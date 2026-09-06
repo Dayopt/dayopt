@@ -100,6 +100,38 @@ UPDATE public.write_fence_control SET fence_enabled = false WHERE singleton_key 
   - Stripe: Dashboard → Webhooks → 失敗イベントの「Resend」で手動再送する
   - Resend: **再送は自動（5s/5m/30m/2h/5h/10h/10h backoff）だが、失敗が続くと endpoint 自体が無効化されメール通知が届く。** Dashboard で endpoint が無効化されていないか確認し、必要なら再有効化する（無効化されたまま気づかないと、bounce/complaint の取り込みが恒久的に止まる）
 
+### MCP write gate の開閉（`mcp_mutation_control`）
+
+Write Fence とは別の gate。MCP 経由の書き込み（`plans.create` 等）だけを対象にする。停止・段階有効化の両方をこの節の手順で行う。詳細な契約は issue [#1754](https://github.com/Dayopt/dayopt/issues/1754) のコメント（step-6 系ドキュメント相当）が正本。
+
+#### 現在の状態を見る（read-only）
+
+```bash
+op run -- pnpm mcp:gate
+```
+
+`SUPABASE_SERVICE_ROLE_KEY` / `NEXT_PUBLIC_SUPABASE_URL` は 1Password `app` item から `op run` が解決する。`writes_enabled` / `enabled_client_ids` / `revision` を表示するだけで、何も変更しない。
+
+#### 1 client を有効化する（段階導入）
+
+```bash
+op run -- pnpm mcp:gate -- --enable-global      # global gate を ON
+op run -- pnpm mcp:gate -- --enable-client=claude-ai   # 対象 client を allowlist へ
+```
+
+- `client_id` は `claude-ai` / `chatgpt` / `cursor` のいずれか
+- Vercel の `MCP_WRITE_ENABLED_CLIENTS` にも同じ client_id を追加する（env gate と DB gate の両方が揃って初めて write scope が発行される）
+- 既存 connection は `write_enabled_at` を持たないため、対象ユーザーは再接続（再 consent）が必要
+
+#### 緊急停止（stop and roll forward、上から順に）
+
+1. global gate を OFF にする: `op run -- pnpm mcp:gate -- --disable-global`
+2. 対象 client を allowlist から外す: `op run -- pnpm mcp:gate -- --disable-client=<id>`
+3. Vercel の `MCP_WRITE_ENABLED_CLIENTS` から対象 client を外す
+4. 恒久停止が必要な connection は Settings（本人）または `revoke_oauth_connection` RPC（運用側）で個別 revoke し、同じ token family が復活しないことを確認する
+
+`mcp_mutation_control` は revision を使った CAS 更新（`set_mcp_mutation_control_v1` / `set_mcp_client_write_control_v1`、いずれも `service_role` 限定の `SECURITY DEFINER` RPC）。直接 `UPDATE` できる GRANT はどのロールにも無い。`pnpm mcp:gate` が revision の読み直しと引数整形を行うため、SQL を手で書く必要はない。
+
 ### 重要ダッシュボードURL
 
 | ダッシュボード  | URL                                             |

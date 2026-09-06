@@ -284,7 +284,8 @@ function McpApiSection() {
           />
         </div>
       </LabeledRow>
-      {/* Connection guide（公開 docs の MCP ガイドは未執筆のためリンクは張らない） */}
+      {/* Connection guide（`apps/web/content/docs/{en,ja}/data/api-mcp.mdx` は
+          draft:true で未公開のため、公開後にここへリンクを追加する） */}
       <InfoBox className="mt-4 p-4">
         <p className="text-muted-foreground text-base md:text-sm">{t('connectionGuide')}</p>
       </InfoBox>

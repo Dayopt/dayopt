@@ -243,7 +243,7 @@ export const productionEnvSchema: EnvSchemaEntry[] = [
       'production',
       human,
       'app',
-      '#1754（MCP OAuth epic、status:watching）の production 未展開分',
+      '#2553（#1754 epic の Production 有効化ゲート）の production 未展開分',
     ),
   ),
 

@@ -32,6 +32,7 @@
     "typecheck:scripts": "tsc -p tsconfig.scripts.json",
     "prepare": "husky",
     "branch:finish": "bash scripts/tasks/finish-branch.sh",
+    "mcp:gate": "tsx scripts/tasks/mcp-gate.ts",
     "green:watch": "node scripts/tasks/green-watch.mjs",
     "ai:usage": "node scripts/tasks/ai-usage.mjs",
     "ctx": "node scripts/tasks/ctx.mjs",

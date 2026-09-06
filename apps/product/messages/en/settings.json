@@ -369,10 +369,10 @@
       },
       "mcp": {
         "title": "MCP / API",
-        "description": "Connect AI assistants like Claude Desktop to your Dayopt data.",
+        "description": "Connect AI assistants like Claude, ChatGPT, or Cursor to your Dayopt data.",
         "serverUrl": "MCP server URL",
         "copied": "Copied to clipboard",
-        "connectionGuide": "Add the URL to your Claude Desktop settings.",
+        "connectionGuide": "Add this URL as a custom connector or MCP server in your AI assistant's settings.",
         "proRequired": "MCP / API access requires a Pro plan.",
         "upgrade": "Upgrade to Pro"
       },
