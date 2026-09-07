@@ -375,20 +375,20 @@ function insertHistoricalCreateReceipt(input: {
 }) {
   execFileSync(
     'psql',
-    [
-      ...psqlArgs({
-        user_id: userId,
-        connection_id: input.authorization.connectionId,
-        operation_id: input.operationId,
-        resource_id: input.record.id,
-        resource_version: input.record.updated_at,
-        plan_id: input.planId,
-        title: input.title,
-        start_at: input.startAt,
-        end_at: input.endAt,
-      }),
-      '-c',
-      `INSERT INTO public.mcp_mutation_receipts (
+    psqlArgs({
+      user_id: userId,
+      connection_id: input.authorization.connectionId,
+      operation_id: input.operationId,
+      resource_id: input.record.id,
+      resource_version: input.record.updated_at,
+      plan_id: input.planId,
+      title: input.title,
+      start_at: input.startAt,
+      end_at: input.endAt,
+    }),
+    {
+      env: psqlEnv(),
+      input: `INSERT INTO public.mcp_mutation_receipts (
         user_id, client_id, operation_id, origin_connection_id, envelope_version,
         tool_name, request_digest, resource_type, resource_id, resource_version
       )
@@ -411,8 +411,8 @@ function insertHistoricalCreateReceipt(input: {
         'record', :'resource_id'::UUID, :'resource_version'::TIMESTAMPTZ
       FROM public.oauth_connections AS connection
       WHERE connection.id = :'connection_id'::UUID;`,
-    ],
-    { env: psqlEnv(), stdio: 'pipe' },
+      stdio: 'pipe',
+    },
   );
 }
 
