@@ -1365,7 +1365,11 @@ describe.skipIf(SKIP_INTEGRATION)('RLS access matrix', () => {
     });
 
     afterAll(async () => {
-      await adminSupabase.from('records').delete().eq('plan_id', RPC_CONFIRM_PLAN_ID);
+      await adminSupabase
+        .from('records')
+        .delete()
+        .eq('user_id', TEST_USER_B_ID)
+        .eq('start_at', rpcConfirmPlanStartAt);
       await adminSupabase
         .from('records')
         .delete()
@@ -1465,7 +1469,11 @@ describe.skipIf(SKIP_INTEGRATION)('RLS access matrix', () => {
           .select('deleted_at')
           .eq('id', RPC_SOFT_DELETE_RECORD_ID)
           .single(),
-        adminSupabase.from('records').select('id').eq('plan_id', RPC_CONFIRM_PLAN_ID),
+        adminSupabase
+          .from('records')
+          .select('id')
+          .eq('user_id', TEST_USER_B_ID)
+          .eq('start_at', rpcConfirmPlanStartAt),
       ]);
       expect(plan?.deleted_at).toBeNull();
       expect(record?.deleted_at).toBeNull();

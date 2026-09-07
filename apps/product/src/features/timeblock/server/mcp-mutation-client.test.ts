@@ -236,6 +236,32 @@ describe('McpMutationClient archived activity boundary', () => {
     expect(db.applyRecordCreate).toHaveBeenCalledOnce();
   });
 
+  it('records.createは廃止済みplanIdの新規要求にschema更新案内を返す', async () => {
+    const db = createFakeDb();
+    db.applyRecordCreate.mockResolvedValue({ data: null, error: { code: 'DT012' } });
+    const client = buildClient(db);
+
+    await expect(
+      client.createRecord({
+        operationId: 'op-legacy-plan-link',
+        title: 'Legacy Record',
+        note: null,
+        activityId: null,
+        planId: '00000000-0000-4000-8000-0000000000f1',
+        startAt: '2026-07-31T00:00:00.000Z',
+        endAt: '2026-07-31T01:00:00.000Z',
+        fulfillment: null,
+        connectionId: CONNECTION_ID,
+        accessTokenId: ACCESS_TOKEN_ID,
+      }),
+    ).rejects.toMatchObject({
+      code: 'INVALID_INPUT',
+      message: expect.stringContaining('omit planId'),
+    });
+
+    expect(db.applyRecordCreate).toHaveBeenCalledOnce();
+  });
+
   it('records.updateはactivityIdを省略した編集ならアクティビティ検証なしで通る', async () => {
     const db = createFakeDb();
     db.applyRecordUpdate.mockResolvedValue({

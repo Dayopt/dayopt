@@ -490,150 +490,60 @@ describe.skipIf(!RUN_LOCAL)('MCP Stage 1 rolling compatibility', () => {
 
   // 直接 DML の残る writer は service_role だけになった。linked-Record invariant は
   // app guard ではなく DB trigger が担保しているので、その writer で固定する。
-  it('still enforces linked-Record invariants for the remaining direct writer', async () => {
-    const deletedPlan = await createHistoricalPlan({
-      title: 'Direct writer deleted Plan',
+  it('independent direct records survive Plan deletion', async () => {
+    const plan = await createHistoricalPlan({
+      title: 'Independent',
       startAt: hoursAgo(26),
       endAt: hoursAgo(25),
     });
-    const { error: deletePlanError } = await admin.rpc('soft_delete_plan', {
-      p_plan_id: deletedPlan.id,
-      p_user_id: userId,
-    });
-    expect(deletePlanError).toBeNull();
-
-    const { data: standaloneRecord, error: standaloneRecordError } = await admin
+    const { data: record, error } = await admin
       .from('records')
       .insert({
         user_id: userId,
-        title: 'Direct writer standalone Record',
-        source: 'manual',
-        start_at: hoursAgo(24),
-        end_at: hoursAgo(23),
+        title: 'Independent record',
+        source: 'from_plan',
+        start_at: plan.start_at,
+        end_at: plan.end_at,
       })
-      .select('id')
+      .select('*')
       .single();
-    if (standaloneRecordError) throw standaloneRecordError;
-
-    const { error: newLinkError } = await admin.from('records').insert({
-      user_id: userId,
-      title: 'New link to deleted Plan',
-      plan_id: deletedPlan.id,
-      source: 'from_plan',
-      start_at: hoursAgo(22),
-      end_at: hoursAgo(21),
-    });
-    expect(newLinkError?.code).toBe('DT001');
-
-    const { error: deletedNewLinkError } = await admin.from('records').insert({
-      user_id: userId,
-      title: 'Deleted new link to deleted Plan',
-      plan_id: deletedPlan.id,
-      source: 'from_plan',
-      start_at: hoursAgo(22),
-      end_at: hoursAgo(21),
-      deleted_at: new Date().toISOString(),
-    });
-    expect(deletedNewLinkError?.code).toBe('DT001');
-
-    const { error: deletedRelinkError } = await admin
-      .from('records')
-      .update({
-        plan_id: deletedPlan.id,
-        deleted_at: new Date().toISOString(),
-      })
-      .eq('id', standaloneRecord.id);
-    expect(deletedRelinkError?.code).toBe('DT001');
-
-    const { error: relinkError } = await admin
-      .from('records')
-      .update({ plan_id: deletedPlan.id })
-      .eq('id', standaloneRecord.id);
-    expect(relinkError?.code).toBe('DT001');
+    expect(error).toBeNull();
+    const deletion = await admin.rpc('soft_delete_plan', { p_plan_id: plan.id, p_user_id: userId });
+    expect(deletion.error).toBeNull();
+    const { data } = await admin.from('records').select('*').eq('id', record!.id).single();
+    expect(data).toEqual(record);
   });
 
-  it('still rejects restoring links to skipped Plans, but allows future Plans', async () => {
-    const skippedPlan = await createHistoricalPlan({
-      title: 'Skipped restore Plan',
+  it('restores independent records after the copied Plan is deleted', async () => {
+    const plan = await createHistoricalPlan({
+      title: 'Restore independent',
       startAt: hoursAgo(10),
       endAt: hoursAgo(9),
     });
-    // authenticated の直接 DML は Candidate 6 で閉じたので、fixture は
-    // 残る direct writer（service_role）で作る
-    const { data: skippedRecord, error: skippedRecordError } = await admin
-      .from('records')
-      .insert({
-        user_id: userId,
-        title: skippedPlan.title,
-        plan_id: skippedPlan.id,
-        source: 'from_plan',
-        start_at: skippedPlan.start_at,
-        end_at: skippedPlan.end_at,
+    const { data: record, error } = await admin
+      .rpc('record_plan_command_v1', {
+        p_user_id: userId,
+        p_plan_id: plan.id,
+        p_expected_updated_at: plan.updated_at,
       })
-      .select('id')
       .single();
-    if (skippedRecordError) throw skippedRecordError;
-
-    await userClient.rpc('soft_delete_record', {
-      p_record_id: skippedRecord.id,
+    expect(error).toBeNull();
+    const deletion = await userClient.rpc('soft_delete_record', {
+      p_record_id: record!.id,
       p_user_id: userId,
     });
-    const { error: skipError } = await admin
-      .from('plans')
-      .update({ skipped_at: new Date().toISOString() })
-      .eq('id', skippedPlan.id);
-    expect(skipError).toBeNull();
-
-    const { error: skippedRestoreError } = await admin.rpc('restore_record', {
-      p_record_id: skippedRecord.id,
+    expect(deletion.error).toBeNull();
+    const planDeletion = await admin.rpc('soft_delete_plan', {
+      p_plan_id: plan.id,
       p_user_id: userId,
     });
-    expect(skippedRestoreError?.code).toBe('DT008');
-
-    const futurePlanId = crypto.randomUUID();
-    const futureRecordId = crypto.randomUUID();
-    runOwnerSql(
-      `
-        INSERT INTO public.plans (
-          id, user_id, title, source, start_at, end_at
-        ) VALUES (
-          :'plan_id'::UUID,
-          :'user_id'::UUID,
-          'Future restore Plan',
-          'manual',
-          pg_catalog.now() + INTERVAL '2 hours',
-          pg_catalog.now() + INTERVAL '3 hours'
-        );
-
-        INSERT INTO public.records (
-          id, user_id, plan_id, title, source, start_at, end_at
-        ) VALUES (
-          :'record_id'::UUID,
-          :'user_id'::UUID,
-          :'plan_id'::UUID,
-          'Future restore Record',
-          'from_plan',
-          pg_catalog.now() + INTERVAL '2 hours',
-          pg_catalog.now() + INTERVAL '3 hours'
-        );
-      `,
-      {
-        plan_id: futurePlanId,
-        record_id: futureRecordId,
-        user_id: userId,
-      },
-    );
-
-    await userClient.rpc('soft_delete_record', {
-      p_record_id: futureRecordId,
+    expect(planDeletion.error).toBeNull();
+    const restored = await admin.rpc('restore_record', {
+      p_record_id: record!.id,
       p_user_id: userId,
     });
-    // Plan が未来にあることは Record の紐付けを縛らない（旧 DT013 を撤去）。
-    // 残る時刻ルールは「Record は未来に終われない」だけで、restore は時刻を動かさないため通る。
-    const { error: futureRestoreError } = await admin.rpc('restore_record', {
-      p_record_id: futureRecordId,
-      p_user_id: userId,
-    });
-    expect(futureRestoreError).toBeNull();
+    expect(restored.error).toBeNull();
+    const { data } = await admin.from('records').select('deleted_at').eq('id', record!.id).single();
+    expect(data?.deleted_at).toBeNull();
   });
 });

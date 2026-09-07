@@ -157,7 +157,7 @@ CREATE TABLE public.plans (
   note TEXT,
   start_at TIMESTAMPTZ NOT NULL,
   end_at TIMESTAMPTZ NOT NULL,
-  skipped_at TIMESTAMPTZ,
+  skipped_at TIMESTAMPTZ, -- 段階移行中の互換列。依存撤去後の別migrationで削除する
   source TEXT NOT NULL DEFAULT 'manual', -- manual / external_calendar / api
   deleted_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -179,7 +179,7 @@ CREATE TABLE public.plans (
 CREATE TABLE public.records (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  plan_id UUID REFERENCES public.plans(id),
+  plan_id UUID, -- 段階移行中の互換列。FKなし。別migrationで削除する
   external_calendar_event_id UUID REFERENCES public.external_calendar_events(id),
   title TEXT NOT NULL,
   note TEXT,
@@ -194,7 +194,6 @@ CREATE TABLE public.records (
 -- records 関連 constraint / trigger:
 --   records_no_overlap                    -> user_id + tstzrange(start_at, end_at, '[)') EXCLUDE
 --   prevent_records_source_change         -> prevent_time_model_source_change()
---   enforce_record_plan_owner             -> enforce_record_plan_owner()
 --   enforce_record_external_event_owner   -> enforce_record_external_event_owner()
 --   validate_record_temporal_write_v1      -> 時刻順序、未来 Record を拒否
 --   enforce_active_record_plan_v1

@@ -69,43 +69,6 @@ describe('computeCalendarDayDiffs', () => {
     expect(result.summary.diffMinutes).toBe(45);
   });
 
-  it('skipped planned entry は missed として集計する', () => {
-    const result = computeCalendarDayDiffs(
-      [
-        entry({
-          isSkipped: true,
-          actualStartDate: null,
-          actualEndDate: null,
-        }),
-      ],
-      now,
-    );
-
-    expect(result.items).toMatchObject([{ kind: 'missed', plannedMinutes: 60 }]);
-    expect(result.summary.missedMinutes).toBe(60);
-    expect(result.summary.diffMinutes).toBe(-60);
-  });
-
-  it('skipped planned entry は actual が残っていても実績集計から除外する', () => {
-    const result = computeCalendarDayDiffs(
-      [
-        entry({
-          isSkipped: true,
-          actualStartDate: new Date('2026-06-18T09:00:00.000Z'),
-          actualEndDate: new Date('2026-06-18T10:00:00.000Z'),
-        }),
-      ],
-      now,
-    );
-
-    expect(result.summary).toMatchObject({
-      plannedMinutes: 60,
-      actualMinutes: 0,
-      missedMinutes: 60,
-      diffMinutes: -60,
-    });
-  });
-
   it('実績未編集の planned entry は予定どおりとして差分に出さない', () => {
     const result = computeCalendarDayDiffs(
       [

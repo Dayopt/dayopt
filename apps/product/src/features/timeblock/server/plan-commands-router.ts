@@ -105,40 +105,6 @@ export const planCommandsRouter = createTRPCRouter({
       }
     }),
 
-  skip: protectedProcedure
-    .meta({ description: 'Skip Plan through the versioned atomic command boundary' })
-    .input(versionedPlanSchema)
-    .mutation(async ({ ctx, input }) => {
-      const service = createTimeblockCommandService(ctx.supabase);
-      try {
-        return await service.setPlanSkipped({
-          userId: ctx.userId,
-          id: input.id,
-          expectedUpdatedAt: input.expectedUpdatedAt,
-          skipped: true,
-        });
-      } catch (error) {
-        handleServiceError(error);
-      }
-    }),
-
-  unskip: protectedProcedure
-    .meta({ description: 'Unskip Plan through the versioned atomic command boundary' })
-    .input(versionedPlanSchema)
-    .mutation(async ({ ctx, input }) => {
-      const service = createTimeblockCommandService(ctx.supabase);
-      try {
-        return await service.setPlanSkipped({
-          userId: ctx.userId,
-          id: input.id,
-          expectedUpdatedAt: input.expectedUpdatedAt,
-          skipped: false,
-        });
-      } catch (error) {
-        handleServiceError(error);
-      }
-    }),
-
   record: protectedProcedure
     .meta({ description: 'Create Record from Plan through the atomic command boundary' })
     .input(versionedPlanSchema)

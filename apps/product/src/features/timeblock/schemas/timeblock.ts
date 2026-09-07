@@ -38,18 +38,19 @@ export const planIdSchema = z.object({
   id: z.string().uuid('validation.invalidUuid'),
 });
 
-export const planFilterSchema = z.object({
-  ids: z.array(z.string().uuid()).max(100).optional(),
-  search: z.string().max(200).optional(),
-  activityId: z.string().uuid().optional(),
-  startDate: z.string().datetime({ offset: true }).optional(),
-  endDate: z.string().datetime({ offset: true }).optional(),
-  includeSkipped: z.boolean().optional(),
-  sortBy: z.enum(['created_at', 'updated_at', 'title', 'start_at']).optional(),
-  sortOrder: z.enum(['asc', 'desc']).optional(),
-  limit: z.number().min(1).max(100).optional(),
-  offset: z.number().min(0).optional(),
-});
+export const planFilterSchema = z
+  .object({
+    ids: z.array(z.string().uuid()).max(100).optional(),
+    search: z.string().max(200).optional(),
+    activityId: z.string().uuid().optional(),
+    startDate: z.string().datetime({ offset: true }).optional(),
+    endDate: z.string().datetime({ offset: true }).optional(),
+    sortBy: z.enum(['created_at', 'updated_at', 'title', 'start_at']).optional(),
+    sortOrder: z.enum(['asc', 'desc']).optional(),
+    limit: z.number().min(1).max(100).optional(),
+    offset: z.number().min(0).optional(),
+  })
+  .strict();
 
 export const confirmDaySchema = z
   .object({
@@ -62,7 +63,7 @@ export const confirmDaySchema = z
 export const fulfillmentSchema = z.enum(['low', 'medium', 'high']);
 
 const baseRecordSchema = baseTimeblockSchema.extend({
-  planId: z.string().uuid().nullable().optional(),
+  planId: z.null({ invalid_type_error: 'Plan links have been removed; omit planId.' }).optional(),
   fulfillment: fulfillmentSchema.nullable().optional(),
 });
 
@@ -74,18 +75,18 @@ export const recordIdSchema = z.object({
   id: z.string().uuid('validation.invalidUuid'),
 });
 
-export const recordFilterSchema = z.object({
-  search: z.string().max(200).optional(),
-  activityId: z.string().uuid().optional(),
-  planId: z.string().uuid().optional(),
-  planIds: z.array(z.string().uuid()).max(100).optional(),
-  startDate: z.string().datetime({ offset: true }).optional(),
-  endDate: z.string().datetime({ offset: true }).optional(),
-  sortBy: z.enum(['created_at', 'updated_at', 'title', 'start_at']).optional(),
-  sortOrder: z.enum(['asc', 'desc']).optional(),
-  limit: z.number().min(1).max(100).optional(),
-  offset: z.number().min(0).optional(),
-});
+export const recordFilterSchema = z
+  .object({
+    search: z.string().max(200).optional(),
+    activityId: z.string().uuid().optional(),
+    startDate: z.string().datetime({ offset: true }).optional(),
+    endDate: z.string().datetime({ offset: true }).optional(),
+    sortBy: z.enum(['created_at', 'updated_at', 'title', 'start_at']).optional(),
+    sortOrder: z.enum(['asc', 'desc']).optional(),
+    limit: z.number().min(1).max(100).optional(),
+    offset: z.number().min(0).optional(),
+  })
+  .strict();
 
 export type CreatePlanInput = z.infer<typeof createPlanSchema>;
 export type UpdatePlanInput = z.infer<typeof updatePlanSchema>;

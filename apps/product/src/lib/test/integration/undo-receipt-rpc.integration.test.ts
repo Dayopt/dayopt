@@ -136,7 +136,7 @@ function listUndoable(userId: string) {
 async function getPlan(planId: string) {
   const { data, error } = await admin
     .from('plans')
-    .select('title, note, start_at, end_at, skipped_at, deleted_at')
+    .select('title, note, start_at, end_at, deleted_at, skipped_at')
     .eq('id', planId)
     .maybeSingle();
   if (error) throw error;

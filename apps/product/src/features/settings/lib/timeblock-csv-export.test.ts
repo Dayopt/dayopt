@@ -31,6 +31,19 @@ describe('escapeTimeblockCsvField', () => {
 });
 
 describe('timeblockRowsToCsv', () => {
+  it('does not export retired links or skip states from old rows', () => {
+    const csv = timeblockRowsToCsv([
+      {
+        kind: 'record',
+        id: 'rec',
+        plan_id: 'old-link',
+        skipped_at: 'old-state',
+        source: 'from_plan',
+      },
+    ]);
+    expect(csv).not.toMatch(/plan_id|skipped_at|old-link|old-state/);
+    expect(csv).toContain('from_plan');
+  });
   it('header・列順・LF record separator を固定する', () => {
     const csv = timeblockRowsToCsv([
       { kind: 'plan', id: 'plan-1', title: '=2+2', note: null },

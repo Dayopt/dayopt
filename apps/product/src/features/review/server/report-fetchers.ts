@@ -1,3 +1,4 @@
+import { collectQueryPages } from '@/lib/database/collect-query-pages';
 import 'server-only';
 
 import type { SupabaseClient } from '@supabase/supabase-js';
@@ -20,9 +21,7 @@ import { captureUnexpectedDatabaseError, captureUnexpectedError } from '@/lib/se
  * **選択は半開区間の重なりで書く**（`start_at < rangeEnd AND end_at > rangeStart`）。
  * `start_at` だけで絞ると、期間境界を跨ぐブロック（日曜 23 時就寝 → 月曜 7 時起床）が
  * 開始側の期間へ全時間帰属し、跨いだ先からは丸ごと消える。これは
- * `features/timeblock/server/statistics-fetchers.ts` が抱える既知の不具合（#2426）で、
- * 新しい集計経路では最初から作らない。取得後の clip は `lib/report-period.ts` の
- * `clipMinutes` / `distributeToBuckets` が行う。
+ * 取得後の clip は共通導出関数が行う。
  *
  * `archived_at` では絞らない。アーカイブは未来にだけ効く操作で、過去の記録が消えるわけでは
  * ないため、期間内にインクがあるアクティビティは通常どおり集計対象にする。
@@ -81,7 +80,7 @@ export async function fetchReportRecords(
   userId: string,
   range: ReportRangeInput,
 ): Promise<ReportRecordRow[]> {
-  const { data, error } = await supabase
+  const query = supabase
     .from(databaseTables.records)
     .select('id, activity_id, start_at, end_at, fulfillment')
     .eq('user_id', userId)
@@ -89,25 +88,26 @@ export async function fetchReportRecords(
     .lt('start_at', range.endAt)
     .gt('end_at', range.startAt);
 
+  const { data, error } = await collectQueryPages((from, to) => query.order('id').range(from, to));
   if (error) throwDatabaseError(error, 'fetch_report_records');
   return data ?? [];
 }
 
-/** 期間に重なる Plan を取る。skip 済みは予定として計上しないので除外する。 */
+/** 期間に重なる Plan を取る。 */
 export async function fetchReportPlans(
   supabase: ReportFetchClient,
   userId: string,
   range: ReportRangeInput,
 ): Promise<ReportPlanRow[]> {
-  const { data, error } = await supabase
+  const query = supabase
     .from(databaseTables.plans)
     .select('id, activity_id, start_at, end_at')
     .eq('user_id', userId)
     .is('deleted_at', null)
-    .is('skipped_at', null)
     .lt('start_at', range.endAt)
     .gt('end_at', range.startAt);
 
+  const { data, error } = await collectQueryPages((from, to) => query.order('id').range(from, to));
   if (error) throwDatabaseError(error, 'fetch_report_plans');
   return data ?? [];
 }
@@ -346,10 +346,9 @@ export async function fetchReportDetailRecords(
     .lt('start_at', range.endAt)
     .gt('end_at', range.startAt);
 
-  const { data, error } =
-    activityId === null
-      ? await base.is('activity_id', null)
-      : await base.eq('activity_id', activityId);
+  const query =
+    activityId === null ? base.is('activity_id', null) : base.eq('activity_id', activityId);
+  const { data, error } = await collectQueryPages((from, to) => query.order('id').range(from, to));
 
   if (error) throwDatabaseError(error, 'fetch_report_detail_records');
   return data ?? [];
@@ -367,14 +366,12 @@ export async function fetchReportDetailPlans(
     .select('id, activity_id, start_at, end_at')
     .eq('user_id', userId)
     .is('deleted_at', null)
-    .is('skipped_at', null)
     .lt('start_at', range.endAt)
     .gt('end_at', range.startAt);
 
-  const { data, error } =
-    activityId === null
-      ? await base.is('activity_id', null)
-      : await base.eq('activity_id', activityId);
+  const query =
+    activityId === null ? base.is('activity_id', null) : base.eq('activity_id', activityId);
+  const { data, error } = await collectQueryPages((from, to) => query.order('id').range(from, to));
 
   if (error) throwDatabaseError(error, 'fetch_report_detail_plans');
   return data ?? [];

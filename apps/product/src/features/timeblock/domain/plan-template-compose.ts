@@ -5,7 +5,6 @@
  * 保存対象の境界:
  *
  * - `kind === 'plan'` の Plan だけ。Record・外部カレンダーの ghost は対象外
- * - skip 済み Plan は対象外（やらなかった並びを型にしない）
  * - **start がその暦日に入る** Plan だけ。前日から跨ぐ Plan は錨がこの日に無いので対象外
  * - 錨位置は start をユーザー timezone の壁時計で見た「local midnight からの分」
  * - 同じ錨に 2 件以上ある時は開始が早い方だけ残す（`UNIQUE (template_id, anchor_minute)` の
@@ -27,7 +26,7 @@ interface TemplateBlockDraft {
 
 type ComposeSource = Pick<
   CalendarEvent,
-  'kind' | 'isSkipped' | 'activityId' | 'title' | 'startDate' | 'plannedStartDate'
+  'kind' | 'activityId' | 'title' | 'startDate' | 'plannedStartDate'
 >;
 
 export function deriveTemplateBlocksFromDay(
@@ -37,7 +36,7 @@ export function deriveTemplateBlocksFromDay(
 ): TemplateBlockDraft[] {
   const candidates: Array<TemplateBlockDraft & { startMs: number }> = [];
   for (const event of events) {
-    if (event.kind !== 'plan' || event.isSkipped) continue;
+    if (event.kind !== 'plan') continue;
     const start = event.plannedStartDate ?? event.startDate;
     if (!start) continue;
     if (instantToDateKey(start, timezone) !== dateKey) continue;

@@ -1,5 +1,8 @@
 import 'server-only';
 
+import { toDerivedBlock } from '@/lib/database';
+import { aggregate } from '@/lib/time';
+
 import {
   clipMinutes,
   distributeToTimeOfDay,
@@ -87,20 +90,6 @@ function isFulfillmentLevel(value: string | null): value is keyof ReportDetailFu
   return value === 'low' || value === 'medium' || value === 'high';
 }
 
-/**
- * 中央値（分）。**平均を返さない。**
- *
- * 偶数個のときは中央 2 つの平均を取る（統計的な中央値の定義。1 箱の代表値としての
- * 「平均を出さない」とは別）。0 件は `null` で、表示側は `—` を出す。
- */
-function median(values: number[]): number | null {
-  if (values.length === 0) return null;
-  const sorted = [...values].sort((a, b) => a - b);
-  const middle = Math.floor(sorted.length / 2);
-  if (sorted.length % 2 === 1) return sorted[middle] ?? null;
-  return ((sorted[middle - 1] ?? 0) + (sorted[middle] ?? 0)) / 2;
-}
-
 class ReportDetailService {
   constructor(private readonly supabase: ReportFetchClient) {}
 
@@ -133,10 +122,24 @@ class ReportDetailService {
       (record) => clipMinutes(record.start_at, record.end_at, range.startAt, range.endAt) > 0,
     );
 
+    const totals = aggregate(
+      { ...range, timezone },
+      activityId,
+      [
+        ...plans.map((row) => toDerivedBlock(row, 'plan')),
+        ...periodRecords.map((row) => toDerivedBlock(row, 'rec')),
+      ],
+      now,
+    );
     return {
       ...this.summarizeRecords(periodRecords, range, timezone),
-      ...this.summarizePlans(plans, range, now.getTime()),
-      trend: includeTrend ? this.buildTrend(records, trendRanges) : [],
+      plannedMinutes: totals.plannedMinutes,
+      plannedPastMinutes: totals.plannedPastMinutes,
+      plannedPastBoxes: totals.plannedPastBoxes,
+      recordedMinutes: totals.recordedMinutes,
+      medianBoxMinutes: totals.medianBoxMinutes,
+      fulfillment: totals.fulfillment,
+      trend: includeTrend ? this.buildTrend(records, trendRanges, activityId, timezone, now) : [],
       records: this.toDetailRecords(periodRecords, range),
     };
   }
@@ -164,23 +167,12 @@ class ReportDetailService {
     records: ReportDetailRecordRow[],
     range: { startAt: string; endAt: string },
     timezone: string,
-  ): Pick<
-    ReportActivityDetailResult,
-    'recordedMinutes' | 'medianBoxMinutes' | 'fulfillment' | 'timeOfDay'
-  > {
-    const fulfillment: ReportDetailFulfillment = { low: 0, medium: 0, high: 0 };
+  ): Pick<ReportActivityDetailResult, 'timeOfDay'> {
     const timeOfDay = REPORT_TIME_OF_DAY_BUCKETS.map(() => 0);
-    const boxMinutes: number[] = [];
-    let recordedMinutes = 0;
 
     for (const record of records) {
       const minutes = clipMinutes(record.start_at, record.end_at, range.startAt, range.endAt);
       if (minutes <= 0) continue;
-
-      recordedMinutes += minutes;
-      boxMinutes.push(minutes);
-
-      if (isFulfillmentLevel(record.fulfillment)) fulfillment[record.fulfillment] += 1;
 
       // 時間帯も期間の外へはみ出した分は数えない。clip してから按分する
       const clippedStart =
@@ -195,53 +187,25 @@ class ReportDetailService {
     }
 
     return {
-      recordedMinutes,
-      medianBoxMinutes: median(boxMinutes),
-      fulfillment,
       timeOfDay,
     };
-  }
-
-  private summarizePlans(
-    plans: { start_at: string; end_at: string }[],
-    range: { startAt: string; endAt: string },
-    nowMs: number,
-  ): Pick<
-    ReportActivityDetailResult,
-    'plannedMinutes' | 'plannedPastMinutes' | 'plannedPastBoxes'
-  > {
-    let plannedMinutes = 0;
-    let plannedPastMinutes = 0;
-    let plannedPastBoxes = 0;
-
-    for (const plan of plans) {
-      const minutes = clipMinutes(plan.start_at, plan.end_at, range.startAt, range.endAt);
-      if (minutes <= 0) continue;
-
-      plannedMinutes += minutes;
-      // 「予定比」はまだ来ていない予定を分母に入れない（期間集計と同じ規則）。
-      // ISO 文字列の辞書順比較は境界で誤判定しうるので数値で比べる
-      if (Date.parse(plan.start_at) <= nowMs) {
-        plannedPastMinutes += minutes;
-        plannedPastBoxes += 1;
-      }
-    }
-
-    return { plannedMinutes, plannedPastMinutes, plannedPastBoxes };
   }
 
   private buildTrend(
     records: ReportDetailRecordRow[],
     ranges: { startAt: string; endAt: string; buckets: { key: string }[] }[],
+    activityId: string | null,
+    timezone: string,
+    now: Date,
   ): ReportDetailTrendPoint[] {
     return ranges.map((periodRange) => ({
       key: periodRange.buckets[0]?.key ?? periodRange.startAt,
-      recordedMinutes: records.reduce(
-        (total, record) =>
-          total +
-          clipMinutes(record.start_at, record.end_at, periodRange.startAt, periodRange.endAt),
-        0,
-      ),
+      recordedMinutes: aggregate(
+        { ...periodRange, timezone },
+        activityId,
+        records.map((row) => toDerivedBlock(row, 'rec')),
+        now,
+      ).recordedMinutes,
     }));
   }
 

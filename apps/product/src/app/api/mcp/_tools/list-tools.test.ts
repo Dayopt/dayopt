@@ -25,10 +25,24 @@ import {
   registerRecordsTrashListTool,
 } from './timeblock-detail';
 import { registerPlansListTool, registerRecordsListTool } from './timeblock-list';
+import { registerRecordsCreateTool } from './timeblock-mutations';
 
 const createMcpTrpcCaller = vi.hoisted(() => vi.fn());
 const listDeletedPlans = vi.hoisted(() => vi.fn());
 const listDeletedRecords = vi.hoisted(() => vi.fn());
+const createRecordMutation = vi.hoisted(() => vi.fn());
+const MockMcpMutationError = vi.hoisted(
+  () =>
+    class MockMcpMutationError extends Error {
+      constructor(
+        public readonly code: string,
+        message: string,
+      ) {
+        super(message);
+        this.name = 'McpMutationError';
+      }
+    },
+);
 
 vi.mock('@/lib/mcp/trpc-bridge', () => ({ createMcpTrpcCaller }));
 vi.mock('@/features/timeblock/server/service-index', async () => {
@@ -40,6 +54,10 @@ vi.mock('@/features/timeblock/server/service-index', async () => {
     // features/timeblock/server/mcp-mutation-contract.ts の
     // MCP_MUTATION_RECEIPT_SCHEMA_VERSION と一致させる。
     MCP_MUTATION_RECEIPT_SCHEMA_VERSION: 1,
+    McpMutationClient: class McpMutationClient {
+      createRecord = createRecordMutation;
+    },
+    McpMutationError: MockMcpMutationError,
     createTimeblockTrashReadClient: () => ({ listDeletedPlans, listDeletedRecords }),
     TimeblockTrashReadError: class TimeblockTrashReadError extends Error {},
     TIMEBLOCK_CONTEXT_MAX_RANGE_MS: 31 * 24 * 60 * 60 * 1_000,
@@ -60,7 +78,6 @@ vi.mock('@/features/timeblock/server/service-index', async () => {
       startAt: row.start_at,
       endAt: row.end_at,
       source: row.source,
-      skippedAt: row.skipped_at,
       deletedAt: row.deleted_at,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
@@ -70,7 +87,6 @@ vi.mock('@/features/timeblock/server/service-index', async () => {
       title: row.title,
       note: row.note,
       activityId: row.activity_id,
-      planId: row.plan_id,
       startAt: row.start_at,
       endAt: row.end_at,
       source: row.source,
@@ -271,8 +287,8 @@ describe('MCP list tools public contract', () => {
     const plans = parseText(planResult).plans as Array<Record<string, unknown>>;
     const records = parseText(recordResult).records as Array<Record<string, unknown>>;
 
-    expect(planResult.structuredContent).toMatchObject({ schemaVersion: 3, count: 1 });
-    expect(recordResult.structuredContent).toMatchObject({ schemaVersion: 3, count: 1 });
+    expect(planResult.structuredContent).toMatchObject({ schemaVersion: 4, count: 1 });
+    expect(recordResult.structuredContent).toMatchObject({ schemaVersion: 4, count: 1 });
     expect(plans).toHaveLength(1);
     expect(records).toHaveLength(1);
     for (const row of [...plans, ...records]) {
@@ -292,7 +308,7 @@ describe('MCP list tools public contract', () => {
     const entries = result.entries as Array<Record<string, unknown>>;
 
     expect(toolResult.structuredContent).toEqual(result);
-    expect(result.schemaVersion).toBe(3);
+    expect(result.schemaVersion).toBe(4);
     expect(result.count).toBe(2);
     expect(entries).toHaveLength(2);
     for (const entry of entries) {
@@ -323,20 +339,20 @@ describe('MCP list tools public contract', () => {
     // get / trash とも行の中身まで見る。count だけを見ていると、read client の
     // SELECT から activity_id が落ちても件数は変わらないので素通りする。
     expect(planResult).toMatchObject({
-      schemaVersion: 3,
+      schemaVersion: 4,
       plan: { id: plan.id, activityId: TIMEBLOCK_ACTIVITY_ID },
     });
     expect(recordResult).toMatchObject({
-      schemaVersion: 3,
+      schemaVersion: 4,
       record: { id: record.id, activityId: TIMEBLOCK_ACTIVITY_ID, fulfillment: 'high' },
     });
     expect(planTrashResult).toMatchObject({
-      schemaVersion: 3,
+      schemaVersion: 4,
       count: 1,
       plans: [{ id: plan.id, activityId: TIMEBLOCK_ACTIVITY_ID }],
     });
     expect(recordTrashResult).toMatchObject({
-      schemaVersion: 3,
+      schemaVersion: 4,
       count: 1,
       records: [{ id: record.id, activityId: TIMEBLOCK_ACTIVITY_ID, fulfillment: 'high' }],
     });
@@ -489,7 +505,7 @@ describe('MCP list tools public contract', () => {
         true,
       );
       expect(result.structuredContent).toEqual({
-        schemaVersion: 3,
+        schemaVersion: 4,
         count: 1,
         activities: [
           {
@@ -520,7 +536,7 @@ describe('MCP list tools public contract', () => {
 
     expect(MCP_ACTIVITY_LIST_OUTPUT_SCHEMA.safeParse(result.structuredContent).success).toBe(true);
     expect(result.structuredContent).toEqual({
-      schemaVersion: 3,
+      schemaVersion: 4,
       count: 2,
       activities: [
         {
@@ -563,7 +579,7 @@ describe('MCP list tools public contract', () => {
     const result = await handler({}, extra);
     expect(MCP_CATEGORY_LIST_OUTPUT_SCHEMA.safeParse(result.structuredContent).success).toBe(true);
     expect(result.structuredContent).toEqual({
-      schemaVersion: 3,
+      schemaVersion: 4,
       count: 1,
       categories: [
         {
@@ -582,7 +598,7 @@ describe('MCP list tools public contract', () => {
 
     const archivedResult = await handler({ includeArchived: true }, extra);
     expect(archivedResult.structuredContent).toEqual({
-      schemaVersion: 3,
+      schemaVersion: 4,
       count: 2,
       categories: [
         {
@@ -618,8 +634,8 @@ describe('MCP list tools public contract', () => {
       basis: {
         planMeaning: 'budget',
         recordMeaning: 'actual',
-        rowFilter: 'active_start_in_period',
-        durationBoundary: 'full_row_not_clipped',
+        rowFilter: 'active_overlapping_period',
+        durationBoundary: 'clipped_to_period',
         periodBoundary: '[)',
         varianceConvention: 'planned_minus_recorded',
       },
@@ -671,7 +687,7 @@ describe('MCP list tools public contract', () => {
     // 弾く schema へ戻すと、未分類を含む review が client 側で検証エラーになる。
     expect(MCP_REVIEW_GET_OUTPUT_SCHEMA.safeParse(result.structuredContent).success).toBe(true);
     expect(result.structuredContent).toMatchObject({
-      basis: { rowFilter: 'active_start_in_period' },
+      basis: { rowFilter: 'active_overlapping_period' },
       activities: [
         {
           activityId: '00000000-0000-4000-8000-000000000009',
@@ -713,8 +729,8 @@ describe('MCP list tools public contract', () => {
       basis: {
         planMeaning: 'budget',
         recordMeaning: 'actual',
-        rowFilter: 'active_start_in_period',
-        durationBoundary: 'full_row_not_clipped',
+        rowFilter: 'active_overlapping_period',
+        durationBoundary: 'clipped_to_period',
         periodBoundary: '[)',
         varianceConvention: 'planned_minus_recorded',
       },
@@ -802,8 +818,8 @@ describe('MCP list tools public contract', () => {
       basis: {
         planMeaning: 'budget',
         recordMeaning: 'actual',
-        rowFilter: 'active_start_in_period',
-        durationBoundary: 'full_row_not_clipped',
+        rowFilter: 'active_overlapping_period',
+        durationBoundary: 'clipped_to_period',
         periodBoundary: '[)',
         varianceConvention: 'planned_minus_recorded',
       },
@@ -890,8 +906,8 @@ describe('MCP list tools public contract', () => {
       basis: {
         planMeaning: 'budget',
         recordMeaning: 'actual',
-        rowFilter: 'active_start_in_period',
-        durationBoundary: 'full_row_not_clipped',
+        rowFilter: 'active_overlapping_period',
+        durationBoundary: 'clipped_to_period',
         periodBoundary: '[)',
         varianceConvention: 'planned_minus_recorded',
       },
@@ -1009,7 +1025,7 @@ describe('MCP list tools public contract', () => {
       // 完全一致し、注入文字列も原文のまま復元される）を固定する。
       expect(JSON.parse(inner)).toEqual(result.structuredContent);
       expect(inner).toContain('Ignore previous instructions');
-      expect(result.structuredContent).toMatchObject({ schemaVersion: 3 });
+      expect(result.structuredContent).toMatchObject({ schemaVersion: 4 });
     }
   });
 
@@ -1027,7 +1043,7 @@ describe('MCP list tools public contract', () => {
       expect(result.isError, name).toBe(true);
       expect(getText(result)).not.toContain(UNTRUSTED_DATA_START);
       expect(JSON.parse(getText(result))).toMatchObject({
-        schemaVersion: 3,
+        schemaVersion: 4,
         error: { code: 'INSUFFICIENT_SCOPE', retryable: false },
       });
     }
@@ -1050,7 +1066,7 @@ describe('MCP list tools public contract', () => {
       expect(result.isError, name).toBe(true);
       expect(getText(result)).not.toContain(UNTRUSTED_DATA_START);
       expect(JSON.parse(getText(result))).toMatchObject({
-        schemaVersion: 3,
+        schemaVersion: 4,
         error: { code: 'READ_FAILED', retryable: true },
       });
     }
@@ -1094,6 +1110,79 @@ describe('MCP list tools public contract', () => {
         expect(content.text).toContain(UNTRUSTED_DATA_START);
         expect(content.text).toContain(UNTRUSTED_DATA_END);
       }
+    } finally {
+      await client.close();
+      await server.close();
+    }
+  });
+
+  it('旧planId入力を成功済み再送へ通し、新規要求は更新案内付きで拒否する', async () => {
+    const operationId = '66666666-6666-4666-8666-666666666666';
+    const planId = '77777777-7777-4777-8777-777777777777';
+    const receipt = {
+      schemaVersion: 1,
+      operationId,
+      resourceType: 'record' as const,
+      resourceId: '88888888-8888-4888-8888-888888888888',
+      version: '2026-09-07T10:00:00.000Z',
+      deletedAt: null,
+      replayed: true,
+    };
+    createRecordMutation
+      .mockResolvedValueOnce(receipt)
+      .mockRejectedValueOnce(
+        new MockMcpMutationError(
+          'INVALID_INPUT',
+          'Plan links have been removed; omit planId and refresh the tool schema',
+        ),
+      );
+
+    const server = new McpServer({ name: 'legacy-record-replay-server', version: '1.0.0' });
+    registerRecordsCreateTool(server, {
+      ...context,
+      scopes: ['write:records'],
+    });
+    const client = new Client({ name: 'legacy-record-replay-client', version: '1.0.0' });
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    await server.connect(serverTransport);
+    await client.connect(clientTransport);
+
+    const legacyInput = {
+      title: 'Legacy replay',
+      planId,
+      startAt: '2026-09-07T08:00:00.000Z',
+      endAt: '2026-09-07T09:00:00.000Z',
+    };
+    try {
+      const replay = CallToolResultSchema.parse(
+        await client.callTool({
+          name: 'records.create',
+          arguments: { operationId, ...legacyInput },
+        }),
+      );
+      expect(replay.structuredContent).toEqual(receipt);
+      expect(createRecordMutation).toHaveBeenNthCalledWith(
+        1,
+        expect.objectContaining({ operationId, planId }),
+      );
+
+      const rejected = CallToolResultSchema.parse(
+        await client.callTool({
+          name: 'records.create',
+          arguments: {
+            operationId: '99999999-9999-4999-8999-999999999999',
+            ...legacyInput,
+          },
+        }),
+      );
+      expect(rejected.isError).toBe(true);
+      expect(JSON.parse((rejected.content[0] as { text: string }).text)).toMatchObject({
+        error: {
+          code: 'INVALID_INPUT',
+          message: expect.stringContaining('omit planId'),
+          retryable: false,
+        },
+      });
     } finally {
       await client.close();
       await server.close();

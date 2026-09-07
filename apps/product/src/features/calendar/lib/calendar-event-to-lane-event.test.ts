@@ -24,7 +24,6 @@ function makeRecordEvent(overrides: Partial<CalendarDisplayEvent> = {}): Calenda
     origin: 'planned',
     timeblockState: 'past',
     kind: 'record',
-    planId: 'plan-1',
     recordSource: 'from_plan',
     ...overrides,
   };
@@ -32,21 +31,19 @@ function makeRecordEvent(overrides: Partial<CalendarDisplayEvent> = {}): Calenda
 
 describe('calendarEventToRecordEvent', () => {
   it('集約済みの合計差分を代表Recordへ引き継ぐ', () => {
-    const event = calendarEventToRecordEvent(makeRecordEvent({ diffMinutes: -20 }));
+    const event = calendarEventToRecordEvent(makeRecordEvent({}));
 
     expect(event).toMatchObject({
       id: 'record-1',
       duration: 30,
-      planId: 'plan-1',
-      diffMinutes: -20,
     });
   });
 
   it('secondary Recordは個別のPlan差分を再計算しない', () => {
     const event = calendarEventToRecordEvent(
-      makeRecordEvent({ id: 'record-2', recordSource: 'manual', diffMinutes: undefined }),
+      makeRecordEvent({ id: 'record-2', recordSource: 'manual' }),
     );
 
-    expect(event.diffMinutes).toBeUndefined();
+    expect(event).not.toHaveProperty('diffMinutes');
   });
 });

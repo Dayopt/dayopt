@@ -13,7 +13,6 @@
       "retry": "再試行",
       "results": "タイムブロック",
       "overflow": "新しい順に{count}件を表示しています。検索語を絞り込んでください。",
-      "skipped": "やらなかった",
       "kind": {
         "plan": "予定",
         "record": "記録"

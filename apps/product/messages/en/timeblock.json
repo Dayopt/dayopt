@@ -27,9 +27,6 @@
       "deletedCount": "{count, plural, one {1 item} other {# items}} deleted",
       "restored": "Restored",
       "restoreFailed": "Failed to restore",
-      "skipped": "Skipped",
-      "skipFailed": "Failed to skip. Please try again",
-      "unskipped": "Skip undone",
       "conflict": "This timeblock was modified elsewhere. Reload to see the latest version.",
       "placed": "Added {name} at {time}",
       "overlapError": "{time} overlaps with an existing timeblock"
@@ -90,8 +87,6 @@
         "diff": "Diff",
         "timeProgress": "Time progress"
       },
-      "skip": "Skip",
-      "unskip": "Undo skip",
       "note": {
         "label": "Note",
         "placeholder": "Add a note...",
@@ -120,12 +115,9 @@
       "deleteConfirm": "Delete"
     },
     "relationships": {
-      "relatedRecords": "Related records",
+      "relatedRecords": "Records during this time",
       "recordSummary": "{count, plural, one {# record} other {# records}} · {duration} total",
-      "originalPlan": "Original plan",
-      "originalPlanUnavailable": "Original plan is unavailable",
       "openRecord": "Open record: {activity}, {dateTime}, {duration}",
-      "openPlan": "Open original plan: {activity}, {dateTime}, {duration}",
       "loadFailed": "Could not load relationships"
     },
     "editor": {
@@ -161,9 +153,6 @@
         "deleteFailed": "Could not delete. Please try again",
         "restored": "Restored",
         "restoreFailed": "Could not restore. Please try again",
-        "skipped": "Skipped",
-        "skipFailed": "Could not skip. Please try again",
-        "unskipped": "Skip removed",
         "planCreated": "Plan added ✓"
       },
       "migratedLocked": "Migrated past records cannot be edited",

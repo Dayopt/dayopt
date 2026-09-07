@@ -3,8 +3,7 @@
  *
  * `TimeblockCard.tsx` のトークン使用を踏襲するが、DnD・overlay 計算・gap クリック
  * 導線は Step 6 の対象のため持ち込まない（read 側専用の軽量プレゼンテーショナル
- * コンポーネント）。差分は `DiffBadge`（±0 は非表示）、予定外の記録は
- * 静かなマーカーのみ（二値ラベルは使わない、copywriting準拠）。
+ * コンポーネント）。Record は特定の Plan との対応を表示しない。
  */
 'use client';
 
@@ -20,7 +19,6 @@ import { cn } from '@dayopt/components';
 
 import type { TwoLanePosition } from '../../../../../lib/two-lane-layout';
 import { DayDiffMarker } from './DayDiffMarker';
-import { DiffBadge } from './DiffBadge';
 
 interface RecordLaneCardProps {
   event: RecordEvent;
@@ -93,8 +91,6 @@ export function RecordLaneCard({
   // アクティビティなしの時だけ中立トークンの塗りに落とす。
   const colorClasses = hasActivity ? getCategoryColorClasses(activityColor) : null;
   const displayName = activityName ?? t('calendar.filter.noActivity');
-  const isUnplanned = event.planId == null;
-  const hasDiff = event.diffMinutes != null && event.diffMinutes !== 0;
   // 時刻を出すかは縦に入るかだけで決める。狭い列（compact）でも高さがあるカードから
   // 時刻が消えていて、何時のブロックか読めなかった（2026-09-07 User 指摘）
   const showDetails = position.height >= DETAIL_HEIGHT_THRESHOLD;
@@ -102,7 +98,6 @@ export function RecordLaneCard({
   return (
     <div
       data-record-lane-card
-      data-record-planned={!isUnplanned}
       data-entry-block={interactive ? 'true' : undefined}
       tabIndex={interactive ? 0 : undefined}
       role={interactive ? 'button' : undefined}
@@ -172,7 +167,6 @@ export function RecordLaneCard({
           )}
           <span className="truncate">{displayName}</span>
         </p>
-        {hasDiff && !compact && <DiffBadge diffMinutes={event.diffMinutes ?? 0} />}
       </div>
       {showDetails && (
         <p className="text-muted-foreground truncate">

@@ -26,8 +26,8 @@ export const MCP_REVIEW_GET_OUTPUT_SCHEMA = z
       .object({
         planMeaning: z.literal('budget'),
         recordMeaning: z.literal('actual'),
-        rowFilter: z.literal('active_start_in_period'),
-        durationBoundary: z.literal('full_row_not_clipped'),
+        rowFilter: z.literal('active_overlapping_period'),
+        durationBoundary: z.literal('clipped_to_period'),
         periodBoundary: z.literal('[)'),
         varianceConvention: z.literal('planned_minus_recorded'),
       })

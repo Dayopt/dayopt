@@ -54,7 +54,6 @@ function makeRecord(overrides: Partial<RecordEvent> = {}): RecordEvent {
     title: 'Deep Work',
     note: null,
     activityId: null,
-    planId: 'plan-1',
     startDate: makeDate(9, 0),
     endDate: makeDate(9, 45),
     displayStartDate: makeDate(9, 0),
@@ -68,11 +67,7 @@ function makeRecord(overrides: Partial<RecordEvent> = {}): RecordEvent {
 export const WithPlanAndRecord: Story = {
   render: () => (
     <Frame>
-      <TwoLaneDayColumn
-        hourHeight={72}
-        plans={[makePlan()]}
-        records={[makeRecord({ diffMinutes: -15 })]}
-      />
+      <TwoLaneDayColumn hourHeight={72} plans={[makePlan()]} records={[makeRecord({})]} />
     </Frame>
   ),
 };
@@ -93,12 +88,10 @@ export const MixedDay: Story = {
             displayStartDate: makeDate(11, 0),
             displayEndDate: makeDate(11, 30),
             duration: 30,
-            status: 'skipped',
+            status: 'unrecorded',
           }),
         ]}
-        records={[
-          makeRecord({ id: 'l1', planId: null, diffMinutes: undefined, title: 'メール返信' }),
-        ]}
+        records={[makeRecord({ id: 'l1', title: 'メール返信' })]}
       />
     </Frame>
   ),
@@ -119,15 +112,11 @@ export const AllPatterns: Story = {
       <div className="space-y-2">
         <p className="text-muted-foreground text-xs">予定+記録（差分あり）</p>
         <Frame>
-          <TwoLaneDayColumn
-            hourHeight={72}
-            plans={[makePlan()]}
-            records={[makeRecord({ diffMinutes: -15 })]}
-          />
+          <TwoLaneDayColumn hourHeight={72} plans={[makePlan()]} records={[makeRecord({})]} />
         </Frame>
       </div>
       <div className="space-y-2">
-        <p className="text-muted-foreground text-xs">未記録・skip・予定外が混在</p>
+        <p className="text-muted-foreground text-xs">未記録の予定と記録が混在</p>
         <Frame>
           <TwoLaneDayColumn
             hourHeight={72}
@@ -141,12 +130,10 @@ export const AllPatterns: Story = {
                 displayStartDate: makeDate(11, 0),
                 displayEndDate: makeDate(11, 30),
                 duration: 30,
-                status: 'skipped',
+                status: 'unrecorded',
               }),
             ]}
-            records={[
-              makeRecord({ id: 'l1', planId: null, diffMinutes: undefined, title: 'メール返信' }),
-            ]}
+            records={[makeRecord({ id: 'l1', title: 'メール返信' })]}
           />
         </Frame>
       </div>

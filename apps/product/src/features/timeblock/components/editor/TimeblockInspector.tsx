@@ -20,6 +20,7 @@ import { useActivitiesMap } from '@/features/activities';
 import { MEDIA_QUERIES } from '@/lib/breakpoints';
 import { useDomSlot } from '@/lib/dom-slots/useDomSlot';
 import { useMediaQuery } from '@/lib/hooks/useMediaQuery';
+import { overlappingRecords, type DerivedBlock } from '@/lib/time';
 import { api } from '@/lib/trpc';
 import { Drawer, DrawerContent, DrawerTitle, Spinner } from '@dayopt/components';
 
@@ -53,6 +54,35 @@ interface TimeModelInspectorProps {
 const INSPECTOR_FOCUSABLE_SELECTOR =
   'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
+function toInspectorDerivedBlock(
+  row: {
+    id: string;
+    activity_id: string | null;
+    start_at: string;
+    end_at: string;
+    note?: string | null;
+    fulfillment?: string | null;
+    source?: string;
+  },
+  kind: 'plan' | 'rec',
+): DerivedBlock {
+  const fulfillment = row.fulfillment;
+  return {
+    id: row.id,
+    kind,
+    activityId: row.activity_id,
+    start: row.start_at,
+    end: row.end_at,
+    memo: row.note ?? null,
+    fulfillment:
+      fulfillment === 'low' || fulfillment === 'medium' || fulfillment === 'high'
+        ? fulfillment
+        : null,
+    live: false,
+    source: row.source ?? 'manual',
+  };
+}
+
 /** plans / records 対応 Inspector のトップレベル（モバイル=Drawer / PC=DockedInspectorPanel） */
 export function TimeblockInspector({
   onViewStats,
@@ -85,16 +115,13 @@ export function TimeblockInspector({
     { enabled: isOpen && !duplicateDraft && !!timeblockId && timeblockKind === 'record' },
   );
   const relatedRecordsQuery = api.records.list.useQuery(
-    { planId: timeblockId ?? '', sortBy: 'start_at', sortOrder: 'asc' },
-    { enabled: isOpen && !duplicateDraft && !!timeblockId && timeblockKind === 'plan' },
-  );
-  const originalPlanId = timeblockKind === 'record' ? recordQuery.data?.plan_id : null;
-  const originalPlanQuery = api.plans.getById.useQuery(
-    { id: originalPlanId ?? '' },
     {
-      enabled: isOpen && !duplicateDraft && !!originalPlanId && timeblockKind === 'record',
-      retry: (failureCount, error) => (error.data?.code === 'NOT_FOUND' ? false : failureCount < 3),
+      startDate: planQuery.data?.start_at,
+      endDate: planQuery.data?.end_at,
+      sortBy: 'start_at',
+      sortOrder: 'asc',
     },
+    { enabled: isOpen && !duplicateDraft && !!planQuery.data && timeblockKind === 'plan' },
   );
 
   const activeQuery = timeblockKind === 'plan' ? planQuery : recordQuery;
@@ -145,23 +172,20 @@ export function TimeblockInspector({
     relationships = {
       kind: 'plan',
       status,
-      records: relatedRecordsQuery.data ?? [],
+      records: plan
+        ? (() => {
+            const rows = relatedRecordsQuery.data ?? [];
+            const ids = new Set(
+              overlappingRecords(
+                toInspectorDerivedBlock(plan, 'plan'),
+                rows.map((row) => toInspectorDerivedBlock(row, 'rec')),
+                new Date(),
+              ).map((row) => row.id),
+            );
+            return rows.filter((row) => ids.has(row.id));
+          })()
+        : [],
       onRetry: () => void relatedRecordsQuery.refetch(),
-    };
-  } else if (!duplicateDraft && originalPlanId) {
-    const isUnavailable = originalPlanQuery.error?.data?.code === 'NOT_FOUND';
-    const status: 'loading' | 'error' | 'success' | 'unavailable' = isUnavailable
-      ? 'unavailable'
-      : originalPlanQuery.isError
-        ? 'error'
-        : originalPlanQuery.isSuccess
-          ? 'success'
-          : 'loading';
-    relationships = {
-      kind: 'record',
-      status,
-      plan: originalPlanQuery.data ?? null,
-      onRetry: () => void originalPlanQuery.refetch(),
     };
   }
 

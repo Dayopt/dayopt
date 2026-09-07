@@ -2,23 +2,22 @@
  * `CalendarDisplayEvent`（Step 8 の time model 射影）から TwoLane カード用の
  * `PlanEvent` / `RecordEvent` 表示型へ変換するアダプタ。
  *
- * `useCalendarData` は Plan / Record から CalendarDisplayEvent を作る際に kind/planId/recordSource を
- * 既に埋めているため、ここではCalendarが取得した関連イベント（`allEvents`）から
- * Plan の記録済み判定に必要な情報だけを逆引きする。Record の差分は
- * `useCalendarData` が 1 Plan : N Record を集約して代表 Record に事前計算する。
+ * `useCalendarData` は Plan / Record を独立した CalendarDisplayEvent に変換する。
+ * ここでは表示中の全イベントから、同じアクティビティで15分以上重なる Record の
+ * 有無だけを読み取り時に導出する。
  */
 
-import type { PlanEvent, PlanEventStatus, RecordEvent } from '@/features/timeblock';
+import { type PlanEvent, type PlanEventStatus, type RecordEvent } from '@/features/timeblock';
+import { overlappingRecords, type DerivedBlock } from '@/lib/time';
 
 import type { CalendarDisplayEvent } from '../types/calendar.types';
 
 function resolvePlanEventStatus(
   event: CalendarDisplayEvent,
-  isRecorded: boolean,
+  hasRecords: boolean,
   now: Date,
 ): PlanEventStatus {
-  if (event.isSkipped) return 'skipped';
-  if (isRecorded) return 'recorded';
+  if (hasRecords) return 'with-records';
   const endDate = event.endDate ?? event.displayEndDate;
   const startDate = event.startDate ?? event.displayStartDate;
   if (endDate && endDate.getTime() <= now.getTime()) return 'unrecorded';
@@ -32,7 +31,18 @@ export function calendarEventToPlanEvent(
   allEvents: ReadonlyArray<CalendarDisplayEvent>,
   now: Date = new Date(),
 ): PlanEvent {
-  const isRecorded = allEvents.some((e) => e.kind === 'record' && e.planId === event.id);
+  const project = (item: CalendarDisplayEvent): DerivedBlock => ({
+    id: item.id,
+    kind: item.kind === 'record' ? 'rec' : 'plan',
+    activityId: item.activityId ?? null,
+    start: (item.startDate ?? item.displayStartDate).toISOString(),
+    end: (item.endDate ?? item.displayEndDate).toISOString(),
+    memo: item.description ?? null,
+    fulfillment: null,
+    live: false,
+    source: 'manual',
+  });
+  const hasRecords = overlappingRecords(project(event), allEvents.map(project), now).length > 0;
   return {
     id: event.id,
     title: event.title,
@@ -43,7 +53,7 @@ export function calendarEventToPlanEvent(
     displayStartDate: event.displayStartDate,
     displayEndDate: event.displayEndDate,
     duration: event.duration,
-    status: resolvePlanEventStatus(event, isRecorded, now),
+    status: resolvePlanEventStatus(event, hasRecords, now),
   };
 }
 
@@ -54,12 +64,10 @@ export function calendarEventToRecordEvent(event: CalendarDisplayEvent): RecordE
     title: event.title,
     note: event.description ?? null,
     activityId: event.activityId ?? null,
-    planId: event.planId ?? null,
     startDate: event.startDate ?? event.displayStartDate,
     endDate: event.endDate ?? event.displayEndDate,
     displayStartDate: event.displayStartDate,
     displayEndDate: event.displayEndDate,
     duration: event.duration,
-    diffMinutes: event.diffMinutes,
   };
 }

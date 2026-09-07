@@ -356,8 +356,6 @@ export const CalendarGridContent = React.memo(function CalendarGridContent({
           ? {
               ...previewEntry,
               kind: 'record' as const,
-              planId: entry.id,
-              diffMinutes: undefined,
             }
           : previewEntry;
 

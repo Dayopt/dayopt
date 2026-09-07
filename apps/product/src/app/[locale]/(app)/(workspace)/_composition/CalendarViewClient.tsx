@@ -104,8 +104,6 @@ export function CalendarViewClient({ translations }: CalendarViewClientProps) {
           onDeleteTimeblockConfirm={composition.onDeleteTimeblockConfirm}
           onViewStats={composition.onViewStats}
           onCopy={composition.onCopy}
-          onSkip={composition.onSkip}
-          onUnskip={composition.onUnskip}
           onNavigate={composition.onNavigate}
           onViewChange={composition.onViewChange}
           onNavigatePrev={composition.onNavigatePrev}

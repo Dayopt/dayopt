@@ -39,7 +39,6 @@ function buildPair(index: number, actualMinutes = 90) {
       activity_id: 'activity-a',
       start_at: `2026-08-${day}T09:00:00.000Z`,
       end_at: `2026-08-${day}T10:00:00.000Z`,
-      skipped_at: null,
     },
     record: {
       id: `record-${index}`,
@@ -66,9 +65,9 @@ describe('StatisticsFeedforwardService', () => {
     const expectedStart = new Date(
       NOW.getTime() - ESTIMATION_WINDOW_DAYS * 24 * 60 * 60 * 1000,
     ).toISOString();
-    expect(plansMock.gte).toHaveBeenCalledWith('start_at', expectedStart);
+    expect(plansMock.gt).toHaveBeenCalledWith('end_at', expectedStart);
     expect(plansMock.lt).toHaveBeenCalledWith('start_at', NOW.toISOString());
-    expect(plansMock.gte).toHaveBeenCalledTimes(1);
+    expect(plansMock.gt).toHaveBeenCalledTimes(1);
     expect(plansMock.lt).toHaveBeenCalledTimes(1);
   });
 
@@ -95,7 +94,7 @@ describe('StatisticsFeedforwardService', () => {
     ]);
   });
 
-  it('skipped_at を持つ Plan は分母から外れる', async () => {
+  it('旧skip状態は期間合計へ影響しない', async () => {
     const pairs = [buildPair(0), buildPair(1), buildPair(2)];
     const plans: Record<string, unknown>[] = pairs.map((pair) => ({ ...pair.plan }));
     plans[2] = { ...(plans[2] as Record<string, unknown>), skipped_at: '2026-08-03T10:00:00.000Z' };
@@ -104,8 +103,10 @@ describe('StatisticsFeedforwardService', () => {
       pairs.map((pair) => pair.record),
     );
 
-    // n が 2 に落ちるので沈黙する
-    await expect(service.getTagEstimationFactors(USER_ID, NOW)).resolves.toEqual([]);
+    // 廃止された状態によって過去予定を減らさない
+    await expect(service.getTagEstimationFactors(USER_ID, NOW)).resolves.toEqual([
+      { activityId: 'activity-a', factor: 1.5, sampleCount: 3 },
+    ]);
   });
 
   it('取得した Plan の id だけを使って records を引く', async () => {
@@ -117,6 +118,7 @@ describe('StatisticsFeedforwardService', () => {
 
     await service.getTagEstimationFactors(USER_ID, NOW);
 
-    expect(recordsMock.in).toHaveBeenCalledWith('plan_id', ['plan-0', 'plan-1', 'plan-2']);
+    expect(recordsMock.gt).toHaveBeenCalledWith('end_at', expect.any(String));
+    expect(recordsMock.lt).toHaveBeenCalledWith('start_at', NOW.toISOString());
   });
 });

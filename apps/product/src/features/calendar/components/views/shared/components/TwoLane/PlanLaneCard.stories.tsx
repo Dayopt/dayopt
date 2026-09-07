@@ -97,29 +97,15 @@ export const Unrecorded: Story = {
   ),
 };
 
-/** 記録済み（records あり）。Record レーンが主役になるため控えめに沈める。 */
-export const Recorded: Story = {
+/** 同じ時間帯の記録あり。予定全体の完遂は意味しない。 */
+export const WithRecords: Story = {
   render: () => (
     <Slot>
       <PlanLaneCard
-        event={makeEvent('recorded')}
+        event={makeEvent('with-records')}
         position={basePosition}
         activityName="Deep Work"
         activityColor="indigo"
-      />
-    </Slot>
-  ),
-};
-
-/** skip 済み（やらなかった）。斜線ハッチングで減衰表示。 */
-export const Skipped: Story = {
-  render: () => (
-    <Slot>
-      <PlanLaneCard
-        event={makeEvent('skipped')}
-        position={basePosition}
-        activityName="Deep Work"
-        activityColor="gray"
       />
     </Slot>
   ),
@@ -157,7 +143,7 @@ export const CompareTarget: Story = {
   render: () => (
     <Slot>
       <PlanLaneCard
-        event={makeEvent('recorded')}
+        event={makeEvent('with-records')}
         position={basePosition}
         activityName="Deep Work"
         activityColor="indigo"
@@ -207,8 +193,7 @@ export const AllPatterns: Story = {
           ['upcoming', 'blue'],
           ['active', 'teal'],
           ['unrecorded', 'amber'],
-          ['recorded', 'indigo'],
-          ['skipped', 'gray'],
+          ['with-records', 'indigo'],
         ] as const
       ).map(([status, color]) => (
         <Slot key={status}>
@@ -217,7 +202,7 @@ export const AllPatterns: Story = {
             position={basePosition}
             activityName="Deep Work"
             activityColor={color}
-            showDayDiffMarker={status === 'recorded'}
+            showDayDiffMarker={status === 'with-records'}
           />
         </Slot>
       ))}

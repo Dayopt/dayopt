@@ -52,6 +52,10 @@ export function useTimeblockRecordMutations() {
     onSettled: () => {
       void utils.plans.list.invalidate();
       void utils.records.list.invalidate();
+      void queryClient.invalidateQueries({
+        predicate: ({ queryKey }) =>
+          Array.isArray(queryKey[0]) && ['statistics', 'review'].includes(queryKey[0][0]),
+      });
     },
   });
 
@@ -77,6 +81,10 @@ export function useTimeblockRecordMutations() {
     onSettled: () => {
       void utils.plans.list.invalidate();
       void utils.records.list.invalidate();
+      void queryClient.invalidateQueries({
+        predicate: ({ queryKey }) =>
+          Array.isArray(queryKey[0]) && ['statistics', 'review'].includes(queryKey[0][0]),
+      });
     },
   });
 

@@ -1,7 +1,7 @@
-import type { PublicRecordRow, Row } from '@/lib/database';
+import type { PublicPlanRow, PublicRecordRow } from '@/lib/database';
 import type { PlanFilter, RecordFilter } from '../schemas/timeblock';
 
-export type PlanRow = Row<'plans'>;
+export type PlanRow = PublicPlanRow;
 
 export type RecordRow = PublicRecordRow;
 

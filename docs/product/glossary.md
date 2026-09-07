@@ -49,7 +49,7 @@ pnpm copy:check:strict
 | ----------------------- | -------------------- | -------------- | ------------------------------------------------------------------------------------ | --------------------------------- | ---------------------------------- | ------------------------------------------------------------------------------------ |
 | Timeblock               | タイムブロック       | Timeblock      | `features/timeblock` / `messages/timeblock.json`                                     | ブロック / 箱 / エントリ / タスク | block / box / event / entry / task | カレンダー上の時間ブロック。予定 / 記録の総称                                        |
 | Plan                    | 予定                 | Plan           | `PlanEvent` / `features/timeblock`<br>`plans`                                        | 計画                              | —                                  | これからやる時間の宣言。時間軸のどこにでも置ける独立エンティティ                     |
-| Record                  | 記録                 | Record         | `RecordEvent` / `features/timeblock`<br>`records`                                    | 実績                              | —                                  | 実際に使った時間。1 予定に複数紐づく（1:N）。未来には終われない                      |
+| Record                  | 記録                 | Record         | `RecordEvent` / `features/timeblock`<br>`records`                                    | 実績                              | —                                  | 実際に使った時間。予定とは独立して保存し、未来には終われない                         |
 | Timeboxing              | タイムボックス       | Timebox        | —                                                                                    | —                                 | —                                  | 時間を区切って作業する手法そのもの。説明文脈で使う（個々の時間は「タイムブロック」） |
 | Activity                | アクティビティ       | Activity       | `features/activities` / `messages/activities.json`<br>`activities`                   | タグ / ラベル                     | —                                  | 予定と記録の単位。最も具体的な分類で、無限に増えてよい                               |
 | Category                | カテゴリー           | Category       | `categories`                                                                         | —                                 | —                                  | 所属の主軸。1 アクティビティは最大 1 カテゴリー。色とアイコンを持つ                  |
@@ -87,23 +87,17 @@ pnpm copy:check:strict
 
 ### コード内部語
 
-| Concept               | 識別子                                   | DB                                                                     | 意味                                                                                                                                                                     | 状態   |
-| --------------------- | ---------------------------------------- | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------ |
-| Timeblock destination | `TimeblockDestination` / `kind` / `lane` | —                                                                      | 予定 / 記録の判別子。canonical は 'plan' \| 'record'。kind / lane / destination / sourceKind / resourceType が現状混在している                                           | 現行   |
-| Timeblock state       | `TimeblockState`                         | —                                                                      | 時間位置から導く 3 値（upcoming / active / past）。実体は useCalendarData が持つ                                                                                         | 現行   |
-| Source                | `PlanSource` / `RecordSource`            | `plans.source` / `records.source`                                      | 作成時に確定する不変の provenance。plans は manual / external_calendar / api、records はそれに from_plan / auto_migrated を加えた 5 値                                   | 現行   |
-| Ghost                 | `useConvertGhostEvent` / `GhostRenderer` | —                                                                      | コード内で 3 つの無関係な意味に使われている: 外部カレンダーの未変換予定 / DnD 中の描画 / Button の variant                                                               | 現行   |
-| Restore               | `restoreActivity` / `restorePlan`        | —                                                                      | 3 つの無関係な操作が同じ動詞を使っている: アーカイブ解除 / ゴミ箱からの復元 / バックアップ復元                                                                           | 現行   |
-| title / name          | —                                        | —                                                                      | 時間を持つものは title（plans / records / plan_template_blocks / external_calendar_events）、分類は name（activities / categories / segments / plan_templates）          | 現行   |
-| note / description    | —                                        | `plans.note` / `records.note` / `external_calendar_events.description` | Dayopt 自身のメモは note。description は外部カレンダー由来の本文と、MCP / メタタグの説明文にだけ使う                                                                     | 現行   |
-| Subscription status   | —                                        | `profiles.subscription_status`                                         | free / trialing / active / past_due / canceled。値の意味は docs/product/specs/billing.md                                                                                 | 現行   |
-| Timeblock origin      | `TimeblockOrigin`                        | —                                                                      | 'planned' \| 'unplanned'。生成元で意味が 2 つに割れており（予定そのものか / 予定に紐づく記録か）、主要な呼び出し側は既に kind から再計算して迂回している。撤去は別 issue | 非推奨 |
-
-### 廃止予定
-
-| Concept | ja                      | en   | DB / 識別子                             | 理由と参照                                                                                      |
-| ------- | ----------------------- | ---- | --------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| Skip    | スキップ / やらなかった | Skip | `plans.skipped_at`<br>`skip` / `unskip` | 概念ごと撤去する方針。新しい文言・docs でこの語彙を増やさない / decisions.md 2026-09-07 / #2636 |
+| Concept               | 識別子                                   | DB                                                                     | 意味                                                                                                                                                            | 状態   |
+| --------------------- | ---------------------------------------- | ---------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
+| Timeblock destination | `TimeblockDestination` / `kind` / `lane` | —                                                                      | 予定 / 記録の判別子。canonical は 'plan' \| 'record'。kind / lane / destination / sourceKind / resourceType が現状混在している                                  | 現行   |
+| Timeblock state       | `TimeblockState`                         | —                                                                      | 時間位置から導く 3 値（upcoming / active / past）。実体は useCalendarData が持つ                                                                                | 現行   |
+| Source                | `PlanSource` / `RecordSource`            | `plans.source` / `records.source`                                      | 作成時に確定する不変の provenance。plans は manual / external_calendar / api、records はそれに from_plan / auto_migrated を加えた 5 値                          | 現行   |
+| Ghost                 | `useConvertGhostEvent` / `GhostRenderer` | —                                                                      | コード内で 3 つの無関係な意味に使われている: 外部カレンダーの未変換予定 / DnD 中の描画 / Button の variant                                                      | 現行   |
+| Restore               | `restoreActivity` / `restorePlan`        | —                                                                      | 3 つの無関係な操作が同じ動詞を使っている: アーカイブ解除 / ゴミ箱からの復元 / バックアップ復元                                                                  | 現行   |
+| title / name          | —                                        | —                                                                      | 時間を持つものは title（plans / records / plan_template_blocks / external_calendar_events）、分類は name（activities / categories / segments / plan_templates） | 現行   |
+| note / description    | —                                        | `plans.note` / `records.note` / `external_calendar_events.description` | Dayopt 自身のメモは note。description は外部カレンダー由来の本文と、MCP / メタタグの説明文にだけ使う                                                            | 現行   |
+| Subscription status   | —                                        | `profiles.subscription_status`                                         | free / trialing / active / past_due / canceled。値の意味は docs/product/specs/billing.md                                                                        | 現行   |
+| Timeblock origin      | `TimeblockOrigin`                        | —                                                                      | 'planned' \| 'unplanned'。旧表示型で Plan / Record を表す kind の代替として残る。主要な呼び出し側は kind から再計算しており、撤去は別 issue                     | 非推奨 |
 
 ## 禁止表記一覧
 
@@ -179,15 +173,14 @@ Plan（予定）と Record（記録）は独立エンティティで、その総
 | **Record は未来に終われない**（`end_at <= now`） | Record        | DB trigger `validate_record_temporal_write_v1`（`DT005`） |
 
 - **Plan** は時間軸のどこにでも置ける。過去の Plan もドラッグ移動・リサイズ・時間編集ができ、編集しても Plan のままで Record へは変わらない
-- **Record** は過去の事実。終了を未来へ動かす編集だけ不可。紐付け先 Plan がどこにあるかは制約しない
+- **Record** は過去の事実。終了を未来へ動かす編集だけ不可。Plan とは独立して保存する
 - **保存先ルール**: 新規作成時に保存先を選ぶ UI は無い。`end_at > now` なら Plan、`end_at <= now` なら Record として一意に決まる（`resolveTimeblockDestination`）。UI に種別選択の一手を足さない
 - **強制点は DB trigger / SQL 関数**。アプリ層（service / MCP client / UI）はその写し
 
-Review で区別する 3 つの状態:
+Review で区別する 2 つの状態:
 
 - **未記録の予定** — 過去の Plan で Record が無い。「まだ記録していない」
-- **やらなかった予定** — `skipped_at` があるもの。**この概念は廃止予定**（下記）
-- **予定外の記録** — Record に `plan_id` が無いもの。Calendar 上に可視のマーカーは持たず、Review の差分集計でのみ扱う（旧「予定外」/「Unplanned」マーカーと「予定に戻す」導線は 2026-09-04 に UI から撤去済み）
+- **この時間帯の記録** — 同じアクティビティで予定と15分以上重なる Record。対応関係は保存せず、表示時に導出する
 
 ### アクティビティ / カテゴリー / セグメント
 
@@ -220,10 +213,6 @@ Review で区別する 3 つの状態:
 - **羅針盤**: 横軸が投下時間、縦軸が充実と消耗の差の散布図。充実の回答が 5 件未満のアクティビティは点にせず「待っているもの」へ回す
 
 いずれも評価語ではない。「精度」「達成」「スコア」を UI 文言に混ぜない。
-
-### skip（やらなかった）は廃止予定
-
-`plans.skipped_at` と skip / unskip 操作は概念ごと撤去する方針（2026-09-07 確定）。撤去自体は DB カラム・MCP 公開契約・公開 docs に及ぶ不可逆変更なので [#2636](https://github.com/Dayopt/dayopt/issues/2636) で扱う。**新しい UI 文言・docs・spec でこの語彙を増やさない**。現存する機能の説明は [`specs/plan-record.md`](./specs/plan-record.md) にある。
 
 ### 同音異義と除外の判断理由
 

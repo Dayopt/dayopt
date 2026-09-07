@@ -16,7 +16,6 @@ export interface PlanEventSourceRow {
   activity_id: string | null;
   start_at: string;
   end_at: string;
-  skipped_at: string | null;
 }
 
 /** TZ変換やDBから読み出した秒以下のずれが所要時間計算にノイズを混ぜないよう truncate する */
@@ -29,23 +28,20 @@ function truncateToMinute(date: Date): Date {
 /**
  * overview.md §4「過去 Plan の見え方」に基づく status 判定。
  *
- * 優先順位: skip > 記録済み > 時間位置（unrecorded/active/upcoming）
+ * 優先順位: 同じ時間帯の記録あり > 時間位置（unrecorded/active/upcoming）
  */
 function resolvePlanEventStatus({
-  skippedAt,
   startDate,
   endDate,
-  isRecorded,
+  hasRecords,
   now,
 }: {
-  skippedAt: string | null;
   startDate: Date;
   endDate: Date;
-  isRecorded: boolean;
+  hasRecords: boolean;
   now: Date;
 }): PlanEventStatus {
-  if (skippedAt != null) return 'skipped';
-  if (isRecorded) return 'recorded';
+  if (hasRecords) return 'with-records';
   if (endDate.getTime() <= now.getTime()) return 'unrecorded';
   if (startDate.getTime() <= now.getTime()) return 'active';
   return 'upcoming';
@@ -53,8 +49,8 @@ function resolvePlanEventStatus({
 
 interface PlanRowToPlanEventOptions {
   timezone: string;
-  /** この plan を参照する record（`source <> 'auto_migrated'` を問わず）が 1 件以上あるか */
-  isRecorded: boolean;
+  /** 同じアクティビティで15分以上重なる Record が1件以上あるか。 */
+  hasRecords: boolean;
   /** テスト用の時刻固定。省略時は `new Date()` */
   now?: Date;
 }
@@ -79,10 +75,9 @@ export function planRowToPlanEvent(
     displayEndDate: convertToTimezone(endDate, options.timezone),
     duration,
     status: resolvePlanEventStatus({
-      skippedAt: row.skipped_at,
       startDate,
       endDate,
-      isRecorded: options.isRecorded,
+      hasRecords: options.hasRecords,
       now,
     }),
   };
@@ -90,8 +85,8 @@ export function planRowToPlanEvent(
 
 interface ExpandPlanRowsOptions {
   timezone: string;
-  /** record から紐づけられている plan id の集合（1 件以上参照されていれば記録済み扱い） */
-  recordedPlanIds: ReadonlySet<string>;
+  /** 同じ時間帯の Record がある Plan ID の導出集合。 */
+  planIdsWithRecords: ReadonlySet<string>;
   now?: Date;
 }
 
@@ -102,7 +97,7 @@ export function expandPlanRowsToPlanEvents(
   return rows.map((row) =>
     planRowToPlanEvent(row, {
       timezone: options.timezone,
-      isRecorded: options.recordedPlanIds.has(row.id),
+      hasRecords: options.planIdsWithRecords.has(row.id),
       ...(options.now !== undefined && { now: options.now }),
     }),
   );

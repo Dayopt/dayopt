@@ -77,7 +77,12 @@ const recordCreateInputSchema = z
     title: titleSchema,
     note: noteSchema,
     activityId: nullableIdSchema,
-    planId: nullableIdSchema,
+    planId: resourceIdSchema
+      .nullable()
+      .optional()
+      .describe(
+        'Deprecated compatibility input. Omit for new Records. A UUID is accepted only so an already-completed legacy operationId can replay; a new operation is rejected.',
+      ),
     startAt: timestampSchema,
     endAt: timestampSchema,
     fulfillment: fulfillmentCreateSchema,

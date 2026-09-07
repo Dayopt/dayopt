@@ -52,11 +52,10 @@ export function checkClientSideOverlap(
   // ドラッグ対象が実績レイヤーで占有する range（effective actual）:
   // - unplanned: 移動先 = actual
   // - planned で actual 確定済み: plan の移動は actual を動かさない → actual レイヤーは不変（null）
-  // - planned で actual 未編集・未スキップ: 移動先が過去なら自動記録として actual レイヤーを占有
+  // - planned で actual 未編集: 移動先が過去なら自動記録として actual レイヤーを占有
   const hasConfirmedActual = draggedEvent?.actualStartDate != null;
   const previewIsPast = previewEndTime.getTime() <= now;
-  const plannedOccupiesActual =
-    shouldCheckPlanned && !hasConfirmedActual && !draggedEvent?.isSkipped && previewIsPast;
+  const plannedOccupiesActual = shouldCheckPlanned && !hasConfirmedActual && previewIsPast;
   const targetActualStart = shouldCheckPlanned
     ? plannedOccupiesActual
       ? previewStartTime
@@ -132,7 +131,6 @@ function toOverlapEntry(event: CalendarDisplayEvent, now: number) {
   const isAutoRecorded =
     event.origin === 'planned' &&
     event.actualStartDate == null &&
-    !event.isSkipped &&
     plannedEnd != null &&
     plannedEnd.getTime() <= now;
 

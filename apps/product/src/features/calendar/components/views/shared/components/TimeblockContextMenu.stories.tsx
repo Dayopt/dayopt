@@ -126,8 +126,6 @@ const allHandlers = {
   onViewStats: fn(),
   onCopy: fn(),
   onDuplicate: fn(),
-  onSkip: fn(),
-  onUnskip: fn(),
 };
 
 // ─────────────────────────────────────────────────────────

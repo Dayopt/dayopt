@@ -139,7 +139,7 @@ export const GLOSSARY: readonly GlossaryEntry[] = [
     concept: 'Record',
     ja: '記録',
     en: 'Record',
-    usage: '実際に使った時間。1 予定に複数紐づく（1:N）。未来には終われない',
+    usage: '実際に使った時間。予定とは独立して保存し、未来には終われない',
     code: { identifiers: ['RecordEvent'], feature: 'timeblock' },
     db: ['records'],
     forbidden: [
@@ -660,23 +660,9 @@ export const GLOSSARY: readonly GlossaryEntry[] = [
     status: 'deprecated',
     concept: 'Timeblock origin',
     usage:
-      "'planned' | 'unplanned'。生成元で意味が 2 つに割れており（予定そのものか / 予定に紐づく記録か）、主要な呼び出し側は既に kind から再計算して迂回している。撤去は別 issue",
+      "'planned' | 'unplanned'。旧表示型で Plan / Record を表す kind の代替として残る。主要な呼び出し側は kind から再計算しており、撤去は別 issue",
     code: { identifiers: ['TimeblockOrigin'] },
     refs: ['#2637'],
-  },
-
-  // ─── 廃止予定 ───
-  {
-    id: 'skip',
-    layer: 'ui',
-    status: 'planned-removal',
-    concept: 'Skip',
-    ja: 'スキップ / やらなかった',
-    en: 'Skip',
-    usage: '概念ごと撤去する方針。新しい文言・docs でこの語彙を増やさない',
-    code: { identifiers: ['skip', 'unskip'] },
-    db: ['plans.skipped_at'],
-    refs: ['decisions.md 2026-09-07', '#2636'],
   },
 ];
 

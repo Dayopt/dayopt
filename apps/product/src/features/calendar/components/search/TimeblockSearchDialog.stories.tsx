@@ -43,18 +43,15 @@ function createTimeblockRow(id: string, startAt: string, overrides: Record<strin
 const PLANS = [
   createTimeblockRow('plan-1', '2026-07-15T00:00:00.000Z', {
     note: 'Outline the next product iteration',
-    skipped_at: null,
   }),
   createTimeblockRow('plan-2', '2026-07-13T05:00:00.000Z', {
     note: 'Review the week',
-    skipped_at: '2026-07-13T07:00:00.000Z',
   }),
 ];
 
 const RECORDS = [
   createTimeblockRow('record-1', '2026-07-14T01:30:00.000Z', {
     note: 'Calendar search states',
-    plan_id: 'plan-1',
   }),
 ];
 
@@ -104,7 +101,7 @@ export const OverLimit: Story = {
         createTimeblockRow(
           `plan-${index + 1}`,
           new Date(Date.UTC(2026, 6, 31 - index, 0, 0)).toISOString(),
-          { note: `Search result ${index + 1}`, skipped_at: null },
+          { note: `Search result ${index + 1}` },
         ),
       ),
       'records.list': [],
@@ -154,7 +151,6 @@ const STATIC_RESULT: TimeblockSearchResult = {
   activityId: 'activity-work',
   startAt: '2026-07-15T00:00:00.000Z',
   endAt: '2026-07-15T01:00:00.000Z',
-  isSkipped: false,
 };
 /** タグ削除で未分類化した(#1576) 結果。アイコンは中立マーカー(bg-muted + Minus)になる。 */
 const STATIC_RESULT_UNCATEGORIZED: TimeblockSearchResult = {
@@ -164,7 +160,6 @@ const STATIC_RESULT_UNCATEGORIZED: TimeblockSearchResult = {
   activityId: null,
   startAt: '2026-07-15T02:00:00.000Z',
   endAt: '2026-07-15T02:45:00.000Z',
-  isSkipped: false,
 };
 const STATIC_TAGS = new Map(TAGS.map((tag) => [tag.id, tag]));
 const STATIC_CALLBACKS = {

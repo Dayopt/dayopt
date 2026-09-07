@@ -918,13 +918,6 @@ export type Database = {
             referencedRelation: 'external_calendar_events';
             referencedColumns: ['id'];
           },
-          {
-            foreignKeyName: 'records_plan_id_fkey';
-            columns: ['plan_id'];
-            isOneToOne: false;
-            referencedRelation: 'plans';
-            referencedColumns: ['id'];
-          },
         ];
       };
       reports: {

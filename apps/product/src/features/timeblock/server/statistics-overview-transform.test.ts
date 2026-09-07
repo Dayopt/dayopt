@@ -26,7 +26,7 @@ describe('transformStatsOverviewResponse', () => {
   it('null 入力 → 全 field が default', () => {
     expect(transformStatsOverviewResponse(null)).toEqual({
       cumulativeTime: { totalMinutes: 0 },
-      planRate: { totalEntries: 0, plannedEntries: 0, planRate: 0 },
+      planRate: { totalEntries: 0, plannedEntries: 0, planRate: null },
       contextSwitches: { totalSwitches: 0, avgPerDay: 0 },
       blankRate: {
         availableMinutes: 0,
@@ -75,9 +75,9 @@ describe('transformStatsOverviewResponse', () => {
 
   it('planRate.planRate が実値 0 → そのまま 0 (default と区別される)', () => {
     const result = transformStatsOverviewResponse({
-      planRate: { totalEntries: 0, plannedEntries: 0, planRate: 0 },
+      planRate: { totalEntries: 0, plannedEntries: 0, planRate: null },
     });
-    expect(result.planRate.planRate).toBe(0);
+    expect(result.planRate.planRate).toBeNull();
     expect(result.planRate.totalEntries).toBe(0);
   });
 

@@ -60,8 +60,6 @@ interface CalendarCrudHandlersResult {
   onDeleteTimeblockConfirm: (entry: CalendarDisplayEvent) => void;
   onViewStats: (entry: CalendarDisplayEvent) => void;
   onCopy: (entry: CalendarDisplayEvent) => void;
-  onSkip: (entry: CalendarDisplayEvent) => void;
-  onUnskip: (entry: CalendarDisplayEvent) => void;
 }
 
 // =============================================================================
@@ -90,12 +88,8 @@ export function useCalendarCrudHandlers({
   // =========================================================================
   // Context Actions（右クリックメニュー）
   // =========================================================================
-  const {
-    handleDeleteTimeblock: handleDeleteTimeblockConfirm,
-    handleViewStats,
-    handleSkip,
-    handleUnskip,
-  } = useTimeblockContextActions();
+  const { handleDeleteTimeblock: handleDeleteTimeblockConfirm, handleViewStats } =
+    useTimeblockContextActions();
 
   // =========================================================================
   // Timeblock Keyboard Shortcuts
@@ -163,8 +157,6 @@ export function useCalendarCrudHandlers({
       onDeleteTimeblockConfirm: handleDeleteTimeblockConfirm,
       onViewStats: handleViewStats,
       onCopy: handleCopy,
-      onSkip: handleSkip,
-      onUnskip: handleUnskip,
     }),
     [
       disabledTimeblockId,
@@ -175,8 +167,6 @@ export function useCalendarCrudHandlers({
       handleDeleteTimeblockConfirm,
       handleViewStats,
       handleCopy,
-      handleSkip,
-      handleUnskip,
     ],
   );
 }

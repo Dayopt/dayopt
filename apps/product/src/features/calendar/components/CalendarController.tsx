@@ -95,8 +95,6 @@ interface CalendarControllerProps {
   onDeleteTimeblockConfirm: (entry: CalendarDisplayEvent) => void;
   onViewStats: (entry: CalendarDisplayEvent) => void;
   onCopy: (entry: CalendarDisplayEvent) => void;
-  onSkip: (entry: CalendarDisplayEvent) => void;
-  onUnskip: (entry: CalendarDisplayEvent) => void;
 
   // --- Navigation handlers ---
   onNavigate: (direction: 'prev' | 'next' | 'today') => void;
@@ -139,8 +137,6 @@ export function CalendarController({
   onDeleteTimeblockConfirm,
   onViewStats,
   onCopy,
-  onSkip,
-  onUnskip,
   onNavigate,
   onViewChange,
   onNavigatePrev,
@@ -358,8 +354,6 @@ export function CalendarController({
           onViewStats={onViewStats}
           onCopy={onCopy}
           onDuplicate={handleDuplicate}
-          onSkip={onSkip}
-          onUnskip={onUnskip}
         />
       ) : null}
 

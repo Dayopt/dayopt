@@ -30,7 +30,7 @@ describe('unpackPlanRate', () => {
     expect(unpackPlanRate(null)).toEqual({
       totalEntries: 0,
       plannedEntries: 0,
-      planRate: 0,
+      planRate: null,
     });
   });
 
@@ -49,10 +49,10 @@ describe('unpackPlanRate', () => {
   });
 
   it('実値 0 → default と区別される', () => {
-    expect(unpackPlanRate({ totalEntries: 0, plannedEntries: 0, planRate: 0 })).toEqual({
+    expect(unpackPlanRate({ totalEntries: 0, plannedEntries: 0, planRate: null })).toEqual({
       totalEntries: 0,
       plannedEntries: 0,
-      planRate: 0,
+      planRate: null,
     });
   });
 });

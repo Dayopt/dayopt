@@ -1,3 +1,4 @@
+import { toDerivedBlock } from '@/lib/database';
 import 'server-only';
 
 /**
@@ -21,7 +22,7 @@ import {
   fetchActivitiesById,
   fetchCategoriesById,
   fetchPlans,
-  fetchRecordsByPlanIds,
+  fetchRecords,
 } from './statistics-fetchers';
 import { computeBlankRate, minutesBetween } from './statistics-service-grouping';
 import type { ServiceSupabaseClient } from './types';
@@ -35,7 +36,7 @@ export class StatisticsKpiService {
   constructor(private readonly supabase: ServiceSupabaseClient) {}
 
   /**
-   * `get_estimation_accuracy` 相当。`plans` LEFT JOIN `records`（1:N、`auto_migrated` 除外）。
+   * `get_estimation_accuracy` 相当。独立した予定と記録の期間合計比。
    * 詳細は `domain/estimation-accuracy.ts` の `aggregatePlanRecordEstimationAccuracy` を参照。
    */
   async getEstimationAccuracy(userId: string, range: DateRangeInput = {}) {
@@ -49,6 +50,7 @@ export class StatisticsKpiService {
       plans,
       activitiesById,
       categoriesById,
+      range,
     );
     return transformEstimationAccuracy(rows);
   }
@@ -69,24 +71,9 @@ export class StatisticsKpiService {
     plans: ReadonlyArray<StatPlanRow>,
     activitiesById: ReadonlyMap<string, ActivityLookupRow>,
     categoriesById: ReadonlyMap<string, CategoryLookupRow>,
+    range: DateRangeInput = {},
   ): Promise<EstimationAccuracyDbRow[]> {
-    const planIds = plans.map((plan) => plan.id);
-    const records =
-      planIds.length > 0 ? await fetchRecordsByPlanIds(this.supabase, userId, planIds) : [];
-
-    // activity_id が null の plan も未分類バケットとして集計に含める（#1576 を activity 軸へ踏襲）。
-    // フィルタは `aggregatePlanRecordEstimationAccuracy` 側が担う。
-    const planRows = plans.map((plan) => ({
-      id: plan.id,
-      activity_id: plan.activity_id,
-      planned_minutes: minutesBetween(plan.start_at, plan.end_at),
-    }));
-    const recordRows = records.map((record) => ({
-      plan_id: record.plan_id,
-      source: record.source,
-      minutes: minutesBetween(record.start_at, record.end_at),
-    }));
-
+    const records = await fetchRecords(this.supabase, userId, range);
     // アクティビティ自身は色を持たないため、所属カテゴリーの色をここで継承させておく
     const activityLookup: Map<string, EstimationAccuracyActivityLookup> = new Map(
       Array.from(activitiesById.entries()).map(([id, activity]) => {
@@ -96,6 +83,18 @@ export class StatisticsKpiService {
       }),
     );
 
-    return aggregatePlanRecordEstimationAccuracy(planRows, recordRows, activityLookup);
+    return aggregatePlanRecordEstimationAccuracy(
+      [
+        ...plans.map((row) => toDerivedBlock(row, 'plan')),
+        ...records.map((row) => toDerivedBlock(row, 'rec')),
+      ],
+      {
+        startAt: range.startDate ?? '1970-01-01T00:00:00Z',
+        endAt: range.endDate ?? new Date().toISOString(),
+        timezone: 'UTC',
+      },
+      new Date(),
+      activityLookup,
+    );
   }
 }

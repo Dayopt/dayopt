@@ -90,7 +90,7 @@
 --   provision_mcp_preview_environment_identity_v1(...)
 --     — data-less PR PreviewのURL/project-ref/JWT-refをinsert-onceで固定
 --   create/update/delete/restore_plan_command_v1(...)
---   set_plan_skipped_command_v1(...)
+--   set_plan_skipped_command_v1(...)           — 旧clientへ撤去案内を返す互換stub
 --   create/update/delete/restore_record_command_v1(...)
 --   record_plan_command_v1(...)
 --   confirm_day_plans_command_v1(...)

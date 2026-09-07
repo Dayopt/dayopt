@@ -1,14 +1,49 @@
 import type { Row } from './types';
 
+export const publicPlanSelect =
+  'id, user_id, activity_id, external_calendar_event_id, title, note, start_at, end_at, source, deleted_at, created_at, updated_at' as const;
+
+export type PublicPlanRow = Pick<
+  Row<'plans'>,
+  | 'id'
+  | 'user_id'
+  | 'activity_id'
+  | 'external_calendar_event_id'
+  | 'title'
+  | 'note'
+  | 'start_at'
+  | 'end_at'
+  | 'source'
+  | 'deleted_at'
+  | 'created_at'
+  | 'updated_at'
+>;
+
+export function toPublicPlanRow(row: Row<'plans'>): PublicPlanRow {
+  return {
+    id: row.id,
+    user_id: row.user_id,
+    activity_id: row.activity_id,
+    external_calendar_event_id: row.external_calendar_event_id,
+    title: row.title,
+    note: row.note,
+    start_at: row.start_at,
+    end_at: row.end_at,
+    source: row.source,
+    deleted_at: row.deleted_at,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+  };
+}
+
 export const publicRecordSelect =
-  'id, user_id, activity_id, plan_id, external_calendar_event_id, title, note, start_at, end_at, source, fulfillment, deleted_at, created_at, updated_at' as const;
+  'id, user_id, activity_id, external_calendar_event_id, title, note, start_at, end_at, source, fulfillment, deleted_at, created_at, updated_at' as const;
 
 export type PublicRecordRow = Pick<
   Row<'records'>,
   | 'id'
   | 'user_id'
   | 'activity_id'
-  | 'plan_id'
   | 'external_calendar_event_id'
   | 'title'
   | 'note'
@@ -26,7 +61,6 @@ export function toPublicRecordRow(row: Row<'records'>): PublicRecordRow {
     id: row.id,
     user_id: row.user_id,
     activity_id: row.activity_id,
-    plan_id: row.plan_id,
     external_calendar_event_id: row.external_calendar_event_id,
     title: row.title,
     note: row.note,

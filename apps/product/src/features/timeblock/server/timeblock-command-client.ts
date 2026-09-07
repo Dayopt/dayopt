@@ -97,8 +97,6 @@ type CommandOperation =
   | 'record_plan'
   | 'restore_plan'
   | 'restore_record'
-  | 'skip_plan'
-  | 'unskip_plan'
   | 'update_plan'
   | 'update_record';
 
@@ -108,8 +106,6 @@ const VERSIONED_TARGET_OPERATIONS = new Set<CommandOperation>([
   'record_plan',
   'restore_plan',
   'restore_record',
-  'skip_plan',
-  'unskip_plan',
   'update_plan',
   'update_record',
 ]);
@@ -122,13 +118,11 @@ const EXPECTED_COMMAND_ERRORS: Readonly<Record<string, string>> = {
   DT005: 'RECORD_IN_FUTURE',
   DT008: 'INVALID_INPUT',
   DT009: 'FORBIDDEN',
-  DT011: 'ALREADY_RECORDED',
   DT012: 'INVALID_INPUT',
   DT014: 'ACTIVITY_ARCHIVED',
 };
 
 const EXPECTED_COMMAND_MESSAGES: Readonly<Record<string, string>> = {
-  ALREADY_RECORDED: 'Plan already has an active record.',
   CONFLICT: 'This command conflicts with another change.',
   FORBIDDEN: 'This item cannot be changed.',
   INVALID_INPUT: 'The timeblock input is invalid.',
@@ -161,7 +155,7 @@ function throwCommandError(error: CommandError, operation: CommandOperation): ne
   if (mappedCode) throwExpectedCommandError(mappedCode);
 
   if (error.code === '23505') {
-    throwExpectedCommandError(operation === 'record_plan' ? 'ALREADY_RECORDED' : 'CONFLICT');
+    throwExpectedCommandError('CONFLICT');
   }
 
   if (error.code === '40P01' || error.code === '55P03') {
@@ -236,17 +230,6 @@ export class TimeblockCommandClient {
       this.admin.rpc('restore_plan_command_v1', {
         p_expected_updated_at: input.expectedUpdatedAt,
         p_plan_id: input.planId,
-        p_user_id: input.userId,
-      }),
-    );
-  }
-
-  async setPlanSkipped(input: VersionedPlanCommandInput & { skipped: boolean }): Promise<PlanRow> {
-    return this.run(input.skipped ? 'skip_plan' : 'unskip_plan', () =>
-      this.admin.rpc('set_plan_skipped_command_v1', {
-        p_expected_updated_at: input.expectedUpdatedAt,
-        p_plan_id: input.planId,
-        p_skipped: input.skipped,
         p_user_id: input.userId,
       }),
     );
@@ -348,7 +331,7 @@ export class TimeblockCommandClient {
     );
   }
 
-  private async run<TRow>(
+  private async run<TRow extends object>(
     operation: CommandOperation,
     request: () => PromiseLike<CommandResult<TRow>>,
   ): Promise<TRow> {
@@ -365,7 +348,7 @@ export class TimeblockCommandClient {
     });
   }
 
-  private async runMany<TRow>(
+  private async runMany<TRow extends object>(
     operation: CommandOperation,
     request: () => PromiseLike<CommandResult<TRow>>,
   ): Promise<TRow[]> {
@@ -374,7 +357,13 @@ export class TimeblockCommandClient {
     // known-safe failure is retried, and at most once, inside the server adapter.
     if (result.error?.code === '40P01') result = await request();
     if (result.error) throwCommandError(result.error, operation);
-    return result.data ?? [];
+    return (result.data ?? []).map((row) => {
+      // The expand stage still has inert legacy columns. Never expose them to new clients.
+      const projected = { ...row };
+      Reflect.deleteProperty(projected, 'plan_id');
+      Reflect.deleteProperty(projected, 'skipped_at');
+      return projected;
+    });
   }
 }
 
