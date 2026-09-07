@@ -13,6 +13,12 @@ interface IconTabSwitcherItem<TValue extends string> {
   icon?: ReactNode | undefined;
   /** 遷移で切り替える項目。省略すると `onValueChange` を呼ぶボタンになる。 */
   href?: string | undefined;
+  /**
+   * 選べない項目。`href` を持たないボタン項目にだけ効く。
+   * 出したまま押せなくするので、なぜ選べないかは呼び出し側が近くに書く
+   * （disabled な button は hover を受け付けず tooltip が出ないため）。
+   */
+  disabled?: boolean | undefined;
 }
 
 interface IconTabSwitcherProps<TValue extends string> {
@@ -76,8 +82,10 @@ function TabItem<TValue extends string>({
   active: boolean;
   onSelect?: (() => void) | undefined;
 }) {
+  const isDisabled = !item.href && item.disabled === true;
   const className = cn(
     'relative flex h-8 items-center justify-center rounded-lg transition-colors duration-150',
+    isDisabled && 'pointer-events-none opacity-50',
     item.icon
       ? // アイコンは 32px の正方形。44px は擬似要素で足す（Button の _square-sm と同じ技法）
         // eslint-disable-next-line tailwindcss/no-arbitrary-value -- 擬似要素を描くには content が要り、空文字以外に書きようがない
@@ -109,6 +117,7 @@ function TabItem<TValue extends string>({
       role="tab"
       aria-selected={active}
       aria-label={item.label}
+      disabled={isDisabled}
       onClick={onSelect}
       className={className}
     >
@@ -116,7 +125,8 @@ function TabItem<TValue extends string>({
     </button>
   );
 
-  if (!item.icon) return body;
+  // disabled な項目は hover を受け付けないので tooltip を付けても出ない
+  if (!item.icon || isDisabled) return body;
 
   return (
     <HoverTooltip content={item.label} side="bottom">

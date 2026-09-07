@@ -31,12 +31,15 @@ export { useTimeblockInspectorStore } from './stores/useTimeblockInspectorStore'
 export { computeActualTimeDiffOverlay, formatDiffMinutes } from './lib/actual-time-overlay';
 export { TIMEBLOCK_INSPECTOR_SLOT_KEY } from './lib/inspector-slot';
 export { TIMEBLOCK_PARAM, serializeTimeblockParam } from './lib/inspector-url';
-export { timeblockTintColor } from './lib/timeblock-tint';
 
 // =============================================================================
 // Domain (時間モデル — 純粋関数、DB/tRPC/React 非依存)
 // =============================================================================
-export { isPlanRecordDrop, resolveTimeblockDestination } from './domain/timeblock-destination';
+export {
+  isPlanRecordDrop,
+  resolveTimeblockDestination,
+  resolveTimeblockKindChoice,
+} from './domain/timeblock-destination';
 export type { TimeblockDestination } from './domain/timeblock-destination';
 // テンプレート（型）— 保存する組成を「生きた日」から取り出す（#2567）
 export { deriveTemplateBlocksFromDay } from './domain/plan-template-compose';
@@ -57,9 +60,12 @@ export { getTimeblockMenuItems } from './lib/timeblock-menu-items';
 // =============================================================================
 // Components (Inspector fields — 他 feature から再利用可能な入力 row)
 // =============================================================================
-export { ActivityFieldRow } from './components/inspector/fields/ActivityFieldRow';
+export { TimeblockEditor } from './components/editor/TimeblockEditor';
+export type { TimeModelEditorValue } from './components/editor/TimeblockEditor';
 export { DateTimeSection } from './components/inspector/fields/DateTimeSection';
-export { TimeConflictAlert } from './components/inspector/fields/TimeConflictAlert';
+export { InspectorHeaderActions } from './components/inspector/fields/InspectorHeaderActions';
+export { RecordFulfillmentRow } from './components/inspector/fields/RecordFulfillmentRow';
+export type { Fulfillment } from './schemas/timeblock';
 
 // ここにないものはfeature内部専用
 

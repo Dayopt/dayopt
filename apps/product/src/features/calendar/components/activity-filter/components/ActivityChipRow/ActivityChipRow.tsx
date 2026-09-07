@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 
 import { Plus } from 'lucide-react';
 import { useTranslations } from 'next-intl';
@@ -8,10 +8,9 @@ import { useTranslations } from 'next-intl';
 import { ActivityIcon, useActivities, useActivitiesMap } from '@/features/activities';
 
 import { useActivityModalNavigation } from '../../../../hooks/useActivityModalNavigation';
+import { useActivityQuickCreate } from '../../hooks/useActivityQuickCreate';
 
 import { cn } from '@dayopt/components';
-
-import { ActivityTimeblockCreatePopover } from '../ActivityTimeblockCreatePopover';
 
 interface ActivityChipRowProps {
   className?: string;
@@ -21,7 +20,7 @@ interface ActivityChipRowProps {
  * モバイル専用のアクティビティチップ行。
  *
  * - タイムライン下部の固定フッターに横一列で並ぶ（カテゴリー所属・未分類が混在）
- * - タップで bottom sheet `ActivityTimeblockCreatePopover` を開き、時刻指定してエントリ作成
+ * - タップで既定の長さのブロックを即作成し、詳細パネル（Drawer）で時刻を直す
  * - 行末に「+」ボタンを置き新規アクティビティを作成
  * - データソース: `useActivities()`（sidebar と同じ cache を参照、追加 fetch ゼロ）
  * - 並び順はサーバーの名前順に従う（`sort_order` は持たない）。PC サイドバーの
@@ -34,7 +33,7 @@ export function ActivityChipRow({ className }: ActivityChipRowProps) {
   const t = useTranslations();
   const { data: activities } = useActivities();
   const { getActivityById } = useActivitiesMap();
-  const [openActivityId, setOpenActivityId] = useState<string | null>(null);
+  const quickCreate = useActivityQuickCreate();
 
   const { openActivityCreateModal } = useActivityModalNavigation();
 
@@ -52,15 +51,10 @@ export function ActivityChipRow({ className }: ActivityChipRowProps) {
     [activities, getActivityById],
   );
 
-  const openActivity = useMemo(
-    () => chips.find((chip) => chip.id === openActivityId) ?? null,
-    [chips, openActivityId],
-  );
-
   if (chips.length === 0) return null;
 
-  const handleActivityTap = (activityId: string) => {
-    setOpenActivityId(activityId);
+  const handleActivityTap = (activityId: string, activityName: string) => {
+    quickCreate({ activityId, activityName });
   };
 
   return (
@@ -86,7 +80,7 @@ export function ActivityChipRow({ className }: ActivityChipRowProps) {
         <button
           key={chip.id}
           type="button"
-          onClick={() => handleActivityTap(chip.id)}
+          onClick={() => handleActivityTap(chip.id, chip.name)}
           className="hover:bg-state-hover flex h-12 min-w-16 shrink-0 flex-col items-center justify-center gap-1 rounded-lg px-2 transition-colors duration-150"
         >
           <ActivityIcon
@@ -108,17 +102,6 @@ export function ActivityChipRow({ className }: ActivityChipRowProps) {
         <Plus className="size-5" />
         <span className="max-w-16 truncate text-xs">{t('common.actions.add')}</span>
       </button>
-
-      {openActivity && (
-        <ActivityTimeblockCreatePopover
-          open={true}
-          onOpenChange={(o: boolean) => {
-            if (!o) setOpenActivityId(null);
-          }}
-          activity={openActivity}
-          isMobile
-        />
-      )}
     </div>
   );
 }

@@ -30,8 +30,7 @@ interface TimeblockDuplicateEditorValue {
   endAt: Date;
 }
 
-export type TimeblockDuplicateValidationReason =
-  'invalidRange' | 'planRequiresFuture' | 'recordRequiresPast';
+export type TimeblockDuplicateValidationReason = 'invalidRange' | 'recordRequiresPast';
 
 interface TimeblockDuplicateCreateInput {
   title: string;
@@ -62,7 +61,12 @@ export function createTimeblockDuplicateDraft({
   };
 }
 
-/** 複製先の日時変更とPlan / Recordの時間制約を検証する。 */
+/**
+ * 複製先の日時変更と Record の時間制約を検証する。
+ *
+ * Plan は時間軸のどこにでも置けるので時刻を問わない（2026-09-04 に DT004 を撤去済み）。
+ * Record だけが「未来に終われない」（DT005）。
+ */
 export function getTimeblockDuplicateValidationReason(
   draft: TimeblockDuplicateDraft,
   value: TimeblockDuplicateEditorValue,
@@ -70,9 +74,8 @@ export function getTimeblockDuplicateValidationReason(
 ): TimeblockDuplicateValidationReason | null {
   if (value.startAt >= value.endAt) return 'invalidRange';
 
-  const temporalKind = resolveTimeblockDestination(value.endAt, now);
-  if (temporalKind !== draft.kind) {
-    return draft.kind === 'plan' ? 'planRequiresFuture' : 'recordRequiresPast';
+  if (draft.kind === 'record' && resolveTimeblockDestination(value.endAt, now) === 'plan') {
+    return 'recordRequiresPast';
   }
 
   return null;

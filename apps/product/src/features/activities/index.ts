@@ -25,7 +25,7 @@ export {
 export { ActivityDeleteConfirmDialog } from './components/ActivityDeleteConfirmDialog';
 
 // 選択ピッカー（Inspector / 作成ポップオーバー / インラインパレットから開く）
-export { ActivityQuickSelector } from './components/ActivityQuickSelector';
+export { ActivityPickerList, ActivityQuickSelector } from './components/ActivityQuickSelector';
 export type { HoveredActivityInfo } from './components/ActivityQuickSelector';
 
 // 色・アイコンの解決

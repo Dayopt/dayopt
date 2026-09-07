@@ -135,7 +135,6 @@
         "created": "複製しました",
         "validation": {
           "invalidRange": "終了時刻は開始時刻より後にしてください",
-          "planRequiresFuture": "予定は未来の時間を選んでください",
           "recordRequiresPast": "記録は過去の時間を選んでください"
         }
       },

@@ -15,7 +15,7 @@
  *
  * この動的幅判定は表示だけでなく、ドラッグ中の pointer→lane 判定
  * （`resolveTwoLaneFromPointer`）・ドラッグゴースト（`CalendarGridContent.renderGhost`）・
- * 選択後パレット（`InlineActivityPalette`）・選択中プレビュー（`DragSelectionPreview`）の
+ * 選択後ハイライト（`DragSelectionHighlight`）・選択中プレビュー（`DragSelectionPreview`）の
  * 4 経路でも同じ `hasLaneCounterpart` を用いて揃える。表示上フル幅（境界不可視）なのに
  * pointer 判定だけ旧固定境界のままだと、境界の見えないカラムで意図せず
  * Plan→Record 変換 mutation が発火する（#2250 plan-review で検出、P1 級）。

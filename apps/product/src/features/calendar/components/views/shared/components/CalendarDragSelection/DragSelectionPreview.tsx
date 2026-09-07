@@ -95,8 +95,6 @@ export const DragSelectionPreview = memo(function DragSelectionPreview({
     : isPlan
       ? DEFAULT_PLAN_LANE_WIDTH_PERCENT
       : 100 - DEFAULT_PLAN_LANE_WIDTH_PERCENT;
-  const destinationLabel = tCalendar(`timeblock.preview.${kind}`);
-
   // 重複時は全面 destructive 化（drag/resize のゴーストと同一の ConflictOverlay に統一）
   if (isOverlapping) {
     return (
@@ -130,16 +128,15 @@ export const DragSelectionPreview = memo(function DragSelectionPreview({
         zIndex: 1000,
       }}
     >
+      {/*
+        「予定」「記録」の文言はここにも出さない（種別はタブと枠線 / 塗りつぶしの
+        見た目だけで示す。2026-09-07 User 指摘、ドラッグ中のプレビューにも同じ扱いを適用）。
+      */}
       {isCompact ? (
-        <span className="truncate font-medium">
-          {destinationLabel} · <span className="tabular-nums">{timeLabel}</span>
-        </span>
+        <span className="truncate font-medium tabular-nums">{timeLabel}</span>
       ) : (
         <>
-          <div className="flex min-h-0 items-start justify-between gap-1">
-            <span className="truncate font-medium">{tCalendar('timeblock.selectActivity')}</span>
-            <span className="text-muted-foreground shrink-0">{destinationLabel}</span>
-          </div>
+          <span className="truncate font-medium">{tCalendar('timeblock.selectActivity')}</span>
           <span className="text-muted-foreground truncate tabular-nums">{timeLabel}</span>
         </>
       )}
