@@ -20,10 +20,10 @@ import { useActivitiesMap } from '@/features/activities';
 import { MEDIA_QUERIES } from '@/lib/breakpoints';
 import { useDomSlot } from '@/lib/dom-slots/useDomSlot';
 import { useMediaQuery } from '@/lib/hooks/useMediaQuery';
+import { overlappingRecords, type DerivedBlock } from '@/lib/time';
 import { api } from '@/lib/trpc';
 import { Drawer, DrawerContent, DrawerTitle, Spinner } from '@dayopt/components';
 
-import { overlappingRecords, toDerivedBlock } from '../../domain/derived-model';
 import type { TimeblockDestination } from '../../domain/timeblock-destination';
 import { useInspectorURLSync } from '../../hooks/useInspectorURLSync';
 import { TIMEBLOCK_INSPECTOR_SLOT_KEY } from '../../lib/inspector-slot';
@@ -53,6 +53,35 @@ interface TimeModelInspectorProps {
 
 const INSPECTOR_FOCUSABLE_SELECTOR =
   'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+function toInspectorDerivedBlock(
+  row: {
+    id: string;
+    activity_id: string | null;
+    start_at: string;
+    end_at: string;
+    note?: string | null;
+    fulfillment?: string | null;
+    source?: string;
+  },
+  kind: 'plan' | 'rec',
+): DerivedBlock {
+  const fulfillment = row.fulfillment;
+  return {
+    id: row.id,
+    kind,
+    activityId: row.activity_id,
+    start: row.start_at,
+    end: row.end_at,
+    memo: row.note ?? null,
+    fulfillment:
+      fulfillment === 'low' || fulfillment === 'medium' || fulfillment === 'high'
+        ? fulfillment
+        : null,
+    live: false,
+    source: row.source ?? 'manual',
+  };
+}
 
 /** plans / records 対応 Inspector のトップレベル（モバイル=Drawer / PC=DockedInspectorPanel） */
 export function TimeblockInspector({
@@ -148,8 +177,8 @@ export function TimeblockInspector({
             const rows = relatedRecordsQuery.data ?? [];
             const ids = new Set(
               overlappingRecords(
-                toDerivedBlock(plan, 'plan'),
-                rows.map((row) => toDerivedBlock(row, 'rec')),
+                toInspectorDerivedBlock(plan, 'plan'),
+                rows.map((row) => toInspectorDerivedBlock(row, 'rec')),
                 new Date(),
               ).map((row) => row.id),
             );

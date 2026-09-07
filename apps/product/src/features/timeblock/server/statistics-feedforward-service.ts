@@ -8,11 +8,11 @@ import 'server-only';
  * 変換だけを担う。
  */
 
+import { toDerivedBlock } from '@/lib/database';
 import { MS_PER_DAY } from '@/lib/date/constants';
 
 import { aggregateActivityEstimationFactors, type ActivityEstimationFactor } from '../domain';
 
-import { toDerivedBlock } from '../domain/derived-model';
 import { fetchPlansForEstimation, fetchRecords } from './statistics-fetchers';
 import type { ServiceSupabaseClient } from './types';
 

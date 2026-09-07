@@ -7,6 +7,7 @@ DECLARE
   other_user uuid := gen_random_uuid();
   p public.plans%ROWTYPE;
   r public.records%ROWTYPE;
+  legacy_record public.records%ROWTYPE;
   a uuid := gen_random_uuid();
   before_plan jsonb;
   before_record jsonb;
@@ -36,6 +37,11 @@ BEGIN
   IF (SELECT to_jsonb(plan) FROM public.plans plan WHERE id = p.id) IS DISTINCT FROM before_plan THEN
     RAISE EXCEPTION 'moving the record changed the plan';
   END IF;
+  SELECT * INTO p FROM private.set_plan_skipped_unserialized_v1(u, p.id, p.updated_at, true);
+  IF p.skipped_at IS NULL THEN RAISE EXCEPTION 'legacy skip compatibility did not update the plan'; END IF;
+  SELECT * INTO p FROM private.set_plan_skipped_unserialized_v1(u, p.id, p.updated_at, false);
+  IF p.skipped_at IS NOT NULL THEN RAISE EXCEPTION 'legacy unskip compatibility did not update the plan'; END IF;
+  before_plan := to_jsonb(p);
   SELECT count(*) INTO count_created FROM private.confirm_day_plans_unserialized_v1(u, p.start_at, p.start_at + interval '1 day');
   IF count_created <> 1 THEN RAISE EXCEPTION 'empty original period was not recordable'; END IF;
   SELECT count(*) INTO count_created FROM private.confirm_day_plans_unserialized_v1(u, p.start_at, p.start_at + interval '1 day');
@@ -46,13 +52,15 @@ BEGIN
     (u,'partial record',p.start_at + interval '6 hours 45 minutes',p.start_at + interval '7 hours 15 minutes','manual');
   SELECT count(*) INTO count_created FROM private.confirm_day_plans_unserialized_v1(u, p.start_at, p.start_at + interval '1 day');
   IF count_created <> 0 THEN RAISE EXCEPTION 'partly occupied plan was copied or trimmed'; END IF;
-  BEGIN
-    PERFORM private.create_record_unserialized_v1(u, 'legacy request', NULL, p.id, NULL, 'manual', p.start_at, p.end_at);
-    RAISE EXCEPTION 'legacy link request was silently accepted';
-  EXCEPTION WHEN SQLSTATE 'DT012' THEN NULL;
-  END;
+  SELECT * INTO legacy_record FROM private.create_record_unserialized_v1(
+    u, 'legacy request', NULL, p.id, NULL, 'manual', p.start_at - interval '4 hours', p.end_at - interval '4 hours'
+  );
+  IF legacy_record.plan_id IS NOT NULL THEN RAISE EXCEPTION 'legacy create persisted a link'; END IF;
+  SELECT * INTO legacy_record FROM private.delete_record_unserialized_v1(
+    u, legacy_record.id, legacy_record.updated_at
+  );
   INSERT INTO public.activities(id,user_id,name) VALUES(a,u,'changed activity');
-  SELECT * INTO r FROM private.update_record_unserialized_v1(u, r.id, r.updated_at, r.title, r.note, NULL, NULL,
+  SELECT * INTO r FROM private.update_record_unserialized_v1(u, r.id, r.updated_at, r.title, r.note, p.id, NULL,
     r.start_at, r.end_at + interval '30 minutes', a, true);
   IF (SELECT to_jsonb(plan) FROM public.plans plan WHERE id = p.id) IS DISTINCT FROM before_plan THEN
     RAISE EXCEPTION 'resize or activity change mutated the plan';
@@ -81,12 +89,9 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM public.records WHERE id = r.id AND deleted_at IS NULL) THEN
     RAISE EXCEPTION 'record restore depends on deleted plan';
   END IF;
-  IF private.undo_field_applicable_v1('skipped_at', 'plan') THEN RAISE EXCEPTION 'new skip receipt remains applicable'; END IF;
-  BEGIN
-    PERFORM private.set_plan_skipped_unserialized_v1(u, p.id, p.updated_at, true);
-    RAISE EXCEPTION 'retired skip accepted';
-  EXCEPTION WHEN SQLSTATE 'DT012' THEN NULL;
-  END;
+  IF NOT private.undo_field_applicable_v1('skipped_at', 'plan') THEN
+    RAISE EXCEPTION 'expand compatibility rejected old Plan receipt fields';
+  END IF;
 END;
 $test$;
 ROLLBACK;

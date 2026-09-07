@@ -25,3 +25,22 @@ INSERT INTO public.undo_receipt_effects(id,user_id,receipt_id,record_id,effect_k
 VALUES ('a1234567-0000-4000-8000-000000000042','a1234567-0000-4000-8000-000000000001','a1234567-0000-4000-8000-000000000041','a1234567-0000-4000-8000-000000000021','update');
 INSERT INTO public.undo_receipt_field_changes(effect_id,user_id,field_name,before_value,after_value)
 VALUES ('a1234567-0000-4000-8000-000000000042','a1234567-0000-4000-8000-000000000001','title','"ordinary undo restored"','"linked record"');
+
+-- 旧アプリの通常Plan作成receiptはfull maskにskipped_atを含む。skip操作とは区別して維持する。
+INSERT INTO public.undo_receipts(id,user_id,operation_id,command_name,undo_expires_at,recorded_effect_count)
+VALUES ('a1234567-0000-4000-8000-000000000051','a1234567-0000-4000-8000-000000000001',gen_random_uuid(),'plans.create',now()+interval '1 hour',1);
+INSERT INTO public.undo_receipt_effects(id,user_id,receipt_id,plan_id,effect_kind)
+VALUES ('a1234567-0000-4000-8000-000000000052','a1234567-0000-4000-8000-000000000001','a1234567-0000-4000-8000-000000000051','a1234567-0000-4000-8000-000000000011','insert');
+INSERT INTO public.undo_receipt_field_changes(effect_id,user_id,field_name,before_value,after_value)
+SELECT 'a1234567-0000-4000-8000-000000000052', user_id, field_name, 'null'::jsonb, after_value
+FROM public.plans
+CROSS JOIN LATERAL (
+  VALUES
+    ('title', coalesce(to_jsonb(title), 'null'::jsonb)),
+    ('note', coalesce(to_jsonb(note), 'null'::jsonb)),
+    ('start_at', coalesce(to_jsonb(start_at), 'null'::jsonb)),
+    ('end_at', coalesce(to_jsonb(end_at), 'null'::jsonb)),
+    ('skipped_at', coalesce(to_jsonb(skipped_at), 'null'::jsonb)),
+    ('deleted_at', coalesce(to_jsonb(deleted_at), 'null'::jsonb))
+) AS mask(field_name, after_value)
+WHERE id = 'a1234567-0000-4000-8000-000000000011';

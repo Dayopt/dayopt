@@ -5,7 +5,7 @@
 ## 配備順と復旧
 
 1. `[hours]` 本番と同じ旧スキーマの隔離環境へバックアップを復元する。予定・記録について `id` と全列を保存し、復元できることを確認する。実値をリポジトリへ保存しない。
-2. `[hours]` `supabase/migrations/20260907081237_independent_plan_record_commands.sql` を適用する。旧列は残すが、FK・関連トリガー・関連一意制約を外し、書き込み関数を独立操作へ置換する。特に FK をこの段階で外し、予定削除による記録への副作用をなくす。旧非nullリンク入力・skip操作は明示的に拒否する。
+2. `[hours]` `supabase/migrations/20260907081237_independent_plan_record_commands.sql` を適用する。旧列は残すが、FK・関連トリガー・関連一意制約を外し、書き込み関数を独立操作へ置換する。特に FK をこの段階で外し、予定削除による記録への副作用をなくす。旧アプリが送るリンク引数は受理して保存せず、旧skip writerはロールバック互換のため維持する。
 3. `[hours]` アプリを更新し、Previewで操作・API・Undo・集計を検証する。契約撤去前なら旧コードと旧関数へ戻せる。ただし新規の独立記録を勝手に再リンクしてはならない。
 4. `[irreversible]` 独立レビュー・Preview確認・バックアップ復元検証と明示的な出荷指示が揃った後、列撤去だけの別PRで通常migrationを新規作成する。その時点の未適用migration順序に合わせて新しいtimestampを使い、第1PRにはDROP文を同梱しない。
 5. `[irreversible]` 撤去を適用する。`CASCADE` は使わず依存関数・列を明示的に落とす。以後の関連情報・旧状態の復旧にはバックアップが必要。保持列・行集合に意図しない差があれば移行失敗として扱う。
@@ -22,15 +22,15 @@
 
 比較は両方向の `EXCEPT` で、ID集合・件数・全保持列（所有者、論理削除、更新日時、外部参照を含む）を検証する。第1段階のfixture検証は差分0件で、旧リンク付き記録1件と旧skip付き予定1件が保持された。列撤去段階は別PRで同じ検証を再実行する。
 
-`supabase/tests/independent-plan-record.sql` はトランザクション内で操作し、最後にrollbackする。コピー、重複拒否、移動・伸縮・アクティビティ変更、再コピー、一部重複の一括除外、一括再実行、所有者分離、削除・復元、旧入力拒否を検証する。
+`supabase/tests/independent-plan-record.sql` はトランザクション内で操作し、最後にrollbackする。コピー、重複拒否、移動・伸縮・アクティビティ変更、再コピー、一部重複の一括除外、一括再実行、所有者分離、削除・復元、旧入力を保存に使わないことを検証する。
 
 ## 公開契約
 
-- MCP読み取りスキーマはv4。予定・記録の関連IDとskip状態は返さない。nullまたは省略のリンク入力は独立作成として受理し、非nullは更新案内付き入力エラー。
+- MCP読み取りスキーマはv4。予定・記録の関連IDとskip状態は返さない。nullまたは省略のリンク入力は独立作成として受理し、非nullは更新案内付き入力エラー。ただし配備前に同じ旧入力で成功済みのoperationIdは、保存済みreceiptを先に照合して冪等に再生する。
 - MCP reviewの期間は `active_overlapping_period` / `clipped_to_period`。従来の開始時刻による選択・全行時間から期間交差時間へ変更する。予算差・精度の既存フィールドは維持する。
 - レポートの予定比・見積もり係数は記録合計 / 経過済み予定合計。分母15分未満は表示しない。作成時見積もりは直近28日の期間合計比で、予定別比率の中央値ではない。
 - CSVからリンク・skip列を除く。外部カレンダー参照は維持する。
-- 過去のmutation receiptの版と冪等性digestは変更しない。旧skip field changeを含むUndoは、適用前にDR008で原子的に拒否する。通常のUndo対象IDは関連IDではない。
+- 過去のmutation receiptの版と冪等性digestは変更しない。旧skip更新のUndoは適用前にDR008で原子的に拒否する。full maskにskipped_atを含む旧形式の通常Plan作成Undoは維持する。通常のUndo対象IDは関連IDではない。
 
 ## 監査の分類
 
@@ -45,8 +45,9 @@
 ## ローカル検証記録
 
 - Node 24で `pnpm check`: exit 0。内包するtypecheck、lint、境界・token・format・i18n・copy検査、deadcode検査を通過。
-- 同コマンドの単体テストは合計5,700件（Product 3,941、Web 288、scripts 1,402、共有package 69）。
-- `derived-migration-after.sql`: 第1段階で保持列一致。移行前に保存した旧skip receiptのDR008による原子的拒否、通常Undoの再試行も検証。
+- 同コマンドの単体テストは合計5,701件（Product 3,942、Web 288、scripts 1,402、共有package 69）。
+- `derived-migration-after.sql`: 第1段階で保持列一致。移行前に保存した旧skip更新receiptのDR008による原子的拒否、旧形式の通常Plan作成Undo、通常Undoの再試行も検証。
 - `independent-plan-record-concurrency.py dayopt_derived_pr1_*`: 同時一括要求の作成数 `[0, 1]`、保存記録1件。
-- API経由の既存結合テストの旧リンク期待値は更新したが、HTTP経由での実行と認証済みカレンダー/InspectorのE2Eは未実施。既存の共有ローカルSupabaseは旧スキーマのままであり、そこへ今回のmigrationを適用して検証したことにはしない。Previewと独立レビューも未実施。
+- API経由の既存結合テストの旧リンク期待値は更新したが、HTTP経由での実行と認証済みカレンダー/InspectorのE2Eは未実施。既存の共有ローカルSupabaseは旧スキーマのままであり、そこへ今回のmigrationを適用して検証したことにはしない。Supabase/Vercel Previewは成功。
+- 独立レビューで修正した点: DB先行配備中の旧writer互換、成功済みMCP再送、旧形式の通常Plan作成Undo、公開tRPCのskip入力、純粋モデルとDB変換の配置。
 - セルフレビューで修正した点: 拡張段階にも残るFKの副作用、旧列がAPI応答へ混ざる問題、取得上限による集計漏れ、変更後の集計キャッシュ再取得。

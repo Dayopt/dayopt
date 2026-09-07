@@ -68,6 +68,3 @@ export { RecordFulfillmentRow } from './components/inspector/fields/RecordFulfil
 export type { Fulfillment } from './schemas/timeblock';
 
 // ここにないものはfeature内部専用
-
-export { aggregate, overlappingRecords, toDerivedBlock } from './domain/derived-model';
-export type { DerivedBlock } from './domain/derived-model';

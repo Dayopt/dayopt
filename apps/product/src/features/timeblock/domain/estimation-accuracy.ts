@@ -1,4 +1,4 @@
-import { aggregate, type DerivedBlock, type DerivedPeriod } from './derived-model';
+import { aggregate, type DerivedBlock, type DerivedPeriod } from '@/lib/time';
 
 /**
  * 見積もり精度（estimation accuracy）の pure transformation。

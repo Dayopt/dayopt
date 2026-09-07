@@ -5,6 +5,10 @@ import { planFilterSchema, recordFilterSchema } from './timeblock';
 const planId = '11111111-1111-4111-8111-111111111111';
 
 describe('timeblock relation filters', () => {
+  it('廃止したskip入力を拒否する', () => {
+    expect(planFilterSchema.safeParse({ includeSkipped: false }).success).toBe(false);
+  });
+
   it('UUID配列を受け入れる', () => {
     expect(planFilterSchema.safeParse({ ids: [planId] }).success).toBe(true);
     expect(recordFilterSchema.safeParse({ planIds: [planId] }).success).toBe(false);

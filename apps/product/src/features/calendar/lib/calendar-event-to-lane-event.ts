@@ -7,13 +7,8 @@
  * 有無だけを読み取り時に導出する。
  */
 
-import {
-  overlappingRecords,
-  type DerivedBlock,
-  type PlanEvent,
-  type PlanEventStatus,
-  type RecordEvent,
-} from '@/features/timeblock';
+import { type PlanEvent, type PlanEventStatus, type RecordEvent } from '@/features/timeblock';
+import { overlappingRecords, type DerivedBlock } from '@/lib/time';
 
 import type { CalendarDisplayEvent } from '../types/calendar.types';
 

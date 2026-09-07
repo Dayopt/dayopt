@@ -1,4 +1,4 @@
-import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
+import { execFileSync, spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { once } from 'node:events';
 
 import { createClient } from '@supabase/supabase-js';
@@ -364,6 +364,58 @@ function applyCreate(
     .single();
 }
 
+function insertHistoricalCreateReceipt(input: {
+  authorization: WriteAuthorization;
+  operationId: string;
+  record: RecordRow;
+  planId: string;
+  title: string;
+  startAt: string;
+  endAt: string;
+}) {
+  execFileSync(
+    'psql',
+    [
+      ...psqlArgs({
+        user_id: userId,
+        connection_id: input.authorization.connectionId,
+        operation_id: input.operationId,
+        resource_id: input.record.id,
+        resource_version: input.record.updated_at,
+        plan_id: input.planId,
+        title: input.title,
+        start_at: input.startAt,
+        end_at: input.endAt,
+      }),
+      '-c',
+      `INSERT INTO public.mcp_mutation_receipts (
+        user_id, client_id, operation_id, origin_connection_id, envelope_version,
+        tool_name, request_digest, resource_type, resource_id, resource_version
+      )
+      SELECT
+        :'user_id'::UUID, connection.client_id, :'operation_id'::UUID,
+        :'connection_id'::UUID, 1, 'records.create',
+        private.digest_mcp_mutation_envelope_v1(
+          'records.create',
+          pg_catalog.jsonb_build_object(
+            'title', :'title'::TEXT,
+            'note', NULL::TEXT,
+            'tagId', NULL::UUID,
+            'planId', :'plan_id'::UUID,
+            'externalCalendarEventId', NULL::UUID,
+            'source', 'api',
+            'startAt', pg_catalog.to_char(:'start_at'::TIMESTAMPTZ AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"'),
+            'endAt', pg_catalog.to_char(:'end_at'::TIMESTAMPTZ AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')
+          )
+        ),
+        'record', :'resource_id'::UUID, :'resource_version'::TIMESTAMPTZ
+      FROM public.oauth_connections AS connection
+      WHERE connection.id = :'connection_id'::UUID;`,
+    ],
+    { env: psqlEnv(), stdio: 'pipe' },
+  );
+}
+
 function applyUpdate(
   authorization: WriteAuthorization,
   operationId: string,
@@ -508,8 +560,28 @@ describe.skipIf(!RUN_LOCAL)('MCP Record create, update, delete, and restore appl
       startAt: at(-6 * 60 * 60_000),
       endAt: at(-5 * 60 * 60_000),
     };
-    const linked = await applyCreate(authorization, linkedOperationId, linkedInput);
+    const historicalRecord = await createRecord({
+      ...linkedInput,
+      planId: plan.id,
+      source: 'api',
+    });
+    insertHistoricalCreateReceipt({
+      authorization,
+      operationId: linkedOperationId,
+      record: historicalRecord,
+      planId: plan.id,
+      ...linkedInput,
+    });
+
+    const linked = await applyCreate(authorization, linkedOperationId, {
+      ...linkedInput,
+      planId: plan.id,
+    });
     expect(linked.error).toBeNull();
+    expect(linked.data).toMatchObject({
+      resource_id: historicalRecord.id,
+      replayed: true,
+    });
 
     const { data: persisted } = await admin
       .from('records')
@@ -530,15 +602,21 @@ describe.skipIf(!RUN_LOCAL)('MCP Record create, update, delete, and restore appl
       })
       .single();
     expect(deleteError).toBeNull();
-    const { error: skipError } = await admin.rpc('set_plan_skipped_command_v1', {
-      p_user_id: userId,
-      p_plan_id: plan.id,
-      p_expected_updated_at: plan.updated_at,
-      p_skipped: true,
-    });
-    expect(skipError?.code).toBe('DT012');
+    const { data: skippedPlan, error: skipError } = await admin
+      .rpc('set_plan_skipped_command_v1', {
+        p_user_id: userId,
+        p_plan_id: plan.id,
+        p_expected_updated_at: plan.updated_at,
+        p_skipped: true,
+      })
+      .single();
+    expect(skipError).toBeNull();
+    expect(skippedPlan?.skipped_at).not.toBeNull();
 
-    const replay = await applyCreate(authorization, linkedOperationId, linkedInput);
+    const replay = await applyCreate(authorization, linkedOperationId, {
+      ...linkedInput,
+      planId: plan.id,
+    });
     expect(replay.error).toBeNull();
     expect(replay.data).toEqual({ ...linked.data!, replayed: true });
     expect(deleted?.deleted_at).not.toBeNull();

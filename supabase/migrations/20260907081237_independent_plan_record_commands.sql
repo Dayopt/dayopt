@@ -23,9 +23,8 @@ BEGIN
     p_user_id,
     p_external_calendar_event_id
   );
-  IF p_plan_id IS NOT NULL THEN
-    RAISE EXCEPTION 'Plan links have been removed; omit planId when creating a Record' USING ERRCODE = 'DT012';
-  END IF;
+  -- Expand段階では旧アプリが送るplanIdを受理するが、保存には使わない。
+  -- これによりDB先行配備とアプリrollbackの間も独立Recordとして作成できる。
 
   IF p_source IS NULL
     OR p_source <> ALL (ARRAY['manual', 'external_calendar', 'api']::TEXT[])
@@ -99,9 +98,7 @@ BEGIN
     RAISE EXCEPTION 'Invalid Record fulfillment value' USING ERRCODE = 'DT012';
   END IF;
 
-  IF p_plan_id IS NOT NULL THEN
-    RAISE EXCEPTION 'Plan links have been removed; omit planId when updating a Record' USING ERRCODE = 'DT012';
-  END IF;
+  -- Expand段階では旧アプリが既存値として送るplanIdを受理するが、更新には使わない。
 
   PERFORM public.assert_timeblock_content_v1(p_title, p_note);
   IF v_next_activity_id IS DISTINCT FROM v_record.activity_id THEN
@@ -596,9 +593,6 @@ DECLARE
   v_receipt public.mcp_mutation_receipts%ROWTYPE;
   v_record public.records%ROWTYPE;
 BEGIN
-  IF p_plan_id IS NOT NULL THEN
-    RAISE EXCEPTION 'Plan links have been removed; omit planId and refresh the tool schema' USING ERRCODE = 'DT012';
-  END IF;
   IF COALESCE(auth.jwt() ->> 'role', '') <> 'service_role' THEN
     RAISE EXCEPTION 'Access denied'
       USING ERRCODE = '42501';
@@ -700,6 +694,11 @@ BEGIN
     RETURN;
   END IF;
 
+  -- 旧形式で完了済みのmutationは上で再生する。receiptが無い新規リンク要求だけ拒否する。
+  IF p_plan_id IS NOT NULL THEN
+    RAISE EXCEPTION 'Plan links have been removed; omit planId and refresh the tool schema' USING ERRCODE = 'DT012';
+  END IF;
+
   SELECT record.*
   INTO v_record
   FROM public.create_record_command_v1(
@@ -775,8 +774,43 @@ CREATE OR REPLACE FUNCTION private.set_plan_skipped_unserialized_v1(p_user_id uu
  LANGUAGE plpgsql
  SET search_path TO ''
 AS $function$
+DECLARE
+  v_plan public.plans%ROWTYPE;
 BEGIN
-  RAISE EXCEPTION 'Manual skip has been removed; refresh the client' USING ERRCODE = 'DT012';
+  -- アプリ切替中の旧クライアントとrollbackだけを支えるexpand互換writer。
+  -- 新アプリはこの関数を呼ばず、contract段階で列と一緒に撤去する。
+  IF p_skipped IS NULL THEN
+    RAISE EXCEPTION 'Skipped state is required' USING ERRCODE = '22023';
+  END IF;
+
+  SELECT plan.* INTO v_plan
+  FROM public.plans AS plan
+  WHERE plan.id = p_plan_id
+    AND plan.user_id = p_user_id
+    AND plan.deleted_at IS NULL
+  FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Plan not found' USING ERRCODE = 'DT001';
+  END IF;
+  IF p_expected_updated_at IS NULL
+    OR v_plan.updated_at IS DISTINCT FROM p_expected_updated_at THEN
+    RAISE EXCEPTION 'Plan version conflict' USING ERRCODE = 'DT002';
+  END IF;
+
+  IF (p_skipped AND v_plan.skipped_at IS NOT NULL)
+    OR (NOT p_skipped AND v_plan.skipped_at IS NULL) THEN
+    RETURN NEXT v_plan;
+    RETURN;
+  END IF;
+
+  RETURN QUERY
+  UPDATE public.plans
+  SET skipped_at = CASE WHEN p_skipped THEN pg_catalog.now() ELSE NULL END
+  WHERE id = p_plan_id
+    AND user_id = p_user_id
+    AND deleted_at IS NULL
+  RETURNING public.plans.*;
 END;
 $function$;
 
@@ -790,7 +824,7 @@ AS $function$
   -- その resource_type が持つ allowlist 対象列を漏れなく含まなければならない。
   -- 1列でも漏れると、その列への正当な事後編集がDELETEに巻き込まれ silent に消える。
   SELECT CASE p_resource_type
-    WHEN 'plan' THEN ARRAY['deleted_at', 'end_at', 'note', 'start_at', 'title']
+    WHEN 'plan' THEN ARRAY['deleted_at', 'end_at', 'note', 'skipped_at', 'start_at', 'title']
     WHEN 'record' THEN ARRAY['deleted_at', 'end_at', 'note', 'start_at', 'title']
     ELSE NULL
   END;
@@ -805,7 +839,7 @@ AS $function$
   -- skipped_at は plans にしか存在しない列（records には無い）。
   -- それ以外のallowlist列（title/note/start_at/end_at/deleted_at）は両resourceに存在する。
   SELECT CASE
-    WHEN p_field_name = 'skipped_at' THEN FALSE
+    WHEN p_field_name = 'skipped_at' THEN p_resource_type = 'plan'
     ELSE TRUE
   END;
 $function$;
@@ -922,7 +956,9 @@ BEGIN
   IF EXISTS (
     SELECT 1 FROM public.undo_receipt_field_changes AS change
     JOIN public.undo_receipt_effects AS effect ON effect.id = change.effect_id
-    WHERE effect.receipt_id = p_receipt_id AND change.field_name = 'skipped_at'
+    WHERE effect.receipt_id = p_receipt_id
+      AND effect.effect_kind = 'update'
+      AND change.field_name = 'skipped_at'
   ) THEN
     RAISE EXCEPTION 'This receipt contains a retired skip change and cannot be undone' USING ERRCODE = 'DR008';
   END IF;
@@ -1022,6 +1058,7 @@ AS $function$
     WHEN 'note' THEN 'text'
     WHEN 'start_at' THEN 'timestamptz'
     WHEN 'end_at' THEN 'timestamptz'
+    WHEN 'skipped_at' THEN 'timestamptz'
     WHEN 'deleted_at' THEN 'timestamptz'
     ELSE NULL
   END;

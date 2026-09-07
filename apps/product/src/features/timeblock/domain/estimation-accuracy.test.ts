@@ -1,5 +1,5 @@
+import { toDerivedBlock } from '@/lib/database';
 import { describe, expect, it } from 'vitest';
-import { toDerivedBlock } from './derived-model';
 
 import {
   aggregatePlanRecordEstimationAccuracy,

@@ -1,9 +1,9 @@
+import { toDerivedBlock } from '@/lib/database';
 import { describe, expect, it } from 'vitest';
 import {
   aggregateActivityEstimationFactors,
   projectActualMinutes,
 } from './activity-estimation-factor';
-import { toDerivedBlock } from './derived-model';
 
 it('uses independent total durations and requires three plans', () => {
   const period = {

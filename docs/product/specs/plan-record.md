@@ -69,7 +69,7 @@ Dayoptの中心概念。「予定を立てる → 記録する → 差分を見�
 
 ## 共通導出
 
-`domain/derived-model.ts` の `overlappingRecords` と `aggregate` が正本。保存型とは別の読み取り型を使う。
+`apps/product/src/lib/time/derived-model.ts` の `overlappingRecords` と `aggregate` が正本。保存型とは別の読み取り型を使う。
 
 - 期間は `[startAt, endAt)` とユーザーのタイムゾーンで指定する。週の開始日は既存設定から解決する。
 - 記録・予定は期間との交差時間を計上する。経過済み予定は終了を `min(end, now)` で切り、負の時間を計上しない。

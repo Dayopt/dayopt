@@ -107,33 +107,3 @@ export function aggregate(
   }
   return result;
 }
-
-/** Shared projection for DB readers; it deliberately cannot carry relation fields. */
-export function toDerivedBlock(
-  row: {
-    id: string;
-    activity_id: string | null;
-    start_at: string;
-    end_at: string;
-    note?: string | null;
-    fulfillment?: string | null;
-    source?: string;
-  },
-  kind: 'plan' | 'rec',
-): DerivedBlock {
-  const fulfillment = row.fulfillment;
-  return {
-    id: row.id,
-    kind,
-    activityId: row.activity_id,
-    start: row.start_at,
-    end: row.end_at,
-    memo: row.note ?? null,
-    fulfillment:
-      fulfillment === 'low' || fulfillment === 'medium' || fulfillment === 'high'
-        ? fulfillment
-        : null,
-    live: false,
-    source: row.source ?? 'manual',
-  };
-}

@@ -1,5 +1,6 @@
+import { toDerivedBlock } from '@/lib/database';
+import { aggregate, overlappingRecords } from '@/lib/time';
 import 'server-only';
-import { aggregate, overlappingRecords, toDerivedBlock } from '../domain/derived-model';
 
 /**
  * 統計 service — Summary: streak / KPI サマリー

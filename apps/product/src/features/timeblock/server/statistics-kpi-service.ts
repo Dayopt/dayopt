@@ -1,5 +1,5 @@
+import { toDerivedBlock } from '@/lib/database';
 import 'server-only';
-import { toDerivedBlock } from '../domain/derived-model';
 
 /**
  * 統計 service — KPI: 見積もり精度・空白率

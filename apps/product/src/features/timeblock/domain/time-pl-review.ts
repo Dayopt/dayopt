@@ -1,6 +1,6 @@
 import { computePlanAccuracy, computePlanVariance, type PlanAccuracyStatus } from '@/lib/time';
 
-import { aggregate, type DerivedBlock, type DerivedPeriod } from './derived-model';
+import { aggregate, type DerivedBlock, type DerivedPeriod } from '@/lib/time';
 
 export interface TimePLReviewSourceRow {
   /** アクティビティ未設定、およびアクティビティ削除で `activity_id = NULL` になった行は null */

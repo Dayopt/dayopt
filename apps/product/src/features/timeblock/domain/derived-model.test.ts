@@ -1,5 +1,5 @@
+import { aggregate, overlappingRecords, type DerivedBlock } from '@/lib/time';
 import { describe, expect, it } from 'vitest';
-import { aggregate, overlappingRecords, type DerivedBlock } from './derived-model';
 
 const now = new Date('2026-09-07T23:00:00Z');
 const period = { startAt: '2026-09-07T00:00:00Z', endAt: '2026-09-14T00:00:00Z', timezone: 'UTC' };

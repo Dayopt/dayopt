@@ -1,6 +1,7 @@
 import 'server-only';
 
-import { aggregate, toDerivedBlock } from '@/features/timeblock';
+import { toDerivedBlock } from '@/lib/database';
+import { aggregate } from '@/lib/time';
 
 import {
   clipMinutes,

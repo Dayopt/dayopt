@@ -1,3 +1,4 @@
+export { toDerivedBlock } from './derived-block-projection';
 export { Constants } from './generated/database.types';
 export type {
   CompositeTypes,

@@ -1,4 +1,4 @@
-import { aggregate, type DerivedBlock, type DerivedPeriod } from './derived-model';
+import { aggregate, type DerivedBlock, type DerivedPeriod } from '@/lib/time';
 
 export interface ActivityEstimationFactor {
   activityId: string;
