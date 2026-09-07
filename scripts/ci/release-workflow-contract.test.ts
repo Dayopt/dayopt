@@ -389,6 +389,24 @@ describe('release workflow contract', () => {
     expect(grantCount).toBe(1);
   });
 
+  it('keeps every step name used as a slice anchor unique in the file', () => {
+    // この contract の複数の assert は step 名で workflow を slice し、そこから
+    // ファイル末尾までを検査範囲にする（`Enforce release result` から後ろに
+    // `unaffected` が無いこと、など）。**同じ文字列がコメントに 1 度でも先に現れると
+    // 検査範囲が静かに前へずれ、assert の意味が変わる。** 実際 #2643 の作業中に
+    // release job のコメントへ `Enforce release result` と書いた時点で
+    // `treats a no-op release as success` が落ちた。点で直すと同じ罠を次も踏むので、
+    // anchor の一意性そのものを固定する。
+    for (const anchor of [
+      'Publish Production Release status',
+      'Enforce release result',
+      'Upload release manifest',
+    ]) {
+      const occurrences = release.split(anchor).length - 1;
+      expect(occurrences, `"${anchor}" は slice の anchor なので 1 度しか書けない`).toBe(1);
+    }
+  });
+
   it('keeps the audit workflow pinned to its trusted base revision', () => {
     // promote.yml と対称に「掃除」されないよう固定する。pull_request_target で
     // PR head を checkout すると、PR code が Vercel token を読める。
