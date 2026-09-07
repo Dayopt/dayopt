@@ -5,7 +5,7 @@ last_verified: 2026-09-07
 
 # 予定・記録の独立モデルへの移行
 
-この変更はローカル検証済みの実装であり、本番適用を意味しない。物理テーブルと保存行は維持し、相互参照と手動 skip の状態だけを撤去する。
+この変更は2026-09-07に本番適用済み。物理テーブルと保存行は維持し、相互参照と手動 skip の状態だけを撤去した。
 
 ## 配備順と復旧
 
@@ -45,7 +45,7 @@ last_verified: 2026-09-07
 - **正当な残存**: 操作対象の予定ID、Undo effectの対象ID、外部予定参照、旧入力の明示拒否と成功済みMCP receipt再生に必要なRPC引数。
 - **履歴**: 適用済みmigration、旧不変条件を説明する歴史的文書、移行前データを作る検証fixture。新規書き込み・読み取りの根拠にはしない。
 
-contract migrationは本番・共有ローカルDBへ適用していない。検証専用DBのみを使用した。
+contract migrationは本番と検証専用DBへ適用済み。既存の共有ローカルSupabaseには適用していない。
 
 ## ローカル検証記録
 
@@ -66,3 +66,14 @@ contract migrationは本番・共有ローカルDBへ適用していない。検
 不可逆に失われる値だけを `~/Backups/dayopt/plan-record-contract-before-20260907.json` へ保存した。ファイルは所有者のみ読み書き可能なmode 600で、SHA-256は `ac264faa5804507fda76e1ee232f5c98c7320fcbe3eede26ca2e6bad9d50a9bd`。メモ、タイトル、所有者などの保持列は含めない。保持列と行集合はtransactional migrationと上記fixture検証で保護する。
 
 このbackupをcontract適用済み隔離DBの一時テーブルへUUID / timestamptz型で復元し、旧リンク42件・skip値0件が一致することを確認してrollbackした。Supabase組織はProでdaily physical backup対象だが、CLI credentialが未認証だったため直近backupの成功時刻は取得していない。この契約専用backupと復元演習を今回の撤去のrollback証跡とする。
+
+## 本番適用結果
+
+2026-09-07にPR #2649をmerge commit `ea52ad484f6552f77b187eaace7fdcf299a0e4e0` でmainへ取り込み、本番migration `20260907125000_drop_plan_record_relation_columns` を適用した。
+
+- `records.plan_id` と `plans.skipped_at` は不存在。両列を参照するindex / constraintも0件。
+- 適用前後ともPlan 54行・Record 72行で、行削除は発生していない。
+- 旧skip RPCはDT012を返す互換stubとして残存。
+- Production Release run `34130076165` はProduct E2EとProduction promotionを含め成功。
+- `https://dayopt.app/` と `https://app.dayopt.app/api/health` はHTTP 200。health responseは `{"status":"healthy"}`。
+- Supabase advisorは適用前後ともsecurity 9件、performance 57件で、新規指摘なし。Vercelの直近15分のruntime errorも0件。
