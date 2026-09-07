@@ -16,8 +16,6 @@ interface TimeblockContextMenuProps {
   onViewStats?: ((entry: CalendarDisplayEvent) => void) | undefined;
   onCopy?: ((entry: CalendarDisplayEvent) => void) | undefined;
   onDuplicate?: ((entry: CalendarDisplayEvent) => void) | undefined;
-  onSkip?: ((entry: CalendarDisplayEvent) => void) | undefined;
-  onUnskip?: ((entry: CalendarDisplayEvent) => void) | undefined;
 }
 
 /** エントリの右クリックコンテキストメニューコンポーネント */
@@ -29,8 +27,6 @@ export const EventContextMenu = ({
   onViewStats,
   onCopy,
   onDuplicate,
-  onSkip,
-  onUnskip,
 }: TimeblockContextMenuProps) => {
   const t = useTranslations();
   const menuRef = useRef<HTMLDivElement>(null);
@@ -112,17 +108,10 @@ export const EventContextMenu = ({
   };
 
   // 共通の menu items 定義から取得（Inspector の TagRow と同じ source）
-  // origin は entry.origin ではなく kind から作る。useCalendarData は plan 紐付きの
-  // Record にも origin: 'planned' を付けるため、entry.origin をそのまま渡すと
-  // Record に skip が出てしまう（handler が kind で早期 return する無反応メニュー）。
   const menuItems = getTimeblockMenuItems({
-    origin: (entry.kind ?? 'plan') === 'plan' ? 'planned' : 'unplanned',
-    isSkipped: entry.isSkipped,
     onViewStats: onViewStats ? () => onViewStats(entry) : undefined,
     onCopy: onCopy ? () => onCopy(entry) : undefined,
     onDuplicate: onDuplicate ? () => onDuplicate(entry) : undefined,
-    onSkip: onSkip ? () => onSkip(entry) : undefined,
-    onUnskip: onUnskip ? () => onUnskip(entry) : undefined,
     onDelete:
       onDelete && entry.recordSource !== 'auto_migrated' ? () => onDelete(entry) : undefined,
   });

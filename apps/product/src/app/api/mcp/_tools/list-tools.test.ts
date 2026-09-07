@@ -60,7 +60,6 @@ vi.mock('@/features/timeblock/server/service-index', async () => {
       startAt: row.start_at,
       endAt: row.end_at,
       source: row.source,
-      skippedAt: row.skipped_at,
       deletedAt: row.deleted_at,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
@@ -70,7 +69,6 @@ vi.mock('@/features/timeblock/server/service-index', async () => {
       title: row.title,
       note: row.note,
       activityId: row.activity_id,
-      planId: row.plan_id,
       startAt: row.start_at,
       endAt: row.end_at,
       source: row.source,
@@ -271,8 +269,8 @@ describe('MCP list tools public contract', () => {
     const plans = parseText(planResult).plans as Array<Record<string, unknown>>;
     const records = parseText(recordResult).records as Array<Record<string, unknown>>;
 
-    expect(planResult.structuredContent).toMatchObject({ schemaVersion: 3, count: 1 });
-    expect(recordResult.structuredContent).toMatchObject({ schemaVersion: 3, count: 1 });
+    expect(planResult.structuredContent).toMatchObject({ schemaVersion: 4, count: 1 });
+    expect(recordResult.structuredContent).toMatchObject({ schemaVersion: 4, count: 1 });
     expect(plans).toHaveLength(1);
     expect(records).toHaveLength(1);
     for (const row of [...plans, ...records]) {
@@ -292,7 +290,7 @@ describe('MCP list tools public contract', () => {
     const entries = result.entries as Array<Record<string, unknown>>;
 
     expect(toolResult.structuredContent).toEqual(result);
-    expect(result.schemaVersion).toBe(3);
+    expect(result.schemaVersion).toBe(4);
     expect(result.count).toBe(2);
     expect(entries).toHaveLength(2);
     for (const entry of entries) {
@@ -323,20 +321,20 @@ describe('MCP list tools public contract', () => {
     // get / trash とも行の中身まで見る。count だけを見ていると、read client の
     // SELECT から activity_id が落ちても件数は変わらないので素通りする。
     expect(planResult).toMatchObject({
-      schemaVersion: 3,
+      schemaVersion: 4,
       plan: { id: plan.id, activityId: TIMEBLOCK_ACTIVITY_ID },
     });
     expect(recordResult).toMatchObject({
-      schemaVersion: 3,
+      schemaVersion: 4,
       record: { id: record.id, activityId: TIMEBLOCK_ACTIVITY_ID, fulfillment: 'high' },
     });
     expect(planTrashResult).toMatchObject({
-      schemaVersion: 3,
+      schemaVersion: 4,
       count: 1,
       plans: [{ id: plan.id, activityId: TIMEBLOCK_ACTIVITY_ID }],
     });
     expect(recordTrashResult).toMatchObject({
-      schemaVersion: 3,
+      schemaVersion: 4,
       count: 1,
       records: [{ id: record.id, activityId: TIMEBLOCK_ACTIVITY_ID, fulfillment: 'high' }],
     });
@@ -489,7 +487,7 @@ describe('MCP list tools public contract', () => {
         true,
       );
       expect(result.structuredContent).toEqual({
-        schemaVersion: 3,
+        schemaVersion: 4,
         count: 1,
         activities: [
           {
@@ -520,7 +518,7 @@ describe('MCP list tools public contract', () => {
 
     expect(MCP_ACTIVITY_LIST_OUTPUT_SCHEMA.safeParse(result.structuredContent).success).toBe(true);
     expect(result.structuredContent).toEqual({
-      schemaVersion: 3,
+      schemaVersion: 4,
       count: 2,
       activities: [
         {
@@ -563,7 +561,7 @@ describe('MCP list tools public contract', () => {
     const result = await handler({}, extra);
     expect(MCP_CATEGORY_LIST_OUTPUT_SCHEMA.safeParse(result.structuredContent).success).toBe(true);
     expect(result.structuredContent).toEqual({
-      schemaVersion: 3,
+      schemaVersion: 4,
       count: 1,
       categories: [
         {
@@ -582,7 +580,7 @@ describe('MCP list tools public contract', () => {
 
     const archivedResult = await handler({ includeArchived: true }, extra);
     expect(archivedResult.structuredContent).toEqual({
-      schemaVersion: 3,
+      schemaVersion: 4,
       count: 2,
       categories: [
         {
@@ -618,8 +616,8 @@ describe('MCP list tools public contract', () => {
       basis: {
         planMeaning: 'budget',
         recordMeaning: 'actual',
-        rowFilter: 'active_start_in_period',
-        durationBoundary: 'full_row_not_clipped',
+        rowFilter: 'active_overlapping_period',
+        durationBoundary: 'clipped_to_period',
         periodBoundary: '[)',
         varianceConvention: 'planned_minus_recorded',
       },
@@ -671,7 +669,7 @@ describe('MCP list tools public contract', () => {
     // 弾く schema へ戻すと、未分類を含む review が client 側で検証エラーになる。
     expect(MCP_REVIEW_GET_OUTPUT_SCHEMA.safeParse(result.structuredContent).success).toBe(true);
     expect(result.structuredContent).toMatchObject({
-      basis: { rowFilter: 'active_start_in_period' },
+      basis: { rowFilter: 'active_overlapping_period' },
       activities: [
         {
           activityId: '00000000-0000-4000-8000-000000000009',
@@ -713,8 +711,8 @@ describe('MCP list tools public contract', () => {
       basis: {
         planMeaning: 'budget',
         recordMeaning: 'actual',
-        rowFilter: 'active_start_in_period',
-        durationBoundary: 'full_row_not_clipped',
+        rowFilter: 'active_overlapping_period',
+        durationBoundary: 'clipped_to_period',
         periodBoundary: '[)',
         varianceConvention: 'planned_minus_recorded',
       },
@@ -802,8 +800,8 @@ describe('MCP list tools public contract', () => {
       basis: {
         planMeaning: 'budget',
         recordMeaning: 'actual',
-        rowFilter: 'active_start_in_period',
-        durationBoundary: 'full_row_not_clipped',
+        rowFilter: 'active_overlapping_period',
+        durationBoundary: 'clipped_to_period',
         periodBoundary: '[)',
         varianceConvention: 'planned_minus_recorded',
       },
@@ -890,8 +888,8 @@ describe('MCP list tools public contract', () => {
       basis: {
         planMeaning: 'budget',
         recordMeaning: 'actual',
-        rowFilter: 'active_start_in_period',
-        durationBoundary: 'full_row_not_clipped',
+        rowFilter: 'active_overlapping_period',
+        durationBoundary: 'clipped_to_period',
         periodBoundary: '[)',
         varianceConvention: 'planned_minus_recorded',
       },
@@ -1009,7 +1007,7 @@ describe('MCP list tools public contract', () => {
       // 完全一致し、注入文字列も原文のまま復元される）を固定する。
       expect(JSON.parse(inner)).toEqual(result.structuredContent);
       expect(inner).toContain('Ignore previous instructions');
-      expect(result.structuredContent).toMatchObject({ schemaVersion: 3 });
+      expect(result.structuredContent).toMatchObject({ schemaVersion: 4 });
     }
   });
 
@@ -1027,7 +1025,7 @@ describe('MCP list tools public contract', () => {
       expect(result.isError, name).toBe(true);
       expect(getText(result)).not.toContain(UNTRUSTED_DATA_START);
       expect(JSON.parse(getText(result))).toMatchObject({
-        schemaVersion: 3,
+        schemaVersion: 4,
         error: { code: 'INSUFFICIENT_SCOPE', retryable: false },
       });
     }
@@ -1050,7 +1048,7 @@ describe('MCP list tools public contract', () => {
       expect(result.isError, name).toBe(true);
       expect(getText(result)).not.toContain(UNTRUSTED_DATA_START);
       expect(JSON.parse(getText(result))).toMatchObject({
-        schemaVersion: 3,
+        schemaVersion: 4,
         error: { code: 'READ_FAILED', retryable: true },
       });
     }

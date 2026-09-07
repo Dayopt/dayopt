@@ -98,7 +98,6 @@ export type McpRecordRestoreReceipt = McpRecordMutationReceipt<null>;
 
 export type McpMutationErrorCode =
   | 'ACTIVITY_ARCHIVED'
-  | 'ALREADY_RECORDED'
   | 'AUTHORIZATION_LOST'
   | 'CONFLICT'
   | 'FORBIDDEN'

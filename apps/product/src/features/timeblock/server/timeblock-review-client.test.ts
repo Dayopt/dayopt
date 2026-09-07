@@ -32,7 +32,7 @@ function createQueryDouble(result: {
     then: (resolve: (value: unknown) => unknown) =>
       Promise.resolve({ count: null, ...result }).then(resolve),
   };
-  for (const method of ['eq', 'is', 'not', 'gte', 'lt', 'order', 'range', 'abortSignal']) {
+  for (const method of ['eq', 'is', 'not', 'gt', 'lt', 'order', 'range', 'abortSignal']) {
     query[method] = vi.fn((...args: unknown[]) => {
       calls.push({ method, args });
       return query;
@@ -86,10 +86,10 @@ describe('TimeblockReviewClient', () => {
     // `.not('activity_id', 'is', null)` を戻すと、アクティビティ削除のたびに過去の時間が
     // review から目減りする（#1576）。filter 一式を丸ごと固定して回帰を止める。
     expect(page.calls.filter(({ method }) => method === 'not')).toEqual([]);
-    expect(page.calls.filter(({ method }) => ['eq', 'is', 'gte', 'lt'].includes(method))).toEqual([
+    expect(page.calls.filter(({ method }) => ['eq', 'is', 'gt', 'lt'].includes(method))).toEqual([
       { method: 'eq', args: ['user_id', USER_ID] },
       { method: 'is', args: ['deleted_at', null] },
-      { method: 'gte', args: ['start_at', '2026-07-20T00:00:00+09:00'] },
+      { method: 'gt', args: ['end_at', '2026-07-20T00:00:00+09:00'] },
       { method: 'lt', args: ['start_at', '2026-07-27T00:00:00+09:00'] },
     ]);
   });

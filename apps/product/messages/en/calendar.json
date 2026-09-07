@@ -13,7 +13,6 @@
       "retry": "Retry",
       "results": "Timeblocks",
       "overflow": "Showing the newest {count} results. Refine your search to find more.",
-      "skipped": "Skipped",
       "kind": {
         "plan": "Plan",
         "record": "Record"

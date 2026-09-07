@@ -45,14 +45,12 @@ const EXPECTED_ERROR_CODES: Readonly<Record<string, McpMutationErrorCode>> = {
   DT005: 'RECORD_IN_FUTURE',
   DT008: 'INVALID_INPUT',
   DT009: 'FORBIDDEN',
-  DT011: 'ALREADY_RECORDED',
   DT012: 'INVALID_INPUT',
   DT014: 'ACTIVITY_ARCHIVED',
 };
 
 const ERROR_MESSAGES: Readonly<Record<McpMutationErrorCode, string>> = {
   ACTIVITY_ARCHIVED: 'This activity is archived and cannot be assigned to a plan or record.',
-  ALREADY_RECORDED: 'Plan already has an active record.',
   AUTHORIZATION_LOST: 'The Dayopt connection is no longer authorized for this change.',
   CONFLICT:
     'The change is busy or conflicted with another update. Read the latest data and try again.',

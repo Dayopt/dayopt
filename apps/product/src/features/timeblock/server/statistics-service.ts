@@ -5,7 +5,7 @@ import 'server-only';
  *
  * Step 0 の Aggregation Source Contract（旧 `docs/projects/_archive/time-model-split/step-0-statistics-rpc-policy.md`、
  * docs/projects 全廃に伴い #2473 で削除。git 履歴参照）
- * に従い、実績系は `records`、予定系は `plans`、予実比較は `plans` LEFT JOIN `records`（`plan_id` 経由）を読む。
+ * に従い、実績系は `records`、予定系は `plans`、予実比較は独立した期間合計を読む。
  *
  * Step 8 のカットオーバーは完了済みで、**統計 procedure はすべてこのクラス経由**で動く
  * （`statistics-general-router.ts` / `statistics-kpi-router.ts` / `statistics-summary-router.ts`
@@ -74,7 +74,7 @@ export class StatisticsService {
   // ---------------------------------------------------------------------------
 
   /**
-   * `get_estimation_accuracy` 相当。`plans` LEFT JOIN `records`（1:N、`auto_migrated` 除外）。
+   * `get_estimation_accuracy` 相当。独立した予定・記録の期間合計比。
    * 詳細は `domain/estimation-accuracy.ts` の `aggregatePlanRecordEstimationAccuracy` を参照。
    */
   async getEstimationAccuracy(userId: string, range: DateRangeInput = {}) {
@@ -87,7 +87,7 @@ export class StatisticsService {
   }
 
   /**
-   * 作成時フィードフォワード用のタグ別見積もり係数（直近 4 週の中央値、`n >= 3`）。
+   * 作成時フィードフォワード用のタグ別見積もり係数（直近 4 週の期間合計比、`n >= 3`）。
    * 定義は `domain/activity-estimation-factor.ts` を参照。
    */
   async getTagEstimationFactors(userId: string) {

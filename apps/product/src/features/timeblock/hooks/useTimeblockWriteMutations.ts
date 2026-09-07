@@ -67,11 +67,8 @@ interface TimeModelListFilter {
   ids?: string[];
   search?: string;
   activityId?: string;
-  planId?: string;
-  planIds?: string[];
   startDate?: string;
   endDate?: string;
-  includeSkipped?: boolean;
   sortBy?: 'created_at' | 'updated_at' | 'title' | 'start_at';
   sortOrder?: 'asc' | 'desc';
   limit?: number;
@@ -88,8 +85,6 @@ interface TimeModelListRow {
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
-  skipped_at?: string | null;
-  plan_id?: string | null;
 }
 
 function getListFilter(queryKey: unknown): TimeModelListFilter {
@@ -112,15 +107,6 @@ export function doesTimeModelListQueryIncludeRow(
   if (operation === 'create' && (filter.offset ?? 0) > 0) return false;
   if (lane === 'plans' && filter.ids && !filter.ids.includes(row.id)) return false;
   if (filter.activityId && row.activity_id !== filter.activityId) return false;
-  if (lane === 'records' && filter.planId && row.plan_id !== filter.planId) return false;
-  if (
-    lane === 'records' &&
-    filter.planIds &&
-    (row.plan_id == null || !filter.planIds.includes(row.plan_id))
-  )
-    return false;
-  if (lane === 'plans' && filter.includeSkipped === false && row.skipped_at != null) return false;
-
   // アクティビティ名はlist rowだけでは解決できないため、検索cacheの一致判定はserver再検証へ任せる。
   if (filter.search) return false;
 
@@ -361,6 +347,12 @@ export function useTimeblockWriteMutations(options: UseTimeblockWriteMutationsOp
 
   // getById も対象に含めて router 全体を再検証する（Inspector の updated_at 鮮度を保つ）
   const invalidate = () => {
+    void queryClient.invalidateQueries({
+      predicate: (query) => {
+        const path = query.queryKey[0];
+        return Array.isArray(path) && (path[0] === 'statistics' || path[0] === 'review');
+      },
+    });
     void utils.plans.invalidate();
     void utils.records.invalidate();
   };
@@ -380,7 +372,6 @@ export function useTimeblockWriteMutations(options: UseTimeblockWriteMutationsOp
         note: input.note ?? null,
         start_at: input.start_at,
         end_at: input.end_at,
-        skipped_at: null,
         source: 'manual',
         deleted_at: null,
         created_at: nowIso,
@@ -411,7 +402,6 @@ export function useTimeblockWriteMutations(options: UseTimeblockWriteMutationsOp
         id: tempId,
         user_id: '',
         activity_id: input.activityId ?? null,
-        plan_id: input.planId ?? null,
         external_calendar_event_id: input.externalCalendarEventId ?? null,
         title: input.title,
         note: input.note ?? null,
@@ -556,34 +546,6 @@ export function useTimeblockWriteMutations(options: UseTimeblockWriteMutationsOp
     onSettled: invalidate,
   });
 
-  const skipPlan = api.planCommands.skip.useMutation({
-    retry: false,
-    onMutate: snapshot,
-    onSuccess: (updated) => {
-      replaceServerRow('plans', updated);
-      utils.plans.getById.setData({ id: updated.id }, updated);
-    },
-    onError: (_error, _input, context) => {
-      restore(context);
-      toast.error(t('toast.skipFailed'));
-    },
-    onSettled: invalidate,
-  });
-
-  const unskipPlan = api.planCommands.unskip.useMutation({
-    retry: false,
-    onMutate: snapshot,
-    onSuccess: (updated) => {
-      replaceServerRow('plans', updated);
-      utils.plans.getById.setData({ id: updated.id }, updated);
-    },
-    onError: (_error, _input, context) => {
-      restore(context);
-      toast.error(t('toast.skipFailed'));
-    },
-    onSettled: invalidate,
-  });
-
   const fetchPlanById = async (id: string) => {
     await utils.plans.getById.invalidate({ id });
     return utils.plans.getById.fetch({ id });
@@ -602,8 +564,6 @@ export function useTimeblockWriteMutations(options: UseTimeblockWriteMutationsOp
     fetchRecordById,
     restoreRecord,
     restorePlan,
-    skipPlan,
-    unskipPlan,
     updateRecord,
     updatePlan,
   };

@@ -29,7 +29,6 @@ const record: RecordEvent = {
   title: 'Focus',
   note: null,
   activityId: null,
-  planId: 'plan-1',
   startDate: start,
   endDate: end,
   displayStartDate: start,

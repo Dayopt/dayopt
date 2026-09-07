@@ -80,7 +80,6 @@ export function usePlanTemplateMutations() {
       note: null,
       start_at: plan.startAt,
       end_at: plan.endAt,
-      skipped_at: null,
       source: 'manual',
       deleted_at: null,
       created_at: nowIso,

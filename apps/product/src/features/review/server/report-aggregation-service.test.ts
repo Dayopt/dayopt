@@ -87,7 +87,7 @@ function createFakeClient(seed: Seed): ReportFetchClient {
     plans: (seed.plans ?? []).map((row) => ({
       user_id: USER_ID,
       deleted_at: null,
-      skipped_at: null,
+
       external_calendar_event_id: null,
       ...row,
     })),
@@ -125,6 +125,7 @@ function createFakeClient(seed: Seed): ReportFetchClient {
     let current = rows;
     const query = {
       select: () => query,
+      range: () => query,
       eq: (column: string, value: unknown) => {
         current = current.filter((row) => row[column] === value);
         return query;
@@ -335,7 +336,7 @@ describe('ReportAggregationService.getReportPeriod', () => {
     expect(row?.plannedPastBoxes).toBe(2);
   });
 
-  it('now とちょうど同時刻に始まる予定は planPast に入る（境界は含む）', async () => {
+  it('開始ちょうどの予定は件数に含むが経過時間は0分', async () => {
     const service = createReportAggregationService(
       createFakeClient({
         activities: [{ id: 'a1', name: '執筆', category_id: null }],
@@ -353,7 +354,7 @@ describe('ReportAggregationService.getReportPeriod', () => {
     const row = aggregateFor(await service.getReportPeriod(USER_ID, baseInput(), NOW), 'a1');
 
     expect(row?.plannedPastBoxes).toBe(1);
-    expect(row?.plannedPastMinutes).toBe(60);
+    expect(row?.plannedPastMinutes).toBe(0);
   });
 
   it('充実の回答を 3 値で数え、未回答は数えない', async () => {
@@ -449,13 +450,15 @@ describe('ReportAggregationService.getReportPeriod', () => {
     expect(result.activities[0]?.recordedMinutes).toBe(60);
   });
 
-  it('削除済み・skip 済みの行を集計しない', async () => {
+  it('削除済み記録を除外し、残存する予定は計上する', async () => {
     const result = await createReportAggregationService(
       createFakeClientWithFlags(),
     ).getReportPeriod(USER_ID, baseInput(), NOW);
 
-    // deleted_at 付きの Record と skipped_at 付きの Plan は fetcher の `.is(..., null)` で落ちる
-    expect(result.activities).toEqual([]);
+    // deleted_at 付きの Record は fetcher で落ち、残存する Plan は計上される
+    expect(result.activities).toMatchObject([
+      { activityId: 'a1', recordedMinutes: 0, plannedMinutes: 60 },
+    ]);
     expect(result.uncategorizedRecordCount).toBe(0);
   });
 
@@ -705,7 +708,7 @@ function mkRecord(
   return { id, activity_id: activityId, start_at: startAt, end_at: endAt, fulfillment };
 }
 
-/** `deleted_at` / `skipped_at` が立った行だけを持つ client。fetcher の除外条件を押さえる。 */
+/** deleted_at が立った Record と残存する Plan を持つ client。 */
 function createFakeClientWithFlags(): ReportFetchClient {
   const tables: Record<string, Record<string, unknown>[]> = {
     records: [
@@ -727,7 +730,6 @@ function createFakeClientWithFlags(): ReportFetchClient {
         start_at: '2026-09-02T00:00:00+00:00',
         end_at: '2026-09-02T01:00:00+00:00',
         deleted_at: null,
-        skipped_at: '2026-09-02T05:00:00+00:00',
       },
     ],
     activities: [
@@ -740,6 +742,8 @@ function createFakeClientWithFlags(): ReportFetchClient {
     let current = rows;
     const query = {
       select: () => query,
+      order: () => query,
+      range: () => query,
       eq: (column: string, value: unknown) => {
         current = current.filter((row) => row[column] === value);
         return query;

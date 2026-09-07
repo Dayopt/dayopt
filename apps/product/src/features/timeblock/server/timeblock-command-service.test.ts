@@ -23,7 +23,7 @@ const plan: PlanRow = {
   external_calendar_event_id: null,
   id: PLAN_ID,
   note: 'old note',
-  skipped_at: null,
+
   source: 'api',
   start_at: '2026-07-30T01:00:00.000000Z',
   activity_id: null,
@@ -40,7 +40,7 @@ const record: RecordRow = {
   fulfillment: null,
   id: RECORD_ID,
   note: null,
-  plan_id: PLAN_ID,
+
   source: 'manual',
   start_at: '2026-07-28T01:00:00.000000Z',
   activity_id: null,
@@ -55,7 +55,6 @@ function createCommands() {
     updatePlan: vi.fn().mockResolvedValue(plan),
     deletePlan: vi.fn(),
     restorePlan: vi.fn(),
-    setPlanSkipped: vi.fn(),
     recordPlan: vi.fn(),
     confirmDay: vi.fn(),
     createRecord: vi.fn(),
@@ -183,7 +182,7 @@ describe('TimeblockCommandService', () => {
         recordId: RECORD_ID,
         expectedUpdatedAt: record.updated_at,
         note: 'changed note',
-        planId: PLAN_ID,
+        planId: null,
       }),
     );
   });

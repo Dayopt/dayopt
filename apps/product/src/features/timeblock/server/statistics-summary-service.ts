@@ -1,4 +1,5 @@
 import 'server-only';
+import { aggregate, overlappingRecords, toDerivedBlock } from '../domain/derived-model';
 
 /**
  * 統計 service — Summary: streak / KPI サマリー
@@ -11,11 +12,7 @@ import { getUserTimezone } from '@/lib/server/user-timezone-cache';
 import { fetchPlans, fetchRecords } from './statistics-fetchers';
 import type { BlankRateInput } from './statistics-kpi-service';
 import { transformStatsOverviewResponse } from './statistics-overview-transform';
-import {
-  computeBlankRate,
-  computeContextSwitches,
-  minutesBetween,
-} from './statistics-service-grouping';
+import { computeBlankRate, computeContextSwitches } from './statistics-service-grouping';
 import type { ServiceSupabaseClient } from './types';
 
 export class StatisticsSummaryService {
@@ -42,16 +39,36 @@ export class StatisticsSummaryService {
       fetchPlans(this.supabase, userId, { startDate, endDate }),
     ]);
 
-    const cumulativeMinutes = records.reduce(
-      (sum, record) => sum + minutesBetween(record.start_at, record.end_at),
-      0,
+    const blocks = [
+      ...plans.map((row) => toDerivedBlock(row, 'plan')),
+      ...records.map((row) => toDerivedBlock(row, 'rec')),
+    ];
+    const overlappingIds = new Set(
+      plans.flatMap((plan) =>
+        overlappingRecords(toDerivedBlock(plan, 'plan'), blocks, new Date()).map(
+          (record) => record.id,
+        ),
+      ),
     );
-    const plannedEntries = records.filter((record) => record.plan_id != null).length;
+    const plannedEntries = overlappingIds.size;
     const contextSwitches = computeContextSwitches(records, timezone);
-    const scheduledMinutes = plans.reduce(
-      (sum, plan) => sum + minutesBetween(plan.start_at, plan.end_at),
-      0,
+    const now = new Date();
+    const totals = aggregate(
+      {
+        startAt: startDate ?? '1970-01-01T00:00:00Z',
+        endAt:
+          endDate ??
+          new Date(
+            Math.max(now.getTime(), ...blocks.map((block) => Date.parse(block.end))),
+          ).toISOString(),
+        timezone,
+      },
+      null,
+      blocks.map((block) => ({ ...block, activityId: null })),
+      now,
     );
+    const scheduledMinutes = totals.plannedMinutes;
+    const cumulativeMinutes = totals.recordedMinutes;
     const blankRate = computeBlankRate(scheduledMinutes, {
       startDate,
       endDate,
@@ -64,7 +81,10 @@ export class StatisticsSummaryService {
       planRate: {
         totalEntries: records.length,
         plannedEntries,
-        planRate: records.length > 0 ? plannedEntries / records.length : 0,
+        planRate:
+          totals.plannedPastMinutes >= 15
+            ? totals.recordedMinutes / totals.plannedPastMinutes
+            : null,
       },
       contextSwitches,
       blankRate,

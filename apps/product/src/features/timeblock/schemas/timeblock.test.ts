@@ -7,7 +7,7 @@ const planId = '11111111-1111-4111-8111-111111111111';
 describe('timeblock relation filters', () => {
   it('UUID配列を受け入れる', () => {
     expect(planFilterSchema.safeParse({ ids: [planId] }).success).toBe(true);
-    expect(recordFilterSchema.safeParse({ planIds: [planId] }).success).toBe(true);
+    expect(recordFilterSchema.safeParse({ planIds: [planId] }).success).toBe(false);
   });
 
   it('UUIDではないIDを拒否する', () => {

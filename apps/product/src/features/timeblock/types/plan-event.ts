@@ -4,11 +4,10 @@
  * `CalendarEvent`（entries 統合型）から独立した Step 5 の新規型。
  * `status` は「過去 Plan の見え方」（overview.md §4）を表現する:
  * - `upcoming` / `active`: 通常のアウトライン表示
- * - `unrecorded`: 過去・未 skip・records なし（静かなプロンプト）
- * - `recorded`: 過去・records あり（記録済み、控えめ表示）
- * - `skipped`: `skipped_at` あり（減衰表示）
+ * - `unrecorded`: 過去・records なし（静かなプロンプト）
+ * - `with-records`: 同じ時間帯の records あり。予定全体の完遂は意味しない
  */
-export type PlanEventStatus = 'upcoming' | 'active' | 'unrecorded' | 'recorded' | 'skipped';
+export type PlanEventStatus = 'upcoming' | 'active' | 'unrecorded' | 'with-records';
 
 export interface PlanEvent {
   id: string;

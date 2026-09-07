@@ -60,11 +60,6 @@ const MIN_HEIGHT = 20;
 const DETAIL_HEIGHT_THRESHOLD = 40;
 const RESIZE_HANDLE_HEIGHT = 20;
 
-/** skip 済み plan の斜線ハッチング背景。TimeblockCard の skip 表現を踏襲。 */
-function skippedHatchImage(accentColor: string): string {
-  return `repeating-linear-gradient(45deg, transparent 0 5px, color-mix(in oklch, ${accentColor} 38%, transparent) 5px 7px)`;
-}
-
 export function PlanLaneCard({
   event,
   position,
@@ -100,9 +95,8 @@ export function PlanLaneCard({
   const borderClass = colorClasses?.border ?? 'border-border';
   const displayName = activityName ?? t('calendar.filter.noActivity');
 
-  const isSkipped = event.status === 'skipped';
   const isUnrecorded = event.status === 'unrecorded';
-  const isRecorded = event.status === 'recorded';
+  const hasRecords = event.status === 'with-records';
   const showDetails = !compact && position.height >= DETAIL_HEIGHT_THRESHOLD;
   const canDrag = interactive && !disableDrag && Boolean(onPointerDown);
   return (
@@ -119,9 +113,9 @@ export function PlanLaneCard({
         interactive ? 'pointer-events-auto' : 'pointer-events-none',
         compact ? 'border px-1' : 'border-2 px-2',
         borderClass,
-        // skip / 記録済みは控えめに沈める。未記録の過去 plan は静かなプロンプトとして
+        // 記録がある予定は控えめに沈める。未記録の過去 plan は静かなプロンプトとして
         // 破線で「まだ何かが足りない」を示す。
-        isSkipped ? 'opacity-50' : isRecorded ? 'opacity-60' : 'opacity-100',
+        hasRecords ? 'opacity-60' : 'opacity-100',
         isUnrecorded ? 'border-dashed' : 'border-solid',
         'text-foreground bg-transparent',
         'focus-visible:ring-ring focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none',
@@ -135,9 +129,6 @@ export function PlanLaneCard({
         left: `${position.left}%`,
         width: `calc(${position.width}% - 4px)`,
         height: `${Math.max(position.height, MIN_HEIGHT)}px`,
-        ...(isSkipped && colorClasses
-          ? { backgroundImage: skippedHatchImage(colorClasses.cssVar) }
-          : {}),
         ...styleOverride,
       }}
       onClick={interactive ? (e) => onClick?.(event, e) : undefined}

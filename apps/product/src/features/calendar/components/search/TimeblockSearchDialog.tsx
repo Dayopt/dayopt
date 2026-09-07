@@ -186,11 +186,6 @@ export function TimeblockSearchContent({
                   <span className="border-border text-muted-foreground shrink-0 rounded-lg border px-2 py-1 text-xs">
                     {t(`calendar.search.kind.${result.kind}`)}
                   </span>
-                  {result.isSkipped ? (
-                    <span className="text-muted-foreground shrink-0 text-xs">
-                      {t('calendar.search.skipped')}
-                    </span>
-                  ) : null}
                 </div>
                 <p className="flex min-w-0 items-center gap-1 text-sm font-medium">
                   <ActivityIcon

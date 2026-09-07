@@ -20,7 +20,6 @@ import { cn } from '@dayopt/components';
 
 import type { TwoLanePosition } from '../../../../../lib/two-lane-layout';
 import { DayDiffMarker } from './DayDiffMarker';
-import { DiffBadge } from './DiffBadge';
 
 interface RecordLaneCardProps {
   event: RecordEvent;
@@ -93,14 +92,11 @@ export function RecordLaneCard({
   // アクティビティなしの時だけ中立トークンの塗りに落とす。
   const colorClasses = hasActivity ? getCategoryColorClasses(activityColor) : null;
   const displayName = activityName ?? t('calendar.filter.noActivity');
-  const isUnplanned = event.planId == null;
-  const hasDiff = event.diffMinutes != null && event.diffMinutes !== 0;
   const showDetails = !compact && position.height >= DETAIL_HEIGHT_THRESHOLD;
   const canDrag = interactive && !disableDrag && Boolean(onPointerDown);
   return (
     <div
       data-record-lane-card
-      data-record-planned={!isUnplanned}
       data-entry-block={interactive ? 'true' : undefined}
       tabIndex={interactive ? 0 : undefined}
       role={interactive ? 'button' : undefined}
@@ -168,7 +164,6 @@ export function RecordLaneCard({
           )}
           <span className="truncate">{displayName}</span>
         </p>
-        {hasDiff && !compact && <DiffBadge diffMinutes={event.diffMinutes ?? 0} />}
       </div>
       {showDetails && (
         <p className="text-muted-foreground truncate">

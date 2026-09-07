@@ -62,3 +62,6 @@ export { DateTimeSection } from './components/inspector/fields/DateTimeSection';
 export { TimeConflictAlert } from './components/inspector/fields/TimeConflictAlert';
 
 // ここにないものはfeature内部専用
+
+export { aggregate, overlappingRecords, toDerivedBlock } from './domain/derived-model';
+export type { DerivedBlock } from './domain/derived-model';

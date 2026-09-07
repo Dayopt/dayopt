@@ -88,7 +88,7 @@ async function createRecord(userId: string, title = 'undo rpc fixture'): Promise
 }
 
 /** insert effect の undo(=DELETE) は full mask 契約を要求する。plan/record それぞれの全列。 */
-const PLAN_FULL_MASK = ['deleted_at', 'end_at', 'note', 'skipped_at', 'start_at', 'title'] as const;
+const PLAN_FULL_MASK = ['deleted_at', 'end_at', 'note', 'start_at', 'title'] as const;
 const RECORD_FULL_MASK = ['deleted_at', 'end_at', 'note', 'start_at', 'title'] as const;
 
 type EffectInput = {
@@ -136,7 +136,7 @@ function listUndoable(userId: string) {
 async function getPlan(planId: string) {
   const { data, error } = await admin
     .from('plans')
-    .select('title, note, start_at, end_at, skipped_at, deleted_at')
+    .select('title, note, start_at, end_at, deleted_at')
     .eq('id', planId)
     .maybeSingle();
   if (error) throw error;

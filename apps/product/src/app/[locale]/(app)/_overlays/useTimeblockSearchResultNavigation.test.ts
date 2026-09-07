@@ -19,7 +19,6 @@ const RESULT: TimeblockSearchResult = {
   activityId: 'activity-1',
   startAt: '2026-07-14T01:30:00.000Z',
   endAt: '2026-07-14T02:30:00.000Z',
-  isSkipped: false,
 };
 
 describe('useTimeblockSearchResultNavigation', () => {

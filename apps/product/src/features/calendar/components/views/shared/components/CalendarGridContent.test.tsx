@@ -23,6 +23,7 @@ vi.mock('@/features/timeblock', () => ({
   formatDiffMinutes: (minutes: number) => `${minutes}`,
   isPlanRecordDrop: (source: string, target: string) => source === 'plan' && target === 'record',
   resolveTimeblockDestination: () => 'plan',
+  overlappingRecords: () => [],
   useTimeblockWriteMutations: () => ({ createRecord: { mutate: vi.fn() } }),
 }));
 
@@ -306,7 +307,7 @@ describe('CalendarGridContent', () => {
 
     const card = container.querySelector('[data-record-lane-card]');
     expect(card).not.toBeNull();
-    expect(card).toHaveAttribute('data-record-planned', 'true');
+    expect(card).not.toHaveAttribute('data-record-planned');
     expect(card).toHaveStyle({ left: '38%', width: 'calc(62% - 4px)' });
     expect(container.querySelector('[data-plan-lane-card]')).toBeNull();
   });
@@ -330,7 +331,7 @@ describe('CalendarGridContent', () => {
   });
 
   it('RecordをPlanレーン上へdragしてもRecordの塗りカードを維持する', () => {
-    const record = makeCalendarEvent('record', { planId: 'plan-1' });
+    const record = makeCalendarEvent('record', {});
     ghostMock.timeblockId = record.id;
     useCalendarDragStore.getState().updateDrag({ targetLane: 'plan' });
 

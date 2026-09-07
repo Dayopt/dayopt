@@ -58,7 +58,7 @@ exports[`MCP tool contract snapshot > activityListOutput の JSON Schema が変�
     },
     "schemaVersion": {
       "enum": [
-        3,
+        4,
       ],
       "type": "number",
     },
@@ -134,7 +134,7 @@ exports[`MCP tool contract snapshot > categoryListOutput の JSON Schema が変�
     },
     "schemaVersion": {
       "enum": [
-        3,
+        4,
       ],
       "type": "number",
     },
@@ -335,12 +335,6 @@ exports[`MCP tool contract snapshot > constraintsGetOutput の JSON Schema が�
               ],
               "type": "string",
             },
-            "skippedOccupiesLane": {
-              "enum": [
-                true,
-              ],
-              "type": "boolean",
-            },
             "timeUpdateEnd": {
               "enum": [
                 "unrestricted",
@@ -353,7 +347,6 @@ exports[`MCP tool contract snapshot > constraintsGetOutput の JSON Schema が�
             "pastPlanTimeUpdate",
             "pastPlanContentUpdate",
             "timeUpdateEnd",
-            "skippedOccupiesLane",
           ],
           "type": "object",
         },
@@ -363,12 +356,6 @@ exports[`MCP tool contract snapshot > constraintsGetOutput の JSON Schema が�
             "createEnd": {
               "enum": [
                 "at_or_before_as_of",
-              ],
-              "type": "string",
-            },
-            "linkedPlan": {
-              "enum": [
-                "non_deleted_unskipped",
               ],
               "type": "string",
             },
@@ -382,7 +369,6 @@ exports[`MCP tool contract snapshot > constraintsGetOutput の JSON Schema が�
           "required": [
             "createEnd",
             "timeUpdateEnd",
-            "linkedPlan",
           ],
           "type": "object",
         },
@@ -397,7 +383,7 @@ exports[`MCP tool contract snapshot > constraintsGetOutput の JSON Schema が�
     },
     "schemaVersion": {
       "enum": [
-        3,
+        4,
       ],
       "type": "number",
     },
@@ -499,7 +485,7 @@ exports[`MCP tool contract snapshot > entryListOutput の JSON Schema が変わ�
     },
     "schemaVersion": {
       "enum": [
-        3,
+        4,
       ],
       "type": "number",
     },
@@ -543,10 +529,6 @@ exports[`MCP tool contract snapshot > planGetOutput の JSON Schema が変わっ
           "nullable": true,
           "type": "string",
         },
-        "skippedAt": {
-          "nullable": true,
-          "type": "string",
-        },
         "source": {
           "type": "string",
         },
@@ -568,7 +550,6 @@ exports[`MCP tool contract snapshot > planGetOutput の JSON Schema が変わっ
         "startAt",
         "endAt",
         "source",
-        "skippedAt",
         "deletedAt",
         "createdAt",
         "updatedAt",
@@ -577,7 +558,7 @@ exports[`MCP tool contract snapshot > planGetOutput の JSON Schema が変わっ
     },
     "schemaVersion": {
       "enum": [
-        3,
+        4,
       ],
       "type": "number",
     },
@@ -625,10 +606,6 @@ exports[`MCP tool contract snapshot > planListOutput の JSON Schema が変わ�
             "nullable": true,
             "type": "string",
           },
-          "skippedAt": {
-            "nullable": true,
-            "type": "string",
-          },
           "source": {
             "type": "string",
           },
@@ -650,7 +627,6 @@ exports[`MCP tool contract snapshot > planListOutput の JSON Schema が変わ�
           "startAt",
           "endAt",
           "source",
-          "skippedAt",
           "deletedAt",
           "createdAt",
           "updatedAt",
@@ -661,7 +637,7 @@ exports[`MCP tool contract snapshot > planListOutput の JSON Schema が変わ�
     },
     "schemaVersion": {
       "enum": [
-        3,
+        4,
       ],
       "type": "number",
     },
@@ -714,11 +690,6 @@ exports[`MCP tool contract snapshot > recordGetOutput の JSON Schema が変わ�
           "nullable": true,
           "type": "string",
         },
-        "planId": {
-          "format": "uuid",
-          "nullable": true,
-          "type": "string",
-        },
         "source": {
           "type": "string",
         },
@@ -737,7 +708,6 @@ exports[`MCP tool contract snapshot > recordGetOutput の JSON Schema が変わ�
         "title",
         "note",
         "activityId",
-        "planId",
         "startAt",
         "endAt",
         "source",
@@ -750,7 +720,7 @@ exports[`MCP tool contract snapshot > recordGetOutput の JSON Schema が変わ�
     },
     "schemaVersion": {
       "enum": [
-        3,
+        4,
       ],
       "type": "number",
     },
@@ -807,11 +777,6 @@ exports[`MCP tool contract snapshot > recordListOutput の JSON Schema が変わ
             "nullable": true,
             "type": "string",
           },
-          "planId": {
-            "format": "uuid",
-            "nullable": true,
-            "type": "string",
-          },
           "source": {
             "type": "string",
           },
@@ -830,7 +795,6 @@ exports[`MCP tool contract snapshot > recordListOutput の JSON Schema が変わ
           "title",
           "note",
           "activityId",
-          "planId",
           "startAt",
           "endAt",
           "source",
@@ -845,7 +809,7 @@ exports[`MCP tool contract snapshot > recordListOutput の JSON Schema が変わ
     },
     "schemaVersion": {
       "enum": [
-        3,
+        4,
       ],
       "type": "number",
     },
@@ -963,7 +927,7 @@ exports[`MCP tool contract snapshot > reviewGetOutput の JSON Schema が変わ�
       "properties": {
         "durationBoundary": {
           "enum": [
-            "full_row_not_clipped",
+            "clipped_to_period",
           ],
           "type": "string",
         },
@@ -987,7 +951,7 @@ exports[`MCP tool contract snapshot > reviewGetOutput の JSON Schema が変わ�
         },
         "rowFilter": {
           "enum": [
-            "active_start_in_period",
+            "active_overlapping_period",
           ],
           "type": "string",
         },
@@ -1043,7 +1007,7 @@ exports[`MCP tool contract snapshot > reviewGetOutput の JSON Schema が変わ�
     },
     "schemaVersion": {
       "enum": [
-        3,
+        4,
       ],
       "type": "number",
     },
@@ -1176,7 +1140,7 @@ exports[`MCP tool contract snapshot > segmentListOutput の JSON Schema が変�
     },
     "schemaVersion": {
       "enum": [
-        3,
+        4,
       ],
       "type": "number",
     },

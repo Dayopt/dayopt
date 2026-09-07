@@ -23,6 +23,7 @@ import { useMediaQuery } from '@/lib/hooks/useMediaQuery';
 import { api } from '@/lib/trpc';
 import { Drawer, DrawerContent, DrawerTitle, Spinner } from '@dayopt/components';
 
+import { overlappingRecords, toDerivedBlock } from '../../domain/derived-model';
 import type { TimeblockDestination } from '../../domain/timeblock-destination';
 import { useInspectorURLSync } from '../../hooks/useInspectorURLSync';
 import { TIMEBLOCK_INSPECTOR_SLOT_KEY } from '../../lib/inspector-slot';
@@ -75,16 +76,13 @@ export function TimeblockInspector({ onViewStats, onCopy }: TimeModelInspectorPr
     { enabled: isOpen && !duplicateDraft && !!timeblockId && timeblockKind === 'record' },
   );
   const relatedRecordsQuery = api.records.list.useQuery(
-    { planId: timeblockId ?? '', sortBy: 'start_at', sortOrder: 'asc' },
-    { enabled: isOpen && !duplicateDraft && !!timeblockId && timeblockKind === 'plan' },
-  );
-  const originalPlanId = timeblockKind === 'record' ? recordQuery.data?.plan_id : null;
-  const originalPlanQuery = api.plans.getById.useQuery(
-    { id: originalPlanId ?? '' },
     {
-      enabled: isOpen && !duplicateDraft && !!originalPlanId && timeblockKind === 'record',
-      retry: (failureCount, error) => (error.data?.code === 'NOT_FOUND' ? false : failureCount < 3),
+      startDate: planQuery.data?.start_at,
+      endDate: planQuery.data?.end_at,
+      sortBy: 'start_at',
+      sortOrder: 'asc',
     },
+    { enabled: isOpen && !duplicateDraft && !!planQuery.data && timeblockKind === 'plan' },
   );
 
   const activeQuery = timeblockKind === 'plan' ? planQuery : recordQuery;
@@ -131,23 +129,20 @@ export function TimeblockInspector({ onViewStats, onCopy }: TimeModelInspectorPr
     relationships = {
       kind: 'plan',
       status,
-      records: relatedRecordsQuery.data ?? [],
+      records: plan
+        ? (() => {
+            const rows = relatedRecordsQuery.data ?? [];
+            const ids = new Set(
+              overlappingRecords(
+                toDerivedBlock(plan, 'plan'),
+                rows.map((row) => toDerivedBlock(row, 'rec')),
+                new Date(),
+              ).map((row) => row.id),
+            );
+            return rows.filter((row) => ids.has(row.id));
+          })()
+        : [],
       onRetry: () => void relatedRecordsQuery.refetch(),
-    };
-  } else if (!duplicateDraft && originalPlanId) {
-    const isUnavailable = originalPlanQuery.error?.data?.code === 'NOT_FOUND';
-    const status: 'loading' | 'error' | 'success' | 'unavailable' = isUnavailable
-      ? 'unavailable'
-      : originalPlanQuery.isError
-        ? 'error'
-        : originalPlanQuery.isSuccess
-          ? 'success'
-          : 'loading';
-    relationships = {
-      kind: 'record',
-      status,
-      plan: originalPlanQuery.data ?? null,
-      onRetry: () => void originalPlanQuery.refetch(),
     };
   }
 

@@ -118,7 +118,7 @@ CalendarController              メインエントリポイント
 | テーブル     | 用途                                                                    |
 | ------------ | ----------------------------------------------------------------------- |
 | `plans`      | 計画（タイトル、時間、`activity_id` 等）                                |
-| `records`    | 実績（対応する Plan があれば `plan_id` で紐づく）                       |
+| `records`    | 実際に使った時間（予定とは独立）                                        |
 | `activities` | Plan / Record の分類単位（`plans.activity_id` / `records.activity_id`） |
 | `categories` | アクティビティの所属先。色・アイコンを持つのはこちら                    |
 

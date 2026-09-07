@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createChainableMock, createMockSupabase } from '@/lib/test/trpc-test-helpers';
 
-import { fetchPlans, fetchRecords, fetchRecordsByPlanIds } from './statistics-fetchers';
+import { fetchPlans, fetchRecords } from './statistics-fetchers';
 import type { ServiceSupabaseClient } from './types';
 
 const mocks = vi.hoisted(() => ({
@@ -38,10 +38,6 @@ describe('statistics fetcher observability', () => {
 
   it.each([
     ['fetch_records', (client: ServiceSupabaseClient) => fetchRecords(client, USER_ID)],
-    [
-      'fetch_records_by_plan_ids',
-      (client: ServiceSupabaseClient) => fetchRecordsByPlanIds(client, USER_ID, ['plan-1']),
-    ],
     ['fetch_plans', (client: ServiceSupabaseClient) => fetchPlans(client, USER_ID)],
   ])('%sは元DB障害を一度captureしてnormalized errorをthrowする', async (operation, run) => {
     const query = createChainableMock([], DATABASE_ERROR);

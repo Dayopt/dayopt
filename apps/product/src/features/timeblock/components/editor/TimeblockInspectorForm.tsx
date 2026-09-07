@@ -16,7 +16,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
 
 import { useActivitiesMap, useCreateActivity } from '@/features/activities';
-import type { PublicRecordRow, Row } from '@/lib/database';
+import type { PublicPlanRow, PublicRecordRow } from '@/lib/database';
 import { useDebouncedCallback } from '@/lib/hooks/useDebounce';
 import { toast } from '@/lib/toast';
 import { Button } from '@dayopt/components';
@@ -67,22 +67,15 @@ import {
   type TimeblockRelationshipItem,
 } from './TimeblockRelationshipSection';
 
-type PlanRow = Row<'plans'>;
+type PlanRow = PublicPlanRow;
 type RecordRow = PublicRecordRow;
 
-export type TimeblockRelationships =
-  | {
-      kind: 'plan';
-      status: 'loading' | 'error' | 'success';
-      records: readonly RecordRow[];
-      onRetry: () => void;
-    }
-  | {
-      kind: 'record';
-      status: 'loading' | 'error' | 'success' | 'unavailable';
-      plan: PlanRow | null;
-      onRetry: () => void;
-    };
+export type TimeblockRelationships = {
+  kind: 'plan';
+  status: 'loading' | 'error' | 'success';
+  records: readonly RecordRow[];
+  onRetry: () => void;
+};
 
 interface TimeModelInspectorFormProps {
   kind: TimeblockDestination;
@@ -180,8 +173,6 @@ export function TimeblockInspectorForm({
     fetchRecordById,
     restoreRecord,
     restorePlan,
-    skipPlan,
-    unskipPlan,
     updateRecord,
     updatePlan,
   } = useTimeblockWriteMutations(
@@ -235,11 +226,6 @@ export function TimeblockInspectorForm({
   // auto_migrated record は RLS で update / delete とも拒否されるため UI 側も読み取り専用にする
   const isMigrated = !isDuplicateMode && kind === 'record' && record?.source === 'auto_migrated';
   const isPast = kind === 'record' || (target != null && new Date(target.end_at) <= new Date());
-  const isSkipped = kind === 'plan' && plan?.skipped_at != null;
-  const planRelationships = relationships?.kind === 'plan' ? relationships : undefined;
-  const isRecordStateResolved = kind !== 'plan' || planRelationships?.status === 'success';
-  const hasRelatedRecords =
-    planRelationships?.status === 'success' && planRelationships.records.length > 0;
 
   useEffect(() => {
     const targetChanged = activeTargetIdRef.current !== targetId;
@@ -290,7 +276,13 @@ export function TimeblockInspectorForm({
               startAt: new Date(latest.start_at),
               endAt: new Date(latest.end_at),
             }));
-            setFulfillment(parseFulfillment('fulfillment' in latest ? latest.fulfillment : null));
+            setFulfillment(
+              parseFulfillment(
+                'fulfillment' in latest && typeof latest.fulfillment === 'string'
+                  ? latest.fulfillment
+                  : null,
+              ),
+            );
             setHasUnresolvedWrite(false);
             conflictRecoveringRef.current = false;
           } catch {
@@ -499,31 +491,6 @@ export function TimeblockInspectorForm({
     value,
   ]);
 
-  // --- スキップ / 削除 ---
-  const handleSkip = useCallback(() => {
-    if (!targetId || isWriteFrozen) return;
-    setActionPreparing(true);
-    void flushPendingEdits()
-      .then((expectedUpdatedAt) => skipPlan.mutateAsync({ id: targetId, expectedUpdatedAt }))
-      .then(() => toast.success(t('timeblock.editor.toast.skipped')))
-      .catch((error: unknown) => {
-        if (isTimeblockUncertainError(error)) setHasUnresolvedWrite(true);
-      })
-      .finally(() => setActionPreparing(false));
-  }, [targetId, isWriteFrozen, flushPendingEdits, skipPlan, setActionPreparing, t]);
-
-  const handleUnskip = useCallback(() => {
-    if (!targetId || isWriteFrozen) return;
-    setActionPreparing(true);
-    void flushPendingEdits()
-      .then((expectedUpdatedAt) => unskipPlan.mutateAsync({ id: targetId, expectedUpdatedAt }))
-      .then(() => toast.success(t('timeblock.editor.toast.unskipped')))
-      .catch((error: unknown) => {
-        if (isTimeblockUncertainError(error)) setHasUnresolvedWrite(true);
-      })
-      .finally(() => setActionPreparing(false));
-  }, [targetId, isWriteFrozen, flushPendingEdits, unskipPlan, setActionPreparing, t]);
-
   const handleDelete = useCallback(() => {
     if (!targetId || isWriteFrozen) return;
     setActionPreparing(true);
@@ -570,17 +537,11 @@ export function TimeblockInspectorForm({
     ? []
     : // eslint-disable-next-line react-hooks/refs -- helperはcallbackを実行せずmenu itemへ格納するだけ
       getTimeblockMenuItems({
-        // skip / unskip は Plan にしか出ないため、kind をそのまま origin へ写す
-        origin: kind === 'plan' ? 'planned' : 'unplanned',
         activityId: value.activityId,
-        isSkipped,
         onViewStats:
           onViewStats && value.activityId ? () => onViewStats(value.activityId ?? '') : undefined,
         onCopy: onCopy ? handleCopy : undefined,
         onDuplicate: onStartDuplicate ? handleStartDuplicate : undefined,
-        onSkip:
-          kind === 'plan' && isRecordStateResolved && !hasRelatedRecords ? handleSkip : undefined,
-        onUnskip: kind === 'plan' ? handleUnskip : undefined,
         onDelete: isMigrated ? undefined : handleDelete,
       });
 
@@ -692,31 +653,18 @@ export function TimeblockInspectorForm({
         ) : null}
 
         {!isDuplicateMode && relationships && onOpenRelationship ? (
-          relationships.kind === 'plan' ? (
-            <TimeblockRelationshipSection
-              kind="plan"
-              status={relationships.status}
-              records={relationships.records.map(toRelationshipItem)}
-              onOpen={onOpenRelationship}
-              onRetry={relationships.onRetry}
-            />
-          ) : (
-            <TimeblockRelationshipSection
-              kind="record"
-              status={relationships.status}
-              plan={relationships.plan ? toRelationshipItem(relationships.plan) : null}
-              onOpen={onOpenRelationship}
-              onRetry={relationships.onRetry}
-            />
-          )
+          <TimeblockRelationshipSection
+            kind="plan"
+            status={relationships.status}
+            records={relationships.records.map(toRelationshipItem)}
+            onOpen={onOpenRelationship}
+            onRetry={relationships.onRetry}
+          />
         ) : null}
 
         {!isDuplicateMode &&
         kind === 'plan' &&
         isPast &&
-        !isSkipped &&
-        isRecordStateResolved &&
-        !hasRelatedRecords &&
         targetId ? (
           <div className="flex justify-start">
             <RecordPlanButton

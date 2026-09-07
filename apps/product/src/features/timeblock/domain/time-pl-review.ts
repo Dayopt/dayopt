@@ -1,6 +1,6 @@
 import { computePlanAccuracy, computePlanVariance, type PlanAccuracyStatus } from '@/lib/time';
 
-import { aggregateByActivity } from './activity-axis-aggregation';
+import { aggregate, type DerivedBlock, type DerivedPeriod } from './derived-model';
 
 export interface TimePLReviewSourceRow {
   /** アクティビティ未設定、およびアクティビティ削除で `activity_id = NULL` になった行は null */
@@ -57,8 +57,31 @@ export interface TimePLReview {
 export function deriveTimePLReview(
   plans: ReadonlyArray<TimePLReviewSourceRow>,
   records: ReadonlyArray<TimePLReviewSourceRow>,
+  period?: DerivedPeriod,
+  now?: Date,
 ): TimePLReview {
-  const activities = aggregateByActivity(plans.map(toDurationRow), records.map(toDurationRow))
+  const blocks: DerivedBlock[] = [
+    ...plans.map((row, index) => ({ ...toReadBlock(row, index), kind: 'plan' as const })),
+    ...records.map((row, index) => ({ ...toReadBlock(row, index), kind: 'rec' as const })),
+  ];
+  const starts = blocks.map((row) => Date.parse(row.start));
+  const ends = blocks.map((row) => Date.parse(row.end));
+  const bounds = period ?? {
+    startAt: new Date(starts.length > 0 ? Math.min(...starts) : 0).toISOString(),
+    endAt: new Date(ends.length > 0 ? Math.max(...ends) : 0).toISOString(),
+    timezone: 'UTC',
+  };
+  const activities = [...new Set(blocks.map((block) => block.activityId))]
+    .map((activityId) => {
+      const totals = aggregate(bounds, activityId, blocks, now ?? new Date(bounds.endAt));
+      return {
+        activityId,
+        plannedMinutes: roundToTenth(totals.plannedPastMinutes),
+        recordedMinutes: roundToTenth(totals.recordedMinutes),
+        hasPlan: totals.plannedPastMinutes > 0,
+      };
+    })
+    .filter((totals) => totals.hasPlan || totals.recordedMinutes > 0)
     .map((totals) => {
       const variance = computePlanVariance(
         totals.plannedMinutes,
@@ -143,10 +166,16 @@ export function deriveTimePLReview(
   };
 }
 
-function toDurationRow(row: TimePLReviewSourceRow) {
+function toReadBlock(row: TimePLReviewSourceRow, index: number) {
   return {
+    id: String(index),
     activityId: row.activityId,
-    minutes: (Date.parse(row.endAt) - Date.parse(row.startAt)) / 60_000,
+    start: row.startAt,
+    end: row.endAt,
+    memo: null,
+    fulfillment: null,
+    live: false,
+    source: 'manual',
   };
 }
 

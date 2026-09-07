@@ -2,11 +2,10 @@
 
 import { useCallback } from 'react';
 
-import { useLocale, useTranslations } from 'next-intl';
+import { useLocale } from 'next-intl';
 import { useRouter } from 'next/navigation';
 
 import { useTimeblockWriteMutations } from '@/features/timeblock';
-import { toast } from '@/lib/toast';
 
 import { buildReportPath } from '../../lib/panel-url';
 import type { CalendarDisplayEvent } from '../../types/calendar.types';
@@ -15,8 +14,7 @@ import type { CalendarDisplayEvent } from '../../types/calendar.types';
 export function useTimeblockContextActions() {
   const router = useRouter();
   const locale = useLocale();
-  const t = useTranslations();
-  const { deleteRecord, deletePlan, skipPlan, unskipPlan } = useTimeblockWriteMutations();
+  const { deleteRecord, deletePlan } = useTimeblockWriteMutations();
 
   const handleDeleteTimeblock = useCallback(
     (entry: CalendarDisplayEvent) => {
@@ -40,32 +38,8 @@ export function useTimeblockContextActions() {
     [router, locale],
   );
 
-  const handleSkip = useCallback(
-    (entry: CalendarDisplayEvent) => {
-      if (entry.kind !== 'plan') return;
-      skipPlan.mutate(
-        { id: entry.id, expectedUpdatedAt: entry.version },
-        { onSuccess: () => toast.success(t('timeblock.editor.toast.skipped')) },
-      );
-    },
-    [skipPlan, t],
-  );
-
-  const handleUnskip = useCallback(
-    (entry: CalendarDisplayEvent) => {
-      if (entry.kind !== 'plan') return;
-      unskipPlan.mutate(
-        { id: entry.id, expectedUpdatedAt: entry.version },
-        { onSuccess: () => toast.success(t('timeblock.editor.toast.unskipped')) },
-      );
-    },
-    [unskipPlan, t],
-  );
-
   return {
     handleDeleteTimeblock,
     handleViewStats,
-    handleSkip,
-    handleUnskip,
   };
 }

@@ -47,7 +47,7 @@ function createFakeClient(seed: { records?: RecordSeed[]; plans?: PlanSeed[] }):
     plans: (seed.plans ?? []).map((row) => ({
       user_id: USER_ID,
       deleted_at: null,
-      skipped_at: null,
+
       ...row,
     })),
   };
@@ -56,6 +56,8 @@ function createFakeClient(seed: { records?: RecordSeed[]; plans?: PlanSeed[] }):
     let current = rows;
     const query = {
       select: () => query,
+      order: () => query,
+      range: () => query,
       eq: (column: string, value: unknown) => {
         current = current.filter((row) => row[column] === value);
         return query;

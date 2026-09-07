@@ -77,7 +77,12 @@ const recordCreateInputSchema = z
     title: titleSchema,
     note: noteSchema,
     activityId: nullableIdSchema,
-    planId: nullableIdSchema,
+    planId: z
+      .null({
+        invalid_type_error:
+          'Plan links have been removed; omit planId and refresh the tool schema.',
+      })
+      .optional(),
     startAt: timestampSchema,
     endAt: timestampSchema,
     fulfillment: fulfillmentCreateSchema,

@@ -14,7 +14,7 @@ const plan = {
 } as CalendarDisplayEvent;
 
 describe('buildPlanRecordDropInput', () => {
-  it('Planの内容とdrop先のpreview rangeから関連Record入力を作る', () => {
+  it('Planの内容とdrop先のpreview rangeから独立Record入力を作る', () => {
     const input = buildPlanRecordDropInput(plan, {
       start: new Date('2026-07-14T10:15:00.000Z'),
       end: new Date('2026-07-14T10:45:00.000Z'),
@@ -24,7 +24,6 @@ describe('buildPlanRecordDropInput', () => {
       title: 'API design',
       note: 'Review the endpoint contract',
       activityId: 'activity-1',
-      planId: 'plan-1',
       start_at: '2026-07-14T10:15:00.000Z',
       end_at: '2026-07-14T10:45:00.000Z',
     });

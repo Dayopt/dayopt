@@ -23,7 +23,7 @@ export interface CumulativeTimeRpcInner {
 export interface PlanRateRpcInner {
   totalEntries: number;
   plannedEntries: number;
-  planRate: number;
+  planRate: number | null;
 }
 
 /** `unpackContextSwitches` の入力 inner shape */
@@ -52,13 +52,13 @@ export function unpackCumulativeTime(data: unknown): { totalMinutes: number } {
 export function unpackPlanRate(data: unknown): {
   totalEntries: number;
   plannedEntries: number;
-  planRate: number;
+  planRate: number | null;
 } {
   const result = data as Partial<PlanRateRpcInner> | null | undefined;
   return {
     totalEntries: result?.totalEntries ?? 0,
     plannedEntries: result?.plannedEntries ?? 0,
-    planRate: result?.planRate ?? 0,
+    planRate: result?.planRate ?? null,
   };
 }
 

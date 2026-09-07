@@ -12,8 +12,8 @@ import { MS_PER_DAY } from '@/lib/date/constants';
 
 import { aggregateActivityEstimationFactors, type ActivityEstimationFactor } from '../domain';
 
-import { fetchPlansForEstimation, fetchRecordsByPlanIds } from './statistics-fetchers';
-import { minutesBetween } from './statistics-service-grouping';
+import { toDerivedBlock } from '../domain/derived-model';
+import { fetchPlansForEstimation, fetchRecords } from './statistics-fetchers';
 import type { ServiceSupabaseClient } from './types';
 
 /** ADR-026 の「直近 4 週」。`plans.start_at` の [now - 28 日, now) で切る。 */
@@ -41,24 +41,14 @@ export class StatisticsFeedforwardService {
     const plans = await fetchPlansForEstimation(this.supabase, userId, { startDate, endDate });
     if (plans.length === 0) return [];
 
-    const records = await fetchRecordsByPlanIds(
-      this.supabase,
-      userId,
-      plans.map((plan) => plan.id),
-    );
-
+    const records = await fetchRecords(this.supabase, userId, { startDate, endDate });
     return aggregateActivityEstimationFactors(
-      plans.map((plan) => ({
-        id: plan.id,
-        activity_id: plan.activity_id,
-        planned_minutes: minutesBetween(plan.start_at, plan.end_at),
-        is_skipped: plan.skipped_at != null,
-      })),
-      records.map((record) => ({
-        plan_id: record.plan_id,
-        source: record.source,
-        minutes: minutesBetween(record.start_at, record.end_at),
-      })),
+      [
+        ...plans.map((row) => toDerivedBlock(row, 'plan')),
+        ...records.map((row) => toDerivedBlock(row, 'rec')),
+      ],
+      { startAt: startDate, endAt: endDate, timezone: 'UTC' },
+      now,
     );
   }
 }
