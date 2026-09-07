@@ -1,17 +1,17 @@
 {
   "calendar": {
     "search": {
-      "open": "ブロックを検索",
-      "title": "ブロックを検索",
+      "open": "タイムブロックを検索",
+      "title": "タイムブロックを検索",
       "description": "カレンダーの履歴から予定と記録を探します。",
       "placeholder": "アクティビティとメモを検索...",
       "inputLabel": "予定と記録を検索",
       "initial": "アクティビティまたはメモから予定と記録を検索できます。",
       "loading": "検索中...",
-      "empty": "ブロックが見つかりません",
+      "empty": "タイムブロックが見つかりません",
       "error": "現在、検索を利用できません",
       "retry": "再試行",
-      "results": "ブロック",
+      "results": "タイムブロック",
       "overflow": "新しい順に{count}件を表示しています。検索語を絞り込んでください。",
       "skipped": "やらなかった",
       "kind": {
@@ -26,7 +26,7 @@
     "shortcuts": {
       "actions": {
         "open": "キーボードショートカットを開く",
-        "openSearch": "ブロックを検索",
+        "openSearch": "タイムブロックを検索",
         "previousPeriod": "前の期間へ移動",
         "nextPeriod": "次の期間へ移動",
         "today": "今日へ移動",
@@ -38,12 +38,12 @@
         "sixDayView": "6日を表示",
         "sevenDayView": "7日を表示",
         "toggleWeekends": "週末の表示を切り替え",
-        "createBlock": "ブロックを作成",
-        "createBlockNow": "現在時刻にブロックを作成",
-        "copyBlock": "選択中のブロックをコピー",
-        "pasteBlock": "コピーしたブロックを貼り付け",
-        "deleteBlock": "選択中のブロックを削除",
-        "closeInspector": "ブロックの詳細を閉じる"
+        "createBlock": "タイムブロックを作成",
+        "createBlockNow": "現在時刻にタイムブロックを作成",
+        "copyBlock": "選択中のタイムブロックをコピー",
+        "pasteBlock": "コピーしたタイムブロックを貼り付け",
+        "deleteBlock": "選択中のタイムブロックを削除",
+        "closeInspector": "タイムブロックの詳細を閉じる"
       }
     },
     "clipboard": {
@@ -66,53 +66,13 @@
       "generalSettings": "一般設定",
       "stats": "振り返り"
     },
-    "event": {
-      "title": "イベント",
-      "delete": "予定を削除",
-      "edit": "編集",
-      "duplicate": "複製",
-      "restore": "予定を復元しました",
-      "restoreFailed": "復元できませんでした。もう一度お試しください",
+    "timeblock": {
       "adjustEndTime": "ドラッグして終了時間を調整",
-      "noTimeSet": "時間未設定",
       "selectActivity": "アクティビティを選択...",
       "preview": {
         "plan": "予定",
         "record": "記録"
-      },
-      "noDescription": "説明なし",
-      "newTask": "新しいタスク",
-      "created": "予定を作成しました",
-      "updated": "予定を更新しました",
-      "deleted": "予定を削除しました",
-      "moved": "予定を移動しました",
-      "resized": "予定をリサイズしました",
-      "resizeFailed": "予定をリサイズできませんでした。もう一度お試しください",
-      "undoMove": "移動を取り消しました",
-      "undoFailed": "取り消しできませんでした。もう一度お試しください",
-      "moveWithRecord": {
-        "title": "記録をリセットして移動",
-        "description": "この予定には記録があります。移動すると記録がリセットされます",
-        "confirm": "移動"
-      },
-      "diff": {
-        "short": "短縮",
-        "addRecordToGap": "空き時間に記録を追加"
-      },
-      "saved": "保存しました",
-      "noEventsOnThisDay": "まっさらな1日です。最初のブロックを追加しましょう",
-      "selectEventToEdit": "編集するイベントを選択",
-      "selectEventToDelete": "削除するイベントを選択",
-      "deselected": "イベントの選択を解除しました",
-      "operationCancelled": "操作をキャンセルしました",
-      "deleteFailed": "予定を削除できませんでした。もう一度お試しください",
-      "moveFailed": "予定を移動できませんでした。もう一度お試しください",
-      "duplicateFailed": "予定を複製できませんでした。もう一度お試しください",
-      "restoreError": "復元エラー",
-      "createNewEvent": "新しいイベントを作成",
-      "enterEventTitle": "例: ミーティング、ランチ...",
-      "noTitle": "(タイトルなし)",
-      "allDay": "終日"
+      }
     },
     "contextMenu": {
       "title": "タイムブロック操作",
@@ -244,27 +204,27 @@
     "templates": {
       "sectionTitle": "テンプレート",
       "empty": "テンプレートはまだありません",
-      "createEntryLabel": "テンプレートを追加",
+      "createLabel": "テンプレートを追加",
       "settingsLabel": "設定",
-      "saveEntryLabel": "この並びを型として保存",
+      "saveLabel": "この並びをテンプレートとして保存",
       "saveNamePlaceholder": "テンプレート名",
       "renameLabel": "テンプレート名を変更",
       "deleteConfirmTitle": "「{name}」を削除",
       "deleteConfirmDescription": "この操作は取り消せません。テンプレートから作った予定・記録は削除されません。",
       "deleteConfirmButton": "削除",
-      "editEntryLabel": "編集",
+      "editLabel": "編集",
       "editingAsDay": "「{name}」を一日として編集中",
       "overwriteSaveLabel": "上書き保存",
       "diffSummaryPrefix": "変更:",
       "contextMenuTitle": "テンプレートメニュー",
       "rowAriaHint": "テンプレート「{name}」。クリックで適用、ドラッグで任意の日へ、右クリックで編集・改名・削除",
       "toast": {
-        "applyOverlap": "この時間帯には既にブロックがあり、型を置けませんでした",
-        "applyDoesNotFit": "この日は時計が飛ぶ時間帯があり、この型は収まりませんでした",
-        "applyFailed": "型を適用できませんでした。もう一度お試しください",
-        "saveFailed": "型を保存できませんでした。もう一度お試しください",
-        "renameFailed": "型の名前を変更できませんでした。もう一度お試しください",
-        "deleteFailed": "型を削除できませんでした。もう一度お試しください"
+        "applyOverlap": "この時間帯には既にタイムブロックがあり、テンプレートを置けませんでした",
+        "applyDoesNotFit": "この日は時計が飛ぶ時間帯があり、このテンプレートは収まりませんでした",
+        "applyFailed": "テンプレートを適用できませんでした。もう一度お試しください",
+        "saveFailed": "テンプレートを保存できませんでした。もう一度お試しください",
+        "renameFailed": "テンプレートの名前を変更できませんでした。もう一度お試しください",
+        "deleteFailed": "テンプレートを削除できませんでした。もう一度お試しください"
       }
     },
     "activitySelector": {
@@ -304,7 +264,7 @@
     },
     "mobile": {
       "weekLaneSwitcher": {
-        "ariaLabel": "表示するブロック"
+        "ariaLabel": "表示するタイムブロック"
       },
       "touchHint": {
         "title": "長押しで作成",
@@ -312,7 +272,7 @@
       }
     },
     "timeGrid": {
-      "ariaLabel": "カレンダータイムグリッド - クリックまたはEnterキーでイベントを作成"
+      "ariaLabel": "カレンダータイムグリッド - クリックまたはEnterキーでタイムブロックを作成"
     },
     "external": {
       "untitled": "タイトルなしの予定",
@@ -328,8 +288,8 @@
         "loadingLabel": "非表示にしています"
       },
       "toast": {
-        "convertedToPlan": "計画に追加しました",
-        "convertedToRecord": "実績として記録しました",
+        "convertedToPlan": "予定に追加しました",
+        "convertedToRecord": "記録として保存しました",
         "convertUndone": "元に戻しました",
         "convertFailed": "追加できませんでした。もう一度お試しください",
         "dismissFailed": "非表示にできませんでした。もう一度お試しください"
@@ -340,7 +300,7 @@
       "description": "ネットワーク接続を確認してもう一度お試しください",
       "retry": "再読み込み",
       "reload": "ページをリロード",
-      "entriesLoadFailed": "タイムブロックを読み込めませんでした。ページを更新してください"
+      "loadFailed": "タイムブロックを読み込めませんでした。ページを更新してください"
     }
   }
 }

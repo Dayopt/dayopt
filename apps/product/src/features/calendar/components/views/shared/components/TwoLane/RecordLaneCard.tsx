@@ -180,7 +180,7 @@ export function RecordLaneCard({
         <div
           role="slider"
           tabIndex={-1}
-          aria-label={t('calendar.event.adjustEndTime')}
+          aria-label={t('calendar.timeblock.adjustEndTime')}
           aria-orientation="vertical"
           aria-valuenow={position.height}
           aria-valuemin={MIN_HEIGHT}

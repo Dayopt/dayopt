@@ -251,7 +251,9 @@ describe('実 repo に対する CLI', () => {
       cwd: process.cwd(),
       encoding: 'utf8',
     });
-    expect(result.stdout, result.stdout + result.stderr).toContain('合計: 0 件の禁止表記');
-    expect(result.status).toBe(0);
+    // 違反ゼロの時は早期 return して「✅ 禁止表記なし」だけを出すので、
+    // 合計行の有無ではなく「active 違反の見出しが出ていない」ことで判定する。
+    expect(result.stdout, result.stdout + result.stderr).not.toContain('⚠️  禁止表記');
+    expect(result.status, result.stdout + result.stderr).toBe(0);
   });
 });

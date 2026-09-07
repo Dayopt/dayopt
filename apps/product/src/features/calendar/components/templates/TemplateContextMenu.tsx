@@ -110,7 +110,7 @@ export function TemplateContextMenu({
       ? [
           {
             key: 'edit',
-            labelKey: 'calendar.templates.editEntryLabel' as const,
+            labelKey: 'calendar.templates.editLabel' as const,
             icon: SquarePen,
             dangerous: false,
             onSelect: onEdit,

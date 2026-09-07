@@ -258,7 +258,7 @@ export function ViewSwitcher({
               className="gap-2"
             >
               <LayoutTemplate className="size-4" />
-              {t('calendar.templates.saveEntryLabel')}
+              {t('calendar.templates.saveLabel')}
             </DropdownMenuItem>
           </>
         )}

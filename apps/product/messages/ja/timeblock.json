@@ -32,17 +32,11 @@
       "unskipped": "スキップを解除しました",
       "conflict": "このタイムブロックは他の場所で変更されました。最新データを読み込んでください",
       "placed": "{name} を {time} に追加しました",
-      "overlapError": "{time} は既存のブロックと重複しています"
+      "overlapError": "{time} は既存のタイムブロックと重複しています"
     },
     "sidebar": {
       "tabs": {
-        "calendar": "カレンダー",
-        "list": "リスト"
-      },
-      "list": {
-        "nav": {
-          "plan": "Plan"
-        }
+        "calendar": "カレンダー"
       }
     },
     "open": "開く",
@@ -57,15 +51,6 @@
       "willBeRemovedFromCalendar": "カレンダーから削除されます",
       "confirm": "タイムブロックを削除",
       "deleting": "削除中..."
-    },
-    "status": {
-      "label": "ステータス",
-      "backlog": "準備中",
-      "ready": "配置済み",
-      "active": "作業中",
-      "wait": "待ち",
-      "closed": "完了",
-      "cancel": "中止"
     },
     "inspector": {
       "addTitle": "タイトルを追加",
@@ -103,7 +88,7 @@
         "noPlanned": "計画せず過ごした",
         "duration": "期間",
         "diff": "差分",
-        "timeProgress": "時間達成率"
+        "timeProgress": "時間の進捗"
       },
       "skip": "スキップ",
       "unskip": "スキップを解除",
@@ -124,10 +109,6 @@
         "titlePlaceholder": "何をした？",
         "titleLabel": "Record のタイトル",
         "failed": "Record を作成できませんでした。もう一度お試しください",
-        "linkEntry": "Record に紐付け",
-        "unlinkEntry": "Record の紐付けを解除",
-        "searchEntries": "Record を検索...",
-        "noEntries": "まだ Record がありません",
         "addNew": "Record を追加"
       }
     },
@@ -188,7 +169,7 @@
       },
       "migratedLocked": "移行された過去の記録は編集できません",
       "feedforward": {
-        "recentActual": "このアクティビティの直近実績は {duration} 前後です"
+        "recentActual": "このアクティビティの直近の記録は {duration} 前後です"
       },
       "fulfillment": {
         "label": "充実度",

@@ -74,7 +74,7 @@
       "twoFactorPrompt": "Require authentication code when signing in",
       "twoFactorActive": "Multi-factor authentication active",
       "twoFactorProtection": "Your account is protected with an additional security layer.",
-      "emailUsedFor": "Used for login and account emails",
+      "emailUsedFor": "Used for sign-in and account emails",
       "emailVerified": "Verified",
       "mfa": {
         "title": "Multi-factor authentication (MFA)",
@@ -151,7 +151,7 @@
         "error": "Failed to export data",
         "includedData": "Exported data",
         "profile": "Profile information",
-        "tasks": "Task data",
+        "timeblocks": "Timeblock data",
         "smartFilters": "Smart filters",
         "userSettings": "User settings",
         "format": "Format: JSON",
@@ -181,7 +181,7 @@
         "error": "Could not delete your account. If this keeps happening, email support@dayopt.app and we will delete it for you."
       },
       "loginMethod": {
-        "title": "Login method",
+        "title": "Sign-in method",
         "google": "Google"
       }
     },
@@ -227,8 +227,6 @@
       "saturday": "Saturday",
       "showWeekends": "Show weekends",
       "showWeekNumbers": "Show week numbers",
-      "defaultTaskSettings": "Creation defaults",
-      "defaultTaskSettingsDesc": "Default behavior when creating new timeblocks",
       "defaultDuration": "Default duration",
       "defaultDurationDesc": "Default duration when creating new timeblocks",
       "selectDuration": "Select duration",
@@ -316,7 +314,7 @@
         "billing": "Billing",
         "billingDesc": "Plans, payments, and invoices",
         "account": "Account",
-        "accountDesc": "Profile, email, password, and login connections",
+        "accountDesc": "Profile, email, password, and sign-in connections",
         "subscription": "Subscription",
         "subscriptionDesc": "Plan and billing management",
         "about": "About",
@@ -343,7 +341,6 @@
         "exportFailed": "Export failed. Please try again.",
         "includedDataTitle": "Data included in export",
         "profileInfo": "Profile information",
-        "tasksEvents": "Timeblocks",
         "activitySettings": "Activity settings",
         "calendarSettings": "Calendar settings",
         "otherSettings": "Other settings"
@@ -378,7 +375,7 @@
       },
       "deletion": {
         "title": "Data deletion",
-        "deleteBlocks": "Delete all blocks",
+        "deleteBlocks": "Delete all timeblocks",
         "deleteBlocksDesc": "Remove all timeblocks. Activities and settings are kept.",
         "deleteAllData": "Delete all data",
         "deleteAllDataDesc": "Remove all data including activities and settings. Your account remains active.",

@@ -1,17 +1,17 @@
 {
   "calendar": {
     "search": {
-      "open": "Search blocks",
-      "title": "Search blocks",
+      "open": "Search timeblocks",
+      "title": "Search timeblocks",
       "description": "Find plans and records from your calendar history.",
       "placeholder": "Search activities and notes...",
       "inputLabel": "Search plans and records",
       "initial": "Search your plans and records by activity or note.",
       "loading": "Searching...",
-      "empty": "No blocks found.",
+      "empty": "No timeblocks found.",
       "error": "Search is unavailable right now.",
       "retry": "Retry",
-      "results": "Blocks",
+      "results": "Timeblocks",
       "overflow": "Showing the newest {count} results. Refine your search to find more.",
       "skipped": "Skipped",
       "kind": {
@@ -26,7 +26,7 @@
     "shortcuts": {
       "actions": {
         "open": "Open keyboard shortcuts",
-        "openSearch": "Search blocks",
+        "openSearch": "Search timeblocks",
         "previousPeriod": "Go to the previous period",
         "nextPeriod": "Go to the next period",
         "today": "Go to today",
@@ -38,12 +38,12 @@
         "sixDayView": "Show 6 days",
         "sevenDayView": "Show 7 days",
         "toggleWeekends": "Show or hide weekends",
-        "createBlock": "Create a block",
-        "createBlockNow": "Create a block at the current time",
-        "copyBlock": "Copy the selected block",
-        "pasteBlock": "Paste the copied block",
-        "deleteBlock": "Delete the selected block",
-        "closeInspector": "Close block details"
+        "createBlock": "Create a timeblock",
+        "createBlockNow": "Create a timeblock at the current time",
+        "copyBlock": "Copy the selected timeblock",
+        "pasteBlock": "Paste the copied timeblock",
+        "deleteBlock": "Delete the selected timeblock",
+        "closeInspector": "Close timeblock details"
       }
     },
     "clipboard": {
@@ -66,70 +66,30 @@
       "generalSettings": "General settings",
       "stats": "Review"
     },
-    "event": {
-      "title": "Event",
-      "delete": "Delete event",
-      "edit": "Edit",
-      "duplicate": "Duplicate",
-      "restore": "Event restored",
-      "restoreFailed": "Failed to restore",
+    "timeblock": {
       "adjustEndTime": "Drag to adjust end time",
-      "noTimeSet": "No time set",
       "selectActivity": "Select activity...",
       "preview": {
         "plan": "Plan",
         "record": "Record"
-      },
-      "noDescription": "No description",
-      "newTask": "New task",
-      "created": "Event created",
-      "updated": "Event updated",
-      "deleted": "Event deleted",
-      "moved": "Event moved",
-      "resized": "Event resized",
-      "resizeFailed": "Failed to resize event",
-      "undoMove": "Move undone",
-      "undoFailed": "Failed to undo",
-      "moveWithRecord": {
-        "title": "Move and reset record",
-        "description": "This event has a time record. Moving it will reset the record",
-        "confirm": "Move"
-      },
-      "diff": {
-        "short": "Short",
-        "addRecordToGap": "Add record to open time"
-      },
-      "saved": "Saved",
-      "noEventsOnThisDay": "A fresh day. Add your first block to begin.",
-      "selectEventToEdit": "Select an event to edit",
-      "selectEventToDelete": "Select an event to delete",
-      "deselected": "Event deselected",
-      "operationCancelled": "Operation cancelled",
-      "deleteFailed": "Failed to delete event",
-      "moveFailed": "Failed to move event",
-      "duplicateFailed": "Failed to duplicate event",
-      "restoreError": "Restore error",
-      "createNewEvent": "Create new event",
-      "enterEventTitle": "Enter event title",
-      "noTitle": "(No title)",
-      "allDay": "All day"
+      }
     },
     "contextMenu": {
       "title": "Timeblock actions",
       "delete": "Delete"
     },
     "toast": {
-      "created": "Event created",
-      "updated": "Event updated",
-      "deleted": "Event deleted",
-      "moved": "Event moved",
+      "created": "Plan created",
+      "updated": "Plan updated",
+      "deleted": "Plan deleted",
+      "moved": "Plan moved",
       "movedTo": "Moved to {date}",
       "resized": "Duration changed",
       "resizedTo": "Changed to {duration}",
       "durationHoursMinutes": "{hours}h {minutes}m",
       "durationHours": "{hours}h",
       "durationMinutes": "{minutes}m",
-      "duplicated": "{count} events duplicated",
+      "duplicated": "{count} plans duplicated",
       "saving": "Saving...",
       "error": "Operation failed",
       "errorDescription": "Please try again later",
@@ -137,7 +97,7 @@
       "syncError": "Sync failed",
       "syncErrorDescription": "Please check your network connection",
       "batchComplete": "{operation} completed",
-      "batchDescription": "{count} events processed",
+      "batchDescription": "{count} plans processed",
       "dropInvalid": "Invalid drop target",
       "dropFailed": "Drop failed",
       "weekendsShown": "Weekends shown",
@@ -244,22 +204,22 @@
     "templates": {
       "sectionTitle": "Templates",
       "empty": "No templates yet",
-      "createEntryLabel": "Add template",
+      "createLabel": "Add template",
       "settingsLabel": "Settings",
-      "saveEntryLabel": "Save this arrangement as a template",
+      "saveLabel": "Save this arrangement as a template",
       "saveNamePlaceholder": "Template name",
       "renameLabel": "Rename template",
       "deleteConfirmTitle": "Delete \"{name}\"",
       "deleteConfirmDescription": "This can't be undone. Plans and records created from it aren't deleted.",
       "deleteConfirmButton": "Delete",
-      "editEntryLabel": "Edit",
+      "editLabel": "Edit",
       "editingAsDay": "Editing \"{name}\" as a day",
       "overwriteSaveLabel": "Overwrite save",
       "diffSummaryPrefix": "Changed:",
       "contextMenuTitle": "Template menu",
       "rowAriaHint": "Template \"{name}\". Click to apply, drag to any day, right-click to edit, rename, or delete",
       "toast": {
-        "applyOverlap": "This day already has blocks in the way, so the template wasn't applied",
+        "applyOverlap": "This day already has timeblocks in the way, so the template wasn't applied",
         "applyDoesNotFit": "This day skips part of the clock, so the template doesn't fit",
         "applyFailed": "Couldn't apply the template. Please try again",
         "saveFailed": "Couldn't save the template. Please try again",
@@ -304,7 +264,7 @@
     },
     "mobile": {
       "weekLaneSwitcher": {
-        "ariaLabel": "Blocks to show"
+        "ariaLabel": "Timeblocks to show"
       },
       "touchHint": {
         "title": "Long press to create",
@@ -312,7 +272,7 @@
       }
     },
     "timeGrid": {
-      "ariaLabel": "Calendar time grid - click or press Enter to create event"
+      "ariaLabel": "Calendar time grid - click or press Enter to create a timeblock"
     },
     "external": {
       "untitled": "Untitled event",
@@ -340,7 +300,7 @@
       "description": "Please check your network connection and try again.",
       "retry": "Retry",
       "reload": "Reload page",
-      "entriesLoadFailed": "Failed to load timeblocks. Please try refreshing."
+      "loadFailed": "Failed to load timeblocks. Please try refreshing."
     }
   }
 }

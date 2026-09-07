@@ -1,7 +1,6 @@
 {
   "navigation": {
     "dashboard": "Dashboard",
-    "tasks": "Tasks",
     "calendar": "Calendar",
     "settings": "Settings",
     "profile": "Profile",
@@ -43,10 +42,10 @@
         "contact": "Contact us"
       },
       "accountMenuLabel": "Open account menu for {name}",
-      "logout": "Log out",
-      "loggingOut": "Logging out...",
-      "logoutSuccess": "Logged out successfully",
-      "logoutFailed": "Failed to log out"
+      "logout": "Sign out",
+      "loggingOut": "Signing out...",
+      "logoutSuccess": "Signed out successfully",
+      "logoutFailed": "Failed to sign out"
     }
   }
 }

@@ -276,7 +276,7 @@ export function DraftTimeblock({ draft, hourHeight }: DraftTimeblockProps) {
         <div
           role="slider"
           tabIndex={0}
-          aria-label={t('calendar.event.adjustEndTime')}
+          aria-label={t('calendar.timeblock.adjustEndTime')}
           aria-orientation="vertical"
           aria-valuenow={endMinutes - startMinutes}
           aria-valuemin={15}

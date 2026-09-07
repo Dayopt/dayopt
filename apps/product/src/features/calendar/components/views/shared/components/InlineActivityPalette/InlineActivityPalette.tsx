@@ -159,7 +159,7 @@ export function InlineActivityPalette({
   );
   const destination = resolveTimeblockDestination(convertFromTimezone(selectionEndLocal, timezone));
   const isPlan = destination === 'plan';
-  const destinationLabel = tCalendar(`event.preview.${destination}`);
+  const destinationLabel = tCalendar(`timeblock.preview.${destination}`);
   const pickerContextLabel = `${destinationLabel} · ${pickerTimeLabel}`;
 
   // #2250: 相手レーンに重なる entry が無ければフル幅にする（表示層・選択プレビューと
@@ -289,7 +289,7 @@ export function InlineActivityPalette({
           <div
             role="slider"
             tabIndex={0}
-            aria-label={tCalendar('event.adjustEndTime')}
+            aria-label={tCalendar('timeblock.adjustEndTime')}
             aria-orientation="vertical"
             aria-valuenow={endMinutes - startMinutes}
             aria-valuemin={MIN_TIMEBLOCK_DURATION_MINUTES}

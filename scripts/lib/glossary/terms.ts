@@ -8,8 +8,9 @@
  * 判定ロジックと描画は `core.ts`。このファイルはデータだけを持つ。
  *
  * enforcement の運用:
- *   active       … 既に messages 側の違反が 0 件で、再発を CI で止める語
- *   migration    … 既存違反が残っている語。新規追加は禁止（警告で可視化）
+ *   active       … messages 側の違反が 0 件で、再発を CI（copy:check:strict）が止める語
+ *   migration    … 既存違反が残っている語。新規追加は禁止（警告で可視化）。2026-09-07 の
+ *                  移行 PR で全語を active へ上げたため、現在この段階の語は無い
  *   context-only … 機械判定すると誤検知が上回る語。表に載せてレビューで拾う
  */
 
@@ -31,16 +32,18 @@ export const GLOSSARY: readonly GlossaryEntry[] = [
       {
         term: 'ブロック',
         locale: 'ja',
-        enforcement: 'migration',
+        enforcement: 'active',
         // 「タイムブロック」の部分文字列なので、正解語ごと違反判定されないよう
         // lookbehind で外す（旧 glossary が「カテゴリ / カテゴリー」で踏んだ形）
         pattern: '(?<!タイム)ブロック',
+        // 「IP アドレスがブロックされています」は遮断の意味の同音異義。
+        allowKeyPaths: ['[Ii]pBlocked'],
         reason: '総称は「タイムブロック」に統一する。単独の「ブロック」は妨害の意味とも読める',
       },
       {
         term: '箱',
         locale: 'ja',
-        enforcement: 'migration',
+        enforcement: 'active',
         pattern: '(?<!ゴミ)箱',
         reason: '/report だけで使われている 3 つ目の呼称。「タイムブロック」か「件」に寄せる',
       },
@@ -53,7 +56,7 @@ export const GLOSSARY: readonly GlossaryEntry[] = [
       {
         term: 'タスク',
         locale: 'ja',
-        enforcement: 'migration',
+        enforcement: 'active',
         allowKeyPaths: ['^legal\\.', '^app\\.keywords'],
         reason:
           'GTD のタスクリスト項目と混同する。Dayopt が置くのはタスクではなく時間。法的文書と SEO keyword は据え置き',
@@ -61,30 +64,37 @@ export const GLOSSARY: readonly GlossaryEntry[] = [
       {
         term: 'block',
         locale: 'en',
-        enforcement: 'migration',
+        enforcement: 'active',
         match: 'word',
         reason: 'ja「タイムブロック」に対応する en は Timeblock。単独の block は使わない',
       },
       {
         term: 'box',
         locale: 'en',
-        enforcement: 'migration',
+        enforcement: 'active',
         pattern: '\\bboxe?s?\\b',
         reason: '/report の 3 つ目の呼称',
       },
       {
         term: 'event',
         locale: 'en',
-        enforcement: 'migration',
+        enforcement: 'active',
         match: 'word',
-        allowKeyPaths: ['^calendar\\.external\\.', 'externalEvents', 'ghost'],
+        // 外部カレンダー連携（Google Calendar のイベント）と、Sentry の event / 法的文書は別義。
+        allowKeyPaths: [
+          '^calendar\\.external\\.',
+          'externalEvents',
+          'ghost',
+          '^legal\\.',
+          'googleCalendar',
+        ],
         allowConceptIds: ['external-event'],
         reason: 'event は外部カレンダー由来の予定を指す語。Dayopt 自身の時間には使わない',
       },
       {
         term: 'entry',
         locale: 'en',
-        enforcement: 'migration',
+        enforcement: 'active',
         pattern: '\\b(entry|entries)\\b',
         allowKeyPaths: [
           '^oauth\\.consent\\.scope\\.',
@@ -95,7 +105,7 @@ export const GLOSSARY: readonly GlossaryEntry[] = [
       {
         term: 'task',
         locale: 'en',
-        enforcement: 'migration',
+        enforcement: 'active',
         match: 'word',
         allowKeyPaths: ['^legal\\.', '^app\\.keywords'],
         reason: 'ja「タスク」と同じ理由',
@@ -136,7 +146,7 @@ export const GLOSSARY: readonly GlossaryEntry[] = [
       {
         term: '実績',
         locale: 'ja',
-        enforcement: 'migration',
+        enforcement: 'active',
         reason:
           'UI では「記録」に統一する。「実績」は評価の含みがあり、判定せず数字で示すという原則に反する',
       },
@@ -208,7 +218,7 @@ export const GLOSSARY: readonly GlossaryEntry[] = [
       {
         term: '束',
         locale: 'ja',
-        enforcement: 'migration',
+        enforcement: 'active',
         // 「約束」を巻き込まない
         pattern: '(?<!約)束',
         reason: '/report のモバイル chip だけで使われている別名。「セグメント」に一本化する',
@@ -216,13 +226,13 @@ export const GLOSSARY: readonly GlossaryEntry[] = [
       {
         term: 'レンズ',
         locale: 'ja',
-        enforcement: 'migration',
+        enforcement: 'active',
         reason: '同上。spec と UI で「レンズ」「束」「セグメント」が三つ巴になっていた',
       },
       {
         term: 'lens',
         locale: 'en',
-        enforcement: 'migration',
+        enforcement: 'active',
         pattern: '\\b(lens|lenses)\\b',
         reason: 'ja「レンズ」と同じ理由',
       },
@@ -253,7 +263,7 @@ export const GLOSSARY: readonly GlossaryEntry[] = [
       {
         term: '型',
         locale: 'ja',
-        enforcement: 'migration',
+        enforcement: 'active',
         reason:
           '同じ namespace 内で「テンプレート」と割れていた。DB / en / サイドバー見出しに合わせて「テンプレート」へ寄せる',
       },
@@ -362,7 +372,7 @@ export const GLOSSARY: readonly GlossaryEntry[] = [
       {
         term: '達成',
         locale: 'ja',
-        enforcement: 'migration',
+        enforcement: 'active',
         reason:
           '「達成率」「達成度」は良し悪しの判定語。判定せず数字で示すという copywriting 原則に反する',
       },
@@ -401,14 +411,14 @@ export const GLOSSARY: readonly GlossaryEntry[] = [
       {
         term: 'ログイン',
         locale: 'ja',
-        enforcement: 'migration',
+        enforcement: 'active',
         allowKeyPaths: ['^legal\\.'],
         reason: '「サインイン」に統一する。法的文書は改訂扱いになるため据え置き',
       },
       {
         term: 'log in',
         locale: 'en',
-        enforcement: 'migration',
+        enforcement: 'active',
         pattern: '\\blog\\s?in\\b|\\blogged\\s?in\\b|\\blogging\\s?in\\b',
         allowKeyPaths: ['^legal\\.'],
         reason: 'en 側も log in / sign in で割れている',
@@ -427,14 +437,14 @@ export const GLOSSARY: readonly GlossaryEntry[] = [
       {
         term: 'ログアウト',
         locale: 'ja',
-        enforcement: 'migration',
+        enforcement: 'active',
         allowKeyPaths: ['^legal\\.'],
         reason: '「サインアウト」に統一する',
       },
       {
         term: 'log out',
         locale: 'en',
-        enforcement: 'migration',
+        enforcement: 'active',
         pattern: '\\blog\\s?out\\b|\\blogged\\s?out\\b|\\blogging\\s?out\\b',
         allowKeyPaths: ['^legal\\.'],
         reason: 'ja「ログアウト」と同じ理由',
@@ -508,7 +518,7 @@ export const GLOSSARY: readonly GlossaryEntry[] = [
       {
         term: '空白',
         locale: 'ja',
-        enforcement: 'migration',
+        enforcement: 'active',
         onlyNamespaces: ['report'],
         reason:
           'レポートでは「余白」。入力バリデーションの whitespace 義は別物なので report namespace だけを見る',
@@ -516,7 +526,7 @@ export const GLOSSARY: readonly GlossaryEntry[] = [
       {
         term: '無駄',
         locale: 'ja',
-        enforcement: 'migration',
+        enforcement: 'active',
         reason: '余白に良し悪しの評価を持ち込まない',
       },
     ],
@@ -680,28 +690,28 @@ export const KEY_NAME_RULES: readonly KeyNameRule[] = [
   {
     token: 'task',
     preferred: 'timeblock / plan',
-    enforcement: 'migration',
+    enforcement: 'active',
     allowKeyPaths: ['^legal\\.'],
     reason: '旧語彙。Dayopt はタスクではなく時間を置く',
   },
   {
     token: 'tasks',
     preferred: 'timeblock / plan',
-    enforcement: 'migration',
+    enforcement: 'active',
     allowKeyPaths: ['^legal\\.'],
     reason: '同上（複数形）',
   },
   {
     token: 'entry',
     preferred: 'timeblock / plan / record',
-    enforcement: 'migration',
+    enforcement: 'active',
     allowKeyPaths: ['manualEntry$'],
     reason: 'ADR-025 で廃止した Entry モデルの名残。MFA コードの manual entry は別義',
   },
   {
     token: 'entries',
     preferred: 'timeblock / plan / record',
-    enforcement: 'migration',
+    enforcement: 'active',
     allowKeyPaths: [
       '^oauth\\.consent\\.scope\\.',
       '^settings\\.integrations\\.mcpConnections\\.scopes\\.',
@@ -711,26 +721,26 @@ export const KEY_NAME_RULES: readonly KeyNameRule[] = [
   {
     token: 'tag',
     preferred: 'activity / category / segment',
-    enforcement: 'migration',
+    enforcement: 'active',
     reason: '#2162 で廃止した Tag 機能の名残',
   },
   {
     token: 'tags',
     preferred: 'activity / category / segment',
-    enforcement: 'migration',
+    enforcement: 'active',
     reason: '同上（複数形）',
   },
   {
     token: 'event',
     preferred: 'timeblock / plan',
-    enforcement: 'migration',
+    enforcement: 'active',
     allowKeyPaths: ['^calendar\\.external\\.', 'externalEvents', 'ghost'],
     reason: 'event は外部カレンダー由来の予定にだけ使う',
   },
   {
     token: 'events',
     preferred: 'timeblock / plan',
-    enforcement: 'migration',
+    enforcement: 'active',
     allowKeyPaths: ['^calendar\\.external\\.', 'externalEvents', 'ghost'],
     reason: '同上（複数形）',
   },
