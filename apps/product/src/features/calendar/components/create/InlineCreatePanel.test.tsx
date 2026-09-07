@@ -37,10 +37,27 @@ vi.mock('@/features/timeblock', async () => {
         selector({ openInspector, closeInspector }),
       { getState: () => ({ openInspector, closeInspector }) },
     ),
-    // 日付・時間行と重複アラート、ヘッダーの閉じるボタンは本体側で検証済みなので
-    // ここでは種別タブと作成経路に集中する
-    DateTimeSection: () => null,
-    TimeConflictAlert: () => null,
+    // 日付・時間・充実度・メモの入力は TimeblockEditor 側で検証済みなので、
+    // ここではメモと充実度が作成入力へ載るかだけを見る
+    TimeblockEditor: ({
+      onNoteChange,
+      fulfillmentSlot,
+    }: {
+      onNoteChange: (note: string) => void;
+      fulfillmentSlot?: React.ReactNode;
+    }) => (
+      <div>
+        <button type="button" onClick={() => onNoteChange('集中できた')}>
+          note
+        </button>
+        {fulfillmentSlot}
+      </div>
+    ),
+    RecordFulfillmentRow: ({ onChange }: { onChange: (v: 'low' | 'medium' | 'high') => void }) => (
+      <button type="button" onClick={() => onChange('high')}>
+        fulfillment
+      </button>
+    ),
     InspectorHeaderActions: ({ onCloseInspector }: { onCloseInspector?: () => void }) => (
       <button type="button" onClick={onCloseInspector}>
         close
@@ -169,6 +186,34 @@ describe('InlineCreatePanel', () => {
       id: 'activity-1',
       name: '開発',
     });
+  });
+
+  it('メモと充実度は作成入力へ載る（記録）', () => {
+    setSelection(pastDay());
+    render(<InlineCreatePanel onClose={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'note' }));
+    fireEvent.click(screen.getByRole('button', { name: 'fulfillment' }));
+    fireEvent.click(screen.getByRole('button', { name: '開発' }));
+
+    const [input] = createRecordMutate.mock.calls[0] as [{ note?: string; fulfillment?: string }];
+    expect(input.note).toBe('集中できた');
+    expect(input.fulfillment).toBe('high');
+  });
+
+  it('予定では充実度の行を出さず、メモだけ載る', () => {
+    setSelection(pastDay());
+    render(<InlineCreatePanel onClose={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole('tab', { name: 'event.preview.plan' }));
+    expect(screen.queryByRole('button', { name: 'fulfillment' })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'note' }));
+    fireEvent.click(screen.getByRole('button', { name: '開発' }));
+
+    const [input] = createPlanMutate.mock.calls[0] as [{ note?: string; fulfillment?: string }];
+    expect(input.note).toBe('集中できた');
+    expect(input.fulfillment).toBeUndefined();
   });
 
   it('閉じるボタンでは何も作成しない', () => {

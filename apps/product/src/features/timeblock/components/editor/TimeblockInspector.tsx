@@ -259,7 +259,7 @@ export function TimeblockInspector({
         >
           <DrawerContent className="flex flex-col gap-0 overflow-hidden p-0">
             <DrawerTitle className="sr-only">{title}</DrawerTitle>
-            <div className="min-h-0 flex-1 overflow-y-auto">
+            <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto">
               <div className="mx-auto w-full max-w-lg">{contentElement}</div>
             </div>
           </DrawerContent>

@@ -59,7 +59,12 @@ export function DockedInspectorPanel({ children, title, slotElement }: DockedIns
       tabIndex={-1}
       className="flex h-full min-h-0 flex-col gap-0 overflow-hidden focus:outline-none"
     >
-      <div className="min-h-0 flex-1 overflow-y-auto">{children}</div>
+      {/*
+        overflow-x-hidden: 行の 44px タップ領域は擬似要素で外へ広げているため数 px はみ出す。
+        overflow-y だけ指定すると CSS が横も auto に解決し、数 px の横スクロールが生まれる
+        （2026-09-07 User 指摘）。見えない当たり判定なので横は落として構わない。
+      */}
+      <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto">{children}</div>
     </div>,
     slotElement,
   );

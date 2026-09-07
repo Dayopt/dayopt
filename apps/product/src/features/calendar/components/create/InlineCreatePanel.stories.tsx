@@ -124,9 +124,13 @@ const meta = {
     onClose: fn(),
   },
   decorators: [
+    // 実際の器（PC は DockedInspectorPanel、モバイルは Drawer 本文）と同じく、
+    // 縦スクロールは外側が持つ。パネル自身はスクロールしない
     (Story) => (
-      <div className="border-border bg-background h-[560px] w-100 overflow-hidden rounded-lg border">
-        <Story />
+      <div className="border-border bg-background flex h-[560px] w-100 flex-col overflow-hidden rounded-lg border">
+        <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto">
+          <Story />
+        </div>
       </div>
     ),
   ],
@@ -168,8 +172,10 @@ export const Mobile: Story = {
   },
   decorators: [
     (Story) => (
-      <div className="bg-background h-[640px] w-full overflow-hidden">
-        <Story />
+      <div className="bg-background flex h-[640px] w-full flex-col overflow-hidden">
+        <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto">
+          <Story />
+        </div>
       </div>
     ),
   ],

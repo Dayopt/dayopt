@@ -21,6 +21,7 @@ import {
   resolveTimeblockKindChoice,
   useTimeblockInspectorStore,
   useTimeblockWriteMutations,
+  type Fulfillment,
 } from '@/features/timeblock';
 import { convertFromTimezone } from '@/lib/date/timezone';
 import { useUserPreferences } from '@/lib/hooks/useUserPreferences';
@@ -28,7 +29,15 @@ import { logger } from '@/lib/logger';
 
 import { useInlineCreateStore } from '../../stores/useInlineCreateStore';
 
-export function useInlineCreate() {
+/** アクティビティ選択と同時に保存する、作成前に埋めておける値 */
+interface InlineCreateExtras {
+  note?: string | undefined;
+  /** Record にだけ保存する。Plan では無視する */
+  fulfillment?: Fulfillment | null | undefined;
+}
+
+export function useInlineCreate(extras: InlineCreateExtras = {}) {
+  const { note, fulfillment } = extras;
   const pendingSelection = useInlineCreateStore.use.pendingSelection();
   const clearPendingSelection = useInlineCreateStore.use.clearPendingSelection();
   const setHoveredActivity = useInlineCreateStore.use.setHoveredActivity();
@@ -106,6 +115,7 @@ export function useInlineCreate() {
         title: activityName,
       });
 
+      const trimmedNote = note?.trim();
       const mutation = destination === 'plan' ? createPlan : createRecord;
       mutation.mutate(
         {
@@ -113,6 +123,9 @@ export function useInlineCreate() {
           start_at: utcStart.toISOString(),
           end_at: utcEnd.toISOString(),
           activityId,
+          ...(trimmedNote ? { note: trimmedNote } : {}),
+          // 充実度は Record だけが持つ。Plan へ渡すと schema で弾かれる
+          ...(destination === 'record' && fulfillment ? { fulfillment } : {}),
         },
         {
           onSuccess: (created) => {
@@ -144,6 +157,8 @@ export function useInlineCreate() {
       pendingSelection,
       isCreating,
       timezone,
+      note,
+      fulfillment,
       createPlan,
       createRecord,
       clearPendingSelection,

@@ -60,8 +60,11 @@ export { getTimeblockMenuItems } from './lib/timeblock-menu-items';
 // =============================================================================
 // Components (Inspector fields — 他 feature から再利用可能な入力 row)
 // =============================================================================
+export { TimeblockEditor } from './components/editor/TimeblockEditor';
+export type { TimeModelEditorValue } from './components/editor/TimeblockEditor';
 export { DateTimeSection } from './components/inspector/fields/DateTimeSection';
 export { InspectorHeaderActions } from './components/inspector/fields/InspectorHeaderActions';
-export { TimeConflictAlert } from './components/inspector/fields/TimeConflictAlert';
+export { RecordFulfillmentRow } from './components/inspector/fields/RecordFulfillmentRow';
+export type { Fulfillment } from './schemas/timeblock';
 
 // ここにないものはfeature内部専用

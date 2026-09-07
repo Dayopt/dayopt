@@ -335,7 +335,7 @@ export function ActivityPickerList({
         </div>
       ) : null}
 
-      <div className={cn(isEmbedded ? '' : 'min-h-0 flex-1 overflow-y-auto')}>
+      <div className={cn(isEmbedded ? '' : 'min-h-0 flex-1 overflow-x-hidden overflow-y-auto')}>
         {isActivityZero ? (
           <div className={cn('space-y-2 py-4', isEmbedded ? '' : 'px-4')}>
             <div className="text-center">
