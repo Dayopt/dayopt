@@ -10,6 +10,7 @@ import {
   getConfiguredExternalLifecycleAppVersion,
   isConfiguredFencedCalendarSyncWriterReady,
 } from '@/lib/database/external-lifecycle-version';
+import { EXTERNAL_CALENDAR_WINDOW_RADIUS_MS } from '@/lib/external-calendar-ghost';
 import { logger } from '@/lib/logger';
 import { captureUnexpectedDatabaseError, captureUnexpectedError } from '@/lib/sentry';
 
@@ -44,9 +45,6 @@ import { markCalendarConnectionReauth, persistCalendarTokenRotation } from './to
 
 /** iCal feed route / token endpoint と同じ外部呼び出しタイムアウト（`lib/supabase/oauth.ts`）。 */
 const DB_REQUEST_TIMEOUT_MS = 15_000;
-
-/** 取り込み window の半径。iCal export と同じ ±90 日（overview.md §1）。 */
-const WINDOW_RADIUS_MS = 90 * 24 * 60 * 60 * 1000;
 
 /** tombstone UPDATE の 1 バッチあたり件数。URL 長を意識した値。 */
 const TOMBSTONE_BATCH_SIZE = 150;
@@ -322,8 +320,8 @@ export async function syncConnection(params: {
   }
 
   const window: SyncWindow = {
-    timeMin: new Date(runStartedAt.getTime() - WINDOW_RADIUS_MS).toISOString(),
-    timeMax: new Date(runStartedAt.getTime() + WINDOW_RADIUS_MS).toISOString(),
+    timeMin: new Date(runStartedAt.getTime() - EXTERNAL_CALENDAR_WINDOW_RADIUS_MS).toISOString(),
+    timeMax: new Date(runStartedAt.getTime() + EXTERNAL_CALENDAR_WINDOW_RADIUS_MS).toISOString(),
   };
 
   let calendarsSynced = 0;
@@ -649,8 +647,8 @@ async function syncConnectionFenced(args: {
 
   const runStartedAt = new Date(runState.runStartedAtIso);
   const window: SyncWindow = {
-    timeMin: new Date(runStartedAt.getTime() - WINDOW_RADIUS_MS).toISOString(),
-    timeMax: new Date(runStartedAt.getTime() + WINDOW_RADIUS_MS).toISOString(),
+    timeMin: new Date(runStartedAt.getTime() - EXTERNAL_CALENDAR_WINDOW_RADIUS_MS).toISOString(),
+    timeMax: new Date(runStartedAt.getTime() + EXTERNAL_CALENDAR_WINDOW_RADIUS_MS).toISOString(),
   };
 
   let calendarsSynced = 0;
