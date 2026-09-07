@@ -141,7 +141,7 @@ describe('InlineCreatePanel', () => {
     setSelection(pastDay());
     render(<InlineCreatePanel onClose={vi.fn()} />);
 
-    expect(screen.getByRole('tab', { name: 'event.preview.record' })).not.toBeDisabled();
+    expect(screen.getByRole('tab', { name: 'timeblock.preview.record' })).not.toBeDisabled();
 
     fireEvent.click(screen.getByRole('button', { name: '開発' }));
 
@@ -153,7 +153,7 @@ describe('InlineCreatePanel', () => {
     setSelection(pastDay());
     render(<InlineCreatePanel onClose={vi.fn()} />);
 
-    fireEvent.click(screen.getByRole('tab', { name: 'event.preview.plan' }));
+    fireEvent.click(screen.getByRole('tab', { name: 'timeblock.preview.plan' }));
     expect(useInlineCreateStore.getState().pendingSelection?.kind).toBe('plan');
 
     fireEvent.click(screen.getByRole('button', { name: '開発' }));
@@ -166,7 +166,7 @@ describe('InlineCreatePanel', () => {
     setSelection(futureDay());
     render(<InlineCreatePanel onClose={vi.fn()} />);
 
-    expect(screen.getByRole('tab', { name: 'event.preview.record' })).toBeDisabled();
+    expect(screen.getByRole('tab', { name: 'timeblock.preview.record' })).toBeDisabled();
     expect(screen.getByText('activitySelector.recordUnavailableFuture')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: '開発' }));
@@ -205,7 +205,7 @@ describe('InlineCreatePanel', () => {
     setSelection(pastDay());
     render(<InlineCreatePanel onClose={vi.fn()} />);
 
-    fireEvent.click(screen.getByRole('tab', { name: 'event.preview.plan' }));
+    fireEvent.click(screen.getByRole('tab', { name: 'timeblock.preview.plan' }));
     expect(screen.queryByRole('button', { name: 'fulfillment' })).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'note' }));

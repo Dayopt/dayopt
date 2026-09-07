@@ -1,7 +1,6 @@
 {
   "navigation": {
     "dashboard": "ダッシュボード",
-    "tasks": "タスク",
     "calendar": "カレンダー",
     "settings": "設定",
     "profile": "プロフィール",
@@ -43,10 +42,10 @@
         "contact": "お問い合わせ"
       },
       "accountMenuLabel": "{name}のアカウントメニューを開く",
-      "logout": "ログアウト",
-      "loggingOut": "ログアウト中...",
-      "logoutSuccess": "ログアウトしました",
-      "logoutFailed": "ログアウトできませんでした。もう一度お試しください"
+      "logout": "サインアウト",
+      "loggingOut": "サインアウト中...",
+      "logoutSuccess": "サインアウトしました",
+      "logoutFailed": "サインアウトできませんでした。もう一度お試しください"
     }
   }
 }

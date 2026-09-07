@@ -283,13 +283,34 @@ export function useTimeblockWriteMutations(options: UseTimeblockWriteMutationsOp
     restoreTimeblockLists(queryClient, context);
   };
 
+  /**
+   * server が時刻規則で拒否した時の文言（`end_at > start_at` = DT003 /
+   * Record は未来に終われない = DT005）。
+   *
+   * 規則の強制点は DB trigger で、UI 側の事前チェックは往復を減らす写しにすぎない
+   * （`invariants.md` §時刻 の分類 (b)）。写しを外しても文言が汎用 saveFailed へ
+   * 退化しないよう、server 由来の code をここで拾う（#2628）。code は
+   * `client-safe-service-code.ts` の allowlist に載っているものだけが届く。
+   */
+  const temporalRuleMessage = (error: unknown): string | undefined => {
+    switch (getTimeblockServiceCode(error)) {
+      case 'RECORD_IN_FUTURE':
+        return t('timeLocked');
+      case 'INVALID_TIME_RANGE':
+        return t('duplicate.validation.invalidRange');
+      default:
+        return undefined;
+    }
+  };
+
   const reportError = (error: { message: string }) => {
     toast.error(
-      isTimeblockOverlapError(error)
-        ? t('toast.overlap')
-        : isTimeblockStaleError(error)
-          ? t('toast.conflict')
-          : t('toast.saveFailed'),
+      temporalRuleMessage(error) ??
+        (isTimeblockOverlapError(error)
+          ? t('toast.overlap')
+          : isTimeblockStaleError(error)
+            ? t('toast.conflict')
+            : t('toast.saveFailed')),
     );
   };
 

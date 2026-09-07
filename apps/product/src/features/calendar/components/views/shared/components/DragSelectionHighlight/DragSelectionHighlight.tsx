@@ -257,7 +257,7 @@ export function DragSelectionHighlight({
           <div
             role="slider"
             tabIndex={0}
-            aria-label={tCalendar('event.adjustEndTime')}
+            aria-label={tCalendar('timeblock.adjustEndTime')}
             aria-orientation="vertical"
             aria-valuenow={endMinutes - startMinutes}
             aria-valuemin={MIN_TIMEBLOCK_DURATION_MINUTES}

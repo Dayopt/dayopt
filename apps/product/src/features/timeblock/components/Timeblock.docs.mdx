@@ -43,13 +43,14 @@ TimeblockRecordActions                記録導線（ワンタップ「そのま
 
 ## サーバー層
 
-| モジュール                          | 責務                                                           |
-| ----------------------------------- | -------------------------------------------------------------- |
-| `plans-router` / `plan-service`     | Plan CRUD、skip / unskip、ワンタップ記録、一括「この日を確定」 |
-| `records-router` / `record-service` | Record CRUD（`plan_id` 紐づけ / 予定外）                       |
-| `router-index`（statistics）        | 統計 procedure（`api.statistics.*`）。実体は TS service        |
-| `statistics-service`                | 実績 = records、予定 = plans、予実比較 = join の集計           |
-| `timeblock-overlap-service`         | 同レーン重なりの事前チェック                                   |
+| モジュール                                        | 責務                                                                                    |
+| ------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| `plans-router` / `plan-service`                   | Plan の read（list / getById）。write は持たない                                        |
+| `records-router` / `record-service`               | Record の read（list / getById）。write は持たない                                      |
+| `plan-commands-router` / `record-commands-router` | Plan / Record の write（`api.planCommands.*` / `api.recordCommands.*`）。CAS token 必須 |
+| `timeblock-command-service`                       | write の唯一の入口。SQL command へ降ろす前に read で既存行を取る                        |
+| `router-index`（statistics）                      | 統計 procedure（`api.statistics.*`）。実体は TS service                                 |
+| `statistics-service`                              | 実績 = records、予定 = plans、予実比較 = join の集計                                    |
 
 ---
 

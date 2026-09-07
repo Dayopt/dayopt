@@ -49,7 +49,7 @@
         "monthColumn": "{month}"
       },
       "barAriaLabel": "Allocation by category",
-      "lensLabel": "Lens: {name}",
+      "lensLabel": "Segment: {name}",
       "barAriaLabelLens": "Allocation by activity"
     },
     "execution": {
@@ -65,7 +65,7 @@
       "planRatioUnavailable": "—",
       "mirror": {
         "heading": "Estimation mirror — strongest habits first",
-        "empty": "Not enough plan-record pairs yet — plan a box and record it, and the habit shows up here",
+        "empty": "Not enough plan-record pairs yet — plan a timeblock and record it, and the habit shows up here",
         "unnamed": "Unnamed activity",
         "sentence": {
           "over": "{name} runs longer than planned (×{coefficient})",
@@ -84,7 +84,7 @@
       },
       "hint": {
         "lowButFulfilled": "Little but fulfilling → room to add",
-        "heavyButDrained": "Heavy but draining → trim, or use smaller boxes"
+        "heavyButDrained": "Heavy but draining → trim, or use smaller timeblocks"
       },
       "pointAriaLabel": "{name}, recorded {recorded}",
       "emptyBoard": "No points yet — answer the fulfillment prompt when you stop or place a record, and points appear here",
@@ -105,14 +105,14 @@
       },
       "nextPeriod": {
         "planned": {
-          "week": "Next week already holds {duration} of boxes",
-          "month": "Next month already holds {duration} of boxes",
-          "year": "Next year already holds {duration} of boxes"
+          "week": "Next week already holds {duration} of timeblocks",
+          "month": "Next month already holds {duration} of timeblocks",
+          "year": "Next year already holds {duration} of timeblocks"
         },
         "empty": {
-          "week": "No boxes for next week yet",
-          "month": "No boxes for next month yet",
-          "year": "No boxes for next year yet"
+          "week": "No timeblocks for next week yet",
+          "month": "No timeblocks for next month yet",
+          "year": "No timeblocks for next year yet"
         },
         "action": "Open the calendar"
       }
@@ -135,7 +135,7 @@
         "planRatio": "{percent}% of plan",
         "planPending": "Plan not yet due",
         "planNone": "No plan",
-        "median": "Median box",
+        "median": "Median per timeblock",
         "none": "—",
         "fulfillment": "Fulfillment",
         "unanswered": "No answers",
@@ -186,8 +186,8 @@
     },
     "mobile": {
       "lens": {
-        "chip": "Lens",
-        "open": "Choose a lens"
+        "chip": "Segment",
+        "open": "Choose a segment"
       },
       "periodFormat": {
         "weekDay": "MMM d",

@@ -358,14 +358,18 @@ Issue #1564 で、Production Security Advisorの
 
 | RPC                            | server caller                          | EXECUTE role                    | 実行属性           | 判断                                                                                          |
 | ------------------------------ | -------------------------------------- | ------------------------------- | ------------------ | --------------------------------------------------------------------------------------------- |
-| `confirm_day_plans_to_records` | `PlanService`のuser-scoped client      | `authenticated`, `service_role` | `SECURITY INVOKER` | owner RLSと`p_user_id` guardでPlanをRecordへ確定する                                          |
+| `confirm_day_plans_to_records` | なし（drain 待ち。#1893 で撤去）       | `authenticated`, `service_role` | `SECURITY INVOKER` | owner RLSと`p_user_id` guardでPlanをRecordへ確定する                                          |
 | `count_unused_recovery_codes`  | `RecoveryService`のuser-scoped client  | `authenticated`, `service_role` | `SECURITY INVOKER` | owner RLSと`p_user_id` guardで件数だけ返す                                                    |
 | `update_personalization`       | user-scoped client                     | `authenticated`, `service_role` | `SECURITY INVOKER` | owner RLSと`p_user_id` guardで設定を更新する                                                  |
-| `soft_delete_plan`             | `PlanService`のuser-scoped client      | `authenticated`, `service_role` | `SECURITY INVOKER` | owner RLSと`p_user_id` guardで論理削除する                                                    |
-| `soft_delete_record`           | `RecordService`のuser-scoped client    | `authenticated`, `service_role` | `SECURITY INVOKER` | owner RLSと`p_user_id` guardを使い、`auto_migrated`を常に拒否する                             |
-| `restore_plan`                 | `PlanService`のservice-role client     | `service_role`                  | `SECURITY DEFINER` | authenticated SELECTから隠れたdeleted rowを復元するためdefinerを維持する                      |
-| `restore_record`               | `RecordService`のservice-role client   | `service_role`                  | `SECURITY DEFINER` | deleted row復元のためdefinerを維持し、`auto_migrated`を常に拒否する                           |
+| `soft_delete_plan`             | なし（drain 待ち。#1893 で撤去）       | `authenticated`, `service_role` | `SECURITY INVOKER` | owner RLSと`p_user_id` guardで論理削除する                                                    |
+| `soft_delete_record`           | なし（drain 待ち。#1893 で撤去）       | `authenticated`, `service_role` | `SECURITY INVOKER` | owner RLSと`p_user_id` guardを使い、`auto_migrated`を常に拒否する                             |
+| `restore_plan`                 | なし（drain 待ち。#1893 で撤去）       | `service_role`                  | `SECURITY DEFINER` | authenticated SELECTから隠れたdeleted rowを復元するためdefinerを維持する                      |
+| `restore_record`               | なし（drain 待ち。#1893 で撤去）       | `service_role`                  | `SECURITY DEFINER` | deleted row復元のためdefinerを維持し、`auto_migrated`を常に拒否する                           |
 | `use_recovery_code`            | `RecoveryService`のservice-role client | `service_role`                  | `SECURITY DEFINER` | recovery codeにauthenticated UPDATE policyを追加せず、service-role JWTと`p_user_id`で消費する |
+
+Plan / Record の 5 RPC は **app から呼ばれない**（#1893 で legacy route と、それを
+呼んでいた `PlanService` / `RecordService` の write method を削除した）。EXECUTE を
+`authenticated` から剥がす REVOKE と DROP は、旧 bundle の drain 完了後に #1894 で行う。
 
 全対象で`PUBLIC`と`anon`の`EXECUTE`を明示的にREVOKEする。service-role-onlyの3 RPCは
 `authenticated`もREVOKEし、`search_path = ''`と完全修飾したrelation名を必須とする。

@@ -101,10 +101,10 @@ export function InlineCreatePanel({ onClose }: InlineCreatePanelProps) {
   // 並びは時間軸と同じ「これからのこと → 済んだこと」。未来スロットでは記録を選べないので
   // 出したまま押せなくし、理由はタブの下に常時表示する（disabled は hover を受け付けない）
   const kindItems = [
-    { value: 'plan' as const, label: tCalendar('event.preview.plan') },
+    { value: 'plan' as const, label: tCalendar('timeblock.preview.plan') },
     {
       value: 'record' as const,
-      label: tCalendar('event.preview.record'),
+      label: tCalendar('timeblock.preview.record'),
       disabled: !canRecord,
     },
   ];

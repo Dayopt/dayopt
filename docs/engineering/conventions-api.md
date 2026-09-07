@@ -459,7 +459,7 @@ Dayopt の service 層は近い将来、tRPC 以外の skin（MCP server を含�
 
 本 delta セクションの対象外。後続 plan で別途扱う:
 
-- `tag-statistics.ts` など、router / service の責務分離が未完了な箇所は個別 issue で扱う
+- `statistics-*.ts` など、router / service の責務分離が未完了な箇所は個別 issue で扱う
 
 ### 構造の不揃いについての判断
 
@@ -477,12 +477,12 @@ shape の話ではなく後続 plan で扱う:
 
 - `entitledProcedure` middleware の `ctx.subscriptionStatus` を service が読むべきか → 現状読まないので問題なし（badges 削除済み）
 - method 単位の 1:1 結合度の細部 → 必要が出たときに測る
-- `statistics.ts` / `tag-statistics.ts` の service 層分離 → 構造課題、shape とは別
+- `statistics.ts` 系（`statistics-service.ts` / `statistics-kpi-service.ts` 等）の service 層分離 → 構造課題、shape とは別
 
 ### 参照する既存定義（再定義しない）
 
 - `src/lib/trpc/errors.ts:16-119` — `ServiceError` 階層と code enum
-- `src/features/timeblock/server/types.ts` — `ListEntriesOptions`, `CreateEntryOptions`, `UpdateEntryOptions`, `DeleteEntryOptions`, `GetEntryByIdOptions`, `EntryWithTags`, `EntryRow`, `UpdateEntryResult`
+- `src/features/timeblock/server/timeblock-types.ts` — `ListPlansOptions`, `CreatePlanOptions`, `UpdatePlanOptions`, `DeletePlanOptions`, `GetPlanByIdOptions`, `RecordPlanOptions`, `ConfirmDayPlansOptions` と、Record 側の同型（`ListRecordsOptions` 他）。`server/types.ts` は `ServiceSupabaseClient` だけを持つ
 - `src/features/auth/server/user-service.ts` — `DeleteAccountOptions`, `DeleteAccountResult`, `ExportDataOptions`, `ExportDataResult`
 - `src/features/settings/server/billing-service.ts:18-` — `BillingInfo`, `PaymentMethod`, `InvoiceItem`, `BillingOverview`, `SubscriptionStatus`
 - `src/features/contact/server/contact-service.ts` — `CreateIssueParams`, `CreateIssueResult`, `ContactFormInput`

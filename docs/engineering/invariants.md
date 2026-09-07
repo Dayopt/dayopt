@@ -185,8 +185,11 @@ docs へ残している。
   `confirm_day_plans_to_records`) だけは旧bundleのdrainまで `authenticated` に残す
 - timeblock commandの `p_user_id` は必ず `ctx.userId` 由来で、client inputから
   渡ってはならない。RLSが第2の防波堤として効かなくなったため、これが唯一のowner
-  境界になる。router では `{ ...input, userId: ctx.userId }` の順を守る（spreadを
-  後ろに置くと同名fieldの追加で境界が無言で反転し、typecheckも通る）
+  境界になる。守りは 2 つとも機械側にある（#2627）: (1) command routerのinput schemaが
+  `.strict()` なので `userId` を含む入力は `BAD_REQUEST` で弾かれる（silent stripでは
+  なくexplicit reject）、(2) routerはserviceへ渡すfieldを1つずつ書き出し、`...input`
+  のspreadを使わない。serviceは受け取った `userId` を検証せずそのまま `p_user_id` に
+  するので、境界を持っているのはrouterのこの2点だけ
 - **Undo は元操作より強い権限や広い user scope を得ない**（`apply_undo_receipt_v1`、
   #2434）。`undo_receipts.origin_connection_id` は `oauth_connections` への複合FKが
   `ON DELETE SET NULL` を持つため、connectionの物理削除（retention cleanup経由）で
@@ -220,4 +223,34 @@ docs へ残している。
 ## 時刻
 
 - 保存は UTC。表示と日境界の判定はユーザーの timezone で行う
-- 過去の記録ブロックの編集は temporal-constraints の制約に従い、回避経路を作らない
+- 時刻の規則は 2 本だけで、これ以外に過去・未来で操作を出し分けない（2026-09-04 に
+  「未来 Plan」の特別扱い 4 種を撤去）。強制点は **DB trigger / SQL 関数** であり、
+  アプリ層はその写しにすぎない:
+  - `end_at > start_at`（Plan / Record 共通、`DT003` / `INVALID_TIME_RANGE`）
+  - **Record は未来に終われない**（`end_at <= now`、`validate_record_temporal_write_v1`、
+    `DT005` / `RECORD_IN_FUTURE`）
+- Plan は時間軸のどこにでも置ける。過去 Plan もドラッグ移動・リサイズ・時間編集ができ、
+  編集しても Plan のままで Record にはならない。過去スロットへ新規に引いたブロックは
+  Record になる（宛先は `end_at` だけで決まる）
+
+### 規則の写しと、その分類
+
+規則を変える PR は **この表の (a) と (b) を全部直すまでが 1 変更**。DB / service だけ
+緩めて写しが残ると「操作はできるのに保存されない」症状になり、旧規則を assert している
+テストが緑のまま隠す（#2598 の後に #2622 が必要になった件）。撤去 PR ではこの表を
+grep 対象にする。
+
+| 分類          | 場所                                                                                    | 役割                                       | 消してよいか                                  |
+| ------------- | --------------------------------------------------------------------------------------- | ------------------------------------------ | --------------------------------------------- |
+| (a) 契約変換  | `features/timeblock/server/timeblock-command-client.ts` の `EXPECTED_COMMAND_ERRORS`    | DT コード → `TimeblockServiceError` code   | 不可（UI が code で分岐する）                 |
+| (a) 契約変換  | `features/timeblock/server/mcp-mutation-client.ts` の `EXPECTED_ERROR_CODES`            | DT コード → `McpMutationErrorCode`         | 不可（MCP の公開契約）                        |
+| (a) 契約変換  | `features/timeblock/server/timeblock-context-contract.ts` の `TIMEBLOCK_CONTEXT_RULES`  | MCP `constraints.get` が返す規則の宣言     | 不可（公開契約）                              |
+| (b) UX 先回り | `features/timeblock/schemas/timeblock.ts` の `timeRangeRefine`                          | 往復前に `end > start` を弾く              | 可（server が同じ規則で拒否する）             |
+| (b) UX 先回り | `features/timeblock/domain/timeblock-destination.ts`                                    | `end_at` から Plan / Record の宛先を決める | 不可（規則の写しではなく宛先の決定そのもの）  |
+| (b) UX 先回り | `features/calendar/lib/overlap.ts` + `lib/time/time-conflict.ts`                        | 重なりの事前表示                           | 可（overlap は DB 側 `TIME_OVERLAP` が正）    |
+| (b) UX 先回り | `features/calendar/hooks/operations/useTimeblockOperations.ts` の record 未来移動ガード | ドラッグ中に `timeLocked` を出す           | 可（server 拒否でも同じ toast が出る。#2628） |
+
+server が拒否した時に UI が汎用の `saveFailed` へ退化しないよう、`INVALID_TIME_RANGE` /
+`RECORD_IN_FUTURE` は `lib/trpc/client-safe-service-code.ts` の allowlist に載せ、
+`useTimeblockWriteMutations.ts` の `reportError` が規則ごとの文言へ写像する。allowlist から
+外すと (b) が「消せない写し」に戻る

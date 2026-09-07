@@ -11,19 +11,23 @@ import {
 import { createTimeblockCommandService } from './timeblock-command-service';
 
 const expectedUpdatedAtSchema = z.string().datetime({ offset: true });
-const versionedPlanSchema = planIdSchema.extend({
-  expectedUpdatedAt: expectedUpdatedAtSchema,
-});
 
 /**
- * `...input` は必ず `userId: ctx.userId` より前に置く。
+ * owner 境界は「`.strict()` + service へ渡す field の明示」で機械保証する。
  *
- * command の `p_user_id` は Plan / Record の owner 境界そのもので、
- * plans / records の authenticated 直接 DML を剥がした後は RLS が第2の防波堤として
- * 効かない。spread を後ろに置くと、schema に `userId` という名の field が 1 つ
- * 増えた瞬間に client 入力が ctx.userId を上書きする。型は満たされるので
- * typecheck では気付けない。
+ * command の `p_user_id` は Plan / Record の owner 境界そのもので、plans / records の
+ * authenticated 直接 DML を剥がした後は RLS が第2の防波堤として効かない。以前は
+ * `{ ...input, userId: ctx.userId }` の spread 順序だけが守りで、schema に `userId`
+ * という名の field が 1 つ増えた瞬間に client 入力が ctx.userId を上書きしえた
+ * （型は満たされるので typecheck では気付けない）。いまは (1) `.strict()` が未知 key を
+ * BAD_REQUEST にし、(2) service へは field を 1 つずつ書き出すので、input の形が
+ * 変わっても userId は ctx からしか来ない（#2627）。
  */
+const versionedPlanSchema = planIdSchema
+  .extend({
+    expectedUpdatedAt: expectedUpdatedAtSchema,
+  })
+  .strict();
 const confirmDayCommandSchema = confirmDaySchema.superRefine((input, ctx) => {
   const rangeMs = new Date(input.end_at).getTime() - new Date(input.start_at).getTime();
   if (rangeMs > 26 * 60 * 60 * 1000) {
@@ -75,7 +79,11 @@ export const planCommandsRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const service = createTimeblockCommandService(ctx.supabase);
       try {
-        return await service.deletePlan({ ...input, userId: ctx.userId });
+        return await service.deletePlan({
+          userId: ctx.userId,
+          id: input.id,
+          expectedUpdatedAt: input.expectedUpdatedAt,
+        });
       } catch (error) {
         handleServiceError(error);
       }
@@ -87,7 +95,11 @@ export const planCommandsRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const service = createTimeblockCommandService(ctx.supabase);
       try {
-        return await service.restorePlan({ ...input, userId: ctx.userId });
+        return await service.restorePlan({
+          userId: ctx.userId,
+          id: input.id,
+          expectedUpdatedAt: input.expectedUpdatedAt,
+        });
       } catch (error) {
         handleServiceError(error);
       }
@@ -99,7 +111,12 @@ export const planCommandsRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const service = createTimeblockCommandService(ctx.supabase);
       try {
-        return await service.setPlanSkipped({ ...input, userId: ctx.userId, skipped: true });
+        return await service.setPlanSkipped({
+          userId: ctx.userId,
+          id: input.id,
+          expectedUpdatedAt: input.expectedUpdatedAt,
+          skipped: true,
+        });
       } catch (error) {
         handleServiceError(error);
       }
@@ -111,7 +128,12 @@ export const planCommandsRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const service = createTimeblockCommandService(ctx.supabase);
       try {
-        return await service.setPlanSkipped({ ...input, userId: ctx.userId, skipped: false });
+        return await service.setPlanSkipped({
+          userId: ctx.userId,
+          id: input.id,
+          expectedUpdatedAt: input.expectedUpdatedAt,
+          skipped: false,
+        });
       } catch (error) {
         handleServiceError(error);
       }
@@ -123,7 +145,11 @@ export const planCommandsRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const service = createTimeblockCommandService(ctx.supabase);
       try {
-        return await service.recordPlan({ ...input, userId: ctx.userId });
+        return await service.recordPlan({
+          userId: ctx.userId,
+          id: input.id,
+          expectedUpdatedAt: input.expectedUpdatedAt,
+        });
       } catch (error) {
         handleServiceError(error);
       }

@@ -46,16 +46,21 @@ describe('timeblock command routers', () => {
     for (const method of Object.values(methods)) method.mockResolvedValue({});
   });
 
-  it('root routerでlegacy query/writeとversioned commandを別namespaceに保つ', () => {
+  // #1893 で legacy mutation を削除した。plans / records に write が再び生えたら
+  // owner 境界と時刻規則の写しが 2 系統に戻るため、read 専用であることを固定する。
+  it('plans / recordsはread専用で、writeはversioned command namespaceだけが持つ', () => {
     const procedureNames = Object.keys(appRouter._def.procedures);
 
+    expect(procedureNames.filter((name) => name.startsWith('plans.')).sort()).toEqual([
+      'plans.getById',
+      'plans.list',
+    ]);
+    expect(procedureNames.filter((name) => name.startsWith('records.')).sort()).toEqual([
+      'records.getById',
+      'records.list',
+    ]);
     expect(procedureNames).toEqual(
-      expect.arrayContaining([
-        'plans.update',
-        'records.update',
-        'planCommands.update',
-        'recordCommands.update',
-      ]),
+      expect.arrayContaining(['planCommands.update', 'recordCommands.update']),
     );
   });
 
@@ -95,27 +100,51 @@ describe('timeblock command routers', () => {
   });
 
   // p_user_id は Plan / Record の owner 境界そのもので、authenticated の直接 DML を
-  // 剥がした後は RLS が第2の防波堤として効かない。守りは 2 段（zod の unknown key
-  // strip と router の spread 順）で、この test は「2 段とも外れた時だけ落ちる」形で
-  // その合成を固定する。片方だけ残っていれば pass する点は意図通り。
-  it('client入力のuserIdはsession userを上書きしない', async () => {
+  // 剥がした後は RLS が第2の防波堤として効かない。#2627 で守りを「zod の unknown key
+  // strip と spread 順の合成（両方外れた時だけ落ちる）」から機械保証へ変えた:
+  // schema が `.strict()` なので userId の混入は BAD_REQUEST になり、service へ渡す
+  // field は 1 つずつ書き出すので userId は ctx 以外から来ない。silent strip ではなく
+  // explicit reject であることまで固定する。
+  it('client入力のuserIdはBAD_REQUESTで拒否し、serviceへ到達させない', async () => {
     const forgedUserId = '00000000-0000-4000-8000-0000000000ff';
 
-    await recordCaller().delete({
-      id: RECORD_ID,
-      expectedUpdatedAt: VERSION,
-      userId: forgedUserId,
-    } as never);
-    expect(methods.deleteRecord).toHaveBeenCalledWith(expect.objectContaining({ userId: USER_ID }));
+    await expect(
+      recordCaller().delete({
+        id: RECORD_ID,
+        expectedUpdatedAt: VERSION,
+        userId: forgedUserId,
+      } as never),
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    expect(methods.deleteRecord).not.toHaveBeenCalled();
 
-    await planCaller().skip({
+    await expect(
+      planCaller().skip({
+        id: PLAN_ID,
+        expectedUpdatedAt: VERSION,
+        userId: forgedUserId,
+      } as never),
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    expect(methods.setPlanSkipped).not.toHaveBeenCalled();
+
+    // create 系は入れ子の payload schema 側で拒否する
+    await expect(
+      planCaller().create({
+        title: 'Forged',
+        start_at: '2026-07-29T00:00:00.000Z',
+        end_at: '2026-07-29T01:00:00.000Z',
+        userId: forgedUserId,
+      } as never),
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    expect(methods.createPlan).not.toHaveBeenCalled();
+
+    // 正規の入力は通り、userId は session user だけが渡る
+    await planCaller().skip({ id: PLAN_ID, expectedUpdatedAt: VERSION });
+    expect(methods.setPlanSkipped).toHaveBeenCalledWith({
+      userId: USER_ID,
       id: PLAN_ID,
       expectedUpdatedAt: VERSION,
-      userId: forgedUserId,
-    } as never);
-    expect(methods.setPlanSkipped).toHaveBeenCalledWith(
-      expect.objectContaining({ userId: USER_ID, skipped: true }),
-    );
+      skipped: true,
+    });
   });
 
   it('confirm dayはDSTの25時間を許可し、26時間超を拒否する', async () => {

@@ -67,11 +67,11 @@ export function useCalendarDataLayer({
     showWeekends,
   });
 
-  // エントリ取得エラー時にtoast通知 + 再試行アクション
+  // タイムブロック取得エラー時にtoast通知 + 再試行アクション
   useEffect(() => {
     if (timeblocksError) {
-      logger.error('[useCalendarDataLayer] entries fetch error', timeblocksError);
-      toast.error(tError('entriesLoadFailed'), {
+      logger.error('[useCalendarDataLayer] timeblocks fetch error', timeblocksError);
+      toast.error(tError('loadFailed'), {
         action: {
           label: tError('retry'),
           onClick: () => {

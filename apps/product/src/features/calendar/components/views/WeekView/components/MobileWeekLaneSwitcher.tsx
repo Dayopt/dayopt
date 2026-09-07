@@ -12,8 +12,8 @@ interface MobileWeekLaneSwitcherProps {
 }
 
 const OPTIONS = [
-  { value: 'planned', labelKey: 'calendar.event.preview.plan' },
-  { value: 'recorded', labelKey: 'calendar.event.preview.record' },
+  { value: 'planned', labelKey: 'calendar.timeblock.preview.plan' },
+  { value: 'recorded', labelKey: 'calendar.timeblock.preview.record' },
 ] as const;
 
 /** モバイルWeekで予定と記録のどちらを表示するか切り替える。 */

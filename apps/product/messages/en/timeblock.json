@@ -32,17 +32,11 @@
       "unskipped": "Skip undone",
       "conflict": "This timeblock was modified elsewhere. Reload to see the latest version.",
       "placed": "Added {name} at {time}",
-      "overlapError": "{time} overlaps with an existing block"
+      "overlapError": "{time} overlaps with an existing timeblock"
     },
     "sidebar": {
       "tabs": {
-        "calendar": "Calendar",
-        "list": "List"
-      },
-      "list": {
-        "nav": {
-          "plan": "Plan"
-        }
+        "calendar": "Calendar"
       }
     },
     "open": "Open",
@@ -57,15 +51,6 @@
       "willBeRemovedFromCalendar": "It will be removed from calendar",
       "confirm": "Delete",
       "deleting": "Deleting..."
-    },
-    "status": {
-      "label": "Status",
-      "backlog": "Backlog",
-      "ready": "Ready",
-      "active": "Active",
-      "wait": "Wait",
-      "closed": "Closed",
-      "cancel": "Cancel"
     },
     "inspector": {
       "addTitle": "Add title",
@@ -124,10 +109,6 @@
         "titlePlaceholder": "What did you do?",
         "titleLabel": "Record title",
         "failed": "Failed to create Record",
-        "linkEntry": "Link to Record",
-        "unlinkEntry": "Unlink from Record",
-        "searchEntries": "Search Records...",
-        "noEntries": "No Records found",
         "addNew": "Add new Record"
       }
     },

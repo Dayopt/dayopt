@@ -222,7 +222,7 @@ const handleCreatePlan = async (data) => {
 型安全な API 呼び出しとキャッシュ管理。
 
 ```typescript
-const createPlan = api.plans.create.useMutation({
+const createPlan = api.planCommands.create.useMutation({
   onSuccess: () => {
     utils.plans.list.invalidate(); // キャッシュ無効化→再取得
   },

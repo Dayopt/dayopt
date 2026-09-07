@@ -13,6 +13,14 @@ const timeRangeRefine = <T extends Record<string, unknown>>(data: T, ctx: z.Refi
   }
 };
 
+/**
+ * command 入力は `.strict()` にする。
+ *
+ * `p_user_id` は Plan / Record の owner 境界そのもので、authenticated の直接 DML を
+ * 剥がした後は RLS が第2の防波堤として効かない。未知 key の silent strip に頼ると、
+ * `userId` を含む client 入力が「通ったのに無視された」状態になり、境界の破れと
+ * 区別できない。未知 key はここで BAD_REQUEST にする（#2627）。
+ */
 const baseTimeblockSchema = z.object({
   title: z.string().min(1, 'validation.title.required').max(200, 'validation.title.maxLength'),
   note: z.string().max(10000, 'validation.note.maxLength').nullable().optional(),
@@ -22,9 +30,9 @@ const baseTimeblockSchema = z.object({
   end_at: z.string().datetime({ offset: true }),
 });
 
-export const createPlanSchema = baseTimeblockSchema.superRefine(timeRangeRefine);
+export const createPlanSchema = baseTimeblockSchema.strict().superRefine(timeRangeRefine);
 
-export const updatePlanSchema = baseTimeblockSchema.partial().superRefine(timeRangeRefine);
+export const updatePlanSchema = baseTimeblockSchema.partial().strict().superRefine(timeRangeRefine);
 
 export const planIdSchema = z.object({
   id: z.string().uuid('validation.invalidUuid'),
@@ -43,15 +51,12 @@ export const planFilterSchema = z.object({
   offset: z.number().min(0).optional(),
 });
 
-export const recordPlanSchema = z.object({
-  id: z.string().uuid('validation.invalidUuid'),
-});
-
 export const confirmDaySchema = z
   .object({
     start_at: z.string().datetime({ offset: true }),
     end_at: z.string().datetime({ offset: true }),
   })
+  .strict()
   .superRefine(timeRangeRefine);
 
 export const fulfillmentSchema = z.enum(['low', 'medium', 'high']);
@@ -61,9 +66,9 @@ const baseRecordSchema = baseTimeblockSchema.extend({
   fulfillment: fulfillmentSchema.nullable().optional(),
 });
 
-export const createRecordSchema = baseRecordSchema.superRefine(timeRangeRefine);
+export const createRecordSchema = baseRecordSchema.strict().superRefine(timeRangeRefine);
 
-export const updateRecordSchema = baseRecordSchema.partial().superRefine(timeRangeRefine);
+export const updateRecordSchema = baseRecordSchema.partial().strict().superRefine(timeRangeRefine);
 
 export const recordIdSchema = z.object({
   id: z.string().uuid('validation.invalidUuid'),

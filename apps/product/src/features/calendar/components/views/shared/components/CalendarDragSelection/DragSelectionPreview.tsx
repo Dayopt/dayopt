@@ -136,7 +136,7 @@ export const DragSelectionPreview = memo(function DragSelectionPreview({
         <span className="truncate font-medium tabular-nums">{timeLabel}</span>
       ) : (
         <>
-          <span className="truncate font-medium">{tCalendar('event.selectActivity')}</span>
+          <span className="truncate font-medium">{tCalendar('timeblock.selectActivity')}</span>
           <span className="text-muted-foreground truncate tabular-nums">{timeLabel}</span>
         </>
       )}

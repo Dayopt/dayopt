@@ -5,19 +5,15 @@ import { createTRPCRouter, protectedProcedure } from '@/lib/trpc/procedures';
 import { createRecordSchema, recordIdSchema, updateRecordSchema } from '../schemas/timeblock';
 import { createTimeblockCommandService } from './timeblock-command-service';
 
-const versionedRecordSchema = recordIdSchema.extend({
-  expectedUpdatedAt: z.string().datetime({ offset: true }),
-});
-
 /**
- * `...input` は必ず `userId: ctx.userId` より前に置く。
- *
- * command の `p_user_id` は Record の owner 境界そのもので、records の
- * authenticated 直接 DML を剥がした後は RLS が第2の防波堤として効かない。
- * spread を後ろに置くと、schema に `userId` という名の field が 1 つ増えた瞬間に
- * client 入力が ctx.userId を上書きする。型は満たされるので typecheck では
- * 気付けない。
+ * owner 境界は「`.strict()` + service へ渡す field の明示」で機械保証する。
+ * 経緯と理由は plan-commands-router.ts の同じ位置のコメントを正とする（#2627）。
  */
+const versionedRecordSchema = recordIdSchema
+  .extend({
+    expectedUpdatedAt: z.string().datetime({ offset: true }),
+  })
+  .strict();
 
 export const recordCommandsRouter = createTRPCRouter({
   create: protectedProcedure
@@ -59,7 +55,11 @@ export const recordCommandsRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const service = createTimeblockCommandService(ctx.supabase);
       try {
-        return await service.deleteRecord({ ...input, userId: ctx.userId });
+        return await service.deleteRecord({
+          userId: ctx.userId,
+          id: input.id,
+          expectedUpdatedAt: input.expectedUpdatedAt,
+        });
       } catch (error) {
         handleServiceError(error);
       }
@@ -71,7 +71,11 @@ export const recordCommandsRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const service = createTimeblockCommandService(ctx.supabase);
       try {
-        return await service.restoreRecord({ ...input, userId: ctx.userId });
+        return await service.restoreRecord({
+          userId: ctx.userId,
+          id: input.id,
+          expectedUpdatedAt: input.expectedUpdatedAt,
+        });
       } catch (error) {
         handleServiceError(error);
       }

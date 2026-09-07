@@ -3,189 +3,187 @@
 /**
  * copy:check — Copy System 禁止表記スキャナー
  *
- * docs/product/glossary.md（禁止表記一覧）で定義された禁止語が messages に含まれていないかスキャンする。
+ * 禁止語の定義は `scripts/lib/glossary/terms.ts`（用語集レジストリ）が正本で、
+ * `docs/product/glossary.md` の表も同じデータから生成される。このスクリプトは
+ * messages を読んでレジストリの規則を当てるだけの薄い CLI。
+ *
+ * 旧実装は「glossary.md と同期」とコメントしながら TypeScript 定数を手で持って
+ * おり、実際にはずれていた（禁止語「エントリ」が未登録、`タスク` の推奨語が
+ * 禁止語「エントリ」、既に存在しない tags.json の除外設定）。正本を 1 つにして
+ * ずれ自体を無くす。
  *
  * 動作モード:
  *   - デフォルト: 警告のみ (exit 0)
- *   - --strict: ACTIVE_FORBIDDEN の違反があれば exit 1（MIGRATION_TARGETS は警告のみのまま）。
- *     pnpm check:static（CI Static Checks）に pnpm copy:check:strict として配線済み（2026-08-18）
+ *   - --strict: enforcement: 'active' の違反があれば exit 1
+ *     （`pnpm check:static` に `pnpm copy:check:strict` として配線済み）
+ *
+ * スキャン対象は `apps/product/messages/{ja,en}`。LP（apps/web）は語彙ドメインが
+ * 別（ブログ / docs のタグ分類など）のため対象外で、語彙統一は手動レビューで
+ * 担保する（docs/product/glossary.md の詳細ノート参照、2026-08-18 確定）。
  *
  * Usage:
  *   pnpm copy:check
  *   pnpm copy:check:strict
  */
 
-import { readdirSync, readFileSync } from 'fs';
-import { dirname, join, relative, resolve } from 'path';
-import { fileURLToPath } from 'url';
+import { readdirSync, readFileSync } from 'node:fs';
+import { basename, dirname, join, relative, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+import {
+  buildValueRules,
+  compileKeyNameRules,
+  getAllStringValues,
+  scanKeyNames,
+  scanValues,
+  validateRegistry,
+  type KeyNameFinding,
+  type Locale,
+  type MessageValue,
+  type ValueFinding,
+} from '../lib/glossary/core.ts';
+import { GLOSSARY, KEY_NAME_RULES } from '../lib/glossary/terms.ts';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, '../..');
 
-// LP（apps/web）は scanner 対象外。glossary が定義する製品 UI 文言の用語体系とは
-// 別ドメイン（ブログ / docs のタグ分類など）を多く含むため、語彙統一は手動レビューで
-// 担保する（docs/product/glossary.md#スキャン対象外誤検知防止 参照、2026-08-18 確定）。
-const MESSAGES_DIRS = [resolve(ROOT, 'apps/product/messages/ja')];
+const LOCALES: readonly Locale[] = ['ja', 'en'];
+const messagesDirFor = (locale: Locale): string => resolve(ROOT, `apps/product/messages/${locale}`);
 
 const STRICT_MODE = process.argv.includes('--strict');
 
-// ─── 禁止語定義 (docs/product/glossary.md#禁止表記一覧 と同期) ───
+// ─── レジストリ健全性（fail closed） ───
 
-interface ForbiddenTerm {
-  term: string;
-  preferred: string;
-  migration?: boolean;
-  /** 値がこれらのパターンを含む場合は除外（文脈が正当） */
-  excludePatterns?: string[];
-  /** このファイル（messages ディレクトリからの相対パス）は対象外にする */
-  excludeFiles?: string[];
+const registryProblems = validateRegistry(GLOSSARY, KEY_NAME_RULES);
+if (registryProblems.length > 0) {
+  console.error('❌ 用語集レジストリが不整合です（scripts/lib/glossary/terms.ts）:');
+  for (const problem of registryProblems) console.error(`   - ${problem}`);
+  process.exit(2);
 }
 
-/** 即座に使用を停止すべき語 */
-const ACTIVE_FORBIDDEN: ForbiddenTerm[] = [
-  { term: 'ラベル', preferred: 'アクティビティ' },
-  {
-    term: 'レビュー',
-    preferred: '振り返り（ページ名として）',
-    // プレビュー / 法的レビュー / コードレビュー / AI インサイトのレビュー等は許容
-    excludePatterns: ['プレビュー', '法的レビュー', 'レビューを受ける', 'レビューインサイト'],
-  },
-  // 2026-08-18(#2162) に product 側の残存 0 件を確認して strict 対象へ昇格。
-  // tags.json だけは Step 7（tags feature の非破壊 cleanup、#2176）で feature ごと
-  // 撤去される予定のため、それまでの間だけ対象外にする（黙って見逃すのではなく、
-  // 撤去対象であることをここに明記した上での一時的な除外）。
-  {
-    term: 'タグ',
-    preferred: 'アクティビティ / カテゴリー / セグメント',
-    excludeFiles: ['tags.json'],
-  },
-];
+// ─── メッセージ読み込み ───
 
-/** 移行中の語（現行 messages での使用はあるが、新規追加は禁止） */
-const MIGRATION_TARGETS: ForbiddenTerm[] = [
-  { term: 'タスク', preferred: 'エントリ', migration: true },
-  { term: 'ログイン', preferred: 'サインイン', migration: true },
-  { term: 'ログアウト', preferred: 'サインアウト', migration: true },
-];
-
-// ─── JSON 走査ユーティリティ ───
-
-function getAllStringValues(obj: unknown, prefix = ''): Array<{ keyPath: string; value: string }> {
-  const results: Array<{ keyPath: string; value: string }> = [];
-
-  if (typeof obj === 'string') {
-    results.push({ keyPath: prefix, value: obj });
-  } else if (Array.isArray(obj)) {
-    obj.forEach((item, i) => {
-      results.push(...getAllStringValues(item, prefix ? `${prefix}[${i}]` : `[${i}]`));
-    });
-  } else if (obj && typeof obj === 'object') {
-    for (const [key, val] of Object.entries(obj as Record<string, unknown>)) {
-      const path = prefix ? `${prefix}.${key}` : key;
-      results.push(...getAllStringValues(val, path));
-    }
-  }
-
-  return results;
-}
-
-function loadJson(filePath: string): Record<string, unknown> {
-  return JSON.parse(readFileSync(filePath, 'utf-8')) as Record<string, unknown>;
-}
-
-// ─── スキャン結果 ───
-
-interface Finding {
-  file: string;
-  keyPath: string;
-  value: string;
-  term: string;
-  preferred: string;
-  migration: boolean;
-}
-
-const findings: Finding[] = [];
-
-// ─── スキャン実行 ───
-
-for (const messagesDir of MESSAGES_DIRS) {
+function loadMessages(locale: Locale): MessageValue[] {
+  const dir = messagesDirFor(locale);
   let files: string[];
   try {
-    files = readdirSync(messagesDir).filter((f) => f.endsWith('.json'));
+    files = readdirSync(dir).filter((f) => f.endsWith('.json'));
   } catch {
-    continue;
+    return [];
   }
 
+  const values: MessageValue[] = [];
   for (const file of files) {
-    const filePath = join(messagesDir, file);
-    const relPath = relative(ROOT, filePath);
-    const data = loadJson(filePath);
-    const entries = getAllStringValues(data);
-
-    for (const { keyPath, value } of entries) {
-      for (const forbidden of [...ACTIVE_FORBIDDEN, ...MIGRATION_TARGETS]) {
-        if (!value.includes(forbidden.term)) continue;
-        if (forbidden.excludePatterns?.some((p) => value.includes(p))) continue;
-        if (forbidden.excludeFiles?.includes(file)) continue;
-        findings.push({
-          file: relPath,
-          keyPath,
-          value,
-          term: forbidden.term,
-          preferred: forbidden.preferred,
-          migration: forbidden.migration ?? false,
-        });
-      }
+    const namespace = basename(file, '.json');
+    const data = JSON.parse(readFileSync(join(dir, file), 'utf8')) as unknown;
+    for (const { keyPath, value } of getAllStringValues(data)) {
+      values.push({ namespace, keyPath, value });
     }
   }
+  return values;
+}
+
+const valueFindings: ValueFinding[] = [];
+const keyFindings: KeyNameFinding[] = [];
+const compiledKeyRules = compileKeyNameRules(KEY_NAME_RULES);
+
+for (const locale of LOCALES) {
+  const values = loadMessages(locale);
+  valueFindings.push(...scanValues(values, buildValueRules(GLOSSARY, locale), locale));
+  keyFindings.push(...scanKeyNames(values, compiledKeyRules, locale));
 }
 
 // ─── レポート出力 ───
 
-const activeFindings = findings.filter((f) => !f.migration);
-const migrationFindings = findings.filter((f) => f.migration);
+const activeValueFindings = valueFindings.filter((f) => f.enforcement === 'active');
+const migrationValueFindings = valueFindings.filter((f) => f.enforcement === 'migration');
+const activeKeyFindings = keyFindings.filter((f) => f.enforcement === 'active');
+const migrationKeyFindings = keyFindings.filter((f) => f.enforcement === 'migration');
+
+const activeCount = activeValueFindings.length + activeKeyFindings.length;
+const migrationCount = migrationValueFindings.length + migrationKeyFindings.length;
 
 console.log('\n── copy:check ──────────────────────────────────────');
 
-if (activeFindings.length === 0 && migrationFindings.length === 0) {
+function messagePath(finding: { locale: Locale; namespace: string }): string {
+  return relative(ROOT, join(messagesDirFor(finding.locale), `${finding.namespace}.json`));
+}
+
+interface TermSummaryRow {
+  term: string;
+  preferred: string;
+  path: string;
+}
+
+/** 語ごとに件数とファイル数へ畳んで表示する（移行対象は件数が多く全列挙が読めないため） */
+function summarize(label: string, rows: readonly TermSummaryRow[]): void {
+  if (rows.length === 0) return;
+
+  const byTerm = new Map<string, { count: number; files: Set<string>; preferred: string }>();
+  for (const row of rows) {
+    const bucket = byTerm.get(row.term) ?? { count: 0, files: new Set<string>(), preferred: '' };
+    bucket.count += 1;
+    bucket.files.add(row.path);
+    bucket.preferred = row.preferred;
+    byTerm.set(row.term, bucket);
+  }
+
+  console.log(`\n${label}`);
+  for (const [term, bucket] of [...byTerm].sort((a, b) => b[1].count - a[1].count)) {
+    console.log(
+      `   "${term}" → "${bucket.preferred}": ${bucket.count} 件 (${bucket.files.size} ファイル)`,
+    );
+  }
+}
+
+if (activeCount === 0 && migrationCount === 0) {
   console.log('✅ 禁止表記なし\n');
   process.exit(0);
 }
 
-if (activeFindings.length > 0) {
-  console.log(`\n⚠️  禁止表記 (${activeFindings.length} 件):`);
-  for (const f of activeFindings) {
-    console.log(`   ${f.file}`);
-    console.log(`     キー: ${f.keyPath}`);
-    console.log(`     値:   "${f.value}"`);
-    console.log(`     禁止: "${f.term}" → 推奨: "${f.preferred}"\n`);
+if (activeValueFindings.length > 0) {
+  console.log(`\n⚠️  禁止表記 (${activeValueFindings.length} 件):`);
+  for (const finding of activeValueFindings) {
+    console.log(`   ${messagePath(finding)}`);
+    console.log(`     キー: ${finding.keyPath}`);
+    console.log(`     値:   "${finding.value}"`);
+    console.log(`     禁止: "${finding.term}" → 推奨: "${finding.preferred}"\n`);
   }
 }
 
-if (migrationFindings.length > 0) {
-  // 移行対象は語ごとにファイル集計して表示
-  const byTerm = new Map<string, Set<string>>();
-  for (const f of migrationFindings) {
-    if (!byTerm.has(f.term)) byTerm.set(f.term, new Set());
-    byTerm.get(f.term)!.add(f.file);
+if (activeKeyFindings.length > 0) {
+  console.log(`\n⚠️  禁止表記（キー名） (${activeKeyFindings.length} 件):`);
+  for (const finding of activeKeyFindings) {
+    console.log(`   ${messagePath(finding)}`);
+    console.log(`     キー: ${finding.keyPath}`);
+    console.log(`     禁止 token: "${finding.token}" → 推奨: "${finding.preferred}"\n`);
   }
+}
 
-  console.log(`\nℹ️  移行中（新規追加禁止、既存は Phase 2 で対応予定）:`);
-  for (const [term, files] of byTerm) {
-    const preferred = MIGRATION_TARGETS.find((t) => t.term === term)?.preferred ?? '';
-    const count = migrationFindings.filter((f) => f.term === term).length;
-    console.log(`   "${term}" → "${preferred}": ${count} 件 (${[...files].length} ファイル)`);
-  }
+summarize(
+  'ℹ️  移行中（新規追加禁止、既存は移行 PR で対応）:',
+  migrationValueFindings.map((f) => ({
+    term: f.term,
+    preferred: f.preferred,
+    path: messagePath(f),
+  })),
+);
+summarize(
+  'ℹ️  移行中（キー名。値が正しくてもキーが旧語彙だと AI が再生産する）:',
+  migrationKeyFindings.map((f) => ({
+    term: f.token,
+    preferred: f.preferred,
+    path: messagePath(f),
+  })),
+);
+
+console.log(`\n合計: ${activeCount} 件の禁止表記、${migrationCount} 件の移行対象`);
+if (!STRICT_MODE) {
+  console.log('(警告モード: --strict を付けると exit 1 になります)\n');
+} else {
   console.log();
 }
 
-console.log(
-  `合計: ${activeFindings.length} 件の禁止表記、${migrationFindings.length} 件の移行対象`,
-);
-if (!STRICT_MODE) {
-  console.log('(警告モード: --strict を付けると exit 1 になります)\n');
-}
-
-if (STRICT_MODE && activeFindings.length > 0) {
+if (STRICT_MODE && activeCount > 0) {
   process.exit(1);
 }

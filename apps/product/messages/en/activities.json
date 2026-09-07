@@ -31,7 +31,7 @@
     "delete": {
       "confirmTitle": "Delete \"{name}\"",
       "confirmButton": "Delete",
-      "activityDescription": "This can't be undone. The {count} plans and records that use it aren't deleted — they become blocks with no activity.",
+      "activityDescription": "This can't be undone. The {count} plans and records that use it aren't deleted — they become timeblocks with no activity.",
       "activityDescriptionEmpty": "This can't be undone. No plans or records use it.",
       "categoryDescription": "This can't be undone. The {count} activities in it aren't deleted — they become uncategorized.",
       "categoryDescriptionEmpty": "This can't be undone. No activities are in it."

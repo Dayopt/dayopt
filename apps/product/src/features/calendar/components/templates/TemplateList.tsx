@@ -70,12 +70,12 @@ export function TemplateList({
           // 常時は隠し、見出し行にホバー / フォーカスした時だけ出す
           // （「未分類」の action と同じ visibility パターン）
           <span className="flex items-center gap-1 opacity-0 transition-opacity group-hover/section:opacity-100 group-has-[:focus-visible]/section:opacity-100 has-[:focus-visible]:opacity-100 [@media(hover:none)]:opacity-100">
-            <HoverTooltip content={t('calendar.templates.createEntryLabel')} side="top">
+            <HoverTooltip content={t('calendar.templates.createLabel')} side="top">
               <Button
                 variant="ghost"
                 icon
                 className="size-6"
-                aria-label={t('calendar.templates.createEntryLabel')}
+                aria-label={t('calendar.templates.createLabel')}
                 onClick={() => onCreateEntry?.()}
               >
                 <Plus className="size-4" />

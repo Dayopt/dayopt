@@ -177,7 +177,7 @@ Story作成時に確認：
 | 順番 | ドキュメント                                        | 内容                                       |
 | ---- | --------------------------------------------------- | ------------------------------------------ |
 | 1    | [Dayopt コンセプト](../strategy.md)                 | Dayoptとは何か、ジョブ、プロダクト原則     |
-| 2    | [Domain Glossary](../product/glossary.md)           | Plan, Record, Tag 等のドメイン用語         |
+| 2    | [用語集](../product/glossary.md)                    | 予定 / 記録 / アクティビティ等の用語       |
 | 3    | [Architecture](./architecture.md)                   | monorepo packages の責務境界とデータフロー |
 | 4    | [Common Pitfalls](./conventions.md#common-pitfalls) | よくある間違いと正しいパターン             |
 | 5    | Colors（Storybook: Shared/Foundations/Colors）      | カラートークン、Surface体系                |
