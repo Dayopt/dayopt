@@ -101,6 +101,21 @@ describe('factory handoff', () => {
     expect(validateHandoff({ cwd, context, handoff }).status).toBe('invalid');
   });
 
+  it('末尾改行の有無にかかわらず、存在しない最終行を根拠にできない', () => {
+    const withTrailingNewline = ready();
+    withTrailingNewline.facts[0]!.line = 2;
+    expect(validateHandoff({ cwd, context, handoff: withTrailingNewline }).status).toBe('invalid');
+
+    writeFileSync(join(cwd, 'example.ts'), 'export function example() { return 1; }');
+    git('add', 'example.ts');
+    git('-c', 'core.hooksPath=/dev/null', 'commit', '-qm', 'without trailing newline');
+    const withoutTrailingNewline = ready();
+    withoutTrailingNewline.facts[0]!.line = 2;
+    expect(validateHandoff({ cwd, context, handoff: withoutTrailingNewline }).status).toBe(
+      'invalid',
+    );
+  });
+
   it('未知・検証失敗・未実行を ready と数えない', () => {
     const handoff = ready();
     expect(

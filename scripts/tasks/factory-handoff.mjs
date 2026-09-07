@@ -42,6 +42,11 @@ function readJson(path) {
   return JSON.parse(readPublicFile(path).toString('utf8'));
 }
 
+function sourceLineCount(content) {
+  const text = content.toString('utf8');
+  return text.endsWith('\n') ? text.split('\n').length - 1 : text.split('\n').length;
+}
+
 function snapshotSources(root, sources) {
   if (!Array.isArray(sources) || sources.length === 0 || sources.length > 40) {
     throw new Error('根拠となるファイルを --source で 1〜40 件指定してください');
@@ -57,7 +62,7 @@ function snapshotSources(root, sources) {
       throw new Error('repo 外の source は収集しません');
     const content = readPublicFile(absolute);
     if (content.includes(0)) throw new Error('binary は source にできません');
-    return { path, sha256: digest(content), lines: content.toString('utf8').split('\n').length };
+    return { path, sha256: digest(content), lines: sourceLineCount(content) };
   });
 }
 
