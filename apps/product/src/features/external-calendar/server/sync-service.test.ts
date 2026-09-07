@@ -255,6 +255,22 @@ afterEach(() => {
 });
 
 describe('syncConnection — active イベントの upsert', () => {
+  it.each([false, true])('fenced=%s でも同期開始時刻の±90日を provider に渡す', async (fenced) => {
+    isConfiguredFencedCalendarSyncWriterReady.mockResolvedValue(fenced);
+    setupDb({ connection: activeConnection(), calendars: oneCalendar() });
+    syncCalendar.mockResolvedValue(syncResult());
+
+    await expect(
+      syncConnection({ connectionId: CONNECTION_ID, userId: USER_ID }),
+    ).resolves.toMatchObject({ outcome: 'synced' });
+    expect(syncCalendar).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        window: { timeMin: '2026-04-25T00:00:00.000Z', timeMax: '2026-10-22T00:00:00.000Z' },
+      }),
+    );
+  });
+
   it('旧DBでは追加前のconnection列だけを読み同期する', async () => {
     getConfiguredExternalLifecycleAppVersion.mockResolvedValue(0);
     const { calls } = setupDb({
