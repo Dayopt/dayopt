@@ -45,7 +45,7 @@
 ## ローカル検証記録
 
 - Node 24で `pnpm check`: exit 0。内包するtypecheck、lint、境界・token・format・i18n・copy検査、deadcode検査を通過。
-- 同コマンドの単体テストは合計5,701件（Product 3,942、Web 288、scripts 1,402、共有package 69）。
+- 同コマンドの単体テストは合計5,702件（Product 3,943、Web 288、scripts 1,402、共有package 69）。
 - `derived-migration-after.sql`: 第1段階で保持列一致。移行前に保存した旧skip更新receiptのDR008による原子的拒否、旧形式の通常Plan作成Undo、通常Undoの再試行も検証。
 - `independent-plan-record-concurrency.py dayopt_derived_pr1_*`: 同時一括要求の作成数 `[0, 1]`、保存記録1件。
 - API経由の既存結合テストの旧リンク期待値は更新したが、HTTP経由での実行と認証済みカレンダー/InspectorのE2Eは未実施。既存の共有ローカルSupabaseは旧スキーマのままであり、そこへ今回のmigrationを適用して検証したことにはしない。Supabase/Vercel Previewは成功。
