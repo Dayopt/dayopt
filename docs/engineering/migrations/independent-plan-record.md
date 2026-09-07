@@ -18,9 +18,9 @@
 
 - `supabase/tests/derived-migration-before.sql`: 旧リンク付き記録・旧skip付き予定を作成し、全保持列のスナップショットを保存。
 - 拡張migration → `supabase/tests/derived-migration-after.sql`。
-- 列撤去SQL → 同じ `after.sql`。
+- 別PRで列撤去SQLを追加した時も、適用後に同じ `after.sql` を実行する。
 
-比較は両方向の `EXCEPT` で、ID集合・件数・全保持列（所有者、論理削除、更新日時、外部参照を含む）を検証する。fixtureの検証結果は両段階とも差分0件。移行前の完全dumpを別DBへ復元し、比較一致・旧リンク1件・旧skip1件も確認した。
+比較は両方向の `EXCEPT` で、ID集合・件数・全保持列（所有者、論理削除、更新日時、外部参照を含む）を検証する。第1段階のfixture検証は差分0件で、旧リンク付き記録1件と旧skip付き予定1件が保持された。列撤去段階は別PRで同じ検証を再実行する。
 
 `supabase/tests/independent-plan-record.sql` はトランザクション内で操作し、最後にrollbackする。コピー、重複拒否、移動・伸縮・アクティビティ変更、再コピー、一部重複の一括除外、一括再実行、所有者分離、削除・復元、旧入力拒否を検証する。
 
@@ -45,8 +45,8 @@
 ## ローカル検証記録
 
 - Node 24で `pnpm check`: exit 0。内包するtypecheck、lint、境界・token・format・i18n・copy検査、deadcode検査を通過。
-- 同コマンドの単体テストは合計5,690件（Product 3,931、Web 288、scripts 1,402、共有package 69）。
-- `derived-migration-after.sql`: 拡張・列撤去の両段階で保持列一致。移行前に保存した旧skip receiptのDR008による原子的拒否、通常Undoの再試行も検証。
-- `independent-plan-record-concurrency.py dayopt_derived_validation`: 同時一括要求の作成数 `[0, 1]`、保存記録1件。
+- 同コマンドの単体テストは合計5,700件（Product 3,941、Web 288、scripts 1,402、共有package 69）。
+- `derived-migration-after.sql`: 第1段階で保持列一致。移行前に保存した旧skip receiptのDR008による原子的拒否、通常Undoの再試行も検証。
+- `independent-plan-record-concurrency.py dayopt_derived_pr1_*`: 同時一括要求の作成数 `[0, 1]`、保存記録1件。
 - API経由の既存結合テストの旧リンク期待値は更新したが、HTTP経由での実行と認証済みカレンダー/InspectorのE2Eは未実施。既存の共有ローカルSupabaseは旧スキーマのままであり、そこへ今回のmigrationを適用して検証したことにはしない。Previewと独立レビューも未実施。
 - セルフレビューで修正した点: 拡張段階にも残るFKの副作用、旧列がAPI応答へ混ざる問題、取得上限による集計漏れ、変更後の集計キャッシュ再取得。

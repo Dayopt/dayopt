@@ -659,10 +659,7 @@ export function TimeblockInspectorForm({
           />
         ) : null}
 
-        {!isDuplicateMode &&
-        kind === 'plan' &&
-        isPast &&
-        targetId ? (
+        {!isDuplicateMode && kind === 'plan' && isPast && targetId ? (
           <div className="flex justify-start">
             <RecordPlanButton
               planId={targetId}

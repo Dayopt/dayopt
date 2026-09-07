@@ -164,7 +164,7 @@ export function computeCalendarDayDiffs(
   let plannedMinutes = 0;
   let actualMinutes = 0;
   let unplannedMinutes = 0;
-  let missedMinutes = 0;
+  const missedMinutes = 0;
 
   for (const entry of entries) {
     if (entry.isDraft) continue;

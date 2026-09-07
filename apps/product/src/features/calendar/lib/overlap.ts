@@ -55,8 +55,7 @@ export function checkClientSideOverlap(
   // - planned で actual 未編集: 移動先が過去なら自動記録として actual レイヤーを占有
   const hasConfirmedActual = draggedEvent?.actualStartDate != null;
   const previewIsPast = previewEndTime.getTime() <= now;
-  const plannedOccupiesActual =
-    shouldCheckPlanned && !hasConfirmedActual && previewIsPast;
+  const plannedOccupiesActual = shouldCheckPlanned && !hasConfirmedActual && previewIsPast;
   const targetActualStart = shouldCheckPlanned
     ? plannedOccupiesActual
       ? previewStartTime

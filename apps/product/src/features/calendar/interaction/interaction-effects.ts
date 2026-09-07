@@ -82,8 +82,7 @@ export function processInteractionEffects(
         ) {
           const now = Date.now();
           const planEnd = event.endDate ?? event.displayEndDate;
-          const canCreateRecord =
-            planEnd.getTime() <= now && effect.time.end.getTime() <= now;
+          const canCreateRecord = planEnd.getTime() <= now && effect.time.end.getTime() <= now;
           if (canCreateRecord) {
             r.onPlanRecord?.(effect.timeblockId, effect.time);
           }

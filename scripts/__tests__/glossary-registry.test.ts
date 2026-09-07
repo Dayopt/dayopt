@@ -100,8 +100,9 @@ describe('生成物の契約', () => {
     }
   });
 
-  it('廃止予定の概念が「廃止予定」節に出る', () => {
-    expect(rendered).toContain('### 廃止予定');
-    expect(rendered).toContain('Skip');
+  it('廃止予定の概念がなければ空の節を出さない', () => {
+    expect(GLOSSARY.some((entry) => entry.status === 'planned-removal')).toBe(false);
+    expect(rendered).not.toContain('### 廃止予定');
+    expect(rendered).not.toContain('| Skip ');
   });
 });
