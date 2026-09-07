@@ -1,12 +1,22 @@
 import { describe, expect, it } from 'vitest';
 
-import { planFilterSchema, recordFilterSchema } from './timeblock';
+import { createRecordSchema, planFilterSchema, recordFilterSchema } from './timeblock';
 
 const planId = '11111111-1111-4111-8111-111111111111';
 
 describe('timeblock relation filters', () => {
   it('廃止したskip入力を拒否する', () => {
     expect(planFilterSchema.safeParse({ includeSkipped: false }).success).toBe(false);
+  });
+
+  it('Record作成契約に予定参照を受理しない', () => {
+    const base = {
+      title: 'Record',
+      start_at: '2026-09-07T09:00:00.000Z',
+      end_at: '2026-09-07T10:00:00.000Z',
+    };
+    expect(createRecordSchema.safeParse({ ...base, planId: planId }).success).toBe(false);
+    expect(createRecordSchema.safeParse({ ...base, planId: null }).success).toBe(false);
   });
 
   it('UUID配列を受け入れる', () => {

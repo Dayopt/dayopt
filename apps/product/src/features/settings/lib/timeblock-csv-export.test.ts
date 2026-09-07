@@ -31,17 +31,17 @@ describe('escapeTimeblockCsvField', () => {
 });
 
 describe('timeblockRowsToCsv', () => {
-  it('does not export retired links or skip states from old rows', () => {
+  it('defined columns以外の内部値はexportしない', () => {
     const csv = timeblockRowsToCsv([
       {
         kind: 'record',
         id: 'rec',
-        plan_id: 'old-link',
-        skipped_at: 'old-state',
+        internal_value: 'not-exported',
         source: 'from_plan',
       },
     ]);
-    expect(csv).not.toMatch(/plan_id|skipped_at|old-link|old-state/);
+    expect(csv).not.toContain('internal_value');
+    expect(csv).not.toContain('not-exported');
     expect(csv).toContain('from_plan');
   });
   it('header・列順・LF record separator を固定する', () => {

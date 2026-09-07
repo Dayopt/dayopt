@@ -21,7 +21,7 @@ type TimeblockPasteResult =
   | { ok: true; kind: TimeblockDestination; input: TimeblockPasteInput }
   | { ok: false; reason: 'recordRequiresPast' };
 
-/** コピー元の種別を維持し、IDやplan_idを含めない新規作成入力へ変換する。 */
+/** コピー元の種別を維持し、元IDを含めない新規作成入力へ変換する。 */
 export function resolveTimeblockClipboardPaste({
   copiedTimeblock,
   targetDate,
