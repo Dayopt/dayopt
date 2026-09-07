@@ -68,7 +68,7 @@ Dayopt で作業する全エージェントの provider-neutral な正本ガイ�
 - **作成 UI は編集と同じ Inspector**（右パネル / モバイル Drawer）。ドラッグ確定で作成モード（`InlineCreatePanel`）が開き、アクティビティを選んだ瞬間に作成して詳細へ切り替わる。閉じれば保存しない（明示の保存 / キャンセルは置かない）。サイドバーのアクティビティタップは既定の長さで即作成し、同じパネルで直す（取り消しはトースト）
 - **強制点は DB trigger / SQL 関数**。アプリ層（service / MCP client / UI）はその写しで、UI だけを直しても規則は変わらない
 - **規則を撤去する時は写しを全部消すまでが 1 変更**。DB / service だけ緩めて UI 側の写しが残ると「操作はできるのに保存されない」症状になり、旧規則を assert しているテストが緑のまま隠す。撤去 PR では [docs/engineering/invariants.md](docs/engineering/invariants.md) §時刻 の写し表（契約変換 / UX 先回りの 2 分類）を grep 対象にする（2026-09-07、過去 Plan のドラッグ移動が 40348e2bd の後も効かなかった件）
-- 表示用の upcoming / active / past 分類は `useCalendarData` が持つ（`getTimeblockState()` は呼び出し元が test だけの残骸）
+- 表示用の upcoming / active / past 分類は `useCalendarData` が持つ
 
 ### アーキテクチャ
 

@@ -1255,7 +1255,6 @@ npm run test:watch          # ウォッチモード
 npm run test:ui             # Vitest UI
 npm run test:coverage       # カバレッジ付き実行
 npm run test:coverage:summary  # カバレッジサマリー表示
-npm run test:diff-coverage  # 差分カバレッジ
 npm run test-storybook      # Storybook テスト
 npm run test:integration    # 統合テスト（前提: ローカル Supabase 起動。未起動なら失敗する。#2178）
 npm run test:e2e            # Playwright E2Eテスト

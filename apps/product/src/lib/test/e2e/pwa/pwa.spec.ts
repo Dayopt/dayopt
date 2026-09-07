@@ -32,7 +32,12 @@ test.describe('PWA installability', () => {
   });
 
   test('registers the service worker in a production build', async ({ page }) => {
-    test.skip(process.env.NODE_ENV !== 'production', 'Service Worker requires next start');
+    // **runner の NODE_ENV ではなく CI かどうかで判定する。** Playwright runner の
+    // NODE_ENV は 'production' にならないため、旧条件は CI でも常に真になり、この 2 本は
+    // promote の層 3 でも一度も実行されていなかった（#2647）。実際に production build を
+    // 起動するかは playwright.config.ts の webServer が process.env.CI で決めているので、
+    // 同じ判定へ揃える。
+    test.skip(!process.env.CI, 'Service Worker は CI の production build（pnpm start）でのみ登録される');
 
     await page.goto('/');
     await expect.poll(() => getRegisteredServiceWorker(page), { timeout: 5_000 }).not.toBeNull();
@@ -42,7 +47,12 @@ test.describe('PWA installability', () => {
     context,
     page,
   }) => {
-    test.skip(process.env.NODE_ENV !== 'production', 'Service Worker requires next start');
+    // **runner の NODE_ENV ではなく CI かどうかで判定する。** Playwright runner の
+    // NODE_ENV は 'production' にならないため、旧条件は CI でも常に真になり、この 2 本は
+    // promote の層 3 でも一度も実行されていなかった（#2647）。実際に production build を
+    // 起動するかは playwright.config.ts の webServer が process.env.CI で決めているので、
+    // 同じ判定へ揃える。
+    test.skip(!process.env.CI, 'Service Worker は CI の production build（pnpm start）でのみ登録される');
 
     await page.goto('/');
     await expect.poll(() => getRegisteredServiceWorker(page), { timeout: 5_000 }).not.toBeNull();

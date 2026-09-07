@@ -37,7 +37,7 @@ function makeEvent(status: PlanEventStatus, overrides: Partial<PlanEvent> = {}):
   };
 }
 
-/** Plan レーン用カード。overview.md §4「過去 Plan の見え方」の全 status variant。 */
+/** Plan レーン用カード。「過去 Plan の見え方」（docs/product/specs/plan-record.md §記録操作と表示）の全 status variant。 */
 const meta = {
   title: 'Product/Features/Calendar/TwoLane/PlanLaneCard',
   component: PlanLaneCard,
