@@ -25,10 +25,24 @@ import {
   registerRecordsTrashListTool,
 } from './timeblock-detail';
 import { registerPlansListTool, registerRecordsListTool } from './timeblock-list';
+import { registerRecordsCreateTool } from './timeblock-mutations';
 
 const createMcpTrpcCaller = vi.hoisted(() => vi.fn());
 const listDeletedPlans = vi.hoisted(() => vi.fn());
 const listDeletedRecords = vi.hoisted(() => vi.fn());
+const createRecordMutation = vi.hoisted(() => vi.fn());
+const MockMcpMutationError = vi.hoisted(
+  () =>
+    class MockMcpMutationError extends Error {
+      constructor(
+        public readonly code: string,
+        message: string,
+      ) {
+        super(message);
+        this.name = 'McpMutationError';
+      }
+    },
+);
 
 vi.mock('@/lib/mcp/trpc-bridge', () => ({ createMcpTrpcCaller }));
 vi.mock('@/features/timeblock/server/service-index', async () => {
@@ -40,6 +54,10 @@ vi.mock('@/features/timeblock/server/service-index', async () => {
     // features/timeblock/server/mcp-mutation-contract.ts の
     // MCP_MUTATION_RECEIPT_SCHEMA_VERSION と一致させる。
     MCP_MUTATION_RECEIPT_SCHEMA_VERSION: 1,
+    McpMutationClient: class McpMutationClient {
+      createRecord = createRecordMutation;
+    },
+    McpMutationError: MockMcpMutationError,
     createTimeblockTrashReadClient: () => ({ listDeletedPlans, listDeletedRecords }),
     TimeblockTrashReadError: class TimeblockTrashReadError extends Error {},
     TIMEBLOCK_CONTEXT_MAX_RANGE_MS: 31 * 24 * 60 * 60 * 1_000,
@@ -1092,6 +1110,79 @@ describe('MCP list tools public contract', () => {
         expect(content.text).toContain(UNTRUSTED_DATA_START);
         expect(content.text).toContain(UNTRUSTED_DATA_END);
       }
+    } finally {
+      await client.close();
+      await server.close();
+    }
+  });
+
+  it('旧planId入力を成功済み再送へ通し、新規要求は更新案内付きで拒否する', async () => {
+    const operationId = '66666666-6666-4666-8666-666666666666';
+    const planId = '77777777-7777-4777-8777-777777777777';
+    const receipt = {
+      schemaVersion: 1,
+      operationId,
+      resourceType: 'record' as const,
+      resourceId: '88888888-8888-4888-8888-888888888888',
+      version: '2026-09-07T10:00:00.000Z',
+      deletedAt: null,
+      replayed: true,
+    };
+    createRecordMutation
+      .mockResolvedValueOnce(receipt)
+      .mockRejectedValueOnce(
+        new MockMcpMutationError(
+          'INVALID_INPUT',
+          'Plan links have been removed; omit planId and refresh the tool schema',
+        ),
+      );
+
+    const server = new McpServer({ name: 'legacy-record-replay-server', version: '1.0.0' });
+    registerRecordsCreateTool(server, {
+      ...context,
+      scopes: ['write:records'],
+    });
+    const client = new Client({ name: 'legacy-record-replay-client', version: '1.0.0' });
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    await server.connect(serverTransport);
+    await client.connect(clientTransport);
+
+    const legacyInput = {
+      title: 'Legacy replay',
+      planId,
+      startAt: '2026-09-07T08:00:00.000Z',
+      endAt: '2026-09-07T09:00:00.000Z',
+    };
+    try {
+      const replay = CallToolResultSchema.parse(
+        await client.callTool({
+          name: 'records.create',
+          arguments: { operationId, ...legacyInput },
+        }),
+      );
+      expect(replay.structuredContent).toEqual(receipt);
+      expect(createRecordMutation).toHaveBeenNthCalledWith(
+        1,
+        expect.objectContaining({ operationId, planId }),
+      );
+
+      const rejected = CallToolResultSchema.parse(
+        await client.callTool({
+          name: 'records.create',
+          arguments: {
+            operationId: '99999999-9999-4999-8999-999999999999',
+            ...legacyInput,
+          },
+        }),
+      );
+      expect(rejected.isError).toBe(true);
+      expect(JSON.parse((rejected.content[0] as { text: string }).text)).toMatchObject({
+        error: {
+          code: 'INVALID_INPUT',
+          message: expect.stringContaining('omit planId'),
+          retryable: false,
+        },
+      });
     } finally {
       await client.close();
       await server.close();
