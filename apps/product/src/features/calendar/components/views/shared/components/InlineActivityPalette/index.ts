@@ -1,1 +1,0 @@
-export { InlineActivityPalette } from './InlineActivityPalette';

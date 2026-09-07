@@ -5,6 +5,12 @@ import type { Activity } from '@/features/activities';
 
 const mutateMock = vi.hoisted(() => vi.fn());
 
+// 行タップの即作成は useActivityQuickCreate.test / E2E が担う。ここは DnD だけを見るので
+// tRPC / user preferences を必要としない no-op に差し替える
+vi.mock('./hooks/useActivityQuickCreate', () => ({
+  useActivityQuickCreate: () => vi.fn(),
+}));
+
 vi.mock('@/features/activities', async () => {
   const actual =
     await vi.importActual<typeof import('@/features/activities')>('@/features/activities');
@@ -68,16 +74,12 @@ function Harness({ source, allActivities }: HarnessProps) {
         allActivities={allActivities}
         checked
         categoryId={source.category_id}
-        inheritedColor={null}
-        inheritedIcon={null}
         categoryOptions={[]}
         isMobile={false}
         onToggle={() => {}}
         onArchiveActivity={() => {}}
         onDeleteActivity={() => {}}
         onShowOnlyActivity={() => {}}
-        openPopoverActivityId={null}
-        onOpenPopover={() => {}}
       />
       <CategoryDropTarget categoryId={WORK} />
       <CategoryDropTarget categoryId={STUDY} />

@@ -34,8 +34,6 @@ interface CategoryGroupProps {
   onDeleteCategory: (id: string, name: string) => void;
   onArchiveActivity: (id: string) => void;
   onDeleteActivity: (id: string, name: string) => void;
-  openPopoverActivityId: string | null;
-  onOpenPopover: (activityId: string | null) => void;
 }
 
 /**
@@ -62,8 +60,6 @@ export function CategoryGroup({
   onDeleteCategory,
   onArchiveActivity,
   onDeleteActivity,
-  openPopoverActivityId,
-  onOpenPopover,
 }: CategoryGroupProps) {
   const locale = useLocale();
   const router = useRouter();
@@ -132,16 +128,12 @@ export function CategoryGroup({
               allActivities={allActivities}
               checked={visibleActivityIds.has(activity.id)}
               categoryId={category.id}
-              inheritedColor={displayColor}
-              inheritedIcon={category.icon ?? null}
               categoryOptions={categoryOptions.filter((option) => option.id !== category.id)}
               isMobile={isMobile}
               onToggle={() => onToggleActivity(activity.id)}
               onArchiveActivity={() => onArchiveActivity(activity.id)}
               onDeleteActivity={() => onDeleteActivity(activity.id, activity.name)}
               onShowOnlyActivity={() => onShowOnlyActivity(activity.id)}
-              openPopoverActivityId={openPopoverActivityId}
-              onOpenPopover={onOpenPopover}
             />
           ))}
         </div>

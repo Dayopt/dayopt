@@ -19,7 +19,7 @@ interface TimeblockPasteInput {
 
 type TimeblockPasteResult =
   | { ok: true; kind: TimeblockDestination; input: TimeblockPasteInput }
-  | { ok: false; reason: 'planRequiresFuture' | 'recordRequiresPast' };
+  | { ok: false; reason: 'recordRequiresPast' };
 
 /** コピー元の種別を維持し、IDやplan_idを含めない新規作成入力へ変換する。 */
 export function resolveTimeblockClipboardPaste({
@@ -37,13 +37,10 @@ export function resolveTimeblockClipboardPaste({
   const endAt = new Date(
     new Date(startAt).getTime() + copiedTimeblock.duration * 60_000,
   ).toISOString();
-  const temporalKind = resolveTimeblockDestination(endAt, now);
-
-  if (temporalKind !== copiedTimeblock.kind) {
-    return {
-      ok: false,
-      reason: copiedTimeblock.kind === 'plan' ? 'planRequiresFuture' : 'recordRequiresPast',
-    };
+  // Plan は時間軸のどこへでも貼れる（2026-09-04 に DT004 を撤去済み）。
+  // Record だけが未来に終われない（DT005）。
+  if (copiedTimeblock.kind === 'record' && resolveTimeblockDestination(endAt, now) === 'plan') {
+    return { ok: false, reason: 'recordRequiresPast' };
   }
 
   return {

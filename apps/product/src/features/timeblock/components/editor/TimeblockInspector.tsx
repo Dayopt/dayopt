@@ -43,13 +43,22 @@ interface TimeModelInspectorProps {
   onViewStats?: ((tagId: string) => void) | undefined;
   /** Timeblockを独立複製用のクリップボードへ保存する。 */
   onCopy?: ((timeblock: ClipboardTimeblock) => void) | undefined;
+  /**
+   * ドラッグ作成モード（store.createMode）で描く内容。calendar 側が組み立てて
+   * Composition Layer から注入する（timeblock は calendar を import できないため）。
+   */
+  createContent?: React.ReactNode | undefined;
 }
 
 const INSPECTOR_FOCUSABLE_SELECTOR =
   'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 /** plans / records 対応 Inspector のトップレベル（モバイル=Drawer / PC=DockedInspectorPanel） */
-export function TimeblockInspector({ onViewStats, onCopy }: TimeModelInspectorProps) {
+export function TimeblockInspector({
+  onViewStats,
+  onCopy,
+  createContent,
+}: TimeModelInspectorProps) {
   const t = useTranslations();
   const isMobile = useMediaQuery(MEDIA_QUERIES.mobile);
   const { getActivityById } = useActivitiesMap();
@@ -58,6 +67,7 @@ export function TimeblockInspector({ onViewStats, onCopy }: TimeModelInspectorPr
   const timeblockId = useTimeblockInspectorStore((state) => state.timeblockId);
   const timeblockKind = useTimeblockInspectorStore((state) => state.timeblockKind);
   const duplicateDraft = useTimeblockInspectorStore((state) => state.duplicateDraft);
+  const createMode = useTimeblockInspectorStore((state) => state.createMode);
   const inspectorSlotElement = useDomSlot(TIMEBLOCK_INSPECTOR_SLOT_KEY);
   const openInspector = useTimeblockInspectorStore((state) => state.openInspector);
   const openDuplicate = useTimeblockInspectorStore((state) => state.openDuplicate);
@@ -121,6 +131,10 @@ export function TimeblockInspector({ onViewStats, onCopy }: TimeModelInspectorPr
     (focusTarget ?? content).focus();
   }, [activeQuery.isLoading, duplicateDraft, isOpen, target?.id, timeblockKind]);
 
+  // 作成モードは自動で先頭 focusable（種別タブ）へ focus しない。ドラッグ直後にグリッド側の
+  // リサイズ操作を続けられるよう、パネルは focus を奪わずに開く（DockedInspectorPanel が
+  // slot 到着時に 1 回 focus するのは既存挙動のまま）。
+
   let relationships: TimeblockRelationships | undefined;
   if (!duplicateDraft && timeblockKind === 'plan') {
     const status: 'loading' | 'error' | 'success' = relatedRecordsQuery.isError
@@ -158,12 +172,15 @@ export function TimeblockInspector({ onViewStats, onCopy }: TimeModelInspectorPr
 
   // --- コンテンツ（loading / error / empty / form） ---
   const displayActivityId = duplicateDraft?.activityId ?? target?.activity_id;
-  const title =
-    (displayActivityId ? getActivityById(displayActivityId)?.name : undefined) ??
-    t('calendar.filter.noActivity');
+  const title = createMode
+    ? t('calendar.activitySelector.title')
+    : ((displayActivityId ? getActivityById(displayActivityId)?.name : undefined) ??
+      t('calendar.filter.noActivity'));
   let content: React.ReactNode;
 
-  if (duplicateDraft) {
+  if (createMode) {
+    content = createContent ?? null;
+  } else if (duplicateDraft) {
     content = (
       <TimeblockInspectorForm
         key={`duplicate:${duplicateDraft.kind}:${duplicateDraft.sourceId}`}
@@ -242,13 +259,17 @@ export function TimeblockInspector({ onViewStats, onCopy }: TimeModelInspectorPr
         >
           <DrawerContent className="flex flex-col gap-0 overflow-hidden p-0">
             <DrawerTitle className="sr-only">{title}</DrawerTitle>
-            <div className="min-h-0 flex-1 overflow-y-auto">
+            <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto">
               <div className="mx-auto w-full max-w-lg">{contentElement}</div>
             </div>
           </DrawerContent>
         </Drawer>
       ) : (
-        <DockedInspectorPanel title={title} slotElement={inspectorSlotElement}>
+        <DockedInspectorPanel
+          title={title}
+          slotElement={inspectorSlotElement}
+          onRequestClose={handleClose}
+        >
           {contentElement}
         </DockedInspectorPanel>
       )}

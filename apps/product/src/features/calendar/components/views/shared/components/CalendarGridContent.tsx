@@ -2,8 +2,6 @@
 
 import React, { useCallback } from 'react';
 
-import { isSameDay } from 'date-fns';
-
 import { useActivitiesMap } from '@/features/activities';
 import type { ExternalCalendarEvent } from '@/features/external-calendar';
 import {
@@ -34,15 +32,13 @@ import {
   DEFAULT_PLAN_LANE_WIDTH_PERCENT,
   hasLaneCounterpart,
 } from '../../../../lib/two-lane-layout';
-import { useActivityDraftStore } from '../../../../stores/useActivityDraftStore';
 import { useCalendarDragStore } from '../../../../stores/useCalendarDragStore';
 import type { CalendarDisplayEvent } from '../../../../types/calendar.types';
 import { HOURS_PER_DAY } from '../constants/grid.constants';
 import { useResponsiveHourHeight } from '../hooks/useResponsiveHourHeight';
 import type { DateTimeSelection } from './CalendarDragSelection';
 import { CalendarDragSelection } from './CalendarDragSelection';
-import { DraftTimeblock } from './DraftTimeblock';
-import { InlineActivityPalette } from './InlineActivityPalette';
+import { DragSelectionHighlight } from './DragSelectionHighlight';
 import { ExternalEventCard } from './TwoLane/ExternalEventCard';
 import { PlanLaneCard } from './TwoLane/PlanLaneCard';
 import { RecordLaneCard } from './TwoLane/RecordLaneCard';
@@ -195,9 +191,6 @@ export const CalendarGridContent = React.memo(function CalendarGridContent({
   const gridHeight = HOURS_PER_DAY * HOUR_HEIGHT;
   const { createRecord } = useTimeblockWriteMutations();
   const { convertGhost, dismissGhost } = useConvertGhostEvent();
-
-  // アクティビティタップで開いている draft entry（同日のときだけ block を描画）
-  const activityDraft = useActivityDraftStore((s) => s.draft);
 
   // 日付間ドラッグ（day以外のビューで使用）
   const enableCrossDayDrag = viewMode !== 'day';
@@ -468,16 +461,11 @@ export const CalendarGridContent = React.memo(function CalendarGridContent({
           );
         })}
 
-        <InlineActivityPalette
+        <DragSelectionHighlight
           hourHeight={HOUR_HEIGHT}
           dayEntries={allEventsForOverlapCheck ?? entries}
           {...(enableCrossDayDrag ? { date } : {})}
         />
-
-        {/* Tag タップで作成中の draft entry を該当日に描画 */}
-        {activityDraft && isSameDay(activityDraft.date, date) && (
-          <DraftTimeblock draft={activityDraft} hourHeight={HOUR_HEIGHT} />
-        )}
       </div>
 
       {/* React Portal ゴースト（DOM clone廃止） */}

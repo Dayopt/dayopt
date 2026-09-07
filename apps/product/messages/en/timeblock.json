@@ -143,7 +143,6 @@
         "created": "Duplicated",
         "validation": {
           "invalidRange": "The end time must be after the start time",
-          "planRequiresFuture": "Choose a future time for the Plan",
           "recordRequiresPast": "Choose a past time for the Record"
         }
       },

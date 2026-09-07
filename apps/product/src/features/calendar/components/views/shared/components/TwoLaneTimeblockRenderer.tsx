@@ -92,6 +92,7 @@ export function TwoLaneTimeblockRenderer({
 }: TwoLaneEntryRendererProps) {
   const inspectorEntryId = useTimeblockInspectorStore((state) => state.timeblockId);
   const isInspectorOpen = useTimeblockInspectorStore((state) => state.isOpen);
+  const hoveredActivity = useTimeblockInspectorStore((state) => state.hoveredActivity);
   const { getActivityById } = useActivitiesMap();
 
   const timeblockDragging =
@@ -111,12 +112,22 @@ export function TwoLaneTimeblockRenderer({
       ? { zIndex: 1000 }
       : {};
 
-  const activity = entry.activityId ? getActivityById(entry.activityId) : undefined;
-  const activityName = activity?.name ?? null;
-  const activityColor = activity?.color ?? null;
-  const activityIcon = activity?.icon ?? null;
-  const activityCategoryId = activity?.categoryId ?? null;
   const isActive = isInspectorOpen && inspectorEntryId === entry.id;
+  const activity = entry.activityId ? getActivityById(entry.activityId) : undefined;
+  // 開いているブロックでアクティビティをホバー中なら、選ぶ前に色・アイコン・名前を
+  // カードへ先出しする（ドラッグ作成のハイライトと同じ扱い。2026-09-07 User 指示）
+  const isPreviewingHover = isActive && hoveredActivity !== null;
+  const activityName = isPreviewingHover ? hoveredActivity.name : (activity?.name ?? null);
+  const activityColor = isPreviewingHover ? hoveredActivity.color : (activity?.color ?? null);
+  const activityIcon = isPreviewingHover ? hoveredActivity.icon : (activity?.icon ?? null);
+  // カードは「未分類（categoryId === null）」で icon 領域を隠す。プレビュー中は
+  // ホバー候補の色の有無で判定する（hoveredActivity は categoryId を持たないため、
+  // 実 entry の categoryId をそのまま使うと候補と無関係な値になる）
+  const activityCategoryId = isPreviewingHover
+    ? hoveredActivity.color != null
+      ? 'preview'
+      : null
+    : (activity?.categoryId ?? null);
   const disableDrag = isDragDisabled(entry);
   const disableResize = disableDrag;
   const rect = toRect(position);

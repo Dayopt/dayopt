@@ -118,13 +118,10 @@ function getDuplicateValidationMessageKey(
   reason: TimeblockDuplicateValidationReason,
 ):
   | 'timeblock.editor.duplicate.validation.invalidRange'
-  | 'timeblock.editor.duplicate.validation.planRequiresFuture'
   | 'timeblock.editor.duplicate.validation.recordRequiresPast' {
   switch (reason) {
     case 'invalidRange':
       return 'timeblock.editor.duplicate.validation.invalidRange';
-    case 'planRequiresFuture':
-      return 'timeblock.editor.duplicate.validation.planRequiresFuture';
     case 'recordRequiresPast':
       return 'timeblock.editor.duplicate.validation.recordRequiresPast';
   }

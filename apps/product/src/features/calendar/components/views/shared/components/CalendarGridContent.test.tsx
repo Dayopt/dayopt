@@ -70,11 +70,6 @@ vi.mock('@/features/calendar/interaction/GhostRenderer', () => ({
       : null,
 }));
 
-vi.mock('@/features/calendar/stores/useActivityDraftStore', () => ({
-  useActivityDraftStore: (selector: (state: { draft: null }) => unknown) =>
-    selector({ draft: null }),
-}));
-
 vi.mock('@/features/calendar/components/views/shared/hooks/useResponsiveHourHeight', () => ({
   useResponsiveHourHeight: () => 60,
 }));
@@ -83,8 +78,7 @@ vi.mock('./CalendarDragSelection', () => ({
   CalendarDragSelection: ({ children }: { children: React.ReactNode }) => children,
 }));
 
-vi.mock('./DraftTimeblock', () => ({ DraftTimeblock: () => null }));
-vi.mock('./InlineActivityPalette', () => ({ InlineActivityPalette: () => null }));
+vi.mock('./DragSelectionHighlight', () => ({ DragSelectionHighlight: () => null }));
 
 vi.mock('./TwoLaneTimeblockRenderer', () => ({
   TwoLaneTimeblockRenderer: ({

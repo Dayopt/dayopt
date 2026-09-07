@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * インラインアクティビティパレットの entry 作成ロジック
+ * ドラッグ作成（Inspector 作成モード）の entry 作成ロジック
  *
  * ドラッグ選択（pendingSelection）からの plan / record 作成、
  * 新規アクティビティ作成 → entry 作成、選択範囲の live 競合判定を担う。
@@ -18,34 +18,49 @@ import { useCreateActivity } from '@/features/activities';
 import {
   collectTimeblockLaneItems,
   hasTimeblockLaneConflict,
-  resolveTimeblockDestination,
+  resolveTimeblockKindChoice,
+  useTimeblockInspectorStore,
   useTimeblockWriteMutations,
+  type Fulfillment,
 } from '@/features/timeblock';
 import { convertFromTimezone } from '@/lib/date/timezone';
 import { useUserPreferences } from '@/lib/hooks/useUserPreferences';
 import { logger } from '@/lib/logger';
 
-import { useInlineCreateStore } from '../../../../../stores/useInlineCreateStore';
+import { useInlineCreateStore } from '../../stores/useInlineCreateStore';
 
-export function useInlineActivityPaletteCreation() {
+/** アクティビティ選択と同時に保存する、作成前に埋めておける値 */
+interface InlineCreateExtras {
+  note?: string | undefined;
+  /** Record にだけ保存する。Plan では無視する */
+  fulfillment?: Fulfillment | null | undefined;
+}
+
+export function useInlineCreate(extras: InlineCreateExtras = {}) {
+  const { note, fulfillment } = extras;
   const pendingSelection = useInlineCreateStore.use.pendingSelection();
   const clearPendingSelection = useInlineCreateStore.use.clearPendingSelection();
+  const setHoveredActivity = useInlineCreateStore.use.setHoveredActivity();
   const timezone = useUserPreferences((s) => s.timezone);
   const t = useTranslations('activities');
   const tEntry = useTranslations('timeblock');
 
   const queryClient = useQueryClient();
+  const openInspector = useTimeblockInspectorStore((state) => state.openInspector);
+  const closeInspector = useTimeblockInspectorStore((state) => state.closeInspector);
   const { createRecord, createPlan } = useTimeblockWriteMutations();
   const createActivityMutation = useCreateActivity({ showToast: false });
   const [isCreating, setIsCreating] = useState(false);
-  const [hoveredActivity, setHoveredActivity] = useState<HoveredActivityInfo | null>(null);
   const lockedRef = useRef(false);
 
   // 選択後はホバークリアを無視（mouseLeaveでちらつかないように）
-  const handleActivityHover = useCallback((activity: HoveredActivityInfo | null) => {
-    if (activity === null && lockedRef.current) return;
-    setHoveredActivity(activity);
-  }, []);
+  const handleActivityHover = useCallback(
+    (activity: HoveredActivityInfo | null) => {
+      if (activity === null && lockedRef.current) return;
+      setHoveredActivity(activity);
+    },
+    [setHoveredActivity],
+  );
 
   // plan / record 作成ハンドラー（アクティビティ必須、その名前をタイトルに設定）
   const handleCreate = useCallback(
@@ -73,8 +88,9 @@ export function useInlineActivityPaletteCreation() {
       const utcStart = convertFromTimezone(localStart, timezone);
       const utcEnd = convertFromTimezone(localEnd, timezone);
 
-      // 保存先は end ルールで一意に決める（lane はドラッグ起点の表示ヒントに留める）
-      const destination = resolveTimeblockDestination(utcEnd);
+      // 既定は end ルール。過去スロットに限りユーザーがタブで選んだ種別を優先する
+      // （lane はドラッグ起点の表示ヒントに留める）。
+      const { kind: destination } = resolveTimeblockKindChoice(utcEnd, pendingSelection.kind);
 
       // 事前 overlap 判定（セレクタを開いている間の resize / 他クライアント更新による race を回避）
       // 同一レーンのみ禁止（plan×plan / record×record）。plan×record は許可。
@@ -83,15 +99,15 @@ export function useInlineActivityPaletteCreation() {
         destination === 'plan' ? 'plans' : 'records',
       );
       if (hasTimeblockLaneConflict(laneItems, utcStart, utcEnd)) {
+        // パネルは開いたままにする。時間を直して選び直せる
         toast.error(tEntry('errors.timeOverlap'));
-        clearPendingSelection();
         return;
       }
 
       lockedRef.current = true;
       setIsCreating(true);
 
-      logger.log('🏷️ InlineActivityPalette: Creating', {
+      logger.log('🏷️ InlineCreate: Creating', {
         destination,
         start: utcStart.toISOString(),
         end: utcEnd.toISOString(),
@@ -99,9 +115,7 @@ export function useInlineActivityPaletteCreation() {
         title: activityName,
       });
 
-      // ハイライトを即座に消す（pendingSelectionの値は既にローカル変数に展開済み）
-      clearPendingSelection();
-
+      const trimmedNote = note?.trim();
       const mutation = destination === 'plan' ? createPlan : createRecord;
       mutation.mutate(
         {
@@ -109,17 +123,33 @@ export function useInlineActivityPaletteCreation() {
           start_at: utcStart.toISOString(),
           end_at: utcEnd.toISOString(),
           activityId,
+          ...(trimmedNote ? { note: trimmedNote } : {}),
+          // 充実度は Record だけが持つ。Plan へ渡すと schema で弾かれる
+          ...(destination === 'record' && fulfillment ? { fulfillment } : {}),
         },
         {
-          onSuccess: () => {
+          onSuccess: (created) => {
             setIsCreating(false);
+            lockedRef.current = false;
+            clearPendingSelection();
             toast.success(
               destination === 'plan'
                 ? tEntry('editor.toast.planCreated')
                 : tEntry('editor.toast.recorded'),
             );
+            // 同じパネルをそのまま作成したブロックの詳細へ切り替える。メモ入力や
+            // 記録化へ続けて進めるようにするため（作成モードはここで終わる）
+            if (created?.id) {
+              openInspector(created.id, destination);
+            } else {
+              closeInspector();
+            }
           },
-          onError: () => setIsCreating(false),
+          // 失敗時はパネルを閉じない。時間や種別を直して選び直せる
+          onError: () => {
+            setIsCreating(false);
+            lockedRef.current = false;
+          },
         },
       );
     },
@@ -127,9 +157,13 @@ export function useInlineActivityPaletteCreation() {
       pendingSelection,
       isCreating,
       timezone,
+      note,
+      fulfillment,
       createPlan,
       createRecord,
       clearPendingSelection,
+      closeInspector,
+      openInspector,
       queryClient,
       tEntry,
     ],
@@ -193,7 +227,7 @@ export function useInlineActivityPaletteCreation() {
     const utcEnd = convertFromTimezone(localEnd, timezone);
 
     // 保存先レーンと同じレーンのみ判定（plan×record は共存可）
-    const destination = resolveTimeblockDestination(utcEnd);
+    const { kind: destination } = resolveTimeblockKindChoice(utcEnd, pendingSelection.kind);
     const laneItems = collectTimeblockLaneItems(
       queryClient,
       destination === 'plan' ? 'plans' : 'records',
@@ -203,7 +237,6 @@ export function useInlineActivityPaletteCreation() {
 
   return {
     isCreating,
-    hoveredActivity,
     handleActivityHover,
     handleCreate,
     handleCreateAndSelect,

@@ -47,7 +47,6 @@
       }
     },
     "clipboard": {
-      "planRequiresFuture": "Plans can only be pasted into future time",
       "recordRequiresPast": "Records can only be pasted into past time"
     },
     "panel": {
@@ -238,7 +237,11 @@
         "exercise": "Exercise",
         "break": "Break",
         "meal": "Meal"
-      }
+      },
+      "kindLabel": "Type to create",
+      "recordUnavailableFuture": "Records cannot end in the future",
+      "allCategories": "All",
+      "categoryFilterLabel": "Filter by category"
     },
     "stats": {
       "review": {

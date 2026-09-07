@@ -9,6 +9,7 @@ import { Toaster } from '@/components/ui/feedback/toast';
 import { ShortcutCheatSheetDialog } from '@/components/ui/overlays/shortcut-cheat-sheet-dialog';
 import {
   buildReportPath,
+  InlineCreatePanel,
   isCalendarViewPath,
   useCalendarNavigation,
   useShortcutRegistry,
@@ -167,7 +168,11 @@ export function GlobalOverlays() {
         catalog={APP_SHORTCUT_CATALOG}
         activeScope={shortcutActiveScope}
       />
-      <TimeblockInspector onViewStats={handleViewStats} onCopy={handleCopy} />
+      <TimeblockInspector
+        onViewStats={handleViewStats}
+        onCopy={handleCopy}
+        createContent={<InlineCreatePanel onClose={closeInspector} />}
+      />
       <Toaster />
     </>
   );

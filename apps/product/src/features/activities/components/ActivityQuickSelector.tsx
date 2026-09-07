@@ -61,6 +61,9 @@ const SAMPLE_ACTIVITY_CHIPS: Array<{
   { nameKey: 'meal', color: 'orange', icon: 'utensils' },
 ];
 
+/** 「未分類」チップを表す擬似カテゴリー ID（実カテゴリーの UUID とは衝突しない） */
+const UNCATEGORIZED_FILTER_ID = '__uncategorized__';
+
 const EMPTY_CATEGORIES: ActivityTree['categories'] = [];
 const EMPTY_ACTIVITIES: ActivityTree['uncategorized'] = [];
 
@@ -135,7 +138,9 @@ function ActivityBadgeCell({
       }
       onMouseLeave={onHoverEnd}
       className={cn(
-        'flex min-h-11 items-center gap-1 rounded-full border px-3 py-2 text-sm transition-colors',
+        // 上下は左右より広く取る。角丸が左右の端を削るぶん、同じ数値だと上下だけ
+        // 詰まって見え、名前が窮屈になる（2026-09-07 User 指摘）
+        'flex min-h-12 items-center gap-1 rounded-full border px-3 py-3 text-sm transition-colors',
         'active:scale-95 active:transition-transform',
         isSelected
           ? uncategorized
@@ -153,13 +158,52 @@ function ActivityBadgeCell({
   );
 }
 
+/**
+ * カテゴリー絞り込みチップ。
+ *
+ * 選択中のチップを再タップすると解除して全件へ戻る。カテゴリー数が 1 つ以下なら
+ * 呼び出し側が行ごと出さない（絞り込む意味が無いため）。
+ */
+function CategoryFilterChip({
+  label,
+  icon,
+  color,
+  isActive,
+  onClick,
+}: {
+  label: string;
+  icon?: string | null | undefined;
+  color?: string | null | undefined;
+  isActive: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={isActive}
+      onClick={onClick}
+      className={cn(
+        'flex min-h-11 shrink-0 items-center gap-1 rounded-full border px-3 text-sm transition-colors',
+        'active:scale-95 active:transition-transform',
+        isActive
+          ? 'border-border bg-state-selected text-foreground'
+          : 'border-border text-muted-foreground hover:bg-state-hover hover:text-foreground',
+      )}
+    >
+      {icon ? <ActivityIcon icon={icon} color={color ?? null} size="sm" /> : null}
+      <span className="truncate">{label}</span>
+    </button>
+  );
+}
+
 function CreateBadge({ label, onClick }: { label: string; onClick: () => void }) {
   return (
     <button
       type="button"
       onClick={onClick}
       className={cn(
-        'border-border hover:bg-state-hover text-muted-foreground flex min-h-11 items-center gap-1 rounded-full border border-dashed px-3 py-2 text-sm transition-colors',
+        // 同じ一覧に並ぶので、アクティビティの pill と同じ高さ・余白にする
+        'border-border hover:bg-state-hover text-muted-foreground flex min-h-12 items-center gap-1 rounded-full border border-dashed px-3 py-3 text-sm transition-colors',
         'active:scale-95 active:transition-transform',
       )}
     >
@@ -169,20 +213,7 @@ function CreateBadge({ label, onClick }: { label: string; onClick: () => void })
   );
 }
 
-/**
- * アクティビティ選択コンテンツ
- *
- * カテゴリーごとの見出し + 所属アクティビティ、末尾に「未分類」、さらに末尾の「+」で
- * 自身を閉じてグローバル ActivityCreateModal を `openActivityCreateModal({ onCreated })`
- * で開く。所属アクティビティが 0 件のカテゴリーは見出しごと出さない（選べるものが無い
- * 見出しはノイズになるため）。
- */
-function ActivityQuickSelectorContent({
-  onSelect,
-  onCreateAndSelect,
-  onActivityHover,
-  closeSelf,
-}: {
+interface ActivityPickerListProps {
   onSelect: (activityId: string, activityName: string) => void;
   onCreateAndSelect: (
     name: string,
@@ -191,18 +222,60 @@ function ActivityQuickSelectorContent({
     categoryId?: string | null,
   ) => void;
   onActivityHover?: ((activity: HoveredActivityInfo | null) => void) | undefined;
-  /** 自身（ActivityQuickSelector）を閉じる関数。modal を開く前に呼んで nest を回避 */
-  closeSelf: () => void;
-}) {
+  /**
+   * 自身を包む overlay を閉じる関数。ActivityCreateModal を開く前に呼んで
+   * vaul の nested Drawer を避ける。overlay に載っていない埋め込み用途では省略する。
+   */
+  closeSelf?: (() => void) | undefined;
+  /**
+   * `overlay`: 自前で縦スクロールし、左右に overlay 用の余白と区切り線を持つ（既定）。
+   * `embedded`: スクロールも余白も持たない。高さと余白は埋め込み先のパネルが与える。
+   */
+  variant?: 'overlay' | 'embedded' | undefined;
+}
+
+/**
+ * アクティビティ選択リスト（カテゴリー絞り込みチップ + 見出しごとの pill）。
+ *
+ * カテゴリーごとの見出し + 所属アクティビティ、末尾に「未分類」、さらに末尾の「+」で
+ * グローバル ActivityCreateModal を `openActivityCreateModal({ onCreated })` で開く。
+ * 所属アクティビティが 0 件のカテゴリーは見出しごと出さない（選べるものが無い
+ * 見出しはノイズになるため）。
+ *
+ * 縦スクロールは持たない。高さの制約は呼び出し側（overlay / パネル）が与える。
+ */
+export function ActivityPickerList({
+  onSelect,
+  onCreateAndSelect,
+  onActivityHover,
+  closeSelf,
+  variant = 'overlay',
+}: ActivityPickerListProps) {
+  const isEmbedded = variant === 'embedded';
   const t = useTranslations('calendar');
   const { data: tree } = useActivityTree();
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  // 絞り込み中のカテゴリー。null は全件表示、UNCATEGORIZED_FILTER_ID は未分類だけ
+  const [filterId, setFilterId] = useState<string | null>(null);
   const openActivityCreateModal = useShellStore.use.openActivityCreateModal();
 
   const categories = tree?.categories ?? EMPTY_CATEGORIES;
   const uncategorized = tree?.uncategorized ?? EMPTY_ACTIVITIES;
   const isActivityZero =
     uncategorized.length === 0 && categories.every((node) => node.activities.length === 0);
+
+  // 選べるものが無いカテゴリーはチップにも出さない（見出しの規律と同じ）
+  const chipCategories = categories.filter((node) => node.activities.length > 0);
+  const showUncategorizedChip = uncategorized.length > 0;
+  // チップが 1 つしか無いなら絞り込む意味が無いので行ごと出さない
+  const showChipRow = chipCategories.length + (showUncategorizedChip ? 1 : 0) > 1;
+
+  const visibleCategories =
+    filterId === null ? chipCategories : chipCategories.filter((n) => n.category.id === filterId);
+  const visibleUncategorized =
+    filterId === null || filterId === UNCATEGORIZED_FILTER_ID ? uncategorized : EMPTY_ACTIVITIES;
+
+  const toggleFilter = (id: string) => setFilterId((current) => (current === id ? null : id));
 
   const handleSelect = useCallback(
     (activityId: string, activityName: string) => {
@@ -213,7 +286,7 @@ function ActivityQuickSelectorContent({
   );
 
   const handleOpenCreate = useCallback(() => {
-    closeSelf();
+    closeSelf?.();
     openActivityCreateModal({
       onCreated: (activity) => {
         // 作成は modal 側で済んでいる。caller の onCreateAndSelect は再度 mutation
@@ -229,49 +302,109 @@ function ActivityQuickSelectorContent({
   const handleHoverEnd = onActivityHover ? () => onActivityHover(null) : undefined;
 
   return (
-    <div className="overflow-y-auto" style={{ maxHeight: '50vh' }}>
-      {isActivityZero ? (
-        <div className="space-y-2 px-4 py-4">
-          <div className="text-center">
-            <p className="text-foreground text-sm">{t('activitySelector.emptyTitle')}</p>
-            <p className="text-muted-foreground mt-1 text-xs">
-              {t('activitySelector.emptyDescription')}
-            </p>
-          </div>
-          <div className="flex flex-wrap justify-center gap-2">
-            {SAMPLE_ACTIVITY_CHIPS.map(({ nameKey, color, icon }) => {
-              const name = t(`activitySelector.sampleActivities.${nameKey}`);
-              return (
-                <button
-                  key={nameKey}
-                  type="button"
-                  onClick={() => onCreateAndSelect(name, color, icon)}
-                  className="border-border hover:bg-state-hover flex items-center gap-1 rounded-full border px-2 py-1 text-sm transition-colors"
-                >
-                  <ActivityIcon icon={icon} color={color} size="sm" />
-                  {name}
-                </button>
-              );
-            })}
+    <>
+      {showChipRow ? (
+        <div
+          className={cn('shrink-0 pb-2', isEmbedded ? '' : 'border-border-subtle border-b px-4')}
+        >
+          <div
+            role="group"
+            aria-label={t('activitySelector.categoryFilterLabel')}
+            className="scrollbar-hide flex items-center gap-2 overflow-x-auto overscroll-x-contain"
+          >
+            <CategoryFilterChip
+              label={t('activitySelector.allCategories')}
+              isActive={filterId === null}
+              onClick={() => setFilterId(null)}
+            />
+            {chipCategories.map(({ category }) => (
+              <CategoryFilterChip
+                key={category.id}
+                label={category.name}
+                icon={category.icon}
+                color={category.color}
+                isActive={filterId === category.id}
+                onClick={() => toggleFilter(category.id)}
+              />
+            ))}
+            {showUncategorizedChip ? (
+              <CategoryFilterChip
+                label={t('filter.uncategorized')}
+                isActive={filterId === UNCATEGORIZED_FILTER_ID}
+                onClick={() => toggleFilter(UNCATEGORIZED_FILTER_ID)}
+              />
+            ) : null}
           </div>
         </div>
       ) : null}
 
-      <div className="flex flex-col gap-2 px-4 py-2">
-        {categories.map(({ category, activities }) =>
-          activities.length > 0 ? (
-            <div key={category.id} className="flex flex-col gap-2">
-              <div className="text-foreground flex items-center gap-1 px-1 text-sm font-medium">
-                <ActivityIcon icon={category.icon} color={category.color} size="sm" />
-                <span className="truncate">{category.name}</span>
+      <div className={cn(isEmbedded ? '' : 'min-h-0 flex-1 overflow-x-hidden overflow-y-auto')}>
+        {isActivityZero ? (
+          <div className={cn('space-y-2 py-4', isEmbedded ? '' : 'px-4')}>
+            <div className="text-center">
+              <p className="text-foreground text-sm">{t('activitySelector.emptyTitle')}</p>
+              <p className="text-muted-foreground mt-1 text-xs">
+                {t('activitySelector.emptyDescription')}
+              </p>
+            </div>
+            <div className="flex flex-wrap justify-center gap-2">
+              {SAMPLE_ACTIVITY_CHIPS.map(({ nameKey, color, icon }) => {
+                const name = t(`activitySelector.sampleActivities.${nameKey}`);
+                return (
+                  <button
+                    key={nameKey}
+                    type="button"
+                    onClick={() => onCreateAndSelect(name, color, icon)}
+                    className="border-border hover:bg-state-hover flex items-center gap-1 rounded-full border px-2 py-1 text-sm transition-colors"
+                  >
+                    <ActivityIcon icon={icon} color={color} size="sm" />
+                    {name}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ) : null}
+
+        <div className={cn('flex flex-col gap-2 py-2', isEmbedded ? '' : 'px-4')}>
+          {visibleCategories.map(({ category, activities }) =>
+            activities.length > 0 ? (
+              <div key={category.id} className="flex flex-col gap-2">
+                <div className="text-foreground flex items-center gap-1 px-1 text-sm font-medium">
+                  <ActivityIcon icon={category.icon} color={category.color} size="sm" />
+                  <span className="truncate">{category.name}</span>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {activities.map((activity) => (
+                    <ActivityBadgeCell
+                      key={activity.id}
+                      activity={activity}
+                      color={category.color}
+                      icon={category.icon}
+                      isSelected={selectedId === activity.id}
+                      onSelect={() => handleSelect(activity.id, activity.name)}
+                      onHover={handleHover}
+                      onHoverEnd={handleHoverEnd}
+                    />
+                  ))}
+                </div>
+              </div>
+            ) : null,
+          )}
+
+          {visibleUncategorized.length > 0 ? (
+            <div className="flex flex-col gap-2">
+              <div className="text-foreground px-1 text-sm font-medium">
+                {t('filter.uncategorized')}
               </div>
               <div className="flex flex-wrap gap-2">
-                {activities.map((activity) => (
+                {visibleUncategorized.map((activity) => (
                   <ActivityBadgeCell
                     key={activity.id}
                     activity={activity}
-                    color={category.color}
-                    icon={category.icon}
+                    color={null}
+                    icon={null}
+                    uncategorized
                     isSelected={selectedId === activity.id}
                     onSelect={() => handleSelect(activity.id, activity.name)}
                     onHover={handleHover}
@@ -280,37 +413,14 @@ function ActivityQuickSelectorContent({
                 ))}
               </div>
             </div>
-          ) : null,
-        )}
+          ) : null}
 
-        {uncategorized.length > 0 ? (
-          <div className="flex flex-col gap-2">
-            <div className="text-foreground px-1 text-sm font-medium">
-              {t('filter.uncategorized')}
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {uncategorized.map((activity) => (
-                <ActivityBadgeCell
-                  key={activity.id}
-                  activity={activity}
-                  color={null}
-                  icon={null}
-                  uncategorized
-                  isSelected={selectedId === activity.id}
-                  onSelect={() => handleSelect(activity.id, activity.name)}
-                  onHover={handleHover}
-                  onHoverEnd={handleHoverEnd}
-                />
-              ))}
-            </div>
+          <div className="flex flex-wrap gap-2">
+            <CreateBadge label={t('activitySelector.new')} onClick={handleOpenCreate} />
           </div>
-        ) : null}
-
-        <div className="flex flex-wrap gap-2">
-          <CreateBadge label={t('activitySelector.new')} onClick={handleOpenCreate} />
         </div>
       </div>
-    </div>
+    </>
   );
 }
 
@@ -424,13 +534,13 @@ export function ActivityQuickSelector({
     return (
       <Drawer open={open} onOpenChange={onOpenChange} handleOnly>
         {/* eslint-disable-next-line tailwindcss/no-arbitrary-value -- viewport unit */}
-        <DrawerContent className="max-h-[80vh]">
-          <DrawerHeader>
+        <DrawerContent className="flex max-h-[80vh] flex-col">
+          <DrawerHeader className="shrink-0">
             <DrawerTitle>{t('activitySelector.title')}</DrawerTitle>
             {timeLabel && <p className="text-muted-foreground text-sm">{timeLabel}</p>}
             {hint}
           </DrawerHeader>
-          <ActivityQuickSelectorContent
+          <ActivityPickerList
             onSelect={onSelect}
             onCreateAndSelect={onCreateAndSelect}
             onActivityHover={onActivityHover}
@@ -457,7 +567,7 @@ export function ActivityQuickSelector({
       )}
       style={position ? { top: position.top, left: position.left } : { visibility: 'hidden' }}
     >
-      <div className="flex items-start justify-between gap-2 px-4 pt-4 pb-2">
+      <div className="flex shrink-0 items-start justify-between gap-2 px-4 pt-4 pb-2">
         <div className="min-w-0">
           <h2 className="font-medium">{t('activitySelector.title')}</h2>
           {timeLabel && <p className="text-muted-foreground truncate text-sm">{timeLabel}</p>}
@@ -476,7 +586,7 @@ export function ActivityQuickSelector({
         </Button>
       </div>
 
-      <ActivityQuickSelectorContent
+      <ActivityPickerList
         onSelect={onSelect}
         onCreateAndSelect={onCreateAndSelect}
         onActivityHover={onActivityHover}

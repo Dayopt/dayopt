@@ -59,7 +59,7 @@ describe('resolveTimeblockClipboardPaste', () => {
     }
   });
 
-  it('Planを過去へ貼り付けず理由を返す', () => {
+  it('Planは過去へも貼り付けられる（Plan は時間軸のどこにでも置ける）', () => {
     expect(
       resolveTimeblockClipboardPaste({
         copiedTimeblock: plan,
@@ -67,7 +67,7 @@ describe('resolveTimeblockClipboardPaste', () => {
         timezone: 'Asia/Tokyo',
         now: new Date('2026-07-14T00:00:00.000Z'),
       }),
-    ).toEqual({ ok: false, reason: 'planRequiresFuture' });
+    ).toMatchObject({ ok: true, kind: 'plan' });
   });
 
   it('Recordを未来へ貼り付けず理由を返す', () => {

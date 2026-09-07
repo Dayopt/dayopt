@@ -13,6 +13,7 @@ import type { DateTimeSelection } from '../../views/shared';
 /** エントリクリック・時間範囲選択など、カレンダー共通のUIイベントハンドラーを提供するフック */
 export function useCalendarHandlers() {
   const openTimeblockInspector = useTimeblockInspectorStore((state) => state.openInspector);
+  const openCreateInspector = useTimeblockInspectorStore((state) => state.openCreate);
   const inspectorEntryId = useTimeblockInspectorStore((state) => state.timeblockId);
   const inspectorIsOpen = useTimeblockInspectorStore((state) => state.isOpen);
 
@@ -36,7 +37,7 @@ export function useCalendarHandlers() {
   );
 
   // 統一された時間範囲選択ハンドラー（全ビュー共通）
-  // ドラッグ/ダブルクリック/タップ → InlineActivityPalette 表示
+  // ドラッグ/ダブルクリック/タップ → グリッド上のハイライト + Inspector 作成モード
   const handleDateTimeRangeSelect = useCallback(
     (selection: DateTimeSelection) => {
       // 最小ブロック長制約の適用
@@ -60,8 +61,11 @@ export function useCalendarHandlers() {
         endMinute: endMinutes % 60,
         creationSource: selection.creationSource,
       });
+      // 選択と同時に編集と同じパネルを作成モードで開く。閉じる操作は
+      // closeInspector → calendar-drag-cancel → pendingSelection 破棄で完結する
+      openCreateInspector();
     },
-    [setPendingSelection],
+    [openCreateInspector, setPendingSelection],
   );
 
   return {

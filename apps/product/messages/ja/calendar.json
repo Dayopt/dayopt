@@ -47,7 +47,6 @@
       }
     },
     "clipboard": {
-      "planRequiresFuture": "予定は未来の時間に貼り付けてください",
       "recordRequiresPast": "記録は過去の時間に貼り付けてください"
     },
     "panel": {
@@ -238,7 +237,11 @@
         "exercise": "運動",
         "break": "休憩",
         "meal": "食事"
-      }
+      },
+      "kindLabel": "作成する種別",
+      "recordUnavailableFuture": "記録は今より後の時間には作れません",
+      "allCategories": "すべて",
+      "categoryFilterLabel": "カテゴリーで絞り込み"
     },
     "stats": {
       "review": {

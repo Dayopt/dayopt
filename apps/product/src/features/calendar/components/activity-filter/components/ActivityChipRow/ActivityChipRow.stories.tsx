@@ -67,7 +67,7 @@ function mocks(activities: Activity[], categories: Category[] = MOCK_CATEGORIES)
  * - 名前順で並ぶ（PC サイドバーと同じサーバー側の並び）
  * - アーカイブ済みは一覧の時点で除外される
  * - 色とアイコンは所属カテゴリーから継承し、未分類は中立表示
- * - タップで bottom sheet popover（`ActivityTimeblockCreatePopover` を isMobile=true で再利用）
+ * - タップで既定の長さのブロックを即作成し、詳細パネル（Drawer）で時刻を直す
  */
 const meta = {
   title: 'Product/Features/Calendar/Sidebar/ActivityChipRow',

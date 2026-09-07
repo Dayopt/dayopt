@@ -1,32 +1,29 @@
 'use client';
 
 /**
- * インラインアクティビティパレット
+ * ドラッグ選択のハイライト
  *
- * カレンダーグリッド上でドラッグ確定後に表示される。
- * 選択範囲のハイライトをグリッド上に描画し、
- * ActivityQuickSelector（Drawer/Dialog）でアクティビティ選択 → エントリ作成。
+ * カレンダーグリッド上でドラッグ確定後に、選択範囲をカードとして描画する。
+ * アクティビティ選択と作成は Inspector の作成モード（InlineCreatePanel）が担うため、
+ * ここはグリッド上の見た目とリサイズ / long-press 移動だけを持つ。
  *
- * entry 作成・競合判定は useInlineActivityPaletteCreation、
  * リサイズ / long-press 移動は inline-selection-gestures に分離している。
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 
-import { format, isSameDay } from 'date-fns';
-import { enUS, ja } from 'date-fns/locale';
-import { useLocale, useTranslations } from 'next-intl';
+import { isSameDay } from 'date-fns';
+import { useTranslations } from 'next-intl';
 
+import { ActivityIcon, getCategoryColorClasses } from '@/features/activities';
 import {
-  ActivityIcon,
-  ActivityQuickSelector,
-  getCategoryColorClasses,
-} from '@/features/activities';
-import { resolveTimeblockDestination } from '@/features/timeblock';
+  resolveTimeblockDestination,
+  resolveTimeblockKindChoice,
+  useTimeblockInspectorStore,
+} from '@/features/timeblock';
 import { formatTimeString } from '@/lib/date';
 import { convertFromTimezone } from '@/lib/date/timezone';
 import { useUserPreferences } from '@/lib/hooks/useUserPreferences';
-import { useShellStore } from '@/lib/stores/useShellStore';
 import { cn } from '@dayopt/components';
 
 import { MIN_TIMEBLOCK_DURATION_MINUTES } from '../../../../../domain/precision';
@@ -38,16 +35,16 @@ import {
 import { useInlineCreateStore } from '../../../../../stores/useInlineCreateStore';
 import type { CalendarDisplayEvent } from '../../../../../types/calendar.types';
 
+import { useInlineCreate } from '../../../../create/useInlineCreate';
 import { Z_INDEX } from '../../constants/grid.constants';
 import { ConflictOverlay } from '../ConflictOverlay';
 import {
   createBodyPointerDownHandler,
   createResizeStartHandler,
 } from './inline-selection-gestures';
-import { useInlineActivityPaletteCreation } from './useInlineActivityPaletteCreation';
 
-/** InlineActivityPalette コンポーネントのプロパティ */
-interface InlineActivityPaletteProps {
+/** DragSelectionHighlight コンポーネントのプロパティ */
+interface DragSelectionHighlightProps {
   /** 1時間あたりの高さ（px） */
   hourHeight: number;
   /** このカラムの日付（複数日ビューで対象カラムのみ表示するため） */
@@ -59,67 +56,35 @@ interface InlineActivityPaletteProps {
   dayEntries?: CalendarDisplayEvent[] | undefined;
 }
 
-/** ドラッグ選択後にカレンダーグリッド上でアクティビティを選んでエントリ作成するコンポーネント */
-export function InlineActivityPalette({
+/** ドラッグ選択の範囲をグリッド上にカードとして描き、リサイズ / 移動を受け付ける */
+export function DragSelectionHighlight({
   hourHeight,
   date,
   dayEntries,
-}: InlineActivityPaletteProps) {
+}: DragSelectionHighlightProps) {
   const pendingSelection = useInlineCreateStore.use.pendingSelection();
   const clearPendingSelection = useInlineCreateStore.use.clearPendingSelection();
   const updateSelectionTimes = useInlineCreateStore.use.updateSelectionTimes();
+  const isCreateMode = useTimeblockInspectorStore((state) => state.createMode);
+  // 作成パネルでホバー中のアクティビティ。色と名前をハイライトへ先出しする
+  const hoveredActivity = useInlineCreateStore.use.hoveredActivity();
   const timezone = useUserPreferences((s) => s.timezone);
-  const locale = useLocale();
   const tCalendar = useTranslations('calendar');
   const tEntry = useTranslations('timeblock');
   const { tap, impact } = useHapticFeedback();
 
   const highlightRef = useRef<HTMLDivElement>(null);
 
-  const { hoveredActivity, handleActivityHover, handleCreate, handleCreateAndSelect, hasConflict } =
-    useInlineActivityPaletteCreation();
+  // 競合判定は作成パネルと同じロジックを使う（どちらも store の pendingSelection を見る）
+  const { hasConflict } = useInlineCreate();
 
-  // selector の open は pendingSelection と分離する。
-  // 「+」で modal に遷移する時は selector を閉じつつ pendingSelection を保持する必要がある
-  // (open={!!pendingSelection} だと selector が閉じず modal と nest してしまう)。
-  const [waitingForModal, setWaitingForModal] = useState(false);
-  const activeSheetType = useShellStore((s) => s.activeSheet?.type ?? null);
-  const isActivityCreateModalOpen = activeSheetType === 'activityCreate';
-
-  // 派生 state: pending あり && modal が前にも後にもいない時だけ open
-  const selectorOpen = !!pendingSelection && !isActivityCreateModalOpen && !waitingForModal;
-
-  const handleOpenChange = useCallback(
-    (open: boolean) => {
-      if (open) return;
-      queueMicrotask(() => {
-        if (useShellStore.getState().activeSheet?.type === 'activityCreate') {
-          // modal 遷移中: pendingSelection を保持し、selector を非表示にする flag を立てる
-          setWaitingForModal(true);
-        } else {
-          // 通常 dismiss: pendingSelection を解放
-          clearPendingSelection();
-        }
-      });
-    },
-    [clearPendingSelection],
-  );
-
-  // modal close 検知: activeSheet が activityCreate から離れたら waitingForModal を解除する。
-  // 外部 store (Zustand) の変化に追随する subscribe 相当のため setState を許可する。
+  // 作成パネルが閉じた（＝破棄された）らハイライトも消す。作成成功時は
+  // useInlineCreate 側が先に clearPendingSelection するので二重呼び出しにならない
   useEffect(() => {
-    if (!waitingForModal) return;
-    if (isActivityCreateModalOpen) return;
-    queueMicrotask(() => setWaitingForModal(false));
-  }, [waitingForModal, isActivityCreateModalOpen]);
-
-  // pending を modal-pending 状態で抱えている間、unmount または waitingForModal の解除で
-  // 必ず pending を解放する (calendar 離脱で stale selection が残らないように)。
-  // 成功 path は handleCreate が先に clearPendingSelection を呼ぶため idempotent。
-  useEffect(() => {
-    if (!waitingForModal) return;
-    return () => clearPendingSelection();
-  }, [waitingForModal, clearPendingSelection]);
+    if (isCreateMode) return;
+    if (!pendingSelection) return;
+    clearPendingSelection();
+  }, [isCreateMode, pendingSelection, clearPendingSelection]);
 
   const timeFormat = useUserPreferences((s) => s.timeFormat);
 
@@ -138,11 +103,6 @@ export function InlineActivityPalette({
   // 時間ラベル + 合計時間
   const timeLabel = `${formatTimeString(startHour, startMinute, timeFormat)} – ${formatTimeString(endHour, endMinute, timeFormat)}`;
 
-  // ピッカーヘッダー用の日付+時間ラベル（例: "3/30 (日) 14:00 – 15:30"）
-  const dateFnsLocale = locale === 'ja' ? ja : enUS;
-  const datePattern = locale === 'ja' ? 'M/d (E)' : 'E, MMM d';
-  const pickerTimeLabel = `${format(pendingSelection.date, datePattern, { locale: dateFnsLocale })} ${timeLabel}`;
-
   const selectionStartLocal = new Date(
     pendingSelection.date.getFullYear(),
     pendingSelection.date.getMonth(),
@@ -157,10 +117,12 @@ export function InlineActivityPalette({
     endHour,
     endMinute,
   );
-  const destination = resolveTimeblockDestination(convertFromTimezone(selectionEndLocal, timezone));
+  // 既定は end_at 判定。過去スロットだけタブで Plan / Record を選び直せる。
+  const { kind: destination } = resolveTimeblockKindChoice(
+    convertFromTimezone(selectionEndLocal, timezone),
+    pendingSelection.kind,
+  );
   const isPlan = destination === 'plan';
-  const destinationLabel = tCalendar(`timeblock.preview.${destination}`);
-  const pickerContextLabel = `${destinationLabel} · ${pickerTimeLabel}`;
 
   // #2250: 相手レーンに重なる entry が無ければフル幅にする（表示層・選択プレビューと
   // 同じ判定）。selectionStartLocal/EndLocal は displayStartDate/displayEndDate と
@@ -215,6 +177,8 @@ export function InlineActivityPalette({
       {/* 選択範囲ハイライト（カレンダーグリッド上） */}
       <div
         data-activity-palette
+        // 作成パネルと組で動く。掴んで伸ばしてもパネルを閉じない（DockedInspectorPanel）
+        data-inspector-keep-open
         className="pointer-events-none absolute right-0 left-0"
         style={{ zIndex: Z_INDEX.POPOVER }}
       >
@@ -242,7 +206,13 @@ export function InlineActivityPalette({
             />
           ) : selectionHeight < 40 ? (
             <div className="flex min-w-0 items-center gap-1">
-              {hoveredActivity?.icon && (
+              {/*
+                一覧と同じマーカーを出す。カテゴリーに icon が無くても色ドットへ
+                フォールバックさせる（icon の有無で出し分けると、色だけ反映されて
+                アイコンが出ない状態になる。2026-09-07 User 指摘）。
+                未分類は継承する色が無いので、一覧と同じくテキストだけにする
+              */}
+              {hoveredActivity?.color != null && (
                 <ActivityIcon
                   icon={hoveredActivity.icon}
                   color={hoveredActivity.color}
@@ -250,21 +220,20 @@ export function InlineActivityPalette({
                   className="shrink-0"
                 />
               )}
+              {/*
+                「予定」「記録」の文言はブロック内には出さない（種別はタブと枠線 /
+                塗りつぶしの見た目だけで示す。2026-09-07 User 指摘）。選ぶ前は時刻だけ、
+                選んだ後は名前だけを出す
+              */}
               <span className="truncate font-medium">
-                {hoveredActivity ? displayName : destinationLabel}
-                {!hoveredActivity && (
-                  <>
-                    {' · '}
-                    <span className="tabular-nums">{timeLabel}</span>
-                  </>
-                )}
+                {hoveredActivity ? displayName : <span className="tabular-nums">{timeLabel}</span>}
               </span>
             </div>
           ) : (
             <>
               <div className="flex min-h-0 items-start justify-between gap-1">
                 <div className="flex min-w-0 items-center gap-1">
-                  {hoveredActivity?.icon && (
+                  {hoveredActivity?.color != null && (
                     <ActivityIcon
                       icon={hoveredActivity.icon}
                       color={hoveredActivity.color}
@@ -274,7 +243,6 @@ export function InlineActivityPalette({
                   )}
                   <span className="truncate font-medium">{displayName}</span>
                 </div>
-                <span className="text-muted-foreground shrink-0">{destinationLabel}</span>
               </div>
               <span className="text-muted-foreground truncate tabular-nums">{timeLabel}</span>
             </>
@@ -309,17 +277,6 @@ export function InlineActivityPalette({
           />
         </div>
       </div>
-
-      {/* アクティビティ選択パネル */}
-      <ActivityQuickSelector
-        open={selectorOpen}
-        onOpenChange={handleOpenChange}
-        onSelect={handleCreate}
-        onCreateAndSelect={handleCreateAndSelect}
-        onActivityHover={handleActivityHover}
-        anchorRef={highlightRef}
-        timeLabel={pickerContextLabel}
-      />
     </>
   );
 }
