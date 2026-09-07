@@ -193,7 +193,15 @@ main へ merge しても Production domain は**直接**切り替わらない。
 
 **失敗はどう届くか**: promote は merge した本人の push で起動するため、run が失敗すると GitHub の
 既定通知でその本人へ失敗メールが届く。加えて `Production Release` の commit status が main の
-当該 commit へ failure で付く（commit 一覧・PR 画面で赤く見える）。専用の異常起票 job は持たない。
+当該 commit へ failure で付く（commit 一覧・PR 画面で赤く見える）。
+
+さらに 2026-09-07（[#2643](https://github.com/Dayopt/dayopt/issues/2643)）から、promote.yml の
+`File promote failure` job が **`[auto] Production Release が失敗しました` という 1 本の issue**
+へ起票する（`area:deployment` / `priority:p1`）。同じ title prefix の open issue が既にあれば
+新規作成せずコメントで追記するので、失敗が続く間も issue は 1 本のまま増えない。本文には
+どの job が落ちたか、対象 SHA、run URL が入る。**直したら issue は手で close する**（自動で
+閉じる経路は持たない）。それまでは push actor へのメールしか経路が無く、3 run 連続で
+promote が止まったまま気づかれなかった。
 
 ただしこれは **Auto-assign Custom Production Domains を無効化した後**の話。無効化前は main merge が
 そのまま公開されるため、release run が赤くても本番が無傷とは限らない。ケース0 へ進む前に、現在の

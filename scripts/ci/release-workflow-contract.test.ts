@@ -335,6 +335,38 @@ describe('release workflow contract', () => {
     expect(createRelease).toContain('"$state" != "success"');
   });
 
+  it('reports a promote failure through a job that outlives the skipped release', () => {
+    // 層 3 が赤いと release job ごと skip されるため、release の step では失敗を
+    // 拾えない。independent な job が needs の result を直接見る（#2643）。
+    const notify = release.slice(release.indexOf('\n  notify_failure:'), release.indexOf('\n  release:'));
+    expect(notify).not.toBe('');
+    expect(notify).toMatch(/^\s*needs: \[impact, e2e, web, release\]\s*$/m);
+    for (const job of ['impact', 'e2e', 'web', 'release']) {
+      expect(notify).toContain(`needs.${job}.result == 'failure'`);
+    }
+    // 暗黙の success() が付くと、needs が失敗した時点でこの job も skip される。
+    expect(notify).toContain('!cancelled()');
+    expect(notify).toContain('gh issue create');
+    // 失敗のたびに新規 issue を作らない（既存 open があれば追記する）。
+    expect(notify).toContain('gh issue comment');
+  });
+
+  it('keeps issue write permission off every job that runs repository code', () => {
+    // 起票 job は checkout しない。code を実行する job に書き込み token を置かない
+    // （層 3 は PR / main の code をそのまま走らせる）。
+    const beforeJobs = code(release.slice(0, release.indexOf('\njobs:')));
+    expect(beforeJobs).not.toContain('issues: write');
+
+    const notify = release.slice(release.indexOf('\n  notify_failure:'), release.indexOf('\n  release:'));
+    expect(code(notify)).toContain('issues: write');
+    expect(notify).not.toContain('actions/checkout');
+
+    // 他の job は起票権限を持たない。
+    const jobsBlock = release.slice(release.indexOf('\njobs:'));
+    const grantCount = code(jobsBlock).match(/issues: write/g)?.length ?? 0;
+    expect(grantCount).toBe(1);
+  });
+
   it('keeps the audit workflow pinned to its trusted base revision', () => {
     // promote.yml と対称に「掃除」されないよう固定する。pull_request_target で
     // PR head を checkout すると、PR code が Vercel token を読める。
