@@ -406,7 +406,10 @@ describe('Stripe webhook 署名検証', () => {
    * `apps/product` は `stripe` を依存に持つので新規依存は要らない。
    */
   describe('実SDKでの署名検証', () => {
-    const realStripe = new Stripe('sk_test_dummy');
+    // 署名検証（constructEvent / generateTestHeaderString）は webhook secret だけを使う
+    // HMAC で、API key は一度も参照されない。Stripe key の形をした literal を置くと
+    // secrets:check が正しく反応するので、鍵らしくない文字列を渡す。
+    const realStripe = new Stripe('unused-api-key-signature-verification-only');
     const signedPayload = JSON.stringify(eventMock);
 
     function withRealVerification() {

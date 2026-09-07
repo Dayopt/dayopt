@@ -338,7 +338,10 @@ describe('release workflow contract', () => {
   it('reports a promote failure through a job that outlives the skipped release', () => {
     // 層 3 が赤いと release job ごと skip されるため、release の step では失敗を
     // 拾えない。independent な job が needs の result を直接見る（#2643）。
-    const notify = release.slice(release.indexOf('\n  notify_failure:'), release.indexOf('\n  release:'));
+    const notify = release.slice(
+      release.indexOf('\n  notify_failure:'),
+      release.indexOf('\n  release:'),
+    );
     expect(notify).not.toBe('');
     expect(notify).toMatch(/^\s*needs: \[impact, e2e, web, release\]\s*$/m);
     for (const job of ['impact', 'e2e', 'web', 'release']) {
@@ -357,7 +360,10 @@ describe('release workflow contract', () => {
     const beforeJobs = code(release.slice(0, release.indexOf('\njobs:')));
     expect(beforeJobs).not.toContain('issues: write');
 
-    const notify = release.slice(release.indexOf('\n  notify_failure:'), release.indexOf('\n  release:'));
+    const notify = release.slice(
+      release.indexOf('\n  notify_failure:'),
+      release.indexOf('\n  release:'),
+    );
     expect(code(notify)).toContain('issues: write');
     expect(notify).not.toContain('actions/checkout');
 

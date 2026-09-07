@@ -37,7 +37,10 @@ test.describe('PWA installability', () => {
     // promote の層 3 でも一度も実行されていなかった（#2647）。実際に production build を
     // 起動するかは playwright.config.ts の webServer が process.env.CI で決めているので、
     // 同じ判定へ揃える。
-    test.skip(!process.env.CI, 'Service Worker は CI の production build（pnpm start）でのみ登録される');
+    test.skip(
+      !process.env.CI,
+      'Service Worker は CI の production build（pnpm start）でのみ登録される',
+    );
 
     await page.goto('/');
     await expect.poll(() => getRegisteredServiceWorker(page), { timeout: 5_000 }).not.toBeNull();
@@ -52,7 +55,10 @@ test.describe('PWA installability', () => {
     // promote の層 3 でも一度も実行されていなかった（#2647）。実際に production build を
     // 起動するかは playwright.config.ts の webServer が process.env.CI で決めているので、
     // 同じ判定へ揃える。
-    test.skip(!process.env.CI, 'Service Worker は CI の production build（pnpm start）でのみ登録される');
+    test.skip(
+      !process.env.CI,
+      'Service Worker は CI の production build（pnpm start）でのみ登録される',
+    );
 
     await page.goto('/');
     await expect.poll(() => getRegisteredServiceWorker(page), { timeout: 5_000 }).not.toBeNull();
