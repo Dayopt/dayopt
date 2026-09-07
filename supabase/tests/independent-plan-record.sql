@@ -23,7 +23,7 @@ BEGIN
   EXCEPTION WHEN SQLSTATE 'DT001' THEN NULL;
   END;
   SELECT * INTO r FROM private.record_plan_unserialized_v1(u, p.id, p.updated_at);
-  IF coalesce(to_jsonb(r)->>'plan_id', '') <> '' THEN RAISE EXCEPTION 'record persisted a link'; END IF;
+  IF to_jsonb(r) ? 'plan_id' THEN RAISE EXCEPTION 'record still exposes a link column'; END IF;
   IF (SELECT to_jsonb(plan) FROM public.plans plan WHERE id = p.id) IS DISTINCT FROM before_plan THEN
     RAISE EXCEPTION 'copy changed the plan';
   END IF;
@@ -37,10 +37,12 @@ BEGIN
   IF (SELECT to_jsonb(plan) FROM public.plans plan WHERE id = p.id) IS DISTINCT FROM before_plan THEN
     RAISE EXCEPTION 'moving the record changed the plan';
   END IF;
-  SELECT * INTO p FROM private.set_plan_skipped_unserialized_v1(u, p.id, p.updated_at, true);
-  IF p.skipped_at IS NULL THEN RAISE EXCEPTION 'legacy skip compatibility did not update the plan'; END IF;
-  SELECT * INTO p FROM private.set_plan_skipped_unserialized_v1(u, p.id, p.updated_at, false);
-  IF p.skipped_at IS NOT NULL THEN RAISE EXCEPTION 'legacy unskip compatibility did not update the plan'; END IF;
+  BEGIN
+    PERFORM private.set_plan_skipped_unserialized_v1(u, p.id, p.updated_at, true);
+    RAISE EXCEPTION 'retired skip writer was accepted';
+  EXCEPTION WHEN SQLSTATE 'DT012' THEN NULL;
+  END;
+  IF to_jsonb(p) ? 'skipped_at' THEN RAISE EXCEPTION 'plan still exposes skipped state'; END IF;
   before_plan := to_jsonb(p);
   SELECT count(*) INTO count_created FROM private.confirm_day_plans_unserialized_v1(u, p.start_at, p.start_at + interval '1 day');
   IF count_created <> 1 THEN RAISE EXCEPTION 'empty original period was not recordable'; END IF;
@@ -55,7 +57,7 @@ BEGIN
   SELECT * INTO legacy_record FROM private.create_record_unserialized_v1(
     u, 'legacy request', NULL, p.id, NULL, 'manual', p.start_at - interval '4 hours', p.end_at - interval '4 hours'
   );
-  IF legacy_record.plan_id IS NOT NULL THEN RAISE EXCEPTION 'legacy create persisted a link'; END IF;
+  IF to_jsonb(legacy_record) ? 'plan_id' THEN RAISE EXCEPTION 'legacy create exposed a link column'; END IF;
   SELECT * INTO legacy_record FROM private.delete_record_unserialized_v1(
     u, legacy_record.id, legacy_record.updated_at
   );
@@ -89,8 +91,8 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM public.records WHERE id = r.id AND deleted_at IS NULL) THEN
     RAISE EXCEPTION 'record restore depends on deleted plan';
   END IF;
-  IF NOT private.undo_field_applicable_v1('skipped_at', 'plan') THEN
-    RAISE EXCEPTION 'expand compatibility rejected old Plan receipt fields';
+  IF private.undo_field_applicable_v1('skipped_at', 'plan') THEN
+    RAISE EXCEPTION 'contract stage accepted a retired Plan receipt field';
   END IF;
 END;
 $test$;

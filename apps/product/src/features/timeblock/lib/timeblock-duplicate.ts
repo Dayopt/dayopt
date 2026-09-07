@@ -81,7 +81,7 @@ export function getTimeblockDuplicateValidationReason(
   return null;
 }
 
-/** 複製下書きを既存create mutationの入力へ変換する。元IDとplan_idは含めない。 */
+/** 複製下書きを既存create mutationの入力へ変換する。元IDは含めない。 */
 export function buildTimeblockDuplicateCreateInput(
   draft: TimeblockDuplicateDraft,
   value: TimeblockDuplicateEditorValue,

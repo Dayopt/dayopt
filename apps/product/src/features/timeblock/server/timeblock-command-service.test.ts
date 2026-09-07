@@ -182,7 +182,6 @@ describe('TimeblockCommandService', () => {
         recordId: RECORD_ID,
         expectedUpdatedAt: record.updated_at,
         note: 'changed note',
-        planId: null,
       }),
     );
   });

@@ -178,7 +178,6 @@ describe('TimeblockCommandClient', () => {
     await expect(
       new TimeblockCommandClient().createRecord({
         ...createPlanInput(),
-        planId: plan.id,
         fulfillment: null,
       }),
     ).rejects.toMatchObject({ code: 'RECORD_IN_FUTURE' });

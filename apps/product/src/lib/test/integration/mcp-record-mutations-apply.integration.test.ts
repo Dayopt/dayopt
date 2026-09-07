@@ -602,17 +602,6 @@ describe.skipIf(!RUN_LOCAL)('MCP Record create, update, delete, and restore appl
       })
       .single();
     expect(deleteError).toBeNull();
-    const { data: skippedPlan, error: skipError } = await admin
-      .rpc('set_plan_skipped_command_v1', {
-        p_user_id: userId,
-        p_plan_id: plan.id,
-        p_expected_updated_at: plan.updated_at,
-        p_skipped: true,
-      })
-      .single();
-    expect(skipError).toBeNull();
-    expect(skippedPlan?.skipped_at).not.toBeNull();
-
     const replay = await applyCreate(authorization, linkedOperationId, {
       ...linkedInput,
       planId: plan.id,

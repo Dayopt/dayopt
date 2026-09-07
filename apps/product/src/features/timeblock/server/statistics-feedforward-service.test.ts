@@ -43,7 +43,6 @@ function buildPair(index: number, actualMinutes = 90) {
     record: {
       id: `record-${index}`,
       activity_id: 'activity-a',
-      plan_id: `plan-${index}`,
       source: 'from_plan',
       start_at: `2026-08-${day}T09:00:00.000Z`,
       end_at: new Date(
@@ -89,21 +88,6 @@ describe('StatisticsFeedforwardService', () => {
       pairs.map((pair) => pair.record),
     );
 
-    await expect(service.getTagEstimationFactors(USER_ID, NOW)).resolves.toEqual([
-      { activityId: 'activity-a', factor: 1.5, sampleCount: 3 },
-    ]);
-  });
-
-  it('旧skip状態は期間合計へ影響しない', async () => {
-    const pairs = [buildPair(0), buildPair(1), buildPair(2)];
-    const plans: Record<string, unknown>[] = pairs.map((pair) => ({ ...pair.plan }));
-    plans[2] = { ...(plans[2] as Record<string, unknown>), skipped_at: '2026-08-03T10:00:00.000Z' };
-    const { service } = createService(
-      plans,
-      pairs.map((pair) => pair.record),
-    );
-
-    // 廃止された状態によって過去予定を減らさない
     await expect(service.getTagEstimationFactors(USER_ID, NOW)).resolves.toEqual([
       { activityId: 'activity-a', factor: 1.5, sampleCount: 3 },
     ]);

@@ -88,7 +88,7 @@ async function createRecord(userId: string, title = 'undo rpc fixture'): Promise
 }
 
 /** insert effect の undo(=DELETE) は full mask 契約を要求する。plan/record それぞれの全列。 */
-const PLAN_FULL_MASK = ['deleted_at', 'end_at', 'note', 'skipped_at', 'start_at', 'title'] as const;
+const PLAN_FULL_MASK = ['deleted_at', 'end_at', 'note', 'start_at', 'title'] as const;
 const RECORD_FULL_MASK = ['deleted_at', 'end_at', 'note', 'start_at', 'title'] as const;
 
 type EffectInput = {
@@ -136,7 +136,7 @@ function listUndoable(userId: string) {
 async function getPlan(planId: string) {
   const { data, error } = await admin
     .from('plans')
-    .select('title, note, start_at, end_at, deleted_at, skipped_at')
+    .select('title, note, start_at, end_at, deleted_at')
     .eq('id', planId)
     .maybeSingle();
   if (error) throw error;
@@ -498,10 +498,9 @@ describe.skipIf(!RUN_LOCAL)('undo receipt RPC (#2434)', () => {
       ).rejects.toThrow();
     });
 
-    it('クロスレビューP2: recordにskipped_atのfield_changeを記録するとrecord時点で拒否される（resource_type不一致）', async () => {
-      // skipped_atはplansにしか存在しない列。record時点で拒否せずに通すと、
-      // list_undoable_receipts_v1で「Undo可能」と出た上でapply時に42703で落ちる
-      // （ユーザーに見える failure）。
+    it('撤去済みskipped_atのfield_changeを新規receiptへ記録できない', async () => {
+      // 撤去済み列を受理すると、一覧ではUndo可能に見えてapply時に失敗するため、
+      // resource種別にかかわらず記録時点で拒否する。
       const recordId = await createRecord(ownerId);
       await expect(
         recordReceipt({

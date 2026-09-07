@@ -139,7 +139,6 @@ export class TimeblockCommandService {
       title: input.title,
       note: input.note ?? null,
       activityId: input.activityId ?? null,
-      planId: null,
       externalCalendarEventId: input.externalCalendarEventId ?? null,
       source: input.externalCalendarEventId ? 'external_calendar' : 'manual',
       startAt: input.start_at,
@@ -163,7 +162,6 @@ export class TimeblockCommandService {
       title: input.title ?? existing.title,
       note: input.note === undefined ? existing.note : input.note,
       activityId: input.activityId === undefined ? existing.activity_id : input.activityId,
-      planId: null,
       externalCalendarEventId:
         input.externalCalendarEventId === undefined
           ? existing.external_calendar_event_id

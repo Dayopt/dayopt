@@ -63,7 +63,6 @@ export const confirmDaySchema = z
 export const fulfillmentSchema = z.enum(['low', 'medium', 'high']);
 
 const baseRecordSchema = baseTimeblockSchema.extend({
-  planId: z.null({ invalid_type_error: 'Plan links have been removed; omit planId.' }).optional(),
   fulfillment: fulfillmentSchema.nullable().optional(),
 });
 

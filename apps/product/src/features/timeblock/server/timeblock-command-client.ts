@@ -54,7 +54,6 @@ interface VersionedPlanCommandInput {
 type Fulfillment = 'low' | 'medium' | 'high';
 
 interface CreateRecordCommandInput extends CreatePlanCommandInput {
-  planId: string | null;
   fulfillment: Fulfillment | null;
 }
 
@@ -282,7 +281,7 @@ export class TimeblockCommandClient {
         p_external_calendar_event_id: input.externalCalendarEventId as never,
         p_fulfillment: input.fulfillment as never,
         p_note: input.note as never,
-        p_plan_id: input.planId as never,
+        p_plan_id: null as never,
         p_source: input.source,
         p_start_at: input.startAt,
         p_title: input.title,
@@ -302,7 +301,7 @@ export class TimeblockCommandClient {
         p_fulfillment: input.fulfillment as never,
         p_fulfillment_present: true,
         p_note: input.note as never,
-        p_plan_id: input.planId as never,
+        p_plan_id: null as never,
         p_record_id: input.recordId,
         p_start_at: input.startAt,
         p_title: input.title,
@@ -357,13 +356,7 @@ export class TimeblockCommandClient {
     // known-safe failure is retried, and at most once, inside the server adapter.
     if (result.error?.code === '40P01') result = await request();
     if (result.error) throwCommandError(result.error, operation);
-    return (result.data ?? []).map((row) => {
-      // The expand stage still has inert legacy columns. Never expose them to new clients.
-      const projected = { ...row };
-      Reflect.deleteProperty(projected, 'plan_id');
-      Reflect.deleteProperty(projected, 'skipped_at');
-      return projected;
-    });
+    return result.data ?? [];
   }
 }
 

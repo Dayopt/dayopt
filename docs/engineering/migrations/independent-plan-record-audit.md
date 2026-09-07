@@ -142,3 +142,13 @@ last_verified: 2026-09-07
 | `supabase/migrations/_archive/20260226000004_improve_tags_records_schema.sql`                              | 62                                                                                                                                                                                                                                                          | 履歴                                       |
 | `supabase/migrations/_archive/20260301000000_unify_plans_records_to_entries.sql`                           | 82, 83, 95, 99, 118, 168, 169, 170, 171                                                                                                                                                                                                                     | 履歴                                       |
 | `supabase/schemas/010_tables_core.sql`                                                                     | 160, 182, 252, 284, 287, 292, 299, 304                                                                                                                                                                                                                      | 撤去・置換                                 |
+
+## Contract段階の再監査
+
+基準: `ffd0957b9663b2cdb831a49a548569cb3410a528`。`records.plan_id` と `plans.skipped_at` の物理列は `20260907125000_drop_plan_record_relation_columns.sql` で撤去する。現行コードとschema定義から両列を除き、残る識別子を次の3種類へ限定した。
+
+- **正当な残存**: Plan操作対象ID、Undo effectのPlan対象ID、旧MCP入力の明示拒否と成功済みreceipt再生に必要な引数。
+- **移行検証**: 撤去前fixture、保持列比較、撤去済み入力を拒否するテスト。
+- **履歴**: 適用済みmigrationとarchive。現行の読み書き根拠には使わない。
+
+現行の本番コードを `records.plan_id` / `plans.skipped_at` / `record.plan_id` / `plan.skipped_at` で再検索した結果は0件。Undo substrateの `undo_receipt_effects.plan_id` は操作対象のPlan IDであり、予定と記録の関連ではないため保持する。
