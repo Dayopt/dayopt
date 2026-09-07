@@ -95,7 +95,9 @@ export function RecordLaneCard({
   const displayName = activityName ?? t('calendar.filter.noActivity');
   const isUnplanned = event.planId == null;
   const hasDiff = event.diffMinutes != null && event.diffMinutes !== 0;
-  const showDetails = !compact && position.height >= DETAIL_HEIGHT_THRESHOLD;
+  // 時刻を出すかは縦に入るかだけで決める。狭い列（compact）でも高さがあるカードから
+  // 時刻が消えていて、何時のブロックか読めなかった（2026-09-07 User 指摘）
+  const showDetails = position.height >= DETAIL_HEIGHT_THRESHOLD;
   const canDrag = interactive && !disableDrag && Boolean(onPointerDown);
   return (
     <div
@@ -107,9 +109,11 @@ export function RecordLaneCard({
       aria-label={interactive ? displayName : undefined}
       aria-hidden={interactive ? undefined : true}
       className={cn(
-        'absolute flex flex-col gap-1 overflow-hidden rounded-lg py-1 text-xs',
+        'absolute flex flex-col gap-1 overflow-hidden rounded-lg text-xs',
         interactive ? 'pointer-events-auto' : 'pointer-events-none',
-        compact ? 'px-1' : 'px-2',
+        compact ? 'px-2' : 'px-3',
+        // 高さが足りないカードだけ上下を詰める（詰めないと文字が切れる）
+        showDetails ? 'py-2' : 'py-1',
         colorClasses?.tint ?? 'bg-card',
         'text-foreground',
         'focus-visible:ring-ring focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none',

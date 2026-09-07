@@ -71,7 +71,9 @@ export function ExternalEventCard({
   const t = useTranslations('calendar.external');
   const [confirmOpen, setConfirmOpen] = useState(false);
   const displayTitle = event.title ?? t('untitled');
-  const showDetails = !compact && position.height >= DETAIL_HEIGHT_THRESHOLD;
+  // 時刻を出すかは縦に入るかだけで決める。狭い列（compact）でも高さがあるカードから
+  // 時刻が消えていて、何時のブロックか読めなかった（2026-09-07 User 指摘）
+  const showDetails = position.height >= DETAIL_HEIGHT_THRESHOLD;
   const interactive = onConvert !== undefined;
 
   return (
@@ -80,12 +82,14 @@ export function ExternalEventCard({
       tabIndex={interactive ? 0 : undefined}
       role={interactive ? 'button' : undefined}
       className={cn(
-        'border-border-subtle absolute flex flex-col gap-1 overflow-hidden rounded-lg border py-1 text-xs',
+        'border-border-subtle absolute flex flex-col gap-1 overflow-hidden rounded-lg border text-xs',
         'border-l-indicator border-l-border',
         interactive ? 'pointer-events-auto cursor-pointer' : 'pointer-events-none',
         interactive &&
           'focus-visible:ring-ring focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none',
-        compact ? 'px-1' : 'px-2',
+        compact ? 'px-2' : 'px-3',
+        // 高さが足りないカードだけ上下を詰める（詰めないと文字が切れる）
+        showDetails ? 'py-2' : 'py-1',
         // 自分の計画より一段沈める。plan の skip(50%) / 記録済み(60%) とは別のレンジに置き、
         // 「Dayopt の外にある予定」として読ませる。
         'text-muted-foreground bg-transparent opacity-75',
