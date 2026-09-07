@@ -1,8 +1,17 @@
+import { collectQueryPages } from '@/lib/database/collect-query-pages';
 import 'server-only';
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 import { databaseTables, type Database } from '@/lib/database';
+import {
+  calendarSelectionKey,
+  EXTERNAL_CALENDAR_WINDOW_RADIUS_MS,
+  GHOST_CONNECTION_STATUS,
+  GHOST_EVENT_STATUS,
+  GHOST_QUERY_BATCH_SIZE,
+  GHOST_QUERY_MAX_BATCHES,
+} from '@/lib/external-calendar-ghost';
 import { logger } from '@/lib/logger';
 import { captureUnexpectedDatabaseError, captureUnexpectedError } from '@/lib/sentry';
 
@@ -12,9 +21,7 @@ import { captureUnexpectedDatabaseError, captureUnexpectedError } from '@/lib/se
  * **選択は半開区間の重なりで書く**（`start_at < rangeEnd AND end_at > rangeStart`）。
  * `start_at` だけで絞ると、期間境界を跨ぐブロック（日曜 23 時就寝 → 月曜 7 時起床）が
  * 開始側の期間へ全時間帰属し、跨いだ先からは丸ごと消える。これは
- * `features/timeblock/server/statistics-fetchers.ts` が抱える既知の不具合（#2426）で、
- * 新しい集計経路では最初から作らない。取得後の clip は `lib/report-period.ts` の
- * `clipMinutes` / `distributeToBuckets` が行う。
+ * 取得後の clip は共通導出関数が行う。
  *
  * `archived_at` では絞らない。アーカイブは未来にだけ効く操作で、過去の記録が消えるわけでは
  * ないため、期間内にインクがあるアクティビティは通常どおり集計対象にする。
@@ -73,7 +80,7 @@ export async function fetchReportRecords(
   userId: string,
   range: ReportRangeInput,
 ): Promise<ReportRecordRow[]> {
-  const { data, error } = await supabase
+  const query = supabase
     .from(databaseTables.records)
     .select('id, activity_id, start_at, end_at, fulfillment')
     .eq('user_id', userId)
@@ -81,25 +88,26 @@ export async function fetchReportRecords(
     .lt('start_at', range.endAt)
     .gt('end_at', range.startAt);
 
+  const { data, error } = await collectQueryPages((from, to) => query.order('id').range(from, to));
   if (error) throwDatabaseError(error, 'fetch_report_records');
   return data ?? [];
 }
 
-/** 期間に重なる Plan を取る。skip 済みは予定として計上しないので除外する。 */
+/** 期間に重なる Plan を取る。 */
 export async function fetchReportPlans(
   supabase: ReportFetchClient,
   userId: string,
   range: ReportRangeInput,
 ): Promise<ReportPlanRow[]> {
-  const { data, error } = await supabase
+  const query = supabase
     .from(databaseTables.plans)
     .select('id, activity_id, start_at, end_at')
     .eq('user_id', userId)
     .is('deleted_at', null)
-    .is('skipped_at', null)
     .lt('start_at', range.endAt)
     .gt('end_at', range.startAt);
 
+  const { data, error } = await collectQueryPages((from, to) => query.order('id').range(from, to));
   if (error) throwDatabaseError(error, 'fetch_report_plans');
   return data ?? [];
 }
@@ -136,29 +144,6 @@ export async function fetchReportCategories(
 // 未変換の外部予定（4 章 2 行目）
 // =============================================================================
 
-/**
- * 数える窓の半径。`external-calendar` の sync window（±90 日、`sync-service.ts`）と同値。
- *
- * 仕様 §4.4 は期間非限定を要求するが、無限区間の query は書けない。sync がこの外側へ
- * 行を書かないので、実質「いま存在する ghost の総数」になる。**prune が追いつかず窓の外に
- * 残っている古い行は数えない** — 件数を多く見せて押した先を空にするより、少なく数える方に倒す。
- */
-const GHOST_MIRROR_RADIUS_MS = 90 * 24 * 60 * 60 * 1000;
-
-/**
- * 1 バッチの件数と上限。`event-query-service.ts` と同値（150 × 20 = 3,000 件）。
- *
- * **窓の広さが違うことに注意。** あちらの 3,000 件は router が保証する最大 62 日レンジ向けだが、
- * こちらは ±90 日（180 日）に同じ上限を当てている。共有・会議室カレンダーを多数選ぶと
- * 到達しうるので、到達時は件数が実際より少なくなる（下の fail-open）。黙って劣化させないよう
- * Sentry へも送る。
- */
-const GHOST_BATCH_SIZE = 150;
-const GHOST_MAX_BATCHES = 20;
-
-/** `sync-service` が active な行へ入れる唯一の status。除外は allowlist で書く。 */
-const GHOST_ACTIVE_STATUS = 'confirmed';
-
 export interface ReportGhostEventRow {
   id: string;
   start_at: string;
@@ -171,18 +156,19 @@ interface GhostCandidateRow {
   start_at: string | null;
 }
 
-function ghostCalendarKey(connectionId: string, providerCalendarId: string): string {
-  return `${connectionId} ${providerCalendarId}`;
-}
-
 /**
  * カレンダー画面が ghost として描く行の選択条件を、レポート側でも同じ形で組む。
  *
  * **`external-calendar` の `listGhostEvents` を呼べない**（feature 間の deep import は
  * eslint が error、barrel は client 用で `server-only` を通せない）ため、導出条件
  * 「ミラー − cancelled − dismissed − 孤児 − 選択解除 − plans/records が参照済み」を
- * ここでも同じ順序で書く。**条件を 1 つでも緩めると、4 章の「N 件」を押した先の
+ * ここでも同じ順序で書く。純粋な定数・選択キーは `lib/external-calendar-ghost` を共有し、
+ * DB 選択条件の一致は `lib/test/external-calendar-ghost-contract.test.ts` で検証する。
+ * **条件を 1 つでも緩めると、4 章の「N 件」を押した先の
  * カレンダーに ghost が 1 つも無い**という行き止まりになる。
+ *
+ * レポートは同期と同じ ±90 日を数え、窓外に残る古い行は含めない。カレンダーの
+ * 最大62日より広いため、共有の取得予算（150 × 20件）に達すると数え漏れる可能性がある。
  *
  * `listGhostEvents` との意図的な違いは 1 点だけ: **バッチ上限に当たっても throw しない**。
  * あちらは「範囲内の予定が再現性なく欠落する」ことを避けるための fail closed だが、
@@ -197,18 +183,18 @@ export async function fetchReportUnconvertedExternalEvents(
   const selectedCalendarKeys = await loadSelectedGhostCalendarKeys(supabase, userId);
   if (selectedCalendarKeys.size === 0) return [];
 
-  const windowStart = new Date(now.getTime() - GHOST_MIRROR_RADIUS_MS).toISOString();
-  const windowEnd = new Date(now.getTime() + GHOST_MIRROR_RADIUS_MS).toISOString();
+  const windowStart = new Date(now.getTime() - EXTERNAL_CALENDAR_WINDOW_RADIUS_MS).toISOString();
+  const windowEnd = new Date(now.getTime() + EXTERNAL_CALENDAR_WINDOW_RADIUS_MS).toISOString();
 
   const events: ReportGhostEventRow[] = [];
   let cursor: string | null = null;
 
-  for (let batch = 0; batch < GHOST_MAX_BATCHES; batch += 1) {
+  for (let batch = 0; batch < GHOST_QUERY_MAX_BATCHES; batch += 1) {
     let query = supabase
       .from(databaseTables.externalCalendarEvents)
       .select('id, connection_id, provider_calendar_id, start_at')
       .eq('user_id', userId)
-      .eq('status', GHOST_ACTIVE_STATUS)
+      .eq('status', GHOST_EVENT_STATUS)
       .is('dismissed_at', null)
       .not('connection_id', 'is', null)
       .lt('start_at', windowEnd)
@@ -217,7 +203,9 @@ export async function fetchReportUnconvertedExternalEvents(
     // 初回は cursor 無し。UUID 列に空文字を渡すと PostgREST 側で invalid UUID になる。
     if (cursor !== null) query = query.gt('id', cursor);
 
-    const { data, error } = await query.order('id', { ascending: true }).limit(GHOST_BATCH_SIZE);
+    const { data, error } = await query
+      .order('id', { ascending: true })
+      .limit(GHOST_QUERY_BATCH_SIZE);
 
     if (error) throwDatabaseError(error, 'fetch_report_external_events');
 
@@ -234,7 +222,7 @@ export async function fetchReportUnconvertedExternalEvents(
       if (referenced.has(row.id)) continue;
       if (row.start_at === null || row.connection_id === null) continue;
       if (
-        !selectedCalendarKeys.has(ghostCalendarKey(row.connection_id, row.provider_calendar_id))
+        !selectedCalendarKeys.has(calendarSelectionKey(row.connection_id, row.provider_calendar_id))
       ) {
         continue;
       }
@@ -242,14 +230,14 @@ export async function fetchReportUnconvertedExternalEvents(
     }
 
     cursor = candidates[candidates.length - 1]?.id ?? cursor;
-    if (candidates.length < GHOST_BATCH_SIZE) return events;
+    if (candidates.length < GHOST_QUERY_BATCH_SIZE) return events;
   }
 
   // 上限に当たったら「数え切れたぶん」で返す（上のコメント参照）。カレンダー側と違い
   // ここで落とすとレポート全体が読めなくなる。ただし **黙って少なく数えるのは避ける** —
   // 件数が実際より少ないまま出続けるので、運用側が気づけるよう Sentry にも残す
   // （`event-query-service.ts` は throw する側で同じ通知を出している）。
-  logger.warn('[report-ghost] stopped at the batch limit', { batches: GHOST_MAX_BATCHES });
+  logger.warn('[report-ghost] stopped at the batch limit', { batches: GHOST_QUERY_MAX_BATCHES });
   captureUnexpectedError(new Error('report ghost count hit the batch limit'), {
     feature: 'report',
     operation: 'ghost_count_batch_limit',
@@ -266,7 +254,7 @@ async function loadSelectedGhostCalendarKeys(
     .from(databaseTables.calendarConnections)
     .select('id')
     .eq('user_id', userId)
-    .eq('status', 'active');
+    .eq('status', GHOST_CONNECTION_STATUS);
 
   if (connectionError) throwDatabaseError(connectionError, 'fetch_report_calendar_connections');
 
@@ -282,7 +270,7 @@ async function loadSelectedGhostCalendarKeys(
   if (error) throwDatabaseError(error, 'fetch_report_selected_calendars');
 
   return new Set(
-    (data ?? []).map((row) => ghostCalendarKey(row.connection_id, row.provider_calendar_id)),
+    (data ?? []).map((row) => calendarSelectionKey(row.connection_id, row.provider_calendar_id)),
   );
 }
 
@@ -358,10 +346,9 @@ export async function fetchReportDetailRecords(
     .lt('start_at', range.endAt)
     .gt('end_at', range.startAt);
 
-  const { data, error } =
-    activityId === null
-      ? await base.is('activity_id', null)
-      : await base.eq('activity_id', activityId);
+  const query =
+    activityId === null ? base.is('activity_id', null) : base.eq('activity_id', activityId);
+  const { data, error } = await collectQueryPages((from, to) => query.order('id').range(from, to));
 
   if (error) throwDatabaseError(error, 'fetch_report_detail_records');
   return data ?? [];
@@ -379,14 +366,12 @@ export async function fetchReportDetailPlans(
     .select('id, activity_id, start_at, end_at')
     .eq('user_id', userId)
     .is('deleted_at', null)
-    .is('skipped_at', null)
     .lt('start_at', range.endAt)
     .gt('end_at', range.startAt);
 
-  const { data, error } =
-    activityId === null
-      ? await base.is('activity_id', null)
-      : await base.eq('activity_id', activityId);
+  const query =
+    activityId === null ? base.is('activity_id', null) : base.eq('activity_id', activityId);
+  const { data, error } = await collectQueryPages((from, to) => query.order('id').range(from, to));
 
   if (error) throwDatabaseError(error, 'fetch_report_detail_plans');
   return data ?? [];

@@ -30,7 +30,6 @@ const record: RecordEvent = {
   title: 'Legacy record title',
   note: null,
   activityId: null,
-  planId: 'plan-1',
   startDate,
   endDate,
   displayStartDate: startDate,
@@ -179,26 +178,14 @@ describe('TwoLane cards', () => {
 
   it('Recordカードは差分0のbadgeを隠し、差分がある場合も中立色で表示する', () => {
     const { container, rerender } = render(
-      <RecordLaneCard
-        event={{ ...record, diffMinutes: 0 }}
-        position={position}
-        activityName="Deep Work"
-      />,
+      <RecordLaneCard event={{ ...record }} position={position} activityName="Deep Work" />,
     );
 
     expect(container.querySelector('[data-record-diff-badge]')).toBeNull();
 
-    rerender(
-      <RecordLaneCard
-        event={{ ...record, diffMinutes: 20 }}
-        position={position}
-        activityName="Deep Work"
-      />,
-    );
+    rerender(<RecordLaneCard event={{ ...record }} position={position} activityName="Deep Work" />);
 
     const badge = container.querySelector('[data-record-diff-badge]');
-    expect(badge).not.toBeNull();
-    expect(badge).toHaveClass('text-muted-foreground');
-    expect(badge).not.toHaveClass('text-success', 'text-destructive');
+    expect(badge).toBeNull();
   });
 });

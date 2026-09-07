@@ -54,7 +54,6 @@ interface VersionedPlanCommandInput {
 type Fulfillment = 'low' | 'medium' | 'high';
 
 interface CreateRecordCommandInput extends CreatePlanCommandInput {
-  planId: string | null;
   fulfillment: Fulfillment | null;
 }
 
@@ -97,8 +96,6 @@ type CommandOperation =
   | 'record_plan'
   | 'restore_plan'
   | 'restore_record'
-  | 'skip_plan'
-  | 'unskip_plan'
   | 'update_plan'
   | 'update_record';
 
@@ -108,8 +105,6 @@ const VERSIONED_TARGET_OPERATIONS = new Set<CommandOperation>([
   'record_plan',
   'restore_plan',
   'restore_record',
-  'skip_plan',
-  'unskip_plan',
   'update_plan',
   'update_record',
 ]);
@@ -122,13 +117,11 @@ const EXPECTED_COMMAND_ERRORS: Readonly<Record<string, string>> = {
   DT005: 'RECORD_IN_FUTURE',
   DT008: 'INVALID_INPUT',
   DT009: 'FORBIDDEN',
-  DT011: 'ALREADY_RECORDED',
   DT012: 'INVALID_INPUT',
   DT014: 'ACTIVITY_ARCHIVED',
 };
 
 const EXPECTED_COMMAND_MESSAGES: Readonly<Record<string, string>> = {
-  ALREADY_RECORDED: 'Plan already has an active record.',
   CONFLICT: 'This command conflicts with another change.',
   FORBIDDEN: 'This item cannot be changed.',
   INVALID_INPUT: 'The timeblock input is invalid.',
@@ -161,7 +154,7 @@ function throwCommandError(error: CommandError, operation: CommandOperation): ne
   if (mappedCode) throwExpectedCommandError(mappedCode);
 
   if (error.code === '23505') {
-    throwExpectedCommandError(operation === 'record_plan' ? 'ALREADY_RECORDED' : 'CONFLICT');
+    throwExpectedCommandError('CONFLICT');
   }
 
   if (error.code === '40P01' || error.code === '55P03') {
@@ -241,17 +234,6 @@ export class TimeblockCommandClient {
     );
   }
 
-  async setPlanSkipped(input: VersionedPlanCommandInput & { skipped: boolean }): Promise<PlanRow> {
-    return this.run(input.skipped ? 'skip_plan' : 'unskip_plan', () =>
-      this.admin.rpc('set_plan_skipped_command_v1', {
-        p_expected_updated_at: input.expectedUpdatedAt,
-        p_plan_id: input.planId,
-        p_skipped: input.skipped,
-        p_user_id: input.userId,
-      }),
-    );
-  }
-
   async recordPlan(input: VersionedPlanCommandInput): Promise<RecordRow> {
     return this.run('record_plan', () =>
       this.admin.rpc('record_plan_command_v1', {
@@ -299,7 +281,7 @@ export class TimeblockCommandClient {
         p_external_calendar_event_id: input.externalCalendarEventId as never,
         p_fulfillment: input.fulfillment as never,
         p_note: input.note as never,
-        p_plan_id: input.planId as never,
+        p_plan_id: null as never,
         p_source: input.source,
         p_start_at: input.startAt,
         p_title: input.title,
@@ -319,7 +301,7 @@ export class TimeblockCommandClient {
         p_fulfillment: input.fulfillment as never,
         p_fulfillment_present: true,
         p_note: input.note as never,
-        p_plan_id: input.planId as never,
+        p_plan_id: null as never,
         p_record_id: input.recordId,
         p_start_at: input.startAt,
         p_title: input.title,
@@ -348,7 +330,7 @@ export class TimeblockCommandClient {
     );
   }
 
-  private async run<TRow>(
+  private async run<TRow extends object>(
     operation: CommandOperation,
     request: () => PromiseLike<CommandResult<TRow>>,
   ): Promise<TRow> {
@@ -365,7 +347,7 @@ export class TimeblockCommandClient {
     });
   }
 
-  private async runMany<TRow>(
+  private async runMany<TRow extends object>(
     operation: CommandOperation,
     request: () => PromiseLike<CommandResult<TRow>>,
   ): Promise<TRow[]> {

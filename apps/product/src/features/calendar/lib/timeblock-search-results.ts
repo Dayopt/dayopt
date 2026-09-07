@@ -7,7 +7,6 @@ export interface TimeblockSearchSourceRow {
   activity_id: string | null;
   start_at: string;
   end_at: string;
-  skipped_at?: string | null | undefined;
 }
 
 /** Plan / Record を区別したブロック検索結果。 */
@@ -18,7 +17,6 @@ export interface TimeblockSearchResult {
   activityId: string | null;
   startAt: string;
   endAt: string;
-  isSkipped: boolean;
 }
 
 interface MergedTimeblockSearchResults {
@@ -37,7 +35,6 @@ function toSearchResult(
     activityId: row.activity_id,
     startAt: row.start_at,
     endAt: row.end_at,
-    isSkipped: kind === 'plan' && row.skipped_at != null,
   };
 }
 

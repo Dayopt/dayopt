@@ -72,17 +72,17 @@ features/{name}/
 
 #### domain を作った判断（実例）
 
-| Feature     | domain の中身                                                                                         |
-| ----------- | ----------------------------------------------------------------------------------------------------- |
-| `timeblock` | `timeblock-destination` / `monthly-trend` / `streak-calculator` / `estimation-accuracy` / `tag-stats` |
-| `tags`      | `tag-tree` / `tag-merge`                                                                              |
-| `review`    | `variance` / `timePL/`（薄い構成）                                                                    |
+| Feature      | domain の中身                                                                                            |
+| ------------ | -------------------------------------------------------------------------------------------------------- |
+| `timeblock`  | `timeblock-destination` / `estimation-accuracy` / `plan-template-compose` / `activity-estimation-factor` |
+| `activities` | `activity-tree-cache`                                                                                    |
+| `review`     | `variance` / `timePL/`（薄い構成）                                                                       |
 
 ### DAG Layer
 
 ```
-Layer 0 (基盤):       tags
-Layer 1 (中核):       timeblock
+Layer 0 (基盤):       activities
+Layer 1 (中核):       timeblock, external-calendar
 Layer 2 (体験):       calendar, review
 Independent:          auth, contact
 Composition:          settings  (= 通常 feature DAG には乗せない)
@@ -214,10 +214,10 @@ const { data: plans, isLoading } = api.plans.list.useQuery({
 #### Presentational（見た目）
 
 ```tsx
-function EntryCard({ entry, onEdit, onDelete }) {
+function PlanCard({ plan, onEdit, onDelete }) {
   return (
     <Card>
-      <h3>{entry.title}</h3>
+      <h3>{plan.title}</h3>
       <Button onClick={onEdit}>編集</Button>
     </Card>
   );
@@ -227,14 +227,14 @@ function EntryCard({ entry, onEdit, onDelete }) {
 #### Container（ロジック）
 
 ```tsx
-function EntryCardContainer({ entryId }) {
-  const { data: entry } = api.plans.getById.useQuery({ id: entryId });
-  const deleteEntry = api.planCommands.delete.useMutation();
+function PlanCardContainer({ planId }) {
+  const { data: plan } = api.plans.getById.useQuery({ id: planId });
+  const deletePlan = api.planCommands.delete.useMutation();
 
   return (
-    <EntryCard
-      entry={entry}
-      onDelete={() => deleteEntry.mutate({ id: entryId, expectedUpdatedAt: entry.updated_at })}
+    <PlanCard
+      plan={plan}
+      onDelete={() => deletePlan.mutate({ id: planId, expectedUpdatedAt: plan.updated_at })}
     />
   );
 }
@@ -246,10 +246,10 @@ function EntryCardContainer({ entryId }) {
 
 ```typescript
 // Service内でエラーをスロー
-if (!entry) {
+if (!plan) {
   throw new TRPCError({
     code: 'NOT_FOUND',
-    message: 'エントリが見つかりません',
+    message: '予定が見つかりません',
   });
 }
 
@@ -257,7 +257,7 @@ if (!entry) {
 const mutation = api.planCommands.update.useMutation({
   onError: (error) => {
     if (error.data?.code === 'NOT_FOUND') {
-      toast.error('エントリが見つかりません');
+      toast.error('予定が見つかりません');
     }
   },
 });

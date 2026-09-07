@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { Row } from '@/lib/database';
+import type { PublicPlanRow } from '@/lib/database';
 
 import { TimeblockCommandClient } from './timeblock-command-client';
 
@@ -15,14 +15,14 @@ vi.mock('@/lib/sentry', () => ({
     error instanceof Error ? error : new Error('database command failed'),
 }));
 
-const plan: Row<'plans'> = {
+const plan: PublicPlanRow = {
   created_at: '2026-07-23T00:00:00.000001Z',
   deleted_at: null,
   end_at: '2026-07-24T02:00:00.000000Z',
   external_calendar_event_id: null,
   id: '00000000-0000-4000-8000-000000000001',
   note: null,
-  skipped_at: null,
+
   source: 'manual',
   start_at: '2026-07-24T01:00:00.000000Z',
   activity_id: null,
@@ -153,7 +153,7 @@ describe('TimeblockCommandClient', () => {
     });
   });
 
-  it('from_plan一意制約違反はrecord_planだけALREADY_RECORDEDへ変換する', async () => {
+  it('一意制約違反は保存競合へ変換する', async () => {
     rpc.mockResolvedValue({
       data: null,
       error: { code: '23505', message: 'duplicate key value violates unique constraint' },
@@ -165,7 +165,7 @@ describe('TimeblockCommandClient', () => {
         planId: plan.id,
         expectedUpdatedAt: plan.updated_at,
       }),
-    ).rejects.toMatchObject({ code: 'ALREADY_RECORDED' });
+    ).rejects.toMatchObject({ code: 'CONFLICT' });
 
     await expect(new TimeblockCommandClient().createPlan(createPlanInput())).rejects.toMatchObject({
       code: 'CONFLICT',
@@ -178,7 +178,6 @@ describe('TimeblockCommandClient', () => {
     await expect(
       new TimeblockCommandClient().createRecord({
         ...createPlanInput(),
-        planId: plan.id,
         fulfillment: null,
       }),
     ).rejects.toMatchObject({ code: 'RECORD_IN_FUTURE' });

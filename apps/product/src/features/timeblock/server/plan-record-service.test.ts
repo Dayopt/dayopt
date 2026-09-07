@@ -42,7 +42,7 @@ function createPlan(overrides: Partial<PlanRow> = {}): PlanRow {
     external_calendar_event_id: null,
     id: 'plan-1',
     note: null,
-    skipped_at: null,
+
     source: 'manual',
     start_at: '2030-03-17T10:00:00.000Z',
     activity_id: null,
@@ -62,7 +62,7 @@ function createRecord(overrides: Partial<RecordRow> = {}): RecordRow {
     fulfillment: null,
     id: 'record-1',
     note: null,
-    plan_id: null,
+
     source: 'manual',
     start_at: '2026-03-17T10:00:00.000Z',
     activity_id: null,
@@ -241,27 +241,19 @@ describe('RecordService.list', () => {
     expect(recordQuery.or).toHaveBeenCalledWith('note.ilike.%Research%');
   });
 
-  it('user scopeを維持して指定したplan_idに絞り込む', async () => {
-    const planIds = [
-      '11111111-1111-4111-8111-111111111111',
-      '22222222-2222-4222-8222-222222222222',
-    ];
+  it('reads temporal context without a plan reference and preserves owner filtering', async () => {
     const query = createChainableMock([]);
     const { service, mockSupabase } = createRecordService();
     mockSupabase.from.mockReturnValue(query);
-
-    await expect(service.list({ userId: USER_ID, planIds })).resolves.toEqual([]);
-
+    await service.list({
+      userId: USER_ID,
+      startDate: '2026-09-07T09:00:00Z',
+      endDate: '2026-09-07T10:00:00Z',
+    });
     expect(query.eq).toHaveBeenCalledWith('user_id', USER_ID);
     expect(query.is).toHaveBeenCalledWith('deleted_at', null);
-    expect(query.in).toHaveBeenCalledWith('plan_id', planIds);
-  });
-
-  it('planIdsが空配列ならDBへ問い合わせず空配列を返す', async () => {
-    const { service, mockSupabase } = createRecordService();
-
-    await expect(service.list({ userId: USER_ID, planIds: [] })).resolves.toEqual([]);
-
-    expect(mockSupabase.from).not.toHaveBeenCalled();
+    expect(query.lt).toHaveBeenCalledWith('start_at', '2026-09-07T10:00:00Z');
+    expect(query.gt).toHaveBeenCalledWith('end_at', '2026-09-07T09:00:00Z');
+    expect(query.in).not.toHaveBeenCalledWith('plan_id', expect.anything());
   });
 });

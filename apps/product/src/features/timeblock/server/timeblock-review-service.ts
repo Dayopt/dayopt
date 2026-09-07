@@ -55,7 +55,12 @@ class TimeblockReviewService {
       );
     }
 
-    const review = deriveTimePLReview(plans, records);
+    const review = deriveTimePLReview(
+      plans,
+      records,
+      { startAt: range.startDate, endAt: range.endDate, timezone: marker.timezone },
+      new Date(marker.databaseNow),
+    );
     if (review.activities.length > TIMEBLOCK_REVIEW_MAX_ACTIVITIES) {
       throw new TimeblockServiceError(
         'RANGE_TOO_DENSE',

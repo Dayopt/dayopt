@@ -2,14 +2,13 @@ import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { PublicRecordRow, Row } from '@/lib/database';
+import type { PublicPlanRow, PublicRecordRow } from '@/lib/database';
 
 import { useTimeblockInspectorStore } from '../../stores/useTimeblockInspectorStore';
 
 import { TimeblockInspector } from './TimeblockInspector';
 
 const mocks = vi.hoisted(() => ({
-  originalPlanNotFound: false,
   planGetById: vi.fn(),
   recordGetById: vi.fn(),
   recordsList: vi.fn(),
@@ -108,18 +107,18 @@ const plan = {
   note: null,
   start_at: '2026-07-14T09:00:00.000Z',
   end_at: '2026-07-14T10:00:00.000Z',
-  skipped_at: null,
+
   source: 'manual',
   deleted_at: null,
   created_at: '2026-07-14T08:00:00.000Z',
   updated_at: '2026-07-14T08:00:00.000Z',
-} satisfies Row<'plans'>;
+} satisfies PublicPlanRow;
 
 const record = {
   id: 'record-1',
   user_id: 'user-1',
   activity_id: 'activity-1',
-  plan_id: plan.id,
+
   external_calendar_event_id: null,
   title: 'Legacy record title',
   note: null,
@@ -143,23 +142,11 @@ function success<T>(data: T) {
   };
 }
 
-function notFound() {
-  return {
-    data: undefined,
-    error: { data: { code: 'NOT_FOUND' } },
-    isError: true,
-    isLoading: false,
-    isSuccess: false,
-    refetch: vi.fn(),
-  };
-}
-
 describe('TimeblockInspector relationships', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.originalPlanNotFound = false;
     mocks.planGetById.mockImplementation((input: { id: string }, options: { enabled: boolean }) => {
-      if (options.enabled && mocks.originalPlanNotFound) return notFound();
+      if (!options.enabled) return success(undefined);
       return success(input.id === plan.id ? plan : undefined);
     });
     mocks.recordGetById.mockImplementation((input: { id: string }) =>
@@ -181,43 +168,26 @@ describe('TimeblockInspector relationships', () => {
     expect(screen.getByTestId('inspector-kind')).toHaveTextContent('plan');
     expect(screen.getByTestId('relationship-kind')).toHaveTextContent('plan');
     expect(mocks.recordsList).toHaveBeenCalledWith(
-      { planId: plan.id, sortBy: 'start_at', sortOrder: 'asc' },
+      { startDate: plan.start_at, endDate: plan.end_at, sortBy: 'start_at', sortOrder: 'asc' },
       expect.objectContaining({ enabled: true }),
     );
 
     await user.click(screen.getByRole('button', { name: 'open-related' }));
 
     expect(screen.getByTestId('inspector-kind')).toHaveTextContent('record');
-    expect(screen.getByTestId('relationship-kind')).toHaveTextContent('record');
+    expect(screen.getByTestId('relationship-kind')).toHaveTextContent('none');
     await waitFor(() => expect(screen.getByRole('button', { name: 'open-related' })).toHaveFocus());
     expect(useTimeblockInspectorStore.getState()).toMatchObject({
       timeblockId: record.id,
       timeblockKind: 'record',
     });
-
-    await user.click(screen.getByRole('button', { name: 'open-related' }));
-
-    expect(screen.getByTestId('inspector-kind')).toHaveTextContent('plan');
-    await waitFor(() => expect(screen.getByRole('button', { name: 'open-related' })).toHaveFocus());
-    expect(useTimeblockInspectorStore.getState()).toMatchObject({
-      timeblockId: plan.id,
-      timeblockKind: 'plan',
-    });
   });
 
-  it('Recordのplan_idから元Planを取得し、NOT_FOUNDは再試行せず取得不可にする', () => {
-    mocks.originalPlanNotFound = true;
+  it('記録詳細は元の予定を取得しない', () => {
     act(() => useTimeblockInspectorStore.getState().openInspector(record.id, 'record'));
     render(<TimeblockInspector />);
-
-    expect(screen.getByTestId('relationship-status')).toHaveTextContent('unavailable');
-    const originalPlanCall = mocks.planGetById.mock.calls.find(
-      ([input, options]) => input.id === plan.id && options.enabled,
-    );
-    expect(originalPlanCall).toBeDefined();
-    const retry = originalPlanCall?.[1].retry as
-      ((failureCount: number, error: { data?: { code?: string } }) => boolean) | undefined;
-    expect(retry?.(0, { data: { code: 'NOT_FOUND' } })).toBe(false);
+    expect(screen.getByTestId('relationship-status')).toHaveTextContent('none');
+    expect(mocks.planGetById.mock.calls.some(([, options]) => options.enabled)).toBe(false);
   });
 
   it('複製下書きを直接表示し、キャンセルで元ブロックの詳細へ戻る', async () => {

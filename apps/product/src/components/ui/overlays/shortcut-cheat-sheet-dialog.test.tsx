@@ -68,7 +68,7 @@ describe('ShortcutCheatSheetDialog', () => {
   it('登録済み操作をplatformに合うキー表記で表示する', () => {
     const onError = renderDialog();
 
-    expect(screen.getByText('Copy the selected block')).toBeInTheDocument();
+    expect(screen.getByText('Copy the selected timeblock')).toBeInTheDocument();
     expect(screen.getByText('⌘C')).toBeInTheDocument();
     expect(screen.getAllByText('⌫')).toHaveLength(1);
     expectNoMissingMessage(onError);
@@ -117,8 +117,8 @@ describe('ShortcutCheatSheetDialog', () => {
       target: { value: 'copy' },
     });
 
-    expect(screen.getByText('Copy the selected block')).toBeInTheDocument();
-    expect(screen.queryByText('Delete the selected block')).not.toBeInTheDocument();
+    expect(screen.getByText('Copy the selected timeblock')).toBeInTheDocument();
+    expect(screen.queryByText('Delete the selected timeblock')).not.toBeInTheDocument();
     expect(screen.queryByText('Open keyboard shortcuts')).not.toBeInTheDocument();
     expectNoMissingMessage(onError);
   });
@@ -132,8 +132,8 @@ describe('ShortcutCheatSheetDialog', () => {
       target: { value: 'ctrl' },
     });
 
-    expect(screen.getByText('Copy the selected block')).toBeInTheDocument();
-    expect(screen.queryByText('Delete the selected block')).not.toBeInTheDocument();
+    expect(screen.getByText('Copy the selected timeblock')).toBeInTheDocument();
+    expect(screen.queryByText('Delete the selected timeblock')).not.toBeInTheDocument();
     expectNoMissingMessage(onError);
   });
 
@@ -145,7 +145,7 @@ describe('ShortcutCheatSheetDialog', () => {
     });
 
     expect(screen.getByText('No matching shortcuts')).toBeInTheDocument();
-    expect(screen.queryByText('Copy the selected block')).not.toBeInTheDocument();
+    expect(screen.queryByText('Copy the selected timeblock')).not.toBeInTheDocument();
     expectNoMissingMessage(onError);
   });
 
@@ -179,7 +179,7 @@ describe('ShortcutCheatSheetDialog', () => {
 
     const headings = screen.getAllByRole('heading', { level: 3 }).map((el) => el.textContent);
     const generalIndex = headings.findIndex((text) => text?.includes('General'));
-    const blocksIndex = headings.findIndex((text) => text?.includes('Blocks'));
+    const blocksIndex = headings.findIndex((text) => text?.includes('Timeblocks'));
     expect(generalIndex).toBeGreaterThanOrEqual(0);
     expect(blocksIndex).toBeGreaterThan(generalIndex);
     expectNoMissingMessage(onError);
@@ -215,7 +215,7 @@ describe('ShortcutCheatSheetDialog', () => {
 
     const headings = screen.getAllByRole('heading', { level: 3 }).map((el) => el.textContent);
     const generalIndex = headings.findIndex((text) => text?.includes('General'));
-    const blocksIndex = headings.findIndex((text) => text?.includes('Blocks'));
+    const blocksIndex = headings.findIndex((text) => text?.includes('Timeblocks'));
     expect(blocksIndex).toBeGreaterThanOrEqual(0);
     expect(generalIndex).toBeGreaterThan(blocksIndex);
     expectNoMissingMessage(onError);

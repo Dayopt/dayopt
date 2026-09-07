@@ -9,7 +9,7 @@ const row = {
   id: 'record-1',
   title: 'Deep Work',
   note: 'Focus',
-  plan_id: 'plan-1',
+
   activity_id: 'activity-1',
   start_at: '2026-07-10T01:00:00.000Z',
   end_at: '2026-07-10T02:00:00.000Z',
@@ -27,24 +27,7 @@ describe('useTimeblockWriteMutations', () => {
     expect(useTimeblockWriteMutations).toBeTypeOf('function');
   });
 
-  it('planIdが異なるrecords.listには作成行を入れない', () => {
-    expect(
-      doesTimeModelListQueryIncludeRow(listKey({ planId: 'plan-2', limit: 1 }), row, 'records'),
-    ).toBe(false);
-    expect(
-      doesTimeModelListQueryIncludeRow(listKey({ planId: 'plan-1', limit: 1 }), row, 'records'),
-    ).toBe(true);
-  });
-
-  it('関連コンテキストのID配列に一致する行だけを対象にする', () => {
-    expect(doesTimeModelListQueryIncludeRow(listKey({ planIds: ['plan-1'] }), row, 'records')).toBe(
-      true,
-    );
-    expect(doesTimeModelListQueryIncludeRow(listKey({ planIds: ['plan-2'] }), row, 'records')).toBe(
-      false,
-    );
-    expect(doesTimeModelListQueryIncludeRow(listKey({ planIds: [] }), row, 'records')).toBe(false);
-
+  it('操作対象のID配列に一致する行だけを対象にする', () => {
     expect(
       doesTimeModelListQueryIncludeRow(listKey({ ids: ['record-1'] }, 'plans'), row, 'plans'),
     ).toBe(true);

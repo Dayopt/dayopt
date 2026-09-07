@@ -34,7 +34,7 @@ export interface StatsKpiSummaryRpcResult {
  */
 interface StatsOverviewResult {
   cumulativeTime: { totalMinutes: number };
-  planRate: { totalEntries: number; plannedEntries: number; planRate: number };
+  planRate: { totalEntries: number; plannedEntries: number; planRate: number | null };
   contextSwitches: { totalSwitches: number; avgPerDay: number };
   blankRate: {
     availableMinutes: number;

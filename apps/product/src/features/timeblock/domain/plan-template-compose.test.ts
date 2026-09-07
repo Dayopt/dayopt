@@ -4,7 +4,6 @@ import { deriveTemplateBlocksFromDay } from './plan-template-compose';
 
 interface SourceOverrides {
   kind?: 'plan' | 'record';
-  isSkipped?: boolean;
   activityId?: string | null;
   title?: string;
   startDate?: Date | null;
@@ -15,7 +14,6 @@ function source(startIso: string, overrides: SourceOverrides = {}) {
   const start = new Date(startIso);
   return {
     kind: 'plan' as const,
-    isSkipped: false,
     activityId: 'a1',
     title: 'Work',
     startDate: start,
@@ -25,13 +23,12 @@ function source(startIso: string, overrides: SourceOverrides = {}) {
 }
 
 describe('deriveTemplateBlocksFromDay', () => {
-  it('その暦日に start が入る非 skip の Plan だけを錨順に取り出す（Asia/Tokyo）', () => {
+  it('その暦日に start が入る Plan だけを錨順に取り出す（Asia/Tokyo）', () => {
     const blocks = deriveTemplateBlocksFromDay(
       [
         source('2026-09-05T03:00:00Z', { title: 'Lunch', activityId: null }),
         source('2026-09-05T00:00:00Z', { title: 'Focus' }),
         source('2026-09-05T02:00:00Z', { kind: 'record', title: 'Record' }),
-        source('2026-09-05T01:00:00Z', { isSkipped: true, title: 'Skipped' }),
         // 前日 23:30 JST 開始（14:30Z）は対象外
         source('2026-09-04T14:30:00Z', { title: 'Yesterday' }),
         // 翌日 00:00 JST（15:00Z）は対象外

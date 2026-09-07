@@ -1,3 +1,4 @@
+import { collectQueryPages } from '@/lib/database/collect-query-pages';
 import 'server-only';
 
 import { databaseTables, publicRecordSelect } from '@/lib/database';
@@ -24,8 +25,6 @@ export class RecordService {
     const {
       userId,
       activityId,
-      planId,
-      planIds,
       search,
       startDate,
       endDate,
@@ -35,8 +34,6 @@ export class RecordService {
       offset,
     } = options;
 
-    if (planIds?.length === 0) return [];
-
     let query = this.supabase
       .from(databaseTables.records)
       .select(publicRecordSelect)
@@ -44,8 +41,6 @@ export class RecordService {
       .is('deleted_at', null);
 
     if (activityId) query = query.eq('activity_id', activityId);
-    if (planId) query = query.eq('plan_id', planId);
-    if (planIds) query = query.in('plan_id', planIds);
 
     if (search) {
       const searchFilter = await buildTimeblockSearchFilter({
@@ -64,14 +59,18 @@ export class RecordService {
       query = query.lte('start_at', endDate);
     }
 
-    query = query.order(sortBy, { ascending: sortOrder === 'asc' });
+    query = query
+      .order(sortBy, { ascending: sortOrder === 'asc' })
+      .order('id', { ascending: true });
 
     if (limit) query = query.limit(limit);
     if (offset) query = query.range(offset, offset + (limit ?? 100) - 1);
 
     const { data, error } = search
       ? await runPrivateTimeblockSearchQuery(() => query)
-      : await query;
+      : limit || offset
+        ? await query
+        : await collectQueryPages((from, to) => query.range(from, to));
 
     if (error) {
       const original = captureUnexpectedDatabaseError(error, {

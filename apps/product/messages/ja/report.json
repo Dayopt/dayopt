@@ -49,7 +49,7 @@
         "monthColumn": "{month}月"
       },
       "barAriaLabel": "カテゴリー別の配分",
-      "lensLabel": "レンズ: {name}",
+      "lensLabel": "セグメント: {name}",
       "barAriaLabelLens": "アクティビティ別の配分"
     },
     "execution": {
@@ -84,7 +84,7 @@
       },
       "hint": {
         "lowButFulfilled": "少ないが充実 → 増やす余地",
-        "heavyButDrained": "重いのに消耗 → 削る・箱を小さく"
+        "heavyButDrained": "重いのに消耗 → 削る・タイムブロックを小さく"
       },
       "pointAriaLabel": "{name} 記録 {recorded}",
       "emptyBoard": "まだ点がありません — 記録の停止・配置のトーストで充実に答えると、ここに点が生まれます",
@@ -105,14 +105,14 @@
       },
       "nextPeriod": {
         "planned": {
-          "week": "来週はすでに {duration} の箱が置かれています",
-          "month": "来月はすでに {duration} の箱が置かれています",
-          "year": "来年はすでに {duration} の箱が置かれています"
+          "week": "来週はすでに {duration} のタイムブロックが置かれています",
+          "month": "来月はすでに {duration} のタイムブロックが置かれています",
+          "year": "来年はすでに {duration} のタイムブロックが置かれています"
         },
         "empty": {
-          "week": "来週の箱はまだありません",
-          "month": "来月の箱はまだありません",
-          "year": "来年の箱はまだありません"
+          "week": "来週のタイムブロックはまだありません",
+          "month": "来月のタイムブロックはまだありません",
+          "year": "来年のタイムブロックはまだありません"
         },
         "action": "カレンダーで組む"
       }
@@ -131,11 +131,11 @@
       },
       "stats": {
         "recorded": "記録合計",
-        "plan": "計画との差",
+        "plan": "予定との差",
         "planRatio": "予定比 {percent}%",
         "planPending": "予定は未消化",
         "planNone": "予定なし",
-        "median": "1 箱の中央値",
+        "median": "1 件あたりの中央値",
         "none": "—",
         "fulfillment": "充実の分布",
         "unanswered": "未回答",
@@ -163,7 +163,7 @@
         }
       },
       "records": {
-        "heading": "記録（{count}箱）",
+        "heading": "記録（{count}件）",
         "empty": "この期間に記録はありません",
         "unanswered": "—",
         "weekdays": ["日", "月", "火", "水", "木", "金", "土"],
@@ -186,8 +186,8 @@
     },
     "mobile": {
       "lens": {
-        "chip": "束",
-        "open": "束を選ぶ"
+        "chip": "セグメント",
+        "open": "セグメントを選ぶ"
       },
       "periodFormat": {
         "weekDay": "M月d日",

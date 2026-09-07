@@ -48,7 +48,7 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** 1件のRecordが紐づくPlan。 */
+/** 1件のRecordが時間帯に重なるPlan。 */
 export const PlanSingle: Story = {
   args: {
     kind: 'plan',
@@ -59,7 +59,7 @@ export const PlanSingle: Story = {
   },
 };
 
-/** 複数のRecordが紐づくPlan。件数と合計記録時間を表示する。 */
+/** 複数のRecordが時間帯に重なるPlan。件数と合計記録時間を表示する。 */
 export const PlanMultiple: Story = {
   args: {
     kind: 'plan',
@@ -81,39 +81,19 @@ export const PlanWithUncategorizedRecord: Story = {
   },
 };
 
-/** 元のPlanに紐づくRecord。 */
-export const RecordLinked: Story = {
-  args: {
-    kind: 'record',
-    status: 'success',
-    plan: { ...relatedRecords[0]!, id: '00000000-0000-4000-8000-000000000001' },
-    onOpen: fn(),
-    onRetry: fn(),
-  },
-};
-
-/** 元のPlanが削除済みなどで取得できない状態。 */
-export const RecordUnavailable: Story = {
-  args: {
-    kind: 'record',
-    status: 'unavailable',
-    plan: null,
-    onOpen: fn(),
-    onRetry: fn(),
-  },
-};
-
-/** 日をまたぐ元Plan。開始日と終了日の双方を表示する。 */
+/** 日をまたぐ記録。開始日と終了日の双方を表示する。 */
 export const CrossDay: Story = {
   args: {
-    kind: 'record',
+    kind: 'plan',
     status: 'success',
-    plan: {
-      ...relatedRecords[0]!,
-      id: '00000000-0000-4000-8000-000000000002',
-      startAt: new Date('2026-07-14T23:30:00'),
-      endAt: new Date('2026-07-15T01:00:00'),
-    },
+    records: [
+      {
+        ...relatedRecords[0]!,
+        id: '00000000-0000-4000-8000-000000000002',
+        startAt: new Date('2026-07-14T23:30:00'),
+        endAt: new Date('2026-07-15T01:00:00'),
+      },
+    ],
     onOpen: fn(),
     onRetry: fn(),
   },
@@ -124,21 +104,23 @@ export const MobileNarrow: Story = {
   render: () => (
     <div className="w-full max-w-xs">
       <TimeblockRelationshipSection
-        kind="record"
+        kind="plan"
         status="success"
-        plan={{
-          ...relatedRecords[0]!,
-          activityName: '設計レビューとAPIインターフェースの整理',
-        }}
+        records={[
+          {
+            ...relatedRecords[0]!,
+            activityName: '設計レビューとAPIインターフェースの整理',
+          },
+        ]}
         onOpen={fn()}
         onRetry={fn()}
       />
     </div>
   ),
   args: {
-    kind: 'record',
+    kind: 'plan',
     status: 'success',
-    plan: relatedRecords[0]!,
+    records: [relatedRecords[0]!],
     onOpen: fn(),
     onRetry: fn(),
   },
@@ -195,32 +177,6 @@ export const AllPatterns: Story = {
         kind="plan"
         status="success"
         records={[...relatedRecords, uncategorizedRecord]}
-        onOpen={fn()}
-        onRetry={fn()}
-      />
-      <TimeblockRelationshipSection
-        kind="record"
-        status="success"
-        plan={{ ...relatedRecords[0]!, id: '00000000-0000-4000-8000-000000000001' }}
-        onOpen={fn()}
-        onRetry={fn()}
-      />
-      <TimeblockRelationshipSection
-        kind="record"
-        status="unavailable"
-        plan={null}
-        onOpen={fn()}
-        onRetry={fn()}
-      />
-      <TimeblockRelationshipSection
-        kind="record"
-        status="success"
-        plan={{
-          ...relatedRecords[0]!,
-          id: '00000000-0000-4000-8000-000000000002',
-          startAt: new Date('2026-07-14T23:30:00'),
-          endAt: new Date('2026-07-15T01:00:00'),
-        }}
         onOpen={fn()}
         onRetry={fn()}
       />

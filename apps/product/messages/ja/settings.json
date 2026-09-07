@@ -63,7 +63,7 @@
       "showPassword": "パスワードを表示",
       "hidePassword": "パスワードを隠す",
       "passwordUpdateFailed": "パスワードを更新できませんでした。もう一度お試しください",
-      "signOutOthersFailed": "パスワードは変更されましたが、他の端末のログアウトに失敗しました。設定から再試行してください",
+      "signOutOthersFailed": "パスワードは変更されましたが、他の端末のサインアウトに失敗しました。設定から再試行してください",
       "passwordIncorrect": "現在のパスワードが正しくありません",
       "passwordReused": "過去5回分のパスワードは使用できません。別のパスワードを入力してください。",
       "passwordPwned": "このパスワードは過去に漏洩しています。より安全なパスワードを使ってください。",
@@ -74,11 +74,11 @@
       "twoFactorPrompt": "サインイン時に認証コードを要求",
       "twoFactorActive": "多要素認証が有効",
       "twoFactorProtection": "アカウントは追加のセキュリティ層で保護されています。",
-      "emailUsedFor": "ログインやアカウントメールに使用",
+      "emailUsedFor": "サインインやアカウントメールに使用",
       "emailVerified": "認証済み",
       "mfa": {
         "title": "多要素認証 (MFA)",
-        "description": "認証アプリを使って、ログイン時に追加のセキュリティ層を追加",
+        "description": "認証アプリを使って、サインイン時に追加のセキュリティ層を追加",
         "enableMFA": "MFAを有効にする",
         "disableMFA": "MFAを無効にする",
         "loading": "読み込み中...",
@@ -100,11 +100,11 @@
         },
         "enabled": {
           "title": "多要素認証が有効",
-          "description": "ログイン時に認証アプリで生成されるコードが必要です"
+          "description": "サインイン時に認証アプリで生成されるコードが必要です"
         },
         "recoveryCodes": {
           "title": "リカバリーコードを保存してください",
-          "description": "認証アプリにアクセスできなくなった場合、これらのコードでログインできます。",
+          "description": "認証アプリにアクセスできなくなった場合、これらのコードでサインインできます。",
           "oneTimeUse": "各コードは1回のみ使用可能です。",
           "saveWarning": "これらのコードを安全な場所に保存してください。この画面を閉じると再表示できません。",
           "saved": "保存しました",
@@ -151,7 +151,7 @@
         "error": "データをエクスポートできませんでした。もう一度お試しください",
         "includedData": "エクスポートされるデータ",
         "profile": "プロフィール情報",
-        "tasks": "タスクデータ",
+        "timeblocks": "タイムブロックのデータ",
         "smartFilters": "スマートフィルター",
         "userSettings": "ユーザー設定",
         "format": "形式: JSON",
@@ -181,7 +181,7 @@
         "error": "アカウントを削除できませんでした。繰り返す場合は support@dayopt.app にご連絡ください。こちらで削除します"
       },
       "loginMethod": {
-        "title": "ログイン方法",
+        "title": "サインイン方法",
         "google": "Google"
       }
     },
@@ -227,8 +227,6 @@
       "saturday": "土曜日",
       "showWeekends": "週末を表示",
       "showWeekNumbers": "週番号を表示",
-      "defaultTaskSettings": "作成時のデフォルト",
-      "defaultTaskSettingsDesc": "新しいタイムブロック作成時のデフォルト動作",
       "defaultDuration": "デフォルト時間",
       "defaultDurationDesc": "新しいタイムブロック作成時のデフォルト時間",
       "selectDuration": "時間を選択",
@@ -316,7 +314,7 @@
         "billing": "請求",
         "billingDesc": "プラン、お支払い、領収書",
         "account": "アカウント",
-        "accountDesc": "プロフィール、メール、パスワード、ログイン連携",
+        "accountDesc": "プロフィール、メール、パスワード、サインイン連携",
         "subscription": "サブスクリプション",
         "subscriptionDesc": "プランと課金管理",
         "about": "このアプリについて",
@@ -343,7 +341,6 @@
         "exportFailed": "エクスポートできませんでした。もう一度お試しください。",
         "includedDataTitle": "エクスポートに含まれるデータ",
         "profileInfo": "プロフィール情報",
-        "tasksEvents": "タイムブロック",
         "activitySettings": "アクティビティ設定",
         "calendarSettings": "カレンダー設定",
         "otherSettings": "その他の設定"
@@ -378,7 +375,7 @@
       },
       "deletion": {
         "title": "データ削除",
-        "deleteBlocks": "全ブロックを削除",
+        "deleteBlocks": "全タイムブロックを削除",
         "deleteBlocksDesc": "すべてのタイムブロックを削除します。アクティビティと設定は残ります。",
         "deleteAllData": "全データを削除",
         "deleteAllDataDesc": "アクティビティや設定を含むすべてのデータを削除します。アカウントは残ります。",
@@ -540,14 +537,14 @@
           "unknown": "不明なクライアント"
         },
         "scopes": {
-          "readEntries": "予定と実績を読む",
+          "readEntries": "予定と記録を読む",
           "readActivities": "アクティビティとカテゴリーを読む",
           "readConstraints": "時間の制約を読む",
           "readStats": "ふりかえりを読む",
           "writePlans": "予定を作成・編集する",
           "deletePlans": "予定を削除する",
-          "writeRecords": "実績を作成・編集する",
-          "deleteRecords": "実績を削除する"
+          "writeRecords": "記録を作成・編集する",
+          "deleteRecords": "記録を削除する"
         }
       }
     },

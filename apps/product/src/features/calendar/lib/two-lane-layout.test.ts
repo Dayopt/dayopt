@@ -48,7 +48,6 @@ function makeRecord(overrides: Partial<RecordEvent> = {}): RecordEvent {
     title: 'Deep Work',
     note: null,
     activityId: null,
-    planId: null,
     startDate: start,
     endDate: end,
     displayStartDate: start,
@@ -252,6 +251,29 @@ describe('calculateTwoLaneLayout（#2250: 区間ごとの動的幅判定）', ()
 
     expect(result.planLayouts[0]?.position).toMatchObject({ left: 0, width: 38 });
     expect(result.recordLayouts[0]?.position).toMatchObject({ left: 38, width: 62 });
+  });
+
+  it('別アクティビティでも1分だけ重なれば split 幅になる', () => {
+    const result = calculateTwoLaneLayout({
+      plans: [
+        makePlan({
+          activityId: 'activity-plan',
+          displayStartDate: localDate(9, 0),
+          displayEndDate: localDate(10, 0),
+        }),
+      ],
+      records: [
+        makeRecord({
+          activityId: 'activity-record',
+          displayStartDate: localDate(9, 59),
+          displayEndDate: localDate(11, 0),
+        }),
+      ],
+      hourHeight: HOUR_HEIGHT,
+    });
+
+    expect(result.planLayouts[0]?.position.width).toBe(38);
+    expect(result.recordLayouts[0]?.position.width).toBe(62);
   });
 });
 

@@ -114,14 +114,12 @@ export const MCP_CONSTRAINTS_GET_OUTPUT_SCHEMA = z
             pastPlanTimeUpdate: z.literal('allowed'),
             pastPlanContentUpdate: z.literal('allowed'),
             timeUpdateEnd: z.literal('unrestricted'),
-            skippedOccupiesLane: z.literal(true),
           })
           .strict(),
         records: z
           .object({
             createEnd: z.literal('at_or_before_as_of'),
             timeUpdateEnd: z.literal('at_or_before_as_of'),
-            linkedPlan: z.literal('non_deleted_unskipped'),
           })
           .strict(),
       })

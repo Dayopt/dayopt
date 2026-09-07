@@ -1,5 +1,7 @@
+import { collectQueryPages } from '@/lib/database/collect-query-pages';
 import 'server-only';
 
+import { publicPlanSelect } from '@/lib/database';
 import { captureUnexpectedDatabaseError } from '@/lib/sentry';
 
 import { runPrivateTimeblockSearchQuery } from './private-timeblock-search-query';
@@ -27,7 +29,6 @@ export class PlanService {
       search,
       startDate,
       endDate,
-      includeSkipped = true,
       sortBy = 'start_at',
       sortOrder = 'asc',
       limit,
@@ -38,13 +39,12 @@ export class PlanService {
 
     let query = this.supabase
       .from('plans')
-      .select('*')
+      .select(publicPlanSelect)
       .eq('user_id', userId)
       .is('deleted_at', null);
 
     if (ids) query = query.in('id', ids);
     if (activityId) query = query.eq('activity_id', activityId);
-    if (!includeSkipped) query = query.is('skipped_at', null);
 
     if (search) {
       const searchFilter = await buildTimeblockSearchFilter({
@@ -63,14 +63,18 @@ export class PlanService {
       query = query.lte('start_at', endDate);
     }
 
-    query = query.order(sortBy, { ascending: sortOrder === 'asc' });
+    query = query
+      .order(sortBy, { ascending: sortOrder === 'asc' })
+      .order('id', { ascending: true });
 
     if (limit) query = query.limit(limit);
     if (offset) query = query.range(offset, offset + (limit ?? 100) - 1);
 
     const { data, error } = search
       ? await runPrivateTimeblockSearchQuery(() => query)
-      : await query;
+      : limit || offset
+        ? await query
+        : await collectQueryPages((from, to) => query.range(from, to));
 
     if (error) {
       const original = captureUnexpectedDatabaseError(error, {
@@ -89,7 +93,7 @@ export class PlanService {
     const { userId, planId } = options;
     const { data, error } = await this.supabase
       .from('plans')
-      .select('*')
+      .select(publicPlanSelect)
       .eq('id', planId)
       .eq('user_id', userId)
       .is('deleted_at', null)

@@ -307,7 +307,6 @@ describe('useInteraction Plan → Record drop', () => {
         endDate: new Date('2026-01-16T10:00:00'),
       },
     ],
-    ['skipped Plan', { ...baseEvent, isSkipped: true }],
   ])('%sはRecordレーンへdropしても記録callbackを呼ばない', (_label, event) => {
     const onEventUpdate = vi.fn();
     const onPlanRecord = vi.fn();

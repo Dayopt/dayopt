@@ -342,7 +342,7 @@ export const keigoEntries: AuditEntry[] = [
   },
   {
     file: 'calendar.json',
-    key: 'calendar.error.entriesLoadFailed',
+    key: 'calendar.error.loadFailed',
     category: 'keigo',
     current: 'エントリの読み込みに失敗しました。ページを更新してください。',
     proposed: 'エントリを読み込めなかった。ページを更新して',

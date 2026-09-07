@@ -27,22 +27,13 @@
       "deletedCount": "{count}件を削除しました",
       "restored": "復元しました",
       "restoreFailed": "復元できませんでした。もう一度お試しください",
-      "skipped": "スキップしました",
-      "skipFailed": "スキップできませんでした。もう一度お試しください",
-      "unskipped": "スキップを解除しました",
       "conflict": "このタイムブロックは他の場所で変更されました。最新データを読み込んでください",
       "placed": "{name} を {time} に追加しました",
-      "overlapError": "{time} は既存のブロックと重複しています"
+      "overlapError": "{time} は既存のタイムブロックと重複しています"
     },
     "sidebar": {
       "tabs": {
-        "calendar": "カレンダー",
-        "list": "リスト"
-      },
-      "list": {
-        "nav": {
-          "plan": "Plan"
-        }
+        "calendar": "カレンダー"
       }
     },
     "open": "開く",
@@ -57,15 +48,6 @@
       "willBeRemovedFromCalendar": "カレンダーから削除されます",
       "confirm": "タイムブロックを削除",
       "deleting": "削除中..."
-    },
-    "status": {
-      "label": "ステータス",
-      "backlog": "準備中",
-      "ready": "配置済み",
-      "active": "作業中",
-      "wait": "待ち",
-      "closed": "完了",
-      "cancel": "中止"
     },
     "inspector": {
       "addTitle": "タイトルを追加",
@@ -103,10 +85,8 @@
         "noPlanned": "計画せず過ごした",
         "duration": "期間",
         "diff": "差分",
-        "timeProgress": "時間達成率"
+        "timeProgress": "時間の進捗"
       },
-      "skip": "スキップ",
-      "unskip": "スキップを解除",
       "note": {
         "label": "メモ",
         "placeholder": "例: 集中できた",
@@ -124,10 +104,6 @@
         "titlePlaceholder": "何をした？",
         "titleLabel": "Record のタイトル",
         "failed": "Record を作成できませんでした。もう一度お試しください",
-        "linkEntry": "Record に紐付け",
-        "unlinkEntry": "Record の紐付けを解除",
-        "searchEntries": "Record を検索...",
-        "noEntries": "まだ Record がありません",
         "addNew": "Record を追加"
       }
     },
@@ -139,12 +115,9 @@
       "deleteConfirm": "削除"
     },
     "relationships": {
-      "relatedRecords": "関連する記録",
+      "relatedRecords": "この時間帯の記録",
       "recordSummary": "{count}件 · 計{duration}",
-      "originalPlan": "元の予定",
-      "originalPlanUnavailable": "元の予定を表示できません",
       "openRecord": "記録を開く: {activity}、{dateTime}、{duration}",
-      "openPlan": "元の予定を開く: {activity}、{dateTime}、{duration}",
       "loadFailed": "関連を読み込めませんでした"
     },
     "editor": {
@@ -162,7 +135,6 @@
         "created": "複製しました",
         "validation": {
           "invalidRange": "終了時刻は開始時刻より後にしてください",
-          "planRequiresFuture": "予定は未来の時間を選んでください",
           "recordRequiresPast": "記録は過去の時間を選んでください"
         }
       },
@@ -181,14 +153,11 @@
         "deleteFailed": "削除できませんでした。もう一度お試しください",
         "restored": "復元しました",
         "restoreFailed": "復元できませんでした。もう一度お試しください",
-        "skipped": "スキップしました",
-        "skipFailed": "スキップできませんでした。もう一度お試しください",
-        "unskipped": "スキップを解除しました",
         "planCreated": "予定を追加しました ✓"
       },
       "migratedLocked": "移行された過去の記録は編集できません",
       "feedforward": {
-        "recentActual": "このアクティビティの直近実績は {duration} 前後です"
+        "recentActual": "このアクティビティの直近の記録は {duration} 前後です"
       },
       "fulfillment": {
         "label": "充実度",

@@ -59,16 +59,16 @@ describe('mergeTimeblockSearchResults', () => {
     expect(merged.hasMore).toBe(true);
   });
 
-  it('やらなかった予定だけisSkippedを付ける', () => {
+  it('検索結果に手動の未実施状態を付けない', () => {
     const startAt = '2026-07-15T09:00:00.000Z';
-    const plans = [createRow('plan', startAt, { skipped_at: '2026-07-15T11:00:00.000Z' })];
-    const records = [createRow('record', startAt, { skipped_at: '2026-07-15T11:00:00.000Z' })];
+    const plans = [createRow('plan', startAt)];
+    const records = [createRow('record', startAt)];
 
     const merged = mergeTimeblockSearchResults(plans, records);
 
     expect(merged.results).toEqual([
-      expect.objectContaining({ id: 'plan', kind: 'plan', isSkipped: true }),
-      expect.objectContaining({ id: 'record', kind: 'record', isSkipped: false }),
+      expect.objectContaining({ id: 'plan', kind: 'plan' }),
+      expect.objectContaining({ id: 'record', kind: 'record' }),
     ]);
   });
 });

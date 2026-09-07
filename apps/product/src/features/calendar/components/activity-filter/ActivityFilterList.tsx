@@ -210,7 +210,6 @@ export function ActivityFilterList({ betweenCategoriesAndUncategorized }: Activi
   const [categoriesSectionCollapsed, setCategoriesSectionCollapsed] = useState(false);
   // カテゴリー作成 popover の開閉。開いている間は「カテゴリ」見出しの + を隠さない（#2211）
   const [categoryCreateOpen, setCategoryCreateOpen] = useState(false);
-  const [openPopoverActivityId, setOpenPopoverActivityId] = useState<string | null>(null);
 
   const toggleCategoryCollapse = useCallback((categoryId: string) => {
     setCollapsedCategories((prev) => {
@@ -355,8 +354,6 @@ export function ActivityFilterList({ betweenCategoriesAndUncategorized }: Activi
                     onDeleteCategory={handleDeleteCategory}
                     onArchiveActivity={handleArchiveActivity}
                     onDeleteActivity={handleDeleteActivity}
-                    openPopoverActivityId={openPopoverActivityId}
-                    onOpenPopover={setOpenPopoverActivityId}
                   />
                 ))}
 
@@ -491,16 +488,12 @@ export function ActivityFilterList({ betweenCategoriesAndUncategorized }: Activi
                         allActivities={allActivities}
                         checked={visibleActivityIds.has(activity.id)}
                         categoryId={null}
-                        inheritedColor={null}
-                        inheritedIcon={null}
                         categoryOptions={categoryOptions}
                         isMobile={isMobile}
                         onToggle={() => toggleActivity(activity.id)}
                         onArchiveActivity={() => handleArchiveActivity(activity.id)}
                         onDeleteActivity={() => handleDeleteActivity(activity.id, activity.name)}
                         onShowOnlyActivity={() => showOnlyActivity(activity.id)}
-                        openPopoverActivityId={openPopoverActivityId}
-                        onOpenPopover={setOpenPopoverActivityId}
                       />
                     ))}
                   </div>

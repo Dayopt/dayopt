@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
 
+import type { HoveredActivityInfo } from '@/features/activities';
+
 import type { TimeblockDestination } from '../domain/timeblock-destination';
 import type { TimeblockDuplicateDraft } from '../lib/timeblock-duplicate';
 
@@ -22,6 +24,16 @@ interface TimeblockInspectorState {
   timeblockKind: TimeblockDestination;
   /** 複製時だけ保持する独立新規ブロックの下書き。 */
   duplicateDraft: TimeblockDuplicateDraft | null;
+  /**
+   * ドラッグ作成モード。calendar 側の pendingSelection を元に、同じパネルで
+   * アクティビティを選ぶ。timeblockId は null（URL 同期しない）。
+   */
+  createMode: boolean;
+  /**
+   * アクティビティ選択でホバー中の値。開いているブロックのカードが、
+   * 選ぶ前に色・アイコン・名前を先出しする（作成時のハイライトと同じ扱い）。
+   */
+  hoveredActivity: HoveredActivityInfo | null;
 }
 
 /**
@@ -34,6 +46,10 @@ interface TimeblockInspectorActions {
   openDuplicate: (draft: TimeblockDuplicateDraft) => void;
   /** 複製を取り消して元ブロックの詳細へ戻る。 */
   cancelDuplicate: () => void;
+  /** ドラッグ作成モードで開く（アクティビティ選択 → 作成）。 */
+  openCreate: () => void;
+  /** アクティビティ選択のホバーを反映する（離れたら null）。 */
+  setHoveredActivity: (activity: HoveredActivityInfo | null) => void;
   /** Inspector を閉じる */
   closeInspector: () => void;
 }
@@ -51,6 +67,11 @@ export const useTimeblockInspectorStore = create<TimeblockInspectorStore>()(
       timeblockId: null,
       timeblockKind: 'plan',
       duplicateDraft: null,
+      createMode: false,
+      hoveredActivity: null,
+
+      setHoveredActivity: (activity) =>
+        set({ hoveredActivity: activity }, false, 'setHoveredActivity'),
 
       openInspector: (timeblockId, kind = 'plan') =>
         set(
@@ -59,6 +80,8 @@ export const useTimeblockInspectorStore = create<TimeblockInspectorStore>()(
             timeblockId,
             timeblockKind: kind,
             duplicateDraft: null,
+            createMode: false,
+            hoveredActivity: null,
           },
           false,
           'openInspector',
@@ -71,9 +94,25 @@ export const useTimeblockInspectorStore = create<TimeblockInspectorStore>()(
             timeblockId: draft.sourceId,
             timeblockKind: draft.kind,
             duplicateDraft: draft,
+            createMode: false,
+            hoveredActivity: null,
           },
           false,
           'openDuplicate',
+        ),
+
+      openCreate: () =>
+        set(
+          {
+            isOpen: true,
+            timeblockId: null,
+            timeblockKind: 'plan',
+            duplicateDraft: null,
+            createMode: true,
+            hoveredActivity: null,
+          },
+          false,
+          'openCreate',
         ),
 
       cancelDuplicate: () => set({ duplicateDraft: null }, false, 'cancelDuplicate'),
@@ -89,6 +128,8 @@ export const useTimeblockInspectorStore = create<TimeblockInspectorStore>()(
             timeblockId: null,
             timeblockKind: 'plan',
             duplicateDraft: null,
+            createMode: false,
+            hoveredActivity: null,
           },
           false,
           'closeInspector',

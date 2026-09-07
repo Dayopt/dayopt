@@ -59,7 +59,7 @@ describe('timeblock duplicate', () => {
     ).toBeNull();
   });
 
-  it('Planは未来、Recordは過去の変更先だけを許可する', () => {
+  it('Planはどの時刻へも複製でき、Recordは過去の変更先だけを許可する', () => {
     const plan = createDraft('plan');
     const record = createDraft('record');
 
@@ -73,7 +73,7 @@ describe('timeblock duplicate', () => {
         },
         now,
       ),
-    ).toBe('planRequiresFuture');
+    ).toBeNull();
     expect(
       getTimeblockDuplicateValidationReason(
         record,

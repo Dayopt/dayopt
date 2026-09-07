@@ -157,7 +157,6 @@ CREATE TABLE public.plans (
   note TEXT,
   start_at TIMESTAMPTZ NOT NULL,
   end_at TIMESTAMPTZ NOT NULL,
-  skipped_at TIMESTAMPTZ,
   source TEXT NOT NULL DEFAULT 'manual', -- manual / external_calendar / api
   deleted_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -169,8 +168,6 @@ CREATE TABLE public.plans (
 --   prevent_plans_source_change         -> prevent_time_model_source_change()
 --   enforce_plan_external_event_owner   -> enforce_plan_external_event_owner()
 --   validate_plan_temporal_write_v1      -> 時刻順序のみ。Plan は時間軸のどこにでも置ける
---   enforce_plan_skip_record_invariant_v1
---     -> active Record がある Plan の skip を拒否
 --   direct DML / command writer fence
 --     -> 旧UIのdirect DMLとtyped commandをglobal + user単位lockで直列化し、
 --        commit時のuser revisionをtransactionごとに1回だけ進める
@@ -179,7 +176,6 @@ CREATE TABLE public.plans (
 CREATE TABLE public.records (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  plan_id UUID REFERENCES public.plans(id),
   external_calendar_event_id UUID REFERENCES public.external_calendar_events(id),
   title TEXT NOT NULL,
   note TEXT,
@@ -194,12 +190,8 @@ CREATE TABLE public.records (
 -- records 関連 constraint / trigger:
 --   records_no_overlap                    -> user_id + tstzrange(start_at, end_at, '[)') EXCLUDE
 --   prevent_records_source_change         -> prevent_time_model_source_change()
---   enforce_record_plan_owner             -> enforce_record_plan_owner()
 --   enforce_record_external_event_owner   -> enforce_record_external_event_owner()
 --   validate_record_temporal_write_v1      -> 時刻順序、未来 Record を拒否
---   enforce_active_record_plan_v1
---     -> new link/relinkはactive / owner / non-skipped Planだけ。
---        既存リンクを持つRecordのrestoreだけはPlan soft-delete後も現行UI互換で許可
 --   direct DML / command writer fence
 --     -> Planと同じuser binding、lock upgrade拒否、transaction単位revisionを適用
 

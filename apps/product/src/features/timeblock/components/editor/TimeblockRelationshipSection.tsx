@@ -28,7 +28,7 @@ export interface TimeblockRelationshipItem {
   endAt: Date;
 }
 
-type RelationshipStatus = 'loading' | 'error' | 'success' | 'unavailable';
+type RelationshipStatus = 'loading' | 'error' | 'success';
 
 interface SharedRelationshipProps {
   status: RelationshipStatus;
@@ -36,17 +36,10 @@ interface SharedRelationshipProps {
   onRetry: () => void;
 }
 
-type TimeblockRelationshipSectionProps = SharedRelationshipProps &
-  (
-    | {
-        kind: 'plan';
-        records: readonly TimeblockRelationshipItem[];
-      }
-    | {
-        kind: 'record';
-        plan: TimeblockRelationshipItem | null;
-      }
-  );
+type TimeblockRelationshipSectionProps = SharedRelationshipProps & {
+  kind: 'plan';
+  records: readonly TimeblockRelationshipItem[];
+};
 
 function getDurationMinutes(item: TimeblockRelationshipItem): number {
   return Math.max(0, Math.round((item.endAt.getTime() - item.startAt.getTime()) / 60_000));
@@ -57,9 +50,9 @@ export function TimeblockRelationshipSection(props: TimeblockRelationshipSection
   const t = useTranslations('timeblock.relationships');
   const { formatDate, formatTime } = useDateFormat();
   const headingId = useId();
-  const heading = props.kind === 'plan' ? t('relatedRecords') : t('originalPlan');
+  const heading = t('relatedRecords');
 
-  if (props.kind === 'plan' && props.status === 'success' && props.records.length === 0) {
+  if (props.status === 'success' && props.records.length === 0) {
     return null;
   }
 
@@ -71,7 +64,7 @@ export function TimeblockRelationshipSection(props: TimeblockRelationshipSection
       ? `${startDate} · ${startTime}–${endTime}`
       : `${startDate} ${startTime}–${formatDate(item.endAt)} ${endTime}`;
     const duration = formatDurationMinutes(getDurationMinutes(item));
-    const openLabel = t(kind === 'record' ? 'openRecord' : 'openPlan', {
+    const openLabel = t('openRecord', {
       activity: item.activityName,
       dateTime,
       duration,
@@ -110,7 +103,7 @@ export function TimeblockRelationshipSection(props: TimeblockRelationshipSection
         <h2 id={headingId} className="text-foreground text-sm font-medium">
           {heading}
         </h2>
-        {props.kind === 'plan' && props.status === 'success' ? (
+        {props.status === 'success' ? (
           <span className="text-muted-foreground shrink-0 text-xs tabular-nums">
             {t('recordSummary', {
               count: props.records.length,
@@ -132,19 +125,8 @@ export function TimeblockRelationshipSection(props: TimeblockRelationshipSection
         <ErrorState title={t('loadFailed')} onRetry={props.onRetry} size="sm" className="pt-2" />
       ) : null}
 
-      {props.status === 'unavailable' ||
-      (props.kind === 'record' && props.status === 'success' && !props.plan) ? (
-        <p className="text-muted-foreground px-2 pt-2 text-sm">{t('originalPlanUnavailable')}</p>
-      ) : null}
-
       {props.status === 'success' ? (
-        <div className="pt-2">
-          {props.kind === 'plan'
-            ? props.records.map((record) => renderItem(record, 'record'))
-            : props.plan
-              ? renderItem(props.plan, 'plan')
-              : null}
-        </div>
+        <div className="pt-2">{props.records.map((record) => renderItem(record, 'record'))}</div>
       ) : null}
     </section>
   );

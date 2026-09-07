@@ -20,7 +20,6 @@ const PLAN_ROW = {
   activity_id: 'activity-work',
   start_at: '2026-07-15T00:00:00.000Z',
   end_at: '2026-07-15T01:00:00.000Z',
-  skipped_at: null,
 };
 
 function successfulQuery(data: unknown[]) {
@@ -147,7 +146,6 @@ describe('TimeblockSearchDialog', () => {
       activity_id: 'activity-archived',
       start_at: '2026-05-01T00:00:00.000Z',
       end_at: '2026-05-01T01:00:00.000Z',
-      skipped_at: null,
     };
     mockPlansUseQuery.mockImplementation(() => ({
       data: [archivedActivityPlan],
@@ -242,7 +240,6 @@ describe('TimeblockSearchContent', () => {
     activityId: 'activity-work',
     startAt: '2026-07-14T01:30:00.000Z',
     endAt: '2026-07-14T02:30:00.000Z',
-    isSkipped: false,
   };
 
   function renderContent(

@@ -3,6 +3,13 @@ import 'server-only';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 import { databaseTables, type Database } from '@/lib/database';
+import {
+  calendarSelectionKey,
+  GHOST_CONNECTION_STATUS,
+  GHOST_EVENT_STATUS,
+  GHOST_QUERY_BATCH_SIZE,
+  GHOST_QUERY_MAX_BATCHES,
+} from '@/lib/external-calendar-ghost';
 import { logger } from '@/lib/logger';
 import { captureUnexpectedError } from '@/lib/sentry';
 
@@ -31,15 +38,6 @@ import { ExternalCalendarServiceError } from './external-calendar-service-error'
  *   `connection_id IS NOT NULL` だけでは選択解除後も ghost として復活しうる。現在も
  *   `calendar_connection_calendars` に存在する `(connection_id, provider_calendar_id)` だけを通す
  */
-
-/** 1 バッチあたり件数。`event-pruning` と同値で、max_rows=1000 と URL 長 8192B に触れない。 */
-const EVENT_QUERY_BATCH_SIZE = 150;
-
-/** バッチ上限。150 × 20 = 3,000 件で、router が許す 62 日 range の想定を大きく超える。 */
-const MAX_EVENT_QUERY_BATCHES = 20;
-
-/** `sync-service` の `upsertActiveEvents` が active な行へ入れる唯一の値。 */
-const ACTIVE_EVENT_STATUS = 'confirmed';
 
 interface ExternalCalendarEventSummary {
   id: string;
@@ -113,10 +111,6 @@ function hasTimeRange(
   return row.start_at !== null && row.end_at !== null;
 }
 
-function calendarSelectionKey(connectionId: string, providerCalendarId: string): string {
-  return `${connectionId} ${providerCalendarId}`;
-}
-
 /**
  * ユーザーの `active` な接続 id を返す。
  *
@@ -132,7 +126,7 @@ async function loadActiveConnectionIds(
     .from(databaseTables.calendarConnections)
     .select('id')
     .eq('user_id', userId)
-    .eq('status', 'active');
+    .eq('status', GHOST_CONNECTION_STATUS);
 
   if (error) {
     throw new ExternalCalendarServiceError(
@@ -195,12 +189,12 @@ export async function listGhostEvents(
   const events: ExternalCalendarEventSummary[] = [];
   let cursor: string | null = null;
 
-  for (let batch = 0; batch < MAX_EVENT_QUERY_BATCHES; batch += 1) {
+  for (let batch = 0; batch < GHOST_QUERY_MAX_BATCHES; batch += 1) {
     let query = supabase
       .from(databaseTables.externalCalendarEvents)
       .select('id, title, calendar_name, connection_id, provider_calendar_id, start_at, end_at')
       .eq('user_id', userId)
-      .eq('status', ACTIVE_EVENT_STATUS)
+      .eq('status', GHOST_EVENT_STATUS)
       .is('dismissed_at', null)
       .not('connection_id', 'is', null)
       .lt('start_at', range.endAt)
@@ -214,7 +208,7 @@ export async function listGhostEvents(
 
     const { data, error } = await query
       .order('id', { ascending: true })
-      .limit(EVENT_QUERY_BATCH_SIZE);
+      .limit(GHOST_QUERY_BATCH_SIZE);
 
     if (error) {
       throw new ExternalCalendarServiceError(
@@ -252,10 +246,10 @@ export async function listGhostEvents(
     }
 
     cursor = candidates[candidates.length - 1]?.id ?? cursor;
-    if (candidates.length < EVENT_QUERY_BATCH_SIZE) return events;
+    if (candidates.length < GHOST_QUERY_BATCH_SIZE) return events;
   }
 
-  logger.warn('[calendar-ghost] stopped at the batch limit', { batches: MAX_EVENT_QUERY_BATCHES });
+  logger.warn('[calendar-ghost] stopped at the batch limit', { batches: GHOST_QUERY_MAX_BATCHES });
   // 上限値は logger 側にだけ出す。`CaptureErrorContext` は string キーしか持たない。
   captureUnexpectedError(new Error('external calendar ghost query hit the batch limit'), {
     feature: 'external_calendar',

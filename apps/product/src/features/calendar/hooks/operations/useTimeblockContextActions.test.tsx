@@ -20,8 +20,6 @@ vi.mock('@/features/timeblock', () => ({
   useTimeblockWriteMutations: () => ({
     deleteRecord: { mutate: vi.fn() },
     deletePlan: { mutate: vi.fn() },
-    skipPlan: { mutate: vi.fn() },
-    unskipPlan: { mutate: vi.fn() },
   }),
 }));
 

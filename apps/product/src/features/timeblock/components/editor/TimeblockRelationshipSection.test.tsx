@@ -13,8 +13,6 @@ vi.mock('next-intl', () => ({
     (key: string, values?: Record<string, string | number>): string => {
       const translations: Record<string, string> = {
         relatedRecords: 'Related records',
-        originalPlan: 'Original plan',
-        originalPlanUnavailable: 'Original plan is unavailable',
         loadFailed: 'Could not load relationships',
       };
       if (key === 'recordSummary') {
@@ -22,9 +20,6 @@ vi.mock('next-intl', () => ({
       }
       if (key === 'openRecord') {
         return `Open record: ${String(values?.activity)}, ${String(values?.dateTime)}`;
-      }
-      if (key === 'openPlan') {
-        return `Open original plan: ${String(values?.activity)}, ${String(values?.dateTime)}`;
       }
       return translations[key] ?? key;
     },
@@ -105,40 +100,19 @@ describe('TimeblockRelationshipSection', () => {
     expect(onOpen).toHaveBeenCalledWith('record-1', 'record');
   });
 
-  it('Recordから元のPlanを人間向け情報で表示して開く', async () => {
-    const user = userEvent.setup();
-    const onOpen = vi.fn();
-
-    render(
-      <TimeblockRelationshipSection
-        kind="record"
-        status="success"
-        plan={{ ...records[0]!, id: 'plan-1' }}
-        onOpen={onOpen}
-        onRetry={vi.fn()}
-      />,
-    );
-
-    expect(screen.getByRole('region', { name: 'Original plan' })).toBeInTheDocument();
-    await user.click(
-      screen.getByRole('button', {
-        name: 'Open original plan: API development, 2026-07-14 · 09:05–09:35',
-      }),
-    );
-    expect(onOpen).toHaveBeenCalledWith('plan-1', 'plan');
-  });
-
   it('日をまたぐ関係先では終了日も表示する', () => {
     render(
       <TimeblockRelationshipSection
-        kind="record"
+        kind="plan"
         status="success"
-        plan={{
-          ...records[0]!,
-          id: 'plan-cross-day',
-          startAt: new Date('2026-07-14T23:30:00.000Z'),
-          endAt: new Date('2026-07-15T01:00:00.000Z'),
-        }}
+        records={[
+          {
+            ...records[0]!,
+            id: 'plan-cross-day',
+            startAt: new Date('2026-07-14T23:30:00.000Z'),
+            endAt: new Date('2026-07-15T01:00:00.000Z'),
+          },
+        ]}
         onOpen={vi.fn()}
         onRetry={vi.fn()}
       />,
@@ -159,21 +133,6 @@ describe('TimeblockRelationshipSection', () => {
     );
 
     expect(screen.queryByRole('region')).not.toBeInTheDocument();
-  });
-
-  it('元のPlanが取得できない場合はIDを露出せず中立状態を表示する', () => {
-    render(
-      <TimeblockRelationshipSection
-        kind="record"
-        status="unavailable"
-        plan={null}
-        onOpen={vi.fn()}
-        onRetry={vi.fn()}
-      />,
-    );
-
-    expect(screen.getByText('Original plan is unavailable')).toBeInTheDocument();
-    expect(screen.queryByRole('button')).not.toBeInTheDocument();
   });
 
   it('アクティビティなしのRecordは中立マーカーのActivityIconを描画する', () => {

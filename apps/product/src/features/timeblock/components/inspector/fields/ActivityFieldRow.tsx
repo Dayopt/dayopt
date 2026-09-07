@@ -26,7 +26,9 @@ import { ChevronDown } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 
 import { ActivityIcon, ActivityQuickSelector } from '@/features/activities';
+
 import { cn } from '@dayopt/components';
+import { useTimeblockInspectorStore } from '../../../stores/useTimeblockInspectorStore';
 
 interface ActivityFieldRowProps {
   activityId: string | null;
@@ -71,14 +73,17 @@ export function ActivityFieldRow({
   const t = useTranslations();
   const [selectorOpen, setSelectorOpen] = useState(false);
   const buttonRef = useRef<HTMLButtonElement>(null);
+  // 開いているブロックのカードへ、選ぶ前の色・アイコン・名前を先出しする
+  const setHoveredActivity = useTimeblockInspectorStore((state) => state.setHoveredActivity);
   const isCompact = variant === 'compact';
 
   const handleSelect = useCallback(
     (selectedActivityId: string) => {
       onActivityChange(selectedActivityId);
+      setHoveredActivity(null);
       setSelectorOpen(false);
     },
-    [onActivityChange],
+    [onActivityChange, setHoveredActivity],
   );
 
   const handleCreateAndSelect = useCallback(
@@ -127,9 +132,13 @@ export function ActivityFieldRow({
 
       <ActivityQuickSelector
         open={selectorOpen}
-        onOpenChange={setSelectorOpen}
+        onOpenChange={(open) => {
+          if (!open) setHoveredActivity(null);
+          setSelectorOpen(open);
+        }}
         onSelect={handleSelect}
         onCreateAndSelect={handleCreateAndSelect}
+        onActivityHover={setHoveredActivity}
         anchorRef={buttonRef}
       />
     </>

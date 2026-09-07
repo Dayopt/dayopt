@@ -28,44 +28,26 @@ type Story = StoryObj;
 // ---------------------------------------------------------------------------
 
 const fullPlannedMenu = getTimeblockMenuItems({
-  origin: 'planned',
   activityId: 'activity-1',
   onViewStats: fn(),
   onCopy: fn(),
   onDuplicate: fn(),
-  onSkip: fn(),
   onDelete: fn(),
 });
 
-/** Record（plan 紐付けなし）: skip / unskip は planned にしか出ない。 */
+/** Record のメニュー。 */
 const recordMenu = getTimeblockMenuItems({
-  origin: 'unplanned',
   activityId: 'activity-1',
   onViewStats: fn(),
   onCopy: fn(),
   onDuplicate: fn(),
-  onSkip: fn(),
   onDelete: fn(),
 });
 
 const copyAndDeleteMenu = getTimeblockMenuItems({
-  origin: 'planned',
   activityId: 'activity-1',
   onCopy: fn(),
   onDuplicate: fn(),
-  onDelete: fn(),
-});
-
-/** skip 済みの planned: skip が unskip に入れ替わる。 */
-const skippedPlannedMenu = getTimeblockMenuItems({
-  origin: 'planned',
-  activityId: 'activity-1',
-  isSkipped: true,
-  onViewStats: fn(),
-  onCopy: fn(),
-  onDuplicate: fn(),
-  onSkip: fn(),
-  onUnskip: fn(),
   onDelete: fn(),
 });
 
@@ -91,20 +73,11 @@ export const CopyAndDelete: Story = {
   ),
 };
 
-/** Record（plan 紐付けなし）。skip / unskip は出ない。 */
+/** Record。 */
 export const Record: Story = {
   render: () => (
     <div className="w-72">
       <InspectorHeaderActions menuItems={recordMenu} onCloseInspector={fn()} />
-    </div>
-  ),
-};
-
-/** skip 済みの予定。skip が unskip に入れ替わる。 */
-export const SkippedPlanned: Story = {
-  render: () => (
-    <div className="w-72">
-      <InspectorHeaderActions menuItems={skippedPlannedMenu} onCloseInspector={fn()} />
     </div>
   ),
 };
@@ -127,12 +100,8 @@ export const AllPatterns: Story = {
         <InspectorHeaderActions menuItems={fullPlannedMenu} onCloseInspector={fn()} />
       </div>
       <div className="space-y-1">
-        <p className="text-muted-foreground text-xs">Record（skip なし）</p>
+        <p className="text-muted-foreground text-xs">Record</p>
         <InspectorHeaderActions menuItems={recordMenu} onCloseInspector={fn()} />
-      </div>
-      <div className="space-y-1">
-        <p className="text-muted-foreground text-xs">skip 済みの予定</p>
-        <InspectorHeaderActions menuItems={skippedPlannedMenu} onCloseInspector={fn()} />
       </div>
       <div className="space-y-1">
         <p className="text-muted-foreground text-xs">メニューなし（閉じるボタンのみ）</p>

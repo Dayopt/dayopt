@@ -44,6 +44,8 @@ function createSupabaseStub(results: Record<string, QueryResult[]>) {
       'is',
       'order',
       'gte',
+      'gt',
+      'range',
       'lt',
     ]) {
       chain[method] = vi.fn((...args: unknown[]) => {
@@ -91,7 +93,7 @@ function recordRows(activityId: string, minutes: number, count: number) {
   return Array.from({ length: count }, (_, index) => ({
     id: `rec-${index}`,
     activity_id: activityId,
-    plan_id: null,
+
     source: 'manual',
     start_at: '2026-09-01T00:00:00.000Z',
     end_at: new Date(Date.parse('2026-09-01T00:00:00.000Z') + minutes * 60_000).toISOString(),

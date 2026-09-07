@@ -11,8 +11,19 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 
 import type { EmailLocale } from '@/emails/i18n';
 import { getAppUrl } from '@/lib/app-url';
-import type { Database, PublicRecordRow, PublicUserSettingsRow, Row } from '@/lib/database';
-import { databaseTables, publicRecordSelect, publicUserSettingsSelect } from '@/lib/database';
+import type {
+  Database,
+  PublicPlanRow,
+  PublicRecordRow,
+  PublicUserSettingsRow,
+  Row,
+} from '@/lib/database';
+import {
+  databaseTables,
+  publicPlanSelect,
+  publicRecordSelect,
+  publicUserSettingsSelect,
+} from '@/lib/database';
 import { getUserLocale, sendAccountDeletionEmail } from '@/lib/email/router';
 import { logger } from '@/lib/logger';
 import {
@@ -170,7 +181,7 @@ interface ExportDataResult {
   userId: string;
   data: {
     profile: Row<'profiles'> | null;
-    plans: Row<'plans'>[];
+    plans: PublicPlanRow[];
     records: PublicRecordRow[];
     categories: Row<'categories'>[];
     activities: Row<'activities'>[];
@@ -440,7 +451,7 @@ export function createUserService(
       const adminClient = createServiceRoleClient();
       let deletedCount = 0;
 
-      // records.plan_id は plans を参照するため、records → plans の順で削除する。
+      // アカウント削除では記録と予定の両方を削除する。
       for (const table of [databaseTables.records, databaseTables.plans] as const) {
         const { data: deleted, error } = await adminClient
           .from(table)
@@ -513,7 +524,7 @@ export function createUserService(
         userSettingsResult,
       ] = await Promise.all([
         supabase.from('profiles').select('*').eq('id', userId).single(),
-        adminClient.from('plans').select('*').eq('user_id', userId),
+        adminClient.from('plans').select(publicPlanSelect).eq('user_id', userId),
         adminClient.from(databaseTables.records).select(publicRecordSelect).eq('user_id', userId),
         supabase.from(databaseTables.categories).select('*').eq('user_id', userId),
         supabase.from(databaseTables.activities).select('*').eq('user_id', userId),

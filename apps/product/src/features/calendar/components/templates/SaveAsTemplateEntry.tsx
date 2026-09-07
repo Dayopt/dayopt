@@ -42,7 +42,7 @@ export function SaveAsTemplateEntry({ dayBlocks, onSave, onCancel }: SaveAsTempl
     return (
       <Button variant="ghost" className="justify-start gap-2" onClick={() => setIsEditing(true)}>
         <LayoutTemplate className="size-4" />
-        {t('calendar.templates.saveEntryLabel')}
+        {t('calendar.templates.saveLabel')}
       </Button>
     );
   }

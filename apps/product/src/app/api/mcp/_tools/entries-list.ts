@@ -137,14 +137,12 @@ export function registerEntriesListTool(server: McpServer, ctx: McpRequestContex
             id: record.id,
             title: record.title,
             description: record.note,
-            origin: record.plan_id ? 'planned' : 'unplanned',
+            origin: 'unplanned',
             start_time: record.start_at,
             end_time: record.end_at,
             actual_start_time: record.start_at,
             actual_end_time: record.end_at,
-            planned_duration_minutes: record.plan_id
-              ? durationMinutes(record.start_at, record.end_at)
-              : null,
+            planned_duration_minutes: null,
             activity_id: record.activity_id,
             created_at: record.created_at,
             updated_at: record.updated_at,

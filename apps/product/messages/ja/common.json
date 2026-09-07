@@ -1,7 +1,7 @@
 {
   "app": {
     "name": "Dayopt",
-    "description": "タイムボクシング・時間記録・タスク・カレンダーを一つに",
+    "description": "タイムボクシング・時間記録・予定・カレンダーを一つに",
     "version": "v1.0.0",
     "keywords": ["タスク管理", "生産性向上", "プロジェクト管理"]
   },
@@ -48,12 +48,10 @@
     "change": "変更",
     "apply": "適用",
     "loading": "読み込み中...",
-    "noData": "まっさらな1日です。最初のブロックを記録しましょう",
+    "noData": "まっさらな1日です。最初のタイムブロックを記録しましょう",
     "undo": "元に戻す",
     "skipToMainContent": "メインコンテンツへスキップ",
-    "createNewEvent": "新しいイベントを作成",
     "toast": {
-      "eventDeleted": "予定を削除しました",
       "copied": "コピーしました",
       "copyFailed": "コピーできませんでした。もう一度お試しください"
     },
@@ -201,7 +199,7 @@
       "placeholder": "例: ミーティング、運動",
       "noResults": "一致する結果がありません",
       "activitiesGroup": "アクティビティ",
-      "blocksGroup": "ブロック",
+      "blocksGroup": "タイムブロック",
       "moreResults": "他に{count}件以上あります"
     },
     "offline": {
@@ -256,7 +254,6 @@
     },
     "createNew": {
       "plan": "Plan を作成",
-      "task": "タスクを作成",
       "activity": "アクティビティを作成",
       "defaultPlanTitle": "新しい Plan"
     },
@@ -264,12 +261,6 @@
     "userProfile": {
       "comingSoon": "プロフィールページは近日公開予定です",
       "notFound": "ユーザーが見つかりません"
-    },
-    "entry": {
-      "origin": {
-        "planned": "予定",
-        "unplanned": "記録のみ"
-      }
     },
     "activities": {
       "add": "アクティビティを追加",

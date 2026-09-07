@@ -26,7 +26,7 @@ describe('StatisticsService.getActivityStats', () => {
         {
           id: 'l1',
           activity_id: 'activity-1',
-          plan_id: null,
+
           source: 'manual',
           start_at: '2026-07-01T00:00:00Z',
           end_at: '2026-07-01T01:00:00Z',
@@ -34,7 +34,7 @@ describe('StatisticsService.getActivityStats', () => {
         {
           id: 'l2',
           activity_id: 'activity-1',
-          plan_id: null,
+
           source: 'manual',
           start_at: '2026-07-02T00:00:00Z',
           end_at: '2026-07-02T01:00:00Z',
@@ -42,7 +42,7 @@ describe('StatisticsService.getActivityStats', () => {
         {
           id: 'l3',
           activity_id: 'activity-2',
-          plan_id: null,
+
           source: 'manual',
           start_at: '2026-07-01T00:00:00Z',
           end_at: '2026-07-01T01:00:00Z',
@@ -102,7 +102,7 @@ describe('StatisticsService.getActivityStats', () => {
         {
           id: 'l1',
           activity_id: 'activity-1',
-          plan_id: 'p1',
+
           source: 'from_plan',
           start_at: '2026-07-01T00:00:00Z',
           end_at: '2026-07-01T01:00:00Z',
@@ -175,7 +175,7 @@ describe('StatisticsService.getEstimationAccuracy', () => {
         {
           id: 'l1',
           activity_id: 'activity-1',
-          plan_id: 'p1',
+
           source: 'from_plan',
           start_at: '2026-07-01T00:00:00Z',
           end_at: '2026-07-01T01:30:00Z',
@@ -183,7 +183,7 @@ describe('StatisticsService.getEstimationAccuracy', () => {
         {
           id: 'l2',
           activity_id: 'activity-1',
-          plan_id: 'p2',
+
           source: 'auto_migrated',
           start_at: '2026-07-02T00:00:00Z',
           end_at: '2026-07-02T00:30:00Z',
@@ -194,7 +194,9 @@ describe('StatisticsService.getEstimationAccuracy', () => {
     const result = await service.getEstimationAccuracy(USER_ID);
 
     // p2 の record は auto_migrated なので実績なし扱い → record_count は p1 のみで 1 件 → HAVING で除外
-    expect(result).toEqual([]);
+    expect(result).toMatchObject([
+      { avgPlannedMinutes: 45, avgActualMinutes: 60, avgDeviationMinutes: 15, recordCount: 2 },
+    ]);
     expect(mockSupabase.from).toHaveBeenCalledWith('plans');
     expect(mockSupabase.from).toHaveBeenCalledWith('records');
   });
@@ -225,7 +227,7 @@ describe('StatisticsService.getEstimationAccuracy', () => {
         {
           id: 'l1',
           activity_id: null,
-          plan_id: 'p-unset',
+
           source: 'manual',
           start_at: '2026-07-01T00:00:00Z',
           end_at: '2026-07-01T00:40:00Z',
@@ -233,7 +235,7 @@ describe('StatisticsService.getEstimationAccuracy', () => {
         {
           id: 'l2',
           activity_id: 'deleted-activity-id',
-          plan_id: 'p-deleted',
+
           source: 'manual',
           start_at: '2026-07-02T00:00:00Z',
           end_at: '2026-07-02T01:00:00Z',

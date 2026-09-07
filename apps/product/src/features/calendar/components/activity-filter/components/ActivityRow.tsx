@@ -13,11 +13,11 @@ import { cn, DropdownMenu, DropdownMenuTrigger, HoverTooltip } from '@dayopt/com
 import { useActivityModalNavigation } from '../../../hooks/useActivityModalNavigation';
 import { buildReportPath } from '../../../lib/panel-url';
 import { DROP_TARGET_UNCATEGORIZED } from '../activity-drop-target';
+import { useActivityQuickCreate } from '../hooks/useActivityQuickCreate';
 import { useActivityDragSource } from '../useActivityDragHandlers';
 import { useMoveActivityToCategory } from '../useMoveActivityToCategory';
 
 import { ActivityRowMenu, type CategoryOption } from './ActivityRowMenu';
-import { ActivityTimeblockCreatePopover } from './ActivityTimeblockCreatePopover';
 
 interface ActivityRowProps {
   activity: Activity;
@@ -27,21 +27,12 @@ interface ActivityRowProps {
   checked: boolean;
   /** 所属カテゴリー ID（null = 未分類） */
   categoryId: string | null;
-  /**
-   * クイック作成ポップオーバーへ渡す継承色。行そのものには出さないが、
-   * ポップオーバーはカテゴリーの色でブロックの見た目を示すため必要。
-   */
-  inheritedColor: string | null;
-  /** 同上（ポップオーバー用） */
-  inheritedIcon: string | null;
   categoryOptions: CategoryOption[];
   isMobile: boolean;
   onToggle: () => void;
   onArchiveActivity: () => void;
   onDeleteActivity: () => void;
   onShowOnlyActivity: () => void;
-  openPopoverActivityId: string | null;
-  onOpenPopover: (activityId: string | null) => void;
 }
 
 /**
@@ -49,23 +40,19 @@ interface ActivityRowProps {
  *
  * 行はテキストのみで、アイコンも色ドットも出さない。色とアイコンを持つのは
  * カテゴリーだけで、配下の行に並べても見出しの繰り返しになるため。
- * 行クリックでクイック作成ポップオーバー、👁 で表示切替、⋯ でメニュー。
+ * 行クリックで既定の長さのブロックを即作成して詳細パネルを開き、👁 で表示切替、⋯ でメニュー。
  */
 export function ActivityRow({
   activity,
   allActivities,
   checked,
   categoryId,
-  inheritedColor,
-  inheritedIcon,
   categoryOptions,
   isMobile,
   onToggle,
   onArchiveActivity,
   onDeleteActivity,
   onShowOnlyActivity,
-  openPopoverActivityId,
-  onOpenPopover,
 }: ActivityRowProps) {
   const t = useTranslations();
   const locale = useLocale();
@@ -74,15 +61,15 @@ export function ActivityRow({
   const { openActivityRenameModal } = useActivityModalNavigation();
 
   const [menuOpen, setMenuOpen] = useState(false);
+  const quickCreate = useActivityQuickCreate();
 
-  const isPopoverOpen = openPopoverActivityId === activity.id;
+  const handleQuickCreate = useCallback(() => {
+    quickCreate({ activityId: activity.id, activityName: activity.name });
+  }, [quickCreate, activity.id, activity.name]);
 
-  // メニュー / ポップオーバーを開いている行は drag source にしない。Radix の
-  // portal が開いている最中に掴まれると、開いたまま行だけが飛ぶ
-  const { isDragging, dragProps } = useActivityDragSource(
-    activity,
-    !isMobile && !menuOpen && !isPopoverOpen,
-  );
+  // メニューを開いている行は drag source にしない。Radix の portal が開いている
+  // 最中に掴まれると、開いたまま行だけが飛ぶ
+  const { isDragging, dragProps } = useActivityDragSource(activity, !isMobile && !menuOpen);
 
   // 同名衝突の判定・toast・mutation は DnD と共有する（useMoveActivityToCategory）
   const handleChangeCategory = useCallback(
@@ -109,7 +96,7 @@ export function ActivityRow({
             'group/item relative flex cursor-pointer items-center rounded-lg text-sm select-none',
             isMobile ? 'h-11' : 'h-8',
             'hover:bg-state-hover',
-            (menuOpen || isPopoverOpen) && 'bg-state-selected',
+            menuOpen && 'bg-state-selected',
             // 掴んでいる行。ドラッグ画像はブラウザが作る半透明の複製なので、
             // ここで opacity を足すと二重に薄くなる。地色だけ変える
             isDragging && 'bg-state-dragged',
@@ -117,9 +104,9 @@ export function ActivityRow({
           onClick={(event) => {
             // メニュー項目のクリックは行まで波及させない。Radix の portal でも
             // React の合成イベントはコンポーネントツリーを遡るため、素通しだと
-            // 項目を押すたびにクイック作成ポップオーバーが裏で開く
+            // 項目を押すたびに裏でブロックが作られる
             if ((event.target as HTMLElement).closest('[role="menu"]')) return;
-            onOpenPopover(activity.id);
+            handleQuickCreate();
           }}
           {...dragProps}
         >
@@ -142,7 +129,7 @@ export function ActivityRow({
               type="button"
               onClick={(event) => {
                 event.stopPropagation();
-                onOpenPopover(activity.id);
+                handleQuickCreate();
               }}
               className={cn(
                 'focus-visible:ring-ring block w-full min-w-0 truncate rounded-lg text-left focus-visible:ring-2 focus-visible:outline-none',
@@ -198,20 +185,6 @@ export function ActivityRow({
               onDeleteActivity={onDeleteActivity}
             />
           </DropdownMenu>
-
-          {isPopoverOpen ? (
-            <ActivityTimeblockCreatePopover
-              open
-              onOpenChange={(nextOpen) => onOpenPopover(nextOpen ? activity.id : null)}
-              activity={{
-                id: activity.id,
-                name: activity.name,
-                color: inheritedColor,
-                icon: inheritedIcon,
-              }}
-              isMobile={isMobile}
-            />
-          ) : null}
         </div>
       </div>
     </>

@@ -8,8 +8,8 @@ export const TIMEBLOCK_REVIEW_BASIS = {
   planMeaning: 'budget',
   recordMeaning: 'actual',
   // タグ有無で絞らない。未分類の行も単一バケットとして集計に含める（#1576）
-  rowFilter: 'active_start_in_period',
-  durationBoundary: 'full_row_not_clipped',
+  rowFilter: 'active_overlapping_period',
+  durationBoundary: 'clipped_to_period',
   periodBoundary: '[)',
   varianceConvention: 'planned_minus_recorded',
 } as const;

@@ -2,19 +2,8 @@ import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 
 import { serializeUntrustedMcpData } from './untrusted-data-serialization';
 
-// v2 (#1576): review.get の破壊的契約変更（tagId nullable 化、isUncategorized /
-// isArchived の必須field追加、basis.rowFilter literal の active_tagged_start_in_period
-// → active_start_in_period 変更）を機械可読に伝えるための bump。読み取り系 tool の
-// 出力封筒にのみ使う。mutation receipt (plans.create 等) の schemaVersion は DB
-// (mcp_mutation_receipts.envelope_version) に永続化された別系統の値のため、
-// MCP_MUTATION_RECEIPT_SCHEMA_VERSION（features/timeblock/server/mcp-mutation-contract.ts）
-// を使う。混同すると SDK の outputSchema 検証が実際の DB 値と食い違って壊れる。
-// v3 (#2174): タグモデル全置換（#2162）に伴う公開契約の切替。`tags.list` を
-// `activities.list` / `categories.list` へ置換し、read / mutation tool の `tagId` を
-// `activityId` へ改名、mutation の `TAG_ARCHIVED` を `ACTIVITY_ARCHIVED` へ変更した。
-// alias は持たせず一度に切っている（production の OAuth 接続が 0 件であることを
-// read-only で実測済み。詳細は 20260818150000 の migration 冒頭）。
-export const MCP_TOOL_SCHEMA_VERSION = 3 as const;
+// v4: independent records and period-clipped aggregate reads. Mutation receipt versions are unchanged.
+export const MCP_TOOL_SCHEMA_VERSION = 4 as const;
 
 /**
  * 成功結果の legacy text は必ず untrusted data として枠付けする。

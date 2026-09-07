@@ -102,7 +102,7 @@ function recordUpdateArgs(record: RecordRow, title: string, expectedUpdatedAt = 
     p_expected_updated_at: expectedUpdatedAt,
     p_title: title,
     p_note: record.note as never,
-    p_plan_id: record.plan_id as never,
+    p_plan_id: dbNull,
     p_external_calendar_event_id: record.external_calendar_event_id as never,
     p_start_at: record.start_at,
     p_end_at: record.end_at,
@@ -165,7 +165,7 @@ describe.skipIf(!RUN_LOCAL)('atomic Plan and Record command boundary', () => {
     expect(error?.code).toBe('22023');
   });
 
-  it('places and moves Plans anywhere on the timeline, and skips upcoming Plans', async () => {
+  it('places and moves Plans anywhere on the timeline, and rejects retired skip', async () => {
     // 過去に終わる Plan を作れる
     const pastPlan = await createPlan({
       title: 'Yesterday',
@@ -195,16 +195,14 @@ describe.skipIf(!RUN_LOCAL)('atomic Plan and Record command boundary', () => {
       .single();
     expect(movedToFutureError).toBeNull();
 
-    // 未来 Plan を skip できる
-    const { error: skipError } = await admin
-      .rpc('set_plan_skipped_command_v1', {
-        p_user_id: userId,
-        p_plan_id: movedToFuture!.id,
-        p_expected_updated_at: movedToFuture!.updated_at,
-        p_skipped: true,
-      })
-      .single();
-    expect(skipError).toBeNull();
+    // contract後の旧クライアントには、保存状態を作らず撤去案内を返す
+    const { error: skipError } = await admin.rpc('set_plan_skipped_command_v1', {
+      p_user_id: userId,
+      p_plan_id: movedToFuture!.id,
+      p_expected_updated_at: movedToFuture!.updated_at,
+      p_skipped: true,
+    });
+    expect(skipError?.code).toBe('DT012');
   });
 
   it('serializes concurrent Plan updates with exact compare-and-swap', async () => {
@@ -469,7 +467,7 @@ describe.skipIf(!RUN_LOCAL)('atomic Plan and Record command boundary', () => {
     expect(plan.id).not.toBe(record.id);
   });
 
-  it('rejects a future Record but allows a past Record linked to a future Plan', async () => {
+  it('rejects future Records and ignores the drained legacy link argument', async () => {
     const plan = await createPlan({
       title: 'Future link target',
       startAt: at(60 * 60_000),
@@ -489,37 +487,17 @@ describe.skipIf(!RUN_LOCAL)('atomic Plan and Record command boundary', () => {
       p_start_at: at(60 * 60_000),
       p_end_at: at(2 * 60 * 60_000),
     });
-    const { error: futurePlanError } = await admin.rpc('create_record_command_v1', {
-      ...base,
-      p_plan_id: plan.id,
-      p_start_at: at(-2 * 60 * 60_000),
-      p_end_at: at(-60 * 60_000),
-    });
-    const { error: directFuturePlanError } = await admin.from('records').insert({
-      user_id: userId,
-      title: 'Legacy direct writer',
-      plan_id: plan.id,
-      source: 'api',
-      start_at: at(-4 * 60 * 60_000),
-      end_at: at(-3 * 60 * 60_000),
-    });
-    const unlinked = await createRecord({
-      title: 'Legacy direct update',
-      startAt: at(-6 * 60 * 60_000),
-      endAt: at(-5 * 60 * 60_000),
-      source: 'api',
-    });
-    const { error: directRelinkError } = await admin
-      .from('records')
-      .update({ plan_id: plan.id })
-      .eq('id', unlinked.id);
-
-    // 未来に終わる Record だけが唯一残る時刻ルールで拒否される。
+    const { data: legacyRecord, error: futurePlanError } = await admin
+      .rpc('create_record_command_v1', {
+        ...base,
+        p_plan_id: plan.id,
+        p_start_at: at(-2 * 60 * 60_000),
+        p_end_at: at(-60 * 60_000),
+      })
+      .single();
     expect(futureRecordError?.code).toBe('DT005');
-    // 過去の Record は、紐付け先 Plan が未来にあっても受け付ける。
     expect(futurePlanError).toBeNull();
-    expect(directFuturePlanError).toBeNull();
-    expect(directRelinkError).toBeNull();
+    expect(legacyRecord).not.toHaveProperty('plan_id');
   });
 
   it('allows either Record restore or overlapping create, never both', async () => {
@@ -563,42 +541,25 @@ describe.skipIf(!RUN_LOCAL)('atomic Plan and Record command boundary', () => {
     ).toHaveLength(1);
   });
 
-  it('serializes Plan skip against linked Record creation', async () => {
+  it('retired skip request cannot affect an independently created Record', async () => {
     const plan = await createPlan({
-      title: 'Nearly complete',
-      startAt: at(-2_000),
-      endAt: at(1_500),
+      title: 'Independent',
+      startAt: at(-4 * 60 * 60_000),
+      endAt: at(-3 * 60 * 60_000),
     });
-    await new Promise((resolve) => setTimeout(resolve, 1_700));
-
-    const attempts = await Promise.all([
-      admin
-        .rpc('set_plan_skipped_command_v1', {
-          p_user_id: userId,
-          p_plan_id: plan.id,
-          p_expected_updated_at: plan.updated_at,
-          p_skipped: true,
-        })
-        .single(),
-      admin
-        .rpc('record_plan_command_v1', {
-          p_user_id: userId,
-          p_plan_id: plan.id,
-          p_expected_updated_at: plan.updated_at,
-        })
-        .single(),
+    const [record, skip] = await Promise.all([
+      createRecord({ title: 'Independent record', startAt: plan.start_at, endAt: plan.end_at }),
+      admin.rpc('set_plan_skipped_command_v1', {
+        p_user_id: userId,
+        p_plan_id: plan.id,
+        p_expected_updated_at: plan.updated_at,
+        p_skipped: true,
+      }),
     ]);
-
-    expect(attempts.filter(({ error }) => error === null)).toHaveLength(1);
-    expect(
-      attempts.filter(({ error }) => ['DT008', 'DT011'].includes(error?.code ?? '')),
-    ).toHaveLength(1);
-
-    const [{ data: persistedPlan }, { data: linkedRecords }] = await Promise.all([
-      admin.from('plans').select('skipped_at').eq('id', plan.id).single(),
-      admin.from('records').select('id').eq('plan_id', plan.id).is('deleted_at', null),
-    ]);
-    expect(Boolean(persistedPlan?.skipped_at) && (linkedRecords?.length ?? 0) > 0).toBe(false);
+    expect(record.id).toBeTruthy();
+    expect(skip.error?.code).toBe('DT012');
+    const { data } = await admin.from('plans').select('id').eq('id', plan.id).single();
+    expect(data?.id).toBe(plan.id);
   });
 
   it('serializes confirm-day against one-tap Plan recording', async () => {
@@ -625,19 +586,20 @@ describe.skipIf(!RUN_LOCAL)('atomic Plan and Record command boundary', () => {
         .single(),
     ]);
 
-    expect(attempts.every(({ error }) => error === null || error.code === 'DT011')).toBe(true);
+    expect(attempts.every(({ error }) => error === null || error.code === '23P01')).toBe(true);
     expect(attempts.some(({ error }) => error === null)).toBe(true);
 
     const { data: linkedRecords, error } = await admin
       .from('records')
       .select('id')
-      .eq('plan_id', plan.id)
+      .eq('user_id', userId)
+      .eq('start_at', plan.start_at)
       .is('deleted_at', null);
     expect(error).toBeNull();
     expect(linkedRecords).toHaveLength(1);
   });
 
-  it('rejects restoring a linked Record after its Plan is skipped', async () => {
+  it('restores an independent Record after a retired skip request', async () => {
     const plan = await createPlan({
       title: 'Restore invariant',
       startAt: at(-2_000),
@@ -663,7 +625,7 @@ describe.skipIf(!RUN_LOCAL)('atomic Plan and Record command boundary', () => {
       p_expected_updated_at: plan.updated_at,
       p_skipped: dbNull,
     });
-    expect(nullSkipError?.code).toBe('22023');
+    expect(nullSkipError?.code).toBe('DT012');
 
     const { data: record, error: recordError } = await admin
       .rpc('record_plan_command_v1', {
@@ -691,7 +653,7 @@ describe.skipIf(!RUN_LOCAL)('atomic Plan and Record command boundary', () => {
         p_skipped: true,
       })
       .single();
-    expect(skipError).toBeNull();
+    expect(skipError?.code).toBe('DT012');
 
     const { error: restoreError } = await admin
       .rpc('restore_record_command_v1', {
@@ -700,7 +662,7 @@ describe.skipIf(!RUN_LOCAL)('atomic Plan and Record command boundary', () => {
         p_expected_updated_at: deleted!.updated_at,
       })
       .single();
-    expect(restoreError?.code).toBe('DT008');
+    expect(restoreError).toBeNull();
   });
 
   it('keeps auto-migrated Records immutable for service-role commands', async () => {
@@ -787,7 +749,7 @@ describe.skipIf(!RUN_LOCAL)('atomic Plan and Record command boundary', () => {
     );
     expect(confirmError).toBeNull();
 
-    const record = confirmed?.find((row) => row.plan_id === plan!.id);
+    const record = confirmed?.find((row) => row.start_at === plan!.start_at);
     expect(record?.activity_id).toBe(activity!.id);
   });
 });

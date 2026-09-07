@@ -127,7 +127,6 @@ DO $$
 DECLARE
   v_user_id UUID := '00000000-0000-0000-0000-000000000001';
   v_date DATE;
-  v_plan_id UUID;
   v_dow INT;
   v_activity_ids UUID[] := ARRAY[
     'a0000000-0000-0000-0000-000000000001',
@@ -147,12 +146,11 @@ BEGIN
       VALUES (gen_random_uuid(), v_user_id, 'API開発',
         (v_date || ' 09:00:00')::TIMESTAMPTZ,
         (v_date || ' 11:00:00')::TIMESTAMPTZ,
-        v_activity_ids[1])
-      RETURNING id INTO v_plan_id;
+        v_activity_ids[1]);
       INSERT INTO public.records (
-        user_id, plan_id, title, start_at, end_at, source, activity_id
+        user_id, title, start_at, end_at, source, activity_id
       ) VALUES (
-        v_user_id, v_plan_id, 'API開発',
+        v_user_id, 'API開発',
         (v_date || ' 09:00:00')::TIMESTAMPTZ,
         (v_date || ' 11:00:00')::TIMESTAMPTZ,
         'from_plan', v_activity_ids[1]
@@ -163,12 +161,11 @@ BEGIN
       VALUES (gen_random_uuid(), v_user_id, 'チームスタンドアップ',
         (v_date || ' 11:00:00')::TIMESTAMPTZ,
         (v_date || ' 11:30:00')::TIMESTAMPTZ,
-        v_activity_ids[3])
-      RETURNING id INTO v_plan_id;
+        v_activity_ids[3]);
       INSERT INTO public.records (
-        user_id, plan_id, title, start_at, end_at, source, activity_id
+        user_id, title, start_at, end_at, source, activity_id
       ) VALUES (
-        v_user_id, v_plan_id, 'チームスタンドアップ',
+        v_user_id, 'チームスタンドアップ',
         (v_date || ' 11:00:00')::TIMESTAMPTZ,
         (v_date || ' 11:30:00')::TIMESTAMPTZ,
         'from_plan', v_activity_ids[3]
@@ -179,12 +176,11 @@ BEGIN
       VALUES (gen_random_uuid(), v_user_id, 'UIコンポーネント実装',
         (v_date || ' 13:00:00')::TIMESTAMPTZ,
         (v_date || ' 15:00:00')::TIMESTAMPTZ,
-        v_activity_ids[2])
-      RETURNING id INTO v_plan_id;
+        v_activity_ids[2]);
       INSERT INTO public.records (
-        user_id, plan_id, title, start_at, end_at, source, activity_id
+        user_id, title, start_at, end_at, source, activity_id
       ) VALUES (
-        v_user_id, v_plan_id, 'UIコンポーネント実装',
+        v_user_id, 'UIコンポーネント実装',
         (v_date || ' 13:00:00')::TIMESTAMPTZ,
         (v_date || ' 15:00:00')::TIMESTAMPTZ,
         'from_plan', v_activity_ids[2]
@@ -196,12 +192,11 @@ BEGIN
         VALUES (gen_random_uuid(), v_user_id, 'TypeScript勉強会',
           (v_date || ' 15:30:00')::TIMESTAMPTZ,
           (v_date || ' 16:30:00')::TIMESTAMPTZ,
-          v_activity_ids[4])
-        RETURNING id INTO v_plan_id;
+          v_activity_ids[4]);
         INSERT INTO public.records (
-          user_id, plan_id, title, start_at, end_at, source, activity_id
+          user_id, title, start_at, end_at, source, activity_id
         ) VALUES (
-          v_user_id, v_plan_id, 'TypeScript勉強会',
+          v_user_id, 'TypeScript勉強会',
           (v_date || ' 15:30:00')::TIMESTAMPTZ,
           (v_date || ' 16:30:00')::TIMESTAMPTZ,
           'from_plan', v_activity_ids[4]
@@ -224,12 +219,11 @@ BEGIN
       VALUES (gen_random_uuid(), v_user_id, '個人プロジェクト',
         (v_date || ' 10:00:00')::TIMESTAMPTZ,
         (v_date || ' 12:00:00')::TIMESTAMPTZ,
-        v_activity_ids[5])
-      RETURNING id INTO v_plan_id;
+        v_activity_ids[5]);
       INSERT INTO public.records (
-        user_id, plan_id, title, start_at, end_at, source, activity_id
+        user_id, title, start_at, end_at, source, activity_id
       ) VALUES (
-        v_user_id, v_plan_id, '個人プロジェクト',
+        v_user_id, '個人プロジェクト',
         (v_date || ' 10:00:00')::TIMESTAMPTZ,
         (v_date || ' 12:00:00')::TIMESTAMPTZ,
         'from_plan', v_activity_ids[5]

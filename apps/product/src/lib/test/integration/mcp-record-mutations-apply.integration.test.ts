@@ -1,4 +1,4 @@
-import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
+import { execFileSync, spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { once } from 'node:events';
 
 import { createClient } from '@supabase/supabase-js';
@@ -331,7 +331,7 @@ function uiUpdate(record: RecordRow, title: string) {
       p_expected_updated_at: record.updated_at,
       p_title: title,
       p_note: record.note as never,
-      p_plan_id: record.plan_id as never,
+      p_plan_id: dbNull,
       p_external_calendar_event_id: record.external_calendar_event_id as never,
       p_start_at: record.start_at,
       p_end_at: record.end_at,
@@ -362,6 +362,58 @@ function applyCreate(
       p_end_at: input.endAt,
     })
     .single();
+}
+
+function insertHistoricalCreateReceipt(input: {
+  authorization: WriteAuthorization;
+  operationId: string;
+  record: RecordRow;
+  planId: string;
+  title: string;
+  startAt: string;
+  endAt: string;
+}) {
+  execFileSync(
+    'psql',
+    psqlArgs({
+      user_id: userId,
+      connection_id: input.authorization.connectionId,
+      operation_id: input.operationId,
+      resource_id: input.record.id,
+      resource_version: input.record.updated_at,
+      plan_id: input.planId,
+      title: input.title,
+      start_at: input.startAt,
+      end_at: input.endAt,
+    }),
+    {
+      env: psqlEnv(),
+      input: `INSERT INTO public.mcp_mutation_receipts (
+        user_id, client_id, operation_id, origin_connection_id, envelope_version,
+        tool_name, request_digest, resource_type, resource_id, resource_version
+      )
+      SELECT
+        :'user_id'::UUID, connection.client_id, :'operation_id'::UUID,
+        :'connection_id'::UUID, 1, 'records.create',
+        private.digest_mcp_mutation_envelope_v1(
+          'records.create',
+          pg_catalog.jsonb_build_object(
+            'title', :'title'::TEXT,
+            'note', NULL::TEXT,
+            'tagId', NULL::UUID,
+            'planId', :'plan_id'::UUID,
+            'externalCalendarEventId', NULL::UUID,
+            'source', 'api',
+            'startAt', pg_catalog.to_char(:'start_at'::TIMESTAMPTZ AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"'),
+            'endAt', pg_catalog.to_char(:'end_at'::TIMESTAMPTZ AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')
+          )
+        ),
+        'record', :'resource_id'::UUID, :'resource_version'::TIMESTAMPTZ
+      FROM public.oauth_connections AS connection
+      WHERE connection.id = :'connection_id'::UUID;`,
+      stdio: 'pipe',
+    },
+  );
 }
 
 function applyUpdate(
@@ -484,7 +536,7 @@ describe.skipIf(!RUN_LOCAL)('MCP Record create, update, delete, and restore appl
     await admin.auth.admin.deleteUser(foreignUserId);
   });
 
-  it('creates standalone and linked api Records and replays historical success', async () => {
+  it('creates independent api Records and replays historical success', async () => {
     const authorization = await createWriteAuthorization();
     const standaloneOperationId = crypto.randomUUID();
     const linkedOperationId = crypto.randomUUID();
@@ -505,20 +557,38 @@ describe.skipIf(!RUN_LOCAL)('MCP Record create, update, delete, and restore appl
     const plan = await createCompletedPlan('Track target');
     const linkedInput = {
       title: 'Linked actual',
-      planId: plan.id,
       startAt: at(-6 * 60 * 60_000),
       endAt: at(-5 * 60 * 60_000),
     };
-    const linked = await applyCreate(authorization, linkedOperationId, linkedInput);
+    const historicalRecord = await createRecord({
+      ...linkedInput,
+      planId: plan.id,
+      source: 'api',
+    });
+    insertHistoricalCreateReceipt({
+      authorization,
+      operationId: linkedOperationId,
+      record: historicalRecord,
+      planId: plan.id,
+      ...linkedInput,
+    });
+
+    const linked = await applyCreate(authorization, linkedOperationId, {
+      ...linkedInput,
+      planId: plan.id,
+    });
     expect(linked.error).toBeNull();
+    expect(linked.data).toMatchObject({
+      resource_id: historicalRecord.id,
+      replayed: true,
+    });
 
     const { data: persisted } = await admin
       .from('records')
-      .select('plan_id, source, external_calendar_event_id, deleted_at')
+      .select('source, external_calendar_event_id, deleted_at')
       .eq('id', linked.data!.resource_id)
       .single();
     expect(persisted).toEqual({
-      plan_id: plan.id,
       source: 'api',
       external_calendar_event_id: null,
       deleted_at: null,
@@ -532,15 +602,10 @@ describe.skipIf(!RUN_LOCAL)('MCP Record create, update, delete, and restore appl
       })
       .single();
     expect(deleteError).toBeNull();
-    const { error: skipError } = await admin.rpc('set_plan_skipped_command_v1', {
-      p_user_id: userId,
-      p_plan_id: plan.id,
-      p_expected_updated_at: plan.updated_at,
-      p_skipped: true,
+    const replay = await applyCreate(authorization, linkedOperationId, {
+      ...linkedInput,
+      planId: plan.id,
     });
-    expect(skipError).toBeNull();
-
-    const replay = await applyCreate(authorization, linkedOperationId, linkedInput);
     expect(replay.error).toBeNull();
     expect(replay.data).toEqual({ ...linked.data!, replayed: true });
     expect(deleted?.deleted_at).not.toBeNull();
@@ -560,7 +625,7 @@ describe.skipIf(!RUN_LOCAL)('MCP Record create, update, delete, and restore appl
     expect(sameRangeCount).toBe(1);
   });
 
-  it('applies partial updates while preserving Plan attribution and external provenance', async () => {
+  it('applies partial updates while preserving external provenance', async () => {
     const authorization = await createWriteAuthorization();
     const externalEventId = crypto.randomUUID();
     const startAt = at(-12 * 60 * 60_000);
@@ -578,12 +643,11 @@ describe.skipIf(!RUN_LOCAL)('MCP Record create, update, delete, and restore appl
       last_synced_at: new Date().toISOString(),
     });
     expect(eventError).toBeNull();
-    const plan = await createCompletedPlan('Preserved attribution');
+    await createCompletedPlan('Independent comparison');
 
     const record = await createRecord({
       title: 'External original',
       note: 'Remove me',
-      planId: plan.id,
       externalCalendarEventId: externalEventId,
       source: 'external_calendar',
       startAt,
@@ -603,7 +667,6 @@ describe.skipIf(!RUN_LOCAL)('MCP Record create, update, delete, and restore appl
     expect(preserved).toMatchObject({
       title: 'MCP correction',
       note: 'Remove me',
-      plan_id: plan.id,
       source: 'external_calendar',
       external_calendar_event_id: externalEventId,
       start_at: record.start_at,
@@ -623,7 +686,6 @@ describe.skipIf(!RUN_LOCAL)('MCP Record create, update, delete, and restore appl
     const { data: current } = await admin.from('records').select('*').eq('id', record.id).single();
     expect(current).toMatchObject({
       note: null,
-      plan_id: plan.id,
       source: 'external_calendar',
       external_calendar_event_id: externalEventId,
     });
@@ -641,10 +703,10 @@ describe.skipIf(!RUN_LOCAL)('MCP Record create, update, delete, and restore appl
     expect(replay.data).toEqual({ ...cleared.data!, replayed: true });
     const { data: afterReplay } = await admin
       .from('records')
-      .select('title, plan_id')
+      .select('title')
       .eq('id', record.id)
       .single();
-    expect(afterReplay).toEqual({ title: 'UI after MCP', plan_id: plan.id });
+    expect(afterReplay).toEqual({ title: 'UI after MCP' });
   });
 
   it('rejects empty/non-canonical patches and cross-tool operation reuse without receipts', async () => {
@@ -886,42 +948,20 @@ describe.skipIf(!RUN_LOCAL)('MCP Record create, update, delete, and restore appl
     expect(activeCount).toBe(1);
   });
 
-  it('serializes linked MCP create against Plan skip', async () => {
+  it('rejects retired link input without a receipt or a Plan mutation', async () => {
     const authorization = await createWriteAuthorization();
     const operationId = crypto.randomUUID();
-    const plan = await createCompletedPlan('Link-skip race');
-    const attempts = await Promise.all([
-      applyCreate(authorization, operationId, {
-        title: 'Linked race Record',
-        planId: plan.id,
-        startAt: at(-4 * 60 * 60_000),
-        endAt: at(-3 * 60 * 60_000),
-      }),
-      admin
-        .rpc('set_plan_skipped_command_v1', {
-          p_user_id: userId,
-          p_plan_id: plan.id,
-          p_expected_updated_at: plan.updated_at,
-          p_skipped: true,
-        })
-        .single(),
-    ]);
-    expect(attempts.filter(({ error }) => error === null)).toHaveLength(1);
-    expect(
-      attempts.filter(({ error }) => ['DT008', 'DT011'].includes(error?.code ?? '')),
-    ).toHaveLength(1);
-
-    const { data: currentPlan } = await admin
-      .from('plans')
-      .select('skipped_at')
-      .eq('id', plan.id)
-      .single();
-    const { count: activeLinkedRecords } = await admin
-      .from('records')
-      .select('id', { count: 'exact', head: true })
-      .eq('plan_id', plan.id)
-      .is('deleted_at', null);
-    expect(Boolean(currentPlan?.skipped_at) && activeLinkedRecords === 1).toBe(false);
+    const plan = await createCompletedPlan('Retired link');
+    const result = await applyCreate(authorization, operationId, {
+      title: 'Old input',
+      planId: plan.id,
+      startAt: plan.start_at,
+      endAt: plan.end_at,
+    });
+    expect(result.error?.code).toBe('DT012');
+    expect(await countReceipts([operationId])).toBe(0);
+    const { data } = await admin.from('plans').select('*').eq('id', plan.id).single();
+    expect(data).toEqual(plan);
   });
 
   it('keeps exact CAS failures receipt-free and rejects immutable migrated Records', async () => {
@@ -1061,7 +1101,7 @@ describe.skipIf(!RUN_LOCAL)('MCP Record create, update, delete, and restore appl
       endAt: at(-43 * 60 * 60_000),
     });
     // Plan の位置は Record の紐付けを制約しない。Record 自身が過去であればよい。
-    expect(futurePlanLink.error).toBeNull();
+    expect(futurePlanLink.error?.code).toBe('DT012');
 
     const { data: foreignPlan, error: foreignPlanError } = await admin
       .rpc('create_plan_command_v1', {
@@ -1127,12 +1167,12 @@ describe.skipIf(!RUN_LOCAL)('MCP Record create, update, delete, and restore appl
       foreignDeleted!.updated_at,
     );
 
-    expect(foreignCreate.error?.code).toBe('DT001');
+    expect(foreignCreate.error?.code).toBe('DT012');
     expect(foreignUpdate.error?.code).toBe('DT001');
     expect(foreignDelete.error?.code).toBe('DT001');
     expect(foreignRestore.error?.code).toBe('DT001');
     // 未来 Plan への紐付けは成功する側なので receipt が 1 件残る。
-    expect(await countReceipts([futurePlanOperationId])).toBe(1);
+    expect(await countReceipts([futurePlanOperationId])).toBe(0);
     expect(
       await countReceipts([
         unknownOperationId,

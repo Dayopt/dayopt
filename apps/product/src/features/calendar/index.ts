@@ -22,6 +22,7 @@ export { ViewSwitcherList } from './components/layout/Header/ViewSwitcherList';
 // =============================================================================
 export { ActivityFilterList } from './components/activity-filter/ActivityFilterList';
 export { ActivityChipRow } from './components/activity-filter/components/ActivityChipRow';
+export { InlineCreatePanel } from './components/create';
 
 // =============================================================================
 // Templates（型）

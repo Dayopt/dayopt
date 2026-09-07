@@ -64,7 +64,7 @@ class TimeblockReviewClient implements TimeblockReviewReadClient {
     query
       .eq('user_id', input.userId)
       .is('deleted_at', null)
-      .gte('start_at', input.startDate)
+      .gt('end_at', input.startDate)
       .lt('start_at', input.endDate)
       .order('start_at', { ascending: true })
       .order('id', { ascending: true })

@@ -164,7 +164,7 @@ export function computeCalendarDayDiffs(
   let plannedMinutes = 0;
   let actualMinutes = 0;
   let unplannedMinutes = 0;
-  let missedMinutes = 0;
+  const missedMinutes = 0;
 
   for (const entry of entries) {
     if (entry.isDraft) continue;
@@ -173,7 +173,7 @@ export function computeCalendarDayDiffs(
     const actual = clipRange(actualRange(entry), bounds);
     const plannedDuration = diffMinutes(planned.start, planned.end);
     const actualDuration = diffMinutes(actual.start, actual.end);
-    const countedActualDuration = entry.isSkipped === true ? 0 : actualDuration;
+    const countedActualDuration = actualDuration;
     const hasActualEdit = entry.actualStartDate != null || entry.actualEndDate != null;
 
     if (entry.origin !== 'unplanned') {
@@ -190,14 +190,6 @@ export function computeCalendarDayDiffs(
     }
 
     const hasActual = actual.start != null && actual.end != null && actualDuration > 0;
-    const missed = entry.isSkipped === true;
-
-    if (missed) {
-      missedMinutes += plannedDuration;
-      items.push(makeItem(entry, 'missed', planned, { start: null, end: null }));
-      continue;
-    }
-
     if (!hasActual) {
       if (plannedDuration > 0 && hasActualEdit) {
         items.push(makeItem(entry, 'shifted', planned, { start: null, end: null }));

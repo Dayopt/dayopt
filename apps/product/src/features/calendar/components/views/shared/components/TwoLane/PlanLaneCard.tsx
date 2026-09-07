@@ -60,11 +60,6 @@ const MIN_HEIGHT = 20;
 const DETAIL_HEIGHT_THRESHOLD = 40;
 const RESIZE_HANDLE_HEIGHT = 20;
 
-/** skip 済み plan の斜線ハッチング背景。TimeblockCard の skip 表現を踏襲。 */
-function skippedHatchImage(accentColor: string): string {
-  return `repeating-linear-gradient(45deg, transparent 0 5px, color-mix(in oklch, ${accentColor} 38%, transparent) 5px 7px)`;
-}
-
 export function PlanLaneCard({
   event,
   position,
@@ -100,10 +95,10 @@ export function PlanLaneCard({
   const borderClass = colorClasses?.border ?? 'border-border';
   const displayName = activityName ?? t('calendar.filter.noActivity');
 
-  const isSkipped = event.status === 'skipped';
-  const isUnrecorded = event.status === 'unrecorded';
-  const isRecorded = event.status === 'recorded';
-  const showDetails = !compact && position.height >= DETAIL_HEIGHT_THRESHOLD;
+  const hasRecords = event.status === 'with-records';
+  // 時刻を出すかは縦に入るかだけで決める。狭い列（compact）でも高さがあるカードから
+  // 時刻が消えていて、何時のブロックか読めなかった（2026-09-07 User 指摘）
+  const showDetails = position.height >= DETAIL_HEIGHT_THRESHOLD;
   const canDrag = interactive && !disableDrag && Boolean(onPointerDown);
   return (
     <div
@@ -115,14 +110,15 @@ export function PlanLaneCard({
       aria-label={interactive ? displayName : undefined}
       aria-hidden={interactive ? undefined : true}
       className={cn(
-        'absolute flex flex-col gap-1 overflow-hidden rounded-lg py-1 text-xs',
+        'absolute flex flex-col gap-1 overflow-hidden rounded-lg text-xs',
         interactive ? 'pointer-events-auto' : 'pointer-events-none',
-        compact ? 'border px-1' : 'border-2 px-2',
+        compact ? 'border px-2' : 'border-2 px-3',
+        // 高さが足りないカードだけ上下を詰める（詰めないと文字が切れる）
+        showDetails ? 'py-2' : 'py-1',
         borderClass,
-        // skip / 記録済みは控えめに沈める。未記録の過去 plan は静かなプロンプトとして
-        // 破線で「まだ何かが足りない」を示す。
-        isSkipped ? 'opacity-50' : isRecorded ? 'opacity-60' : 'opacity-100',
-        isUnrecorded ? 'border-dashed' : 'border-solid',
+        // 同じアクティビティで15分以上重なる記録がある予定は控えめに沈める。
+        hasRecords ? 'opacity-60' : 'opacity-100',
+        'border-solid',
         'text-foreground bg-transparent',
         'focus-visible:ring-ring focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none',
         isActive && 'ring-ring ring-2',
@@ -135,9 +131,6 @@ export function PlanLaneCard({
         left: `${position.left}%`,
         width: `calc(${position.width}% - 4px)`,
         height: `${Math.max(position.height, MIN_HEIGHT)}px`,
-        ...(isSkipped && colorClasses
-          ? { backgroundImage: skippedHatchImage(colorClasses.cssVar) }
-          : {}),
         ...styleOverride,
       }}
       onClick={interactive ? (e) => onClick?.(event, e) : undefined}
@@ -192,7 +185,7 @@ export function PlanLaneCard({
         <div
           role="slider"
           tabIndex={-1}
-          aria-label={t('calendar.event.adjustEndTime')}
+          aria-label={t('calendar.timeblock.adjustEndTime')}
           aria-orientation="vertical"
           aria-valuenow={position.height}
           aria-valuemin={MIN_HEIGHT}

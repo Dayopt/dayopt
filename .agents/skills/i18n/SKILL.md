@@ -38,12 +38,14 @@ Dayoptの国際化対応を支援するスキル。next-intl v4を使用。
 
 **最初に確認する**:
 
-1. [`docs/product/glossary.md`](../../../docs/product/glossary.md) — UI で使う言葉の正解（エントリ / 予定 / 記録 / タグ等）
-2. [`docs/product/glossary.md`](../../../docs/product/glossary.md#禁止表記一覧) — 使ってはいけない表現の一覧
+1. [`docs/product/glossary.md`](../../../docs/product/glossary.md) — 用語の正解（タイムブロック / 予定 / 記録 / アクティビティ等）と禁止表記
+2. [`scripts/lib/glossary/terms.ts`](../../../scripts/lib/glossary/terms.ts) — その**正本**。用語や禁止語を足す時はここを編集して `pnpm glossary:generate` を実行する（glossary.md の表は生成物）
+
+用語集は 3 層に分かれる。`ui` が UI 文言に出る呼称（`pnpm copy:check` が messages を機械検査する）、`design` は docs でだけ使う設計語（決算バー・羅針盤など。UI 文言に書かない）、`code` は識別子と DB 名の対応。
 
 用語だけでなく**トーン**（研究者ペルソナ、CTA 階層、数字フレーミング）は [`docs/product/copywriting.md`](../../../docs/product/copywriting.md) が正本。UI 文言を書く時はこちらも読む。
 
-新規テキスト追加後に `pnpm copy:check` で禁止表記が含まれていないか確認する。
+新規テキスト追加後に `pnpm copy:check` を実行する（CI と同じ基準は `pnpm copy:check:strict`）。**値だけでなくキー名も検査される** — キー名に `task` / `entry` / `entries` / `tag` / `event` を使わない。値が正しくてもキー名が旧語彙だと、次の実装が既存キーを手本にして旧語彙を再生産する。
 
 ## アーキテクチャ（重要）
 
@@ -65,22 +67,7 @@ apps/product/messages/en/calendar.json → 自動で calendar namespace を検�
 
 ### ロードされる全 namespace（apps/product）
 
-| ネームスペース | 用途                                      |
-| -------------- | ----------------------------------------- |
-| `auth`         | 認証フロー全体                            |
-| `calendar`     | カレンダー機能                            |
-| `common`       | 共通 UI（複数トップレベルキーを持つ例外） |
-| `contact`      | お問い合わせ                              |
-| `email`        | メールテンプレート                        |
-| `entry`        | エントリ機能                              |
-| `error`        | グローバルエラー                          |
-| `legal`        | 法的文書                                  |
-| `navigation`   | ナビゲーション                            |
-| `oauth`        | OAuth 認証                                |
-| `record`       | レコード                                  |
-| `settings`     | 設定画面                                  |
-| `sidebar`      | サイドバー                                |
-| `activities`   | アクティビティ機能                        |
+`request.ts` がディレクトリを自動スキャンするため、**実体は `ls apps/product/messages/en` が正**。用途の説明は [`docs/engineering/i18n.md`](../../../docs/engineering/i18n.md#ネームスペース一覧) にある（ここでは複製しない）。
 
 ### packages/components は next-intl 非依存
 
@@ -148,22 +135,7 @@ t('items', { count: 5 }); // → "5 items"
 
 ### 翻訳ファイル一覧（apps/product）
 
-| ファイル          | 用途                                                                 |
-| ----------------- | -------------------------------------------------------------------- |
-| `common.json`     | 共通キー（actions, aria, form, validation, errors, status, time 等） |
-| `calendar.json`   | カレンダー機能                                                       |
-| `activities.json` | アクティビティ管理                                                   |
-| `settings.json`   | 設定画面                                                             |
-| `auth.json`       | 認証フロー                                                           |
-| `timeblock.json`  | Plan / Record（タイムブロック）                                      |
-| `navigation.json` | ナビゲーション                                                       |
-| `error.json`      | エラーページ UI                                                      |
-| `legal.json`      | 法的文書                                                             |
-| `shortcuts.json`  | キーボードショートカット                                             |
-| `sidebar.json`    | サイドバー                                                           |
-| `contact.json`    | お問い合わせ                                                         |
-| `oauth.json`      | OAuth 認証                                                           |
-| `email.json`      | メールテンプレート（複数トップレベルキーの例外）                     |
+上と同じく `ls apps/product/messages/en` が正。1 ファイル = 1 トップレベルキー（`common` と `email` だけが歴史的例外）で、`pnpm lint:i18n` が強制する。
 
 ### common.json の内部構造（最重要）
 
@@ -205,10 +177,10 @@ t('items', { count: 5 }); // → "5 items"
 
 ## 新規翻訳キー追加手順
 
-1. **用語を確認**: `docs/product/glossary.md` で正しい表記を確認
+1. **用語を確認**: `docs/product/glossary.md` で正しい表記を確認（無い概念なら `scripts/lib/glossary/terms.ts` へ足して `pnpm glossary:generate`）
 2. **配置先を決める**: 上記フロー参照
 3. **両言語に追加**: en と ja のキー構造を完全一致させる
-4. **検証**: `pnpm i18n:check && pnpm copy:check`
+4. **検証**: `pnpm i18n:check && pnpm copy:check:strict`
 
 ```json
 // apps/product/messages/en/timeblock.json — 追加
@@ -262,10 +234,10 @@ t('actions.save');
 
 ```typescript
 // ❌ 禁止 — 禁止語「タスク」を使う
-{ "entry": { "createTask": "タスクを作成" } }
+{ "calendar": { "event": { "newTask": "タスクを作成" } } }
 
 // ✅ 正しい — glossary に従う
-{ "entry": { "create": "エントリを作成" } }
+{ "timeblock": { "create": "タイムブロックを作成" } }
 ```
 
 ## AI/Agent ルール
@@ -276,7 +248,7 @@ t('actions.save');
 4. `common` に入れるのは共通操作語だけ（domain 固有キーは feature ファイルへ）
 5. 新しい用語は `docs/product/glossary.md` を確認する
 6. 迷ったら既存キーをまず検索する（重複定義を防ぐ）
-7. 最後に `pnpm i18n:check` と `pnpm copy:check` を実行する
+7. 最後に `pnpm i18n:check` と `pnpm copy:check:strict` を実行する
 
 ## チェックリスト
 
@@ -289,7 +261,8 @@ t('actions.save');
 - [ ] 機能固有キーは feature ファイルに置いたか（common.json に混ぜていない）
 - [ ] キー名は意味のあるドット記法か（例: `calendar.toast.deleted`）
 - [ ] `pnpm i18n:check` が通るか
-- [ ] `pnpm copy:check` で禁止表記が出ていないか
+- [ ] キー名に旧語彙（`task` / `entry` / `tag` / `event`）を使っていないか
+- [ ] `pnpm copy:check:strict` が通るか
 
 ## 言語検出の仕組み
 
@@ -299,8 +272,8 @@ t('actions.save');
 
 ## 関連ファイル
 
-- `docs/product/glossary.md` - UI 用語の source of truth
-- `docs/product/glossary.md#禁止表記一覧` - 禁止表記一覧
+- `docs/product/glossary.md` - 用語集（生成物。`#禁止表記一覧` に禁止語の一覧）
+- `scripts/lib/glossary/terms.ts` - 用語集の正本。編集後は `pnpm glossary:generate`
 - `docs/engineering/i18n.md` - 実装ガイド（詳細版）
 - `packages/i18n/src/routing.ts` - 共通ルーティング設定
 - `packages/i18n/src/navigation.ts` - 共通ナビゲーションユーティリティ

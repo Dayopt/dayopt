@@ -1,3 +1,4 @@
+import { collectQueryPages } from '@/lib/database/collect-query-pages';
 import 'server-only';
 
 /**
@@ -21,15 +22,9 @@ export interface StatPlanRow {
 interface StatRecordRow {
   id: string;
   activity_id: string | null;
-  plan_id: string | null;
   source: string;
   start_at: string;
   end_at: string;
-}
-
-/** 見積もり係数用の Plan 行。skip 判定に `skipped_at` を要するため専用 shape にする。 */
-interface EstimationPlanRow extends StatPlanRow {
-  skipped_at: string | null;
 }
 
 export interface ActivityLookupRow {
@@ -59,40 +54,30 @@ export async function fetchRecords(
 ): Promise<StatRecordRow[]> {
   let query = supabase
     .from(databaseTables.records)
-    .select('id, activity_id, plan_id, source, start_at, end_at')
+    .select('id, activity_id, source, start_at, end_at')
     .eq('user_id', userId)
     .is('deleted_at', null);
-  if (range.startDate) query = query.gte('start_at', range.startDate);
+  if (range.startDate) query = query.gt('end_at', range.startDate);
   if (range.endDate) query = query.lt('start_at', range.endDate);
 
-  const { data, error } = await query;
+  const { data, error } = await collectQueryPages((from, to) => query.order('id').range(from, to));
   if (error) {
     throw captureUnexpectedDatabaseError(error, {
       feature: 'statistics',
       operation: 'fetch_records',
     });
   }
-  return data ?? [];
-}
-
-export async function fetchRecordsByPlanIds(
-  supabase: ServiceSupabaseClient,
-  userId: string,
-  planIds: string[],
-): Promise<StatRecordRow[]> {
-  const { data, error } = await supabase
-    .from(databaseTables.records)
-    .select('id, activity_id, plan_id, source, start_at, end_at')
-    .eq('user_id', userId)
-    .is('deleted_at', null)
-    .in('plan_id', planIds);
-  if (error) {
-    throw captureUnexpectedDatabaseError(error, {
-      feature: 'statistics',
-      operation: 'fetch_records_by_plan_ids',
-    });
-  }
-  return data ?? [];
+  return (data ?? []).map((row) => ({
+    ...row,
+    start_at:
+      range.startDate && Date.parse(row.start_at) < Date.parse(range.startDate)
+        ? range.startDate
+        : row.start_at,
+    end_at:
+      range.endDate && Date.parse(row.end_at) > Date.parse(range.endDate)
+        ? range.endDate
+        : row.end_at,
+  }));
 }
 
 export async function fetchPlans(
@@ -105,46 +90,61 @@ export async function fetchPlans(
     .select('id, activity_id, start_at, end_at')
     .eq('user_id', userId)
     .is('deleted_at', null);
-  if (range.startDate) query = query.gte('start_at', range.startDate);
+  if (range.startDate) query = query.gt('end_at', range.startDate);
   if (range.endDate) query = query.lt('start_at', range.endDate);
 
-  const { data, error } = await query;
+  const { data, error } = await collectQueryPages((from, to) => query.order('id').range(from, to));
   if (error) {
     throw captureUnexpectedDatabaseError(error, {
       feature: 'statistics',
       operation: 'fetch_plans',
     });
   }
-  return data ?? [];
+  return (data ?? []).map((row) => ({
+    ...row,
+    start_at:
+      range.startDate && Date.parse(row.start_at) < Date.parse(range.startDate)
+        ? range.startDate
+        : row.start_at,
+    end_at:
+      range.endDate && Date.parse(row.end_at) > Date.parse(range.endDate)
+        ? range.endDate
+        : row.end_at,
+  }));
 }
 
-/**
- * 見積もり係数用の Plan 取得。`fetchPlans` と違い `skipped_at` を含める。
- *
- * `fetchPlans` 側に列を足さないのは、既存 consumer（Time P/L / 空白率 / 見積もり精度）が
- * skip 状態を見ない設計で、そこへ未使用列を流し込むと「使われている」と誤読されるため。
- */
+/** 見積もり係数用の期間重複予定。 */
 export async function fetchPlansForEstimation(
   supabase: ServiceSupabaseClient,
   userId: string,
   range: DateRangeInput = {},
-): Promise<EstimationPlanRow[]> {
+): Promise<StatPlanRow[]> {
   let query = supabase
     .from('plans')
-    .select('id, activity_id, start_at, end_at, skipped_at')
+    .select('id, activity_id, start_at, end_at')
     .eq('user_id', userId)
     .is('deleted_at', null);
-  if (range.startDate) query = query.gte('start_at', range.startDate);
+  if (range.startDate) query = query.gt('end_at', range.startDate);
   if (range.endDate) query = query.lt('start_at', range.endDate);
 
-  const { data, error } = await query;
+  const { data, error } = await collectQueryPages((from, to) => query.order('id').range(from, to));
   if (error) {
     throw captureUnexpectedDatabaseError(error, {
       feature: 'statistics',
       operation: 'fetch_plans_for_estimation',
     });
   }
-  return data ?? [];
+  return (data ?? []).map((row) => ({
+    ...row,
+    start_at:
+      range.startDate && Date.parse(row.start_at) < Date.parse(range.startDate)
+        ? range.startDate
+        : row.start_at,
+    end_at:
+      range.endDate && Date.parse(row.end_at) > Date.parse(range.endDate)
+        ? range.endDate
+        : row.end_at,
+  }));
 }
 
 export async function fetchActivitiesById(

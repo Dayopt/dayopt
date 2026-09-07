@@ -70,8 +70,6 @@ interface CalendarCompositionResult {
   onDeleteTimeblockConfirm: ReturnType<typeof useCalendarCrudHandlers>['onDeleteTimeblockConfirm'];
   onViewStats: ReturnType<typeof useCalendarCrudHandlers>['onViewStats'];
   onCopy: ReturnType<typeof useCalendarCrudHandlers>['onCopy'];
-  onSkip: ReturnType<typeof useCalendarCrudHandlers>['onSkip'];
-  onUnskip: ReturnType<typeof useCalendarCrudHandlers>['onUnskip'];
 
   // === Navigation handlers ===
   onNavigate: ReturnType<typeof useCalendarNavHandlers>['onNavigate'];

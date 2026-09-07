@@ -3,8 +3,7 @@
  *
  * `TimeblockCard.tsx` のトークン使用を踏襲するが、DnD・overlay 計算・gap クリック
  * 導線は Step 6 の対象のため持ち込まない（read 側専用の軽量プレゼンテーショナル
- * コンポーネント）。差分は `DiffBadge`（±0 は非表示）、予定外の記録は
- * 静かなマーカーのみ（二値ラベルは使わない、copywriting準拠）。
+ * コンポーネント）。Record は特定の Plan との対応を表示しない。
  */
 'use client';
 
@@ -20,7 +19,6 @@ import { cn } from '@dayopt/components';
 
 import type { TwoLanePosition } from '../../../../../lib/two-lane-layout';
 import { DayDiffMarker } from './DayDiffMarker';
-import { DiffBadge } from './DiffBadge';
 
 interface RecordLaneCardProps {
   event: RecordEvent;
@@ -93,23 +91,24 @@ export function RecordLaneCard({
   // アクティビティなしの時だけ中立トークンの塗りに落とす。
   const colorClasses = hasActivity ? getCategoryColorClasses(activityColor) : null;
   const displayName = activityName ?? t('calendar.filter.noActivity');
-  const isUnplanned = event.planId == null;
-  const hasDiff = event.diffMinutes != null && event.diffMinutes !== 0;
-  const showDetails = !compact && position.height >= DETAIL_HEIGHT_THRESHOLD;
+  // 時刻を出すかは縦に入るかだけで決める。狭い列（compact）でも高さがあるカードから
+  // 時刻が消えていて、何時のブロックか読めなかった（2026-09-07 User 指摘）
+  const showDetails = position.height >= DETAIL_HEIGHT_THRESHOLD;
   const canDrag = interactive && !disableDrag && Boolean(onPointerDown);
   return (
     <div
       data-record-lane-card
-      data-record-planned={!isUnplanned}
       data-entry-block={interactive ? 'true' : undefined}
       tabIndex={interactive ? 0 : undefined}
       role={interactive ? 'button' : undefined}
       aria-label={interactive ? displayName : undefined}
       aria-hidden={interactive ? undefined : true}
       className={cn(
-        'absolute flex flex-col gap-1 overflow-hidden rounded-lg py-1 text-xs',
+        'absolute flex flex-col gap-1 overflow-hidden rounded-lg text-xs',
         interactive ? 'pointer-events-auto' : 'pointer-events-none',
-        compact ? 'px-1' : 'px-2',
+        compact ? 'px-2' : 'px-3',
+        // 高さが足りないカードだけ上下を詰める（詰めないと文字が切れる）
+        showDetails ? 'py-2' : 'py-1',
         colorClasses?.tint ?? 'bg-card',
         'text-foreground',
         'focus-visible:ring-ring focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none',
@@ -168,7 +167,6 @@ export function RecordLaneCard({
           )}
           <span className="truncate">{displayName}</span>
         </p>
-        {hasDiff && !compact && <DiffBadge diffMinutes={event.diffMinutes ?? 0} />}
       </div>
       {showDetails && (
         <p className="text-muted-foreground truncate">
@@ -180,7 +178,7 @@ export function RecordLaneCard({
         <div
           role="slider"
           tabIndex={-1}
-          aria-label={t('calendar.event.adjustEndTime')}
+          aria-label={t('calendar.timeblock.adjustEndTime')}
           aria-orientation="vertical"
           aria-valuenow={position.height}
           aria-valuemin={MIN_HEIGHT}

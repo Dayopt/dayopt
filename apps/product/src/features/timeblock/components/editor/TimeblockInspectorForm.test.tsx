@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { PublicRecordRow, Row } from '@/lib/database';
+import type { PublicPlanRow, PublicRecordRow } from '@/lib/database';
 
 import { createTimeblockDuplicateDraft } from '../../lib/timeblock-duplicate';
 import { TimeblockInspectorForm } from './TimeblockInspectorForm';
@@ -87,8 +87,6 @@ vi.mock('../../hooks/useTimeblockWriteMutations', () => ({
       fetchRecordById: vi.fn(),
       restoreRecord: mutation,
       restorePlan: { ...mutation, mutateAsync: mocks.restorePlanMutateAsync },
-      skipPlan: mutation,
-      unskipPlan: mutation,
       updateRecord: mutation,
       updatePlan: mutation,
     };
@@ -259,24 +257,24 @@ const futurePlan = {
   note: null,
   start_at: '2026-07-15T13:00:00.000Z',
   end_at: '2026-07-15T14:00:00.000Z',
-  skipped_at: null,
+
   source: 'manual',
   deleted_at: null,
   created_at: '2026-07-15T10:00:00.000Z',
   updated_at: '2026-07-15T10:00:00.000Z',
-} satisfies Row<'plans'>;
+} satisfies PublicPlanRow;
 
 const pastPlan = {
   ...futurePlan,
   start_at: '2026-07-15T10:00:00.000Z',
   end_at: '2026-07-15T11:00:00.000Z',
-} satisfies Row<'plans'>;
+} satisfies PublicPlanRow;
 
 const relatedRecord = {
   id: 'record-1',
   user_id: 'user-1',
   activity_id: null,
-  plan_id: pastPlan.id,
+
   external_calendar_event_id: null,
   title: 'Recorded work',
   note: null,
@@ -517,7 +515,7 @@ describe('TimeblockInspectorForm', () => {
     expect(mocks.enqueueSave).not.toHaveBeenCalled();
   });
 
-  it('関係取得を解決するまで記録導線を出さず、0件成功時だけ表示する', () => {
+  it('時間帯の記録取得中でも独立した記録操作を表示する', () => {
     const { rerender } = render(
       <TimeblockInspectorForm
         kind="plan"
@@ -528,7 +526,7 @@ describe('TimeblockInspectorForm', () => {
       />,
     );
 
-    expect(screen.queryByRole('button', { name: 'prepare-record' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'prepare-record' })).toBeInTheDocument();
 
     rerender(
       <TimeblockInspectorForm
@@ -543,7 +541,7 @@ describe('TimeblockInspectorForm', () => {
     expect(screen.getByRole('button', { name: 'prepare-record' })).toBeInTheDocument();
   });
 
-  it('関連RecordがあるPlanには記録導線を重ねて表示しない', () => {
+  it('時間帯の記録の有無で予定の記録操作を消さない', () => {
     render(
       <TimeblockInspectorForm
         kind="plan"
@@ -559,7 +557,7 @@ describe('TimeblockInspectorForm', () => {
       />,
     );
 
-    expect(screen.queryByRole('button', { name: 'prepare-record' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'prepare-record' })).toBeInTheDocument();
   });
 
   it('記録成功後のRecord IDをInspector切替へ渡す', () => {

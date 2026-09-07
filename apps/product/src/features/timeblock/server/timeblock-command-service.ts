@@ -110,15 +110,6 @@ export class TimeblockCommandService {
     });
   }
 
-  setPlanSkipped(options: VersionedTargetOptions & { skipped: boolean }): Promise<PlanRow> {
-    return this.commands.setPlanSkipped({
-      userId: options.userId,
-      planId: options.id,
-      expectedUpdatedAt: options.expectedUpdatedAt,
-      skipped: options.skipped,
-    });
-  }
-
   async recordPlan(options: VersionedTargetOptions): Promise<RecordRow> {
     const record = await this.commands.recordPlan({
       userId: options.userId,
@@ -148,7 +139,6 @@ export class TimeblockCommandService {
       title: input.title,
       note: input.note ?? null,
       activityId: input.activityId ?? null,
-      planId: input.planId ?? null,
       externalCalendarEventId: input.externalCalendarEventId ?? null,
       source: input.externalCalendarEventId ? 'external_calendar' : 'manual',
       startAt: input.start_at,
@@ -172,7 +162,6 @@ export class TimeblockCommandService {
       title: input.title ?? existing.title,
       note: input.note === undefined ? existing.note : input.note,
       activityId: input.activityId === undefined ? existing.activity_id : input.activityId,
-      planId: input.planId === undefined ? existing.plan_id : input.planId,
       externalCalendarEventId:
         input.externalCalendarEventId === undefined
           ? existing.external_calendar_event_id

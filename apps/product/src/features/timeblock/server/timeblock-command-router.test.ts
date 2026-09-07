@@ -8,7 +8,6 @@ const methods = vi.hoisted(() => ({
   updatePlan: vi.fn(),
   deletePlan: vi.fn(),
   restorePlan: vi.fn(),
-  setPlanSkipped: vi.fn(),
   recordPlan: vi.fn(),
   confirmDay: vi.fn(),
   createRecord: vi.fn(),
@@ -118,13 +117,13 @@ describe('timeblock command routers', () => {
     expect(methods.deleteRecord).not.toHaveBeenCalled();
 
     await expect(
-      planCaller().skip({
+      planCaller().delete({
         id: PLAN_ID,
         expectedUpdatedAt: VERSION,
         userId: forgedUserId,
       } as never),
     ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
-    expect(methods.setPlanSkipped).not.toHaveBeenCalled();
+    expect(methods.deletePlan).not.toHaveBeenCalled();
 
     // create 系は入れ子の payload schema 側で拒否する
     await expect(
@@ -138,12 +137,11 @@ describe('timeblock command routers', () => {
     expect(methods.createPlan).not.toHaveBeenCalled();
 
     // 正規の入力は通り、userId は session user だけが渡る
-    await planCaller().skip({ id: PLAN_ID, expectedUpdatedAt: VERSION });
-    expect(methods.setPlanSkipped).toHaveBeenCalledWith({
+    await planCaller().delete({ id: PLAN_ID, expectedUpdatedAt: VERSION });
+    expect(methods.deletePlan).toHaveBeenCalledWith({
       userId: USER_ID,
       id: PLAN_ID,
       expectedUpdatedAt: VERSION,
-      skipped: true,
     });
   });
 

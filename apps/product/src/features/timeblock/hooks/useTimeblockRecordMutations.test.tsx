@@ -22,6 +22,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('@tanstack/react-query', () => ({
   useQueryClient: () => ({
+    invalidateQueries: vi.fn(),
     getQueriesData: vi.fn(({ predicate }) => {
       const queryKey = [['records', 'list'], { input: {}, type: 'query' }];
       return predicate({ queryKey }) ? [[queryKey, []]] : [];
@@ -74,7 +75,7 @@ const record = {
   id: 'record-1',
   user_id: 'user-1',
   activity_id: null,
-  plan_id: 'plan-1',
+
   external_calendar_event_id: null,
   title: 'API development',
   note: 'Done',

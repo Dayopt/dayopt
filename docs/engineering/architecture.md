@@ -185,7 +185,7 @@ end
 
 ### Calendar の Plan / Record と UI state
 
-Calendar は Plan（予定）と Record（記録）を別レーンで描画し、`records.plan_id` で 1 Plan : N Record を表現する。
+Calendar は Plan（予定）と Record（記録）を別レーンで描画し、時間の重なりと期間集計から比較を導出する。
 
 ```mermaid
 flowchart LR
@@ -364,8 +364,8 @@ RLS の正確な対象・policy・grant は自動生成の [`data/db/rls-snapsho
 
 | テーブル                     | 役割                                                             | 主要カラム                                                                                                               |
 | ---------------------------- | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| **plans**                    | Plan（予定）。これからやる時間の宣言                             | title, activity_id, start_at, end_at, skipped_at, source, external_calendar_event_id                                     |
-| **records**                  | Record（記録）。`plan_id` で 1 Plan : N Record                   | title, activity_id, plan_id, start_at, end_at, source, external_calendar_event_id                                        |
+| **plans**                    | Plan（予定）。これからやる時間の宣言                             | title, activity_id, start_at, end_at, source, external_calendar_event_id                                                 |
+| **records**                  | Record（記録）。予定とは独立                                     | title, activity_id, start_at, end_at, source, external_calendar_event_id                                                 |
 | **external_calendar_events** | 外部カレンダー同期ミラー（テーブルのみ存在。同期実装は Phase 2） | connection_id, provider, provider_calendar_id, provider_event_id, start_at, end_at, status, dismissed_at, last_synced_at |
 | **categories**               | 所属の主軸。単一所属（`activities.category_id` 1本で表現）       | name, color, icon, archived_at                                                                                           |
 | **activities**               | Plan / Record の分類単位。所属カテゴリーから色・アイコンを継承   | category_id, name, archived_at                                                                                           |
@@ -436,11 +436,10 @@ Phase 2（external-calendar-import）で追加。OAuth / 同期 / UI は Step 2 
                     ┌──────────────────┐      ┌──────────────────┐
                     │      plans        │      │      records       │
                     │──────────────────│      │──────────────────│
-                    │ id (PK)           │◄─────│ plan_id (FK, NULL) │
-                    │ user_id (FK)      │ 1:N  │ user_id (FK)       │
+                    │ id (PK)           │      │ id (PK)            │
+                    │ user_id (FK)      │      │ user_id (FK)       │
                     │ title, note       │      │ title, note        │
                     │ start_at/end_at   │      │ start_at/end_at    │
-                    │ skipped_at        │      │ plan_id (nullable) │
                     │ source            │      │ source             │
                     │ external_calendar_│      │ external_calendar_ │
                     │  event_id (FK)    │      │  event_id (FK)     │

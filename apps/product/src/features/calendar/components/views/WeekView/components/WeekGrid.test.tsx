@@ -63,7 +63,7 @@ describe('WeekGrid mobile lane display', () => {
       'record',
     );
 
-    await user.click(screen.getByRole('button', { name: 'calendar.event.preview.plan' }));
+    await user.click(screen.getByRole('button', { name: 'calendar.timeblock.preview.plan' }));
 
     expect(useCalendarDisplayModeStore.getState().mobileWeekDisplayMode).toBe('planned');
     expect(screen.getByTestId('calendar-grid-content')).toHaveAttribute(

@@ -740,7 +740,6 @@ export type Database = {
           external_calendar_event_id: string | null;
           id: string;
           note: string | null;
-          skipped_at: string | null;
           source: string;
           start_at: string;
           title: string;
@@ -755,7 +754,6 @@ export type Database = {
           external_calendar_event_id?: string | null;
           id?: string;
           note?: string | null;
-          skipped_at?: string | null;
           source?: string;
           start_at: string;
           title: string;
@@ -770,7 +768,6 @@ export type Database = {
           external_calendar_event_id?: string | null;
           id?: string;
           note?: string | null;
-          skipped_at?: string | null;
           source?: string;
           start_at?: string;
           title?: string;
@@ -864,7 +861,6 @@ export type Database = {
           fulfillment: string | null;
           id: string;
           note: string | null;
-          plan_id: string | null;
           source: string;
           start_at: string;
           title: string;
@@ -880,7 +876,6 @@ export type Database = {
           fulfillment?: string | null;
           id?: string;
           note?: string | null;
-          plan_id?: string | null;
           source?: string;
           start_at: string;
           title: string;
@@ -896,7 +891,6 @@ export type Database = {
           fulfillment?: string | null;
           id?: string;
           note?: string | null;
-          plan_id?: string | null;
           source?: string;
           start_at?: string;
           title?: string;
@@ -916,13 +910,6 @@ export type Database = {
             columns: ['external_calendar_event_id'];
             isOneToOne: false;
             referencedRelation: 'external_calendar_events';
-            referencedColumns: ['id'];
-          },
-          {
-            foreignKeyName: 'records_plan_id_fkey';
-            columns: ['plan_id'];
-            isOneToOne: false;
-            referencedRelation: 'plans';
             referencedColumns: ['id'];
           },
         ];
@@ -1793,7 +1780,6 @@ export type Database = {
           fulfillment: string | null;
           id: string;
           note: string | null;
-          plan_id: string | null;
           source: string;
           start_at: string;
           title: string;
@@ -1823,7 +1809,6 @@ export type Database = {
           fulfillment: string | null;
           id: string;
           note: string | null;
-          plan_id: string | null;
           source: string;
           start_at: string;
           title: string;
@@ -1873,7 +1858,6 @@ export type Database = {
           external_calendar_event_id: string | null;
           id: string;
           note: string | null;
-          skipped_at: string | null;
           source: string;
           start_at: string;
           title: string;
@@ -1897,7 +1881,6 @@ export type Database = {
           external_calendar_event_id: string | null;
           id: string;
           note: string | null;
-          skipped_at: string | null;
           source: string;
           start_at: string;
           title: string;
@@ -1933,7 +1916,6 @@ export type Database = {
           fulfillment: string | null;
           id: string;
           note: string | null;
-          plan_id: string | null;
           source: string;
           start_at: string;
           title: string;
@@ -1979,7 +1961,6 @@ export type Database = {
           external_calendar_event_id: string | null;
           id: string;
           note: string | null;
-          skipped_at: string | null;
           source: string;
           start_at: string;
           title: string;
@@ -2008,7 +1989,6 @@ export type Database = {
           fulfillment: string | null;
           id: string;
           note: string | null;
-          plan_id: string | null;
           source: string;
           start_at: string;
           title: string;
@@ -2227,7 +2207,6 @@ export type Database = {
           external_calendar_event_id: string | null;
           id: string;
           note: string | null;
-          skipped_at: string | null;
           source: string;
           start_at: string;
           title: string;
@@ -2412,7 +2391,6 @@ export type Database = {
           fulfillment: string | null;
           id: string;
           note: string | null;
-          plan_id: string | null;
           source: string;
           start_at: string;
           title: string;
@@ -2468,7 +2446,6 @@ export type Database = {
           external_calendar_event_id: string | null;
           id: string;
           note: string | null;
-          skipped_at: string | null;
           source: string;
           start_at: string;
           title: string;
@@ -2501,7 +2478,6 @@ export type Database = {
           fulfillment: string | null;
           id: string;
           note: string | null;
-          plan_id: string | null;
           source: string;
           start_at: string;
           title: string;
@@ -2648,7 +2624,6 @@ export type Database = {
           external_calendar_event_id: string | null;
           id: string;
           note: string | null;
-          skipped_at: string | null;
           source: string;
           start_at: string;
           title: string;
@@ -2730,7 +2705,6 @@ export type Database = {
           external_calendar_event_id: string | null;
           id: string;
           note: string | null;
-          skipped_at: string | null;
           source: string;
           start_at: string;
           title: string;
@@ -2769,7 +2743,6 @@ export type Database = {
           fulfillment: string | null;
           id: string;
           note: string | null;
-          plan_id: string | null;
           source: string;
           start_at: string;
           title: string;

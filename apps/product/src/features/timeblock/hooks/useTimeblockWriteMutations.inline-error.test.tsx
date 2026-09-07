@@ -30,7 +30,6 @@ interface TimeModelRow {
   activity_id: string | null;
   start_at: string;
   end_at: string;
-  skipped_at?: string | null;
   deleted_at: string | null;
   created_at: string;
   updated_at: string;
@@ -44,7 +43,6 @@ const mocks = vi.hoisted(() => ({
   planUpdateCallbacks: undefined as MutationCallbacks | undefined,
   recordUpdateCallbacks: undefined as MutationCallbacks | undefined,
   planRestoreCallbacks: undefined as MutationCallbacks | undefined,
-  planSkipCallbacks: undefined as MutationCallbacks | undefined,
   otherMutationCallbacks: [] as MutationCallbacks[],
   cacheEntries: [] as CacheEntry[],
   querySetData: vi.fn(),
@@ -128,13 +126,6 @@ vi.mock('@/lib/trpc', () => {
             return useMutation(callbacks);
           },
         },
-        skip: {
-          useMutation: (callbacks: MutationCallbacks) => {
-            mocks.planSkipCallbacks = callbacks;
-            return useMutation(callbacks);
-          },
-        },
-        unskip: { useMutation },
       },
       recordCommands: {
         create: {
@@ -164,7 +155,6 @@ describe('useTimeblockWriteMutations create overlap presentation', () => {
     mocks.planUpdateCallbacks = undefined;
     mocks.recordUpdateCallbacks = undefined;
     mocks.planRestoreCallbacks = undefined;
-    mocks.planSkipCallbacks = undefined;
     mocks.otherMutationCallbacks = [];
     mocks.cacheEntries = [];
     mocks.recordDetailSetData.mockClear();
@@ -180,7 +170,7 @@ describe('useTimeblockWriteMutations create overlap presentation', () => {
       mocks.recordUpdateCallbacks,
       ...mocks.otherMutationCallbacks,
     ];
-    expect(callbacks).toHaveLength(10);
+    expect(callbacks).toHaveLength(8);
     expect(callbacks.every((options) => options?.retry === false)).toBe(true);
   });
 
@@ -364,7 +354,7 @@ describe('useTimeblockWriteMutations create overlap presentation', () => {
       activity_id: null,
       start_at: '2026-07-17T09:00:00.000Z',
       end_at: '2026-07-17T10:00:00.000Z',
-      skipped_at: null,
+
       deleted_at: null,
       created_at: '2026-07-17T08:00:00.000Z',
       updated_at: '2026-07-17T08:00:00.000001+00:00',
@@ -383,34 +373,6 @@ describe('useTimeblockWriteMutations create overlap presentation', () => {
     expect(mocks.planDetailSetData).toHaveBeenCalledWith({ id: updated.id }, updated);
   });
 
-  it('skip commandの返却行をincludeSkipped=falseの一覧から除く', () => {
-    const queryKey = [['plans', 'list'], { input: { includeSkipped: false }, type: 'query' }];
-    const current: TimeModelRow = {
-      id: 'plan-1',
-      title: 'Plan',
-      note: null,
-      activity_id: null,
-      start_at: '2026-07-17T09:00:00.000Z',
-      end_at: '2026-07-17T10:00:00.000Z',
-      skipped_at: null,
-      deleted_at: null,
-      created_at: '2026-07-17T08:00:00.000Z',
-      updated_at: '2026-07-17T08:00:00.000001+00:00',
-    };
-    mocks.cacheEntries = [[queryKey, [current]]];
-    renderHook(() => useTimeblockWriteMutations());
-
-    act(() =>
-      mocks.planSkipCallbacks?.onSuccess?.({
-        ...current,
-        skipped_at: '2026-07-17T10:30:00.000Z',
-        updated_at: '2026-07-17T10:30:00.000001+00:00',
-      }),
-    );
-
-    expect(mocks.cacheEntries[0]?.[1]).toEqual([]);
-  });
-
   it('restore commandの返却行を一致する一覧へ再挿入する', () => {
     const queryKey = [['plans', 'list'], { input: {}, type: 'query' }];
     const restored: TimeModelRow = {
@@ -420,7 +382,7 @@ describe('useTimeblockWriteMutations create overlap presentation', () => {
       activity_id: null,
       start_at: '2026-07-17T09:00:00.000Z',
       end_at: '2026-07-17T10:00:00.000Z',
-      skipped_at: null,
+
       deleted_at: null,
       created_at: '2026-07-17T08:00:00.000Z',
       updated_at: '2026-07-17T11:00:00.000001+00:00',

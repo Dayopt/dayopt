@@ -64,7 +64,7 @@ TimeblockRecordActions                記録導線（ワンタップ「そのま
 | `useTimeblockRecordMutations`                  | ワンタップ記録 / この日を確定                      |
 | `useInspectorURLSync` / `useInspectorKeyboard` | URL 同期・キーボード操作                           |
 
-コピーは表示内容と Plan / Record の種別だけを保持する。`id` / `plan_id` は保持せず、貼り付け時は同じ種別の独立した Timeblock を作る。
+コピーは表示内容と Plan / Record の種別だけを保持する。元の `id` は保持せず、貼り付け時は同じ種別の独立した Timeblock を作る。
 
 複製は同じ内容を未保存の詳細カードへ展開し、独立した Plan / Record を1件作る。時間重複時はサイドバー作成と同じ `TimeConflictAlert` を表示し、日時を変更するまで作成を無効にする。複製下書きでは編集時の自動保存を行わない。
 

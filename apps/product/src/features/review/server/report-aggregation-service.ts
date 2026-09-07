@@ -1,8 +1,10 @@
 import 'server-only';
 
+import { toDerivedBlock } from '@/lib/database';
+import { aggregate } from '@/lib/time';
+
 import {
   clipMinutes,
-  distributeToBuckets,
   resolveNextReportRange,
   resolvePreviousReportRange,
   resolveReportRange,
@@ -132,22 +134,6 @@ interface ActivityBucketState {
   byBucket: number[];
 }
 
-function createState(bucketCount: number): ActivityBucketState {
-  return {
-    recordedMinutes: 0,
-    plannedMinutes: 0,
-    plannedPastMinutes: 0,
-    plannedPastBoxes: 0,
-    recordBoxes: 0,
-    fulfillment: { low: 0, medium: 0, high: 0 },
-    byBucket: Array.from({ length: bucketCount }, () => 0),
-  };
-}
-
-function isFulfillmentLevel(value: string | null): value is keyof ReportFulfillmentCounts {
-  return value === 'low' || value === 'medium' || value === 'high';
-}
-
 /**
  * 公開するのは `createReportAggregationService` だけ。呼び出し側（router / test）は
  * factory 経由で受け取り、戻り値の型は推論で拾う。
@@ -185,7 +171,7 @@ class ReportAggregationService {
     const activityById = new Map(activities.map((row) => [row.id, row]));
     const categoryById = new Map(categories.map((row) => [row.id, row]));
 
-    const states = this.buildStates(records, plans, range, now.getTime());
+    const states = this.buildStates(records, plans, range, now, timezone);
     const uncategorizedRecords = this.selectUncategorizedRecords(records, activityById, range);
 
     return {
@@ -204,12 +190,10 @@ class ReportAggregationService {
       activities: [...states].map(([activityId, state]) =>
         this.toAggregate(activityId, state, activityById, categoryById),
       ),
-      previousActivities: this.buildPreviousTotals(previousRecords, previousRange),
-      nextPeriodPlannedMinutes: nextPlans.reduce(
-        (total, plan) =>
-          total + clipMinutes(plan.start_at, plan.end_at, nextRange.startAt, nextRange.endAt),
-        0,
-      ),
+      previousActivities: this.buildPreviousTotals(previousRecords, previousRange, timezone, now),
+      nextPeriodPlannedMinutes: [
+        ...this.buildStates([], nextPlans, nextRange, now, timezone).values(),
+      ].reduce((sum, state) => sum + state.plannedMinutes, 0),
       uncategorizedRecordCount: uncategorizedRecords.length,
       unconvertedExternalEventCount: ghostEvents.length,
       firstUncategorizedRecord: this.toFirstJumpTarget(uncategorizedRecords, timezone),
@@ -221,57 +205,28 @@ class ReportAggregationService {
     records: ReportRecordRow[],
     plans: ReportPlanRow[],
     range: ReturnType<typeof resolveReportRange>,
-    nowMs: number,
+    now: Date,
+    timezone: string,
   ): Map<string | null, ActivityBucketState> {
-    // `activityId` は null を取りうる。Map は null をキーにできるので番兵文字列を作らない
-    // （UUID と衝突しない値を捻り出す必要がなく、変換の往復も消える）。
+    const blocks = [
+      ...plans.map((row) => toDerivedBlock(row, 'plan')),
+      ...records.map((row) => toDerivedBlock(row, 'rec')),
+    ];
     const states = new Map<string | null, ActivityBucketState>();
-    const ensure = (activityId: string | null): ActivityBucketState => {
-      const existing = states.get(activityId);
-      if (existing) return existing;
-      const created = createState(range.buckets.length);
-      states.set(activityId, created);
-      return created;
-    };
-
-    for (const record of records) {
-      const minutes = clipMinutes(record.start_at, record.end_at, range.startAt, range.endAt);
-      if (minutes <= 0) continue;
-
-      const state = ensure(record.activity_id);
-      state.recordedMinutes += minutes;
-      state.recordBoxes += 1;
-
-      // 0 時またぎはここで日境界へ按分される。ブロック自体は分割しない。
-      const distributed = distributeToBuckets(record.start_at, record.end_at, range.buckets);
-      for (let index = 0; index < distributed.length; index += 1) {
-        state.byBucket[index] = (state.byBucket[index] ?? 0) + (distributed[index] ?? 0);
-      }
-
-      if (isFulfillmentLevel(record.fulfillment)) {
-        state.fulfillment[record.fulfillment] += 1;
-      }
+    for (const activityId of new Set(blocks.map((block) => block.activityId))) {
+      const totals = aggregate({ ...range, timezone }, activityId, blocks, now);
+      states.set(activityId, {
+        recordedMinutes: totals.recordedMinutes,
+        plannedMinutes: totals.plannedMinutes,
+        plannedPastMinutes: totals.plannedPastMinutes,
+        plannedPastBoxes: totals.plannedPastBoxes,
+        recordBoxes: totals.recordBoxes,
+        fulfillment: totals.fulfillment,
+        byBucket: range.buckets.map(
+          (bucket) => aggregate({ ...bucket, timezone }, activityId, blocks, now).recordedMinutes,
+        ),
+      });
     }
-
-    for (const plan of plans) {
-      const minutes = clipMinutes(plan.start_at, plan.end_at, range.startAt, range.endAt);
-      if (minutes <= 0) continue;
-
-      const state = ensure(plan.activity_id);
-      state.plannedMinutes += minutes;
-
-      // 「予定比」と「見積もりの鏡」は、まだ来ていない予定を分母に入れない。
-      // 開始が現在時刻を過ぎた予定だけを planPast として数える。
-      //
-      // ISO 文字列を直接比較しない。Supabase の timestamptz は `+00:00` 付きで返り、
-      // `Date#toISOString()` の `Z` 表記や小数秒の有無と字面が揃わないため、
-      // 辞書順比較は境界付近で誤判定しうる。必ず数値へ落として比べる。
-      if (Date.parse(plan.start_at) <= nowMs) {
-        state.plannedPastMinutes += minutes;
-        state.plannedPastBoxes += 1;
-      }
-    }
-
     return states;
   }
 
@@ -306,16 +261,14 @@ class ReportAggregationService {
   private buildPreviousTotals(
     records: ReportRecordRow[],
     range: { startAt: string; endAt: string },
+    timezone: string,
+    now: Date,
   ): { activityId: string | null; recordedMinutes: number }[] {
-    const totals = new Map<string | null, number>();
-
-    for (const record of records) {
-      const minutes = clipMinutes(record.start_at, record.end_at, range.startAt, range.endAt);
-      if (minutes <= 0) continue;
-      totals.set(record.activity_id, (totals.get(record.activity_id) ?? 0) + minutes);
-    }
-
-    return [...totals].map(([activityId, recordedMinutes]) => ({ activityId, recordedMinutes }));
+    const blocks = records.map((row) => toDerivedBlock(row, 'rec'));
+    return [...new Set(blocks.map((block) => block.activityId))].map((activityId) => ({
+      activityId,
+      recordedMinutes: aggregate({ ...range, timezone }, activityId, blocks, now).recordedMinutes,
+    }));
   }
 
   /**

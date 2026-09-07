@@ -1,7 +1,7 @@
 {
   "app": {
     "name": "Dayopt",
-    "description": "Timeboxing, time tracking, tasks, and calendar — unified",
+    "description": "Timeboxing, time tracking, plans, and calendar — unified",
     "version": "v1.0.0",
     "keywords": ["task management", "productivity", "project management"]
   },
@@ -51,9 +51,7 @@
     "noData": "No data available",
     "undo": "Undo",
     "skipToMainContent": "Skip to main content",
-    "createNewEvent": "Create new event",
     "toast": {
-      "eventDeleted": "Event deleted",
       "copied": "Copied to clipboard",
       "copyFailed": "Failed to copy"
     },
@@ -201,7 +199,7 @@
       "placeholder": "Search...",
       "noResults": "No results found",
       "activitiesGroup": "Activities",
-      "blocksGroup": "Blocks",
+      "blocksGroup": "Timeblocks",
       "moreResults": "{count}+ more results"
     },
     "offline": {
@@ -256,7 +254,6 @@
     },
     "createNew": {
       "plan": "Create Plan",
-      "task": "Create task",
       "activity": "Create activity",
       "defaultPlanTitle": "New Plan"
     },
@@ -264,12 +261,6 @@
     "userProfile": {
       "comingSoon": "Profile page coming soon",
       "notFound": "User not found"
-    },
-    "entry": {
-      "origin": {
-        "planned": "Planned",
-        "unplanned": "Record only"
-      }
     },
     "activities": {
       "add": "Add activity",

@@ -31,6 +31,19 @@ describe('escapeTimeblockCsvField', () => {
 });
 
 describe('timeblockRowsToCsv', () => {
+  it('defined columns以外の内部値はexportしない', () => {
+    const csv = timeblockRowsToCsv([
+      {
+        kind: 'record',
+        id: 'rec',
+        internal_value: 'not-exported',
+        source: 'from_plan',
+      },
+    ]);
+    expect(csv).not.toContain('internal_value');
+    expect(csv).not.toContain('not-exported');
+    expect(csv).toContain('from_plan');
+  });
   it('header・列順・LF record separator を固定する', () => {
     const csv = timeblockRowsToCsv([
       { kind: 'plan', id: 'plan-1', title: '=2+2', note: null },
