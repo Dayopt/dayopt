@@ -354,6 +354,22 @@ describe('release workflow contract', () => {
     expect(notify).toContain('gh issue comment');
   });
 
+  it('never files a promote failure for a superseded release', () => {
+    // `superseded` は「より新しい deployment が既に live」= target の内容は production に
+    // 入っている状態で、release job は exit 1 するが異常ではない。result だけで判定すると
+    // burst merge のたびに正常な追い越しを p1 issue として起票し、runbook Playbook 2
+    // （rollback 調査）へ誘導してしまう。
+    const notify = release.slice(
+      release.indexOf('\n  notify_failure:'),
+      release.indexOf('\n  release:'),
+    );
+    expect(notify).toContain("needs.release.outputs.release_status != 'superseded'");
+    // 除外は release job が状態を output していないと常に真になる（空文字 != superseded）。
+    expect(code(releaseJob)).toMatch(
+      /outputs:\s*\n\s*release_status: \$\{\{ steps\.release\.outputs\.release_status \}\}/,
+    );
+  });
+
   it('keeps issue write permission off every job that runs repository code', () => {
     // 起票 job は checkout しない。code を実行する job に書き込み token を置かない
     // （層 3 は PR / main の code をそのまま走らせる）。

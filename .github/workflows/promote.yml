@@ -251,12 +251,17 @@ jobs:
   notify_failure:
     name: File promote failure
     needs: [impact, e2e, web, release]
+    # `superseded` は異常ではない。burst merge で後発 run が先に promote すると先発は
+    # superseded で exit 1 するが、その commit の内容は既に production に入っている。
+    # result だけを見ると正常な追い越しを P1 として起票し、runbook Playbook 2（rollback
+    # 調査）へ誘導してしまう。
     if: >-
       ${{ !cancelled()
           && ( needs.impact.result == 'failure'
                || needs.e2e.result == 'failure'
                || needs.web.result == 'failure'
-               || needs.release.result == 'failure' ) }}
+               || ( needs.release.result == 'failure'
+                    && needs.release.outputs.release_status != 'superseded' ) ) }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -350,6 +355,11 @@ jobs:
     concurrency:
       group: production-release
       cancel-in-progress: false
+    # `superseded`（より新しい deployment が既に live で、target の内容は production に
+    # 入っている状態）でも合否判定の step は exit 1 する。notify_failure から本物の失敗と
+    # 区別するために状態そのものを出す。
+    outputs:
+      release_status: ${{ steps.release.outputs.release_status }}
     permissions:
       contents: read
       statuses: write

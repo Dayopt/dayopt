@@ -199,7 +199,9 @@ main へ merge しても Production domain は**直接**切り替わらない。
 `File promote failure` job が **`[auto] Production Release が失敗しました` という 1 本の issue**
 へ起票する（`area:deployment` / `priority:p1`）。同じ title prefix の open issue が既にあれば
 新規作成せずコメントで追記するので、失敗が続く間も issue は 1 本のまま増えない。本文には
-どの job が落ちたか、対象 SHA、run URL が入る。**直したら issue は手で close する**（自動で
+どの job が落ちたか、対象 SHA、run URL が入る。**`superseded` は起票しない** —— burst merge で
+後発 run が先に promote した時、先発は superseded で exit 1 するが、その commit の内容は既に
+production に入っているので異常ではない。**直したら issue は手で close する**（自動で
 閉じる経路は持たない）。それまでは push actor へのメールしか経路が無く、3 run 連続で
 promote が止まったまま気づかれなかった。
 
