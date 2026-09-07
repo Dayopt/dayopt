@@ -1,4 +1,5 @@
 import { NextRequest } from 'next/server';
+import Stripe from 'stripe';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { resetWriteFenceCacheForTestsOnly } from '@/lib/ops/write-fence';
@@ -23,7 +24,11 @@ const eventMock = vi.hoisted(() => ({
   livemode: false,
   type: 'customer.subscription.deleted',
 }));
-const constructEvent = vi.hoisted(() => vi.fn(() => eventMock));
+// 引数を受ける形にしておく。**引数を無視する mock のままだと「payload / signature /
+// secret のどれを渡し間違えても緑」**になり、署名検証を守れない（#2646）。
+const constructEvent = vi.hoisted(() =>
+  vi.fn((_payload: string, _signature: string, _secret: string): unknown => eventMock),
+);
 const retrieveAccount = vi.hoisted(() => vi.fn());
 const retrieveEvent = vi.hoisted(() => vi.fn());
 const retrieveSubscription = vi.hoisted(() => vi.fn());
@@ -39,6 +44,7 @@ const profileMaybeSingle = vi.hoisted(() => vi.fn());
 const writeFenceMaybeSingle = vi.hoisted(() => vi.fn());
 const getUserById = vi.hoisted(() => vi.fn());
 const trackProductEvent = vi.hoisted(() => vi.fn());
+const captureUnexpectedError = vi.hoisted(() => vi.fn());
 const from = vi.hoisted(() =>
   vi.fn((table: string) => ({
     select: vi.fn(() => ({
@@ -86,7 +92,7 @@ vi.mock('@/lib/logger', () => ({
 }));
 vi.mock('@/lib/sentry', () => ({
   captureUnexpectedDatabaseError: vi.fn(),
-  captureUnexpectedError: vi.fn(),
+  captureUnexpectedError,
   observeAuthOperation: vi.fn((_name: string, operation: () => unknown) => operation()),
 }));
 vi.mock('./stripe-webhook-idempotency', () => ({
@@ -97,10 +103,10 @@ vi.mock('./stripe-webhook-idempotency', () => ({
 
 import { POST } from './route';
 
-function request(): NextRequest {
+function request(overrides: { body?: string; headers?: Record<string, string> } = {}): NextRequest {
   return new NextRequest('https://app.dayopt.test/api/webhooks/stripe', {
-    body: '{}',
-    headers: { 'stripe-signature': 'signed' },
+    body: overrides.body ?? '{}',
+    headers: overrides.headers ?? { 'stripe-signature': 'signed' },
     method: 'POST',
   });
 }
@@ -108,6 +114,8 @@ function request(): NextRequest {
 beforeEach(() => {
   vi.clearAllMocks();
   resetWriteFenceCacheForTestsOnly();
+  envMock.STRIPE_WEBHOOK_SECRET = 'fixture';
+  constructEvent.mockImplementation(() => eventMock);
   eventMock.account = null;
   eventMock.livemode = false;
   eventMock.type = 'customer.subscription.deleted';
@@ -340,5 +348,102 @@ describe('Stripe webhook route', () => {
     expect(response.headers.get('Retry-After')).toBe('30');
     expect(claimStripeWebhookEvent).not.toHaveBeenCalled();
     expect(syncSubscriptionStatus).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * 署名検証の負のケース。
+ *
+ * 実測（#2646）: `route.ts` の署名ヘッダ欠如ガード（401）を削除しても webhook 関連
+ * 51 件がすべて pass した。既存の test は常に正しいヘッダしか送らず、`constructEvent`
+ * も throw しない固定 mock だったため、**401 を assert する test が 1 本も無かった**。
+ * 検証を素通りした request が claim（冪等性の予約）と業務処理へ到達しないことまで見る。
+ */
+describe('Stripe webhook 署名検証', () => {
+  it('署名ヘッダが無い request を401で拒否し、業務処理へ進めない', async () => {
+    const response = await POST(request({ headers: {} }));
+
+    expect(response.status).toBe(401);
+    await expect(response.json()).resolves.toEqual({ error: 'Missing signature' });
+    expect(constructEvent).not.toHaveBeenCalled();
+    expect(claimStripeWebhookEvent).not.toHaveBeenCalled();
+    expect(syncDeletedSubscriptionStatus).not.toHaveBeenCalled();
+  });
+
+  it('署名検証がthrowしたら401で拒否し、業務処理へ進めない', async () => {
+    constructEvent.mockImplementationOnce(() => {
+      throw new Error('No signatures found matching the expected signature for payload');
+    });
+
+    const response = await POST(request());
+
+    expect(response.status).toBe(401);
+    await expect(response.json()).resolves.toEqual({ error: 'Invalid signature' });
+    expect(claimStripeWebhookEvent).not.toHaveBeenCalled();
+    expect(syncDeletedSubscriptionStatus).not.toHaveBeenCalled();
+  });
+
+  // issue #2646 は「早期 return」と書いているが、実装は 500 を返す（`route.ts` の
+  // `Webhook secret not configured`）。現行挙動をそのまま固定する。
+  it('webhook secret未設定は500で止め、Sentryへconfigurationとして送る', async () => {
+    envMock.STRIPE_WEBHOOK_SECRET = '';
+
+    const response = await POST(request());
+
+    expect(response.status).toBe(500);
+    await expect(response.json()).resolves.toEqual({ error: 'Webhook secret not configured' });
+    expect(captureUnexpectedError).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({ operation: 'configuration', source: 'stripe_webhook' }),
+    );
+    expect(constructEvent).not.toHaveBeenCalled();
+    expect(claimStripeWebhookEvent).not.toHaveBeenCalled();
+  });
+
+  /**
+   * ここだけ mock ではなく実 SDK の `constructEvent` を通す。mock throw は「throw したら
+   * 401 になる」ことしか証明せず、**secret の受け渡し先を取り違えた類のバグは拾えない**。
+   * `apps/product` は `stripe` を依存に持つので新規依存は要らない。
+   */
+  describe('実SDKでの署名検証', () => {
+    const realStripe = new Stripe('sk_test_dummy');
+    const signedPayload = JSON.stringify(eventMock);
+
+    function withRealVerification() {
+      constructEvent.mockImplementation((payload: string, signature: string, secret: string) =>
+        realStripe.webhooks.constructEvent(payload, signature, secret),
+      );
+    }
+
+    it('正しいsecretで署名したpayloadは検証を通り、冪等性のclaimまで進む', async () => {
+      withRealVerification();
+      const signature = realStripe.webhooks.generateTestHeaderString({
+        payload: signedPayload,
+        secret: 'fixture',
+      });
+
+      const response = await POST(
+        request({ body: signedPayload, headers: { 'stripe-signature': signature } }),
+      );
+
+      expect(response.status).not.toBe(401);
+      expect(claimStripeWebhookEvent).toHaveBeenCalledOnce();
+    });
+
+    it('別のsecretで署名したpayloadは401で拒否する', async () => {
+      withRealVerification();
+      const signature = realStripe.webhooks.generateTestHeaderString({
+        payload: signedPayload,
+        secret: 'wrong-secret',
+      });
+
+      const response = await POST(
+        request({ body: signedPayload, headers: { 'stripe-signature': signature } }),
+      );
+
+      expect(response.status).toBe(401);
+      await expect(response.json()).resolves.toEqual({ error: 'Invalid signature' });
+      expect(claimStripeWebhookEvent).not.toHaveBeenCalled();
+    });
   });
 });

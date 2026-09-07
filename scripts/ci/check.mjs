@@ -436,6 +436,7 @@ async function runUnit() {
     console.log('product 影響なしのため product unit test を skip します。');
   }
   run('pnpm', ['test:web']);
+  run('pnpm', ['--filter', '@dayopt/billing', 'test:run']);
   run('pnpm', ['--filter', '@dayopt/i18n', 'test:run']);
   run('pnpm', ['--filter', '@dayopt/observability', 'test:run']);
 }
