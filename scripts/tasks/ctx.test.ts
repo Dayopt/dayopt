@@ -609,6 +609,34 @@ describe('nextStep', () => {
 });
 
 describe('buildContextPack (execFileImpl 経由の gh 呼び出し形)', () => {
+  it('表示から省略された本文でも振り分けと資料の鮮度に反映する', () => {
+    const make = (suffix: string) =>
+      buildContextPack(
+        { number: 123, comments: 5, bodyLines: 5, allComments: false },
+        {
+          existsFn: () => true,
+          readFileImpl: () => '',
+          execFileImpl: (_cmd: string, args: string[]) => {
+            if (args[1] === 'repos/Dayopt/dayopt/issues/123')
+              return JSON.stringify({
+                title: '資料の更新',
+                state: 'open',
+                labels: [],
+                html_url: 'https://github.com/Dayopt/dayopt/issues/123',
+                body: `## やること\n受け入れ条件: scripts/tasks/ctx.mjs の結果を確認\n## 検証\n\`pnpm test:scripts\`\n${'説明\n'.repeat(70)}${suffix}`,
+              });
+            return '[]';
+          },
+        },
+      );
+    const first = make('OAuth の判断を含む');
+    const next = make('OAuth の判断を変更する');
+    expect(first.body.text).not.toContain('OAuth');
+    expect(first.routing).toMatchObject({ level: 'L3', ready: true, preparation: 'L1' });
+    expect(first.body.text).toBe(next.body.text);
+    expect(first.bodySha256).not.toBe(next.bodySha256);
+    expect(renderMarkdown(first)).toContain('実装・判断: L3');
+  });
   it('issue: issues API → comments → search prs → pr view(headRefName,files) の順で argv を渡す', () => {
     const calls: string[][] = [];
     const execFileImpl = vi.fn((_cmd: string, args: string[]) => {
@@ -659,6 +687,7 @@ describe('buildContextPack (execFileImpl 経由の gh 呼び出し形)', () => {
       { number: 99, state: 'OPEN', title: 'PR', headRefName: 'sonnet/foo-2550' },
     ]);
     expect(pack.files).toContain('apps/product/src/foo.ts');
+    expect(pack.routing).toMatchObject({ level: 'unclassified', preparation: 'L1', ready: false });
     expect(calls[0]).toEqual(['api', 'repos/Dayopt/dayopt/issues/2550']);
     expect(pack.judgmentRecords).toEqual({
       dod: false,
@@ -1007,6 +1036,14 @@ describe('renderMarkdown', () => {
       decisionLines: [],
       skills: ['pr-cross-review'],
       judgmentRecords: { dod: true, breakdown: true, brief: true },
+      routing: {
+        level: 'L3',
+        ready: false,
+        preparation: 'L1',
+        reasons: ['時間規則'],
+        missing: ['検証コマンド'],
+        preparationGoal: '根拠を整理する',
+      },
       nextStep: 'pnpm branch:finish 9999',
       nextStepSecondary: null,
     };
@@ -1015,6 +1052,8 @@ describe('renderMarkdown', () => {
     const markdown = renderMarkdown(pack);
     const lineCount = markdown.split('\n').length;
     expect(lineCount).toBeLessThanOrEqual(150);
+    expect(markdown).toContain('実装・判断: L3');
+    expect(markdown).toContain('不足: 検証コマンド');
     expect(markdown).toContain('#### 判断の記録');
     expect(markdown).toContain('次の一手: pnpm branch:finish 9999');
   });

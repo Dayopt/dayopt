@@ -32,7 +32,7 @@ description: 複数ファイル・複数手順・調査を伴うタスクの着�
    - allowed path と禁止事項を短く指定できる
    - 成功条件と出力を親が独立検証できる
    - context の受け渡し・待ち・統合の費用より、並列性または専門性の便益が大きい
-5. **出力契約を渡す**。下記 template に従い、model 名より能力要件を先に書く。runtime が model 明示を必要とする場合だけ、利用可能な中から条件を満たすものを指定する
+5. **出力契約を渡す**。下記 template に従い、model 名より能力要件を先に書く。issue / PR があれば `pnpm ctx <N>` の振り分けを確認し、採用する層・理由・実際の model を引き継ぎ時に記録する。model 指定が可能な runtime では下記の候補から選び、選べない時は変更済みと報告しない
 6. **outcome を検証する**。diff、検証コマンドの出力、必要なら UI / API / data flow を成功条件と突き合わせる。「passed」「done」という申告だけでは完了にしない
 7. **永続 handoff を更新する**。issue / PR に、確認した事実、残る仮説、判断、検証結果、次の一手を書く。会話 transcript だけに状態を残さない
 
@@ -60,6 +60,52 @@ description: 複数ファイル・複数手順・調査を伴うタスクの着�
 | External service | repo script、公式 CLI、必要時だけ MCP                    | metadata と対象 1 件へ絞り、secret を出さない |
 
 同じ tool 連鎖が繰り返される場合は script 化の候補にするが、今回だけの短い処理を先回りして恒久化しない。巨大出力は context に入れる前に範囲指定、`--jq`、head / tail で射影する。
+
+## L0〜L3 の振り分けと引き継ぎ
+
+`pnpm ctx <N>` / `--json` は機械判定による助言を返す。既存の保護対象判定は外部契約・不可逆性の信号として再利用し、時間・操作の不変条件は別に検出する。`review:full` は人間向けの印なので機械入力に使わない。実装・判断の層と、事前整理の層を分ける。L3 の変更でも事実収集は L0・L1 に渡せる。
+
+| 層  | 成果                                             | Codex の候補（運用上の目安） |
+| --- | ------------------------------------------------ | ---------------------------- |
+| L0  | CLI による情報取得・集計・検証                   | model を起動しない           |
+| L1  | 指定範囲の根拠付き事実・既存パターン・未確認事項 | Spark / Luna                 |
+| L2  | 仕様と検証方法が明確な通常実装                   | Terra、範囲が狭い場合は Luna |
+| L3  | 不変条件・権限・外部契約・設計の判断             | Sol / Astra                  |
+
+この表は能力の保証でも自動起動設定でもない。runtime の可用性と実際の結果で選び直す。Spark の速さを消費量の少なさと同一視しない。毎回 L1 から順に昇格させず、初めから適切な層へ渡す。
+
+- `routing.level` は通常実装を L2、危険な手掛かりがあれば L3、情報不足なら `unclassified` とする。L1 は事前整理の候補で、コード変更の自動許可ではない
+- `routing.ready` は入力項目の存在確認だけ。受け入れ条件・検証コマンドの検出は既存の文字列判定なので、内容が十分かは担当が確認する。`status:ready` の付与・merge・production 操作を許可しない
+- path / 本文の一致は保守的な手掛かり。calendar 内の小修正も L3 候補になる場合がある。差分の実際の意味を確認して層を下げる時は理由を残す。一致なしを安全の証明にしない
+- 想定原因と実測が食い違う、対象が広がる、同種の失敗が続く時は AGENTS.md の停止条件に従い、証拠を残して再判定する
+
+### L1 の資料を再利用する
+
+引き渡しが必要な作業にだけ使う。同じ担当が小修正を完了できる時は資料を増やさない。
+
+```bash
+pnpm --silent ctx <N> --json > /tmp/dayopt-context.json
+pnpm handoff:create --context /tmp/dayopt-context.json \
+  --source scripts/tasks/ctx.mjs --source scripts/tasks/trace.mjs \
+  --out /tmp/dayopt-handoff.json
+pnpm handoff:validate --context /tmp/dayopt-context.json --file /tmp/dayopt-handoff.json
+```
+
+`--source` は作業ごとの関連ファイルに置き換える。repo 内のファイルを 1〜40 件まで明示する。ディレクトリ丸ごとや秘密ファイルは収集しない。生成された JSON は `draft` で、既存ファイルは上書きしない。L1 は以下を記入する:
+
+- `goal` / `acceptance`: ユーザーの目的と完了条件
+- `facts`: `{ "claim": "確認した事実", "path": "scripts/tasks/ctx.mjs", "line": 1 }` の配列。選択した source と実在する行番号を根拠にする
+- `hypotheses` / `unknowns`: 推定と未確認事項を別々の文字列配列にする。未確認範囲を空配列で隠さない
+- `verification`: `{ "command": "実行したコマンド", "status": "passed", "exitCode": 0, "output": "出力の要点" }` の配列。未実行は `status: "not-run"`、`exitCode: null`、`output` に理由を書く。失敗は `failed` と実際の非 0 exit を記録する
+- `nextAction`: 次の担当に判断してほしい問い。記入後に `status` を `ready` または `partial` にする
+
+対象 HEAD・選択した source の作業中の内容・ctx のハッシュが変われば再利用できない。引き渡す前に ctx を再取得して検査する。資料の生成時点から対象が変わったら新しい出力先へ作り直し、変化した事実だけ再確認する。PR は現在の HEAD が PR head SHA と一致する checkout で作る。snapshot と snapshotId は編集しない。
+
+検査結果は `ready` / `partial` / `stale` / `invalid`。`ready` 以外は非 0 exit で、未実行や未確認を完了扱いしない。これは鮮度・形式・根拠参照の検査であり、記述の真偽・コマンドの実行・安全性は証明しない。選択していないファイルの変化も保証外。L2・L3 は論点に必要な一次資料と結果を確認する。独立レビューには L1 の安全性の結論を渡さず、`pr-cross-review` の review pack を使う。
+
+### 効果の回収
+
+最初の数件は issue / PR に「採用した層と model、再利用した根拠、調べ直した範囲、手戻り・User 介入」を短く残す。評価単位は完了 1 件あたりの総消費と再探索・手戻り。`pnpm ai:usage` の Codex は現状未収集なので、0 消費や節約済みと扱わない。Codex の利用量を実測できる経路が揃うまでは、定性的な改善と消費量の主張を分ける。
 
 ## 委譲 prompt の骨格
 
