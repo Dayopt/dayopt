@@ -55,7 +55,7 @@ contract migrationは本番と検証専用DBへ適用済み。既存の共有ロ
 - `independent-plan-record-concurrency.py dayopt_derived_pr1_*`: 同時一括要求の作成数 `[0, 1]`、保存記録1件。
 - contract用隔離DB `dayopt_derived_contract_2648`: expand前fixture → expand migration → contract migration → `derived-migration-after.sql` を順に適用し、保持列の両方向差分0件。旧skip更新UndoはDR008、旧形式の通常Plan作成Undoと通常Undoの再試行は成功。
 - 同じ隔離DBで `independent-plan-record.sql`: exit 0。旧列が行型に存在しないこと、旧skip writerがDT012で拒否されること、コピー・一括記録・相互非干渉を確認。
-- API経由の既存結合テストの旧リンク期待値は更新したが、HTTP経由での実行と認証済みカレンダー/InspectorのE2Eは未実施。既存の共有ローカルSupabaseは旧スキーマのままであり、そこへ今回のmigrationを適用して検証したことにはしない。Supabase/Vercel Previewは成功。
+- 認証済みブラウザE2E `derived-plan-record-flow.spec.ts` で、同一週内の記録ドラッグ後に予定Inspectorの記録一覧だけが消え、レポートの予定比150%は維持されることを確認。ローカル隔離ユーザーと共有ローカルSupabaseでexit 0。共有ローカルDBは旧スキーマのままであり、そこへ今回のmigrationを適用して検証したことにはしない。Supabase/Vercel Previewは成功。
 - 独立レビューで修正した点: DB先行配備中の旧writer互換、成功済みMCP再送、旧形式の通常Plan作成Undo、公開tRPCのskip入力、純粋モデルとDB変換の配置。
 - セルフレビューで修正した点: 拡張段階にも残るFKの副作用、旧列がAPI応答へ混ざる問題、取得上限による集計漏れ、変更後の集計キャッシュ再取得。
 
