@@ -335,6 +335,78 @@ describe('release workflow contract', () => {
     expect(createRelease).toContain('"$state" != "success"');
   });
 
+  it('reports a promote failure through a job that outlives the skipped release', () => {
+    // 層 3 が赤いと release job ごと skip されるため、release の step では失敗を
+    // 拾えない。independent な job が needs の result を直接見る（#2643）。
+    const notify = release.slice(
+      release.indexOf('\n  notify_failure:'),
+      release.indexOf('\n  release:'),
+    );
+    expect(notify).not.toBe('');
+    expect(notify).toMatch(/^\s*needs: \[impact, e2e, web, release\]\s*$/m);
+    for (const job of ['impact', 'e2e', 'web', 'release']) {
+      expect(notify).toContain(`needs.${job}.result == 'failure'`);
+    }
+    // 暗黙の success() が付くと、needs が失敗した時点でこの job も skip される。
+    expect(notify).toContain('!cancelled()');
+    expect(notify).toContain('gh issue create');
+    // 失敗のたびに新規 issue を作らない（既存 open があれば追記する）。
+    expect(notify).toContain('gh issue comment');
+  });
+
+  it('never files a promote failure for a superseded release', () => {
+    // `superseded` は「より新しい deployment が既に live」= target の内容は production に
+    // 入っている状態で、release job は exit 1 するが異常ではない。result だけで判定すると
+    // burst merge のたびに正常な追い越しを p1 issue として起票し、runbook Playbook 2
+    // （rollback 調査）へ誘導してしまう。
+    const notify = release.slice(
+      release.indexOf('\n  notify_failure:'),
+      release.indexOf('\n  release:'),
+    );
+    expect(notify).toContain("needs.release.outputs.release_status != 'superseded'");
+    // 除外は release job が状態を output していないと常に真になる（空文字 != superseded）。
+    expect(code(releaseJob)).toMatch(
+      /outputs:\s*\n\s*release_status: \$\{\{ steps\.release\.outputs\.release_status \}\}/,
+    );
+  });
+
+  it('keeps issue write permission off every job that runs repository code', () => {
+    // 起票 job は checkout しない。code を実行する job に書き込み token を置かない
+    // （層 3 は PR / main の code をそのまま走らせる）。
+    const beforeJobs = code(release.slice(0, release.indexOf('\njobs:')));
+    expect(beforeJobs).not.toContain('issues: write');
+
+    const notify = release.slice(
+      release.indexOf('\n  notify_failure:'),
+      release.indexOf('\n  release:'),
+    );
+    expect(code(notify)).toContain('issues: write');
+    expect(notify).not.toContain('actions/checkout');
+
+    // 他の job は起票権限を持たない。
+    const jobsBlock = release.slice(release.indexOf('\njobs:'));
+    const grantCount = code(jobsBlock).match(/issues: write/g)?.length ?? 0;
+    expect(grantCount).toBe(1);
+  });
+
+  it('keeps every step name used as a slice anchor unique in the file', () => {
+    // この contract の複数の assert は step 名で workflow を slice し、そこから
+    // ファイル末尾までを検査範囲にする（`Enforce release result` から後ろに
+    // `unaffected` が無いこと、など）。**同じ文字列がコメントに 1 度でも先に現れると
+    // 検査範囲が静かに前へずれ、assert の意味が変わる。** 実際 #2643 の作業中に
+    // release job のコメントへ `Enforce release result` と書いた時点で
+    // `treats a no-op release as success` が落ちた。点で直すと同じ罠を次も踏むので、
+    // anchor の一意性そのものを固定する。
+    for (const anchor of [
+      'Publish Production Release status',
+      'Enforce release result',
+      'Upload release manifest',
+    ]) {
+      const occurrences = release.split(anchor).length - 1;
+      expect(occurrences, `"${anchor}" は slice の anchor なので 1 度しか書けない`).toBe(1);
+    }
+  });
+
   it('keeps the audit workflow pinned to its trusted base revision', () => {
     // promote.yml と対称に「掃除」されないよう固定する。pull_request_target で
     // PR head を checkout すると、PR code が Vercel token を読める。

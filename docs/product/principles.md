@@ -22,7 +22,7 @@ last_verified: 2026-09-07
 機能が揃ったら完成ではない。**このループが最小摩擦で 7 日間自走したら v1 完成:**
 
 1. 朝(または前夜): ルーティンのゴースト確定 + 数タイムブロックの計画が **2分以内**（**未実装**。「ルーティン」の繰り返しタイムブロック・ゴースト確定という概念自体が実コードに無い。単発のタイムブロック配置は実装済みで、アクティビティを押して時間に置く 3 ステップ以内で完了する — 「計画する」節参照）
-2. 日中: タイムブロック開始の合図が来る。記録はワンタップ、押し忘れは後から訂正できる（**半分実装**。ワンタップ記録と事後訂正は実装済み — `RecordPlanButton`([TimeblockRecordActions.tsx](../../apps/product/src/features/timeblock/components/editor/TimeblockRecordActions.tsx)) が過去 Plan を同時間帯の Record へワンタップで記録し、過去 Plan のタイトル・アクティビティ・メモ訂正は `temporal-constraints.md` で許可済み。**タイムブロック開始・終了の合図（opt-in 通知）は未実装** — push notification / Notification API の配線が product 側に無い）
+2. 日中: タイムブロック開始の合図が来る。記録はワンタップ、押し忘れは後から訂正できる（**半分実装**。ワンタップ記録と事後訂正は実装済み — `RecordPlanButton`([TimeblockRecordActions.tsx](../../apps/product/src/features/timeblock/components/editor/TimeblockRecordActions.tsx)) が過去 Plan を同時間帯の Record へワンタップで記録し、過去 Plan のタイトル・アクティビティ・メモ訂正は [specs/plan-record.md](specs/plan-record.md) で許可済み。**タイムブロック開始・終了の合図（opt-in 通知）は未実装** — push notification / Notification API の配線が product 側に無い）
 3. 夜: カレンダーを開いた瞬間、今日の予定と実績のズレが見える(操作ゼロ)（**実装済み**。下記「ズレの3点分散」① の 2 レーンカレンダーがそのまま実装）
 4. 週末: ルールベース統計が「来週の 1 つの補正」を提示する（**再実装中**。旧 `WeeklyReflectionPanel` はレポート面の 4 章構成への一新（[#2575](https://github.com/Dayopt/dayopt/issues/2575)）で撤去した。後継は 2 章の「見積もりの鏡」で、過去予定 30 分以上・箱 3 つ以上のアクティビティから癖の強い順に最大 3 件を出す）
 5. この間、アプリの都合の通知・煽りがゼロ（**該当なし判定**。②の合図通知自体が未実装のため、通知・煽りは構造的にゼロ。②が実装された時点で改めて判定が要る）

@@ -87,7 +87,9 @@ const EXTERNAL_CALENDAR_EVENT_GRANTED_COLUMNS = [
 const TEST_EMAIL_A = `test-rls-a-${TEST_USER_A_ID}@example.com`;
 const TEST_EMAIL_B = `test-rls-b-${TEST_USER_B_ID}@example.com`;
 const TEST_PASSWORD = 'test-password-123';
-const SKIP_INTEGRATION = process.env.SKIP_INTEGRATION_TESTS === 'true';
+// 他の integration suite と同じ gate を使う。`SKIP_INTEGRATION_TESTS` は repo の
+// どこにも設定されておらず、この 5 ファイルだけが別 env を見ていた（#2647）。
+const RUN_LOCAL = process.env.USE_LOCAL_DB === 'true';
 const ACCESS_DENIED_MESSAGE = 'Access denied: user_id mismatch';
 const RPC_TIME_ANCHOR = Date.now();
 const isoAtRpcOffset = (offsetMs: number) => new Date(RPC_TIME_ANCHOR + offsetMs).toISOString();
@@ -365,7 +367,7 @@ async function createUser(id: string, email: string) {
   if (error) throw error;
 }
 
-describe.skipIf(SKIP_INTEGRATION)('RLS access matrix', () => {
+describe.skipIf(!RUN_LOCAL)('RLS access matrix', () => {
   beforeAll(async () => {
     await createUser(TEST_USER_A_ID, TEST_EMAIL_A);
     await createUser(TEST_USER_B_ID, TEST_EMAIL_B);

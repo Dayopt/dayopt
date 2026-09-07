@@ -90,7 +90,8 @@ function nextSlot(): number {
 }
 
 async function createPlan(userId: string): Promise<string> {
-  // Plan は未来側に置く（過去への新規 Plan は業務ルールで禁止）。
+  // Plan は未来側に置く。過去に終わる新規は宛先が Record になるため（`resolveTimeblockDestination`）、
+  // Plan の fixture は未来側でないと作れない。
   const start = new Date(Date.now() + nextSlot() * 60 * 60 * 1000);
   const { data, error } = await admin
     .from('plans')
