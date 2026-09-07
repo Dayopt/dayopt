@@ -256,7 +256,7 @@ describeWithEnv('Critical Path: 計画 → 実績 → 振り返り', () => {
     await expect(createPanel).toBeVisible({ timeout: 10_000 });
 
     // 過去帯の既定は「記録」。タブで「予定」へ切り替えてから選ぶ
-    await createPanel.getByRole('button', { name: '予定', exact: true }).click();
+    await createPanel.getByRole('tab', { name: '予定', exact: true }).click();
     await createPanel.getByRole('button', { name: ACTIVITY_NAME }).click();
 
     const planCard = page.locator('[data-plan-lane-card]', { hasText: ACTIVITY_NAME }).first();

@@ -4,7 +4,8 @@
  * ドラッグ作成パネル（Inspector の作成モード本体）
  *
  * カレンダーをドラッグして時間帯を確定すると、編集と同じ右パネル（モバイルは Drawer）に
- * この内容が出る。並びは編集画面と同じで、上から種別タブ → 日付・時間 → アクティビティ一覧。
+ * この内容が出る。並びは編集画面と同じで、ヘッダー行に種別タブ（予定 / 記録）を置き、
+ * その下に日付・時間 → アクティビティ一覧と続く。
  *
  * - アクティビティを選んだ瞬間に作成する（明示の作成ボタンは持たない）
  * - 閉じると破棄する（明示のキャンセルボタンも持たない）
@@ -16,6 +17,7 @@ import { useCallback } from 'react';
 
 import { useTranslations } from 'next-intl';
 
+import { IconTabSwitcher } from '@/components/ui/navigation/IconTabSwitcher';
 import { ActivityPickerList } from '@/features/activities';
 import {
   DateTimeSection,
@@ -26,7 +28,7 @@ import {
 } from '@/features/timeblock';
 import { convertFromTimezone } from '@/lib/date/timezone';
 import { useUserPreferences } from '@/lib/hooks/useUserPreferences';
-import { cn, SegmentedControl, type SegmentedControlOption } from '@dayopt/components';
+import { cn } from '@dayopt/components';
 
 import { useHapticFeedback } from '../../hooks/accessibility/useHapticFeedback';
 import { useInlineCreateStore } from '../../stores/useInlineCreateStore';
@@ -97,46 +99,44 @@ export function InlineCreatePanel({ onClose }: InlineCreatePanelProps) {
     pendingSelection.kind,
   );
 
-  const kindOptions: SegmentedControlOption<TimeblockDestination>[] = [
+  // 並びは時間軸と同じ「これからのこと → 済んだこと」。未来スロットでは記録を選べないので
+  // 出したまま押せなくし、理由はタブの下に常時表示する（disabled は hover を受け付けない）
+  const kindItems = [
+    { value: 'plan' as const, label: tCalendar('event.preview.plan') },
     {
-      value: 'record',
+      value: 'record' as const,
       label: tCalendar('event.preview.record'),
       disabled: !canRecord,
-      // disabled な button は hover を受け付けないので、理由は読み上げラベルと
-      // 下の常時表示テキストの両方で伝える
-      ...(canRecord
-        ? {}
-        : {
-            ariaLabel: `${tCalendar('event.preview.record')} — ${tCalendar('activitySelector.recordUnavailableFuture')}`,
-          }),
     },
-    { value: 'plan', label: tCalendar('event.preview.plan') },
   ];
 
   const isInvalidRange = endHour * 60 + endMinute <= startHour * 60 + startMinute;
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      {/* ヘッダー行は編集画面（TimeblockInspectorForm）と同じ h-14 / px-2 に揃える */}
+      {/*
+        ヘッダー行は編集画面（TimeblockInspectorForm）と同じ h-14 / px-2 に揃える。
+        編集がアクティビティ名を置く位置に、作成では種別タブを置く（作成時の主語は種別で、
+        アクティビティは下の一覧で選ぶため）。
+      */}
       <div className="flex h-14 shrink-0 items-center justify-between px-2">
-        <h2 className="truncate pl-2 font-medium">{tCalendar('activitySelector.title')}</h2>
+        <div className="flex min-w-0 items-center pl-2">
+          <IconTabSwitcher
+            value={kind}
+            onValueChange={(next: TimeblockDestination) => {
+              tap();
+              setSelectionKind(next);
+            }}
+            items={kindItems}
+            ariaLabel={tCalendar('activitySelector.kindLabel')}
+          />
+        </div>
         <InspectorHeaderActions onCloseInspector={onClose} />
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col gap-3 px-4 pb-4">
-        <SegmentedControl
-          value={kind}
-          onValueChange={(next) => {
-            tap();
-            setSelectionKind(next);
-          }}
-          options={kindOptions}
-          ariaLabel={tCalendar('activitySelector.kindLabel')}
-          size="sm"
-          className="shrink-0"
-        />
         {!canRecord && (
-          <p className="text-muted-foreground -mt-2 shrink-0 text-xs">
+          <p className="text-muted-foreground shrink-0 text-xs">
             {tCalendar('activitySelector.recordUnavailableFuture')}
           </p>
         )}
