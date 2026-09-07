@@ -1,5 +1,5 @@
-import { render, screen, waitFor } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
 
 import { DockedInspectorPanel } from './DockedInspectorPanel';
 
@@ -53,5 +53,67 @@ describe('DockedInspectorPanel', () => {
     unmount();
 
     expect(document.activeElement).toBe(trigger);
+  });
+
+  it('パネルの外を押したら閉じる', () => {
+    const slot = makeSlot();
+    const outside = document.createElement('div');
+    document.body.appendChild(outside);
+    const onRequestClose = vi.fn();
+
+    render(
+      <DockedInspectorPanel title="Work" slotElement={slot} onRequestClose={onRequestClose}>
+        <button type="button">Edit</button>
+      </DockedInspectorPanel>,
+    );
+
+    fireEvent.pointerDown(outside);
+
+    expect(onRequestClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('パネルの中を押しても閉じない', () => {
+    const slot = makeSlot();
+    const onRequestClose = vi.fn();
+
+    render(
+      <DockedInspectorPanel title="Work" slotElement={slot} onRequestClose={onRequestClose}>
+        <button type="button">Edit</button>
+      </DockedInspectorPanel>,
+    );
+
+    fireEvent.pointerDown(screen.getByRole('button', { name: 'Edit' }));
+
+    expect(onRequestClose).not.toHaveBeenCalled();
+  });
+
+  it('パネル外の popover / メニュー / トーストと、組で動く印を持つ要素では閉じない', () => {
+    const slot = makeSlot();
+    const onRequestClose = vi.fn();
+
+    render(
+      <DockedInspectorPanel title="Work" slotElement={slot} onRequestClose={onRequestClose}>
+        <button type="button">Edit</button>
+      </DockedInspectorPanel>,
+    );
+
+    // 日付ピッカー（Radix popover）、メニュー、トーストはいずれも document.body 直下へ出る。
+    // カレンダー上の選択ハイライトは自分で `data-inspector-keep-open` を付ける
+    for (const attrs of [
+      { 'data-radix-popper-content-wrapper': '' },
+      { role: 'menu' },
+      { 'data-sonner-toaster': '' },
+      { 'data-inspector-keep-open': '' },
+    ]) {
+      const layer = document.createElement('div');
+      for (const [name, value] of Object.entries(attrs)) layer.setAttribute(name, value);
+      const inner = document.createElement('button');
+      layer.appendChild(inner);
+      document.body.appendChild(layer);
+
+      fireEvent.pointerDown(inner);
+    }
+
+    expect(onRequestClose).not.toHaveBeenCalled();
   });
 });

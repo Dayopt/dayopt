@@ -265,7 +265,11 @@ export function TimeblockInspector({
           </DrawerContent>
         </Drawer>
       ) : (
-        <DockedInspectorPanel title={title} slotElement={inspectorSlotElement}>
+        <DockedInspectorPanel
+          title={title}
+          slotElement={inspectorSlotElement}
+          onRequestClose={handleClose}
+        >
           {contentElement}
         </DockedInspectorPanel>
       )}

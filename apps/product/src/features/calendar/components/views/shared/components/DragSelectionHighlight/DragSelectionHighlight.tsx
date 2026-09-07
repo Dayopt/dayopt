@@ -178,6 +178,8 @@ export function DragSelectionHighlight({
       {/* 選択範囲ハイライト（カレンダーグリッド上） */}
       <div
         data-activity-palette
+        // 作成パネルと組で動く。掴んで伸ばしてもパネルを閉じない（DockedInspectorPanel）
+        data-inspector-keep-open
         className="pointer-events-none absolute right-0 left-0"
         style={{ zIndex: Z_INDEX.POPOVER }}
       >
