@@ -207,7 +207,13 @@ export function DragSelectionHighlight({
             />
           ) : selectionHeight < 40 ? (
             <div className="flex min-w-0 items-center gap-1">
-              {hoveredActivity?.icon && (
+              {/*
+                一覧と同じマーカーを出す。カテゴリーに icon が無くても色ドットへ
+                フォールバックさせる（icon の有無で出し分けると、色だけ反映されて
+                アイコンが出ない状態になる。2026-09-07 User 指摘）。
+                未分類は継承する色が無いので、一覧と同じくテキストだけにする
+              */}
+              {hoveredActivity?.color != null && (
                 <ActivityIcon
                   icon={hoveredActivity.icon}
                   color={hoveredActivity.color}
@@ -229,7 +235,7 @@ export function DragSelectionHighlight({
             <>
               <div className="flex min-h-0 items-start justify-between gap-1">
                 <div className="flex min-w-0 items-center gap-1">
-                  {hoveredActivity?.icon && (
+                  {hoveredActivity?.color != null && (
                     <ActivityIcon
                       icon={hoveredActivity.icon}
                       color={hoveredActivity.color}

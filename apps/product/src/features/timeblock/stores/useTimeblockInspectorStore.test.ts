@@ -51,3 +51,46 @@ describe('useTimeblockInspectorStore duplicate', () => {
     });
   });
 });
+
+describe('useTimeblockInspectorStore hoveredActivity', () => {
+  beforeEach(() => {
+    useTimeblockInspectorStore.getState().closeInspector();
+  });
+
+  it('setHoveredActivity で値を反映する', () => {
+    useTimeblockInspectorStore.getState().openInspector('plan-1', 'plan');
+    useTimeblockInspectorStore
+      .getState()
+      .setHoveredActivity({ id: 'a1', name: '開発', color: 'blue', icon: 'briefcase' });
+
+    expect(useTimeblockInspectorStore.getState().hoveredActivity).toEqual({
+      id: 'a1',
+      name: '開発',
+      color: 'blue',
+      icon: 'briefcase',
+    });
+  });
+
+  it('openInspector / openCreate / openDuplicate / closeInspector はホバーを持ち越さない', () => {
+    const setHover = () =>
+      useTimeblockInspectorStore
+        .getState()
+        .setHoveredActivity({ id: 'a1', name: '開発', color: 'blue', icon: null });
+
+    setHover();
+    useTimeblockInspectorStore.getState().openInspector('plan-2', 'plan');
+    expect(useTimeblockInspectorStore.getState().hoveredActivity).toBeNull();
+
+    setHover();
+    useTimeblockInspectorStore.getState().openCreate();
+    expect(useTimeblockInspectorStore.getState().hoveredActivity).toBeNull();
+
+    setHover();
+    useTimeblockInspectorStore.getState().openDuplicate(draft);
+    expect(useTimeblockInspectorStore.getState().hoveredActivity).toBeNull();
+
+    setHover();
+    useTimeblockInspectorStore.getState().closeInspector();
+    expect(useTimeblockInspectorStore.getState().hoveredActivity).toBeNull();
+  });
+});

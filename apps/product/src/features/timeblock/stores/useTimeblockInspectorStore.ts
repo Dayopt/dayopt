@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
 
+import type { HoveredActivityInfo } from '@/features/activities';
+
 import type { TimeblockDestination } from '../domain/timeblock-destination';
 import type { TimeblockDuplicateDraft } from '../lib/timeblock-duplicate';
 
@@ -27,6 +29,11 @@ interface TimeblockInspectorState {
    * アクティビティを選ぶ。timeblockId は null（URL 同期しない）。
    */
   createMode: boolean;
+  /**
+   * アクティビティ選択でホバー中の値。開いているブロックのカードが、
+   * 選ぶ前に色・アイコン・名前を先出しする（作成時のハイライトと同じ扱い）。
+   */
+  hoveredActivity: HoveredActivityInfo | null;
 }
 
 /**
@@ -41,6 +48,8 @@ interface TimeblockInspectorActions {
   cancelDuplicate: () => void;
   /** ドラッグ作成モードで開く（アクティビティ選択 → 作成）。 */
   openCreate: () => void;
+  /** アクティビティ選択のホバーを反映する（離れたら null）。 */
+  setHoveredActivity: (activity: HoveredActivityInfo | null) => void;
   /** Inspector を閉じる */
   closeInspector: () => void;
 }
@@ -59,6 +68,10 @@ export const useTimeblockInspectorStore = create<TimeblockInspectorStore>()(
       timeblockKind: 'plan',
       duplicateDraft: null,
       createMode: false,
+      hoveredActivity: null,
+
+      setHoveredActivity: (activity) =>
+        set({ hoveredActivity: activity }, false, 'setHoveredActivity'),
 
       openInspector: (timeblockId, kind = 'plan') =>
         set(
@@ -68,6 +81,7 @@ export const useTimeblockInspectorStore = create<TimeblockInspectorStore>()(
             timeblockKind: kind,
             duplicateDraft: null,
             createMode: false,
+            hoveredActivity: null,
           },
           false,
           'openInspector',
@@ -81,6 +95,7 @@ export const useTimeblockInspectorStore = create<TimeblockInspectorStore>()(
             timeblockKind: draft.kind,
             duplicateDraft: draft,
             createMode: false,
+            hoveredActivity: null,
           },
           false,
           'openDuplicate',
@@ -94,6 +109,7 @@ export const useTimeblockInspectorStore = create<TimeblockInspectorStore>()(
             timeblockKind: 'plan',
             duplicateDraft: null,
             createMode: true,
+            hoveredActivity: null,
           },
           false,
           'openCreate',
@@ -113,6 +129,7 @@ export const useTimeblockInspectorStore = create<TimeblockInspectorStore>()(
             timeblockKind: 'plan',
             duplicateDraft: null,
             createMode: false,
+            hoveredActivity: null,
           },
           false,
           'closeInspector',
