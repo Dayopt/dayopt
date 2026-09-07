@@ -82,7 +82,7 @@ test.describe('Smoke: 認証フロー', () => {
     {
       locale: 'ja',
       loginPath: '/ja/auth/login',
-      heading: 'ログイン',
+      heading: 'サインイン',
       signupLink: '新規登録',
       signupPath: '/ja/auth/signup',
     },
