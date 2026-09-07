@@ -123,7 +123,6 @@ export function DragSelectionHighlight({
     pendingSelection.kind,
   );
   const isPlan = destination === 'plan';
-  const destinationLabel = tCalendar(`event.preview.${destination}`);
 
   // #2250: 相手レーンに重なる entry が無ければフル幅にする（表示層・選択プレビューと
   // 同じ判定）。selectionStartLocal/EndLocal は displayStartDate/displayEndDate と
@@ -221,14 +220,13 @@ export function DragSelectionHighlight({
                   className="shrink-0"
                 />
               )}
+              {/*
+                「予定」「記録」の文言はブロック内には出さない（種別はタブと枠線 /
+                塗りつぶしの見た目だけで示す。2026-09-07 User 指摘）。選ぶ前は時刻だけ、
+                選んだ後は名前だけを出す
+              */}
               <span className="truncate font-medium">
-                {hoveredActivity ? displayName : destinationLabel}
-                {!hoveredActivity && (
-                  <>
-                    {' · '}
-                    <span className="tabular-nums">{timeLabel}</span>
-                  </>
-                )}
+                {hoveredActivity ? displayName : <span className="tabular-nums">{timeLabel}</span>}
               </span>
             </div>
           ) : (
@@ -245,7 +243,6 @@ export function DragSelectionHighlight({
                   )}
                   <span className="truncate font-medium">{displayName}</span>
                 </div>
-                <span className="text-muted-foreground shrink-0">{destinationLabel}</span>
               </div>
               <span className="text-muted-foreground truncate tabular-nums">{timeLabel}</span>
             </>

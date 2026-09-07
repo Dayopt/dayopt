@@ -101,7 +101,6 @@ export function PlanLaneCard({
   const displayName = activityName ?? t('calendar.filter.noActivity');
 
   const isSkipped = event.status === 'skipped';
-  const isUnrecorded = event.status === 'unrecorded';
   const isRecorded = event.status === 'recorded';
   // 時刻を出すかは縦に入るかだけで決める。狭い列（compact）でも高さがあるカードから
   // 時刻が消えていて、何時のブロックか読めなかった（2026-09-07 User 指摘）
@@ -123,10 +122,11 @@ export function PlanLaneCard({
         // 高さが足りないカードだけ上下を詰める（詰めないと文字が切れる）
         showDetails ? 'py-2' : 'py-1',
         borderClass,
-        // skip / 記録済みは控えめに沈める。未記録の過去 plan は静かなプロンプトとして
-        // 破線で「まだ何かが足りない」を示す。
+        // skip / 記録済みは控えめに沈める。未記録の過去 plan も枠線は他と同じ実線にする
+        // （破線は「まだ何かが足りない」の合図として使っていたが、常時ボーダーだけの
+        // 見た目に揃える。2026-09-07 User 指摘）。
         isSkipped ? 'opacity-50' : isRecorded ? 'opacity-60' : 'opacity-100',
-        isUnrecorded ? 'border-dashed' : 'border-solid',
+        'border-solid',
         'text-foreground bg-transparent',
         'focus-visible:ring-ring focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none',
         isActive && 'ring-ring ring-2',
