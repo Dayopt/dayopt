@@ -45,7 +45,7 @@ last_verified: 2026-09-07
 - **正当な残存**: 操作対象の予定ID、Undo effectの対象ID、外部予定参照、旧入力の明示拒否と成功済みMCP receipt再生に必要なRPC引数。
 - **履歴**: 適用済みmigration、旧不変条件を説明する歴史的文書、移行前データを作る検証fixture。新規書き込み・読み取りの根拠にはしない。
 
-本番・共有ローカルDBには適用していない。検証専用DBのみを使用した。
+contract migrationは本番・共有ローカルDBへ適用していない。検証専用DBのみを使用した。
 
 ## ローカル検証記録
 
@@ -58,3 +58,11 @@ last_verified: 2026-09-07
 - API経由の既存結合テストの旧リンク期待値は更新したが、HTTP経由での実行と認証済みカレンダー/InspectorのE2Eは未実施。既存の共有ローカルSupabaseは旧スキーマのままであり、そこへ今回のmigrationを適用して検証したことにはしない。Supabase/Vercel Previewは成功。
 - 独立レビューで修正した点: DB先行配備中の旧writer互換、成功済みMCP再送、旧形式の通常Plan作成Undo、公開tRPCのskip入力、純粋モデルとDB変換の配置。
 - セルフレビューで修正した点: 拡張段階にも残るFKの副作用、旧列がAPI応答へ混ざる問題、取得上限による集計漏れ、変更後の集計キャッシュ再取得。
+
+## 本番適用前の復旧証跡
+
+2026-09-07 22:15 JSTに本番をread-onlyで確認し、expand migration `20260907081237` の適用、Plan 54行、Record 72行、旧リンク42件、skip済み0件を確認した。
+
+不可逆に失われる値だけを `~/Backups/dayopt/plan-record-contract-before-20260907.json` へ保存した。ファイルは所有者のみ読み書き可能なmode 600で、SHA-256は `ac264faa5804507fda76e1ee232f5c98c7320fcbe3eede26ca2e6bad9d50a9bd`。メモ、タイトル、所有者などの保持列は含めない。保持列と行集合はtransactional migrationと上記fixture検証で保護する。
+
+このbackupをcontract適用済み隔離DBの一時テーブルへUUID / timestamptz型で復元し、旧リンク42件・skip値0件が一致することを確認してrollbackした。Supabase組織はProでdaily physical backup対象だが、CLI credentialが未認証だったため直近backupの成功時刻は取得していない。この契約専用backupと復元演習を今回の撤去のrollback証跡とする。
