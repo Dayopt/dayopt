@@ -116,6 +116,22 @@ describe('factory handoff', () => {
     );
   });
 
+  it('空の source を根拠にできない', () => {
+    writeFileSync(join(cwd, 'empty.ts'), '');
+    git('add', 'empty.ts');
+    git('-c', 'core.hooksPath=/dev/null', 'commit', '-qm', 'empty source');
+    const draft = createHandoff({ cwd, context, sources: ['empty.ts'] });
+    const handoff = {
+      ...draft,
+      status: 'ready',
+      acceptance: '空の source は根拠として使わない',
+      facts: [{ claim: '存在しない根拠', path: 'empty.ts', line: 1 }],
+      verification: [{ command: 'true', status: 'passed', exitCode: 0, output: 'exit 0' }],
+      nextAction: '根拠のある source を選び直す',
+    };
+    expect(validateHandoff({ cwd, context, handoff }).status).toBe('invalid');
+  });
+
   it('未知・検証失敗・未実行を ready と数えない', () => {
     const handoff = ready();
     expect(

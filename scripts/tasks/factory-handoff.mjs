@@ -44,6 +44,7 @@ function readJson(path) {
 
 function sourceLineCount(content) {
   const text = content.toString('utf8');
+  if (!text) return 0;
   return text.endsWith('\n') ? text.split('\n').length - 1 : text.split('\n').length;
 }
 
