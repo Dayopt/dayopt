@@ -35,6 +35,8 @@
     "green:watch": "node scripts/tasks/green-watch.mjs",
     "ai:usage": "node scripts/tasks/ai-usage.mjs",
     "ctx": "node scripts/tasks/ctx.mjs",
+    "handoff:create": "node scripts/tasks/factory-handoff.mjs create",
+    "handoff:validate": "node scripts/tasks/factory-handoff.mjs validate",
     "trace": "node scripts/tasks/trace.mjs",
     "migration:create": "supabase migration new",
     "migration:list": "supabase migration list",

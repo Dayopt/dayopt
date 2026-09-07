@@ -1,8 +1,10 @@
+import { createHash } from 'node:crypto';
 import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { resolveProtectedPathGate } from '../ci/protected-path-gate.mjs';
+import { resolveFactoryRoute } from '../lib/factory-routing.mjs';
 import { REPO, runGh, runGhJson } from '../lib/gh.mjs';
 import { isDirectExecution } from '../lib/is-direct-execution.mjs';
 
@@ -726,6 +728,15 @@ function buildMarkdownLines(pack, { bodyMaxLines, commentsMax, filesMax, related
   }
 
   // --- 末尾セクション（常に全文表示。ここより上で行数を確保する） ---
+  if (pack.routing) {
+    lines.push('#### 作業の振り分け（助言・モデル起動なし）', '');
+    lines.push(
+      `実装・判断: ${pack.routing.level} | 入力充足: ${pack.routing.ready ? 'あり' : '不足'} | 事前整理: ${pack.routing.preparation}`,
+    );
+    lines.push(`理由: ${pack.routing.reasons.join(' / ')}`);
+    lines.push(`不足: ${pack.routing.missing.join(' / ') || 'なし（内容の正しさは担当が確認）'}`);
+    lines.push(`事前整理の成果: ${pack.routing.preparationGoal}`, '');
+  }
   if (pack.skills.length > 0) {
     lines.push('#### 関連 skill 候補');
     lines.push('');
@@ -872,6 +883,7 @@ export function buildContextPack(options, deps = {}) {
   let files = null;
   let ciRollup = null;
   let unresolvedThreads = null;
+  let metadataAvailable = base !== null;
 
   if (kind === 'pr') {
     const pr = tryOr(
@@ -882,12 +894,13 @@ export function buildContextPack(options, deps = {}) {
             'view',
             String(number),
             '--json',
-            'number,title,state,url,labels,milestone,assignees,headRefName,baseRefName,isDraft,mergeStateStatus,reviewDecision,statusCheckRollup,body,files',
+            'number,title,state,url,labels,milestone,assignees,headRefName,baseRefName,headRefOid,baseRefOid,isDraft,mergeStateStatus,reviewDecision,statusCheckRollup,body,files',
           ],
           { execFileImpl },
         ),
       null,
     );
+    metadataAvailable = pr !== null;
     header = {
       title: pr?.title ?? base?.title ?? null,
       state: pr?.state ?? base?.state ?? null,
@@ -897,6 +910,8 @@ export function buildContextPack(options, deps = {}) {
       url: pr?.url ?? base?.html_url ?? null,
       headRefName: pr?.headRefName ?? null,
       baseRefName: pr?.baseRefName ?? null,
+      headSha: pr?.headRefOid ?? null,
+      baseSha: pr?.baseRefOid ?? null,
       isDraft: pr?.isDraft ?? null,
       mergeStateStatus: pr?.mergeStateStatus ?? null,
       reviewDecision: pr?.reviewDecision ?? null,
@@ -1065,6 +1080,15 @@ export function buildContextPack(options, deps = {}) {
         }
       : null;
   const judgmentHint = buildJudgmentHint(judgmentRecords);
+  const criteria = detectAcceptanceCriteria(rawBody);
+  const routing = resolveFactoryRoute({
+    files,
+    labels: header.labels,
+    body: rawBody,
+    ...criteria,
+    metadataAvailable,
+    state: header.state,
+  });
   let finalNextStep = step;
   let nextStepSecondary = null;
   if (judgmentHint) {
@@ -1078,6 +1102,7 @@ export function buildContextPack(options, deps = {}) {
   return {
     number,
     kind,
+    bodySha256: createHash('sha256').update(rawBody).digest('hex'),
     header,
     body: bodyResult,
     comments,
@@ -1087,6 +1112,7 @@ export function buildContextPack(options, deps = {}) {
     decisionLines,
     skills,
     judgmentRecords,
+    routing,
     nextStep: finalNextStep,
     nextStepSecondary,
   };
