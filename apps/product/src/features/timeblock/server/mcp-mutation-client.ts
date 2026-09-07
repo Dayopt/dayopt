@@ -77,11 +77,20 @@ function mutationError(code: McpMutationErrorCode): McpMutationError {
   return new McpMutationError(code, ERROR_MESSAGES[code]);
 }
 
-function throwMutationDatabaseError(error: MutationDatabaseError, operation: string): never {
+function throwMutationDatabaseError(
+  error: MutationDatabaseError,
+  operation: string,
+  messageOverrides: Readonly<Record<string, string>> = {},
+): never {
   const databaseCode =
     typeof error.code === 'string' && /^[A-Z0-9_]{1,32}$/.test(error.code) ? error.code : undefined;
   const mappedCode = databaseCode ? EXPECTED_ERROR_CODES[databaseCode] : undefined;
-  if (mappedCode) throw mutationError(mappedCode);
+  if (mappedCode) {
+    throw new McpMutationError(
+      mappedCode,
+      (databaseCode && messageOverrides[databaseCode]) ?? ERROR_MESSAGES[mappedCode],
+    );
+  }
   if (databaseCode === '40P01') throw mutationError('CONFLICT');
 
   // Do not attach the PostgREST object as a cause: database messages can contain
@@ -179,6 +188,7 @@ interface MutationRpcResult {
 async function requestMutationRows(
   request: () => PromiseLike<MutationRpcResult>,
   operation: string,
+  messageOverrides?: Readonly<Record<string, string>>,
 ): Promise<unknown[]> {
   let result: MutationRpcResult;
   try {
@@ -187,10 +197,10 @@ async function requestMutationRows(
   } catch (error) {
     const code =
       error !== null && typeof error === 'object' && 'code' in error ? error.code : undefined;
-    throwMutationDatabaseError({ code }, operation);
+    throwMutationDatabaseError({ code }, operation, messageOverrides);
   }
 
-  if (result.error) throwMutationDatabaseError(result.error, operation);
+  if (result.error) throwMutationDatabaseError(result.error, operation, messageOverrides);
   return result.data ?? [];
 }
 
@@ -338,7 +348,9 @@ export class McpMutationClient {
         p_title: input.title,
       });
 
-    const rows = await requestMutationRows(request, operation);
+    const rows = await requestMutationRows(request, operation, {
+      DT012: 'Plan links have been removed; omit planId and refresh the tool schema.',
+    });
     return toMutationReceipt(
       requireActiveMutationReceipt(rows, input.operationId, operation, 'record'),
     );

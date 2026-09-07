@@ -38,7 +38,7 @@ export interface McpRecordCreateInput extends McpMutationBinding {
   title: string;
   note: string | null;
   activityId: string | null;
-  /** Null creates an unplanned Record; a UUID links it to a completed Plan. */
+  /** A UUID is accepted only to replay a completed legacy mutation; new writes must use null. */
   planId: string | null;
   startAt: string;
   endAt: string;
