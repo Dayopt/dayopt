@@ -7,6 +7,7 @@
  *  - frontmatter-check       : path別metadata / code path / stock lifecycle
  *  - naming-check            : kebab-case 命名規約
  *  - decisions-append-only   : docs/decisions.md の append-only 契約
+ *  - glossary-sync           : 用語集の生成ブロックが terms.ts と一致するか
  *
  * 各ドメイン log/ の凍結契約チェック（append-only-guard）は、domain log/ 全廃
  * （2026-08-28、#2475）に伴い撤去した。
@@ -22,6 +23,7 @@ import {
   runDecisionsAppendOnlyGuard,
 } from './checks/decisions-append-only.ts';
 import { reportFrontmatterCheck, runFrontmatterCheck } from './checks/frontmatter-check.ts';
+import { reportGlossarySyncCheck, runGlossarySyncCheck } from './checks/glossary-sync.ts';
 import { reportLinkCheck, runLinkCheck } from './checks/link-check.ts';
 import { reportNamingCheck, runNamingCheck } from './checks/naming-check.ts';
 import { colors } from './config.ts';
@@ -42,9 +44,12 @@ async function main(): Promise<void> {
   const decisionsAppendOnlyViolations = runDecisionsAppendOnlyGuard();
   const decisionsAppendOnlyOk = reportDecisionsAppendOnlyGuard(decisionsAppendOnlyViolations);
 
+  const glossarySyncViolations = await runGlossarySyncCheck();
+  const glossarySyncOk = reportGlossarySyncCheck(glossarySyncViolations);
+
   console.log('\n' + '='.repeat(60));
 
-  const ok = linkOk && frontmatterOk && namingOk && decisionsAppendOnlyOk;
+  const ok = linkOk && frontmatterOk && namingOk && decisionsAppendOnlyOk && glossarySyncOk;
 
   if (ok) {
     console.log(`${colors.green}✅ docs-guard: 全チェック pass${colors.reset}`);

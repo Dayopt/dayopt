@@ -116,13 +116,13 @@ today.setHours(0, 0, 0, 0); // サーバーTZの0時 ≠ ユーザーの0時
 ```tsx
 import { toTZStartISO, toTZEndISO, tzIsSameDay } from '@/lib/date/timezone';
 
-// ✅ 「今日の全エントリ」を取得するクエリ境界
+// ✅ 「今日の全タイムブロック」を取得するクエリ境界
 const startDate = toTZStartISO(new Date(), timezone); // "2026-03-25T15:00:00.000Z" (JST)
 const endDate = toTZEndISO(new Date(), timezone); // "2026-03-26T14:59:59.999Z" (JST)
 const plans = api.plans.list.useQuery({ startDate, endDate });
 
 // ✅ マルチデイ判定
-const isMultiDay = !tzIsSameDay(entry.startDate, entry.endDate, timezone);
+const isMultiDay = !tzIsSameDay(plan.startDate, plan.endDate, timezone);
 ```
 
 ---
@@ -141,18 +141,18 @@ Supabase (TIMESTAMPTZ: "2026-03-26T05:30:00.000Z")
 カレンダー表示 (14:30)
 ```
 
-### エントリ作成
+### 予定 / 記録の作成
 
 ```tsx
 // ✅ 正しい: TZユーティリティ経由
 const startISO = localTimeToUTCISO(date, hours, minutes, timezone);
 const endISO = localTimeToUTCISO(date, endHours, endMinutes, timezone);
-createEntry({ start_time: startISO, end_time: endISO });
+createPlan({ start_at: startISO, end_at: endISO });
 
 // ❌ 禁止: ブラウザTZ依存
 const start = new Date();
 start.setHours(14, 30, 0, 0);
-createEntry({ start_time: start.toISOString() }); // ブラウザTZ ≠ 設定TZ
+createPlan({ start_at: start.toISOString() }); // ブラウザTZ ≠ 設定TZ
 ```
 
 ### クエリ境界の計算

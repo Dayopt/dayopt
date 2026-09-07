@@ -81,6 +81,8 @@
     "test:e2e:headed": "pnpm --filter @dayopt/product test:e2e:headed",
     "i18n:check": "pnpm --filter @dayopt/product i18n:check",
     "i18n:unused": "pnpm --filter @dayopt/product i18n:unused",
+    "glossary:generate": "tsx scripts/tasks/generate-glossary.ts",
+    "glossary:check": "tsx scripts/tasks/generate-glossary.ts --check",
     "copy:check": "tsx scripts/tasks/check-glossary.ts",
     "copy:check:strict": "tsx scripts/tasks/check-glossary.ts --strict",
     "vercel:env": "vercel env ls",

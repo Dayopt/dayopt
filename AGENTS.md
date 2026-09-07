@@ -94,6 +94,7 @@ Dayopt で作業する全エージェントの provider-neutral な正本ガイ�
 - Component: 関数宣言 + props 型の直接注釈（アロー関数 const は避ける）
 - ログ: `@/lib/logger` を使う。`console.log` は本番コード禁止
 - 命名: `utils.ts`/`helpers.ts` を避け責務を表す具体名にする
+- 語彙: 用語は `docs/product/glossary.md`（正本 `scripts/lib/glossary/terms.ts`）に従う。messages は `pnpm copy:check:strict` が値とキー名を機械検査するが、docs / skill / issue 本文は検査対象外なので旧語彙（エントリ / タグ / タスク / ブロック / 箱 / 型 / レンズ）を書かない
 - eslint-disable は最終手段。使う時は同じ行に `-- 理由` を書く。ファイル全体無効化より1行無効化を優先
 - 依存追加前に確認: ブラウザ標準/既存依存で代替できないか、Star 1000+/直近6ヶ月更新か、出口コスト（捨てる時に何が壊れるか）を1文で言えるか
 - `--no-verify` によるフックスキップは禁止（hook が機械ブロックする）
