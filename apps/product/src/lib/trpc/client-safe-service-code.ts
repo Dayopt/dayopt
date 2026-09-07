@@ -18,6 +18,12 @@ const CLIENT_SAFE_SERVICE_CODES = new Set([
   'STALE_VERSION',
   'TEMPORARY_FAILURE',
   'TIME_OVERLAP',
+  // Timeblock: 時刻規則（DT003 / DT005）の拒否。UI 側の写しを外しても汎用の
+  // saveFailed へ退化しないよう、規則ごとの文言へ写像できるようにする（#2628）。
+  // 規則そのものは公開仕様（MCP `constraints.get` が同じものを返す）なので、
+  // これを載せても内部構成は漏れない
+  'INVALID_TIME_RANGE',
+  'RECORD_IN_FUTURE',
   // Timeblock: 型がその日に収まらない（DST で時計が飛ぶ日など）。他の日なら通る型が
   // その日だけ落ちるので、汎用の失敗と区別して原因を伝える必要がある（#2567）
   'TEMPLATE_DOES_NOT_FIT',

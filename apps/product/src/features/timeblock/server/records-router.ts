@@ -1,16 +1,14 @@
-import { z } from 'zod';
-
 import { handleServiceError } from '@/lib/trpc/errors';
 import { createTRPCRouter, protectedProcedure } from '@/lib/trpc/procedures';
-import {
-  createRecordSchema,
-  recordFilterSchema,
-  recordIdSchema,
-  updateRecordSchema,
-} from '../schemas/timeblock';
-import { legacyTimeblockMutationProcedure } from './legacy-route-observation';
+import { recordFilterSchema, recordIdSchema } from '../schemas/timeblock';
 import { createRecordService } from './service-index';
 
+/**
+ * Record の read 専用 router。
+ *
+ * 書き込みは `recordCommands.*`（`TimeblockCommandService`）に一本化済みで、
+ * legacy mutation は #1893 で削除した。read は UI と MCP read tool が使うため残す。
+ */
 export const recordsRouter = createTRPCRouter({
   list: protectedProcedure
     .meta({ description: 'Record list for the split time model' })
@@ -18,7 +16,8 @@ export const recordsRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       const service = createRecordService(ctx.supabase);
       try {
-        return await service.list({ userId: ctx.userId, ...input });
+        // userId は必ず spread の後に置く（filter に userId 名の field が生えても ctx が勝つ）
+        return await service.list({ ...input, userId: ctx.userId });
       } catch (error) {
         handleServiceError(error);
       }
@@ -31,64 +30,6 @@ export const recordsRouter = createTRPCRouter({
       const service = createRecordService(ctx.supabase);
       try {
         return await service.getById({ userId: ctx.userId, recordId: input.id });
-      } catch (error) {
-        handleServiceError(error);
-      }
-    }),
-
-  create: legacyTimeblockMutationProcedure
-    .meta({ description: 'Create past record' })
-    .input(createRecordSchema)
-    .mutation(async ({ ctx, input }) => {
-      const service = createRecordService(ctx.supabase);
-      try {
-        return await service.create({ userId: ctx.userId, input });
-      } catch (error) {
-        handleServiceError(error);
-      }
-    }),
-
-  update: legacyTimeblockMutationProcedure
-    .meta({ description: 'Update record with optimistic lock support' })
-    .input(
-      recordIdSchema.extend({
-        data: updateRecordSchema,
-        expectedUpdatedAt: z.string().datetime({ offset: true }).optional(),
-      }),
-    )
-    .mutation(async ({ ctx, input }) => {
-      const service = createRecordService(ctx.supabase);
-      try {
-        return await service.update({
-          userId: ctx.userId,
-          recordId: input.id,
-          input: input.data,
-          expectedUpdatedAt: input.expectedUpdatedAt,
-        });
-      } catch (error) {
-        handleServiceError(error);
-      }
-    }),
-
-  delete: legacyTimeblockMutationProcedure
-    .meta({ description: 'Soft delete record' })
-    .input(recordIdSchema)
-    .mutation(async ({ ctx, input }) => {
-      const service = createRecordService(ctx.supabase);
-      try {
-        return await service.delete({ userId: ctx.userId, recordId: input.id });
-      } catch (error) {
-        handleServiceError(error);
-      }
-    }),
-
-  restore: legacyTimeblockMutationProcedure
-    .meta({ description: 'Restore soft-deleted record' })
-    .input(recordIdSchema)
-    .mutation(async ({ ctx, input }) => {
-      const service = createRecordService(ctx.supabase);
-      try {
-        return await service.restore({ userId: ctx.userId, recordId: input.id });
       } catch (error) {
         handleServiceError(error);
       }

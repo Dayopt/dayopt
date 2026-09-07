@@ -5,8 +5,6 @@ import { readFileSync } from 'node:fs';
 import { createClient } from '@supabase/supabase-js';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { plansRouter } from '@/features/timeblock/server/plans-router';
-import { recordsRouter } from '@/features/timeblock/server/records-router';
 import type { Database } from '@/lib/database';
 import {
   exchangeAuthorizationCode,
@@ -14,7 +12,6 @@ import {
   resolveRequestedResource,
 } from '@/lib/oauth-server';
 import { generateAuthorizationCode, hashToken } from '@/lib/oauth-server/tokens';
-import { createTestCaller } from '@/lib/test/trpc-test-helpers';
 import type { Context } from '@/lib/trpc/procedures';
 
 const LOCAL_DB_URL = 'http://127.0.0.1:54321';
@@ -142,31 +139,6 @@ async function createHistoricalPlan(input: {
   const { data, error } = await admin.from('plans').select().eq('id', planId).single();
   if (error) throw error;
   return data;
-}
-
-/**
- * legacy tRPC route と同じ context を作る。
- *
- * `ctx.supabase` は authenticated client のまま（read と旧 3 RPC はここを通る）で、
- * write だけが service-owned command boundary へ降りることを確認するための土台。
- */
-function legacyContext(): Context {
-  return {
-    req: {
-      headers: {},
-      cookies: {},
-      socket: { remoteAddress: '127.0.0.1' },
-    } as Context['req'],
-    res: {
-      setHeader: () => {},
-      end: () => {},
-    } as unknown as Context['res'],
-    userId,
-    sessionId: 'mcp-stage1-compat-session',
-    mfaAssurance: { currentLevel: 'aal1', nextLevel: 'aal1' },
-    supabase: userClient,
-    authMode: 'session' as const,
-  };
 }
 
 describe.skipIf(!RUN_LOCAL)('MCP Stage 1 rolling compatibility', () => {
@@ -514,119 +486,6 @@ describe.skipIf(!RUN_LOCAL)('MCP Stage 1 rolling compatibility', () => {
       p_user_id: userId,
     });
     expect(legacyDeleteRecordError).toBeNull();
-  });
-
-  it('keeps every current Plan and Record write path available', async () => {
-    const ctx = legacyContext();
-    const plans = createTestCaller(plansRouter, ctx);
-    const records = createTestCaller(recordsRouter, ctx);
-
-    const plan = await plans.create({
-      title: 'Legacy Plan',
-      start_at: hoursAgo(-1),
-      end_at: hoursAgo(-2),
-    });
-    expect(plan.user_id).toBe(userId);
-
-    const updatedPlan = await plans.update({
-      id: plan.id,
-      data: { title: 'Legacy Plan updated' },
-    });
-    expect(updatedPlan.title).toBe('Legacy Plan updated');
-
-    const historicalPlan = await createHistoricalPlan({
-      title: 'Existing past Plan',
-      startAt: hoursAgo(8),
-      endAt: hoursAgo(7),
-    });
-
-    const skippedPlan = await plans.skip({ id: historicalPlan.id });
-    expect(skippedPlan.skipped_at).not.toBeNull();
-
-    const unskippedPlan = await plans.unskip({ id: historicalPlan.id });
-    expect(unskippedPlan.skipped_at).toBeNull();
-
-    await expect(plans.delete({ id: plan.id })).resolves.toEqual({ success: true });
-    await expect(plans.restore({ id: plan.id })).resolves.toEqual({ success: true });
-
-    const record = await records.create({
-      title: 'Legacy Record',
-      start_at: hoursAgo(6),
-      end_at: hoursAgo(5),
-    });
-    expect(record.source).toBe('manual');
-
-    const updatedRecord = await records.update({
-      id: record.id,
-      data: { title: 'Legacy Record updated' },
-    });
-    expect(updatedRecord.title).toBe('Legacy Record updated');
-
-    await expect(records.delete({ id: record.id })).resolves.toEqual({ success: true });
-    await expect(records.restore({ id: record.id })).resolves.toEqual({ success: true });
-
-    const recordablePlan = await createHistoricalPlan({
-      title: 'Legacy recordable Plan',
-      startAt: hoursAgo(4),
-      endAt: hoursAgo(3),
-    });
-
-    const linkedRecord = await records.create({
-      title: recordablePlan.title,
-      planId: recordablePlan.id,
-      start_at: recordablePlan.start_at,
-      end_at: recordablePlan.end_at,
-    });
-    expect(linkedRecord.plan_id).toBe(recordablePlan.id);
-
-    await expect(plans.delete({ id: recordablePlan.id })).resolves.toEqual({ success: true });
-
-    const activeLinkedRecord = await records.getById({ id: linkedRecord.id });
-    expect(activeLinkedRecord.deleted_at).toBeNull();
-    expect(activeLinkedRecord.plan_id).toBe(recordablePlan.id);
-
-    await expect(records.delete({ id: linkedRecord.id })).resolves.toEqual({ success: true });
-    await expect(records.restore({ id: linkedRecord.id })).resolves.toEqual({ success: true });
-
-    const restoredLinkedRecord = await records.getById({ id: linkedRecord.id });
-    expect(restoredLinkedRecord.deleted_at).toBeNull();
-    expect(restoredLinkedRecord.plan_id).toBe(recordablePlan.id);
-
-    // 削除済み Plan への新規リンクは app guard が先に落とす（NOT_FOUND）。
-    // DB 側 trigger の DT001 は下の direct-writer テストが固定する。
-    await expect(
-      records.create({
-        title: 'New link to deleted Plan',
-        planId: recordablePlan.id,
-        start_at: hoursAgo(12),
-        end_at: hoursAgo(11),
-      }),
-    ).rejects.toMatchObject({ code: 'NOT_FOUND' });
-
-    await expect(
-      records.update({ id: record.id, data: { planId: recordablePlan.id } }),
-    ).rejects.toMatchObject({ code: 'NOT_FOUND' });
-
-    const recordFromPlan = await createHistoricalPlan({
-      title: 'Legacy one-tap recordable Plan',
-      startAt: hoursAgo(30),
-      endAt: hoursAgo(29),
-    });
-    const oneTapRecord = await plans.record({ id: recordFromPlan.id });
-    expect(oneTapRecord.plan_id).toBe(recordFromPlan.id);
-    expect(oneTapRecord.source).toBe('from_plan');
-
-    const confirmablePlan = await createHistoricalPlan({
-      title: 'Legacy confirm-day Plan',
-      startAt: hoursAgo(2),
-      endAt: hoursAgo(1),
-    });
-
-    const confirmedRecords = await plans.confirmDay({
-      start_at: hoursAgo(2.5),
-      end_at: hoursAgo(0.5),
-    });
-    expect(confirmedRecords.some((item) => item.plan_id === confirmablePlan.id)).toBe(true);
   });
 
   // 直接 DML の残る writer は service_role だけになった。linked-Record invariant は

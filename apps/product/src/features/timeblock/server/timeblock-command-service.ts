@@ -50,9 +50,9 @@ export class TimeblockCommandService {
     private readonly supabase: ServiceSupabaseClient,
     private readonly commands: TimeblockCommandClient = createTimeblockCommandClient(),
   ) {
-    // 同一requestで service-role client を作り直さないよう command client を共有する
-    this.plans = new PlanService(supabase, commands);
-    this.records = new RecordService(supabase, commands);
+    // read 専用 service。write は下の this.commands（TimeblockCommandClient）だけが持つ
+    this.plans = new PlanService(supabase);
+    this.records = new RecordService(supabase);
   }
 
   async createPlan(options: UserCommandOptions<CreatePlanInput>): Promise<PlanRow> {

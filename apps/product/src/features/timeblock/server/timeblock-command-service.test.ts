@@ -187,4 +187,41 @@ describe('TimeblockCommandService', () => {
       }),
     );
   });
+  // service は userId を検証しない。渡された値がそのまま command の p_user_id になり、
+  // 直接 DML を剥がした後は RLS も止めない。owner 境界を持っているのは router 側の
+  // `.strict()` + 明示 field だけ、という前提をここで固定する（#2627）。
+  it('serviceは渡されたuserIdをそのままcommandのownerとして使う', async () => {
+    const otherUserId = '00000000-0000-4000-8000-0000000000ff';
+    const query = createChainableMock({ ...plan, user_id: otherUserId });
+    const supabase = createMockSupabase({ from: vi.fn(() => query) });
+    const commands = createCommands();
+    const service = new TimeblockCommandService(
+      supabase as unknown as ServiceSupabaseClient,
+      commands as unknown as TimeblockCommandClient,
+    );
+
+    await service.updatePlan({
+      userId: otherUserId,
+      id: PLAN_ID,
+      expectedUpdatedAt: plan.updated_at,
+      input: { title: 'Changed' },
+    });
+
+    expect(query.eq).toHaveBeenCalledWith('user_id', otherUserId);
+    expect(commands.updatePlan).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: otherUserId, planId: PLAN_ID }),
+    );
+
+    await service.deletePlan({
+      userId: otherUserId,
+      id: PLAN_ID,
+      expectedUpdatedAt: plan.updated_at,
+    });
+
+    expect(commands.deletePlan).toHaveBeenCalledWith({
+      userId: otherUserId,
+      planId: PLAN_ID,
+      expectedUpdatedAt: plan.updated_at,
+    });
+  });
 });

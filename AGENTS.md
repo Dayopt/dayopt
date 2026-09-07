@@ -66,7 +66,7 @@ Dayopt で作業する全エージェントの provider-neutral な正本ガイ�
 - **Record**: 過去の事実。終了を未来へ動かす編集だけ不可。紐付け先 Plan がどこにあるかは制約しない
 - 過去スロットへ新規に引いたブロックは Record になる（`resolveTimeblockDestination` は end_at だけで宛先を決める。UI に種別選択の一手を足さない）
 - **強制点は DB trigger / SQL 関数**。アプリ層（service / MCP client / UI）はその写しで、UI だけを直しても規則は変わらない
-- **規則を撤去する時は写しを全部消すまでが 1 変更**。DB / service だけ緩めて UI 側の写しが残ると「操作はできるのに保存されない」症状になり、旧規則を assert しているテストが緑のまま隠す。撤去 PR では `features/calendar` の interaction 経路と Storybook docs まで grep する（2026-09-07、過去 Plan のドラッグ移動が 40348e2bd の後も効かなかった件）
+- **規則を撤去する時は写しを全部消すまでが 1 変更**。DB / service だけ緩めて UI 側の写しが残ると「操作はできるのに保存されない」症状になり、旧規則を assert しているテストが緑のまま隠す。撤去 PR では [docs/engineering/invariants.md](docs/engineering/invariants.md) §時刻 の写し表（契約変換 / UX 先回りの 2 分類）を grep 対象にする（2026-09-07、過去 Plan のドラッグ移動が 40348e2bd の後も効かなかった件）
 - 表示用の upcoming / active / past 分類は `useCalendarData` が持つ（`getTimeblockState()` は呼び出し元が test だけの残骸）
 
 ### アーキテクチャ

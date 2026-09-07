@@ -229,9 +229,14 @@ function PlanCard({ plan, onEdit, onDelete }) {
 ```tsx
 function PlanCardContainer({ planId }) {
   const { data: plan } = api.plans.getById.useQuery({ id: planId });
-  const deletePlan = api.plans.delete.useMutation();
+  const deletePlan = api.planCommands.delete.useMutation();
 
-  return <PlanCard plan={plan} onDelete={() => deletePlan.mutate({ id: planId })} />;
+  return (
+    <PlanCard
+      plan={plan}
+      onDelete={() => deletePlan.mutate({ id: planId, expectedUpdatedAt: plan.updated_at })}
+    />
+  );
 }
 ```
 
@@ -249,7 +254,7 @@ if (!plan) {
 }
 
 // Client側でキャッチ
-const mutation = api.plans.update.useMutation({
+const mutation = api.planCommands.update.useMutation({
   onError: (error) => {
     if (error.data?.code === 'NOT_FOUND') {
       toast.error('予定が見つかりません');
@@ -533,7 +538,7 @@ from('entries')
 EntryService
 
 // ✅ 現在
-api.plans.create(...) / api.records.create(...)
+api.planCommands.create(...) / api.recordCommands.create(...)
 from('plans') / from('records')
 PlanService / RecordService
 ```
