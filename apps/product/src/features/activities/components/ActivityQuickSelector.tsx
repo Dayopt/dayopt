@@ -138,7 +138,9 @@ function ActivityBadgeCell({
       }
       onMouseLeave={onHoverEnd}
       className={cn(
-        'flex min-h-11 items-center gap-1 rounded-full border px-3 py-2 text-sm transition-colors',
+        // 上下は左右より広く取る。角丸が左右の端を削るぶん、同じ数値だと上下だけ
+        // 詰まって見え、名前が窮屈になる（2026-09-07 User 指摘）
+        'flex min-h-12 items-center gap-1 rounded-full border px-3 py-3 text-sm transition-colors',
         'active:scale-95 active:transition-transform',
         isSelected
           ? uncategorized
@@ -200,7 +202,8 @@ function CreateBadge({ label, onClick }: { label: string; onClick: () => void })
       type="button"
       onClick={onClick}
       className={cn(
-        'border-border hover:bg-state-hover text-muted-foreground flex min-h-11 items-center gap-1 rounded-full border border-dashed px-3 py-2 text-sm transition-colors',
+        // 同じ一覧に並ぶので、アクティビティの pill と同じ高さ・余白にする
+        'border-border hover:bg-state-hover text-muted-foreground flex min-h-12 items-center gap-1 rounded-full border border-dashed px-3 py-3 text-sm transition-colors',
         'active:scale-95 active:transition-transform',
       )}
     >
