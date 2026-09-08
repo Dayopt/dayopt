@@ -19,7 +19,7 @@ import { suppressConsentBanner } from './suppress-consent-banner';
  * 「掴んで動かして保存される」ところまで通す層をここで持つ。
  *
  * spec を分けているのは rate limit の予算を分けるため（#2246、
- * `create-scoped-test-user.ts` 参照）。procedures.ts の user 単位 100req/60s は
+ * `create-scoped-test-user.ts` 参照）。procedures.ts の user 単位 300req/60s（#2669 までは 100）は
  * calendar を数回ロードすると尽き、同居させると mutation が 429 で落ちる。
  */
 

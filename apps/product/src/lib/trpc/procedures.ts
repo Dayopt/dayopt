@@ -20,7 +20,11 @@ import { ServiceError } from '@/lib/trpc/errors';
 import { createCallerFactory, createTRPCRouter, mergeRouters, t } from '@/lib/trpc/router';
 import { isValidMfaAssuranceTransition } from '@/lib/trpc/session-auth-context';
 export type { Context } from '@/lib/trpc/context';
-const USER_RATE_LIMIT = 100;
+// 1 画面読込で 15〜20 手続き（週表示の plans / records / externalCalendar.listEvents に
+// サイドバー・settings・billing が乗る）を撃つ実装に対し、100/min は E2E だけでなく
+// 週送りを連打する実ユーザーも届く値だった（2026-09-08、#2669 で trace 集計）。
+// 300 でも 5 req/s なので乱用の上限は保つ。Upstash 側（`trpcUserRateLimit`）と揃える。
+const USER_RATE_LIMIT = 300;
 const USER_RATE_WINDOW_MS = 60 * 1000;
 const userRequestLog = new Map<string, number[]>();
 

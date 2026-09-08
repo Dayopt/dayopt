@@ -19,7 +19,7 @@ interface ProcedureMeta {
   description?: string;
   /** 認証レベル */
   auth?: ProductAccessLevel;
-  /** エンドポイント固有のレート制限（グローバル100 req/minを上書き） */
+  /** エンドポイント固有のレート制限（グローバル300 req/minを上書き） */
   rateLimit?: { requests: number; window: string };
   /** 非推奨フラグ */
   deprecated?: boolean;
