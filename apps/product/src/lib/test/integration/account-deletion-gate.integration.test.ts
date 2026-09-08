@@ -1685,9 +1685,11 @@ WHERE operation_id = :'operation_id'::UUID;`,
   it('blocks new Calendar, billing, and Storage writes once closing starts', async () => {
     setGateActivation(true);
 
+    // avatars の key は `<uid>/avatar.<ext>` しか許されない（#2460）。任意名を使うと
+    // 削除ゲートではなく key 形式の policy で弾かれ、ゲートが外れても緑になる偽陽性になる。
     const { error: beforeGateAvatarError } = await gateFirstUserClient.storage
       .from('avatars')
-      .upload(`${gateFirstUserId}/before.png`, new Uint8Array([137, 80, 78, 71]), {
+      .upload(`${gateFirstUserId}/avatar.png`, new Uint8Array([137, 80, 78, 71]), {
         contentType: 'image/png',
         upsert: true,
       });
@@ -1701,7 +1703,7 @@ WHERE operation_id = :'operation_id'::UUID;`,
     expect(beforeGateAttachmentError).toBeNull();
 
     const [{ error: avatarCleanupError }, { error: attachmentCleanupError }] = await Promise.all([
-      admin.storage.from('avatars').remove([`${gateFirstUserId}/before.png`]),
+      admin.storage.from('avatars').remove([`${gateFirstUserId}/avatar.png`]),
       admin.storage.from('attachments').remove([`${gateFirstUserId}/before.txt`]),
     ]);
     expect(avatarCleanupError).toBeNull();
@@ -1717,9 +1719,10 @@ WHERE operation_id = :'operation_id'::UUID;`,
     });
     expect(gateFirstBillingError?.code).toBe('AD019');
 
+    // ここも許可された key 形式を使う。ゲートだけが拒否理由になるようにする。
     const { error: gatedAvatarError } = await gateFirstUserClient.storage
       .from('avatars')
-      .upload(`${gateFirstUserId}/after.png`, new Uint8Array([137, 80, 78, 71]), {
+      .upload(`${gateFirstUserId}/avatar.webp`, new Uint8Array([137, 80, 78, 71]), {
         contentType: 'image/png',
       });
     const { error: gatedAttachmentError } = await gateFirstUserClient.storage

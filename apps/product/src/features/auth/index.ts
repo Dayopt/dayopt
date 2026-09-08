@@ -22,6 +22,7 @@ export { SignupForm } from './components/SignupForm';
 export { hasPasswordIdentity, hasVerifiedMfaFactor } from './domain';
 // --- Stores ---
 export { AuthStoreInitializer } from './stores/AuthStoreInitializer';
+export { waitForResolvedUserId } from './stores/resolve-user-id';
 export { useAuthStore } from './stores/useAuthStore';
 
 // ここにないものはfeature内部専用

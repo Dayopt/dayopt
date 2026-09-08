@@ -6,6 +6,7 @@ import { useLogout } from './useLogout';
 const mockPush = vi.fn();
 const mockRefresh = vi.fn();
 const mockSignOut = vi.fn();
+const mockClearPersistedQueryCache = vi.fn().mockResolvedValue(undefined);
 
 vi.mock('next-intl', () => ({
   useTranslations: () => (key: string) => key,
@@ -24,6 +25,10 @@ vi.mock('@/lib/supabase/client', () => ({
       signOut: mockSignOut,
     },
   }),
+}));
+
+vi.mock('@/lib/tanstack-query/persist-storage', () => ({
+  clearPersistedQueryCache: () => mockClearPersistedQueryCache(),
 }));
 
 vi.mock('sonner', () => ({
@@ -55,6 +60,19 @@ describe('useLogout', () => {
     expect(mockSignOut).toHaveBeenCalled();
     expect(mockPush).toHaveBeenCalledWith('/auth/login');
     expect(mockRefresh).toHaveBeenCalled();
+  });
+
+  // #2619: sign-out は soft navigation なので、永続化 cache を明示的に消さないと
+  // 同じブラウザの次のユーザーに前ユーザーの plan / record が復元されうる。
+  it('永続化された query cache を破棄する', async () => {
+    mockSignOut.mockResolvedValue({ error: null });
+    const { result } = renderHook(() => useLogout());
+
+    await act(async () => {
+      await result.current.logout();
+    });
+
+    expect(mockClearPersistedQueryCache).toHaveBeenCalledTimes(1);
   });
 
   it('sets isLoggingOut during the process', async () => {

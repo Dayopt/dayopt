@@ -321,11 +321,28 @@ type ConnectionSecret = {
   authorityEpoch?: number;
 };
 
+type LoadConnectionSecretOptions = {
+  /**
+   * fenced writer が ready でも authority fence（`authority_fence_id` /
+   * `authority_epoch`）が NULL の行を「存在しない」と扱わず、fence 値を undefined に
+   * したまま secret を返す（#2620）。
+   *
+   * **破壊的経路（disconnect）専用。** fence は fenced sync writer の CAS 入力なので、
+   * CAS を伴う書き込み経路（`updateSelectedCalendars`）では既定の false のままにする。
+   * disconnect は fence 値を一切使わず、DELETE も CAS ではなく
+   * `id` + `user_id` の一致だけで行うため、ここで fence を要求しても守れる不変条件が無い。
+   * 一方で要求すると、ユーザーが実行した取り消しが revoke も削除もせず成功を返す
+   * （＝ provider 側の grant が生き続ける）。
+   */
+  allowMissingAuthorityFence?: boolean;
+};
+
 /** service_role で connection の token 行を読む。無ければ null。 */
 async function loadConnectionSecret(
   db: CalendarConnectionClient,
   userId: string,
   connectionId: string,
+  options: LoadConnectionSecretOptions = {},
 ): Promise<ConnectionSecret | null> {
   // #2050: この判定は `getConfiguredExternalLifecycleAppVersion`（Candidate 3 marker、
   // settings/billing 等の無関係な既存呼び出し元と共有）とは別関数に分離してある —
@@ -351,7 +368,17 @@ async function loadConnectionSecret(
     if (data.authority_fence_id === null || data.authority_epoch === null) {
       // authority fence 未確立の接続（理論上は #2050 の CAS 対象外）。fenced writer
       // 呼び出しに必要な CAS 値が揃わないため missing 相当として扱う。
-      return null;
+      //
+      // ただし fence を使わない破壊的経路（disconnect）だけは例外にする（#2620）。
+      // 接続作成経路（`saveConnection` / `reconnectExistingConnection`）は fence 列を
+      // 書かないため、OAuth callback が作った行は必ずここに落ちる。missing 扱いのままだと
+      // 切断が revoke も DELETE も飛ばして成功を返し、Google 側の grant が無期限に残る。
+      if (!options.allowMissingAuthorityFence) return null;
+      return {
+        dataGeneration: data.data_generation,
+        status: data.status,
+        refreshTokenEnc: data.refresh_token_enc,
+      };
     }
     return {
       dataGeneration: data.data_generation,
@@ -772,6 +799,17 @@ function reportUnrevokedGrant(reason: string): void {
  *
  * 解約済みユーザーも切断できるよう protectedProcedure から呼ぶ。接続が既に無ければ冪等に成功。
  *
+ * **authority fence の欠落で止まらない**（#2620）。`loadConnectionSecret` は fenced writer が
+ * ready な時、`authority_fence_id` / `authority_epoch` が NULL の行を missing 相当として
+ * null を返すが、disconnect は `allowMissingAuthorityFence` でその扱いを外す。fence を書く
+ * 接続作成経路が存在しない以上、要求すると全ての新規接続で切断が空振りする。
+ *
+ * **revoke の失敗は削除を止めない**（上記 2 が best-effort である帰結を明示する）。provider が
+ * revoke を拒否しても行は削除し、Sentry に `disconnect_revoke` を残す。ユーザーが実行した
+ * 取り消しの主目的は Dayopt 側からのデータ・token の除去であり、そこを provider 応答に
+ * 依存させると「切断できない接続」が生まれる。provider 側 grant の取りこぼしは Sentry で
+ * 観測する（`revoke-outbox.ts` の再送は DB 起点の経路専用で、この関数からは enqueue しない）。
+ *
  * **wall-clock 予算（deadline）は意図的に持たせていない**（#2079 で検討し、導入しない結論。
  * listProviderCalendars とは扱いを変える）:
  *
@@ -804,7 +842,11 @@ function reportUnrevokedGrant(reason: string): void {
 export async function disconnect(userId: string, connectionId: string): Promise<void> {
   const db = createCalendarConnectionDbClient();
 
-  const secret = await loadConnectionSecret(db, userId, connectionId);
+  // authority fence の欠落を「切断済み」と解釈しない（#2620）。fence が NULL でも
+  // revoke と DELETE には必ず到達させる。行そのものが無い時だけ冪等に return する。
+  const secret = await loadConnectionSecret(db, userId, connectionId, {
+    allowMissingAuthorityFence: true,
+  });
   if (!secret) return; // 既に切断済み。冪等。
 
   // 1. revoke より先にミラーを掃除する。失敗したら revoke も connection 削除もしない。

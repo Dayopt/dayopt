@@ -15,6 +15,7 @@ import { Webhook } from 'standardwebhooks';
 
 import type { EmailData, WebhookPayload } from '../_shared/types.ts';
 
+import { buildConfirmUrl as buildAuthConfirmUrl } from './confirm-url.ts';
 import { ConfirmEmail } from './ConfirmEmail.tsx';
 import { EmailChangeEmail } from './EmailChangeEmail.tsx';
 import { MagicLinkEmail } from './MagicLinkEmail.tsx';
@@ -57,43 +58,11 @@ async function getUserLocale(userId: string): Promise<Locale> {
 }
 
 /**
- * Auth メールタイプに応じた確認URLを構築
- *
- * token_hash を検証できるのはアプリの `/auth/confirm` route（verifyOtp）だけなので、
- * リンクは必ず confirm route を経由させ、検証後の行き先を `next` で渡す。
- * redirect_to に直接 token_hash を付けると着地先が検証せずリンクが死ぬ（過去バグ）。
- *
- * - host: redirect_to の origin を優先（GoTrue が allowlist 検証済み。Preview 対応）
- * - next: redirect_to の path + query（confirm route 側で getSafeRedirectPath 検証）
- *
- * @param tokenHash email_change では宛先ごとに使う hash が異なるため上書き可能にする
+ * 確認 URL の組み立ては `./confirm-url.ts`（Deno API 非依存の純関数）へ寄せてある。
+ * origin の allowlist 検証を含み、Node 側の vitest から直接テストできる（#2616）。
  */
-function buildConfirmUrl(emailData: EmailData, tokenHash: string = emailData.token_hash): string {
-  const { redirect_to, email_action_type } = emailData;
-
-  let origin = APP_URL;
-  let nextPath = '';
-  if (redirect_to) {
-    try {
-      const redirectUrl = new URL(redirect_to);
-      origin = redirectUrl.origin;
-      nextPath = `${redirectUrl.pathname}${redirectUrl.search}`;
-    } catch {
-      // redirect_to が不正なら APP_URL の既定挙動にフォールバック
-    }
-  }
-
-  const url = new URL('/auth/confirm', origin);
-  url.searchParams.set('token_hash', tokenHash);
-  // verifyOtp の EmailOtpType は 'magiclink'（アンダースコアなし）
-  url.searchParams.set(
-    'type',
-    email_action_type === 'magic_link' ? 'magiclink' : email_action_type,
-  );
-  if (nextPath && nextPath !== '/') {
-    url.searchParams.set('next', nextPath);
-  }
-  return url.toString();
+function buildConfirmUrl(emailData: EmailData, tokenHash?: string): string {
+  return buildAuthConfirmUrl({ emailData, appUrl: APP_URL, tokenHash });
 }
 
 interface OutgoingEmail {

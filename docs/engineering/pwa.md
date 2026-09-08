@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-08-13
+last_verified: 2026-09-08
 code: apps/product/src/lib/pwa
 ---
 
@@ -23,6 +23,12 @@ Dayopt の PWA は、ホーム画面へのインストール、静的キャッ�
 
 Query cache persistence only restores previously fetched data. It does not persist, queue, or replay
 mutations.
+
+The persisted cache is scoped to the signed-in user. Each blob is stored under a key derived from the
+authenticated user id and carries that id inside it, so a blob written by one account is never restored
+for another. Restoring also deletes any blob that belongs to someone else, and signing out clears the
+store entirely. Restoring waits for the auth store to resolve the session, so an offline revisit by the
+same user still hydrates from cache as before.
 
 ## Service Worker Cache Strategy
 

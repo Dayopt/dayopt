@@ -9,6 +9,7 @@ const deleteFactor = vi.hoisted(() => vi.fn());
 const getUserById = vi.hoisted(() => vi.fn());
 const verifyRecoveryCode = vi.hoisted(() => vi.fn());
 const adminRpc = vi.hoisted(() => vi.fn());
+const adminFrom = vi.hoisted(() => vi.fn());
 const captureUnexpectedDatabaseError = vi.hoisted(() => vi.fn());
 const captureUnexpectedError = vi.hoisted(() => vi.fn());
 const getUserLocale = vi.hoisted(() => vi.fn());
@@ -22,9 +23,12 @@ vi.mock('@/lib/sentry', () => ({
   observeAuthOperation: async (_operation: string, call: () => PromiseLike<unknown>) => call(),
 }));
 
+// #2618: `mfa_recovery_codes` はブラウザロールから到達できなくなったため、
+// コードの読み取りと残数取得も service_role client 経由になった。
 vi.mock('@/lib/supabase/oauth', () => ({
   createServiceRoleClient: () => ({
     auth: { admin: { mfa: { listFactors, deleteFactor }, getUserById } },
+    from: adminFrom,
     rpc: adminRpc,
   }),
 }));
@@ -42,14 +46,27 @@ function createService(options?: {
 }) {
   const query = createChainableMock(options?.codes ?? [], options?.fetchError ?? null);
   const rpcResults = [...(options?.rpcResults ?? [])];
-  const rpc = vi.fn(async () => rpcResults.shift() ?? { data: null, error: null });
-  adminRpc.mockResolvedValue(options?.adminRpcResult ?? { data: true, error: null });
+  const consumeResult = options?.adminRpcResult ?? { data: true, error: null };
+
+  // service_role client は 2 種類の RPC を受ける。呼び分けは名前で行う
+  // （`use_recovery_code` = 消費、`count_unused_recovery_codes` = 残数）。
+  adminRpc.mockImplementation(async (name: string) =>
+    name === 'count_unused_recovery_codes'
+      ? (rpcResults.shift() ?? { data: null, error: null })
+      : consumeResult,
+  );
+  adminFrom.mockImplementation(() => query);
+
+  // user-scoped client は locale 取得にしか使われない（コードの読み書きは service_role 側）。
   const from = vi.fn(() => query);
+  const rpc = vi.fn(async () => ({ data: null, error: null }));
 
   return {
     service: new RecoveryService({ from, rpc } as never),
     query,
     rpc,
+    adminRpc,
+    adminFrom,
   };
 }
 
@@ -74,7 +91,7 @@ describe('RecoveryService', () => {
 
   it('一致したコードを消費し、verified factorだけを削除して残数を返す', async () => {
     const hash = 'matching-hash';
-    const { service, query, rpc } = createService({
+    const { service, query } = createService({
       codes: [{ id: 'code-1', code_hash: hash }],
       rpcResults: [{ data: 7, error: null }],
     });
@@ -98,7 +115,7 @@ describe('RecoveryService', () => {
       p_user_id: USER_ID,
       p_code_hash: hash,
     });
-    expect(rpc).toHaveBeenCalledWith('count_unused_recovery_codes', { p_user_id: USER_ID });
+    expect(adminRpc).toHaveBeenCalledWith('count_unused_recovery_codes', { p_user_id: USER_ID });
     expect(deleteFactor).toHaveBeenCalledWith({ userId: USER_ID, id: 'verified-1' });
     expect(deleteFactor).not.toHaveBeenCalledWith({ userId: USER_ID, id: 'unverified-1' });
 

@@ -32,7 +32,17 @@ export class RecoveryService {
 
   async verify(options: { userId: string; code: string }) {
     const { userId, code } = options;
-    const { data: codes, error: fetchError } = await this.supabase
+
+    // #2618: `mfa_recovery_codes` は認証主体（anon / authenticated）から到達できない
+    // credential store になった。この読み取りは service_role で行う。
+    //
+    // user-scoped client で読んでいた頃は、aal1 のユーザー自身が同じ表へ INSERT できたため、
+    // 「一致する行がある」ことが認証の根拠にならなかった（自分で植えた行に一致させられた）。
+    // service_role で読むこと自体は認可を強めないが、表への書き込み経路を service_role only
+    // へ寄せたので、ここも同じ client に揃えて grant の前提を一本化する。
+    const adminClient = createServiceRoleClient();
+
+    const { data: codes, error: fetchError } = await adminClient
       .from('mfa_recovery_codes')
       .select('id, code_hash')
       .eq('user_id', userId)
@@ -57,8 +67,6 @@ export class RecoveryService {
     if (!matchedCode) {
       throw new RecoveryServiceError('RECOVERY_INVALID', 'RECOVERY_INVALID');
     }
-
-    const adminClient = createServiceRoleClient();
 
     // factor削除 → コード消費の順で実行する（#2039）。逆順だと factor削除失敗時に
     // 「コードは消費済みだが MFA は有効なまま」というロックアウト方向の中途状態が残る。
@@ -134,7 +142,7 @@ export class RecoveryService {
       await this.notifyMfaDisabled(adminClient, userId);
     }
 
-    const { data: remainingCount, error: countError } = await this.supabase.rpc(
+    const { data: remainingCount, error: countError } = await adminClient.rpc(
       'count_unused_recovery_codes',
       { p_user_id: userId },
     );
