@@ -347,6 +347,8 @@ Code Qualityを採用しない判断と2026-07-21時点の外部設定証跡は�
 
 finish-branch.sh が名前で success を要求するのは `ci.yml` の 3 job（`🔍 Static Checks` / `📦 Unit Tests` / `🧪 Integration Tests`）に加えて次を含める。`🧪 Integration Tests` は 2026-09-02、[#2539](https://github.com/Dayopt/dayopt/issues/2539) で `📦 Unit Tests` から分離した。同じ #2539 で affected 判定を `🧭 Impact` job へ切り出し、`impact →（static ∥ unit ∥ integration）`の並列構成にしている（実測で CI 全体が 16 分 55 秒 → 6〜7 分台。run 33588708693 → 33615047182 / 33618057064。**この数値が構成の基準値の正本**で、`ci.yml` / `check.mjs` 側のコメントには数値を置かない）。**`🧭 Impact` は required にしない** — 下流 3 job は `needs.impact.result` を条件にせず、impact が落ちても空 output を fail closed（全実行）として受けて必ず走るため、検査そのものは常に行われる（この設計は Codex / 内製 risk-reviewer の P2 指摘で入れた。要求すると impact 障害時に全 job が skip され検査ゼロになる）。**`🧪 Integration Tests` は DB を触る PR でだけ走る**ため、`branch:finish` も affected な PR でだけ名前で要求する。
 
+**`📦 Unit Tests` が走らせる package は `scripts/ci/check.mjs` の `runUnit()` が名指しで持つ**（`@dayopt/product` / `pnpm test:web` / `pnpm test:scripts` / `@dayopt/billing` / `@dayopt/i18n` / `@dayopt/observability`）。root の `pnpm test:run` とは別経路なので、片方だけに package を足すと**ローカルでは走るのに CI では走らない** test ができる。実際 `@dayopt/billing` が root にだけ載っており、capability map（Free / Pro の正本）を守る test が CI の外にあった（2026-09-07、[#2646](https://github.com/Dayopt/dayopt/issues/2646)）。package を増やす時は両方へ足す。
+
 **2026-08-20、CI 4 層再設計（[#2269](https://github.com/Dayopt/dayopt/issues/2269)）により `🎭 E2E Tests` / `🌐 Web Build & E2E` は required checks から除去した。** この 2 job は `.github/workflows/ci.yml` から `.github/workflows/heavy-post-merge.yml` へ移設され、pull_request では発火しなくなった（nightly + workflow_dispatch のみ。push:main は #2382（2026-08-25）で per-merge 実行のコストを理由に廃止済み）。旧記述（4 job が required）は誤り。#2483（2026-08-28）で `heavy-post-merge.yml` は `nightly.yml` へ吸収され、**2026-09-03 に `promote.yml` へ再移設した**（merge 連動 promote。per-PR で required にしない扱いは不変で、走るのは merge 後の promote 経路。影響のある suite だけが走る）。 詳細は 2026-08-20 の決定ログ（削除済み、git 履歴参照）、per-PR 検証の後継はレーンのローカル影響 spec 実走義務（`AGENTS.md §レーン運用` §条件付き事前 E2E）を参照。
 
 | context                   | 発行元                                                  | 目的                                                                    |
@@ -1253,7 +1255,6 @@ npm run test:watch          # ウォッチモード
 npm run test:ui             # Vitest UI
 npm run test:coverage       # カバレッジ付き実行
 npm run test:coverage:summary  # カバレッジサマリー表示
-npm run test:diff-coverage  # 差分カバレッジ
 npm run test-storybook      # Storybook テスト
 npm run test:integration    # 統合テスト（前提: ローカル Supabase 起動。未起動なら失敗する。#2178）
 npm run test:e2e            # Playwright E2Eテスト

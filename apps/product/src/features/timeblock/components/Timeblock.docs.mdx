@@ -16,7 +16,7 @@ Plan / Recordのeditor、inspector、record action component群。Storybookで�
 | Relationships  | Planの関連Record一覧、Recordの元Plan、loading / error / unavailable        |
 
 - Inspectorで開いたPlan / Recordは時間編集で暗黙変換しない
-- past Planは時間fieldをdisabledにし、内容訂正とrecord actionは残す
+- past Planも時間fieldを編集できる（編集してもPlanのままでRecordへは変わらない）。内容訂正とrecord actionも残す
 - 「そのまま記録」のpendingは、最新のタグ・メモ保存からRecord作成まで継続する
 - Plan / Recordの関係はraw IDではなくタグと日時で示し、行選択で同じInspectorの対象を切り替える
 - product rule、DB、RPCはStorybookに複製しない

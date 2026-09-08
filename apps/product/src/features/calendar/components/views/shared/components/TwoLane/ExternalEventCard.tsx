@@ -22,8 +22,8 @@ import {
  * `PlanEvent` を組もうとすると偽の値を埋めることになるため。
  *
  * **`onConvert` / `onDismiss` を渡した時だけ操作可能になる**（#1985, #1984）。省略時は従来通り
- * 読み取り専用（`TwoLaneTimeblockRenderer` を通らないため、過去ブロックの編集制約
- * `temporal-constraints.md` とはそもそも交差しない）。
+ * 読み取り専用（`TwoLaneTimeblockRenderer` を通らないため、時刻の規則
+ * （docs/product/specs/plan-record.md §時刻の規則）とはそもそも交差しない）。
  *
  * - **カード全体のタップ = 変換**（`onConvert`）。Plan / Record どちらに変換されるかは
  *   呼び出し側（`useConvertGhostEvent`）が `event.endDate` と現在時刻だけで一意に決める

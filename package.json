@@ -68,7 +68,6 @@
     "test-storybook:dark": "pnpm --filter @dayopt/storybook test-storybook:dark",
     "test:ui": "pnpm --filter @dayopt/product test:ui",
     "test:coverage": "pnpm --filter @dayopt/product test:coverage",
-    "test:diff-coverage": "pnpm --filter @dayopt/product test:diff-coverage",
     "test:watch": "pnpm --filter @dayopt/product test:watch",
     "test:integration": "pnpm --filter @dayopt/product test:integration",
     "db:reset": "pnpm --filter @dayopt/product db:reset",
