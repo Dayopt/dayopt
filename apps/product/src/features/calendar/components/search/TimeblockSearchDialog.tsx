@@ -183,19 +183,19 @@ export function TimeblockSearchContent({
             >
               <div className="min-w-0 flex-1 space-y-1">
                 <div className="flex min-w-0 items-center gap-2">
-                  <span className="border-border text-muted-foreground shrink-0 rounded-lg border px-2 py-1 text-xs">
+                  <p className="flex min-w-0 flex-1 items-center gap-2 text-sm font-medium">
+                    <ActivityIcon
+                      icon={activity?.icon ?? null}
+                      color={activity?.color ?? null}
+                      size="sm"
+                      neutral={!activity}
+                    />
+                    <span className="truncate">{displayName}</span>
+                  </p>
+                  <span className="text-muted-foreground shrink-0 text-xs">
                     {t(`calendar.search.kind.${result.kind}`)}
                   </span>
                 </div>
-                <p className="flex min-w-0 items-center gap-1 text-sm font-medium">
-                  <ActivityIcon
-                    icon={activity?.icon ?? null}
-                    color={activity?.color ?? null}
-                    size="sm"
-                    neutral={!activity}
-                  />
-                  <span className="truncate">{displayName}</span>
-                </p>
                 {result.note ? (
                   <p className="text-muted-foreground line-clamp-1 text-xs">{result.note}</p>
                 ) : null}
@@ -378,7 +378,7 @@ export function TimeblockSearchDialog({
       title={t('calendar.search.title')}
       description={t('calendar.search.description')}
       mobilePresentation="full-height"
-      className="sm:max-w-xl [&_[data-slot=dialog-close]]:top-2 [&_[data-slot=dialog-close]]:right-2"
+      className="sm:max-w-xl [&_[data-slot=dialog-close]]:top-2 [&_[data-slot=dialog-close]]:right-2 [&_[data-slot=dialog-close]]:hidden md:[&_[data-slot=dialog-close]]:flex"
     >
       <div className="border-border flex shrink-0 items-center gap-1 border-b p-2 md:contents md:border-0 md:p-0">
         <CommandInput

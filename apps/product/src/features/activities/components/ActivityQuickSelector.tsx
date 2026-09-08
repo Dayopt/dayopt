@@ -22,8 +22,9 @@ import { createPortal } from 'react-dom';
 import { Plus, X } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 
+import { MEDIA_QUERIES } from '@/lib/breakpoints';
 import { useHasMounted } from '@/lib/hooks/useHasMounted';
-import { useIsMobile } from '@/lib/hooks/useIsMobile';
+import { useMediaQuery } from '@/lib/hooks/useMediaQuery';
 import { useShellStore } from '@/lib/stores/useShellStore';
 import {
   Button,
@@ -425,7 +426,7 @@ export function ActivityPickerList({
 }
 
 /** アンカー要素の横にパネルを配置する位置を計算 */
-function calcAnchoredPosition(anchorRect: DOMRect, panelWidth: number) {
+function calcAnchoredPosition(anchorRect: DOMRect, panelWidth: number, panelHeight: number) {
   const GAP = 8;
   const MARGIN = 16;
   const spaceRight = window.innerWidth - anchorRect.right - GAP - MARGIN;
@@ -438,11 +439,11 @@ function calcAnchoredPosition(anchorRect: DOMRect, panelWidth: number) {
       : spaceLeft >= panelWidth
         ? anchorRect.left - GAP - panelWidth
         : // どちらも足りなければ右寄せ（画面端からマージン）
-          window.innerWidth - panelWidth - MARGIN;
+          Math.max(MARGIN, window.innerWidth - panelWidth - MARGIN);
 
   // 縦位置: アンカーの上端に揃えつつ、画面内に収まるようクランプ
   const maxTop = window.innerHeight - MARGIN;
-  const top = Math.max(MARGIN, Math.min(anchorRect.top, maxTop - 200));
+  const top = Math.max(MARGIN, Math.min(anchorRect.top, maxTop - panelHeight));
 
   return { top, left };
 }
@@ -459,7 +460,7 @@ export function ActivityQuickSelector({
   hint,
 }: ActivityQuickSelectorProps) {
   const t = useTranslations('calendar');
-  const isMobile = useIsMobile();
+  const isMobile = useMediaQuery(MEDIA_QUERIES.mobile);
   const mounted = useHasMounted();
   const panelRef = useRef<HTMLDivElement>(null);
 
@@ -475,10 +476,12 @@ export function ActivityQuickSelector({
     const update = () => {
       const rect = anchor.getBoundingClientRect();
       const panelWidth = 320; // w-80 = 20rem = 320px
-      setPosition(calcAnchoredPosition(rect, panelWidth));
+      setPosition(calcAnchoredPosition(rect, panelWidth, panelRef.current?.offsetHeight ?? 0));
     };
 
     update();
+    const observer = new ResizeObserver(update);
+    if (panelRef.current) observer.observe(panelRef.current);
 
     // スクロール・リサイズで再計算
     window.addEventListener('resize', update);
@@ -487,6 +490,7 @@ export function ActivityQuickSelector({
     scrollParent.addEventListener('scroll', update, { passive: true });
 
     return () => {
+      observer.disconnect();
       window.removeEventListener('resize', update);
       scrollParent.removeEventListener('scroll', update);
     };
@@ -498,6 +502,7 @@ export function ActivityQuickSelector({
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
+        e.preventDefault();
         onOpenChange(false);
       }
     };

@@ -87,7 +87,7 @@
         "heavyButDrained": "Heavy but draining → trim, or use smaller timeblocks"
       },
       "pointAriaLabel": "{name}, recorded {recorded}",
-      "emptyBoard": "No points yet — answer the fulfillment prompt when you stop or place a record, and points appear here",
+      "emptyBoard": "Choose fulfillment in record details. Each activity appears after {threshold} answers.",
       "waiting": "Waiting to become a point: {names}",
       "waitingSeparator": ", ",
       "footnote": "Opacity = number of answers · a point appears at n≥{threshold}"

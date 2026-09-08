@@ -98,6 +98,9 @@ describe('GoogleCalendarSettingsView', () => {
     );
 
     expect(screen.getByRole('button', { name: 'addAccount' })).toBeDisabled();
+    expect(screen.getByText('unavailable')).toBeInTheDocument();
+    expect(screen.queryByText('description')).not.toBeInTheDocument();
+    expect(screen.queryByText('empty')).not.toBeInTheDocument();
     for (const button of screen.getAllByRole('button', { name: 'reconnect' })) {
       expect(button).toBeDisabled();
     }

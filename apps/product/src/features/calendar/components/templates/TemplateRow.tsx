@@ -93,22 +93,28 @@ export function TemplateRow({
       onMouseLeave={() => setIsHovered(false)}
       onContextMenu={handleContextMenu}
     >
-      <Popover open={(isHovered || isFocused) && !isRenaming && !contextMenuPosition}>
-        <PopoverTrigger asChild>
-          {isRenaming ? (
-            <input
-              ref={renameInputRef}
-              aria-label={t('calendar.templates.renameLabel')}
-              value={renameValue}
-              onChange={(e) => setRenameValue(e.target.value)}
-              onBlur={commitRename}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') commitRename();
-                if (e.key === 'Escape') setIsRenaming(false);
-              }}
-              className="border-border bg-background text-foreground w-full min-w-0 rounded-lg border px-2 py-1 text-sm outline-none"
-            />
-          ) : (
+      {isRenaming ? (
+        <input
+          ref={renameInputRef}
+          aria-label={t('calendar.templates.renameLabel')}
+          value={renameValue}
+          onChange={(e) => setRenameValue(e.target.value)}
+          onBlur={commitRename}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              commitRename();
+            }
+            if (e.key === 'Escape') {
+              e.preventDefault();
+              setIsRenaming(false);
+            }
+          }}
+          className="border-border bg-background text-foreground w-full min-w-0 rounded-lg border px-2 py-1 text-sm outline-none"
+        />
+      ) : (
+        <Popover open={(isHovered || isFocused) && !contextMenuPosition}>
+          <PopoverTrigger asChild>
             <button
               type="button"
               className="text-foreground focus-visible:ring-ring min-w-0 flex-1 truncate rounded-lg text-left text-sm focus-visible:ring-2 focus-visible:outline-none"
@@ -118,12 +124,12 @@ export function TemplateRow({
             >
               {template.name}
             </button>
-          )}
-        </PopoverTrigger>
-        <PopoverContent side="right" align="start" className="h-96 w-64 p-3">
-          <MiniDayPreview blocks={template.blocks} />
-        </PopoverContent>
-      </Popover>
+          </PopoverTrigger>
+          <PopoverContent side="right" align="start" className="h-96 w-64 p-3">
+            <MiniDayPreview blocks={template.blocks} />
+          </PopoverContent>
+        </Popover>
+      )}
 
       {contextMenuPosition && (
         <TemplateContextMenu
