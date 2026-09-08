@@ -24,8 +24,11 @@ pnpm --filter @dayopt/product start
 pnpm test:e2e -- src/lib/test/e2e/pwa/pwa.spec.ts
 ```
 
-The manifest test can run against the normal Playwright development server. Production-only tests
-are skipped unless `NODE_ENV=production`.
+The manifest test can run against the normal Playwright development server. The Service Worker
+tests only run in CI (`process.env.CI`), where `playwright.config.ts` starts a production build with
+`pnpm build && pnpm start` — the SW is not registered by the dev server. They also need a
+service-role Supabase target, because the SW only mounts inside the authenticated `(app)` layout, so
+the suite seeds and deletes its own test user.
 
 ## Scope Boundary
 

@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { logger } from '@/lib/logger';
 import { observeAuthOperation } from '@/lib/sentry';
 import { createClient } from '@/lib/supabase/client';
+import { clearPersistedQueryCache } from '@/lib/tanstack-query/persist-storage';
 import { toast } from '@/lib/toast';
 import { useRouter } from '@dayopt/i18n/navigation';
 import { useTranslations } from 'next-intl';
@@ -30,6 +31,10 @@ export function useLogout() {
     try {
       const supabase = createClient();
       await observeAuthOperation('sign_out', () => supabase.auth.signOut());
+      // 永続化された query cache（IndexedDB）を破棄する（#2619）。sign-out は soft
+      // navigation なので、消さないと同じブラウザの次のユーザーに前ユーザーの
+      // plan / record が復元されうる。memory 側は QueryCacheAuthBoundary が閉じる。
+      await clearPersistedQueryCache();
       toast.success(t('navigation.navUser.logoutSuccess'));
       router.push('/auth/login');
       router.refresh();

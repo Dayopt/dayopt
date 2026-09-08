@@ -1,3 +1,5 @@
+import { isBillingEnforced } from '@/lib/billing/enforcement-flag';
+import { dayoptProTrialDays } from '@dayopt/billing';
 import 'server-only';
 
 import { createHash } from 'node:crypto';
@@ -10,7 +12,6 @@ import { getAppUrl } from '@/lib/app-url';
 import type { Database } from '@/lib/database';
 import { requireStripe } from '@/lib/stripe/client';
 import { ServiceError } from '@/lib/trpc/errors';
-import { dayoptProTrialDays } from '@dayopt/billing';
 
 import { BILLING_OPERATION_SERVICE_CODES } from '../lib/billing-operation';
 
@@ -1035,7 +1036,8 @@ async function createCheckoutProviderSession(
           supabase_user_id: input.userId,
         },
         mode: 'subscription',
-        ...(!input.hasTrialHistory
+        ...(isBillingEnforced() ? { payment_method_types: ['card' as const] } : {}),
+        ...(!isBillingEnforced() && !input.hasTrialHistory
           ? {
               subscription_data: {
                 trial_period_days: dayoptProTrialDays,

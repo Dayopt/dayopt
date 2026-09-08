@@ -92,7 +92,7 @@ publish されるのは `paths` に一致する contract 変更 PR だけなの�
 
 どの context を required にするかは [infra.md §merge gate の required checks](../engineering/infra.md#merge-gate-の-required-checks) を正本とする。ここには複製しない（job 名を変えるたびに 2 箇所が乖離するため）。
 
-private + Free plan では GitHub 側の required check 強制自体が効かず、マージ可否は `scripts/tasks/finish-branch.sh` が判定する。ruleset の実状は API から確認できない（`gh api repos/Dayopt/dayopt/rulesets` は 403 `Upgrade to GitHub Pro` を返す）ため、この画面の設定は手動確認に依存する。
+2026-09-07 の repo public 化以降、main の ruleset `6790553` が required status checks / strict up-to-date / thread resolution を GitHub 側で強制する（bypass actor 0）。実状は `gh api repos/Dayopt/dayopt/rulesets/6790553` で確認できる。`scripts/tasks/finish-branch.sh` はその上位互換の検査（`🧪 Integration Tests` / Vercel context の名前要求）を追加で行う。public 化前（Free plan の private repo）は ruleset API が 403 を返し finish-branch.sh だけが gate だった。
 
 ### Fork Pull Request
 
@@ -356,16 +356,17 @@ Issue #1564 で、Production Security Advisorの
 
 ## RPC判断表
 
-| RPC                            | server caller                          | EXECUTE role                    | 実行属性           | 判断                                                                                          |
-| ------------------------------ | -------------------------------------- | ------------------------------- | ------------------ | --------------------------------------------------------------------------------------------- |
-| `confirm_day_plans_to_records` | なし（drain 待ち。#1893 で撤去）       | `authenticated`, `service_role` | `SECURITY INVOKER` | owner RLSと`p_user_id` guardでPlanをRecordへ確定する                                          |
-| `count_unused_recovery_codes`  | `RecoveryService`のuser-scoped client  | `authenticated`, `service_role` | `SECURITY INVOKER` | owner RLSと`p_user_id` guardで件数だけ返す                                                    |
-| `update_personalization`       | user-scoped client                     | `authenticated`, `service_role` | `SECURITY INVOKER` | owner RLSと`p_user_id` guardで設定を更新する                                                  |
-| `soft_delete_plan`             | なし（drain 待ち。#1893 で撤去）       | `authenticated`, `service_role` | `SECURITY INVOKER` | owner RLSと`p_user_id` guardで論理削除する                                                    |
-| `soft_delete_record`           | なし（drain 待ち。#1893 で撤去）       | `authenticated`, `service_role` | `SECURITY INVOKER` | owner RLSと`p_user_id` guardを使い、`auto_migrated`を常に拒否する                             |
-| `restore_plan`                 | なし（drain 待ち。#1893 で撤去）       | `service_role`                  | `SECURITY DEFINER` | authenticated SELECTから隠れたdeleted rowを復元するためdefinerを維持する                      |
-| `restore_record`               | なし（drain 待ち。#1893 で撤去）       | `service_role`                  | `SECURITY DEFINER` | deleted row復元のためdefinerを維持し、`auto_migrated`を常に拒否する                           |
-| `use_recovery_code`            | `RecoveryService`のservice-role client | `service_role`                  | `SECURITY DEFINER` | recovery codeにauthenticated UPDATE policyを追加せず、service-role JWTと`p_user_id`で消費する |
+| RPC                             | server caller                                                 | EXECUTE role                    | 実行属性           | 判断                                                                                                        |
+| ------------------------------- | ------------------------------------------------------------- | ------------------------------- | ------------------ | ----------------------------------------------------------------------------------------------------------- |
+| `confirm_day_plans_to_records`  | なし（drain 待ち。#1893 で撤去）                              | `authenticated`, `service_role` | `SECURITY INVOKER` | owner RLSと`p_user_id` guardでPlanをRecordへ確定する                                                        |
+| `count_unused_recovery_codes`   | `RecoveryService`のservice-role client / ブラウザ（`useMFA`） | `authenticated`, `service_role` | `SECURITY DEFINER` | #2618 で表の SELECT grant をブラウザロールから剥がしたため definer 化した。`p_user_id` guard で件数だけ返す |
+| `update_personalization`        | user-scoped client                                            | `authenticated`, `service_role` | `SECURITY INVOKER` | owner RLSと`p_user_id` guardで設定を更新する                                                                |
+| `soft_delete_plan`              | なし（drain 待ち。#1893 で撤去）                              | `authenticated`, `service_role` | `SECURITY INVOKER` | owner RLSと`p_user_id` guardで論理削除する                                                                  |
+| `soft_delete_record`            | なし（drain 待ち。#1893 で撤去）                              | `authenticated`, `service_role` | `SECURITY INVOKER` | owner RLSと`p_user_id` guardを使い、`auto_migrated`を常に拒否する                                           |
+| `restore_plan`                  | なし（drain 待ち。#1893 で撤去）                              | `service_role`                  | `SECURITY DEFINER` | authenticated SELECTから隠れたdeleted rowを復元するためdefinerを維持する                                    |
+| `restore_record`                | なし（drain 待ち。#1893 で撤去）                              | `service_role`                  | `SECURITY DEFINER` | deleted row復元のためdefinerを維持し、`auto_migrated`を常に拒否する                                         |
+| `use_recovery_code`             | `RecoveryService`のservice-role client                        | `service_role`                  | `SECURITY DEFINER` | recovery codeにauthenticated UPDATE policyを追加せず、service-role JWTと`p_user_id`で消費する               |
+| `replace_mfa_recovery_codes_v1` | `generateAndSaveRecoveryCodesAction`のservice-role client     | `service_role`                  | `SECURITY DEFINER` | #2618。認証主体は`mfa_recovery_codes`へ直接書けない。旧コードの削除と新コードの挿入を1 txで行う             |
 
 Plan / Record の 5 RPC は **app から呼ばれない**（#1893 で legacy route と、それを
 呼んでいた `PlanService` / `RecordService` の write method を削除した）。EXECUTE を

@@ -1,3 +1,5 @@
+import { isBillingEnforced } from '@/lib/billing/enforcement-flag';
+import { dayoptProTrialDays } from '@dayopt/billing';
 import 'server-only';
 
 /**
@@ -12,12 +14,14 @@ import type Stripe from 'stripe';
 
 import { env } from '@/env';
 import { getAppUrl } from '@/lib/app-url';
+import { getBillingAccess } from '@/lib/billing/access-service';
 import type { Database } from '@/lib/database';
 import { logger } from '@/lib/logger';
 import { captureUnexpectedDatabaseError } from '@/lib/sentry';
 import { requireStripe } from '@/lib/stripe/client';
 import { ServiceError } from '@/lib/trpc/errors';
-import { dayoptProTrialDays, type SubscriptionStatus } from '@dayopt/billing';
+import type { BillingAccess } from '@dayopt/billing';
+import { type SubscriptionStatus } from '@dayopt/billing';
 
 import { resolveBillingLifecycleMode } from './billing-lifecycle-mode';
 import {
@@ -185,8 +189,11 @@ async function createLegacyCheckoutSession(
       line_items: [{ price: priceId, quantity: 1 }],
       metadata: { supabase_user_id: userId },
       mode: 'subscription',
+      ...(isBillingEnforced() ? { payment_method_types: ['card' as const] } : {}),
       subscription_data:
-        existingSubscriptions.data.length > 0 ? {} : { trial_period_days: dayoptProTrialDays },
+        existingSubscriptions.data.length > 0 || isBillingEnforced()
+          ? {}
+          : { trial_period_days: dayoptProTrialDays },
       success_url: `${appUrl}/settings/billing?success=true`,
     },
     { idempotencyKey: `dayopt-billing-checkout-legacy-v1-${operationId}` },
@@ -256,33 +263,11 @@ export async function getPaymentMethod(
     return null;
   }
 
-  const customer = await stripe.customers.retrieve(billingInfo.stripeCustomerId);
-
-  if (customer.deleted) {
-    return null;
-  }
-
-  const defaultPaymentMethodId =
-    typeof customer.invoice_settings?.default_payment_method === 'string'
-      ? customer.invoice_settings.default_payment_method
-      : customer.invoice_settings?.default_payment_method?.id;
-
-  if (!defaultPaymentMethodId) {
-    return null;
-  }
-
-  const pm = await stripe.paymentMethods.retrieve(defaultPaymentMethodId);
-
-  if (!pm.card) {
-    return null;
-  }
-
-  return {
-    brand: pm.card.brand,
-    last4: pm.card.last4,
-    expMonth: pm.card.exp_month,
-    expYear: pm.card.exp_year,
-  };
+  return getPaymentMethodByCustomerId(
+    stripe,
+    billingInfo.stripeCustomerId,
+    billingInfo.subscriptionId,
+  );
 }
 
 /**
@@ -318,6 +303,7 @@ export async function getInvoices(
 
 /** 課金情報の一括取得結果（billingInfo・支払い方法・請求書を含む） */
 export interface BillingOverview {
+  access: BillingAccess;
   billingInfo: BillingInfo;
   paymentMethod: PaymentMethod | null;
   invoices: InvoiceItem[];
@@ -359,21 +345,35 @@ export async function getBillingOverview(
     subscriptionId: (profile.subscription_id as string) ?? null,
   };
 
+  const access = await getBillingAccess(supabase, userId);
+
   // Free ユーザーは Stripe 問い合わせ不要
   if (!billingInfo.stripeCustomerId) {
-    return { billingInfo, paymentMethod: null, invoices: [], trialEndsAt: null };
+    return {
+      billingInfo,
+      access,
+      paymentMethod: null,
+      invoices: [],
+      trialEndsAt: access.trialEndsAt,
+    };
   }
 
   const stripe = requireStripe();
 
   // Stripe API を並列実行
   const [paymentMethod, invoiceList, trialEndsAt] = await Promise.all([
-    getPaymentMethodByCustomerId(stripe, billingInfo.stripeCustomerId),
+    getPaymentMethodByCustomerId(stripe, billingInfo.stripeCustomerId, billingInfo.subscriptionId),
     getInvoicesByCustomerId(stripe, billingInfo.stripeCustomerId),
     getTrialEndsAt(stripe, billingInfo),
   ]);
 
-  return { billingInfo, paymentMethod, invoices: invoiceList, trialEndsAt };
+  return {
+    billingInfo,
+    access,
+    paymentMethod,
+    invoices: invoiceList,
+    trialEndsAt: access.state === 'trial' ? access.trialEndsAt : trialEndsAt,
+  };
 }
 
 /**
@@ -409,6 +409,7 @@ async function getTrialEndsAt(stripe: Stripe, billingInfo: BillingInfo): Promise
 async function getPaymentMethodByCustomerId(
   stripe: Stripe,
   customerId: string,
+  subscriptionId: string | null,
 ): Promise<PaymentMethod | null> {
   const customer = await stripe.customers.retrieve(customerId);
 
@@ -416,16 +417,37 @@ async function getPaymentMethodByCustomerId(
     return null;
   }
 
-  const defaultPaymentMethodId =
-    typeof customer.invoice_settings?.default_payment_method === 'string'
-      ? customer.invoice_settings.default_payment_method
-      : customer.invoice_settings?.default_payment_method?.id;
+  let defaultPaymentMethodId = resolvePaymentMethodId(
+    customer.invoice_settings?.default_payment_method,
+  );
+
+  // CheckoutはカードをSubscriptionだけへ保存し、Customerのinvoice settingsへコピーしない
+  // 場合がある。既存利用者向けにCustomerを優先し、無い場合は現在のSubscriptionを使う。
+  if (!defaultPaymentMethodId && subscriptionId) {
+    try {
+      const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+      defaultPaymentMethodId = resolvePaymentMethodId(subscription.default_payment_method);
+    } catch (error) {
+      logger.error('Failed to fetch subscription payment method', {
+        errorType: error instanceof Error ? error.name : 'unknown',
+      });
+      return null;
+    }
+  }
 
   if (!defaultPaymentMethodId) {
     return null;
   }
 
-  const pm = await stripe.paymentMethods.retrieve(defaultPaymentMethodId);
+  let pm: Stripe.PaymentMethod;
+  try {
+    pm = await stripe.paymentMethods.retrieve(defaultPaymentMethodId);
+  } catch (error) {
+    logger.error('Failed to fetch payment method', {
+      errorType: error instanceof Error ? error.name : 'unknown',
+    });
+    return null;
+  }
 
   if (!pm.card) {
     return null;
@@ -437,6 +459,13 @@ async function getPaymentMethodByCustomerId(
     expMonth: pm.card.exp_month,
     expYear: pm.card.exp_year,
   };
+}
+
+function resolvePaymentMethodId(
+  paymentMethod: string | Stripe.PaymentMethod | null | undefined,
+): string | null {
+  if (typeof paymentMethod === 'string') return paymentMethod;
+  return paymentMethod?.id ?? null;
 }
 
 /**

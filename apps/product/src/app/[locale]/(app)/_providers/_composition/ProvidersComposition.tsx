@@ -14,8 +14,8 @@ import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client
 
 import {
   CACHE_BUSTER,
+  createUserScopedQueryPersister,
   PERSIST_MAX_AGE_MS,
-  queryPersister,
 } from '@/lib/tanstack-query/persist-storage';
 import { shouldPersistQuery } from '@/lib/tanstack-query/should-persist-query';
 
@@ -31,12 +31,14 @@ const AxeAccessibilityChecker =
       )
     : () => null;
 
-import { AuthStoreInitializer } from '@/features/auth';
+import { AuthStoreInitializer, waitForResolvedUserId } from '@/features/auth';
 import { UserSettingsInitializer } from '@/features/settings';
+import { BillingAccessProvider } from '@/lib/billing/BillingAccessProvider';
 import { api } from '@/lib/trpc';
 import { createAppTrpcClient } from '@/lib/trpc/browser-client';
 import { createAppQueryClient } from '@/lib/trpc/query-client';
 import { ThemeProvider } from '../theme-provider';
+import { QueryCacheAuthBoundary } from './QueryCacheAuthBoundary';
 
 // SessionMonitorProviderを遅延ロード（セッション失効通知 + タイムアウト警告）
 const SessionMonitorProvider = dynamic(
@@ -85,6 +87,11 @@ interface ProvidersCompositionProps {
 export function ProvidersComposition({ children }: ProvidersCompositionProps) {
   const [queryClient] = useState(() => createAppQueryClient());
   const [trpcClient] = useState(() => createAppTrpcClient());
+  // 永続化 cache は認証済み user ごとに分ける（#2619）。復元は auth store が session を
+  // 読み終えるまで待つので、user が確定する前に他人の blob を hydrate することはない。
+  const [queryPersister] = useState(() =>
+    createUserScopedQueryPersister({ resolveUserId: waitForResolvedUserId }),
+  );
 
   // Provider階層（最適化済み）
   // Context Provider: PersistQueryClientProvider → api.Provider → ThemeProvider
@@ -109,16 +116,22 @@ export function ProvidersComposition({ children }: ProvidersCompositionProps) {
       <api.Provider client={trpcClient} queryClient={queryClient}>
         {/* 認証ストア初期化（Contextを提供しないので並列配置可能） */}
         <AuthStoreInitializer />
+        {/* 認証主体が変わったら memory / 永続 cache を破棄する（#2619） */}
+        <QueryCacheAuthBoundary />
         <ThemeProvider>
           <SessionMonitorProvider>
             <ServiceWorkerProvider>
               {/* UserSettings の hydration が完了するまで children を render しない。
                   timezone 等が defaults のまま timezone-dependent mutation が実行
                   されるのを防ぐ。TanStack Query の永続 cache が効けば体感遅延は極小。 */}
-              <UserSettingsInitializer>{children}</UserSettingsInitializer>
-              <GlobalActivityCreateModal />
-              <GlobalActivityRenameModal />
-              <GlobalCategoryRenameModal />
+              <UserSettingsInitializer>
+                <BillingAccessProvider>
+                  {children}
+                  <GlobalActivityCreateModal />
+                  <GlobalActivityRenameModal />
+                  <GlobalCategoryRenameModal />
+                </BillingAccessProvider>
+              </UserSettingsInitializer>
             </ServiceWorkerProvider>
           </SessionMonitorProvider>
         </ThemeProvider>

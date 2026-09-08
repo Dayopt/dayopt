@@ -68,7 +68,7 @@ Dayopt で作業する全エージェントの provider-neutral な正本ガイ�
 - **作成 UI は編集と同じ Inspector**（右パネル / モバイル Drawer）。ドラッグ確定で作成モード（`InlineCreatePanel`）が開き、アクティビティを選んだ瞬間に作成して詳細へ切り替わる。閉じれば保存しない（明示の保存 / キャンセルは置かない）。サイドバーのアクティビティタップは既定の長さで即作成し、同じパネルで直す（取り消しはトースト）
 - **強制点は DB trigger / SQL 関数**。アプリ層（service / MCP client / UI）はその写しで、UI だけを直しても規則は変わらない
 - **規則を撤去する時は写しを全部消すまでが 1 変更**。DB / service だけ緩めて UI 側の写しが残ると「操作はできるのに保存されない」症状になり、旧規則を assert しているテストが緑のまま隠す。撤去 PR では [docs/engineering/invariants.md](docs/engineering/invariants.md) §時刻 の写し表（契約変換 / UX 先回りの 2 分類）を grep 対象にする（2026-09-07、過去 Plan のドラッグ移動が 40348e2bd の後も効かなかった件）
-- 表示用の upcoming / active / past 分類は `useCalendarData` が持つ（`getTimeblockState()` は呼び出し元が test だけの残骸）
+- 表示用の upcoming / active / past 分類は `useCalendarData` が持つ
 
 ### アーキテクチャ
 
@@ -98,6 +98,8 @@ Dayopt で作業する全エージェントの provider-neutral な正本ガイ�
 - 語彙: 用語は `docs/product/glossary.md`（正本 `scripts/lib/glossary/terms.ts`）に従う。messages は `pnpm copy:check:strict` が値とキー名を機械検査するが、docs / skill / issue 本文は検査対象外なので旧語彙（エントリ / タグ / タスク / ブロック / 箱 / 型 / レンズ）を書かない
 - eslint-disable は最終手段。使う時は同じ行に `-- 理由` を書く。ファイル全体無効化より1行無効化を優先
 - 依存追加前に確認: ブラウザ標準/既存依存で代替できないか、Star 1000+/直近6ヶ月更新か、出口コスト（捨てる時に何が壊れるか）を1文で言えるか
+- 依存はまず利用する workspace の `package.json` へ足す。root は repo 横断の tooling だけに置く。2 workspace 以上で version を揃える価値があるものは `pnpm-workspace.yaml` の catalog へ
+- root の `package.json` scripts は人間 / agent / CI / hooks / docs から参照される安定インターフェース。改名・削除は permission allowlist と docs 参照の同時更新まで含めて 1 変更にする
 - `--no-verify` によるフックスキップは禁止（hook が機械ブロックする）
 - アクセシビリティ: アイコンボタンに `aria-label`、フォームに `label` 紐付け、タッチターゲット最小 44x44px、画像に `alt`
 
@@ -128,7 +130,7 @@ review threadは全件resolveしてからmerge（fix積む/反論reply/issue化�
 
 レビューのシンプルルール: (1) 壊れる筋書きを語れないなら指摘しない、語れたなら黙殺しない (2) mergeの基準は完璧ではなくmainより安全 (3) 迷ったら点を塞ぐよりclassを閉じる。
 
-**merge の遮断は、有効化された provider adapter の pre-tool guard（`gh pr merge` / `gh api ... pulls/.../merge` の直接実行を block）と `pnpm branch:finish` の CI check（status-check-rollup 判定）だけで行う。adapter を呼ばない runtime と User 自身の UI merge は対象外**（この境界が実害化したら GitHub Team plan の ruleset へ切り替える。2026-09-04、#2596）。`pr-cross-review` と外部 provider の反証レビューは advisory で、所見は PR コメントとして投稿するだけで merge を止めない。保護対象 path の判定（`scripts/ci/protected-path-gate.mjs`）は、レビューをどこまで重く行うかの目安に使う。保護対象の基準は**外部契約 or 不可逆**（auth/OAuth/MCP、billing/webhook、migration、外部calendar provider、system API、ガードレール自身）。`review:full` ラベルは「User 自身が重く見て目を通す」印であり、機械判定の入力にはしない。
+**merge の遮断は、main の repository ruleset（required status checks / strict up-to-date / review thread resolution、bypass actor 0。2026-09-07 の repo public 化で有効。`Production Config Audit` の required 化は #2640 で外す）と、有効化された provider adapter の pre-tool guard（`gh pr merge` / `gh api ... pulls/.../merge` の直接実行を block。2026-09-04、#2596）、`pnpm branch:finish` の CI check（status-check-rollup 判定。`🧪 Integration Tests` と Vercel context を名前で要求する点で ruleset の上位互換）で行う。** ruleset は local / cloud / UI のどの経路にも効くが、Integration Tests は ruleset に無いので UI / API から直接 merge する経路では RLS drift 検査を通らない（扱いは #2640）。`pr-cross-review` と外部 provider の反証レビューは advisory で、所見は PR コメントとして投稿するだけで merge を止めない。保護対象 path の判定（`scripts/ci/protected-path-gate.mjs`）は、レビューをどこまで重く行うかの目安に使う。保護対象の基準は**外部契約 or 不可逆**（auth/OAuth/MCP、billing/webhook、migration、外部calendar provider、system API、ガードレール自身）。`review:full` ラベルは「User 自身が重く見て目を通す」印であり、機械判定の入力にはしない。
 
 retreat条件: `apps/product/src/features/timeblock` または `apps/product/src/lib/time` 配下のtestを削除・skipするPRは、`review:full` labelを手で付けてUser自身が目を通す（時間不変条件の安全網がそのtest自身であるため。#2489 / #2503）。
 

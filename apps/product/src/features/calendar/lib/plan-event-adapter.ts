@@ -26,7 +26,7 @@ function truncateToMinute(date: Date): Date {
 }
 
 /**
- * overview.md §4「過去 Plan の見え方」に基づく status 判定。
+ * 「過去 Plan の見え方」に基づく status 判定（docs/product/specs/plan-record.md §記録操作と表示）。
  *
  * 優先順位: 同じ時間帯の記録あり > 時間位置（unrecorded/active/upcoming）
  */

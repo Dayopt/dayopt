@@ -3,6 +3,8 @@
 import React from 'react';
 
 import { format } from 'date-fns';
+import { enUS, ja } from 'date-fns/locale';
+import { useLocale } from 'next-intl';
 
 import { isTodayInTimezone } from '@/lib/date/timezone';
 import { useUserPreferences } from '@/lib/hooks/useUserPreferences';
@@ -18,12 +20,20 @@ const useDateFormats = (
   dayNameFormat: string,
   dateFormat: string,
 ) => {
+  const locale = useLocale();
+  const dateFnsLocale = locale === 'ja' ? ja : enUS;
   const dayName = showDayName
-    ? format(date, dayNameFormat === 'short' ? 'EEE' : dayNameFormat === 'long' ? 'EEEE' : 'EEEEE')
+    ? format(
+        date,
+        dayNameFormat === 'short' ? 'EEE' : dayNameFormat === 'long' ? 'EEEE' : 'EEEEE',
+        { locale: dateFnsLocale },
+      )
     : undefined;
 
-  const dateString = format(date, dateFormat);
-  const monthYear = showMonthYear ? format(date, 'MMM yyyy') : undefined;
+  const dateString = format(date, dateFormat, { locale: dateFnsLocale });
+  const monthYear = showMonthYear
+    ? format(date, locale === 'ja' ? 'yyyy年M月' : 'MMM yyyy', { locale: dateFnsLocale })
+    : undefined;
 
   return { dayName, dateString, monthYear };
 };

@@ -10,12 +10,14 @@
  * auto_migrated の record は RLS で不変のため読み取り専用として扱う。
  */
 
+import { useBillingAccess } from '@/lib/billing/BillingAccessProvider';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
 
 import { useActivitiesMap, useCreateActivity } from '@/features/activities';
+import { isBillingAccessEndedError } from '@/lib/billing/client-access-error';
 import type { PublicPlanRow, PublicRecordRow } from '@/lib/database';
 import { useDebouncedCallback } from '@/lib/hooks/useDebounce';
 import { toast } from '@/lib/toast';
@@ -221,6 +223,9 @@ export function TimeblockInspectorForm({
   }, [value.startAt, value.endAt]);
 
   // auto_migrated record は RLS で update / delete とも拒否されるため UI 側も読み取り専用にする
+  const { canUseProduct } = useBillingAccess();
+  const billingDraftRef = useRef(false);
+  const [hasBillingDraft, setHasBillingDraft] = useState(false);
   const isMigrated = !isDuplicateMode && kind === 'record' && record?.source === 'auto_migrated';
   const isPast = kind === 'record' || (target != null && new Date(target.end_at) <= new Date());
 
@@ -229,6 +234,8 @@ export function TimeblockInspectorForm({
     activeTargetIdRef.current = targetId;
     if (targetChanged) {
       conflictRecoveringRef.current = false;
+      billingDraftRef.current = false;
+      setHasBillingDraft(false);
       setHasUnresolvedWrite(false);
     }
     if (targetChanged || (!noteDirtyRef.current && !saveInFlightRef.current)) {
@@ -239,6 +246,13 @@ export function TimeblockInspectorForm({
   const savePatch = useCallback(
     async (patch: TimeblockSavePatch) => {
       if (!targetId || isMigrated) return;
+      if (!canUseProduct || billingDraftRef.current) {
+        billingDraftRef.current = true;
+        setHasBillingDraft(true);
+        throw Object.assign(new Error('Product access has ended'), {
+          data: { serviceCode: 'BILLING_ACCESS_ENDED' },
+        });
+      }
       const expectedUpdatedAt = latestUpdatedAtRef.current;
       if (!expectedUpdatedAt) throw new Error('Missing timeblock version');
       const input = {
@@ -254,7 +268,10 @@ export function TimeblockInspectorForm({
             : await updateRecord.mutateAsync(input);
         latestUpdatedAtRef.current = updated.updated_at;
       } catch (error) {
-        if (isTimeblockStaleError(error)) {
+        if (isBillingAccessEndedError(error)) {
+          billingDraftRef.current = true;
+          setHasBillingDraft(true);
+        } else if (isTimeblockStaleError(error)) {
           conflictRecoveringRef.current = true;
           setIsRecoveringConflict(true);
           noteGenerationRef.current += 1;
@@ -298,10 +315,20 @@ export function TimeblockInspectorForm({
         saveInFlightRef.current = false;
       }
     },
-    [kind, targetId, isMigrated, updatePlan, updateRecord, fetchPlanById, fetchRecordById],
+    [
+      canUseProduct,
+      kind,
+      targetId,
+      isMigrated,
+      updatePlan,
+      updateRecord,
+      fetchPlanById,
+      fetchRecordById,
+    ],
   );
   const { enqueue: enqueueSave, flush: flushSave } = useCoalescedTimeblockSave(savePatch, {
-    shouldDiscardPending: isTimeblockStaleError,
+    shouldDiscardPending: (error) =>
+      isTimeblockStaleError(error) || isBillingAccessEndedError(error),
     shouldPausePending: isTimeblockUncertainError,
   });
 
@@ -425,6 +452,26 @@ export function TimeblockInspectorForm({
     return updatedAt;
   }, [cancelScheduledNoteSave, flushSave, value.activityId]);
 
+  const prepareDelete = useCallback(async (): Promise<{
+    expectedUpdatedAt: string;
+    canUndo: boolean;
+  }> => {
+    if (canUseProduct) {
+      try {
+        return { expectedUpdatedAt: await flushPendingEdits(), canUndo: true };
+      } catch (error) {
+        // 利用期限がサーバー側で先に切れた場合も、許可された削除は続行する。
+        if (!isBillingAccessEndedError(error)) throw error;
+      }
+    }
+
+    cancelScheduledNoteSave();
+    noteDirtyRef.current = false;
+    const updatedAt = latestUpdatedAtRef.current;
+    if (!updatedAt) throw new Error('Missing timeblock version');
+    return { expectedUpdatedAt: updatedAt, canUndo: false };
+  }, [canUseProduct, cancelScheduledNoteSave, flushPendingEdits]);
+
   const handleCopy = useCallback(() => {
     if (!target || !onCopy) return;
     onCopy(
@@ -491,26 +538,33 @@ export function TimeblockInspectorForm({
   const handleDelete = useCallback(() => {
     if (!targetId || isWriteFrozen) return;
     setActionPreparing(true);
-    void flushPendingEdits()
-      .then(async (expectedUpdatedAt) => {
+    void prepareDelete()
+      .then(async ({ expectedUpdatedAt, canUndo }) => {
         const deleted =
           kind === 'plan'
             ? await deletePlan.mutateAsync({ id: targetId, expectedUpdatedAt })
             : await deleteRecord.mutateAsync({ id: targetId, expectedUpdatedAt });
         onDeleted();
-        toast.success(t('timeblock.editor.toast.deleted'), {
-          action: {
-            label: t('common.undo'),
-            onClick: () => {
-              const input = { id: targetId, expectedUpdatedAt: deleted.updated_at };
-              const restore =
-                kind === 'plan' ? restorePlan.mutateAsync(input) : restoreRecord.mutateAsync(input);
-              void restore
-                .then(() => toast.success(t('timeblock.editor.toast.restored')))
-                .catch(() => undefined);
-            },
-          },
-        });
+        toast.success(
+          t('timeblock.editor.toast.deleted'),
+          canUndo
+            ? {
+                action: {
+                  label: t('common.undo'),
+                  onClick: () => {
+                    const input = { id: targetId, expectedUpdatedAt: deleted.updated_at };
+                    const restore =
+                      kind === 'plan'
+                        ? restorePlan.mutateAsync(input)
+                        : restoreRecord.mutateAsync(input);
+                    void restore
+                      .then(() => toast.success(t('timeblock.editor.toast.restored')))
+                      .catch(() => undefined);
+                  },
+                },
+              }
+            : undefined,
+        );
       })
       .catch((error: unknown) => {
         if (isTimeblockUncertainError(error)) setHasUnresolvedWrite(true);
@@ -520,7 +574,7 @@ export function TimeblockInspectorForm({
     kind,
     targetId,
     isWriteFrozen,
-    flushPendingEdits,
+    prepareDelete,
     deletePlan,
     deleteRecord,
     restorePlan,
@@ -538,7 +592,7 @@ export function TimeblockInspectorForm({
         onViewStats:
           onViewStats && value.activityId ? () => onViewStats(value.activityId ?? '') : undefined,
         onCopy: onCopy ? handleCopy : undefined,
-        onDuplicate: onStartDuplicate ? handleStartDuplicate : undefined,
+        onDuplicate: canUseProduct && onStartDuplicate ? handleStartDuplicate : undefined,
         onDelete: isMigrated ? undefined : handleDelete,
       });
 
@@ -576,7 +630,7 @@ export function TimeblockInspectorForm({
             uncategorized={selectedActivity?.categoryId === null}
             onActivityChange={handleActivityChange}
             onCreateAndSelect={handleCreateAndSelectActivity}
-            disabled={isWriteFrozen}
+            disabled={isWriteFrozen || !canUseProduct}
           />
         </div>
         <InspectorHeaderActions
@@ -589,6 +643,28 @@ export function TimeblockInspectorForm({
       <div className="space-y-3 p-4 pt-0">
         {isMigrated ? (
           <p className="text-muted-foreground text-sm">{t('timeblock.editor.migratedLocked')}</p>
+        ) : null}
+
+        {hasBillingDraft ? (
+          <div role="status">
+            <p>{t('settings.subscription.singlePlan.draftRetained')}</p>
+            <Button
+              disabled={!canUseProduct}
+              onClick={() => {
+                billingDraftRef.current = false;
+                enqueueSave({
+                  note: normalizeNote(value.note),
+                  activityId: value.activityId,
+                  start_at: value.startAt.toISOString(),
+                  end_at: value.endAt.toISOString(),
+                  ...(kind === 'record' ? { fulfillment } : {}),
+                });
+                setHasBillingDraft(false);
+              }}
+            >
+              {t('settings.subscription.singlePlan.retrySave')}
+            </Button>
+          </div>
         ) : null}
 
         {hasUnresolvedWrite ? (
@@ -609,14 +685,15 @@ export function TimeblockInspectorForm({
             createPlan.isPending ||
             createRecord.isPending ||
             isWriteFrozen ||
-            isMigrated
+            isMigrated ||
+            !canUseProduct
           }
           fulfillmentSlot={
             !isDuplicateMode && kind === 'record' ? (
               <RecordFulfillmentRow
                 value={fulfillment}
                 onChange={handleFulfillmentChange}
-                disabled={isWriteFrozen || isMigrated}
+                disabled={isWriteFrozen || isMigrated || !canUseProduct}
               />
             ) : undefined
           }

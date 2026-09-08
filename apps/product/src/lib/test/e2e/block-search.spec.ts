@@ -214,7 +214,10 @@ describeWithEnv('Block search', () => {
       .toBe(`record:${recordId}`);
     await expect(page.getByRole('region', { name: ACTIVITY_NAME })).toBeVisible();
 
-    // Inspector は modal dialog なので、実際の導線どおり一度閉じてから次の検索を開く。
+    // 検索ダイアログが exit 中（DOM に残っている間）に Escape を押すと Radix の
+    // DismissableLayer がそれを消費し、Inspector は #2661 の意図どおり閉じない。
+    // 実際の導線と同じく、ダイアログが消えてから Inspector を閉じる（#2669）。
+    await expect(page.getByRole('combobox', { name: '予定と記録を検索' })).toHaveCount(0);
     await page.keyboard.press('Escape');
     await expect(page.getByRole('region', { name: ACTIVITY_NAME })).toHaveCount(0);
 

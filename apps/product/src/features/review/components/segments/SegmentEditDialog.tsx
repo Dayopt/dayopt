@@ -1,5 +1,7 @@
 'use client';
 
+import { useBillingAccess } from '@/lib/billing/BillingAccessProvider';
+
 import { useCallback, useMemo, useState } from 'react';
 
 import { useTranslations } from 'next-intl';
@@ -25,7 +27,7 @@ interface SegmentEditDialogProps {
   initialName?: string;
   initialActivityIds?: readonly string[];
   isSubmitting: boolean;
-  onSubmit: (input: { name: string; activityIds: string[] }) => void;
+  onSubmit: (input: { name: string; activityIds: string[] }) => Promise<void>;
 }
 
 /**
@@ -78,7 +80,7 @@ interface SegmentEditFormProps {
   initialName: string;
   initialActivityIds: readonly string[];
   isSubmitting: boolean;
-  onSubmit: (input: { name: string; activityIds: string[] }) => void;
+  onSubmit: (input: { name: string; activityIds: string[] }) => Promise<void>;
   onClose: () => void;
 }
 
@@ -90,6 +92,7 @@ function SegmentEditForm({
   onSubmit,
   onClose,
 }: SegmentEditFormProps) {
+  const { canUseProduct } = useBillingAccess();
   const t = useTranslations('calendar.stats.review.segments');
   const [name, setName] = useState(initialName);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set(initialActivityIds));
@@ -105,12 +108,17 @@ function SegmentEditForm({
   }, []);
 
   const trimmedName = name.trim();
-  const canSubmit = trimmedName.length > 0 && selectedIds.size > 0 && !isSubmitting;
+  const canSubmit =
+    canUseProduct && trimmedName.length > 0 && selectedIds.size > 0 && !isSubmitting;
 
-  const handleSubmit = useCallback(() => {
+  const handleSubmit = useCallback(async () => {
     if (!canSubmit) return;
-    onSubmit({ name: trimmedName, activityIds: [...selectedIds] });
-    onClose();
+    try {
+      await onSubmit({ name: trimmedName, activityIds: [...selectedIds] });
+      onClose();
+    } catch {
+      // Mutation hooks show the error and roll back optimistic state; retain form input.
+    }
   }, [canSubmit, onSubmit, onClose, selectedIds, trimmedName]);
 
   const categoryGroups = useMemo(() => tree?.categories ?? [], [tree]);

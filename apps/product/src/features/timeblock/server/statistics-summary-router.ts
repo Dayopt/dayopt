@@ -1,9 +1,8 @@
 import { z } from 'zod';
 
 import { handleServiceError } from '@/lib/trpc/errors';
-import { entitlementKeys } from '@dayopt/billing';
 
-import { createTRPCRouter, entitledProcedure, protectedProcedure } from '@/lib/trpc/procedures';
+import { createTRPCRouter, protectedProcedure } from '@/lib/trpc/procedures';
 
 import { calculateStreak } from '../domain';
 
@@ -54,7 +53,7 @@ export const statisticsSummaryRouter = createTRPCRouter({
   // ---------------------------------------------------------------------------
 
   /** 全KPIを1クエリで取得 */
-  getStatsOverview: entitledProcedure(entitlementKeys.reportLongRange)
+  getStatsOverview: protectedProcedure
     .meta({ description: '全KPIサマリー一括取得（7指標を1クエリ）' })
     .input(
       dateRangeInput.extend({

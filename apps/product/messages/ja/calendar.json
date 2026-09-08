@@ -201,6 +201,7 @@
     },
     "templates": {
       "sectionTitle": "テンプレート",
+      "loadFailed": "テンプレートを読み込めませんでした。",
       "empty": "テンプレートはまだありません",
       "createLabel": "テンプレートを追加",
       "settingsLabel": "設定",

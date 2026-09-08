@@ -343,9 +343,11 @@ Code Qualityを採用しない判断と2026-07-21時点の外部設定証跡は�
 
 ### merge gate の required checks
 
-**merge gate は `pnpm branch:finish`（`scripts/tasks/finish-branch.sh`）が唯一の強制点であり、GitHub の required status check ではない。** この repo は Free plan の private repo で、ruleset / branch protection とも API が 403 を返し設定できない（2026-09-02 実測。`gh api repos/Dayopt/dayopt/rulesets` → `Upgrade to GitHub Pro or make this repository public`）。したがって「skipped が required check で成功扱いになる」という GitHub 側の挙動はそもそも発火せず、gate は finish-branch.sh が **success を名前で要求する**ことだけで成り立っている（UI / API から直接 merge すればすり抜けられる点は既知で、`branch:finish` を標準経路とする運用契約の上に乗っている）。
+**merge gate は 2 段で、GitHub 側の ruleset と `pnpm branch:finish`（`scripts/tasks/finish-branch.sh`）が両方効く。** 2026-09-07 の repo public 化で main の ruleset `6790553`（`Branch name pattern: main`）が有効になり、required status checks（`🔍 Static Checks` / `📦 Unit Tests` / `Production Config Audit` / `Vercel – product` / `Vercel – web`）、strict up-to-date、review thread resolution 必須、bypass actor 0 を GitHub 自身が強制する（2026-09-08 実測。`gh api repos/Dayopt/dayopt/rulesets/6790553`）。2026-09-07 までは Free plan の private repo で ruleset API が 403 を返し、gate は finish-branch.sh だけだった（旧記述）。ruleset は skipped な required check を成功扱いにするので、finish-branch.sh が **success を名前で要求する**検査（`🧪 Integration Tests` の affected 判定、Vercel context の存在確認）は ruleset の上位互換として残す。UI / API から直接 merge する経路は ruleset だけを通る（Integration Tests を ruleset に足すかは [#2640](https://github.com/Dayopt/dayopt/issues/2640)）。`Production Config Audit` が required に入っているのは #2640 で外す（下記「ruleset の required 指定に使ってはいけない」の落とし穴が public 化で実際に発生した）。
 
 finish-branch.sh が名前で success を要求するのは `ci.yml` の 3 job（`🔍 Static Checks` / `📦 Unit Tests` / `🧪 Integration Tests`）に加えて次を含める。`🧪 Integration Tests` は 2026-09-02、[#2539](https://github.com/Dayopt/dayopt/issues/2539) で `📦 Unit Tests` から分離した。同じ #2539 で affected 判定を `🧭 Impact` job へ切り出し、`impact →（static ∥ unit ∥ integration）`の並列構成にしている（実測で CI 全体が 16 分 55 秒 → 6〜7 分台。run 33588708693 → 33615047182 / 33618057064。**この数値が構成の基準値の正本**で、`ci.yml` / `check.mjs` 側のコメントには数値を置かない）。**`🧭 Impact` は required にしない** — 下流 3 job は `needs.impact.result` を条件にせず、impact が落ちても空 output を fail closed（全実行）として受けて必ず走るため、検査そのものは常に行われる（この設計は Codex / 内製 risk-reviewer の P2 指摘で入れた。要求すると impact 障害時に全 job が skip され検査ゼロになる）。**`🧪 Integration Tests` は DB を触る PR でだけ走る**ため、`branch:finish` も affected な PR でだけ名前で要求する。
+
+**`📦 Unit Tests` が走らせる package は `scripts/ci/check.mjs` の `runUnit()` が名指しで持つ**（`@dayopt/product` / `pnpm test:web` / `pnpm test:scripts` / `@dayopt/billing` / `@dayopt/i18n` / `@dayopt/observability`）。root の `pnpm test:run` とは別経路なので、片方だけに package を足すと**ローカルでは走るのに CI では走らない** test ができる。実際 `@dayopt/billing` が root にだけ載っており、capability map（Free / Pro の正本）を守る test が CI の外にあった（2026-09-07、[#2646](https://github.com/Dayopt/dayopt/issues/2646)）。package を増やす時は両方へ足す。
 
 **2026-08-20、CI 4 層再設計（[#2269](https://github.com/Dayopt/dayopt/issues/2269)）により `🎭 E2E Tests` / `🌐 Web Build & E2E` は required checks から除去した。** この 2 job は `.github/workflows/ci.yml` から `.github/workflows/heavy-post-merge.yml` へ移設され、pull_request では発火しなくなった（nightly + workflow_dispatch のみ。push:main は #2382（2026-08-25）で per-merge 実行のコストを理由に廃止済み）。旧記述（4 job が required）は誤り。#2483（2026-08-28）で `heavy-post-merge.yml` は `nightly.yml` へ吸収され、**2026-09-03 に `promote.yml` へ再移設した**（merge 連動 promote。per-PR で required にしない扱いは不変で、走るのは merge 後の promote 経路。影響のある suite だけが走る）。 詳細は 2026-08-20 の決定ログ（削除済み、git 履歴参照）、per-PR 検証の後継はレーンのローカル影響 spec 実走義務（`AGENTS.md §レーン運用` §条件付き事前 E2E）を参照。
 
@@ -456,8 +458,8 @@ Main が `pnpm review:marker` の出力（`gh api --method POST repos/{owner}/{r
   PR で publish されるのは `pull_request_target` の `paths` に一致する contract 変更 PR だけになり、
   それ以外の PR では status も check run も存在しない。required にすると、2026-08-05 の
   `ci.yml` paths-ignore 撤去（PR #1836）と同じく「永久に `expected` のまま」で全 PR が
-  merge 不能になる。現状 Free plan では ruleset 自体が使えない（`gh api .../rulesets` は 403）ので
-  実害は出ていないが、Pro へ上げる時の落とし穴として残す
+  merge 不能になる。**2026-09-07 の public 化で ruleset が有効化され、この落とし穴が実際に発生した**
+  （全 PR が `mergeStateStatus: BLOCKED`、PR ごとの手動 dispatch で回避中。解消は [#2640](https://github.com/Dayopt/dayopt/issues/2640)）
 - **外部モデルの自動 diff レビュー（ai-review / Gemini）は 2026-08-03 に撤去した。** レビューは
   外部レビュー（Codex。2026-08-13 に全 PR 適用を停止し、2026-09-01 にクロスレビュー必須 PR 限定で
   必須化して再開、#2529）と Claude の内部レビュー（`AGENTS.md §委任・報告の作法`
@@ -1253,7 +1255,6 @@ npm run test:watch          # ウォッチモード
 npm run test:ui             # Vitest UI
 npm run test:coverage       # カバレッジ付き実行
 npm run test:coverage:summary  # カバレッジサマリー表示
-npm run test:diff-coverage  # 差分カバレッジ
 npm run test-storybook      # Storybook テスト
 npm run test:integration    # 統合テスト（前提: ローカル Supabase 起動。未起動なら失敗する。#2178）
 npm run test:e2e            # Playwright E2Eテスト

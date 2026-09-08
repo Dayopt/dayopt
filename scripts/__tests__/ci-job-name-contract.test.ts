@@ -70,13 +70,16 @@ describe('CI job 名の契約', () => {
     }
   });
 
-  it('promote.yml は impact と層 3 の 2 suite、release を持つ', () => {
+  it('promote.yml は impact と層 3 の 2 suite、失敗の起票、release を持つ', () => {
     // 層 3 は 2026-09-03 に nightly.yml から移設した。名前は check-run gate の
     // 入力ではなくなったが、run を読む人と `gh run view` の識別子として残る。
+    // `File promote failure` は 2026-09-07（#2643）に足した失敗の可視化 job で、
+    // contract の都合で release job より前に宣言している。
     expect(promoteNames).toEqual([
       '🧭 Release Impact',
       '🎭 E2E Tests',
       '🌐 Web Build & E2E',
+      'File promote failure',
       'Promote Production',
     ]);
   });
@@ -306,7 +309,7 @@ describe('CI job 名の契約', () => {
     it('実ファイルから名前を 1 つ以上抜けている（regex の空振りで全 assert が素通りしない）', () => {
       expect(ciNames.length).toBe(4);
       expect(nightlyNames.length).toBeGreaterThanOrEqual(3);
-      expect(promoteNames.length).toBe(4);
+      expect(promoteNames.length).toBe(5);
     });
   });
 });

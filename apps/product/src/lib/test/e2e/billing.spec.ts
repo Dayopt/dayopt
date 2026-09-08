@@ -61,7 +61,8 @@ const DUMMY_PORTAL_URL = 'https://billing.stripe.com/p/session/e2e-dummy';
 
 // 両方 toast.success のため type では区別できない。文言で区別する
 // （messages/ja/settings.json の settings.subscription.checkoutSuccess / checkoutCanceled と同期）。
-const CHECKOUT_SUCCESS_TOAST_TEXT = 'Proプランへようこそ！サブスクリプションが有効になりました。';
+const CHECKOUT_SUCCESS_TOAST_TEXT =
+  '契約が有効になりました。Dayoptをご利用いただきありがとうございます。';
 const CHECKOUT_CANCELED_TOAST_TEXT =
   'チェックアウトがキャンセルされました。いつでもアップグレードできます。';
 
@@ -181,7 +182,7 @@ describeWithEnv('Billing: Checkout / Portal 導線', () => {
     await login(page);
     await openBillingSettings(page);
 
-    const upgradeButton = page.getByRole('button', { name: 'アップグレード' });
+    const upgradeButton = page.getByRole('button', { name: '月 $5 で利用する' });
     await expect(upgradeButton).toBeVisible({ timeout: 10_000 });
     await expect(upgradeButton).toBeEnabled();
 
@@ -217,6 +218,12 @@ describeWithEnv('Billing: Checkout / Portal 導線', () => {
         paymentMethod: null,
         invoices: [],
         trialEndsAt: null,
+        access: {
+          state: 'subscribed' as const,
+          canUseProduct: true,
+          trialEndsAt: null,
+          enforced: false,
+        },
       }),
     );
     await page.route('**/api/trpc/billing.createPortalSession*', (route) =>

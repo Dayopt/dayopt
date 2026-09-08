@@ -25,7 +25,7 @@ function scrollToTopPx(container: HTMLDivElement, topPx: number) {
  * Mobile では Drawer が下半分を覆うため、選択された entry や作成中の選択範囲が隠れる。
  * 対象を viewport の上端から ~25% の位置に置く。
  *
- * PC では何もしない（Inspector は右ドッキングパネルで entry を覆わないため）。
+ * PC では検索などで画面外の対象を開いた場合だけ scroll する。
  */
 export function useScrollTimeblockIntoView({
   scrollContainerRef,
@@ -38,23 +38,39 @@ export function useScrollTimeblockIntoView({
 
   // Inspector 開時: 該当 entry を viewport の 25% に置く
   useEffect(() => {
-    if (!isMobile) return;
     if (!inspectorIsOpen || !inspectorEntryId) return;
     const container = scrollContainerRef.current;
     if (!container) return;
 
-    const timer = setTimeout(() => {
+    const scrollToSelection = () => {
       const timeblockEl = container.querySelector<HTMLElement>(
         `[data-entry-id="${inspectorEntryId}"]`,
       );
       if (!timeblockEl) return;
+      observer.disconnect();
       const containerRect = container.getBoundingClientRect();
       const timeblockRect = timeblockEl.getBoundingClientRect();
+      if (
+        !isMobile &&
+        timeblockRect.top >= containerRect.top &&
+        timeblockRect.bottom <= containerRect.bottom
+      )
+        return;
       const timeblockTopInContainer = timeblockRect.top - containerRect.top + container.scrollTop;
       scrollToTopPx(container, timeblockTopInContainer);
-    }, 220);
+    };
+    // 別の日のデータ取得が遅くても、カードの描画後に対象へ移動する。
+    const observer = new MutationObserver(() => {
+      clearTimeout(timer);
+      timer = setTimeout(scrollToSelection, 220);
+    });
+    let timer = setTimeout(scrollToSelection, 220);
+    observer.observe(container, { childList: true, subtree: true });
 
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      observer.disconnect();
+    };
   }, [isMobile, inspectorIsOpen, inspectorEntryId, scrollContainerRef]);
 
   // ドラッグ作成の選択範囲: 開始時刻を viewport の 25% に置く。

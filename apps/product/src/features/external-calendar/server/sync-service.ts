@@ -1,3 +1,5 @@
+import { getBillingAccess } from '@/lib/billing/access-service';
+import { createServiceRoleClient } from '@/lib/supabase/oauth';
 import 'server-only';
 
 import { randomUUID } from 'node:crypto';
@@ -205,6 +207,9 @@ export async function syncConnection(params: {
   deadlineAt?: number | undefined;
 }): Promise<SyncConnectionResult> {
   const { connectionId, userId, forceFullSync = false, deadlineAt } = params;
+  if (!(await getBillingAccess(createServiceRoleClient(), userId)).canUseProduct) {
+    throw new ExternalCalendarServiceError('FORBIDDEN', 'Product access has ended');
+  }
   const adapter: CalendarProviderAdapter = googleCalendarAdapter;
   const db = createSyncDbClient();
 
@@ -477,6 +482,8 @@ async function syncOneCalendar(args: {
   }
 
   try {
+    if (!(await getBillingAccess(createServiceRoleClient(), connection.user_id)).canUseProduct)
+      return 'failed';
     if (result.events.length > 0) {
       await upsertActiveEvents(db, connection, calendar, result.events, runStartedAtIso);
     }
@@ -490,12 +497,16 @@ async function syncOneCalendar(args: {
     // 行が active のまま残る。全ページ完走した full sync のときだけ mark-and-sweep で掃除する。
     // ページ途中で落ちた（nextCursor === null かつ events 未完）run では走らせない。
     if (result.usedFullSync && result.nextCursor !== null) {
+      if (!(await getBillingAccess(createServiceRoleClient(), connection.user_id)).canUseProduct)
+        return 'failed';
       await sweepStaleEvents(db, connection, calendar, runStartedAtIso);
     }
 
     // 全ページ走破に成功したときだけ cursor を確定する。途中で落ちたら保存せず、次回また
     // 先頭からやり直す（upsert は冪等）。
     if (result.nextCursor !== null) {
+      if (!(await getBillingAccess(createServiceRoleClient(), connection.user_id)).canUseProduct)
+        return 'failed';
       await saveSyncToken(db, connection, calendar, result.nextCursor, runStartedAtIso);
     }
 
@@ -858,6 +869,8 @@ async function persistCalendarSyncResultChunked(args: {
   const chunksToSend = eventChunks.length > 0 ? eventChunks : [[]];
 
   for (let i = 0; i < chunksToSend.length; i += 1) {
+    if (!(await getBillingAccess(createServiceRoleClient(), cas.userId)).canUseProduct)
+      return 'failed';
     const isLast = i === chunksToSend.length - 1;
     const outcome = await persistCalendarSyncResult({
       ...cas,
@@ -1020,6 +1033,8 @@ async function tombstoneEvents(
   // sparse row を無限に増やすのを防ぐ）。既存の start_at / end_at / dismissed_at は残るので、
   // NULL 時刻の不滅ゴミ行が生まれず prune が効く。
   for (let i = 0; i < providerEventIds.length; i += TOMBSTONE_BATCH_SIZE) {
+    if (!(await getBillingAccess(createServiceRoleClient(), connection.user_id)).canUseProduct)
+      throw new ExternalCalendarServiceError('FORBIDDEN', 'Product access has ended');
     const chunk = providerEventIds.slice(i, i + TOMBSTONE_BATCH_SIZE);
     const { error } = await db
       .from(databaseTables.externalCalendarEvents)

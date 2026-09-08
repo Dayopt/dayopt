@@ -1,5 +1,6 @@
 'use client';
 
+import { useBillingAccess } from '@/lib/billing/BillingAccessProvider';
 import React, { useCallback } from 'react';
 
 import { useActivitiesMap } from '@/features/activities';
@@ -182,6 +183,7 @@ export const CalendarGridContent = React.memo(function CalendarGridContent({
   externalEvents,
   className,
 }: CalendarGridContentProps) {
+  const { canUseProduct } = useBillingAccess();
   const { getActivityById } = useActivitiesMap();
   const isMobile = useMediaQuery(MEDIA_QUERIES.mobile);
   const { defaultDuration, timeFormat } = useUserPreferences();
@@ -193,7 +195,7 @@ export const CalendarGridContent = React.memo(function CalendarGridContent({
   const { convertGhost, dismissGhost } = useConvertGhostEvent();
 
   // 日付間ドラッグ（day以外のビューで使用）
-  const enableCrossDayDrag = viewMode !== 'day';
+  const enableCrossDayDrag = canUseProduct && viewMode !== 'day';
   const { planLaneWidthPercent, compactCards } = resolveCalendarLanePresentation(
     viewMode,
     laneDisplayMode,
@@ -400,7 +402,7 @@ export const CalendarGridContent = React.memo(function CalendarGridContent({
         dayIndex={dayIndex}
         className={cn('absolute inset-0', enableCrossDayDrag && 'z-10')}
         onTimeRangeSelect={onTimeRangeSelect}
-        disabled={isActive}
+        disabled={isActive || !canUseProduct}
         plans={allEventsForOverlapCheck ?? entries}
         defaultDuration={defaultDuration}
         timeFormat={timeFormat}
@@ -427,8 +429,8 @@ export const CalendarGridContent = React.memo(function CalendarGridContent({
               position={position}
               timeFormat={timeFormat}
               compact={compactCards}
-              onConvert={() => convertGhost(event)}
-              onDismiss={() => dismissGhost(event)}
+              onConvert={canUseProduct ? () => convertGhost(event) : undefined}
+              onDismiss={canUseProduct ? () => dismissGhost(event) : undefined}
             />
           );
         })}
@@ -452,9 +454,15 @@ export const CalendarGridContent = React.memo(function CalendarGridContent({
               timeFormat={timeFormat}
               onEntryClick={onEntryClick}
               onEntryContextMenu={onEntryContextMenu}
-              onPointerDown={handlers.handlePointerDown}
-              onTouchStart={handlers.handleTouchStart}
-              onResizeStart={handlers.handleResizeStart}
+              onPointerDown={(...args) => {
+                if (canUseProduct) handlers.handlePointerDown(...args);
+              }}
+              onTouchStart={(...args) => {
+                if (canUseProduct) handlers.handleTouchStart(...args);
+              }}
+              onResizeStart={(...args) => {
+                if (canUseProduct) handlers.handleResizeStart(...args);
+              }}
             />
           );
         })}

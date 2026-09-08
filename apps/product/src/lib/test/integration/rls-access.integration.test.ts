@@ -87,7 +87,9 @@ const EXTERNAL_CALENDAR_EVENT_GRANTED_COLUMNS = [
 const TEST_EMAIL_A = `test-rls-a-${TEST_USER_A_ID}@example.com`;
 const TEST_EMAIL_B = `test-rls-b-${TEST_USER_B_ID}@example.com`;
 const TEST_PASSWORD = 'test-password-123';
-const SKIP_INTEGRATION = process.env.SKIP_INTEGRATION_TESTS === 'true';
+// 他の integration suite と同じ gate を使う。`SKIP_INTEGRATION_TESTS` は repo の
+// どこにも設定されておらず、この 5 ファイルだけが別 env を見ていた（#2647）。
+const RUN_LOCAL = process.env.USE_LOCAL_DB === 'true';
 const ACCESS_DENIED_MESSAGE = 'Access denied: user_id mismatch';
 const RPC_TIME_ANCHOR = Date.now();
 const isoAtRpcOffset = (offsetMs: number) => new Date(RPC_TIME_ANCHOR + offsetMs).toISOString();
@@ -174,20 +176,6 @@ const userOwnedCases: UserOwnedRlsCase[] = [
       if (error) throw error;
     },
     update: { theme: 'dark' },
-  },
-  {
-    table: 'mfa_recovery_codes',
-    idColumn: 'id',
-    rowId: crypto.randomUUID(),
-    seed: async function () {
-      const { error } = await adminSupabase.from('mfa_recovery_codes').insert({
-        id: this.rowId,
-        user_id: TEST_USER_B_ID,
-        code_hash: `rls-${this.rowId}`,
-      });
-      if (error) throw error;
-    },
-    update: { used_at: new Date().toISOString() },
   },
   {
     table: 'reports',
@@ -299,6 +287,14 @@ const SERVICE_OWNED_USER_TABLE_MUTATIONS = new Set([
   'records',
 ]);
 
+/**
+ * 保存済みデータの削除は本人に残す一方、INSERT / UPDATE は課金判定を通る
+ * service-owned writer に限定する table。共通 matrix では UPDATE の期待値だけが
+ * SERVICE_OWNED_USER_TABLE_MUTATIONS と異なる。
+ */
+const SERVER_WRITE_OWNER_DELETE_TABLES = new Set(['activities', 'categories', 'segments']);
+const SERVER_WRITE_OWNER_DELETE_CASES = ['activities', 'categories', 'segments'] as const;
+
 const serviceRoleCases = [
   {
     table: 'stripe_webhook_events',
@@ -365,7 +361,7 @@ async function createUser(id: string, email: string) {
   if (error) throw error;
 }
 
-describe.skipIf(SKIP_INTEGRATION)('RLS access matrix', () => {
+describe.skipIf(!RUN_LOCAL)('RLS access matrix', () => {
   beforeAll(async () => {
     await createUser(TEST_USER_A_ID, TEST_EMAIL_A);
     await createUser(TEST_USER_B_ID, TEST_EMAIL_B);
@@ -443,6 +439,7 @@ describe.skipIf(SKIP_INTEGRATION)('RLS access matrix', () => {
         const { data, error } = await query;
         const isPrivilegeDeniedMutation =
           (operation !== 'select' && SERVICE_OWNED_USER_TABLE_MUTATIONS.has(testCase.table)) ||
+          (operation === 'update' && SERVER_WRITE_OWNER_DELETE_TABLES.has(testCase.table)) ||
           (operation === 'delete' && testCase.table === 'profiles');
         if (isPrivilegeDeniedMutation) {
           expect(error?.code).toBe('42501');
@@ -453,6 +450,41 @@ describe.skipIf(SKIP_INTEGRATION)('RLS access matrix', () => {
       },
     );
   });
+
+  it.each(SERVER_WRITE_OWNER_DELETE_CASES)(
+    '$table はownerでも直接insert/updateを拒否し、select/deleteは許可する',
+    async (table) => {
+      const rowId = crypto.randomUUID();
+      const row = { id: rowId, user_id: TEST_USER_B_ID, name: `RLS boundary ${rowId}` };
+
+      const { error: directInsertError } = await supabaseB.from(table).insert(row);
+      expect(directInsertError?.code).toBe('42501');
+
+      const { error: serviceInsertError } = await adminSupabase.from(table).insert(row);
+      expect(serviceInsertError).toBeNull();
+
+      const { error: directUpdateError } = await supabaseB
+        .from(table)
+        .update({ name: 'forbidden direct update' })
+        .eq('id', rowId);
+      expect(directUpdateError?.code).toBe('42501');
+
+      const { data: selected, error: selectError } = await supabaseB
+        .from(table)
+        .select('id')
+        .eq('id', rowId);
+      expect(selectError).toBeNull();
+      expect(selected).toEqual([{ id: rowId }]);
+
+      const { data: deleted, error: deleteError } = await supabaseB
+        .from(table)
+        .delete()
+        .eq('id', rowId)
+        .select('id');
+      expect(deleteError).toBeNull();
+      expect(deleted).toEqual([{ id: rowId }]);
+    },
+  );
 
   // Candidate 6: plans / records の authenticated 直接 DML を剥がし、SELECT だけ残した。
   // RLS policy は残っているが grant 層で到達不能になるため、insert/update/delete は
@@ -508,6 +540,48 @@ describe.skipIf(SKIP_INTEGRATION)('RLS access matrix', () => {
     expect(recordReadError).toBeNull();
     expect(plan?.title).toBe('RLS plan');
     expect(record?.title).toBe('RLS record');
+  });
+
+  // #2618: MFA リカバリコードは「MFA を解除してよいか」の判断根拠なので、判断される当人
+  // （authenticated）から読み書きできてはいけない。以前は自分の user_id なら INSERT でき、
+  // 別アカウントで学んだ code_hash を被害者の行として植えることで MFA を迂回できた。
+  // 詳細な境界は mfa-recovery-codes-lockdown.integration.test.ts が固定する。ここでは
+  // 「owner でも到達できない table」として RLS マトリクスの側にも記録しておく。
+  it('authenticatedはown recovery codeにも一切到達できない', async () => {
+    const ownRowId = crypto.randomUUID();
+    const { error: seedError } = await adminSupabase.from('mfa_recovery_codes').insert({
+      id: ownRowId,
+      user_id: TEST_USER_B_ID,
+      code_hash: `rls-${ownRowId}`,
+    });
+    expect(seedError).toBeNull();
+
+    const [select, insert, update, remove] = await Promise.all([
+      supabaseB.from('mfa_recovery_codes').select('code_hash').eq('id', ownRowId),
+      supabaseB
+        .from('mfa_recovery_codes')
+        .insert({ user_id: TEST_USER_B_ID, code_hash: 'forbidden-direct-insert' }),
+      supabaseB
+        .from('mfa_recovery_codes')
+        .update({ used_at: new Date().toISOString() })
+        .eq('id', ownRowId),
+      supabaseB.from('mfa_recovery_codes').delete().eq('id', ownRowId),
+    ]);
+
+    for (const result of [select, insert, update, remove]) {
+      expect(result.error?.code).toBe('42501');
+    }
+
+    // service_role 側からは従来どおり読める（消費経路が壊れていないこと）。
+    const { data: row, error: adminReadError } = await adminSupabase
+      .from('mfa_recovery_codes')
+      .select('code_hash')
+      .eq('id', ownRowId)
+      .single();
+    expect(adminReadError).toBeNull();
+    expect(row?.code_hash).toBe(`rls-${ownRowId}`);
+
+    await adminSupabase.from('mfa_recovery_codes').delete().eq('id', ownRowId);
   });
 
   describe('profiles deletion grants', () => {
@@ -1034,10 +1108,9 @@ describe.skipIf(SKIP_INTEGRATION)('RLS access matrix', () => {
     );
   });
 
-  // #2271。segments / activities の junction table。roles={public} かつ UPDATE grant が無い
-  // ため、userOwnedCases の共通ブロック（select/update/delete の3操作前提）には当てはまらず
-  // 独立させる。segment_id / activity_id は userOwnedCases で既に seed 済みの行を再利用する
-  // （複合 FK が (segment_id, user_id) / (activity_id, user_id) の一致を要求するため）。
+  // segment_activities はINSERT/UPDATEをservice-owned writerへ限定し、SELECT/DELETEは
+  // ownerに残すため、userOwnedCasesの共通ブロックとは権限集合が異なる。
+  // segment_id / activity_id はuserOwnedCasesでseed済みの行を再利用する。
   describe('segment_activities cross-user isolation', () => {
     const segmentCase = userOwnedCases.find((c) => c.table === 'segments');
     const activityCase = userOwnedCases.find((c) => c.table === 'activities');
@@ -1053,13 +1126,20 @@ describe.skipIf(SKIP_INTEGRATION)('RLS access matrix', () => {
         .eq('activity_id', activityCase.rowId);
     });
 
-    it('ownerは自分のsegment/activityの組をinsert・select・deleteできる', async () => {
+    it('ownerの直接insertは拒否し、service-role作成後はselect・deleteできる', async () => {
       const { error: insertError } = await supabaseB.from('segment_activities').insert({
         segment_id: segmentCase.rowId,
         activity_id: activityCase.rowId,
         user_id: TEST_USER_B_ID,
       });
-      expect(insertError).toBeNull();
+      expect(insertError?.code).toBe('42501');
+
+      const { error: serviceInsertError } = await adminSupabase.from('segment_activities').insert({
+        segment_id: segmentCase.rowId,
+        activity_id: activityCase.rowId,
+        user_id: TEST_USER_B_ID,
+      });
+      expect(serviceInsertError).toBeNull();
 
       const { data, error: selectError } = await supabaseB
         .from('segment_activities')
@@ -1110,17 +1190,13 @@ describe.skipIf(SKIP_INTEGRATION)('RLS access matrix', () => {
       expect(stillThere).toHaveLength(1);
     });
 
-    it('他ユーザーの所有物へのinsertは複合FKで拒否される', async () => {
-      // (segment_id, activity_id) は前の it で既に owner 分が存在するため、PK 衝突（23505）
-      // ではなく FK 違反（23503）を確実に見るために activity_id は未使用の新規 UUID を使う。
-      // 「B の segment に、存在しない activity をぶら下げる」形で複合 FK
-      // (segment_id, user_id) -> segments(id, user_id) を検証する。
+    it('他ユーザーの所有物への直接insertもgrant層で拒否する', async () => {
       const { error } = await supabaseA.from('segment_activities').insert({
         segment_id: segmentCase.rowId, // user B の segment
         activity_id: crypto.randomUUID(), // どのユーザーの activity にも存在しない
         user_id: TEST_USER_A_ID,
       });
-      expect(error?.code).toBe('23503');
+      expect(error?.code).toBe('42501');
     });
 
     it('authenticatedのupdateはUPDATE grantが無いため常に42501', async () => {

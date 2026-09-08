@@ -40,12 +40,14 @@ const SUPABASE_ANON_KEY =
 const TEST_USER_ID = crypto.randomUUID();
 
 // テストをスキップするかどうか（CI環境でSupabaseが起動していない場合）
-const SKIP_INTEGRATION = process.env.SKIP_INTEGRATION_TESTS === 'true';
+// 他の integration suite と同じ gate を使う。`SKIP_INTEGRATION_TESTS` は repo の
+// どこにも設定されておらず、この 5 ファイルだけが別 env を見ていた（#2647）。
+const RUN_LOCAL = process.env.USE_LOCAL_DB === 'true';
 const userRouter = createUserRouter({
   beforeIdentityDeletion: async () => ({ status: 'completed' }),
 });
 
-describe.skipIf(SKIP_INTEGRATION)('GDPR Router Integration', () => {
+describe.skipIf(!RUN_LOCAL)('GDPR Router Integration', () => {
   let adminSupabase: ReturnType<typeof createClient<Database>>;
   let supabase: ReturnType<typeof createClient<Database>>;
   let ctx: Context;

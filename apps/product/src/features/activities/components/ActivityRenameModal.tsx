@@ -9,6 +9,7 @@
  * 「カテゴリーを変更」が担当するので、ここには置かない）。
  */
 
+import { useBillingAccess } from '@/lib/billing/BillingAccessProvider';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { useTranslations } from 'next-intl';
@@ -51,6 +52,7 @@ function ActivityRenameModalForm({ open, onClose, activity }: ActivityRenameModa
   const { data: existingActivities } = useActivities();
   const updateActivityMutation = useUpdateActivity();
 
+  const { canUseProduct } = useBillingAccess();
   const [name, setName] = useState(activity.name);
   const [debouncedName, setDebouncedName] = useState(activity.name);
   const [submitting, setSubmitting] = useState(false);
@@ -82,7 +84,8 @@ function ActivityRenameModalForm({ open, onClose, activity }: ActivityRenameModa
 
   const trimmedLive = name.trim();
   const unchanged = trimmedLive === activity.name;
-  const canSubmit = trimmedLive.length > 0 && !duplicate && !unchanged && !submitting;
+  const canSubmit =
+    canUseProduct && trimmedLive.length > 0 && !duplicate && !unchanged && !submitting;
 
   const errorMessage = duplicate ? t('duplicateName') : null;
 

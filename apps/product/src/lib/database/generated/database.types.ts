@@ -817,6 +817,9 @@ export type Database = {
       };
       profiles: {
         Row: {
+          app_trial_consumed_at: string | null;
+          app_trial_ends_at: string | null;
+          app_trial_started_at: string | null;
           avatar_url: string | null;
           created_at: string;
           email: string;
@@ -828,6 +831,9 @@ export type Database = {
           updated_at: string;
         };
         Insert: {
+          app_trial_consumed_at?: string | null;
+          app_trial_ends_at?: string | null;
+          app_trial_started_at?: string | null;
           avatar_url?: string | null;
           created_at?: string;
           email: string;
@@ -839,6 +845,9 @@ export type Database = {
           updated_at?: string;
         };
         Update: {
+          app_trial_consumed_at?: string | null;
+          app_trial_ends_at?: string | null;
+          app_trial_started_at?: string | null;
           avatar_url?: string | null;
           created_at?: string;
           email?: string;
@@ -2415,6 +2424,10 @@ export type Database = {
           p_user_id: string;
         };
         Returns: string;
+      };
+      replace_mfa_recovery_codes_v1: {
+        Args: { p_code_hashes: string[]; p_user_id: string };
+        Returns: number;
       };
       replace_selected_calendars_command_v1: {
         Args: {

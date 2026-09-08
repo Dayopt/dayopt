@@ -22,7 +22,7 @@ describe('product events', () => {
     abortSignal.mockResolvedValue({ data: null, error: null });
   });
 
-  it('accepts only the six allowlisted event names', () => {
+  it('accepts only the allowlisted event names', () => {
     expect(PRODUCT_EVENT_NAMES).toEqual([
       'user_signed_up',
       'plan_created',
@@ -30,6 +30,10 @@ describe('product events', () => {
       'review_opened',
       'checkout_started',
       'subscription_started',
+      'app_trial_started',
+      'subscription_payment_succeeded',
+      'subscription_renewal_succeeded',
+      'subscription_ended',
     ]);
     expect(PRODUCT_EVENT_NAMES.every(isProductEventName)).toBe(true);
     expect(isProductEventName('entry_created')).toBe(false);

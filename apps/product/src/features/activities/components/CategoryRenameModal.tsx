@@ -9,6 +9,7 @@
  * カテゴリーメニューが担当するので、ここには置かない）。
  */
 
+import { useBillingAccess } from '@/lib/billing/BillingAccessProvider';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { useTranslations } from 'next-intl';
@@ -51,6 +52,7 @@ function CategoryRenameModalForm({ open, onClose, category }: CategoryRenameModa
   const { data: existingCategories } = useCategories();
   const updateCategoryMutation = useUpdateCategory();
 
+  const { canUseProduct } = useBillingAccess();
   const [name, setName] = useState(category.name);
   const [debouncedName, setDebouncedName] = useState(category.name);
   const [submitting, setSubmitting] = useState(false);
@@ -73,7 +75,8 @@ function CategoryRenameModalForm({ open, onClose, category }: CategoryRenameModa
 
   const trimmedLive = name.trim();
   const unchanged = trimmedLive === category.name;
-  const canSubmit = trimmedLive.length > 0 && !duplicate && !unchanged && !submitting;
+  const canSubmit =
+    canUseProduct && trimmedLive.length > 0 && !duplicate && !unchanged && !submitting;
 
   const errorMessage = duplicate ? t('duplicateName') : null;
 

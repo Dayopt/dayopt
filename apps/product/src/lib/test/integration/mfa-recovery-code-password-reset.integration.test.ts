@@ -13,14 +13,13 @@
  * 2. USE_LOCAL_DB=true pnpm test:integration
  */
 
-import { createHmac } from 'node:crypto';
-
 import { createClient } from '@supabase/supabase-js';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { createUserRouter } from '@/features/auth/server/router';
 import { hashRecoveryCode } from '@/lib/auth/recovery-codes';
 import type { Database } from '@/lib/database';
+import { generateTotp } from '@/lib/test/totp';
 import { createTestCaller } from '@/lib/test/trpc-test-helpers';
 import type { Context } from '@/lib/trpc/procedures';
 import { createTRPCRouter } from '@/lib/trpc/router';
@@ -38,7 +37,9 @@ const SUPABASE_ANON_KEY =
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0';
 
-const SKIP_INTEGRATION = process.env.SKIP_INTEGRATION_TESTS === 'true';
+// 他の integration suite と同じ gate を使う。`SKIP_INTEGRATION_TESTS` は repo の
+// どこにも設定されておらず、この 5 ファイルだけが別 env を見ていた（#2647）。
+const RUN_LOCAL = process.env.USE_LOCAL_DB === 'true';
 
 const userRouter = createUserRouter({
   beforeIdentityDeletion: async () => ({ status: 'completed' }),
@@ -48,7 +49,7 @@ const userRouter = createUserRouter({
 // userRouter を直接 caller に渡すと path が 'verifyRecoveryCode' になり判定が正しく検証できない
 const testRouter = createTRPCRouter({ user: userRouter });
 
-describe.skipIf(SKIP_INTEGRATION)('MFA recovery code via tRPC (password-reset flow)', () => {
+describe.skipIf(!RUN_LOCAL)('MFA recovery code via tRPC (password-reset flow)', () => {
   let adminSupabase: ReturnType<typeof createClient<Database>>;
   let userId: string;
   let email: string;
@@ -179,36 +180,3 @@ describe.skipIf(SKIP_INTEGRATION)('MFA recovery code via tRPC (password-reset fl
     await recoverySupabase.auth.signOut();
   });
 });
-
-/** RFC 6238 TOTP（SHA-1, 30秒間隔, 6桁）。テスト専用の最小実装 */
-function generateTotp(base32Secret: string, forTime: number = Date.now()): string {
-  const key = base32Decode(base32Secret);
-  const counter = Math.floor(forTime / 1000 / 30);
-  const counterBuffer = Buffer.alloc(8);
-  counterBuffer.writeBigUInt64BE(BigInt(counter));
-
-  const hmac = createHmac('sha1', key).update(counterBuffer).digest();
-  const offset = hmac[hmac.length - 1] & 0x0f;
-  const binCode =
-    ((hmac[offset] & 0x7f) << 24) |
-    ((hmac[offset + 1] & 0xff) << 16) |
-    ((hmac[offset + 2] & 0xff) << 8) |
-    (hmac[offset + 3] & 0xff);
-  return String(binCode % 1_000_000).padStart(6, '0');
-}
-
-function base32Decode(input: string): Buffer {
-  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
-  const cleaned = input.toUpperCase().replace(/=+$/, '');
-  let bits = '';
-  for (const char of cleaned) {
-    const index = alphabet.indexOf(char);
-    if (index === -1) continue;
-    bits += index.toString(2).padStart(5, '0');
-  }
-  const bytes: number[] = [];
-  for (let i = 0; i + 8 <= bits.length; i += 8) {
-    bytes.push(parseInt(bits.slice(i, i + 8), 2));
-  }
-  return Buffer.from(bytes);
-}
