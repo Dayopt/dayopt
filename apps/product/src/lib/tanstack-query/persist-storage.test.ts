@@ -19,6 +19,9 @@ vi.mock('@/lib/logger', () => ({
   logger: { warn: vi.fn(), error: vi.fn(), info: vi.fn(), debug: vi.fn() },
 }));
 
+const forgetLastKnownUserId = vi.hoisted(() => vi.fn());
+vi.mock('./cache-owner', () => ({ forgetLastKnownUserId }));
+
 const USER_A = 'user-a';
 const USER_B = 'user-b';
 
@@ -191,5 +194,15 @@ describe('clearPersistedQueryCache', () => {
     await clearPersistedQueryCache(storage);
 
     expect(storage.entries.size).toBe(0);
+  });
+
+  // 記憶している所有者を残すと、sign-out 後もオフライン fallback が前ユーザーを指し続ける。
+  // 破棄と記憶の削除が必ず対で起きることが、fallback を安全にしている前提。
+  it('記憶している cache の所有者も忘れる', async () => {
+    const storage = createMemoryStorage();
+
+    await clearPersistedQueryCache(storage);
+
+    expect(forgetLastKnownUserId).toHaveBeenCalled();
   });
 });

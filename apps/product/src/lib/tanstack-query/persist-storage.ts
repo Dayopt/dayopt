@@ -31,6 +31,8 @@ import superjson from 'superjson';
 
 import { logger } from '@/lib/logger';
 
+import { forgetLastKnownUserId } from './cache-owner';
+
 const DB_NAME = 'dayopt-query-cache';
 const STORE_NAME = 'cache';
 /**
@@ -263,6 +265,10 @@ export async function clearPersistedQueryCache(
   storage: QueryCacheStorage = indexedDbQueryCacheStorage,
 ): Promise<void> {
   if (!isStorageAvailable()) return;
+  // 覚えている所有者も必ず対で忘れる。ここに同居させておけば、sign-out 経路が増えても
+  // 「cache は消したが所有者は覚えたまま」（＝オフライン fallback が前ユーザーを指し続ける）
+  // という取りこぼしが構造的に起きない。
+  forgetLastKnownUserId();
   try {
     await storage.clear();
   } catch (error) {

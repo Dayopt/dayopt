@@ -27,8 +27,13 @@ mutations.
 The persisted cache is scoped to the signed-in user. Each blob is stored under a key derived from the
 authenticated user id and carries that id inside it, so a blob written by one account is never restored
 for another. Restoring also deletes any blob that belongs to someone else, and signing out clears the
-store entirely. Restoring waits for the auth store to resolve the session, so an offline revisit by the
-same user still hydrates from cache as before.
+store entirely.
+
+Restoring waits for the auth store to resolve the session. Offline that resolution can fail, because an
+expired access token cannot be refreshed without a network. The cache owner is therefore remembered in
+`localStorage` and used as a fallback, so an offline revisit by the same user still hydrates from cache.
+Signing out clears that remembered owner in the same call that clears the store, which is what keeps the
+fallback from ever pointing at a previous account.
 
 ## Service Worker Cache Strategy
 
