@@ -15,6 +15,7 @@ const mocks = vi.hoisted(() => ({
   createRecordMutate: vi.fn(),
   deletePlanMutateAsync: vi.fn(),
   restorePlanMutateAsync: vi.fn(),
+  canUseProduct: true,
   onCreateTimeOverlap: undefined as (() => void) | undefined,
   onUpdateTimeOverlap: undefined as
     | ((input: {
@@ -24,6 +25,15 @@ const mocks = vi.hoisted(() => ({
     | undefined,
   cachedPlans: [] as Array<{ id: string; start_at: string; end_at: string }>,
   cachedRecords: [] as Array<{ id: string; start_at: string; end_at: string }>,
+}));
+
+vi.mock('@/lib/billing/BillingAccessProvider', () => ({
+  useBillingAccess: () => ({
+    state: mocks.canUseProduct ? 'trial' : 'expired',
+    canUseProduct: mocks.canUseProduct,
+    trialEndsAt: null,
+    enforced: true,
+  }),
 }));
 
 vi.mock('@tanstack/react-query', () => ({
@@ -296,6 +306,7 @@ describe('TimeblockInspectorForm', () => {
     mocks.createRecordMutate.mockReset();
     mocks.deletePlanMutateAsync.mockReset();
     mocks.restorePlanMutateAsync.mockReset();
+    mocks.canUseProduct = true;
     mocks.onCreateTimeOverlap = undefined;
     mocks.onUpdateTimeOverlap = undefined;
     mocks.cachedPlans = [];
@@ -333,6 +344,46 @@ describe('TimeblockInspectorForm', () => {
     expect(mocks.restorePlanMutateAsync).toHaveBeenCalledWith({
       id: futurePlan.id,
       expectedUpdatedAt: deleted.updated_at,
+    });
+  });
+
+  it('利用終了後は編集をflushせず既存versionで削除する', async () => {
+    mocks.canUseProduct = false;
+    mocks.deletePlanMutateAsync.mockResolvedValue({
+      ...futurePlan,
+      deleted_at: '2026-07-15T12:00:00.000Z',
+    });
+    render(<TimeblockInspectorForm kind="plan" plan={futurePlan} onDeleted={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'delete' }));
+    await act(async () => undefined);
+
+    expect(mocks.flushSave).not.toHaveBeenCalled();
+    expect(mocks.deletePlanMutateAsync).toHaveBeenCalledWith({
+      id: futurePlan.id,
+      expectedUpdatedAt: futurePlan.updated_at,
+    });
+    expect(mocks.toastSuccess).toHaveBeenCalledWith('timeblock.editor.toast.deleted', undefined);
+  });
+
+  it('削除直前の保存で期限切れになっても既存versionで削除を続ける', async () => {
+    const accessEnded = Object.assign(new Error('Product access has ended'), {
+      data: { serviceCode: 'BILLING_ACCESS_ENDED' },
+    });
+    mocks.flushSave.mockRejectedValueOnce(accessEnded);
+    mocks.deletePlanMutateAsync.mockResolvedValue({
+      ...futurePlan,
+      deleted_at: '2026-07-15T12:00:00.000Z',
+    });
+    render(<TimeblockInspectorForm kind="plan" plan={futurePlan} onDeleted={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'delete' }));
+    await act(async () => undefined);
+
+    expect(mocks.flushSave).toHaveBeenCalledOnce();
+    expect(mocks.deletePlanMutateAsync).toHaveBeenCalledWith({
+      id: futurePlan.id,
+      expectedUpdatedAt: futurePlan.updated_at,
     });
   });
 

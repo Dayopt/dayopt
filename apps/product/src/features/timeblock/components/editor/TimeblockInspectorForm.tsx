@@ -452,6 +452,23 @@ export function TimeblockInspectorForm({
     return updatedAt;
   }, [cancelScheduledNoteSave, flushSave, value.activityId]);
 
+  const prepareDelete = useCallback(async (): Promise<string> => {
+    if (canUseProduct) {
+      try {
+        return await flushPendingEdits();
+      } catch (error) {
+        // 利用期限がサーバー側で先に切れた場合も、許可された削除は続行する。
+        if (!isBillingAccessEndedError(error)) throw error;
+      }
+    }
+
+    cancelScheduledNoteSave();
+    noteDirtyRef.current = false;
+    const updatedAt = latestUpdatedAtRef.current;
+    if (!updatedAt) throw new Error('Missing timeblock version');
+    return updatedAt;
+  }, [canUseProduct, cancelScheduledNoteSave, flushPendingEdits]);
+
   const handleCopy = useCallback(() => {
     if (!target || !onCopy) return;
     onCopy(
@@ -518,26 +535,33 @@ export function TimeblockInspectorForm({
   const handleDelete = useCallback(() => {
     if (!targetId || isWriteFrozen) return;
     setActionPreparing(true);
-    void flushPendingEdits()
+    void prepareDelete()
       .then(async (expectedUpdatedAt) => {
         const deleted =
           kind === 'plan'
             ? await deletePlan.mutateAsync({ id: targetId, expectedUpdatedAt })
             : await deleteRecord.mutateAsync({ id: targetId, expectedUpdatedAt });
         onDeleted();
-        toast.success(t('timeblock.editor.toast.deleted'), {
-          action: {
-            label: t('common.undo'),
-            onClick: () => {
-              const input = { id: targetId, expectedUpdatedAt: deleted.updated_at };
-              const restore =
-                kind === 'plan' ? restorePlan.mutateAsync(input) : restoreRecord.mutateAsync(input);
-              void restore
-                .then(() => toast.success(t('timeblock.editor.toast.restored')))
-                .catch(() => undefined);
-            },
-          },
-        });
+        toast.success(
+          t('timeblock.editor.toast.deleted'),
+          canUseProduct
+            ? {
+                action: {
+                  label: t('common.undo'),
+                  onClick: () => {
+                    const input = { id: targetId, expectedUpdatedAt: deleted.updated_at };
+                    const restore =
+                      kind === 'plan'
+                        ? restorePlan.mutateAsync(input)
+                        : restoreRecord.mutateAsync(input);
+                    void restore
+                      .then(() => toast.success(t('timeblock.editor.toast.restored')))
+                      .catch(() => undefined);
+                  },
+                },
+              }
+            : undefined,
+        );
       })
       .catch((error: unknown) => {
         if (isTimeblockUncertainError(error)) setHasUnresolvedWrite(true);
@@ -547,11 +571,12 @@ export function TimeblockInspectorForm({
     kind,
     targetId,
     isWriteFrozen,
-    flushPendingEdits,
+    prepareDelete,
     deletePlan,
     deleteRecord,
     restorePlan,
     restoreRecord,
+    canUseProduct,
     setActionPreparing,
     onDeleted,
     t,
