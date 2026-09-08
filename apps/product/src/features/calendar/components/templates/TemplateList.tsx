@@ -129,7 +129,7 @@ export function TemplateList({
                 key={template.id}
                 template={template}
                 onApply={() => onApplyTemplate?.(template.id)}
-                onEdit={() => onEditTemplate?.(template.id)}
+                onEdit={onEditTemplate ? () => onEditTemplate(template.id) : undefined}
                 onRename={(name) => onRenameTemplate?.(template.id, name)}
                 onDelete={() => setDeleteTarget(template)}
               />

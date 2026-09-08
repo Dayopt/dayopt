@@ -6,6 +6,15 @@ import { TemplateList } from './TemplateList';
 vi.mock('next-intl', () => ({ useTranslations: () => (key: string) => key }));
 
 describe('TemplateList available actions', () => {
+  it('編集処理がないテンプレートのメニューに編集を出さない', () => {
+    render(<TemplateList templates={[{ id: 't', name: '確認用', blocks: [] }]} />);
+    fireEvent.contextMenu(screen.getByRole('button', { name: '確認用' }));
+    expect(
+      screen.queryByRole('menuitem', { name: 'calendar.templates.editLabel' }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'common.actions.rename' })).toBeInTheDocument();
+  });
+
   it('does not offer creation or settings without handlers', () => {
     render(<TemplateList templates={[]} />);
     expect(
