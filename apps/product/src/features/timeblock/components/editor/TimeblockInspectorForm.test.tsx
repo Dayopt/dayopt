@@ -385,6 +385,7 @@ describe('TimeblockInspectorForm', () => {
       id: futurePlan.id,
       expectedUpdatedAt: futurePlan.updated_at,
     });
+    expect(mocks.toastSuccess).toHaveBeenCalledWith('timeblock.editor.toast.deleted', undefined);
   });
 
   afterEach(() => {

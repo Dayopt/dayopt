@@ -452,10 +452,13 @@ export function TimeblockInspectorForm({
     return updatedAt;
   }, [cancelScheduledNoteSave, flushSave, value.activityId]);
 
-  const prepareDelete = useCallback(async (): Promise<string> => {
+  const prepareDelete = useCallback(async (): Promise<{
+    expectedUpdatedAt: string;
+    canUndo: boolean;
+  }> => {
     if (canUseProduct) {
       try {
-        return await flushPendingEdits();
+        return { expectedUpdatedAt: await flushPendingEdits(), canUndo: true };
       } catch (error) {
         // 利用期限がサーバー側で先に切れた場合も、許可された削除は続行する。
         if (!isBillingAccessEndedError(error)) throw error;
@@ -466,7 +469,7 @@ export function TimeblockInspectorForm({
     noteDirtyRef.current = false;
     const updatedAt = latestUpdatedAtRef.current;
     if (!updatedAt) throw new Error('Missing timeblock version');
-    return updatedAt;
+    return { expectedUpdatedAt: updatedAt, canUndo: false };
   }, [canUseProduct, cancelScheduledNoteSave, flushPendingEdits]);
 
   const handleCopy = useCallback(() => {
@@ -536,7 +539,7 @@ export function TimeblockInspectorForm({
     if (!targetId || isWriteFrozen) return;
     setActionPreparing(true);
     void prepareDelete()
-      .then(async (expectedUpdatedAt) => {
+      .then(async ({ expectedUpdatedAt, canUndo }) => {
         const deleted =
           kind === 'plan'
             ? await deletePlan.mutateAsync({ id: targetId, expectedUpdatedAt })
@@ -544,7 +547,7 @@ export function TimeblockInspectorForm({
         onDeleted();
         toast.success(
           t('timeblock.editor.toast.deleted'),
-          canUseProduct
+          canUndo
             ? {
                 action: {
                   label: t('common.undo'),
@@ -576,7 +579,6 @@ export function TimeblockInspectorForm({
     deleteRecord,
     restorePlan,
     restoreRecord,
-    canUseProduct,
     setActionPreparing,
     onDeleted,
     t,
