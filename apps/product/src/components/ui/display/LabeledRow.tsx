@@ -89,7 +89,11 @@ export function LabeledRow({
 
   if ((isNavigate || isAction) && onClick) {
     return (
-      <button type="button" className="w-full text-left" onClick={onClick}>
+      <button
+        type="button"
+        className="hover:bg-state-hover focus-visible:ring-ring w-full rounded-lg text-left focus-visible:ring-2 focus-visible:outline-hidden"
+        onClick={onClick}
+      >
         {content}
       </button>
     );

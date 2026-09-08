@@ -95,3 +95,15 @@ describe('MobileCalendarHeader outside tap to close', () => {
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
   });
 });
+
+// CSS で高さだけを閉じても、子孫の操作はフォーカス可能なまま残る。
+it('閉じた日付選択は inert にし、展開時だけ操作可能に戻す', () => {
+  renderHeader({ defaultExpanded: false });
+  const grid = screen.getByTestId('month-grid');
+  const toggle = screen.getByRole('button', { expanded: false });
+  expect(grid.closest('[inert]')).not.toBeNull();
+  fireEvent.click(toggle);
+  expect(grid.closest('[inert]')).toBeNull();
+  fireEvent.click(toggle);
+  expect(grid.closest('[inert]')).not.toBeNull();
+});

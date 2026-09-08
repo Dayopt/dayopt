@@ -46,9 +46,9 @@ export function ExecutionChapter({
     <section
       aria-label={t('kick')}
       data-report-chapter="execution"
-      className="border-border-subtle bg-card flex flex-col gap-4 rounded-2xl border p-4 shadow-sm"
+      className="border-border-subtle @container flex flex-col gap-4 border-b pb-8 last:border-b-0"
     >
-      <p className="text-muted-foreground text-xs">{t('kick')}</p>
+      <h2 className="text-foreground text-sm font-medium">{t('kick')}</h2>
 
       {rows.length === 0 ? (
         <p className="text-muted-foreground text-xs">{t(`empty.${granularity}`)}</p>
@@ -94,7 +94,7 @@ function ExecutionRow({
           })
         }
         aria-label={t('rowAriaLabel', { name, recorded })}
-        className="hover:bg-state-hover flex min-h-11 w-full items-center gap-2 rounded-lg px-2 text-left"
+        className="hover:bg-state-hover focus-visible:ring-ring flex min-h-11 w-full flex-wrap items-center gap-x-2 gap-y-2 rounded-lg px-2 py-3 text-left focus-visible:ring-2 focus-visible:outline-hidden @lg:py-2"
       >
         <span
           aria-hidden
@@ -102,15 +102,19 @@ function ExecutionRow({
           style={{ backgroundColor: rowColor(row.color) }}
         />
 
-        {/* 狭い面では名前と比率の欄を詰める（バーが潰れて長短が読めなくなるため）。
-            出す内容と計算は変えない — 幅だけをレスポンシブにする */}
         <span
-          className={cn('w-18 shrink-0 truncate text-xs md:w-24', row.archived && 'opacity-50')}
+          className={cn(
+            'min-w-0 flex-1 truncate text-sm @lg:w-44 @lg:flex-none',
+            row.archived && 'opacity-50',
+          )}
         >
           {name}
         </span>
 
-        <span aria-hidden className="flex min-w-0 flex-1 flex-col gap-1">
+        <span
+          aria-hidden
+          className="order-last flex w-full min-w-0 flex-col gap-1 @lg:order-none @lg:w-auto @lg:flex-1"
+        >
           {/* 上段 = 記録。幅は行の最大値（記録・予定のどちらか大きい方）に対する比 */}
           <span
             className="block"
@@ -130,12 +134,12 @@ function ExecutionRow({
           )}
         </span>
 
-        <span className="text-foreground w-10 shrink-0 text-right text-xs tabular-nums">
+        <span className="text-foreground w-12 shrink-0 text-right text-sm tabular-nums">
           {recorded}
         </span>
 
         {/* 過去予定が閾値未満の行では比率を作らない。0% や空文字ではなくダッシュ */}
-        <span className="text-muted-foreground w-10 shrink-0 text-right text-xs tabular-nums md:w-14">
+        <span className="text-muted-foreground w-24 shrink-0 text-right text-xs whitespace-nowrap tabular-nums">
           {row.planRatioPercent === null
             ? t('planRatioUnavailable')
             : t('planRatio', { percent: row.planRatioPercent })}

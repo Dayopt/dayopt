@@ -152,7 +152,7 @@ describe('shortcut-registry', () => {
     expect(handler).not.toHaveBeenCalled();
   });
 
-  it.each(['input', 'dialog'])('%s内でも未処理のEscapeはglobal closeへ渡す', (context) => {
+  it.each(['input', 'dialog'])('%sのEscapeを適切な所有者へ渡す', (context) => {
     const handler = registerTestShortcut({ key: 'Escape' });
     const container =
       context === 'input' ? document.createElement('input') : document.createElement('div');
@@ -165,6 +165,20 @@ describe('shortcut-registry', () => {
 
     dispatchKeyDown(target, { key: 'Escape' });
 
+    if (context === 'dialog') expect(handler).not.toHaveBeenCalled();
+    else expect(handler).toHaveBeenCalledOnce();
+  });
+
+  it('focusがtriggerに残るpopoverでもEscapeを奪わない', () => {
+    const handler = registerTestShortcut({ key: 'Escape' });
+    const trigger = document.createElement('button');
+    const overlay = document.createElement('div');
+    overlay.setAttribute('role', 'dialog');
+    document.body.append(trigger, overlay);
+    dispatchKeyDown(trigger, { key: 'Escape' });
+    expect(handler).not.toHaveBeenCalled();
+    overlay.remove();
+    dispatchKeyDown(trigger, { key: 'Escape' });
     expect(handler).toHaveBeenCalledOnce();
   });
 });

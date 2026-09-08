@@ -11,6 +11,8 @@
 
 import { logger } from '@/lib/logger';
 
+import { hasOpenKeyboardOverlay } from './keyboard-overlay';
+
 // =============================================================================
 // Types
 // =============================================================================
@@ -162,10 +164,11 @@ function isInsideOverlay(element: Element): boolean {
  *
  * レジストリに登録されたショートカットを照合し、最も優先度の高いハンドラを実行する。
  * 入力フィールドやoverlay内のキー操作、および既に処理済みのイベントはスキップする。
- * ただし未処理のEscapeはInspectorなどのglobal closeへ渡す。
+ * ただし子オーバーレイがない場合の未処理 Escape は Inspector などの global close へ渡す。
  */
 export function handleGlobalKeyDown(event: KeyboardEvent): void {
   if (event.defaultPrevented || event.isComposing) return;
+  if (event.key === 'Escape' && hasOpenKeyboardOverlay()) return;
 
   const combo = normalizeKeyCombo(event);
   const eventElement = getEventElement(event);

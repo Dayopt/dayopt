@@ -1,5 +1,7 @@
 import { useEffect } from 'react';
 
+import { hasOpenKeyboardOverlay } from '@/lib/keyboard/keyboard-overlay';
+
 interface UseInspectorKeyboardOptions {
   /** Inspectorが開いているか */
   isOpen: boolean;
@@ -48,6 +50,7 @@ export function useInspectorKeyboard({
     if (!isOpen) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.defaultPrevented || e.isComposing || hasOpenKeyboardOverlay()) return;
       // 入力中は無視
       const target = e.target as HTMLElement;
       if (target.isContentEditable || target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {

@@ -22,48 +22,43 @@ interface MirrorRowsProps {
 export function MirrorRows({ rows, onSelectActivity }: MirrorRowsProps) {
   const t = useTranslations('report.execution.mirror');
 
+  if (rows.length === 0) return null;
+
   return (
     <div className="flex flex-col gap-2">
       <p className="text-muted-foreground text-xs">{t('heading')}</p>
 
-      {rows.length === 0 ? (
-        <p className="text-muted-foreground text-xs">{t('empty')}</p>
-      ) : (
-        <ul data-report-rows="mirror" className="flex flex-col gap-2">
-          {rows.map((row) => (
-            <li key={row.activityId ?? '__unassigned'}>
-              <button
-                type="button"
-                onClick={() =>
-                  onSelectActivity?.({
-                    activityId: row.activityId,
-                    name: row.name,
-                    categoryName: row.categoryName,
-                    color: row.color,
-                  })
-                }
-                className="hover:bg-state-hover flex min-h-11 w-full items-center gap-2 rounded-lg px-2 text-left text-xs"
-              >
-                <span
-                  aria-hidden
-                  className="size-2 shrink-0 rounded-full"
-                  style={{ backgroundColor: mirrorColor(row.color) }}
-                />
-                <span className="text-foreground min-w-0 flex-1">
-                  {t(`sentence.${row.tone}`, {
-                    name: row.name ?? t('unnamed'),
-                    coefficient: row.coefficient.toFixed(2),
-                    percent: Math.round(row.coefficient * 100),
-                  })}
-                </span>
-                <span className="text-muted-foreground shrink-0 tabular-nums">
-                  ×{row.coefficient.toFixed(2)}
-                </span>
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
+      <ul data-report-rows="mirror" className="flex flex-col">
+        {rows.map((row) => (
+          <li key={row.activityId ?? '__unassigned'}>
+            <button
+              type="button"
+              onClick={() =>
+                onSelectActivity?.({
+                  activityId: row.activityId,
+                  name: row.name,
+                  categoryName: row.categoryName,
+                  color: row.color,
+                })
+              }
+              className="hover:bg-state-hover focus-visible:ring-ring flex min-h-11 w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-sm focus-visible:ring-2 focus-visible:outline-hidden"
+            >
+              <span
+                aria-hidden
+                className="size-2 shrink-0 rounded-full"
+                style={{ backgroundColor: mirrorColor(row.color) }}
+              />
+              <span className="text-foreground min-w-0 flex-1">
+                {t(`sentence.${row.tone}`, {
+                  name: row.name ?? t('unnamed'),
+                  coefficient: row.coefficient.toFixed(2),
+                  percent: Math.round(row.coefficient * 100),
+                })}
+              </span>
+            </button>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

@@ -168,3 +168,12 @@ export const ClosedState: Story = {
 export const Interactive: Story = {
   render: () => <InteractiveSettingsDialog />,
 };
+
+/** ダイアログを開いたまま狭いウィンドウへ変更した状態。 */
+export const NarrowViewport: Story = {
+  globals: { viewport: { value: 'mobile1', isRotated: false } },
+  render: () => {
+    useShellStore.setState({ activeSheet: { type: 'settings', category: 'account' } });
+    return <SettingsDialog />;
+  },
+};
