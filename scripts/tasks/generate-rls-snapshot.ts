@@ -174,6 +174,12 @@ const PUBLIC_TABLES_WITHOUT_POLICIES_ALLOWLIST = [
   'mcp_environment_identity',
   'mcp_mutation_control',
   'mcp_mutation_receipts',
+  // #2618: MFA リカバリコードは「MFA を解除してよいか」の判断根拠なので、判断される当人
+  // （anon / authenticated）から到達させない。grant を revoke したうえで policy も落とし、
+  // service_role の SECURITY DEFINER RPC（生成 = replace_mfa_recovery_codes_v1、
+  // 消費 = use_recovery_code、件数 = count_unused_recovery_codes）だけを入口にしている。
+  // 「policy が無い」のは分離の抜けではなく、分離を policy より下の層（grant）で行った結果。
+  'mfa_recovery_codes',
 ];
 
 /**

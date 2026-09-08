@@ -866,6 +866,86 @@ describe('disconnect', () => {
   });
 });
 
+// #2620: production では fenced writer が ready で、かつ接続作成経路（saveConnection /
+// reconnectExistingConnection）が authority fence 列を書かないため、OAuth callback が作った
+// 接続は必ず fence NULL で始まる。この組み合わせを固定するテストが 1 件も無かったため
+// （既存の disconnect テストは beforeEach の既定 false で非 fenced 経路だけを通る）、
+// 「切断しましたと言うのに revoke も削除もしない」不具合が緑のまま隠れていた。
+describe('disconnect（fenced writer ready）', () => {
+  beforeEach(() => {
+    isConfiguredFencedCalendarSyncWriterReady.mockResolvedValue(true);
+  });
+
+  it('authority fence が未確立でも revoke と connection 削除に到達する', async () => {
+    const { calls } = setupServiceRoleDb({
+      connection: {
+        status: 'active',
+        refresh_token_enc: 'enc',
+        data_generation: 3,
+        authority_fence_id: null,
+        authority_epoch: null,
+      },
+    });
+
+    await disconnect(USER_ID, CONNECTION_ID);
+
+    expect(revoke).toHaveBeenCalledWith('refresh-token');
+    expect(deleteUnreferencedEvents).toHaveBeenCalledTimes(2);
+    expect(findWith(calls, 'calendar_connections', 'delete')).toBeDefined();
+  });
+
+  it('authority fence 済みの接続でも従来どおり revoke と削除に到達する', async () => {
+    const { calls } = setupServiceRoleDb({
+      connection: {
+        status: 'active',
+        refresh_token_enc: 'enc',
+        data_generation: 3,
+        authority_fence_id: 'fence-1',
+        authority_epoch: 7,
+      },
+    });
+
+    await disconnect(USER_ID, CONNECTION_ID);
+
+    expect(revoke).toHaveBeenCalledWith('refresh-token');
+    expect(findWith(calls, 'calendar_connections', 'delete')).toBeDefined();
+  });
+
+  // fence の欠落を許すのは「行が無い」判定を捨てるという意味ではない。2 回目の切断は
+  // 行そのものが消えているので、従来どおり冪等に何もしない。
+  it('接続が既に無ければ冪等に何もしない', async () => {
+    setupServiceRoleDb({ connection: null });
+
+    await disconnect(USER_ID, CONNECTION_ID);
+
+    expect(revoke).not.toHaveBeenCalled();
+    expect(deleteUnreferencedEvents).not.toHaveBeenCalled();
+  });
+
+  // revoke は best-effort のまま。provider が拒否しても行は消して Sentry へ送る
+  // （消さないと「切断できない接続」が残る）。
+  it('fence 未確立の接続で revoke が失敗しても削除まで進み Sentry へ送る', async () => {
+    const { calls } = setupServiceRoleDb({
+      connection: {
+        status: 'active',
+        refresh_token_enc: 'enc',
+        data_generation: 3,
+        authority_fence_id: null,
+        authority_epoch: null,
+      },
+    });
+    revoke.mockResolvedValue(false);
+
+    await disconnect(USER_ID, CONNECTION_ID);
+
+    expect(captureUnexpectedError).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({ operation: 'disconnect_revoke' }),
+    );
+    expect(findWith(calls, 'calendar_connections', 'delete')).toBeDefined();
+  });
+});
+
 // =============================================================================
 // revokeOrphanedGrant（#2072）
 // =============================================================================

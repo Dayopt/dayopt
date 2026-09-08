@@ -7,6 +7,7 @@
 import { logger } from '@/lib/logger';
 import { captureUnexpectedAuthError, observeAuthOperation } from '@/lib/sentry';
 import { createClient } from '@/lib/supabase/client';
+import { clearPersistedQueryCache } from '@/lib/tanstack-query/persist-storage';
 import type {
   AuthError,
   AuthResponse,
@@ -126,6 +127,10 @@ export const useAuthStore = create<AuthState>()(
               // C2: セッション失効の検出 — 以前ログイン済みだったのに session が消えた場合
               if (previousUser && !session?.user && event === 'SIGNED_OUT') {
                 set({ _sessionExpired: true });
+                // 永続化 query cache を破棄する（#2619）。UI の logout 経路（useLogout /
+                // 設定画面 / session timeout）はどれもここを通るので、経路ごとの書き漏らしに
+                // 依存せず 1 箇所で閉じる。memory 側は QueryCacheAuthBoundary が担当。
+                void clearPersistedQueryCache();
               }
             });
 
