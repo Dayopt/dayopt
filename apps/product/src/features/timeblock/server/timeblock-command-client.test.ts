@@ -182,4 +182,52 @@ describe('TimeblockCommandClient', () => {
       }),
     ).rejects.toMatchObject({ code: 'RECORD_IN_FUTURE' });
   });
+
+  /**
+   * `EXPECTED_COMMAND_ERRORS` の全キーを固定する。
+   *
+   * この表は `invariants.md` §時刻 の写し表で分類 (a)（契約変換・消してはいけない写し）
+   * に置かれているが、実測（#2644）では DT003 / DT008 / DT009 / DT012 / DT014 / 22023 が
+   * 未固定で、DT003 の行を消しても product の unit が全 pass した。UI は code で文言を
+   * 出し分けるため、写像が落ちると規則ごとの説明が汎用 saveFailed へ退化する（#2628）。
+   *
+   * **実装から表を import しない。** import すると表と期待値が同時に動いてしまい、
+   * 行を消しても緑のままになる。ここに書いた期待値そのものが正本の写しである。
+   */
+  it.each([
+    ['22023', 'INVALID_INPUT'],
+    ['23P01', 'TIME_OVERLAP'],
+    ['DT002', 'STALE_VERSION'],
+    ['DT003', 'INVALID_TIME_RANGE'],
+    ['DT005', 'RECORD_IN_FUTURE'],
+    ['DT008', 'INVALID_INPUT'],
+    ['DT009', 'FORBIDDEN'],
+    ['DT012', 'INVALID_INPUT'],
+    ['DT014', 'ACTIVITY_ARCHIVED'],
+  ])('DB の %s を公開 code %s へ変換する', async (dbCode, serviceCode) => {
+    rpc.mockResolvedValue({ data: null, error: { code: dbCode, message: 'trigger detail' } });
+
+    await expect(new TimeblockCommandClient().createPlan(createPlanInput())).rejects.toMatchObject({
+      code: serviceCode,
+    });
+  });
+
+  // DT001 は表の外側で操作によって出し分ける。versioned な操作（update / delete /
+  // record / restore）では STALE_TARGET、そうでない create では NOT_FOUND。
+  it('versionedでない操作のDT001はNOT_FOUNDへ落とす', async () => {
+    rpc.mockResolvedValue({ data: null, error: { code: 'DT001', message: 'target missing' } });
+
+    await expect(new TimeblockCommandClient().createPlan(createPlanInput())).rejects.toMatchObject({
+      code: 'NOT_FOUND',
+    });
+  });
+
+  // 表にも個別分岐にも無い code は握り潰さず COMMAND_FAILED として上げる。
+  it('未知のDB codeはCOMMAND_FAILEDへ変換する', async () => {
+    rpc.mockResolvedValue({ data: null, error: { code: 'XX999', message: 'unexpected' } });
+
+    await expect(new TimeblockCommandClient().createPlan(createPlanInput())).rejects.toMatchObject({
+      code: 'COMMAND_FAILED',
+    });
+  });
 });

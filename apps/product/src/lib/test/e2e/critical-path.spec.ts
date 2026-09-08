@@ -16,8 +16,9 @@ import { suppressConsentBanner } from './suppress-consent-banner';
  * ことを検証する。
  *
  * 過去帯ドラッグでパレットが開かない症状は、ドラッグ x 座標が Plan lane 側
- * （`box.width * 0.15`）だったことが原因だった。過去日は Plan 追加が禁止される
- * （temporal-constraints.md）ため、Record lane 側（`box.width * 0.6`）へ変更して解消した。
+ * （`box.width * 0.15`）だったことが原因だった。過去スロットの新規作成は宛先が
+ * Record になる（docs/product/specs/plan-record.md §新規作成時の保存先ルール）ため、
+ * Record lane 側（`box.width * 0.6`）へ変更して解消した。
  *
  * seed は service role で自前ユーザーを作る（block-search.spec.ts と同型）。
  * 実行先は resolveServiceRoleTarget が安全と判定した時だけ有効になる。

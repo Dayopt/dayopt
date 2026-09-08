@@ -8,7 +8,6 @@ import type { CalendarDisplayEvent } from './calendar.types';
 export type TimedTimeblock = CalendarDisplayEvent & {
   start: Date; // startDateのエイリアス
   end: Date; // endDateのエイリアス
-  isReadOnly?: boolean;
 };
 
 /** カラム割り当て済みのエントリ列情報 */

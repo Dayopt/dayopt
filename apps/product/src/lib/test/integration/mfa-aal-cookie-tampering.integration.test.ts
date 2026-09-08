@@ -56,7 +56,9 @@ const SUPABASE_ANON_KEY =
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0';
 
-const SKIP_INTEGRATION = process.env.SKIP_INTEGRATION_TESTS === 'true';
+// 他の integration suite と同じ gate を使う。`SKIP_INTEGRATION_TESTS` は repo の
+// どこにも設定されておらず、この 5 ファイルだけが別 env を見ていた（#2647）。
+const RUN_LOCAL = process.env.USE_LOCAL_DB === 'true';
 
 const testRouter = createTRPCRouter({
   probe: protectedProcedure.query(() => ({ ok: true })),
@@ -105,7 +107,7 @@ function tamperStoredFactors(raw: Map<string, string>): void {
   }
 }
 
-describe.skipIf(SKIP_INTEGRATION)('MFA AAL cookie tampering (#2047)', () => {
+describe.skipIf(!RUN_LOCAL)('MFA AAL cookie tampering (#2047)', () => {
   let adminSupabase: ReturnType<typeof createClient<Database>>;
   let userId: string;
   let email: string;

@@ -26,9 +26,11 @@ const SUPABASE_SERVICE_KEY =
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU';
 
 const TEST_USER_ID = crypto.randomUUID();
-const SKIP_INTEGRATION = process.env.SKIP_INTEGRATION_TESTS === 'true';
+// 他の integration suite と同じ gate を使う。`SKIP_INTEGRATION_TESTS` は repo の
+// どこにも設定されておらず、この 5 ファイルだけが別 env を見ていた（#2647）。
+const RUN_LOCAL = process.env.USE_LOCAL_DB === 'true';
 
-describe.skipIf(SKIP_INTEGRATION)('UserSettings Router Integration', () => {
+describe.skipIf(!RUN_LOCAL)('UserSettings Router Integration', () => {
   let adminSupabase: ReturnType<typeof createClient<Database>>;
   let supabase: ReturnType<typeof createClient<Database>>;
   let ctx: Context;

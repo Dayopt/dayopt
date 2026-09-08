@@ -1,9 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import {
-  doesTimeModelListQueryIncludeRow,
-  useTimeblockWriteMutations,
-} from './useTimeblockWriteMutations';
+import { doesTimeModelListQueryIncludeRow } from './useTimeblockWriteMutations';
 
 const row = {
   id: 'record-1',
@@ -23,10 +20,6 @@ function listKey(input: Record<string, unknown>, lane: 'plans' | 'records' = 're
 }
 
 describe('useTimeblockWriteMutations', () => {
-  it('Plan と Record の作成・編集 mutation をまとめる hook を提供する', () => {
-    expect(useTimeblockWriteMutations).toBeTypeOf('function');
-  });
-
   it('操作対象のID配列に一致する行だけを対象にする', () => {
     expect(
       doesTimeModelListQueryIncludeRow(listKey({ ids: ['record-1'] }, 'plans'), row, 'plans'),

@@ -231,6 +231,86 @@ jobs:
           path: apps/web/test-results/
           retention-days: 7
 
+  # ─── 失敗の可視化 ───────────────────────────────────────────────────────
+  #
+  # promote の失敗は今まで **push した本人への失敗メールと commit status だけ**で、
+  # 気づかれないまま「merge しても production へ出ない」状態が続いた（2026-09-07 に
+  # 3 run 連続。#2643）。層 3 が赤いと release job ごと skip されるため、release の
+  # step では拾えない —— 独立 job にして needs の result を見る。
+  #
+  # **この job は checkout しない。** repo の code を実行する job に書き込み token を
+  # 置かない（ci.yml の同じ原則）。gh は runner に同梱されている。
+  #
+  # release job より前に置いてあるのは読み順の都合ではなく、
+  # scripts/ci/release-workflow-contract.test.ts が release job を「宣言の開始から
+  # ファイル末尾まで」で切り出しているため。後ろに足すとその契約検査の対象がこの job
+  # まで広がる。実行順は needs が決めるので位置は影響しない。
+  #
+  # drill: `workflow_dispatch` の `simulate_failure`（例 `promote:product`）で release を
+  # 意図的に落とせば、起票までを本番の経路で確認できる。専用 input は増やさない。
+  notify_failure:
+    name: File promote failure
+    needs: [impact, e2e, web, release]
+    # `superseded` は異常ではない。burst merge で後発 run が先に promote すると先発は
+    # superseded で exit 1 するが、その commit の内容は既に production に入っている。
+    # result だけを見ると正常な追い越しを P1 として起票し、runbook Playbook 2（rollback
+    # 調査）へ誘導してしまう。
+    if: >-
+      ${{ !cancelled()
+          && ( needs.impact.result == 'failure'
+               || needs.e2e.result == 'failure'
+               || needs.web.result == 'failure'
+               || ( needs.release.result == 'failure'
+                    && needs.release.outputs.release_status != 'superseded' ) ) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      # 失敗のたびに新規 issue を乱造しない。既存の未クローズ自動起票 issue があれば
+      # コメントで追記する（title prefix で判定し、dedupe 専用ラベルは増やさない）。
+      - name: File or update promote failure issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ github.sha }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          IMPACT_RESULT: ${{ needs.impact.result }}
+          E2E_RESULT: ${{ needs.e2e.result }}
+          WEB_RESULT: ${{ needs.web.result }}
+          RELEASE_RESULT: ${{ needs.release.result }}
+        run: |
+          set -euo pipefail
+          title_prefix="[auto] Production Release が失敗しました"
+          body="production への promote が失敗した。**この commit は production へ出ていない**（現行 production は直前の正常な deployment のまま応答している）。
+
+          | job | result |
+          | --- | --- |
+          | Release Impact | \`$IMPACT_RESULT\` |
+          | E2E Tests | \`$E2E_RESULT\` |
+          | Web Build & E2E | \`$WEB_RESULT\` |
+          | Promote Production | \`$RELEASE_RESULT\` |
+
+          対象 SHA: \`$SHA\`
+          run: $RUN_URL
+
+          直し方は \`docs/operations/runbook.md\` の Playbook 2。**「Re-run failed jobs」は使わない** —— 成功済みの impact job が再実行されず outputs が再利用されるため、古い判定のまま同じ失敗を繰り返す。修正を main へ merge すれば自動で再実行される。main HEAD をそのまま再試行するなら \`gh workflow run promote.yml --ref main\`。
+
+          このコメントは \`promote.yml\` の \`notify_failure\` job による自動起票/追記。"
+
+          existing=$(TITLE_PREFIX="$title_prefix" gh issue list --repo "$GITHUB_REPOSITORY" \
+            --label "area:deployment" --state open --json number,title \
+            --jq '[.[] | select(.title | startswith(env.TITLE_PREFIX))][0].number // empty')
+
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --repo "$GITHUB_REPOSITORY" --body "$body"
+          else
+            gh issue create --repo "$GITHUB_REPOSITORY" \
+              --title "$title_prefix" \
+              --label "area:deployment,priority:p1" \
+              --body "$body"
+          fi
+
   # ─── promote 本体（層 4）────────────────────────────────────────────────
   release:
     name: Promote Production
@@ -275,6 +355,11 @@ jobs:
     concurrency:
       group: production-release
       cancel-in-progress: false
+    # `superseded`（より新しい deployment が既に live で、target の内容は production に
+    # 入っている状態）でも合否判定の step は exit 1 する。notify_failure から本物の失敗と
+    # 区別するために状態そのものを出す。
+    outputs:
+      release_status: ${{ steps.release.outputs.release_status }}
     permissions:
       contents: read
       statuses: write
