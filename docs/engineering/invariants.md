@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-08-27
+last_verified: 2026-09-08
 ---
 
 # Dayopt 不変条件カタログ
@@ -46,6 +46,14 @@ docs へ残している。
 - Session認証のHTTP / RSC tRPC contextは共通resolverでverified user、session token、MFA assuranceを解決する。session token取得失敗でMFA lookupを抑止しない
 - 認証済みsessionでMFA lookupがerror / throw、未知・不正遷移、またはassurance欠落なら`protectedProcedure`はfail closedで拒否する。AAL claimなしはSupabase契約どおりAAL1へ正規化する
 - proxyのMFA redirectをprocedure backstop追加と引き換えに弱めない
+- **MFA の credential を保持する表は、認証主体（`anon` / `authenticated`）から読み書きできない。**
+  `mfa_recovery_codes` は grant を revoke して policy を持たない deny-all とし、生成
+  （`replace_mfa_recovery_codes_v1`）・消費（`use_recovery_code`）・件数
+  （`count_unused_recovery_codes`）の SECURITY DEFINER RPC だけを入口にする。RLS の
+  `auth.uid() = user_id` は assurance level を見ないため、aal1 のユーザー自身が自分の行を
+  植えられてしまい、「一致する行がある」ことが MFA 解除の根拠にならなくなる（#2618）
+- リカバリコードの発行は aal2 を要求する。第二要素と等価な credential を、第二要素を通していない
+  セッションから発行させない（assurance を確定できない場合も fail closed で拒否する）
 
 ## データ分離（RLS）
 
@@ -54,6 +62,9 @@ docs へ残している。
   この形から外れる policy は、外れる理由が migration に書かれているべき
 - `SECURITY DEFINER` 関数は `search_path` を固定し、内部で `auth.uid()` を検証する
 - token・暗号化 credential の列を `authenticated` ロールに GRANT しない
+- **永続化するクライアント cache は認証主体に束縛する。** ブラウザに残す query cache は
+  user id で名前空間を分け、別 principal の blob を復元せず、sign-out で破棄する。
+  key に所有者が無いと、共有端末で前のユーザーのデータが次のユーザーへ復元される（#2619）
 - **所有者付きリソースを跨いで参照する行は、単一 ID ではなく `(id, user_id)` の複合 FK で
   束縛する。** トリガーではなく FK で守るので、他人の行を紐づけることが構造的に不可能になる。
   参照先には `UNIQUE (id, user_id)` の anchor が要る（`categories` / `activities` /
@@ -90,6 +101,14 @@ docs へ残している。
   generic upsert で削除済み接続を復活させず、切断との競合では切断を勝たせる
 - iCal feed token は URL を知るだけで購読できる bearer-style credential として扱い、client query を
   永続 cache へ保存しない。Settings を開く時と focus 復帰時は再取得し、取得中の cached URL は操作させない
+- **ユーザーが明示した外部カレンダーの切断は、provider revoke の試行と行の削除の両方に必ず到達する。**
+  authority fence（`authority_fence_id` / `authority_epoch`）の欠落を「切断済み」と解釈しない。
+  fence を書く接続作成経路が無い以上、fence を要求すると全ての新規接続で切断が空振りし、
+  UI が成功を表示したまま Google 側の grant が無期限に生き残る（#2620）
+- **auth メールの token 配送先 origin は Edge Function 自身の allowlist で閉じる。** GoTrue の
+  redirect allowlist（production は Dashboard が正本で repo から強制できず、CI 監査も fail-open）
+  だけに依存しない。`redirect_to` の origin が allowlist 外なら `NEXT_PUBLIC_APP_URL` へ落とし、
+  `next`（path + query）の受け渡しは変えない（#2616）
 - `external-connection-maintenance` cron は calendar revoke outbox に **`MIN_BATCH_BUDGET_MS`
   以上の残り時間**を必ず渡す。outbox はこれを割ると 1 件も claim せずに break するため、retention の
   取り分を増やしすぎると provider への revoke request が永久に送られない（DB からは接続が消えている
