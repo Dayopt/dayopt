@@ -4,7 +4,7 @@ import { api } from '@/lib/trpc';
 import type { BillingAccess } from '@dayopt/billing';
 import { Button } from '@dayopt/components';
 import { useTranslations } from 'next-intl';
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useRef, useState } from 'react';
 
 const BillingAccessContext = createContext<BillingAccess>({
   state: 'not_started',
@@ -34,7 +34,17 @@ export function BillingAccessProvider({ children }: { children: React.ReactNode 
       void utils.billing.getOverview.invalidate();
     },
   });
+  // access の state が別の値へ遷移した時だけ overview を取り直す。初回解決
+  // （undefined → state）で invalidate すると、同じページ読込で useAppInlineBanner が
+  // 取得したばかりの getOverview を二重に撃ち、ユーザー単位 rate limit（300/min）を
+  // 圧迫する（#2669）。
+  const previousStateRef = useRef<BillingAccess['state'] | undefined>(undefined);
   useEffect(() => {
+    const nextState = query.data?.state;
+    const previousState = previousStateRef.current;
+    previousStateRef.current = nextState;
+    if (previousState === undefined || nextState === undefined || previousState === nextState)
+      return;
     void utils.billing.getOverview.invalidate();
   }, [query.data?.state, utils]);
   const [now, setNow] = useState(() => Date.now());

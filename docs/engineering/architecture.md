@@ -110,7 +110,7 @@ end
 
     subgraph Middleware
         CTX["createFetchTRPCContext"]
-        RL["Rate Limit<br/>(100 req/min)"]
+        RL["Rate Limit<br/>(300 req/min)"]
     end
 
     S --> CTX

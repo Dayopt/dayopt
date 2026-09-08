@@ -92,7 +92,7 @@ publish されるのは `paths` に一致する contract 変更 PR だけなの�
 
 どの context を required にするかは [infra.md §merge gate の required checks](../engineering/infra.md#merge-gate-の-required-checks) を正本とする。ここには複製しない（job 名を変えるたびに 2 箇所が乖離するため）。
 
-private + Free plan では GitHub 側の required check 強制自体が効かず、マージ可否は `scripts/tasks/finish-branch.sh` が判定する。ruleset の実状は API から確認できない（`gh api repos/Dayopt/dayopt/rulesets` は 403 `Upgrade to GitHub Pro` を返す）ため、この画面の設定は手動確認に依存する。
+2026-09-07 の repo public 化以降、main の ruleset `6790553` が required status checks / strict up-to-date / thread resolution を GitHub 側で強制する（bypass actor 0）。実状は `gh api repos/Dayopt/dayopt/rulesets/6790553` で確認できる。`scripts/tasks/finish-branch.sh` はその上位互換の検査（`🧪 Integration Tests` / Vercel context の名前要求）を追加で行う。public 化前（Free plan の private repo）は ruleset API が 403 を返し finish-branch.sh だけが gate だった。
 
 ### Fork Pull Request
 
