@@ -36,7 +36,7 @@ export function BillingAccessProvider({ children }: { children: React.ReactNode 
   });
   // access の state が別の値へ遷移した時だけ overview を取り直す。初回解決
   // （undefined → state）で invalidate すると、同じページ読込で useAppInlineBanner が
-  // 取得したばかりの getOverview を二重に撃ち、ユーザー単位 rate limit（100/min）を
+  // 取得したばかりの getOverview を二重に撃ち、ユーザー単位 rate limit（300/min）を
   // 圧迫する（#2669）。
   const previousStateRef = useRef<BillingAccess['state'] | undefined>(undefined);
   useEffect(() => {

@@ -52,7 +52,7 @@ type ReauthContext = 'account_deletion' | 'email_change';
  *
  * 目的は2つ:
  * 1. captcha 免除・副作用ゼロの `signInWithPassword` を、盗まれた session からの
- *    オンライン総当たりに使わせない（tRPC 既定の 100/min/user だけでは緩すぎる）
+ *    オンライン総当たりに使わせない（tRPC 既定の 300/min/user だけでは緩すぎる）
  * 2. GoTrue 側の IP 共有バケット（全ユーザー・全 context で共有）の消費を頭打ちにする
  *
  * bucket は `context` ごとに分離する（`${context}:${userId}` をキーにする）。同一 bucket
