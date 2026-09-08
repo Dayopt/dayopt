@@ -176,7 +176,6 @@ export const CalendarNavigationProvider = ({ children }: { children: React.React
 
   // useRefで最新値を保持し、コールバックの依存配列を安定化
   const viewTypeRef = useRef(viewType);
-  const initialDateRef = useRef(initialDate);
   const pathnameRef = useRef(pathname);
 
   // 現在のlocaleを取得（例: /ja/day -> ja）
@@ -269,14 +268,7 @@ export const CalendarNavigationProvider = ({ children }: { children: React.React
   // URL由来の initialDate が変更されたら currentDate を同期
   // （ブラウザ戻る/進む、直接URL入力時）
   React.useEffect(() => {
-    const previousInitialDate = initialDateRef.current;
-    initialDateRef.current = initialDate;
-
-    if (
-      isCalendarPage &&
-      initialDate.getTime() !== previousInitialDate.getTime() &&
-      initialDate.getTime() !== currentDateRef.current.getTime()
-    ) {
+    if (isCalendarPage && initialDate.getTime() !== currentDateRef.current.getTime()) {
       startTransition(() => {
         setCurrentDate(initialDate);
       });

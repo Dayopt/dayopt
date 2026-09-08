@@ -77,7 +77,7 @@ export const MobileCalendarHeader = memo<MobileCalendarHeaderProps>(
     });
     const dayNumber = format(currentDate, 'd');
     const daySuffix = locale === 'ja' ? '日' : '';
-    const weekdayShort = format(currentDate, 'EEE', { locale: enUS });
+    const weekdayShort = format(currentDate, 'EEE', { locale: dateFnsLocale });
     const today = isTodayInTimezone(currentDate, timezone);
     // 過去日を見ている: Redo（時間を進めて今日へ戻る）。未来日を見ている: Undo
     // （時間を戻して今日へ戻る）。today の時はボタン自体を非表示にする（#2302）
@@ -211,6 +211,7 @@ export const MobileCalendarHeader = memo<MobileCalendarHeaderProps>(
 
         {/* インライン展開パネル — grid-rows アニメーション */}
         <div
+          inert={!isExpanded}
           className={cn(
             // eslint-disable-next-line tailwindcss/no-arbitrary-value -- grid-template-rows の transition はトークンで表現不可
             'ease-standard grid transition-[grid-template-rows] duration-200',

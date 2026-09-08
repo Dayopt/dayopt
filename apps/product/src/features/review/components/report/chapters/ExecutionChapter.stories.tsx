@@ -106,6 +106,11 @@ export const Default: Story = {
   args: { granularity: 'week', rows: ROWS, mirrorRows: MIRROR_ROWS },
 };
 
+export const Mobile: Story = {
+  args: { granularity: 'week', rows: ROWS, mirrorRows: MIRROR_ROWS },
+  globals: { viewport: { value: 'mobile1', isRotated: false } },
+};
+
 /** 鏡の候補が 1 件だけの週。並べられるものだけ並べる。 */
 export const SingleMirrorRow: Story = {
   args: { granularity: 'week', rows: ROWS, mirrorRows: [MIRROR_ROWS[0] as ReportMirrorRow] },
@@ -173,11 +178,6 @@ export const AllPatterns: Story = {
   },
 };
 
-function Row({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="flex flex-col gap-2">
-      <p className="text-muted-foreground text-xs">{label}</p>
-      {children}
-    </div>
-  );
+function Row({ children }: { label: string; children: React.ReactNode }) {
+  return <div className="flex flex-col gap-2">{children}</div>;
 }

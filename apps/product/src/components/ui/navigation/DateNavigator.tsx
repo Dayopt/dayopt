@@ -40,7 +40,7 @@ const navButtonBase =
 export const DateNavigator = ({
   onNavigate,
   onPrefetch,
-  todayLabel = 'Today',
+  todayLabel,
   showTodayButton = true,
   showArrows = true,
   className,
@@ -83,7 +83,7 @@ export const DateNavigator = ({
             onTouchStart={() => onPrefetch?.('today')}
             className={cn(navButtonBase, 'px-4 text-sm')}
           >
-            {todayLabel}
+            {todayLabel ?? t('common.time.today')}
           </button>
         </HoverTooltip>
       )}

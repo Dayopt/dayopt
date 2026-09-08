@@ -113,10 +113,11 @@ export function GlobalOverlays() {
   const handleViewStats = useCallback(
     (activityId: string) => {
       void activityId;
-      router.push(buildReportPath(locale, new Date()));
-      closeInspector();
+      // 遷移開始後に閉じると Inspector の URL 同期が遷移を上書きする。
+      // workspace 外への遷移後に上の effect が閉じるため、ここでは遷移だけ行う。
+      router.push(buildReportPath(locale, calendarNavigation?.currentDate ?? new Date()));
     },
-    [closeInspector, router, locale],
+    [router, locale, calendarNavigation?.currentDate],
   );
 
   const handleCopy = useCallback(

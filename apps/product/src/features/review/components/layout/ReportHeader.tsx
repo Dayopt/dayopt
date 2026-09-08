@@ -59,23 +59,21 @@ export function ReportHeader({
       {/* 並び・余白はカレンダーの中央グループと同値にする（`gap-2` + switcher に `ml-2`）。
           期間ラベル → `‹ 今日 ›` → 粒度を左に固めて 1 つのまとまりに読ませる —
           粒度だけ右端に置くと、面を移るたびに目線が横断する（2026-09-07 User 指示） */}
-      <div className="flex min-w-0 items-center gap-2">
+      <div className="flex min-w-0 flex-wrap items-center gap-2">
         <DateRangeDisplay
           date={periodStart}
           {...(granularity === 'week' ? { endDate: periodEnd } : {})}
           weekStartsOn={weekStartsOn}
           formatPattern={resolveFormatPattern(granularity)}
         />
-        <DateNavigator
-          onNavigate={onNavigate}
-          todayLabel={t(`nav.current.${granularity}`)}
-          arrowSize="md"
-        />
-        <ReportGranularitySwitcher
-          className="ml-2"
-          value={granularity}
-          onValueChange={onGranularityChange}
-        />
+        <div className="flex shrink-0 items-center gap-4">
+          <DateNavigator
+            onNavigate={onNavigate}
+            todayLabel={t(`nav.current.${granularity}`)}
+            arrowSize="md"
+          />
+          <ReportGranularitySwitcher value={granularity} onValueChange={onGranularityChange} />
+        </div>
       </div>
     </AppHeader>
   );

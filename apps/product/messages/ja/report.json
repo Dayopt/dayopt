@@ -87,7 +87,7 @@
         "heavyButDrained": "重いのに消耗 → 削る・タイムブロックを小さく"
       },
       "pointAriaLabel": "{name} 記録 {recorded}",
-      "emptyBoard": "まだ点がありません — 記録の停止・配置のトーストで充実に答えると、ここに点が生まれます",
+      "emptyBoard": "記録の詳細で充実度を選ぶと、アクティビティごとに{threshold}件の回答から分布を表示します。",
       "waiting": "点になるのを待っている：{names}",
       "waitingSeparator": "、",
       "footnote": "濃度＝回答数 · 点は回答 n≥{threshold} で生まれます"

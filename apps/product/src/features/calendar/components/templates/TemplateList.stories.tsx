@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { fn } from 'storybook/test';
 
 import { TemplateList } from './TemplateList';
 import type { TemplateView } from './types';
@@ -106,21 +107,52 @@ export const Empty: Story = {
   ),
 };
 
+export const Loading: Story = {
+  render: () => (
+    <Frame>
+      <TemplateList templates={[]} isLoading />
+    </Frame>
+  ),
+};
+
+export const Error: Story = {
+  render: () => (
+    <Frame>
+      <TemplateList templates={[]} isError onRetry={fn()} />
+    </Frame>
+  ),
+};
+
+export const AvailableActions: Story = {
+  render: () => (
+    <Frame>
+      <TemplateList templates={[]} onCreateEntry={fn()} onOpenSettings={fn()} />
+    </Frame>
+  ),
+};
+
 export const AllPatterns: Story = {
   render: () => (
     <div className="flex flex-wrap items-start gap-6">
+      <Frame>
+        <TemplateList templates={[]} isLoading />
+      </Frame>
+      <Frame>
+        <TemplateList templates={[]} isError onRetry={fn()} />
+      </Frame>
       <div className="space-y-2">
-        <p className="text-muted-foreground text-xs">通常の一覧</p>
         <Frame>
           <TemplateList templates={templates} />
         </Frame>
       </div>
       <div className="space-y-2">
-        <p className="text-muted-foreground text-xs">空</p>
         <Frame>
           <TemplateList templates={[]} />
         </Frame>
       </div>
+      <Frame>
+        <TemplateList templates={[]} onCreateEntry={fn()} onOpenSettings={fn()} />
+      </Frame>
     </div>
   ),
 };

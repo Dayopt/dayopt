@@ -30,3 +30,20 @@ describe('useCalendarNavigationHandlers', () => {
     expect(navigateRelative).toHaveBeenCalledWith('next', false);
   });
 });
+
+it('日付選択は表示だけでなくURLも更新する', () => {
+  const navigateToDate = vi.fn();
+  const { result } = renderHook(() =>
+    useCalendarNavigationHandlers({
+      viewType: 'day',
+      currentDate: new Date(2026, 8, 8),
+      showWeekends: true,
+      navigateRelative: vi.fn(),
+      navigateToDate,
+      changeView: vi.fn(),
+    }),
+  );
+  const selectedDate = new Date(2026, 8, 7);
+  act(() => result.current.handleDateSelect(selectedDate));
+  expect(navigateToDate).toHaveBeenCalledWith(selectedDate, true);
+});

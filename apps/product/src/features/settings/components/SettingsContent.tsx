@@ -51,7 +51,7 @@ export function SettingsContent({ category }: SettingsContentProps) {
   }, [utils]);
 
   return (
-    <div className="min-h-0 flex-1 overflow-auto p-4 sm:p-6">
+    <div key={category} className="min-h-0 flex-1 overflow-auto p-4 sm:p-6">
       <Suspense fallback={<SettingsLoadingSkeleton />}>
         <CategoryComponent />
       </Suspense>
