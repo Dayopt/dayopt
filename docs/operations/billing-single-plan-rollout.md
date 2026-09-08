@@ -24,7 +24,7 @@ ProductとWebのProductionデプロイはこの順序を揃えるまで保留す
 1. 復元可能なバックアップと現在の権限を保存し、対象project・branch・Stripeモード・SHAを証跡に記録する。既存の復元訓練 #1879 が未完了なら本番移行は行わない。
 2. **追加schemaを先に適用**する。`20260907233848_single_plan_trial.sql` と分析イベント追加は後方互換。既存の未完了購入を誤って消費済みにしないため、statusだけでは消費済みにせず、手順5の請求成功・旧trial履歴を正本として分類する。
 3. **直接書き込み権限を撤去する前に、新Productコードを配備する。** activities/categories/segments/テンプレートのINSERT/UPDATEをサーバー専用経路へ移す。フラグOFFでも作成・変更・削除が通ることを確認する。
-4. 新Productの本番SHAと書き込みsmoke testを証跡化してからdirect Data API権限を撤去する。MCP migration `20260908022927` は `billing_enforced=false` で適用し、この時点では既存のsubscriber-only判定を維持する。SELECT/DELETE・owner RLS・複合FKは保持する。古いブラウザもサーバー経由のため新コードへ到達する。
+4. 新Productの本番SHAと書き込みsmoke testを証跡化してから、権限撤去migration `20260908021201_restrict_single_plan_direct_writes.sql` を適用する。続けてMCP migration `20260908022927_add_mcp_billing_access_switch.sql` を `billing_enforced=false` のまま適用し、既存のsubscriber-only判定を維持する。全migrationを旧Productへ一括先行適用しない。SELECT/DELETE・owner RLS・複合FKは保持する。古いブラウザもサーバー経由のため新コードへ到達する。
 5. 既存のwrite fenceを使って利用者の書き込みを止め、Webhook処理を含む移行競合を監視する。次のread-only preflightを実行し、人数と生成SQLをレビューする。全Stripe履歴が取得できない顧客が1人でもいれば有効化しない。契約やtrial履歴のないincomplete / incomplete_expiredだけの顧客は対象から除外される。
 
    ```bash
@@ -40,7 +40,7 @@ ProductとWebのProductionデプロイはこの順序を揃えるまで保留す
 
 制限の不具合は `BILLING_ENFORCED=false` で停止し、MCPは現在revisionを使って `set_mcp_billing_enforcement_v1(false, <expected_revision>)` へ戻す。開始済み・消費済み日時とStripe情報は残し、再有効化で45日を再発行しない。Web表示も同時に停止時の説明へ戻す。
 
-Productのコードを権限撤去前の版へ戻す場合、先に新経路を維持した修正版を用意する。旧版へ単純revertすると作成が拒否される。やむを得ず旧権限へ戻す場合はバックアップ済みの権限から別の承認済みmigrationで復旧し、制限をOFFのままにする。新しい日時列は削除しない。外部予定・接続・tokenを課金終了に合わせて削除しない。
+Productのコードを権限撤去前の版へ戻す場合、先に新経路を維持した修正版を用意する。旧版へ単純revertすると作成が拒否される。やむを得ず旧権限へ戻す場合は、postgresだけが実行できる `private.restore_single_plan_direct_write_grants_v1()` を明示指示後に呼び、migration前のtable grantへ戻す。復旧後に全6テーブルのSELECT/INSERT/DELETE、更新可能な4テーブルのUPDATE、利用者自身の作成・編集・削除を確認し、制限をOFFのままにする。新しい日時列は削除しない。外部予定・接続・tokenを課金終了に合わせて削除しない。
 
 ## 既存利用者向け案内案
 
