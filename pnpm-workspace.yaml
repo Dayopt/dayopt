@@ -1,3 +1,6 @@
+# pnpm 11 以降、非 registry / 非 auth の設定はこのファイルが正本（`.npmrc` からは読まれない）。
+# supply-chain の既定は pnpm 11 側で有効: `minimumReleaseAge` = 1440 分、`blockExoticSubdeps` = on。
+# ここで再宣言しないのは default と同値だからで、無効化しているわけではない。
 packages:
   - 'apps/*'
   - 'packages/*'
@@ -9,9 +12,9 @@ allowBuilds:
   sharp: true
   supabase: true
   unrs-resolver: true
-auditConfig:
+audit:
   # image-size 2.0.2 に未リリースの上流修正を適用済みの advisory だけを除外する
-  ignoreGhsas:
+  ignore:
     - GHSA-w3rx-r6r6-pgpr
     - GHSA-5p2g-fcmc-qvqq
 overrides:
