@@ -1,5 +1,5 @@
-import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { fireEvent, render, screen } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
 
 import type { PlanEvent, RecordEvent } from '@/features/timeblock';
 
@@ -38,6 +38,28 @@ const record: RecordEvent = {
 };
 
 describe('TwoLane cards', () => {
+  it('カードをキーボードで開け、ポインターのリサイズは別の slider として公開しない', () => {
+    const open = vi.fn();
+    const resize = vi.fn();
+    const { container } = render(
+      <PlanLaneCard
+        event={plan}
+        position={position}
+        activityName="確認"
+        onClick={open}
+        onPointerDown={vi.fn()}
+        onResizeStart={resize}
+      />,
+    );
+    fireEvent.keyDown(screen.getByRole('button', { name: '確認' }), { key: 'Enter' });
+    expect(open).toHaveBeenCalledOnce();
+    expect(screen.queryByRole('slider')).not.toBeInTheDocument();
+    const handle = container.querySelector('[data-resize-handle]');
+    expect(handle).not.toBeNull();
+    fireEvent.mouseDown(handle!);
+    expect(resize).toHaveBeenCalledOnce();
+  });
+
   it('Planカードはtitleではなくタグ名を表示する', () => {
     render(<PlanLaneCard event={plan} position={position} activityName="Deep Work" />);
 

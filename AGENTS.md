@@ -98,6 +98,8 @@ Dayopt で作業する全エージェントの provider-neutral な正本ガイ�
 - 語彙: 用語は `docs/product/glossary.md`（正本 `scripts/lib/glossary/terms.ts`）に従う。messages は `pnpm copy:check:strict` が値とキー名を機械検査するが、docs / skill / issue 本文は検査対象外なので旧語彙（エントリ / タグ / タスク / ブロック / 箱 / 型 / レンズ）を書かない
 - eslint-disable は最終手段。使う時は同じ行に `-- 理由` を書く。ファイル全体無効化より1行無効化を優先
 - 依存追加前に確認: ブラウザ標準/既存依存で代替できないか、Star 1000+/直近6ヶ月更新か、出口コスト（捨てる時に何が壊れるか）を1文で言えるか
+- 依存はまず利用する workspace の `package.json` へ足す。root は repo 横断の tooling だけに置く。2 workspace 以上で version を揃える価値があるものは `pnpm-workspace.yaml` の catalog へ
+- root の `package.json` scripts は人間 / agent / CI / hooks / docs から参照される安定インターフェース。改名・削除は permission allowlist と docs 参照の同時更新まで含めて 1 変更にする
 - `--no-verify` によるフックスキップは禁止（hook が機械ブロックする）
 - アクセシビリティ: アイコンボタンに `aria-label`、フォームに `label` 紐付け、タッチターゲット最小 44x44px、画像に `alt`
 

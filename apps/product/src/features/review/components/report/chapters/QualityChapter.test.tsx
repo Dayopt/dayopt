@@ -36,14 +36,16 @@ describe('QualityChapter', () => {
   it('点が 0 件でもエラーにならず空文言を出す', () => {
     render(<QualityChapter points={[]} waitingActivities={[]} />);
 
-    expect(screen.getByText('report.quality.emptyBoard')).toBeInTheDocument();
+    expect(screen.getByText('report.quality.emptyBoard 5')).toBeInTheDocument();
     expect(document.querySelector('[data-report-list="waiting"]')).toBeNull();
+    expect(document.querySelector('[data-report-board="compass"]')).toBeNull();
+    expect(screen.queryByText('report.quality.footnote 5')).not.toBeInTheDocument();
   });
 
-  it('待機中のアクティビティを名前だけ並べる', () => {
+  it('分布がある時は待機中のアクティビティも名前だけ並べる', () => {
     render(
       <QualityChapter
-        points={[]}
+        points={[point()]}
         waitingActivities={[
           { activityId: 'a', name: '運動' },
           { activityId: 'b', name: '家事' },

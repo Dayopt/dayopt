@@ -8,7 +8,7 @@
  * 入れ子はしない（#2411 §5.1）。順序だけを ActivityFilterList の
  * `betweenCategoriesAndUncategorized` slot で差し込む。
  *
- * 型の作成導線はここに置かない（見出しの「+」は無効のまま）。作成は常に
+ * テンプレートの作成導線はここに置かない。作成は常に
  * 「生きた日」からのみ行う仕様で、入口は日ビューのヘッダーメニューにある
  * （#2411 §5.4 の空フォルダ病の予防。仕様であってバグではない）。
  *
@@ -31,7 +31,7 @@ import { getDateKey } from '@/lib/date';
 import { api } from '@/lib/trpc';
 
 export function CalendarSidebar() {
-  const { data } = api.planTemplates.list.useQuery();
+  const { data, isPending, isError, refetch } = api.planTemplates.list.useQuery();
   const { getActivityById } = useActivitiesMap();
   const viewedDate = useCalendarNavigationStore((state) => state.viewedDate);
   const { applyToDay, renameTemplate, deleteTemplate } = usePlanTemplateMutations();
@@ -72,6 +72,9 @@ export function CalendarSidebar() {
         betweenCategoriesAndUncategorized={
           <TemplateList
             templates={templates}
+            isLoading={isPending}
+            isError={isError}
+            onRetry={() => void refetch()}
             onApplyTemplate={handleApply}
             onRenameTemplate={handleRename}
             onDeleteTemplate={handleDelete}
