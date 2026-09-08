@@ -82,6 +82,27 @@ describe('application trial lifecycle', () => {
     );
     expect(state.mutate).toHaveBeenCalledTimes(1);
   });
+  it('refetches the overview only when the access state transitions (#2669)', () => {
+    const view = render(
+      <BillingAccessProvider>
+        <Editor />
+      </BillingAccessProvider>,
+    );
+    expect(utils.billing.getOverview.invalidate).not.toHaveBeenCalled();
+    view.rerender(
+      <BillingAccessProvider>
+        <Editor />
+      </BillingAccessProvider>,
+    );
+    expect(utils.billing.getOverview.invalidate).not.toHaveBeenCalled();
+    state.access = { state: 'subscribed', canUseProduct: true, trialEndsAt: null, enforced: true };
+    view.rerender(
+      <BillingAccessProvider>
+        <Editor />
+      </BillingAccessProvider>,
+    );
+    expect(utils.billing.getOverview.invalidate).toHaveBeenCalledTimes(1);
+  });
   it('closes writes at the exact deadline and retains the input', () => {
     render(
       <BillingAccessProvider>
