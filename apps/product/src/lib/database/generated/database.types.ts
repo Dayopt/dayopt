@@ -817,6 +817,9 @@ export type Database = {
       };
       profiles: {
         Row: {
+          app_trial_consumed_at: string | null;
+          app_trial_ends_at: string | null;
+          app_trial_started_at: string | null;
           avatar_url: string | null;
           created_at: string;
           email: string;
@@ -828,6 +831,9 @@ export type Database = {
           updated_at: string;
         };
         Insert: {
+          app_trial_consumed_at?: string | null;
+          app_trial_ends_at?: string | null;
+          app_trial_started_at?: string | null;
           avatar_url?: string | null;
           created_at?: string;
           email: string;
@@ -839,6 +845,9 @@ export type Database = {
           updated_at?: string;
         };
         Update: {
+          app_trial_consumed_at?: string | null;
+          app_trial_ends_at?: string | null;
+          app_trial_started_at?: string | null;
           avatar_url?: string | null;
           created_at?: string;
           email?: string;

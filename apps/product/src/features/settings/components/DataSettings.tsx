@@ -2,12 +2,9 @@
 
 import { useCallback, useState } from 'react';
 
+import { useBillingAccess } from '@/lib/billing/BillingAccessProvider';
+import { useShellStore } from '@/lib/stores/useShellStore';
 import { toast } from '@/lib/toast';
-import {
-  canUseEntitlement,
-  entitlementKeys,
-  getPlanIdForSubscriptionStatus,
-} from '@dayopt/billing';
 import { dayoptUrls } from '@dayopt/config';
 import { Check, Copy, Crown, Download, Trash2 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
@@ -180,11 +177,8 @@ function McpApiSection() {
   const t = useTranslations('settings.dataControls.mcp');
   const [copied, setCopied] = useState<'url' | null>(null);
 
-  // Pro判定: billing overview の subscription status から判定
-  const billingOverview = api.billing.getOverview.useQuery(undefined, { retry: false });
-  const subStatus = billingOverview.data?.billingInfo.subscriptionStatus;
-  const currentPlan = getPlanIdForSubscriptionStatus(subStatus);
-  const canAccessPro = canUseEntitlement(currentPlan, entitlementKeys.mcpApi);
+  const { canUseProduct } = useBillingAccess();
+  const openSettings = useShellStore.use.openSettings();
   // この deploy の canonical MCP resource URI（next.config.mjs の
   // resolveProductPublicMcpResourceUri が build 時に解決）。production は
   // mcp.dayopt.app、Preview identity 有効時は branch origin、MCP 資格のない
@@ -211,7 +205,7 @@ function McpApiSection() {
   // MCP 資格のない deploy では接続導線を出さない（Production へ誤接続させない）。
   if (!mcpServerUrl) return null;
 
-  if (!canAccessPro) {
+  if (!canUseProduct) {
     return (
       <SectionCard title={t('title')}>
         <p className="text-muted-foreground mb-4 text-base md:text-sm">{t('description')}</p>
@@ -219,7 +213,7 @@ function McpApiSection() {
           <div className="flex items-center gap-2">
             <Crown className="text-muted-foreground h-5 w-5 shrink-0" />
             <p className="text-foreground flex-1 text-base md:text-sm">{t('proRequired')}</p>
-            <Button variant="outline" size="sm" disabled>
+            <Button variant="outline" size="sm" onClick={() => openSettings('billing')}>
               {t('upgrade')}
             </Button>
           </div>

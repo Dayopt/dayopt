@@ -1,15 +1,13 @@
 import { z } from 'zod';
 
-import { entitlementKeys } from '@dayopt/billing';
-
-import { createTRPCRouter, entitledProcedure, protectedProcedure } from '@/lib/trpc/procedures';
+import { createTRPCRouter, protectedProcedure } from '@/lib/trpc/procedures';
 
 import { StatisticsService } from './statistics-service';
 import { dateRangeInput, handleStatsError } from './statistics-shared';
 
 export const statisticsKpiRouter = createTRPCRouter({
   /** 見積もり精度: タグ別の予定時間 vs 実績時間 */
-  getEstimationAccuracy: entitledProcedure(entitlementKeys.estimationFullHistory)
+  getEstimationAccuracy: protectedProcedure
     .meta({ description: '見積もり精度KPI（タグ別の予定vs実績）' })
     .input(dateRangeInput)
     .query(async ({ ctx, input }) => {
@@ -21,7 +19,7 @@ export const statisticsKpiRouter = createTRPCRouter({
     }),
 
   /** 空白率: 活動可能時間のうちスケジュールされていない時間の割合 */
-  getBlankRate: entitledProcedure(entitlementKeys.reportLongRange)
+  getBlankRate: protectedProcedure
     .meta({ description: '空白率KPI（未スケジュール時間の割合）' })
     .input(
       dateRangeInput.extend({

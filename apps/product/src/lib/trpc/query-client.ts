@@ -3,6 +3,7 @@
 import { MutationCache, QueryCache, QueryClient } from '@tanstack/react-query';
 import { TRPCClientError } from '@trpc/client';
 
+import { isBillingAccessEndedError } from '@/lib/billing/client-access-error';
 import { PERSIST_MAX_AGE_MS } from '@/lib/tanstack-query/persist-storage';
 import { captureUnexpectedTrpcClientFailure } from '@/lib/trpc/client-errors';
 
@@ -44,10 +45,12 @@ function handleAuthError(error: unknown): void {
  * グローバルエラーハンドリング: 認証エラー時は自動でログインページへリダイレクト
  */
 export function createAppQueryClient(): QueryClient {
-  return new QueryClient({
+  const queryClient: QueryClient = new QueryClient({
     queryCache: new QueryCache({
       onError: (error) => {
         handleAuthError(error);
+        if (isBillingAccessEndedError(error))
+          void queryClient.invalidateQueries({ queryKey: [['billing', 'getAccess']] });
         captureUnexpectedTrpcClientFailure(error, {
           feature: 'trpc',
           operation: 'query_cache',
@@ -57,6 +60,8 @@ export function createAppQueryClient(): QueryClient {
     mutationCache: new MutationCache({
       onError: (error) => {
         handleAuthError(error);
+        if (isBillingAccessEndedError(error))
+          void queryClient.invalidateQueries({ queryKey: [['billing', 'getAccess']] });
         captureUnexpectedTrpcClientFailure(error, {
           feature: 'trpc',
           operation: 'mutation_cache',
@@ -74,7 +79,7 @@ export function createAppQueryClient(): QueryClient {
         refetchOnReconnect: 'always',
         retry: (failureCount, error) => {
           // 認証エラーはリトライしない(すぐにリダイレクト)
-          if (isAuthError(error)) return false;
+          if (isAuthError(error) || isBillingAccessEndedError(error)) return false;
           // 404もリトライしない
           if (error && 'status' in error && error.status === 404) return false;
           return failureCount < 3;
@@ -84,10 +89,11 @@ export function createAppQueryClient(): QueryClient {
       mutations: {
         retry: (failureCount, error) => {
           // 認証エラーはリトライしない
-          if (isAuthError(error)) return false;
+          if (isAuthError(error) || isBillingAccessEndedError(error)) return false;
           return failureCount < 1;
         },
       },
     },
   });
+  return queryClient;
 }

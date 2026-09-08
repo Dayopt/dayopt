@@ -30,6 +30,7 @@ const CLIENT_SAFE_SERVICE_CODES = new Set([
   // Billing: 支払い操作の失敗を「再試行 / やり直し / 削除中」へ畳む。いずれも
   // ユーザー自身の操作状態だけを表し、決済ベンダーの構成や内部commandの失敗
   // （BILLING_COMMAND_FAILED / BILLING_CONTRACT_INVALID / STRIPE_NOT_CONFIGURED 等）は含まない。
+  'BILLING_ACCESS_ENDED',
   'BILLING_ACCOUNT_CLOSING',
   'BILLING_CHECKOUT_NOT_AVAILABLE',
   'BILLING_OPERATION_CONFLICT',

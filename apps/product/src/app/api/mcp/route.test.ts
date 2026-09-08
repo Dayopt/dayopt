@@ -391,7 +391,10 @@ describe('MCP route scope preflight', () => {
     expect(response.headers.get('cache-control')).toBe('no-store');
     expect(response.headers.get('www-authenticate')).toBeNull();
     await expect(response.json()).resolves.toMatchObject({
-      error: { code: -32001, message: 'Pro plan required' },
+      error: {
+        code: -32001,
+        message: 'Open the Dayopt app to start your trial or subscribe to resume access',
+      },
     });
     expect(readBody).not.toHaveBeenCalled();
     expect(handleMcpProtocolRequest).not.toHaveBeenCalled();

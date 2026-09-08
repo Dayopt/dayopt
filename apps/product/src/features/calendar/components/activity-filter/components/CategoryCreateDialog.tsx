@@ -1,5 +1,7 @@
 'use client';
 
+import { useBillingAccess } from '@/lib/billing/BillingAccessProvider';
+
 import { useCallback, useState } from 'react';
 
 import { Plus } from 'lucide-react';
@@ -48,7 +50,8 @@ export function CategoryCreateDialog({ onOpenChange }: CategoryCreateDialogProps
 
   const trimmedName = name.trim();
   const submitting = createCategoryMutation.isPending;
-  const canSubmit = trimmedName.length > 0 && !submitting;
+  const { canUseProduct } = useBillingAccess();
+  const canSubmit = canUseProduct && trimmedName.length > 0 && !submitting;
 
   const resetForm = useCallback(() => {
     setName('');

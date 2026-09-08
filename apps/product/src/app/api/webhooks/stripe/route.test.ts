@@ -43,10 +43,16 @@ const rpc = vi.hoisted(() => vi.fn());
 const profileMaybeSingle = vi.hoisted(() => vi.fn());
 const writeFenceMaybeSingle = vi.hoisted(() => vi.fn());
 const getUserById = vi.hoisted(() => vi.fn());
+const trackBillingEvent = vi.hoisted(() => vi.fn());
+vi.mock('@/lib/analytics/billing-events', () => ({ trackBillingEvent }));
 const trackProductEvent = vi.hoisted(() => vi.fn());
+const profileConsume = vi.hoisted(() =>
+  vi.fn(() => ({ eq: () => ({ is: () => Promise.resolve({ error: null }) }) })),
+);
 const captureUnexpectedError = vi.hoisted(() => vi.fn());
 const from = vi.hoisted(() =>
   vi.fn((table: string) => ({
+    update: profileConsume,
     select: vi.fn(() => ({
       eq: vi.fn(() => ({
         maybeSingle: table === 'write_fence_control' ? writeFenceMaybeSingle : profileMaybeSingle,
@@ -112,6 +118,7 @@ function request(overrides: { body?: string; headers?: Record<string, string> } 
 }
 
 beforeEach(() => {
+  trackBillingEvent.mockResolvedValue(true);
   vi.clearAllMocks();
   resetWriteFenceCacheForTestsOnly();
   envMock.STRIPE_WEBHOOK_SECRET = 'fixture';
@@ -180,6 +187,54 @@ describe('Stripe webhook route', () => {
     expect(trackProductEvent).toHaveBeenCalledTimes(1);
   });
 
+  it.each(['subscription_create', 'subscription_cycle'])(
+    'records trusted %s invoice once',
+    async (reason) => {
+      eventMock.type = 'invoice.paid';
+      eventMock.data.object = {
+        id: 'in_paid',
+        customer: 'cus_test123',
+        status: 'paid',
+        amount_paid: 500,
+        billing_reason: reason,
+      };
+      profileMaybeSingle.mockResolvedValue({ data: { id: 'user-1' }, error: null });
+      expect((await POST(request())).status).toBe(200);
+      expect(profileConsume).toHaveBeenCalledWith({
+        app_trial_consumed_at: new Date(eventMock.created * 1_000).toISOString(),
+      });
+      expect(trackBillingEvent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sourceId: 'in_paid',
+          userId: 'user-1',
+          eventName:
+            reason === 'subscription_create'
+              ? 'subscription_payment_succeeded'
+              : 'subscription_renewal_succeeded',
+        }),
+      );
+      claimStripeWebhookEvent.mockResolvedValueOnce('already_processed');
+      expect((await POST(request())).status).toBe(200);
+      expect(trackBillingEvent).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it('releases a paid invoice receipt when analytics persistence fails', async () => {
+    eventMock.type = 'invoice.paid';
+    eventMock.data.object = {
+      id: 'in_paid',
+      customer: 'cus_test123',
+      status: 'paid',
+      amount_paid: 500,
+      billing_reason: 'subscription_create',
+    };
+    profileMaybeSingle.mockResolvedValue({ data: { id: 'user-1' }, error: null });
+    trackBillingEvent.mockResolvedValue(false);
+    expect((await POST(request())).status).toBe(500);
+    expect(markStripeWebhookEventProcessed).not.toHaveBeenCalled();
+    expect(releaseStripeWebhookEvent).toHaveBeenCalled();
+  });
+
   it.each([
     'account_deleted',
     'account_deleting',
@@ -198,7 +253,7 @@ describe('Stripe webhook route', () => {
     );
     // fence check は毎回 write_fence_control を読むが、profile lookup（通知用）は
     // 起きていないことだけを確認する。
-    expect(from).not.toHaveBeenCalledWith('profiles');
+    if (outcome !== 'already_terminal') expect(from).not.toHaveBeenCalledWith('profiles');
     expect(markStripeWebhookEventProcessed).toHaveBeenCalledWith(expect.anything(), 'evt_test123');
     expect(releaseStripeWebhookEvent).not.toHaveBeenCalled();
   });

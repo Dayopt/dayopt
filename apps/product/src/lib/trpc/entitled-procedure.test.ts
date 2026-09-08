@@ -1,246 +1,89 @@
-import { TRPCError } from '@trpc/server';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-
-import { createChainableMock } from '@/lib/test/trpc-test-helpers';
-
+vi.mock('@/lib/ops/write-fence', () => ({ isWriteFenceEnabled: vi.fn().mockResolvedValue(false) }));
+import { createChainableMock, createMockContext } from '@/lib/test/trpc-test-helpers';
 import { entitlementKeys } from '@dayopt/billing';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  createCallerFactory,
+  createTRPCRouter,
+  entitledProcedure,
+  protectedProcedure,
+} from './procedures';
 
-// 判定は本物（capability map）を使いつつ、どのキーで引いたかだけを観測する。
-const hasEntitlementForStatus = vi.hoisted(() => vi.fn());
-vi.mock('@/lib/billing/enforcement', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@/lib/billing/enforcement')>();
-  return {
-    ...actual,
-    hasEntitlementForStatus: hasEntitlementForStatus.mockImplementation(
-      actual.hasEntitlementForStatus,
+const router = createTRPCRouter({
+  billing: createTRPCRouter({ startTrial: protectedProcedure.mutation(() => 'started') }),
+  review: createTRPCRouter({ getReportPeriod: protectedProcedure.query(() => 'report') }),
+  planCommands: createTRPCRouter({
+    create: protectedProcedure.mutation(() => 'created'),
+    delete: protectedProcedure.mutation(() => 'deleted'),
+  }),
+  externalCalendar: createTRPCRouter({
+    listProviderCalendars: entitledProcedure(entitlementKeys.externalCalendarSync).query(
+      () => 'provider',
     ),
-  };
+  }),
 });
-
-import { createCallerFactory, createTRPCRouter, entitledProcedure } from './procedures';
-
-// テスト用の最小ルーター
-const testRouter = createTRPCRouter({
-  ping: entitledProcedure(entitlementKeys.externalCalendarSync).query(() => 'pong'),
-  mcpPing: entitledProcedure(entitlementKeys.mcpApi).query(() => 'pong'),
-});
-
-const createCaller = createCallerFactory(testRouter);
-
-/**
- * entitledProcedure 用のコンテキストを作成
- *
- * profiles テーブルの応答をモックし、subscription_status を制御する
- */
-function createProTestContext(
-  subscriptionStatus: string | null,
-  options: { userId?: string; profileError?: boolean } = {},
-) {
-  const { userId = 'test-user-id', profileError = false } = options;
-
-  const profileData = profileError ? null : { id: userId, subscription_status: subscriptionStatus };
-
-  const profileMock = createChainableMock(
-    profileData,
-    profileError ? { message: 'DB connection error', code: 'PGRST000' } : null,
-  );
-
-  const supabase = {
-    from: (table: string) => {
-      if (table === 'profiles') return profileMock;
-      return createChainableMock(null);
-    },
+const caller = createCallerFactory(router);
+function context(status: string, endsAt: string | null = null) {
+  const db = {
+    from: (table: string) =>
+      createChainableMock(
+        table === 'profiles'
+          ? {
+              subscription_status: status,
+              app_trial_started_at: endsAt ? '2026-09-01T00:00:00Z' : null,
+              app_trial_ends_at: endsAt,
+              app_trial_consumed_at: status === 'canceled' ? '2026-08-01T00:00:00Z' : null,
+            }
+          : null,
+      ),
   };
-
-  return {
-    req: { headers: {}, cookies: {}, socket: { remoteAddress: '127.0.0.1' } },
-    res: { setHeader: () => {}, end: () => {} },
-    userId,
-    sessionId: 'test-session',
-    mfaAssurance: { currentLevel: 'aal1' as const, nextLevel: 'aal1' as const },
-    supabase,
-    authMode: 'session' as const,
-  };
+  return { ...createMockContext({ userId: 'user-1' }), supabase: db, subscriptionStatus: 'active' };
 }
-
-describe('entitledProcedure', () => {
-  // 既定（enforcement 無効）では全 status が素通りするため、enforcement の挙動を
-  // 検証する既存テストは BILLING_ENFORCED='true' を前提にする。
+describe('single-plan procedure boundary', () => {
   beforeEach(() => {
     vi.stubEnv('BILLING_ENFORCED', 'true');
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-09-08T00:00:00Z'));
   });
-
   afterEach(() => {
     vi.unstubAllEnvs();
+    vi.useRealTimers();
   });
-
-  describe('アクセス許可（Pro機能利用可能）', () => {
-    it.each([
-      { status: 'active', label: 'active' },
-      { status: 'trialing', label: 'trialing' },
-      { status: 'past_due', label: 'past_due（猶予期間）' },
-    ])('$label ユーザーは通過する', async ({ status }) => {
-      const ctx = createProTestContext(status);
-      const caller = createCaller(ctx as never);
-
-      const result = await caller.ping();
-      expect(result).toBe('pong');
-    });
+  it.each(['free', 'canceled'])(
+    'preserves saved reads and deletion for %s despite old claims',
+    async (status) => {
+      const api = caller(context(status) as never);
+      await expect(api.review.getReportPeriod()).resolves.toBe('report');
+      await expect(api.planCommands.delete()).resolves.toBe('deleted');
+      await expect(api.planCommands.create()).rejects.toMatchObject({ code: 'FORBIDDEN' });
+      await expect(api.externalCalendar.listProviderCalendars()).rejects.toMatchObject({
+        code: 'FORBIDDEN',
+      });
+    },
+  );
+  it.each(['active', 'past_due', 'trialing'])('permits %s', async (status) => {
+    await expect(caller(context(status) as never).planCommands.create()).resolves.toBe('created');
   });
-
-  describe('アクセス拒否（FORBIDDEN）', () => {
-    it.each([
-      { status: 'free', label: 'free' },
-      { status: 'canceled', label: 'canceled' },
-    ])('$label ユーザーは FORBIDDEN', async ({ status }) => {
-      const ctx = createProTestContext(status);
-      const caller = createCaller(ctx as never);
-
-      await expect(caller.ping()).rejects.toThrow(
-        expect.objectContaining({
-          code: 'FORBIDDEN',
-        }),
-      );
-    });
-
-    it('subscription_status が null の場合は FORBIDDEN', async () => {
-      const ctx = createProTestContext(null);
-      const caller = createCaller(ctx as never);
-
-      await expect(caller.ping()).rejects.toThrow(
-        expect.objectContaining({
-          code: 'FORBIDDEN',
-        }),
-      );
-    });
-
-    it('subscription_status が undefined（カラム未設定）の場合は FORBIDDEN', async () => {
-      const profileMock = createChainableMock({ id: 'test-user-id' });
-      const supabase = {
-        from: () => profileMock,
-      };
-      const ctx = {
-        req: { headers: {}, cookies: {}, socket: { remoteAddress: '127.0.0.1' } },
-        res: { setHeader: () => {}, end: () => {} },
-        userId: 'test-user-id',
-        sessionId: 'test-session',
-        mfaAssurance: { currentLevel: 'aal1' as const, nextLevel: 'aal1' as const },
-        supabase,
-        authMode: 'session' as const,
-      };
-      const caller = createCaller(ctx as never);
-
-      await expect(caller.ping()).rejects.toThrow(
-        expect.objectContaining({
-          code: 'FORBIDDEN',
-        }),
-      );
-    });
+  it('uses the current trial deadline at exact expiry', async () => {
+    await expect(
+      caller(context('free', '2026-09-08T00:00:00.001Z') as never).planCommands.create(),
+    ).resolves.toBe('created');
+    await expect(
+      caller(context('free', '2026-09-08T00:00:00Z') as never).planCommands.create(),
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
   });
-
-  describe('エラーハンドリング', () => {
-    it('profiles 取得エラーで INTERNAL_SERVER_ERROR', async () => {
-      const ctx = createProTestContext('active', { profileError: true });
-      const caller = createCaller(ctx as never);
-
-      await expect(caller.ping()).rejects.toThrow(
-        expect.objectContaining({
-          code: 'INTERNAL_SERVER_ERROR',
-        }),
-      );
-    });
-
-    it('未認証ユーザーは UNAUTHORIZED（protectedProcedure で弾かれる）', async () => {
-      const ctx = createProTestContext('active', { userId: undefined as never });
-      // userId を明示的に削除
-      delete (ctx as Record<string, unknown>).userId;
-      const caller = createCaller(ctx as never);
-
-      await expect(caller.ping()).rejects.toThrow(
-        expect.objectContaining({
-          code: 'UNAUTHORIZED',
-        }),
-      );
-    });
+  it('does not block the trial start behind its own gate', async () => {
+    await expect(caller(context('free') as never).billing.startTrial()).resolves.toBe('started');
   });
-
-  describe('状態遷移シナリオ', () => {
-    it('Free→Pro 切替直後: active でアクセス可能', async () => {
-      const ctx = createProTestContext('active');
-      const caller = createCaller(ctx as never);
-
-      const result = await caller.ping();
-      expect(result).toBe('pong');
-    });
-
-    it('Pro→Free 降格: canceled でアクセス不可', async () => {
-      const ctx = createProTestContext('canceled');
-      const caller = createCaller(ctx as never);
-
-      try {
-        await caller.ping();
-        expect.fail('Should have thrown');
-      } catch (err) {
-        expect(err).toBeInstanceOf(TRPCError);
-        expect((err as TRPCError).code).toBe('FORBIDDEN');
-        expect((err as TRPCError).message).toContain('Pro');
-      }
-    });
-
-    it('支払い失敗→回復中: past_due でアクセス維持', async () => {
-      const ctx = createProTestContext('past_due');
-      const caller = createCaller(ctx as never);
-
-      const result = await caller.ping();
-      expect(result).toBe('pong');
-    });
+  it('preserves the disabled switch', async () => {
+    vi.stubEnv('BILLING_ENFORCED', 'false');
+    await expect(caller(context('canceled') as never).planCommands.create()).resolves.toBe(
+      'created',
+    );
   });
-
-  it('別の entitlement key でも Pro なら通る', async () => {
-    const ctx = createProTestContext('active');
-    const caller = createCaller(ctx as never);
-
-    await expect(caller.mcpPing()).resolves.toBe('pong');
-  });
-
-  it('別の entitlement key でも Free は弾かれる', async () => {
-    const ctx = createProTestContext('free');
-    const caller = createCaller(ctx as never);
-
-    await expect(caller.mcpPing()).rejects.toThrow(TRPCError);
-  });
-
-  // 現在 Pro は 4 キー全部を持つので、key を無視して固定キーで判定しても上の 2 本は
-  // 通ってしまう。map が一様でなくなった瞬間に誤配線が課金バグになるため、
-  // 「どのキーで判定したか」をここで固定する。
-  it.each([
-    { procedure: 'ping', expectedKey: entitlementKeys.externalCalendarSync },
-    { procedure: 'mcpPing', expectedKey: entitlementKeys.mcpApi },
-  ])('$procedure は $expectedKey で判定する', async ({ procedure, expectedKey }) => {
-    const ctx = createProTestContext('active');
-    const caller = createCaller(ctx as never);
-
-    await (caller as unknown as Record<string, () => Promise<string>>)[procedure]!();
-
-    expect(hasEntitlementForStatus).toHaveBeenCalledWith('active', expectedKey);
-  });
-
-  describe('enforcement 無効時（既定・全機能無料）', () => {
-    beforeEach(() => {
-      // 親の 'true' を上書き。未設定（既定）相当として 'false' を明示する。
-      vi.stubEnv('BILLING_ENFORCED', 'false');
-    });
-
-    it.each([
-      { status: 'free', label: 'free' },
-      { status: 'canceled', label: 'canceled' },
-      { status: null, label: 'null（未設定）' },
-    ])('$label でも素通りする（Pro ゲートを踏まない）', async ({ status }) => {
-      const ctx = createProTestContext(status);
-      const caller = createCaller(ctx as never);
-
-      const result = await caller.ping();
-      expect(result).toBe('pong');
-    });
+  it('continues to require authentication', async () => {
+    await expect(
+      caller({ ...context('active'), userId: null } as never).review.getReportPeriod(),
+    ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
   });
 });

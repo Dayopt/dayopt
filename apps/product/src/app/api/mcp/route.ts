@@ -261,7 +261,7 @@ function proEntitlementErrorResponse(): Response {
       jsonrpc: '2.0',
       error: {
         code: -32001,
-        message: 'Pro plan required',
+        message: 'Open the Dayopt app to start your trial or subscribe to resume access',
       },
       id: null,
     },

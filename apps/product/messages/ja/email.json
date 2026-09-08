@@ -41,41 +41,41 @@
     "thankYou": "Dayopt をご利用いただきありがとうございました。"
   },
   "trialStart": {
-    "subject": "7日間の Pro トライアルが始まりました",
-    "heading": "7日間の Pro トライアルが始まりました",
-    "body": "Pro トライアルが有効になりました。以下の機能をお試しいただけます：",
+    "subject": "Dayopt トライアルが始まりました",
+    "heading": "Dayopt トライアルが始まりました",
+    "body": "Dayopt トライアルが有効になりました。以下の機能をお試しいただけます：",
     "labelTrialEnds": "トライアル終了日",
-    "proFeaturesIntro": "Pro に含まれる機能：",
+    "proFeaturesIntro": "Dayopt に含まれる機能：",
     "featureLongRange": "月・年の俯瞰と過去の自分との比較",
     "featureGoogleCalendar": "Google カレンダー同期",
     "featureApi": "MCP / API アクセス",
-    "noActionNote": "特に操作は不要です。トライアルは今すぐ開始されます。Pro が不要と感じた場合、トライアル終了後に自動的に Free プランに移行します。",
+    "noActionNote": "終了日時とお支払い予定は、設定の請求管理で確認できます。",
     "ctaButton": "Dayopt を開く"
   },
   "trialExpiring": {
-    "subject": "Pro トライアルが残り3日です",
-    "heading": "Pro トライアルが残り3日です",
-    "body": "Pro トライアルは {trialEndDate} に終了します。終了後、アカウントは自動的に Free プランに移行します。",
-    "keepProHint": "Pro の機能を引き続きご利用いただくには、アカウント設定からいつでもサブスクリプションに登録できます。",
+    "subject": "Dayopt トライアルが残り3日です",
+    "heading": "Dayopt トライアルが残り3日です",
+    "body": "無料体験は {trialEndDate} に終了します。お支払い予定は設定の請求管理で確認できます。",
+    "keepProHint": "Dayopt の機能を引き続きご利用いただくには、アカウント設定からいつでもサブスクリプションに登録できます。",
     "ctaButton": "プランを見る",
-    "freePlanNote": "Free プランでも、タイムボクシング・時間記録・カレンダー表示をすべてご利用いただけます。"
+    "freePlanNote": "利用期間終了後も、保存済みカレンダーとレポートは閲覧できます。"
   },
   "trialExpired": {
-    "subject": "Pro トライアルが終了しました",
-    "heading": "Pro トライアルが終了しました",
-    "body": "7日間の Pro トライアルが終了し、アカウントは Free プランになりました。",
-    "freeAccessIntro": "引き続き以下の機能をご利用いただけます：",
-    "featureTimeboxing": "タイムボクシングとデイリープランニング",
-    "featureTracking": "時間記録とレコード",
-    "featureCalendar": "カレンダー表示",
-    "upgradeHint": "月・年の俯瞰と過去の自分との比較、Google カレンダー同期などをご利用いただくには、いつでも Pro にアップグレードできます。",
-    "ctaButton": "Pro にアップグレード",
-    "thankYou": "Pro をお試しいただきありがとうございました。"
+    "subject": "Dayopt トライアルが終了しました",
+    "heading": "Dayopt トライアルが終了しました",
+    "body": "無料体験が終了しました。作成・編集を続けるには購入してください。",
+    "freeAccessIntro": "引き続き利用できます：",
+    "featureTimeboxing": "保存済みの予定",
+    "featureTracking": "保存済みの記録とレポート",
+    "featureCalendar": "カレンダー閲覧とデータエクスポート",
+    "upgradeHint": "購入すると、作成・編集・同期・MCP / API の利用を再開できます。",
+    "ctaButton": "Dayopt にアップグレード",
+    "thankYou": "Dayopt をお試しいただきありがとうございました。"
   },
   "proStart": {
-    "subject": "Pro へようこそ",
-    "heading": "Pro へようこそ",
-    "body": "Pro サブスクリプションが有効になりました。ご利用ありがとうございます。",
+    "subject": "Dayopt へようこそ",
+    "heading": "Dayopt へようこそ",
+    "body": "Dayopt サブスクリプションが有効になりました。ご利用ありがとうございます。",
     "fullAccessIntro": "以下の機能をすべてご利用いただけます：",
     "featureLongRange": "月・年の俯瞰と過去の自分との比較",
     "featureGoogleCalendar": "Google カレンダー同期",
@@ -86,26 +86,26 @@
   "paymentFailed": {
     "subject": "お支払いに失敗しました",
     "heading": "お支払いに失敗しました",
-    "body": "Dayopt Pro の最新のお支払いを処理できませんでした。",
-    "urgencyNote": "現在 Pro 機能は引き続きご利用いただけますが、サービスの中断を避けるため、お支払い方法を更新してください。",
+    "body": "Dayopt の最新のお支払いを処理できませんでした。",
+    "urgencyNote": "現在 Dayopt 機能は引き続きご利用いただけますが、サービスの中断を避けるため、お支払い方法を更新してください。",
     "ctaButton": "お支払い方法を更新",
     "helpLine": "お心当たりがない場合やサポートが必要な場合は、{supportEmail} までご連絡ください。"
   },
   "paymentRecovered": {
     "subject": "お支払いが完了しました",
     "heading": "お支払いが完了しました",
-    "body": "Dayopt Pro の最新のお支払いが正常に処理されました。Pro アクセスは引き続きご利用いただけます。",
+    "body": "Dayopt の最新のお支払いが正常に処理されました。Dayopt アクセスは引き続きご利用いただけます。",
     "noActionNote": "お客様側での操作は不要です。",
     "ctaButton": "Dayopt を開く"
   },
   "cancellationConfirm": {
-    "subject": "Pro サブスクリプションが解約されました",
-    "heading": "Pro サブスクリプションが解約されました",
-    "body": "Pro サブスクリプションが解約されました。{periodEndDate} まで引き続き Pro をご利用いただけます。",
-    "labelProAccessUntil": "Pro 利用可能期限",
-    "afterPeriodNote": "期限後、アカウントは Free プランに移行します。データはすべて保持され、削除されることはありません。",
+    "subject": "Dayopt サブスクリプションが解約されました",
+    "heading": "Dayopt サブスクリプションが解約されました",
+    "body": "契約が終了しました。最後の契約期間の終了日は {periodEndDate} です。",
+    "labelProAccessUntil": "Dayopt 利用可能期限",
+    "afterPeriodNote": "保存済みカレンダーとレポートは閲覧できます。データのエクスポートと削除もできます。",
     "resubscribeHint": "「設定 → お支払い」からいつでも再登録できます。",
     "ctaButton": "アカウントを管理",
-    "thankYou": "Pro メンバーとしてご利用いただきありがとうございました。"
+    "thankYou": "Dayopt メンバーとしてご利用いただきありがとうございました。"
   }
 }

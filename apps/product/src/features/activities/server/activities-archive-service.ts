@@ -1,3 +1,4 @@
+import { createServiceRoleClient } from '@/lib/supabase/oauth';
 import 'server-only';
 
 import type { Database } from '@/lib/database';
@@ -20,7 +21,7 @@ import {
  */
 export class ActivitiesArchiveService {
   constructor(
-    private readonly supabase: SupabaseClient<Database>,
+    _supabase: SupabaseClient<Database>,
     private readonly queryService: ActivitiesQueryService,
   ) {}
 
@@ -34,7 +35,7 @@ export class ActivitiesArchiveService {
     if (category.archived_at) return category;
 
     const archivedAt = new Date().toISOString();
-    const { data, error } = await this.supabase
+    const { data, error } = await createServiceRoleClient()
       .from('categories')
       .update({ archived_at: archivedAt })
       .eq('id', categoryId)
@@ -62,7 +63,7 @@ export class ActivitiesArchiveService {
     });
     if (!category.archived_at) return category;
 
-    const { data, error } = await this.supabase
+    const { data, error } = await createServiceRoleClient()
       .from('categories')
       .update({ archived_at: null })
       .eq('id', categoryId)
@@ -97,7 +98,7 @@ export class ActivitiesArchiveService {
     if (activity.archived_at) return activity;
 
     const archivedAt = new Date().toISOString();
-    const { data, error } = await this.supabase
+    const { data, error } = await createServiceRoleClient()
       .from('activities')
       .update({ archived_at: archivedAt })
       .eq('id', activityId)
@@ -125,7 +126,7 @@ export class ActivitiesArchiveService {
     });
     if (!activity.archived_at) return activity;
 
-    const { data, error } = await this.supabase
+    const { data, error } = await createServiceRoleClient()
       .from('activities')
       .update({ archived_at: null })
       .eq('id', activityId)

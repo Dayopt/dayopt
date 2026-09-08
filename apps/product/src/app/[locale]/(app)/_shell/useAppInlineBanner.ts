@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from 'react';
 
 import { useTranslations } from 'next-intl';
 
+import { useBillingAccess } from '@/lib/billing/BillingAccessProvider';
+import { useUserPreferences } from '@/lib/hooks/useUserPreferences';
 import { useShellStore } from '@/lib/stores/useShellStore';
 import { toast } from '@/lib/toast';
 import { api } from '@/lib/trpc';
@@ -36,6 +38,15 @@ interface InlineBannerState {
  */
 export function useAppInlineBanner(): InlineBannerState {
   const t = useTranslations();
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 60_000);
+    return () => clearInterval(timer);
+  }, []);
+  const access = useBillingAccess();
+  const timezone = useUserPreferences((s) => s.timezone);
+  const utils = api.useUtils();
+  const openSettings = useShellStore.use.openSettings();
   const [billingActionClosed, setBillingActionClosed] = useState(false);
   const serviceWorkerUpdateAvailable = useShellStore.use.serviceWorkerUpdateAvailable();
   const {
@@ -67,6 +78,7 @@ export function useAppInlineBanner(): InlineBannerState {
     const status = billingQuery.data?.billingInfo.subscriptionStatus;
     if (!shouldContinueBillingPoll({ startedAt: pollStartedAt, subscriptionStatus: status })) {
       stopBillingPoll();
+      void utils.billing.getAccess.invalidate();
       return;
     }
     // webhook 未達のまま data が変化しないと、この effect は再実行されず
@@ -75,7 +87,7 @@ export function useAppInlineBanner(): InlineBannerState {
     const remainingMs = BILLING_POLL_MAX_DURATION_MS - (Date.now() - pollStartedAt);
     const timer = setTimeout(stopBillingPoll, Math.max(remainingMs, 0) + BILLING_POLL_INTERVAL_MS);
     return () => clearTimeout(timer);
-  }, [billingQuery.data, pollStartedAt, stopBillingPoll]);
+  }, [billingQuery.data, pollStartedAt, stopBillingPoll, utils]);
   const createPortal = api.billing.createPortalSession.useMutation({
     onSuccess(data, variables) {
       if (!variables) return;
@@ -119,6 +131,30 @@ export function useAppInlineBanner(): InlineBannerState {
       };
     }
 
+    if (
+      access.enforced &&
+      (access.state === 'expired' ||
+        (access.state === 'trial' &&
+          access.trialEndsAt &&
+          Date.parse(access.trialEndsAt) - now <= 7 * 86_400_000))
+    ) {
+      return {
+        visible: true,
+        message:
+          access.state === 'expired'
+            ? t('settings.subscription.singlePlan.expired')
+            : t('settings.subscription.singlePlan.ending', {
+                date: new Date(access.trialEndsAt!).toLocaleString(undefined, {
+                  timeZone: timezone,
+                }),
+              }),
+        action: {
+          label: t('settings.subscription.singlePlan.purchase'),
+          onClick: () => openSettings('billing'),
+        },
+      };
+    }
+
     // Priority 2: Service Worker 更新（自動リロードはしない。編集中データの喪失を
     // 避けるため、ユーザーの明示操作でのみ反映する）
     if (serviceWorkerUpdateAvailable) {
@@ -134,6 +170,10 @@ export function useAppInlineBanner(): InlineBannerState {
 
     return { visible: false, message: '' };
   }, [
+    access,
+    now,
+    timezone,
+    openSettings,
     beginPortalAttempt,
     billingActionClosed,
     createPortal,

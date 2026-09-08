@@ -1,3 +1,4 @@
+import { createServiceRoleClient } from '@/lib/supabase/oauth';
 import 'server-only';
 
 import type { Database, Insert, Update } from '@/lib/database';
@@ -66,7 +67,7 @@ function assertValidName(name: string): string {
  */
 export class ActivitiesMutationService {
   constructor(
-    private readonly supabase: SupabaseClient<Database>,
+    _supabase: SupabaseClient<Database>,
     private readonly queryService: ActivitiesQueryService,
   ) {}
 
@@ -81,7 +82,7 @@ export class ActivitiesMutationService {
       icon: input.icon ?? null,
     };
 
-    const { data, error } = await this.supabase
+    const { data, error } = await createServiceRoleClient()
       .from('categories')
       .insert(categoryData)
       .select()
@@ -119,7 +120,7 @@ export class ActivitiesMutationService {
     if (updates.color !== undefined) updateData.color = updates.color;
     if (updates.icon !== undefined) updateData.icon = updates.icon;
 
-    const { data, error } = await this.supabase
+    const { data, error } = await createServiceRoleClient()
       .from('categories')
       .update(updateData)
       .eq('id', categoryId)
@@ -172,7 +173,7 @@ export class ActivitiesMutationService {
       category_id: categoryId,
     };
 
-    const { data, error } = await this.supabase
+    const { data, error } = await createServiceRoleClient()
       .from('activities')
       .insert(activityData)
       .select()
@@ -229,7 +230,7 @@ export class ActivitiesMutationService {
       updateData.category_id = nextCategoryId;
     }
 
-    const { data, error } = await this.supabase
+    const { data, error } = await createServiceRoleClient()
       .from('activities')
       .update(updateData)
       .eq('id', activityId)
