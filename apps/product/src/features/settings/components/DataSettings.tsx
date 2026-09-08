@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useState } from 'react';
 
 import { toast } from '@/lib/toast';
 import {
@@ -8,9 +8,8 @@ import {
   entitlementKeys,
   getPlanIdForSubscriptionStatus,
 } from '@dayopt/billing';
-import { Button as SharedButton } from '@dayopt/components';
 import { dayoptUrls } from '@dayopt/config';
-import { AlertTriangle, Check, Copy, Crown, Download, Trash2, Upload } from 'lucide-react';
+import { Check, Copy, Crown, Download, Trash2 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 
 import { ConfirmDialog } from '@/components/ui/overlays/confirm-dialog';
@@ -42,7 +41,6 @@ export function DataSettings() {
   return (
     <div className="space-y-6 sm:space-y-8">
       <ExportSection />
-      <RestoreSection />
       <McpApiSection />
       <DeletionSection />
     </div>
@@ -124,7 +122,7 @@ function ExportSection() {
       <p className="text-muted-foreground mb-2 text-base md:text-sm">{t('description')}</p>
       <LabeledRow label={t('format')}>
         <Select value={format} onValueChange={(v) => setFormat(v as ExportFormat)}>
-          <SelectTrigger variant="ghost">
+          <SelectTrigger variant="ghost" aria-label={t('format')}>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -135,7 +133,7 @@ function ExportSection() {
       </LabeledRow>
       <LabeledRow label={t('range')}>
         <Select value={range} onValueChange={(v) => setRange(v as ExportRange)}>
-          <SelectTrigger variant="ghost">
+          <SelectTrigger variant="ghost" aria-label={t('range')}>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -145,8 +143,8 @@ function ExportSection() {
         </Select>
       </LabeledRow>
       {range === 'custom' && (
-        <LabeledRow label={t('startDate')}>
-          <div className="flex items-center gap-2">
+        <>
+          <LabeledRow label={t('startDate')}>
             <Input
               type="date"
               value={startDate}
@@ -154,7 +152,8 @@ function ExportSection() {
               className="w-32 sm:w-36"
               aria-label={t('startDate')}
             />
-            <span className="text-muted-foreground">—</span>
+          </LabeledRow>
+          <LabeledRow label={t('endDate')}>
             <Input
               type="date"
               value={endDate}
@@ -162,8 +161,8 @@ function ExportSection() {
               className="w-32 sm:w-36"
               aria-label={t('endDate')}
             />
-          </div>
-        </LabeledRow>
+          </LabeledRow>
+        </>
       )}
       <LabeledRow label={t('exportButton')}>
         <Button variant="outline" onClick={handleExport} disabled={isExporting}>
@@ -175,48 +174,7 @@ function ExportSection() {
   );
 }
 
-// ─── Restore ─────────────────────────────────────────
-
-function RestoreSection() {
-  const t = useTranslations('settings.dataControls.restore');
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  return (
-    <SectionCard title={t('title')}>
-      <p className="text-muted-foreground mb-4 text-base md:text-sm">{t('description')}</p>
-
-      <div className="border-border flex flex-col items-center justify-center rounded-2xl border-2 border-dashed p-8">
-        <Upload className="text-muted-foreground mb-2 h-8 w-8" />
-        <p className="text-muted-foreground text-base md:text-sm">{t('dropzone')}</p>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".json"
-          className="hidden"
-          disabled
-          aria-hidden="true"
-        />
-        <SharedButton
-          variant="ghost"
-          className="mt-4"
-          disabled
-          onClick={() => fileInputRef.current?.click()}
-        >
-          {t('selectFile')}
-        </SharedButton>
-      </div>
-
-      <div className="mt-4 flex items-start gap-2">
-        <AlertTriangle className="text-muted-foreground mt-1 h-4 w-4 shrink-0" />
-        <p className="text-muted-foreground text-xs">{t('warning')}</p>
-      </div>
-
-      <p className="text-muted-foreground mt-2 text-xs italic">{t('comingSoon')}</p>
-    </SectionCard>
-  );
-}
-
-// ─── MCP / API ───────────────────────────────────────
+// ─── MCP / API ─────────────────────────────────────────
 
 function McpApiSection() {
   const t = useTranslations('settings.dataControls.mcp');

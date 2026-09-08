@@ -33,6 +33,17 @@ const BASE_ARGS = {
 
 export const Week: Story = { args: BASE_ARGS };
 
+export const Narrow: Story = {
+  args: BASE_ARGS,
+  decorators: [
+    (Story) => (
+      <div className="w-96">
+        <Story />
+      </div>
+    ),
+  ],
+};
+
 export const Month: Story = {
   args: {
     ...BASE_ARGS,

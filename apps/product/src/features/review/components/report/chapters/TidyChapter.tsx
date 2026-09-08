@@ -45,9 +45,9 @@ export function TidyChapter({
     <section
       aria-label={t('kick')}
       data-report-chapter="tidy"
-      className="border-border-subtle bg-card flex flex-col gap-4 rounded-2xl border p-4 shadow-sm"
+      className="border-border-subtle flex flex-col gap-4 border-b pb-8 last:border-b-0"
     >
-      <p className="text-muted-foreground text-xs">{t('kick')}</p>
+      <h2 className="text-foreground text-sm font-medium">{t('kick')}</h2>
 
       <ul className="flex flex-col gap-2">
         <TidyRow
@@ -65,7 +65,7 @@ export function TidyChapter({
       </ul>
 
       <div className="border-border-subtle flex min-h-11 flex-wrap items-center gap-2 border-t pt-4">
-        <p className="text-foreground min-w-0 flex-1 text-xs">
+        <p className="text-foreground min-w-0 flex-1 text-sm">
           {nextPeriodPlannedMinutes > 0
             ? t(`nextPeriod.planned.${granularity}`, {
                 duration: formatReportDuration(nextPeriodPlannedMinutes),
@@ -105,7 +105,7 @@ function TidyRow({
 
   return (
     <li className="flex min-h-11 items-center gap-2">
-      <span className="text-foreground min-w-0 flex-1 text-xs">{label}</span>
+      <span className="text-foreground min-w-0 flex-1 text-sm">{label}</span>
 
       {count > 0 ? (
         <Button

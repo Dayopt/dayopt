@@ -87,10 +87,13 @@ describe('ExecutionChapter', () => {
     ).toBeInTheDocument();
   });
 
-  it('鏡の候補が無ければ空文言を出す', () => {
+  it('比較候補が無ければ説明を重ねず記録の行を残す', () => {
     render(<ExecutionChapter granularity="week" mirrorRows={[]} rows={[row()]} />);
 
-    expect(screen.getByText('report.execution.mirror.empty')).toBeInTheDocument();
+    expect(screen.queryByText('report.execution.mirror.heading')).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /report.execution.rowAriaLabel 執筆/ }),
+    ).toBeInTheDocument();
   });
 
   it('記録も予定も無ければ空文言だけを出す', () => {

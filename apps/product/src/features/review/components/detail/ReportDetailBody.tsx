@@ -42,9 +42,8 @@ export interface ReportDetailBodyProps {
   showTrend: boolean;
 }
 
-/** 時間帯の棒の最大高さ（px）と、0 のときの下限。仕様 §6-4。 */
-const TIME_OF_DAY_MAX_HEIGHT = 38;
-const TIME_OF_DAY_EMPTY_HEIGHT = 2;
+/** 推移の棒の最大高さ（px）。 */
+const TREND_MAX_HEIGHT = 38;
 /** 推移を出す最小の「データのある期間」数。これ未満は節ごと出さない（仕様 §6-5）。 */
 const TREND_MIN_PERIODS = 2;
 
@@ -257,23 +256,16 @@ function TimeOfDayBars({ values }: { values: readonly number[] }) {
   return (
     <div className="flex flex-col gap-2">
       <p className="text-muted-foreground text-xs">{t('heading')}</p>
-      <ul data-report-bars="time-of-day" className="flex items-end gap-2">
+      <ul data-report-bars="time-of-day" className="flex flex-col gap-2">
         {values.map((minutes, index) => (
-          <li
-            key={labels[index] ?? index}
-            className="flex min-w-0 flex-1 flex-col items-center gap-1"
-          >
-            <span
-              className="bg-foreground w-full rounded-lg"
-              style={{
-                height:
-                  minutes > 0
-                    ? `${(minutes / max) * TIME_OF_DAY_MAX_HEIGHT}px`
-                    : `${TIME_OF_DAY_EMPTY_HEIGHT}px`,
-                opacity: minutes > 0 ? 1 : 0.25,
-              }}
-            />
-            <span className="text-muted-foreground truncate text-xs">{labels[index]}</span>
+          <li key={labels[index] ?? index} className="flex min-w-0 items-center gap-2">
+            <span className="text-muted-foreground w-20 shrink-0 text-xs">{labels[index]}</span>
+            <span className="bg-muted h-2 min-w-0 flex-1 overflow-hidden rounded-full">
+              <span
+                className="bg-foreground block h-full rounded-full"
+                style={{ width: `${(minutes / max) * 100}%` }}
+              />
+            </span>
           </li>
         ))}
       </ul>
@@ -304,7 +296,7 @@ function TrendBars({
             <span
               className="bg-foreground w-full rounded-lg"
               style={{
-                height: `${(point.recordedMinutes / max) * TIME_OF_DAY_MAX_HEIGHT}px`,
+                height: `${(point.recordedMinutes / max) * TREND_MAX_HEIGHT}px`,
                 opacity: point.recordedMinutes > 0 ? 1 : 0.25,
               }}
             />

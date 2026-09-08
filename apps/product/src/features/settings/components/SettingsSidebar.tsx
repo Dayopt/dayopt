@@ -17,6 +17,7 @@ import type { SettingsCategory } from '../types';
 
 interface SettingsSidebarProps {
   className?: string;
+  presentation?: 'page' | 'dialog';
 }
 
 /**
@@ -25,7 +26,7 @@ interface SettingsSidebarProps {
  * PC（Dialog内）: store でカテゴリ切替（URL変更なし）
  * Mobile（実ページ）: Link でページ遷移
  */
-export function SettingsSidebar({ className }: SettingsSidebarProps) {
+export function SettingsSidebar({ className, presentation = 'page' }: SettingsSidebarProps) {
   const t = useTranslations();
   const isMobile = useMediaQuery(MEDIA_QUERIES.mobile);
   const pathname = usePathname() ?? '/';
@@ -35,7 +36,8 @@ export function SettingsSidebar({ className }: SettingsSidebarProps) {
   const storeCategory = activeSheet?.type === 'settings' ? activeSheet.category : 'account';
   const setCategory = useShellStore((s) => s.setSettingsCategory);
   const pathCategory = pathname.split('/settings/')[1]?.split('/')[0] ?? 'account';
-  const currentCategory = isMobile ? pathCategory : storeCategory;
+  const usePageNavigation = isMobile && presentation === 'page';
+  const currentCategory = usePageNavigation ? pathCategory : storeCategory;
 
   return (
     <aside className={cn('bg-surface-container flex flex-col', className)}>
@@ -43,12 +45,17 @@ export function SettingsSidebar({ className }: SettingsSidebarProps) {
         <h2 className="text-lg font-medium">{t('settings.dialog.title')}</h2>
       </div>
       <ScrollArea className="flex-1">
-        <nav className="flex flex-col gap-1 p-2">
+        <nav
+          className={cn(
+            'flex gap-1 p-2',
+            presentation === 'dialog' ? 'flex-row overflow-x-auto md:flex-col' : 'flex-col',
+          )}
+        >
           {SETTINGS_CATEGORIES.map((category) => {
             const Icon = category.icon;
             const isActive = currentCategory === category.id;
 
-            if (isMobile) {
+            if (usePageNavigation) {
               return (
                 <Link
                   key={category.id}
@@ -72,7 +79,7 @@ export function SettingsSidebar({ className }: SettingsSidebarProps) {
                 type="button"
                 onClick={() => setCategory(category.id as SettingsCategory)}
                 className={cn(
-                  'flex w-full items-center gap-4 rounded-lg px-4 py-2 text-left text-sm transition-colors',
+                  'flex min-h-11 shrink-0 items-center gap-2 rounded-lg px-4 py-2 text-left text-sm whitespace-nowrap transition-colors md:min-h-0 md:w-full md:gap-4',
                   isActive
                     ? 'bg-state-selected text-foreground'
                     : 'text-muted-foreground hover:bg-state-hover',

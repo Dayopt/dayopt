@@ -50,11 +50,11 @@ export function ICalFeedSettingsView({
       ) : feedUrl ? (
         <>
           <LabeledRow label={t('feedUrl')}>
-            <div className="flex max-w-full items-center gap-2">
+            <div className="flex w-48 max-w-full items-center gap-2 sm:w-80">
               <Input
                 value={feedUrl}
                 readOnly
-                className="min-w-0 font-mono text-xs sm:w-80"
+                className="min-w-0 flex-1 font-mono text-xs"
                 aria-label={t('feedUrl')}
               />
               <Button variant="outline" size="sm" icon onClick={onCopy} aria-label={t('copy')}>

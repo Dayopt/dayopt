@@ -104,7 +104,7 @@ export function DatePickerPopover({
       popoverTrigger={triggerButton}
       selectedDate={selectedDate}
       onDateSelect={onDateChange}
-      popoverAlign="start"
+      popoverAlign="end"
       popoverZIndex={popoverZIndex}
       minDate={minDate}
     />

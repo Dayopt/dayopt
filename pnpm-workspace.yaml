@@ -15,6 +15,8 @@ auditConfig:
     - GHSA-w3rx-r6r6-pgpr
     - GHSA-5p2g-fcmc-qvqq
 overrides:
+  # Vaul/cmdk と直接利用する Dialog が同じ dismissable-layer を共有する (#2661)。
+  '@radix-ui/react-dialog': '1.1.20'
   tar: '^7.5.4'
   tmp: '^0.2.4'
   '@types/react': '19.2.17'

@@ -14,6 +14,9 @@ import type { TemplateView } from './types';
 
 interface TemplateListProps {
   templates: ReadonlyArray<TemplateView>;
+  isLoading?: boolean | undefined;
+  isError?: boolean | undefined;
+  onRetry?: (() => void) | undefined;
   onApplyTemplate?: ((templateId: string) => void) | undefined;
   onEditTemplate?: ((templateId: string) => void) | undefined;
   onRenameTemplate?: ((templateId: string, name: string) => void) | undefined;
@@ -30,9 +33,7 @@ interface TemplateListProps {
  * カテゴリー樹（`ActivityFilterList`）とは別枠のフラットな一覧。
  * カテゴリー分けは持たない（テンプレートはカテゴリーではなく「並べ方」を保存する）。
  *
- * 見出しの hover アクション（+ / 歯車）は「カテゴリ」「未分類」と同じ視覚パターンで
- * 先に置く。中身（作成導線・設定内容）は #2567 で配線するため、現状 `onCreateEntry` /
- * `onOpenSettings` を渡さなければ何も起きない（見た目だけ先行）。
+ * 見出しの hover アクション（+ / 歯車）は、対応する操作が渡された場合だけ表示する。
  *
  * データ取得（tRPC）は #2567 で配線する。ここでは `templates` を props で
  * 受け取るだけの表示専用コンポーネント。
@@ -42,6 +43,9 @@ interface TemplateListProps {
  */
 export function TemplateList({
   templates,
+  isLoading = false,
+  isError = false,
+  onRetry,
   onApplyTemplate,
   onEditTemplate,
   onRenameTemplate,
@@ -70,32 +74,51 @@ export function TemplateList({
           // 常時は隠し、見出し行にホバー / フォーカスした時だけ出す
           // （「未分類」の action と同じ visibility パターン）
           <span className="flex items-center gap-1 opacity-0 transition-opacity group-hover/section:opacity-100 group-has-[:focus-visible]/section:opacity-100 has-[:focus-visible]:opacity-100 [@media(hover:none)]:opacity-100">
-            <HoverTooltip content={t('calendar.templates.createLabel')} side="top">
-              <Button
-                variant="ghost"
-                icon
-                className="size-6"
-                aria-label={t('calendar.templates.createLabel')}
-                onClick={() => onCreateEntry?.()}
-              >
-                <Plus className="size-4" />
-              </Button>
-            </HoverTooltip>
-            <HoverTooltip content={t('calendar.templates.settingsLabel')} side="top">
-              <Button
-                variant="ghost"
-                icon
-                className="size-6"
-                aria-label={t('calendar.templates.settingsLabel')}
-                onClick={() => onOpenSettings?.()}
-              >
-                <Settings2 className="size-4" />
-              </Button>
-            </HoverTooltip>
+            {onCreateEntry && (
+              <HoverTooltip content={t('calendar.templates.createLabel')} side="top">
+                <Button
+                  variant="ghost"
+                  icon
+                  className="size-6"
+                  aria-label={t('calendar.templates.createLabel')}
+                  onClick={onCreateEntry}
+                >
+                  <Plus className="size-4" />
+                </Button>
+              </HoverTooltip>
+            )}
+            {onOpenSettings && (
+              <HoverTooltip content={t('calendar.templates.settingsLabel')} side="top">
+                <Button
+                  variant="ghost"
+                  icon
+                  className="size-6"
+                  aria-label={t('calendar.templates.settingsLabel')}
+                  onClick={onOpenSettings}
+                >
+                  <Settings2 className="size-4" />
+                </Button>
+              </HoverTooltip>
+            )}
           </span>
         }
       >
-        {templates.length === 0 ? (
+        {isLoading ? (
+          <p role="status" className="text-muted-foreground px-2 py-1 text-xs">
+            {t('common.loading')}
+          </p>
+        ) : isError ? (
+          <div className="px-2 py-1">
+            <p role="status" className="text-muted-foreground text-xs">
+              {t('calendar.templates.loadFailed')}
+            </p>
+            {onRetry && (
+              <Button variant="ghost" size="sm" onClick={onRetry}>
+                {t('common.actions.retry')}
+              </Button>
+            )}
+          </div>
+        ) : templates.length === 0 ? (
           <p role="status" className="text-muted-foreground px-2 py-1 text-xs">
             {t('calendar.templates.empty')}
           </p>

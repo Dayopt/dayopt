@@ -52,6 +52,32 @@ describe('CalendarNavigationProvider', () => {
     window.history.replaceState(null, '', '/ja/calendar?date=2026-03-25');
   });
 
+  it('レポートと戻り先の日付が同じでも以前のカレンダー日付を残さない', () => {
+    const content = (
+      <CalendarNavigationProvider>
+        <TestConsumer />
+      </CalendarNavigationProvider>
+    );
+    const { rerender } = render(content);
+    expect(screen.getByTestId('date')).toHaveTextContent('2026-03-25');
+
+    mockPathname = '/ja/report';
+    window.history.replaceState(null, '', '/ja/report?date=2026-03-30');
+    rerender(
+      <CalendarNavigationProvider>
+        <TestConsumer />
+      </CalendarNavigationProvider>,
+    );
+    mockPathname = '/ja/calendar';
+    window.history.replaceState(null, '', '/ja/calendar?date=2026-03-30');
+    rerender(
+      <CalendarNavigationProvider>
+        <TestConsumer />
+      </CalendarNavigationProvider>,
+    );
+    expect(screen.getByTestId('date')).toHaveTextContent('2026-03-30');
+  });
+
   it('resolves view from query on the /calendar URL contract', () => {
     window.history.replaceState(null, '', '/ja/calendar?view=week&date=2026-03-25');
     mockPathname = '/ja/calendar';
