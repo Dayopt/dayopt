@@ -20,7 +20,8 @@ interface SessionAuthContext {
   mfaAssurance?: MfaAssurance | undefined;
 }
 
-type SessionAuthOperationPrefix = 'trpc_context' | 'rsc_trpc' | 'calendar_connect' | 'proxy';
+type SessionAuthOperationPrefix =
+  'trpc_context' | 'rsc_trpc' | 'calendar_connect' | 'proxy' | 'recovery_codes';
 
 function createFailedMfaAssurance(): MfaAssurance {
   return {

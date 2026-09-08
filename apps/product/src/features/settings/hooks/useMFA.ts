@@ -244,6 +244,12 @@ export function useMFA(): UseMFAReturn {
       if (codes) {
         setRecoveryCodes(codes);
         setRecoveryCodeCount(codes.length);
+      } else {
+        // 生成に失敗しても factor 自体は既に verified なので、MFA 有効化は取り消さない。
+        // ただし黙って進むと「MFA 有効・リカバリコード 0 本・通知なし」というロックアウト
+        // 方向の状態になるので、必ずユーザーに伝えて再生成へ誘導する（#2618 で発行に
+        // aal2 を要求する fail-closed 分岐が増えたぶん、ここが空振りする経路も増えた）。
+        setError(t('settings.account.mfa.recoveryCodes.enrollmentGenerateFailed'));
       }
 
       setSuccess(t('common.errors.mfa.enabled'));
