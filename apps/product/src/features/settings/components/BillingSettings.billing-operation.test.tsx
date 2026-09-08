@@ -15,6 +15,7 @@ const SECOND_OPERATION_ID = '00000000-0000-4000-8000-000000000002';
 const checkoutMutate = vi.hoisted(() => vi.fn());
 const portalMutate = vi.hoisted(() => vi.fn());
 const toastError = vi.hoisted(() => vi.fn());
+const billingState = vi.hoisted(() => ({ subscriptionStatus: 'free', enforced: false }));
 const checkoutOptions = vi.hoisted(
   () =>
     ({ current: null }) as {
@@ -123,7 +124,13 @@ vi.mock('@/lib/trpc', () => ({
             billingInfo: {
               stripeCustomerId: null,
               subscriptionId: null,
-              subscriptionStatus: 'free',
+              subscriptionStatus: billingState.subscriptionStatus,
+            },
+            access: {
+              state: billingState.subscriptionStatus === 'canceled' ? 'expired' : 'not_started',
+              canUseProduct: !billingState.enforced,
+              trialEndsAt: null,
+              enforced: billingState.enforced,
             },
             invoices: [],
             paymentMethod: null,
@@ -141,9 +148,22 @@ import { BillingSettings } from './BillingSettings';
 
 describe('BillingSettings billing operation', () => {
   beforeEach(() => {
+    billingState.subscriptionStatus = 'free';
+    billingState.enforced = false;
     vi.spyOn(crypto, 'randomUUID')
       .mockReturnValueOnce(FIRST_OPERATION_ID)
       .mockReturnValueOnce(SECOND_OPERATION_ID);
+  });
+
+  it('課金制限offではキャンセル済み利用者に再契約を促さない', () => {
+    billingState.subscriptionStatus = 'canceled';
+    render(<BillingSettings />);
+
+    expect(screen.getByText('settings.subscription.singlePlan.disabled')).toBeInTheDocument();
+    expect(screen.queryByText('settings.subscription.canceledDescription')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'settings.subscription.resubscribe' }),
+    ).not.toBeInTheDocument();
   });
 
   afterEach(() => {

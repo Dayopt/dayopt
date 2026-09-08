@@ -305,7 +305,7 @@ export function BillingSettings() {
       )}
 
       {/* キャンセル済み通知（canceled 時のみ） */}
-      {subscriptionStatus === 'canceled' && (
+      {subscriptionStatus === 'canceled' && access?.enforced && (
         <SectionCard>
           <div className="flex items-center gap-4 rounded-lg p-4">
             <AlertTriangle className="text-muted-foreground h-5 w-5 shrink-0" />
