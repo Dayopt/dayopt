@@ -213,10 +213,11 @@ return 0`,
 
 /**
  * tRPC protectedProcedure 用レート制限
- * 100リクエスト / 1分 per user
+ * 300リクエスト / 1分 per user（in-memory fallback の `USER_RATE_LIMIT` と同値。
+ * 100 は 1 画面 15〜20 手続きの実装で実ユーザーも届く値だった。#2669）
  */
 export const trpcUserRateLimit = createRateLimiter(
-  Ratelimit.slidingWindow(100, '1 m'),
+  Ratelimit.slidingWindow(300, '1 m'),
   'ratelimit:product:trpc:user',
 );
 
