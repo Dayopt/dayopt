@@ -304,6 +304,74 @@ describe.skipIf(!RUN_LOCAL)('plan_templates schema contract (#2567)', () => {
   });
 
   describe('RLS with real authenticated clients', () => {
+    it('allows owner read/delete but rejects direct template and block writes', async () => {
+      const client = await signIn(ownerEmail);
+      const directTemplateId = crypto.randomUUID();
+      const { error: directTemplateInsertError } = await client.from('plan_templates').insert({
+        id: directTemplateId,
+        user_id: ownerId,
+        name: '直接作成は拒否',
+      });
+      expect(directTemplateInsertError?.code).toBe(RLS_VIOLATION);
+
+      const templateId = await createTemplate(ownerId, `所有-${crypto.randomUUID()}`);
+      const directBlockId = crypto.randomUUID();
+      const { error: directBlockInsertError } = await client.from('plan_template_blocks').insert({
+        id: directBlockId,
+        template_id: templateId,
+        user_id: ownerId,
+        activity_id: null,
+        title: '直接作成は拒否',
+        anchor_minute: 540,
+      });
+      expect(directBlockInsertError?.code).toBe(RLS_VIOLATION);
+
+      const blockId = crypto.randomUUID();
+      const { error: serviceBlockInsertError } = await admin.from('plan_template_blocks').insert({
+        id: blockId,
+        template_id: templateId,
+        user_id: ownerId,
+        activity_id: null,
+        title: 'service-owned writer',
+        anchor_minute: 540,
+      });
+      expect(serviceBlockInsertError).toBeNull();
+
+      const { error: directTemplateUpdateError } = await client
+        .from('plan_templates')
+        .update({ name: '直接更新は拒否' })
+        .eq('id', templateId);
+      expect(directTemplateUpdateError?.code).toBe(RLS_VIOLATION);
+
+      const { data: selectedTemplates, error: templateSelectError } = await client
+        .from('plan_templates')
+        .select('id')
+        .eq('id', templateId);
+      const { data: selectedBlocks, error: blockSelectError } = await client
+        .from('plan_template_blocks')
+        .select('id')
+        .eq('id', blockId);
+      expect(templateSelectError).toBeNull();
+      expect(selectedTemplates).toEqual([{ id: templateId }]);
+      expect(blockSelectError).toBeNull();
+      expect(selectedBlocks).toEqual([{ id: blockId }]);
+
+      const { data: deletedBlocks, error: blockDeleteError } = await client
+        .from('plan_template_blocks')
+        .delete()
+        .eq('id', blockId)
+        .select('id');
+      const { data: deletedTemplates, error: templateDeleteError } = await client
+        .from('plan_templates')
+        .delete()
+        .eq('id', templateId)
+        .select('id');
+      expect(blockDeleteError).toBeNull();
+      expect(deletedBlocks).toEqual([{ id: blockId }]);
+      expect(templateDeleteError).toBeNull();
+      expect(deletedTemplates).toEqual([{ id: templateId }]);
+    });
+
     it('hides another user’s templates and blocks from select', async () => {
       const foreignTemplateId = await createTemplate(otherId, `他人-${crypto.randomUUID()}`);
       await admin.from('plan_template_blocks').insert({
@@ -334,7 +402,7 @@ describe.skipIf(!RUN_LOCAL)('plan_templates schema contract (#2567)', () => {
       const foreignTemplateId = await createTemplate(otherId, `他人-${crypto.randomUUID()}`);
       const client = await signIn(ownerEmail);
 
-      const { data: renamed } = await client
+      const { error: renameError } = await client
         .from('plan_templates')
         .update({ name: '乗っ取り' })
         .eq('id', foreignTemplateId)
@@ -345,7 +413,7 @@ describe.skipIf(!RUN_LOCAL)('plan_templates schema contract (#2567)', () => {
         .eq('id', foreignTemplateId)
         .select('id');
 
-      expect(renamed).toEqual([]);
+      expect(renameError?.code).toBe(RLS_VIOLATION);
       expect(deleted).toEqual([]);
 
       const { data: survivor, error } = await admin
@@ -357,12 +425,7 @@ describe.skipIf(!RUN_LOCAL)('plan_templates schema contract (#2567)', () => {
       expect(survivor.name).not.toBe('乗っ取り');
     });
 
-    /**
-     * 自分の行なので UPDATE の USING は通るが、WITH CHECK が新しい行（他人の user_id）を
-     * 弾く。PostgREST は 0 件更新ではなく **エラー**（42501）を返す — 行が黙って
-     * フィルタされる形ではないので、`data` が空配列であることを期待すると落ちる。
-     */
-    it('refuses to move a template to another user', async () => {
+    it('refuses authenticated direct updates even for an owned template', async () => {
       const templateId = await createTemplate(ownerId, `所有-${crypto.randomUUID()}`);
       const client = await signIn(ownerEmail);
 
