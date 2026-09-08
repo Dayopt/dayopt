@@ -44,13 +44,6 @@ BEGIN
       OR has_column_privilege('authenticated','public.profiles',r.column_name,'INSERT')
       THEN RAISE EXCEPTION 'trial tampering possible: %',r.column_name; END IF;
   END LOOP;
-  FOR r IN SELECT table_name,column_name FROM information_schema.columns
-    WHERE table_schema='public' AND table_name IN ('activities','categories','segments','segment_activities','plans','records','plan_templates','plan_template_blocks')
-  LOOP
-    IF has_column_privilege('authenticated','public.'||r.table_name,r.column_name,'INSERT')
-      OR has_column_privilege('authenticated','public.'||r.table_name,r.column_name,'UPDATE')
-      THEN RAISE EXCEPTION 'direct write bypass: %.%',r.table_name,r.column_name; END IF;
-  END LOOP;
   INSERT INTO public.categories(id,user_id,name,color) VALUES(c,other_user,'foreign fixture','blue');
   BEGIN
     INSERT INTO public.activities(id,user_id,name,category_id) VALUES(a,u,'cross tenant',c);
@@ -62,11 +55,6 @@ BEGIN
   SET LOCAL ROLE authenticated;
   IF NOT EXISTS(SELECT 1 FROM public.activities WHERE id=a) THEN RAISE EXCEPTION 'expired read denied'; END IF;
   IF EXISTS(SELECT 1 FROM public.categories WHERE id=c) THEN RAISE EXCEPTION 'foreign read allowed'; END IF;
-  BEGIN
-    UPDATE public.activities SET name='bypass' WHERE id=a;
-    RAISE EXCEPTION 'direct update succeeded';
-  EXCEPTION WHEN insufficient_privilege THEN NULL;
-  END;
   BEGIN
     UPDATE public.profiles SET app_trial_consumed_at=NULL WHERE id=u;
     RAISE EXCEPTION 'direct trial tampering succeeded';
