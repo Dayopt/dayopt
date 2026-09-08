@@ -8,7 +8,7 @@ import type { Database } from '@/lib/database';
  * 旧実装は全 E2E spec が単一の `TEST_USER_EMAIL` / `TEST_USER_PASSWORD`
  * （`scripts/ci/create-e2e-test-user.mjs` が発行）を共有していたため、
  * `workers` 並列実行下で procedures.ts の in-memory rate limiter（userId 単位
- * 100req/60s）を spec 間で共有し、閾値超過で calendar data の取得が
+ * 300req/60s。#2669 までは 100）を spec 間で共有し、閾値超過で calendar data の取得が
  * timeout する不具合があった（#2246）。spec ごとに account を分離することで、
  * rate limit の予算も spec 単位に分離する。
  *
