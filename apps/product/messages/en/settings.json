@@ -113,7 +113,8 @@
           "noCodesLeft": "No recovery codes remaining",
           "exhaustedWarning": "All recovery codes have been used. If you lose your device, you won't be able to access your account. Please regenerate codes now.",
           "regenerateSuccess": "New recovery codes generated. Please save them in a secure location.",
-          "regenerateFailed": "Failed to generate recovery codes"
+          "regenerateFailed": "Failed to generate recovery codes",
+          "enrollmentGenerateFailed": "Multi-factor authentication is enabled, but recovery codes could not be generated. Please regenerate them from settings."
         },
         "disableDialog": {
           "title": "Disable multi-factor authentication",

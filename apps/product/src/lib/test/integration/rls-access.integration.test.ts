@@ -178,20 +178,6 @@ const userOwnedCases: UserOwnedRlsCase[] = [
     update: { theme: 'dark' },
   },
   {
-    table: 'mfa_recovery_codes',
-    idColumn: 'id',
-    rowId: crypto.randomUUID(),
-    seed: async function () {
-      const { error } = await adminSupabase.from('mfa_recovery_codes').insert({
-        id: this.rowId,
-        user_id: TEST_USER_B_ID,
-        code_hash: `rls-${this.rowId}`,
-      });
-      if (error) throw error;
-    },
-    update: { used_at: new Date().toISOString() },
-  },
-  {
     table: 'reports',
     idColumn: 'id',
     rowId: crypto.randomUUID(),
@@ -510,6 +496,48 @@ describe.skipIf(!RUN_LOCAL)('RLS access matrix', () => {
     expect(recordReadError).toBeNull();
     expect(plan?.title).toBe('RLS plan');
     expect(record?.title).toBe('RLS record');
+  });
+
+  // #2618: MFA リカバリコードは「MFA を解除してよいか」の判断根拠なので、判断される当人
+  // （authenticated）から読み書きできてはいけない。以前は自分の user_id なら INSERT でき、
+  // 別アカウントで学んだ code_hash を被害者の行として植えることで MFA を迂回できた。
+  // 詳細な境界は mfa-recovery-codes-lockdown.integration.test.ts が固定する。ここでは
+  // 「owner でも到達できない table」として RLS マトリクスの側にも記録しておく。
+  it('authenticatedはown recovery codeにも一切到達できない', async () => {
+    const ownRowId = crypto.randomUUID();
+    const { error: seedError } = await adminSupabase.from('mfa_recovery_codes').insert({
+      id: ownRowId,
+      user_id: TEST_USER_B_ID,
+      code_hash: `rls-${ownRowId}`,
+    });
+    expect(seedError).toBeNull();
+
+    const [select, insert, update, remove] = await Promise.all([
+      supabaseB.from('mfa_recovery_codes').select('code_hash').eq('id', ownRowId),
+      supabaseB
+        .from('mfa_recovery_codes')
+        .insert({ user_id: TEST_USER_B_ID, code_hash: 'forbidden-direct-insert' }),
+      supabaseB
+        .from('mfa_recovery_codes')
+        .update({ used_at: new Date().toISOString() })
+        .eq('id', ownRowId),
+      supabaseB.from('mfa_recovery_codes').delete().eq('id', ownRowId),
+    ]);
+
+    for (const result of [select, insert, update, remove]) {
+      expect(result.error?.code).toBe('42501');
+    }
+
+    // service_role 側からは従来どおり読める（消費経路が壊れていないこと）。
+    const { data: row, error: adminReadError } = await adminSupabase
+      .from('mfa_recovery_codes')
+      .select('code_hash')
+      .eq('id', ownRowId)
+      .single();
+    expect(adminReadError).toBeNull();
+    expect(row?.code_hash).toBe(`rls-${ownRowId}`);
+
+    await adminSupabase.from('mfa_recovery_codes').delete().eq('id', ownRowId);
   });
 
   describe('profiles deletion grants', () => {
