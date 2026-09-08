@@ -14,7 +14,7 @@ interface UseCalendarNavigationHandlersOptions {
   currentDate: Date;
   showWeekends: boolean;
   navigateRelative: (direction: 'prev' | 'next' | 'today', showWeekends?: boolean) => void;
-  navigateToDate: (date: Date) => void;
+  navigateToDate: (date: Date, updateUrl?: boolean) => void;
   changeView: (view: CalendarViewType) => void;
 }
 
@@ -102,7 +102,7 @@ export function useCalendarNavigationHandlers({
   const handleDateSelect = useCallback(
     (date: Date) => {
       const adjustedDate = adjustWeekendDate(date);
-      navigateToDate(adjustedDate);
+      navigateToDate(adjustedDate, true);
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps -- advanced-use-latest パターンで安定化済み
     [navigateToDate],

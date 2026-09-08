@@ -35,19 +35,21 @@ export function QualityChapter({
     <section
       aria-label={t('kick')}
       data-report-chapter="quality"
-      className="border-border-subtle bg-card flex flex-col gap-4 rounded-2xl border p-4 shadow-sm"
+      className="border-border-subtle flex flex-col gap-4 border-b pb-8 last:border-b-0"
     >
-      <p className="text-muted-foreground text-xs">{t('kick')}</p>
+      <h2 className="text-foreground text-sm font-medium">{t('kick')}</h2>
 
       <CompassScatter onSelectActivity={onSelectActivity} points={points} />
 
-      <div className="flex flex-col gap-1">
-        <WaitingList activities={waitingActivities} />
-        {/* 濃度の意味と点が生まれる回数は常に添える（読み手が濃さを推測しないで済むように） */}
-        <p className="text-muted-foreground text-xs">
-          {t('footnote', { threshold: COMPASS_MIN_FULFILLMENT })}
-        </p>
-      </div>
+      {points.length > 0 && (
+        <div className="flex flex-col gap-1">
+          <WaitingList activities={waitingActivities} />
+          {/* 濃度の意味と点が生まれる回数は常に添える（読み手が濃さを推測しないで済むように） */}
+          <p className="text-muted-foreground text-xs">
+            {t('footnote', { threshold: COMPASS_MIN_FULFILLMENT })}
+          </p>
+        </div>
+      )}
     </section>
   );
 }

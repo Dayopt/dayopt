@@ -131,7 +131,7 @@ export function DisplaySettings() {
       <SectionCard title={t('settings.preferences.languageAndTheme')}>
         <LabeledRow label={t('settings.preferences.language')}>
           <Select value={locale} onValueChange={handleLanguageChange}>
-            <SelectTrigger variant="ghost">
+            <SelectTrigger variant="ghost" aria-label={t('settings.preferences.language')}>
               <SelectValue placeholder={t('settings.preferences.selectLanguage')} />
             </SelectTrigger>
             <SelectContent>
@@ -145,7 +145,7 @@ export function DisplaySettings() {
         </LabeledRow>
         <LabeledRow label={t('settings.preferences.themeLabel')}>
           <Select value={theme} onValueChange={handleThemeChange}>
-            <SelectTrigger variant="ghost">
+            <SelectTrigger variant="ghost" aria-label={t('settings.preferences.themeLabel')}>
               <SelectValue placeholder={t('settings.preferences.selectTheme')} />
             </SelectTrigger>
             <SelectContent>
@@ -161,7 +161,7 @@ export function DisplaySettings() {
       <SectionCard title={t('settings.calendar.timeAndTimezone')}>
         <LabeledRow label={t('settings.calendar.timezone')}>
           <Select value={settings.timezone} onValueChange={handleTimezoneChange}>
-            <SelectTrigger variant="ghost">
+            <SelectTrigger variant="ghost" aria-label={t('settings.calendar.timezone')}>
               <SelectValue placeholder={t('settings.calendar.selectTimezone')} />
             </SelectTrigger>
             <SelectContent>
@@ -175,7 +175,7 @@ export function DisplaySettings() {
         </LabeledRow>
         <LabeledRow label={t('settings.calendar.timeFormat')}>
           <Select value={settings.timeFormat} onValueChange={handleTimeFormatChange}>
-            <SelectTrigger variant="ghost">
+            <SelectTrigger variant="ghost" aria-label={t('settings.calendar.timeFormat')}>
               <SelectValue placeholder={t('settings.calendar.selectTimeFormat')} />
             </SelectTrigger>
             <SelectContent>
@@ -186,7 +186,7 @@ export function DisplaySettings() {
         </LabeledRow>
         <LabeledRow label={t('settings.calendar.weekStartsOn')}>
           <Select value={String(settings.weekStartsOn)} onValueChange={handleWeekStartsOnChange}>
-            <SelectTrigger variant="ghost">
+            <SelectTrigger variant="ghost" aria-label={t('settings.calendar.weekStartsOn')}>
               <SelectValue placeholder={t('settings.calendar.selectStartDay')} />
             </SelectTrigger>
             <SelectContent>
@@ -202,7 +202,7 @@ export function DisplaySettings() {
       <SectionCard title={t('settings.calendar.defaultViewSection')}>
         <LabeledRow label={t('settings.calendar.defaultView')}>
           <Select value={settings.defaultView} onValueChange={handleDefaultViewChange}>
-            <SelectTrigger variant="ghost">
+            <SelectTrigger variant="ghost" aria-label={t('settings.calendar.defaultView')}>
               <SelectValue placeholder={t('settings.calendar.selectDefaultView')} />
             </SelectTrigger>
             <SelectContent>
@@ -218,7 +218,7 @@ export function DisplaySettings() {
             value={String(settings.defaultDuration)}
             onValueChange={handleDefaultDurationChange}
           >
-            <SelectTrigger variant="ghost">
+            <SelectTrigger variant="ghost" aria-label={t('settings.calendar.defaultDuration')}>
               <SelectValue placeholder={t('settings.calendar.selectDuration')} />
             </SelectTrigger>
             <SelectContent>
@@ -241,7 +241,7 @@ export function DisplaySettings() {
         </LabeledRow>
         <LabeledRow label={t('settings.calendar.density')}>
           <Select value={settings.hourHeightDensity} onValueChange={handleDensityChange}>
-            <SelectTrigger variant="ghost">
+            <SelectTrigger variant="ghost" aria-label={t('settings.calendar.density')}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>

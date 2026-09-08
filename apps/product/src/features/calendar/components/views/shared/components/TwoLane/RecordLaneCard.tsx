@@ -99,6 +99,7 @@ export function RecordLaneCard({
     <div
       data-record-lane-card
       data-entry-block={interactive ? 'true' : undefined}
+      data-entry-id={interactive ? event.id : undefined}
       tabIndex={interactive ? 0 : undefined}
       role={interactive ? 'button' : undefined}
       aria-label={interactive ? displayName : undefined}
@@ -176,13 +177,10 @@ export function RecordLaneCard({
       {showDayDiffMarker && <DayDiffMarker />}
       {canDrag && onResizeStart && (
         <div
-          role="slider"
-          tabIndex={-1}
-          aria-label={t('calendar.timeblock.adjustEndTime')}
-          aria-orientation="vertical"
-          aria-valuenow={position.height}
-          aria-valuemin={MIN_HEIGHT}
-          aria-valuemax={1440}
+          // ポインター用のジェスチャー領域。キーボードではカードから Inspector の時刻入力を使う。
+          // ピクセル高を時刻の slider として公開しない。
+          role="presentation"
+          data-resize-handle
           className="absolute right-0 bottom-0 left-0 cursor-ns-resize"
           style={{ height: RESIZE_HANDLE_HEIGHT }}
           onMouseDown={(e) => {

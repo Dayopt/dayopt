@@ -133,7 +133,7 @@ export function MFASection({ _useMFAHook }: MFASectionProps = {}) {
 
         {/* MFA未設定時の表示 */}
         {!hasMFA && !showMFASetup && (
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col items-start gap-4 md:flex-row md:items-center md:justify-between">
             <div>
               <div className="text-base font-normal">{t('settings.account.mfa.title')}</div>
               <p className="text-muted-foreground mt-1 text-base md:text-sm">
