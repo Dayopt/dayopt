@@ -263,33 +263,11 @@ export async function getPaymentMethod(
     return null;
   }
 
-  const customer = await stripe.customers.retrieve(billingInfo.stripeCustomerId);
-
-  if (customer.deleted) {
-    return null;
-  }
-
-  const defaultPaymentMethodId =
-    typeof customer.invoice_settings?.default_payment_method === 'string'
-      ? customer.invoice_settings.default_payment_method
-      : customer.invoice_settings?.default_payment_method?.id;
-
-  if (!defaultPaymentMethodId) {
-    return null;
-  }
-
-  const pm = await stripe.paymentMethods.retrieve(defaultPaymentMethodId);
-
-  if (!pm.card) {
-    return null;
-  }
-
-  return {
-    brand: pm.card.brand,
-    last4: pm.card.last4,
-    expMonth: pm.card.exp_month,
-    expYear: pm.card.exp_year,
-  };
+  return getPaymentMethodByCustomerId(
+    stripe,
+    billingInfo.stripeCustomerId,
+    billingInfo.subscriptionId,
+  );
 }
 
 /**
@@ -384,7 +362,7 @@ export async function getBillingOverview(
 
   // Stripe API を並列実行
   const [paymentMethod, invoiceList, trialEndsAt] = await Promise.all([
-    getPaymentMethodByCustomerId(stripe, billingInfo.stripeCustomerId),
+    getPaymentMethodByCustomerId(stripe, billingInfo.stripeCustomerId, billingInfo.subscriptionId),
     getInvoicesByCustomerId(stripe, billingInfo.stripeCustomerId),
     getTrialEndsAt(stripe, billingInfo),
   ]);
@@ -431,6 +409,7 @@ async function getTrialEndsAt(stripe: Stripe, billingInfo: BillingInfo): Promise
 async function getPaymentMethodByCustomerId(
   stripe: Stripe,
   customerId: string,
+  subscriptionId: string | null,
 ): Promise<PaymentMethod | null> {
   const customer = await stripe.customers.retrieve(customerId);
 
@@ -438,16 +417,37 @@ async function getPaymentMethodByCustomerId(
     return null;
   }
 
-  const defaultPaymentMethodId =
-    typeof customer.invoice_settings?.default_payment_method === 'string'
-      ? customer.invoice_settings.default_payment_method
-      : customer.invoice_settings?.default_payment_method?.id;
+  let defaultPaymentMethodId = resolvePaymentMethodId(
+    customer.invoice_settings?.default_payment_method,
+  );
+
+  // CheckoutはカードをSubscriptionだけへ保存し、Customerのinvoice settingsへコピーしない
+  // 場合がある。既存利用者向けにCustomerを優先し、無い場合は現在のSubscriptionを使う。
+  if (!defaultPaymentMethodId && subscriptionId) {
+    try {
+      const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+      defaultPaymentMethodId = resolvePaymentMethodId(subscription.default_payment_method);
+    } catch (error) {
+      logger.error('Failed to fetch subscription payment method', {
+        errorType: error instanceof Error ? error.name : 'unknown',
+      });
+      return null;
+    }
+  }
 
   if (!defaultPaymentMethodId) {
     return null;
   }
 
-  const pm = await stripe.paymentMethods.retrieve(defaultPaymentMethodId);
+  let pm: Stripe.PaymentMethod;
+  try {
+    pm = await stripe.paymentMethods.retrieve(defaultPaymentMethodId);
+  } catch (error) {
+    logger.error('Failed to fetch payment method', {
+      errorType: error instanceof Error ? error.name : 'unknown',
+    });
+    return null;
+  }
 
   if (!pm.card) {
     return null;
@@ -459,6 +459,13 @@ async function getPaymentMethodByCustomerId(
     expMonth: pm.card.exp_month,
     expYear: pm.card.exp_year,
   };
+}
+
+function resolvePaymentMethodId(
+  paymentMethod: string | Stripe.PaymentMethod | null | undefined,
+): string | null {
+  if (typeof paymentMethod === 'string') return paymentMethod;
+  return paymentMethod?.id ?? null;
 }
 
 /**

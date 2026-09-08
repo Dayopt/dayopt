@@ -260,8 +260,14 @@ describe('billing-service', () => {
       expect(overview.trialEndsAt).toBeNull();
     });
 
-    it('trialing 以外では subscription を引かない（追加の Stripe 呼び出しをしない）', async () => {
+    it('Customerに支払い方法が無ければ現在のSubscriptionから取得する', async () => {
       stubCustomerAndInvoices();
+      stripeMock.subscriptions.retrieve.mockResolvedValue({
+        default_payment_method: 'pm_subscription',
+      });
+      stripeMock.paymentMethods.retrieve.mockResolvedValue({
+        card: { brand: 'visa', last4: '4242', exp_month: 12, exp_year: 2034 },
+      });
 
       const overview = await getBillingOverview(
         createProfileSupabase({ ...TRIALING_PROFILE, subscription_status: 'active' }),
@@ -269,6 +275,55 @@ describe('billing-service', () => {
       );
 
       expect(overview.trialEndsAt).toBeNull();
+      expect(overview.paymentMethod).toEqual({
+        brand: 'visa',
+        last4: '4242',
+        expMonth: 12,
+        expYear: 2034,
+      });
+      expect(stripeMock.subscriptions.retrieve).toHaveBeenCalledOnce();
+      expect(stripeMock.subscriptions.retrieve).toHaveBeenCalledWith('sub_test');
+    });
+
+    it('Subscriptionの支払い方法取得が失敗しても請求画面の他情報を返す', async () => {
+      stubCustomerAndInvoices();
+      stripeMock.subscriptions.retrieve.mockResolvedValue({
+        default_payment_method: 'pm_subscription',
+      });
+      stripeMock.paymentMethods.retrieve.mockRejectedValue(new Error('Stripe unavailable'));
+
+      const overview = await getBillingOverview(
+        createProfileSupabase({ ...TRIALING_PROFILE, subscription_status: 'active' }),
+        'user-1',
+      );
+
+      expect(overview.paymentMethod).toBeNull();
+      expect(overview.invoices).toEqual([]);
+      expect(overview.billingInfo.subscriptionStatus).toBe('active');
+    });
+
+    it('Customerに支払い方法があればSubscriptionより優先する', async () => {
+      stripeMock.customers.retrieve.mockResolvedValue({
+        deleted: false,
+        invoice_settings: { default_payment_method: 'pm_customer' },
+      });
+      stripeMock.paymentMethods.retrieve.mockResolvedValue({
+        card: { brand: 'mastercard', last4: '4444', exp_month: 11, exp_year: 2033 },
+      });
+      stripeMock.invoices.list.mockResolvedValue({ data: [] });
+
+      const overview = await getBillingOverview(
+        createProfileSupabase({ ...TRIALING_PROFILE, subscription_status: 'active' }),
+        'user-1',
+      );
+
+      expect(overview.paymentMethod).toEqual({
+        brand: 'mastercard',
+        last4: '4444',
+        expMonth: 11,
+        expYear: 2033,
+      });
+      expect(stripeMock.paymentMethods.retrieve).toHaveBeenCalledWith('pm_customer');
       expect(stripeMock.subscriptions.retrieve).not.toHaveBeenCalled();
     });
 
