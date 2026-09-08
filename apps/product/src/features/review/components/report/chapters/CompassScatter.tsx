@@ -5,6 +5,8 @@ import { useTranslations } from 'next-intl';
 import { getCategoryColorClasses } from '@/features/activities';
 import { cn } from '@dayopt/components';
 
+import { COMPASS_MIN_FULFILLMENT } from '../../../domain/report/report-view-model';
+
 import { formatReportDuration } from '../../../domain/report/format-duration';
 
 import type { ReportCompassPoint } from '../../../domain/report/report-view-model';
@@ -32,6 +34,14 @@ const LABEL_FLIP_X = 70;
 export function CompassScatter({ points, onSelectActivity }: CompassScatterProps) {
   const t = useTranslations('report.quality');
 
+  if (points.length === 0) {
+    return (
+      <p className="text-muted-foreground text-sm">
+        {t('emptyBoard', { threshold: COMPASS_MIN_FULFILLMENT })}
+      </p>
+    );
+  }
+
   return (
     <div className="flex flex-col gap-1">
       <div className="flex items-stretch gap-2 overflow-x-clip">
@@ -46,32 +56,19 @@ export function CompassScatter({ points, onSelectActivity }: CompassScatterProps
           data-report-board="compass"
           style={{ height: BOARD_HEIGHT }}
         >
-          {/* ヒントは 2 つだけ。ここに推奨文を足さない（仕様 §4.3）。
-              点が無い盤では出さない — 読む対象が無いうえ、狭い幅で空文言と重なる */}
-          {points.length > 0 && (
-            <>
-              <p className="text-muted-foreground absolute top-0 left-0 w-1/2 text-xs opacity-70">
-                {t('hint.lowButFulfilled')}
-              </p>
-              <p className="text-muted-foreground absolute right-0 bottom-0 w-1/2 text-right text-xs opacity-70">
-                {t('hint.heavyButDrained')}
-              </p>
-            </>
-          )}
-
-          {points.length === 0 ? (
-            <p className="text-muted-foreground absolute inset-0 flex items-center justify-center px-4 text-center text-xs">
-              {t('emptyBoard')}
-            </p>
-          ) : (
-            points.map((point) => (
-              <CompassPoint
-                key={point.activityId ?? '__unassigned'}
-                onSelectActivity={onSelectActivity}
-                point={point}
-              />
-            ))
-          )}
+          <p className="text-muted-foreground absolute top-0 left-0 w-1/2 text-xs opacity-70">
+            {t('hint.lowButFulfilled')}
+          </p>
+          <p className="text-muted-foreground absolute right-0 bottom-0 w-1/2 text-right text-xs opacity-70">
+            {t('hint.heavyButDrained')}
+          </p>
+          {points.map((point) => (
+            <CompassPoint
+              key={point.activityId ?? '__unassigned'}
+              onSelectActivity={onSelectActivity}
+              point={point}
+            />
+          ))}
         </div>
       </div>
 

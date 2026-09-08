@@ -201,6 +201,7 @@
     },
     "templates": {
       "sectionTitle": "Templates",
+      "loadFailed": "Couldn't load templates.",
       "empty": "No templates yet",
       "createLabel": "Add template",
       "settingsLabel": "Settings",

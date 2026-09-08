@@ -57,14 +57,16 @@ export function AllocationChapter({
 }: AllocationChapterProps) {
   const t = useTranslations('report.allocation');
   const lensActive = activeSegmentName !== null;
+  const showSegments = !lensActive && segmentBars.length > 0;
+  const hasInk = inkColumns.some((column) => column.stacks.some((stack) => stack.minutes > 0));
 
   return (
     <section
       aria-label={t('kick')}
       data-report-chapter="allocation"
-      className="border-border-subtle bg-card flex flex-col gap-4 rounded-2xl border p-4 shadow-sm"
+      className="border-border-subtle @container flex flex-col gap-4 border-b pb-8 last:border-b-0"
     >
-      <p className="text-muted-foreground text-xs">{t('kick')}</p>
+      <h2 className="text-foreground text-sm font-medium">{t('kick')}</h2>
 
       <Headline
         activeSegmentName={activeSegmentName}
@@ -84,12 +86,14 @@ export function AllocationChapter({
 
       {/* レンズ中はセグメント別バーを出さない。分母が選択中セグメントの記録合計なので、
           選択中だけ 100%・他が 0% と並び、比較としての意味を失う（2026-09-04 User 裁可） */}
-      <div className={cn('grid gap-6', !lensActive && 'md:grid-cols-2')}>
+      <div className={cn('grid gap-6', showSegments && '@lg:grid-cols-2')}>
         <Legend granularity={granularity} slices={slices} />
-        {lensActive ? null : <SegmentBars bars={segmentBars} />}
+        {showSegments && <SegmentBars bars={segmentBars} />}
       </div>
 
-      <InkColumns columns={inkColumns} granularity={granularity} maxMinutes={maxInkMinutes} />
+      {hasInk && (
+        <InkColumns columns={inkColumns} granularity={granularity} maxMinutes={maxInkMinutes} />
+      )}
     </section>
   );
 }
@@ -205,7 +209,7 @@ function Legend({
   return (
     <ul data-report-legend="allocation" className="flex flex-col gap-2">
       {slices.map((slice) => (
-        <li key={slice.key} className="flex items-center gap-2 text-xs">
+        <li key={slice.key} className="flex items-center gap-2 text-sm">
           <span
             className="size-2 shrink-0 rounded-full"
             style={{ backgroundColor: sliceColor(slice.color) }}
@@ -243,7 +247,7 @@ function SegmentBars({ bars }: { bars: readonly ReportSegmentBar[] }) {
       ) : (
         <ul className="flex flex-col gap-2">
           {bars.map((bar) => (
-            <li key={bar.segmentId} className="flex items-center gap-2 text-xs">
+            <li key={bar.segmentId} className="flex items-center gap-2 text-sm">
               <span className="text-foreground w-14 shrink-0 truncate">{bar.name}</span>
               <span className="bg-muted h-2 min-w-0 flex-1 overflow-hidden rounded-full">
                 <span

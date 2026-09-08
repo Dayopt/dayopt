@@ -47,7 +47,7 @@ import type { ReportGranularity } from '../../lib/report-period';
  *
  * 読み込み・エラーの分岐も同じ枠を使う。枠が違うと、解決した瞬間に横位置が跳ねる。
  */
-const REPORT_BODY_CONTAINER = 'flex w-full flex-col gap-3 p-4 md:p-6';
+const REPORT_BODY_CONTAINER = 'flex w-full flex-col gap-8 p-4 md:p-6';
 
 interface ReportBodyProps {
   anchorDate: string;

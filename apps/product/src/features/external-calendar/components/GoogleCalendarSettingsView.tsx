@@ -87,11 +87,11 @@ export function GoogleCalendarSettingsView({
         </Button>
       }
     >
-      <p className="text-muted-foreground mb-4 text-sm">{t('description')}</p>
-
       {!availabilityLoading && !available ? (
-        <InlineBanner visible message={t('unavailable')} />
-      ) : null}
+        <p className="text-muted-foreground text-sm">{t('unavailable')}</p>
+      ) : (
+        <p className="text-muted-foreground mb-4 text-sm">{t('description')}</p>
+      )}
 
       {loading ? (
         <div className="space-y-3 py-4" aria-label={t('loading')}>
@@ -102,9 +102,9 @@ export function GoogleCalendarSettingsView({
         <ErrorState title={t('loadError')} onRetry={onRetry} size="sm" />
       ) : hasConnections ? (
         <div className="mt-4 space-y-4">{children}</div>
-      ) : (
+      ) : available ? (
         <p className="text-muted-foreground py-4 text-sm">{t('empty')}</p>
-      )}
+      ) : null}
     </SectionCard>
   );
 }
