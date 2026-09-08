@@ -1,3 +1,7 @@
+vi.mock('@/lib/hooks/useUserPreferences', () => ({
+  useUserPreferences: (select: (state: { timezone: string }) => unknown) =>
+    select({ timezone: 'Asia/Tokyo' }),
+}));
 import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -152,7 +156,7 @@ describe('BillingSettings billing operation', () => {
     const user = userEvent.setup();
     render(<BillingSettings />);
     const upgrade = screen.getByRole('button', {
-      name: 'settings.subscription.upgrade',
+      name: 'settings.subscription.singlePlan.purchase',
     });
 
     await user.click(upgrade);
@@ -181,7 +185,7 @@ describe('BillingSettings billing operation', () => {
     const user = userEvent.setup();
     render(<BillingSettings />);
     const upgrade = screen.getByRole('button', {
-      name: 'settings.subscription.upgrade',
+      name: 'settings.subscription.singlePlan.purchase',
     });
 
     await user.click(upgrade);
@@ -218,7 +222,7 @@ describe('BillingSettings billing operation', () => {
     const user = userEvent.setup();
     render(<BillingSettings />);
     const upgrade = screen.getByRole('button', {
-      name: 'settings.subscription.upgrade',
+      name: 'settings.subscription.singlePlan.purchase',
     });
 
     await user.click(upgrade);

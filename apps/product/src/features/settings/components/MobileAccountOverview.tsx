@@ -3,7 +3,7 @@
 import { Link, useRouter } from '@dayopt/i18n/navigation';
 import { useState } from 'react';
 
-import { getPlanIdForSubscriptionStatus, isPaidPlan } from '@dayopt/billing';
+import { useBillingAccess } from '@/lib/billing/BillingAccessProvider';
 import {
   Avatar,
   AvatarFallback,
@@ -68,9 +68,8 @@ export function MobileAccountOverview({
   const initials = getInitials(displayName);
 
   const billingOverview = api.billing.getOverview.useQuery(undefined, { retry: false });
-  const subStatus = billingOverview.data?.billingInfo.subscriptionStatus;
-  const currentPlan = getPlanIdForSubscriptionStatus(subStatus);
-  const canAccessPro = isPaidPlan(currentPlan);
+  const access = useBillingAccess();
+  const canAccessPro = access.state === 'subscribed';
   const isLoadingBilling = billingOverview.isLoading;
 
   const helpLinks: Array<{
@@ -163,9 +162,7 @@ export function MobileAccountOverview({
                 <Skeleton className="h-6 w-10 rounded-lg" />
               ) : (
                 <Badge variant={canAccessPro ? 'primary' : 'outline'}>
-                  {canAccessPro
-                    ? t('settings.subscription.plans.pro.name')
-                    : t('settings.subscription.plans.free.name')}
+                  {t('settings.subscription.singlePlan.name')}
                 </Badge>
               )}
             </Link>
@@ -179,9 +176,11 @@ export function MobileAccountOverview({
               >
                 <Crown className="text-primary size-5 shrink-0" />
                 <div className="min-w-0 flex-1 text-left">
-                  <p className="text-base font-medium">{t('navigation.navUser.upgradePlan')}</p>
+                  <p className="text-base font-medium">
+                    {t('settings.subscription.singlePlan.purchase')}
+                  </p>
                   <p className="text-muted-foreground text-xs">
-                    {t('settings.subscription.proPlanDescription')}
+                    {t('settings.subscription.singlePlan.included')}
                   </p>
                 </div>
                 <ChevronRight className="text-muted-foreground size-4 shrink-0" />

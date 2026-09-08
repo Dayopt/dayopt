@@ -1,9 +1,9 @@
+import { resolveBillingAccess } from '@dayopt/billing';
 import 'server-only';
 
 import { env } from '@/env';
-import { entitlementKeys } from '@dayopt/billing';
 
-import { hasEntitlementForStatus, isBillingEnforced } from '@/lib/billing/enforcement';
+import { isBillingEnforced } from '@/lib/billing/enforcement';
 import { databaseTables } from '@/lib/database';
 import { logger } from '@/lib/logger';
 import {
@@ -204,7 +204,7 @@ async function checkMcpEntitlement(
 
   const { data: profile, error } = await db
     .from(databaseTables.profiles)
-    .select('subscription_status')
+    .select('subscription_status, app_trial_started_at, app_trial_ends_at, app_trial_consumed_at')
     .eq('id', userId)
     .maybeSingle();
 
@@ -218,7 +218,7 @@ async function checkMcpEntitlement(
     );
   }
 
-  return hasEntitlementForStatus(profile.subscription_status, entitlementKeys.mcpApi);
+  return resolveBillingAccess(profile, Date.now(), true).canUseProduct;
 }
 
 function parseStoredScopes(scopes: string[]): SupportedScope[] | null {

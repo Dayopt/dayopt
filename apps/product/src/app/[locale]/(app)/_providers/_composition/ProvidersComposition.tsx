@@ -33,6 +33,7 @@ const AxeAccessibilityChecker =
 
 import { AuthStoreInitializer } from '@/features/auth';
 import { UserSettingsInitializer } from '@/features/settings';
+import { BillingAccessProvider } from '@/lib/billing/BillingAccessProvider';
 import { api } from '@/lib/trpc';
 import { createAppTrpcClient } from '@/lib/trpc/browser-client';
 import { createAppQueryClient } from '@/lib/trpc/query-client';
@@ -115,10 +116,14 @@ export function ProvidersComposition({ children }: ProvidersCompositionProps) {
               {/* UserSettings の hydration が完了するまで children を render しない。
                   timezone 等が defaults のまま timezone-dependent mutation が実行
                   されるのを防ぐ。TanStack Query の永続 cache が効けば体感遅延は極小。 */}
-              <UserSettingsInitializer>{children}</UserSettingsInitializer>
-              <GlobalActivityCreateModal />
-              <GlobalActivityRenameModal />
-              <GlobalCategoryRenameModal />
+              <UserSettingsInitializer>
+                <BillingAccessProvider>
+                  {children}
+                  <GlobalActivityCreateModal />
+                  <GlobalActivityRenameModal />
+                  <GlobalCategoryRenameModal />
+                </BillingAccessProvider>
+              </UserSettingsInitializer>
             </ServiceWorkerProvider>
           </SessionMonitorProvider>
         </ThemeProvider>

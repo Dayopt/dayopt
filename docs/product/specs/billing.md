@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-09-07
+last_verified: 2026-09-08
 public_docs:
   - faq/pricing
   - api-mcp
@@ -8,158 +8,48 @@ lp:
   - 'API and MCP access'
 ---
 
-# Stripe 課金統合
+# 課金と利用期間
 
-Dayoptの Stripe サブスクリプション課金システムの技術ドキュメント。
+月 $5 の単一有料プランと、カード不要の45日間無料体験。実装と本番有効化は別であり、公開順は[移行手順](../../operations/billing-single-plan-rollout.md)に従う。`BILLING_ENFORCED` の既定値はfalse。本番の設定値はこの文書から推測しない。
 
----
+## 利用状態
 
-## 概要
+正本は `packages/billing/src/access.ts` の `resolveBillingAccess`。Stripeの請求状態とアプリの体験日時を分離する。
 
-| 項目           | 内容                                        |
-| -------------- | ------------------------------------------- |
-| プラン構成     | Free ($0) / Pro ($5/月)                     |
-| 年額           | 未実装（現行 Price ID は月額のみ）          |
-| トライアル     | 7日間無料                                   |
-| 決済基盤       | Stripe Checkout + Customer Portal + Webhook |
-| ステータス管理 | Supabase `profiles` テーブル                |
+| 状態   | 条件                                     | 通常利用                   |
+| ------ | ---------------------------------------- | -------------------------- |
+| 未開始 | 体験の開始・消費がなく、現在の契約もない | 認証済みアプリを開いて開始 |
+| 体験中 | 開始時刻以上、終了時刻未満で未消費       | 全機能                     |
+| 契約中 | `active` / `trialing` / `past_due`       | 全機能                     |
+| 終了後 | 体験の期限到達、消費済み、契約終了       | 保存済み情報の閲覧と管理   |
 
-現行 entitlement は `external_calendar_sync` / `mcp_api` / `report_long_range` / `estimation_full_history` の 4 キー（`@dayopt/billing` `entitlement.ts` が正本）。Free は空配列、Pro は 4 キー全部。gate の型は `procedure`（`entitledProcedure`）/ `route`（MCP）/ `input_range`（report の `granularity`、強制点は [#2605](https://github.com/Dayopt/dayopt/issues/2605) で未実装）/ `service_window`（見積もりの算出期間、強制点は未実装）の4種。Free/Pro の機能境界は epic [#2610](https://github.com/Dayopt/dayopt/issues/2610) §方針 で管理する。`BILLING_ENFORCED` の既定値は `false` で、その間は `entitledProcedure` / MCP を含む全 gate が認証後にゲートせず通過する（旧実装は MCP だけ enforcement flag を無視して Pro を必須にしていたが、現在は他の gate と同じ扱いになった）。
----
+`profiles.app_trial_started_at`、`app_trial_ends_at`、`app_trial_consumed_at` は本人が変更できない列。開始と終了の差は1080時間で固定する。複数タブ・再ログインは条件付きUPDATEで開始を再発行しない。期限ちょうどで終了。表示は利用者設定のtimezoneで行い、timezone変更で期間は変わらない。
 
-## アーキテクチャ
+初回アプリ表示の `billing.startTrial` mutationだけが開始する。登録・LP閲覧・バックグラウンド同期・MCPでは開始しない。既存未契約者は公開後の初回アプリ表示から開始する。現在および過去の契約者・Stripe trial経験者は公開前の分類で消費済みにする。未完了購入だけの履歴は除外する。既存Stripe trialの期限は延長も短縮もしない。
 
-Router → Service → Stripe/Supabase の3層構造に準拠。
+## 操作境界
 
-```
-┌─────────────────────────────────────────────────────┐
-│  Client (BillingSettings)                           │
-│    api.billing.getOverview.useQuery()               │
-│    api.billing.createCheckoutSession.useMutation()  │
-│    api.billing.createPortalSession.useMutation()    │
-└──────────────────────┬──────────────────────────────┘
-                       │ tRPC
-┌──────────────────────▼──────────────────────────────┐
-│  billing-router.ts (Router層)                       │
-│    getInfo / getOverview / getPaymentMethod / getInvoices
-│    createCheckoutSession / createPortalSession
-└──────────────────────┬──────────────────────────────┘
-                       │
-┌──────────────────────▼──────────────────────────────┐
-│  billing-service.ts / billing-mutation-service.ts    │
-│    read + webhook / Checkout + Portal orchestration  │
-└────────┬─────────────────────────┬──────────────────┘
-         │                         │
-┌────────▼────────┐  ┌────────────▼─────────────────┐
-│  Stripe API     │  │  Supabase (profiles テーブル) │
-│  - Checkout     │  │  - stripe_customer_id         │
-│  - Portal       │  │  - subscription_status        │
-│  - Webhook      │  │  - subscription_id            │
-└─────────────────┘  └──────────────────────────────┘
-```
+`apps/product/src/lib/billing/operation-access.ts` が通常のmutationを既定で制限し、本人の管理操作を明示的に許可する。`protectedProcedure` はJWTの契約claimではなく最新profileから判定し、同じprocedure内の追加判定へ結果を引き継ぐ。既存 `entitledProcedure(key)` は移行互換の入口として残るが、キーによる機能差はない。
 
-### Webhook（別経路）
+| 終了後も許可                                     | 終了後は拒否                                               |
+| ------------------------------------------------ | ---------------------------------------------------------- |
+| 保存済みカレンダー・週/月/年レポート・明細       | 予定・記録・アクティビティ・テンプレート等の作成/編集/複製 |
+| データexport、削除、アカウント削除               | インポート、Google接続、新規同期                           |
+| 連携解除、認証・プライバシー・表示設定、請求管理 | MCP/API/iCalフィードの通常利用                             |
 
-```
-Stripe Event
-  → POST /api/webhooks/stripe (Next.js Route Handler)
-    → signature 検証 (stripe.webhooks.constructEvent)
-    → syncSubscriptionStatus (Service層)
-    → Supabase profiles 更新 (Service Role Client, RLSバイパス)
-```
+レポート生成機能は新設しない。見積もりの算出方法も利用状態で変えない。保存済み外部予定は終了後も表示する。接続情報・tokenを削除せず、再契約後は通常の同期経路で再開する。通常操作は開始時に判定し、長時間同期は保存バッチごとに再判定する。
 
----
+Data APIの直接INSERT/UPDATEは閉じ、既存のservice-owned commandと固定userIdの書き込みを使う。SELECT/DELETEのowner RLSと複合FKは保持する。MCPのDB認可も体験期限を認識し、既存のtoken/scope/resource/失効チェックを維持する。
 
-## データモデル
+## 画面と購入
 
-### profiles テーブル（billing カラム）
+`BillingAccessProvider` はアプリ表示時に開始し、期限到達・focus・定期再取得で最新状態へ合わせる。期限切れや照会失敗でも開いている入力をunmountせず、サーバーで拒否した楽観更新は既存mutationのrollbackで戻す。Inspectorに未保存の入力を残し、利用再開後は本人が保存し直す。自動再送しない。
 
-マイグレーション: `20260317120000_add_stripe_billing_columns.sql`
+設定は料金・残り日数・終了日時・契約状態・購入/請求管理へ整理する。終了7日前からアプリ内案内を出す。新しい催促メールは送らない。
 
-| カラム                | 型              | デフォルト | 説明                               |
-| --------------------- | --------------- | ---------- | ---------------------------------- |
-| `stripe_customer_id`  | `text UNIQUE`   | `NULL`     | Stripe Customer ID (`cus_xxx`)     |
-| `subscription_status` | `text NOT NULL` | `'free'`   | サブスクリプション状態             |
-| `subscription_id`     | `text UNIQUE`   | `NULL`     | Stripe Subscription ID (`sub_xxx`) |
+購入は既存Checkoutを利用する。新方式ではStripeの7日trialを付けない。購入成功時点で契約開始し、署名・provider照合済みの `invoice.paid` で体験を消費する。新方式のCheckoutはカード決済に限定し、入金前のactive状態が長期間残る非同期決済を追加しない。中断やincompleteだけでは消費しない。解約予約は期間終了まで利用でき、更新のpast_due中も継続する。unpaid/canceledで終了後へ移り、再契約に追加の体験は付けない。
 
-**インデックス**: `idx_profiles_stripe_customer_id` — Webhook ハンドラでの高速検索用
-
-**CHECK制約**: `chk_subscription_status` — 値を以下に限定
-
-### SubscriptionStatus 型
-
-```typescript
-type SubscriptionStatus = 'free' | 'active' | 'past_due' | 'canceled' | 'trialing';
-```
-
-| ステータス | 意味                     | Pro機能 |
-| ---------- | ------------------------ | ------- |
-| `free`     | 未課金 / 完全解約後      | 不可    |
-| `trialing` | 7日間トライアル中        | **可**  |
-| `active`   | 有効なサブスクリプション | **可**  |
-| `past_due` | 支払い遅延（リトライ中） | **可**  |
-| `canceled` | 解約済み                 | 不可    |
-
-### Stripe Status マッピング
-
-Webhook で受け取る Stripe の `Subscription.Status` を Dayopt のステータスに変換する:
-
-| Stripe Status                              | Dayopt Status |
-| ------------------------------------------ | ------------- |
-| `active`                                   | `active`      |
-| `trialing`                                 | `trialing`    |
-| `past_due`                                 | `past_due`    |
-| `canceled`, `unpaid`, `incomplete_expired` | `canceled`    |
-| `incomplete`, `paused`, その他             | `free`        |
-
----
-
-## 主要フロー
-
-Candidate 3のDB機能が揃ったことと、実際に新経路を使うことは別に判定する。最終markerがあってもaccount deletion gateが無効な間は、Checkout、Portal、Webhookとも従来経路を使う。旧アプリが停止し、Stripe identityと購読eventを確認した後だけ、account deletion gateと同じ明示checkpointでdurable経路へ切り替える。
-
-### 1. チェックアウトフロー
-
-```
-ユーザー "Pro にアップグレード" クリック
-  → BillingSettings.handleUpgrade()
-  → client が同じ intent 用の operationId を生成
-  → api.billing.createCheckoutSession.mutate({ operationId })
-  → billing-mutation-service.createCheckoutSession()
-    → DB claim（request digest と operationId を固定）
-    → Customer が未作成なら Customer provisioning を durable start
-    → email で候補を絞り、metadata または同じ idempotency key で Customer を復旧
-    → profiles.stripe_customer_id を exact operation へ bind
-    → Customer の全 Subscription を確認
-    → live Subscription があれば open Checkout を失効して operation を終了
-    → Checkout provider mutation を durable start
-    → 古い open Checkout Session を expire
-    → 同じ namespaced idempotency key で Checkout Session を作成・復旧
-    → Session ID と短命 URL を DB で reconcile
-  → ブラウザを Stripe Checkout ページへリダイレクト
-  → 決済完了後 → success_url (/settings/billing?success=true) / キャンセル時 → cancel_url (/settings/billing?canceled=true)
-  → settings/[category]/page.tsx が復帰 query を検出 → toast 表示 + billing.getOverview invalidate
-    → PC は SettingsDialog を再度開いて query を消す / モバイルは query を除いた /settings/billing に留まる
-    → Portal も return_url (/settings/billing?portal_return=true) で同じ経路に入る。
-      印を付けないと復帰を検出できず、IndexedDB へ永続化された課金概要が
-      staleTime の間そのまま復元され、解約やプラン変更が画面へ反映されない
-  → Stripe が Webhook を送信 → DB更新（次セクション参照）
-```
-
-### 2. ポータルフロー（サブスク管理）
-
-```
-Proユーザー "プランを管理" クリック
-  → client が同じ intent 用の operationId を生成
-  → api.billing.createPortalSession.mutate({ operationId })
-  → billing-mutation-service.createPortalSession()
-    → DB claim → provider mutation の durable start
-    → 同じ namespaced idempotency key で Portal Session を作成・復旧
-    → Session ID と短命 URL を DB で reconcile
-  → ブラウザを Stripe Customer Portal へリダイレクト
-  → ユーザーが支払い方法変更 / プラン変更 / 解約を実行
-  → 変更は Webhook 経由で DB に反映
-```
+Checkout/Portal復帰は既存のquery処理と有限pollingを再利用する。成功画面へのアクセスだけでは課金や支払成功を確定しない。
 
 ### 再送とURLの契約
 
@@ -180,17 +70,17 @@ Proユーザー "プランを管理" クリック
 - Customer作成の応答が不明なまま23時間を過ぎた場合は、アカウント削除側がuser metadataでexact検索してprofile bindまたはabandonを完了するまで削除開始を拒否する
 - アカウント削除開始後は既存URLを削除し、Checkout / Portal の作成・redirectを行わない。open Checkout SessionはCalendarやStorageより先にexpireし、最終Billing stepでも再列挙する
 
-### 3. Webhook イベント処理
+## Webhookと計測
 
-エンドポイント: `POST /api/webhooks/stripe`
+| イベント                        | 処理                                                                        |
+| ------------------------------- | --------------------------------------------------------------------------- |
+| `checkout.session.completed`    | 実際のSubscriptionを読み、請求状態を同期                                    |
+| `customer.subscription.updated` | 現在のStripe statusを内部statusへ写す                                       |
+| `customer.subscription.deleted` | exact Customer/subscriptionを終了。削除中・古いsubscriptionは既存保護で除外 |
+| `invoice.paid`                  | 金額が正のsubscription_create/cycleを初回/更新支払として区別                |
+| `invoice.payment_failed`        | 既存の支払失敗通知。削除済み利用者には送らない                              |
 
-| イベント                        | 処理                                                                                                                                                     |
-| ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `checkout.session.completed`    | `syncSubscriptionStatus(customerId, subscriptionId, 'active')`                                                                                           |
-| `customer.subscription.updated` | `mapStripeStatus()` でステータス変換 → `syncSubscriptionStatus()`                                                                                        |
-| `customer.subscription.deleted` | exact Customer / subscriptionなら`canceled`へ更新。account削除中、stale subscription、削除済みaccountの短期receiptは通知なしで終端し、未知Customerは失敗 |
-| `invoice.payment_failed`        | live Customerだけ通知。削除済みaccountは通知せず終端し、未知Customerは失敗                                                                               |
-| その他                          | 未対応eventとして失敗。新しいevent typeは処理方針を決めてから追加する                                                                                    |
+支払イベントは請求ID由来の安定したIDで重複排除し、保存失敗時はWebhookを失敗させ再送を受ける。画面復帰の旧 `subscription_started` は購入確定人数に使わない。体験開始/終了の人数はprofilesを正本とし、終了記録用cronは作らない。read-only集計は `docs/operations/queries/billing-cohorts.sql`。観測期間・人数・未成熟コホートを分ける。
 
 **セキュリティ**:
 
@@ -205,61 +95,6 @@ account削除フローはgeneric operationをcommitしてからStripe subscripti
 
 ---
 
-## Feature Gating
-
-### entitledProcedure
-
-`apps/product/src/lib/trpc/procedures.ts` で定義。`protectedProcedure` を拡張し、`EntitlementKey` を1つ受け取る builder。`BILLING_ENFORCED=true` のときだけ、その key を `@dayopt/billing` の `planEntitlements` と `profiles.subscription_status` から判定する。
-
-```typescript
-export function entitledProcedure(key: EntitlementKey) {
-  return protectedProcedure.meta({ auth: 'pro' }).use(async ({ ctx, next }) => {
-    if (!isBillingEnforced()) return next({ ctx });
-
-    let status = ctx.authMode === 'oauth' ? undefined : ctx.subscriptionStatus;
-    if (!status) {
-      // profiles.subscription_status を DB から取得
-    }
-
-    if (!hasEntitlementForStatus(status, key)) {
-      throw new TRPCError({
-        code: 'FORBIDDEN',
-        message: 'Pro plan required',
-      });
-    }
-
-    return next({ ctx });
-  });
-}
-```
-
-### 使い方
-
-Pro 限定のエンドポイントでは `protectedProcedure` の代わりに `entitledProcedure(key)` を使用:
-
-```typescript
-// ❌ 誰でもアクセス可能
-export const myRouter = createTRPCRouter({
-  proFeature: protectedProcedure.query(async ({ ctx }) => { ... }),
-});
-
-// ✅ 該当 entitlement を持つユーザーのみ
-export const myRouter = createTRPCRouter({
-  proFeature: entitledProcedure(entitlementKeys.mcpApi).query(async ({ ctx }) => { ... }),
-});
-```
-
-### プロシージャ階層
-
-```
-publicProcedure                 ← 認証不要
-  └─ protectedProcedure         ← ログイン必須
-       ├─ entitledProcedure(key) ← 該当 entitlement 必須
-       └─ adminProcedure        ← 管理者権限必須
-```
-
----
-
 ## 環境変数
 
 | 変数名                            | 用途                         | 設定場所                                        |
@@ -268,65 +103,8 @@ publicProcedure                 ← 認証不要
 | `STRIPE_ACCOUNT_ID`               | 固定するStripe account ID    | `acct_...`。削除前のprovider identity照合に使用 |
 | `STRIPE_LIVEMODE`                 | 固定するlive/test mode       | liveは`true`、testは`false`                     |
 | `STRIPE_WEBHOOK_SECRET`           | Webhook 署名検証シークレット | サーバーサイドのみ                              |
-| `NEXT_PUBLIC_STRIPE_PRO_PRICE_ID` | Pro プランの Price ID        | サーバー側 Checkout 設定値。UI 表示制御にも使用 |
+| `NEXT_PUBLIC_STRIPE_PRO_PRICE_ID` | 単一有料プランの Price ID    | サーバー側 Checkout 設定値。UI 表示制御にも使用 |
 
 **注意**: `STRIPE_SECRET_KEY` が未設定の場合、`getStripe()` は `null` を返す（graceful degradation）。`STRIPE_ACCOUNT_ID`と`STRIPE_LIVEMODE`はdurable経路を有効にする前の必須checkpointであり、`STRIPE_SECRET_KEY`と3項目をまとめて設定する。アカウント削除はAccount APIとBalance APIで両方を照合し、不一致または確認不能ならidentityを残す。
 
 ---
-
-## ローカル開発
-
-### Stripe CLI でのWebhookテスト
-
-```bash
-# Stripe CLI をインストール（初回のみ）
-brew install stripe/stripe-cli/stripe
-
-# ログイン
-stripe login
-
-# Webhook をローカルに転送
-stripe listen --forward-to localhost:3000/api/webhooks/stripe
-
-# 出力される signing secret は 1Password master に保存し、
-# .op-env.agent の op:// 参照経由で注入する
-```
-
-### テストカード
-
-| カード番号            | 用途           |
-| --------------------- | -------------- |
-| `4242 4242 4242 4242` | 成功           |
-| `4000 0025 0000 3155` | 3Dセキュア認証 |
-| `4000 0000 0000 9995` | 支払い失敗     |
-
-有効期限: 任意の未来日、CVC: 任意の3桁
-
-### Stripe Dashboard
-
-- **テストモード**: Stripe Dashboard の左上トグルで切り替え
-- **Webhook ログ**: Dashboard → Developers → Webhooks → イベント一覧でデバッグ
-- **Price ID 確認**: Dashboard → Products → 該当プラン → Price ID をコピー
-
----
-
-## 関連ファイル
-
-| ファイル                                                                           | 役割                                                                   |
-| ---------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
-| `apps/product/src/lib/stripe/client.ts`                                            | Stripe クライアント初期化（`getStripe` / `requireStripe`）             |
-| `apps/product/src/features/settings/server/billing-service.ts`                     | 課金ビジネスロジック（Service層）                                      |
-| `apps/product/src/features/settings/server/billing-router.ts`                      | tRPC Router（Router層）                                                |
-| `apps/product/src/app/api/webhooks/stripe/route.ts`                                | Webhook エンドポイント                                                 |
-| `apps/product/src/app/api/webhooks/stripe/stripe-webhook-identity.ts`              | Webhook secretとAPI accountのprovider照合                              |
-| `apps/product/src/lib/trpc/procedures.ts`                                          | `entitledProcedure` 定義                                               |
-| `apps/product/src/features/settings/components/BillingSettings.tsx`                | 課金設定UI                                                             |
-| `apps/product/src/app/[locale]/(app)/settings/[category]/page.tsx`                 | Checkout 復帰 query（`?success=true` / `?canceled=true`）の toast 表示 |
-| `apps/product/src/app/[locale]/(app)/settings/_utils/billing-return.ts`            | Checkout / Portal 復帰 query の解釈（parse / remove）                  |
-| `supabase/migrations/20260317120000_add_stripe_billing_columns.sql`                | DBマイグレーション                                                     |
-| `supabase/migrations/20260730090049_preserve_billing_webhook_terminal_receipt.sql` | account削除後Webhookの短期receipt                                      |
-| `supabase/migrations/20260730090050_close_billing_webhook_races.sql`               | 削除中通知抑止とcleanup残件判定                                        |
-| `supabase/migrations/20260730090051_remove_legacy_billing_receipt_cleanup.sql`     | count-only cleanup RPCの撤去                                           |
-| `supabase/migrations/20260730090055_report_billing_cleanup_backlog.sql`            | Billing cleanupの残件判定                                              |
-| `packages/billing/src/pricing.ts`                                                  | Free / Pro の表示価格と7日トライアル                                   |
-| `packages/billing/src/entitlement.ts`                                              | 4-key entitlement map（`entitlementKeys` / `planEntitlements`）        |

@@ -208,14 +208,14 @@
       "reload": "再読み込み"
     },
     "trialEnded": {
-      "title": "14日間のトライアルが終了しました",
-      "description": "これからはFreeプランでご利用いただけます。月・年の俯瞰、Google カレンダー同期、API/MCP アクセスはProプランの機能です。",
-      "continueFree": "Freeで続ける",
-      "continuePro": "Proを続ける"
+      "title": "45日間の無料体験が終了しました",
+      "description": "保存済みカレンダーとレポートの閲覧、データのエクスポート・削除は引き続きできます。購入すると編集を再開できます。",
+      "continueFree": "保存済みデータを見る",
+      "continuePro": "購入する"
     },
     "paymentError": {
       "title": "お支払いを確認できませんでした",
-      "description": "Proプランの更新ができませんでした。お支払い情報をご確認ください。このまま解決しない場合、Freeプランに変更されます。",
+      "description": "お支払い方法をご確認ください。再試行中は利用を継続できます。契約終了後も保存済みデータは閲覧できます。",
       "checkPayment": "支払い情報を確認",
       "later": "後で確認する"
     },

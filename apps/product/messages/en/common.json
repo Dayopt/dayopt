@@ -208,14 +208,14 @@
       "reload": "Reload"
     },
     "trialEnded": {
-      "title": "Your 14-day trial has ended",
-      "description": "You can continue using the Free plan. Monthly and yearly overviews, Google Calendar sync, and API/MCP access are Pro features.",
-      "continueFree": "Continue with Free",
-      "continuePro": "Continue with Pro"
+      "title": "Your 45-day trial has ended",
+      "description": "View your saved calendar and reports, export or delete your data, or subscribe to resume editing.",
+      "continueFree": "View saved data",
+      "continuePro": "Subscribe"
     },
     "paymentError": {
       "title": "Payment could not be confirmed",
-      "description": "Your Pro plan could not be renewed. Please check your payment information. If unresolved, your plan will be changed to Free.",
+      "description": "Please check your payment method. Access continues while payment is retried. If the subscription ends, saved data remains readable.",
       "checkPayment": "Check payment info",
       "later": "Check later"
     },

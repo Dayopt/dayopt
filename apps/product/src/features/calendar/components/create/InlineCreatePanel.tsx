@@ -16,6 +16,7 @@
  *   どちらも同じ `pendingSelection` を読み書きするので相互に反映される
  */
 
+import { useBillingAccess } from '@/lib/billing/BillingAccessProvider';
 import { useCallback, useState } from 'react';
 
 import { useTranslations } from 'next-intl';
@@ -45,6 +46,7 @@ interface InlineCreatePanelProps {
 
 /** ドラッグ選択からアクティビティを選んで plan / record を作る Inspector 作成モード */
 export function InlineCreatePanel({ onClose }: InlineCreatePanelProps) {
+  const { canUseProduct } = useBillingAccess();
   const t = useTranslations();
   const tCalendar = useTranslations('calendar');
   const timezone = useUserPreferences((s) => s.timezone);
@@ -119,6 +121,14 @@ export function InlineCreatePanel({ onClose }: InlineCreatePanelProps) {
   const endAt = new Date(date.getFullYear(), date.getMonth(), date.getDate(), endHour, endMinute);
   const editorValue: TimeModelEditorValue = { note, activityId: null, startAt, endAt };
   const dateTimeError = hasConflict ? t('timeblock.errors.timeOverlap') : undefined;
+
+  if (!canUseProduct)
+    return (
+      <div role="status" className="p-4">
+        <p>{t('settings.subscription.singlePlan.expired')}</p>
+        <InspectorHeaderActions menuItems={[]} onCloseInspector={onClose} />
+      </div>
+    );
 
   return (
     <div className="flex flex-col">

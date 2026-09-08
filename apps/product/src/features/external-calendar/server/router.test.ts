@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { createMockContext } from '@/lib/test/trpc-test-helpers';
+import { createChainableMock, createMockContext } from '@/lib/test/trpc-test-helpers';
 import { createCallerFactory } from '@/lib/trpc/procedures';
 
 const listConnections = vi.hoisted(() => vi.fn());
@@ -34,8 +34,8 @@ vi.mock('@/lib/rate-limit/upstash', () => ({
 }));
 // flag だけ差し替え、capability map の判定（hasEntitlementForStatus）は本物を使う。
 // map を mock すると「どのキーで弾いたか」を検証できなくなる。
-vi.mock('@/lib/billing/enforcement', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@/lib/billing/enforcement')>()),
+vi.mock('@/lib/billing/enforcement-flag', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/billing/enforcement-flag')>()),
   isBillingEnforced,
 }));
 
@@ -48,7 +48,18 @@ const EVENT_ID = '00000000-0000-4000-8000-0000000000e1';
 const createCaller = createCallerFactory(externalCalendarRouter);
 
 function caller(overrides: { requestStartedAt?: number } = {}) {
-  return createCaller(createMockContext({ userId: USER_ID, ...overrides }));
+  return createCaller({
+    ...createMockContext({ userId: USER_ID, ...overrides }),
+    supabase: {
+      from: () =>
+        createChainableMock({
+          subscription_status: 'free',
+          app_trial_started_at: null,
+          app_trial_ends_at: null,
+          app_trial_consumed_at: null,
+        }),
+    },
+  } as never);
 }
 
 beforeEach(() => {
@@ -229,11 +240,10 @@ describe('externalCalendarRouter — listEvents', () => {
     });
   });
 
-  it('entitledProcedure(external_calendar_sync) なので BILLING_ENFORCED on の未 Pro ユーザーは弾かれる', async () => {
+  it('期限終了後も保持済み外部予定を閲覧できる', async () => {
     isBillingEnforced.mockReturnValue(true);
-
-    await expect(caller().listEvents(RANGE)).rejects.toMatchObject({ code: 'FORBIDDEN' });
-    expect(listGhostEvents).not.toHaveBeenCalled();
+    await expect(caller().listEvents(RANGE)).resolves.toEqual([]);
+    expect(listGhostEvents).toHaveBeenCalled();
   });
 
   // 「未認証は UNAUTHORIZED」の契約は write-fence-coverage.test.ts が全 procedure 横断で

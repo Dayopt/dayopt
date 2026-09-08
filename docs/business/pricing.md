@@ -1,60 +1,48 @@
 ---
 status: current
-last_verified: 2026-09-07
+last_verified: 2026-09-08
 code:
   - packages/billing/src/pricing.ts
   - packages/billing/src/plans.ts
-  - packages/billing/src/entitlement.ts
+  - packages/billing/src/access.ts
 ---
 
 # 価格戦略
 
-Dayoptの現在の価格契約と、価格を変更する時に守る判断基準。ユーザーに見える実装仕様は[Billing spec](../product/specs/billing.md)を正とする。
+採用した事業方針と現行実装を分けて記載する。実装仕様は[Billing spec](../product/specs/billing.md)、移行作業は[#2610](https://github.com/Dayopt/dayopt/issues/2610)を参照する。
 
-## 現在の契約
+## 採用方針（2026-09-08、本番未有効化）
 
-**始めるのは無料。続けた分だけ、Pro が返す。**
+**Dayopt は単一の有料サービス。最初の一定期間は全機能を無料で試せる。**
 
-| Plan | 価格       | Trial   | Entitlement                                   |
-| ---- | ---------- | ------- | --------------------------------------------- |
-| Free | $0         | なし    | なし                                          |
-| Pro  | $5 / month | 初回7日 | 4-key map（`@dayopt/billing` entitlement.ts） |
+永続 Free / 機能別 Pro を撤回する。カレンダーで予定と記録を扱い、既存レポートページの週・月・年表示で理解して次の予定に反映する体験全体へ課金する。別途レポートを生成・作成する機能は設けない。
 
-| 面                                     | Free               | Pro            | gate の型                   |
-| -------------------------------------- | ------------------ | -------------- | --------------------------- |
-| 予定・記録・カレンダー・アクティビティ | 全部、無制限       | 同じ           | なし                        |
-| 過去の週を見に行く                     | どこまでも遡れる   | 同じ           | なし                        |
-| 週の report と明細                     | ○                  | 同じ           | なし                        |
-| 月・年の集計、期間をまたぐ推移         | ×                  | ○              | 入力レンジ（`granularity`） |
-| 過去の自分との比較                     | ×                  | ○              | 入力レンジ                  |
-| 見積もりのフィードフォワード           | 直近 28 日から算出 | 全履歴から算出 | service の算出期間          |
-| Google カレンダー同期                  | ×                  | ○              | procedure + cron skip       |
-| MCP / API                              | ×                  | ○              | route                       |
-| データエクスポート                     | ○                  | ○              | なし                        |
-| Billing / Settings / アカウント削除    | ○                  | ○              | なし                        |
+| 状態             | 利用範囲                                                                      |
+| ---------------- | ----------------------------------------------------------------------------- |
+| 無料体験中       | 全機能                                                                        |
+| 契約中           | 全機能。新機能も原則全員に提供                                                |
+| 体験・契約終了後 | 保存済みカレンダー/レポートの全期間閲覧・明細、export、削除、請求管理・再契約 |
 
-- 年額planは未実装
-- exact valueは`@dayopt/billing`を正とし、UIから独自の価格定数を持たない
-- `BILLING_ENFORCED`の既定はfalse。enforcementを有効にするまで`entitledProcedure`は認証だけを要求する
-- 境界の正本は本表。変更は epic [#2610](https://github.com/Dayopt/dayopt/issues/2610) の手順に従う
+- 月 $5 据え置き。カード不要の無料体験は **45日**。認証後に初めてアプリを開いた時に始まる。既存未契約者も公開後の初回利用から45日。
+- 体験終了で自動課金しない。本人が購入して継続する。
+- 終了後は新規作成・編集・同期・MCP/APIの通常利用を停止する。削除や連携解除など本人の管理操作は妨げない。保持済み情報の閲覧と新規同期は区別する。
+- 機能数・履歴深さ・レポートの集計期間・見積もりの算出期間で課金を分けない。
+- 既存ユーザーの移行・支払失敗・復帰・期限境界はBilling specと移行手順に従う。方針決定は本番の制限適用や課金開始の承認ではない。
 
-## 判断基準
+## 実装と公開
 
-- FreeでPlan / Record / Calendarの基本loopを理解できるようにする
-- Proは「件数を増やす」より、継続利用で価値が増える分析・連携・exportを候補にする
-- 価格やtrialを変更する時はbilling package、Stripe Price、UI copy、LP、Billing specを同じ変更で揃える
-- in-app AIは提供しないため、model API原価を価格根拠に含めない
-- 実ユーザーのconversion / churn evidenceがない推定表を現行契約として扱わない
-- 閲覧は縛らず、集計を Pro にする
-- 数量上限・履歴深さ・指標本数で分けない
-- trial は積み重ねの価値が見える長さにする（初期値 30 日、確定は [#2614](https://github.com/Dayopt/dayopt/issues/2614)）
+`@dayopt/billing` の利用状態とサーバー共通判定で期間を制御する。旧Free/Pro IDは請求状態の互換に残るが、機能差の判定には使わない。`BILLING_ENFORCED` の既定値はfalseで、本番値は未確認。フラグOFFのCheckoutは旧契約を維持し、新方式の有効化時に7日Stripe trialを外す。
 
-## 変更前に必要な証拠
+公開表示は実際の有効化と揃える。[移行手順](../operations/billing-single-plan-rollout.md)の検証・復元演習・履歴分類を終えてから提供を開始する。
 
-1. current paid / trial / canceled数とconversion
-2. checkout開始から完了までのdrop-off
-3. cancel理由とPro機能の利用実績
-4. provider dashboardで確認した実コスト
-5. 価格変更が既存subscriberへ与える影響
+## 判断基準と検証
 
-仮説・競合比較は[competitors.md](./competitors.md)、サービス費用の計算方法は[business-model.md](./business-model.md)を参照する。
+- 課金用に機能を追加するのではなく、Dayopt全体を使い続ける価値を検証する。
+- 無料体験→週をまたぐ再利用→初回購入→翌月の有料継続を[#2615](https://github.com/Dayopt/dayopt/issues/2615)で測る。接続や画面表示だけを価値の証拠にしない。
+- 最初は少人数で利用・離脱理由を聞き、購入と継続の実績を確認する。人数・観測期間を明記し、市場全体の転換率へ一般化しない。
+- 45日で1か月の振り返りと次の予定への反映まで体験できるかは未実測の仮説。
+- 永続無料を置かないことで獲得が難しくなるリスクと、説明・開発の単純化を比較する。価格・体験期間・対象ユーザーを同時に変更しない。
+- 実コストと必要売上から必要な有料人数を見積もる。in-app AIは提供しないため、model API原価を価格根拠に含めない。
+- 本番導入前に既存subscriberへの影響、復元演習、決済検証、移行とrollbackを確認し、ユーザーの明示指示を得る。
+
+仮説・競合比較は[competitors.md](./competitors.md)、費用の計算方法は[business-model.md](./business-model.md)を参照する。

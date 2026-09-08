@@ -119,7 +119,7 @@ describe('PlanTemplateService', () => {
         user_settings: [{ data: settings, error: null }],
         records: [{ data: recordRows(ACTIVITY_A, 90, 3), error: null }],
       });
-      const service = new PlanTemplateService(supabase, createCommands());
+      const service = new PlanTemplateService(supabase, createCommands(), () => supabase);
 
       const result = await service.list(USER_ID);
 
@@ -135,7 +135,7 @@ describe('PlanTemplateService', () => {
       const { supabase, calls } = createSupabaseStub({
         plan_templates: [{ data: [], error: null }],
       });
-      const service = new PlanTemplateService(supabase, createCommands());
+      const service = new PlanTemplateService(supabase, createCommands(), () => supabase);
 
       await expect(service.list(USER_ID)).resolves.toEqual([]);
       expect(calls.some((call) => call.table === 'plan_template_blocks')).toBe(false);
@@ -152,7 +152,7 @@ describe('PlanTemplateService', () => {
         ],
         plan_template_blocks: [{ data: null, error: { code: '23503', message: 'fk violation' } }],
       });
-      const service = new PlanTemplateService(supabase, createCommands());
+      const service = new PlanTemplateService(supabase, createCommands(), () => supabase);
 
       await expect(
         service.create({
@@ -184,7 +184,7 @@ describe('PlanTemplateService', () => {
         user_settings: [{ data: settings, error: null }],
         records: [{ data: [], error: null }],
       });
-      const service = new PlanTemplateService(supabase, createCommands());
+      const service = new PlanTemplateService(supabase, createCommands(), () => supabase);
 
       const result = await service.create({
         userId: USER_ID,
@@ -227,7 +227,7 @@ describe('PlanTemplateService', () => {
           { data: null, error: null },
         ],
       });
-      const service = new PlanTemplateService(supabase, createCommands());
+      const service = new PlanTemplateService(supabase, createCommands(), () => supabase);
 
       await expect(
         service.rename({ userId: USER_ID, input: { templateId: TEMPLATE_ID, name: '新' } }),
@@ -246,7 +246,7 @@ describe('PlanTemplateService', () => {
           },
         ],
       });
-      const service = new PlanTemplateService(supabase, createCommands());
+      const service = new PlanTemplateService(supabase, createCommands(), () => supabase);
 
       await expect(
         service.rename({ userId: USER_ID, input: { templateId: TEMPLATE_ID, name: '新' } }),
@@ -280,7 +280,7 @@ describe('PlanTemplateService', () => {
           },
         ],
       });
-      const service = new PlanTemplateService(supabase, commands);
+      const service = new PlanTemplateService(supabase, commands, () => supabase);
 
       const result = await service.apply({
         userId: USER_ID,
@@ -323,7 +323,7 @@ describe('PlanTemplateService', () => {
       const { supabase } = createSupabaseStub({
         plan_templates: [{ data: null, error: null }],
       });
-      const service = new PlanTemplateService(supabase, commands);
+      const service = new PlanTemplateService(supabase, commands, () => supabase);
 
       await expect(
         service.apply({ userId: USER_ID, input: { templateId: TEMPLATE_ID, date: '2026-09-05' } }),
@@ -348,7 +348,7 @@ describe('PlanTemplateService', () => {
         records: [{ data: [], error: null }],
         activities: [{ data: [{ id: ACTIVITY_A, archived_at: null }], error: null }],
       });
-      const service = new PlanTemplateService(supabase, commands);
+      const service = new PlanTemplateService(supabase, commands, () => supabase);
 
       await expect(
         service.apply({ userId: USER_ID, input: { templateId: TEMPLATE_ID, date: '2026-09-05' } }),
@@ -368,7 +368,7 @@ describe('PlanTemplateService', () => {
         records: [{ data: [], error: null }],
         activities: [{ data: [{ id: ACTIVITY_A, archived_at: null }], error: null }],
       });
-      const service = new PlanTemplateService(supabase, commands);
+      const service = new PlanTemplateService(supabase, commands, () => supabase);
 
       await expect(
         service.apply({ userId: USER_ID, input: { templateId: TEMPLATE_ID, date: '2026-09-05' } }),

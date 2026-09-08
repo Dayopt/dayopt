@@ -1,24 +1,17 @@
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
+import { useUserPreferences } from '@/lib/hooks/useUserPreferences';
 import { toast } from '@/lib/toast';
-import {
-  dayoptPlanIds,
-  dayoptPlans,
-  dayoptPricing,
-  getPlanIdForSubscriptionStatus,
-  isPaidPlan,
-  type DayoptPlanId,
-} from '@dayopt/billing';
-import { Badge, cn } from '@dayopt/components';
-import { AlertTriangle, Check, CreditCard, Crown } from 'lucide-react';
+import { dayoptPricing, getPlanIdForSubscriptionStatus, isPaidPlan } from '@dayopt/billing';
+import { Badge } from '@dayopt/components';
+import { AlertTriangle, CreditCard, Crown } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 
 import { LabeledRow } from '@/components/ui/display/LabeledRow';
 import { SectionCard } from '@/components/ui/display/SectionCard';
 import { ErrorState } from '@/components/ui/feedback/ErrorState';
-import type { MessageKey } from '@/lib/i18n';
 import { api } from '@/lib/trpc';
 import {
   AlertDialog,
@@ -38,36 +31,6 @@ import { useStableBillingOperation } from '../hooks/useStableBillingOperation';
 import { getBillingOperationErrorPresentation } from '../lib/billing-operation';
 import { useBillingPollStore } from '../stores/useBillingPollStore';
 
-interface Plan {
-  id: DayoptPlanId;
-  nameKey: MessageKey;
-  featureKeys: MessageKey[];
-  recommended?: boolean;
-}
-
-const PLANS: Plan[] = [
-  {
-    id: dayoptPlans.free.id,
-    nameKey: 'settings.subscription.plans.free.name',
-    featureKeys: [
-      'settings.subscription.plans.free.features.timeboxing',
-      'settings.subscription.plans.free.features.weeklyReview',
-      'settings.subscription.plans.free.features.unlimitedActivities',
-      'settings.subscription.plans.free.features.dataExport',
-    ],
-  },
-  {
-    id: dayoptPlans.pro.id,
-    nameKey: 'settings.subscription.plans.pro.name',
-    featureKeys: [
-      'settings.subscription.plans.pro.features.longRange',
-      'settings.subscription.plans.pro.features.googleCalendar',
-      'settings.subscription.plans.pro.features.api',
-    ],
-    recommended: true,
-  },
-];
-
 /**
  * Stripe Price ID
  *
@@ -79,6 +42,12 @@ const STRIPE_PRICE_ID = process.env.NEXT_PUBLIC_STRIPE_PRO_PRICE_ID ?? '';
 /** 請求・サブスクリプション設定コンポーネント。プラン変更・支払方法・請求履歴・キャンセルを管理 */
 export function BillingSettings() {
   const t = useTranslations();
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 60_000);
+    return () => clearInterval(timer);
+  }, []);
+  const timezone = useUserPreferences((s) => s.timezone);
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [billingActionsClosed, setBillingActionsClosed] = useState(false);
   const {
@@ -108,6 +77,7 @@ export function BillingSettings() {
 
   const subscriptionStatus = overview.data?.billingInfo.subscriptionStatus;
   const trialEndsAt = overview.data?.trialEndsAt ?? null;
+  const access = overview.data?.access;
   const currentPlan = getPlanIdForSubscriptionStatus(subscriptionStatus);
   const canAccessPro = isPaidPlan(currentPlan);
 
@@ -201,8 +171,11 @@ export function BillingSettings() {
         year: 'numeric',
         month: 'short',
         day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        timeZone: timezone,
       }),
-    [],
+    [timezone],
   );
 
   const formatCurrency = useCallback((amount: number, currency: string) => {
@@ -262,22 +235,16 @@ export function BillingSettings() {
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
-              <h4 className="text-lg font-medium">
-                {canAccessPro
-                  ? t('settings.subscription.plans.pro.name')
-                  : t('settings.subscription.freePlanLabel')}
-              </h4>
+              <h4 className="text-lg font-medium">{t('settings.subscription.singlePlan.name')}</h4>
               <Badge variant="secondary">{t('settings.subscription.currentBadge')}</Badge>
               {subscriptionStatus === 'trialing' && (
                 <Badge variant="outline">{t('settings.subscription.trialBadge')}</Badge>
               )}
             </div>
             <p className="text-muted-foreground text-base md:text-sm">
-              {subscriptionStatus === 'trialing'
-                ? t('settings.subscription.trialDescription')
-                : canAccessPro
-                  ? t('settings.subscription.proPlanDescription')
-                  : t('settings.subscription.freePlanDescription')}
+              {access?.enforced
+                ? t(`settings.subscription.singlePlan.${access.state}`)
+                : t('settings.subscription.singlePlan.disabled')}
             </p>
             {/* Checkout 成功直後、webhook 反映待ちでまだ Free に見えている間の一時表示 */}
             {isPollingAfterCheckout && !canAccessPro && (
@@ -286,7 +253,14 @@ export function BillingSettings() {
               </p>
             )}
             {/* Stripe から期限を取れなかった場合は表示しない（Badge と説明文は従来どおり出る） */}
-            {subscriptionStatus === 'trialing' && trialEndsAt && (
+            {access?.state === 'trial' && trialEndsAt && (
+              <p>
+                {t('settings.subscription.singlePlan.remainingDays', {
+                  days: Math.max(0, Math.ceil((Date.parse(trialEndsAt) - now) / 86_400_000)),
+                })}
+              </p>
+            )}
+            {trialEndsAt && (
               <p className="text-muted-foreground text-base md:text-sm">
                 {t('settings.subscription.trialEndsAt', {
                   date: dateFormatter.format(new Date(trialEndsAt)),
@@ -355,71 +329,26 @@ export function BillingSettings() {
         </SectionCard>
       )}
 
-      {/* プラン変更（Free ユーザーのみ — canceled は上で専用UIを表示） */}
-      {currentPlan === dayoptPlanIds.free && subscriptionStatus !== 'canceled' && (
-        <SectionCard title={t('settings.subscription.selectPlan')}>
-          <div className="grid gap-4 md:grid-cols-2">
-            {PLANS.map((plan) => (
-              <div
-                key={plan.id}
-                className={cn(
-                  'border-border relative rounded-2xl border p-4',
-                  plan.recommended && 'border-primary ring-state-active ring-2',
-                  currentPlan === plan.id && 'bg-container',
-                )}
-              >
-                {plan.recommended && (
-                  <Badge className="absolute -top-2 left-1/2 -translate-x-1/2">
-                    <Crown className="mr-1 h-3 w-3" />
-                    {t('settings.subscription.recommended')}
-                  </Badge>
-                )}
-
-                <div className="mb-4">
-                  <div className="flex items-center gap-2">
-                    <h4 className="font-medium">{t(plan.nameKey)}</h4>
-                  </div>
-                  <div className="mt-2">
-                    <span className="text-2xl font-medium">
-                      {new Intl.NumberFormat(undefined, {
-                        style: 'currency',
-                        currency: 'usd',
-                      }).format(dayoptPricing[plan.id].monthlyUsdCents / 100)}
-                    </span>
-                    <span className="text-muted-foreground text-base md:text-sm">
-                      {t('settings.subscription.perMonth')}
-                    </span>
-                  </div>
-                </div>
-
-                <ul className="mb-4 space-y-2">
-                  {plan.featureKeys.map((featureKey) => (
-                    <li key={featureKey} className="flex items-center gap-2 text-base md:text-sm">
-                      <Check className="text-primary h-4 w-4 flex-shrink-0" />
-                      <span>{t(featureKey)}</span>
-                    </li>
-                  ))}
-                </ul>
-
-                {isPaidPlan(plan.id) ? (
-                  <Button
-                    className="w-full"
-                    variant="primary"
-                    disabled={!isStripeConfigured || areBillingActionsDisabled}
-                    onClick={handleUpgrade}
-                  >
-                    {isMutating
-                      ? t('settings.subscription.processing')
-                      : t('settings.subscription.upgrade')}
-                  </Button>
-                ) : (
-                  <Button className="w-full" variant="ghost" disabled>
-                    {t('settings.subscription.inUse')}
-                  </Button>
-                )}
-              </div>
-            ))}
-          </div>
+      {!canAccessPro && subscriptionStatus !== 'canceled' && (
+        <SectionCard title={t('settings.subscription.singlePlan.name')}>
+          <p>{t('settings.subscription.singlePlan.included')}</p>
+          {access?.enforced && (
+            <p className="text-muted-foreground text-sm">
+              {t('settings.subscription.singlePlan.purchaseNow')}
+            </p>
+          )}
+          <p className="text-lg">
+            {dayoptPricing.pro.displayPrice}
+            {t('settings.subscription.perMonth')}
+          </p>
+          <Button
+            onClick={handleUpgrade}
+            disabled={!isStripeConfigured || areBillingActionsDisabled}
+          >
+            {isMutating
+              ? t('settings.subscription.processing')
+              : t('settings.subscription.singlePlan.purchase')}
+          </Button>
         </SectionCard>
       )}
 

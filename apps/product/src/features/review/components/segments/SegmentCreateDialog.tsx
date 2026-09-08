@@ -1,5 +1,7 @@
 'use client';
 
+import { useBillingAccess } from '@/lib/billing/BillingAccessProvider';
+
 import { useCallback, useState } from 'react';
 
 import { Plus } from 'lucide-react';
@@ -24,6 +26,7 @@ interface SegmentCreateDialogProps {
  * 読めるようにする。
  */
 export function SegmentCreateDialog({ onOpenChange }: SegmentCreateDialogProps = {}) {
+  const { canUseProduct } = useBillingAccess();
   const t = useTranslations('calendar.stats.review.segments');
   const [open, setOpen] = useState(false);
   const createSegment = useCreateSegment();
@@ -41,6 +44,7 @@ export function SegmentCreateDialog({ onOpenChange }: SegmentCreateDialogProps =
       <HoverTooltip content={t('create')} side="top">
         <Button
           type="button"
+          disabled={!canUseProduct}
           variant="ghost"
           icon
           className={cn('size-6', open && 'bg-state-hover')}
@@ -56,7 +60,9 @@ export function SegmentCreateDialog({ onOpenChange }: SegmentCreateDialogProps =
         onOpenChange={handleOpenChange}
         title={t('create')}
         isSubmitting={createSegment.isPending}
-        onSubmit={(input) => createSegment.mutate(input)}
+        onSubmit={async (input) => {
+          await createSegment.mutateAsync(input);
+        }}
       />
     </>
   );

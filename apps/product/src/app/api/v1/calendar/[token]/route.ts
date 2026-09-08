@@ -12,6 +12,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 import { plansToICal } from '@/features/timeblock';
+import { getBillingAccess } from '@/lib/billing/access-service';
+import { isBillingEnforced } from '@/lib/billing/enforcement-flag';
 import { logger } from '@/lib/logger';
 import {
   icalFeedGlobalRateLimit,
@@ -328,6 +330,16 @@ export async function GET(
     const userId = await getUserIdByToken(token);
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    if (
+      isBillingEnforced() &&
+      !(await getBillingAccess(createServiceRoleClient(), userId)).canUseProduct
+    ) {
+      return NextResponse.json(
+        { error: 'Open Dayopt to start a trial or subscribe to resume the feed' },
+        { status: 403, headers: { 'Cache-Control': 'no-store' } },
+      );
     }
 
     // エントリ取得 → iCal変換

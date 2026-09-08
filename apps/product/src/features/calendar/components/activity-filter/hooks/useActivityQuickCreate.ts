@@ -15,6 +15,8 @@
  * ドラッグして空いている場所を指せばよい）。
  */
 
+import { useBillingAccess } from '@/lib/billing/BillingAccessProvider';
+import { useShellStore } from '@/lib/stores/useShellStore';
 import { useCallback } from 'react';
 
 import { useQueryClient } from '@tanstack/react-query';
@@ -54,6 +56,8 @@ interface QuickCreateArgs {
 /** アクティビティのタップから既定の長さでブロックを作り、詳細パネルを開く */
 export function useActivityQuickCreate() {
   const t = useTranslations();
+  const { canUseProduct } = useBillingAccess();
+  const openSettings = useShellStore.use.openSettings();
   const timezone = useUserPreferences((s) => s.timezone);
   const defaultDuration = useUserPreferences((s) => s.defaultDuration);
   const queryClient = useQueryClient();
@@ -63,6 +67,11 @@ export function useActivityQuickCreate() {
 
   return useCallback(
     ({ activityId, activityName, date }: QuickCreateArgs) => {
+      if (!canUseProduct) {
+        toast.error(t('settings.subscription.singlePlan.expired'));
+        openSettings('billing');
+        return;
+      }
       const localStart = defaultStartAt(date ?? new Date());
       const localEnd = new Date(localStart.getTime() + defaultDuration * 60 * 1000);
       const startAt = convertFromTimezone(localStart, timezone);
@@ -116,6 +125,8 @@ export function useActivityQuickCreate() {
       );
     },
     [
+      canUseProduct,
+      openSettings,
       closeInspector,
       createPlan,
       createRecord,

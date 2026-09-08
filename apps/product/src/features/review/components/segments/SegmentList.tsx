@@ -182,11 +182,11 @@ export function SegmentList() {
           initialName={editingSegment.name}
           initialActivityIds={editingSegment.activityIds}
           isSubmitting={renameSegment.isPending || setSegmentActivities.isPending}
-          onSubmit={(input) => {
+          onSubmit={async (input) => {
             if (input.name !== editingSegment.name) {
-              renameSegment.mutate({ segmentId: editingSegment.id, name: input.name });
+              await renameSegment.mutateAsync({ segmentId: editingSegment.id, name: input.name });
             }
-            setSegmentActivities.mutate({
+            await setSegmentActivities.mutateAsync({
               segmentId: editingSegment.id,
               activityIds: input.activityIds,
             });

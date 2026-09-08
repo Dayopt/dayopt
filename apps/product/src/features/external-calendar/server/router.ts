@@ -158,7 +158,7 @@ export const externalCalendarRouter = createTRPCRouter({
       }
     }),
 
-  listEvents: entitledProcedure(entitlementKeys.externalCalendarSync)
+  listEvents: protectedProcedure
     .meta({ description: 'calendar 画面に出す ghost（未変換の外部予定）' })
     .input(listEventsInput)
     .query(async ({ ctx, input }) => {

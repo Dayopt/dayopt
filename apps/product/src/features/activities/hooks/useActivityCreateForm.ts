@@ -1,5 +1,6 @@
 'use client';
 
+import { useBillingAccess } from '@/lib/billing/BillingAccessProvider';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { useTranslations } from 'next-intl';
@@ -32,6 +33,7 @@ export function useActivityCreateForm({
   onCreated,
   onClose,
 }: UseActivityCreateFormOptions) {
+  const { canUseProduct } = useBillingAccess();
   const t = useTranslations('calendar.filter.createDialog');
 
   const { data: existingActivities } = useActivities();
@@ -88,7 +90,7 @@ export function useActivityCreateForm({
     [checkDuplicate, trimmedDebounced],
   );
 
-  const canSubmit = trimmedLive.length > 0 && !duplicate && !submitting;
+  const canSubmit = canUseProduct && trimmedLive.length > 0 && !duplicate && !submitting;
 
   const errorMessage = duplicate ? t('duplicateName') : null;
 

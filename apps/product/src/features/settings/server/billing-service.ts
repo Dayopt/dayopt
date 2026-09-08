@@ -1,3 +1,5 @@
+import { isBillingEnforced } from '@/lib/billing/enforcement-flag';
+import { dayoptProTrialDays } from '@dayopt/billing';
 import 'server-only';
 
 /**
@@ -12,12 +14,14 @@ import type Stripe from 'stripe';
 
 import { env } from '@/env';
 import { getAppUrl } from '@/lib/app-url';
+import { getBillingAccess } from '@/lib/billing/access-service';
 import type { Database } from '@/lib/database';
 import { logger } from '@/lib/logger';
 import { captureUnexpectedDatabaseError } from '@/lib/sentry';
 import { requireStripe } from '@/lib/stripe/client';
 import { ServiceError } from '@/lib/trpc/errors';
-import { dayoptProTrialDays, type SubscriptionStatus } from '@dayopt/billing';
+import type { BillingAccess } from '@dayopt/billing';
+import { type SubscriptionStatus } from '@dayopt/billing';
 
 import { resolveBillingLifecycleMode } from './billing-lifecycle-mode';
 import {
@@ -185,8 +189,11 @@ async function createLegacyCheckoutSession(
       line_items: [{ price: priceId, quantity: 1 }],
       metadata: { supabase_user_id: userId },
       mode: 'subscription',
+      ...(isBillingEnforced() ? { payment_method_types: ['card' as const] } : {}),
       subscription_data:
-        existingSubscriptions.data.length > 0 ? {} : { trial_period_days: dayoptProTrialDays },
+        existingSubscriptions.data.length > 0 || isBillingEnforced()
+          ? {}
+          : { trial_period_days: dayoptProTrialDays },
       success_url: `${appUrl}/settings/billing?success=true`,
     },
     { idempotencyKey: `dayopt-billing-checkout-legacy-v1-${operationId}` },
@@ -318,6 +325,7 @@ export async function getInvoices(
 
 /** 課金情報の一括取得結果（billingInfo・支払い方法・請求書を含む） */
 export interface BillingOverview {
+  access: BillingAccess;
   billingInfo: BillingInfo;
   paymentMethod: PaymentMethod | null;
   invoices: InvoiceItem[];
@@ -359,9 +367,17 @@ export async function getBillingOverview(
     subscriptionId: (profile.subscription_id as string) ?? null,
   };
 
+  const access = await getBillingAccess(supabase, userId);
+
   // Free ユーザーは Stripe 問い合わせ不要
   if (!billingInfo.stripeCustomerId) {
-    return { billingInfo, paymentMethod: null, invoices: [], trialEndsAt: null };
+    return {
+      billingInfo,
+      access,
+      paymentMethod: null,
+      invoices: [],
+      trialEndsAt: access.trialEndsAt,
+    };
   }
 
   const stripe = requireStripe();
@@ -373,7 +389,13 @@ export async function getBillingOverview(
     getTrialEndsAt(stripe, billingInfo),
   ]);
 
-  return { billingInfo, paymentMethod, invoices: invoiceList, trialEndsAt };
+  return {
+    billingInfo,
+    access,
+    paymentMethod,
+    invoices: invoiceList,
+    trialEndsAt: access.state === 'trial' ? access.trialEndsAt : trialEndsAt,
+  };
 }
 
 /**

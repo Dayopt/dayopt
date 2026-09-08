@@ -232,7 +232,8 @@ describe('billing-mutation-service', () => {
     vi.clearAllMocks();
   });
 
-  it('starts Checkout durably and uses namespaced Stripe idempotency', async () => {
+  it.each([false, true])('starts Checkout durably with single-plan mode %s', async (enforced) => {
+    vi.stubEnv('BILLING_ENFORCED', String(enforced));
     const { client, rpc } = createSupabase('cus_existing', {
       claim_billing_mutation_v3: [
         reply([billingClaimRow('claimed')]),
@@ -255,7 +256,7 @@ describe('billing-mutation-service', () => {
           dayopt_operation_id: OPERATION_ID,
           supabase_user_id: 'user-1',
         },
-        subscription_data: { trial_period_days: expect.any(Number) },
+        ...(enforced ? {} : { subscription_data: { trial_period_days: expect.any(Number) } }),
       }),
       {
         idempotencyKey: `dayopt-billing-checkout-v1-${OPERATION_ID}`,

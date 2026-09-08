@@ -1,3 +1,7 @@
+vi.mock('@/lib/hooks/useUserPreferences', () => ({
+  useUserPreferences: (select: (state: { timezone: string }) => unknown) =>
+    select({ timezone: 'Asia/Tokyo' }),
+}));
 import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -57,6 +61,7 @@ vi.mock('@/features/settings', async () => ({
 
 vi.mock('@/lib/trpc', () => ({
   api: {
+    useUtils: () => ({ billing: { getAccess: { invalidate: vi.fn() } } }),
     billing: {
       createPortalSession: {
         useMutation: (options: NonNullable<typeof mutationOptions.current>) => {

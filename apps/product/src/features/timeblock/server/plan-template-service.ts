@@ -1,3 +1,4 @@
+import { createServiceRoleClient } from '@/lib/supabase/oauth';
 import 'server-only';
 
 /**
@@ -148,6 +149,7 @@ export class PlanTemplateService {
   constructor(
     private readonly supabase: ServiceSupabaseClient,
     private readonly commands: TimeblockCommandClient = createTimeblockCommandClient(),
+    private readonly writes: () => ServiceSupabaseClient = createServiceRoleClient,
   ) {}
 
   async list(userId: string): Promise<PlanTemplateView[]> {
@@ -175,7 +177,7 @@ export class PlanTemplateService {
    */
   async create(options: UserOptions<CreatePlanTemplateInput>): Promise<PlanTemplateView> {
     const { userId, input } = options;
-    const { data: template, error } = await this.supabase
+    const { data: template, error } = await this.writes()
       .from('plan_templates')
       .insert({ user_id: userId, name: input.name })
       .select('id, name, created_at, updated_at')
@@ -188,7 +190,7 @@ export class PlanTemplateService {
       );
     }
 
-    const { data: blocks, error: blocksError } = await this.supabase
+    const { data: blocks, error: blocksError } = await this.writes()
       .from('plan_template_blocks')
       .insert(
         input.blocks.map((block) => ({
@@ -217,7 +219,7 @@ export class PlanTemplateService {
     options: UserOptions<RenamePlanTemplateInput>,
   ): Promise<{ id: string; name: string; updatedAt: string }> {
     const { userId, input } = options;
-    const { data, error } = await this.supabase
+    const { data, error } = await this.writes()
       .from('plan_templates')
       .update({ name: input.name })
       .eq('id', input.templateId)

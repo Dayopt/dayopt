@@ -1,3 +1,4 @@
+import { createServiceRoleClient } from '@/lib/supabase/oauth';
 import 'server-only';
 
 import type { SupabaseClient } from '@supabase/supabase-js';
@@ -107,7 +108,7 @@ class SegmentsService {
     name: string;
     activityIds: readonly string[];
   }): Promise<Segment> {
-    const { data, error } = await this.supabase
+    const { data, error } = await createServiceRoleClient()
       .from('segments')
       .insert({ user_id: options.userId, name: options.name })
       .select('id, name, created_at, updated_at')
@@ -162,7 +163,7 @@ class SegmentsService {
   }
 
   async rename(options: { userId: string; segmentId: string; name: string }): Promise<void> {
-    const { data, error } = await this.supabase
+    const { data, error } = await createServiceRoleClient()
       .from('segments')
       .update({ name: options.name })
       .eq('id', options.segmentId)
@@ -214,13 +215,15 @@ class SegmentsService {
     const toRemove = [...current].filter((id) => !desired.has(id));
 
     if (toAdd.length > 0) {
-      const { error } = await this.supabase.from('segment_activities').insert(
-        toAdd.map((activityId) => ({
-          user_id: options.userId,
-          segment_id: options.segmentId,
-          activity_id: activityId,
-        })),
-      );
+      const { error } = await createServiceRoleClient()
+        .from('segment_activities')
+        .insert(
+          toAdd.map((activityId) => ({
+            user_id: options.userId,
+            segment_id: options.segmentId,
+            activity_id: activityId,
+          })),
+        );
 
       if (error) {
         // セグメント側は上で確認済みなので、この FK 違反は activity 側で確定する。

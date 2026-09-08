@@ -6,6 +6,7 @@
 import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
 
+import { getBillingAccess, startAppTrial } from '@/lib/billing/access-service';
 import { observeAuthOperation } from '@/lib/sentry';
 import { createServiceRoleClient } from '@/lib/supabase/oauth';
 import { handleServiceError } from '@/lib/trpc/errors';
@@ -35,6 +36,20 @@ function resolveBillingOperationId(input: z.infer<typeof billingOperationInput>)
 
 /** 課金管理のtRPCルーター（Stripeサブスクリプション・Checkout・Portal・請求書） */
 export const billingRouter = createTRPCRouter({
+  getAccess: protectedProcedure.query(async ({ ctx }) => {
+    try {
+      return await getBillingAccess(ctx.supabase, ctx.userId);
+    } catch (error) {
+      handleServiceError(error);
+    }
+  }),
+  startTrial: protectedProcedure.mutation(async ({ ctx }) => {
+    try {
+      return await startAppTrial(createServiceRoleClient(), ctx.userId);
+    } catch (error) {
+      handleServiceError(error);
+    }
+  }),
   /**
    * 課金情報を取得
    */

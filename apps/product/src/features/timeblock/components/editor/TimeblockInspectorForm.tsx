@@ -10,12 +10,14 @@
  * auto_migrated の record は RLS で不変のため読み取り専用として扱う。
  */
 
+import { useBillingAccess } from '@/lib/billing/BillingAccessProvider';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
 
 import { useActivitiesMap, useCreateActivity } from '@/features/activities';
+import { isBillingAccessEndedError } from '@/lib/billing/client-access-error';
 import type { PublicPlanRow, PublicRecordRow } from '@/lib/database';
 import { useDebouncedCallback } from '@/lib/hooks/useDebounce';
 import { toast } from '@/lib/toast';
@@ -221,6 +223,9 @@ export function TimeblockInspectorForm({
   }, [value.startAt, value.endAt]);
 
   // auto_migrated record は RLS で update / delete とも拒否されるため UI 側も読み取り専用にする
+  const { canUseProduct } = useBillingAccess();
+  const billingDraftRef = useRef(false);
+  const [hasBillingDraft, setHasBillingDraft] = useState(false);
   const isMigrated = !isDuplicateMode && kind === 'record' && record?.source === 'auto_migrated';
   const isPast = kind === 'record' || (target != null && new Date(target.end_at) <= new Date());
 
@@ -229,6 +234,8 @@ export function TimeblockInspectorForm({
     activeTargetIdRef.current = targetId;
     if (targetChanged) {
       conflictRecoveringRef.current = false;
+      billingDraftRef.current = false;
+      setHasBillingDraft(false);
       setHasUnresolvedWrite(false);
     }
     if (targetChanged || (!noteDirtyRef.current && !saveInFlightRef.current)) {
@@ -239,6 +246,13 @@ export function TimeblockInspectorForm({
   const savePatch = useCallback(
     async (patch: TimeblockSavePatch) => {
       if (!targetId || isMigrated) return;
+      if (!canUseProduct || billingDraftRef.current) {
+        billingDraftRef.current = true;
+        setHasBillingDraft(true);
+        throw Object.assign(new Error('Product access has ended'), {
+          data: { serviceCode: 'BILLING_ACCESS_ENDED' },
+        });
+      }
       const expectedUpdatedAt = latestUpdatedAtRef.current;
       if (!expectedUpdatedAt) throw new Error('Missing timeblock version');
       const input = {
@@ -254,7 +268,10 @@ export function TimeblockInspectorForm({
             : await updateRecord.mutateAsync(input);
         latestUpdatedAtRef.current = updated.updated_at;
       } catch (error) {
-        if (isTimeblockStaleError(error)) {
+        if (isBillingAccessEndedError(error)) {
+          billingDraftRef.current = true;
+          setHasBillingDraft(true);
+        } else if (isTimeblockStaleError(error)) {
           conflictRecoveringRef.current = true;
           setIsRecoveringConflict(true);
           noteGenerationRef.current += 1;
@@ -298,10 +315,20 @@ export function TimeblockInspectorForm({
         saveInFlightRef.current = false;
       }
     },
-    [kind, targetId, isMigrated, updatePlan, updateRecord, fetchPlanById, fetchRecordById],
+    [
+      canUseProduct,
+      kind,
+      targetId,
+      isMigrated,
+      updatePlan,
+      updateRecord,
+      fetchPlanById,
+      fetchRecordById,
+    ],
   );
   const { enqueue: enqueueSave, flush: flushSave } = useCoalescedTimeblockSave(savePatch, {
-    shouldDiscardPending: isTimeblockStaleError,
+    shouldDiscardPending: (error) =>
+      isTimeblockStaleError(error) || isBillingAccessEndedError(error),
     shouldPausePending: isTimeblockUncertainError,
   });
 
@@ -538,7 +565,7 @@ export function TimeblockInspectorForm({
         onViewStats:
           onViewStats && value.activityId ? () => onViewStats(value.activityId ?? '') : undefined,
         onCopy: onCopy ? handleCopy : undefined,
-        onDuplicate: onStartDuplicate ? handleStartDuplicate : undefined,
+        onDuplicate: canUseProduct && onStartDuplicate ? handleStartDuplicate : undefined,
         onDelete: isMigrated ? undefined : handleDelete,
       });
 
@@ -576,7 +603,7 @@ export function TimeblockInspectorForm({
             uncategorized={selectedActivity?.categoryId === null}
             onActivityChange={handleActivityChange}
             onCreateAndSelect={handleCreateAndSelectActivity}
-            disabled={isWriteFrozen}
+            disabled={isWriteFrozen || !canUseProduct}
           />
         </div>
         <InspectorHeaderActions
@@ -589,6 +616,28 @@ export function TimeblockInspectorForm({
       <div className="space-y-3 p-4 pt-0">
         {isMigrated ? (
           <p className="text-muted-foreground text-sm">{t('timeblock.editor.migratedLocked')}</p>
+        ) : null}
+
+        {hasBillingDraft ? (
+          <div role="status">
+            <p>{t('settings.subscription.singlePlan.draftRetained')}</p>
+            <Button
+              disabled={!canUseProduct}
+              onClick={() => {
+                billingDraftRef.current = false;
+                enqueueSave({
+                  note: normalizeNote(value.note),
+                  activityId: value.activityId,
+                  start_at: value.startAt.toISOString(),
+                  end_at: value.endAt.toISOString(),
+                  ...(kind === 'record' ? { fulfillment } : {}),
+                });
+                setHasBillingDraft(false);
+              }}
+            >
+              {t('settings.subscription.singlePlan.retrySave')}
+            </Button>
+          </div>
         ) : null}
 
         {hasUnresolvedWrite ? (
@@ -609,14 +658,15 @@ export function TimeblockInspectorForm({
             createPlan.isPending ||
             createRecord.isPending ||
             isWriteFrozen ||
-            isMigrated
+            isMigrated ||
+            !canUseProduct
           }
           fulfillmentSlot={
             !isDuplicateMode && kind === 'record' ? (
               <RecordFulfillmentRow
                 value={fulfillment}
                 onChange={handleFulfillmentChange}
-                disabled={isWriteFrozen || isMigrated}
+                disabled={isWriteFrozen || isMigrated || !canUseProduct}
               />
             ) : undefined
           }

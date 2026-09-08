@@ -32,6 +32,7 @@ import {
   syncDeletedSubscriptionStatus,
   syncSubscriptionStatus,
 } from '@/features/settings/server/billing-service';
+import { trackBillingEvent } from '@/lib/analytics/billing-events';
 import { trackProductEvent } from '@/lib/analytics/product-events';
 import { getAppUrl } from '@/lib/app-url';
 import { logger } from '@/lib/logger';
@@ -450,6 +451,19 @@ export async function POST(request: NextRequest) {
         }
         logger.info('Subscription deleted', { outcome: syncOutcome });
 
+        if (syncOutcome === 'updated' || syncOutcome === 'already_terminal') {
+          const endedProfile = await getBillingProfileByCustomerId(supabase, customerId);
+          if (
+            endedProfile &&
+            !(await trackBillingEvent({
+              eventName: 'subscription_ended',
+              sourceId: subscription.id,
+              userId: endedProfile.id,
+              occurredAt: new Date(event.created * 1_000).toISOString(),
+            }))
+          )
+            throw new Error('Billing analytics must be retried');
+        }
         if (syncOutcome === 'updated') {
           // 解約確認メール
           const cancelUser = await getUserByCustomerId(supabase, customerId);
@@ -475,6 +489,51 @@ export async function POST(request: NextRequest) {
               'send_cancellation_email',
             );
           }
+        }
+        break;
+      }
+
+      case 'invoice.paid': {
+        const invoice = event.data.object;
+        const customerId =
+          typeof invoice.customer === 'string' ? invoice.customer : invoice.customer?.id;
+        if (
+          customerId &&
+          invoice.status === 'paid' &&
+          invoice.amount_paid > 0 &&
+          (invoice.billing_reason === 'subscription_create' ||
+            invoice.billing_reason === 'subscription_cycle')
+        ) {
+          if (
+            lifecycleMode === 'durable' &&
+            (await classifyBillingCustomerEvent(supabase, customerId)) === 'account_deleted'
+          )
+            break;
+          const user = await getBillingProfileByCustomerId(supabase, customerId);
+          if (!user) throw new Error('Paid invoice has no application user');
+          const { error: consumptionError } = await supabase
+            .from('profiles')
+            .update({ app_trial_consumed_at: new Date(event.created * 1_000).toISOString() })
+            .eq('id', user.id)
+            .is('app_trial_consumed_at', null);
+          if (consumptionError)
+            throw captureUnexpectedDatabaseError(consumptionError, {
+              feature: 'billing',
+              operation: 'consume_paid_trial',
+            });
+
+          if (
+            !(await trackBillingEvent({
+              eventName:
+                invoice.billing_reason === 'subscription_create'
+                  ? 'subscription_payment_succeeded'
+                  : 'subscription_renewal_succeeded',
+              sourceId: invoice.id,
+              userId: user.id,
+              occurredAt: new Date(event.created * 1_000).toISOString(),
+            }))
+          )
+            throw new Error('Billing analytics must be retried');
         }
         break;
       }

@@ -102,7 +102,25 @@ function makeBillingMocks(
   invoices: InvoiceItem[] = [],
   trialEndsAt: string | null = null,
 ) {
-  const overview: BillingOverview = { billingInfo, paymentMethod, invoices, trialEndsAt };
+  const overview: BillingOverview = {
+    billingInfo,
+    paymentMethod,
+    invoices,
+    trialEndsAt,
+    access: {
+      state:
+        billingInfo.subscriptionStatus === 'free'
+          ? trialEndsAt
+            ? 'trial'
+            : 'not_started'
+          : billingInfo.subscriptionStatus === 'canceled'
+            ? 'expired'
+            : 'subscribed',
+      canUseProduct: billingInfo.subscriptionStatus !== 'canceled',
+      trialEndsAt,
+      enforced: true,
+    },
+  };
   return {
     'billing.getOverview': overview,
     'billing.getInfo': billingInfo,
@@ -212,5 +230,30 @@ export const JpyCurrency: Story = {
 export const StripeNotConfigured: Story = {
   parameters: {
     trpcMocks: makeBillingMocks(FREE_BILLING_INFO),
+  },
+};
+
+/** Card-free trial with identical feature access. */
+export const AppTrial: Story = {
+  parameters: { trpcMocks: makeBillingMocks(FREE_BILLING_INFO, null, [], '2026-10-23T00:00:00Z') },
+};
+/** Saved calendar/report viewing remains available after expiry. */
+export const AppTrialExpired: Story = {
+  parameters: {
+    trpcMocks: {
+      ...makeBillingMocks(FREE_BILLING_INFO),
+      'billing.getOverview': {
+        billingInfo: FREE_BILLING_INFO,
+        paymentMethod: null,
+        invoices: [],
+        trialEndsAt: '2026-09-08T00:00:00Z',
+        access: {
+          state: 'expired',
+          canUseProduct: false,
+          trialEndsAt: '2026-09-08T00:00:00Z',
+          enforced: true,
+        },
+      },
+    },
   },
 };
