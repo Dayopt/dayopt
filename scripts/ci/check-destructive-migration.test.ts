@@ -478,6 +478,45 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON public.segments TO authenticated;
     ).toEqual([]);
   });
 
+  it.each([
+    [
+      'VIEW',
+      'CREATE VIEW private.plans_v2 AS SELECT 1;',
+      'REVOKE ALL ON TABLE private.plans_v2 FROM PUBLIC, anon, authenticated;',
+    ],
+    [
+      'MATERIALIZED VIEW',
+      'CREATE MATERIALIZED VIEW private.stats_mv AS SELECT 1;',
+      'REVOKE ALL ON private.stats_mv FROM PUBLIC;',
+    ],
+    [
+      'UNLOGGED TABLE',
+      'CREATE UNLOGGED TABLE private.revision_fence (id int);',
+      'REVOKE ALL ON TABLE private.revision_fence FROM PUBLIC, anon, authenticated;',
+    ],
+    [
+      'SCHEMA',
+      'CREATE SCHEMA IF NOT EXISTS private;',
+      'REVOKE ALL ON SCHEMA private FROM PUBLIC, anon, authenticated;',
+    ],
+  ])(
+    '同 PR で作った %s への REVOKE は縮小ではない（repo の定型 CREATE → REVOKE → GRANT）',
+    (_label, create, revoke) => {
+      expect(
+        detectContractNarrowing([
+          { path: 'supabase/migrations/x.sql', content: `${create}\n${revoke}` },
+        ]),
+      ).toEqual([]);
+    },
+  );
+
+  it('既存 schema への REVOKE は縮小として残る', () => {
+    const findings = detectContractNarrowing([
+      { path: 'supabase/migrations/x.sql', content: 'REVOKE USAGE ON SCHEMA public FROM anon;' },
+    ]);
+    expect(findings.map((f) => [f.kind, f.target])).toEqual([['REVOKE', 'schema public']]);
+  });
+
   it('CREATE と REVOKE が別ファイルに分かれていても、同一 PR 内なら除外する', () => {
     expect(
       detectContractNarrowing([

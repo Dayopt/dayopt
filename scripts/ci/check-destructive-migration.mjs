@@ -418,17 +418,35 @@ function splitStatements(masked) {
 /**
  * PR で追加された migration 群が**作る**オブジェクトを集める。ここに入るものへの
  * 縮小は旧 build が知らないため coupled の対象外。
+ * `tables` には VIEW / MATERIALIZED VIEW も入れる（`REVOKE ... ON TABLE` / 無修飾 `ON` は
+ * view にも同じ構文で書かれ、この repo の定型が `CREATE VIEW private.x; REVOKE ALL ON
+ * TABLE private.x ...` だから）。`CREATE SCHEMA` は `schemas` に別で持つ
+ * （`REVOKE ALL ON SCHEMA private` を新規 schema なら除外するため）。
  * @param {string[]} sqlTexts
- * @returns {{ tables: Set<string>, functions: Set<string>, columns: Set<string> }}
+ * @returns {{ tables: Set<string>, functions: Set<string>, columns: Set<string>, schemas: Set<string> }}
  */
 export function collectCreatedObjects(sqlTexts) {
   const tables = new Set();
   const functions = new Set();
   const columns = new Set();
+  const schemas = new Set();
   for (const sql of sqlTexts) {
     for (const { text } of splitStatements(maskForTopLevelScan(sql))) {
-      const table = /\bCREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?([\w".]+)/i.exec(text);
+      const table =
+        /\bCREATE\s+(?:UNLOGGED\s+|TEMP(?:ORARY)?\s+)?TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?([\w".]+)/i.exec(
+          text,
+        );
       if (table) tables.add(normalizeIdent(table[1]));
+      const view =
+        /\bCREATE\s+(?:OR\s+REPLACE\s+)?(?:MATERIALIZED\s+)?VIEW\s+(?:IF\s+NOT\s+EXISTS\s+)?([\w".]+)/i.exec(
+          text,
+        );
+      if (view) tables.add(normalizeIdent(view[1]));
+      const schema =
+        /\bCREATE\s+SCHEMA\s+(?:IF\s+NOT\s+EXISTS\s+)?(?:AUTHORIZATION\s+\w+\s+)?([\w"]+)/i.exec(
+          text,
+        );
+      if (schema) schemas.add(schema[1].replace(/"/g, '').toLowerCase());
       const fn = /\bCREATE\s+(?:OR\s+REPLACE\s+)?FUNCTION\s+([\w".]+)/i.exec(text);
       if (fn) functions.add(normalizeIdent(fn[1]));
       const alter = /\bALTER\s+TABLE\s+(?:ONLY\s+)?(?:IF\s+EXISTS\s+)?([\w".]+)/i.exec(text);
@@ -443,7 +461,7 @@ export function collectCreatedObjects(sqlTexts) {
       }
     }
   }
-  return { tables, functions, columns };
+  return { tables, functions, columns, schemas };
 }
 
 /**
@@ -465,7 +483,13 @@ function classifyNarrowing(text, created) {
   if (revoke) {
     const privileges = revoke[1];
     const objectKind = (revoke[2] ?? '').toUpperCase();
-    if (objectKind === 'ALL' || objectKind === 'SCHEMA') {
+    if (objectKind === 'SCHEMA') {
+      const schemaName = revoke[3].trim().replace(/"/g, '').toLowerCase();
+      return [
+        { kind: 'REVOKE', target: `schema ${schemaName}`, exempt: created.schemas.has(schemaName) },
+      ];
+    }
+    if (objectKind === 'ALL') {
       return [{ kind: 'REVOKE', target: revoke[3].trim().replace(/\s+/g, ' '), exempt: false }];
     }
     const idents = revoke[3]
