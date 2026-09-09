@@ -1194,6 +1194,69 @@ describe('renderMarkdown', () => {
     expect(markdown).toContain('次の一手: pnpm branch:finish 8888');
   });
 
+  it('#2560 項目 5: 受け入れ条件は最終段でセクションごと落ちる（省略行だけ残さない）', () => {
+    // acceptanceMaxLines を 0 まで絞った段で「…（N 行省略）」だけが残ると、
+    // 段階縮小の最終段が 0 行まで縮まず 150 行を守れない場合がある。
+    const pack = {
+      number: 8891,
+      kind: 'pr' as const,
+      header: {
+        title: 'x',
+        state: 'OPEN',
+        labels: [],
+        milestone: null,
+        assignee: null,
+        url: 'x',
+        headRefName: 'a',
+        baseRefName: 'main',
+        isDraft: false,
+        mergeStateStatus: 'CLEAN',
+        reviewDecision: null,
+        ciRollup: { success: 1, failure: 0, pending: 0 },
+        unresolvedThreads: 0,
+      },
+      body: {
+        text: Array.from({ length: 400 }, (_, i) => `本文 ${i}`).join('\n'),
+        truncated: false,
+        remaining: 0,
+      },
+      comments: Array.from({ length: 60 }, (_, i) => ({
+        author: `u${i}`,
+        date: '2026-09-01',
+        body: `c${i}`,
+      })),
+      related: {
+        parentEpic: null,
+        prs: null,
+        linkedIssues: [
+          {
+            number: 100,
+            state: 'open',
+            title: 'issue A',
+            labels: [],
+            acceptanceText: Array.from({ length: 300 }, (_, i) => `受け入れ ${i}`).join('\n'),
+          },
+        ],
+      },
+      files: Array.from({ length: 200 }, (_, i) => `src/f${i}.ts`),
+      protectedRequired: true,
+      decisionLines: Array.from({ length: 300 }, (_, i) => `- 決定 ${i}`),
+      skills: [],
+      judgmentRecords: { dod: true, breakdown: true, brief: true },
+      nextStep: 'pnpm branch:finish 8891',
+      nextStepSecondary: null,
+    };
+
+    const markdown = renderMarkdown(pack);
+
+    expect(markdown.split('\n').length).toBeLessThanOrEqual(150);
+    // 最終段まで縮んだ時は見出しごと消える（省略行だけの残骸を作らない）。
+    if (!markdown.includes('#### linked issue の受け入れ条件')) {
+      expect(markdown).not.toMatch(/…（\d+ 行省略）/);
+    }
+    expect(markdown).toContain('次の一手: pnpm branch:finish 8891');
+  });
+
   it('#2560 項目 5: 決定ログを縮めた時は省略件数を出す', () => {
     const basePack = {
       number: 8889,

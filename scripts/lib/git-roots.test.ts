@@ -1,9 +1,11 @@
 import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { describe, expect, it, vi } from 'vitest';
 
+import { evaluate } from '../hooks/pre-tool-guard-rules.mjs';
 import { resolveMainCheckoutRoot, resolvePhysicalPath, resolveRoots } from './git-roots.mjs';
 
 const REPO_ROOT = join(import.meta.dirname, '..', '..');
@@ -94,6 +96,45 @@ describe('resolveRoots', () => {
     expect(resolveMainCheckoutRoot(LANE, git, { realpathImpl: identityRealpath })).toBeNull();
   });
 
+  it('bare repo 家系では bare entry を main checkout と誤認しない', () => {
+    // `git worktree list --porcelain` は bare repo を先頭 stanza に出し、path の
+    // 次行に `bare` を置く。行単位で `worktree ` だけを拾うと `.git` ディレクトリを
+    // main checkout と誤認し、誰の cwd とも一致しない prefix になる（ai-usage が
+    // 黙って 0 件になり、non-null なので fallback も効かない）。
+    const BARE = '/repo/bare.git';
+    const git = makeGit({
+      'rev-parse --show-toplevel': LANE,
+      'rev-parse --absolute-git-dir': `${BARE}/worktrees/lane`,
+      'rev-parse --git-common-dir': BARE,
+      'worktree list --porcelain': `worktree ${BARE}\nbare\n\nworktree ${LANE}\nHEAD abc\nbranch refs/heads/main\n`,
+    });
+
+    const roots = resolveRoots(LANE, git, { realpathImpl: identityRealpath });
+
+    // bare ディレクトリは main 候補にしない。最初の非 bare stanza を採る。
+    expect(roots?.mainRoot).toBe(LANE);
+    expect(roots?.mainRoot).not.toBe(BARE);
+  });
+
+  it('main checkout の path が解決できない時は mainRoot を空にする（別 worktree へ昇格させない）', () => {
+    const git = makeGit({
+      'rev-parse --show-toplevel': LANE,
+      'rev-parse --absolute-git-dir': `${MAIN}/.git/worktrees/lane`,
+      'rev-parse --git-common-dir': `${MAIN}/.git`,
+      'worktree list --porcelain': `worktree ${MAIN}\n\nworktree ${LANE}\n`,
+    });
+    // main checkout だけ realpath に失敗する（消えた main checkout 等）。
+    const realpathImpl = ((p: string) => {
+      if (p === MAIN) throw new Error('ENOENT');
+      return p;
+    }) as unknown as typeof import('node:fs').realpathSync;
+
+    const roots = resolveRoots(LANE, git, { realpathImpl });
+
+    expect(roots?.mainRoot).toBe('');
+    expect(resolveMainCheckoutRoot(LANE, git, { realpathImpl })).toBeNull();
+  });
+
   it('--git-common-dir が相対 path でも main checkout 判定ができる', () => {
     const git = makeGit({
       'rev-parse --show-toplevel': MAIN,
@@ -147,29 +188,77 @@ describe('pre-tool-guard の import 不変条件（#2674 で共有しなかっ�
 
   it.each(guardFiles)('%s は node 標準ライブラリしか import しない', (relPath) => {
     const source = readFileSync(join(REPO_ROOT, relPath), 'utf8');
-    const specifiers = [...source.matchAll(/^\s*import\s[^;]*?from\s+'([^']+)'/gm)].map(
-      (m) => m[1],
-    );
+    // 静的 `import x from 'y'` / 副作用 `import 'y'` / 動的 `import('y')` の 3 形すべてを
+    // 見る（loader 自身が動的 import を使うので、静的形だけを見ると素通りする）。
+    const specifiers = [
+      ...source.matchAll(/^\s*import\s[^;]*?from\s+['"]([^'"]+)['"]/gm),
+      ...source.matchAll(/^\s*import\s+['"]([^'"]+)['"]/gm),
+      ...source.matchAll(/\bimport\s*\(\s*['"]([^'"]+)['"]\s*\)/g),
+    ].map((m) => m[1]);
 
     expect(specifiers.length).toBeGreaterThan(0);
     for (const specifier of specifiers) {
-      expect(specifier, `${relPath} が ${specifier} を import している`).toMatch(/^node:/);
+      // 同ディレクトリの相対 import（loader → rules）は復旧経路が覆うので許す。
+      const allowed = specifier.startsWith('node:') || specifier.startsWith('./');
+      expect(allowed, `${relPath} が ${specifier} を import している`).toBe(true);
     }
   });
 
-  it('guard 側の worktree 家系解決は、この lib と同じ返り値になる（drift 検出）', () => {
-    // 実 repo（main checkout）で両者を突き合わせる。guard 側は private 関数なので
-    // 直接は呼べないため、公開されている振る舞い（現在の repo root）で比較する。
-    const roots = resolveRoots(REPO_ROOT);
-    const expectedToplevel = execFileSync('git', ['rev-parse', '--show-toplevel'], {
-      cwd: REPO_ROOT,
-      encoding: 'utf8',
-    }).trim();
+  it('guard 側の worktree 家系解決は、この lib と同じ root を見る（drift 検出）', () => {
+    // 実 git fixture（main + 2 worktree）を組み、**両実装を同じ state に対して動かす**。
+    // guard 側の resolveRoots は private だが、worktree 境界違反の BLOCKED メッセージが
+    // `currentRoot` を含む（pre-tool-guard-rules.mjs の checkWorktreeBoundary）ので、
+    // そこを突き合わせれば実装同士を比較できる。
+    const fixtureRoot = realpathSync(mkdtempSync(join(tmpdir(), 'git-roots-drift-')));
+    const git = (args: string[], cwd: string) =>
+      execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
 
-    expect(roots).not.toBeNull();
-    expect(roots?.currentRoot).toBe(resolvePhysicalPath(expectedToplevel, REPO_ROOT));
-    // mainRoot は必ず currentRoot か、その祖先（worktree から呼んだ場合）になる。
-    expect(roots?.mainRoot).toBeTruthy();
-    expect(roots?.currentRoot.startsWith(roots?.mainRoot ?? '')).toBe(true);
+    try {
+      const mainDir = join(fixtureRoot, 'main');
+      mkdirSync(mainDir);
+      git(['init', '-q', '-b', 'main'], mainDir);
+      git(['config', 'user.email', 't@example.com'], mainDir);
+      git(['config', 'user.name', 'test'], mainDir);
+      writeFileSync(join(mainDir, 'seed.txt'), 'x\n');
+      git(['add', 'seed.txt'], mainDir);
+      git(['commit', '-qm', 'init'], mainDir);
+
+      const laneA = join(mainDir, '.claude', 'worktrees', 'laneA');
+      const laneB = join(mainDir, '.claude', 'worktrees', 'laneB');
+      git(['worktree', 'add', '-q', laneA, '-b', 'laneA'], mainDir);
+      git(['worktree', 'add', '-q', laneB, '-b', 'laneB'], mainDir);
+
+      // --- lib 側の見え方 ---
+      const libRoots = resolveRoots(laneA);
+      expect(libRoots?.currentRoot).toBe(realpathSync(laneA));
+      expect(libRoots?.mainRoot).toBe(realpathSync(mainDir));
+      expect(libRoots?.otherRoots).toContain(realpathSync(laneB));
+
+      // --- guard 側の見え方（同じ fixture、同じ cwd）---
+      const decision = evaluate(
+        JSON.stringify({
+          tool_name: 'Write',
+          tool_input: { file_path: join(laneB, 'seed.txt') },
+        }),
+        { cwd: laneA },
+      );
+
+      // laneA から laneB を編集しようとしているので block される。
+      expect(decision.decision).not.toBe('allow');
+      // BLOCKED メッセージが名指しする currentRoot が lib の currentRoot と一致する。
+      expect(decision.message).toContain(libRoots?.currentRoot ?? '<unresolved>');
+
+      // 自分の worktree 内なら通る（fail-open ではなく、境界判定が効いている証拠）。
+      const allowed = evaluate(
+        JSON.stringify({
+          tool_name: 'Write',
+          tool_input: { file_path: join(laneA, 'seed.txt') },
+        }),
+        { cwd: laneA },
+      );
+      expect(allowed.decision).toBe('allow');
+    } finally {
+      rmSync(fixtureRoot, { recursive: true, force: true });
+    }
   });
 });

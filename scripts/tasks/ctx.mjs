@@ -722,15 +722,19 @@ function buildMarkdownLines(
         sectionBody.pop();
       }
       const heading = ['#### linked issue の受け入れ条件', ''];
+      // 見出しと省略行だけで予算を使い切る段（acceptanceMaxLines <= 3）では、
+      // 「…（N 行省略）」しか残らないセクションを出しても行数を食うだけなので
+      // セクションごと落とす。段階縮小の最終段が実際に 0 行まで縮むようにする。
       const budget = Math.max(0, acceptanceMaxLines - heading.length);
-      let cappedBody = sectionBody;
-      if (sectionBody.length > budget) {
-        const keep = Math.max(0, budget - 1); // 省略行 1 行分を予約する
-        cappedBody = sectionBody.slice(0, keep);
-        cappedBody.push(`…（${sectionBody.length - keep} 行省略）`);
+      if (budget > 1) {
+        let cappedBody = sectionBody;
+        if (sectionBody.length > budget) {
+          const keep = budget - 1; // 省略行 1 行分を予約する
+          cappedBody = sectionBody.slice(0, keep);
+          cappedBody.push(`…（${sectionBody.length - keep} 行省略）`);
+        }
+        lines.push(...heading, ...cappedBody, '');
       }
-      // acceptanceMaxLines が 0 まで絞られた attempt ではセクションごと落とす。
-      if (cappedBody.length > 0) lines.push(...heading, ...cappedBody, '');
     }
   }
 

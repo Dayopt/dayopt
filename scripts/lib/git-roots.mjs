@@ -82,14 +82,29 @@ export function resolveRoots(cwd, execFileImpl = execFileSync, { realpathImpl } 
 
   const otherRoots = [];
   let mainRoot = '';
+  let sawMainCandidate = false;
   const worktreeListRaw = runGitCapture(['worktree', 'list', '--porcelain'], cwd, execFileImpl);
-  for (const line of worktreeListRaw.split('\n')) {
-    if (!line.startsWith('worktree ')) continue;
-    const wtPathRaw = line.slice('worktree '.length);
-    const wtResolved = resolve(wtPathRaw);
+  // porcelain は 1 worktree = 1 stanza（空行区切り）。行単位で `worktree ` だけを
+  // 拾うと、bare repo の entry（`worktree <path>` の次行が `bare`）を working tree と
+  // 誤認する。bare 家系では先頭 stanza が bare な `.git` ディレクトリになり、
+  // それを mainRoot にすると誰の cwd とも一致しない prefix が出来て、ai:usage が
+  // 黙って 0 件になる（fallback も効かない。修正前より悪い）。stanza 単位で読む。
+  for (const stanza of worktreeListRaw.split('\n\n')) {
+    const stanzaLines = stanza.split('\n');
+    const head = stanzaLines.find((line) => line.startsWith('worktree '));
+    if (!head) continue;
+    const isBare = stanzaLines.some((line) => line.trim() === 'bare');
+    const wtResolved = resolve(head.slice('worktree '.length));
+
+    if (!isBare && !sawMainCandidate) {
+      // 最初の非 bare stanza が main checkout（git の出力順の仕様）。
+      // 解決できなければ mainRoot は空のままにする ── 「次に解決できた worktree」を
+      // main へ昇格させると、誤った root を自信を持って返すことになる。
+      sawMainCandidate = true;
+      mainRoot = wtResolved;
+    }
+
     if (!wtResolved) continue;
-    // 先頭の worktree 行が main checkout（git の出力順の仕様）。
-    if (!mainRoot) mainRoot = wtResolved;
     if (wtResolved === toplevelResolved) continue;
     otherRoots.push(wtResolved);
   }
