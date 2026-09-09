@@ -314,3 +314,97 @@ describe('runMigrationSafety', () => {
     expect(result.results).toEqual([]);
   });
 });
+
+describe('runMigrationSafety — coupled migration（#2680）', () => {
+  const noopSpawn = () => ({ status: 0 });
+  const mfaLockdown =
+    'REVOKE ALL ON TABLE public.mfa_recovery_codes FROM anon, authenticated;\nDROP POLICY "x" ON public.mfa_recovery_codes;';
+
+  it('縮小 migration と product runtime 変更が同一 PR なら coupled: true を返し、summary / comment に Coupled 節を足す', async () => {
+    const summaries: string[] = [];
+    const bodies: string[] = [];
+    const spawnImpl = vi.fn((_cmd: string, args: string[]) => {
+      if (args.includes('comment')) bodies.push(args[args.length - 1] as string);
+      return { status: 0 };
+    });
+    const result = await runMigrationSafety({
+      repo: 'Dayopt/dayopt',
+      prNumber: 7,
+      fetchFilesImpl: vi.fn(() => [
+        { filename: 'supabase/migrations/20260908060000_lock_down.sql', status: 'added' },
+        {
+          filename: 'apps/product/src/features/settings/server/recovery-code-actions.ts',
+          status: 'modified',
+        },
+      ]),
+      readFileImpl: vi.fn(() => mfaLockdown),
+      execFileImpl: vi.fn(() => 'false'),
+      spawnImpl,
+      writeStepSummaryImpl: vi.fn(async (markdown: string) => {
+        summaries.push(markdown);
+      }),
+    });
+    expect(result.coupled).toBe(true);
+    expect(result.coupling?.narrowing.map((f) => f.kind)).toEqual(['REVOKE', 'DROP_POLICY']);
+    expect(summaries[0]).toContain('Coupled migration');
+    expect(bodies[0]).toContain('Coupled migration');
+  });
+
+  it('縮小 migration でも product runtime 変更が無ければ coupled: false（従来どおり fail open の通知のみ）', async () => {
+    const summaries: string[] = [];
+    const result = await runMigrationSafety({
+      repo: 'Dayopt/dayopt',
+      prNumber: 7,
+      fetchFilesImpl: vi.fn(() => [
+        { filename: 'supabase/migrations/20260908060000_lock_down.sql', status: 'added' },
+        {
+          filename: 'apps/product/src/lib/database/generated/database.types.ts',
+          status: 'modified',
+        },
+        { filename: 'docs/engineering/infra.md', status: 'modified' },
+      ]),
+      readFileImpl: vi.fn(() => mfaLockdown),
+      execFileImpl: vi.fn(() => 'false'),
+      spawnImpl: vi.fn(noopSpawn),
+      writeStepSummaryImpl: vi.fn(async (markdown: string) => {
+        summaries.push(markdown);
+      }),
+    });
+    expect(result.coupled).toBe(false);
+    expect(result.results).toHaveLength(1);
+    expect(summaries[0]).not.toContain('Coupled migration');
+  });
+
+  it('既にラベルが付いていて再通知しない round でも coupled は返す（hard fail は毎 push）', async () => {
+    const result = await runMigrationSafety({
+      repo: 'Dayopt/dayopt',
+      prNumber: 7,
+      fetchFilesImpl: vi.fn(() => [
+        { filename: 'supabase/migrations/20260908060000_lock_down.sql', status: 'added' },
+        { filename: 'apps/product/src/a.ts', status: 'modified' },
+      ]),
+      readFileImpl: vi.fn(() => mfaLockdown),
+      execFileImpl: vi.fn(() => 'true'),
+      spawnImpl: vi.fn(noopSpawn),
+      writeStepSummaryImpl: vi.fn(async () => {}),
+    });
+    expect(result.notified).toBe(false);
+    expect(result.coupled).toBe(true);
+  });
+
+  it('destructive 無しなら coupled: false を返す', async () => {
+    const result = await runMigrationSafety({
+      repo: 'Dayopt/dayopt',
+      prNumber: 7,
+      fetchFilesImpl: vi.fn(() => [
+        { filename: 'supabase/migrations/20260101_x.sql', status: 'added' },
+        { filename: 'apps/product/src/a.ts', status: 'modified' },
+      ]),
+      readFileImpl: vi.fn(() => 'CREATE TABLE public.widgets (id uuid primary key);'),
+      execFileImpl: vi.fn(),
+      spawnImpl: vi.fn(noopSpawn),
+      writeStepSummaryImpl: vi.fn(async () => {}),
+    });
+    expect(result.coupled).toBe(false);
+  });
+});

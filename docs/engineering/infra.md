@@ -1549,6 +1549,8 @@ ORDER BY schemaname, tablename;
 | NOT NULL 追加    | 先に backfill で全行埋める → 制約追加        |
 | RLS ポリシー変更 | 新ポリシー追加 → アプリ更新 → 旧ポリシー削除 |
 
+**「後に DB」側の migration（既存オブジェクトへの `REVOKE` / `DROP POLICY` / `DROP COLUMN` / `DROP TABLE` / `DROP FUNCTION` / `RENAME` / 列型変更）と product の runtime コード変更を同一 PR に束ねると、CI（`ci.yml` unit job の migration safety、`scripts/ci/check-destructive-migration.mjs` の coupled 判定）が落とす。** Supabase の GitHub 連携は main merge 時点で migration を production へ適用し、Vercel の promote は E2E 後の別 job なので、promote が失敗している間ずっと旧 build が新 schema に当たる（2026-09-08、#2672 で 5 時間 4 分）。同一 PR の新規 migration が作ったオブジェクト（`CREATE TABLE` / `CREATE FUNCTION` / `ADD COLUMN`）への縮小は旧 build が知らないので対象外。plain な destructive 検知（ラベル + コメント、fail open）は従来どおり。
+
 ### 関連
 
 - skill: `.agents/skills/supabase/SKILL.md`

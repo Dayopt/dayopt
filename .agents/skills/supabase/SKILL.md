@@ -185,6 +185,8 @@ column / table の削除を伴う機能撤去は 3 段階に分け、1 PR に混
 
 先に drop すると、旧コードが動いている deploy 間隙で本番エラーになる。core column 削除で確立した手順。
 
+**1 と 3 を同一 PR に束ねると CI が落とす**（`scripts/ci/check-destructive-migration.mjs` の coupled 判定。既存オブジェクトへの `REVOKE` / `DROP POLICY` / `DROP COLUMN` 等 + `apps/product/**` / `packages/**` の runtime 変更）。Supabase 連携は merge 時に即適用、Vercel promote は E2E 後なので、promote が失敗している間は旧 build が新 schema に当たる（2026-09-08、#2672 で 5 時間 4 分）。新規テーブル雛形の `REVOKE ALL` → `GRANT` や、同 PR で足した列への列レベル `REVOKE` は対象外。
+
 ### 命名規則
 
 ```

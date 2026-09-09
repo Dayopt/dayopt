@@ -53,6 +53,8 @@ import { fileURLToPath } from 'node:url';
 
 import {
   checkFiles as detectDestructiveMigrations,
+  evaluateCoupledMigration,
+  formatCoupledSummary,
   formatSummary as formatMigrationSummary,
 } from './check-destructive-migration.mjs';
 import {
@@ -412,8 +414,18 @@ async function runUnit() {
   // PR でしか走らないが、この検知は「新規 migration を含む PR」で必ず要る。
   // 両者の条件は現状ほぼ一致する（migrations/** は INTEGRATION_GLOBS に入っている）
   // が、glob を締める変更（#2539 の後続）で乖離しうるため、常時走る側へ置く。
+  // coupled migration（既存オブジェクトの契約を縮める migration + product runtime 変更が
+  // 同一 PR）だけは hard fail にする（#2680。2026-09-08 に #2672 で旧 build が revoke 済み
+  // schema に 5 時間当たり続けた）。ただし throw は他の unit test を全部走らせた**後**に
+  // 行う。検知を先頭へ置いた理由（test 失敗に巻き込まれない）を保つため。
+  let coupledMigration = null;
   if (isPr) {
-    await runMigrationSafety({ repo, prNumber, env: { ...process.env, GH_TOKEN: ghToken } });
+    const safety = await runMigrationSafety({
+      repo,
+      prNumber,
+      env: { ...process.env, GH_TOKEN: ghToken },
+    });
+    if (safety.coupled) coupledMigration = safety.coupling;
   }
 
   run('pnpm', ['build:packages']);
@@ -439,6 +451,14 @@ async function runUnit() {
   run('pnpm', ['--filter', '@dayopt/billing', 'test:run']);
   run('pnpm', ['--filter', '@dayopt/i18n', 'test:run']);
   run('pnpm', ['--filter', '@dayopt/observability', 'test:run']);
+
+  if (coupledMigration) {
+    throw new Error(
+      `::error::coupled migration: 既存オブジェクトの契約を縮める migration と product の runtime 変更が同一 PR にあります。` +
+        `app コードだけの PR を先に出荷し、migration は別 PR にしてください（Step Summary / PR コメントの「Coupled migration」参照、#2680）。` +
+        ` 縮小: ${coupledMigration.narrowing.map((f) => `${f.kind} ${f.target}`).join(', ')}`,
+    );
+  }
 }
 
 // ─── integration モード（Supabase 起動済みの job で走る）──────────────
@@ -461,8 +481,9 @@ async function runIntegration() {
 }
 
 /**
- * migration safety の検知〜通知。「検知しても job は失敗させない」（fail open）
- * 設計を維持する。ラベル付与より先にコメント投稿を行う（旧 integration.yml と
+ * migration safety の検知〜通知。plain な destructive 検知は「検知しても job は失敗させない」
+ * （fail open）設計を維持する。戻り値の `coupled`（既存オブジェクトの契約を縮める migration と
+ * product runtime 変更が同一 PR、#2680）だけは呼び出し側（runUnit）が hard fail にする。ラベル付与より先にコメント投稿を行う（旧 integration.yml と
  * 同じ crash-safety の理由: cancel-in-progress で通知前に打ち切られても、
  * ラベルだけ残って以後永久に通知されない状態を避ける）。
  *
@@ -524,8 +545,17 @@ export async function runMigrationSafety({
     });
 
   const results = detectDestructiveMigrations(withContent);
-  await writeStepSummaryImpl(formatMigrationSummary(results));
-  if (results.length === 0) return { results, notified: false };
+  // coupled 判定は「PR で追加された migration」×「PR の全変更ファイル」で行う。
+  // narrowing ⊂ destructive なので、results が空なら coupled も必ず false。
+  const coupling = evaluateCoupledMigration({
+    addedMigrations: withContent.filter((f) => f.status === 'added'),
+    prFiles: files.map((f) => f.filename),
+  });
+  const summary =
+    formatMigrationSummary(results) +
+    (coupling.coupled ? `\n${formatCoupledSummary(coupling)}` : '');
+  await writeStepSummaryImpl(summary);
+  if (results.length === 0) return { results, notified: false, coupled: false, coupling };
 
   let hasLabel = false;
   try {
@@ -544,7 +574,7 @@ export async function runMigrationSafety({
   } catch {
     hasLabel = false; // 取得失敗は「未検知」扱いで通知を試みる（fail open）
   }
-  if (hasLabel) return { results, notified: false }; // round ごとの追い push で毎回コメントしない
+  if (hasLabel) return { results, notified: false, coupled: coupling.coupled, coupling }; // round ごとの追い push で毎回コメントしない
 
   spawnImpl(
     'gh',
@@ -564,7 +594,7 @@ export async function runMigrationSafety({
 
   const commentResult = spawnImpl(
     'gh',
-    ['pr', 'comment', String(prNumber), '--repo', repo, '--body', formatMigrationSummary(results)],
+    ['pr', 'comment', String(prNumber), '--repo', repo, '--body', summary],
     { env },
   );
   if (commentResult.status === 0) {
@@ -580,13 +610,13 @@ export async function runMigrationSafety({
       ],
       { env },
     );
-    return { results, notified: true };
+    return { results, notified: true, coupled: coupling.coupled, coupling };
   }
   // fork PR では pull_request イベントの GITHUB_TOKEN が構造的に read-only になる
   console.log(
     '::warning::migration safety のコメント投稿に失敗しました（fork PR 等で write 権限が無い可能性）。Step Summary の検知結果を確認してください。',
   );
-  return { results, notified: false };
+  return { results, notified: false, coupled: coupling.coupled, coupling };
 }
 
 // ─── CLI ────────────────────────────────────────────────────────────
