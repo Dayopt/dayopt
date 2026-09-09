@@ -341,6 +341,310 @@ export function formatGithubOutput(results) {
   return `destructive=${destructive}\n`;
 }
 
+// ─── contract narrowing × app コードの同一 PR 検出（coupled migration）────────
+//
+// Supabase GitHub integration は main merge 時点で migration を production へ適用し、
+// Vercel の promote は E2E 完走後の別 job（promote.yml）で行う。既存オブジェクトの
+// 権限・契約を**縮める** migration と、その新しい経路を使う app コードを同一 PR に
+// 束ねると、promote が失敗している間ずっと旧 build が新 schema に当たる。
+//
+// 実測（2026-09-08）: PR #2672 は `mfa_recovery_codes` への REVOKE ALL + DROP POLICY と
+// RPC 切替を同一 PR に持ち、promote が E2E で 4 run 連続失敗したため **5 時間 4 分**
+// 旧 build（table を直接 INSERT / DELETE）が revoke 済み schema に当たり続けた。
+// `docs/decisions.md` 2026-09-04 が PR 分割を規律として書いていたが機械強制が無かった。
+//
+// 判定は「縮小」だけを対象にする。DELETE FROM / TRUNCATE / DROP TRIGGER / DROP CONSTRAINT
+// / backfill は旧 build の契約を縮めないので coupled の対象外（plain な destructive 検知
+// には残る）。同一 PR の新規 migration が**作った**オブジェクトへの縮小は除外する
+// （新規テーブル雛形の `REVOKE ALL ... FROM PUBLIC, anon, authenticated` → `GRANT`、
+// 新規列への列レベル REVOKE は旧 build が知らないオブジェクトなので窓が開かない）。
+//
+// plain な destructive 検知は fail open のまま（#2272）。coupled だけを hard fail にする。
+
+export const NARROWING_KINDS = new Set([
+  'DROP_TABLE',
+  'DROP_COLUMN',
+  'DROP_POLICY',
+  'REVOKE',
+  'RENAME',
+  'ALTER_COLUMN_TYPE',
+  'DROP_FUNCTION',
+]);
+
+/**
+ * identifier を `schema.name`（小文字・quote 除去、既定 schema は public）へ正規化する。
+ * @param {string} raw
+ */
+function normalizeIdent(raw) {
+  // `format('... ON public.%I ...')` のような動的 SQL は識別子が `public.` で切れる。
+  // migration 自身が DO ブロックで実行する REVOKE なので検知対象に残し、対象名だけ
+  // `<dynamic>` にする（除外判定には乗らない = 縮小として扱う）。
+  const unquoted = raw.replace(/"/g, '').trim();
+  const parts = unquoted
+    .split('.')
+    .map((part) => part.trim().toLowerCase())
+    .filter(Boolean)
+    .map((part) => (part.includes('%') ? '<dynamic>' : part));
+  if (unquoted.endsWith('.')) parts.push('<dynamic>');
+  if (parts.length === 0) return '';
+  if (parts.length === 1) return `public.${parts[0]}`;
+  return parts.slice(-2).join('.');
+}
+
+/**
+ * masked text（`maskForTopLevelScan`）を `;` 区切りの文へ分け、各文の開始行を付ける。
+ * masked は改行位置を保つので、行番号は生のファイルと一致する。
+ * @param {string} masked
+ * @returns {{ text: string, line: number }[]}
+ */
+function splitStatements(masked) {
+  const statements = [];
+  let start = 0;
+  for (let i = 0; i <= masked.length; i += 1) {
+    if (i === masked.length || masked[i] === ';') {
+      const raw = masked.slice(start, i);
+      const leading = raw.length - raw.trimStart().length;
+      const text = raw.trim();
+      if (text) {
+        const line = masked.slice(0, start + leading).split('\n').length;
+        statements.push({ text, line });
+      }
+      start = i + 1;
+    }
+  }
+  return statements;
+}
+
+/**
+ * PR で追加された migration 群が**作る**オブジェクトを集める。ここに入るものへの
+ * 縮小は旧 build が知らないため coupled の対象外。
+ * `tables` には VIEW / MATERIALIZED VIEW も入れる（`REVOKE ... ON TABLE` / 無修飾 `ON` は
+ * view にも同じ構文で書かれ、この repo の定型が `CREATE VIEW private.x; REVOKE ALL ON
+ * TABLE private.x ...` だから）。`CREATE SCHEMA` は `schemas` に別で持つ
+ * （`REVOKE ALL ON SCHEMA private` を新規 schema なら除外するため）。
+ * @param {string[]} sqlTexts
+ * @returns {{ tables: Set<string>, functions: Set<string>, columns: Set<string>, schemas: Set<string> }}
+ */
+export function collectCreatedObjects(sqlTexts) {
+  const tables = new Set();
+  const functions = new Set();
+  const columns = new Set();
+  const schemas = new Set();
+  for (const sql of sqlTexts) {
+    for (const { text } of splitStatements(maskForTopLevelScan(sql))) {
+      const table =
+        /\bCREATE\s+(?:UNLOGGED\s+|TEMP(?:ORARY)?\s+)?TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?([\w".]+)/i.exec(
+          text,
+        );
+      if (table) tables.add(normalizeIdent(table[1]));
+      const view =
+        /\bCREATE\s+(?:OR\s+REPLACE\s+)?(?:MATERIALIZED\s+)?VIEW\s+(?:IF\s+NOT\s+EXISTS\s+)?([\w".]+)/i.exec(
+          text,
+        );
+      if (view) tables.add(normalizeIdent(view[1]));
+      const schema =
+        /\bCREATE\s+SCHEMA\s+(?:IF\s+NOT\s+EXISTS\s+)?(?:AUTHORIZATION\s+\w+\s+)?([\w"]+)/i.exec(
+          text,
+        );
+      if (schema) schemas.add(schema[1].replace(/"/g, '').toLowerCase());
+      const fn = /\bCREATE\s+(?:OR\s+REPLACE\s+)?FUNCTION\s+([\w".]+)/i.exec(text);
+      if (fn) functions.add(normalizeIdent(fn[1]));
+      const alter = /\bALTER\s+TABLE\s+(?:ONLY\s+)?(?:IF\s+EXISTS\s+)?([\w".]+)/i.exec(text);
+      if (alter) {
+        const tableName = normalizeIdent(alter[1]);
+        const addColumn = /\bADD\s+COLUMN\s+(?:IF\s+NOT\s+EXISTS\s+)?([\w"]+)/gi;
+        let m = addColumn.exec(text);
+        while (m !== null) {
+          columns.add(`${tableName}.${m[1].replace(/"/g, '').toLowerCase()}`);
+          m = addColumn.exec(text);
+        }
+      }
+    }
+  }
+  return { tables, functions, columns, schemas };
+}
+
+/**
+ * 1 文から縮小の対象オブジェクトを引く。対象が同一 PR で作られていれば `exempt: true`。
+ * 文の先頭に anchor しない: masked text は関数本体・文字列・コメントを潰してあるので、
+ * `DO $$ BEGIN REVOKE ...;` のように匿名ブロックの内側にある文も同じ規則で拾える
+ * （migration 自身が実行する REVOKE を DO で包んだ形を素通りさせない）。
+ * @param {string} text 文（masked）
+ * @param {ReturnType<typeof collectCreatedObjects>} created
+ * @returns {{ kind: string, target: string, exempt: boolean }[]}
+ */
+function classifyNarrowing(text, created) {
+  // `REVOKE ... ON a, b, c FROM ...` は対象ごとに 1 件にする（#2666 の 6 テーブル列挙）。
+  // 関数の引数リスト `f(UUID, TEXT[])` はカンマを含むので、分割前に括弧ごと落とす。
+  const revoke =
+    /\bREVOKE\b([\s\S]*?)\bON\s+(?:(TABLE|FUNCTION|PROCEDURE|ROUTINE|SEQUENCE|TYPE|SCHEMA|ALL)\s+)?([\s\S]*?)\s+FROM\b/i.exec(
+      text,
+    );
+  if (revoke) {
+    const privileges = revoke[1];
+    const objectKind = (revoke[2] ?? '').toUpperCase();
+    if (objectKind === 'SCHEMA') {
+      const schemaName = revoke[3].trim().replace(/"/g, '').toLowerCase();
+      return [
+        { kind: 'REVOKE', target: `schema ${schemaName}`, exempt: created.schemas.has(schemaName) },
+      ];
+    }
+    if (objectKind === 'ALL') {
+      return [{ kind: 'REVOKE', target: revoke[3].trim().replace(/\s+/g, ' '), exempt: false }];
+    }
+    const idents = revoke[3]
+      .replace(/\([^)]*\)/g, '')
+      .split(',')
+      .map((part) => part.trim())
+      .filter(Boolean);
+    const isFunction =
+      objectKind === 'FUNCTION' || objectKind === 'PROCEDURE' || objectKind === 'ROUTINE';
+    const columnLists = [...privileges.matchAll(/\(([^)]*)\)/g)].map((m) => m[1]);
+    const cols = columnLists
+      .flatMap((list) => list.split(','))
+      .map((c) => c.replace(/"/g, '').trim().toLowerCase())
+      .filter(Boolean);
+    return idents.map((ident) => {
+      const target = normalizeIdent(ident);
+      if (isFunction) return { kind: 'REVOKE', target, exempt: created.functions.has(target) };
+      if (created.tables.has(target)) return { kind: 'REVOKE', target, exempt: true };
+      if (cols.length > 0) {
+        const allNew = cols.every((c) => created.columns.has(`${target}.${c}`));
+        return { kind: 'REVOKE', target, exempt: allNew };
+      }
+      return { kind: 'REVOKE', target, exempt: false };
+    });
+  }
+
+  const dropPolicy = /\bDROP\s+POLICY\s+(?:IF\s+EXISTS\s+)?(?:"[^"]*"|\w+)\s+ON\s+([\w".]+)/i.exec(
+    text,
+  );
+  if (dropPolicy) {
+    const target = normalizeIdent(dropPolicy[1]);
+    return [{ kind: 'DROP_POLICY', target, exempt: created.tables.has(target) }];
+  }
+
+  const dropTable = /\bDROP\s+TABLE\s+(?:IF\s+EXISTS\s+)?([\w".]+)/i.exec(text);
+  if (dropTable) {
+    const target = normalizeIdent(dropTable[1]);
+    return [{ kind: 'DROP_TABLE', target, exempt: created.tables.has(target) }];
+  }
+
+  const dropFunction = /\bDROP\s+FUNCTION\s+(?:IF\s+EXISTS\s+)?([\w".]+)/i.exec(text);
+  if (dropFunction) {
+    const target = normalizeIdent(dropFunction[1]);
+    return [{ kind: 'DROP_FUNCTION', target, exempt: created.functions.has(target) }];
+  }
+
+  const alter = /\bALTER\s+TABLE\s+(?:ONLY\s+)?(?:IF\s+EXISTS\s+)?([\w".]+)/i.exec(text);
+  if (alter) {
+    const target = normalizeIdent(alter[1]);
+    const tableIsNew = created.tables.has(target);
+    const dropColumn = /\bDROP\s+COLUMN\s+(?:IF\s+EXISTS\s+)?([\w"]+)/i.exec(text);
+    if (dropColumn) {
+      const col = dropColumn[1].replace(/"/g, '').toLowerCase();
+      return [
+        {
+          kind: 'DROP_COLUMN',
+          target: `${target}.${col}`,
+          exempt: tableIsNew || created.columns.has(`${target}.${col}`),
+        },
+      ];
+    }
+    if (/\bRENAME\s+(COLUMN|TO)\b/i.test(text)) {
+      return [{ kind: 'RENAME', target, exempt: tableIsNew }];
+    }
+    if (/\bALTER\s+COLUMN\s+\S+\s+(?:SET\s+DATA\s+)?TYPE\b/i.test(text)) {
+      return [{ kind: 'ALTER_COLUMN_TYPE', target, exempt: tableIsNew }];
+    }
+  }
+  return [];
+}
+
+/**
+ * 追加 migration 群のうち、**既存オブジェクト**の契約を縮める文を列挙する。
+ * @param {{ path: string, content: string }[]} addedMigrations
+ * @returns {{ path: string, line: number, kind: string, target: string, snippet: string }[]}
+ */
+export function detectContractNarrowing(addedMigrations) {
+  const created = collectCreatedObjects(addedMigrations.map((f) => f.content));
+  const findings = [];
+  for (const file of addedMigrations) {
+    const rawLines = file.content.split('\n');
+    for (const { text, line } of splitStatements(maskForTopLevelScan(file.content))) {
+      for (const hit of classifyNarrowing(text, created)) {
+        if (hit.exempt || !NARROWING_KINDS.has(hit.kind)) continue;
+        findings.push({
+          path: file.path,
+          line,
+          kind: hit.kind,
+          target: hit.target,
+          snippet: (rawLines[line - 1] ?? '').trim().slice(0, 200),
+        });
+      }
+    }
+  }
+  return findings.sort((a, b) => a.path.localeCompare(b.path) || a.line - b.line);
+}
+
+// 旧 build が配信され続ける側 = product の runtime。web は DB を触らない。
+// test / story / 生成型（migration と同時に更新するのが正）は runtime に乗らないので除く。
+const NON_RUNTIME_PATH = [
+  /\.test\.[cm]?[jt]sx?$/,
+  /\.stories\.[jt]sx?$/,
+  /(^|\/)__tests__\//,
+  /^apps\/product\/src\/lib\/test\//,
+  /^apps\/product\/src\/lib\/database\/generated\//,
+  /\.mdx?$/,
+];
+
+/** @param {string} path */
+export function isProductRuntimePath(path) {
+  if (!path.startsWith('apps/product/') && !path.startsWith('packages/')) return false;
+  return !NON_RUNTIME_PATH.some((re) => re.test(path));
+}
+
+/**
+ * @param {{ addedMigrations: { path: string, content: string }[], prFiles: string[] }} input
+ * @returns {{ coupled: boolean, narrowing: ReturnType<typeof detectContractNarrowing>, appFiles: string[] }}
+ */
+export function evaluateCoupledMigration({ addedMigrations, prFiles }) {
+  const narrowing = detectContractNarrowing(addedMigrations);
+  const appFiles = prFiles.filter(isProductRuntimePath);
+  return { coupled: narrowing.length > 0 && appFiles.length > 0, narrowing, appFiles };
+}
+
+/**
+ * @param {ReturnType<typeof evaluateCoupledMigration>} evaluation
+ */
+export function formatCoupledSummary(evaluation) {
+  const lines = [
+    '## Coupled migration（この PR は merge できません）',
+    '',
+    '❌ **既存オブジェクトの契約を縮める migration と、product の runtime コード変更が同一 PR にあります。**',
+    '',
+    'Supabase の GitHub 連携は main merge 時点で migration を production へ適用しますが、Vercel の promote は E2E 完走後の別 job です。promote が失敗している間、**旧 build が新 schema に当たり続けます**（2026-09-08、#2672 で 5 時間 4 分。`mfa_recovery_codes` の直接 INSERT が revoke 後も旧 build から呼ばれ続けた）。',
+    '',
+    '### 縮小している文',
+  ];
+  for (const f of evaluation.narrowing) {
+    lines.push(`- \`${f.path}\` L${f.line} **${f.kind}** \`${f.target}\`: \`${f.snippet}\``);
+  }
+  lines.push('', '### 同一 PR の runtime 変更');
+  for (const p of evaluation.appFiles.slice(0, 20)) lines.push(`- \`${p}\``);
+  if (evaluation.appFiles.length > 20) lines.push(`- ほか ${evaluation.appFiles.length - 20} 件`);
+  lines.push(
+    '',
+    '### 直し方',
+    '',
+    '1. **app コードだけの PR を先に出荷する**（旧 schema でも新 schema でも動く形にする。旧経路への参照をゼロにする）',
+    '2. production に promote されたことを確認してから、**migration だけの PR** を merge する',
+    '',
+    '新規オブジェクト（同一 PR の `CREATE TABLE` / `CREATE FUNCTION` / `ADD COLUMN`）への REVOKE / DROP は旧 build が知らないので対象外です。規律は `docs/decisions.md` 2026-09-04 [db]（#2175）、順序表は `docs/engineering/infra.md` §スキーマ変更を含むリリースの順序。',
+  );
+  return `${lines.join('\n')}\n`;
+}
+
 // ─── CLI ────────────────────────────────────────────────────────────
 
 async function readStdin() {

@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import {
   fetchPrFilenames,
+  fetchPrFilesFromGit,
   fetchPrFilesWithStatus,
   resolveDiffBase,
   runMigrationSafety,
@@ -181,7 +182,7 @@ describe('runMigrationSafety', () => {
   // 回帰固定: ファイル一覧の取得失敗で job ごと落とさない（fail open）。
   // #2483 で migration safety を unit test 群より前へ移したため、ここで例外を
   // 素通しすると GitHub API の一時障害だけでテストが 1 本も走らなくなる。
-  it('ファイル一覧の取得に失敗したら skip して続行する（例外を投げない）', async () => {
+  it('ファイル一覧の取得に失敗したら再試行 → git diff で代替し、どちらも駄目なら例外は投げず undeterminable を返す', async () => {
     const fetchFilesImpl = vi.fn(() => {
       throw new Error('gh api failed: 503');
     });
@@ -197,11 +198,69 @@ describe('runMigrationSafety', () => {
       execFileImpl: vi.fn(),
       spawnImpl,
       writeStepSummaryImpl,
+      gitFallbackImpl: vi.fn(() => null),
+      sleepImpl: vi.fn(async () => {}),
     });
-    expect(result).toEqual({ results: [], notified: false, skipped: true });
+    expect(fetchFilesImpl).toHaveBeenCalledTimes(2); // 1 回だけ再試行
+    expect(result).toEqual({
+      results: [],
+      notified: false,
+      skipped: true,
+      coupled: false,
+      undeterminable: true,
+    });
     expect(spawnImpl).not.toHaveBeenCalled();
-    expect(summaries[0]).toContain('skip');
+    expect(summaries[0]).toContain('判定ができません');
     expect(summaries[0]).toContain('gh api failed: 503');
+  });
+
+  it('gh api が 2 回失敗しても git diff で代替できれば coupled 判定まで行う', async () => {
+    const fetchFilesImpl = vi.fn(() => {
+      throw new Error('gh api failed: 503');
+    });
+    const summaries: string[] = [];
+    const result = await runMigrationSafety({
+      repo: 'Dayopt/dayopt',
+      prNumber: 1,
+      fetchFilesImpl,
+      readFileImpl: vi.fn(() => 'REVOKE ALL ON TABLE public.plans FROM authenticated;'),
+      execFileImpl: vi.fn(() => 'false'),
+      spawnImpl: vi.fn(noopSpawn),
+      writeStepSummaryImpl: vi.fn(async (markdown: string) => {
+        summaries.push(markdown);
+      }),
+      gitFallbackImpl: vi.fn(() => [
+        { filename: 'supabase/migrations/20260101_x.sql', status: 'added' },
+        { filename: 'apps/product/src/a.ts', status: 'modified' },
+      ]),
+      sleepImpl: vi.fn(async () => {}),
+    });
+    expect(result.undeterminable).toBeUndefined();
+    expect(result.coupled).toBe(true);
+    expect(summaries[0]).toContain('git diff で代替');
+  });
+
+  it('gh api の再試行が成功したら fallback を使わない', async () => {
+    let calls = 0;
+    const fetchFilesImpl = vi.fn(() => {
+      calls += 1;
+      if (calls === 1) throw new Error('gh api failed: 502');
+      return [];
+    });
+    const gitFallbackImpl = vi.fn(() => null);
+    const result = await runMigrationSafety({
+      repo: 'Dayopt/dayopt',
+      prNumber: 1,
+      fetchFilesImpl,
+      execFileImpl: vi.fn(),
+      spawnImpl: vi.fn(noopSpawn),
+      writeStepSummaryImpl: vi.fn(async () => {}),
+      gitFallbackImpl,
+      sleepImpl: vi.fn(async () => {}),
+    });
+    expect(gitFallbackImpl).not.toHaveBeenCalled();
+    expect(result.coupled).toBe(false);
+    expect(result.undeterminable).toBeUndefined();
   });
 
   it('destructive な変更を検知したら comment 投稿→ラベル付与の順で通知する', async () => {
@@ -312,5 +371,139 @@ describe('runMigrationSafety', () => {
     });
     expect(result.notified).toBe(false);
     expect(result.results).toEqual([]);
+  });
+});
+
+describe('runMigrationSafety — coupled migration（#2680）', () => {
+  const noopSpawn = () => ({ status: 0 });
+  const mfaLockdown =
+    'REVOKE ALL ON TABLE public.mfa_recovery_codes FROM anon, authenticated;\nDROP POLICY "x" ON public.mfa_recovery_codes;';
+
+  it('縮小 migration と product runtime 変更が同一 PR なら coupled: true を返し、summary / comment に Coupled 節を足す', async () => {
+    const summaries: string[] = [];
+    const bodies: string[] = [];
+    const spawnImpl = vi.fn((_cmd: string, args: string[]) => {
+      if (args.includes('comment')) bodies.push(args[args.length - 1] as string);
+      return { status: 0 };
+    });
+    const result = await runMigrationSafety({
+      repo: 'Dayopt/dayopt',
+      prNumber: 7,
+      fetchFilesImpl: vi.fn(() => [
+        { filename: 'supabase/migrations/20260908060000_lock_down.sql', status: 'added' },
+        {
+          filename: 'apps/product/src/features/settings/server/recovery-code-actions.ts',
+          status: 'modified',
+        },
+      ]),
+      readFileImpl: vi.fn(() => mfaLockdown),
+      execFileImpl: vi.fn(() => 'false'),
+      spawnImpl,
+      writeStepSummaryImpl: vi.fn(async (markdown: string) => {
+        summaries.push(markdown);
+      }),
+    });
+    expect(result.coupled).toBe(true);
+    expect(result.coupling?.narrowing.map((f) => f.kind)).toEqual(['REVOKE', 'DROP_POLICY']);
+    expect(summaries[0]).toContain('Coupled migration');
+    expect(bodies[0]).toContain('Coupled migration');
+  });
+
+  it('縮小 migration でも product runtime 変更が無ければ coupled: false（従来どおり fail open の通知のみ）', async () => {
+    const summaries: string[] = [];
+    const result = await runMigrationSafety({
+      repo: 'Dayopt/dayopt',
+      prNumber: 7,
+      fetchFilesImpl: vi.fn(() => [
+        { filename: 'supabase/migrations/20260908060000_lock_down.sql', status: 'added' },
+        {
+          filename: 'apps/product/src/lib/database/generated/database.types.ts',
+          status: 'modified',
+        },
+        { filename: 'docs/engineering/infra.md', status: 'modified' },
+      ]),
+      readFileImpl: vi.fn(() => mfaLockdown),
+      execFileImpl: vi.fn(() => 'false'),
+      spawnImpl: vi.fn(noopSpawn),
+      writeStepSummaryImpl: vi.fn(async (markdown: string) => {
+        summaries.push(markdown);
+      }),
+    });
+    expect(result.coupled).toBe(false);
+    expect(result.results).toHaveLength(1);
+    expect(summaries[0]).not.toContain('Coupled migration');
+  });
+
+  it('既にラベルが付いていて再通知しない round でも coupled は返す（hard fail は毎 push）', async () => {
+    const result = await runMigrationSafety({
+      repo: 'Dayopt/dayopt',
+      prNumber: 7,
+      fetchFilesImpl: vi.fn(() => [
+        { filename: 'supabase/migrations/20260908060000_lock_down.sql', status: 'added' },
+        { filename: 'apps/product/src/a.ts', status: 'modified' },
+      ]),
+      readFileImpl: vi.fn(() => mfaLockdown),
+      execFileImpl: vi.fn(() => 'true'),
+      spawnImpl: vi.fn(noopSpawn),
+      writeStepSummaryImpl: vi.fn(async () => {}),
+    });
+    expect(result.notified).toBe(false);
+    expect(result.coupled).toBe(true);
+  });
+
+  it('destructive 無しなら coupled: false を返す', async () => {
+    const result = await runMigrationSafety({
+      repo: 'Dayopt/dayopt',
+      prNumber: 7,
+      fetchFilesImpl: vi.fn(() => [
+        { filename: 'supabase/migrations/20260101_x.sql', status: 'added' },
+        { filename: 'apps/product/src/a.ts', status: 'modified' },
+      ]),
+      readFileImpl: vi.fn(() => 'CREATE TABLE public.widgets (id uuid primary key);'),
+      execFileImpl: vi.fn(),
+      spawnImpl: vi.fn(noopSpawn),
+      writeStepSummaryImpl: vi.fn(async () => {}),
+    });
+    expect(result.coupled).toBe(false);
+  });
+});
+
+describe('fetchPrFilesFromGit', () => {
+  it('base ref があれば two-dot の name-status を {filename, status} に変換する', () => {
+    const spawnImpl = vi.fn(() => ({ status: 0 }));
+    const execFileImpl = vi.fn(
+      () =>
+        'A\tsupabase/migrations/20260101_x.sql\nM\tapps/product/src/a.ts\nR100\told.ts\tnew.ts\nD\tgone.ts\n',
+    );
+    expect(
+      fetchPrFilesFromGit({ baseRef: 'origin/main', execImpl: execFileImpl, spawnImpl }),
+    ).toEqual([
+      { filename: 'supabase/migrations/20260101_x.sql', status: 'added' },
+      { filename: 'apps/product/src/a.ts', status: 'modified' },
+      { filename: 'new.ts', status: 'renamed' },
+      { filename: 'gone.ts', status: 'removed' },
+    ]);
+    expect(execFileImpl).toHaveBeenCalledWith(
+      'git',
+      ['diff', '--name-status', '-M', 'origin/main', 'HEAD'],
+      expect.anything(),
+    );
+  });
+
+  it('base ref が無ければ depth=1 で fetch を試し、それでも無ければ null', () => {
+    const calls: string[][] = [];
+    const spawnImpl = vi.fn((_cmd: string, args: string[]) => {
+      calls.push(args);
+      return { status: 1 };
+    });
+    expect(
+      fetchPrFilesFromGit({ baseRef: 'origin/main', execImpl: vi.fn(), spawnImpl }),
+    ).toBeNull();
+    expect(calls.find((c) => c.includes('fetch'))).toEqual([
+      'fetch',
+      '--depth=1',
+      'origin',
+      'main:refs/remotes/origin/main',
+    ]);
   });
 });

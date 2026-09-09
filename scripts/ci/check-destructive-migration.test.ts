@@ -2,9 +2,13 @@ import { describe, expect, it } from 'vitest';
 
 import {
   checkFiles,
+  detectContractNarrowing,
   detectDestructivePatterns,
+  evaluateCoupledMigration,
+  formatCoupledSummary,
   formatGithubOutput,
   formatSummary,
+  isProductRuntimePath,
 } from './check-destructive-migration.mjs';
 
 describe('detectDestructivePatterns', () => {
@@ -392,5 +396,279 @@ describe('formatSummary / formatGithubOutput', () => {
     expect(summary).toContain('L3');
     expect(summary).toContain('EXPLICIT AUTHORITY');
     expect(formatGithubOutput(results)).toBe('destructive=true\n');
+  });
+});
+
+describe('detectContractNarrowing / evaluateCoupledMigration（coupled migration、#2672 の窓）', () => {
+  const mfaLockdown = `
+BEGIN;
+REVOKE ALL ON TABLE public.mfa_recovery_codes FROM anon, authenticated;
+DROP POLICY IF EXISTS "Users can insert own recovery codes" ON public.mfa_recovery_codes;
+CREATE OR REPLACE FUNCTION public.replace_mfa_recovery_codes_v1(p_user_id UUID, p_hashes TEXT[])
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
+BEGIN
+  DELETE FROM public.mfa_recovery_codes WHERE user_id = p_user_id;
+END;
+$$;
+REVOKE EXECUTE ON FUNCTION public.replace_mfa_recovery_codes_v1(UUID, TEXT[]) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.replace_mfa_recovery_codes_v1(UUID, TEXT[]) TO service_role;
+COMMIT;
+`;
+
+  const trialExpand = `
+BEGIN;
+ALTER TABLE public.profiles
+  ADD COLUMN app_trial_started_at timestamptz,
+  ADD COLUMN app_trial_ends_at timestamptz,
+  ADD COLUMN app_trial_consumed_at timestamptz;
+-- Server-owned just like subscription_status; never extend client column grants.
+REVOKE INSERT (app_trial_started_at, app_trial_ends_at, app_trial_consumed_at),
+       UPDATE (app_trial_started_at, app_trial_ends_at, app_trial_consumed_at)
+  ON public.profiles FROM PUBLIC, anon, authenticated;
+CREATE FUNCTION private.consume_app_trial_on_subscription_v1()
+RETURNS trigger LANGUAGE plpgsql SET search_path = '' AS $$
+BEGIN
+  RETURN NEW;
+END;
+$$;
+REVOKE ALL ON FUNCTION private.consume_app_trial_on_subscription_v1() FROM PUBLIC, anon, authenticated;
+COMMIT;
+`;
+
+  const newTableTemplate = `
+CREATE TABLE IF NOT EXISTS public.segments (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE
+);
+ALTER TABLE public.segments ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON TABLE public.segments FROM PUBLIC, anon, authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.segments TO authenticated;
+`;
+
+  it('#2672 形: 既存テーブルへの REVOKE ALL と DROP POLICY を縮小として検出し、同 PR で作った関数への REVOKE は除外する', () => {
+    const findings = detectContractNarrowing([
+      {
+        path: 'supabase/migrations/20260908060000_lock_down_mfa_recovery_codes.sql',
+        content: mfaLockdown,
+      },
+    ]);
+    expect(findings.map((f) => [f.kind, f.target])).toEqual([
+      ['REVOKE', 'public.mfa_recovery_codes'],
+      ['DROP_POLICY', 'public.mfa_recovery_codes'],
+    ]);
+    expect(findings[0].line).toBe(3);
+  });
+
+  it('#2663 形: 同 PR で ADD COLUMN した列への列レベル REVOKE と、同 PR で CREATE した関数への REVOKE は縮小ではない', () => {
+    expect(
+      detectContractNarrowing([
+        { path: 'supabase/migrations/20260907233848_single_plan_trial.sql', content: trialExpand },
+      ]),
+    ).toEqual([]);
+  });
+
+  it('新規テーブル雛形（CREATE TABLE → REVOKE ALL → GRANT）は縮小ではない', () => {
+    expect(
+      detectContractNarrowing([
+        {
+          path: 'supabase/migrations/20260818130000_create_segments.sql',
+          content: newTableTemplate,
+        },
+      ]),
+    ).toEqual([]);
+  });
+
+  it.each([
+    [
+      'VIEW',
+      'CREATE VIEW private.plans_v2 AS SELECT 1;',
+      'REVOKE ALL ON TABLE private.plans_v2 FROM PUBLIC, anon, authenticated;',
+    ],
+    [
+      'MATERIALIZED VIEW',
+      'CREATE MATERIALIZED VIEW private.stats_mv AS SELECT 1;',
+      'REVOKE ALL ON private.stats_mv FROM PUBLIC;',
+    ],
+    [
+      'UNLOGGED TABLE',
+      'CREATE UNLOGGED TABLE private.revision_fence (id int);',
+      'REVOKE ALL ON TABLE private.revision_fence FROM PUBLIC, anon, authenticated;',
+    ],
+    [
+      'SCHEMA',
+      'CREATE SCHEMA IF NOT EXISTS private;',
+      'REVOKE ALL ON SCHEMA private FROM PUBLIC, anon, authenticated;',
+    ],
+  ])(
+    '同 PR で作った %s への REVOKE は縮小ではない（repo の定型 CREATE → REVOKE → GRANT）',
+    (_label, create, revoke) => {
+      expect(
+        detectContractNarrowing([
+          { path: 'supabase/migrations/x.sql', content: `${create}\n${revoke}` },
+        ]),
+      ).toEqual([]);
+    },
+  );
+
+  it('既存 schema への REVOKE は縮小として残る', () => {
+    const findings = detectContractNarrowing([
+      { path: 'supabase/migrations/x.sql', content: 'REVOKE USAGE ON SCHEMA public FROM anon;' },
+    ]);
+    expect(findings.map((f) => [f.kind, f.target])).toEqual([['REVOKE', 'schema public']]);
+  });
+
+  it('CREATE と REVOKE が別ファイルに分かれていても、同一 PR 内なら除外する', () => {
+    expect(
+      detectContractNarrowing([
+        {
+          path: 'supabase/migrations/20260101000000_a.sql',
+          content: 'CREATE TABLE public.widgets (id uuid primary key);',
+        },
+        {
+          path: 'supabase/migrations/20260101000001_b.sql',
+          content: 'REVOKE ALL ON public.widgets FROM anon, authenticated;',
+        },
+      ]),
+    ).toEqual([]);
+  });
+
+  it.each([
+    ['ALTER TABLE public.plans DROP COLUMN tag_id;', 'DROP_COLUMN', 'public.plans.tag_id'],
+    ['ALTER TABLE public.plans RENAME COLUMN tag_id TO activity_id;', 'RENAME', 'public.plans'],
+    [
+      'ALTER TABLE public.plans ALTER COLUMN title TYPE varchar(50);',
+      'ALTER_COLUMN_TYPE',
+      'public.plans',
+    ],
+    ['DROP TABLE public.tags;', 'DROP_TABLE', 'public.tags'],
+    ['DROP FUNCTION public.get_tag_stats(uuid);', 'DROP_FUNCTION', 'public.get_tag_stats'],
+  ])('既存オブジェクトへの %s を縮小として検出する', (sql, kind, target) => {
+    const findings = detectContractNarrowing([{ path: 'supabase/migrations/x.sql', content: sql }]);
+    expect(findings).toHaveLength(1);
+    expect(findings[0]).toMatchObject({ kind, target });
+  });
+
+  it('REVOKE ... ON a, b, c は対象ごとに 1 件にし、関数の引数リストのカンマで割らない（#2666 形）', () => {
+    const sql = `
+REVOKE ALL PRIVILEGES ON
+  public.activities,
+  public.categories,
+  public.segments
+FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION private.restore_single_plan_direct_write_grants_v1(UUID, TEXT[])
+FROM PUBLIC, anon, authenticated, service_role;
+`;
+    const findings = detectContractNarrowing([{ path: 'supabase/migrations/x.sql', content: sql }]);
+    expect(findings.map((f) => f.target)).toEqual([
+      'public.activities',
+      'public.categories',
+      'public.segments',
+      'private.restore_single_plan_direct_write_grants_v1',
+    ]);
+  });
+
+  it('DO ブロック内の format() による動的 REVOKE は縮小として残し、対象名を <dynamic> にする', () => {
+    const sql = `
+DO $$
+DECLARE t text;
+BEGIN
+  FOREACH t IN ARRAY ARRAY['activities', 'categories'] LOOP
+    EXECUTE format(
+      'REVOKE INSERT (%I), UPDATE (%I) ON public.%I FROM PUBLIC, anon, authenticated',
+      'name', 'name', t
+    );
+  END LOOP;
+END $$;
+`;
+    const findings = detectContractNarrowing([{ path: 'supabase/migrations/x.sql', content: sql }]);
+    expect(findings.map((f) => [f.kind, f.target])).toEqual([['REVOKE', 'public.<dynamic>']]);
+  });
+
+  it('関数本体の中の REVOKE / DROP は文として数えない（DO ブロックは数える）', () => {
+    const sql = `
+CREATE OR REPLACE FUNCTION public.cleanup_v1() RETURNS void LANGUAGE plpgsql AS $$
+BEGIN
+  EXECUTE 'REVOKE ALL ON public.plans FROM authenticated';
+END;
+$$;
+DO $$ BEGIN
+  REVOKE SELECT ON public.records FROM anon;
+END $$;
+`;
+    const findings = detectContractNarrowing([{ path: 'supabase/migrations/x.sql', content: sql }]);
+    expect(findings.map((f) => f.target)).toEqual(['public.records']);
+  });
+
+  it('DELETE FROM / TRUNCATE / DROP TRIGGER / backfill は destructive だが縮小ではない', () => {
+    const sql = `
+DELETE FROM public.tags WHERE archived_at IS NOT NULL;
+TRUNCATE public.stripe_webhook_events;
+DROP TRIGGER legacy ON public.tags;
+UPDATE public.plans SET color = 'x';
+`;
+    expect(detectDestructivePatterns(sql).length).toBeGreaterThan(0);
+    expect(detectContractNarrowing([{ path: 'supabase/migrations/x.sql', content: sql }])).toEqual(
+      [],
+    );
+  });
+
+  it('縮小 + product runtime 変更が同一 PR なら coupled', () => {
+    const evaluation = evaluateCoupledMigration({
+      addedMigrations: [{ path: 'supabase/migrations/x.sql', content: mfaLockdown }],
+      prFiles: [
+        'supabase/migrations/x.sql',
+        'apps/product/src/features/settings/server/recovery-code-actions.ts',
+        'apps/product/src/features/settings/server/recovery-code-actions.test.ts',
+      ],
+    });
+    expect(evaluation.coupled).toBe(true);
+    expect(evaluation.appFiles).toEqual([
+      'apps/product/src/features/settings/server/recovery-code-actions.ts',
+    ]);
+  });
+
+  it('縮小があっても、変更が migration / 生成型 / test / story / docs / web だけなら coupled ではない', () => {
+    const evaluation = evaluateCoupledMigration({
+      addedMigrations: [{ path: 'supabase/migrations/x.sql', content: mfaLockdown }],
+      prFiles: [
+        'supabase/migrations/x.sql',
+        'apps/product/src/lib/database/generated/database.types.ts',
+        'apps/product/src/features/settings/server/recovery-code-actions.test.ts',
+        'apps/product/src/features/settings/components/Foo.stories.tsx',
+        'apps/product/src/lib/test/integration/mfa.integration.test.ts',
+        'apps/product/README.md',
+        'apps/web/src/app/page.tsx',
+        'docs/engineering/infra.md',
+      ],
+    });
+    expect(evaluation.coupled).toBe(false);
+    expect(evaluation.narrowing).toHaveLength(2);
+    expect(evaluation.appFiles).toEqual([]);
+  });
+
+  it('runtime 変更があっても縮小が無ければ coupled ではない（expand-only は同一 PR でよい）', () => {
+    const evaluation = evaluateCoupledMigration({
+      addedMigrations: [{ path: 'supabase/migrations/x.sql', content: trialExpand }],
+      prFiles: ['supabase/migrations/x.sql', 'apps/product/src/features/billing/server/trial.ts'],
+    });
+    expect(evaluation.coupled).toBe(false);
+  });
+
+  it('packages/** の runtime 変更も product build の入力として数える', () => {
+    expect(isProductRuntimePath('packages/billing/src/index.ts')).toBe(true);
+    expect(isProductRuntimePath('packages/billing/src/index.test.ts')).toBe(false);
+    expect(isProductRuntimePath('apps/web/src/lib/x.ts')).toBe(false);
+  });
+
+  it('formatCoupledSummary は縮小文・runtime ファイル・直し方（PR 分割）を含む', () => {
+    const evaluation = evaluateCoupledMigration({
+      addedMigrations: [{ path: 'supabase/migrations/x.sql', content: mfaLockdown }],
+      prFiles: ['apps/product/src/a.ts'],
+    });
+    const summary = formatCoupledSummary(evaluation);
+    expect(summary).toContain('merge できません');
+    expect(summary).toContain('public.mfa_recovery_codes');
+    expect(summary).toContain('apps/product/src/a.ts');
+    expect(summary).toContain('migration だけの PR');
   });
 });
