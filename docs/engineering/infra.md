@@ -71,6 +71,8 @@ pnpm dev
 
 `pnpm dev` は `op run` 経由のまま。Supabase local が停止中なら自動起動し、`supabase status -o env` から URL / anon key / service role key を取得して、値を表示せずに product app へ渡す。`.env.local` の実値保存は禁止。
 
+**Next.js が生成する `apps/*/AGENTS.md` / `CLAUDE.md` は指示の正本ではない。** Next.js 16 は `next dev` が AI coding agent を検出すると app 直下へこの 2 ファイル（`<!-- BEGIN:nextjs-agent-rules -->` ブロック）を書き出す。untracked のまま残ると `pnpm branch:finish` の worktree dirty 判定を止め、誰も書いていない指示が読み込まれる。両 app の `next.config.mjs` で `agentRules: false` にして生成を止め、`.gitignore` にも app 直下だけを対象にした保険を置いてある（[#2693](https://github.com/Dayopt/dayopt/issues/2693)）。既に生えてしまった分は `rm` してよい。`apps/product/src/AGENTS.md` のように repo が意図して置いた nested な指示ファイルとは別物なので、消す前に `git ls-files` で tracked かどうかを見る。
+
 **Supabase の接続先は local 固定で、切り替え手段は無い。** かつて存在した `DAYOPT_SUPABASE_TARGET=op` は `.op-env.agent` の `op://agent/supabase/...` を使う escape hatch だったが、その参照先が production を指していたため廃止した（[#1929](https://github.com/Dayopt/dayopt/issues/1929)）。Supabase local が起動しない時は Docker Desktop を確認し、`supabase start` を手動で実行してエラーを読む。
 
 ### Migration

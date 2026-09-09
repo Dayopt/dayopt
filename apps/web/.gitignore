@@ -162,3 +162,8 @@ public/search-index.json
 # Project specific
 memo/
 .env*.local
+
+# Next.js が agent 検出時に app 直下へ生成する指示ファイル（#2693）。
+# 理由と方針は apps/product/.gitignore の同じ項目を参照。
+/AGENTS.md
+/CLAUDE.md

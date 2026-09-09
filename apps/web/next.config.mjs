@@ -42,6 +42,11 @@ const withBundleAnalyzer = bundleAnalyzer({
 const nextConfig = {
   reactStrictMode: true,
 
+  // Next.js の agent-rules 自動生成を止める（#2693）。理由は
+  // apps/product/next.config.mjs の同じ設定に書いてある。web も同じ next を
+  // catalog から引くため、`next dev` を agent セッションで起動すれば同様に生成される。
+  agentRules: false,
+
   env: {
     NEXT_PUBLIC_VERCEL_ENV: process.env.VERCEL_ENV || '',
   },
