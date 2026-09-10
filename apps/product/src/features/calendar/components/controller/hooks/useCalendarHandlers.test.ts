@@ -77,6 +77,51 @@ describe('useCalendarHandlers.handleTimeblockClick', () => {
     expect(closeInspector).not.toHaveBeenCalled();
   });
 
+  it('1 回のクリックが 2 経路で届いても 1 回だけ処理する', () => {
+    const { result } = renderHook(() => useCalendarHandlers());
+
+    // 状態機械の EVENT_CLICK と、その直後に来るカードの onClick
+    result.current.handleTimeblockClick(entry);
+    result.current.handleTimeblockClick(entry);
+
+    // 2 回処理すると開いて閉じるで打ち消し合い、押しても何も起きなくなる
+    expect(openInspector).toHaveBeenCalledTimes(1);
+    expect(closeInspector).not.toHaveBeenCalled();
+  });
+
+  it('間を空けた 2 回目は畳まない（意図した再クリックは効く）', () => {
+    vi.useFakeTimers();
+    try {
+      // 同じ hook インスタンスのまま時間だけ進める（畳む窓は instance が覚えている）
+      const { result, rerender } = renderHook(() => useCalendarHandlers());
+
+      result.current.handleTimeblockClick(entry);
+      expect(openInspector).toHaveBeenCalledTimes(1);
+
+      // 開いた状態を反映し、人が押し直す間隔を空ける
+      inspectorState.value = { isOpen: true, timeblockId: 'plan-1', duplicateDraft: null };
+      rerender();
+      vi.advanceTimersByTime(300);
+      result.current.handleTimeblockClick(entry);
+
+      expect(closeInspector).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('別のブロックが続けて届いた時は畳まない', () => {
+    const { result } = renderHook(() => useCalendarHandlers());
+
+    result.current.handleTimeblockClick(entry);
+    result.current.handleTimeblockClick({
+      ...entry,
+      id: 'plan-2',
+    } as unknown as CalendarDisplayEvent);
+
+    expect(openInspector).toHaveBeenCalledTimes(2);
+  });
+
   it('複製の下書き中は閉じない（下書きを黙って捨てない）', () => {
     inspectorState.value = {
       isOpen: true,
