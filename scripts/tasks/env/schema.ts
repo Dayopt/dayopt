@@ -71,6 +71,8 @@ export const envSchema: EnvSchemaEntry[] = [
   // 読む理由が無いため、ここには entry を置かない。
   envEntry('CRON_SECRET', false, 'secret', 'staging', agent, 'supabase'),
   envEntry('SEND_EMAIL_HOOK_SECRET', false, 'secret', 'staging', agent, 'supabase'),
+  // Edge Function `send-auth-email` の Sentry 送信用。未投入なら no-op（#2682）。
+  envEntry('SENTRY_DSN', false, 'secret', 'staging', agent, 'supabase'),
 
   envEntry('UPSTASH_REDIS_REST_URL', false, 'secret', 'staging', agent, 'upstash'),
   envEntry('UPSTASH_REDIS_REST_TOKEN', false, 'secret', 'staging', agent, 'upstash'),
@@ -169,6 +171,8 @@ export const productionEnvSchema: EnvSchemaEntry[] = [
   envEntry('SUPABASE_DB_PASSWORD', true, 'secret', 'production', human, 'supabase'),
   envEntry('CRON_SECRET', false, 'secret', 'production', human, 'supabase'),
   envEntry('SEND_EMAIL_HOOK_SECRET', false, 'secret', 'production', human, 'supabase'),
+  // Edge Function `send-auth-email` の Sentry 送信用。未投入なら no-op（#2682）。
+  envEntry('SENTRY_DSN', false, 'secret', 'production', human, 'supabase'),
   envEntry('UPSTASH_REDIS_REST_URL', false, 'secret', 'production', human, 'upstash'),
   envEntry('UPSTASH_REDIS_REST_TOKEN', false, 'secret', 'production', human, 'upstash'),
   envEntry('STRIPE_SECRET_KEY', false, 'secret', 'production', human, 'stripe-live'),
