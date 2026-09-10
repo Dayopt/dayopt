@@ -16,6 +16,10 @@
     {
       "path": "/api/cron/calendar-account-deletion-settle",
       "schedule": "5 * * * *"
+    },
+    {
+      "path": "/api/cron/billing-reconciliation",
+      "schedule": "15 2 * * *"
     }
   ],
   "rewrites": [

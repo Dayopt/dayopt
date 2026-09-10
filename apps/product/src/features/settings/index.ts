@@ -50,8 +50,10 @@ export { getBillingOperationErrorPresentation } from './lib/billing-operation';
 export {
   BILLING_POLL_INTERVAL_MS,
   BILLING_POLL_MAX_DURATION_MS,
+  hasBillingPollTimedOut,
   shouldContinueBillingPoll,
 } from './lib/billing-poll';
+export { reportBillingReturnPollTimeout } from './lib/billing-poll-observability';
 
 // =============================================================================
 // Stores (Composition Layer 向け)

@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { resetWriteFenceCacheForTestsOnly } from '@/lib/ops/write-fence';
+import { resetWebhookSignatureFailureCaptureForTestsOnly } from '@/lib/webhooks/signature-failure-monitor';
 
 const mocks = vi.hoisted(() => ({
   verifyWebhook: vi.fn(),
@@ -82,6 +83,7 @@ describe('Product Resend webhook', () => {
       from: fromWithWriteFence(() => undefined),
     });
     resetWriteFenceCacheForTestsOnly();
+    resetWebhookSignatureFailureCaptureForTestsOnly();
     mocks.captureUnexpectedDatabaseError.mockImplementation((error: unknown) =>
       error instanceof Error ? error : new Error('Unexpected database failure', { cause: error }),
     );
@@ -231,10 +233,20 @@ describe('Product Resend webhook', () => {
     });
     expect((await POST(missingHeaders)).status).toBe(401);
 
-    mocks.verifyWebhook.mockImplementationOnce(() => {
+    mocks.verifyWebhook.mockImplementation(() => {
       throw new Error('invalid signature');
     });
-    expect((await POST(request())).status).toBe(401);
+    const invalidResponses = await Promise.all(Array.from({ length: 5 }, () => POST(request())));
+    expect(invalidResponses.every((response) => response.status === 401)).toBe(true);
+    expect(mocks.captureUnexpectedError).toHaveBeenCalledOnce();
+    expect(mocks.captureUnexpectedError).toHaveBeenCalledWith(expect.any(Error), {
+      feature: 'email',
+      operation: 'signature_verification',
+      route: '/api/webhooks/resend',
+      source: 'resend_webhook',
+    });
+
+    mocks.verifyWebhook.mockReset();
 
     const oversized = request('x');
     oversized.headers.set('content-length', String(64 * 1024 + 1));

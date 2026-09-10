@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { useTranslations } from 'next-intl';
 
@@ -14,6 +14,8 @@ import {
   BILLING_POLL_INTERVAL_MS,
   BILLING_POLL_MAX_DURATION_MS,
   getBillingOperationErrorPresentation,
+  hasBillingPollTimedOut,
+  reportBillingReturnPollTimeout,
   shouldContinueBillingPoll,
   useBillingPollStore,
   useStableBillingOperation,
@@ -61,6 +63,7 @@ export function useAppInlineBanner(): InlineBannerState {
   // 常駐するため、settings modal の開閉に関係なくポーリングを継続できる。
   const pollStartedAt = useBillingPollStore.use.startedAt();
   const stopBillingPoll = useBillingPollStore.use.stop();
+  const reportedBillingPollStartedAtRef = useRef<number | null>(null);
 
   const billingQuery = api.billing.getOverview.useQuery(undefined, {
     retry: false,
@@ -77,6 +80,13 @@ export function useAppInlineBanner(): InlineBannerState {
     if (pollStartedAt === null) return;
     const status = billingQuery.data?.billingInfo.subscriptionStatus;
     if (!shouldContinueBillingPoll({ startedAt: pollStartedAt, subscriptionStatus: status })) {
+      if (
+        hasBillingPollTimedOut({ startedAt: pollStartedAt, subscriptionStatus: status }) &&
+        reportedBillingPollStartedAtRef.current !== pollStartedAt
+      ) {
+        reportedBillingPollStartedAtRef.current = pollStartedAt;
+        reportBillingReturnPollTimeout(t('settings.subscription.checkoutDelayed'));
+      }
       stopBillingPoll();
       void utils.billing.getAccess.invalidate();
       return;
@@ -85,9 +95,19 @@ export function useAppInlineBanner(): InlineBannerState {
     // startedAt が残って「反映中」表示が消えない。refetchInterval の自然停止とは
     // 別に、打ち切り時刻（+ 最終 refetch の着地猶予 1 interval）で必ず stop する
     const remainingMs = BILLING_POLL_MAX_DURATION_MS - (Date.now() - pollStartedAt);
-    const timer = setTimeout(stopBillingPoll, Math.max(remainingMs, 0) + BILLING_POLL_INTERVAL_MS);
+    const timer = setTimeout(
+      () => {
+        if (reportedBillingPollStartedAtRef.current !== pollStartedAt) {
+          reportedBillingPollStartedAtRef.current = pollStartedAt;
+          reportBillingReturnPollTimeout(t('settings.subscription.checkoutDelayed'));
+        }
+        stopBillingPoll();
+        void utils.billing.getAccess.invalidate();
+      },
+      Math.max(remainingMs, 0) + BILLING_POLL_INTERVAL_MS,
+    );
     return () => clearTimeout(timer);
-  }, [billingQuery.data, pollStartedAt, stopBillingPoll, utils]);
+  }, [billingQuery.data, pollStartedAt, stopBillingPoll, t, utils]);
   const createPortal = api.billing.createPortalSession.useMutation({
     onSuccess(data, variables) {
       if (!variables) return;
