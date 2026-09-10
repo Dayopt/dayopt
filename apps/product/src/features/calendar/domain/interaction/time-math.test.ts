@@ -4,9 +4,12 @@ import { formatTimeString, parseTimeString } from '@/lib/date';
 
 import {
   addMinutesToTime,
+  DAY_END_MINUTES,
+  DAY_LAST_START_MINUTES,
+  minutesToPixels,
+  pixelsToMinutesUnsnapped,
   pixelsToTime,
-  pixelsToTimeUnsnapped,
-  snapDeltaToGrid,
+  snapDeltaMinutes,
   snapToGrid,
   timeToPixels,
 } from './time-math';
@@ -22,10 +25,9 @@ describe('pixelsToTime', () => {
     expect(pixelsToTime(60, HOUR_HEIGHT)).toEqual({ hour: 1, minute: 0 });
   });
 
-  it('デフォルトは 1 分単位（#2496: 全操作 1 分スナップ）', () => {
-    // 1px=1分なので 7px → 0:07 をそのまま保持
-    expect(pixelsToTime(7, HOUR_HEIGHT)).toEqual({ hour: 0, minute: 7 });
-    expect(pixelsToTime(8, HOUR_HEIGHT)).toEqual({ hour: 0, minute: 8 });
+  it('デフォルトは 15 分単位（新規作成の絶対 snap）', () => {
+    expect(pixelsToTime(7, HOUR_HEIGHT)).toEqual({ hour: 0, minute: 0 });
+    expect(pixelsToTime(8, HOUR_HEIGHT)).toEqual({ hour: 0, minute: 15 });
   });
 
   it('snapInterval=15 を明示すると 15 分単位にスナップする', () => {
@@ -48,7 +50,7 @@ describe('pixelsToTime', () => {
   });
 
   it('スナップで minute=60 になった場合は次の hour に繰り上がる', () => {
-    // hourDecimal = 0.99, minute fraction = 59.4 → interval=15 で snap to 60 → 0 分 / 1 時
+    // hourDecimal = 0.98, minute fraction = 59 → interval=15 で snap to 60 → 0 分 / 1 時
     expect(pixelsToTime(59, HOUR_HEIGHT, 15)).toEqual({ hour: 1, minute: 0 });
   });
 
@@ -83,11 +85,11 @@ describe('snapToGrid', () => {
     expect(result.snappedTop).toBe(15); // 0h + 15min @ 1px/min
   });
 
-  it('デフォルトは 1 分粒度で snap する（#2496）', () => {
+  it('デフォルトは 15 分粒度で snap する', () => {
     const result = snapToGrid(8, HOUR_HEIGHT);
     expect(result.hour).toBe(0);
-    expect(result.minute).toBe(8);
-    expect(result.snappedTop).toBe(8);
+    expect(result.minute).toBe(15);
+    expect(result.snappedTop).toBe(15);
   });
 
   it('intervalMin を上書きできる', () => {
@@ -159,61 +161,86 @@ describe('addMinutesToTime', () => {
   });
 });
 
-describe('pixelsToTimeUnsnapped', () => {
-  it('0px → 00:00', () => {
-    expect(pixelsToTimeUnsnapped(0, HOUR_HEIGHT)).toEqual({ hour: 0, minute: 0 });
+describe('minutesToPixels', () => {
+  it('分を Y 座標へ戻す', () => {
+    expect(minutesToPixels(0, HOUR_HEIGHT)).toBe(0);
+    expect(minutesToPixels(90, HOUR_HEIGHT)).toBe(90);
+    expect(minutesToPixels(90, 72)).toBe(108);
+  });
+});
+
+describe('pixelsToMinutesUnsnapped', () => {
+  it('0px → 0 分', () => {
+    expect(pixelsToMinutesUnsnapped(0, HOUR_HEIGHT)).toBe(0);
   });
 
   it('snap せず 1 分粒度を保持する（10:07 を保持）', () => {
-    // 1px = 1 分なので 607px → 10:07
-    expect(pixelsToTimeUnsnapped(607, HOUR_HEIGHT)).toEqual({ hour: 10, minute: 7 });
-    // 8px → 0:08（pixelsToTime なら 0:15 にスナップされる位置）
-    expect(pixelsToTimeUnsnapped(8, HOUR_HEIGHT)).toEqual({ hour: 0, minute: 8 });
+    // 1px = 1 分なので 607px → 607 分 = 10:07
+    expect(pixelsToMinutesUnsnapped(607, HOUR_HEIGHT)).toBe(607);
+    // 8px → 8 分（pixelsToTime なら 0:15 にスナップされる位置）
+    expect(pixelsToMinutesUnsnapped(8, HOUR_HEIGHT)).toBe(8);
   });
 
   it('float 誤差を Math.round で吸収する', () => {
     // hourHeight=72 で 10:07 相当 → (607/60)*72 = 728.4
-    expect(pixelsToTimeUnsnapped(728.4, 72)).toEqual({ hour: 10, minute: 7 });
+    expect(pixelsToMinutesUnsnapped(728.4, 72)).toBe(607);
   });
 
-  it('負の Y は 0 にクランプ、最大 23:59 にクランプ', () => {
-    expect(pixelsToTimeUnsnapped(-50, HOUR_HEIGHT)).toEqual({ hour: 0, minute: 0 });
-    expect(pixelsToTimeUnsnapped(100 * HOUR_HEIGHT, HOUR_HEIGHT)).toEqual({
-      hour: 23,
-      minute: 59,
-    });
+  it('負の Y は 0 にクランプする', () => {
+    expect(pixelsToMinutesUnsnapped(-50, HOUR_HEIGHT)).toBe(0);
+  });
+
+  it('開始側は 23:59、終了側は 24:00 を上限にできる', () => {
+    expect(pixelsToMinutesUnsnapped(100 * HOUR_HEIGHT, HOUR_HEIGHT, DAY_LAST_START_MINUTES)).toBe(
+      23 * 60 + 59,
+    );
+    expect(pixelsToMinutesUnsnapped(100 * HOUR_HEIGHT, HOUR_HEIGHT, DAY_END_MINUTES)).toBe(24 * 60);
+  });
+
+  it('hourHeight が 0 以下なら 0 を返す（ゼロ除算防御）', () => {
+    expect(pixelsToMinutesUnsnapped(100, 0)).toBe(0);
   });
 });
 
-describe('snapDeltaToGrid', () => {
-  it('deltaY=60 (1 hour) で snap interval=15 → 60 を返す（量子化済）', () => {
-    expect(snapDeltaToGrid(60, HOUR_HEIGHT, 15)).toBe(60);
+describe('snapDeltaMinutes', () => {
+  it('deltaY=60px (1 hour) で snap interval=15 → 60 分', () => {
+    expect(snapDeltaMinutes(60, HOUR_HEIGHT, 15)).toBe(60);
   });
 
-  it('deltaY=22 → 15 に量子化（22/15=1.46 → round=1）', () => {
-    expect(snapDeltaToGrid(22, HOUR_HEIGHT, 15)).toBe(15);
+  it('deltaY=22px → 15 分に量子化（22/15=1.46 → round=1）', () => {
+    expect(snapDeltaMinutes(22, HOUR_HEIGHT, 15)).toBe(15);
   });
 
-  it('deltaY=7 → 0 に量子化（snap interval 未満）', () => {
-    expect(snapDeltaToGrid(7, HOUR_HEIGHT, 15)).toBe(0);
+  it('deltaY=7px → 0 分に量子化（snap interval 未満）', () => {
+    expect(snapDeltaMinutes(7, HOUR_HEIGHT, 15)).toBe(0);
   });
 
-  it('deltaY=-30 → -30（負方向もそのまま量子化）', () => {
-    expect(snapDeltaToGrid(-30, HOUR_HEIGHT, 15)).toBe(-30);
+  it('deltaY=-30px → -30 分（負方向もそのまま量子化）', () => {
+    expect(snapDeltaMinutes(-30, HOUR_HEIGHT, 15)).toBe(-30);
+  });
+
+  it('デフォルトは 15 分刻み', () => {
+    expect(snapDeltaMinutes(22, HOUR_HEIGHT)).toBe(15);
   });
 
   it('snap interval=5 で細かく量子化', () => {
-    expect(snapDeltaToGrid(7, HOUR_HEIGHT, 5)).toBe(5);
-    expect(snapDeltaToGrid(8, HOUR_HEIGHT, 5)).toBe(10);
+    expect(snapDeltaMinutes(7, HOUR_HEIGHT, 5)).toBe(5);
+    expect(snapDeltaMinutes(8, HOUR_HEIGHT, 5)).toBe(10);
+  });
+
+  it('hourHeight に依存せず分で量子化する（hourHeight=72）', () => {
+    // 72px/h では 15 分 = 18px。30px の移動は 25 分 → 30 分へ量子化
+    expect(snapDeltaMinutes(30, 72, 15)).toBe(30);
+  });
+
+  it('不正な hourHeight / interval では 0 を返す', () => {
+    expect(snapDeltaMinutes(30, 0, 15)).toBe(0);
+    expect(snapDeltaMinutes(30, HOUR_HEIGHT, 0)).toBe(0);
   });
 
   it('precision regression: 10:07 entry を 30 分動かしても :07 が保持される', () => {
-    // originalTop = 607（10:07）、deltaY = 30（30 分）
-    const originalTop = 607;
-    const deltaY = 30;
-    const snappedDelta = snapDeltaToGrid(deltaY, HOUR_HEIGHT, 15);
-    expect(snappedDelta).toBe(30);
-    const newTop = originalTop + snappedDelta;
-    expect(pixelsToTimeUnsnapped(newTop, HOUR_HEIGHT)).toEqual({ hour: 10, minute: 37 });
+    const originalStart = pixelsToMinutesUnsnapped(607, HOUR_HEIGHT); // 10:07
+    const moved = originalStart + snapDeltaMinutes(30, HOUR_HEIGHT, 15);
+    expect(moved).toBe(10 * 60 + 37);
   });
 });

@@ -21,7 +21,7 @@ Plan（予定）とRecord（記録）を同じ時間軸で配置・閲覧する�
 - モバイルはDay / Weekを提供する。Weekでは予定または記録を切り替えて日カラム全幅に表示し、最後に選んだ表示を端末へ保持する。既定は記録
 - モバイルの検索、作成、Inspector、activity / 日時picker、振り返りpanelは[Mobile overlays](./mobile-overlays.md)のmodal性とdismiss契約に従う
 - 新規作成時の保存先は`end_at > now`ならPlan、`end_at <= now`ならRecordとして自動決定し、既存Plan / Recordの編集では種別を維持する
-- 15分gridへのsnap、dragによる移動・resize、keyboard操作、activity filterを提供する
+- dragによる作成・移動・resizeは15分刻み、Inspectorの時間入力は1分刻みとする。移動・resizeは移動量だけを15分刻みにするため、10:07のタイムブロックを1コマ下げると10:22になり15分gridへ吸着しない。keyboard操作、activity filterも提供する
 - `?`キーまたはSidebar右端のヘルプメニューから、現在登録されているkeyboard shortcut一覧を背景overlayなしの横長2列で開く。操作行の区切り線は表示しない。キー表記は利用中platform、説明はlocaleに合わせる
 - Calendarの時間軸、card、選択 / drag preview、Diff panelの時刻表示はユーザー設定の12時間 / 24時間表記に従う。Inspectorの入力・保存値は`HH:mm`を正とする
 - scroll keyはfocus中のCalendar gridだけが処理し、入力、IME、menu / dialog中はglobal shortcutを実行しない

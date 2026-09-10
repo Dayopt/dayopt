@@ -17,7 +17,7 @@ import { formatTimeString } from '@/lib/date';
 import { useIsMobile } from '@/lib/hooks/useIsMobile';
 import { useUserPreferences } from '@/lib/hooks/useUserPreferences';
 
-import { MOBILE_TIME_COLUMN_WIDTH, TIME_COLUMN_WIDTH } from '../constants/grid.constants';
+import { resolveTimeColumnWidth } from '../constants/grid.constants';
 import { CurrentTimeLine } from '../grid/CurrentTimeLine';
 import { TimeColumn } from '../grid/TimeColumn/TimeColumn';
 import { useContainerHeight } from '../hooks/useContainerHeight';
@@ -56,13 +56,18 @@ interface CalendarDateHeaderProps {
 }
 
 /**
- * 時間列のデフォルト幅。モバイルでは短い時刻ラベルの左側余白を抑えるため縮小する。
- * timeColumnWidth を明示指定しない呼び出し元（CalendarDateHeader / ScrollableCalendarLayout
- * 共通）が同じ値源を見るための共有 hook。
+ * 時間列の既定メトリクス。モバイルは幅を詰めつつ、ラベルを一段小さくして
+ * 左右 8px の余白が消えないようにする。12h 表記（`12:00 PM`）は 24h より広い。
+ *
+ * timeColumnWidth を明示指定しない呼び出し元（CalendarDateHeader /
+ * ScrollableCalendarLayout 共通）が同じ値源を見るための共有 hook。片方だけ幅を
+ * 変えるとヘッダーとグリッドの列がズレる。
  */
-function useDefaultTimeColumnWidth(): number {
+function useDefaultTimeColumnMetrics(): { width: number; dense: boolean } {
   const isMobile = useIsMobile();
-  return isMobile ? MOBILE_TIME_COLUMN_WIDTH : TIME_COLUMN_WIDTH;
+  const timeFormat = useUserPreferences((s) => s.timeFormat);
+
+  return { width: resolveTimeColumnWidth(timeFormat, isMobile), dense: isMobile };
 }
 
 /**
@@ -77,8 +82,8 @@ export const CalendarDateHeader = ({
   className,
 }: CalendarDateHeaderProps) => {
   const showWeekNumbers = useUserPreferences((s) => s.showWeekNumbers);
-  const defaultTimeColumnWidth = useDefaultTimeColumnWidth();
-  const resolvedTimeColumnWidth = timeColumnWidth ?? defaultTimeColumnWidth;
+  const defaultTimeColumn = useDefaultTimeColumnMetrics();
+  const resolvedTimeColumnWidth = timeColumnWidth ?? defaultTimeColumn.width;
 
   // 設定がオンで週番号が渡されている場合のみ表示
   const shouldShowWeekNumber = showWeekNumbers && weekNumber != null;
@@ -141,8 +146,8 @@ export const ScrollableCalendarLayout = ({
   enableKeyboardNavigation = true,
   onScrollPositionChange,
 }: ScrollableCalendarLayoutProps) => {
-  const defaultTimeColumnWidth = useDefaultTimeColumnWidth();
-  const resolvedTimeColumnWidth = timeColumnWidth ?? defaultTimeColumnWidth;
+  const defaultTimeColumn = useDefaultTimeColumnMetrics();
+  const resolvedTimeColumnWidth = timeColumnWidth ?? defaultTimeColumn.width;
 
   // scroll container の ref を先に確保し、実測高の観測と useScrollableCalendar 双方で共有する
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
@@ -240,6 +245,7 @@ export const ScrollableCalendarLayout = ({
                 format={timeFormat}
                 className="h-full"
                 width={resolvedTimeColumnWidth}
+                dense={defaultTimeColumn.dense}
               />
               {/* 現在時刻ラベル（Apple Calendar風） */}
               {shouldShowCurrentTimeLine && hasToday && (

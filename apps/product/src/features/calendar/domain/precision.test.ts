@@ -13,8 +13,12 @@ describe('precision policy constants', () => {
     expect(INSPECTOR_TIME_PRECISION_MINUTES).toBe(1);
   });
 
-  it('drag / resize / tap の snap は 1 分で統一（#2496）', () => {
-    expect(DEFAULT_DRAG_SNAP_MINUTES).toBe(1);
+  it('drag / resize / tap の snap は 15 分', () => {
+    expect(DEFAULT_DRAG_SNAP_MINUTES).toBe(15);
+  });
+
+  it('drag と Inspector は非対称（ドラッグの方が粗い）', () => {
+    expect(DEFAULT_DRAG_SNAP_MINUTES).toBeGreaterThan(INSPECTOR_TIME_PRECISION_MINUTES);
   });
 
   it('最小ブロック長は 5 分（snap 粒度とは独立）', () => {

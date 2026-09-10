@@ -114,6 +114,27 @@ export const Spacious: Story = {
   ],
 };
 
+/**
+ * モバイル密度（dense）。幅 48px にラベルを一段小さくして収め、左右 8px の余白を保つ。
+ * 12 時間表記は `12:00 PM` が長いため 72px を使う。
+ */
+export const Dense: Story = {
+  args: {
+    format: '24h',
+    startHour: 0,
+    endHour: 24,
+    hourHeight: 72,
+    dense: true,
+  },
+  decorators: [
+    (Story) => (
+      <div className="border-border h-[500px] w-fit overflow-y-auto rounded-lg border">
+        <Story />
+      </div>
+    ),
+  ],
+};
+
 /** 全パターン一覧。 */
 export const AllPatterns: Story = {
   render: () => (
@@ -122,6 +143,18 @@ export const AllPatterns: Story = {
         <p className="text-muted-foreground text-xs">24時間表示</p>
         <div className="border-border h-[400px] overflow-y-auto rounded-lg border">
           <TimeColumn format="24h" startHour={6} endHour={22} hourHeight={72} />
+        </div>
+      </div>
+      <div className="space-y-2">
+        <p className="text-muted-foreground text-xs">モバイル密度 24h（48px）</p>
+        <div className="border-border h-[400px] w-fit overflow-y-auto rounded-lg border">
+          <TimeColumn format="24h" startHour={6} endHour={22} hourHeight={72} dense />
+        </div>
+      </div>
+      <div className="space-y-2">
+        <p className="text-muted-foreground text-xs">モバイル密度 12h（72px）</p>
+        <div className="border-border h-[400px] w-fit overflow-y-auto rounded-lg border">
+          <TimeColumn format="12h" startHour={6} endHour={22} hourHeight={72} dense />
         </div>
       </div>
       <div className="space-y-2">
