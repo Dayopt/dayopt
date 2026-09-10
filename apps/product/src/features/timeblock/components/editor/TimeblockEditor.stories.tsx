@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { useState } from 'react';
 
 import { RecordFulfillmentRow } from '../inspector/fields';
+import { EstimationFeedforward } from './EstimationFeedforward';
 import { TimeblockEditor, type TimeModelEditorValue } from './TimeblockEditor';
 
 import type { Fulfillment } from '../../schemas/timeblock';
@@ -105,6 +106,42 @@ export const TimeConflict: Story = {
     onDateTimeChange: () => undefined,
     onNoteChange: () => undefined,
     dateTimeError: 'この時間帯には既に予定があります',
+  },
+};
+
+/**
+ * 見積もりフィードフォワードのバッジを日時グルーピングの直上に置いた状態。
+ * 時間を決める前に目に入る位置なので、グループの中ではなく上に出す。
+ */
+export const WithEstimationFeedforward: Story = {
+  args: {
+    value: futureValue,
+    onDateTimeChange: () => undefined,
+    onNoteChange: () => undefined,
+  },
+  parameters: {
+    trpcMocks: {
+      'statistics.getTagEstimationFactors': [
+        { activityId: 'activity-1', factor: 1.5, sampleCount: 4 },
+      ],
+    },
+  },
+  render: function WithFeedforwardStory() {
+    const [value, setValue] = useState(futureValue);
+    return (
+      <TimeblockEditor
+        value={value}
+        onDateTimeChange={setValue}
+        onNoteChange={(note) => setValue((current) => ({ ...current, note }))}
+        beforeDateTimeSlot={
+          <EstimationFeedforward
+            destination="plan"
+            activityId={value.activityId}
+            draftMinutes={(value.endAt.getTime() - value.startAt.getTime()) / 60000}
+          />
+        }
+      />
+    );
   },
 };
 

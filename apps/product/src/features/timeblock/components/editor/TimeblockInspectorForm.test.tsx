@@ -209,6 +209,7 @@ vi.mock('./TimeblockEditor', () => ({
     onDateTimeChange,
     onNoteChange,
     dateTimeError,
+    beforeDateTimeSlot,
   }: {
     value: {
       note: string;
@@ -224,8 +225,11 @@ vi.mock('./TimeblockEditor', () => ({
     }) => void;
     onNoteChange: (note: string) => void;
     dateTimeError?: string;
+    beforeDateTimeSlot?: React.ReactNode;
   }) => (
     <>
+      {/* 実物と同じく日時グルーピングの上に置く（フィードフォワードの配線を見える化する） */}
+      {beforeDateTimeSlot}
       <output data-testid="current-end">{value.endAt.toISOString()}</output>
       {dateTimeError ? <output data-testid="date-time-error">{dateTimeError}</output> : null}
       <button
