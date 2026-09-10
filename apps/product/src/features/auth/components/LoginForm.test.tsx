@@ -292,6 +292,25 @@ describe('LoginForm', () => {
       });
     });
 
+    it('locale付きredirectパラメータを重複させない', async () => {
+      mockSearchParams = new URLSearchParams(`redirect=${encodeURIComponent('/ja/settings')}`);
+      const user = userEvent.setup();
+      mockSignIn.mockResolvedValue({
+        data: { user: { id: '123' }, session: {} },
+        error: null,
+      });
+
+      renderWithProviders(<LoginForm />);
+
+      await user.type(screen.getByLabelText(/auth\.loginForm\.email/), 'test@example.com');
+      await user.type(screen.getByLabelText(/auth\.loginForm\.password/), 'password123');
+      await user.click(screen.getByRole('button', { name: 'auth.loginForm.loginButton' }));
+
+      await waitFor(() => {
+        expect(mockPush).toHaveBeenCalledWith('/ja/settings');
+      });
+    });
+
     it('不正なredirectパラメータはフォールバックされる', async () => {
       mockSearchParams = new URLSearchParams('redirect=//evil.com');
       const user = userEvent.setup();
