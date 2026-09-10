@@ -385,10 +385,10 @@ Phase 2（external-calendar-import）で追加。OAuth / 同期 / UI は Step 2 
 
 #### ユーザー設定（2テーブル）
 
-| テーブル          | 役割                                    | 主要カラム                                                                                                      |
-| ----------------- | --------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| **profiles**      | ユーザープロフィール（auth.usersと1:1） | email, username, full_name, avatar_url                                                                          |
-| **user_settings** | 表示設定                                | timezone, theme, time format, snap interval, business hours。物理スキーマの legacy 列はプロダクト契約に含めない |
+| テーブル          | 役割                                    | 主要カラム                                                                                                         |
+| ----------------- | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| **profiles**      | ユーザープロフィール（auth.usersと1:1） | email, username, full_name, avatar_url                                                                             |
+| **user_settings** | 表示設定                                | timezone, theme, time format, default duration, business hours。物理スキーマの legacy 列はプロダクト契約に含めない |
 
 #### セキュリティ/監査（1テーブル）
 
