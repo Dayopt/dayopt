@@ -57,8 +57,8 @@ overrides:
   # qs: express 経由の DoS と array-limit bypass
   #   (GHSA-4mjr-xmp4-gh2g / GHSA-x5fp-wj9c-mxmx)
   'qs@6.15.3': '^6.15.4'
-  # smol-toml: knip が 1.7.0 を exact pin。TOML parse の DoS
-  #   (GHSA-7w5x-hrqm-74c2)。devDependency のみ（knip は lint 用）
+  # smol-toml: knip 経由（宣言は `^1.5.2` だが lockfile が 1.7.0 に固定されて
+  #   いた）。TOML parse の DoS (GHSA-7w5x-hrqm-74c2)。devDependency のみ
   'smol-toml@1.7.0': '^1.7.1'
   # extract-zip (GHSA-jmr9-qjv8-65gv) は **ここに入れられない**。advisory は
   # `>=2.0.2` を修正版と書くが 2.0.2 は未リリースで、最新が 2.0.1（override を
