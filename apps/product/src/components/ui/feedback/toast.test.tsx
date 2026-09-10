@@ -3,6 +3,7 @@
  *
  * Inspector も Esc で閉じる（useInspectorKeyboard / useCalendarTimeblockKeyboard）ため、
  * 削除直後の 1 打で取り消し口まで消えると、戻す手段が 5 秒を待たずに失われる。
+ * 一方でトースト本体のクリックは狙って押した操作なので、取り消し付きでも消す。
  *
  * ブラウザで確かめようとすると、ページが非表示の間 sonner がタイマーを止めるので
  * 結果が当てにならない。ここは handler の判断だけを直接確かめる。
@@ -14,13 +15,8 @@ const onScreen = vi.hoisted(() => ({ value: [] as Array<{ action?: unknown }> })
 const dismiss = vi.hoisted(() => vi.fn());
 const isMobile = vi.hoisted(() => ({ value: false }));
 
-const toasterProps = vi.hoisted(() => ({ value: {} as Record<string, unknown> }));
-
 vi.mock('sonner', () => ({
-  Toaster: (props: Record<string, unknown>) => {
-    toasterProps.value = props;
-    return <div data-testid="sonner-root" />;
-  },
+  Toaster: () => <div data-testid="sonner-root" />,
   toast: { getToasts: () => onScreen.value, dismiss },
 }));
 vi.mock('@/lib/hooks/useMediaQuery', () => ({ useMediaQuery: () => isMobile.value }));
@@ -76,13 +72,13 @@ describe('Toaster の消去', () => {
     expect(dismiss).toHaveBeenCalledTimes(1);
   });
 
-  it('取り消し付きはクリックでも消さない', () => {
+  it('取り消し付きでもクリックでは消す（×を置かない以上、唯一の「今すぐ消す」導線）', () => {
     onScreen.value = UNDO_ON_SCREEN;
     render(<Toaster />);
 
     clickToastBody();
 
-    expect(dismiss).not.toHaveBeenCalled();
+    expect(dismiss).toHaveBeenCalledTimes(1);
   });
 
   it('モバイルでは Esc もクリックも購読しない（スワイプで消す）', () => {
@@ -93,25 +89,5 @@ describe('Toaster の消去', () => {
     clickToastBody();
 
     expect(dismiss).not.toHaveBeenCalled();
-  });
-});
-
-describe('Toaster の閉じるボタン', () => {
-  beforeEach(() => {
-    onScreen.value = PLAIN_ON_SCREEN;
-  });
-
-  it('デスクトップでは出す（Esc / クリックを取り消しに効かせない分の受け皿）', () => {
-    isMobile.value = false;
-    render(<Toaster />);
-
-    expect(toasterProps.value.closeButton).toBe(true);
-  });
-
-  it('モバイルでは出さない（swipe があり、44px は本文を削る）', () => {
-    isMobile.value = true;
-    render(<Toaster />);
-
-    expect(toasterProps.value.closeButton).toBe(false);
   });
 });

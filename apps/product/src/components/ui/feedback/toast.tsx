@@ -18,10 +18,8 @@ type ToasterProps = React.ComponentProps<typeof Sonner>;
  * - 高さ: 48px 固定、幅: 100vw-32px(mobile) / 360px(desktop)
  * - アクション: 本文と同じ文字色 + hover の地色（brand color は使わない。
  *   「元に戻す」はこの面の主役ではなく、押さない選択も同じだけ正しい）
- * - 右端に閉じる（desktop のみ）。取り消し付きは Esc / クリックでは消さない代わりに、
- *   邪魔な時はここから明示的に閉じられる。モバイルは swipe が同じ役割を持ち、
- *   44px の当たり判定を置くと 343px の本文が 157px まで削れて文言が切れる
- * - 消去: 自動(3s/5s) + 閉じる(desktop) + swipe(mobile) + Esc/クリック(desktop)
+ * - ×ボタンなし
+ * - 消去: 自動(3s/5s) + swipe(mobile) + Esc/クリック(desktop)
  * - 同時表示: 最大1つ、cross-fade 差し替え
  *
  * @example
@@ -35,10 +33,13 @@ type ToasterProps = React.ComponentProps<typeof Sonner>;
  * ```
  */
 /**
- * 「元に戻す」付きが出ている間は、ついでの消去を効かせない。Inspector も Esc で
- * 閉じるので（useInspectorKeyboard / useCalendarTimeblockKeyboard）、削除直後の 1 打で
- * 取り消し口まで消えてしまう。クリックも同じく、狙っていない場所への 1 クリックで
- * 戻し口を失わせない。取り消しは 5 秒で自然に消える。
+ * 「元に戻す」付きが出ている間は Esc での消去を効かせない。Inspector も Esc で閉じるので
+ * （useInspectorKeyboard / useCalendarTimeblockKeyboard）、削除直後の 1 打が二役になり、
+ * 取り消し口まで消えてしまう。
+ *
+ * トースト本体のクリックは別扱いで、取り消し付きでも消す。狙って押した操作なので
+ * 巻き添えにならず、×ボタンを置かない以上ここが唯一の「今すぐ消す」導線になる
+ * （アクションリンク上のクリックは呼び出し側が除外済み）。
  */
 const hasUndoableToast = (): boolean => {
   try {
@@ -59,7 +60,6 @@ const Toaster = ({ ...props }: ToasterProps) => {
       const toastEl = (e.target as Element).closest('[data-sonner-toast]');
       if (!toastEl) return;
       if ((e.target as Element).closest('[data-action]')) return;
-      if (hasUndoableToast()) return;
       sonnerToast.dismiss();
     };
     document.addEventListener('click', handler);
@@ -88,14 +88,12 @@ const Toaster = ({ ...props }: ToasterProps) => {
       visibleToasts={1}
       duration={3000}
       containerAriaLabel={t('toastContainer')}
-      closeButton={!isMobile}
       className={isMobile ? '' : '[--width:360px]'}
       offset={isMobile ? { top: 16 } : { bottom: 16 }}
       mobileOffset={{ top: 16, left: 16, right: 16 }}
       swipeDirections={isMobile ? ['left', 'right'] : []}
       toastOptions={{
         unstyled: true,
-        closeButtonAriaLabel: t('close'),
         classNames: {
           toast:
             'flex items-center gap-2 !h-12 w-full px-4 rounded-lg border border-border shadow-card bg-card text-foreground',
@@ -106,10 +104,6 @@ const Toaster = ({ ...props }: ToasterProps) => {
           // brand color を当てない。地の文字色 + hover の地色で「押せる」ことだけ示す
           actionButton:
             'shrink-0 -mr-1 cursor-pointer rounded-lg border-0 bg-transparent px-2 py-1 text-sm text-foreground transition-colors hover:bg-state-hover md:text-xs',
-          // sonner は閉じるを絶対配置で左上へ出す。静的な flex 要素へ戻して右端へ送る
-          // （loader と同じ手当て）
-          closeButton:
-            'order-last shrink-0 rounded-lg !static !size-7 !transform-none !border-0 !bg-transparent text-muted-foreground transition-colors hover:!bg-state-hover hover:text-foreground',
           loader: '!static !inset-auto !transform-none',
         },
       }}
