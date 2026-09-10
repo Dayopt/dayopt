@@ -81,6 +81,21 @@ describe('Toaster の消去', () => {
     expect(dismiss).toHaveBeenCalledTimes(1);
   });
 
+  it('途中で bubble を止められても消える（Radix の外側クリック判定より先に受ける）', () => {
+    render(<Toaster />);
+    const wrapper = document.createElement('div');
+    wrapper.addEventListener('click', (event) => event.stopPropagation());
+    const el = document.createElement('div');
+    el.setAttribute('data-sonner-toast', '');
+    wrapper.appendChild(el);
+    document.body.appendChild(wrapper);
+
+    el.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    wrapper.remove();
+
+    expect(dismiss).toHaveBeenCalledTimes(1);
+  });
+
   it('モバイルでは Esc もクリックも購読しない（スワイプで消す）', () => {
     isMobile.value = true;
     render(<Toaster />);

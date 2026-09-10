@@ -62,8 +62,10 @@ const Toaster = ({ ...props }: ToasterProps) => {
       if ((e.target as Element).closest('[data-action]')) return;
       sonnerToast.dismiss();
     };
-    document.addEventListener('click', handler);
-    return () => document.removeEventListener('click', handler);
+    // capture で受ける。Radix の dismissable layer（メニュー / ポップオーバーの
+    // 外側クリック判定）が bubble を止めることがあり、その後ろで待つと消せない
+    document.addEventListener('click', handler, true);
+    return () => document.removeEventListener('click', handler, true);
   }, [isMobile]);
 
   // デスクトップ: Esc キーで消去
