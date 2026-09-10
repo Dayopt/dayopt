@@ -48,7 +48,7 @@ interface ReconciliationDependencies {
   retrieveAccountId: () => Promise<string>;
 }
 
-interface BillingWebhookReconciliationSummary {
+export interface BillingWebhookReconciliationSummary {
   checked: number;
   failed: number;
   invalidState: number;
