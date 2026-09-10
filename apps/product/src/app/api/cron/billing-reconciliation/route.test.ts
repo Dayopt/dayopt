@@ -20,7 +20,7 @@ const envMock = vi.hoisted(
 );
 
 vi.mock('@/env', () => ({ env: envMock }));
-vi.mock('@/features/settings/server/billing-webhook-reconciliation', () => ({
+vi.mock('@/features/settings/server', () => ({
   hasBillingWebhookReconciliationDiscrepancy: (summary: {
     failed: number;
     invalidState: number;

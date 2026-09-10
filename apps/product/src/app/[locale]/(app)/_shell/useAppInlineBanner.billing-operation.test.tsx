@@ -43,12 +43,7 @@ vi.mock('@/features/settings', async () => ({
   // 課金 checkout 復帰の有限ポーリング（issue #1887）。この test では復帰を
   // 起こさないため startedAt は常に null（= ポーリング非アクティブ）。
   // 分岐そのものは再実装せず実物を使う。ここで写すと分岐の変化を test が追えない（#1937）。
-  ...(await vi.importActual<typeof import('@/features/settings/lib/billing-operation')>(
-    '@/features/settings/lib/billing-operation',
-  )),
-  ...(await vi.importActual<typeof import('@/features/settings/lib/billing-poll')>(
-    '@/features/settings/lib/billing-poll',
-  )),
+  ...(await vi.importActual<typeof import('@/features/settings')>('@/features/settings')),
   reportBillingReturnPollTimeout,
   useBillingPollStore: {
     use: {
