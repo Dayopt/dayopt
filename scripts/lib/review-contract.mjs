@@ -223,7 +223,7 @@ function neutralizeDelimiters(text) {
  */
 function delimiterFor(...parts) {
   const digest = createHash('sha256')
-    .update(parts.map((part) => String(part ?? '')).join(' '))
+    .update(parts.map((part) => String(part ?? '')).join('\u0000'))
     .digest('hex');
   return `${BASE_DELIMITER}-${digest.slice(0, 12)}`;
 }
