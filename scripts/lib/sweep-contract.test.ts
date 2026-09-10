@@ -159,7 +159,13 @@ describe('sweepResultErrors', () => {
     (reached) => {
       const errors = sweepResultErrors('security-reproducer', {
         attempts: [
-          { candidateId: id(1), status: 'failed-to-reproduce', reachedTargetPath: reached },
+          {
+            candidateId: id(1),
+            status: 'failed-to-reproduce',
+            reachedTargetPath: reached,
+            command: 'pnpm test:integration x',
+            testPath: 'a/b.integration.test.ts',
+          },
         ],
       });
       expect(errors).toEqual([
@@ -168,12 +174,33 @@ describe('sweepResultErrors', () => {
     },
   );
 
-  it('到達を示せた失敗は failed-to-reproduce として通す', () => {
+  it('到達を示せた失敗は、実行の出所つきなら failed-to-reproduce として通す', () => {
+    expect(
+      sweepResultErrors('security-reproducer', {
+        attempts: [
+          {
+            candidateId: id(1),
+            status: 'failed-to-reproduce',
+            reachedTargetPath: 'yes',
+            command: 'pnpm test:integration x',
+            testPath: 'a/b.integration.test.ts',
+          },
+        ],
+      }),
+    ).toEqual([]);
+  });
+
+  // cross-review（risk-reviewer, GPT-5.6）の P2: reachedTargetPath は自己申告なので、
+  // 実行の出所を伴わない negative を「再現せず」と記録できてしまう。
+  it('reachedTargetPath だけを根拠に failed-to-reproduce を通さない', () => {
     expect(
       sweepResultErrors('security-reproducer', {
         attempts: [{ candidateId: id(1), status: 'failed-to-reproduce', reachedTargetPath: 'yes' }],
       }),
-    ).toEqual([]);
+    ).toEqual([
+      'attempts[0]: failed-to-reproduce には実行した command が要る',
+      'attempts[0]: failed-to-reproduce には再現を書いた test の path が要る',
+    ]);
   });
 
   it('environment-missing と not-run は到達証拠を要求しない（環境不足を再現失敗と混ぜない）', () => {
@@ -188,11 +215,14 @@ describe('sweepResultErrors', () => {
     ).toEqual([]);
   });
 
-  it('reproduced には実行した command を要求する', () => {
+  it('reproduced には実行した command と test の path を要求する', () => {
     expect(
       sweepResultErrors('security-reproducer', {
         attempts: [{ candidateId: id(1), status: 'reproduced', reachedTargetPath: 'yes' }],
       }),
-    ).toEqual(['attempts[0]: reproduced には実行した command が要る']);
+    ).toEqual([
+      'attempts[0]: reproduced には実行した command が要る',
+      'attempts[0]: reproduced には再現を書いた test の path が要る',
+    ]);
   });
 });

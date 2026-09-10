@@ -231,6 +231,20 @@ const SWEEP_SCHEMAS = {
 };
 
 /**
+ * 「まだ決まっていない」ことを表す判定。id が入っていても裁定は終わっていないので、
+ * 判定済みと同じには数えない（cross-review の behavior-verifier P2）。全候補を
+ * undetermined にした critic が `reviewed` になると、何も裁定していない run が
+ * 「指摘 0 件」と読まれる。
+ */
+export const UNSETTLED = {
+  'security-critic': new Set(['undetermined']),
+  'security-reproducer': new Set(['not-run', 'environment-missing']),
+};
+
+/** 実際に実行したと主張する status。command と testPath の提示を要求する。 */
+const EXECUTED_STATUSES = new Set(['reproduced', 'failed-to-reproduce']);
+
+/**
  * schema の語彙では書けない条件を課す。
  *
  * - needs-execution と申告した候補には実行要求と期待 evidence が要る
@@ -256,8 +270,15 @@ export function sweepResultErrors(role, result) {
         errors.push(
           `attempts[${index}]: 到達証拠のない失敗を failed-to-reproduce にしない（not-run / environment-missing へ落とす）`,
         );
-      if (attempt.status === 'reproduced' && !attempt.command?.trim())
-        errors.push(`attempts[${index}]: reproduced には実行した command が要る`);
+      // `reachedTargetPath: 'yes'` は自己申告にすぎない。実行の出所を伴わない negative は
+      // 「再現せず」と読まれて本物の欠陥を落とすので、発火・不発火のどちらを主張する時も
+      // 実行した command と test の所在を要求する（cross-review の risk-reviewer P2）。
+      if (EXECUTED_STATUSES.has(attempt.status)) {
+        if (!attempt.command?.trim())
+          errors.push(`attempts[${index}]: ${attempt.status} には実行した command が要る`);
+        if (!attempt.testPath?.trim())
+          errors.push(`attempts[${index}]: ${attempt.status} には再現を書いた test の path が要る`);
+      }
     }
   }
   return errors;

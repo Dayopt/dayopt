@@ -1,11 +1,12 @@
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { basename, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 import { buildReviewPrompt, packArtifacts, packContract } from '../lib/review-contract.mjs';
 import {
+  UNSETTLED,
   buildSweepPrompt,
   normalizeCandidateSet,
   reconcileVerdicts,
@@ -173,6 +174,10 @@ export function createSweepPack({ cwd = process.cwd(), at, scope, context, threa
     ),
   ].sort();
   if (!paths.length) throw new Error('scope が対象 SHA のどのファイルにも一致しません');
+  // 展開後の path も 1 件ずつ検査する。ディレクトリ指定の scope に env ファイルが
+  // 含まれていると、宣言した文字列だけの検査では素通りする（cross-review の
+  // behavior-verifier P2）。createReviewPack と同じ強度に揃える。
+  for (const path of paths) ensurePublicPath(path);
   const contextText = readMaterial(context);
   const threatModelText = readMaterial(threatModel);
   const omissions = [];
@@ -269,6 +274,13 @@ function reviewerErrors(envelope, roles) {
  * schema を満たしていても、候補が欠けた判定・別 run の候補への判定・食い違う
  * 判定は「指摘 0 件」ではない。理由を混ぜず、どれに当たったかを errors / reasons
  * へ別々の文字列で残す。
+ *
+ * **critic と reproducer では突き合わせる母集合が違う。** critic は researcher の
+ * 全候補に判定を返す。reproducer が実行するのは critic が needs-execution とした
+ * 部分集合だけなので、全候補と突き合わせると confirmed / rejected 済みの候補が
+ * 未判定として残り、正常な sweep が永久に partial になる（cross-review の
+ * risk-reviewer P1）。reproducer には critic の検証が emit した実行待ち集合
+ * （`candidateSetHash` は元の run のまま、`candidates` が部分集合）を渡す。
  */
 function reconcileAgainstCandidates(role, results, candidates) {
   if (!candidates)
@@ -299,7 +311,8 @@ function reconcileAgainstCandidates(role, results, candidates) {
  * @property {string} candidateSetHash
  * @property {{candidateId: string, signature: string}[]} [candidates] researcher が挙げた候補
  * @property {number} [total] 候補の総数
- * @property {number} [decided] 判定が付いた候補の数
+ * @property {number} [settled] 裁定が確定した候補の数
+ * @property {string[]} [unsettled] 判定は返ったが裁定が決まっていない candidateId
  * @property {string[]} [missing] 未判定のまま残った candidateId
  * @property {string[]} [foreign] 候補集合に無い candidateId への判定
  * @property {string[]} [conflicting] 同一 candidateId への食い違う判定
@@ -418,7 +431,12 @@ export function validateReview(pack, envelope, options = {}) {
         status: partialCoverage ? 'partial' : 'reviewed',
         kind,
         findings: results.flatMap((result) => result.findings),
-        recommendation: results[0].recommendation,
+        // 合流時は重い方を採る。1 本目が proceed で 2 本目が halt の時に halt が
+        // 黙って落ちると、合流が反証を薄める方向に働く（cross-review の
+        // behavior-verifier P2）。
+        recommendation: ['halt', 'revise', 'proceed'].find((level) =>
+          results.some((result) => result.recommendation === level),
+        ),
         unknowns: results.flatMap((result) => result.unknowns),
         role,
         reviewer: envelopes.length === 1 ? reviewer[0] : reviewer,
@@ -448,22 +466,61 @@ export function validateReview(pack, envelope, options = {}) {
     const reconciliation = reconcileAgainstCandidates(role, results, options.candidates);
     if (reconciliation.errors.length)
       return { ...base, status: 'invalid', errors: reconciliation.errors };
-    const { foreign, conflicting, duplicate, missing, decidedCount } = reconciliation.reconciled;
+    const { foreign, conflicting, duplicate, missing } = reconciliation.reconciled;
+    // 「まだ決まっていない」判定は、id が入っていても裁定済みに数えない。
+    const unsettledValues = UNSETTLED[role];
+    const key = role === 'security-critic' ? 'verdict' : 'status';
+    const entries = results.flatMap((result) =>
+      role === 'security-critic' ? (result.verdicts ?? []) : (result.attempts ?? []),
+    );
+    const unsettled = [
+      ...new Set(
+        entries
+          .filter((entry) => unsettledValues.has(entry[key]))
+          .map((entry) => entry.candidateId),
+      ),
+    ];
+    const settledCount = new Set(
+      entries.filter((entry) => !unsettledValues.has(entry[key])).map((entry) => entry.candidateId),
+    ).size;
+    // critic の検証は「次に実行が要る候補」を部分集合として返す。reproducer の
+    // 検証はこれを母集合にする（全候補ではない）。
+    const pending =
+      role === 'security-critic'
+        ? results
+            .flatMap((result) => result.verdicts ?? [])
+            .filter((verdict) => verdict.verdict === 'needs-execution')
+            .map((verdict) => verdict.candidateId)
+        : null;
     const reasons = [];
-    if (missing.length) reasons.push(`未判定の candidateId ${missing.length} 件`);
+    if (missing.length) reasons.push(`判定が返っていない candidateId ${missing.length} 件`);
+    if (unsettled.length)
+      reasons.push(
+        `裁定が決まっていない candidateId ${unsettled.length} 件（${[...unsettledValues].join(' / ')}）`,
+      );
     if (partialCoverage) reasons.push('reviewer が coverage=partial を申告');
     if (duplicate.length) reasons.push(`同一判定の重複 ${duplicate.length} 件`);
+    const known = new Map(
+      options.candidates.candidates.map((candidate) => [candidate.candidateId, candidate]),
+    );
     return {
       ...base,
-      status: missing.length || partialCoverage ? 'partial' : 'reviewed',
+      status: missing.length || unsettled.length || partialCoverage ? 'partial' : 'reviewed',
       candidateSet: {
         candidateSetHash: options.candidates.candidateSetHash,
         total: options.candidates.candidates.length,
-        decided: decidedCount,
+        settled: settledCount,
+        unsettled,
         missing,
         foreign,
         conflicting,
         duplicate,
+        ...(pending
+          ? {
+              candidates: pending.map((id) => known.get(id)).filter(Boolean),
+              pendingCount: pending.length,
+            }
+          : {}),
       },
       reasons,
     };
@@ -530,8 +587,16 @@ function main(args) {
     { candidates },
   );
   const emit = options['emit-candidates'];
-  if (emit && result.status !== 'invalid' && result.candidateSet?.candidates)
+  if (emit && result.status !== 'invalid' && result.candidateSet?.candidates) {
+    // 既存の候補ファイルへは上書きしない。分割実行を 1 本ずつ検証すると、後の round
+    // だけの候補集合で前の round を黙って置き換えてしまう（cross-review の
+    // behavior-verifier P2）。合流は `--result` を並べて 1 回で検証する。
+    if (existsSync(emit))
+      throw new Error(
+        '--emit-candidates の出力先が既にあります。--result を並べて 1 回で検証してください',
+      );
     writeFileSync(emit, JSON.stringify(result.candidateSet, null, 2) + '\n');
+  }
   console.log(JSON.stringify(result, null, 2));
   if (result.status !== 'reviewed') process.exitCode = 1;
 }

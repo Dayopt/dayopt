@@ -1,6 +1,6 @@
 ---
 name: security-sweep
-description: security sweep の実行を明示依頼された時、月次ガーデニングのセキュリティ sweep 周期、`/claude-security` の所見を候補集合として記録する時、中断した sweep を再開する時に発動。scope と SHA を pack で固定し、researcher / critic / reproducer の envelope を `review:validate` で機械検査する provider 非依存の advisory。PR 差分のレビューや実装では発動しない。
+description: security sweep の実行を明示依頼された時、月次ガーデニングの sweep 周期、`/claude-security` の所見を候補集合として記録する時、中断した sweep を再開する時に発動。scope と SHA を pack で固定し、researcher / critic / reproducer の envelope を機械検査する provider 非依存の advisory。実装では発動しない。
 effort: medium
 maxTurns: 25
 ---
@@ -22,7 +22,7 @@ merge gate ではない。所見は issue と PR コメントに残す。`/claud
 
 ## When NOT to Use
 
-この skill は **explicit な sweep 意図のみを契機とする**。近接するが発動しないケース:
+この skill は **explicit な sweep 意図のみを契機とする**。暗黙的な invocation ケースは該当なし（型の穴埋めとして明記）。参考として近接するが発動しないケース:
 
 - PR の diff を merge 前に読む → `pr-cross-review` skill の領域
 - 実装中に認可・RLS・入力検証の観点を確認する → `security` skill の領域
@@ -98,8 +98,12 @@ pnpm review:validate --pack <pack> --result <researcher.json> --emit-candidates 
 `candidates.json` を prompt と一緒に渡す。critic は**入力の全候補に verdict を返す**。
 
 ```bash
-pnpm review:validate --pack <pack> --result <critic.json> --candidates <run-dir>/candidates.json
+pnpm review:validate --pack <pack> --result <critic.json> \
+  --candidates <run-dir>/candidates.json \
+  --emit-candidates <run-dir>/pending.json
 ```
+
+`pending.json` には `needs-execution` とした候補だけが入る（`candidateSetHash` は元の run のまま）。手順 6 はこれを母集合にする。
 
 分割実行した場合は `--result` を複数回渡して合流させる。
 
@@ -121,7 +125,11 @@ critic が `needs-execution` とした候補だけを対象にする。
 
 **この隔離は container ではない。** Mantis の「host 実行禁止」より弱い。弱くてよいと判断したのは、Dayopt の候補が TS / SQL の到達可能性であって任意コード実行を伴わず、既存の integration 基盤で再現できるため。最終の壁は `apps/product/src/lib/test/service-role-target-guard.ts`（production project ref を opt-in でも拒否する）と `AGENTS.md` の EXPLICIT AUTHORITY で、この skill の記述ではない。
 
-status は 5 択で、**到達証拠のない失敗を `failed-to-reproduce` にしない**。ビルド失敗・setup 失敗・コマンド不在からの negative は `not-run`、環境が揃わない場合は `environment-missing` へ落とす。`review:validate` がこの条件を機械で落とす。
+status は 5 択で、**到達証拠のない失敗を `failed-to-reproduce` にしない**。ビルド失敗・setup 失敗・コマンド不在からの negative は `not-run`、環境が揃わない場合は `environment-missing` へ落とす。
+
+`reproduced` と `failed-to-reproduce` は「実際に実行した」という主張なので、`command` と `testPath` の両方を要求する（`reachedTargetPath` の自己申告だけでは通らない）。`review:validate` がこの条件を機械で落とす。
+
+**reproducer に渡す候補ファイルは、researcher の `candidates.json` ではなく手順 5 が emit した実行待ち集合**（`--emit-candidates` の出力）。全候補と突き合わせると、confirmed / rejected 済みの候補が未判定として残り、正常な sweep が永久に `partial` になる。
 
 ### 7. 裁定して記録する
 
