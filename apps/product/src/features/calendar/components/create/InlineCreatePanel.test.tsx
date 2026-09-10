@@ -60,7 +60,7 @@ vi.mock('@/features/timeblock', async () => {
     ),
     useActivityMedianDurations: () => ({
       medianByActivityId: new Map([['activity-1', 45]]),
-      getMedianMinutes: () => 45,
+      getMedianMinutes: (activityId: string | null) => (activityId === 'activity-1' ? 45 : null),
     }),
     InspectorHeaderActions: ({ onCloseInspector }: { onCloseInspector?: () => void }) => (
       <button type="button" onClick={onCloseInspector}>
@@ -93,6 +93,7 @@ vi.mock('@/features/activities', () => ({
         onMouseEnter={() =>
           onActivityHover?.({ id: 'activity-1', name: '開発', color: 'blue', icon: 'briefcase' })
         }
+        onMouseLeave={() => onActivityHover?.(null)}
       >
         開発
       </button>
@@ -116,14 +117,14 @@ vi.mock('next-intl', () => ({
 
 /** 指定日の 9:00-10:00 を pendingSelection に置く */
 function setSelection(date: Date) {
-  useInlineCreateStore.setState({
-    pendingSelection: {
-      date,
-      startHour: 9,
-      startMinute: 0,
-      endHour: 10,
-      endMinute: 0,
-    },
+  // ドラッグ確定と同じ経路を通す。ここで「ドラッグで決めた長さ」が記録され、
+  // ホバーを外した時の戻り先になる
+  useInlineCreateStore.getState().setPendingSelection({
+    date,
+    startHour: 9,
+    startMinute: 0,
+    endHour: 10,
+    endMinute: 0,
   });
 }
 
@@ -145,7 +146,7 @@ describe('InlineCreatePanel', () => {
     createRecordMutate.mockClear();
     openInspector.mockClear();
     closeInspector.mockClear();
-    useInlineCreateStore.setState({ pendingSelection: null, hoveredActivity: null });
+    useInlineCreateStore.getState().clearPendingSelection();
   });
 
   it('過去スロットの既定は記録で、アクティビティを押した時点で Record を作る', () => {
@@ -197,6 +198,44 @@ describe('InlineCreatePanel', () => {
       id: 'activity-1',
       name: '開発',
     });
+  });
+
+  it('ホバーするとそのアクティビティの普段の長さが選択範囲へ着る', () => {
+    setSelection(pastDay());
+    render(<InlineCreatePanel onClose={vi.fn()} />);
+
+    fireEvent.mouseEnter(screen.getByRole('button', { name: '開発' }));
+
+    // 9:00–10:00 のドラッグが、中央値 45 分に合わせて 9:00–9:45 になる。
+    // グリッドのハイライトはこの pendingSelection を読んで厚みを描く
+    const selection = useInlineCreateStore.getState().pendingSelection;
+    expect(selection?.endHour).toBe(9);
+    expect(selection?.endMinute).toBe(45);
+  });
+
+  it('ホバーを外すとドラッグで決めた長さへ戻る', () => {
+    setSelection(pastDay());
+    render(<InlineCreatePanel onClose={vi.fn()} />);
+    const pill = screen.getByRole('button', { name: '開発' });
+
+    fireEvent.mouseEnter(pill);
+    fireEvent.mouseLeave(pill);
+
+    const selection = useInlineCreateStore.getState().pendingSelection;
+    expect(selection?.endHour).toBe(10);
+    expect(selection?.endMinute).toBe(0);
+  });
+
+  it('プレビューした長さのまま作成する（表示と保存が食い違わない）', () => {
+    setSelection(pastDay());
+    render(<InlineCreatePanel onClose={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole('button', { name: '開発' }));
+
+    const [input] = createRecordMutate.mock.calls[0] as [{ start_at: string; end_at: string }];
+    const durationMinutes =
+      (new Date(input.end_at).getTime() - new Date(input.start_at).getTime()) / 60000;
+    expect(durationMinutes).toBe(45);
   });
 
   it('メモと充実度は作成入力へ載る（記録）', () => {
