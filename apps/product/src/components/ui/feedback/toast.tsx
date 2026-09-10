@@ -59,12 +59,16 @@ const Toaster = ({ ...props }: ToasterProps) => {
 
   return (
     <Sonner
-      position={isMobile ? 'top-center' : 'top-right'}
+      // デスクトップは下中央。右側は詳細パネル（Inspector）が常駐し、右下に出すと
+      // メモ欄や削除系の操作に「元に戻す」が被って押し間違いを誘う。下中央はグリッドの
+      // 深夜帯に当たり、どのパネルを開いていても操作対象と重ならない。
+      // モバイルは Drawer が下から出るので上中央のまま
+      position={isMobile ? 'top-center' : 'bottom-center'}
       visibleToasts={1}
       duration={3000}
       containerAriaLabel={t('toastContainer')}
       className={isMobile ? '' : '[--width:360px]'}
-      offset={isMobile ? { top: 16 } : { top: 16, right: 16 }}
+      offset={isMobile ? { top: 16 } : { bottom: 16 }}
       mobileOffset={{ top: 16, left: 16, right: 16 }}
       swipeDirections={isMobile ? ['left', 'right'] : []}
       toastOptions={{
