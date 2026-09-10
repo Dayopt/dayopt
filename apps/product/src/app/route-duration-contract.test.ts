@@ -76,6 +76,7 @@ const ROUTE_DURATION_CONTRACT = {
   // 最大 10 件）。予算不等式は settle-dispatcher.ts の SETTLE_WORST_CASE_MS を route.test.ts が
   // 実測で固定する。
   'src/app/api/cron/calendar-account-deletion-settle/route.ts': 60,
+  'src/app/api/cron/billing-reconciliation/route.ts': 60,
   'src/app/api/cron/calendar-sync/route.ts': 60,
   'src/app/api/cron/external-connection-maintenance/route.ts': 60,
   'src/app/api/integrations/google-calendar/start/route.ts': 60,

@@ -12,7 +12,7 @@ import { useForm } from 'react-hook-form';
 
 import type { MessageKey } from '@/lib/i18n';
 import { logger } from '@/lib/logger';
-import { getSafeRedirectPath } from '@/lib/safe-redirect';
+import { getSafeLocalizedRedirectPath, getSafeRedirectPath } from '@/lib/safe-redirect';
 import { captureUnexpectedAuthError, observeAuthOperation } from '@/lib/sentry';
 import { createClient } from '@/lib/supabase/client';
 import { isTurnstileEnabled, Turnstile, type TurnstileInstance } from '@/lib/turnstile';
@@ -137,7 +137,7 @@ export function LoginForm({ className, ...props }: React.ComponentProps<'div'>) 
 
         // MFA検証画面へのリダイレクトURL構築
         // MFAVerifyPage は searchParams.get('next') でlocale付きパスを受け取る
-        const fullRedirectPath = `/${locale}${redirectPath}`;
+        const fullRedirectPath = getSafeLocalizedRedirectPath(redirectPath, locale);
         const buildMfaUrl = () => {
           const base = `/${locale}/auth/mfa-verify`;
           return redirectPath !== '/calendar'

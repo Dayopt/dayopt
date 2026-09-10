@@ -62,6 +62,10 @@ const nextConfig = {
     // client 側で Vercel 環境を判別するため露出。preview は NODE_ENV=production だが
     // VERCEL_ENV=preview なので、Sentry を production のみ有効化する gate に必要。
     NEXT_PUBLIC_VERCEL_ENV: process.env.VERCEL_ENV || '',
+    // sw.js のキャッシュバージョニング（useServiceWorker.ts が `/sw.js?v=<sha>` で登録する）
+    // に使う。turbo.json の build env allowlist には VERCEL_GIT_COMMIT_SHA はあるが
+    // NEXT_PUBLIC_ 版が無いため、ここで client 向けに再露出する。
+    NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA: process.env.VERCEL_GIT_COMMIT_SHA ?? '',
   },
 
   // TypeScript設定
