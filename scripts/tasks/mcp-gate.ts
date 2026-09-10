@@ -2,11 +2,19 @@
 /**
  * MCP write gate 操作スクリプト（issue #1754 Production closed beta）
  *
- * `public.mcp_mutation_control`（global write gate + client allowlist）を
- * service_role 経由の SECURITY DEFINER RPC（`set_mcp_mutation_control_v1` /
- * `set_mcp_client_write_control_v1`）だけで操作する。直接 UPDATE できる GRANT は
- * どのロールにも無い（`supabase/migrations/20260729062445_mcp_mutation_envelope_foundation.sql`
- * / `20260729073125_mcp_environment_identity_client_fence.sql`）。
+ * `public.mcp_mutation_control`（global write gate + client allowlist + 利用権判定の
+ * 切替）を service_role 経由の SECURITY DEFINER RPC（`set_mcp_mutation_control_v1` /
+ * `set_mcp_client_write_control_v1` / `set_mcp_billing_enforcement_v1`）だけで操作する。
+ * 直接 UPDATE できる GRANT はどのロールにも無い
+ * （`supabase/migrations/20260729062445_mcp_mutation_envelope_foundation.sql`
+ * / `20260729073125_mcp_environment_identity_client_fence.sql`
+ * / `20260908022927_add_mcp_billing_access_switch.sql`）。
+ *
+ * `billing_enforced` は MCP **書き込み**の DB 側利用権判定（`private.authorize_mcp_mutation_v1`）
+ * の切替。false（既定）は契約中（active / trialing / past_due）だけを通す旧契約、true は
+ * 45 日無料体験中も通す単一プラン契約。読み取り側の判定は env `BILLING_ENFORCED`
+ * （app 層 `checkMcpEntitlement`）が持ち、この列とは独立。切替順序は
+ * `docs/operations/billing-single-plan-rollout.md` §公開順序 / §復帰 に従う。
  *
  * `@supabase/supabase-js` は apps/product 専属の依存で root scripts からは
  * phantom dependency になるため使わない。PostgREST の REST / RPC endpoint を
@@ -20,6 +28,8 @@
  *   pnpm mcp:gate -- --disable-global
  *   pnpm mcp:gate -- --enable-client=claude-ai
  *   pnpm mcp:gate -- --disable-client=claude-ai
+ *   pnpm mcp:gate -- --enable-billing
+ *   pnpm mcp:gate -- --disable-billing
  *
  * 必須 env: NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
  * （production 値は 1Password `app` item。`op run -- pnpm mcp:gate ...` で渡す）
@@ -33,6 +43,7 @@ type OAuthClientId = (typeof VALID_CLIENT_IDS)[number];
 
 interface MutationControlRow {
   writes_enabled: boolean;
+  billing_enforced: boolean;
   enabled_client_ids: string[];
   revision: number;
   changed_at: string;
@@ -92,7 +103,7 @@ async function readControl(
   const rows = await restRequest<MutationControlRow[]>(
     supabaseUrl,
     serviceRoleKey,
-    'mcp_mutation_control?select=writes_enabled,enabled_client_ids,revision,changed_at',
+    'mcp_mutation_control?select=writes_enabled,billing_enforced,enabled_client_ids,revision,changed_at',
   );
   const [row] = rows;
   if (!row) {
@@ -104,19 +115,29 @@ async function readControl(
 async function main() {
   const flags = parseArgs(process.argv.slice(2));
 
-  const writeFlags = ['enable-global', 'disable-global', 'enable-client', 'disable-client'].filter(
-    (key) => flags.has(key),
-  );
+  const writeFlags = [
+    'enable-global',
+    'disable-global',
+    'enable-client',
+    'disable-client',
+    'enable-billing',
+    'disable-billing',
+  ].filter((key) => flags.has(key));
   if (writeFlags.length > 1) {
     console.error(`書き込み系オプションは 1 回に 1 個までです（指定: ${writeFlags.join(', ')}）。`);
     process.exit(1);
   }
 
-  // --enable-global / --disable-global は bare boolean flag（値を取らない）。
-  // `--enable-global=false` のような入力は flags.has('enable-global') が
-  // true のままになり、値を無視して gate を ON にしてしまう（意図と逆方向の
-  // 書き込み）。値付きで渡された場合は解釈せずに拒否する。
-  for (const key of ['enable-global', 'disable-global'] as const) {
+  // --enable-global / --disable-global / --enable-billing / --disable-billing は
+  // bare boolean flag（値を取らない）。`--enable-global=false` のような入力は
+  // flags.has('enable-global') が true のままになり、値を無視して gate を ON に
+  // してしまう（意図と逆方向の書き込み）。値付きで渡された場合は解釈せずに拒否する。
+  for (const key of [
+    'enable-global',
+    'disable-global',
+    'enable-billing',
+    'disable-billing',
+  ] as const) {
     if (flags.get(key) !== undefined && flags.get(key) !== true) {
       console.error(
         `--${key} は値を取りません（例: --${key}）。--${key}=${String(flags.get(key))} のような指定は意図しない方向へ倒れうるため拒否します。`,
@@ -133,12 +154,15 @@ async function main() {
   console.log('--- 現在の MCP write gate 状態 ---');
   console.log(`writes_enabled: ${control.writes_enabled}`);
   console.log(`enabled_client_ids: ${JSON.stringify(control.enabled_client_ids)}`);
+  console.log(
+    `billing_enforced: ${control.billing_enforced}（write の利用権判定。false=契約中のみ / true=45 日体験中も可）`,
+  );
   console.log(`revision: ${control.revision}`);
   console.log(`changed_at: ${control.changed_at}`);
 
   if (writeFlags.length === 0) {
     console.log(
-      '\n(read-only 実行。書き込むには --enable-global / --disable-global / --enable-client=<id> / --disable-client=<id> を指定してください)',
+      '\n(read-only 実行。書き込むには --enable-global / --disable-global / --enable-client=<id> / --disable-client=<id> / --enable-billing / --disable-billing を指定してください)',
     );
     return;
   }
@@ -157,6 +181,27 @@ async function main() {
       },
     );
     console.log(`\nglobal gate を ${writesEnabled ? 'ON' : 'OFF'} にしました。`, result);
+    return;
+  }
+
+  if (flags.has('enable-billing') || flags.has('disable-billing')) {
+    const billingEnforced = flags.has('enable-billing');
+    const [result] = await restRequest<[Record<string, unknown>]>(
+      supabaseUrl,
+      serviceRoleKey,
+      'rpc/set_mcp_billing_enforcement_v1',
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          p_billing_enforced: billingEnforced,
+          p_expected_revision: revision,
+        }),
+      },
+    );
+    console.log(
+      `\nMCP write の利用権判定を ${billingEnforced ? '単一プラン契約（45 日体験中も可）' : '旧契約（契約中のみ）'} にしました。`,
+      result,
+    );
     return;
   }
 
