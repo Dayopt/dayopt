@@ -3,3 +3,14 @@
 
 # usability-probe-setup.ts の出力（認証済み storageState を含む。生セッションなので commit しない）
 .probe/
+
+# Next.js が agent 検出時に app 直下へ生成する指示ファイル（#2693）。next.config.mjs の
+# `agentRules: false` で生成自体を止めているが、next の version 変更で flag が効かなく
+# なっても `pnpm branch:finish` の worktree 掃除を止めないための二重防御。
+# 先頭 `/` で app 直下だけに限定する（apps/product/src/AGENTS.md 等、repo が意図して
+# 置いた nested な指示ファイルまで無視しないため）。
+# この保険が効くのは 2 ファイルが untracked の間だけ。将来 app 直下へ AGENTS.md を
+# tracked で置くなら、next は既存ファイルへ block を upsert するので ignore では守れない
+# （その時は agentRules: false だけが頼りになる）。
+/AGENTS.md
+/CLAUDE.md
