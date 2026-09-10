@@ -3,7 +3,11 @@ import { useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
 
-import { resolveTimeblockDestination, useTimeblockWriteMutations } from '@/features/timeblock';
+import {
+  resolveTimeblockDestination,
+  useTimeblockDeleteUndo,
+  useTimeblockWriteMutations,
+} from '@/features/timeblock';
 import { logger } from '@/lib/logger';
 import { toast } from '@/lib/toast';
 
@@ -61,8 +65,9 @@ function findTimeModelRowById(
  * plans.list / records.list キャッシュから id を逆引きして kind を判定する。
  */
 export const useTimeblockOperations = () => {
-  const { deleteRecord, deletePlan, updateRecord, updatePlan, restorePlan, restoreRecord } =
-    useTimeblockWriteMutations();
+  const { deleteRecord, deletePlan, updateRecord, updatePlan } = useTimeblockWriteMutations();
+  // 削除の戻し方はカレンダーと Inspector で 1 つに揃える
+  const showDeleteUndo = useTimeblockDeleteUndo();
   const queryClient = useQueryClient();
   const t = useTranslations();
 
@@ -91,28 +96,6 @@ export const useTimeblockOperations = () => {
     [updatePlan, updateRecord, t],
   );
 
-  /**
-   * 削除の取り消しを出す。キーボード（Delete / Backspace）と右クリックの削除は
-   * 確認を挟まない代わりに、ここで戻し口を渡す（可逆は速く、ルール 4）。
-   */
-  const showDeleteUndoToast = useCallback(
-    (id: string, kind: TimeblockDestination, deletedUpdatedAt: string) => {
-      toast.success(t('timeblock.editor.toast.deleted'), {
-        action: {
-          label: t('common.undo'),
-          onClick: () => {
-            const input = { id, expectedUpdatedAt: deletedUpdatedAt };
-            const restored =
-              kind === 'plan' ? restorePlan.mutateAsync(input) : restoreRecord.mutateAsync(input);
-            // 失敗時は restore mutation 自身がトーストを出す
-            void restored.catch(() => undefined);
-          },
-        },
-      });
-    },
-    [restorePlan, restoreRecord, t],
-  );
-
   // Timeblock 削除ハンドラー（id のみ。kind はキャッシュから逆引きする）
   const handleTimeblockDelete = useCallback(
     async (timeblockId: string): Promise<boolean> => {
@@ -135,13 +118,13 @@ export const useTimeblockOperations = () => {
                 id: timeblockId,
                 expectedUpdatedAt: found.row.updated_at,
               });
-        showDeleteUndoToast(timeblockId, found.kind, deleted.updated_at);
+        showDeleteUndo(found.kind, deleted);
         return true;
       } catch {
         return false;
       }
     },
-    [queryClient, deletePlan, deleteRecord, showDeleteUndoToast],
+    [queryClient, deletePlan, deleteRecord, showDeleteUndo],
   );
 
   // Timeblock更新ハンドラー（ドラッグ&ドロップ / リサイズ用）

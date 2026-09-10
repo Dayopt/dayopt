@@ -21,6 +21,7 @@ export type { RecordEvent } from './types/record-event';
 export {
   useActivityMedianDurations,
   usePlanTemplateMutations,
+  useTimeblockDeleteUndo,
   useTimeblockWriteMutations,
 } from './hooks';
 

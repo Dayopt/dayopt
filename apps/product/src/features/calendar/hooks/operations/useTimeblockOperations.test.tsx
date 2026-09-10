@@ -9,8 +9,7 @@ const updatePlanMutate = vi.fn();
 const updateRecordMutate = vi.fn();
 const deletePlanMutate = vi.fn();
 const deleteRecordMutate = vi.fn();
-const restorePlanMutate = vi.fn(() => Promise.resolve({}));
-const restoreRecordMutate = vi.fn(() => Promise.resolve({}));
+const showDeleteUndo = vi.fn();
 const getQueriesData = vi.fn(
   (_opts: { predicate: (q: { queryKey: unknown }) => boolean }) => [] as Array<[unknown, unknown]>,
 );
@@ -30,9 +29,10 @@ vi.mock('@/features/timeblock', async () => {
       updateRecord: { mutate: updateRecordMutate },
       deletePlan: { mutate: deletePlanMutate, mutateAsync: deletePlanMutate },
       deleteRecord: { mutate: deleteRecordMutate, mutateAsync: deleteRecordMutate },
-      restorePlan: { mutate: restorePlanMutate, mutateAsync: restorePlanMutate },
-      restoreRecord: { mutate: restoreRecordMutate, mutateAsync: restoreRecordMutate },
     }),
+    // 取り消しトーストの中身は useTimeblockDeleteUndo の test が持つ。ここでは
+    // 「削除が返した版で呼ばれるか」だけ見る
+    useTimeblockDeleteUndo: () => showDeleteUndo,
   };
 });
 
@@ -118,8 +118,7 @@ describe('useTimeblockOperations', () => {
     updateRecordMutate.mockReset();
     deletePlanMutate.mockReset();
     deleteRecordMutate.mockReset();
-    restorePlanMutate.mockClear();
-    restoreRecordMutate.mockClear();
+    showDeleteUndo.mockClear();
     getQueriesData.mockReset();
     getQueriesData.mockReturnValue([]);
     toastSuccess.mockReset();
@@ -193,19 +192,10 @@ describe('useTimeblockOperations', () => {
       const { result } = renderHook(() => useTimeblockOperations());
       await result.current.handleTimeblockDelete('plan-1');
 
-      const [message, options] = toastSuccess.mock.calls[0] as [
-        string,
-        { action: { onClick: () => void } },
-      ];
-      expect(message).toBe('timeblock.editor.toast.deleted');
-
-      options.action.onClick();
       // 復元は削除が返した版を使う（削除前の版だと STALE_VERSION で弾かれる）
-      expect(restorePlanMutate).toHaveBeenCalledWith({
-        id: 'plan-1',
-        expectedUpdatedAt: '2026-04-26T00:00:05.000000Z',
+      expect(showDeleteUndo).toHaveBeenCalledWith('plan', {
+        updated_at: '2026-04-26T00:00:05.000000Z',
       });
-      expect(restoreRecordMutate).not.toHaveBeenCalled();
     });
 
     it('記録の削除は記録として復元する', async () => {
@@ -223,17 +213,9 @@ describe('useTimeblockOperations', () => {
       const { result } = renderHook(() => useTimeblockOperations());
       await result.current.handleTimeblockDelete('record-1');
 
-      const [, options] = toastSuccess.mock.calls[0] as [
-        string,
-        { action: { onClick: () => void } },
-      ];
-      options.action.onClick();
-
-      expect(restoreRecordMutate).toHaveBeenCalledWith({
-        id: 'record-1',
-        expectedUpdatedAt: '2026-04-26T00:00:05.000000Z',
+      expect(showDeleteUndo).toHaveBeenCalledWith('record', {
+        updated_at: '2026-04-26T00:00:05.000000Z',
       });
-      expect(restorePlanMutate).not.toHaveBeenCalled();
     });
 
     it('キャッシュに id が見つからなければ何も mutate せず logger.error する', async () => {
