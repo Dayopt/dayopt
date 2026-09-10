@@ -58,7 +58,11 @@ export { plansToICal } from './lib/plan-to-ical';
 // =============================================================================
 export { createClipboardTimeblock } from './lib/timeblock-clipboard';
 export { createTimeblockDuplicateDraft } from './lib/timeblock-duplicate';
-export { collectTimeblockLaneItems, hasTimeblockLaneConflict } from './lib/timeblock-lane-conflict';
+export {
+  collectTimeblockLaneItems,
+  findFreeTimeblockLaneSlot,
+  hasTimeblockLaneConflict,
+} from './lib/timeblock-lane-conflict';
 export { getTimeblockMenuItems } from './lib/timeblock-menu-items';
 
 // =============================================================================

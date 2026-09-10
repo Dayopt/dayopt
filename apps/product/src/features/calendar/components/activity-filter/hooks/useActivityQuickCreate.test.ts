@@ -12,6 +12,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useActivityQuickCreate } from './useActivityQuickCreate';
 
 const hasConflict = vi.hoisted(() => ({ value: false }));
+/** 同一レーンに既にあるブロック。空き探しの入力になる */
+const laneItems = vi.hoisted(() => ({
+  value: [] as Array<{ id: string; start_at: string; end_at: string }>,
+}));
 const createPlanMutate = vi.hoisted(() => vi.fn());
 const createRecordMutate = vi.hoisted(() => vi.fn());
 const openInspector = vi.hoisted(() => vi.fn());
@@ -22,11 +26,16 @@ vi.mock('@/features/timeblock', async () => {
   const domain = await vi.importActual<
     typeof import('@/features/timeblock/domain/timeblock-destination')
   >('@/features/timeblock/domain/timeblock-destination');
+  // 空き探しは本物を使う。ここで見たいのは hook がその結果どおりに作るかどうか
+  const lane = await vi.importActual<
+    typeof import('@/features/timeblock/lib/timeblock-lane-conflict')
+  >('@/features/timeblock/lib/timeblock-lane-conflict');
 
   return {
     resolveTimeblockDestination: domain.resolveTimeblockDestination,
-    collectTimeblockLaneItems: () => [],
+    collectTimeblockLaneItems: () => laneItems.value,
     hasTimeblockLaneConflict: () => hasConflict.value,
+    findFreeTimeblockLaneSlot: lane.findFreeTimeblockLaneSlot,
     useTimeblockWriteMutations: () => ({
       createPlan: { mutate: createPlanMutate },
       createRecord: { mutate: createRecordMutate },
@@ -54,9 +63,29 @@ vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({}) }));
 vi.mock('@/lib/toast', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 vi.mock('next-intl', () => ({ useTranslations: () => (key: string) => key }));
 
+/**
+ * hook は「ブラウザローカルの壁時計を組み立て → ユーザー timezone として解釈」する
+ * （`convertFromTimezone`）。この test の timezone mock は 'UTC' なので、既存ブロックの
+ * fixture も同じ空間、つまり壁時計の数字をそのまま UTC と読んだ時刻で作る。
+ */
+function wallClockAsUtc(date: Date): Date {
+  return new Date(
+    Date.UTC(
+      date.getFullYear(),
+      date.getMonth(),
+      date.getDate(),
+      date.getHours(),
+      date.getMinutes(),
+      date.getSeconds(),
+      date.getMilliseconds(),
+    ),
+  );
+}
+
 describe('useActivityQuickCreate', () => {
   beforeEach(() => {
     hasConflict.value = false;
+    laneItems.value = [];
     medianMinutes.value = new Map();
     createPlanMutate.mockClear();
     createRecordMutate.mockClear();
@@ -117,8 +146,41 @@ describe('useActivityQuickCreate', () => {
     expect(openInspector).toHaveBeenCalledWith('plan-1', 'plan');
   });
 
-  it('既定の枠が同じレーンの既存ブロックと重なる時は作成しない', () => {
-    hasConflict.value = true;
+  it('今の時間が埋まっている時は、直後の空きへずらして作る', () => {
+    // 既定の開始（今）を含む 3 時間がふさがっている
+    const now = wallClockAsUtc(new Date());
+    laneItems.value = [
+      {
+        id: 'existing',
+        start_at: new Date(now.getTime() - 60 * 60 * 1000).toISOString(),
+        end_at: new Date(now.getTime() + 2 * 60 * 60 * 1000).toISOString(),
+      },
+    ];
+    const { result } = renderHook(() => useActivityQuickCreate());
+
+    result.current({ activityId: 'activity-1', activityName: '開発' });
+
+    expect(createPlanMutate).toHaveBeenCalledTimes(1);
+    const [input] = createPlanMutate.mock.calls[0] as [{ start_at: string; end_at: string }];
+    // 既存の終わりから、既定の長さのまま作る（縮めない）
+    expect(input.start_at).toBe(laneItems.value[0]?.end_at);
+    const durationMinutes =
+      (new Date(input.end_at).getTime() - new Date(input.start_at).getTime()) / 60000;
+    expect(durationMinutes).toBe(60);
+  });
+
+  it('その日にもう空きが無ければ作成しない', () => {
+    const localNow = new Date();
+    const localEndOfDay = new Date(localNow);
+    localEndOfDay.setHours(23, 59, 59, 999);
+    laneItems.value = [
+      {
+        id: 'all-day',
+        start_at: new Date(wallClockAsUtc(localNow).getTime() - 60 * 60 * 1000).toISOString(),
+        // 探す上限（その日の終わり）まで埋まっているので、長さが入る空きは残らない
+        end_at: wallClockAsUtc(localEndOfDay).toISOString(),
+      },
+    ];
     const { result } = renderHook(() => useActivityQuickCreate());
 
     result.current({ activityId: 'activity-1', activityName: '開発' });

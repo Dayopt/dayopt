@@ -8,6 +8,7 @@
     },
     "toast": {
       "created": "「{title}」を記録しました ✓",
+      "createdShifted": "「{title}」を {time} に作成しました（その時間は空いていませんでした）",
       "createFailed": "作成できませんでした: {error}",
       "updated": "更新しました",
       "updateFailed": "更新できませんでした。もう一度お試しください",

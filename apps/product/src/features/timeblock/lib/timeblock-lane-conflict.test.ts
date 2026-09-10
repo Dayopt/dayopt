@@ -1,63 +1,71 @@
-import { QueryClient } from '@tanstack/react-query';
+/**
+ * 同一レーンの空き探し。
+ *
+ * サイドバーのタップは「今の時間が埋まっているから作れない」で止めず、
+ * その日のうちで長さが丸ごと入る最初の空きへずらす。長さは縮めない。
+ */
+
 import { describe, expect, it } from 'vitest';
 
-import { collectTimeblockLaneItems, hasTimeblockLaneConflict } from './timeblock-lane-conflict';
+import { findFreeTimeblockLaneSlot } from './timeblock-lane-conflict';
 
-const plan = {
-  id: 'plan-1',
-  start_at: '2026-07-17T09:00:00.000Z',
-  end_at: '2026-07-17T10:00:00.000Z',
-};
+function item(id: string, startAt: string, endAt: string) {
+  return { id, start_at: startAt, end_at: endAt };
+}
 
-const record = {
-  id: 'record-1',
-  start_at: '2026-07-17T09:00:00.000Z',
-  end_at: '2026-07-17T10:00:00.000Z',
-};
+const DAY_END = new Date('2026-09-10T23:59:59.999Z');
 
-describe('collectTimeblockLaneItems', () => {
-  it('指定レーンのlist cacheだけを集め、同じidを重複させない', () => {
-    const queryClient = new QueryClient();
-    queryClient.setQueryData([['plans', 'list'], { input: { startDate: '2026-07-17' } }], [plan]);
-    queryClient.setQueryData([['plans', 'list'], { input: { activityId: 'activity-1' } }], [plan]);
-    queryClient.setQueryData(
-      [['records', 'list'], { input: { startDate: '2026-07-17' } }],
-      [record],
-    );
+describe('findFreeTimeblockLaneSlot', () => {
+  it('重なりが無ければ希望どおりの枠を返す', () => {
+    const slot = findFreeTimeblockLaneSlot([], new Date('2026-09-10T10:00:00Z'), 45, DAY_END);
 
-    expect(collectTimeblockLaneItems(queryClient, 'plans')).toEqual([plan]);
-    expect(collectTimeblockLaneItems(queryClient, 'records')).toEqual([record]);
+    expect(slot?.startAt.toISOString()).toBe('2026-09-10T10:00:00.000Z');
+    expect(slot?.endAt.toISOString()).toBe('2026-09-10T10:45:00.000Z');
   });
 
-  it('cacheが空またはundefinedなら空配列を返す', () => {
-    const queryClient = new QueryClient();
-    queryClient.setQueryData([['plans', 'list'], { input: {} }], undefined);
+  it('重なる時は既存の終わりからにずらし、長さは保つ', () => {
+    const items = [item('a', '2026-09-10T09:30:00Z', '2026-09-10T11:00:00Z')];
 
-    expect(collectTimeblockLaneItems(queryClient, 'plans')).toEqual([]);
-  });
-});
+    const slot = findFreeTimeblockLaneSlot(items, new Date('2026-09-10T10:00:00Z'), 45, DAY_END);
 
-describe('hasTimeblockLaneConflict', () => {
-  it('半開区間で重複を検出し、隣接する時間は許可する', () => {
-    expect(
-      hasTimeblockLaneConflict(
-        [plan],
-        new Date('2026-07-17T09:30:00.000Z'),
-        new Date('2026-07-17T10:30:00.000Z'),
-      ),
-    ).toBe(true);
-    expect(
-      hasTimeblockLaneConflict(
-        [plan],
-        new Date('2026-07-17T10:00:00.000Z'),
-        new Date('2026-07-17T11:00:00.000Z'),
-      ),
-    ).toBe(false);
+    expect(slot?.startAt.toISOString()).toBe('2026-09-10T11:00:00.000Z');
+    expect(slot?.endAt.toISOString()).toBe('2026-09-10T11:45:00.000Z');
   });
 
-  it('編集中の行自身は重複対象から除外する', () => {
-    expect(
-      hasTimeblockLaneConflict([plan], new Date(plan.start_at), new Date(plan.end_at), plan.id),
-    ).toBe(false);
+  it('連続して埋まっていても、丸ごと入る空きまで進む', () => {
+    const items = [
+      item('a', '2026-09-10T10:00:00Z', '2026-09-10T11:00:00Z'),
+      item('b', '2026-09-10T11:00:00Z', '2026-09-10T12:00:00Z'),
+      // 12:00–12:30 は 30 分しか空いていないので 45 分は入らない
+      item('c', '2026-09-10T12:30:00Z', '2026-09-10T13:00:00Z'),
+    ];
+
+    const slot = findFreeTimeblockLaneSlot(items, new Date('2026-09-10T10:00:00Z'), 45, DAY_END);
+
+    expect(slot?.startAt.toISOString()).toBe('2026-09-10T13:00:00.000Z');
+  });
+
+  it('半開区間なので、既存の終わりと同時に始まる枠は重ならない', () => {
+    const items = [item('a', '2026-09-10T10:00:00Z', '2026-09-10T11:00:00Z')];
+
+    const slot = findFreeTimeblockLaneSlot(items, new Date('2026-09-10T11:00:00Z'), 60, DAY_END);
+
+    expect(slot?.startAt.toISOString()).toBe('2026-09-10T11:00:00.000Z');
+  });
+
+  it('その日にもう入らなければ null を返す（呼び出し側が知らせる）', () => {
+    const items = [item('a', '2026-09-10T10:00:00Z', '2026-09-10T23:30:00Z')];
+
+    const slot = findFreeTimeblockLaneSlot(items, new Date('2026-09-10T10:00:00Z'), 45, DAY_END);
+
+    expect(slot).toBeNull();
+  });
+
+  it('開始より前に終わっている既存は無視する', () => {
+    const items = [item('a', '2026-09-10T08:00:00Z', '2026-09-10T09:00:00Z')];
+
+    const slot = findFreeTimeblockLaneSlot(items, new Date('2026-09-10T10:00:00Z'), 45, DAY_END);
+
+    expect(slot?.startAt.toISOString()).toBe('2026-09-10T10:00:00.000Z');
   });
 });

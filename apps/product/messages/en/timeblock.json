@@ -8,6 +8,7 @@
     },
     "toast": {
       "created": "\"{title}\" created",
+      "createdShifted": "Created \"{title}\" at {time} (the original time was taken)",
       "createFailed": "Failed to create: {error}",
       "updated": "Updated",
       "updateFailed": "Failed to update",
