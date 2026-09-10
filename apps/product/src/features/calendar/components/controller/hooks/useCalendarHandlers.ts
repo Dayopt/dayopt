@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useRef } from 'react';
+import { useCallback } from 'react';
 
 import { useTimeblockInspectorStore } from '@/features/timeblock';
 import { logger } from '@/lib/logger';
@@ -9,19 +9,6 @@ import { useInlineCreateStore } from '../../../stores/useInlineCreateStore';
 
 import type { CalendarDisplayEvent } from '../../../types/calendar.types';
 import type { DateTimeSelection } from '../../views/shared';
-
-/**
- * 1 回のクリックが 2 経路で届くのを畳む窓（ミリ秒）。
- *
- * ドラッグ可能なカードでは、pointer の状態機械が「動いていない＝クリック」と判断して
- * EVENT_CLICK を出し（domain/interaction/pointer-up.ts）、その直後にブラウザの click が
- * カードの onClick を叩く。開くだけの実装では二重でも無害だったが、トグルにすると
- * 開いて閉じるで打ち消し合い、押しても何も起きないように見える（2026-09-10 User 指摘）。
- *
- * 2 経路は同じ tick で連続するので、ごく短い窓で十分。人が意図して 2 回押す間隔
- * （早くても 150ms 以上）は畳まない。
- */
-const CLICK_DEDUPE_WINDOW_MS = 50;
 
 /** エントリクリック・時間範囲選択など、カレンダー共通のUIイベントハンドラーを提供するフック */
 export function useCalendarHandlers() {
@@ -34,21 +21,12 @@ export function useCalendarHandlers() {
 
   const setPendingSelection = useInlineCreateStore.use.setPendingSelection();
 
-  /** 直前に処理したクリック（同じブロックの二重配送を落とすため） */
-  const lastClickRef = useRef<{ id: string; at: number } | null>(null);
-
   // Inspector で開いているTimeblockIDをDnD無効化用に計算
   const disabledTimeblockId = inspectorIsOpen ? inspectorEntryId : null;
 
   // エントリクリックハンドラー（開いているブロックをもう一度押したら閉じる）
   const handleTimeblockClick = useCallback(
     (entry: CalendarDisplayEvent) => {
-      // 同じクリックの 2 通目は捨てる（上の CLICK_DEDUPE_WINDOW_MS を参照）
-      const now = Date.now();
-      const last = lastClickRef.current;
-      if (last && last.id === entry.id && now - last.at < CLICK_DEDUPE_WINDOW_MS) return;
-      lastClickRef.current = { id: entry.id, at: now };
-
       // 同じブロックの再クリックはトグルにする。開けた操作と同じ操作で閉じられる
       // （2026-09-10 User 指示）。複製の下書き中は閉じない — 下書きを黙って捨てる
       // ことになるため、従来どおり元ブロックの詳細へ開き直す
