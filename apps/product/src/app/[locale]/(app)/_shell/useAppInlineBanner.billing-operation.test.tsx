@@ -10,6 +10,9 @@ const beginPortalAttempt = vi.hoisted(() => vi.fn(() => OPERATION_ID));
 const portalMutate = vi.hoisted(() => vi.fn());
 const settlePortalAttempt = vi.hoisted(() => vi.fn(() => true));
 const toastError = vi.hoisted(() => vi.fn());
+const reportBillingReturnPollTimeout = vi.hoisted(() => vi.fn());
+const stopBillingPoll = vi.hoisted(() => vi.fn());
+const pollStartedAt = vi.hoisted(() => ({ current: null }) as { current: number | null });
 const billingOverview = vi.hoisted(
   () =>
     ({
@@ -39,17 +42,13 @@ vi.mock('@/lib/toast', () => ({
 vi.mock('@/features/settings', async () => ({
   // 課金 checkout 復帰の有限ポーリング（issue #1887）。この test では復帰を
   // 起こさないため startedAt は常に null（= ポーリング非アクティブ）。
-  BILLING_POLL_INTERVAL_MS: 2500,
-  BILLING_POLL_MAX_DURATION_MS: 30_000,
   // 分岐そのものは再実装せず実物を使う。ここで写すと分岐の変化を test が追えない（#1937）。
-  ...(await vi.importActual<typeof import('@/features/settings/lib/billing-operation')>(
-    '@/features/settings/lib/billing-operation',
-  )),
-  shouldContinueBillingPoll: () => false,
+  ...(await vi.importActual<typeof import('@/features/settings')>('@/features/settings')),
+  reportBillingReturnPollTimeout,
   useBillingPollStore: {
     use: {
-      startedAt: () => null,
-      stop: () => vi.fn(),
+      startedAt: () => pollStartedAt.current,
+      stop: () => stopBillingPoll,
     },
   },
   useStableBillingOperation: () => ({
@@ -85,6 +84,7 @@ describe('useAppInlineBanner billing operation', () => {
     beginPortalAttempt.mockReturnValue(OPERATION_ID);
     settlePortalAttempt.mockReturnValue(true);
     billingOverview.current = { billingInfo: { subscriptionStatus: 'past_due' } };
+    pollStartedAt.current = null;
   });
 
   afterEach(() => {
@@ -138,5 +138,18 @@ describe('useAppInlineBanner billing operation', () => {
     const { result } = renderHook(() => useAppInlineBanner());
 
     expect(result.current).toEqual({ visible: false, message: '' });
+  });
+
+  it('Checkout復帰後もfreeのまま期限を迎えたら利用者案内とSentry通知を起動する', () => {
+    billingOverview.current = { billingInfo: { subscriptionStatus: 'free' } };
+    pollStartedAt.current = Date.now() - 30_000;
+
+    renderHook(() => useAppInlineBanner());
+
+    expect(reportBillingReturnPollTimeout).toHaveBeenCalledOnce();
+    expect(reportBillingReturnPollTimeout).toHaveBeenCalledWith(
+      'settings.subscription.checkoutDelayed',
+    );
+    expect(stopBillingPoll).toHaveBeenCalledOnce();
   });
 });

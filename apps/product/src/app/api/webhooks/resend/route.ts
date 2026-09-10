@@ -20,6 +20,7 @@ import {
 } from '@/lib/rate-limit/upstash';
 import { captureUnexpectedDatabaseError, captureUnexpectedError } from '@/lib/sentry';
 import { createServiceRoleClient } from '@/lib/supabase/oauth';
+import { captureWebhookSignatureFailure } from '@/lib/webhooks/signature-failure-monitor';
 
 export const maxDuration = 30;
 export const runtime = 'nodejs';
@@ -181,6 +182,11 @@ export async function POST(request: NextRequest) {
       });
     } catch {
       logger.warn('Resend webhook signature verification failed');
+      captureWebhookSignatureFailure({
+        feature: 'email',
+        route: '/api/webhooks/resend',
+        source: 'resend_webhook',
+      });
       return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
     }
 

@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { BILLING_POLL_MAX_DURATION_MS, shouldContinueBillingPoll } from './billing-poll';
+import {
+  BILLING_POLL_MAX_DURATION_MS,
+  hasBillingPollTimedOut,
+  shouldContinueBillingPoll,
+} from './billing-poll';
 
 describe('shouldContinueBillingPoll', () => {
   it('startedAt が null なら（未開始）ポーリングしない', () => {
@@ -58,6 +62,26 @@ describe('shouldContinueBillingPoll', () => {
         now: BILLING_POLL_MAX_DURATION_MS + 1,
       }),
     ).toBe(false);
+  });
+
+  it('最大経過時間後でも契約が反映済みならtimeoutとして扱わない', () => {
+    expect(
+      hasBillingPollTimedOut({
+        startedAt: 0,
+        subscriptionStatus: 'active',
+        now: BILLING_POLL_MAX_DURATION_MS,
+      }),
+    ).toBe(false);
+  });
+
+  it('最大経過時間後もfreeならtimeoutとして扱う', () => {
+    expect(
+      hasBillingPollTimedOut({
+        startedAt: 0,
+        subscriptionStatus: 'free',
+        now: BILLING_POLL_MAX_DURATION_MS,
+      }),
+    ).toBe(true);
   });
 
   it('now を省略すると Date.now() を使う（未開始なら影響しない）', () => {

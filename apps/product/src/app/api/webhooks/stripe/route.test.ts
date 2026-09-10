@@ -3,6 +3,7 @@ import Stripe from 'stripe';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { resetWriteFenceCacheForTestsOnly } from '@/lib/ops/write-fence';
+import { resetWebhookSignatureFailureCaptureForTestsOnly } from '@/lib/webhooks/signature-failure-monitor';
 
 const envMock = vi.hoisted(() => ({
   RESEND_API_KEY: undefined,
@@ -121,6 +122,7 @@ beforeEach(() => {
   trackBillingEvent.mockResolvedValue(true);
   vi.clearAllMocks();
   resetWriteFenceCacheForTestsOnly();
+  resetWebhookSignatureFailureCaptureForTestsOnly();
   envMock.STRIPE_WEBHOOK_SECRET = 'fixture';
   constructEvent.mockImplementation(() => eventMock);
   eventMock.account = null;
@@ -149,6 +151,24 @@ beforeEach(() => {
 });
 
 describe('Stripe webhook route', () => {
+  it('idempotency claim失敗をSentryへ通知して500を返す', async () => {
+    const claimError = new Error('database claim failed');
+    claimStripeWebhookEvent.mockRejectedValueOnce(claimError);
+
+    const response = await POST(request());
+
+    expect(response.status).toBe(500);
+    expect(captureUnexpectedError).toHaveBeenCalledWith(
+      claimError,
+      expect.objectContaining({
+        feature: 'billing',
+        operation: 'claim',
+        source: 'stripe_webhook',
+      }),
+    );
+    expect(syncDeletedSubscriptionStatus).not.toHaveBeenCalled();
+  });
+
   it('subscription checkoutをprocessedにした後で一度だけ記録し、duplicateでは再記録しない', async () => {
     eventMock.type = 'checkout.session.completed';
     eventMock.data.object = {
@@ -426,14 +446,21 @@ describe('Stripe webhook 署名検証', () => {
   });
 
   it('署名検証がthrowしたら401で拒否し、業務処理へ進めない', async () => {
-    constructEvent.mockImplementationOnce(() => {
+    constructEvent.mockImplementation(() => {
       throw new Error('No signatures found matching the expected signature for payload');
     });
 
-    const response = await POST(request());
+    const responses = await Promise.all(Array.from({ length: 5 }, () => POST(request())));
 
-    expect(response.status).toBe(401);
-    await expect(response.json()).resolves.toEqual({ error: 'Invalid signature' });
+    expect(responses.every((response) => response.status === 401)).toBe(true);
+    await expect(responses[0]!.json()).resolves.toEqual({ error: 'Invalid signature' });
+    expect(captureUnexpectedError).toHaveBeenCalledOnce();
+    expect(captureUnexpectedError).toHaveBeenCalledWith(expect.any(Error), {
+      feature: 'billing',
+      operation: 'signature_verification',
+      route: '/api/webhooks/stripe',
+      source: 'stripe_webhook',
+    });
     expect(claimStripeWebhookEvent).not.toHaveBeenCalled();
     expect(syncDeletedSubscriptionStatus).not.toHaveBeenCalled();
   });

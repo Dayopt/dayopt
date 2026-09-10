@@ -28,6 +28,19 @@ interface ShouldContinueBillingPollParams {
   now?: number;
 }
 
+/** Free相当の状態が最大待機時間を超えた時だけ、購入反映のtimeoutと判定する。 */
+export function hasBillingPollTimedOut({
+  startedAt,
+  subscriptionStatus,
+  now = Date.now(),
+}: ShouldContinueBillingPollParams): boolean {
+  return (
+    startedAt !== null &&
+    getPlanIdForSubscriptionStatus(subscriptionStatus) === dayoptPlanIds.free &&
+    now - startedAt >= BILLING_POLL_MAX_DURATION_MS
+  );
+}
+
 /**
  * ポーリングを続けるべきか判定する。
  *
@@ -42,5 +55,5 @@ export function shouldContinueBillingPoll({
 }: ShouldContinueBillingPollParams): boolean {
   if (startedAt === null) return false;
   if (getPlanIdForSubscriptionStatus(subscriptionStatus) !== dayoptPlanIds.free) return false;
-  return now - startedAt < BILLING_POLL_MAX_DURATION_MS;
+  return !hasBillingPollTimedOut({ startedAt, subscriptionStatus, now });
 }

@@ -45,6 +45,7 @@ import {
 import { requireStripe } from '@/lib/stripe/client';
 import { createServiceRoleClient } from '@/lib/supabase/oauth';
 import { getOriginalError } from '@/lib/trpc/errors';
+import { captureWebhookSignatureFailure } from '@/lib/webhooks/signature-failure-monitor';
 import { mapStripeSubscriptionStatus } from '@dayopt/billing';
 
 import {
@@ -232,6 +233,11 @@ export async function POST(request: NextRequest) {
     event = stripe.webhooks.constructEvent(payload, signature, webhookSecret);
   } catch {
     logger.warn('Stripe webhook signature verification failed');
+    captureWebhookSignatureFailure({
+      feature: 'billing',
+      route: '/api/webhooks/stripe',
+      source: 'stripe_webhook',
+    });
     return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
   }
 
@@ -309,8 +315,9 @@ export async function POST(request: NextRequest) {
         { status: 503, headers: { 'Retry-After': '30' } },
       );
     }
-  } catch {
+  } catch (error) {
     logger.error('Stripe webhook idempotency claim failed');
+    captureStripeWebhookFailure(error, 'claim', event);
     return NextResponse.json({ error: 'Webhook processing unavailable' }, { status: 500 });
   }
 
