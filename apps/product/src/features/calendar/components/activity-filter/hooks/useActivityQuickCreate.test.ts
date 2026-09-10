@@ -7,7 +7,7 @@
  */
 
 import { renderHook } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useActivityQuickCreate } from './useActivityQuickCreate';
 
@@ -83,8 +83,23 @@ function wallClockAsUtc(date: Date): Date {
   );
 }
 
+/**
+ * 固定する「今」（ローカル 09:00）。
+ *
+ * この file の test は全て `new Date()` からの相対で fixture を組むため、実時計のまま
+ * だと夜に落ちる: 既存ブロックを now+2h まで置く test は、ローカル 21 時以降だと空き
+ * （+ 60 分）がその日の終わりを越えて `findFreeTimeblockLaneSlot` が null を返す。
+ * 実行時刻に依存しないよう、朝の時刻へ固定する。ローカル時刻で組み立てるので
+ * runner の timezone にも依存しない。
+ */
+const FIXED_NOW = new Date(2026, 8, 10, 9, 0, 0, 0);
+
 describe('useActivityQuickCreate', () => {
   beforeEach(() => {
+    // Date だけを偽装する。setTimeout 等を止めると Testing Library の描画が進まない
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(FIXED_NOW);
+
     hasConflict.value = false;
     laneItems.value = [];
     medianMinutes.value = new Map();
@@ -92,6 +107,10 @@ describe('useActivityQuickCreate', () => {
     createPlanMutate.mockClear();
     createRecordMutate.mockClear();
     openInspector.mockClear();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it('中央値の無いアクティビティは設定の既定の長さで保存する', () => {
