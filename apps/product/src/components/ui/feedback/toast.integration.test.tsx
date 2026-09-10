@@ -1,8 +1,8 @@
 /**
  * 実物の sonner を使って、クリックで消えるかを確かめる。
  *
- * ブラウザでは Browser pane が非表示だと sonner の内部処理が進まず判定できないので、
- * jsdom で本物を描画して確かめる。
+ * sonner の消去は requestAnimationFrame を経由するため、Browser pane が非表示だと
+ * rAF が止まって判定できない。jsdom で本物を描画して確かめる。
  */
 import { render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
@@ -14,18 +14,28 @@ const { Toaster } = await import('./toast');
 const { toast } = await import('@/lib/toast');
 
 describe('Toaster（実物の sonner）', () => {
-  it('本体クリックで消える', async () => {
+  it('×で消える', async () => {
     render(<Toaster />);
     toast.success('保存しました');
 
-    const el = await screen.findByText('保存しました');
-    const toastEl = el.closest('[data-sonner-toast]');
-    expect(toastEl).not.toBeNull();
+    await screen.findByText('保存しました');
+    const close = screen.getByRole('button', { name: 'close' });
 
-    (toastEl as HTMLElement).click();
+    close.click();
 
     await waitFor(() => {
       expect(screen.queryByText('保存しました')).toBeNull();
     });
+  });
+
+  it('本体をクリックしても消えない（×だけが消す）', async () => {
+    render(<Toaster />);
+    toast.success('保存しました');
+
+    const el = await screen.findByText('保存しました');
+    (el.closest('[data-sonner-toast]') as HTMLElement).click();
+
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    expect(screen.queryByText('保存しました')).not.toBeNull();
   });
 });

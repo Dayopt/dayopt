@@ -1,37 +1,34 @@
 /**
- * Esc / クリックによる消去が「元に戻す」を巻き添えにしないこと。
+ * トーストの消去の入口。
  *
- * Inspector も Esc で閉じる（useInspectorKeyboard / useCalendarTimeblockKeyboard）ため、
- * 削除直後の 1 打で取り消し口まで消えると、戻す手段が 5 秒を待たずに失われる。
- * 一方でトースト本体のクリックは狙って押した操作なので、取り消し付きでも消す。
- *
- * ブラウザで確かめようとすると、ページが非表示の間 sonner がタイマーを止めるので
- * 結果が当てにならない。ここは handler の判断だけを直接確かめる。
+ * 「今すぐ消す」は×へ集約する（Material の snackbar / sonner / Linear と同じ形）。
+ * 本文クリックと Esc は持たない。隣にアクションがある面では意図が曖昧で、Esc は
+ * Inspector を閉じる操作と一打が二役になるため。
  */
 import { render } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const onScreen = vi.hoisted(() => ({ value: [] as Array<{ action?: unknown }> }));
 const dismiss = vi.hoisted(() => vi.fn());
 const isMobile = vi.hoisted(() => ({ value: false }));
+const toasterProps = vi.hoisted(() => ({ value: {} as Record<string, unknown> }));
 
 vi.mock('sonner', () => ({
-  Toaster: () => <div data-testid="sonner-root" />,
-  toast: { getToasts: () => onScreen.value, dismiss },
+  Toaster: (props: Record<string, unknown>) => {
+    toasterProps.value = props;
+    return <div data-testid="sonner-root" />;
+  },
+  toast: { dismiss },
 }));
 vi.mock('@/lib/hooks/useMediaQuery', () => ({ useMediaQuery: () => isMobile.value }));
 vi.mock('next-intl', () => ({ useTranslations: () => (key: string) => key }));
 
 const { Toaster } = await import('./toast');
 
-const UNDO_ON_SCREEN = [{ action: { label: '元に戻す' } }];
-const PLAIN_ON_SCREEN = [{ action: undefined }];
-
 function pressEscape() {
   document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
 }
 
-/** トースト本体のクリックを模す（handler は closest で判定する） */
+/** トースト本体のクリックを模す */
 function clickToastBody() {
   const el = document.createElement('div');
   el.setAttribute('data-sonner-toast', '');
@@ -43,20 +40,10 @@ function clickToastBody() {
 describe('Toaster の消去', () => {
   beforeEach(() => {
     dismiss.mockClear();
-    onScreen.value = PLAIN_ON_SCREEN;
     isMobile.value = false;
   });
 
-  it('取り消しの無いトーストは Esc で消える', () => {
-    render(<Toaster />);
-
-    pressEscape();
-
-    expect(dismiss).toHaveBeenCalledTimes(1);
-  });
-
-  it('取り消し付きは Esc で消さない（Inspector を閉じる 1 打で戻し口を失わせない）', () => {
-    onScreen.value = UNDO_ON_SCREEN;
+  it('Esc では消さない（Inspector を閉じる 1 打で取り消し口を失わせない）', () => {
     render(<Toaster />);
 
     pressEscape();
@@ -64,45 +51,24 @@ describe('Toaster の消去', () => {
     expect(dismiss).not.toHaveBeenCalled();
   });
 
-  it('取り消しの無いトーストはクリックで消える', () => {
+  it('本文クリックでも消さない（アクションと意図が競合する）', () => {
     render(<Toaster />);
 
     clickToastBody();
 
-    expect(dismiss).toHaveBeenCalledTimes(1);
+    expect(dismiss).not.toHaveBeenCalled();
   });
 
-  it('取り消し付きでもクリックでは消す（×を置かない以上、唯一の「今すぐ消す」導線）', () => {
-    onScreen.value = UNDO_ON_SCREEN;
+  it('デスクトップは×を出す（唯一の「今すぐ消す」導線）', () => {
     render(<Toaster />);
 
-    clickToastBody();
-
-    expect(dismiss).toHaveBeenCalledTimes(1);
+    expect(toasterProps.value.closeButton).toBe(true);
   });
 
-  it('途中で bubble を止められても消える（Radix の外側クリック判定より先に受ける）', () => {
-    render(<Toaster />);
-    const wrapper = document.createElement('div');
-    wrapper.addEventListener('click', (event) => event.stopPropagation());
-    const el = document.createElement('div');
-    el.setAttribute('data-sonner-toast', '');
-    wrapper.appendChild(el);
-    document.body.appendChild(wrapper);
-
-    el.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    wrapper.remove();
-
-    expect(dismiss).toHaveBeenCalledTimes(1);
-  });
-
-  it('モバイルでは Esc もクリックも購読しない（スワイプで消す）', () => {
+  it('モバイルは×を出さない（swipe が同じ役割を持つ）', () => {
     isMobile.value = true;
     render(<Toaster />);
 
-    pressEscape();
-    clickToastBody();
-
-    expect(dismiss).not.toHaveBeenCalled();
+    expect(toasterProps.value.closeButton).toBe(false);
   });
 });

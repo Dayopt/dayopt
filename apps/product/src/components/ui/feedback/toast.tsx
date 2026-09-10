@@ -3,8 +3,7 @@
 import { MEDIA_QUERIES } from '@/lib/breakpoints';
 import { useMediaQuery } from '@/lib/hooks/useMediaQuery';
 import { useTranslations } from 'next-intl';
-import { useEffect } from 'react';
-import { Toaster as Sonner, toast as sonnerToast } from 'sonner';
+import { Toaster as Sonner } from 'sonner';
 
 type ToasterProps = React.ComponentProps<typeof Sonner>;
 
@@ -18,9 +17,15 @@ type ToasterProps = React.ComponentProps<typeof Sonner>;
  * - 高さ: 48px 固定、幅: 100vw-32px(mobile) / 360px(desktop)
  * - アクション: 本文と同じ文字色 + hover の地色（brand color は使わない。
  *   「元に戻す」はこの面の主役ではなく、押さない選択も同じだけ正しい）
- * - ×ボタンなし
- * - 消去: 自動(3s/5s) + swipe(mobile) + Esc/クリック(desktop)
+ * - 右上の角に×。絶対配置なので本文の幅を取らない。普段は透明で、ポインタが
+ *   トーストに乗った時とキーボードでフォーカスした時だけ現れる
+ * - 消去: 自動(3s/5s、ホバー中は止まる) + ×(desktop) + swipe(mobile)
  * - 同時表示: 最大1つ、cross-fade 差し替え
+ *
+ * 本文クリックと Esc では消さない。どちらも標準的な作りではなく（Material の
+ * snackbar / sonner / Linear のどれも持たない）、隣にアクションがある面では意図が
+ * 曖昧になる。Esc は Inspector を閉じる操作と一打が二役になり、削除直後の 1 打で
+ * 取り消し口まで消していた。「今すぐ消す」は×へ集約する。
  *
  * @example
  * ```tsx
@@ -32,53 +37,9 @@ type ToasterProps = React.ComponentProps<typeof Sonner>;
  * });
  * ```
  */
-/**
- * 「元に戻す」付きが出ている間は Esc での消去を効かせない。Inspector も Esc で閉じるので
- * （useInspectorKeyboard / useCalendarTimeblockKeyboard）、削除直後の 1 打が二役になり、
- * 取り消し口まで消えてしまう。
- *
- * トースト本体のクリックは別扱いで、取り消し付きでも消す。狙って押した操作なので
- * 巻き添えにならず、×ボタンを置かない以上ここが唯一の「今すぐ消す」導線になる
- * （アクションリンク上のクリックは呼び出し側が除外済み）。
- */
-const hasUndoableToast = (): boolean => {
-  try {
-    return sonnerToast.getToasts().some((item) => 'action' in item && item.action != null);
-  } catch {
-    return false;
-  }
-};
-
 const Toaster = ({ ...props }: ToasterProps) => {
   const isMobile = useMediaQuery(MEDIA_QUERIES.mobile);
   const t = useTranslations('common.aria');
-
-  // デスクトップ: トーストクリックで消去（アクションリンクは除外）
-  useEffect(() => {
-    if (isMobile) return;
-    const handler = (e: MouseEvent) => {
-      const toastEl = (e.target as Element).closest('[data-sonner-toast]');
-      if (!toastEl) return;
-      if ((e.target as Element).closest('[data-action]')) return;
-      sonnerToast.dismiss();
-    };
-    // capture で受ける。Radix の dismissable layer（メニュー / ポップオーバーの
-    // 外側クリック判定）が bubble を止めることがあり、その後ろで待つと消せない
-    document.addEventListener('click', handler, true);
-    return () => document.removeEventListener('click', handler, true);
-  }, [isMobile]);
-
-  // デスクトップ: Esc キーで消去
-  useEffect(() => {
-    if (isMobile) return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape') return;
-      if (hasUndoableToast()) return;
-      sonnerToast.dismiss();
-    };
-    document.addEventListener('keydown', handler);
-    return () => document.removeEventListener('keydown', handler);
-  }, [isMobile]);
 
   return (
     <Sonner
@@ -94,11 +55,14 @@ const Toaster = ({ ...props }: ToasterProps) => {
       offset={isMobile ? { top: 16 } : { bottom: 16 }}
       mobileOffset={{ top: 16, left: 16, right: 16 }}
       swipeDirections={isMobile ? ['left', 'right'] : []}
+      closeButton={!isMobile}
       toastOptions={{
         unstyled: true,
+        closeButtonAriaLabel: t('close'),
         classNames: {
+          // group / relative: × を角へ浮かせ、トーストのホバーでだけ出すため
           toast:
-            'flex items-center gap-2 !h-12 w-full px-4 rounded-lg border border-border shadow-card bg-card text-foreground',
+            'group relative flex items-center gap-2 !h-12 w-full px-4 rounded-lg border border-border shadow-card bg-card text-foreground',
           icon: 'shrink-0 [&_svg]:size-4',
           content: 'min-w-0 flex-1 [[data-sonner-toast]:not(:has([data-icon]))_&]:col-start-1',
           title: 'text-base md:text-sm truncate',
@@ -106,6 +70,11 @@ const Toaster = ({ ...props }: ToasterProps) => {
           // brand color を当てない。地の文字色 + hover の地色で「押せる」ことだけ示す
           actionButton:
             'shrink-0 -mr-1 cursor-pointer rounded-lg border-0 bg-transparent px-2 py-1 text-sm text-foreground transition-colors hover:bg-state-hover md:text-xs',
+          // 右上の角へ浮かせる。unstyled では sonner 側の位置 CSS が当たらないので、
+          // 絶対配置は自前で書く。本文の行に入らないため幅を取らず、モバイルで文言が
+          // 切れることもない。普段は透明で、ポインタが乗った時とフォーカス時だけ出す
+          closeButton:
+            '!absolute !top-0 !right-0 !left-auto flex !size-5 -translate-y-1/2 translate-x-1/2 items-center justify-center rounded-full border border-border bg-card text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100',
           loader: '!static !inset-auto !transform-none',
         },
       }}
