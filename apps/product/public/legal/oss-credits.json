@@ -2015,7 +2015,7 @@
   },
   {
     "name": "hono",
-    "version": "4.13.0",
+    "version": "4.13.7",
     "license": "MIT",
     "repository": "https://github.com/honojs/hono.git",
     "publisher": "Yusuke Wada <yusuke@kamawada.com> (https://github.com/yusukebe)"

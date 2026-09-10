@@ -2,6 +2,8 @@
 
 import { createHash } from 'node:crypto';
 
+import { SWEEP_SCHEMAS } from './sweep-contract.mjs';
+
 const SCHEMAS = {
   'behavior-verifier': {
     type: 'object',
@@ -223,7 +225,7 @@ function neutralizeDelimiters(text) {
  */
 function delimiterFor(...parts) {
   const digest = createHash('sha256')
-    .update(parts.map((part) => String(part ?? '')).join(' '))
+    .update(parts.map((part) => String(part ?? '')).join('\u0000'))
     .digest('hex');
   return `${BASE_DELIMITER}-${digest.slice(0, 12)}`;
 }
@@ -285,6 +287,48 @@ function buildReviewPrompt(role, diffPath, extraContext, ctxMarkdown) {
   if (extraContext) parts.push(buildContextPackSection(extraContext, delimiter));
   parts.push(diffInstruction);
   return parts.join('\n\n');
+}
+
+/**
+ * pack 種別ごとの契約。**artifact 集合を role 一覧から算出しない。**
+ *
+ * 以前は `Object.keys(SCHEMAS)` から artifact 名を導出しており、role を 1 つ足すと
+ * 既に生成済みの pack が manifest の件数照合で一斉に invalid になった。種別と
+ * version を key にした literal の registry にして、過去の pack を凍結する。
+ *
+ * `kind` を持たない manifest は pr / contractVersion 1 として読む（既存 pack の
+ * 後方互換）。未知の kind / version は fail closed で invalid にする。
+ */
+const PACK_CONTRACTS = {
+  pr: {
+    1: {
+      roles: ['behavior-verifier', 'architecture-guard', 'risk-reviewer'],
+      materials: ['diff.patch', 'context.md', 'verification.md', 'sources.json'],
+      schemas: SCHEMAS,
+    },
+  },
+  sweep: {
+    1: {
+      roles: ['security-researcher', 'security-critic', 'security-reproducer'],
+      materials: ['context.md', 'threat-model.md', 'sources.json'],
+      schemas: SWEEP_SCHEMAS,
+    },
+  },
+};
+
+/** その契約が持つべき artifact 名の集合。生成時と検証時で同じ関数を使う。 */
+export function packArtifacts(kind, contractVersion) {
+  const contract = PACK_CONTRACTS[kind]?.[contractVersion];
+  if (!contract) return null;
+  return new Set([
+    ...contract.materials,
+    ...contract.roles.flatMap((role) => [`${role}.prompt.md`, `${role}.schema.json`]),
+  ]);
+}
+
+/** その契約の role 一覧と schema。未知の kind / version では null。 */
+export function packContract(kind, contractVersion) {
+  return PACK_CONTRACTS[kind]?.[contractVersion] ?? null;
 }
 
 export { buildContextPackSection, buildReviewPrompt, SCHEMAS };

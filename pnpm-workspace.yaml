@@ -26,19 +26,20 @@ overrides:
   '@types/react-dom': '19.2.3'
   # security: Dependabot alerts解消 (#1569)
   # 同一 major に閉じる `^` で上限を付け、意図せぬメジャー更新を防ぐ
-  hono: '^4.12.25'
+  hono: '^4.13.5'
   dompurify: '^3.4.13'
   esbuild: '^0.28.1'
-  'js-yaml@4.1.1': '^4.2.0'
+  # js-yaml v4: selector を脆弱域全体にする。requester ごとに宣言 range が違い
+  # （cosmiconfig `^4.1.0` / @eslint/eslintrc `^4.3.0`）、単一 version の
+  # selector では片方しか置換されない (GHSA-2883-xcg3-v3hh)
+  'js-yaml@>=4.0.0 <4.3.2': '^4.3.2'
   'postcss@8.4.31': '^8.5.16'
   '@babel/core@7.29.0': '^7.29.7'
   # upstream が修正版を取り込むまで、脆弱な間接依存だけを置換する (#1569)
   'sharp@<0.35.0': '^0.35.3'
   'valibot@1.2.0': '^1.4.2'
-  'js-yaml@3.14.2': '3.15.1'
+  'js-yaml@3.14.2': '3.15.2'
   'uuid@8.3.2': '11.1.1'
-  # estimo が 5.1.5 を exact pin しているため、脆弱な v5 だけを置換する
-  'nanoid@5.1.5': '^5.1.16'
   # postcss 経由の間接依存。ビルド時ツールチェーン経由（devDependency の
   # Storybook/Tailwind に加え、@sentry/nextjs のビルドプラグイン peer chain を含む。
   # 実行時 bundle 非搭載）。size=0 での無限ループ DoS (GHSA-2v37-7h3g-55p8) を解消する (#2108)
@@ -56,6 +57,9 @@ overrides:
   # qs: express 経由の DoS と array-limit bypass
   #   (GHSA-4mjr-xmp4-gh2g / GHSA-x5fp-wj9c-mxmx)
   'qs@6.15.3': '^6.15.4'
+  # smol-toml: knip 経由（宣言は `^1.5.2` だが lockfile が 1.7.0 に固定されて
+  #   いた）。TOML parse の DoS (GHSA-7w5x-hrqm-74c2)。devDependency のみ
+  'smol-toml@1.7.0': '^1.7.1'
   # extract-zip (GHSA-jmr9-qjv8-65gv) は **ここに入れられない**。advisory は
   # `>=2.0.2` を修正版と書くが 2.0.2 は未リリースで、最新が 2.0.1（override を
   # 書くと ERR_PNPM_NO_MATCHING_VERSION で install が落ちる）。経路は
@@ -121,9 +125,9 @@ catalogs:
     '@testing-library/user-event': '^14.6.1'
     '@types/qrcode': '^1.5.6'
     '@vitejs/plugin-react': '^5.2.0'
-    '@vitest/browser-playwright': '^4.1.10'
-    '@vitest/coverage-istanbul': '^4.1.10'
-    '@vitest/ui': '^4.1.10'
+    '@vitest/browser-playwright': '^4.1.11'
+    '@vitest/coverage-istanbul': '^4.1.11'
+    '@vitest/ui': '^4.1.11'
     '@vueless/storybook-dark-mode': '^10.0.8'
     babel-plugin-react-compiler: '^1.0.0'
     eslint: '^9.39.5'
@@ -147,4 +151,4 @@ catalogs:
     tsx: '^4.23.1'
     tw-animate-css: '^1.3.6'
     typescript: '^5'
-    vitest: '^4.1.10'
+    vitest: '^4.1.11'

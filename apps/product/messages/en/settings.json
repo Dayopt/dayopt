@@ -641,6 +641,7 @@
       "pastDueDescription": "Your last payment failed. Please update your payment method to avoid losing access.",
       "updatePayment": "Update payment",
       "checkoutSuccess": "Your subscription is active. Welcome to Dayopt.",
+      "checkoutDelayed": "We couldn't confirm your subscription yet. Refresh Billing in a moment. If it still hasn't changed, contact support.",
       "checkoutCanceled": "Checkout was canceled. You can upgrade anytime.",
       "stripeNotConfigured": "Stripe is not configured yet",
       "loadError": "Failed to load billing information",

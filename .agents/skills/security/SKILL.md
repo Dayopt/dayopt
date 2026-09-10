@@ -165,10 +165,16 @@ pnpm security:check
    レビュー。別 provider の反証は User が必要時に使う任意経路。AGENTS.md §レビュー規則、
    #2596）。危険クラスの diff では merge 前に `pr-cross-review` skill を明示的に実行する
 
+5. **実装前に `docs/engineering/threat-model.md` の既往クラスと却下記録を読む** - Dayopt で
+   実際に起きた欠陥のクラスと、反証つきで却下済みの候補が並んでいる。同じ穴を掘り直さない
+   ためのチェックであり、汎用の OWASP 観点では拾えない。ファイルが対象境界を含んでいない
+   場合は、そこが未検査であることを前提に進める
+
 ## 関連する検査経路
 
 - **`pr-cross-review` skill** — auth / RLS / service role / OAuth / webhook / billing / redirect / migration を扱う PR の merge 前クロスレビュー
-- **`/claude-security`** — 既存コードの深掘りスキャン。月次 sweep（`/gardening` §5.7）と、auth 周りの大きな変更前にユーザーが手動起動する
+- **`security-sweep` skill** — PR 差分ではなく 1 SHA の scope を読む provider 非依存の調査。候補・反証・実行証拠を候補集合として残し、その結果が `docs/engineering/threat-model.md` へ戻る
+- **`/claude-security`** — 既存コードの深掘りスキャン。`security-sweep` の researcher 段の任意の加速器で、必須ではない
 
 > このスキルは「実装時のガイド」、上記は「既存コードの検査」。新規コード実装時はこのスキルを、既存コードのスキャンは `/claude-security` を使う。
 

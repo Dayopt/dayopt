@@ -171,6 +171,21 @@ describe('review-contract.mjs の buildReviewPrompt（F1: prompt injection 対�
     },
   );
 
+  // #2588: 区切り子の hash は、複数の untrusted 入力を NUL 文字で連結して計算する。
+  // その NUL はソース上で escape 表記（\u0000）で書く。以前は生の NUL バイトが
+  // ソースに直接埋め込まれており、`rg` がファイル全体を binary 扱いして検索から外れ、
+  // formatter / editor が黙って落としうる状態だった。区切り文字が変わると同じ入力から
+  // 別の区切り子が出て pack を再生成できなくなる（packId は prompt の hash 由来）ため、
+  // 実測値そのものを golden として固定する。値の更新は区切り文字の意図的な変更時のみ。
+  it.each([
+    ['ctx のみ', undefined, 'ctx body', 'untrusted-context-fbb79bdb557b'],
+    ['ctx + extraContext', 'extra', 'ctx body', 'untrusted-context-1bf74aab0d0d'],
+    ['ctx 空', undefined, '', 'untrusted-context-6e340b9cffb3'],
+  ])('#2588: 区切り子の hash が実測値から動かない（%s）', (_label, extra, ctx, expected) => {
+    const result = buildReviewPrompt('risk-reviewer', '/tmp/diff', extra, ctx);
+    expect(result).toContain(`<${expected}>`);
+  });
+
   it('#2560 項目 1: 区切り子は本文 hash 由来で、同じ入力なら同じ（pack を再生成できる）', () => {
     const a = buildReviewPrompt('risk-reviewer', '/tmp/diff', undefined, '本文');
     const b = buildReviewPrompt('risk-reviewer', '/tmp/diff', undefined, '本文');
