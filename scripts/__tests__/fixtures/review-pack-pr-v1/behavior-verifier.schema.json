@@ -1,0 +1,104 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "role",
+    "scopeChecked",
+    "facts",
+    "expectedTransitions",
+    "findings",
+    "counterevidence",
+    "unknowns",
+    "coverage",
+    "recommendation",
+    "recommendationReason"
+  ],
+  "properties": {
+    "role": {
+      "type": "string",
+      "enum": [
+        "behavior-verifier"
+      ]
+    },
+    "scopeChecked": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1
+    },
+    "facts": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "expectedTransitions": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "severity",
+          "target",
+          "scenario",
+          "recommendationToMain"
+        ],
+        "properties": {
+          "severity": {
+            "type": "string",
+            "enum": [
+              "blocker",
+              "warning"
+            ]
+          },
+          "target": {
+            "type": "string"
+          },
+          "scenario": {
+            "type": "string"
+          },
+          "recommendationToMain": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "counterevidence": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "unknowns": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "coverage": {
+      "type": "string",
+      "enum": [
+        "complete",
+        "partial"
+      ]
+    },
+    "recommendation": {
+      "type": "string",
+      "enum": [
+        "proceed",
+        "revise",
+        "halt"
+      ]
+    },
+    "recommendationReason": {
+      "type": "string"
+    }
+  }
+}
