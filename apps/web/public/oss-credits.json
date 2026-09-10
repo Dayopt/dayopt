@@ -1885,7 +1885,7 @@
   },
   {
     "name": "js-yaml",
-    "version": "3.15.1",
+    "version": "3.15.2",
     "license": "MIT",
     "repository": "nodeca/js-yaml",
     "publisher": "Vladimir Zapparov <dervus.grim@gmail.com>"
