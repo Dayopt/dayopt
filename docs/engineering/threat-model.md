@@ -88,6 +88,9 @@ sweep が実際に得た既往クラス・却下記録を置く。
 - `app/api/v1/calendar/[token]`（token ベースの無認証 ICS。protected path glob の外）
 - `app/api/csp-report`（無認証の入力口。protected path glob の外）
 - Supabase Auth の設定値そのもの（`production-auth-config-audit.mjs` が別途 drift を見る）
+- `app/[locale]/**/_composition/**`（Provider の設置と client 側の配線）。2026-09-10 の pilot で
+  ここを scope から外した結果、client 側キャッシュの候補が終端を確定できず `undetermined` に
+  なった。この境界を sweep する時は判定モジュールと一緒に入れる
 
 ---
 

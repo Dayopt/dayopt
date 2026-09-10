@@ -46,6 +46,8 @@ context.md に次を書く。ここが後で「何を読ませなかったか」
 - scope に**入れなかった**関連範囲と、その理由
 - 評価目的の run なら、入力から意図的に外したもの（既知の所見、issue、修正履歴）
 
+**判定に要る配線まで scope へ入れる。** 判定モジュールだけを入れて、それを組み立てている場所（Composition Layer、Provider の設置、route への mount）を外すと、critic は候補の終端を確定できず `undetermined` を返す。2026-09-10 の pilot では、永続キャッシュの候補を 2 provider の researcher がどちらも挙げたのに、persister を注入する `_composition/` が scope 外だったため critic が「復元されて表示されるところまでは確定できない」と正しく保留した。**`undetermined` が配線の欠落を理由に出たら、reviewer を回し直すのではなく scope を直して pack を作り直す。**
+
 ### 2. pack を作る
 
 ```bash
