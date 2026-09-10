@@ -22,7 +22,7 @@ vi.mock('@/lib/sentry', () => ({
 
 vi.mock('@/lib/supabase/middleware', () => ({ updateSession: mocks.updateSession }));
 
-import { proxy } from './proxy';
+import { config, proxy } from './proxy';
 
 function mockAuthenticatedSession(aalResult: {
   data: { currentLevel: string | null; nextLevel: string | null } | null;
@@ -633,5 +633,45 @@ describe('proxy path canonicalization', () => {
     const response = await proxy(new NextRequest('https://app.dayopt.app/%ZZ'));
 
     expect(response.status).toBe(404);
+  });
+});
+
+describe('proxy が OG 画像を locale 解決から外す（#2573）', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.stubEnv('NEXT_PUBLIC_MAINTENANCE_MODE', 'false');
+    mockUnauthenticatedSession();
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('config.matcher が /opengraph-image を除外する', () => {
+    // 最後の entry が「除外リスト以外の全 path」。拡張子を持たない `/opengraph-image` は
+    // `.*\..*` に引っかからないので、名指しの除外が無いと proxy が起動して
+    // next-intl が `/en/opengraph-image` へ rewrite し 404 になる。
+    const catchAll = config.matcher.at(-1);
+    expect(catchAll).toBeDefined();
+    const pattern = new RegExp(`^${catchAll}$`);
+
+    expect(pattern.test('/opengraph-image')).toBe(false);
+    expect(pattern.test('/sitemap.xml')).toBe(false);
+    expect(pattern.test('/calendar')).toBe(true);
+    expect(pattern.test('/ja/calendar')).toBe(true);
+  });
+
+  it('OG 画像への request で updateSession を呼ばずに素通しする', async () => {
+    const response = await proxy(new NextRequest('https://app.dayopt.app/opengraph-image'));
+
+    expect(response.status).toBe(200);
+    expect(mocks.updateSession).not.toHaveBeenCalled();
+  });
+
+  it('percent-encode した OG 画像 path も同じ扱いにする', async () => {
+    const response = await proxy(new NextRequest('https://app.dayopt.app/%6fpengraph-image'));
+
+    expect(response.status).toBe(200);
+    expect(mocks.updateSession).not.toHaveBeenCalled();
   });
 });
