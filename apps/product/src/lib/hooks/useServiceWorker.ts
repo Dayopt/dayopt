@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 
 import { logger } from '@/lib/logger';
+import { clearDayoptCaches } from '@/lib/pwa/chunk-load-recovery';
 
 interface ServiceWorkerState {
   /** Service Workerがサポートされているか */
@@ -159,13 +160,8 @@ export function useServiceWorker(): UseServiceWorkerResult {
 
     registration.active.postMessage({ type: 'CLEAR_CACHE' });
 
-    // 追加でブラウザキャッシュもクリア
-    if ('caches' in window) {
-      const cacheNames = await caches.keys();
-      await Promise.all(
-        cacheNames.filter((name) => name.startsWith('dayopt-')).map((name) => caches.delete(name)),
-      );
-    }
+    // 追加でブラウザキャッシュもクリア（ChunkLoadError 復帰と共通のロジック）
+    await clearDayoptCaches();
   }, [registration]);
 
   return {

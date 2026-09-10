@@ -9,6 +9,7 @@ import { Component, ErrorInfo, ReactNode } from 'react';
 
 import { Button } from '@dayopt/components';
 
+import { attemptChunkLoadRecovery } from '@/lib/pwa/chunk-load-recovery';
 import { handleReactError } from '@/lib/sentry';
 import { useTranslations } from 'next-intl';
 
@@ -106,6 +107,11 @@ class ErrorBoundary extends Component<Props, State> {
   }
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    // リロードで解消する一過性なので 1 回目は capture しない。2 回目は通常どおり capture される。
+    if (attemptChunkLoadRecovery(error)) {
+      return;
+    }
+
     // Sentryにエラーを送信（自動分類・優先度付き）
     handleReactError(error, errorInfo, {
       route: typeof window !== 'undefined' ? window.location.pathname : 'unknown',
