@@ -419,3 +419,73 @@ jobs:
           set -o pipefail
           node scripts/ci/production-storage-rls-audit.mjs | tee storage-rls-audit-output.txt
           grep -q 'Production Storage RLS Audit passed' storage-rls-audit-output.txt
+
+  # ─── Supabase 側 audit の失敗を issue にする ─────────────────────────────
+  # auth-config / storage-rls は commit status も issue も出さず、失敗は workflow の
+  # 赤色と schedule 起動の既定メールだけだった（2026-09-08 Production Reality Audit）。
+  # Supabase Auth の Dashboard drift や production の storage.objects RLS drift は
+  # Actions タブを開く人がいなければ気づかない。deploy-health / promote.yml
+  # notify_failure と同じ title-prefix 方式で 1 本の issue に集約する。
+  #
+  # **監査 job 自体には触れない。** Supabase PAT を持つ job の permissions は
+  # `contents: read` のままにし、起票は別 job で行う（token を branch code へ渡さない
+  # 設計と、「auth-config 以降の job は commit status を発行しない」契約 test を保つ。
+  # この job は `gh issue` しか呼ばず、checkout も置かない）。
+  notify-supabase-audit-failure:
+    name: File Supabase audit failure
+    needs: [auth-config, storage-rls]
+    if: >-
+      ${{ !cancelled()
+          && ( needs.auth-config.result == 'failure'
+               || needs.storage-rls.result == 'failure' ) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: File or update Supabase audit failure issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          AUTH_RESULT: ${{ needs.auth-config.result }}
+          STORAGE_RESULT: ${{ needs.storage-rls.result }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          title_prefix="[auto] Production Supabase audit が失敗しました"
+          hints=""
+          if [ "$AUTH_RESULT" = "failure" ]; then
+            hints="$hints
+          - **Auth config**: Supabase Dashboard 側の drift の可能性。\`scripts/ci/production-auth-config-audit.mjs\` の \`AUTH_CONFIG_CONTRACT\` と実値を突き合わせる（値は run log に出ない。\`docs/operations/security/environment-secrets.md\` §Supabase Auth config の手順で手元確認）。redirect allowlist / captcha / MFA / signup の緩和は production ユーザーに直結する"
+          fi
+          if [ "$STORAGE_RESULT" = "failure" ]; then
+            hints="$hints
+          - **Storage RLS**: 401 なら \`SUPABASE_STORAGE_RLS_AUDIT_TOKEN\` の 90 日期限（2026-08-25 発行、#2345）または失効。\`docs/operations/secrets.md\` の \`ci/supabase-storage-rls-audit\` を再発行して GitHub Secret を更新する。それ以外は production の \`storage.objects\` policy / \`avatars\` bucket の drift（#2316 と同クラス）。**この job が止まっている間、production の storage RLS を見る目は無い**"
+          fi
+          body="production の Supabase 側 audit が失敗した（起動: \`$EVENT_NAME\`）。
+
+          | job | result |
+          | --- | --- |
+          | Audit Supabase Auth config | \`$AUTH_RESULT\` |
+          | Audit production storage.objects RLS | \`$STORAGE_RESULT\` |
+
+          run: $RUN_URL
+          $hints
+
+          直したら **この issue は手で close する**（自動で閉じる経路は無い）。同じ title prefix の open issue があれば追記するので、失敗が続いても issue は増えない。
+
+          このコメントは \`production-config-audit.yml\` の \`notify-supabase-audit-failure\` job による自動起票/追記。"
+
+          existing=$(TITLE_PREFIX="$title_prefix" gh issue list --repo "$GITHUB_REPOSITORY" \
+            --label "area:operations" --state open --json number,title \
+            --jq '[.[] | select(.title | startswith(env.TITLE_PREFIX))][0].number // empty')
+
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --repo "$GITHUB_REPOSITORY" --body "$body"
+          else
+            gh issue create --repo "$GITHUB_REPOSITORY" \
+              --title "$title_prefix" \
+              --label "area:operations,quality:security,priority:p1" \
+              --body "$body"
+          fi

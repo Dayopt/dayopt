@@ -14,6 +14,7 @@ import { AlertCircle } from 'lucide-react';
 import { useEffect } from 'react';
 
 import { logger } from '@/lib/logger';
+import { attemptChunkLoadRecovery } from '@/lib/pwa/chunk-load-recovery';
 import { captureClientBoundaryError } from '@/lib/sentry';
 import { Button, Card } from '@dayopt/components';
 
@@ -24,6 +25,10 @@ interface ErrorProps {
 
 export default function LocaleError({ error, reset }: ErrorProps) {
   useEffect(() => {
+    // リロードで解消する一過性なので 1 回目は capture しない。2 回目は通常どおり capture される。
+    if (attemptChunkLoadRecovery(error)) {
+      return;
+    }
     logger.error('[Locale Error]', { errorType: error.name, digest: error.digest });
     captureClientBoundaryError(error, {
       feature: 'locale',

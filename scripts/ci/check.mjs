@@ -53,6 +53,8 @@ import { fileURLToPath } from 'node:url';
 
 import {
   checkFiles as detectDestructiveMigrations,
+  evaluateCoupledMigration,
+  formatCoupledSummary,
   formatSummary as formatMigrationSummary,
 } from './check-destructive-migration.mjs';
 import {
@@ -99,6 +101,56 @@ export function fetchPrFilenames({ repo, prNumber, execImpl = execFileSync, env 
     { encoding: 'utf8', maxBuffer: 32 * 1024 * 1024, ...(env ? { env } : {}) },
   );
   return out.split('\n').filter(Boolean);
+}
+
+/**
+ * migration safety の git fallback。`gh api` が使えない時に、base ref との two-dot diff から
+ * `{ filename, status }` を組み立てる。shallow checkout でも動くよう merge-base（`...`）は使わず、
+ * base ref が無ければ `git fetch --depth=1` を 1 回試す（public repo なので credential 不要）。
+ * 判定できなければ null（呼び出し側が fail closed にする）。
+ * @param {{ baseRef?: string, execImpl?: ExecFileImpl, spawnImpl?: SpawnImpl, env?: NodeJS.ProcessEnv }} opts
+ * @returns {{ filename: string, status: string }[] | null}
+ */
+export function fetchPrFilesFromGit({
+  baseRef = `origin/${process.env.GITHUB_BASE_REF || 'main'}`,
+  execImpl = execFileSync,
+  spawnImpl = spawnSync,
+  env,
+} = {}) {
+  const opts = { encoding: 'utf8', cwd: ROOT, ...(env ? { env } : {}) };
+  const hasRef = () =>
+    spawnImpl('git', ['rev-parse', '--verify', '--quiet', `${baseRef}^{commit}`], opts).status ===
+    0;
+  if (!hasRef()) {
+    const remote = baseRef.split('/')[0];
+    const branch = baseRef.slice(remote.length + 1);
+    spawnImpl('git', ['fetch', '--depth=1', remote, `${branch}:refs/remotes/${baseRef}`], opts);
+    if (!hasRef()) return null;
+  }
+  let out;
+  try {
+    out = execImpl('git', ['diff', '--name-status', '-M', baseRef, 'HEAD'], opts);
+  } catch {
+    return null;
+  }
+  const STATUS = {
+    A: 'added',
+    M: 'modified',
+    D: 'removed',
+    R: 'renamed',
+    C: 'added',
+    T: 'modified',
+  };
+  const entries = [];
+  for (const line of out.split('\n')) {
+    const cols = line.split('\t');
+    if (cols.length < 2) continue;
+    const code = cols[0].trim().charAt(0);
+    const filename = cols[cols.length - 1].trim();
+    if (!filename) continue;
+    entries.push({ filename, status: STATUS[code] ?? 'modified' });
+  }
+  return entries;
 }
 
 /**
@@ -412,8 +464,20 @@ async function runUnit() {
   // PR でしか走らないが、この検知は「新規 migration を含む PR」で必ず要る。
   // 両者の条件は現状ほぼ一致する（migrations/** は INTEGRATION_GLOBS に入っている）
   // が、glob を締める変更（#2539 の後続）で乖離しうるため、常時走る側へ置く。
+  // coupled migration（既存オブジェクトの契約を縮める migration + product runtime 変更が
+  // 同一 PR）だけは hard fail にする（#2680。2026-09-08 に #2672 で旧 build が revoke 済み
+  // schema に 5 時間当たり続けた）。ただし throw は他の unit test を全部走らせた**後**に
+  // 行う。検知を先頭へ置いた理由（test 失敗に巻き込まれない）を保つため。
+  let coupledMigration = null;
+  let migrationSafetyUndeterminable = false;
   if (isPr) {
-    await runMigrationSafety({ repo, prNumber, env: { ...process.env, GH_TOKEN: ghToken } });
+    const safety = await runMigrationSafety({
+      repo,
+      prNumber,
+      env: { ...process.env, GH_TOKEN: ghToken },
+    });
+    if (safety.coupled) coupledMigration = safety.coupling;
+    if (safety.undeterminable) migrationSafetyUndeterminable = true;
   }
 
   run('pnpm', ['build:packages']);
@@ -439,6 +503,19 @@ async function runUnit() {
   run('pnpm', ['--filter', '@dayopt/billing', 'test:run']);
   run('pnpm', ['--filter', '@dayopt/i18n', 'test:run']);
   run('pnpm', ['--filter', '@dayopt/observability', 'test:run']);
+
+  if (migrationSafetyUndeterminable) {
+    throw new Error(
+      '::error::migration safety: PR のファイル一覧を gh api でも git diff でも取得できず、coupled migration の判定ができません。再実行するか、token / checkout の配線を確認してください（#2680）。',
+    );
+  }
+  if (coupledMigration) {
+    throw new Error(
+      `::error::coupled migration: 既存オブジェクトの契約を縮める migration と product の runtime 変更が同一 PR にあります。` +
+        `app コードだけの PR を先に出荷し、migration は別 PR にしてください（Step Summary / PR コメントの「Coupled migration」参照、#2680）。` +
+        ` 縮小: ${coupledMigration.narrowing.map((f) => `${f.kind} ${f.target}`).join(', ')}`,
+    );
+  }
 }
 
 // ─── integration モード（Supabase 起動済みの job で走る）──────────────
@@ -461,8 +538,9 @@ async function runIntegration() {
 }
 
 /**
- * migration safety の検知〜通知。「検知しても job は失敗させない」（fail open）
- * 設計を維持する。ラベル付与より先にコメント投稿を行う（旧 integration.yml と
+ * migration safety の検知〜通知。plain な destructive 検知は「検知しても job は失敗させない」
+ * （fail open）設計を維持する。戻り値の `coupled`（既存オブジェクトの契約を縮める migration と
+ * product runtime 変更が同一 PR、#2680）だけは呼び出し側（runUnit）が hard fail にする。ラベル付与より先にコメント投稿を行う（旧 integration.yml と
  * 同じ crash-safety の理由: cancel-in-progress で通知前に打ち切られても、
  * ラベルだけ残って以後永久に通知されない状態を避ける）。
  *
@@ -476,6 +554,8 @@ async function runIntegration() {
  *   execFileImpl?: ExecFileImpl,
  *   spawnImpl?: SpawnImpl,
  *   writeStepSummaryImpl?: typeof writeStepSummary,
+ *   gitFallbackImpl?: typeof fetchPrFilesFromGit,
+ *   sleepImpl?: (ms: number) => Promise<void>,
  *   env?: NodeJS.ProcessEnv,
  * }} opts
  */
@@ -487,6 +567,8 @@ export async function runMigrationSafety({
   execFileImpl = execFileSync,
   spawnImpl = spawnSync,
   writeStepSummaryImpl = writeStepSummary,
+  gitFallbackImpl = fetchPrFilesFromGit,
+  sleepImpl = (ms) => new Promise((resolvePromise) => setTimeout(resolvePromise, ms)),
   env = process.env,
 }) {
   // env は gh 呼び出し 2 箇所（ファイル一覧の取得とラベル確認）の両方へ渡す。
@@ -500,16 +582,42 @@ export async function runMigrationSafety({
   // run 33181021085 がこの形で落ちた）。migration safety は検知しても job を
   // 落とさない契約なので、取得できなかった時も同じ向き（続行）へ倒し、
   // 見落としの可能性だけを Step Summary へ残す。
+  //
+  // ただし coupled 判定（#2680）は hard fail の保証なので、取得失敗で黙って gate が開く
+  // 形にはしない（push 前反証レビュー指摘、P2）: gh api を 1 回だけ再試行し、それでも
+  // 駄目なら base ref との git diff で代替する。どちらも判定できなければ `undeterminable`
+  // を返し、呼び出し側（runUnit）が unit test 完走後に job を落とす（再実行で直る
+  // 一時障害なら再実行、token 配線の壊れなら「静かに失効したガードレール」ではなく
+  // 赤い job として見える）。
   let files;
+  let fallbackNote = '';
   try {
     files = fetchFilesImpl({ repo, prNumber, env });
   } catch (error) {
-    await writeStepSummaryImpl(
-      `## Migration safety\n\n` +
-        `⚠️ PR のファイル一覧を取得できなかったため、破壊的 migration の検知を skip しました。\n\n` +
-        `\`\`\`\n${error instanceof Error ? error.message : String(error)}\n\`\`\`\n`,
-    );
-    return { results: [], notified: false, skipped: true };
+    const firstMessage = error instanceof Error ? error.message : String(error);
+    try {
+      await sleepImpl(1500);
+      files = fetchFilesImpl({ repo, prNumber, env });
+    } catch {
+      const fromGit = gitFallbackImpl({ env });
+      if (fromGit === null) {
+        await writeStepSummaryImpl(
+          `## Migration safety\n\n` +
+            `❌ PR のファイル一覧を gh api（再試行 1 回）でも git diff でも取得できなかったため、` +
+            `破壊的 migration の検知と coupled migration の判定ができません。Unit Tests job は失敗扱いにします（再実行で直る一時障害か、token / checkout の配線を確認する。#2680）。\n\n` +
+            `\`\`\`\n${firstMessage}\n\`\`\`\n`,
+        );
+        return {
+          results: [],
+          notified: false,
+          skipped: true,
+          coupled: false,
+          undeterminable: true,
+        };
+      }
+      files = fromGit;
+      fallbackNote = `\n> ⚠️ PR のファイル一覧は gh api が失敗したため base ref との git diff で代替した（${firstMessage.slice(0, 160)}）。\n`;
+    }
   }
   const withContent = files
     .filter((f) => f.filename.startsWith('supabase/migrations/') && f.filename.endsWith('.sql'))
@@ -524,8 +632,18 @@ export async function runMigrationSafety({
     });
 
   const results = detectDestructiveMigrations(withContent);
-  await writeStepSummaryImpl(formatMigrationSummary(results));
-  if (results.length === 0) return { results, notified: false };
+  // coupled 判定は「PR で追加された migration」×「PR の全変更ファイル」で行う。
+  // narrowing ⊂ destructive なので、results が空なら coupled も必ず false。
+  const coupling = evaluateCoupledMigration({
+    addedMigrations: withContent.filter((f) => f.status === 'added'),
+    prFiles: files.map((f) => f.filename),
+  });
+  const summary =
+    formatMigrationSummary(results) +
+    fallbackNote +
+    (coupling.coupled ? `\n${formatCoupledSummary(coupling)}` : '');
+  await writeStepSummaryImpl(summary);
+  if (results.length === 0) return { results, notified: false, coupled: false, coupling };
 
   let hasLabel = false;
   try {
@@ -544,7 +662,7 @@ export async function runMigrationSafety({
   } catch {
     hasLabel = false; // 取得失敗は「未検知」扱いで通知を試みる（fail open）
   }
-  if (hasLabel) return { results, notified: false }; // round ごとの追い push で毎回コメントしない
+  if (hasLabel) return { results, notified: false, coupled: coupling.coupled, coupling }; // round ごとの追い push で毎回コメントしない
 
   spawnImpl(
     'gh',
@@ -564,7 +682,7 @@ export async function runMigrationSafety({
 
   const commentResult = spawnImpl(
     'gh',
-    ['pr', 'comment', String(prNumber), '--repo', repo, '--body', formatMigrationSummary(results)],
+    ['pr', 'comment', String(prNumber), '--repo', repo, '--body', summary],
     { env },
   );
   if (commentResult.status === 0) {
@@ -580,13 +698,13 @@ export async function runMigrationSafety({
       ],
       { env },
     );
-    return { results, notified: true };
+    return { results, notified: true, coupled: coupling.coupled, coupling };
   }
   // fork PR では pull_request イベントの GITHUB_TOKEN が構造的に read-only になる
   console.log(
     '::warning::migration safety のコメント投稿に失敗しました（fork PR 等で write 権限が無い可能性）。Step Summary の検知結果を確認してください。',
   );
-  return { results, notified: false };
+  return { results, notified: false, coupled: coupling.coupled, coupling };
 }
 
 // ─── CLI ────────────────────────────────────────────────────────────

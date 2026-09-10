@@ -30,6 +30,20 @@ assertProductOperationalProductionBuildEnv(process.env);
 const nextConfig = {
   reactStrictMode: true,
 
+  // Next.js の agent-rules 自動生成を止める（#2693）。
+  //
+  // Next.js 16 は `next dev` が AI coding agent を検出すると、この app ディレクトリへ
+  // `AGENTS.md` / `CLAUDE.md`（`<!-- BEGIN:nextjs-agent-rules -->` ブロック）を書き出す。
+  // Dayopt では 2 つの実害がある:
+  //   1. untracked のまま残り、`pnpm branch:finish` の worktree dirty 判定
+  //      （scripts/tasks/finish-branch.sh の `git status --porcelain`）が毎回止まる
+  //   2. 誰も書いていない指示ファイルが指示として読み込まれる。repo が意図して置いた
+  //      nested な AGENTS.md（apps/product/src/AGENTS.md 等）とは別物で、内容は
+  //      next の version 次第。provider や framework が書いた指示を正本へ逆流させない
+  //      （docs/operations/tooling.md）
+  // env での無効化手段は無く、この top-level flag が唯一の opt-out。
+  agentRules: false,
+
   // Multi-zones設定: LP（web）とアプリ（app）を同一ドメインで運用
   // @see https://nextjs.org/docs/app/building-your-application/deploying/multi-zones
   assetPrefix: process.env.NODE_ENV === 'production' ? '/app-static' : undefined,
@@ -48,6 +62,10 @@ const nextConfig = {
     // client 側で Vercel 環境を判別するため露出。preview は NODE_ENV=production だが
     // VERCEL_ENV=preview なので、Sentry を production のみ有効化する gate に必要。
     NEXT_PUBLIC_VERCEL_ENV: process.env.VERCEL_ENV || '',
+    // sw.js のキャッシュバージョニング（useServiceWorker.ts が `/sw.js?v=<sha>` で登録する）
+    // に使う。turbo.json の build env allowlist には VERCEL_GIT_COMMIT_SHA はあるが
+    // NEXT_PUBLIC_ 版が無いため、ここで client 向けに再露出する。
+    NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA: process.env.VERCEL_GIT_COMMIT_SHA ?? '',
   },
 
   // TypeScript設定

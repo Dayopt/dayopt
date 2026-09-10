@@ -13,11 +13,17 @@ import React from 'react';
 import { Resend } from 'resend';
 import { Webhook } from 'standardwebhooks';
 
+import { captureEdgeFunctionEvent } from '../_shared/sentry.ts';
 import type { EmailData, WebhookPayload } from '../_shared/types.ts';
 
 import { buildConfirmUrl as buildAuthConfirmUrl } from './confirm-url.ts';
 import { ConfirmEmail } from './ConfirmEmail.tsx';
 import { EmailChangeEmail } from './EmailChangeEmail.tsx';
+import {
+  classifySendAuthEmailFailure,
+  resolveSendAuthEmailStatus,
+  type SendAuthEmailFailurePhase,
+} from './failure.ts';
 import { MagicLinkEmail } from './MagicLinkEmail.tsx';
 import { PasswordResetEmail } from './PasswordResetEmail.tsx';
 import { authEmailSubjects } from './subjects.ts';
@@ -80,9 +86,27 @@ Deno.serve(async (req) => {
   const headers = Object.fromEntries(req.headers);
   const wh = new Webhook(hookSecret);
 
+  let verified: WebhookPayload;
   try {
-    const { user, email_data } = wh.verify(payload, headers) as WebhookPayload;
+    verified = wh.verify(payload, headers) as WebhookPayload;
+  } catch (error) {
+    // 署名不一致は認証境界の失敗。攻撃者由来のノイズを Sentry Issues に入れないため
+    // capture しない（#2616 の allowlist 判定とは別の防御、#2682）。
+    const { status, message } = classifySendAuthEmailFailure(error, 'verify');
+    return new Response(JSON.stringify({ error: { http_code: status, message } }), {
+      status,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
 
+  const { user, email_data } = verified;
+
+  // Sentry へ送る context 用。宛先 email・本文・token_hash は含めない。
+  let phase: SendAuthEmailFailurePhase = 'render';
+  let sentCount = 0;
+  let currentSubject = '';
+
+  try {
     const userName = user.user_metadata.full_name || 'there';
     const confirmUrl = buildConfirmUrl(email_data);
     const locale = await getUserLocale(user.id);
@@ -182,8 +206,12 @@ Deno.serve(async (req) => {
     }
 
     for (const { to, subject, element } of emails) {
+      currentSubject = subject;
+
+      phase = 'render';
       const html = await renderAsync(element);
 
+      phase = 'send';
       const { error } = await resend.emails.send({
         from: `Dayopt <${FROM_EMAIL}>`,
         to: [to],
@@ -199,20 +227,43 @@ Deno.serve(async (req) => {
         });
         throw error;
       }
+
+      sentCount += 1;
     }
   } catch (error) {
-    // catch 変数は unknown。auth hook のエラー契約（http_code / message）に
-    // 載せる 2 プロパティだけを取り出す
-    const { code, message } = error as { code?: number; message?: string };
+    const classified = classifySendAuthEmailFailure(error, phase);
+    const { kind, resendErrorName, message } = classified;
+    const firstEmailAlreadySent = sentCount > 0;
+
+    // 部分送信済みなら retryable status を返さない（判定理由は resolveSendAuthEmailStatus）
+    const status = resolveSendAuthEmailStatus(classified, { firstEmailAlreadySent });
+
+    // 401（署名不一致）は基本的には verify 段階の try/catch が処理するためここには来ないが、
+    // 万一 classify が 401 を返しても capture しない（攻撃者由来のノイズを Issues に入れない）
+    if (status !== 401) {
+      await captureEdgeFunctionEvent(Deno.env.get('SENTRY_DSN'), {
+        functionName: 'send-auth-email',
+        message: `send-auth-email failed: ${kind}`,
+        tags: {
+          action: email_data.email_action_type,
+          phase,
+          kind,
+          status: String(status),
+          resend_error: resendErrorName ?? 'none',
+        },
+        extra: { subject: currentSubject, firstEmailAlreadySent },
+      });
+    }
+
     return new Response(
       JSON.stringify({
         error: {
-          http_code: code,
+          http_code: status,
           message,
         },
       }),
       {
-        status: 401,
+        status,
         headers: { 'Content-Type': 'application/json' },
       },
     );

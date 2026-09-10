@@ -12,6 +12,7 @@ import {
   extractBashPrefix,
   fetchMergedPrStats,
   foldUsageRecord,
+  getRepoRoot,
   human,
   isSubagentFilePath,
   normalizeModelLabel,
@@ -845,5 +846,80 @@ describe('subagent と Main session の分類は排他（isSubagentFilePath が�
   it('top-level session jsonl は subagent ではない（= Main session 扱い）', () => {
     const file = '/Users/x/.claude/projects/-Users-x-dayopt/sess.jsonl';
     expect(isSubagentFilePath(file)).toBe(false);
+  });
+});
+
+describe('getRepoRoot（#2674: worktree から実行しても main checkout を集計対象にする）', () => {
+  const MAIN = '/repo';
+  const LANE = '/repo/.claude/worktrees/lane';
+
+  /** 実在しない fixture path をそのまま返す realpath（symlink 解決なし）。 */
+  const identityRealpath = ((p: string) => p) as unknown as typeof import('node:fs').realpathSync;
+
+  function makeGit(responses: Record<string, string>) {
+    return vi.fn((_cmd: string, args: string[]) => {
+      const key = args.join(' ');
+      if (!(key in responses)) throw new Error(`unexpected git call: ${key}`);
+      return responses[key];
+    });
+  }
+
+  it('worktree から呼んでも main checkout の root を返す（旧実装は worktree 自身を返していた）', () => {
+    const execFileImpl = makeGit({
+      'rev-parse --show-toplevel': LANE,
+      'rev-parse --absolute-git-dir': `${MAIN}/.git/worktrees/lane`,
+      'rev-parse --git-common-dir': `${MAIN}/.git`,
+      'worktree list --porcelain': `worktree ${MAIN}\n\nworktree ${LANE}\n`,
+    });
+
+    const root = getRepoRoot({
+      execFileImpl: execFileImpl as never,
+      cwd: LANE,
+      realpathImpl: identityRealpath,
+    });
+
+    expect(root).toBe(MAIN);
+    expect(root).not.toBe(LANE);
+  });
+
+  it('main checkout から呼んだ時も同じ root を返す（worktree 実行と結果が一致する）', () => {
+    const responses = {
+      'rev-parse --show-toplevel': MAIN,
+      'rev-parse --absolute-git-dir': `${MAIN}/.git`,
+      'rev-parse --git-common-dir': `${MAIN}/.git`,
+      'worktree list --porcelain': `worktree ${MAIN}\n\nworktree ${LANE}\n`,
+    };
+
+    expect(
+      getRepoRoot({
+        execFileImpl: makeGit(responses) as never,
+        cwd: MAIN,
+        realpathImpl: identityRealpath,
+      }),
+    ).toBe(MAIN);
+  });
+
+  it('git が使えない時は cwd へ縮退する（従来どおり例外にしない）', () => {
+    const execFileImpl = vi.fn(() => {
+      throw new Error('git not found');
+    });
+
+    expect(
+      getRepoRoot({
+        execFileImpl: execFileImpl as never,
+        cwd: '/tmp/x',
+        realpathImpl: identityRealpath,
+      }),
+    ).toBe('/tmp/x');
+  });
+
+  it('main root を prefix にすると worktree 配下のセッションも集計に入る（#2674 手順 3）', () => {
+    const agg = createAggregate();
+    const ctx = { file: 'a.jsonl', currentChain: null };
+
+    // BOUNDS.cwdPrefix は '/repo'（= main checkout root）。
+    foldUsageRecord(agg, assistantRecord({ cwd: '/repo/.claude/worktrees/lane' }), BOUNDS, ctx);
+
+    expect(agg.models.size).toBe(1);
   });
 });

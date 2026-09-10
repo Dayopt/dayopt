@@ -198,9 +198,13 @@ export function detectJudgmentRecords(comments, body) {
   // 除外しないと自分自身の「なし」テキストに含まれる「DoD」「分解表」という語に
   // 一致して true へ誤反転する（自己言及によるフラップ）。`brief` 判定自体は
   // CTX_MARKER コメントの存在そのものを見るため、そちらは全件を対象にする。
-  const nonBriefList = list.filter(
-    (c) => typeof c.body !== 'string' || !c.body.startsWith(CTX_MARKER),
-  );
+  //
+  // #2560 項目 6: 除外条件は prefix 一致だけでなく author_association も見る
+  // （brief 判定側の isTrustedMarkerComment と揃える）。prefix だけで除外すると、
+  // 第三者が `<!-- ctx-brief -->` で始まるコメントを投稿するだけで、そのコメントを
+  // 判定対象から外せる。除外したいのは「Main 自身が書いた brief」だけなので、
+  // 信頼できない author の marker 風コメントは通常のコメントとして扱う。
+  const nonBriefList = list.filter((c) => !isTrustedMarkerComment(c));
 
   const dod =
     hasDodMention(bodyText) ||
@@ -524,6 +528,13 @@ export function nextStep({
   }
   if (isDraft === false && (unresolvedThreads ?? 0) > 0) return 'thread を resolve';
 
+  // #2560 項目 3: draft かつ未解決 thread あり は、上の 2 分岐のどちらにも入らず
+  // 末尾の「未取得」へ落ちていた。3 つとも取得できているのに「取得できなかった」と
+  // 騙る状態を作らないよう、この組み合わせを名指しで扱う。
+  if (isDraft === true && (unresolvedThreads ?? 0) > 0) {
+    return `thread を resolve してから ready 化する（未解決 ${unresolvedThreads}、gh pr ready ${number}）`;
+  }
+
   if (ciRollup && ciRollup.pending > 0) {
     return `CI の完走を待つ（pending ${ciRollup.pending}）`;
   }
@@ -538,6 +549,9 @@ export function nextStep({
   ) {
     return `pnpm branch:finish ${number}`;
   }
+  // #2560 項目 3: ここへ来るのは ciRollup / unresolvedThreads / isDraft の
+  // どれかが実際に null の時だけ（上の分岐で allFetched の組み合わせは尽くしている。
+  // ctx.test.ts の網羅 test がこの不変条件を固定する）。
   return '状態が未取得のため判断保留（gh の再実行）';
 }
 
@@ -555,6 +569,9 @@ function formatFileList(files, max = 40) {
 /** pack（buildContextPack の出力）を markdown へ描画する。空セクションは丸ごと省く。 */
 const RENDER_MAX_LINES = 150;
 
+/** linked issue の受け入れ条件セクションの既定上限（段階縮小でさらに絞られる）。 */
+const LINKED_ISSUE_ACCEPTANCE_DEFAULT_MAX_LINES = 25;
+
 /**
  * 可変セクション（本文・コメント・触るファイル・関連）の表示上限を指定して
  * markdown 行配列を組み立てる。`null` は無制限（省略なし）。
@@ -562,7 +579,20 @@ const RENDER_MAX_LINES = 150;
  * このパラメータでは縮めない ── 呼び出し側（`renderMarkdown`）が
  * 150 行に収まるまで可変セクションだけを段階的に縮める。
  */
-function buildMarkdownLines(pack, { bodyMaxLines, commentsMax, filesMax, relatedMax }) {
+function buildMarkdownLines(
+  pack,
+  {
+    bodyMaxLines,
+    commentsMax,
+    filesMax,
+    relatedMax,
+    // #2560 項目 5: 決定ログと linked issue の受け入れ条件も段階縮小の対象にする。
+    // どちらも以前は縮小対象外で、決定ログに至っては上限すら無かったため、
+    // この 2 つが太ると 150 行予算をどの attempt でも守れなかった。
+    decisionMax = null,
+    acceptanceMaxLines = LINKED_ISSUE_ACCEPTANCE_DEFAULT_MAX_LINES,
+  },
+) {
   const lines = [];
   lines.push(`### #${pack.number} ${pack.header.title ?? '（タイトル未取得）'}`);
 
@@ -691,16 +721,20 @@ function buildMarkdownLines(pack, { bodyMaxLines, commentsMax, filesMax, related
       while (sectionBody.length > 0 && sectionBody[sectionBody.length - 1] === '') {
         sectionBody.pop();
       }
-      const LINKED_ISSUE_ACCEPTANCE_MAX_LINES = 25;
       const heading = ['#### linked issue の受け入れ条件', ''];
-      const budget = Math.max(0, LINKED_ISSUE_ACCEPTANCE_MAX_LINES - heading.length);
-      let cappedBody = sectionBody;
-      if (sectionBody.length > budget) {
-        const keep = Math.max(0, budget - 1); // 省略行 1 行分を予約する
-        cappedBody = sectionBody.slice(0, keep);
-        cappedBody.push(`…（${sectionBody.length - keep} 行省略）`);
+      // 見出しと省略行だけで予算を使い切る段（acceptanceMaxLines <= 3）では、
+      // 「…（N 行省略）」しか残らないセクションを出しても行数を食うだけなので
+      // セクションごと落とす。段階縮小の最終段が実際に 0 行まで縮むようにする。
+      const budget = Math.max(0, acceptanceMaxLines - heading.length);
+      if (budget > 1) {
+        let cappedBody = sectionBody;
+        if (sectionBody.length > budget) {
+          const keep = budget - 1; // 省略行 1 行分を予約する
+          cappedBody = sectionBody.slice(0, keep);
+          cappedBody.push(`…（${sectionBody.length - keep} 行省略）`);
+        }
+        lines.push(...heading, ...cappedBody, '');
       }
-      lines.push(...heading, ...cappedBody, '');
     }
   }
 
@@ -721,10 +755,16 @@ function buildMarkdownLines(pack, { bodyMaxLines, commentsMax, filesMax, related
   }
 
   if (pack.decisionLines.length > 0) {
-    lines.push('#### 決定ログ');
-    lines.push('');
-    for (const line of pack.decisionLines) lines.push(`- ${escapeCell(line.replace(/^- /, ''))}`);
-    lines.push('');
+    const shownDecisions =
+      decisionMax === null ? pack.decisionLines : pack.decisionLines.slice(0, decisionMax);
+    if (shownDecisions.length > 0) {
+      lines.push('#### 決定ログ');
+      lines.push('');
+      for (const line of shownDecisions) lines.push(`- ${escapeCell(line.replace(/^- /, ''))}`);
+      const omittedDecisions = pack.decisionLines.length - shownDecisions.length;
+      if (omittedDecisions > 0) lines.push(`- …他 ${omittedDecisions} 件省略（150 行上限）`);
+      lines.push('');
+    }
   }
 
   // --- 末尾セクション（常に全文表示。ここより上で行数を確保する） ---
@@ -771,11 +811,19 @@ function buildMarkdownLines(pack, { bodyMaxLines, commentsMax, filesMax, related
  *
  * **150 行保証**: 末尾セクション（判断の記録・次の一手・保護対象・関連 skill 候補）は
  * 「次の一手」を落とすと呼び出し側が何もできなくなるため、常に全文を残す。可変
- * セクション（本文 → コメント → 触るファイル → 関連の順）を段階的に切り詰めながら
- * 150 行以内に収まる組み合わせが見つかるまで再描画する（見つからなければ最も強く
- * 切り詰めた版を返す ── 末尾セクションだけでも 150 行を超える異常系は想定しない）。
+ * セクション（本文 → コメント → 触るファイル → 関連 → 決定ログ → linked issue の
+ * 受け入れ条件の順）を段階的に切り詰めながら 150 行以内に収まる組み合わせが
+ * 見つかるまで再描画する。
+ *
+ * #2560 項目 5: 決定ログと linked issue の受け入れ条件は以前どの attempt でも
+ * 縮まなかった（決定ログは上限すら無かった）。この 2 つが太ると 150 行を守れず、
+ * しかも黙って超過版を返していたため、呼び出し側は予算超過に気づけなかった。
+ * 縮小対象へ加えたうえで、最後まで収まらなければ warn で 1 行知らせる。
+ *
+ * @param {object} pack
+ * @param {{ warn?: (message: string) => void }} [options] warn は test 用の注入点
  */
-export function renderMarkdown(pack) {
+export function renderMarkdown(pack, { warn = defaultRenderWarn } = {}) {
   const attempts = [
     { bodyMaxLines: null, commentsMax: null, filesMax: null, relatedMax: null },
     { bodyMaxLines: 40, commentsMax: null, filesMax: null, relatedMax: null },
@@ -788,6 +836,26 @@ export function renderMarkdown(pack) {
     { bodyMaxLines: 0, commentsMax: 0, filesMax: 0, relatedMax: null },
     { bodyMaxLines: 0, commentsMax: 0, filesMax: 0, relatedMax: 5 },
     { bodyMaxLines: 0, commentsMax: 0, filesMax: 0, relatedMax: 0 },
+    // ここから先は #2560 項目 5 で足した段。決定ログ → 受け入れ条件の順に削る
+    // （決定ログは「今の判断」より前の履歴なので先に落とす）。
+    { bodyMaxLines: 0, commentsMax: 0, filesMax: 0, relatedMax: 0, decisionMax: 5 },
+    { bodyMaxLines: 0, commentsMax: 0, filesMax: 0, relatedMax: 0, decisionMax: 0 },
+    {
+      bodyMaxLines: 0,
+      commentsMax: 0,
+      filesMax: 0,
+      relatedMax: 0,
+      decisionMax: 0,
+      acceptanceMaxLines: 10,
+    },
+    {
+      bodyMaxLines: 0,
+      commentsMax: 0,
+      filesMax: 0,
+      relatedMax: 0,
+      decisionMax: 0,
+      acceptanceMaxLines: 0,
+    },
   ];
 
   let rendered = '';
@@ -795,7 +863,18 @@ export function renderMarkdown(pack) {
     rendered = buildMarkdownLines(pack, attempt).join('\n');
     if (rendered.split('\n').length <= RENDER_MAX_LINES) return rendered;
   }
+  // 末尾セクション（判断の記録・次の一手・保護対象・関連 skill 候補）だけで
+  // 予算を超える異常系。落とすと呼び出し側が何もできなくなるため超過版を返すが、
+  // 黙って返さない。
+  warn(
+    `[ctx] 150 行に収まりませんでした（${rendered.split('\n').length} 行）。末尾セクションだけで予算を超えています。`,
+  );
   return rendered;
+}
+
+/** renderMarkdown の既定の警告先。stdout の brief 本文を汚さないよう stderr へ書く。 */
+function defaultRenderWarn(message) {
+  process.stderr.write(`${message}\n`);
 }
 
 // --- gh 呼び出しを含む組み立て（main からのみ呼ばれる） ---------------------

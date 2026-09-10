@@ -42,6 +42,11 @@ const withBundleAnalyzer = bundleAnalyzer({
 const nextConfig = {
   reactStrictMode: true,
 
+  // Next.js の agent-rules 自動生成を止める（#2693）。理由は
+  // apps/product/next.config.mjs の同じ設定に書いてある。web も同じ next を
+  // catalog から引くため、`next dev` を agent セッションで起動すれば同様に生成される。
+  agentRules: false,
+
   env: {
     NEXT_PUBLIC_VERCEL_ENV: process.env.VERCEL_ENV || '',
   },
@@ -219,11 +224,6 @@ const nextConfig = {
     };
   },
 
-  // Turbopack configuration (default bundler in Next.js 16)
-  turbopack: {
-    // Turbopack handles optimization automatically
-  },
-
   // ビルド最適化
   compiler: {
     // 本番環境でconsole.log/info/debugを削除、error/warnは残す
@@ -281,65 +281,6 @@ const nextConfig = {
         pathname: '/**',
       },
     ],
-  },
-
-  // Simplified webpack configuration
-  webpack: (config, { dev, isServer }) => {
-    // Add explicit file extensions for better module resolution
-    config.resolve.extensions = ['.tsx', '.ts', '.jsx', '.js', '.json'];
-
-    // Only apply optimizations in production
-    if (!dev && !isServer) {
-      // Enhanced code splitting optimization
-      config.optimization = {
-        ...config.optimization,
-        splitChunks: {
-          chunks: 'all',
-          maxInitialRequests: 25,
-          maxAsyncRequests: 30,
-          cacheGroups: {
-            // React and core libs
-            vendor: {
-              test: /[\\/]node_modules[\\/](react|react-dom|next)[\\/]/,
-              name: 'vendor',
-              chunks: 'all',
-              priority: 10,
-            },
-            // UI library chunk
-            ui: {
-              test: /[\\/]node_modules[\\/](@radix-ui|lucide-react|class-variance-authority|clsx|tailwind-merge)[\\/]/,
-              name: 'ui',
-              chunks: 'all',
-              priority: 9,
-            },
-            // Form libraries
-            form: {
-              test: /[\\/]node_modules[\\/](@hookform|zod|react-hook-form)[\\/]/,
-              name: 'form',
-              chunks: 'all',
-              priority: 8,
-            },
-            // MDX and content
-            content: {
-              test: /[\\/]node_modules[\\/](next-mdx-remote|gray-matter|remark|rehype|web-vitals)[\\/]/,
-              name: 'content',
-              chunks: 'all',
-              priority: 7,
-            },
-            // Common components chunk
-            common: {
-              name: 'common',
-              minChunks: 2,
-              chunks: 'all',
-              priority: 5,
-              reuseExistingChunk: true,
-            },
-          },
-        },
-      };
-    }
-
-    return config;
   },
 
   poweredByHeader: false,

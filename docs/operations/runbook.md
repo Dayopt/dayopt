@@ -360,6 +360,8 @@ force は層 3・smoke・Production Config Audit をすべて skip する。**�
 
 - [ ] Stripe Dashboard → Webhooks → エンドポイントに失敗マーク
 - [ ] Sentry: `tags.source:stripe_webhook` のエラー
+- [ ] 401 が続く場合は Sentry の `tags.operation:signature_verification` を確認（同一送信元は60秒に1件へ集約）
+- [ ] 日次 `/api/cron/billing-reconciliation` の 503 と、Sentry の `tags.operation:billing_webhook_reconciliation` を確認。Stripe の直近イベントに対する missing / failed / stale processing を件数だけで検出する
 
 ### 初動
 
@@ -387,6 +389,14 @@ force は層 3・smoke・Production Config Audit をすべて skip する。**�
 - [ ] 処理対象イベント: `checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.payment_failed`
 - [ ] 修正 → push → 自動デプロイ
 - [ ] Stripe Dashboard → 失敗イベントの「Resend」
+
+#### ケースC: 日次照合で差分を検出
+
+- [ ] cron response の `missing` / `failed` / `staleProcessing` / `invalidState` / `truncated` を確認する（event ID や顧客情報は response に含まれない）
+- [ ] Stripe Dashboard の直近イベントと `stripe_webhook_events` を照合し、対象イベントを特定する
+- [ ] `truncated: true` の場合は26時間内に400件を超えているため、Stripe Dashboardで対象時間帯を絞る
+- [ ] missing / failed / stale processing は、下記の手順で該当イベントを再送する
+- [ ] 日次照合は検出専用であり、自動修復やDB更新を行わない
 
 ### 失敗イベントの再送
 

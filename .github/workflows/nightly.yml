@@ -189,3 +189,76 @@ jobs:
           RCLONE_CONFIG_DEST_SECRET_ACCESS_KEY: ${{ secrets.RCLONE_CONFIG_DEST_SECRET_ACCESS_KEY }}
           DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
         run: bash scripts/ci/storage-backup.sh
+
+  # ─── nightly の失敗を issue にする ────────────────────────────────────
+  # 3 job とも失敗しても issue も commit status も出ず、schedule 起動の既定メールだけ
+  # だった（2026-09-08 Production Reality Audit。2026-08-31 / 09-01 の失敗 run は誰にも
+  # 届かず、ログは GitHub の保持期限で既に取得不能）。特に storage-backup-export は
+  # DR で唯一「演習済み」の復元経路（#2026）の搬出元なので、静かな停止は復元元が
+  # 古くなることを意味する。promote.yml notify_failure と同じ title-prefix 方式。
+  # skipped（cron 振り分けで走らない job）は失敗ではない。
+  notify-failure:
+    name: File nightly failure
+    needs: [status-label-sweep, replica-check, storage-backup-export]
+    if: >-
+      ${{ !cancelled()
+          && ( needs.status-label-sweep.result == 'failure'
+               || needs.replica-check.result == 'failure'
+               || needs.storage-backup-export.result == 'failure' ) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: File or update nightly failure issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          SWEEP_RESULT: ${{ needs.status-label-sweep.result }}
+          REPLICA_RESULT: ${{ needs.replica-check.result }}
+          BACKUP_RESULT: ${{ needs.storage-backup-export.result }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          title_prefix="[auto] Nightly job が失敗しました"
+          hints=""
+          if [ "$BACKUP_RESULT" = "failure" ]; then
+            hints="$hints
+          - **storage-backup-export**: Supabase Storage → Cloudflare R2 の日次搬出が止まっている。**連続すると DR の復元元（\`docs/operations/disaster-recovery-drill.md\` §Storage）が古くなる。** secrets 未投入なら run log の \`未設定の GitHub Secrets\` を見る。rclone の失敗なら \`scripts/ci/storage-backup.sh\` の \`--max-delete\` 上限（暫定 1000）に当たっていないか確認する"
+          fi
+          if [ "$REPLICA_RESULT" = "failure" ]; then
+            hints="$hints
+          - **replica-check**: Vercel production env と 1Password 台帳（\`scripts/tasks/env/schema.ts\`）の不一致。\`pnpm replica:check\` を手元で再現し、\`docs/operations/secrets.md\` に従って同期する"
+          fi
+          if [ "$SWEEP_RESULT" = "failure" ]; then
+            hints="$hints
+          - **status-label-sweep**: \`scripts/ci/strip-status-labels.mjs bulk\` の失敗。実害は closed issue に \`status:*\` が残るだけ（queue 検索は \`is:open\` 付きが通常）。翌日の cron で再試行される"
+          fi
+          body="nightly の job が失敗した（起動: \`$EVENT_NAME\`）。
+
+          | job | result |
+          | --- | --- |
+          | status:* ラベルの batch sweep | \`$SWEEP_RESULT\` |
+          | Check Vercel replica against 1Password ledger | \`$REPLICA_RESULT\` |
+          | Export Supabase Storage to R2 | \`$BACKUP_RESULT\` |
+
+          run: $RUN_URL
+          $hints
+
+          直したら **この issue は手で close する**（自動で閉じる経路は無い）。同じ title prefix の open issue があれば追記するので、失敗が続いても issue は増えない。
+
+          このコメントは \`nightly.yml\` の \`notify-failure\` job による自動起票/追記。"
+
+          existing=$(TITLE_PREFIX="$title_prefix" gh issue list --repo "$GITHUB_REPOSITORY" \
+            --label "area:operations" --state open --json number,title \
+            --jq '[.[] | select(.title | startswith(env.TITLE_PREFIX))][0].number // empty')
+
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --repo "$GITHUB_REPOSITORY" --body "$body"
+          else
+            gh issue create --repo "$GITHUB_REPOSITORY" \
+              --title "$title_prefix" \
+              --label "area:operations,priority:p2" \
+              --body "$body"
+          fi
