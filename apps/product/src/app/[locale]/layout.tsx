@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { getTranslations } from 'next-intl/server';
 import { headers } from 'next/headers';
 
-import { getAppUrl } from '@/lib/app-url';
+import { getAppUrl, getOgImageUrl } from '@/lib/app-url';
 import type { Locale } from '@dayopt/i18n/routing';
 import { routing } from '@dayopt/i18n/routing';
 
@@ -77,7 +77,7 @@ export async function generateMetadata({
       description: t('description'),
       images: [
         {
-          url: `${getAppUrl()}/opengraph-image`,
+          url: getOgImageUrl(),
           width: 1200,
           height: 630,
           alt: t('name'),
@@ -90,7 +90,7 @@ export async function generateMetadata({
       creator: '@dayopt',
       title: t('name'),
       description: t('description'),
-      images: [`${getAppUrl()}/opengraph-image`],
+      images: [getOgImageUrl()],
     },
     alternates: {
       canonical: `${getAppUrl()}/${validLocale}`,
@@ -122,7 +122,7 @@ function generateJsonLd(locale: string, appName: string, appDescription: string)
     },
     screenshot: {
       '@type': 'ImageObject',
-      url: `${baseUrl}/opengraph-image`,
+      url: getOgImageUrl(),
       width: 1200,
       height: 630,
     },

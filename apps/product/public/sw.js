@@ -4,21 +4,20 @@
  * オフライン対応とキャッシング戦略を提供
  *
  * バージョニング戦略:
- * - SW自体はクエリパラメータでバージョン管理（useServiceWorker.ts）
- * - キャッシュ名にはメジャーバージョンのみ含める
- * - 破壊的変更がない限りキャッシュは引き継ぐ
+ * - SW自体はクエリパラメータでバージョン管理（useServiceWorker.ts が
+ *   `/sw.js?v=<commit sha>` で登録する）
+ * - キャッシュ名にはそのバージョン文字列をそのまま含める。commit SHA は deploy ごとに
+ *   変わるため、deploy のたびにキャッシュ名が自動的にローテーションし、
+ *   `activate` イベントが旧バージョンのキャッシュを削除する（手動インクリメント不要）
+ * - v が付かない登録（ローカル開発等）では 'dev' にフォールバックする
  */
 
 // SW内ログ: 開発時のみ出力（本番ではno-op）
 const __SW_DEBUG__ = typeof location !== 'undefined' && location.hostname === 'localhost';
 const swLog = __SW_DEBUG__ ? console.log.bind(console) : () => {};
 
-// キャッシュバージョン: 破壊的変更時のみインクリメント
-// 4: primary を紺へ変更しアイコン / splash / manifest を作り直した（#1757）。
-//    STATIC_ASSETS に manifest.json とアイコンが含まれるため、上げないと
-//    既存インストールに旧ブランドが残り続ける
-const CACHE_VERSION = '4';
-const CACHE_NAME = `dayopt-v${CACHE_VERSION}`;
+// キャッシュバージョン: 登録 URL のクエリパラメータ（commit SHA）から取得する
+const CACHE_VERSION = new URL(self.location.href).searchParams.get('v') || 'dev';
 const STATIC_CACHE_NAME = `dayopt-static-v${CACHE_VERSION}`;
 const DYNAMIC_CACHE_NAME = `dayopt-dynamic-v${CACHE_VERSION}`;
 

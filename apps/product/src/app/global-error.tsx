@@ -14,6 +14,7 @@
 
 import { useEffect } from 'react';
 
+import { attemptChunkLoadRecovery } from '@/lib/pwa/chunk-load-recovery';
 import { captureClientBoundaryError } from '@/lib/sentry';
 
 import { createGlobalErrorActions } from './_global-error/actions';
@@ -27,6 +28,10 @@ interface GlobalErrorProps {
 
 export default function GlobalError({ error, reset }: GlobalErrorProps) {
   useEffect(() => {
+    // リロードで解消する一過性なので 1 回目は capture しない。2 回目は通常どおり capture される。
+    if (attemptChunkLoadRecovery(error)) {
+      return;
+    }
     captureClientBoundaryError(error, {
       feature: 'root_layout',
       operation: 'render',
