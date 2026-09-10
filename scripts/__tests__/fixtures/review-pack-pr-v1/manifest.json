@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "baseSha": "29e7edb4fe5a14bb49f09cfd2bebf6a4609419db",
+  "headSha": "156ce1b9178f005cc78700cdf2d9929423d12ddb",
+  "diffMode": "direct",
+  "changedPaths": [
+    "logic.ts"
+  ],
+  "sourcePaths": [
+    "AGENTS.md",
+    "docs/README.md",
+    "logic.ts"
+  ],
+  "omissions": [
+    "29e7edb4fe5a14bb49f09cfd2bebf6a4609419db:AGENTS.md: absent, non-blob, unreadable or over 1 MiB",
+    "156ce1b9178f005cc78700cdf2d9929423d12ddb:AGENTS.md: absent, non-blob, unreadable or over 1 MiB",
+    "29e7edb4fe5a14bb49f09cfd2bebf6a4609419db:docs/README.md: absent, non-blob, unreadable or over 1 MiB",
+    "156ce1b9178f005cc78700cdf2d9929423d12ddb:docs/README.md: absent, non-blob, unreadable or over 1 MiB"
+  ],
+  "files": {
+    "diff.patch": "3566af3b917dd83fdef912d4a37c968d0f3dbca63e8f64fe0af3a60b0a8421fd",
+    "context.md": "180ebdb0896160c4cecd258d7bd033a8e3219647561bbc2cdf3872c38c2ee651",
+    "verification.md": "cc97aebfa11e0bcbe9991ad4c903ea0971765d99d772b0a78a311fb2f4fcbcb0",
+    "sources.json": "e14e17baf0fa5127852566e820231cfc02491362e541f2262388b591c3fab04c",
+    "behavior-verifier.prompt.md": "228a8ee9c40981f44a41650bc6184f25fec6d6d616d57903fc752530b8c852ed",
+    "behavior-verifier.schema.json": "bbdf4b435028ed50db76d2f68b4fd260f5da3d0daa4441c516b4299d78cf11f8",
+    "architecture-guard.prompt.md": "55ed1b08069b5d8950d1af4e44fc9bfbe8f335dcb619c5268444c61cfcc01104",
+    "architecture-guard.schema.json": "9b73c51e030e79db765ac62a9346cc8ac2610f08e68e17474b970c3714c4b7c5",
+    "risk-reviewer.prompt.md": "1f4b29285869f22a7864dc4c07aad560b7d33f0428e383775a2d65ceb2444c93",
+    "risk-reviewer.schema.json": "c6b49cfff1fa51293092ce1ae1cda644558349dd1b3f42a77fb49da71a930c75"
+  },
+  "packId": "307a86616e3046f0dab50dba0230abd2b526983d490919bdc924c0400d020e85"
+}

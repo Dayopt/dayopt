@@ -178,6 +178,7 @@ worktree で作業するセッション（レーン）は次を守る:
 | `security`             | 認証/認可・RLS・外部入力を受けるフォーム                                         |
 | `test`                 | 新機能・バグ修正後のテスト                                                       |
 | `pr-cross-review`      | merge前クロスレビュー（旧risk-reviewer/behavior-verifier観点を統合）             |
+| `security-sweep`       | 1 SHA の scope を読む security 調査（候補・反証・実行証拠を機械検査）            |
 | `docs-writing`         | ユーザー向けdocs・リリースノート・技術ドキュメント                               |
 | `docs-audit`           | 公開docsの監査                                                                   |
 | `releasing`            | リリース作業end-to-end（明示依頼時のみ）                                         |

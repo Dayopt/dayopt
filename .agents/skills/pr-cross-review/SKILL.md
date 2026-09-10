@@ -55,6 +55,8 @@ pnpm review:pack \
   --out <new-output-directory>
 ```
 
+`risk-reviewer` を使う diff では `--source docs/engineering/threat-model.md` を足す。信頼境界と既往クラス、反証つきの却下記録が入るので、同じクラスの再発をその場で照合できる（`security-sweep` skill が更新する）。
+
 pack は exact base / head SHA、pack ID、base から head への直接 diff、変更 path の before / after source、関連 source、role ごとの prompt と result-body schema を manifest に固定する。binary、欠落、1 MiB 超の source は omission として記録されるため、0 件や確認済みと解釈しない。出力先は新規 directory、context と verification は非空にする。生成後に HEAD が動いた場合、古い pack の結果を現 HEAD のレビューとして再利用しない。
 
 ### 4. reviewer を実行する

@@ -1,3 +1,7 @@
 .github/workflows/*.yml
 # pnpm が正規フォーマットで管理する生成物。prettier で再整形すると次の pnpm install で全量書き戻しの churn が起きる（2026-08-07 に lint-staged 経由で実際に発生）
 pnpm-lock.yaml
+
+# 契約変更前に凍結した review pack（#2588）。manifest が各 artifact の hash を持つため、
+# 整形するとバイト列が変わり後方互換 test が pack の破損として落ちる。再生成もしない。
+scripts/__tests__/fixtures/review-pack-pr-v1/

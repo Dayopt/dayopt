@@ -101,6 +101,7 @@
     "test:web": "pnpm --filter @dayopt/web test",
     "agent:preflight": "node scripts/tasks/agent-preflight.mjs",
     "review:pack": "node scripts/tasks/review-pack.mjs create",
+    "review:sweep": "node scripts/tasks/review-pack.mjs sweep",
     "review:validate": "node scripts/tasks/review-pack.mjs validate"
   },
   "devDependencies": {

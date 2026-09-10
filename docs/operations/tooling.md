@@ -547,6 +547,32 @@ validator は `not-run`、`stale`、`partial`、`reviewed`、`invalid` を区別
 
 OpenAI / Codex を primary reviewer とする。auth / RLS / billing / migration / 公開契約などで独立した反証の価値がある時は、Claude Code や Antigravity を optional counterreview として追加できる。各 provider の所見は個別に failure scenario と一次情報を照合し、多数決で棄却しない。role の選択と投稿手順は `.agents/skills/pr-cross-review/SKILL.md` を正本とする。
 
+### pack の種別と契約 version
+
+pack は `kind`（`pr` / `sweep`）と `contractVersion` を manifest に持ち、artifact 集合はその組から literal registry で決まる。**role 一覧から artifact 名を導出しない** — 導出していた頃は role を 1 つ足すだけで生成済み pack が一斉に `invalid` になった。`kind` を持たない manifest は `pr` / version 1 として読み、未知の kind / version は fail closed で `invalid` にする。契約変更前に生成した PR pack を `scripts/__tests__/fixtures/review-pack-pr-v1/` に凍結してあり、整形するとバイト列が変わって pack の破損になるため `.prettierignore` の対象にしている。
+
+`sweep` は PR の差分ではなく 1 つの SHA における scope を読む（`security-sweep` skill）。`baseSha` / `headSha` を持たず `targetSha` 1 本と `scopePaths` を持ち、`diff.patch` と `verification.md` は作らない。envelope に `baseSha` / `headSha` が入っていれば PR envelope の流用として `invalid` にする。
+
+```bash
+pnpm review:sweep --at <commit-ish> --scope <repo 相対 path（繰り返し可）> \
+  --context <context-markdown-path> --threat-model <threat-model-path> --out <new-directory>
+```
+
+sweep の後段（`security-critic` / `security-reproducer`）は候補集合と突き合わせる。`--result` は繰り返せ、上限や中断で分割した同一 role の結果を 1 回の検証で合流させる。
+
+```bash
+pnpm review:validate --pack <directory> --result <result.json> [--result <result2.json>] \
+  [--candidates <candidates.json>] [--verdicts <critic.json>] [--emit-candidates <new-path>]
+```
+
+- `candidateId` / `signature` / `candidateSetHash` は**生成側が導出**し、reviewer の申告を採らない
+- 判定が返っていない候補、候補集合に無い id への判定、食い違う判定、別 run の候補集合を**別々の理由で**検出する
+- `undetermined`（critic）と `not-run` / `environment-missing`（reproducer）は裁定が決まっていないものとして `partial` に留める。id が入っていることを「判定済み」と数えない
+- `--emit-candidates` は**内容の違う**候補集合で既存ファイルを置き換えない（同一内容の再検証は冪等に通る）。分割した envelope は `--result` を並べて 1 回で検証する
+- reproducer の母集合は `--verdicts` に渡した critic envelope から**その場で再計算**する。実行待ち集合をファイルに残すと、分割した critic の一部だけで書いた部分集合が古いまま残り、渡していない round の `needs-execution` が母集合にも `missing` にも現れなくなる。裁定が全候補に届いていない critic に対して reproducer を `reviewed` にはしない
+- `rejected` / `undetermined` には `counterevidence` を要求する。`confirmed` には要求しない（落とす判断にだけ反証を求める）
+- `reproduced` / `failed-to-reproduce` は実行した `command` と `testPath` の提示を要求する。到達証拠のない失敗は `not-run` / `environment-missing` へ落とす。`statically-confirmed` は件数を結果に出して、実行できた候補が逃げていないか見えるようにする
+
 ## 6. Migration acceptance と handoff
 
 native worktree root の fresh Codex session による共通指示・skills の発見と、サブディレクトリ起動の別 Codex session への review pack 引き継ぎを確認した。Codex の project trust と実 hook 発火、Antigravity の skill discovery と review adapter は未検証であり、設定ファイルの存在を有効化の証拠にしない。
