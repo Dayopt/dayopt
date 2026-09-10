@@ -11,6 +11,9 @@
  *   `user_settings.default_duration` を渡す
  * - 5 分丸め
  * - `source = 'auto_migrated'` の Record は除外（ユーザーが確定した実績ではない）
+ *
+ * 同じ集計を `statistics.getActivityStats` の `medianMinutes` も使う（作成パネルの
+ * アクティビティ pill の目安表示と、サイドバータップの既定長）。定義を 2 本にしない。
  */
 
 /** 集計対象の Record 行。期間フィルタ適用後のものを渡す。 */
@@ -20,6 +23,9 @@ export interface TemplateDurationRecordRow {
   start_at: string;
   end_at: string;
 }
+
+/** 中央値の窓（日）。`activity-estimation-factor` の「直近 4 週」と揃える。 */
+export const MEDIAN_DURATION_WINDOW_DAYS = 28;
 
 /** 沈黙閾値。これ未満の activity は中央値を返さず既定長になる。 */
 const MIN_TEMPLATE_DURATION_SAMPLE_COUNT = 3;

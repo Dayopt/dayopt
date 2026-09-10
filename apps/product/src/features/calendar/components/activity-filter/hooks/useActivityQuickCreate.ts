@@ -3,9 +3,13 @@
 /**
  * サイドバー / チップ行のアクティビティタップからブロックを即作成する。
  *
- * タップした瞬間に既定の長さで作り、作成したブロックを編集と同じ右パネル
+ * タップした瞬間に作り、作成したブロックを編集と同じ右パネル
  * （モバイルは Drawer）で開く。時間・メモの修正はそのパネルで行うため、作成前に
  * 埋めるフォームは持たない。取り消しは 5 秒のトーストから行う。
+ *
+ * 長さはそのアクティビティの記録の中央値（`useActivityMedianDurations`）を使い、
+ * 中央値が無い（記録 3 件未満）なら設定の既定の長さへフォールバックする。
+ * 「いつもこのくらい」で作れる方が、作った後に毎回引き伸ばすより一手少ない。
  *
  * 保存先は end_at のルールで決まる（過去 → 記録、未来 → 予定）。既定の開始時刻は
  * 今日なら現在時刻、それ以外は 09:00 なので、今日のタップは常に「今から先」＝予定になる。
@@ -27,6 +31,7 @@ import {
   collectTimeblockLaneItems,
   hasTimeblockLaneConflict,
   resolveTimeblockDestination,
+  useActivityMedianDurations,
   useTimeblockInspectorStore,
   useTimeblockWriteMutations,
 } from '@/features/timeblock';
@@ -53,13 +58,14 @@ interface QuickCreateArgs {
   date?: Date | undefined;
 }
 
-/** アクティビティのタップから既定の長さでブロックを作り、詳細パネルを開く */
+/** アクティビティのタップから記録の中央値（無ければ既定）の長さでブロックを作り、詳細パネルを開く */
 export function useActivityQuickCreate() {
   const t = useTranslations();
   const { canUseProduct } = useBillingAccess();
   const openSettings = useShellStore.use.openSettings();
   const timezone = useUserPreferences((s) => s.timezone);
   const defaultDuration = useUserPreferences((s) => s.defaultDuration);
+  const { getMedianMinutes } = useActivityMedianDurations();
   const queryClient = useQueryClient();
   const { createPlan, createRecord, deletePlan, deleteRecord } = useTimeblockWriteMutations();
   const openInspector = useTimeblockInspectorStore((state) => state.openInspector);
@@ -73,7 +79,8 @@ export function useActivityQuickCreate() {
         return;
       }
       const localStart = defaultStartAt(date ?? new Date());
-      const localEnd = new Date(localStart.getTime() + defaultDuration * 60 * 1000);
+      const durationMinutes = getMedianMinutes(activityId) ?? defaultDuration;
+      const localEnd = new Date(localStart.getTime() + durationMinutes * 60 * 1000);
       const startAt = convertFromTimezone(localStart, timezone);
       const endAt = convertFromTimezone(localEnd, timezone);
       const destination = resolveTimeblockDestination(endAt);
@@ -131,6 +138,7 @@ export function useActivityQuickCreate() {
       createPlan,
       createRecord,
       defaultDuration,
+      getMedianMinutes,
       deletePlan,
       deleteRecord,
       openInspector,

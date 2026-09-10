@@ -58,6 +58,10 @@ vi.mock('@/features/timeblock', async () => {
         fulfillment
       </button>
     ),
+    useActivityMedianDurations: () => ({
+      medianByActivityId: new Map([['activity-1', 45]]),
+      getMedianMinutes: () => 45,
+    }),
     InspectorHeaderActions: ({ onCloseInspector }: { onCloseInspector?: () => void }) => (
       <button type="button" onClick={onCloseInspector}>
         close
@@ -66,27 +70,34 @@ vi.mock('@/features/timeblock', async () => {
   };
 });
 
-// アクティビティ一覧は 1 件だけ返す。押すとその場で作成へ進む
+// アクティビティ一覧は 1 件だけ返す。押すとその場で作成へ進む。
+// 受け取った中央値は行の表示へ回すので、ここでは「渡ってきたか」だけを見える形にする
+// （pill の描画そのものは ActivityQuickSelector.test.tsx が実物で確認する）
 vi.mock('@/features/activities', () => ({
   useCreateActivity: () => ({ mutateAsync: vi.fn() }),
   ActivityPickerList: ({
     onSelect,
     onActivityHover,
+    durationByActivityId,
   }: {
     onSelect: (id: string, name: string) => void;
     onActivityHover?: (
       activity: { id: string; name: string; color: string | null; icon: string | null } | null,
     ) => void;
+    durationByActivityId?: ReadonlyMap<string, number> | undefined;
   }) => (
-    <button
-      type="button"
-      onClick={() => onSelect('activity-1', '開発')}
-      onMouseEnter={() =>
-        onActivityHover?.({ id: 'activity-1', name: '開発', color: 'blue', icon: 'briefcase' })
-      }
-    >
-      開発
-    </button>
+    <div>
+      <button
+        type="button"
+        onClick={() => onSelect('activity-1', '開発')}
+        onMouseEnter={() =>
+          onActivityHover?.({ id: 'activity-1', name: '開発', color: 'blue', icon: 'briefcase' })
+        }
+      >
+        開発
+      </button>
+      <span data-testid="median">{durationByActivityId?.get('activity-1') ?? 'none'}</span>
+    </div>
   ),
 }));
 
@@ -214,6 +225,13 @@ describe('InlineCreatePanel', () => {
     const [input] = createPlanMutate.mock.calls[0] as [{ note?: string; fulfillment?: string }];
     expect(input.note).toBe('集中できた');
     expect(input.fulfillment).toBeUndefined();
+  });
+
+  it('記録の中央値をアクティビティ一覧へ渡す（予定・記録どちらのタブでも）', () => {
+    setSelection(pastDay());
+    render(<InlineCreatePanel onClose={vi.fn()} />);
+
+    expect(screen.getByTestId('median')).toHaveTextContent('45');
   });
 
   it('閉じるボタンでは何も作成しない', () => {

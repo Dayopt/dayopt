@@ -18,7 +18,11 @@ export type { RecordEvent } from './types/record-event';
 // =============================================================================
 // Hooks
 // =============================================================================
-export { usePlanTemplateMutations, useTimeblockWriteMutations } from './hooks';
+export {
+  useActivityMedianDurations,
+  usePlanTemplateMutations,
+  useTimeblockWriteMutations,
+} from './hooks';
 
 // =============================================================================
 // Stores

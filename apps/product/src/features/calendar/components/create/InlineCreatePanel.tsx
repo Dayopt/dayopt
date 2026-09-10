@@ -28,6 +28,7 @@ import {
   RecordFulfillmentRow,
   resolveTimeblockKindChoice,
   TimeblockEditor,
+  useActivityMedianDurations,
   type Fulfillment,
   type TimeblockDestination,
   type TimeModelEditorValue,
@@ -51,6 +52,9 @@ export function InlineCreatePanel({ onClose }: InlineCreatePanelProps) {
   const tCalendar = useTranslations('calendar');
   const timezone = useUserPreferences((s) => s.timezone);
   const { tap } = useHapticFeedback();
+  // 選ぶ前に「このアクティビティは普段どのくらいか」が見えるよう、一覧の各行へ添える。
+  // 予定・記録どちらのタブでも同じ記録の中央値を出す（実際にかかった時間が目安）
+  const { medianByActivityId } = useActivityMedianDurations();
 
   const pendingSelection = useInlineCreateStore.use.pendingSelection();
   const setSelectionKind = useInlineCreateStore.use.setSelectionKind();
@@ -174,6 +178,7 @@ export function InlineCreatePanel({ onClose }: InlineCreatePanelProps) {
           onSelect={handleCreate}
           onCreateAndSelect={handleCreateAndSelect}
           onActivityHover={handleActivityHover}
+          durationByActivityId={medianByActivityId}
         />
 
         {/*

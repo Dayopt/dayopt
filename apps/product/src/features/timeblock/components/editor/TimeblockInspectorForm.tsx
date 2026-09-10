@@ -27,6 +27,7 @@ import {
   resolveTimeblockDestination,
   type TimeblockDestination,
 } from '../../domain/timeblock-destination';
+import { useActivityMedianDurations } from '../../hooks/useActivityMedianDurations';
 import {
   useCoalescedTimeblockSave,
   type TimeblockSavePatch,
@@ -149,6 +150,8 @@ export function TimeblockInspectorForm({
   const t = useTranslations();
   const queryClient = useQueryClient();
   const { getActivityById } = useActivitiesMap();
+  // アクティビティを選び直す時にも「普段どのくらいか」を一覧へ添える（作成時と同じ目安）
+  const { medianByActivityId } = useActivityMedianDurations();
   const createActivityMutation = useCreateActivity({ showToast: false });
   const isDuplicateMode = duplicateDraft != null;
   const [hasTimeConflict, setHasTimeConflict] = useState(false);
@@ -631,6 +634,7 @@ export function TimeblockInspectorForm({
             onActivityChange={handleActivityChange}
             onCreateAndSelect={handleCreateAndSelectActivity}
             disabled={isWriteFrozen || !canUseProduct}
+            durationByActivityId={medianByActivityId}
           />
         </div>
         <InspectorHeaderActions

@@ -2,7 +2,8 @@
  * サイドバー / チップ行のタップからの即作成。
  *
  * 「タップした時点で保存され、作ったブロックが詳細パネルで開く」ことと、
- * 保存先が end_at のルールで決まることを確認する。
+ * 保存先が end_at のルールで決まること、長さが記録の中央値（無ければ設定の
+ * 既定の長さ）になることを確認する。
  */
 
 import { renderHook } from '@testing-library/react';
@@ -14,6 +15,8 @@ const hasConflict = vi.hoisted(() => ({ value: false }));
 const createPlanMutate = vi.hoisted(() => vi.fn());
 const createRecordMutate = vi.hoisted(() => vi.fn());
 const openInspector = vi.hoisted(() => vi.fn());
+/** activityId → 記録の中央値（分）。空なら設定の既定の長さへフォールバックする */
+const medianMinutes = vi.hoisted(() => ({ value: new Map<string, number>() }));
 
 vi.mock('@/features/timeblock', async () => {
   const domain = await vi.importActual<
@@ -29,6 +32,11 @@ vi.mock('@/features/timeblock', async () => {
       createRecord: { mutate: createRecordMutate },
       deletePlan: { mutate: vi.fn() },
       deleteRecord: { mutate: vi.fn() },
+    }),
+    useActivityMedianDurations: () => ({
+      medianByActivityId: medianMinutes.value,
+      getMedianMinutes: (activityId: string | null) =>
+        activityId == null ? null : (medianMinutes.value.get(activityId) ?? null),
     }),
     useTimeblockInspectorStore: Object.assign(
       (selector: (s: { openInspector: unknown; closeInspector: unknown }) => unknown) =>
@@ -49,12 +57,13 @@ vi.mock('next-intl', () => ({ useTranslations: () => (key: string) => key }));
 describe('useActivityQuickCreate', () => {
   beforeEach(() => {
     hasConflict.value = false;
+    medianMinutes.value = new Map();
     createPlanMutate.mockClear();
     createRecordMutate.mockClear();
     openInspector.mockClear();
   });
 
-  it('タップした時点で既定の長さのブロックを保存する', () => {
+  it('中央値の無いアクティビティは設定の既定の長さで保存する', () => {
     const { result } = renderHook(() => useActivityQuickCreate());
 
     result.current({ activityId: 'activity-1', activityName: '開発' });
@@ -65,6 +74,30 @@ describe('useActivityQuickCreate', () => {
     ];
     expect(input.title).toBe('開発');
     expect(input.activityId).toBe('activity-1');
+    const durationMinutes =
+      (new Date(input.end_at).getTime() - new Date(input.start_at).getTime()) / 60000;
+    expect(durationMinutes).toBe(60);
+  });
+
+  it('記録の中央値があるアクティビティはその長さで保存する', () => {
+    medianMinutes.value = new Map([['activity-1', 45]]);
+    const { result } = renderHook(() => useActivityQuickCreate());
+
+    result.current({ activityId: 'activity-1', activityName: '開発' });
+
+    const [input] = createPlanMutate.mock.calls[0] as [{ start_at: string; end_at: string }];
+    const durationMinutes =
+      (new Date(input.end_at).getTime() - new Date(input.start_at).getTime()) / 60000;
+    expect(durationMinutes).toBe(45);
+  });
+
+  it('中央値は他のアクティビティへ漏れない（自分の値が無ければ既定の長さ）', () => {
+    medianMinutes.value = new Map([['activity-1', 45]]);
+    const { result } = renderHook(() => useActivityQuickCreate());
+
+    result.current({ activityId: 'activity-2', activityName: '読書' });
+
+    const [input] = createPlanMutate.mock.calls[0] as [{ start_at: string; end_at: string }];
     const durationMinutes =
       (new Date(input.end_at).getTime() - new Date(input.start_at).getTime()) / 60000;
     expect(durationMinutes).toBe(60);

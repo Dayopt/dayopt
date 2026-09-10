@@ -23,6 +23,7 @@ import { Plus, X } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 
 import { MEDIA_QUERIES } from '@/lib/breakpoints';
+import { formatDurationMinutes } from '@/lib/date';
 import { useHasMounted } from '@/lib/hooks/useHasMounted';
 import { useMediaQuery } from '@/lib/hooks/useMediaQuery';
 import { useShellStore } from '@/lib/stores/useShellStore';
@@ -93,6 +94,12 @@ interface ActivityQuickSelectorProps {
   /** ヘッダーに表示する日付・時間帯ラベル（例: "3/30 (日) 14:00 – 15:30"） */
   timeLabel?: string | undefined;
   /**
+   * activityId → 普段の長さ（分）。渡された行にだけ名前の後ろへ目安を添える。
+   * 中央値の集計は timeblock feature が持つが、activities は Layer 0 なので
+   * component ではなく素のデータで受け取り、依存方向を保つ（`hint` と同じ作法）。
+   */
+  durationByActivityId?: ReadonlyMap<string, number> | undefined;
+  /**
    * timeLabel の下に出す補助表示。呼び出し側が組み立てた ReactNode をそのまま描画する。
    * activities feature は Layer 0 なので上位 feature の component を import できない。
    * ノードで受け取ることで依存方向を保ったまま合成できる（例: 作成時フィードフォワード）。
@@ -112,6 +119,8 @@ interface ActivityBadgeCellProps {
   onHoverEnd?: (() => void) | undefined;
   /** 未分類（カテゴリー未所属）なら true。アイコンを出さずテキストのみにする */
   uncategorized?: boolean;
+  /** 名前の後ろに添える普段の長さ（分）。無い（サンプル不足）なら省略して沈黙する */
+  durationMinutes?: number | undefined;
 }
 
 /** 選択用の pill badge。未分類は継承する色が無いのでアイコンを出さない */
@@ -124,6 +133,7 @@ function ActivityBadgeCell({
   onHover,
   onHoverEnd,
   uncategorized = false,
+  durationMinutes,
 }: ActivityBadgeCellProps) {
   // 選択中の見た目はカテゴリー色の Tailwind クラスで出す。移植元は style 属性で
   // CSS 変数を直接当てていたが、`design-system.md` が style 属性を禁じており、
@@ -155,6 +165,14 @@ function ActivityBadgeCell({
           アイコンを出しており、pill 側で繰り返しても情報が増えない（サイドバーの
           ActivityRow と同じ規律、2026-08-18 User 指示） */}
       <span className="truncate">{activity.name}</span>
+      {/* 普段の長さの目安。断定せず、選択の邪魔もしないよう地の文より小さく薄く出す
+          （警告色・アイコン・感嘆符は使わない、ADR-026 のトーン）。サンプルが
+          足りないアクティビティでは何も出さない */}
+      {durationMinutes != null && (
+        <span className="text-muted-foreground shrink-0 text-xs tabular-nums">
+          {formatDurationMinutes(durationMinutes)}
+        </span>
+      )}
     </button>
   );
 }
@@ -233,6 +251,8 @@ interface ActivityPickerListProps {
    * `embedded`: スクロールも余白も持たない。高さと余白は埋め込み先のパネルが与える。
    */
   variant?: 'overlay' | 'embedded' | undefined;
+  /** activityId → 普段の長さ（分）。渡された行にだけ名前の後ろへ目安を添える */
+  durationByActivityId?: ReadonlyMap<string, number> | undefined;
 }
 
 /**
@@ -251,6 +271,7 @@ export function ActivityPickerList({
   onActivityHover,
   closeSelf,
   variant = 'overlay',
+  durationByActivityId,
 }: ActivityPickerListProps) {
   const isEmbedded = variant === 'embedded';
   const t = useTranslations('calendar');
@@ -386,6 +407,7 @@ export function ActivityPickerList({
                       onSelect={() => handleSelect(activity.id, activity.name)}
                       onHover={handleHover}
                       onHoverEnd={handleHoverEnd}
+                      durationMinutes={durationByActivityId?.get(activity.id)}
                     />
                   ))}
                 </div>
@@ -410,6 +432,7 @@ export function ActivityPickerList({
                     onSelect={() => handleSelect(activity.id, activity.name)}
                     onHover={handleHover}
                     onHoverEnd={handleHoverEnd}
+                    durationMinutes={durationByActivityId?.get(activity.id)}
                   />
                 ))}
               </div>
@@ -458,6 +481,7 @@ export function ActivityQuickSelector({
   anchorRef,
   timeLabel,
   hint,
+  durationByActivityId,
 }: ActivityQuickSelectorProps) {
   const t = useTranslations('calendar');
   const isMobile = useMediaQuery(MEDIA_QUERIES.mobile);
@@ -550,6 +574,7 @@ export function ActivityQuickSelector({
             onCreateAndSelect={onCreateAndSelect}
             onActivityHover={onActivityHover}
             closeSelf={closeSelf}
+            durationByActivityId={durationByActivityId}
           />
         </DrawerContent>
       </Drawer>
@@ -596,6 +621,7 @@ export function ActivityQuickSelector({
         onCreateAndSelect={onCreateAndSelect}
         onActivityHover={onActivityHover}
         closeSelf={closeSelf}
+        durationByActivityId={durationByActivityId}
       />
     </div>
   );

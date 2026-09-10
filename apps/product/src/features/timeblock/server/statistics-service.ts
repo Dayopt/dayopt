@@ -44,9 +44,9 @@ export class StatisticsService {
   // General: アクティビティ別統計・時間帯分布
   // ---------------------------------------------------------------------------
 
-  /** アクティビティ別の実績件数・最終使用日（キーは activityId）。 */
-  async getActivityStats(userId: string) {
-    return this.generalService.getActivityStats(userId);
+  /** アクティビティ別の実績件数・最終使用日・記録の長さの中央値（キーは activityId）。 */
+  async getActivityStats(userId: string, now = new Date()) {
+    return this.generalService.getActivityStats(userId, now);
   }
 
   /** `get_daily_hours` 相当。指定年の日別実績時間（ヒートマップ用）。 */

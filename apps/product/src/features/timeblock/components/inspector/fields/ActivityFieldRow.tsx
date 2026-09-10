@@ -56,6 +56,11 @@ interface ActivityFieldRowProps {
   disabled?: boolean | undefined;
   /** 見た目の重さ。既定は `heading`（見出し相当）。 */
   variant?: 'heading' | 'compact' | undefined;
+  /**
+   * activityId → 普段の長さ（分）。選択一覧の各行へ目安として添える。
+   * 集計を引くのは呼び出し側（この component は pure props を保つ）。
+   */
+  durationByActivityId?: ReadonlyMap<string, number> | undefined;
 }
 
 /** アクティビティ選択トリガー（アイコン + 名前、タップで QuickSelector 表示） */
@@ -69,6 +74,7 @@ export function ActivityFieldRow({
   onCreateAndSelect,
   disabled = false,
   variant = 'heading',
+  durationByActivityId,
 }: ActivityFieldRowProps) {
   const t = useTranslations();
   const [selectorOpen, setSelectorOpen] = useState(false);
@@ -140,6 +146,7 @@ export function ActivityFieldRow({
         onCreateAndSelect={handleCreateAndSelect}
         onActivityHover={setHoveredActivity}
         anchorRef={buttonRef}
+        durationByActivityId={durationByActivityId}
       />
     </>
   );

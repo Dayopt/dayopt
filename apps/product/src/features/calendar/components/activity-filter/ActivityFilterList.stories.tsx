@@ -69,7 +69,12 @@ const MOCK_TRPC = {
   'activities.listTree': MOCK_TREE,
   'activities.listActivities': [...LIVE_ACTIVITIES, ARCHIVED_ACTIVITY],
   'activities.listCategories': [WORK, STUDY, ARCHIVED_CATEGORY],
-  'statistics.getActivityStats': { counts: {}, planCounts: {}, lastUsed: {} },
+  'statistics.getActivityStats': {
+    counts: {},
+    planCounts: {},
+    lastUsed: {},
+    medianMinutes: {},
+  },
 };
 
 const meta = {
@@ -277,6 +282,7 @@ export const SortedByLastUsed: Story = {
       'statistics.getActivityStats': {
         counts: {},
         planCounts: {},
+        medianMinutes: {},
         lastUsed: {
           // 「仕事」内: 実装 > 会議 の順になる（名前順なら 会議 が先）
           'act-dev': '2026-09-03T09:00:00.000Z',
