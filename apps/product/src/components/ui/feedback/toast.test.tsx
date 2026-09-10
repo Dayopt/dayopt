@@ -14,8 +14,13 @@ const onScreen = vi.hoisted(() => ({ value: [] as Array<{ action?: unknown }> })
 const dismiss = vi.hoisted(() => vi.fn());
 const isMobile = vi.hoisted(() => ({ value: false }));
 
+const toasterProps = vi.hoisted(() => ({ value: {} as Record<string, unknown> }));
+
 vi.mock('sonner', () => ({
-  Toaster: () => <div data-testid="sonner-root" />,
+  Toaster: (props: Record<string, unknown>) => {
+    toasterProps.value = props;
+    return <div data-testid="sonner-root" />;
+  },
   toast: { getToasts: () => onScreen.value, dismiss },
 }));
 vi.mock('@/lib/hooks/useMediaQuery', () => ({ useMediaQuery: () => isMobile.value }));
@@ -88,5 +93,25 @@ describe('Toaster の消去', () => {
     clickToastBody();
 
     expect(dismiss).not.toHaveBeenCalled();
+  });
+});
+
+describe('Toaster の閉じるボタン', () => {
+  beforeEach(() => {
+    onScreen.value = PLAIN_ON_SCREEN;
+  });
+
+  it('デスクトップでは出す（Esc / クリックを取り消しに効かせない分の受け皿）', () => {
+    isMobile.value = false;
+    render(<Toaster />);
+
+    expect(toasterProps.value.closeButton).toBe(true);
+  });
+
+  it('モバイルでは出さない（swipe があり、44px は本文を削る）', () => {
+    isMobile.value = true;
+    render(<Toaster />);
+
+    expect(toasterProps.value.closeButton).toBe(false);
   });
 });

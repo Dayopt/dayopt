@@ -12,12 +12,16 @@ type ToasterProps = React.ComponentProps<typeof Sonner>;
  * Toast通知コンポーネント（v2: ミニマル1行デザイン）
  *
  * デザイン仕様:
- * - 1行構成、description なし、×ボタンなし
+ * - 1行構成、description なし
  * - 背景: card、枠線: border（タイプ別カラー分けなし）
  * - 角丸: 8px、影: shadow-card
  * - 高さ: 48px 固定、幅: 100vw-32px(mobile) / 360px(desktop)
- * - アクション: テキストリンク（brand color）
- * - 消去: 自動(3s/5s) + swipe(mobile) + Esc/クリック(desktop)
+ * - アクション: 本文と同じ文字色 + hover の地色（brand color は使わない。
+ *   「元に戻す」はこの面の主役ではなく、押さない選択も同じだけ正しい）
+ * - 右端に閉じる（desktop のみ）。取り消し付きは Esc / クリックでは消さない代わりに、
+ *   邪魔な時はここから明示的に閉じられる。モバイルは swipe が同じ役割を持ち、
+ *   44px の当たり判定を置くと 343px の本文が 157px まで削れて文言が切れる
+ * - 消去: 自動(3s/5s) + 閉じる(desktop) + swipe(mobile) + Esc/クリック(desktop)
  * - 同時表示: 最大1つ、cross-fade 差し替え
  *
  * @example
@@ -84,12 +88,14 @@ const Toaster = ({ ...props }: ToasterProps) => {
       visibleToasts={1}
       duration={3000}
       containerAriaLabel={t('toastContainer')}
+      closeButton={!isMobile}
       className={isMobile ? '' : '[--width:360px]'}
       offset={isMobile ? { top: 16 } : { bottom: 16 }}
       mobileOffset={{ top: 16, left: 16, right: 16 }}
       swipeDirections={isMobile ? ['left', 'right'] : []}
       toastOptions={{
         unstyled: true,
+        closeButtonAriaLabel: t('close'),
         classNames: {
           toast:
             'flex items-center gap-2 !h-12 w-full px-4 rounded-lg border border-border shadow-card bg-card text-foreground',
@@ -97,8 +103,13 @@ const Toaster = ({ ...props }: ToasterProps) => {
           content: 'min-w-0 flex-1 [[data-sonner-toast]:not(:has([data-icon]))_&]:col-start-1',
           title: 'text-base md:text-sm truncate',
           description: 'sr-only',
+          // brand color を当てない。地の文字色 + hover の地色で「押せる」ことだけ示す
           actionButton:
-            'shrink-0 text-sm md:text-xs text-primary bg-transparent border-0 p-0 cursor-pointer',
+            'shrink-0 -mr-1 cursor-pointer rounded-lg border-0 bg-transparent px-2 py-1 text-sm text-foreground transition-colors hover:bg-state-hover md:text-xs',
+          // sonner は閉じるを絶対配置で左上へ出す。静的な flex 要素へ戻して右端へ送る
+          // （loader と同じ手当て）
+          closeButton:
+            'order-last shrink-0 rounded-lg !static !size-7 !transform-none !border-0 !bg-transparent text-muted-foreground transition-colors hover:!bg-state-hover hover:text-foreground',
           loader: '!static !inset-auto !transform-none',
         },
       }}
