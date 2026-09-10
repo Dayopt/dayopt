@@ -14,16 +14,19 @@
 
 import { DEFAULT_DRAG_SNAP_MINUTES } from '../precision';
 import {
-  buildDragTimeRange,
+  buildMoveTimeRange,
   buildSelectionRange,
-  ensureEndAfterStartSnap,
+  minutesToDate,
+  resizeHeightPx,
+  resolveMoveStartMinutes,
+  resolveResizeEndMinutes,
+  resolveResizeStartMinutes,
   resolveTargetDate,
-  snapEndToGrid,
 } from './grid-geometry';
 import { IDLE, LONGPRESS_DELAY_MS, SELECTION_LONGPRESS_DELAY_MS } from './machine-constants';
 import { handlePointerMove } from './pointer-move';
 import { handlePointerUp } from './pointer-up';
-import { snapToGrid } from './time-math';
+import { minutesToPixels } from './time-math';
 import type {
   InteractionAction,
   InteractionContext,
@@ -92,16 +95,17 @@ export function interactionReducer(
     case 'LONGPRESS_FIRED': {
       if (state.mode !== 'longpress-pending') return { state, effects };
 
-      const durationMs = ctx.getTimeblockDurationMs(state.timeblockId);
-      const durationPx = (durationMs / 60_000) * (ctx.hourHeight / 60);
-      const startSnap = snapToGrid(state.originalPosition.top, ctx.hourHeight, interval);
-      const endSnap = snapEndToGrid(
-        state.originalPosition.top + durationPx,
-        ctx.hourHeight,
-        interval,
-      );
+      // 長押し直後は移動量ゼロ。相対 snap なので元ブロックの時刻をそのまま保つ。
+      const durationMinutes = Math.round(ctx.getTimeblockDurationMs(state.timeblockId) / 60_000);
+      const startMinutes = resolveMoveStartMinutes({
+        originalTopPx: state.originalPosition.top,
+        deltaPx: 0,
+        hourHeight: ctx.hourHeight,
+        intervalMin: interval,
+        durationMinutes,
+      });
       const targetDate = resolveTargetDate(ctx, state.dateIndex);
-      const previewTime = buildDragTimeRange(targetDate, startSnap, endSnap, interval);
+      const previewTime = buildMoveTimeRange(targetDate, startMinutes, durationMinutes);
       const isOverlapping = ctx.checkOverlap(
         state.timeblockId,
         previewTime.start,
@@ -125,7 +129,7 @@ export function interactionReducer(
           originalPosition: state.originalPosition,
           dateIndex: state.dateIndex,
           targetDateIndex: state.dateIndex,
-          snappedTop: startSnap.snappedTop,
+          snappedTop: minutesToPixels(startMinutes, ctx.hourHeight),
           previewTime,
           isOverlapping,
         },
@@ -138,23 +142,20 @@ export function interactionReducer(
     case 'RESIZE_START': {
       if (state.mode !== 'idle') return { state, effects };
 
-      const startSnap = snapToGrid(action.originalPosition.top, ctx.hourHeight, interval);
-      const endTop = action.originalPosition.top + action.originalPosition.height;
-      const endSnap = ensureEndAfterStartSnap(
-        startSnap,
-        snapEndToGrid(endTop, ctx.hourHeight, interval),
-        ctx.hourHeight,
-        interval,
-      );
+      // 掴んだ時点では時刻を変えない。開始は snap せず、終端も最小長の担保だけ行う。
+      const startMinutes = resolveResizeStartMinutes(action.originalPosition.top, ctx.hourHeight);
+      const endMinutes = resolveResizeEndMinutes({
+        startMinutes,
+        originalEndPx: action.originalPosition.top + action.originalPosition.height,
+        deltaPx: 0,
+        hourHeight: ctx.hourHeight,
+        intervalMin: interval,
+        minEndMinutes: ctx.getResizeMinEndMinutes?.(action.timeblockId) ?? null,
+      });
 
-      const start = new Date(ctx.date);
-      start.setHours(startSnap.hour, startSnap.minute, 0, 0);
-      const end = new Date(ctx.date);
-      end.setHours(endSnap.hour, endSnap.minute, 0, 0);
-      const snappedHeight = Math.max(
-        (ctx.hourHeight / 60) * interval,
-        endSnap.snappedTop - startSnap.snappedTop,
-      );
+      const start = minutesToDate(ctx.date, startMinutes);
+      const end = minutesToDate(ctx.date, endMinutes);
+      const snappedHeight = resizeHeightPx(startMinutes, endMinutes, ctx.hourHeight);
       const isOverlapping = ctx.checkOverlap(action.timeblockId, start, end, 'resize');
 
       return {

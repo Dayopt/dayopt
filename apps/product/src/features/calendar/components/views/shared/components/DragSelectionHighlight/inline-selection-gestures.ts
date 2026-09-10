@@ -7,6 +7,7 @@
 
 import type React from 'react';
 
+import { snapDeltaMinutes } from '../../../../../domain/interaction/time-math';
 import {
   crossedHapticBoundary,
   MIN_TIMEBLOCK_DURATION_MINUTES,
@@ -28,7 +29,7 @@ interface ResizeGestureOptions {
   tap: () => void;
 }
 
-/** 下端 handle: end time だけを 1 分単位で更新するハンドラを生成する */
+/** 下端 handle: end time だけを snap 粒度（既定 15 分）で更新するハンドラを生成する */
 export function createResizeStartHandler({
   hourHeight,
   startMinutes,
@@ -42,7 +43,7 @@ export function createResizeStartHandler({
     let lastEndMin = baseEndMin;
 
     const onMove = (event: PointerEvent) => {
-      const deltaMin = Math.round(((event.clientY - clientY) * 60) / hourHeight);
+      const deltaMin = snapDeltaMinutes(event.clientY - clientY, hourHeight);
       const next = Math.max(minEndMin, Math.min(24 * 60, baseEndMin + deltaMin));
       if (next === lastEndMin) return;
       if (crossedHapticBoundary(lastEndMin, next)) tap();
@@ -109,7 +110,7 @@ export function createBodyPointerDownHandler({
         return;
       }
       // moving
-      const deltaMin = Math.round(((event.clientY - startClientY) * 60) / hourHeight);
+      const deltaMin = snapDeltaMinutes(event.clientY - startClientY, hourHeight);
       const next = Math.max(0, Math.min(24 * 60 - duration, baseStartMin + deltaMin));
       if (next === lastStartMin) return;
       if (crossedHapticBoundary(lastStartMin, next)) tap();
