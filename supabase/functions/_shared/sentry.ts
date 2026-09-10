@@ -89,6 +89,16 @@ export function buildSentryEnvelope(
 }
 
 /**
+ * Sentry への POST に許す時間の上限（ms）。
+ *
+ * Auth Hook は 1 回の invocation あたり 5 秒の総予算しか持たず、retryable な失敗では
+ * その予算内で再試行まで行われる（Supabase Auth Hooks の仕様、2026-09-10 実測）。
+ * capture のために hook 全体を timeout させると、観測のために可用性を下げることになる。
+ * 送信は best-effort とし、上限を超えたら諦める。
+ */
+const CAPTURE_TIMEOUT_MS = 1000;
+
+/**
  * DSN が無ければ no-op。envelope の構築・送信のどの段階で失敗しても例外は投げず、
  * function 名だけを添えて console.error に残す（呼び出し側の error path を壊さない）。
  */
@@ -107,6 +117,7 @@ export async function captureEdgeFunctionEvent(
       method: 'POST',
       headers: envelope.headers,
       body: envelope.body,
+      signal: AbortSignal.timeout(CAPTURE_TIMEOUT_MS),
     });
   } catch {
     console.error('[sentry] capture failed', { functionName: event.functionName });

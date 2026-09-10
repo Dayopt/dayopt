@@ -87,11 +87,16 @@ When a deploy rotates the `_next/static` chunk hashes, a tab that is still open 
 can fail to fetch a chunk it needs (`ChunkLoadError`, `Failed to fetch dynamically imported module`,
 `Importing a module script failed`). `src/lib/pwa/chunk-load-recovery.ts` detects these errors and
 reloads the page once, guarded by a `sessionStorage` flag
-(`dayopt:chunk-reload-attempted`) so a single tab retries at most once per incident. All four route
+(`dayopt:chunk-reload-attempted`) so a single tab retries at most once per incident. The four route
 error boundaries (`error.tsx`, `global-error.tsx`, `[locale]/error.tsx`, `[locale]/(app)/error.tsx`)
-and the class `ErrorBoundary` call `attemptChunkLoadRecovery` before reporting to Sentry, so the
-first occurrence reloads silently and only a repeat failure (the flag already set) is captured and
-shown to the user.
+call `attemptChunkLoadRecovery` before reporting to Sentry, so the first occurrence reloads silently
+and only a repeat failure (the flag already set) is captured and shown to the user.
+
+The feature-scoped class `ErrorBoundary` (`components/ui/feedback/error-boundary.tsx`) deliberately
+does **not** auto-reload. It wraps the calendar workspace, where the Inspector and inline-create
+panel hold unsaved edits in stores without `persist`; an unprompted reload would discard them
+silently. There the user sees the normal fallback UI and decides whether to reload. Auto-recovery is
+limited to route boundaries, where the page is already dead and no draft is reachable.
 
 ## Offline Writes Decision
 

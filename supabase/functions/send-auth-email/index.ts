@@ -19,7 +19,11 @@ import type { EmailData, WebhookPayload } from '../_shared/types.ts';
 import { buildConfirmUrl as buildAuthConfirmUrl } from './confirm-url.ts';
 import { ConfirmEmail } from './ConfirmEmail.tsx';
 import { EmailChangeEmail } from './EmailChangeEmail.tsx';
-import { classifySendAuthEmailFailure, type SendAuthEmailFailurePhase } from './failure.ts';
+import {
+  classifySendAuthEmailFailure,
+  resolveSendAuthEmailStatus,
+  type SendAuthEmailFailurePhase,
+} from './failure.ts';
 import { MagicLinkEmail } from './MagicLinkEmail.tsx';
 import { PasswordResetEmail } from './PasswordResetEmail.tsx';
 import { authEmailSubjects } from './subjects.ts';
@@ -227,12 +231,16 @@ Deno.serve(async (req) => {
       sentCount += 1;
     }
   } catch (error) {
-    const { status, kind, resendErrorName, message } = classifySendAuthEmailFailure(error, phase);
+    const classified = classifySendAuthEmailFailure(error, phase);
+    const { kind, resendErrorName, message } = classified;
+    const firstEmailAlreadySent = sentCount > 0;
+
+    // 部分送信済みなら retryable status を返さない（判定理由は resolveSendAuthEmailStatus）
+    const status = resolveSendAuthEmailStatus(classified, { firstEmailAlreadySent });
 
     // 401（署名不一致）は基本的には verify 段階の try/catch が処理するためここには来ないが、
     // 万一 classify が 401 を返しても capture しない（攻撃者由来のノイズを Issues に入れない）
     if (status !== 401) {
-      const firstEmailAlreadySent = sentCount > 0;
       await captureEdgeFunctionEvent(Deno.env.get('SENTRY_DSN'), {
         functionName: 'send-auth-email',
         message: `send-auth-email failed: ${kind}`,

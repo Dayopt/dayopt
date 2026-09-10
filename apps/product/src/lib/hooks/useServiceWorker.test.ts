@@ -97,6 +97,21 @@ describe('useServiceWorker', () => {
       });
     });
 
+    it('commit SHA があれば ?v= 付きで登録する（キャッシュ名の deploy ごとローテーション）', async () => {
+      // sw.js は登録 URL の `v` から CACHE_VERSION を導出する。ここが無言で
+      // bare `/sw.js` に戻ると全 deploy が `dayopt-*-vdev` を共有し、#2688 の
+      // 修正が効かなくなる
+      vi.stubEnv('NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA', 'abcdef1234567890');
+
+      renderHook(() => useServiceWorker());
+
+      await waitFor(() => {
+        expect(navigator.serviceWorker.register).toHaveBeenCalledWith('/sw.js?v=abcdef12', {
+          scope: '/',
+        });
+      });
+    });
+
     it('登録エラー時、error が設定される', async () => {
       const error = new Error('Registration failed');
       vi.mocked(navigator.serviceWorker.register).mockRejectedValue(error);

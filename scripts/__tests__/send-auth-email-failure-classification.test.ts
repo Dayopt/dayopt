@@ -16,7 +16,10 @@ import {
   captureEdgeFunctionEvent,
   parseSentryDsn,
 } from '../../supabase/functions/_shared/sentry.ts';
-import { classifySendAuthEmailFailure } from '../../supabase/functions/send-auth-email/failure.ts';
+import {
+  classifySendAuthEmailFailure,
+  resolveSendAuthEmailStatus,
+} from '../../supabase/functions/send-auth-email/failure.ts';
 
 describe('classifySendAuthEmailFailure', () => {
   it('WebhookVerificationError は 401 signature（phase を問わない）', () => {
@@ -219,5 +222,61 @@ describe('buildSentryEnvelope: environment', () => {
     const eventLine = JSON.parse(envelope!.body.split('\n')[2]!);
     expect(eventLine.environment).toBe('production');
     expect(eventLine.tags.function).toBe('send-auth-email');
+  });
+});
+
+describe('captureEdgeFunctionEvent: Auth Hook の 5 秒予算を守る', () => {
+  it('POST に abort signal を渡し、hook 全体を timeout させない', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(new Response(null, { status: 200 }));
+
+    await captureEdgeFunctionEvent(
+      'https://abc123@o0.ingest.sentry.io/123',
+      {
+        functionName: 'send-auth-email',
+        message: 'send-auth-email failed: resend_unavailable',
+        tags: { kind: 'resend_unavailable' },
+      },
+      fetchImpl,
+    );
+
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    const init = fetchImpl.mock.calls[0]![1] as RequestInit;
+    expect(init.signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it('abort された fetch でも throw しない', async () => {
+    const fetchImpl = vi.fn().mockRejectedValue(new DOMException('aborted', 'TimeoutError'));
+
+    await expect(
+      captureEdgeFunctionEvent(
+        'https://abc123@o0.ingest.sentry.io/123',
+        {
+          functionName: 'send-auth-email',
+          message: 'x',
+          tags: {},
+        },
+        fetchImpl,
+      ),
+    ).resolves.toBeUndefined();
+  });
+});
+
+describe('resolveSendAuthEmailStatus: 部分送信からの再試行を止める', () => {
+  const unavailable = classifySendAuthEmailFailure({ name: 'internal_server_error' }, 'send');
+
+  it('1 通も送れていなければ 503 のまま GoTrue の再試行に載せる', () => {
+    expect(resolveSendAuthEmailStatus(unavailable, { firstEmailAlreadySent: false })).toBe(503);
+  });
+
+  it('email_change の 2 通目失敗では 500 へ落とす（1 通目の重複配送を防ぐ）', () => {
+    expect(resolveSendAuthEmailStatus(unavailable, { firstEmailAlreadySent: true })).toBe(500);
+  });
+
+  it('もともと non-retryable な失敗は部分送信の有無で変わらない', () => {
+    const rejected = classifySendAuthEmailFailure({ name: 'validation_error' }, 'send');
+    const signature = classifySendAuthEmailFailure(new Error('bad'), 'verify');
+
+    expect(resolveSendAuthEmailStatus(rejected, { firstEmailAlreadySent: true })).toBe(500);
+    expect(resolveSendAuthEmailStatus(signature, { firstEmailAlreadySent: true })).toBe(401);
   });
 });

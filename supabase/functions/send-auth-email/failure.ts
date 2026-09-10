@@ -120,3 +120,21 @@ export function classifySendAuthEmailFailure(
 
   return { status: 500, kind: 'unknown', message };
 }
+
+/**
+ * 実際に返す HTTP status を決める。
+ *
+ * GoTrue は 503 / 429 を retryable として扱い、5 秒の総予算内で最大 3 回まで同じ hook を
+ * 呼び直す（Supabase Auth Hooks の仕様、2026-09-10 実測）。`email_change` は現アドレス宛 →
+ * 新アドレス宛の順に 2 通送るため、2 通目の失敗で 503 を返すと再試行のたびに 1 通目が
+ * 重複配送される。冪等でない状態からの再試行は害の方が大きいので non-retryable へ落とす。
+ */
+export function resolveSendAuthEmailStatus(
+  failure: SendAuthEmailFailure,
+  options: { firstEmailAlreadySent: boolean },
+): SendAuthEmailFailure['status'] {
+  if (failure.status === 503 && options.firstEmailAlreadySent) {
+    return 500;
+  }
+  return failure.status;
+}

@@ -49,7 +49,7 @@ provider plan、sampling rate、SDK versionなどの値は変わるため、pack
 - `/api/csp-report`の有効なCSP violation
 - Stripe webhook等のroute handlerで捕捉したunexpected error
 - loggerのerror / warn breadcrumb
-- `send-auth-email`（Supabase Edge Function、DSN 未投入なら no-op）: render / Resend 送信失敗（HTTP 500 / 503）。tags は `action` / `phase` / `kind` / `status` / `resend_error`、extra は `subject` / `firstEmailAlreadySent`。宛先 email・本文・token_hash は送らない。署名不一致（HTTP 401）は攻撃者由来のノイズを Issues に入れないため capture しない。DSN は Supabase secret `SENTRY_DSN`（[secrets](./secrets.md)）
+- `send-auth-email`（Supabase Edge Function、DSN 未投入なら no-op）: render / Resend 送信失敗（HTTP 500 / 503）。tags は `action` / `phase` / `kind` / `status` / `resend_error`、extra は `subject` / `firstEmailAlreadySent`。宛先 email・本文・token_hash は送らない。署名不一致（HTTP 401）は攻撃者由来のノイズを Issues に入れないため capture しない。DSN は Supabase secret `SENTRY_DSN`（[secrets](./secrets.md)）。**status の意味**: Auth Hook は 503 / 429 を retryable として扱い、5 秒の総予算内で最大 3 回まで同じ hook を呼び直す（2026-09-10 実測）。そのため Resend の availability 失敗だけを 503 にし、`email_change` の 2 通目失敗のように**すでに 1 通送信済み**の状態では 500 へ落とす（再試行すると 1 通目が重複配送されるため）。capture 自体は 1 秒で打ち切り、観測のために hook を timeout させない
 
 expected auth / validation / not-found / conflict、Web Vitals、正常な login / billing event は Issues に送らない。性能は trace と Speed Insights、正常系行動は既存 analytics で確認する。
 
