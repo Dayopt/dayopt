@@ -5,6 +5,10 @@
  *
  * ドラッグ選択（pendingSelection）からの plan / record 作成、
  * 新規アクティビティ作成 → entry 作成、選択範囲の live 競合判定を担う。
+ *
+ * アクティビティのホバーでは色と名前に加えて「普段の長さ」も先出しする。着せ替え先は
+ * pendingSelection 自身なので、グリッドのハイライトの厚み・パネルの時刻・重なり判定・
+ * 作成される長さが必ず一致する。
  */
 
 import { useCallback, useMemo, useRef, useState } from 'react';
@@ -19,6 +23,7 @@ import {
   collectTimeblockLaneItems,
   hasTimeblockLaneConflict,
   resolveTimeblockKindChoice,
+  useActivityMedianDurations,
   useTimeblockInspectorStore,
   useTimeblockWriteMutations,
   type Fulfillment,
@@ -41,6 +46,8 @@ export function useInlineCreate(extras: InlineCreateExtras = {}) {
   const pendingSelection = useInlineCreateStore.use.pendingSelection();
   const clearPendingSelection = useInlineCreateStore.use.clearPendingSelection();
   const setHoveredActivity = useInlineCreateStore.use.setHoveredActivity();
+  const previewActivityDuration = useInlineCreateStore.use.previewActivityDuration();
+  const { getMedianMinutes } = useActivityMedianDurations();
   const timezone = useUserPreferences((s) => s.timezone);
   const t = useTranslations('activities');
   const tEntry = useTranslations('timeblock');
@@ -58,16 +65,25 @@ export function useInlineCreate(extras: InlineCreateExtras = {}) {
     (activity: HoveredActivityInfo | null) => {
       if (activity === null && lockedRef.current) return;
       setHoveredActivity(activity);
+      // 色・名前と一緒に長さも着せる。中央値の無いアクティビティ（null）へ移ったら
+      // ドラッグで決めた長さへ戻る
+      previewActivityDuration(activity ? getMedianMinutes(activity.id) : null);
     },
-    [setHoveredActivity],
+    [setHoveredActivity, previewActivityDuration, getMedianMinutes],
   );
 
   // plan / record 作成ハンドラー（アクティビティ必須、その名前をタイトルに設定）
   const handleCreate = useCallback(
     (activityId: string, activityName: string) => {
-      if (!pendingSelection || isCreating) return;
+      if (isCreating) return;
 
-      const { date: selDate, startHour, startMinute, endHour, endMinute } = pendingSelection;
+      // ホバーの無い環境（タップ）でも同じ長さで作る。ホバー済みなら同じ値なので
+      // 何も動かない。長さを直した後は store 側で no-op になる
+      previewActivityDuration(getMedianMinutes(activityId));
+      const selection = useInlineCreateStore.getState().pendingSelection;
+      if (!selection) return;
+
+      const { date: selDate, startHour, startMinute, endHour, endMinute } = selection;
 
       // ローカル時刻 → UTC変換
       const localStart = new Date(
@@ -90,7 +106,7 @@ export function useInlineCreate(extras: InlineCreateExtras = {}) {
 
       // 既定は end ルール。過去スロットに限りユーザーがタブで選んだ種別を優先する
       // （lane はドラッグ起点の表示ヒントに留める）。
-      const { kind: destination } = resolveTimeblockKindChoice(utcEnd, pendingSelection.kind);
+      const { kind: destination } = resolveTimeblockKindChoice(utcEnd, selection.kind);
 
       // 事前 overlap 判定（セレクタを開いている間の resize / 他クライアント更新による race を回避）
       // 同一レーンのみ禁止（plan×plan / record×record）。plan×record は許可。
@@ -154,8 +170,9 @@ export function useInlineCreate(extras: InlineCreateExtras = {}) {
       );
     },
     [
-      pendingSelection,
       isCreating,
+      previewActivityDuration,
+      getMedianMinutes,
       timezone,
       note,
       fulfillment,

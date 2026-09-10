@@ -8,6 +8,7 @@
 'use client';
 
 import type React from 'react';
+import { useRef } from 'react';
 
 import { useTranslations } from 'next-intl';
 
@@ -17,6 +18,7 @@ import { formatTimeRange } from '@/lib/date';
 import type { TimeFormat } from '@/lib/time';
 import { cn } from '@dayopt/components';
 
+import { DRAG_THRESHOLD_PX } from '../../../../../domain/interaction/machine-constants';
 import type { TwoLanePosition } from '../../../../../lib/two-lane-layout';
 import { DayDiffMarker } from './DayDiffMarker';
 
@@ -100,6 +102,33 @@ export function PlanLaneCard({
   // 時刻が消えていて、何時のブロックか読めなかった（2026-09-07 User 指摘）
   const showDetails = position.height >= DETAIL_HEIGHT_THRESHOLD;
   const canDrag = interactive && !disableDrag && Boolean(onPointerDown);
+  /**
+   * クリックの届け先は 1 つにする。掴めるカードでは pointer の状態機械が「動いていない＝
+   * クリック」と判断して届ける（EVENT_CLICK）ので、同じ gesture の末尾に来るブラウザの
+   * click は捨てる。2 経路とも届けると開閉のトグルが打ち消し合う（2026-09-10 User 指摘）。
+   *
+   * 判定は mousedown / touchstart の時点で固定する。mouseup で状態機械が開いた直後に
+   * click が来るため、click 時点の isActive を見ると「開いているカードの click」と誤認する。
+   * 詳細を開いているカード（isActive）は状態機械が握らない（drag 無効）ので click が届ける。
+   * キーボードの click は gesture を伴わないので常に届ける。動かしてから離した click
+   * （drag の末尾）は状態機械が EVENT_CLICK を出さないので従来どおり届ける。
+   */
+  const gestureStartRef = useRef<{ x: number; y: number } | null>(null);
+  const beginGesture = (x: number, y: number) => {
+    gestureStartRef.current = canDrag && !isActive ? { x, y } : null;
+  };
+  const handleClick = (e: React.MouseEvent) => {
+    const start = gestureStartRef.current;
+    gestureStartRef.current = null;
+    if (start) {
+      const moved = Math.max(Math.abs(e.clientX - start.x), Math.abs(e.clientY - start.y));
+      // 不等号は状態機械に合わせる。pointer-up.ts は `> DRAG_THRESHOLD_PX` を「動いた」と
+      // 見なすので、閾値ちょうど（5px）は EVENT_CLICK が出る。ここを `<` にすると 5px の
+      // 時だけ 2 経路とも届き、トグルが打ち消し合う
+      if (moved <= DRAG_THRESHOLD_PX) return;
+    }
+    onClick?.(event, e);
+  };
   return (
     <div
       data-plan-lane-card
@@ -134,19 +163,24 @@ export function PlanLaneCard({
         height: `${Math.max(position.height, MIN_HEIGHT)}px`,
         ...styleOverride,
       }}
-      onClick={interactive ? (e) => onClick?.(event, e) : undefined}
+      onClick={interactive ? handleClick : undefined}
       onContextMenu={interactive ? (e) => onContextMenu?.(event, e) : undefined}
       onMouseDown={
         interactive
           ? (e) => {
-              if (e.button === 0 && canDrag) onPointerDown?.(event, e);
+              if (e.button !== 0 || !canDrag) return;
+              beginGesture(e.clientX, e.clientY);
+              onPointerDown?.(event, e);
             }
           : undefined
       }
       onTouchStart={
         interactive
           ? (e) => {
-              if (canDrag) onTouchStart?.(event, e);
+              if (!canDrag) return;
+              const touch = e.touches[0];
+              beginGesture(touch?.clientX ?? 0, touch?.clientY ?? 0);
+              onTouchStart?.(event, e);
             }
           : undefined
       }

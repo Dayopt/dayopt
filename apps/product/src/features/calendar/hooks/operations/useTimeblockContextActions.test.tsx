@@ -5,6 +5,9 @@ import type { CalendarDisplayEvent } from '../../types/calendar.types';
 
 const mocks = vi.hoisted(() => ({
   push: vi.fn(),
+  deletePlanMutate: vi.fn(),
+  deleteRecordMutate: vi.fn(),
+  showDeleteUndo: vi.fn(),
 }));
 
 vi.mock('next/navigation', () => ({
@@ -18,9 +21,10 @@ vi.mock('next-intl', () => ({
 
 vi.mock('@/features/timeblock', () => ({
   useTimeblockWriteMutations: () => ({
-    deleteRecord: { mutate: vi.fn() },
-    deletePlan: { mutate: vi.fn() },
+    deleteRecord: { mutate: mocks.deleteRecordMutate },
+    deletePlan: { mutate: mocks.deletePlanMutate },
   }),
+  useTimeblockDeleteUndo: () => mocks.showDeleteUndo,
 }));
 
 vi.mock('@/lib/toast', () => ({
@@ -56,5 +60,50 @@ describe('useTimeblockContextActions - Review navigation', () => {
     act(() => result.current.handleViewStats({ ...classifiedEntry, activityId: null }));
 
     expect(mocks.push).not.toHaveBeenCalled();
+  });
+});
+
+describe('useTimeblockContextActions - 削除', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('右クリックの削除も取り消しを出す（静かに消さない）', () => {
+    const { result } = renderHook(() => useTimeblockContextActions());
+
+    act(() => {
+      result.current.handleDeleteTimeblock({
+        ...classifiedEntry,
+        version: '2026-03-25T00:00:00.000Z',
+      } as unknown as CalendarDisplayEvent);
+    });
+
+    const [input, options] = mocks.deletePlanMutate.mock.calls[0] as [
+      { id: string; expectedUpdatedAt: string },
+      { onSuccess: (deleted: { id: string; updated_at: string }) => void },
+    ];
+    expect(input).toEqual({ id: 'entry-1', expectedUpdatedAt: '2026-03-25T00:00:00.000Z' });
+
+    // 削除が返した版で戻せるようにする
+    options.onSuccess({ id: 'entry-1', updated_at: '2026-03-25T00:00:05.000Z' });
+    expect(mocks.showDeleteUndo).toHaveBeenCalledWith('plan', {
+      id: 'entry-1',
+      updated_at: '2026-03-25T00:00:05.000Z',
+    });
+  });
+
+  it('移行済みの記録は削除しない（取り消しも出さない）', () => {
+    const { result } = renderHook(() => useTimeblockContextActions());
+
+    act(() => {
+      result.current.handleDeleteTimeblock({
+        ...classifiedEntry,
+        kind: 'record',
+        recordSource: 'auto_migrated',
+      } as unknown as CalendarDisplayEvent);
+    });
+
+    expect(mocks.deleteRecordMutate).not.toHaveBeenCalled();
+    expect(mocks.showDeleteUndo).not.toHaveBeenCalled();
   });
 });

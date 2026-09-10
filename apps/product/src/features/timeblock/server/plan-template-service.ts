@@ -17,7 +17,10 @@ import { trackProductEvent } from '@/lib/analytics/product-events';
 import { MS_PER_DAY } from '@/lib/date/constants';
 import { captureUnexpectedDatabaseError } from '@/lib/sentry';
 
-import { aggregateActivityMedianDurations } from '../domain/plan-template-duration';
+import {
+  aggregateActivityMedianDurations,
+  MEDIAN_DURATION_WINDOW_DAYS,
+} from '../domain/plan-template-duration';
 import {
   materializeTemplateDay,
   PlanTemplateMaterializeError,
@@ -38,9 +41,6 @@ import {
 import { TimeblockServiceError } from './timeblock-service-error';
 import type { PlanRow } from './timeblock-types';
 import type { ServiceSupabaseClient } from './types';
-
-/** 中央値の窓。`activity-estimation-factor` の「直近 4 週」と揃える。 */
-const TEMPLATE_DURATION_WINDOW_DAYS = 28;
 
 /** `user_settings` 行が無い時の既定長。column default（60）と同じ値。 */
 const FALLBACK_DEFAULT_MINUTES = 60;
@@ -391,7 +391,7 @@ export class PlanTemplateService {
       });
     }
     const records = await fetchRecords(this.supabase, userId, {
-      startDate: new Date(now.getTime() - TEMPLATE_DURATION_WINDOW_DAYS * MS_PER_DAY).toISOString(),
+      startDate: new Date(now.getTime() - MEDIAN_DURATION_WINDOW_DAYS * MS_PER_DAY).toISOString(),
       endDate: now.toISOString(),
     });
     return {

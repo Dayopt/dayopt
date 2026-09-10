@@ -52,3 +52,35 @@ export function hasTimeblockLaneConflict(
     (item) => item.id !== excludeId && rangesOverlap(startAt, endAt, item.start_at, item.end_at),
   );
 }
+
+/**
+ * `startAt` 以降で、同一レーンの既存ブロックと重ならない最初の枠を探す。
+ *
+ * 重なったブロックの終わりから試し直すので、連続して埋まっていても順に先へ進む。
+ * `searchLimitAt` までに長さが丸ごと入る枠が無ければ `null`（呼び出し側が知らせる）。
+ * 長さは縮めない。中央値どおりの長さで作れる場所だけを返す。
+ */
+export function findFreeTimeblockLaneSlot(
+  items: TimeblockLaneItem[],
+  startAt: Date,
+  durationMinutes: number,
+  searchLimitAt: Date,
+): { startAt: Date; endAt: Date } | null {
+  const durationMs = durationMinutes * 60_000;
+  const limit = searchLimitAt.getTime();
+  const blocking = items
+    .map((item) => ({ start: Date.parse(item.start_at), end: Date.parse(item.end_at) }))
+    .filter((item) => Number.isFinite(item.start) && Number.isFinite(item.end))
+    .sort((a, b) => a.start - b.start);
+
+  let start = startAt.getTime();
+  // 各周回で必ず「重なったブロックの終わり」へ進むので、ブロック数だけ回れば必ず終わる
+  for (let guard = 0; guard <= blocking.length; guard += 1) {
+    const end = start + durationMs;
+    if (end > limit) return null;
+    const hit = blocking.find((item) => item.start < end && item.end > start);
+    if (!hit) return { startAt: new Date(start), endAt: new Date(end) };
+    start = hit.end;
+  }
+  return null;
+}

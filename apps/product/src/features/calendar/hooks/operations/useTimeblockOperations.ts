@@ -3,7 +3,11 @@ import { useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
 
-import { resolveTimeblockDestination, useTimeblockWriteMutations } from '@/features/timeblock';
+import {
+  resolveTimeblockDestination,
+  useTimeblockDeleteUndo,
+  useTimeblockWriteMutations,
+} from '@/features/timeblock';
 import { logger } from '@/lib/logger';
 import { toast } from '@/lib/toast';
 
@@ -62,6 +66,8 @@ function findTimeModelRowById(
  */
 export const useTimeblockOperations = () => {
   const { deleteRecord, deletePlan, updateRecord, updatePlan } = useTimeblockWriteMutations();
+  // 削除の戻し方はカレンダーと Inspector で 1 つに揃える
+  const showDeleteUndo = useTimeblockDeleteUndo();
   const queryClient = useQueryClient();
   const t = useTranslations();
 
@@ -102,23 +108,23 @@ export const useTimeblockOperations = () => {
       }
       if (found.row.source === 'auto_migrated') return false;
       try {
-        if (found.kind === 'plan') {
-          await deletePlan.mutateAsync({
-            id: timeblockId,
-            expectedUpdatedAt: found.row.updated_at,
-          });
-        } else {
-          await deleteRecord.mutateAsync({
-            id: timeblockId,
-            expectedUpdatedAt: found.row.updated_at,
-          });
-        }
+        const deleted =
+          found.kind === 'plan'
+            ? await deletePlan.mutateAsync({
+                id: timeblockId,
+                expectedUpdatedAt: found.row.updated_at,
+              })
+            : await deleteRecord.mutateAsync({
+                id: timeblockId,
+                expectedUpdatedAt: found.row.updated_at,
+              });
+        showDeleteUndo(found.kind, deleted);
         return true;
       } catch {
         return false;
       }
     },
-    [queryClient, deletePlan, deleteRecord],
+    [queryClient, deletePlan, deleteRecord, showDeleteUndo],
   );
 
   // Timeblock更新ハンドラー（ドラッグ&ドロップ / リサイズ用）

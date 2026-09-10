@@ -5,7 +5,7 @@ import { useCallback } from 'react';
 import { useLocale } from 'next-intl';
 import { useRouter } from 'next/navigation';
 
-import { useTimeblockWriteMutations } from '@/features/timeblock';
+import { useTimeblockDeleteUndo, useTimeblockWriteMutations } from '@/features/timeblock';
 
 import { buildReportPath } from '../../lib/panel-url';
 import type { CalendarDisplayEvent } from '../../types/calendar.types';
@@ -15,17 +15,23 @@ export function useTimeblockContextActions() {
   const router = useRouter();
   const locale = useLocale();
   const { deleteRecord, deletePlan } = useTimeblockWriteMutations();
+  const showDeleteUndo = useTimeblockDeleteUndo();
 
   const handleDeleteTimeblock = useCallback(
     (entry: CalendarDisplayEvent) => {
       if (entry.recordSource === 'auto_migrated') return;
-      if ((entry.kind ?? 'plan') === 'plan') {
-        deletePlan.mutate({ id: entry.id, expectedUpdatedAt: entry.version });
+      const kind = entry.kind ?? 'plan';
+      const input = { id: entry.id, expectedUpdatedAt: entry.version };
+      // 右クリックからの削除も、キーボードや Inspector と同じ戻し方にする
+      const onSuccess = (deleted: { id: string; updated_at: string }) =>
+        showDeleteUndo(kind, deleted);
+      if (kind === 'plan') {
+        deletePlan.mutate(input, { onSuccess });
       } else {
-        deleteRecord.mutate({ id: entry.id, expectedUpdatedAt: entry.version });
+        deleteRecord.mutate(input, { onSuccess });
       }
     },
-    [deletePlan, deleteRecord],
+    [deletePlan, deleteRecord, showDeleteUndo],
   );
 
   const handleViewStats = useCallback(

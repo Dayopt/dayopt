@@ -360,6 +360,38 @@ describe('useInteraction Plan → Record drop', () => {
   });
 });
 
+describe('useInteraction handlePointerDown: 詳細を開いているブロック', () => {
+  it('クリックを二重に届けない（カードの onClick が届けるので何もしない）', () => {
+    const onEventClick = vi.fn();
+    const { result } = renderHook(() =>
+      useInteraction(makeProps({ disabledPlanId: baseEvent.id, onEventClick })),
+    );
+
+    act(() => {
+      result.current.handlers.handlePointerDown(baseEvent.id, createMouseEvent(), rect);
+    });
+
+    // ここで呼ぶと 1 クリックが 2 回届き、開閉のトグルが打ち消し合う
+    expect(onEventClick).not.toHaveBeenCalled();
+    // drag も始めない
+    expect(result.current.state.mode).toBe('idle');
+  });
+
+  it('別のブロックなら従来どおり drag の判定へ入る', () => {
+    const onEventClick = vi.fn();
+    const { result } = renderHook(() =>
+      useInteraction(makeProps({ disabledPlanId: 'entry-other', onEventClick })),
+    );
+
+    act(() => {
+      result.current.handlers.handlePointerDown(baseEvent.id, createMouseEvent(), rect);
+    });
+
+    expect(onEventClick).not.toHaveBeenCalled();
+    expect(result.current.state.mode).not.toBe('idle');
+  });
+});
+
 describe('useInteraction handleResizeStart guard', () => {
   it('PC + Inspector open: disabledPlanId と resizeDisabledPlanId が同じ ID のとき RESIZE_START を block', () => {
     const { result } = renderHook(() =>

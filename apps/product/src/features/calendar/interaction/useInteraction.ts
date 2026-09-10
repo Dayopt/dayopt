@@ -206,12 +206,11 @@ export function useInteraction(props: UseInteractionProps): UseInteractionReturn
       const r = latestRef.current;
       pendingTargetLaneRef.current = null;
       dragLaneRef.current = null;
-      // Disabled plan → direct click
-      if (r.disabledPlanId && timeblockId === r.disabledPlanId) {
-        const event = r.events.find((ev) => ev.id === timeblockId);
-        if (event) r.onEventClick?.(event);
-        return;
-      }
+      // 詳細を開いているブロックは drag させない。クリックはカード自身の onClick が
+      // 届けるので、ここでは何もしない（touch 側と同じ扱い）。
+      // かつてここで onEventClick を呼んでいたが、カードの onClick と合わせて 1 回の
+      // クリックが 2 回届き、開閉のトグルが打ち消し合っていた（2026-09-10 User 指摘）
+      if (r.disabledPlanId && timeblockId === r.disabledPlanId) return;
       e.preventDefault();
       e.stopPropagation();
       dispatch({

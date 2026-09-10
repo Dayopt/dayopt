@@ -9,6 +9,7 @@ const updatePlanMutate = vi.fn();
 const updateRecordMutate = vi.fn();
 const deletePlanMutate = vi.fn();
 const deleteRecordMutate = vi.fn();
+const showDeleteUndo = vi.fn();
 const getQueriesData = vi.fn(
   (_opts: { predicate: (q: { queryKey: unknown }) => boolean }) => [] as Array<[unknown, unknown]>,
 );
@@ -29,6 +30,9 @@ vi.mock('@/features/timeblock', async () => {
       deletePlan: { mutate: deletePlanMutate, mutateAsync: deletePlanMutate },
       deleteRecord: { mutate: deleteRecordMutate, mutateAsync: deleteRecordMutate },
     }),
+    // 取り消しトーストの中身は useTimeblockDeleteUndo の test が持つ。ここでは
+    // 「削除が返した版で呼ばれるか」だけ見る
+    useTimeblockDeleteUndo: () => showDeleteUndo,
   };
 });
 
@@ -114,6 +118,7 @@ describe('useTimeblockOperations', () => {
     updateRecordMutate.mockReset();
     deletePlanMutate.mockReset();
     deleteRecordMutate.mockReset();
+    showDeleteUndo.mockClear();
     getQueriesData.mockReset();
     getQueriesData.mockReturnValue([]);
     toastSuccess.mockReset();
@@ -139,6 +144,7 @@ describe('useTimeblockOperations', () => {
         ]),
       );
 
+      deletePlanMutate.mockResolvedValue({ updated_at: '2026-04-26T00:00:05.000000Z' });
       const { result } = renderHook(() => useTimeblockOperations());
       await result.current.handleTimeblockDelete('plan-1');
 
@@ -160,6 +166,7 @@ describe('useTimeblockOperations', () => {
         ]),
       );
 
+      deleteRecordMutate.mockResolvedValue({ updated_at: '2026-04-26T00:00:05.000000Z' });
       const { result } = renderHook(() => useTimeblockOperations());
       await result.current.handleTimeblockDelete('record-1');
 
@@ -168,6 +175,47 @@ describe('useTimeblockOperations', () => {
         expectedUpdatedAt: '2026-04-26T00:00:00.000001Z',
       });
       expect(deletePlanMutate).not.toHaveBeenCalled();
+    });
+
+    it('削除したら取り消しを出し、押すと削除後の版で復元する', async () => {
+      mockCaches(
+        makeCache('plans', [
+          {
+            id: 'plan-1',
+            start_at: '2026-04-27T00:00:00.000Z',
+            end_at: '2026-04-27T01:00:00.000Z',
+          },
+        ]),
+      );
+      deletePlanMutate.mockResolvedValue({ updated_at: '2026-04-26T00:00:05.000000Z' });
+
+      const { result } = renderHook(() => useTimeblockOperations());
+      await result.current.handleTimeblockDelete('plan-1');
+
+      // 復元は削除が返した版を使う（削除前の版だと STALE_VERSION で弾かれる）
+      expect(showDeleteUndo).toHaveBeenCalledWith('plan', {
+        updated_at: '2026-04-26T00:00:05.000000Z',
+      });
+    });
+
+    it('記録の削除は記録として復元する', async () => {
+      mockCaches(
+        makeCache('records', [
+          {
+            id: 'record-1',
+            start_at: '2026-04-26T00:00:00.000Z',
+            end_at: '2026-04-26T01:00:00.000Z',
+          },
+        ]),
+      );
+      deleteRecordMutate.mockResolvedValue({ updated_at: '2026-04-26T00:00:05.000000Z' });
+
+      const { result } = renderHook(() => useTimeblockOperations());
+      await result.current.handleTimeblockDelete('record-1');
+
+      expect(showDeleteUndo).toHaveBeenCalledWith('record', {
+        updated_at: '2026-04-26T00:00:05.000000Z',
+      });
     });
 
     it('キャッシュに id が見つからなければ何も mutate せず logger.error する', async () => {

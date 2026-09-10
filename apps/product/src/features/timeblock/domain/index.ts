@@ -17,5 +17,9 @@ export { calculateStreak } from './streak-calculator';
 export { aggregateActivityEstimationFactors } from './activity-estimation-factor';
 export type { ActivityEstimationFactor } from './activity-estimation-factor';
 export { aggregateActivityPlanCounts, aggregateActivityStats } from './activity-stats';
+export {
+  MEDIAN_DURATION_WINDOW_DAYS,
+  aggregateActivityMedianDurations,
+} from './plan-template-duration';
 export { deriveTimePLReview } from './time-pl-review';
 export type { TimePLReview } from './time-pl-review';

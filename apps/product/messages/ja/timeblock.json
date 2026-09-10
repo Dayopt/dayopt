@@ -7,29 +7,7 @@
       "recordTimeOverlap": "この時間帯には既に記録があります"
     },
     "toast": {
-      "created": "「{title}」を記録しました ✓",
-      "createFailed": "作成できませんでした: {error}",
-      "updated": "更新しました",
-      "updateFailed": "更新できませんでした。もう一度お試しください",
-      "deleted": "削除しました",
-      "deleteFailed": "削除できませんでした: {error}",
-      "bulkUpdated": "{count}件を更新しました",
-      "bulkUpdateFailed": "一括更新できませんでした: {error}",
-      "bulkDeleted": "{count}件を削除しました",
-      "bulkDeleteFailed": "一括削除できませんでした: {error}",
-      "activitiesAdded": "アクティビティを追加しました",
-      "activitiesAddFailed": "アクティビティを追加できませんでした: {error}",
-      "statusChanged": "ステータスを{status}に変更しました",
-      "statusChangedCount": "{count}件のステータスを変更しました",
-      "statusChangeFailed": "ステータスを変更できませんでした。もう一度お試しください",
-      "archivedCount": "{count}件をアーカイブしました",
-      "archiveFailed": "アーカイブできませんでした。もう一度お試しください",
-      "deletedCount": "{count}件を削除しました",
-      "restored": "復元しました",
-      "restoreFailed": "復元できませんでした。もう一度お試しください",
-      "conflict": "このタイムブロックは他の場所で変更されました。最新データを読み込んでください",
-      "placed": "{name} を {time} に追加しました",
-      "overlapError": "{time} は既存のタイムブロックと重複しています"
+      "updated": "更新しました"
     },
     "sidebar": {
       "tabs": {
@@ -153,7 +131,9 @@
         "deleteFailed": "削除できませんでした。もう一度お試しください",
         "restored": "復元しました",
         "restoreFailed": "復元できませんでした。もう一度お試しください",
-        "planCreated": "予定を追加しました ✓"
+        "planCreated": "予定を追加しました ✓",
+        "planCreatedShifted": "{time} に予定を追加しました",
+        "recordedShifted": "{time} に記録しました"
       },
       "migratedLocked": "移行された過去の記録は編集できません",
       "feedforward": {

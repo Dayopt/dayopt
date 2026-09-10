@@ -58,6 +58,10 @@ vi.mock('@/features/timeblock', async () => {
         fulfillment
       </button>
     ),
+    useActivityMedianDurations: () => ({
+      medianByActivityId: new Map([['activity-1', 45]]),
+      getMedianMinutes: (activityId: string | null) => (activityId === 'activity-1' ? 45 : null),
+    }),
     InspectorHeaderActions: ({ onCloseInspector }: { onCloseInspector?: () => void }) => (
       <button type="button" onClick={onCloseInspector}>
         close
@@ -66,27 +70,35 @@ vi.mock('@/features/timeblock', async () => {
   };
 });
 
-// アクティビティ一覧は 1 件だけ返す。押すとその場で作成へ進む
+// アクティビティ一覧は 1 件だけ返す。押すとその場で作成へ進む。
+// 受け取った中央値は行の表示へ回すので、ここでは「渡ってきたか」だけを見える形にする
+// （pill の描画そのものは ActivityQuickSelector.test.tsx が実物で確認する）
 vi.mock('@/features/activities', () => ({
   useCreateActivity: () => ({ mutateAsync: vi.fn() }),
   ActivityPickerList: ({
     onSelect,
     onActivityHover,
+    durationByActivityId,
   }: {
     onSelect: (id: string, name: string) => void;
     onActivityHover?: (
       activity: { id: string; name: string; color: string | null; icon: string | null } | null,
     ) => void;
+    durationByActivityId?: ReadonlyMap<string, number> | undefined;
   }) => (
-    <button
-      type="button"
-      onClick={() => onSelect('activity-1', '開発')}
-      onMouseEnter={() =>
-        onActivityHover?.({ id: 'activity-1', name: '開発', color: 'blue', icon: 'briefcase' })
-      }
-    >
-      開発
-    </button>
+    <div>
+      <button
+        type="button"
+        onClick={() => onSelect('activity-1', '開発')}
+        onMouseEnter={() =>
+          onActivityHover?.({ id: 'activity-1', name: '開発', color: 'blue', icon: 'briefcase' })
+        }
+        onMouseLeave={() => onActivityHover?.(null)}
+      >
+        開発
+      </button>
+      <span data-testid="median">{durationByActivityId?.get('activity-1') ?? 'none'}</span>
+    </div>
   ),
 }));
 
@@ -105,14 +117,14 @@ vi.mock('next-intl', () => ({
 
 /** 指定日の 9:00-10:00 を pendingSelection に置く */
 function setSelection(date: Date) {
-  useInlineCreateStore.setState({
-    pendingSelection: {
-      date,
-      startHour: 9,
-      startMinute: 0,
-      endHour: 10,
-      endMinute: 0,
-    },
+  // ドラッグ確定と同じ経路を通す。ここで「ドラッグで決めた長さ」が記録され、
+  // ホバーを外した時の戻り先になる
+  useInlineCreateStore.getState().setPendingSelection({
+    date,
+    startHour: 9,
+    startMinute: 0,
+    endHour: 10,
+    endMinute: 0,
   });
 }
 
@@ -134,7 +146,7 @@ describe('InlineCreatePanel', () => {
     createRecordMutate.mockClear();
     openInspector.mockClear();
     closeInspector.mockClear();
-    useInlineCreateStore.setState({ pendingSelection: null, hoveredActivity: null });
+    useInlineCreateStore.getState().clearPendingSelection();
   });
 
   it('過去スロットの既定は記録で、アクティビティを押した時点で Record を作る', () => {
@@ -188,6 +200,44 @@ describe('InlineCreatePanel', () => {
     });
   });
 
+  it('ホバーするとそのアクティビティの普段の長さが選択範囲へ着る', () => {
+    setSelection(pastDay());
+    render(<InlineCreatePanel onClose={vi.fn()} />);
+
+    fireEvent.mouseEnter(screen.getByRole('button', { name: '開発' }));
+
+    // 9:00–10:00 のドラッグが、中央値 45 分に合わせて 9:00–9:45 になる。
+    // グリッドのハイライトはこの pendingSelection を読んで厚みを描く
+    const selection = useInlineCreateStore.getState().pendingSelection;
+    expect(selection?.endHour).toBe(9);
+    expect(selection?.endMinute).toBe(45);
+  });
+
+  it('ホバーを外すとドラッグで決めた長さへ戻る', () => {
+    setSelection(pastDay());
+    render(<InlineCreatePanel onClose={vi.fn()} />);
+    const pill = screen.getByRole('button', { name: '開発' });
+
+    fireEvent.mouseEnter(pill);
+    fireEvent.mouseLeave(pill);
+
+    const selection = useInlineCreateStore.getState().pendingSelection;
+    expect(selection?.endHour).toBe(10);
+    expect(selection?.endMinute).toBe(0);
+  });
+
+  it('プレビューした長さのまま作成する（表示と保存が食い違わない）', () => {
+    setSelection(pastDay());
+    render(<InlineCreatePanel onClose={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole('button', { name: '開発' }));
+
+    const [input] = createRecordMutate.mock.calls[0] as [{ start_at: string; end_at: string }];
+    const durationMinutes =
+      (new Date(input.end_at).getTime() - new Date(input.start_at).getTime()) / 60000;
+    expect(durationMinutes).toBe(45);
+  });
+
   it('メモと充実度は作成入力へ載る（記録）', () => {
     setSelection(pastDay());
     render(<InlineCreatePanel onClose={vi.fn()} />);
@@ -214,6 +264,13 @@ describe('InlineCreatePanel', () => {
     const [input] = createPlanMutate.mock.calls[0] as [{ note?: string; fulfillment?: string }];
     expect(input.note).toBe('集中できた');
     expect(input.fulfillment).toBeUndefined();
+  });
+
+  it('記録の中央値をアクティビティ一覧へ渡す（予定・記録どちらのタブでも）', () => {
+    setSelection(pastDay());
+    render(<InlineCreatePanel onClose={vi.fn()} />);
+
+    expect(screen.getByTestId('median')).toHaveTextContent('45');
   });
 
   it('閉じるボタンでは何も作成しない', () => {
