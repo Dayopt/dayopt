@@ -223,7 +223,8 @@
         "applyFailed": "Couldn't apply the template. Please try again",
         "saveFailed": "Couldn't save the template. Please try again",
         "renameFailed": "Couldn't rename the template. Please try again",
-        "deleteFailed": "Couldn't delete the template. Please try again"
+        "deleteFailed": "Couldn't delete the template. Please try again",
+        "applied": "{count, plural, one {1 plan} other {# plans}} added"
       }
     },
     "activitySelector": {

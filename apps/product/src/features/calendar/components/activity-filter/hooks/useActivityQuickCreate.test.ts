@@ -60,7 +60,8 @@ vi.mock('@/lib/hooks/useUserPreferences', () => ({
     selector({ timezone: 'UTC', defaultDuration: 60 }),
 }));
 vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({}) }));
-vi.mock('@/lib/toast', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
+const toastSuccess = vi.hoisted(() => vi.fn());
+vi.mock('@/lib/toast', () => ({ toast: { success: toastSuccess, error: vi.fn() } }));
 vi.mock('next-intl', () => ({ useTranslations: () => (key: string) => key }));
 
 /**
@@ -87,6 +88,7 @@ describe('useActivityQuickCreate', () => {
     hasConflict.value = false;
     laneItems.value = [];
     medianMinutes.value = new Map();
+    toastSuccess.mockClear();
     createPlanMutate.mockClear();
     createRecordMutate.mockClear();
     openInspector.mockClear();
@@ -144,6 +146,40 @@ describe('useActivityQuickCreate', () => {
     options.onSuccess({ id: 'plan-1', updated_at: '2026-09-07T00:00:00.000Z' });
 
     expect(openInspector).toHaveBeenCalledWith('plan-1', 'plan');
+  });
+
+  it('予定として作ったら予定の文言を出す（記録とは言わない）', () => {
+    const { result } = renderHook(() => useActivityQuickCreate());
+
+    result.current({ activityId: 'activity-1', activityName: '開発' });
+    const [, options] = createPlanMutate.mock.calls[0] as [
+      unknown,
+      { onSuccess: (created: { id: string; updated_at: string }) => void },
+    ];
+    options.onSuccess({ id: 'plan-1', updated_at: '2026-09-07T00:00:00.000Z' });
+
+    expect(toastSuccess.mock.calls[0]?.[0]).toBe('timeblock.editor.toast.planCreated');
+  });
+
+  it('ずらして作った時は時刻つきの文言を出す', () => {
+    const now = wallClockAsUtc(new Date());
+    laneItems.value = [
+      {
+        id: 'existing',
+        start_at: new Date(now.getTime() - 60 * 60 * 1000).toISOString(),
+        end_at: new Date(now.getTime() + 2 * 60 * 60 * 1000).toISOString(),
+      },
+    ];
+    const { result } = renderHook(() => useActivityQuickCreate());
+
+    result.current({ activityId: 'activity-1', activityName: '開発' });
+    const [, options] = createPlanMutate.mock.calls[0] as [
+      unknown,
+      { onSuccess: (created: { id: string; updated_at: string }) => void },
+    ];
+    options.onSuccess({ id: 'plan-1', updated_at: '2026-09-07T00:00:00.000Z' });
+
+    expect(toastSuccess.mock.calls[0]?.[0]).toBe('timeblock.editor.toast.planCreatedShifted');
   });
 
   it('今の時間が埋まっている時は、直後の空きへずらして作る', () => {

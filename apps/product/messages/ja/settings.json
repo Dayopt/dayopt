@@ -385,7 +385,11 @@
         "confirmDeleteAll": "すべてのデータが完全に削除されます。アカウントは残りますが、タイムブロック、アクティビティ、設定はすべて削除されます。",
         "typeToConfirm": "確認のため「{keyword}」と入力してください",
         "confirmKeyword": "削除",
-        "deleting": "削除中..."
+        "deleting": "削除中...",
+        "blocksDeleted": "{count} 件のタイムブロックを削除しました",
+        "blocksDeleteFailed": "タイムブロックを削除できませんでした。もう一度お試しください",
+        "allDataDeleted": "すべてのデータを削除しました",
+        "allDataDeleteFailed": "データを削除できませんでした。もう一度お試しください"
       }
     },
     "integrations": {

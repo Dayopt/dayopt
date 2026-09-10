@@ -516,9 +516,21 @@ export function TimeblockInspectorForm({
   const handleCreateDuplicate = useCallback(() => {
     if (!duplicateDraft || duplicateValidationReason !== null || hasTimeConflict) return;
     const input = buildTimeblockDuplicateCreateInput(duplicateDraft, value);
-    const onSuccess = (created: { id: string } | null | undefined) => {
+    const onSuccess = (created: { id: string; updated_at: string } | null | undefined) => {
       if (!created) return;
-      toast.success(t('timeblock.editor.duplicate.created'));
+      toast.success(t('timeblock.editor.duplicate.created'), {
+        action: {
+          label: t('common.undo'),
+          onClick: () => {
+            const input = { id: created.id, expectedUpdatedAt: created.updated_at };
+            if (duplicateDraft.kind === 'plan') {
+              deletePlan.mutate(input);
+            } else {
+              deleteRecord.mutate(input);
+            }
+          },
+        },
+      });
       onDuplicateCreated?.(created.id, duplicateDraft.kind);
     };
 
@@ -530,6 +542,8 @@ export function TimeblockInspectorForm({
   }, [
     createPlan,
     createRecord,
+    deletePlan,
+    deleteRecord,
     duplicateDraft,
     hasTimeConflict,
     duplicateValidationReason,

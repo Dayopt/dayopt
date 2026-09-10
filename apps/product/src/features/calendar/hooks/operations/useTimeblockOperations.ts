@@ -61,7 +61,8 @@ function findTimeModelRowById(
  * plans.list / records.list キャッシュから id を逆引きして kind を判定する。
  */
 export const useTimeblockOperations = () => {
-  const { deleteRecord, deletePlan, updateRecord, updatePlan } = useTimeblockWriteMutations();
+  const { deleteRecord, deletePlan, updateRecord, updatePlan, restorePlan, restoreRecord } =
+    useTimeblockWriteMutations();
   const queryClient = useQueryClient();
   const t = useTranslations();
 
@@ -90,6 +91,28 @@ export const useTimeblockOperations = () => {
     [updatePlan, updateRecord, t],
   );
 
+  /**
+   * 削除の取り消しを出す。キーボード（Delete / Backspace）と右クリックの削除は
+   * 確認を挟まない代わりに、ここで戻し口を渡す（可逆は速く、ルール 4）。
+   */
+  const showDeleteUndoToast = useCallback(
+    (id: string, kind: TimeblockDestination, deletedUpdatedAt: string) => {
+      toast.success(t('timeblock.editor.toast.deleted'), {
+        action: {
+          label: t('common.undo'),
+          onClick: () => {
+            const input = { id, expectedUpdatedAt: deletedUpdatedAt };
+            const restored =
+              kind === 'plan' ? restorePlan.mutateAsync(input) : restoreRecord.mutateAsync(input);
+            // 失敗時は restore mutation 自身がトーストを出す
+            void restored.catch(() => undefined);
+          },
+        },
+      });
+    },
+    [restorePlan, restoreRecord, t],
+  );
+
   // Timeblock 削除ハンドラー（id のみ。kind はキャッシュから逆引きする）
   const handleTimeblockDelete = useCallback(
     async (timeblockId: string): Promise<boolean> => {
@@ -102,23 +125,23 @@ export const useTimeblockOperations = () => {
       }
       if (found.row.source === 'auto_migrated') return false;
       try {
-        if (found.kind === 'plan') {
-          await deletePlan.mutateAsync({
-            id: timeblockId,
-            expectedUpdatedAt: found.row.updated_at,
-          });
-        } else {
-          await deleteRecord.mutateAsync({
-            id: timeblockId,
-            expectedUpdatedAt: found.row.updated_at,
-          });
-        }
+        const deleted =
+          found.kind === 'plan'
+            ? await deletePlan.mutateAsync({
+                id: timeblockId,
+                expectedUpdatedAt: found.row.updated_at,
+              })
+            : await deleteRecord.mutateAsync({
+                id: timeblockId,
+                expectedUpdatedAt: found.row.updated_at,
+              });
+        showDeleteUndoToast(timeblockId, found.kind, deleted.updated_at);
         return true;
       } catch {
         return false;
       }
     },
-    [queryClient, deletePlan, deleteRecord],
+    [queryClient, deletePlan, deleteRecord, showDeleteUndoToast],
   );
 
   // Timeblock更新ハンドラー（ドラッグ&ドロップ / リサイズ用）

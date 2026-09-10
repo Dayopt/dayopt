@@ -39,7 +39,24 @@ const mocks = vi.hoisted(() => ({
   templateListInvalidate: vi.fn(),
   cancelQueries: vi.fn(),
   toastError: vi.fn(),
+  toastSuccess: vi.fn(),
+  deletePlanMutate: vi.fn(),
 }));
+
+/**
+ * 適用の取り消しは `useTimeblockWriteMutations` の削除経路を借りる。ここで見たいのは
+ * 「返ってきた行それぞれに削除を投げるか」なので、mutation 群は差し替え、同じ module が
+ * 提供する pure helper（snapshot / insert 等）は本物を使う。
+ */
+vi.mock('./useTimeblockWriteMutations', async () => {
+  const actual = await vi.importActual<typeof import('./useTimeblockWriteMutations')>(
+    './useTimeblockWriteMutations',
+  );
+  return {
+    ...actual,
+    useTimeblockWriteMutations: () => ({ deletePlan: { mutate: mocks.deletePlanMutate } }),
+  };
+});
 
 vi.mock('@tanstack/react-query', () => ({
   useQueryClient: () => ({
@@ -66,7 +83,9 @@ vi.mock('@tanstack/react-query', () => ({
 }));
 
 vi.mock('next-intl', () => ({ useTranslations: () => (key: string) => key }));
-vi.mock('@/lib/toast', () => ({ toast: { error: mocks.toastError, success: vi.fn() } }));
+vi.mock('@/lib/toast', () => ({
+  toast: { error: mocks.toastError, success: mocks.toastSuccess },
+}));
 vi.mock('@/lib/hooks/useUserPreferences', () => ({
   useUserPreferences: (
     selector: (preferences: { timezone: string; defaultDuration: number }) => unknown,
@@ -202,6 +221,55 @@ describe('usePlanTemplateMutations', () => {
 
       const ids = (mocks.planRows as PlanRow[]).map((row) => row.id).sort();
       expect(ids).toEqual(['existing', 'plan-1']);
+    });
+
+    it('成功時は置いた件数と取り消しを出し、取り消しで全件削除する', async () => {
+      const context = await mocks.applyCallbacks?.onMutate?.({
+        templateId: TEMPLATE_ID,
+        date: '2026-09-05',
+      });
+      const serverRows = [
+        planRow({
+          id: 'plan-1',
+          title: '集中',
+          start_at: '2026-09-05T00:00:00.000Z',
+          end_at: '2026-09-05T01:00:00.000Z',
+          updated_at: '2026-09-05T00:00:00.000Z',
+        }),
+        planRow({
+          id: 'plan-2',
+          title: '休憩',
+          start_at: '2026-09-05T01:00:00.000Z',
+          end_at: '2026-09-05T01:30:00.000Z',
+          updated_at: '2026-09-05T00:00:00.000Z',
+        }),
+      ];
+
+      mocks.applyCallbacks?.onSuccess?.(serverRows, {}, context);
+
+      const [message, options] = mocks.toastSuccess.mock.calls[0] as [
+        string,
+        { action: { onClick: () => void } },
+      ];
+      expect(message).toBe('calendar.templates.toast.applied');
+
+      // 1 タップで増えた分は 1 タップで戻せる
+      options.action.onClick();
+      expect(mocks.deletePlanMutate).toHaveBeenCalledTimes(2);
+      expect(
+        mocks.deletePlanMutate.mock.calls.map(([input]) => (input as { id: string }).id),
+      ).toEqual(['plan-1', 'plan-2']);
+    });
+
+    it('1 件も置かなかった時は取り消しを出さない', async () => {
+      const context = await mocks.applyCallbacks?.onMutate?.({
+        templateId: TEMPLATE_ID,
+        date: '2026-09-05',
+      });
+
+      mocks.applyCallbacks?.onSuccess?.([], {}, context);
+
+      expect(mocks.toastSuccess).not.toHaveBeenCalled();
     });
 
     it('失敗時は temp 行を全て巻き戻し、重複は専用の文言で伝える', async () => {

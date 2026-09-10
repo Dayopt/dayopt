@@ -30,6 +30,20 @@ type ToasterProps = React.ComponentProps<typeof Sonner>;
  * });
  * ```
  */
+/**
+ * 「元に戻す」付きが出ている間は、ついでの消去を効かせない。Inspector も Esc で
+ * 閉じるので（useInspectorKeyboard / useCalendarTimeblockKeyboard）、削除直後の 1 打で
+ * 取り消し口まで消えてしまう。クリックも同じく、狙っていない場所への 1 クリックで
+ * 戻し口を失わせない。取り消しは 5 秒で自然に消える。
+ */
+const hasUndoableToast = (): boolean => {
+  try {
+    return sonnerToast.getToasts().some((item) => 'action' in item && item.action != null);
+  } catch {
+    return false;
+  }
+};
+
 const Toaster = ({ ...props }: ToasterProps) => {
   const isMobile = useMediaQuery(MEDIA_QUERIES.mobile);
   const t = useTranslations('common.aria');
@@ -41,6 +55,7 @@ const Toaster = ({ ...props }: ToasterProps) => {
       const toastEl = (e.target as Element).closest('[data-sonner-toast]');
       if (!toastEl) return;
       if ((e.target as Element).closest('[data-action]')) return;
+      if (hasUndoableToast()) return;
       sonnerToast.dismiss();
     };
     document.addEventListener('click', handler);
@@ -51,7 +66,9 @@ const Toaster = ({ ...props }: ToasterProps) => {
   useEffect(() => {
     if (isMobile) return;
     const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') sonnerToast.dismiss();
+      if (e.key !== 'Escape') return;
+      if (hasUndoableToast()) return;
+      sonnerToast.dismiss();
     };
     document.addEventListener('keydown', handler);
     return () => document.removeEventListener('keydown', handler);

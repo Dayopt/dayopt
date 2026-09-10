@@ -78,7 +78,8 @@ export function useActivityQuickCreate() {
   return useCallback(
     ({ activityId, activityName, date }: QuickCreateArgs) => {
       if (!canUseProduct) {
-        toast.error(t('settings.subscription.singlePlan.expired'));
+        // 課金の状態は開いた設定画面そのものが説明する。閲覧のみである旨の
+        // 説明文をトーストへ流用しても「なぜ作れないか」は伝わらない
         openSettings('billing');
         return;
       }
@@ -134,17 +135,27 @@ export function useActivityQuickCreate() {
             // 作ったブロックをそのまま詳細で開く。時間の修正はこのパネルか
             // カレンダー上のドラッグで行う
             openInspector(created.id, destination);
+            // 予定と記録は別のものなので、作ったトーストでも言い分ける。
+            // ずらした時は時刻を出す（押した時間と違う場所に現れたことが読める）
             const message =
               shiftedMs > 0
-                ? t('timeblock.toast.createdShifted', {
-                    title: activityName,
-                    time: formatTimeString(
-                      shiftedLocalStart.getHours(),
-                      shiftedLocalStart.getMinutes(),
-                      timeFormat,
-                    ),
-                  })
-                : t('timeblock.toast.created', { title: activityName });
+                ? t(
+                    destination === 'plan'
+                      ? 'timeblock.editor.toast.planCreatedShifted'
+                      : 'timeblock.editor.toast.recordedShifted',
+                    {
+                      time: formatTimeString(
+                        shiftedLocalStart.getHours(),
+                        shiftedLocalStart.getMinutes(),
+                        timeFormat,
+                      ),
+                    },
+                  )
+                : t(
+                    destination === 'plan'
+                      ? 'timeblock.editor.toast.planCreated'
+                      : 'timeblock.editor.toast.recorded',
+                  );
             toast.success(message, {
               duration: 5000,
               action: {

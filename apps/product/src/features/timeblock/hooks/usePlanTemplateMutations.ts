@@ -27,6 +27,7 @@ import {
   removeTimeModelRowsFromMatchingLists,
   restoreTimeblockLists,
   snapshotTimeblockLists,
+  useTimeblockWriteMutations,
   type TimeblockListsSnapshot,
 } from './useTimeblockWriteMutations';
 
@@ -39,6 +40,8 @@ const EMPTY_ARCHIVED: ReadonlySet<string> = new Set();
 
 export function usePlanTemplateMutations() {
   const utils = api.useUtils();
+  // 適用の取り消しは同じ削除経路を通す（楽観的更新と失敗時のトーストを共有する）
+  const { deletePlan } = useTimeblockWriteMutations();
   const queryClient = useQueryClient();
   const t = useTranslations();
   const timezone = useUserPreferences((preferences) => preferences.timezone);
@@ -115,6 +118,18 @@ export function usePlanTemplateMutations() {
       for (const row of rows) {
         insertTimeModelRowIntoMatchingLists(queryClient, 'plans', row);
       }
+      if (rows.length === 0) return;
+      // 1 タップで複数件が増える操作なので、まとめて戻せる口をその場で渡す
+      toast.success(t('calendar.templates.toast.applied', { count: rows.length }), {
+        action: {
+          label: t('common.undo'),
+          onClick: () => {
+            for (const row of rows) {
+              deletePlan.mutate({ id: row.id, expectedUpdatedAt: row.updated_at });
+            }
+          },
+        },
+      });
     },
     onError: (error, _input, context) => {
       restoreTimeblockLists(queryClient, context);
