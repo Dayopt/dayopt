@@ -98,12 +98,10 @@ pnpm review:validate --pack <pack> --result <researcher.json> --emit-candidates 
 `candidates.json` を prompt と一緒に渡す。critic は**入力の全候補に verdict を返す**。
 
 ```bash
-pnpm review:validate --pack <pack> --result <critic.json> \
-  --candidates <run-dir>/candidates.json \
-  --emit-candidates <run-dir>/pending.json
+pnpm review:validate --pack <pack> --result <critic.json> --candidates <run-dir>/candidates.json
 ```
 
-`pending.json` には `needs-execution` とした候補だけが入る（`candidateSetHash` は元の run のまま）。手順 6 はこれを母集合にする。
+**`rejected` と `undetermined` には `counterevidence` が要る。** `confirmed` には要らない（落とす判断にだけ反証を求める）。
 
 分割実行した場合は `--result` を複数回渡して合流させる。
 
@@ -129,19 +127,29 @@ status は 5 択で、**到達証拠のない失敗を `failed-to-reproduce` に
 
 `reproduced` と `failed-to-reproduce` は「実際に実行した」という主張なので、`command` と `testPath` の両方を要求する（`reachedTargetPath` の自己申告だけでは通らない）。`review:validate` がこの条件を機械で落とす。
 
-**reproducer に渡す候補ファイルは、researcher の `candidates.json` ではなく手順 5 が emit した実行待ち集合**（`--emit-candidates` の出力）。全候補と突き合わせると、confirmed / rejected 済みの候補が未判定として残り、正常な sweep が永久に `partial` になる。
+**reproducer の母集合は critic envelope から再計算する。** 実行待ち集合をファイルとして残さないのは、分割した critic の round1 だけで書いた部分集合が古いまま残り、round2 の `needs-execution` が母集合にも `missing` にも現れないまま `reviewed` に到達しうるため。
+
+```bash
+pnpm review:validate --pack <pack> --result <reproducer.json> \
+  --candidates <run-dir>/candidates.json \
+  --verdicts <critic.json> [--verdicts <critic-round2.json>]
+```
+
+分割した critic envelope は**すべて**渡す。裁定が全候補に届いていない critic に対しては、reproducer だけを `reviewed` にできない。
 
 ### 7. 裁定して記録する
 
 `review:validate` の status は次を区別する。**どれも「指摘 0 件」と数えない。**
 
-| status     | 意味                                                                          |
-| ---------- | ----------------------------------------------------------------------------- |
-| `not-run`  | envelope が無い                                                               |
-| `stale`    | packId / SHA が pack と一致しない                                             |
-| `partial`  | 未判定の候補が残っている、または reviewer が coverage=partial を申告した      |
-| `reviewed` | schema と入力整合性が確認できた。**品質の合格ではない**                       |
-| `invalid`  | schema 不一致、別 run の候補集合、集合外 id、食い違う判定、到達証拠のない失敗 |
+| status     | 意味                                                                                                                                                                                                  |
+| ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `not-run`  | envelope が無い                                                                                                                                                                                       |
+| `stale`    | packId / SHA が pack と一致しない                                                                                                                                                                     |
+| `partial`  | (a) 判定が返っていない候補がある (b) 判定は返ったが裁定が決まっていない（critic の `undetermined`、reproducer の `not-run` / `environment-missing`） (c) reviewer が coverage=partial を申告した      |
+| `reviewed` | schema と入力整合性が確認できた。**品質の合格ではない**                                                                                                                                               |
+| `invalid`  | schema 不一致、別 run の候補集合、集合外 id、食い違う判定、到達証拠のない失敗、`reproduced` / `failed-to-reproduce` の command / testPath 欠落、裁定が全候補に届いていない critic に対する reproducer |
+
+`partial` の理由は `reasons` に分けて出る。**(a) と (b) を混同しない** — 全候補を `undetermined` にした critic は「指摘 0 件」ではなく「何も裁定していない」。
 
 `confirmed` の候補は `AGENTS.md §レビュー規則` の P1 / P2 に正規化し、`dispatch` skill の intake で起票する。修正へ進む場合は別 PR とし、**回帰 test が修正前の SHA で fail し、修正後に pass すること**と、正当な操作を妨げないことを PR に証跡として添える。
 

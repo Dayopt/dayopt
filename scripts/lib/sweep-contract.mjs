@@ -160,7 +160,7 @@ const SWEEP_SCHEMAS = {
         items: {
           type: 'object',
           additionalProperties: false,
-          required: ['candidateId', 'verdict', 'reasoning', 'counterevidence', 'reachability'],
+          required: ['candidateId', 'verdict', 'reasoning', 'reachability'],
           properties: {
             candidateId: { type: 'string' },
             verdict: {
@@ -236,6 +236,18 @@ const SWEEP_SCHEMAS = {
  * undetermined にした critic が `reviewed` になると、何も裁定していない run が
  * 「指摘 0 件」と読まれる。
  */
+/** critic の verdict から、実行が要ると裁定された candidateId を取り出す。 */
+export function executionQueue(results) {
+  return [
+    ...new Set(
+      results
+        .flatMap((result) => result.verdicts ?? [])
+        .filter((verdict) => verdict.verdict === 'needs-execution')
+        .map((verdict) => verdict.candidateId),
+    ),
+  ];
+}
+
 export const UNSETTLED = {
   'security-critic': new Set(['undetermined']),
   'security-reproducer': new Set(['not-run', 'environment-missing']),
@@ -257,6 +269,14 @@ export function sweepResultErrors(role, result) {
   const errors = [];
   if (role === 'security-critic') {
     for (const [index, verdict] of (result.verdicts ?? []).entries()) {
+      // 落とす判断にだけ反証を要求する。confirmed に counterevidence は無くて当然なので、
+      // 全 verdict で必須にすると reviewer が空文字を埋めるか envelope ごと invalid になる
+      // （実測: 12 件中 10 件が blank で invalid、2026-09-10 の pilot）。
+      if (
+        ['rejected', 'undetermined'].includes(verdict.verdict) &&
+        !verdict.counterevidence?.trim()
+      )
+        errors.push(`verdicts[${index}]: ${verdict.verdict} には counterevidence が要る`);
       if (verdict.verdict !== 'needs-execution') continue;
       if (!verdict.executionRequest?.trim())
         errors.push(`verdicts[${index}]: needs-execution には executionRequest が要る`);

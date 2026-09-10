@@ -322,6 +322,39 @@ function researcherResult(count: number) {
   };
 }
 
+/** reproducer の母集合を決める critic envelope。needsExecution に挙げた候補だけが実行待ちになる。 */
+function criticEnvelopeFor(
+  manifest: { packId: string; targetSha: string },
+  candidateSet: { candidateSetHash: string; candidates?: { candidateId: string }[] },
+  needsExecution: string[],
+) {
+  return sweepEnvelope(manifest, 'security-critic', {
+    candidateSetHash: candidateSet.candidateSetHash,
+    scopeChecked: ['auth/token.ts'],
+    verdicts: (candidateSet.candidates ?? []).map((candidate) =>
+      needsExecution.includes(candidate.candidateId)
+        ? {
+            candidateId: candidate.candidateId,
+            verdict: 'needs-execution',
+            reasoning: '静的には決められない',
+            reachability: 'unknown',
+            executionRequest: 'pnpm test:integration auth-token',
+            expectedEvidence: '未認証の呼び出しが 200 を返すこと',
+          }
+        : {
+            candidateId: candidate.candidateId,
+            verdict: 'rejected',
+            reasoning: '呼び出し元が別途検証している',
+            counterevidence: 'auth/session.ts が事前に検証する',
+            reachability: 'unreachable',
+          },
+    ),
+    unknowns: [],
+    coverage: 'complete',
+    summary: '裁定した',
+  });
+}
+
 function criticVerdict(index: number, over: Record<string, unknown> = {}) {
   return {
     candidateId: uuid(index),
@@ -351,14 +384,14 @@ describe('#2588: 合流と emit の安全性（cross-review 由来）', () => {
     expect(validateReview(f.out, [proceed]).recommendation).toBe('proceed');
   });
 
-  // behavior-verifier(claude-opus-5) P2: 分割実行を 1 本ずつ検証すると、後の round の
-  // 候補集合が前の round を黙って置き換える。合流は --result を並べて 1 回で行う。
-  it('--emit-candidates は既存の候補ファイルを上書きしない', () => {
+  // behavior-verifier(claude-opus-5) P2 と fix round の risk-reviewer P2:
+  // 後の round だけの候補集合が前の round を黙って置き換える経路を塞ぐ。ただし
+  // 同じ内容の再検証は冪等なので通す（塞ぐと正常な再実行まで止まる）。
+  it('--emit-candidates は内容の違う候補集合で既存ファイルを置き換えない', () => {
     const { cwd, at, context, threatModel, out } = sweepFixture();
     const manifest = createSweepPack({ cwd, at, scope: ['auth'], context, threatModel, out });
-    const researcher = sweepEnvelope(manifest, 'security-researcher', researcherResult(2));
     const emit = join(cwd, 'candidates.json');
-    const run = () =>
+    const run = (name: string, count: number) =>
       spawnSync(
         process.execPath,
         [
@@ -367,22 +400,30 @@ describe('#2588: 合流と emit の安全性（cross-review 由来）', () => {
           '--pack',
           out,
           '--result',
-          writeEnvelope(cwd, 'researcher.json', researcher),
+          writeEnvelope(
+            cwd,
+            name,
+            sweepEnvelope(manifest, 'security-researcher', researcherResult(count)),
+          ),
           '--emit-candidates',
           emit,
         ],
         { encoding: 'utf8' },
       );
 
-    const first = run();
-    expect(first.status).toBe(0);
+    expect(run('round1.json', 2).status).toBe(0);
     expect(JSON.parse(readFileSync(emit, 'utf8')).candidates).toHaveLength(2);
 
-    const second = run();
-    expect(second.status).not.toBe(0);
-    expect(second.stderr).toContain('review pack');
-    // 1 本目の候補が残っている（後の round に置き換わっていない）。
+    // 同じ内容なら冪等に通る。
+    expect(run('round1-again.json', 2).status).toBe(0);
+
+    // 内容が違えば拒否し、前の候補集合を残す。理由は catch-all の汎用文ではなく名指し。
+    const replaced = run('round2.json', 1);
+    expect(replaced.status).not.toBe(0);
+    expect(replaced.stderr).toContain('別の候補集合があります');
     expect(JSON.parse(readFileSync(emit, 'utf8')).candidates).toHaveLength(2);
+    // 検証結果そのものは潰さずに出す（例外で result ごと落とさない）。
+    expect(JSON.parse(replaced.stdout).status).toBe('reviewed');
   });
 });
 
@@ -403,6 +444,22 @@ describe('#2588: security sweep pack', () => {
     expect(sources).not.toContain('UNCOMMITTED');
     expect(sources).not.toContain('noise');
     expect([...packArtifacts('sweep', 1)!].sort()).toEqual(Object.keys(manifest.files).sort());
+  });
+
+  // fix round の risk-reviewer P2: ディレクトリ指定の scope に env ファイルが混ざる経路。
+  // 宣言した文字列だけを検査していた頃は、展開後の path が素通りして sources.json に
+  // 中身が入り、外部 provider へ渡った。
+  it('ディレクトリ指定で展開された env ファイルを scope に取り込まない', () => {
+    const { cwd, context, threatModel, out } = sweepFixture();
+    const git = (...args: string[]) => execFileSync('git', args, { cwd, encoding: 'utf8' }).trim();
+    writeFileSync(join(cwd, 'auth/.env.example'), 'SUPABASE_URL=op://agent/x\n');
+    git('add', '.');
+    git('commit', '-qm', 'env in scope');
+    const at = git('rev-parse', 'HEAD');
+
+    expect(() =>
+      createSweepPack({ cwd, at, scope: ['auth'], context, threatModel, out }),
+    ).toThrow();
   });
 
   it('scope が対象 SHA のどのファイルにも一致しなければ pack を作らない', () => {
@@ -562,41 +619,16 @@ describe('#2588: security sweep pack', () => {
 
   // クロスレビュー（risk-reviewer, GPT-5.6）の P1: reproducer を全候補と突き合わせると、
   // confirmed / rejected 済みの候補が未判定として残り、正常な sweep が reviewed へ到達しない。
-  it('reproducer は critic の needs-execution 部分集合だけを母集合にする', () => {
+  it('reproducer の母集合は critic envelope から再計算する（古い部分集合ファイルを残さない）', () => {
     const { cwd, at, context, threatModel, out } = sweepFixture();
     const manifest = createSweepPack({ cwd, at, scope: ['auth'], context, threatModel, out });
     const candidateSet = candidateSetOf(
       validateReview(out, sweepEnvelope(manifest, 'security-researcher', researcherResult(3))),
     );
-    const critic = validateReview(
-      out,
-      sweepEnvelope(manifest, 'security-critic', {
-        candidateSetHash: candidateSet.candidateSetHash,
-        scopeChecked: ['auth/token.ts'],
-        verdicts: [
-          criticVerdict(1, { verdict: 'confirmed', reachability: 'reachable' }),
-          criticVerdict(2),
-          criticVerdict(3, {
-            verdict: 'needs-execution',
-            reachability: 'unknown',
-            executionRequest: 'pnpm test:integration auth-token',
-            expectedEvidence: '未認証の呼び出しが 200 を返すこと',
-          }),
-        ],
-        unknowns: [],
-        coverage: 'complete',
-        summary: '裁定した',
-      }),
-      { candidates: candidateSet },
-    );
-    expect(critic.status).toBe('reviewed');
+    const critic = criticEnvelopeFor(manifest, candidateSet, [uuid(3)]);
+    expect(validateReview(out, critic, { candidates: candidateSet }).status).toBe('reviewed');
 
-    // critic の検証が実行待ち集合を返す。母集合は 3 件ではなく 1 件。
-    const pending = candidateSetOf(critic);
-    expect(pending.candidateSetHash).toBe(candidateSet.candidateSetHash);
-    expect(pending.candidates?.map((candidate) => candidate.candidateId)).toEqual([uuid(3)]);
-
-    const reproducerEnvelope = sweepEnvelope(manifest, 'security-reproducer', {
+    const attempt = sweepEnvelope(manifest, 'security-reproducer', {
       candidateSetHash: candidateSet.candidateSetHash,
       isolation: 'worktree + local Supabase 127.0.0.1',
       attempts: [
@@ -614,15 +646,66 @@ describe('#2588: security sweep pack', () => {
       summary: '実行待ちの 1 件を再現した',
     });
 
-    // 実行待ち集合を母集合にすれば reviewed。
-    expect(validateReview(out, reproducerEnvelope, { candidates: pending }).status).toBe(
-      'reviewed',
-    );
+    // 実行待ちの 1 件だけで reviewed。confirmed / rejected 済みは母集合に入らない。
+    const ok = validateReview(out, attempt, { candidates: candidateSet, verdicts: [critic] });
+    expect(ok.status).toBe('reviewed');
+    expect(candidateSetOf(ok).missing).toEqual([]);
 
-    // 全候補を母集合にすると、実行の必要が無い 2 件が未判定として残り partial になる。
-    const againstAll = validateReview(out, reproducerEnvelope, { candidates: candidateSet });
-    expect(againstAll.status).toBe('partial');
-    expect(candidateSetOf(againstAll).missing).toEqual([uuid(1), uuid(2)]);
+    // critic envelope が無ければ「判定できた」ことにしない。
+    expect(validateReview(out, attempt, { candidates: candidateSet }).status).toBe('invalid');
+  });
+
+  // fix round の risk-reviewer P1: 分割した critic の一部だけを渡すと、渡していない
+  // round の needs-execution が母集合にも missing にも現れないまま reviewed に到達した。
+  it('裁定が全候補に届いていない critic に対して reproducer を reviewed にしない', () => {
+    const { cwd, at, context, threatModel, out } = sweepFixture();
+    const manifest = createSweepPack({ cwd, at, scope: ['auth'], context, threatModel, out });
+    const candidateSet = candidateSetOf(
+      validateReview(out, sweepEnvelope(manifest, 'security-researcher', researcherResult(3))),
+    );
+    // round1 は 2 件だけ裁定し、うち 1 件が needs-execution。
+    const round1 = sweepEnvelope(manifest, 'security-critic', {
+      candidateSetHash: candidateSet.candidateSetHash,
+      scopeChecked: ['auth/token.ts'],
+      verdicts: [
+        criticVerdict(1),
+        {
+          candidateId: uuid(2),
+          verdict: 'needs-execution',
+          reasoning: '静的には決められない',
+          reachability: 'unknown',
+          executionRequest: 'pnpm test:integration a',
+          expectedEvidence: 'a が観測できること',
+        },
+      ],
+      unknowns: [],
+      coverage: 'partial',
+      summary: '途中で切り上げた',
+    });
+    const attempt = sweepEnvelope(manifest, 'security-reproducer', {
+      candidateSetHash: candidateSet.candidateSetHash,
+      isolation: 'worktree + local Supabase 127.0.0.1',
+      attempts: [
+        {
+          candidateId: uuid(2),
+          status: 'reproduced',
+          reachedTargetPath: 'yes',
+          command: 'pnpm test:integration a',
+          testPath: 'a/b.integration.test.ts',
+          evidence: 'a を観測した',
+        },
+      ],
+      unknowns: [],
+      coverage: 'complete',
+      summary: '再現した',
+    });
+
+    const result = validateReview(out, attempt, {
+      candidates: candidateSet,
+      verdicts: [round1],
+    });
+    expect(result.status).toBe('invalid');
+    expect(result.errors?.[0]).toContain('critic の裁定が');
   });
 
   // クロスレビュー（risk-reviewer, GPT-5.6）の P2: reachedTargetPath は自己申告なので、
@@ -636,6 +719,7 @@ describe('#2588: security sweep pack', () => {
     const candidateSet = candidateSetOf(
       validateReview(out, sweepEnvelope(manifest, 'security-researcher', researcherResult(1))),
     );
+    const critic = criticEnvelopeFor(manifest, candidateSet, [uuid(1)]);
     const reproducer = (attempt: Record<string, unknown>) =>
       validateReview(
         out,
@@ -655,7 +739,7 @@ describe('#2588: security sweep pack', () => {
           coverage: 'complete',
           summary: '再現を試みた',
         }),
-        { candidates: candidateSet },
+        { candidates: candidateSet, verdicts: [critic] },
       );
 
     expect(reproducer({}).errors).toEqual([
@@ -706,7 +790,10 @@ describe('#2588: security sweep pack', () => {
         coverage: 'complete',
         summary: '実行できなかった理由を分けた',
       }),
-      { candidates: candidateSet },
+      {
+        candidates: candidateSet,
+        verdicts: [criticEnvelopeFor(manifest, candidateSet, [uuid(1), uuid(2), uuid(3)])],
+      },
     );
     // statically-confirmed だけが裁定済み。not-run と environment-missing は未決。
     expect(result.status).toBe('partial');
@@ -749,6 +836,7 @@ describe('#2588: security sweep pack', () => {
     const candidateSet = candidateSetOf(
       validateReview(out, sweepEnvelope(manifest, 'security-researcher', researcherResult(1))),
     );
+    const critic = criticEnvelopeFor(manifest, candidateSet, [uuid(1)]);
     const reproducer = (attempt: Record<string, unknown>) =>
       sweepEnvelope(manifest, 'security-reproducer', {
         candidateSetHash: candidateSet.candidateSetHash,
@@ -762,7 +850,7 @@ describe('#2588: security sweep pack', () => {
     const bogus = validateReview(
       out,
       reproducer({ status: 'failed-to-reproduce', reachedTargetPath: 'unknown' }),
-      { candidates: candidateSet },
+      { candidates: candidateSet, verdicts: [critic] },
     );
     expect(bogus.status).toBe('invalid');
     expect(bogus.errors?.[0]).toContain('到達証拠のない失敗');
@@ -771,7 +859,7 @@ describe('#2588: security sweep pack', () => {
     const honest = validateReview(
       out,
       reproducer({ status: 'environment-missing', reachedTargetPath: 'unknown' }),
-      { candidates: candidateSet },
+      { candidates: candidateSet, verdicts: [critic] },
     );
     expect(honest.status).toBe('partial');
     expect(candidateSetOf(honest).unsettled).toEqual([uuid(1)]);

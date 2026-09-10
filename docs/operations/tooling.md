@@ -562,14 +562,16 @@ sweep の後段（`security-critic` / `security-reproducer`）は候補集合と
 
 ```bash
 pnpm review:validate --pack <directory> --result <result.json> [--result <result2.json>] \
-  [--candidates <candidates.json>] [--emit-candidates <new-path>]
+  [--candidates <candidates.json>] [--verdicts <critic.json>] [--emit-candidates <new-path>]
 ```
 
 - `candidateId` / `signature` / `candidateSetHash` は**生成側が導出**し、reviewer の申告を採らない
 - 判定が返っていない候補、候補集合に無い id への判定、食い違う判定、別 run の候補集合を**別々の理由で**検出する
 - `undetermined`（critic）と `not-run` / `environment-missing`（reproducer）は裁定が決まっていないものとして `partial` に留める。id が入っていることを「判定済み」と数えない
-- `--emit-candidates` は既存ファイルへ上書きしない。分割実行は `--result` を並べて 1 回で検証する。critic の検証は `needs-execution` の部分集合を emit し、reproducer はそれを母集合にする
-- `reproduced` / `failed-to-reproduce` は実行した `command` と `testPath` の提示を要求する。到達証拠のない失敗は `not-run` / `environment-missing` へ落とす
+- `--emit-candidates` は**内容の違う**候補集合で既存ファイルを置き換えない（同一内容の再検証は冪等に通る）。分割した envelope は `--result` を並べて 1 回で検証する
+- reproducer の母集合は `--verdicts` に渡した critic envelope から**その場で再計算**する。実行待ち集合をファイルに残すと、分割した critic の一部だけで書いた部分集合が古いまま残り、渡していない round の `needs-execution` が母集合にも `missing` にも現れなくなる。裁定が全候補に届いていない critic に対して reproducer を `reviewed` にはしない
+- `rejected` / `undetermined` には `counterevidence` を要求する。`confirmed` には要求しない（落とす判断にだけ反証を求める）
+- `reproduced` / `failed-to-reproduce` は実行した `command` と `testPath` の提示を要求する。到達証拠のない失敗は `not-run` / `environment-missing` へ落とす。`statically-confirmed` は件数を結果に出して、実行できた候補が逃げていないか見えるようにする
 
 ## 6. Migration acceptance と handoff
 

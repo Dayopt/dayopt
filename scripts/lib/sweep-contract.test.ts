@@ -146,10 +146,24 @@ describe('sweepResultErrors', () => {
     ]);
   });
 
-  it('confirmed / rejected には実行要求を求めない', () => {
+  it('confirmed には実行要求も counterevidence も求めない', () => {
     expect(
       sweepResultErrors('security-critic', {
-        verdicts: [{ candidateId: id(1), verdict: 'rejected' }],
+        verdicts: [{ candidateId: id(1), verdict: 'confirmed' }],
+      }),
+    ).toEqual([]);
+  });
+
+  // pilot 実測（2026-09-10）: counterevidence を全 verdict 必須にしていたため、
+  // confirmed 8 件を含む critic envelope が 12 件中 10 件 blank で invalid になった。
+  // 落とす判断にだけ反証を要求する。
+  it.each([['rejected'], ['undetermined']])('%s には counterevidence を要求する', (verdict) => {
+    expect(
+      sweepResultErrors('security-critic', { verdicts: [{ candidateId: id(1), verdict }] }),
+    ).toEqual([`verdicts[0]: ${verdict} には counterevidence が要る`]);
+    expect(
+      sweepResultErrors('security-critic', {
+        verdicts: [{ candidateId: id(1), verdict, counterevidence: 'a.ts が事前に検証する' }],
       }),
     ).toEqual([]);
   });

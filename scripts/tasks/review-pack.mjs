@@ -8,6 +8,7 @@ import { buildReviewPrompt, packArtifacts, packContract } from '../lib/review-co
 import {
   UNSETTLED,
   buildSweepPrompt,
+  executionQueue,
   normalizeCandidateSet,
   reconcileVerdicts,
   sweepResultErrors,
@@ -282,7 +283,7 @@ function reviewerErrors(envelope, roles) {
  * risk-reviewer P1）。reproducer には critic の検証が emit した実行待ち集合
  * （`candidateSetHash` は元の run のまま、`candidates` が部分集合）を渡す。
  */
-function reconcileAgainstCandidates(role, results, candidates) {
+function reconcileAgainstCandidates(role, results, candidates, verdicts) {
   if (!candidates)
     return { errors: [`${role} の検証には researcher の candidates ファイルが要る`] };
   const stated = new Set(results.map((result) => result.candidateSetHash));
@@ -296,7 +297,36 @@ function reconcileAgainstCandidates(role, results, candidates) {
   const entries = results.flatMap((result) =>
     role === 'security-critic' ? (result.verdicts ?? []) : (result.attempts ?? []),
   );
-  const ids = candidates.candidates.map((candidate) => candidate.candidateId);
+  let ids = candidates.candidates.map((candidate) => candidate.candidateId);
+  if (role === 'security-reproducer') {
+    // 母集合は critic が needs-execution とした部分集合。critic envelope をその場で
+    // 読み直し、**裁定が全候補に行き渡っていること**を先に確かめる。行き渡っていない
+    // critic に対して reproducer だけを reviewed にできてはいけない。
+    if (!verdicts?.length)
+      return {
+        errors: [
+          'security-reproducer の検証には critic envelope（--verdicts、分割した分はすべて）が要る',
+        ],
+      };
+    const criticStated = new Set(verdicts.map((one) => one.result?.candidateSetHash));
+    if (criticStated.size !== 1 || !criticStated.has(candidates.candidateSetHash))
+      return { errors: ['critic envelope が別 run の候補集合に対する判定になっている'] };
+    const criticResults = verdicts.map((one) => one.result);
+    const criticCoverage = reconcileVerdicts(
+      ids,
+      criticResults.flatMap((r) => r.verdicts ?? []),
+      {
+        key: 'verdict',
+      },
+    );
+    if (criticCoverage.missing.length)
+      return {
+        errors: [
+          `critic の裁定が ${criticCoverage.missing.length} 件の候補に届いていない（分割した critic envelope をすべて --verdicts で渡す）`,
+        ],
+      };
+    ids = executionQueue(criticResults);
+  }
   const reconciled = reconcileVerdicts(ids, entries, { key });
   const errors = [];
   if (reconciled.foreign.length)
@@ -317,6 +347,8 @@ function reconcileAgainstCandidates(role, results, candidates) {
  * @property {string[]} [foreign] 候補集合に無い candidateId への判定
  * @property {string[]} [conflicting] 同一 candidateId への食い違う判定
  * @property {string[]} [duplicate] 同一 candidateId への同じ判定の重複
+ * @property {{candidateId: string}[]} [executionQueue] critic が実行を要ると裁定した候補
+ * @property {number} [staticallyConfirmed] 実行を伴わない statically-confirmed の件数
  */
 
 /**
@@ -330,6 +362,7 @@ function reconcileAgainstCandidates(role, results, candidates) {
  * @property {string[]} [errors]
  * @property {string[]} [reasons] partial の理由（未判定・自己申告・重複）
  * @property {CandidateSetReport} [candidateSet]
+ * @property {number} [staticallyConfirmed] 実行を伴わない statically-confirmed の件数
  * @property {object|object[]} [reviewer]
  */
 
@@ -344,7 +377,8 @@ function reconcileAgainstCandidates(role, results, candidates) {
  *
  * @param {string} pack pack ディレクトリ
  * @param {object|object[]} [envelope] 同一 role の envelope（未実行なら省略）
- * @param {{candidates?: CandidateSetReport}} [options]
+ * @param {{candidates?: CandidateSetReport, verdicts?: object[]}} [options] `verdicts` は
+ *   reproducer 検証で母集合を再計算するための critic envelope（分割した分はすべて）
  * @returns {ReviewValidation}
  */
 export function validateReview(pack, envelope, options = {}) {
@@ -463,7 +497,12 @@ export function validateReview(pack, envelope, options = {}) {
         },
       };
     }
-    const reconciliation = reconcileAgainstCandidates(role, results, options.candidates);
+    const reconciliation = reconcileAgainstCandidates(
+      role,
+      results,
+      options.candidates,
+      options.verdicts,
+    );
     if (reconciliation.errors.length)
       return { ...base, status: 'invalid', errors: reconciliation.errors };
     const { foreign, conflicting, duplicate, missing } = reconciliation.reconciled;
@@ -483,17 +522,21 @@ export function validateReview(pack, envelope, options = {}) {
     const settledCount = new Set(
       entries.filter((entry) => !unsettledValues.has(entry[key])).map((entry) => entry.candidateId),
     ).size;
-    // critic の検証は「次に実行が要る候補」を部分集合として返す。reproducer の
-    // 検証はこれを母集合にする（全候補ではない）。
-    const pending =
-      role === 'security-critic'
-        ? results
-            .flatMap((result) => result.verdicts ?? [])
-            .filter((verdict) => verdict.verdict === 'needs-execution')
-            .map((verdict) => verdict.candidateId)
-        : null;
+    // critic は「次に実行が要る候補」を返すが、これはファイルとして残さない。
+    // 残すと、分割実行した critic の round1 だけで書いた部分集合が古いまま残り、
+    // round2 の needs-execution が母集合にも missing にも現れないまま reproducer が
+    // reviewed に到達しうる（fix round の risk-reviewer P1）。reproducer の検証は
+    // critic envelope そのものを `--verdicts` で受け取り、その場で再計算する。
+    const pending = role === 'security-critic' ? executionQueue(results) : null;
     const reasons = [];
     if (missing.length) reasons.push(`判定が返っていない candidateId ${missing.length} 件`);
+    if (role === 'security-reproducer') {
+      const staticCount = entries.filter((entry) => entry.status === 'statically-confirmed').length;
+      if (staticCount)
+        reasons.push(
+          `実行を伴わない statically-confirmed が ${staticCount} 件（実行できた候補が逃げていないか確認する）`,
+        );
+    }
     if (unsettled.length)
       reasons.push(
         `裁定が決まっていない candidateId ${unsettled.length} 件（${[...unsettledValues].join(' / ')}）`,
@@ -515,10 +558,15 @@ export function validateReview(pack, envelope, options = {}) {
         foreign,
         conflicting,
         duplicate,
-        ...(pending
+        ...(pending ? { executionQueue: pending.map((id) => known.get(id)).filter(Boolean) } : {}),
+        // statically-confirmed は実行を伴わないので、settled でも件数を見えるようにする。
+        // 実行できなかった候補を not-run ではなくこの値へ逃がす経路が残っているため
+        // （fix round の risk-reviewer P3）。
+        ...(role === 'security-reproducer'
           ? {
-              candidates: pending.map((id) => known.get(id)).filter(Boolean),
-              pendingCount: pending.length,
+              staticallyConfirmed: entries.filter(
+                (entry) => entry.status === 'statically-confirmed',
+              ).length,
             }
           : {}),
       },
@@ -536,15 +584,15 @@ export function validateReview(pack, envelope, options = {}) {
 const MODES = {
   create: ['base', 'head', 'context', 'verification', 'out', 'source'],
   sweep: ['at', 'scope', 'context', 'threat-model', 'out'],
-  validate: ['pack', 'result', 'candidates', 'emit-candidates'],
+  validate: ['pack', 'result', 'candidates', 'verdicts', 'emit-candidates'],
 };
-const REPEATABLE = { source: 'sources', scope: 'scope', result: 'results' };
+const REPEATABLE = { source: 'sources', scope: 'scope', result: 'results', verdicts: 'verdicts' };
 
 function main(args) {
   const mode = args.shift();
   const allowed = MODES[mode];
   if (!allowed) throw new Error('mode: create | sweep | validate');
-  const options = { sources: [], scope: [], results: [] };
+  const options = { sources: [], scope: [], results: [], verdicts: [] };
   while (args.length) {
     const key = args.shift().replace(/^--/, '');
     const value = args.shift();
@@ -581,24 +629,27 @@ function main(args) {
   const candidates = options.candidates
     ? JSON.parse(readFileSync(options.candidates, 'utf8'))
     : undefined;
+  const verdicts = options.verdicts.map((path) => JSON.parse(readFileSync(path, 'utf8')));
   const result = validateReview(
     options.pack,
     envelopes.length === 0 ? undefined : envelopes.length === 1 ? envelopes[0] : envelopes,
-    { candidates },
+    { candidates, verdicts },
   );
   const emit = options['emit-candidates'];
+  let emitError = null;
   if (emit && result.status !== 'invalid' && result.candidateSet?.candidates) {
-    // 既存の候補ファイルへは上書きしない。分割実行を 1 本ずつ検証すると、後の round
-    // だけの候補集合で前の round を黙って置き換えてしまう（cross-review の
-    // behavior-verifier P2）。合流は `--result` を並べて 1 回で検証する。
-    if (existsSync(emit))
-      throw new Error(
-        '--emit-candidates の出力先が既にあります。--result を並べて 1 回で検証してください',
-      );
-    writeFileSync(emit, JSON.stringify(result.candidateSet, null, 2) + '\n');
+    const next = JSON.stringify(result.candidateSet, null, 2) + '\n';
+    // 既存ファイルと**内容が違う**時だけ拒否する。分割実行を 1 本ずつ検証すると、
+    // 後の round だけの候補集合が前の round を黙って置き換える（cross-review の
+    // behavior-verifier P2）。同じ内容の再検証は冪等なので通す。
+    if (existsSync(emit) && readFileSync(emit, 'utf8') !== next)
+      emitError =
+        '--emit-candidates の出力先に別の候補集合があります。上書きしません。分割した envelope は --result を並べて 1 回で検証してください';
+    else writeFileSync(emit, next);
   }
   console.log(JSON.stringify(result, null, 2));
-  if (result.status !== 'reviewed') process.exitCode = 1;
+  if (emitError) console.error(emitError);
+  if (emitError || result.status !== 'reviewed') process.exitCode = 1;
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
