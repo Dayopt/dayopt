@@ -87,6 +87,30 @@ describe('DockedInspectorPanel', () => {
     expect(onRequestClose).not.toHaveBeenCalled();
   });
 
+  it('カレンダーのブロックを押しても閉じない（開閉はカードの click が決める）', () => {
+    const slot = makeSlot();
+    const onRequestClose = vi.fn();
+
+    render(
+      <DockedInspectorPanel title="Work" slotElement={slot} onRequestClose={onRequestClose}>
+        <button type="button">Edit</button>
+      </DockedInspectorPanel>,
+    );
+
+    const card = document.createElement('div');
+    card.setAttribute('data-entry-block', 'true');
+    card.setAttribute('data-entry-id', 'plan-1');
+    const label = document.createElement('span');
+    card.appendChild(label);
+    document.body.appendChild(card);
+
+    // カードの中身を押した場合も含めて閉じない。ここで閉じると、後から走る click が
+    // 開き直して「閉じてまた開く」になる
+    fireEvent.pointerDown(label);
+
+    expect(onRequestClose).not.toHaveBeenCalled();
+  });
+
   it('パネル外の popover / メニュー / トーストと、組で動く印を持つ要素では閉じない', () => {
     const slot = makeSlot();
     const onRequestClose = vi.fn();

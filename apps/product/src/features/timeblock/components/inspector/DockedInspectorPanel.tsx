@@ -28,6 +28,16 @@ const FOCUSABLE_SELECTOR =
  * `data-inspector-keep-open` は、パネルと組で動く画面上の部品が自分で付ける印。
  * 作成中の選択範囲（カレンダー上のハイライト）はこれを持ち、掴んで伸ばしても畳まれない。
  */
+/**
+ * カレンダー上のブロック。押しても閉じない。
+ *
+ * 開閉はカードの click ハンドラが決める（同じブロックなら閉じ、別のブロックなら
+ * 中身を差し替える）。ここで pointerdown 時に閉じてしまうと、後から走る click が
+ * 開き直すため、同じブロックを押しても閉じず、別のブロックへ移る時も一度畳まれて
+ * から開く「またたき」になる（2026-09-10 User 指摘）。
+ */
+const TIMEBLOCK_CARD_SELECTOR = '[data-entry-block]';
+
 const OVERLAY_LAYER_SELECTOR = [
   '[data-inspector-keep-open]',
   '[data-radix-popper-content-wrapper]',
@@ -81,8 +91,8 @@ export function DockedInspectorPanel({
     return () => clearTimeout(timer);
   }, [slotElement]);
 
-  // パネルの外を押したら閉じる。pointerdown を capture で見るのは、押した先の
-  // click ハンドラ（別ブロックを開く等）より先に閉じ、開き直しの取りこぼしを避けるため。
+  // パネルの外を押したら閉じる。pointerdown を capture で見るのは、メニューなどが
+  // 自分を閉じて DOM から外れる前に押した先を判定するため。
   useEffect(() => {
     if (!onRequestClose) return;
 
@@ -93,6 +103,8 @@ export function DockedInspectorPanel({
       if (!target.isConnected) return;
       if (panelRef.current?.contains(target)) return;
       if (target.closest(OVERLAY_LAYER_SELECTOR)) return;
+      // ブロックの開閉はカード側の click に委ねる
+      if (target.closest(TIMEBLOCK_CARD_SELECTOR)) return;
       onRequestClose();
     };
 

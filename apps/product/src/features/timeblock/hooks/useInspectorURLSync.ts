@@ -1,6 +1,6 @@
 'use client';
 
-import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import { useEffect, useRef } from 'react';
 
 import {
@@ -23,7 +23,6 @@ import { useTimeblockInspectorStore } from '../stores/useTimeblockInspectorStore
 export function useInspectorURLSync() {
   const searchParams = useSearchParams();
   const pathname = usePathname();
-  const router = useRouter();
 
   const isOpen = useTimeblockInspectorStore((state) => state.isOpen);
   const timeblockId = useTimeblockInspectorStore((state) => state.timeblockId);
@@ -41,7 +40,11 @@ export function useInspectorURLSync() {
   useEffect(() => {
     if (!searchParams) return;
 
-    const timeblockParam = searchParams.get(TIMEBLOCK_PARAM);
+    // 値は window.location から読む。自前の history 書き換えは useSearchParams() へ
+    // 反映されないため、hook の値は古いことがある（CalendarNavigationContext §5-3 と
+    // 同じ理由）。ここで古い値を信じると、閉じた直後に開き直してしまう。
+    // searchParams は「外からの navigation が起きた」合図としてだけ使う。
+    const timeblockParam = new URLSearchParams(window.location.search).get(TIMEBLOCK_PARAM);
     if (previousURLParamRef.current === timeblockParam) return;
     previousURLParamRef.current = timeblockParam;
     if (!timeblockParam) return;
@@ -78,11 +81,15 @@ export function useInspectorURLSync() {
 
     if (isOpen && timeblockId) {
       // 既存エントリでインスペクタが開いている場合
-      // push で履歴エントリを追加 → 戻る/進むで復元可能にする
+      // 履歴エントリを追加 → 戻る/進むで復元可能にする（popstate 側で拾う）。
+      // router.push は使わない。client navigation が走るとパネルが一度畳まれてから
+      // 開き直り、別ブロックへ移る時に「またたき」になる。カレンダーの date / view も
+      // 同じ理由で history API を直接使っている（CalendarNavigationContext）
       const serialized = serializeTimeblockParam(timeblockId, timeblockKind);
       if (currentEntryParam !== serialized) {
         currentParams.set(TIMEBLOCK_PARAM, serialized);
-        router.push(`${currentPathname}?${currentParams.toString()}`, { scroll: false });
+        previousURLParamRef.current = serialized;
+        window.history.pushState(null, '', `${currentPathname}?${currentParams.toString()}`);
       }
     } else {
       // インスペクタが閉じている、またはドラフトモード
@@ -98,7 +105,7 @@ export function useInspectorURLSync() {
         window.history.replaceState(null, '', newUrl);
       }
     }
-  }, [isOpen, timeblockId, timeblockKind, pathname, searchParams, router]);
+  }, [isOpen, timeblockId, timeblockKind, pathname, searchParams]);
 
   // popstate対応: ブラウザの戻る/進むでURLが変わった時
   useEffect(() => {
