@@ -126,6 +126,26 @@ describe('lane card のクリック配送', () => {
     expect(onClick).toHaveBeenCalledOnce();
   });
 
+  it('閾値ちょうど（5px）は状態機械が届けるので捨てる', () => {
+    const onClick = vi.fn();
+    render(
+      <PlanLaneCard
+        event={plan}
+        position={position}
+        activityName="確認"
+        onClick={onClick}
+        onPointerDown={vi.fn()}
+      />,
+    );
+    const card = screen.getByRole('button', { name: '確認' });
+
+    // pointer-up.ts は `> DRAG_THRESHOLD_PX` を「動いた」とするので 5px は click 扱い
+    fireEvent.mouseDown(card, AT);
+    fireEvent.click(card, { clientX: 15, clientY: 10, button: 0 });
+
+    expect(onClick).not.toHaveBeenCalled();
+  });
+
   it('動かしてから離した click（drag の末尾）は従来どおり届ける', () => {
     const onClick = vi.fn();
     render(

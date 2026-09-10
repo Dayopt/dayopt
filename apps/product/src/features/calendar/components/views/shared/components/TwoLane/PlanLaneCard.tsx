@@ -122,7 +122,10 @@ export function PlanLaneCard({
     gestureStartRef.current = null;
     if (start) {
       const moved = Math.max(Math.abs(e.clientX - start.x), Math.abs(e.clientY - start.y));
-      if (moved < DRAG_THRESHOLD_PX) return;
+      // 不等号は状態機械に合わせる。pointer-up.ts は `> DRAG_THRESHOLD_PX` を「動いた」と
+      // 見なすので、閾値ちょうど（5px）は EVENT_CLICK が出る。ここを `<` にすると 5px の
+      // 時だけ 2 経路とも届き、トグルが打ち消し合う
+      if (moved <= DRAG_THRESHOLD_PX) return;
     }
     onClick?.(event, e);
   };
