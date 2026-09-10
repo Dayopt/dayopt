@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-09-08
+last_verified: 2026-09-10
 code: apps/product/src/lib/pwa
 ---
 
@@ -44,6 +44,12 @@ fallback from ever pointing at a previous account.
 | Other GET requests | Network First          | Use a cached response only when the network fails                            |
 | Auth and tRPC      | No Cache               | Dynamic authenticated requests bypass the Service Worker cache               |
 
+Cache names carry the deploying commit SHA (`dayopt-static-v<sha>`, `dayopt-dynamic-v<sha>`), passed
+in as a query string when the page registers the worker (`/sw.js?v=<sha>`, see
+`useServiceWorker.ts`). Every deploy therefore rotates the cache names automatically, and `activate`
+deletes every `dayopt-` cache that does not match the current version. A registration without a `v`
+query param (local development) falls back to `dayopt-static-vdev` / `dayopt-dynamic-vdev`.
+
 The Service Worker has no Background Sync handler and does not access an IndexedDB mutation queue.
 
 ## Installation
@@ -67,10 +73,30 @@ keep-alive workarounds.
 - install prompt and iOS install guide
 - iOS PWA initialization
 
-It does not initialize a mutation processor or display synchronization status. It also does not
-display an update-available notification: `public/sw.js` calls `self.skipWaiting()` on install, so a
-new Service Worker version activates automatically and takes effect on the next page load. There is
-no user-facing "update" action to trigger.
+It does not initialize a mutation processor or display synchronization status.
+
+`public/sw.js` calls `self.skipWaiting()` on install, so a new Service Worker version activates
+automatically as soon as it is detected — but that does not reach pages already open. `useServiceWorker`
+tracks the `controllerchange` event fired when an already-open page's controller switches to the new
+worker and exposes it as `updateAvailable`. The hook never reloads on its own (to avoid discarding
+in-progress edits); calling `applyUpdate()` reloads the page to pick up the new version.
+
+### ChunkLoadError recovery
+
+When a deploy rotates the `_next/static` chunk hashes, a tab that is still open on the previous build
+can fail to fetch a chunk it needs (`ChunkLoadError`, `Failed to fetch dynamically imported module`,
+`Importing a module script failed`). `src/lib/pwa/chunk-load-recovery.ts` detects these errors and
+reloads the page once, guarded by a `sessionStorage` flag
+(`dayopt:chunk-reload-attempted`) so a single tab retries at most once per incident. The four route
+error boundaries (`error.tsx`, `global-error.tsx`, `[locale]/error.tsx`, `[locale]/(app)/error.tsx`)
+call `attemptChunkLoadRecovery` before reporting to Sentry, so the first occurrence reloads silently
+and only a repeat failure (the flag already set) is captured and shown to the user.
+
+The feature-scoped class `ErrorBoundary` (`components/ui/feedback/error-boundary.tsx`) deliberately
+does **not** auto-reload. It wraps the calendar workspace, where the Inspector and inline-create
+panel hold unsaved edits in stores without `persist`; an unprompted reload would discard them
+silently. There the user sees the normal fallback UI and decides whether to reload. Auto-recovery is
+limited to route boundaries, where the page is already dead and no draft is reachable.
 
 ## Offline Writes Decision
 
@@ -91,6 +117,7 @@ Until those conditions are met, failed or unavailable mutations follow the norma
 
 ```text
 src/lib/pwa/
+├── chunk-load-recovery.ts
 ├── install-prompt.ts
 └── ios-workarounds.ts
 
