@@ -11,6 +11,7 @@ import {
   hashToken,
   isRuntimeClientWriteEnabled,
   isSupportedScope,
+  isWriteEnabledByMutationControl,
   isWriteScope,
   resolveClient,
   resolveRequestedResource,
@@ -185,7 +186,7 @@ async function applyDurableWriteGate(
     );
   }
 
-  return control.writes_enabled && control.enabled_client_ids.includes(clientId)
+  return isWriteEnabledByMutationControl(control, clientId)
     ? scopes
     : scopes.filter((scope) => !isWriteScope(scope));
 }

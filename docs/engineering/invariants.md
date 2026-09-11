@@ -124,6 +124,14 @@ docs へ残している。
 
 ## MCP の DB 書き込み境界
 
+- OAuth metadata が広告する `scopes_supported` は `SUPPORTED_SCOPES` 全量（write 込み）。
+  広告は「AS が理解する scope」の宣言であって付与の約束ではない。実際に付与するのは
+  consent の `resolveGrantableScopes` で、**env allowlist（`MCP_WRITE_ENABLED_CLIENTS`）と
+  DB gate（`mcp_mutation_control`）の AND**（`isConsentWriteEnabled`、DB が読めない時は
+  write を落とす fail-closed）が閉じていれば write scope を落として read-only の grant に
+  する。付与後に gate が閉じた場合は `applyDurableWriteGate` が token 側で同じ降格を行い、
+  判定規則そのものは `isWriteEnabledByMutationControl` を両者で共有する。
+  authorize 検証は gate を見ない（見ると gate 閉の client が read-only 接続すら作れない）
 - MCP mutation の global gate は DB 上で既定 `OFF`、`enabled_client_ids` は既定 `[]`。
   両方が許可した client だけがwrite grant/applyを通る。各gateはrevision付きの
   service-role-only RPC以外から変更しない

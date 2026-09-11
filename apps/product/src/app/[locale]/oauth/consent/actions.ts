@@ -8,7 +8,8 @@ import {
   createOAuthDbClient,
   generateAuthorizationCode,
   hasWriteScope,
-  isRuntimeClientWriteEnabled,
+  isConsentWriteEnabled,
+  resolveGrantableScopes,
   validateAuthorizeInput,
 } from '@/lib/oauth-server';
 import { assertOAuthAuthorizationRequestHost } from '@/lib/oauth-server/authorization-request-host';
@@ -89,6 +90,22 @@ export async function processConsent(formData: FormData) {
     redirect(redirectUrl.toString());
   }
 
+  // hidden field は改ざんされうるので、付与する scope をここで再計算する。
+  // write gate（env allowlist AND `mcp_mutation_control`）が閉じている client では
+  // write scope を落とし、read-only の grant として成立させる。grant RPC は
+  // write 要求 + gate 閉を例外で拒否する（42501 / DM003）ため、ここで落とさないと
+  // read 目的の接続まで `server_error` になる。
+  const grantableScopes = resolveGrantableScopes(
+    validation.scopes,
+    await isConsentWriteEnabled(dbClient, validation.client.id),
+  );
+
+  if (grantableScopes.length === 0) {
+    logger.warn('[oauth] consent grant had no grantable scopes after the write gate');
+    redirectUrl.searchParams.set('error', 'invalid_scope');
+    redirect(redirectUrl.toString());
+  }
+
   const { code, hash } = generateAuthorizationCode();
   const { error: insertError } = await dbClient.rpc('create_oauth_authorization_grant_v2', {
     p_code_hash: hash,
@@ -97,9 +114,8 @@ export async function processConsent(formData: FormData) {
     p_resource_uri: validation.resourceUri,
     p_redirect_uri: validation.redirectUri,
     p_code_challenge: validation.codeChallenge,
-    p_scopes: validation.scopes,
-    p_write_enabled:
-      hasWriteScope(validation.scopes) && isRuntimeClientWriteEnabled(validation.client.id),
+    p_scopes: grantableScopes,
+    p_write_enabled: hasWriteScope(grantableScopes),
   });
 
   if (insertError) {

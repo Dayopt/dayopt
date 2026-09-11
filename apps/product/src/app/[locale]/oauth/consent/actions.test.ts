@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { validateAuthorizeInput as realValidateAuthorizeInput } from '@/lib/oauth-server/authorize-validation';
 import { resetWriteFenceCacheForTestsOnly } from '@/lib/ops/write-fence';
 
 const redirect = vi.hoisted(() =>
@@ -12,6 +13,7 @@ const assertTokenIssuanceDatabaseIdentity = vi.hoisted(() => vi.fn());
 const grantRpc = vi.hoisted(() => vi.fn());
 const getUser = vi.hoisted(() => vi.fn());
 const writeFenceMaybeSingle = vi.hoisted(() => vi.fn());
+const isConsentWriteEnabled = vi.hoisted(() => vi.fn());
 
 /** `next/navigation` の redirect と同様に throw で制御を打ち切るテスト用シグナル。 */
 class RedirectSignal extends Error {
@@ -40,14 +42,23 @@ vi.mock('@/lib/supabase/server', () => ({
 vi.mock('@/lib/oauth-server/authorization-request-host', () => ({
   assertOAuthAuthorizationRequestHost: vi.fn().mockResolvedValue(undefined),
 }));
-vi.mock('@/lib/oauth-server', () => ({
-  assertTokenIssuanceDatabaseIdentity,
-  createOAuthDbClient: () => ({ rpc: grantRpc }),
-  generateAuthorizationCode: () => ({ code: 'issued-code', hash: 'issued-code-hash' }),
-  hasWriteScope: () => false,
-  isRuntimeClientWriteEnabled: () => false,
-  validateAuthorizeInput,
-}));
+// scope の降格判定は本物を使う。stub に置き換えると「gate 閉なら write を落とす」
+// という肝心の挙動をテストが証明しなくなる（TEST-1）。可変にするのは client 単位の
+// runtime gate だけ。
+vi.mock('@/lib/oauth-server', async () => {
+  const scopes = await vi.importActual<typeof import('@/lib/oauth-server/scopes')>(
+    '@/lib/oauth-server/scopes',
+  );
+  return {
+    assertTokenIssuanceDatabaseIdentity,
+    createOAuthDbClient: () => ({ rpc: grantRpc }),
+    generateAuthorizationCode: () => ({ code: 'issued-code', hash: 'issued-code-hash' }),
+    hasWriteScope: scopes.hasWriteScope,
+    resolveGrantableScopes: scopes.resolveGrantableScopes,
+    isConsentWriteEnabled,
+    validateAuthorizeInput,
+  };
+});
 
 import { processConsent } from './actions';
 
@@ -80,6 +91,7 @@ describe('processConsent database identity gate', () => {
     });
     assertTokenIssuanceDatabaseIdentity.mockResolvedValue(undefined);
     grantRpc.mockResolvedValue({ error: null });
+    isConsentWriteEnabled.mockResolvedValue(false);
   });
 
   it('DB identity不一致ならgrant RPCへ到達せずserver_errorでredirectする', async () => {
@@ -122,5 +134,87 @@ describe('processConsent database identity gate', () => {
     const redirectedTo = new URL(redirect.mock.calls.at(-1)![0]);
     expect(redirectedTo.searchParams.get('error')).toBe('temporarily_unavailable');
     expect(redirectedTo.searchParams.get('code')).toBeNull();
+  });
+});
+
+describe('processConsent write gate downgrade', () => {
+  // validateAuthorizeInput は本物を通す。stub で「あり得ない validation 結果」を
+  // 作ると、authorize が弾く入力を consent が降格している気になれてしまう（TEST-1）。
+  function createFormData(scope: string): FormData {
+    const formData = createConsentFormData();
+    formData.set('scope', scope);
+    return formData;
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    resetWriteFenceCacheForTestsOnly();
+    writeFenceMaybeSingle.mockResolvedValue({ data: { fence_enabled: false }, error: null });
+    getUser.mockResolvedValue({ data: { user: { id: 'user-1' } }, error: null });
+    assertTokenIssuanceDatabaseIdentity.mockResolvedValue(undefined);
+    grantRpc.mockResolvedValue({ error: null });
+    isConsentWriteEnabled.mockResolvedValue(false);
+    validateAuthorizeInput.mockImplementation(realValidateAuthorizeInput);
+  });
+
+  it('write gate が閉じた client の write 要求は read へ降格して grant する', async () => {
+    await expect(
+      processConsent(createFormData('read:entries read:activities write:plans delete:records')),
+    ).rejects.toBeInstanceOf(RedirectSignal);
+
+    expect(grantRpc).toHaveBeenCalledWith(
+      'create_oauth_authorization_grant_v2',
+      expect.objectContaining({
+        p_scopes: ['read:entries', 'read:activities'],
+        p_write_enabled: false,
+      }),
+    );
+    const redirectedTo = new URL(redirect.mock.calls.at(-1)![0]);
+    expect(redirectedTo.searchParams.get('code')).toBe('issued-code');
+    expect(redirectedTo.searchParams.get('error')).toBeNull();
+  });
+
+  it('write gate が開いた client の write 要求はそのまま write 付きで grant する', async () => {
+    isConsentWriteEnabled.mockResolvedValue(true);
+
+    await expect(processConsent(createFormData('read:entries write:plans'))).rejects.toBeInstanceOf(
+      RedirectSignal,
+    );
+
+    expect(grantRpc).toHaveBeenCalledWith(
+      'create_oauth_authorization_grant_v2',
+      expect.objectContaining({
+        p_scopes: ['read:entries', 'write:plans'],
+        p_write_enabled: true,
+      }),
+    );
+  });
+
+  it('広告済み 8 scope を要求されても gate 閉なら read 4 個だけを grant する', async () => {
+    await expect(
+      processConsent(
+        createFormData(
+          'read:entries read:activities read:constraints read:stats ' +
+            'write:plans delete:plans write:records delete:records',
+        ),
+      ),
+    ).rejects.toBeInstanceOf(RedirectSignal);
+
+    expect(grantRpc).toHaveBeenCalledWith(
+      'create_oauth_authorization_grant_v2',
+      expect.objectContaining({
+        p_scopes: ['read:entries', 'read:activities', 'read:constraints', 'read:stats'],
+        p_write_enabled: false,
+      }),
+    );
+  });
+
+  it('write scope だけの要求は authorize 検証が弾き、grant へ到達しない', async () => {
+    await expect(processConsent(createFormData('write:plans'))).rejects.toBeInstanceOf(
+      RedirectSignal,
+    );
+
+    expect(grantRpc).not.toHaveBeenCalled();
+    expect(redirect).toHaveBeenLastCalledWith('/oauth/authorize');
   });
 });

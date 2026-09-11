@@ -4,8 +4,8 @@ import { createClient } from '@supabase/supabase-js';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import type { Database } from '@/lib/database';
-// barrel は SUPPORTED_SCOPES を公開しない（外へ出すのは ADVERTISED_SCOPES 側）ので
-// leaf を直接読む。この定数こそが 4 箇所の唯一の期待値なので、テスト側で
+// barrel は SUPPORTED_SCOPES を公開しない（外へ出すのは同値の ADVERTISED_SCOPES 側）
+// ので leaf を直接読む。この定数こそが 4 箇所の唯一の期待値なので、テスト側で
 // 別の配列に写し取らない。
 import { SUPPORTED_SCOPES } from '@/lib/oauth-server/scopes';
 

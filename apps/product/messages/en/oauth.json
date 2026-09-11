@@ -17,6 +17,7 @@
       },
       "readOnlyNotice": "Read-only. {clientName} cannot modify your records.",
       "writeNotice": "{clientName} can change the selected Dayopt data directly. You can disconnect it from Settings.",
+      "writeUnavailableNotice": "Writing is not enabled for this connection yet, so only read access will be granted.",
       "approve": "Authorize",
       "deny": "Cancel",
       "userLabel": "Connecting as {email}"
