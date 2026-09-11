@@ -72,7 +72,7 @@ function plannedRange(entry: CalendarDisplayEvent): { start: Date | null; end: D
 }
 
 function actualRange(entry: CalendarDisplayEvent): { start: Date | null; end: Date | null } {
-  if (entry.origin === 'unplanned') {
+  if (entry.kind === 'record') {
     return {
       start: entry.actualStartDate ?? entry.startDate,
       end: entry.actualEndDate ?? entry.endDate,
@@ -176,12 +176,12 @@ export function computeCalendarDayDiffs(
     const countedActualDuration = actualDuration;
     const hasActualEdit = entry.actualStartDate != null || entry.actualEndDate != null;
 
-    if (entry.origin !== 'unplanned') {
+    if (entry.kind !== 'record') {
       plannedMinutes += plannedDuration;
     }
     actualMinutes += countedActualDuration;
 
-    if (entry.origin === 'unplanned') {
+    if (entry.kind === 'record') {
       if (actualDuration > 0) {
         unplannedMinutes += actualDuration;
         items.push(makeItem(entry, 'unplanned', { start: null, end: null }, actual));

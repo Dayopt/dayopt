@@ -128,7 +128,6 @@ function makeCalendarEvent(
     version: '2026-07-15T00:00:00.000000Z',
     duration: 60,
     isMultiDay: false,
-    origin: kind === 'plan' ? 'planned' : 'unplanned',
     timeblockState: kind === 'plan' ? 'upcoming' : 'past',
     kind,
     ...overrides,
@@ -215,7 +214,7 @@ describe('CalendarGridContent', () => {
       version: '2026-06-04T00:00:00.000000Z',
       duration: 120,
       isMultiDay: false,
-      origin: 'planned' as const,
+      kind: 'plan' as const,
       timeblockState: 'upcoming' as const,
     };
 
@@ -356,7 +355,6 @@ describe('CalendarGridContent', () => {
       version: '2026-06-04T00:00:00.000000Z',
       duration: 60,
       isMultiDay: false,
-      origin: 'planned' as const,
       timeblockState: 'upcoming' as const,
       kind: 'plan' as const,
     } satisfies CalendarDisplayEvent;

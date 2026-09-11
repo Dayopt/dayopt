@@ -7,7 +7,7 @@
  */
 
 import { renderHook } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useActivityQuickCreate } from './useActivityQuickCreate';
 
@@ -55,9 +55,20 @@ vi.mock('@/features/timeblock', async () => {
   };
 });
 
+/**
+ * ユーザー timezone は runner のローカルゾーンに合わせる。
+ *
+ * hook は「ブラウザローカルの壁時計を組み立て → ユーザー timezone として解釈」する
+ * （`convertFromTimezone`）。ここを 'UTC' 固定にすると、UTC より西の runner では
+ * 壁時計 09:00 が real now より数時間前の UTC 09:00 に読まれ、既定の枠が過去扱い
+ * （記録）になって `createPlan` が呼ばれない。ローカルゾーンなら変換が恒等になり、
+ * fixture も `new Date()` をそのまま使える。
+ */
+const RUNNER_TIMEZONE = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
 vi.mock('@/lib/hooks/useUserPreferences', () => ({
   useUserPreferences: (selector: (s: { timezone: string; defaultDuration: number }) => unknown) =>
-    selector({ timezone: 'UTC', defaultDuration: 60 }),
+    selector({ timezone: RUNNER_TIMEZONE, defaultDuration: 60 }),
 }));
 vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({}) }));
 const toastSuccess = vi.hoisted(() => vi.fn());
@@ -65,26 +76,22 @@ vi.mock('@/lib/toast', () => ({ toast: { success: toastSuccess, error: vi.fn() }
 vi.mock('next-intl', () => ({ useTranslations: () => (key: string) => key }));
 
 /**
- * hook は「ブラウザローカルの壁時計を組み立て → ユーザー timezone として解釈」する
- * （`convertFromTimezone`）。この test の timezone mock は 'UTC' なので、既存ブロックの
- * fixture も同じ空間、つまり壁時計の数字をそのまま UTC と読んだ時刻で作る。
+ * 固定する「今」（ローカル 09:00）。
+ *
+ * この file の test は全て `new Date()` からの相対で fixture を組むため、実時計のまま
+ * だと夜に落ちる: 既存ブロックを now+2h まで置く test は、ローカル 21 時以降だと空き
+ * （+ 60 分）がその日の終わりを越えて `findFreeTimeblockLaneSlot` が null を返す。
+ * 実行時刻に依存しないよう、朝の時刻へ固定する。ローカル時刻で組み立てるので
+ * runner の timezone にも依存しない。
  */
-function wallClockAsUtc(date: Date): Date {
-  return new Date(
-    Date.UTC(
-      date.getFullYear(),
-      date.getMonth(),
-      date.getDate(),
-      date.getHours(),
-      date.getMinutes(),
-      date.getSeconds(),
-      date.getMilliseconds(),
-    ),
-  );
-}
+const FIXED_NOW = new Date(2026, 8, 10, 9, 0, 0, 0);
 
 describe('useActivityQuickCreate', () => {
   beforeEach(() => {
+    // Date だけを偽装する。setTimeout 等を止めると Testing Library の描画が進まない
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(FIXED_NOW);
+
     hasConflict.value = false;
     laneItems.value = [];
     medianMinutes.value = new Map();
@@ -92,6 +99,10 @@ describe('useActivityQuickCreate', () => {
     createPlanMutate.mockClear();
     createRecordMutate.mockClear();
     openInspector.mockClear();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it('中央値の無いアクティビティは設定の既定の長さで保存する', () => {
@@ -162,7 +173,7 @@ describe('useActivityQuickCreate', () => {
   });
 
   it('ずらして作った時は時刻つきの文言を出す', () => {
-    const now = wallClockAsUtc(new Date());
+    const now = new Date();
     laneItems.value = [
       {
         id: 'existing',
@@ -184,7 +195,7 @@ describe('useActivityQuickCreate', () => {
 
   it('今の時間が埋まっている時は、直後の空きへずらして作る', () => {
     // 既定の開始（今）を含む 3 時間がふさがっている
-    const now = wallClockAsUtc(new Date());
+    const now = new Date();
     laneItems.value = [
       {
         id: 'existing',
@@ -212,9 +223,9 @@ describe('useActivityQuickCreate', () => {
     laneItems.value = [
       {
         id: 'all-day',
-        start_at: new Date(wallClockAsUtc(localNow).getTime() - 60 * 60 * 1000).toISOString(),
+        start_at: new Date(localNow.getTime() - 60 * 60 * 1000).toISOString(),
         // 探す上限（その日の終わり）まで埋まっているので、長さが入る空きは残らない
-        end_at: wallClockAsUtc(localEndOfDay).toISOString(),
+        end_at: localEndOfDay.toISOString(),
       },
     ];
     const { result } = renderHook(() => useActivityQuickCreate());

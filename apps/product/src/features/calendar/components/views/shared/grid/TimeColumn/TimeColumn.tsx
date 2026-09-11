@@ -9,7 +9,7 @@ import { memo, useMemo } from 'react';
 
 import { cn } from '@dayopt/components';
 
-import { TIME_COLUMN_WIDTH } from '../../constants/grid.constants';
+import { resolveTimeColumnWidth } from '../../constants/grid.constants';
 
 import type { TimeColumnProps } from '../../../../../types/grid.types';
 
@@ -31,8 +31,12 @@ export const TimeColumn = memo<TimeColumnProps>(function TimeColumn({
   hourHeight = 72,
   format = '24h',
   className = '',
-  width = TIME_COLUMN_WIDTH,
+  width,
+  dense = false,
 }) {
+  // 幅は表記と密度で決まる。明示指定が無ければ同じ規則から解く
+  const resolvedWidth = width ?? resolveTimeColumnWidth(format, dense);
+
   // グリッド高さ
   const gridHeight = (endHour - startHour) * hourHeight;
 
@@ -50,7 +54,9 @@ export const TimeColumn = memo<TimeColumnProps>(function TimeColumn({
         <div
           key={`hour-${hour}`}
           className={cn(
-            'relative flex w-full items-start justify-end pr-2 text-sm tabular-nums select-none',
+            // px-2: ラベルは右詰めだが、左をグリッド端に接触させない（左右 8px）
+            'relative flex w-full items-start justify-end px-2 tabular-nums select-none',
+            dense ? 'text-xs' : 'text-sm',
             textClass,
           )}
           style={{ height: `${hourHeight}px` }}
@@ -61,13 +67,13 @@ export const TimeColumn = memo<TimeColumnProps>(function TimeColumn({
     }
 
     return rows;
-  }, [startHour, endHour, hourHeight, format]);
+  }, [startHour, endHour, hourHeight, format, dense]);
 
   return (
     <div
       className={cn('sticky left-0 z-10 flex flex-col', className)}
       style={{
-        width: `${width}px`,
+        width: `${resolvedWidth}px`,
         height: `${gridHeight}px`,
       }}
     >

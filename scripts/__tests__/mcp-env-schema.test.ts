@@ -53,10 +53,11 @@ describe('MCP OAuth env inventory', () => {
       environment: 'production' as const,
       schema: productionEnvSchema,
       vault: 'human',
-      // production の MCP app 変数は #1754（MCP OAuth epic、status:watching）の
-      // 未展開分として pendingReason を持つ（#2063）。staging は local dev
+      // production の MCP app 変数は #2553（#1754 epic の Production 有効化
+      // ゲート）の未展開分として pendingReason を持つ（#2063）。#2553 の手順 1
+      // で Vercel へ投入され、pending が解消される。staging は local dev
       // 直接消費のため schema先行ではなく pendingReason を付けない。
-      pendingReason: '#1754（MCP OAuth epic、status:watching）の production 未展開分',
+      pendingReason: '#2553（#1754 epic の Production 有効化ゲート）の production 未展開分',
     },
   ])(
     '$environmentのapp itemにclient redirect、OAuth identity、MCP gateをexactly once登録する',

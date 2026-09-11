@@ -7,6 +7,7 @@ import { createMcpTrpcCaller } from '@/lib/mcp/trpc-bridge';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
 import type { McpRequestContext } from '../_context';
+import { MCP_CONTEXT_RANGE_SCHEMA } from './context-range-schema';
 import { findMcpContextReadErrorCode } from './context-read-error';
 import { MCP_REVIEW_GET_INPUT_SCHEMA, MCP_REVIEW_GET_OUTPUT_SCHEMA } from './review-contract';
 import { createMcpToolError, createMcpToolSuccess, MCP_TOOL_SCHEMA_VERSION } from './tool-result';
@@ -36,6 +37,18 @@ export function registerReviewGetTool(server: McpServer, ctx: McpRequestContext)
         return createMcpToolError(
           'INSUFFICIENT_SCOPE',
           'This connection does not have access to Dayopt review statistics.',
+        );
+      }
+
+      // 交差検証（start < end、31 日上限）は広告用 schema から外してあるため、
+      // ここで明示的に走らせる。tRPC 側の `timeblockContextRangeSchema` も同じ規則を
+      // 持つが、そちらへ落とすと client の入力ミスが zod error として
+      // `captureUnexpectedMcpToolError` に乗り、Sentry の予期せぬ失敗として積まれる。
+      const range = MCP_CONTEXT_RANGE_SCHEMA.safeParse(input);
+      if (!range.success) {
+        return createMcpToolError(
+          'INVALID_RANGE',
+          range.error.issues[0]?.message ?? 'Invalid date range.',
         );
       }
 
@@ -77,7 +90,7 @@ export function registerReviewGetTool(server: McpServer, ctx: McpRequestContext)
         };
 
         const [result, archivedActivityIds] = await Promise.all([
-          trpc.statistics.getMcpReview(input),
+          trpc.statistics.getMcpReview(range.data),
           resolveArchivedActivityIds(),
         ]);
 

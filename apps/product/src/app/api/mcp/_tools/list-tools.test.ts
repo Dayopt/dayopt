@@ -1114,6 +1114,41 @@ describe('MCP list tools public contract', () => {
     }
   });
 
+  // MCP SDK が実際に広告する inputSchema を見る。`contract-snapshot.test.ts` は
+  // zodToJsonSchema を直接呼ぶため ZodEffects でも正しい JSON Schema を出してしまい、
+  // 「SDK は shape を取り出せず空で広告する」という実害を検出できなかった（#2553 で
+  // 本番の review.get / constraints.get が「引数なし」と広告され、client が {} で
+  // 呼んで -32602 で失敗した）。ここは client 越しの listTools() を正とする。
+  it('範囲入力を取る read tool は startDate / endDate を広告する', async () => {
+    const server = new McpServer({ name: 'range-input-schema-server', version: '1.0.0' });
+    registerReviewGetTool(server, { ...context, scopes: ['read:stats'] });
+    registerConstraintsGetTool(server, { ...context, scopes: ['read:constraints'] });
+
+    const client = new Client({ name: 'range-input-schema-client', version: '1.0.0' });
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    await server.connect(serverTransport);
+    await client.connect(clientTransport);
+
+    try {
+      const listedTools = await client.listTools();
+      for (const name of ['review.get', 'constraints.get']) {
+        const tool = listedTools.tools.find((candidate) => candidate.name === name);
+        expect(tool, `${name} should be advertised`).toBeDefined();
+
+        const inputSchema = tool?.inputSchema as
+          { properties?: Record<string, unknown>; required?: string[] } | undefined;
+        expect(
+          Object.keys(inputSchema?.properties ?? {}).sort(),
+          `${name} must advertise its range parameters`,
+        ).toEqual(['endDate', 'startDate']);
+        expect([...(inputSchema?.required ?? [])].sort()).toEqual(['endDate', 'startDate']);
+      }
+    } finally {
+      await client.close();
+      await server.close();
+    }
+  });
+
   it('旧planId入力を成功済み再送へ通し、新規要求は更新案内付きで拒否する', async () => {
     const operationId = '66666666-6666-4666-8666-666666666666';
     const planId = '77777777-7777-4777-8777-777777777777';

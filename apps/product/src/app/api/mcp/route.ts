@@ -304,7 +304,7 @@ function authErrorResponse(err: unknown): Response {
         : []),
       // 初回認可 (pre-auth challenge) では広告済み read scope 一式を要求する。
       // token の granted scopes に無い tool は tools/list に出ないため、ここを
-      // read:entries だけにすると tags/review/constraints が初回接続で不可視になる
+      // read:entries だけにすると activities/review/constraints が初回接続で不可視になる
       // (発見できない tool は step-up も発火しない)。write 系は step-up 専用。
       `scope="${ADVERTISED_SCOPES.join(' ')}"`,
       `resource_metadata="${getResourceMetadataUrl()}"`,

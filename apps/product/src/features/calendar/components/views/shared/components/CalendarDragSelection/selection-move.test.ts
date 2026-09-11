@@ -2,7 +2,7 @@
  * computeSelectionMove のユニットテスト
  *
  * Y 座標 → 選択範囲・ドラッグ判定・スナップ変化・重複判定の計算を検証する。
- * hourHeight=60 なので 1px = 1分（9:00 = 540px）。
+ * hourHeight=60 なので 1px = 1分（9:00 = 540px）。選択は 15 分の絶対 snap。
  */
 
 import { describe, expect, it } from 'vitest';
@@ -50,25 +50,25 @@ describe('computeSelectionMove', () => {
     expect(result.snap).toEqual({ startMin: 540, endMin: 600 });
   });
 
-  it('開始位置より上へ動かしても最低 5 分の選択を維持する', () => {
+  it('開始位置より上へ動かしても最低 1 snap 分（15 分）の選択を維持する', () => {
     const result = computeSelectionMove(makeInput({ y: 500 }));
 
     expect(result.selection).toEqual({
       startHour: 9,
       startMinute: 0,
       endHour: 9,
-      endMinute: 5,
+      endMinute: 15,
     });
   });
 
-  it('1 分粒度で選択範囲を計算する（9:00 → 9:37）', () => {
+  it('15 分粒度で選択範囲を計算する（9:37 の位置は 9:30 へ揃う）', () => {
     const result = computeSelectionMove(makeInput({ y: 577 }));
 
     expect(result.selection).toEqual({
       startHour: 9,
       startMinute: 0,
       endHour: 9,
-      endMinute: 37,
+      endMinute: 30,
     });
   });
 
@@ -97,8 +97,8 @@ describe('computeSelectionMove', () => {
     expect(result.snapChanged).toBe(false);
   });
 
-  it('同一 5 分区画内の 1 分移動では snapChanged にならない（振動連射防止）', () => {
-    // y=601 → end 10:01。lastSnap end=600 と同じ 5 分区画（600-604）
+  it('同一 5 分区画内の移動では snapChanged にならない（振動連射防止）', () => {
+    // y=601 → 15 分 snap で end 10:00。lastSnap end=600 と同じ 5 分区画（600-604）
     const result = computeSelectionMove(
       makeInput({ y: 601, lastSnap: { startMin: 540, endMin: 600 } }),
     );
