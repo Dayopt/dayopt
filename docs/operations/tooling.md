@@ -498,6 +498,8 @@ BSD-2-Clause: 12 packages (1.3%)
 
 OpenAI / Codex は実装を含む primary provider として使う。他 provider は auth / RLS / billing / migration / 公開契約などで、独立した反証の便益が費用を上回る時に任意で追加する。外部 provider の可用性は merge gate にしない。
 
+ChatGPT / Gemini 等への調査・資料整理・分析・説明作成の受け渡しは [Chat 連携手順](./chat-handoff.md) を使う。入口の判断は `routing`、GitHub の起票・状態管理は `dispatch` が持つ。利用枠と主担当の読み込み負担も比較し、人の画面操作待ちを必須工程にしない。実験と採否は対象 Issue に残す。
+
 ## 3. Hook の共有と保証境界
 
 判定ロジックは `scripts/hooks/pre-tool-guard-rules.mjs` に置き、provider adapter は runtime の tool-call payload を共有形式へ変換する薄い入口にする。Claude Code は `scripts/hooks/pre-tool-guard.mjs`、Codex は `scripts/hooks/codex-pre-tool-guard.mjs` を入口とする。
