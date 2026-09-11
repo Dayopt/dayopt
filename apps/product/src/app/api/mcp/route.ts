@@ -302,10 +302,12 @@ function authErrorResponse(err: unknown): Response {
       ...(isOAuthErr && err.code === 'invalid_request' && status === 400
         ? ['error="invalid_request"']
         : []),
-      // 初回認可 (pre-auth challenge) では広告済み read scope 一式を要求する。
+      // 初回認可 (pre-auth challenge) では広告済み scope 一式を要求する。
       // token の granted scopes に無い tool は tools/list に出ないため、ここを
       // read:entries だけにすると activities/review/constraints が初回接続で不可視になる
-      // (発見できない tool は step-up も発火しない)。write 系は step-up 専用。
+      // (発見できない tool は step-up も発火しない)。write 系も同じ理由で含める:
+      // 要求されない限り付与されず、gate が閉じている client では consent 側の
+      // resolveGrantableScopes が read へ降格させる。
       `scope="${ADVERTISED_SCOPES.join(' ')}"`,
       `resource_metadata="${getResourceMetadataUrl()}"`,
     ];

@@ -17,7 +17,11 @@ type OAuthOnlyDatabase = {
   public: {
     Tables: Pick<
       Database['public']['Tables'],
-      'oauth_tokens' | 'oauth_authorization_codes' | 'oauth_connections'
+      | 'oauth_tokens'
+      | 'oauth_authorization_codes'
+      | 'oauth_connections'
+      // consent の write gate 判定に使う singleton（read-only、tenant data ではない）
+      | 'mcp_mutation_control'
     >;
     Views: Record<string, never>;
     Functions: Pick<
