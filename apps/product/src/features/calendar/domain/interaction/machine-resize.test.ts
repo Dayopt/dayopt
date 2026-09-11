@@ -47,7 +47,7 @@ describe('RESIZE_START', () => {
     );
 
     if (state.mode === 'resizing') {
-      // 1 分 snap（#2496）なので 10:07 をそのまま保持する
+      // 開始時刻は snap しないので 10:07 をそのまま保持する
       expect(state.previewTime.start.getMinutes()).toBe(7);
       expect(state.isOverlapping).toBe(true);
     }
@@ -70,7 +70,7 @@ describe('RESIZE_START', () => {
 
     if (state.mode === 'resizing') {
       const durationMs = state.previewTime.end.getTime() - state.previewTime.start.getTime();
-      // 1 分 snap（#2496）: 10:08-10:16 の 8 分 entry をそのまま保持する
+      // 掴んだ時点では時刻を変えない: 10:08-10:16 の 8 分 entry をそのまま保持する
       expect(state.snappedHeight).toBe(8);
       expect(state.previewTime.start.getHours()).toBe(10);
       expect(state.previewTime.start.getMinutes()).toBe(8);
@@ -136,6 +136,48 @@ describe('POINTER_MOVE while resizing', () => {
       expect(state.snappedHeight).toBe(30);
       expect(state.previewTime.end.getHours()).toBe(9);
       expect(state.previewTime.end.getMinutes()).toBe(30);
+    }
+  });
+
+  it('actual start の下限は snap 粒度へ切り上げない（9:32 を 9:45 へ広げない）', () => {
+    // 15 分 snap でも actual start はグリッド由来ではない実データの制約
+    const movedPoint = { clientX: origin.clientX, clientY: origin.clientY - 60 };
+    const { state } = dispatch(
+      resizingState,
+      { type: 'POINTER_MOVE', point: movedPoint },
+      createCtx({ getResizeMinEndMinutes: () => 9 * 60 + 32 }),
+    );
+
+    if (state.mode === 'resizing') {
+      expect(state.previewTime.end.getHours()).toBe(9);
+      expect(state.previewTime.end.getMinutes()).toBe(32);
+    }
+  });
+
+  it('開始時刻は 15 分 snap でも動かさない（10:07 の entry を縮めても 10:07 のまま）', () => {
+    const offGridResizing: InteractionState = {
+      mode: 'resizing',
+      timeblockId: 'a',
+      startPoint: origin,
+      currentPoint: origin,
+      originalPosition: { top: 607, left: 0, width: 200, height: 60 }, // 10:07-11:07
+      direction: 'bottom',
+      snappedHeight: 60,
+      previewTime: {
+        start: new Date('2026-01-15T10:07:00'),
+        end: new Date('2026-01-15T11:07:00'),
+      },
+      isOverlapping: false,
+    };
+    const movedPoint = { clientX: origin.clientX, clientY: origin.clientY - 30 };
+    const { state } = dispatch(offGridResizing, { type: 'POINTER_MOVE', point: movedPoint });
+
+    if (state.mode === 'resizing') {
+      expect(state.previewTime.start.getHours()).toBe(10);
+      expect(state.previewTime.start.getMinutes()).toBe(7);
+      expect(state.previewTime.end.getHours()).toBe(10);
+      expect(state.previewTime.end.getMinutes()).toBe(37);
+      expect(state.snappedHeight).toBe(30);
     }
   });
 });

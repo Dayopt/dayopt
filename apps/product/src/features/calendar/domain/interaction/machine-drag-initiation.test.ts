@@ -127,7 +127,7 @@ describe('LONGPRESS_FIRED', () => {
     );
 
     if (state.mode === 'dragging') {
-      // 1 分 snap（#2496）なので 10:07 をそのまま保持する
+      // 相対 snap なので移動量ゼロの長押し直後は 10:07 をそのまま保持する
       expect(state.previewTime.start.getMinutes()).toBe(7);
       expect(state.isOverlapping).toBe(true);
     }

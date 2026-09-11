@@ -1,0 +1,17 @@
+[
+  {
+    "path": "AGENTS.md",
+    "base": null,
+    "head": null
+  },
+  {
+    "path": "docs/README.md",
+    "base": null,
+    "head": null
+  },
+  {
+    "path": "logic.ts",
+    "base": "export const value = 1;\n",
+    "head": "export const value = 2;\n"
+  }
+]

@@ -14,6 +14,15 @@ const meta = {
   title: 'Product/Features/Timeblock/EstimationFeedforward',
   component: EstimationFeedforward,
   tags: ['autodocs'],
+  // Inspector の実幅（PC の docked panel）に近い器で見る。バッジは日時グルーピングの
+  // 直上に置くので、パネル幅で文が折り返すかどうかがそのまま見え方になる
+  decorators: [
+    (Story) => (
+      <div className="w-[360px]">
+        <Story />
+      </div>
+    ),
+  ],
   parameters: { layout: 'padded', ...withFactors },
   args: {
     destination: 'plan',

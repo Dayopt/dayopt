@@ -14,17 +14,27 @@ import type { DateTimeSelection } from '../../views/shared';
 export function useCalendarHandlers() {
   const openTimeblockInspector = useTimeblockInspectorStore((state) => state.openInspector);
   const openCreateInspector = useTimeblockInspectorStore((state) => state.openCreate);
+  const closeTimeblockInspector = useTimeblockInspectorStore((state) => state.closeInspector);
   const inspectorEntryId = useTimeblockInspectorStore((state) => state.timeblockId);
   const inspectorIsOpen = useTimeblockInspectorStore((state) => state.isOpen);
+  const inspectorDuplicateDraft = useTimeblockInspectorStore((state) => state.duplicateDraft);
 
   const setPendingSelection = useInlineCreateStore.use.setPendingSelection();
 
   // Inspector で開いているTimeblockIDをDnD無効化用に計算
   const disabledTimeblockId = inspectorIsOpen ? inspectorEntryId : null;
 
-  // エントリクリックハンドラー
+  // エントリクリックハンドラー（開いているブロックをもう一度押したら閉じる）
   const handleTimeblockClick = useCallback(
     (entry: CalendarDisplayEvent) => {
+      // 同じブロックの再クリックはトグルにする。開けた操作と同じ操作で閉じられる
+      // （2026-09-10 User 指示）。複製の下書き中は閉じない — 下書きを黙って捨てる
+      // ことになるため、従来どおり元ブロックの詳細へ開き直す
+      if (inspectorIsOpen && inspectorEntryId === entry.id && inspectorDuplicateDraft === null) {
+        closeTimeblockInspector();
+        return;
+      }
+
       openTimeblockInspector(entry.id, entry.kind ?? 'plan');
 
       logger.log('Opening Timeblock Inspector:', {
@@ -33,7 +43,13 @@ export function useCalendarHandlers() {
         kind: entry.kind,
       });
     },
-    [openTimeblockInspector],
+    [
+      closeTimeblockInspector,
+      inspectorDuplicateDraft,
+      inspectorEntryId,
+      inspectorIsOpen,
+      openTimeblockInspector,
+    ],
   );
 
   // 統一された時間範囲選択ハンドラー（全ビュー共通）

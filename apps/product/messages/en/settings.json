@@ -385,7 +385,11 @@
         "confirmDeleteAll": "This will permanently delete all your data. Your account will remain but all timeblocks, activities, and settings will be removed.",
         "typeToConfirm": "Type \"{keyword}\" to confirm",
         "confirmKeyword": "DELETE",
-        "deleting": "Deleting..."
+        "deleting": "Deleting...",
+        "blocksDeleted": "{count, plural, one {1 timeblock} other {# timeblocks}} deleted",
+        "blocksDeleteFailed": "Could not delete the timeblocks. Please try again",
+        "allDataDeleted": "All data deleted",
+        "allDataDeleteFailed": "Could not delete your data. Please try again"
       }
     },
     "integrations": {

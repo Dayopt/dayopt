@@ -94,8 +94,21 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
+/**
+ * 普段の長さ（記録の中央値）。渡した行にだけ名前の後ろへ添える。
+ * サンプルが 3 件に満たないアクティビティは Map に入らず、行は名前だけになる
+ */
+const DURATIONS = new Map([
+  ['meeting', 30],
+  ['development', 90],
+  ['meal', 45],
+]);
+
 /** PC: アンカー要素の横にパネルを開く */
-function renderAnchored(hint?: React.ReactNode) {
+function renderAnchored(
+  hint?: React.ReactNode,
+  durationByActivityId?: ReadonlyMap<string, number>,
+) {
   function Renderer() {
     const anchorRef = useRef<HTMLDivElement>(null);
 
@@ -114,6 +127,7 @@ function renderAnchored(hint?: React.ReactNode) {
           onCreateAndSelect={fn()}
           anchorRef={anchorRef}
           hint={hint}
+          durationByActivityId={durationByActivityId}
         />
       </div>
     );
@@ -174,6 +188,15 @@ export const WithKindTabs: Story = {
   },
 };
 
+/**
+ * 普段の長さつき。中央値のあるアクティビティにだけ「30m」「1h 30m」を添え、
+ * サンプル不足の行（レビュー・睡眠・運動）は名前だけのまま沈黙する。
+ */
+export const WithTypicalDurations: Story = {
+  parameters: { trpcMocks: { 'activities.listTree': ACTIVITY_TREE } },
+  render: () => renderAnchored(undefined, DURATIONS),
+};
+
 /** モバイル: vaul Drawer。同じチップ行と一覧構造を使う。 */
 export const Mobile: Story = {
   parameters: {
@@ -188,8 +211,8 @@ export const Mobile: Story = {
   ),
 };
 
-/** 全パターンの基準となるインタラクティブ表示。 */
+/** 全パターンの基準となるインタラクティブ表示（普段の長さの有無が同じ一覧に混ざった状態）。 */
 export const AllPatterns: Story = {
   parameters: { trpcMocks: { 'activities.listTree': ACTIVITY_TREE } },
-  render: () => renderAnchored(),
+  render: () => renderAnchored(undefined, DURATIONS),
 };

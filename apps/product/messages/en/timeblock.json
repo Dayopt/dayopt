@@ -7,29 +7,7 @@
       "recordTimeOverlap": "This time overlaps with another Record"
     },
     "toast": {
-      "created": "\"{title}\" created",
-      "createFailed": "Failed to create: {error}",
-      "updated": "Updated",
-      "updateFailed": "Failed to update",
-      "deleted": "Deleted",
-      "deleteFailed": "Failed to delete: {error}",
-      "bulkUpdated": "{count, plural, one {1 item} other {# items}} updated",
-      "bulkUpdateFailed": "Failed to bulk update: {error}",
-      "bulkDeleted": "{count, plural, one {1 item} other {# items}} deleted",
-      "bulkDeleteFailed": "Failed to bulk delete: {error}",
-      "activitiesAdded": "Activities added",
-      "activitiesAddFailed": "Failed to add activities: {error}",
-      "statusChanged": "Status changed to {status}",
-      "statusChangedCount": "Status changed for {count, plural, one {1 item} other {# items}}",
-      "statusChangeFailed": "Failed to change status",
-      "archivedCount": "{count, plural, one {1 item} other {# items}} archived",
-      "archiveFailed": "Failed to archive",
-      "deletedCount": "{count, plural, one {1 item} other {# items}} deleted",
-      "restored": "Restored",
-      "restoreFailed": "Failed to restore",
-      "conflict": "This timeblock was modified elsewhere. Reload to see the latest version.",
-      "placed": "Added {name} at {time}",
-      "overlapError": "{time} overlaps with an existing timeblock"
+      "updated": "Updated"
     },
     "sidebar": {
       "tabs": {
@@ -153,7 +131,9 @@
         "deleteFailed": "Could not delete. Please try again",
         "restored": "Restored",
         "restoreFailed": "Could not restore. Please try again",
-        "planCreated": "Plan added ✓"
+        "planCreated": "Plan added ✓",
+        "planCreatedShifted": "Plan added at {time}",
+        "recordedShifted": "Recorded at {time}"
       },
       "migratedLocked": "Migrated past records cannot be edited",
       "feedforward": {

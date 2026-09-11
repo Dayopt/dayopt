@@ -275,23 +275,23 @@ function DeletionSection() {
 
   const deleteBlocksMutation = api.user.deleteBlocks.useMutation({
     onSuccess: (data) => {
-      toast.success(t('deleteBlocks') + ` (${data.deletedCount})`);
+      toast.success(t('blocksDeleted', { count: data.deletedCount }));
       setTarget(null);
       setConfirmInput('');
     },
     onError: () => {
-      toast.error(t('deleteBlocks'));
+      toast.error(t('blocksDeleteFailed'));
     },
   });
 
   const deleteAllDataMutation = api.user.deleteAllData.useMutation({
     onSuccess: () => {
-      toast.success(t('deleteAllData'));
+      toast.success(t('allDataDeleted'));
       setTarget(null);
       setConfirmInput('');
     },
     onError: () => {
-      toast.error(t('deleteAllData'));
+      toast.error(t('allDataDeleteFailed'));
     },
   });
 

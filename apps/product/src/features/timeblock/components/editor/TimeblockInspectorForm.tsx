@@ -27,6 +27,7 @@ import {
   resolveTimeblockDestination,
   type TimeblockDestination,
 } from '../../domain/timeblock-destination';
+import { useActivityMedianDurations } from '../../hooks/useActivityMedianDurations';
 import {
   useCoalescedTimeblockSave,
   type TimeblockSavePatch,
@@ -149,6 +150,8 @@ export function TimeblockInspectorForm({
   const t = useTranslations();
   const queryClient = useQueryClient();
   const { getActivityById } = useActivitiesMap();
+  // アクティビティを選び直す時にも「普段どのくらいか」を一覧へ添える（作成時と同じ目安）
+  const { medianByActivityId } = useActivityMedianDurations();
   const createActivityMutation = useCreateActivity({ showToast: false });
   const isDuplicateMode = duplicateDraft != null;
   const [hasTimeConflict, setHasTimeConflict] = useState(false);
@@ -513,9 +516,21 @@ export function TimeblockInspectorForm({
   const handleCreateDuplicate = useCallback(() => {
     if (!duplicateDraft || duplicateValidationReason !== null || hasTimeConflict) return;
     const input = buildTimeblockDuplicateCreateInput(duplicateDraft, value);
-    const onSuccess = (created: { id: string } | null | undefined) => {
+    const onSuccess = (created: { id: string; updated_at: string } | null | undefined) => {
       if (!created) return;
-      toast.success(t('timeblock.editor.duplicate.created'));
+      toast.success(t('timeblock.editor.duplicate.created'), {
+        action: {
+          label: t('common.undo'),
+          onClick: () => {
+            const input = { id: created.id, expectedUpdatedAt: created.updated_at };
+            if (duplicateDraft.kind === 'plan') {
+              deletePlan.mutate(input);
+            } else {
+              deleteRecord.mutate(input);
+            }
+          },
+        },
+      });
       onDuplicateCreated?.(created.id, duplicateDraft.kind);
     };
 
@@ -527,6 +542,8 @@ export function TimeblockInspectorForm({
   }, [
     createPlan,
     createRecord,
+    deletePlan,
+    deleteRecord,
     duplicateDraft,
     hasTimeConflict,
     duplicateValidationReason,
@@ -631,6 +648,7 @@ export function TimeblockInspectorForm({
             onActivityChange={handleActivityChange}
             onCreateAndSelect={handleCreateAndSelectActivity}
             disabled={isWriteFrozen || !canUseProduct}
+            durationByActivityId={medianByActivityId}
           />
         </div>
         <InspectorHeaderActions
@@ -679,6 +697,18 @@ export function TimeblockInspectorForm({
           onNoteChange={handleNoteChange}
           onNoteBlur={isDuplicateMode ? undefined : flushNoteSave}
           dateTimeError={dateTimeError}
+          /*
+            保存先は kind ではなく end_at のルールで判定する。編集で end を過去へ動かした
+            瞬間に消え、未来へ戻せば再び出る。過去 Plan（end が過去）では出ない — 見積もりの
+            事前フィードバックであり、終わった時間帯に対しては助言する相手がいないため。
+          */
+          beforeDateTimeSlot={
+            <EstimationFeedforward
+              destination={resolveTimeblockDestination(value.endAt)}
+              activityId={value.activityId}
+              draftMinutes={(value.endAt.getTime() - value.startAt.getTime()) / 60000}
+            />
+          }
           disabled={
             deletePlan.isPending ||
             deleteRecord.isPending ||
@@ -697,17 +727,6 @@ export function TimeblockInspectorForm({
               />
             ) : undefined
           }
-        />
-
-        {/*
-          保存先は kind ではなく end_at のルールで判定する。編集で end を過去へ動かした
-          瞬間に消え、未来へ戻せば再び出る。過去 Plan（end が過去）では出ない — 見積もりの
-          事前フィードバックであり、終わった時間帯に対しては助言する相手がいないため。
-        */}
-        <EstimationFeedforward
-          destination={resolveTimeblockDestination(value.endAt)}
-          activityId={value.activityId}
-          draftMinutes={(value.endAt.getTime() - value.startAt.getTime()) / 60000}
         />
 
         {duplicateDraft ? (

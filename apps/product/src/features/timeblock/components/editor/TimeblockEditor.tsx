@@ -29,6 +29,11 @@ interface TimeModelEditorProps {
   disabled?: boolean | undefined;
   /** 日時グルーピングの直下（時間の下）に差し込む要素。Record の充実度用（#2412） */
   fulfillmentSlot?: React.ReactNode | undefined;
+  /**
+   * 日時グルーピングの直上に差し込む要素。見積もりフィードフォワード用。
+   * 時間を決める前に目に入る位置に置くため、グループの中ではなく上に出す。
+   */
+  beforeDateTimeSlot?: React.ReactNode | undefined;
 }
 
 function withTime(date: Date, value: string): Date {
@@ -51,6 +56,7 @@ export function TimeblockEditor({
   dateTimeError,
   disabled,
   fulfillmentSlot,
+  beforeDateTimeSlot,
 }: TimeModelEditorProps) {
   const t = useTranslations('timeblock.editor');
   const hasDateTimeError = !isValidTimeModelRange(value) || dateTimeError != null;
@@ -58,6 +64,7 @@ export function TimeblockEditor({
   return (
     <div className="space-y-3">
       <div className="space-y-1">
+        {beforeDateTimeSlot ? <div className="pb-2">{beforeDateTimeSlot}</div> : null}
         <div className="bg-muted rounded-2xl px-4 py-2">
           <DateTimeSection
             dateLabel={t('date')}

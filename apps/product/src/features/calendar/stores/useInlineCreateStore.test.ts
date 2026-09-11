@@ -57,4 +57,81 @@ describe('useInlineCreateStore', () => {
       expect(useInlineCreateStore.getState().pendingSelection).toBeNull();
     });
   });
+
+  describe('previewActivityDuration（普段の長さの着せ替え）', () => {
+    function setSelection() {
+      useInlineCreateStore.getState().setPendingSelection(mockSelection);
+    }
+
+    it('ホバー中のアクティビティの長さを選択範囲へ着せる', () => {
+      setSelection();
+
+      useInlineCreateStore.getState().previewActivityDuration(120);
+
+      const selection = useInlineCreateStore.getState().pendingSelection;
+      expect(selection?.startHour).toBe(10);
+      expect(selection?.startMinute).toBe(0);
+      expect(selection?.endHour).toBe(12);
+      expect(selection?.endMinute).toBe(0);
+    });
+
+    it('null を渡すとドラッグで決めた長さ（1 時間 30 分）へ戻す', () => {
+      setSelection();
+      useInlineCreateStore.getState().previewActivityDuration(120);
+
+      useInlineCreateStore.getState().previewActivityDuration(null);
+
+      const selection = useInlineCreateStore.getState().pendingSelection;
+      expect(selection?.endHour).toBe(11);
+      expect(selection?.endMinute).toBe(30);
+    });
+
+    it('ユーザーが長さを直した後は着せ替えない', () => {
+      setSelection();
+      // 時刻入力 / リサイズで 10:00–10:15 にした
+      useInlineCreateStore.getState().updateSelectionTimes({ endHour: 10, endMinute: 15 });
+
+      useInlineCreateStore.getState().previewActivityDuration(120);
+
+      const selection = useInlineCreateStore.getState().pendingSelection;
+      expect(selection?.endHour).toBe(10);
+      expect(selection?.endMinute).toBe(15);
+    });
+
+    it('長さを保ったまま位置だけ動かす操作は着せ替えを止めない', () => {
+      setSelection();
+      // long-press 移動: 10:00–11:30 → 13:00–14:30（長さは 90 分のまま）
+      useInlineCreateStore
+        .getState()
+        .updateSelectionTimes({ startHour: 13, startMinute: 0, endHour: 14, endMinute: 30 });
+
+      useInlineCreateStore.getState().previewActivityDuration(120);
+
+      const selection = useInlineCreateStore.getState().pendingSelection;
+      expect(selection?.endHour).toBe(15);
+      expect(selection?.endMinute).toBe(0);
+    });
+
+    it('日をまたがないよう 23:59 でクランプする', () => {
+      useInlineCreateStore.getState().setPendingSelection({
+        ...mockSelection,
+        startHour: 23,
+        startMinute: 0,
+        endHour: 23,
+        endMinute: 30,
+      });
+
+      useInlineCreateStore.getState().previewActivityDuration(180);
+
+      const selection = useInlineCreateStore.getState().pendingSelection;
+      expect(selection?.endHour).toBe(23);
+      expect(selection?.endMinute).toBe(59);
+    });
+
+    it('選択が無い時は何も起きない', () => {
+      useInlineCreateStore.getState().previewActivityDuration(120);
+
+      expect(useInlineCreateStore.getState().pendingSelection).toBeNull();
+    });
+  });
 });
