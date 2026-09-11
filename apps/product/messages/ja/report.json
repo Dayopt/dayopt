@@ -123,7 +123,6 @@
       "unassigned": "アクティビティ未設定",
       "uncategorized": "未分類",
       "error": "明細を読み込めませんでした",
-      "openCalendar": "カレンダーで見る",
       "subtitle": {
         "week": "{category} · この週の明細",
         "month": "{category} · この月の明細",

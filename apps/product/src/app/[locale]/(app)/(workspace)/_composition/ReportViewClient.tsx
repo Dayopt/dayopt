@@ -239,7 +239,6 @@ export function ReportViewClient({ granularity }: ReportViewClientProps) {
       <ConnectedReportDetailPanel
         anchorDate={anchorDate}
         granularity={granularity}
-        onOpenCalendarDay={jump.onJumpToDay}
         surface={isMobile ? 'sheet' : 'panel'}
       />
 

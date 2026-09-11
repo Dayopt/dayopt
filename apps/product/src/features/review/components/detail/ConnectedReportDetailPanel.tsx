@@ -15,8 +15,6 @@ import type { ReportDetailTarget } from '../../stores/useReportDetailStore';
 interface ConnectedReportDetailPanelProps {
   anchorDate: string;
   granularity: ReportGranularity;
-  /** 最初の箱の日をカレンダー（日ビュー）で開く。Composition Bridge の `onJumpToDay`。 */
-  onOpenCalendarDay: (dayKey: string) => void;
   /**
    * 器の選択。`sheet` はモバイルのボトムシート（推移なし）、`panel` はデスクトップの
    * 4 カラム目。**Composition Bridge が決める** — review 本体は器を知らない。
@@ -38,7 +36,6 @@ interface ConnectedReportDetailPanelProps {
 export function ConnectedReportDetailPanel({
   anchorDate,
   granularity,
-  onOpenCalendarDay,
   surface,
 }: ConnectedReportDetailPanelProps) {
   const isOpen = useReportDetailStore((state) => state.isOpen);
@@ -58,7 +55,6 @@ export function ConnectedReportDetailPanel({
     <OpenReportDetailPanel
       anchorDate={anchorDate}
       granularity={granularity}
-      onOpenCalendarDay={onOpenCalendarDay}
       surface={surface}
       target={target}
     />
@@ -68,12 +64,11 @@ export function ConnectedReportDetailPanel({
 function OpenReportDetailPanel({
   anchorDate,
   granularity,
-  onOpenCalendarDay,
   surface,
   target,
 }: ConnectedReportDetailPanelProps & { target: ReportDetailTarget }) {
   const close = useReportDetailStore((state) => state.close);
-  // 明細の時刻・曜日・ジャンプ先の日付は、ブラウザのローカルではなくユーザー設定の timezone で切る
+  // 明細の時刻と曜日は、ブラウザのローカルではなくユーザー設定の timezone で切る
   const timezone = useUserPreferences((state) => state.timezone);
   // シートは推移を出さないので、**取得もしない**（表示側だけで落とすと運ぶだけ無駄になる）
   const { data, isPending, isError } = useReportActivityDetail({
@@ -93,7 +88,6 @@ function OpenReportDetailPanel({
     isPending,
     name: target.name,
     onClose: close,
-    onOpenCalendarDay,
     timezone,
   };
 

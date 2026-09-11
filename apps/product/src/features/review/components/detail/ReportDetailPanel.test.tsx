@@ -110,7 +110,6 @@ function renderPanel(overrides: Partial<Parameters<typeof ReportDetailPanel>[0]>
       isPending={false}
       name="執筆"
       onClose={() => {}}
-      onOpenCalendarDay={() => {}}
       {...overrides}
     />,
   );
@@ -193,7 +192,6 @@ describe('ReportDetailPanel', () => {
         isPending={false}
         name="執筆"
         onClose={() => {}}
-        onOpenCalendarDay={() => {}}
       />,
     );
 
@@ -210,24 +208,6 @@ describe('ReportDetailPanel', () => {
     expect(screen.getByText('10:00–11:30')).toBeInTheDocument();
     // 2026-09-01 は火曜
     expect(screen.getByText('火')).toBeInTheDocument();
-  });
-
-  it('「カレンダーで見る」は timezone で切った日を渡す', async () => {
-    const onOpenCalendarDay = vi.fn();
-    renderPanel({
-      detail: detail({
-        records: [
-          // JST では 09-02 の 08:00。UTC の日付（09-01）で開くと 1 日ずれる
-          record('rec-night', 30, { startAt: '2026-09-01T23:00:00.000Z' }),
-        ],
-      }),
-      onOpenCalendarDay,
-    });
-
-    const { default: userEvent } = await import('@testing-library/user-event');
-    await userEvent.setup().click(screen.getByText('report.detail.openCalendar'));
-
-    expect(onOpenCalendarDay).toHaveBeenCalledWith('2026-09-02');
   });
 
   it('時間帯は 6 本すべて描く（0 のバケットも残す）', () => {
@@ -363,7 +343,6 @@ describe('ReportDetailPanel', () => {
         isPending={false}
         name="執筆"
         onClose={() => {}}
-        onOpenCalendarDay={() => {}}
       />,
     );
 
@@ -441,7 +420,6 @@ describe('ReportDetailPanel', () => {
         isPending={false}
         name="執筆"
         onClose={() => {}}
-        onOpenCalendarDay={() => {}}
       />,
     );
 

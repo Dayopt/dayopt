@@ -16,7 +16,6 @@ import {
   MIRROR_MIN_PLAN_BOXES,
   MIRROR_MIN_PLAN_MINUTES,
 } from '../../domain/report/report-view-model';
-import { resolveZonedDayKey } from '../../lib/report-period';
 import { DurationStrip } from './DurationStrip';
 
 import type { ReportGranularity } from '../../lib/report-period';
@@ -30,15 +29,13 @@ export interface ReportDetailBodyProps {
   granularity: ReportGranularity;
   /**
    * ユーザーの timezone。**ブラウザのローカル時刻で描かない** — 設定が実機とずれている時に
-   * 明細の時刻と曜日がカレンダーと食い違い、「カレンダーで見る」も別の日を開いてしまう。
+   * 明細の時刻と曜日がカレンダーと食い違う。
    */
   timezone: string;
   detail: ReportActivityDetailResult | undefined;
   isPending: boolean;
   isError: boolean;
   onClose: () => void;
-  /** 最初の箱の日をカレンダーで開く。`null` は明細が 0 件でボタンを出さない。 */
-  onOpenCalendarDay: ((dayKey: string) => void) | null;
   /**
    * 週別の推移を出すか。**モバイルは出さない**（狭い面で 6 本の棒は読めない）。
    * 出さない時は取得側（`useReportActivityDetail`）も `includeTrend: false` にする。
@@ -69,7 +66,6 @@ export function ReportDetailBody({
   isPending,
   isError,
   onClose,
-  onOpenCalendarDay,
   showTrend,
 }: ReportDetailBodyProps) {
   const t = useTranslations('report.detail');
@@ -108,7 +104,6 @@ export function ReportDetailBody({
         <DetailSections
           detail={detail}
           granularity={granularity}
-          onOpenCalendarDay={onOpenCalendarDay}
           showTrend={showTrend}
           timezone={timezone}
         />
@@ -120,18 +115,14 @@ export function ReportDetailBody({
 function DetailSections({
   detail,
   granularity,
-  onOpenCalendarDay,
   showTrend,
   timezone,
 }: {
   detail: ReportActivityDetailResult;
   granularity: ReportGranularity;
-  onOpenCalendarDay: ((dayKey: string) => void) | null;
   showTrend: boolean;
   timezone: string;
 }) {
-  const t = useTranslations('report.detail');
-  const firstRecord = detail.records[0];
   const listRef = useRef<HTMLUListElement>(null);
 
   // ストリップの点は明細の行へ着地する（仕様 §0「数字は必ず明細に落ちる」）。
@@ -158,19 +149,6 @@ function DetailSections({
       <TimeOfDayBars values={detail.timeOfDay} />
       {showTrend && <TrendBars granularity={granularity} trend={detail.trend} />}
       <RecordList listRef={listRef} records={detail.records} timezone={timezone} />
-
-      {onOpenCalendarDay !== null && firstRecord !== undefined && (
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          className="min-h-11 self-start"
-          // ISO の先頭 10 文字は UTC の日付。深夜の記録で 1 日ずれるので timezone で切る
-          onClick={() => onOpenCalendarDay(resolveZonedDayKey(firstRecord.startAt, timezone))}
-        >
-          {t('openCalendar')}
-        </Button>
-      )}
     </>
   );
 }

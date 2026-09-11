@@ -31,7 +31,6 @@ const meta = {
     isError: false,
     isPending: false,
     onClose: () => {},
-    onOpenCalendarDay: () => {},
   },
 } satisfies Meta<typeof ReportDetailSheet>;
 
@@ -159,7 +158,6 @@ export const AllPatterns: Story = {
       isError: false,
       isPending: false,
       onClose: () => {},
-      onOpenCalendarDay: () => {},
       showTrend: false,
     };
     return (

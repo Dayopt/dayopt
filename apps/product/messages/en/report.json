@@ -123,7 +123,6 @@
       "unassigned": "No activity set",
       "uncategorized": "Uncategorized",
       "error": "Could not load the details",
-      "openCalendar": "Open in calendar",
       "subtitle": {
         "week": "{category} · this week",
         "month": "{category} · this month",
