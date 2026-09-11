@@ -77,4 +77,15 @@ describe('isProtectedProductPath', () => {
       expect(isProtectedProductPath(path)).toBe(false);
     },
   );
+
+  // #2637 項目 5: 廃止済み画面の path が protectedProductPaths に残っていた。
+  // route が実在しないので保護してもしなくても 404 だが、prefix 一致で判定するため
+  // 将来 /tags-xxx のような別 path を足した時に無言で保護対象へ入る。
+  // route を新設する時は access-policy.ts への追加を同じ commit に含める（上の #2190 と同じ規約）。
+  it.each(['/tasks', '/tags', '/box', '/table', '/board', '/add'])(
+    '%s（廃止済み画面）は isProtectedProductPath の対象ではない',
+    (path) => {
+      expect(isProtectedProductPath(path)).toBe(false);
+    },
+  );
 });

@@ -18,7 +18,7 @@ const basePosition: TimeblockPosition = {
     createdAt: new Date('2026-06-04T00:00:00'),
     updatedAt: new Date('2026-06-04T00:00:00'),
     version: '2026-06-04T00:00:00.000000Z',
-    origin: 'unplanned',
+    kind: 'record',
   },
   top: 100,
   height: 60,

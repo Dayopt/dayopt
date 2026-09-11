@@ -75,7 +75,6 @@ function makeEvent(overrides: Partial<CalendarEvent> & { id: string }): Calendar
     displayEndDate: end,
     duration: 60,
     isMultiDay: false,
-    origin: 'planned',
     timeblockState: 'upcoming',
     plannedStartDate: start,
     plannedEndDate: end,

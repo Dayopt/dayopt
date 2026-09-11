@@ -45,8 +45,8 @@ interface OverlapGroup {
  * エントリの重複レイアウトを一括計算（メインエントリポイント）
  *
  * Googleカレンダー風の横並び配置:
- * 1. Planned を左側（column: 0）に配置
- * 2. Unplanned を右側に配置
+ * 1. Plan を左側（column: 0）に配置
+ * 2. Record を右側に配置
  */
 export function calculateTimeblockLayouts(entries: TimedTimeblock[]): TimeblockLayout[] {
   if (entries.length === 0) return [];
@@ -139,10 +139,10 @@ function calculateGroupLayout(entries: TimedTimeblock[]): TimeblockLayout[] {
   // 各エントリにカラムを割り当て
   const assignments = new Map<string, number>();
 
-  // planned を左、unplanned を右に安定配置するため、origin を優先してから開始時刻順に割り当てる。
+  // Plan を左、Record を右に安定配置するため、kind を優先してから開始時刻順に割り当てる。
   const sortedForAssignment = [...entries].sort((a, b) => {
-    if (a.origin === 'planned' && b.origin === 'unplanned') return -1;
-    if (a.origin === 'unplanned' && b.origin === 'planned') return 1;
+    if (a.kind === 'plan' && b.kind === 'record') return -1;
+    if (a.kind === 'record' && b.kind === 'plan') return 1;
     const timeDiff = new Date(a.start).getTime() - new Date(b.start).getTime();
     if (timeDiff !== 0) return timeDiff;
     return 0;

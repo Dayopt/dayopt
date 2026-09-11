@@ -143,7 +143,7 @@ describe('useWeekTimeblocks', () => {
   it('同じ時間帯では予定外記録を planned より前面にする', () => {
     const unplanned = createMockEntry({
       id: 'gap-record',
-      origin: 'unplanned',
+      kind: 'record',
       startDate: new Date('2026-03-30T10:00:00'),
       endDate: new Date('2026-03-30T10:30:00'),
       displayStartDate: new Date('2026-03-30T10:00:00'),
@@ -151,7 +151,7 @@ describe('useWeekTimeblocks', () => {
     });
     const planned = createMockEntry({
       id: 'planned',
-      origin: 'planned',
+      kind: 'plan',
       startDate: new Date('2026-03-30T10:00:00'),
       endDate: new Date('2026-03-30T11:00:00'),
       displayStartDate: new Date('2026-03-30T10:00:00'),

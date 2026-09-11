@@ -1,10 +1,10 @@
 import type { CalendarDisplayEvent } from '../types/calendar.types';
 
-/** planned entry の予定と記録が、リサイズ開始前から異なっているかを判定する。 */
+/** Plan の予定と記録が、リサイズ開始前から異なっているかを判定する。 */
 export function hasCalendarActualRangeDiff(
   entry: CalendarDisplayEvent | null | undefined,
 ): boolean {
-  if (entry?.origin !== 'planned') return false;
+  if (entry?.kind !== 'plan') return false;
 
   const plannedStart = entry.plannedStartDate ?? entry.startDate;
   const plannedEnd = entry.plannedEndDate ?? entry.endDate;

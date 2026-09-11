@@ -68,7 +68,7 @@ export function buildDragPreviewEntry(
     Math.round((previewTime.end.getTime() - previewTime.start.getTime()) / 60000),
   );
 
-  if (entry.origin === 'unplanned') {
+  if (entry.kind === 'record') {
     return {
       ...entry,
       startDate: previewTime.start,
