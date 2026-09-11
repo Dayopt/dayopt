@@ -195,6 +195,7 @@ gateを有効にした後は、同じユーザーの操作をDB内で直列化�
   | `statistics.getMcpReview`                                 | `read:stats`       |
   | `activities.listActivities` / `activities.listCategories` | `read:activities`  |
   | `timeblockContext.getConstraints`                         | `read:constraints` |
+  | `review.listSegments`                                     | `read:activities`  |
 
   互換 MCP tool `entries.list` も `read:entries` scope を使う。write / delete は tRPC を経由せず、MCP mutation 経路（`private.authorize_mcp_mutation_v1` + 三重 write gate）だけが扱う
 

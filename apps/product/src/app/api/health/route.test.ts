@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   loggerError: vi.fn(),
   loggerWarn: vi.fn(),
   envValidationError: false,
+  healthLimit: vi.fn(),
 }));
 
 vi.mock('@supabase/supabase-js', () => ({
@@ -33,6 +34,10 @@ vi.mock('@/lib/logger', () => ({
     error: mocks.loggerError,
     warn: mocks.loggerWarn,
   },
+}));
+
+vi.mock('@/lib/rate-limit/upstash', () => ({
+  healthCheckGlobalRateLimit: { limit: mocks.healthLimit },
 }));
 
 vi.mock('@/env', () => ({
@@ -67,6 +72,7 @@ describe('GET /api/health', () => {
 
     mocks.envValidationError = false;
     mocks.redisConstructorOptions = [];
+    mocks.healthLimit.mockResolvedValue({ success: true });
     mocks.rpc.mockImplementation(() =>
       Promise.resolve({
         data: [
@@ -361,6 +367,61 @@ describe('GET /api/health', () => {
     expect(response.status).toBe(503);
     expect((await response.json()).status).toBe('unhealthy');
     expect(JSON.stringify(mocks.loggerError.mock.calls)).not.toContain('redis-token-sentinel');
+  });
+
+  it('上限を超えたら依存を叩かずに直近の結果を返す', async () => {
+    // 無認証・無制限のままだと、1 リクエストごとに service-role client の生成 →
+    // identity RPC → profiles SELECT → Redis PING を駆動できる（#2721 D-09）。
+    const first = await GET();
+    expect(first.status).toBe(200);
+    const callsAfterFirst = mocks.createClient.mock.calls.length;
+    expect(callsAfterFirst).toBeGreaterThan(0);
+
+    mocks.healthLimit.mockResolvedValueOnce({ success: false });
+    const replayed = await GET();
+
+    expect(replayed.status).toBe(first.status);
+    expect(replayed.headers.get('X-Health-Check-Replayed')).toBe('true');
+    // 依存を一切叩いていない。
+    expect(mocks.createClient.mock.calls.length).toBe(callsAfterFirst);
+  });
+
+  it('障害中の結果も記憶し、古い healthy を返さない', async () => {
+    // 成功だけを覚えると、障害が始まった後に上限を超えた瞬間から最大 60 秒
+    // 「古い healthy」を返し、外形監視のアラートがその分遅れる。
+    const healthy = await GET();
+    expect(healthy.status).toBe(200);
+
+    mocks.limit.mockResolvedValueOnce({
+      data: null,
+      error: {
+        code: 'PGRST202',
+        message: 'database-message-sentinel',
+        details: 'database-details-sentinel',
+        hint: 'database-hint-sentinel',
+      },
+    });
+    const unhealthy = await GET();
+    expect(unhealthy.status).toBe(503);
+
+    mocks.healthLimit.mockResolvedValueOnce({ success: false });
+    const replayed = await GET();
+
+    expect(replayed.status).toBe(503);
+    expect(replayed.headers.get('X-Health-Check-Replayed')).toBe('true');
+    // 監視側が stale を判別できるよう経過時間を出す。
+    expect(Number(replayed.headers.get('X-Health-Check-Age-Ms'))).toBeGreaterThanOrEqual(0);
+  });
+
+  it('limiter が落ちても通常の check を続ける', async () => {
+    // 監視の入口なので、limiter 障害では止めない（fail-open）。
+    mocks.healthLimit.mockRejectedValueOnce(new Error('redis unavailable'));
+
+    const response = await GET();
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('X-Health-Check-Replayed')).toBeNull();
+    expect(mocks.createClient).toHaveBeenCalled();
   });
 });
 

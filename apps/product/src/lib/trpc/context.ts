@@ -15,6 +15,8 @@ import { type Database } from '@/lib/database';
 import { logger } from '@/lib/logger';
 import { extractBearerToken, verifyAccessToken } from '@/lib/mcp/auth';
 import { OAuthServerError, type OAuthClientId, type SupportedScope } from '@/lib/oauth-server';
+import { trpcPreAuthIpRateLimit } from '@/lib/rate-limit/upstash';
+import { extractClientIp } from '@/lib/security/ip-validation';
 import { captureUnexpectedError } from '@/lib/sentry';
 import { AuthMode, createServiceRoleClient, detectAuthMode } from '@/lib/supabase/oauth';
 import { resolveSessionAuthContext, type MfaAssurance } from '@/lib/trpc/session-auth-context';
@@ -233,6 +235,44 @@ async function createTRPCContext(opts: {
   };
 }
 
+/**
+ * 認証前の粗い上限。
+ *
+ * `protectedProcedure` の user 単位 300/分 は `ctx.userId` が確定した後にしか働かない。
+ * その手前の `resolveSessionAuthContext` は cookie 由来 session があれば毎回
+ * Supabase Auth へ問い合わせるため、cookie を付けた未認証リクエストで Auth quota と
+ * Function 時間を消費できる（#2721 D-06）。
+ *
+ * **cookie 無しには掛けない** — auth-js は session が無ければ外部通信せず短絡するので
+ * （`GoTrueClient` の `_getUser`）、掛けても守るものが無く、公開ページからの
+ * 未認証 procedure を巻き込むだけになる。
+ *
+ * **IP 単位だけにする。** 全 IP 合算の bucket を置くと、少数の IP から合算値を
+ * 使い切るだけで全ログイン済みユーザーの `/api/trpc` を止められる（この層は
+ * procedure より手前なので画面全体が壊れる）。単一ソースの増幅は IP 単位で有界。
+ *
+ * Redis 障害時は可用性を優先して通す（アプリ全体の入口なので fail-closed にしない）。
+ * 後段の user 単位 limit と `protectedProcedure` の認証は生きている。
+ */
+async function isPreAuthRateLimited(req: TrpcRequestLike): Promise<boolean> {
+  if (Object.keys(req.cookies).length === 0) return false;
+
+  const ip = extractClientIp(req.headers['x-real-ip'] ?? null);
+  try {
+    const ipResult = await trpcPreAuthIpRateLimit?.limit(`trpc-pre-auth-ip:${ip}`);
+    return Boolean(ipResult && !ipResult.success);
+  } catch (error) {
+    const original =
+      error instanceof Error ? error : new Error('tRPC pre-auth rate limit check failed');
+    captureUnexpectedError(original, {
+      feature: 'rate_limit',
+      operation: 'trpc_pre_auth_rate_limit_check',
+      source: 'upstash',
+    });
+    return false;
+  }
+}
+
 /** Fetch API用tRPCコンテキスト作成（App Router Route Handler向け） */
 export async function createFetchTRPCContext(opts: FetchCreateContextFnOptions): Promise<Context> {
   // handler が呼ばれた直後、auth 解決より前に anchor する（Context.requestStartedAt 参照）。
@@ -245,6 +285,13 @@ export async function createFetchTRPCContext(opts: FetchCreateContextFnOptions):
     throw new TRPCError({
       code: 'UNAUTHORIZED',
       message: 'OAuth tokens are accepted only through the MCP endpoint',
+    });
+  }
+
+  if (await isPreAuthRateLimited(req)) {
+    throw new TRPCError({
+      code: 'TOO_MANY_REQUESTS',
+      message: 'Too many requests. Please try again later.',
     });
   }
 

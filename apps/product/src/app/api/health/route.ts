@@ -6,6 +6,7 @@ import {
   assertDatabaseOAuthIdentity,
   resolveDatabaseOAuthProjectRef,
 } from '@/lib/oauth-server/database-identity';
+import { healthCheckGlobalRateLimit } from '@/lib/rate-limit/upstash';
 
 import { resolveHealthStatus, type OverallHealthStatus } from './health-status';
 
@@ -188,8 +189,59 @@ function isOperationalDeployment(): boolean {
  *
  * 本番環境ではステータスのみ返す（情報露出防止）
  */
+/**
+ * 直近の結果。上限を超えた時に「新しく依存を叩かずに」返すためだけに持つ。
+ *
+ * `/api/health` は無認証で、1 回ごとに service-role client の生成 → identity RPC →
+ * `profiles` の SELECT → Redis PING を駆動する（#2721 D-09）。外形監視を止めないため、
+ * 超過時は 503 ではなく直近の結果をそのまま返す。
+ */
+const LAST_RESULT_MAX_AGE_MS = 60_000;
+let lastResult: { body: unknown; httpStatus: number; at: number } | null = null;
+
+function rememberResult(body: unknown, httpStatus: number): void {
+  lastResult = { body, httpStatus, at: Date.now() };
+}
+
+/**
+ * 上限超過時に返せる直近の結果。無ければ null（= 通常どおり依存を叩く）。
+ *
+ * **成功も失敗も記憶する。** 成功だけを覚えると、障害中に上限を超えた瞬間から
+ * 最大 60 秒「古い healthy」を返し、外形監視のアラートがその分遅れる。
+ * 監視側が stale を判別できるよう、経過時間もヘッダーへ出す。
+ */
+function replayableResult(): NextResponse | null {
+  if (!lastResult) return null;
+  const ageMs = Date.now() - lastResult.at;
+  if (ageMs > LAST_RESULT_MAX_AGE_MS) return null;
+  return NextResponse.json(lastResult.body, {
+    status: lastResult.httpStatus,
+    headers: {
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+      'X-Health-Check-Replayed': 'true',
+      'X-Health-Check-Age-Ms': String(ageMs),
+    },
+  });
+}
+
+async function exceedsHealthCheckBudget(): Promise<boolean> {
+  if (!healthCheckGlobalRateLimit) return false;
+  try {
+    const { success } = await healthCheckGlobalRateLimit.limit('health-all');
+    return !success;
+  } catch {
+    // 監視の入口なので、limiter 障害では止めずに通常の check を続ける。
+    return false;
+  }
+}
+
 export async function GET() {
   const startTime = Date.now();
+
+  if (await exceedsHealthCheckBudget()) {
+    const replayed = replayableResult();
+    if (replayed) return replayed;
+  }
 
   try {
     const hasValidEnvironment = await hasValidOperationalEnvironment();
@@ -198,6 +250,7 @@ export async function GET() {
         status: 'unhealthy',
         responseTimeMs: Date.now() - startTime,
       });
+      rememberResult({ status: 'unhealthy' }, 503);
       return NextResponse.json(
         { status: 'unhealthy' },
         {
@@ -234,6 +287,7 @@ export async function GET() {
 
     // 本番環境ではステータスのみ返す（内部情報の露出を防止）
     if (isOperationalDeployment()) {
+      rememberResult({ status: overallStatus }, httpStatus);
       return NextResponse.json(
         { status: overallStatus },
         {
@@ -268,6 +322,8 @@ export async function GET() {
       healthStatus.details = { warnings };
     }
 
+    rememberResult(healthStatus, httpStatus);
+
     // レスポンス時間をヘッダーに追加
     const response = NextResponse.json(healthStatus, { status: httpStatus });
 
@@ -288,6 +344,7 @@ export async function GET() {
 
     // 本番環境ではエラー詳細を隠す
     if (isOperationalDeployment()) {
+      rememberResult({ status: 'unhealthy' }, 503);
       return NextResponse.json({ status: 'unhealthy' }, { status: 503 });
     }
 
@@ -307,6 +364,7 @@ export async function GET() {
       },
     };
 
+    rememberResult(errorStatus, 503);
     return NextResponse.json(errorStatus, { status: 503 });
   }
 }
