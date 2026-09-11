@@ -75,7 +75,7 @@ User["👤 ユーザー操作"]
 
     subgraph Server["⚙️ サーバー"]
         API["/api/trpc/[trpc]"]
-        MW["Middleware<br/>(認証・Rate Limit)"]
+        MW["createFetchTRPCContext<br/>(認証前 rate limit・session 解決)"]
         TRPC_R["tRPC Router<br/>(protectedProcedure)"]
         SVC["Service Layer<br/>(ビジネスロジック)"]
     end
@@ -100,37 +100,57 @@ User["👤 ユーザー操作"]
 
 ### 認証フロー
 
-```mermaid
-graph LR
-subgraph AuthModes["認証モード（自動判定）"]
-S["Session<br/>(Cookie)"]
-O["OAuth 2.1<br/>(Bearer Token)"]
-SR["Service-Role<br/>(API Key)"]
-end
-
-    subgraph Middleware
-        CTX["createFetchTRPCContext"]
-        RL["Rate Limit<br/>(300 req/min)"]
-    end
-
-    S --> CTX
-    O --> CTX
-    SR --> CTX
-    CTX -->|"userId 抽出"| RL
-    RL --> Router["tRPC Router"]
-```
-
-### Provider 階層
+OAuth bearer が tRPC へ到達する経路は **MCP endpoint の内部実行だけ**で、公開 HTTP 境界の
+`/api/trpc` へ同じ token を投げても DB を引く前に 401 になる。rate limit は 2 段で、
+認証前（cookie 付きのみ、IP 単位）と認証後（user 単位）は別の bucket。
 
 ```mermaid
 graph TD
-    P["Providers (root)"]
-    P --> QC["QueryClientProvider"]
+    subgraph Public["公開 HTTP 境界"]
+        TRPC["/api/trpc<br/>Session (Cookie) のみ"]
+        MCP["/api/mcp<br/>OAuth 2.1 Bearer"]
+    end
+
+    subgraph Ctx["createFetchTRPCContext"]
+        REJECT["OAuth bearer → 401<br/>(MCP 以外では受理しない)"]
+        PRE["pre-auth rate limit<br/>cookie 付きのみ / IP 単位"]
+        SESSION["session 解決 (getUser)"]
+    end
+
+    subgraph Proc["protectedProcedure"]
+        MFA["MFA assurance"]
+        BILLING["利用権"]
+        FENCE["write fence (mutation)"]
+        RL["user rate limit<br/>300 req/min"]
+    end
+
+    BRIDGE["lib/mcp/trpc-bridge<br/>createCaller(oauthExecution: mcp_internal)"]
+
+    TRPC --> REJECT --> PRE --> SESSION --> MFA
+    MCP -->|"token 検証後"| BRIDGE --> MFA
+    MFA --> BILLING --> FENCE --> RL --> Router["tRPC Router"]
+```
+
+- `service-role`（`X-API-Key`）モードは context に存在するが、全 procedure が `ctx.userId` を
+  要求するため公開境界からは到達できない（内部 caller 専用）
+- OAuth caller は user rate limit を消費しない（MCP 側の専用 limiter で一度だけ制限する）
+
+### Provider 階層
+
+実体は `app/[locale]/(app)/_providers/_composition/ProvidersComposition.tsx`。
+
+```mermaid
+graph TD
+    P["PersistQueryClientProvider"]
     P --> TC["api.Provider (tRPC)"]
-    P --> AS["AuthStoreInitializer"]
-    P --> TP["ThemeProvider"]
-    P --> SW["ServiceWorkerProvider (lazy)"]
-    P --> GT["GlobalTagMergeModal (lazy)"]
+    TC --> AS["AuthStoreInitializer（Context 無し・並列）"]
+    TC --> QB["QueryCacheAuthBoundary（認証主体の変化で cache 破棄）"]
+    TC --> TP["ThemeProvider"]
+    TP --> SM["SessionMonitorProvider (lazy)"]
+    SM --> SW["ServiceWorkerProvider (lazy)"]
+    SW --> US["UserSettingsInitializer（hydration 待ち）"]
+    US --> BA["BillingAccessProvider"]
+    BA --> CH["children + Global*Modal"]
 ```
 
 ### キャッシュ戦略
