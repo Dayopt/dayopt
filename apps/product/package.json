@@ -24,8 +24,8 @@
     "copy:check": "tsx ../../scripts/tasks/check-glossary.ts",
     "i18n:add-locale": "tsx ../../scripts/tasks/add-locale.ts",
     "docs:check": "tsx ../../scripts/tasks/validate-doc-references.ts",
-    "api:spec": "NEXT_PUBLIC_SUPABASE_URL=https://dummy.supabase.co NEXT_PUBLIC_SUPABASE_ANON_KEY=dummy SUPABASE_SERVICE_ROLE_KEY=dummy tsx ../../scripts/tasks/generate-api-spec.ts",
-    "api:spec:check": "NEXT_PUBLIC_SUPABASE_URL=https://dummy.supabase.co NEXT_PUBLIC_SUPABASE_ANON_KEY=dummy SUPABASE_SERVICE_ROLE_KEY=dummy tsx ../../scripts/tasks/generate-api-spec.ts --check",
+    "api:spec": "NEXT_PUBLIC_SUPABASE_URL=https://dummy.supabase.co NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=dummy SUPABASE_SECRET_KEY=dummy tsx ../../scripts/tasks/generate-api-spec.ts",
+    "api:spec:check": "NEXT_PUBLIC_SUPABASE_URL=https://dummy.supabase.co NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=dummy SUPABASE_SECRET_KEY=dummy tsx ../../scripts/tasks/generate-api-spec.ts --check",
     "license:check": "license-checker --production --excludePrivatePackages --onlyAllow \"$(cat .licensrc.json | jq -r .onlyAllow)\"",
     "license:check-risks": "tsx ../../scripts/tasks/check-license-risks.ts",
     "license:audit": "license-checker --production --summary",
@@ -63,7 +63,7 @@
     "security:check": "pnpm audit --audit-level=moderate",
     "security:check:production": "pnpm audit --prod --audit-level=high",
     "storybook:coverage": "tsx ../../scripts/tasks/check-story-coverage.ts",
-    "test:mcp:conformance": "NEXT_PUBLIC_SUPABASE_URL=https://dummy.supabase.co NEXT_PUBLIC_SUPABASE_ANON_KEY=dummy SUPABASE_SERVICE_ROLE_KEY=dummy MCP_CANONICAL_RESOURCE_URI=https://mcp.dayopt.app NODE_OPTIONS='--conditions=react-server' tsx scripts/mcp-conformance.ts"
+    "test:mcp:conformance": "NEXT_PUBLIC_SUPABASE_URL=https://dummy.supabase.co NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=dummy SUPABASE_SECRET_KEY=dummy MCP_CANONICAL_RESOURCE_URI=https://mcp.dayopt.app NODE_OPTIONS='--conditions=react-server' tsx scripts/mcp-conformance.ts"
   },
   "dependencies": {
     "@dayopt/billing": "workspace:*",

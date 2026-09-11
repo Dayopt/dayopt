@@ -436,7 +436,7 @@ npx supabase functions deploy send-auth-email --use-api --project-ref=<PROD_REF>
 **Supabase platform 自動注入(触らない):**
 
 - `SUPABASE_URL`
-- `SUPABASE_SERVICE_ROLE_KEY`
+- `SUPABASE_SECRET_KEY`
 
 #### 設定方法
 
@@ -496,7 +496,7 @@ npx supabase secrets set --env-file .env.edge.<env> --project-ref=<REF>
 
 ### Secrets
 
-- `SUPABASE_SERVICE_ROLE_KEY` / `RESEND_API_KEY` 等の秘匿値を**ログ出力・commit しない**
+- `SUPABASE_SECRET_KEY` / `RESEND_API_KEY` 等の秘匿値を**ログ出力・commit しない**
 - `.env.edge.*` は `.gitignore` 対象
 - secrets の値を `console.log` / `logger` に含めない
 

@@ -27,6 +27,7 @@ import {
 import { MagicLinkEmail } from './MagicLinkEmail.tsx';
 import { PasswordResetEmail } from './PasswordResetEmail.tsx';
 import { authEmailSubjects } from './subjects.ts';
+import { resolveAuthEmailSecretKey } from './supabase-key.ts';
 
 const resend = new Resend(Deno.env.get('RESEND_API_KEY') as string);
 const hookSecret = (Deno.env.get('SEND_EMAIL_HOOK_SECRET') as string).replace('v1,whsec_', '');
@@ -43,12 +44,18 @@ type Locale = 'en' | 'ja';
  */
 async function getUserLocale(userId: string): Promise<Locale> {
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
-  const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+  if (!supabaseUrl) return 'en';
+  const secretKey = resolveAuthEmailSecretKey({
+    supabaseUrl,
+    secretKey: Deno.env.get('SUPABASE_SECRET_KEY'),
+    secretKeys: Deno.env.get('SUPABASE_SECRET_KEYS'),
+    localServiceRoleKey: Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'),
+  });
 
-  if (!supabaseUrl || !serviceRoleKey) return 'en';
+  if (!secretKey) return 'en';
 
   try {
-    const supabase = createClient(supabaseUrl, serviceRoleKey);
+    const supabase = createClient(supabaseUrl, secretKey);
     const { data } = await supabase
       .from('user_settings')
       .select('preferred_locale')

@@ -198,7 +198,7 @@ describe('calendar account deletion settle cron', () => {
   // causeCode が無い場合（例: client 生成失敗）は stage 自身の code へフォールバックする。
   it('causeCode が無い CalendarAccountDeletionSettleError は自身の stage code を errorCode に使う', async () => {
     const error = new CalendarAccountDeletionSettleError('client', {
-      message: 'missing SUPABASE_SERVICE_ROLE_KEY',
+      message: 'missing SUPABASE_SECRET_KEY',
     });
     dispatchCalendarAccountDeletionSettle.mockRejectedValue(error);
 
@@ -210,7 +210,7 @@ describe('calendar account deletion settle cron', () => {
       operation: 'cron_dispatch',
       route: '/api/cron/calendar-account-deletion-settle',
       errorCode: 'ACCOUNT_DELETION_SETTLE_CLIENT_FAILED',
-      errorMessage: 'missing SUPABASE_SERVICE_ROLE_KEY',
+      errorMessage: 'missing SUPABASE_SECRET_KEY',
     });
   });
 });

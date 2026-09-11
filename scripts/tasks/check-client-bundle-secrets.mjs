@@ -31,7 +31,9 @@ const STATIC_DIR = resolve(ROOT, 'apps/product/.next/static');
  * env 名を含めるのは「client component が誤って参照した」形を検出するため。
  */
 const PATTERNS = [
+  'SUPABASE_SECRET_KEY',
   'SUPABASE_SERVICE_ROLE_KEY',
+  'sb_secret_',
   'STRIPE_SECRET_KEY',
   'RECOVERY_CODE_PEPPER',
   'SENTRY_AUTH_TOKEN',

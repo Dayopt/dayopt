@@ -67,12 +67,11 @@ export async function assertDatabaseOAuthIdentity(
 export function resolveDatabaseOAuthProjectRef(input: {
   environment: OAuthEnvironmentConfig['environment'];
   supabaseUrl: string | undefined;
-  serviceRoleKey: string | undefined;
 }): string | null {
   if (input.environment !== 'preview') return null;
 
   try {
-    if (!input.supabaseUrl || !input.serviceRoleKey) throw new Error();
+    if (!input.supabaseUrl) throw new Error();
     const url = new URL(input.supabaseUrl);
     if (
       url.protocol !== 'https:' ||
@@ -87,24 +86,12 @@ export function resolveDatabaseOAuthProjectRef(input: {
     }
 
     const hostMatch = /^([a-z]{20})[.]supabase[.]co$/u.exec(url.hostname);
-    if (!hostMatch) throw new Error();
+    if (!hostMatch?.[1]) throw new Error();
 
-    const parts = input.serviceRoleKey.split('.');
-    if (parts.length !== 3 || !parts[1]) throw new Error();
-    const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8')) as unknown;
-    if (
-      !payload ||
-      typeof payload !== 'object' ||
-      !('role' in payload) ||
-      payload.role !== 'service_role' ||
-      !('ref' in payload) ||
-      typeof payload.ref !== 'string' ||
-      payload.ref !== hostMatch[1]
-    ) {
-      throw new Error();
-    }
-
-    return payload.ref;
+    // Opaque API keys carry no project claims. The URL identifies the expected
+    // project; the authenticated identity RPC above must independently return
+    // the same project ref. A mismatched key fails authentication at that URL.
+    return hostMatch[1];
   } catch {
     throw new DatabaseOAuthIdentityError();
   }

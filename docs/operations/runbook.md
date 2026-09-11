@@ -110,7 +110,7 @@ Write Fence とは別の gate。MCP 経由の書き込み（`plans.create` 等�
 op run -- pnpm mcp:gate
 ```
 
-`SUPABASE_SERVICE_ROLE_KEY` / `NEXT_PUBLIC_SUPABASE_URL` は 1Password `app` item から `op run` が解決する。`writes_enabled` / `enabled_client_ids` / `revision` を表示するだけで、何も変更しない。
+`SUPABASE_SECRET_KEY` / `NEXT_PUBLIC_SUPABASE_URL` は 1Password `app` item から `op run` が解決する。`writes_enabled` / `enabled_client_ids` / `revision` を表示するだけで、何も変更しない。
 
 #### 1 client を有効化する（段階導入）
 
@@ -199,8 +199,8 @@ op run -- pnpm mcp:gate -- --disable-billing   # 旧契約（契約中のみ）�
 #### ケースB: 環境変数ミス
 
 - [ ] Vercel Dashboard → Settings → Environment Variables を確認
-- [ ] `NEXT_PUBLIC_SUPABASE_URL` と `NEXT_PUBLIC_SUPABASE_ANON_KEY` が設定済みか
-- [ ] サーバー側: `SUPABASE_SERVICE_ROLE_KEY` が設定済みか
+- [ ] `NEXT_PUBLIC_SUPABASE_URL` と `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` が設定済みか
+- [ ] サーバー側: `SUPABASE_SECRET_KEY` が設定済みか
 - [ ] 修正後: 再デプロイ（Vercel Dashboard → Deployments → Redeploy）
 
 #### ケースC: Edge Functions障害

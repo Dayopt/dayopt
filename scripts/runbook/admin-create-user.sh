@@ -12,7 +12,7 @@
 # 前提:
 #   - .op-env.human が存在し、以下を含む:
 #       NEXT_PUBLIC_SUPABASE_URL=op://...
-#       SUPABASE_SERVICE_ROLE_KEY=op://...
+#       SUPABASE_SECRET_KEY=op://...
 #   - 1Password CLI (op) に signin 済み (op signin)
 #   - password を保存する 1Password item を事前に作成済み
 #
@@ -68,12 +68,12 @@ REQUEST_BODY=$(jq -n \
 RESPONSE_FILE=$(mktemp "${TMPDIR:-/tmp}/admin-create-user-response.XXXXXX")
 trap 'rm -f "$RESPONSE_FILE"' EXIT
 
+auth_headers_json
+
 HTTP_STATUS=$(curl -sS -o "$RESPONSE_FILE" -w "%{http_code}" \
   -X POST \
   "${NEXT_PUBLIC_SUPABASE_URL}/auth/v1/admin/users" \
-  -H "apikey: ${SUPABASE_SERVICE_ROLE_KEY}" \
-  -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
-  -H "Content-Type: application/json" \
+  "${AUTH_HEADERS[@]}" \
   -d "$REQUEST_BODY")
 
 if [[ "$HTTP_STATUS" -ge 200 && "$HTTP_STATUS" -lt 300 ]]; then

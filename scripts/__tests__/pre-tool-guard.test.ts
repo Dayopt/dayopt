@@ -44,7 +44,7 @@ const ADMIN_EXAMPLE = `${HUMAN}.example`;
 const AGENT = `.op-env${'.'}agent`;
 const LOCAL_EXAMPLE = `${AGENT}.example`;
 
-const PROD_REF = `op://human/supabase/SUPABASE_SERVICE_ROLE_KEY`;
+const PROD_REF = `op://human/supabase/SUPABASE_SECRET_KEY`;
 const AGENT_REF = `op://agent/supabase/SUPABASE_ACCESS_TOKEN`;
 
 type Decision = 'block' | 'allow';
@@ -1528,13 +1528,13 @@ describe('pre-tool-guard.mjs: #2293 vercel invoke anchor の抜け穴修正（pu
 
 describe('pre-tool-guard.mjs: #2293 op read（--reveal 相当の masking を持たず、例外なく block）', () => {
   it('redirect なしの op read は落ちる', () => {
-    expect(runGuard(bash('op read "op://human/supabase/SUPABASE_SERVICE_ROLE_KEY"'))).toBe('block');
+    expect(runGuard(bash('op read "op://human/supabase/SUPABASE_SECRET_KEY"'))).toBe('block');
   });
 
   it('後続コマンドと ; で連結しても落ちる', () => {
-    expect(
-      runGuard(bash('op read "op://human/supabase/SUPABASE_SERVICE_ROLE_KEY" && echo done')),
-    ).toBe('block');
+    expect(runGuard(bash('op read "op://human/supabase/SUPABASE_SECRET_KEY" && echo done'))).toBe(
+      'block',
+    );
   });
 
   // 当初は `>/dev/null` への破棄 redirect があれば通す設計だったが、push前
@@ -1545,16 +1545,14 @@ describe('pre-tool-guard.mjs: #2293 op read（--reveal 相当の masking を持�
   // block する設計へ変更した（接続確認は (a) の既定 masked 出力で代替できる）。
   it('stdout への破棄 redirect（>/dev/null）があっても、例外なく落ちる（設計変更）', () => {
     expect(
-      runGuard(
-        bash('op read "op://human/supabase/SUPABASE_SERVICE_ROLE_KEY" >/dev/null && echo OK'),
-      ),
+      runGuard(bash('op read "op://human/supabase/SUPABASE_SECRET_KEY" >/dev/null && echo OK')),
     ).toBe('block');
   });
 
   it('stderr のみの破棄（2>/dev/null）は stdout の実値を隠さない（旧設計の穴の回帰防止）', () => {
-    expect(
-      runGuard(bash('op read "op://human/supabase/SUPABASE_SERVICE_ROLE_KEY" 2>/dev/null')),
-    ).toBe('block');
+    expect(runGuard(bash('op read "op://human/supabase/SUPABASE_SECRET_KEY" 2>/dev/null'))).toBe(
+      'block',
+    );
   });
 
   it('複数の op read が混在し、片方だけ redirect されていても両方落ちる（旧設計の穴の回帰防止）', () => {
@@ -1566,18 +1564,18 @@ describe('pre-tool-guard.mjs: #2293 op read（--reveal 相当の masking を持�
   });
 
   it('op run -- の後ろに空白1つで置かれた op read も落ちる（anchor 限定の抜け穴修正）', () => {
-    expect(
-      runGuard(bash('op run -- op read "op://human/supabase/SUPABASE_SERVICE_ROLE_KEY"')),
-    ).toBe('block');
+    expect(runGuard(bash('op run -- op read "op://human/supabase/SUPABASE_SECRET_KEY"'))).toBe(
+      'block',
+    );
   });
 
   // merge前クロスレビューで発見: 絶対パス起動（/usr/local/bin/op 等）は直前の
   // 文字が `/` で境界集合 [[:space:];&|] のどれにも一致せず素通りした。
   // 境界集合に `/` を追加して修正した。
   it('絶対パス起動（/usr/local/bin/op read）でも落ちる', () => {
-    expect(
-      runGuard(bash('/usr/local/bin/op read "op://human/supabase/SUPABASE_SERVICE_ROLE_KEY"')),
-    ).toBe('block');
+    expect(runGuard(bash('/usr/local/bin/op read "op://human/supabase/SUPABASE_SECRET_KEY"'))).toBe(
+      'block',
+    );
   });
 
   it('代替経路（op item get --fields、既定形式）は影響を受けない', () => {

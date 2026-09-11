@@ -50,22 +50,18 @@ type OAuthSupabaseClient = SupabaseClient<OAuthOnlyDatabase>;
 const OAUTH_DB_TIMEOUT_MS = 15_000;
 
 export function createOAuthDbClient(): OAuthSupabaseClient {
-  return createClient<OAuthOnlyDatabase>(
-    env.NEXT_PUBLIC_SUPABASE_URL,
-    env.SUPABASE_SERVICE_ROLE_KEY,
-    {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-      },
-      global: {
-        fetch: (url, options) => {
-          return fetch(url, {
-            ...options,
-            signal: options?.signal ?? AbortSignal.timeout(OAUTH_DB_TIMEOUT_MS),
-          });
-        },
+  return createClient<OAuthOnlyDatabase>(env.NEXT_PUBLIC_SUPABASE_URL, env.SUPABASE_SECRET_KEY, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+    global: {
+      fetch: (url, options) => {
+        return fetch(url, {
+          ...options,
+          signal: options?.signal ?? AbortSignal.timeout(OAUTH_DB_TIMEOUT_MS),
+        });
       },
     },
-  );
+  });
 }

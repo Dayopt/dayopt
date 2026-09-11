@@ -59,7 +59,6 @@ export async function verifyAccessToken(token: string): Promise<VerifiedAccessTo
     const expectedSupabaseProjectRef = resolveDatabaseOAuthProjectRef({
       environment: expectedIdentity.environment,
       supabaseUrl: env.NEXT_PUBLIC_SUPABASE_URL,
-      serviceRoleKey: env.SUPABASE_SERVICE_ROLE_KEY,
     });
     await assertDatabaseOAuthIdentity(
       expectedIdentity,

@@ -44,8 +44,8 @@ const serverSchema = z
   .object({
     // Supabase
     NEXT_PUBLIC_SUPABASE_URL: z.string().url(),
-    NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().min(1),
-    SUPABASE_SERVICE_ROLE_KEY: z.string().min(1),
+    NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: z.string().min(1),
+    SUPABASE_SECRET_KEY: z.string().min(1),
 
     // Upstash Redis
     UPSTASH_REDIS_REST_URL: z.string().url().optional(),

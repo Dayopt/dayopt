@@ -70,7 +70,12 @@ interface CheckOptions {
 
 function runCheck(options: CheckOptions = {}) {
   const fakeOpDirectory = createFakeOpDirectory();
-  const fields = [...new Set(onePasswordEnvSchema.map((entry) => entry.field))].map((field) => ({
+  const fields = [
+    ...new Set([
+      ...onePasswordEnvSchema.map((entry) => entry.field),
+      ...forbiddenFields.map((entry) => entry.field),
+    ]),
+  ].map((field) => ({
     id: field,
     label: field,
     value: field === options.emptyField ? '' : sentinelSecret,
@@ -113,7 +118,7 @@ describe('check-1password.ts', () => {
     const result = runCheck();
 
     expect(result.status, result.stderr).toBe(0);
-    expect(result.stdout).toContain('human / supabase / SUPABASE_SERVICE_ROLE_KEY: OK');
+    expect(result.stdout).toContain('human / supabase / SUPABASE_SECRET_KEY: OK');
     expect(result.stdout).not.toContain(sentinelSecret);
     expect(result.stderr).not.toContain(sentinelSecret);
   });
@@ -240,8 +245,8 @@ describe('check-1password.ts', () => {
 
   it.each([
     'NEXT_PUBLIC_SUPABASE_URL',
-    'NEXT_PUBLIC_SUPABASE_ANON_KEY',
-    'SUPABASE_SERVICE_ROLE_KEY',
+    'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY',
+    'SUPABASE_SECRET_KEY',
   ])('production の Supabase %s が欠けたら失敗する', (field) => {
     // Staging 側の複製を撤去した分の required 検査は production へ移した。
     // 欠けると runtime だけでなく .op-env.human 経由の管理者運用も止まる。

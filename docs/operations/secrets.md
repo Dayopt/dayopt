@@ -268,7 +268,7 @@ vault は 2026-08-14 の信頼境界軸再編（[#2086](https://github.com/Dayop
 
 | Item                     | Fields                                                                                                                                                                                                                                                                                 |
 | ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `supabase`               | `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_DB_PASSWORD`, `CRON_SECRET`, `SEND_EMAIL_HOOK_SECRET`（`SUPABASE_ACCESS_TOKEN` は `supabase-cli` へ切り出し済み。同名 field は削除済み）                                           |
+| `supabase`               | `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY`, `SUPABASE_DB_PASSWORD`, `CRON_SECRET`, `SEND_EMAIL_HOOK_SECRET`（`SUPABASE_ACCESS_TOKEN` は `supabase-cli` へ切り出し済み。同名 field は削除済み）                                          |
 | `supabase-cli`           | `SUPABASE_ACCESS_TOKEN` + 有効期限 field。CLI / MCP が使う operational credential 専用 item（rotation 対象、#2127）                                                                                                                                                                    |
 | `supabase-login`         | Supabase Dashboard の GUI ログイン（LOGIN item、OTP 付き）。op:// では参照されない、ブラウザでの手動サインイン専用（#2127）                                                                                                                                                            |
 | `upstash`                | `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`                                                                                                                                                                                                                                   |
@@ -457,6 +457,10 @@ master へ値を戻す時は GUI か対象を限定した `op item create` / `op
 
 **preview target には同名 `SUPABASE_URL` / `SUPABASE_ANON_KEY` が integration 注入として存在し続ける**（`configurationId` 一致で確認）。production target の手動残骸を削除しただけで、preview 側の integration 注入分は対象外・維持。`replica:check` は production target だけを見る設計のため影響しない。
 
+### #2517 のコード移行契約
+
+上の integration-managed 分類は当時の記録。#2517 では `SUPABASE_SECRET_KEY` と `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` を runtime が使用するため、Production 台帳へ移し、未台帳例外から外す。実値の所有関係・同期確認はまだ完了を主張しない。Preview の integration 管理は維持する。配備前条件とrollbackは [Supabase API keys の移行](./supabase-api-keys.md) を参照。
+
 ### Vercel Env
 
 Vercel Production Env は runtime / build 用の replica。1Password を先に更新し、必要な値だけ Vercel Dashboard に手動同期する。Vercel 側で値を直接変更した場合は、必ず同じ変更を 1Password master に戻す。
@@ -494,7 +498,7 @@ production の Auth `uri_allow_list` に **localhost を入れない**。かつ�
 存在確認の例（agent の Bash tool 経由では `op item get` の既定 human-readable 形式・`--reveal` なしを使う。`op read` は #2293 により agent からの直接実行を無条件で block しているため、この用途には使わない。位置引数は item 名のみで、vault は `--vault` flag で指定する）:
 
 ```bash
-op item get supabase --vault human --fields SUPABASE_SERVICE_ROLE_KEY
+op item get supabase --vault human --fields SUPABASE_SECRET_KEY
 ```
 
 ### 短命トークンのローテーション（expiry 付き再発行）

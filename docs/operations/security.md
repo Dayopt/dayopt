@@ -127,14 +127,14 @@ pin-github-action .github/workflows/*.yml
 
 ### 使用中の Secrets
 
-| Secret                          | 用途              | ワークフロー                   |
-| ------------------------------- | ----------------- | ------------------------------ |
-| `NEXT_PUBLIC_SUPABASE_URL`      | Supabase 接続     | ci, e2e                        |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase 匿名キー | ci, e2e                        |
-| `NEXT_PUBLIC_APP_URL`           | アプリ URL        | ci, e2e                        |
-| `SUPABASE_ACCESS_TOKEN`         | Supabase CLI 認証 | emergency only / local scripts |
-| `VERCEL_TOKEN`                  | Vercel API 監査   | production-config-audit        |
-| `VERCEL_ORG_ID`                 | Vercel team 特定  | production-config-audit        |
+| Secret                                 | 用途              | ワークフロー                   |
+| -------------------------------------- | ----------------- | ------------------------------ |
+| `NEXT_PUBLIC_SUPABASE_URL`             | Supabase 接続     | ci, e2e                        |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Supabase 匿名キー | ci, e2e                        |
+| `NEXT_PUBLIC_APP_URL`                  | アプリ URL        | ci, e2e                        |
+| `SUPABASE_ACCESS_TOKEN`                | Supabase CLI 認証 | emergency only / local scripts |
+| `VERCEL_TOKEN`                         | Vercel API 監査   | production-config-audit        |
+| `VERCEL_ORG_ID`                        | Vercel team 特定  | production-config-audit        |
 
 `GEMINI_API_KEY` は外部モデル diff レビュー（ai-review）専用だったが、2026-08-03 の撤去に
 合わせて **key 自体を失効させた**。GitHub repo secret の削除に加え、Google AI Studio 側の

@@ -32,7 +32,7 @@
  * **`.op-env.human` 経由では実行しない**（`docs/operations/tooling.md` の通り
  * production 専用の env file のため）。local を対象にした本スクリプトの
  * cleanup は `supabase status -o env` の値を `NEXT_PUBLIC_SUPABASE_URL` /
- * `SUPABASE_SERVICE_ROLE_KEY` として渡す。専用の cleanup script は書かない
+ * `SUPABASE_SECRET_KEY` として渡す。専用の cleanup script は書かない
  * （既存の管理スクリプトを使い回す）。
  *
  * @see docs/product/log — プローブの所見はここに記録される（本スクリプトの管轄外）
@@ -60,7 +60,7 @@ const APP_ROOT = resolve(__dirname, '../../../..');
 const STORAGE_STATE_PATH = resolve(APP_ROOT, '.probe/storage-state.json');
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SECRET_KEY;
 
 function parseBaseUrl(argv: string[]): string {
   const flag = argv.find((arg) => arg.startsWith('--base-url='));
@@ -107,7 +107,7 @@ async function main() {
   const cleanupHost = new URL(SUPABASE_URL!).host;
   console.log(`[usability-probe-setup] test user 作成済み（${cleanupHost}）: ${email}`);
   console.log(
-    `[usability-probe-setup] cleanup: NEXT_PUBLIC_SUPABASE_URL=${SUPABASE_URL} SUPABASE_SERVICE_ROLE_KEY=<ローカルの値> USER_EMAIL=${email} bash scripts/runbook/admin-delete-user.sh`,
+    `[usability-probe-setup] cleanup: NEXT_PUBLIC_SUPABASE_URL=${SUPABASE_URL} SUPABASE_SECRET_KEY=<ローカルの値> USER_EMAIL=${email} bash scripts/runbook/admin-delete-user.sh`,
   );
 
   const { error: profileError } = await adminSupabase.from('profiles').upsert({

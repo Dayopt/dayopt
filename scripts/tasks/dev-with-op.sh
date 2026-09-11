@@ -134,16 +134,22 @@ else
 fi
 
 LOCAL_SUPABASE_URL="$(get_local_supabase_env API_URL)"
-LOCAL_SUPABASE_ANON_KEY="$(get_local_supabase_env ANON_KEY)"
-LOCAL_SUPABASE_SERVICE_ROLE_KEY="$(get_local_supabase_env SERVICE_ROLE_KEY)"
+LOCAL_SUPABASE_ANON_KEY="$(get_local_supabase_env PUBLISHABLE_KEY)"
+if [[ -z "$LOCAL_SUPABASE_ANON_KEY" ]]; then
+  LOCAL_SUPABASE_ANON_KEY="$(get_local_supabase_env ANON_KEY)"
+fi
+LOCAL_SUPABASE_SECRET_KEY="$(get_local_supabase_env SECRET_KEY)"
+if [[ -z "$LOCAL_SUPABASE_SECRET_KEY" ]]; then
+  LOCAL_SUPABASE_SECRET_KEY="$(get_local_supabase_env SERVICE_ROLE_KEY)"
+fi
 
-if [[ -z "$LOCAL_SUPABASE_URL" || -z "$LOCAL_SUPABASE_ANON_KEY" || -z "$LOCAL_SUPABASE_SERVICE_ROLE_KEY" ]]; then
+if [[ -z "$LOCAL_SUPABASE_URL" || -z "$LOCAL_SUPABASE_ANON_KEY" || -z "$LOCAL_SUPABASE_SECRET_KEY" ]]; then
   error "Supabase local の URL / key を取得できませんでした。"
   exit 1
 fi
 
 exec op run --env-file="$OP_ENV_PATH" -- env \
   NEXT_PUBLIC_SUPABASE_URL="$LOCAL_SUPABASE_URL" \
-  NEXT_PUBLIC_SUPABASE_ANON_KEY="$LOCAL_SUPABASE_ANON_KEY" \
-  SUPABASE_SERVICE_ROLE_KEY="$LOCAL_SUPABASE_SERVICE_ROLE_KEY" \
+  NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY="$LOCAL_SUPABASE_ANON_KEY" \
+  SUPABASE_SECRET_KEY="$LOCAL_SUPABASE_SECRET_KEY" \
   pnpm --filter @dayopt/product dev:raw

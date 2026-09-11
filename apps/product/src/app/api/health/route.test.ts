@@ -54,8 +54,8 @@ import { GET } from './route';
 describe('GET /api/health', () => {
   beforeEach(() => {
     vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://example.supabase.co');
-    vi.stubEnv('SUPABASE_SERVICE_ROLE_KEY', 'service-role-sentinel');
-    vi.stubEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY', 'anon-key-sentinel');
+    vi.stubEnv('SUPABASE_SECRET_KEY', 'service-role-sentinel');
+    vi.stubEnv('NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY', 'anon-key-sentinel');
     vi.stubEnv('NEXT_PUBLIC_APP_VERSION', '0.32.0');
     vi.stubEnv('VERCEL_ENV', '');
     vi.stubEnv('VERCEL_TARGET_ENV', '');
@@ -148,13 +148,7 @@ describe('GET /api/health', () => {
   it('OAuth-enabled Previewをproject refと依存必須かつ詳細非公開として扱う', async () => {
     stubPreviewOperationalEnvironment();
     vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://abcdefghijklmnopqrst.supabase.co');
-    vi.stubEnv(
-      'SUPABASE_SERVICE_ROLE_KEY',
-      createUnsignedTestJwt({
-        role: 'service_role',
-        ref: 'abcdefghijklmnopqrst',
-      }),
-    );
+    vi.stubEnv('SUPABASE_SECRET_KEY', 'sb_secret_isolated-fixture');
     vi.stubEnv('UPSTASH_REDIS_REST_URL', 'https://preview-example.upstash.io');
     vi.stubEnv('UPSTASH_REDIS_REST_TOKEN', 'preview-redis-token-sentinel');
 
@@ -167,14 +161,8 @@ describe('GET /api/health', () => {
 
   it('OAuth-enabled PreviewはSupabase project ref driftをunhealthyにする', async () => {
     stubPreviewOperationalEnvironment();
-    vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://abcdefghijklmnopqrst.supabase.co');
-    vi.stubEnv(
-      'SUPABASE_SERVICE_ROLE_KEY',
-      createUnsignedTestJwt({
-        role: 'service_role',
-        ref: 'zyxwvutsrqponmlkjihg',
-      }),
-    );
+    vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://zyxwvutsrqponmlkjihg.supabase.co');
+    vi.stubEnv('SUPABASE_SECRET_KEY', 'sb_secret_isolated-fixture');
     vi.stubEnv('UPSTASH_REDIS_REST_URL', 'https://preview-example.upstash.io');
     vi.stubEnv('UPSTASH_REDIS_REST_TOKEN', 'preview-redis-token-sentinel');
 
@@ -266,8 +254,8 @@ describe('GET /api/health', () => {
 
   it('非productionのDB設定不足をdegradedとしてclientを作らず返す', async () => {
     vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', '');
-    vi.stubEnv('SUPABASE_SERVICE_ROLE_KEY', '');
-    vi.stubEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY', '');
+    vi.stubEnv('SUPABASE_SECRET_KEY', '');
+    vi.stubEnv('NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY', '');
 
     const response = await GET();
 
@@ -278,7 +266,7 @@ describe('GET /api/health', () => {
   });
 
   it('productionのservice-role secret不足をunhealthyとして扱う', async () => {
-    vi.stubEnv('SUPABASE_SERVICE_ROLE_KEY', '');
+    vi.stubEnv('SUPABASE_SECRET_KEY', '');
     vi.stubEnv('VERCEL_ENV', 'production');
     vi.stubEnv('UPSTASH_REDIS_REST_URL', 'https://example.upstash.io');
     vi.stubEnv('UPSTASH_REDIS_REST_TOKEN', 'redis-token-sentinel');
@@ -391,12 +379,4 @@ function stubPreviewOperationalEnvironment(): void {
     'MCP_CANONICAL_RESOURCE_URI',
     'https://product-git-codex-mcp-preview-dayopt.vercel.app',
   );
-}
-
-function createUnsignedTestJwt(payload: Record<string, string>): string {
-  return [
-    Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url'),
-    Buffer.from(JSON.stringify(payload)).toString('base64url'),
-    'signature',
-  ].join('.');
 }

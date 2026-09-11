@@ -8,7 +8,7 @@ async function main(): Promise<void> {
   if (!output?.endsWith('.sql'))
     throw new Error('Usage: tsx scripts/billing-trial-preflight.ts /absolute/path/review.sql');
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const key = process.env.SUPABASE_SECRET_KEY;
   const stripeKey = process.env.STRIPE_SECRET_KEY;
   if (!url || !key || !stripeKey)
     throw new Error('Provider credentials are required; no output generated');
