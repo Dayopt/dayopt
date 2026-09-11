@@ -7,6 +7,7 @@ import { useDomSlot } from '@/lib/dom-slots/useDomSlot';
 
 import { REPORT_DETAIL_SLOT_KEY } from '../../lib/report-detail-slot';
 import { ReportDetailBody } from './ReportDetailBody';
+import { ReportDetailResizeHandle } from './ReportDetailResizeHandle';
 
 import type { ReportDetailBodyProps } from './ReportDetailBody';
 
@@ -28,14 +29,18 @@ export function ReportDetailPanel(props: ReportDetailPanelProps) {
   if (slot === null) return null;
 
   return createPortal(
-    <section
-      aria-label={t('ariaLabel')}
-      data-report-panel="detail"
-      className="flex h-full flex-col gap-4 overflow-y-auto p-4"
-    >
-      {/* デスクトップは幅に余裕があるので推移を出す */}
-      <ReportDetailBody {...props} showTrend />
-    </section>,
+    // splitter はスクロール面の外に置く（中に入れると `inset-y-0` がスクロール量に引きずられる）
+    <div className="relative h-full">
+      <ReportDetailResizeHandle />
+      <section
+        aria-label={t('ariaLabel')}
+        data-report-panel="detail"
+        className="flex h-full flex-col gap-4 overflow-y-auto p-4"
+      >
+        {/* デスクトップは幅に余裕があるので推移を出す */}
+        <ReportDetailBody {...props} showTrend />
+      </section>
+    </div>,
     slot,
   );
 }

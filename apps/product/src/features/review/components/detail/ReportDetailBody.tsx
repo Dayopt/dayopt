@@ -3,6 +3,9 @@
 import { formatInTimeZone } from 'date-fns-tz';
 import { X } from 'lucide-react';
 import { useTranslations } from 'next-intl';
+import { useCallback, useRef } from 'react';
+
+import type { RefObject } from 'react';
 
 import { getCategoryColorClasses } from '@/features/activities';
 import { Button, Skeleton, cn } from '@dayopt/components';
@@ -13,7 +16,7 @@ import {
   MIRROR_MIN_PLAN_BOXES,
   MIRROR_MIN_PLAN_MINUTES,
 } from '../../domain/report/report-view-model';
-import { resolveZonedDayKey } from '../../lib/report-period';
+import { DurationStrip } from './DurationStrip';
 
 import type { ReportGranularity } from '../../lib/report-period';
 import type { ReportActivityDetailResult } from '../../server/report-detail-service';
@@ -26,15 +29,13 @@ export interface ReportDetailBodyProps {
   granularity: ReportGranularity;
   /**
    * ユーザーの timezone。**ブラウザのローカル時刻で描かない** — 設定が実機とずれている時に
-   * 明細の時刻と曜日がカレンダーと食い違い、「カレンダーで見る」も別の日を開いてしまう。
+   * 明細の時刻と曜日がカレンダーと食い違う。
    */
   timezone: string;
   detail: ReportActivityDetailResult | undefined;
   isPending: boolean;
   isError: boolean;
   onClose: () => void;
-  /** 最初の箱の日をカレンダーで開く。`null` は明細が 0 件でボタンを出さない。 */
-  onOpenCalendarDay: ((dayKey: string) => void) | null;
   /**
    * 週別の推移を出すか。**モバイルは出さない**（狭い面で 6 本の棒は読めない）。
    * 出さない時は取得側（`useReportActivityDetail`）も `includeTrend: false` にする。
@@ -65,7 +66,6 @@ export function ReportDetailBody({
   isPending,
   isError,
   onClose,
-  onOpenCalendarDay,
   showTrend,
 }: ReportDetailBodyProps) {
   const t = useTranslations('report.detail');
@@ -104,7 +104,6 @@ export function ReportDetailBody({
         <DetailSections
           detail={detail}
           granularity={granularity}
-          onOpenCalendarDay={onOpenCalendarDay}
           showTrend={showTrend}
           timezone={timezone}
         />
@@ -116,39 +115,40 @@ export function ReportDetailBody({
 function DetailSections({
   detail,
   granularity,
-  onOpenCalendarDay,
   showTrend,
   timezone,
 }: {
   detail: ReportActivityDetailResult;
   granularity: ReportGranularity;
-  onOpenCalendarDay: ((dayKey: string) => void) | null;
   showTrend: boolean;
   timezone: string;
 }) {
-  const t = useTranslations('report.detail');
-  const firstRecord = detail.records[0];
+  const listRef = useRef<HTMLUListElement>(null);
+
+  // ストリップの点は明細の行へ着地する（仕様 §0「数字は必ず明細に落ちる」）。
+  // パネルは 1 本のスクロール面なので、行までスクロールしてフォーカスを移すだけでよい
+  const handleSelectRecord = useCallback((recordId: string) => {
+    const row = listRef.current?.querySelector<HTMLElement>(
+      `[data-record-id="${CSS.escape(recordId)}"]`,
+    );
+    if (row === null || row === undefined) return;
+    row.scrollIntoView({ block: 'nearest' });
+    row.focus({ preventScroll: true });
+  }, []);
 
   return (
     <>
       <StatGrid detail={detail} />
       <MirrorLine detail={detail} />
+      <DurationStrip
+        distribution={detail.durationDistribution}
+        medianPlanBoxMinutes={detail.medianPlanBoxMinutes}
+        onSelectRecord={handleSelectRecord}
+        records={detail.records}
+      />
       <TimeOfDayBars values={detail.timeOfDay} />
       {showTrend && <TrendBars granularity={granularity} trend={detail.trend} />}
-      <RecordList records={detail.records} timezone={timezone} />
-
-      {onOpenCalendarDay !== null && firstRecord !== undefined && (
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          className="min-h-11 self-start"
-          // ISO の先頭 10 文字は UTC の日付。深夜の記録で 1 日ずれるので timezone で切る
-          onClick={() => onOpenCalendarDay(resolveZonedDayKey(firstRecord.startAt, timezone))}
-        >
-          {t('openCalendar')}
-        </Button>
-      )}
+      <RecordList listRef={listRef} records={detail.records} timezone={timezone} />
     </>
   );
 }
@@ -273,7 +273,12 @@ function TimeOfDayBars({ values }: { values: readonly number[] }) {
   );
 }
 
-/** 直近 6 期間の推移。**データのある期間が 2 未満なら節ごと出さない**（仕様 §6-5）。 */
+/**
+ * 直近 6 期間の推移。**データのある期間が 2 未満なら節ごと出さない**（仕様 §6-5）。
+ *
+ * 棒は合計、重ねた線は 1 件あたりの中央値。合計だけでは「回数が増えたのか、1 回が長く
+ * なったのか」が分からない。2 つの軸を持つので、線は棒とは別に自分の最大値で正規化する。
+ */
 function TrendBars({
   granularity,
   trend,
@@ -286,32 +291,114 @@ function TrendBars({
   if (withData.length < TREND_MIN_PERIODS) return null;
 
   const max = Math.max(1, ...trend.map((point) => point.recordedMinutes));
+  const medians = trend.map((point) => point.medianBoxMinutes);
+  const medianMax = Math.max(1, ...medians.filter((value) => value !== null));
 
   return (
     <div className="flex flex-col gap-2">
       <p className="text-muted-foreground text-xs">{t(`trend.heading.${granularity}`)}</p>
-      <ul data-report-bars="trend" className="flex items-end gap-2">
-        {trend.map((point) => (
-          <li key={point.key} className="flex min-w-0 flex-1 flex-col items-center">
-            <span
-              className="bg-foreground w-full rounded-lg"
-              style={{
-                height: `${(point.recordedMinutes / max) * TREND_MAX_HEIGHT}px`,
-                opacity: point.recordedMinutes > 0 ? 1 : 0.25,
-              }}
+      <div className="relative" style={{ height: `${TREND_MAX_HEIGHT}px` }}>
+        <ul data-report-bars="trend" className="flex h-full items-end gap-2">
+          {trend.map((point) => (
+            <li key={point.key} className="flex min-w-0 flex-1 flex-col items-center justify-end">
+              <span
+                className="bg-foreground w-full rounded-lg"
+                style={{
+                  height: `${(point.recordedMinutes / max) * TREND_MAX_HEIGHT}px`,
+                  opacity: point.recordedMinutes > 0 ? 1 : 0.25,
+                }}
+              />
+            </li>
+          ))}
+        </ul>
+        <TrendMedianLine medians={medians} medianMax={medianMax} />
+      </div>
+      <p className="text-muted-foreground text-xs">{t('trend.legend')}</p>
+    </div>
+  );
+}
+
+/**
+ * 推移に重ねる中央値の折れ線。
+ *
+ * div では斜線が引けないので、線だけ inline SVG を使う（chart library は入れない）。
+ * `preserveAspectRatio="none"` で棒の並びへ引き伸ばすため、線の太さは
+ * `vector-effect="non-scaling-stroke"` で保つ。**点は SVG に置かない** — 同じ引き伸ばしで
+ * 円が横長の楕円に潰れるため、位置だけ % で持つ div にする。
+ *
+ * **中央値の無い期間で線を切る**（0 として谷を描くと「短くなった」と読めてしまう）。
+ * x は棒の中心（`(i + 0.5) / n`）に合わせる。端に寄せると線が棒からはみ出す。
+ */
+function TrendMedianLine({
+  medians,
+  medianMax,
+}: {
+  medians: (number | null)[];
+  medianMax: number;
+}) {
+  const t = useTranslations('report.detail');
+  const points = medians.map((value, index) => {
+    const x = ((index + 0.5) / medians.length) * 100;
+    if (value === null) return null;
+    return { x, y: TREND_MAX_HEIGHT - (value / medianMax) * TREND_MAX_HEIGHT, value };
+  });
+
+  // 連続している区間ごとに折れ線を分ける
+  const segments: { x: number; y: number }[][] = [];
+  for (const point of points) {
+    if (point === null) {
+      segments.push([]);
+      continue;
+    }
+    const last = segments[segments.length - 1];
+    if (last === undefined) segments.push([point]);
+    else last.push(point);
+  }
+
+  return (
+    <div aria-hidden className="pointer-events-none absolute inset-0">
+      <svg
+        className="text-foreground h-full w-full"
+        data-report-line="trend-median"
+        preserveAspectRatio="none"
+        viewBox={`0 0 100 ${TREND_MAX_HEIGHT}`}
+      >
+        {segments
+          .filter((segment) => segment.length >= 2)
+          .map((segment) => (
+            <polyline
+              key={`${segment[0]?.x}-${segment.length}`}
+              fill="none"
+              points={segment.map((point) => `${point.x},${point.y}`).join(' ')}
+              stroke="currentColor"
+              strokeWidth={1}
+              vectorEffect="non-scaling-stroke"
             />
-          </li>
-        ))}
-      </ul>
+          ))}
+      </svg>
+      {points.map((point, index) =>
+        point === null ? null : (
+          <span
+            key={medians[index] === null ? index : `${index}-${point.value}`}
+            data-report-point="trend-median"
+            className="bg-foreground ring-background absolute size-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full ring-2"
+            style={{ left: `${point.x}%`, top: `${(point.y / TREND_MAX_HEIGHT) * 100}%` }}
+            title={t('trend.median', { duration: formatReportDuration(point.value) })}
+          />
+        ),
+      )}
     </div>
   );
 }
 
 /** 記録の明細。曜日 1 字 / 開始–終了 / 長さ / 充実チップ。 */
 function RecordList({
+  listRef,
   records,
   timezone,
 }: {
+  /** ストリップの点から行を引くための参照。 */
+  listRef: RefObject<HTMLUListElement | null>;
   records: ReportActivityDetailResult['records'];
   timezone: string;
 }) {
@@ -325,9 +412,15 @@ function RecordList({
       {records.length === 0 ? (
         <p className="text-muted-foreground text-xs">{t('empty')}</p>
       ) : (
-        <ul data-report-list="records" className="flex flex-col gap-1">
+        <ul ref={listRef} data-report-list="records" className="flex flex-col gap-1">
           {records.map((record) => (
-            <li key={record.id} className="flex items-center gap-2 text-xs">
+            <li
+              key={record.id}
+              data-record-id={record.id}
+              // ストリップの点から着地した時にフォーカスを受ける（Tab 順には入れない）
+              tabIndex={-1}
+              className="focus-visible:outline-ring flex items-center gap-2 rounded-lg text-xs focus-visible:outline-2"
+            >
               <span className="text-muted-foreground w-4 shrink-0">
                 {weekdays[zonedWeekdayIndex(record.startAt, timezone)]}
               </span>
