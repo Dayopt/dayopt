@@ -1,3 +1,8 @@
+---
+status: current
+last_verified: 2026-09-11
+---
+
 # Supabase API keys の移行
 
 [#2517](https://github.com/Dayopt/dayopt/issues/2517) のコード準備と運用切替を分離する。以下は移行契約であり、外部設定の変更済み・本番稼働確認済みという記録ではない。
