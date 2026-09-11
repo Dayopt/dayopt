@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('next-intl', () => ({
@@ -17,39 +17,83 @@ vi.mock('next-intl', () => ({
 
 import { setDomSlot } from '@/lib/dom-slots/useDomSlot';
 
-import { REPORT_DETAIL_SLOT_KEY } from '../../lib/report-detail-slot';
+import {
+  isMedianEligibleSource,
+  summarizeDurationDistribution,
+} from '../../domain/report/duration-distribution';
+import {
+  REPORT_DETAIL_PANEL_DEFAULT_WIDTH,
+  REPORT_DETAIL_PANEL_MAX_WIDTH,
+  REPORT_DETAIL_PANEL_MIN_WIDTH,
+  REPORT_DETAIL_SLOT_KEY,
+} from '../../lib/report-detail-slot';
+import { useReportDetailStore } from '../../stores/useReportDetailStore';
 import { ReportDetailPanel } from './ReportDetailPanel';
 
 import type { ReportActivityDetailResult } from '../../server/report-detail-service';
 
 function detail(overrides: Partial<ReportActivityDetailResult> = {}): ReportActivityDetailResult {
-  return {
+  const base: ReportActivityDetailResult = {
     recordedMinutes: 600,
     plannedMinutes: 480,
     plannedPastMinutes: 480,
     plannedPastBoxes: 4,
     medianBoxMinutes: 90,
+    medianPlanBoxMinutes: 80,
     fulfillment: { low: 1, medium: 0, high: 3 },
     timeOfDay: [60, 240, 120, 180, 0, 0],
     trend: [
-      { key: '2026-08-03', recordedMinutes: 0 },
-      { key: '2026-08-10', recordedMinutes: 300 },
-      { key: '2026-08-17', recordedMinutes: 420 },
-      { key: '2026-08-24', recordedMinutes: 0 },
-      { key: '2026-08-31', recordedMinutes: 600 },
-      { key: '2026-09-07', recordedMinutes: 0 },
+      { key: '2026-08-03', recordedMinutes: 0, medianBoxMinutes: null },
+      { key: '2026-08-10', recordedMinutes: 300, medianBoxMinutes: 150 },
+      { key: '2026-08-17', recordedMinutes: 420, medianBoxMinutes: 140 },
+      { key: '2026-08-24', recordedMinutes: 0, medianBoxMinutes: null },
+      { key: '2026-08-31', recordedMinutes: 600, medianBoxMinutes: 90 },
+      { key: '2026-09-07', recordedMinutes: 0, medianBoxMinutes: null },
     ],
     records: [
-      {
-        id: 'rec-1',
-        title: '執筆',
-        startAt: '2026-09-01T01:00:00.000Z',
-        endAt: '2026-09-01T02:30:00.000Z',
-        minutes: 90,
-        fulfillment: 'high',
-        note: null,
-      },
+      record('rec-1', 90, { startAt: '2026-09-01T01:00:00.000Z', fulfillment: 'high' }),
+      // 曜日と時刻が重ならないよう別の日に置く（明細の行を text で引く test があるため）
+      record('rec-2', 60, { startAt: '2026-09-02T01:00:00.000Z' }),
+      record('rec-3', 120, { startAt: '2026-09-03T01:00:00.000Z' }),
     ],
+    durationDistribution: null,
+    ...overrides,
+  };
+
+  return {
+    ...base,
+    durationDistribution: overrides.durationDistribution ?? distributionOf(base.records),
+  };
+}
+
+/**
+ * 分布は server が全件から出す。fixture でも同じ規則（auto_migrated を除く）で作り、
+ * 「明細と分布が別物」の状態を誤って固定しないようにする。
+ */
+function distributionOf(
+  records: ReportActivityDetailResult['records'],
+): ReportActivityDetailResult['durationDistribution'] {
+  return summarizeDurationDistribution(
+    records.filter((row) => isMedianEligibleSource(row.source)).map((row) => row.minutes),
+  );
+}
+
+/** 明細 1 件。長さだけ変えたい test が多いので分単位を第 2 引数に取る。 */
+function record(
+  id: string,
+  minutes: number,
+  overrides: Partial<ReportActivityDetailResult['records'][number]> = {},
+): ReportActivityDetailResult['records'][number] {
+  const startAt = overrides.startAt ?? '2026-09-01T01:00:00.000Z';
+  return {
+    id,
+    title: '執筆',
+    startAt,
+    endAt: new Date(Date.parse(startAt) + minutes * 60_000).toISOString(),
+    minutes,
+    fulfillment: null,
+    note: null,
+    source: 'manual',
     ...overrides,
   };
 }
@@ -66,7 +110,6 @@ function renderPanel(overrides: Partial<Parameters<typeof ReportDetailPanel>[0]>
       isPending={false}
       name="執筆"
       onClose={() => {}}
-      onOpenCalendarDay={() => {}}
       {...overrides}
     />,
   );
@@ -78,6 +121,9 @@ describe('ReportDetailPanel', () => {
     const slot = document.createElement('div');
     document.body.appendChild(slot);
     setDomSlot(REPORT_DETAIL_SLOT_KEY, slot);
+    // jsdom は scrollIntoView を持たない（ストリップの点が明細へ着地する経路で呼ぶ）
+    Element.prototype.scrollIntoView = vi.fn();
+    useReportDetailStore.setState({ width: REPORT_DETAIL_PANEL_DEFAULT_WIDTH, isResizing: false });
   });
 
   it('slot が未登録なら何も描かない', () => {
@@ -135,9 +181,9 @@ describe('ReportDetailPanel', () => {
         color="blue"
         detail={detail({
           trend: [
-            { key: 'a', recordedMinutes: 0 },
-            { key: 'b', recordedMinutes: 0 },
-            { key: 'c', recordedMinutes: 120 },
+            { key: 'a', recordedMinutes: 0, medianBoxMinutes: null },
+            { key: 'b', recordedMinutes: 0, medianBoxMinutes: null },
+            { key: 'c', recordedMinutes: 120, medianBoxMinutes: 120 },
           ],
         })}
         granularity="week"
@@ -146,7 +192,6 @@ describe('ReportDetailPanel', () => {
         isPending={false}
         name="執筆"
         onClose={() => {}}
-        onOpenCalendarDay={() => {}}
       />,
     );
 
@@ -165,32 +210,6 @@ describe('ReportDetailPanel', () => {
     expect(screen.getByText('火')).toBeInTheDocument();
   });
 
-  it('「カレンダーで見る」は timezone で切った日を渡す', async () => {
-    const onOpenCalendarDay = vi.fn();
-    renderPanel({
-      detail: detail({
-        records: [
-          {
-            id: 'rec-night',
-            title: '執筆',
-            // JST では 09-02 の 08:00。UTC の日付（09-01）で開くと 1 日ずれる
-            startAt: '2026-09-01T23:00:00.000Z',
-            endAt: '2026-09-01T23:30:00.000Z',
-            minutes: 30,
-            fulfillment: null,
-            note: null,
-          },
-        ],
-      }),
-      onOpenCalendarDay,
-    });
-
-    const { default: userEvent } = await import('@testing-library/user-event');
-    await userEvent.setup().click(screen.getByText('report.detail.openCalendar'));
-
-    expect(onOpenCalendarDay).toHaveBeenCalledWith('2026-09-02');
-  });
-
   it('時間帯は 6 本すべて描く（0 のバケットも残す）', () => {
     renderPanel();
 
@@ -201,6 +220,182 @@ describe('ReportDetailPanel', () => {
     renderPanel({ detail: detail({ records: [] }) });
 
     expect(screen.getByText('report.detail.records.empty')).toBeInTheDocument();
+  });
+
+  it('ストリップは記録が 3 件未満なら件数不足と出す', () => {
+    renderPanel({ detail: detail({ records: [record('rec-1', 60), record('rec-2', 90)] }) });
+
+    expect(screen.getByText('report.detail.strip.notEnough')).toBeInTheDocument();
+    expect(document.querySelector('[data-report-strip="duration"]')).toBeNull();
+  });
+
+  it('ストリップは件数・中央値・25–75% と両端の長さを出す', () => {
+    renderPanel();
+
+    expect(screen.getByText('report.detail.strip.heading')).toBeInTheDocument();
+    expect(screen.getByText('report.detail.strip.count 3')).toBeInTheDocument();
+    // 60 / 90 / 120 の中央値
+    expect(screen.getByText('report.detail.strip.median 1:30')).toBeInTheDocument();
+    expect(screen.getByText('report.detail.strip.iqr 1:00 2:00')).toBeInTheDocument();
+
+    // 軸は記録の 1:00〜2:00（予定の中央値 80 分は内側なので広がらない）。
+    // 同じ `1:00` が明細の行にも出るのでストリップの節の中だけを見る
+    const section = screen.getByText('report.detail.strip.heading').closest('div') as HTMLElement;
+    const axisLabels = within(section)
+      .getAllByText(/^\d+:\d{2}$/)
+      .map((node) => node.textContent);
+    expect(axisLabels).toEqual(['1:00', '2:00']);
+
+    const strip = document.querySelector('[data-report-strip="duration"]') as HTMLElement;
+    expect(within(strip).getAllByRole('button')).toHaveLength(3);
+  });
+
+  it('ストリップの点を押すと明細の該当行へ着地する', async () => {
+    renderPanel();
+
+    const strip = document.querySelector('[data-report-strip="duration"]') as HTMLElement;
+    const { default: userEvent } = await import('@testing-library/user-event');
+    // 点は長さ順ではなく明細の並び順。1 つ目は rec-1（90 分）
+    await userEvent.setup().click(within(strip).getAllByRole('button')[0] as HTMLElement);
+
+    const row = document.querySelector('[data-record-id="rec-1"]');
+    expect(row).not.toBeNull();
+    expect(row).toHaveFocus();
+    expect(Element.prototype.scrollIntoView).toHaveBeenCalled();
+  });
+
+  /**
+   * 同じ長さの点は座標も同じ。1 記録 = 1 ボタンにすると 44px のヒット領域が完全に重なり、
+   * ポインタでは最後の 1 件しか押せない（「25 分」を繰り返す使い方で必ず起きる）。
+   */
+  it('同じ長さの記録は 1 つの点にまとめ、件数で語る', async () => {
+    renderPanel({
+      detail: detail({
+        records: [
+          record('rec-a', 25),
+          record('rec-b', 25, { startAt: '2026-09-02T01:00:00.000Z' }),
+          record('rec-c', 25, { startAt: '2026-09-03T01:00:00.000Z' }),
+          record('rec-d', 50, { startAt: '2026-09-04T01:00:00.000Z' }),
+        ],
+      }),
+    });
+
+    const strip = document.querySelector('[data-report-strip="duration"]') as HTMLElement;
+    const dots = within(strip).getAllByRole('button');
+    expect(dots).toHaveLength(2);
+    // n は点の数ではなく記録の数
+    expect(screen.getByText('report.detail.strip.count 4')).toBeInTheDocument();
+    expect(within(strip).getByText('report.detail.strip.dotAriaLabel 0:25 3')).toBeInTheDocument();
+
+    const { default: userEvent } = await import('@testing-library/user-event');
+    await userEvent.setup().click(dots[0] as HTMLElement);
+
+    // 同じ長さのうち最初の記録へ着地する
+    expect(document.querySelector('[data-record-id="rec-a"]')).toHaveFocus();
+  });
+
+  /** 明細は 200 件で切られる。client で数え直すと同じパネルに違う中央値が 2 つ並ぶ。 */
+  it('件数と中央値は明細ではなく server の分布を出す', () => {
+    renderPanel({
+      detail: detail({
+        durationDistribution: { n: 210, min: 30, q1: 45, median: 60, q3: 90, max: 600 },
+      }),
+    });
+
+    expect(screen.getByText('report.detail.strip.count 210')).toBeInTheDocument();
+    expect(screen.getByText('report.detail.strip.median 1:00')).toBeInTheDocument();
+  });
+
+  /** 自動移行は「ユーザーが確定した実績」ではないので代表値に数えない（明細には残す）。 */
+  it('auto_migrated の記録は明細に残るが点にはしない', () => {
+    renderPanel({
+      detail: detail({
+        records: [
+          record('rec-1', 60),
+          record('rec-2', 90, { startAt: '2026-09-02T01:00:00.000Z' }),
+          record('rec-3', 120, { startAt: '2026-09-03T01:00:00.000Z' }),
+          record('rec-migrated', 480, {
+            startAt: '2026-09-04T01:00:00.000Z',
+            source: 'auto_migrated',
+          }),
+        ],
+      }),
+    });
+
+    const strip = document.querySelector('[data-report-strip="duration"]') as HTMLElement;
+    expect(within(strip).getAllByRole('button')).toHaveLength(3);
+    expect(screen.getByText('report.detail.strip.count 3')).toBeInTheDocument();
+    expect(document.querySelector('[data-record-id="rec-migrated"]')).not.toBeNull();
+  });
+
+  it('予定の中央値が無ければ印を出さない', () => {
+    const { rerender } = renderPanel();
+    expect(screen.getByText('▲')).toBeInTheDocument();
+
+    rerender(
+      <ReportDetailPanel
+        categoryName="仕事"
+        color="blue"
+        detail={detail({ medianPlanBoxMinutes: null })}
+        granularity="week"
+        timezone="Asia/Tokyo"
+        isError={false}
+        isPending={false}
+        name="執筆"
+        onClose={() => {}}
+      />,
+    );
+
+    expect(screen.queryByText('▲')).toBeNull();
+  });
+
+  it('推移は中央値のある期間だけを線で結び、棒は 6 本のまま', () => {
+    renderPanel();
+
+    expect(document.querySelectorAll('[data-report-bars="trend"] > li')).toHaveLength(6);
+    const line = document.querySelector('[data-report-line="trend-median"]') as SVGElement;
+    // 中央値があるのは index 1・2（連続）と 4（孤立）。線は連続する 1 区間だけ
+    expect(line.querySelectorAll('polyline')).toHaveLength(1);
+    // 点は SVG の外（引き伸ばしで楕円に潰れるため）
+    expect(document.querySelectorAll('[data-report-point="trend-median"]')).toHaveLength(3);
+  });
+
+  it('幅の区切りは矢印キーで動き、上限・下限に収まる', async () => {
+    renderPanel();
+
+    const separator = screen.getByRole('separator');
+    const { default: userEvent } = await import('@testing-library/user-event');
+    const user = userEvent.setup();
+
+    separator.focus();
+    await user.keyboard('{ArrowLeft}');
+    expect(useReportDetailStore.getState().width).toBe(REPORT_DETAIL_PANEL_DEFAULT_WIDTH + 16);
+
+    await user.keyboard('{Home}');
+    expect(useReportDetailStore.getState().width).toBe(REPORT_DETAIL_PANEL_MIN_WIDTH);
+
+    // 下限で更に狭めても下限のまま
+    await user.keyboard('{ArrowRight}');
+    expect(useReportDetailStore.getState().width).toBe(REPORT_DETAIL_PANEL_MIN_WIDTH);
+
+    await user.keyboard('{End}');
+    expect(useReportDetailStore.getState().width).toBe(REPORT_DETAIL_PANEL_MAX_WIDTH);
+  });
+
+  it('ドラッグ中だけ isResizing になり、離すと幅が残る', () => {
+    renderPanel();
+
+    const separator = screen.getByRole('separator');
+    fireEvent.pointerDown(separator, { button: 0, clientX: 500 });
+    expect(useReportDetailStore.getState().isResizing).toBe(true);
+
+    // 左へ 60px 引く = パネルは 60px 広がる
+    fireEvent.pointerMove(window, { clientX: 440 });
+    expect(useReportDetailStore.getState().width).toBe(REPORT_DETAIL_PANEL_DEFAULT_WIDTH + 60);
+
+    fireEvent.pointerUp(window);
+    expect(useReportDetailStore.getState().isResizing).toBe(false);
+    expect(useReportDetailStore.getState().width).toBe(REPORT_DETAIL_PANEL_DEFAULT_WIDTH + 60);
   });
 
   /** 仕様 §6。パネル内で編集はしない。 */
@@ -225,7 +420,6 @@ describe('ReportDetailPanel', () => {
         isPending={false}
         name="執筆"
         onClose={() => {}}
-        onOpenCalendarDay={() => {}}
       />,
     );
 

@@ -1,3 +1,7 @@
+import {
+  isMedianEligibleSource,
+  summarizeDurationDistribution,
+} from '../../domain/report/duration-distribution';
 import { ReportDetailBody } from './ReportDetailBody';
 import { ReportDetailSheet } from './ReportDetailSheet';
 
@@ -27,7 +31,6 @@ const meta = {
     isError: false,
     isPending: false,
     onClose: () => {},
-    onOpenCalendarDay: () => {},
   },
 } satisfies Meta<typeof ReportDetailSheet>;
 
@@ -35,19 +38,21 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 function detail(overrides: Partial<ReportActivityDetailResult> = {}): ReportActivityDetailResult {
-  return {
+  const base: ReportActivityDetailResult = {
     recordedMinutes: 600,
     plannedMinutes: 480,
     plannedPastMinutes: 480,
     plannedPastBoxes: 4,
     medianBoxMinutes: 90,
+    medianPlanBoxMinutes: 60,
     fulfillment: { low: 1, medium: 2, high: 3 },
     timeOfDay: [60, 240, 120, 180, 0, 0],
     // シートは推移を描かない。渡しても出ないことを Story でも示す
     trend: [
-      { key: '2026-08-24', recordedMinutes: 180 },
-      { key: '2026-08-31', recordedMinutes: 600 },
+      { key: '2026-08-24', recordedMinutes: 180, medianBoxMinutes: 90 },
+      { key: '2026-08-31', recordedMinutes: 600, medianBoxMinutes: 120 },
     ],
+    // ストリップはシートにも出る（狭い面でも 1 本の軸なら読める）
     records: [
       {
         id: 'rec-1',
@@ -57,6 +62,7 @@ function detail(overrides: Partial<ReportActivityDetailResult> = {}): ReportActi
         minutes: 90,
         fulfillment: 'high',
         note: null,
+        source: 'manual',
       },
       {
         id: 'rec-2',
@@ -66,10 +72,39 @@ function detail(overrides: Partial<ReportActivityDetailResult> = {}): ReportActi
         minutes: 120,
         fulfillment: null,
         note: 'メモ',
+        source: 'manual',
+      },
+      {
+        id: 'rec-3',
+        title: '執筆',
+        startAt: '2026-09-03T01:00:00.000Z',
+        endAt: '2026-09-03T02:00:00.000Z',
+        minutes: 60,
+        fulfillment: 'low',
+        note: null,
+        source: 'manual',
       },
     ],
+    durationDistribution: null,
     ...overrides,
   };
+
+  return {
+    ...base,
+    durationDistribution: overrides.durationDistribution ?? distributionOf(base.records),
+  };
+}
+
+/**
+ * 分布は server が全件から出す。fixture でも同じ規則（auto_migrated を除く）で作り、
+ * 「明細と分布が別物」の状態を誤って固定しないようにする。
+ */
+function distributionOf(
+  records: ReportActivityDetailResult['records'],
+): ReportActivityDetailResult['durationDistribution'] {
+  return summarizeDurationDistribution(
+    records.filter((row) => isMedianEligibleSource(row.source)).map((row) => row.minutes),
+  );
 }
 
 /** 既定（375x812）。統計 4 枚・鏡・時間帯・明細が縦に並ぶ。 */
@@ -123,7 +158,6 @@ export const AllPatterns: Story = {
       isError: false,
       isPending: false,
       onClose: () => {},
-      onOpenCalendarDay: () => {},
       showTrend: false,
     };
     return (

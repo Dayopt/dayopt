@@ -320,6 +320,8 @@ export interface ReportDetailRecordRow {
   start_at: string;
   end_at: string;
   fulfillment: string | null;
+  /** `'manual'` / `'from_plan'` / `'auto_migrated'` など。中央値の除外判定に使う。 */
+  source: string;
 }
 
 /**
@@ -340,7 +342,7 @@ export async function fetchReportDetailRecords(
 ): Promise<ReportDetailRecordRow[]> {
   const base = supabase
     .from(databaseTables.records)
-    .select('id, title, note, activity_id, start_at, end_at, fulfillment')
+    .select('id, title, note, activity_id, start_at, end_at, fulfillment, source')
     .eq('user_id', userId)
     .is('deleted_at', null)
     .lt('start_at', range.endAt)

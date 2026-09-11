@@ -27,12 +27,7 @@ const TARGET = { activityId: 'act-1', name: '執筆', categoryName: '仕事', co
 
 function renderConnected(surface: 'panel' | 'sheet' = 'panel') {
   return render(
-    <ConnectedReportDetailPanel
-      anchorDate="2026-09-04"
-      granularity="week"
-      onOpenCalendarDay={() => {}}
-      surface={surface}
-    />,
+    <ConnectedReportDetailPanel anchorDate="2026-09-04" granularity="week" surface={surface} />,
   );
 }
 
