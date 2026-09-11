@@ -118,7 +118,16 @@
           ]
         }
       },
-      "trialNote": "7-day free trial · No credit card required"
+      "trialNote": "45-day free trial · No credit card required",
+      "singlePlan": {
+        "title": "Dayopt",
+        "description": "Turn your plans and records into a better next day.",
+        "perMonth": "/month",
+        "trial": "Try every feature free for {days} days. No card required.",
+        "included": "Calendar, weekly, monthly and yearly report views, Google Calendar sync, MCP and API. Everything included.",
+        "afterTrial": "Your trial starts when you first open the app. Subscribe to continue after it ends. You can still view, export and delete your saved data.",
+        "cta": "Try Dayopt free"
+      }
     },
     "contact": {
       "title": "Get in Touch",
