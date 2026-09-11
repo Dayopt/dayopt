@@ -194,14 +194,20 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
 
     const Comp = asChild ? Slot : 'button';
 
-    // aria-disabled または loading 時はクリックを無効化
-    const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
-      if (props['aria-disabled'] || loading) {
-        e.preventDefault();
-        return;
-      }
-      onClick?.(e);
-    };
+    // aria-disabled または loading 時はクリックを無効化する。
+    //
+    // **ガードが要る時だけ関数を挟む。** 素通しの場合に毎回新しい関数を作って渡すと、
+    // Server Component から描画した時に「Event handlers cannot be passed to Client
+    // Component props」でサーバー例外になる（本番では React #441 に潰れて原因が
+    // 見えない。2026-09-11 に `/oauth/consent` が本番でこれで落ちた）。
+    // `asChild` 側は元から onClick を素通ししており、そのため
+    // `<Button asChild>` を使う Server Component だけが無事だった。
+    const handleClick =
+      props['aria-disabled'] || loading
+        ? (e: React.MouseEvent<HTMLButtonElement>) => {
+            e.preventDefault();
+          }
+        : onClick;
 
     // ローディング中のコンテンツ
     const content = loading ? (

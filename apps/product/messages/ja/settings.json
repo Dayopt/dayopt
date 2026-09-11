@@ -367,10 +367,10 @@
       },
       "mcp": {
         "title": "MCP / API",
-        "description": "Claude DesktopなどのAIアシスタントからDayoptのデータに接続。",
+        "description": "Claude・ChatGPT・CursorなどのAIアシスタントからDayoptのデータに接続。",
         "serverUrl": "MCPサーバーURL",
         "copied": "クリップボードにコピーしました",
-        "connectionGuide": "上記のURLをClaude Desktopの設定に追加してください。",
+        "connectionGuide": "上記のURLを、お使いのAIアシスタントのカスタムコネクタまたはMCPサーバーの設定に追加してください。",
         "proRequired": "無料体験中または契約中に利用できます。",
         "upgrade": "購入する"
       },

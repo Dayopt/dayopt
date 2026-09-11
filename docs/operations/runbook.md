@@ -100,6 +100,57 @@ UPDATE public.write_fence_control SET fence_enabled = false WHERE singleton_key 
   - Stripe: Dashboard → Webhooks → 失敗イベントの「Resend」で手動再送する
   - Resend: **再送は自動（5s/5m/30m/2h/5h/10h/10h backoff）だが、失敗が続くと endpoint 自体が無効化されメール通知が届く。** Dashboard で endpoint が無効化されていないか確認し、必要なら再有効化する（無効化されたまま気づかないと、bounce/complaint の取り込みが恒久的に止まる）
 
+### MCP write gate の開閉（`mcp_mutation_control`）
+
+Write Fence とは別の gate。MCP 経由の書き込み（`plans.create` 等）だけを対象にする。停止・段階有効化の両方をこの節の手順で行う。詳細な契約は issue [#1754](https://github.com/Dayopt/dayopt/issues/1754) のコメント（step-6 系ドキュメント相当）が正本。
+
+#### 現在の状態を見る（read-only）
+
+```bash
+op run -- pnpm mcp:gate
+```
+
+`SUPABASE_SERVICE_ROLE_KEY` / `NEXT_PUBLIC_SUPABASE_URL` は 1Password `app` item から `op run` が解決する。`writes_enabled` / `enabled_client_ids` / `revision` を表示するだけで、何も変更しない。
+
+#### 1 client を有効化する（段階導入）
+
+```bash
+op run -- pnpm mcp:gate -- --enable-global      # global gate を ON
+op run -- pnpm mcp:gate -- --enable-client=claude-ai   # 対象 client を allowlist へ
+```
+
+- `client_id` は `claude-ai` / `chatgpt` / `cursor` のいずれか
+- Vercel の `MCP_WRITE_ENABLED_CLIENTS` にも同じ client_id を追加する（env gate と DB gate の両方が揃って初めて write scope が発行される）
+- 既存 connection は `write_enabled_at` を持たないため、対象ユーザーは再接続（再 consent）が必要
+- gate が開いても、書き込みは下記の**利用権判定**を別途通る。gate と利用権は独立した 2 つの条件
+
+#### 利用権（billing）判定の切替
+
+MCP の利用権判定は読み取りと書き込みで持ち場が違う（2026-09-08、単一有料プラン移行 #2610 / PR #2668）。
+
+| 経路          | 判定点                                                   | 切替                                                                 | `false`（既定）                                  | `true`                   |
+| ------------- | -------------------------------------------------------- | -------------------------------------------------------------------- | ------------------------------------------------ | ------------------------ |
+| 読み取り tool | app 層 `checkMcpEntitlement`（`lib/mcp/auth.ts`）        | Vercel env `BILLING_ENFORCED`                                        | **判定しない**（profile を読まず全 token 許可）  | 契約中または 45 日体験中 |
+| 書き込み tool | DB `private.authorize_mcp_mutation_v1`（`DM005` で拒否） | `mcp_mutation_control.billing_enforced`（`op run -- pnpm mcp:gate`） | 契約中（`active` / `trialing` / `past_due`）のみ | 契約中または 45 日体験中 |
+
+```bash
+op run -- pnpm mcp:gate -- --enable-billing    # DB 側を単一プラン契約（体験中も可）へ
+op run -- pnpm mcp:gate -- --disable-billing   # 旧契約（契約中のみ）へ戻す
+```
+
+- **順序は [billing-single-plan-rollout.md](billing-single-plan-rollout.md) §公開順序 6 / §復帰 が正本**（DB 側 `--enable-billing` → `BILLING_ENFORCED=true` の Product 配備、戻す時は逆）。env だけ `true` にすると、体験中ユーザーは読めるのに書き込みだけ `DM005` で落ちる
+- 45 日体験は `BILLING_ENFORCED=true` の下で認証済みアプリを初めて表示した時にしか始まらない（`billing.startTrial`）。env が未設定の間は誰も体験中にならないため、`--enable-billing` 単独では実効的に何も変わらない
+- この切替は Write Fence にも `writes_enabled` / `enabled_client_ids` にも影響しない
+
+#### 緊急停止（stop and roll forward、上から順に）
+
+1. global gate を OFF にする: `op run -- pnpm mcp:gate -- --disable-global`
+2. 対象 client を allowlist から外す: `op run -- pnpm mcp:gate -- --disable-client=<id>`
+3. Vercel の `MCP_WRITE_ENABLED_CLIENTS` から対象 client を外す
+4. 恒久停止が必要な connection は Settings（本人）または `revoke_oauth_connection` RPC（運用側）で個別 revoke し、同じ token family が復活しないことを確認する
+
+`mcp_mutation_control` は revision を使った CAS 更新（`set_mcp_mutation_control_v1` / `set_mcp_client_write_control_v1` / `set_mcp_billing_enforcement_v1`、いずれも `service_role` 限定の `SECURITY DEFINER` RPC）。直接 `UPDATE` できる GRANT はどのロールにも無い。`pnpm mcp:gate` が revision の読み直しと引数整形を行うため、SQL を手で書く必要はない。
+
 ### 重要ダッシュボードURL
 
 | ダッシュボード  | URL                                             |
