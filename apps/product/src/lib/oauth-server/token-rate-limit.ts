@@ -5,6 +5,7 @@ import {
   oauthTokenGlobalRateLimit,
   oauthTokenIpRateLimit,
   oauthTokenPreBodyIpRateLimit,
+  oauthTokenRefreshIpRateLimit,
   oauthTokenRefreshRateLimit,
 } from '@/lib/rate-limit/upstash';
 import { extractClientIp } from '@/lib/security/ip-validation';
@@ -15,6 +16,7 @@ import { hashToken } from './tokens';
 const LOCAL_PRE_BODY_IP_LIMIT = 600;
 const LOCAL_IP_LIMIT = 10;
 const LOCAL_REFRESH_LIMIT = 30;
+const LOCAL_REFRESH_IP_LIMIT = 120;
 const LOCAL_GLOBAL_LIMIT = 120;
 const LOCAL_WINDOW_MS = 60_000;
 const localRequests = new Map<string, number[]>();
@@ -54,13 +56,7 @@ export async function checkOAuthTokenGrantRateLimit(
 ): Promise<OAuthTokenRateLimitState> {
   const grantState =
     grant.type === 'refresh_token'
-      ? await checkRateLimit(
-          oauthTokenRefreshRateLimit,
-          // 平文は bucket key に載せない（upstash 側でも identifier は再度 hash される）。
-          `refresh:${hashToken(grant.refreshToken)}`,
-          LOCAL_REFRESH_LIMIT,
-          'check_oauth_token_refresh_rate_limit',
-        )
+      ? await checkRefreshGrantRateLimit(request, grant.refreshToken)
       : await checkRateLimit(
           oauthTokenIpRateLimit,
           `ip:${extractClientIp(request.headers.get('x-real-ip'))}`,
@@ -74,6 +70,35 @@ export async function checkOAuthTokenGrantRateLimit(
     'all-clients',
     LOCAL_GLOBAL_LIMIT,
     'check_oauth_token_global_rate_limit',
+  );
+}
+
+/**
+ * refresh grant は **IP と token の両方**を通す。
+ *
+ * bucket key の材料は検証前の body なので、token 単位だけだと攻撃者が毎回別の値を
+ * 送って bucket を無限に作れてしまい、1 IP から全体上限を飽和させて正規ユーザーの
+ * token 更新を巻き添えで止められる。IP 側は共有 egress IP を締め出さない値にして
+ * ある（`authorization_code` の 10/分 より緩い）ので、D-01 の目的は保たれる。
+ */
+async function checkRefreshGrantRateLimit(
+  request: Request,
+  refreshToken: string,
+): Promise<OAuthTokenRateLimitState> {
+  const ipState = await checkRateLimit(
+    oauthTokenRefreshIpRateLimit,
+    `refresh-ip:${extractClientIp(request.headers.get('x-real-ip'))}`,
+    LOCAL_REFRESH_IP_LIMIT,
+    'check_oauth_token_refresh_ip_rate_limit',
+  );
+  if (ipState !== 'allowed') return ipState;
+
+  return checkRateLimit(
+    oauthTokenRefreshRateLimit,
+    // 平文は bucket key に載せない（upstash 側でも identifier は再度 hash される）。
+    `refresh:${hashToken(refreshToken)}`,
+    LOCAL_REFRESH_LIMIT,
+    'check_oauth_token_refresh_rate_limit',
   );
 }
 

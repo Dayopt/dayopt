@@ -142,6 +142,15 @@ export async function POST(request: NextRequest) {
   }
 }
 
+/**
+ * form body の上限。
+ *
+ * grant 種別の判定に body が要るため、body 読み取りは per-grant の上限より手前にある
+ * （粗い IP 上限の内側）。無制限に読ませると、その頻度差がそのまま memory / CPU の
+ * 増幅になる。`/api/mcp` と同じく宣言値と実測値の両方で切る。
+ */
+const MAX_FORM_BODY_BYTES = 16 * 1024;
+
 async function readFormBody(request: NextRequest): Promise<URLSearchParams> {
   const contentType = request.headers.get('content-type') ?? '';
   if (!contentType.includes('application/x-www-form-urlencoded')) {
@@ -150,7 +159,18 @@ async function readFormBody(request: NextRequest): Promise<URLSearchParams> {
       'Content-Type must be application/x-www-form-urlencoded',
     );
   }
-  return new URLSearchParams(await request.text());
+
+  const declaredLength = Number(request.headers.get('content-length'));
+  if (Number.isFinite(declaredLength) && declaredLength > MAX_FORM_BODY_BYTES) {
+    throw new OAuthServerError('invalid_request', 'Request body is too large');
+  }
+
+  const body = await request.text();
+  // 宣言値は信用しない（欠落・過少申告どちらもありうる）。
+  if (new TextEncoder().encode(body).length > MAX_FORM_BODY_BYTES) {
+    throw new OAuthServerError('invalid_request', 'Request body is too large');
+  }
+  return new URLSearchParams(body);
 }
 
 function required(value: string | undefined, name: string): string {

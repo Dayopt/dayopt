@@ -13,14 +13,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   ipLimit: vi.fn(),
-  globalLimit: vi.fn(),
   resolveSessionAuthContext: vi.fn(),
   captureUnexpectedError: vi.fn(),
 }));
 
 vi.mock('@/lib/rate-limit/upstash', () => ({
   trpcPreAuthIpRateLimit: { limit: mocks.ipLimit },
-  trpcPreAuthGlobalRateLimit: { limit: mocks.globalLimit },
 }));
 vi.mock('@/lib/sentry', () => ({ captureUnexpectedError: mocks.captureUnexpectedError }));
 vi.mock('@/lib/trpc/session-auth-context', () => ({
@@ -46,7 +44,6 @@ describe('tRPC pre-auth rate limit', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.ipLimit.mockResolvedValue({ success: true });
-    mocks.globalLimit.mockResolvedValue({ success: true });
     mocks.resolveSessionAuthContext.mockResolvedValue({});
   });
 
@@ -55,14 +52,23 @@ describe('tRPC pre-auth rate limit', () => {
     await createContext({ 'x-real-ip': '203.0.113.10' });
 
     expect(mocks.ipLimit).not.toHaveBeenCalled();
-    expect(mocks.globalLimit).not.toHaveBeenCalled();
   });
 
-  it('cookie 付きのリクエストは IP と全体の上限を順に通る', async () => {
+  it('cookie 付きのリクエストは IP 単位の上限を通る', async () => {
     await createContext({ 'x-real-ip': '203.0.113.10', cookie: 'sb-access-token=whatever' });
 
     expect(mocks.ipLimit).toHaveBeenCalledWith('trpc-pre-auth-ip:203.0.113.10');
-    expect(mocks.globalLimit).toHaveBeenCalledWith('trpc-pre-auth-all');
+  });
+
+  it('全 IP 合算の bucket は置かない（少数 IP で全ユーザーを止められるため）', async () => {
+    await createContext({ 'x-real-ip': '203.0.113.10', cookie: 'sb-access-token=whatever' });
+
+    // 呼ばれる limiter は IP 単位の 1 本だけ。
+    expect(mocks.ipLimit).toHaveBeenCalledOnce();
+    const identifiers = mocks.ipLimit.mock.calls.map(([identifier]) => identifier as string);
+    expect(identifiers.every((identifier) => identifier.startsWith('trpc-pre-auth-ip:'))).toBe(
+      true,
+    );
   });
 
   it('IP の上限を超えたら session を解決せずに拒否する', async () => {
@@ -73,16 +79,6 @@ describe('tRPC pre-auth rate limit', () => {
     ).rejects.toMatchObject({ code: 'TOO_MANY_REQUESTS' });
 
     // Supabase Auth への問い合わせに到達しないことがこの層の目的。
-    expect(mocks.resolveSessionAuthContext).not.toHaveBeenCalled();
-    expect(mocks.globalLimit).not.toHaveBeenCalled();
-  });
-
-  it('全体の上限を超えた場合も session を解決しない', async () => {
-    mocks.globalLimit.mockResolvedValueOnce({ success: false });
-
-    await expect(
-      createContext({ 'x-real-ip': '203.0.113.10', cookie: 'sb-access-token=whatever' }),
-    ).rejects.toMatchObject({ code: 'TOO_MANY_REQUESTS' });
     expect(mocks.resolveSessionAuthContext).not.toHaveBeenCalled();
   });
 

@@ -278,6 +278,20 @@ export const oauthTokenRefreshRateLimit = createRateLimiter(
   'ratelimit:product:oauth-token:refresh',
 );
 
+/**
+ * refresh grant の IP 単位上限。**token 単位の上限と AND で使う。**
+ *
+ * bucket key の材料（refresh token）は検証前の body なので、攻撃者は毎回別の値を
+ * 送って per-token bucket を無限に作れる。token 単位だけだと 1 IP から全体上限
+ * （`oauthTokenGlobalRateLimit`）を飽和させられ、正規ユーザーの token 更新が
+ * 巻き添えで止まる。共有 egress IP を締め出さないよう、`authorization_code` 用の
+ * 10/分 より緩くする。
+ */
+export const oauthTokenRefreshIpRateLimit = createRateLimiter(
+  Ratelimit.slidingWindow(120, '1 m'),
+  'ratelimit:product:oauth-token:refresh-ip',
+);
+
 /** OAuth token endpoint全体のDB負荷上限。 */
 export const oauthTokenGlobalRateLimit = createRateLimiter(
   Ratelimit.slidingWindow(120, '1 m'),
@@ -329,12 +343,6 @@ export const trpcPreAuthIpRateLimit = createRateLimiter(
   'ratelimit:product:trpc:pre-auth-ip',
 );
 
-/** 認証前の tRPC 境界用: 全 IP 合算の上限。 */
-export const trpcPreAuthGlobalRateLimit = createRateLimiter(
-  Ratelimit.slidingWindow(6_000, '1 m'),
-  'ratelimit:product:trpc:pre-auth-global',
-);
-
 /**
  * `/api/health` 用の全体上限。
  *
@@ -342,7 +350,7 @@ export const trpcPreAuthGlobalRateLimit = createRateLimiter(
  * 外形監視を止めないため、超過時は 503 ではなく直近の結果を返す。
  */
 export const healthCheckGlobalRateLimit = createRateLimiter(
-  Ratelimit.slidingWindow(60, '1 m'),
+  Ratelimit.slidingWindow(120, '1 m'),
   'ratelimit:product:health:global',
 );
 

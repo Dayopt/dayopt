@@ -15,7 +15,7 @@ import { type Database } from '@/lib/database';
 import { logger } from '@/lib/logger';
 import { extractBearerToken, verifyAccessToken } from '@/lib/mcp/auth';
 import { OAuthServerError, type OAuthClientId, type SupportedScope } from '@/lib/oauth-server';
-import { trpcPreAuthGlobalRateLimit, trpcPreAuthIpRateLimit } from '@/lib/rate-limit/upstash';
+import { trpcPreAuthIpRateLimit } from '@/lib/rate-limit/upstash';
 import { extractClientIp } from '@/lib/security/ip-validation';
 import { captureUnexpectedError } from '@/lib/sentry';
 import { AuthMode, createServiceRoleClient, detectAuthMode } from '@/lib/supabase/oauth';
@@ -247,6 +247,10 @@ async function createTRPCContext(opts: {
  * （`GoTrueClient` の `_getUser`）、掛けても守るものが無く、公開ページからの
  * 未認証 procedure を巻き込むだけになる。
  *
+ * **IP 単位だけにする。** 全 IP 合算の bucket を置くと、少数の IP から合算値を
+ * 使い切るだけで全ログイン済みユーザーの `/api/trpc` を止められる（この層は
+ * procedure より手前なので画面全体が壊れる）。単一ソースの増幅は IP 単位で有界。
+ *
  * Redis 障害時は可用性を優先して通す（アプリ全体の入口なので fail-closed にしない）。
  * 後段の user 単位 limit と `protectedProcedure` の認証は生きている。
  */
@@ -256,10 +260,7 @@ async function isPreAuthRateLimited(req: TrpcRequestLike): Promise<boolean> {
   const ip = extractClientIp(req.headers['x-real-ip'] ?? null);
   try {
     const ipResult = await trpcPreAuthIpRateLimit?.limit(`trpc-pre-auth-ip:${ip}`);
-    if (ipResult && !ipResult.success) return true;
-
-    const globalResult = await trpcPreAuthGlobalRateLimit?.limit('trpc-pre-auth-all');
-    return Boolean(globalResult && !globalResult.success);
+    return Boolean(ipResult && !ipResult.success);
   } catch (error) {
     const original =
       error instanceof Error ? error : new Error('tRPC pre-auth rate limit check failed');

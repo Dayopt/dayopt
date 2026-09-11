@@ -398,6 +398,33 @@ describe('GET /api/health', () => {
     expect(mocks.createClient.mock.calls.length).toBe(callsAfterFirst);
   });
 
+  it('障害中の結果も記憶し、古い healthy を返さない', async () => {
+    // 成功だけを覚えると、障害が始まった後に上限を超えた瞬間から最大 60 秒
+    // 「古い healthy」を返し、外形監視のアラートがその分遅れる。
+    const healthy = await GET();
+    expect(healthy.status).toBe(200);
+
+    mocks.limit.mockResolvedValueOnce({
+      data: null,
+      error: {
+        code: 'PGRST202',
+        message: 'database-message-sentinel',
+        details: 'database-details-sentinel',
+        hint: 'database-hint-sentinel',
+      },
+    });
+    const unhealthy = await GET();
+    expect(unhealthy.status).toBe(503);
+
+    mocks.healthLimit.mockResolvedValueOnce({ success: false });
+    const replayed = await GET();
+
+    expect(replayed.status).toBe(503);
+    expect(replayed.headers.get('X-Health-Check-Replayed')).toBe('true');
+    // 監視側が stale を判別できるよう経過時間を出す。
+    expect(Number(replayed.headers.get('X-Health-Check-Age-Ms'))).toBeGreaterThanOrEqual(0);
+  });
+
   it('limiter が落ちても通常の check を続ける', async () => {
     // 監視の入口なので、limiter 障害では止めない（fail-open）。
     mocks.healthLimit.mockRejectedValueOnce(new Error('redis unavailable'));

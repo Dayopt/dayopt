@@ -204,14 +204,23 @@ function rememberResult(body: unknown, httpStatus: number): void {
   lastResult = { body, httpStatus, at: Date.now() };
 }
 
-/** 上限超過時に返せる直近の結果。無ければ null（= 通常どおり依存を叩く）。 */
+/**
+ * 上限超過時に返せる直近の結果。無ければ null（= 通常どおり依存を叩く）。
+ *
+ * **成功も失敗も記憶する。** 成功だけを覚えると、障害中に上限を超えた瞬間から
+ * 最大 60 秒「古い healthy」を返し、外形監視のアラートがその分遅れる。
+ * 監視側が stale を判別できるよう、経過時間もヘッダーへ出す。
+ */
 function replayableResult(): NextResponse | null {
-  if (!lastResult || Date.now() - lastResult.at > LAST_RESULT_MAX_AGE_MS) return null;
+  if (!lastResult) return null;
+  const ageMs = Date.now() - lastResult.at;
+  if (ageMs > LAST_RESULT_MAX_AGE_MS) return null;
   return NextResponse.json(lastResult.body, {
     status: lastResult.httpStatus,
     headers: {
       'Cache-Control': 'no-cache, no-store, must-revalidate',
       'X-Health-Check-Replayed': 'true',
+      'X-Health-Check-Age-Ms': String(ageMs),
     },
   });
 }
@@ -242,6 +251,7 @@ export async function GET() {
         status: 'unhealthy',
         responseTimeMs: Date.now() - startTime,
       });
+      rememberResult({ status: 'unhealthy' }, 503);
       return NextResponse.json(
         { status: 'unhealthy' },
         {
@@ -335,6 +345,7 @@ export async function GET() {
 
     // 本番環境ではエラー詳細を隠す
     if (isOperationalDeployment()) {
+      rememberResult({ status: 'unhealthy' }, 503);
       return NextResponse.json({ status: 'unhealthy' }, { status: 503 });
     }
 
@@ -354,6 +365,7 @@ export async function GET() {
       },
     };
 
+    rememberResult(errorStatus, 503);
     return NextResponse.json(errorStatus, { status: 503 });
   }
 }
