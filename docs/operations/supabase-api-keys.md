@@ -21,6 +21,8 @@ Edge の旧 `SUPABASE_SERVICE_ROLE_KEY` は loopback URL と local Docker の正
 
 ## 切替手順と停止条件
 
+main へのマージは Supabase GitHub integration による Edge 配備と、検証成功後の Vercel 自動 promote を起動する。コードのマージ承認にはこの配備の影響も含めて判断する。以下の外部設定の手動変更・旧キー無効化は別操作であり、マージだけで完了したとは扱わない。
+
 1. Preview の URL と新キーが同じ専用 Supabase branch を指すことを確認する。integration が管理する Preview 値へ production の値を上書きしない。新しい変数名が無い場合は配備を止める。
 2. Production の既存 integration-managed modern keys と `human/supabase` 台帳の所有関係を整理する。新しい2フィールドを正本に反映し、Vercel replica と一致させる。既存 legacy field はrollback完了まで保持し、先に削除しない。`replica:check` の成功は値の一致やキーの有効性を証明しない。
 3. 隔離された Preview で login / refresh / SSR、管理 API、CAPTCHA 有効時の password 再認証、MCP OAuth 交換・read/write・別ユーザー拒否、health identity を確認する。誤った project key と欠落設定が拒否されることも確認する。テスト用ユーザー・データを限定し、メール送信先も管理下に置く。
