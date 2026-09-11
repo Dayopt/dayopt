@@ -26,7 +26,7 @@ Edge の旧 `SUPABASE_SERVICE_ROLE_KEY` は loopback URL と local Docker の正
 3. 隔離された Preview で login / refresh / SSR、管理 API、CAPTCHA 有効時の password 再認証、MCP OAuth 交換・read/write・別ユーザー拒否、health identity を確認する。誤った project key と欠落設定が拒否されることも確認する。テスト用ユーザー・データを限定し、メール送信先も管理下に置く。
 4. Edge の managed default を確認してから Preview 配備する。日本語 locale lookup、署名不正拒否、署名付き hook のメール送信を確認する。Node の resolver テストを Deno / hosted gateway の実測と同一視しない。
 5. Preview の証拠をレビュー後、別の明示指示で Production を切り替える。公開キーはビルドへ埋め込まれるため再ビルドが必要。失敗時は旧配備と保持済み旧設定へ戻す。キーを無効化する前ならこのrollbackが可能。
-6. 古いブラウザ配信物、外部クライアント、cron、Edge、runbook の legacy 利用が無いことを観測する。観測期間と対象を記録し、別の明示指示で旧キーを無効化する。コード検索ゼロだけでは無効化しない。
+6. 公式移行手順には legacy key の自動利用表示は無いと明記されている。Dashboard の last-used indicator を完了条件にせず、古いブラウザ配信物、外部クライアント、cron、Edge、runbook の設定と実行記録から legacy 利用が無いことを確認する。観測期間と対象を記録し、別の明示指示で旧キーを無効化する。コード検索ゼロだけでは無効化しない。
 
 このPRの隔離テストは本番接続・設定変更・旧キー無効化を行わない。hosted gateway、CAPTCHA、Edge runtime、実際の replica 一致と legacy 利用ゼロは運用切替時の検証として残す。issue はその完了まで閉じない。
 

@@ -33,7 +33,6 @@ const STATIC_DIR = resolve(ROOT, 'apps/product/.next/static');
 const PATTERNS = [
   'SUPABASE_SECRET_KEY',
   'SUPABASE_SERVICE_ROLE_KEY',
-  'sb_secret_',
   'STRIPE_SECRET_KEY',
   'RECOVERY_CODE_PEPPER',
   'SENTRY_AUTH_TOKEN',
@@ -84,6 +83,11 @@ function main() {
   const hits = [];
   for (const file of files) {
     const content = readFileSync(file, 'utf8');
+    // supabase-js itself contains startsWith('sb_secret_'). Require key material
+    // after the prefix, without exempting the SDK chunk from leak detection.
+    if (/sb_secret_[A-Za-z0-9_-]+/u.test(content)) {
+      hits.push({ file: relative(ROOT, file), pattern: 'Supabase secret key literal' });
+    }
     for (const pattern of PATTERNS) {
       if (content.includes(pattern)) {
         hits.push({ file: relative(ROOT, file), pattern });
