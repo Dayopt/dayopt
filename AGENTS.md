@@ -73,7 +73,7 @@ Dayopt で作業する全エージェントの provider-neutral な正本ガイ�
 ### アーキテクチャ
 
 - **依存方向は一方向**: `features/ -> lib/`。lib/ は feature 非依存。feature 間は barrel 経由のみ、deep import 禁止（`pnpm lint:boundaries` 機械強制）。DAG: Layer0(activities) → Layer1(timeblock, external-calendar) → Layer2(calendar, review)。settings は composition として DAG 除外。詳細判断（domain 配置、RPC transformer 配置、Composition Hub）は `pr-cross-review` skill が持つ
-- **新規 API は必ず tRPC**（Router → Service → Supabase の3層、feature-colocated）。REST は既存 allowlist（`/api/health/*`, `/api/v1/system/*`, `/api/integrations/*`, `/api/mcp`, `/api/oauth/token`, `/api/cron/*`）のみ
+- **新規 API は必ず tRPC**（Router → Service → Supabase の3層、feature-colocated）。REST は既存 allowlist（`/api/health/*`, `/api/v1/*`, `/api/integrations/*`, `/api/mcp`, `/api/oauth/token`, `/api/cron/*`, `/api/webhooks/*`, `/api/csp-report`）のみ
 - **状態管理**: Zustand でグローバル、useState でローカル
 - **UI**: `@dayopt/components` 第一選択、semantic token 経由のみ（`pnpm lint:tokens` 機械強制）、Storybook に無いパターンは先に Story 追加（`storybook` skill）
 - **ロジックの置き場**: 新規の集計・ビジネスロジックは TS service 層。既存 PL/pgSQL 関数は凍結資産（bug fix のみ）

@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-08-04
+last_verified: 2026-09-11
 code: apps/product/src/features
 ---
 
@@ -12,248 +12,79 @@ tRPC + Zod による API バリデーション、service 層の skin-agnostic co
 
 ## API バリデーション（Zod + tRPC）
 
-Dayopt における Zod + tRPC による型安全な API バリデーションシステムの解説。
+### どこに何があるか
 
-### システム構成
+feature-colocated。`src/server/api/` のような集約ディレクトリは無い。
 
-- **tRPC**: エンドツーエンド型安全 API
-- **Zod**: ランタイムスキーマバリデーション
-- **TanStack Query**: クライアント状態管理・キャッシュ
+| 置き場         | 実例                                                                                       |
+| -------------- | ------------------------------------------------------------------------------------------ |
+| router         | `features/{feature}/server/router.ts`（分割時は `plans-router.ts` のように責務名を付ける） |
+| 入出力スキーマ | `features/{feature}/schemas/{feature}.ts`                                                  |
+| service        | `features/{feature}/server/{name}-service.ts`。router からは `service-index.ts` 経由で取る |
+| router の合成  | `app/api/trpc/_server/app-router.ts`                                                       |
+| procedure 定義 | `lib/trpc/procedures.ts`（`protectedProcedure` / `entitledProcedure`）                     |
+| エラー変換     | `lib/trpc/errors.ts` の `handleServiceError`                                               |
 
-```
-src/
-├── server/api/              # tRPC サーバー設定
-│   ├── root.ts             # メインルーター
-│   ├── trpc.ts             # tRPC設定・ミドルウェア
-│   └── routers/            # 各ルーター
-├── schemas/api/            # Zod スキーマ定義
-│   ├── common.ts           # 共通スキーマ
-│   └── tasks.ts            # タスクスキーマ
-└── lib/
-    └── api/
-        └── error-handler.ts # エラーハンドリング
-```
+### 基本形
 
-### 基本的な使い方
-
-#### 1. API定義（サーバー側）
+router は薄く保ち、入力検証を Zod、認可を `protectedProcedure`、実装を service に置く。
 
 ```typescript
-export const tasksRouter = createTRPCRouter({
-  create: protectedProcedure
-    .input(createTaskInputSchema) // Zod自動バリデーション
-    .output(taskOutputSchema) // 出力型保証
-    .mutation(async ({ input, ctx }) => {
-      const task = await createTask(input);
-      return task;
+// features/timeblock/server/plans-router.ts
+export const plansRouter = createTRPCRouter({
+  list: protectedProcedure
+    .meta({ description: 'Plan list for the split time model' })
+    .input(planFilterSchema.optional())
+    .query(async ({ ctx, input }) => {
+      const service = createPlanService(ctx.supabase);
+      try {
+        // userId は必ず spread の後に置く（filter に userId 名の field が生えても ctx が勝つ）
+        return await service.list({ ...input, userId: ctx.userId });
+      } catch (error) {
+        handleServiceError(error);
+      }
     }),
 });
 ```
 
-#### 2. スキーマ定義
+**`ctx.userId` は spread の後に置く。** MCP の読み取りは service-role client で tRPC を呼ぶため
+RLS が効かず、テナント分離はこの 1 行に依存する（`lib/test/integration/mcp-read-tenant-isolation.integration.test.ts`
+が全 read 経路で回帰を見る）。
+
+### スキーマ
+
+`.strict()` を付けて未知 field を落とす。日時は offset 付き ISO 8601 で受ける。
 
 ```typescript
-// src/schemas/api/tasks.ts
-export const createTaskInputSchema = taskBaseSchema
-  .omit({ status: true })
-  .extend({
-    dueDate: z.date().min(new Date(), '期限は現在時刻以降を指定してください').optional(),
+// features/timeblock/schemas/timeblock.ts
+export const planFilterSchema = z
+  .object({
+    ids: z.array(z.string().uuid()).max(100).optional(),
+    activityId: z.string().uuid().optional(),
+    startDate: z.string().datetime({ offset: true }).optional(),
+    endDate: z.string().datetime({ offset: true }).optional(),
+    limit: z.number().min(1).max(100).optional(),
   })
-  .refine(
-    (data) => {
-      if (data.parentTaskId && !data.projectId) return false;
-      return true;
-    },
-    {
-      message: '親タスクがある場合はプロジェクトも指定してください',
-      path: ['projectId'],
-    },
-  );
+  .strict();
 ```
 
-#### 3. クライアント側使用
+MCP tool が同じ procedure を使う場合、tool 側の入力スキーマは
+`app/api/mcp/_tools/` に別途あり、契約 snapshot（`contract-snapshot.test.ts`）で固定する。
+tool 間で受理集合を揃えること（#2721 D-04）。
 
-```typescript
-function TaskForm() {
-  const { create } = useTaskOperations();
+### エラー
 
-  const handleSubmit = (data: CreateTaskInput) => {
-    create.mutate(data, {
-      onSuccess: (task) => {
-        /* 成功処理 */
-      },
-      onError: (error) => {
-        /* エラー処理 */
-      },
-    });
-  };
-}
-```
+service は `ServiceError` を投げ、router は `handleServiceError` に渡す。予期しない失敗だけが
+Sentry へ行き、client には `serviceCode` だけが返る（詳細は本ファイル §エラーパターン辞書）。
 
-### スキーマ設計パターン
+### zod の version
 
-#### 1. 基本スキーマ
+`apps/product` は v3 系、`apps/web` は v4 系に固定。app 間でスキーマを共有しない（`AGENTS.md`）。
 
-```typescript
-export const taskBaseSchema = z.object({
-  title: titleSchema,
-  description: descriptionSchema,
-  priority: prioritySchema,
-  status: statusSchema,
-  dueDate: futureDateSchema.optional(),
-  estimatedHours: z.number().min(0.1).max(1000).optional(),
-});
-```
+### テスト
 
-#### 2. 入力スキーマ（作成・更新）
-
-```typescript
-// 作成用（一部フィールド除外・追加バリデーション）
-export const createTaskInputSchema = taskBaseSchema.omit({ status: true }).extend({
-  dueDate: z.date().min(new Date()).optional(),
-});
-
-// 更新用（全フィールド任意・条件バリデーション）
-export const updateTaskInputSchema = taskBaseSchema
-  .partial()
-  .extend({ id: idSchema })
-  .refine((data) => {
-    if (data.completed === true) {
-      return data.progress === 100 || data.progress === undefined;
-    }
-    return true;
-  });
-```
-
-#### 3. 出力スキーマ
-
-```typescript
-export const taskOutputSchema = taskBaseSchema.extend({
-  id: idSchema,
-  completed: z.boolean(),
-  ...metadataSchema.shape,
-});
-```
-
-#### 4. 型の再利用
-
-```typescript
-export type Task = z.infer<typeof taskSchema>;
-export type CreateTaskInput = z.infer<typeof createTaskInputSchema>;
-export type UpdateTaskInput = z.infer<typeof updateTaskInputSchema>;
-```
-
-### ベストプラクティス
-
-#### エラーメッセージの日本語化
-
-```typescript
-z.string().min(1, 'タイトルは必須です').max(200, 'タイトルは200文字以内で入力してください');
-```
-
-#### バリデーションの分離
-
-```typescript
-export function validateTaskTitle(title: string): boolean {
-  return titleSchema.safeParse(title).success;
-}
-```
-
-#### 楽観的更新
-
-```typescript
-const updateTask = trpc.tasks.update.useMutation({
-  onMutate: async (updateData) => {
-    await utils.tasks.list.cancel();
-    const previousTasks = utils.tasks.list.getData();
-
-    utils.tasks.list.setData(previousTasks, (old) => ({
-      ...old,
-      tasks: old.tasks.map((task) =>
-        task.id === updateData.id ? { ...task, ...updateData } : task,
-      ),
-    }));
-
-    return { previousTasks };
-  },
-  onError: (error, updateData, context) => {
-    if (context?.previousTasks) {
-      utils.tasks.list.setData(context.previousTasks, context.previousTasks);
-    }
-  },
-});
-```
-
-楽観的更新の詳細パターンは `optimistic-update` skill を参照。
-
-### トラブルシューティング
-
-#### Transform後のスキーマでメソッドが使用できない
-
-```typescript
-// ❌ 問題のあるコード
-const schema = z
-  .string()
-  .transform((val) => val.trim())
-  .min(1);
-
-// ✅ 正しいコード（メソッドをtransformの前に）
-const schema = z
-  .string()
-  .min(1)
-  .transform((val) => val.trim());
-```
-
-#### UUIDバリデーションエラー
-
-```typescript
-// テストでは有効なUUIDを使用
-const testId = '550e8400-e29b-41d4-a716-446655440000';
-```
-
-#### 日付バリデーションの不一致
-
-```typescript
-// 共通スキーマを使用して一貫性確保
-import { futureDateSchema } from '@/schemas/api/common';
-```
-
-### テスト戦略
-
-#### スキーマバリデーションテスト
-
-```typescript
-describe('タスクスキーマバリデーション', () => {
-  it('正常なデータが検証をパスする', () => {
-    const validInput: CreateTaskInput = {
-      title: '新しいタスク',
-      priority: 'medium',
-    };
-    expect(createTaskInputSchema.safeParse(validInput).success).toBe(true);
-  });
-
-  it('無効なデータで検証が失敗する', () => {
-    const invalidInput = { title: '' };
-    const result = createTaskInputSchema.safeParse(invalidInput);
-    expect(result.success).toBe(false);
-  });
-});
-```
-
-#### API統合テスト
-
-```typescript
-describe('tRPC API統合テスト', () => {
-  it('タスク作成APIが正常に動作する', async () => {
-    const caller = tasksRouter.createCaller(mockContext);
-    const result = await caller.create({
-      title: 'テストタスク',
-      priority: 'high',
-    });
-    expect(result.id).toBeDefined();
-  });
-});
-```
+router / service の単体は対象ファイルの隣に `X.test.ts`（`test` skill）。認可とテナント境界は
+`lib/test/integration/` の integration で実 DB に対して確認する。
 
 ---
 
