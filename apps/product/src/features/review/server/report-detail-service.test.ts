@@ -408,6 +408,43 @@ describe('ReportDetailService.getActivityDetail', () => {
     expect(result.medianPlanBoxMinutes).toBeNull();
   });
 
+  it('分布は明細の 200 件上限に切られず、全件から出す', async () => {
+    // 210 件。明細は古い順に 200 件で切られるが、代表値は全件で決まる
+    const records = Array.from({ length: 210 }, (_, index) =>
+      record(`r${String(index).padStart(3, '0')}`, '2026-09-01', '00:00', '00:00', {
+        start_at: jst('2026-09-01', '00:00'),
+        // 先頭 200 件は 60 分、末尾 10 件は 600 分
+        end_at: new Date(
+          Date.parse(jst('2026-09-01', '00:00')) + (index < 200 ? 60 : 600) * 60_000,
+        ).toISOString(),
+      }),
+    );
+    const service = createReportDetailService(createFakeClient({ records }));
+
+    const result = await service.getActivityDetail(USER_ID, baseInput(), NOW);
+
+    expect(result.records).toHaveLength(200);
+    expect(result.durationDistribution?.n).toBe(210);
+    expect(result.durationDistribution?.max).toBe(600);
+    expect(result.durationDistribution?.median).toBe(result.medianBoxMinutes);
+  });
+
+  it('分布は 3 件未満なら null（中央値カードは出る）', async () => {
+    const service = createReportDetailService(
+      createFakeClient({
+        records: [
+          record('r1', '2026-09-01', '10:00', '11:00'),
+          record('r2', '2026-09-02', '10:00', '12:00'),
+        ],
+      }),
+    );
+
+    const result = await service.getActivityDetail(USER_ID, baseInput(), NOW);
+
+    expect(result.durationDistribution).toBeNull();
+    expect(result.medianBoxMinutes).toBe(90);
+  });
+
   /** アクティビティ未設定の記録も明細を開ける（`.eq(null)` では引けない）。 */
   it('activityId が null ならアクティビティ未設定の記録を集める', async () => {
     const service = createReportDetailService(

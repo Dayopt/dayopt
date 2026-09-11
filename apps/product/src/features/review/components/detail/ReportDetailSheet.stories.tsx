@@ -1,3 +1,7 @@
+import {
+  isMedianEligibleSource,
+  summarizeDurationDistribution,
+} from '../../domain/report/duration-distribution';
 import { ReportDetailBody } from './ReportDetailBody';
 import { ReportDetailSheet } from './ReportDetailSheet';
 
@@ -35,7 +39,7 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 function detail(overrides: Partial<ReportActivityDetailResult> = {}): ReportActivityDetailResult {
-  return {
+  const base: ReportActivityDetailResult = {
     recordedMinutes: 600,
     plannedMinutes: 480,
     plannedPastMinutes: 480,
@@ -82,8 +86,26 @@ function detail(overrides: Partial<ReportActivityDetailResult> = {}): ReportActi
         source: 'manual',
       },
     ],
+    durationDistribution: null,
     ...overrides,
   };
+
+  return {
+    ...base,
+    durationDistribution: overrides.durationDistribution ?? distributionOf(base.records),
+  };
+}
+
+/**
+ * 分布は server が全件から出す。fixture でも同じ規則（auto_migrated を除く）で作り、
+ * 「明細と分布が別物」の状態を誤って固定しないようにする。
+ */
+function distributionOf(
+  records: ReportActivityDetailResult['records'],
+): ReportActivityDetailResult['durationDistribution'] {
+  return summarizeDurationDistribution(
+    records.filter((row) => isMedianEligibleSource(row.source)).map((row) => row.minutes),
+  );
 }
 
 /** 既定（375x812）。統計 4 枚・鏡・時間帯・明細が縦に並ぶ。 */

@@ -155,7 +155,7 @@
         "heading": "Length per record",
         "count": "(n={count})",
         "notEnough": "Not enough records (shown from 3)",
-        "dotAriaLabel": "Record at {start}, {duration}",
+        "dotAriaLabel": "{duration}, {count, plural, one {# record} other {# records}}",
         "median": "Median {duration}",
         "iqr": "25–75% spans {low} to {high}",
         "planMedian": "Median plan {duration}"

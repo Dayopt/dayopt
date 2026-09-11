@@ -18,6 +18,10 @@ vi.mock('next-intl', () => ({
 import { setDomSlot } from '@/lib/dom-slots/useDomSlot';
 
 import {
+  isMedianEligibleSource,
+  summarizeDurationDistribution,
+} from '../../domain/report/duration-distribution';
+import {
   REPORT_DETAIL_PANEL_DEFAULT_WIDTH,
   REPORT_DETAIL_PANEL_MAX_WIDTH,
   REPORT_DETAIL_PANEL_MIN_WIDTH,
@@ -29,7 +33,7 @@ import { ReportDetailPanel } from './ReportDetailPanel';
 import type { ReportActivityDetailResult } from '../../server/report-detail-service';
 
 function detail(overrides: Partial<ReportActivityDetailResult> = {}): ReportActivityDetailResult {
-  return {
+  const base: ReportActivityDetailResult = {
     recordedMinutes: 600,
     plannedMinutes: 480,
     plannedPastMinutes: 480,
@@ -52,8 +56,26 @@ function detail(overrides: Partial<ReportActivityDetailResult> = {}): ReportActi
       record('rec-2', 60, { startAt: '2026-09-02T01:00:00.000Z' }),
       record('rec-3', 120, { startAt: '2026-09-03T01:00:00.000Z' }),
     ],
+    durationDistribution: null,
     ...overrides,
   };
+
+  return {
+    ...base,
+    durationDistribution: overrides.durationDistribution ?? distributionOf(base.records),
+  };
+}
+
+/**
+ * 分布は server が全件から出す。fixture でも同じ規則（auto_migrated を除く）で作り、
+ * 「明細と分布が別物」の状態を誤って固定しないようにする。
+ */
+function distributionOf(
+  records: ReportActivityDetailResult['records'],
+): ReportActivityDetailResult['durationDistribution'] {
+  return summarizeDurationDistribution(
+    records.filter((row) => isMedianEligibleSource(row.source)).map((row) => row.minutes),
+  );
 }
 
 /** 明細 1 件。長さだけ変えたい test が多いので分単位を第 2 引数に取る。 */
@@ -260,6 +282,48 @@ describe('ReportDetailPanel', () => {
     expect(row).not.toBeNull();
     expect(row).toHaveFocus();
     expect(Element.prototype.scrollIntoView).toHaveBeenCalled();
+  });
+
+  /**
+   * 同じ長さの点は座標も同じ。1 記録 = 1 ボタンにすると 44px のヒット領域が完全に重なり、
+   * ポインタでは最後の 1 件しか押せない（「25 分」を繰り返す使い方で必ず起きる）。
+   */
+  it('同じ長さの記録は 1 つの点にまとめ、件数で語る', async () => {
+    renderPanel({
+      detail: detail({
+        records: [
+          record('rec-a', 25),
+          record('rec-b', 25, { startAt: '2026-09-02T01:00:00.000Z' }),
+          record('rec-c', 25, { startAt: '2026-09-03T01:00:00.000Z' }),
+          record('rec-d', 50, { startAt: '2026-09-04T01:00:00.000Z' }),
+        ],
+      }),
+    });
+
+    const strip = document.querySelector('[data-report-strip="duration"]') as HTMLElement;
+    const dots = within(strip).getAllByRole('button');
+    expect(dots).toHaveLength(2);
+    // n は点の数ではなく記録の数
+    expect(screen.getByText('report.detail.strip.count 4')).toBeInTheDocument();
+    expect(within(strip).getByText('report.detail.strip.dotAriaLabel 0:25 3')).toBeInTheDocument();
+
+    const { default: userEvent } = await import('@testing-library/user-event');
+    await userEvent.setup().click(dots[0] as HTMLElement);
+
+    // 同じ長さのうち最初の記録へ着地する
+    expect(document.querySelector('[data-record-id="rec-a"]')).toHaveFocus();
+  });
+
+  /** 明細は 200 件で切られる。client で数え直すと同じパネルに違う中央値が 2 つ並ぶ。 */
+  it('件数と中央値は明細ではなく server の分布を出す', () => {
+    renderPanel({
+      detail: detail({
+        durationDistribution: { n: 210, min: 30, q1: 45, median: 60, q3: 90, max: 600 },
+      }),
+    });
+
+    expect(screen.getByText('report.detail.strip.count 210')).toBeInTheDocument();
+    expect(screen.getByText('report.detail.strip.median 1:00')).toBeInTheDocument();
   });
 
   /** 自動移行は「ユーザーが確定した実績」ではないので代表値に数えない（明細には残す）。 */

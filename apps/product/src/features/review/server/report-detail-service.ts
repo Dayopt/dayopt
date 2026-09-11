@@ -3,7 +3,12 @@ import 'server-only';
 import { toDerivedBlock } from '@/lib/database';
 import { aggregate } from '@/lib/time';
 
-import { isMedianEligibleSource, medianOf } from '../domain/report/duration-distribution';
+import {
+  isMedianEligibleSource,
+  medianOf,
+  summarizeDurationDistribution,
+  type DurationDistribution,
+} from '../domain/report/duration-distribution';
 import {
   clipMinutes,
   distributeToTimeOfDay,
@@ -73,6 +78,14 @@ export interface ReportActivityDetailResult {
   /** 期間内の記録ボックス長の中央値。0 件は `null`（**平均ではない**）。 */
   medianBoxMinutes: number | null;
   /**
+   * 1 件あたりの長さの分布（`auto_migrated` を除く）。閾値未満は `null`。
+   *
+   * **`records` からは作らせない。** 明細は 200 件で切るので、多い期間だと client 側の
+   * 再計算がカードの中央値とずれ、同じパネルに違う「中央値」が 2 つ並ぶ。点の描画だけを
+   * 明細に任せ、代表値と件数はここで確定する。
+   */
+  durationDistribution: DurationDistribution | null;
+  /**
    * 期間内で**開始済み**の予定 1 件あたりの長さの中央値。0 件は `null`。
    *
    * 記録の中央値と並べて「1 回あたりどれだけ見誤っているか」を出すために持つ。合計比
@@ -138,6 +151,10 @@ class ReportDetailService {
       (record) => clipMinutes(record.start_at, record.end_at, range.startAt, range.endAt) > 0,
     );
 
+    // 中央値・分布の母集団（auto_migrated を除いた clip 済みの長さ）。明細の 200 件上限より
+    // 先に確定させる
+    const recordMinutes = this.resolveEligibleMinutes(periodRecords, range);
+
     const totals = aggregate(
       { ...range, timezone },
       activityId,
@@ -155,7 +172,8 @@ class ReportDetailService {
       recordedMinutes: totals.recordedMinutes,
       // `totals.medianBoxMinutes` は使わない（全件で出るため）。表示側のストリップと同じ
       // 母集団（auto_migrated を除いた clip 済みの長さ）から出す
-      medianBoxMinutes: this.resolveRecordMedian(periodRecords, range),
+      medianBoxMinutes: medianOf(recordMinutes),
+      durationDistribution: summarizeDurationDistribution(recordMinutes),
       medianPlanBoxMinutes: this.resolvePlanMedian(plans, range, now),
       fulfillment: totals.fulfillment,
       trend: includeTrend ? this.buildTrend(records, trendRanges, activityId, timezone, now) : [],
@@ -164,21 +182,19 @@ class ReportDetailService {
   }
 
   /**
-   * 記録 1 件あたりの長さの中央値（分）。`auto_migrated` は除く。
+   * 代表値に数えてよい記録の長さ（分）。`auto_migrated` は除く。
    *
    * 集計の `aggregate` ではなく `clipMinutes` で出す。明細（`records[]`）の長さと同じ関数を
-   * 通すので、カードの中央値とストリップの点が必ず同じ母集団になる。
+   * 通すので、ストリップの点と代表値が同じ尺になる。
    */
-  private resolveRecordMedian(
+  private resolveEligibleMinutes(
     records: ReportDetailRecordRow[],
     range: { startAt: string; endAt: string },
-  ): number | null {
-    const minutes = records
+  ): number[] {
+    return records
       .filter((record) => isMedianEligibleSource(record.source))
       .map((record) => clipMinutes(record.start_at, record.end_at, range.startAt, range.endAt))
       .filter((value) => value > 0);
-
-    return medianOf(minutes);
   }
 
   /**
@@ -272,7 +288,7 @@ class ReportDetailService {
         now,
       ).recordedMinutes,
       // 合計は全件、中央値は表示中の期間と同じ規則（auto_migrated を除く）
-      medianBoxMinutes: this.resolveRecordMedian(records, periodRange),
+      medianBoxMinutes: medianOf(this.resolveEligibleMinutes(records, periodRange)),
     }));
   }
 

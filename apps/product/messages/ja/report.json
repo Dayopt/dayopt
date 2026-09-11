@@ -155,7 +155,7 @@
         "heading": "1 件あたりの長さ",
         "count": "（n={count}）",
         "notEnough": "件数不足（3 件から出します）",
-        "dotAriaLabel": "{start} の記録 {duration}",
+        "dotAriaLabel": "{duration} の記録 {count} 件",
         "median": "中央値 {duration}",
         "iqr": "25–75% は {low} 〜 {high}",
         "planMedian": "予定の中央値 {duration}"

@@ -38,7 +38,7 @@ export function medianOf(values: readonly number[]): number | null {
   return medianOfSorted([...values].sort((a, b) => a - b));
 }
 
-interface DurationDistribution {
+export interface DurationDistribution {
   /** 分布に使った件数。 */
   n: number;
   min: number;

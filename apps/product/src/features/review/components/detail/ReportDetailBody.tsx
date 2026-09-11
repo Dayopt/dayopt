@@ -150,10 +150,10 @@ function DetailSections({
       <StatGrid detail={detail} />
       <MirrorLine detail={detail} />
       <DurationStrip
+        distribution={detail.durationDistribution}
         medianPlanBoxMinutes={detail.medianPlanBoxMinutes}
         onSelectRecord={handleSelectRecord}
         records={detail.records}
-        timezone={timezone}
       />
       <TimeOfDayBars values={detail.timeOfDay} />
       {showTrend && <TrendBars granularity={granularity} trend={detail.trend} />}
