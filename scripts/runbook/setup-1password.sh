@@ -130,8 +130,8 @@ echo "  [human]"
 run item create --category=apicredential --vault=human --title=supabase \
   --tags=dayopt/supabase notesPlain="$NOTES" \
   'NEXT_PUBLIC_SUPABASE_URL[text]=' \
-  'NEXT_PUBLIC_SUPABASE_ANON_KEY[concealed]=' \
-  'SUPABASE_SERVICE_ROLE_KEY[concealed]=' \
+  'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY[concealed]=' \
+  'SUPABASE_SECRET_KEY[concealed]=' \
   'SEND_EMAIL_HOOK_SECRET[concealed]=' \
   'CRON_SECRET[concealed]=' \
   'SUPABASE_DB_PASSWORD[concealed]=' \

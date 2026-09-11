@@ -90,23 +90,19 @@ type RecordDeleteRpcArgs = Database['public']['Functions']['apply_mcp_record_del
 type RecordRestoreRpcArgs = Database['public']['Functions']['apply_mcp_record_restore_v1']['Args'];
 
 function createMcpMutationDbClient(): McpMutationDbClient {
-  return createClient<McpMutationDatabase>(
-    env.NEXT_PUBLIC_SUPABASE_URL,
-    env.SUPABASE_SERVICE_ROLE_KEY,
-    {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-      },
-      global: {
-        fetch: (url, options) =>
-          fetch(url, {
-            ...options,
-            signal: options?.signal ?? AbortSignal.timeout(15_000),
-          }),
-      },
+  return createClient<McpMutationDatabase>(env.NEXT_PUBLIC_SUPABASE_URL, env.SUPABASE_SECRET_KEY, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
     },
-  );
+    global: {
+      fetch: (url, options) =>
+        fetch(url, {
+          ...options,
+          signal: options?.signal ?? AbortSignal.timeout(15_000),
+        }),
+    },
+  });
 }
 
 /** Exposes typed apply methods without exposing the underlying service-role client. */

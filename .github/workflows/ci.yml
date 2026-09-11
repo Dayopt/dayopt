@@ -236,8 +236,8 @@ jobs:
         id: supabase
         run: |
           API_URL=$(supabase status --output json | jq -r '.API_URL')
-          ANON_KEY=$(supabase status --output json | jq -r '.ANON_KEY')
-          SERVICE_ROLE_KEY=$(supabase status --output json | jq -r '.SERVICE_ROLE_KEY')
+          ANON_KEY=$(supabase status --output json | jq -er '.PUBLISHABLE_KEY // .ANON_KEY | select(type == "string" and length > 0)')
+          SERVICE_ROLE_KEY=$(supabase status --output json | jq -er '.SECRET_KEY // .SERVICE_ROLE_KEY | select(type == "string" and length > 0)')
           DB_URL=$(supabase status --output json | jq -r '.DB_URL')
           echo "api_url=$API_URL" >> $GITHUB_OUTPUT
           echo "anon_key=$ANON_KEY" >> $GITHUB_OUTPUT
@@ -248,8 +248,8 @@ jobs:
         env:
           INTEGRATION_AFFECTED: ${{ needs.impact.outputs.integration }}
           NEXT_PUBLIC_SUPABASE_URL: ${{ steps.supabase.outputs.api_url }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ steps.supabase.outputs.anon_key }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ steps.supabase.outputs.service_role_key }}
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ steps.supabase.outputs.anon_key }}
+          SUPABASE_SECRET_KEY: ${{ steps.supabase.outputs.service_role_key }}
           DATABASE_URL: ${{ steps.supabase.outputs.db_url }}
           USE_LOCAL_DB: 'true'
           NODE_ENV: test

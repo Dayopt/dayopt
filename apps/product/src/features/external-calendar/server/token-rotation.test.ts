@@ -7,7 +7,7 @@ const captureUnexpectedError = vi.hoisted(() => vi.fn());
 vi.mock('@/env', () => ({
   env: {
     NEXT_PUBLIC_SUPABASE_URL: 'https://project.supabase.co',
-    SUPABASE_SERVICE_ROLE_KEY: 'service-role-key',
+    SUPABASE_SECRET_KEY: 'service-role-key',
   },
 }));
 vi.mock('@supabase/supabase-js', () => ({ createClient }));

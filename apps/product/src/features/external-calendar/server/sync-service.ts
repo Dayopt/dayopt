@@ -131,7 +131,7 @@ type SyncDatabase = {
 type SyncClient = SupabaseClient<SyncDatabase>;
 
 function createSyncDbClient(): SyncClient {
-  return createClient<SyncDatabase>(env.NEXT_PUBLIC_SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, {
+  return createClient<SyncDatabase>(env.NEXT_PUBLIC_SUPABASE_URL, env.SUPABASE_SECRET_KEY, {
     auth: { autoRefreshToken: false, persistSession: false },
     // narrow 版には `createServiceRoleClient` の timeout 注入が無いので、ここで足す。
     global: {

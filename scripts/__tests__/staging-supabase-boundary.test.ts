@@ -8,8 +8,8 @@ import { envSchema, forbiddenFields, productionEnvSchema } from '../tasks/env/sc
 // agent には常設 staging が無く、置けば production の複製になる 4 field。
 const SUPABASE_CONNECTION_FIELDS = [
   'NEXT_PUBLIC_SUPABASE_URL',
-  'NEXT_PUBLIC_SUPABASE_ANON_KEY',
-  'SUPABASE_SERVICE_ROLE_KEY',
+  'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY',
+  'SUPABASE_SECRET_KEY',
   'SUPABASE_DB_PASSWORD',
 ] as const;
 
@@ -115,7 +115,14 @@ describe('agent/supabase の接続情報境界', () => {
     const covered = forbiddenFields
       .filter((entry) => entry.vault === 'agent' && entry.item === 'supabase')
       .map((entry) => entry.field);
-    expect(covered.sort()).toEqual([...SUPABASE_CONNECTION_FIELDS, 'SUPABASE_ACCESS_TOKEN'].sort());
+    expect(covered.sort()).toEqual(
+      [
+        ...SUPABASE_CONNECTION_FIELDS,
+        'SUPABASE_ACCESS_TOKEN',
+        'NEXT_PUBLIC_SUPABASE_ANON_KEY',
+        'SUPABASE_SERVICE_ROLE_KEY',
+      ].sort(),
+    );
   });
 
   it('admin script 用の env 参照は Production を指し、Staging を経由しない', () => {
@@ -124,7 +131,7 @@ describe('agent/supabase の接続情報境界', () => {
     }
     // 管理者運用は production 相手なので、参照先が Production であること自体を固定する
     expect(adminEnvExample).toContain(
-      'SUPABASE_SERVICE_ROLE_KEY=op://human/supabase/SUPABASE_SERVICE_ROLE_KEY',
+      'SUPABASE_SECRET_KEY=op://human/supabase/SUPABASE_SECRET_KEY',
     );
     // .op-env.human は各自が作る実行用ファイルなので commit させない
     expect(gitignore).toMatch(/^\.op-env\.human$/mu);

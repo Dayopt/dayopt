@@ -160,8 +160,8 @@ export const productionEnvSchema: EnvSchemaEntry[] = [
   // .op-env.human 経由の管理者運用（緊急時のユーザー復旧）が op run の
   // 参照解決で止まる。
   envEntry('NEXT_PUBLIC_SUPABASE_URL', true, 'public', 'production', human, 'supabase'),
-  envEntry('NEXT_PUBLIC_SUPABASE_ANON_KEY', true, 'public', 'production', human, 'supabase'),
-  envEntry('SUPABASE_SERVICE_ROLE_KEY', true, 'secret', 'production', human, 'supabase'),
+  envEntry('NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY', true, 'public', 'production', human, 'supabase'),
+  envEntry('SUPABASE_SECRET_KEY', true, 'secret', 'production', human, 'supabase'),
   // SUPABASE_ACCESS_TOKEN は 2026-08-17 に human/supabase-cli へ専用 item として切り出した
   // （#2127）。「アプリが env として消費する値の束」と「人間・CLI が使う operational
   // credential（rotation 対象、有効期限 field 必須）」を分離する命名規約に合わせたもの。
@@ -295,9 +295,12 @@ export const productionEnvSchema: EnvSchemaEntry[] = [
 // schema の不在（envSchema 側）と実在の禁止（ここ）は別物なので両方を持つ。
 export const forbiddenFields: ForbiddenField[] = [
   ...[
-    'NEXT_PUBLIC_SUPABASE_URL',
+    // 移行後も旧名で production credential が agent に複製されるのを防ぐ。
     'NEXT_PUBLIC_SUPABASE_ANON_KEY',
     'SUPABASE_SERVICE_ROLE_KEY',
+    'NEXT_PUBLIC_SUPABASE_URL',
+    'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY',
+    'SUPABASE_SECRET_KEY',
     'SUPABASE_DB_PASSWORD',
   ].map((field) => ({
     vault: agent,

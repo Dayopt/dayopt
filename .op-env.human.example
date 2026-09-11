@@ -10,8 +10,8 @@
 # 手順と作業ログの規約は docs/operations/tooling.md 第4部 を正本とする。
 # 通常の local dev では使わない（pnpm dev は Supabase local を見る）。
 NEXT_PUBLIC_SUPABASE_URL=op://human/supabase/NEXT_PUBLIC_SUPABASE_URL
-NEXT_PUBLIC_SUPABASE_ANON_KEY=op://human/supabase/NEXT_PUBLIC_SUPABASE_ANON_KEY
-SUPABASE_SERVICE_ROLE_KEY=op://human/supabase/SUPABASE_SERVICE_ROLE_KEY
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=op://human/supabase/NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+SUPABASE_SECRET_KEY=op://human/supabase/SUPABASE_SECRET_KEY
 # USE_LINKED_DB=true の seed-dev-data.sh が使う supabase db query --linked に要る。
 # 欠けると Auth API での user 作成だけ成功して DB 投入で止まり、既知 password の
 # user が production に残る（部分適用）。

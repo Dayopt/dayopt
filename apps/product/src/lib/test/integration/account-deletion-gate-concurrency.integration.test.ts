@@ -7,7 +7,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { Database } from '@/lib/database';
 
 const LOCAL_DB_URL = 'http://127.0.0.1:54321';
-const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+const SERVICE_ROLE_KEY = process.env.SUPABASE_SECRET_KEY!;
 const RUN_LOCAL = process.env.USE_LOCAL_DB === 'true';
 const TEST_PASSWORD = 'account-gate-race-password';
 const REQUEST_DIGEST = 'c'.repeat(64);

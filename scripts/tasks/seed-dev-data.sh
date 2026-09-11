@@ -20,10 +20,10 @@ LOCAL_ANON_KEY="sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH"
 if [ "${USE_LINKED_DB:-}" = "true" ]; then
   echo "☁️  linked Supabase モード（緊急時のみ）"
   SUPABASE_URL="${NEXT_PUBLIC_SUPABASE_URL:-}"
-  ANON_KEY="${NEXT_PUBLIC_SUPABASE_ANON_KEY:-}"
+  ANON_KEY="${NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY:-}"
 
   if [ -z "$SUPABASE_URL" ] || [ -z "$ANON_KEY" ]; then
-    echo "❌ NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY が未設定です"
+    echo "❌ NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY が未設定です"
     echo "   op run --env-file=.op-env.human -- env USE_LINKED_DB=true pnpm db:seed を実行してください"
     exit 1
   fi

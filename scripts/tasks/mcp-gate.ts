@@ -31,7 +31,7 @@
  *   pnpm mcp:gate -- --enable-billing
  *   pnpm mcp:gate -- --disable-billing
  *
- * 必須 env: NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
+ * 必須 env: NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SECRET_KEY
  * （production 値は 1Password `app` item。`op run -- pnpm mcp:gate ...` で渡す）
  *
  * revision は毎回 DB から読み直して渡す（CAS）。同時実行での取り違えを防ぐため、
@@ -147,7 +147,7 @@ async function main() {
   }
 
   const supabaseUrl = requireEnv('NEXT_PUBLIC_SUPABASE_URL');
-  const serviceRoleKey = requireEnv('SUPABASE_SERVICE_ROLE_KEY');
+  const serviceRoleKey = requireEnv('SUPABASE_SECRET_KEY');
 
   const control = await readControl(supabaseUrl, serviceRoleKey);
 

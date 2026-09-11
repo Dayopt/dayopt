@@ -153,7 +153,7 @@ async function createTRPCContext(opts: {
   else if (authMode === 'service-role') {
     try {
       const apiKey = typeof req.headers['x-api-key'] === 'string' ? req.headers['x-api-key'] : null;
-      const expectedKey = env.SUPABASE_SERVICE_ROLE_KEY;
+      const expectedKey = env.SUPABASE_SECRET_KEY;
 
       if (!apiKey || !expectedKey || !safeCompare(apiKey, expectedKey)) {
         throw new TRPCError({
@@ -176,7 +176,7 @@ async function createTRPCContext(opts: {
 
     supabase = createServerClient<Database>(
       env.NEXT_PUBLIC_SUPABASE_URL,
-      env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+      env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
       {
         cookies: {
           getAll() {

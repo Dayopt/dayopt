@@ -2,7 +2,7 @@
  * service role で破壊的な seed / cleanup を行う E2E の実行先ガード。
  *
  * 対象 suite は auth user、profile、user_settings、tag、plan、record を作って
- * 消す。`NEXT_PUBLIC_SUPABASE_URL` と `SUPABASE_SERVICE_ROLE_KEY` が「揃っている
+ * 消す。`NEXT_PUBLIC_SUPABASE_URL` と `SUPABASE_SECRET_KEY` が「揃っている
  * こと」だけを条件にすると、Production の認証情報を持つ shell から起動された
  * 瞬間に Production のデータを mutate する。CLAUDE.md の `EXPLICIT AUTHORITY`
  * （production mutation・データ削除は明示指示が揃うまで実行しない）に反するので、
@@ -30,7 +30,7 @@ export function resolveServiceRoleTarget(
   env: NodeJS.ProcessEnv = process.env,
 ): ServiceRoleTarget {
   if (!supabaseUrl || !serviceRoleKey) {
-    return { safe: false, reason: 'NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY が未設定' };
+    return { safe: false, reason: 'NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SECRET_KEY が未設定' };
   }
 
   let hostname: string;
@@ -67,7 +67,7 @@ export function resolveServiceRoleTarget(
  * `safe === false` で suite を丸ごと `test.describe.skip` にする設計は安全側だが、
  * skip は Playwright 上「0 failed」として集計されるため、**実行先の env が壊れていても
  * CI は緑になる**。実際 `promote.yml` は `supabase status | jq` の出力を
- * `SUPABASE_SERVICE_ROLE_KEY` へ渡しており、ここが空文字に落ちれば破壊的 suite が
+ * `SUPABASE_SECRET_KEY` へ渡しており、ここが空文字に落ちれば破壊的 suite が
  * 全部静かに消えたまま job が通る。
  *
  * そこで「走らないとおかしい」実行主体（= CI）だけが

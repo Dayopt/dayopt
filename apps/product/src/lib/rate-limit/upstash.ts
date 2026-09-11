@@ -17,7 +17,7 @@ import { captureUnexpectedError } from '@/lib/sentry';
 
 /**
  * `@/env` の `env.X` は初回アクセス時に schema 全体（Supabase 必須3変数を含む）を検証する
- * all-or-nothing Proxy（`src/env.ts`）。generic Preview deployment は `SUPABASE_SERVICE_ROLE_KEY`
+ * all-or-nothing Proxy（`src/env.ts`）。generic Preview deployment は `SUPABASE_SECRET_KEY`
  * を持たない（決定ログ（削除済み、git 履歴参照））ため、この module を
  * 経由するどの route も import 時点で無関係に crash していた（#2011）。Upstash 側は本来
  * `UPSTASH_REDIS_REST_URL` / `_TOKEN` の2変数しか要らないので、`process.env` を直接読む

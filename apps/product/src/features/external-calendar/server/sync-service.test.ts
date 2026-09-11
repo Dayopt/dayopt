@@ -24,7 +24,7 @@ const loggerWarn = vi.hoisted(() => vi.fn());
 vi.mock('@/env', () => ({
   env: {
     NEXT_PUBLIC_SUPABASE_URL: 'https://project.supabase.co',
-    SUPABASE_SERVICE_ROLE_KEY: 'service-role-key',
+    SUPABASE_SECRET_KEY: 'service-role-key',
     CALENDAR_TOKEN_ENCRYPTION_KEY: 'A'.repeat(43) + '=',
   },
 }));

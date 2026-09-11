@@ -62,7 +62,7 @@ export class SupabaseConfigError extends Error {
  */
 export function createClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 
   if (
     !url ||
@@ -71,7 +71,7 @@ export function createClient() {
     anonKey === PLACEHOLDER_SUPABASE_ANON_KEY
   ) {
     throw new SupabaseConfigError(
-      '❌ NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY が未設定です:\n\n' +
+      '❌ NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY が未設定です:\n\n' +
         'これらは pnpm dev が Supabase local（supabase status -o env）から注入します。' +
         'pnpm dev で起動してください。詳細は docs/operations/secrets.md を参照してください。',
     );

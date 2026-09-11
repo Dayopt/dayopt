@@ -1,3 +1,4 @@
+import { createClient } from '@supabase/supabase-js';
 import { TRPCError } from '@trpc/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -39,6 +40,64 @@ beforeEach(() => {
 });
 
 describe('verifyPasswordWithCaptchaBypass', () => {
+  it.each(['sb_secret_isolated-test-key', 'eyJ-legacy-isolated-test-key'])(
+    'uses the SDK wire contract and revokes only the issued session for %s',
+    async (key) => {
+      const accessToken = [
+        Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url'),
+        Buffer.from(JSON.stringify({ sub: USER_ID, exp: 4102444800 })).toString('base64url'),
+        'isolated-signature',
+      ].join('.');
+      const requests: { url: string; headers: Headers; body: string }[] = [];
+      const interceptedFetch: typeof fetch = async (input, init) => {
+        const url = String(input);
+        requests.push({ url, headers: new Headers(init?.headers), body: String(init?.body ?? '') });
+        if (url === 'https://isolated.invalid/auth/v1/token?grant_type=password') {
+          return Response.json({
+            access_token: accessToken,
+            refresh_token: 'isolated-refresh-token',
+            expires_in: 3600,
+            token_type: 'bearer',
+            user: {
+              id: USER_ID,
+              email: EMAIL,
+              aud: 'authenticated',
+              app_metadata: {},
+              user_metadata: {},
+            },
+          });
+        }
+        if (url === 'https://isolated.invalid/auth/v1/logout?scope=local') {
+          return new Response(null, { status: 204 });
+        }
+        throw new Error('Unexpected isolated SDK request');
+      };
+      createServiceRoleClient.mockImplementation(() =>
+        createClient('https://isolated.invalid', key, {
+          auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+          global: { fetch: interceptedFetch },
+        }),
+      );
+
+      expect(
+        await verifyPasswordWithCaptchaBypass({
+          email: EMAIL,
+          password: PASSWORD,
+          context: 'email_change',
+        }),
+      ).toEqual({ outcome: 'verified' });
+      expect(requests).toHaveLength(2);
+      expect(requests[0]!.headers.get('apikey')).toBe(key);
+      // SDK の互換送信。gateway は apikey と同じ値の Bearer を受け付ける。
+      expect(requests[0]!.headers.get('authorization')).toBe(`Bearer ${key}`);
+      expect(JSON.parse(requests[0]!.body)).toMatchObject({ email: EMAIL, password: PASSWORD });
+      expect(requests[1]!.headers.get('apikey')).toBe(key);
+      expect(requests[1]!.headers.get('authorization')).toBe(`Bearer ${accessToken}`);
+      expect(requests[1]!.url).toBe('https://isolated.invalid/auth/v1/logout?scope=local');
+      expect(captureUnexpectedError).not.toHaveBeenCalled();
+    },
+  );
+
   it('service-role client の signInWithPassword で検証する（user-scoped client を使うと captcha で必ず失敗する）', async () => {
     const result = await verifyPasswordWithCaptchaBypass({
       email: EMAIL,

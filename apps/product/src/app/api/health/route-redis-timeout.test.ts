@@ -53,8 +53,8 @@ describe('GET /api/health — checkRedis timeout（実 @upstash/redis）', () =>
 
   beforeEach(() => {
     vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://example.supabase.co');
-    vi.stubEnv('SUPABASE_SERVICE_ROLE_KEY', 'service-role-sentinel');
-    vi.stubEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY', 'anon-key-sentinel');
+    vi.stubEnv('SUPABASE_SECRET_KEY', 'service-role-sentinel');
+    vi.stubEnv('NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY', 'anon-key-sentinel');
     vi.stubEnv('VERCEL_ENV', '');
     vi.stubEnv('VERCEL_TARGET_ENV', '');
     vi.stubEnv('MCP_OAUTH_ENVIRONMENT', '');

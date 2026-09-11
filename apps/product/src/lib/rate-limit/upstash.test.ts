@@ -222,7 +222,7 @@ describe('Upstash Rate Limit', () => {
   });
 
   it('#2011: loads without touching @/env even when its schema validation would throw', async () => {
-    // generic Preview deployment は SUPABASE_SERVICE_ROLE_KEY を持たない
+    // generic Preview deployment は SUPABASE_SECRET_KEY を持たない
     // （決定ログ（削除済み、git 履歴参照））ため、`@/env` の
     // Proxy に触れると schema 全体の検証が走り無関係に throw する。この module は
     // Upstash の2変数しか要らないので `@/env` を経由しないことを固定する。

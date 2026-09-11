@@ -68,10 +68,10 @@ async function hasValidOperationalEnvironment(): Promise<boolean> {
  */
 async function checkDatabase(): Promise<'ok' | 'error' | 'warning'> {
   const dbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const serviceRoleKey = process.env.SUPABASE_SECRET_KEY;
   const dbKey = isOperationalDeployment()
     ? serviceRoleKey
-    : (serviceRoleKey ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+    : (serviceRoleKey ?? process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY);
 
   if (!dbUrl || !dbKey) {
     return isOperationalDeployment() ? 'error' : 'warning';
@@ -92,7 +92,6 @@ async function checkDatabase(): Promise<'ok' | 'error' | 'warning'> {
       const expectedSupabaseProjectRef = resolveDatabaseOAuthProjectRef({
         environment: expectedIdentity.environment,
         supabaseUrl: dbUrl,
-        serviceRoleKey,
       });
       await assertDatabaseOAuthIdentity(
         expectedIdentity,

@@ -73,20 +73,16 @@ type EventPruningDatabase = {
 type EventPruningClient = SupabaseClient<EventPruningDatabase>;
 
 function createEventPruningClient(): EventPruningClient {
-  return createClient<EventPruningDatabase>(
-    env.NEXT_PUBLIC_SUPABASE_URL,
-    env.SUPABASE_SERVICE_ROLE_KEY,
-    {
-      auth: { autoRefreshToken: false, persistSession: false },
-      global: {
-        fetch: (url, options) =>
-          fetch(url, {
-            ...options,
-            signal: options?.signal ?? AbortSignal.timeout(DB_REQUEST_TIMEOUT_MS),
-          }),
-      },
+  return createClient<EventPruningDatabase>(env.NEXT_PUBLIC_SUPABASE_URL, env.SUPABASE_SECRET_KEY, {
+    auth: { autoRefreshToken: false, persistSession: false },
+    global: {
+      fetch: (url, options) =>
+        fetch(url, {
+          ...options,
+          signal: options?.signal ?? AbortSignal.timeout(DB_REQUEST_TIMEOUT_MS),
+        }),
     },
-  );
+  });
 }
 
 /** plans / records の両方から、与えた id を参照している external_calendar_event_id を集める。 */
