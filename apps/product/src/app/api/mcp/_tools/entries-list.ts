@@ -29,7 +29,7 @@ import { MCP_UNTRUSTED_CONTENT_NOTICE } from './untrusted-data-serialization';
 export const MCP_ENTRY_LIST_INPUT_SCHEMA = z
   .object({
     startDate: MCP_TIMEBLOCK_TIMESTAMP_SCHEMA.optional().describe(
-      'ISO 8601 date-time with a UTC offset. With endDate: returns entries overlapping the half-open range [startDate, endDate). Alone: returns entries whose startTime >= startDate.',
+      'ISO 8601 date-time with a UTC offset. With endDate: returns entries overlapping the half-open range [startDate, endDate). Alone: returns entries whose startTime >= startDate. Results are capped by limit (newest first), so a dense range can return fewer entries than it contains.',
     ),
     endDate: MCP_TIMEBLOCK_TIMESTAMP_SCHEMA.optional().describe(
       'ISO 8601 date-time with a UTC offset. With startDate: see startDate. Alone: returns entries whose startTime <= endDate.',
@@ -41,7 +41,9 @@ export const MCP_ENTRY_LIST_INPUT_SCHEMA = z
       .min(1)
       .max(100)
       .optional()
-      .describe('Max entries to return. Defaults to 50, max 100.'),
+      .describe(
+        'Max entries to return, newest first. Defaults to 50, max 100. Truncation is silent: a full result is not signalled.',
+      ),
   })
   .strict();
 

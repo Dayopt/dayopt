@@ -25,7 +25,7 @@ import { MCP_UNTRUSTED_CONTENT_NOTICE } from './untrusted-data-serialization';
  * duration を合算した時に日跨ぎの block を二重計上する（#2721 D-03、V-3 で再現）。
  */
 export const MCP_TIMEBLOCK_RANGE_START_DESCRIPTION =
-  'ISO 8601 date-time with a UTC offset. With endDate: returns blocks overlapping the half-open range [startDate, endDate). Alone: returns blocks whose startAt >= startDate.';
+  'ISO 8601 date-time with a UTC offset. With endDate: returns blocks overlapping the half-open range [startDate, endDate). Alone: returns blocks whose startAt >= startDate. Results are capped by limit (newest startAt first), so a dense range can return fewer blocks than it contains.';
 export const MCP_TIMEBLOCK_RANGE_END_DESCRIPTION =
   'ISO 8601 date-time with a UTC offset. With startDate: see startDate. Alone: returns blocks whose startAt <= endDate.';
 
@@ -44,7 +44,15 @@ export const MCP_TIMEBLOCK_LIST_INPUT_SCHEMA = z
       MCP_TIMEBLOCK_RANGE_END_DESCRIPTION,
     ),
     activityId: z.string().uuid().optional(),
-    limit: z.number().int().min(1).max(100).optional(),
+    limit: z
+      .number()
+      .int()
+      .min(1)
+      .max(100)
+      .optional()
+      .describe(
+        'Max blocks to return, newest startAt first. Defaults to 50, max 100. Truncation is silent: a full result is not signalled.',
+      ),
   })
   .strict();
 

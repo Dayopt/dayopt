@@ -419,13 +419,13 @@ exports[`MCP tool contract snapshot > entryListInput の JSON Schema が変わ�
       "type": "string",
     },
     "limit": {
-      "description": "Max entries to return. Defaults to 50, max 100.",
+      "description": "Max entries to return, newest first. Defaults to 50, max 100. Truncation is silent: a full result is not signalled.",
       "maximum": 100,
       "minimum": 1,
       "type": "integer",
     },
     "startDate": {
-      "description": "ISO 8601 date-time with a UTC offset. With endDate: returns entries overlapping the half-open range [startDate, endDate). Alone: returns entries whose startTime >= startDate.",
+      "description": "ISO 8601 date-time with a UTC offset. With endDate: returns entries overlapping the half-open range [startDate, endDate). Alone: returns entries whose startTime >= startDate. Results are capped by limit (newest first), so a dense range can return fewer entries than it contains.",
       "type": "string",
     },
   },
@@ -1709,12 +1709,13 @@ exports[`MCP tool contract snapshot > timeblockListInput の JSON Schema が変�
       "type": "string",
     },
     "limit": {
+      "description": "Max blocks to return, newest startAt first. Defaults to 50, max 100. Truncation is silent: a full result is not signalled.",
       "maximum": 100,
       "minimum": 1,
       "type": "integer",
     },
     "startDate": {
-      "description": "ISO 8601 date-time with a UTC offset. With endDate: returns blocks overlapping the half-open range [startDate, endDate). Alone: returns blocks whose startAt >= startDate.",
+      "description": "ISO 8601 date-time with a UTC offset. With endDate: returns blocks overlapping the half-open range [startDate, endDate). Alone: returns blocks whose startAt >= startDate. Results are capped by limit (newest startAt first), so a dense range can return fewer blocks than it contains.",
       "type": "string",
     },
   },
