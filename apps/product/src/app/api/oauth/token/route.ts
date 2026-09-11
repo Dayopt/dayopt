@@ -63,9 +63,24 @@ export async function POST(request: NextRequest) {
     );
     if (grantRateLimitState !== 'allowed') return rateLimitErrorResponse(grantRateLimitState);
 
+    // write fence は **新規接続の作成（authorization_code）だけ**を止める。
+    //
+    // `refresh_token` を止めると、access token の寿命が 5 分なので fence が 5 分を超えた
+    // 時点で read-only 接続も失効し、runbook §write fence の「読み取りは通したまま
+    // 書き込みだけ止める」が MCP に対して成り立たなくなる（#2721 D-02）。
+    // 一方 refresh を通しても write の露出は増えない — MCP 経由の書き込みは
+    // `mcp_mutation_control` の別 gate が持ち、fence はもともとそこに効かない
+    // （runbook の対象表）。つまり同じ接続は fence 中でも既存の access token で
+    // 書けるので、rotation を拒んでも防げるものが無い。
+    //
+    // 書き込まれるのは `oauth_tokens` の rotation 行だけで、retention cleanup が掃く。
+    //
     // rate limit の後に置く。fence 判定は service-role の DB 読取を伴うため、rate limit
     // より前に置くと未認証リクエストがそれを無制限に駆動できてしまう（増幅経路）。
-    if (await isWriteFenceEnabled(createServiceRoleClient())) {
+    if (
+      grantType === 'authorization_code' &&
+      (await isWriteFenceEnabled(createServiceRoleClient()))
+    ) {
       return writeFencedErrorResponse();
     }
 

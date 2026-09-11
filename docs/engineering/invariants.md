@@ -138,6 +138,14 @@ docs へ残している。
 - Candidate 1では `global OFF AND client list empty` をProductionの停止条件とする。
   旧UI direct UPDATE、tag mergeのlock順、legacy confirm-dayとdirect Recordのraceは、
   Stage 2のapp command移行と競合testが終わるまでMCP writeから到達不能にする
+- **MCP の読み取りは service-role client で tRPC を呼ぶため RLS が効かず、テナント分離は
+  各 service の user filter（`.eq('user_id', ctx.userId)` / `rpc(p_user_id)`）だけが持つ。**
+  書き込みには `assert_timeblock_writer_row_v1` の row trigger という二重の網があるが、
+  読み取りには DB 側の網が無い。**新しい read tool を足す時は
+  `lib/test/integration/mcp-read-tenant-isolation.integration.test.ts` にも case を足す**
+  （2026-09-11、[#2721](https://github.com/Dayopt/dayopt/issues/2721) D-08。RPC へ寄せても
+  アプリが `p_user_id` を渡す構造なら独立した認可は増えないため、現行 + この suite で
+  class を閉じる判断）
 - MCP apply RPC は `service_role` だけが実行できる。各 apply transaction 内で user、
   connection、access token、DB-owned environment/resource、scope、期限、
   connection/token の失効状態を共通writer fence内で再検証する
