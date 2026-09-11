@@ -151,6 +151,15 @@
         "coefficient": "×{coefficient} against plan",
         "notEnough": "Not enough runs to show a habit yet"
       },
+      "strip": {
+        "heading": "Length per record",
+        "count": "(n={count})",
+        "notEnough": "Not enough records (shown from 3)",
+        "dotAriaLabel": "Record at {start}, {duration}",
+        "median": "Median {duration}",
+        "iqr": "25–75% spans {low} to {high}",
+        "planMedian": "Median plan {duration}"
+      },
       "timeOfDay": {
         "heading": "Time of day — when it happens",
         "labels": ["Early", "Morning", "Midday", "Afternoon", "Evening", "Night"]
@@ -160,7 +169,9 @@
           "week": "Last 6 weeks",
           "month": "Last 6 months",
           "year": "Last 6 years"
-        }
+        },
+        "legend": "Bars: total　Line: median per record",
+        "median": "Median {duration}"
       },
       "records": {
         "heading": "{count, plural, one {# record} other {# records}}",
@@ -172,7 +183,8 @@
           "medium": "Neutral",
           "low": "Drained"
         }
-      }
+      },
+      "resize": "Resize panel"
     },
     "sidebar": {
       "categoriesHeading": "Categories",

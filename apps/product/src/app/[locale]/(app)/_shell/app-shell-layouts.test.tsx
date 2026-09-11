@@ -50,12 +50,15 @@ vi.mock('@/components/shell/AnimatedWidthPanel', () => ({
   AnimatedWidthPanel: ({
     children,
     open,
+    width,
     ...rest
   }: {
     children: React.ReactNode;
     open?: boolean;
+    width?: number;
   } & Record<string, unknown>) => (
-    <aside data-open={open} {...pickDataAttributes(rest)}>
+    // 幅は本物では inline style。mock では属性で見えるようにする（可変幅のパネルがあるため）
+    <aside data-open={open} data-width={width} {...pickDataAttributes(rest)}>
       {children}
     </aside>
   ),
@@ -82,7 +85,7 @@ vi.mock('./useAppInlineBanner', () => ({
   useAppInlineBanner: () => bannerState.current,
 }));
 
-import { useReportDetailStore } from '@/features/review';
+import { REPORT_DETAIL_PANEL_DEFAULT_WIDTH, useReportDetailStore } from '@/features/review';
 import { useTimeblockInspectorStore } from '@/features/timeblock';
 
 import { DesktopLayout } from './desktop-layout';
@@ -214,6 +217,33 @@ describe('DesktopLayout', () => {
     expect(inspector()?.getAttribute('data-open')).toBe('false');
 
     act(() => useReportDetailStore.getState().close());
+  });
+
+  /** 幅は review の store が持つ。shell は読むだけで、調停ロジックを持たない。 */
+  it('follows the report detail width stored by the review feature', () => {
+    act(() => {
+      useReportDetailStore.getState().toggle({
+        activityId: 'act-1',
+        name: '執筆',
+        categoryName: '仕事',
+        color: 'blue',
+      });
+      useReportDetailStore.getState().setWidth(480);
+    });
+
+    const { container } = render(
+      <DesktopLayout>
+        <div>Content</div>
+      </DesktopLayout>,
+    );
+
+    const detail = container.querySelector('[data-panel="report-detail"]') as HTMLElement;
+    expect(detail.getAttribute('data-width')).toBe('480');
+
+    act(() => {
+      useReportDetailStore.getState().close();
+      useReportDetailStore.getState().setWidth(REPORT_DETAIL_PANEL_DEFAULT_WIDTH);
+    });
   });
 });
 

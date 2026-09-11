@@ -151,6 +151,15 @@
         "coefficient": "予定に対して ×{coefficient}",
         "notEnough": "まだ傾向を出せる回数がない"
       },
+      "strip": {
+        "heading": "1 件あたりの長さ",
+        "count": "（n={count}）",
+        "notEnough": "件数不足（3 件から出します）",
+        "dotAriaLabel": "{start} の記録 {duration}",
+        "median": "中央値 {duration}",
+        "iqr": "25–75% は {low} 〜 {high}",
+        "planMedian": "予定の中央値 {duration}"
+      },
       "timeOfDay": {
         "heading": "時間帯の分布 — いつやっているか",
         "labels": ["朝", "午前", "昼", "午後", "夜", "深夜"]
@@ -160,7 +169,9 @@
           "week": "週別の推移（6 週）",
           "month": "月別の推移（6 か月）",
           "year": "年別の推移（6 年）"
-        }
+        },
+        "legend": "棒: 合計　線: 1 件あたりの中央値",
+        "median": "中央値 {duration}"
       },
       "records": {
         "heading": "記録（{count}件）",
@@ -172,7 +183,8 @@
           "medium": "普通",
           "low": "消耗"
         }
-      }
+      },
+      "resize": "パネルの幅を変える"
     },
     "sidebar": {
       "categoriesHeading": "カテゴリ",

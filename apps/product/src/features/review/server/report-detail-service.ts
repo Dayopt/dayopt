@@ -3,6 +3,7 @@ import 'server-only';
 import { toDerivedBlock } from '@/lib/database';
 import { aggregate } from '@/lib/time';
 
+import { isMedianEligibleSource, medianOf } from '../domain/report/duration-distribution';
 import {
   clipMinutes,
   distributeToTimeOfDay,
@@ -30,6 +31,10 @@ import {
  *
  * **平均を出さない**（仕様 §0-4）。1 箱の代表値は中央値だけを返し、component 側で平均を
  * 計算する余地も作らない。
+ *
+ * **中央値だけ `auto_migrated` を除く。** 自動移行の Record はユーザーが確定した実績では
+ * ないので、代表値には数えない（作成パネルの「普段の長さ」と同じ規則）。合計・充実・時間帯・
+ * 明細は「実際にその時間が埋まっていた」事実なので全件を数える。
  */
 
 /** 充実の 3 値。未回答の記録は数えない。 */
@@ -48,12 +53,16 @@ export interface ReportDetailRecord {
   minutes: number;
   fulfillment: keyof ReportDetailFulfillment | null;
   note: string | null;
+  /** `'auto_migrated'` はストリップの点にしない（中央値と同じ規則で表示側が絞る）。 */
+  source: string;
 }
 
 export interface ReportDetailTrendPoint {
   /** 期間の初日（`YYYY-MM-DD`）。表示側はラベルを持たず、並び順だけを使う。 */
   key: string;
   recordedMinutes: number;
+  /** その期間の 1 件あたりの中央値。記録が無い期間は `null`（0 ではない）。 */
+  medianBoxMinutes: number | null;
 }
 
 export interface ReportActivityDetailResult {
@@ -63,6 +72,13 @@ export interface ReportActivityDetailResult {
   plannedPastBoxes: number;
   /** 期間内の記録ボックス長の中央値。0 件は `null`（**平均ではない**）。 */
   medianBoxMinutes: number | null;
+  /**
+   * 期間内で**開始済み**の予定 1 件あたりの長さの中央値。0 件は `null`。
+   *
+   * 記録の中央値と並べて「1 回あたりどれだけ見誤っているか」を出すために持つ。合計比
+   * （見積もりの鏡）は総量のずれしか言えず、回数が違うと同じ係数でも意味が変わる。
+   */
+  medianPlanBoxMinutes: number | null;
   fulfillment: ReportDetailFulfillment;
   /** `REPORT_TIME_OF_DAY_BUCKETS` と同 index。分単位・重なり分は按分済み。 */
   timeOfDay: number[];
@@ -137,11 +153,60 @@ class ReportDetailService {
       plannedPastMinutes: totals.plannedPastMinutes,
       plannedPastBoxes: totals.plannedPastBoxes,
       recordedMinutes: totals.recordedMinutes,
-      medianBoxMinutes: totals.medianBoxMinutes,
+      // `totals.medianBoxMinutes` は使わない（全件で出るため）。表示側のストリップと同じ
+      // 母集団（auto_migrated を除いた clip 済みの長さ）から出す
+      medianBoxMinutes: this.resolveRecordMedian(periodRecords, range),
+      medianPlanBoxMinutes: this.resolvePlanMedian(plans, range, now),
       fulfillment: totals.fulfillment,
       trend: includeTrend ? this.buildTrend(records, trendRanges, activityId, timezone, now) : [],
       records: this.toDetailRecords(periodRecords, range),
     };
+  }
+
+  /**
+   * 記録 1 件あたりの長さの中央値（分）。`auto_migrated` は除く。
+   *
+   * 集計の `aggregate` ではなく `clipMinutes` で出す。明細（`records[]`）の長さと同じ関数を
+   * 通すので、カードの中央値とストリップの点が必ず同じ母集団になる。
+   */
+  private resolveRecordMedian(
+    records: ReportDetailRecordRow[],
+    range: { startAt: string; endAt: string },
+  ): number | null {
+    const minutes = records
+      .filter((record) => isMedianEligibleSource(record.source))
+      .map((record) => clipMinutes(record.start_at, record.end_at, range.startAt, range.endAt))
+      .filter((value) => value > 0);
+
+    return medianOf(minutes);
+  }
+
+  /**
+   * 開始済みの予定 1 件あたりの長さの中央値（分）。0 件は `null`。
+   *
+   * **まだ始まっていない予定は数えない**（`plannedPastBoxes` と同じ境界）。これから来る予定を
+   * 混ぜると、期間の後半に置いた長い予定が「普段の見積もり」を押し上げる。始まって途中の予定は
+   * `now` で切る（過去ぶんだけが比較可能な量）。
+   */
+  private resolvePlanMedian(
+    plans: { start_at: string; end_at: string }[],
+    range: { startAt: string; endAt: string },
+    now: Date,
+  ): number | null {
+    const nowIso = now.toISOString();
+    const minutes = plans
+      .filter((plan) => Date.parse(plan.start_at) <= now.getTime())
+      .map((plan) =>
+        clipMinutes(
+          plan.start_at,
+          Date.parse(plan.end_at) > now.getTime() ? nowIso : plan.end_at,
+          range.startAt,
+          range.endAt,
+        ),
+      )
+      .filter((value) => value > 0);
+
+    return medianOf(minutes);
   }
 
   /** 表示中を含む直近 6 期間を、古い順に返す。 */
@@ -206,6 +271,8 @@ class ReportDetailService {
         records.map((row) => toDerivedBlock(row, 'rec')),
         now,
       ).recordedMinutes,
+      // 合計は全件、中央値は表示中の期間と同じ規則（auto_migrated を除く）
+      medianBoxMinutes: this.resolveRecordMedian(records, periodRange),
     }));
   }
 
@@ -222,6 +289,7 @@ class ReportDetailService {
         minutes: clipMinutes(record.start_at, record.end_at, range.startAt, range.endAt),
         fulfillment: isFulfillmentLevel(record.fulfillment) ? record.fulfillment : null,
         note: record.note,
+        source: record.source,
       }))
       .sort((a, b) => Date.parse(a.startAt) - Date.parse(b.startAt))
       .slice(0, REPORT_DETAIL_RECORD_LIMIT);

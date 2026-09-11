@@ -45,7 +45,7 @@ export function ConnectedReportDetailPanel({
   const target = useReportDetailStore((state) => state.target);
 
   // `/report` を離れたら閉じる。**store は shell の 4 カラム目の開閉も握っている**ので、
-  // 開いたままカレンダーへ移ると、中身の無い 250px の帯がカレンダー側に残る
+  // 開いたままカレンダーへ移ると、中身の無い帯がカレンダー側に残る
   // （パネル本体はこの component と一緒に unmount されるが、幅は shell が持つため）。
   useEffect(() => () => useReportDetailStore.getState().close(), []);
 

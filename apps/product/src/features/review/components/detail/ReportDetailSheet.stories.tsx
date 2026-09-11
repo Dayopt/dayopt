@@ -41,13 +41,15 @@ function detail(overrides: Partial<ReportActivityDetailResult> = {}): ReportActi
     plannedPastMinutes: 480,
     plannedPastBoxes: 4,
     medianBoxMinutes: 90,
+    medianPlanBoxMinutes: 60,
     fulfillment: { low: 1, medium: 2, high: 3 },
     timeOfDay: [60, 240, 120, 180, 0, 0],
     // シートは推移を描かない。渡しても出ないことを Story でも示す
     trend: [
-      { key: '2026-08-24', recordedMinutes: 180 },
-      { key: '2026-08-31', recordedMinutes: 600 },
+      { key: '2026-08-24', recordedMinutes: 180, medianBoxMinutes: 90 },
+      { key: '2026-08-31', recordedMinutes: 600, medianBoxMinutes: 120 },
     ],
+    // ストリップはシートにも出る（狭い面でも 1 本の軸なら読める）
     records: [
       {
         id: 'rec-1',
@@ -57,6 +59,7 @@ function detail(overrides: Partial<ReportActivityDetailResult> = {}): ReportActi
         minutes: 90,
         fulfillment: 'high',
         note: null,
+        source: 'manual',
       },
       {
         id: 'rec-2',
@@ -66,6 +69,17 @@ function detail(overrides: Partial<ReportActivityDetailResult> = {}): ReportActi
         minutes: 120,
         fulfillment: null,
         note: 'メモ',
+        source: 'manual',
+      },
+      {
+        id: 'rec-3',
+        title: '執筆',
+        startAt: '2026-09-03T01:00:00.000Z',
+        endAt: '2026-09-03T02:00:00.000Z',
+        minutes: 60,
+        fulfillment: 'low',
+        note: null,
+        source: 'manual',
       },
     ],
     ...overrides,
