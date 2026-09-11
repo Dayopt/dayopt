@@ -180,7 +180,11 @@ describeWithEnv('Derived Plan / Record browser flow', () => {
     await expect
       .poll(() => page.evaluate(() => document.body.style.cursor), { timeout: 5_000 })
       .toBe('grabbing');
-    await page.mouse.move(x, yFrom + (115 / 60) * hourHeight, { steps: 12 });
+    // ドラッグは 15 分刻みの**相対 snap**（移動量だけを量子化し、元の分 :05 は保持する。
+    // `domain/precision.ts` の `DEFAULT_DRAG_SNAP_MINUTES` と `time-math.ts` の
+    // `snapDeltaMinutes`）。移動量は 15 の倍数にしておく —— 115 分だと snap 境界の
+    // 中点 112.5 分まで 2.5 分しかなく、ピクセル誤差で 105 分側へ倒れて flaky になる。
+    await page.mouse.move(x, yFrom + (120 / 60) * hourHeight, { steps: 12 });
     await page.mouse.up();
 
     await expect
@@ -197,7 +201,7 @@ describeWithEnv('Derived Plan / Record browser flow', () => {
         },
         { timeout: 15_000 },
       )
-      .toBe(`${isoAt('11:00')}/${isoAt('12:30')}`);
+      .toBe(`${isoAt('11:05')}/${isoAt('12:35')}`);
 
     await openDay(page);
     await page.locator('[data-plan-lane-card]', { hasText: ACTIVITY_NAME }).first().click();
