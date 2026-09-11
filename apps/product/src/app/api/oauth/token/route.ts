@@ -10,7 +10,8 @@ import {
 } from '@/lib/oauth-server';
 import { rejectUnexpectedOAuthHost } from '@/lib/oauth-server/request-host';
 import {
-  checkOAuthTokenRateLimit,
+  checkOAuthTokenGrantRateLimit,
+  checkOAuthTokenPreBodyRateLimit,
   type OAuthTokenRateLimitState,
 } from '@/lib/oauth-server/token-rate-limit';
 import { isWriteFenceEnabled } from '@/lib/ops/write-fence';
@@ -44,19 +45,29 @@ export async function POST(request: NextRequest) {
   const hostRejection = rejectUnexpectedOAuthHost(request);
   if (hostRejection) return hostRejection;
 
-  const rateLimitState = await checkOAuthTokenRateLimit(request);
-  if (rateLimitState !== 'allowed') return rateLimitErrorResponse(rateLimitState);
-
-  // rate limit の後に置く。fence 判定は service-role の DB 読取を伴うため、rate limit
-  // より前に置くと未認証リクエストがそれを無制限に駆動できてしまう（増幅経路）。
-  if (await isWriteFenceEnabled(createServiceRoleClient())) {
-    return writeFencedErrorResponse();
-  }
+  // grant 種別ごとに bucket を分けるには body が要るので、まず body 読み取り自体に
+  // 粗い IP 上限を掛ける。DB を引く処理（fence 判定・grant 消費）は、その後段の
+  // grant 別上限の内側にある。
+  const preBodyState = await checkOAuthTokenPreBodyRateLimit(request);
+  if (preBodyState !== 'allowed') return rateLimitErrorResponse(preBodyState);
 
   try {
     const form = await readFormBody(request);
     const get = (key: string): string | undefined => form.get(key) ?? undefined;
     const grantType = get('grant_type');
+
+    const refreshToken = grantType === 'refresh_token' ? get('refresh_token') : undefined;
+    const grantRateLimitState = await checkOAuthTokenGrantRateLimit(
+      request,
+      refreshToken ? { type: 'refresh_token', refreshToken } : { type: 'other' },
+    );
+    if (grantRateLimitState !== 'allowed') return rateLimitErrorResponse(grantRateLimitState);
+
+    // rate limit の後に置く。fence 判定は service-role の DB 読取を伴うため、rate limit
+    // より前に置くと未認証リクエストがそれを無制限に駆動できてしまう（増幅経路）。
+    if (await isWriteFenceEnabled(createServiceRoleClient())) {
+      return writeFencedErrorResponse();
+    }
 
     if (grantType === 'authorization_code') {
       const code = required(get('code'), 'code');
@@ -81,7 +92,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (grantType === 'refresh_token') {
-      const refreshToken = required(get('refresh_token'), 'refresh_token');
+      const presentedRefreshToken = required(refreshToken, 'refresh_token');
       const clientId = required(get('client_id'), 'client_id');
       const resource = requiredResource(get('resource'));
 
@@ -91,7 +102,7 @@ export async function POST(request: NextRequest) {
       }
 
       const tokens = await refreshAccessToken({
-        refresh_token: refreshToken,
+        refresh_token: presentedRefreshToken,
         client_id: client.id,
         resource_uri: resource,
       });
@@ -131,6 +142,15 @@ export async function POST(request: NextRequest) {
   }
 }
 
+/**
+ * form body の上限。
+ *
+ * grant 種別の判定に body が要るため、body 読み取りは per-grant の上限より手前にある
+ * （粗い IP 上限の内側）。無制限に読ませると、その頻度差がそのまま memory / CPU の
+ * 増幅になる。`/api/mcp` と同じく宣言値と実測値の両方で切る。
+ */
+const MAX_FORM_BODY_BYTES = 16 * 1024;
+
 async function readFormBody(request: NextRequest): Promise<URLSearchParams> {
   const contentType = request.headers.get('content-type') ?? '';
   if (!contentType.includes('application/x-www-form-urlencoded')) {
@@ -139,7 +159,18 @@ async function readFormBody(request: NextRequest): Promise<URLSearchParams> {
       'Content-Type must be application/x-www-form-urlencoded',
     );
   }
-  return new URLSearchParams(await request.text());
+
+  const declaredLength = Number(request.headers.get('content-length'));
+  if (Number.isFinite(declaredLength) && declaredLength > MAX_FORM_BODY_BYTES) {
+    throw new OAuthServerError('invalid_request', 'Request body is too large');
+  }
+
+  const body = await request.text();
+  // 宣言値は信用しない（欠落・過少申告どちらもありうる）。
+  if (new TextEncoder().encode(body).length > MAX_FORM_BODY_BYTES) {
+    throw new OAuthServerError('invalid_request', 'Request body is too large');
+  }
+  return new URLSearchParams(body);
 }
 
 function required(value: string | undefined, name: string): string {
