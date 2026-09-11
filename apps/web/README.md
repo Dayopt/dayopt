@@ -43,7 +43,7 @@ repo rootの`.op-env.agent`に`op://`参照だけを置き、通常はroot comma
 | `content/releases` | 公開release notes    |
 | `messages/{en,ja}` | web用copy            |
 
-公開コンテンツの執筆規約は`.claude/skills/docs-writing/SKILL.md`を使う。内部設計・開発規約はroot [`docs/README.md`](../../docs/README.md)へ置き、このapp配下に二重管理しない。
+公開コンテンツの執筆規約は`.agents/skills/docs-writing/SKILL.md`を使う（`.claude/skills` は互換 symlink で正本ではない）。内部設計・開発規約はroot [`docs/README.md`](../../docs/README.md)へ置き、このapp配下に二重管理しない。
 
 ## Verification
 

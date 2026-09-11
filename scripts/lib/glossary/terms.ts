@@ -654,16 +654,6 @@ export const GLOSSARY: readonly GlossaryEntry[] = [
       'free / trialing / active / past_due / canceled。値の意味は docs/product/specs/billing.md',
     db: ['profiles.subscription_status'],
   },
-  {
-    id: 'timeblock-origin',
-    layer: 'code',
-    status: 'deprecated',
-    concept: 'Timeblock origin',
-    usage:
-      "'planned' | 'unplanned'。旧表示型で Plan / Record を表す kind の代替として残る。主要な呼び出し側は kind から再計算しており、撤去は別 issue",
-    code: { identifiers: ['TimeblockOrigin'] },
-    refs: ['#2637'],
-  },
 ];
 
 /**

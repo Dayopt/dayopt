@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-08-20
+last_verified: 2026-09-11
 code: apps/product/src
 ---
 
@@ -25,7 +25,7 @@ Dayopt のシステム構成、データフロー、DB スキーマ、技術選�
 
 ### バックエンド
 
-- **Supabase (PostgreSQL)** — 認証・DB・リアルタイムを一体で提供する BaaS。PostgreSQL（SQL が使える）、RLS によるセキュリティ、オープンソースである点が採用理由
+- **Supabase (PostgreSQL)** — 認証と DB。PostgreSQL（SQL が使える）、RLS によるセキュリティ、オープンソースである点が採用理由。**Realtime は採用していない**（`postgres_changes` 購読ゼロ、publication 0 件。キャッシュ整合は TanStack Query の invalidate で取る）
 - **tRPC** — クライアント⇔サーバー間の E2E 型安全な API 通信。スキーマ自動生成不要、型の不整合はコンパイルエラーになる
 - **Zod** — バリデーション。型推論と tRPC 統合
 
@@ -44,7 +44,7 @@ Dayopt のシステム構成、データフロー、DB スキーマ、技術選�
 | tRPC           | E2E 型安全、コード量削減             |
 | Zustand        | シンプル、Redux 不要                 |
 | TanStack Query | キャッシング、リフェッチ             |
-| Supabase       | 認証、DB、リアルタイム一体型         |
+| Supabase       | 認証、DB、RLS を一体で提供           |
 | Tailwind CSS   | ユーティリティファースト             |
 | shadcn/ui      | カスタマイズ可能、Radix UI ベース    |
 | Zod            | 型推論、tRPC と統合                  |
@@ -353,7 +353,7 @@ USING (auth.uid() = user_id);
 
 ## Database Architecture
 
-> **RLS 対象 public テーブル数**: 27 | **PostgreSQL**: v17
+> **PostgreSQL**: v17。RLS 対象テーブル数・policy 数は [`data/db/rls-snapshot.md`](./data/db/rls-snapshot.md) の集計行を正とする（ここに書くと二重管理になり陳腐化する）
 
 Dayopt は Supabase（PostgreSQL）を使用する。本番は Pro organization の `dayopt` project、PR ごとの検証は ephemeral Preview Branches を使い、永続 Staging project は置かない。
 RLS の正確な対象・policy・grant は自動生成の [`data/db/rls-snapshot.md`](./data/db/rls-snapshot.md) を正とする。
@@ -526,6 +526,8 @@ Phase 2（external-calendar-import）で追加。OAuth / 同期 / UI は Step 2 
 
 複数テーブルを跨ぐ操作は DB 関数で原子性を保証:
 
+アプリ（`features/timeblock/server/timeblock-command-client.ts`）が呼ぶのは `*_command_v1` 系。下の旧名は凍結資産で、現在は integration test が互換境界として直接呼ぶだけになっている。
+
 - `soft_delete_plan()` / `restore_plan()` — Plan のソフトデリート / 復元
 - `soft_delete_record()` / `restore_record()` — Record のソフトデリート / 復元
 - `confirm_day_plans_to_records()` — 指定日の未記録 Plan を一括で Record 化（一括「この日を確定」）
@@ -609,7 +611,7 @@ apps/product, apps/web
 `packages/foundations`, `packages/components`, `packages/config`, `packages/observability` は最小の公開面を持つ package として運用中。
 `packages/i18n` は `packages/config` の locale 定義を使い、product / web に共通する next-intl adapter の公開面を環境別 subpath に限定して提供する。
 `packages/observability` のroot exportはprovider非依存のprivacy / consent契約だけを公開する。Sentryの初期化、DSN値、sampling、upload実行、app固有routeは各appに残し、Production build gateの純粋な検証policyだけを`./build-gate` subpathで共有する。
-`apps/product/src/lib/time`（旧 `packages/domain`）は Dayopt の意味を表すpure TypeScriptで、`TimeRange`, `TimeblockOrigin`, `ReviewPeriod`, `UserPreference`等の軽い型・定数・helperを持つ。
+`apps/product/src/lib/time`（旧 `packages/domain`）は Dayopt の意味を表すpure TypeScriptで、`TimeRange`, `PlanSource`, `ReviewPeriod`, `UserPreference`等の軽い型・定数・helperを持つ。
 
 DB boundary は `apps/product/src/lib/database`（旧 `packages/database`、product-local 化済み）が Supabase generated types と DB row helper を担う。DB access を含む service は product 側に残す。
 `packages/billing` は Free / Pro の公開 plan model, subscription status, entitlement map（`entitlementKeys` / `planEntitlements`）, pricing 表示用定数の境界として運用中。Stripe SDK / secret / webhook / checkout / portal は product 側の server-only 境界に残す。

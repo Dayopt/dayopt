@@ -27,7 +27,6 @@ const counterpartRecordAllDay: CalendarDisplayEvent = {
   ...baseEvent,
   id: 'counterpart-record',
   kind: 'record',
-  origin: 'unplanned',
   startDate: new Date('2026-01-15T00:00:00'),
   endDate: new Date('2026-01-15T23:59:00'),
   displayStartDate: new Date('2026-01-15T00:00:00'),
@@ -256,7 +255,6 @@ describe('useInteraction Plan → Record drop', () => {
       ...baseEvent,
       id: 'record-1',
       kind: 'record' as const,
-      origin: 'unplanned' as const,
       startDate: new Date('2026-01-15T09:15:00'),
       endDate: new Date('2026-01-15T10:45:00'),
     };
@@ -462,7 +460,6 @@ describe('useInteraction resize completion', () => {
     const onEventUpdate = vi.fn();
     const matchingEntry: CalendarDisplayEvent = {
       ...baseEvent,
-      origin: 'planned',
       plannedStartDate: baseEvent.startDate,
       plannedEndDate: baseEvent.endDate,
       actualStartDate: baseEvent.startDate,
@@ -501,7 +498,6 @@ describe('useInteraction resize completion', () => {
     const onEventUpdate = vi.fn();
     const overtimeEntry: CalendarDisplayEvent = {
       ...baseEvent,
-      origin: 'planned',
       plannedStartDate: baseEvent.startDate,
       plannedEndDate: baseEvent.endDate,
       actualStartDate: baseEvent.startDate,

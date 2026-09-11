@@ -41,7 +41,10 @@ export type { ReportGranularity } from './lib/report-period';
 // =============================================================================
 // 詳細パネルの器（shell が 4 カラム目を用意するために要る）
 // =============================================================================
-export { REPORT_DETAIL_PANEL_WIDTH, REPORT_DETAIL_SLOT_KEY } from './lib/report-detail-slot';
+export {
+  REPORT_DETAIL_PANEL_DEFAULT_WIDTH,
+  REPORT_DETAIL_SLOT_KEY,
+} from './lib/report-detail-slot';
 export { useReportDetailStore } from './stores/useReportDetailStore';
 
 // ここにないものはfeature内部専用

@@ -80,7 +80,7 @@ const basePlan: CalendarDisplayEvent = {
   duration: 60,
   isMultiDay: false,
 
-  origin: 'planned',
+  kind: 'plan',
 };
 
 // 週の各日に分散したプラン

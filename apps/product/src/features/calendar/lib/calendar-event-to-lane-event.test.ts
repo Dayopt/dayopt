@@ -21,7 +21,6 @@ function makeRecordEvent(overrides: Partial<CalendarDisplayEvent> = {}): Calenda
     displayEndDate: endDate,
     duration: 30,
     isMultiDay: false,
-    origin: 'planned',
     timeblockState: 'past',
     kind: 'record',
     recordSource: 'from_plan',
