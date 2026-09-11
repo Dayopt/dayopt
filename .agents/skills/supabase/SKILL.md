@@ -128,6 +128,12 @@ git push
 
 **帰結**: `supabase/` を触らない PR の Vercel Preview には Supabase env が注入されず、auth など DB 接続が要る挙動は検証できない（env validation で 500 になる）。**Preview での実挙動確認に依存した検証計画を立てない。** local + production 確認で回すのが既定（[#1461](https://github.com/Dayopt/dayopt/issues/1461)）。
 
+### 未 merge の migration を書き直す時
+
+pre-tool guard が止めるのは **`origin/main` に載っている migration** だけになった（[#2185](https://github.com/Dayopt/dayopt/issues/2185)）。main へ merge された migration は production へ適用されるため改変を禁じるが、未 merge の PR ブランチにしか無い migration は同じ PR 内で直してよい（レビュー指摘の反映・設計の訂正）。guard が古い判定を出す時は `git fetch origin main` を先に実行する。
+
+**ただし push 済みの migration を書き換えた場合、その PR の Supabase preview branch は同じ version を再適用しない**（`supabase_migrations.schema_migrations` に version が残っているため）。preview で実挙動を確認する必要があるなら、preview branch を作り直すか、打ち消し用の migration を別途足す。未 push のうちに直せば、この問題は起きない。
+
 ### CLI から preview branch を作る時
 
 調査目的などで手動に作る場合、次の 2 点を外すと確実に失敗する。

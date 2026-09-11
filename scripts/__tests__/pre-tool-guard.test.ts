@@ -95,6 +95,20 @@ function git(args: string[], cwd: string): void {
   }
 }
 
+// 対象 path を commit して origin/main へ push し、`refs/remotes/origin/main` を生やす。
+// migration ガードの「適用済み」判定はこの ref を見る（#2185）。
+function commitAndPush(cwd: string, ...paths: string[]): void {
+  git(['add', '--', ...paths], cwd);
+  git(['-c', 'user.email=t@example.com', '-c', 'user.name=t', 'commit', '-q', '-m', 'm'], cwd);
+  git(['push', '-q', 'origin', 'HEAD:main'], cwd);
+}
+
+// commit だけして push しない（origin/main には載らない）。
+function commitOnly(cwd: string, ...paths: string[]): void {
+  git(['add', '--', ...paths], cwd);
+  git(['-c', 'user.email=t@example.com', '-c', 'user.name=t', 'commit', '-q', '-m', 'local'], cwd);
+}
+
 function write(filePath: string, content = ''): Record<string, unknown> {
   return { tool_name: 'Write', tool_input: { file_path: filePath, content } };
 }
@@ -972,6 +986,12 @@ describe('pre-tool-guard.mjs: symlink 経由の保護ファイル判定（#2566�
       ],
       repoDir,
     );
+    // migration 判定は origin/main 基準になった（#2185）。この describe が証明したいのは
+    // 「symlink 別名でも保護判定が外れない」ことなので、origin/main 不在による
+    // fail-closed で block が出る状態にはしない（それでは symlink 解決が壊れても緑になる）。
+    const remoteDir = join(fixtureRoot, 'remote.git');
+    git(['init', '-q', '--bare', remoteDir], fixtureRoot);
+    git(['remote', 'add', 'origin', remoteDir], repoDir);
 
     // 実体（保護対象）
     writeFileSync(join(repoDir, '.env'), 'SECRET=1\n');
@@ -981,6 +1001,7 @@ describe('pre-tool-guard.mjs: symlink 経由の保護ファイル判定（#2566�
     mkdirSync(join(repoDir, 'supabase', 'migrations'), { recursive: true });
     migrationPath = join(repoDir, 'supabase', 'migrations', '20260101000000_init.sql');
     writeFileSync(migrationPath, 'select 1;\n');
+    commitAndPush(repoDir, 'supabase/migrations/20260101000000_init.sql');
 
     // 保護対象を指す別名（basename からは保護対象と分からない形）
     mkdirSync(join(repoDir, 'tmp'));
@@ -1022,7 +1043,7 @@ describe('pre-tool-guard.mjs: symlink 経由の保護ファイル判定（#2566�
     expect(runGuard(write(alias, `A=${PROD_REF}\n`), repoDir)).toBe('block');
   });
 
-  it('既存 migration を指す symlink への Write も block する', () => {
+  it('origin/main に載っている migration を指す symlink への Write も block する', () => {
     expect(runGuard(write(join(repoDir, 'tmp', 'alias-d')), repoDir)).toBe('block');
   });
 
@@ -1587,6 +1608,124 @@ describe('pre-tool-guard.mjs: migrations 配下の既存ファイル編集（#25
     expect(
       runGuard(write(resolve(rootDir, 'supabase/migrations/99999999999999_new.sql'), 'SELECT 1;')),
     ).toBe('allow');
+  });
+});
+
+// migration ガードの「適用済み」判定を、ディスク上の存在から **origin/main の tree に
+// 在るか** へ寄せた（#2185）。main へ merge された migration は production へ適用される
+// ので改変を止める必要があるが、未 merge の PR ブランチにしか無い migration は
+// どの共有環境にも適用されておらず、同じ PR 内で直すのは正当な操作だった。
+//
+// 敵対的に見た時の懸念は「判定不能を allow へ倒して guard を無力化されること」なので、
+// origin/main が無い / git が動かない / path を repo 相対へ直せない、を個別に block 側で
+// 固定する。**allow のケースだけでなく、これら fail-closed のケースを必ず対で置く**。
+describe('pre-tool-guard.mjs: migration の適用済み判定は origin/main 基準（#2185）', () => {
+  let fixtureRoot: string;
+  let repoDir: string;
+  let appliedSql: string;
+  let localOnlySql: string;
+  let uncommittedSql: string;
+
+  beforeAll(() => {
+    fixtureRoot = mkdtempSync(join(tmpdir(), 'pre-tool-guard-migration-origin-'));
+    repoDir = join(fixtureRoot, 'repo');
+    mkdirSync(repoDir);
+    git(['init', '-q', '.'], repoDir);
+    git(
+      [
+        '-c',
+        'user.email=t@example.com',
+        '-c',
+        'user.name=t',
+        'commit',
+        '-q',
+        '--allow-empty',
+        '-m',
+        'init',
+      ],
+      repoDir,
+    );
+    git(['init', '-q', '--bare', join(fixtureRoot, 'remote.git')], fixtureRoot);
+    git(['remote', 'add', 'origin', join(fixtureRoot, 'remote.git')], repoDir);
+
+    mkdirSync(join(repoDir, 'supabase', 'migrations'), { recursive: true });
+
+    // (1) origin/main に載っている = 適用済み
+    appliedSql = join(repoDir, 'supabase', 'migrations', '20260101000000_applied.sql');
+    writeFileSync(appliedSql, 'select 1;\n');
+    commitAndPush(repoDir, 'supabase/migrations/20260101000000_applied.sql');
+
+    // (2) ローカル commit のみ（未 push）
+    localOnlySql = join(repoDir, 'supabase', 'migrations', '20260202000000_local.sql');
+    writeFileSync(localOnlySql, 'select 2;\n');
+    commitOnly(repoDir, 'supabase/migrations/20260202000000_local.sql');
+
+    // (3) 未 commit
+    uncommittedSql = join(repoDir, 'supabase', 'migrations', '20260303000000_wip.sql');
+    writeFileSync(uncommittedSql, 'select 3;\n');
+
+    // 未 push の migration を指す symlink（正規化後の path で判定していることの確認）
+    mkdirSync(join(repoDir, 'tmp'));
+    symlinkSync(uncommittedSql, join(repoDir, 'tmp', 'wip-alias'), 'file');
+  });
+
+  afterAll(() => {
+    rmSync(fixtureRoot, { recursive: true, force: true });
+  });
+
+  it('origin/main に載っている migration の Edit は block する', () => {
+    expect(runGuard(edit(appliedSql, 'DROP TABLE x;'), repoDir)).toBe('block');
+  });
+
+  it('origin/main に載っている migration の Write も block する', () => {
+    expect(runGuard(write(appliedSql, 'DROP TABLE x;'), repoDir)).toBe('block');
+  });
+
+  it('ローカル commit のみ（未 push）の migration は allow する', () => {
+    expect(runGuard(edit(localOnlySql, 'ALTER TABLE x;'), repoDir)).toBe('allow');
+  });
+
+  it('未 commit の migration は allow する', () => {
+    expect(runGuard(edit(uncommittedSql, 'ALTER TABLE x;'), repoDir)).toBe('allow');
+  });
+
+  it('未 push の migration を指す symlink も allow する（正規化後の path で判定している）', () => {
+    expect(runGuard(write(join(repoDir, 'tmp', 'wip-alias'), 'select 9;'), repoDir)).toBe('allow');
+  });
+
+  it('origin/main の ref が無い repo では block する（fail-closed）', () => {
+    const noOriginRoot = mkdtempSync(join(tmpdir(), 'pre-tool-guard-migration-no-origin-'));
+    try {
+      git(['init', '-q', '.'], noOriginRoot);
+      git(
+        [
+          '-c',
+          'user.email=t@example.com',
+          '-c',
+          'user.name=t',
+          'commit',
+          '-q',
+          '--allow-empty',
+          '-m',
+          'init',
+        ],
+        noOriginRoot,
+      );
+      mkdirSync(join(noOriginRoot, 'supabase', 'migrations'), { recursive: true });
+      const sql = join(noOriginRoot, 'supabase', 'migrations', '20260101000000_x.sql');
+      writeFileSync(sql, 'select 1;\n');
+      expect(runGuard(edit(sql, 'DROP TABLE x;'), noOriginRoot)).toBe('block');
+    } finally {
+      rmSync(noOriginRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('git が使えない（PATH に git が無い）環境では block する（fail-closed）', () => {
+    // guard は git を PATH から引く。git が引けない時に allow へ倒れると、
+    // PATH を細工するだけで適用済み migration を書き換えられてしまう。
+    expect(runGuard(edit(appliedSql, 'DROP TABLE x;'), repoDir, { PATH: '/nonexistent' })).toBe(
+      'block',
+    );
   });
 });
 
