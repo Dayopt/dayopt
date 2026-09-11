@@ -23,7 +23,6 @@ const migratedRecord: CalendarDisplayEvent = {
   displayEndDate: new Date('2026-07-28T02:00:00.000Z'),
   duration: 60,
   isMultiDay: false,
-  origin: 'unplanned',
   recordSource: 'auto_migrated',
 };
 
@@ -48,7 +47,6 @@ describe('EventContextMenu', () => {
       ...migratedRecord,
       id: 'plan-1',
       kind: 'plan',
-      origin: 'planned',
       recordSource: undefined,
     };
 

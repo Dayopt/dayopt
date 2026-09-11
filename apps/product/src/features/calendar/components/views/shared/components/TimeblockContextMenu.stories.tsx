@@ -30,7 +30,6 @@ const completedPlannedEntry: CalendarDisplayEvent = {
   displayEndDate: pastEnd,
   duration: 60,
   isMultiDay: false,
-  origin: 'planned',
   actualStartDate: past,
   actualEndDate: pastEnd,
 };
@@ -62,7 +61,6 @@ const unplannedEntry: CalendarDisplayEvent = {
   ...completedPlannedEntry,
   id: 'entry-4',
   kind: 'record',
-  origin: 'unplanned',
 };
 
 /** エントリコンテキストメニュー。右クリックメニューとして使用する。 */

@@ -107,7 +107,7 @@ export function processInteractionEffects(
 
       case 'RESIZE_COMPLETE': {
         // 自動記録モデル: planned の resize は planned のみ更新（確定済み actual は固定、
-        // 未編集 actual は NULL のまま）。buildTimeUpdateData が origin 別に処理するため
+        // 未編集 actual は NULL のまま）。buildTimeUpdateData が kind 別に処理するため
         // ここで actual の扱いを指定する必要はない。
         r.onEventUpdate?.(effect.timeblockId, {
           startTime: effect.time.start,

@@ -35,7 +35,7 @@ function createTimedEntry(
     color: '',
     createdAt: new Date(),
     updatedAt: new Date(),
-    origin: 'planned',
+    kind: 'plan',
     ...overrides,
   } as TimedTimeblock;
 }
@@ -55,7 +55,7 @@ function createCalendarEvent(
     color: '',
     createdAt: new Date(),
     updatedAt: new Date(),
-    origin: 'planned',
+    kind: 'plan',
     ...overrides,
   } as CalendarDisplayEvent;
 }
@@ -111,7 +111,7 @@ describe('calculateTimeblockLayouts', () => {
       end: new Date('2026-01-15T10:30:00'),
       actualStartDate: new Date('2026-01-15T10:00:00'),
       actualEndDate: new Date('2026-01-15T10:30:00'),
-      origin: 'unplanned',
+      kind: 'record',
     });
     const planned = createTimedEntry({
       id: 'planned',
@@ -121,7 +121,7 @@ describe('calculateTimeblockLayouts', () => {
       plannedEndDate: new Date('2026-01-15T11:00:00'),
       actualStartDate: new Date('2026-01-15T10:30:00'),
       actualEndDate: new Date('2026-01-15T11:00:00'),
-      origin: 'planned',
+      kind: 'plan',
     });
 
     const layouts = calculateTimeblockLayouts([unplannedGapRecord, planned]);
@@ -141,7 +141,7 @@ describe('calculateTimeblockLayouts', () => {
       plannedEndDate: new Date('2026-01-15T11:00:00'),
       actualStartDate: new Date('2026-01-15T10:30:00'),
       actualEndDate: new Date('2026-01-15T11:00:00'),
-      origin: 'planned',
+      kind: 'plan',
     });
     const overlappingRecord = createTimedEntry({
       id: 'overlap-record',
@@ -149,7 +149,7 @@ describe('calculateTimeblockLayouts', () => {
       end: new Date('2026-01-15T10:45:00'),
       actualStartDate: new Date('2026-01-15T10:15:00'),
       actualEndDate: new Date('2026-01-15T10:45:00'),
-      origin: 'unplanned',
+      kind: 'record',
     });
 
     const layouts = calculateTimeblockLayouts([planned, overlappingRecord]);
@@ -168,13 +168,13 @@ describe('calculateTimeblockLayouts', () => {
       end: new Date('2026-01-15T10:15:00'),
       actualStartDate: new Date('2026-01-15T09:45:00'),
       actualEndDate: new Date('2026-01-15T10:15:00'),
-      origin: 'unplanned',
+      kind: 'record',
     });
     const planned = createTimedEntry({
       id: 'planned',
       start: new Date('2026-01-15T10:00:00'),
       end: new Date('2026-01-15T11:00:00'),
-      origin: 'planned',
+      kind: 'plan',
     });
 
     const layouts = calculateTimeblockLayouts([unplanned, planned]);
@@ -210,13 +210,13 @@ describe('calculateTimeblockLayouts', () => {
       id: 'planned',
       start: new Date('2026-01-15T10:00:00'),
       end: new Date('2026-01-15T11:00:00'),
-      origin: 'planned',
+      kind: 'plan',
     });
     const laterEntry = createTimedEntry({
       id: 'later-entry',
       start: new Date('2026-01-15T10:00:00'),
       end: new Date('2026-01-15T11:00:00'),
-      origin: 'planned',
+      kind: 'plan',
     });
     // 後発エントリを先に渡しても、早い方がcolumn 0になるべき
     const layouts = calculateTimeblockLayouts([laterEntry, planned]);
@@ -451,7 +451,7 @@ describe('computeActualTimeDiffOverlay', () => {
       actualStartDate: new Date('2026-01-15T10:15:00'), // 15分遅れ
       actualEndDate: new Date('2026-01-15T11:00:00'),
       timeblockState: 'past',
-      origin: 'planned',
+      kind: 'plan',
     });
     const overlay = computeActualTimeDiffOverlay(event, 72);
 
@@ -465,7 +465,7 @@ describe('computeActualTimeDiffOverlay', () => {
       startDate: new Date('2099-01-15T10:00:00'),
       endDate: new Date('2099-01-15T11:00:00'),
       timeblockState: 'upcoming',
-      origin: 'planned',
+      kind: 'plan',
     });
     const overlay = computeActualTimeDiffOverlay(event, 72);
 
@@ -480,7 +480,7 @@ describe('computeActualTimeDiffOverlay', () => {
       startDate: new Date('2026-01-15T10:00:00'),
       endDate: new Date('2026-01-15T11:00:00'),
       timeblockState: 'past',
-      origin: 'planned',
+      kind: 'plan',
     });
     const overlay = computeActualTimeDiffOverlay(event, 72);
     expect(overlay.topKind).toBe('none');
@@ -493,7 +493,7 @@ describe('computeActualTimeDiffOverlay', () => {
       actualStartDate: new Date('2026-01-15T09:45:00'), // 15分早い
       actualEndDate: new Date('2026-01-15T11:00:00'),
       timeblockState: 'past',
-      origin: 'planned',
+      kind: 'plan',
     });
     const overlay = computeActualTimeDiffOverlay(event, 72);
 

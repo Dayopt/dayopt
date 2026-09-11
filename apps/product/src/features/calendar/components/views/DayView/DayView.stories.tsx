@@ -53,7 +53,7 @@ const basePlan: CalendarDisplayEvent = {
   duration: 60,
   isMultiDay: false,
 
-  origin: 'planned',
+  kind: 'plan',
 };
 
 const mockPlans: CalendarDisplayEvent[] = [
@@ -230,7 +230,7 @@ const presetBase: CalendarDisplayEvent = {
   displayEndDate: today,
   duration: 0,
   isMultiDay: false,
-  origin: 'planned',
+  kind: 'plan',
 };
 
 function preset(

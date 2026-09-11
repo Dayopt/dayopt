@@ -122,4 +122,4 @@ code: apps/product/src/features/timeblock # 任意。repo 内の実在 path
 - 月次 `/gardening` は journal を持たない。判断は `decisions.md`、所見は issue（数値は `pnpm ai:usage` で再計算できる）
 - `pnpm docs:check` はlink、metadata、path、naming、`decisions.md` の append-only 契約を検証する
 
-テンプレートは [`_templates/`](./_templates/)、AIの自発的な更新責務はroot [`CLAUDE.md`](../CLAUDE.md)を参照する。
+テンプレートは [`_templates/`](./_templates/)、AIの自発的な更新責務はroot [`AGENTS.md`](../AGENTS.md)を参照する（`CLAUDE.md` は AGENTS.md を import するだけの adapter）。

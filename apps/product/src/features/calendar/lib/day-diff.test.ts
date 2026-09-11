@@ -28,7 +28,7 @@ function entry(overrides: Partial<CalendarDisplayEvent> = {}): CalendarDisplayEv
     version: '2026-07-15T00:00:00.000000Z',
     duration: 60,
     isMultiDay: false,
-    origin: 'planned',
+    kind: 'plan',
     ...overrides,
   };
 }
@@ -50,7 +50,7 @@ describe('computeCalendarDayDiffs', () => {
       [
         entry({
           id: 'unplanned-1',
-          origin: 'unplanned',
+          kind: 'record',
           startDate: new Date('2026-06-18T12:00:00.000Z'),
           endDate: new Date('2026-06-18T12:45:00.000Z'),
           plannedStartDate: null,
