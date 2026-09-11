@@ -11,6 +11,7 @@ import {
   MCP_CONSTRAINTS_GET_INPUT_SCHEMA,
   MCP_CONSTRAINTS_GET_OUTPUT_SCHEMA,
 } from './context-contract';
+import { MCP_CONTEXT_RANGE_SCHEMA } from './context-range-schema';
 import { findMcpContextReadErrorCode } from './context-read-error';
 import { createMcpToolError, createMcpToolSuccess, MCP_TOOL_SCHEMA_VERSION } from './tool-result';
 import { MCP_UNTRUSTED_CONTENT_NOTICE } from './untrusted-data-serialization';
@@ -33,6 +34,18 @@ export function registerConstraintsGetTool(server: McpServer, ctx: McpRequestCon
         );
       }
 
+      // 交差検証（start < end、31 日上限）は広告用 schema から外してあるため、
+      // ここで明示的に走らせる。tRPC 側の `timeblockContextRangeSchema` も同じ規則を
+      // 持つが、そちらへ落とすと client の入力ミスが zod error として
+      // `captureUnexpectedMcpToolError` に乗り、Sentry の予期せぬ失敗として積まれる。
+      const range = MCP_CONTEXT_RANGE_SCHEMA.safeParse(input);
+      if (!range.success) {
+        return createMcpToolError(
+          'INVALID_RANGE',
+          range.error.issues[0]?.message ?? 'Invalid date range.',
+        );
+      }
+
       try {
         const trpc = createMcpTrpcCaller({
           userId: ctx.userId,
@@ -40,7 +53,7 @@ export function registerConstraintsGetTool(server: McpServer, ctx: McpRequestCon
           scopes: ctx.scopes,
           signal: extra.signal,
         });
-        const result = await trpc.timeblockContext.getConstraints(input);
+        const result = await trpc.timeblockContext.getConstraints(range.data);
 
         return createMcpToolSuccess({
           schemaVersion: MCP_TOOL_SCHEMA_VERSION,

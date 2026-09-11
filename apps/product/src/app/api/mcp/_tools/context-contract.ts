@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { MCP_CONTEXT_RANGE_SCHEMA } from './context-range-schema';
+import { MCP_CONTEXT_RANGE_INPUT_SCHEMA } from './context-range-schema';
 import { MCP_TIMEBLOCK_TIMESTAMP_SCHEMA } from './timeblock-timestamp-schema';
 import { MCP_TOOL_SCHEMA_VERSION } from './tool-result';
 
@@ -72,7 +72,7 @@ export const MCP_CATEGORY_LIST_OUTPUT_SCHEMA = z
   })
   .strict();
 
-export const MCP_CONSTRAINTS_GET_INPUT_SCHEMA = MCP_CONTEXT_RANGE_SCHEMA;
+export const MCP_CONSTRAINTS_GET_INPUT_SCHEMA = MCP_CONTEXT_RANGE_INPUT_SCHEMA;
 
 export const MCP_CONSTRAINTS_GET_OUTPUT_SCHEMA = z
   .object({
