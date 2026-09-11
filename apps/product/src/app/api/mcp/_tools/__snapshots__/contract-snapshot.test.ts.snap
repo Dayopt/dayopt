@@ -405,6 +405,34 @@ exports[`MCP tool contract snapshot > constraintsGetOutput の JSON Schema が�
 }
 `;
 
+exports[`MCP tool contract snapshot > entryListInput の JSON Schema が変わっていない 1`] = `
+{
+  "additionalProperties": false,
+  "properties": {
+    "activityId": {
+      "description": "Filter by activity UUID.",
+      "format": "uuid",
+      "type": "string",
+    },
+    "endDate": {
+      "description": "ISO 8601 date-time with a UTC offset. With startDate: see startDate. Alone: returns entries whose startTime <= endDate.",
+      "type": "string",
+    },
+    "limit": {
+      "description": "Max entries to return. Defaults to 50, max 100.",
+      "maximum": 100,
+      "minimum": 1,
+      "type": "integer",
+    },
+    "startDate": {
+      "description": "ISO 8601 date-time with a UTC offset. With endDate: returns entries overlapping the half-open range [startDate, endDate). Alone: returns entries whose startTime >= startDate.",
+      "type": "string",
+    },
+  },
+  "type": "object",
+}
+`;
+
 exports[`MCP tool contract snapshot > entryListOutput の JSON Schema が変わっていない 1`] = `
 {
   "additionalProperties": false,
@@ -494,6 +522,161 @@ exports[`MCP tool contract snapshot > entryListOutput の JSON Schema が変わ�
     "schemaVersion",
     "count",
     "entries",
+  ],
+  "type": "object",
+}
+`;
+
+exports[`MCP tool contract snapshot > planActiveReceipt の JSON Schema が変わっていない 1`] = `
+{
+  "additionalProperties": false,
+  "properties": {
+    "deletedAt": {
+      "enum": [
+        "null",
+      ],
+      "nullable": true,
+    },
+    "operationId": {
+      "format": "uuid",
+      "type": "string",
+    },
+    "replayed": {
+      "type": "boolean",
+    },
+    "resourceId": {
+      "format": "uuid",
+      "type": "string",
+    },
+    "resourceType": {
+      "enum": [
+        "plan",
+      ],
+      "type": "string",
+    },
+    "schemaVersion": {
+      "enum": [
+        1,
+      ],
+      "type": "number",
+    },
+    "version": {
+      "type": "string",
+    },
+  },
+  "required": [
+    "schemaVersion",
+    "operationId",
+    "resourceType",
+    "resourceId",
+    "version",
+    "deletedAt",
+    "replayed",
+  ],
+  "type": "object",
+}
+`;
+
+exports[`MCP tool contract snapshot > planCreateInput の JSON Schema が変わっていない 1`] = `
+{
+  "additionalProperties": false,
+  "properties": {
+    "activityId": {
+      "format": "uuid",
+      "nullable": true,
+      "type": "string",
+    },
+    "endAt": {
+      "description": "ISO 8601 date-time with a UTC offset",
+      "type": "string",
+    },
+    "note": {
+      "maxLength": 10000,
+      "nullable": true,
+      "type": "string",
+    },
+    "operationId": {
+      "format": "uuid",
+      "type": "string",
+    },
+    "startAt": {
+      "description": "ISO 8601 date-time with a UTC offset",
+      "type": "string",
+    },
+    "title": {
+      "maxLength": 200,
+      "minLength": 1,
+      "type": "string",
+    },
+  },
+  "required": [
+    "operationId",
+    "title",
+    "startAt",
+    "endAt",
+  ],
+  "type": "object",
+}
+`;
+
+exports[`MCP tool contract snapshot > planDeletedReceipt の JSON Schema が変わっていない 1`] = `
+{
+  "additionalProperties": false,
+  "properties": {
+    "deletedAt": {
+      "type": "string",
+    },
+    "operationId": {
+      "format": "uuid",
+      "type": "string",
+    },
+    "replayed": {
+      "type": "boolean",
+    },
+    "resourceId": {
+      "format": "uuid",
+      "type": "string",
+    },
+    "resourceType": {
+      "enum": [
+        "plan",
+      ],
+      "type": "string",
+    },
+    "schemaVersion": {
+      "enum": [
+        1,
+      ],
+      "type": "number",
+    },
+    "version": {
+      "type": "string",
+    },
+  },
+  "required": [
+    "schemaVersion",
+    "operationId",
+    "resourceType",
+    "resourceId",
+    "version",
+    "deletedAt",
+    "replayed",
+  ],
+  "type": "object",
+}
+`;
+
+exports[`MCP tool contract snapshot > planGetInput の JSON Schema が変わっていない 1`] = `
+{
+  "additionalProperties": false,
+  "properties": {
+    "planId": {
+      "format": "uuid",
+      "type": "string",
+    },
+  },
+  "required": [
+    "planId",
   ],
   "type": "object",
 }
@@ -646,6 +829,252 @@ exports[`MCP tool contract snapshot > planListOutput の JSON Schema が変わ�
     "schemaVersion",
     "count",
     "plans",
+  ],
+  "type": "object",
+}
+`;
+
+exports[`MCP tool contract snapshot > planUpdateInput の JSON Schema が変わっていない 1`] = `
+{
+  "additionalProperties": false,
+  "properties": {
+    "activityId": {
+      "format": "uuid",
+      "nullable": true,
+      "type": "string",
+    },
+    "endAt": {
+      "description": "ISO 8601 date-time with a UTC offset",
+      "type": "string",
+    },
+    "expectedUpdatedAt": {
+      "description": "ISO 8601 date-time with a UTC offset",
+      "type": "string",
+    },
+    "note": {
+      "maxLength": 10000,
+      "nullable": true,
+      "type": "string",
+    },
+    "operationId": {
+      "format": "uuid",
+      "type": "string",
+    },
+    "planId": {
+      "format": "uuid",
+      "type": "string",
+    },
+    "startAt": {
+      "description": "ISO 8601 date-time with a UTC offset",
+      "type": "string",
+    },
+    "title": {
+      "maxLength": 200,
+      "minLength": 1,
+      "type": "string",
+    },
+  },
+  "required": [
+    "operationId",
+    "planId",
+    "expectedUpdatedAt",
+  ],
+  "type": "object",
+}
+`;
+
+exports[`MCP tool contract snapshot > planVersionedInput の JSON Schema が変わっていない 1`] = `
+{
+  "additionalProperties": false,
+  "properties": {
+    "expectedUpdatedAt": {
+      "description": "ISO 8601 date-time with a UTC offset",
+      "type": "string",
+    },
+    "operationId": {
+      "format": "uuid",
+      "type": "string",
+    },
+    "planId": {
+      "format": "uuid",
+      "type": "string",
+    },
+  },
+  "required": [
+    "operationId",
+    "planId",
+    "expectedUpdatedAt",
+  ],
+  "type": "object",
+}
+`;
+
+exports[`MCP tool contract snapshot > recordActiveReceipt の JSON Schema が変わっていない 1`] = `
+{
+  "additionalProperties": false,
+  "properties": {
+    "deletedAt": {
+      "enum": [
+        "null",
+      ],
+      "nullable": true,
+    },
+    "operationId": {
+      "format": "uuid",
+      "type": "string",
+    },
+    "replayed": {
+      "type": "boolean",
+    },
+    "resourceId": {
+      "format": "uuid",
+      "type": "string",
+    },
+    "resourceType": {
+      "enum": [
+        "record",
+      ],
+      "type": "string",
+    },
+    "schemaVersion": {
+      "enum": [
+        1,
+      ],
+      "type": "number",
+    },
+    "version": {
+      "type": "string",
+    },
+  },
+  "required": [
+    "schemaVersion",
+    "operationId",
+    "resourceType",
+    "resourceId",
+    "version",
+    "deletedAt",
+    "replayed",
+  ],
+  "type": "object",
+}
+`;
+
+exports[`MCP tool contract snapshot > recordCreateInput の JSON Schema が変わっていない 1`] = `
+{
+  "additionalProperties": false,
+  "properties": {
+    "activityId": {
+      "format": "uuid",
+      "nullable": true,
+      "type": "string",
+    },
+    "endAt": {
+      "description": "ISO 8601 date-time with a UTC offset",
+      "type": "string",
+    },
+    "fulfillment": {
+      "description": "Subjective fulfillment felt during this Record: low, medium, or high. Optional; omit or pass null to leave it unrated.",
+      "enum": [
+        "low",
+        "medium",
+        "high",
+      ],
+      "nullable": true,
+      "type": "string",
+    },
+    "note": {
+      "maxLength": 10000,
+      "nullable": true,
+      "type": "string",
+    },
+    "operationId": {
+      "format": "uuid",
+      "type": "string",
+    },
+    "planId": {
+      "description": "Deprecated compatibility input. Omit for new Records. A UUID is accepted only so an already-completed legacy operationId can replay; a new operation is rejected.",
+      "format": "uuid",
+      "nullable": true,
+      "type": "string",
+    },
+    "startAt": {
+      "description": "ISO 8601 date-time with a UTC offset",
+      "type": "string",
+    },
+    "title": {
+      "maxLength": 200,
+      "minLength": 1,
+      "type": "string",
+    },
+  },
+  "required": [
+    "operationId",
+    "title",
+    "startAt",
+    "endAt",
+  ],
+  "type": "object",
+}
+`;
+
+exports[`MCP tool contract snapshot > recordDeletedReceipt の JSON Schema が変わっていない 1`] = `
+{
+  "additionalProperties": false,
+  "properties": {
+    "deletedAt": {
+      "type": "string",
+    },
+    "operationId": {
+      "format": "uuid",
+      "type": "string",
+    },
+    "replayed": {
+      "type": "boolean",
+    },
+    "resourceId": {
+      "format": "uuid",
+      "type": "string",
+    },
+    "resourceType": {
+      "enum": [
+        "record",
+      ],
+      "type": "string",
+    },
+    "schemaVersion": {
+      "enum": [
+        1,
+      ],
+      "type": "number",
+    },
+    "version": {
+      "type": "string",
+    },
+  },
+  "required": [
+    "schemaVersion",
+    "operationId",
+    "resourceType",
+    "resourceId",
+    "version",
+    "deletedAt",
+    "replayed",
+  ],
+  "type": "object",
+}
+`;
+
+exports[`MCP tool contract snapshot > recordGetInput の JSON Schema が変わっていない 1`] = `
+{
+  "additionalProperties": false,
+  "properties": {
+    "recordId": {
+      "format": "uuid",
+      "type": "string",
+    },
+  },
+  "required": [
+    "recordId",
   ],
   "type": "object",
 }
@@ -818,6 +1247,91 @@ exports[`MCP tool contract snapshot > recordListOutput の JSON Schema が変わ
     "schemaVersion",
     "count",
     "records",
+  ],
+  "type": "object",
+}
+`;
+
+exports[`MCP tool contract snapshot > recordUpdateInput の JSON Schema が変わっていない 1`] = `
+{
+  "additionalProperties": false,
+  "properties": {
+    "activityId": {
+      "format": "uuid",
+      "nullable": true,
+      "type": "string",
+    },
+    "endAt": {
+      "description": "ISO 8601 date-time with a UTC offset",
+      "type": "string",
+    },
+    "expectedUpdatedAt": {
+      "description": "ISO 8601 date-time with a UTC offset",
+      "type": "string",
+    },
+    "fulfillment": {
+      "description": "Subjective fulfillment felt during this Record: low, medium, or high. Omitting this field leaves the existing rating unchanged; pass null explicitly to clear it.",
+      "enum": [
+        "low",
+        "medium",
+        "high",
+      ],
+      "nullable": true,
+      "type": "string",
+    },
+    "note": {
+      "maxLength": 10000,
+      "nullable": true,
+      "type": "string",
+    },
+    "operationId": {
+      "format": "uuid",
+      "type": "string",
+    },
+    "recordId": {
+      "format": "uuid",
+      "type": "string",
+    },
+    "startAt": {
+      "description": "ISO 8601 date-time with a UTC offset",
+      "type": "string",
+    },
+    "title": {
+      "maxLength": 200,
+      "minLength": 1,
+      "type": "string",
+    },
+  },
+  "required": [
+    "operationId",
+    "recordId",
+    "expectedUpdatedAt",
+  ],
+  "type": "object",
+}
+`;
+
+exports[`MCP tool contract snapshot > recordVersionedInput の JSON Schema が変わっていない 1`] = `
+{
+  "additionalProperties": false,
+  "properties": {
+    "expectedUpdatedAt": {
+      "description": "ISO 8601 date-time with a UTC offset",
+      "type": "string",
+    },
+    "operationId": {
+      "format": "uuid",
+      "type": "string",
+    },
+    "recordId": {
+      "format": "uuid",
+      "type": "string",
+    },
+  },
+  "required": [
+    "operationId",
+    "recordId",
+    "expectedUpdatedAt",
   ],
   "type": "object",
 }
@@ -1178,6 +1692,46 @@ exports[`MCP tool contract snapshot > segmentListOutput の JSON Schema が変�
     "count",
     "segments",
   ],
+  "type": "object",
+}
+`;
+
+exports[`MCP tool contract snapshot > timeblockListInput の JSON Schema が変わっていない 1`] = `
+{
+  "additionalProperties": false,
+  "properties": {
+    "activityId": {
+      "format": "uuid",
+      "type": "string",
+    },
+    "endDate": {
+      "description": "ISO 8601 date-time with a UTC offset. With startDate: see startDate. Alone: returns blocks whose startAt <= endDate.",
+      "type": "string",
+    },
+    "limit": {
+      "maximum": 100,
+      "minimum": 1,
+      "type": "integer",
+    },
+    "startDate": {
+      "description": "ISO 8601 date-time with a UTC offset. With endDate: returns blocks overlapping the half-open range [startDate, endDate). Alone: returns blocks whose startAt >= startDate.",
+      "type": "string",
+    },
+  },
+  "type": "object",
+}
+`;
+
+exports[`MCP tool contract snapshot > trashListInput の JSON Schema が変わっていない 1`] = `
+{
+  "additionalProperties": false,
+  "properties": {
+    "limit": {
+      "maximum": 100,
+      "minimum": 1,
+      "type": "integer",
+    },
+  },
   "type": "object",
 }
 `;

@@ -25,9 +25,9 @@ import {
 import { createMcpToolError, createMcpToolSuccess, MCP_TOOL_SCHEMA_VERSION } from './tool-result';
 import { MCP_UNTRUSTED_CONTENT_NOTICE } from './untrusted-data-serialization';
 
-const planGetInputSchema = z.object({ planId: z.string().uuid() }).strict();
-const recordGetInputSchema = z.object({ recordId: z.string().uuid() }).strict();
-const trashListInputSchema = z
+export const MCP_PLAN_GET_INPUT_SCHEMA = z.object({ planId: z.string().uuid() }).strict();
+export const MCP_RECORD_GET_INPUT_SCHEMA = z.object({ recordId: z.string().uuid() }).strict();
+export const MCP_TRASH_LIST_INPUT_SCHEMA = z
   .object({ limit: z.number().int().min(1).max(100).optional() })
   .strict();
 
@@ -37,7 +37,7 @@ export function registerPlansGetTool(server: McpServer, ctx: McpRequestContext) 
     {
       title: 'Get a Dayopt plan',
       description: `Get one active Plan owned by the authenticated Dayopt user. ${MCP_UNTRUSTED_CONTENT_NOTICE}`,
-      inputSchema: planGetInputSchema,
+      inputSchema: MCP_PLAN_GET_INPUT_SCHEMA,
       outputSchema: MCP_PLAN_GET_OUTPUT_SCHEMA,
       annotations: { readOnlyHint: true, idempotentHint: true },
     },
@@ -60,7 +60,7 @@ export function registerRecordsGetTool(server: McpServer, ctx: McpRequestContext
     {
       title: 'Get a Dayopt record',
       description: `Get one active Record owned by the authenticated Dayopt user. ${MCP_UNTRUSTED_CONTENT_NOTICE}`,
-      inputSchema: recordGetInputSchema,
+      inputSchema: MCP_RECORD_GET_INPUT_SCHEMA,
       outputSchema: MCP_RECORD_GET_OUTPUT_SCHEMA,
       annotations: { readOnlyHint: true, idempotentHint: true },
     },
@@ -83,7 +83,7 @@ export function registerPlansTrashListTool(server: McpServer, ctx: McpRequestCon
     {
       title: 'List trashed Dayopt plans',
       description: `List soft-deleted Plans owned by the authenticated Dayopt user. ${MCP_UNTRUSTED_CONTENT_NOTICE}`,
-      inputSchema: trashListInputSchema,
+      inputSchema: MCP_TRASH_LIST_INPUT_SCHEMA,
       outputSchema: MCP_PLAN_LIST_OUTPUT_SCHEMA,
       annotations: { readOnlyHint: true, idempotentHint: true },
     },
@@ -111,7 +111,7 @@ export function registerRecordsTrashListTool(server: McpServer, ctx: McpRequestC
     {
       title: 'List trashed Dayopt records',
       description: `List soft-deleted Records owned by the authenticated Dayopt user. ${MCP_UNTRUSTED_CONTENT_NOTICE}`,
-      inputSchema: trashListInputSchema,
+      inputSchema: MCP_TRASH_LIST_INPUT_SCHEMA,
       outputSchema: MCP_RECORD_LIST_OUTPUT_SCHEMA,
       annotations: { readOnlyHint: true, idempotentHint: true },
     },

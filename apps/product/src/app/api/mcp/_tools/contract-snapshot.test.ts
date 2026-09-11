@@ -10,6 +10,7 @@ import {
   MCP_CONSTRAINTS_GET_OUTPUT_SCHEMA,
   MCP_SEGMENT_LIST_OUTPUT_SCHEMA,
 } from './context-contract';
+import { MCP_ENTRY_LIST_INPUT_SCHEMA } from './entries-list';
 import { MCP_REVIEW_GET_INPUT_SCHEMA, MCP_REVIEW_GET_OUTPUT_SCHEMA } from './review-contract';
 import {
   MCP_ENTRY_LIST_OUTPUT_SCHEMA,
@@ -18,6 +19,24 @@ import {
   MCP_RECORD_GET_OUTPUT_SCHEMA,
   MCP_RECORD_LIST_OUTPUT_SCHEMA,
 } from './timeblock-contract';
+import {
+  MCP_PLAN_GET_INPUT_SCHEMA,
+  MCP_RECORD_GET_INPUT_SCHEMA,
+  MCP_TRASH_LIST_INPUT_SCHEMA,
+} from './timeblock-detail';
+import { MCP_TIMEBLOCK_LIST_INPUT_SCHEMA } from './timeblock-list';
+import {
+  MCP_PLAN_ACTIVE_RECEIPT_SCHEMA,
+  MCP_PLAN_CREATE_INPUT_SCHEMA,
+  MCP_PLAN_DELETED_RECEIPT_SCHEMA,
+  MCP_PLAN_UPDATE_INPUT_SCHEMA,
+  MCP_PLAN_VERSIONED_INPUT_SCHEMA,
+  MCP_RECORD_ACTIVE_RECEIPT_SCHEMA,
+  MCP_RECORD_CREATE_INPUT_SCHEMA,
+  MCP_RECORD_DELETED_RECEIPT_SCHEMA,
+  MCP_RECORD_UPDATE_INPUT_SCHEMA,
+  MCP_RECORD_VERSIONED_INPUT_SCHEMA,
+} from './timeblock-mutations';
 
 /**
  * MCP tool の zod contract を JSON Schema へ変換し snapshot する（#2596）。
@@ -44,6 +63,23 @@ const CONTRACTS = {
   recordListOutput: MCP_RECORD_LIST_OUTPUT_SCHEMA,
   recordGetOutput: MCP_RECORD_GET_OUTPUT_SCHEMA,
   entryListOutput: MCP_ENTRY_LIST_OUTPUT_SCHEMA,
+  // 入力側（#2721 D-05）。広告される引数の削除・型変更・enum 縮小も diff に出す。
+  entryListInput: MCP_ENTRY_LIST_INPUT_SCHEMA,
+  timeblockListInput: MCP_TIMEBLOCK_LIST_INPUT_SCHEMA,
+  planGetInput: MCP_PLAN_GET_INPUT_SCHEMA,
+  recordGetInput: MCP_RECORD_GET_INPUT_SCHEMA,
+  trashListInput: MCP_TRASH_LIST_INPUT_SCHEMA,
+  // mutation の入出力（#2721 D-05）。write gate が開く前に固定しておく。
+  planCreateInput: MCP_PLAN_CREATE_INPUT_SCHEMA,
+  planUpdateInput: MCP_PLAN_UPDATE_INPUT_SCHEMA,
+  planVersionedInput: MCP_PLAN_VERSIONED_INPUT_SCHEMA,
+  recordCreateInput: MCP_RECORD_CREATE_INPUT_SCHEMA,
+  recordUpdateInput: MCP_RECORD_UPDATE_INPUT_SCHEMA,
+  recordVersionedInput: MCP_RECORD_VERSIONED_INPUT_SCHEMA,
+  planActiveReceipt: MCP_PLAN_ACTIVE_RECEIPT_SCHEMA,
+  planDeletedReceipt: MCP_PLAN_DELETED_RECEIPT_SCHEMA,
+  recordActiveReceipt: MCP_RECORD_ACTIVE_RECEIPT_SCHEMA,
+  recordDeletedReceipt: MCP_RECORD_DELETED_RECEIPT_SCHEMA,
 } as const;
 
 describe('MCP tool contract snapshot', () => {

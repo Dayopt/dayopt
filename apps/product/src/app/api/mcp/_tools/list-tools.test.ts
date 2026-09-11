@@ -1149,6 +1149,78 @@ describe('MCP list tools public contract', () => {
     }
   });
 
+  // #2721 D-04: list 3 本だけ `z.string().datetime()`（UTC Z のみ）で、同じ文字列が
+  // constraints.get では通るのに plans.list では -32602 になっていた。SDK client 越しに
+  // 実際の受理集合を見る（schema を直接 parse すると SDK の入力検証を迂回してしまう）。
+  it('範囲を取るread toolはUTCオフセット付きISOをtool間で同じように受理する', async () => {
+    const plansList = vi.fn().mockResolvedValue([]);
+    const recordsList = vi.fn().mockResolvedValue([]);
+    createMcpTrpcCaller.mockReturnValue({
+      plans: { list: plansList },
+      records: { list: recordsList },
+    });
+
+    const server = new McpServer({ name: 'range-offset-server', version: '1.0.0' });
+    registerPlansListTool(server, context);
+    registerRecordsListTool(server, context);
+    registerEntriesListTool(server, context);
+    const client = new Client({ name: 'range-offset-client', version: '1.0.0' });
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    await server.connect(serverTransport);
+    await client.connect(clientTransport);
+
+    const startDate = '2026-09-10T00:00:00+09:00';
+    const endDate = '2026-09-11T00:00:00+09:00';
+    try {
+      for (const name of ['plans.list', 'records.list', 'entries.list']) {
+        const result = CallToolResultSchema.parse(
+          await client.callTool({ name, arguments: { startDate, endDate } }),
+        );
+        expect(result.isError, `${name} must accept an offset datetime`).toBeFalsy();
+      }
+    } finally {
+      await client.close();
+      await server.close();
+    }
+
+    // service へはそのまま渡す（tRPC 側の planFilterSchema も offset を受理する）。
+    expect(plansList).toHaveBeenCalledWith(expect.objectContaining({ startDate, endDate }));
+    expect(recordsList).toHaveBeenCalledWith(expect.objectContaining({ startDate, endDate }));
+  });
+
+  // #2721 D-03: service は両端指定時だけ半開区間との重なりで絞り、片側だけならその端を
+  // start_at に当てる。description がこの非対称を隠すと、日ごとに範囲を切って合算する
+  // client が日跨ぎの block を二重計上する。
+  it('範囲を取るlist toolは両端指定が半開区間の重なりであることを広告する', async () => {
+    const server = new McpServer({ name: 'range-semantics-server', version: '1.0.0' });
+    registerPlansListTool(server, context);
+    registerRecordsListTool(server, context);
+    registerEntriesListTool(server, context);
+    const client = new Client({ name: 'range-semantics-client', version: '1.0.0' });
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    await server.connect(serverTransport);
+    await client.connect(clientTransport);
+
+    try {
+      const listedTools = await client.listTools();
+      for (const name of ['plans.list', 'records.list', 'entries.list']) {
+        const tool = listedTools.tools.find((candidate) => candidate.name === name);
+        const properties = (
+          tool?.inputSchema as { properties?: Record<string, { description?: string }> } | undefined
+        )?.properties;
+
+        expect(properties?.startDate?.description, `${name} startDate`).toContain(
+          '[startDate, endDate)',
+        );
+        expect(properties?.startDate?.description, `${name} startDate`).toContain('UTC offset');
+        expect(properties?.endDate?.description, `${name} endDate`).toContain('Alone');
+      }
+    } finally {
+      await client.close();
+      await server.close();
+    }
+  });
+
   it('旧planId入力を成功済み再送へ通し、新規要求は更新案内付きで拒否する', async () => {
     const operationId = '66666666-6666-4666-8666-666666666666';
     const planId = '77777777-7777-4777-8777-777777777777';

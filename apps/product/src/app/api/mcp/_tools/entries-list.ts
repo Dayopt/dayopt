@@ -10,6 +10,7 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
 import type { McpRequestContext } from '../_context';
 import { MCP_ENTRY_LIST_OUTPUT_SCHEMA } from './timeblock-contract';
+import { MCP_TIMEBLOCK_TIMESTAMP_SCHEMA } from './timeblock-timestamp-schema';
 import { createMcpToolError, createMcpToolSuccess, MCP_TOOL_SCHEMA_VERSION } from './tool-result';
 import { MCP_UNTRUSTED_CONTENT_NOTICE } from './untrusted-data-serialization';
 
@@ -20,18 +21,19 @@ import { MCP_UNTRUSTED_CONTENT_NOTICE } from './untrusted-data-serialization';
  * を呼び、従来の entry 形式へ合成して返す。
  */
 
-const inputSchema = z
+/**
+ * 範囲フィルターの意味と受理集合は `plans.list` / `records.list` と同じ（#2721 D-03 / D-04）。
+ * 実 service は両端指定時だけ半開区間との重なりで絞り、片側指定ではその端を `start_at`
+ * に当てる。
+ */
+export const MCP_ENTRY_LIST_INPUT_SCHEMA = z
   .object({
-    startDate: z
-      .string()
-      .datetime()
-      .optional()
-      .describe('Inclusive ISO 8601 datetime. Returns entries with start_time >= this.'),
-    endDate: z
-      .string()
-      .datetime()
-      .optional()
-      .describe('Inclusive ISO 8601 datetime. Returns entries with start_time <= this.'),
+    startDate: MCP_TIMEBLOCK_TIMESTAMP_SCHEMA.optional().describe(
+      'ISO 8601 date-time with a UTC offset. With endDate: returns entries overlapping the half-open range [startDate, endDate). Alone: returns entries whose startTime >= startDate.',
+    ),
+    endDate: MCP_TIMEBLOCK_TIMESTAMP_SCHEMA.optional().describe(
+      'ISO 8601 date-time with a UTC offset. With startDate: see startDate. Alone: returns entries whose startTime <= endDate.',
+    ),
     activityId: z.string().uuid().optional().describe('Filter by activity UUID.'),
     limit: z
       .number()
@@ -83,7 +85,7 @@ export function registerEntriesListTool(server: McpServer, ctx: McpRequestContex
     {
       title: 'List Dayopt entries',
       description: `List the authenticated user's Dayopt entries (timeboxes / records). Read-only. ${MCP_UNTRUSTED_CONTENT_NOTICE}`,
-      inputSchema,
+      inputSchema: MCP_ENTRY_LIST_INPUT_SCHEMA,
       outputSchema: MCP_ENTRY_LIST_OUTPUT_SCHEMA,
     },
     async ({ startDate, endDate, activityId, limit }) => {
