@@ -28,6 +28,40 @@ async function getRegisteredServiceWorker(page: Page): Promise<string | null> {
   });
 }
 
+/**
+ * offline fallback を返せる状態か。**登録の存在では足りない**（#2654）。
+ *
+ * `getRegistrations()` は worker が `installing` の間も registration を返すので、
+ * それだけを待って offline へ落とすと、precache 途中の worker がまだ page を
+ * 制御しないまま reload が走り、SW を通らない navigation がブラウザのネットワーク
+ * エラー画面（`<body></body>`）になる。待つべき状態を 2 つとも名指しする:
+ *
+ * 1. `navigator.serviceWorker.controller` が非 null — sw.js の activate が
+ *    `clients.claim()` を呼ぶので、これは「activate 済みかつこの page を制御中」の合図
+ * 2. `/offline` が cache にある — install の precache は best-effort で個別の失敗を
+ *    握るため、install 完了だけでは precache 済みを意味しない
+ *
+ * `navigator.serviceWorker.ready` は解決するまで返らず poll の timeout が効かないので使わない。
+ */
+async function isOfflineFallbackReady(page: Page): Promise<boolean> {
+  return page.evaluate(async () => {
+    if (!('serviceWorker' in navigator)) return false;
+    if (!navigator.serviceWorker.controller) return false;
+    for (const key of await caches.keys()) {
+      const cache = await caches.open(key);
+      if (await cache.match('/offline')) return true;
+    }
+    return false;
+  });
+}
+
+/** reload 後の document を Service Worker が制御しているか（= ブラウザのエラー画面ではない）。 */
+async function isControlledByServiceWorker(page: Page): Promise<boolean> {
+  return page.evaluate(
+    () => 'serviceWorker' in navigator && navigator.serviceWorker.controller !== null,
+  );
+}
+
 test.describe('PWA installability', () => {
   test('exposes a valid web app manifest', async ({ page }) => {
     await page.goto('/');
@@ -107,12 +141,16 @@ describeWithEnv('PWA Service Worker', () => {
     page,
   }) => {
     await loginToApp(page);
-    await expect.poll(() => getRegisteredServiceWorker(page), { timeout: 15_000 }).not.toBeNull();
+    // 登録の存在ではなく「activate 済みで page を制御」「/offline が precache 済み」を待つ。
+    await expect.poll(() => isOfflineFallbackReady(page), { timeout: 15_000 }).toBe(true);
 
     await context.setOffline(true);
-    // sw.js は install で `/offline` を precache し、navigation の失敗時に返す。
+    // sw.js は navigation を DYNAMIC cache → network → `/offline` の順で解決する。
     await page.reload({ waitUntil: 'domcontentloaded' }).catch(() => undefined);
 
+    // 描画されたのが cache 済みページでも `/offline` でも、SW が返した document である
+    // ことは共通する。body の非空だけだとブラウザのエラー画面でも通ってしまう。
+    await expect.poll(() => isControlledByServiceWorker(page), { timeout: 10_000 }).toBe(true);
     await expect(page.locator('body')).not.toBeEmpty();
     await context.setOffline(false);
   });
