@@ -60,13 +60,18 @@ overrides:
   # smol-toml: knip 経由（宣言は `^1.5.2` だが lockfile が 1.7.0 に固定されて
   #   いた）。TOML parse の DoS (GHSA-7w5x-hrqm-74c2)。devDependency のみ
   'smol-toml@1.7.0': '^1.7.1'
-  # extract-zip (GHSA-jmr9-qjv8-65gv) は **ここに入れられない**。advisory は
-  # `>=2.0.2` を修正版と書くが 2.0.2 は未リリースで、最新が 2.0.1（override を
-  # 書くと ERR_PNPM_NO_MATCHING_VERSION で install が落ちる）。経路は
-  # @lhci/cli -> lighthouse -> puppeteer-core -> @puppeteer/browsers の
-  # devDependency のみで production bundle に載らない。上流が出すまで
-  # `pnpm security:check` に出続けるのを許容する（ignoreGhsas へ入れない —
-  # 局所パッチのような緩和実体が無いため、隠すと再評価の機会を失う）。
+  # extract-zip (GHSA-jmr9-qjv8-65gv) は **extract-zip 自体を override できない**。
+  # advisory は `>=2.0.2` を修正版と書くが 2.0.2 は未リリースで、最新が 2.0.1
+  # （override を書くと ERR_PNPM_NO_MATCHING_VERSION で install が落ちる）。
+  # 代わりに **唯一の requester を差し替えて経路ごと消す**: @puppeteer/browsers は
+  # 3.0.0 で extract-zip を modern-tar へ置換済みで、3.x に extract-zip は無い。
+  # puppeteer-core 24.x が 2.13.2 を exact pin しているため bump では届かず、
+  # ここで 3.x へ寄せる（#2066）。3.x は ESM only なので、CJS からの利用
+  # （@lhci/cli -> puppeteer-core の cjs build）は Node の require(esm) に乗る
+  # — @puppeteer/browsers 3.x の engines が node>=22.12 なのは上流も同じ前提を
+  # 置いているため。repo の node は 24（.nvmrc）。devDependency のみで production
+  # bundle には載らない。
+  '@puppeteer/browsers@2.13.2': '^3.2.2'
 # image-size 2.0.2 の未リリース上流修正を固定する。
 # GHSA-w3rx-r6r6-pgpr / GHSA-5p2g-fcmc-qvqq は patchedDependencies で緩和済み。
 patchedDependencies:

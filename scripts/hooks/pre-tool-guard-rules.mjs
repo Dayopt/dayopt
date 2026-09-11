@@ -127,14 +127,26 @@ function disallowedVaultRefs(text) {
 // =====================================================================
 
 function runGitCapture(args, cwd, execFileImpl) {
+  return runGitResult(args, cwd, execFileImpl).out;
+}
+
+/**
+ * `runGitCapture` と同じ実行だが、**「空を返した」と「失敗した」を区別する**。
+ *
+ * `git ls-tree` は「その path が tree に無い」を exit 0 + 空出力で返すため、
+ * 空文字だけでは「無い（= allow してよい）」と「git が動かなかった（= 判定
+ * 不能なので block）」が見分けられない。fail-closed を保つ判定はこちらを使う。
+ */
+function runGitResult(args, cwd, execFileImpl) {
   try {
-    return execFileImpl('git', args, {
+    const out = execFileImpl('git', args, {
       cwd,
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'ignore'],
-    }).trim();
+    });
+    return { ok: true, out: typeof out === 'string' ? out.trim() : '' };
   } catch {
-    return '';
+    return { ok: false, out: '' };
   }
 }
 
@@ -323,6 +335,50 @@ function isRegularFile(p) {
 }
 
 /**
+ * 既存 migration が **`origin/main` に載っているか**（= 適用済みとみなすか）。
+ *
+ * migration は main へ merge された時点で production へ適用されるため、
+ * 「origin/main の tree に在る」を適用済みの判定に使う（#2185）。逆に、未 merge の
+ * PR ブランチにしか無い migration は production はもちろんどの共有環境にも
+ * 適用されていないので、同じ PR 内で書き直してよい（レビュー指摘の反映や設計の
+ * 訂正で普通に起きる。以前はここが一律 block で、そのつど User の例外裁可が要った）。
+ *
+ * **判定不能はすべて block**（fail-closed）: origin/main の ref が無い、git が
+ * 動かない、path を repo root からの相対へ直せない、のいずれも「適用済みでない」
+ * 証明にはならない。ref が古いだけの時は `git fetch origin main` で判定し直せる。
+ *
+ * 注意: push 済み・未 merge の migration を書き換えると、Supabase preview branch は
+ * 同じ version を再適用しないため preview 側だけ古い定義が残る（`supabase` skill）。
+ */
+function isMigrationOnOriginMain(filePath, cwd, execFileImpl) {
+  const ref = 'refs/remotes/origin/main';
+  if (!runGitCapture(['rev-parse', '--verify', '--quiet', ref], cwd, execFileImpl)) return true;
+
+  const roots = resolveRoots(cwd, execFileImpl);
+  if (!roots) return true;
+
+  const relative = repoRelativePath(filePath, roots.currentRoot, cwd);
+  if (!relative) return true;
+
+  const result = runGitResult(['ls-tree', '--name-only', ref, '--', relative], cwd, execFileImpl);
+  if (!result.ok) return true;
+  return result.out !== '';
+}
+
+/**
+ * 絶対 path を repo root からの相対 path へ直す。root 配下でなければ symlink を
+ * 解決してもう一度試し（repo root 自体が symlink 越しの checkout でも効くように）、
+ * それでも配下でなければ空文字（呼び出し元は判定不能として扱う）。
+ */
+function repoRelativePath(filePath, currentRoot, cwd) {
+  for (const candidate of [filePath, resolvePhysicalPath(filePath, cwd)]) {
+    if (!candidate) continue;
+    if (candidate.startsWith(`${currentRoot}/`)) return candidate.slice(currentRoot.length + 1);
+  }
+  return '';
+}
+
+/**
  * Write は content、Edit は new_string、MultiEdit は edits[].new_string、
  * NotebookEdit は new_source に書き込み内容が入る。jq:
  *   [.tool_input.content?, .tool_input.new_string?, .tool_input.new_source?,
@@ -388,9 +444,15 @@ function checkWriteGuards(filePath, root, cwd, execFileImpl) {
     }
   }
 
-  if (candidates.some((p) => isExistingMigrationSqlPath(p) && isRegularFile(p))) {
+  const appliedMigration = candidates.some(
+    (p) =>
+      isExistingMigrationSqlPath(p) &&
+      isRegularFile(p) &&
+      isMigrationOnOriginMain(p, cwd, execFileImpl),
+  );
+  if (appliedMigration) {
     block(
-      `BLOCKED: 既存マイグレーションファイルの変更は禁止です。新しいマイグレーションを作成してください${via}`,
+      `BLOCKED: origin/main に載っている（適用済みの）マイグレーションファイルの変更は禁止です。新しいマイグレーションを作成してください${via}。未 merge のマイグレーションがこう判定される場合は origin/main の取得が古いので、git fetch origin main のうえで再実行してください`,
     );
   }
 }
