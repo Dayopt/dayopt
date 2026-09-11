@@ -22,6 +22,8 @@ export {
   hasWriteScope,
   isSupportedScope,
   isWriteScope,
+  resolveGrantableScopes,
   type SupportedScope,
 } from './scopes';
 export { generateAuthorizationCode, hashToken } from './tokens';
+export { isConsentWriteEnabled, isWriteEnabledByMutationControl } from './write-gate';

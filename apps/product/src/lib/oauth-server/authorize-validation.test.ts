@@ -130,10 +130,17 @@ describe('validateAuthorizeInput resource, PKCE, and scopes', () => {
     if (result.ok) expect(result.scopes).toEqual(['read:entries']);
   });
 
-  it('keeps write scopes closed unless the client is explicitly enabled', () => {
-    expect(
-      validateAuthorizeInput({ ...baseAuthorizeInput, scope: 'read:entries write:plans' }),
-    ).toEqual({ ok: false, error: 'invalid_scope' });
+  // #1754: metadata が write 込みの全 scope を広告するようになったので、gate が閉じた
+  // client も write を要求してくるのが正常系。ここで弾くと read-only の接続まで
+  // 作れなくなるため、gate 判定は consent（resolveGrantableScopes）へ移した。
+  it('write gate が閉じていても authorize は通し、付与の判断を consent へ渡す', () => {
+    const closed = validateAuthorizeInput({
+      ...baseAuthorizeInput,
+      scope: 'read:entries write:plans',
+    });
+
+    expect(closed.ok).toBe(true);
+    if (closed.ok) expect(closed.scopes).toEqual(['read:entries', 'write:plans']);
 
     vi.stubEnv('MCP_WRITE_ENABLED_CLIENTS', 'chatgpt,claude-ai');
     const enabled = validateAuthorizeInput({

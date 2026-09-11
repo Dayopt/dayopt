@@ -124,6 +124,15 @@ op run -- pnpm mcp:gate -- --enable-client=claude-ai   # 対象 client を allow
 - 既存 connection は `write_enabled_at` を持たないため、対象ユーザーは再接続（再 consent）が必要
 - gate が開いても、書き込みは下記の**利用権判定**を別途通る。gate と利用権は独立した 2 つの条件
 
+**開放の順序**（1 client ぶん）:
+
+1. DB 側を開ける: `--enable-billing`（必要なら）→ `--enable-global` → `--enable-client=<id>`
+2. Vercel Production env `MCP_WRITE_ENABLED_CLIENTS` に `<id>` を追加する
+3. **env を live に載せる**: Auto-assign Custom Production Domains は無効運用なので、Dashboard の Redeploy では公開されない。次の main merge が起こす `Production Release`（promote）を待つ
+4. 対象ユーザーが client 側で接続を作り直す（再 consent）。これで `write_enabled_at` が刻まれる
+
+`scopes_supported` は常に全 8 scope を広告する。client（Claude など）は広告された scope をそのまま要求するため、広告しないと **gate を全部開けても write が一度も要求されない**。付与するかどうかは consent が client 単位で決め、**env allowlist と DB gate の両方が開いている時だけ** write を付ける。どちらかが閉じていれば write を落とした read-only の grant になり、consent は失敗しない（`isConsentWriteEnabled` / `resolveGrantableScopes`）。したがって緊急停止で DB gate だけを先に閉じても、その client の read-only 接続は作り続けられる。
+
 #### 利用権（billing）判定の切替
 
 MCP の利用権判定は読み取りと書き込みで持ち場が違う（2026-09-08、単一有料プラン移行 #2610 / PR #2668）。
