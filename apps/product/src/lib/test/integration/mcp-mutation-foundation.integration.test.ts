@@ -73,6 +73,75 @@ async function createWriteConnection() {
   return data;
 }
 
+/** grant -> code 交換まで通し、apply RPC が要求する (connection, access token) を得る。 */
+async function createWriteAuthorization(): Promise<{
+  connectionId: string;
+  accessTokenId: string;
+}> {
+  const code = `code-${crypto.randomUUID()}`;
+  const { data: connectionId, error: grantError } = await admin.rpc(
+    'create_oauth_authorization_grant_v2',
+    {
+      p_user_id: userId,
+      p_client_id: 'chatgpt',
+      p_resource_uri: resource,
+      p_scopes: ['read:entries', 'write:plans'],
+      p_code_hash: hashToken(code),
+      p_redirect_uri: redirectUri,
+      p_code_challenge: challenge,
+      p_write_enabled: true,
+    },
+  );
+  if (grantError || !connectionId) throw grantError ?? new Error('Connection was not created');
+
+  const { data: exchange, error: exchangeError } = await admin.rpc(
+    'exchange_oauth_authorization_code_v2',
+    {
+      p_code_hash: hashToken(code),
+      p_client_id: 'chatgpt',
+      p_redirect_uri: redirectUri,
+      p_resource_uri: resource,
+      p_code_challenge: challenge,
+      p_refresh_hash: hashToken(`dop_rt_${crypto.randomUUID()}`),
+      p_access_hash: hashToken(`dop_at_${crypto.randomUUID()}`),
+    },
+  );
+  if (exchangeError) throw exchangeError;
+  const accessTokenId = exchange?.[0]?.access_id;
+  if (!accessTokenId) throw new Error('Access token was not issued');
+
+  return { connectionId, accessTokenId };
+}
+
+/** MCP write は利用権（DM005）を要求する。gate の検証に集中するため契約中にしておく。 */
+async function entitleUser(): Promise<void> {
+  const { error } = await admin
+    .from('profiles')
+    .update({ subscription_status: 'active' })
+    .eq('id', userId);
+  if (error) throw error;
+}
+
+/**
+ * gate の可否だけを見る apply。Plan 同士の重なりは禁止（`plans_no_overlap`）なので、
+ * 呼び出しごとに別スロットを使う。
+ */
+let nextProbeSlotHours = 24;
+function applyPlanCreate(authorization: { connectionId: string; accessTokenId: string }) {
+  const startHours = nextProbeSlotHours++;
+  return admin
+    .rpc('apply_mcp_plan_create_v1', {
+      p_connection_id: authorization.connectionId,
+      p_access_token_id: authorization.accessTokenId,
+      p_operation_id: crypto.randomUUID(),
+      p_title: `gate probe ${startHours}`,
+      p_note: null as never,
+      p_start_at: new Date(Date.now() + startHours * 60 * 60_000).toISOString(),
+      p_end_at: new Date(Date.now() + (startHours + 0.5) * 60 * 60_000).toISOString(),
+    })
+    .single();
+}
+
 describe.skipIf(!RUN_LOCAL)('MCP mutation foundation integration', () => {
   beforeAll(async () => {
     const { error: createError } = await admin.auth.admin.createUser({
@@ -170,6 +239,54 @@ describe.skipIf(!RUN_LOCAL)('MCP mutation foundation integration', () => {
     expect(readError).toBeNull();
     expect(new Date(connection!.last_used_at!).getTime()).toBe(new Date(usedAt).getTime());
     expect(connection?.write_enabled_at).not.toBeNull();
+  });
+
+  it('rejects writes once the access token has expired', async () => {
+    // 期限切れの access token は `private.authorize_mcp_mutation_v1` の
+    // `LEAST(token.expires_at, connection.reauth_required_at) > now()` で落ちる。
+    // token 検証はアプリ層（`lib/mcp/auth.ts`）にもあるが、そこを迂回して apply RPC を
+    // 直に叩いても通らないことを DB 側で固定する。
+    await entitleUser();
+    await setMutationControl(true);
+    await setClientWriteControl('chatgpt', true);
+    const authorization = await createWriteAuthorization();
+
+    const healthy = await applyPlanCreate(authorization);
+    expect(healthy.error).toBeNull();
+
+    const { error: expireError } = await admin
+      .from('oauth_tokens')
+      .update({ expires_at: new Date(Date.now() - 60_000).toISOString() })
+      .eq('id', authorization.accessTokenId);
+    expect(expireError).toBeNull();
+
+    const expired = await applyPlanCreate(authorization);
+    expect(expired.error?.code).toBe('DM004');
+
+    await setClientWriteControl('chatgpt', false);
+    await setMutationControl(false);
+  });
+
+  it('keeps the global switch authoritative even when the client is allowed', async () => {
+    // grant 時の RPC は `enabled_client_ids` しか見ず、`writes_enabled` は見ない
+    // （#2721 D-12 の非対称）。global を落とした状態で client だけ許可しても、
+    // 実行時の `authorize_mcp_mutation_v1` が DM003 で止めることを固定する。
+    await entitleUser();
+    await setMutationControl(true);
+    await setClientWriteControl('chatgpt', true);
+    const authorization = await createWriteAuthorization();
+    expect((await applyPlanCreate(authorization)).error).toBeNull();
+
+    const stopped = await setMutationControl(false);
+    expect(stopped.writes_enabled).toBe(false);
+    const current = await readMutationControl();
+    // client 側の allowlist は開いたまま = global だけが閉じている状態。
+    expect(current.enabled_client_ids).toEqual(['chatgpt']);
+
+    const blocked = await applyPlanCreate(authorization);
+    expect(blocked.error?.code).toBe('DM003');
+
+    await setClientWriteControl('chatgpt', false);
   });
 
   it('keeps authoritative receipts payload-free and non-forgeable', async () => {
