@@ -69,7 +69,8 @@
       "selectActivity": "アクティビティを選択...",
       "preview": {
         "plan": "予定",
-        "record": "記録"
+        "record": "記録",
+        "remaining": "あと {duration}"
       }
     },
     "contextMenu": {

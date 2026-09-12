@@ -37,7 +37,7 @@ function durationMinutesOf(selection: {
 }
 
 /** ドラッグ選択で確定した時間範囲 */
-interface PendingSelection {
+export interface PendingSelection {
   date: Date;
   startHour: number;
   startMinute: number;
