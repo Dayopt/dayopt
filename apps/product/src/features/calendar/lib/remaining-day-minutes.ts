@@ -23,8 +23,11 @@ export const DAY_MINUTES = 24 * 60;
  *
  * `CalendarDisplayEvent`（instant の Date）と `plans.list` cache 行（ISO 文字列）の
  * どちらからも作れるよう、構造だけを要求する。
+ *
+ * export しない（呼び出し側は構造的に満たすオブジェクトを渡すだけで、この名前を
+ * 必要としない。export すると knip が未使用 export として弾く）。
  */
-export interface RemainingDayPlanRange {
+interface RemainingDayPlanRange {
   start: Date | string;
   end: Date | string;
   isDraft?: boolean | undefined;
