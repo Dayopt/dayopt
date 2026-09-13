@@ -728,42 +728,19 @@ function checkSupabaseMgmtDangerEndpoint(commandJoined, commandUnquoted) {
 }
 
 // ---------------------------------------------------------------------
-// gh pr merge / gh api ...pulls/.../merge の直接実行（cost guard、#2596）
+// merge の直接実行は block しない（2026-09-13、#2640）
 // ---------------------------------------------------------------------
-// merge 経路を `pnpm branch:finish <N>` 1 本に機械的に絞る（#2596）。free plan の
-// private repo では branch protection / ruleset が使えず、CI red の遮断は
-// finish-branch.sh の statusCheckRollup 判定だけが担っている。Bash tool からの
-// `gh pr merge` / `gh api ... -X PUT .../pulls/<N>/merge` 直接実行を許すと、この
-// 唯一の遮断を素通りできてしまう。
+// 2026-09-04（#2596）から 2026-09-13 までは `gh pr merge` / `gh api ... PUT
+// .../pulls/<N>/merge` を block し、merge 経路を `pnpm branch:finish <N>` 1 本に
+// 絞っていた。Free plan の private repo では ruleset が使えず、CI red の遮断を
+// finish-branch.sh の rollup 判定だけが担っていたため。
 //
-// finish-branch.sh 自身が内部で `gh api -X PUT .../pulls/$PR_NUMBER/merge` を実行
-// するが、それは spawn されたシェルの中の呼び出しであり、Bash tool には
-// `pnpm branch:finish <N>` という外側の1行しか見えないため、この rule では
-// 素通りする（#2596 実装 plan で確認済み）。
-//
-// **security guard ではなく cost guard**。迂回されても漏洩は起きない（CI red の
-// merge を試みるだけ）ので、判定は単純な正規表現に留める。
-const GH_PR_MERGE_RE =
-  /(^|[ \t\n\v\f\r;&|/])gh[ \t\n\v\f\r]+pr[ \t\n\v\f\r]+merge([ \t\n\v\f\r]|$)/;
-const GH_API_PULLS_MERGE_RE =
-  /(^|[ \t\n\v\f\r;&|/])gh[ \t\n\v\f\r]+api[ \t\n\v\f\r][^\n]*pulls\/[^ \t\n\v\f\r"']*\/merge/;
-const PUT_METHOD_FLAG_RE =
-  /(^|[ \t\n\v\f\r;&|])(-X|--method)[ \t\n\v\f\r=]*put([ \t\n\v\f\r;&|]|$)/i;
-
-function checkGhMergeDirectExecution(commandJoined, commandUnquoted) {
-  for (const scanned of [commandJoined, commandUnquoted]) {
-    if (GH_PR_MERGE_RE.test(scanned)) {
-      block(
-        'BLOCKED: gh pr merge を直接実行しないでください（#2596）。pnpm branch:finish <PR番号> を使ってください（CI red での merge を機械的に遮断します。この文字列に言及しただけでも落ちます。docs や commit message に書く時は文面を変えるか、Write / Edit で file に書いてから渡してください）',
-      );
-    }
-    if (GH_API_PULLS_MERGE_RE.test(scanned) && PUT_METHOD_FLAG_RE.test(scanned)) {
-      block(
-        'BLOCKED: gh api で pulls/<N>/merge へ PUT する直接実行は禁止です（#2596）。pnpm branch:finish <PR番号> を使ってください（CI red での merge を機械的に遮断します。この文字列に言及しただけでも落ちます。docs や commit message に書く時は文面を変えるか、Write / Edit で file に書いてから渡してください）',
-      );
-    }
-  }
-}
+// 2026-09-07 の repo public 化で main の ruleset（required status checks / strict
+// up-to-date / thread resolution、bypass actor 0）が有効になり、CI red の merge は
+// GitHub 自身がどの経路（local / cloud / UI / API / MCP）でも拒む。この guard は
+// Bash の `gh` 文字列しか見えず、MCP の merge tool は素通りしていたので、経路ごとに
+// 条件が違う非対称だけが残っていた。ruleset を唯一の gate にし、この rule は撤去した。
+// `pnpm branch:finish` は worktree / branch 掃除の入口として残る（gate ではない）。
 
 const OP_READ_RE = /(^|[ \t\n\v\f\r;&|/])op[ \t\n\v\f\r]+read([ \t\n\v\f\r]|$)/;
 
@@ -812,7 +789,6 @@ function checkBashCommand(rawCommand, cwd, execFileImpl) {
   checkVercelToken(commandJoined, commandUnquoted);
   checkSupabaseMgmtDangerEndpoint(commandJoined, commandUnquoted);
   checkOpRead(commandJoined, commandUnquoted);
-  checkGhMergeDirectExecution(commandJoined, commandUnquoted);
 }
 
 // =====================================================================

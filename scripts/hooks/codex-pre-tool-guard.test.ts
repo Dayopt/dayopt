@@ -92,7 +92,6 @@ describe('Codex shell and loader', () => {
   it.each([
     'git push --force',
     'git commit --no-verify',
-    'gh pr merge 123',
     'op read op://agent/item/field',
     'cat .env.local',
     'cat supabase/.env.test',
@@ -148,7 +147,7 @@ describe('Codex shell and loader', () => {
       input: JSON.stringify({
         cwd: root,
         tool_name: 'Bash',
-        tool_input: { command: 'gh pr merge 123' },
+        tool_input: { command: 'git push --force' },
       }),
       encoding: 'utf8',
     });

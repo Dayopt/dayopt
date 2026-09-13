@@ -1813,74 +1813,28 @@ describe('pre-tool-guard.mjs: env-file 名の直後の非 ASCII 空白（NBSP）
 });
 
 // =====================================================================
-// gh pr merge / gh api ...pulls/.../merge の直接実行（cost guard、#2596）
+// merge の直接実行は block しない（2026-09-13、#2640）
 // =====================================================================
-// merge 経路を `pnpm branch:finish <N>` 1 本に機械的に絞る。free plan の private
-// repo では branch protection / ruleset が使えず、CI red の遮断は
-// finish-branch.sh の statusCheckRollup 判定だけが担っている。
-//
-// 他の Bash guard と同じく、**文字列に言及しただけでも落ちる**（コマンド本文を
-// 走査するため）。docs や commit message へ書く時は Write / Edit で file に
-// 書いてから渡す。
-describe('pre-tool-guard.mjs: gh pr merge 直接実行（#2596）', () => {
+// #2596 で入れた `gh pr merge` / `gh api ... PUT .../pulls/<N>/merge` の block は、
+// Free plan の private repo で ruleset が使えなかった時代の代替だった。2026-09-07 の
+// public 化で main の ruleset（bypass actor 0）が CI red の merge を全経路で拒むため、
+// guard 側の block は撤去し、ruleset を唯一の gate にした。この describe は
+// 「再導入しない」ことを固定する（block に戻すなら #2640 の決定を先に覆す）。
+describe('pre-tool-guard.mjs: merge の直接実行は ruleset に任せる（#2640）', () => {
   const bash = (command: string) => ({ tool_name: 'Bash', tool_input: { command } });
 
-  it('gh pr merge を直接実行すると block する', () => {
-    expect(runGuard(bash('gh pr merge 2596'))).toBe('block');
+  it('gh pr merge を block しない', () => {
+    expect(runGuard(bash('gh pr merge 2640 --merge'))).toBe('allow');
   });
 
-  it('gh pr merge に追加フラグが付いていても block する', () => {
-    expect(runGuard(bash('gh pr merge 2596 --merge --delete-branch'))).toBe('block');
-  });
-
-  it('引用符付きの PR 番号でも block する', () => {
-    expect(runGuard(bash('gh pr merge "2596"'))).toBe('block');
-  });
-
-  it('gh api で pulls/<N>/merge へ -X PUT する直接実行を block する', () => {
+  it('gh api で pulls/<N>/merge へ PUT しても block しない', () => {
     expect(
-      runGuard(
-        bash(
-          'gh api -X PUT repos/Dayopt/dayopt/pulls/2596/merge -f merge_method=merge -f sha=abc123',
-        ),
-      ),
-    ).toBe('block');
+      runGuard(bash('gh api -X PUT repos/Dayopt/dayopt/pulls/2640/merge -f merge_method=merge')),
+    ).toBe('allow');
   });
 
-  it('--method PUT（フラグの別表記）でも block する', () => {
-    expect(
-      runGuard(
-        bash('gh api --method PUT repos/Dayopt/dayopt/pulls/2596/merge -f merge_method=merge'),
-      ),
-    ).toBe('block');
-  });
-
-  it('--method put（小文字）でも block する', () => {
-    expect(
-      runGuard(
-        bash('gh api --method put repos/Dayopt/dayopt/pulls/2596/merge -f merge_method=merge'),
-      ),
-    ).toBe('block');
-  });
-
-  it('pnpm branch:finish は通す（誘導先を塞がない）', () => {
-    expect(runGuard(bash('pnpm branch:finish 2596'))).toBe('allow');
-  });
-
-  it('bash scripts/tasks/finish-branch.sh の直接起動も通す', () => {
-    expect(runGuard(bash('bash scripts/tasks/finish-branch.sh 2596'))).toBe('allow');
-  });
-
-  it('gh pr view 等 merge 以外の pr 操作は通す', () => {
-    expect(runGuard(bash('gh pr view 2596'))).toBe('allow');
-  });
-
-  it('PUT を伴わない gh api での pulls/.../merge 参照（状態確認）は通す', () => {
-    expect(runGuard(bash('gh api repos/Dayopt/dayopt/pulls/2596/merge'))).toBe('allow');
-  });
-
-  it('merge を含まない別コマンド名（word boundary）は通す', () => {
-    expect(runGuard(bash('gh pr merger-status 2596'))).toBe('allow');
+  it('pnpm branch:finish は引き続き通す（掃除の入口）', () => {
+    expect(runGuard(bash('pnpm branch:finish 2640'))).toBe('allow');
   });
 });
 
