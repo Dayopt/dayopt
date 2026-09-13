@@ -427,7 +427,7 @@ describe('CLI', () => {
     );
     expect(result.status).toBe(0);
     expect(result.stdout).toBe(
-      'docs_only=false\nproduct_unit=false\nweb_ci=false\nintegration=false\n',
+      'docs_only=false\nproduct_unit=false\nweb_ci=false\nintegration=false\nmcp_conformance=true\n',
     );
   });
 });
@@ -441,13 +441,13 @@ describe('CLI', () => {
 describe('formatGithubOutput', () => {
   it('product に影響する変更では product=true / web_ci=false / integration=false', () => {
     expect(formatGithubOutput(resolveImpact(['apps/product/src/foo.ts']))).toBe(
-      'docs_only=false\nproduct_unit=true\nweb_ci=false\nintegration=false\n',
+      'docs_only=false\nproduct_unit=true\nweb_ci=false\nintegration=false\nmcp_conformance=false\n',
     );
   });
 
   it('web に影響する変更では web_ci=true / product=false / integration=false', () => {
     expect(formatGithubOutput(resolveImpact(['apps/web/src/foo.ts']))).toBe(
-      'docs_only=false\nproduct_unit=false\nweb_ci=true\nintegration=false\n',
+      'docs_only=false\nproduct_unit=false\nweb_ci=true\nintegration=false\nmcp_conformance=false\n',
     );
   });
 
@@ -459,46 +459,46 @@ describe('formatGithubOutput', () => {
     const impact = resolveImpact(['.github/actions/setup/action.yml']) as Impact;
     expect(impact.web).toBe(false);
     expect(formatGithubOutput(impact)).toBe(
-      'docs_only=false\nproduct_unit=true\nweb_ci=true\nintegration=true\n',
+      'docs_only=false\nproduct_unit=true\nweb_ci=true\nintegration=true\nmcp_conformance=true\n',
     );
   });
 
   it('公開コンテンツ（apps/web/content）の変更は web_ci=true / integration=false', () => {
     expect(formatGithubOutput(resolveImpact(['apps/web/content/blog/en/foo.mdx']))).toBe(
-      'docs_only=false\nproduct_unit=false\nweb_ci=true\nintegration=false\n',
+      'docs_only=false\nproduct_unit=false\nweb_ci=true\nintegration=false\nmcp_conformance=false\n',
     );
   });
 
   it('中立 path のみの変更では product=false（Unit の product test を skip できる）・integration=false', () => {
     expect(formatGithubOutput(resolveImpact(['scripts/tasks/finish-branch.sh']))).toBe(
-      'docs_only=false\nproduct_unit=false\nweb_ci=false\nintegration=false\n',
+      'docs_only=false\nproduct_unit=false\nweb_ci=false\nintegration=false\nmcp_conformance=false\n',
     );
   });
 
   it('docs のみの変更では docs_only=true・integration=false', () => {
     expect(formatGithubOutput(resolveImpact(['docs/README.md']))).toBe(
-      'docs_only=true\nproduct_unit=false\nweb_ci=false\nintegration=false\n',
+      'docs_only=true\nproduct_unit=false\nweb_ci=false\nintegration=false\nmcp_conformance=false\n',
     );
   });
 
   it('判定不能（変更ファイル一覧が空）は全キーとも実行側に倒す', () => {
     expect(formatGithubOutput(resolveImpact([]))).toBe(
-      'docs_only=false\nproduct_unit=true\nweb_ci=true\nintegration=true\n',
+      'docs_only=false\nproduct_unit=true\nweb_ci=true\nintegration=true\nmcp_conformance=true\n',
     );
   });
 
   it('未知 path を含む変更は全キーとも実行側に倒す', () => {
     expect(formatGithubOutput(resolveImpact(['mystery.config.xyz']))).toBe(
-      'docs_only=false\nproduct_unit=true\nweb_ci=true\nintegration=true\n',
+      'docs_only=false\nproduct_unit=true\nweb_ci=true\nintegration=true\nmcp_conformance=true\n',
     );
   });
 
   it('impact が壊れていても実行側に倒す（fail closed）', () => {
     expect(formatGithubOutput(undefined)).toBe(
-      'docs_only=false\nproduct_unit=true\nweb_ci=true\nintegration=true\n',
+      'docs_only=false\nproduct_unit=true\nweb_ci=true\nintegration=true\nmcp_conformance=true\n',
     );
     expect(formatGithubOutput({})).toBe(
-      'docs_only=false\nproduct_unit=true\nweb_ci=true\nintegration=true\n',
+      'docs_only=false\nproduct_unit=true\nweb_ci=true\nintegration=true\nmcp_conformance=true\n',
     );
   });
 });
@@ -765,5 +765,35 @@ describe('provider-neutral harness paths', () => {
     '.claude/skills',
   ])('keeps executable/config %s outside docs-only skipping', (file) => {
     expectImpact([file], { docsOnly: false });
+  });
+});
+
+describe('MCP conformance impact', () => {
+  it.each([
+    'apps/product/src/app/api/mcp/_tools/registry.ts',
+    'apps/product/src/app/mcp/route.ts',
+    'apps/product/src/lib/mcp/auth.ts',
+    'apps/product/src/lib/oauth-server/scopes.ts',
+    'apps/product/scripts/mcp-conformance-expected-failures.yml',
+    'apps/product/package.json',
+    'pnpm-lock.yaml',
+    'pnpm-workspace.yaml',
+    'scripts/ci/impact.mjs',
+    'scripts/ci/check.mjs',
+    '.github/workflows/ci.yml',
+  ])('%s runs protocol checks', (path) => {
+    expect(resolveImpact([path]).mcpConformance).toBe(true);
+  });
+  it.each([
+    'docs/operations/runbook.md',
+    'apps/web/content/docs/ja/data/api-mcp.mdx',
+    'apps/product/src/features/calendar/components/Calendar.tsx',
+  ])('%s skips protocol checks', (path) => {
+    expect(resolveImpact([path]).mcpConformance).toBe(false);
+  });
+  it('cannot silently skip on unknown or missing impact', () => {
+    expect(resolveImpact([]).mcpConformance).toBe(true);
+    expect(resolveImpact(['unknown.config']).mcpConformance).toBe(true);
+    expect(formatGithubOutput(undefined)).toContain('mcp_conformance=true');
   });
 });
