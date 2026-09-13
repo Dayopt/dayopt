@@ -12,7 +12,7 @@ import { captureUnexpectedDatabaseError } from '@/lib/sentry';
 
 import type { ServiceSupabaseClient } from './types';
 
-export interface StatPlanRow {
+interface StatPlanRow {
   id: string;
   activity_id: string | null;
   start_at: string;
@@ -27,7 +27,7 @@ interface StatRecordRow {
   end_at: string;
 }
 
-export interface DateRangeInput {
+interface DateRangeInput {
   startDate?: string | undefined;
   endDate?: string | undefined;
 }
