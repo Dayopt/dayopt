@@ -1,5 +1,5 @@
 /**
- * Timeblock[] → iCalendar 文字列変換
+ * Plan[] → iCalendar 文字列変換
  *
  * RFC 5545 準拠の VCALENDAR を生成。
  * Google Calendar / Apple Calendar などで購読可能。
@@ -7,12 +7,13 @@
 
 import { dayoptDomains } from '@dayopt/config';
 
-interface ICalEntry {
+/** `plans` 行のうち iCal に載せる列。列名は DB（`plans`）と同じにして詰め替えを持たない */
+interface ICalPlan {
   id: string;
   title: string;
-  description: string | null;
-  start_time: string | null;
-  end_time: string | null;
+  note: string | null;
+  start_at: string | null;
+  end_at: string | null;
   created_at: string | null;
   updated_at: string | null;
 }
@@ -59,9 +60,9 @@ function foldLine(line: string): string {
 }
 
 /**
- * Timeblock配列からiCalendar文字列を生成
+ * Plan 配列から iCalendar 文字列を生成
  */
-export function plansToICal(entries: ICalEntry[]): string {
+export function plansToICal(plans: ICalPlan[]): string {
   const lines: string[] = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
@@ -71,31 +72,31 @@ export function plansToICal(entries: ICalEntry[]): string {
     'X-WR-CALNAME:Dayopt',
   ];
 
-  for (const entry of entries) {
-    if (!entry.start_time || !entry.end_time) continue;
+  for (const plan of plans) {
+    if (!plan.start_at || !plan.end_at) continue;
 
     // SUMMARY は Plan のタイトル。#2162 cutover 以降に作られた Plan は tag_id が
     // NULL なので旧実装でも実質 title へ落ちており、ここでの一本化は現行挙動への
     // 収束（cutover 前の古い Plan だけ、旧タグ名 → タイトル へ変わる）。
-    const summary = entry.title;
-    const uid = `${entry.id}@${dayoptDomains.marketing}`;
+    const summary = plan.title;
+    const uid = `${plan.id}@${dayoptDomains.marketing}`;
 
     lines.push('BEGIN:VEVENT');
     lines.push(foldLine(`UID:${uid}`));
-    lines.push(`DTSTART:${toICalDateTime(entry.start_time)}`);
-    lines.push(`DTEND:${toICalDateTime(entry.end_time)}`);
+    lines.push(`DTSTART:${toICalDateTime(plan.start_at)}`);
+    lines.push(`DTEND:${toICalDateTime(plan.end_at)}`);
     lines.push(foldLine(`SUMMARY:${escapeICalText(summary)}`));
 
-    if (entry.description) {
-      lines.push(foldLine(`DESCRIPTION:${escapeICalText(entry.description)}`));
+    if (plan.note) {
+      lines.push(foldLine(`DESCRIPTION:${escapeICalText(plan.note)}`));
     }
 
-    if (entry.created_at) {
-      lines.push(`DTSTAMP:${toICalDateTime(entry.created_at)}`);
+    if (plan.created_at) {
+      lines.push(`DTSTAMP:${toICalDateTime(plan.created_at)}`);
     }
 
-    if (entry.updated_at) {
-      lines.push(`LAST-MODIFIED:${toICalDateTime(entry.updated_at)}`);
+    if (plan.updated_at) {
+      lines.push(`LAST-MODIFIED:${toICalDateTime(plan.updated_at)}`);
     }
 
     lines.push('END:VEVENT');
