@@ -343,6 +343,21 @@ describe('sanitizeSentryEvent', () => {
     expect(JSON.stringify(result)).not.toContain('meet me at noon');
   });
 
+  it('keeps an internal connection id and failure count, but drops non-UUID connection ids (#2687)', () => {
+    const connectionId = '6F9619FF-8B86-D011-B42D-00CF4FC964FF';
+    expect(sanitizeTechnicalContext({ connectionId, consecutiveFailures: 6 })).toEqual({
+      connectionId: connectionId.toLowerCase(),
+      consecutiveFailures: 6,
+    });
+
+    const leaked = sanitizeTechnicalContext({
+      connectionId: 'someone@example.com',
+      consecutiveFailures: '6',
+    });
+    expect(leaked).toEqual({});
+    expect(JSON.stringify(leaked)).not.toContain('example.com');
+  });
+
   it('drops an arbitrary deep subtree instead of returning any original leaf', () => {
     const root: Record<string, unknown> = {};
     let cursor = root;

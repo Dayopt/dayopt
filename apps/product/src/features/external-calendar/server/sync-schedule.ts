@@ -13,6 +13,19 @@
  */
 export const DUE_STALENESS_MS = 14 * 60 * 1000;
 
+/**
+ * 前進しなかった run がこの回数続いた接続は、cron の通常の due から外す（#2687）。
+ * cron 15 分 × 6 ≒ 1.5 時間。`status` は変えない（provider / DB 障害でも積もるため、
+ * 全ユーザーを再同意に追い込まない）。`syncNow` / 選択変更の同期が 1 回前進すれば 0 に戻る。
+ */
+export const SYNC_PAUSE_FAILURE_THRESHOLD = 6;
+
+/**
+ * due から外した接続を cron が再試行する間隔。外したまま放置すると provider / DB 障害が
+ * 明けても誰かが手で同期するまで止まり続けるので、1 日 1 回は試す。
+ */
+export const PAUSED_CONNECTION_RETRY_MS = 24 * 60 * 60 * 1000;
+
 /** 1 日を 15 分刻みで割ったスロット数（24h × 4）。cron 間隔と一致する。 */
 const SLOTS_PER_DAY = 96;
 const SLOT_LENGTH_MINUTES = 15;

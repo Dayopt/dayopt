@@ -54,6 +54,7 @@ function connections(n: number) {
   return Array.from({ length: n }, (_, index) => ({
     id: `00000000-0000-4000-8000-${index.toString().padStart(12, '0')}`,
     user_id: `10000000-0000-4000-8000-${index.toString().padStart(12, '0')}`,
+    consecutive_failures: index,
   }));
 }
 
@@ -80,13 +81,15 @@ describe('dispatchCalendarSync — due フィルタ', () => {
     // status='active' で絞る
     expect(recorder.chain).toContainEqual({ method: 'eq', args: ['status', 'active'] });
     // last_synced_at is null or < cutoff
-    const orArg = String(methods.or?.[0] ?? '');
-    expect(orArg).toContain('last_synced_at.is.null');
-    expect(orArg).toContain('last_synced_at.lt.');
+    const orArgs = recorder.chain.filter((e) => e.method === 'or').map((e) => String(e.args[0]));
+    expect(orArgs).toHaveLength(2);
+    expect(orArgs[0]).toBe('last_synced_at.is.null,last_synced_at.lt.2026-07-24T02:53:00.000Z');
+    // 連続失敗が閾値未満、または前回の書き込みから 1 日経った接続だけ（#2687）
+    expect(orArgs[1]).toBe('consecutive_failures.lt.6,updated_at.lt.2026-07-23T03:07:00.000Z');
     // 昇順・NULL 最優先
     expect(methods.order).toEqual(['last_synced_at', { ascending: true, nullsFirst: true }]);
     // token 系を触らない列指定
-    expect(String(methods.select?.[0])).toBe('id, user_id');
+    expect(String(methods.select?.[0])).toBe('id, user_id, consecutive_failures');
   });
 
   it('列挙エラーは throw する（route が 500 にできるよう）', async () => {
@@ -130,7 +133,12 @@ describe('dispatchCalendarSync — 逐次同期', () => {
     expect(summary).toMatchObject({ due: 3, processed: 3, failed: 1, deferred: 0 });
     expect(captureUnexpectedError).toHaveBeenCalledWith(
       expect.objectContaining({ message: 'calendar connection sync was isolated' }),
-      expect.objectContaining({ operation: 'dispatch_sync_connection' }),
+      expect.objectContaining({
+        operation: 'dispatch_sync_connection',
+        // どの接続が何回失敗しているかを内部 ID で追えるようにする（#2687）
+        connectionId: '00000000-0000-4000-8000-000000000000',
+        consecutiveFailures: 0,
+      }),
     );
     expect(JSON.stringify(captureUnexpectedError.mock.calls)).not.toContain(
       'provider-secret-detail',

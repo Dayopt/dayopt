@@ -10,7 +10,12 @@ import { createServiceRoleClient } from '@/lib/supabase/oauth';
 
 import { TOKEN_REQUEST_TIMEOUT_MS } from './google-oauth';
 import { GOOGLE_API_TIMEOUT_MS } from './providers/google';
-import { DUE_STALENESS_MS, isDailyFullSyncSlot } from './sync-schedule';
+import {
+  DUE_STALENESS_MS,
+  isDailyFullSyncSlot,
+  PAUSED_CONNECTION_RETRY_MS,
+  SYNC_PAUSE_FAILURE_THRESHOLD,
+} from './sync-schedule';
 import { syncConnection } from './sync-service';
 
 /**
@@ -51,7 +56,51 @@ type DispatchSummary = {
   deferred: number;
 };
 
-type DueConnection = { id: string; user_id: string };
+type DueConnection = { id: string; user_id: string; consecutive_failures: number };
+
+type DispatchDbClient = ReturnType<typeof createServiceRoleClient>;
+
+/**
+ * due な接続を列挙する。
+ *
+ * due = active かつ「一度も同期していない or staleness を超えた」かつ「連続失敗が閾値未満、
+ * または前回の書き込みから再試行間隔が過ぎた」。列は明示。last_synced_at 昇順（NULL 最優先）で、
+ * 最も古い接続から処理して starvation を防ぐ。
+ *
+ * 連続失敗が閾値に達した接続は last_synced_at が進まない（#2687）ため、放っておくと毎回列の
+ * 先頭を占める。再試行の起点は `updated_at`（BEFORE UPDATE trigger が更新する）で、失敗 run の
+ * 書き込み自体が次の再試行を 1 日先へ送る。
+ */
+export async function listDueConnections(
+  db: DispatchDbClient,
+  now: Date,
+): Promise<DueConnection[]> {
+  const staleBefore = new Date(now.getTime() - DUE_STALENESS_MS).toISOString();
+  const pausedRetryBefore = new Date(now.getTime() - PAUSED_CONNECTION_RETRY_MS).toISOString();
+
+  // 2 つの or() は別々の `or` クエリパラメータになり、PostgREST が AND で結ぶ。
+  const { data, error } = await db
+    .from(databaseTables.calendarConnections)
+    .select('id, user_id, consecutive_failures')
+    .eq('status', 'active')
+    .or(`last_synced_at.is.null,last_synced_at.lt.${staleBefore}`)
+    .or(
+      `consecutive_failures.lt.${SYNC_PAUSE_FAILURE_THRESHOLD},updated_at.lt.${pausedRetryBefore}`,
+    )
+    .order('last_synced_at', { ascending: true, nullsFirst: true })
+    .limit(MAX_CONNECTIONS_PER_RUN);
+
+  if (error) {
+    captureUnexpectedDatabaseError(error, {
+      feature: 'external_calendar',
+      operation: 'dispatch_list_due_connections',
+    });
+    // 列挙自体が失敗したら何もできない。route が 500 にできるよう投げる。
+    throw error;
+  }
+
+  return data ?? [];
+}
 
 /**
  * due な接続を同期する。
@@ -65,29 +114,7 @@ export async function dispatchCalendarSync(params: {
 }): Promise<DispatchSummary> {
   const { now, deadlineAt } = params;
   const db = createServiceRoleClient();
-
-  // due = active かつ「一度も同期していない or staleness を超えた」。列は明示。
-  // last_synced_at 昇順（NULL 最優先）で、最も古い接続から処理して starvation を防ぐ。
-  const staleBefore = new Date(now.getTime() - DUE_STALENESS_MS).toISOString();
-
-  const { data, error } = await db
-    .from(databaseTables.calendarConnections)
-    .select('id, user_id')
-    .eq('status', 'active')
-    .or(`last_synced_at.is.null,last_synced_at.lt.${staleBefore}`)
-    .order('last_synced_at', { ascending: true, nullsFirst: true })
-    .limit(MAX_CONNECTIONS_PER_RUN);
-
-  if (error) {
-    captureUnexpectedDatabaseError(error, {
-      feature: 'external_calendar',
-      operation: 'dispatch_list_due_connections',
-    });
-    // 列挙自体が失敗したら何もできない。route が 500 にできるよう投げる。
-    throw error;
-  }
-
-  const dueConnections: DueConnection[] = data ?? [];
+  const dueConnections = await listDueConnections(db, now);
   const summary: DispatchSummary = {
     due: dueConnections.length,
     processed: 0,
@@ -134,10 +161,13 @@ export async function dispatchCalendarSync(params: {
     } catch {
       // token authorityやDB応答が未確定でも、1接続で後続due接続をstarveさせない。
       // raw errorにはprovider/DB情報が入り得るため固定messageだけを通知する。
+      // 接続は内部 ID と連続失敗数だけで識別する（email / provider account は載せない、#2687）。
       summary.failed += 1;
       captureUnexpectedError(new Error('calendar connection sync was isolated'), {
         feature: 'external_calendar',
         operation: 'dispatch_sync_connection',
+        connectionId: connection.id,
+        consecutiveFailures: connection.consecutive_failures,
       });
       logger.warn('[calendar-cron] connection sync failed; continuing dispatch');
     } finally {

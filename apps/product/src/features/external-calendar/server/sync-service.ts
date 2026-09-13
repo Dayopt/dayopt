@@ -147,6 +147,8 @@ function createSyncDbClient(): SyncClient {
 /** `refresh_token_enc` は column-scoped grant 外だが service_role なので読める。列は明示列挙する。 */
 type ConnectionRow = {
   data_generation: number;
+  /** 前進しなかった run の連続数（#2687）。legacy 経路の加算の元値に使う */
+  consecutive_failures: number;
   id: string;
   user_id: string;
   status: string;
@@ -253,7 +255,7 @@ export async function syncConnection(params: {
       feature: 'external_calendar',
       operation: 'decrypt_refresh_token',
     });
-    await writeConnectionError(db, connectionId, userId, 'encryption_key_invalid', runStartedAtIso);
+    await writeConnectionFailure(db, connection, 'encryption_key_invalid');
     return { outcome: 'encryption_key_invalid', calendarsSynced: 0, calendarsFailed: 0 };
   }
 
@@ -275,7 +277,7 @@ export async function syncConnection(params: {
       return reauthResult(reauthOutcome, 0, 0);
     }
     captureProviderError(error, 'start_session');
-    await writeConnectionError(db, connectionId, userId, providerErrorCode(error), runStartedAtIso);
+    await writeConnectionFailure(db, connection, providerErrorCode(error));
     return { outcome: 'partial_failure', calendarsSynced: 0, calendarsFailed: 0 };
   }
 
@@ -320,7 +322,7 @@ export async function syncConnection(params: {
   if (calendars === null) {
     // Sentry には既に出ている。ここでは「成功として last_synced_at を進めない」ことと、
     // ユーザーに見える形でエラーを残すことが要る。
-    await writeConnectionError(db, connectionId, userId, 'partial_failure', runStartedAtIso);
+    await writeConnectionFailure(db, connection, 'partial_failure');
     return { outcome: 'partial_failure', calendarsSynced: 0, calendarsFailed: 0 };
   }
 
@@ -400,7 +402,7 @@ export async function syncConnection(params: {
   // 起きた場合、後者を先に返すと「選択を確認して」という実失敗側の行動喚起が
   // 「もう一度お試しください」に隠れてしまう（risk-reviewer 指摘、PR #2075）。
   if (calendarsFailed > 0) {
-    await writeConnectionError(db, connectionId, userId, 'partial_failure', runStartedAtIso);
+    await writeConnectionFailure(db, connection, 'partial_failure');
     return { outcome: 'partial_failure', calendarsSynced, calendarsFailed };
   }
 
@@ -409,7 +411,7 @@ export async function syncConnection(params: {
     if (calendarsSynced > 0) {
       // 部分的に進捗があった（sync_token は完走した分だけ既に確定済み）。次回 sync は
       // 残りのカレンダーから再開する。last_synced_at を進めて記録する。
-      await writeConnectionError(db, connectionId, userId, 'partial_timeout', runStartedAtIso);
+      await writeConnectionProgress(db, connectionId, userId, 'partial_timeout', runStartedAtIso);
     }
     // else: 完全な空振り（1 カレンダーも完走しなかった）。last_synced_at を進めると
     // due 判定（last_synced_at 昇順）でこの接続が列の最後尾へ回り、starvation 防止の
@@ -418,7 +420,7 @@ export async function syncConnection(params: {
     return { outcome: 'partial_timeout', calendarsSynced, calendarsFailed };
   }
 
-  await writeConnectionSuccess(db, connectionId, userId, runStartedAtIso);
+  await writeConnectionProgress(db, connectionId, userId, null, runStartedAtIso);
   return { outcome: 'synced', calendarsSynced, calendarsFailed };
 }
 
@@ -940,13 +942,13 @@ async function loadConnection(
         cause: normalized,
       });
     }
-    return data === null ? null : { ...data, data_generation: 0 };
+    return data === null ? null : { ...data, data_generation: 0, consecutive_failures: 0 };
   }
 
   // 列は明示列挙する。column-scoped grant のため select('*') は 42501 になる。
   const { data, error } = await db
     .from(databaseTables.calendarConnections)
-    .select('id, user_id, status, refresh_token_enc, data_generation')
+    .select('id, user_id, status, refresh_token_enc, data_generation, consecutive_failures')
     .eq('id', connectionId)
     .eq('user_id', userId)
     .maybeSingle();
@@ -1125,28 +1127,43 @@ function reauthResult(
   );
 }
 
-async function writeConnectionError(
+/**
+ * 前進しなかった run の記録（#2687）。
+ *
+ * `last_synced_at` は進めない。進めると恒久的に壊れた接続の「最終同期」が常に新しく見え、
+ * ユーザーも運用側も同期が止まっていることに気づけない。連続失敗数を 1 積み、閾値を超えた
+ * 接続は cron の due から外れる（`sync-dispatcher.ts`）。fenced 経路の同じ規則は
+ * `finish_calendar_sync_run_v1` が持つ。
+ *
+ * 加算は run 開始時に読んだ値からの read-modify-write。同じ接続の cron と `syncNow` が
+ * 重なった時だけ 1 回分数え落とすが、閾値判定が遅れる方向なので許容する。
+ */
+async function writeConnectionFailure(
+  db: SyncClient,
+  connection: ConnectionRow,
+  code: Exclude<SyncErrorCode, 'partial_timeout'>,
+): Promise<void> {
+  await updateConnection(db, connection.id, connection.user_id, {
+    last_sync_error: code,
+    consecutive_failures: connection.consecutive_failures + 1,
+  });
+}
+
+/**
+ * 1 カレンダー以上を完走した run の記録。成功（`code: null`）と `partial_timeout` がここに来る。
+ * `last_synced_at` を進め、連続失敗数を 0 に戻す。
+ */
+async function writeConnectionProgress(
   db: SyncClient,
   connectionId: string,
   userId: string,
-  code: SyncErrorCode,
+  code: 'partial_timeout' | null,
   runStartedAtIso: string,
 ): Promise<void> {
   await updateConnection(db, connectionId, userId, {
     last_sync_error: code,
     last_synced_at: runStartedAtIso,
-  });
-}
-
-async function writeConnectionSuccess(
-  db: SyncClient,
-  connectionId: string,
-  userId: string,
-  runStartedAtIso: string,
-): Promise<void> {
-  await updateConnection(db, connectionId, userId, {
-    last_sync_error: null,
-    last_synced_at: runStartedAtIso,
+    consecutive_failures: 0,
   });
 }
 
@@ -1170,7 +1187,9 @@ async function updateConnection(
 // =============================================================================
 
 /** provider の生メッセージを外へ出さないよう、error → 安定コードに畳む。 */
-function providerErrorCode(error: unknown): SyncErrorCode {
+function providerErrorCode(
+  error: unknown,
+): Extract<SyncErrorCode, 'reauth_required' | 'rate_limited' | 'provider_unavailable'> {
   if (error instanceof CalendarProviderError) {
     if (error.kind === 'reauth_required') return 'reauth_required';
     if (error.kind === 'rate_limited') return 'rate_limited';

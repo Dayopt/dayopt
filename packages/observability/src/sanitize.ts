@@ -10,6 +10,9 @@ export interface TechnicalErrorContext {
   source?: string;
   component?: string;
   digest?: string;
+  /** 内部の接続 ID。UUID 形だけを通す（email / provider account は通さない、#2687） */
+  connectionId?: string;
+  consecutiveFailures?: number;
 }
 
 const REDACTED = '[REDACTED]';
@@ -35,6 +38,8 @@ const TECHNICAL_CONTEXT_KEYS = new Set([
   'category',
   'component',
   'componentstack',
+  'connectionid',
+  'consecutivefailures',
   'count',
   'digest',
   'directive',
@@ -62,7 +67,16 @@ const TECHNICAL_CONTEXT_KEYS = new Set([
   'type',
 ]);
 
-const TECHNICAL_NUMBER_KEYS = new Set(['attempt', 'count', 'duration', 'limit', 'statuscode']);
+const TECHNICAL_NUMBER_KEYS = new Set([
+  'attempt',
+  'consecutivefailures',
+  'count',
+  'duration',
+  'limit',
+  'statuscode',
+]);
+
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const TECHNICAL_TAG_KEYS = new Set([
   ...TECHNICAL_CONTEXT_KEYS,
@@ -411,6 +425,9 @@ function sanitizeTechnicalValue(key: string, value: unknown): unknown {
   const normalized = normalizedKey(key);
   if (normalized === 'requestid' || normalized === 'digest') {
     return sanitizeTechnicalIdentifier(value);
+  }
+  if (normalized === 'connectionid') {
+    return typeof value === 'string' && UUID_PATTERN.test(value) ? value.toLowerCase() : undefined;
   }
   if (normalized === 'route' || normalized === 'page') {
     return typeof value === 'string' ? sanitizeObservabilityUrl(value) : undefined;
