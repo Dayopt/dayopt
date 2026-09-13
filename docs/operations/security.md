@@ -53,7 +53,8 @@ GitHub Actionsのセキュリティ設定、OWASP準拠のセキュリティ監�
 （`Production Config Audit`）を `finish-branch.sh` の trusted dispatch 免除が照合するため。
 **この context を ruleset の required 指定に使ってはいけない**（2026-09-03、#2571。PR で
 publish されるのは `paths` に一致する contract 変更 PR だけなので、required にすると
-それ以外の PR が永久に `expected` で止まる。詳細は
+それ以外の PR が永久に `expected` で止まる。2026-09-07 の public 化で実際に required に入り
+全 PR が止まった。2026-09-13 に #2640 で外した。詳細は
 [infra.md §merge gate の required checks](../engineering/infra.md#merge-gate-の-required-checks)）。
 
 `contents: write` は持たない（外部 API の結果を受けて動く job に書き込み権限を与えない）。
@@ -92,7 +93,7 @@ publish されるのは `paths` に一致する contract 変更 PR だけなの�
 
 どの context を required にするかは [infra.md §merge gate の required checks](../engineering/infra.md#merge-gate-の-required-checks) を正本とする。ここには複製しない（job 名を変えるたびに 2 箇所が乖離するため）。
 
-2026-09-07 の repo public 化以降、main の ruleset `6790553` が required status checks / strict up-to-date / thread resolution を GitHub 側で強制する（bypass actor 0）。実状は `gh api repos/Dayopt/dayopt/rulesets/6790553` で確認できる。`scripts/tasks/finish-branch.sh` はその上位互換の検査（`🧪 Integration Tests` / Vercel context の名前要求）を追加で行う。public 化前（Free plan の private repo）は ruleset API が 403 を返し finish-branch.sh だけが gate だった。
+2026-09-07 の repo public 化以降、main の ruleset `6790553` が required status checks（`🧪 Integration Tests` を含む。2026-09-13、#2640）/ strict up-to-date / thread resolution を GitHub 側で全経路に強制する（bypass actor 0）。これが唯一の merge gate で、実状は `gh api repos/Dayopt/dayopt/rulesets/6790553` で確認できる。`scripts/tasks/finish-branch.sh` は merge と掃除の入口で、その rollup 検査は ruleset と重複する冗長検査。public 化前（Free plan の private repo）は ruleset API が 403 を返し finish-branch.sh だけが gate だった。
 
 ### Fork Pull Request
 

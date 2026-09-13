@@ -9,6 +9,7 @@ import { render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useInlineCreateStore } from '../../../../../stores/useInlineCreateStore';
+import type { CalendarDisplayEvent } from '../../../../../types/calendar.types';
 
 import { DragSelectionHighlight } from './DragSelectionHighlight';
 
@@ -59,6 +60,35 @@ function seedSelection() {
       endMinute: 0,
     },
   });
+  return date;
+}
+
+/** 壁時計の日付 + 時刻から、mock した TZ（UTC）の instant を作る */
+function utcAt(day: Date, hour: number): Date {
+  return new Date(Date.UTC(day.getFullYear(), day.getMonth(), day.getDate(), hour, 0, 0, 0));
+}
+
+function planEvent(start: Date, end: Date, overrides: Partial<CalendarDisplayEvent> = {}) {
+  return {
+    id: `plan-${start.toISOString()}`,
+    title: 'Focus',
+    startDate: start,
+    endDate: end,
+    plannedStartDate: start,
+    plannedEndDate: end,
+    displayStartDate: start,
+    displayEndDate: end,
+    status: 'open',
+    color: 'var(--category-blue)',
+    activityId: 'a1',
+    createdAt: start,
+    updatedAt: end,
+    version: '2026-07-15T00:00:00.000000Z',
+    duration: 60,
+    isMultiDay: false,
+    kind: 'plan',
+    ...overrides,
+  } as CalendarDisplayEvent;
 }
 
 describe('DragSelectionHighlight のプレビュー', () => {
@@ -101,5 +131,93 @@ describe('DragSelectionHighlight のプレビュー', () => {
 
     expect(screen.queryByTestId('activity-marker')).not.toBeInTheDocument();
     expect(screen.getByText('散歩')).toBeInTheDocument();
+  });
+});
+
+describe('DragSelectionHighlight の残り時間（#2096）', () => {
+  beforeEach(() => {
+    useInlineCreateStore.setState({ pendingSelection: null, hoveredActivity: null });
+  });
+
+  it('24h からその日の予定合計と選択中の長さを引いた残りを出す', () => {
+    const day = seedSelection();
+    const dayEntries = [
+      planEvent(utcAt(day, 13), utcAt(day, 14)),
+      planEvent(utcAt(day, 15), utcAt(day, 16)),
+    ];
+
+    const { container } = render(
+      <DragSelectionHighlight hourHeight={60} dayEntries={dayEntries} />,
+    );
+
+    // 24h - 予定 2h - 選択 2h = 20h
+    expect(container.querySelector('[data-remaining-day-minutes]')).toHaveAttribute(
+      'data-remaining-day-minutes',
+      '1200',
+    );
+  });
+
+  it('別の日の予定は引かない', () => {
+    const day = seedSelection();
+    const otherDay = new Date(day);
+    otherDay.setDate(otherDay.getDate() + 1);
+
+    const { container } = render(
+      <DragSelectionHighlight
+        hourHeight={60}
+        dayEntries={[planEvent(utcAt(otherDay, 13), utcAt(otherDay, 14))]}
+      />,
+    );
+
+    // 24h - 選択 2h = 22h
+    expect(container.querySelector('[data-remaining-day-minutes]')).toHaveAttribute(
+      'data-remaining-day-minutes',
+      '1320',
+    );
+  });
+
+  it('記録の選択では出さない', () => {
+    const date = new Date();
+    date.setDate(date.getDate() - 2);
+    useInlineCreateStore.setState({
+      pendingSelection: {
+        date,
+        startHour: 9,
+        startMinute: 0,
+        endHour: 11,
+        endMinute: 0,
+        kind: 'record',
+      },
+    });
+
+    const { container } = render(<DragSelectionHighlight hourHeight={60} dayEntries={[]} />);
+
+    expect(container.querySelector('[data-remaining-day-minutes]')).toBeNull();
+  });
+
+  it('dayEntries が未配線なら出さない', () => {
+    seedSelection();
+
+    const { container } = render(<DragSelectionHighlight hourHeight={60} />);
+
+    expect(container.querySelector('[data-remaining-day-minutes]')).toBeNull();
+  });
+
+  it('compact（40px 未満）では出さない', () => {
+    const day = seedSelection();
+    useInlineCreateStore.setState({
+      pendingSelection: {
+        date: day,
+        startHour: 9,
+        startMinute: 0,
+        endHour: 9,
+        endMinute: 30,
+      },
+    });
+
+    // 30 分 x hourHeight 60 = 30px < 40px
+    const { container } = render(<DragSelectionHighlight hourHeight={60} dayEntries={[]} />);
+
+    expect(container.querySelector('[data-remaining-day-minutes]')).toBeNull();
   });
 });

@@ -12,8 +12,15 @@ import { memo } from 'react';
 import { useTranslations } from 'next-intl';
 
 import { resolveTimeblockDestination } from '@/features/timeblock';
+import { getDateKey } from '@/lib/date';
+import { useUserPreferences } from '@/lib/hooks/useUserPreferences';
 import { cn } from '@dayopt/components';
 
+import {
+  computeRemainingDayMinutes,
+  formatRemainingDuration,
+  planRangesFromCalendarEvents,
+} from '../../../../../lib/remaining-day-minutes';
 import {
   DEFAULT_PLAN_LANE_WIDTH_PERCENT,
   hasLaneCounterpart,
@@ -56,6 +63,7 @@ export const DragSelectionPreview = memo(function DragSelectionPreview({
 }: DragSelectionPreviewProps) {
   const tCalendar = useTranslations('calendar');
   const tEntry = useTranslations('timeblock');
+  const timezone = useUserPreferences((s) => s.timezone);
 
   // 選択範囲のスタイルを計算
   const startMinutes = selection.startHour * 60 + selection.startMinute;
@@ -111,6 +119,19 @@ export const DragSelectionPreview = memo(function DragSelectionPreview({
   // 通常時: 確定後の TwoLane カードと同じレーン位置・surface・角丸・余白。
   const isCompact = height < 40;
 
+  // #2096: 予定を置く瞬間だけ、その日の残り時間を静かに示す。
+  // 記録の選択・重なり表示中（上で早期 return）・compact では出さない。
+  // allDayEvents は範囲全体の未フィルタ一覧なので activity filter の影響を受けない。
+  const remainingMinutes =
+    isPlan && !isCompact && allDayEvents !== undefined
+      ? computeRemainingDayMinutes({
+          plans: planRangesFromCalendarEvents(allDayEvents),
+          dateKey: getDateKey(date),
+          timezone,
+          selectionMinutes: endMinutes - startMinutes,
+        })
+      : null;
+
   return (
     <div
       data-drag-selection-preview={kind}
@@ -138,6 +159,16 @@ export const DragSelectionPreview = memo(function DragSelectionPreview({
         <>
           <span className="truncate font-medium">{tCalendar('timeblock.selectActivity')}</span>
           <span className="text-muted-foreground truncate tabular-nums">{timeLabel}</span>
+          {remainingMinutes !== null && (
+            <span
+              data-remaining-day-minutes={remainingMinutes}
+              className="text-muted-foreground truncate tabular-nums"
+            >
+              {tCalendar('timeblock.preview.remaining', {
+                duration: formatRemainingDuration(remainingMinutes),
+              })}
+            </span>
+          )}
         </>
       )}
     </div>

@@ -36,9 +36,11 @@ import {
 import { convertFromTimezone } from '@/lib/date/timezone';
 import { useUserPreferences } from '@/lib/hooks/useUserPreferences';
 import { useHapticFeedback } from '../../hooks/accessibility/useHapticFeedback';
+import { formatRemainingDuration } from '../../lib/remaining-day-minutes';
 import { useInlineCreateStore } from '../../stores/useInlineCreateStore';
 
 import { useInlineCreate } from './useInlineCreate';
+import { useRemainingDayMinutes } from './useRemainingDayMinutes';
 
 interface InlineCreatePanelProps {
   /** パネルを閉じる（＝作成せずに破棄する） */
@@ -71,6 +73,9 @@ export function InlineCreatePanel({ onClose }: InlineCreatePanelProps) {
       fulfillment,
     },
   );
+
+  // #2096: 予定を置く瞬間だけ、その日の残り時間を静かに示す
+  const remainingMinutes = useRemainingDayMinutes(pendingSelection);
 
   // TimeblockEditor は Date で値を持つ。選択範囲（日付 + 時・分）へ落として store を更新する
   const handleDateTimeChange = useCallback(
@@ -153,7 +158,25 @@ export function InlineCreatePanel({ onClose }: InlineCreatePanelProps) {
             ariaLabel={tCalendar('activitySelector.kindLabel')}
           />
         </div>
-        <InspectorHeaderActions onCloseInspector={onClose} />
+        {/*
+          残り時間はヘッダーのタブの隣に置く。本文の先頭に入れると「アクティビティ選択は
+          タブの直下」（2026-09-07 User 指示）を崩すため。モバイル Drawer でも最上部に残る。
+          重なりエラー中（本文の dateTimeError）と記録タブでは出さない
+        */}
+        <div className="flex min-w-0 items-center gap-2">
+          {kind === 'plan' && !hasConflict && remainingMinutes !== null && (
+            <span
+              role="status"
+              data-remaining-day-minutes={remainingMinutes}
+              className="text-muted-foreground truncate text-xs tabular-nums"
+            >
+              {tCalendar('timeblock.preview.remaining', {
+                duration: formatRemainingDuration(remainingMinutes),
+              })}
+            </span>
+          )}
+          <InspectorHeaderActions onCloseInspector={onClose} />
+        </div>
       </div>
 
       {/*

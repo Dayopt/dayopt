@@ -4,7 +4,7 @@
  * リファクタリング済み: ロジックは専用フックに分離
  * - useScrollableCalendar: スクロール管理・キーボードナビゲーション
  * - useCurrentTimeLine: 現在時刻線のロジック
- * - useSleepHoursLayout: グリッドレイアウト計算
+ * - useCalendarGridLayout: グリッド高さ・今日の列位置の計算
  */
 
 'use client';
@@ -20,12 +20,12 @@ import { useUserPreferences } from '@/lib/hooks/useUserPreferences';
 import { resolveTimeColumnWidth } from '../constants/grid.constants';
 import { CurrentTimeLine } from '../grid/CurrentTimeLine';
 import { TimeColumn } from '../grid/TimeColumn/TimeColumn';
+import { useCalendarGridLayout } from '../hooks/useCalendarGridLayout';
 import { useContainerHeight } from '../hooks/useContainerHeight';
 import { useCurrentTimeLine } from '../hooks/useCurrentTimeLine';
 import { useHourHeightSync, useResponsiveHourHeight } from '../hooks/useResponsiveHourHeight';
 import { useScrollableCalendar } from '../hooks/useScrollableCalendar';
 import { useScrollTimeblockIntoView } from '../hooks/useScrollTimeblockIntoView';
-import { useSleepHoursLayout } from '../hooks/useSleepHoursLayout';
 import { TimezoneOffset } from './TimezoneOffset';
 
 /** ScrollableCalendarLayout コンポーネントのプロパティ */
@@ -158,7 +158,7 @@ export const ScrollableCalendarLayout = ({
   const HOUR_HEIGHT = useResponsiveHourHeight();
 
   // グリッドレイアウト計算（フック利用）
-  const { gridHeight, hasToday } = useSleepHoursLayout({
+  const { gridHeight, hasToday } = useCalendarGridLayout({
     hourHeight: HOUR_HEIGHT,
     displayDates,
   });

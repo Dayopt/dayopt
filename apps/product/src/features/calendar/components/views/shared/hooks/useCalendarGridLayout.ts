@@ -1,7 +1,12 @@
 /**
- * 睡眠時間帯のレイアウト計算
+ * カレンダーグリッドのレイアウト計算
  *
- * ScrollableCalendarLayoutから抽出したカスタムフック
+ * ScrollableCalendarLayout から抽出したカスタムフック。
+ * 24 時間分のグリッド高さと、表示範囲における今日の列位置を返す。
+ *
+ * 旧名は `useSleepHoursLayout` だったが、睡眠時間帯の描画も睡眠設定の読み取りも
+ * 行っていない（睡眠スケジュールは実装されたことがなく、参照の無い文言キーだけが
+ * 残っていた。同じ変更で削除した）。名前が嘘をつかないよう改名した（2026-09-13）。
  */
 
 import { useMemo } from 'react';
@@ -14,26 +19,23 @@ interface TodayColumnPosition {
   width: string;
 }
 
-/** useSleepHoursLayout フックのオプション */
-interface UseSleepHoursLayoutOptions {
+/** useCalendarGridLayout フックのオプション */
+interface UseCalendarGridLayoutOptions {
   hourHeight: number;
   displayDates?: Date[] | undefined;
 }
 
-/** useSleepHoursLayout フックの戻り値 */
-interface UseSleepHoursLayoutReturn {
+/** useCalendarGridLayout フックの戻り値 */
+interface UseCalendarGridLayoutReturn {
   gridHeight: number;
   todayColumnPosition: TodayColumnPosition | null;
   hasToday: boolean;
 }
 
-/**
- * カレンダーグリッドのレイアウト計算フック
- */
-export const useSleepHoursLayout = ({
+export const useCalendarGridLayout = ({
   hourHeight,
   displayDates = [],
-}: UseSleepHoursLayoutOptions): UseSleepHoursLayoutReturn => {
+}: UseCalendarGridLayoutOptions): UseCalendarGridLayoutReturn => {
   // グリッド高さ
   const gridHeight = HOURS_PER_DAY * hourHeight;
 

@@ -345,7 +345,7 @@ Code Qualityを採用しない判断と2026-07-21時点の外部設定証跡は�
 
 ### merge gate の required checks
 
-**merge gate は 2 段で、GitHub 側の ruleset と `pnpm branch:finish`（`scripts/tasks/finish-branch.sh`）が両方効く。** 2026-09-07 の repo public 化で main の ruleset `6790553`（`Branch name pattern: main`）が有効になり、required status checks（`🔍 Static Checks` / `📦 Unit Tests` / `Production Config Audit` / `Vercel – product` / `Vercel – web`）、strict up-to-date、review thread resolution 必須、bypass actor 0 を GitHub 自身が強制する（2026-09-08 実測。`gh api repos/Dayopt/dayopt/rulesets/6790553`）。2026-09-07 までは Free plan の private repo で ruleset API が 403 を返し、gate は finish-branch.sh だけだった（旧記述）。ruleset は skipped な required check を成功扱いにするので、finish-branch.sh が **success を名前で要求する**検査（`🧪 Integration Tests` の affected 判定、Vercel context の存在確認）は ruleset の上位互換として残す。UI / API から直接 merge する経路は ruleset だけを通る（Integration Tests を ruleset に足すかは [#2640](https://github.com/Dayopt/dayopt/issues/2640)）。`Production Config Audit` が required に入っているのは #2640 で外す（下記「ruleset の required 指定に使ってはいけない」の落とし穴が public 化で実際に発生した）。
+**merge gate は main の ruleset `6790553`（`Branch name pattern: main`）1 本。** 2026-09-07 の repo public 化で有効になり、required status checks（`🔍 Static Checks` / `📦 Unit Tests` / `🧪 Integration Tests` / `Vercel – product` / `Vercel – web`）、strict up-to-date、review thread resolution 必須、bypass actor 0 を GitHub 自身が local / cloud / UI / API / MCP のどの経路でも同じ条件で強制する（実状は `gh api repos/Dayopt/dayopt/rulesets/6790553`）。2026-09-13 に [#2640](https://github.com/Dayopt/dayopt/issues/2640) で `Production Config Audit` を required から外し、`🧪 Integration Tests` を足した。ruleset は skipped な required check を成功扱いにするので、DB を触らない PR で integration job が skip されても止まらない。`pnpm branch:finish`（`scripts/tasks/finish-branch.sh`）は merge と worktree / branch 掃除の入口で、その rollup 検査（affected 判定による `🧪 Integration Tests` の名前要求、Vercel context の存在確認）は ruleset と重複する冗長検査として残す。gate ではないので、UI / API / MCP から直接 merge しても条件は変わらない。2026-09-07 までは Free plan の private repo で ruleset API が 403 を返し、gate は finish-branch.sh だけだった（旧記述）。
 
 finish-branch.sh が名前で success を要求するのは `ci.yml` の 3 job（`🔍 Static Checks` / `📦 Unit Tests` / `🧪 Integration Tests`）に加えて次を含める。`🧪 Integration Tests` は 2026-09-02、[#2539](https://github.com/Dayopt/dayopt/issues/2539) で `📦 Unit Tests` から分離した。同じ #2539 で affected 判定を `🧭 Impact` job へ切り出し、`impact →（static ∥ unit ∥ integration）`の並列構成にしている（実測で CI 全体が 16 分 55 秒 → 6〜7 分台。run 33588708693 → 33615047182 / 33618057064。**この数値が構成の基準値の正本**で、`ci.yml` / `check.mjs` 側のコメントには数値を置かない）。**`🧭 Impact` は required にしない** — 下流 3 job は `needs.impact.result` を条件にせず、impact が落ちても空 output を fail closed（全実行）として受けて必ず走るため、検査そのものは常に行われる（この設計は Codex / 内製 risk-reviewer の P2 指摘で入れた。要求すると impact 障害時に全 job が skip され検査ゼロになる）。**`🧪 Integration Tests` は DB を触る PR でだけ走る**ため、`branch:finish` も affected な PR でだけ名前で要求する。
 
@@ -461,7 +461,7 @@ Main が `pnpm review:marker` の出力（`gh api --method POST repos/{owner}/{r
   それ以外の PR では status も check run も存在しない。required にすると、2026-08-05 の
   `ci.yml` paths-ignore 撤去（PR #1836）と同じく「永久に `expected` のまま」で全 PR が
   merge 不能になる。**2026-09-07 の public 化で ruleset が有効化され、この落とし穴が実際に発生した**
-  （全 PR が `mergeStateStatus: BLOCKED`、PR ごとの手動 dispatch で回避中。解消は [#2640](https://github.com/Dayopt/dayopt/issues/2640)）
+  （全 PR が `mergeStateStatus: BLOCKED`、5 日で 34 回の手動 dispatch で回避。2026-09-13 に [#2640](https://github.com/Dayopt/dayopt/issues/2640) で required から外して解消）
 - **外部モデルの自動 diff レビュー（ai-review / Gemini）は 2026-08-03 に撤去した。** レビューは
   外部レビュー（Codex。2026-08-13 に全 PR 適用を停止し、2026-09-01 にクロスレビュー必須 PR 限定で
   必須化して再開、#2529）と Claude の内部レビュー（`AGENTS.md §委任・報告の作法`

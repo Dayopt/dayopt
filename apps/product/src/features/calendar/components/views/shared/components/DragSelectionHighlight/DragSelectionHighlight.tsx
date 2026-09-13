@@ -21,13 +21,18 @@ import {
   resolveTimeblockKindChoice,
   useTimeblockInspectorStore,
 } from '@/features/timeblock';
-import { formatTimeString } from '@/lib/date';
+import { formatTimeString, getDateKey } from '@/lib/date';
 import { convertFromTimezone } from '@/lib/date/timezone';
 import { useUserPreferences } from '@/lib/hooks/useUserPreferences';
 import { cn } from '@dayopt/components';
 
 import { MIN_TIMEBLOCK_DURATION_MINUTES } from '../../../../../domain/precision';
 import { useHapticFeedback } from '../../../../../hooks/accessibility/useHapticFeedback';
+import {
+  computeRemainingDayMinutes,
+  formatRemainingDuration,
+  planRangesFromCalendarEvents,
+} from '../../../../../lib/remaining-day-minutes';
 import {
   DEFAULT_PLAN_LANE_WIDTH_PERCENT,
   hasLaneCounterpart,
@@ -147,6 +152,20 @@ export function DragSelectionHighlight({
       ? DEFAULT_PLAN_LANE_WIDTH_PERCENT
       : 100 - DEFAULT_PLAN_LANE_WIDTH_PERCENT;
 
+  // #2096: 予定を置く瞬間だけ、その日の残り時間を静かに示す。
+  // 記録の選択・重なり表示中・compact（40px 未満）では出さない。
+  // dayEntries は範囲全体の未フィルタ一覧なので activity filter の影響を受けない。
+  // pendingSelection.date は壁時計 Date なので getDateKey に timezone を渡さない（#2017 同型）。
+  const remainingMinutes =
+    isPlan && selectionHeight >= 40 && dayEntries !== undefined
+      ? computeRemainingDayMinutes({
+          plans: planRangesFromCalendarEvents(dayEntries),
+          dateKey: getDateKey(pendingSelection.date),
+          timezone,
+          selectionMinutes: endMinutes - startMinutes,
+        })
+      : null;
+
   // ホバー中アクティビティが継承する色を解決
   const hoveredColorClasses = hoveredActivity
     ? getCategoryColorClasses(hoveredActivity.color)
@@ -245,6 +264,16 @@ export function DragSelectionHighlight({
                 </div>
               </div>
               <span className="text-muted-foreground truncate tabular-nums">{timeLabel}</span>
+              {remainingMinutes !== null && (
+                <span
+                  data-remaining-day-minutes={remainingMinutes}
+                  className="text-muted-foreground truncate tabular-nums"
+                >
+                  {tCalendar('timeblock.preview.remaining', {
+                    duration: formatRemainingDuration(remainingMinutes),
+                  })}
+                </span>
+              )}
             </>
           )}
           {/* 下端リサイズ横棒は非表示統一。実際のリサイズは slider が担保。 */}

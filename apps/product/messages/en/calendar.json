@@ -69,7 +69,8 @@
       "selectActivity": "Select activity...",
       "preview": {
         "plan": "Plan",
-        "record": "Record"
+        "record": "Record",
+        "remaining": "{duration} left"
       }
     },
     "contextMenu": {

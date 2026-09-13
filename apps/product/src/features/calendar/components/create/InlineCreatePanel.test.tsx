@@ -17,6 +17,8 @@ const createPlanMutate = vi.hoisted(() => vi.fn());
 const createRecordMutate = vi.hoisted(() => vi.fn());
 const openInspector = vi.hoisted(() => vi.fn());
 const closeInspector = vi.hoisted(() => vi.fn());
+/** plans.list cache の代役。残り時間の計算対象（#2096） */
+const laneItems = vi.hoisted(() => [] as { id: string; start_at: string; end_at: string }[]);
 
 vi.mock('@/features/timeblock', async () => {
   const domain = await vi.importActual<
@@ -26,7 +28,7 @@ vi.mock('@/features/timeblock', async () => {
   return {
     resolveTimeblockDestination: domain.resolveTimeblockDestination,
     resolveTimeblockKindChoice: domain.resolveTimeblockKindChoice,
-    collectTimeblockLaneItems: () => [],
+    collectTimeblockLaneItems: () => laneItems,
     hasTimeblockLaneConflict: () => false,
     useTimeblockWriteMutations: () => ({
       createPlan: { mutate: createPlanMutate },
@@ -112,7 +114,8 @@ vi.mock('../../hooks/accessibility/useHapticFeedback', () => ({
 }));
 vi.mock('next-intl', () => ({
   useLocale: () => 'ja',
-  useTranslations: () => (key: string) => key,
+  useTranslations: () => (key: string, values?: Record<string, unknown>) =>
+    values ? `${key}:${JSON.stringify(values)}` : key,
 }));
 
 /** 指定日の 9:00-10:00 を pendingSelection に置く */
@@ -147,6 +150,7 @@ describe('InlineCreatePanel', () => {
     openInspector.mockClear();
     closeInspector.mockClear();
     useInlineCreateStore.getState().clearPendingSelection();
+    laneItems.length = 0;
   });
 
   it('過去スロットの既定は記録で、アクティビティを押した時点で Record を作る', () => {
@@ -283,5 +287,63 @@ describe('InlineCreatePanel', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
     expect(createPlanMutate).not.toHaveBeenCalled();
     expect(createRecordMutate).not.toHaveBeenCalled();
+  });
+
+  describe('その日の残り時間（#2096）', () => {
+    /** 壁時計の日付 + 時刻から、mock した TZ（UTC）の instant を作る */
+    function utcAt(day: Date, hour: number): string {
+      return new Date(
+        Date.UTC(day.getFullYear(), day.getMonth(), day.getDate(), hour, 0, 0, 0),
+      ).toISOString();
+    }
+
+    it('24h から cache 上の予定合計と選択中の長さを引いた残りを出す', () => {
+      const day = futureDay();
+      laneItems.push({ id: 'p1', start_at: utcAt(day, 13), end_at: utcAt(day, 14) });
+      setSelection(day);
+
+      const { container } = render(<InlineCreatePanel onClose={vi.fn()} />);
+
+      // 24h - 予定 1h - 選択 1h = 22h
+      const label = container.querySelector('[data-remaining-day-minutes]');
+      expect(label).toHaveAttribute('data-remaining-day-minutes', '1320');
+      expect(label?.textContent).toContain('22h');
+    });
+
+    it('別の日の予定は引かない', () => {
+      const day = futureDay();
+      const otherDay = new Date(day);
+      otherDay.setDate(otherDay.getDate() + 1);
+      laneItems.push({ id: 'p1', start_at: utcAt(otherDay, 13), end_at: utcAt(otherDay, 14) });
+      setSelection(day);
+
+      const { container } = render(<InlineCreatePanel onClose={vi.fn()} />);
+
+      // 24h - 選択 1h = 23h
+      expect(container.querySelector('[data-remaining-day-minutes]')).toHaveAttribute(
+        'data-remaining-day-minutes',
+        '1380',
+      );
+    });
+
+    it('記録タブでは出さない（過去スロットの既定）', () => {
+      setSelection(pastDay());
+
+      const { container } = render(<InlineCreatePanel onClose={vi.fn()} />);
+
+      expect(container.querySelector('[data-remaining-day-minutes]')).toBeNull();
+    });
+
+    it('過去スロットで予定タブへ切り替えると出る', () => {
+      setSelection(pastDay());
+
+      const { container } = render(<InlineCreatePanel onClose={vi.fn()} />);
+      fireEvent.click(screen.getByRole('tab', { name: 'timeblock.preview.plan' }));
+
+      expect(container.querySelector('[data-remaining-day-minutes]')).toHaveAttribute(
+        'data-remaining-day-minutes',
+        '1380',
+      );
+    });
   });
 });
