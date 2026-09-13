@@ -14,17 +14,19 @@
 export const DUE_STALENESS_MS = 14 * 60 * 1000;
 
 /**
- * 前進しなかった run がこの回数続いた接続は、cron の通常の due から外す（#2687）。
- * cron 15 分 × 6 ≒ 1.5 時間。`status` は変えない（provider / DB 障害でも積もるため、
- * 全ユーザーを再同意に追い込まない）。`syncNow` / 選択変更の同期が 1 回前進すれば 0 に戻る。
+ * 前進しなかった run（1 カレンダーも保存できなかった run）がこの回数続いた接続は、
+ * cron の 15 分ごとの due から外す（#2687）。cron 15 分 × 6 ≒ 1.5 時間。`status` は変えない
+ * （provider / DB 障害でも積もるため、全ユーザーを再同意に追い込まない）。
+ * `syncNow` / 選択変更 / 再接続の同期が 1 回前進すれば 0 に戻る。
  */
 export const SYNC_PAUSE_FAILURE_THRESHOLD = 6;
 
 /**
- * due から外した接続を cron が再試行する間隔。外したまま放置すると provider / DB 障害が
- * 明けても誰かが手で同期するまで止まり続けるので、1 日 1 回は試す。
+ * due から外した接続を cron が再試行する間隔。恒久的に壊れた接続の試行を 1/4 に減らしつつ、
+ * Google / DB 障害が明けた後の自動復帰を 1 時間以内に収める（長くすると障害明けに全接続が
+ * その間止まったままになる）。起点は `updated_at` で、run の開始（sync_sequence 更新）でも進む。
  */
-export const PAUSED_CONNECTION_RETRY_MS = 24 * 60 * 60 * 1000;
+export const PAUSED_CONNECTION_RETRY_MS = 60 * 60 * 1000;
 
 /** 1 日を 15 分刻みで割ったスロット数（24h × 4）。cron 間隔と一致する。 */
 const SLOTS_PER_DAY = 96;

@@ -69,7 +69,7 @@ type DispatchDbClient = ReturnType<typeof createServiceRoleClient>;
  *
  * 連続失敗が閾値に達した接続は last_synced_at が進まない（#2687）ため、放っておくと毎回列の
  * 先頭を占める。再試行の起点は `updated_at`（BEFORE UPDATE trigger が更新する）で、失敗 run の
- * 書き込み自体が次の再試行を 1 日先へ送る。
+ * 書き込み自体が次の再試行を `PAUSED_CONNECTION_RETRY_MS` 先へ送る。
  */
 export async function listDueConnections(
   db: DispatchDbClient,

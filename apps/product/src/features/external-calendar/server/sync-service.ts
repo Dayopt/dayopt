@@ -402,7 +402,13 @@ export async function syncConnection(params: {
   // 起きた場合、後者を先に返すと「選択を確認して」という実失敗側の行動喚起が
   // 「もう一度お試しください」に隠れてしまう（risk-reviewer 指摘、PR #2075）。
   if (calendarsFailed > 0) {
-    await writeConnectionFailure(db, connection, 'partial_failure');
+    // 1 つでも完走したカレンダーがあれば前進として記録する（#2687）。一部のカレンダーだけが
+    // 恒久的に失敗する接続を、健全なカレンダーごと cron から外さないため。
+    if (calendarsSynced > 0) {
+      await writeConnectionProgress(db, connectionId, userId, 'partial_failure', runStartedAtIso);
+    } else {
+      await writeConnectionFailure(db, connection, 'partial_failure');
+    }
     return { outcome: 'partial_failure', calendarsSynced, calendarsFailed };
   }
 
@@ -1150,14 +1156,14 @@ async function writeConnectionFailure(
 }
 
 /**
- * 1 カレンダー以上を完走した run の記録。成功（`code: null`）と `partial_timeout` がここに来る。
- * `last_synced_at` を進め、連続失敗数を 0 に戻す。
+ * 1 カレンダー以上を完走した run の記録。成功（`code: null`）と、一部が予算切れ / 失敗した run
+ * （`partial_timeout` / `partial_failure`）がここに来る。`last_synced_at` を進め、連続失敗数を 0 に戻す。
  */
 async function writeConnectionProgress(
   db: SyncClient,
   connectionId: string,
   userId: string,
-  code: 'partial_timeout' | null,
+  code: 'partial_timeout' | 'partial_failure' | null,
   runStartedAtIso: string,
 ): Promise<void> {
   await updateConnection(db, connectionId, userId, {

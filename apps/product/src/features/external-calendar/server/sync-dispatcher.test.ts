@@ -84,8 +84,8 @@ describe('dispatchCalendarSync — due フィルタ', () => {
     const orArgs = recorder.chain.filter((e) => e.method === 'or').map((e) => String(e.args[0]));
     expect(orArgs).toHaveLength(2);
     expect(orArgs[0]).toBe('last_synced_at.is.null,last_synced_at.lt.2026-07-24T02:53:00.000Z');
-    // 連続失敗が閾値未満、または前回の書き込みから 1 日経った接続だけ（#2687）
-    expect(orArgs[1]).toBe('consecutive_failures.lt.6,updated_at.lt.2026-07-23T03:07:00.000Z');
+    // 連続失敗が閾値未満、または前回の書き込みから 1 時間経った接続だけ（#2687）
+    expect(orArgs[1]).toBe('consecutive_failures.lt.6,updated_at.lt.2026-07-24T02:07:00.000Z');
     // 昇順・NULL 最優先
     expect(methods.order).toEqual(['last_synced_at', { ascending: true, nullsFirst: true }]);
     // token 系を触らない列指定

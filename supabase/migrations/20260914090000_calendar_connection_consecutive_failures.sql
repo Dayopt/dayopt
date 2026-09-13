@@ -1,12 +1,15 @@
 -- #2687: 恒久的に失敗し続ける外部カレンダー接続を見分けられるようにする。
 --
 -- 1. calendar_connections.consecutive_failures を追加する（expand-only。既存列には触れない）。
---    前進した run（成功 / partial_timeout）で 0、前進しなかった失敗 run で +1。
+--    前進した run で 0、前進しなかった失敗 run で +1。前進 = エラー無し、またはこの run が
+--    接続のカレンダーを 1 つ以上保存した（persist_calendar_sync_result_command_v1 が
+--    calendar_connection_calendars.last_synced_at を run 開始時刻にする）。一部のカレンダーだけが
+--    恒久的に失敗する接続（partial_failure）を、健全なカレンダーごと止めないため。
 --    authenticated には GRANT しない（UI は last_sync_error と last_synced_at だけを読む）。
 -- 2. finish_calendar_sync_run_v1 を、前進しなかった run では last_synced_at を進めない形へ置き換える。
 --    署名・権限・CAS（lock_calendar_sync_writer_v1 以下）は 20260820120000 から変えない。
 --
--- 閾値を超えた接続を cron の due から外す判定は app 側（sync-dispatcher.ts）が持つ。
+-- 閾値を超えた接続の再試行間隔（1 時間）は app 側（sync-dispatcher.ts）が持つ。
 -- status は変えない（provider 障害や DB 障害でも数が積もるため、全ユーザーを再同意に
 -- 追い込まない。encryption_key_invalid と同じ方針）。
 
@@ -48,10 +51,7 @@ DECLARE
   v_writer_state TEXT;
   v_connection_last_synced_at TIMESTAMPTZ;
   v_now CONSTANT TIMESTAMPTZ := pg_catalog.clock_timestamp();
-  -- 前進した run か。partial_timeout は 1 カレンダー以上を完走した run だけが書く
-  -- （sync-service.ts。1 つも完走しなかった予算切れは finish を呼ばない）。
-  v_progressed CONSTANT BOOLEAN :=
-    p_last_sync_error IS NULL OR p_last_sync_error = 'partial_timeout';
+  v_progressed BOOLEAN;
 BEGIN
   PERFORM private.assert_timeblock_service_role_request_v1();
 
@@ -130,6 +130,18 @@ BEGIN
       );
   END IF;
 
+  -- #2687: この run が接続のカレンダーを 1 つでも保存していれば前進とみなす。
+  -- 同じ接続の run は sync_sequence で直列化されている（lock_calendar_sync_writer_v1）ので、
+  -- run 開始時刻以上の last_synced_at はこの run の保存を指す。
+  v_progressed := p_last_sync_error IS NULL
+    OR EXISTS (
+      SELECT 1
+      FROM public.calendar_connection_calendars AS calendar
+      WHERE calendar.user_id = p_user_id
+        AND calendar.connection_id = p_connection_id
+        AND calendar.last_synced_at >= p_run_started_at
+    );
+
   -- #2687: 前進しなかった run は last_synced_at を進めず、連続失敗数だけを積む。
   -- 恒久的に壊れた接続の「最終同期」が常に新しく見える状態を作らないため。
   -- 行は lock_calendar_sync_writer_v1 が FOR UPDATE 済みなので加算は競合しない。
@@ -163,6 +175,6 @@ COMMENT ON FUNCTION public.finish_calendar_sync_run_v1(
   TEXT, UUID, UUID, BIGINT, UUID, BIGINT, BIGINT, TIMESTAMPTZ,
   TEXT, BOOLEAN, TIMESTAMPTZ, TIMESTAMPTZ
 ) IS
-  'Publishes connection status and optional anti-join window pruning only if no newer DB-issued sync run, purge, reconnect, selection change, or revoke superseded it; service role only. p_last_sync_error allowlist includes partial_timeout (#2078). Runs without progress keep last_synced_at and increment consecutive_failures (#2687).';
+  'Publishes connection status and optional anti-join window pruning only if no newer DB-issued sync run, purge, reconnect, selection change, or revoke superseded it; service role only. p_last_sync_error allowlist includes partial_timeout (#2078). Runs that persisted no calendar keep last_synced_at and increment consecutive_failures (#2687).';
 
 COMMIT;

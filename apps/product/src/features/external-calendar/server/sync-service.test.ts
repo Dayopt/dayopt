@@ -607,6 +607,47 @@ describe('syncConnection — 認可と鍵', () => {
     expect(patch).toEqual({ last_sync_error: 'partial_failure', consecutive_failures: 1 });
   });
 
+  it('一部のカレンダーだけ失敗した run は前進として last_synced_at を進め、連続失敗数を 0 に戻す（#2687）', async () => {
+    // 共有を外されたカレンダーが 1 つ混ざっているだけで、健全なカレンダーごと cron から外さない
+    const { calls } = setupDb({
+      connection: activeConnection(5),
+      calendars: [
+        {
+          id: 'cal-row-1',
+          provider_calendar_id: CALENDAR_ID,
+          calendar_name: 'Work',
+          sync_token: null,
+        },
+        {
+          id: 'cal-row-2',
+          provider_calendar_id: 'unshared',
+          calendar_name: 'Gone',
+          sync_token: null,
+        },
+      ],
+    });
+    syncCalendar
+      .mockResolvedValueOnce(syncResult())
+      .mockRejectedValueOnce(new CalendarProviderError('gone', 'not_found', 'gone', 404));
+
+    const result = await syncConnection({ connectionId: CONNECTION_ID, userId: USER_ID });
+
+    expect(result).toMatchObject({
+      outcome: 'partial_failure',
+      calendarsSynced: 1,
+      calendarsFailed: 1,
+    });
+    const updates = recordersFor(calls, 'calendar_connections').filter((recorder) =>
+      recorder.chain.some((entry) => entry.method === 'update'),
+    );
+    const patch = argsOf(updates.at(-1)!, 'update')[0] as Record<string, unknown>;
+    expect(patch).toEqual({
+      last_sync_error: 'partial_failure',
+      last_synced_at: RUN_ISO,
+      consecutive_failures: 0,
+    });
+  });
+
   it('成功した run は last_synced_at を進め、連続失敗数を 0 に戻す（#2687）', async () => {
     const { calls } = setupDb({ connection: activeConnection(7), calendars: oneCalendar() });
     syncCalendar.mockResolvedValue(syncResult());
