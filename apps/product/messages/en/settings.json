@@ -252,19 +252,6 @@
       "densityDefault": "Default",
       "densitySpacious": "Spacious"
     },
-    "sleepSchedule": {
-      "title": "Sleep schedule",
-      "enabled": "Show sleep hours",
-      "description": "Highlight sleep hours with background color on the calendar grid",
-      "bedtime": "Bedtime",
-      "wakeTime": "Wake time",
-      "duration": "Sleep duration",
-      "hours": "{hours} hours",
-      "preview": "Preview",
-      "legendSleep": "Sleep",
-      "legendActivity": "Active",
-      "settingsSaved": "Sleep schedule saved"
-    },
     "preferences": {
       "settingsSaved": "Preferences saved successfully",
       "languageAndTheme": "Language & theme",

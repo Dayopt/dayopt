@@ -252,19 +252,6 @@
       "densityDefault": "デフォルト",
       "densitySpacious": "ゆったり"
     },
-    "sleepSchedule": {
-      "title": "睡眠スケジュール",
-      "enabled": "睡眠時間帯を表示",
-      "description": "カレンダーのグリッドに睡眠時間帯を背景色で表示",
-      "bedtime": "就寝時刻",
-      "wakeTime": "起床時刻",
-      "duration": "睡眠時間",
-      "hours": "{hours}時間",
-      "preview": "プレビュー",
-      "legendSleep": "睡眠",
-      "legendActivity": "活動",
-      "settingsSaved": "睡眠スケジュールを保存しました"
-    },
     "preferences": {
       "settingsSaved": "環境設定を保存しました",
       "languageAndTheme": "言語とテーマ",
