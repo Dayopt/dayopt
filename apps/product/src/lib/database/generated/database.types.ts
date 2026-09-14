@@ -114,6 +114,7 @@ export type Database = {
         Row: {
           authority_epoch: number | null;
           authority_fence_id: string | null;
+          consecutive_failures: number;
           created_at: string;
           data_generation: number;
           granted_scopes: string[];
@@ -133,6 +134,7 @@ export type Database = {
         Insert: {
           authority_epoch?: number | null;
           authority_fence_id?: string | null;
+          consecutive_failures?: number;
           created_at?: string;
           data_generation?: number;
           granted_scopes: string[];
@@ -152,6 +154,7 @@ export type Database = {
         Update: {
           authority_epoch?: number | null;
           authority_fence_id?: string | null;
+          consecutive_failures?: number;
           created_at?: string;
           data_generation?: number;
           granted_scopes?: string[];
