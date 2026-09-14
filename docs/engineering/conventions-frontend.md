@@ -775,27 +775,25 @@ experimental: {
 
 #### tRPC Server-side Prefetch
 
+server で prefetch した query は、client が **同じ input** で query した時だけ hydrate された cache に当たる（query key に input が含まれるため）。input を server / client で別々に組むと、画面は正しく出たまま同じ範囲を browser から取り直す。calendar は `features/calendar/domain/calendar-query-input.ts` の builder を両側で使う（#2747）。
+
 ```tsx
-// src/app/[locale]/(app)/calendar/[view]/page.tsx
-import { dehydrate, HydrationBoundary } from '@tanstack/react-query';
-import { createServerHelpers } from '@/lib/trpc/server';
-
-export default async function CalendarPage() {
-  const helpers = await createServerHelpers();
-
-  await helpers.plans.list.prefetch();
-  await helpers.records.list.prefetch();
-  await helpers.activities.list.prefetch();
-
-  return (
-    <HydrationBoundary state={dehydrate(helpers.queryClient)}>
-      <CalendarClient />
-    </HydrationBoundary>
-  );
-}
+// src/app/[locale]/(app)/(workspace)/_server/calendar-prefetch.ts（要点）
+const settings = await helpers.userSettings.get.fetch();
+const listInput = buildTimeblockListInput({
+  viewType,
+  anchorDateKey,
+  timezone: settings?.timezone ?? browserTimezone,
+  weekStartsOn: settings?.weekStartsOn ?? DEFAULT_WEEK_STARTS_ON,
+  showWeekends: settings?.showWeekends ?? DEFAULT_SHOW_WEEKENDS,
+});
+await Promise.all([
+  helpers.plans.list.prefetch(listInput),
+  helpers.records.list.prefetch(listInput),
+]);
 ```
 
-**効果**: 初回レンダリング時にデータが既にキャッシュ済み。クライアントでの追加フェッチ不要。
+**効果**: 初回レンダリング時にデータが既にキャッシュ済み。`calendar-initial-load.spec.ts` が「初回 load で範囲系 procedure を browser から撃たない」ことを固定している。
 
 ### Phase 2: Link Prefetch最適化
 
