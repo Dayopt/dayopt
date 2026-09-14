@@ -76,6 +76,7 @@ export function useCalendarHandlers() {
         endHour: Math.floor(endMinutes / 60),
         endMinute: endMinutes % 60,
         creationSource: selection.creationSource,
+        durationSource: selection.durationSource,
       });
       // 選択と同時に編集と同じパネルを作成モードで開く。閉じる操作は
       // closeInspector → calendar-drag-cancel → pendingSelection 破棄で完結する

@@ -128,12 +128,14 @@ export function processInteractionEffects(
       case 'SELECT_COMPLETE': {
         const selDate = r.displayDates?.[effect.dateIndex] ?? r.date;
         const endMinutes = getMinutesFromDayStart(selDate, effect.range.end);
+        // SELECT_COMPLETE は閾値以上動かした（範囲を引いた）時だけ出る
         r.onTimeRangeSelect?.({
           date: selDate,
           startHour: effect.range.start.getHours(),
           startMinute: effect.range.start.getMinutes(),
           endHour: Math.floor(endMinutes / 60),
           endMinute: endMinutes % 60,
+          durationSource: 'dragged',
         });
         break;
       }
