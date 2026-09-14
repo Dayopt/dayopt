@@ -331,6 +331,8 @@ vault は 2026-08-14 の信頼境界軸再編（[#2086](https://github.com/Dayop
 
 **PAT の権限（これ以外は No access）**: Resource owner = Dayopt org、Only select repositories = dayopt、有効期限 1 年。Repository permissions: Actions R / Commit statuses R / Contents **RW** / Issues **RW** / Metadata R / Pull requests **RW**。Organization permissions: なし。Contents RW は git push と `gh pr create` に要る。Checks は fine-grained PAT の選択肢に無い。private repo で CI 結果（check run）がこの token で読めるかは、login 後に `gh pr checks` で実測して追記する。`Administration` / `Secrets` / `Workflows` / `Environments` は付けない（付けると P1-1 が戻る）。
 
+**帰結: `.github/workflows/` を変える commit を agent は push できない。** GitHub が「`workflow` scope の無い token による workflow の作成・更新」を拒否する（2026-09-14、PR #2761 で実測）。workflow を変える PR は、agent が commit まで作り、push だけ User が自分の terminal（既定の `gh` identity）で行う。PAT に Workflows を足して回避しない。workflow は `GITHUB_TOKEN` の権限と secret の配布先を決めるので、agent が書き換えられると P1-1 と同じ穴が開く。
+
 **発行と登録（User の GUI / terminal、値は表示しない）**:
 
 1. GitHub → Settings → Developer settings → Personal access tokens → Fine-grained → Generate（上記権限）。Dayopt org 側で fine-grained PAT が許可・承認されているか確認する
