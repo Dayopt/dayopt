@@ -145,7 +145,7 @@ describeWithEnv('PWA Service Worker', () => {
     await expect.poll(() => isOfflineFallbackReady(page), { timeout: 15_000 }).toBe(true);
 
     await context.setOffline(true);
-    // sw.js は navigation を DYNAMIC cache → network → `/offline` の順で解決する。
+    // sw.js は navigation を network → DYNAMIC cache → `/offline` の順で解決する（Network First）。
     await page.reload({ waitUntil: 'domcontentloaded' }).catch(() => undefined);
 
     // 描画されたのが cache 済みページでも `/offline` でも、SW が返した document である

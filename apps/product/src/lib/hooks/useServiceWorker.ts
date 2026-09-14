@@ -2,8 +2,20 @@
 
 import { useCallback, useEffect, useState } from 'react';
 
+import { getBuildSha } from '@/lib/app-info';
 import { logger } from '@/lib/logger';
+import {
+  isStaleAgainstDeployed,
+  isStaleOnControllerChange,
+  readServiceWorkerVersion,
+} from '@/lib/pwa/build-staleness';
 import { clearDayoptCaches } from '@/lib/pwa/chunk-load-recovery';
+
+/** 配信中のビルドの版を返すエンドポイント */
+const DEPLOYED_VERSION_ENDPOINT = '/api/health/version';
+
+/** タブ復帰ごとの版確認の最短間隔。切り替えを連打しても 1 分に 1 回しか叩かない */
+const DEPLOYED_VERSION_PROBE_INTERVAL_MS = 60_000;
 
 interface ServiceWorkerState {
   /** Service Workerがサポートされているか */
@@ -15,11 +27,12 @@ interface ServiceWorkerState {
   /** エラー */
   error: Error | null;
   /**
-   * 表示中のページを制御する Service Worker が新バージョンへ切り替わったか
-   * （`controllerchange`、初回登録時の遷移は除く。#2232）。
-   * true の間、現在のページは旧シェルの JS のまま動き続けている。
+   * 表示中のページが、配信中の最新ビルドより古いか。
+   * 新 SW への切替（`controllerchange`）かタブ復帰時の版確認で、SHA が食い違った時だけ true。
    */
   updateAvailable: boolean;
+  /** 検知した最新ビルドの版。分からなければ null（自動リロードの重複防止キーに使う） */
+  latestVersion: string | null;
 }
 
 interface UseServiceWorkerResult extends ServiceWorkerState {
@@ -29,14 +42,27 @@ interface UseServiceWorkerResult extends ServiceWorkerState {
   applyUpdate: () => void;
 }
 
+function isDeployedVersionPayload(value: unknown): value is { commitSha: string } {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    typeof (value as { commitSha?: unknown }).commitSha === 'string'
+  );
+}
+
 /**
  * Service Worker を管理するフック
  *
  * sw.js は install 時に skipWaiting するため新バージョンは検出後すぐ有効化されるが、
- * **開きっぱなしのページには反映されない**。新 SW が制御を得た（`controllerchange`）
- * ことを検出し、`updateAvailable` で呼び出し側（`ServiceWorkerProvider`）に伝える。
- * 実際のリロードは `applyUpdate()` を呼ぶまで行わない（編集中データの喪失を避ける
- * ため、フックが勝手にリロードすることはない）。
+ * **開きっぱなしのページには反映されない**。このフックは「表示中のページが古い」ことを
+ * `updateAvailable` で伝えるだけで、自分ではリロードしない。いつリロードしてよいかは
+ * 編集中かどうかを知る呼び出し側（`useApplyUpdateWhenSafe`）が決める。
+ *
+ * 古さの検知経路は 2 つ:
+ * - `controllerchange`: 別のタブが新しい deploy を開き、新 SW が制御を得た時。
+ *   ページ自身の SHA と新 SW の SHA が同じなら（自分が新版を起動した側なら）無視する
+ * - タブ復帰（`visibilitychange` / `focus`）: `/api/health/version` を叩いて SHA を比べる。
+ *   sw.js の登録 URL は旧版のままなので、`reg.update()` だけでは新しい deploy を見つけられない
  *
  * @example
  * ```tsx
@@ -50,6 +76,7 @@ export function useServiceWorker(): UseServiceWorkerResult {
     isRegistering: false,
     error: null,
     updateAvailable: false,
+    latestVersion: null,
   });
 
   const [registration, setRegistration] = useState<ServiceWorkerRegistration | null>(null);
@@ -70,14 +97,9 @@ export function useServiceWorker(): UseServiceWorkerResult {
 
     const registerSW = async () => {
       try {
-        // デプロイごとにSWを更新するためのバージョン文字列
-        // Vercel: NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA
-        // フォールバック: ビルド時刻ベース
-        const swVersion =
-          process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA?.slice(0, 8) ||
-          process.env.NEXT_PUBLIC_BUILD_ID ||
-          '';
-        const swUrl = swVersion ? `/sw.js?v=${swVersion}` : '/sw.js';
+        // デプロイごとにSWを更新するためのバージョン文字列（Vercel の commit SHA）
+        const buildSha = getBuildSha();
+        const swUrl = buildSha ? `/sw.js?v=${buildSha}` : '/sw.js';
 
         const reg = await navigator.serviceWorker.register(swUrl, {
           scope: '/',
@@ -90,9 +112,8 @@ export function useServiceWorker(): UseServiceWorkerResult {
           isRegistering: false,
         }));
 
-        // 定期的に更新チェック（1時間ごと）。sw.js は install 時に skipWaiting するため、
-        // 検出した新バージョンは次回リロードで自動的に有効化される（通知 UI は持たない）
-
+        // 定期的に更新チェック（1時間ごと）。登録 URL は自分の版のままなので、拾えるのは
+        // sw.js 自体の中身が変わった時だけ。新しい deploy の検知はタブ復帰時の版確認が担う
         setInterval(
           () => {
             reg.update();
@@ -143,11 +164,70 @@ export function useServiceWorker(): UseServiceWorkerResult {
         hasController = true;
         return;
       }
-      setState((prev) => ({ ...prev, updateAvailable: true }));
+      const scriptUrl = sw.controller?.scriptURL;
+      if (!isStaleOnControllerChange(getBuildSha(), scriptUrl)) {
+        // このページ自身が新しい deploy の SW を起動した。既に最新なので何もしない
+        return;
+      }
+      const controllerVersion = readServiceWorkerVersion(scriptUrl);
+      setState((prev) => ({
+        ...prev,
+        updateAvailable: true,
+        latestVersion: controllerVersion ?? prev.latestVersion,
+      }));
     };
 
     sw.addEventListener('controllerchange', handleControllerChange);
     return () => sw.removeEventListener('controllerchange', handleControllerChange);
+  }, []);
+
+  // タブ復帰時に配信中の版を確認する
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+    const buildSha = getBuildSha();
+    if (process.env.NODE_ENV === 'development' || !buildSha) {
+      // SHA を持たないビルドでは比較できない
+      return;
+    }
+
+    let lastProbeAt = Date.now();
+    let cancelled = false;
+
+    const probe = async () => {
+      if (document.visibilityState !== 'visible') return;
+      const now = Date.now();
+      if (now - lastProbeAt < DEPLOYED_VERSION_PROBE_INTERVAL_MS) return;
+      lastProbeAt = now;
+
+      try {
+        const response = await fetch(DEPLOYED_VERSION_ENDPOINT, { cache: 'no-store' });
+        if (!response.ok) return;
+        const payload: unknown = await response.json();
+        if (cancelled || !isDeployedVersionPayload(payload)) return;
+        if (!isStaleAgainstDeployed(buildSha, payload.commitSha)) return;
+        setState((prev) => ({
+          ...prev,
+          updateAvailable: true,
+          latestVersion: payload.commitSha,
+        }));
+      } catch {
+        // オフラインや一時的な失敗。次の復帰でまた確認する
+      }
+    };
+
+    const handleVisible = () => {
+      void probe();
+    };
+
+    document.addEventListener('visibilitychange', handleVisible);
+    window.addEventListener('focus', handleVisible);
+    return () => {
+      cancelled = true;
+      document.removeEventListener('visibilitychange', handleVisible);
+      window.removeEventListener('focus', handleVisible);
+    };
   }, []);
 
   const applyUpdate = useCallback(() => {
