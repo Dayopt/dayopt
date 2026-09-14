@@ -844,12 +844,9 @@ const shouldPrefetch = useMemo(() => {
 #### キャッシュ自動バージョニング
 
 ```ts
-// src/hooks/useServiceWorker.ts
-const swVersion =
-  process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA?.slice(0, 8) ||
-  process.env.NEXT_PUBLIC_BUILD_ID ||
-  '';
-const swUrl = swVersion ? `/sw.js?v=${swVersion}` : '/sw.js';
+// src/lib/hooks/useServiceWorker.ts（getBuildSha は src/lib/app-info.ts）
+const buildSha = getBuildSha();
+const swUrl = buildSha ? `/sw.js?v=${buildSha}` : '/sw.js';
 ```
 
 **効果**: デプロイ時にSWが自動更新、古いキャッシュの自動クリーンアップ。
