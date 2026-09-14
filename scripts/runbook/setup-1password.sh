@@ -234,9 +234,7 @@ run item create --category=securenote --vault=human --title=github-ssh \
 run item create --category=apicredential --vault=ci --title=vercel \
   --tags=dayopt/vercel notesPlain="$NOTES" \
   'VERCEL_TOKEN[concealed]=' \
-  'VERCEL_TEAM_ID[text]=' \
-  'VERCEL_PROJECT_ID_STAGING[text]=' \
-  'VERCEL_PROJECT_ID_PRODUCTION[text]='
+  'VERCEL_TEAM_ID[text]='
 
 run item create --category=apicredential --vault=agent --title=google \
   --tags=dayopt/google notesPlain="$NOTES" \

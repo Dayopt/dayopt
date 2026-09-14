@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { CalendarDisplayEvent } from '../types/calendar.types';
-import { computeCalendarDayDiffs, filterCalendarDayDiffEntries } from './day-diff';
+import { computeCalendarDayDiffs, filterCalendarDayDiffTimeblocks } from './day-diff';
 
 const now = new Date('2026-06-18T23:00:00.000Z');
 
@@ -193,7 +193,7 @@ describe('computeCalendarDayDiffs', () => {
       }),
     ];
 
-    const source = filterCalendarDayDiffEntries(entries, bounds, () => true);
+    const source = filterCalendarDayDiffTimeblocks(entries, bounds, () => true);
     const result = computeCalendarDayDiffs(source, bounds);
 
     expect(source).toHaveLength(1);
@@ -202,7 +202,7 @@ describe('computeCalendarDayDiffs', () => {
   });
 
   it('diff source は アクティビティ filter を適用する', () => {
-    const source = filterCalendarDayDiffEntries(
+    const source = filterCalendarDayDiffTimeblocks(
       [entry()],
       {
         dayStart: new Date('2026-06-18T00:00:00.000Z'),

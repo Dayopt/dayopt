@@ -1,34 +1,8 @@
-import type { SupabaseClient } from '@supabase/supabase-js';
 import { TRPCError } from '@trpc/server';
-import { formatInTimeZone } from 'date-fns-tz';
-import { z } from 'zod';
 
-import type { Database } from '@/lib/database';
 import { logger } from '@/lib/logger';
-import { captureUnexpectedDatabaseError, captureUnexpectedError } from '@/lib/sentry';
+import { captureUnexpectedError } from '@/lib/sentry';
 import { getOriginalError, isExpectedTrpcError } from '@/lib/trpc/errors';
-
-export function getTodayInTimezone(timezone: string): string {
-  return formatInTimeZone(new Date(), timezone, 'yyyy-MM-dd');
-}
-
-export async function getUserTimezone(
-  supabase: SupabaseClient<Database>,
-  userId: string,
-): Promise<string> {
-  const { data, error } = await supabase
-    .from('user_settings')
-    .select('timezone')
-    .eq('user_id', userId)
-    .maybeSingle();
-  if (error) {
-    throw captureUnexpectedDatabaseError(error, {
-      feature: 'statistics',
-      operation: 'get_user_timezone',
-    });
-  }
-  return (data?.timezone as string | null | undefined) ?? 'UTC';
-}
 
 export function handleStatsError(operation: string, error: unknown): never {
   if (error instanceof TRPCError) {
@@ -58,8 +32,3 @@ export function handleStatsError(operation: string, error: unknown): never {
     cause: unexpectedError,
   });
 }
-
-export const dateRangeInput = z.object({
-  startDate: z.string().datetime({ offset: true }).optional(),
-  endDate: z.string().datetime({ offset: true }).optional(),
-});

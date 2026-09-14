@@ -113,8 +113,6 @@ export const envSchema: EnvSchemaEntry[] = [
 
   envEntry('VERCEL_TOKEN', false, 'secret', 'shared', ci, 'vercel'),
   envEntry('VERCEL_TEAM_ID', false, 'public', 'shared', ci, 'vercel'),
-  envEntry('VERCEL_PROJECT_ID_STAGING', false, 'public', 'shared', ci, 'vercel'),
-  envEntry('VERCEL_PROJECT_ID_PRODUCTION', false, 'public', 'shared', ci, 'vercel'),
   // agent 用 Vercel token（#2086 plan v2）。CI と agent の VERCEL_TOKEN 二重用途を
   // 解消するため agent は別発行 token を使う。発行までは replica:check を User 実行に倒す
   pendingEnvEntry(

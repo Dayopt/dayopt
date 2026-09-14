@@ -96,10 +96,10 @@ export function useWeekTimeblocks({
 
       // TimeblockLayoutをWeekEntryPositionに変換
       layouts.forEach((layout: TimeblockLayout, index: number) => {
-        const entry = layout.entry as CalendarDisplayEvent;
+        const entry = layout.timeblock as CalendarDisplayEvent;
         const { top, height } = layoutEntryToVerticalPosition(
-          new Date(layout.entry.start),
-          new Date(layout.entry.end),
+          new Date(layout.timeblock.start),
+          new Date(layout.timeblock.end),
           hourHeight,
         );
 

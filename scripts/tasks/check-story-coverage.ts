@@ -6,12 +6,15 @@
  * 1. UI / Common コンポーネントの Story 存在確認
  * 2. AllPatterns Story の存在確認
  * 3. StoryObj<typeof meta> の型安全確認
+ * 4. (--collected) Storybook テスト（vitest --project storybook）が Story ファイルを取りこぼしていないか
  *
  * Usage:
- *   npx tsx scripts/tasks/check-story-coverage.ts           # レポート表示
- *   npx tsx scripts/tasks/check-story-coverage.ts --strict   # カバレッジ低下で exit 1
+ *   npx tsx scripts/tasks/check-story-coverage.ts             # レポート表示
+ *   npx tsx scripts/tasks/check-story-coverage.ts --strict    # カバレッジ低下で exit 1
+ *   npx tsx scripts/tasks/check-story-coverage.ts --collected # collect 漏れで exit 1（ブラウザ起動を伴い数分かかる）
  */
 
+import { execFileSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -32,6 +35,22 @@ const SCAN_DIRS = [
 ];
 
 const isStrict = process.argv.includes('--strict');
+const isCollected = process.argv.includes('--collected');
+
+/**
+ * `apps/storybook/.storybook/main.ts` の `stories` glob が指す Story ファイルの置き場所。
+ * main.ts に root を足したらここにも足す（足し忘れは「期待集合に無いのに collect された」として赤になる）。
+ */
+const COLLECT_SCAN_ROOTS = [
+  path.join(APP_ROOT, 'src'),
+  path.join(ROOT, 'apps/web/src'),
+  path.join(ROOT, 'packages/foundations/src'),
+  path.join(ROOT, 'packages/components/src'),
+  path.join(STORYBOOK_ROOT, '.storybook/stories'),
+];
+
+/** vitest.config.ts の storybookTest `tags.exclude` と同じ値 */
+const EXCLUDED_STORY_TAGS = ['docs-only', 'wip'];
 
 // ─────────────────────────────────────────────────────────
 // Types
@@ -148,10 +167,97 @@ function checkQuality(storyFiles: string[]): QualityResult[] {
 }
 
 // ─────────────────────────────────────────────────────────
+// Collect Check（#2592）
+// ─────────────────────────────────────────────────────────
+
+const STORY_FILE_PATTERN = /\.stories\.(ts|tsx|js|jsx|mjs)$/;
+
+function findStoryFilesByPattern(dir: string): string[] {
+  if (!fs.existsSync(dir)) return [];
+  const results: string[] = [];
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const fullPath = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      if (entry.name === 'node_modules' || entry.name === '.next') continue;
+      results.push(...findStoryFilesByPattern(fullPath));
+    } else if (STORY_FILE_PATTERN.test(entry.name)) {
+      results.push(fullPath);
+    }
+  }
+  return results;
+}
+
+/** meta の `tags` に除外タグを持つ Story ファイルは storybookTest が collect しない */
+function hasExcludedMetaTag(content: string): boolean {
+  return [...content.matchAll(/tags:\s*\[([^\]]*)\]/g)].some((match) =>
+    EXCLUDED_STORY_TAGS.some((tag) => new RegExp(`['"]${tag}['"]`).test(match[1] ?? '')),
+  );
+}
+
+function parseCollectedStoryFiles(listOutput: string, storybookRoot: string): Set<string> {
+  const files = new Set<string>();
+  for (const line of listOutput.split('\n')) {
+    const match = line.match(/^\[storybook \(chromium\)\] (\S+)/);
+    if (match?.[1]) files.add(path.resolve(storybookRoot, match[1]));
+  }
+  return files;
+}
+
+function checkCollected(): number {
+  const expected = new Set(
+    COLLECT_SCAN_ROOTS.flatMap(findStoryFilesByPattern).filter(
+      (file) => !hasExcludedMetaTag(fs.readFileSync(file, 'utf-8')),
+    ),
+  );
+
+  // vitest list の表示パスは storybook project の root（apps/storybook）基準
+  const output = execFileSync('pnpm', ['exec', 'vitest', 'list', '--project', 'storybook'], {
+    cwd: APP_ROOT,
+    encoding: 'utf-8',
+    maxBuffer: 64 * 1024 * 1024,
+    stdio: ['ignore', 'pipe', 'pipe'],
+    timeout: 15 * 60 * 1000,
+  });
+  const collected = parseCollectedStoryFiles(output, STORYBOOK_ROOT);
+
+  const missing = [...expected].filter((file) => !collected.has(file)).sort();
+  const unexpected = [...collected].filter((file) => !expected.has(file)).sort();
+
+  console.log('\n━━━ Storybook Test Collection ━━━\n');
+  console.log(`Expected: ${expected.size} files / Collected: ${collected.size} files\n`);
+
+  for (const [label, files] of [
+    ['Not collected', missing],
+    ['Collected but not expected', unexpected],
+  ] as const) {
+    if (files.length === 0) continue;
+    console.log(`${label} (${files.length}):`);
+    for (const file of files) console.log(`  ${path.relative(ROOT, file)}`);
+    console.log('');
+  }
+
+  if (missing.length === 0 && unexpected.length === 0) {
+    console.log('All testable story files are collected.\n');
+  }
+  return missing.length + unexpected.length;
+}
+
+// ─────────────────────────────────────────────────────────
 // Report
 // ─────────────────────────────────────────────────────────
 
 function main(): void {
+  if (isCollected) {
+    const mismatches = checkCollected();
+    if (mismatches > 0) {
+      console.error(
+        `ERROR: storybook project の collect 集合が Story ファイルと ${mismatches} 件食い違う`,
+      );
+      process.exit(1);
+    }
+    return;
+  }
+
   // Coverage
   const coverageResults = checkCoverage();
   const covered = coverageResults.filter((r) => r.hasStory);
