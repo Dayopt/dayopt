@@ -22,7 +22,7 @@ export const DEFAULT_SHOW_WEEKENDS = true;
 
 const DATE_KEY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
-export interface CalendarRangeInputOptions {
+interface CalendarRangeInputOptions {
   viewType: CalendarViewType;
   /**
    * 表示の基準日（`yyyy-MM-dd`）。Date ではなく日付キーで受ける。
@@ -39,12 +39,12 @@ export interface CalendarRangeInputOptions {
   showWeekends: boolean;
 }
 
-export interface CalendarRangeInput {
+interface CalendarRangeInput {
   startDate: string;
   endDate: string;
 }
 
-export interface TimeblockListInput extends CalendarRangeInput {
+interface TimeblockListInput extends CalendarRangeInput {
   sortBy: 'start_at';
   sortOrder: 'asc';
 }
