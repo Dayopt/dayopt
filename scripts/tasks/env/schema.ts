@@ -104,8 +104,19 @@ export const envSchema: EnvSchemaEntry[] = [
   envEntry('NEXT_PUBLIC_TURNSTILE_SITE_KEY', false, 'public', 'shared', agent, 'turnstile'),
   envEntry('TURNSTILE_SECRET_KEY', false, 'secret', 'shared', agent, 'turnstile'),
 
-  envEntry('VERCEL_TOKEN', false, 'secret', 'shared', ci, 'vercel'),
-  envEntry('VERCEL_TEAM_ID', false, 'public', 'shared', ci, 'vercel'),
+  // CI の Vercel automation（Production Config Audit / Production Release / replica-check）。
+  // 2026-09-14 に User が item 名を vercel → vercel-production へ改め、bypass secret 2 件を同居させた。
+  envEntry('VERCEL_TOKEN', false, 'secret', 'shared', ci, 'vercel-production'),
+  envEntry('VERCEL_TEAM_ID', false, 'public', 'shared', ci, 'vercel-production'),
+  envEntry(
+    'VERCEL_AUTOMATION_BYPASS_PRODUCT',
+    false,
+    'secret',
+    'production',
+    ci,
+    'vercel-production',
+  ),
+  envEntry('VERCEL_AUTOMATION_BYPASS_WEB', false, 'secret', 'production', ci, 'vercel-production'),
   // agent 用 Vercel token は置かない（2026-09-14、監査 P1-2）。Vercel の token は scope を
   // 絞れず team 全権になるため、agent vault の「漏れても 1 日で戻せる」定義に入らない。
   // 未使用のまま置かれていた agent/vercel は Vercel 側で revoke し item を archive した。
@@ -307,6 +318,14 @@ export const forbiddenFields: ForbiddenField[] = [
     item: 'supabase',
     field: 'SUPABASE_ACCESS_TOKEN',
     reason: 'human 正本へ一本化済み（#1933）',
+  },
+  // agent/resend から human/resend-send へ移した時に持ち込まれた webhook 署名の複製。
+  // webhook 署名の master は app 別の human/resend・human/resend-web（2026-09-14）。
+  {
+    vault: human,
+    item: 'resend-send',
+    field: 'RESEND_WEBHOOK_SECRET',
+    reason: 'webhook 署名は human/resend・human/resend-web が正本。送信 item に複製を置かない',
   },
 ];
 

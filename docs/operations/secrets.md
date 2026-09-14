@@ -309,15 +309,15 @@ vault は 2026-08-14 の信頼境界軸再編（[#2086](https://github.com/Dayop
 
 **CI が消費する値の master を置く。** 現在 CI は 1Password を直接読まず GitHub Secrets replica で動くため、この vault の読み手は同期作業の人間だけ。Service Account を導入する時は、この vault を SA の read scope にする（[#2086](https://github.com/Dayopt/dayopt/issues/2086)）。
 
-| Item                         | Fields                           | 用途                                                                                                                                                                                                                                                                 |
-| ---------------------------- | -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `vercel`                     | `VERCEL_TOKEN`, `VERCEL_TEAM_ID` | Production Config Audit / Production Release / project metadata                                                                                                                                                                                                      |
-| `supabase-auth-audit`        | `credential`                     | Production Auth Config Audit 専用 scoped token（Auth の Read のみ）                                                                                                                                                                                                  |
-| `supabase-storage-rls-audit` | `credential`                     | Production Storage RLS Audit 専用 scoped token（`database_read` のみ、90 日期限）。`production-config-audit.yml` の `storage-rls` job が参照し、GitHub Secret `SUPABASE_STORAGE_RLS_AUDIT_TOKEN` へ同期する（[#2345](https://github.com/Dayopt/dayopt/issues/2345)） |
+| Item                         | Fields                                                                                               | 用途                                                                                                                                                                                                                                                                 |
+| ---------------------------- | ---------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `vercel-production`          | `VERCEL_TOKEN`, `VERCEL_TEAM_ID`, `VERCEL_AUTOMATION_BYPASS_PRODUCT`, `VERCEL_AUTOMATION_BYPASS_WEB` | Production Config Audit / Production Release（promote・smoke）/ replica-check。2026-09-14 に `vercel` から改名し bypass secret を登録                                                                                                                                |
+| `supabase-auth-audit`        | `credential`                                                                                         | Production Auth Config Audit 専用 scoped token（Auth の Read のみ）                                                                                                                                                                                                  |
+| `supabase-storage-rls-audit` | `credential`                                                                                         | Production Storage RLS Audit 専用 scoped token（`database_read` のみ、90 日期限）。`production-config-audit.yml` の `storage-rls` job が参照し、GitHub Secret `SUPABASE_STORAGE_RLS_AUDIT_TOKEN` へ同期する（[#2345](https://github.com/Dayopt/dayopt/issues/2345)） |
 
 **Supabase Management API の scoped access token（`sbp_` prefix）は Account Settings → Access Tokens（https://supabase.com/dashboard/account/tokens）で発行する。** Project の Settings → API Keys ページ（`sb_sec...` prefix、Data API 用の secret key）とは別物で Management API には使えない。2026-08-25、`supabase-storage-rls-audit` token の発行でこの取り違えにより 401 が発生した（[#2345](https://github.com/Dayopt/dayopt/issues/2345) コメント参照）。
 
-予定（#2090 の実施後に追加する）: `VERCEL_AUTOMATION_BYPASS_PRODUCT` / `VERCEL_AUTOMATION_BYPASS_WEB`（bypass secret の 1Password 登録先）。
+`VERCEL_AUTOMATION_BYPASS_PRODUCT` / `VERCEL_AUTOMATION_BYPASS_WEB` は 2026-09-14 に `ci/vercel-production` へ登録済み（#2090 の判断リストの項目）。
 
 `VERCEL_TOKEN`はautomation専用とし、local CLIのloginや`--token`引数には使わない。Production Config AuditとProduction Releaseが環境変数からprocess内で読み、Authorization headerにだけ設定する。Production Releaseはenv metadataの読取に加えて、Production deploymentのpromoteとrollbackを行う。localの確認方法とrotation順序は[Environment Secrets](./security/environment-secrets.md)を正とする。agent からは読まない。agent 用の Vercel token も発行しない（token は scope を絞れず team 全権になるため。§Agent の vercel CLI）。
 
@@ -441,7 +441,7 @@ pnpm replica:check   # 要 VERCEL_TOKEN / VERCEL_TEAM_ID（下記）
 - `replica:check` — Vercel Production Env（product / web）の **key 名だけ**を取得し、1Password 台帳（`scripts/tasks/env/schema.ts` の `onePasswordEnvSchema`）に無い key を検出する（replica ⊆ 台帳。基本方針 7 の機械検証、[#2084](https://github.com/Dayopt/dayopt/issues/2084)）。`production-config-audit.mjs` が「台帳側の必須 key が Vercel に揃っているか」を見るのと逆方向。値は取得も表示もしない。**日次 cron（`.github/workflows/nightly.yml` の replica-check job、06:30 JST。#2483 で replica-check.yml から統合）で定期実行する**（[#2111](https://github.com/Dayopt/dayopt/issues/2111)。初回実運用の NG 13 件分類が #2094/#2101 の merge で完了したため、local 専用だった制約は解除した）。token は production-config-audit と同じ GitHub Secrets（`ci/vercel` の replica）を再利用し、新規 token 発行は不要。手元での単発実行も引き続き可能（下の実行例は `ci` vault を inline 参照で解決するため、agent はコピペ実行しない。agent 用の Vercel token は発行しない方針のため、手元実行は User が行う。実行例:
 
   ```bash
-  VERCEL_TOKEN="op://ci/vercel/VERCEL_TOKEN" VERCEL_TEAM_ID="op://ci/vercel/VERCEL_TEAM_ID" op run -- pnpm replica:check
+  VERCEL_TOKEN="op://ci/vercel-production/VERCEL_TOKEN" VERCEL_TEAM_ID="op://ci/vercel-production/VERCEL_TEAM_ID" op run -- pnpm replica:check
   ```
 
   検出された key の対応は 2 択: master（1Password）へ登録して schema に entry を足すか、Vercel 側から撤去する。台帳に無いが存在してよい key は script 内 `allowedNonLedgerKeys` に理由付きで載せる（空が正常。ただし Supabase↔Vercel integration 由来の 11 件は構造的に台帳登録できないため例外として載せている。詳細は下記 §Vercel Production の integration-managed 例外）。契約は `scripts/__tests__/check-vercel-replica.test.ts` が固定する
@@ -487,7 +487,7 @@ master へ値を戻す時は GUI か対象を限定した `op item create` / `op
 | PR Preview Branch credentials                  | 1Password 非保存（基本方針の既知の例外。ephemeral）                                                                         | —                                                                                                                                          |
 | `~/.config/gh-agent/hosts.yml`（開発機、0600） | `agent/github-agent`                                                                                                        | `pnpm agent:preflight` の gh identity 行（classic scope が見えたら警告）                                                                   |
 
-**未台帳（invariant 違反候補、2026-08-14 実測）**: `VERCEL_AUTOMATION_BYPASS_PRODUCT` / `VERCEL_AUTOMATION_BYPASS_WEB` は GitHub Secrets と Vercel（Protection Bypass for Automation）に存在するが、`ci/vercel` item（旧 Dayopt-Shared/vercel）に対応 field が無い（field label のみ実測、値は未取得）。処遇（1Password への登録、または再生成して登録）は [#2090](https://github.com/Dayopt/dayopt/issues/2090) の判断リストで扱う。
+**未台帳だった bypass secret は解消済み**: `VERCEL_AUTOMATION_BYPASS_PRODUCT` / `VERCEL_AUTOMATION_BYPASS_WEB` は 2026-08-14 の実測で GitHub Secrets と Vercel にだけ存在していたが、2026-09-14 に `ci/vercel-production` へ登録した（field 名を実測、値は未取得）。
 
 ### Bootstrap 例外台帳
 

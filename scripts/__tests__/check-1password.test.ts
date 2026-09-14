@@ -42,6 +42,8 @@ case "$1" in
         # op item get <item> --vault <vault> --format=json → $3=item, $5=vault
         if [ "$3" = "supabase" ] && [ "$5" = "agent" ]; then
           printf '%s\n' "$FAKE_OP_STAGING_SUPABASE_JSON"
+        elif [ "$3" = "resend-send" ] && [ "$5" = "human" ]; then
+          printf '%s\n' "$FAKE_OP_RESEND_SEND_JSON"
         else
           printf '%s\n' "$FAKE_OP_ITEM_JSON"
         fi
@@ -62,7 +64,7 @@ interface CheckOptions {
   emptyField?: string;
   missingItem?: string;
   mode?: 'error' | 'invalid-json';
-  /** true にすると agent/supabase が禁止 field を持ったまま残っている状態を再現する */
+  /** true にすると agent/supabase と human/resend-send が禁止 field を持ったまま残っている状態を再現する */
   leakForbidden?: boolean;
   /** op vault get を失敗させる vault 名（不在 / 権限不足 / 一時エラーの再現） */
   missingVault?: string;
@@ -90,6 +92,15 @@ function runCheck(options: CheckOptions = {}) {
   const stagingSupabaseFields = options.leakForbidden
     ? fields
     : fields.filter((field) => !forbiddenNames.has(field.id));
+  // human/resend-send も webhook secret の複製を持たない（是正済みの状態）
+  const resendSendForbidden = new Set(
+    forbiddenFields
+      .filter((entry) => entry.vault === 'human' && entry.item === 'resend-send')
+      .map((entry) => entry.field),
+  );
+  const resendSendFields = options.leakForbidden
+    ? fields
+    : fields.filter((field) => !resendSendForbidden.has(field.id));
 
   return spawnSync('pnpm', ['exec', 'tsx', 'scripts/tasks/env/check-1password.ts'], {
     cwd: rootDir,
@@ -102,6 +113,7 @@ function runCheck(options: CheckOptions = {}) {
       FAKE_OP_MODE: options.mode ?? '',
       FAKE_OP_SENTINEL: sentinelSecret,
       FAKE_OP_STAGING_SUPABASE_JSON: JSON.stringify({ fields: stagingSupabaseFields }),
+      FAKE_OP_RESEND_SEND_JSON: JSON.stringify({ fields: resendSendFields }),
       PATH: `${fakeOpDirectory}:${process.env.PATH ?? ''}`,
     },
   });

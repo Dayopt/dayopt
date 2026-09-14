@@ -227,10 +227,12 @@ run item create --category=securenote --vault=human --title=github-ssh \
   --tags=dayopt/github \
   notesPlain="GitHub SSH key operational item. 既存 item がある場合は move + merge する。"
 
-run item create --category=apicredential --vault=ci --title=vercel \
+run item create --category=apicredential --vault=ci --title=vercel-production \
   --tags=dayopt/vercel notesPlain="$NOTES" \
   'VERCEL_TOKEN[concealed]=' \
-  'VERCEL_TEAM_ID[text]='
+  'VERCEL_TEAM_ID[text]=' \
+  'VERCEL_AUTOMATION_BYPASS_PRODUCT[concealed]=' \
+  'VERCEL_AUTOMATION_BYPASS_WEB[concealed]='
 
 run item create --category=login --vault=human --title=domain \
   --tags=recovery notesPlain="$NOTES"$'\n⚠️ レジストラ乗っ取られたら事業終了。recovery codes を別メディアに二重バックアップ' \
