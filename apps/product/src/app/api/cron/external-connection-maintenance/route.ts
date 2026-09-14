@@ -96,7 +96,9 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       });
     }
 
-    await writeCronHeartbeat('external-connection-maintenance', 'completed', heartbeatStartedAt);
+    if (!summary.schemaUnavailable) {
+      await writeCronHeartbeat('external-connection-maintenance', 'completed', heartbeatStartedAt);
+    }
     return noStoreJson({ ok: true, ...summary });
   } catch {
     // dispatcher の将来変更でも raw DB/provider error を Sentry の cause へ通さない。

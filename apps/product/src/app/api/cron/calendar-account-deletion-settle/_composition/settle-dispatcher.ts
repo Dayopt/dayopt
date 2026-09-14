@@ -120,6 +120,7 @@ export async function dispatchCalendarAccountDeletionSettle(params: {
   if (lifecycleVersion === 0) {
     const summary: AccountDeletionSettleSummary = {
       ...NO_ACCOUNT_DELETION_SETTLE,
+      skipped: true,
       durationMs: Date.now() - startedAt,
     };
     logger.info('[calendar-account-deletion-settle] predecessor schema; settle deferred', summary);
@@ -148,7 +149,7 @@ export async function dispatchCalendarAccountDeletionSettle(params: {
 
   if (listError) {
     if (isPredecessorMissingFunction(listError)) {
-      return { ...NO_ACCOUNT_DELETION_SETTLE, durationMs: Date.now() - startedAt };
+      return { ...NO_ACCOUNT_DELETION_SETTLE, skipped: true, durationMs: Date.now() - startedAt };
     }
     throw new CalendarAccountDeletionSettleError('list', {
       code: listError.code,

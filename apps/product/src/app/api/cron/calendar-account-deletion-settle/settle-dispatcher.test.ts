@@ -48,14 +48,14 @@ beforeEach(() => {
 });
 
 describe('dispatchCalendarAccountDeletionSettle', () => {
-  it('旧DBでは何もせず正常終了する', async () => {
+  it('旧DBでは処理をskipしたと報告する', async () => {
     rpc.mockReturnValue({
       abortSignal: vi.fn(async () => ({ data: null, error: { code: 'PGRST202' } })),
     });
 
     await expect(
       dispatchCalendarAccountDeletionSettle({ deadlineAt: FAR_DEADLINE }),
-    ).resolves.toMatchObject({ normalized: 0, inFlight: 0, other: 0, skipped: false });
+    ).resolves.toMatchObject({ normalized: 0, inFlight: 0, other: 0, skipped: true });
     expect(rpc).toHaveBeenCalledTimes(1);
   });
 

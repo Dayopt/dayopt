@@ -278,3 +278,11 @@ describe('external-connection-maintenance heartbeat wiring', () => {
     expect(writeCronHeartbeat.mock.calls[0]![1]).toBe('started');
   });
 });
+
+it('DBが未対応なら完了heartbeatを更新しない', async () => {
+  dispatchExternalConnectionMaintenance.mockResolvedValue({ ...SUMMARY, schemaUnavailable: true });
+  const response = await GET(request('Bearer super-secret-cron'));
+  expect(response.status).toBe(200);
+  expect(await response.json()).toMatchObject({ schemaUnavailable: true });
+  expect(writeCronHeartbeat.mock.calls.map((call) => call[1])).toEqual(['started']);
+});

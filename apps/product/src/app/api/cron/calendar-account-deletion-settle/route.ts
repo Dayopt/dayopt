@@ -83,7 +83,9 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       });
     }
 
-    await writeCronHeartbeat('calendar-account-deletion-settle', 'completed', heartbeatStartedAt);
+    if (!summary.skipped) {
+      await writeCronHeartbeat('calendar-account-deletion-settle', 'completed', heartbeatStartedAt);
+    }
     return noStoreJson({ ok: true, ...summary });
   } catch (error) {
     // 常に新しい generic Error で capture する（raw error インスタンス自体は Sentry の

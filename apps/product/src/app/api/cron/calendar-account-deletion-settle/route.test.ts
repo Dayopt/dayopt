@@ -249,3 +249,11 @@ describe('calendar-account-deletion-settle heartbeat wiring', () => {
     expect(writeCronHeartbeat.mock.calls[0]![1]).toBe('started');
   });
 });
+
+it('authority identity不足で未実行なら完了heartbeatを更新しない', async () => {
+  dispatchCalendarAccountDeletionSettle.mockResolvedValue({ ...SUMMARY, skipped: true });
+  const response = await GET(request('Bearer super-secret-cron'));
+  expect(response.status).toBe(200);
+  expect(await response.json()).toMatchObject({ skipped: true });
+  expect(writeCronHeartbeat.mock.calls.map((call) => call[1])).toEqual(['started']);
+});
