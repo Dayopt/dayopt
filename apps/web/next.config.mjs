@@ -60,6 +60,9 @@ const nextConfig = {
       sentryIngestOrigin,
     });
 
+    // security headers の正本はここ 1 箇所。vercel.json には置かない（両方に書くと片側だけ
+    // 更新されて値がずれる。実際に Permissions-Policy の interest-cohort が片側に無かった。#2747）。
+    // product は X-XSS-Protection を 0 にしている（CSP を持つため）。web との差は意図的。
     return [
       {
         source: '/(.*)',
@@ -188,41 +191,10 @@ const nextConfig = {
     ];
   },
 
-  // Multi-zones設定: LP（web）とアプリ（app）を同一ドメインで運用
-  // web側にないパスはapp側（dayopt-app）にフォールバック
-  // @see https://nextjs.org/docs/app/building-your-application/deploying/multi-zones
-  async rewrites() {
-    const appDomain = process.env.APP_DOMAIN || 'https://dayopt-app.vercel.app';
-
-    return {
-      // app側のアセットをプロキシ
-      beforeFiles: [
-        {
-          source: '/app-static/:path*',
-          destination: `${appDomain}/app-static/:path*`,
-        },
-      ],
-      // web側にないパスをapp側にフォールバック
-      fallback: [
-        {
-          source: '/settings',
-          destination: `${appDomain}/settings`,
-        },
-        {
-          source: '/settings/:path*',
-          destination: `${appDomain}/settings/:path*`,
-        },
-        {
-          source: '/ja/settings',
-          destination: `${appDomain}/ja/settings`,
-        },
-        {
-          source: '/ja/settings/:path*',
-          destination: `${appDomain}/ja/settings/:path*`,
-        },
-      ],
-    };
-  },
+  // rewrites は置かない。web（dayopt.app）と product（app.dayopt.app）は別ドメインで配信し、
+  // web から product へは絶対 URL（`dayoptProductUrls`）でリンクする。以前あった path ベースの
+  // Multi-Zones（`/settings` `/app-static` を product へ proxy）は production で既に 404 を
+  // 返しており、リンク元も無かったため 2026-09-14 に撤去した（#2747）。
 
   // ビルド最適化
   compiler: {
@@ -248,11 +220,9 @@ const nextConfig = {
   // @see https://nextjs.org/docs/app/api-reference/config/next-config-js/cacheComponents
 
   experimental: {
-    // Next.js 15 Router Cache再有効化
-    staleTimes: {
-      dynamic: 30, // 動的ルート: 30秒キャッシュ
-      static: 180, // 静的ルート: 3分キャッシュ
-    },
+    // staleTimes は指定しない（Next.js の既定 dynamic: 0 / static: 300 を使う）。2026-09-14 実測（#2747）。
+    // web のページは全て静的（SSG）で dynamic の対象が無く、以前の static: 180 は既定の 5 分より短く
+    // 訪問済みページの再取得を早めるだけだった（Link で戻る遷移が 200 秒後に 1 回再取得される）。
     optimizePackageImports: [
       '@web/components',
       '@web/lib',

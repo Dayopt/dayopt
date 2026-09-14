@@ -747,31 +747,28 @@ Dayoptで実装済みのNext.js App Router向けパフォーマンス最適化�
 
 | カテゴリ        | 実装内容                                     | ファイル                       |
 | --------------- | -------------------------------------------- | ------------------------------ |
-| PPR             | Partial Prerendering有効化                   | `next.config.mjs`              |
 | Server Prefetch | tRPC Server-side helpers + HydrationBoundary | `src/lib/trpc/server.ts`       |
-| Router Cache    | staleTimes設定                               | `next.config.mjs`              |
+| Router Cache    | staleTimes設定（product のみ）               | `next.config.mjs`              |
 | Link最適化      | ネットワーク条件に応じたprefetch             | `nav-main.tsx`                 |
 | LCP最適化       | priority属性追加                             | エラーページ各種               |
 | SW最適化        | キャッシュ自動バージョニング                 | `useServiceWorker.ts`, `sw.js` |
 | Bundle最適化    | optimizePackageImports拡張                   | `next.config.mjs`              |
 | 遅延ロード      | Novel Editor dynamic import                  | `PlanInspectorContent.tsx`     |
 
-### Phase 1: PPR + Server-side Prefetch
+### Phase 1: Router Cache + Server-side Prefetch
 
-#### PPR (Partial Prerendering)
+PPR / Cache Components は web・product とも採用していない（#2519。理由は各 `next.config.mjs` のコメント）。
 
-```js
-// next.config.mjs
-experimental: {
-  ppr: true,
-  staleTimes: {
-    dynamic: 30,
-    static: 180,
-  },
-}
-```
+#### Router Cache（staleTimes）
 
-**効果**: 静的シェルを即座に表示、動的部分を後からストリーミング。FCPの大幅改善。
+`experimental.staleTimes` は app ごとに実測して決めた（2026-09-14、#2747）。
+
+| app     | 設定                                            | 理由（実測）                                                                                                                                        |
+| ------- | ----------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| product | `dynamic: 30` / `static: 180`                   | workspace tab（calendar ⇄ report）の Link 往復。既定のままだと戻るたびに RSC を取り直し calendar への戻りが約 875ms。30 秒保持で RSC 0 回・36〜83ms |
+| web     | 指定しない（既定 `dynamic: 0` / `static: 300`） | 全ページが SSG で dynamic の対象が無い。`static: 180` は既定より短く、Link で戻る遷移を 200 秒後に 1 回余計に取り直していた                         |
+
+server state の鮮度は TanStack Query が持つので、Router Cache で RSC を再利用しても古いデータは表示されない。
 
 #### tRPC Server-side Prefetch
 
