@@ -297,6 +297,42 @@ describe('release workflow contract', () => {
     expect(releaseJob).toMatch(/cancel-in-progress: false/);
   });
 
+  it('surfaces retry-passes in both layer 3 jobs (#2743)', () => {
+    // retries: 2 の retry-pass は「最終的に緑」に埋もれる。層 3 の各 job で
+    // e2e-retry-report.mjs を always() で走らせ、outcome を同じ job の step id から渡す。
+    const jobSlice = (start: string, end: string) =>
+      code(release.slice(release.indexOf(start), release.indexOf(end)));
+    const layer3 = [
+      {
+        job: jobSlice('\n  e2e:', '\n  web:'),
+        stepId: 'e2e',
+        json: 'apps/product/test-results/e2e-results.json',
+      },
+      {
+        job: jobSlice('\n  web:', '\n  notify_failure:'),
+        stepId: 'web_e2e',
+        json: 'apps/web/test-results/e2e-results.json',
+      },
+    ];
+    for (const { job, stepId, json } of layer3) {
+      expect(job).toMatch(new RegExp(`\\n\\s+id: ${stepId}\\n`));
+      const reportStep = job.slice(
+        job.indexOf('e2e-retry-report.mjs') - 400,
+        job.indexOf('e2e-retry-report.mjs'),
+      );
+      expect(reportStep).toContain('if: always()');
+      expect(reportStep).toContain(`E2E_TEST_OUTCOME: \${{ steps.${stepId}.outcome }}`);
+      expect(job).toContain(`node scripts/ci/e2e-retry-report.mjs ${json}`);
+      // JSON を always() の report artifact にも残す（後から run をまたいで retry-pass を棚卸しできる）
+      const afterReport = job.slice(job.indexOf(`e2e-retry-report.mjs ${json}`) + json.length);
+      expect(afterReport).toMatch(
+        new RegExp(
+          `upload-artifact[^\\n]*\\n\\s+if: always\\(\\)[\\s\\S]*?path: \\|[\\s\\S]*?${json.replace(/\./g, '\\.')}`,
+        ),
+      );
+    }
+  });
+
   it('gives each layer 3 job its own concurrency group', () => {
     // **2 job を同じ group に入れてはいけない。** job レベル group は同一 run 内の
     // job 同士にも効くため、cancel-in-progress: true だと e2e と web が互いを

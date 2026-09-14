@@ -1,0 +1,190 @@
+import { expect, type Page } from '@playwright/test';
+import { createClient } from '@supabase/supabase-js';
+
+import type { Database } from '@/lib/database';
+import { suppressConsentBanner } from './suppress-consent-banner';
+
+/**
+ * クリティカルパス E2E（desktop / mobile）が共有する seed と操作の足場。
+ *
+ * spec ごとに `createCriticalPathIdentity` で別ユーザーを作る。desktop と mobile が
+ * 同じユーザーを共有すると、serial で作った Plan / Record が互いの Report 集計へ
+ * 混ざり、`1:00` の assertion が片方の成否に依存する。
+ */
+
+export const TIMEZONE = 'Asia/Tokyo';
+
+export type AdminSupabase = ReturnType<typeof createClient<Database>>;
+
+export interface CriticalPathIdentity {
+  userId: string;
+  email: string;
+  password: string;
+  activityName: string;
+  categoryName: string;
+}
+
+export function createCriticalPathIdentity(prefix: string): CriticalPathIdentity {
+  const runId = crypto.randomUUID();
+  return {
+    userId: crypto.randomUUID(),
+    email: `${prefix}-${runId}@example.com`,
+    password: 'test-password-123',
+    activityName: `Journey ${runId.slice(0, 8)}`,
+    categoryName: `Cat ${runId.slice(0, 8)}`,
+  };
+}
+
+/**
+ * 日付は必ず TIMEZONE 基準で決める。
+ *
+ * `test.use({ timezoneId })` が効くのは browser context だけで、Node 側の
+ * `Date` の getFullYear / getMonth / getDate は runner の host TZ を返す。
+ * CI runner は UTC なので、Tokyo の 00:00-09:00（UTC では前日 15:00-24:00）に
+ * 実行すると host 日付が Tokyo より 1 日前になり、`tomorrow` が当日へ落ちて
+ * 09:00 が過去になる = Plan ではなく Record が作られて assertion が壊れる。
+ */
+const DATE_PARAM_FORMAT = new Intl.DateTimeFormat('en-CA', {
+  timeZone: TIMEZONE,
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+});
+
+export function offsetDateParam(offsetDays: number): string {
+  // Asia/Tokyo は DST を持たないため、24h 加算と暦日加算が一致する
+  return DATE_PARAM_FORMAT.format(new Date(Date.now() + offsetDays * 86_400_000));
+}
+
+export function createAdminSupabase(url: string, serviceKey: string): AdminSupabase {
+  return createClient<Database>(url, serviceKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+}
+
+/** auth user / profile / settings（default_duration 60）/ カテゴリー / アクティビティを 1 組作る。 */
+export async function seedCriticalPathUser(
+  admin: AdminSupabase,
+  identity: CriticalPathIdentity,
+  fullName: string,
+) {
+  const { error: authError } = await admin.auth.admin.createUser({
+    id: identity.userId,
+    email: identity.email,
+    password: identity.password,
+    email_confirm: true,
+    user_metadata: { full_name: fullName },
+  });
+  if (authError && !authError.message.includes('already exists')) {
+    throw new Error(authError.message);
+  }
+
+  await admin.from('profiles').upsert({
+    id: identity.userId,
+    email: identity.email,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  });
+  await admin.from('user_settings').upsert({
+    user_id: identity.userId,
+    timezone: TIMEZONE,
+    preferred_locale: 'ja',
+    default_view: 'day',
+    default_duration: 60,
+    time_format: '24h',
+    week_starts_on: 1,
+  });
+
+  // 色・アイコンを持つのはカテゴリーだけで、アクティビティは継承する（#2162 §4-6）
+  const { data: category, error: categoryError } = await admin
+    .from('categories')
+    .insert({
+      user_id: identity.userId,
+      name: identity.categoryName,
+      color: 'blue',
+      icon: 'circle',
+    })
+    .select()
+    .single();
+  if (categoryError) throw new Error(categoryError.message);
+
+  const { error: activityError } = await admin.from('activities').insert({
+    user_id: identity.userId,
+    category_id: category.id,
+    name: identity.activityName,
+  });
+  if (activityError) throw new Error(activityError.message);
+}
+
+export async function cleanupCriticalPathUser(admin: AdminSupabase, userId: string) {
+  await admin.from('records').delete().eq('user_id', userId);
+  await admin.from('plans').delete().eq('user_id', userId);
+  await admin.from('activities').delete().eq('user_id', userId);
+  await admin.from('categories').delete().eq('user_id', userId);
+  await admin.from('user_settings').delete().eq('user_id', userId);
+  await admin.from('profiles').delete().eq('id', userId);
+  await admin.auth.admin.deleteUser(userId);
+}
+
+export async function loginAs(page: Page, identity: CriticalPathIdentity) {
+  await suppressConsentBanner(page);
+  await page.goto('/ja/auth/login');
+  await page.locator('input[type="email"], input[name="email"]').first().fill(identity.email);
+  await page.locator('input[type="password"]').first().fill(identity.password);
+  await page.locator('button[type="submit"]').first().click();
+  await page.waitForURL(/\/ja\/calendar/i, { timeout: 15_000 });
+}
+
+export async function openDay(page: Page, dateParam: string) {
+  await page.goto(`/ja/calendar?view=day&date=${dateParam}`);
+  await expect(page.locator('[data-calendar-grid]').first()).toBeVisible({ timeout: 10_000 });
+}
+
+/**
+ * 1 日目のグリッドを「hour 時の 1 時間前」までスクロールし、グリッドの box と 1 時間の高さを返す。
+ * html の scroll-behavior: smooth でアニメーションすると直後の boundingBox が確定しないので instant で動かす。
+ */
+export async function revealHour(page: Page, hour: number) {
+  const grid = page.locator('[data-calendar-grid][data-calendar-day-index="0"]').first();
+  await expect(grid).toBeVisible({ timeout: 10_000 });
+
+  const gridHeight = await grid.evaluate((el) => el.getBoundingClientRect().height);
+  const hourHeight = gridHeight / 24;
+
+  await page
+    .locator('[data-calendar-scroll]')
+    .first()
+    .evaluate(
+      (el, top) => {
+        el.scrollTo({ top, behavior: 'instant' });
+      },
+      hourHeight * (hour - 1),
+    );
+
+  const box = await grid.boundingBox();
+  if (!box) throw new Error('calendar grid is not visible');
+  return { grid, box, hourHeight };
+}
+
+/**
+ * 記録した 1 時間が /report の 1 章（配分）へ反映されたことを確かめる。
+ *
+ * 凡例のうち「このカテゴリーの行」が 1 時間ぶんを出す。`未分類` を許容しない —
+ * カテゴリー紐付けを失う回帰では label が未分類へ落ちてこの行が消えるため、
+ * getByText('1:00') のような行を特定しない一致では緑になってしまう。
+ */
+export async function expectReportAllocationShowsOneHour(page: Page, categoryName: string) {
+  const allocation = page.locator('[data-report-chapter="allocation"]');
+  await expect(allocation).toBeVisible({ timeout: 10_000 });
+
+  // ヘッドラインは記録合計の `h:mm`。1 時間の記録があるので 0:00 のままにはならない。
+  const headline = allocation.locator('[data-report-headline="recorded"]');
+  await expect(headline).toBeVisible({ timeout: 10_000 });
+  await expect(headline).not.toHaveText('0:00');
+
+  const legendRow = allocation
+    .locator('[data-report-legend="allocation"] li')
+    .filter({ hasText: categoryName });
+  await expect(legendRow).toHaveCount(1, { timeout: 10_000 });
+  await expect(legendRow).toContainText('1:00');
+}

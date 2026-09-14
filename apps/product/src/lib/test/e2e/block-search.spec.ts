@@ -241,14 +241,18 @@ describeWithEnv('Block search', () => {
     await expect(page.getByRole('region', { name: ACTIVITY_NAME })).toBeVisible();
   });
 
-  test('mobileは展開mini calendarから検索を開ける', async ({ page }, testInfo) => {
-    test.skip(!testInfo.project.name.includes('Mobile'), 'mobile-only');
+  test(
+    'mobileは展開mini calendarから検索を開ける',
+    { tag: '@mobile' },
+    async ({ page }, testInfo) => {
+      test.skip(!testInfo.project.name.includes('Mobile'), 'mobile-only');
 
-    await page.getByRole('button', { name: 'カレンダーを開く' }).click();
-    await page.getByRole('button', { name: 'ブロックを検索' }).click();
-    await page.getByRole('combobox', { name: '予定と記録を検索' }).fill(ACTIVITY_NAME);
+      await page.getByRole('button', { name: 'カレンダーを開く' }).click();
+      await page.getByRole('button', { name: 'ブロックを検索' }).click();
+      await page.getByRole('combobox', { name: '予定と記録を検索' }).fill(ACTIVITY_NAME);
 
-    await expect(page.getByText(PLAN_NOTE)).toBeVisible();
-    await expect(page.getByText(RECORD_NOTE)).toBeVisible();
-  });
+      await expect(page.getByText(PLAN_NOTE)).toBeVisible();
+      await expect(page.getByText(RECORD_NOTE)).toBeVisible();
+    },
+  );
 });
