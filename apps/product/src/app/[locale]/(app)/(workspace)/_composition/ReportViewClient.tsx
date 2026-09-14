@@ -240,6 +240,7 @@ export function ReportViewClient({ granularity }: ReportViewClientProps) {
         anchorDate={anchorDate}
         granularity={granularity}
         surface={isMobile ? 'sheet' : 'panel'}
+        onJumpToRecord={jump.onJumpToRecord}
       />
 
       <div

@@ -175,6 +175,7 @@
       "records": {
         "heading": "記録（{count}件）",
         "empty": "この期間に記録はありません",
+        "openInCalendar": "カレンダーでこの記録を開く",
         "unanswered": "—",
         "weekdays": ["日", "月", "火", "水", "木", "金", "土"],
         "fulfillment": {
