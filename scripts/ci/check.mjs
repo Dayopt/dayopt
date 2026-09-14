@@ -47,8 +47,8 @@
  */
 
 import { execFileSync, spawn, spawnSync } from 'node:child_process';
-import { appendFileSync, readFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { appendFileSync, readdirSync, readFileSync } from 'node:fs';
+import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import {
@@ -211,6 +211,118 @@ export function shouldRunProductUnitTests(productUnit) {
 /** DB を触らない PR では Supabase の起動自体を省略する（affected 判定）。 */
 export function shouldRunIntegrationTests(integrationAffected) {
   return !isFalseFlag(integrationAffected);
+}
+
+// ─── product unit の範囲（PR では related、nightly で full）──────────────
+//
+// **product unit は Unit job 248 秒のうち 178 秒を占め、しかも PR push のたびに全件走っていた**
+// （2026-09-14 実測、run 34792874608）。repo を private に戻すと Actions は分課金になり、
+// 月の消費は 1 run の重さより回数（週 100 PR push）で決まる（docs/engineering/testing.md §予算）。
+//
+// PR では `vitest related <変更ファイル>` で、変更が import graph で届く test だけを走らせる。
+// graph で追えない依存は 3 種類あり、それぞれ別の手で閉じる:
+//
+// 1. **build 済みで読む依存**（`packages/*` は dist 経由）・**設定 / test setup / toolchain** →
+//    その path を含む PR は full に倒す（`PRODUCT_UNIT_TRACEABLE` にも `NEUTRAL` にも無い path は全部 full）
+// 2. **src をファイルとして読む契約 test**（service role 境界など）→ `findFsReadingProductTests` が
+//    `node:fs` を使う test を毎回見つけて、related とは別に必ず走らせる
+// 3. **それでも漏れる経路**（削除した module を vi.mock 文字列で参照する等）→ nightly.yml の
+//    `product-unit-full` が main を毎日 full で走らせる。検出の遅れは最大 1 日で、層 3 の E2E は
+//    merge ごとに走る
+//
+// 判定できない時は必ず full（PR ファイル一覧が取れない / API 上限 / PR context が無い）。
+
+/** related に渡せば import graph で追える path。`src/lib/test/` は setup を含むので除く。 */
+function isProductUnitTraceable(file) {
+  if (file.startsWith('apps/product/src/lib/test/')) return false;
+  return (
+    file.startsWith('apps/product/src/') ||
+    file.startsWith('apps/product/messages/') ||
+    (file.startsWith('scripts/') && !file.startsWith('scripts/ci/check.mjs'))
+  );
+}
+
+/** product の unit test に届かないと分かっている path（届くか分からないものは入れない）。 */
+function isProductUnitNeutral(file) {
+  if (['AGENTS.md', 'CLAUDE.md', 'README.md'].includes(file)) return true;
+  if (file === '.github/actions/setup/action.yml' || file === '.github/workflows/ci.yml') {
+    return false;
+  }
+  return [
+    'docs/',
+    '.claude/',
+    '.agents/',
+    '.codex/',
+    '.husky/',
+    '.vscode/',
+    '.github/',
+    'apps/web/',
+    'apps/storybook/',
+    'supabase/',
+  ].some((prefix) => file.startsWith(prefix));
+}
+
+/** GitHub の PR files API が返す上限。ちょうど届いたら一覧が切れている可能性がある。 */
+const PR_FILES_API_LIMIT = 3000;
+
+/**
+ * @param {{ isPr: boolean, unitMode?: string, files: string[] | null }} input
+ * @returns {{ scope: 'full', reason: string } | { scope: 'related', targets: string[], reason: string }}
+ */
+export function resolveProductUnitScope({ isPr, unitMode, files }) {
+  if (unitMode === 'full') return { scope: 'full', reason: 'CI_UNIT_MODE=full' };
+  if (!isPr) return { scope: 'full', reason: 'PR context が無い（schedule / dispatch）' };
+  if (!files || files.length === 0) {
+    return { scope: 'full', reason: 'PR のファイル一覧を取得できない' };
+  }
+  if (files.length >= PR_FILES_API_LIMIT) {
+    return { scope: 'full', reason: `PR のファイル数が API 上限（${PR_FILES_API_LIMIT}）に届いた` };
+  }
+
+  const targets = [];
+  for (const file of files) {
+    if (isProductUnitTraceable(file)) targets.push(file);
+    else if (!isProductUnitNeutral(file)) {
+      return { scope: 'full', reason: `import graph で追えない変更を含む: ${file}` };
+    }
+  }
+  return {
+    scope: 'related',
+    targets,
+    reason: `変更 ${files.length} ファイル中 ${targets.length} ファイルから related を解決`,
+  };
+}
+
+const FS_READ_PATTERN = /from ['"](?:node:)?fs(?:\/promises)?['"]|\breadFileSync\b|\breaddirSync\b/;
+
+/**
+ * product の unit test のうち、ファイルを fs で読むもの（import graph に乗らない依存を持つ）を返す。
+ * integration test（`.integration.test.`）は別 job なので含めない。path は apps/product 基準。
+ * @param {{ productDir?: string, readdirImpl?: typeof readdirSync, readFileImpl?: ReadFileImpl }} [opts]
+ */
+export function findFsReadingProductTests({
+  productDir = join(ROOT, 'apps/product'),
+  readdirImpl = readdirSync,
+  readFileImpl = readFileSync,
+} = {}) {
+  const found = [];
+  const walk = (dir) => {
+    for (const entry of readdirImpl(dir, { withFileTypes: true })) {
+      if (entry.name === 'node_modules' || entry.name.startsWith('.')) continue;
+      const path = join(dir, entry.name);
+      if (entry.isDirectory()) {
+        walk(path);
+      } else if (
+        /\.test\.tsx?$/.test(entry.name) &&
+        !entry.name.includes('.integration.test.') &&
+        FS_READ_PATTERN.test(readFileImpl(path, 'utf8'))
+      ) {
+        found.push(relative(productDir, path).split('\\').join('/'));
+      }
+    }
+  };
+  walk(join(productDir, 'src'));
+  return found.sort();
 }
 
 // ─── diff 範囲の解決（gitleaks / docs reminder で共有）────────────────
@@ -495,7 +607,7 @@ async function runUnit() {
   run('pnpm', ['--dir', 'apps/web', 'exec', 'vitest', 'run', 'production-build-gate.test.mjs']);
 
   if (productUnit) {
-    run('pnpm', ['--filter', '@dayopt/product', 'test:run']);
+    runProductUnit({ isPr, repo, prNumber, ghToken });
   } else {
     console.log('product 影響なしのため product unit test を skip します。');
   }
@@ -515,6 +627,70 @@ async function runUnit() {
         `app コードだけの PR を先に出荷し、migration は別 PR にしてください（Step Summary / PR コメントの「Coupled migration」参照、#2680）。` +
         ` 縮小: ${coupledMigration.narrowing.map((f) => `${f.kind} ${f.target}`).join(', ')}`,
     );
+  }
+}
+
+/**
+ * product の unit test を PR では related + fs 契約 test、それ以外は full で走らせる
+ * （判定の設計は resolveProductUnitScope の上のコメント）。
+ */
+function runProductUnit({ isPr, repo, prNumber, ghToken }) {
+  let files = null;
+  if (isPr) {
+    try {
+      files = fetchPrFilenames({ repo, prNumber, env: { ...process.env, GH_TOKEN: ghToken } });
+    } catch (error) {
+      console.log(
+        `::notice::PR のファイル一覧を取得できないため product unit を full で走らせます: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
+  const decision = resolveProductUnitScope({
+    isPr,
+    unitMode: process.env.CI_UNIT_MODE,
+    files,
+  });
+
+  if (decision.scope === 'full') {
+    console.log(`product unit: full（${decision.reason}）`);
+    run('pnpm', ['--filter', '@dayopt/product', 'test:run']);
+    return;
+  }
+
+  const fsTests = findFsReadingProductTests();
+  console.log(
+    `product unit: related（${decision.reason}）+ fs を読む契約 test ${fsTests.length} 件`,
+  );
+  if (decision.targets.length > 0) {
+    run('pnpm', [
+      '--dir',
+      'apps/product',
+      'exec',
+      'vitest',
+      'related',
+      ...decision.targets.map((file) => join(ROOT, file)),
+      '--project',
+      'unit',
+      '--project',
+      'unit-dom',
+      '--run',
+      '--passWithNoTests',
+    ]);
+  }
+  if (fsTests.length > 0) {
+    run('pnpm', [
+      '--dir',
+      'apps/product',
+      'exec',
+      'vitest',
+      '--project',
+      'unit',
+      '--project',
+      'unit-dom',
+      'run',
+      ...fsTests,
+    ]);
   }
 }
 

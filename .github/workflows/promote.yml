@@ -107,7 +107,12 @@ jobs:
     name: "\U0001F3AD E2E Tests"
     needs: impact
     if: ${{ needs.impact.outputs.product_affected == 'true' && github.event.inputs.force != 'true' }}
-    runs-on: ubuntu-latest
+    # repo variable `PROMOTE_E2E_RUNNER`（JSON。例: ["self-hosted","linux","dayopt-e2e"]）で
+    # self-hosted runner へ寄せられる。未設定なら ubuntu-latest（従来どおり）。private repo の
+    # Actions 分課金で最大の main push job を runner 側へ逃がすための切替で、戻す時は変数を
+    # 消すだけ（docs/operations/self-hosted-runner.md、#2743）。**寄せてよいのはこの job だけ**:
+    # web / release / notify は token を持つか外部へ書くので GitHub-hosted に固定する。
+    runs-on: ${{ fromJSON(vars.PROMOTE_E2E_RUNNER || '"ubuntu-latest"') }}
     timeout-minutes: 20
     concurrency:
       group: promote-layer3-e2e-${{ github.ref }}
@@ -118,6 +123,14 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+
+      # 以降の step は apt（--with-deps）/ jq / Docker を前提にする。self-hosted を macOS で
+      # 登録すると途中で分かりにくく落ちるので、入口で止める。
+      - name: Require a Linux runner
+        if: runner.os != 'Linux'
+        run: |
+          echo "::error::E2E job は Linux runner 前提です（runner.os=${RUNNER_OS}）。PROMOTE_E2E_RUNNER を見直すか削除してください。"
+          exit 1
 
       - uses: ./.github/actions/setup
 

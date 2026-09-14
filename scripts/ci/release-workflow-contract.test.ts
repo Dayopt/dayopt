@@ -333,6 +333,22 @@ describe('release workflow contract', () => {
     }
   });
 
+  it('lets only the product E2E job move to a self-hosted runner (#2743)', () => {
+    const e2eJob = code(release.slice(release.indexOf('\n  e2e:'), release.indexOf('\n  web:')));
+    // 変数未設定なら GitHub-hosted のまま。既定値を落とすと変数が無い repo で job が起動しない。
+    expect(e2eJob).toContain(
+      `runs-on: \${{ fromJSON(vars.PROMOTE_E2E_RUNNER || '"ubuntu-latest"') }}`,
+    );
+    expect(e2eJob).toMatch(/if: runner\.os != 'Linux'/);
+
+    // token を持つ / 外部へ書く job は GitHub-hosted に固定する。self-hosted は repo の外の
+    // 機械なので、そこへ Vercel promote token や issues: write を置かない。
+    const runsOn = [...code(release).matchAll(/^\s+runs-on:\s*(.+)$/gm)].map((m) => m[1].trim());
+    const selfHostable = runsOn.filter((value) => value.includes('vars.'));
+    expect(selfHostable).toHaveLength(1);
+    expect(runsOn.filter((value) => value === 'ubuntu-latest').length).toBe(runsOn.length - 1);
+  });
+
   it('gives each layer 3 job its own concurrency group', () => {
     // **2 job を同じ group に入れてはいけない。** job レベル group は同一 run 内の
     // job 同士にも効くため、cancel-in-progress: true だと e2e と web が互いを
