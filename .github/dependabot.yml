@@ -1,7 +1,8 @@
 version: 2
 updates:
   # npm依存関係の自動更新
-  # private repo の Actions 課金対策として monthly に間引く（PR ごとにフル CI が走るため）。
+  # private repo の Actions 実行は GitHub Team プランの included minutes を消費するため、
+  # monthly に間引く（Dependabot PR ごとにフル CI が走るため）。
   # security update は Dependabot security updates が schedule と無関係に即時 PR を出す。
   - package-ecosystem: 'npm'
     directory: '/'

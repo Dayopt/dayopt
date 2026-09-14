@@ -19,15 +19,17 @@ name: Production Config Audit
 #     promote 側が見ている（`production-release.mjs` が `runProductionConfigAudit` を呼ぶ）。
 #     main へ merge する時点の drift は出荷を止めないので、検出遅延 1 日で足りる
 #   - backstop は日次 cron（06:00 JST）と下の push:main。dashboard の手動変更もそこで拾う
-#   - merge は deadlock しない。Free plan の private repo では ruleset / branch protection が
-#     使えず（`gh api .../rulesets` は 403）、唯一の gate である `finish-branch.sh` は
-#     **失敗数と pending 数を数えるだけ**で check run の「存在」を要求しない。run が無ければ
+#   - merge は deadlock しない。merge gate は main の ruleset（2026-09-07 から有効。
+#     GitHub Team の private repo でも強制される）で、その required checks に
+#     `Production Config Audit` は含まれない（2026-09-13 に #2640 で外した）。
+#     `finish-branch.sh` の rollup 検査もこの check の「存在」は要求せず、run が無ければ
 #     rollup に entry が出ないだけで通る
 #   - 2026-08-05 の `ci.yml` paths-ignore 撤去（PR #1836）の再演にはならない。あの事故の原因は
 #     `paths` 単体ではなく「ruleset が required にした check が永久に expected で残る」ことで、
-#     ruleset を使えない今は同じ経路が成立しない。**将来 Pro へ上げて ruleset を使う時は、
-#     `Production Config Audit` を required にしないこと**（PR で publish されるのは
-#     contract 変更 PR だけなので blanket な required check に使えない）
+#     この check が required でない限り同じ経路は成立しない。**`Production Config Audit` を
+#     ruleset の required checks に戻さないこと**（PR で publish されるのは contract 変更 PR
+#     だけなので blanket な required check に使えない。2026-09-07 に ruleset が有効化された
+#     直後、required に入っていたこの check が原因で全 PR が merge 不能になった）
 #   - contract ファイルを別 path へ動かして `paths` をすり抜ける経路は、
 #     `scripts/__tests__/protected-path-gate-contract.test.ts` が
 #     「各 glob が tracked file に 1 件以上一致する」ことを CI で毎回検査するので先に落ちる

@@ -3,7 +3,12 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { collectPreflight, renderPreflight } from './agent-preflight.mjs';
+import {
+  collectGhIdentity,
+  collectPreflight,
+  parseGhAuthStatus,
+  renderPreflight,
+} from './agent-preflight.mjs';
 const dirs: string[] = [];
 afterEach(() => {
   for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true });
@@ -48,6 +53,58 @@ describe('agent preflight', () => {
     expect(state.hooks['pre-push']).toBe(true);
     expect(state.skills).toBe(true);
     expect(state.codexHooks).toContain('unverified');
+  });
+  it('flags a User OAuth token (classic broad scopes) as an un-isolated gh identity', () => {
+    // 監査 P1-1 の実測形。token 行は parse 対象にしない
+    const statusText = [
+      'github.com',
+      '  ✓ Logged in to github.com account t3-nico (keyring)',
+      '  - Active account: true',
+      '  - Token: gho_****',
+      "  - Token scopes: 'admin:org', 'delete_repo', 'gist', 'repo', 'workflow'",
+    ].join('\n');
+    expect(parseGhAuthStatus(statusText)).toEqual({
+      account: 't3-nico',
+      scopes: ['admin:org', 'delete_repo', 'gist', 'repo', 'workflow'],
+    });
+    const identity = collectGhIdentity({ env: {}, statusText });
+    expect(identity.isolated).toBe(false);
+    expect(identity.broadScopes).toEqual(['admin:org', 'delete_repo', 'repo', 'workflow']);
+    const rendered = renderPreflight({ ...collectPreflight(fixture()), ghIdentity: identity });
+    expect(rendered).toContain('gh が User の OAuth token（admin:org');
+    expect(rendered).not.toContain('gho_');
+  });
+  it('treats a fine-grained PAT under GH_CONFIG_DIR as isolated and stays quiet', () => {
+    const statusText = [
+      'github.com',
+      '  ✓ Logged in to github.com account t3-nico (/Users/x/.config/gh-agent/hosts.yml)',
+      '  - Active account: true',
+      '  - Token: github_pat_****',
+      '  - Token scopes: none',
+    ].join('\n');
+    const identity = collectGhIdentity({
+      env: { GH_CONFIG_DIR: '/Users/x/.config/gh-agent' },
+      statusText,
+    });
+    expect(identity).toMatchObject({
+      account: 't3-nico',
+      scopes: [],
+      broadScopes: [],
+      isolated: true,
+      configDir: '/Users/x/.config/gh-agent',
+    });
+    const rendered = renderPreflight({ ...collectPreflight(fixture()), ghIdentity: identity });
+    expect(rendered).toContain('config: /Users/x/.config/gh-agent | scopes: none (fine-grained)');
+    expect(rendered).not.toContain('gh が User の OAuth token');
+  });
+  it('reports an unauthenticated or absent gh without throwing', () => {
+    expect(collectGhIdentity({ env: {}, ghPresent: false })).toMatchObject({
+      account: null,
+      isolated: false,
+    });
+    expect(
+      collectGhIdentity({ env: {}, statusText: 'You are not logged into any GitHub hosts.' }),
+    ).toMatchObject({ account: null, scopes: [] });
   });
   it('CLI exits nonzero on missing prerequisites and supports JSON', () => {
     const root = fixture();
