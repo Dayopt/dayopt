@@ -53,6 +53,10 @@ export function TemplateRow({
   // 操作する人には、ホバー限定だとプレビューへ到達する手段が無くなる
   // （WCAG 1.4.13 Content on Hover or Focus）
   const [isFocused, setIsFocused] = useState(false);
+  // クリックで適用した後は、マウスが行の上に残っていてもプレビューを畳む。
+  // 適用したのに 1 日分のミニチュアが横に出続けると、置いた結果が隠れる
+  // （2026-09-14 UI レビュー）。行を離れたら通常のホバー挙動に戻る
+  const [isSuppressedAfterApply, setIsSuppressedAfterApply] = useState(false);
   const [contextMenuPosition, setContextMenuPosition] = useState<{ x: number; y: number } | null>(
     null,
   );
@@ -89,8 +93,12 @@ export function TemplateRow({
         visualState === 'dragging' ? 'opacity-30' : 'hover:bg-state-hover',
         visualState === 'applying' && 'bg-state-hover',
       )}
+      role="listitem"
       onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
+      onMouseLeave={() => {
+        setIsHovered(false);
+        setIsSuppressedAfterApply(false);
+      }}
       onContextMenu={handleContextMenu}
     >
       {isRenaming ? (
@@ -113,19 +121,31 @@ export function TemplateRow({
           className="border-border bg-background text-foreground w-full min-w-0 rounded-lg border px-2 py-1 text-sm outline-none"
         />
       ) : (
-        <Popover open={(isHovered || isFocused) && !contextMenuPosition}>
+        <Popover open={(isHovered || isFocused) && !isSuppressedAfterApply && !contextMenuPosition}>
           <PopoverTrigger asChild>
             <button
               type="button"
               className="text-foreground focus-visible:ring-ring min-w-0 flex-1 truncate rounded-lg text-left text-sm focus-visible:ring-2 focus-visible:outline-none"
-              onClick={() => onApply?.()}
-              onFocus={() => setIsFocused(true)}
+              onClick={() => {
+                setIsSuppressedAfterApply(true);
+                onApply?.();
+              }}
+              // マウスクリックで残るフォーカスではプレビューを出さない（クリック後に
+              // 開きっぱなしになる）。キーボード到達（focus-visible）の時だけ出す
+              onFocus={(e) => setIsFocused(e.currentTarget.matches(':focus-visible'))}
               onBlur={() => setIsFocused(false)}
             >
               {template.name}
             </button>
           </PopoverTrigger>
-          <PopoverContent side="right" align="start" className="h-96 w-64 p-3">
+          <PopoverContent
+            side="right"
+            align="start"
+            className="h-96 w-64 p-3"
+            // プレビューは tooltip 相当。開いた時にフォーカスを中へ移すと、フォーカスで
+            // 開いた直後に行のボタンが blur して閉じる（開閉のちらつき）
+            onOpenAutoFocus={(e) => e.preventDefault()}
+          >
             <MiniDayPreview blocks={template.blocks} />
           </PopoverContent>
         </Popover>

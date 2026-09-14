@@ -1,6 +1,7 @@
 'use client';
 
 import type { inferRouterOutputs } from '@trpc/server';
+import { useLocale } from 'next-intl';
 import { useCallback } from 'react';
 
 import { CACHE_5_MINUTES } from '@/lib/date';
@@ -23,7 +24,19 @@ function getBrowserTimezone(): string {
   return typeof window === 'undefined' ? 'UTC' : Intl.DateTimeFormat().resolvedOptions().timeZone;
 }
 
-export function toUserPreferences(settings: UserSettingsData | undefined): UserPreference {
+/**
+ * 日付表記は画面の言語（next-intl の locale）に揃える。user_settings の
+ * preferredLocale はメール等の配信言語で、設定の「言語」select は URL locale だけを
+ * 切り替えるため両者はずれうる。ja の画面に MM/dd/yyyy が出ていた（2026-09-14）。
+ */
+function resolveDateFormat(locale: string): UserPreference['dateFormat'] {
+  return locale === 'ja' ? 'yyyy/MM/dd' : 'MM/dd/yyyy';
+}
+
+export function toUserPreferences(
+  settings: UserSettingsData | undefined,
+  locale: string,
+): UserPreference {
   if (!settings) {
     return {
       timezone: getBrowserTimezone(),
@@ -38,7 +51,7 @@ export function toUserPreferences(settings: UserSettingsData | undefined): UserP
   return {
     timezone: settings.timezone,
     timeFormat: settings.timeFormat,
-    dateFormat: settings.preferredLocale === 'ja' ? 'yyyy/MM/dd' : 'MM/dd/yyyy',
+    dateFormat: resolveDateFormat(locale),
     weekStartsOn: settings.weekStartsOn,
     showWeekNumbers: settings.showWeekNumbers,
     defaultDuration: settings.defaultDuration,
@@ -49,12 +62,13 @@ export function toUserPreferences(settings: UserSettingsData | undefined): UserP
 export function useUserPreferences<T = UserPreference>(
   selector?: (preferences: UserPreference) => T,
 ): T {
+  const locale = useLocale();
   const selectPreferences = useCallback(
     (settings: UserSettingsData) => {
-      const preferences = toUserPreferences(settings);
+      const preferences = toUserPreferences(settings, locale);
       return selector ? selector(preferences) : (preferences as T);
     },
-    [selector],
+    [selector, locale],
   );
   const { data } = api.userSettings.get.useQuery(undefined, {
     staleTime: CACHE_5_MINUTES,
@@ -65,6 +79,6 @@ export function useUserPreferences<T = UserPreference>(
   });
   if (data !== undefined) return data as T;
 
-  const fallback = toUserPreferences(undefined);
+  const fallback = toUserPreferences(undefined, locale);
   return selector ? selector(fallback) : (fallback as T);
 }

@@ -61,6 +61,8 @@ export interface UseInteractionProps {
     startMinute: number;
     endHour: number;
     endMinute: number;
+    /** グリッドで範囲を引いた選択。普段の長さで上書きしない */
+    durationSource: 'dragged';
   }) => void;
 }
 

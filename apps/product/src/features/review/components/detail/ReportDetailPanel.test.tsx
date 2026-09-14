@@ -126,6 +126,23 @@ describe('ReportDetailPanel', () => {
     useReportDetailStore.setState({ width: REPORT_DETAIL_PANEL_DEFAULT_WIDTH, isResizing: false });
   });
 
+  it('明細の行を押すと、その日（ユーザー TZ）の記録をカレンダーで開く', () => {
+    const onOpenRecord = vi.fn();
+    renderPanel({ onOpenRecord });
+
+    // rec-1: 2026-09-01T01:00Z = 09/01 10:00 JST
+    fireEvent.click(screen.getByRole('button', { name: /10:00–11:30/ }));
+
+    expect(onOpenRecord).toHaveBeenCalledExactlyOnceWith({ id: 'rec-1', dayKey: '2026-09-01' });
+  });
+
+  it('onOpenRecord が無ければ明細の行はボタンにしない', () => {
+    renderPanel();
+
+    expect(screen.queryByRole('button', { name: /10:00–11:30/ })).toBeNull();
+    expect(screen.getByText('10:00–11:30')).toBeInTheDocument();
+  });
+
   it('slot が未登録なら何も描かない', () => {
     setDomSlot(REPORT_DETAIL_SLOT_KEY, null);
     renderPanel();

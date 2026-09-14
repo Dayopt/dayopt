@@ -126,6 +126,7 @@
         "writeUnresolved": "The save result could not be confirmed. Reopen this view to check the latest version",
         "saveFailed": "Could not save. Your changes are still here. Please try again",
         "recordFailed": "Could not record. Please try again",
+        "undoFailed": "Could not undo. Please try again",
         "confirmFailed": "Could not confirm the day. Please try again",
         "deleted": "Deleted",
         "deleteFailed": "Could not delete. Please try again",

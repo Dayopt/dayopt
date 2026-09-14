@@ -3,7 +3,7 @@
 import { useCallback, useMemo } from 'react';
 
 import { resolveNextPeriodStartDayKey, type ReportGranularity } from '@/features/review';
-import { useTimeblockInspectorStore } from '@/features/timeblock';
+import { serializeTimeblockParam, TIMEBLOCK_PARAM } from '@/features/timeblock';
 import { useRouter } from '@dayopt/i18n/navigation';
 
 interface UseReportJumpOptions {
@@ -38,17 +38,19 @@ export function useReportJump({
   weekStartsOn,
 }: UseReportJumpOptions): ReportJumpHandlers {
   const router = useRouter();
-  const openInspector = useTimeblockInspectorStore((state) => state.openInspector);
 
   const onJumpToRecord = useCallback(
     (target: { id: string; dayKey: string }) => {
-      router.push(`/calendar?view=day&date=${target.dayKey}`);
-      // **遷移を要求してから開く。** inspector は shell に常駐しているので順序を逆にしても
-      // 動くはずだが、先に開くと「まだレポートを見ている画面に記録の編集パネルが開く」
-      // 瞬間が生まれる。遷移が先なら、開いた時にはもうカレンダーが宛先になっている。
-      openInspector(target.id, 'record');
+      // 記録は URL の `?timeblock=record:<id>` で開く（検索結果と同じ経路。
+      // `useInspectorURLSync` が client navigation 後に読んで Inspector を開く）。
+      // 以前は router.push の直後に store の openInspector を呼んでいたが、
+      // その pushState が App Router の遷移中に割り込み、/calendar への遷移自体が
+      // 起きなかった（2026-09-14 実測。レポートに Inspector が一瞬開いて閉じるだけ）
+      const params = new URLSearchParams({ view: 'day', date: target.dayKey });
+      params.set(TIMEBLOCK_PARAM, serializeTimeblockParam(target.id, 'record'));
+      router.push(`/calendar?${params.toString()}`);
     },
-    [openInspector, router],
+    [router],
   );
 
   const onJumpToDay = useCallback(

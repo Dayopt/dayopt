@@ -255,9 +255,10 @@
   --category-gray-tint: oklch(0.28 0.02 250);
 
   /* Now Indicator — 現在時刻線・ドット・ラベル */
-  --now-indicator: oklch(0.65 0.15 25);
+  /* 現在時刻バッジ（12px 白文字）の contrast 4.5:1 を満たす明度。0.65 では 3.45 だった */
+  --now-indicator: oklch(0.58 0.17 25);
   --now-indicator-foreground: oklch(1 0 0);
-  --now-indicator-muted: oklch(0.65 0.15 25 / 0.3);
+  --now-indicator-muted: oklch(0.58 0.17 25 / 0.3);
 
   /* Borders & Inputs */
   --border: oklch(1 0 0 / 0.12);

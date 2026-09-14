@@ -8,6 +8,8 @@
       "views": "Views",
       "quickCreate": "Create",
       "theme": "Theme",
+      "switchToDark": "Switch to dark mode",
+      "switchToLight": "Switch to light mode",
       "getHelp": "Get help",
       "toggleSidebar": "Toggle sidebar",
       "closeSidebar": "Close sidebar",

@@ -109,7 +109,6 @@ export function CalendarViewClient({ translations }: CalendarViewClientProps) {
           onNavigatePrev={composition.onNavigatePrev}
           onNavigateNext={composition.onNavigateNext}
           onNavigateToday={composition.onNavigateToday}
-          onToggleWeekends={composition.onToggleWeekends}
           onSettingsChange={composition.onSettingsChange}
           onDateSelect={composition.onDateSelect}
           onPrefetch={composition.prefetchDirection}
