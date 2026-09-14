@@ -266,7 +266,7 @@ jobs:
           fi
           if [ "$UNIT_RESULT" = "failure" ]; then
             hints="$hints
-          - **product-unit-full**: PR では related に絞った product unit が main の full 実行で落ちた。PR の判定（\`scripts/ci/check.mjs\` の \`resolveProductUnitScope\`）が拾えなかった依存があるので、落ちた test を直すのに加え、その依存の型を full 側へ倒す規則に足す（docs/engineering/testing.md §いつ回すか）"
+          - **product-unit-full**: PR では related に絞った product unit が main の full 実行で落ちた。PR の判定（\`scripts/ci/check.mjs\` の \`resolveProductUnitScope\`）が拾えなかった依存があるので、落ちた test を直すのに加え、その依存の種類を full 側へ倒す規則に足す（docs/engineering/testing.md §いつ回すか）"
           fi
           if [ "$SWEEP_RESULT" = "failure" ]; then
             hints="$hints
