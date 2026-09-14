@@ -146,7 +146,7 @@ describe('既定値の server / client 一致', () => {
   // client の fallback はテストで import するだけで、server 側（calendar-prefetch.ts）は
   // 'use client' module を import できないため定数を共有している。値のずれをここで止める。
   it('row の無い user の既定値が client の fallback と同じ', () => {
-    expect(toUserPreferences(undefined).weekStartsOn).toBe(DEFAULT_WEEK_STARTS_ON);
+    expect(toUserPreferences(undefined, 'ja').weekStartsOn).toBe(DEFAULT_WEEK_STARTS_ON);
     expect(toCalendarSettings(undefined).showWeekends).toBe(DEFAULT_SHOW_WEEKENDS);
   });
 });
