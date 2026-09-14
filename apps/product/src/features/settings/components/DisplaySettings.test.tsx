@@ -1,7 +1,13 @@
-import { render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { DisplaySettings } from './DisplaySettings';
+
+const mocks = vi.hoisted(() => ({
+  replace: vi.fn(),
+  refresh: vi.fn(),
+  updateMutate: vi.fn(),
+}));
 
 vi.mock('next-intl', () => ({
   useTranslations: () => (key: string) => key,
@@ -10,9 +16,12 @@ vi.mock('next-intl', () => ({
 vi.mock('@/lib/hooks/useTheme', () => ({
   useTheme: () => ({ theme: 'system', setTheme: vi.fn() }),
 }));
+vi.mock('@/lib/hooks/useUpdateUserSettings', () => ({
+  useUpdateUserSettings: () => ({ mutate: mocks.updateMutate, isPending: false }),
+}));
 vi.mock('@dayopt/i18n/navigation', () => ({
   usePathname: () => '/calendar',
-  useRouter: () => ({ replace: vi.fn(), refresh: vi.fn() }),
+  useRouter: () => ({ replace: mocks.replace, refresh: mocks.refresh }),
 }));
 vi.mock('../hooks/useUserSettings', () => ({
   useUserSettings: () => ({
@@ -46,5 +55,23 @@ describe('DisplaySettings accessible controls', () => {
     ]) {
       expect(screen.getByRole('combobox', { name })).toBeInTheDocument();
     }
+  });
+});
+
+describe('DisplaySettings language', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('言語を変えると URL locale と一緒に preferred_locale も保存する', () => {
+    render(<DisplaySettings />);
+    const trigger = screen.getByRole('combobox', { name: 'settings.preferences.language' });
+    fireEvent.pointerDown(trigger, { button: 0, ctrlKey: false, pointerType: 'mouse' });
+    fireEvent.click(trigger);
+    const option = screen.getByRole('option', { name: /English/ });
+    fireEvent.click(option);
+
+    expect(mocks.updateMutate).toHaveBeenCalledWith({ preferredLocale: 'en' });
+    expect(mocks.replace).toHaveBeenCalledWith('/calendar', { locale: 'en' });
   });
 });
