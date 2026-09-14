@@ -105,19 +105,24 @@ UPDATE public.write_fence_control SET fence_enabled = false WHERE singleton_key 
 
 Write Fence とは別の gate。MCP 経由の書き込み（`plans.create` 等）だけを対象にする。停止・段階有効化の両方をこの節の手順で行う。詳細な契約は issue [#1754](https://github.com/Dayopt/dayopt/issues/1754) のコメント（step-6 系ドキュメント相当）が正本。
 
-#### 現在の状態を見る（read-only）
+#### 実行主体・対象環境を確認する
+
+Production の操作は対象 project と変更内容を承認した人間が行う。repo root で `.op-env.human.example` の参照を `.op-env.human` に準備し、[secrets.md](secrets.md) の消費境界に従う。agent は human credential を消費しない。`op run` だけではファイルは読み込まれない。
 
 ```bash
-op run -- pnpm mcp:gate
+# 人間の端末で実行。現在の状態を見るだけ（read-only）
+op run --env-file=.op-env.human -- pnpm mcp:gate
 ```
 
-`SUPABASE_SECRET_KEY` / `NEXT_PUBLIC_SUPABASE_URL` は 1Password `app` item から `op run` が解決する。`writes_enabled` / `enabled_client_ids` / `revision` を表示するだけで、何も変更しない。
+`NEXT_PUBLIC_SUPABASE_URL` / `SUPABASE_SECRET_KEY` は `human/supabase` item から解決する。接続先 origin と DB identity、gate 状態、revision を表示する。値を `.env` に保存しない。
+
+書き込み時は `--expect-url` に承認対象の Supabase project origin を、`--expect-environment` に `production` または `preview` を必ず指定する。以下の `<approved-supabase-origin>` は Dashboard と照合した origin へ置き換える。資格情報不足、URL不一致、DB identity不一致では setter を呼ばない。CAS競合・timeoutでは自動再送せず、状態を読み直して適用有無を確認する。local演習はlocal資格情報をprocess envへ渡し、local DBにseedされたidentityの環境名を指定する。
 
 #### 1 client を有効化する（段階導入）
 
 ```bash
-op run -- pnpm mcp:gate -- --enable-global      # global gate を ON
-op run -- pnpm mcp:gate -- --enable-client=claude-ai   # 対象 client を allowlist へ
+op run --env-file=.op-env.human -- pnpm mcp:gate -- --expect-url='<approved-supabase-origin>' --expect-environment=production --enable-global      # global gate を ON
+op run --env-file=.op-env.human -- pnpm mcp:gate -- --expect-url='<approved-supabase-origin>' --expect-environment=production --enable-client=claude-ai   # 対象 client を allowlist へ
 ```
 
 - `client_id` は `claude-ai` / `chatgpt` / `cursor` のいずれか
@@ -127,10 +132,12 @@ op run -- pnpm mcp:gate -- --enable-client=claude-ai   # 対象 client を allow
 
 **開放の順序**（1 client ぶん）:
 
-1. DB 側を開ける: `--enable-billing`（必要なら）→ `--enable-global` → `--enable-client=<id>`
-2. Vercel Production env `MCP_WRITE_ENABLED_CLIENTS` に `<id>` を追加する
-3. **env を live に載せる**: Auto-assign Custom Production Domains は無効運用なので、Dashboard の Redeploy では公開されない。次の main merge が起こす `Production Release`（promote）を待つ
-4. 対象ユーザーが client 側で接続を作り直す（再 consent）。これで `write_enabled_at` が刻まれる
+1. 対象ユーザーの利用権と現在の gate を確認する。全体の課金切替は下記の rollout に従い、MCP 接続のためだけに `BILLING_ENFORCED` を切り替えない。
+2. Vercel Production env `MCP_WRITE_ENABLED_CLIENTS` に `<id>` を追加する。
+3. env 設定後に作成された main HEAD の Production build を確認し、実際に配信中の deployment ID・SHA・env 設定時刻との前後を照合する。live より新しい main HEAD に Product の変更がある場合は `gh workflow run promote.yml --ref main` で通常の検証を経て配信できる。**live と main HEAD が同じ SHA の場合、redeploy しても通常 dispatch は `already serving` と判定し、新しい deployment を選ばない。** この場合は gate を閉じたまま停止し、#2735 で追跡する「deployment ID を指定し通常の検証を維持する再配備経路」の整備後に続行する。`force=true` はこの SHA 判定を変えず検証を省略するため、代替手順にしない。
+4. 承認済みの DB 操作を1回ずつ行う: `--enable-billing`（体験利用を許可する場合）→ `--enable-global` → `--enable-client=<id>`。毎回期待 URL・環境を指定する。
+5. 対象ユーザーが再 consent し、付与 scope と `write_enabled_at`、実際の tool 一覧を確認する。広告 scope だけを write 開放の証拠にしない。
+6. 過去に終了した Record を作成し、receipt と Calendar 反映を確認する。未来終了の Record は DT005 で拒否される。
 
 `scopes_supported` は常に全 8 scope を広告する。client（Claude など）は広告された scope をそのまま要求するため、広告しないと **gate を全部開けても write が一度も要求されない**。付与するかどうかは consent が client 単位で決め、**env allowlist と DB gate の両方が開いている時だけ** write を付ける。どちらかが閉じていれば write を落とした read-only の grant になり、consent は失敗しない（`isConsentWriteEnabled` / `resolveGrantableScopes`）。したがって緊急停止で DB gate だけを先に閉じても、その client の read-only 接続は作り続けられる。
 
@@ -138,28 +145,34 @@ op run -- pnpm mcp:gate -- --enable-client=claude-ai   # 対象 client を allow
 
 MCP の利用権判定は読み取りと書き込みで持ち場が違う（2026-09-08、単一有料プラン移行 #2610 / PR #2668）。
 
-| 経路          | 判定点                                                   | 切替                                                                 | `false`（既定）                                  | `true`                   |
-| ------------- | -------------------------------------------------------- | -------------------------------------------------------------------- | ------------------------------------------------ | ------------------------ |
-| 読み取り tool | app 層 `checkMcpEntitlement`（`lib/mcp/auth.ts`）        | Vercel env `BILLING_ENFORCED`                                        | **判定しない**（profile を読まず全 token 許可）  | 契約中または 45 日体験中 |
-| 書き込み tool | DB `private.authorize_mcp_mutation_v1`（`DM005` で拒否） | `mcp_mutation_control.billing_enforced`（`op run -- pnpm mcp:gate`） | 契約中（`active` / `trialing` / `past_due`）のみ | 契約中または 45 日体験中 |
+| 経路          | 判定点                                                   | 切替                                                                                          | `false`（既定）                                  | `true`                   |
+| ------------- | -------------------------------------------------------- | --------------------------------------------------------------------------------------------- | ------------------------------------------------ | ------------------------ |
+| 読み取り tool | app 層 `checkMcpEntitlement`（`lib/mcp/auth.ts`）        | Vercel env `BILLING_ENFORCED`                                                                 | **判定しない**（profile を読まず全 token 許可）  | 契約中または 45 日体験中 |
+| 書き込み tool | DB `private.authorize_mcp_mutation_v1`（`DM005` で拒否） | `mcp_mutation_control.billing_enforced`（`op run --env-file=.op-env.human -- pnpm mcp:gate`） | 契約中（`active` / `trialing` / `past_due`）のみ | 契約中または 45 日体験中 |
 
 ```bash
-op run -- pnpm mcp:gate -- --enable-billing    # DB 側を単一プラン契約（体験中も可）へ
-op run -- pnpm mcp:gate -- --disable-billing   # 旧契約（契約中のみ）へ戻す
+op run --env-file=.op-env.human -- pnpm mcp:gate -- --expect-url='<approved-supabase-origin>' --expect-environment=production --enable-billing    # DB 側を単一プラン契約（体験中も可）へ
+op run --env-file=.op-env.human -- pnpm mcp:gate -- --expect-url='<approved-supabase-origin>' --expect-environment=production --disable-billing   # 旧契約（契約中のみ）へ戻す
 ```
 
 - **順序は [billing-single-plan-rollout.md](billing-single-plan-rollout.md) §公開順序 6 / §復帰 が正本**（DB 側 `--enable-billing` → `BILLING_ENFORCED=true` の Product 配備、戻す時は逆）。env だけ `true` にすると、体験中ユーザーは読めるのに書き込みだけ `DM005` で落ちる
-- 45 日体験は `BILLING_ENFORCED=true` の下で認証済みアプリを初めて表示した時にしか始まらない（`billing.startTrial`）。env が未設定の間は誰も体験中にならないため、`--enable-billing` 単独では実効的に何も変わらない
+- 通常の45日体験は `BILLING_ENFORCED=true` の下で `billing.startTrial` が開始する。創業者の限定検証は #2553 の2026-09-11承認済み手順で事前開始する経路があるため、現在の開始・終了・消費状態を確認して判断する。既に始まった体験を再発行・延長したり、Stripe customerなしで契約状態をactiveへ変更したりしない
 - この切替は Write Fence にも `writes_enabled` / `enabled_client_ids` にも影響しない
 
 #### 緊急停止（stop and roll forward、上から順に）
 
-1. global gate を OFF にする: `op run -- pnpm mcp:gate -- --disable-global`
-2. 対象 client を allowlist から外す: `op run -- pnpm mcp:gate -- --disable-client=<id>`
+1. global gate を OFF にする: `op run --env-file=.op-env.human -- pnpm mcp:gate -- --expect-url='<approved-supabase-origin>' --expect-environment=production --disable-global`
+2. 対象 client を allowlist から外す: `op run --env-file=.op-env.human -- pnpm mcp:gate -- --expect-url='<approved-supabase-origin>' --expect-environment=production --disable-client=<id>`
 3. Vercel の `MCP_WRITE_ENABLED_CLIENTS` から対象 client を外す
 4. 恒久停止が必要な connection は Settings（本人）または `revoke_oauth_connection` RPC（運用側）で個別 revoke し、同じ token family が復活しないことを確認する
 
 `mcp_mutation_control` は revision を使った CAS 更新（`set_mcp_mutation_control_v1` / `set_mcp_client_write_control_v1` / `set_mcp_billing_enforcement_v1`、いずれも `service_role` 限定の `SECURITY DEFINER` RPC）。直接 `UPDATE` できる GRANT はどのロールにも無い。`pnpm mcp:gate` が revision の読み直しと引数整形を行うため、SQL を手で書く必要はない。
+
+#### 運用移行の検証
+
+MCP実装・harness・依存またはCI実行経路を変更するPRは、既存の Unit Tests 内で `pnpm --filter @dayopt/product test:mcp:conformance` を実行する。対象判定は `scripts/ci/impact.mjs`、非対象はskip、判定不能は実行する。expected-failuresは互換範囲の記録であり、失敗を隠すために緩めない。
+
+#2553 に配備SHA・gate・付与scope・revoke/再接続・停止/復旧・7日実利用の証拠を記録する。#1754 には3clientの操作完了と画面反映p95、retention backlog、アカウント削除の終端を記録する。cron停止とschema driftの常設監視は #2681 / #2683 が担当する。秘密・token・個人の内容を記録せず、件数・時刻・状態だけを残す。
 
 ### 重要ダッシュボードURL
 

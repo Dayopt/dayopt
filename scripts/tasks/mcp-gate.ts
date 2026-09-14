@@ -24,19 +24,21 @@
  *
  * Usage:
  *   pnpm mcp:gate
- *   pnpm mcp:gate -- --enable-global
- *   pnpm mcp:gate -- --disable-global
- *   pnpm mcp:gate -- --enable-client=claude-ai
- *   pnpm mcp:gate -- --disable-client=claude-ai
- *   pnpm mcp:gate -- --enable-billing
- *   pnpm mcp:gate -- --disable-billing
+ *   pnpm mcp:gate -- --expect-url='<origin>' --expect-environment=production --enable-global
+ *   pnpm mcp:gate -- --expect-url='<origin>' --expect-environment=production --disable-global
+ *   pnpm mcp:gate -- --expect-url='<origin>' --expect-environment=production --enable-client=claude-ai
+ *   pnpm mcp:gate -- --expect-url='<origin>' --expect-environment=production --disable-client=claude-ai
+ *   pnpm mcp:gate -- --expect-url='<origin>' --expect-environment=production --enable-billing
+ *   pnpm mcp:gate -- --expect-url='<origin>' --expect-environment=production --disable-billing
  *
  * 必須 env: NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SECRET_KEY
- * （production 値は 1Password `app` item。`op run -- pnpm mcp:gate ...` で渡す）
+ * （production は人間が `.op-env.human` を消費する。runbook §MCP write gate を参照）
  *
  * revision は毎回 DB から読み直して渡す（CAS）。同時実行での取り違えを防ぐため、
  * 書き込み系オプションは 1 回の呼び出しにつき 1 個までしか受け付けない。
  */
+
+import { pathToFileURL } from 'node:url';
 
 const VALID_CLIENT_IDS = ['claude-ai', 'chatgpt', 'cursor'] as const;
 type OAuthClientId = (typeof VALID_CLIENT_IDS)[number];
@@ -55,23 +57,47 @@ function isValidClientId(value: string): value is OAuthClientId {
 
 function parseArgs(argv: string[]) {
   const flags = new Map<string, string | true>();
+  const allowed = new Set([
+    'enable-global',
+    'disable-global',
+    'enable-client',
+    'disable-client',
+    'enable-billing',
+    'disable-billing',
+    'expect-url',
+    'expect-environment',
+  ]);
   for (const raw of argv) {
-    if (!raw.startsWith('--')) continue;
-    const [key, value] = raw.slice(2).split('=');
-    flags.set(key, value ?? true);
+    if (raw === '--') continue;
+    const match = /^--([^=]+)(?:=(.*))?$/.exec(raw);
+    if (!match || !allowed.has(match[1]!) || flags.has(match[1]!)) {
+      throw new Error('不明または重複したオプションです。');
+    }
+    flags.set(match[1]!, match[2] ?? true);
   }
   return flags;
 }
 
-function requireEnv(name: string): string {
-  const value = process.env[name];
-  if (!value) {
-    console.error(
-      `環境変数 ${name} が未設定です。service_role 権限の値を op run 等で渡してください。`,
-    );
-    process.exit(1);
-  }
+function requireEnv(env: NodeJS.ProcessEnv, name: string): string {
+  const value = env[name];
+  if (!value) throw new Error(`環境変数 ${name} が未設定です。`);
   return value;
+}
+
+function validateUrl(value: string): string {
+  const url = new URL(value);
+  const local = ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname);
+  if (
+    (url.protocol !== 'https:' && !(local && url.protocol === 'http:')) ||
+    url.username ||
+    url.password ||
+    url.pathname !== '/' ||
+    url.search ||
+    url.hash
+  ) {
+    throw new Error('Supabase URL は HTTPS origin（local は HTTP 可）で指定してください。');
+  }
+  return url.origin;
 }
 
 async function restRequest<T>(
@@ -82,6 +108,8 @@ async function restRequest<T>(
 ): Promise<T> {
   const response = await fetch(`${supabaseUrl}/rest/v1/${path}`, {
     ...init,
+    redirect: 'error',
+    signal: AbortSignal.timeout(15_000),
     headers: {
       apikey: serviceRoleKey,
       Authorization: `Bearer ${serviceRoleKey}`,
@@ -91,7 +119,10 @@ async function restRequest<T>(
   });
   const body = await response.text();
   if (!response.ok) {
-    throw new Error(`PostgREST ${response.status}: ${body}`);
+    // Do not echo arbitrary upstream bodies or credentials into the runbook log.
+    throw new Error(
+      `PostgREST ${response.status}。状態を再確認してください（自動再試行しません）。`,
+    );
   }
   return body ? (JSON.parse(body) as T) : (undefined as T);
 }
@@ -112,8 +143,8 @@ async function readControl(
   return row;
 }
 
-async function main() {
-  const flags = parseArgs(process.argv.slice(2));
+export async function runMcpGate(argv: string[], env: NodeJS.ProcessEnv) {
+  const flags = parseArgs(argv);
 
   const writeFlags = [
     'enable-global',
@@ -124,8 +155,7 @@ async function main() {
     'disable-billing',
   ].filter((key) => flags.has(key));
   if (writeFlags.length > 1) {
-    console.error(`書き込み系オプションは 1 回に 1 個までです（指定: ${writeFlags.join(', ')}）。`);
-    process.exit(1);
+    throw new Error('書き込み系オプションは 1 回に 1 個までです。');
   }
 
   // --enable-global / --disable-global / --enable-billing / --disable-billing は
@@ -139,15 +169,52 @@ async function main() {
     'disable-billing',
   ] as const) {
     if (flags.get(key) !== undefined && flags.get(key) !== true) {
-      console.error(
-        `--${key} は値を取りません（例: --${key}）。--${key}=${String(flags.get(key))} のような指定は意図しない方向へ倒れうるため拒否します。`,
-      );
-      process.exit(1);
+      throw new Error(`--${key} は値を取りません。`);
     }
   }
 
-  const supabaseUrl = requireEnv('NEXT_PUBLIC_SUPABASE_URL');
-  const serviceRoleKey = requireEnv('SUPABASE_SECRET_KEY');
+  const supabaseUrl = validateUrl(requireEnv(env, 'NEXT_PUBLIC_SUPABASE_URL'));
+  const serviceRoleKey = requireEnv(env, 'SUPABASE_SECRET_KEY');
+  const expectedUrl = flags.get('expect-url');
+  const expectedEnvironment = flags.get('expect-environment');
+  const writing = writeFlags.length > 0;
+  if (writing && (typeof expectedUrl !== 'string' || typeof expectedEnvironment !== 'string')) {
+    throw new Error(
+      '書き込みには --expect-url=<origin> と --expect-environment=production|preview が必要です。',
+    );
+  }
+  if (
+    expectedUrl !== undefined &&
+    (typeof expectedUrl !== 'string' || validateUrl(expectedUrl) !== supabaseUrl)
+  ) {
+    throw new Error('期待した Supabase URL と接続先が一致しません。');
+  }
+  if (
+    expectedEnvironment !== undefined &&
+    !['production', 'preview'].includes(String(expectedEnvironment))
+  ) {
+    throw new Error('期待環境は production または preview です。');
+  }
+  for (const key of ['enable-client', 'disable-client']) {
+    const value = flags.get(key);
+    if (value !== undefined && (typeof value !== 'string' || !isValidClientId(value))) {
+      throw new Error(`--${key} は claude-ai / chatgpt / cursor を指定してください。`);
+    }
+  }
+  const identities = await restRequest<Array<{ environment: string }>>(
+    supabaseUrl,
+    serviceRoleKey,
+    'rpc/get_mcp_environment_identity_v1',
+    { method: 'POST', body: '{}' },
+  );
+  if (
+    identities.length !== 1 ||
+    !['production', 'preview'].includes(identities[0]!.environment) ||
+    (expectedEnvironment !== undefined && identities[0]!.environment !== expectedEnvironment)
+  ) {
+    throw new Error('DB の MCP identity が期待環境と一致しません。');
+  }
+  console.log(`target: ${supabaseUrl} (${identities[0]!.environment})`);
 
   const control = await readControl(supabaseUrl, serviceRoleKey);
 
@@ -234,7 +301,9 @@ async function main() {
   );
 }
 
-main().catch((error) => {
-  console.error(error);
-  process.exit(1);
-});
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  runMcpGate(process.argv.slice(2), process.env).catch((error: unknown) => {
+    console.error(error instanceof Error ? error.message : 'MCP gate 操作に失敗しました。');
+    process.exitCode = 1;
+  });
+}
