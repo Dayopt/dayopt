@@ -24,7 +24,7 @@ import { formatDurationMinutes } from '@/lib/date';
 import { Badge } from '@dayopt/components';
 
 import type { TimeblockDestination } from '../../domain/timeblock-destination';
-import { useTagEstimationFactors } from '../../hooks/useTagEstimationFactors';
+import { useActivityEstimationFactors } from '../../hooks/useActivityEstimationFactors';
 
 interface EstimationFeedforwardProps {
   /** 保存先。`'plan'` のときだけ表示する。 */
@@ -40,7 +40,7 @@ export function EstimationFeedforward({
   draftMinutes,
 }: EstimationFeedforwardProps) {
   const t = useTranslations('timeblock.editor.feedforward');
-  const { project } = useTagEstimationFactors();
+  const { project } = useActivityEstimationFactors();
 
   if (destination !== 'plan') return null;
 

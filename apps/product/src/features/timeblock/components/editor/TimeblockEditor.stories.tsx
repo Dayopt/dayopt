@@ -121,7 +121,7 @@ export const WithEstimationFeedforward: Story = {
   },
   parameters: {
     trpcMocks: {
-      'statistics.getTagEstimationFactors': [
+      'statistics.getActivityEstimationFactors': [
         { activityId: 'activity-1', factor: 1.5, sampleCount: 4 },
       ],
     },
