@@ -205,7 +205,7 @@ MCP の tool set には `buy_domain` / `buy_pro` / `buy_credits` / `pause_projec
 
 ### MCP を持たない経路
 
-GitHub は `gh` CLI を使う（`--json` + `--jq` で必要な情報へ絞る）。通常のブラウザ操作は現在の runtime のブラウザ機能を使う。Claude Code の Browser tool は互換経路であり必須ではない。browser-only の専用プローブは `usability-probe` の別契約に従う。
+GitHub は `gh` CLI を使う（`--json` + `--jq` で必要な情報へ絞る）。Agent セッションの `gh` は `GH_CONFIG_DIR` 経由の fine-grained PAT（`agent/github-agent`、Dayopt/dayopt 限定、Administration / Secrets / Workflows 無し）で動く。ruleset・GitHub Secret・org 設定の変更は scope に無いので失敗する。それらは User の terminal で行う（`docs/operations/secrets.md` §Agent の gh identity）。通常のブラウザ操作は現在の runtime のブラウザ機能を使う。Claude Code の Browser tool は互換経路であり必須ではない。browser-only の専用プローブは `usability-probe` の別契約に従う。
 
 ### UptimeRobot (`mcp__uptimerobot__*`)
 

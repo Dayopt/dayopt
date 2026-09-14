@@ -328,6 +328,11 @@ export const operationalItems: OperationalItem[] = [
   { vault: human, item: 'supabase-login', required: true },
   // Upstash Console の GUI ログイン。op:// では参照されない（#2127）。
   { vault: human, item: 'upstash-login', required: true },
+  // Agent セッションの gh / git push が使う fine-grained PAT（Dayopt/dayopt repo 限定、
+  // Administration / Secrets / Workflows 無し）。op run では消費せず、User が
+  // `GH_CONFIG_DIR=~/.config/gh-agent gh auth login --with-token` で replica を作る。
+  // 発行手順と権限一覧は docs/operations/secrets.md §Agent の gh identity。
+  { vault: agent, item: 'github-agent', required: true },
 ];
 
 export const onePasswordEnvSchema = [...envSchema, ...productionEnvSchema];
