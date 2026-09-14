@@ -1,4 +1,4 @@
-import { expect, type Page, test } from '@playwright/test';
+import { expect, type Page } from '@playwright/test';
 
 import {
   assertServiceRoleSuiteRunnable,
@@ -17,6 +17,9 @@ import {
   seedCriticalPathUser,
   TIMEZONE,
 } from './critical-path-fixture';
+import { test } from './trpc-budget-fixture';
+
+test.use({ trpcProcedureBudget: 26 });
 
 /**
  * クリティカルパス E2E（desktop）— 計画 → 実績 → 振り返りの中核ループを実 UI 操作で通す

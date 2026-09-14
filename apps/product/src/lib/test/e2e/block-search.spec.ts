@@ -1,4 +1,4 @@
-import { expect, type Page, test } from '@playwright/test';
+import { expect, type Page } from '@playwright/test';
 import { createClient } from '@supabase/supabase-js';
 
 import type { Database } from '@/lib/database';
@@ -8,6 +8,9 @@ import {
   resolveServiceRoleTarget,
 } from '../service-role-target-guard';
 import { suppressConsentBanner } from './suppress-consent-banner';
+import { test } from './trpc-budget-fixture';
+
+test.use({ trpcProcedureBudget: 48 });
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SECRET_KEY;

@@ -322,7 +322,7 @@ describe.skipIf(!RUN_LOCAL)('external authority maintenance', () => {
 
     expect(
       ownerSql(`
-        SELECT schedule || '|' || command
+        SELECT schedule || '|' || split_part(command, chr(10), 2)
         FROM cron.job
         WHERE jobname = 'expire-calendar-revoke-outbox';
       `),

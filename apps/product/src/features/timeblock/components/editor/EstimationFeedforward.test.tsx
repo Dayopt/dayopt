@@ -18,7 +18,7 @@ vi.mock('next-intl', () => ({
 vi.mock('@/lib/trpc', () => ({
   api: {
     statistics: {
-      getTagEstimationFactors: {
+      getActivityEstimationFactors: {
         useQuery: () => queryResult.current,
       },
     },
