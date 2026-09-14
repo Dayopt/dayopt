@@ -25,6 +25,23 @@ function formatHourLabel(hour: number, format: '12h' | '24h'): string {
   return `${h}:00 ${ampm}`;
 }
 
+/** 現在時刻バッジ（text-xs + py-1 ≒ 24px）と時刻ラベルが重なる縦距離の目安（px） */
+const OCCLUSION_RADIUS_PX = 24;
+
+/**
+ * 現在時刻バッジと重なる時刻ラベルかどうか。Google / Apple Calendar と同じく、
+ * バッジが乗る時刻ラベルは描かずバッジだけを読ませる
+ */
+export function isHourLabelOccluded(
+  hour: number,
+  occludedMinutes: number | null | undefined,
+  hourHeight: number,
+): boolean {
+  if (occludedMinutes == null) return false;
+  const distancePx = (Math.abs(hour * 60 - occludedMinutes) / 60) * hourHeight;
+  return distancePx < OCCLUSION_RADIUS_PX;
+}
+
 export const TimeColumn = memo<TimeColumnProps>(function TimeColumn({
   startHour = 0,
   endHour = 24,
@@ -33,6 +50,7 @@ export const TimeColumn = memo<TimeColumnProps>(function TimeColumn({
   className = '',
   width,
   dense = false,
+  occludedMinutes,
 }) {
   // 幅は表記と密度で決まる。明示指定が無ければ同じ規則から解く
   const resolvedWidth = width ?? resolveTimeColumnWidth(format, dense);
@@ -45,8 +63,11 @@ export const TimeColumn = memo<TimeColumnProps>(function TimeColumn({
     const rows: React.ReactNode[] = [];
     for (let hour = startHour; hour < endHour; hour++) {
       const label = formatHourLabel(hour, format);
-      // 0時と折りたたみ時の最初の時間はラベルを表示しない
-      const showLabel = hour !== 0 && !(hour === startHour && startHour > 0);
+      // 0時と折りたたみ時の最初の時間、現在時刻バッジが重なる時間はラベルを表示しない
+      const showLabel =
+        hour !== 0 &&
+        !(hour === startHour && startHour > 0) &&
+        !isHourLabelOccluded(hour, occludedMinutes, hourHeight);
 
       const textClass = 'text-muted-foreground';
 
@@ -67,7 +88,7 @@ export const TimeColumn = memo<TimeColumnProps>(function TimeColumn({
     }
 
     return rows;
-  }, [startHour, endHour, hourHeight, format, dense]);
+  }, [startHour, endHour, hourHeight, format, dense, occludedMinutes]);
 
   return (
     <div

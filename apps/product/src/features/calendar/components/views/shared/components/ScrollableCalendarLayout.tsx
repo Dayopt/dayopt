@@ -175,10 +175,12 @@ export const ScrollableCalendarLayout = ({
   // Mobile + Inspector open / Tag draft open のとき、対象が Drawer に隠れないよう自動スクロール
   useScrollTimeblockIntoView({ scrollContainerRef, hourHeight: HOUR_HEIGHT });
 
-  // 現在時刻線ロジック（フック利用）
+  // 現在時刻線ロジック（フック利用）。線と同じ user TZ で計算する
+  const timezone = useUserPreferences((s) => s.timezone);
   const { currentTime, currentTimePosition } = useCurrentTimeLine({
     hourHeight: HOUR_HEIGHT,
     showCurrentTime,
+    timezone,
   });
 
   // 現在時刻のフォーマット（設定に応じて 24h/12h）
@@ -246,8 +248,13 @@ export const ScrollableCalendarLayout = ({
                 className="h-full"
                 width={resolvedTimeColumnWidth}
                 dense={defaultTimeColumn.dense}
+                occludedMinutes={
+                  shouldShowCurrentTimeLine && hasToday
+                    ? currentTime.getHours() * 60 + currentTime.getMinutes()
+                    : null
+                }
               />
-              {/* 現在時刻ラベル（Apple Calendar風） */}
+              {/* 現在時刻ラベル（Apple Calendar風）。重なる時刻ラベルは TimeColumn 側で隠す */}
               {shouldShowCurrentTimeLine && hasToday && (
                 <div
                   className="bg-now-indicator text-now-indicator-foreground pointer-events-none absolute right-1 z-20 rounded-lg px-1 py-1 text-xs font-medium tabular-nums"
