@@ -6,6 +6,8 @@ import path from 'path';
 import { defineConfig } from 'vitest/config';
 const dirname =
   typeof __dirname !== 'undefined' ? __dirname : path.dirname(fileURLToPath(import.meta.url));
+const STORYBOOK_CONFIG_DIR = path.join(dirname, '../storybook/.storybook');
+const STORYBOOK_ROOT = path.dirname(STORYBOOK_CONFIG_DIR);
 
 // ─── unit test の環境分割（node / happy-dom）─────────────────────────
 //
@@ -126,11 +128,17 @@ export default defineConfig({
         },
       },
       // Storybook テスト（ブラウザ: Playwright chromium）
+      //
+      // `root` は configDir の親（apps/storybook）に揃える（#2592）。addon-vitest は stories glob を
+      // `test.root ?? process.cwd()`（= apps/product）基準の相対 include に直す一方、project の実 root は
+      // Storybook の viteFinal が返す apps/storybook になる。基準がずれると `../../product/src/**` だけが
+      // `src/**` に潰れて apps/storybook/src を探し、product の Story が 1 件も collect されない
+      // （web / packages は apps/* 兄弟の偶然で通っていた）。`test.include` は plugin が破棄するので使えない。
       {
         extends: true,
         plugins: [
           storybookTest({
-            configDir: path.join(dirname, '../storybook/.storybook'),
+            configDir: STORYBOOK_CONFIG_DIR,
             storybookScript: 'pnpm --filter @dayopt/storybook storybook -- --no-open',
             tags: {
               exclude: ['docs-only', 'wip'],
@@ -139,6 +147,7 @@ export default defineConfig({
         ],
         test: {
           name: 'storybook',
+          root: STORYBOOK_ROOT,
           browser: {
             enabled: true,
             headless: true,
@@ -157,7 +166,7 @@ export default defineConfig({
         extends: true,
         plugins: [
           storybookTest({
-            configDir: path.join(dirname, '../storybook/.storybook'),
+            configDir: STORYBOOK_CONFIG_DIR,
             storybookScript: 'pnpm --filter @dayopt/storybook storybook -- --no-open',
             tags: {
               exclude: ['docs-only', 'wip'],
@@ -166,6 +175,7 @@ export default defineConfig({
         ],
         test: {
           name: 'storybook-dark',
+          root: STORYBOOK_ROOT,
           browser: {
             enabled: true,
             headless: true,
