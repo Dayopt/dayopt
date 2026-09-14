@@ -1,4 +1,4 @@
-import { expect, type Page, test } from '@playwright/test';
+import { expect, type Page } from '@playwright/test';
 
 import {
   assertServiceRoleSuiteRunnable,
@@ -17,6 +17,10 @@ import {
   seedCriticalPathUser,
   TIMEZONE,
 } from './critical-path-fixture';
+import { test } from './trpc-budget-fixture';
+
+// desktop の critical-path と同じループなので同じ予算。実測 12〜20（2026-09-14、local dev 2 run）
+test.use({ trpcProcedureBudget: 26 });
 
 /**
  * クリティカルパス E2E（mobile）— 計画 → 実績 → 振り返りを **mobile の実導線** で通す（#2743）
