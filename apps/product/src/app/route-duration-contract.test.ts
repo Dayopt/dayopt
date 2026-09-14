@@ -51,6 +51,7 @@ const ROUTE_DURATION_CONTRACT = {
   // 外部 I/O 無し
   'src/app/.well-known/oauth-authorization-server/route.ts': 15,
   'src/app/.well-known/oauth-protected-resource/route.ts': 15,
+  'src/app/api/health/version/route.ts': 15,
   'src/app/api/v1/system/[...retired]/route.ts': 5,
   'src/app/maintenance/route.ts': 15,
 
@@ -110,6 +111,7 @@ const ROUTE_DURATION_CONTRACT = {
 const NO_EXTERNAL_IO_ROUTES = new Set<string>([
   'src/app/.well-known/oauth-authorization-server/route.ts',
   'src/app/.well-known/oauth-protected-resource/route.ts',
+  'src/app/api/health/version/route.ts',
   'src/app/api/v1/system/[...retired]/route.ts',
   'src/app/maintenance/route.ts',
 ]);
