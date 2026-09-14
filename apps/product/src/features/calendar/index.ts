@@ -76,6 +76,17 @@ export { CALENDAR_SHORTCUT_CATALOG } from './lib/calendar-shortcut-catalog';
 // =============================================================================
 // Domain（Calendar 固有の仕様ルール）
 // =============================================================================
+export {
+  DEFAULT_SHOW_WEEKENDS,
+  DEFAULT_WEEK_STARTS_ON,
+  buildCalendarRangeInput,
+  buildTimeblockListInput,
+} from './domain/calendar-query-input';
+export type {
+  CalendarRangeInput,
+  CalendarRangeInputOptions,
+  TimeblockListInput,
+} from './domain/calendar-query-input';
 export { calculateViewDateRange } from './domain/view-range';
 
 // =============================================================================
