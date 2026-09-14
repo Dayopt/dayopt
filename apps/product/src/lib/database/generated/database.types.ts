@@ -206,6 +206,27 @@ export type Database = {
         };
         Relationships: [];
       };
+      cron_heartbeats: {
+        Row: {
+          job_name: string;
+          last_completed_at: string | null;
+          last_started_at: string;
+          last_summary: Json | null;
+        };
+        Insert: {
+          job_name: string;
+          last_completed_at?: string | null;
+          last_started_at: string;
+          last_summary?: Json | null;
+        };
+        Update: {
+          job_name?: string;
+          last_completed_at?: string | null;
+          last_started_at?: string;
+          last_summary?: Json | null;
+        };
+        Relationships: [];
+      };
       email_suppressions: {
         Row: {
           created_at: string;
@@ -324,6 +345,7 @@ export type Database = {
       };
       mcp_mutation_control: {
         Row: {
+          billing_enforced: boolean;
           changed_at: string;
           enabled_client_ids: string[];
           revision: number;
@@ -331,6 +353,7 @@ export type Database = {
           writes_enabled: boolean;
         };
         Insert: {
+          billing_enforced?: boolean;
           changed_at?: string;
           enabled_client_ids?: string[];
           revision?: number;
@@ -338,6 +361,7 @@ export type Database = {
           writes_enabled?: boolean;
         };
         Update: {
+          billing_enforced?: boolean;
           changed_at?: string;
           enabled_client_ids?: string[];
           revision?: number;
@@ -2607,6 +2631,14 @@ export type Database = {
           p_user_id: string;
         };
         Returns: boolean;
+      };
+      set_mcp_billing_enforcement_v1: {
+        Args: { p_billing_enforced: boolean; p_expected_revision: number };
+        Returns: {
+          billing_enforced: boolean;
+          changed_at: string;
+          revision: number;
+        }[];
       };
       set_mcp_client_write_control_v1: {
         Args: {

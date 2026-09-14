@@ -495,9 +495,10 @@ SELECT private.cleanup_calendar_authority_retention_internal_v1(10);`,
     // 配線の契約は migration のリテラル比較で足りる（実行結果は上のテストが担保する）。
     // 2026-08-12: risk-reviewer 指摘で追加。expire-calendar-revoke-outbox の
     // external-authority-maintenance.integration.test.ts と同型のガード。
+    // #2681: 開始/完了heartbeatで包んだ元の保守SQL（2行目）とscheduleを固定する。
     expect(
       ownerSql(
-        `SELECT schedule || '|' || command
+        `SELECT schedule || '|' || split_part(command, chr(10), 2)
 FROM cron.job
 WHERE jobname = 'cleanup-calendar-authority-retention';`,
       ),
