@@ -6,20 +6,13 @@ import type { DayoptPlanId } from './plans';
 export const entitlementKeys = {
   externalCalendarSync: 'external_calendar_sync',
   mcpApi: 'mcp_api',
-  reportLongRange: 'report_long_range',
-  estimationFullHistory: 'estimation_full_history',
 } as const;
 
 export type EntitlementKey = (typeof entitlementKeys)[keyof typeof entitlementKeys];
 
 export const planEntitlements = {
   free: [],
-  pro: [
-    entitlementKeys.externalCalendarSync,
-    entitlementKeys.mcpApi,
-    entitlementKeys.reportLongRange,
-    entitlementKeys.estimationFullHistory,
-  ],
+  pro: [entitlementKeys.externalCalendarSync, entitlementKeys.mcpApi],
 } as const satisfies Record<DayoptPlanId, readonly EntitlementKey[]>;
 
 export function canUseEntitlement(planId: DayoptPlanId, entitlement: EntitlementKey): boolean {

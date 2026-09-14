@@ -90,17 +90,7 @@ async function getPlansForFeed(userId: string) {
     });
   }
 
-  return (plans ?? []).map((plan) => {
-    return {
-      id: plan.id,
-      title: plan.title,
-      description: plan.note,
-      start_time: plan.start_at,
-      end_time: plan.end_at,
-      created_at: plan.created_at,
-      updated_at: plan.updated_at,
-    };
-  });
+  return plans ?? [];
 }
 
 /**

@@ -12,7 +12,7 @@ export type TimedTimeblock = CalendarDisplayEvent & {
 
 /** カラム割り当て済みのエントリ列情報 */
 export interface TimeblockColumn {
-  entries: CalendarDisplayEvent[];
+  timeblocks: CalendarDisplayEvent[];
   columnIndex: number;
   totalColumns: number;
 }
