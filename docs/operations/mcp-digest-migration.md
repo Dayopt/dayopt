@@ -1,3 +1,8 @@
+---
+status: current
+last_verified: 2026-09-14
+---
+
 # MCP create digest の互換移行（#2736）
 
 ## 変更と適用順序
