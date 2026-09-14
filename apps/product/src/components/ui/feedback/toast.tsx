@@ -37,6 +37,9 @@ type ToasterProps = React.ComponentProps<typeof Sonner>;
  * });
  * ```
  */
+/** モバイルヘッダー（pt-safe + min-h-14）の直下。 */
+const MOBILE_TOAST_TOP_OFFSET = 'calc(env(safe-area-inset-top, 0px) + 64px)';
+
 const Toaster = ({ ...props }: ToasterProps) => {
   const isMobile = useMediaQuery(MEDIA_QUERIES.mobile);
   const t = useTranslations('common.aria');
@@ -46,14 +49,16 @@ const Toaster = ({ ...props }: ToasterProps) => {
       // デスクトップは下中央。右側は詳細パネル（Inspector）が常駐し、右下に出すと
       // メモ欄や削除系の操作に「元に戻す」が被って押し間違いを誘う。下中央はグリッドの
       // 深夜帯に当たり、どのパネルを開いていても操作対象と重ならない。
-      // モバイルは Drawer が下から出るので上中央のまま
+      // モバイルは Drawer が下から出るので上中央のまま。ただしヘッダー（safe-area +
+      // 56px）の下に出す。ヘッダーに被せると日付・レポート・アカウントの操作を 5 秒
+      // 塞ぎ、レポートを開こうとして「元に戻す」を押す事故が起きた（2026-09-14）
       position={isMobile ? 'top-center' : 'bottom-center'}
       visibleToasts={1}
       duration={3000}
       containerAriaLabel={t('toastContainer')}
       className={isMobile ? '' : '[--width:360px]'}
-      offset={isMobile ? { top: 16 } : { bottom: 16 }}
-      mobileOffset={{ top: 16, left: 16, right: 16 }}
+      offset={isMobile ? { top: MOBILE_TOAST_TOP_OFFSET } : { bottom: 16 }}
+      mobileOffset={{ top: MOBILE_TOAST_TOP_OFFSET, left: 16, right: 16 }}
       swipeDirections={isMobile ? ['left', 'right'] : []}
       closeButton={!isMobile}
       toastOptions={{
