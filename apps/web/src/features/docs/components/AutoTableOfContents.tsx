@@ -1,6 +1,6 @@
 'use client';
 
-import { dayoptBrand } from '@dayopt/config';
+import { Link } from '@dayopt/i18n/navigation';
 import { useTranslations } from 'next-intl';
 import { useEffect, useState } from 'react';
 import { TocItem, generateTableOfContents } from '../lib/toc';
@@ -8,11 +8,16 @@ import { TocItem, generateTableOfContents } from '../lib/toc';
 interface AutoTableOfContentsProps {
   content: string;
   className?: string;
-  /** 下部の Links（Issue 報告 / ソース）を内包表示するか。別 card に分けたい場合は false。 */
+  /** 下部の Links（問題の報告）を内包表示するか。別 card に分けたい場合は false。 */
   showLinks?: boolean;
 }
 
-/** TOC 下部の外部リンク（Issue 報告 / ソース）。単体でも別 card として使える。 */
+/**
+ * TOC 下部のリンク（問題の報告）。単体でも別 card として使える。
+ *
+ * repository は非公開のため GitHub の issue / source へは誘導せず、誰でも開ける
+ * お問い合わせページへ送る。
+ */
 export function TocLinks() {
   const t = useTranslations('docs.toc');
 
@@ -23,24 +28,12 @@ export function TocLinks() {
       </div>
       <ul className="space-y-2">
         <li>
-          <a
-            href={dayoptBrand.githubIssuesNewUrl}
-            target="_blank"
-            rel="noopener noreferrer"
+          <Link
+            href="/contact"
             className="text-muted-foreground hover:text-foreground text-sm transition-colors"
           >
             {t('reportIssue')}
-          </a>
-        </li>
-        <li>
-          <a
-            href={dayoptBrand.githubRepositoryUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-muted-foreground hover:text-foreground text-sm transition-colors"
-          >
-            {t('viewSource')}
-          </a>
+          </Link>
         </li>
       </ul>
     </div>

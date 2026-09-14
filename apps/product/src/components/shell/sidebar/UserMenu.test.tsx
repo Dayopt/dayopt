@@ -63,4 +63,26 @@ describe('HelpMenuItems (#2153)', () => {
       expect(openSheetMock).toHaveBeenCalledWith({ type: 'contact' });
     });
   });
+
+  it('リリースノートは marketing site の公開ページへリンクし、GitHub へ誘導しない', () => {
+    render(
+      <DropdownMenu open>
+        <DropdownMenuContent>
+          <HelpMenuItems />
+        </DropdownMenuContent>
+      </DropdownMenu>,
+    );
+
+    // repository は非公開のため、GitHub Releases へのリンクはログイン済みユーザーにも 404 になる
+    const releaseNotes = screen.getByRole('menuitem', {
+      name: 'navigation.navUser.helpSubmenu.releaseNotes',
+    });
+    expect(releaseNotes).toHaveAttribute('href', 'https://dayopt.app/ja/blog/release');
+
+    const hrefs = screen
+      .getAllByRole('menuitem')
+      .map((item) => item.getAttribute('href'))
+      .filter((href): href is string => href !== null);
+    expect(hrefs.filter((href) => href.includes('github.com'))).toEqual([]);
+  });
 });
