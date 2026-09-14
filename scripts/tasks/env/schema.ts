@@ -16,6 +16,11 @@ export type EnvSchemaEntry = {
    * すでに status 行だけで自明なため）。
    */
   pendingReason?: string;
+  /**
+   * GitHub Actions Secret（replica）の名前が envName と違う時だけ持つ。workflow は
+   * `secrets.<githubSecret>` を step の env `<envName>` へ渡す。
+   */
+  githubSecret?: string;
 };
 
 export type OperationalItem = {
@@ -111,8 +116,6 @@ export const envSchema: EnvSchemaEntry[] = [
   envEntry('TURNSTILE_SECRET_KEY', false, 'secret', 'shared', agent, 'turnstile'),
   envEntry('ANTHROPIC_API_KEY', false, 'secret', 'shared', agent, 'anthropic'),
 
-  envEntry('VERCEL_TOKEN', false, 'secret', 'shared', ci, 'vercel'),
-  envEntry('VERCEL_TEAM_ID', false, 'public', 'shared', ci, 'vercel'),
   // agent 用 Vercel token（#2086 plan v2）。CI と agent の VERCEL_TOKEN 二重用途を
   // 解消するため agent は別発行 token を使う。発行までは replica:check を User 実行に倒す
   pendingEnvEntry(
@@ -330,4 +333,88 @@ export const operationalItems: OperationalItem[] = [
   { vault: human, item: 'upstash-login', required: true },
 ];
 
-export const onePasswordEnvSchema = [...envSchema, ...productionEnvSchema];
+// CI（GitHub Actions）が消費する automation credential の master（vault ci）。replica は
+// GitHub Actions Secrets（repo 単位）。envName は workflow の step env 名で、Secret 名が違う時だけ
+// githubSecret を持つ。workflow の secrets.* 参照とこの表の対応は
+// scripts/__tests__/ci-secret-ledger.test.ts が名前で双方向に検査する（2026-09-14 監査）。
+// どれが欠けても本番 promote・監査・backup のいずれかが止まるため、すべて required。
+const rcloneFields = [
+  'TYPE',
+  'PROVIDER',
+  'ENDPOINT',
+  'REGION',
+  'ACCESS_KEY_ID',
+  'SECRET_ACCESS_KEY',
+];
+
+function rcloneEntries(side: 'SOURCE' | 'DEST', item: string): EnvSchemaEntry[] {
+  return rcloneFields.map((suffix) =>
+    envEntry(
+      `RCLONE_CONFIG_${side}_${suffix}`,
+      true,
+      suffix.endsWith('KEY') || suffix.endsWith('KEY_ID') ? 'secret' : 'public',
+      'production',
+      ci,
+      item,
+    ),
+  );
+}
+
+export const ciSecretSchema: EnvSchemaEntry[] = [
+  // item 名は 2026-09-14 に vercel から vercel-production へ変更（用途を名前で分かるように）。
+  // token は team 全権で、promote / rollback（promote.yml）と読み取り監査で共用する。
+  // Vercel の token は scope を絞れないため、分けても被害範囲は変わらない。
+  envEntry('VERCEL_TOKEN', true, 'secret', 'production', ci, 'vercel-production'),
+  {
+    ...envEntry('VERCEL_TEAM_ID', true, 'public', 'production', ci, 'vercel-production'),
+    githubSecret: 'VERCEL_ORG_ID',
+  },
+  {
+    ...envEntry(
+      'VERCEL_BYPASS_PRODUCT',
+      true,
+      'secret',
+      'production',
+      ci,
+      'vercel-production',
+      'VERCEL_AUTOMATION_BYPASS_PRODUCT',
+    ),
+    githubSecret: 'VERCEL_AUTOMATION_BYPASS_PRODUCT',
+  },
+  {
+    ...envEntry(
+      'VERCEL_BYPASS_WEB',
+      true,
+      'secret',
+      'production',
+      ci,
+      'vercel-production',
+      'VERCEL_AUTOMATION_BYPASS_WEB',
+    ),
+    githubSecret: 'VERCEL_AUTOMATION_BYPASS_WEB',
+  },
+  // Supabase Management API の scoped token。field id は日本語ロケールでも credential。
+  envEntry(
+    'SUPABASE_AUTH_AUDIT_TOKEN',
+    true,
+    'secret',
+    'production',
+    ci,
+    'supabase-auth-audit',
+    'credential',
+  ),
+  envEntry(
+    'SUPABASE_STORAGE_RLS_AUDIT_TOKEN',
+    true,
+    'secret',
+    'production',
+    ci,
+    'supabase-storage-rls-audit',
+    'credential',
+  ),
+  // nightly の Storage backup（rclone）。SOURCE は Supabase Storage の S3 接続、DEST は Cloudflare R2。
+  ...rcloneEntries('SOURCE', 'Supabase-StorageS3-backupsource'),
+  ...rcloneEntries('DEST', 'Cloudflare-R2-storagebackup'),
+];
+
+export const onePasswordEnvSchema = [...envSchema, ...productionEnvSchema, ...ciSecretSchema];

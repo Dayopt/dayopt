@@ -66,6 +66,8 @@ interface CheckOptions {
   leakForbidden?: boolean;
   /** op vault get を失敗させる vault 名（不在 / 権限不足 / 一時エラーの再現） */
   missingVault?: string;
+  /** 全 item に期限 field を足す。値は op の DATE field と同じ epoch 秒の文字列 */
+  expiry?: { label: string; value: string };
 }
 
 function runCheck(options: CheckOptions = {}) {
@@ -80,6 +82,14 @@ function runCheck(options: CheckOptions = {}) {
     label: field,
     value: field === options.emptyField ? '' : sentinelSecret,
   }));
+  if (options.expiry) {
+    fields.push({
+      id: 'expiry',
+      label: options.expiry.label,
+      value: options.expiry.value,
+      type: 'DATE',
+    } as (typeof fields)[number]);
+  }
 
   // 既定の agent/supabase は禁止 field を持たない（是正済みの状態）
   const forbiddenNames = new Set(
@@ -114,6 +124,40 @@ afterEach(() => {
 });
 
 describe('check-1password.ts', () => {
+  const epochSecondsFromNow = (days: number) =>
+    String(Math.floor((Date.now() + days * 86_400_000) / 1000));
+
+  it('期限切れの token があれば失敗し、日付だけを出して値は出さない', () => {
+    const result = runCheck({ expiry: { label: '有効期限', value: epochSecondsFromNow(-1) } });
+
+    expect(result.status).toBe(1);
+    expect(result.stdout).toMatch(/ci \/ supabase-storage-rls-audit: EXPIRED \d{4}-\d{2}-\d{2}/);
+    expect(result.stdout).not.toContain(sentinelSecret);
+  });
+
+  it('30 日以内に切れる token は警告するが成功のまま', () => {
+    const result = runCheck({ expiry: { label: 'expires', value: epochSecondsFromNow(10) } });
+
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stdout).toMatch(/EXPIRES_SOON \d{4}-\d{2}-\d{2}（残り (9|10) 日）/);
+  });
+
+  it('期限に余裕がある token は日付だけを表示する', () => {
+    const result = runCheck({ expiry: { label: '有効期限', value: epochSecondsFromNow(200) } });
+
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stdout).toMatch(/: EXPIRES \d{4}-\d{2}-\d{2}\n/);
+    expect(result.stdout).not.toContain('EXPIRES_SOON');
+    expect(result.stdout).not.toContain('EXPIRED');
+  });
+
+  it('期限 field を日付として読めない時は値を出さずに知らせる', () => {
+    const result = runCheck({ expiry: { label: '有効期限', value: sentinelSecret } });
+
+    expect(result.stdout).toContain('EXPIRY_UNREADABLE');
+    expect(result.stdout).not.toContain(sentinelSecret);
+  });
+
   it('参照先と状態だけを表示し、取得した値を出力しない', () => {
     const result = runCheck();
 
