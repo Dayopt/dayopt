@@ -16,7 +16,7 @@ export const TIMEZONE = 'Asia/Tokyo';
 
 export type AdminSupabase = ReturnType<typeof createClient<Database>>;
 
-export interface CriticalPathIdentity {
+interface CriticalPathIdentity {
   userId: string;
   email: string;
   password: string;
