@@ -5,6 +5,7 @@ const dispatchExternalConnectionMaintenance = vi.hoisted(() => vi.fn());
 const captureUnexpectedError = vi.hoisted(() => vi.fn());
 const loggerError = vi.hoisted(() => vi.fn());
 const loggerWarn = vi.hoisted(() => vi.fn());
+const writeCronHeartbeat = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
 const isWriteFenceEnabled = vi.hoisted(() => vi.fn());
 const envMock = vi.hoisted(
   () => ({ CRON_SECRET: 'super-secret-cron' }) as { CRON_SECRET?: string | undefined },
@@ -24,6 +25,7 @@ vi.mock('@/lib/logger', () => ({
     debug: vi.fn(),
   },
 }));
+vi.mock('@/lib/ops/cron-heartbeat', () => ({ writeCronHeartbeat }));
 vi.mock('@/lib/ops/write-fence', () => ({ isWriteFenceEnabled }));
 vi.mock('@/lib/supabase/oauth', () => ({ createServiceRoleClient: vi.fn(() => ({})) }));
 
@@ -241,5 +243,38 @@ describe('external connection maintenance cron', () => {
       '[external-connection-maintenance] finalize guard candidates are stuck',
       { calendarFinalizeStuck: 3 },
     );
+  });
+});
+
+describe('external-connection-maintenance heartbeat wiring', () => {
+  it('records start and completion only around successful authorized work', async () => {
+    await GET(request());
+    expect(writeCronHeartbeat).not.toHaveBeenCalled();
+    const response = await GET(request('Bearer super-secret-cron'));
+    expect(response.status).toBe(200);
+    expect(writeCronHeartbeat).toHaveBeenNthCalledWith(
+      1,
+      'external-connection-maintenance',
+      'started',
+      expect.any(String),
+    );
+    expect(writeCronHeartbeat).toHaveBeenNthCalledWith(
+      2,
+      'external-connection-maintenance',
+      'completed',
+      writeCronHeartbeat.mock.calls[0]![2],
+    );
+    expect(writeCronHeartbeat.mock.invocationCallOrder[0]).toBeLessThan(
+      dispatchExternalConnectionMaintenance.mock.invocationCallOrder[0]!,
+    );
+    expect(writeCronHeartbeat.mock.invocationCallOrder[1]).toBeGreaterThan(
+      dispatchExternalConnectionMaintenance.mock.invocationCallOrder[0]!,
+    );
+  });
+  it('keeps failed dispatch distinguishable from completion', async () => {
+    dispatchExternalConnectionMaintenance.mockRejectedValueOnce(new Error('fixture failure'));
+    expect((await GET(request('Bearer super-secret-cron'))).status).toBe(500);
+    expect(writeCronHeartbeat).toHaveBeenCalledTimes(1);
+    expect(writeCronHeartbeat.mock.calls[0]![1]).toBe('started');
   });
 });

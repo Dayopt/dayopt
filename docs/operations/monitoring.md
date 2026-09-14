@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-08-25
+last_verified: 2026-09-14
 code:
   - packages/observability
   - apps/product/src/instrumentation.ts
@@ -28,6 +28,34 @@ Dayoptのproduction監視はSentry、Vercel、Supabase、`/api/health`、UptimeR
 | Supabase Edge Function logs | `send-auth-email` の `send failed` / `capture failed`（Sentry envelope の送信自体が失敗した場合。#2682）                                                                                                                                                                                                                                                                                                                                                                               | Supabase Dashboard → Edge Functions → Logs                                                                                   |
 
 provider plan、sampling rate、SDK versionなどの値は変わるため、package manifest・runtime config・dashboardを正とする。
+
+## Cron heartbeat と本番 schema・権限監査
+
+実行主体は GitHub Actions の `production-config-audit.yml`。main への push と定期実行だけが本番監査用資格情報を受け取る。PR や branch の手動実行には渡さない。読取経路は Supabase Management API の `read_only: true` で、対象 project は既存監査と同じ production に固定する。
+
+| 対象                                                                                                      | 監査頻度                   | 異常条件                                               |
+| --------------------------------------------------------------------------------------------------------- | -------------------------- | ------------------------------------------------------ |
+| calendar-sync / external-connection-maintenance                                                           | 15分                       | 最終完了から45分超                                     |
+| calendar-account-deletion-settle                                                                          | 15分                       | 最終完了から180分超                                    |
+| expire-calendar-revoke-outbox                                                                             | 15分                       | 最終完了から3分超                                      |
+| cleanup-product-events                                                                                    | 15分                       | 最終完了から4320分超                                   |
+| cleanup-calendar-authority-retention / expire-calendar-revoke-authority / finalize-calendar-revoke-guards | 15分                       | 最終完了から180分超                                    |
+| migration / schema / RLS / ACL / default privileges                                                       | 毎日06:00 JST、main push時 | 未適用migration、repository snapshotとの差分、読取失敗 |
+
+GitHub の schedule は実行時刻を保証しない。15分は起動予定の頻度であり、検知・通知の最大遅延の保証ではない。記録欠落、無効時刻、資格情報不足、API失敗も監査失敗とする。本番だけにある migration version は履歴差として表示し、schema / ACL の比較は省略しない。baseline は migration から生成し、本番から上書きしない。CI は隔離DBから型を再生成して committed types と比較する。default privileges の方針変更は #1715 で判断する。
+
+完了記録は `public.cron_heartbeats`。利用者ID・入力・資格情報を含めず、job名、開始・完了時刻、成功と所要時間だけを保存する。Vercel側の記録失敗は Sentry に送るが保守処理を止めない（各書込1.5秒、開始・終了合計3秒）。pg_cron は元の schedule / owner / command を保持して同じトランザクションで記録する。処理が失敗すれば開始記録も rollback され、最後の成功が古くなることで検出する。heartbeat は正常終了の証拠であり、処理対象がゼロになった証拠ではない。
+
+通知先は既存の `[auto] Production Supabase audit が失敗しました` Issue。異常ごとに同じ未解決Issueへ job の結果、run URL、調査先を追記し、GitHubの購読通知を受けるリポジトリ運用者が一次対応する。監査用 job は `contents: read` のみで、通知 job だけが `issues: write` を持つ。Issue の自動クローズはしない。運用移管時に運用者の購読設定と実通知の受信を確認する。
+
+復旧手順:
+
+1. 通知の run URL で対象job・実行SHA・最終完了時刻を特定する。監査不能を利用ゼロや成功として扱わない。
+2. heartbeat異常なら Vercel / pg_cron の履歴、`CRON_SECRET` の設定有無、write fence、DB job の owner / database / active を確認する。資格情報の実値や cron command の内容をログへ出さない。
+3. schema異常なら配信SHAとmigration履歴を照合する。配備途中か未適用か、手動変更かを分ける。production baselineを再生成して差分を隠さない。修正操作は [runbook](./runbook.md) と本番変更の承認境界に従う。
+4. 原因を修正後、通常の保守処理が完了し、次の監査が成功した証拠をIssueに残して手動で閉じる。時刻を手で更新して監視だけ緑にしない。
+
+導入直後は各jobの初回完了が揃うまで監査が失敗する。日次jobの初回実行を含めて観測し、8件すべての実行記録と通知受信を確認してから #2681 / #2683 を閉じる。ローカルの異常fixtureは通知スクリプトへの到達を検証するが、本番の通知受信の代わりにはならない。MCP cleanupの滞留は #1908 の件数・遅延測定と合わせて判断する。
 
 ## Sentry runtime contract
 
@@ -150,6 +178,8 @@ Supabase 公式ドキュメント（[Manage Logs usage](https://supabase.com/doc
 - `/api/health`が503を返す
 - login、Calendar data load、Plan / Record write、Stripe webhook等のcritical pathが継続失敗
 - production deployment失敗
+- cron heartbeatの完了時刻が閾値超過、記録欠落、または監査不能（上記の頻度・復旧手順を適用）
+- production schema・RLS・ACL・default privilegesのdriftまたは未適用migration
 
 ### Scheduled review
 

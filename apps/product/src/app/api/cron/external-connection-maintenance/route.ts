@@ -4,6 +4,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 
 import { env } from '@/env';
 import { logger } from '@/lib/logger';
+import { writeCronHeartbeat } from '@/lib/ops/cron-heartbeat';
 import { isWriteFenceEnabled } from '@/lib/ops/write-fence';
 import { captureUnexpectedError } from '@/lib/sentry';
 import { createServiceRoleClient } from '@/lib/supabase/oauth';
@@ -55,6 +56,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     );
   }
 
+  const heartbeatStartedAt = new Date().toISOString();
+  await writeCronHeartbeat('external-connection-maintenance', 'started', heartbeatStartedAt);
   try {
     const summary = await dispatchExternalConnectionMaintenance({
       deadlineAt: Date.now() + TIME_BUDGET_MS,
@@ -93,6 +96,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       });
     }
 
+    await writeCronHeartbeat('external-connection-maintenance', 'completed', heartbeatStartedAt);
     return noStoreJson({ ok: true, ...summary });
   } catch {
     // dispatcher の将来変更でも raw DB/provider error を Sentry の cause へ通さない。
