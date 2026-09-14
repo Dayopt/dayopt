@@ -178,7 +178,10 @@ export async function dispatchCalendarAccountDeletionSettle(params: {
         .abortSignal(AbortSignal.timeout(ACCOUNT_DELETION_SETTLE_TIMEOUT_MS));
 
       if (error) {
-        if (isPredecessorMissingFunction(error)) continue;
+        if (isPredecessorMissingFunction(error)) {
+          result.skipped = true;
+          continue;
+        }
         throw new CalendarAccountDeletionSettleError('normalize', {
           code: error.code,
           message: error.message,
