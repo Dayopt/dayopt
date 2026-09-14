@@ -48,7 +48,7 @@
  * `LEGAL_CONTRACT_CASES.lastUpdated` として独立に検証する。hash に混ぜないのは、
  * 落ちた時に「本文が変わった」のか「日付だけ変わった」のかを区別できるようにするため。
  */
-import { DEFAULT_LOCALE, LOCALE_PREFIX } from '@dayopt/config';
+import { DEFAULT_LOCALE, LOCALE_PREFIX, dayoptContact } from '@dayopt/config';
 import { cleanup, render } from '@testing-library/react';
 import { MDXRemote } from 'next-mdx-remote';
 import { serialize } from 'next-mdx-remote/serialize';
@@ -172,19 +172,15 @@ const LEGAL_CONTRACT_CASES: readonly LegalContractCase[] = [
     metadataTitle: 'Security - Dayopt',
     metadataDescription:
       'Dayopt implements the highest standards of security to protect your information.',
-    lastUpdated: 'Last Updated: October 15, 2025',
-    bodyHash: '0713c3984851d02dbb5fbffa54cd6d5867c6963a01b2eb56fdbf1a037d08d40e',
+    lastUpdated: 'Last Updated: September 14, 2026',
+    bodyHash: '4b298c951e2009fb40156eff8b5ab881825cd23ad90fdfed257beb061047767f',
     hrefs: [
       'mailto:security@dayopt.app',
-      'https://github.com/Dayopt/dayopt/security/advisories/new',
-      'https://github.com/Dayopt/dayopt/blob/main/docs/legal/SECURITY.md',
-      'https://github.com/Dayopt/dayopt/blob/main/docs/legal/VULNERABILITY_DISCLOSURE.md',
-      'https://github.com/Dayopt/dayopt/blob/main/docs/legal/INCIDENT_RESPONSE.md',
       '/legal/privacy',
       'mailto:security@dayopt.app',
       'mailto:support@dayopt.app',
     ],
-    counts: { h2: 5, h3: 10, tables: 2, lists: 5 },
+    counts: { h2: 5, h3: 7, tables: 2, lists: 5 },
   },
   {
     locale: 'ja',
@@ -234,25 +230,37 @@ const LEGAL_CONTRACT_CASES: readonly LegalContractCase[] = [
     metadataTitle: 'セキュリティ - Dayopt',
     metadataDescription:
       'Dayoptは、ユーザーの皆様の情報を保護するために、最高水準のセキュリティ対策を実施しています。',
-    lastUpdated: '最終更新日: 2025-10-15',
-    bodyHash: '7ccba2a1c8e3e578d3840f36e0a1f61c09c211f2aa01100a026ed33bf167fca7',
+    lastUpdated: '最終更新日: 2026-09-14',
+    bodyHash: '8e324446c8f78f06690c6db6d1fd3ea9c46f1ab63b936c0f0babdf22931736ef',
     hrefs: [
       'mailto:security@dayopt.app',
-      'https://github.com/Dayopt/dayopt/security/advisories/new',
-      'https://github.com/Dayopt/dayopt/blob/main/docs/legal/SECURITY.md',
-      'https://github.com/Dayopt/dayopt/blob/main/docs/legal/VULNERABILITY_DISCLOSURE.md',
-      'https://github.com/Dayopt/dayopt/blob/main/docs/legal/INCIDENT_RESPONSE.md',
       '/ja/legal/privacy',
       'mailto:security@dayopt.app',
       'mailto:support@dayopt.app',
     ],
-    counts: { h2: 5, h3: 10, tables: 2, lists: 5 },
+    counts: { h2: 5, h3: 7, tables: 2, lists: 5 },
   },
 ];
 
 afterEach(() => {
   cleanup();
 });
+
+/**
+ * 公開 legal ページが Dayopt のリポジトリへリンクしてはいけない。リポジトリは private 化する
+ * （2026-09-14 決定）ため、外部の閲覧者・セキュリティ研究者からは 404 になり、特に脆弱性の
+ * 報告窓口が黙って塞がる。報告窓口はリポジトリの公開設定に依存しないメールに限る。
+ */
+const DAYOPT_REPOSITORY_URL_PATTERN = /github\.com\/Dayopt\//i;
+
+async function renderLegalBody(testCase: LegalContractCase): Promise<HTMLElement> {
+  const document = getLegalDocument(testCase.locale, testCase.slug);
+  // Link mock（localizeHref）が参照する現在 locale をセットしてから render する。
+  linkLocaleRef.current = testCase.locale;
+  const compiled = await serialize(document.content, LEGAL_MDX_OPTIONS);
+  const { container } = render(<MDXRemote {...compiled} components={legalMdxComponents} />);
+  return container as HTMLElement;
+}
 
 describe('legal document contract', () => {
   for (const testCase of LEGAL_CONTRACT_CASES) {
@@ -267,12 +275,9 @@ describe('legal document contract', () => {
       // LegalDocument.tsx:89 相当。metadata にも body hash にも現れないので独立に検証する。
       expect(document.frontMatter.lastUpdated).toBe(testCase.lastUpdated);
 
-      // Link mock（localizeHref）が参照する現在 locale をセットしてから render する。
-      linkLocaleRef.current = testCase.locale;
-      const compiled = await serialize(document.content, LEGAL_MDX_OPTIONS);
-      const { container } = render(<MDXRemote {...compiled} components={legalMdxComponents} />);
+      const container = await renderLegalBody(testCase);
 
-      const bodyText = (container as HTMLElement).textContent ?? '';
+      const bodyText = container.textContent ?? '';
       expect(createHash('sha256').update(bodyText).digest('hex')).toBe(testCase.bodyHash);
 
       const hrefs = Array.from(container.querySelectorAll('a')).map((anchor) =>
@@ -286,6 +291,39 @@ describe('legal document contract', () => {
         tables: container.querySelectorAll('table').length,
         lists: container.querySelectorAll('ul, ol').length,
       }).toEqual(testCase.counts);
+    });
+  }
+});
+
+describe('legal document repository visibility independence', () => {
+  for (const testCase of LEGAL_CONTRACT_CASES) {
+    it(`${testCase.locale}/${testCase.slug} は Dayopt のリポジトリへリンクしない`, async () => {
+      const container = await renderLegalBody(testCase);
+      const hrefs = Array.from(container.querySelectorAll('a')).map(
+        (anchor) => anchor.getAttribute('href') ?? '',
+      );
+      expect(hrefs.filter((href) => DAYOPT_REPOSITORY_URL_PATTERN.test(href))).toEqual([]);
+      expect(container.textContent ?? '').not.toMatch(/GitHub Security Advisory/i);
+    });
+  }
+
+  for (const locale of ['en', 'ja'] as const) {
+    it(`${locale}/security の脆弱性報告窓口は security メールである`, async () => {
+      const testCase = LEGAL_CONTRACT_CASES.find(
+        (candidate) => candidate.locale === locale && candidate.slug === 'security',
+      );
+      if (!testCase) throw new Error(`security contract case が無い: ${locale}`);
+      const container = await renderLegalBody(testCase);
+
+      // mailto を含む最初の section が「脆弱性の報告」。その中のリンクは security メールだけ
+      const reportSection = Array.from(container.querySelectorAll('section')).find((section) =>
+        section.querySelector('a[href^="mailto:"]'),
+      );
+      if (!reportSection) throw new Error('mailto を含む section が無い');
+      const reportLinks = Array.from(reportSection.querySelectorAll('a')).map((anchor) =>
+        anchor.getAttribute('href'),
+      );
+      expect(reportLinks).toEqual([`mailto:${dayoptContact.securityEmail}`]);
     });
   }
 });

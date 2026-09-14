@@ -714,6 +714,224 @@ function checkVercelToken(commandJoined, commandUnquoted) {
   }
 }
 
+// ---------------------------------------------------------------------
+// vercel CLI: 読み取り系サブコマンドだけを通す（2026-09-14、Secret / Credential 監査 P1-2）
+// ---------------------------------------------------------------------
+//
+// agent の vercel CLI は User 本人の対話 login（team 全権）で動く。Vercel の token は
+// scope を絞れないため、identity 分離ではなく「コマンド位置の vercel が読み取り系か」
+// で止める。書き込み系を数え上げると新サブコマンドで穴が開くので、**許可する側を
+// 固定する**（env-file の判定と同じ理由）。引数なしの `vercel` は deploy なので落とす。
+// `env pull` / `pull` / `dev` / `build` は実値を file や process へ引き出すので読み取り
+// 扱いにしない。
+//
+// 保証境界: adapter が渡したコマンド文字列を quote を解釈して区切り（quote 外の
+// ; & | 改行 括弧 $( backtick）で分け、各区切りの先頭にある vercel を見る。env 代入・env / command / exec / npx / pnpm exec|dlx / bunx /
+// xargs / op run ... -- / sh|bash|zsh -c の前置きは剥がして辿る。変数展開や wrapper
+// script、`pnpm vercel:env:pull:unsafe` のような npm script の内側は見えない（speed
+// bump であり、production 変更を止める本体は User の明示操作と EXPLICIT AUTHORITY）。
+const VERCEL_READ_SUBCOMMANDS = {
+  ls: null,
+  list: null,
+  inspect: null,
+  logs: null,
+  whoami: null,
+  help: null,
+  teams: ['ls', 'list'],
+  project: ['ls', 'list', 'inspect'],
+  projects: ['ls', 'list', 'inspect'],
+  env: ['ls', 'list'],
+  domains: ['ls', 'list', 'inspect'],
+  dns: ['ls', 'list'],
+  certs: ['ls', 'list'],
+  alias: ['ls', 'list'],
+  integration: ['list', 'ls'],
+};
+const VERCEL_VALUE_FLAGS = new Set([
+  '--scope',
+  '-S',
+  '--team',
+  '-T',
+  '--cwd',
+  '--local-config',
+  '-A',
+  '--global-config',
+  '-Q',
+]);
+const VERCEL_API_METHOD_FLAGS = new Set(['-X', '--method']);
+const VERCEL_API_BODY_FLAG_RE = /^(-d|--data|--input|-F|--field|--raw-field|-f)(=|$)/;
+const SHELL_WRAPPERS = new Set(['sh', 'bash', 'zsh']);
+
+function stripVercelPrefix(tokens) {
+  let i = 0;
+  for (;;) {
+    const t = tokens[i];
+    if (t === undefined) return tokens.slice(i);
+    if (/^[A-Za-z_][A-Za-z0-9_]*=/.test(t)) {
+      i += 1;
+    } else if (t === 'env' || t === 'command' || t === 'exec' || t === 'time') {
+      i += 1;
+      while (tokens[i]?.startsWith('-')) i += 1;
+    } else if (t === 'npx' || t === 'bunx' || t === 'xargs') {
+      i += 1;
+      while (tokens[i]?.startsWith('-')) i += 1;
+    } else if (t === 'pnpm' && (tokens[i + 1] === 'exec' || tokens[i + 1] === 'dlx')) {
+      i += 2;
+      while (tokens[i]?.startsWith('-')) i += 1;
+    } else if (t === 'op' && tokens[i + 1] === 'run') {
+      const dashdash = tokens.indexOf('--', i + 2);
+      if (dashdash === -1) return [];
+      i = dashdash + 1;
+    } else {
+      return tokens.slice(i);
+    }
+  }
+}
+
+/** vercel 呼び出し 1 件の引数列が読み取りだけか。null なら許可、文字列なら block 理由。 */
+function vercelInvocationViolation(args) {
+  const positional = [];
+  let method = null;
+  let hasBody = false;
+  for (let i = 0; i < args.length; i += 1) {
+    const a = args[i];
+    if (VERCEL_VALUE_FLAGS.has(a)) {
+      i += 1;
+    } else if (VERCEL_API_METHOD_FLAGS.has(a)) {
+      method = (args[i + 1] ?? '').toUpperCase();
+      i += 1;
+    } else if (/^(-X|--method)=/.test(a)) {
+      method = a.split('=')[1].toUpperCase();
+    } else if (/^-X[A-Za-z]+$/.test(a)) {
+      method = a.slice(2).toUpperCase();
+    } else if (VERCEL_API_BODY_FLAG_RE.test(a)) {
+      hasBody = true;
+      if (!a.includes('=')) i += 1;
+    } else if (a === '--help' || a === '-h' || a === '--version' || a === '-v') {
+      return null;
+    } else if (a.startsWith('-')) {
+      // 値を取らない flag（--prod / --yes / --json 等）はそのまま読み飛ばす
+    } else {
+      positional.push(a);
+    }
+  }
+  const [sub, action] = positional;
+  if (sub === undefined) return '引数なしの vercel は deploy です';
+  if (sub === 'api') {
+    if ((method !== null && method !== 'GET') || hasBody)
+      return 'vercel api は GET（body なし）だけを許可します';
+    return null;
+  }
+  if (!Object.hasOwn(VERCEL_READ_SUBCOMMANDS, sub))
+    return `vercel ${sub} は読み取り系ではありません`;
+  const actions = VERCEL_READ_SUBCOMMANDS[sub];
+  if (actions === null) return null;
+  if (
+    action === undefined &&
+    (sub === 'env' || sub === 'teams' || sub === 'project' || sub === 'projects')
+  )
+    return null; // 既定動作が一覧表示
+  if (!actions.includes(action)) return `vercel ${sub} ${action ?? ''} は読み取り系ではありません`;
+  return null;
+}
+
+/**
+ * quote を解釈して「区切りごとの token 列」に分ける最小の shell 字句解析。
+ * quote の内側の `|` `;` は区切りにしない（`rg "A|B" file` を誤検知しないため）。
+ * `$(` と backtick は内側のコマンドの始まりとして区切り扱いにする。
+ * 変数展開・glob・brace 展開はしない（見えないものは見えないまま）。
+ */
+function splitShellSegments(command) {
+  const segments = [];
+  let tokens = [];
+  let token = '';
+  let hasToken = false;
+  let quote = null;
+  const endToken = () => {
+    if (hasToken) tokens.push(token);
+    token = '';
+    hasToken = false;
+  };
+  const endSegment = () => {
+    endToken();
+    if (tokens.length > 0) segments.push(tokens);
+    tokens = [];
+  };
+  for (let i = 0; i < command.length; i += 1) {
+    const c = command[i];
+    if (quote === "'") {
+      if (c === "'") quote = null;
+      else token += c;
+      continue;
+    }
+    if (quote === '"') {
+      if (c === '"') quote = null;
+      else if (c === '\\' && i + 1 < command.length) token += command[(i += 1)];
+      else token += c;
+      continue;
+    }
+    if (c === '\\') {
+      if (command[i + 1] === '\n') i += 1;
+      else if (i + 1 < command.length) {
+        token += command[(i += 1)];
+        hasToken = true;
+      }
+      continue;
+    }
+    if (c === '$' && (command[i + 1] === "'" || command[i + 1] === '"')) {
+      quote = command[(i += 1)];
+      hasToken = true;
+      continue;
+    }
+    if (c === "'" || c === '"') {
+      quote = c;
+      hasToken = true;
+      continue;
+    }
+    if (c === '$' && command[i + 1] === '(') {
+      i += 1;
+      endSegment();
+      continue;
+    }
+    if (';&|\n()`'.includes(c)) {
+      endSegment();
+      continue;
+    }
+    if (' \t\v\f\r'.includes(c)) {
+      endToken();
+      continue;
+    }
+    token += c;
+    hasToken = true;
+  }
+  endSegment();
+  return segments;
+}
+
+function scanVercelCommand(command, depth) {
+  if (depth > 3) return;
+  for (const segment of splitShellSegments(command)) {
+    const tokens = stripVercelPrefix(segment);
+    if (tokens.length === 0) continue;
+    const head = tokens[0].split('/').pop();
+    if (SHELL_WRAPPERS.has(head) && tokens[1] === '-c' && tokens[2] !== undefined) {
+      scanVercelCommand(tokens[2], depth + 1);
+      continue;
+    }
+    if (head !== 'vercel') continue;
+    const violation = vercelInvocationViolation(tokens.slice(1));
+    if (violation !== null) {
+      block(
+        `BLOCKED: ${violation}。agent から vercel CLI で実行してよいのは読み取り系（ls / inspect / logs / whoami / env ls / project ls 等、api は GET のみ）だけです。agent の vercel は User の team 全権 login で動くため、deploy / promote / rollback / env add・rm・pull / domains / certs / link / pull 等は User の terminal か Dashboard で行ってください（docs/operations/secrets.md §Agent の vercel CLI）`,
+      );
+    }
+  }
+}
+
+function checkVercelWrite(rawCommand) {
+  scanVercelCommand(rawCommand, 0);
+}
+
 const SUPABASE_MGMT_DANGER_ENDPOINT_RE =
   /api\.supabase\.com\/v1\/(projects\/[^ \t\n\v\f\r"']*\/(config|branches)|branches)/;
 
@@ -787,6 +1005,7 @@ function checkBashCommand(rawCommand, cwd, execFileImpl) {
   checkOpItemGetReveal(commandJoined, commandUnquoted);
   checkSupabaseBranchesGet(commandJoined, commandUnquoted);
   checkVercelToken(commandJoined, commandUnquoted);
+  checkVercelWrite(rawCommand);
   checkSupabaseMgmtDangerEndpoint(commandJoined, commandUnquoted);
   checkOpRead(commandJoined, commandUnquoted);
 }

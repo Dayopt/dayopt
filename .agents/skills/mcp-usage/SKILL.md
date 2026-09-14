@@ -13,17 +13,17 @@ description: Sentry / Supabase(local・cloud) / Context7 / Eagle / Storybook / U
 
 Claude Code 互換の9サーバーの登録例:
 
-| Server                    | 種別                 | 登録内容                                                                                                                                                                                                                                                             |
-| ------------------------- | -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `eagle`                   | http                 | `http://127.0.0.1:41596/mcp`                                                                                                                                                                                                                                         |
-| `supabase-local`          | http                 | `http://127.0.0.1:54321/mcp`                                                                                                                                                                                                                                         |
-| `storybook`               | http                 | `http://localhost:6006/mcp`                                                                                                                                                                                                                                          |
-| `sentry`                  | http (OAuth)         | **常駐登録しない**（オンデマンド、下記 §Sentry）。`https://mcp.sentry.dev/mcp`                                                                                                                                                                                       |
-| `vercel`                  | http (OAuth)         | **常駐登録しない**（CLI-first。下記 §Vercel）。登録が要る時だけ `https://mcp.vercel.com`                                                                                                                                                                             |
-| `context7`                | stdio                | `npx -y @upstash/context7-mcp@latest`                                                                                                                                                                                                                                |
-| `supabase` (cloud)        | stdio                | **常駐登録しない**（使う時だけ登録。下記 §オンデマンド専用サーバーの登録・解除）。`op run -- npx -y @supabase/mcp-server-supabase@latest --read-only --project-ref=yvglwblxrnrenfifsnje` / env `SUPABASE_ACCESS_TOKEN=op://human/supabase-cli/SUPABASE_ACCESS_TOKEN` |
-| `uptimerobot`             | http (headersHelper) | **常駐登録しない**（使う時だけ登録。下記同節）。`https://mcp.uptimerobot.com/mcp` / `headersHelper: ~/.claude/scripts/uptimerobot-headers.sh`（spawn 時に 1Password の Read-only API Key を解決）                                                                    |
-| `usability-probe-browser` | stdio                | **常駐登録しない**（ユーザビリティプローブ実行時だけ登録。下記同節）。`npx -y @playwright/mcp@latest --storage-state=<storageState のパス> --allowed-origins=<probe 対象 origin>`。token 不要（`--storage-state` は事前生成したファイルへのローカルパス）            |
+| Server                    | 種別                 | 登録内容                                                                                                                                                                                                                                                    |
+| ------------------------- | -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `eagle`                   | http                 | `http://127.0.0.1:41596/mcp`                                                                                                                                                                                                                                |
+| `supabase-local`          | http                 | `http://127.0.0.1:54321/mcp`                                                                                                                                                                                                                                |
+| `storybook`               | http                 | `http://localhost:6006/mcp`                                                                                                                                                                                                                                 |
+| `sentry`                  | http (OAuth)         | **常駐登録しない**（オンデマンド、下記 §Sentry）。`https://mcp.sentry.dev/mcp`                                                                                                                                                                              |
+| `vercel`                  | http (OAuth)         | **常駐登録しない**（CLI-first。下記 §Vercel）。登録が要る時だけ `https://mcp.vercel.com`                                                                                                                                                                    |
+| `context7`                | stdio                | `npx -y @upstash/context7-mcp@latest`                                                                                                                                                                                                                       |
+| `supabase` (cloud)        | stdio                | **常駐登録しない**（使う時だけ登録。下記 §オンデマンド専用サーバーの登録・解除）。`op run -- npx -y @supabase/mcp-server-supabase@latest --read-only --project-ref=yvglwblxrnrenfifsnje` / env `SUPABASE_ACCESS_TOKEN=op://agent/supabase-agent/credential` |
+| `uptimerobot`             | http (headersHelper) | **常駐登録しない**（使う時だけ登録。下記同節）。`https://mcp.uptimerobot.com/mcp` / `headersHelper: ~/.claude/scripts/uptimerobot-headers.sh`（spawn 時に 1Password の Read-only API Key を解決）                                                           |
+| `usability-probe-browser` | stdio                | **常駐登録しない**（ユーザビリティプローブ実行時だけ登録。下記同節）。`npx -y @playwright/mcp@latest --storage-state=<storageState のパス> --allowed-origins=<probe 対象 origin>`。token 不要（`--storage-state` は事前生成したファイルへのローカルパス）   |
 
 認証方式はサーバーごとに 4 通り:
 
@@ -60,13 +60,13 @@ production schema を実際に見る時だけ登録する。
 
 ```bash
 # 使う時（-e で SUPABASE_ACCESS_TOKEN の op:// 参照を渡す。op run がこれを解決する）
-claude mcp add supabase -s user -e SUPABASE_ACCESS_TOKEN=op://human/supabase-cli/SUPABASE_ACCESS_TOKEN -- op run -- npx -y @supabase/mcp-server-supabase@latest --read-only --project-ref=yvglwblxrnrenfifsnje
+claude mcp add supabase -s user -e SUPABASE_ACCESS_TOKEN=op://agent/supabase-agent/credential -- op run -- npx -y @supabase/mcp-server-supabase@latest --read-only --project-ref=yvglwblxrnrenfifsnje
 
 # 使い終わったら
 claude mcp remove supabase -s user
 ```
 
-登録後は再起動して `list_tables` で疎通確認する。`supabase-local`（http、`op` 不要）は常駐のままでよい。
+token は `agent/supabase-agent`（read 権限だけの scoped token）で、write を含む `human/supabase-cli` は使わない。`execute_sql` は `--read-only` と token の両方で読み取りに限られるが、`auth.users` などの個人情報も読める。個人情報を含む行は User の明示指示がある時だけ読む。登録後は再起動して `list_tables` で疎通確認する。`supabase-local`（http、`op` 不要）は常駐のままでよい。
 
 #### `uptimerobot`
 
@@ -166,7 +166,7 @@ MCP の tool set には `buy_domain` / `buy_pro` / `buy_credits` / `pause_projec
   - `vercel logs <deployment-url> --json | jq -c 'select(.level=="error")' | head`（runtime error）
   - `vercel project ls`、`vercel env ls`（既存 `pnpm vercel:env`）
 - **ドキュメント参照**: `context7`（`resolve-library-id vercel` → `query-docs`）か WebFetch を使う。Vercel MCP の `search_vercel_documentation` は使わない。
-- **絶対ルール**: 本番 promote / env 書き換えは既存 workflow（`promote.yml`、`pnpm vercel:env:pull:unsafe`）のみで行う。CLI から `vercel deploy` / `vercel env add` を production に対して打たない。`--token` は渡さない（pre-tool-guard がブロックする）。
+- **絶対ルール**: agent から実行してよいのは読み取り系サブコマンドだけ（`ls` / `inspect` / `logs` / `whoami` / `env ls` / `project ls` 等、`api` は GET のみ）。deploy / promote / rollback / env の追加・削除・pull / domain / cert / link は pre-tool-guard が block する。本番の promote は `promote.yml`、env 変更は User の terminal か Dashboard で行う。`--token` は渡さない。agent 用 Vercel token は置かない（`docs/operations/secrets.md` §Agent の vercel CLI）。
 - **MCP が要る場面**（横断 deployment 検索、agent run trace など CLI に無い機能）: `claude mcp add` で `https://mcp.vercel.com` をオンデマンド登録し、`/mcp` で OAuth 承認、使い終わったら `claude mcp remove vercel -s user`。
 
 ### Context7 (`mcp__context7__*`)
@@ -205,7 +205,7 @@ MCP の tool set には `buy_domain` / `buy_pro` / `buy_credits` / `pause_projec
 
 ### MCP を持たない経路
 
-GitHub は `gh` CLI を使う（`--json` + `--jq` で必要な情報へ絞る）。通常のブラウザ操作は現在の runtime のブラウザ機能を使う。Claude Code の Browser tool は互換経路であり必須ではない。browser-only の専用プローブは `usability-probe` の別契約に従う。
+GitHub は `gh` CLI を使う（`--json` + `--jq` で必要な情報へ絞る）。Agent セッションの `gh` は `GH_CONFIG_DIR` 経由の fine-grained PAT（`agent/github-agent`、Dayopt/dayopt 限定、Administration / Secrets / Workflows 無し）で動く。ruleset・GitHub Secret・org 設定の変更は scope に無いので失敗する。それらは User の terminal で行う（`docs/operations/secrets.md` §Agent の gh identity）。通常のブラウザ操作は現在の runtime のブラウザ機能を使う。Claude Code の Browser tool は互換経路であり必須ではない。browser-only の専用プローブは `usability-probe` の別契約に従う。
 
 ### UptimeRobot (`mcp__uptimerobot__*`)
 

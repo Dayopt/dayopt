@@ -85,8 +85,7 @@
     "packageList": "パッケージリスト（{count}件）",
     "footer": {
       "notice": "完全なライセンステキストとNOTICEファイルについては：",
-      "thirdPartyNotices": "THIRD_PARTY_NOTICES.txt",
-      "githubRepository": "GitHubリポジトリ"
+      "thirdPartyNotices": "THIRD_PARTY_NOTICES.txt"
     }
   }
 }

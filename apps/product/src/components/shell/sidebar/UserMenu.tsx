@@ -18,6 +18,7 @@ import Link from 'next/link';
 
 import { createDayoptUrl, dayoptUrls } from '@dayopt/config';
 
+import { getReleaseNotesUrl } from '@/lib/app-info';
 import { MEDIA_QUERIES } from '@/lib/breakpoints';
 import { useLogout } from '@/lib/hooks/useLogout';
 import { useMediaQuery } from '@/lib/hooks/useMediaQuery';
@@ -54,11 +55,7 @@ export function HelpMenuItems() {
       </DropdownMenuItem>
       <DropdownMenuSeparator />
       <DropdownMenuItem asChild>
-        <Link
-          href="https://github.com/Dayopt/dayopt/releases"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
+        <Link href={getReleaseNotesUrl(locale)} target="_blank" rel="noopener noreferrer">
           <Megaphone />
           {t('navigation.navUser.helpSubmenu.releaseNotes')}
         </Link>

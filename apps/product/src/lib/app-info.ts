@@ -1,8 +1,15 @@
-import { dayoptBrand } from '@dayopt/config';
+import { createDayoptUrl, dayoptBrand, dayoptUrls } from '@dayopt/config';
 
 export const APP_NAME = dayoptBrand.name;
 export const APP_VERSION = process.env.NEXT_PUBLIC_APP_VERSION ?? 'unknown';
-export const APP_RELEASES_URL = 'https://github.com/Dayopt/dayopt/releases';
+/**
+ * リリースノートの公開 URL（marketing site の blog `release` カテゴリ）。
+ *
+ * repository は非公開のため GitHub Releases へは誘導しない。
+ */
+export function getReleaseNotesUrl(locale: string): string {
+  return createDayoptUrl(dayoptUrls.marketing, `/${locale}/blog/release`);
+}
 /**
  * このビルドの commit SHA（先頭 8 桁）。Vercel 以外のビルドでは空文字。
  *

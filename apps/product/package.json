@@ -42,7 +42,7 @@
     "test:watch": "vitest --watch",
     "test:integration": "tsx scripts/run-integration-tests.ts",
     "db:reset": "supabase db reset --local",
-    "db:reset-linked:unsafe": "supabase db reset --linked",
+    "db:reset-linked:unsafe": "bash ../../scripts/tasks/confirm-target.sh linked ../../supabase 'linked DB の全データ削除と migration 再適用' && supabase db reset --linked",
     "db:seed": "../../scripts/tasks/seed-dev-data.sh",
     "db:seed:identity": "psql postgresql://postgres:postgres@127.0.0.1:54322/postgres -v ON_ERROR_STOP=1 -f ../../supabase/local/mcp-identity-seed.sql",
     "db:fresh": "pnpm db:reset && pnpm db:seed:identity && pnpm db:seed",
