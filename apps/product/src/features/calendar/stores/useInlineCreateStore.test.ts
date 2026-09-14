@@ -86,6 +86,25 @@ describe('useInlineCreateStore', () => {
       expect(selection?.endMinute).toBe(30);
     });
 
+    it('範囲を引いたドラッグ（durationSource: dragged）には着せ替えない', () => {
+      useInlineCreateStore
+        .getState()
+        .setPendingSelection({ ...mockSelection, durationSource: 'dragged' });
+      useInlineCreateStore.getState().previewActivityDuration(45);
+      const selection = useInlineCreateStore.getState().pendingSelection;
+      expect(selection?.endHour).toBe(11);
+      expect(selection?.endMinute).toBe(30);
+      expect(useInlineCreateStore.getState().hasUserSetDuration).toBe(true);
+    });
+
+    it('クリック / タップ起点（durationSource 未指定）には着せる', () => {
+      useInlineCreateStore.getState().setPendingSelection(mockSelection);
+      useInlineCreateStore.getState().previewActivityDuration(45);
+      const selection = useInlineCreateStore.getState().pendingSelection;
+      expect(selection?.endHour).toBe(10);
+      expect(selection?.endMinute).toBe(45);
+    });
+
     it('ユーザーが長さを直した後は着せ替えない', () => {
       setSelection();
       // 時刻入力 / リサイズで 10:00–10:15 にした

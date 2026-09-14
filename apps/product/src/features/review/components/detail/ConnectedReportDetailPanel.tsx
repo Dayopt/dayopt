@@ -20,6 +20,8 @@ interface ConnectedReportDetailPanelProps {
    * 4 カラム目。**Composition Bridge が決める** — review 本体は器を知らない。
    */
   surface: 'panel' | 'sheet';
+  /** 明細の行からその記録をカレンダーで開く（`useReportJump`）。 */
+  onJumpToRecord?: ((target: { id: string; dayKey: string }) => void) | undefined;
 }
 
 /**
@@ -37,6 +39,7 @@ export function ConnectedReportDetailPanel({
   anchorDate,
   granularity,
   surface,
+  onJumpToRecord,
 }: ConnectedReportDetailPanelProps) {
   const isOpen = useReportDetailStore((state) => state.isOpen);
   const target = useReportDetailStore((state) => state.target);
@@ -57,6 +60,7 @@ export function ConnectedReportDetailPanel({
       granularity={granularity}
       surface={surface}
       target={target}
+      onJumpToRecord={onJumpToRecord}
     />
   );
 }
@@ -66,6 +70,7 @@ function OpenReportDetailPanel({
   granularity,
   surface,
   target,
+  onJumpToRecord,
 }: ConnectedReportDetailPanelProps & { target: ReportDetailTarget }) {
   const close = useReportDetailStore((state) => state.close);
   // 明細の時刻と曜日は、ブラウザのローカルではなくユーザー設定の timezone で切る
@@ -89,6 +94,7 @@ function OpenReportDetailPanel({
     name: target.name,
     onClose: close,
     timezone,
+    onOpenRecord: onJumpToRecord,
   };
 
   return surface === 'sheet' ? (

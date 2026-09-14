@@ -56,6 +56,7 @@ export {
 export { useCalendarSettings } from './hooks/useCalendarSettings';
 export { useCalendarNavigationStore } from './stores/useCalendarNavigationStore';
 export type { UserSettings } from './stores/userSettings';
+export { useTemplateSaveStore } from './stores/useTemplateSaveStore';
 export { useTimeblockClipboardStore } from './stores/useTimeblockClipboardStore';
 // =============================================================================
 // Hooks

@@ -175,6 +175,7 @@
       "records": {
         "heading": "{count, plural, one {# record} other {# records}}",
         "empty": "No records in this period",
+        "openInCalendar": "Open this record in the calendar",
         "unanswered": "—",
         "weekdays": ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
         "fulfillment": {

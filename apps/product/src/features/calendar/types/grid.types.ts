@@ -9,6 +9,11 @@ export interface TimeColumnProps {
   width?: number | undefined;
   /** 狭い列（モバイル）向けにラベルを一段小さくする */
   dense?: boolean | undefined;
+  /**
+   * 現在時刻バッジが重なる位置（0:00 からの分）。近い時刻ラベルを隠して
+   * バッジと重ならないようにする。null / undefined なら隠さない
+   */
+  occludedMinutes?: number | null | undefined;
 }
 
 /** 現在時刻線コンポーネントのプロパティ */

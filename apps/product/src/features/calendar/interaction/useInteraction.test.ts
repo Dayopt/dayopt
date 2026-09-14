@@ -601,6 +601,8 @@ describe('useInteraction selection completion', () => {
       startMinute: 45,
       endHour: 24,
       endMinute: 0,
+      // 範囲を引いた選択なので、アクティビティの普段の長さで上書きしない
+      durationSource: 'dragged',
     });
   });
 });

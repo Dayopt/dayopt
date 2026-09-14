@@ -10,7 +10,7 @@ import React, {
   useTransition,
 } from 'react';
 
-import { usePathname } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 
 import { useCalendarNavigationStore } from '@/features/calendar/stores/useCalendarNavigationStore';
 import { MEDIA_QUERIES } from '@/lib/breakpoints';
@@ -149,6 +149,9 @@ const CalendarNavigationContext = createContext<CalendarNavigationContextValue |
  */
 export const CalendarNavigationProvider = ({ children }: { children: React.ReactNode }) => {
   const pathname = usePathname() ?? '/';
+  // Next の client 遷移が search まで確定した合図としてだけ使う。値は読まない
+  // （自前の history 書き換えは反映されないため。useInspectorURLSync と同じ扱い）
+  const searchParams = useSearchParams();
 
   // pathname + window.location.search からワークスペースタブ判定と初期値を計算。
   // render 中は ref を読めない（react-hooks/refs）ため fallbackDate は渡さない —
@@ -263,7 +266,36 @@ export const CalendarNavigationProvider = ({ children }: { children: React.React
     if (viewParam === viewType) return;
     if (isMobileRef.current && !isMobileCalendarViewSupported(viewParam)) return;
     setViewType(viewParam);
-  }, [isCalendarPage, pathname, viewType]);
+  }, [isCalendarPage, pathname, searchParams, viewType]);
+
+  // /report → /calendar の client 遷移では pathname が先に変わり、その render で読む
+  // window.location はまだ /report のもの（date= が古い）。上の `initialDate` は
+  // [pathname] にしか反応しないので、URL が確定した後にもう一度 date= を読み直す
+  // （レポートの明細 → その日のカレンダー、「カレンダーで組む」が直前の日付のまま
+  // 開いていた。2026-09-14 実測）。
+  //
+  // 読み直すのは「pathname が変わった後、window.location がその pathname に追いついた
+  // 最初の 1 回」だけ。calendar 内の view / date 変更も history API で URL を書き
+  // （writeWorkspaceUrl）、Next はそれを useSearchParams へ反映するので、常に読み直すと
+  // 検索結果ジャンプのように「view を先に書いて date を後から直す」経路で、途中の
+  // 古い date= を拾って戻してしまう余地がある
+  const pendingDateResyncRef = useRef(false);
+  const resyncPathnameRef = useRef(pathname);
+  React.useEffect(() => {
+    if (resyncPathnameRef.current !== pathname) {
+      resyncPathnameRef.current = pathname;
+      pendingDateResyncRef.current = true;
+    }
+    if (!isCalendarPage || !pendingDateResyncRef.current) return;
+    // まだ URL が前の route のまま（search も古い）。次の searchParams 更新を待つ
+    if (window.location.pathname !== pathname) return;
+    pendingDateResyncRef.current = false;
+    const dateFromUrl = readDateParamFromLocation();
+    if (!dateFromUrl || dateFromUrl.getTime() === currentDateRef.current.getTime()) return;
+    startTransition(() => {
+      setCurrentDate(dateFromUrl);
+    });
+  }, [isCalendarPage, pathname, searchParams, startTransition]);
 
   // URL由来の initialDate が変更されたら currentDate を同期
   // （ブラウザ戻る/進む、直接URL入力時）

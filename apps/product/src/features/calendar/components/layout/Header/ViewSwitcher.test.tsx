@@ -41,10 +41,22 @@ describe('ViewSwitcher', () => {
 
     await user.click(screen.getByRole('button', { name: 'calendar.views.multiday' }));
     const viewOptions = await screen.findAllByRole('menuitem');
-    await user.click(viewOptions[6]!);
+    await user.click(viewOptions[7]!);
 
     expect(mocks.onChange).toHaveBeenCalledWith('7day');
     expect(mocks.onChange).not.toHaveBeenCalledWith('week');
+  });
+
+  it('週を選ぶとweekへ切り替える（7日から戻れる）', async () => {
+    const user = userEvent.setup();
+    render(
+      <ViewSwitcher currentView="7day" onChange={mocks.onChange} onSettingsChange={vi.fn()} />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'calendar.views.multiday' }));
+    await user.click(screen.getByRole('menuitem', { name: /calendar\.views\.week/ }));
+
+    expect(mocks.onChange).toHaveBeenCalledWith('week');
   });
 
   it('weekは7日ではなく週として表示する', () => {

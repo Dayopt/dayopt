@@ -9,7 +9,7 @@
  * @see _composition/useCalendarComposition.ts
  */
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo } from 'react';
 
 import type { ExternalCalendarEvent } from '@/features/external-calendar';
 import {
@@ -36,6 +36,7 @@ import { initializePreload } from './controller/utils';
 import { SaveAsTemplateHeader } from './templates/SaveAsTemplateHeader';
 
 import type { UserSettings } from '@/features/calendar/stores/userSettings';
+import { useTemplateSaveStore } from '@/features/calendar/stores/useTemplateSaveStore';
 import { CalendarLayout } from './layout/CalendarLayout';
 import { EventContextMenu, MobileTouchHint } from './views/shared/components';
 
@@ -102,7 +103,6 @@ interface CalendarControllerProps {
   onNavigatePrev: () => void;
   onNavigateNext: () => void;
   onNavigateToday: () => void;
-  onToggleWeekends: () => void;
   onDateSelect: (date: Date) => void;
 
   // --- Prefetch ---
@@ -142,7 +142,6 @@ export function CalendarController({
   onNavigatePrev,
   onNavigateNext,
   onNavigateToday,
-  onToggleWeekends,
   onPrefetch,
   onSettingsChange,
   onDateSelect,
@@ -161,7 +160,10 @@ export function CalendarController({
   // =========================================================================
   // 保存中はヘッダーの中身だけを名前入力へ差し替える。メインの盤面は触らない
   // （保存されるのは「今見えている日の盤面そのもの」という関係を UI で保つ）。
-  const [savingDateKey, setSavingDateKey] = useState<string | null>(null);
+  // 起動元は表示メニュー（日ビュー）とサイドバーの「+」の 2 つなので store で持つ
+  const savingDateKey = useTemplateSaveStore((state) => state.savingDateKey);
+  const setSavingDateKey = useTemplateSaveStore((state) => state.startSaving);
+  const stopSaving = useTemplateSaveStore((state) => state.stopSaving);
   const timezone = useUserPreferences((preferences) => preferences.timezone);
   const { createTemplate } = usePlanTemplateMutations();
 
@@ -177,7 +179,19 @@ export function CalendarController({
   // 実際に保存される日がずれる。state ではなく導出で持ち、閉じ忘れの経路を作らない。
   const isSavingAsTemplate = savingDateKey === templateDateKey && viewType === 'day';
 
-  const closeSaveAsTemplate = useCallback(() => setSavingDateKey(null), []);
+  const closeSaveAsTemplate = useCallback(() => stopSaving(), [stopSaving]);
+
+  // /report 等へ移って戻ると Controller は再マウントするが、store は生き残る。
+  // 同じ日・日ビューのままなら保存ヘッダーが勝手に再開するので、離れる時に落とす
+  useEffect(() => () => stopSaving(), [stopSaving]);
+
+  // サイドバーの「+」は週ビューからも押せる。保存対象の日が今見えている日なら
+  // 日ビューへ切り替えて保存ヘッダーを出す（別の日なら何もせず、日を動かした時と
+  // 同じく自然に閉じる）
+  useEffect(() => {
+    if (savingDateKey === null || savingDateKey !== templateDateKey || viewType === 'day') return;
+    onViewChange('day');
+  }, [savingDateKey, templateDateKey, viewType, onViewChange]);
 
   // 移動系は保存状態を落としてから元のハンドラへ渡す（同じ日へ戻った時に
   // 空のヘッダーが復活しないようにする）
@@ -242,7 +256,6 @@ export function CalendarController({
     viewType,
     onNavigate: handleNavigate,
     onViewChange: handleViewChange,
-    onToggleWeekends,
   });
 
   // =========================================================================

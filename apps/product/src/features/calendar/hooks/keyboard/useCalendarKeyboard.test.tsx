@@ -18,7 +18,6 @@ describe('useCalendarKeyboard', () => {
         viewType: 'day',
         onNavigate: vi.fn(),
         onViewChange,
-        onToggleWeekends: vi.fn(),
       });
     });
 

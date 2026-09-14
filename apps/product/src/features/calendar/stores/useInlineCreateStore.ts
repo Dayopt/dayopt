@@ -16,8 +16,10 @@ import { createSelectors } from '@/lib/zustand/createSelectors';
  * 別状態ではなく pendingSelection 自身にする。グリッドのハイライト・パネルの時刻入力・
  * 重なり判定・作成が同じ 1 つの値を読む。
  *
- * ただしユーザーが時間を直した後は着せない。ドラッグは「どこに置くか」の指定だが、
- * リサイズや時刻入力は「どれだけの長さにするか」の明示的な指定なので、そちらを優先する。
+ * ただし長さをユーザーが決めた後は着せない。範囲を引いたドラッグ、リサイズ、時刻入力は
+ * 「どれだけの長さにするか」の明示的な指定なので、そちらを優先する。着せる対象は
+ * クリック / タップ起点（既定の長さで置いただけ）の選択に限る（2026-09-14 User 判断。
+ * それまでは引いた範囲も「置き場所の指定」と見なして上書きしていた）。
  */
 
 /** 1 日の終端（23:59）。`createInstantSelection` と同じクランプ規則を使う */
@@ -44,6 +46,8 @@ export interface PendingSelection {
   endHour: number;
   endMinute: number;
   creationSource?: 'planned-gap' | undefined;
+  /** `dragged` は範囲を引いて長さまで決めた選択。普段の長さで上書きしない */
+  durationSource?: 'dragged' | undefined;
   /** Step 5 のレーン起点。保存先は最終的に end_at のルールが優先する。 */
   lane?: 'plan' | 'record' | undefined;
   /**
@@ -61,8 +65,8 @@ interface InlineCreateState {
    */
   hoveredActivity: HoveredActivityInfo | null;
   /**
-   * ドラッグで決めた長さ（分）。ホバーを外した時・中央値の無いアクティビティへ移った時に
-   * ここへ戻す。
+   * 選択時の長さ（分。クリック / タップ起点なら既定の長さ）。ホバーを外した時・
+   * 中央値の無いアクティビティへ移った時にここへ戻す。
    */
   baseDurationMinutes: number | null;
   /**
@@ -73,7 +77,7 @@ interface InlineCreateState {
   setHoveredActivity: (activity: HoveredActivityInfo | null) => void;
   /**
    * ホバー中のアクティビティの普段の長さ（分）を選択範囲へ着せる。
-   * `null` を渡すとドラッグで決めた長さへ戻す。長さを直した後は no-op。
+   * `null` を渡すと選択時の長さへ戻す。長さをユーザーが決めた選択では no-op。
    */
   previewActivityDuration: (minutes: number | null) => void;
   setPendingSelection: (selection: PendingSelection) => void;
@@ -114,7 +118,8 @@ const useInlineCreateStoreBase = create<InlineCreateState>()(
         set({
           pendingSelection: selection,
           baseDurationMinutes: durationMinutesOf(selection),
-          hasUserSetDuration: false,
+          // 範囲を引いた選択は最初から「ユーザーが長さを決めた」扱い
+          hasUserSetDuration: selection.durationSource === 'dragged',
         }),
       clearPendingSelection: () =>
         set({

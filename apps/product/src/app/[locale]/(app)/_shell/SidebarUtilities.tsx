@@ -17,15 +17,21 @@ export function SidebarUtilities() {
     setTheme(resolvedTheme === 'light' ? 'dark' : 'light');
   }, [resolvedTheme, setTheme]);
 
+  // tooltip と aria-label は同じ「切り替え先」を言う。以前は tooltip だけ英語固定だった
+  const label =
+    resolvedTheme === 'light'
+      ? t('navigation.sidebar.switchToDark')
+      : t('navigation.sidebar.switchToLight');
+
   return (
     <div className="flex items-center gap-1 px-2 py-2">
-      <HoverTooltip content={resolvedTheme === 'light' ? 'Dark mode' : 'Light mode'} side="right">
+      <HoverTooltip content={label} side="right">
         <Button
           variant="ghost"
           icon
           className="size-8"
           onClick={handleThemeToggle}
-          aria-label={t('navigation.sidebar.theme')}
+          aria-label={label}
         >
           {resolvedTheme === 'light' ? (
             <Moon className="size-4" aria-hidden="true" />

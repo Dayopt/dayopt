@@ -9,7 +9,6 @@ interface UseCalendarKeyboardProps {
   viewType: CalendarViewType;
   onNavigate: (direction: 'prev' | 'next' | 'today') => void;
   onViewChange: (view: CalendarViewType) => void;
-  onToggleWeekends: () => void;
 }
 
 /**
@@ -22,22 +21,18 @@ interface UseCalendarKeyboardProps {
  * - Cmd/Ctrl + 3: 3-Day View
  * - Cmd/Ctrl + 5: 5-Day View
  * - Cmd/Ctrl + 7: 7-Day View
- * - Cmd/Ctrl + W: 週末表示切り替え
+ *
+ * Cmd/Ctrl + W（週末表示切り替え）は useWeekendToggleShortcut が持つ。ここにも
+ * 登録していた時期があり、registry が二重登録の警告を dev で毎回出していた
  */
-export const useCalendarKeyboard = ({
-  onNavigate,
-  onViewChange,
-  onToggleWeekends,
-}: UseCalendarKeyboardProps) => {
+export const useCalendarKeyboard = ({ onNavigate, onViewChange }: UseCalendarKeyboardProps) => {
   const onNavigateRef = useRef(onNavigate);
   const onViewChangeRef = useRef(onViewChange);
-  const onToggleWeekendsRef = useRef(onToggleWeekends);
 
   useEffect(() => {
     onNavigateRef.current = onNavigate;
     onViewChangeRef.current = onViewChange;
-    onToggleWeekendsRef.current = onToggleWeekends;
-  }, [onNavigate, onViewChange, onToggleWeekends]);
+  }, [onNavigate, onViewChange]);
 
   useEffect(() => {
     const shortcuts: ShortcutDef[] = [
@@ -95,14 +90,6 @@ export const useCalendarKeyboard = ({
         handler: (e) => {
           e.preventDefault();
           onViewChangeRef.current('7day');
-        },
-      },
-      {
-        key: 'Cmd+W',
-        description: '週末表示切り替え（Cmd）',
-        handler: (e) => {
-          e.preventDefault();
-          onToggleWeekendsRef.current();
         },
       },
     ];
