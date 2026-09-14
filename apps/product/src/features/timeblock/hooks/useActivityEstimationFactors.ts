@@ -7,10 +7,8 @@
  * 掛け算は client の pure 関数（`projectActualMinutes`）で行う。draft の時間を
  * 動かすたびに query を撃つ必要は無く、debounce も要らない。
  *
- * hook 名・ファイル名（`activity-estimation-factor.ts`）は tRPC procedure 名
- * （`statistics.getTagEstimationFactors`、破壊的公開契約変更を避けるため維持）
- * との対応を保つため据え置いている。中身は activity 軸の集計
- * （issue #2162 のコメント欄 step-5-7-completion.md §4-2 相当、#2473 で移設）。
+ * #2694: 新名へ切り替える。古いclient向けのprocedure aliasはserverに残し、
+ * 配信確認後に撤去する。集計の意味と取得頻度は変更しない。
  */
 
 import { useMemo } from 'react';
@@ -32,13 +30,13 @@ interface ActivityEstimationFactors {
   project: (activityId: string | null, draftMinutes: number) => ActivityEstimationProjection | null;
 }
 
-export function useTagEstimationFactors(): ActivityEstimationFactors {
+export function useActivityEstimationFactors(): ActivityEstimationFactors {
   // 意図的に isError をハンドリングしない（`test` skill の
   // 「UI を描画する全 useQuery は ErrorState 必須」に対する明示的な例外）。
   // これは受動的なヒントで、取れなかった事実をユーザーに見せる価値が無く、
   // ErrorState を出すと ADR-026 の「静かに教える」トーンを壊す。
   // 失敗時は data が undefined のまま project() が null を返し、何も描画されない。
-  const { data } = api.statistics.getTagEstimationFactors.useQuery(undefined, {
+  const { data } = api.statistics.getActivityEstimationFactors.useQuery(undefined, {
     staleTime: CACHE_5_MINUTES,
   });
 

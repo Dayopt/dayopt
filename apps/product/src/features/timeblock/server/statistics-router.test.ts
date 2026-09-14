@@ -5,13 +5,13 @@ import { createCallerFactory } from '@/lib/trpc/procedures';
 
 const serviceMethods = vi.hoisted(() => ({
   getActivityStats: vi.fn(),
-  getTagEstimationFactors: vi.fn(),
+  getActivityEstimationFactors: vi.fn(),
 }));
 
 vi.mock('./statistics-service', () => ({
   StatisticsService: class {
     getActivityStats = serviceMethods.getActivityStats;
-    getTagEstimationFactors = serviceMethods.getTagEstimationFactors;
+    getActivityEstimationFactors = serviceMethods.getActivityEstimationFactors;
   },
 }));
 
@@ -30,21 +30,21 @@ function authedCaller() {
 beforeEach(() => {
   vi.clearAllMocks();
   serviceMethods.getActivityStats.mockResolvedValue({ counts: {}, planCounts: {}, lastUsed: {} });
-  serviceMethods.getTagEstimationFactors.mockResolvedValue([]);
+  serviceMethods.getActivityEstimationFactors.mockResolvedValue([]);
 });
 
 // 「未認証は UNAUTHORIZED」の契約は write-fence-coverage.test.ts が全 procedure 横断で
 // 機械検証する（#2187 E-3）。ここでの個別 assert（getActivityStats）は重複だったため削除した。
 
 describe('statistics router: StatisticsService 委譲', () => {
-  it('getActivityStats / getTagEstimationFactors を service へ渡す', async () => {
+  it('getActivityStats / getActivityEstimationFactors を service へ渡す', async () => {
     const caller = authedCaller();
 
     await caller.getActivityStats();
-    await caller.getTagEstimationFactors();
+    await caller.getActivityEstimationFactors();
 
     expect(serviceMethods.getActivityStats).toHaveBeenCalledWith(USER_ID);
-    expect(serviceMethods.getTagEstimationFactors).toHaveBeenCalledWith(USER_ID);
+    expect(serviceMethods.getActivityEstimationFactors).toHaveBeenCalledWith(USER_ID);
   });
 
   it('呼び出し元の無かった分布・KPI・streak 系 procedure は公開しない（#2624）', () => {
@@ -62,7 +62,7 @@ describe('statistics router: StatisticsService 委譲', () => {
       expect(procedures).not.toContain(removed);
     }
     expect(procedures).toEqual(
-      expect.arrayContaining(['getActivityStats', 'getTagEstimationFactors', 'getMcpReview']),
+      expect.arrayContaining(['getActivityStats', 'getActivityEstimationFactors', 'getMcpReview']),
     );
   });
 
@@ -72,4 +72,24 @@ describe('statistics router: StatisticsService 委譲', () => {
       code: 'INTERNAL_SERVER_ERROR',
     });
   });
+});
+
+describe('estimation procedure compatible rename', () => {
+  it.each(['getActivityEstimationFactors', 'getTagEstimationFactors'] as const)(
+    '%s returns the same user-scoped factors',
+    async (name) => {
+      const factors = [{ activityId: 'activity-a', factor: 1.5, sampleCount: 4 }];
+      serviceMethods.getActivityEstimationFactors.mockResolvedValue(factors);
+      await expect(authedCaller()[name]()).resolves.toEqual(factors);
+      expect(serviceMethods.getActivityEstimationFactors).toHaveBeenCalledExactlyOnceWith(USER_ID);
+    },
+  );
+  it.each(['getActivityEstimationFactors', 'getTagEstimationFactors'] as const)(
+    '%s denies unauthenticated calls before the service',
+    async (name) => {
+      const caller = createCaller(createMockContext());
+      await expect(caller[name]()).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+      expect(serviceMethods.getActivityEstimationFactors).not.toHaveBeenCalled();
+    },
+  );
 });

@@ -698,7 +698,8 @@ export const KEY_NAME_RULES: readonly KeyNameRule[] = [
     token: 'tag',
     preferred: 'activity / category / segment',
     enforcement: 'active',
-    reason: '#2162 で廃止した Tag 機能の名残',
+    reason:
+      '#2162 で廃止した機能の名残。#2694 でclient/serviceをactivityへ改名。旧tRPC名は配信確認まで互換aliasとして残す',
   },
   {
     token: 'tags',

@@ -1,7 +1,7 @@
 import 'server-only';
 
 /**
- * 統計 service — 作成時フィードフォワード（タグ別見積もり係数）
+ * 統計 service — 作成時フィードフォワード（アクティビティ別見積もり係数）
  *
  * ADR-026（決定ログ（削除済み、git 履歴参照））の 1 点目。
  * 集計の定義は `domain/activity-estimation-factor.ts` が正本で、この層は行取得と分単位への
@@ -28,11 +28,8 @@ export class StatisticsFeedforwardService {
    * 期間は UTC の絶対時刻で切る。タイムゾーン境界に依存する「日」の集計ではなく
    * 「今から 28 日前まで」の窓なので、user timezone を引く必要が無い。
    *
-   * メソッド名は procedure 名（`statistics.getTagEstimationFactors`）に合わせて維持している
-   * （issue #2162 のコメント欄 step-5-7-completion.md §4-2 相当、#2473 で移設。procedure 名の改名は
-   * 破壊的公開契約変更のため別 scope）。中身は activity 軸の集計を返す。
    */
-  async getTagEstimationFactors(
+  async getActivityEstimationFactors(
     userId: string,
     now = new Date(),
   ): Promise<ActivityEstimationFactor[]> {
