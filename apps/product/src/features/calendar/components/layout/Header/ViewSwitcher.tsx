@@ -46,8 +46,14 @@ interface MainViewOption {
   shortcut: string;
 }
 
+/**
+ * 週（月〜日の週境界）は 7日（基準日中央の 7 営業日）とは別の view。既定 view で
+ * あり設定の「起動時のビュー」からも選べるのに、7 を押した後にここから戻れなかった
+ * （2026-09-14 UI レビュー）。shortcut は Google Calendar と同じ W にする。
+ */
 const MAIN_VIEW_OPTIONS: MainViewOption[] = [
   { value: 'day', count: 1, shortcut: '1' },
+  { value: 'week', count: 7, shortcut: 'W' },
   { value: '2day', count: 2, shortcut: '2' },
   { value: '3day', count: 3, shortcut: '3' },
   { value: '4day', count: 4, shortcut: '4' },
@@ -102,9 +108,11 @@ export function ViewSwitcher({
         : t('calendar.views.multiday', { count: getMultiDayCount(currentView) });
 
   const getMainViewLabel = (option: MainViewOption): string =>
-    option.count === 1
-      ? t('calendar.views.day')
-      : t('calendar.views.multiday', { count: option.count });
+    option.value === 'week'
+      ? t('calendar.views.week')
+      : option.count === 1
+        ? t('calendar.views.day')
+        : t('calendar.views.multiday', { count: option.count });
 
   const handleSelect = useCallback(
     (value: CalendarViewType) => {
@@ -121,7 +129,7 @@ export function ViewSwitcher({
     persistSettings({ showWeekNumbers: !showWeekNumbers });
   }, [showWeekNumbers, persistSettings]);
 
-  // キーボードショートカット: 1〜7
+  // キーボードショートカット: 1〜7 / W
   const onChangeRef = useRef(onChange);
   useEffect(() => {
     onChangeRef.current = onChange;
@@ -184,6 +192,14 @@ export function ViewSwitcher({
         handler: (e) => {
           e.preventDefault();
           onChangeRef.current('7day');
+        },
+      },
+      {
+        key: 'W',
+        description: '週表示に切り替え（W）',
+        handler: (e) => {
+          e.preventDefault();
+          onChangeRef.current('week');
         },
       },
     ];
