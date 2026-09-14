@@ -351,6 +351,7 @@ export type Database = {
           applied_at: string;
           client_id: string;
           data_generation: number;
+          digest_version: number;
           envelope_version: number;
           operation_id: string;
           origin_connection_id: string | null;
@@ -368,6 +369,7 @@ export type Database = {
           applied_at?: string;
           client_id: string;
           data_generation?: number;
+          digest_version?: number;
           envelope_version: number;
           operation_id: string;
           origin_connection_id?: string | null;
@@ -385,6 +387,7 @@ export type Database = {
           applied_at?: string;
           client_id?: string;
           data_generation?: number;
+          digest_version?: number;
           envelope_version?: number;
           operation_id?: string;
           origin_connection_id?: string | null;
