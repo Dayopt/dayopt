@@ -23,10 +23,8 @@ MCP_OAUTH_PREVIEW_UPSTASH_HOST=op://agent/app/MCP_OAUTH_PREVIEW_UPSTASH_HOST
 NEXT_PUBLIC_TURNSTILE_SITE_KEY=op://agent/turnstile/NEXT_PUBLIC_TURNSTILE_SITE_KEY
 TURNSTILE_SECRET_KEY=op://agent/turnstile/TURNSTILE_SECRET_KEY
 ANTHROPIC_API_KEY=op://agent/anthropic/ANTHROPIC_API_KEY
-# VERCEL_* は ci vault へ移動した（#2086 vault 再編）。agent 用の別発行 token が
-# 1Password に入ったら agent/vercel 参照で戻す。それまで replica:check は User 実行。
-# VERCEL_TOKEN=op://agent/vercel/VERCEL_TOKEN
-# VERCEL_TEAM_ID=op://agent/vercel/VERCEL_TEAM_ID
+# VERCEL_* は置かない。Vercel token は scope を絞れず team 全権になるため agent vault に
+# 入れない（2026-09-14、監査 P1-2）。replica:check は CI の日次 cron と User 実行で回す。
 GOOGLE_SITE_VERIFICATION=op://agent/google/GOOGLE_SITE_VERIFICATION
 YANDEX_VERIFICATION=op://agent/google/YANDEX_VERIFICATION
 YAHOO_VERIFICATION=op://agent/google/YAHOO_VERIFICATION

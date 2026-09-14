@@ -113,16 +113,10 @@ export const envSchema: EnvSchemaEntry[] = [
 
   envEntry('VERCEL_TOKEN', false, 'secret', 'shared', ci, 'vercel'),
   envEntry('VERCEL_TEAM_ID', false, 'public', 'shared', ci, 'vercel'),
-  // agent 用 Vercel token（#2086 plan v2）。CI と agent の VERCEL_TOKEN 二重用途を
-  // 解消するため agent は別発行 token を使う。発行までは replica:check を User 実行に倒す
-  pendingEnvEntry(
-    'VERCEL_TOKEN',
-    'secret',
-    'shared',
-    agent,
-    'vercel',
-    'agent 用 token 未発行（#2086 plan v2）。User 発行後に item を作り replica:check の参照を切り替える',
-  ),
+  // agent 用 Vercel token は置かない（2026-09-14、監査 P1-2）。Vercel の token は scope を
+  // 絞れず team 全権になるため、agent vault の「漏れても 1 日で戻せる」定義に入らない。
+  // 未使用のまま置かれていた agent/vercel は Vercel 側で revoke し item を archive した。
+  // agent の Vercel 読み取りは CLI の読み取り系サブコマンドだけで行う（pre-tool-guard）。
 
   envEntry('GOOGLE_SITE_VERIFICATION', false, 'public', 'shared', agent, 'google'),
   envEntry('YANDEX_VERIFICATION', false, 'public', 'shared', agent, 'google'),

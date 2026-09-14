@@ -250,7 +250,6 @@ vault は 2026-08-14 の信頼境界軸再編（[#2086](https://github.com/Dayop
 | `turnstile`       | `NEXT_PUBLIC_TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY`                                                                                                                                                                                                                                                                                             | Cloudflare Turnstile（旧 Shared）                                                                                                   |
 | `anthropic`       | `ANTHROPIC_API_KEY`                                                                                                                                                                                                                                                                                                                                  | optional / legacy key。現行 runtime consumer なし（旧 Shared）                                                                      |
 | `google`          | `GOOGLE_SITE_VERIFICATION`, `YANDEX_VERIFICATION`, `YAHOO_VERIFICATION`                                                                                                                                                                                                                                                                              | Webmaster verification（旧 Shared）                                                                                                 |
-| `vercel`          | `VERCEL_TOKEN`（agent 用別発行、未発行 pending）                                                                                                                                                                                                                                                                                                     | `pnpm replica:check` 用。CI の token（ci/vercel）とは別発行で共用しない（#2086 plan v2）                                            |
 | `github-agent`    | `credential`（fine-grained PAT、Dayopt/dayopt 限定）, `expires`                                                                                                                                                                                                                                                                                      | Agent セッションの `gh` / git push 用 identity。op run では消費せず `GH_CONFIG_DIR` の replica で使う（下記 §Agent の gh identity） |
 
 `SUPABASE_ACCESS_TOKEN`（Supabase Management API 用。cloud の `supabase` MCP server と `scripts/runbook/enable-auth-hook.sh` が使う）は `human/supabase` を正本に一本化した（[#1933](https://github.com/Dayopt/dayopt/issues/1933)）。以前は `human/supabase` と同一値のまま `agent/supabase` にも複製されていたが、production を指す token を staging item から読む理由が無いため repo 側の参照はすべて production へ切り替えた。**item 自体は残す**（`CRON_SECRET` / `SEND_EMAIL_HOOK_SECRET` は cron / send-email hook の local dev 検証に使うため、廃止しない）。
@@ -318,7 +317,7 @@ vault は 2026-08-14 の信頼境界軸再編（[#2086](https://github.com/Dayop
 
 予定（#2090 の実施後に追加する）: `VERCEL_AUTOMATION_BYPASS_PRODUCT` / `VERCEL_AUTOMATION_BYPASS_WEB`（bypass secret の 1Password 登録先）。
 
-`VERCEL_TOKEN`はautomation専用とし、local CLIのloginや`--token`引数には使わない。Production Config AuditとProduction Releaseが環境変数からprocess内で読み、Authorization headerにだけ設定する。Production Releaseはenv metadataの読取に加えて、Production deploymentのpromoteとrollbackを行う。localの確認方法とrotation順序は[Environment Secrets](./security/environment-secrets.md)を正とする。agent からは読まない（agent の `replica:check` は agent 用の別発行 token を使う。発行までは User 実行）。
+`VERCEL_TOKEN`はautomation専用とし、local CLIのloginや`--token`引数には使わない。Production Config AuditとProduction Releaseが環境変数からprocess内で読み、Authorization headerにだけ設定する。Production Releaseはenv metadataの読取に加えて、Production deploymentのpromoteとrollbackを行う。localの確認方法とrotation順序は[Environment Secrets](./security/environment-secrets.md)を正とする。agent からは読まない。agent 用の Vercel token も発行しない（token は scope を絞れず team 全権になるため。§Agent の vercel CLI）。
 
 ---
 
@@ -341,6 +340,22 @@ vault は 2026-08-14 の信頼境界軸再編（[#2086](https://github.com/Dayop
 **検証**: Agent セッションで `gh auth status` に `admin:org` / `delete_repo` が出ないこと、`gh api repos/Dayopt/dayopt/rulesets` が読めること、`gh api orgs/Dayopt/actions/secrets` が 403 / 404 になること（admin 不在の証明。書き込みは試さない）。`pnpm agent:preflight` の `gh identity` 行が classic scope を検出すると警告を出す（speed bump、fail はしない）。`pnpm 1password:check` は `agent/github-agent` の実在を検査する（`operationalItems`）。
 
 **rotation**: §短命トークンのローテーション（expiry 付き再発行）に従う。新 PAT を発行 → 1Password 更新 → 上記 4 を再実行 → GitHub の token 一覧で新 token の Last used が更新されたことを確認 → 旧 PAT を revoke。
+
+## Agent の vercel CLI（読み取り系だけ）
+
+策定日: 2026-09-14（Secret / Credential 監査 P1-2、User 裁可）。agent の `vercel` CLI は User 本人の対話 login で動き、team `Dayopt` の全権を持つ。Vercel の token は scope を絞れないため、GitHub のような identity 分離はできない。そこで **agent から実行してよい vercel サブコマンドを読み取り系に固定する**。
+
+**agent 用 Vercel token は置かない。** 以前は `agent/vercel` を「agent 用の別発行 token（発行待ち）」として schema に持っていたが、実際には未使用の team 全権 token が入っていた。agent vault の定義（漏れても 1 日で戻せるもの）に合わないため、2026-09-14 に Vercel 側で revoke し、1Password の item を archive した。
+
+**許可するもの（`scripts/hooks/pre-tool-guard-rules.mjs` の allowlist）**: `ls` / `list` / `inspect` / `logs` / `whoami` / `help` / `--version`、`teams ls`、`project ls|inspect`、`env ls`、`domains ls|inspect`、`dns ls`、`certs ls`、`alias ls`、`integration list`、`api`（GET かつ body なし）。
+
+**それ以外は block する。** 引数なしの `vercel`（= deploy）、`deploy` / `promote` / `rollback` / `redeploy` / `remove`、`env add|rm|pull`、`pull` / `dev` / `build`（実値を file や process へ引き出す）、`link`、`domains` / `certs` / `dns` / `alias` / `project` の変更、`api` の非 GET と body 付き。書き込み系を数え上げると新しいサブコマンドで穴が開くので、許可する側を固定している。
+
+**判定の保証境界**: コマンド文字列を quote を解釈して区切り（quote 外の `;` `&` `|` 改行 括弧 `$(` backtick）で分け、各区切りの先頭の `vercel` を見る。env 代入、`env` / `command` / `exec` / `npx` / `pnpm exec|dlx` / `bunx` / `xargs` / `op run ... --` の前置きと、`sh|bash|zsh -c` の中身は辿る。変数展開、wrapper script、npm script の内側（例: `pnpm vercel:env:pull:unsafe`）は見えない。hook は speed bump で、production 変更を止める本体は User の明示操作と `AGENTS.md` の EXPLICIT AUTHORITY。契約は `scripts/__tests__/pre-tool-guard.test.ts` が固定する。
+
+**受け入れる誤検知**: heredoc の本文は区切りを解釈しないので、行頭が書き込み系の vercel コマンドで始まる行を含むと落ちる。commit message や PR 本文にコマンド例を書く時は Write / Edit で file に書いてから `-F` / `--body-file` で渡す。quote 内の `|`（`rg "A|B"` 等）や、コマンド位置にない vercel の言及は落とさない。
+
+**User が行うもの**: production の env 変更、promote / rollback の手動実行、domain / cert、project 設定。いずれも User の terminal か Vercel Dashboard で行う。
 
 ## Service Account（無人実行用、設計のみ・未導入）
 
@@ -407,7 +422,7 @@ pnpm replica:check   # 要 VERCEL_TOKEN / VERCEL_TEAM_ID（下記）
 
 - `env:check` — required env を `OK / EMPTY / MISSING` だけで確認する
 - `secrets:check` — tracked files と untracked `.env*` を scan し、literal secret は `value: [redacted]` で報告する。CI では ready 後の PR で走る（`ci.yml` の static job、`scripts/ci/check.mjs`。#2483 で docs-guard.yml から移設）
-- `replica:check` — Vercel Production Env（product / web）の **key 名だけ**を取得し、1Password 台帳（`scripts/tasks/env/schema.ts` の `onePasswordEnvSchema`）に無い key を検出する（replica ⊆ 台帳。基本方針 7 の機械検証、[#2084](https://github.com/Dayopt/dayopt/issues/2084)）。`production-config-audit.mjs` が「台帳側の必須 key が Vercel に揃っているか」を見るのと逆方向。値は取得も表示もしない。**日次 cron（`.github/workflows/nightly.yml` の replica-check job、06:30 JST。#2483 で replica-check.yml から統合）で定期実行する**（[#2111](https://github.com/Dayopt/dayopt/issues/2111)。初回実運用の NG 13 件分類が #2094/#2101 の merge で完了したため、local 専用だった制約は解除した）。token は production-config-audit と同じ GitHub Secrets（`ci/vercel` の replica）を再利用し、新規 token 発行は不要。手元での単発実行も引き続き可能（下の実行例は `ci` vault を inline 参照で解決するため、agent はコピペ実行しない。agent 用 token（`agent/vercel`、発行待ち）が入ったら agent も自走できる）。実行例:
+- `replica:check` — Vercel Production Env（product / web）の **key 名だけ**を取得し、1Password 台帳（`scripts/tasks/env/schema.ts` の `onePasswordEnvSchema`）に無い key を検出する（replica ⊆ 台帳。基本方針 7 の機械検証、[#2084](https://github.com/Dayopt/dayopt/issues/2084)）。`production-config-audit.mjs` が「台帳側の必須 key が Vercel に揃っているか」を見るのと逆方向。値は取得も表示もしない。**日次 cron（`.github/workflows/nightly.yml` の replica-check job、06:30 JST。#2483 で replica-check.yml から統合）で定期実行する**（[#2111](https://github.com/Dayopt/dayopt/issues/2111)。初回実運用の NG 13 件分類が #2094/#2101 の merge で完了したため、local 専用だった制約は解除した）。token は production-config-audit と同じ GitHub Secrets（`ci/vercel` の replica）を再利用し、新規 token 発行は不要。手元での単発実行も引き続き可能（下の実行例は `ci` vault を inline 参照で解決するため、agent はコピペ実行しない。agent 用の Vercel token は発行しない方針のため、手元実行は User が行う。実行例:
 
   ```bash
   VERCEL_TOKEN="op://ci/vercel/VERCEL_TOKEN" VERCEL_TEAM_ID="op://ci/vercel/VERCEL_TEAM_ID" op run -- pnpm replica:check

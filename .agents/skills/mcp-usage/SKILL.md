@@ -166,7 +166,7 @@ MCP の tool set には `buy_domain` / `buy_pro` / `buy_credits` / `pause_projec
   - `vercel logs <deployment-url> --json | jq -c 'select(.level=="error")' | head`（runtime error）
   - `vercel project ls`、`vercel env ls`（既存 `pnpm vercel:env`）
 - **ドキュメント参照**: `context7`（`resolve-library-id vercel` → `query-docs`）か WebFetch を使う。Vercel MCP の `search_vercel_documentation` は使わない。
-- **絶対ルール**: 本番 promote / env 書き換えは既存 workflow（`promote.yml`、`pnpm vercel:env:pull:unsafe`）のみで行う。CLI から `vercel deploy` / `vercel env add` を production に対して打たない。`--token` は渡さない（pre-tool-guard がブロックする）。
+- **絶対ルール**: agent から実行してよいのは読み取り系サブコマンドだけ（`ls` / `inspect` / `logs` / `whoami` / `env ls` / `project ls` 等、`api` は GET のみ）。deploy / promote / rollback / env の追加・削除・pull / domain / cert / link は pre-tool-guard が block する。本番の promote は `promote.yml`、env 変更は User の terminal か Dashboard で行う。`--token` は渡さない。agent 用 Vercel token は置かない（`docs/operations/secrets.md` §Agent の vercel CLI）。
 - **MCP が要る場面**（横断 deployment 検索、agent run trace など CLI に無い機能）: `claude mcp add` で `https://mcp.vercel.com` をオンデマンド登録し、`/mcp` で OAuth 承認、使い終わったら `claude mcp remove vercel -s user`。
 
 ### Context7 (`mcp__context7__*`)
