@@ -81,6 +81,13 @@ describe('CalendarNavigationProvider', () => {
     rerender(tree());
     expect(screen.getByTestId('date')).toHaveTextContent('2026-03-27');
     expect(screen.getByTestId('view')).toHaveTextContent('day');
+
+    // 確定後の calendar 内の URL 書き換え（検索ジャンプ等が途中で書く古い date=）は
+    // 「外からの遷移」ではないので拾わない
+    mockSearchParams = new URLSearchParams('view=day&date=2026-03-20');
+    window.history.replaceState(null, '', '/ja/calendar?view=day&date=2026-03-20');
+    rerender(tree());
+    expect(screen.getByTestId('date')).toHaveTextContent('2026-03-27');
   });
 
   it('レポートと戻り先の日付が同じでも以前のカレンダー日付を残さない', () => {

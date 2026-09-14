@@ -181,6 +181,10 @@ export function CalendarController({
 
   const closeSaveAsTemplate = useCallback(() => stopSaving(), [stopSaving]);
 
+  // /report 等へ移って戻ると Controller は再マウントするが、store は生き残る。
+  // 同じ日・日ビューのままなら保存ヘッダーが勝手に再開するので、離れる時に落とす
+  useEffect(() => () => stopSaving(), [stopSaving]);
+
   // サイドバーの「+」は週ビューからも押せる。保存対象の日が今見えている日なら
   // 日ビューへ切り替えて保存ヘッダーを出す（別の日なら何もせず、日を動かした時と
   // 同じく自然に閉じる）
