@@ -70,10 +70,12 @@ export function ActivityChipRow({ className }: ActivityChipRowProps) {
         'scrollbar-hide overscroll-x-contain',
         className,
       )}
-      // ボタンが並ぶ行なので list ではなく group。role="list" にすると子へ
+      // ボタンが並ぶ行なので list ではない。role="list" にすると子へ
       // role="listitem" が要り、interactive な button に非 interactive な role を
-      // 付ける矛盾が生じる（listitem を付けるとボタンとして読まれなくなる）
-      role="group"
+      // 付ける矛盾が生じる（listitem を付けるとボタンとして読まれなくなる）。
+      // group では landmark に含まれず axe の region 違反になるため、名前付きの
+      // region（landmark）にする（モバイル shell で main の外に置かれる行のため）
+      role="region"
       aria-label={t('calendar.filter.quickCreate')}
     >
       {chips.map((chip) => (
