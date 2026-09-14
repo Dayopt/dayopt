@@ -1,8 +1,15 @@
 import { describe, expect, it } from 'vitest';
 
 import { getDateKey } from '@/lib/date';
+import { toUserPreferences } from '@/lib/hooks/useUserPreferences';
 
-import { buildCalendarRangeInput, buildTimeblockListInput } from './calendar-query-input';
+import { toCalendarSettings } from '../hooks/useCalendarSettings';
+import {
+  buildCalendarRangeInput,
+  buildTimeblockListInput,
+  DEFAULT_SHOW_WEEKENDS,
+  DEFAULT_WEEK_STARTS_ON,
+} from './calendar-query-input';
 import { calculateViewDateRange } from './view-range';
 
 describe('buildCalendarRangeInput', () => {
@@ -136,12 +143,9 @@ describe('buildTimeblockListInput', () => {
 });
 
 describe('既定値の server / client 一致', () => {
-  it('row の無い user の既定値が client の fallback と同じ', async () => {
-    const { DEFAULT_SHOW_WEEKENDS, DEFAULT_WEEK_STARTS_ON } =
-      await import('./calendar-query-input');
-    const { toUserPreferences } = await import('@/lib/hooks/useUserPreferences');
-    const { toCalendarSettings } = await import('../hooks/useCalendarSettings');
-
+  // client の fallback はテストで import するだけで、server 側（calendar-prefetch.ts）は
+  // 'use client' module を import できないため定数を共有している。値のずれをここで止める。
+  it('row の無い user の既定値が client の fallback と同じ', () => {
     expect(toUserPreferences(undefined).weekStartsOn).toBe(DEFAULT_WEEK_STARTS_ON);
     expect(toCalendarSettings(undefined).showWeekends).toBe(DEFAULT_SHOW_WEEKENDS);
   });
