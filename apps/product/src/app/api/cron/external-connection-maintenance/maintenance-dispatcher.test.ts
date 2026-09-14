@@ -173,6 +173,7 @@ describe('dispatchExternalConnectionMaintenance', () => {
 
     const summary = await dispatchExternalConnectionMaintenance({ deadlineAt: FAR_DEADLINE });
 
+    expect(summary.schemaUnavailable).toBe(true);
     expect(summary.complete).toBe(false);
     expect(summary.retention.due.authorizationCodes).toBe(true);
     // 未実装分は 0 件として記録する（例外にしない）。
@@ -294,7 +295,8 @@ describe('dispatchExternalConnectionMaintenance', () => {
     await expect(
       dispatchExternalConnectionMaintenance({ deadlineAt: FAR_DEADLINE }),
     ).resolves.toMatchObject({
-      complete: true,
+      complete: false,
+      schemaUnavailable: true,
       outbox: { claimed: 0, total: 0 },
       retention: {
         oauthAuthorizationCodesDeleted: 0,

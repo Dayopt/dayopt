@@ -7,7 +7,7 @@ import 'server-only';
  * docs/projects 全廃に伴い #2473 で削除。git 履歴参照）
  * に従い、実績系は `records`、予定系は `plans` を読む。
  *
- * 統計 procedure（`getActivityStats` / `getTagEstimationFactors`）はこのクラス経由で動く。
+ * 統計 procedure（`getActivityStats` / `getActivityEstimationFactors`）はこのクラス経由で動く。
  * PL/pgSQL の統計 RPC は呼ばれていない。呼び出し元の無かった分布・KPI・streak 系の
  * procedure は #2624 で削除した。
  *
@@ -36,10 +36,10 @@ export class StatisticsService {
   }
 
   /**
-   * 作成時フィードフォワード用のタグ別見積もり係数（直近 4 週の期間合計比、`n >= 3`）。
+   * 作成時フィードフォワード用のアクティビティ別見積もり係数（直近 4 週の期間合計比、`n >= 3`）。
    * 定義は `domain/activity-estimation-factor.ts` を参照。
    */
-  async getTagEstimationFactors(userId: string) {
-    return this.feedforwardService.getTagEstimationFactors(userId);
+  async getActivityEstimationFactors(userId: string) {
+    return this.feedforwardService.getActivityEstimationFactors(userId);
   }
 }

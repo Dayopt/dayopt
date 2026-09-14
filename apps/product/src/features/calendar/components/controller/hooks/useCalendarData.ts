@@ -2,8 +2,6 @@
 
 import { useCallback, useDeferredValue, useEffect, useMemo } from 'react';
 
-import { addDays, subDays } from 'date-fns';
-
 import { useActivities, useArchivedActivities } from '@/features/activities';
 import {
   useExternalCalendarEvents,
@@ -139,54 +137,7 @@ export function useCalendarData({
   // tRPC utils（プリフェッチ用）
   const utils = api.useUtils();
 
-  // 隣接期間のプリフェッチ（ナビゲーション高速化、viewType別に最適化）
-  useEffect(() => {
-    const prefetchRange = (date: Date, view: CalendarViewType = viewType) => {
-      const range = calculateViewDateRange(view, date, weekStartsOn, showWeekends);
-      const input = {
-        startDate: toTZStartISO(range.start, timezone),
-        endDate: toTZEndISO(range.end, timezone),
-        sortBy: 'start_at' as const,
-        sortOrder: 'asc' as const,
-      };
-      void Promise.all([
-        utils.plans.list.prefetch(input),
-        utils.records.list.prefetch(input),
-        // ghost も一緒に温める。載せないと日送りのたびに plan / record だけ即出て、
-        // 外部予定が後追いでポップインする。
-        utils.externalCalendar.listEvents.prefetch({
-          startDate: input.startDate,
-          endDate: input.endDate,
-        }),
-      ]);
-    };
-
-    if (viewType === 'day') {
-      // dayビュー: 前後3日を個別にprefetch（日送りでのキャッシュヒット率向上）
-      for (let i = 1; i <= 3; i++) {
-        prefetchRange(subDays(currentDate, i));
-        prefetchRange(addDays(currentDate, i));
-      }
-    } else if (isMultiDayView(viewType)) {
-      // multi-dayビュー: 前後1期間分をprefetch
-      prefetchRange(getPreviousPeriod(viewType, currentDate, showWeekends));
-      prefetchRange(getNextPeriod(viewType, currentDate, showWeekends));
-    } else {
-      // weekビュー: 前後1週間をprefetch
-      prefetchRange(subDays(currentDate, 7));
-      prefetchRange(addDays(currentDate, 7));
-    }
-  }, [
-    currentDate,
-    viewType,
-    weekStartsOn,
-    showWeekends,
-    timezone,
-    utils.records.list,
-    utils.plans.list,
-    utils.externalCalendar.listEvents,
-  ]);
-
+  // 未表示の期間は自動取得せず、ナビゲーション操作時に対象期間だけ先読みする。
   // 指定方向のナビゲーション先を事前取得（ホバー/タッチ時に呼ばれる）
   const prefetchDirection = useCallback(
     (direction: 'prev' | 'next' | 'today') => {
