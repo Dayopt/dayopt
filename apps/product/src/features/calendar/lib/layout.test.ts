@@ -125,8 +125,8 @@ describe('calculateTimeblockLayouts', () => {
     });
 
     const layouts = calculateTimeblockLayouts([unplannedGapRecord, planned]);
-    const plannedLayout = layouts.find((layout) => layout.entry.id === 'planned');
-    const recordLayout = layouts.find((layout) => layout.entry.id === 'gap-record');
+    const plannedLayout = layouts.find((layout) => layout.timeblock.id === 'planned');
+    const recordLayout = layouts.find((layout) => layout.timeblock.id === 'gap-record');
 
     expect(plannedLayout).toMatchObject({ column: 0, left: 0, width: 50, totalColumns: 2 });
     expect(recordLayout).toMatchObject({ column: 1, left: 50, width: 50, totalColumns: 2 });
@@ -178,8 +178,8 @@ describe('calculateTimeblockLayouts', () => {
     });
 
     const layouts = calculateTimeblockLayouts([unplanned, planned]);
-    const plannedLayout = layouts.find((layout) => layout.entry.id === 'planned');
-    const unplannedLayout = layouts.find((layout) => layout.entry.id === 'unplanned');
+    const plannedLayout = layouts.find((layout) => layout.timeblock.id === 'planned');
+    const unplannedLayout = layouts.find((layout) => layout.timeblock.id === 'unplanned');
 
     expect(plannedLayout).toMatchObject({ column: 0, left: 0, width: 50, totalColumns: 2 });
     expect(unplannedLayout).toMatchObject({ column: 1, left: 50, width: 50, totalColumns: 2 });
@@ -221,8 +221,8 @@ describe('calculateTimeblockLayouts', () => {
     // 後発エントリを先に渡しても、早い方がcolumn 0になるべき
     const layouts = calculateTimeblockLayouts([laterEntry, planned]);
 
-    const plannedLayout = layouts.find((l) => l.entry.id === 'planned');
-    const laterLayout = layouts.find((l) => l.entry.id === 'later-entry');
+    const plannedLayout = layouts.find((l) => l.timeblock.id === 'planned');
+    const laterLayout = layouts.find((l) => l.timeblock.id === 'later-entry');
 
     expect(plannedLayout!.column).toBe(1);
     expect(laterLayout!.column).toBe(0);
@@ -255,8 +255,8 @@ describe('findOverlapGroups', () => {
     const groups = findOverlapGroups(entries);
 
     expect(groups).toHaveLength(2);
-    expect(groups[0]!.entries).toHaveLength(2);
-    expect(groups[1]!.entries).toHaveLength(1);
+    expect(groups[0]!.timeblocks).toHaveLength(2);
+    expect(groups[1]!.timeblocks).toHaveLength(1);
   });
 });
 
@@ -405,7 +405,7 @@ describe('calculateTimeblockPosition', () => {
       start: new Date('2026-01-15T10:00:00'),
       end: new Date('2026-01-15T11:00:00'),
     });
-    const column = { entries: [], columnIndex: 0, totalColumns: 1 };
+    const column = { timeblocks: [], columnIndex: 0, totalColumns: 1 };
     const pos = calculateTimeblockPosition(entry, column, 72);
 
     expect(pos.top).toBe(720); // 10 * 72
@@ -419,7 +419,7 @@ describe('calculateTimeblockPosition', () => {
       start: new Date('2026-01-15T10:00:00'),
       end: new Date('2026-01-15T10:05:00'), // 5分 = 6px
     });
-    const column = { entries: [], columnIndex: 0, totalColumns: 1 };
+    const column = { timeblocks: [], columnIndex: 0, totalColumns: 1 };
     const pos = calculateTimeblockPosition(entry, column, 72);
 
     expect(pos.height).toBe(14);
@@ -430,7 +430,7 @@ describe('calculateTimeblockPosition', () => {
       start: new Date('2026-01-15T10:00:00'),
       end: new Date('2026-01-15T11:00:00'),
     });
-    const column = { entries: [], columnIndex: 1, totalColumns: 2 };
+    const column = { timeblocks: [], columnIndex: 1, totalColumns: 2 };
     const pos = calculateTimeblockPosition(entry, column, 72);
 
     expect(pos.left).toBe(50);

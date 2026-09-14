@@ -87,18 +87,18 @@ export function useViewTimeblocks({
   const timeblockPositions = useMemo((): TimeblockPosition[] => {
     return timeblockLayouts.map((layout: TimeblockLayout, index: number) => {
       const { top, height } = layoutEntryToVerticalPosition(
-        new Date(layout.entry.start),
-        new Date(layout.entry.end),
+        new Date(layout.timeblock.start),
+        new Date(layout.timeblock.end),
         hourHeight,
       );
 
       return {
-        plan: layout.entry as CalendarDisplayEvent,
+        plan: layout.timeblock as CalendarDisplayEvent,
         top,
         height,
         left: layout.left,
         width: layout.width,
-        zIndex: getTimeblockStackIndex(layout.entry as CalendarDisplayEvent, index),
+        zIndex: getTimeblockStackIndex(layout.timeblock as CalendarDisplayEvent, index),
         column: layout.column,
         totalColumns: layout.totalColumns,
         opacity: layout.totalColumns > 1 ? 0.95 : 1.0,

@@ -3,6 +3,8 @@ import { spawnSync } from 'node:child_process';
 import { createClient } from '@supabase/supabase-js';
 import { afterEach, describe, expect, it } from 'vitest';
 
+import { listDueConnections } from '@/features/external-calendar/server/sync-dispatcher';
+import { SYNC_PAUSE_FAILURE_THRESHOLD } from '@/features/external-calendar/server/sync-schedule';
 import type { Database } from '@/lib/database';
 
 /**
@@ -307,6 +309,109 @@ WHERE user_id = :'user_id'::UUID;`,
       { connection_id: connectionId },
     );
     expect(lastSyncError).toBe('partial_timeout');
+  });
+
+  // #2687: 恒久的に失敗する接続は「最終同期」が新しく見えないようにし、閾値で cron の due から外す。
+  it('1 カレンダーも保存しなかった run は last_synced_at を据え置いて連続失敗数を積み、閾値で due から外れ、保存した run で戻る', async () => {
+    const { authorityFenceId, authorityEpoch } = setupConnection();
+    const lastSuccessAt = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+    ownerSql(
+      `UPDATE public.calendar_connections SET last_synced_at = :'last_synced_at'::TIMESTAMPTZ
+WHERE id = :'connection_id'::UUID;`,
+      { connection_id: connectionId, last_synced_at: lastSuccessAt },
+    );
+
+    async function runOnce(options: { persistCalendar: boolean }) {
+      const { data: beginRows, error: beginError } = await admin.rpc('begin_calendar_sync_run_v1', {
+        p_project_key: projectKey,
+        p_user_id: userId,
+        p_connection_id: connectionId,
+      });
+      expect(beginError).toBeNull();
+      const begin = beginRows![0]!;
+      expect(begin.result).toBe('started');
+      if (options.persistCalendar) {
+        const { data: persistResult, error: persistError } = await admin.rpc(
+          'persist_calendar_sync_result_command_v1',
+          {
+            p_project_key: projectKey,
+            p_user_id: userId,
+            p_connection_id: connectionId,
+            p_expected_generation: begin.data_generation,
+            p_expected_authority_fence_id: authorityFenceId,
+            p_expected_authority_epoch: authorityEpoch,
+            p_expected_sync_sequence: begin.sync_sequence,
+            p_calendar_selection_id: calendarSelectionId,
+            p_provider_calendar_id: 'primary',
+            p_run_started_at: begin.run_started_at,
+            p_events: [],
+            p_tombstone_event_ids: [],
+            p_used_full_sync: false,
+            p_next_cursor: 'next-token',
+          },
+        );
+        expect(persistError).toBeNull();
+        expect(persistResult).toBe('persisted');
+      }
+      const { data: finishResult, error: finishError } = await admin.rpc(
+        'finish_calendar_sync_run_v1',
+        {
+          p_project_key: projectKey,
+          p_user_id: userId,
+          p_connection_id: connectionId,
+          p_expected_generation: begin.data_generation,
+          p_expected_authority_fence_id: authorityFenceId,
+          p_expected_authority_epoch: authorityEpoch,
+          p_expected_sync_sequence: begin.sync_sequence,
+          p_run_started_at: begin.run_started_at,
+          p_last_sync_error: 'partial_failure',
+          p_prune_window: false,
+          p_not_before: null,
+          p_not_after: null,
+        },
+      );
+      expect(finishError).toBeNull();
+      expect(finishResult).toBe('finished');
+      return begin.run_started_at;
+    }
+
+    function connectionState(): { lastSyncedAt: number; consecutiveFailures: number } {
+      const [lastSyncedAt, consecutiveFailures] = ownerSql(
+        `SELECT FLOOR(EXTRACT(EPOCH FROM last_synced_at) * 1000)::BIGINT || '|' || consecutive_failures
+FROM public.calendar_connections WHERE id = :'connection_id'::UUID;`,
+        { connection_id: connectionId },
+      ).split('|');
+      return {
+        lastSyncedAt: Number(lastSyncedAt),
+        consecutiveFailures: Number(consecutiveFailures),
+      };
+    }
+
+    async function isDue(now: Date): Promise<boolean> {
+      const due = await listDueConnections(admin, now);
+      return due.some((connection) => connection.id === connectionId);
+    }
+
+    for (let failure = 1; failure <= SYNC_PAUSE_FAILURE_THRESHOLD; failure += 1) {
+      expect(await isDue(new Date())).toBe(true);
+      await runOnce({ persistCalendar: false });
+      expect(connectionState()).toEqual({
+        lastSyncedAt: Date.parse(lastSuccessAt),
+        consecutiveFailures: failure,
+      });
+    }
+
+    // 閾値に達したら通常の cron では拾わない
+    expect(await isDue(new Date())).toBe(false);
+    // 前回の書き込みから 1 時間経てば再試行の対象に戻る（provider / DB 障害からの自然復帰）
+    expect(await isDue(new Date(Date.now() + 61 * 60 * 1000))).toBe(true);
+
+    // エラー付きでも、カレンダーを 1 つ保存した run は前進として最終同期が進み、数は 0 に戻る
+    const progressedAt = await runOnce({ persistCalendar: true });
+    expect(connectionState()).toEqual({
+      lastSyncedAt: Date.parse(progressedAt),
+      consecutiveFailures: 0,
+    });
   });
 
   // #2289: begin_calendar_sync_run_v1 は service_role にしか EXECUTE 権限が無い

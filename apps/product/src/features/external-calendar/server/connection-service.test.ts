@@ -63,6 +63,7 @@ import {
   listProviderCalendars,
   reconnectExistingConnection,
   revokeOrphanedGrant,
+  saveConnection,
   updateSelectedCalendars,
 } from './connection-service';
 
@@ -238,6 +239,27 @@ describe('reconnect contract', () => {
     );
   });
 
+  it('接続の保存は連続失敗数を 0 に戻す（#2687）', async () => {
+    const { calls } = setupServiceRoleDb({});
+
+    await saveConnection({
+      userId: USER_ID,
+      providerAccountId: 'google-sub-123',
+      providerAccountEmail: 'user@example.com',
+      grantedScopes: ['calendar.readonly'],
+      refreshToken: 'new-refresh-token',
+      encryptionKey: 'encryption-key',
+    });
+
+    const upsert = findWith(calls, 'calendar_connections', 'upsert');
+    if (!upsert) throw new Error('connection upsert not found');
+    expect(argsOf(upsert, 'upsert')[0]).toMatchObject({
+      status: 'active',
+      last_sync_error: null,
+      consecutive_failures: 0,
+    });
+  });
+
   it('再接続は安定 sub を含む条件付き UPDATE だけを実行する', async () => {
     const { calls } = setupServiceRoleDb({ reconnectUpdate: { id: CONNECTION_ID } });
 
@@ -261,6 +283,7 @@ describe('reconnect contract', () => {
       refresh_token_enc: 'enc',
       status: 'active',
       last_sync_error: null,
+      consecutive_failures: 0,
     });
     expect(
       update.chain.filter((entry) => entry.method === 'eq').map((entry) => entry.args),

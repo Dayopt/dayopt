@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Dayopt で作業する全エージェントの provider-neutral な正本ガイダンス。OpenAI / Codex を primary harness とし、他 provider でも同じ判断層と不変条件を使う。毎セッション読み込まれる唯一のファイルとして ~200 行に圧縮し、特定作業でだけ要る手順は `.agents/skills/*/SKILL.md` を参照する（末尾の Skills 索引）。機械が強制しているルール（lint / typecheck / CI / hooks）の説明は極力書かない — 機械の判定結果そのものが正であり、prose の重複は陳腐化する。
+Dayopt で作業する全エージェントの provider-neutral な正本ガイダンス。通常開発は ChatGPT Chat + Codex を使い、他 provider の互換 adapter でも同じ判断層と不変条件を読む。毎セッションの入口はこのファイルとし、特定作業だけの手順は `.agents/skills/*/SKILL.md` を参照する（末尾の Skills 索引）。~200 行は予算であり、行数だけを理由に不変条件を削らない。
 
 ## レビュー規則
 
@@ -88,7 +88,7 @@ Dayopt で作業する全エージェントの provider-neutral な正本ガイ�
 - 既存の未コミット差分はユーザー作業として扱い、勝手に revert / stage しない
 - env ファイルの読み書き境界は `docs/operations/secrets.md` に従う。`.op-env.agent`/`.op-env.human` は触ってよいが、実値が入りうる `.env`/`.env.local` は読みも書きもしない
 - `git add .` は避ける。path-limited add で scope を固定する。コミット前に `git diff --cached` を確認する
-- コード変更後は `pnpm typecheck` / `pnpm lint` / `pnpm lint:boundaries` を通す
+- 作業中は変更を証明する対象の検証を優先する。小さく可逆な変更で毎回全体検査を重ねない。挙動変更は対象 test / E2E / Storybook 等、高リスク変更は専用契約を満たす。ready 化前の `pnpm check` と pre-push は維持し、同じ差分・環境で通った検査は新しい根拠なく繰り返さない
 - コミットメッセージは日本語 Conventional Commits（Latin大文字語で始めると`subject-case`で弾かれる）
 - 型: 具体的な型を使う。union の variance には `as never`（`as any` 禁止）。`unknown` は型ガードと併用のみ
 - Export: named export。App Router 特殊ファイル（page/layout/loading等）のみ `export default`
@@ -141,15 +141,16 @@ worktree で作業するセッション（レーン）は次を守る:
 - **止まる前に連絡**する。質問・ブロック・想定外・判断待ちが発生したら、待ち状態に入る前に (1) 何で止まっているか (2) 自分の推奨 (3) 待ち中に続行できる代替作業の有無、の3点で担当issue/PRへコメントする。黙って停止しない
 - **停止条件**: 同種のエラーに3回連続で失敗した／scope外のファイルを変更しないと解決できないと判明した／チケットが前提とする原因・機構が実測と食い違うと分かった、のいずれかに当たったら試行を続けず停止して報告する。エスカレーションは失敗ではなく正しい動作
 - **検証の証跡原則**: 検証主張には実行コマンドと出力の要点を添える。「passした」だけの報告は不可
-- **push前セルフレビューはriskに比例させる**: 自動委任条件カテゴリ（auth/RLS/billing/migration/公開契約/cross-feature等、正本は `pr-cross-review` skill 手順2の表）に触れるdiffと既存パターン追従でない新規ロジックは、push前に敵対的セルフレビューを行い生出力を報告へ添付する（#2374）。typo・docs・パターン追従は機械検証（`pnpm check` + pre-pushフック）のみでよい
+- **push前セルフレビューはriskに比例させる**: auth/RLS/billing/migration/公開契約/cross-feature 等の diff と既存パターン追従でない新規ロジックは、push前に敵対的セルフレビューを行い根拠を報告する。これは reviewer の自動委任条件ではない。通常 PR の独立レビューは GitHub の `@codex review`、高リスク変更の追加契約は `pr-cross-review` skill を参照する
 - issue/PRコメントが内容の正本。1 worktree = 1 branch = 1 PR、役目を終えたworktreeはその場で削除する
 
 ## 委任・報告の作法
 
+- **主担当は1つ**。原則として同じ Codex session が調査・判断・実装・検証・修正まで完了する。工程だけを理由に agent / model を切り替えない。目的は必要な品質を少ない総利用量・手戻り・人間介入で達成すること
 - **最初に成功条件を固定する**。ユーザーが確認できる結果、対象範囲、検証方法を先に書き、手段や model 選択を目的化しない
 - **事実と仮説を分ける**。repo / docs / issue / 実行結果で確認した事実には証拠を添え、未実測の原因や効果は仮説として明記する。安く確認できる仮説は作業前に検証する
 - **決定的な道具を先に使う**。検索・git history・diff・typecheck・lint・test・JSON 変換・CI 取得は、まず既存 script / CLI で閉じられないか探す。LLM や外部連携を使う時も、必要な瞬間だけ最小の context・権限・経路を渡す（`routing` / `mcp-usage` skill）
-- **委譲は採算が合う時だけ行う**。独立して進められ、scope と出力を検証でき、context 引き渡しと統合の費用を上回る時に限る。小さく一体な作業は担当 agent がそのまま完了してよい
+- **委譲は採算が合う時だけ行う**。既定は単独完遂。初期の委譲対象は独立した read-only の大量調査に限り、引き渡し・待ち・親による照合を含めて便益を判断する。判断と重要な編集は主担当が持つ。専用 security harness の独立レビュー契約は別途維持する
 - **委譲契約**: 成功条件、触ってよい path、既知の制約、期待する証拠、検証コマンド、外部 state を変更してよいかを明記する。write 可能な委譲は同一 worktree・非重複 scope に限定し、commit / push / external mutation は明示的に委ねられた場合だけ行う
 - **判断では意味のある選択肢を比較する**。差が実際の挙動・リスク・可逆性に影響する選択肢だけを並べ、推奨と最悪の failure mode を添える。複数の判断は 1 回に束ねる
 - **出力ではなく outcome を検証する**。diff、コマンド出力、実際の UI / API / data flow を成功条件と突き合わせ、subagent や tool の「passed」という申告だけで完了にしない
@@ -177,7 +178,7 @@ worktree で作業するセッション（レーン）は次を守る:
 | `optimistic-update`    | tRPC mutation の楽観的更新                                                       |
 | `security`             | 認証/認可・RLS・外部入力を受けるフォーム                                         |
 | `test`                 | 新機能・バグ修正後のテスト                                                       |
-| `pr-cross-review`      | merge前クロスレビュー（旧risk-reviewer/behavior-verifier観点を統合）             |
+| `pr-cross-review`      | GitHub の独立 PR レビューと高リスク変更の追加契約                                |
 | `security-sweep`       | 1 SHA の scope を読む security 調査（候補・反証・実行証拠を機械検査）            |
 | `docs-writing`         | ユーザー向けdocs・リリースノート・技術ドキュメント                               |
 | `docs-audit`           | 公開docsの監査                                                                   |

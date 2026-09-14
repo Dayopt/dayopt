@@ -7,9 +7,11 @@ description: Sentry / Supabase(local・cloud) / Context7 / Eagle / Storybook / U
 
 モデルによってはツール呼び出しが控えめになる傾向がある。モデルによらず、以下の場面では積極的に MCP を呼ぶこと。推測より確認を優先する。
 
-MCP サーバーの定義は **global 設定に一本化する**（`~/.claude.json` の user scope `mcpServers`）。**repo 側に MCP 定義を置かない**。repo と global の両方に同名サーバーがあるとキー単位でマージされ、方式が食い違うと壊れる。
+通常は現在の runtime が公開する connector / MCP / CLI を使い、必要な capability が既に利用可能か先に確認する。**repo 側に MCP 定義や認証情報を置かない**。個人設定の追加・削除は利用判断とは別の明示依頼として扱う。
 
-全 9 サーバーの登録内容。新しいマシンではこの表を元に global へ登録する:
+下記の登録表と `claude mcp` コマンドは **Claude Code の互換 adapter 例**であり、Codex の通常経路の前提ではない。Claude Code で登録する場合は `~/.claude.json` の user scope に一本化し、repo と同名定義を二重管理しない。別 runtime では同じ capability・scope・認証境界を満たす既存の連携を使う。設定ファイルの存在だけで利用可能・read-only と判断せず、公開toolと実際の権限を確認する。
+
+Claude Code 互換の9サーバーの登録例:
 
 | Server                    | 種別                 | 登録内容                                                                                                                                                                                                                                                             |
 | ------------------------- | -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -203,7 +205,7 @@ MCP の tool set には `buy_domain` / `buy_pro` / `buy_credits` / `pause_projec
 
 ### MCP を持たない経路
 
-GitHub は `gh` CLI が正（`--json` + `--jq` で射影、横断集計も足りる）。ブラウザ操作は Claude Code 組み込みの Browser tool が正。この 2 つは MCP へ戻さない。
+GitHub は `gh` CLI を使う（`--json` + `--jq` で必要な情報へ絞る）。通常のブラウザ操作は現在の runtime のブラウザ機能を使う。Claude Code の Browser tool は互換経路であり必須ではない。browser-only の専用プローブは `usability-probe` の別契約に従う。
 
 ### UptimeRobot (`mcp__uptimerobot__*`)
 
