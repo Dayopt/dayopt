@@ -8,12 +8,16 @@ import {
   type ExternalCalendarEvent,
 } from '@/features/external-calendar';
 import { getDateKey } from '@/lib/date';
-import { toTZEndISO, toTZStartISO, tzIsSameDay } from '@/lib/date/timezone';
+import { tzIsSameDay } from '@/lib/date/timezone';
 import { useUserPreferences } from '@/lib/hooks/useUserPreferences';
 import { api } from '@/lib/trpc';
 
 import { useCalendarFilterStore } from '@/features/calendar/stores/useCalendarFilterStore';
 
+import {
+  buildCalendarRangeInput,
+  buildTimeblockListInput,
+} from '../../../domain/calendar-query-input';
 import {
   calculateViewDateRange,
   getNextPeriod,
@@ -77,27 +81,22 @@ export function useCalendarData({
     return calculateViewDateRange(viewType, currentDate, weekStartsOn, showWeekends);
   }, [viewType, currentDate, weekStartsOn, showWeekends]);
 
-  // 日付範囲をISO 8601形式に変換（サーバーサイドフィルタ用）
-  // toISOString()はTZ依存のためユーザーTZのローカル深夜をUTC ISOに変換して使用
+  // query input は server prefetch（calendar-prefetch.ts）と同じ builder で組む。
+  // 別実装にすると query key がずれ、server で先読みした cache を初回表示で使えない（#2747）。
+  const anchorDateKey = getDateKey(currentDate);
+  const listInput = useMemo(
+    () =>
+      buildTimeblockListInput({ viewType, anchorDateKey, timezone, weekStartsOn, showWeekends }),
+    [viewType, anchorDateKey, timezone, weekStartsOn, showWeekends],
+  );
   const dateFilter = useMemo(
-    () => ({
-      startDate: toTZStartISO(viewDateRange.start, timezone),
-      endDate: toTZEndISO(viewDateRange.end, timezone),
-    }),
-    [viewDateRange, timezone],
+    () => ({ startDate: listInput.startDate, endDate: listInput.endDate }),
+    [listInput],
   );
 
   // Step 8: entries を読まず、plans / records をそれぞれ取得する。
-  const plansQuery = api.plans.list.useQuery({
-    ...dateFilter,
-    sortBy: 'start_at',
-    sortOrder: 'asc',
-  });
-  const recordsQuery = api.records.list.useQuery({
-    ...dateFilter,
-    sortBy: 'start_at',
-    sortOrder: 'asc',
-  });
+  const plansQuery = api.plans.list.useQuery(listInput);
+  const recordsQuery = api.records.list.useQuery(listInput);
 
   // 外部カレンダーの ghost（#1962）。接続の有無を先に確かめると waterfall になるので、
   // enabled ゲートは置かず plans / records と同じ範囲で常に撃つ。未接続なら即 0 件が返る。
@@ -137,6 +136,20 @@ export function useCalendarData({
   // tRPC utils（プリフェッチ用）
   const utils = api.useUtils();
 
+  const prefetchRange = useCallback(
+    (options: Parameters<typeof buildTimeblockListInput>[0]) => {
+      const input = buildTimeblockListInput(options);
+      void Promise.all([
+        utils.plans.list.prefetch(input),
+        utils.records.list.prefetch(input),
+        // ghost も一緒に温める。載せないと日送りのたびに plan / record だけ即出て、
+        // 外部予定が後追いでポップインする。
+        utils.externalCalendar.listEvents.prefetch(buildCalendarRangeInput(options)),
+      ]);
+    },
+    [utils.records.list, utils.plans.list, utils.externalCalendar.listEvents],
+  );
+
   // 未表示の期間は自動取得せず、ナビゲーション操作時に対象期間だけ先読みする。
   // 指定方向のナビゲーション先を事前取得（ホバー/タッチ時に呼ばれる）
   const prefetchDirection = useCallback(
@@ -165,66 +178,29 @@ export function useCalendarData({
         }
       }
 
-      const range = calculateViewDateRange(viewType, targetDate, weekStartsOn, showWeekends);
-      const input = {
-        startDate: toTZStartISO(range.start, timezone),
-        endDate: toTZEndISO(range.end, timezone),
-        sortBy: 'start_at' as const,
-        sortOrder: 'asc' as const,
-      };
-      void Promise.all([
-        utils.plans.list.prefetch(input),
-        utils.records.list.prefetch(input),
-        // ghost も一緒に温める。載せないと日送りのたびに plan / record だけ即出て、
-        // 外部予定が後追いでポップインする。
-        utils.externalCalendar.listEvents.prefetch({
-          startDate: input.startDate,
-          endDate: input.endDate,
-        }),
-      ]);
+      prefetchRange({
+        viewType,
+        anchorDateKey: getDateKey(targetDate),
+        timezone,
+        weekStartsOn,
+        showWeekends,
+      });
     },
-    [
-      currentDate,
-      viewType,
-      weekStartsOn,
-      showWeekends,
-      timezone,
-      utils.records.list,
-      utils.plans.list,
-      utils.externalCalendar.listEvents,
-    ],
+    [prefetchRange, currentDate, viewType, weekStartsOn, showWeekends, timezone],
   );
 
   // ビュー切り替え先の日付範囲を即座にprefetch（useEffect経由の1レンダー遅延を回避）
   const prefetchForView = useCallback(
     (newViewType: CalendarViewType) => {
-      const range = calculateViewDateRange(newViewType, currentDate, weekStartsOn, showWeekends);
-      const input = {
-        startDate: toTZStartISO(range.start, timezone),
-        endDate: toTZEndISO(range.end, timezone),
-        sortBy: 'start_at' as const,
-        sortOrder: 'asc' as const,
-      };
-      void Promise.all([
-        utils.plans.list.prefetch(input),
-        utils.records.list.prefetch(input),
-        // ghost も一緒に温める。載せないと日送りのたびに plan / record だけ即出て、
-        // 外部予定が後追いでポップインする。
-        utils.externalCalendar.listEvents.prefetch({
-          startDate: input.startDate,
-          endDate: input.endDate,
-        }),
-      ]);
+      prefetchRange({
+        viewType: newViewType,
+        anchorDateKey,
+        timezone,
+        weekStartsOn,
+        showWeekends,
+      });
     },
-    [
-      currentDate,
-      weekStartsOn,
-      showWeekends,
-      timezone,
-      utils.records.list,
-      utils.plans.list,
-      utils.externalCalendar.listEvents,
-    ],
+    [prefetchRange, anchorDateKey, weekStartsOn, showWeekends, timezone],
   );
 
   // フィルター関数と状態を取得（ストアに統一）

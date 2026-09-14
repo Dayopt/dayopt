@@ -1,17 +1,9 @@
 import { getTranslations } from 'next-intl/server';
 
 import type { CalendarViewType, MultiDayViewType } from '@/features/calendar';
-import { parseCalendarDateParam } from '@/features/calendar';
 import { isReportGranularity, type ReportGranularity } from '@/features/review';
 import { isValidCalendarViewToken } from '@/lib/calendar-view-tokens';
 import type { Locale } from '@dayopt/i18n/routing';
-
-/**
- * searchParams から日付を解析する
- */
-export function parseDateParam(date: string | undefined): Date | undefined {
-  return parseCalendarDateParam(date);
-}
 
 /** URL segmentをサポート対象のmulti-day view（2day〜7day）として解析する。 */
 export function parseMultiDayViewParam(nday: string): MultiDayViewType | null {
