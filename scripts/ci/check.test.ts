@@ -4,6 +4,7 @@ import {
   fetchPrFilenames,
   fetchPrFilesFromGit,
   fetchPrFilesWithStatus,
+  formatMigrationSafetyOutput,
   resolveDiffBase,
   runMcpConformance,
   runMigrationSafety,
@@ -142,26 +143,20 @@ describe('fetchPrFilesWithStatus', () => {
 
 describe('runMigrationSafety', () => {
   const fetchOk = (entries: { filename: string; status: string }[]) => vi.fn(() => entries);
-  const noopSpawn = () => ({ status: 0 });
 
-  it('destructive な変更が無ければ通知せず終了する', async () => {
-    const execFileImpl = vi.fn();
-    const spawnImpl = vi.fn(noopSpawn);
+  it('destructive な変更が無ければ通知不要として終了する', async () => {
     const writeStepSummaryImpl = vi.fn(async () => {});
     const result = await runMigrationSafety({
       repo: 'Dayopt/dayopt',
       prNumber: 1,
       fetchFilesImpl: fetchOk([]),
-      execFileImpl,
-      spawnImpl,
       writeStepSummaryImpl,
     });
-    expect(result.notified).toBe(false);
-    expect(spawnImpl).not.toHaveBeenCalled();
+    expect(result.notify).toBe(false);
     expect(writeStepSummaryImpl).toHaveBeenCalledOnce();
   });
 
-  // 回帰固定: runTest() は write 権限つき GH_TOKEN を process.env から外したうえで
+  // 回帰固定: runUnit() は GH_TOKEN を process.env から外したうえで
   // token を含む env を runMigrationSafety へ渡す。その env をファイル一覧取得の
   // gh 呼び出しへ転送し忘れると、gh が「GH_TOKEN を設定してください」で失敗し
   // Unit Tests job ごと落ちる（PR #2484 の実障害。run 33181021085）。
@@ -172,8 +167,6 @@ describe('runMigrationSafety', () => {
       repo: 'Dayopt/dayopt',
       prNumber: 1,
       fetchFilesImpl,
-      execFileImpl: vi.fn(),
-      spawnImpl: vi.fn(noopSpawn),
       writeStepSummaryImpl: vi.fn(async () => {}),
       env,
     });
@@ -187,7 +180,6 @@ describe('runMigrationSafety', () => {
     const fetchFilesImpl = vi.fn(() => {
       throw new Error('gh api failed: 503');
     });
-    const spawnImpl = vi.fn(noopSpawn);
     const summaries: string[] = [];
     const writeStepSummaryImpl = vi.fn(async (markdown: string) => {
       summaries.push(markdown);
@@ -196,8 +188,6 @@ describe('runMigrationSafety', () => {
       repo: 'Dayopt/dayopt',
       prNumber: 1,
       fetchFilesImpl,
-      execFileImpl: vi.fn(),
-      spawnImpl,
       writeStepSummaryImpl,
       gitFallbackImpl: vi.fn(() => null),
       sleepImpl: vi.fn(async () => {}),
@@ -205,12 +195,12 @@ describe('runMigrationSafety', () => {
     expect(fetchFilesImpl).toHaveBeenCalledTimes(2); // 1 回だけ再試行
     expect(result).toEqual({
       results: [],
-      notified: false,
+      notify: false,
+      summary: '',
       skipped: true,
       coupled: false,
       undeterminable: true,
     });
-    expect(spawnImpl).not.toHaveBeenCalled();
     expect(summaries[0]).toContain('判定ができません');
     expect(summaries[0]).toContain('gh api failed: 503');
   });
@@ -225,8 +215,6 @@ describe('runMigrationSafety', () => {
       prNumber: 1,
       fetchFilesImpl,
       readFileImpl: vi.fn(() => 'REVOKE ALL ON TABLE public.plans FROM authenticated;'),
-      execFileImpl: vi.fn(() => 'false'),
-      spawnImpl: vi.fn(noopSpawn),
       writeStepSummaryImpl: vi.fn(async (markdown: string) => {
         summaries.push(markdown);
       }),
@@ -253,8 +241,6 @@ describe('runMigrationSafety', () => {
       repo: 'Dayopt/dayopt',
       prNumber: 1,
       fetchFilesImpl,
-      execFileImpl: vi.fn(),
-      spawnImpl: vi.fn(noopSpawn),
       writeStepSummaryImpl: vi.fn(async () => {}),
       gitFallbackImpl,
       sleepImpl: vi.fn(async () => {}),
@@ -264,97 +250,27 @@ describe('runMigrationSafety', () => {
     expect(result.undeterminable).toBeUndefined();
   });
 
-  it('destructive な変更を検知したら comment 投稿→ラベル付与の順で通知する', async () => {
-    const readFileImpl = vi.fn(() => 'DROP TABLE foo;');
-    const execFileImpl = vi.fn(() => 'false'); // has_label=false
-    const calls: string[][] = [];
-    const spawnImpl = vi.fn((_cmd: string, args: string[]) => {
-      calls.push(args);
-      return { status: 0 };
-    });
+  // 通知（ラベル + コメント）は ci.yml の migration-notice job が行う（credential audit P2-6）。
+  // この関数は通知が要るかと本文だけを返し、write 系の gh を呼ぶ注入点自体を持たない。
+  // 通知の順序・再通知抑止・fork PR の fail open は scripts/__tests__/ci-token-isolation.test.ts
+  // が migration-notice job の run script を偽 gh で実行して固定する。
+  it('destructive な変更を検知したら notify: true と Step Summary と同じ本文を返す', async () => {
+    const summaries: string[] = [];
     const result = await runMigrationSafety({
       repo: 'Dayopt/dayopt',
       prNumber: 7,
       fetchFilesImpl: fetchOk([
         { filename: 'supabase/migrations/20260101_x.sql', status: 'added' },
       ]),
-      readFileImpl,
-      execFileImpl,
-      spawnImpl,
-      writeStepSummaryImpl: vi.fn(async () => {}),
+      readFileImpl: vi.fn(() => 'DROP TABLE foo;'),
+      writeStepSummaryImpl: vi.fn(async (markdown: string) => {
+        summaries.push(markdown);
+      }),
     });
-    expect(result.notified).toBe(true);
+    expect(result.notify).toBe(true);
     expect(result.results).toHaveLength(1);
-    // label create → comment → label 付与の順で呼ばれる
-    expect(calls[0]).toEqual(expect.arrayContaining(['label', 'create']));
-    expect(calls[1]).toEqual(expect.arrayContaining(['pr', 'comment']));
-    expect(calls[2]).toEqual(expect.arrayContaining(['api', '--method', 'POST']));
-  });
-
-  it('既にラベルが付いていれば round ごとに再通知しない', async () => {
-    const execFileImpl = vi.fn(() => 'true'); // has_label=true
-    const spawnImpl = vi.fn(noopSpawn);
-    const result = await runMigrationSafety({
-      repo: 'Dayopt/dayopt',
-      prNumber: 7,
-      fetchFilesImpl: fetchOk([
-        { filename: 'supabase/migrations/20260101_x.sql', status: 'added' },
-      ]),
-      readFileImpl: vi.fn(() => 'DROP TABLE foo;'),
-      execFileImpl,
-      spawnImpl,
-      writeStepSummaryImpl: vi.fn(async () => {}),
-    });
-    expect(result.notified).toBe(false);
-    expect(spawnImpl).not.toHaveBeenCalled();
-  });
-
-  it('ラベル存在確認の gh api が失敗しても fail open で通知を試みる', async () => {
-    const execFileImpl = vi.fn(() => {
-      throw new Error('gh api rate limited');
-    });
-    const calls: string[][] = [];
-    const spawnImpl = vi.fn((_cmd: string, args: string[]) => {
-      calls.push(args);
-      return { status: 0 };
-    });
-    const result = await runMigrationSafety({
-      repo: 'Dayopt/dayopt',
-      prNumber: 7,
-      fetchFilesImpl: fetchOk([
-        { filename: 'supabase/migrations/20260101_x.sql', status: 'added' },
-      ]),
-      readFileImpl: vi.fn(() => 'TRUNCATE foo;'),
-      execFileImpl,
-      spawnImpl,
-      writeStepSummaryImpl: vi.fn(async () => {}),
-    });
-    expect(result.notified).toBe(true);
-    expect(calls.some((c) => c.includes('comment'))).toBe(true);
-  });
-
-  it('コメント投稿が失敗（fork PR の read-only token 等）したらラベルは付与しない', async () => {
-    const execFileImpl = vi.fn(() => 'false');
-    const spawnImpl = vi.fn((_cmd: string, args: string[]) =>
-      args.includes('comment') ? { status: 1 } : { status: 0 },
-    );
-    const result = await runMigrationSafety({
-      repo: 'Dayopt/dayopt',
-      prNumber: 7,
-      fetchFilesImpl: fetchOk([
-        { filename: 'supabase/migrations/20260101_x.sql', status: 'added' },
-      ]),
-      readFileImpl: vi.fn(() => 'DROP TABLE foo;'),
-      execFileImpl,
-      spawnImpl,
-      writeStepSummaryImpl: vi.fn(async () => {}),
-    });
-    expect(result.notified).toBe(false);
-    // label create は行うが、POST（ラベル付与）は行わない
-    const postCalls = spawnImpl.mock.calls.filter(
-      (c) => Array.isArray(c[1]) && (c[1] as string[]).includes('POST'),
-    );
-    expect(postCalls).toHaveLength(0);
+    expect(result.summary).toBe(summaries[0]);
+    expect(result.summary).toContain('DROP TABLE');
   });
 
   it('読めないファイル（削除・rename）は空文字として扱い例外を投げない', async () => {
@@ -366,27 +282,49 @@ describe('runMigrationSafety', () => {
       prNumber: 7,
       fetchFilesImpl: fetchOk([{ filename: 'supabase/migrations/removed.sql', status: 'removed' }]),
       readFileImpl,
-      execFileImpl: vi.fn(),
-      spawnImpl: vi.fn(noopSpawn),
       writeStepSummaryImpl: vi.fn(async () => {}),
     });
-    expect(result.notified).toBe(false);
+    expect(result.notify).toBe(false);
     expect(result.results).toEqual([]);
   });
 });
 
+describe('formatMigrationSafetyOutput', () => {
+  const decode = (lines: string[]) => {
+    const b64 = lines.find((line) => line.startsWith('migration_comment_b64='))!.slice(22);
+    return Buffer.from(b64, 'base64').toString('utf8');
+  };
+
+  it('通知が要る時は true と、改行・delimiter 風の行を含む本文を 1 行の base64 で出す', () => {
+    const summary =
+      '## Migration safety\n\nEOF\nmigration_destructive=false\n日本語 `DROP TABLE`\n';
+    const lines = formatMigrationSafetyOutput({ notify: true, summary });
+
+    expect(lines).toHaveLength(2);
+    expect(lines[0]).toBe('migration_destructive=true');
+    expect(lines[1]).toMatch(/^migration_comment_b64=[A-Za-z0-9+/]+={0,2}$/);
+    expect(decode(lines)).toBe(summary);
+  });
+
+  it.each([
+    [{ notify: false, summary: '## Migration safety' }],
+    [{ notify: true }],
+    [{ notify: 'true', summary: 'x' }],
+    [undefined],
+  ])('通知不要・不完全な入力 %j は false と空本文', (safety) => {
+    expect(formatMigrationSafetyOutput(safety as never)).toEqual([
+      'migration_destructive=false',
+      'migration_comment_b64=',
+    ]);
+  });
+});
+
 describe('runMigrationSafety — coupled migration（#2680）', () => {
-  const noopSpawn = () => ({ status: 0 });
   const mfaLockdown =
     'REVOKE ALL ON TABLE public.mfa_recovery_codes FROM anon, authenticated;\nDROP POLICY "x" ON public.mfa_recovery_codes;';
 
-  it('縮小 migration と product runtime 変更が同一 PR なら coupled: true を返し、summary / comment に Coupled 節を足す', async () => {
+  it('縮小 migration と product runtime 変更が同一 PR なら coupled: true を返し、summary / comment 本文に Coupled 節を足す', async () => {
     const summaries: string[] = [];
-    const bodies: string[] = [];
-    const spawnImpl = vi.fn((_cmd: string, args: string[]) => {
-      if (args.includes('comment')) bodies.push(args[args.length - 1] as string);
-      return { status: 0 };
-    });
     const result = await runMigrationSafety({
       repo: 'Dayopt/dayopt',
       prNumber: 7,
@@ -398,8 +336,6 @@ describe('runMigrationSafety — coupled migration（#2680）', () => {
         },
       ]),
       readFileImpl: vi.fn(() => mfaLockdown),
-      execFileImpl: vi.fn(() => 'false'),
-      spawnImpl,
       writeStepSummaryImpl: vi.fn(async (markdown: string) => {
         summaries.push(markdown);
       }),
@@ -407,7 +343,8 @@ describe('runMigrationSafety — coupled migration（#2680）', () => {
     expect(result.coupled).toBe(true);
     expect(result.coupling?.narrowing.map((f) => f.kind)).toEqual(['REVOKE', 'DROP_POLICY']);
     expect(summaries[0]).toContain('Coupled migration');
-    expect(bodies[0]).toContain('Coupled migration');
+    expect(result.notify).toBe(true);
+    expect(result.summary).toContain('Coupled migration');
   });
 
   it('縮小 migration でも product runtime 変更が無ければ coupled: false（従来どおり fail open の通知のみ）', async () => {
@@ -424,8 +361,6 @@ describe('runMigrationSafety — coupled migration（#2680）', () => {
         { filename: 'docs/engineering/infra.md', status: 'modified' },
       ]),
       readFileImpl: vi.fn(() => mfaLockdown),
-      execFileImpl: vi.fn(() => 'false'),
-      spawnImpl: vi.fn(noopSpawn),
       writeStepSummaryImpl: vi.fn(async (markdown: string) => {
         summaries.push(markdown);
       }),
@@ -433,23 +368,6 @@ describe('runMigrationSafety — coupled migration（#2680）', () => {
     expect(result.coupled).toBe(false);
     expect(result.results).toHaveLength(1);
     expect(summaries[0]).not.toContain('Coupled migration');
-  });
-
-  it('既にラベルが付いていて再通知しない round でも coupled は返す（hard fail は毎 push）', async () => {
-    const result = await runMigrationSafety({
-      repo: 'Dayopt/dayopt',
-      prNumber: 7,
-      fetchFilesImpl: vi.fn(() => [
-        { filename: 'supabase/migrations/20260908060000_lock_down.sql', status: 'added' },
-        { filename: 'apps/product/src/a.ts', status: 'modified' },
-      ]),
-      readFileImpl: vi.fn(() => mfaLockdown),
-      execFileImpl: vi.fn(() => 'true'),
-      spawnImpl: vi.fn(noopSpawn),
-      writeStepSummaryImpl: vi.fn(async () => {}),
-    });
-    expect(result.notified).toBe(false);
-    expect(result.coupled).toBe(true);
   });
 
   it('destructive 無しなら coupled: false を返す', async () => {
@@ -461,8 +379,6 @@ describe('runMigrationSafety — coupled migration（#2680）', () => {
         { filename: 'apps/product/src/a.ts', status: 'modified' },
       ]),
       readFileImpl: vi.fn(() => 'CREATE TABLE public.widgets (id uuid primary key);'),
-      execFileImpl: vi.fn(),
-      spawnImpl: vi.fn(noopSpawn),
       writeStepSummaryImpl: vi.fn(async () => {}),
     });
     expect(result.coupled).toBe(false);
