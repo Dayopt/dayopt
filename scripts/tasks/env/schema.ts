@@ -207,10 +207,10 @@ export const productionEnvSchema: EnvSchemaEntry[] = [
   envEntry('SENTRY_DSN', true, 'public', 'production', human, 'sentry-web'),
   envEntry('SENTRY_ORG', true, 'public', 'production', human, 'sentry-web'),
   envEntry('SENTRY_PROJECT', true, 'public', 'production', human, 'sentry-web'),
-  // item 名は sentry ではなく sentry-login（2026-08-14 実測の命名 drift、#2063）。
-  // 修正前は op の曖昧解決で偶然通っていたが、1password:check の恒久 red の
-  // 直接原因だった（required entry が MISSING_ITEM で fail）。
-  envEntry('SENTRY_AUTH_TOKEN', true, 'secret', 'production', human, 'sentry-login'),
+  // Vercel Production build の source map upload token。master は ci/sentry-release-token
+  // （#2085 で release 用 token を分離）。human/sentry-login は GUI ログイン item で token field を
+  // 持たない（2026-09-14 実測で MISSING_FIELD、#2696）。
+  envEntry('SENTRY_AUTH_TOKEN', true, 'secret', 'production', ci, 'sentry-release-token'),
   // NEXT_PUBLIC_APP_URL / NEXT_PUBLIC_SITE_URL / RECOVERY_CODE_PEPPER は
   // replica（Vercel Production Env）に値がある可能性がある「反映漏れ」枠。
   // schema先行（機能未展開）ではないため pendingReason は付けない。EMPTY の場合は
@@ -324,6 +324,14 @@ export const operationalItems: OperationalItem[] = [
   // `GH_CONFIG_DIR=~/.config/gh-agent gh auth login --with-token` で replica を作る。
   // 発行手順と権限一覧は docs/operations/secrets.md §Agent の gh identity。
   { vault: agent, item: 'github-agent', required: true },
+  // Agent が production Supabase を読む時の scoped access token（read 権限だけ、期限付き）。
+  // supabase MCP（--read-only）と supabase-mgmt-safe-get.mjs が inline op:// で使う。
+  // write を含む human/supabase-cli を agent が解決しないための分離（2026-09-14 監査 P2-7）。
+  // field は日本語ロケールでも id が credential。docs/operations/secrets.md §Agent の Supabase 読み取り token。
+  { vault: agent, item: 'supabase-readonly', required: true },
+  // Agent の Sentry 読み取り token（org の read scope だけ。2026-09-14 に access を実測、#2696）。
+  // sentry CLI が inline op:// で使う。mcp-usage skill §Sentry。
+  { vault: agent, item: 'sentry-cli-readonly', required: true },
 ];
 
 export const onePasswordEnvSchema = [...envSchema, ...productionEnvSchema];

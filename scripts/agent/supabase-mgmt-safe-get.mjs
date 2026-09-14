@@ -21,11 +21,10 @@ import {
  * は allowlist から除外し、この wrapper 経由でも値を返さない。それ以外（boolean / enum /
  * 数値 / secretになり得ないURL）だけを直接返す。
  *
- * 使い方（Management API token は human vault が正本。CLI引数へ載せず inline env var +
- * op run で解決する。--env-file 経由は human vault が pre-tool-guard で block されるため、
- * この inline 形が唯一の経路）:
+ * 使い方（token は agent vault の read-only scoped token。CLI 引数へ載せず inline env var +
+ * op run で解決する。write を含む human/supabase-cli は使わない。2026-09-14 監査 P2-7）:
  *
- *   SUPABASE_ACCESS_TOKEN="op://human/supabase-cli/SUPABASE_ACCESS_TOKEN" \
+ *   SUPABASE_ACCESS_TOKEN="op://agent/supabase-readonly/credential" \
  *     op run -- node scripts/agent/supabase-mgmt-safe-get.mjs auth-config <field1> [field2 ...]
  */
 

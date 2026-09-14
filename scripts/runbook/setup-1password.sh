@@ -206,9 +206,8 @@ run item create --category=apicredential --vault=human --title=resend-support-re
   --tags=dayopt/resend notesPlain="$NOTES"$'\nGmail Send mail as 専用。Sending access / dayopt.app限定。アプリ用keyと共用しない。' \
   'RESEND_SMTP_API_KEY[concealed]='
 
-# 実 item 名は sentry-login（Sentry の login 情報と同居。#2063 で判明した命名 drift、
-# schema.ts と揃える）
-run item create --category=apicredential --vault=human --title=sentry-login \
+# Vercel Production build の source map upload token。release 用として ci に置く（#2085）。
+run item create --category=apicredential --vault=ci --title=sentry-release-token \
   --tags=dayopt/sentry notesPlain="$NOTES" \
   'SENTRY_AUTH_TOKEN[concealed]='
 

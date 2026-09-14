@@ -39,6 +39,7 @@ PASSWORD_ITEM_ID="${PASSWORD_ITEM_ID:-}"
 
 require_user_email_and_password_item "admin-set-user-password.sh"
 require_supabase_env_verbose
+require_target_confirmation "$(supabase_ref_from_url "$NEXT_PUBLIC_SUPABASE_URL")" "user の password 上書き（${USER_EMAIL}）"
 
 auth_headers_json
 
