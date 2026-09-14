@@ -3,20 +3,19 @@ import { createTRPCRouter, protectedProcedure } from '@/lib/trpc/procedures';
 import { StatisticsService } from './statistics-service';
 import { handleStatsError } from './statistics-shared';
 
+/** 作成時フィードフォワードは利用期間によらない中核操作。#2605 がgateの最終決定を持つ。 */
+const activityEstimationFactors = protectedProcedure
+  .meta({ description: '作成時フィードフォワード（アクティビティ別見積もり係数の中央値）' })
+  .query(async ({ ctx }) => {
+    try {
+      return await new StatisticsService(ctx.supabase).getActivityEstimationFactors(ctx.userId);
+    } catch (error) {
+      handleStatsError('getActivityEstimationFactors', error);
+    }
+  });
+
 export const statisticsKpiRouter = createTRPCRouter({
-  /**
-   * 作成時フィードフォワード: タグ別見積もり係数（直近 4 週の中央値、`n >= 3`）
-   *
-   * Plan を作る瞬間の中核ループ（ADR-026 の 1 点目）に属するため `protectedProcedure` を使う。
-   * 利用期間による gate の最終決定は #2605 が持つ。
-   */
-  getTagEstimationFactors: protectedProcedure
-    .meta({ description: '作成時フィードフォワード（タグ別見積もり係数の中央値）' })
-    .query(async ({ ctx }) => {
-      try {
-        return await new StatisticsService(ctx.supabase).getTagEstimationFactors(ctx.userId);
-      } catch (error) {
-        handleStatsError('getTagEstimationFactors', error);
-      }
-    }),
+  getActivityEstimationFactors: activityEstimationFactors,
+  /** @deprecated #2694: 新名を配信して旧clientの利用を観測するまで維持する。 */
+  getTagEstimationFactors: activityEstimationFactors,
 });

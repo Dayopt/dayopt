@@ -133,16 +133,16 @@ pnpm copy:check:strict
 
 キーパスを `.` と camelCase 境界で分割した token と**完全一致**で判定する（`ariaLabel` の `label` や `sentryReport` の `sentry` を誤検知しないため）。値が正しくてもキー名が旧語彙だと、AI が既存キーを手本にして旧語彙を再生産する。
 
-| token     | 推奨                          | 強制    | 例外                                                                                    | 理由                                                                    |
-| --------- | ----------------------------- | ------- | --------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
-| `task`    | timeblock / plan              | CI 必須 | `^legal\\.`                                                                             | 旧語彙。Dayopt はタスクではなく時間を置く                               |
-| `tasks`   | timeblock / plan              | CI 必須 | `^legal\\.`                                                                             | 同上（複数形）                                                          |
-| `entry`   | timeblock / plan / record     | CI 必須 | `manualEntry$`                                                                          | ADR-025 で廃止した Entry モデルの名残。MFA コードの manual entry は別義 |
-| `entries` | timeblock / plan / record     | CI 必須 | `^oauth\\.consent\\.scope\\.` / `^settings\\.integrations\\.mcpConnections\\.scopes\\.` | 同上。OAuth scope 名 read:entries は外部契約なのでキー名ごと据え置き    |
-| `tag`     | activity / category / segment | CI 必須 | —                                                                                       | #2162 で廃止した Tag 機能の名残                                         |
-| `tags`    | activity / category / segment | CI 必須 | —                                                                                       | 同上（複数形）                                                          |
-| `event`   | timeblock / plan              | CI 必須 | `^calendar\\.external\\.` / `externalEvents` / `ghost`                                  | event は外部カレンダー由来の予定にだけ使う                              |
-| `events`  | timeblock / plan              | CI 必須 | `^calendar\\.external\\.` / `externalEvents` / `ghost`                                  | 同上（複数形）                                                          |
+| token     | 推奨                          | 強制    | 例外                                                                                    | 理由                                                                                                          |
+| --------- | ----------------------------- | ------- | --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `task`    | timeblock / plan              | CI 必須 | `^legal\\.`                                                                             | 旧語彙。Dayopt はタスクではなく時間を置く                                                                     |
+| `tasks`   | timeblock / plan              | CI 必須 | `^legal\\.`                                                                             | 同上（複数形）                                                                                                |
+| `entry`   | timeblock / plan / record     | CI 必須 | `manualEntry$`                                                                          | ADR-025 で廃止した Entry モデルの名残。MFA コードの manual entry は別義                                       |
+| `entries` | timeblock / plan / record     | CI 必須 | `^oauth\\.consent\\.scope\\.` / `^settings\\.integrations\\.mcpConnections\\.scopes\\.` | 同上。OAuth scope 名 read:entries は外部契約なのでキー名ごと据え置き                                          |
+| `tag`     | activity / category / segment | CI 必須 | —                                                                                       | #2162 で廃止した機能の名残。#2694 でclient/serviceをactivityへ改名。旧tRPC名は配信確認まで互換aliasとして残す |
+| `tags`    | activity / category / segment | CI 必須 | —                                                                                       | 同上（複数形）                                                                                                |
+| `event`   | timeblock / plan              | CI 必須 | `^calendar\\.external\\.` / `externalEvents` / `ghost`                                  | event は外部カレンダー由来の予定にだけ使う                                                                    |
+| `events`  | timeblock / plan              | CI 必須 | `^calendar\\.external\\.` / `externalEvents` / `ghost`                                  | 同上（複数形）                                                                                                |
 
 ## スキャン対象外（誤検知防止）
 
