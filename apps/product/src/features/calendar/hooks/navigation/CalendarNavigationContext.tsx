@@ -10,7 +10,7 @@ import React, {
   useTransition,
 } from 'react';
 
-import { usePathname } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 
 import { useCalendarNavigationStore } from '@/features/calendar/stores/useCalendarNavigationStore';
 import { MEDIA_QUERIES } from '@/lib/breakpoints';
@@ -149,6 +149,9 @@ const CalendarNavigationContext = createContext<CalendarNavigationContextValue |
  */
 export const CalendarNavigationProvider = ({ children }: { children: React.ReactNode }) => {
   const pathname = usePathname() ?? '/';
+  // Next の client 遷移が search まで確定した合図としてだけ使う。値は読まない
+  // （自前の history 書き換えは反映されないため。useInspectorURLSync と同じ扱い）
+  const searchParams = useSearchParams();
 
   // pathname + window.location.search からワークスペースタブ判定と初期値を計算。
   // render 中は ref を読めない（react-hooks/refs）ため fallbackDate は渡さない —
@@ -263,7 +266,21 @@ export const CalendarNavigationProvider = ({ children }: { children: React.React
     if (viewParam === viewType) return;
     if (isMobileRef.current && !isMobileCalendarViewSupported(viewParam)) return;
     setViewType(viewParam);
-  }, [isCalendarPage, pathname, viewType]);
+  }, [isCalendarPage, pathname, searchParams, viewType]);
+
+  // /report → /calendar の client 遷移では pathname が先に変わり、その render で読む
+  // window.location.search はまだ /report のもの（date= が古い）。上の `initialDate`
+  // は [pathname] にしか反応しないので、search が確定した後にもう一度 URL の date= を
+  // 読み直す（レポートの明細 → その日のカレンダー、「カレンダーで組む」が直前の日付の
+  // まま開いていた。2026-09-14 実測）
+  React.useEffect(() => {
+    if (!isCalendarPage) return;
+    const dateFromUrl = readDateParamFromLocation();
+    if (!dateFromUrl || dateFromUrl.getTime() === currentDateRef.current.getTime()) return;
+    startTransition(() => {
+      setCurrentDate(dateFromUrl);
+    });
+  }, [isCalendarPage, pathname, searchParams, startTransition]);
 
   // URL由来の initialDate が変更されたら currentDate を同期
   // （ブラウザ戻る/進む、直接URL入力時）

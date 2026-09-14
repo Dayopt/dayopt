@@ -2,10 +2,12 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 let mockPathname = '/ja/calendar';
+let mockSearchParams = new URLSearchParams();
 const mockUseMediaQuery = vi.fn(() => false);
 
 vi.mock('next/navigation', () => ({
   usePathname: () => mockPathname,
+  useSearchParams: () => mockSearchParams,
 }));
 
 vi.mock('@/lib/hooks/useMediaQuery', () => ({
@@ -49,7 +51,36 @@ describe('CalendarNavigationProvider', () => {
     vi.clearAllMocks();
     mockUseMediaQuery.mockReturnValue(false);
     mockPathname = '/ja/calendar';
+    mockSearchParams = new URLSearchParams('date=2026-03-25');
     window.history.replaceState(null, '', '/ja/calendar?date=2026-03-25');
+  });
+
+  it('/report → /calendar の client 遷移で search が遅れて確定しても ?date= と ?view= に追従する', () => {
+    // 同じ element を渡すと React が再 render を省くため、毎回作り直す
+    const tree = () => (
+      <CalendarNavigationProvider>
+        <TestConsumer />
+      </CalendarNavigationProvider>
+    );
+    const { rerender } = render(tree());
+
+    mockPathname = '/ja/report';
+    mockSearchParams = new URLSearchParams('date=2026-03-30');
+    window.history.replaceState(null, '', '/ja/report?date=2026-03-30');
+    rerender(tree());
+
+    // Next は pathname を先に確定し、その render では window.location.search がまだ古い
+    // （/report の date= のまま）。この瞬間は /report の日付を拾ってしまう
+    mockPathname = '/ja/calendar';
+    rerender(tree());
+    expect(screen.getByTestId('date')).toHaveTextContent('2026-03-30');
+
+    // search が確定した（useSearchParams が更新される）
+    mockSearchParams = new URLSearchParams('view=day&date=2026-03-27');
+    window.history.replaceState(null, '', '/ja/calendar?view=day&date=2026-03-27');
+    rerender(tree());
+    expect(screen.getByTestId('date')).toHaveTextContent('2026-03-27');
+    expect(screen.getByTestId('view')).toHaveTextContent('day');
   });
 
   it('レポートと戻り先の日付が同じでも以前のカレンダー日付を残さない', () => {
