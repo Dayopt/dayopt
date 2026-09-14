@@ -63,6 +63,9 @@ const KNOWN_PLACEMENT_EXCEPTIONS = new Set<string>([
   // production-storage-rls-audit.mjs（ci）の import のみで、正しい分類は
   // lib（現状維持。この exception は現状 no-op だが記録として残す）。
   'scripts/lib/storage-objects-app-policy-names.mjs',
+  // production-db-readonly: tasks/ci共通の読取transport。workflowのpathsへの言及は
+  // 変更時に監査を起動するfilterであり、workflowからの実行ではない（上記と同型）。
+  'scripts/lib/production-db-readonly.mjs',
   // scripts-taxonomy.ts: 唯一の実 importer が __tests__/ 配下のテストファイルであり、
   // classifyAllScripts の importedBy 判定は __tests__/ を除外した allScriptFiles しか
   // 走査しないため、ライブラリとして実在するにもかかわらず無参照判定になる
