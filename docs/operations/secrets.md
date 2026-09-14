@@ -328,7 +328,7 @@ vault は 2026-08-14 の信頼境界軸再編（[#2086](https://github.com/Dayop
 
 **identity の分け方**: `GH_CONFIG_DIR` で config dir を分ける。User は既定（`~/.config/gh`、keyring）、Agent は `~/.config/gh-agent`（plaintext `hosts.yml`、0600）。keyring は host / user 単位で 1 token しか持てず、同じ account の 2 token が衝突するため、Agent 側だけ `--insecure-storage` を使う。この file は replica で、master は `agent/github-agent`（上記 Replica 台帳）。
 
-**PAT の権限（これ以外は No access）**: Resource owner = Dayopt org、Only select repositories = dayopt、有効期限 1 年。Repository permissions: Actions R / Checks R / Commit statuses R / Contents **RW** / Issues **RW** / Metadata R / Pull requests **RW**。Organization permissions: なし。Contents RW は git push と `gh pr create` に要る。`Administration` / `Secrets` / `Workflows` / `Environments` は付けない（付けると P1-1 が戻る）。
+**PAT の権限（これ以外は No access）**: Resource owner = Dayopt org、Only select repositories = dayopt、有効期限 1 年。Repository permissions: Actions R / Commit statuses R / Contents **RW** / Issues **RW** / Metadata R / Pull requests **RW**。Organization permissions: なし。Contents RW は git push と `gh pr create` に要る。Checks は fine-grained PAT の選択肢に無い。private repo で CI 結果（check run）がこの token で読めるかは、login 後に `gh pr checks` で実測して追記する。`Administration` / `Secrets` / `Workflows` / `Environments` は付けない（付けると P1-1 が戻る）。
 
 **発行と登録（User の GUI / terminal、値は表示しない）**:
 
