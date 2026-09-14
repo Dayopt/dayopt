@@ -37,8 +37,8 @@ type ToasterProps = React.ComponentProps<typeof Sonner>;
  * });
  * ```
  */
-/** モバイルヘッダー（pt-safe + min-h-14）の直下。 */
-const MOBILE_TOAST_TOP_OFFSET = 'calc(env(safe-area-inset-top, 0px) + 64px)';
+/** モバイルヘッダー（pt-safe + 実測 68px）の直下。 */
+const MOBILE_TOAST_TOP_OFFSET = 'calc(env(safe-area-inset-top, 0px) + 72px)';
 
 const Toaster = ({ ...props }: ToasterProps) => {
   const isMobile = useMediaQuery(MEDIA_QUERIES.mobile);
