@@ -89,7 +89,7 @@ export function ActivityChipRow({ className }: ActivityChipRowProps) {
             size="md"
             neutral={chip.color === null}
           />
-          <span className="text-muted-foreground max-w-16 truncate text-xs">{chip.name}</span>
+          <span className="text-muted-foreground max-w-24 truncate text-xs">{chip.name}</span>
         </button>
       ))}
 
@@ -100,7 +100,7 @@ export function ActivityChipRow({ className }: ActivityChipRowProps) {
         className="hover:bg-state-hover text-muted-foreground flex h-12 min-w-16 shrink-0 flex-col items-center justify-center gap-1 rounded-lg px-2 transition-colors duration-150"
       >
         <Plus className="size-5" />
-        <span className="max-w-16 truncate text-xs">{t('common.actions.add')}</span>
+        <span className="max-w-24 truncate text-xs">{t('common.actions.add')}</span>
       </button>
     </div>
   );
