@@ -5,9 +5,6 @@ UPSTASH_REDIS_REST_TOKEN=op://agent/upstash/UPSTASH_REDIS_REST_TOKEN
 STRIPE_SECRET_KEY=op://agent/stripe-test/STRIPE_SECRET_KEY
 STRIPE_WEBHOOK_SECRET=op://agent/stripe-test/STRIPE_WEBHOOK_SECRET
 NEXT_PUBLIC_STRIPE_PRO_PRICE_ID=op://agent/stripe-test/NEXT_PUBLIC_STRIPE_PRO_PRICE_ID
-RESEND_API_KEY=op://agent/resend/RESEND_API_KEY
-RESEND_FROM_EMAIL=op://agent/resend/RESEND_FROM_EMAIL
-RESEND_WEBHOOK_SECRET=op://agent/resend/RESEND_WEBHOOK_SECRET
 NEXT_PUBLIC_APP_URL=op://agent/app/NEXT_PUBLIC_APP_URL
 NEXT_PUBLIC_SITE_URL=op://agent/app/NEXT_PUBLIC_SITE_URL
 RECOVERY_CODE_PEPPER=op://agent/app/RECOVERY_CODE_PEPPER
@@ -22,12 +19,10 @@ MCP_OAUTH_PREVIEW_BRANCH=op://agent/app/MCP_OAUTH_PREVIEW_BRANCH
 MCP_OAUTH_PREVIEW_UPSTASH_HOST=op://agent/app/MCP_OAUTH_PREVIEW_UPSTASH_HOST
 NEXT_PUBLIC_TURNSTILE_SITE_KEY=op://agent/turnstile/NEXT_PUBLIC_TURNSTILE_SITE_KEY
 TURNSTILE_SECRET_KEY=op://agent/turnstile/TURNSTILE_SECRET_KEY
-ANTHROPIC_API_KEY=op://agent/anthropic/ANTHROPIC_API_KEY
+# RESEND_* / ANTHROPIC_API_KEY / *_VERIFICATION は置かない（2026-09-14、production credential と
+# consumer の無い key を agent から外した。master は human）。
 # VERCEL_* は置かない。Vercel token は scope を絞れず team 全権になるため agent vault に
 # 入れない（2026-09-14、監査 P1-2）。replica:check は CI の日次 cron と User 実行で回す。
-GOOGLE_SITE_VERIFICATION=op://agent/google/GOOGLE_SITE_VERIFICATION
-YANDEX_VERIFICATION=op://agent/google/YANDEX_VERIFICATION
-YAHOO_VERIFICATION=op://agent/google/YAHOO_VERIFICATION
 # agent/google-calendar item は現在 1Password に存在しない（2026-08-14
 # 実測、#2063）。コメントアウトしたままだと外部カレンダー連携の local dev 検証は
 # できないが、有効な行のまま残すと op run が解決不能参照で起動前に失敗し、

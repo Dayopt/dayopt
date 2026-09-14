@@ -142,17 +142,17 @@ describe('check-1password.ts', () => {
   });
 
   it('optional item が未作成でも状態を表示して成功する', () => {
-    const result = runCheck({ missingItem: 'google' });
+    const result = runCheck({ missingItem: 'upstash' });
 
     expect(result.status, result.stderr).toBe(0);
-    expect(result.stdout).toContain('agent / google / GOOGLE_SITE_VERIFICATION: MISSING_ITEM');
+    expect(result.stdout).toContain('agent / upstash / UPSTASH_REDIS_REST_URL: MISSING_ITEM');
   });
 
   it('optional field が空でも状態を表示して成功する', () => {
-    const result = runCheck({ emptyField: 'GOOGLE_SITE_VERIFICATION' });
+    const result = runCheck({ emptyField: 'TURNSTILE_SECRET_KEY' });
 
     expect(result.status, result.stderr).toBe(0);
-    expect(result.stdout).toContain('agent / google / GOOGLE_SITE_VERIFICATION: EMPTY');
+    expect(result.stdout).toContain('agent / turnstile / TURNSTILE_SECRET_KEY: EMPTY');
   });
 
   it('pendingReason を持つ entry が非 OK の時、理由を添えて表示する', () => {

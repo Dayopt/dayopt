@@ -83,16 +83,10 @@ export const envSchema: EnvSchemaEntry[] = [
   envEntry('STRIPE_WEBHOOK_SECRET', false, 'secret', 'staging', agent, 'stripe-test'),
   envEntry('NEXT_PUBLIC_STRIPE_PRO_PRICE_ID', false, 'public', 'staging', agent, 'stripe-test'),
 
-  envEntry('RESEND_API_KEY', false, 'secret', 'shared', agent, 'resend'),
-  envEntry('RESEND_FROM_EMAIL', false, 'public', 'shared', agent, 'resend'),
-  pendingEnvEntry(
-    'RESEND_WEBHOOK_SECRET',
-    'secret',
-    'staging',
-    agent,
-    'resend',
-    '旧 Staging/resend（human/resend-old-staging に退避中）から agent/resend への field 統合待ち（#2086 cutover）',
-  ),
+  // Resend は agent に置かない（2026-09-14、Secret / Credential 監査）。送信 key は
+  // production ドメインから送れる本番 credential で、agent vault の「漏れても 1 日で
+  // 戻せる」定義に入らない。master は human/resend-send（productionEnvSchema）。local dev
+  // では送信しない（env.ts が Resend を必須にするのは Vercel Production だけ）。
 
   envEntry('NEXT_PUBLIC_APP_URL', true, 'public', 'local', agent, 'app'),
   envEntry('NEXT_PUBLIC_SITE_URL', false, 'public', 'staging', agent, 'app'),
@@ -109,7 +103,6 @@ export const envSchema: EnvSchemaEntry[] = [
 
   envEntry('NEXT_PUBLIC_TURNSTILE_SITE_KEY', false, 'public', 'shared', agent, 'turnstile'),
   envEntry('TURNSTILE_SECRET_KEY', false, 'secret', 'shared', agent, 'turnstile'),
-  envEntry('ANTHROPIC_API_KEY', false, 'secret', 'shared', agent, 'anthropic'),
 
   envEntry('VERCEL_TOKEN', false, 'secret', 'shared', ci, 'vercel'),
   envEntry('VERCEL_TEAM_ID', false, 'public', 'shared', ci, 'vercel'),
@@ -118,9 +111,9 @@ export const envSchema: EnvSchemaEntry[] = [
   // 未使用のまま置かれていた agent/vercel は Vercel 側で revoke し item を archive した。
   // agent の Vercel 読み取りは CLI の読み取り系サブコマンドだけで行う（pre-tool-guard）。
 
-  envEntry('GOOGLE_SITE_VERIFICATION', false, 'public', 'shared', agent, 'google'),
-  envEntry('YANDEX_VERIFICATION', false, 'public', 'shared', agent, 'google'),
-  envEntry('YAHOO_VERIFICATION', false, 'public', 'shared', agent, 'google'),
+  // ANTHROPIC_API_KEY（consumer 無し）と webmaster verification 3 件（値が空で Vercel にも
+  // replica 無し）は、2026-09-14 に agent の item ごと削除したため entry を置かない。
+  // verification を使う時は公開値なので human/app 等の production item に足す。
 
   // 外部カレンダー取り込み用の専用 OAuth client（Supabase Auth の Google provider とは別物）。
   // agent（旧 Dayopt-Staging）/google-calendar item は 2026-08-14 実測時点で 1Password に
@@ -200,6 +193,10 @@ export const productionEnvSchema: EnvSchemaEntry[] = [
     'stripe-live',
     '課金未有効化のため未設定（2026-08-11 実測、#1669）',
   ),
+  // Product / Web の Production が共用する送信 credential。2026-09-14 に agent/resend から移した。
+  // webhook 署名（app 別）の human/resend・human/resend-web とは item を分ける。
+  envEntry('RESEND_API_KEY', false, 'secret', 'production', human, 'resend-send'),
+  envEntry('RESEND_FROM_EMAIL', false, 'public', 'production', human, 'resend-send'),
   envEntry('RESEND_WEBHOOK_SECRET', false, 'secret', 'production', human, 'resend'),
   envEntry('RESEND_WEBHOOK_SECRET', false, 'secret', 'production', human, 'resend-web'),
   envEntry('NEXT_PUBLIC_SENTRY_DSN', true, 'public', 'production', human, 'sentry'),
