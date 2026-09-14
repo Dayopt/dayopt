@@ -347,7 +347,7 @@ export const operationalItems: OperationalItem[] = [
   // supabase MCP（--read-only）と supabase-mgmt-safe-get.mjs が inline op:// で使う。
   // write を含む human/supabase-cli を agent が解決しないための分離（2026-09-14 監査 P2-7）。
   // field は日本語ロケールでも id が credential。docs/operations/secrets.md §Agent の Supabase 読み取り token。
-  { vault: agent, item: 'supabase-readonly', required: true },
+  { vault: agent, item: 'supabase-agent', required: true },
   // Agent の Sentry 読み取り token（org の read scope だけ。2026-09-14 に access を実測、#2696）。
   // sentry CLI が inline op:// で使う。mcp-usage skill §Sentry。
   { vault: agent, item: 'sentry-cli-readonly', required: true },

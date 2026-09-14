@@ -24,7 +24,7 @@ import {
  * 使い方（token は agent vault の read-only scoped token。CLI 引数へ載せず inline env var +
  * op run で解決する。write を含む human/supabase-cli は使わない。2026-09-14 監査 P2-7）:
  *
- *   SUPABASE_ACCESS_TOKEN="op://agent/supabase-readonly/credential" \
+ *   SUPABASE_ACCESS_TOKEN="op://agent/supabase-agent/credential" \
  *     op run -- node scripts/agent/supabase-mgmt-safe-get.mjs auth-config <field1> [field2 ...]
  */
 
