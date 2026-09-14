@@ -21,7 +21,7 @@ const SETTINGS = {
 
 describe('toUserPreferences', () => {
   it('user_settings query responseをapp-wide preferenceへ変換する', () => {
-    expect(toUserPreferences(SETTINGS)).toEqual({
+    expect(toUserPreferences(SETTINGS, 'ja')).toEqual({
       timezone: 'Asia/Tokyo',
       timeFormat: '12h',
       dateFormat: 'yyyy/MM/dd',
@@ -31,8 +31,15 @@ describe('toUserPreferences', () => {
     });
   });
 
+  it('日付表記はpreferredLocaleではなく画面のlocaleに従う', () => {
+    expect(toUserPreferences({ ...SETTINGS, preferredLocale: 'en' }, 'ja').dateFormat).toBe(
+      'yyyy/MM/dd',
+    );
+    expect(toUserPreferences(SETTINGS, 'en').dateFormat).toBe('MM/dd/yyyy');
+  });
+
   it('row未作成時は安全なdefaultを返す', () => {
-    expect(toUserPreferences(null)).toMatchObject({
+    expect(toUserPreferences(null, 'ja')).toMatchObject({
       timeFormat: '24h',
       dateFormat: 'yyyy-MM-dd',
       weekStartsOn: 1,
