@@ -102,7 +102,6 @@ interface CalendarControllerProps {
   onNavigatePrev: () => void;
   onNavigateNext: () => void;
   onNavigateToday: () => void;
-  onToggleWeekends: () => void;
   onDateSelect: (date: Date) => void;
 
   // --- Prefetch ---
@@ -142,7 +141,6 @@ export function CalendarController({
   onNavigatePrev,
   onNavigateNext,
   onNavigateToday,
-  onToggleWeekends,
   onPrefetch,
   onSettingsChange,
   onDateSelect,
@@ -242,7 +240,6 @@ export function CalendarController({
     viewType,
     onNavigate: handleNavigate,
     onViewChange: handleViewChange,
-    onToggleWeekends,
   });
 
   // =========================================================================
