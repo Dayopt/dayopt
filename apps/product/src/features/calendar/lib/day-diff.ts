@@ -64,25 +64,25 @@ function minutesBetween(a: Date | null, b: Date | null): number {
   return Math.round((b.getTime() - a.getTime()) / 60_000);
 }
 
-function plannedRange(entry: CalendarDisplayEvent): { start: Date | null; end: Date | null } {
+function plannedRange(timeblock: CalendarDisplayEvent): { start: Date | null; end: Date | null } {
   return {
-    start: entry.plannedStartDate ?? entry.startDate,
-    end: entry.plannedEndDate ?? entry.endDate,
+    start: timeblock.plannedStartDate ?? timeblock.startDate,
+    end: timeblock.plannedEndDate ?? timeblock.endDate,
   };
 }
 
-function actualRange(entry: CalendarDisplayEvent): { start: Date | null; end: Date | null } {
-  if (entry.kind === 'record') {
+function actualRange(timeblock: CalendarDisplayEvent): { start: Date | null; end: Date | null } {
+  if (timeblock.kind === 'record') {
     return {
-      start: entry.actualStartDate ?? entry.startDate,
-      end: entry.actualEndDate ?? entry.endDate,
+      start: timeblock.actualStartDate ?? timeblock.startDate,
+      end: timeblock.actualEndDate ?? timeblock.endDate,
     };
   }
 
-  const planned = plannedRange(entry);
+  const planned = plannedRange(timeblock);
   return {
-    start: entry.actualStartDate ?? planned.start,
-    end: entry.actualEndDate ?? planned.end,
+    start: timeblock.actualStartDate ?? planned.start,
+    end: timeblock.actualEndDate ?? planned.end,
   };
 }
 
@@ -109,23 +109,23 @@ function clipRange(
   return { start: clippedStart, end: clippedEnd };
 }
 
-export function filterCalendarDayDiffEntries(
-  entries: readonly CalendarDisplayEvent[],
+export function filterCalendarDayDiffTimeblocks(
+  timeblocks: readonly CalendarDisplayEvent[],
   bounds: CalendarDayDiffOptions,
-  isEntryVisible: (activityId: string | null) => boolean,
+  isActivityVisible: (activityId: string | null) => boolean,
 ): CalendarDisplayEvent[] {
-  return entries.filter((entry) => {
-    if (!isEntryVisible(entry.activityId ?? null)) return false;
+  return timeblocks.filter((timeblock) => {
+    if (!isActivityVisible(timeblock.activityId ?? null)) return false;
 
-    const planned = clipRange(plannedRange(entry), bounds);
-    const actual = clipRange(actualRange(entry), bounds);
+    const planned = clipRange(plannedRange(timeblock), bounds);
+    const actual = clipRange(actualRange(timeblock), bounds);
 
     return diffMinutes(planned.start, planned.end) > 0 || diffMinutes(actual.start, actual.end) > 0;
   });
 }
 
 function makeItem(
-  entry: CalendarDisplayEvent,
+  timeblock: CalendarDisplayEvent,
   kind: CalendarDayDiffKind,
   planned: { start: Date | null; end: Date | null },
   actual: { start: Date | null; end: Date | null },
@@ -134,12 +134,12 @@ function makeItem(
   const actualMinutes = diffMinutes(actual.start, actual.end);
 
   return {
-    id: `${kind}:${entry.id}`,
-    timeblockId: entry.id,
+    id: `${kind}:${timeblock.id}`,
+    timeblockId: timeblock.id,
     kind,
-    title: entry.title,
-    activityId: entry.activityId ?? null,
-    color: entry.color,
+    title: timeblock.title,
+    activityId: timeblock.activityId ?? null,
+    color: timeblock.color,
     plannedStart: planned.start,
     plannedEnd: planned.end,
     actualStart: actual.start,
@@ -149,15 +149,15 @@ function makeItem(
     diffMinutes: actualMinutes - plannedMinutes,
     startDiffMinutes: minutesBetween(planned.start, actual.start),
     endDiffMinutes: minutesBetween(planned.end, actual.end),
-    sortTime: (actual.start ?? planned.start ?? entry.displayStartDate).getTime(),
+    sortTime: (actual.start ?? planned.start ?? timeblock.displayStartDate).getTime(),
   };
 }
 
 export function computeCalendarDayDiffs(
-  entries: readonly CalendarDisplayEvent[],
+  timeblocks: readonly CalendarDisplayEvent[],
   options: CalendarDayDiffOptions | Date = {},
 ): CalendarDayDiffResult {
-  if (entries.length === 0) return EMPTY_RESULT;
+  if (timeblocks.length === 0) return EMPTY_RESULT;
 
   const bounds = resolveOptions(options);
   const items: CalendarDayDiffItem[] = [];
@@ -166,25 +166,25 @@ export function computeCalendarDayDiffs(
   let unplannedMinutes = 0;
   const missedMinutes = 0;
 
-  for (const entry of entries) {
-    if (entry.isDraft) continue;
+  for (const timeblock of timeblocks) {
+    if (timeblock.isDraft) continue;
 
-    const planned = clipRange(plannedRange(entry), bounds);
-    const actual = clipRange(actualRange(entry), bounds);
+    const planned = clipRange(plannedRange(timeblock), bounds);
+    const actual = clipRange(actualRange(timeblock), bounds);
     const plannedDuration = diffMinutes(planned.start, planned.end);
     const actualDuration = diffMinutes(actual.start, actual.end);
     const countedActualDuration = actualDuration;
-    const hasActualEdit = entry.actualStartDate != null || entry.actualEndDate != null;
+    const hasActualEdit = timeblock.actualStartDate != null || timeblock.actualEndDate != null;
 
-    if (entry.kind !== 'record') {
+    if (timeblock.kind !== 'record') {
       plannedMinutes += plannedDuration;
     }
     actualMinutes += countedActualDuration;
 
-    if (entry.kind === 'record') {
+    if (timeblock.kind === 'record') {
       if (actualDuration > 0) {
         unplannedMinutes += actualDuration;
-        items.push(makeItem(entry, 'unplanned', { start: null, end: null }, actual));
+        items.push(makeItem(timeblock, 'unplanned', { start: null, end: null }, actual));
       }
       continue;
     }
@@ -192,7 +192,7 @@ export function computeCalendarDayDiffs(
     const hasActual = actual.start != null && actual.end != null && actualDuration > 0;
     if (!hasActual) {
       if (plannedDuration > 0 && hasActualEdit) {
-        items.push(makeItem(entry, 'shifted', planned, { start: null, end: null }));
+        items.push(makeItem(timeblock, 'shifted', planned, { start: null, end: null }));
       }
       continue;
     }
@@ -206,7 +206,7 @@ export function computeCalendarDayDiffs(
     }
 
     const kind: CalendarDayDiffKind = startDiffMinutes === 0 ? 'resized' : 'shifted';
-    items.push(makeItem(entry, kind, planned, actual));
+    items.push(makeItem(timeblock, kind, planned, actual));
   }
 
   items.sort((a, b) => a.sortTime - b.sortTime || a.title.localeCompare(b.title));

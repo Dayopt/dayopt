@@ -56,7 +56,7 @@ describe('StatisticsFeedforwardService', () => {
   it('4 週窓は plan.start_at の [28 日前, now) で切る（record の発生時刻では切らない）', async () => {
     const { plansMock, service } = createService([], []);
 
-    await service.getTagEstimationFactors(USER_ID, NOW);
+    await service.getActivityEstimationFactors(USER_ID, NOW);
 
     // 過去 Plan への遅延記録があっても、窓は Plan 側の start_at だけで決まる。
     // record 側で切ると「4 週前の Plan を昨日記録した」比が窓に入り、
@@ -77,7 +77,7 @@ describe('StatisticsFeedforwardService', () => {
   it('Plan が 0 件なら records を引かずに空配列を返す', async () => {
     const { recordsMock, service } = createService([], []);
 
-    await expect(service.getTagEstimationFactors(USER_ID, NOW)).resolves.toEqual([]);
+    await expect(service.getActivityEstimationFactors(USER_ID, NOW)).resolves.toEqual([]);
     expect(recordsMock.select).not.toHaveBeenCalled();
   });
 
@@ -88,7 +88,7 @@ describe('StatisticsFeedforwardService', () => {
       pairs.map((pair) => pair.record),
     );
 
-    await expect(service.getTagEstimationFactors(USER_ID, NOW)).resolves.toEqual([
+    await expect(service.getActivityEstimationFactors(USER_ID, NOW)).resolves.toEqual([
       { activityId: 'activity-a', factor: 1.5, sampleCount: 3 },
     ]);
   });
@@ -100,7 +100,7 @@ describe('StatisticsFeedforwardService', () => {
       pairs.map((pair) => pair.record),
     );
 
-    await service.getTagEstimationFactors(USER_ID, NOW);
+    await service.getActivityEstimationFactors(USER_ID, NOW);
 
     expect(recordsMock.gt).toHaveBeenCalledWith('end_at', expect.any(String));
     expect(recordsMock.lt).toHaveBeenCalledWith('start_at', NOW.toISOString());

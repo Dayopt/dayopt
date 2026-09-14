@@ -121,7 +121,7 @@ self.addEventListener('fetch', (event) => {
 
   // ナビゲーションリクエスト（HTMLページ）
   if (request.mode === 'navigate') {
-    event.respondWith(handleNavigationRequest(request, event));
+    event.respondWith(handleNavigationRequest(request));
     return;
   }
 
@@ -137,44 +137,37 @@ self.addEventListener('fetch', (event) => {
 
 /**
  * ナビゲーションリクエストの処理
- * Stale-While-Revalidate: キャッシュがあれば即返し、
- * バックグラウンドでネットワークfetchしてキャッシュを更新する
+ * Network First: 常にネットワークの HTML を返し、成功したらキャッシュを更新する。
+ * ネットワークが使えない時だけキャッシュ → `/offline` の順にフォールバックする。
+ *
+ * 以前は Stale-While-Revalidate で、deploy 直後の 1 回目の表示が必ず前のビルドの HTML に
+ * なっていた（新しい版を見るのにもう一度リロードが要った）。認証済みの動的なアプリで
+ * 古い HTML を先に返す利点は無いため、オフライン時の読み取りだけをキャッシュに任せる。
  */
-async function handleNavigationRequest(request, event) {
+async function handleNavigationRequest(request) {
   const cache = await caches.open(DYNAMIC_CACHE_NAME);
-  const cached = await cache.match(request);
 
-  // バックグラウンドでネットワークfetch → キャッシュ更新（次回用）
-  const fetchPromise = fetch(request)
-    .then((response) => {
-      if (response.ok) {
-        cache.put(request, response.clone());
-      }
-      return response;
-    })
-    .catch(() => null);
-
-  if (cached) {
-    // バックグラウンドfetchをworkerのlifetimeに結びつける
-    event.waitUntil(fetchPromise);
-    return cached;
-  }
-
-  // キャッシュがない場合はネットワークを待つ
-  const networkResponse = await fetchPromise;
-  if (networkResponse) {
+  try {
+    const networkResponse = await fetch(request);
+    if (networkResponse.ok) {
+      cache.put(request, networkResponse.clone());
+    }
     return networkResponse;
-  }
+  } catch (error) {
+    const cached = await cache.match(request);
+    if (cached) {
+      return cached;
+    }
 
-  // どちらもない場合はオフラインフォールバック
-  const offlineResponse = await caches.match('/offline');
-  if (offlineResponse) {
-    return offlineResponse;
+    const offlineResponse = await caches.match('/offline');
+    if (offlineResponse) {
+      return offlineResponse;
+    }
+    return new Response('オフラインです', {
+      status: 503,
+      headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+    });
   }
-  return new Response('オフラインです', {
-    status: 503,
-    headers: { 'Content-Type': 'text/plain; charset=utf-8' },
-  });
 }
 
 /**

@@ -8,7 +8,7 @@ const FACTORS = [
   { activityId: 'activity-learning', factor: 0.75, sampleCount: 6 },
 ];
 
-const withFactors = { trpcMocks: { 'statistics.getTagEstimationFactors': FACTORS } };
+const withFactors = { trpcMocks: { 'statistics.getActivityEstimationFactors': FACTORS } };
 
 const meta = {
   title: 'Product/Features/Timeblock/EstimationFeedforward',
@@ -59,7 +59,7 @@ export const InsufficientSamples: Story = {
 
 /** 取得に失敗しても ErrorState を出さず、静かに消える。 */
 export const QueryFailed: Story = {
-  parameters: { trpcMocks: { 'statistics.getTagEstimationFactors': undefined } },
+  parameters: { trpcMocks: { 'statistics.getActivityEstimationFactors': undefined } },
 };
 
 /** 全パターン一覧。何も出ないケースは高さ 0 になる。 */

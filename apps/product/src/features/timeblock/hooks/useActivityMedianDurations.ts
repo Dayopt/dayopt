@@ -24,7 +24,7 @@ interface ActivityMedianDurations {
 }
 
 export function useActivityMedianDurations(): ActivityMedianDurations {
-  // 意図的に isError をハンドリングしない（`useTagEstimationFactors` と同じ理由）。
+  // 意図的に isError をハンドリングしない（`useActivityEstimationFactors` と同じ理由）。
   // これは受動的なヒントで、取れなかった事実をユーザーに見せる価値が無い。
   // 失敗時は data が undefined のまま Map が空になり、目安は出ず既定長で作られる。
   const { data } = api.statistics.getActivityStats.useQuery(undefined, {

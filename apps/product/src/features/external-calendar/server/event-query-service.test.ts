@@ -225,6 +225,17 @@ describe('listGhostEvents / 選択解除済みカレンダーの historical anch
     await expect(listGhostEvents(supabase, USER_ID, RANGE)).resolves.toEqual([]);
   });
 
+  it('active な接続があってもカレンダーを 1 つも選んでいなければミラーを読まない', async () => {
+    const { supabase, eventTables, selectionTables } = createSupabase({
+      events: [mirrorRow({ id: 'a' })],
+      selectedCalendars: [],
+    });
+
+    await expect(listGhostEvents(supabase, USER_ID, RANGE)).resolves.toEqual([]);
+    expect(selectionTables).toHaveLength(1);
+    expect(eventTables).toHaveLength(0);
+  });
+
   it('soft-delete 済み参照が anti-join を通しても、選択解除済みなら ghost に戻さない', async () => {
     // plans が soft-delete 済みだと anti-join は「未参照」扱いにする（既存挙動、上のテスト参照）が、
     // カレンダー自体が選択解除済みなら historical anchor として ghost には出さない。
@@ -284,6 +295,18 @@ describe('listGhostEvents / 再認証待ちの接続', () => {
     await listGhostEvents(supabase, USER_ID, RANGE);
 
     expect(selectionTables).toHaveLength(0);
+  });
+
+  it('active な接続が 1 件も無ければミラー（external_calendar_events）も読まない', async () => {
+    // 未接続ユーザーは週送りのたびに listEvents を撃つ。結果が空と確定した時点で打ち切る（#2678）。
+    const { supabase, eventTables, referenceTables } = createSupabase({
+      events: [mirrorRow({ id: 'a' })],
+      connections: [],
+    });
+
+    await expect(listGhostEvents(supabase, USER_ID, RANGE)).resolves.toEqual([]);
+    expect(eventTables).toHaveLength(0);
+    expect(referenceTables).toHaveLength(0);
   });
 
   it('一部の接続だけ reauth_required でも、他の active な接続の行は巻き込まず返す', async () => {

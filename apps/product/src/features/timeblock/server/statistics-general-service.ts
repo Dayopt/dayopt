@@ -1,33 +1,19 @@
 import 'server-only';
 
 /**
- * 統計 service — General: タグ別統計・時間帯分布・トレンド
+ * 統計 service — General: アクティビティ別統計
  */
 
-import { formatInTimeZone, fromZonedTime } from 'date-fns-tz';
-
 import { MS_PER_DAY } from '@/lib/date/constants';
-import { getUserTimezone } from '@/lib/server/user-timezone-cache';
 
 import {
   aggregateActivityMedianDurations,
   aggregateActivityPlanCounts,
   aggregateActivityStats,
-  aggregateDayOfWeekDistribution,
-  aggregateHourlyDistribution,
-  aggregateMonthlyTrend,
-  getMonthlyStartDate,
   MEDIAN_DURATION_WINDOW_DAYS,
 } from '../domain';
 
-import type { DateRangeInput } from './statistics-fetchers';
 import { fetchPlans, fetchRecords } from './statistics-fetchers';
-import {
-  groupHoursByDay,
-  groupHoursByMonth,
-  groupMinutesByDow,
-  groupMinutesByHour,
-} from './statistics-service-grouping';
 import type { ServiceSupabaseClient } from './types';
 
 export class StatisticsGeneralService {
@@ -90,44 +76,5 @@ export class StatisticsGeneralService {
       planCounts: aggregateActivityPlanCounts(planRows),
       medianMinutes: Object.fromEntries(aggregateActivityMedianDurations(recentRecords)),
     };
-  }
-
-  /** `get_daily_hours` 相当。指定年の日別実績時間（ヒートマップ用）。 */
-  async getDailyHours(userId: string, year: number) {
-    const timezone = await getUserTimezone(this.supabase, userId);
-    const startOfYear = fromZonedTime(`${year}-01-01T00:00:00`, timezone).toISOString();
-    const startOfNextYear = fromZonedTime(`${year + 1}-01-01T00:00:00`, timezone).toISOString();
-    const records = await fetchRecords(this.supabase, userId, {
-      startDate: startOfYear,
-      endDate: startOfNextYear,
-    });
-    return groupHoursByDay(records, timezone);
-  }
-
-  /** `get_hourly_distribution` 相当。 */
-  async getHourlyDistribution(userId: string, range: DateRangeInput = {}) {
-    const timezone = await getUserTimezone(this.supabase, userId);
-    const records = await fetchRecords(this.supabase, userId, range);
-    return aggregateHourlyDistribution(groupMinutesByHour(records, timezone));
-  }
-
-  /** `get_dow_distribution` 相当。 */
-  async getDayOfWeekDistribution(userId: string, range: DateRangeInput = {}) {
-    const timezone = await getUserTimezone(this.supabase, userId);
-    const records = await fetchRecords(this.supabase, userId, range);
-    return aggregateDayOfWeekDistribution(groupMinutesByDow(records, timezone));
-  }
-
-  /** `get_monthly_hours` 相当。 */
-  async getMonthlyTrend(userId: string, months = 12) {
-    const timezone = await getUserTimezone(this.supabase, userId);
-    const nowStr = formatInTimeZone(new Date(), timezone, 'yyyy-MM');
-    const [nowYear, nowMonth] = nowStr.split('-').map(Number) as [number, number];
-    const startDate = getMonthlyStartDate(nowYear, nowMonth, months);
-
-    const records = await fetchRecords(this.supabase, userId, {
-      startDate: startDate.toISOString(),
-    });
-    return aggregateMonthlyTrend(groupHoursByMonth(records, timezone), nowYear, nowMonth, months);
   }
 }

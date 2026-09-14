@@ -140,9 +140,10 @@ describe.skipIf(!RUN_LOCAL)('calendar revoke authority lifecycle cron', () => {
   });
 
   it('cron に正しい関数名・引数・スケジュールで登録されている（expire / finalize 両方）', () => {
+    // #2681: 開始/完了heartbeatで包んだ元の保守SQL（2行目）とscheduleを固定する。
     expect(
       ownerSql(
-        `SELECT schedule || '|' || command
+        `SELECT schedule || '|' || split_part(command, chr(10), 2)
 FROM cron.job
 WHERE jobname = 'expire-calendar-revoke-authority';`,
       ),
@@ -150,9 +151,10 @@ WHERE jobname = 'expire-calendar-revoke-authority';`,
       "10 * * * *|SELECT private.expire_calendar_revoke_ciphertexts_internal_v1(fence.id, 1000) FROM private.calendar_authority_fences AS fence WHERE fence.scope_kind = 'project'",
     );
 
+    // #2681: 開始/完了heartbeatで包んだ元の保守SQL（2行目）とscheduleを固定する。
     expect(
       ownerSql(
-        `SELECT schedule || '|' || command
+        `SELECT schedule || '|' || split_part(command, chr(10), 2)
 FROM cron.job
 WHERE jobname = 'finalize-calendar-revoke-guards';`,
       ),

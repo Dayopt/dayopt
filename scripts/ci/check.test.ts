@@ -5,6 +5,7 @@ import {
   fetchPrFilesFromGit,
   fetchPrFilesWithStatus,
   resolveDiffBase,
+  runMcpConformance,
   runMigrationSafety,
   shouldRunIntegrationTests,
   shouldRunProductUnitTests,
@@ -504,6 +505,25 @@ describe('fetchPrFilesFromGit', () => {
       '--depth=1',
       'origin',
       'main:refs/remotes/origin/main',
+    ]);
+  });
+});
+
+describe('conformance in required CI unit job', () => {
+  it('skips explicitly unrelated changes', () => {
+    const execute = vi.fn();
+    runMcpConformance('false', execute);
+    expect(execute).not.toHaveBeenCalled();
+  });
+  it.each(['true', undefined])('runs for %s and propagates a baseline failure', (affected) => {
+    const execute = vi.fn(() => {
+      throw new Error('unexpected protocol failure');
+    });
+    expect(() => runMcpConformance(affected, execute)).toThrow('unexpected protocol failure');
+    expect(execute).toHaveBeenCalledWith('pnpm', [
+      '--filter',
+      '@dayopt/product',
+      'test:mcp:conformance',
     ]);
   });
 });

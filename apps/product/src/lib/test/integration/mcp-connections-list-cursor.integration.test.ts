@@ -142,6 +142,16 @@ describe.skipIf(!RUN_LOCAL)('MCP connections list cursor integration', () => {
     await admin.auth.admin.deleteUser(ownerId);
   });
 
+  it('再認証期限の前後でも未revoke接続を一覧から消さない（V-11）', async () => {
+    const ids = insertConnections(['2026-08-01T00:00:00Z', '2026-08-02T00:00:00Z']);
+    psql(`UPDATE public.oauth_connections SET reauth_required_at = now() - interval '1 second' WHERE id = '${ids[0]}';
+      UPDATE public.oauth_connections SET reauth_required_at = now() + interval '1 hour' WHERE id = '${ids[1]}';`);
+    const { items } = await collectAllPages();
+    expect(new Set(items.map((row) => row.id))).toEqual(new Set(ids));
+    // The settings contract exposes no validity flag. A retained row is not proof of usable authority.
+    expect(items.every((row) => !('reauth_required_at' in row))).toBe(true);
+  });
+
   it('ページ境界を跨いで authorized_at が全件同値でも、全 connection を 1 度ずつ返す', async () => {
     // 最も過酷な tie: 60 件すべてが同一 authorized_at。この場合ページを進められるのは
     // `and(authorized_at.eq.X, id.lt.Y)` 側の枝だけなので、複合比較が壊れていれば

@@ -127,6 +127,19 @@ type PublicContractExposureRow = {
 
 /** psql で 1 行 JSON を取り出す（複数行・特殊文字に強い） */
 function queryJson<T>(sql: string): T {
+  if (process.env.RLS_SNAPSHOT_TRANSPORT === 'management-api') {
+    if (!CHECK_MODE) throw new Error('Production snapshots are check-only');
+    const out = execFileSync(
+      process.execPath,
+      [resolve(ROOT, 'scripts/lib/production-db-readonly.mjs')],
+      {
+        input: sql,
+        encoding: 'utf8',
+        maxBuffer: 32 * 1024 * 1024,
+      },
+    ).trim();
+    return JSON.parse(out) as T;
+  }
   const out = execFileSync('psql', [DATABASE_URL, '-t', '-A', '-c', sql], {
     encoding: 'utf8',
     maxBuffer: 32 * 1024 * 1024,
@@ -171,6 +184,7 @@ function fetchRlsTables(): RlsRow[] {
  * deny-all を選ぶ場合は、このリストへ明示的に追加することでレビューに乗る）。
  */
 const PUBLIC_TABLES_WITHOUT_POLICIES_ALLOWLIST = [
+  'cron_heartbeats', // service-role-only operational metadata; deny all user roles
   'mcp_environment_identity',
   'mcp_mutation_control',
   'mcp_mutation_receipts',
@@ -600,7 +614,29 @@ function fetchPublicContractExposure(): PublicContractExposureRow[] {
  * 描画された snapshot」が drift 無しとして通る。security artifact でこれは致命的なので、
  * section を足す時も必ずこの型へフィールドとして足す。
  */
+type DefaultAclRow = {
+  owner: string;
+  schema: string;
+  object_type: string;
+  grantee: string;
+  privileges: string;
+};
+
+function fetchDefaultAcls(): DefaultAclRow[] {
+  return queryJson<
+    DefaultAclRow[]
+  >(`SELECT coalesce(json_agg(row_to_json(r) ORDER BY owner, schema, object_type, grantee), '[]'::json)
+    FROM (SELECT pg_get_userbyid(d.defaclrole) AS owner, coalesce(n.nspname, '<global>') AS schema,
+      d.defaclobjtype::text AS object_type, CASE WHEN acl.grantee=0 THEN 'PUBLIC' ELSE pg_get_userbyid(acl.grantee) END AS grantee,
+      string_agg(DISTINCT ${GRANTABLE_PRIVILEGE_SQL}, ', ' ORDER BY ${GRANTABLE_PRIVILEGE_SQL}) AS privileges
+      FROM pg_default_acl d LEFT JOIN pg_namespace n ON n.oid=d.defaclnamespace
+      CROSS JOIN LATERAL aclexplode(d.defaclacl) acl
+      WHERE d.defaclnamespace=0 OR n.nspname IN ('public','private')
+      GROUP BY d.defaclrole,n.nspname,d.defaclobjtype,acl.grantee) r;`);
+}
+
 type SnapshotSections = {
+  defaultAcls: DefaultAclRow[];
   policies: PolicyRow[];
   rlsTables: RlsRow[];
   storagePolicies: PolicyRow[];
@@ -620,6 +656,7 @@ type SnapshotSections = {
 };
 
 function render({
+  defaultAcls,
   policies,
   rlsTables,
   storagePolicies,
@@ -796,23 +833,32 @@ function render({
     'ではない。** 生成元は migration から構築した local DB で、CI の drift check も同じく ephemeral な',
   );
   lines.push(
-    'local DB に対してのみ走る。production に対する同等のチェックは存在しないため、production で',
+    'local DB に加え、production-config-audit.yml から同じ読取queryとbaselineを使ってproductionを比較する。',
   );
-  lines.push('migration を経由しない手動変更が行われた場合、その差分はここに現れない。');
+  lines.push('migration を経由しない権限変更も差分として検出し、本番からbaselineを上書きしない。');
   lines.push('');
   lines.push(
     '対象は schema USAGE（`nspacl`）/ オブジェクト ACL（`relacl`）/ 列レベル ACL（`attacl`）/',
   );
   lines.push(
-    'function EXECUTE（`proacl`）/ custom type・domain USAGE（`typacl`）の 5 catalog。次の 1 つは対象外:',
+    'function EXECUTE（`proacl`）/ custom type・domain USAGE（`typacl`）の 5 catalog と、次節の default privileges。',
   );
   lines.push('');
-  lines.push(
-    '- **default privileges（`pg_default_acl`）** — local と production で非対称なことが分かっており、',
-  );
-  lines.push('  扱いは #1715 が決める（現時点で private の default ACL は 0 件）');
+  lines.push('- default privileges は次節で比較する。差分検出は権限変更の承認を意味しない。');
   lines.push('');
 
+  lines.push('### default privileges（public / private / global）');
+  lines.push('');
+  lines.push('local と production の差は検出し、権限方針の判断は #1715 で行う。');
+  lines.push('');
+  lines.push('| owner | schema | object type | grantee | privileges |');
+  lines.push('| --- | --- | --- | --- | --- |');
+  for (const row of defaultAcls) {
+    lines.push(
+      `| ${cell(row.owner)} | ${cell(row.schema)} | ${cell(row.object_type)} | ${cell(row.grantee)} | ${cell(row.privileges)} |`,
+    );
+  }
+  lines.push('');
   lines.push('### private の owner（ACL 一覧から除外している主体）');
   lines.push('');
   lines.push('| 対象 | 名前 | owner |');
@@ -992,6 +1038,7 @@ async function main(): Promise<void> {
     }
 
     const raw = render({
+      defaultAcls: fetchDefaultAcls(),
       policies: fetchPolicies(),
       rlsTables: fetchRlsTables(),
       storagePolicies: fetchStoragePolicies(),
@@ -1024,7 +1071,11 @@ async function main(): Promise<void> {
     const existing = existsSync(OUTPUT_PATH) ? readFileSync(OUTPUT_PATH, 'utf8') : '';
     if (existing.trim() !== content.trim()) {
       console.error('❌ RLS snapshot が最新ではありません。');
-      console.error('   pnpm rls:snapshot を実行して更新してください。');
+      console.error(
+        process.env.RLS_SNAPSHOT_TRANSPORT === 'management-api'
+          ? '   production とrepository baselineの差分を調査してください。本番からbaselineを更新しないでください。'
+          : '   pnpm rls:snapshot を実行して更新してください。',
+      );
       process.exit(1);
     }
     console.log('✅ RLS snapshot は最新です。');

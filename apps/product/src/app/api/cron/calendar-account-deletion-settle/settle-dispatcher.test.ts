@@ -48,14 +48,14 @@ beforeEach(() => {
 });
 
 describe('dispatchCalendarAccountDeletionSettle', () => {
-  it('旧DBでは何もせず正常終了する', async () => {
+  it('旧DBでは処理をskipしたと報告する', async () => {
     rpc.mockReturnValue({
       abortSignal: vi.fn(async () => ({ data: null, error: { code: 'PGRST202' } })),
     });
 
     await expect(
       dispatchCalendarAccountDeletionSettle({ deadlineAt: FAR_DEADLINE }),
-    ).resolves.toMatchObject({ normalized: 0, inFlight: 0, other: 0, skipped: false });
+    ).resolves.toMatchObject({ normalized: 0, inFlight: 0, other: 0, skipped: true });
     expect(rpc).toHaveBeenCalledTimes(1);
   });
 
@@ -263,4 +263,22 @@ describe('dispatchCalendarAccountDeletionSettle', () => {
       });
     });
   });
+});
+
+it.each([
+  'list_expired_calendar_account_deletion_intents_v1',
+  'normalize_calendar_account_deletion_intent_v1',
+])('必要RPC %s が欠ければ完了として扱わない', async (missing) => {
+  rpc.mockImplementation((operation: string) => ({
+    abortSignal: vi.fn(async () => {
+      if (operation === missing) return { data: null, error: { code: 'PGRST202' } };
+      if (operation === 'get_external_lifecycle_app_version_v2') return { data: 1, error: null };
+      if (operation === 'list_expired_calendar_account_deletion_intents_v1')
+        return { data: [{ user_id: 'user-1', deletion_id: 'del-1' }], error: null };
+      return { data: 'normalized', error: null };
+    }),
+  }));
+  const result = await dispatchCalendarAccountDeletionSettle({ deadlineAt: FAR_DEADLINE });
+  expect(rpc).toHaveBeenCalledWith(missing, expect.anything());
+  expect(result).toMatchObject({ skipped: true, normalized: 0 });
 });

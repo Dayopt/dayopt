@@ -487,18 +487,11 @@ BSD-2-Clause: 12 packages (1.3%)
 
 ## 2. Routing の基準
 
-特定 provider の model tier や「coordinator は実装しない」という役割固定は持たない。作業ごとに次を順に決める。
+通常開発は ChatGPT Chat + Codex。短い協働原則は `AGENTS.md`、モデル選択と委譲の詳細は `.agents/skills/routing/SKILL.md` を正本とする。同じ主担当が調査・判断・実装・検証・修正まで完了し、初期の委譲対象は独立した read-only の大量調査に限る。
 
-1. ユーザーが確認できる成功条件、対象範囲、検証方法を固定する
-2. repo / docs / issue / command output で確認した事実と、未実測の仮説を分ける
-3. 決定的な script / CLI、担当 agent の直接実行、scoped delegation、別 provider の反証を意味のある選択肢として比較する
-4. 委譲は bounded scope と独立検証が可能で、引き渡し・待ち・統合の費用を上回る時だけ行う
-5. diff、実行結果、必要な UI / API / data flow を成功条件と突き合わせる
-6. issue / PR がある作業は、判断・進捗・ブロック・検証をそこへ残す
+Chat は product / UX・research・仕様整理、Codex は repo に基づく判断と実装を担う。受け渡しが必要な時だけ [Chat 連携手順](./chat-handoff.md) を読む。承認済みの目的・仕様・リスク境界内の技術判断を毎回 Chat に戻さない。
 
-OpenAI / Codex は実装を含む primary provider として使う。他 provider は auth / RLS / billing / migration / 公開契約などで、独立した反証の便益が費用を上回る時に任意で追加する。外部 provider の可用性は merge gate にしない。
-
-ChatGPT / Gemini 等への調査・資料整理・分析・説明作成の受け渡しは [Chat 連携手順](./chat-handoff.md) を使う。入口の判断は `routing`、GitHub の起票・状態管理は `dispatch` が持つ。利用枠と主担当の読み込み負担も比較し、人の画面操作待ちを必須工程にしない。実験と採否は対象 Issue に残す。
+モデル名は難しさ・影響・検証可能性に応じた初期目安であり、実測なしに効率を主張しない。`pnpm ctx` の既存 L0〜L3 / preparation は助言として維持し、別 agent の起動指示にしない。
 
 ## 3. Hook の共有と保証境界
 
@@ -527,27 +520,11 @@ Codex でこの project を初めて開く時は、project trust を確認し、
 
 新規・更新時は `.agents/skills/skill-design/SKILL.md` に従う。description / When to Use は provider-neutral にし、特定 model の名前を発火条件や必須 tier にしない。provider 固有の adapter は capability、scope、出力契約、generic fallback、実際の保証境界を併記する。
 
-## 5. Portable review interface
+## 5. Independent PR Review と追加契約
 
-クロスレビューの一次情報は provider の session ではなく immutable review pack に固定する。
+通常 PR の独立レビューは GitHub の `@codex review`。依頼・対象 SHA の照合・所見の裁定・再レビューは `.agents/skills/pr-cross-review/SKILL.md` を正本とする。実装 session の reviewer subagent や独自 pack を日常の必須工程にしない。未応答・古い結果・未実行は指摘0とは異なる。
 
-```bash
-pnpm review:pack --base <ref> --head <ref> \
-  --context <context-markdown-path> --verification <verification-markdown-path> \
-  --source <repo-relative-file> --out <new-directory>
-```
-
-pack は exact base / head SHA、pack ID、base から head への直接 diff、変更 path の before / after source、関連 source、role ごとの prompt と result-body schema を持つ。`--source` は繰り返せる。binary、欠落、1 MiB 超の source は omission として記録される。context と verification は非空、出力先は新規 directory とする。
-
-reviewer は read-only sandbox で provider 固有の tool を使い、同じ pack を読む。資料確認の `cat` / `rg` / `git show` 相当は許可するが、test や package install を含むコード実行、状態変更、nested agent は許可しない。result body を schema に合わせ、その外側に `packId`、`baseSha`、`headSha`、`provider`、`model`、`modelFamily`、`sessionId`、`independence`、`role` を持つ JSON envelope を付ける。`independence` は実態に応じて `separate-session` または `different-model-family` を記録する。固定 model、Claude Workflow、provider の多数決は共通契約に含めない。
-
-```bash
-pnpm review:validate --pack <directory> --result <result.json>
-```
-
-validator は `not-run`、`stale`、`partial`、`reviewed`、`invalid` を区別する。`invalid` は envelope / result の schema 違反で、必須 string が空白だけの場合も含む。`not-run` / `stale` / `partial` / `invalid` は非 0 exit、`reviewed` は findings の件数に関係なく 0 exit である。これは transport と provenance の検証であり、レビュー品質や merge 可否の判定ではない。`not-run`、`partial`、未収集 provider を指摘 0 件として集計しない。
-
-OpenAI / Codex を primary reviewer とする。auth / RLS / billing / migration / 公開契約などで独立した反証の価値がある時は、Claude Code や Antigravity を optional counterreview として追加できる。各 provider の所見は個別に failure scenario と一次情報を照合し、多数決で棄却しない。role の選択と投稿手順は `.agents/skills/pr-cross-review/SKILL.md` を正本とする。
+高リスク変更の immutable pack / role / envelope / validation は同 skill の `references/high-risk-review.md` に保持する。OpenAI / Codex を primary とし、別 provider の追加反証は任意。専用 security sweep と不可逆操作の独立レビュー条件は通常レビューで置き換えない。
 
 ### pack の種別と契約 version
 
@@ -603,6 +580,8 @@ native worktree root の fresh Codex session による共通指示・skills の�
 ---
 
 ## 履歴: Opus 4.7 Skill Triggers Migration
+
+以下は当時の移行記録であり、現在の発火規約ではない。旧モデル向けの要素数・形式・自動起動の推奨を現在のモデルへ自動適用しない。現行の正本は `skill-design` と各 skill。
 
 **Date**: 2026-04-17
 **Scope**: 現在の `.agents/skills/` に移行済みの project skills 12 個

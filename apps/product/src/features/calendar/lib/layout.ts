@@ -2,7 +2,7 @@
  * レイアウト計算エンジン — React/DOM依存ゼロの純粋関数
  *
  * Googleカレンダー風のsweep-lineアルゴリズムによる重複検出・カラム割り当て、
- * エントリカードの位置計算、予定vs記録の差分オーバーレイ計算を提供。
+ * タイムブロックカードの位置計算、予定vs記録の差分オーバーレイ計算を提供。
  */
 
 import type { TimeblockColumn, TimedTimeblock } from '../types/timeblock.types';
@@ -19,7 +19,7 @@ export { computeActualTimeDiffOverlay } from '@/features/timeblock';
 
 /** 重複レイアウト情報 */
 export interface TimeblockLayout {
-  entry: TimedTimeblock;
+  timeblock: TimedTimeblock;
   /** 左から何番目のカラム（0始まり） */
   column: number;
   /** その時間帯の総カラム数 */
@@ -32,7 +32,7 @@ export interface TimeblockLayout {
 
 /** 重複グループ */
 interface OverlapGroup {
-  entries: TimedTimeblock[];
+  timeblocks: TimedTimeblock[];
   startTime: Date;
   endTime: Date;
 }
@@ -42,30 +42,30 @@ interface OverlapGroup {
 // ========================================
 
 /**
- * エントリの重複レイアウトを一括計算（メインエントリポイント）
+ * タイムブロックの重複レイアウトを一括計算（メインの入口）
  *
  * Googleカレンダー風の横並び配置:
  * 1. Plan を左側（column: 0）に配置
  * 2. Record を右側に配置
  */
-export function calculateTimeblockLayouts(entries: TimedTimeblock[]): TimeblockLayout[] {
-  if (entries.length === 0) return [];
+export function calculateTimeblockLayouts(timeblocks: TimedTimeblock[]): TimeblockLayout[] {
+  if (timeblocks.length === 0) return [];
 
-  // Step 1: エントリを開始時間でソート
-  const sortedEntries = [...entries].sort((a, b) => {
+  // Step 1: タイムブロックを開始時間でソート
+  const sortedTimeblocks = [...timeblocks].sort((a, b) => {
     const aStart = new Date(a.start);
     const bStart = new Date(b.start);
     return aStart.getTime() - bStart.getTime();
   });
 
   // Step 2: 重複グループを検出
-  const overlapGroups = findOverlapGroups(sortedEntries);
+  const overlapGroups = findOverlapGroups(sortedTimeblocks);
 
   // Step 3: 各グループ内でレイアウトを計算
   const layouts: TimeblockLayout[] = [];
 
   overlapGroups.forEach((group) => {
-    const groupLayouts = calculateGroupLayout(group.entries);
+    const groupLayouts = calculateGroupLayout(group.timeblocks);
     layouts.push(...groupLayouts);
   });
 
@@ -73,29 +73,29 @@ export function calculateTimeblockLayouts(entries: TimedTimeblock[]): TimeblockL
 }
 
 /**
- * 重複するエントリグループを検出（sweep-line）
+ * 重複するタイムブロックグループを検出（sweep-line）
  */
-export function findOverlapGroups(entries: TimedTimeblock[]): OverlapGroup[] {
+export function findOverlapGroups(timeblocks: TimedTimeblock[]): OverlapGroup[] {
   const groups: OverlapGroup[] = [];
   let currentGroup: TimedTimeblock[] = [];
   let groupEndTime: Date | null = null;
 
-  entries.forEach((entry) => {
-    const timeblockStart = new Date(entry.start);
-    const timeblockEnd = new Date(entry.end);
+  timeblocks.forEach((timeblock) => {
+    const timeblockStart = new Date(timeblock.start);
+    const timeblockEnd = new Date(timeblock.end);
 
     if (!groupEndTime || timeblockStart >= groupEndTime) {
       if (currentGroup.length > 0) {
         groups.push({
-          entries: currentGroup,
+          timeblocks: currentGroup,
           startTime: new Date(currentGroup[0]!.start),
           endTime: groupEndTime!,
         });
       }
-      currentGroup = [entry];
+      currentGroup = [timeblock];
       groupEndTime = timeblockEnd;
     } else {
-      currentGroup.push(entry);
+      currentGroup.push(timeblock);
       if (timeblockEnd > groupEndTime) {
         groupEndTime = timeblockEnd;
       }
@@ -104,7 +104,7 @@ export function findOverlapGroups(entries: TimedTimeblock[]): OverlapGroup[] {
 
   if (currentGroup.length > 0 && groupEndTime) {
     groups.push({
-      entries: currentGroup,
+      timeblocks: currentGroup,
       startTime: new Date(currentGroup[0]!.start),
       endTime: groupEndTime,
     });
@@ -120,27 +120,27 @@ export function findOverlapGroups(entries: TimedTimeblock[]): OverlapGroup[] {
  * 1. Plan（type !== 'record'）を左側（column: 0）に配置
  * 2. Record（type === 'record'）を右側に配置
  */
-function calculateGroupLayout(entries: TimedTimeblock[]): TimeblockLayout[] {
+function calculateGroupLayout(timeblocks: TimedTimeblock[]): TimeblockLayout[] {
   const layouts: TimeblockLayout[] = [];
 
-  // 各エントリの「競合リスト」を作成
+  // 各タイムブロックの「競合リスト」を作成
   const conflicts = new Map<string, Set<string>>();
 
-  entries.forEach((entry1) => {
+  timeblocks.forEach((timeblock1) => {
     const conflictSet = new Set<string>();
-    entries.forEach((entry2) => {
-      if (entry1.id !== entry2.id && isOverlapping(entry1, entry2)) {
-        conflictSet.add(entry2.id);
+    timeblocks.forEach((timeblock2) => {
+      if (timeblock1.id !== timeblock2.id && isOverlapping(timeblock1, timeblock2)) {
+        conflictSet.add(timeblock2.id);
       }
     });
-    conflicts.set(entry1.id, conflictSet);
+    conflicts.set(timeblock1.id, conflictSet);
   });
 
-  // 各エントリにカラムを割り当て
+  // 各タイムブロックにカラムを割り当て
   const assignments = new Map<string, number>();
 
   // Plan を左、Record を右に安定配置するため、kind を優先してから開始時刻順に割り当てる。
-  const sortedForAssignment = [...entries].sort((a, b) => {
+  const sortedForAssignment = [...timeblocks].sort((a, b) => {
     if (a.kind === 'plan' && b.kind === 'record') return -1;
     if (a.kind === 'record' && b.kind === 'plan') return 1;
     const timeDiff = new Date(a.start).getTime() - new Date(b.start).getTime();
@@ -148,10 +148,10 @@ function calculateGroupLayout(entries: TimedTimeblock[]): TimeblockLayout[] {
     return 0;
   });
 
-  sortedForAssignment.forEach((entry) => {
+  sortedForAssignment.forEach((timeblock) => {
     const usedColumns = new Set<number>();
 
-    conflicts.get(entry.id)?.forEach((conflictId) => {
+    conflicts.get(timeblock.id)?.forEach((conflictId) => {
       if (assignments.has(conflictId)) {
         usedColumns.add(assignments.get(conflictId)!);
       }
@@ -162,7 +162,7 @@ function calculateGroupLayout(entries: TimedTimeblock[]): TimeblockLayout[] {
       column++;
     }
 
-    assignments.set(entry.id, column);
+    assignments.set(timeblock.id, column);
   });
 
   const maxConcurrent = Math.max(
@@ -171,37 +171,37 @@ function calculateGroupLayout(entries: TimedTimeblock[]): TimeblockLayout[] {
   );
 
   // レイアウト情報を生成
-  entries.forEach((entry) => {
-    const column = assignments.get(entry.id)!;
+  timeblocks.forEach((timeblock) => {
+    const column = assignments.get(timeblock.id)!;
     const width = 100 / maxConcurrent;
     const left = width * column;
 
-    layouts.push({ entry, column, totalColumns: maxConcurrent, width, left });
+    layouts.push({ timeblock, column, totalColumns: maxConcurrent, width, left });
   });
 
   return layouts;
 }
 
 /**
- * 2つのエントリが時間的に重複しているかを判定
+ * 2つのタイムブロックが時間的に重複しているかを判定
  *
  * 接触のみ（一方の end === 他方の start）は重複としない
  */
-export function isOverlapping(entry1: TimedTimeblock, entry2: TimedTimeblock): boolean {
-  return entry1.start < entry2.end && entry2.start < entry1.end;
+export function isOverlapping(timeblock1: TimedTimeblock, timeblock2: TimedTimeblock): boolean {
+  return timeblock1.start < timeblock2.end && timeblock2.start < timeblock1.end;
 }
 
 /**
  * 最大同時重複数を計算（sweep-line）
  */
-export function calculateMaxConcurrent(entries: TimedTimeblock[]): number {
+export function calculateMaxConcurrent(timeblocks: TimedTimeblock[]): number {
   const timePoints: { time: Date; type: 'start' | 'end'; timeblockId: string }[] = [];
 
-  entries.forEach((entry) => {
-    const start = new Date(entry.start);
-    const end = new Date(entry.end);
-    timePoints.push({ time: start, type: 'start', timeblockId: entry.id });
-    timePoints.push({ time: end, type: 'end', timeblockId: entry.id });
+  timeblocks.forEach((timeblock) => {
+    const start = new Date(timeblock.start);
+    const end = new Date(timeblock.end);
+    timePoints.push({ time: start, type: 'start', timeblockId: timeblock.id });
+    timePoints.push({ time: end, type: 'end', timeblockId: timeblock.id });
   });
 
   timePoints.sort((a, b) => {
@@ -226,29 +226,29 @@ export function calculateMaxConcurrent(entries: TimedTimeblock[]): number {
 }
 
 // ========================================
-// エントリカード配置
+// タイムブロックカード配置
 // ========================================
 
 /**
- * エントリグループを検出（重複するエントリをグループ化）
+ * タイムブロックグループを検出（重複するタイムブロックをグループ化）
  */
-export function detectOverlapGroups(entries: TimedTimeblock[]): TimedTimeblock[][] {
-  if (entries.length === 0) return [];
+export function detectOverlapGroups(timeblocks: TimedTimeblock[]): TimedTimeblock[][] {
+  if (timeblocks.length === 0) return [];
 
-  const sortedEntries = [...entries].sort((a, b) => a.start.getTime() - b.start.getTime());
+  const sortedTimeblocks = [...timeblocks].sort((a, b) => a.start.getTime() - b.start.getTime());
   const groups: TimedTimeblock[][] = [];
 
-  for (const entry of sortedEntries) {
+  for (const timeblock of sortedTimeblocks) {
     let added = false;
     for (const group of groups) {
-      if (group.some((p) => isOverlapping(p, entry))) {
-        group.push(entry);
+      if (group.some((p) => isOverlapping(p, timeblock))) {
+        group.push(timeblock);
         added = true;
         break;
       }
     }
     if (!added) {
-      groups.push([entry]);
+      groups.push([timeblock]);
     }
   }
 
@@ -256,15 +256,15 @@ export function detectOverlapGroups(entries: TimedTimeblock[]): TimedTimeblock[]
 }
 
 /**
- * エントリの表示位置を計算
+ * タイムブロックの表示位置を計算
  */
 export function calculateTimeblockPosition(
-  entry: TimedTimeblock,
+  timeblock: TimedTimeblock,
   column: TimeblockColumn,
   hourHeight: number = 60,
 ): { top: number; height: number; left: number; width: number } {
-  const startMinutes = entry.start.getHours() * 60 + entry.start.getMinutes();
-  const endMinutes = entry.end.getHours() * 60 + entry.end.getMinutes();
+  const startMinutes = timeblock.start.getHours() * 60 + timeblock.start.getMinutes();
+  const endMinutes = timeblock.end.getHours() * 60 + timeblock.end.getMinutes();
 
   const top = (startMinutes * hourHeight) / 60;
   const height = Math.max(((endMinutes - startMinutes) * hourHeight) / 60, MIN_EVENT_HEIGHT);

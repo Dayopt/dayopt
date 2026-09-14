@@ -208,6 +208,13 @@ export function shouldRunProductUnitTests(productUnit) {
   return !isFalseFlag(productUnit);
 }
 
+/** Protocol failures must fail the existing required unit job, not a detached advisory job. */
+export function runMcpConformance(affected, execute = run) {
+  if (!isFalseFlag(affected)) {
+    execute('pnpm', ['--filter', '@dayopt/product', 'test:mcp:conformance']);
+  }
+}
+
 /** DB を触らない PR では Supabase の起動自体を省略する（affected 判定）。 */
 export function shouldRunIntegrationTests(integrationAffected) {
   return !isFalseFlag(integrationAffected);
@@ -499,6 +506,7 @@ async function runUnit() {
   } else {
     console.log('product 影響なしのため product unit test を skip します。');
   }
+  runMcpConformance(process.env.MCP_CONFORMANCE);
   run('pnpm', ['test:web']);
   run('pnpm', ['--filter', '@dayopt/billing', 'test:run']);
   run('pnpm', ['--filter', '@dayopt/i18n', 'test:run']);
@@ -534,7 +542,34 @@ async function runIntegration() {
   }
 
   run('pnpm', ['test:integration']);
+  run(
+    'psql',
+    [
+      '-h',
+      '127.0.0.1',
+      '-p',
+      '54322',
+      '-U',
+      'postgres',
+      '-d',
+      'postgres',
+      '-v',
+      'ON_ERROR_STOP=1',
+      '-c',
+      'SET app.isolated_validation = on',
+      '-f',
+      'supabase/tests/cron-heartbeats.sql',
+    ],
+    { env: { ...process.env, PGPASSWORD: 'postgres' } },
+  );
   run('pnpm', ['rls:snapshot:check']);
+  run('pnpm', ['types:generate:local']);
+  run('git', [
+    'diff',
+    '--exit-code',
+    '--',
+    'apps/product/src/lib/database/generated/database.types.ts',
+  ]);
 }
 
 /**

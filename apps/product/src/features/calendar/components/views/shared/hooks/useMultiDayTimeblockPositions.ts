@@ -111,10 +111,11 @@ export function useMultiDayTimeblockPositions({
   // レイアウト情報をTimeblockPositionに変換
   const timeblockPositions = useMemo((): TimeblockPosition[] => {
     return timeblockLayouts.map((layout: TimeblockLayout, index: number) => {
-      const entry = timeblockMap.get(layout.entry.id) ?? (layout.entry as CalendarDisplayEvent);
+      const entry =
+        timeblockMap.get(layout.timeblock.id) ?? (layout.timeblock as CalendarDisplayEvent);
       const { top, height } = layoutEntryToVerticalPosition(
-        new Date(layout.entry.start),
-        new Date(layout.entry.end),
+        new Date(layout.timeblock.start),
+        new Date(layout.timeblock.end),
         hourHeight,
       );
 

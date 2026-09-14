@@ -88,6 +88,7 @@ jobs:
     outputs:
       docs_only: ${{ steps.run.outputs.docs_only }}
       product_unit: ${{ steps.run.outputs.product_unit }}
+      mcp_conformance: ${{ steps.run.outputs.mcp_conformance }}
       integration: ${{ steps.run.outputs.integration }}
       functions_changed: ${{ steps.run.outputs.functions_changed }}
     steps:
@@ -174,6 +175,7 @@ jobs:
           GITHUB_EVENT_NAME: ${{ github.event_name }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           PRODUCT_UNIT: ${{ needs.impact.outputs.product_unit }}
+          MCP_CONFORMANCE: ${{ needs.impact.outputs.mcp_conformance }}
           NODE_ENV: test
           CI: true
         run: node scripts/ci/check.mjs unit

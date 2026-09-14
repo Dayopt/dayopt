@@ -1,4 +1,4 @@
-import { expect, type Page, test } from '@playwright/test';
+import { expect, type Page } from '@playwright/test';
 import { createClient } from '@supabase/supabase-js';
 
 import type { Database } from '@/lib/database';
@@ -7,6 +7,9 @@ import {
   resolveServiceRoleTarget,
 } from '../service-role-target-guard';
 import { suppressConsentBanner } from './suppress-consent-banner';
+import { test } from './trpc-budget-fixture';
+
+test.use({ trpcProcedureBudget: 26 });
 
 /**
  * クリティカルパス E2E — 計画 → 実績 → 振り返りの中核ループを実 UI 操作で通す
