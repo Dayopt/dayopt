@@ -90,6 +90,15 @@ describe('production schema and query boundary', () => {
   });
   it('connects both failure results to the existing issue notification job', () => {
     const workflow = readFileSync('.github/workflows/production-config-audit.yml', 'utf8');
+    for (const source of [
+      'scripts/ci/production-cron-heartbeat-audit.mjs',
+      'scripts/ci/production-schema-drift-audit.mjs',
+      'scripts/lib/production-db-readonly.mjs',
+      'scripts/tasks/generate-rls-snapshot.ts',
+      'docs/engineering/data/db/rls-snapshot.md',
+    ]) {
+      expect(workflow.split('  push:')[1]!.split('  schedule:')[0]).toContain(source);
+    }
     expect(workflow).toContain('needs: [auth-config, storage-rls, cron-heartbeat, schema-drift]');
     expect(workflow).toContain("needs.cron-heartbeat.result == 'failure'");
     expect(workflow).toContain("needs.schema-drift.result == 'failure'");
