@@ -96,11 +96,13 @@ own SHA from `getBuildSha()` in `src/lib/app-info.ts`. It learns the deployed SH
   `/sw.js?v=<old sha>` URL.
 
 `useApplyUpdateWhenSafe`, next to `ServiceWorkerProvider`, reloads the page once the page is stale,
-visible, and safe. Safe means no mutation is in flight, the Inspector holds no create-mode or duplicate
-draft, no modal or sheet is open, and no input has focus. When the page is not safe it does nothing and
-checks again on the next tab return. It never reloads the instant the page becomes safe, because the user
-was just interacting. A `sessionStorage` flag (`dayopt:auto-update-reloaded`) records the target SHA, so
-a delayed CDN rollout cannot cause a reload loop.
+visible, online, and safe. Safe means no mutation is in flight, the Inspector holds no create-mode or
+duplicate draft, no dialog, sheet, or menu is open in the DOM, and no input has focus. A component that
+keeps unsaved input outside those signals registers `useBlockAutoReload` from
+`src/lib/pwa/auto-reload-blockers.ts`; the Inspector form does this while a write is unresolved. When the
+page is not safe it does nothing and checks again on the next tab return. It never reloads the instant the
+page becomes safe, because the user was just interacting. A `sessionStorage` flag
+(`dayopt:auto-update-reloaded`) records the target SHA, so a delayed CDN rollout cannot cause a reload loop.
 
 Navigation requests are Network First, so the first load after a promote already renders the new HTML.
 
@@ -140,6 +142,7 @@ Until those conditions are met, failed or unavailable mutations follow the norma
 
 ```text
 src/lib/pwa/
+├── auto-reload-blockers.ts
 ├── build-staleness.ts
 ├── chunk-load-recovery.ts
 ├── install-prompt.ts

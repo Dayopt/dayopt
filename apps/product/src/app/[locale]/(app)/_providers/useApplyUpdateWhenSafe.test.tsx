@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { useBlockAutoReload } from '@/lib/pwa/auto-reload-blockers';
 import { useShellStore } from '@/lib/stores/useShellStore';
 
 import { useTimeblockInspectorStore } from '@/features/timeblock';
@@ -40,6 +41,7 @@ describe('useApplyUpdateWhenSafe', () => {
 
   afterEach(() => {
     document.body.innerHTML = '';
+    vi.restoreAllMocks();
   });
 
   it('古くなければ何もしない', () => {
@@ -139,5 +141,41 @@ describe('useApplyUpdateWhenSafe', () => {
       document.dispatchEvent(new Event('visibilitychange'));
     });
     expect(applyUpdate).toHaveBeenCalledOnce();
+  });
+  it('state にだけ入力を持つダイアログが開いている間はリロードしない', () => {
+    // activeSheet を通らない自前管理のダイアログ（SegmentEditDialog など）
+    const dialog = document.createElement('div');
+    dialog.setAttribute('role', 'dialog');
+    const checkbox = document.createElement('button');
+    dialog.appendChild(checkbox);
+    document.body.appendChild(dialog);
+    checkbox.focus();
+
+    const { applyUpdate } = renderApply({ updateAvailable: true, latestVersion: '99999999' });
+
+    expect(applyUpdate).not.toHaveBeenCalled();
+  });
+
+  it('未保存の入力を持つ component が止めている間はリロードせず、外れたら次の復帰でリロードする', () => {
+    const blocker = renderHook((active: boolean) => useBlockAutoReload(active), {
+      initialProps: true,
+    });
+    const { applyUpdate } = renderApply({ updateAvailable: true, latestVersion: '99999999' });
+    expect(applyUpdate).not.toHaveBeenCalled();
+
+    blocker.rerender(false);
+    act(() => {
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+
+    expect(applyUpdate).toHaveBeenCalledOnce();
+  });
+
+  it('オフラインの間はリロードしない', () => {
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+
+    const { applyUpdate } = renderApply({ updateAvailable: true, latestVersion: '99999999' });
+
+    expect(applyUpdate).not.toHaveBeenCalled();
   });
 });

@@ -20,6 +20,7 @@ import { useActivitiesMap, useCreateActivity } from '@/features/activities';
 import { isBillingAccessEndedError } from '@/lib/billing/client-access-error';
 import type { PublicPlanRow, PublicRecordRow } from '@/lib/database';
 import { useDebouncedCallback } from '@/lib/hooks/useDebounce';
+import { useBlockAutoReload } from '@/lib/pwa/auto-reload-blockers';
 import { toast } from '@/lib/toast';
 import { Button } from '@dayopt/components';
 
@@ -345,6 +346,8 @@ export function TimeblockInspectorForm({
   );
 
   const isWriteFrozen = isPreparingAction || isRecoveringConflict || hasUnresolvedWrite;
+  // 保存を止めて入力を画面にだけ残している間は、新しい deploy への自動リロードで消さない
+  useBlockAutoReload(hasUnresolvedWrite || hasBillingDraft || isRecoveringConflict);
   const setActionPreparing = useCallback((preparing: boolean) => {
     actionPreparingRef.current = preparing;
     setIsPreparingAction(preparing);

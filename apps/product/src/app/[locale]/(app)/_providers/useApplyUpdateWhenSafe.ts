@@ -4,6 +4,8 @@ import { useCallback, useEffect } from 'react';
 
 import { useQueryClient } from '@tanstack/react-query';
 
+import { hasOpenKeyboardOverlay } from '@/lib/keyboard/keyboard-overlay';
+import { isAutoReloadBlocked } from '@/lib/pwa/auto-reload-blockers';
 import { useShellStore } from '@/lib/stores/useShellStore';
 
 import { useTimeblockInspectorStore } from '@/features/timeblock';
@@ -51,11 +53,13 @@ function markReloaded(version: string): boolean {
  * 更新の通知 UI は持たない。次のどれかに当たる間は何もせず、次にタブへ戻った時に判定し直す。
  * 「安全になった瞬間」には追いかけてリロードしない。直前まで操作していた画面が消えるため。
  *
- * - タブが見えていない
+ * - タブが見えていない、またはオフライン（リロードすると `/offline` に落ちる）
  * - 保存中の mutation がある（楽観的更新の確定前）
  * - Inspector が作成モードか複製の下書きを持っている（保存前の入力が store にしかない）
- * - モーダル / シートが開いている
+ * - ダイアログ / シート / メニューが DOM 上で開いている。component の state にだけ入力を
+ *   持つダイアログを、個別に登録しなくてもまとめて守る
  * - 入力欄にフォーカスがある
+ * - 未保存の入力を持つ component が `useBlockAutoReload` で止めている
  *
  * 同じ版へ向けたリロードは sessionStorage で 1 回に抑える。配信の反映遅れでリロード後も
  * 古いままだった場合に、リロードを繰り返さないため。
@@ -70,11 +74,14 @@ export function useApplyUpdateWhenSafe({
   const tryApply = useCallback(() => {
     if (!updateAvailable) return;
     if (document.visibilityState !== 'visible') return;
+    if (!navigator.onLine) return;
     if (queryClient.isMutating() > 0) return;
+    if (isAutoReloadBlocked()) return;
 
     const inspector = useTimeblockInspectorStore.getState();
     if (inspector.createMode || inspector.duplicateDraft !== null) return;
     if (useShellStore.getState().activeSheet !== null) return;
+    if (hasOpenKeyboardOverlay()) return;
     if (isEditableElementFocused()) return;
 
     const version = latestVersion ?? 'unknown';
