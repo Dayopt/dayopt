@@ -428,13 +428,13 @@ master へ値を戻す時は GUI か対象を限定した `op item create` / `op
 
 基本方針 7「値がどこに存在していようと、必ず 1Password にもある」を検査可能にするための列挙。**この表に載っていない場所に長寿命の実値が存在したら、それ自体が違反**（発見したら master へ登録するか撤去し、この表を更新する）。
 
-| 場所                                         | master                                                                                                              | 機械検証                                                                                                                                                           |
-| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Vercel Production Env（product / web）       | `scripts/tasks/env/schema.ts` の各 entry                                                                            | `production-config-audit.mjs`（台帳 → replica）+ `pnpm replica:check`（replica → 台帳、§Verification）                                                             |
-| Vercel Preview Env（`RECOVERY_CODE_PEPPER`） | `agent` / `human` の `app`（Preview 維持の経緯は [Environment Secrets](./security/environment-secrets.md) §Vercel） | 無し                                                                                                                                                               |
-| GitHub Secrets                               | `ci` vault（`scripts/tasks/env/schema.ts` の `ciSecretSchema`）                                                     | `scripts/__tests__/ci-secret-ledger.test.ts`（workflow が参照する名前 ⇔ 台帳。値と、どの workflow も参照しない Secret は見ない。一覧 API は admin 権限が要るため） |
-| Supabase Dashboard Secrets                   | `agent/turnstile` 等（下記 §Supabase Dashboard Secrets）                                                            | 無し                                                                                                                                                               |
-| PR Preview Branch credentials                | 1Password 非保存（基本方針の既知の例外。ephemeral）                                                                 | —                                                                                                                                                                  |
+| 場所                                                                          | master                                                                                                              | 機械検証                                                                                                                                                           |
+| ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Vercel Production Env（product / web）                                        | `scripts/tasks/env/schema.ts` の各 entry                                                                            | `production-config-audit.mjs`（台帳 → replica）+ `pnpm replica:check`（replica → 台帳、§Verification）                                                             |
+| Vercel Preview Env（`RECOVERY_CODE_PEPPER`）                                  | `agent` / `human` の `app`（Preview 維持の経緯は [Environment Secrets](./security/environment-secrets.md) §Vercel） | 無し                                                                                                                                                               |
+| GitHub Actions environment secrets（`production-release` / `production-ops`） | `ci` vault（`scripts/tasks/env/schema.ts` の `ciSecretSchema`）                                                     | `scripts/__tests__/ci-secret-ledger.test.ts`（workflow が参照する名前 ⇔ 台帳。値と、どの workflow も参照しない Secret は見ない。一覧 API は admin 権限が要るため） |
+| Supabase Dashboard Secrets                                                    | `agent/turnstile` 等（下記 §Supabase Dashboard Secrets）                                                            | 無し                                                                                                                                                               |
+| PR Preview Branch credentials                                                 | 1Password 非保存（基本方針の既知の例外。ephemeral）                                                                 | —                                                                                                                                                                  |
 
 ### Bootstrap 例外台帳
 
@@ -474,6 +474,19 @@ Contact送信用の`RESEND_API_KEY` / `RESEND_FROM_EMAIL`とapp別`RESEND_WEBHOO
 ### GitHub Secrets
 
 GitHub Actions Secrets は CI/CD 用の replica。build / e2e 用 public env などは 1Password から手動同期する。Migration は Supabase GitHub integration が担当するため、GitHub Actions から `supabase db push` しない。
+
+**CI の Secret は repo 単位ではなく environment に置く**（2026-09-14、ci vault 整理）。repo 単位の Secret は、同じ repo の任意の branch に workflow を足すだけで読める（`pull_request` の同一 repo branch にも渡る）。GitHub App（Claude / Codex / Slack）は workflows の書き込み権限を持つため、この経路は実際に開いていた。environment の deployment branch policy を `main` だけにすると、他 branch の workflow が `environment:` を宣言しても secrets を受け取れない。
+
+| environment          | 使う job                                                                                                 | Secret                                                                                                                                                       |
+| -------------------- | -------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `production-release` | `promote.yml` の impact / release                                                                        | `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_AUTOMATION_BYPASS_PRODUCT`, `VERCEL_AUTOMATION_BYPASS_WEB`                                                          |
+| `production-ops`     | `production-config-audit.yml` の Vercel / Supabase 監査、`nightly.yml` の replica check / Storage backup | `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `SUPABASE_AUTH_AUDIT_TOKEN`, `SUPABASE_STORAGE_RLS_AUDIT_TOKEN`, `RCLONE_CONFIG_SOURCE_*`（6）, `RCLONE_CONFIG_DEST_*`（6） |
+
+- **deployment 記録は作らない**: release job 以外は `environment: { name, deployment: false }` で宣言する（15 分おきの監査が deployment を積まないため）。branch policy は `deployment: false` でも効く
+- **`pull_request_target` と `schedule`**: GitHub は default branch（`main`）の ref で policy を評価するので、Production Config Audit の PR 検査と定期実行はそのまま通る。`workflow_dispatch` を `main` 以外の ref で起動すると、environment が拒否する
+- **同期の手順**: `scripts/runbook/sync-ci-environment-secrets.sh` を User の terminal で実行する（既定 dry-run、`--execute` で反映、`--only <Secret 名>` で 1 つだけ）。値は `op read` から `gh secret set --env` へ pipe で渡し、表示しない。一覧は `ciSecretSchema` の `githubEnvironments` と 1:1 で、`scripts/__tests__/ci-secret-ledger.test.ts` が workflow の宣言・script の一覧と照合する
+- **rotation 時**: 1Password master を更新したら、この script の `--only` で該当 Secret を environment へ同期する。`VERCEL_TOKEN` / `VERCEL_ORG_ID` は 2 つの environment に複製しているので、両方が更新される
+- **Team プランの private repo でも使える**: environment secret と deployment branch policy は GitHub Team の private repo で使える。required reviewers は Enterprise が要るので使わない
 
 ### Supabase Dashboard Secrets
 

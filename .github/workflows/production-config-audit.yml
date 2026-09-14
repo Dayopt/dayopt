@@ -119,6 +119,11 @@ jobs:
     # finish-branch.sh の畳み込みが「判定を持つ entry を優先」で処理する（ci.yml の重量 job と同型）。
     if: github.event.schedule != '*/15 * * * *' && (github.event_name != 'pull_request_target' || github.event.pull_request.draft == false)
     runs-on: ubuntu-latest
+    # Secret は main からだけ使える environment に置く（2026-09-14、ci vault 整理）。
+    # 他 branch の workflow から secrets を読めないようにするためで、deployment 記録は作らない
+    environment:
+      name: production-ops
+      deployment: false
     timeout-minutes: 5
     steps:
       # pull_request_target must execute only the trusted base revision, never PR code.
@@ -240,6 +245,11 @@ jobs:
     name: Check production deploy health (trusted)
     if: github.event_name == 'push' || (github.event_name == 'schedule' && github.event.schedule != '*/15 * * * *')
     runs-on: ubuntu-latest
+    # Secret は main からだけ使える environment に置く（2026-09-14、ci vault 整理）。
+    # 他 branch の workflow から secrets を読めないようにするためで、deployment 記録は作らない
+    environment:
+      name: production-ops
+      deployment: false
     timeout-minutes: 5
     permissions:
       contents: read
@@ -361,6 +371,11 @@ jobs:
     name: Audit Supabase Auth config (trusted)
     if: github.event_name == 'push' || (github.event_name == 'schedule' && github.event.schedule != '*/15 * * * *')
     runs-on: ubuntu-latest
+    # Secret は main からだけ使える environment に置く（2026-09-14、ci vault 整理）。
+    # 他 branch の workflow から secrets を読めないようにするためで、deployment 記録は作らない
+    environment:
+      name: production-ops
+      deployment: false
     timeout-minutes: 5
     permissions:
       contents: read
@@ -406,6 +421,11 @@ jobs:
     name: Audit production storage.objects RLS (trusted)
     if: github.event_name == 'push' || (github.event_name == 'schedule' && github.event.schedule != '*/15 * * * *')
     runs-on: ubuntu-latest
+    # Secret は main からだけ使える environment に置く（2026-09-14、ci vault 整理）。
+    # 他 branch の workflow から secrets を読めないようにするためで、deployment 記録は作らない
+    environment:
+      name: production-ops
+      deployment: false
     timeout-minutes: 5
     permissions:
       contents: read
@@ -441,6 +461,11 @@ jobs:
     name: Audit production cron heartbeats (trusted)
     if: github.event_name == 'push' || github.event_name == 'schedule'
     runs-on: ubuntu-latest
+    # Secret は main からだけ使える environment に置く（2026-09-14、ci vault 整理）。
+    # 他 branch の workflow から secrets を読めないようにするためで、deployment 記録は作らない
+    environment:
+      name: production-ops
+      deployment: false
     timeout-minutes: 5
     permissions:
       contents: read
@@ -463,6 +488,11 @@ jobs:
     name: Audit production schema and ACL (trusted)
     if: github.event_name == 'push' || (github.event_name == 'schedule' && github.event.schedule != '*/15 * * * *')
     runs-on: ubuntu-latest
+    # Secret は main からだけ使える environment に置く（2026-09-14、ci vault 整理）。
+    # 他 branch の workflow から secrets を読めないようにするためで、deployment 記録は作らない
+    environment:
+      name: production-ops
+      deployment: false
     timeout-minutes: 10
     permissions:
       contents: read
