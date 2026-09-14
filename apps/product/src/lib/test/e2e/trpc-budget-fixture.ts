@@ -32,6 +32,10 @@ export const test = base.extend<{
       page.on('request', onRequest);
       page.on('response', onResponse);
       await use();
+      // 保存やreload直後に残る通信の応答も観測してから予算を確定する。
+      if (testInfo.status === 'passed') {
+        await page.waitForLoadState('networkidle', { timeout: 5_000 });
+      }
       page.off('request', onRequest);
       page.off('response', onResponse);
       if (testInfo.status === 'skipped') return;
