@@ -182,6 +182,8 @@ jobs:
 
       - uses: ./.github/actions/setup
 
+      # product unit は PR では変更から届く test（vitest related）+ fs を読む契約 test に絞り、
+      # full は nightly.yml の product-unit-full が毎日走らせる（check.mjs resolveProductUnitScope、#2743）。
       - name: Run unit tests (+ migration safety)
         id: run
         env:

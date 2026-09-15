@@ -112,7 +112,12 @@ jobs:
     name: "\U0001F3AD E2E Tests"
     needs: impact
     if: ${{ needs.impact.outputs.product_affected == 'true' && github.event.inputs.force != 'true' }}
-    runs-on: ubuntu-latest
+    # repo variable `PROMOTE_E2E_RUNNER`（JSON。例: ["self-hosted","linux","dayopt-e2e"]）で
+    # self-hosted runner へ寄せられる。未設定なら ubuntu-latest（従来どおり）。private repo の
+    # Actions 分課金で最大の main push job を runner 側へ逃がすための切替で、戻す時は変数を
+    # 消すだけ（docs/operations/self-hosted-runner.md、#2743）。**寄せてよいのはこの job だけ**:
+    # web / release / notify は token を持つか外部へ書くので GitHub-hosted に固定する。
+    runs-on: ${{ fromJSON(vars.PROMOTE_E2E_RUNNER || '"ubuntu-latest"') }}
     timeout-minutes: 20
     concurrency:
       group: promote-layer3-e2e-${{ github.ref }}
@@ -123,6 +128,14 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+
+      # 以降の step は apt（--with-deps）/ jq / Docker を前提にする。self-hosted を macOS で
+      # 登録すると途中で分かりにくく落ちるので、入口で止める。
+      - name: Require a Linux runner
+        if: runner.os != 'Linux'
+        run: |
+          echo "::error::E2E job は Linux runner 前提です（runner.os=${RUNNER_OS}）。PROMOTE_E2E_RUNNER を見直すか削除してください。"
+          exit 1
 
       - uses: ./.github/actions/setup
 
@@ -155,8 +168,11 @@ jobs:
           echo "anon_key=$ANON_KEY" >> $GITHUB_OUTPUT
           echo "service_role_key=$SERVICE_ROLE_KEY" >> $GITHUB_OUTPUT
 
+      # Mobile Chrome は `@mobile` tag の test だけを持つ（playwright.config.ts の grep）。
+      # 同じ invocation に入れて build / webServer を 1 回で済ませる（#2743）。
       - name: Run E2E tests
-        run: pnpm --dir apps/product exec playwright test --project="chromium"
+        id: e2e
+        run: pnpm --dir apps/product exec playwright test --project="chromium" --project="Mobile Chrome"
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ steps.supabase.outputs.api_url }}
           NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ steps.supabase.outputs.anon_key }}
@@ -171,12 +187,22 @@ jobs:
         if: always()
         run: supabase stop
 
+      # retry-pass（初回失敗 → retry で成功）を「最終的に緑」に埋もれさせない（#2743）。
+      # retry-pass では落とさず、Step Summary と warning 注釈で見せる。
+      - name: Report E2E retries
+        if: always()
+        env:
+          E2E_TEST_OUTCOME: ${{ steps.e2e.outcome }}
+        run: node scripts/ci/e2e-retry-report.mjs apps/product/test-results/e2e-results.json --label product --file-prefix apps/product/src/lib/test/e2e/
+
       - name: Upload report
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
           name: playwright-report
-          path: apps/product/playwright-report/
+          path: |
+            apps/product/playwright-report/
+            apps/product/test-results/e2e-results.json
           retention-days: 7
 
       - name: Upload screenshots on failure
@@ -218,14 +244,23 @@ jobs:
         run: pnpm --filter @dayopt/web exec playwright install --with-deps chromium chromium-headless-shell
 
       - name: Run web E2E tests
+        id: web_e2e
         run: pnpm --filter @dayopt/web test:e2e:smoke
+
+      - name: Report web E2E retries
+        if: always()
+        env:
+          E2E_TEST_OUTCOME: ${{ steps.web_e2e.outcome }}
+        run: node scripts/ci/e2e-retry-report.mjs apps/web/test-results/e2e-results.json --label web --file-prefix apps/web/src/test/e2e/
 
       - name: Upload web report
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
           name: web-playwright-report
-          path: apps/web/playwright-report/
+          path: |
+            apps/web/playwright-report/
+            apps/web/test-results/e2e-results.json
           retention-days: 7
 
       - name: Upload web test results on failure

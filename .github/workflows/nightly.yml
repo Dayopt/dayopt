@@ -42,6 +42,7 @@ on:
           - replica-check
           - status-label-sweep
           - storage-backup
+          - unit-full
           - all
         default: replica-check
       dry_run:
@@ -84,6 +85,36 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: node scripts/ci/strip-status-labels.mjs bulk --execute --budget-seconds 480
+
+  # ─── product unit の full 実行（#2743）──────────────────────────────
+  # PR の Unit job は product unit を `vitest related`（変更が import graph で届く test）に
+  # 絞っている（scripts/ci/check.mjs resolveProductUnitScope）。graph で追えない漏れ
+  # （削除した module を vi.mock の文字列で参照する等）を最大 1 日で拾う backstop。
+  # 04:30 JST の cron（status-label-sweep と同じ枠）に同居させ、cron を増やさない。
+  product-unit-full:
+    name: Product unit tests (full)
+    if: github.event.schedule == '30 19 * * *' || (github.event_name == 'workflow_dispatch' && (github.event.inputs.jobs == 'unit-full' || github.event.inputs.jobs == 'all'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    concurrency:
+      group: nightly-product-unit-full
+      cancel-in-progress: true
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: ./.github/actions/setup
+
+      - name: Run unit tests (full)
+        env:
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+          CI_UNIT_MODE: full
+          NODE_ENV: test
+          CI: true
+        run: node scripts/ci/check.mjs unit
 
   # ─── replica-check（旧 replica-check.yml）───────────────────────────
   replica-check:
@@ -209,10 +240,11 @@ jobs:
   # skipped（cron 振り分けで走らない job）は失敗ではない。
   notify-failure:
     name: File nightly failure
-    needs: [status-label-sweep, replica-check, storage-backup-export]
+    needs: [status-label-sweep, product-unit-full, replica-check, storage-backup-export]
     if: >-
       ${{ !cancelled()
           && ( needs.status-label-sweep.result == 'failure'
+               || needs.product-unit-full.result == 'failure'
                || needs.replica-check.result == 'failure'
                || needs.storage-backup-export.result == 'failure' ) }}
     runs-on: ubuntu-latest
@@ -226,6 +258,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           SWEEP_RESULT: ${{ needs.status-label-sweep.result }}
+          UNIT_RESULT: ${{ needs.product-unit-full.result }}
           REPLICA_RESULT: ${{ needs.replica-check.result }}
           BACKUP_RESULT: ${{ needs.storage-backup-export.result }}
           EVENT_NAME: ${{ github.event_name }}
@@ -241,6 +274,10 @@ jobs:
             hints="$hints
           - **replica-check**: Vercel production env と 1Password 台帳（\`scripts/tasks/env/schema.ts\`）の不一致。\`pnpm replica:check\` を手元で再現し、\`docs/operations/secrets.md\` に従って同期する"
           fi
+          if [ "$UNIT_RESULT" = "failure" ]; then
+            hints="$hints
+          - **product-unit-full**: PR では related に絞った product unit が main の full 実行で落ちた。PR の判定（\`scripts/ci/check.mjs\` の \`resolveProductUnitScope\`）が拾えなかった依存があるので、落ちた test を直すのに加え、その依存の種類を full 側へ倒す規則に足す（docs/engineering/testing.md §いつ回すか）"
+          fi
           if [ "$SWEEP_RESULT" = "failure" ]; then
             hints="$hints
           - **status-label-sweep**: \`scripts/ci/strip-status-labels.mjs bulk\` の失敗。実害は closed issue に \`status:*\` が残るだけ（queue 検索は \`is:open\` 付きが通常）。翌日の cron で再試行される"
@@ -250,6 +287,7 @@ jobs:
           | job | result |
           | --- | --- |
           | status:* ラベルの batch sweep | \`$SWEEP_RESULT\` |
+          | Product unit tests (full) | \`$UNIT_RESULT\` |
           | Check Vercel replica against 1Password ledger | \`$REPLICA_RESULT\` |
           | Export Supabase Storage to R2 | \`$BACKUP_RESULT\` |
 

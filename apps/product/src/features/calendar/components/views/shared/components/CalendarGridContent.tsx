@@ -383,6 +383,8 @@ export const CalendarGridContent = React.memo(function CalendarGridContent({
       Array.from({ length: 24 }, (_, hour) => (
         <div
           key={hour}
+          // E2E が「この時間帯」へ touch を落とす足場（handler div の子孫である必要がある）
+          data-calendar-hour={hour}
           className={`relative ${hour < 23 ? 'border-border-subtle border-b' : ''}`}
           style={{ height: HOUR_HEIGHT }}
         />

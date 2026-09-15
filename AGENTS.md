@@ -88,7 +88,7 @@ Dayopt で作業する全エージェントの provider-neutral な正本ガイ�
 - 既存の未コミット差分はユーザー作業として扱い、勝手に revert / stage しない
 - env ファイルの読み書き境界は `docs/operations/secrets.md` に従う。`.op-env.agent`/`.op-env.human` は触ってよいが、実値が入りうる `.env`/`.env.local` は読みも書きもしない
 - `git add .` は避ける。path-limited add で scope を固定する。コミット前に `git diff --cached` を確認する
-- 作業中は変更を証明する対象の検証を優先する。小さく可逆な変更で毎回全体検査を重ねない。挙動変更は対象 test / E2E / Storybook 等、高リスク変更は専用契約を満たす。ready 化前の `pnpm check` と pre-push は維持し、同じ差分・環境で通った検査は新しい根拠なく繰り返さない
+- 作業中は変更を証明する対象の検証を優先する。小さく可逆な変更で毎回全体検査を重ねない。挙動変更は対象 test / E2E / Storybook 等、高リスク変更は専用契約を満たす。ready 化前の `pnpm check` と pre-push は維持し、同じ差分・環境で通った検査は新しい根拠なく繰り返さない。どの層にテストを置くか・回帰テストの基準・CI 予算は [docs/engineering/testing.md](docs/engineering/testing.md)
 - コミットメッセージは日本語 Conventional Commits（Latin大文字語で始めると`subject-case`で弾かれる）
 - 型: 具体的な型を使う。union の variance には `as never`（`as any` 禁止）。`unknown` は型ガードと併用のみ
 - Export: named export。App Router 特殊ファイル（page/layout/loading等）のみ `export default`
