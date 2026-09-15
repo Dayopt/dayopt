@@ -51,6 +51,8 @@
     "lint:i18n": "pnpm --filter @dayopt/product lint:i18n",
     "docs:check": "tsx scripts/tasks/docs-guard/index.ts",
     "docs:coverage": "tsx scripts/tasks/docs-coverage/index.ts",
+    "architecture:generate": "tsx scripts/tasks/generate-architecture-map.ts",
+    "architecture:check": "tsx scripts/tasks/generate-architecture-map.ts --check",
     "docs:check:claude-links": "pnpm --filter @dayopt/product docs:check",
     "rls:snapshot": "tsx scripts/tasks/generate-rls-snapshot.ts",
     "rls:snapshot:check": "tsx scripts/tasks/generate-rls-snapshot.ts --check",

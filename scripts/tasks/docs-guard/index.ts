@@ -8,6 +8,7 @@
  *  - naming-check            : kebab-case 命名規約
  *  - decisions-append-only   : docs/decisions.md の append-only 契約
  *  - glossary-sync           : 用語集の生成ブロックが terms.ts と一致するか
+ *  - architecture-map        : Architecture Map の生成ブロック drift と参照切れ
  *
  * 各ドメイン log/ の凍結契約チェック（append-only-guard）は、domain log/ 全廃
  * （2026-08-28、#2475）に伴い撤去した。
@@ -18,6 +19,10 @@
  * ローカルでは `pnpm docs:check` からも同じスクリプトが実行される。
  */
 
+import {
+  reportArchitectureMapCheck,
+  runArchitectureMapCheck,
+} from './checks/architecture-map-sync.ts';
 import {
   reportDecisionsAppendOnlyGuard,
   runDecisionsAppendOnlyGuard,
@@ -47,9 +52,18 @@ async function main(): Promise<void> {
   const glossarySyncViolations = await runGlossarySyncCheck();
   const glossarySyncOk = reportGlossarySyncCheck(glossarySyncViolations);
 
+  const architectureMapViolations = await runArchitectureMapCheck();
+  const architectureMapOk = reportArchitectureMapCheck(architectureMapViolations);
+
   console.log('\n' + '='.repeat(60));
 
-  const ok = linkOk && frontmatterOk && namingOk && decisionsAppendOnlyOk && glossarySyncOk;
+  const ok =
+    linkOk &&
+    frontmatterOk &&
+    namingOk &&
+    decisionsAppendOnlyOk &&
+    glossarySyncOk &&
+    architectureMapOk;
 
   if (ok) {
     console.log(`${colors.green}✅ docs-guard: 全チェック pass${colors.reset}`);

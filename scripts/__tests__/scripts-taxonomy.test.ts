@@ -35,6 +35,7 @@ const KNOWN_PLACEMENT_EXCEPTIONS = new Set<string>([
   'scripts/tasks/boundaries/checks/public-api-barrels.ts',
   'scripts/tasks/boundaries/config.ts',
   // docs-guard/: index.ts が pkg entry "docs:check" を持つ tasks unit。
+  'scripts/tasks/docs-guard/checks/architecture-map-sync.ts',
   'scripts/tasks/docs-guard/checks/decisions-append-only.ts',
   'scripts/tasks/docs-guard/checks/frontmatter-check.ts',
   'scripts/tasks/docs-guard/checks/glossary-sync.ts',
