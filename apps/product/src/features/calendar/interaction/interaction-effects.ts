@@ -80,9 +80,10 @@ export function processInteractionEffects(
           dragLaneRef.current &&
           isPlanRecordDrop(dragLaneRef.current.source, dragLaneRef.current.target)
         ) {
-          const now = Date.now();
-          const planEnd = event.endDate ?? event.displayEndDate;
-          const canCreateRecord = planEnd.getTime() <= now && effect.time.end.getTime() <= now;
+          // 制約は drop 先の時間帯だけ（DT005: Record は未来に終われない）。Plan が
+          // 未来に終わるかは見ない — 「未来 Plan」の特別扱いは #2598 で撤去済みで、
+          // DB も過去に終わる Record を未来 Plan へ紐付けられる（#2645）
+          const canCreateRecord = effect.time.end.getTime() <= Date.now();
           if (canCreateRecord) {
             r.onPlanRecord?.(effect.timeblockId, effect.time);
           }

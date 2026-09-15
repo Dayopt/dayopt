@@ -30,7 +30,7 @@ Plan（予定）とRecord（記録）を同じ時間軸で配置・閲覧する�
 - Diffは符号と方向を数字・iconで示し、増減そのものをsuccess / destructive色で評価しない
 - 過去Planの時間も通常どおり編集できる。Recordは終了を未来へ動かす編集だけ不可
 - 既存カードのdrag previewは移動先のレーンと同じカードで表示する。Planはoutline、RecordとPlan→Recordの記録化previewは塗りで区別する
-- 過去PlanをRecordレーンへdragすると、drop previewの時間帯へアクティビティとメモをコピーした独立Recordを作る。元Planは変更しない
+- PlanをRecordレーンへdragすると、drop previewの時間帯へアクティビティとメモをコピーした独立Recordを作る。元Planは変更しない。可否はdrop先の時間帯だけで決まり、Plan自身が未来に終わるかは問わない（Recordは未来に終われない = `DT005`）
 - PlanとRecordが時間的に少しでも重なる区間はactivityに関係なく左右へ分ける。詳細の「この時間帯の記録」は同じactivityで15分以上重なるRecordを表示する
 - Plan / Recordカードへ予定別の差分は表示しない。予実比較は期間内のRecord合計 / 経過済みPlan合計から導出する
 - 差分の正負は符号と方向iconで示し、成功・失敗を意味する色は使わない
