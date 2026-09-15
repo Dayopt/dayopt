@@ -315,7 +315,7 @@ export const GLOSSARY: readonly GlossaryEntry[] = [
     ja: 'ドラフト',
     en: 'Draft',
     usage: '未保存のプレビュー状態のタイムブロック。ドラッグ中・複製直後など',
-    code: { identifiers: ['isDraft', 'DraftTimeblock'] },
+    code: { identifiers: ['isDraft'] },
   },
   {
     id: 'archive',

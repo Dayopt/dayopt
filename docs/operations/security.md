@@ -279,7 +279,7 @@ marketplace が見つからない場合は先に `claude plugin marketplace add 
 | アプリ例外・セキュリティイベント | Sentry（CSP 違反は `csp-violation` として directive 単位の固定 fingerprint で送信）                                   |
 | rate limit 超過                  | **専用の記録なし**（下記参照）                                                                                        |
 
-**OAuth token のライフサイクル（発行・更新・失効）を記録するテーブルは存在しない。** `oauth_audit_log` は名前に反して MCP tool call 用のスキーマ（`supabase/schemas/017_tables_oauth.sql`）で、token 操作の記録には使えない。インシデント対応時に「記録が残っているはず」と仮定しない。
+**OAuth token のライフサイクル（発行・更新・失効）を記録するテーブルは存在しない。** `oauth_audit_log` は名前に反して MCP tool call 用のスキーマ（列は `docs/engineering/architecture.md` の生成 ER 図、定義は `supabase/migrations/` が正）で、token 操作の記録には使えない。インシデント対応時に「記録が残っているはず」と仮定しない。
 
 **rate limit の超過も記録されない。** `Ratelimit` は product / web とも `analytics: false` で構築しており（raw identifier を保存しないための意図的な設定）、Upstash の request metrics からは拒否されたリクエストを判別できない。
 

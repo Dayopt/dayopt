@@ -286,6 +286,40 @@ grep 対象にする。
 | (b) UX 先回り | `features/calendar/hooks/operations/useTimeblockOperations.ts` の record 未来移動ガード | ドラッグ中に `timeLocked` を出す                  | 可（server 拒否でも同じ toast が出る。#2628） |
 | (b) UX 先回り | `features/calendar/interaction/interaction-effects.ts` の `case 'DROP'` の記録化経路    | Record レーンへの drop 先が未来なら記録を作らない | 可（server が `DT005` で拒否する。#2645）     |
 
+<!-- architecture-map:time-rules:start — 正本 直上の「規則の写しと、その分類」表 / 再生成 pnpm architecture:generate / 検証 pnpm architecture:check。この範囲は手編集しない -->
+
+```mermaid
+flowchart LR
+  subgraph db["DB trigger（正）"]
+    DT003["DT003<br/>end_at #gt; start_at"]
+    DT005["DT005<br/>end_at #lt;= now"]
+  end
+  subgraph contract["(a) 契約変換"]
+    contract1["timeblock-command-client.ts<br/>EXPECTED_COMMAND_ERRORS<br/>消せない"]
+    contract2["mcp-mutation-client.ts<br/>EXPECTED_ERROR_CODES<br/>消せない"]
+    contract3["timeblock-context-contract.ts<br/>TIMEBLOCK_CONTEXT_RULES<br/>消せない"]
+  end
+  subgraph ux["(b) UX 先回り"]
+    ux1["timeblock.ts<br/>timeRangeRefine<br/>消してよい"]
+    ux2["timeblock-destination.ts<br/>消せない"]
+    ux3["overlap.ts<br/>time-conflict.ts<br/>消してよい"]
+    ux4["useTimeblockOperations.ts<br/>消してよい"]
+    ux5["interaction-effects.ts<br/>case 'DROP'<br/>消してよい"]
+  end
+  db --> contract1
+  db --> contract2
+  db --> contract3
+  db -.-> ux1
+  db -.-> ux2
+  db -.-> ux3
+  db -.-> ux4
+  db -.-> ux5
+  classDef removable stroke-dasharray: 4 2
+  class ux1,ux3,ux4,ux5 removable
+```
+
+<!-- architecture-map:time-rules:end -->
+
 server が拒否した時に UI が汎用の `saveFailed` へ退化しないよう、`INVALID_TIME_RANGE` /
 `RECORD_IN_FUTURE` は `lib/trpc/client-safe-service-code.ts` の allowlist に載せ、
 `useTimeblockWriteMutations.ts` の `reportError` が規則ごとの文言へ写像する。allowlist から
