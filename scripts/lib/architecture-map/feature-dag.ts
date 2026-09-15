@@ -182,12 +182,23 @@ export function buildFeatureDag(
   for (const feature of features) layerOf(feature);
 
   const kinds = new Map<string, FeatureKind>();
+  const isComposition = (feature: string): boolean => {
+    const rule = rules.get(feature);
+    return (
+      rule?.deepImportOnlyBan === true && !rule.bansAllFeatures && rule.bannedFeatures.length === 0
+    );
+  };
   for (const feature of features) {
     const rule = rules.get(feature);
-    if (rule?.deepImportOnlyBan && !rule.bansAllFeatures && rule.bannedFeatures.length === 0) {
+    if (isComposition(feature)) {
       kinds.set(feature, 'composition');
     } else if (rule?.bansAllFeatures) {
-      kinds.set(feature, (importers.get(feature)?.size ?? 0) > 0 ? 'layer0' : 'independent');
+      // composition（settings）は全 feature の barrel を import できるので、DAG の層を決める
+      // importer には数えない。数えると auth が「Layer 0 の基盤 feature」に化ける（#2775）
+      const layeredImporters = [...(importers.get(feature) ?? [])].filter(
+        (importer) => !isComposition(importer),
+      );
+      kinds.set(feature, layeredImporters.length > 0 ? 'layer0' : 'independent');
     } else {
       kinds.set(feature, 'layered');
     }

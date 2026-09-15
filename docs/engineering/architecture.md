@@ -177,7 +177,6 @@ end
 graph TD
   subgraph L0["Layer 0"]
     activities["activities (Layer 0)"]
-    auth["auth (Layer 0)"]
     external_calendar["external-calendar (Layer 0)"]
   end
   subgraph L1["Layer 1"]
@@ -191,6 +190,7 @@ graph TD
     settings["settings (composition)"]
   end
   subgraph Independent
+    auth["auth (independent)"]
     contact["contact (independent)"]
   end
   calendar --> activities
@@ -384,6 +384,8 @@ Dayopt は Supabase（PostgreSQL）を使用する。本番は Pro organization 
 RLS の正確な対象・policy・grant は自動生成の [`data/db/rls-snapshot.md`](./data/db/rls-snapshot.md) を正とする。
 
 実装から自動発見した項目（feature / テーブル / 関数 / router / procedure / MCP tool / store / Story / route / i18n）と用語集の概念との対応、および未マッピング項目は [`data/architecture-inventory.md`](./data/architecture-inventory.md)（生成物）を見る。
+
+外部との接点（HTTP route / 定期実行 / Edge Function）、権限と上限（OAuth scope / procedure builder / rate limit）、DB エラーコード、分析イベント、env 変数、package、および呼び出し関係（MCP tool → procedure、procedure の利用元と未使用、store の利用元、docs → feature、E2E → route、DB 関数の test 被覆）は [`data/system-surface.md`](./data/system-surface.md)（生成物）を見る。
 
 ### テーブルの役割（手書き）
 
