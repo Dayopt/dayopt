@@ -60,6 +60,11 @@ jobs:
   impact:
     name: "\U0001F9ED Release Impact"
     runs-on: ubuntu-latest
+    # Secret は main からだけ使える environment に置く（2026-09-14、ci vault 整理）。
+    # 他 branch の workflow から secrets を読めないようにするためで、deployment 記録は作らない
+    environment:
+      name: production-release
+      deployment: false
     timeout-minutes: 10
     permissions:
       contents: read

@@ -16,6 +16,16 @@ export type EnvSchemaEntry = {
    * すでに status 行だけで自明なため）。
    */
   pendingReason?: string;
+  /**
+   * GitHub Actions Secret（replica）の名前が envName と違う時だけ持つ。workflow は
+   * `secrets.<githubSecret>` を step の env `<envName>` へ渡す。
+   */
+  githubSecret?: string;
+  /**
+   * GitHub Actions の environment 名。CI の Secret は repo 単位ではなく、main からだけ使える
+   * environment に置く（2026-09-14）。同じ Secret を複数の environment に複製する時は全部並べる。
+   */
+  githubEnvironments?: string[];
 };
 
 export type OperationalItem = {
@@ -104,19 +114,7 @@ export const envSchema: EnvSchemaEntry[] = [
   envEntry('NEXT_PUBLIC_TURNSTILE_SITE_KEY', false, 'public', 'shared', agent, 'turnstile'),
   envEntry('TURNSTILE_SECRET_KEY', false, 'secret', 'shared', agent, 'turnstile'),
 
-  // CI の Vercel automation（Production Config Audit / Production Release / replica-check）。
-  // 2026-09-14 に User が item 名を vercel → vercel-production へ改め、bypass secret 2 件を同居させた。
-  envEntry('VERCEL_TOKEN', false, 'secret', 'shared', ci, 'vercel-production'),
-  envEntry('VERCEL_TEAM_ID', false, 'public', 'shared', ci, 'vercel-production'),
-  envEntry(
-    'VERCEL_AUTOMATION_BYPASS_PRODUCT',
-    false,
-    'secret',
-    'production',
-    ci,
-    'vercel-production',
-  ),
-  envEntry('VERCEL_AUTOMATION_BYPASS_WEB', false, 'secret', 'production', ci, 'vercel-production'),
+  // ci vault（Vercel / Supabase 監査 / backup）の entry は下の ciSecretSchema にまとめる。
   // agent 用 Vercel token は置かない（2026-09-14、監査 P1-2）。Vercel の token は scope を
   // 絞れず team 全権になるため、agent vault の「漏れても 1 日で戻せる」定義に入らない。
   // 未使用のまま置かれていた agent/vercel は Vercel 側で revoke し item を archive した。
@@ -353,4 +351,76 @@ export const operationalItems: OperationalItem[] = [
   { vault: agent, item: 'sentry-cli-readonly', required: true },
 ];
 
-export const onePasswordEnvSchema = [...envSchema, ...productionEnvSchema];
+// CI（GitHub Actions）が消費する automation credential の master（vault ci）。replica は
+// GitHub Actions Secrets（repo 単位）。envName は workflow の step env 名で、Secret 名が違う時だけ
+// githubSecret を持つ。workflow の secrets.* 参照とこの表の対応は
+// scripts/__tests__/ci-secret-ledger.test.ts が名前で双方向に検査する（2026-09-14 監査）。
+// どれが欠けても本番 promote・監査・backup のいずれかが止まるため、すべて required。
+// 本番 release（promote.yml）と、監査・backup・replica check（production-config-audit.yml /
+// nightly.yml）で environment を分ける。どちらも deployment branch policy は main だけ。
+const RELEASE_AND_OPS = ['production-release', 'production-ops'];
+const OPS = ['production-ops'];
+
+const rcloneFields = [
+  'TYPE',
+  'PROVIDER',
+  'ENDPOINT',
+  'REGION',
+  'ACCESS_KEY_ID',
+  'SECRET_ACCESS_KEY',
+];
+
+function ciEntry(
+  envName: string,
+  visibility: EnvVisibility,
+  item: string,
+  githubEnvironments: string[],
+  options: { field?: string; githubSecret?: string } = {},
+): EnvSchemaEntry {
+  return {
+    ...envEntry(envName, true, visibility, 'production', ci, item, options.field),
+    ...(options.githubSecret ? { githubSecret: options.githubSecret } : {}),
+    githubEnvironments,
+  };
+}
+
+function rcloneEntries(side: 'SOURCE' | 'DEST', item: string): EnvSchemaEntry[] {
+  return rcloneFields.map((suffix) =>
+    ciEntry(
+      `RCLONE_CONFIG_${side}_${suffix}`,
+      suffix.endsWith('KEY') || suffix.endsWith('KEY_ID') ? 'secret' : 'public',
+      item,
+      OPS,
+    ),
+  );
+}
+
+export const ciSecretSchema: EnvSchemaEntry[] = [
+  // item 名は 2026-09-14 に vercel から vercel-production へ変更（用途を名前で分かるように）。
+  // token は team 全権で、promote / rollback（promote.yml）と読み取り監査で共用する。
+  // Vercel の token は scope を絞れないため、分けても被害範囲は変わらない。
+  ciEntry('VERCEL_TOKEN', 'secret', 'vercel-production', RELEASE_AND_OPS),
+  ciEntry('VERCEL_TEAM_ID', 'public', 'vercel-production', RELEASE_AND_OPS, {
+    githubSecret: 'VERCEL_ORG_ID',
+  }),
+  ciEntry('VERCEL_BYPASS_PRODUCT', 'secret', 'vercel-production', ['production-release'], {
+    field: 'VERCEL_AUTOMATION_BYPASS_PRODUCT',
+    githubSecret: 'VERCEL_AUTOMATION_BYPASS_PRODUCT',
+  }),
+  ciEntry('VERCEL_BYPASS_WEB', 'secret', 'vercel-production', ['production-release'], {
+    field: 'VERCEL_AUTOMATION_BYPASS_WEB',
+    githubSecret: 'VERCEL_AUTOMATION_BYPASS_WEB',
+  }),
+  // Supabase Management API の scoped token。field id は日本語ロケールでも credential。
+  ciEntry('SUPABASE_AUTH_AUDIT_TOKEN', 'secret', 'supabase-auth-audit', OPS, {
+    field: 'credential',
+  }),
+  ciEntry('SUPABASE_STORAGE_RLS_AUDIT_TOKEN', 'secret', 'supabase-storage-rls-audit', OPS, {
+    field: 'credential',
+  }),
+  // nightly の Storage backup（rclone）。SOURCE は Supabase Storage の S3 接続、DEST は Cloudflare R2。
+  ...rcloneEntries('SOURCE', 'Supabase-StorageS3-backupsource'),
+  ...rcloneEntries('DEST', 'Cloudflare-R2-storagebackup'),
+];
+
+export const onePasswordEnvSchema = [...envSchema, ...productionEnvSchema, ...ciSecretSchema];

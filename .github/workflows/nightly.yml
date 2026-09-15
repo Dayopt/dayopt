@@ -90,6 +90,11 @@ jobs:
     name: Check Vercel replica against 1Password ledger
     if: github.event.schedule == '30 21 * * *' || (github.event_name == 'workflow_dispatch' && (github.event.inputs.jobs == 'replica-check' || github.event.inputs.jobs == 'all'))
     runs-on: ubuntu-latest
+    # Secret は main からだけ使える environment に置く（2026-09-14、ci vault 整理）。
+    # 他 branch の workflow から secrets を読めないようにするためで、deployment 記録は作らない
+    environment:
+      name: production-ops
+      deployment: false
     timeout-minutes: 5
     concurrency:
       group: nightly-replica-check
@@ -117,6 +122,11 @@ jobs:
     name: Export Supabase Storage to R2
     if: github.event.schedule == '0 22 * * *' || (github.event_name == 'workflow_dispatch' && (github.event.inputs.jobs == 'storage-backup' || github.event.inputs.jobs == 'all'))
     runs-on: ubuntu-latest
+    # Secret は main からだけ使える environment に置く（2026-09-14、ci vault 整理）。
+    # 他 branch の workflow から secrets を読めないようにするためで、deployment 記録は作らない
+    environment:
+      name: production-ops
+      deployment: false
     timeout-minutes: 30
     concurrency:
       group: nightly-storage-backup-export

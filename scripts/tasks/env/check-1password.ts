@@ -11,6 +11,7 @@ type CommandResult = {
 type OnePasswordField = {
   id?: string;
   label?: string;
+  type?: string;
   value?: unknown;
 };
 
@@ -202,6 +203,58 @@ for (const forbidden of forbiddenFields) {
   }
 
   console.log(`${label}: ABSENT`);
+}
+
+// 有効期限の検査（2026-09-14、Secret / Credential 監査）。短命 token の期限切れは
+// CI の監査 job や agent の読み取りを 401 で黙って止めるため、切れる前に気づけるようにする。
+// 見るのは上で取得済みの item だけで、ラベルが期限を表す field の日付だけを読む。値は出さない。
+//
+// 保証境界: 期限 field を持つ item だけが対象。期限 field の無い token（Vercel の CI token 等）は
+// 検査できない。期限切れは失敗、30 日以内は警告（exit code は変えない）。
+const EXPIRY_LABEL_PATTERN = /^(有効期限|expires?|expiry|expiration|valid until)$/i;
+const EXPIRY_WARNING_DAYS = 30;
+const DAY_MS = 86_400_000;
+
+function expiryEpochMs(field: OnePasswordField): number | null {
+  if (typeof field.value !== 'string' && typeof field.value !== 'number') return null;
+  const raw = String(field.value).trim();
+  // 1Password の DATE field は epoch 秒。手入力の text field は YYYY-MM-DD だけを受け付ける
+  if (/^[0-9]{9,11}$/.test(raw)) return Number(raw) * 1000;
+  if (/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(raw)) {
+    const parsed = Date.parse(`${raw}T00:00:00Z`);
+    return Number.isNaN(parsed) ? null : parsed;
+  }
+  return null;
+}
+
+const now = Date.now();
+for (const [key, itemResult] of itemCache) {
+  if (itemResult.status !== 'OK') continue;
+  const label = key.replace('/', ' / ');
+  for (const field of itemResult.item.fields ?? []) {
+    if (!EXPIRY_LABEL_PATTERN.test((field.label ?? '').trim())) continue;
+    const expiresAt = expiryEpochMs(field);
+    if (expiresAt === null) {
+      console.log(`${label}: EXPIRY_UNREADABLE`);
+      console.log(
+        '  └ 期限 field を日付として読めません（1Password の日付 field か YYYY-MM-DD にする）',
+      );
+      continue;
+    }
+    const date = new Date(expiresAt).toISOString().slice(0, 10);
+    const daysLeft = Math.floor((expiresAt - now) / DAY_MS);
+    if (expiresAt <= now) {
+      console.log(`${label}: EXPIRED ${date}`);
+      console.log(
+        '  └ 再発行して 1Password と replica を更新する（docs/operations/secrets.md §短命トークンのローテーション）',
+      );
+      hasFailure = true;
+    } else if (daysLeft <= EXPIRY_WARNING_DAYS) {
+      console.log(`${label}: EXPIRES_SOON ${date}（残り ${daysLeft} 日）`);
+    } else {
+      console.log(`${label}: EXPIRES ${date}`);
+    }
+  }
 }
 
 if (hasFailure) {
