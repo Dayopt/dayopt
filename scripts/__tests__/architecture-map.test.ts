@@ -22,10 +22,12 @@ import {
   replaceGeneratedBlock,
 } from '../lib/architecture-map/generated-block.ts';
 import {
+  collectDatabaseUsers,
   discoverMcpTools,
   discoverTrpcProcedures,
   discoverTrpcRouters,
   featureOf,
+  parseTableAliases,
 } from '../lib/architecture-map/inventory.ts';
 import {
   likec4Id,
@@ -36,7 +38,27 @@ import {
   checkGlossaryReferences,
   checkTimeRuleMirrorReferences,
 } from '../lib/architecture-map/references.ts';
+import {
+  collectFeatureCoverage,
+  collectMcpToolProcedures,
+  collectProcedureUsage,
+  normalizeGotoUrl,
+  parseFrontmatterCodePaths,
+} from '../lib/architecture-map/relations.ts';
 import { parseSchemaModel } from '../lib/architecture-map/schema-model.ts';
+import {
+  foldPgCronJobs,
+  parseAnalyticsEventCheck,
+  parseAnalyticsEventNames,
+  parseMcpTrpcScopeRequirements,
+  parseProcedureBuilders,
+  parseRateLimits,
+  parseRouteMethods,
+  parseSupabaseConfig,
+  parseSupportedScopes,
+  parseWorkflowSchedules,
+  routeUrlOf,
+} from '../lib/architecture-map/surface.ts';
 import {
   parseTimeRulesSection,
   renderTimeRulesDiagram,
@@ -621,7 +643,45 @@ describe('likec4-model: Inventory + 用語集 + DAG から LikeC4 model / views 
   const dag = buildFeatureDag(parseFeatureRules(ESLINT_FIXTURE), [
     { from: 'timeblock', to: 'activities' },
   ]);
-  const sources = { map, glossary, dag, schema };
+  const surface = {
+    httpRoutes: [
+      {
+        id: '/api/cron/calendar-sync',
+        app: 'product' as const,
+        methods: ['GET'],
+        path: 'apps/product/src/app/api/cron/calendar-sync/route.ts',
+      },
+    ],
+    schedules: [
+      {
+        id: '/api/cron/calendar-sync',
+        source: 'vercel' as const,
+        schedule: '*/15 * * * *',
+        target: '/api/cron/calendar-sync',
+        path: 'apps/product/vercel.json',
+        authoritative: true,
+      },
+    ],
+    supabase: [],
+    errorCodes: [],
+    scopes: [],
+    rateLimits: [],
+    procedureBuilders: [],
+    analyticsEvents: [],
+    envVars: [],
+    packages: [],
+  };
+  const relations = {
+    procedureUsage: [],
+    unusedProcedures: [],
+    mcpToolProcedures: [],
+    storeUsage: [],
+    docCodeLinks: [],
+    e2eRoutes: [],
+    dbFunctionTests: [],
+    featureCoverage: [],
+  };
+  const sources = { map, glossary, dag, schema, surface, relations };
 
   it('識別子は種別 prefix 付きで、同名の feature と table が衝突しない', () => {
     expect(likec4Id('f', 'activities')).toBe('f_activities');
@@ -643,12 +703,351 @@ describe('likec4-model: Inventory + 用語集 + DAG から LikeC4 model / views 
     expect(model).not.toContain('metadata { kind ');
   });
 
+  it('HTTP route と定期実行を載せ、cron から route へ triggers を引く', () => {
+    const model = renderLikeC4Model(sources);
+    expect(model).toContain("httproute h_product_api_cron_calendar-sync '/api/cron/calendar-sync'");
+    expect(model).toContain("metadata { app 'product' methods 'GET' }");
+    expect(model).toContain(
+      "  cron_vercel__api_cron_calendar-sync -> h_product_api_cron_calendar-sync 'triggers'",
+    );
+  });
+
   it('views は固定 view と、直接対応を持つ概念ごとの view を出す', () => {
     const views = renderLikeC4Views(sources);
-    for (const name of ['index', 'features', 'data', 'mcp', 'unmapped']) {
+    for (const name of ['index', 'features', 'data', 'mcp', 'api', 'unmapped']) {
       expect(views).toContain(`view ${name} {`);
     }
     expect(views).toContain('view concept_plan of c_plan {');
     expect(views).not.toContain('concept_orphan');
+  });
+});
+
+describe('inventory: 取りこぼしていた形を拾う', () => {
+  const appRouter = {
+    path: 'apps/product/src/app/api/trpc/_server/app-router.ts',
+    text: `
+import { createUserRouter } from '@/features/auth/server/router';
+import { statisticsRouter } from '@/features/timeblock/server/router-index';
+import { createTRPCRouter } from '@/lib/trpc/router';
+
+const userRouter = createUserRouter({});
+
+export const appRouter = createTRPCRouter({
+  statistics: statisticsRouter,
+  user: userRouter,
+});
+`,
+  };
+  const sources = [
+    appRouter,
+    {
+      // 関数の中で組み立てる router（インデントが 2 space ではない）
+      path: 'apps/product/src/features/auth/server/router.ts',
+      text: `export function createUserRouter(dependencies) {
+  return createTRPCRouter({
+    deleteAccount: protectedProcedure.mutation(async () => {}),
+    exportData: protectedProcedure.query(async () => {}),
+  });
+}`,
+    },
+    {
+      // namespace を持つ file は mergeRouters 経由の 2 hop 先にある
+      path: 'apps/product/src/features/timeblock/server/router-index.ts',
+      text: "import { statisticsQueriesRouter } from './statistics';\nexport const statisticsRouter = statisticsQueriesRouter;",
+    },
+    {
+      path: 'apps/product/src/features/timeblock/server/statistics.ts',
+      text: "import { statisticsKpiRouter } from './statistics-kpi-router';\nexport const statisticsQueriesRouter = mergeRouters(statisticsKpiRouter);",
+    },
+    {
+      // const 経由で登録する procedure（deprecated alias を含む）
+      path: 'apps/product/src/features/timeblock/server/statistics-kpi-router.ts',
+      text: `const activityEstimationFactors = protectedProcedure.query(async () => {});
+
+export const statisticsKpiRouter = createTRPCRouter({
+  getActivityEstimationFactors: activityEstimationFactors,
+  getTagEstimationFactors: activityEstimationFactors,
+});`,
+    },
+  ];
+
+  it('インデントに依存せず、mergeRouters の先まで namespace を伝播する', () => {
+    const routers = discoverTrpcRouters(appRouter);
+    const procedures = discoverTrpcProcedures(sources, routers).map((item) => item.id);
+    expect(procedures).toEqual([
+      'user.deleteAccount',
+      'user.exportData',
+      'statistics.getActivityEstimationFactors',
+      'statistics.getTagEstimationFactors',
+    ]);
+  });
+
+  it('.rpc(定数) と .from(databaseTables.x) を拾い、テーブル以外の .from は拾わない', () => {
+    const files = [
+      {
+        path: 'apps/product/src/lib/database/tables.ts',
+        text: "export const databaseTables = {\n  plans: 'plans',\n  userSettings: 'user_settings',\n} as const;",
+      },
+      {
+        path: 'apps/product/src/features/timeblock/server/service.ts',
+        text: `const CLAIM_STEP_RPC = 'create_plan_command_v1';
+await admin.rpc(CLAIM_STEP_RPC, {});
+await admin.rpc<Row>('update_plan_command_v1', {});
+await admin.from(databaseTables.plans).select();
+await admin.from('user_settings').select();
+await supabase.storage.from('avatars').upload();
+Array.from('abc');`,
+      },
+    ];
+    const users = collectDatabaseUsers(
+      files,
+      parseTableAliases(files),
+      new Set(['plans', 'user_settings']),
+    );
+    expect([...users.rpc.keys()].sort()).toEqual([
+      'create_plan_command_v1',
+      'update_plan_command_v1',
+    ]);
+    expect([...users.table.keys()].sort()).toEqual(['plans', 'user_settings']);
+    expect([...(users.table.get('plans') ?? [])]).toEqual(['timeblock']);
+  });
+});
+
+describe('surface: 運用面の発見', () => {
+  it('route.ts の method は再 export 形も拾う', () => {
+    expect(parseRouteMethods('export { handler as GET, handler as POST };')).toEqual([
+      'GET',
+      'POST',
+    ]);
+    expect(parseRouteMethods("export { DELETE, GET, POST } from '@/app/api/mcp/route';")).toEqual([
+      'GET',
+      'POST',
+      'DELETE',
+    ]);
+    expect(
+      parseRouteMethods('export async function GET() {}\nexport const runtime = "edge";'),
+    ).toEqual(['GET']);
+  });
+
+  it('route group を除いた URL を作る', () => {
+    expect(routeUrlOf('apps/product/src/app/[locale]/(auth)/auth/callback/route.ts')).toBe(
+      '/[locale]/auth/callback',
+    );
+    expect(routeUrlOf('apps/product/src/app/.well-known/oauth-protected-resource/route.ts')).toBe(
+      '/.well-known/oauth-protected-resource',
+    );
+  });
+
+  it('pg_cron は schedule / unschedule を migration 順に畳む', () => {
+    const jobs = foldPgCronJobs([
+      {
+        path: 'supabase/migrations/001_a.sql',
+        text: "select cron.schedule('cleanup-login-attempts', '0 3 * * *', $$select 1$$);",
+      },
+      {
+        path: 'supabase/migrations/002_b.sql',
+        text: "select cron.schedule(\n  'expire-outbox',\n  '* * * * *',\n  $$select 1$$\n);",
+      },
+      {
+        path: 'supabase/migrations/003_c.sql',
+        text: "select cron.unschedule('cleanup-login-attempts');",
+      },
+    ]);
+    expect([...jobs.keys()]).toEqual(['expire-outbox']);
+    expect(jobs.get('expire-outbox')?.schedule).toBe('* * * * *');
+  });
+
+  it('workflow の on.schedule だけを読む（他の schedule: 行は読まない）', () => {
+    const yaml = `on:
+  schedule:
+    # 毎朝
+    - cron: '30 19 * * *'
+    - cron: '0 22 * * *'
+  workflow_dispatch:
+jobs:
+  build:
+    steps:
+      - run: echo schedule:
+`;
+    expect(parseWorkflowSchedules(yaml)).toEqual(['30 19 * * *', '0 22 * * *']);
+  });
+
+  it('config.toml から Edge Function / auth hook / bucket を読む', () => {
+    const toml = `[storage.buckets.avatars]
+public = false
+
+[auth.hook.send_email]
+enabled = true
+uri = "https://example"
+
+[functions.send-auth-email]
+verify_jwt = false
+`;
+    expect(parseSupabaseConfig(toml)).toEqual([
+      { kind: 'storage-bucket', id: 'avatars' },
+      { kind: 'auth-hook', id: 'send_email', detail: 'enabled' },
+      { kind: 'edge-function', id: 'send-auth-email' },
+    ]);
+  });
+
+  it('scope / rate limit / builder / 分析イベントを読む', () => {
+    expect(
+      parseSupportedScopes(
+        "export const SUPPORTED_SCOPES = [\n  'read:entries',\n  'write:plans',\n] as const;",
+      ),
+    ).toEqual(['read:entries', 'write:plans']);
+    expect(
+      parseMcpTrpcScopeRequirements(
+        "const MCP_TRPC_SCOPE_REQUIREMENTS: Partial<Record<string, SupportedScope>> = {\n  'plans.list': 'read:entries',\n};\n",
+      ).get('plans.list'),
+    ).toBe('read:entries');
+    expect(
+      parseRateLimits(
+        "export const trpcUserRateLimit = createRateLimiter(\n  Ratelimit.slidingWindow(300, '1 m'),\n  'trpc',\n);",
+      ),
+    ).toEqual([{ id: 'trpcUserRateLimit', limit: 300, window: '1 m' }]);
+    expect(
+      parseProcedureBuilders(
+        'export const protectedProcedure = t.procedure\nexport function entitledProcedure(key) {}',
+      ),
+    ).toEqual(['protectedProcedure', 'entitledProcedure']);
+    expect(
+      parseAnalyticsEventNames(
+        "export const PRODUCT_EVENT_NAMES = [\n  'user_signed_up',\n] as const;",
+      ),
+    ).toEqual(['user_signed_up']);
+    expect(
+      parseAnalyticsEventCheck([
+        {
+          path: 'supabase/migrations/001_a.sql',
+          text: "ALTER TABLE public.product_events ADD CONSTRAINT product_events_event_name_check CHECK (\n  event_name IN ('user_signed_up', 'plan_created')\n);",
+        },
+      ]),
+    ).toEqual(['user_signed_up', 'plan_created']);
+  });
+});
+
+describe('relations: 呼び出し関係', () => {
+  const procedures = [
+    { kind: 'trpc-procedure' as const, id: 'plans.list', path: 'x/server/plans-router.ts' },
+    {
+      kind: 'trpc-procedure' as const,
+      id: 'billing.getInvoices',
+      path: 'x/server/billing-router.ts',
+    },
+    {
+      kind: 'trpc-procedure' as const,
+      id: 'activities.listActivities',
+      path: 'x/server/router.ts',
+    },
+  ];
+
+  it('client / MCP の呼び出し元を分け、未使用を出す', () => {
+    const sources = [
+      {
+        path: 'apps/product/src/features/calendar/hooks/useCalendarData.ts',
+        text: 'const { data } = api.plans.list.useQuery();\nutils.plans.list.invalidate();',
+      },
+      {
+        path: 'apps/product/src/app/api/mcp/_tools/activities-list.ts',
+        text: 'const rows = await trpc.activities.listActivities({});',
+      },
+      {
+        path: 'apps/product/src/features/settings/components/BillingSettings.stories.tsx',
+        text: 'api.billing.getInvoices.useQuery();',
+      },
+      {
+        path: 'apps/product/src/features/settings/server/billing-router.ts',
+        text: 'export const billingRouter = createTRPCRouter({ getInvoices: protectedProcedure });',
+      },
+    ];
+    const { usage, unused } = collectProcedureUsage(sources, procedures);
+    const byId = new Map(usage.map((item) => [item.id, item]));
+    expect(byId.get('plans.list')?.callers.app).toHaveLength(1);
+    expect(byId.get('activities.listActivities')?.callers.mcp).toHaveLength(1);
+    // Story と router 定義そのものは呼び出し元に数えない
+    expect(unused).toEqual(['billing.getInvoices']);
+  });
+
+  it('MCP registry の tool を file へ束ね、その file が呼ぶ procedure を出す', () => {
+    const sources = [
+      {
+        path: 'apps/product/src/app/api/mcp/_tools/registry.ts',
+        text: `import { registerPlansListTool, registerRecordsListTool } from './timeblock-list';
+
+export const MCP_TOOL_DESCRIPTORS = [
+  { name: 'plans.list', requiredScope: 'read:entries', register: registerPlansListTool },
+  { name: 'records.list', requiredScope: 'read:entries', register: registerRecordsListTool },
+];`,
+      },
+      {
+        path: 'apps/product/src/app/api/mcp/_tools/timeblock-list.ts',
+        text: 'const plans = await trpc.plans.list({});\nconst records = await trpc.records.list({});',
+      },
+    ];
+    expect(collectMcpToolProcedures(sources)).toEqual([
+      {
+        path: 'apps/product/src/app/api/mcp/_tools/timeblock-list.ts',
+        tools: ['plans.list', 'records.list'],
+        procedures: ['plans.list', 'records.list'],
+      },
+    ]);
+  });
+
+  it('frontmatter の code: を scalar / 配列の両方で読む', () => {
+    expect(
+      parseFrontmatterCodePaths('---\nstatus: current\ncode: apps/product/src\n---\n本文'),
+    ).toEqual(['apps/product/src']);
+    expect(
+      parseFrontmatterCodePaths(
+        '---\ncode:\n  - apps/product/src/features/timeblock\n  - scripts/ci\nstatus: current\n---\n',
+      ),
+    ).toEqual(['apps/product/src/features/timeblock', 'scripts/ci']);
+    expect(parseFrontmatterCodePaths('# frontmatter なし')).toEqual([]);
+  });
+
+  it('page.goto の URL から locale と query を落とす', () => {
+    expect(normalizeGotoUrl('/ja/calendar?view=day&date=2026-01-01')).toBe('/calendar');
+    expect(normalizeGotoUrl('/en/auth/login')).toBe('/auth/login');
+    expect(normalizeGotoUrl('/ja')).toBe('/');
+    // query の中の変数は無視して path だけ見る（E2E は日付を変数で渡す）
+    expect(normalizeGotoUrl('/ja/calendar?date=${PAST_DATE}')).toBe('/calendar');
+    // path 自体が変数なら route へ寄せない
+    expect(normalizeGotoUrl('/ja/${slug}/edit')).toBeUndefined();
+    expect(normalizeGotoUrl('https://attacker.example')).toBeUndefined();
+  });
+
+  it('feature ごとの test / Story 被覆を数える', () => {
+    const sources = [
+      {
+        path: 'apps/product/src/features/calendar/components/DayView.tsx',
+        text: 'export function DayView() {}',
+      },
+      {
+        path: 'apps/product/src/features/calendar/components/DayView.stories.tsx',
+        text: 'const meta = {};',
+      },
+      {
+        path: 'apps/product/src/features/calendar/components/WeekView.tsx',
+        text: 'export function WeekView() {}',
+      },
+      {
+        path: 'apps/product/src/features/calendar/lib/overlap.ts',
+        text: 'export function overlap() {}',
+      },
+      {
+        path: 'apps/product/src/features/calendar/lib/overlap.test.ts',
+        text: 'it("works", () => {});',
+      },
+    ];
+    expect(collectFeatureCoverage(sources)).toEqual([
+      {
+        feature: 'calendar',
+        sourceFiles: 3,
+        testFiles: 1,
+        components: 2,
+        componentsWithStory: 1,
+      },
+    ]);
   });
 });

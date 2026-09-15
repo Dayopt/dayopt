@@ -26,6 +26,12 @@ views {
     include * where kind is concept
     autoLayout LeftRight
   }
+  view api {
+    title 'HTTP route と定期実行'
+    include * where kind is httproute
+    include * where kind is schedule
+    autoLayout LeftRight
+  }
   view unmapped {
     title '未マッピング（どの概念からも辿れない要素）'
     include * where tag is #unmapped

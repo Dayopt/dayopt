@@ -32,9 +32,11 @@ const PRODUCT_SRC = 'apps/product/src';
 /** `apps/product/src` 配下の .ts / .tsx を読み込む（生成物も含めて 1 回だけ走査）。 */
 export function collectProductSources(root: string): SourceFile[] {
   const files: SourceFile[] = [];
+  // dot ディレクトリを一律で飛ばすと `app/.well-known/**` の route を落とす（#2775）
+  const skipped = new Set(['node_modules', '.next', '.turbo', '.git', '.vercel']);
   const walk = (dir: string): void => {
     for (const entry of readdirSync(dir)) {
-      if (entry === 'node_modules' || entry.startsWith('.')) continue;
+      if (skipped.has(entry)) continue;
       const full = join(dir, entry);
       if (statSync(full).isDirectory()) {
         walk(full);

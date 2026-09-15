@@ -28,6 +28,10 @@ export const GENERATED_DOC_CONTRACTS: Record<string, { source: string; command: 
     source: 'scripts/tasks/generate-architecture-map.ts',
     command: 'pnpm architecture:generate',
   },
+  'docs/engineering/data/system-surface.md': {
+    source: 'scripts/tasks/generate-architecture-map.ts',
+    command: 'pnpm architecture:generate',
+  },
 };
 export const GENERATED_DOCS = Object.keys(GENERATED_DOC_CONTRACTS);
 

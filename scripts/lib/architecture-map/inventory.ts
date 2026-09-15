@@ -17,7 +17,7 @@
  */
 
 import { existsSync, readdirSync } from 'node:fs';
-import { join } from 'node:path';
+import { join } from 'node:path/posix';
 
 import ts from 'typescript';
 
@@ -150,28 +150,140 @@ export function discoverTrpcRouters(appRouter: SourceFile): InventoryItem[] {
   return items;
 }
 
-const PROCEDURE_RE = /^ {2}([A-Za-z]+):\s*([A-Za-z]*Procedure)\b/gm;
+/** 呼び出し / property chain の根にある識別子を返す（`protectedProcedure.meta().query()` → `protectedProcedure`）。 */
+function rootIdentifier(node: ts.Expression): string | undefined {
+  let current: ts.Node = node;
+  for (;;) {
+    if (ts.isIdentifier(current)) return current.text;
+    if (ts.isCallExpression(current) || ts.isPropertyAccessExpression(current)) {
+      current = current.expression;
+      continue;
+    }
+    return undefined;
+  }
+}
 
+/**
+ * router file の namespace を解決する。
+ *
+ * app-router が直接 import する file は namespace が確定している。`statistics.ts` のように
+ * `mergeRouters` で束ねる中間 file があるため、そこから router 系の import を辿って同じ
+ * namespace を伝播させる（辿る先は `createTRPCRouter` / `mergeRouters` を含む file だけ）。
+ */
+export function resolveRouterNamespaces(
+  sources: SourceFile[],
+  routers: InventoryItem[],
+): Map<string, string> {
+  const byPath = new Map(sources.map((file) => [file.path, file]));
+  const namespaceOfPath = new Map<string, string>();
+  const queue: Array<{ path: string; namespace: string }> = [];
+  for (const router of routers) {
+    if (namespaceOfPath.has(router.path)) continue;
+    namespaceOfPath.set(router.path, router.id);
+    queue.push({ path: router.path, namespace: router.id });
+  }
+
+  while (queue.length > 0) {
+    const current = queue.shift();
+    if (current === undefined) break;
+    const file = byPath.get(current.path);
+    if (file === undefined) continue;
+    for (const match of file.text.matchAll(/(?:from|import)\s*\(?\s*['"]([^'"]+)['"]/g)) {
+      const target = resolveImportPath(match[1], current.path, byPath);
+      if (target === undefined || namespaceOfPath.has(target)) continue;
+      const imported = byPath.get(target);
+      if (imported === undefined) continue;
+      if (
+        !imported.text.includes('createTRPCRouter(') &&
+        !imported.text.includes('mergeRouters(')
+      ) {
+        continue;
+      }
+      namespaceOfPath.set(target, current.namespace);
+      queue.push({ path: target, namespace: current.namespace });
+    }
+  }
+  return namespaceOfPath;
+}
+
+function resolveImportPath(
+  specifier: string,
+  fromPath: string,
+  byPath: Map<string, SourceFile>,
+): string | undefined {
+  let base: string;
+  if (specifier.startsWith('@/')) {
+    base = `${PRODUCT_SRC}/${specifier.slice(2)}`;
+  } else if (specifier.startsWith('.')) {
+    const dir = fromPath.slice(0, fromPath.lastIndexOf('/'));
+    base = join(dir, specifier).replace(/\\/g, '/');
+  } else {
+    return undefined;
+  }
+  for (const candidate of [`${base}.ts`, `${base}.tsx`, `${base}/index.ts`]) {
+    if (byPath.has(candidate)) return candidate;
+  }
+  return undefined;
+}
+
+/**
+ * router file の `createTRPCRouter({...})` から procedure を取り出す。
+ *
+ * 正規表現ではなく AST を使う（`createUserRouter` のように関数の中で組み立てる router は
+ * インデントが 2 space ではなく、行頭一致だと丸ごと落ちる。#2775 で `user.*` 6 件を実際に落としていた）。
+ */
 export function discoverTrpcProcedures(
   sources: SourceFile[],
   routers: InventoryItem[],
 ): InventoryItem[] {
-  const namespaceOfPath = new Map(routers.map((router) => [router.path, router.id]));
+  const namespaceOfPath = resolveRouterNamespaces(sources, routers);
   const items: InventoryItem[] = [];
+
   for (const file of sources) {
     if (!isRuntimeSource(file) || !file.text.includes('createTRPCRouter(')) continue;
     const routerName =
       namespaceOfPath.get(file.path) ?? file.path.replace(/^.*\//, '').replace(/\.tsx?$/, '');
-    for (const match of file.text.matchAll(PROCEDURE_RE)) {
-      items.push({
-        kind: 'trpc-procedure',
-        id: `${routerName}.${match[1]}`,
-        path: file.path,
-        feature: featureOf(file.path),
-        detail: match[2],
-      });
+    const sourceFile = ts.createSourceFile(file.path, file.text, ts.ScriptTarget.Latest, true);
+
+    // `const x = protectedProcedure...` を経由して登録される procedure（statistics-kpi-router）
+    const builderOfConst = new Map<string, string>();
+    for (const statement of sourceFile.statements) {
+      if (!ts.isVariableStatement(statement)) continue;
+      for (const declaration of statement.declarationList.declarations) {
+        if (!ts.isIdentifier(declaration.name) || declaration.initializer === undefined) continue;
+        const root = rootIdentifier(declaration.initializer);
+        if (root?.endsWith('Procedure') === true) builderOfConst.set(declaration.name.text, root);
+      }
     }
+
+    const visit = (node: ts.Node): void => {
+      if (
+        ts.isCallExpression(node) &&
+        ts.isIdentifier(node.expression) &&
+        node.expression.text === 'createTRPCRouter' &&
+        node.arguments[0] !== undefined &&
+        ts.isObjectLiteralExpression(node.arguments[0])
+      ) {
+        for (const member of node.arguments[0].properties) {
+          if (!ts.isPropertyAssignment(member) || !ts.isIdentifier(member.name)) continue;
+          const root = rootIdentifier(member.initializer);
+          if (root === undefined) continue;
+          const builder = root.endsWith('Procedure') ? root : builderOfConst.get(root);
+          if (builder === undefined) continue;
+          items.push({
+            kind: 'trpc-procedure',
+            id: `${routerName}.${member.name.text}`,
+            path: file.path,
+            feature: featureOf(file.path),
+            detail: builder,
+          });
+        }
+      }
+      ts.forEachChild(node, visit);
+    };
+    visit(sourceFile);
   }
+
   return items;
 }
 
@@ -188,24 +300,69 @@ export function discoverMcpTools(registry: SourceFile): InventoryItem[] {
   return items;
 }
 
-const RPC_RE = /\.rpc\(\s*'([a-z_0-9]+)'/g;
+/** `.rpc('name')` と `.rpc(CONST)`（同 file の `const CONST = 'name'`）の両方を拾う。 */
+const RPC_RE = /\.rpc(?:<[^>]*>)?\(\s*(?:'([a-z_0-9]+)'|([A-Z][A-Z0-9_]*))/g;
+/** `.from('table')` と `.from(databaseTables.alias)`。table 名は schema の実在テーブルで絞る。 */
+const FROM_RE = /\.from\(\s*(?:'([a-z_]+)'|databaseTables\.([A-Za-z]+))/g;
 
-function rpcUsers(sources: SourceFile[]): Map<string, Set<string>> {
-  const users = new Map<string, Set<string>>();
+function ownerOf(path: string): string | undefined {
+  return featureOf(path) ?? path.match(/^apps\/product\/src\/([a-z]+)\//)?.[1];
+}
+
+function addUser(users: Map<string, Set<string>>, key: string, owner: string): void {
+  let set = users.get(key);
+  if (set === undefined) {
+    set = new Set();
+    users.set(key, set);
+  }
+  set.add(owner);
+}
+
+/** 同 file の `const NAME = 'value'` を解決する（`.rpc(CLAIM_STEP_RPC)` 形式のため）。 */
+function stringConstants(text: string): Map<string, string> {
+  const constants = new Map<string, string>();
+  for (const match of text.matchAll(/const\s+([A-Z][A-Z0-9_]*)\s*=\s*'([a-z_0-9]+)'/g)) {
+    constants.set(match[1], match[2]);
+  }
+  return constants;
+}
+
+/** DB 関数 / テーブルごとに「どの feature（または lib / app）から触られているか」を集める。 */
+export function collectDatabaseUsers(
+  sources: SourceFile[],
+  tableAliases: Map<string, string>,
+  tableNames: Set<string>,
+): { rpc: Map<string, Set<string>>; table: Map<string, Set<string>> } {
+  const rpc = new Map<string, Set<string>>();
+  const table = new Map<string, Set<string>>();
   for (const file of sources) {
     if (!isRuntimeSource(file)) continue;
-    const owner = featureOf(file.path) ?? file.path.match(/^apps\/product\/src\/([a-z]+)\//)?.[1];
+    const owner = ownerOf(file.path);
     if (owner === undefined) continue;
+    const constants = stringConstants(file.text);
     for (const match of file.text.matchAll(RPC_RE)) {
-      let set = users.get(match[1]);
-      if (set === undefined) {
-        set = new Set();
-        users.set(match[1], set);
-      }
-      set.add(owner);
+      const name = match[1] ?? constants.get(match[2] ?? '');
+      if (name !== undefined) addUser(rpc, name, owner);
+    }
+    for (const match of file.text.matchAll(FROM_RE)) {
+      const name = match[1] ?? tableAliases.get(match[2] ?? '');
+      if (name !== undefined && tableNames.has(name)) addUser(table, name, owner);
     }
   }
-  return users;
+  return { rpc, table };
+}
+
+const TABLES_CONSTANT_PATH = `${PRODUCT_SRC}/lib/database/tables.ts`;
+
+/** `databaseTables` の alias → 実テーブル名。 */
+export function parseTableAliases(sources: SourceFile[]): Map<string, string> {
+  const aliases = new Map<string, string>();
+  const file = sources.find((candidate) => candidate.path === TABLES_CONSTANT_PATH);
+  if (file === undefined) return aliases;
+  for (const match of file.text.matchAll(/^\s+([A-Za-z]+):\s*'([a-z_]+)',?$/gm)) {
+    aliases.set(match[1], match[2]);
+  }
+  return aliases;
 }
 
 export function discoverInventory(
@@ -224,13 +381,21 @@ export function discoverInventory(
     items.push({ kind: 'feature', id: feature, path: `${PRODUCT_SRC}/features/${feature}` });
   }
 
+  const tableNames = new Set(schema.tables.map((table) => table.name));
+  const users = collectDatabaseUsers(sources, parseTableAliases(sources), tableNames);
   for (const table of schema.tables) {
-    items.push({ kind: 'table', id: table.name, path: 'supabase/migrations' });
+    const usedBy = [...(users.table.get(table.name) ?? [])].sort();
+    items.push({
+      kind: 'table',
+      id: table.name,
+      path: 'supabase/migrations',
+      usedBy,
+      detail: usedBy.length > 0 ? `used by ${usedBy.join(', ')}` : 'app からの直接アクセスなし',
+    });
   }
-  const users = rpcUsers(sources);
   for (const fn of schema.functions) {
     if (fn === 'graphql') continue;
-    const usedBy = [...(users.get(fn) ?? [])].sort();
+    const usedBy = [...(users.rpc.get(fn) ?? [])].sort();
     items.push({
       kind: 'db-function',
       id: fn,

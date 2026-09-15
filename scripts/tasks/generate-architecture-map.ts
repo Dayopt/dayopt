@@ -15,7 +15,7 @@
  *   - 実装の自動発見（feature / table / 関数 / router / procedure / MCP tool / store / Story / route / i18n）
  *     + 用語集の対応（`code.feature` / `db` / `mcpTools` / `i18nNamespace`）
  *       → `docs/engineering/data/architecture-inventory.md`（全文生成。未マッピングも一覧）
- *       → `architecture/model.c4` / `architecture/views.c4`（LikeC4。interactive な探索 view）
+ *       → `docs/engineering/data/architecture/{model,views}.c4`（LikeC4 の探索 view）
  *
  * あわせて、text 正本が指す参照（feature / 識別子 / DB / path / symbol）の実在を検査する。
  *
@@ -51,7 +51,7 @@ import {
   architectureMapMarkers,
   replaceGeneratedBlock,
 } from '../lib/architecture-map/generated-block.ts';
-import { discoverInventory } from '../lib/architecture-map/inventory.ts';
+import { discoverInventory, type InventoryItem } from '../lib/architecture-map/inventory.ts';
 import { renderLikeC4Model, renderLikeC4Views } from '../lib/architecture-map/likec4-model.ts';
 import {
   checkGlossaryReferences,
@@ -59,7 +59,10 @@ import {
   collectProductSources,
   type ReferenceViolation,
 } from '../lib/architecture-map/references.ts';
+import { collectMcpToolProcedures, collectRelations } from '../lib/architecture-map/relations.ts';
 import { parseSchemaModel, type SchemaModel } from '../lib/architecture-map/schema-model.ts';
+import { renderSurfaceDocument } from '../lib/architecture-map/surface-document.ts';
+import { discoverSystemSurface, type SystemSurface } from '../lib/architecture-map/surface.ts';
 import {
   parseTimeRulesSection,
   renderTimeRulesDiagram,
@@ -75,8 +78,10 @@ const ESLINT_CONFIG_PATH = 'apps/product/eslint.config.mjs';
 const ARCHITECTURE_DOC = 'docs/engineering/architecture.md';
 const INVARIANTS_DOC = 'docs/engineering/invariants.md';
 export const INVENTORY_DOC = 'docs/engineering/data/architecture-inventory.md';
-export const LIKEC4_MODEL = 'architecture/model.c4';
-export const LIKEC4_VIEWS = 'architecture/views.c4';
+export const SURFACE_DOC = 'docs/engineering/data/system-surface.md';
+const LIKEC4_DIR = 'docs/engineering/data/architecture';
+export const LIKEC4_MODEL = `${LIKEC4_DIR}/model.c4`;
+export const LIKEC4_VIEWS = `${LIKEC4_DIR}/views.c4`;
 
 const ER_MARKERS = architectureMapMarkers('er', SCHEMA_TYPES_PATH);
 const FEATURE_DAG_MARKERS = architectureMapMarkers(
@@ -185,7 +190,14 @@ export async function buildArchitectureMapDocs(): Promise<GeneratedDocument[]> {
   );
 
   const sources = collectProductSources(ROOT);
-  const conceptMap = mapInventoryToConcepts(discoverInventory(ROOT, sources, schema), GLOSSARY);
+  const items = discoverInventory(ROOT, sources, schema);
+  const conceptMap = mapInventoryToConcepts(items, GLOSSARY);
+  const systemSurface = discoverSystemSurface(
+    ROOT,
+    sources,
+    items.filter((item) => item.kind === 'mcp-tool'),
+  );
+  const relations = collectRelations(ROOT, sources, items);
   const likec4Sources = {
     map: conceptMap,
     glossary: GLOSSARY,
@@ -194,6 +206,8 @@ export async function buildArchitectureMapDocs(): Promise<GeneratedDocument[]> {
       collectFeatureDependencies(sources),
     ),
     schema,
+    surface: systemSurface,
+    relations,
   };
   const inventory = renderInventoryDocument(
     conceptMap,
@@ -205,11 +219,23 @@ export async function buildArchitectureMapDocs(): Promise<GeneratedDocument[]> {
     ].join('\n'),
   );
 
+  const surface = renderSurfaceDocument(
+    systemSurface,
+    relations,
+    items,
+    [
+      '> **生成元**: `scripts/tasks/generate-architecture-map.ts`（`pnpm architecture:generate`）。',
+      '> 実装（`apps/*` / `supabase` / `.github` / `scripts`）から自動発見した運用面の snapshot。',
+      '> **手で編集しない**。drift は `pnpm architecture:check`（docs-guard からも常時実行）が検出する。',
+    ].join('\n'),
+  );
+
   const documents: GeneratedDocument[] = [];
   for (const [path, content] of [
     [ARCHITECTURE_DOC, architecture],
     [INVARIANTS_DOC, invariants],
     [INVENTORY_DOC, inventory],
+    [SURFACE_DOC, surface],
     [LIKEC4_MODEL, renderLikeC4Model(likec4Sources)],
     [LIKEC4_VIEWS, renderLikeC4Views(likec4Sources)],
   ] as const) {
@@ -229,6 +255,55 @@ export async function buildArchitectureMapDocs(): Promise<GeneratedDocument[]> {
   return documents;
 }
 
+/**
+ * 自動発見した面どうしの整合を検査する。
+ *
+ *   - 分析イベントが TS と DB の CHECK 制約で食い違っていないか（片方だけ足すと insert が落ちる）
+ *   - app が参照する DT コードを migration が実際に raise するか
+ *   - MCP tool が呼ぶ tRPC procedure が実在するか
+ */
+export function checkSurfaceConsistency(
+  surface: SystemSurface,
+  items: InventoryItem[],
+  sources: ReturnType<typeof collectProductSources>,
+): ReferenceViolation[] {
+  const violations: ReferenceViolation[] = [];
+
+  for (const event of surface.analyticsEvents) {
+    if (!event.allowedInDb) {
+      violations.push({
+        source: 'analytics-event',
+        reason: `'${event.id}' は PRODUCT_EVENT_NAMES にあるが product_events の CHECK 制約が許可していません`,
+      });
+    }
+  }
+
+  for (const entry of surface.errorCodes) {
+    if (entry.raisedIn === 0 && entry.referencedIn.length > 0) {
+      violations.push({
+        source: 'db-error-code',
+        reason: `${entry.code} を app が参照しているが、migration のどこからも RAISE されていません（${entry.referencedIn[0]}）`,
+      });
+    }
+  }
+
+  const procedures = new Set(
+    items.filter((item) => item.kind === 'trpc-procedure').map((item) => item.id),
+  );
+  for (const tool of collectMcpToolProcedures(sources)) {
+    for (const procedure of tool.procedures) {
+      if (!procedures.has(procedure)) {
+        violations.push({
+          source: 'mcp-tool',
+          reason: `${tool.path} が呼ぶ '${procedure}' は tRPC に存在しません`,
+        });
+      }
+    }
+  }
+
+  return violations;
+}
+
 export function checkArchitectureReferences(): ReferenceViolation[] {
   const schema = loadSchemaModel();
   const sources = collectProductSources(ROOT);
@@ -237,11 +312,8 @@ export function checkArchitectureReferences(): ReferenceViolation[] {
     parseFeatureRules(readRepoFile(ESLINT_CONFIG_PATH)),
     collectFeatureDependencies(sources),
   );
-  const mcpTools = new Set(
-    discoverInventory(ROOT, sources, schema)
-      .filter((item) => item.kind === 'mcp-tool')
-      .map((item) => item.id),
-  );
+  const items = discoverInventory(ROOT, sources, schema);
+  const mcpTools = new Set(items.filter((item) => item.kind === 'mcp-tool').map((item) => item.id));
   const mcpViolations: ReferenceViolation[] = [];
   for (const entry of GLOSSARY) {
     for (const tool of entry.mcpTools ?? []) {
@@ -255,6 +327,15 @@ export function checkArchitectureReferences(): ReferenceViolation[] {
   }
   return [
     ...mcpViolations,
+    ...checkSurfaceConsistency(
+      discoverSystemSurface(
+        ROOT,
+        sources,
+        items.filter((item) => item.kind === 'mcp-tool'),
+      ),
+      items,
+      sources,
+    ),
     ...checkGlossaryReferences(GLOSSARY, schema, sources, ROOT),
     ...checkTimeRuleMirrorReferences(timeRules.mirrors, sources),
     ...checkFeatureDagConsistency(dag).map((reason) => ({ source: 'feature-dag', reason })),
