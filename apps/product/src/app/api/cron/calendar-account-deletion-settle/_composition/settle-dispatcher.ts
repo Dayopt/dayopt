@@ -151,6 +151,24 @@ export async function dispatchCalendarAccountDeletionSettle(params: {
     if (isPredecessorMissingFunction(listError)) {
       return { ...NO_ACCOUNT_DELETION_SETTLE, skipped: true, durationMs: Date.now() - startedAt };
     }
+    // CA010 = この project key で activated な Calendar authority project が無い（#2748）。
+    // intent は active project の fence にしか紐付かないため settle 対象は構造上 0 件で、
+    // 失敗ではなく 0 件の完了として扱う。未 provision の production で毎時 DAYOPT-V を出し
+    // heartbeat の completion を欠かしていた。pg_cron 側の authority job も同じ状態を
+    // 0 行 no-op にしている（20260813130000）。activation 後の project key 不一致も CA010 に
+    // なるが、同じ fence を解決する Calendar sync / revoke writer が同時に失敗するので、
+    // この cron だけが唯一の観測点ではない。
+    if (listError.code === 'CA010') {
+      const summary: AccountDeletionSettleSummary = {
+        ...NO_ACCOUNT_DELETION_SETTLE,
+        durationMs: Date.now() - startedAt,
+      };
+      logger.info(
+        '[calendar-account-deletion-settle] calendar authority project is not active; nothing to settle',
+        summary,
+      );
+      return summary;
+    }
     throw new CalendarAccountDeletionSettleError('list', {
       code: listError.code,
       message: listError.message,
