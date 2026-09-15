@@ -7,7 +7,6 @@
       "outputs": [".next/**", "!.next/cache/**", "storybook-static/**", "dist/**"],
       "env": [
         "ANALYZE",
-        "ANTHROPIC_API_KEY",
         "BILLING_ENFORCED",
         "CALENDAR_TOKEN_ENCRYPTION_KEY",
         "CI",

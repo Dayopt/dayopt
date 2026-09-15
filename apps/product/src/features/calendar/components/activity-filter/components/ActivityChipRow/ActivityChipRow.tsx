@@ -70,10 +70,12 @@ export function ActivityChipRow({ className }: ActivityChipRowProps) {
         'scrollbar-hide overscroll-x-contain',
         className,
       )}
-      // ボタンが並ぶ行なので list ではなく group。role="list" にすると子へ
+      // ボタンが並ぶ行なので list ではない。role="list" にすると子へ
       // role="listitem" が要り、interactive な button に非 interactive な role を
-      // 付ける矛盾が生じる（listitem を付けるとボタンとして読まれなくなる）
-      role="group"
+      // 付ける矛盾が生じる（listitem を付けるとボタンとして読まれなくなる）。
+      // group では landmark に含まれず axe の region 違反になるため、名前付きの
+      // region（landmark）にする（モバイル shell で main の外に置かれる行のため）
+      role="region"
       aria-label={t('calendar.filter.quickCreate')}
     >
       {chips.map((chip) => (
@@ -89,7 +91,7 @@ export function ActivityChipRow({ className }: ActivityChipRowProps) {
             size="md"
             neutral={chip.color === null}
           />
-          <span className="text-muted-foreground max-w-16 truncate text-xs">{chip.name}</span>
+          <span className="text-muted-foreground max-w-24 truncate text-xs">{chip.name}</span>
         </button>
       ))}
 
@@ -100,7 +102,7 @@ export function ActivityChipRow({ className }: ActivityChipRowProps) {
         className="hover:bg-state-hover text-muted-foreground flex h-12 min-w-16 shrink-0 flex-col items-center justify-center gap-1 rounded-lg px-2 transition-colors duration-150"
       >
         <Plus className="size-5" />
-        <span className="max-w-16 truncate text-xs">{t('common.actions.add')}</span>
+        <span className="max-w-24 truncate text-xs">{t('common.actions.add')}</span>
       </button>
     </div>
   );

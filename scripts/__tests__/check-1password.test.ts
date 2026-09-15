@@ -42,6 +42,8 @@ case "$1" in
         # op item get <item> --vault <vault> --format=json → $3=item, $5=vault
         if [ "$3" = "supabase" ] && [ "$5" = "agent" ]; then
           printf '%s\n' "$FAKE_OP_STAGING_SUPABASE_JSON"
+        elif [ "$3" = "resend-send" ] && [ "$5" = "human" ]; then
+          printf '%s\n' "$FAKE_OP_RESEND_SEND_JSON"
         else
           printf '%s\n' "$FAKE_OP_ITEM_JSON"
         fi
@@ -62,10 +64,12 @@ interface CheckOptions {
   emptyField?: string;
   missingItem?: string;
   mode?: 'error' | 'invalid-json';
-  /** true にすると agent/supabase が禁止 field を持ったまま残っている状態を再現する */
+  /** true にすると agent/supabase と human/resend-send が禁止 field を持ったまま残っている状態を再現する */
   leakForbidden?: boolean;
   /** op vault get を失敗させる vault 名（不在 / 権限不足 / 一時エラーの再現） */
   missingVault?: string;
+  /** 全 item に期限 field を足す。値は op の DATE field と同じ epoch 秒の文字列 */
+  expiry?: { label: string; value: string };
 }
 
 function runCheck(options: CheckOptions = {}) {
@@ -80,6 +84,14 @@ function runCheck(options: CheckOptions = {}) {
     label: field,
     value: field === options.emptyField ? '' : sentinelSecret,
   }));
+  if (options.expiry) {
+    fields.push({
+      id: 'expiry',
+      label: options.expiry.label,
+      value: options.expiry.value,
+      type: 'DATE',
+    } as (typeof fields)[number]);
+  }
 
   // 既定の agent/supabase は禁止 field を持たない（是正済みの状態）
   const forbiddenNames = new Set(
@@ -90,6 +102,15 @@ function runCheck(options: CheckOptions = {}) {
   const stagingSupabaseFields = options.leakForbidden
     ? fields
     : fields.filter((field) => !forbiddenNames.has(field.id));
+  // human/resend-send も webhook secret の複製を持たない（是正済みの状態）
+  const resendSendForbidden = new Set(
+    forbiddenFields
+      .filter((entry) => entry.vault === 'human' && entry.item === 'resend-send')
+      .map((entry) => entry.field),
+  );
+  const resendSendFields = options.leakForbidden
+    ? fields
+    : fields.filter((field) => !resendSendForbidden.has(field.id));
 
   return spawnSync('pnpm', ['exec', 'tsx', 'scripts/tasks/env/check-1password.ts'], {
     cwd: rootDir,
@@ -102,6 +123,7 @@ function runCheck(options: CheckOptions = {}) {
       FAKE_OP_MODE: options.mode ?? '',
       FAKE_OP_SENTINEL: sentinelSecret,
       FAKE_OP_STAGING_SUPABASE_JSON: JSON.stringify({ fields: stagingSupabaseFields }),
+      FAKE_OP_RESEND_SEND_JSON: JSON.stringify({ fields: resendSendFields }),
       PATH: `${fakeOpDirectory}:${process.env.PATH ?? ''}`,
     },
   });
@@ -114,6 +136,40 @@ afterEach(() => {
 });
 
 describe('check-1password.ts', () => {
+  const epochSecondsFromNow = (days: number) =>
+    String(Math.floor((Date.now() + days * 86_400_000) / 1000));
+
+  it('期限切れの token があれば失敗し、日付だけを出して値は出さない', () => {
+    const result = runCheck({ expiry: { label: '有効期限', value: epochSecondsFromNow(-1) } });
+
+    expect(result.status).toBe(1);
+    expect(result.stdout).toMatch(/ci \/ supabase-storage-rls-audit: EXPIRED \d{4}-\d{2}-\d{2}/);
+    expect(result.stdout).not.toContain(sentinelSecret);
+  });
+
+  it('30 日以内に切れる token は警告するが成功のまま', () => {
+    const result = runCheck({ expiry: { label: 'expires', value: epochSecondsFromNow(10) } });
+
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stdout).toMatch(/EXPIRES_SOON \d{4}-\d{2}-\d{2}（残り (9|10) 日）/);
+  });
+
+  it('期限に余裕がある token は日付だけを表示する', () => {
+    const result = runCheck({ expiry: { label: '有効期限', value: epochSecondsFromNow(200) } });
+
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stdout).toMatch(/: EXPIRES \d{4}-\d{2}-\d{2}\n/);
+    expect(result.stdout).not.toContain('EXPIRES_SOON');
+    expect(result.stdout).not.toContain('EXPIRED');
+  });
+
+  it('期限 field を日付として読めない時は値を出さずに知らせる', () => {
+    const result = runCheck({ expiry: { label: '有効期限', value: sentinelSecret } });
+
+    expect(result.stdout).toContain('EXPIRY_UNREADABLE');
+    expect(result.stdout).not.toContain(sentinelSecret);
+  });
+
   it('参照先と状態だけを表示し、取得した値を出力しない', () => {
     const result = runCheck();
 
@@ -142,17 +198,17 @@ describe('check-1password.ts', () => {
   });
 
   it('optional item が未作成でも状態を表示して成功する', () => {
-    const result = runCheck({ missingItem: 'google' });
+    const result = runCheck({ missingItem: 'upstash' });
 
     expect(result.status, result.stderr).toBe(0);
-    expect(result.stdout).toContain('agent / google / GOOGLE_SITE_VERIFICATION: MISSING_ITEM');
+    expect(result.stdout).toContain('agent / upstash / UPSTASH_REDIS_REST_URL: MISSING_ITEM');
   });
 
   it('optional field が空でも状態を表示して成功する', () => {
-    const result = runCheck({ emptyField: 'GOOGLE_SITE_VERIFICATION' });
+    const result = runCheck({ emptyField: 'TURNSTILE_SECRET_KEY' });
 
     expect(result.status, result.stderr).toBe(0);
-    expect(result.stdout).toContain('agent / google / GOOGLE_SITE_VERIFICATION: EMPTY');
+    expect(result.stdout).toContain('agent / turnstile / TURNSTILE_SECRET_KEY: EMPTY');
   });
 
   it('pendingReason を持つ entry が非 OK の時、理由を添えて表示する', () => {

@@ -19,7 +19,7 @@ GitHub Actionsのセキュリティ設定、OWASP準拠のセキュリティ監�
 .github/
   dependabot.yml              # 依存関係自動更新
   workflows/
-    ci.yml                    # impact（affected 判定）→ static（gitleaks + secrets:check + docs:check + lint/typecheck/knip）∥ unit（+ migration safety）∥ integration（affected 時の RLS/integration）の並列 4 job
+    ci.yml                    # impact（affected 判定）→ static（gitleaks + secrets:check + docs:check + lint/typecheck/knip）∥ unit（+ migration safety の検知）∥ integration（affected 時の RLS/integration）の並列 4 job + unit 後の migration-notice（検知時だけラベル + コメント）
     production-config-audit.yml  # Vercel environment metadata 監査
     nightly.yml               # status-label-sweep + replica-check + storage-backup-export の 3 job（#2483 で旧ファイルから統合。night-watch job は 2026-09-02、層 3 と integration は 2026-09-03 に撤去）
     create-release.yml        # GitHub Release 作成
@@ -28,16 +28,25 @@ GitHub Actionsのセキュリティ設定、OWASP準拠のセキュリティ監�
 
 ## 権限設計
 
-全ワークフローで最小権限の原則を適用。`pull-requests: write` を持つワークフローは無い
-（唯一持っていた `ai-review.yml` は 2026-08-03 に撤去した）。
+全ワークフローで最小権限の原則を適用。`pull-requests: write` を持つのは `ci.yml` の
+migration-notice job だけ（`ai-review.yml` は 2026-08-03 に撤去した）。
+
+**PR head のコードや依存を実行する job に write 権限の token を持たせない**（2026-09-14、
+credential audit P2-6）。`ci.yml` の job が checkout / setup（`pnpm install`）/ `node` を
+含むなら実効 permissions は read のみで、write 権限を持つ job は checkout も `uses:` も
+持たない。`scripts/__tests__/ci-token-isolation.test.ts` が job 単位で機械検査する。
+以前は unit job が migration safety の通知のために `pull-requests: write` /
+`issues: write` を持ち、`check.mjs` 内で `GH_TOKEN` を env から押収するだけが防御だった
+（同じ step で動く PR head の `check.mjs` 自身は token を読める）。
 
 ### ワークフロー別 permissions
 
 | ワークフロー                                        | permissions                                                  | 理由                                                                                          |
 | --------------------------------------------------- | ------------------------------------------------------------ | --------------------------------------------------------------------------------------------- |
-| `ci.yml`（impact job）                              | `contents: read` / `pull-requests: read`                     | PR の変更ファイル一覧の取得（gh api）を行う唯一の job                                         |
+| `ci.yml`（impact job）                              | `contents: read` / `pull-requests: read`                     | PR の変更ファイル一覧の取得（gh api）による affected 判定                                     |
 | `ci.yml`（static job）                              | `contents: read` / `pull-requests: read`                     | コード読み取りのみ（gh を呼ばないため step env に `GH_TOKEN` を渡さない）                     |
-| `ci.yml`（unit job）                                | `contents: read` / `pull-requests: write` / `issues: write`  | migration safety の通知                                                                       |
+| `ci.yml`（unit job）                                | `contents: read` / `pull-requests: read`                     | PR コードの unit test + migration safety の検知（PR files の読み取り。結果は job output）     |
+| `ci.yml`（migration-notice job）                    | `contents: read` / `pull-requests: write` / `issues: write`  | migration safety の通知。checkout・依存 install をせず、unit の output は allowlist 検証する  |
 | `ci.yml`（integration job）                         | `contents: read`                                             | gh を呼ばないため job 単位で最小へ絞る（PR コードを実行する job に書き込み token を置かない） |
 | `nightly.yml`（replica-check / storage-backup job） | `contents: read`                                             | コード読み取りのみ                                                                            |
 | `nightly.yml`（status-label-sweep job）             | `issues: write` / `contents: read`                           | ラベル一括剥がし                                                                              |

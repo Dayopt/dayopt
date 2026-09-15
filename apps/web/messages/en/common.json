@@ -241,8 +241,7 @@
       "loading": "Loading...",
       "noHeadings": "No headings found",
       "links": "Links",
-      "reportIssue": "Report an issue",
-      "viewSource": "View source"
+      "reportIssue": "Report an issue"
     },
     "sidebar": {
       "searchPlaceholder": "Search docs..."

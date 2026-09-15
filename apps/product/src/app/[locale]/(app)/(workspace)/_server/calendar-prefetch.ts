@@ -1,99 +1,77 @@
 import { headers } from 'next/headers';
 
 import type { CalendarViewType } from '@/features/calendar';
-import { calculateViewDateRange } from '@/features/calendar';
+import {
+  buildCalendarRangeInput,
+  buildTimeblockListInput,
+  DEFAULT_SHOW_WEEKENDS,
+  DEFAULT_WEEK_STARTS_ON,
+  parseCalendarDateParam,
+} from '@/features/calendar';
+import { getDateKey } from '@/lib/date';
 import { logger } from '@/lib/logger';
 import { createServerHelpers, dehydrate } from '@/lib/trpc/server';
 
-/**
- * ローカル日付の 00:00:00 を UTC midnight として正規化した ISO 文字列を生成
- *
- * サーバー(UTC)とクライアント(JST等)で同じローカル日付なら同じ文字列を返すため、
- * tRPC クエリキーが一致しキャッシュヒットが保証される。
- */
-function toLocalDateUTCStart(date: Date): string {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, '0');
-  const d = String(date.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}T00:00:00.000Z`;
-}
-
-/** ローカル日付の 23:59:59.999 を UTC midnight として正規化した ISO 文字列を生成 */
-function toLocalDateUTCEnd(date: Date): string {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, '0');
-  const d = String(date.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}T23:59:59.999Z`;
-}
+/** `user-tz` Cookie を proxy.ts が転送したヘッダー。初回アクセス（Cookie 未設定）は無い */
+const USER_TIMEZONE_HEADER = 'x-user-timezone';
 
 /**
- * タイムゾーン文字列を用いてサーバーの UTC 日時をユーザーのローカル日付に変換する。
+ * 「今日」をブラウザの暦日で求める。
  *
- * `new Date()` はサーバー上では UTC で評価されるため、ユーザーがタイムゾーンをまたぐ
- * 時間帯（例: UTC+9 深夜）では日付がズレる。
- * Intl.DateTimeFormat で UTC → ローカル日付部分を取得し、Date を再構成する。
+ * client の `CalendarNavigationProvider` は `?date=` が無い時 `new Date()` をブラウザの
+ * ローカル暦日で読む。server はブラウザ TZ を `user-tz` Cookie でしか知らないので、
+ * user_settings.timezone ではなく Cookie 側で暦日を決める（両者が違う user でも key が揃う）。
+ * 不正な TZ 文字列は UTC に落とす。
  */
-function toLocalDate(utcDate: Date, timezone: string): Date {
+function resolveTodayDateKey(now: Date, browserTimezone: string): string {
   try {
-    const parts = new Intl.DateTimeFormat('en-CA', {
-      timeZone: timezone,
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-    }).formatToParts(utcDate);
-
-    const year = Number(parts.find((p) => p.type === 'year')?.value ?? utcDate.getFullYear());
-    const month = Number(parts.find((p) => p.type === 'month')?.value ?? utcDate.getMonth() + 1);
-    const day = Number(parts.find((p) => p.type === 'day')?.value ?? utcDate.getDate());
-
-    return new Date(year, month - 1, day);
+    return getDateKey(now, browserTimezone);
   } catch {
-    // 不正なタイムゾーン文字列の場合は UTC をそのまま使用
-    return utcDate;
+    return getDateKey(now, 'UTC');
   }
 }
 
 /**
  * カレンダービュー用 prefetch（day/week/Nday）
  *
- * ビュータイプに応じた日付範囲でプランデータを事前取得し、
- * クライアントでのデータ取得を高速化する。
+ * client の `useCalendarData` と**同じ builder・同じ設定値**で input を組み、
+ * dehydrate した cache が client query にそのまま hydrate されるようにする（#2747）。
  *
- * 認証エラー（ログアウト直後等）ではprefetchをスキップし、
- * 空のdehydratedStateを返す。クライアント側で再取得される。
+ * - 範囲の timezone / weekStartsOn / showWeekends は user_settings を正とする。client は
+ *   `UserSettingsInitializer` が settings の確定まで描画を止めるので、同じ値で query を撃つ
+ * - row の無い新規ユーザーは client の既定（browser TZ / 月曜 / 週末表示）に合わせる
+ * - settings を取得できない時（未認証・DB エラー）は、曖昧な既定値で先読みしても key が
+ *   揃わないので calendar 範囲の prefetch 自体をやめる。client 側で通常どおり取得される
  */
-export async function prefetchCalendarData(view: CalendarViewType, targetDate: Date) {
+export async function prefetchCalendarData(view: CalendarViewType, dateParam: string | undefined) {
   const helpers = await createServerHelpers();
 
-  // middleware が `user-tz` Cookie から転送した `x-user-timezone` ヘッダーを使用
-  // targetDate が `new Date()` の場合はユーザーのローカル日付に補正する
-  // 初回アクセス時（Cookie未設定）は UTC にフォールバック
   const headersList = await headers();
-  const userTimezone = headersList.get('x-user-timezone') ?? 'UTC';
-  const localTargetDate = toLocalDate(targetDate, userTimezone);
-
-  // weekStartsOnはZustandストアなのでSSRではデフォルト値1（月曜日）を使用
-  const viewDateRange = calculateViewDateRange(view, localTargetDate, 1);
-  // toISOString()はTZ依存のためローカル日付をUTC normalizeして文字列化
-  const dateFilter = {
-    startDate: toLocalDateUTCStart(viewDateRange.start),
-    endDate: toLocalDateUTCEnd(viewDateRange.end),
-  };
+  const browserTimezone = headersList.get(USER_TIMEZONE_HEADER) ?? 'UTC';
 
   try {
+    const settings = await helpers.userSettings.get.fetch();
+
+    // parse 失敗（不正な ?date=）は client も今日に倒すので揃う
+    const anchorDateKey = parseCalendarDateParam(dateParam)
+      ? (dateParam as string)
+      : resolveTodayDateKey(new Date(), browserTimezone);
+
+    const rangeOptions = {
+      viewType: view,
+      anchorDateKey,
+      timezone: settings?.timezone ?? browserTimezone,
+      weekStartsOn: settings?.weekStartsOn ?? DEFAULT_WEEK_STARTS_ON,
+      showWeekends: settings?.showWeekends ?? DEFAULT_SHOW_WEEKENDS,
+    };
+    const listInput = buildTimeblockListInput(rangeOptions);
+
+    // prefetch は失敗を投げない（TanStack Query の prefetchQuery）。失敗した query は
+    // dehydrate されず、client 側で取り直される。
     await Promise.all([
-      helpers.plans.list.prefetch({
-        ...dateFilter,
-        sortBy: 'start_at',
-        sortOrder: 'asc',
-        limit: 100,
-      }),
-      helpers.records.list.prefetch({
-        ...dateFilter,
-        sortBy: 'start_at',
-        sortOrder: 'asc',
-        limit: 100,
-      }),
+      helpers.plans.list.prefetch(listInput),
+      helpers.records.list.prefetch(listInput),
+      helpers.externalCalendar.listEvents.prefetch(buildCalendarRangeInput(rangeOptions)),
       helpers.statistics.getActivityStats.prefetch(),
     ]);
   } catch (error) {

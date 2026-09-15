@@ -211,8 +211,7 @@
       "loading": "読み込み中...",
       "noHeadings": "見出しが見つかりません",
       "links": "リンク",
-      "reportIssue": "問題を報告",
-      "viewSource": "ソースを表示"
+      "reportIssue": "問題を報告"
     },
     "sidebar": {
       "searchPlaceholder": "ドキュメントを検索..."

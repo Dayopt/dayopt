@@ -63,6 +63,9 @@ if [[ -z "${SUPABASE_ACCESS_TOKEN:-}" ]]; then
   exit 1
 fi
 
+source "$(dirname "${BASH_SOURCE[0]}")/../tasks/confirm-target.sh"
+require_target_confirmation "$PROJECT_REF" "production Auth config の書き換え（custom_access_token hook 有効化）"
+
 # ========================================
 # Auth Hook 有効化
 # ========================================

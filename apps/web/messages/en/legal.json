@@ -85,8 +85,7 @@
     "packageList": "Package List ({count})",
     "footer": {
       "notice": "For complete license texts and NOTICE files, please see:",
-      "thirdPartyNotices": "THIRD_PARTY_NOTICES.txt",
-      "githubRepository": "GitHub Repository"
+      "thirdPartyNotices": "THIRD_PARTY_NOTICES.txt"
     }
   }
 }

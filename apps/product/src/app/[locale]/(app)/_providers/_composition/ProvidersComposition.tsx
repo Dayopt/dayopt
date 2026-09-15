@@ -93,9 +93,14 @@ export function ProvidersComposition({ children }: ProvidersCompositionProps) {
     createUserScopedQueryPersister({ resolveUserId: waitForResolvedUserId }),
   );
 
-  // Provider階層（最適化済み）
+  // Provider階層
   // Context Provider: PersistQueryClientProvider → api.Provider → ThemeProvider
-  // 非Context: AuthStoreInitializer（並列配置）
+  // 非Context: AuthStoreInitializer / QueryCacheAuthBoundary / SessionMonitorProvider /
+  //   ServiceWorkerProvider（並列配置）
+  //
+  // children の祖先に置いてよいのは、未確定だと表示や mutation の正しさが壊れる gate
+  // （UserSettingsInitializer / BillingAccessProvider）だけ。副作用だけの遅延ロード component を
+  // 祖先に置くと、その chunk が届くまで page 本体も server prefetch の hydrate も止まる（#2747）。
   return (
     <PersistQueryClientProvider
       client={queryClient}
@@ -119,21 +124,20 @@ export function ProvidersComposition({ children }: ProvidersCompositionProps) {
         {/* 認証主体が変わったら memory / 永続 cache を破棄する（#2619） */}
         <QueryCacheAuthBoundary />
         <ThemeProvider>
-          <SessionMonitorProvider>
-            <ServiceWorkerProvider>
-              {/* UserSettings の hydration が完了するまで children を render しない。
-                  timezone 等が defaults のまま timezone-dependent mutation が実行
-                  されるのを防ぐ。TanStack Query の永続 cache が効けば体感遅延は極小。 */}
-              <UserSettingsInitializer>
-                <BillingAccessProvider>
-                  {children}
-                  <GlobalActivityCreateModal />
-                  <GlobalActivityRenameModal />
-                  <GlobalCategoryRenameModal />
-                </BillingAccessProvider>
-              </UserSettingsInitializer>
-            </ServiceWorkerProvider>
-          </SessionMonitorProvider>
+          {/* セッション失効通知・PWA 登録は children を gate しない副作用なので並列配置 */}
+          <SessionMonitorProvider />
+          <ServiceWorkerProvider />
+          {/* UserSettings の hydration が完了するまで children を render しない。
+              timezone 等が defaults のまま timezone-dependent mutation が実行
+              されるのを防ぐ。TanStack Query の永続 cache が効けば体感遅延は極小。 */}
+          <UserSettingsInitializer>
+            <BillingAccessProvider>
+              {children}
+              <GlobalActivityCreateModal />
+              <GlobalActivityRenameModal />
+              <GlobalCategoryRenameModal />
+            </BillingAccessProvider>
+          </UserSettingsInitializer>
         </ThemeProvider>
         {/* 開発ツール（開発環境のみ） */}
         {process.env.NODE_ENV === 'development' && <AxeAccessibilityChecker />}

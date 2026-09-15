@@ -215,7 +215,7 @@ export function useDragSelection({
         if (mode.isOverlapping) {
           toast.error(p.t('errors.timeOverlap'));
         } else if (p.onTimeRangeSelect) {
-          p.onTimeRangeSelect({ date: p.date, ...mode.selection });
+          p.onTimeRangeSelect({ date: p.date, ...mode.selection, durationSource: 'dragged' });
         }
       }
       dispatch({ type: 'MOUSE_UP' });
@@ -304,7 +304,7 @@ export function useDragSelection({
         if (mode.isOverlapping) {
           toast.error(p.t('errors.timeOverlap'));
         } else if (p.onTimeRangeSelect) {
-          p.onTimeRangeSelect({ date: p.date, ...sel });
+          p.onTimeRangeSelect({ date: p.date, ...sel, durationSource: 'dragged' });
         }
       } else if (handler) {
         // クライアント側overlap検出（サーバーエラーを未然に防ぐ）

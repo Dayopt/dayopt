@@ -1411,6 +1411,91 @@ describe('pre-tool-guard.mjs: #2293 vercel --token / -t（07-22 incident 再現�
   });
 });
 
+describe('pre-tool-guard.mjs: vercel CLI は読み取り系だけを通す（2026-09-14 監査 P1-2）', () => {
+  const V = 'vercel';
+
+  it.each([
+    `${V} ls`,
+    `${V} list --scope dayopt`,
+    `${V} inspect https://x.vercel.app`,
+    `${V} inspect --logs https://x.vercel.app`,
+    `${V} logs https://x.vercel.app --json`,
+    `${V} whoami`,
+    `${V} --version`,
+    `${V} teams ls`,
+    `${V} project ls`,
+    `${V} env ls`,
+    `${V} env ls production`,
+    `${V} domains ls`,
+    `${V} api /v5/user/tokens`,
+    `${V} api /v9/projects/product -X GET`,
+    `npx ${V} ls`,
+    `pnpm exec ${V} env ls`,
+    `/opt/homebrew/bin/${V} whoami`,
+    `${V} ls | head -20`,
+    `${V} api /v5/user/tokens | jq .tokens`,
+  ])('読み取り系は通す: %s', (command) => {
+    expect(runGuard(bash(command))).toBe('allow');
+  });
+
+  it.each([
+    [`${V}`, '引数なしは deploy'],
+    [`${V} --prod`, 'flag だけでも deploy'],
+    [`${V} deploy --prod`, 'deploy'],
+    [`${V} promote https://x.vercel.app`, 'promote'],
+    [`${V} rollback`, 'rollback'],
+    [`${V} redeploy https://x.vercel.app`, 'redeploy'],
+    [`${V} env add SUPABASE_SECRET_KEY production`, 'env 追加'],
+    [`${V} env rm SUPABASE_SECRET_KEY production --yes`, 'env 削除'],
+    [`${V} env pull .env.local`, '実値を file へ引き出す'],
+    [`${V} pull --environment production`, '実値を file へ引き出す'],
+    [`${V} dev`, '実値を process へ引き出す'],
+    [`${V} domains rm dayopt.app`, 'domain 削除'],
+    [`${V} certs issue dayopt.app`, 'cert'],
+    [`${V} project rm product`, 'project 削除'],
+    [`${V} remove product --yes`, 'deployment 削除'],
+    [`${V} link --yes`, 'link'],
+    [`${V} api /v10/projects/product/env -X POST`, 'api の非 GET'],
+    [`${V} api /v9/projects/product --method=DELETE`, 'api の非 GET（= 形）'],
+    [`${V} api /v10/projects/product/env -d x`, 'api に body'],
+    [`${V} --scope dayopt env rm X production`, 'value flag を読み飛ばした後の書き込み'],
+  ])('書き込み系は落とす: %s（%s）', (command) => {
+    expect(runGuard(bash(command))).toBe('block');
+  });
+
+  it.each([
+    `npx --yes ${V} env rm X production`,
+    `pnpm dlx ${V} promote https://x.vercel.app`,
+    `env FOO=1 ${V} env rm X production`,
+    `FOO=1 ${V} deploy`,
+    `command ${V} rollback`,
+    `op run -- ${V} env add X production`,
+    `sh -c "${V} env rm X production"`,
+    `echo hi && ${V} domains rm dayopt.app`,
+    `true; ${V} deploy`,
+    `echo x | xargs ${V} env rm`,
+    `(${V} deploy)`,
+    `echo $(${V} env rm X production)`,
+    `bash -c '${V} promote https://x.vercel.app'`,
+    `true\n${V} deploy`,
+    `cd apps/product\n${V} env rm X production`,
+  ])('前置きや区切りを挟んでも書き込み系は落とす: %s', (command) => {
+    expect(runGuard(bash(command))).toBe('block');
+  });
+
+  it.each([
+    `rg ${V} docs/operations`,
+    `git log --oneline -- ${V}.json`,
+    `ls apps/product/${V}.json`,
+    `echo ${V} deploy`,
+    `rg -n "VERCEL|${V}" scripts/__tests__/check-1password.test.ts`,
+    `grep -E 'deploy|${V} env rm' docs/operations/secrets.md`,
+    `git commit -m "docs: ${V} env rm は User が行う"`,
+  ])('コマンド位置にない vercel の言及は落とさない: %s', (command) => {
+    expect(runGuard(bash(command))).toBe('allow');
+  });
+});
+
 describe('pre-tool-guard.mjs: #2293 Supabase Management API secret endpoint（08-11 incident 再現 ×2）', () => {
   it('08-11 incident 1 の実行形（config/auth への直接 curl）は落ちる', () => {
     expect(

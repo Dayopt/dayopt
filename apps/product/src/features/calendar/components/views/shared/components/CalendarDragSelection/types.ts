@@ -19,6 +19,11 @@ export interface DateTimeSelection extends TimeRange {
   date: Date;
   /** 選択の発生元。planned gap 由来の作成だけ preview を記録レーンに寄せる。 */
   creationSource?: 'planned-gap' | undefined;
+  /**
+   * 長さの出どころ。`dragged` は範囲を引いて長さまで決めた選択（アクティビティの
+   * 普段の長さで上書きしない）。未指定はクリック / タップ起点の既定の長さ
+   */
+  durationSource?: 'dragged' | undefined;
 }
 
 /** CalendarDragSelection コンポーネントのプロパティ */

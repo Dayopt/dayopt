@@ -55,7 +55,8 @@ export function useInlineCreate(extras: InlineCreateExtras = {}) {
   const queryClient = useQueryClient();
   const openInspector = useTimeblockInspectorStore((state) => state.openInspector);
   const closeInspector = useTimeblockInspectorStore((state) => state.closeInspector);
-  const { createRecord, createPlan } = useTimeblockWriteMutations();
+  const { createRecord, createPlan, deletePlan, deleteRecord } = useTimeblockWriteMutations();
+  const tCommon = useTranslations('common');
   const createActivityMutation = useCreateActivity({ showToast: false });
   const [isCreating, setIsCreating] = useState(false);
   const lockedRef = useRef(false);
@@ -148,11 +149,35 @@ export function useInlineCreate(extras: InlineCreateExtras = {}) {
             setIsCreating(false);
             lockedRef.current = false;
             clearPendingSelection();
-            toast.success(
+            const message =
               destination === 'plan'
                 ? tEntry('editor.toast.planCreated')
-                : tEntry('editor.toast.recorded'),
-            );
+                : tEntry('editor.toast.recorded');
+            // サイドバーのタップ作成（useActivityQuickCreate）と同じく取り消しを付ける。
+            // 作成は可逆なので速く進め、間違えたらトーストから戻せるようにする（ルール4）
+            if (created?.id) {
+              const createdId = created.id;
+              const payload = { id: createdId, expectedUpdatedAt: created.updated_at };
+              toast.success(message, {
+                duration: 5000,
+                action: {
+                  label: tCommon('undo'),
+                  onClick: () => {
+                    // 取り消したブロックを詳細で開いたままにしない
+                    if (useTimeblockInspectorStore.getState().timeblockId === createdId) {
+                      closeInspector();
+                    }
+                    if (destination === 'plan') {
+                      deletePlan.mutate(payload);
+                    } else {
+                      deleteRecord.mutate(payload);
+                    }
+                  },
+                },
+              });
+            } else {
+              toast.success(message);
+            }
             // 同じパネルをそのまま作成したブロックの詳細へ切り替える。メモ入力や
             // 記録化へ続けて進めるようにするため（作成モードはここで終わる）
             if (created?.id) {
@@ -178,11 +203,14 @@ export function useInlineCreate(extras: InlineCreateExtras = {}) {
       fulfillment,
       createPlan,
       createRecord,
+      deletePlan,
+      deleteRecord,
       clearPendingSelection,
       closeInspector,
       openInspector,
       queryClient,
       tEntry,
+      tCommon,
     ],
   );
 

@@ -8,6 +8,9 @@
 #   source "$(dirname "${BASH_SOURCE[0]}")/admin-common.sh"
 # ========================================
 
+# 破壊的な操作の対象確認（DAYOPT_CONFIRM_TARGET）。confirm-target.sh が正本。
+source "$(dirname "${BASH_SOURCE[0]}")/../tasks/confirm-target.sh"
+
 require_user_email() {
   if [[ -z "${USER_EMAIL:-}" ]]; then
     echo "エラー: USER_EMAIL を指定してください" >&2

@@ -64,7 +64,6 @@ import {
 } from './impact.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
-const MIGRATION_LABEL = 'db:destructive-migration';
 
 // DI 用の簡略型（`typeof execFileSync` 等の strict overload 型をそのまま JSDoc に
 // 使うと、test の単純な mock（`vi.fn(() => 'stdout')` 等）が Node の完全な戻り値型
@@ -82,7 +81,7 @@ const MIGRATION_LABEL = 'db:destructive-migration';
 
 /**
  * `env` は gh の実行環境。省略時は execFileSync の既定どおり process.env を継承する。
- * runTest() は PR コードへ write 権限つき GH_TOKEN を渡さないため process.env から
+ * runUnit() は PR コードの依存へ GH_TOKEN を継承させないため process.env から
  * それを削除しており、その文脈から呼ぶ場合は token を含む env を明示的に渡す必要が
  * ある（渡さないと gh が「GH_TOKEN を設定してください」で失敗する）。
  * @param {{ repo?: string, prNumber?: string | number, execImpl?: ExecFileImpl, env?: NodeJS.ProcessEnv }} opts
@@ -554,15 +553,16 @@ async function runStatic() {
 // ─── unit モード（DB 非依存。Supabase を起動しない job で走る）────────
 
 async function runUnit() {
-  // ── write 権限つき GH_TOKEN を PR コードの実行から隔離する ──────────
-  // このジョブは permissions: pull-requests: write / issues: write を宣言し、
-  // その GITHUB_TOKEN を GH_TOKEN として step env に受け取る。以降の run()
-  // 呼び出しは PR branch のテストコードと全依存（postinstall・vitest
-  // transform・plugin を含む）を実行するため、env を明示指定しない
-  // spawnSync はこのトークンをそのまま子プロセスへ継承してしまう
-  // （token 分離原則: 子プロセスへ継承させる env から押収し、
-  // 押収した値は migration safety の gh 呼び出しにだけ明示的に渡す。
-  // push前反証レビュー risk-reviewer 指摘、P1、PR #2484）。
+  // ── GH_TOKEN を PR コードの依存から隔離する ────────────────────────
+  // **この job の token は read-only**（contents: read / pull-requests: read）。
+  // PR head のコードと全依存を実行する job に書き込み token を置かないため、
+  // 破壊的 migration のラベル付与・コメント投稿は ci.yml の `migration-notice` job
+  // （checkout も依存 install もしない）へ移した（2026-09-14、credential audit P2-6。
+  // それ以前はこの job が pull-requests: write / issues: write を持ち、ここでの押収だけが
+  // 防御だった。PR #2484 の P1 指摘）。read-only でも PR の変更ファイル一覧を読める
+  // token であることに変わりはないため、以降の run()（postinstall・vitest transform・
+  // plugin を含む）へ継承させない押収は残す。押収した値は migration safety の
+  // ファイル一覧取得にだけ明示的に渡す。
   const ghToken = process.env.GH_TOKEN;
   delete process.env.GH_TOKEN;
 
@@ -597,6 +597,9 @@ async function runUnit() {
     });
     if (safety.coupled) coupledMigration = safety.coupling;
     if (safety.undeterminable) migrationSafetyUndeterminable = true;
+    // 通知（ラベル + コメント）は write 権限を持つ下流 job が行う。unit test の失敗で
+    // step が落ちても GITHUB_OUTPUT は step 終了時に処理されるため、検知直後に書く。
+    await writeGithubOutput(formatMigrationSafetyOutput(safety));
   }
 
   run('pnpm', ['build:packages']);
@@ -749,11 +752,15 @@ async function runIntegration() {
 }
 
 /**
- * migration safety の検知〜通知。plain な destructive 検知は「検知しても job は失敗させない」
+ * migration safety の検知。plain な destructive 検知は「検知しても job は失敗させない」
  * （fail open）設計を維持する。戻り値の `coupled`（既存オブジェクトの契約を縮める migration と
- * product runtime 変更が同一 PR、#2680）だけは呼び出し側（runUnit）が hard fail にする。ラベル付与より先にコメント投稿を行う（旧 integration.yml と
- * 同じ crash-safety の理由: cancel-in-progress で通知前に打ち切られても、
- * ラベルだけ残って以後永久に通知されない状態を避ける）。
+ * product runtime 変更が同一 PR、#2680）だけは呼び出し側（runUnit）が hard fail にする。
+ *
+ * **通知（ラベル付与・PR コメント）はここでは行わない**（2026-09-14、credential audit P2-6）。
+ * この関数は PR head のコードと全依存を実行する unit job で走るため、write 権限の token を
+ * 持たせない。`notify` と `summary` を返し、runUnit が formatMigrationSafetyOutput() で
+ * job output へ出し、ci.yml の `migration-notice` job（checkout も依存 install もしない）が
+ * コメント投稿 → ラベル付与を行う（順序と「付与済みなら再通知しない」規約はそちらが持つ）。
  *
  * 実行に使う関数はすべて注入可能にしてある（test では gh / fs へ実際に触れずに
  * 分岐を検証する。strip-status-labels.mjs と同じ DI の型）。
@@ -762,8 +769,6 @@ async function runIntegration() {
  *   prNumber?: string | number,
  *   fetchFilesImpl?: typeof fetchPrFilesWithStatus,
  *   readFileImpl?: ReadFileImpl,
- *   execFileImpl?: ExecFileImpl,
- *   spawnImpl?: SpawnImpl,
  *   writeStepSummaryImpl?: typeof writeStepSummary,
  *   gitFallbackImpl?: typeof fetchPrFilesFromGit,
  *   sleepImpl?: (ms: number) => Promise<void>,
@@ -775,16 +780,13 @@ export async function runMigrationSafety({
   prNumber,
   fetchFilesImpl = fetchPrFilesWithStatus,
   readFileImpl = readFileSync,
-  execFileImpl = execFileSync,
-  spawnImpl = spawnSync,
   writeStepSummaryImpl = writeStepSummary,
   gitFallbackImpl = fetchPrFilesFromGit,
   sleepImpl = (ms) => new Promise((resolvePromise) => setTimeout(resolvePromise, ms)),
   env = process.env,
 }) {
-  // env は gh 呼び出し 2 箇所（ファイル一覧の取得とラベル確認）の両方へ渡す。
-  // runTest() が process.env から GH_TOKEN を外しているため、片方でも漏らすと
-  // その gh が「GH_TOKEN を設定してください」で失敗する。
+  // env はファイル一覧取得の gh 呼び出しへ渡す。runUnit() が process.env から
+  // GH_TOKEN を外しているため、渡し漏らすと gh が「GH_TOKEN を設定してください」で失敗する。
   //
   // 取得失敗は fail open に倒す（内製クロスレビュー risk-reviewer 指摘、P2）。
   // この呼び出しは #2483 で unit test 群より前へ移したため、例外を素通しすると
@@ -820,7 +822,8 @@ export async function runMigrationSafety({
         );
         return {
           results: [],
-          notified: false,
+          notify: false,
+          summary: '',
           skipped: true,
           coupled: false,
           undeterminable: true,
@@ -854,68 +857,24 @@ export async function runMigrationSafety({
     fallbackNote +
     (coupling.coupled ? `\n${formatCoupledSummary(coupling)}` : '');
   await writeStepSummaryImpl(summary);
-  if (results.length === 0) return { results, notified: false, coupled: false, coupling };
+  return { results, notify: results.length > 0, summary, coupled: coupling.coupled, coupling };
+}
 
-  let hasLabel = false;
-  try {
-    hasLabel = JSON.parse(
-      execFileImpl(
-        'gh',
-        [
-          'api',
-          `repos/${repo}/issues/${prNumber}/labels`,
-          '--jq',
-          `[.[] | select(.name == "${MIGRATION_LABEL}")] | length > 0`,
-        ],
-        { encoding: 'utf8', env },
-      ),
-    );
-  } catch {
-    hasLabel = false; // 取得失敗は「未検知」扱いで通知を試みる（fail open）
-  }
-  if (hasLabel) return { results, notified: false, coupled: coupling.coupled, coupling }; // round ごとの追い push で毎回コメントしない
-
-  spawnImpl(
-    'gh',
-    [
-      'label',
-      'create',
-      MIGRATION_LABEL,
-      '--repo',
-      repo,
-      '--color',
-      'B60205',
-      '--description',
-      '破壊的 migration を検知（EXPLICIT AUTHORITY 要確認）',
-    ],
-    { env },
-  );
-
-  const commentResult = spawnImpl(
-    'gh',
-    ['pr', 'comment', String(prNumber), '--repo', repo, '--body', summary],
-    { env },
-  );
-  if (commentResult.status === 0) {
-    spawnImpl(
-      'gh',
-      [
-        'api',
-        '--method',
-        'POST',
-        `repos/${repo}/issues/${prNumber}/labels`,
-        '-f',
-        `labels[]=${MIGRATION_LABEL}`,
-      ],
-      { env },
-    );
-    return { results, notified: true, coupled: coupling.coupled, coupling };
-  }
-  // fork PR では pull_request イベントの GITHUB_TOKEN が構造的に read-only になる
-  console.log(
-    '::warning::migration safety のコメント投稿に失敗しました（fork PR 等で write 権限が無い可能性）。Step Summary の検知結果を確認してください。',
-  );
-  return { results, notified: false, coupled: coupling.coupled, coupling };
+/**
+ * runMigrationSafety の結果を GITHUB_OUTPUT の行へ変換する。受け手は ci.yml の
+ * `migration-notice` job で、`migration_destructive` は `true` / `false` の 2 値だけ、
+ * コメント本文は改行や delimiter を含みうる markdown なので 1 行の base64 にする
+ * （複数行 output の heredoc delimiter を本文で偽装されない形にするため）。
+ * 受け手はこの output を「PR head のコードが書いた値」として allowlist で検証する。
+ * @param {{ notify?: boolean, summary?: string }} safety
+ * @returns {string[]}
+ */
+export function formatMigrationSafetyOutput(safety) {
+  const notify = safety?.notify === true && typeof safety.summary === 'string';
+  return [
+    `migration_destructive=${notify ? 'true' : 'false'}`,
+    `migration_comment_b64=${notify ? Buffer.from(safety.summary, 'utf8').toString('base64') : ''}`,
+  ];
 }
 
 // ─── CLI ────────────────────────────────────────────────────────────

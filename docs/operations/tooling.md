@@ -736,18 +736,20 @@ op run --env-file=.op-env.human -- \
 
 **`.op-env.agent`（通常の local dev 用）ではなく `.op-env.human` を使う。** `pnpm dev` の Supabase 接続先は local 固定で、`.op-env.agent` は Supabase の接続情報を持たない（[secrets.md](./secrets.md) の `agent` 節）。admin script は Supabase Auth Admin API を service role で叩くため、専用の env-file を分けている。
 
-`.op-env.human.example` は `human/supabase` を参照する。**つまりこれらの script の実行は production への操作**であり、実行したら手動作業ログを残す。local の Supabase を対象にしたい場合は `supabase status -o env` の値を `env` で直接渡す。
+`.op-env.human.example` は `human/supabase` を参照する。**つまりこれらの script の実行は production への操作**であり、実行したら手動作業ログを残す。
+
+**書き換え・削除をする script は対象の打ち返しを要求する**（2026-09-14、Secret / Credential 監査 P2-2）。`admin-delete-user.sh` / `admin-set-user-password.sh` / `enable-auth-hook.sh` / `USE_LINKED_DB=true` の `seed-dev-data.sh` / `pnpm db:reset-linked:unsafe` は、操作対象から導いた Supabase project ref を `DAYOPT_CONFIRM_TARGET` に渡さない限り、ネットワークへ出る前に止まる。止まった時のメッセージに対象 ref が出るので、正しい対象だと確かめてから付けて再実行する。期待値は URL（admin 系・seed）か `supabase/.temp/project-ref`（linked reset）から導くため、別 project を指したまま確認を通すことはできない。正本は `scripts/tasks/confirm-target.sh`、契約は `scripts/__tests__/confirm-target.test.ts`。local の Supabase を対象にしたい場合は `supabase status -o env` の値を `env` で直接渡す。
 
 ## スクリプト一覧
 
-| スクリプト                    | 用途                                                      | 必須 env                         |
-| ----------------------------- | --------------------------------------------------------- | -------------------------------- |
-| `admin-create-user.sh`        | email + password で user を新規作成（即 login 可能）      | `USER_EMAIL`, `PASSWORD_ITEM_ID` |
-| `admin-delete-user.sh`        | user を hard delete（関連 row も CASCADE 削除）           | `USER_EMAIL`                     |
-| `admin-ensure-profile.sh`     | trigger 未発火時に `profiles` row を手動 upsert           | `USER_EMAIL`                     |
-| `admin-generate-magiclink.sh` | captcha / UI form の bug を bypass する magic link を発行 | `USER_EMAIL`                     |
-| `admin-set-user-password.sh`  | 既存 user の password を上書き + email 確認済みにする     | `USER_EMAIL`, `PASSWORD_ITEM_ID` |
-| `admin-show-user.sh`          | email から `auth.users` の状態を dump（read-only）        | `USER_EMAIL`                     |
+| スクリプト                    | 用途                                                      | 必須 env                                                  |
+| ----------------------------- | --------------------------------------------------------- | --------------------------------------------------------- |
+| `admin-create-user.sh`        | email + password で user を新規作成（即 login 可能）      | `USER_EMAIL`, `PASSWORD_ITEM_ID`                          |
+| `admin-delete-user.sh`        | user を hard delete（関連 row も CASCADE 削除）           | `USER_EMAIL`, `DAYOPT_CONFIRM_TARGET`                     |
+| `admin-ensure-profile.sh`     | trigger 未発火時に `profiles` row を手動 upsert           | `USER_EMAIL`                                              |
+| `admin-generate-magiclink.sh` | captcha / UI form の bug を bypass する magic link を発行 | `USER_EMAIL`                                              |
+| `admin-set-user-password.sh`  | 既存 user の password を上書き + email 確認済みにする     | `USER_EMAIL`, `PASSWORD_ITEM_ID`, `DAYOPT_CONFIRM_TARGET` |
+| `admin-show-user.sh`          | email から `auth.users` の状態を dump（read-only）        | `USER_EMAIL`                                              |
 
 `PASSWORD_ITEM_ID` は password を保存した 1Password item の ID。
 
@@ -755,7 +757,7 @@ op run --env-file=.op-env.human -- \
 
 | スクリプト            | 用途                                                                                                                                                                                                                                                                                                                                                                           | 必須 env                                                                                             |
 | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------- |
-| `enable-auth-hook.sh` | Production project の `custom_access_token` hook を有効化する。**現在は実行しない** — production では意図的に無効で（[#1946](https://github.com/Dayopt/dayopt/issues/1946) で決着）、`BILLING_ENFORCED` が未設定の間この hook が消せる DB クエリは無い。実行してよい条件と、同じ変更で `production-auth-config-audit.mjs` の期待値を `true` にする手順は script のヘッダが正本 | `SUPABASE_ACCESS_TOKEN`                                                                              |
+| `enable-auth-hook.sh` | Production project の `custom_access_token` hook を有効化する。**現在は実行しない** — production では意図的に無効で（[#1946](https://github.com/Dayopt/dayopt/issues/1946) で決着）、`BILLING_ENFORCED` が未設定の間この hook が消せる DB クエリは無い。実行してよい条件と、同じ変更で `production-auth-config-audit.mjs` の期待値を `true` にする手順は script のヘッダが正本 | `SUPABASE_ACCESS_TOKEN`, `DAYOPT_CONFIRM_TARGET`                                                     |
 | `verify-login.sh`     | email + password の組合せで直接 `/auth/v1/token` を叩き、login 可否を確認する（read-only）                                                                                                                                                                                                                                                                                     | `USER_EMAIL`, `PASSWORD_ITEM_ID`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` |
 
 `verify-login.sh` が成功すれば password 自体は正しい（UI / CSP / form 側の問題）。失敗すれば `admin-set-user-password.sh` で password を再設定する。

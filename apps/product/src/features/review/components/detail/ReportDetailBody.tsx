@@ -41,6 +41,11 @@ export interface ReportDetailBodyProps {
    * 出さない時は取得側（`useReportActivityDetail`）も `includeTrend: false` にする。
    */
   showTrend: boolean;
+  /**
+   * 明細の行から、その日のカレンダーでその記録を開く。渡さなければ行は読むだけ。
+   * ルーティングは Composition Bridge（`useReportJump`）が持つ（review は calendar を知らない）。
+   */
+  onOpenRecord?: ((target: { id: string; dayKey: string }) => void) | undefined;
 }
 
 /** 推移の棒の最大高さ（px）。 */
@@ -67,6 +72,7 @@ export function ReportDetailBody({
   isError,
   onClose,
   showTrend,
+  onOpenRecord,
 }: ReportDetailBodyProps) {
   const t = useTranslations('report.detail');
 
@@ -106,6 +112,7 @@ export function ReportDetailBody({
           granularity={granularity}
           showTrend={showTrend}
           timezone={timezone}
+          onOpenRecord={onOpenRecord}
         />
       )}
     </>
@@ -117,11 +124,13 @@ function DetailSections({
   granularity,
   showTrend,
   timezone,
+  onOpenRecord,
 }: {
   detail: ReportActivityDetailResult;
   granularity: ReportGranularity;
   showTrend: boolean;
   timezone: string;
+  onOpenRecord: ReportDetailBodyProps['onOpenRecord'];
 }) {
   const listRef = useRef<HTMLUListElement>(null);
 
@@ -148,7 +157,12 @@ function DetailSections({
       />
       <TimeOfDayBars values={detail.timeOfDay} />
       {showTrend && <TrendBars granularity={granularity} trend={detail.trend} />}
-      <RecordList listRef={listRef} records={detail.records} timezone={timezone} />
+      <RecordList
+        listRef={listRef}
+        records={detail.records}
+        timezone={timezone}
+        onOpenRecord={onOpenRecord}
+      />
     </>
   );
 }
@@ -391,19 +405,29 @@ function TrendMedianLine({
   );
 }
 
-/** 記録の明細。曜日 1 字 / 開始–終了 / 長さ / 充実チップ。 */
+/**
+ * 記録の明細。曜日 1 字 / 開始–終了 / 長さ / 充実チップ。
+ *
+ * `onOpenRecord` があれば行はボタンになり、その日のカレンダーでその記録を開く。
+ * 数字は明細に落ち、明細は記録そのものに落ちる（レポートで気づいた 1 件を
+ * 直しに行く導線。2026-09-14 UI レビュー）。
+ */
 function RecordList({
   listRef,
   records,
   timezone,
+  onOpenRecord,
 }: {
   /** ストリップの点から行を引くための参照。 */
   listRef: RefObject<HTMLUListElement | null>;
   records: ReportActivityDetailResult['records'];
   timezone: string;
+  onOpenRecord: ReportDetailBodyProps['onOpenRecord'];
 }) {
   const t = useTranslations('report.detail.records');
   const weekdays = t.raw('weekdays') as string[];
+  const rowClassName =
+    'focus-visible:outline-ring flex w-full items-center gap-2 rounded-lg text-xs focus-visible:outline-2';
 
   return (
     <div className="flex flex-col gap-2">
@@ -413,36 +437,62 @@ function RecordList({
         <p className="text-muted-foreground text-xs">{t('empty')}</p>
       ) : (
         <ul ref={listRef} data-report-list="records" className="flex flex-col gap-1">
-          {records.map((record) => (
-            <li
-              key={record.id}
-              data-record-id={record.id}
-              // ストリップの点から着地した時にフォーカスを受ける（Tab 順には入れない）
-              tabIndex={-1}
-              className="focus-visible:outline-ring flex items-center gap-2 rounded-lg text-xs focus-visible:outline-2"
-            >
-              <span className="text-muted-foreground w-4 shrink-0">
-                {weekdays[zonedWeekdayIndex(record.startAt, timezone)]}
-              </span>
-              <span className="text-foreground min-w-0 flex-1 truncate">
-                {formatClock(record.startAt, timezone)}–{formatClock(record.endAt, timezone)}
-              </span>
-              <span className="text-foreground shrink-0 tabular-nums">
-                {formatReportDuration(record.minutes)}
-              </span>
-              {/* 充実の 3 値に色を付けない（仕様 §10）。チップは単色 */}
-              <span
-                className={cn(
-                  'bg-muted text-muted-foreground shrink-0 rounded-lg px-1',
-                  record.fulfillment === null && 'opacity-60',
+          {records.map((record) => {
+            const cells = (
+              <>
+                <span className="text-muted-foreground w-4 shrink-0">
+                  {weekdays[zonedWeekdayIndex(record.startAt, timezone)]}
+                </span>
+                <span className="text-foreground min-w-0 flex-1 truncate text-left">
+                  {formatClock(record.startAt, timezone)}–{formatClock(record.endAt, timezone)}
+                </span>
+                <span className="text-foreground shrink-0 tabular-nums">
+                  {formatReportDuration(record.minutes)}
+                </span>
+                {/* 充実の 3 値に色を付けない（仕様 §10）。チップは単色 */}
+                <span
+                  className={cn(
+                    'bg-muted text-muted-foreground shrink-0 rounded-lg px-1',
+                    record.fulfillment === null && 'opacity-60',
+                  )}
+                >
+                  {record.fulfillment === null
+                    ? t('unanswered')
+                    : t(`fulfillment.${record.fulfillment}`)}
+                </span>
+              </>
+            );
+
+            return (
+              <li key={record.id}>
+                {onOpenRecord ? (
+                  <button
+                    type="button"
+                    data-record-id={record.id}
+                    title={t('openInCalendar')}
+                    className={cn(rowClassName, 'hover:bg-state-hover -mx-1 min-h-8 px-1')}
+                    onClick={() =>
+                      onOpenRecord({
+                        id: record.id,
+                        dayKey: formatInTimeZone(new Date(record.startAt), timezone, 'yyyy-MM-dd'),
+                      })
+                    }
+                  >
+                    {cells}
+                  </button>
+                ) : (
+                  <div
+                    data-record-id={record.id}
+                    // ストリップの点から着地した時にフォーカスを受ける（Tab 順には入れない）
+                    tabIndex={-1}
+                    className={rowClassName}
+                  >
+                    {cells}
+                  </div>
                 )}
-              >
-                {record.fulfillment === null
-                  ? t('unanswered')
-                  : t(`fulfillment.${record.fulfillment}`)}
-              </span>
-            </li>
-          ))}
+              </li>
+            );
+          })}
         </ul>
       )}
     </div>

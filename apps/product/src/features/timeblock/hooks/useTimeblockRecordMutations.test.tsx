@@ -18,6 +18,8 @@ const mocks = vi.hoisted(() => ({
   listSetData: vi.fn(),
   getByIdSetData: vi.fn(),
   querySetData: vi.fn(),
+  deleteMutate: vi.fn(),
+  toastSuccess: vi.fn(),
 }));
 
 vi.mock('@tanstack/react-query', () => ({
@@ -28,6 +30,7 @@ vi.mock('@tanstack/react-query', () => ({
       return predicate({ queryKey }) ? [[queryKey, []]] : [];
     }),
     setQueryData: mocks.querySetData,
+    setQueriesData: vi.fn(),
   }),
 }));
 
@@ -36,7 +39,7 @@ vi.mock('next-intl', () => ({
 }));
 
 vi.mock('@/lib/toast', () => ({
-  toast: { error: vi.fn(), success: vi.fn() },
+  toast: { error: vi.fn(), success: mocks.toastSuccess },
 }));
 
 vi.mock('@/lib/trpc', () => ({
@@ -54,6 +57,11 @@ vi.mock('@/lib/trpc', () => ({
         },
       },
     }),
+    recordCommands: {
+      delete: {
+        useMutation: () => ({ isPending: false, mutate: mocks.deleteMutate }),
+      },
+    },
     planCommands: {
       record: {
         useMutation: (callbacks: MutationCallbacks<RecordRow>) => {
@@ -105,6 +113,30 @@ describe('useTimeblockRecordMutations', () => {
       expect.anything(),
       expect.arrayContaining([record]),
     );
+  });
+
+  it('ワンタップ記録のトーストから作った Record を取り消せる', () => {
+    renderHook(() => useTimeblockRecordMutations());
+
+    act(() => {
+      mocks.recordCallbacks?.onSuccess?.(record);
+    });
+
+    expect(mocks.toastSuccess).toHaveBeenCalledWith(
+      'toast.recorded',
+      expect.objectContaining({ action: expect.objectContaining({ label: 'undo' }) }),
+    );
+    const options = mocks.toastSuccess.mock.calls[0]?.[1] as {
+      action: { onClick: () => void };
+    };
+    act(() => {
+      options.action.onClick();
+    });
+
+    expect(mocks.deleteMutate).toHaveBeenCalledWith({
+      id: 'record-1',
+      expectedUpdatedAt: record.updated_at,
+    });
   });
 
   it('日次確定の返却行も詳細cacheへ反映する', () => {

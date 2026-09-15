@@ -211,7 +211,14 @@ export function PlanLaneCard({
         <span className="truncate">{displayName}</span>
       </p>
       {showDetails && (
-        <p className="text-muted-foreground truncate">
+        <p
+          className={cn(
+            'truncate',
+            // 沈めたカード（opacity-60）で muted だと 12px の時刻が 3.1:1 まで落ちる。
+            // 沈めている間は foreground で書き、階層は opacity だけで付ける
+            hasRecords ? 'text-foreground' : 'text-muted-foreground',
+          )}
+        >
           {formatTimeRange(event.displayStartDate, event.displayEndDate, timeFormat)}
         </p>
       )}

@@ -15,6 +15,60 @@ function git(args, cwd) {
   }
 }
 
+/**
+ * User 本人の OAuth token に付く classic scope のうち、Agent セッションに載っていては
+ * いけないもの。fine-grained PAT は classic scope を持たないので、これが 1 つでも
+ * 見えたら「User の gh identity をそのまま使っている」と判定できる（監査 P1-1）。
+ */
+export const BROAD_GH_SCOPES = ['admin:org', 'delete_repo', 'repo', 'workflow', 'admin:repo_hook'];
+
+/**
+ * `gh auth status` の人間可読出力から account と classic scope だけを抜く。
+ * token 行（`- Token: gho_****`）は読まない（masked とはいえ state に載せる理由が無い）。
+ * @param {string | null} text
+ */
+export function parseGhAuthStatus(text) {
+  if (!text) return { account: null, scopes: [] };
+  const account = text.match(/Logged in to github\.com account (\S+)/)?.[1] ?? null;
+  const scopesLine = text.match(/Token scopes:\s*(.*)/)?.[1] ?? '';
+  const scopes = [...scopesLine.matchAll(/'([^']+)'/g)].map((m) => m[1]);
+  return { account, scopes };
+}
+
+/**
+ * Agent セッションの gh identity。`GH_CONFIG_DIR` が agent 用 dir を指し、
+ * classic の広い scope が見えなければ分離済み。gh 不在・未 login は null 扱い。
+ * @param {{ env?: NodeJS.ProcessEnv, ghPresent?: boolean, statusText?: string | null }} [opts]
+ */
+export function collectGhIdentity({ env = process.env, ghPresent = true, statusText } = {}) {
+  const configDir = env.GH_CONFIG_DIR ?? null;
+  let text = statusText;
+  if (text === undefined) {
+    if (!ghPresent) text = null;
+    else {
+      try {
+        // 未 login は exit 1 でも stderr に状態を出すので両方を読む
+        text = execFileSync('gh', ['auth', 'status'], {
+          encoding: 'utf8',
+          stdio: ['ignore', 'pipe', 'pipe'],
+          timeout: 5000,
+        });
+      } catch (error) {
+        text = [error?.stdout, error?.stderr].filter(Boolean).join('\n') || null;
+      }
+    }
+  }
+  const { account, scopes } = parseGhAuthStatus(text);
+  const broadScopes = scopes.filter((scope) => BROAD_GH_SCOPES.includes(scope));
+  return {
+    configDir,
+    account,
+    scopes,
+    broadScopes,
+    isolated: broadScopes.length === 0 && account !== null,
+  };
+}
+
 export function collectPreflight(cwd = process.cwd()) {
   const root = git(['rev-parse', '--show-toplevel'], cwd);
   if (!root) throw new Error('Git worktree を確認できません');
@@ -39,6 +93,7 @@ export function collectPreflight(cwd = process.cwd()) {
     }),
   );
   const skills = existsSync(join(root, '.agents/skills/routing/SKILL.md'));
+  const ghIdentity = collectGhIdentity({ ghPresent: cli.gh });
   return {
     cwd,
     root,
@@ -50,12 +105,20 @@ export function collectPreflight(cwd = process.cwd()) {
     hooksPath,
     hooks,
     cli,
+    ghIdentity,
     skills,
     // Presence is not proof of runtime activation or trust.
     codexHooks: existsSync(join(root, '.codex/hooks.json'))
       ? 'configured; runtime activation unverified'
       : 'missing',
   };
+}
+
+function renderGhIdentity(identity) {
+  if (!identity || identity.account === null) return '未 login / 未取得';
+  const config = identity.configDir ? `config: ${identity.configDir}` : 'config: default';
+  const scopes = identity.scopes.length ? identity.scopes.join(',') : 'none (fine-grained)';
+  return `${identity.account} | ${config} | scopes: ${scopes}`;
 }
 
 export function renderPreflight(state) {
@@ -75,7 +138,12 @@ export function renderPreflight(state) {
       .join(' ')} (${state.hooksPath ?? '未設定'})`,
     `**Shared skills**: ${state.skills ? 'present; session discovery unverified' : 'missing'}`,
     `**Codex hooks**: ${state.codexHooks}`,
+    `**gh identity**: ${renderGhIdentity(state.ghIdentity)}`,
   ];
+  if (state.ghIdentity?.broadScopes.length)
+    lines.push(
+      `- gh が User の OAuth token（${state.ghIdentity.broadScopes.join(', ')}）で動いている。Agent セッションは GH_CONFIG_DIR を agent 用 fine-grained PAT へ切り替える（docs/operations/secrets.md §Agent の gh identity）`,
+    );
   if (!state.cli.gh)
     lines.push(
       '- gh なし: ctx / trace / branch:finish の GitHub 情報は未取得。利用可能な接続で確認する',
