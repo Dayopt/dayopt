@@ -84,6 +84,7 @@ code: apps/product/src/features/timeblock # 任意。repo 内の実在 path
 | 全体 architecture / state flow | `engineering/architecture.md`                                                        |
 | coding / API / frontend 規約   | `engineering/conventions*.md` と `AGENTS.md`                                         |
 | 不可解な失敗の切り分け手順     | `engineering/diagnostics.md`                                                         |
+| テスト方針・CI 予算            | `engineering/testing.md`, `operations/self-hosted-runner.md`                         |
 | env・deploy・secret            | `engineering/infra.md`, `operations/secrets.md`                                      |
 | 障害対応・release              | `operations/runbook.md`                                                              |
 | 監視・alert                    | `operations/monitoring.md`                                                           |
