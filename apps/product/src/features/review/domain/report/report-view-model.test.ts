@@ -2,20 +2,26 @@ import { describe, expect, it } from 'vitest';
 
 import {
   answerCountOf,
-  applySegmentLens,
+  buildActivityUsageRows,
   buildAllocationSlices,
   buildCompassPoints,
   buildCompassWaitingList,
+  buildDurationBins,
   buildExecutionRows,
+  buildHourTotals,
   buildInkColumns,
   buildMirrorRows,
-  buildSegmentBars,
+  buildUsageSummary,
   computeDenominators,
-  computePreviousDelta,
-  computeUncategorizedPercent,
+  countRecordBoxes,
   defaultReportFilterState,
   maxInkColumnMinutes,
+  medianFromDurationCounts,
+  mergeDurationCounts,
+  normalizeReportPeriodPayload,
+  resolveAllocationMode,
   resolveVisibleActivities,
+  sortActivityUsageRows,
   toPercent,
   UNCATEGORIZED_KEY,
 } from './report-view-model';
@@ -36,6 +42,8 @@ function activity(overrides: Partial<ReportActivityAggregate> = {}): ReportActiv
     plannedPastMinutes: 0,
     plannedPastBoxes: 0,
     recordBoxes: 0,
+    durationCounts: [],
+    byHour: Array.from({ length: 24 }, () => 0),
     fulfillment: { low: 0, medium: 0, high: 0 },
     byBucket: [0, 0, 0, 0, 0, 0, 0],
     ...overrides,
@@ -73,37 +81,48 @@ describe('resolveVisibleActivities', () => {
     expect(visible.map((row) => row.activityId)).toContain('a4');
   });
 
-  it('未分類を隠すとカテゴリー未設定だけ落ちる', () => {
-    const visible = resolveVisibleActivities(rows, {
+  it('hidden に載ったアクティビティだけ落とし、同じカテゴリーの他の行は残す', () => {
+    const withSibling = [...rows, activity({ activityId: 'a1b', categoryId: 'c1' })];
+
+    const visible = resolveVisibleActivities(withSibling, {
       ...defaultReportFilterState,
-      uncategorizedHidden: true,
+      hiddenActivityIds: ['a1'],
     });
 
-    expect(visible.map((row) => row.activityId)).toEqual(['a1', 'a2']);
-  });
-});
-
-describe('applySegmentLens', () => {
-  const rows = [
-    activity({ activityId: 'a1' }),
-    activity({ activityId: 'a2' }),
-    activity({ activityId: null }),
-  ];
-
-  it('null（すべて）なら素通し', () => {
-    expect(applySegmentLens(rows, null)).toHaveLength(3);
+    expect(visible.map((row) => row.activityId)).toEqual(['a2', 'a3', 'a1b']);
   });
 
-  it('メンバーだけに絞る', () => {
-    expect(applySegmentLens(rows, ['a2']).map((row) => row.activityId)).toEqual(['a2']);
+  it('カテゴリーが隠れていればアクティビティを個別に隠していなくても落ちる', () => {
+    const visible = resolveVisibleActivities(rows, {
+      ...defaultReportFilterState,
+      hiddenCategoryIds: ['c1'],
+      hiddenActivityIds: ['a2'],
+    });
+
+    expect(visible.map((row) => row.activityId)).toEqual(['a3']);
   });
 
-  it('アクティビティ未設定の行はレンズ中に入らない', () => {
-    expect(applySegmentLens(rows, ['a1', 'a2'])).toHaveLength(2);
+  it('未分類のアクティビティも個別に隠せる（アクティビティ未設定の行は残る）', () => {
+    const withUnassigned = [...rows, activity({ activityId: null, categoryId: null })];
+
+    const visible = resolveVisibleActivities(withUnassigned, {
+      ...defaultReportFilterState,
+      hiddenActivityIds: ['a3'],
+    });
+
+    expect(visible.map((row) => row.activityId)).toEqual(['a1', 'a2', null]);
   });
 
-  it('空のセグメントでは何も残らない', () => {
-    expect(applySegmentLens(rows, [])).toEqual([]);
+  it('アクティビティ未設定の行はどの hidden でも落ちない', () => {
+    const withUnassigned = [...rows, activity({ activityId: null, categoryId: null })];
+
+    const visible = resolveVisibleActivities(withUnassigned, {
+      ...defaultReportFilterState,
+      hiddenCategoryIds: ['c1', 'c2'],
+      hiddenActivityIds: ['a3'],
+    });
+
+    expect(visible.map((row) => row.activityId)).toEqual([null]);
   });
 });
 
@@ -113,30 +132,17 @@ describe('computeDenominators', () => {
     activity({ activityId: 'a2', categoryId: 'c2', recordedMinutes: 2400 }), // 睡眠相当
   ];
 
-  it('余白 on では track に余白が入る', () => {
+  it('track は記録の合計そのもの（余白は混ぜず、見出しの数字にだけ残す）', () => {
     const result = computeDenominators({
       allActivities: all,
       visibleActivities: all,
       lengthMinutes: 10080,
-      marginVisible: true,
     });
 
     expect(result.totalAllMinutes).toBe(3000);
     expect(result.marginMinutes).toBe(7080);
     expect(result.visibleMinutes).toBe(3000);
-    expect(result.trackMinutes).toBe(10080);
-  });
-
-  it('余白 off では track がインクの合計になる', () => {
-    const result = computeDenominators({
-      allActivities: all,
-      visibleActivities: all,
-      lengthMinutes: 10080,
-      marginVisible: false,
-    });
-
     expect(result.trackMinutes).toBe(3000);
-    expect(result.marginMinutes).toBe(7080);
   });
 
   it('カテゴリを隠すと V と track から抜けるが、余白の値は変わらない', () => {
@@ -146,11 +152,10 @@ describe('computeDenominators', () => {
       allActivities: all,
       visibleActivities: visible,
       lengthMinutes: 10080,
-      marginVisible: true,
     });
 
     expect(result.visibleMinutes).toBe(600);
-    expect(result.trackMinutes).toBe(600 + 7080);
+    expect(result.trackMinutes).toBe(600);
     // 余白はフィルタに依存しない（仕様 §13-2）
     expect(result.marginMinutes).toBe(7080);
     expect(result.totalAllMinutes).toBe(3000);
@@ -160,15 +165,14 @@ describe('computeDenominators', () => {
     const result = computeDenominators({
       allActivities: [],
       visibleActivities: [],
-      lengthMinutes: 10080,
-      marginVisible: false,
+      lengthMinutes: 0,
     });
 
     expect(result.trackMinutes).toBe(1);
     expect(result.visibleMinutes).toBe(0);
   });
 
-  it('記録が分母を超えても余白は負のまま track へ足さない', () => {
+  it('記録が期間の長さを超えても余白は負のまま返す', () => {
     // 重なりのある記録などで totalAll が L を超えうる
     const over = [activity({ recordedMinutes: 20000 })];
 
@@ -176,7 +180,6 @@ describe('computeDenominators', () => {
       allActivities: over,
       visibleActivities: over,
       lengthMinutes: 10080,
-      marginVisible: true,
     });
 
     expect(result.marginMinutes).toBe(-9920);
@@ -210,7 +213,7 @@ describe('buildAllocationSlices', () => {
   ];
 
   it('カテゴリー別にまとめ、記録の多い順に並べる', () => {
-    const slices = buildAllocationSlices(rows, 10080, 'category');
+    const slices = buildAllocationSlices(rows, 1020, 'category');
 
     expect(slices.map((slice) => slice.key)).toEqual(['c1', UNCATEGORIZED_KEY]);
     expect(slices[0]?.minutes).toBe(900);
@@ -219,19 +222,19 @@ describe('buildAllocationSlices', () => {
   });
 
   it('記録 0 のカテゴリは行を持たない', () => {
-    expect(buildAllocationSlices(rows, 10080, 'category').some((s) => s.key === 'c2')).toBe(false);
+    expect(buildAllocationSlices(rows, 1020, 'category').some((s) => s.key === 'c2')).toBe(false);
   });
 
-  it('余白のセグメントを作らない', () => {
-    const slices = buildAllocationSlices(rows, 10080, 'category');
+  it('区画の合計が記録の合計（100%）になり、余白の区画は作らない', () => {
+    const slices = buildAllocationSlices(rows, 1020, 'category');
     const total = slices.reduce((sum, slice) => sum + slice.minutes, 0);
 
-    // 塗るのはインクだけ。残りは背景トラック（紙）として残る
     expect(total).toBe(1020);
+    expect(slices.reduce((sum, slice) => sum + slice.percent, 0)).toBe(100);
     expect(slices.some((slice) => slice.key === '__margin')).toBe(false);
   });
 
-  it('レンズ中はアクティビティ別に割る', () => {
+  it('アクティビティ別に割ると名前がアクティビティになる', () => {
     const slices = buildAllocationSlices(rows, 1020, 'activity');
 
     expect(slices.map((slice) => slice.key)).toEqual(['a1', 'a2', 'a3']);
@@ -243,112 +246,227 @@ describe('buildAllocationSlices', () => {
   });
 });
 
-describe('computeUncategorizedPercent', () => {
-  it('見えているインクに対する割合を返す', () => {
-    const rows = [
-      activity({ activityId: 'a1', categoryId: 'c1', recordedMinutes: 800 }),
-      activity({ activityId: 'a2', categoryId: null, recordedMinutes: 200 }),
-    ];
-
-    expect(computeUncategorizedPercent(rows, 1000)).toBe(20);
+describe('resolveAllocationMode', () => {
+  it('記録のあるカテゴリーが 2 つ以上ならカテゴリー別', () => {
+    expect(
+      resolveAllocationMode([
+        activity({ activityId: 'a1', categoryId: 'c1', recordedMinutes: 10 }),
+        activity({ activityId: 'a2', categoryId: null, recordedMinutes: 10 }),
+      ]),
+    ).toBe('category');
   });
 
-  it('インクが無ければ 0%', () => {
-    expect(computeUncategorizedPercent([], 0)).toBe(0);
+  it('カテゴリーが 1 つでアクティビティが 2 つ以上ならアクティビティ別', () => {
+    expect(
+      resolveAllocationMode([
+        activity({ activityId: 'a1', categoryId: 'c1', recordedMinutes: 10 }),
+        activity({ activityId: 'a2', categoryId: 'c1', recordedMinutes: 10 }),
+        // 記録 0 の別カテゴリーは数えない（見えていても区画にならない）
+        activity({ activityId: 'a3', categoryId: 'c2', recordedMinutes: 0 }),
+      ]),
+    ).toBe('activity');
+  });
+
+  it('アクティビティが 1 つだけなら配分を出さない', () => {
+    expect(
+      resolveAllocationMode([
+        activity({ activityId: 'a1', categoryId: 'c1', recordedMinutes: 10 }),
+      ]),
+    ).toBe('none');
+    expect(resolveAllocationMode([])).toBe('none');
   });
 });
 
-describe('computePreviousDelta', () => {
-  it('同じフィルタで比較した差を返す', () => {
-    const delta = computePreviousDelta({
-      visibleMinutes: 600,
-      previousActivities: [
-        { activityId: 'a1', recordedMinutes: 400 },
-        { activityId: 'a2', recordedMinutes: 100 },
-      ],
-      visibleActivityIds: new Set(['a1', 'a2']),
-    });
-
-    expect(delta).toBe(100);
-  });
-
-  it('見えていないアクティビティは前期間側でも数えない', () => {
-    const delta = computePreviousDelta({
-      visibleMinutes: 600,
-      previousActivities: [
-        { activityId: 'a1', recordedMinutes: 400 },
-        { activityId: 'a2', recordedMinutes: 100 },
-      ],
-      visibleActivityIds: new Set(['a1']),
-    });
-
-    expect(delta).toBe(200);
-  });
-
-  it('前期間にインクが無ければ null（数字を作らない）', () => {
+describe('countRecordBoxes', () => {
+  it('見えている行の件数を足す', () => {
     expect(
-      computePreviousDelta({
-        visibleMinutes: 600,
-        previousActivities: [],
-        visibleActivityIds: new Set(['a1']),
-      }),
-    ).toBeNull();
-  });
-
-  it('前期間の合計が 1 分未満なら null', () => {
-    expect(
-      computePreviousDelta({
-        visibleMinutes: 600,
-        previousActivities: [{ activityId: 'a1', recordedMinutes: 0.5 }],
-        visibleActivityIds: new Set(['a1']),
-      }),
-    ).toBeNull();
+      countRecordBoxes([
+        activity({ recordBoxes: 3 }),
+        activity({ activityId: 'a2', recordBoxes: 4 }),
+      ]),
+    ).toBe(7);
   });
 });
 
-describe('buildSegmentBars', () => {
+describe('buildActivityUsageRows / sortActivityUsageRows', () => {
   const rows = [
-    activity({ activityId: 'a1', recordedMinutes: 600 }),
-    activity({ activityId: 'a2', recordedMinutes: 300 }),
-    activity({ activityId: 'a3', recordedMinutes: 120 }),
+    activity({
+      activityId: 'a1',
+      activityName: '執筆',
+      recordedMinutes: 600,
+      recordBoxes: 5,
+      durationCounts: [
+        [60, 2],
+        [90, 1],
+        [120, 2],
+      ],
+    }),
+    activity({
+      activityId: 'a2',
+      activityName: '会議',
+      recordedMinutes: 300,
+      recordBoxes: 6,
+      durationCounts: [],
+    }),
+    activity({ activityId: 'a3', activityName: '散歩', recordedMinutes: 0 }),
+    activity({ activityId: 'a4', activityName: '新規', recordedMinutes: 120, recordBoxes: 2 }),
+  ];
+  const previous = [
+    { activityId: 'a1', recordedMinutes: 400 },
+    { activityId: 'a2', recordedMinutes: 500 },
   ];
 
-  it('メンバーの合計を返す', () => {
-    const bars = buildSegmentBars(
-      rows,
-      [{ id: 's1', name: '深い仕事', activityIds: ['a1', 'a2'] }],
-      10080,
-    );
+  it('記録のある行だけを、中央値と前期間との差付きで返す', () => {
+    const result = buildActivityUsageRows(rows, previous);
 
-    expect(bars[0]?.minutes).toBe(900);
-    expect(bars[0]?.percent).toBe(9);
+    expect(result.map((row) => row.activityId)).toEqual(['a1', 'a2', 'a4']);
+    expect(result[0]).toMatchObject({ recordBoxes: 5, medianRecordMinutes: 90, deltaMinutes: 200 });
+    // 行の中央値はサーバーのスカラーではなく度数から出す（60, 60, 90, 120, 120 → 90）
+    expect(result[1]).toMatchObject({ medianRecordMinutes: null, deltaMinutes: -200 });
+    // 前期間に無かった行は増分がそのまま差になる
+    expect(result[2]?.deltaMinutes).toBe(120);
   });
 
-  it('セグメント同士が重なってよい（合計しない）', () => {
-    const bars = buildSegmentBars(
-      rows,
+  it('前期間にインクが無ければ差を作らない（見出しの Δ と同じ規則）', () => {
+    const result = buildActivityUsageRows(rows, []);
+
+    expect(result.every((row) => row.deltaMinutes === null)).toBe(true);
+  });
+
+  it('既定は記録時間の多い順、差の順では増えたものが先頭で null は末尾', () => {
+    const result = buildActivityUsageRows(rows, previous);
+
+    expect(sortActivityUsageRows(result, 'recorded').map((row) => row.activityId)).toEqual([
+      'a1',
+      'a2',
+      'a4',
+    ]);
+    expect(sortActivityUsageRows(result, 'delta').map((row) => row.activityId)).toEqual([
+      'a1',
+      'a4',
+      'a2',
+    ]);
+
+    const withoutPrevious = buildActivityUsageRows(rows, []);
+    expect(sortActivityUsageRows(withoutPrevious, 'delta').map((row) => row.activityId)).toEqual([
+      'a1',
+      'a2',
+      'a4',
+    ]);
+  });
+});
+
+describe('medianFromDurationCounts / mergeDurationCounts', () => {
+  it('度数から中央値を出す（奇数件は真ん中、偶数件は中央 2 件の平均）', () => {
+    expect(
+      medianFromDurationCounts([
+        [30, 1],
+        [60, 1],
+        [120, 1],
+      ]),
+    ).toBe(60);
+    expect(
+      medianFromDurationCounts([
+        [30, 2],
+        [60, 2],
+      ]),
+    ).toBe(45);
+    expect(
+      medianFromDurationCounts([
+        [15, 5],
+        [90, 1],
+      ]),
+    ).toBe(15);
+    expect(medianFromDurationCounts([])).toBeNull();
+  });
+
+  /** 中央値の中央値は中央値にならない。全体は度数を合算してから出す。 */
+  it('複数のアクティビティの度数を合算してから中央値を出す', () => {
+    const merged = mergeDurationCounts([
+      [[10, 3]],
       [
-        { id: 's1', name: 'A', activityIds: ['a1', 'a2'] },
-        { id: 's2', name: 'B', activityIds: ['a2', 'a3'] },
+        [10, 1],
+        [120, 3],
       ],
-      10080,
-    );
+    ]);
 
-    expect(bars[0]?.minutes).toBe(900);
-    expect(bars[1]?.minutes).toBe(420);
+    expect(merged).toEqual([
+      [10, 4],
+      [120, 3],
+    ]);
+    // 各中央値（10 と 120）の中央値 65 ではなく、7 件の真ん中 = 10
+    expect(medianFromDurationCounts(merged)).toBe(10);
+  });
+});
+
+describe('buildUsageSummary', () => {
+  const visible = [
+    activity({
+      activityId: 'a1',
+      recordedMinutes: 600,
+      recordBoxes: 4,
+      durationCounts: [[150, 4]],
+    }),
+    activity({ activityId: 'a2', recordedMinutes: 60, recordBoxes: 2, durationCounts: [[30, 2]] }),
+  ];
+
+  it('見えている集合の記録時間・件数・中央値を返す', () => {
+    expect(buildUsageSummary(visible, []).current).toEqual({
+      recordedMinutes: 660,
+      recordCount: 6,
+      medianMinutes: 150,
+    });
   });
 
-  it('メンバー 0 件のセグメントも行を残す', () => {
-    const bars = buildSegmentBars(rows, [{ id: 's1', name: '空', activityIds: [] }], 10080);
+  it('前期間は今見えているアクティビティだけで足す', () => {
+    const summary = buildUsageSummary(visible, [
+      { activityId: 'a1', recordedMinutes: 300, recordBoxes: 3, durationCounts: [[100, 3]] },
+      // 今は隠している（見えていない）アクティビティの前期間は比べない
+      { activityId: 'a9', recordedMinutes: 900, recordBoxes: 9, durationCounts: [[100, 9]] },
+    ]);
 
-    expect(bars).toHaveLength(1);
-    expect(bars[0]?.minutes).toBe(0);
+    expect(summary.previous).toEqual({ recordedMinutes: 300, recordCount: 3, medianMinutes: 100 });
   });
 
-  it('100% で頭打ちにする', () => {
-    const bars = buildSegmentBars(rows, [{ id: 's1', name: '全部', activityIds: ['a1'] }], 100);
+  it('前期間にインクが無ければ比較しない', () => {
+    expect(buildUsageSummary(visible, []).previous).toBeNull();
+  });
+});
 
-    expect(bars[0]?.percent).toBe(100);
+describe('buildHourTotals', () => {
+  it('見えているアクティビティの時間帯を足す', () => {
+    const hours = (entries: Record<number, number>) =>
+      Array.from({ length: 24 }, (_, hour) => entries[hour] ?? 0);
+
+    const totals = buildHourTotals([
+      activity({ activityId: 'a1', byHour: hours({ 9: 30, 10: 60 }) }),
+      activity({ activityId: 'a2', byHour: hours({ 10: 15 }) }),
+    ]);
+
+    expect(totals[9]).toBe(30);
+    expect(totals[10]).toBe(75);
+    expect(totals).toHaveLength(24);
+  });
+});
+
+describe('buildDurationBins', () => {
+  it('下限を含み上限を含まないビンへ振り分ける', () => {
+    const bins = buildDurationBins([
+      [4, 1],
+      [5, 2],
+      [29, 1],
+      [30, 1],
+      [240, 3],
+    ]);
+
+    const countFrom = (from: number) => bins.find((bin) => bin.fromMinutes === from)?.count;
+    expect(countFrom(0)).toBe(1);
+    expect(countFrom(5)).toBe(2);
+    expect(countFrom(15)).toBe(1);
+    expect(countFrom(30)).toBe(1);
+    expect(countFrom(120)).toBe(3);
+    expect(bins.at(-1)?.toMinutes).toBeNull();
+    expect(bins.reduce((sum, bin) => sum + bin.count, 0)).toBe(8);
   });
 });
 
@@ -641,5 +759,41 @@ describe('answerCountOf', () => {
   it('3 値の和を返す', () => {
     expect(answerCountOf(activity({ fulfillment: { low: 1, medium: 2, high: 3 } }))).toBe(6);
     expect(answerCountOf(activity())).toBe(0);
+  });
+});
+
+describe('normalizeReportPeriodPayload', () => {
+  /** 永続化 cache に残った、項目を足す前の形。描画の合算で落ちないよう空で補う。 */
+  it('足りない項目を空で補い、ある項目はそのまま残す', () => {
+    const {
+      durationCounts: _durationCounts,
+      byHour: _byHour,
+      ...legacy
+    } = activity({
+      activityId: 'a1',
+      recordedMinutes: 60,
+    });
+    const current = activity({ activityId: 'a2', durationCounts: [[30, 1]] });
+
+    const normalized = normalizeReportPeriodPayload({
+      nowAt: '2026-09-04T00:00:00.000Z',
+      activities: [legacy, current],
+      previousActivities: [{ activityId: 'a1', recordedMinutes: 10 }],
+    });
+
+    expect(normalized.nowAt).toBe('2026-09-04T00:00:00.000Z');
+    expect(normalized.activities[0]).toMatchObject({
+      activityId: 'a1',
+      recordedMinutes: 60,
+      durationCounts: [],
+      byHour: [],
+    });
+    expect(normalized.activities[1]?.durationCounts).toEqual([[30, 1]]);
+    expect(normalized.previousActivities[0]).toEqual({
+      activityId: 'a1',
+      recordedMinutes: 10,
+      recordBoxes: 0,
+      durationCounts: [],
+    });
   });
 });

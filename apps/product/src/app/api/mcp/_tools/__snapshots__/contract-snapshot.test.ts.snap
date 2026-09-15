@@ -1644,58 +1644,6 @@ exports[`MCP tool contract snapshot > reviewGetOutput の JSON Schema が変わ�
 }
 `;
 
-exports[`MCP tool contract snapshot > segmentListOutput の JSON Schema が変わっていない 1`] = `
-{
-  "additionalProperties": false,
-  "properties": {
-    "count": {
-      "minimum": 0,
-      "type": "integer",
-    },
-    "schemaVersion": {
-      "enum": [
-        4,
-      ],
-      "type": "number",
-    },
-    "segments": {
-      "items": {
-        "additionalProperties": false,
-        "properties": {
-          "activityIds": {
-            "items": {
-              "format": "uuid",
-              "type": "string",
-            },
-            "type": "array",
-          },
-          "id": {
-            "format": "uuid",
-            "type": "string",
-          },
-          "name": {
-            "type": "string",
-          },
-        },
-        "required": [
-          "id",
-          "name",
-          "activityIds",
-        ],
-        "type": "object",
-      },
-      "type": "array",
-    },
-  },
-  "required": [
-    "schemaVersion",
-    "count",
-    "segments",
-  ],
-  "type": "object",
-}
-`;
-
 exports[`MCP tool contract snapshot > timeblockListInput の JSON Schema が変わっていない 1`] = `
 {
   "additionalProperties": false,

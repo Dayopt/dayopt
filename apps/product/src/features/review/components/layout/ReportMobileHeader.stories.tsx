@@ -87,6 +87,18 @@ export const NarrowScreen: Story = {
 
 /** すべての状態を 1 画面に並べる（ADR-023 の AllPatterns）。 */
 export const AllPatterns: Story = {
+  parameters: {
+    a11y: {
+      config: {
+        // 同じヘッダーを並べて見せる一覧なので、banner landmark が必ず重なる。
+        // 実画面では 1 ページに 1 つしか描かないため、この重複は起きない
+        rules: [
+          { id: 'landmark-no-duplicate-banner', enabled: false },
+          { id: 'landmark-unique', enabled: false },
+        ],
+      },
+    },
+  },
   args: BASE_ARGS,
   render: function AllPatternsMobileHeader() {
     return (

@@ -4,31 +4,31 @@ import { Meta } from '@storybook/addon-docs/blocks';
 
 # Review
 
-`/report` の 4 章構成（配分 / 執行 / 質 / 整える）を描く component 群。カレンダー内パネルは廃止済みで、Review は独立したフルページを持つ。Storybook では章ごとの loading / empty / populated と、狭い面（375x812 / 320px）の詰まり方を確認する。
+`/report` の 3 タブ（時間の使い方 = 配分 / 差分 = 執行 / 振り返り = 質）を描く component 群。カレンダー内パネルは廃止済みで、Review は独立したフルページを持つ。Storybook では面ごとの loading / empty / populated と、狭い面（375x812 / 320px）の詰まり方を確認する。
 
 ## Story ownership
 
-| 層       | component                                                                                                                     | Story |
-| -------- | ----------------------------------------------------------------------------------------------------------------------------- | ----- |
-| Layout   | `ReportHeader`（粒度切替あり）/ `ReportMobileHeader`（粒度切替なし）/ `ReportGranularitySwitcher`                             | あり  |
-| Chapters | `AllocationChapter` / `ExecutionChapter` + `MirrorRows` / `QualityChapter` + `CompassScatter` + `WaitingList` / `TidyChapter` | あり  |
-| Sidebar  | `ReportFilterList`（デスクトップ）/ `ReportFilterChipRow`（モバイル）/ `SegmentList`                                          | あり  |
-| Detail   | `ReportDetailPanel`（slot へ portal）/ `ReportDetailSheet`（`Drawer`）                                                        | あり  |
+| 層       | component                                                                                                                  | Story |
+| -------- | -------------------------------------------------------------------------------------------------------------------------- | ----- |
+| Layout   | `ReportHeader`（粒度切替あり）/ `ReportMobileHeader`（粒度切替なし）/ `ReportGranularitySwitcher` / `ReportTabs`           | あり  |
+| Chapters | `AllocationChapter` / `ExecutionChapter` + `MirrorRows` / `QualityChapter` + `CompassScatter` + `WaitingList`              | あり  |
+| Sidebar  | `ReportFilterList`（デスクトップ、カレンダーと同じ骨格の 👁 一覧） / `ReportFilterDrawer`（モバイル、同じ一覧を Drawer で） | あり  |
+| Detail   | `ReportDetailPanel`（slot へ portal）/ `ReportDetailSheet`（`Drawer`）                                                     | あり  |
 
-Story を持たないのは、tRPC query か器の選択を握る配線 component（`ReportBody` / `ConnectedReportDetailPanel` / `ReportDetailBody` / `SegmentEditDialog`）。中身は上記の Story が兼ねる。
+Story を持たないのは、tRPC query か器の選択を握る配線 component（`ReportBody` / `ConnectedReportDetailPanel` / `ReportDetailBody`）。中身は上記の Story が兼ねる。
 
 ## Review が持つもの / 持たないもの
 
 **持つ**:
 
-- `domain/report/` — 1〜4 章の派生（分母・鏡・羅針盤・インク）はすべてここの純粋関数。閾値の定数もここ
+- `domain/report/` — 各面の派生（分母・鏡・羅針盤・インク）はすべてここの純粋関数。閾値の定数もここ
 - `server/` — `getReportPeriod`（期間集計、スカラーのみ）と `getReportActivityDetail`（詳細パネル専用）
-- `stores/` — `useReportViewStore`（フィルタとレンズ。端末ローカル）/ `useReportDetailStore`（詳細の開閉）
+- `stores/` — `useReportViewStore`（フィルタ。端末ローカル）/ `useReportDetailStore`（詳細の開閉）
 - 章 component と、詳細の本文（`ReportDetailBody`）+ 2 つの器
 
 **持たない**（Composition Bridge = `app/**/(workspace)/_composition/ReportViewClient.tsx` が担う）:
 
-- ルーティングとカレンダーへのジャンプ（`useReportJump`）
+- ルーティング（`?tab=` の書き換えを含む）とカレンダーへのジャンプ（`useReportJump`）
 - 期間ナビの配線（`useCalendarNavigation`）
 - **器の選択**（デスクトップのパネル / モバイルのシート）とモバイル判定
 

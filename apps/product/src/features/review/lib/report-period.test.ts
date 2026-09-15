@@ -4,8 +4,6 @@ import {
   clipMinutes,
   distributeToBuckets,
   isReportGranularity,
-  resolveNextPeriodStartDayKey,
-  resolveNextReportRange,
   resolvePreviousReportRange,
   resolveReportRange,
   shiftReportAnchor,
@@ -15,6 +13,11 @@ import {
 const TOKYO = 'Asia/Tokyo';
 const UTC = 'UTC';
 const NEW_YORK = 'America/New_York';
+
+/** 次の期間。本体からは消えた helper の代わりに、anchor を 1 期間ずらして同じ関数で解く。 */
+function nextRange(anchorDate: string, granularity: 'week' | 'month' | 'year') {
+  return resolveReportRange(shiftReportAnchor(anchorDate, granularity, 1), granularity, TOKYO, 1);
+}
 
 describe('resolveReportRange - 週', () => {
   it('月曜始まりで水曜を含む週を返す', () => {
@@ -70,7 +73,7 @@ describe('resolveReportRange - 週', () => {
 
   it('隣り合う週の間に隙間が無い（1ms の穴を作らない）', () => {
     const current = resolveReportRange('2026-09-02', 'week', TOKYO, 1);
-    const next = resolveNextReportRange('2026-09-02', 'week', TOKYO, 1);
+    const next = nextRange('2026-09-02', 'week');
 
     expect(current.endAt).toBe(next.startAt);
   });
@@ -171,11 +174,11 @@ describe('shiftReportAnchor', () => {
   });
 });
 
-describe('resolvePreviousReportRange / resolveNextReportRange', () => {
+describe('resolvePreviousReportRange / 次の期間', () => {
   it('前後の期間が現在の期間と接する', () => {
     const previous = resolvePreviousReportRange('2026-09-02', 'week', TOKYO, 1);
     const current = resolveReportRange('2026-09-02', 'week', TOKYO, 1);
-    const next = resolveNextReportRange('2026-09-02', 'week', TOKYO, 1);
+    const next = nextRange('2026-09-02', 'week');
 
     expect(previous.endAt).toBe(current.startAt);
     expect(current.endAt).toBe(next.startAt);
@@ -183,7 +186,7 @@ describe('resolvePreviousReportRange / resolveNextReportRange', () => {
 
   it('月粒度でも接する', () => {
     const current = resolveReportRange('2026-09-15', 'month', TOKYO, 1);
-    const next = resolveNextReportRange('2026-09-15', 'month', TOKYO, 1);
+    const next = nextRange('2026-09-15', 'month');
 
     expect(current.endAt).toBe(next.startAt);
     expect(next.lengthMinutes).toBe(31 * 1440); // 10 月
@@ -338,24 +341,5 @@ describe('todayReportAnchor', () => {
     expect(todayReportAnchor(UTC, now)).toBe('2026-09-02');
     expect(todayReportAnchor(TOKYO, now)).toBe('2026-09-03');
     expect(todayReportAnchor(NEW_YORK, now)).toBe('2026-09-02');
-  });
-});
-
-describe('resolveNextPeriodStartDayKey', () => {
-  it('週は次週の開始曜日を返す（週の開始設定に従う）', () => {
-    expect(resolveNextPeriodStartDayKey('2026-09-04', 'week', 1)).toBe('2026-09-07');
-    expect(resolveNextPeriodStartDayKey('2026-09-04', 'week', 0)).toBe('2026-09-06');
-    // 土曜始まり。9/4（金）を含む週は 08-29(土)〜09-04(金) で、次週は 09-05(土)
-    expect(resolveNextPeriodStartDayKey('2026-09-04', 'week', 6)).toBe('2026-09-05');
-  });
-
-  it('月は翌月 1 日を返す', () => {
-    expect(resolveNextPeriodStartDayKey('2026-09-20', 'month', 1)).toBe('2026-10-01');
-    // 年をまたぐ
-    expect(resolveNextPeriodStartDayKey('2026-12-31', 'month', 1)).toBe('2027-01-01');
-  });
-
-  it('年は翌年 1 月 1 日を返す', () => {
-    expect(resolveNextPeriodStartDayKey('2026-05-02', 'year', 1)).toBe('2027-01-01');
   });
 });

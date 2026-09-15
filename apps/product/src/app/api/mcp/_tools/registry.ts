@@ -8,7 +8,6 @@ import { registerCategoriesListTool } from './categories-list';
 import { registerConstraintsGetTool } from './constraints-get';
 import { registerEntriesListTool } from './entries-list';
 import { registerReviewGetTool } from './review-get';
-import { registerSegmentsListTool } from './segments-list';
 import {
   registerPlansGetTool,
   registerPlansTrashListTool,
@@ -49,13 +48,6 @@ export const MCP_TOOL_DESCRIPTORS = [
     name: 'categories.list',
     requiredScope: 'read:activities',
     register: registerCategoriesListTool,
-  },
-  {
-    // セグメントは「アクティビティの名前付きグループ」で新しいデータ種別を露出しない
-    // ため、専用 scope を作らず read:activities に相乗りする（#2173 裁定）。
-    name: 'segments.list',
-    requiredScope: 'read:activities',
-    register: registerSegmentsListTool,
   },
   {
     name: 'constraints.get',

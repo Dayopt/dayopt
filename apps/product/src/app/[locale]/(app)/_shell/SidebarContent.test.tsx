@@ -97,7 +97,6 @@ vi.mock('@/components/ui/inputs/mini-calendar', () => ({
 
 vi.mock('@/features/review', () => ({
   ReportFilterList: () => <div data-testid="report-filter-list" />,
-  SegmentList: () => <div data-testid="segment-list" />,
 }));
 
 vi.mock('@/lib/hooks/useTheme', () => ({
@@ -133,7 +132,7 @@ describe('SidebarContent', () => {
     expect(activityFilter.contains(templateList)).toBe(true);
   });
 
-  it('renders ReportSidebar（カテゴリーフィルタ + セグメント一覧、calendar の view-switcher/activity-filter は出さない）on /report', () => {
+  it('renders ReportSidebar（分析フィルタだけ、calendar の view-switcher/activity-filter は出さない）on /report', () => {
     pathnameMock.mockReturnValue('/report');
 
     render(<SidebarContent />);
@@ -142,7 +141,6 @@ describe('SidebarContent', () => {
     expect(screen.queryByTestId('activity-filter-list')).not.toBeInTheDocument();
     expect(screen.queryByTestId('template-list')).not.toBeInTheDocument();
     expect(screen.getByTestId('report-filter-list')).toBeInTheDocument();
-    expect(screen.getByTestId('segment-list')).toBeInTheDocument();
   });
 
   it('取得したテンプレートを一覧へ渡し、クリックで表示中の日へ適用する（#2567）', () => {

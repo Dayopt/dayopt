@@ -17,8 +17,7 @@ interface RecordSeed {
   start_at: string;
   end_at: string;
   fulfillment?: string | null;
-  /** 外部予定から変換された記録は、その予定 id を持つ（ghost の anti-join に効く）。 */
-  external_calendar_event_id?: string | null;
+  source?: string;
   user_id?: string;
 }
 
@@ -46,26 +45,11 @@ interface CategorySeed {
   user_id?: string;
 }
 
-interface ExternalEventSeed {
-  id: string;
-  start_at: string;
-  end_at: string;
-  status?: string;
-  dismissed_at?: string | null;
-  connection_id?: string | null;
-  provider_calendar_id?: string;
-  user_id?: string;
-}
-
 interface Seed {
   records?: RecordSeed[];
   plans?: PlanSeed[];
   activities?: ActivitySeed[];
   categories?: CategorySeed[];
-  externalEvents?: ExternalEventSeed[];
-  /** 接続とカレンダー選択。省略時は「外部カレンダー未接続」。 */
-  connections?: { id: string; status?: string }[];
-  selectedCalendars?: { connection_id: string; provider_calendar_id: string }[];
 }
 
 /**
@@ -81,14 +65,12 @@ function createFakeClient(seed: Seed): ReportFetchClient {
       user_id: USER_ID,
       deleted_at: null,
       fulfillment: null,
-      external_calendar_event_id: null,
+      source: 'manual',
       ...row,
     })),
     plans: (seed.plans ?? []).map((row) => ({
       user_id: USER_ID,
       deleted_at: null,
-
-      external_calendar_event_id: null,
       ...row,
     })),
     activities: (seed.activities ?? []).map((row) => ({
@@ -100,23 +82,6 @@ function createFakeClient(seed: Seed): ReportFetchClient {
       user_id: USER_ID,
       color: null,
       icon: null,
-      ...row,
-    })),
-    external_calendar_events: (seed.externalEvents ?? []).map((row) => ({
-      user_id: USER_ID,
-      status: 'confirmed',
-      dismissed_at: null,
-      connection_id: 'conn-1',
-      provider_calendar_id: 'cal-1',
-      ...row,
-    })),
-    calendar_connections: (seed.connections ?? []).map((row) => ({
-      user_id: USER_ID,
-      status: 'active',
-      ...row,
-    })),
-    calendar_connection_calendars: (seed.selectedCalendars ?? []).map((row) => ({
-      user_id: USER_ID,
       ...row,
     })),
   };
@@ -142,20 +107,8 @@ function createFakeClient(seed: Seed): ReportFetchClient {
         current = current.filter((row) => Date.parse(String(row[column])) > Date.parse(value));
         return query;
       },
-      not: (column: string, _operator: string, value: unknown) => {
-        current = current.filter((row) => row[column] !== value);
-        return query;
-      },
-      in: (column: string, values: unknown[]) => {
-        current = current.filter((row) => values.includes(row[column]));
-        return query;
-      },
       order: (column: string) => {
         current = [...current].sort((a, b) => String(a[column]).localeCompare(String(b[column])));
-        return query;
-      },
-      limit: (count: number) => {
-        current = current.slice(0, count);
         return query;
       },
       then: (
@@ -459,36 +412,98 @@ describe('ReportAggregationService.getReportPeriod', () => {
     expect(result.activities).toMatchObject([
       { activityId: 'a1', recordedMinutes: 0, plannedMinutes: 60 },
     ]);
-    expect(result.uncategorizedRecordCount).toBe(0);
   });
 
-  it('未分類の記録件数を数える（アクティビティ未設定も含む）', async () => {
+  /**
+   * 一覧の「1 件の中央値」。母集団は詳細パネルと同じ（clip 済み・`auto_migrated` を除く）。
+   * 規則をどちらかで変えると、同じアクティビティで 2 つの中央値が並ぶ。
+   */
+  it('アクティビティごとに 1 件の長さの度数を返し、自動移行の記録は数えない', async () => {
     const service = createReportAggregationService(
       createFakeClient({
-        activities: [
-          { id: 'a1', name: '執筆', category_id: 'c1' },
-          { id: 'a2', name: '雑務', category_id: null },
-        ],
-        categories: [{ id: 'c1', name: '仕事' }],
+        activities: [{ id: 'a1', name: '執筆', category_id: null }],
         records: [
-          mkRecord('r1', 'a1', '2026-09-02T00:00:00+00:00', '2026-09-02T01:00:00+00:00'),
-          mkRecord('r2', 'a2', '2026-09-02T02:00:00+00:00', '2026-09-02T03:00:00+00:00'),
-          mkRecord('r3', null, '2026-09-02T04:00:00+00:00', '2026-09-02T05:00:00+00:00'),
+          mkRecord('r1', 'a1', '2026-09-01T00:00:00+00:00', '2026-09-01T00:30:00+00:00'),
+          mkRecord('r2', 'a1', '2026-09-02T00:00:00+00:00', '2026-09-02T01:00:00+00:00'),
+          mkRecord('r3', 'a1', '2026-09-03T00:00:00+00:00', '2026-09-03T02:00:00+00:00'),
+          // 自動移行は合計には入るが代表値には数えない
+          {
+            ...mkRecord('r4', 'a1', '2026-09-04T00:00:00+00:00', '2026-09-04T08:00:00+00:00'),
+            source: 'auto_migrated',
+          },
+          // 週の頭をまたぐ記録は期間へ clip した長さで数える（JST 08-31 00:00 = UTC 08-30 15:00）
+          mkRecord('r5', null, '2026-08-30T14:00:00+00:00', '2026-08-30T16:00:00+00:00'),
         ],
       }),
     );
 
     const result = await service.getReportPeriod(USER_ID, baseInput(), NOW);
 
-    expect(result.uncategorizedRecordCount).toBe(2);
+    expect(aggregateFor(result, 'a1')?.recordedMinutes).toBe(30 + 60 + 120 + 480);
+    expect(aggregateFor(result, 'a1')?.durationCounts).toEqual([
+      [30, 1],
+      [60, 1],
+      [120, 1],
+    ]);
+    // 期間の外にはみ出した 60 分は数えない
+    expect(aggregateFor(result, null)?.durationCounts).toEqual([[60, 1]]);
   });
 
-  it('次期間の予定合計を返す', async () => {
+  it('数えられる記録が無ければ度数は空', async () => {
+    const service = createReportAggregationService(
+      createFakeClient({
+        activities: [{ id: 'a1', name: '執筆', category_id: null }],
+        records: [
+          {
+            ...mkRecord('r1', 'a1', '2026-09-01T00:00:00+00:00', '2026-09-01T01:00:00+00:00'),
+            source: 'auto_migrated',
+          },
+        ],
+      }),
+    );
+
+    const result = await service.getReportPeriod(USER_ID, baseInput(), NOW);
+
+    expect(aggregateFor(result, 'a1')?.recordedMinutes).toBe(60);
+    expect(aggregateFor(result, 'a1')?.durationCounts).toEqual([]);
+  });
+
+  /**
+   * 時間帯はユーザーの timezone の壁時計で切る。UTC のまま切ると、JST の朝の記録が前日の夜に並ぶ。
+   * 期間へ clip してから按分するので、期間の外の部分は時間帯にも入らない（日別の棒と合計が揃う）。
+   */
+  it('時間帯を JST の壁時計で按分し、期間の外は数えない', async () => {
+    const service = createReportAggregationService(
+      createFakeClient({
+        activities: [{ id: 'a1', name: '執筆', category_id: null }],
+        records: [
+          // JST 09-01 08:30〜10:00
+          mkRecord('r1', 'a1', '2026-08-31T23:30:00+00:00', '2026-09-01T01:00:00+00:00'),
+          // JST 08-30 23:00〜08-31 01:00。期間（08-31 00:00〜）に入るのは 0 時台の 60 分だけ
+          mkRecord('r2', 'a1', '2026-08-30T14:00:00+00:00', '2026-08-30T16:00:00+00:00'),
+        ],
+      }),
+    );
+
+    const result = await service.getReportPeriod(USER_ID, baseInput(), NOW);
+    const byHour = aggregateFor(result, 'a1')?.byHour ?? [];
+
+    expect(byHour).toHaveLength(24);
+    expect(byHour[8]).toBe(30);
+    expect(byHour[9]).toBe(60);
+    expect(byHour[0]).toBe(60);
+    expect(byHour[23]).toBe(0);
+    expect(byHour.reduce((sum, minutes) => sum + minutes, 0)).toBe(
+      aggregateFor(result, 'a1')?.recordedMinutes,
+    );
+  });
+
+  it('次期間の予定は今期間の集計に入らない', async () => {
     const service = createReportAggregationService(
       createFakeClient({
         activities: [{ id: 'a1', name: '執筆', category_id: null }],
         plans: [
-          // 来週（JST 09-08 09:00〜11:00）
+          // 来週（JST 09-08 09:00〜11:00）。半開区間の外
           {
             id: 'p1',
             activity_id: 'a1',
@@ -501,8 +516,6 @@ describe('ReportAggregationService.getReportPeriod', () => {
 
     const result = await service.getReportPeriod(USER_ID, baseInput(), NOW);
 
-    expect(result.nextPeriodPlannedMinutes).toBe(120);
-    // 今期間の集計には来週の予定が入らない
     expect(aggregateFor(result, 'a1')).toBeUndefined();
   });
 
@@ -519,7 +532,9 @@ describe('ReportAggregationService.getReportPeriod', () => {
 
     const result = await service.getReportPeriod(USER_ID, baseInput(), NOW);
 
-    expect(result.previousActivities).toEqual([{ activityId: 'a1', recordedMinutes: 120 }]);
+    expect(result.previousActivities).toEqual([
+      { activityId: 'a1', recordedMinutes: 120, recordBoxes: 1, durationCounts: [[120, 1]] },
+    ]);
     expect(result.activities).toEqual([]);
   });
 
@@ -547,154 +562,6 @@ describe('ReportAggregationService.getReportPeriod', () => {
 
     expect(result.period.bucketKeys).toHaveLength(12);
     expect(result.period.bucketKeys[0]).toBe('2026-01');
-  });
-  describe('4 章（整える）', () => {
-    /** 件数とジャンプ先が同じ集合から出ることを見る（別 query だと押した先が空になりうる）。 */
-    it('未分類の記録の件数と、最も早い 1 件の日を返す', async () => {
-      const service = createReportAggregationService(
-        createFakeClient({
-          records: [
-            mkRecord('rec-late', null, '2026-09-03T01:00:00+00:00', '2026-09-03T02:00:00+00:00'),
-            mkRecord(
-              'rec-early',
-              'act-1',
-              '2026-09-01T00:30:00+00:00',
-              '2026-09-01T01:30:00+00:00',
-            ),
-            mkRecord(
-              'rec-sorted',
-              'act-2',
-              '2026-09-02T01:00:00+00:00',
-              '2026-09-02T02:00:00+00:00',
-            ),
-          ],
-          activities: [
-            { id: 'act-1', name: '散歩', category_id: null },
-            { id: 'act-2', name: '実装', category_id: 'cat-1' },
-          ],
-          categories: [{ id: 'cat-1', name: '仕事' }],
-        }),
-      );
-
-      const result = await service.getReportPeriod(USER_ID, baseInput(), NOW);
-
-      expect(result.uncategorizedRecordCount).toBe(2);
-      // JST 09-01 09:30。UTC のまま日付を切る実装だと深夜帯でずれる
-      expect(result.firstUncategorizedRecord).toEqual({ id: 'rec-early', dayKey: '2026-09-01' });
-    });
-
-    it('未分類の記録が無ければジャンプ先を返さない', async () => {
-      const service = createReportAggregationService(
-        createFakeClient({
-          records: [
-            mkRecord('rec-1', 'act-2', '2026-09-02T01:00:00+00:00', '2026-09-02T02:00:00+00:00'),
-          ],
-          activities: [{ id: 'act-2', name: '実装', category_id: 'cat-1' }],
-          categories: [{ id: 'cat-1', name: '仕事' }],
-        }),
-      );
-
-      const result = await service.getReportPeriod(USER_ID, baseInput(), NOW);
-
-      expect(result.uncategorizedRecordCount).toBe(0);
-      expect(result.firstUncategorizedRecord).toBeNull();
-    });
-
-    /** 外部カレンダー未接続でも 2 行目が落ちない（受け入れ条件 6）。 */
-    it('外部カレンダー未接続なら未変換の予定は 0 件', async () => {
-      const service = createReportAggregationService(createFakeClient({}));
-
-      const result = await service.getReportPeriod(USER_ID, baseInput(), NOW);
-
-      expect(result.unconvertedExternalEventCount).toBe(0);
-      expect(result.firstUnconvertedExternalEvent).toBeNull();
-    });
-
-    it('未変換の外部予定を数え、最も早い日を返す（期間の外も数える）', async () => {
-      const service = createReportAggregationService(
-        createFakeClient({
-          connections: [{ id: 'conn-1' }],
-          selectedCalendars: [{ connection_id: 'conn-1', provider_calendar_id: 'cal-1' }],
-          externalEvents: [
-            // どちらも表示中の週（08-31〜09-07 JST）の外。期間に限定しない（仕様 §4.4）
-            {
-              id: 'ev-late',
-              start_at: '2026-09-20T02:00:00+00:00',
-              end_at: '2026-09-20T03:00:00+00:00',
-            },
-            {
-              id: 'ev-early',
-              start_at: '2026-09-14T00:00:00+00:00',
-              end_at: '2026-09-14T01:00:00+00:00',
-            },
-          ],
-        }),
-      );
-
-      const result = await service.getReportPeriod(USER_ID, baseInput(), NOW);
-
-      expect(result.unconvertedExternalEventCount).toBe(2);
-      expect(result.firstUnconvertedExternalEvent).toEqual({ dayKey: '2026-09-14' });
-    });
-
-    /**
-     * カレンダー画面が ghost として描かない行は、レポートでも数えない。
-     * ここが緩むと「N 件」を押した先に ghost が 1 つも無い行き止まりになる。
-     */
-    it('cancelled / dismiss 済み / 孤児 / 選択解除 / 変換済みは数えない', async () => {
-      const span = {
-        start_at: '2026-09-08T00:00:00+00:00',
-        end_at: '2026-09-08T01:00:00+00:00',
-      };
-      const service = createReportAggregationService(
-        createFakeClient({
-          connections: [{ id: 'conn-1' }],
-          selectedCalendars: [{ connection_id: 'conn-1', provider_calendar_id: 'cal-1' }],
-          externalEvents: [
-            { id: 'ev-ok', ...span },
-            { id: 'ev-cancelled', status: 'cancelled', ...span },
-            { id: 'ev-dismissed', dismissed_at: '2026-09-01T00:00:00+00:00', ...span },
-            { id: 'ev-orphan', connection_id: null, ...span },
-            { id: 'ev-unselected', provider_calendar_id: 'cal-other', ...span },
-            { id: 'ev-converted', ...span },
-          ],
-          records: [
-            {
-              ...mkRecord('rec-converted', 'act-2', span.start_at, span.end_at),
-              external_calendar_event_id: 'ev-converted',
-            },
-          ],
-          activities: [{ id: 'act-2', name: '実装', category_id: 'cat-1' }],
-          categories: [{ id: 'cat-1', name: '仕事' }],
-        }),
-      );
-
-      const result = await service.getReportPeriod(USER_ID, baseInput(), NOW);
-
-      expect(result.unconvertedExternalEventCount).toBe(1);
-      expect(result.firstUnconvertedExternalEvent).toEqual({ dayKey: '2026-09-08' });
-    });
-
-    /** 再認証待ちの接続は同期が止まっており、ミラーが凍結する。fail closed で数えない。 */
-    it('active でない接続の予定は数えない', async () => {
-      const service = createReportAggregationService(
-        createFakeClient({
-          connections: [{ id: 'conn-1', status: 'reauth_required' }],
-          selectedCalendars: [{ connection_id: 'conn-1', provider_calendar_id: 'cal-1' }],
-          externalEvents: [
-            {
-              id: 'ev-1',
-              start_at: '2026-09-08T00:00:00+00:00',
-              end_at: '2026-09-08T01:00:00+00:00',
-            },
-          ],
-        }),
-      );
-
-      const result = await service.getReportPeriod(USER_ID, baseInput(), NOW);
-
-      expect(result.unconvertedExternalEventCount).toBe(0);
-    });
   });
 });
 

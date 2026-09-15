@@ -246,28 +246,6 @@
       "allCategories": "All",
       "categoryFilterLabel": "Filter by category"
     },
-    "stats": {
-      "review": {
-        "segments": {
-          "title": "Segments",
-          "create": "Create segment",
-          "namePlaceholder": "e.g. Deep work",
-          "emptyTitle": "No segments yet",
-          "emptyDescription": "Save an activity combination you review often",
-          "editActivities": "Edit activities",
-          "delete": "Delete",
-          "deleteConfirmTitle": "Delete this segment?",
-          "deleteConfirmDescription": "This deletes \"{name}\". This action cannot be undone.",
-          "created": "Segment created",
-          "duplicateName": "A segment with this name already exists",
-          "createFailed": "Failed to create segment",
-          "renameFailed": "Failed to rename segment",
-          "updateFailed": "Failed to update segment",
-          "deleted": "Segment deleted",
-          "deleteFailed": "Failed to delete segment"
-        }
-      }
-    },
     "mobile": {
       "weekLaneSwitcher": {
         "ariaLabel": "Timeblocks to show"
