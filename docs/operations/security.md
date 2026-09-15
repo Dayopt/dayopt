@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-07-30
+last_verified: 2026-09-16
 ---
 
 # セキュリティ方針
@@ -41,19 +41,22 @@ credential audit P2-6）。`ci.yml` の job が checkout / setup（`pnpm install
 
 ### ワークフロー別 permissions
 
-| ワークフロー                                        | permissions                                                  | 理由                                                                                          |
-| --------------------------------------------------- | ------------------------------------------------------------ | --------------------------------------------------------------------------------------------- |
-| `ci.yml`（impact job）                              | `contents: read` / `pull-requests: read`                     | PR の変更ファイル一覧の取得（gh api）による affected 判定                                     |
-| `ci.yml`（static job）                              | `contents: read` / `pull-requests: read`                     | コード読み取りのみ（gh を呼ばないため step env に `GH_TOKEN` を渡さない）                     |
-| `ci.yml`（unit job）                                | `contents: read` / `pull-requests: read`                     | PR コードの unit test + migration safety の検知（PR files の読み取り。結果は job output）     |
-| `ci.yml`（migration-notice job）                    | `contents: read` / `pull-requests: write` / `issues: write`  | migration safety の通知。checkout・依存 install をせず、unit の output は allowlist 検証する  |
-| `ci.yml`（integration job）                         | `contents: read`                                             | gh を呼ばないため job 単位で最小へ絞る（PR コードを実行する job に書き込み token を置かない） |
-| `nightly.yml`（replica-check / storage-backup job） | `contents: read`                                             | コード読み取りのみ                                                                            |
-| `nightly.yml`（status-label-sweep job）             | `issues: write` / `contents: read`                           | ラベル一括剥がし                                                                              |
-| `production-config-audit.yml`                       | `contents: read` / `pull-requests: read` / `statuses: write` | 固定 context 名での status 発行                                                               |
-| `promote.yml`（impact / 層 3 job）                  | `contents: read`                                             | コード読み取りのみ（層 3 は local Supabase で完結し secret を読まない）                       |
-| `promote.yml`（release job）                        | `contents: read` / `statuses: write`                         | `Production Release` context の status 発行。workflow レベルには置かない                      |
-| `create-release.yml`                                | `contents: write`                                            | タグからリリース作成                                                                          |
+| ワークフロー                                                                       | permissions                                                  | 理由                                                                                          |
+| ---------------------------------------------------------------------------------- | ------------------------------------------------------------ | --------------------------------------------------------------------------------------------- |
+| `ci.yml`（impact job）                                                             | `contents: read` / `pull-requests: read`                     | PR の変更ファイル一覧の取得（gh api）による affected 判定                                     |
+| `ci.yml`（static job）                                                             | `contents: read` / `pull-requests: read`                     | コード読み取りのみ（gh を呼ばないため step env に `GH_TOKEN` を渡さない）                     |
+| `ci.yml`（unit job）                                                               | `contents: read` / `pull-requests: read`                     | PR コードの unit test + migration safety の検知（PR files の読み取り。結果は job output）     |
+| `ci.yml`（migration-notice job）                                                   | `contents: read` / `pull-requests: write` / `issues: write`  | migration safety の通知。checkout・依存 install をせず、unit の output は allowlist 検証する  |
+| `ci.yml`（integration job）                                                        | `contents: read`                                             | gh を呼ばないため job 単位で最小へ絞る（PR コードを実行する job に書き込み token を置かない） |
+| `nightly.yml`（replica-check / storage-backup job）                                | `contents: read`                                             | コード読み取りのみ                                                                            |
+| `nightly.yml`（status-label-sweep job）                                            | `issues: write` / `contents: read`                           | ラベル一括剥がし                                                                              |
+| `nightly.yml`（notify-failure job）                                                | `issues: write` / `contents: read`                           | 失敗時の issue 通知                                                                           |
+| `production-config-audit.yml`（deploy-health / notify-supabase-audit-failure job） | `issues: write` ほか                                         | 失敗時の issue 通知                                                                           |
+| `promote.yml`（notify_failure job）                                                | `issues: write` / `contents: read`                           | 失敗時の issue 通知                                                                           |
+| `production-config-audit.yml`                                                      | `contents: read` / `pull-requests: read` / `statuses: write` | 固定 context 名での status 発行                                                               |
+| `promote.yml`（impact / 層 3 job）                                                 | `contents: read`                                             | コード読み取りのみ（層 3 は local Supabase で完結し secret を読まない）                       |
+| `promote.yml`（release job）                                                       | `contents: read` / `statuses: write`                         | `Production Release` context の status 発行。workflow レベルには置かない                      |
+| `create-release.yml`                                                               | `contents: write`                                            | タグからリリース作成                                                                          |
 
 `production-config-audit.yml` は `pull_request_target` で走るが、
 **`pull_request_target` でも job の check run は PR の `statusCheckRollup` に出る**

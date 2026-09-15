@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-09-11
+last_verified: 2026-09-16
 code: apps/product/src
 ---
 
@@ -137,35 +137,25 @@ graph TD
 
 ### Provider 階層
 
-実体は `app/[locale]/(app)/_providers/_composition/ProvidersComposition.tsx`。
+実体は `app/[locale]/(app)/_providers/_composition/ProvidersComposition.tsx`。**入れ子の順序をここに写さない**
+（2026-09-16 に、実装と食い違ったまま残っていた図を撤去した。#2747 で並びが変わっている）。
 
-```mermaid
-graph TD
-    P["PersistQueryClientProvider"]
-    P --> TC["api.Provider (tRPC)"]
-    TC --> AS["AuthStoreInitializer（Context 無し・並列）"]
-    TC --> QB["QueryCacheAuthBoundary（認証主体の変化で cache 破棄）"]
-    TC --> TP["ThemeProvider"]
-    TP --> SM["SessionMonitorProvider (lazy)"]
-    SM --> SW["ServiceWorkerProvider (lazy)"]
-    SW --> US["UserSettingsInitializer（hydration 待ち）"]
-    US --> BA["BillingAccessProvider"]
-    BA --> CH["children + Global*Modal"]
-```
+守る規則だけを書く:
+
+- Context を張るのは `PersistQueryClientProvider` → `api.Provider`（tRPC）→ `ThemeProvider` の 3 つだけ
+- 副作用だけの component（`AuthStoreInitializer` / `QueryCacheAuthBoundary` / `SessionMonitorProvider` / `ServiceWorkerProvider`）は children を包まず並列に置く。包むと遅延ロードが描画を止める
+- children を包むのは、データを待たせる必要がある `UserSettingsInitializer` と `BillingAccessProvider` だけ
 
 ### キャッシュ戦略
 
-```mermaid
-graph LR
-subgraph Cache["TanStack Query キャッシュ"]
-E["plans / records / calendars<br/>stale: 5min, gc: 10min"]
-AC["activities / categories<br/>stale: 5min, gc: 10min"]
-US["userSettings<br/>stale: 1h, gc: 2h"]
-end
+既定値は `src/lib/trpc/query-client.ts` が正本（2026-09-16 時点で staleTime 5 分 / gcTime 2 時間、gcTime は
+IndexedDB 永続化の上限と同じ値）。hook 側で個別に上書きするものがあるため、**この doc に数値を写さない**。
 
-    WF["refetchOnWindowFocus"] -.->|"stale時 再取得"| E
-    WF -.->|"stale時 再取得"| AC
-```
+方針:
+
+- サーバーデータは TanStack Query に置き、Zustand へ複製しない
+- 変更が自分の操作でしか起きないものは invalidate で整合を取る（Realtime は使わない）
+- 永続化の対象は `should-persist-query.ts` が決める。認証主体が変われば `QueryCacheAuthBoundary` が cache を捨てる
 
 ### Feature 間の依存（Composition Layer）
 
@@ -205,7 +195,7 @@ graph TD
 
 <!-- architecture-map:feature-dag:end -->
 
-依存方向の正はリポジトリルートの [AGENTS.md / `pr-cross-review` skill](../../AGENTS.md / `pr-cross-review` skill) と
+依存方向の正はリポジトリルートの [AGENTS.md](../../AGENTS.md) と
 `apps/product/eslint.config.mjs`。`settings` は cross-cutting composition、`calendar` はページ全体を合成する hub として扱う。
 
 ### Calendar の Plan / Record と UI state
@@ -214,10 +204,9 @@ Calendar は Plan（予定）と Record（記録）を別レーンで描画し�
 
 ```mermaid
 flowchart LR
-    URL["URL: date / view / panel"] --> NAV["CalendarNavigationContext"]
+    URL["URL: date / view"] --> NAV["CalendarNavigationContext"]
     NAV --> CLIENT["CalendarViewClient"]
     CLIENT --> CTRL["CalendarController"]
-    CLIENT --> PANEL["right-side panel: review / diff"]
     CTRL --> QUERY["tRPC + TanStack Query"]
     QUERY --> SERVICE["timeblock router / service"]
     SERVICE --> DB["Supabase: plans / records"]
@@ -225,8 +214,9 @@ flowchart LR
     NAV -.->|"command / mirror only"| ZS
 ```
 
-- 日付・view range・右パネルの表示可否は URL と `CalendarNavigationContext` が source of truth。
-- `CalendarViewClient` が `CalendarController` と右側パネルを合成する。Review/Diff は独立ページではなく Calendar shell に追従する。
+- 日付と view range は URL と `CalendarNavigationContext` が source of truth。
+- 振り返りは `/report` として独立した画面。かつて Calendar shell の右パネル（`panel=review` / `panel=diff`）だったが、
+  現在その query は legacy redirect の入口としてだけ残る（`panel-url.ts` / `proxy.ts`。2026-09-16 に記述を更新）。
 - Zustand は drag、inline create、clipboard、inspector、shell などの一時 UI state と、表示モード・アクティビティフィルターのユーザー設定だけを担う。URL/Context の値を永続化しない。
 - Plan / Record / activity などのサーバーデータは Zustand に複製せず、tRPC / TanStack Query 経由で扱う。
 
@@ -397,15 +387,15 @@ RLS の正確な対象・policy・grant は自動生成の [`data/db/rls-snapsho
 | ---------------------------- | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
 | **plans**                    | Plan（予定）。これからやる時間の宣言                             | title, activity_id, start_at, end_at, source, external_calendar_event_id                                                 |
 | **records**                  | Record（記録）。予定とは独立                                     | title, activity_id, start_at, end_at, source, external_calendar_event_id                                                 |
-| **external_calendar_events** | 外部カレンダー同期ミラー（テーブルのみ存在。同期実装は Phase 2） | connection_id, provider, provider_calendar_id, provider_event_id, start_at, end_at, status, dismissed_at, last_synced_at |
+| **external_calendar_events** | 外部カレンダー同期ミラー（Google の取り込みが稼働中）            | connection_id, provider, provider_calendar_id, provider_event_id, start_at, end_at, status, dismissed_at, last_synced_at |
 | **categories**               | 所属の主軸。単一所属（`activities.category_id` 1本で表現）       | name, color, icon, archived_at                                                                                           |
 | **activities**               | Plan / Record の分類単位。所属カテゴリーから色・アイコンを継承   | category_id, name, archived_at                                                                                           |
-| **segments**                 | 分析用の保存クエリ（横断参照、重複を許す）                       | name                                                                                                                     |
-| **segment_activities**       | セグメントとアクティビティの多対多 junction                      | segment_id, activity_id                                                                                                  |
+| **segments**                 | 撤去済み（2026-09-15）。UI / tRPC / MCP は無く、table だけが残る | name                                                                                                                     |
+| **segment_activities**       | 同上（drop は不可逆なので別変更）                                | segment_id, activity_id                                                                                                  |
 
 #### 外部カレンダー連携
 
-Phase 2（external-calendar-import）で追加。OAuth / 同期 / UI は Step 2 以降。
+外部カレンダー取り込みで追加。取り込みは `calendar-sync` の定期実行が動いている（間隔は [`data/system-surface.md`](./data/system-surface.md) の定期実行を見る）。
 
 | テーブル                          | 役割                                                              | 主要カラム                                                                                       |
 | --------------------------------- | ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
