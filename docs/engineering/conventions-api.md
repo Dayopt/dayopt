@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-09-11
+last_verified: 2026-09-16
 code: apps/product/src/features
 ---
 
@@ -154,7 +154,7 @@ Dayopt の service 層は近い将来、tRPC 以外の skin（MCP server を含�
 - error: `UserServiceError extends ServiceError`
 - skins: tRPC のみ
 
-##### `deleteAccount(options)` — L89
+##### `deleteAccount(options)`
 
 - input: `DeleteAccountOptions { userId, userEmail, password, confirmText }`
 - output: `Promise<{ success: true }>`
@@ -162,20 +162,20 @@ Dayopt の service 層は近い将来、tRPC 以外の skin（MCP server を含�
 - side effect: **Stripe API (cancel subscriptions + delete customer)**, **Storage delete (avatars)**, **Supabase auth.admin.deleteUser** (RLS bypass via 内部 `createServiceRoleClient()`), logger
 - 注: 原則 4 該当。JSDoc に副作用を明記する。
 
-##### `deleteBlocks(userId)` — L179
+##### `deleteBlocks(userId)`
 
 - input: `userId: string`
 - output: `Promise<{ deletedCount }>`
 - error: `UserServiceError(DELETE_DATA_FAILED)`
 
-##### `deleteAllData(userId)` — L200
+##### `deleteAllData(userId)`
 
 - input: `userId: string`
 - output: `Promise<{ success: true }>`
 - error: `UserServiceError(DELETE_DATA_FAILED)`
 - side effect: DB write（plans / records → activities / categories → settings の cascade delete）
 
-##### `exportData(options)` — L237
+##### `exportData(options)`
 
 - input: `ExportDataOptions { userId }`
 - output: `Promise<ExportDataResult { exportedAt, userId, data: { profile, plans, records, categories, activities, userSettings } }>`
@@ -204,46 +204,46 @@ Dayopt の service 層は近い将来、tRPC 以外の skin（MCP server を含�
 - error: `BillingServiceError extends ServiceError`
 - skins: tRPC (`billing-router.ts`) + REST (`src/app/api/webhooks/stripe/route.ts`)
 
-##### `getBillingInfo(supabase, userId)` — L64
+##### `getBillingInfo(supabase, userId)`
 
 - output: `Promise<BillingInfo { subscriptionStatus, stripeCustomerId, subscriptionId }>`
 - error: `BillingServiceError(FETCH_FAILED)`
 - side effect: DB read
 
-##### `createCheckoutSession(supabase, userId, email, priceId)` — L130
+##### `createCheckoutSession(supabase, userId, email, priceId)`
 
 - output: `Promise<string>` (Checkout session URL)
 - error: `BillingServiceError(CREATE_FAILED | UPDATE_FAILED)`
 - side effect: **Stripe API**（customers.create + subscriptions.list + checkout.sessions.create）, DB write (`stripe_customer_id` 更新), `getAppUrl()` で base URL 取得
 
-##### `createPortalSession(supabase, userId)` — L171
+##### `createPortalSession(supabase, userId)`
 
 - output: `Promise<string>` (Portal session URL)
 - error: `BillingServiceError(NOT_FOUND | INTERNAL_SERVER_ERROR)`
 - side effect: **Stripe API**（billingPortal.sessions.create）
 
-##### `getPaymentMethod(supabase, userId)` — L196
+##### `getPaymentMethod(supabase, userId)`
 
 - output: `Promise<PaymentMethod | null>` (null は legitimate absence: 顧客 ID なし / 顧客削除済み / default PM なし)
 - error: **Stripe API 失敗は throw（明示的 catch なし、propagate）**
 - side effect: **Stripe API**（customers.retrieve + paymentMethods.retrieve）
 - 注: 原則 7 準拠。null は absence、throw は failure。
 
-##### `getInvoices(supabase, userId, limit? ★)` — L239
+##### `getInvoices(supabase, userId, limit? ★)`
 
 - output: `Promise<InvoiceItem[]>` (空配列は legitimate absence: 顧客 ID なし)
 - error: Stripe API 失敗は throw
 - side effect: **Stripe API**（invoices.list）
 - pagination: `limit` を引数化 ★（current は固定 10）
 
-##### `getBillingOverview(supabase, userId)` — L279
+##### `getBillingOverview(supabase, userId)`
 
 - output: `Promise<BillingOverview { billingInfo, paymentMethod, invoices }>`
 - error: `BillingServiceError(FETCH_FAILED)` + Stripe API 失敗は throw
 - side effect: DB read + **Stripe API**（getPaymentMethodByCustomerId + getInvoicesByCustomerId を並列）
 - 注: 内部で profile を 1 回だけ fetch（N+1 解消済み）。getBillingInfo / getPaymentMethod / getInvoices の subscription_status read 重複ロジックを廃止して overview に集約する余地あり（Delta 参照）
 
-##### `syncSubscriptionStatus(serviceRoleSupabase ★, stripeCustomerId, subscriptionId?, status)` — L375
+##### `syncSubscriptionStatus(serviceRoleSupabase ★, stripeCustomerId, subscriptionId?, status)`
 
 - output: `Promise<void>`
 - error: `BillingServiceError(UPDATE_FAILED)`
@@ -327,303 +327,36 @@ shape の話ではなく後続 plan で扱う:
 
 ---
 
-## エラーパターン辞書
+## エラー処理
 
-Dayopt の統一エラー管理システム。エラーコード体系、自動復旧、ユーザー通知、Sentry連携を提供する。
+**2026-09-16 にこの節を書き直した。** それまでは `@/config/error-patterns` の 7 カテゴリ辞書、`createAppError` / `ERROR_CODES`、`error-analysis.ts`、`GlobalErrorBoundary` / `ErrorFallbacks`、`app/error/{401,403,500}/` を前提に 200 行あったが、**どれも実装されていない**（`rg` で 0 件）。読んだ人が存在しない API を書こうとするため撤去した。
 
-### エラーコード体系（7カテゴリ）
+### 実在するもの
 
-| カテゴリ       | コード範囲 | 例                                                                    |
-| -------------- | ---------- | --------------------------------------------------------------------- |
-| **AUTH**       | 1xxx       | `INVALID_TOKEN`(1001), `EXPIRED_TOKEN`(1002), `NO_PERMISSION`(1003)   |
-| **VALIDATION** | 2xxx       | `REQUIRED_FIELD`(2001), `INVALID_FORMAT`(2002), `INVALID_EMAIL`(2004) |
-| **DB**         | 3xxx       | `CONNECTION_FAILED`(3001), `QUERY_TIMEOUT`(3002), `NOT_FOUND`(3004)   |
-| **BIZ**        | 4xxx       | ビジネスロジックエラー                                                |
-| **EXTERNAL**   | 5xxx       | 外部サービス連携エラー                                                |
-| **SYSTEM**     | 6xxx       | システム・インフラエラー                                              |
-| **RATE**       | 7xxx       | レート制限エラー                                                      |
+| 役割                         | 実体                                                                                                              |
+| ---------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| service 層のエラー           | `ServiceError`（`src/lib/trpc/errors.ts`）とその feature 別の派生                                                 |
+| service コード → tRPC コード | `ERROR_CODE_MAP`（`src/lib/trpc/error-code-map.ts`）                                                              |
+| client へ出してよいコード    | `src/lib/trpc/client-safe-service-code.ts` の allowlist                                                           |
+| UI の捕捉                    | `src/components/ui/feedback/error-boundary.tsx`、App Router の `error.tsx` / `global-error.tsx` / `not-found.tsx` |
+| 監視への送信                 | `src/lib/sentry/`（`integration.ts` ほか）                                                                        |
 
-### 基本的な使い方
+DB 側のエラーコード（`DT001`〜）の一覧と app 側の参照箇所は [`data/system-surface.md`](./data/system-surface.md) の生成表を見る。
 
-#### エラーの作成と処理
+### 書き方
 
-```typescript
-import { createAppError, ERROR_CODES } from '@/config/error-patterns';
-import { handleError } from '@/lib/error-handler';
+正規化・Sentry 送信・ユーザー通知・自動復旧の組み合わせ方は [`error-handling` skill](../../.agents/skills/error-handling/SKILL.md) が正本。ここでは重複させない。
 
-const error = createAppError('ユーザーが見つかりません', ERROR_CODES.NOT_FOUND, {
-  source: 'user-service',
-  userId: 'user-123',
-  context: { searchId: 'invalid-id' },
-});
-
-await handleError(error);
-```
-
-#### React Hookでの使用
-
-```typescript
-import { useErrorHandler } from '@/hooks/use-error-handler';
-
-function UserProfile() {
-  const { handleWithRecovery, errorState, clearError } = useErrorHandler();
-
-  const loadUser = async () => {
-    const result = await handleWithRecovery(
-      () => fetch('/api/user/123').then((res) => res.json()),
-      ERROR_CODES.API_UNAVAILABLE,
-      { context: { component: 'UserProfile' } },
-    );
-
-    if (result.success) {
-      setUser(result.data);
-    }
-  };
-
-  return (
-    <div>
-      {errorState.hasError && (
-        <ErrorNotification error={errorState.error} onDismiss={clearError} />
-      )}
-      <button onClick={loadUser}>ユーザーを読み込み</button>
-    </div>
-  );
-}
-```
-
-### 自動復旧戦略
-
-#### カテゴリ別リトライ設定
-
-| カテゴリ | リトライ    | 戦略                       |
-| -------- | ----------- | -------------------------- |
-| AUTH     | 無効        | 認証エラーはリトライしない |
-| DB       | 有効（3回） | 指数バックオフ + ジッター  |
-| EXTERNAL | 有効（3回） | 指数バックオフ             |
-| RATE     | 有効        | Retry-After ヘッダーに従う |
-
-#### サーキットブレーカー
-
-```typescript
-{
-  enabled: true,
-  failureThreshold: 5,      // 5回失敗でOPEN
-  recoveryTimeout: 30000,   // 30秒後に HALF_OPEN
-  successThreshold: 3       // 3回成功で CLOSED
-}
-```
-
-### ベストプラクティス
-
-#### エラーコードの選択
-
-```typescript
-// ✅ 具体的なエラーコード
-throw createAppError('Email format is invalid', ERROR_CODES.INVALID_EMAIL);
-
-// ❌ 汎用的すぎるエラーコード
-throw createAppError('Email format is invalid', ERROR_CODES.INVALID_FORMAT);
-```
-
-#### コンテキスト情報
-
-```typescript
-// ✅ 有用なコンテキスト（デバッグに必要な情報のみ）
-const error = createAppError('User not found', ERROR_CODES.NOT_FOUND, {
-  source: 'user-service',
-  userId: requestedUserId,
-  context: { searchCriteria: 'email' },
-});
-
-// ❌ 機密情報を含めない
-const error = createAppError('Login failed', ERROR_CODES.INVALID_CREDENTIALS, {
-  context: { password: 'user-password' }, // ❌ 絶対禁止
-});
-```
-
-#### ユーザー向けメッセージ
-
-```typescript
-// ユーザー向けメッセージはエラーパターンから自動選択される
-const error = createAppError(
-  'Database connection timeout', // 技術的詳細（ログ用）
-  ERROR_CODES.QUERY_TIMEOUT,
-);
-// → ユーザーには「処理がタイムアウトしました」と表示される
-```
-
-### Sentry連携
-
-Sentry Issue は予期しない障害だけに限定する。validation、認証失敗、404、conflict、
-rate limit などの想定内レスポンスは送信しない。tRPC / Next.js の中央adapterが扱う障害は
-そこで一度だけcaptureし、個別のserviceから重ねて送らない。
-
-中央adapterの外にあるError Boundaryなどでは、元の`Error`とstackを保持したまま
-`captureUnexpectedError`を使う。付与できるのはfeature、operation、route、request IDなどの
-技術コンテキストだけで、本文、email、検索語、認証情報、任意のmetadataは渡さない。
-一般エラーに手動fingerprintは設定せず、Sentry標準のgroupingを使う。
-
-```typescript
-import { captureUnexpectedError } from '@/lib/sentry';
-
-captureUnexpectedError(error, {
-  feature: 'calendar',
-  operation: 'load_entries',
-  route: '/api/calendar',
-});
-```
-
-### マイグレーション（従来 → エラーパターン）
-
-```typescript
-// ❌ Before: 手動エラー処理
-try {
-  const user = await fetchUser(id);
-} catch (error) {
-  console.error('Error fetching user:', error);
-  toast.error('ユーザーの取得に失敗しました');
-}
-
-// ✅ After: エラーパターン辞書
-try {
-  const user = await fetchUser(id);
-} catch (error) {
-  await handleError(error, ERROR_CODES.API_UNAVAILABLE, {
-    source: 'user-fetch',
-    context: { userId: id },
-  });
-}
-```
-
-### エラーハンドリングフロー
-
-#### フロントエンドエラー
-
-```
-エラー発生
-  ↓
-ErrorBoundary/FeatureErrorBoundary がキャッチ
-  ↓
-error-analysis.ts で分析
-  ↓
-error-patterns.ts からパターン取得
-  ↓
-ユーザーフレンドリーなメッセージ表示
-  ↓
-自動復旧可能？ → Yes: リトライ実行
-                → No: フォールバック表示
-```
-
-#### API/サーバーエラー
-
-```
-エラー発生
-  ↓
-api/error-handler.ts でキャッチ
-  ↓
-エラーコード判定 (errorCodes.ts)
-  ↓
-適切なHTTPステータスコード返却
-  ↓
-クライアントでエラーパターン辞書から処理
-```
-
-#### グローバルエラー
-
-```
-未処理のエラー発生
-  ↓
-GlobalErrorBoundary がキャッチ
-  ↓
-Sentry統合 (sentry/integration.ts)
-  ↓
-自動復旧システム起動
-  ↓
-リトライ → 成功: アプリ続行
-        → 失敗: エラー画面表示
-```
-
-### ディレクトリ構造
-
-#### エラーパターン辞書
-
-```
-src/config/
-├── error-patterns.ts          # メイン辞書（ErrorPattern, ERROR_PATTERNS, AppError）
-└── error-patterns/            # 高機能版（将来の拡張用）
-    ├── index.ts               # ErrorPatternDictionary
-    ├── categories.ts          # 7カテゴリ定義
-    ├── messages.ts            # ユーザー向けメッセージ
-    └── recovery-strategies.ts # リトライ・サーキットブレーカー
-```
-
-#### エラーバウンダリー
-
-```
-src/components/
-├── error-boundary.tsx              # ErrorBoundary, FeatureErrorBoundary
-└── common/
-    ├── GlobalErrorBoundary.tsx     # 全画面保護 + 自動復旧
-    └── ErrorFallbacks.tsx          # Network/DB/API/UI/Auth別フォールバック
-```
-
-#### エラーページ
-
-```
-src/app/
-├── not-found.tsx              # 404エラー
-├── error.tsx                  # 500エラー
-└── error/
-    ├── 401/page.tsx           # 認証エラー
-    ├── 403/page.tsx           # 権限エラー
-    ├── 500/page.tsx           # サーバーエラー
-    └── maintenance/page.tsx   # メンテナンス
-```
-
-### 新しいエラーパターンの追加
-
-#### 1. エラーコード追加
-
-```typescript
-// src/constants/errorCodes.ts
-export const ERROR_CODES = {
-  // 既存のコード...
-  NEW_ERROR: 4100, // 4000番台 = BIZカテゴリ
-};
-```
-
-#### 2. パターン追加
-
-```typescript
-// src/config/error-patterns.ts
-export const ERROR_PATTERNS: Record<number, ErrorPattern> = {
-  [ERROR_CODES.NEW_ERROR]: {
-    technical: '技術者向けメッセージ',
-    userFriendly: 'ユーザー向けメッセージ',
-    short: '短縮メッセージ',
-    description: '詳細説明',
-    recommendedActions: ['アクション1', 'アクション2'],
-    autoRecoverable: false,
-    urgency: 'medium',
-    emoji: '⚠️',
-  },
-};
-```
+- service は `ServiceError`（またはその派生）を throw し、router は `handleServiceError` に渡す
+- 新しい service コードを足したら `ERROR_CODE_MAP` に対応を足す。載せ忘れると `INTERNAL_SERVER_ERROR` に落ちる
+- UI が code で分岐する必要があるものは client-safe allowlist に載せる。載せないと汎用文言へ退化する
 
 ### DO / DON'T
 
-#### DO
+- service が投げるコードは呼び出し側が分岐に使える名前にする（`FETCH_FAILED` のような汎用名は最後の手段）
+- 新しいコードは `ERROR_CODE_MAP` に必ず対応を足す（載せ忘れは `INTERNAL_SERVER_ERROR` に落ちる）
+- エラーを握りつぶさない。ログか Sentry のどちらかには必ず出す
+- ユーザー向け文言に技術的な詳細を載せない。文言は i18n 側に置く
+- 同じ判定を service と UI の両方に書かない（写しの扱いは [invariants.md](./invariants.md) §時刻 の分類に倣う）
 
-- エラーは必ずエラーパターン辞書に登録する
-- カテゴリに応じた適切なエラーコードを使用する
-- ユーザーフレンドリーなメッセージを提供する
-- 自動復旧可能なエラーは積極的にリトライする
-
-#### DON'T
-
-- 汎用的な `try-catch` を乱用しない
-- エラーメッセージに技術的な詳細を含めない
-- エラーを握りつぶさない（必ずログ出力またはSentry送信）
-- 同じエラーパターンを複数の場所で重複定義しない
-
-エラーバウンダリーの詳細な自動復旧フローは [`conventions-frontend.md`](./conventions-frontend.md) の ErrorBoundary セクションを参照。
+UI 側の ErrorBoundary の置き方は [`conventions-frontend.md`](./conventions-frontend.md) を参照。

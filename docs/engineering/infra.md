@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-08-19
+last_verified: 2026-09-16
 ---
 
 # インフラ・環境・API/Routing 総覧
@@ -359,30 +359,9 @@ finish-branch.sh が名前で success を要求するのは `ci.yml` の 3 job�
 
 **2026-08-20、CI 4 層再設計（[#2269](https://github.com/Dayopt/dayopt/issues/2269)）により `🎭 E2E Tests` / `🌐 Web Build & E2E` は required checks から除去した。** この 2 job は `.github/workflows/ci.yml` から `.github/workflows/heavy-post-merge.yml` へ移設され、pull_request では発火しなくなった（nightly + workflow_dispatch のみ。push:main は #2382（2026-08-25）で per-merge 実行のコストを理由に廃止済み）。旧記述（4 job が required）は誤り。#2483（2026-08-28）で `heavy-post-merge.yml` は `nightly.yml` へ吸収され、**2026-09-03 に `promote.yml` へ再移設した**（merge 連動 promote。per-PR で required にしない扱いは不変で、走るのは merge 後の promote 経路。影響のある suite だけが走る）。 詳細は 2026-08-20 の決定ログ（削除済み、git 履歴参照）、per-PR 検証の後継はレーンのローカル影響 spec 実走義務（`AGENTS.md §レーン運用` §条件付き事前 E2E）を参照。
 
-| context                   | 発行元                                                  | 目的                                                                    |
-| ------------------------- | ------------------------------------------------------- | ----------------------------------------------------------------------- |
-| `🛡️ docs & secrets guard` | GitHub Actions                                          | docs lifecycle と secret 漏えい防止の検査が成功すること                 |
-| `Production Config Audit` | GitHub Actions                                          | live な Vercel env metadata が Production 契約を満たすこと              |
-| `Vercel – product`        | Vercel GitHub App                                       | Product の Preview build が成功すること                                 |
-| `Vercel – web`            | Vercel GitHub App                                       | Web の Preview build が成功すること                                     |
-| `dayopt/internal-review`  | `pnpm review:marker` が生成する `gh api` を Main が実行 | 内製クロスレビューが実施されたこと（クロスレビュー必須 PR のみ。#2562） |
+required status checks の実状は ruleset が正本で、context の一覧をここへ写さない（`gh api repos/Dayopt/dayopt/rulesets/6790553 --jq '.rules[] | select(.type=="required_status_checks") | .parameters.required_status_checks[].context'` で引く）。
 
-**`dayopt/internal-review` は他の context と性質が違う。** GitHub Actions / Vercel が発行するのではなく、
-Main が `pnpm review:marker` の出力（`gh api --method POST repos/{owner}/{repo}/statuses/<head>`）を
-目視してから実行して作る。description は `p1=<int> p2=<int> fp=<hash> fpa=<hash> coverage=<...> agents=<csv>` の
-機械可読フィールド固定で、gate は `p1` / `p2` を数値として読み（数値以外・欠落は fail closed）、
-`fp` / `fpa` を **レビュー指紋**として読む。
-
-- **束縛**: 現 HEAD の status が無くても、旧 HEAD の status の指紋が現在の PR diff の指紋と一致すれば
-  有効（#2558）。指紋は `git diff <base>...<head>` の変更行のうち保護対象 path だけ（`review:full` の
-  PR では全 file）を正規化した sha256 の先頭 16 桁で、hunk header と context 行を含まないため
-  **追従 merge では変わらない**。docs だけの push・追従で `@codex review` と CI をやり直す無駄を消す
-- **旧設計との違い**: 2026-09 以前は `[internal-review]` marker 付き PR コメントを正規表現で読んでいた。
-  zerolike 判定の破綻・取得窓に残る壊れた marker・短縮 SHA 手打ちの捏造という 3 事故クラスが
-  材料そのものから来ていたため、commit status へ移した（#2562）。summary コメントは
-  `[review-summary]` marker で残るが、**gate は読まない**（`pnpm trace` の分析用）
-
-`🛡️ docs & secrets guard` は #1868 で main ruleset の required check へ追加した。
+**過去に required だった 2 context は、もう存在しない**（2026-09-16 に旧記述を撤去）。`🛡️ docs & secrets guard` の検査は `ci.yml` の static job（`scripts/ci/check.mjs`）へ吸収され、内製クロスレビューの commit status `dayopt/internal-review` は 2026-09-04 のクロスレビュー廃止方針で撤去した（`pnpm review:marker` という script も無い）。`Production Config Audit` は 2026-09-13 に required から外し、nightly / 定期実行として残っている。
 
 - `Vercel – product` / `Vercel – web` の区切り文字は en dash（U+2013）で、hyphen ではない
 - **`branch:finish` は `🔍 Static Checks` / `📦 Unit Tests` / `🧪 Integration Tests` も名前で success を要求する（2026-08-26、[#2415](https://github.com/Dayopt/dayopt/issues/2415)。3 つ目は 2026-09-02、[#2539](https://github.com/Dayopt/dayopt/issues/2539)）。**
@@ -517,8 +496,7 @@ Main が `pnpm review:marker` の出力（`gh api --method POST repos/{owner}/{r
   `finish-branch.sh` は **workflow の起動有無と独立に**、contract を変えた PR へ status
   `Production Config Audit` の success を要求する（判定は `protected-path-gate.mjs` の `auditContract`）。
   **変更ファイル一覧そのものを取得できなかった PR も要求する** — contract 変更を否定できない以上、
-  通す理由が無い（#2586 で Codex と architecture-guard の両系統から同じ指摘）。その PR は同じ理由で
-  `REVIEW_GATE_REQUIRED` も fail closed で立ち、内製証跡（commit status `dayopt/internal-review`）と Codex の独立 2 系統も必須になる。解除は **push ごとに** `gh workflow run production-config-audit.yml --ref <branch>`
+  通す理由が無い（#2586 で Codex と architecture-guard の両系統から同じ指摘）。解除は **push ごとに** `gh workflow run production-config-audit.yml --ref <branch>`
   の trusted dispatch を実行する。成功すると commit status `Production Config Audit` が head SHA へ
   success で発行される。workflow_dispatch run の check run は PR の `statusCheckRollup` に紐づかないため
   畳み込みでは解消できず、`finish-branch.sh` は **status `Production Config Audit` が success の時に限り**
@@ -940,159 +918,44 @@ export type TagRow = Database['public']['Tables']['tags']['Row'];
 
 ## App Routes Overview
 
-`src/app/[locale]/**` 配下の Next.js App Router routing を総覧。Route Group / Composition Layer / 認証境界の関係を一望できるようまとめる。`/api/**` は上記「API Endpoints Overview」を参照。
+Next.js App Router の**構造の決まり**を書く。実在する route の一覧は生成物を見る（この doc に書くと必ず古くなる。2026-09-16 に `/day` `/week` `playground/` など存在しない route の表を撤去した）。
 
-策定日: 2026-04-26（最終更新: 2026-05-12 に onboarding route group 削除を反映）
-スコープ: `src/app/**` 配下の Next.js App Router 全 route。`/api/**` は除外。`(public)` Route Group は現時点で存在しない。
+| 知りたいこと                        | 見る場所                                                                      |
+| ----------------------------------- | ----------------------------------------------------------------------------- |
+| 画面（page）の一覧                  | [`data/architecture-inventory.md`](./data/architecture-inventory.md) の route |
+| route handler の一覧（method 付き） | [`data/system-surface.md`](./data/system-surface.md) の HTTP route            |
+| 画面ごとの E2E 被覆                 | [`data/system-surface.md`](./data/system-surface.md) の E2E spec → route      |
 
-### Route Group 構造
+### Route Group の役割
 
-```
-src/app/
-├── layout.tsx                  ← ルート layout（HTML / theme / font / globals.css）
-├── error.tsx, global-error.tsx ← root-level error boundaries
-├── not-found.tsx               ← root-level 404
-├── sitemap.ts                  ← 多言語 sitemap（app 側の最小公開 URL のみ）
-├── opengraph-image.tsx         ← OG image generator (edge runtime)
-├── maintenance/route.ts        ← /maintenance（locale プレフィックスなし、Provider バイパス）
-├── offline/page.tsx            ← /offline（PWA フォールバック）
-├── api/                        ← REST / Webhook（API Endpoints Overview 参照）
-└── [locale]/
-    ├── layout.tsx              ← locale-scoped HTML lang / dir / metadata
-    ├── page.tsx                ← / → /{locale}/week へ redirect
-    ├── error.tsx               ← locale-scoped error boundary
-    ├── (app)/                  ← 認証必須グループ
-    │   ├── layout.tsx          ← IntlProvider + Providers + BaseLayout
-    │   ├── error.tsx, not-found.tsx
-    │   ├── (workspace)/        ← day / week / [nday]（Review / Diffはquery panel）
-    │   ├── settings/
-    │   ├── playground/
-    │   ├── _providers/         ← Providers ツリー
-    │   ├── _shell/             ← Shell layout components
-    │   └── _overlays/          ← グローバルダイアログ群
-    ├── (auth)/                 ← 認証フロー（login / signup / reset / mfa-verify）
-    │   ├── layout.tsx          ← IntlProvider (auth namespace) + AuthClientLayout
-    │   ├── loading.tsx
-    │   └── auth/{login,signup,password,reset-password,mfa-verify}/page.tsx
-    └── playground/             ← dev playground（locale 直下）
-```
+| Group                | 置くもの                                  | 前提                                                                   |
+| -------------------- | ----------------------------------------- | ---------------------------------------------------------------------- |
+| `[locale]/(app)/`    | 認証必須の画面                            | `layout.tsx` が Providers（tRPC / Query / Theme 等）と shell を注入    |
+| `(app)/(workspace)/` | 日々使う作業画面                          | `_composition/` の client ツリーを `page.tsx` から薄く呼ぶ             |
+| `[locale]/(auth)/`   | 認証フロー                                | `PublicProviders`（Theme + Tooltip）だけ。データ層を持たない           |
+| `src/app/` 直下      | locale を持たない route と metadata route | root layout / error / sitemap / OG image / `/maintenance` / `/offline` |
 
-### (app) Group: 認証必須ページ
+### Auth 境界
 
-すべて `Supabase Auth` のセッションが前提。`(app)/layout.tsx` で `Providers`（tRPC / TanStack Query / Auth Store / Calendar Settings / Theme）を注入し、`BaseLayout` で sidebar + header を提供する。
+- auth check は **proxy（`src/proxy.ts`）に一元化**する。page / layout 単位の auth ガードは置かない
+- 認証が要る画面は `(app)` 配下に置けばよい。認証をスキップする画面は `(auth)` 配下に置く
+- 認証済みで `(auth)` を踏むのが正常系の path は除外する（`isAuthPathAllowedWhileAuthenticated`、`src/lib/auth/domain/access-policy.ts`）。`/auth/mfa-verify`、`/auth/confirm`、`/auth/callback`、`/auth/reset-password` が対象
 
-#### Layout 系
+### composition layer
 
-| Path                  | Type           | 責務                                                                                                                           |
-| --------------------- | -------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| `(app)/layout.tsx`    | layout         | IntlProvider（app namespace のみ）+ Providers + BaseLayout + GlobalOverlays。`metadata.robots: noindex` で認証ページを検索除外 |
-| `(app)/error.tsx`     | error boundary | (app) Group 内のページエラーを BaseLayout 内側で表示。i18n 対応、Sentry にも記録                                               |
-| `(app)/not-found.tsx` | not-found      | (app) Group 内の 404。BaseLayout 内側で表示し、ナビ崩れを防ぐ                                                                  |
-
-#### (workspace) — メインモード
-
-| Path                                        | Type           | 責務 / 主な合成元                                                                                                    |
-| ------------------------------------------- | -------------- | -------------------------------------------------------------------------------------------------------------------- |
-| `(workspace)/day/page.tsx`                  | page (server)  | `prefetchCalendarData` → `HydrationBoundary` → `CalendarViewClient`（day view）。`generateMetadata` で i18n タイトル |
-| `(workspace)/week/page.tsx`                 | page (server)  | week view。同上の prefetch + Suspense streaming                                                                      |
-| `(workspace)/[nday]/page.tsx`               | page (server)  | 多日数 view（2day〜9day）。`[nday]` で動的セグメント                                                                 |
-| `(workspace)/{day,week,[nday]}/loading.tsx` | loading        | 共通 `CalendarSkeleton` を表示                                                                                       |
-| `(workspace)/{day,week,[nday]}/error.tsx`   | error boundary | calendar segment 専用エラー                                                                                          |
-| `(workspace)/_composition/`                 | —              | `CalendarViewClient` ほか、各 view の合成 layer                                                                      |
-| `(workspace)/_server/`                      | —              | `prefetchCalendarData` / `parseDateParam` / `CalendarSkeleton` 等の server-only ヘルパ                               |
-
-#### settings
-
-| Path                           | Type            | 責務                                                                                |
-| ------------------------------ | --------------- | ----------------------------------------------------------------------------------- |
-| `settings/page.tsx`            | page (client)   | settings 一覧。client component、`useAuthStore` + `SETTINGS_CATEGORIES` で nav 表示 |
-| `settings/layout.tsx`          | layout (client) | settings 用の slot 構造                                                             |
-| `settings/[category]/page.tsx` | page (client)   | カテゴリ別 settings（`SettingsContent` を render）                                  |
-
-#### playground
-
-| Path                           | Type | 責務                                                                      |
-| ------------------------------ | ---- | ------------------------------------------------------------------------- |
-| `playground/dnd-tags/page.tsx` | page | dnd-kit 検証用の dev playground（production では `noindex` 継承で隠れる） |
-
-### composition layer の使い方
-
-各 mode の `_composition/` には「ページから見た合成 hub」を集める:
-
-- 入力: `params` / `searchParams` / `prefetched data`
-- 合成対象: feature barrel (`@/features/calendar`, `@/features/review`, `@/features/timeblock` 等)
-- 出力: 1 つの client component ツリー
-
-`page.tsx` 自体は薄く保つ（prefetch + Suspense + 合成 component の呼出）。view の差し替えやデータ取得方式の変更は composition layer 内で完結させる。詳細は AGENTS.md / `pr-cross-review` skill の Composition Layer / Composition Hub を参照。
+各 mode の `_composition/` は「ページから見た合成 hub」。入力は `params` / `searchParams` / prefetch 済みデータ、合成対象は feature barrel、出力は 1 つの client component ツリー。`page.tsx` は prefetch と合成の呼び出しだけに保ち、view の差し替えは composition layer 内で完結させる。
 
 ### providers / shell / overlays
 
-| Path                                 | 責務                                                                                                                                                                                                                                          |
-| ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `(app)/_providers/Providers.tsx`     | tRPC / TanStack Query / Auth Store / Calendar Settings / Theme などのデータ層                                                                                                                                                                 |
-| `(app)/_shell/base-layout.tsx`       | sidebar + header + main の UI shell                                                                                                                                                                                                           |
-| `(app)/_overlays/GlobalOverlays.tsx` | ContactDialog / SettingsDialog / TimeblockSearchDialog / ShortcutCheatSheetDialog / TimeblockInspector / Toaster を集約マウント。keyboard shortcut の global listener（`useShortcutRegistry` / `useTimeblockSearchShortcut`）もここで購読する |
+| Path                | 責務                                                                       |
+| ------------------- | -------------------------------------------------------------------------- |
+| `(app)/_providers/` | データ層（tRPC / TanStack Query / Auth Store / Theme など）の合成          |
+| `(app)/_shell/`     | sidebar + header + main の UI shell                                        |
+| `(app)/_overlays/`  | グローバルダイアログと keyboard shortcut の global listener を集約マウント |
 
-### Auth 境界の確認
+Provider の実際の入れ子は `ProvidersComposition.tsx` を読む（順序は副作用の依存で決まるため、ここに写さない）。
 
-- `(app)` 配下の page で auth check は **proxy（`src/proxy.ts`）に一元化されている**（未認証で protected path → `/auth/login?redirect=`、MFA 未検証なら `/auth/mfa-verify`）。page / layout 単位の auth ガードは持たない
-- ページ単体での auth ガードは不要。新規 page を追加するときは `(app)` 配下に置けば自動的に認証必須となる
-- 認証スキップしたい page は `(auth)/` に置く（下記参照）
-
-### (auth) Group: 認証フロー
-
-未認証ユーザー向けの login / signup / reset 系ページ。`AuthClientLayout` で軽量な `PublicProviders`（Theme + Tooltip のみ）を注入し、`AuthLayout` で UI を組み立てる。tRPC / TanStack Query などのデータ層は持たない（Supabase Auth Client SDK を直接利用）。
-
-認証済みユーザーが `(auth)` 配下へ来た場合は proxy が `/week` へ流すが、**セッションを持ったまま踏むのが正常系のパスは除外する**（`isAuthPathAllowedWhileAuthenticated`、`src/lib/auth/domain/access-policy.ts`）。対象は `/auth/mfa-verify`（aal2 への昇格）、`/auth/confirm`（メール内リンクの `token_hash` 検証。ログイン中のメールアドレス変更が通る）、`/auth/callback`（OAuth の code 交換）、`/auth/reset-password`（confirm でセッション確立後に着地）。
-
-#### Layout 系
-
-| Path                 | Type            | 責務                                                                                                       |
-| -------------------- | --------------- | ---------------------------------------------------------------------------------------------------------- |
-| `(auth)/layout.tsx`  | layout (server) | IntlProvider（`common` / `auth` / `error` namespace のみ）+ `AuthClientLayout`。`metadata.robots: noindex` |
-| `(auth)/loading.tsx` | loading         | 認証フロー共通のローディング表示                                                                           |
-
-#### Pages
-
-| Path                                  | Type          | 責務                                                                                                                            |
-| ------------------------------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| `(auth)/auth/page.tsx`                | page (server) | `/auth` ルートへの直接アクセス時の入口（リダイレクト or 案内）                                                                  |
-| `(auth)/auth/login/page.tsx`          | page (server) | `LoginForm` を中央配置で render                                                                                                 |
-| `(auth)/auth/signup/page.tsx`         | page (server) | `SignupForm`                                                                                                                    |
-| `(auth)/auth/password/page.tsx`       | page (server) | `PasswordResetForm`（リセットメール送信）                                                                                       |
-| `(auth)/auth/reset-password/page.tsx` | page (server) | `ResetPasswordForm`（リセットリンク経由の新パスワード設定）                                                                     |
-| `(auth)/auth/mfa-verify/page.tsx`     | page (server) | MFA TOTP コード検証                                                                                                             |
-| `(auth)/auth/mfa-verify/layout.tsx`   | layout        | MFA 専用 wrapper                                                                                                                |
-| `(auth)/auth/confirm/route.ts`        | route handler | 認証メール内リンクの着地点。`token_hash` + `type` を `verifyOtp` し `next` へ redirect（signup / recovery / email_change 共通） |
-| `(auth)/auth/callback/route.ts`       | route handler | OAuth の `code` をセッションへ交換                                                                                              |
-
-### [locale] 直下
-
-locale ルーティングの境界。HTML lang / dir、metadata、redirect を担う。
-
-| Path                                       | Type            | 責務                                                                                          |
-| ------------------------------------------ | --------------- | --------------------------------------------------------------------------------------------- |
-| `[locale]/layout.tsx`                      | layout (server) | `<html lang dir>` の確定、`generateMetadata` で多言語 OG / canonical、未対応 locale を 404 に |
-| `[locale]/page.tsx`                        | page (server)   | `/{locale}` → `/{locale}/week` redirect。`force-dynamic`                                      |
-| `[locale]/error.tsx`                       | error boundary  | locale 全体のエラー（IntlProvider 未マウントケース含む）                                      |
-| `[locale]/playground/dnd-multi-container/` | dev             | dnd-kit Multiple Containers の検証用                                                          |
-
-### ルート直下（src/app/）
-
-locale プレフィックスを持たない routing と Next.js metadata route 群。
-
-| Path                   | Type                | 責務                                                                                                                 |
-| ---------------------- | ------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| `layout.tsx`           | root layout         | HTML 骨格 / theme provider / font / `globals.css` の読み込み。**この layout は触らない** が原則（影響範囲が全 page） |
-| `error.tsx`            | root error boundary | App router の最上位エラー                                                                                            |
-| `global-error.tsx`     | global error        | layout も含めた致命エラー時の最終手段（`<html>` から自前で組む）                                                     |
-| `not-found.tsx`        | root 404            | 全 path 共通の 404                                                                                                   |
-| `sitemap.ts`           | metadata route      | 多言語 sitemap。app 側は SaaS のため公開 URL 最小（マーケは web/ 側）                                                |
-| `opengraph-image.tsx`  | metadata route      | edge runtime で動的 OG 画像生成。`@/lib/og-colors` で色固定                                                          |
-| `maintenance/route.ts` | route handler       | `/maintenance`。Route Handler で raw HTML を返し、Provider ツリーをバイパスして CSP を回避                           |
-| `offline/page.tsx`     | page (client)       | PWA オフラインフォールバック。`navigator.language` で ja/en を切替                                                   |
-
-### 認証境界の全体像
+### 落ちた時にどこへ行くか
 
 ```
 未認証 → (auth)            : login / signup / reset / mfa
@@ -1105,7 +968,7 @@ locale 不正 / path 不在    → [locale]/error.tsx, not-found.tsx, root not-f
 
 ### 関連ドキュメント
 
-- Feature 境界: AGENTS.md / `pr-cross-review` skill
+- Feature 境界: [AGENTS.md](../../AGENTS.md)、実際の依存は [architecture.md](./architecture.md) の生成ブロック
 
 ---
 
@@ -1226,149 +1089,17 @@ npm run check               # typecheck + lint + test:run（一括）
 
 ### 全コマンド一覧
 
-#### 開発サーバー
+**一覧はここに置かない**。`package.json` の `scripts` が正本で、写すと必ず古くなる（2026-09-16 に、存在しない 12 script を並べた表を撤去した）。
 
 ```bash
-pnpm dev                    # .op-env.agent + op run 経由で next dev
-pnpm dev:raw                # 素の next dev（一時作業用）
-npm run storybook           # Storybook（ポート6006）
+# root の script 名を引く
+node -e "console.log(Object.keys(require('./package.json').scripts).join('\n'))"
+
+# workspace 個別（product / web / storybook / packages）
+pnpm --filter @dayopt/product run
 ```
 
-#### ビルド
-
-```bash
-npm run build               # next build
-npm run build-storybook     # Storybook ビルド
-npm run bundle:analyze      # バンドル解析付きビルド
-```
-
-#### コード品質
-
-```bash
-npm run lint                # ESLint（--max-warnings 0）
-npm run lint:fix            # ESLint 自動修正
-npm run lint:boundaries     # feature間の直接importを検出
-npm run lint:boundaries:update  # 許可リスト更新
-npm run lint:tokens         # Tailwindセマンティックトークンチェック
-npm run typecheck           # tsc --noEmit
-npm run format              # Prettier フォーマット
-npm run format:check        # Prettier チェックのみ
-```
-
-#### テスト
-
-```bash
-npm run test                # Vitest（watchモード）
-npm run test:run            # Vitest（1回実行）
-npm run test:unit           # ユニットテスト
-npm run test:watch          # ウォッチモード
-npm run test:ui             # Vitest UI
-npm run test:coverage       # カバレッジ付き実行
-npm run test:coverage:summary  # カバレッジサマリー表示
-npm run test-storybook      # Storybook テスト
-npm run test:integration    # 統合テスト（前提: ローカル Supabase 起動。未起動なら失敗する。#2178）
-npm run test:e2e            # Playwright E2Eテスト
-npm run test:e2e:smoke      # E2Eスモークテスト
-npm run test:e2e:critical   # E2Eクリティカルパス
-npm run test:e2e:ui         # Playwright UIモード
-npm run test:e2e:headed     # ブラウザ表示付きE2E
-```
-
-> **既知の問題: ローカル node が 26 系だと localStorage 系 unit test が偽陽性で落ちる**（#2198）。repo の要求は `engines: node 24.x`（`.nvmrc` も `24`）だが、ローカルの実行環境が pin に従わず node 26 のままだと、node 26 の `ExperimentalWarning: localStorage is not available because --localstorage-file was not provided` により zustand persist / localStorage 依存の test が失敗する。CI は node 24 で実行するため常に green（偽陽性はローカル限定）。
->
-> 2026-08-19 実測（node `v26.5.0`、`pnpm test:run`）: **10 ファイル・74 テスト**が失敗する。失敗ファイル一覧:
->
-> - `__tests__/instrumentation-client.test.ts`
-> - `src/features/calendar/components/views/WeekView/components/__tests__/WeekGrid.test.tsx`
-> - `src/features/calendar/hooks/keyboard/__tests__/useShortcutRegistry.test.tsx`
-> - `src/features/calendar/hooks/keyboard/__tests__/useTimeblockSearchShortcut.test.ts`
-> - `src/features/calendar/stores/__tests__/useCalendarDisplayModeStore.test.ts`
-> - `src/features/calendar/stores/__tests__/useCalendarFilterStore.test.ts`
-> - `src/lib/__tests__/cookie-consent.test.ts`
-> - `src/lib/analytics/__tests__/DeferredAnalytics.test.tsx`
-> - `src/lib/stores/__tests__/usePageTitleStore.test.ts`
-> - `src/lib/stores/__tests__/useShellStore.test.ts`
->
-> **切り分け手順**: 失敗したファイル集合を上のリストと突き合わせる。完全に一致する（または部分集合である）なら node バージョン起因の偽陽性であり、自分の変更が原因ではない。一致しない・上記以外のファイルも失敗している場合は実際の regression を疑う。
->
-> **根治**: ローカル node を 24 系へ固定する（`.nvmrc` は既に `24`。`nvm use` や `mise install` 等で実行環境側を pin に合わせる。repo 側の対応はここまでで、実行環境の切り替えは各自のローカル設定に依存する）。数値は node / 依存の更新で変動しうるため、再遭遇時は本節の記載を鵜呑みにせず `pnpm test:run` を再実行して突き合わせる。
-
-#### Supabase / DB
-
-```bash
-npm run db:reset            # ローカルDB リセット
-npm run db:reset-linked:unsafe # 手動リンク先をリセット（緊急時のみ）
-npm run db:seed             # 開発データ投入
-npm run db:fresh            # リセット + シード
-npm run migration:create    # マイグレーション作成
-npm run migration:list      # マイグレーション一覧
-npm run migration:status    # DB差分確認
-npm run types:generate          # Supabase production main から apps/product/src/lib/database に型生成
-npm run types:generate:production # production main から apps/product/src/lib/database に型生成
-npm run types:generate:local    # ローカルから apps/product/src/lib/database に型生成
-```
-
-#### 環境変数
-
-```bash
-pnpm env:check           # secret 値を表示せず env の存在確認
-pnpm secrets:check       # tracked files と untracked .env* の literal secret 検出
-pnpm 1password:check     # 1Password schema の vault/item/field 存在確認
-pnpm vercel:env          # Vercel 環境変数一覧
-pnpm vercel:env:pull:unsafe  # apps/product/.env.local に一時同期
-```
-
-#### i18n
-
-```bash
-npm run i18n:check          # 翻訳キーの整合性チェック
-npm run i18n:unused         # 未使用の翻訳キーを検出
-```
-
-#### セキュリティ・ライセンス
-
-```bash
-npm run license:check       # ライセンスチェック
-npm run license:audit       # ライセンスサマリー
-npm run license:report      # ライセンスCSVレポート
-npm run security:audit      # npm audit（production）
-npm run security:check      # npm audit（moderate以上）
-npm run security:full       # audit + typecheck + lint
-npm run security:audit:actions  # GitHub Actions監査
-```
-
-#### パフォーマンス
-
-```bash
-npm run size:budget         # バンドルサイズバジェットチェック（check-bundle-budget.ts）
-npm run perf:lighthouse     # Lighthouse CI
-npm run deps:circular       # 循環依存検出
-npm run deps:outdated       # 古いパッケージ一覧
-```
-
-#### ドキュメント
-
-```bash
-npm run docs:check          # コード-ドキュメント整合性
-npm run docs:validate       # リンク + ルール検証
-```
-
-#### Sentry
-
-```bash
-pnpm --filter @dayopt/product exec vitest --project unit run src/app/api/csp-report/__tests__/route.test.ts
-pnpm --filter @dayopt/product exec vitest --project unit run src/lib/sentry/__tests__/scrub-pii.test.ts
-```
-
-runtimeとsource map uploadはVercel Productionだけで有効にする。CI / Preview buildではSentry credentialsを渡さない。Production smokeは恒久scriptにせず、対象projectと一時endpointの撤去条件を決めてから実施する。
-
-#### Git ログ
-
-```bash
-npm run log:feat            # feat: コミットのみ表示
-npm run log:fix             # fix: コミットのみ表示
-npm run log:type            # 型別コミット一覧（最新20件）
-```
+script の追加・改名は permission allowlist と docs 参照の同時更新まで含めて 1 変更にする（AGENTS.md の Non-Negotiables）。どのコマンドをいつ使うかは、テストは [testing.md](./testing.md)、DB は [supabase skill](../../.agents/skills/supabase/SKILL.md)、release は [releasing skill](../../.agents/skills/releasing/SKILL.md) を見る。
 
 ### pre-commit フック（自動実行）
 

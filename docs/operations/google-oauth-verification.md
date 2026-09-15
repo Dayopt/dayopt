@@ -331,20 +331,20 @@ account settings at any time, independently of Dayopt.
 
 ### シーン構成
 
-| #   | 画面                                            | 見せること                                                                                                                      | 尺        |
-| --- | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | --------- |
-| 1   | `https://dayopt.app`                            | homepage。アプリが何をするものか分かる状態                                                                                      | 5 秒      |
-| 2   | `https://app.dayopt.app/en/week` にログイン済み | 週表示。ここが「予定を計画する場所」だと分かる                                                                                  | 10 秒     |
-| 3   | Settings → **Integrations**                     | "Google Calendar" カード。説明文 "Choose which Google calendars to import into Dayopt." と **"Connect Google account"** ボタン  | 10 秒     |
-| 4   | ボタンをクリック → Google の画面へ遷移          | **アドレスバーを映したまま**。`accounts.google.com` の URL に client ID が入っているのが読める状態で一拍止める                  | 8 秒      |
-| 5   | Google アカウント選択 → 同意画面                | **アプリ名 "Dayopt" が表示されていること**と、要求している scope が全部読めること。スクロールして全 scope を映す                | 15 秒     |
-| 6   | 「続行」→ Dayopt へ戻る                         | callback 後に "Google account connected" のトーストが出る                                                                       | 5 秒      |
-| 7   | Integrations の Google Calendar カード          | **"Calendars to import"** のチェックボックス一覧。実際のカレンダー名が出ている。1〜2 個チェックして **"Apply"**                 | 15 秒     |
-| 8   | 同カード                                        | ステータス **"Connected"** と **"Last sync: {日時}"** が更新される。**"Sync now"** を押して "Google Calendar synced" のトースト | 10 秒     |
-| 9   | **週表示に戻る**                                | **取り込んだ Google の予定が、ユーザーの計画と並んで表示されている**。ステップ 7 で選んだカレンダーの予定だと分かる             | **20 秒** |
-| 10  | 週表示                                          | その予定を避けて自分のブロックを置く。scope で取ったデータが何の役に立つかを見せる                                              | 15 秒     |
-| 11  | Integrations → **"Disconnect"**                 | 確認ダイアログ "Disconnect this Google account?" と説明文。実行して "Google account disconnected"                               | 10 秒     |
-| 12  | 週表示                                          | 取り込まれていた予定が消えている（ユーザー自身のブロックは残る）                                                                | 8 秒      |
+| #   | 画面                                                          | 見せること                                                                                                                      | 尺        |
+| --- | ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | --------- |
+| 1   | `https://dayopt.app`                                          | homepage。アプリが何をするものか分かる状態                                                                                      | 5 秒      |
+| 2   | `https://app.dayopt.app/en/calendar?view=week` にログイン済み | 週表示。ここが「予定を計画する場所」だと分かる                                                                                  | 10 秒     |
+| 3   | Settings → **Integrations**                                   | "Google Calendar" カード。説明文 "Choose which Google calendars to import into Dayopt." と **"Connect Google account"** ボタン  | 10 秒     |
+| 4   | ボタンをクリック → Google の画面へ遷移                        | **アドレスバーを映したまま**。`accounts.google.com` の URL に client ID が入っているのが読める状態で一拍止める                  | 8 秒      |
+| 5   | Google アカウント選択 → 同意画面                              | **アプリ名 "Dayopt" が表示されていること**と、要求している scope が全部読めること。スクロールして全 scope を映す                | 15 秒     |
+| 6   | 「続行」→ Dayopt へ戻る                                       | callback 後に "Google account connected" のトーストが出る                                                                       | 5 秒      |
+| 7   | Integrations の Google Calendar カード                        | **"Calendars to import"** のチェックボックス一覧。実際のカレンダー名が出ている。1〜2 個チェックして **"Apply"**                 | 15 秒     |
+| 8   | 同カード                                                      | ステータス **"Connected"** と **"Last sync: {日時}"** が更新される。**"Sync now"** を押して "Google Calendar synced" のトースト | 10 秒     |
+| 9   | **週表示に戻る**                                              | **取り込んだ Google の予定が、ユーザーの計画と並んで表示されている**。ステップ 7 で選んだカレンダーの予定だと分かる             | **20 秒** |
+| 10  | 週表示                                                        | その予定を避けて自分のブロックを置く。scope で取ったデータが何の役に立つかを見せる                                              | 15 秒     |
+| 11  | Integrations → **"Disconnect"**                               | 確認ダイアログ "Disconnect this Google account?" と説明文。実行して "Google account disconnected"                               | 10 秒     |
+| 12  | 週表示                                                        | 取り込まれていた予定が消えている（ユーザー自身のブロックは残る）                                                                | 8 秒      |
 
 合計 2 分強。
 
