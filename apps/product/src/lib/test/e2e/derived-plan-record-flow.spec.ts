@@ -8,6 +8,7 @@ import {
   resolveServiceRoleTarget,
 } from '../service-role-target-guard';
 import { createScopedTestUser, deleteScopedTestUser } from './create-scoped-test-user';
+import { REPORT_EXECUTION, REPORT_TAB_PARAM } from './report-selectors';
 import { suppressConsentBanner } from './suppress-consent-banner';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -132,8 +133,10 @@ describeWithEnv('Derived Plan / Record browser flow', () => {
   }
 
   async function expectPlanRatio(page: Page) {
-    await page.goto(`/ja/report?date=${PAST_DATE}&range=week`);
-    const row = page.locator('[data-report-rows="execution"] > li', {
+    // 予実の行は差分の面（`?tab=diff`）にある。既定タブは「時間の使い方」なので
+    // tab を指定しないと `ExecutionChapter` そのものが描かれない（#2773 の 3 タブ再編）
+    await page.goto(`/ja/report?date=${PAST_DATE}&range=week&tab=${REPORT_TAB_PARAM.diff}`);
+    const row = page.locator(REPORT_EXECUTION.rows, {
       hasText: ACTIVITY_NAME,
     });
     await expect(row).toContainText('予定比 150%', { timeout: 15_000 });

@@ -2,6 +2,7 @@ import { expect, type Locator, type Page } from '@playwright/test';
 import { createClient } from '@supabase/supabase-js';
 
 import type { Database } from '@/lib/database';
+import { REPORT_ALLOCATION } from './report-selectors';
 import { suppressConsentBanner } from './suppress-consent-banner';
 
 /**
@@ -195,22 +196,22 @@ export async function revealHour(page: Page, hour: number) {
 /**
  * 記録した 1 時間が /report の 1 章（配分）へ反映されたことを確かめる。
  *
- * 凡例のうち「このカテゴリーの行」が 1 時間ぶんを出す。`未分類` を許容しない —
+ * 配分の横棒のうち「このカテゴリーの行」が 1 時間ぶんを出す。`未分類` を許容しない —
  * カテゴリー紐付けを失う回帰では label が未分類へ落ちてこの行が消えるため、
  * getByText('1:00') のような行を特定しない一致では緑になってしまう。
  */
 export async function expectReportAllocationShowsOneHour(page: Page, categoryName: string) {
-  const allocation = page.locator('[data-report-chapter="allocation"]');
+  const allocation = page.locator(REPORT_ALLOCATION.chapter);
   await expect(allocation).toBeVisible({ timeout: 10_000 });
 
   // ヘッドラインは記録合計の `h:mm`。1 時間の記録があるので 0:00 のままにはならない。
-  const headline = allocation.locator('[data-report-headline="recorded"]');
+  const headline = allocation.locator(REPORT_ALLOCATION.recordedHeadline);
   await expect(headline).toBeVisible({ timeout: 10_000 });
   await expect(headline).not.toHaveText('0:00');
 
-  const legendRow = allocation
-    .locator('[data-report-legend="allocation"] li')
+  const breakdownRow = allocation
+    .locator(REPORT_ALLOCATION.breakdownRows)
     .filter({ hasText: categoryName });
-  await expect(legendRow).toHaveCount(1, { timeout: 10_000 });
-  await expect(legendRow).toContainText('1:00');
+  await expect(breakdownRow).toHaveCount(1, { timeout: 10_000 });
+  await expect(breakdownRow).toContainText('1:00');
 }
