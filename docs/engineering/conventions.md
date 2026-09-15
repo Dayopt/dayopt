@@ -319,7 +319,7 @@ const mutation = api.planCommands.update.useMutation({
 | `transform`    | pure transform（snake → camel、shape 変換）    | `transformDbActivity`       |
 | `unpack`       | RPC field の default 埋め（単一 RPC field 用） | —                           |
 | `calculate`    | pure 計算（streak、平均、差分など）            | `calculateTimeblockLayouts` |
-| `build`        | 入力から構造化された出力を構築                 | `buildSegmentBars`          |
+| `build`        | 入力から構造化された出力を構築                 | `buildInkColumns`           |
 
 ### 1 procedure 1 file 原則
 

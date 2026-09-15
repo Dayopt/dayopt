@@ -206,11 +206,12 @@ export const GLOSSARY: readonly GlossaryEntry[] = [
   {
     id: 'segment',
     layer: 'ui',
-    status: 'current',
+    status: 'deprecated',
     concept: 'Segment',
     ja: 'セグメント',
     en: 'Segment',
-    usage: '分析用の保存されたクエリ。所属ではなく横断参照なので合計比率を持たない',
+    usage:
+      '旧: 分析用の保存されたクエリ。2026-09-15 に UI / tRPC / MCP から撤去し、/report のアクティビティ単位フィルタへ置き換えた。DB テーブルだけが残る',
     code: { feature: 'review' },
     db: ['segments', 'segment_activities'],
     refs: ['#2162'],
@@ -452,7 +453,37 @@ export const GLOSSARY: readonly GlossaryEntry[] = [
     ],
   },
 
-  // ─── UI 用語: /report の 4 章 ───
+  // ─── UI 用語: /report のタブと面 ───
+  {
+    id: 'report-tab-usage',
+    layer: 'ui',
+    status: 'current',
+    concept: 'Time spent (report tab)',
+    ja: '時間の使い方',
+    en: 'Time spent',
+    usage: 'タブ。事実だけで何にいくら使ったかを見る面。中身は配分の面',
+    code: { identifiers: ['ReportTabs'] },
+  },
+  {
+    id: 'report-tab-diff',
+    layer: 'ui',
+    status: 'current',
+    concept: 'Plan vs. record (report tab)',
+    ja: '差分',
+    en: 'Plan vs. record',
+    usage: 'タブ。予定と記録の違いを見る面。中身は執行の面。「レビュー」は禁止語なので付けない',
+    code: { identifiers: ['ReportTabs'] },
+  },
+  {
+    id: 'report-tab-reflect',
+    layer: 'ui',
+    status: 'current',
+    concept: 'Reflection (report tab)',
+    ja: '振り返り',
+    en: 'Reflection',
+    usage: 'タブ。それが良い使い方だったかを見る面。中身は質の面。ja はページ名（Review）と同じ語',
+    code: { identifiers: ['ReportTabs'] },
+  },
   {
     id: 'report-chapter-allocation',
     layer: 'ui',
@@ -483,16 +514,6 @@ export const GLOSSARY: readonly GlossaryEntry[] = [
     usage: '3 章。投下時間と充実 / 消耗の関係を見る。中の散布図が「羅針盤」',
     code: { identifiers: ['QualityChapter'] },
   },
-  {
-    id: 'report-chapter-tidy',
-    layer: 'ui',
-    status: 'current',
-    concept: 'Tidy (chapter 4)',
-    ja: '整える',
-    en: 'Tidy',
-    usage: '4 章。未変換の外部カレンダー予定など、来週へ持ち越す前に片づけるもの',
-    code: { identifiers: ['TidyChapter'] },
-  },
 
   // ─── 設計語（UI 文言には出さない） ───
   {
@@ -512,7 +533,8 @@ export const GLOSSARY: readonly GlossaryEntry[] = [
     concept: 'Margin',
     ja: '余白',
     en: 'Margin',
-    usage: '記録が書かれていない時間。分母には入るが塗らない。フィルタで動かない',
+    usage:
+      '記録が書かれていない時間。見出しに数字で出すだけで、配分には混ぜず塗らない。フィルタで動かない',
     code: { identifiers: ['marginMinutes'] },
     forbidden: [
       {
