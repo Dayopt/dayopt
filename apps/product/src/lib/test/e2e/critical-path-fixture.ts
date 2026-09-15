@@ -1,4 +1,4 @@
-import { expect, type Page } from '@playwright/test';
+import { expect, type Locator, type Page } from '@playwright/test';
 import { createClient } from '@supabase/supabase-js';
 
 import type { Database } from '@/lib/database';
@@ -124,6 +124,32 @@ export async function cleanupCriticalPathUser(admin: AdminSupabase, userId: stri
   await admin.from('user_settings').delete().eq('user_id', userId);
   await admin.from('profiles').delete().eq('id', userId);
   await admin.auth.admin.deleteUser(userId);
+}
+
+/**
+ * アクティビティを押して作成し、サーバーが保存を返すまで待つ。
+ *
+ * カードは楽観的更新で即座に出るので、見えただけでは DB に届いた証拠にならない。
+ * 保存応答より先に reload すると、作成が破棄されて「リロード後も残る」が落ちる
+ * （2026-09-15 の promote run 34912772207 で mobile の初回試行が実際に落ちた）。
+ * httpBatchLink は同 tick の呼び出しを `/api/trpc/a,b?batch=1` に束ねるので path は部分一致で見る。
+ */
+export async function clickAndAwaitCreate(
+  page: Page,
+  activityButton: Locator,
+  kind: 'plan' | 'record',
+) {
+  const procedure = `${kind}Commands.create`;
+  const saved = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'POST' &&
+      new URL(response.url()).pathname.startsWith('/api/trpc/') &&
+      new URL(response.url()).pathname.includes(procedure),
+    { timeout: 15_000 },
+  );
+  await activityButton.click();
+  const response = await saved;
+  expect(response.ok(), `${procedure} が保存に失敗した（HTTP ${response.status()}）`).toBe(true);
 }
 
 export async function loginAs(page: Page, identity: CriticalPathIdentity) {

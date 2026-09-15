@@ -7,6 +7,7 @@ import {
 import {
   type AdminSupabase,
   cleanupCriticalPathUser,
+  clickAndAwaitCreate,
   createAdminSupabase,
   createCriticalPathIdentity,
   expectReportAllocationShowsOneHour,
@@ -86,10 +87,14 @@ async function longPressHour(page: Page, hour: number) {
 }
 
 /** 作成モードの Drawer（DrawerTitle = アクティビティを選択）からアクティビティを選ぶ。 */
-async function pickActivityInDrawer(page: Page) {
+async function pickActivityInDrawer(page: Page, kind: 'plan' | 'record') {
   const drawer = page.getByRole('dialog', { name: 'アクティビティを選択' });
   await expect(drawer).toBeVisible({ timeout: 10_000 });
-  await drawer.getByRole('button', { name: IDENTITY.activityName }).click();
+  await clickAndAwaitCreate(
+    page,
+    drawer.getByRole('button', { name: IDENTITY.activityName }),
+    kind,
+  );
 }
 
 describeWithEnv('Mobile Critical Path: 計画 → 実績 → 振り返り', () => {
@@ -118,7 +123,7 @@ describeWithEnv('Mobile Critical Path: 計画 → 実績 → 振り返り', () =
     await openDay(page, offsetDateParam(1));
 
     await longPressHour(page, 9);
-    await pickActivityInDrawer(page);
+    await pickActivityInDrawer(page, 'plan');
 
     const planCard = page.locator('[data-plan-lane-card]', { hasText: IDENTITY.activityName });
     await expect(planCard.first()).toBeVisible({ timeout: 10_000 });
@@ -133,7 +138,7 @@ describeWithEnv('Mobile Critical Path: 計画 → 実績 → 振り返り', () =
 
     // 過去スロットの既定は Record（resolveTimeblockDestination）。タブは触らない
     await longPressHour(page, 9);
-    await pickActivityInDrawer(page);
+    await pickActivityInDrawer(page, 'record');
 
     const recordCard = page.locator('[data-record-lane-card]', { hasText: IDENTITY.activityName });
     await expect(recordCard.first()).toBeVisible({ timeout: 10_000 });
