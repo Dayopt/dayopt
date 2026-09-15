@@ -139,6 +139,35 @@ describe('dispatchCalendarAccountDeletionSettle', () => {
     expect(summary.normalized).toBe(0);
   });
 
+  it('Calendar authority project が未 activation（CA010）なら失敗にせず 0 件の完了を返す', async () => {
+    rpc.mockImplementation((operation: string) => {
+      if (operation === 'get_external_lifecycle_app_version_v2') {
+        return { abortSignal: vi.fn(async () => ({ data: 1, error: null })) };
+      }
+      if (operation === 'list_expired_calendar_account_deletion_intents_v1') {
+        return {
+          abortSignal: vi.fn(async () => ({
+            data: null,
+            error: { code: 'CA010', message: 'Calendar authority project is not active' },
+          })),
+        };
+      }
+      return { abortSignal: vi.fn(async () => ({ data: 'normalized', error: null })) };
+    });
+
+    const summary = await dispatchCalendarAccountDeletionSettle({ deadlineAt: FAR_DEADLINE });
+
+    expect(summary).toMatchObject({ normalized: 0, inFlight: 0, other: 0, skipped: false });
+    expect(rpc).toHaveBeenCalledWith(
+      'list_expired_calendar_account_deletion_intents_v1',
+      expect.anything(),
+    );
+    expect(rpc).not.toHaveBeenCalledWith(
+      'normalize_calendar_account_deletion_intent_v1',
+      expect.anything(),
+    );
+  });
+
   it('候補が0件ならnormalizeを呼ばず0件のまま完了する', async () => {
     const summary = await dispatchCalendarAccountDeletionSettle({ deadlineAt: FAR_DEADLINE });
 
