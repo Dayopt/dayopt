@@ -137,7 +137,7 @@ const verifySuccess = {
 } satisfies AuthMFAVerifyResponse;
 
 const emptyFactorsList = {
-  data: { all: [], totp: [], phone: [], webauthn: [] },
+  data: { all: [], totp: [], phone: [], webauthn: [], recovery_code: [] },
   error: null,
 } satisfies AuthMFAListFactorsResponse;
 
@@ -156,7 +156,13 @@ const VERIFIED_FACTOR = {
 };
 
 const verifiedFactorsList = {
-  data: { all: [VERIFIED_FACTOR], totp: [VERIFIED_FACTOR], phone: [], webauthn: [] },
+  data: {
+    all: [VERIFIED_FACTOR],
+    totp: [VERIFIED_FACTOR],
+    phone: [],
+    webauthn: [],
+    recovery_code: [],
+  },
   error: null,
 } satisfies AuthMFAListFactorsResponse;
 
