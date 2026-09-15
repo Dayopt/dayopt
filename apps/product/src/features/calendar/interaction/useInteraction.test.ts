@@ -288,6 +288,14 @@ describe('useInteraction Plan → Record drop', () => {
     expect(onPlanRecord).not.toHaveBeenCalled();
   });
 
+  /**
+   * 制約は drop 先の時間帯だけ（DT005）。Plan 自身が未来に終わるかは見ない。
+   *
+   * 以前はここが「記録callbackを呼ばない」を assert しており、撤去済み DT013
+   * （#2598 で消した「未来 Plan」の特別扱い）を緑で固定していた（#2645）。
+   * DB は過去に終わる Record を未来 Plan へ紐付けられる
+   * （timeblock-atomic-commands.integration.test.ts が real DB で固定）。
+   */
   it.each([
     [
       'active Plan',
@@ -305,7 +313,7 @@ describe('useInteraction Plan → Record drop', () => {
         endDate: new Date('2026-01-16T10:00:00'),
       },
     ],
-  ])('%sはRecordレーンへdropしても記録callbackを呼ばない', (_label, event) => {
+  ])('%sでもdrop先が過去ならRecordレーンへのdropで記録callbackを呼ぶ', (_label, event) => {
     const onEventUpdate = vi.fn();
     const onPlanRecord = vi.fn();
     const hook = renderHook(() =>
@@ -314,7 +322,7 @@ describe('useInteraction Plan → Record drop', () => {
 
     dropIntoRecordLane(hook);
 
-    expect(onPlanRecord).not.toHaveBeenCalled();
+    expect(onPlanRecord).toHaveBeenCalledTimes(1);
     expect(onEventUpdate).not.toHaveBeenCalled();
   });
 

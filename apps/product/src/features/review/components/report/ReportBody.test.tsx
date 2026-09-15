@@ -33,6 +33,8 @@ import { ReportBody } from './ReportBody';
 
 import type { ReportTab } from '../../lib/report-tab';
 
+import { REPORT_ALLOCATION, REPORT_EXECUTION } from '@/lib/test/e2e/report-selectors';
+
 /**
  * 週 = 10080 分。記録は 仕事 600 + 睡眠 2400 + 未分類 60 = 3060 分。
  * したがって余白は 10080 − 3060 = 7020 分（= 117:00）で、**フィルタでは動かない**。
@@ -457,6 +459,30 @@ describe('ReportBody', () => {
 
     expect(useReportDetailStore.getState().isOpen).toBe(true);
     expect(useReportDetailStore.getState().target?.activityId).toBe('act-dev');
+  });
+
+  /**
+   * E2E が見ている data 属性がこの面に実在することを、per-PR の Unit Tests で固定する。
+   *
+   * E2E（`critical-path` / `derived-plan-record-flow` / `mobile-critical-path`）は
+   * merge 必須チェックに入っておらず **main マージ後の promote でしか走らない**。
+   * PR #2773 が `data-report-headline` → `data-report-summary` などを改名した時、
+   * E2E 側が追従しないまま merge され、promote が赤になって初めて分かった（#2774）。
+   * ここが同じ改名を per-PR で止める。**赤くなったら E2E 側も直す**のが正しい直し方で、
+   * `report-selectors.ts` の値だけ合わせても E2E は直らない。
+   */
+  describe('E2E セレクタ契約（#2774）', () => {
+    it.each<[ReportTab, string]>([
+      ['usage', REPORT_ALLOCATION.chapter],
+      ['usage', REPORT_ALLOCATION.recordedHeadline],
+      ['usage', REPORT_ALLOCATION.breakdownRows],
+      ['diff', REPORT_EXECUTION.chapter],
+      ['diff', REPORT_EXECUTION.rows],
+    ])('%s タブで %s が解決する', (tab, selector) => {
+      renderBody(tab);
+
+      expect(document.querySelectorAll(selector).length).toBeGreaterThan(0);
+    });
   });
 });
 

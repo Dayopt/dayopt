@@ -278,6 +278,23 @@ describe('ReportFilterList', () => {
     );
   });
 
+  /**
+   * 空状態を一覧の**中**へ入れない（#2752）。`role="status"` は list の子として
+   * 許されず、`<ul>` 直下に置くと axe が 2 つ違反を出す（role が要素に不許可 /
+   * list の直下に許されない子）。テキストの有無だけを見る上の test では、
+   * 一覧の中へ戻しても緑のまま通ってしまう。
+   */
+  it('空状態は一覧（role=list）の外に置く', () => {
+    treeState.current = { data: { categories: [], uncategorized: [] }, isPending: false };
+    render(<ReportFilterList />);
+
+    const statuses = screen.getAllByRole('status');
+    expect(statuses).toHaveLength(2);
+    for (const status of statuses) {
+      expect(status.closest('[role="list"], ul, ol')).toBeNull();
+    }
+  });
+
   it('読み込み中は骨組みを出す', () => {
     treeState.current = { data: undefined, isPending: true };
     render(<ReportFilterList />);

@@ -208,6 +208,9 @@ describe('runMigrationSafety', () => {
       undeterminable: true,
     });
     expect(summaries[0]).toContain('判定ができません');
+    // fail closed の宣言そのものを契約にする。ここが warning 表現へ緩むと
+    // 「判定できないのに job が緑」へ静かに退行する（#2680 / #2750）
+    expect(summaries[0]).toContain('失敗扱い');
     expect(summaries[0]).toContain('gh api failed: 503');
   });
 
@@ -232,7 +235,7 @@ describe('runMigrationSafety', () => {
     });
     expect(result.undeterminable).toBeUndefined();
     expect(result.coupled).toBe(true);
-    expect(summaries[0]).toContain('git diff で代替');
+    expect(summaries[0]).toContain('git diff（base ref または merge commit の第 1 親）で代替');
   });
 
   it('gh api の再試行が成功したら fallback を使わない', async () => {
@@ -428,6 +431,65 @@ describe('fetchPrFilesFromGit', () => {
       'origin',
       'main:refs/remotes/origin/main',
     ]);
+  });
+
+  /**
+   * private repo でも成立する経路（#2750）。`pull_request` の checkout は
+   * `refs/pull/N/merge` を取るので、`fetch-depth: 2` があれば第 1 親が base になる。
+   * credential を要さないのが要点なので、**fetch を呼ばないこと**まで固定する。
+   */
+  it('base ref が無くても merge commit の第 1 親から一覧を返す（fetch しない）', () => {
+    const calls: string[][] = [];
+    const spawnImpl = vi.fn((_cmd: string, args: string[]) => {
+      calls.push(args);
+      const rev = args[args.length - 1];
+      return { status: rev === 'HEAD^2^{commit}' || rev === 'HEAD^1^{commit}' ? 0 : 1 };
+    });
+    const execFileImpl = vi.fn(() => 'A\tsupabase/migrations/20260101_x.sql\nM\tapps/a.ts\n');
+
+    expect(
+      fetchPrFilesFromGit({ baseRef: 'origin/main', execImpl: execFileImpl, spawnImpl }),
+    ).toEqual([
+      { filename: 'supabase/migrations/20260101_x.sql', status: 'added' },
+      { filename: 'apps/a.ts', status: 'modified' },
+    ]);
+    expect(execFileImpl).toHaveBeenCalledWith(
+      'git',
+      ['diff', '--name-status', '-M', 'HEAD^1', 'HEAD'],
+      expect.anything(),
+    );
+    expect(calls.find((c) => c.includes('fetch'))).toBeUndefined();
+  });
+
+  /**
+   * HEAD が merge commit でなければ `HEAD^1` は「PR branch の 1 つ前の commit」という
+   * もっともらしい誤答になる。**誤答より null（fail closed）を選ぶ**ことを固定する。
+   * depth=1 の shallow で親 object が無い場合も `^{commit}` の peel が失敗して同じ側に倒れる。
+   */
+  it('HEAD が merge commit でなければ第 1 親を base にせず null にする', () => {
+    // 親は解決するが第 2 親が無い = 通常の commit。`HEAD^1` を使うと
+    // 「PR branch の 1 つ前」で diff してしまうので、ここは null へ倒す
+    const spawnImpl = vi.fn((_cmd: string, args: string[]) => {
+      if (args[0] === 'fetch') return { status: 128 };
+      return { status: args[args.length - 1] === 'HEAD^1^{commit}' ? 0 : 1 };
+    });
+    const execFileImpl = vi.fn();
+
+    expect(
+      fetchPrFilesFromGit({ baseRef: 'origin/main', execImpl: execFileImpl, spawnImpl }),
+    ).toBeNull();
+    expect(execFileImpl).not.toHaveBeenCalled();
+  });
+
+  /** private repo の認証なし fetch が非 0 で終わっても throw せず null（呼び出し側が fail closed）。 */
+  it('fetch が非 0 で終了しても例外を投げず null を返す', () => {
+    const spawnImpl = vi.fn((_cmd: string, args: string[]) =>
+      args[0] === 'fetch' ? { status: 128 } : { status: 1 },
+    );
+
+    expect(
+      fetchPrFilesFromGit({ baseRef: 'origin/main', execImpl: vi.fn(), spawnImpl }),
+    ).toBeNull();
   });
 });
 

@@ -275,15 +275,16 @@ docs へ残している。
 テストが緑のまま隠す（#2598 の後に #2622 が必要になった件）。撤去 PR ではこの表を
 grep 対象にする。
 
-| 分類          | 場所                                                                                    | 役割                                       | 消してよいか                                  |
-| ------------- | --------------------------------------------------------------------------------------- | ------------------------------------------ | --------------------------------------------- |
-| (a) 契約変換  | `features/timeblock/server/timeblock-command-client.ts` の `EXPECTED_COMMAND_ERRORS`    | DT コード → `TimeblockServiceError` code   | 不可（UI が code で分岐する）                 |
-| (a) 契約変換  | `features/timeblock/server/mcp-mutation-client.ts` の `EXPECTED_ERROR_CODES`            | DT コード → `McpMutationErrorCode`         | 不可（MCP の公開契約）                        |
-| (a) 契約変換  | `features/timeblock/server/timeblock-context-contract.ts` の `TIMEBLOCK_CONTEXT_RULES`  | MCP `constraints.get` が返す規則の宣言     | 不可（公開契約）                              |
-| (b) UX 先回り | `features/timeblock/schemas/timeblock.ts` の `timeRangeRefine`                          | 往復前に `end > start` を弾く              | 可（server が同じ規則で拒否する）             |
-| (b) UX 先回り | `features/timeblock/domain/timeblock-destination.ts`                                    | `end_at` から Plan / Record の宛先を決める | 不可（規則の写しではなく宛先の決定そのもの）  |
-| (b) UX 先回り | `features/calendar/lib/overlap.ts` + `lib/time/time-conflict.ts`                        | 重なりの事前表示                           | 可（overlap は DB 側 `TIME_OVERLAP` が正）    |
-| (b) UX 先回り | `features/calendar/hooks/operations/useTimeblockOperations.ts` の record 未来移動ガード | ドラッグ中に `timeLocked` を出す           | 可（server 拒否でも同じ toast が出る。#2628） |
+| 分類          | 場所                                                                                    | 役割                                              | 消してよいか                                  |
+| ------------- | --------------------------------------------------------------------------------------- | ------------------------------------------------- | --------------------------------------------- |
+| (a) 契約変換  | `features/timeblock/server/timeblock-command-client.ts` の `EXPECTED_COMMAND_ERRORS`    | DT コード → `TimeblockServiceError` code          | 不可（UI が code で分岐する）                 |
+| (a) 契約変換  | `features/timeblock/server/mcp-mutation-client.ts` の `EXPECTED_ERROR_CODES`            | DT コード → `McpMutationErrorCode`                | 不可（MCP の公開契約）                        |
+| (a) 契約変換  | `features/timeblock/server/timeblock-context-contract.ts` の `TIMEBLOCK_CONTEXT_RULES`  | MCP `constraints.get` が返す規則の宣言            | 不可（公開契約）                              |
+| (b) UX 先回り | `features/timeblock/schemas/timeblock.ts` の `timeRangeRefine`                          | 往復前に `end > start` を弾く                     | 可（server が同じ規則で拒否する）             |
+| (b) UX 先回り | `features/timeblock/domain/timeblock-destination.ts`                                    | `end_at` から Plan / Record の宛先を決める        | 不可（規則の写しではなく宛先の決定そのもの）  |
+| (b) UX 先回り | `features/calendar/lib/overlap.ts` + `lib/time/time-conflict.ts`                        | 重なりの事前表示                                  | 可（overlap は DB 側 `TIME_OVERLAP` が正）    |
+| (b) UX 先回り | `features/calendar/hooks/operations/useTimeblockOperations.ts` の record 未来移動ガード | ドラッグ中に `timeLocked` を出す                  | 可（server 拒否でも同じ toast が出る。#2628） |
+| (b) UX 先回り | `features/calendar/interaction/interaction-effects.ts` の `case 'DROP'` の記録化経路    | Record レーンへの drop 先が未来なら記録を作らない | 可（server が `DT005` で拒否する。#2645）     |
 
 server が拒否した時に UI が汎用の `saveFailed` へ退化しないよう、`INVALID_TIME_RANGE` /
 `RECORD_IN_FUTURE` は `lib/trpc/client-safe-service-code.ts` の allowlist に載せ、
