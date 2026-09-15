@@ -169,36 +169,41 @@ end
 
 ### Feature 間の依存（Composition Layer）
 
+<!-- architecture-map:feature-dag:start — 正本 apps/product/eslint.config.mjs の no-restricted-imports と features/ の実 import / 再生成 pnpm architecture:generate / 検証 pnpm architecture:check。この範囲は手編集しない -->
+
+実際の runtime import（stories / test を除く）を描く。層は依存の最長経路、種別（Layer 0 / independent / composition）は ESLint の規則から取る。
+
 ```mermaid
 graph TD
-subgraph Features
-ACT["activities (Layer 0)"]
-TB["timeblock (Layer 1)"]
-CAL["calendar (Layer 2 / hub)"]
-REV["review (Layer 2)"]
-AUTH["auth (independent)"]
-CONTACT["contact (independent)"]
-SET["settings (composition)"]
-end
-
-    subgraph Composition["Composition Layer"]
-        APP["app/**/_composition + layout"]
-        LIB["lib/*"]
-        STORE["lib/stores/*"]
-    end
-
-    TB --> ACT
-    CAL --> TB
-    CAL --> ACT
-    REV --> TB
-    REV --> ACT
-    APP --> CAL
-    APP --> REV
-    APP --> AUTH
-    SET --> STORE
-    CAL --> STORE
-    LIB --> STORE
+  subgraph L0["Layer 0"]
+    activities["activities (Layer 0)"]
+    auth["auth (Layer 0)"]
+    external_calendar["external-calendar (Layer 0)"]
+  end
+  subgraph L1["Layer 1"]
+    review["review (Layer 1)"]
+    timeblock["timeblock (Layer 1)"]
+  end
+  subgraph L2["Layer 2"]
+    calendar["calendar (Layer 2)"]
+  end
+  subgraph Composition
+    settings["settings (composition)"]
+  end
+  subgraph Independent
+    contact["contact (independent)"]
+  end
+  calendar --> activities
+  calendar --> external_calendar
+  calendar --> timeblock
+  review --> activities
+  settings --> auth
+  settings --> calendar
+  settings --> external_calendar
+  timeblock --> activities
 ```
+
+<!-- architecture-map:feature-dag:end -->
 
 依存方向の正はリポジトリルートの [AGENTS.md / `pr-cross-review` skill](../../AGENTS.md / `pr-cross-review` skill) と
 `apps/product/eslint.config.mjs`。`settings` は cross-cutting composition、`calendar` はページ全体を合成する hub として扱う。

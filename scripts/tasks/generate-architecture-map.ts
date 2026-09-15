@@ -10,6 +10,8 @@
  *       → 同 doc 直下の生成ブロック（時刻規則の流れ図）
  *   - `scripts/lib/glossary/terms.ts` の `db:`
  *       → ER 図「概念に紐づくテーブル」の選択に使う
+ *   - `apps/product/eslint.config.mjs` の no-restricted-imports + features/ の実 import
+ *       → architecture.md の生成ブロック（Feature DAG 図）
  *
  * あわせて、text 正本が指す参照（feature / 識別子 / DB / path / symbol）の実在を検査する。
  *
@@ -29,6 +31,14 @@ import { fileURLToPath } from 'node:url';
 import { format as formatWithPrettier, resolveConfig as resolvePrettierConfig } from 'prettier';
 
 import { renderErDiagram, renderTableIndex } from '../lib/architecture-map/er-diagram.ts';
+import {
+  buildFeatureDag,
+  checkFeatureDagConsistency,
+  collectFeatureDependencies,
+  parseFeatureRules,
+  renderFeatureDagDiagram,
+  type FeatureDag,
+} from '../lib/architecture-map/feature-dag.ts';
 import {
   architectureMapMarkers,
   replaceGeneratedBlock,
@@ -51,10 +61,15 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, '../..');
 
 const SCHEMA_TYPES_PATH = 'apps/product/src/lib/database/generated/database.types.ts';
+const ESLINT_CONFIG_PATH = 'apps/product/eslint.config.mjs';
 const ARCHITECTURE_DOC = 'docs/engineering/architecture.md';
 const INVARIANTS_DOC = 'docs/engineering/invariants.md';
 
 const ER_MARKERS = architectureMapMarkers('er', SCHEMA_TYPES_PATH);
+const FEATURE_DAG_MARKERS = architectureMapMarkers(
+  'feature-dag',
+  `${ESLINT_CONFIG_PATH} の no-restricted-imports と features/ の実 import`,
+);
 const TIME_RULES_MARKERS = architectureMapMarkers(
   'time-rules',
   '直上の「規則の写しと、その分類」表',
@@ -70,6 +85,13 @@ export interface GeneratedDocument {
 
 function readRepoFile(path: string): string {
   return readFileSync(resolve(ROOT, path), 'utf8');
+}
+
+export function loadFeatureDag(): FeatureDag {
+  return buildFeatureDag(
+    parseFeatureRules(readRepoFile(ESLINT_CONFIG_PATH)),
+    collectFeatureDependencies(collectProductSources(ROOT)),
+  );
 }
 
 export function loadSchemaModel(): SchemaModel {
@@ -111,10 +133,25 @@ function renderErBlock(schema: SchemaModel): string {
   ].join('\n');
 }
 
+function renderFeatureDagBlock(dag: FeatureDag): string {
+  return [
+    '実際の runtime import（stories / test を除く）を描く。層は依存の最長経路、種別（Layer 0 / independent / composition）は ESLint の規則から取る。',
+    '',
+    '```mermaid',
+    renderFeatureDagDiagram(dag),
+    '```',
+  ].join('\n');
+}
+
 export async function buildArchitectureMapDocs(): Promise<GeneratedDocument[]> {
   const schema = loadSchemaModel();
   const architecture = replaceGeneratedBlock(
-    readRepoFile(ARCHITECTURE_DOC),
+    replaceGeneratedBlock(
+      readRepoFile(ARCHITECTURE_DOC),
+      FEATURE_DAG_MARKERS,
+      renderFeatureDagBlock(loadFeatureDag()),
+      ARCHITECTURE_DOC,
+    ),
     ER_MARKERS,
     renderErBlock(schema),
     ARCHITECTURE_DOC,
@@ -150,9 +187,14 @@ export function checkArchitectureReferences(): ReferenceViolation[] {
   const schema = loadSchemaModel();
   const sources = collectProductSources(ROOT);
   const timeRules = parseTimeRulesSection(readRepoFile(INVARIANTS_DOC));
+  const dag = buildFeatureDag(
+    parseFeatureRules(readRepoFile(ESLINT_CONFIG_PATH)),
+    collectFeatureDependencies(sources),
+  );
   return [
     ...checkGlossaryReferences(GLOSSARY, schema, sources, ROOT),
     ...checkTimeRuleMirrorReferences(timeRules.mirrors, sources),
+    ...checkFeatureDagConsistency(dag).map((reason) => ({ source: 'feature-dag', reason })),
   ];
 }
 

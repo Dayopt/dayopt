@@ -6,6 +6,13 @@ import {
   toMermaidType,
 } from '../lib/architecture-map/er-diagram.ts';
 import {
+  buildFeatureDag,
+  checkFeatureDagConsistency,
+  collectFeatureDependencies,
+  parseFeatureRules,
+  renderFeatureDagDiagram,
+} from '../lib/architecture-map/feature-dag.ts';
+import {
   architectureMapMarkers,
   replaceGeneratedBlock,
 } from '../lib/architecture-map/generated-block.ts';
@@ -288,5 +295,117 @@ describe('repo の Architecture Map は最新で、参照は全件実在する',
 
   it('glossary / invariants の参照先が実在する', () => {
     expect(checkArchitectureReferences()).toEqual([]);
+  });
+});
+
+const ESLINT_FIXTURE = `
+export default [
+  {
+    files: ['src/features/activities/**/*.{ts,tsx}'],
+    rules: { 'no-restricted-imports': ['error', { patterns: [{ group: ['@/features/*', '@/features/**'], message: 'L0' }] }] },
+  },
+  {
+    files: ['src/features/timeblock/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        { patterns: [
+          { group: ['@/features/calendar', '@/features/calendar/**'], message: 'L2' },
+          { group: ['@/features/activities/**'], message: 'barrel only' },
+        ] },
+      ],
+    },
+  },
+  {
+    files: ['src/features/calendar/**/*.{ts,tsx}'],
+    rules: { 'no-restricted-imports': ['error', { patterns: [{ group: ['@/features/activities/**', '@/features/timeblock/**'], message: 'barrel only' }] }] },
+  },
+  {
+    files: ['src/features/settings/**/*.{ts,tsx}'],
+    rules: { 'no-restricted-imports': ['error', { patterns: [{ group: ['@/features/*/**'], message: 'deep' }] }] },
+  },
+  {
+    files: ['src/features/auth/**/*.{ts,tsx}'],
+    rules: { 'no-restricted-imports': ['error', { patterns: [{ group: ['@/features/*', '@/features/**'], message: 'independent' }] }] },
+  },
+];
+`;
+
+describe('feature-dag: eslint 規則と実 import から Feature DAG を組む', () => {
+  const rules = parseFeatureRules(ESLINT_FIXTURE);
+  const sources = [
+    {
+      path: 'apps/product/src/features/timeblock/a.ts',
+      text: "import { x } from '@/features/activities';",
+    },
+    {
+      path: 'apps/product/src/features/calendar/b.tsx',
+      text: "import { y } from '@/features/timeblock';\nimport { z } from '@/features/activities';",
+    },
+    {
+      path: 'apps/product/src/features/calendar/b.stories.tsx',
+      text: "import { s } from '@/features/settings';",
+    },
+    {
+      path: 'apps/product/src/features/settings/c.ts',
+      text: "const m = await import('@/features/calendar');",
+    },
+    { path: 'apps/product/src/features/auth/d.ts', text: "import { q } from '@/lib/x';" },
+  ];
+
+  it('規則を feature ごとに分類する', () => {
+    expect(rules.get('activities')).toMatchObject({ bansAllFeatures: true, bannedFeatures: [] });
+    expect(rules.get('timeblock')).toMatchObject({
+      bansAllFeatures: false,
+      bannedFeatures: ['calendar'],
+    });
+    expect(rules.get('settings')).toMatchObject({ deepImportOnlyBan: true, bannedFeatures: [] });
+  });
+
+  it('runtime import だけを edge にし、stories / test と自己 import を除く', () => {
+    expect(collectFeatureDependencies(sources)).toEqual([
+      { from: 'calendar', to: 'activities' },
+      { from: 'calendar', to: 'timeblock' },
+      { from: 'settings', to: 'calendar' },
+      { from: 'timeblock', to: 'activities' },
+    ]);
+  });
+
+  it('層は依存の最長経路、種別は規則から決める', () => {
+    const dag = buildFeatureDag(rules, collectFeatureDependencies(sources));
+    expect(Object.fromEntries(dag.layers)).toEqual({
+      activities: 0,
+      auth: 0,
+      calendar: 2,
+      settings: 3,
+      timeblock: 1,
+    });
+    expect(dag.kinds.get('activities')).toBe('layer0');
+    expect(dag.kinds.get('auth')).toBe('independent');
+    expect(dag.kinds.get('settings')).toBe('composition');
+    expect(dag.kinds.get('calendar')).toBe('layered');
+    expect(checkFeatureDagConsistency(dag)).toEqual([]);
+  });
+
+  it('規則が禁止する edge を不整合として返す', () => {
+    const dag = buildFeatureDag(rules, [
+      { from: 'timeblock', to: 'calendar' },
+      { from: 'activities', to: 'timeblock' },
+    ]);
+    expect(checkFeatureDagConsistency(dag)).toEqual([
+      'timeblock → calendar は eslint で禁止されている',
+      'activities は他 feature への依存が禁止だが timeblock を import している',
+    ]);
+  });
+
+  it('図は層ごとの subgraph と edge を持つ', () => {
+    const diagram = renderFeatureDagDiagram(
+      buildFeatureDag(rules, collectFeatureDependencies(sources)),
+    );
+    expect(diagram).toContain('  subgraph L0["Layer 0"]');
+    expect(diagram).toContain('    activities["activities (Layer 0)"]');
+    expect(diagram).toContain('    settings["settings (composition)"]');
+    expect(diagram).toContain('    auth["auth (independent)"]');
+    expect(diagram).toContain('  calendar --> timeblock');
   });
 });
