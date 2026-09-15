@@ -1,7 +1,7 @@
 /**
  * レポート 1〜4 章の派生（client 側の純粋関数）。
  *
- * サーバーはアクティビティ別のスカラーだけを返し、フィルタ・レンズ・分母・鏡・羅針盤は
+ * サーバーはアクティビティ別のスカラーだけを返し、フィルタ・分母・鏡・羅針盤は
  * すべてここで導出する。カテゴリのトグルや余白の on/off でサーバーへ往復させないため。
  *
  * **評価しない。** スコア・達成率・平均・ストリーク・良し悪しの判定はここに置かない
@@ -36,8 +36,56 @@ export const EXECUTION_MIN_PLAN_MINUTES = 15;
 const MIRROR_MAX_ROWS = 3;
 
 // ============================================================
-// フィルタとレンズ
+// フィルタ
 // ============================================================
+
+/**
+ * 期間集計を、今のコードが前提にする形へ寄せる。
+ *
+ * **集計はブラウザに永続化される**（`PersistQueryClientProvider`、`getReportPeriod` も対象）。
+ * 捨てる目印（cache buster）は本番がリリース版数、dev が固定値なので、項目を足す変更が
+ * リリースの間にデプロイされると、足す前に保存された形がそのまま復元されて描画で落ちる
+ * （`durationCounts` を回そうとして `list is not iterable`）。取り直すまでの一瞬でも面ごと
+ * 消えるので、足りない項目は「無い」として空で補う。
+ *
+ * 項目を足す時はここにも既定値を足す。
+ */
+export function normalizeReportPeriodPayload<
+  TPayload extends {
+    activities: readonly LegacyReportActivity[];
+    previousActivities: readonly LegacyPreviousActivity[];
+  },
+>(
+  payload: TPayload,
+): Omit<TPayload, 'activities' | 'previousActivities'> & {
+  activities: ReportActivityAggregate[];
+  previousActivities: PreviousAggregate[];
+} {
+  return {
+    ...payload,
+    activities: payload.activities.map((activity) => ({
+      ...activity,
+      durationCounts: Array.isArray(activity.durationCounts) ? activity.durationCounts : [],
+      byHour: Array.isArray(activity.byHour) ? activity.byHour : [],
+    })),
+    previousActivities: payload.previousActivities.map((row) => ({
+      ...row,
+      recordBoxes: typeof row.recordBoxes === 'number' ? row.recordBoxes : 0,
+      durationCounts: Array.isArray(row.durationCounts) ? row.durationCounts : [],
+    })),
+  };
+}
+
+/** 項目を足す前に保存されたかもしれない集計行。足した項目は省略されうる。 */
+type LegacyReportActivity = Omit<ReportActivityAggregate, 'durationCounts' | 'byHour'> &
+  Partial<Pick<ReportActivityAggregate, 'durationCounts' | 'byHour'>>;
+
+type LegacyPreviousActivity = {
+  activityId: string | null;
+  recordedMinutes: number;
+  recordBoxes?: number | undefined;
+  durationCounts?: [number, number][] | undefined;
+};
 
 /** 未分類（カテゴリー未設定）を表す擬似カテゴリのキー。 */
 export const UNCATEGORIZED_KEY = '__uncategorized';
@@ -45,89 +93,86 @@ export const UNCATEGORIZED_KEY = '__uncategorized';
 export interface ReportFilterState {
   /** ここに載っていないカテゴリは可視。新しく作ったカテゴリが自動で可視になる。 */
   hiddenCategoryIds: readonly string[];
-  uncategorizedHidden: boolean;
-  /** 余白（未記録時間）を分母に入れるか。仕様の `__margin`。 */
-  marginHidden: boolean;
+  /**
+   * ここに載っていないアクティビティは可視。カテゴリーと同じ hidden 方式で、
+   * 新しく作ったアクティビティが自動で分母に入る。
+   */
+  hiddenActivityIds: readonly string[];
 }
 
 export const defaultReportFilterState: ReportFilterState = {
   hiddenCategoryIds: [],
-  uncategorizedHidden: false,
-  marginHidden: false,
+  hiddenActivityIds: [],
 };
 
 /**
  * 分母に入れるアクティビティを絞る（仕様の `visA`）。
  *
- * カテゴリー未設定のアクティビティと、アクティビティ未設定の行は「未分類」として
- * まとめて扱う。
+ * カテゴリーとアクティビティの両方の hidden を通す（親が隠れていれば子も出ない）。
+ * 未分類のアクティビティ（カテゴリー未設定）はアクティビティ単位でだけ出し入れする。
+ *
+ * **アクティビティ未設定の行は常に残す**（カレンダーと同じ。フィルタ行を持たず、
+ * すべての集計に含める = activities 仕様「アクティビティなし」）。
  */
 export function resolveVisibleActivities(
   activities: readonly ReportActivityAggregate[],
   filter: ReportFilterState,
 ): ReportActivityAggregate[] {
-  const hidden = new Set(filter.hiddenCategoryIds);
+  const hiddenCategories = new Set(filter.hiddenCategoryIds);
+  const hiddenActivities = new Set(filter.hiddenActivityIds);
   return activities.filter((activity) => {
-    if (activity.categoryId === null) return !filter.uncategorizedHidden;
-    return !hidden.has(activity.categoryId);
+    if (activity.activityId === null) return true;
+    if (hiddenActivities.has(activity.activityId)) return false;
+    if (activity.categoryId === null) return true;
+    return !hiddenCategories.has(activity.categoryId);
   });
-}
-
-/**
- * セグメントレンズを重ねる（仕様 §2.4）。
- *
- * `activityIds` が `null` なら「すべて」（レンズなし）。レンズ中は宇宙が
- * `segment.activityIds ∩ visible` に縮む。
- */
-export function applySegmentLens(
-  activities: readonly ReportActivityAggregate[],
-  activityIds: readonly string[] | null,
-): ReportActivityAggregate[] {
-  if (activityIds === null) return [...activities];
-  const members = new Set(activityIds);
-  return activities.filter(
-    (activity) => activity.activityId !== null && members.has(activity.activityId),
-  );
 }
 
 // ============================================================
 // 分母（1 章）
 // ============================================================
 
-export interface ReportDenominators {
+interface ReportDenominators {
   /** フィルタを無視した全アクティビティの記録合計。余白の計算に使う。 */
   totalAllMinutes: number;
-  /** 余白（未記録時間）。**フィルタで変わらない**。 */
+  /** 余白（未記録時間）。**フィルタで変わらない**。見出しに数字として出すだけで、配分には混ぜない。 */
   marginMinutes: number;
   /** 見えているインク（仕様の `V`）。 */
   visibleMinutes: number;
-  /** 決算バーの全長（仕様の `track`）。0 除算を避けるため最小 1。 */
+  /** 配分の分母（仕様の `track`）。見えている記録の合計そのもの。0 除算を避けるため最小 1。 */
   trackMinutes: number;
 }
 
 /**
- * 決算バーの分母を出す（仕様 §2.3）。
+ * 時間の使い方の分母を出す（仕様 §1）。
+ *
+ * **配分の分母は記録時間の合計**（2026-09-15 User 裁可）。「仕事を優先したから納得」という
+ * 読み方は記録の中での比率でないと成り立たない。余白（書かれていない時間）は配分に混ぜず、
+ * 見出しの数字にだけ出す。以前の「週 = 168h を分母にした決算バー」はこの裁可で廃止した。
  *
  * `marginMinutes` はフィルタに依存しない。カテゴリを 1 つ隠しても余白の値は動かず、
- * 動くのは `visibleMinutes` と `trackMinutes` だけ（仕様 §13-2）。
- *
- * レンズ中は余白を分母に入れない（セグメント内の記録合計が 100%）。
+ * 動くのは `visibleMinutes` と `trackMinutes` だけ（仕様 §10 の 13-2）。
  */
 export function computeDenominators(options: {
   allActivities: readonly ReportActivityAggregate[];
   visibleActivities: readonly ReportActivityAggregate[];
   lengthMinutes: number;
-  marginVisible: boolean;
 }): ReportDenominators {
   const totalAllMinutes = sumRecorded(options.allActivities);
   const marginMinutes = options.lengthMinutes - totalAllMinutes;
   const visibleMinutes = sumRecorded(options.visibleActivities);
-  const trackMinutes = Math.max(
-    1,
-    visibleMinutes + (options.marginVisible ? Math.max(0, marginMinutes) : 0),
-  );
 
-  return { totalAllMinutes, marginMinutes, visibleMinutes, trackMinutes };
+  return {
+    totalAllMinutes,
+    marginMinutes,
+    visibleMinutes,
+    trackMinutes: Math.max(1, visibleMinutes),
+  };
+}
+
+/** 見えている記録の件数。細かく分ければ増える数なので、多いほど良い指標にはしない。 */
+export function countRecordBoxes(visibleActivities: readonly ReportActivityAggregate[]): number {
+  return visibleActivities.reduce((total, activity) => total + activity.recordBoxes, 0);
 }
 
 function sumRecorded(activities: readonly ReportActivityAggregate[]): number {
@@ -144,7 +189,7 @@ export function toPercent(minutes: number, trackMinutes: number): number {
 // ============================================================
 
 export interface ReportAllocationSlice {
-  /** カテゴリー ID。未分類は `UNCATEGORIZED_KEY`。レンズ中はアクティビティ ID。 */
+  /** カテゴリー ID。未分類は `UNCATEGORIZED_KEY`。 */
   key: string;
   label: string | null;
   color: string | null;
@@ -154,11 +199,30 @@ export interface ReportAllocationSlice {
 }
 
 /**
- * 決算バーと凡例のセグメント（仕様 §4.1）。
+ * 配分の内訳の単位（仕様 §1 の表）。見えている集合から導く。
  *
- * 通常モードはカテゴリー別、レンズ中はアクティビティ別に割る。
- * **余白のセグメントは作らない** — 余白は背景トラック（紙）として残し、塗らない。
- * 記録が 0 のセグメントは行を持たない。
+ * - 見えているカテゴリー（未分類を含む）が 2 つ以上 → カテゴリー別
+ * - カテゴリーが 1 つでアクティビティが 2 つ以上 → その配下のアクティビティ別
+ * - アクティビティが 1 つだけ → 配分を出さない（自分自身の 100% は情報にならない）
+ *
+ * サイドバーの選択ではなく記録のある集合で決める。1 つのカテゴリーだけを残しても、
+ * その期間に記録が無ければ出すものが無い。
+ */
+export function resolveAllocationMode(
+  visibleActivities: readonly ReportActivityAggregate[],
+): 'category' | 'activity' | 'none' {
+  const withInk = visibleActivities.filter((activity) => activity.recordedMinutes > 0);
+  const categoryKeys = new Set(withInk.map((activity) => activity.categoryId ?? UNCATEGORIZED_KEY));
+  if (categoryKeys.size >= 2) return 'category';
+  const activityKeys = new Set(withInk.map((activity) => activity.activityId ?? UNCATEGORIZED_KEY));
+  return activityKeys.size >= 2 ? 'activity' : 'none';
+}
+
+/**
+ * 配分の横棒の区画（仕様 §1）。`mode` に応じてカテゴリー別 / アクティビティ別に割る。
+ *
+ * **余白の区画は作らない** — 余白は配分に混ぜない（`trackMinutes` は記録の合計）。
+ * 記録が 0 の行は持たない。
  */
 export function buildAllocationSlices(
   visibleActivities: readonly ReportActivityAggregate[],
@@ -196,84 +260,222 @@ export function buildAllocationSlices(
     .sort((a, b) => b.minutes - a.minutes);
 }
 
-/** 未分類の占める割合（1 章ヘッドライン右端）。`V` が 0 なら 0%。 */
-export function computeUncategorizedPercent(
-  visibleActivities: readonly ReportActivityAggregate[],
-  visibleMinutes: number,
-): number {
-  if (visibleMinutes <= 0) return 0;
-  const uncategorized = visibleActivities
-    .filter((activity) => activity.categoryId === null)
-    .reduce((total, activity) => total + activity.recordedMinutes, 0);
-  return Math.round((uncategorized / visibleMinutes) * 100);
-}
-
-/**
- * 前期間との差（1 章ヘッドラインの Δ）。
- *
- * 前期間にインクが 1 分も無ければ `null`（比較する相手がいないので数字を作らない）。
- * 比較は現在と同じフィルタ・レンズを通した集合で行う。
- */
-export function computePreviousDelta(options: {
-  visibleMinutes: number;
-  previousActivities: readonly { activityId: string | null; recordedMinutes: number }[];
-  visibleActivityIds: ReadonlySet<string | null>;
-}): number | null {
-  const previousVisible = options.previousActivities
-    .filter((row) => options.visibleActivityIds.has(row.activityId))
-    .reduce((total, row) => total + row.recordedMinutes, 0);
-
-  const previousTotal = options.previousActivities.reduce(
-    (total, row) => total + row.recordedMinutes,
-    0,
-  );
-  if (previousTotal < 1) return null;
-
-  return options.visibleMinutes - previousVisible;
-}
-
 // ============================================================
-// 1 章: セグメント別バー
+// 時間の使い方: 数字のカード（記録時間 / 件数 / 1 件の中央値）
 // ============================================================
 
-export interface ReportSegmentBar {
-  segmentId: string;
-  name: string;
-  minutes: number;
-  /** `track` に対する割合。100% で頭打ち。 */
-  percent: number;
+/** 期間の前と比べるための 1 組の数字。 */
+export interface ReportUsageFigures {
+  recordedMinutes: number;
+  recordCount: number;
+  /** 1 件あたりの長さの中央値（分）。数えられる記録が無ければ `null`。 */
+  medianMinutes: number | null;
 }
 
+export interface ReportUsageSummary {
+  current: ReportUsageFigures;
+  /**
+   * 前期間の同じ集合（今見えているアクティビティ）の数字。前期間にインクが 1 分も無ければ
+   * `null`（比較する相手がいないので差を作らない）。
+   */
+  previous: ReportUsageFigures | null;
+}
+
+type PreviousAggregate = {
+  activityId: string | null;
+  recordedMinutes: number;
+  recordBoxes: number;
+  durationCounts: readonly (readonly [number, number])[];
+};
+
 /**
- * セグメント別のバー（仕様 §4.1）。
+ * 数字のカードの値（仕様 §1 ①）。
  *
- * セグメント同士は**重複してよい**。合計・円グラフは作らない。
+ * 前期間は「今見えているアクティビティ」に絞って足す。フィルタを掛けたまま期間を比べる
+ * （現在はフィルタ後、前期間はフィルタ前、と分母が食い違う比較をしない）。
  */
-export function buildSegmentBars(
+export function buildUsageSummary(
   visibleActivities: readonly ReportActivityAggregate[],
-  segments: readonly { id: string; name: string; activityIds: readonly string[] }[],
-  trackMinutes: number,
-): ReportSegmentBar[] {
-  const minutesByActivity = new Map<string, number>();
-  for (const activity of visibleActivities) {
-    if (activity.activityId === null) continue;
-    minutesByActivity.set(
-      activity.activityId,
-      (minutesByActivity.get(activity.activityId) ?? 0) + activity.recordedMinutes,
-    );
+  previousActivities: readonly PreviousAggregate[],
+): ReportUsageSummary {
+  const current: ReportUsageFigures = {
+    recordedMinutes: sumRecorded(visibleActivities),
+    recordCount: countRecordBoxes(visibleActivities),
+    medianMinutes: medianFromDurationCounts(
+      mergeDurationCounts(visibleActivities.map((activity) => activity.durationCounts)),
+    ),
+  };
+
+  const previousTotal = previousActivities.reduce((total, row) => total + row.recordedMinutes, 0);
+  if (previousTotal < 1) return { current, previous: null };
+
+  const visibleIds = new Set(visibleActivities.map((activity) => activity.activityId));
+  const previousVisible = previousActivities.filter((row) => visibleIds.has(row.activityId));
+  return {
+    current,
+    previous: {
+      recordedMinutes: previousVisible.reduce((total, row) => total + row.recordedMinutes, 0),
+      recordCount: previousVisible.reduce((total, row) => total + row.recordBoxes, 0),
+      medianMinutes: medianFromDurationCounts(
+        mergeDurationCounts(previousVisible.map((row) => row.durationCounts)),
+      ),
+    },
+  };
+}
+
+/** `[長さ, 件数]` の度数を複数まとめて、長さの昇順に畳み直す。 */
+export function mergeDurationCounts(
+  lists: readonly (readonly (readonly [number, number])[])[],
+): [number, number][] {
+  const counts = new Map<number, number>();
+  for (const list of lists) {
+    for (const [minutes, count] of list) counts.set(minutes, (counts.get(minutes) ?? 0) + count);
   }
+  return [...counts.entries()].sort((a, b) => a[0] - b[0]);
+}
 
-  return segments.map((segment) => {
-    const minutes = segment.activityIds.reduce(
-      (total, activityId) => total + (minutesByActivity.get(activityId) ?? 0),
-      0,
-    );
-    return {
-      segmentId: segment.id,
-      name: segment.name,
-      minutes,
-      percent: Math.min(100, toPercent(minutes, trackMinutes)),
-    };
+/**
+ * 度数からの中央値。偶数件は中央 2 件の平均（`medianOf` と同じ規則）。0 件は `null`。
+ */
+export function medianFromDurationCounts(
+  counts: readonly (readonly [number, number])[],
+): number | null {
+  const total = counts.reduce((sum, [, count]) => sum + count, 0);
+  if (total === 0) return null;
+
+  // 0 始まりの順位 `index` にある値
+  const valueAt = (index: number): number => {
+    let seen = 0;
+    for (const [minutes, count] of counts) {
+      seen += count;
+      if (index < seen) return minutes;
+    }
+    return counts[counts.length - 1]?.[0] ?? 0;
+  };
+
+  const middle = Math.floor(total / 2);
+  return total % 2 === 1 ? valueAt(middle) : (valueAt(middle - 1) + valueAt(middle)) / 2;
+}
+
+// ============================================================
+// 時間の使い方: 時間帯の分布 / 1 件の長さの分布
+// ============================================================
+
+/** 見えているアクティビティの 0〜23 時の記録（分）を足す。 */
+export function buildHourTotals(visibleActivities: readonly ReportActivityAggregate[]): number[] {
+  const totals = Array.from({ length: 24 }, () => 0);
+  for (const activity of visibleActivities) {
+    activity.byHour.forEach((minutes, index) => {
+      totals[index] = (totals[index] ?? 0) + minutes;
+    });
+  }
+  return totals;
+}
+
+/**
+ * 1 件の長さの分布の区切り（分、下限を含み上限を含まない）。最後は上限なし。
+ *
+ * 短い記録ほど細かく刻む。「20 分前後に集まっている」のか「1〜2 時間が多い」のかを
+ * 読み分けるための幅で、等間隔にはしない。
+ */
+const REPORT_DURATION_BIN_EDGES = [0, 5, 10, 15, 30, 45, 60, 90, 120] as const;
+
+export interface ReportDurationBin {
+  /** 下限（分、含む）。 */
+  fromMinutes: number;
+  /** 上限（分、含まない）。最後のビンは `null`（上限なし）。 */
+  toMinutes: number | null;
+  count: number;
+}
+
+/** 度数を `REPORT_DURATION_BIN_EDGES` のビンへ振り分ける。 */
+export function buildDurationBins(
+  counts: readonly (readonly [number, number])[],
+): ReportDurationBin[] {
+  const bins: ReportDurationBin[] = REPORT_DURATION_BIN_EDGES.map((from, index) => ({
+    fromMinutes: from,
+    toMinutes: REPORT_DURATION_BIN_EDGES[index + 1] ?? null,
+    count: 0,
+  }));
+  for (const [minutes, count] of counts) {
+    let target = bins[0];
+    for (const bin of bins) if (minutes >= bin.fromMinutes) target = bin;
+    if (target) target.count += count;
+  }
+  return bins;
+}
+
+// ============================================================
+// 時間の使い方: アクティビティ一覧
+// ============================================================
+
+export type ReportUsageSortKey = 'recorded' | 'delta';
+
+export interface ReportActivityUsageRow {
+  activityId: string | null;
+  name: string | null;
+  categoryName: string | null;
+  color: string | null;
+  archived: boolean;
+  recordedMinutes: number;
+  recordBoxes: number;
+  /** 1 件あたりの長さの中央値（分）。数えられる記録が無ければ `null`。 */
+  medianRecordMinutes: number | null;
+  /** 前期間との差（分）。前期間にインクが 1 分も無ければ `null`（比較する相手がいない）。 */
+  deltaMinutes: number | null;
+}
+
+/**
+ * 時間の使い方の一覧（仕様 §1 ④）。記録のある行をすべて出す（足切りしない）。
+ *
+ * 差は行ごとに `rec − 前期間の rec`。前期間にインクが 1 分も無ければ全行 `null` にする
+ * （見出しの Δ と同じ規則。0 と「比較できない」を混ぜない）。
+ */
+export function buildActivityUsageRows(
+  visibleActivities: readonly ReportActivityAggregate[],
+  previousActivities: readonly Pick<PreviousAggregate, 'activityId' | 'recordedMinutes'>[],
+): ReportActivityUsageRow[] {
+  const previousTotal = previousActivities.reduce((total, row) => total + row.recordedMinutes, 0);
+  const previousByActivity = new Map(
+    previousActivities.map((row) => [row.activityId, row.recordedMinutes]),
+  );
+
+  return visibleActivities
+    .filter((activity) => activity.recordedMinutes > 0)
+    .map((activity) => ({
+      activityId: activity.activityId,
+      name: activity.activityName,
+      categoryName: activity.categoryName,
+      color: activity.categoryColor,
+      archived: activity.archived,
+      recordedMinutes: activity.recordedMinutes,
+      recordBoxes: activity.recordBoxes,
+      medianRecordMinutes: medianFromDurationCounts(activity.durationCounts),
+      deltaMinutes:
+        previousTotal < 1
+          ? null
+          : activity.recordedMinutes - (previousByActivity.get(activity.activityId) ?? 0),
+    }));
+}
+
+/**
+ * 一覧の並び。記録時間の多い順が既定（規模で読む）。差の順は「最近増えたもの」を探す並び。
+ * 差が `null` の行は末尾。同点は記録時間、さらに名前で安定させる。
+ */
+export function sortActivityUsageRows(
+  rows: readonly ReportActivityUsageRow[],
+  sortKey: ReportUsageSortKey,
+): ReportActivityUsageRow[] {
+  const byName = (a: ReportActivityUsageRow, b: ReportActivityUsageRow) =>
+    (a.name ?? '').localeCompare(b.name ?? '');
+  return [...rows].sort((a, b) => {
+    if (sortKey === 'delta') {
+      if (a.deltaMinutes === null && b.deltaMinutes !== null) return 1;
+      if (a.deltaMinutes !== null && b.deltaMinutes === null) return -1;
+      const byDelta = (b.deltaMinutes ?? 0) - (a.deltaMinutes ?? 0);
+      if (byDelta !== 0) return byDelta;
+    }
+    return b.recordedMinutes - a.recordedMinutes || byName(a, b);
   });
 }
 

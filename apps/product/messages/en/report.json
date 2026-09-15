@@ -11,6 +11,12 @@
       "month": "Month",
       "year": "Year"
     },
+    "tabs": {
+      "label": "Report view",
+      "usage": "Time spent",
+      "diff": "Plan vs. record",
+      "reflect": "Reflection"
+    },
     "nav": {
       "current": {
         "week": "This week",
@@ -19,41 +25,84 @@
       }
     },
     "allocation": {
-      "kick": "1 · Allocation — where the time went",
-      "subtitleWithMargin": "Recorded {recorded} · Margin {margin}",
-      "subtitleInkOnly": "Ink only (margin chip off)",
-      "deltaPrevious": {
-        "week": "Last week",
-        "month": "Last month",
-        "year": "Last year"
+      "kick": "Time spent",
+      "cards": {
+        "recorded": "Recorded",
+        "count": "Records",
+        "median": "Median length",
+        "countValue": "{count}",
+        "countDelta": "{diff}",
+        "deltaLabel": {
+          "week": "vs. last week",
+          "month": "vs. last month",
+          "year": "vs. last year"
+        },
+        "percent": "({percent}%)",
+        "noPrevious": "No records in the previous period",
+        "unavailable": "—",
+        "margin": "Margin {margin}"
       },
-      "uncategorizedShare": "Uncategorized {percent}%",
-      "uncategorized": "Uncategorized",
-      "legendEmpty": {
-        "week": "No ink this week yet",
-        "month": "No ink this month yet",
-        "year": "No ink this year yet"
-      },
-      "segments": {
-        "heading": "Segments — they may overlap, they do not sum",
-        "empty": "No segments yet"
-      },
-      "ink": {
+      "daily": {
         "heading": {
-          "week": "Ink by day",
-          "month": "Ink by week",
-          "year": "Ink by month"
+          "week": "Recorded time by day",
+          "month": "Recorded time by week",
+          "year": "Recorded time by month"
+        },
+        "empty": {
+          "week": "No records this week yet",
+          "month": "No records this month yet",
+          "year": "No records this year yet"
         },
         "weekdays": ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+        "dayLabel": "{month}/{day} {weekday}",
         "weekColumn": "W{index}",
-        "monthColumn": "{month}"
+        "monthColumn": "{month}",
+        "axisHours": "{hours}h",
+        "barAriaLabel": "{label}, recorded {recorded}"
       },
-      "barAriaLabel": "Allocation by category",
-      "lensLabel": "Segment: {name}",
-      "barAriaLabelLens": "Allocation by activity"
+      "breakdown": {
+        "heading": {
+          "category": "Allocation by category",
+          "activity": "Allocation by activity"
+        },
+        "uncategorized": "Uncategorized"
+      },
+      "table": {
+        "heading": "Activities",
+        "columns": {
+          "activity": "Activity",
+          "recorded": "Recorded",
+          "count": "Records",
+          "median": "Median",
+          "delta": "vs. prev."
+        },
+        "sort": {
+          "recorded": "Sort by recorded time",
+          "delta": "Sort by change from the previous period"
+        },
+        "unavailable": "—",
+        "empty": "No activity has records in this period",
+        "unnamed": "Unnamed activity",
+        "rowAriaLabel": "{name}, recorded {recorded}"
+      },
+      "hours": {
+        "heading": "Time of day",
+        "empty": "No records yet",
+        "axis": "{hour}:00",
+        "barAriaLabel": "{hour}:00, recorded {recorded}"
+      },
+      "durations": {
+        "heading": "Record length",
+        "empty": "No records yet",
+        "range": "{from}–{to} min",
+        "rangeOpen": "{from} min or more",
+        "tickMinutes": "{minutes}m",
+        "tickHours": "{hours}h",
+        "barAriaLabel": "{label}, {count} records"
+      }
     },
     "execution": {
-      "kick": "2 · Execution — did it go as planned",
+      "kick": "Plan and record — did it go as planned",
       "empty": {
         "week": "No activity moved this week yet",
         "month": "No activity moved this month yet",
@@ -75,7 +124,7 @@
       }
     },
     "quality": {
-      "kick": "3 · Quality — was it a good allocation",
+      "kick": "Quality — was it a good allocation",
       "unnamed": "Unnamed activity",
       "axis": {
         "time": "Time spent →",
@@ -91,31 +140,6 @@
       "waiting": "Waiting to become a point: {names}",
       "waitingSeparator": ", ",
       "footnote": "Opacity = number of answers · a point appears at n≥{threshold}"
-    },
-    "tidy": {
-      "kick": "4 · Tidy up — and on to next week",
-      "none": "None",
-      "uncategorized": {
-        "label": "{count, plural, one {# uncategorized record} other {# uncategorized records}}",
-        "action": "Sort them"
-      },
-      "externalEvents": {
-        "label": "{count, plural, one {# external calendar event not reviewed} other {# external calendar events not reviewed}}",
-        "action": "Review them"
-      },
-      "nextPeriod": {
-        "planned": {
-          "week": "Next week already holds {duration} of timeblocks",
-          "month": "Next month already holds {duration} of timeblocks",
-          "year": "Next year already holds {duration} of timeblocks"
-        },
-        "empty": {
-          "week": "No timeblocks for next week yet",
-          "month": "No timeblocks for next month yet",
-          "year": "No timeblocks for next year yet"
-        },
-        "action": "Open the calendar"
-      }
     },
     "detail": {
       "ariaLabel": "Activity details",
@@ -189,17 +213,18 @@
     "sidebar": {
       "categoriesHeading": "Categories",
       "uncategorized": "Uncategorized",
-      "margin": "Margin (unrecorded)",
-      "marginLensDisabled": "Margin stays out of the denominator while a segment is selected",
       "empty": "No categories yet",
-      "lensHeading": "Segments",
-      "lensAll": "All",
-      "segmentMenu": "Menu for {name}"
+      "noUncategorized": "No uncategorized activities",
+      "show": "Count {name}",
+      "hide": "Don't count {name}",
+      "expandCategory": "Expand {name}",
+      "collapseCategory": "Collapse {name}"
     },
     "mobile": {
-      "lens": {
-        "chip": "Segment",
-        "open": "Choose a segment"
+      "filter": {
+        "open": "Filters",
+        "title": "What to count",
+        "description": "Choose which categories and activities to count"
       },
       "periodFormat": {
         "weekDay": "MMM d",

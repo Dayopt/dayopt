@@ -3,12 +3,13 @@ import 'server-only';
 import { toDerivedBlock } from '@/lib/database';
 import { aggregate } from '@/lib/time';
 
+import { isMedianEligibleSource } from '../domain/report/duration-distribution';
 import {
   clipMinutes,
-  resolveNextReportRange,
+  distributeToHours,
+  REPORT_HOUR_BUCKETS,
   resolvePreviousReportRange,
   resolveReportRange,
-  resolveZonedDayKey,
   type ReportGranularity,
   type ReportWeekStartsOn,
 } from '../lib/report-period';
@@ -18,26 +19,24 @@ import {
   fetchReportCategories,
   fetchReportPlans,
   fetchReportRecords,
-  fetchReportUnconvertedExternalEvents,
   type ReportActivityRow,
   type ReportCategoryRow,
   type ReportFetchClient,
-  type ReportGhostEventRow,
   type ReportPlanRow,
   type ReportRecordRow,
 } from './report-fetchers';
 
 /**
- * `/report` の 1〜4 章が読む期間集計。
+ * `/report` の各タブが読む期間集計。
  *
- * **返すのはアクティビティ別のスカラーだけ。** フィルタ（カテゴリ / 未分類 / 余白）・
- * セグメントレンズ・分母・見積もりの鏡・羅針盤の座標は、すべて client の純粋関数
+ * **返すのはアクティビティ別のスカラーだけ。** フィルタ（カテゴリー / アクティビティ /
+ * 未分類 / 余白）・分母・見積もりの鏡・羅針盤の座標は、すべて client の純粋関数
  * （`domain/report/`）が導出する。トグルのたびにサーバーへ往復させないため。
  *
- * **箱の明細は載せない。** 1〜4 章に要る箱の情報は件数（`plannedPastBoxes` / `recordBoxes`）と
- * 充実の回答数だけで、どちらもスカラーに畳める。明細・中央値・時間帯分布が要るのは
- * 詳細パネルだけなので、開いた時に専用 procedure で取る。年粒度で payload が Record 件数に
- * 線形比例するのを構造的に断つ。
+ * **箱の明細は載せない。** 各タブに要る箱の情報は件数（`plannedPastBoxes` / `recordBoxes`）・
+ * 充実の回答数・長さの度数（`durationCounts`）・時間帯（`byHour`）だけで、どれも件数に比例しない。
+ * 明細・分布・時間帯が要るのは詳細パネルだけなので、開いた時に専用 procedure で取る。
+ * 年粒度で payload が Record 件数に線形比例するのを構造的に断つ。
  */
 
 /** 充実の 3 値（`records.fulfillment`）。UI では 消耗 / 普通 / 充実。 */
@@ -68,9 +67,29 @@ export interface ReportActivityAggregate {
   /** 仕様の `planBoxesPast`。見積もりの鏡の候補条件に使う。 */
   plannedPastBoxes: number;
   recordBoxes: number;
+  /**
+   * 1 件あたりの長さ（分、整数へ丸め）ごとの件数。`[長さ, 件数]` を長さの昇順で持つ。
+   *
+   * 母集団は詳細パネルの中央値と同じ（clip 済み・`auto_migrated` を除く）。**明細ではなく
+   * 長さの度数**なので、件数ではなく「異なる長さの数」に比例する（1 日 = 最大 1440 通り）。
+   * 見えているアクティビティを client で合算すれば、どのフィルタでも全体の中央値と分布が
+   * 正確に出る（中央値の中央値は中央値にならないため、スカラーの中央値だけでは足りない）。
+   */
+  durationCounts: [number, number][];
+  /** `REPORT_HOUR_BUCKETS` と同 index（0〜23 時）。期間へ clip し、0 時またぎは按分済み。 */
+  byHour: number[];
   fulfillment: ReportFulfillmentCounts;
   /** `period.bucketKeys` と同 index。記録ぶん。0 時またぎは按分済み。 */
   byBucket: number[];
+}
+
+/** 前期間の比較に使う最小限の集計。 */
+interface ReportPreviousActivityAggregate {
+  activityId: string | null;
+  recordedMinutes: number;
+  recordBoxes: number;
+  /** `ReportActivityAggregate.durationCounts` と同じ形・同じ母集団。 */
+  durationCounts: [number, number][];
 }
 
 interface ReportPeriodSummary {
@@ -87,33 +106,8 @@ interface ReportPeriodResult {
   /** `plannedPastMinutes` の判定基準。client の時計とずれてもサーバーの値で一貫させる。 */
   nowAt: string;
   activities: ReportActivityAggregate[];
-  /** 前期間の Δ 表示用。記録合計だけを持つ。 */
-  previousActivities: { activityId: string | null; recordedMinutes: number }[];
-  /** 4 章「来週はすでに N 分の箱が置かれています」。次期間の予定合計。 */
-  nextPeriodPlannedMinutes: number;
-  /** 4 章「未分類の記録が N 件」。期間内の記録のうちカテゴリー未設定のもの。 */
-  uncategorizedRecordCount: number;
-  /**
-   * 4 章「未確認の外部カレンダー予定が N 件」。**期間に限定しない**（仕様 §4.4）。
-   * 外部カレンダー未接続・選択なしなら 0。
-   *
-   * **Free / Pro の切れ目はここ。** カレンダー画面の ghost 表示（`externalCalendar.listEvents`）は
-   * `entitledProcedure` にある（#1962）。課金 enforcement を有効にする時（#1669 配下）、この件数も
-   * 同じゲートに揃える必要がある — 揃えないと「Pro を切ると ghost は見えないのに、レポートは
-   * 件数を出して押せる」非対称になる。enforcement が off の今は実害が無いので、切れ目の
-   * 明示だけに留める。
-   */
-  unconvertedExternalEventCount: number;
-  /** 4 章「仕分ける」のジャンプ先。期間内で最も早い未分類の記録。無ければ `null`。 */
-  firstUncategorizedRecord: ReportJumpTarget | null;
-  /** 4 章「確認する」のジャンプ先。最も早い未変換の外部予定。無ければ `null`。 */
-  firstUnconvertedExternalEvent: Omit<ReportJumpTarget, 'id'> | null;
-}
-
-/** カレンダーへのジャンプ先（4 章）。`dayKey` はユーザーの timezone での壁時計日付。 */
-interface ReportJumpTarget {
-  id: string;
-  dayKey: string;
+  /** 前期間の比較用（記録時間・件数・1 件の長さ）。 */
+  previousActivities: ReportPreviousActivityAggregate[];
 }
 
 interface ReportPeriodInput {
@@ -130,6 +124,8 @@ interface ActivityBucketState {
   plannedPastMinutes: number;
   plannedPastBoxes: number;
   recordBoxes: number;
+  durationCounts: [number, number][];
+  byHour: number[];
   fulfillment: ReportFulfillmentCounts;
   byBucket: number[];
 }
@@ -154,25 +150,20 @@ class ReportAggregationService {
       timezone,
       weekStartsOn,
     );
-    const nextRange = resolveNextReportRange(anchorDate, granularity, timezone, weekStartsOn);
     const nowAt = now.toISOString();
 
-    const [records, plans, previousRecords, nextPlans, activities, categories, ghostEvents] =
-      await Promise.all([
-        fetchReportRecords(this.supabase, userId, range),
-        fetchReportPlans(this.supabase, userId, range),
-        fetchReportRecords(this.supabase, userId, previousRange),
-        fetchReportPlans(this.supabase, userId, nextRange),
-        fetchReportActivities(this.supabase, userId),
-        fetchReportCategories(this.supabase, userId),
-        fetchReportUnconvertedExternalEvents(this.supabase, userId, now),
-      ]);
+    const [records, plans, previousRecords, activities, categories] = await Promise.all([
+      fetchReportRecords(this.supabase, userId, range),
+      fetchReportPlans(this.supabase, userId, range),
+      fetchReportRecords(this.supabase, userId, previousRange),
+      fetchReportActivities(this.supabase, userId),
+      fetchReportCategories(this.supabase, userId),
+    ]);
 
     const activityById = new Map(activities.map((row) => [row.id, row]));
     const categoryById = new Map(categories.map((row) => [row.id, row]));
 
     const states = this.buildStates(records, plans, range, now, timezone);
-    const uncategorizedRecords = this.selectUncategorizedRecords(records, activityById, range);
 
     return {
       period: {
@@ -191,13 +182,6 @@ class ReportAggregationService {
         this.toAggregate(activityId, state, activityById, categoryById),
       ),
       previousActivities: this.buildPreviousTotals(previousRecords, previousRange, timezone, now),
-      nextPeriodPlannedMinutes: [
-        ...this.buildStates([], nextPlans, nextRange, now, timezone).values(),
-      ].reduce((sum, state) => sum + state.plannedMinutes, 0),
-      uncategorizedRecordCount: uncategorizedRecords.length,
-      unconvertedExternalEventCount: ghostEvents.length,
-      firstUncategorizedRecord: this.toFirstJumpTarget(uncategorizedRecords, timezone),
-      firstUnconvertedExternalEvent: this.toFirstGhostDay(ghostEvents, timezone),
     };
   }
 
@@ -212,6 +196,8 @@ class ReportAggregationService {
       ...plans.map((row) => toDerivedBlock(row, 'plan')),
       ...records.map((row) => toDerivedBlock(row, 'rec')),
     ];
+    const eligibleMinutes = this.collectMedianEligibleMinutes(records, range);
+    const hoursByActivity = this.collectHourTotals(records, range, timezone);
     const states = new Map<string | null, ActivityBucketState>();
     for (const activityId of new Set(blocks.map((block) => block.activityId))) {
       const totals = aggregate({ ...range, timezone }, activityId, blocks, now);
@@ -221,6 +207,8 @@ class ReportAggregationService {
         plannedPastMinutes: totals.plannedPastMinutes,
         plannedPastBoxes: totals.plannedPastBoxes,
         recordBoxes: totals.recordBoxes,
+        durationCounts: toDurationCounts(eligibleMinutes.get(activityId) ?? []),
+        byHour: hoursByActivity.get(activityId) ?? REPORT_HOUR_BUCKETS.map(() => 0),
         fulfillment: totals.fulfillment,
         byBucket: range.buckets.map(
           (bucket) => aggregate({ ...bucket, timezone }, activityId, blocks, now).recordedMinutes,
@@ -253,9 +241,34 @@ class ReportAggregationService {
       plannedPastMinutes: state.plannedPastMinutes,
       plannedPastBoxes: state.plannedPastBoxes,
       recordBoxes: state.recordBoxes,
+      durationCounts: state.durationCounts,
+      byHour: state.byHour,
       fulfillment: state.fulfillment,
       byBucket: state.byBucket,
     };
+  }
+
+  /**
+   * 1 件あたりの中央値の母集団を、アクティビティごとに集める。
+   *
+   * 詳細パネル（`report-detail-service.ts`）と同じ規則: `clipMinutes` で期間へ切った長さ、
+   * `auto_migrated` は除く、clip して 0 になる行は数えない。規則をここで変えると、
+   * 一覧の中央値と詳細パネルの中央値が同じアクティビティで食い違う。
+   */
+  private collectMedianEligibleMinutes(
+    records: ReportRecordRow[],
+    range: { startAt: string; endAt: string },
+  ): Map<string | null, number[]> {
+    const byActivity = new Map<string | null, number[]>();
+    for (const record of records) {
+      if (!isMedianEligibleSource(record.source)) continue;
+      const minutes = clipMinutes(record.start_at, record.end_at, range.startAt, range.endAt);
+      if (minutes <= 0) continue;
+      const list = byActivity.get(record.activity_id) ?? [];
+      list.push(minutes);
+      byActivity.set(record.activity_id, list);
+    }
+    return byActivity;
   }
 
   private buildPreviousTotals(
@@ -263,69 +276,59 @@ class ReportAggregationService {
     range: { startAt: string; endAt: string },
     timezone: string,
     now: Date,
-  ): { activityId: string | null; recordedMinutes: number }[] {
+  ): ReportPreviousActivityAggregate[] {
     const blocks = records.map((row) => toDerivedBlock(row, 'rec'));
-    return [...new Set(blocks.map((block) => block.activityId))].map((activityId) => ({
-      activityId,
-      recordedMinutes: aggregate({ ...range, timezone }, activityId, blocks, now).recordedMinutes,
-    }));
-  }
-
-  /**
-   * 未分類の記録（4 章 1 行目）。
-   *
-   * アクティビティ未設定の記録も「カテゴリーが決まっていない記録」として数える。
-   * 仕分けの導線が向かう先は同じ（記録を開いてアクティビティ / カテゴリーを付ける）。
-   *
-   * **件数とジャンプ先を同じ集合から出す。** 別々の query で数えると、「N 件」と
-   * 「最初の 1 件」が食い違って、押した先に何も無い日が開きうる。
-   */
-  private selectUncategorizedRecords(
-    records: ReportRecordRow[],
-    activityById: Map<string, ReportActivityRow>,
-    range: { startAt: string; endAt: string },
-  ): ReportRecordRow[] {
-    return records.filter((record) => {
-      // 期間へ clip すると長さ 0 になる行（境界に接するだけ・長さ 0 の記録）は数えない。
-      // `recordBoxes` と件数がずれると、4 章の「N 件」を押した先に何も無い事故になる。
-      if (clipMinutes(record.start_at, record.end_at, range.startAt, range.endAt) <= 0) {
-        return false;
-      }
-      if (record.activity_id === null) return true;
-      return activityById.get(record.activity_id)?.category_id == null;
+    const eligibleMinutes = this.collectMedianEligibleMinutes(records, range);
+    return [...new Set(blocks.map((block) => block.activityId))].map((activityId) => {
+      const totals = aggregate({ ...range, timezone }, activityId, blocks, now);
+      return {
+        activityId,
+        recordedMinutes: totals.recordedMinutes,
+        recordBoxes: totals.recordBoxes,
+        durationCounts: toDurationCounts(eligibleMinutes.get(activityId) ?? []),
+      };
     });
   }
 
-  /** 最も早い記録をジャンプ先に選ぶ。`start_at` は文字列比較せず数値で比べる。 */
-  private toFirstJumpTarget(records: ReportRecordRow[], timezone: string): ReportJumpTarget | null {
-    const first = records.reduce<ReportRecordRow | null>(
-      (earliest, record) =>
-        earliest === null || Date.parse(record.start_at) < Date.parse(earliest.start_at)
-          ? record
-          : earliest,
-      null,
-    );
-
-    if (first === null) return null;
-    return { id: first.id, dayKey: resolveZonedDayKey(first.start_at, timezone) };
-  }
-
-  /** 最も早い未変換の外部予定の日。id は使わない（ghost を開く UI が無い）。 */
-  private toFirstGhostDay(
-    events: ReportGhostEventRow[],
+  /**
+   * 記録を 0〜23 時へ按分し、アクティビティごとに足す（分）。記録を 1 周するだけで済ませる。
+   *
+   * 期間へ clip してから按分するので、期間の外にはみ出した部分は数えない（日別の棒と合計が揃う）。
+   */
+  private collectHourTotals(
+    records: ReportRecordRow[],
+    range: { startAt: string; endAt: string },
     timezone: string,
-  ): { dayKey: string } | null {
-    const first = events.reduce<ReportGhostEventRow | null>(
-      (earliest, event) =>
-        earliest === null || Date.parse(event.start_at) < Date.parse(earliest.start_at)
-          ? event
-          : earliest,
-      null,
-    );
-
-    if (first === null) return null;
-    return { dayKey: resolveZonedDayKey(first.start_at, timezone) };
+  ): Map<string | null, number[]> {
+    const byActivity = new Map<string | null, number[]>();
+    const rangeStartMs = Date.parse(range.startAt);
+    const rangeEndMs = Date.parse(range.endAt);
+    for (const record of records) {
+      const startMs = Math.max(Date.parse(record.start_at), rangeStartMs);
+      const endMs = Math.min(Date.parse(record.end_at), rangeEndMs);
+      if (!(endMs > startMs)) continue;
+      const totals = byActivity.get(record.activity_id) ?? REPORT_HOUR_BUCKETS.map(() => 0);
+      distributeToHours(
+        new Date(startMs).toISOString(),
+        new Date(endMs).toISOString(),
+        timezone,
+      ).forEach((minutes, index) => {
+        totals[index] = (totals[index] ?? 0) + minutes;
+      });
+      byActivity.set(record.activity_id, totals);
+    }
+    return byActivity;
   }
+}
+
+/** 長さの配列を `[長さ（分、整数）, 件数]` の昇順へ畳む。 */
+function toDurationCounts(minutes: readonly number[]): [number, number][] {
+  const counts = new Map<number, number>();
+  for (const value of minutes) {
+    const rounded = Math.max(1, Math.round(value));
+    counts.set(rounded, (counts.get(rounded) ?? 0) + 1);
+  }
+  return [...counts.entries()].sort((a, b) => a[0] - b[0]);
 }
 
 export function createReportAggregationService(supabase: ReportFetchClient) {
