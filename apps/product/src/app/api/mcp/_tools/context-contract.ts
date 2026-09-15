@@ -126,28 +126,3 @@ export const MCP_CONSTRAINTS_GET_OUTPUT_SCHEMA = z
       .strict(),
   })
   .strict();
-
-/**
- * セグメント（分析用の保存されたクエリ）の一覧。
- *
- * アーカイブ概念を持たないので archive filter を取らない（segments テーブルに
- * archived_at が無い。#2162 §4-3）。セグメントは軽量な保存クエリなので、
- * アーカイブではなく削除で足りるという設計判断。
- */
-export const MCP_SEGMENT_LIST_OUTPUT_SCHEMA = z
-  .object({
-    schemaVersion: z.literal(MCP_TOOL_SCHEMA_VERSION),
-    count: z.number().int().nonnegative(),
-    segments: z.array(
-      z
-        .object({
-          id: z.string().uuid(),
-          name: z.string(),
-          // セグメントが保持するのはアクティビティの集合だけ。期間・指標・並べ替えは
-          // 持たない（#2162 §6-4。レポートビルダー化を構造で防ぐ）。
-          activityIds: z.array(z.string().uuid()),
-        })
-        .strict(),
-    ),
-  })
-  .strict();

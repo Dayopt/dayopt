@@ -65,7 +65,6 @@ interface TenantFixture {
   activityId: string;
   planId: string;
   recordId: string;
-  segmentId: string;
   deletedPlanId: string;
   deletedRecordId: string;
 }
@@ -125,24 +124,11 @@ async function seedTenantData(userId: string, label: string): Promise<TenantFixt
     .single();
   if (recordError) throw recordError;
 
-  const { data: segment, error: segmentError } = await admin
-    .from('segments')
-    .insert({ user_id: userId, name: `${label} segment` })
-    .select('id')
-    .single();
-  if (segmentError) throw segmentError;
-
-  const { error: membershipError } = await admin
-    .from('segment_activities')
-    .insert({ user_id: userId, segment_id: segment.id, activity_id: activity.id });
-  if (membershipError) throw membershipError;
-
   return {
     categoryId: category.id,
     activityId: activity.id,
     planId: plan.id,
     recordId: record.id,
-    segmentId: segment.id,
     deletedPlanId: await createDeletedPlan(userId, `${label} trashed plan`),
     deletedRecordId: await createDeletedRecord(userId, `${label} trashed record`),
   };
@@ -242,27 +228,18 @@ describe.skipIf(!RUN_LOCAL)('MCP read tenant isolation', () => {
     ).rejects.toMatchObject({ code: 'NOT_FOUND' });
   });
 
-  it('keeps activities, categories and segments in the caller lane', async () => {
+  it('keeps activities and categories in the caller lane', async () => {
     const ownerActivities = await callerFor(ownerId).activities.listActivities({});
     const ownerCategories = await callerFor(ownerId).activities.listCategories({});
-    const ownerSegments = await callerFor(ownerId).review.listSegments();
     expect(ownerActivities.map((activity) => activity.id)).toContain(owner.activityId);
     expect(ownerCategories.map((category) => category.id)).toContain(owner.categoryId);
-    expect(ownerSegments.map((segment) => segment.id)).toContain(owner.segmentId);
 
     const intruderActivities = await callerFor(intruderId).activities.listActivities({});
     const intruderCategories = await callerFor(intruderId).activities.listCategories({});
-    const intruderSegments = await callerFor(intruderId).review.listSegments();
     expect(intruderActivities.map((activity) => activity.id)).toContain(intruder.activityId);
     expect(intruderActivities.map((activity) => activity.id)).not.toContain(owner.activityId);
     expect(intruderCategories.map((category) => category.id)).toContain(intruder.categoryId);
     expect(intruderCategories.map((category) => category.id)).not.toContain(owner.categoryId);
-    expect(intruderSegments.map((segment) => segment.id)).toContain(intruder.segmentId);
-    expect(intruderSegments.map((segment) => segment.id)).not.toContain(owner.segmentId);
-    // セグメントのメンバーシップ経由で他人の activity id が漏れないことも見る。
-    expect(intruderSegments.flatMap((segment) => segment.activityIds)).not.toContain(
-      owner.activityId,
-    );
   });
 
   it('keeps aggregate reads from summing another tenant', async () => {
@@ -314,7 +291,6 @@ describe.skipIf(!RUN_LOCAL)('MCP read tenant isolation', () => {
     await expect(entriesOnly.activities.listActivities({})).rejects.toMatchObject({
       code: 'FORBIDDEN',
     });
-    await expect(entriesOnly.review.listSegments()).rejects.toMatchObject({ code: 'FORBIDDEN' });
     await expect(entriesOnly.timeblockContext.getConstraints(rangeAround())).rejects.toMatchObject({
       code: 'FORBIDDEN',
     });

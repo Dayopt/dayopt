@@ -259,7 +259,7 @@ const userOwnedCases: UserOwnedRlsCase[] = [
     update: { name: 'foreign update' },
   },
   {
-    // #2162 Step 5。service-role client の test（segment-schema / segments-service）は
+    // #2162 Step 5。service-role client の test（segment-schema）は
     // 複合 FK を検証できるが RLS は素通りするため、実 anon client で見る場所がここになる。
     table: 'segments',
     idColumn: 'id',

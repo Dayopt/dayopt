@@ -34,9 +34,6 @@ const MCP_TRPC_SCOPE_REQUIREMENTS: Partial<Record<string, SupportedScope>> = {
   'records.list': 'read:entries',
   'records.getById': 'read:entries',
   'statistics.getMcpReview': 'read:stats',
-  // segments.list tool が呼ぶ。セグメントはアクティビティの名前付きグループなので
-  // read:activities の読み取り範囲に収まる（#2173）。
-  'review.listSegments': 'read:activities',
   'activities.listActivities': 'read:activities',
   'activities.listCategories': 'read:activities',
   'timeblockContext.getConstraints': 'read:constraints',

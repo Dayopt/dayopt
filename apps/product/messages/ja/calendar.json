@@ -246,28 +246,6 @@
       "allCategories": "すべて",
       "categoryFilterLabel": "カテゴリーで絞り込み"
     },
-    "stats": {
-      "review": {
-        "segments": {
-          "title": "セグメント",
-          "create": "セグメントを作成",
-          "namePlaceholder": "例: 深い仕事",
-          "emptyTitle": "セグメントはまだありません",
-          "emptyDescription": "よく振り返るアクティビティの組み合わせを保存できます",
-          "editActivities": "アクティビティを編集",
-          "delete": "削除",
-          "deleteConfirmTitle": "セグメントを削除しますか？",
-          "deleteConfirmDescription": "「{name}」を削除します。この操作は取り消せません。",
-          "created": "セグメントを作成しました",
-          "duplicateName": "同じ名前のセグメントがあります",
-          "createFailed": "セグメントの作成に失敗しました",
-          "renameFailed": "名前の変更に失敗しました",
-          "updateFailed": "更新に失敗しました",
-          "deleted": "セグメントを削除しました",
-          "deleteFailed": "削除に失敗しました"
-        }
-      }
-    },
     "mobile": {
       "weekLaneSwitcher": {
         "ariaLabel": "表示するタイムブロック"
