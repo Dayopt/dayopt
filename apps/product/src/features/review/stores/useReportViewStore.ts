@@ -1,16 +1,21 @@
 /**
- * `/report` の表示状態（フィルタとレンズ）。
+ * `/report` の表示状態（フィルタ）。
  *
- * **端末ローカルにだけ持つ**（仕様 §2.2）。アカウント同期しないので、別ブラウザ・別端末には
+ * **端末ローカルにだけ持つ**（仕様 §2）。アカウント同期しないので、別ブラウザ・別端末には
  * 持ち越さない。分母の出し入れは「今この画面をどう読むか」であって、アカウントの設定ではない。
  *
- * **hidden を持つ**（visible ではない）。ここに載っていないカテゴリーは可視なので、新しく作った
- * カテゴリーは自動で分母に入る。`useCalendarFilterStore` が必要としている `knownActivityIds`
- * （「新規」と「意図的に隠した既知」を見分けるための第 3 の集合）は、この形では要らない。
- * 消えたカテゴリーの ID が `hiddenCategoryIds` に残っても、一致するカテゴリーが無いだけで無害。
+ * **hidden を持つ**（visible ではない）。ここに載っていないカテゴリー / アクティビティは可視なので、
+ * 新しく作ったものは自動で分母に入る。`useCalendarFilterStore` が必要としている
+ * `knownActivityIds`（「新規」と「意図的に隠した既知」を見分けるための第 3 の集合）は、
+ * この形では要らない。消えた ID が hidden に残っても、一致する行が無いだけで無害。
  *
- * 名前が `-FilterStore` でないのは、フィルタに加えてレンズ（`segmentId`）も持つため。
- * `/report` の「今どう見えているか」を 1 つに束ねる（epic #2575 / #2578）。
+ * カテゴリーとアクティビティの hidden は独立した 2 集合で持つ。カテゴリーを隠すと配下は
+ * まとめて出ず（アーカイブ済みで一覧に無いアクティビティも含めて）、アクティビティを隠すと
+ * その 1 行だけが出ない。
+ *
+ * v1 が持っていたセグメントのレンズ（`segmentId`）は 2026-09-15 に概念ごと撤去した。
+ * アクティビティ単位のフィルタが入れば「この数個だけで見る」は他を外すことで足り、
+ * 別概念を持つ理由が無くなったため。
  */
 
 import { create } from 'zustand';
@@ -23,30 +28,41 @@ import { defaultReportFilterState } from '../domain/report/report-view-model';
 interface ReportViewState {
   /** ここに無いカテゴリーは可視。新しく作ったカテゴリーは自動で可視になる。 */
   hiddenCategoryIds: string[];
-  uncategorizedHidden: boolean;
-  /** 余白（未記録時間）を分母に入れないか。仕様の `__margin`。 */
-  marginHidden: boolean;
-  /** セグメントレンズ。`null` は「すべて」（レンズなし）。 */
-  segmentId: string | null;
+  /** ここに無いアクティビティは可視。新しく作ったアクティビティは自動で可視になる。 */
+  hiddenActivityIds: string[];
 }
 
 interface ReportViewActions {
-  toggleCategory: (categoryId: string) => void;
-  toggleUncategorized: () => void;
-  toggleMargin: () => void;
-  setSegmentId: (segmentId: string | null) => void;
+  /**
+   * カテゴリーの出し入れ。
+   *
+   * 隠れているカテゴリーを戻す時は、`memberActivityIds` に載った配下の hidden も
+   * まとめて解く。外したカテゴリーを戻す意図は「このカテゴリーを見る」なので、一部の子だけ
+   * 隠れたままの状態（戻したのに何も出ない）を作らない。
+   */
+  toggleCategory: (categoryId: string, memberActivityIds?: readonly string[]) => void;
+  toggleActivity: (activityId: string) => void;
 }
 
 type ReportViewStore = ReportViewState & ReportViewActions;
 
-/** 既定は「すべて可視・余白 on・レンズなし」。派生側の既定と 1 箇所で揃える。 */
+/** 既定は「すべて可視」。派生側の既定と 1 箇所で揃える。 */
 function createInitialReportViewState(): ReportViewState {
   return {
     hiddenCategoryIds: [...defaultReportFilterState.hiddenCategoryIds],
-    uncategorizedHidden: defaultReportFilterState.uncategorizedHidden,
-    marginHidden: defaultReportFilterState.marginHidden,
-    segmentId: null,
+    hiddenActivityIds: [...defaultReportFilterState.hiddenActivityIds],
   };
+}
+
+function toStringArray(value: unknown, fallback: string[]): string[] {
+  return Array.isArray(value)
+    ? value.filter((id): id is string => typeof id === 'string')
+    : fallback;
+}
+
+function withoutIds(ids: readonly string[], remove: readonly string[]): string[] {
+  const removeSet = new Set(remove);
+  return ids.filter((id) => !removeSet.has(id));
 }
 
 /**
@@ -62,68 +78,69 @@ function createInitialReportViewState(): ReportViewState {
  * 必ず呼ばれるので、こちらを実際の防波堤にする。
  *
  * version に依存しない形にしてある。`merge` が受け取るのは `migrate` 済みの state なので、
- * ここが版数で分岐すると、将来 v2 を書いた瞬間に v2 の state へ v1 の変換を再適用してしまう。
+ * ここが版数で分岐すると、将来 v3 を書いた瞬間に v3 の state へ旧版の変換を再適用してしまう。
  * 版ごとの移行は `migrateReportViewState` 側に書く。
  */
 function sanitizeReportViewState(persistedState: unknown): ReportViewState {
   const defaults = createInitialReportViewState();
   if (typeof persistedState !== 'object' || persistedState === null) return defaults;
 
-  const hiddenCategoryIds = Reflect.get(persistedState, 'hiddenCategoryIds');
-  const uncategorizedHidden = Reflect.get(persistedState, 'uncategorizedHidden');
-  const marginHidden = Reflect.get(persistedState, 'marginHidden');
-  const segmentId = Reflect.get(persistedState, 'segmentId');
-
   return {
-    hiddenCategoryIds: Array.isArray(hiddenCategoryIds)
-      ? hiddenCategoryIds.filter((id): id is string => typeof id === 'string')
-      : defaults.hiddenCategoryIds,
-    uncategorizedHidden:
-      typeof uncategorizedHidden === 'boolean' ? uncategorizedHidden : defaults.uncategorizedHidden,
-    marginHidden: typeof marginHidden === 'boolean' ? marginHidden : defaults.marginHidden,
-    segmentId: typeof segmentId === 'string' ? segmentId : null,
+    hiddenCategoryIds: toStringArray(
+      Reflect.get(persistedState, 'hiddenCategoryIds'),
+      defaults.hiddenCategoryIds,
+    ),
+    hiddenActivityIds: toStringArray(
+      Reflect.get(persistedState, 'hiddenActivityIds'),
+      defaults.hiddenActivityIds,
+    ),
   };
 }
 
 /**
- * 版をまたぐ移行。今は v1 しか無いのでサニタイズと同義。
+ * 版をまたぐ移行。
  *
- * v2 を足す時は、ここで `version` を見て形を変えてから `sanitizeReportViewState` を通す。
+ * v1 → v2: `segmentId` / `uncategorizedHidden` / `marginHidden` を捨て、`hiddenActivityIds` を
+ * 空で足す。サニタイズは知らないキーを拾わず、無いキーを既定で埋めるので、形の変換そのものは
+ * サニタイズと同義。未分類はカレンダーと同じくアクティビティ単位でだけ出し入れするので、
+ * v1 で未分類をまとめて隠していた端末は「全部見える」へ戻る（可逆で、1 手で隠し直せる）。
+ * 余白の切替は概念ごと撤去した（余白は常に分母に入る）。
  */
 export function migrateReportViewState(persistedState: unknown, _version: number): ReportViewState {
   return sanitizeReportViewState(persistedState);
 }
 
-/** `/report` のフィルタとレンズを持つ Zustand ストア（localStorage 永続化）。 */
+/** `/report` のフィルタを持つ Zustand ストア（localStorage 永続化）。 */
 export const useReportViewStore = create<ReportViewStore>()(
   devtools(
     persist<ReportViewStore, [], [], ReportViewState>(
       (set) => ({
         ...createInitialReportViewState(),
 
-        toggleCategory: (categoryId) =>
+        toggleCategory: (categoryId, memberActivityIds = []) =>
+          set((state) =>
+            state.hiddenCategoryIds.includes(categoryId)
+              ? {
+                  hiddenCategoryIds: state.hiddenCategoryIds.filter((id) => id !== categoryId),
+                  hiddenActivityIds: withoutIds(state.hiddenActivityIds, memberActivityIds),
+                }
+              : { hiddenCategoryIds: [...state.hiddenCategoryIds, categoryId] },
+          ),
+
+        toggleActivity: (activityId) =>
           set((state) => ({
-            hiddenCategoryIds: state.hiddenCategoryIds.includes(categoryId)
-              ? state.hiddenCategoryIds.filter((id) => id !== categoryId)
-              : [...state.hiddenCategoryIds, categoryId],
+            hiddenActivityIds: state.hiddenActivityIds.includes(activityId)
+              ? state.hiddenActivityIds.filter((id) => id !== activityId)
+              : [...state.hiddenActivityIds, activityId],
           })),
-
-        toggleUncategorized: () =>
-          set((state) => ({ uncategorizedHidden: !state.uncategorizedHidden })),
-
-        toggleMargin: () => set((state) => ({ marginHidden: !state.marginHidden })),
-
-        setSegmentId: (segmentId) => set({ segmentId }),
       }),
       {
         name: 'report-view-storage',
-        version: 1,
+        version: 2,
         storage: platformStorage<ReportViewState>(),
-        partialize: ({ hiddenCategoryIds, uncategorizedHidden, marginHidden, segmentId }) => ({
+        partialize: ({ hiddenCategoryIds, hiddenActivityIds }) => ({
           hiddenCategoryIds,
-          uncategorizedHidden,
-          marginHidden,
-          segmentId,
+          hiddenActivityIds,
         }),
         migrate: migrateReportViewState,
         // version が一致していてもここは通る。壊れた値を state へ入れない最後の関門。

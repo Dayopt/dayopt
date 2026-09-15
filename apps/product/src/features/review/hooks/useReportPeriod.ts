@@ -11,7 +11,7 @@ import type { ReportGranularity } from '../lib/report-period';
  * timezone と週の開始曜日はユーザー設定から取り、URL には載せない（共有リンクの相手は
  * 自分の設定で読む）。期間の正本は URL の `date` / `range` で、その 2 つを引数で受ける。
  *
- * **`/report` の 1〜4 章はこの 1 本だけを読む。** フィルタ・レンズのトグルで再取得しない
+ * **`/report` の各タブはこの 1 本だけを読む。** フィルタやタブの切替で再取得しない
  * （派生は `domain/report/` の純粋関数が client で行う）。詳細パネルだけが別の
  * procedure を持つので、将来「深掘りは Pro」にするならそちら側で分岐する。
  */
