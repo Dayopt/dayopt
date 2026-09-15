@@ -1,11 +1,17 @@
+import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join } from 'node:path';
+
 import { describe, expect, it, vi } from 'vitest';
 
 import {
   fetchPrFilenames,
   fetchPrFilesFromGit,
   fetchPrFilesWithStatus,
+  findFsReadingProductTests,
   formatMigrationSafetyOutput,
   resolveDiffBase,
+  resolveProductUnitScope,
   runMcpConformance,
   runMigrationSafety,
   shouldRunIntegrationTests,
@@ -422,6 +428,99 @@ describe('fetchPrFilesFromGit', () => {
       'origin',
       'main:refs/remotes/origin/main',
     ]);
+  });
+});
+
+describe('resolveProductUnitScope', () => {
+  it('product の src / messages と無関係な path だけなら related に絞る', () => {
+    const decision = resolveProductUnitScope({
+      isPr: true,
+      files: [
+        'apps/product/src/features/calendar/lib/remaining.ts',
+        'apps/product/messages/ja/calendar.json',
+        'docs/engineering/testing.md',
+        'apps/web/src/app/page.tsx',
+        'supabase/migrations/20260914000000_x.sql',
+        '.github/workflows/promote.yml',
+      ],
+    });
+    expect(decision).toMatchObject({
+      scope: 'related',
+      targets: [
+        'apps/product/src/features/calendar/lib/remaining.ts',
+        'apps/product/messages/ja/calendar.json',
+      ],
+    });
+  });
+
+  it.each([
+    ['packages/components/src/button.tsx', 'dist 経由で読むので graph で追えない'],
+    ['apps/product/vitest.config.ts', '設定'],
+    ['apps/product/src/lib/test/setup.ts', 'test setup'],
+    ['apps/product/package.json', '依存'],
+    ['pnpm-lock.yaml', 'lockfile'],
+    ['.github/actions/setup/action.yml', 'CI toolchain'],
+    ['.github/workflows/ci.yml', 'unit job の配線'],
+    ['scripts/ci/check.mjs', 'この判定自身'],
+    ['tsconfig.base.json', '未知の root file'],
+  ])('%s を含むと full（%s）', (file) => {
+    const decision = resolveProductUnitScope({
+      isPr: true,
+      files: ['apps/product/src/a.ts', file],
+    });
+    expect(decision.scope).toBe('full');
+    expect(decision.reason).toContain(file);
+  });
+
+  it('判定できない時は full に倒す', () => {
+    expect(resolveProductUnitScope({ isPr: false, files: ['apps/product/src/a.ts'] }).scope).toBe(
+      'full',
+    );
+    expect(resolveProductUnitScope({ isPr: true, files: null }).scope).toBe('full');
+    expect(resolveProductUnitScope({ isPr: true, files: [] }).scope).toBe('full');
+    expect(
+      resolveProductUnitScope({
+        isPr: true,
+        files: Array.from({ length: 3000 }, (_, i) => `apps/product/src/f${i}.ts`),
+      }).scope,
+    ).toBe('full');
+  });
+
+  it('CI_UNIT_MODE=full は PR でも full（nightly と手動の逃げ道）', () => {
+    expect(
+      resolveProductUnitScope({ isPr: true, unitMode: 'full', files: ['apps/product/src/a.ts'] })
+        .scope,
+    ).toBe('full');
+  });
+});
+
+describe('findFsReadingProductTests', () => {
+  it('fs を読む unit test だけを apps/product 基準の path で返す（integration は除く）', () => {
+    const root = mkdtempSync(join(tmpdir(), 'fs-tests-'));
+    const write = (path: string, body: string) => {
+      mkdirSync(dirname(join(root, path)), { recursive: true });
+      writeFileSync(join(root, path), body);
+    };
+    write('src/app/route-contract.test.ts', "import { readFileSync } from 'node:fs';\n");
+    write('src/features/a/boundary.test.ts', "import { readdirSync } from 'fs';\n");
+    write('src/features/a/pure.test.ts', "import { sum } from './sum';\n");
+    write('src/features/a/view.test.tsx', "import { render } from '@testing-library/react';\n");
+    write(
+      'src/lib/test/integration/rls.integration.test.ts',
+      "import { readFileSync } from 'node:fs';\n",
+    );
+    write('src/node_modules/x/y.test.ts', "import { readFileSync } from 'node:fs';\n");
+
+    expect(findFsReadingProductTests({ productDir: root })).toEqual([
+      'src/app/route-contract.test.ts',
+      'src/features/a/boundary.test.ts',
+    ]);
+  });
+
+  it('実 repo の契約 test（service role 境界）を拾う', () => {
+    expect(findFsReadingProductTests()).toContain(
+      'src/features/auth/server/service-role-auth-usage.test.ts',
+    );
   });
 });
 
