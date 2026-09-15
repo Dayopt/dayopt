@@ -28,6 +28,11 @@ import {
   featureOf,
 } from '../lib/architecture-map/inventory.ts';
 import {
+  likec4Id,
+  renderLikeC4Model,
+  renderLikeC4Views,
+} from '../lib/architecture-map/likec4-model.ts';
+import {
   checkGlossaryReferences,
   checkTimeRuleMirrorReferences,
 } from '../lib/architecture-map/references.ts';
@@ -576,5 +581,74 @@ describe('concept-map: 用語集で意味を付け、未マッピングを炙り
     expect(diagram).toContain('table_plans["DB テーブル<br/>plans"]');
     expect(diagram).toContain('mcp_tool_plans_list["MCP tool<br/>plans.list"]');
     expect(diagram).not.toContain('useTimeblockInspectorStore');
+  });
+});
+
+describe('likec4-model: Inventory + 用語集 + DAG から LikeC4 model / views を生成する', () => {
+  const entry = (overrides: Partial<GlossaryEntry>): GlossaryEntry => ({
+    id: 'x',
+    layer: 'ui',
+    status: 'current',
+    concept: 'X',
+    usage: 'u',
+    ...overrides,
+  });
+  const glossary = [
+    entry({
+      id: 'plan',
+      concept: 'Plan',
+      usage: "it's a plan",
+      code: { feature: 'timeblock' },
+      db: ['plans'],
+    }),
+    entry({ id: 'orphan', concept: 'Orphan' }),
+  ];
+  const schema = parseSchemaModel(SCHEMA_FIXTURE);
+  const items = [
+    { kind: 'feature' as const, id: 'timeblock', path: 'apps/product/src/features/timeblock' },
+    { kind: 'feature' as const, id: 'activities', path: 'apps/product/src/features/activities' },
+    { kind: 'table' as const, id: 'plans', path: 'supabase/migrations' },
+    { kind: 'table' as const, id: 'activities', path: 'supabase/migrations' },
+    { kind: 'mcp-tool' as const, id: 'probe.ping', path: 'registry.ts', detail: 'read:probe' },
+    {
+      kind: 'story' as const,
+      id: 'Product/X',
+      path: 'apps/product/src/features/timeblock/X.stories.tsx',
+      feature: 'timeblock',
+    },
+  ];
+  const map = mapInventoryToConcepts(items, glossary);
+  const dag = buildFeatureDag(parseFeatureRules(ESLINT_FIXTURE), [
+    { from: 'timeblock', to: 'activities' },
+  ]);
+  const sources = { map, glossary, dag, schema };
+
+  it('識別子は種別 prefix 付きで、同名の feature と table が衝突しない', () => {
+    expect(likec4Id('f', 'activities')).toBe('f_activities');
+    expect(likec4Id('t', 'activities')).toBe('t_activities');
+    expect(likec4Id('mcp', 'plans.trash.list')).toBe('mcp_plans_trash_list');
+  });
+
+  it('model は対応を持つ概念だけを載せ、未マッピング要素に #unmapped を付け、Story は載せない', () => {
+    const model = renderLikeC4Model(sources);
+    expect(model).toContain("concept c_plan 'Plan' {");
+    expect(model).toContain("description 'it\\'s a plan'");
+    expect(model).not.toContain('c_orphan');
+    expect(model).toContain("mcptool mcp_probe_ping 'probe.ping' {\n    #unmapped");
+    expect(model).not.toContain('Product/X');
+    expect(model).toContain("  c_plan -> f_timeblock 'direct'");
+    expect(model).toContain("  c_plan -> t_plans 'direct'");
+    expect(model).toContain("  f_timeblock -> f_activities 'imports'");
+    expect(model).toContain("  t_plans -> t_activities 'FK activity_id, user_id'");
+    expect(model).not.toContain('metadata { kind ');
+  });
+
+  it('views は固定 view と、直接対応を持つ概念ごとの view を出す', () => {
+    const views = renderLikeC4Views(sources);
+    for (const name of ['index', 'features', 'data', 'mcp', 'unmapped']) {
+      expect(views).toContain(`view ${name} {`);
+    }
+    expect(views).toContain('view concept_plan of c_plan {');
+    expect(views).not.toContain('concept_orphan');
   });
 });

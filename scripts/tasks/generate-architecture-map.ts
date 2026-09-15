@@ -15,6 +15,7 @@
  *   - 実装の自動発見（feature / table / 関数 / router / procedure / MCP tool / store / Story / route / i18n）
  *     + 用語集の対応（`code.feature` / `db` / `mcpTools` / `i18nNamespace`）
  *       → `docs/engineering/data/architecture-inventory.md`（全文生成。未マッピングも一覧）
+ *       → `architecture/model.c4` / `architecture/views.c4`（LikeC4。interactive な探索 view）
  *
  * あわせて、text 正本が指す参照（feature / 識別子 / DB / path / symbol）の実在を検査する。
  *
@@ -51,6 +52,7 @@ import {
   replaceGeneratedBlock,
 } from '../lib/architecture-map/generated-block.ts';
 import { discoverInventory } from '../lib/architecture-map/inventory.ts';
+import { renderLikeC4Model, renderLikeC4Views } from '../lib/architecture-map/likec4-model.ts';
 import {
   checkGlossaryReferences,
   checkTimeRuleMirrorReferences,
@@ -73,6 +75,8 @@ const ESLINT_CONFIG_PATH = 'apps/product/eslint.config.mjs';
 const ARCHITECTURE_DOC = 'docs/engineering/architecture.md';
 const INVARIANTS_DOC = 'docs/engineering/invariants.md';
 export const INVENTORY_DOC = 'docs/engineering/data/architecture-inventory.md';
+export const LIKEC4_MODEL = 'architecture/model.c4';
+export const LIKEC4_VIEWS = 'architecture/views.c4';
 
 const ER_MARKERS = architectureMapMarkers('er', SCHEMA_TYPES_PATH);
 const FEATURE_DAG_MARKERS = architectureMapMarkers(
@@ -180,8 +184,19 @@ export async function buildArchitectureMapDocs(): Promise<GeneratedDocument[]> {
     INVARIANTS_DOC,
   );
 
+  const sources = collectProductSources(ROOT);
+  const conceptMap = mapInventoryToConcepts(discoverInventory(ROOT, sources, schema), GLOSSARY);
+  const likec4Sources = {
+    map: conceptMap,
+    glossary: GLOSSARY,
+    dag: buildFeatureDag(
+      parseFeatureRules(readRepoFile(ESLINT_CONFIG_PATH)),
+      collectFeatureDependencies(sources),
+    ),
+    schema,
+  };
   const inventory = renderInventoryDocument(
-    mapInventoryToConcepts(discoverInventory(ROOT, collectProductSources(ROOT), schema), GLOSSARY),
+    conceptMap,
     GLOSSARY,
     [
       '> **生成元**: `scripts/tasks/generate-architecture-map.ts`（`pnpm architecture:generate`）。',
@@ -195,7 +210,13 @@ export async function buildArchitectureMapDocs(): Promise<GeneratedDocument[]> {
     [ARCHITECTURE_DOC, architecture],
     [INVARIANTS_DOC, invariants],
     [INVENTORY_DOC, inventory],
+    [LIKEC4_MODEL, renderLikeC4Model(likec4Sources)],
+    [LIKEC4_VIEWS, renderLikeC4Views(likec4Sources)],
   ] as const) {
+    if (!path.endsWith('.md')) {
+      documents.push({ path, content });
+      continue;
+    }
     // repo の .prettierrc（singleQuote 等）を解決してから整形する。既定設定で整形すると
     // doc 内の埋め込み code block が別 style になり、format:check で偽 drift が出る
     const filepath = resolve(ROOT, path);
