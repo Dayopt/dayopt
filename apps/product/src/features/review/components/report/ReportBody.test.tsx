@@ -470,18 +470,46 @@ describe('ReportBody', () => {
    * E2E 側が追従しないまま merge され、promote が赤になって初めて分かった（#2774）。
    * ここが同じ改名を per-PR で止める。**赤くなったら E2E 側も直す**のが正しい直し方で、
    * `report-selectors.ts` の値だけ合わせても E2E は直らない。
+   *
+   * **この test が緑でも E2E が通るとは限らない。** ここの集計は 3 アクティビティ /
+   * 2 カテゴリーで、E2E の seed は 1 カテゴリー・1 アクティビティ。配分の横棒のように
+   * 集合の大きさで描画が変わる要素は、ここでは出て E2E では出ない（実際に #2774 の
+   * 1 回目の修正がそれで promote を落とした）。選べる要素は E2E 側と同じ条件で出るものにする。
    */
   describe('E2E セレクタ契約（#2774）', () => {
     it.each<[ReportTab, string]>([
       ['usage', REPORT_ALLOCATION.chapter],
       ['usage', REPORT_ALLOCATION.recordedHeadline],
       ['usage', REPORT_ALLOCATION.breakdownRows],
+      ['usage', REPORT_ALLOCATION.usageRows],
       ['diff', REPORT_EXECUTION.chapter],
       ['diff', REPORT_EXECUTION.rows],
     ])('%s タブで %s が解決する', (tab, selector) => {
       renderBody(tab);
 
       expect(document.querySelectorAll(selector).length).toBeGreaterThan(0);
+    });
+
+    /**
+     * E2E の seed（記録のあるカテゴリー 1・アクティビティ 1）でも描かれる要素だけを
+     * E2E が見ていることを固定する。配分の横棒はこの条件で `'none'` になり消えるので、
+     * E2E の assertion に使ってはいけない。
+     */
+    it('E2E の seed（1 カテゴリー 1 アクティビティ）では横棒は消えるがアクティビティ一覧は残る', () => {
+      useReportPeriod.mockReturnValue({
+        data: {
+          ...PERIOD_DATA,
+          activities: [PERIOD_DATA.activities[0]],
+          previousActivities: [],
+        },
+        isPending: false,
+        isError: false,
+      });
+      renderBody('usage');
+
+      expect(document.querySelectorAll(REPORT_ALLOCATION.breakdownRows)).toHaveLength(0);
+      expect(document.querySelectorAll(REPORT_ALLOCATION.usageRows).length).toBeGreaterThan(0);
+      expect(document.querySelector(REPORT_ALLOCATION.recordedHeadline)).not.toBeNull();
     });
   });
 });

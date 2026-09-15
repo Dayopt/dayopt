@@ -10,10 +10,13 @@ import { suppressConsentBanner } from './suppress-consent-banner';
  *
  * spec ごとに `createCriticalPathIdentity` で別ユーザーを作る。desktop と mobile が
  * 同じユーザーを共有すると、serial で作った Plan / Record が互いの Report 集計へ
- * 混ざり、`1:00` の assertion が片方の成否に依存する。
+ * 混ざり、`1時間` の assertion が片方の成否に依存する。
  */
 
 export const TIMEZONE = 'Asia/Tokyo';
+
+/** `formatReportSpan(60, 'ja')` の表記。E2E は ja locale で開く。 */
+const ONE_HOUR_SPAN = '1時間';
 
 export type AdminSupabase = ReturnType<typeof createClient<Database>>;
 
@@ -194,24 +197,30 @@ export async function revealHour(page: Page, hour: number) {
 }
 
 /**
- * 記録した 1 時間が /report の 1 章（配分）へ反映されたことを確かめる。
+ * 記録した 1 時間が /report の「時間の使い方」へ反映されたことを確かめる。
  *
- * 配分の横棒のうち「このカテゴリーの行」が 1 時間ぶんを出す。`未分類` を許容しない —
- * カテゴリー紐付けを失う回帰では label が未分類へ落ちてこの行が消えるため、
- * getByText('1:00') のような行を特定しない一致では緑になってしまう。
+ * **完全一致で見る。** 表記は読み物向けの `formatReportSpan`（`1時間` / `12分`）で、
+ * `not.toHaveText('0:00')` のような否定は書式が変われば何にでも当たる
+ * （#2773 で `h:mm` から変わった後も緑のままだった。#2774）。
+ *
+ * 行は**配分の横棒ではなくアクティビティ一覧**を見る。横棒は記録のあるカテゴリーも
+ * アクティビティも 1 つだけだと `resolveAllocationMode` が `'none'` を返して
+ * 描かれず、この seed（カテゴリー 1・アクティビティ 1）では必ず 0 件になる。
+ *
+ * カテゴリー紐付けが `未分類` へ落ちる回帰は unit 側で固定してある
+ * （`ReportBody.test.tsx` の配分・凡例の test 群）。ここは「記録した 1 時間が
+ * この面のこのアクティビティの行に出る」ことだけを end-to-end で見る。
  */
-export async function expectReportAllocationShowsOneHour(page: Page, categoryName: string) {
+export async function expectReportAllocationShowsOneHour(page: Page, activityName: string) {
   const allocation = page.locator(REPORT_ALLOCATION.chapter);
   await expect(allocation).toBeVisible({ timeout: 10_000 });
 
-  // ヘッドラインは記録合計の `h:mm`。1 時間の記録があるので 0:00 のままにはならない。
-  const headline = allocation.locator(REPORT_ALLOCATION.recordedHeadline);
-  await expect(headline).toBeVisible({ timeout: 10_000 });
-  await expect(headline).not.toHaveText('0:00');
+  const recorded = allocation.locator(REPORT_ALLOCATION.recordedHeadline);
+  await expect(recorded).toHaveText(ONE_HOUR_SPAN, { timeout: 10_000 });
 
-  const breakdownRow = allocation
-    .locator(REPORT_ALLOCATION.breakdownRows)
-    .filter({ hasText: categoryName });
-  await expect(breakdownRow).toHaveCount(1, { timeout: 10_000 });
-  await expect(breakdownRow).toContainText('1:00');
+  const usageRow = allocation
+    .locator(REPORT_ALLOCATION.usageRows)
+    .filter({ hasText: activityName });
+  await expect(usageRow).toHaveCount(1, { timeout: 10_000 });
+  await expect(usageRow).toContainText(ONE_HOUR_SPAN);
 }
