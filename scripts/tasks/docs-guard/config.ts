@@ -18,7 +18,18 @@ export const STOCK_DIRS = ['business', 'product', 'engineering', 'operations', '
 export const ROOT_STOCK_FILES = ['docs/strategy.md'];
 
 // 手書きfrontmatterを付けないgenerated file。完全一致だけを例外にする。
-export const GENERATED_DOCS = ['docs/engineering/data/db/rls-snapshot.md'];
+// generated file ごとの表示契約: 冒頭に生成元 script・再生成 command・「手で編集しない」を必ず持つ
+export const GENERATED_DOC_CONTRACTS: Record<string, { source: string; command: string }> = {
+  'docs/engineering/data/db/rls-snapshot.md': {
+    source: 'scripts/tasks/generate-rls-snapshot.ts',
+    command: 'pnpm rls:snapshot',
+  },
+  'docs/engineering/data/architecture-inventory.md': {
+    source: 'scripts/tasks/generate-architecture-map.ts',
+    command: 'pnpm architecture:generate',
+  },
+};
+export const GENERATED_DOCS = Object.keys(GENERATED_DOC_CONTRACTS);
 
 export const colors = {
   reset: '\x1b[0m',
