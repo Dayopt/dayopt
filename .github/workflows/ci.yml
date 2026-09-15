@@ -178,6 +178,11 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          # migration safety の git fallback（check.mjs の fetchPrFilesFromGit）が
+          # `refs/pull/N/merge` の第 1 親を diff base に使う。1（既定の shallow）へ
+          # 戻すと親 object が無く、認証の要る `git fetch` しか残らないので private repo で
+          # fallback が死ぬ（→ undeterminable → この job が赤。#2750）
+          fetch-depth: 2
           persist-credentials: false
 
       - uses: ./.github/actions/setup

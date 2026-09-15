@@ -103,10 +103,25 @@ export function fetchPrFilenames({ repo, prNumber, execImpl = execFileSync, env 
 }
 
 /**
- * migration safety の git fallback。`gh api` が使えない時に、base ref との two-dot diff から
- * `{ filename, status }` を組み立てる。shallow checkout でも動くよう merge-base（`...`）は使わず、
- * base ref が無ければ `git fetch --depth=1` を 1 回試す（public repo なので credential 不要）。
+ * migration safety の git fallback。`gh api` が使えない時に two-dot diff から
+ * `{ filename, status }` を組み立てる。shallow checkout でも動くよう merge-base（`...`）は使わない。
  * 判定できなければ null（呼び出し側が fail closed にする）。
+ *
+ * base の探し方は 3 段。**認証を要さない経路から先に試す**:
+ *
+ * 1. 解決できる base ref（ローカル実行では `origin/main` がある）
+ * 2. `refs/pull/N/merge` の第 1 親 `HEAD^1`。`pull_request` の checkout は merge ref を
+ *    取るので、第 1 親が base 側になる。**`ci.yml` の unit job checkout が
+ *    `fetch-depth: 2` であることに依存する**（1 に戻すと親 object が無くこの段は落ち、
+ *    3 へ進んで結局 null → `undeterminable` → job が赤くなる。静かに gate は開かない）
+ * 3. `git fetch --depth=1`。**private repo では認証が無いので失敗する見込み**
+ *    （`推定`。private 化は未実施）。#2750 がこの段だけに頼る状態を問題にした
+ *
+ * 2 は `HEAD^2` の存在確認で「HEAD が merge commit であること」と「depth >= 2 が実際に
+ * fetch されていること」を同時に見る。`^{commit}` の peel を外すと、shallow で親 object が
+ * 無くても commit の parent 欄から sha が返ってしまうので外さない。merge commit でなければ
+ * `HEAD^1` は「PR branch の 1 つ前の commit」というもっともらしい誤答になるため、
+ * ここを緩めない。
  * @param {{ baseRef?: string, execImpl?: ExecFileImpl, spawnImpl?: SpawnImpl, env?: NodeJS.ProcessEnv }} opts
  * @returns {{ filename: string, status: string }[] | null}
  */
@@ -117,18 +132,34 @@ export function fetchPrFilesFromGit({
   env,
 } = {}) {
   const opts = { encoding: 'utf8', cwd: ROOT, ...(env ? { env } : {}) };
-  const hasRef = () =>
-    spawnImpl('git', ['rev-parse', '--verify', '--quiet', `${baseRef}^{commit}`], opts).status ===
-    0;
-  if (!hasRef()) {
+  const hasRev = (rev) =>
+    spawnImpl('git', ['rev-parse', '--verify', '--quiet', `${rev}^{commit}`], opts).status === 0;
+
+  /** @returns {string | null} diff の base に使える rev */
+  const resolveBase = () => {
+    if (hasRev(baseRef)) return baseRef;
+    // merge commit の第 1 親（credential 不要。private repo でもここで解決する）
+    if (hasRev('HEAD^2') && hasRev('HEAD^1')) return 'HEAD^1';
     const remote = baseRef.split('/')[0];
     const branch = baseRef.slice(remote.length + 1);
-    spawnImpl('git', ['fetch', '--depth=1', remote, `${branch}:refs/remotes/${baseRef}`], opts);
-    if (!hasRef()) return null;
-  }
+    const fetched = spawnImpl(
+      'git',
+      ['fetch', '--depth=1', remote, `${branch}:refs/remotes/${baseRef}`],
+      opts,
+    );
+    if (fetched.status !== 0) {
+      // private repo で認証が無い時の 401 / 404 をログへ残す。黙って null にしない
+      console.log(`::notice::git fetch ${baseRef} が失敗した（status ${fetched.status}）`);
+    }
+    return hasRev(baseRef) ? baseRef : null;
+  };
+
+  const base = resolveBase();
+  if (base === null) return null;
+
   let out;
   try {
-    out = execImpl('git', ['diff', '--name-status', '-M', baseRef, 'HEAD'], opts);
+    out = execImpl('git', ['diff', '--name-status', '-M', base, 'HEAD'], opts);
   } catch {
     return null;
   }
@@ -798,7 +829,7 @@ export async function runMigrationSafety({
   //
   // ただし coupled 判定（#2680）は hard fail の保証なので、取得失敗で黙って gate が開く
   // 形にはしない（push 前反証レビュー指摘、P2）: gh api を 1 回だけ再試行し、それでも
-  // 駄目なら base ref との git diff で代替する。どちらも判定できなければ `undeterminable`
+  // 駄目なら git diff（base ref または merge commit の第 1 親）で代替する。どちらも判定できなければ `undeterminable`
   // を返し、呼び出し側（runUnit）が unit test 完走後に job を落とす（再実行で直る
   // 一時障害なら再実行、token 配線の壊れなら「静かに失効したガードレール」ではなく
   // 赤い job として見える）。
@@ -830,7 +861,7 @@ export async function runMigrationSafety({
         };
       }
       files = fromGit;
-      fallbackNote = `\n> ⚠️ PR のファイル一覧は gh api が失敗したため base ref との git diff で代替した（${firstMessage.slice(0, 160)}）。\n`;
+      fallbackNote = `\n> ⚠️ PR のファイル一覧は gh api が失敗したため git diff（base ref または merge commit の第 1 親）で代替した（${firstMessage.slice(0, 160)}）。\n`;
     }
   }
   const withContent = files
