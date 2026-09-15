@@ -121,12 +121,18 @@ const mockUser = {
 
 // mock 戻り値は satisfies で auth-js の実型に固定し、仮定 mock の形骸化を防ぐ
 const verifiedFactorsList = {
-  data: { all: [VERIFIED_FACTOR], totp: [VERIFIED_FACTOR], phone: [], webauthn: [] },
+  data: {
+    all: [VERIFIED_FACTOR],
+    totp: [VERIFIED_FACTOR],
+    phone: [],
+    webauthn: [],
+    recovery_code: [],
+  },
   error: null,
 } satisfies AuthMFAListFactorsResponse;
 
 const emptyFactorsList = {
-  data: { all: [], totp: [], phone: [], webauthn: [] },
+  data: { all: [], totp: [], phone: [], webauthn: [], recovery_code: [] },
   error: null,
 } satisfies AuthMFAListFactorsResponse;
 

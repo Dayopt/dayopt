@@ -33,11 +33,11 @@
     "@tailwindcss/vite": "^4.3.3",
     "@vueless/storybook-dark-mode": "catalog:tooling",
     "eslint-plugin-storybook": "catalog:tooling",
-    "mermaid": "^11.16.1",
+    "mermaid": "^11.17.2",
     "remark-gfm": "catalog:",
     "storybook": "catalog:tooling",
     "typescript": "catalog:tooling",
-    "vite": "^8.1.5",
+    "vite": "^8.3.0",
     "vitest": "catalog:tooling"
   }
 }
