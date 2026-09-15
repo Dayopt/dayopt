@@ -183,6 +183,6 @@ describeWithEnv('Critical Path: 計画 → 実績 → 振り返り', () => {
     // レポートは週 / 月 / 年の 3 粒度（#2575）。前日の記録は今週の中に入る。
     await page.goto(`/ja/report?date=${offsetDateParam(-1)}&range=week`);
 
-    await expectReportAllocationShowsOneHour(page, IDENTITY.categoryName);
+    await expectReportAllocationShowsOneHour(page, IDENTITY.activityName);
   });
 });

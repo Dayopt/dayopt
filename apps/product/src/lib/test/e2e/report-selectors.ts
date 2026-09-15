@@ -22,8 +22,17 @@ export const REPORT_ALLOCATION = {
   chapter: '[data-report-chapter="allocation"]',
   /** 記録時間のカードの大きい数字（`h:mm`）。 */
   recordedHeadline: '[data-report-summary="recorded"]',
-  /** 配分の横棒の一覧。行ごとにカテゴリー名と時間を出す。 */
+  /**
+   * 配分の横棒の一覧。行ごとにカテゴリー（またはアクティビティ）名と時間を出す。
+   *
+   * **記録のあるカテゴリーが 1 つ、かつアクティビティも 1 つだと描かれない**
+   * （`resolveAllocationMode` が `'none'` を返し `AllocationBars` ごと省く）。
+   * 1 アクティビティしか作らない E2E の seed では使えないので、そちらは
+   * `usageRows` を見る。
+   */
   breakdownRows: '[data-report-bars="allocation"] li',
+  /** アクティビティ一覧の行。記録が 1 件でもあれば必ず描かれる。 */
+  usageRows: '[data-report-table="usage"] li',
 } as const;
 
 /** 差分の面（`?tab=diff`）。既定タブではないので、開くには `tab` パラメータが要る。 */

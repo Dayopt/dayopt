@@ -156,7 +156,7 @@ describeWithEnv('Mobile Critical Path: 計画 → 実績 → 振り返り', () =
       await page.getByRole('link', { name: 'レポートを開く' }).click();
       await expect(page).toHaveURL(/\/ja\/report\?/, { timeout: 10_000 });
 
-      await expectReportAllocationShowsOneHour(page, IDENTITY.categoryName);
+      await expectReportAllocationShowsOneHour(page, IDENTITY.activityName);
     },
   );
 });
