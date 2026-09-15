@@ -27,6 +27,7 @@ export const GLOSSARY: readonly GlossaryEntry[] = [
     en: 'Timeblock',
     usage: 'カレンダー上の時間ブロック。予定 / 記録の総称',
     code: { feature: 'timeblock', i18nNamespace: 'timeblock' },
+    mcpTools: ['entries.list', 'constraints.get'],
     refs: ['decisions.md 2026-09-07'],
     forbidden: [
       {
@@ -122,6 +123,15 @@ export const GLOSSARY: readonly GlossaryEntry[] = [
     usage: 'これからやる時間の宣言。時間軸のどこにでも置ける独立エンティティ',
     code: { identifiers: ['PlanEvent'], feature: 'timeblock' },
     db: ['plans'],
+    mcpTools: [
+      'plans.list',
+      'plans.get',
+      'plans.create',
+      'plans.update',
+      'plans.delete',
+      'plans.restore',
+      'plans.trash.list',
+    ],
     forbidden: [
       {
         term: '計画',
@@ -142,6 +152,15 @@ export const GLOSSARY: readonly GlossaryEntry[] = [
     usage: '実際に使った時間。予定とは独立して保存し、未来には終われない',
     code: { identifiers: ['RecordEvent'], feature: 'timeblock' },
     db: ['records'],
+    mcpTools: [
+      'records.list',
+      'records.get',
+      'records.create',
+      'records.update',
+      'records.delete',
+      'records.restore',
+      'records.trash.list',
+    ],
     forbidden: [
       {
         term: '実績',
@@ -173,6 +192,7 @@ export const GLOSSARY: readonly GlossaryEntry[] = [
     usage: '予定と記録の単位。最も具体的な分類で、無限に増えてよい',
     code: { feature: 'activities', i18nNamespace: 'activities' },
     db: ['activities'],
+    mcpTools: ['activities.list'],
     refs: ['#2162'],
     forbidden: [
       {
@@ -201,6 +221,7 @@ export const GLOSSARY: readonly GlossaryEntry[] = [
     en: 'Category',
     usage: '所属の主軸。1 アクティビティは最大 1 カテゴリー。色とアイコンを持つ',
     db: ['categories'],
+    mcpTools: ['categories.list'],
     refs: ['#2162'],
   },
   {

@@ -12,6 +12,9 @@
  *       → ER 図「概念に紐づくテーブル」の選択に使う
  *   - `apps/product/eslint.config.mjs` の no-restricted-imports + features/ の実 import
  *       → architecture.md の生成ブロック（Feature DAG 図）
+ *   - 実装の自動発見（feature / table / 関数 / router / procedure / MCP tool / store / Story / route / i18n）
+ *     + 用語集の対応（`code.feature` / `db` / `mcpTools` / `i18nNamespace`）
+ *       → `docs/engineering/data/architecture-inventory.md`（全文生成。未マッピングも一覧）
  *
  * あわせて、text 正本が指す参照（feature / 識別子 / DB / path / symbol）の実在を検査する。
  *
@@ -25,11 +28,15 @@
  *   pnpm architecture:check
  */
 
-import { readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { format as formatWithPrettier, resolveConfig as resolvePrettierConfig } from 'prettier';
 
+import {
+  mapInventoryToConcepts,
+  renderInventoryDocument,
+} from '../lib/architecture-map/concept-map.ts';
 import { renderErDiagram, renderTableIndex } from '../lib/architecture-map/er-diagram.ts';
 import {
   buildFeatureDag,
@@ -43,6 +50,7 @@ import {
   architectureMapMarkers,
   replaceGeneratedBlock,
 } from '../lib/architecture-map/generated-block.ts';
+import { discoverInventory } from '../lib/architecture-map/inventory.ts';
 import {
   checkGlossaryReferences,
   checkTimeRuleMirrorReferences,
@@ -64,6 +72,7 @@ const SCHEMA_TYPES_PATH = 'apps/product/src/lib/database/generated/database.type
 const ESLINT_CONFIG_PATH = 'apps/product/eslint.config.mjs';
 const ARCHITECTURE_DOC = 'docs/engineering/architecture.md';
 const INVARIANTS_DOC = 'docs/engineering/invariants.md';
+export const INVENTORY_DOC = 'docs/engineering/data/architecture-inventory.md';
 
 const ER_MARKERS = architectureMapMarkers('er', SCHEMA_TYPES_PATH);
 const FEATURE_DAG_MARKERS = architectureMapMarkers(
@@ -85,6 +94,11 @@ export interface GeneratedDocument {
 
 function readRepoFile(path: string): string {
   return readFileSync(resolve(ROOT, path), 'utf8');
+}
+
+/** 全文生成の doc は初回に存在しないので、無ければ空文字として drift 扱いにする */
+function readRepoFileOrEmpty(path: string): string {
+  return existsSync(resolve(ROOT, path)) ? readRepoFile(path) : '';
 }
 
 export function loadFeatureDag(): FeatureDag {
@@ -166,10 +180,21 @@ export async function buildArchitectureMapDocs(): Promise<GeneratedDocument[]> {
     INVARIANTS_DOC,
   );
 
+  const inventory = renderInventoryDocument(
+    mapInventoryToConcepts(discoverInventory(ROOT, collectProductSources(ROOT), schema), GLOSSARY),
+    GLOSSARY,
+    [
+      '> **生成元**: `scripts/tasks/generate-architecture-map.ts`（`pnpm architecture:generate`）。',
+      '> 実装（`apps/product/src` / `supabase`）から自動発見した項目に、`scripts/lib/glossary/terms.ts` の対応を重ねた snapshot。',
+      '> **手で編集しない**。drift は `pnpm architecture:check`（docs-guard からも常時実行）が検出する。',
+    ].join('\n'),
+  );
+
   const documents: GeneratedDocument[] = [];
   for (const [path, content] of [
     [ARCHITECTURE_DOC, architecture],
     [INVARIANTS_DOC, invariants],
+    [INVENTORY_DOC, inventory],
   ] as const) {
     // repo の .prettierrc（singleQuote 等）を解決してから整形する。既定設定で整形すると
     // doc 内の埋め込み code block が別 style になり、format:check で偽 drift が出る
@@ -191,7 +216,24 @@ export function checkArchitectureReferences(): ReferenceViolation[] {
     parseFeatureRules(readRepoFile(ESLINT_CONFIG_PATH)),
     collectFeatureDependencies(sources),
   );
+  const mcpTools = new Set(
+    discoverInventory(ROOT, sources, schema)
+      .filter((item) => item.kind === 'mcp-tool')
+      .map((item) => item.id),
+  );
+  const mcpViolations: ReferenceViolation[] = [];
+  for (const entry of GLOSSARY) {
+    for (const tool of entry.mcpTools ?? []) {
+      if (!mcpTools.has(tool)) {
+        mcpViolations.push({
+          source: `glossary:${entry.id}`,
+          reason: `mcpTools '${tool}' は MCP registry にありません`,
+        });
+      }
+    }
+  }
   return [
+    ...mcpViolations,
     ...checkGlossaryReferences(GLOSSARY, schema, sources, ROOT),
     ...checkTimeRuleMirrorReferences(timeRules.mirrors, sources),
     ...checkFeatureDagConsistency(dag).map((reason) => ({ source: 'feature-dag', reason })),
@@ -202,7 +244,7 @@ export function checkArchitectureReferences(): ReferenceViolation[] {
 export async function findStaleArchitectureMapDocs(): Promise<string[]> {
   const documents = await buildArchitectureMapDocs();
   return documents
-    .filter((document) => readRepoFile(document.path).trim() !== document.content.trim())
+    .filter((document) => readRepoFileOrEmpty(document.path).trim() !== document.content.trim())
     .map((document) => document.path);
 }
 
@@ -230,7 +272,7 @@ async function main(): Promise<void> {
 
   if (CHECK_MODE) {
     for (const document of documents) {
-      if (readRepoFile(document.path).trim() !== document.content.trim()) {
+      if (readRepoFileOrEmpty(document.path).trim() !== document.content.trim()) {
         ok = false;
         console.error(`❌ ${document.path} の生成ブロックが最新ではありません。`);
       }
@@ -241,6 +283,7 @@ async function main(): Promise<void> {
   }
 
   for (const document of documents) {
+    mkdirSync(dirname(resolve(ROOT, document.path)), { recursive: true });
     writeFileSync(resolve(ROOT, document.path), document.content);
     console.log(`✅ 生成しました: ${document.path}`);
   }

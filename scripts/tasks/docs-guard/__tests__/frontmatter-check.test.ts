@@ -265,6 +265,28 @@ superseded_by:
 
     expect(reasons).toEqual(['generated snapshotに生成元・command・手編集禁止の表示がない']);
   });
+
+  it('generated file ごとの契約（生成元 script / command）を GENERATED_DOC_CONTRACTS から引く', () => {
+    const inventory = 'docs/engineering/data/architecture-inventory.md';
+    const ok = validateDocumentMetadata({
+      content:
+        '# Architecture Inventory\n\n> 生成元: `scripts/tasks/generate-architecture-map.ts`（`pnpm architecture:generate`）。手で編集しない。',
+      relativePath: inventory,
+      root: createRoot(),
+      today: '2026-07-14',
+    });
+    expect(ok).toEqual([]);
+
+    // rls-snapshot の生成元を書いても inventory の契約は満たさない
+    const wrongSource = validateDocumentMetadata({
+      content:
+        '> 生成元: `scripts/tasks/generate-rls-snapshot.ts`（`pnpm rls:snapshot`）。手で編集しない。',
+      relativePath: inventory,
+      root: createRoot(),
+      today: '2026-07-14',
+    });
+    expect(wrongSource).toEqual(['generated snapshotに生成元・command・手編集禁止の表示がない']);
+  });
 });
 
 describe('product specのレジストリ形式', () => {

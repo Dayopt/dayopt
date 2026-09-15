@@ -383,6 +383,8 @@ USING (auth.uid() = user_id);
 Dayopt は Supabase（PostgreSQL）を使用する。本番は Pro organization の `dayopt` project、PR ごとの検証は ephemeral Preview Branches を使い、永続 Staging project は置かない。
 RLS の正確な対象・policy・grant は自動生成の [`data/db/rls-snapshot.md`](./data/db/rls-snapshot.md) を正とする。
 
+実装から自動発見した項目（feature / テーブル / 関数 / router / procedure / MCP tool / store / Story / route / i18n）と用語集の概念との対応、および未マッピング項目は [`data/architecture-inventory.md`](./data/architecture-inventory.md)（生成物）を見る。
+
 ### テーブルの役割（手書き）
 
 一覧・列・FK は下の生成ブロックが正で、ここは役割の説明だけを持つ。ここに無いテーブルは生成ブロックのテーブル一覧で見る。
