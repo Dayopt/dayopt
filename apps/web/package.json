@@ -100,7 +100,7 @@
     "@tailwindcss/typography": "catalog:",
     "@testing-library/react": "catalog:tooling",
     "@types/mdx": "^2.0.14",
-    "@types/node": "^24.13.3",
+    "@types/node": "^24.13.4",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@typescript-eslint/eslint-plugin": "^8.64.0",

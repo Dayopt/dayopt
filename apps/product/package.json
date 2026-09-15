@@ -128,7 +128,7 @@
     "@testing-library/jest-dom": "catalog:tooling",
     "@testing-library/react": "catalog:tooling",
     "@testing-library/user-event": "catalog:tooling",
-    "@types/node": "^24.13.3",
+    "@types/node": "^24.13.4",
     "@types/qrcode": "catalog:tooling",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
