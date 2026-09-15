@@ -7,6 +7,7 @@ import {
 import {
   type AdminSupabase,
   cleanupCriticalPathUser,
+  clickAndAwaitCreate,
   createAdminSupabase,
   createCriticalPathIdentity,
   expectReportAllocationShowsOneHour,
@@ -106,7 +107,11 @@ describeWithEnv('Critical Path: 計画 → 実績 → 振り返り', () => {
     // ドラッグ確定 → 編集と同じ右パネルが作成モードで開く
     const createPanel = page.getByRole('region', { name: 'アクティビティを選択' });
     await expect(createPanel).toBeVisible({ timeout: 10_000 });
-    await createPanel.getByRole('button', { name: ACTIVITY_NAME }).click();
+    await clickAndAwaitCreate(
+      page,
+      createPanel.getByRole('button', { name: ACTIVITY_NAME }),
+      'plan',
+    );
 
     // Plan lane にカードが現れる（lane カードはアクティビティ名を表示する）
     const planCard = page.locator('[data-plan-lane-card]', { hasText: ACTIVITY_NAME }).first();
@@ -130,7 +135,11 @@ describeWithEnv('Critical Path: 計画 → 実績 → 振り返り', () => {
     // ドラッグ確定 → 編集と同じ右パネルが作成モードで開く
     const createPanel = page.getByRole('region', { name: 'アクティビティを選択' });
     await expect(createPanel).toBeVisible({ timeout: 10_000 });
-    await createPanel.getByRole('button', { name: ACTIVITY_NAME }).click();
+    await clickAndAwaitCreate(
+      page,
+      createPanel.getByRole('button', { name: ACTIVITY_NAME }),
+      'record',
+    );
 
     // Record レーンにカードが現れる（lane カードはアクティビティ名を表示する）
     const recordCard = page.locator('[data-record-lane-card]', { hasText: ACTIVITY_NAME }).first();
@@ -154,7 +163,11 @@ describeWithEnv('Critical Path: 計画 → 実績 → 振り返り', () => {
 
     // 過去帯の既定は「記録」。タブで「予定」へ切り替えてから選ぶ
     await createPanel.getByRole('tab', { name: '予定', exact: true }).click();
-    await createPanel.getByRole('button', { name: ACTIVITY_NAME }).click();
+    await clickAndAwaitCreate(
+      page,
+      createPanel.getByRole('button', { name: ACTIVITY_NAME }),
+      'plan',
+    );
 
     const planCard = page.locator('[data-plan-lane-card]', { hasText: ACTIVITY_NAME }).first();
     await expect(planCard).toBeVisible({ timeout: 10_000 });
