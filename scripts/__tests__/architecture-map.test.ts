@@ -1076,7 +1076,7 @@ describe('relations: 呼び出し関係', () => {
     { kind: 'trpc-procedure' as const, id: 'plans.list', path: 'x/server/plans-router.ts' },
     {
       kind: 'trpc-procedure' as const,
-      id: 'billing.getInvoices',
+      id: 'billing.getLegacyInvoices',
       path: 'x/server/billing-router.ts',
     },
     {
@@ -1098,11 +1098,11 @@ describe('relations: 呼び出し関係', () => {
       },
       {
         path: 'apps/product/src/features/settings/components/BillingSettings.stories.tsx',
-        text: 'api.billing.getInvoices.useQuery();',
+        text: 'api.billing.getLegacyInvoices.useQuery();',
       },
       {
         path: 'apps/product/src/features/settings/server/billing-router.ts',
-        text: 'export const billingRouter = createTRPCRouter({ getInvoices: protectedProcedure });',
+        text: 'export const billingRouter = createTRPCRouter({ getLegacyInvoices: protectedProcedure });',
       },
     ];
     const { usage, unused } = collectProcedureUsage(sources, procedures);
@@ -1110,7 +1110,7 @@ describe('relations: 呼び出し関係', () => {
     expect(byId.get('plans.list')?.callers.app).toHaveLength(1);
     expect(byId.get('activities.listActivities')?.callers.mcp).toHaveLength(1);
     // Story と router 定義そのものは呼び出し元に数えない
-    expect(unused).toEqual(['billing.getInvoices']);
+    expect(unused).toEqual(['billing.getLegacyInvoices']);
   });
 
   it('MCP registry の tool を file へ束ね、その file が呼ぶ procedure を出す', () => {

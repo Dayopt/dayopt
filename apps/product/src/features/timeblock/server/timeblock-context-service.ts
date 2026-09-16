@@ -26,11 +26,6 @@ class TimeblockContextService {
     return this.contextClient.getMarker(userId, signal);
   }
 
-  async getRevision(userId: string): Promise<{ revision: string }> {
-    const marker = await this.getMarker(userId);
-    return { revision: marker.revision };
-  }
-
   async getConstraints(
     userId: string,
     range: TimeblockContextRange,
