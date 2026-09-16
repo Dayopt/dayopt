@@ -9,6 +9,7 @@ import {
   buildTrustedPlan,
   collectEvidence,
   createGithubApi,
+  fetchAllReviewPages,
   resolveTarget,
   runValidationGate,
 } from './validation-gate.mjs';
@@ -146,6 +147,7 @@ function fakeApi(overrides: Record<string, unknown> = {}) {
       {
         id: 1,
         user: { login: 't3-nico', type: 'User' },
+        author_association: 'OWNER',
         body: '@codex review',
         created_at: '2026-09-16T10:48:06Z',
         html_url: `https://github.com/${REPO}/pull/7#issuecomment-1`,
@@ -153,6 +155,7 @@ function fakeApi(overrides: Record<string, unknown> = {}) {
       {
         id: 2,
         user: { login: 't3-nico', type: 'User' },
+        author_association: 'OWNER',
         body: `[review-summary]\nhead: ${headSha}\nprovider: codex\nagent: risk-reviewer\nstatus: reviewed\nfindings: 0\n`,
         created_at: '2026-09-16T10:58:00Z',
         html_url: `https://github.com/${REPO}/pull/7#issuecomment-2`,
@@ -176,8 +179,12 @@ function fakeGraphql(threads: unknown[] = []) {
   return () => ({
     repository: {
       pullRequest: {
-        reviews: { nodes: [{ id: 'PRR_1', databaseId: 5221740744 }] },
+        reviews: {
+          pageInfo: { hasNextPage: false, endCursor: null },
+          nodes: [{ id: 'PRR_1', databaseId: 5221740744 }],
+        },
         reviewThreads: {
+          pageInfo: { hasNextPage: false, endCursor: null },
           nodes: threads.length
             ? threads
             : [
@@ -189,7 +196,7 @@ function fakeGraphql(threads: unknown[] = []) {
                   comments: {
                     nodes: [
                       {
-                        author: { login: 'chatgpt-codex-connector[bot]' },
+                        author: { login: 'chatgpt-codex-connector' },
                         body: 'P2',
                         pullRequestReview: { id: 'PRR_1' },
                       },
@@ -752,6 +759,72 @@ describe('validation gate controller', () => {
     expect(outcome.review?.state).toBe('not-started');
     expect(outcome.review?.trigger.shouldRequest).toBe(true);
     expect(outputs.some((text) => text.startsWith('::notice::Review policy'))).toBe(true);
+  });
+
+  it('reads every reviewThreads page and fails closed on an incomplete page', () => {
+    const calls: Record<string, unknown>[] = [];
+    const page = (hasNextPage: boolean, id: string) => ({
+      repository: {
+        pullRequest: {
+          reviews: { pageInfo: { hasNextPage: false, endCursor: null }, nodes: [] },
+          reviewThreads: {
+            pageInfo: { hasNextPage, endCursor: hasNextPage ? `c-${id}` : null },
+            nodes: [
+              { id, isResolved: true, isOutdated: false, path: null, comments: { nodes: [] } },
+            ],
+          },
+        },
+      },
+    });
+    const graphql = (_query: string, variables: Record<string, unknown>) => {
+      calls.push(variables);
+      return variables.threadsAfter === 'c-T1' ? page(false, 'T2') : page(true, 'T1');
+    };
+    const pages = fetchAllReviewPages({ graphql, owner: 'Dayopt', name: 'dayopt', number: 7 });
+    expect(pages.threads.map((thread: { id: string }) => thread.id)).toEqual(['T1', 'T2']);
+    expect(calls[1].threadsAfter).toBe('c-T1');
+    expect(() =>
+      fetchAllReviewPages({
+        graphql: () => ({
+          repository: { pullRequest: { reviews: { nodes: [] }, reviewThreads: { nodes: [] } } },
+        }),
+        owner: 'Dayopt',
+        name: 'dayopt',
+        number: 7,
+      }),
+    ).toThrow('incomplete');
+  });
+
+  it('resolves the PR from an issue_comment event and publishes to the PR head', () => {
+    const { api } = fakeApi();
+    const posted: string[][] = [];
+    const outcome = runValidationGate({
+      env: env({
+        GITHUB_EVENT_NAME: 'issue_comment',
+        GITHUB_EVENT_PATH: writeEvent({ issue: { number: 7, pull_request: { url: 'x' } } }),
+      }),
+      argv: [],
+      api,
+      graphql: fakeGraphql(),
+      cwd,
+      fetchImpl: () => {},
+      output: () => {},
+      postStatus: (args) => {
+        posted.push(args);
+        return '';
+      },
+    });
+    expect(outcome.result?.verdict).toBe('pass');
+    expect(posted.at(-1)).toContain(`repos/${REPO}/statuses/${headSha}`);
+    expect(
+      resolveTarget({
+        eventName: 'issue_comment',
+        event: { issue: { number: 3 } },
+        prArg: undefined,
+        repository: REPO,
+        api,
+      }),
+    ).toBeNull();
   });
 
   it('flattens paginated gh api output and passes exact argv (no shell)', () => {

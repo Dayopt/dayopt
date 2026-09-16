@@ -67,10 +67,11 @@ const request = (createdAt: string, body = '@codex review') => ({
   createdAt,
   htmlUrl: 'https://github.com/Dayopt/dayopt/pull/2800#issuecomment-5696237053',
 });
-const highRiskSummary = (head: string, status = 'reviewed') => ({
+const highRiskSummary = (head: string, status = 'reviewed', authorAssociation = 'OWNER') => ({
   id: 5696227985,
   authorLogin: 't3-nico',
   authorType: 'User',
+  authorAssociation,
   body: `[review-summary]\nhead: ${head}\nprovider: codex\nmodel: gpt-6-astra\nagent: risk-reviewer\nstatus: ${status}\nfindings: 0\n`,
   createdAt: '2026-09-16T10:47:22Z',
   htmlUrl: 'https://github.com/Dayopt/dayopt/pull/2800#issuecomment-5696227985',
@@ -251,6 +252,37 @@ describe('review policy: completion evidence', () => {
     expect(otherBot.state).toBe('not-started');
   });
 
+  it('matches GraphQL thread authors without the [bot] suffix', () => {
+    const graphqlThread = {
+      ...thread('PRR_1', { resolved: false }),
+      comments: [{ authorLogin: 'chatgpt-codex-connector', reviewId: 'PRR_1', body: 'P2' }],
+    };
+    const result = evaluate(
+      [APP],
+      evidence({ reviews: [codexReview(HEAD)], threads: [graphqlThread] }),
+    );
+    expect(result.state).toBe('pending-adjudication');
+  });
+
+  it('excludes dismissed or pending reviews from completion evidence', () => {
+    for (const state of ['DISMISSED', 'PENDING']) {
+      const result = evaluate([APP], evidence({ reviews: [{ ...codexReview(HEAD), state }] }));
+      expect(result.state, state).toBe('not-started');
+    }
+  });
+
+  it('prefers the observed head time over commit metadata when matching requests', () => {
+    const result = evaluate(
+      [APP],
+      evidence({
+        headCommittedAt: '2026-09-16T09:00:00Z',
+        headObservedAt: '2026-09-16T11:50:00Z',
+        comments: [request('2026-09-16T11:45:00Z')],
+      }),
+    );
+    expect(result.state).toBe('not-started');
+  });
+
   it('does not request a review of a blocked head or a draft', () => {
     const blocked = evaluate([APP], evidence(), { validationVerdict: 'blocked' });
     expect(blocked.trigger.shouldRequest).toBe(false);
@@ -286,6 +318,30 @@ describe('review policy: high-risk contract', () => {
     );
     expect(ok.highRisk?.status).toBe('satisfied');
     expect(ok.verdict).toBe('satisfied');
+  });
+
+  it('rejects a review-summary from a non-member and non-strict status forms', () => {
+    const outsider = evaluate(
+      [RLS],
+      evidence({
+        reviews: [codexReview(HEAD)],
+        comments: [highRiskSummary(HEAD, 'reviewed', 'NONE')],
+      }),
+    );
+    expect(outsider.highRisk?.status).toBe('missing');
+    for (const [status, expected] of [
+      ['risk-reviewer=reviewed, behavior-verifier=reviewed', 'satisfied'],
+      ['risk-reviewer=reviewed, behavior-verifier=unknown', 'unknown'],
+      ['not-reviewed', 'unknown'],
+      ['risk-reviewer=reviewed, behavior-verifier=not-run', 'stale'],
+      ['', 'unknown'],
+    ] as const) {
+      const result = evaluate(
+        [RLS],
+        evidence({ reviews: [codexReview(HEAD)], comments: [highRiskSummary(HEAD, status)] }),
+      );
+      expect(result.highRisk?.status, status).toBe(expected);
+    }
   });
 
   it('ignores a bot-authored review-summary marker', () => {

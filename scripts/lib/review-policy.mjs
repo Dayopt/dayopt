@@ -35,17 +35,23 @@ export const REVIEW_RESPONSE_TIMEOUT_MS = 30 * 60 * 1000;
 /**
  * @typedef {{ id: number, authorLogin: string, authorType: string, state: string,
  *   commitId: string, submittedAt: string, htmlUrl: string, body: string }} ReviewEvidence
- * @typedef {{ id: number, authorLogin: string, authorType: string, body: string,
- *   createdAt: string, htmlUrl: string }} CommentEvidence
+ * @typedef {{ id: number, authorLogin: string, authorType: string, authorAssociation?: string,
+ *   body: string, createdAt: string, htmlUrl: string }} CommentEvidence
  * @typedef {{ id: string, isResolved: boolean, isOutdated: boolean, path: string | null,
  *   comments: { authorLogin: string, reviewId: string | null, body: string }[] }} ThreadEvidence
- * @typedef {{ headSha: string, headCommittedAt: string | null,
+ * @typedef {{ headSha: string, headCommittedAt: string | null, headObservedAt?: string | null,
  *   pr: { number: number, state: string, draft: boolean },
  *   reviews: ReviewEvidence[], comments: CommentEvidence[], threads: ThreadEvidence[],
  *   reviewNodeIds?: Record<string, string> }} ReviewPolicyEvidence
  */
 
-const isBot = (entry) => entry.authorLogin === CODEX_LOGIN;
+/** REST は `name[bot]`、GraphQL の author.login は `name`。suffix を正規化して照合する（Codex P2）。 */
+const normalizeLogin = (login) => (login ?? '').replace(/\[bot\]$/, '');
+const isBot = (entry) => normalizeLogin(entry.authorLogin) === normalizeLogin(CODEX_LOGIN);
+/** 高リスク契約の投稿者として受理する author_association（公開 PR では第三者も comment できる）。 */
+export const TRUSTED_ASSOCIATIONS = new Set(['OWNER', 'MEMBER', 'COLLABORATOR']);
+/** 完了証拠として受理する submitted review の state（PENDING / DISMISSED は除外）。 */
+const SUBMITTED_STATES = new Set(['COMMENTED', 'APPROVED', 'CHANGES_REQUESTED']);
 const matchesHead = (short, headSha) =>
   typeof short === 'string' && short.length >= 7 && headSha.startsWith(short.toLowerCase());
 
@@ -53,7 +59,7 @@ const matchesHead = (short, headSha) =>
 export function collectCodexCompletions(evidence) {
   const completions = [];
   for (const review of evidence.reviews ?? []) {
-    if (!isBot(review)) continue;
+    if (!isBot(review) || !SUBMITTED_STATES.has(review.state)) continue;
     const short = review.body?.match(REVIEWED_COMMIT)?.[1]?.toLowerCase() ?? null;
     const target = SHA.test(review.commitId ?? '') ? review.commitId : null;
     completions.push({
@@ -117,6 +123,7 @@ export function readHighRiskSummary(evidence, headSha) {
       (comment) =>
         !isBot(comment) &&
         comment.authorType !== 'Bot' &&
+        TRUSTED_ASSOCIATIONS.has(comment.authorAssociation ?? '') &&
         HIGH_RISK_MARKER.test(comment.body ?? ''),
     )
     .map((comment) => {
@@ -127,10 +134,28 @@ export function readHighRiskSummary(evidence, headSha) {
   const forHead = parsed.filter((entry) => entry.head === headSha);
   if (forHead.length === 0) return { status: parsed.length ? 'stale' : 'missing', entry: null };
   const latest = forHead[forHead.length - 1];
-  if (/\b(not-run|stale|invalid)\b/.test(latest.status)) return { status: 'stale', entry: latest };
-  if (/\bpartial\b/.test(latest.status)) return { status: 'partial', entry: latest };
-  if (/\breviewed\b/.test(latest.status)) return { status: 'satisfied', entry: latest };
-  return { status: 'unknown', entry: latest };
+  return { status: parseHighRiskStatus(latest.status), entry: latest };
+}
+
+/**
+ * `status:` 行を厳密に読む。許容する形は `reviewed` か `role=value` の comma 区切りで、
+ * 全 role の値が正確に `reviewed` の時だけ satisfied。partial / stale / not-run / invalid が
+ * 1 つでもあればその不足を返し、それ以外の値・形は unknown（Codex P2）。
+ */
+export function parseHighRiskStatus(raw) {
+  const values = (raw ?? '')
+    .split(',')
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .map((part) => {
+      const pair = part.match(/^([\w-]+)=([\w-]+)$/);
+      return pair ? pair[2] : part;
+    });
+  if (values.length === 0) return 'unknown';
+  if (values.some((value) => ['not-run', 'stale', 'invalid'].includes(value))) return 'stale';
+  if (values.some((value) => value === 'partial')) return 'partial';
+  if (values.every((value) => value === 'reviewed')) return 'satisfied';
+  return 'unknown';
 }
 
 /**
@@ -174,7 +199,13 @@ export function evaluateReviewPolicy({
   const requests = (evidence.comments ?? []).filter(
     (comment) => !isBot(comment) && REVIEW_REQUEST_PATTERN.test(comment.body ?? ''),
   );
-  const headAt = evidence.headCommittedAt ? Date.parse(evidence.headCommittedAt) : NaN;
+  // head が GitHub 上で観測された時刻（その head の最初の CI run 作成時刻）で依頼を照合する。
+  // commit metadata の日時は cherry-pick / 古い commit の force-push で当てにならない（Codex P2）。
+  const headAt = evidence.headObservedAt
+    ? Date.parse(evidence.headObservedAt)
+    : evidence.headCommittedAt
+      ? Date.parse(evidence.headCommittedAt)
+      : NaN;
   const openRequests = requests.filter(
     (request) => Number.isNaN(headAt) || Date.parse(request.createdAt) >= headAt,
   );

@@ -37,12 +37,18 @@ on:
     workflows: [CI]
     types: [completed]
   status:
+  # レビュー証拠（@codex review 依頼、Codex の完了 comment / summary 表の編集、[review-summary]）は
+  # issue comment として届く。issue_comment も default branch の定義でしか走らない event。
+  # review の submit / thread の resolve は issue_comment を出さないが、通常は修正 push → CI 完了の
+  # workflow_run で再評価される（保証境界は docs/engineering/infra.md）。
+  issue_comment:
+    types: [created, edited]
 
 permissions:
   contents: read
 
 concurrency:
-  group: validation-gate-${{ github.event.workflow_run.head_sha || github.event.sha }}
+  group: validation-gate-${{ github.event.workflow_run.head_sha || github.event.sha || github.event.issue.number }}
   cancel-in-progress: true
 
 jobs:
@@ -52,8 +58,9 @@ jobs:
     # 自身が発行する status（context が Vercel ではない）では走らせない。failure / error も通すのは、
     # wait 上限後に Preview が失敗した時に pending のまま取り残さないため（Codex review P2）。
     if: >-
-      ${{ github.event_name != 'status'
-          || (github.event.state != 'pending' && startsWith(github.event.context, 'Vercel – ')) }}
+      ${{ (github.event_name == 'workflow_run')
+          || (github.event_name == 'status' && github.event.state != 'pending' && startsWith(github.event.context, 'Vercel – '))
+          || (github.event_name == 'issue_comment' && github.event.issue.pull_request != null) }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:

@@ -38,7 +38,7 @@ import { collectPlanInput } from './validation-plan-shadow.mjs';
 
 const SHA = /^[a-f0-9]{40}$/;
 /** default branch の workflow 定義でしか走らない event（status を発行してよい event）。 */
-const TRUSTED_EVENTS = new Set(['workflow_run', 'status']);
+const TRUSTED_EVENTS = new Set(['workflow_run', 'status', 'issue_comment']);
 
 /** gh api を JSON で読む。`--paginate` は配列 endpoint だけに使う。 */
 export function createGithubApi({ execFileImpl } = {}) {
@@ -70,11 +70,12 @@ export function createGithubGraphql({ execFileImpl } = {}) {
   };
 }
 
-const REVIEW_THREADS_QUERY = `query($owner: String!, $name: String!, $number: Int!) {
+const REVIEW_THREADS_QUERY = `query($owner: String!, $name: String!, $number: Int!, $reviewsAfter: String, $threadsAfter: String) {
   repository(owner: $owner, name: $name) {
     pullRequest(number: $number) {
-      reviews(first: 100) { nodes { id databaseId } }
-      reviewThreads(first: 100) {
+      reviews(first: 100, after: $reviewsAfter) { pageInfo { hasNextPage endCursor } nodes { id databaseId } }
+      reviewThreads(first: 100, after: $threadsAfter) {
+        pageInfo { hasNextPage endCursor }
         nodes {
           id isResolved isOutdated path
           comments(first: 50) { nodes { author { login } body pullRequestReview { id } } }
@@ -84,8 +85,38 @@ const REVIEW_THREADS_QUERY = `query($owner: String!, $name: String!, $number: In
   }
 }`;
 
+/** reviews / reviewThreads を最後のページまで読む。途中で応答が欠けたら throw（fail closed）。 */
+export function fetchAllReviewPages({ graphql, owner, name, number, maxPages = 50 }) {
+  const reviews = [];
+  const threads = [];
+  let reviewsAfter = null;
+  let threadsAfter = null;
+  let moreReviews = true;
+  let moreThreads = true;
+  for (let page = 0; moreReviews || moreThreads; page += 1) {
+    if (page >= maxPages) throw new Error('review thread pagination exceeded the page budget');
+    const variables = { owner, name, number };
+    if (reviewsAfter) variables.reviewsAfter = reviewsAfter;
+    if (threadsAfter) variables.threadsAfter = threadsAfter;
+    const pull = graphql(REVIEW_THREADS_QUERY, variables)?.repository?.pullRequest;
+    if (!pull?.reviews?.pageInfo || !pull?.reviewThreads?.pageInfo)
+      throw new Error('review thread page is incomplete');
+    if (moreReviews) {
+      reviews.push(...(pull.reviews.nodes ?? []));
+      moreReviews = pull.reviews.pageInfo.hasNextPage === true;
+      reviewsAfter = pull.reviews.pageInfo.endCursor;
+    }
+    if (moreThreads) {
+      threads.push(...(pull.reviewThreads.nodes ?? []));
+      moreThreads = pull.reviewThreads.pageInfo.hasNextPage === true;
+      threadsAfter = pull.reviewThreads.pageInfo.endCursor;
+    }
+  }
+  return { reviews, threads };
+}
+
 /** Review policy の evidence（review / issue comment / thread / head の commit 日時）を正規化する。 */
-export function collectReviewEvidence({ repository, pr, api, graphql }) {
+export function collectReviewEvidence({ repository, pr, api, graphql, headObservedAt = null }) {
   const headSha = pr.head.sha;
   const reviews = api(`repos/${repository}/pulls/${pr.number}/reviews?per_page=100`, {
     paginate: true,
@@ -105,6 +136,7 @@ export function collectReviewEvidence({ repository, pr, api, graphql }) {
     id: comment.id,
     authorLogin: comment.user?.login ?? '',
     authorType: comment.user?.type ?? '',
+    authorAssociation: comment.author_association ?? '',
     body: comment.body ?? '',
     createdAt: comment.created_at ?? '',
     htmlUrl: comment.html_url ?? '',
@@ -117,12 +149,11 @@ export function collectReviewEvidence({ repository, pr, api, graphql }) {
     headCommittedAt = null;
   }
   const [owner, name] = repository.split('/');
-  const pull = graphql(REVIEW_THREADS_QUERY, { owner, name, number: pr.number })?.repository
-    ?.pullRequest;
+  const pages = fetchAllReviewPages({ graphql, owner, name, number: pr.number });
   const reviewNodeIds = {};
-  for (const node of pull?.reviews?.nodes ?? [])
+  for (const node of pages.reviews)
     if (node?.databaseId) reviewNodeIds[String(node.databaseId)] = node.id;
-  const threads = (pull?.reviewThreads?.nodes ?? []).map((thread) => ({
+  const threads = pages.threads.map((thread) => ({
     id: thread.id,
     isResolved: thread.isResolved === true,
     isOutdated: thread.isOutdated === true,
@@ -136,6 +167,7 @@ export function collectReviewEvidence({ repository, pr, api, graphql }) {
   return {
     headSha,
     headCommittedAt,
+    headObservedAt,
     pr: { number: pr.number, state: pr.state, draft: pr.draft === true },
     reviews,
     comments,
@@ -149,6 +181,12 @@ export function resolveTarget({ eventName, event, prArg, repository, api }) {
   if (prArg !== undefined) {
     const number = Number(prArg);
     return Number.isSafeInteger(number) && number > 0 ? { number, source: 'dispatch' } : null;
+  }
+  // issue_comment（default branch の定義で走る）は PR 番号で対象を決める。PR 以外の issue は対象外。
+  if (eventName === 'issue_comment') {
+    const number = event?.issue?.number;
+    if (!event?.issue?.pull_request || !Number.isSafeInteger(number) || number < 1) return null;
+    return { number, source: eventName };
   }
   const sha = eventShaOf(eventName, event);
   if (!SHA.test(sha ?? '')) return null;
@@ -183,6 +221,7 @@ export function collectEvidence({ repository, pr, api, now = () => new Date() })
       status: run.status,
       conclusion: run.conclusion ?? null,
       htmlUrl: run.html_url,
+      createdAt: run.created_at ?? null,
       jobs: [],
     }));
   for (const run of runs) {
@@ -414,26 +453,27 @@ export function runValidationGate({
   // trusted event から SHA を先に確保する（API に触る前）。以降の PR 解決・取得・収集・評価の
   // どこで例外が起きても、この SHA へ failure を試行できる（Codex P2、3 巡）。
   const eventSha = eventShaOf(env.GITHUB_EVENT_NAME, event);
-  const publishable =
-    publish && TRUSTED_EVENTS.has(env.GITHUB_EVENT_NAME ?? '') && SHA.test(eventSha ?? '');
+  const publishable = publish && TRUSTED_EVENTS.has(env.GITHUB_EVENT_NAME ?? '');
   const runUrl = env.GITHUB_RUN_ID
     ? `${env.GITHUB_SERVER_URL ?? 'https://github.com'}/${repository}/actions/runs/${env.GITHUB_RUN_ID}`
     : '';
-  let statusSha = eventSha;
+  let statusSha = SHA.test(eventSha ?? '') ? eventSha : null;
   const post = (context, status) =>
-    postStatus([
-      'api',
-      '--method',
-      'POST',
-      `repos/${repository}/statuses/${statusSha}`,
-      '-f',
-      `state=${status.state}`,
-      '-f',
-      `context=${context}`,
-      '-f',
-      `description=${status.description.slice(0, 140)}`,
-      ...(runUrl ? ['-f', `target_url=${runUrl}`] : []),
-    ]);
+    statusSha === null
+      ? output(`::warning::Validation gate: no commit to publish ${context} ${status.state} to\n`)
+      : postStatus([
+          'api',
+          '--method',
+          'POST',
+          `repos/${repository}/statuses/${statusSha}`,
+          '-f',
+          `state=${status.state}`,
+          '-f',
+          `context=${context}`,
+          '-f',
+          `description=${status.description.slice(0, 140)}`,
+          ...(runUrl ? ['-f', `target_url=${runUrl}`] : []),
+        ]);
   // fail closed: 対象 PR の解決から評価までを 1 つの try に置き、pending を置いた後はもちろん
   // 置く前の例外でも failure の発行を試みてから再 throw する。これが無いと、同じ head の以前の
   // success が最新 status として残り偽の green になる（Codex P2、2〜3 巡）。open PR が無い
@@ -493,7 +533,13 @@ export function runValidationGate({
       result = evaluateValidation({ plan, evidence });
     }
     result.target = target;
-    const reviewEvidence = collectReviewEvidence({ repository, pr, api, graphql });
+    // head が GitHub 上で観測された時刻 = その head の最初の run 作成時刻（commit 日時より信頼できる）
+    const headObservedAt =
+      evidence.workflowRuns
+        .filter((run) => run.headSha === pr.head.sha && run.createdAt)
+        .map((run) => run.createdAt)
+        .sort()[0] ?? null;
+    const reviewEvidence = collectReviewEvidence({ repository, pr, api, graphql, headObservedAt });
     const review = evaluateReviewPolicy({
       plan,
       evidence: reviewEvidence,

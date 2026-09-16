@@ -24,6 +24,11 @@ describe('validation-gate.yml の信頼境界', () => {
     expect(onBlock).toMatch(/^\s*workflows:\s*\[CI\]\s*$/m);
     // status event も default branch 限定（GitHub docs）。Vercel の success だけを job の if で通す
     expect(onBlock).toMatch(/^\s*status:\s*$/m);
+    // issue_comment も default branch 限定。PR の comment だけ job の if で通す
+    expect(onBlock).toMatch(/^\s*issue_comment:\s*$/m);
+    expect(code).toMatch(
+      /github\.event_name == 'issue_comment' && github\.event\.issue\.pull_request != null/,
+    );
     // pending 以外の terminal state（success / failure / error）で再評価する。success だけだと
     // wait 上限後に失敗した Preview が pending のまま残る
     expect(code).toMatch(
