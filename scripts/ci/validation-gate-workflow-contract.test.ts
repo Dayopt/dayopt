@@ -19,10 +19,11 @@ const code = yaml
 const onBlock = code.slice(code.indexOf('\non:'), code.indexOf('\npermissions:'));
 
 describe('validation-gate.yml の信頼境界', () => {
-  it('default branch でしか走らない event だけを使う（pull_request 系は使わない）', () => {
+  it('default branch の定義でしか走らない workflow_run だけを使う', () => {
     expect(onBlock).toMatch(/^\s*workflow_run:/m);
     expect(onBlock).toMatch(/^\s*workflows:\s*\[CI\]\s*$/m);
-    expect(onBlock).toMatch(/^\s*workflow_dispatch:/m);
+    // workflow_dispatch は任意 ref の定義で走る（Codex review P2、PR #2804）。使わない。
+    expect(onBlock).not.toMatch(/^\s*workflow_dispatch:/m);
     // deployment_status は deployment の commit（PR head）の workflow 定義で走る（PR #2804 で実測）。
     // statuses:write を持つ controller の trigger にすると PR 側の定義に token が渡る。
     expect(onBlock).not.toMatch(/^\s*deployment_status:/m);
@@ -69,7 +70,9 @@ describe('validation-gate.yml の信頼境界', () => {
   });
 
   it('評価は scripts/ci/validation-gate.mjs だけを実行する', () => {
-    const runs = [...code.matchAll(/^\s*node\s+([^\s]+)/gm)].map(([, script]) => script);
+    const runs = [...code.matchAll(/^\s*(?:run:\s*)?node\s+([^\s]+)/gm)].map(
+      ([, script]) => script,
+    );
     expect(new Set(runs)).toEqual(new Set(['scripts/ci/validation-gate.mjs']));
   });
 });

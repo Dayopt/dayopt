@@ -277,6 +277,17 @@ describe('validation evidence: rejected evidence', () => {
     expect(result.verdict).toBe('blocked');
   });
 
+  it.each(['.github/workflows/ci.yml', 'scripts/ci/check.mjs', '.github/actions/setup/action.yml'])(
+    'does not trust a run whose producer definition %s is changed by the PR',
+    (file) => {
+      const result = evaluateValidation({ plan: plan([file, APP_FILE]), evidence: evidence() });
+      expect(result.suites.static.status).toBe('self-produced');
+      expect(result.suites.productUnit.status).toBe('self-produced');
+      expect(result.suites.productPreview.status).toBe('satisfied');
+      expect(result.verdict).toBe('blocked');
+    },
+  );
+
   it('blocks on any failed trusted CI job even when the plan does not require it', () => {
     const result = evaluateValidation({
       plan: plan(['README.md']),

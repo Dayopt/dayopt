@@ -12,7 +12,8 @@
  *   （非必須）へ出す
  *
  * 入力（env）: GITHUB_REPOSITORY / GITHUB_EVENT_NAME / GITHUB_EVENT_PATH / GITHUB_SHA /
- * GH_TOKEN / GITHUB_STEP_SUMMARY / GITHUB_OUTPUT。`--pr <number>` は workflow_dispatch 用。
+ * GH_TOKEN / GITHUB_STEP_SUMMARY / GITHUB_OUTPUT。`--pr <number>` はローカルの read-only 実行用
+ * （status は workflow_run 以外では発行しない）。
  */
 import { execFileSync } from 'node:child_process';
 import { appendFileSync, readFileSync, writeFileSync } from 'node:fs';
@@ -325,7 +326,11 @@ export function runValidationGate({
   if (env.GITHUB_STEP_SUMMARY) appendFileSync(env.GITHUB_STEP_SUMMARY, summary);
   const outPath = env.VALIDATION_RESULT_PATH ? resolve(env.VALIDATION_RESULT_PATH) : null;
   if (outPath) writeFileSync(outPath, `${JSON.stringify({ plan, evidence, result }, null, 2)}\n`);
-  if (publish) {
+  // status の発行は main の定義で走る workflow_run に限る。`--pr` はローカルの read-only
+  // 実行用で、dispatch で PR ref の定義を走らせる経路は workflow 側に無い（二重防御）。
+  if (publish && env.GITHUB_EVENT_NAME !== 'workflow_run')
+    output(`::notice::Validation gate: status not published for event ${env.GITHUB_EVENT_NAME}\n`);
+  if (publish && env.GITHUB_EVENT_NAME === 'workflow_run') {
     const status = toCommitStatus(result);
     const runUrl = env.GITHUB_RUN_ID
       ? `${env.GITHUB_SERVER_URL ?? 'https://github.com'}/${repository}/actions/runs/${env.GITHUB_RUN_ID}`

@@ -87,6 +87,19 @@ const SHA = /^[a-f0-9]{40}$/;
 const SUCCESS = 'success';
 
 /**
+ * `pull_request` の CI run は **PR 側の workflow 定義**で走る。これらの path を PR が変えていると、
+ * job 名を保ったまま検査 step を空にした run が同名の success を作れる（Codex review P2、
+ * PR #2804）。その run は producer として信用せず `self-produced` にする。保証境界は job の
+ * 配線ファイルまで（vitest 設定や package.json scripts の改変は review 側の観点）。
+ */
+export const PRODUCER_DEFINITIONS = Object.freeze([
+  '.github/workflows/ci.yml',
+  '.github/actions/setup/action.yml',
+  'scripts/ci/check.mjs',
+  'scripts/ci/impact.mjs',
+]);
+
+/**
  * @typedef {{ id: number, path: string, event: string, headSha: string, repository: string,
  *   runAttempt: number, status: string, conclusion: string | null, htmlUrl: string,
  *   jobs: { name: string, status: string, conclusion: string | null, runAttempt: number,
@@ -115,7 +128,14 @@ export function selectTrustedRun(runs, { repository, headSha, workflow }) {
   return candidates.reduce((latest, run) => (run.id > latest.id ? run : latest));
 }
 
-function evaluateActionsJob(producer, evidence) {
+function evaluateActionsJob(producer, evidence, plan) {
+  const modified = (plan?.files ?? []).filter((file) => PRODUCER_DEFINITIONS.includes(file));
+  if (modified.length > 0)
+    return {
+      status: 'self-produced',
+      reason: `This PR changes the producer definition (${modified.join(', ')}); its own run cannot prove the suite`,
+      evidence: null,
+    };
   const run = selectTrustedRun(evidence.workflowRuns, {
     repository: evidence.repository,
     headSha: evidence.headSha,
@@ -240,7 +260,7 @@ function evaluateDeployment(producer, evidence) {
   };
 }
 
-function evaluateSuite(name, rule, evidence) {
+function evaluateSuite(name, rule, evidence, plan) {
   const producer = PRODUCERS[name];
   if (!producer)
     return {
@@ -260,7 +280,7 @@ function evaluateSuite(name, rule, evidence) {
     };
   switch (producer.kind) {
     case 'actions-job':
-      return evaluateActionsJob(producer, evidence);
+      return evaluateActionsJob(producer, evidence, plan);
     case 'deployment':
       return evaluateDeployment(producer, evidence);
     case 'release-gate':
@@ -278,7 +298,14 @@ function evaluateSuite(name, rule, evidence) {
   }
 }
 
-const BLOCKING = new Set(['failed', 'missing', 'skipped', 'unwired', 'indeterminate']);
+const BLOCKING = new Set([
+  'failed',
+  'missing',
+  'skipped',
+  'unwired',
+  'indeterminate',
+  'self-produced',
+]);
 
 function latestCiFailures(evidence) {
   const run = selectTrustedRun(evidence.workflowRuns, {
@@ -321,7 +348,7 @@ export function evaluateValidation({ plan, evidence }) {
     suites[name] =
       identityProblems.length > 0
         ? { status: 'indeterminate', reason: identityProblems.join('; '), evidence: null }
-        : evaluateSuite(name, rule, evidence);
+        : evaluateSuite(name, rule, evidence, plan);
     suites[name].stage = PRODUCERS[name]?.stage ?? 'merge';
     suites[name].plan = rule.status;
   }
@@ -397,6 +424,7 @@ const ICON = {
   missing: '❌',
   skipped: '❌',
   unwired: '🚧',
+  'self-produced': '🚫',
   indeterminate: '❓',
 };
 

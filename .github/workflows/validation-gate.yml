@@ -13,9 +13,12 @@ name: Validation gate
 # **required check ではない。** 既存の必須 check / ruleset / branch:finish は変更しない。
 # 必須化は #2798 の比較と User の承認後に別変更で行う。
 #
-# トリガー:
-# - workflow_run（CI 完了）: 主経路。ready / synchronize / reopen で CI が走るたびに再評価する
-# - workflow_dispatch: 手動再評価（PR 番号を指定）
+# トリガーは `workflow_run`（CI 完了）だけ。ready / synchronize / reopen で CI が走るたびに
+# 再評価する。手動の再評価は Actions 画面の「Re-run jobs」（main の定義のまま再実行される）。
+#
+# **`workflow_dispatch` は使わない。** dispatch は任意の ref を指定でき、その ref の workflow
+# 定義とコードが statuses:write 付きで走る（Codex review P2、PR #2804）。workflow 内の `if` は
+# 同じ PR から消せるので防御にならない。
 #
 # **`deployment_status` は使わない。** この event は deployment の commit（= PR head）の
 # workflow 定義で走る（2026-09-17、PR #2804 の run 35156203051 で実測: head_branch が PR branch）。
@@ -30,17 +33,12 @@ on:
   workflow_run:
     workflows: [CI]
     types: [completed]
-  workflow_dispatch:
-    inputs:
-      pr:
-        description: 'Pull request number to evaluate'
-        required: true
 
 permissions:
   contents: read
 
 concurrency:
-  group: validation-gate-${{ github.event.workflow_run.head_sha || inputs.pr }}
+  group: validation-gate-${{ github.event.workflow_run.head_sha }}
   cancel-in-progress: true
 
 jobs:
@@ -75,13 +73,7 @@ jobs:
           VALIDATION_RESULT_PATH: validation-result.json
           # Vercel Preview が CI 完了より遅れて success になる分を待つ上限（timeout-minutes 未満）
           VALIDATION_WAIT_MINUTES: '10'
-          PR_INPUT: ${{ inputs.pr }}
-        run: |
-          if [ -n "${PR_INPUT:-}" ]; then
-            node scripts/ci/validation-gate.mjs --pr "$PR_INPUT"
-          else
-            node scripts/ci/validation-gate.mjs
-          fi
+        run: node scripts/ci/validation-gate.mjs
 
       - name: Save validation result
         if: hashFiles('validation-result.json') != ''

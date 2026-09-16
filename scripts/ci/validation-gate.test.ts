@@ -281,8 +281,13 @@ describe('validation gate controller', () => {
     const posted: string[][] = [];
     const resultPath = join(cwd, 'result.json');
     const outcome = runValidationGate({
-      env: env({ VALIDATION_RESULT_PATH: resultPath, GITHUB_RUN_ID: '1' }),
-      argv: ['--pr', '7'],
+      env: env({
+        VALIDATION_RESULT_PATH: resultPath,
+        GITHUB_RUN_ID: '1',
+        GITHUB_EVENT_NAME: 'workflow_run',
+        GITHUB_EVENT_PATH: writeEvent({ workflow_run: { head_sha: headSha } }),
+      }),
+      argv: [],
       api,
       cwd,
       fetchImpl: () => {},
@@ -305,6 +310,25 @@ describe('validation gate controller', () => {
     expect(saved.result.verdict).toBe('pass');
   });
 
+  it('does not publish a status for a local --pr run (only workflow_run publishes)', () => {
+    const { api } = fakeApi();
+    const posted: string[][] = [];
+    const outcome = runValidationGate({
+      env: env(),
+      argv: ['--pr', '7'],
+      api,
+      cwd,
+      fetchImpl: () => {},
+      output: () => {},
+      postStatus: (args) => {
+        posted.push(args);
+        return '';
+      },
+    });
+    expect(outcome.result?.verdict).toBe('pass');
+    expect(posted).toHaveLength(0);
+  });
+
   it('blocks when the PR removed a required job from ci.yml (no self-exemption)', () => {
     const { api } = fakeApi({
       [`repos/${REPO}/actions/runs/100/jobs?filter=latest&per_page=100`]: [
@@ -313,8 +337,11 @@ describe('validation gate controller', () => {
     });
     const posted: string[][] = [];
     const outcome = runValidationGate({
-      env: env(),
-      argv: ['--pr', '7'],
+      env: env({
+        GITHUB_EVENT_NAME: 'workflow_run',
+        GITHUB_EVENT_PATH: writeEvent({ workflow_run: { head_sha: headSha } }),
+      }),
+      argv: [],
       api,
       cwd,
       fetchImpl: () => {},
@@ -437,7 +464,7 @@ describe('validation gate controller', () => {
       },
     });
     expect(outcome.result?.verdict).toBe('pending');
-    expect(posted[0]).toContain('state=pending');
+    expect(posted).toHaveLength(0); // --pr（ローカル）では発行しない
   });
 
   it('skips events that are not associated with an open PR', () => {
