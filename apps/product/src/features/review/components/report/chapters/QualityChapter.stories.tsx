@@ -83,7 +83,9 @@ export const NoWaiting: Story = { args: { points: POINTS, waitingActivities: [] 
 export const Empty: Story = { args: { points: [], waitingActivities: [] } };
 
 /** すべての状態を 1 画面に並べる（ADR-023 の AllPatterns）。 */
+// 展示専用。各状態はこのファイルの独立 Story で全件検証する。
 export const AllPatterns: Story = {
+  tags: ['docs-only'],
   args: { points: POINTS, waitingActivities: [] },
   render: function AllPatternsQuality() {
     const waiting = [
@@ -122,3 +124,15 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
     </div>
   );
 }
+
+/** 狭い面でも内容が読める。 */
+export const Mobile: Story = {
+  ...Default,
+  decorators: [
+    (Story) => (
+      <div className="w-[320px]">
+        <Story />
+      </div>
+    ),
+  ],
+};

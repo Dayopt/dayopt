@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-09-14
+last_verified: 2026-09-16
 code:
   - .github/workflows/ci.yml
   - .github/workflows/promote.yml
@@ -20,7 +20,7 @@ code:
 | ----------------------------- | -------------------------------------------- | --------------------------------------------------- | ------------------------------ |
 | Static                        | コードとして成立している                     | typecheck / lint / boundaries / knip                | pre-push、PR（ci.yml）         |
 | Unit（Vitest）                | 小さなロジックが正しい                       | 時刻計算、重なり判定、集計、状態遷移                | PR は related、nightly で full |
-| Storybook + Vitest            | UI 部品の状態・操作・a11y                    | editor、activity picker、Report 部品                | local（CI 接続は #2737）       |
+| Storybook + Vitest            | UI 部品の状態・操作・a11y                    | editor、activity picker、Report 部品                | main push（promote.yml 層 3）  |
 | Integration（local Supabase） | 部品・DB・API をつないでも正しい             | RLS、RPC、migration 契約                            | DB を触る PR（ci.yml）         |
 | E2E（Playwright）             | ユーザーが中核の目的を end-to-end で達成する | Plan → Record → reload → Report（desktop / mobile） | main push（promote.yml 層 3）  |
 | 契約 / 監査                   | 横断リスク                                   | workflow contract、production config audit          | PR / main push / 日次          |
@@ -35,10 +35,24 @@ E2E は万能にしない。小さい問題は小さい層で守り、E2E は中
 1. **作業中**: 変更を証明する最小の層をローカルで回す
 2. **push**: pre-push が affected な typecheck / lint、scripts test、format を回す
 3. **ready 化した PR**: ci.yml の Static / Unit / 影響に応じた Integration。product unit は `vitest related`（変更が import graph で届く test）に絞る。graph で追えない変更（`packages/*`、設定、test setup、未知の path）を含む PR は full。src を fs で読む契約 test は毎回走る（`scripts/ci/check.mjs` の `resolveProductUnitScope`）
-4. **main push**: promote.yml の層 3（影響のある project の E2E、desktop + `@mobile`）が green の時だけ production へ promote
+4. **main push**: promote.yml の層 3（影響のある project の E2E、desktop + `@mobile`、Storybook light / dark）が green の時だけ production へ promote
 5. **nightly / 日次**: 自分が変えなくても変わるもの（production config drift、replica、backup）と、PR で絞った product unit の full 実行（`product-unit-full`）
 
 nightly の full が落ちたら、落ちた test を直すのに加えて、PR の判定が拾えなかった依存の種類を full 側へ倒す規則に足す。
+
+## Storybook の実行契約
+
+`promote.yml` の専用 `storybook` job が、collect 検査と light / dark の render・play・a11y を実行する。両 app の配信中 SHA からの差分を基準に、product / web / 共有 UI / Storybook 設定と実行経路の変更を拾う。判定不能時は実行する。失敗・cancel・判定出力欠落は通常の promote を通さず、失敗通知は既存経路へ接続する。既存の force による緊急復旧は維持する。
+
+- collect: `pnpm exec tsx scripts/tasks/check-story-coverage.ts --collected`
+- 両テーマ: `pnpm --filter @dayopt/product exec vitest run --project storybook --project storybook-dark`
+- JSON 結果は `storybook-results-<attempt>` artifact に7日保持する。workflow 全体の成功だけでなく、当該 job の実行と失敗件数を確認する。
+- 全件を per-PR に追加しない。E2E と専用 job を並列実行して所要を分離する。cold cache と GitHub runner の実測は PR / Issue の証跡に残す。
+- テーマは自動登録された framework 設定を保持して拡張する test project の `testTheme` を正本とし、DOM と theme context に同じ値を渡す。各 Story の終了時に実際の DOM class / color-scheme も検査する。ツールバーによる上書きで dark suite が light のまま通ることを防ぐ。
+- AllPatterns は一覧展示、独立 Story は各状態の検査を担う。複数のページ用ランドマークは article に収める。同じ名前のランドマークが重複する一覧展示は `docs-only` とし、展示する全状態を独立 Story で検査する。個別 Story の展示タグはファイル全体の collect 対象を消さない。
+- modal menu は閉じた状態で画面全体を検査し、開いた状態ではメニューを検査する。併せて背景への直接 focus・Tab・Shift+Tab がメニュー内に留まり、Escape で trigger に戻ることを実操作で検査する。axe の modal 判定が menu を認識しないための範囲指定であり、ルール自体は無効化しない。
+
+復元可能性の実演は #1879 の独立した未完了事項。これらの自動テストの成功を DB 復元演習の成功に読み替えない。
 
 ## 回帰テストを足す基準
 

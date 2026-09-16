@@ -129,6 +129,25 @@ describe('ExternalEventCard — dismiss', () => {
     expect(onDismiss).toHaveBeenCalledTimes(1);
   });
 
+  it('dismiss のキーボード操作は変換を発火せず確認を開く', async () => {
+    const user = userEvent.setup();
+    const onConvert = vi.fn();
+    render(
+      <ExternalEventCard
+        event={event}
+        position={position()}
+        onConvert={onConvert}
+        onDismiss={vi.fn()}
+      />,
+    );
+    const dismiss = screen.getByRole('button', { name: 'dismiss.ariaLabel' });
+    expect(dismiss.parentElement?.closest('button, [role="button"]')).toBeNull();
+    dismiss.focus();
+    await user.keyboard('{Enter}');
+    expect(screen.getByRole('alertdialog')).toHaveTextContent('dismiss.confirmTitle');
+    expect(onConvert).not.toHaveBeenCalled();
+  });
+
   it('dismiss アイコンのクリックはカードの onConvert を発火させない', async () => {
     const user = userEvent.setup();
     const onConvert = vi.fn();

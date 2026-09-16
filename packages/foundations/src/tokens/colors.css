@@ -53,6 +53,7 @@
    * 動かすのは明度と彩度だけ（C 0.14 → 0.105 で 25% 落とす）。
    * ============================================ */
   --primary: oklch(0.4 0.105 var(--hue-brand));
+  --primary-text: var(--primary);
   --primary-foreground: var(--white);
 
   /* State: Active brand hue 追従
@@ -71,7 +72,7 @@
    * bg: tint背景用（高明度・低彩度）
    * 4色とも同じ L/C 構造で hue のみ変化
    * ============================================ */
-  --destructive: oklch(0.54 0.18 25);
+  --destructive: oklch(0.53 0.18 25);
   --destructive-tint: oklch(0.96 0.015 25);
   --destructive-foreground: var(--white);
   --warning: oklch(0.55 0.16 70);
@@ -80,7 +81,7 @@
   --success: oklch(0.5 0.15 150);
   --success-tint: oklch(0.95 0.02 150);
   --success-foreground: var(--white);
-  --info: oklch(0.55 0.02 260);
+  --info: oklch(0.54 0.02 260);
   --info-tint: oklch(0.96 0.005 260);
   --info-foreground: var(--white);
 
@@ -193,6 +194,8 @@
    * ただし明度は上げる（0.50 → 0.55）。dark では primary-foreground が白なので
    * 白文字 4.5:1 の制約で L0.55 が上限、かつ暗い面から浮かせるには L を下げられない */
   --primary: oklch(0.55 0.13 var(--hue-brand));
+  /* 面の primary と白文字の対比を保ち、暗い面上のリンク・選択文字は別の明度で守る。 */
+  --primary-text: oklch(0.72 0.1 var(--hue-brand));
   --primary-foreground: var(--white);
 
   /* State: Active brand hue 追従（彩度は primary の低下率 ×0.75 に追従）

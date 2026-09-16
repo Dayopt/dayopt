@@ -90,7 +90,7 @@ export function TemplateRow({
       data-visual-state={visualState}
       className={cn(
         'group/template-row relative flex min-w-0 items-center gap-2 rounded-lg px-2 py-1',
-        visualState === 'dragging' ? 'opacity-30' : 'hover:bg-state-hover',
+        visualState === 'dragging' ? 'bg-state-hover' : 'hover:bg-state-hover',
         visualState === 'applying' && 'bg-state-hover',
       )}
       role="listitem"

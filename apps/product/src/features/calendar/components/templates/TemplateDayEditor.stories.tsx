@@ -75,24 +75,28 @@ export const AllPatterns: Story = {
       <div className="space-y-2">
         <p className="text-muted-foreground text-xs">開いた直後</p>
         <MainAreaFrame>
-          <TemplateDayEditor
-            templateName="朝のルーティン"
-            blocks={blocks}
-            onSave={fn()}
-            onCancel={fn()}
-          />
+          <article>
+            <TemplateDayEditor
+              templateName="朝のルーティン"
+              blocks={blocks}
+              onSave={fn()}
+              onCancel={fn()}
+            />
+          </article>
         </MainAreaFrame>
       </div>
       <div className="space-y-2">
         <p className="text-muted-foreground text-xs">上書き保存後（ヘッダー直下に差分一行）</p>
         <MainAreaFrame>
-          <TemplateDayEditor
-            templateName="朝のルーティン"
-            blocks={blocks}
-            savedDiffSummary="ランニングの錨位置を30分後ろへ"
-            onSave={fn()}
-            onCancel={fn()}
-          />
+          <article>
+            <TemplateDayEditor
+              templateName="朝のルーティン"
+              blocks={blocks}
+              savedDiffSummary="ランニングの錨位置を30分後ろへ"
+              onSave={fn()}
+              onCancel={fn()}
+            />
+          </article>
         </MainAreaFrame>
       </div>
     </div>

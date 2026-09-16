@@ -19,6 +19,8 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { hasExcludedMetaTag } from '../lib/story-test-collection';
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const ROOT = path.resolve(__dirname, '../..');
@@ -187,13 +189,6 @@ function findStoryFilesByPattern(dir: string): string[] {
   return results;
 }
 
-/** meta の `tags` に除外タグを持つ Story ファイルは storybookTest が collect しない */
-function hasExcludedMetaTag(content: string): boolean {
-  return [...content.matchAll(/tags:\s*\[([^\]]*)\]/g)].some((match) =>
-    EXCLUDED_STORY_TAGS.some((tag) => new RegExp(`['"]${tag}['"]`).test(match[1] ?? '')),
-  );
-}
-
 function parseCollectedStoryFiles(listOutput: string, storybookRoot: string): Set<string> {
   const files = new Set<string>();
   for (const line of listOutput.split('\n')) {
@@ -206,7 +201,7 @@ function parseCollectedStoryFiles(listOutput: string, storybookRoot: string): Se
 function checkCollected(): number {
   const expected = new Set(
     COLLECT_SCAN_ROOTS.flatMap(findStoryFilesByPattern).filter(
-      (file) => !hasExcludedMetaTag(fs.readFileSync(file, 'utf-8')),
+      (file) => !hasExcludedMetaTag(fs.readFileSync(file, 'utf-8'), EXCLUDED_STORY_TAGS),
     ),
   );
 

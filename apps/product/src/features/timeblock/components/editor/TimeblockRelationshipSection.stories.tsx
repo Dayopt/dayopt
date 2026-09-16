@@ -149,7 +149,9 @@ export const Error: Story = {
 };
 
 /** 全パターン一覧。 */
+// 展示専用。各状態はこのファイルの独立 Story で全件検証する。
 export const AllPatterns: Story = {
+  tags: ['docs-only'],
   args: {
     kind: 'plan',
     status: 'success',

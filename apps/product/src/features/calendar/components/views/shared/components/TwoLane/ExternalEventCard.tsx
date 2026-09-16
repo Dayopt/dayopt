@@ -79,8 +79,6 @@ export function ExternalEventCard({
   return (
     <div
       data-external-event-card
-      tabIndex={interactive ? 0 : undefined}
-      role={interactive ? 'button' : undefined}
       className={cn(
         'border-border-subtle absolute flex flex-col gap-1 overflow-hidden rounded-lg border text-xs',
         'border-l-indicator border-l-border',
@@ -92,7 +90,7 @@ export function ExternalEventCard({
         showDetails ? 'py-2' : 'py-1',
         // 自分の計画より一段沈める。plan の skip(50%) / 記録済み(60%) とは別のレンジに置き、
         // 「Dayopt の外にある予定」として読ませる。
-        'text-muted-foreground bg-transparent opacity-75',
+        'text-muted-foreground bg-transparent',
         className,
       )}
       style={{
@@ -106,18 +104,15 @@ export function ExternalEventCard({
         minWidth: '4px',
         height: `${Math.max(position.height, MIN_CARD_HEIGHT_PX)}px`,
       }}
-      onClick={interactive ? onConvert : undefined}
-      onKeyDown={
-        interactive
-          ? (e) => {
-              if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                onConvert?.();
-              }
-            }
-          : undefined
-      }
     >
+      {interactive && (
+        <button
+          type="button"
+          className="focus-visible:ring-ring absolute inset-0 rounded-lg focus-visible:ring-2 focus-visible:outline-none"
+          aria-label={`${t('screenReaderPrefix')} ${displayTitle}, ${t('convert.hint')}`}
+          onClick={onConvert}
+        />
+      )}
       <p className="truncate font-medium">
         <span className="sr-only">{t('screenReaderPrefix')}</span>
         {displayTitle}

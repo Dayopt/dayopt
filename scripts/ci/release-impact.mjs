@@ -23,10 +23,13 @@
 
 import { appendFileSync } from 'node:fs';
 
+import { resolveImpact } from './impact.mjs';
+
 import {
   IMPACT_WIRING,
   RELEASE_PROJECTS,
   getProjectState,
+  gitDiffFiles,
   gitHeadSha,
   resolveProjectImpact,
 } from './production-release.mjs';
@@ -34,7 +37,42 @@ import {
 const SHA_PATTERN = /^[0-9a-f]{40}$/;
 
 /** `GITHUB_OUTPUT` へ出すキー。promote.yml の `needs.impact.outputs.*` と 1:1。 */
-export const IMPACT_OUTPUT_KEYS = IMPACT_WIRING.map((wiring) => wiring.outputKey);
+export const IMPACT_OUTPUT_KEYS = [
+  ...IMPACT_WIRING.map((wiring) => wiring.outputKey),
+  'storybook_affected',
+];
+
+/** 配信中の両 app から Storybook の依存差分を見る。判定不能は実行側へ倒す。 */
+export function resolveStorybookImpact({
+  baseSha,
+  targetSha,
+  checkoutAtTarget = true,
+  diffFilesImpl = gitDiffFiles,
+}) {
+  if (!SHA_PATTERN.test(baseSha ?? '') || !SHA_PATTERN.test(targetSha ?? '') || !checkoutAtTarget)
+    return true;
+  if (baseSha === targetSha) return false;
+  try {
+    const files = diffFilesImpl(baseSha, targetSha);
+    if (files.length === 0) return false;
+    const impact = resolveImpact(files);
+    return (
+      impact.product ||
+      impact.web ||
+      files.some(
+        (file) =>
+          file.startsWith('apps/storybook/') ||
+          file === '.github/workflows/promote.yml' ||
+          file === '.github/actions/setup/action.yml' ||
+          file === 'scripts/tasks/check-story-coverage.ts' ||
+          file === 'scripts/lib/story-test-collection.ts' ||
+          file === 'scripts/ci/release-impact.mjs',
+      )
+    );
+  } catch {
+    return true;
+  }
+}
 
 /**
  * 全 project の「promote 前に層 3 を走らせる必要があるか」を返す。
@@ -55,12 +93,14 @@ export async function resolveReleaseImpact({
   headShaImpl = gitHeadSha,
   projectStateImpl = getProjectState,
   projectImpactImpl = resolveProjectImpact,
+  storybookImpactImpl = resolveStorybookImpact,
 }) {
   // target SHA が壊れている時点で live との diff は取れない。全 suite を走らせる。
   if (!SHA_PATTERN.test(sha ?? '')) {
     return projects.map((project) => ({
       project,
       affected: true,
+      storybookAffected: true,
       reason: 'release target SHA is not a 40 character SHA (fail closed)',
     }));
   }
@@ -83,7 +123,15 @@ export async function resolveReleaseImpact({
         targetSha: sha,
         checkoutAtTarget,
       });
-      results.push({ project, ...decision });
+      results.push({
+        project,
+        ...decision,
+        storybookAffected: storybookImpactImpl({
+          baseSha: state?.production?.sha,
+          targetSha: sha,
+          checkoutAtTarget,
+        }),
+      });
     } catch (error) {
       // Vercel API の失敗（token 失効・障害・rate limit）はここへ落ちる。
       // 判定できないなら層 3 を走らせる側へ倒す。
@@ -91,6 +139,7 @@ export async function resolveReleaseImpact({
       results.push({
         project,
         affected: true,
+        storybookAffected: true,
         reason: `cannot read live production: ${message} (fail closed)`,
       });
     }
@@ -103,6 +152,9 @@ export async function resolveReleaseImpact({
 export function formatOutputs(results) {
   return results
     .map(({ project, affected }) => `${project.impactKey}_affected=${affected ? 'true' : 'false'}`)
+    .concat(
+      `storybook_affected=${results.some((result) => result.storybookAffected !== false) ? 'true' : 'false'}`,
+    )
     .join('\n');
 }
 
@@ -142,7 +194,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
       console.error(`::error::release impact resolution failed: ${message}`);
       appendTo(
         process.env.GITHUB_OUTPUT,
-        RELEASE_PROJECTS.map((project) => `${project.impactKey}_affected=true`).join('\n'),
+        IMPACT_OUTPUT_KEYS.map((key) => `${key}=true`).join('\n'),
       );
       process.exitCode = 1;
     });

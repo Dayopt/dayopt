@@ -56,10 +56,10 @@ export function CompassScatter({ points, onSelectActivity }: CompassScatterProps
           data-report-board="compass"
           style={{ height: BOARD_HEIGHT }}
         >
-          <p className="text-muted-foreground absolute top-0 left-0 w-1/2 text-xs opacity-70">
+          <p className="text-muted-foreground absolute top-0 left-0 w-1/2 text-xs">
             {t('hint.lowButFulfilled')}
           </p>
-          <p className="text-muted-foreground absolute right-0 bottom-0 w-1/2 text-right text-xs opacity-70">
+          <p className="text-muted-foreground absolute right-0 bottom-0 w-1/2 text-right text-xs">
             {t('hint.heavyButDrained')}
           </p>
           {points.map((point) => (

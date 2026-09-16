@@ -195,7 +195,7 @@ export function ContactDialogContent({
               {labels.description}{' '}
               <a
                 href={`mailto:${dayoptContact.supportEmail}`}
-                className="text-primary hover:underline"
+                className="text-primary-text underline underline-offset-2"
               >
                 {dayoptContact.supportEmail}
               </a>
@@ -230,7 +230,7 @@ export function ContactDialogContent({
             {labels.description}{' '}
             <a
               href={`mailto:${dayoptContact.supportEmail}`}
-              className="text-primary hover:underline"
+              className="text-primary-text underline underline-offset-2"
             >
               {dayoptContact.supportEmail}
             </a>

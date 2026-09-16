@@ -1,3 +1,4 @@
+import { OPEN_MENU_A11Y, verifyModalMenuFocus } from '@dayopt/components/testing/modal-menu';
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { expect, fn, userEvent, within } from 'storybook/test';
 
@@ -21,7 +22,7 @@ const meta = {
   title: 'Product/Features/Activities/ActivityRowMenu',
   component: ActivityRowMenu,
   tags: ['autodocs'],
-  parameters: { layout: 'centered' },
+  parameters: { layout: 'centered', a11y: OPEN_MENU_A11Y },
   args: {
     currentCategoryId: 'cat-work',
     categoryOptions: CATEGORY_OPTIONS,
@@ -32,9 +33,15 @@ const meta = {
     onArchiveActivity: fn(),
     onDeleteActivity: fn(),
   },
+  play: async ({ canvasElement }) => {
+    const trigger = within(canvasElement).getByRole('button', { name: 'メニューを開く' });
+    await userEvent.click(trigger);
+    await verifyModalMenuFocus(trigger);
+    await expect(await within(document.body).findByRole('menu')).toBeVisible();
+  },
   decorators: [
     (Story) => (
-      <DropdownMenu defaultOpen>
+      <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <button type="button">メニューを開く</button>
         </DropdownMenuTrigger>
@@ -58,7 +65,10 @@ export const Uncategorized: Story = {
 /** モバイル簡略版。表示切替 + アーカイブ + 削除のみ。 */
 export const Mobile: Story = {
   args: { isMobile: true },
-  play: async () => {
+  play: async ({ canvasElement }) => {
+    const trigger = within(canvasElement).getByRole('button', { name: 'メニューを開く' });
+    await userEvent.click(trigger);
+    await verifyModalMenuFocus(trigger);
     const body = within(document.body);
     await expect(body.getByText('このアクティビティだけ表示')).toBeInTheDocument();
     await expect(body.queryByText('カテゴリーを変更')).not.toBeInTheDocument();
@@ -67,7 +77,10 @@ export const Mobile: Story = {
 
 /** 「カテゴリーを変更」サブメニューを開いた状態（DnD の代替導線）。 */
 export const CategoryPickerOpen: Story = {
-  play: async () => {
+  play: async ({ canvasElement }) => {
+    const trigger = within(canvasElement).getByRole('button', { name: 'メニューを開く' });
+    await userEvent.click(trigger);
+    await verifyModalMenuFocus(trigger);
     const body = within(document.body);
     await userEvent.hover(body.getByText('カテゴリーを変更'));
     await expect(await body.findByText('カテゴリーなし')).toBeInTheDocument();
@@ -77,6 +90,12 @@ export const CategoryPickerOpen: Story = {
 
 /** 全パターン一覧（メニューは Portal に出るため、状態ごとに個別 Story で確認する）。 */
 export const AllPatterns: Story = {
+  play: async ({ canvasElement }) => {
+    const trigger = within(canvasElement).getByRole('button', { name: 'カテゴリー所属' });
+    await userEvent.click(trigger);
+    await verifyModalMenuFocus(trigger);
+    await expect(await within(document.body).findByRole('menu')).toBeVisible();
+  },
   render: () => (
     <div className="flex flex-col gap-2">
       <DropdownMenu>
@@ -110,4 +129,14 @@ export const AllPatterns: Story = {
       </DropdownMenu>
     </div>
   ),
+};
+
+/** 閉じた状態ではトリガーを含む全体を検査する。 */
+export const Closed: Story = {
+  parameters: { a11y: { context: { include: ['body'] } } },
+  play: async ({ canvasElement }) => {
+    await expect(
+      within(canvasElement).getByRole('button', { name: 'メニューを開く' }),
+    ).toHaveAttribute('aria-expanded', 'false');
+  },
 };

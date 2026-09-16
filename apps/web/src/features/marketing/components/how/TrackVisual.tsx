@@ -45,7 +45,7 @@ export function TrackVisual() {
           <div key={row.label} className="flex flex-col gap-0.5">
             <span className="text-muted-foreground text-[10px]">{row.label}</span>
             <div
-              className="bg-primary/20 text-primary flex h-4 items-center rounded-[2px] px-1.5 text-[9px] font-medium"
+              className="bg-primary/20 text-primary-text flex h-4 items-center rounded-[2px] px-1.5 text-[9px] font-medium"
               style={{ width: row.planW }}
             >
               {row.planT}

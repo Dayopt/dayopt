@@ -205,9 +205,9 @@ export const AllPatterns: Story = {
 /** 本番のボトムシートと同じ幅の器。 */
 function Sheet({ children }: { children: React.ReactNode }) {
   return (
-    <div className="bg-card border-border-subtle flex w-[375px] flex-col gap-4 rounded-2xl border p-4">
+    <article className="bg-card border-border-subtle flex w-[375px] flex-col gap-4 rounded-2xl border p-4">
       {children}
-    </div>
+    </article>
   );
 }
 

@@ -1,4 +1,5 @@
 import type { Preview } from '@storybook/nextjs-vite';
+import { sb } from 'storybook/test';
 import { MINIMAL_VIEWPORTS } from 'storybook/viewport';
 
 // product globals + apps/web の @source を含む Storybook 用 Tailwind エントリ
@@ -7,6 +8,9 @@ import './tailwind-storybook.css';
 import { dayoptDarkTheme, dayoptLightTheme } from './theme/dayopt';
 import { DocsTemplate, ThemedDocsContainer } from './theme/docs';
 import './theme/overrides.css';
+
+// UI の隔離検証では外部 HIBP API を呼ばない。通信契約は product の unit test が担う。
+sb.mock('../../product/src/lib/auth/pwned-password.ts');
 
 const preview: Preview = {
   parameters: {

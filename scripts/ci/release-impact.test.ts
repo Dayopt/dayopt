@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { formatOutputs, resolveReleaseImpact } from './release-impact.mjs';
+import { formatOutputs, resolveReleaseImpact, resolveStorybookImpact } from './release-impact.mjs';
 
 /**
  * merge 連動 promote（#2526 の nightly 案を置換）の層 3 起動判定。
@@ -35,6 +35,7 @@ function run(options: {
       options.state
         ? await options.state(projectName)
         : { production: { sha: OTHER_SHA } }) as never,
+    storybookImpactImpl: () => false,
     projectImpactImpl: (options.impact ?? (() => ({ affected: true, reason: 'stub' }))) as never,
   });
 }
@@ -48,7 +49,9 @@ describe('release impact（層 3 の起動判定）', () => {
           : { affected: true, reason: 'changed' },
     });
 
-    expect(formatOutputs(results)).toBe('web_affected=false\nproduct_affected=true');
+    expect(formatOutputs(results)).toBe(
+      'web_affected=false\nproduct_affected=true\nstorybook_affected=false',
+    );
   });
 
   it('live production SHA を基準に判定する（push 範囲ではない）', async () => {
@@ -74,7 +77,9 @@ describe('release impact（層 3 の起動判定）', () => {
       impact: () => ({ affected: false, reason: 'no impact' }),
     });
 
-    expect(formatOutputs(results)).toBe('web_affected=true\nproduct_affected=false');
+    expect(formatOutputs(results)).toBe(
+      'web_affected=true\nproduct_affected=false\nstorybook_affected=true',
+    );
     expect(results[0].reason).toContain('vercel 500');
   });
 
@@ -91,7 +96,9 @@ describe('release impact（層 3 の起動判定）', () => {
     });
 
     expect(seenBase).toBeUndefined();
-    expect(formatOutputs(results)).toBe('web_affected=true\nproduct_affected=true');
+    expect(formatOutputs(results)).toBe(
+      'web_affected=true\nproduct_affected=true\nstorybook_affected=false',
+    );
   });
 
   it('target SHA が 40-hex でなければ API を叩かず全 project affected にする', async () => {
@@ -105,7 +112,9 @@ describe('release impact（層 3 の起動判定）', () => {
     });
 
     expect(stateCalls).toBe(0);
-    expect(formatOutputs(results)).toBe('web_affected=true\nproduct_affected=true');
+    expect(formatOutputs(results)).toBe(
+      'web_affected=true\nproduct_affected=true\nstorybook_affected=true',
+    );
   });
 
   it('fetchImpl を渡さなければ global fetch を既定にする', async () => {
@@ -141,5 +150,51 @@ describe('release impact（層 3 の起動判定）', () => {
     });
 
     expect(seenCheckoutAtTarget).toBe(false);
+  });
+});
+
+describe('Storybook impact', () => {
+  const decide = (files: string[]) =>
+    resolveStorybookImpact({ baseSha: OTHER_SHA, targetSha: SHA, diffFilesImpl: () => files });
+  it.each([
+    'apps/product/src/a.tsx',
+    'apps/web/src/a.tsx',
+    'packages/components/src/a.tsx',
+    'apps/storybook/.storybook/preview.tsx',
+    'scripts/lib/story-test-collection.ts',
+    '.github/workflows/promote.yml',
+    '.github/actions/setup/action.yml',
+    'pnpm-lock.yaml',
+    'scripts/tasks/check-story-coverage.ts',
+    'scripts/ci/release-impact.mjs',
+  ])('%s の変更を検証する', (file) => {
+    expect(decide([file])).toBe(true);
+  });
+  it('docs のみと同一 tree は免除する', () => {
+    expect(decide(['docs/engineering/testing.md'])).toBe(false);
+    expect(decide([])).toBe(false);
+  });
+  it('unknown SHA・checkout 不一致・diff 失敗は実行側に倒す', () => {
+    expect(resolveStorybookImpact({ baseSha: undefined, targetSha: SHA })).toBe(true);
+    expect(
+      resolveStorybookImpact({ baseSha: OTHER_SHA, targetSha: SHA, checkoutAtTarget: false }),
+    ).toBe(true);
+    expect(
+      resolveStorybookImpact({
+        baseSha: OTHER_SHA,
+        targetSha: SHA,
+        diffFilesImpl: () => {
+          throw new Error('diff failed');
+        },
+      }),
+    ).toBe(true);
+  });
+  it('どちらかの配信中SHAからStory変更があれば実行する', () => {
+    expect(
+      formatOutputs([
+        { project: PROJECTS[0], affected: false, storybookAffected: false },
+        { project: PROJECTS[1], affected: false, storybookAffected: true },
+      ] as never),
+    ).toContain('storybook_affected=true');
   });
 });

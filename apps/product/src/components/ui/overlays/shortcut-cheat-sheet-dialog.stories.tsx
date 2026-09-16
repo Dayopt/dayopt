@@ -93,8 +93,8 @@ export const Search: Story = {
     const input = await body.findByRole('searchbox', { name: 'ショートカットを検索' });
     await userEvent.type(input, 'コピー');
 
-    await expect(body.getByText('選択中のブロックをコピー')).toBeInTheDocument();
-    await expect(body.queryByText('選択中のブロックを削除')).not.toBeInTheDocument();
+    await expect(body.getByText('選択中のタイムブロックをコピー')).toBeInTheDocument();
+    await expect(body.queryByText('選択中のタイムブロックを削除')).not.toBeInTheDocument();
   },
 };
 

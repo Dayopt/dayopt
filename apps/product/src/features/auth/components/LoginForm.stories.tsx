@@ -84,7 +84,7 @@ export const Submitting: Story = {
     const passwordInput = canvasElement.querySelector<HTMLInputElement>('#password');
     await userEvent.type(passwordInput!, 'SecureP@ss123');
 
-    const submitButton = canvas.getByRole('button', { name: /^ログイン$/ });
+    const submitButton = canvas.getByRole('button', { name: /^サインイン$/ });
     await userEvent.click(submitButton);
 
     // ボタンがローディング状態になっていることを確認
@@ -119,7 +119,7 @@ export const ServerError: Story = {
     const passwordInput = canvasElement.querySelector<HTMLInputElement>('#password');
     await userEvent.type(passwordInput!, 'WrongPassword');
 
-    const submitButton = canvas.getByRole('button', { name: /^ログイン$/ });
+    const submitButton = canvas.getByRole('button', { name: /^サインイン$/ });
     await userEvent.click(submitButton);
 
     // エラーメッセージが表示されることを確認
