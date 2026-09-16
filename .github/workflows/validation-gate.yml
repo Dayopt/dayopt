@@ -1,0 +1,95 @@
+name: Validation gate
+
+# 共通検証計画（#2794）に対する Validation の信頼済み controller（#2795、shadow）。
+#
+# **PR 側のコードを一切実行しない。** `workflow_run` / `deployment_status` /
+# `workflow_dispatch` はいずれも default branch（main）の workflow 定義と checkout で
+# 走るため、判定規則・producer allowlist・status 発行は base 側の信頼済み実装だけが持つ。
+# PR の tree は `refs/pull/N/merge` を git object として fetch し、`git diff` の入力に
+# するだけ（validation-shadow.yml と同じ収集器 `collectPlanInput`）。PR が変更できる
+# validation-shadow.yml の artifact は読まない。
+#
+# 出力は Step Summary・`validation-result` artifact・commit status `Validation (shadow)`。
+# **required check ではない。** 既存の必須 check / ruleset / branch:finish は変更しない。
+# 必須化は #2798 の比較と User の承認後に別変更で行う。
+#
+# トリガーは `workflow_run`（CI 完了）と `status`（Vercel の commit status が terminal になった時）。
+# どちらも GitHub docs で「workflow file が default branch にある時だけ走り、GITHUB_SHA は
+# default branch の最新」と定義された event。CI 完了後に Preview が遅れて success になっても
+# `status` で再評価されるので、pending のまま取り残されない（Codex review P2）。手動の再評価は
+# Actions 画面の「Re-run jobs」（main の定義のまま再実行される）。
+#
+# **`workflow_dispatch` は使わない。** dispatch は任意の ref を指定でき、その ref の workflow
+# 定義とコードが statuses:write 付きで走る（Codex review P2、PR #2804）。workflow 内の `if` は
+# 同じ PR から消せるので防御にならない。
+#
+# **`deployment_status` は使わない。** この event は deployment の commit（= PR head）の
+# workflow 定義で走る（2026-09-17、PR #2804 の run 35156203051 で実測: head_branch が PR branch）。
+# PR 側が書き換えた workflow に statuses:write の token が渡る経路になるため、controller の
+# trigger にできない。Vercel Preview の完了が CI より遅れる分は、job 内で bounded に待つ
+# （VALIDATION_WAIT_MINUTES）。controller 自身も GITHUB_REF が default branch でなければ
+# 評価も status 発行もせずに終了する（二重防御）。
+#
+# 依存 install は行わない（node 標準ライブラリ + runner 同梱の gh だけ。ci.yml の impact job と同じ判断）。
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+  status:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: validation-gate-${{ github.event.workflow_run.head_sha || github.event.sha }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validation (shadow)
+    # status event は Vercel の terminal state（success / failure / error）で評価する。pending と
+    # 自身が発行する status（context が Vercel ではない）では走らせない。failure / error も通すのは、
+    # wait 上限後に Preview が失敗した時に pending のまま取り残さないため（Codex review P2）。
+    if: >-
+      ${{ github.event_name != 'status'
+          || (github.event.state != 'pending' && startsWith(github.event.context, 'Vercel – ')) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      actions: read
+      checks: read
+      deployments: read
+      pull-requests: read
+      statuses: write
+    steps:
+      # checkout は default branch（github.sha）。PR head を ref に指定しない。
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+
+      # merge ref の fetch は token 無しで行う（public repo）。persist-credentials: false の
+      # checkout なので、fetch には credential が残らない。
+      - name: Evaluate validation plan against trusted evidence
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+          VALIDATION_RESULT_PATH: validation-result.json
+          # Vercel Preview が CI 完了より遅れて success になる分を待つ上限（timeout-minutes 未満）。
+          # 上限後の完了は `status` event が拾うので短くてよい
+          VALIDATION_WAIT_MINUTES: '3'
+        run: node scripts/ci/validation-gate.mjs
+
+      - name: Save validation result
+        if: hashFiles('validation-result.json') != ''
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: validation-result-${{ github.run_id }}-${{ github.run_attempt }}
+          path: validation-result.json
+          retention-days: 14
