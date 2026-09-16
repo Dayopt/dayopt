@@ -367,9 +367,12 @@ base 規則の変更は次の PR から有効になり、当該 PR 自身の必�
 
 ### Validation の信頼済み controller（#2795、shadow）
 
-`validation-gate.yml` は `workflow_run`（CI 完了）/ `deployment_status`（Preview 完了）/
-`workflow_dispatch`（PR 番号指定）で、**main の workflow 定義と checkout** だけを使って
-`scripts/ci/validation-gate.mjs` を実行する。PR 側のコード・依存・artifact は実行しない。
+`validation-gate.yml` は `workflow_run`（CI 完了）/ `workflow_dispatch`（PR 番号指定）で、
+**main の workflow 定義と checkout** だけを使って `scripts/ci/validation-gate.mjs` を実行する。
+`deployment_status` は使わない: この event は deployment の commit（PR head）の workflow 定義で
+走る（2026-09-17、PR #2804 で実測）ため、statuses:write を持つ controller の trigger にできない。
+Vercel Preview が CI より遅れる分は job 内で bounded に待つ（`VALIDATION_WAIT_MINUTES`）。
+controller 自身も `GITHUB_REF` が main でなければ評価も発行もしない。PR 側のコード・依存・artifact は実行しない。
 計画は毎回 base policy から再生成し、validation-shadow.yml の artifact は読まない。test merge は
 GitHub の `refs/pull/N/merge`（遅延更新で base が古いことがある）ではなく、main HEAD と
 `refs/pull/N/head` から `git merge-tree` で自前生成する。PR の tree は git object として diff に

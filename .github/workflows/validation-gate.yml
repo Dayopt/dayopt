@@ -15,9 +15,14 @@ name: Validation gate
 #
 # トリガー:
 # - workflow_run（CI 完了）: 主経路。ready / synchronize / reopen で CI が走るたびに再評価する
-# - deployment_status: Vercel Preview の完了は CI とは非同期なので、こちらでも再評価する
-#   （production deployment は job の if で除外）
 # - workflow_dispatch: 手動再評価（PR 番号を指定）
+#
+# **`deployment_status` は使わない。** この event は deployment の commit（= PR head）の
+# workflow 定義で走る（2026-09-17、PR #2804 の run 35156203051 で実測: head_branch が PR branch）。
+# PR 側が書き換えた workflow に statuses:write の token が渡る経路になるため、controller の
+# trigger にできない。Vercel Preview の完了が CI より遅れる分は、job 内で bounded に待つ
+# （VALIDATION_WAIT_MINUTES）。controller 自身も GITHUB_REF が default branch でなければ
+# 評価も status 発行もせずに終了する（二重防御）。
 #
 # 依存 install は行わない（node 標準ライブラリ + runner 同梱の gh だけ。ci.yml の impact job と同じ判断）。
 
@@ -25,7 +30,6 @@ on:
   workflow_run:
     workflows: [CI]
     types: [completed]
-  deployment_status:
   workflow_dispatch:
     inputs:
       pr:
@@ -36,18 +40,14 @@ permissions:
   contents: read
 
 concurrency:
-  group: validation-gate-${{ github.event.workflow_run.head_sha || github.event.deployment.sha || inputs.pr }}
+  group: validation-gate-${{ github.event.workflow_run.head_sha || inputs.pr }}
   cancel-in-progress: true
 
 jobs:
   validate:
     name: Validation (shadow)
-    # deployment_status は production 環境の deployment でも発火する。Preview だけ評価する。
-    if: >-
-      ${{ github.event_name != 'deployment_status'
-          || startsWith(github.event.deployment.environment, 'Preview') }}
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     permissions:
       contents: read
       actions: read
@@ -73,6 +73,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GITHUB_EVENT_NAME: ${{ github.event_name }}
           VALIDATION_RESULT_PATH: validation-result.json
+          # Vercel Preview が CI 完了より遅れて success になる分を待つ上限（timeout-minutes 未満）
+          VALIDATION_WAIT_MINUTES: '10'
           PR_INPUT: ${{ inputs.pr }}
         run: |
           if [ -n "${PR_INPUT:-}" ]; then

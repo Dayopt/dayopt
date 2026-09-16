@@ -356,12 +356,96 @@ describe('validation gate controller', () => {
     expect(posted).toHaveLength(0);
   });
 
+  it('refuses to evaluate or publish from a non-default ref (PR-side workflow definition)', () => {
+    const { api, calls } = fakeApi();
+    const posted: string[][] = [];
+    const outcome = runValidationGate({
+      env: env({ GITHUB_REF: 'refs/heads/claude/some-pr-branch' }),
+      argv: ['--pr', '7'],
+      api,
+      cwd,
+      fetchImpl: () => {},
+      output: () => {},
+      postStatus: (args) => {
+        posted.push(args);
+        return '';
+      },
+    });
+    expect(outcome.skipped).toMatch(/untrusted ref/);
+    expect(calls).toEqual([]);
+    expect(posted).toHaveLength(0);
+  });
+
+  it('waits for a pending Preview within the budget and re-evaluates', () => {
+    let statusCalls = 0;
+    const { api } = fakeApi({
+      [`repos/${REPO}/deployments/6480165896/statuses?per_page=100`]: [],
+    });
+    const flaky = (path: string) => {
+      if (path === `repos/${REPO}/deployments/6480165896/statuses?per_page=100`) {
+        statusCalls += 1;
+        return statusCalls < 3
+          ? [{ id: 1, state: 'pending', environment_url: null }]
+          : [{ id: 2, state: 'success', environment_url: 'https://product-x.vercel.app' }];
+      }
+      return api(path);
+    };
+    let clock = Date.parse('2026-09-17T00:00:00Z');
+    const slept: number[] = [];
+    const outcome = runValidationGate({
+      env: env({ VALIDATION_WAIT_MINUTES: '10', GITHUB_REF: 'refs/heads/main' }),
+      argv: ['--pr', '7'],
+      api: flaky,
+      cwd,
+      fetchImpl: () => {},
+      output: () => {},
+      postStatus: () => '',
+      now: () => new Date(clock),
+      pollIntervalMs: 30_000,
+      sleep: (ms) => {
+        slept.push(ms);
+        clock += ms;
+      },
+    });
+    expect(slept).toEqual([30_000, 30_000]);
+    expect(outcome.result?.verdict).toBe('pass');
+  });
+
+  it('stops waiting at the budget and publishes pending', () => {
+    const { api } = fakeApi({
+      [`repos/${REPO}/deployments/6480165896/statuses?per_page=100`]: [
+        { id: 1, state: 'pending', environment_url: null },
+      ],
+    });
+    let clock = Date.parse('2026-09-17T00:00:00Z');
+    const posted: string[][] = [];
+    const outcome = runValidationGate({
+      env: env({ VALIDATION_WAIT_MINUTES: '1' }),
+      argv: ['--pr', '7'],
+      api,
+      cwd,
+      fetchImpl: () => {},
+      output: () => {},
+      postStatus: (args) => {
+        posted.push(args);
+        return '';
+      },
+      now: () => new Date(clock),
+      pollIntervalMs: 30_000,
+      sleep: (ms) => {
+        clock += ms;
+      },
+    });
+    expect(outcome.result?.verdict).toBe('pending');
+    expect(posted[0]).toContain('state=pending');
+  });
+
   it('skips events that are not associated with an open PR', () => {
     const { api } = fakeApi({ [`repos/${REPO}/commits/${headSha}/pulls?per_page=100`]: [] });
     const outcome = runValidationGate({
       env: env({
-        GITHUB_EVENT_NAME: 'deployment_status',
-        GITHUB_EVENT_PATH: writeEvent({ deployment: { sha: headSha } }),
+        GITHUB_EVENT_NAME: 'workflow_run',
+        GITHUB_EVENT_PATH: writeEvent({ workflow_run: { head_sha: headSha } }),
       }),
       argv: [],
       api,

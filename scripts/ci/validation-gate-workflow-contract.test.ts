@@ -22,8 +22,10 @@ describe('validation-gate.yml の信頼境界', () => {
   it('default branch でしか走らない event だけを使う（pull_request 系は使わない）', () => {
     expect(onBlock).toMatch(/^\s*workflow_run:/m);
     expect(onBlock).toMatch(/^\s*workflows:\s*\[CI\]\s*$/m);
-    expect(onBlock).toMatch(/^\s*deployment_status:/m);
     expect(onBlock).toMatch(/^\s*workflow_dispatch:/m);
+    // deployment_status は deployment の commit（PR head）の workflow 定義で走る（PR #2804 で実測）。
+    // statuses:write を持つ controller の trigger にすると PR 側の定義に token が渡る。
+    expect(onBlock).not.toMatch(/^\s*deployment_status:/m);
     expect(onBlock).not.toMatch(/^\s*pull_request(_target)?:/m);
     expect(onBlock).not.toMatch(/^\s*push:/m);
   });
@@ -59,8 +61,11 @@ describe('validation-gate.yml の信頼境界', () => {
     expect(code.slice(0, code.indexOf('\njobs:'))).toMatch(/^permissions:\n\s+contents: read\s*$/m);
   });
 
-  it('deployment_status は Preview 環境だけ評価する', () => {
-    expect(code).toMatch(/startsWith\(github\.event\.deployment\.environment, 'Preview'\)/);
+  it('Preview の遅延は job 内の bounded wait で吸収し、timeout を超えない', () => {
+    const wait = Number(code.match(/VALIDATION_WAIT_MINUTES:\s*'(\d+)'/)?.[1]);
+    const timeout = Number(code.match(/timeout-minutes:\s*(\d+)/)?.[1]);
+    expect(wait).toBeGreaterThan(0);
+    expect(wait).toBeLessThan(timeout);
   });
 
   it('評価は scripts/ci/validation-gate.mjs だけを実行する', () => {

@@ -47,9 +47,7 @@ export function resolveTarget({ eventName, event, prArg, repository, api }) {
     const number = Number(prArg);
     return Number.isSafeInteger(number) && number > 0 ? { number, source: 'dispatch' } : null;
   }
-  let sha = null;
-  if (eventName === 'workflow_run') sha = event?.workflow_run?.head_sha ?? null;
-  else if (eventName === 'deployment_status') sha = event?.deployment?.sha ?? null;
+  const sha = eventName === 'workflow_run' ? (event?.workflow_run?.head_sha ?? null) : null;
   if (!SHA.test(sha ?? '')) return null;
   const pulls = api(`repos/${repository}/commits/${sha}/pulls?per_page=100`, { paginate: true });
   const open = pulls.filter(
@@ -277,11 +275,23 @@ export function runValidationGate({
     process.stdout.write(text);
   },
   now = () => new Date(),
+  pollIntervalMs = 30_000,
+  sleep = (ms) => {
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+  },
 } = {}) {
   const repository = env.GITHUB_REPOSITORY;
   if (!/^[\w.-]+\/[\w.-]+$/.test(repository ?? '')) throw new Error('GITHUB_REPOSITORY missing');
   const policySha = env.GITHUB_SHA;
   if (!SHA.test(policySha ?? '')) throw new Error('GITHUB_SHA missing');
+  // 二重防御: default branch 以外の定義・checkout で走った場合（deployment_status のように
+  // PR head の workflow を使う event、または他 branch への dispatch）は評価も発行もしない。
+  const trustedRef = env.VALIDATION_TRUSTED_REF ?? 'refs/heads/main';
+  if (env.GITHUB_REF !== undefined && env.GITHUB_REF !== trustedRef)
+    return {
+      skipped: `untrusted ref ${env.GITHUB_REF}; policy must run from ${trustedRef}`,
+      result: null,
+    };
   const prIndex = argv.indexOf('--pr');
   const prArg = prIndex >= 0 ? argv[prIndex + 1] : undefined;
   const event = env.GITHUB_EVENT_PATH
@@ -294,8 +304,21 @@ export function runValidationGate({
   if (target.eventSha !== undefined && target.eventSha !== pr.head.sha)
     return { skipped: `event head ${target.eventSha} superseded by ${pr.head.sha}`, result: null };
   const plan = buildTrustedPlan({ repository, pr, policySha, cwd, fetchImpl });
-  const evidence = collectEvidence({ repository, pr, api, now });
-  const result = evaluateValidation({ plan, evidence });
+  // Vercel Preview は CI 完了より遅れて success になる。deployment_status を trigger に
+  // できない（PR 側の workflow 定義で走る）ため、pending の間だけ bounded に待って再取得する。
+  const waitBudgetMs = Number(env.VALIDATION_WAIT_MINUTES ?? '0') * 60_000;
+  const deadline = now().getTime() + (Number.isFinite(waitBudgetMs) ? waitBudgetMs : 0);
+  let evidence = collectEvidence({ repository, pr, api, now });
+  let result = evaluateValidation({ plan, evidence });
+  while (
+    result.verdict === 'pending' &&
+    !result.reasons.some((reason) => reason.startsWith('update-branch')) &&
+    now().getTime() + pollIntervalMs <= deadline
+  ) {
+    sleep(pollIntervalMs);
+    evidence = collectEvidence({ repository, pr, api, now });
+    result = evaluateValidation({ plan, evidence });
+  }
   result.target = target;
   const summary = formatValidationResult(result);
   output(summary);
