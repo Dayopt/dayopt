@@ -442,7 +442,7 @@ RLS の正確な対象・policy・grant は自動生成の [`data/db/rls-snapsho
 | `plan_templates`                | 5    | —                                                               |
 | `plans`                         | 12   | `activities`, `external_calendar_events`                        |
 | `product_events`                | 5    | —                                                               |
-| `profiles`                      | 12   | —                                                               |
+| `profiles`                      | 13   | —                                                               |
 | `records`                       | 13   | `activities`, `external_calendar_events`                        |
 | `reports`                       | 8    | —                                                               |
 | `segment_activities`            | 3    | `activities`, `segments`                                        |
@@ -540,6 +540,7 @@ erDiagram
     string subscription_id "nullable"
     string subscription_status
     string updated_at
+    string welcome_email_sent_at "nullable"
   }
   records {
     string activity_id FK "nullable"
@@ -811,6 +812,7 @@ erDiagram
     string subscription_id "nullable"
     string subscription_status
     string updated_at
+    string welcome_email_sent_at "nullable"
   }
   records {
     string activity_id FK "nullable"

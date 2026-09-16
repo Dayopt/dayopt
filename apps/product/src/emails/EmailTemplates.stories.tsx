@@ -28,8 +28,6 @@ import { PaymentFailedEmail } from './PaymentFailedEmail';
 import { PaymentRecoveredEmail } from './PaymentRecoveredEmail';
 import { ProStartEmail } from './ProStartEmail';
 import { colors } from './styles';
-import { TrialExpiredEmail } from './TrialExpiredEmail';
-import { TrialExpiringEmail } from './TrialExpiringEmail';
 import { TrialStartEmail } from './TrialStartEmail';
 import { WelcomeEmail } from './WelcomeEmail';
 
@@ -154,8 +152,6 @@ export const Guidelines: Story = {
           <p className="pl-4">styles.ts — 共通スタイル（Edge Function側と同一値を維持）</p>
           <p className="pl-4">WelcomeEmail.tsx — 新規登録</p>
           <p className="pl-4">TrialStartEmail.tsx — トライアル開始</p>
-          <p className="pl-4">TrialExpiringEmail.tsx — トライアル残3日</p>
-          <p className="pl-4">TrialExpiredEmail.tsx — トライアル期限切れ</p>
           <p className="pl-4">ProStartEmail.tsx — Pro開始</p>
           <p className="pl-4">PaymentFailedEmail.tsx — 支払い失敗</p>
           <p className="pl-4">PaymentRecoveredEmail.tsx — 支払い復旧</p>
@@ -198,8 +194,10 @@ export const Guidelines: Story = {
           テンプレートと送信フロー
         </h2>
         <p className="text-muted-foreground mb-3 text-sm">
-          「未配線」は、テンプレートと送信 procedure はあるが呼び出し元が無いもの。現在そのメールは
-          届いていない。課金系は tRPC ではなく Stripe webhook が直接送る。
+          課金系は tRPC ではなく Stripe webhook が直接送る。歓迎メールは OAuth / メール確認の
+          着地点から呼ばれ、`profiles.welcome_email_sent_at` を掴めた 1 リクエストだけが送るので 1
+          ユーザー 1
+          通に固定される。トライアルの催促メールは送らない（docs/product/specs/billing.md）。
         </p>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -216,10 +214,8 @@ export const Guidelines: Story = {
                 ['PasswordResetEmail', 'PW リセット', 'Auth Hook (recovery)'],
                 ['EmailChangeEmail', 'メール変更', 'Auth Hook (email_change)'],
                 ['MagicLinkEmail', 'マジックリンク', 'Auth Hook (magic_link)'],
-                ['WelcomeEmail', '新規登録', 'email.sendWelcome（未配線）'],
+                ['WelcomeEmail', '新規登録', 'サインアップ着地（1 通だけ）'],
                 ['TrialStartEmail', 'トライアル開始', 'Stripe webhook'],
-                ['TrialExpiringEmail', 'トライアル残3日', 'email.sendTrialExpiring（未配線）'],
-                ['TrialExpiredEmail', 'トライアル期限切れ', 'email.sendTrialExpired（未配線）'],
                 ['ProStartEmail', 'Pro開始', 'Stripe webhook'],
                 ['PaymentFailedEmail', '支払い失敗', 'Stripe webhook'],
                 ['PaymentRecoveredEmail', '支払い復旧', 'Stripe webhook'],
@@ -422,37 +418,7 @@ export const TrialStart: Story = {
 };
 
 /** トライアル残3日 */
-export const TrialExpiring: Story = {
-  render: () => (
-    <BilingualEmailPreview
-      enElement={TrialExpiringEmail({
-        userName: 'Tomoya',
-        trialEndDate: 'March 30, 2026',
-        locale: 'en',
-      })}
-      jaElement={TrialExpiringEmail({
-        userName: 'Tomoya',
-        trialEndDate: '2026年3月30日',
-        locale: 'ja',
-      })}
-      subjects={appSubjects('trialExpiring.subject')}
-      title="Trial Expiring"
-    />
-  ),
-};
-
 /** トライアル期限切れ */
-export const TrialExpired: Story = {
-  render: () => (
-    <BilingualEmailPreview
-      enElement={TrialExpiredEmail({ userName: 'Tomoya', locale: 'en' })}
-      jaElement={TrialExpiredEmail({ userName: 'Tomoya', locale: 'ja' })}
-      subjects={appSubjects('trialExpired.subject')}
-      title="Trial Expired"
-    />
-  ),
-};
-
 /** Pro開始 */
 export const ProStart: Story = {
   render: () => (
