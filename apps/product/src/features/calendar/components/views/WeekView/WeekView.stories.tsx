@@ -339,6 +339,8 @@ export const WithOverdueEntry: Story = {
 
 /** 全パターン一覧 */
 export const AllPatterns: Story = {
+  // 6画面の同時描画は一覧展示専用。各状態のrender/a11yは上の独立Storyで検査する。
+  tags: ['docs-only'],
   render: () => (
     <div className="flex flex-col items-start gap-6">
       <div className="h-[500px] w-full">
