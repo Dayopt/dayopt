@@ -62,6 +62,35 @@ describe('ExternalEventCard', () => {
 });
 
 describe('ExternalEventCard — 変換（onConvert）', () => {
+  it('同名の外部予定を時刻とカレンダー名で区別できる', () => {
+    render(
+      <>
+        <ExternalEventCard
+          event={event}
+          position={position({
+            displayStartDate: new Date(2026, 6, 14, 9),
+            displayEndDate: new Date(2026, 6, 14, 10),
+          })}
+          onConvert={vi.fn()}
+        />
+        <ExternalEventCard
+          event={{ ...event, calendarName: 'Personal' }}
+          position={position({
+            displayStartDate: new Date(2026, 6, 14, 11),
+            displayEndDate: new Date(2026, 6, 14, 12),
+          })}
+          onConvert={vi.fn()}
+        />
+      </>,
+    );
+    expect(
+      screen.getByRole('button', { name: /週次ミーティング, 09:00–10:00 · Work/ }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /週次ミーティング, 11:00–12:00 · Personal/ }),
+    ).toBeInTheDocument();
+  });
+
   it('onConvert 未指定なら role=button を持たない読み取り専用のまま', () => {
     render(<ExternalEventCard event={event} position={position()} />);
 

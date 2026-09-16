@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { formatOutputs, resolveReleaseImpact, resolveStorybookImpact } from './release-impact.mjs';
+import {
+  formatOutputs,
+  resolveReleaseImpact,
+  resolveStorybookBase,
+  resolveStorybookImpact,
+} from './release-impact.mjs';
 
 /**
  * merge 連動 promote（#2526 の nightly 案を置換）の層 3 起動判定。
@@ -196,5 +201,84 @@ describe('Storybook impact', () => {
         { project: PROJECTS[1], affected: false, storybookAffected: true },
       ] as never),
     ).toContain('storybook_affected=true');
+  });
+});
+
+describe('Storybook の共通基準', () => {
+  const recent = 'c'.repeat(40);
+  const history = [OTHER_SHA, recent, SHA];
+  const ancestor = (from: string, to: string) => history.indexOf(from) <= history.indexOf(to);
+
+  it.each(['web', 'product'])(
+    '片方だけ昇格済みでも docs-only で過去の %s 変更を再検査しない',
+    async (advanced) => {
+      const bases: string[] = [];
+      const results = await resolveReleaseImpact({
+        sha: SHA,
+        token: 'token',
+        teamId: 'team',
+        projects: PROJECTS as never,
+        headShaImpl: () => SHA,
+        projectStateImpl: (async ({ projectName }: { projectName: string }) => ({
+          production: { sha: projectName === advanced ? recent : OTHER_SHA },
+        })) as never,
+        projectImpactImpl: () => ({ affected: false, reason: 'docs only' }),
+        isAncestorImpl: ancestor,
+        storybookImpactImpl: (options) =>
+          resolveStorybookImpact({
+            ...options,
+            diffFilesImpl: (base: string) => {
+              bases.push(base);
+              return base === recent ? ['docs/README.md'] : [`apps/${advanced}/src/page.tsx`];
+            },
+          }),
+      });
+      expect(bases).toEqual([recent]);
+      expect(formatOutputs(results)).toContain('storybook_affected=false');
+    },
+  );
+
+  it('新しい共通基準以降の未昇格 UI 変更は検査する', () => {
+    const baseSha = resolveStorybookBase({
+      baseShas: [OTHER_SHA, recent],
+      targetSha: SHA,
+      isAncestorImpl: ancestor,
+    });
+    expect(
+      resolveStorybookImpact({
+        baseSha,
+        targetSha: SHA,
+        diffFilesImpl: () => ['apps/product/src/page.tsx'],
+      }),
+    ).toBe(true);
+  });
+
+  it.each([false, null])('target の祖先と確認できない配信 SHA は免除しない (%s)', (ancestry) => {
+    const baseSha = resolveStorybookBase({
+      baseShas: [OTHER_SHA, recent],
+      targetSha: SHA,
+      isAncestorImpl: () => ancestry,
+    });
+    expect(resolveStorybookImpact({ baseSha, targetSha: SHA })).toBe(true);
+  });
+
+  it('両方が target の祖先でも配信履歴が分岐していれば免除しない', () => {
+    expect(
+      resolveStorybookBase({
+        baseShas: [OTHER_SHA, recent],
+        targetSha: SHA,
+        isAncestorImpl: (from: string, to: string) => from === to || to === SHA,
+      }),
+    ).toBeUndefined();
+  });
+
+  it('配信 SHA の欠落を古い片方の情報で補わない', () => {
+    expect(
+      resolveStorybookBase({
+        baseShas: [OTHER_SHA, undefined],
+        targetSha: SHA,
+        isAncestorImpl: ancestor,
+      }),
+    ).toBeUndefined();
   });
 });

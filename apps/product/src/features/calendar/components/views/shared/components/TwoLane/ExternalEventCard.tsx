@@ -75,6 +75,7 @@ export function ExternalEventCard({
   // 時刻が消えていて、何時のブロックか読めなかった（2026-09-07 User 指摘）
   const showDetails = position.height >= DETAIL_HEIGHT_THRESHOLD;
   const interactive = onConvert !== undefined;
+  const eventDetails = `${formatTimeRange(position.displayStartDate, position.displayEndDate, timeFormat)}${event.calendarName ? ` · ${event.calendarName}` : ''}`;
 
   return (
     <div
@@ -108,8 +109,8 @@ export function ExternalEventCard({
       {interactive && (
         <button
           type="button"
-          className="focus-visible:ring-ring absolute inset-0 rounded-lg focus-visible:ring-2 focus-visible:outline-none"
-          aria-label={`${t('screenReaderPrefix')} ${displayTitle}, ${t('convert.hint')}`}
+          className="focus-visible:ring-ring absolute inset-0 rounded-lg focus-visible:ring-2 focus-visible:outline-none focus-visible:ring-inset"
+          aria-label={`${t('screenReaderPrefix')} ${displayTitle}, ${eventDetails}, ${t('convert.hint')}`}
           onClick={onConvert}
         />
       )}
@@ -118,12 +119,7 @@ export function ExternalEventCard({
         {displayTitle}
         {interactive && <span className="sr-only">, {t('convert.hint')}</span>}
       </p>
-      {showDetails && (
-        <p className="truncate">
-          {formatTimeRange(position.displayStartDate, position.displayEndDate, timeFormat)}
-          {event.calendarName ? ` · ${event.calendarName}` : ''}
-        </p>
-      )}
+      {showDetails && <p className="truncate">{eventDetails}</p>}
 
       {onDismiss && (
         <>

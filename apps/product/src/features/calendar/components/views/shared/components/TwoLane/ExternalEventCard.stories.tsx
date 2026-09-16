@@ -320,6 +320,9 @@ export const Convertible: Story = {
     const canvas = within(canvasElement);
     const convert = await canvas.findByRole('button', { name: /週次ミーティング/ });
     await expect(convert).toBeVisible();
+    await userEvent.tab();
+    await expect(convert).toHaveFocus();
+    await expect(getComputedStyle(convert).boxShadow).toContain('inset');
     const bounds = convert.getBoundingClientRect();
     await expect(
       canvasElement.ownerDocument.elementFromPoint(
