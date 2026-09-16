@@ -740,7 +740,20 @@ describe('validation gate controller', () => {
   });
 
   it('normalizes review evidence and never posts a review request in shadow', () => {
-    const { api } = fakeApi({ [`repos/${REPO}/pulls/7/reviews?per_page=100`]: [] });
+    const { api } = fakeApi({
+      [`repos/${REPO}/pulls/7/reviews?per_page=100`]: [],
+      // [review-summary] が無い状態（代替レビュー無し）で、依頼は head より前 → not-started
+      [`repos/${REPO}/issues/7/comments?per_page=100`]: [
+        {
+          id: 1,
+          user: { login: 't3-nico', type: 'User' },
+          author_association: 'OWNER',
+          body: '@codex review',
+          created_at: '2026-09-16T10:48:06Z',
+          html_url: `https://github.com/${REPO}/pull/7#issuecomment-1`,
+        },
+      ],
+    });
     const outputs: string[] = [];
     const outcome = runValidationGate({
       env: env(),
@@ -825,6 +838,29 @@ describe('validation gate controller', () => {
         api,
       }),
     ).toBeNull();
+  });
+
+  it('does not evaluate or publish for a closed PR reached through issue_comment', () => {
+    const { api } = fakeApi({ [`repos/${REPO}/pulls/7`]: pull({ state: 'closed' }) });
+    const posted: string[][] = [];
+    const outcome = runValidationGate({
+      env: env({
+        GITHUB_EVENT_NAME: 'issue_comment',
+        GITHUB_EVENT_PATH: writeEvent({ issue: { number: 7, pull_request: { url: 'x' } } }),
+      }),
+      argv: [],
+      api,
+      graphql: fakeGraphql(),
+      cwd,
+      fetchImpl: () => {},
+      output: () => {},
+      postStatus: (args) => {
+        posted.push(args);
+        return '';
+      },
+    });
+    expect(outcome.skipped).toMatch(/closed/);
+    expect(posted).toHaveLength(0);
   });
 
   it('flattens paginated gh api output and passes exact argv (no shell)', () => {

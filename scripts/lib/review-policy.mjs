@@ -55,6 +55,14 @@ const SUBMITTED_STATES = new Set(['COMMENTED', 'APPROVED', 'CHANGES_REQUESTED'])
 const matchesHead = (short, headSha) =>
   typeof short === 'string' && short.length >= 7 && headSha.startsWith(short.toLowerCase());
 
+function headAtOf(evidence) {
+  return evidence.headObservedAt
+    ? Date.parse(evidence.headObservedAt)
+    : evidence.headCommittedAt
+      ? Date.parse(evidence.headCommittedAt)
+      : NaN;
+}
+
 /** bot の完了証拠（review または no-findings comment）を集める。target は対象 commit（不明は null）。 */
 export function collectCodexCompletions(evidence) {
   const completions = [];
@@ -143,15 +151,17 @@ export function readHighRiskSummary(evidence, headSha) {
  * 1 つでもあればその不足を返し、それ以外の値・形は unknown（Codex P2）。
  */
 export function parseHighRiskStatus(raw) {
-  const values = (raw ?? '')
+  const parts = (raw ?? '')
     .split(',')
     .map((part) => part.trim())
-    .filter(Boolean)
-    .map((part) => {
-      const pair = part.match(/^([\w-]+)=([\w-]+)$/);
-      return pair ? pair[2] : part;
-    });
-  if (values.length === 0) return 'unknown';
+    .filter(Boolean);
+  if (parts.length === 0) return 'unknown';
+  // 許容する形は「単独の値」か「全要素が role=value」だけ。混在や重複の単独値は unknown（Codex P2）。
+  const pairs = parts.map((part) => part.match(/^([\w-]+)=([\w-]+)$/));
+  const allPairs = pairs.every(Boolean);
+  const single = parts.length === 1 && !pairs[0] && /^[\w-]+$/.test(parts[0]);
+  if (!allPairs && !single) return 'unknown';
+  const values = allPairs ? pairs.map((pair) => pair[2]) : [parts[0]];
   if (values.some((value) => ['not-run', 'stale', 'invalid'].includes(value))) return 'stale';
   if (values.some((value) => value === 'partial')) return 'partial';
   if (values.every((value) => value === 'reviewed')) return 'satisfied';
@@ -195,17 +205,23 @@ export function evaluateReviewPolicy({
   const completions = collectCodexCompletions(evidence);
   const forHead = completions.filter((entry) => entry.target && matchesHead(entry.target, headSha));
   const stale = completions.filter((entry) => entry.target && !matchesHead(entry.target, headSha));
-  const unknownTarget = completions.filter((entry) => entry.target === null);
-  const requests = (evidence.comments ?? []).filter(
-    (comment) => !isBot(comment) && REVIEW_REQUEST_PATTERN.test(comment.body ?? ''),
+  // 対象不明の応答は、今回の head 切替後に投稿されたものだけを現 head の障害と数える（Codex P2）。
+  const unknownTarget = completions.filter(
+    (entry) =>
+      entry.target === null &&
+      (Number.isNaN(headAtOf(evidence)) || Date.parse(entry.at ?? '') >= headAtOf(evidence)),
   );
-  // head が GitHub 上で観測された時刻（その head の最初の CI run 作成時刻）で依頼を照合する。
-  // commit metadata の日時は cherry-pick / 古い commit の force-push で当てにならない（Codex P2）。
-  const headAt = evidence.headObservedAt
-    ? Date.parse(evidence.headObservedAt)
-    : evidence.headCommittedAt
-      ? Date.parse(evidence.headCommittedAt)
-      : NaN;
+  // 依頼も信頼済み投稿者だけ数える（第三者の応答されない依頼で unknown へ落とされない。Codex P2）。
+  const requests = (evidence.comments ?? []).filter(
+    (comment) =>
+      !isBot(comment) &&
+      TRUSTED_ASSOCIATIONS.has(comment.authorAssociation ?? '') &&
+      REVIEW_REQUEST_PATTERN.test(comment.body ?? ''),
+  );
+  // head へ切り替わった時刻（その head の最新の CI run 作成時刻。同じ SHA へ戻した場合も
+  // synchronize が新しい run を作る）で依頼を照合する。commit metadata の日時は cherry-pick /
+  // 古い commit の force-push で当てにならない（Codex P2、2 巡）。
+  const headAt = headAtOf(evidence);
   const openRequests = requests.filter(
     (request) => Number.isNaN(headAt) || Date.parse(request.createdAt) >= headAt,
   );
@@ -256,13 +272,21 @@ export function evaluateReviewPolicy({
     reason = 'No independent review for this head';
   }
 
+  // 固定差分レビュー（信頼済み [review-summary]）は、保護対象では追加契約、それ以外では Codex が
+  // unknown / failed の時の「同等の独立レビュー」として扱う（Codex の可用性を gate にしない）。
+  const summary = readHighRiskSummary(evidence, headSha);
   let highRisk = null;
   if (base.protected) {
-    highRisk = readHighRiskSummary(evidence, headSha);
+    highRisk = summary;
     highRisk.reason =
       highRisk.status === 'satisfied'
         ? 'Fixed-diff review summary matches this head'
         : `Fixed-diff review summary for this head is ${highRisk.status}`;
+  }
+  const alternativeReview = summary.status === 'satisfied';
+  if (alternativeReview && ['unknown', 'failed', 'not-started', 'stale'].includes(state)) {
+    state = 'complete';
+    reason = `Independent fixed-diff review recorded for ${headSha.slice(0, 9)} (Codex: ${reason})`;
   }
 
   const shouldRequest =

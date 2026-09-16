@@ -34,15 +34,15 @@ maxTurns: 20
 
 Validation controller（`validation-gate.yml`、[infra.md](../../../docs/engineering/infra.md#validation-の信頼済み-controller2795shadow)）が、共通検証計画の `review` 要件と PR の review / comment / thread から次の状態を機械判定し、非必須の commit status `Review policy (shadow)` と Step Summary に出す。判定するのは「指定 scope の独立レビューが最新 head について成立し、指摘が裁定済みか」であり、裁定内容の正しさではない。
 
-| 状態                   | 意味                                                                                                  | verdict      |
-| ---------------------- | ----------------------------------------------------------------------------------------------------- | ------------ |
-| `not-required`         | 計画が review 不要（README 等の許可済み説明文だけ）                                                   | not-required |
-| `not-started`          | 現 head の Codex 応答が無い。ready なら依頼する                                                       | pending      |
-| `pending`              | 現 head への依頼があり応答待ち、または summary 表が Running                                           | pending      |
-| `stale`                | 応答はあるが対象 commit が現 head ではない。再依頼する                                                | pending      |
-| `complete`             | bot 名義の review / no-findings comment が現 head を対象にし、thread が全件「返信つきで resolve」済み | satisfied    |
-| `pending-adjudication` | 未解決 thread、または返信なしで resolve された thread がある                                          | blocked      |
-| `unknown` / `failed`   | 依頼後 30 分無応答、対象 commit 不明、summary 表が Failed。同等の独立レビューを別途用意する           | blocked      |
+| 状態                   | 意味                                                                                                                            | verdict      |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------- | ------------ |
+| `not-required`         | 計画が review 不要（README 等の許可済み説明文だけ）                                                                             | not-required |
+| `not-started`          | 現 head の Codex 応答が無い。ready なら依頼する                                                                                 | pending      |
+| `pending`              | 現 head への依頼があり応答待ち、または summary 表が Running                                                                     | pending      |
+| `stale`                | 応答はあるが対象 commit が現 head ではない。再依頼する                                                                          | pending      |
+| `complete`             | bot 名義の review / no-findings comment が現 head を対象にし、thread が全件「返信つきで resolve」済み                           | satisfied    |
+| `pending-adjudication` | 未解決 thread、または返信なしで resolve された thread がある                                                                    | blocked      |
+| `unknown` / `failed`   | 依頼後 30 分無応答、対象 commit 不明、summary 表が Failed。現 head の信頼済み `[review-summary]` があれば complete に置き換わる | blocked      |
 
 - 完了証拠は `chatgpt-codex-connector[bot]` 名義の submitted review（`Reviewed commit` が head に一致。PENDING / DISMISSED は除外）か「Codex Review: Didn't find any major issues」comment だけ。依頼 comment の投稿成功・👀 / 👍 反応・summary 表の行は完了にしない
 - `[review-summary]` は OWNER / MEMBER / COLLABORATOR の comment だけ受理し、`status:` は `reviewed` または `role=reviewed, ...` の全 role が reviewed の時だけ満たす（partial / stale / not-run は不足、他は unknown）

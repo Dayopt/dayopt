@@ -25,7 +25,7 @@ describe('validation-gate.yml の信頼境界', () => {
     // status event も default branch 限定（GitHub docs）。Vercel の success だけを job の if で通す
     expect(onBlock).toMatch(/^\s*status:\s*$/m);
     // issue_comment も default branch 限定。PR の comment だけ job の if で通す
-    expect(onBlock).toMatch(/^\s*issue_comment:\s*$/m);
+    expect(onBlock).toMatch(/^\s*issue_comment:\s*\n\s*types: \[created, edited, deleted\]/m);
     expect(code).toMatch(
       /github\.event_name == 'issue_comment' && github\.event\.issue\.pull_request != null/,
     );

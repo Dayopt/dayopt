@@ -59,10 +59,11 @@ const summaryComment = (status: string, commit: string) => ({
   createdAt: '2026-09-16T10:48:27Z',
   htmlUrl: 'https://github.com/Dayopt/dayopt/pull/2800#issuecomment-5696241672',
 });
-const request = (createdAt: string, body = '@codex review') => ({
+const request = (createdAt: string, body = '@codex review', authorAssociation = 'OWNER') => ({
   id: 5696237053,
   authorLogin: 't3-nico',
   authorType: 'User',
+  authorAssociation,
   body,
   createdAt,
   htmlUrl: 'https://github.com/Dayopt/dayopt/pull/2800#issuecomment-5696237053',
@@ -241,7 +242,15 @@ describe('review policy: completion evidence', () => {
   it('rejects a bot response whose target commit cannot be determined and other bots', () => {
     const mismatch = evaluate(
       [APP],
-      evidence({ reviews: [{ ...codexReview(HEAD), body: '**Reviewed commit:** `deadbeef1`' }] }),
+      evidence({
+        reviews: [
+          {
+            ...codexReview(HEAD),
+            body: '**Reviewed commit:** `deadbeef1`',
+            submittedAt: '2026-09-16T11:55:00Z', // head 切替後の応答
+          },
+        ],
+      }),
     );
     expect(mismatch.state).toBe('unknown');
     expect(mismatch.verdict).toBe('blocked');
@@ -281,6 +290,42 @@ describe('review policy: completion evidence', () => {
       }),
     );
     expect(result.state).toBe('not-started');
+  });
+
+  it('ignores review requests from untrusted authors', () => {
+    const result = evaluate(
+      [APP],
+      evidence({ comments: [request('2026-09-16T11:45:00Z', '@codex review', 'NONE')] }),
+    );
+    expect(result.state).toBe('not-started');
+    expect(result.trigger.shouldRequest).toBe(true);
+  });
+
+  it('ignores a target-less response posted before the head switch', () => {
+    const stale = {
+      ...codexReview(OLD),
+      body: '**Reviewed commit:** `deadbeef1`',
+      submittedAt: '2026-09-16T10:00:00Z',
+    };
+    const before = evaluate([APP], evidence({ reviews: [stale] }));
+    expect(before.state).toBe('not-started');
+    const after = evaluate(
+      [APP],
+      evidence({ reviews: [{ ...stale, submittedAt: '2026-09-16T11:55:00Z' }] }),
+    );
+    expect(after.state).toBe('unknown');
+  });
+
+  it('lets a trusted fixed-diff review satisfy the policy when Codex is unavailable', () => {
+    const late = new Date(Date.parse('2026-09-16T11:45:00Z') + REVIEW_RESPONSE_TIMEOUT_MS + 1);
+    const result = evaluate(
+      [APP],
+      evidence({ comments: [request('2026-09-16T11:45:00Z'), highRiskSummary(HEAD)] }),
+      { now: late },
+    );
+    expect(result.state).toBe('complete');
+    expect(result.verdict).toBe('satisfied');
+    expect(result.reason).toMatch(/Independent fixed-diff review/);
   });
 
   it('does not request a review of a blocked head or a draft', () => {
@@ -335,6 +380,8 @@ describe('review policy: high-risk contract', () => {
       ['not-reviewed', 'unknown'],
       ['risk-reviewer=reviewed, behavior-verifier=not-run', 'stale'],
       ['', 'unknown'],
+      ['reviewed, reviewed', 'unknown'],
+      ['reviewed, risk-reviewer=reviewed', 'unknown'],
     ] as const) {
       const result = evaluate(
         [RLS],

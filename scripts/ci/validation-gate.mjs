@@ -496,6 +496,10 @@ export function runValidationGate({
         result: null,
         review: null,
       };
+    // closed / merged PR の comment 編集等では評価も発行もしない（同じ SHA を使う別の open PR の
+    // status を closed PR の証拠で上書きしない。Codex P2）。
+    if (pr.state !== 'open')
+      return { skipped: `PR #${pr.number} is ${pr.state}`, result: null, review: null };
     statusSha = pr.head.sha;
     if (publishable)
       for (const context of [VALIDATION_STATUS_CONTEXT, REVIEW_STATUS_CONTEXT])
@@ -533,12 +537,16 @@ export function runValidationGate({
       result = evaluateValidation({ plan, evidence });
     }
     result.target = target;
-    // head が GitHub 上で観測された時刻 = その head の最初の run 作成時刻（commit 日時より信頼できる）
+    // head へ切り替わった時刻 = その head の最新の pull_request run 作成時刻。synchronize ごとに
+    // 新しい run が作られるため、同じ SHA へ戻した場合も今回の切替を指す（commit 日時より信頼できる）
     const headObservedAt =
       evidence.workflowRuns
-        .filter((run) => run.headSha === pr.head.sha && run.createdAt)
+        .filter(
+          (run) => run.headSha === pr.head.sha && run.event === 'pull_request' && run.createdAt,
+        )
         .map((run) => run.createdAt)
-        .sort()[0] ?? null;
+        .sort()
+        .at(-1) ?? null;
     const reviewEvidence = collectReviewEvidence({ repository, pr, api, graphql, headObservedAt });
     const review = evaluateReviewPolicy({
       plan,

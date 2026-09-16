@@ -41,8 +41,10 @@ on:
   # issue comment として届く。issue_comment も default branch の定義でしか走らない event。
   # review の submit / thread の resolve は issue_comment を出さないが、通常は修正 push → CI 完了の
   # workflow_run で再評価される（保証境界は docs/engineering/infra.md）。
+  # deleted も含める: 成功判定に使った comment（Codex の完了 comment / [review-summary]）が消えたら
+  # 再評価して status を更新する（消えた証拠で success が残らない）。
   issue_comment:
-    types: [created, edited]
+    types: [created, edited, deleted]
 
 permissions:
   contents: read

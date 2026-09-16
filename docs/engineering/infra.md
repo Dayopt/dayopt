@@ -409,9 +409,12 @@ shadow 中は Codex を自動起動しない（workflow に `pull-requests: writ
 review evidence の保証境界: review の submit と thread の resolve は issue_comment を出さないため、
 その直後は再評価されない。通常は修正 push → CI 完了の `workflow_run` で再評価される。
 `pull_request_review` 系は PR 側の定義で走るため trigger にしない。reviewThreads は cursor で
-最後まで読み、応答が欠けた時は failure を発行する。`[review-summary]` は author_association が
-OWNER / MEMBER / COLLABORATOR の comment だけ受理し、`status:` は全 role が `reviewed` の時だけ
-満たす。依頼と head の対応は commit 日時ではなく、その head の最初の CI run 作成時刻で照合する。
+最後まで読み、応答が欠けた時は failure を発行する。`[review-summary]` と `@codex review` 依頼は author_association が
+OWNER / MEMBER / COLLABORATOR の comment だけ受理し、`status:` は単独の `reviewed` か全要素が
+`role=reviewed` の時だけ満たす。依頼と head の対応は commit 日時ではなく、その head の最新の
+pull_request run 作成時刻（切替時刻）で照合する。Codex が無応答 / 失敗でも、現 head の信頼済み
+`[review-summary]` があれば「同等の独立レビュー」として満たす（可用性を gate にしない）。
+closed / merged PR は評価も発行もしない。
 
 結果は Step Summary・`validation-result-<run>` artifact（14 日）・commit status `Validation (shadow)`
 に出す。**required check ではない。** ruleset・`branch:finish`・既存 check は変更しない。
