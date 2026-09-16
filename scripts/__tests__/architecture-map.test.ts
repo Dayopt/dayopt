@@ -65,9 +65,20 @@ import {
 } from '../lib/architecture-map/time-rules.ts';
 import type { GlossaryEntry } from '../lib/glossary/core.ts';
 import {
+  buildProductCallGraph,
   checkArchitectureReferences,
   findStaleArchitectureMapDocs,
 } from '../tasks/generate-architecture-map.ts';
+
+import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+import { discoverInventory } from '../lib/architecture-map/inventory.ts';
+import { collectProductSources } from '../lib/architecture-map/references.ts';
+import { collectRelations } from '../lib/architecture-map/relations.ts';
+
+const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
 /**
  * Supabase 生成型の最小 fixture。実ファイルと同じ入れ子（Database.public.Tables.<t>.Row /
@@ -675,13 +686,22 @@ describe('likec4-model: Inventory + 用語集 + DAG から LikeC4 model / views 
     procedureUsage: [],
     unusedProcedures: [],
     mcpToolProcedures: [],
+    mcpToolFiles: new Map<string, string>(),
     storeUsage: [],
     docCodeLinks: [],
     e2eRoutes: [],
     dbFunctionTests: [],
     featureCoverage: [],
   };
-  const sources = { map, glossary, dag, schema, surface, relations };
+  const callGraph = {
+    procedures: [
+      { id: 'plans.list', tables: ['plans'], functions: [] },
+      { id: 'plans.create', tables: [], functions: ['create_plan_command_v1'] },
+    ],
+    mcpTools: [],
+    pages: [],
+  };
+  const sources = { map, glossary, dag, schema, surface, relations, callGraph };
 
   it('識別子は種別 prefix 付きで、同名の feature と table が衝突しない', () => {
     expect(likec4Id('f', 'activities')).toBe('f_activities');
@@ -710,6 +730,31 @@ describe('likec4-model: Inventory + 用語集 + DAG から LikeC4 model / views 
     expect(model).toContain(
       "  cron_vercel__api_cron_calendar-sync -> h_product_api_cron_calendar-sync 'triggers'",
     );
+  });
+
+  it('procedure の DB アクセスを router 単位へ集約して関係を引く', () => {
+    const model = renderLikeC4Model({
+      ...sources,
+      map: mapInventoryToConcepts(
+        [
+          ...items,
+          {
+            kind: 'trpc-router' as const,
+            id: 'plans',
+            path: 'x/plans-router.ts',
+            feature: 'timeblock',
+          },
+          {
+            kind: 'db-function' as const,
+            id: 'create_plan_command_v1',
+            path: 'supabase/migrations',
+          },
+        ],
+        glossary,
+      ),
+    });
+    expect(model).toContain("  r_plans -> t_plans 'reads'");
+    expect(model).toContain("  r_plans -> fn_create_plan_command_v1 'calls'");
   });
 
   it('views は固定 view と、直接対応を持つ概念ごとの view を出す', () => {
@@ -1051,3 +1096,48 @@ export const MCP_TOOL_DESCRIPTORS = [
     ]);
   });
 });
+
+describe('call-graph: 型チェッカーで呼び出し経路を辿る', () => {
+  /**
+   * 実 repo に対して 1 回だけ program を作る（約 2 秒）。fixture では DI や条件分岐の解決を
+   * 再現できないため、ここでは実装そのものを対象に「解決できていること」を固定する。
+   */
+  const sources = collectProductSources(REPO_ROOT);
+  const schema = parseSchemaModel(
+    readFileSync(`${REPO_ROOT}/apps/product/src/lib/database/generated/database.types.ts`, 'utf8'),
+  );
+  const items = discoverInventory(REPO_ROOT, sources, schema);
+  const relations = collectRelations(REPO_ROOT, sources, items);
+  const graph = buildProductCallGraph(items, sources, schema, relations.mcpToolFiles);
+
+  it('DI 経由（service → client → rpc）の procedure を解決する', () => {
+    const create = graph.procedures.find((procedure) => procedure.id === 'planCommands.create');
+    // router → createTimeblockCommandService → 既定引数で注入される client → rpc
+    expect(create?.functions).toContain('create_plan_command_v1');
+  });
+
+  it('service が直接 .from() するテーブルを解決する', () => {
+    const list = graph.procedures.find((procedure) => procedure.id === 'activities.listActivities');
+    expect(list?.tables).toContain('activities');
+  });
+
+  it('DB を触らない procedure は載せない', () => {
+    const ids = new Set(graph.procedures.map((procedure) => procedure.id));
+    // 定数を返すだけの procedure（DB アクセスなし）
+    expect(ids.has('timeblockContext.getConstraints')).toBe(false);
+  });
+
+  it('MCP の書き込み tool は apply_mcp_* を通る', () => {
+    const create = graph.mcpTools.find((tool) => tool.tool === 'plans.create');
+    expect(create?.functions.some((fn) => fn.startsWith('apply_mcp_'))).toBe(true);
+  });
+
+  it('画面から使う procedure は barrel を辿らず宣言元で絞る', () => {
+    const calendar = graph.pages.find((page) => page.route.endsWith('/calendar'));
+    expect(calendar?.procedures).toContain('plans.list');
+    expect(calendar?.procedures).toContain('statistics.getActivityStats');
+    // calendar から billing / MCP 設定の procedure は使わない（barrel 経由で混ざらないこと）
+    expect(calendar?.procedures.some((id) => id.startsWith('billing.'))).toBe(false);
+    expect(calendar?.procedures.some((id) => id.startsWith('mcpConnections.'))).toBe(false);
+  });
+}, 120_000);

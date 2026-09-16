@@ -15,10 +15,10 @@
 rootから実行する。
 
 ```bash
-pnpm dev:web
+pnpm --filter @dayopt/web dev
 pnpm build:web
-pnpm lint:web
-pnpm typecheck:web
+pnpm --filter @dayopt/web lint
+pnpm --filter @dayopt/web typecheck
 pnpm test:web
 pnpm --filter @dayopt/web test:e2e:smoke
 pnpm --filter @dayopt/web validate:content
@@ -50,8 +50,8 @@ repo rootの`.op-env.agent`に`op://`参照だけを置き、通常はroot comma
 webだけの変更では、変更内容に応じて次を実行する。
 
 ```bash
-pnpm lint:web
-pnpm typecheck:web
+pnpm --filter @dayopt/web lint
+pnpm --filter @dayopt/web typecheck
 pnpm test:web
 pnpm build:web
 ```

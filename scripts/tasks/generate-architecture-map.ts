@@ -34,6 +34,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { format as formatWithPrettier, resolveConfig as resolvePrettierConfig } from 'prettier';
 
+import { buildCallGraph, type CallGraph } from '../lib/architecture-map/call-graph.ts';
 import {
   mapInventoryToConcepts,
   renderInventoryDocument,
@@ -51,7 +52,12 @@ import {
   architectureMapMarkers,
   replaceGeneratedBlock,
 } from '../lib/architecture-map/generated-block.ts';
-import { discoverInventory, type InventoryItem } from '../lib/architecture-map/inventory.ts';
+import {
+  discoverInventory,
+  discoverTrpcRouters,
+  resolveRouterNamespaces,
+  type InventoryItem,
+} from '../lib/architecture-map/inventory.ts';
 import { renderLikeC4Model, renderLikeC4Views } from '../lib/architecture-map/likec4-model.ts';
 import {
   checkGlossaryReferences,
@@ -115,6 +121,36 @@ export function loadFeatureDag(): FeatureDag {
     parseFeatureRules(readRepoFile(ESLINT_CONFIG_PATH)),
     collectFeatureDependencies(collectProductSources(ROOT)),
   );
+}
+
+/** 型チェッカーで呼び出し経路を辿る（entry point は inventory が見つけた router / tool / page）。 */
+export function buildProductCallGraph(
+  items: InventoryItem[],
+  sources: ReturnType<typeof collectProductSources>,
+  schema: SchemaModel,
+  mcpToolFiles: Map<string, string>,
+): CallGraph {
+  const appRouter = sources.find(
+    (file) => file.path === 'apps/product/src/app/api/trpc/_server/app-router.ts',
+  );
+  if (appRouter === undefined) throw new Error('app-router.ts が見つかりません');
+
+  const pageFiles = new Map<string, string>();
+  for (const item of items) {
+    if (item.kind === 'route') pageFiles.set(item.id, item.path);
+  }
+
+  return buildCallGraph({
+    root: ROOT,
+    namespaceOfPath: resolveRouterNamespaces(sources, discoverTrpcRouters(appRouter)),
+    tableNames: new Set(schema.tables.map((table) => table.name)),
+    functionNames: new Set(schema.functions),
+    procedureIds: new Set(
+      items.filter((item) => item.kind === 'trpc-procedure').map((item) => item.id),
+    ),
+    mcpToolFiles,
+    pageFiles,
+  });
 }
 
 export function loadSchemaModel(): SchemaModel {
@@ -198,7 +234,9 @@ export async function buildArchitectureMapDocs(): Promise<GeneratedDocument[]> {
     items.filter((item) => item.kind === 'mcp-tool'),
   );
   const relations = collectRelations(ROOT, sources, items);
+  const callGraph = buildProductCallGraph(items, sources, schema, relations.mcpToolFiles);
   const likec4Sources = {
+    callGraph,
     map: conceptMap,
     glossary: GLOSSARY,
     dag: buildFeatureDag(
@@ -223,6 +261,7 @@ export async function buildArchitectureMapDocs(): Promise<GeneratedDocument[]> {
     systemSurface,
     relations,
     items,
+    callGraph,
     [
       '> **生成元**: `scripts/tasks/generate-architecture-map.ts`（`pnpm architecture:generate`）。',
       '> 実装（`apps/*` / `supabase` / `.github` / `scripts`）から自動発見した運用面の snapshot。',
@@ -266,8 +305,21 @@ export function checkSurfaceConsistency(
   surface: SystemSurface,
   items: InventoryItem[],
   sources: ReturnType<typeof collectProductSources>,
+  callGraph: CallGraph,
 ): ReferenceViolation[] {
   const violations: ReferenceViolation[] = [];
+
+  // MCP の書き込み tool は receipt を残す apply_mcp_* を必ず通る（直接 table を書かない）
+  for (const tool of callGraph.mcpTools) {
+    const isWrite = /\.(create|update|delete|restore)$/.test(tool.tool);
+    if (!isWrite) continue;
+    if (!tool.functions.some((fn) => fn.startsWith('apply_mcp_'))) {
+      violations.push({
+        source: 'mcp-tool',
+        reason: `書き込み tool '${tool.tool}' が apply_mcp_* を通らずに DB へ到達しています`,
+      });
+    }
+  }
 
   for (const event of surface.analyticsEvents) {
     if (!event.allowedInDb) {
@@ -335,6 +387,12 @@ export function checkArchitectureReferences(): ReferenceViolation[] {
       ),
       items,
       sources,
+      buildProductCallGraph(
+        items,
+        sources,
+        schema,
+        collectRelations(ROOT, sources, items).mcpToolFiles,
+      ),
     ),
     ...checkGlossaryReferences(GLOSSARY, schema, sources, ROOT),
     ...checkTimeRuleMirrorReferences(timeRules.mirrors, sources),

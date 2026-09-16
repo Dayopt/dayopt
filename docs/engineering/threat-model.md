@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-09-10
+last_verified: 2026-09-16
 ---
 
 # Threat Model
@@ -53,7 +53,7 @@ sweep が実際に得た既往クラス・却下記録を置く。
 
 ### 攻撃面（`7562ab0ba` 時点で実測）
 
-**入口となる route**（`app/**/route.ts` の全 22 本のうち、この境界に属するもの）:
+**入口となる route**（`app/**/route.ts` のうち、この境界に属するもの。全数と method の一覧は [`data/system-surface.md`](./data/system-surface.md) の生成表を見る）:
 
 | path                                         | 認証                                |
 | -------------------------------------------- | ----------------------------------- |
@@ -76,7 +76,7 @@ sweep が実際に得た既往クラス・却下記録を置く。
 - `apps/product/src/lib/auth/domain/access-policy.ts`、`permissions.ts`、`roles.ts`
 - `apps/product/src/lib/auth/recovery-codes.ts`、`session-config.ts`、`pwned-password.ts`
 - `apps/product/src/lib/safe-redirect.ts` — redirect allowlist
-- `apps/product/src/lib/oauth-server/`（test を除く 18 モジュール）— `authorize-validation`、`code-exchange`、`redirect-uris`、`scopes`、`tokens`、`token-rate-limit`、`identity`、`clients`、`origin`、`request-host`
+- `apps/product/src/lib/oauth-server/`（test を除く全モジュール）— `authorize-validation`、`code-exchange`、`redirect-uris`、`scopes`、`tokens`、`token-rate-limit`、`identity`、`clients`、`origin`、`request-host`
 
 **データ側**: `mfa_recovery_codes`、`oauth_audit_log`、`oauth_authorization_codes`、`oauth_connections`、
 `oauth_tokens`、`profiles`、`user_settings`（RLS の実効値は

@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-08-13
+last_verified: 2026-09-16
 code:
   - apps/product/src/features/settings/components/EmailChangeDialog.tsx
   - apps/product/src/features/settings/components/PasswordChangeDialog.tsx
@@ -166,7 +166,7 @@ gateを有効にした後は、同じユーザーの操作をDB内で直列化�
 
 判定は `data.session?.access_token` で行う。auth-js は `access_token` を伴う session だけを保存する（cookie が書かれる）ので、truthy 判定だと token 無しの session オブジェクトで保護ページへ送ってしまう。
 
-**着地先を login ページにはしない。** `proxy.ts` は認証済みユーザーが auth 系 path に来ると `/week` へ送るため、ログイン中の browser で確認リンクを開くとメッセージが出る前に弾かれる。`/auth/confirmed` は `authPathsAllowedWhileAuthenticated`（`lib/auth/domain/access-policy.ts`）に登録してあり、認証済み・未認証のどちらでも表示できる。**このページを allowlist から外すと本件が再発する。**
+**着地先を login ページにはしない。** `proxy.ts` は認証済みユーザーが auth 系 path に来ると `/calendar` へ送るため、ログイン中の browser で確認リンクを開くとメッセージが出る前に弾かれる。`/auth/confirmed` は `authPathsAllowedWhileAuthenticated`（`lib/auth/domain/access-policy.ts`）に登録してあり、認証済み・未認証のどちらでも表示できる。**このページを allowlist から外すと本件が再発する。**
 
 ## Auth REST API は存在しない
 
@@ -185,7 +185,7 @@ gateを有効にした後は、同じユーザーの操作をDB内で直列化�
 - MFA登録済み `aal1 -> aal2` の状態は `FORBIDDEN`、MFA未登録 `aal1 -> aal1` と検証済み `aal2 -> aal2` は通過する
 - `user.verifyRecoveryCode` は recovery-code 検証により MFA factor を解除するため、既知の `aal1 -> aal2` 状態でも通過を許可する。呼び出し元はログインフロー（`/auth/mfa-verify`）と password-reset flow（`ResetPasswordForm.tsx`、MFA有効アカウントの自己復旧、#2013）の2箇所。password-reset 経路はメールボックス制御のみで到達できるため、login 経路（パスワード保有が前提）より広い攻撃者集合に開かれることを明示的に引き受けている（判断根拠は 2026-08-13-mfa-recovery-password-reset-boundary.md（削除済み、git 履歴参照））。password-reset の別経路として、TOTP の `mfa.challenge`+`mfa.verify` によるセッション昇格（MFAは無効化しない）も両方許可している
 - OAuth bearer mode: token を `oauth_tokens` で検証し、`client_id` と `scopes` を tRPC context に保持する
-- OAuth token は **MCP endpoint（`/api/mcp`）内部からの実行だけ**が tRPC に到達できる。公開 tRPC endpoint（`/api/trpc`）へ同じ token を投げても、scope 判定より手前で `FORBIDDEN` になる（context の `oauthExecution: 'mcp_internal'` が無いため）
+- OAuth token は **MCP endpoint（`/api/mcp`）内部からの実行だけ**が tRPC に到達できる。公開 tRPC endpoint（`/api/trpc`）へ同じ token を投げても、context が DB lookup より手前で `UNAUTHORIZED` を返す（`createFetchTRPCContext`）。procedure 内の `FORBIDDEN` はその後ろの backstop
 - MCP 内部実行でも、procedure path ごとの allowlist（`MCP_TRPC_SCOPE_REQUIREMENTS`、`apps/product/src/lib/trpc/procedures.ts`）と scope が一致した場合だけ許可する。現在の集合:
 
   | procedure                                                 | scope              |

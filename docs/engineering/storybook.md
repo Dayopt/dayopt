@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-08-17
+last_verified: 2026-09-16
 code:
   - apps/storybook/.storybook
   - apps/storybook/package.json
@@ -54,14 +54,12 @@ UI/UX で迷ったら文脈に合う Google 製品を開いて観察する（GAF
 
 ## 📁 構成
 
-| カテゴリ        | 内容                                          | 例                                     |
-| --------------- | --------------------------------------------- | -------------------------------------- |
-| **Docs**        | ガイドライン・アーキテクチャ                  | Accessibility                          |
-| **Foundations** | デザイントークン・設計基盤                    | Colors, Typography, Spacing, Elevation |
-| **Primitives**  | 単体UIコンポーネント                          | Button, Badge, Input, Dialog           |
-| **Recipes**     | 2つ以上の Primitive を組み合わせた複合UI      | Field, ConfirmDialog, Inspector/\*     |
-| **Features**    | ドメインロジックを含む Feature コンポーネント | Timeblock/_, Calendar/_, Tags/\*       |
-| **Patterns**    | 実装パターンのカタログ                        | Forms, Feedback, Loading               |
+top-level は**所有境界**（`Shared` / `Product` / `Web`）で分ける。詳細は下の「命名規則（所有境界 taxonomy）」が正本で、
+`pnpm storybook:taxonomy` が機械検証する。
+
+（2026-09-16: ここにあった `Docs / Foundations / Primitives / Recipes / Features / Patterns` の分類表は、
+所有境界 taxonomy へ移行した後の実態と食い違っていたため撤去した。Story の実数と feature ごとの被覆は
+[`data/system-surface.md`](./data/system-surface.md) を見る。）
 
 ## 🎨 カラートークン
 
