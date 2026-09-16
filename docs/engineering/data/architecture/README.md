@@ -12,7 +12,7 @@ LikeC4 に手書きの事実は置かない。要素・関係・metadata・sourc
 pnpm dlx likec4 start docs/engineering/data/architecture
 ```
 
-ブラウザで interactive な explorer が開く。要素を選ぶと関係が highlight され、`link` から source へ飛べる。view は `index`（概念と feature）/ `features`（Feature DAG）/ `data`（テーブルと FK）/ `mcp` / `api`（HTTP route と定期実行）/ `unmapped`（どの概念からも辿れない要素）/ 概念ごとの `concept_*`。
+ブラウザで interactive な explorer が開く。要素を選ぶと関係が highlight され、`link` から source へ飛べる。view は `index`（概念と feature）/ `features`（Feature DAG）/ `data`（テーブルと FK）/ `mcp` / `api`（HTTP route と定期実行）/ `unmapped`（概念を足す候補。語彙を持たない層は除く）/ 概念ごとの `concept_*`。
 
 静的 HTML 1 枚に出す:
 
@@ -23,7 +23,11 @@ pnpm dlx likec4 build docs/engineering/data/architecture --output-single-file -o
 ## 検証
 
 ```bash
-pnpm dlx likec4 validate docs/engineering/data/architecture
+pnpm dlx likec4@1.59.3 validate docs/engineering/data/architecture
 ```
 
-構文と layout drift を検査する。`likec4` は devDependency に入れていない（`pnpm dlx` で都度実行。採用判断は #2775）。
+構文と layout drift を検査する。
+
+`likec4` は **devDependency に入れていない**。unpacked 11.6MB に加えて `playwright 1.60.0`（repo は `^1.63.0` なので二重になる）と vite 8 が全開発者の install へ入るのに対し、守りたいのは「生成器を壊した時に無効な DSL を黙って吐く」だけだから（#2775 の判断 2）。
+
+代わりに `pnpm docs:check` の `likec4-validate` が、`scripts/lib/architecture-map/` か このディレクトリが変わった PR でだけ同じコマンドを走らせる。**advisory** で、失敗しても merge は止めず GitHub Actions の annotation として出す。version は `scripts/tasks/docs-guard/checks/likec4-validate.ts` の `LIKEC4_VERSION` が正本で、上のコマンドと揃える。
