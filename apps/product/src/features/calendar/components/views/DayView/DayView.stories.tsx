@@ -43,10 +43,7 @@ const basePlan: CalendarDisplayEvent = {
   description: '週次の進捗確認',
   startDate: makeDate(today, 10, 0),
   endDate: makeDate(today, 11, 0),
-  status: 'open',
   color: 'var(--primary)',
-  createdAt: now,
-  updatedAt: now,
   version: '2026-07-15T00:00:00.000000Z',
   displayStartDate: makeDate(today, 10, 0),
   displayEndDate: makeDate(today, 11, 0),
@@ -102,7 +99,6 @@ const overdueEntry: CalendarDisplayEvent = {
   endDate: makeDate(yesterday, 15, 0),
   displayStartDate: makeDate(yesterday, 14, 0),
   displayEndDate: makeDate(yesterday, 15, 0),
-  status: 'open',
 };
 
 const todayRange: ViewDateRange = {
@@ -219,10 +215,7 @@ export const WithOverdueEntry: Story = {
 const presetBase: CalendarDisplayEvent = {
   id: '',
   title: '',
-  status: 'open',
   color: '',
-  createdAt: now,
-  updatedAt: now,
   version: '2026-07-15T00:00:00.000000Z',
   startDate: null,
   endDate: null,
@@ -259,35 +252,27 @@ function preset(
   };
 }
 
-/** 過去エントリ（記録済み）の共通props */
-const closed: Partial<CalendarDisplayEvent> = { status: 'closed', timeblockState: 'past' };
+/** 過去の記録（Record）の共通props */
+const recorded: Partial<CalendarDisplayEvent> = { kind: 'record' };
 
 const presetSampleEntries: CalendarDisplayEvent[] = [
   // 過去（記録済み）
   preset('preset-1', 'Morning Run', 'var(--category-teal)', 8, 0, 30, {
-    ...closed,
+    ...recorded,
     // 予定通り実行
-    actualStartDate: makeDate(today, 8, 0),
-    actualEndDate: makeDate(today, 8, 30),
   }),
   preset('preset-2', 'Draft Proposal', 'var(--category-blue)', 10, 0, 90, {
-    ...closed,
+    ...recorded,
     // 10分遅れて開始 → 上部に斜線
-    actualStartDate: makeDate(today, 10, 10),
-    actualEndDate: makeDate(today, 11, 30),
   }),
   preset('preset-3', 'English Lesson', 'var(--category-green)', 11, 45, 45, {
-    ...closed,
+    ...recorded,
     description: 'Unit 5 — Pronunciation practice',
     // 予定通り
-    actualStartDate: makeDate(today, 11, 45),
-    actualEndDate: makeDate(today, 12, 30),
   }),
   preset('preset-4', 'Lunch & Walk', 'var(--category-amber)', 13, 0, 45, {
-    ...closed,
+    ...recorded,
     // 15分早く終了 → 下部に斜線
-    actualStartDate: makeDate(today, 13, 0),
-    actualEndDate: makeDate(today, 13, 30),
   }),
   // 未来（予定）
   preset('preset-5', 'Prepare Presentation', 'var(--category-blue)', 14, 30, 60, {}),

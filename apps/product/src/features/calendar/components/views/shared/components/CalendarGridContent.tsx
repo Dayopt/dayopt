@@ -49,37 +49,14 @@ import { TwoLaneTimeblockRenderer } from './TwoLaneTimeblockRenderer';
 // Types
 // ========================================
 
-function shiftOptionalDate(
-  date: Date | null | undefined,
-  deltaMs: number,
-): Date | null | undefined {
-  if (date == null) return date;
-  return new Date(date.getTime() + deltaMs);
-}
-
 export function buildDragPreviewEntry(
   entry: CalendarDisplayEvent,
   previewTime: { start: Date; end: Date },
 ): CalendarDisplayEvent {
-  const baseStart = entry.startDate ?? entry.plannedStartDate ?? entry.displayStartDate;
-  const deltaMs = baseStart ? previewTime.start.getTime() - baseStart.getTime() : 0;
   const duration = Math.max(
     1,
     Math.round((previewTime.end.getTime() - previewTime.start.getTime()) / 60000),
   );
-
-  if (entry.kind === 'record') {
-    return {
-      ...entry,
-      startDate: previewTime.start,
-      endDate: previewTime.end,
-      displayStartDate: previewTime.start,
-      displayEndDate: previewTime.end,
-      duration,
-      actualStartDate: previewTime.start,
-      actualEndDate: previewTime.end,
-    };
-  }
 
   return {
     ...entry,
@@ -88,10 +65,6 @@ export function buildDragPreviewEntry(
     displayStartDate: previewTime.start,
     displayEndDate: previewTime.end,
     duration,
-    plannedStartDate: previewTime.start,
-    plannedEndDate: previewTime.end,
-    actualStartDate: shiftOptionalDate(entry.actualStartDate, deltaMs),
-    actualEndDate: shiftOptionalDate(entry.actualEndDate, deltaMs),
   };
 }
 

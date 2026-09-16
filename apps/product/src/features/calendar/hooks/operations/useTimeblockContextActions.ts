@@ -39,7 +39,7 @@ export function useTimeblockContextActions() {
       if (!entry.activityId) return;
       // カレンダー内パネル（CalendarReviewRail）は廃止済み（#2181 Step 4）。
       // アクティビティによるセグメント絞り込みは Step 5（セグメント配線）で復元する。
-      router.push(buildReportPath(locale, entry.startDate ?? entry.actualStartDate ?? new Date()));
+      router.push(buildReportPath(locale, entry.startDate ?? new Date()));
     },
     [router, locale],
   );

@@ -12,8 +12,6 @@ const baseEvent: CalendarDisplayEvent = {
   startDate: new Date('2026-01-15T09:00:00'),
   endDate: new Date('2026-01-15T10:00:00'),
   origin: 'manual',
-  actualStartDate: null,
-  actualEndDate: null,
   kind: 'plan',
   version: '2026-01-15T08:00:00.000000Z',
 } as unknown as CalendarDisplayEvent;
@@ -468,10 +466,6 @@ describe('useInteraction resize completion', () => {
     const onEventUpdate = vi.fn();
     const matchingEntry: CalendarDisplayEvent = {
       ...baseEvent,
-      plannedStartDate: baseEvent.startDate,
-      plannedEndDate: baseEvent.endDate,
-      actualStartDate: baseEvent.startDate,
-      actualEndDate: baseEvent.endDate,
     };
     const { result } = renderHook(() =>
       useInteraction(makeProps({ events: [matchingEntry], onEventUpdate })),
@@ -506,10 +500,6 @@ describe('useInteraction resize completion', () => {
     const onEventUpdate = vi.fn();
     const overtimeEntry: CalendarDisplayEvent = {
       ...baseEvent,
-      plannedStartDate: baseEvent.startDate,
-      plannedEndDate: baseEvent.endDate,
-      actualStartDate: baseEvent.startDate,
-      actualEndDate: new Date('2026-01-15T10:10:00'),
     };
     const { result } = renderHook(() =>
       useInteraction(makeProps({ events: [overtimeEntry], onEventUpdate })),

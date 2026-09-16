@@ -70,10 +70,7 @@ const basePlan: CalendarDisplayEvent = {
   title: 'チームミーティング',
   startDate: makeDate(today, 10, 0),
   endDate: makeDate(today, 11, 0),
-  status: 'open',
   color: 'var(--primary)',
-  createdAt: now,
-  updatedAt: now,
   version: '2026-07-15T00:00:00.000000Z',
   displayStartDate: makeDate(today, 10, 0),
   displayEndDate: makeDate(today, 11, 0),
@@ -154,7 +151,6 @@ const overdueEntry: CalendarDisplayEvent = {
   endDate: makeDate(lastWeek, 15, 0),
   displayStartDate: makeDate(lastWeek, 14, 0),
   displayEndDate: makeDate(lastWeek, 15, 0),
-  status: 'open',
 };
 
 const weekRange: ViewDateRange = {

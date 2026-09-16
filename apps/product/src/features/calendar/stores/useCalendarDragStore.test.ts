@@ -9,15 +9,13 @@ const mockCalendarEvent: CalendarDisplayEvent = {
   title: 'テストプラン',
   startDate: new Date('2026-02-21T10:00:00'),
   endDate: new Date('2026-02-21T11:00:00'),
-  status: 'open',
   color: 'blue',
-  createdAt: new Date(),
-  updatedAt: new Date(),
   version: '2026-07-15T00:00:00.000000Z',
   displayStartDate: new Date('2026-02-21T10:00:00'),
   displayEndDate: new Date('2026-02-21T11:00:00'),
   duration: 60,
   isMultiDay: false,
+  kind: 'plan',
 };
 
 describe('useCalendarDragStore', () => {

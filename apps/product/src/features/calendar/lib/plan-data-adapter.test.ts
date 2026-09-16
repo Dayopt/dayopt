@@ -20,15 +20,13 @@ function makeEvent(overrides: Partial<CalendarEvent> & { id: string }): Calendar
     title: 'Sample',
     startDate: start,
     endDate: end,
-    status: 'open',
     color: '',
-    createdAt: start,
-    updatedAt: start,
     version: '2026-07-15T00:00:00.000000Z',
     displayStartDate: start,
     displayEndDate: end,
     duration: 60,
     isMultiDay: false,
+    kind: 'plan',
     ...overrides,
   };
 }
@@ -81,13 +79,13 @@ describe('applyTimezoneToDisplayDates', () => {
     expect(event.displayStartDate).toBe(originalDisplayStart);
   });
 
-  it('startDate 以外のフィールド（title / status 等）はそのままコピーされる', () => {
-    const event = makeEvent({ id: 'e1', title: 'Coding', status: 'closed', duration: 90 });
+  it('startDate 以外のフィールド（title / kind 等）はそのままコピーされる', () => {
+    const event = makeEvent({ id: 'e1', title: 'Coding', kind: 'record', duration: 90 });
     const result = applyTimezoneToDisplayDates(event, TZ);
 
     expect(result.id).toBe('e1');
     expect(result.title).toBe('Coding');
-    expect(result.status).toBe('closed');
+    expect(result.kind).toBe('record');
     expect(result.duration).toBe(90);
   });
 });

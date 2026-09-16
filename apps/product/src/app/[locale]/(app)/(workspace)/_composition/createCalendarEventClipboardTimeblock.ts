@@ -4,9 +4,7 @@ import { createClipboardTimeblock, type ClipboardTimeblock } from '@/features/ti
 /** Calendar の表示時刻を保ったまま、既存の貼り付け用データへ変換する。 */
 export function createCalendarEventClipboardTimeblock(
   entry: CalendarDisplayEvent,
-): ClipboardTimeblock | null {
-  if (!entry.kind) return null;
-
+): ClipboardTimeblock {
   return createClipboardTimeblock({
     kind: entry.kind,
     title: entry.title,

@@ -21,17 +21,12 @@ const completedPlannedEntry: CalendarDisplayEvent = {
   description: '週次デザインシンク',
   startDate: past,
   endDate: pastEnd,
-  status: 'closed',
   color: 'var(--primary)',
-  createdAt: new Date(),
-  updatedAt: new Date(),
   version: '2026-07-15T00:00:00.000000Z',
   displayStartDate: past,
   displayEndDate: pastEnd,
   duration: 60,
   isMultiDay: false,
-  actualStartDate: past,
-  actualEndDate: pastEnd,
 };
 
 /** タグなし entry（振り返り非表示） */
@@ -50,10 +45,6 @@ const upcomingPlannedEntry: CalendarDisplayEvent = {
   endDate: futureEnd,
   displayStartDate: futureStart,
   displayEndDate: futureEnd,
-  plannedStartDate: futureStart,
-  plannedEndDate: futureEnd,
-  actualStartDate: null,
-  actualEndDate: null,
 };
 
 /** Unplanned entry（計画に戻す表示） */

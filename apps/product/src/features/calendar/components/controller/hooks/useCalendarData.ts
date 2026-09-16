@@ -213,18 +213,16 @@ export function useCalendarData({
   );
   // 未分類(タグなし)フィルターの表示切替も同様にリアクティブ依存として渡す（#1576）
 
-  // Step 8 の表示互換射影。既存のカードと DnD の段階的置換が完了するまで
+  // plans / records から表示用射影（CalendarDisplayEvent）を組む。
   // CalendarDisplayEvent は view model としてだけ維持し、データ取得は time model に固定する。
   const allCalendarEvents = useMemo(() => {
     const visiblePlans = plansQuery.data ?? [];
     const visibleRecords = recordsQuery.data ?? [];
     const plans = visiblePlans;
     const records = visibleRecords;
-    const now = new Date();
     const planEvents = plans.map((plan) => {
       const startDate = new Date(plan.start_at);
       const endDate = new Date(plan.end_at);
-      const timeblockState = endDate <= now ? 'past' : startDate <= now ? 'active' : 'upcoming';
       return applyTimezoneToDisplayDates(
         {
           id: plan.id,
@@ -232,21 +230,13 @@ export function useCalendarData({
           description: plan.note ?? undefined,
           startDate,
           endDate,
-          status: timeblockState === 'past' ? 'closed' : 'open',
           color: '',
           activityId: plan.activity_id,
-          createdAt: new Date(plan.created_at),
-          updatedAt: new Date(plan.updated_at),
           version: plan.updated_at,
           displayStartDate: startDate,
           displayEndDate: endDate,
           duration: Math.round((endDate.getTime() - startDate.getTime()) / 60_000),
           isMultiDay: !tzIsSameDay(startDate, endDate, timezone),
-          timeblockState,
-          plannedStartDate: startDate,
-          plannedEndDate: endDate,
-          actualStartDate: null,
-          actualEndDate: null,
           kind: 'plan' as const,
         },
         timezone,
@@ -265,21 +255,13 @@ export function useCalendarData({
         description: record.note ?? undefined,
         startDate: record.startDate,
         endDate: record.endDate,
-        status: 'closed' as const,
         color: '',
         activityId: record.activityId,
-        createdAt: new Date(sourceRow.created_at),
-        updatedAt: new Date(sourceRow.updated_at),
         version: sourceRow.updated_at,
         displayStartDate: record.displayStartDate,
         displayEndDate: record.displayEndDate,
         duration: record.duration,
         isMultiDay: !tzIsSameDay(record.startDate, record.endDate, timezone),
-        timeblockState: 'past' as const,
-        actualStartDate: record.startDate,
-        actualEndDate: record.endDate,
-        plannedStartDate: null,
-        plannedEndDate: null,
         kind: 'record' as const,
         recordSource: sourceRow.source,
       };

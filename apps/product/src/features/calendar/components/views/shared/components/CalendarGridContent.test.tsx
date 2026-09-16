@@ -121,14 +121,10 @@ function makeCalendarEvent(
     endDate,
     displayStartDate: startDate,
     displayEndDate: endDate,
-    status: 'open',
     color: 'blue',
-    createdAt: new Date('2026-07-15T00:00:00.000Z'),
-    updatedAt: new Date('2026-07-15T00:00:00.000Z'),
     version: '2026-07-15T00:00:00.000000Z',
     duration: 60,
     isMultiDay: false,
-    timeblockState: kind === 'plan' ? 'upcoming' : 'past',
     kind,
     ...overrides,
   };
@@ -195,7 +191,7 @@ describe('CalendarGridContent', () => {
     expect(screen.queryByTestId('two-lane-plan-1')).not.toBeInTheDocument();
   });
 
-  it('drag preview は planned と actual のズレを保って表示用 entry を作る', () => {
+  it('drag preview は移動後の時刻で表示用 entry を作る', () => {
     const entry = {
       id: 'entry-1',
       title: 'dev',
@@ -203,19 +199,11 @@ describe('CalendarGridContent', () => {
       endDate: new Date('2026-06-04T15:00:00.000Z'),
       displayStartDate: new Date('2026-06-04T13:00:00.000Z'),
       displayEndDate: new Date('2026-06-04T15:00:00.000Z'),
-      plannedStartDate: new Date('2026-06-04T13:00:00.000Z'),
-      plannedEndDate: new Date('2026-06-04T15:00:00.000Z'),
-      actualStartDate: new Date('2026-06-04T13:30:00.000Z'),
-      actualEndDate: new Date('2026-06-04T16:45:00.000Z'),
-      status: 'open' as const,
       color: 'blue',
-      createdAt: new Date('2026-06-04T00:00:00.000Z'),
-      updatedAt: new Date('2026-06-04T00:00:00.000Z'),
       version: '2026-06-04T00:00:00.000000Z',
       duration: 120,
       isMultiDay: false,
       kind: 'plan' as const,
-      timeblockState: 'upcoming' as const,
     };
 
     const previewEntry = buildDragPreviewEntry(entry, {
@@ -225,10 +213,10 @@ describe('CalendarGridContent', () => {
 
     expect(previewEntry.startDate?.toISOString()).toBe('2026-06-04T15:00:00.000Z');
     expect(previewEntry.endDate?.toISOString()).toBe('2026-06-04T17:00:00.000Z');
-    expect(previewEntry.plannedStartDate?.toISOString()).toBe('2026-06-04T15:00:00.000Z');
-    expect(previewEntry.plannedEndDate?.toISOString()).toBe('2026-06-04T17:00:00.000Z');
-    expect(previewEntry.actualStartDate?.toISOString()).toBe('2026-06-04T15:30:00.000Z');
-    expect(previewEntry.actualEndDate?.toISOString()).toBe('2026-06-04T18:45:00.000Z');
+    expect(previewEntry.displayStartDate.toISOString()).toBe('2026-06-04T15:00:00.000Z');
+    expect(previewEntry.displayEndDate.toISOString()).toBe('2026-06-04T17:00:00.000Z');
+    expect(previewEntry.duration).toBe(120);
+    expect(previewEntry.kind).toBe('plan');
   });
 
   it('Planのdrag previewはPlanレーンのoutlineカードで表示する（#2250: previewTime に重なる Record が存在する場合は split 幅）', () => {
@@ -348,14 +336,10 @@ describe('CalendarGridContent', () => {
       endDate: new Date('2026-06-04T10:00:00.000Z'),
       displayStartDate: new Date('2026-06-04T09:00:00.000Z'),
       displayEndDate: new Date('2026-06-04T10:00:00.000Z'),
-      status: 'open' as const,
       color: 'blue',
-      createdAt: new Date('2026-06-04T00:00:00.000Z'),
-      updatedAt: new Date('2026-06-04T00:00:00.000Z'),
       version: '2026-06-04T00:00:00.000000Z',
       duration: 60,
       isMultiDay: false,
-      timeblockState: 'upcoming' as const,
       kind: 'plan' as const,
     } satisfies CalendarDisplayEvent;
     const second = {
