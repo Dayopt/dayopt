@@ -39,6 +39,7 @@ const KNOWN_PLACEMENT_EXCEPTIONS = new Set<string>([
   'scripts/tasks/docs-guard/checks/decisions-append-only.ts',
   'scripts/tasks/docs-guard/checks/frontmatter-check.ts',
   'scripts/tasks/docs-guard/checks/glossary-sync.ts',
+  'scripts/tasks/docs-guard/checks/likec4-validate.ts',
   'scripts/tasks/docs-guard/checks/link-check.ts',
   'scripts/tasks/docs-guard/checks/naming-check.ts',
   'scripts/tasks/docs-guard/config.ts',
