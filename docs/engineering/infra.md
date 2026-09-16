@@ -399,6 +399,12 @@ producer は workflow path + job 名 + `pull_request` event + head SHA + reposit
 証拠として `deferred` に分け、merge 判定には含めない。base が進んだ head は `update-branch` として
 pending（strict up-to-date の ruleset と同じ向き）。
 
+同じ controller が Review policy（#2796）も評価する: 計画の `review` 要件と PR の review /
+comment / thread（GraphQL の resolve 状態）から `not-required` / `not-started` / `pending` /
+`stale` / `complete` / `pending-adjudication` / `unknown` を判定し、commit status
+`Review policy (shadow)` に出す。状態の定義と完了証拠は `pr-cross-review` skill §Review policy。
+shadow 中は Codex を自動起動しない（workflow に `pull-requests: write` を渡していない）。
+
 結果は Step Summary・`validation-result-<run>` artifact（14 日）・commit status `Validation (shadow)`
 に出す。**required check ではない。** ruleset・`branch:finish`・既存 check は変更しない。
 GitHub native rule の管理者 bypass はこの check では防げない（bypass actor 0 の ruleset が担う）。

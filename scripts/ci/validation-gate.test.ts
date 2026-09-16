@@ -131,6 +131,36 @@ function fakeApi(overrides: Record<string, unknown> = {}) {
       { id: 2, state: 'success', environment_url: 'https://product-x.vercel.app' },
     ],
     [`repos/${REPO}/compare/main...${headSha}`]: { status: 'ahead' },
+    [`repos/${REPO}/pulls/7/reviews?per_page=100`]: [
+      {
+        id: 5221740744,
+        user: { login: 'chatgpt-codex-connector[bot]', type: 'Bot' },
+        state: 'COMMENTED',
+        commit_id: headSha,
+        submitted_at: '2026-09-16T10:56:22Z',
+        html_url: `https://github.com/${REPO}/pull/7#pullrequestreview-5221740744`,
+        body: `**Reviewed commit:** \`${headSha.slice(0, 10)}\``,
+      },
+    ],
+    [`repos/${REPO}/issues/7/comments?per_page=100`]: [
+      {
+        id: 1,
+        user: { login: 't3-nico', type: 'User' },
+        body: '@codex review',
+        created_at: '2026-09-16T10:48:06Z',
+        html_url: `https://github.com/${REPO}/pull/7#issuecomment-1`,
+      },
+      {
+        id: 2,
+        user: { login: 't3-nico', type: 'User' },
+        body: `[review-summary]\nhead: ${headSha}\nprovider: codex\nagent: risk-reviewer\nstatus: reviewed\nfindings: 0\n`,
+        created_at: '2026-09-16T10:58:00Z',
+        html_url: `https://github.com/${REPO}/pull/7#issuecomment-2`,
+      },
+    ],
+    [`repos/${REPO}/commits/${headSha}`]: {
+      commit: { committer: { date: '2026-09-16T10:50:00Z' } },
+    },
     ...overrides,
   };
   const calls: string[] = [];
@@ -140,6 +170,42 @@ function fakeApi(overrides: Record<string, unknown> = {}) {
     return structuredClone(routes[path]);
   };
   return { api, calls };
+}
+
+function fakeGraphql(threads: unknown[] = []) {
+  return () => ({
+    repository: {
+      pullRequest: {
+        reviews: { nodes: [{ id: 'PRR_1', databaseId: 5221740744 }] },
+        reviewThreads: {
+          nodes: threads.length
+            ? threads
+            : [
+                {
+                  id: 'PRRT_1',
+                  isResolved: true,
+                  isOutdated: false,
+                  path: 'apps/product/src/a.ts',
+                  comments: {
+                    nodes: [
+                      {
+                        author: { login: 'chatgpt-codex-connector[bot]' },
+                        body: 'P2',
+                        pullRequestReview: { id: 'PRR_1' },
+                      },
+                      {
+                        author: { login: 't3-nico' },
+                        body: '対応済み',
+                        pullRequestReview: { id: 'PRR_2' },
+                      },
+                    ],
+                  },
+                },
+              ],
+        },
+      },
+    },
+  });
 }
 
 const env = (patch: Record<string, string> = {}) => ({
@@ -310,6 +376,7 @@ describe('validation gate controller', () => {
       }),
       argv: [],
       api,
+      graphql: fakeGraphql(),
       cwd,
       fetchImpl: () => {},
       output: () => {},
@@ -322,14 +389,23 @@ describe('validation gate controller', () => {
     expect(outcome.result?.verdict).toBe('pass');
     expect(outcome.result?.suites.integration.status).toBe('not-applicable');
     expect(outcome.result?.suites.productPreview.status).toBe('satisfied');
-    expect(posted).toHaveLength(2); // pending → final
+    expect(outcome.review?.verdict).toBe('satisfied');
+    expect(outcome.review?.evidence?.adjudication).toEqual({
+      findings: 1,
+      unresolved: 0,
+      silent: 0,
+    });
+    expect(posted).toHaveLength(4); // pending ×2 → final ×2
     expect(posted[0]).toContain('state=pending');
-    expect(posted[1]).toContain(`repos/${REPO}/statuses/${headSha}`);
-    expect(posted[1]).toContain('state=success');
-    expect(posted[1]).toContain('context=Validation (shadow)');
+    expect(posted[2]).toContain(`repos/${REPO}/statuses/${headSha}`);
+    expect(posted[2]).toContain('state=success');
+    expect(posted[2]).toContain('context=Validation (shadow)');
+    expect(posted[3]).toContain('context=Review policy (shadow)');
+    expect(posted[3]).toContain('state=success');
     const saved = JSON.parse(readFileSync(resultPath, 'utf8'));
     expect(saved.plan.identity.policySha).toBe(baseSha);
     expect(saved.result.verdict).toBe('pass');
+    expect(saved.review.state).toBe('complete');
   });
 
   it('does not publish a status for a local --pr run (only workflow_run publishes)', () => {
@@ -339,6 +415,7 @@ describe('validation gate controller', () => {
       env: env(),
       argv: ['--pr', '7'],
       api,
+      graphql: fakeGraphql(),
       cwd,
       fetchImpl: () => {},
       output: () => {},
@@ -365,6 +442,7 @@ describe('validation gate controller', () => {
       }),
       argv: [],
       api,
+      graphql: fakeGraphql(),
       cwd,
       fetchImpl: () => {},
       output: () => {},
@@ -375,7 +453,8 @@ describe('validation gate controller', () => {
     });
     expect(outcome.result?.verdict).toBe('blocked');
     expect(outcome.result?.suites.productUnit.status).toBe('missing');
-    expect(posted.at(-1)).toContain('state=failure');
+    expect(posted.at(-2)).toContain('state=failure');
+    expect(outcome.review?.trigger.shouldRequest).toBe(false);
   });
 
   it('skips a stale event whose head moved on instead of publishing for it', () => {
@@ -390,6 +469,7 @@ describe('validation gate controller', () => {
       }),
       argv: [],
       api,
+      graphql: fakeGraphql(),
       cwd,
       fetchImpl: () => {
         throw new Error('not fetched in test');
@@ -412,6 +492,7 @@ describe('validation gate controller', () => {
       env: env({ GITHUB_REF: 'refs/heads/claude/some-pr-branch' }),
       argv: ['--pr', '7'],
       api,
+      graphql: fakeGraphql(),
       cwd,
       fetchImpl: () => {},
       output: () => {},
@@ -445,6 +526,7 @@ describe('validation gate controller', () => {
       env: env({ VALIDATION_WAIT_MINUTES: '10', GITHUB_REF: 'refs/heads/main' }),
       argv: ['--pr', '7'],
       api: flaky,
+      graphql: fakeGraphql(),
       cwd,
       fetchImpl: () => {},
       output: () => {},
@@ -472,6 +554,7 @@ describe('validation gate controller', () => {
       env: env({ VALIDATION_WAIT_MINUTES: '1' }),
       argv: ['--pr', '7'],
       api,
+      graphql: fakeGraphql(),
       cwd,
       fetchImpl: () => {},
       output: () => {},
@@ -503,6 +586,7 @@ describe('validation gate controller', () => {
           if (path.includes('/actions/runs?')) throw new Error('HTTP 502');
           return api(path);
         },
+        graphql: fakeGraphql(),
         cwd,
         fetchImpl: () => {},
         output: () => {},
@@ -514,9 +598,11 @@ describe('validation gate controller', () => {
     ).toThrow('HTTP 502');
     expect(posted.map((args) => args.find((arg) => arg.startsWith('state=')))).toEqual([
       'state=pending',
+      'state=pending',
+      'state=failure',
       'state=failure',
     ]);
-    expect(posted[1].join(' ')).toContain('indeterminate: HTTP 502');
+    expect(posted[2].join(' ')).toContain('indeterminate: HTTP 502');
   });
 
   it('still tries to publish failure when even the initial pending post fails', () => {
@@ -540,8 +626,10 @@ describe('validation gate controller', () => {
         },
       }),
     ).toThrow('HTTP 502 on pending');
+    // 最初の pending（Validation）で落ちても、両 context へ failure を発行する
     expect(posted.map((args) => args.find((arg) => arg.startsWith('state=')))).toEqual([
       'state=pending',
+      'state=failure',
       'state=failure',
     ]);
   });
@@ -567,9 +655,11 @@ describe('validation gate controller', () => {
         },
       }),
     ).toThrow('HTTP 502 on pulls');
-    expect(posted).toHaveLength(1);
-    expect(posted[0]).toContain(`repos/${REPO}/statuses/${headSha}`);
-    expect(posted[0]).toContain('state=failure');
+    expect(posted).toHaveLength(2); // Validation / Review policy の両 context へ failure
+    for (const args of posted) {
+      expect(args).toContain(`repos/${REPO}/statuses/${headSha}`);
+      expect(args).toContain('state=failure');
+    }
   });
 
   it('publishes nothing for a trusted event without an open PR (main commits)', () => {
@@ -611,6 +701,7 @@ describe('validation gate controller', () => {
       }),
       argv: [],
       api,
+      graphql: fakeGraphql(),
       cwd,
       fetchImpl: () => {},
       output: () => {},
@@ -620,7 +711,7 @@ describe('validation gate controller', () => {
       },
     });
     expect(outcome.result?.verdict).toBe('pass');
-    expect(posted.at(-1)).toContain('state=success');
+    expect(posted.at(-2)).toContain('state=success');
   });
 
   it('skips events that are not associated with an open PR', () => {
@@ -632,12 +723,35 @@ describe('validation gate controller', () => {
       }),
       argv: [],
       api,
+      graphql: fakeGraphql(),
       cwd,
       fetchImpl: () => {},
       output: () => {},
       postStatus: () => '',
     });
     expect(outcome.skipped).toBe('no open PR for this event');
+  });
+
+  it('normalizes review evidence and never posts a review request in shadow', () => {
+    const { api } = fakeApi({ [`repos/${REPO}/pulls/7/reviews?per_page=100`]: [] });
+    const outputs: string[] = [];
+    const outcome = runValidationGate({
+      env: env(),
+      argv: ['--pr', '7'],
+      api,
+      graphql: fakeGraphql(),
+      cwd,
+      fetchImpl: () => {},
+      output: (text) => {
+        outputs.push(text);
+      },
+      postStatus: () => '',
+      now: () => new Date('2026-09-16T10:55:00Z'),
+    });
+    // 依頼 comment は head より前 → 無視され、not-started で「起動する」判定になるが投稿はしない
+    expect(outcome.review?.state).toBe('not-started');
+    expect(outcome.review?.trigger.shouldRequest).toBe(true);
+    expect(outputs.some((text) => text.startsWith('::notice::Review policy'))).toBe(true);
   });
 
   it('flattens paginated gh api output and passes exact argv (no shell)', () => {

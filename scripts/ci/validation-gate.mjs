@@ -22,6 +22,12 @@ import { resolve } from 'node:path';
 import { runGh } from '../lib/gh.mjs';
 import { isDirectExecution } from '../lib/is-direct-execution.mjs';
 import {
+  REVIEW_STATUS_CONTEXT,
+  evaluateReviewPolicy,
+  formatReviewPolicy,
+  toReviewCommitStatus,
+} from '../lib/review-policy.mjs';
+import {
   VALIDATION_STATUS_CONTEXT,
   evaluateValidation,
   formatValidationResult,
@@ -52,6 +58,90 @@ export function eventShaOf(eventName, event) {
   if (eventName === 'workflow_run') return event?.workflow_run?.head_sha ?? null;
   if (eventName === 'status') return event?.sha ?? null;
   return null;
+}
+
+/** gh api graphql を JSON で読む（review thread の resolve 状態は REST に無い）。 */
+export function createGithubGraphql({ execFileImpl } = {}) {
+  return (query, variables = {}) => {
+    const args = ['api', 'graphql', '-f', `query=${query}`];
+    for (const [key, value] of Object.entries(variables))
+      args.push(typeof value === 'number' ? '-F' : '-f', `${key}=${value}`);
+    return JSON.parse(runGh(args, execFileImpl ? { execFileImpl } : {})).data;
+  };
+}
+
+const REVIEW_THREADS_QUERY = `query($owner: String!, $name: String!, $number: Int!) {
+  repository(owner: $owner, name: $name) {
+    pullRequest(number: $number) {
+      reviews(first: 100) { nodes { id databaseId } }
+      reviewThreads(first: 100) {
+        nodes {
+          id isResolved isOutdated path
+          comments(first: 50) { nodes { author { login } body pullRequestReview { id } } }
+        }
+      }
+    }
+  }
+}`;
+
+/** Review policy の evidence（review / issue comment / thread / head の commit 日時）を正規化する。 */
+export function collectReviewEvidence({ repository, pr, api, graphql }) {
+  const headSha = pr.head.sha;
+  const reviews = api(`repos/${repository}/pulls/${pr.number}/reviews?per_page=100`, {
+    paginate: true,
+  }).map((review) => ({
+    id: review.id,
+    authorLogin: review.user?.login ?? '',
+    authorType: review.user?.type ?? '',
+    state: review.state,
+    commitId: review.commit_id ?? '',
+    submittedAt: review.submitted_at ?? '',
+    htmlUrl: review.html_url ?? '',
+    body: review.body ?? '',
+  }));
+  const comments = api(`repos/${repository}/issues/${pr.number}/comments?per_page=100`, {
+    paginate: true,
+  }).map((comment) => ({
+    id: comment.id,
+    authorLogin: comment.user?.login ?? '',
+    authorType: comment.user?.type ?? '',
+    body: comment.body ?? '',
+    createdAt: comment.created_at ?? '',
+    htmlUrl: comment.html_url ?? '',
+  }));
+  let headCommittedAt = null;
+  try {
+    headCommittedAt =
+      api(`repos/${repository}/commits/${headSha}`)?.commit?.committer?.date ?? null;
+  } catch {
+    headCommittedAt = null;
+  }
+  const [owner, name] = repository.split('/');
+  const pull = graphql(REVIEW_THREADS_QUERY, { owner, name, number: pr.number })?.repository
+    ?.pullRequest;
+  const reviewNodeIds = {};
+  for (const node of pull?.reviews?.nodes ?? [])
+    if (node?.databaseId) reviewNodeIds[String(node.databaseId)] = node.id;
+  const threads = (pull?.reviewThreads?.nodes ?? []).map((thread) => ({
+    id: thread.id,
+    isResolved: thread.isResolved === true,
+    isOutdated: thread.isOutdated === true,
+    path: thread.path ?? null,
+    comments: (thread.comments?.nodes ?? []).map((comment) => ({
+      authorLogin: comment.author?.login ?? '',
+      reviewId: comment.pullRequestReview?.id ?? null,
+      body: comment.body ?? '',
+    })),
+  }));
+  return {
+    headSha,
+    headCommittedAt,
+    pr: { number: pr.number, state: pr.state, draft: pr.draft === true },
+    reviews,
+    comments,
+    threads,
+    reviewNodeIds,
+  };
 }
 
 /** event から評価対象 PR を決める。PR 番号が取れなければ null（評価しない）。 */
@@ -289,6 +379,7 @@ export function runValidationGate({
   env = process.env,
   argv = process.argv.slice(2),
   api = createGithubApi(),
+  graphql = createGithubGraphql(),
   cwd = process.cwd(),
   fetchImpl = (target) => fetchPullRefs(target, cwd),
   publish = true,
@@ -313,6 +404,7 @@ export function runValidationGate({
     return {
       skipped: `untrusted ref ${env.GITHUB_REF}; policy must run from ${trustedRef}`,
       result: null,
+      review: null,
     };
   const prIndex = argv.indexOf('--pr');
   const prArg = prIndex >= 0 ? argv[prIndex + 1] : undefined;
@@ -355,32 +447,31 @@ export function runValidationGate({
       repository,
       api,
     });
-    if (!target) return { skipped: 'no open PR for this event', result: null };
+    if (!target) return { skipped: 'no open PR for this event', result: null, review: null };
     pr = api(`repos/${repository}/pulls/${target.number}`);
     // 古い event（head が進んだ後に届いた完了通知）は評価しない。新しい head の event が別に来る。
     if (target.eventSha !== undefined && target.eventSha !== pr.head.sha)
       return {
         skipped: `event head ${target.eventSha} superseded by ${pr.head.sha}`,
         result: null,
+        review: null,
       };
     statusSha = pr.head.sha;
     if (publishable)
-      post(VALIDATION_STATUS_CONTEXT, {
-        state: 'pending',
-        description: 'Evaluating trusted evidence',
-      });
+      for (const context of [VALIDATION_STATUS_CONTEXT, REVIEW_STATUS_CONTEXT])
+        post(context, { state: 'pending', description: 'Evaluating trusted evidence' });
     return evaluateAndPublish(target, pr);
   } catch (error) {
     const message = error instanceof Error ? error.message : 'evaluation failed';
     if (publishable)
-      try {
-        post(VALIDATION_STATUS_CONTEXT, {
-          state: 'failure',
-          description: `indeterminate: ${message}`,
-        });
-      } catch {
-        output(`::error::Validation gate: could not publish failure status after: ${message}\n`);
-      }
+      for (const context of [VALIDATION_STATUS_CONTEXT, REVIEW_STATUS_CONTEXT])
+        try {
+          post(context, { state: 'failure', description: `indeterminate: ${message}` });
+        } catch {
+          output(
+            `::error::Validation gate: could not publish ${context} failure after: ${message}\n`,
+          );
+        }
     throw error;
   }
 
@@ -402,19 +493,36 @@ export function runValidationGate({
       result = evaluateValidation({ plan, evidence });
     }
     result.target = target;
-    const summary = formatValidationResult(result);
+    const reviewEvidence = collectReviewEvidence({ repository, pr, api, graphql });
+    const review = evaluateReviewPolicy({
+      plan,
+      evidence: reviewEvidence,
+      now: now(),
+      validationVerdict: result.verdict,
+    });
+    const summary = formatValidationResult(result) + '\n' + formatReviewPolicy(review);
     output(summary);
     if (env.GITHUB_STEP_SUMMARY) appendFileSync(env.GITHUB_STEP_SUMMARY, summary);
+    // Codex の起動は shadow では行わない（workflow に pull-requests: write を渡していない）。
+    // 起動要否の判定だけを log に残し、#2798 の比較材料にする。
+    if (review.trigger.shouldRequest) output(`::notice::Review policy: ${review.trigger.reason}\n`);
     const outPath = env.VALIDATION_RESULT_PATH ? resolve(env.VALIDATION_RESULT_PATH) : null;
-    if (outPath) writeFileSync(outPath, `${JSON.stringify({ plan, evidence, result }, null, 2)}\n`);
+    if (outPath)
+      writeFileSync(
+        outPath,
+        `${JSON.stringify({ plan, evidence, result, reviewEvidence, review }, null, 2)}\n`,
+      );
     // status の発行は main の定義で走る event（workflow_run / status）に限る。`--pr` はローカルの
     // read-only 実行用で、dispatch で PR ref の定義を走らせる経路は workflow 側に無い（二重防御）。
     if (publish && !publishable)
       output(
         `::notice::Validation gate: status not published for event ${env.GITHUB_EVENT_NAME}\n`,
       );
-    if (publishable) post(VALIDATION_STATUS_CONTEXT, toCommitStatus(result));
-    return { skipped: null, result };
+    if (publishable) {
+      post(VALIDATION_STATUS_CONTEXT, toCommitStatus(result));
+      post(REVIEW_STATUS_CONTEXT, toReviewCommitStatus(review));
+    }
+    return { skipped: null, result, review };
   }
 }
 
