@@ -59,9 +59,14 @@ export function resolveTarget({ eventName, event, prArg, repository, api }) {
         ? (event?.sha ?? null)
         : null;
   if (!SHA.test(sha ?? '')) return null;
+  // stacked branch では commit を含む open PR が複数返る。head がその commit である PR だけを
+  // 対象にする（祖先として含むだけの PR を選ぶと stale 判定で skip され、本来の PR が再評価されない）。
   const pulls = api(`repos/${repository}/commits/${sha}/pulls?per_page=100`, { paginate: true });
   const open = pulls.filter(
-    (pull) => pull?.state === 'open' && pull?.base?.repo?.full_name === repository,
+    (pull) =>
+      pull?.state === 'open' &&
+      pull?.base?.repo?.full_name === repository &&
+      pull?.head?.sha === sha,
   );
   if (open.length === 0) return null;
   return { number: open[0].number, source: eventName, eventSha: sha };
@@ -242,11 +247,15 @@ export function buildTrustedPlan({ repository, pr, policySha, cwd, fetchImpl, gi
   return plan;
 }
 
+// 合成 merge commit を決定的にする: 同じ base / head / tree なら再評価（status event）でも
+// 同じ testSha になり、planId が安定する（Codex review P2）。日時は固定値。
 const GIT_IDENTITY = {
   GIT_AUTHOR_NAME: 'validation-gate',
   GIT_AUTHOR_EMAIL: 'validation-gate@dayopt.invalid',
   GIT_COMMITTER_NAME: 'validation-gate',
   GIT_COMMITTER_EMAIL: 'validation-gate@dayopt.invalid',
+  GIT_AUTHOR_DATE: '2000-01-01T00:00:00Z',
+  GIT_COMMITTER_DATE: '2000-01-01T00:00:00Z',
 };
 
 function gitIn(cwd) {
@@ -331,22 +340,27 @@ export function runValidationGate({
       `description=${status.description.slice(0, 140)}`,
       ...(runUrl ? ['-f', `target_url=${runUrl}`] : []),
     ]);
-  // fail closed: 評価開始時に pending を置き、収集・評価が例外で落ちても failure を必ず発行する。
-  // これが無いと、同じ head の以前の success が最新 status として残り偽の green になる（Codex P2）。
-  if (publishable)
-    post(VALIDATION_STATUS_CONTEXT, {
-      state: 'pending',
-      description: 'Evaluating trusted evidence',
-    });
+  // fail closed: 評価開始時に pending を置き、収集・評価（pending の発行自体も含む）が例外で
+  // 落ちても failure の発行を試みてから再 throw する。これが無いと、同じ head の以前の success が
+  // 最新 status として残り偽の green になる（Codex P2、2 巡）。
   try {
+    if (publishable)
+      post(VALIDATION_STATUS_CONTEXT, {
+        state: 'pending',
+        description: 'Evaluating trusted evidence',
+      });
     return evaluateAndPublish();
   } catch (error) {
     const message = error instanceof Error ? error.message : 'evaluation failed';
     if (publishable)
-      post(VALIDATION_STATUS_CONTEXT, {
-        state: 'failure',
-        description: `indeterminate: ${message}`,
-      });
+      try {
+        post(VALIDATION_STATUS_CONTEXT, {
+          state: 'failure',
+          description: `indeterminate: ${message}`,
+        });
+      } catch {
+        output(`::error::Validation gate: could not publish failure status after: ${message}\n`);
+      }
     throw error;
   }
 

@@ -367,15 +367,17 @@ base 規則の変更は次の PR から有効になり、当該 PR 自身の必�
 
 ### Validation の信頼済み controller（#2795、shadow）
 
-`validation-gate.yml` は `workflow_run`（CI 完了）と `status`（Vercel の commit status が success）
-で、**main の workflow 定義と checkout** を使って `scripts/ci/validation-gate.mjs` を実行する。
+`validation-gate.yml` は `workflow_run`（CI 完了）と `status`（Vercel の commit status が
+success / failure / error になった時。pending は除く）で、**main の workflow 定義と checkout** を使って `scripts/ci/validation-gate.mjs` を実行する。
 どちらも GitHub docs で「workflow file が default branch にある時だけ走る」event。`deployment_status` は使わない: この event は
 deployment の commit（PR head）の workflow 定義で走る（2026-09-17、PR #2804 で実測）。
 `workflow_dispatch` も使わない: 任意 ref の定義で起動でき、PR branch で改変した controller が
 statuses:write 付きで走る（Codex review P2）。手動再評価は Actions の「Re-run jobs」。
 Vercel Preview が CI より遅れる分は job 内で短く待ち（`VALIDATION_WAIT_MINUTES`）、上限後の
 完了は `status` event が再評価する。controller は評価開始時に pending を発行し、収集・評価が
-例外で落ちても failure を発行してから終了する（以前の success が偽の green として残らない）。
+例外で落ちても（pending の発行自体が失敗した場合も含めて）failure の発行を試みてから終了する
+（以前の success が偽の green として残らない）。合成 merge commit の日時は固定値で、同じ
+base / head / tree なら再評価でも同じ testSha・planId になる。
 controller 自身も `GITHUB_REF` が main でない・event が workflow_run / status でない場合は
 評価も発行もしない。**PR が producer 定義（ci.yml / setup action / check.mjs / impact.mjs）を変えている
 場合、その PR 自身の CI run は `self-produced` として信用しない**（job 名を保ったまま step を

@@ -24,8 +24,10 @@ describe('validation-gate.yml の信頼境界', () => {
     expect(onBlock).toMatch(/^\s*workflows:\s*\[CI\]\s*$/m);
     // status event も default branch 限定（GitHub docs）。Vercel の success だけを job の if で通す
     expect(onBlock).toMatch(/^\s*status:\s*$/m);
+    // pending 以外の terminal state（success / failure / error）で再評価する。success だけだと
+    // wait 上限後に失敗した Preview が pending のまま残る
     expect(code).toMatch(
-      /github\.event\.state == 'success' && startsWith\(github\.event\.context, 'Vercel – '\)/,
+      /github\.event\.state != 'pending' && startsWith\(github\.event\.context, 'Vercel – '\)/,
     );
     // workflow_dispatch は任意 ref の定義で走る（Codex review P2、PR #2804）。使わない。
     expect(onBlock).not.toMatch(/^\s*workflow_dispatch:/m);

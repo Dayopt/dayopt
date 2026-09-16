@@ -206,6 +206,25 @@ describe('validation gate controller', () => {
     expect(plan.problems).toContain('PR head unavailable (fetched head does not match PR head)');
   });
 
+  it('builds the same test merge SHA on repeated evaluation (deterministic plan id)', () => {
+    const first = buildTrustedPlan({
+      repository: REPO,
+      pr: pull(),
+      policySha: baseSha,
+      cwd,
+      fetchImpl: () => {},
+    });
+    const second = buildTrustedPlan({
+      repository: REPO,
+      pr: pull(),
+      policySha: baseSha,
+      cwd,
+      fetchImpl: () => {},
+    });
+    expect(second.identity.testSha).toBe(first.identity.testSha);
+    expect(second.planId).toBe(first.planId);
+  });
+
   it('produces an indeterminate plan when the PR head cannot be fetched', () => {
     const plan = buildTrustedPlan({
       repository: REPO,
@@ -240,10 +259,12 @@ describe('validation gate controller', () => {
     expect(evidence.pr.fork).toBe(false);
   });
 
-  it('resolves the target PR from the workflow_run head sha and ignores closed PRs', () => {
+  it('resolves the target PR from the workflow_run head sha and ignores closed or stacked PRs', () => {
     const { api } = fakeApi({
       [`repos/${REPO}/commits/${headSha}/pulls?per_page=100`]: [
         pull({ number: 9, state: 'closed' }),
+        // stacked PR: この commit を祖先に含むが head は別（先頭に来ても選ばない）
+        pull({ number: 8, head: { sha: 'f'.repeat(40), repo: { full_name: REPO } } }),
         pull(),
       ],
     });
@@ -496,6 +517,33 @@ describe('validation gate controller', () => {
       'state=failure',
     ]);
     expect(posted[1].join(' ')).toContain('indeterminate: HTTP 502');
+  });
+
+  it('still tries to publish failure when even the initial pending post fails', () => {
+    const { api } = fakeApi();
+    const posted: string[][] = [];
+    expect(() =>
+      runValidationGate({
+        env: env({
+          GITHUB_EVENT_NAME: 'workflow_run',
+          GITHUB_EVENT_PATH: writeEvent({ workflow_run: { head_sha: headSha } }),
+        }),
+        argv: [],
+        api,
+        cwd,
+        fetchImpl: () => {},
+        output: () => {},
+        postStatus: (args) => {
+          posted.push(args);
+          if (posted.length === 1) throw new Error('HTTP 502 on pending');
+          return '';
+        },
+      }),
+    ).toThrow('HTTP 502 on pending');
+    expect(posted.map((args) => args.find((arg) => arg.startsWith('state=')))).toEqual([
+      'state=pending',
+      'state=failure',
+    ]);
   });
 
   it('re-evaluates from a Vercel status event and publishes', () => {

@@ -13,7 +13,7 @@ name: Validation gate
 # **required check ではない。** 既存の必須 check / ruleset / branch:finish は変更しない。
 # 必須化は #2798 の比較と User の承認後に別変更で行う。
 #
-# トリガーは `workflow_run`（CI 完了）と `status`（Vercel の commit status が success になった時）。
+# トリガーは `workflow_run`（CI 完了）と `status`（Vercel の commit status が terminal になった時）。
 # どちらも GitHub docs で「workflow file が default branch にある時だけ走り、GITHUB_SHA は
 # default branch の最新」と定義された event。CI 完了後に Preview が遅れて success になっても
 # `status` で再評価されるので、pending のまま取り残されない（Codex review P2）。手動の再評価は
@@ -48,10 +48,12 @@ concurrency:
 jobs:
   validate:
     name: Validation (shadow)
-    # status event は Vercel の success だけ評価する（pending / 自身の発行した status では走らせない）。
+    # status event は Vercel の terminal state（success / failure / error）で評価する。pending と
+    # 自身が発行する status（context が Vercel ではない）では走らせない。failure / error も通すのは、
+    # wait 上限後に Preview が失敗した時に pending のまま取り残さないため（Codex review P2）。
     if: >-
       ${{ github.event_name != 'status'
-          || (github.event.state == 'success' && startsWith(github.event.context, 'Vercel – ')) }}
+          || (github.event.state != 'pending' && startsWith(github.event.context, 'Vercel – ')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
