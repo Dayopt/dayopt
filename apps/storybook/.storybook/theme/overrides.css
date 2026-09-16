@@ -14,6 +14,8 @@
 /* ============================================
  * Story Canvas: コンポーネントプレビュー領域
  * ============================================ */
+/* Vitest の iframe は sb-show-main を持たない。両 runner の背景も同じテーマに揃える。 */
+body,
 .docs-story {
   background: var(--background) !important;
   color: var(--foreground) !important;

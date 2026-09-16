@@ -34,7 +34,7 @@ persistent staging は常設しない。固定 URL が必要な Stripe / OAuth c
 | Vitest unit（product / web）   | required | ロジックとcomponentの回帰検知                                            |
 | Playwright `chromium`          | required | 認証必須含む `apps/product/src/lib/test/e2e` の全specをCIで実行          |
 | Playwright `Mobile Chrome`     | required | `@mobile` tag の test だけを promote 層 3 で chromium と同じ実行に入れる |
-| Storybook browser light / dark | local    | interaction / a11yの既知failureを #1499 / #1586 で解消後にCI昇格を再判断 |
+| Storybook browser light / dark | promote  | collect・render・play・a11y。失敗時は通常の production 昇格を止める      |
 
 e2e job は `supabase/setup-cli` + `supabase start` でlocal Supabase stackを立てる。認証必須specは `create-scoped-test-user.ts`（`apps/product/src/lib/test/e2e/`）でspecファイルごとに専用の使い捨てユーザーをservice role経由で作成する（#2246）。単一の共有test accountだと`workers`並列実行下でtRPCのin-memory rate limiter（userId単位）を超過するため、spec単位でaccountを分離してrate limit予算も分離している。旧`scripts/ci/create-e2e-test-user.mjs`（全specで単一accountを共有する方式）は撤去済み。これにより認証必須testも含めて全specがCIでskipされずに実行される。Mobile Chromeは全specを二重実行せず、`@mobile` tag を付けた mobile 固有の操作境界（長押し作成・Drawer・ヘッダーナビ）の test だけを持つ（2026-09-14、#2743。local 専用だった間に mobile の assertion が UI 変更に追従せず腐っていた）。Playwright Test Agents（planner / generator の opt-in 採用、healer は不採用）は 2026-07-13 に限定採用したが、3週間利用ゼロのまま E2E 追加が手書きで行われたため 2026-08-03 に撤去した。再導入する場合は Playwright に定義を再生成させ、リポジトリ固有制約（healer 不採用、単一フロー限定、`test.skip()` / 固定 wait / `networkidle` 禁止）を planner / generator へ戻す。healer 不採用と CI の正を `chromium` とする判断は撤去後も有効で、根拠は 2026-08-03-playwright-test-agents-retirement.md（削除済み、git 履歴参照） に引き継いだ。
 
@@ -447,12 +447,10 @@ required status checks の実状は ruleset が正本で、context の一覧を�
   101 件・未解決 0 の PR #1820 を偽陰性で止めた）。取得失敗・20 ページ（2000 件）超は
   従来どおり停止に倒す（fail closed）。解決の 3 択は `AGENTS.md §PR / git 運用` §レビュー
 - `Production Release` は merge 後の証跡であり、required check にはしない
-- **Storybook browser suite（`pnpm test-storybook` / `test-storybook:dark`）は CI に載っていない。**
-  `@dayopt/product` の vitest project（`--project storybook` / `storybook-dark`）として実体はあるが、
-  `ci.yml` にも `pnpm check` にも入っていないため、required check 以前に**そもそも実行されていない**。
-  除外の理由だった「light / dark とも既知 failure がある」は解消済みで、#1499 / #1586 は両方 closed、
-  2026-07-30 のローカル実測では light / dark とも 136 tests 全 pass（42 files pass / 33 skip）。
-  CI へ載せるかは job 数 = 課金分の判断（`AGENTS.md §PR / git 運用` §PR 粒度）なので、別途決める
+- **Storybook browser suite は `promote.yml` の専用 job で実行する。**
+  product / web / 共有 UI / Storybook 設定の変更に対して、collect 検査と light / dark を実行し、
+  通常の production 昇格条件と失敗通知に接続する。per-PR の全件実行は追加しない。
+  詳細は [testing.md](testing.md#storybook-の実行契約)、実測証跡は #2737 / #2743 を参照。
 - **`pull_request_target` の job でも check run は PR の `statusCheckRollup` に出る。**
   2026-07-30 に PR #1760 で実測: `production-config-audit.yml`（`pull_request_target`）の job が
   `Audit Vercel metadata (trusted)` という CheckRun として出ている。したがって trusted base 実行の

@@ -144,7 +144,9 @@ export const ManyRows: Story = {
 };
 
 /** すべての状態を 1 画面に並べる（ADR-023 の AllPatterns）。 */
+// 展示専用。各状態はこのファイルの独立 Story で全件検証する。
 export const AllPatterns: Story = {
+  tags: ['docs-only'],
   args: { granularity: 'week', rows: ROWS, mirrorRows: MIRROR_ROWS },
   render: function AllPatternsExecution() {
     return (
@@ -181,3 +183,8 @@ export const AllPatterns: Story = {
 function Row({ children }: { label: string; children: React.ReactNode }) {
   return <div className="flex flex-col gap-2">{children}</div>;
 }
+
+/** 月単位の表示。AllPatterns の月パターンも独立して検証する。 */
+export const Monthly: Story = {
+  args: { granularity: 'month', rows: ROWS, mirrorRows: MIRROR_ROWS },
+};

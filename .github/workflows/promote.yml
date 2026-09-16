@@ -71,6 +71,7 @@ jobs:
     outputs:
       product_affected: ${{ steps.run.outputs.product_affected }}
       web_affected: ${{ steps.run.outputs.web_affected }}
+      storybook_affected: ${{ steps.run.outputs.storybook_affected }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -213,6 +214,36 @@ jobs:
           path: apps/product/test-results/
           retention-days: 7
 
+  storybook:
+    name: Storybook light / dark
+    needs: impact
+    if: ${{ needs.impact.outputs.storybook_affected == 'true' && github.event.inputs.force != 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    concurrency:
+      group: promote-layer3-storybook-${{ github.ref }}
+      cancel-in-progress: true
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+      - name: Install Chromium
+        run: pnpm --filter @dayopt/product exec playwright install --with-deps chromium
+      - name: Check Storybook collection
+        run: pnpm exec tsx scripts/tasks/check-story-coverage.ts --collected
+      - name: Test Storybook light and dark
+        run: pnpm --filter @dayopt/product exec vitest run --project storybook --project storybook-dark --reporter=default --reporter=json --outputFile=storybook-results.json
+      - name: Upload Storybook results
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: storybook-results-${{ github.run_attempt }}
+          path: apps/product/storybook-results.json
+          retention-days: 7
+
   web:
     name: "\U0001F310 Web Build & E2E"
     needs: impact
@@ -290,7 +321,7 @@ jobs:
   # 意図的に落とせば、起票までを本番の経路で確認できる。専用 input は増やさない。
   notify_failure:
     name: File promote failure
-    needs: [impact, e2e, web, release]
+    needs: [impact, e2e, web, storybook, release]
     # `superseded` は異常ではない。burst merge で後発 run が先に promote すると先発は
     # superseded で exit 1 するが、その commit の内容は既に production に入っている。
     # result だけを見ると正常な追い越しを P1 として起票し、runbook Playbook 2（rollback
@@ -300,6 +331,7 @@ jobs:
           && ( needs.impact.result == 'failure'
                || needs.e2e.result == 'failure'
                || needs.web.result == 'failure'
+               || needs.storybook.result == 'failure'
                || ( needs.release.result == 'failure'
                     && needs.release.outputs.release_status != 'superseded' ) ) }}
     runs-on: ubuntu-latest
@@ -318,6 +350,7 @@ jobs:
           IMPACT_RESULT: ${{ needs.impact.result }}
           E2E_RESULT: ${{ needs.e2e.result }}
           WEB_RESULT: ${{ needs.web.result }}
+          STORYBOOK_RESULT: ${{ needs.storybook.result }}
           RELEASE_RESULT: ${{ needs.release.result }}
         run: |
           set -euo pipefail
@@ -329,6 +362,7 @@ jobs:
           | Release Impact | \`$IMPACT_RESULT\` |
           | E2E Tests | \`$E2E_RESULT\` |
           | Web Build & E2E | \`$WEB_RESULT\` |
+          | Storybook light / dark | \`$STORYBOOK_RESULT\` |
           | Promote Production | \`$RELEASE_RESULT\` |
 
           対象 SHA: \`$SHA\`
@@ -354,7 +388,7 @@ jobs:
   # ─── promote 本体（層 4）────────────────────────────────────────────────
   release:
     name: Promote Production
-    needs: [impact, e2e, web]
+    needs: [impact, e2e, web, storybook]
     # **「suite を免除してよいのは impact が明示的に false と言った時だけ」**を
     # 肯定形で書く。`!= 'true'` 形にすると **空文字が免除側に落ちる**: impact job の
     # `outputs:` キー名 / step の `id:` / `impactKey` のどれか 1 つを改名すると、
@@ -382,7 +416,8 @@ jobs:
           && ( github.event.inputs.force == 'true'
                || ( needs.impact.result == 'success'
                     && (needs.impact.outputs.product_affected == 'false' || needs.e2e.result == 'success')
-                    && (needs.impact.outputs.web_affected == 'false' || needs.web.result == 'success') ) ) }}
+                    && (needs.impact.outputs.web_affected == 'false' || needs.web.result == 'success')
+                    && (needs.impact.outputs.storybook_affected == 'false' || needs.storybook.result == 'success') ) ) }}
     runs-on: ubuntu-latest
     # この environment には deployment branch policy（main のみ）が設定済みで、
     # main 以外の ref からの dispatch は job 開始前に GitHub 側で拒否される

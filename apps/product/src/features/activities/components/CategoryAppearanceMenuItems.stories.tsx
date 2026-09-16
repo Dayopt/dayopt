@@ -59,11 +59,13 @@ export const SelectColor: Story = {
   render: () => <InteractivePickerRow />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await userEvent.click(canvas.getByRole('button', { name: '色を選択' }));
+    await userEvent.click(await canvas.findByRole('button', { name: '色を選択' }));
 
     const body = within(document.body);
     await userEvent.click(await body.findByText('緑'));
-    await expect(canvas.getByRole('button', { name: '色を選択' })).toBeInTheDocument();
+    await expect(
+      (await canvas.findByRole('button', { name: '色を選択' })).querySelector('span'),
+    ).toHaveClass('bg-category-green');
   },
 };
 
@@ -72,11 +74,13 @@ export const SelectIcon: Story = {
   render: () => <InteractivePickerRow />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await userEvent.click(canvas.getByRole('button', { name: 'アイコンを選択' }));
+    await userEvent.click(await canvas.findByRole('button', { name: 'アイコンを選択' }));
 
     const body = within(document.body);
     await userEvent.click(await body.findByRole('menuitem', { name: 'dumbbell' }));
-    await expect(canvas.getByRole('button', { name: 'アイコンを選択' })).toBeInTheDocument();
+    await expect(
+      (await canvas.findByRole('button', { name: 'アイコンを選択' })).querySelector('svg'),
+    ).toHaveClass('lucide-dumbbell');
   },
 };
 

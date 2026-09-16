@@ -25,7 +25,7 @@ export const Default: Story = {
     await expect(args.onNavigate).toHaveBeenCalledWith('prev');
 
     // Click today
-    const todayBtn = canvas.getByText('Today');
+    const todayBtn = canvas.getByRole('button', { name: '今日' });
     await userEvent.click(todayBtn);
     await expect(args.onNavigate).toHaveBeenCalledWith('today');
 

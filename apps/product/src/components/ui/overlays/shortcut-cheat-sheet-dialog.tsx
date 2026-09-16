@@ -142,7 +142,7 @@ export function ShortcutCheatSheetDialog({
                       <span className="ml-2 font-normal">{scopeHint(tShortcuts, group.scope)}</span>
                     )}
                   </h3>
-                  <dl className={isActive ? undefined : 'opacity-60'}>
+                  <dl className={isActive ? undefined : 'text-muted-foreground'}>
                     {items.map(({ labelKey, keyLabels }) => (
                       <div
                         key={labelKey}

@@ -47,14 +47,21 @@ const messages = Object.entries(messageModules).reduce<Record<string, unknown>>(
 /** テーマ + tRPC + i18n プロバイダ */
 export const providerDecorator: Decorator = (Story, context) => {
   // eslint-disable-next-line react-hooks/rules-of-hooks -- Storybook decorator は React コンポーネントとして実行される
-  const isDark = useDarkMode();
+  const toolbarDark = useDarkMode();
+  const forcedTheme = context.parameters.testTheme;
+  const resolvedTheme =
+    forcedTheme === 'light' || forcedTheme === 'dark'
+      ? forcedTheme
+      : toolbarDark
+        ? 'dark'
+        : 'light';
 
   // eslint-disable-next-line react-hooks/rules-of-hooks -- Storybook decorator は React コンポーネントとして実行される
   useEffect(() => {
     document.documentElement.classList.remove('light', 'dark');
-    document.documentElement.classList.add(isDark ? 'dark' : 'light');
-    document.documentElement.style.colorScheme = isDark ? 'dark' : 'light';
-  }, [isDark]);
+    document.documentElement.classList.add(resolvedTheme);
+    document.documentElement.style.colorScheme = resolvedTheme;
+  }, [resolvedTheme]);
 
   // parameters.trpcMocks / trpcPending / trpcError を読み取り
   const trpcMocks = context.parameters.trpcMocks as MockResponseMap | undefined;
@@ -63,7 +70,7 @@ export const providerDecorator: Decorator = (Story, context) => {
     { path: string; code: string; message?: string } | undefined;
 
   return (
-    <StorybookThemeProvider>
+    <StorybookThemeProvider resolvedTheme={resolvedTheme}>
       <StoryTRPCProvider
         {...(trpcMocks !== undefined ? { mocks: trpcMocks } : {})}
         {...(trpcPending !== undefined ? { pending: trpcPending } : {})}

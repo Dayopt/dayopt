@@ -1,3 +1,5 @@
+import { OPEN_MENU_A11Y, verifyModalMenuFocus } from '../testing/modal-menu';
+
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import {
   LogOut,
@@ -43,8 +45,7 @@ type Story = StoryObj<typeof meta>;
 
 /** アクションメニュー（ラベルなし）。編集/複製/削除などのアクションリスト、アクションは自明なのでラベル不要。 */
 export const Default: Story = {
-  // aria-hidden-focus: Radix DropdownMenu portal aria-hidden during play interaction
-  parameters: { a11y: { test: 'todo' } },
+  parameters: { a11y: OPEN_MENU_A11Y },
   render: () => (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -79,6 +80,7 @@ export const Default: Story = {
     await expect(body.getByText('プロフィール')).toBeInTheDocument();
     await expect(body.getByText('設定')).toBeInTheDocument();
     await expect(body.getByText('ログアウト')).toBeInTheDocument();
+    await verifyModalMenuFocus(triggerButton);
   },
 };
 
@@ -355,3 +357,6 @@ export const AllPatterns: Story = {
     </div>
   ),
 };
+
+/** 閉じたトリガーを含む画面全体も a11y 検査する。 */
+export const Closed: Story = { render: Default.render };

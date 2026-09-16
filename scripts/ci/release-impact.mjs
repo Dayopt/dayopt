@@ -23,18 +23,73 @@
 
 import { appendFileSync } from 'node:fs';
 
+import { resolveImpact } from './impact.mjs';
+
 import {
   IMPACT_WIRING,
   RELEASE_PROJECTS,
   getProjectState,
+  gitDiffFiles,
   gitHeadSha,
+  gitIsAncestor,
   resolveProjectImpact,
 } from './production-release.mjs';
 
 const SHA_PATTERN = /^[0-9a-f]{40}$/;
 
 /** `GITHUB_OUTPUT` へ出すキー。promote.yml の `needs.impact.outputs.*` と 1:1。 */
-export const IMPACT_OUTPUT_KEYS = IMPACT_WIRING.map((wiring) => wiring.outputKey);
+export const IMPACT_OUTPUT_KEYS = [
+  ...IMPACT_WIRING.map((wiring) => wiring.outputKey),
+  'storybook_affected',
+];
+
+/** 同じ履歴上で最も新しい配信 SHA を共通検査の基準にする。履歴不明は免除しない。 */
+export function resolveStorybookBase({ baseShas, targetSha, isAncestorImpl = gitIsAncestor }) {
+  if (!baseShas.length || !SHA_PATTERN.test(targetSha ?? '')) return undefined;
+  try {
+    let latest;
+    for (const sha of baseShas) {
+      if (!SHA_PATTERN.test(sha ?? '') || isAncestorImpl(sha, targetSha) !== true) return undefined;
+      if (!latest || isAncestorImpl(latest, sha) === true) latest = sha;
+      else if (isAncestorImpl(sha, latest) !== true) return undefined;
+    }
+    return latest;
+  } catch {
+    return undefined;
+  }
+}
+
+/** 共通基準から Storybook の依存差分を見る。判定不能は実行側へ倒す。 */
+export function resolveStorybookImpact({
+  baseSha,
+  targetSha,
+  checkoutAtTarget = true,
+  diffFilesImpl = gitDiffFiles,
+}) {
+  if (!SHA_PATTERN.test(baseSha ?? '') || !SHA_PATTERN.test(targetSha ?? '') || !checkoutAtTarget)
+    return true;
+  if (baseSha === targetSha) return false;
+  try {
+    const files = diffFilesImpl(baseSha, targetSha);
+    if (files.length === 0) return false;
+    const impact = resolveImpact(files);
+    return (
+      impact.product ||
+      impact.web ||
+      files.some(
+        (file) =>
+          file.startsWith('apps/storybook/') ||
+          file === '.github/workflows/promote.yml' ||
+          file === '.github/actions/setup/action.yml' ||
+          file === 'scripts/tasks/check-story-coverage.ts' ||
+          file === 'scripts/lib/story-test-collection.ts' ||
+          file === 'scripts/ci/release-impact.mjs',
+      )
+    );
+  } catch {
+    return true;
+  }
+}
 
 /**
  * 全 project の「promote 前に層 3 を走らせる必要があるか」を返す。
@@ -55,12 +110,15 @@ export async function resolveReleaseImpact({
   headShaImpl = gitHeadSha,
   projectStateImpl = getProjectState,
   projectImpactImpl = resolveProjectImpact,
+  storybookImpactImpl = resolveStorybookImpact,
+  isAncestorImpl = gitIsAncestor,
 }) {
   // target SHA が壊れている時点で live との diff は取れない。全 suite を走らせる。
   if (!SHA_PATTERN.test(sha ?? '')) {
     return projects.map((project) => ({
       project,
       affected: true,
+      storybookAffected: true,
       reason: 'release target SHA is not a 40 character SHA (fail closed)',
     }));
   }
@@ -83,7 +141,11 @@ export async function resolveReleaseImpact({
         targetSha: sha,
         checkoutAtTarget,
       });
-      results.push({ project, ...decision });
+      results.push({
+        project,
+        ...decision,
+        productionSha: state?.production?.sha,
+      });
     } catch (error) {
       // Vercel API の失敗（token 失効・障害・rate limit）はここへ落ちる。
       // 判定できないなら層 3 を走らせる側へ倒す。
@@ -91,18 +153,34 @@ export async function resolveReleaseImpact({
       results.push({
         project,
         affected: true,
+        storybookAffected: true,
         reason: `cannot read live production: ${message} (fail closed)`,
       });
     }
   }
 
-  return results;
+  const storybookAffected = storybookImpactImpl({
+    baseSha: resolveStorybookBase({
+      baseShas: results.map((result) => result.productionSha),
+      targetSha: sha,
+      isAncestorImpl,
+    }),
+    targetSha: sha,
+    checkoutAtTarget,
+  });
+  return results.map(({ productionSha: _productionSha, ...result }) => ({
+    ...result,
+    storybookAffected: result.storybookAffected === true || storybookAffected,
+  }));
 }
 
 /** `key=value` 行の組み立て。GITHUB_OUTPUT が無い環境（ローカル実行）でも値を返す。 */
 export function formatOutputs(results) {
   return results
     .map(({ project, affected }) => `${project.impactKey}_affected=${affected ? 'true' : 'false'}`)
+    .concat(
+      `storybook_affected=${results.some((result) => result.storybookAffected !== false) ? 'true' : 'false'}`,
+    )
     .join('\n');
 }
 
@@ -142,7 +220,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
       console.error(`::error::release impact resolution failed: ${message}`);
       appendTo(
         process.env.GITHUB_OUTPUT,
-        RELEASE_PROJECTS.map((project) => `${project.impactKey}_affected=true`).join('\n'),
+        IMPACT_OUTPUT_KEYS.map((key) => `${key}=true`).join('\n'),
       );
       process.exitCode = 1;
     });

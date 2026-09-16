@@ -161,7 +161,7 @@ export default defineConfig({
           setupFiles: [path.join(dirname, 'src/lib/test/storybook-setup.ts')],
         },
       },
-      // Storybook Dark mode テスト（beforeEach で .dark クラスを強制適用）
+      // Storybook Dark mode テスト（decorator と ThemeContext に同じ theme を渡す）
       {
         extends: true,
         plugins: [

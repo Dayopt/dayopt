@@ -1,7 +1,16 @@
-import * as projectAnnotations from '@dayopt/storybook/preview';
-import * as a11yAddonAnnotations from '@storybook/addon-a11y/preview';
-import { setProjectAnnotations } from '@storybook/nextjs-vite';
+import { setProjectAnnotations } from 'storybook/preview-api';
+import { beforeAll, expect } from 'vitest';
 
-// Storybook portable stories の設定を適用
-// @see https://storybook.js.org/docs/api/portable-stories/portable-stories-vitest#setprojectannotations
-setProjectAnnotations([a11yAddonAnnotations, projectAnnotations]);
+// addon-vitest の自動登録が終わってから拡張する。framework の RSC 等の設定も保持する。
+beforeAll(() => {
+  setProjectAnnotations([
+    globalThis.globalProjectAnnotations,
+    {
+      parameters: { testTheme: 'light' },
+      afterEach: () => {
+        expect(document.documentElement.classList.contains('light')).toBe(true);
+        expect(document.documentElement.style.colorScheme).toBe('light');
+      },
+    },
+  ]);
+});

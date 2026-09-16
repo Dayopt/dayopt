@@ -170,7 +170,7 @@ describe('release workflow contract', () => {
     // 層 3 の 2 job がこの workflow の job として実在する。
     expect(release).toMatch(/^\s*name: "\\U0001F3AD E2E Tests"\s*$/m);
     expect(release).toMatch(/^\s*name: "\\U0001F310 Web Build & E2E"\s*$/m);
-    expect(release).toMatch(/^\s*needs: \[impact, e2e, web\]\s*$/m);
+    expect(release).toMatch(/^\s*needs: \[impact, e2e, web, storybook\]\s*$/m);
 
     // check-run 名の照合はもう存在しない。
     expect(release).not.toContain('check-runs');
@@ -194,7 +194,8 @@ describe('release workflow contract', () => {
         "&& ( github.event.inputs.force == 'true' " +
         "|| ( needs.impact.result == 'success' " +
         "&& (needs.impact.outputs.product_affected == 'false' || needs.e2e.result == 'success') " +
-        "&& (needs.impact.outputs.web_affected == 'false' || needs.web.result == 'success') ) ) }}",
+        "&& (needs.impact.outputs.web_affected == 'false' || needs.web.result == 'success') " +
+        "&& (needs.impact.outputs.storybook_affected == 'false' || needs.storybook.result == 'success') ) ) }}",
     );
   });
 
@@ -395,8 +396,8 @@ describe('release workflow contract', () => {
       release.indexOf('\n  release:'),
     );
     expect(notify).not.toBe('');
-    expect(notify).toMatch(/^\s*needs: \[impact, e2e, web, release\]\s*$/m);
-    for (const job of ['impact', 'e2e', 'web', 'release']) {
+    expect(notify).toMatch(/^\s*needs: \[impact, e2e, web, storybook, release\]\s*$/m);
+    for (const job of ['impact', 'e2e', 'web', 'storybook', 'release']) {
       expect(notify).toContain(`needs.${job}.result == 'failure'`);
     }
     // 暗黙の success() が付くと、needs が失敗した時点でこの job も skip される。
@@ -464,5 +465,23 @@ describe('release workflow contract', () => {
     // PR head を checkout すると、PR code が Vercel token を読める。
     const audit = workflow('production-config-audit.yml');
     expect(audit).toContain('ref: ${{ github.event.pull_request.base.sha || github.sha }}');
+  });
+});
+
+describe('Storybook promote contract', () => {
+  const source = workflow('promote.yml');
+  const job = source.slice(source.indexOf('\n  storybook:'), source.indexOf('\n  web:'));
+  it('collect と両テーマを実行し、失敗を握り潰さない', () => {
+    expect(job).toContain("needs.impact.outputs.storybook_affected == 'true'");
+    expect(job).toContain('check-story-coverage.ts --collected');
+    expect(job).toContain('--project storybook --project storybook-dark');
+    expect(job).not.toContain('continue-on-error');
+    expect(job).not.toContain('secrets.');
+    expect(job).toContain('group: promote-layer3-storybook-${{ github.ref }}');
+  });
+  it('失敗時も結果を保存し通知する', () => {
+    expect(job).toMatch(/name: Upload Storybook results\s+if: always\(\)/);
+    expect(source).toContain("needs.storybook.result == 'failure'");
+    expect(source).toContain('STORYBOOK_RESULT: ${{ needs.storybook.result }}');
   });
 });

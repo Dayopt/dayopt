@@ -337,9 +337,9 @@ export const AllPatterns: Story = {
 /** 本番の 4 カラム目と同じ既定幅（360px）の器。 */
 function Panel({ children }: { children: React.ReactNode }) {
   return (
-    <div className="border-border-subtle flex h-[560px] w-[360px] flex-col gap-4 overflow-y-auto rounded-2xl border p-4">
+    <article className="border-border-subtle flex h-[560px] w-[360px] flex-col gap-4 overflow-y-auto rounded-2xl border p-4">
       {children}
-    </div>
+    </article>
   );
 }
 

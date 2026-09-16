@@ -297,7 +297,8 @@ export const LaneDisplayModes: Story = {
  * このカード自体は onConvert を呼ぶだけ。
  */
 export const Convertible: Story = {
-  render: () => (
+  args: { onConvert: fn(), onDismiss: fn() },
+  render: (args) => (
     <DayColumn>
       <Ghosts events={[]} />
       <ExternalEventCard
@@ -310,14 +311,30 @@ export const Convertible: Story = {
           displayStartDate: at(10),
           displayEndDate: at(11),
         }}
-        onConvert={fn()}
-        onDismiss={fn()}
+        onConvert={args.onConvert}
+        onDismiss={args.onDismiss}
       />
     </DayColumn>
   ),
-  play: async ({ canvasElement }) => {
+  play: async ({ canvasElement, args }) => {
     const canvas = within(canvasElement);
-    await expect(await canvas.findByRole('button', { name: /週次ミーティング/ })).toBeVisible();
+    const convert = await canvas.findByRole('button', { name: /週次ミーティング/ });
+    await expect(convert).toBeVisible();
+    await userEvent.tab();
+    await expect(convert).toHaveFocus();
+    await expect(getComputedStyle(convert).boxShadow).toContain('inset');
+    const bounds = convert.getBoundingClientRect();
+    await expect(
+      canvasElement.ownerDocument.elementFromPoint(
+        bounds.x + bounds.width / 2,
+        bounds.y + bounds.height / 2,
+      ),
+    ).toBe(convert);
+    await userEvent.click(convert);
+    await expect(args.onConvert).toHaveBeenCalledTimes(1);
+    await userEvent.keyboard('{Enter}');
+    await expect(args.onConvert).toHaveBeenCalledTimes(2);
+    await expect(args.onDismiss).not.toHaveBeenCalled();
   },
 };
 
