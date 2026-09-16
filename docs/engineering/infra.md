@@ -365,6 +365,31 @@ AGENTS・skills・実行される MDX・契約文書を区別する。コード�
 後続 #2795 の controller が信頼済み source と revision を照合し、#2798 の比較・承認後に切り替える。
 base 規則の変更は次の PR から有効になり、当該 PR 自身の必要条件を緩めない。
 
+### Validation の信頼済み controller（#2795、shadow）
+
+`validation-gate.yml` は `workflow_run`（CI 完了）/ `deployment_status`（Preview 完了）/
+`workflow_dispatch`（PR 番号指定）で、**main の workflow 定義と checkout** だけを使って
+`scripts/ci/validation-gate.mjs` を実行する。PR 側のコード・依存・artifact は実行しない。
+計画は毎回 base policy から再生成し、validation-shadow.yml の artifact は読まない。test merge は
+GitHub の `refs/pull/N/merge`（遅延更新で base が古いことがある）ではなく、main HEAD と
+`refs/pull/N/head` から `git merge-tree` で自前生成する。PR の tree は git object として diff に
+読むだけで実行しない。conflict は indeterminate。
+
+証拠は GitHub API から取り、controller が import する純粋な評価関数（validation-evidence）が判定する。
+producer は workflow path + job 名 + `pull_request` event + head SHA + repository で照合し、
+同名 check を別 workflow が出しても採用しない。同一 head の複数 run は最新 run の最新 attempt
+だけを見る。Preview は commit status の緑に加えて、同じ SHA の `Preview – product` /
+`Preview – web` deployment とその最新 status を要求し、production environment は拒否する。
+必要 suite は明示的な success だけが satisfied で、skipped / cancelled / timed_out / 不在 /
+未接続 producer（`unwired`）/ 計画 indeterminate はいずれも合格にしない。計画上 not-applicable
+だけを理由付きで受理する。層 3（E2E / Web smoke）は promote.yml が merge 後・公開前に生産する
+証拠として `deferred` に分け、merge 判定には含めない。base が進んだ head は `update-branch` として
+pending（strict up-to-date の ruleset と同じ向き）。
+
+結果は Step Summary・`validation-result-<run>` artifact（14 日）・commit status `Validation (shadow)`
+に出す。**required check ではない。** ruleset・`branch:finish`・既存 check は変更しない。
+GitHub native rule の管理者 bypass はこの check では防げない（bypass actor 0 の ruleset が担う）。
+
 ### merge gate の required checks
 
 **merge gate は main の ruleset `6790553`（`Branch name pattern: main`）1 本。** 2026-09-07 の repo public 化で有効になり、required status checks（`🔍 Static Checks` / `📦 Unit Tests` / `🧪 Integration Tests` / `Vercel – product` / `Vercel – web`）、strict up-to-date、review thread resolution 必須、bypass actor 0 を GitHub 自身が local / cloud / UI / API / MCP のどの経路でも同じ条件で強制する（実状は `gh api repos/Dayopt/dayopt/rulesets/6790553`）。2026-09-13 に [#2640](https://github.com/Dayopt/dayopt/issues/2640) で `Production Config Audit` を required から外し、`🧪 Integration Tests` を足した。ruleset は skipped な required check を成功扱いにするので、DB を触らない PR で integration job が skip されても止まらない。`pnpm branch:finish`（`scripts/tasks/finish-branch.sh`）は merge と worktree / branch 掃除の入口で、その rollup 検査（affected 判定による `🧪 Integration Tests` の名前要求、Vercel context の存在確認）は ruleset と重複する冗長検査として残す。gate ではないので、UI / API / MCP から直接 merge しても条件は変わらない。2026-09-07 までは Free plan の private repo で ruleset API が 403 を返し、gate は finish-branch.sh だけだった（旧記述）。

@@ -1,0 +1,90 @@
+name: Validation gate
+
+# 共通検証計画（#2794）に対する Validation の信頼済み controller（#2795、shadow）。
+#
+# **PR 側のコードを一切実行しない。** `workflow_run` / `deployment_status` /
+# `workflow_dispatch` はいずれも default branch（main）の workflow 定義と checkout で
+# 走るため、判定規則・producer allowlist・status 発行は base 側の信頼済み実装だけが持つ。
+# PR の tree は `refs/pull/N/merge` を git object として fetch し、`git diff` の入力に
+# するだけ（validation-shadow.yml と同じ収集器 `collectPlanInput`）。PR が変更できる
+# validation-shadow.yml の artifact は読まない。
+#
+# 出力は Step Summary・`validation-result` artifact・commit status `Validation (shadow)`。
+# **required check ではない。** 既存の必須 check / ruleset / branch:finish は変更しない。
+# 必須化は #2798 の比較と User の承認後に別変更で行う。
+#
+# トリガー:
+# - workflow_run（CI 完了）: 主経路。ready / synchronize / reopen で CI が走るたびに再評価する
+# - deployment_status: Vercel Preview の完了は CI とは非同期なので、こちらでも再評価する
+#   （production deployment は job の if で除外）
+# - workflow_dispatch: 手動再評価（PR 番号を指定）
+#
+# 依存 install は行わない（node 標準ライブラリ + runner 同梱の gh だけ。ci.yml の impact job と同じ判断）。
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+  deployment_status:
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: 'Pull request number to evaluate'
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: validation-gate-${{ github.event.workflow_run.head_sha || github.event.deployment.sha || inputs.pr }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validation (shadow)
+    # deployment_status は production 環境の deployment でも発火する。Preview だけ評価する。
+    if: >-
+      ${{ github.event_name != 'deployment_status'
+          || startsWith(github.event.deployment.environment, 'Preview') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: read
+      checks: read
+      deployments: read
+      pull-requests: read
+      statuses: write
+    steps:
+      # checkout は default branch（github.sha）。PR head を ref に指定しない。
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+
+      # merge ref の fetch は token 無しで行う（public repo）。persist-credentials: false の
+      # checkout なので、fetch には credential が残らない。
+      - name: Evaluate validation plan against trusted evidence
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+          VALIDATION_RESULT_PATH: validation-result.json
+          PR_INPUT: ${{ inputs.pr }}
+        run: |
+          if [ -n "${PR_INPUT:-}" ]; then
+            node scripts/ci/validation-gate.mjs --pr "$PR_INPUT"
+          else
+            node scripts/ci/validation-gate.mjs
+          fi
+
+      - name: Save validation result
+        if: hashFiles('validation-result.json') != ''
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: validation-result-${{ github.run_id }}-${{ github.run_attempt }}
+          path: validation-result.json
+          retention-days: 14
