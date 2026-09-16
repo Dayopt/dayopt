@@ -48,6 +48,27 @@ describe('complete git collector', () => {
     expect(collectPlanInput(params)).toEqual(collectPlanInput(params));
     expect(collectPlanInput(params).diff.hash).toMatch(/^[a-f0-9]{64}$/);
   });
+  it('changes the diff hash when content changes without changing the path set', () => {
+    const original = collectPlanInput(params);
+    git('checkout', 'candidate');
+    writeFileSync(join(cwd, 'README.md'), 'select 2;\n');
+    git('add', 'README.md');
+    git('commit', '-m', 'change content only');
+    const changedHead = git('rev-parse', 'HEAD');
+    const changedMerge = git(
+      'commit-tree',
+      'HEAD^{tree}',
+      '-p',
+      baseSha,
+      '-p',
+      changedHead,
+      '-m',
+      'test changed merge',
+    );
+    const changed = collectPlanInput({ ...params, headSha: changedHead, testSha: changedMerge });
+    expect(changed.diff.files).toEqual(original.diff.files);
+    expect(changed.diff.hash).not.toBe(original.diff.hash);
+  });
   it('rejects head-only results, mismatched merge parents and unresolved commits', () => {
     expect(() => collectPlanInput({ ...params, testSha: headSha })).toThrow('exact PR merge');
     expect(() => collectPlanInput({ ...params, headSha: baseSha })).toThrow('exact PR merge');
