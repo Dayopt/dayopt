@@ -262,7 +262,12 @@ export function renderSurfaceDocument(
 
   out.push(
     ...section(`### どこからも呼ばれていない procedure（${relations.unusedProcedures.length}）`, [
-      '削除候補ではあるが、判断は別（外部契約に近いものがある）。ここは事実の提示だけ。',
+      '削除候補ではあるが、判断は別（意図的な互換窓や、送信側が未実装のものがある）。ここは事実の提示だけ。',
+      '',
+      '走査範囲は `apps/product/src` / `apps/web/src` / `scripts` / `supabase/functions` の',
+      'TS・JS。SQL と workflow YAML は呼び出し形が違うため見ていないので、**0 件は「この範囲に',
+      '呼び出し元が無い」であって「未使用の証明」ではない**。消す前に公開契約（OAuth scope の',
+      'allowlist、MCP registry）に載っていないかを併せて確かめる。',
       '',
       relations.unusedProcedures.length === 0
         ? 'なし。'

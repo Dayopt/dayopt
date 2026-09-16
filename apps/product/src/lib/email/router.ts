@@ -14,16 +14,11 @@ import { z } from 'zod';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 import { AccountDeletionEmail } from '@/emails/AccountDeletionEmail';
-import { CancellationConfirmEmail } from '@/emails/CancellationConfirmEmail';
 import { createEmailTranslator, type EmailLocale } from '@/emails/i18n';
 import { MfaDisabledEmail } from '@/emails/MfaDisabledEmail';
 import { PasswordChangedEmail } from '@/emails/PasswordChangedEmail';
-import { PaymentFailedEmail } from '@/emails/PaymentFailedEmail';
-import { PaymentRecoveredEmail } from '@/emails/PaymentRecoveredEmail';
-import { ProStartEmail } from '@/emails/ProStartEmail';
 import { TrialExpiredEmail } from '@/emails/TrialExpiredEmail';
 import { TrialExpiringEmail } from '@/emails/TrialExpiringEmail';
-import { TrialStartEmail } from '@/emails/TrialStartEmail';
 import { WelcomeEmail } from '@/emails/WelcomeEmail';
 import { env } from '@/env';
 import { getAppUrl } from '@/lib/app-url';
@@ -284,39 +279,6 @@ export const emailRouter = createTRPCRouter({
       }
     }),
 
-  sendTrialStart: protectedProcedure
-    .meta({ description: 'トライアル開始メール送信' })
-    .input(
-      z.object({
-        email: z.string().email(),
-        userName: z.string().min(1),
-        trialEndDate: z.string().min(1),
-      }),
-    )
-    .mutation(async ({ ctx, input }) => {
-      try {
-        await verifyEmailOwnership(ctx, input.email);
-        logger.info('Sending trial start email', { userId: ctx.userId });
-
-        const locale = await getUserLocale(ctx.supabase, ctx.userId);
-        const t = createEmailTranslator(locale);
-
-        return sendEmail({
-          to: input.email,
-          subject: t('trialStart.subject'),
-          react: TrialStartEmail({
-            userName: input.userName,
-            trialEndDate: input.trialEndDate,
-            locale,
-            appUrl: APP_URL,
-          }),
-          context: 'Trial start email',
-        });
-      } catch (error) {
-        return handleServiceError(error);
-      }
-    }),
-
   sendTrialExpiring: protectedProcedure
     .meta({ description: 'トライアル残3日メール送信' })
     .input(
@@ -381,101 +343,6 @@ export const emailRouter = createTRPCRouter({
       }
     }),
 
-  sendProStart: protectedProcedure
-    .meta({ description: 'Pro開始メール送信' })
-    .input(
-      z.object({
-        email: z.string().email(),
-        userName: z.string().min(1),
-      }),
-    )
-    .mutation(async ({ ctx, input }) => {
-      try {
-        await verifyEmailOwnership(ctx, input.email);
-        logger.info('Sending Pro start email', { userId: ctx.userId });
-
-        const locale = await getUserLocale(ctx.supabase, ctx.userId);
-        const t = createEmailTranslator(locale);
-
-        return sendEmail({
-          to: input.email,
-          subject: t('proStart.subject'),
-          react: ProStartEmail({
-            userName: input.userName,
-            locale,
-            appUrl: APP_URL,
-          }),
-          context: 'Pro start email',
-        });
-      } catch (error) {
-        return handleServiceError(error);
-      }
-    }),
-
-  sendPaymentFailed: protectedProcedure
-    .meta({ description: '支払い失敗メール送信' })
-    .input(
-      z.object({
-        email: z.string().email(),
-        userName: z.string().min(1),
-        portalUrl: z.string().url().optional(),
-      }),
-    )
-    .mutation(async ({ ctx, input }) => {
-      try {
-        await verifyEmailOwnership(ctx, input.email);
-        logger.info('Sending payment failed email', { userId: ctx.userId });
-
-        const locale = await getUserLocale(ctx.supabase, ctx.userId);
-        const t = createEmailTranslator(locale);
-
-        return sendEmail({
-          to: input.email,
-          subject: t('paymentFailed.subject'),
-          react: PaymentFailedEmail({
-            userName: input.userName,
-            ...(input.portalUrl ? { portalUrl: input.portalUrl } : {}),
-            locale,
-            appUrl: APP_URL,
-          }),
-          context: 'Payment failed email',
-        });
-      } catch (error) {
-        return handleServiceError(error);
-      }
-    }),
-
-  sendPaymentRecovered: protectedProcedure
-    .meta({ description: '支払い復旧メール送信' })
-    .input(
-      z.object({
-        email: z.string().email(),
-        userName: z.string().min(1),
-      }),
-    )
-    .mutation(async ({ ctx, input }) => {
-      try {
-        await verifyEmailOwnership(ctx, input.email);
-        logger.info('Sending payment recovered email', { userId: ctx.userId });
-
-        const locale = await getUserLocale(ctx.supabase, ctx.userId);
-        const t = createEmailTranslator(locale);
-
-        return sendEmail({
-          to: input.email,
-          subject: t('paymentRecovered.subject'),
-          react: PaymentRecoveredEmail({
-            userName: input.userName,
-            locale,
-            appUrl: APP_URL,
-          }),
-          context: 'Payment recovered email',
-        });
-      } catch (error) {
-        return handleServiceError(error);
-      }
-    }),
-
   sendPasswordChanged: protectedProcedure
     .meta({ description: 'パスワード変更通知メール送信' })
     .input(
@@ -502,108 +369,6 @@ export const emailRouter = createTRPCRouter({
           }),
           context: 'Password changed email',
           securityNotification: true,
-        });
-      } catch (error) {
-        return handleServiceError(error);
-      }
-    }),
-
-  sendCancellationConfirm: protectedProcedure
-    .meta({ description: 'Pro解約確認メール送信' })
-    .input(
-      z.object({
-        email: z.string().email(),
-        userName: z.string().min(1),
-        periodEndDate: z.string().min(1),
-      }),
-    )
-    .mutation(async ({ ctx, input }) => {
-      try {
-        await verifyEmailOwnership(ctx, input.email);
-        logger.info('Sending cancellation confirm email', { userId: ctx.userId });
-
-        const locale = await getUserLocale(ctx.supabase, ctx.userId);
-        const t = createEmailTranslator(locale);
-
-        return sendEmail({
-          to: input.email,
-          subject: t('cancellationConfirm.subject'),
-          react: CancellationConfirmEmail({
-            userName: input.userName,
-            periodEndDate: input.periodEndDate,
-            locale,
-            appUrl: APP_URL,
-          }),
-          context: 'Cancellation confirm email',
-        });
-      } catch (error) {
-        return handleServiceError(error);
-      }
-    }),
-
-  sendAccountDeletion: protectedProcedure
-    .meta({ description: 'アカウント削除確認メール送信（GDPR対応）' })
-    .input(
-      z.object({
-        email: z.string().email(),
-        userName: z.string().min(1),
-      }),
-    )
-    .mutation(async ({ ctx, input }) => {
-      try {
-        await verifyEmailOwnership(ctx, input.email);
-        logger.info('Sending account deletion email', { userId: ctx.userId });
-
-        return await sendAccountDeletionEmail({
-          email: input.email,
-          userName: input.userName,
-          locale: await getUserLocale(ctx.supabase, ctx.userId),
-        });
-      } catch (error) {
-        return handleServiceError(error);
-      }
-    }),
-
-  sendTest: protectedProcedure
-    .meta({ description: 'テストメール送信（開発環境のみ）', deprecated: true })
-    .input(
-      z.object({
-        to: z.string().email('Invalid email address'),
-        subject: z.string().min(1, 'Subject is required').default('Test Email from Dayopt'),
-      }),
-    )
-    .mutation(async ({ ctx, input }) => {
-      try {
-        if (process.env.NODE_ENV === 'production' || process.env.VERCEL) {
-          throw new TRPCError({
-            code: 'FORBIDDEN',
-            message: 'Test endpoint is only available in local development',
-          });
-        }
-
-        const userId = ctx.userId;
-        if (userId) {
-          const { data: userData } = await observeAuthOperation('email_test_get_user', () =>
-            ctx.supabase.auth.getUser(),
-          );
-          if (userData?.user?.email && userData.user.email !== input.to) {
-            throw new TRPCError({
-              code: 'FORBIDDEN',
-              message: 'Can only send test emails to your own address',
-            });
-          }
-        }
-
-        logger.info('Sending test email', { userId: ctx.userId });
-
-        return sendEmail({
-          to: input.to,
-          subject: input.subject,
-          react: WelcomeEmail({
-            userName: 'Test User',
-            appUrl: getAppUrl(),
-          }),
-          context: 'Test email',
         });
       } catch (error) {
         return handleServiceError(error);

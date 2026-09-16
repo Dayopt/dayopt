@@ -123,9 +123,6 @@ function makeBillingMocks(
   };
   return {
     'billing.getOverview': overview,
-    'billing.getInfo': billingInfo,
-    'billing.getPaymentMethod': paymentMethod,
-    'billing.getInvoices': invoices,
   };
 }
 

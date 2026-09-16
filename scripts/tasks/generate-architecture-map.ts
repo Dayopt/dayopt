@@ -63,6 +63,7 @@ import { renderLikeC4Model, renderLikeC4Views } from '../lib/architecture-map/li
 import {
   checkGlossaryReferences,
   checkTimeRuleMirrorReferences,
+  collectCallerSources,
   collectProductSources,
   type ReferenceViolation,
 } from '../lib/architecture-map/references.ts';
@@ -234,7 +235,7 @@ export async function buildArchitectureMapDocs(): Promise<GeneratedDocument[]> {
     sources,
     discovered.filter((item) => item.kind === 'mcp-tool'),
   );
-  const relations = collectRelations(ROOT, sources, discovered);
+  const relations = collectRelations(ROOT, sources, discovered, collectCallerSources(ROOT));
   const callGraph = buildProductCallGraph(discovered, sources, schema, relations.mcpToolFiles);
   // 画面の feature は call graph（画面 → procedure）が決めるので、概念の対応付けはその後に行う。
   const items = attributeRoutesByCallGraph(discovered, callGraph.pages);

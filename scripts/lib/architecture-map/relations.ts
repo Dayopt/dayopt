@@ -409,10 +409,12 @@ export function collectRelations(
   root: string,
   sources: SourceFile[],
   items: InventoryItem[],
+  /** procedure の利用判定だけは product より広く見る（未指定なら product のみ＝従来どおり） */
+  callerSources: SourceFile[] = sources,
 ): Relations {
   const ofKind = (kind: InventoryItem['kind']): InventoryItem[] =>
     items.filter((item) => item.kind === kind);
-  const { usage, unused } = collectProcedureUsage(sources, ofKind('trpc-procedure'));
+  const { usage, unused } = collectProcedureUsage(callerSources, ofKind('trpc-procedure'));
 
   const mcpToolProcedures = collectMcpToolProcedures(sources);
   const mcpToolFiles = new Map<string, string>();

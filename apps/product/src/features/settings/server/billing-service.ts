@@ -249,55 +249,9 @@ export async function createPortalSession(
     : createLegacyPortalSession(supabase, userId, operationId);
 }
 
-/**
- * デフォルト支払い方法を取得
- */
-export async function getPaymentMethod(
-  supabase: SupabaseClient<Database>,
-  userId: string,
-): Promise<PaymentMethod | null> {
-  const stripe = requireStripe();
-  const billingInfo = await getBillingInfo(supabase, userId);
-
-  if (!billingInfo.stripeCustomerId) {
-    return null;
-  }
-
-  return getPaymentMethodByCustomerId(
-    stripe,
-    billingInfo.stripeCustomerId,
-    billingInfo.subscriptionId,
-  );
-}
-
-/**
- * 請求書一覧を取得（最新10件）
- */
-export async function getInvoices(
-  supabase: SupabaseClient<Database>,
-  userId: string,
-): Promise<InvoiceItem[]> {
-  const stripe = requireStripe();
-  const billingInfo = await getBillingInfo(supabase, userId);
-
-  if (!billingInfo.stripeCustomerId) {
-    return [];
-  }
-
-  const invoices = await stripe.invoices.list({
-    customer: billingInfo.stripeCustomerId,
-    limit: 10,
-  });
-
-  return invoices.data.map((inv) => ({
-    id: inv.id,
-    date: new Date((inv.created ?? 0) * 1000).toISOString(),
-    amount: inv.amount_paid ?? 0,
-    currency: inv.currency ?? 'usd',
-    status: inv.status ?? 'unknown',
-    hostedInvoiceUrl: inv.hosted_invoice_url ?? null,
-  }));
-}
+// 単体取得の getPaymentMethod / getInvoices は getBillingOverview（1 回の profiles SELECT で
+// まとめて返す）へ統合済み。呼び出し元が無くなったため削除した（#2775）。
+// 内部実装の getPaymentMethodByCustomerId / getInvoicesByCustomerId は overview が使い続ける。
 
 // ===== Overview (統合エンドポイント) =====
 

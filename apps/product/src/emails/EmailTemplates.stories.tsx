@@ -197,6 +197,10 @@ export const Guidelines: Story = {
         <h2 className="border-border mb-4 border-b pb-2 text-lg font-medium">
           テンプレートと送信フロー
         </h2>
+        <p className="text-muted-foreground mb-3 text-sm">
+          「未配線」は、テンプレートと送信 procedure はあるが呼び出し元が無いもの。現在そのメールは
+          届いていない。課金系は tRPC ではなく Stripe webhook が直接送る。
+        </p>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
@@ -212,17 +216,17 @@ export const Guidelines: Story = {
                 ['PasswordResetEmail', 'PW リセット', 'Auth Hook (recovery)'],
                 ['EmailChangeEmail', 'メール変更', 'Auth Hook (email_change)'],
                 ['MagicLinkEmail', 'マジックリンク', 'Auth Hook (magic_link)'],
-                ['WelcomeEmail', '新規登録', 'email.sendWelcome'],
-                ['TrialStartEmail', 'トライアル開始', 'email.sendTrialStart'],
-                ['TrialExpiringEmail', 'トライアル残3日', 'email.sendTrialExpiring'],
-                ['TrialExpiredEmail', 'トライアル期限切れ', 'email.sendTrialExpired'],
-                ['ProStartEmail', 'Pro開始', 'email.sendProStart'],
-                ['PaymentFailedEmail', '支払い失敗', 'email.sendPaymentFailed'],
-                ['PaymentRecoveredEmail', '支払い復旧', 'email.sendPaymentRecovered'],
+                ['WelcomeEmail', '新規登録', 'email.sendWelcome（未配線）'],
+                ['TrialStartEmail', 'トライアル開始', 'Stripe webhook'],
+                ['TrialExpiringEmail', 'トライアル残3日', 'email.sendTrialExpiring（未配線）'],
+                ['TrialExpiredEmail', 'トライアル期限切れ', 'email.sendTrialExpired（未配線）'],
+                ['ProStartEmail', 'Pro開始', 'Stripe webhook'],
+                ['PaymentFailedEmail', '支払い失敗', 'Stripe webhook'],
+                ['PaymentRecoveredEmail', '支払い復旧', 'Stripe webhook'],
                 ['PasswordChangedEmail', 'PW変更通知', 'email.sendPasswordChanged'],
                 ['MfaDisabledEmail', '多要素認証無効化通知', 'RecoveryService.verify()'],
-                ['CancellationConfirmEmail', 'Pro解約確認', 'email.sendCancellationConfirm'],
-                ['AccountDeletionEmail', 'アカウント削除', 'email.sendAccountDeletion'],
+                ['CancellationConfirmEmail', 'Pro解約確認', 'Stripe webhook'],
+                ['AccountDeletionEmail', 'アカウント削除', 'sendAccountDeletionEmail()'],
               ].map(([name, use, trigger]) => (
                 <tr key={name} className="border-border border-b">
                   <td className="py-2">
