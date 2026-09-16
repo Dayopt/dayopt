@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   hasWatchedChanges,
@@ -32,6 +32,16 @@ describe('likec4-validate: 走らせる条件', () => {
 });
 
 describe('likec4-validate: advisory の契約', () => {
+  // report は `::warning::` を stdout へ出す。テストから素で呼ぶと GitHub Actions が
+  // それを本物の annotation として拾い、**全 PR に偽の「model が invalid」警告が出る**
+  // （実測: PR #2788 の Unit Tests job）。出力ごと握り潰して呼ぶ。
+  beforeEach(() => {
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it('invalid でも docs-guard を落とさない', () => {
     expect(reportLikeC4ValidateCheck({ outcome: 'invalid', detail: 'boom' })).toBe(true);
   });
