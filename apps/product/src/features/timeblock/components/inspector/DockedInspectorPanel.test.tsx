@@ -98,8 +98,8 @@ describe('DockedInspectorPanel', () => {
     );
 
     const card = document.createElement('div');
-    card.setAttribute('data-entry-block', 'true');
-    card.setAttribute('data-entry-id', 'plan-1');
+    card.setAttribute('data-timeblock-card', 'true');
+    card.setAttribute('data-timeblock-id', 'plan-1');
     const label = document.createElement('span');
     card.appendChild(label);
     document.body.appendChild(card);

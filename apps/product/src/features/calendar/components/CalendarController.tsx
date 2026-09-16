@@ -45,7 +45,7 @@ initializePreload();
 
 // diff ハイライトを点灯させる経路が無くなったため、常にこの空集合を渡す
 // （#2181 Step 6）。render のたびに new Set() すると参照が変わり無駄な再計算を招く。
-const EMPTY_DAY_DIFF_ENTRY_IDS: ReadonlySet<string> = new Set();
+const EMPTY_DAY_DIFF_TIMEBLOCK_IDS: ReadonlySet<string> = new Set();
 
 // =============================================================================
 // Props
@@ -72,7 +72,7 @@ interface CalendarControllerProps {
   disabledTimeblockId: string | null;
 
   // --- Timeblock click handlers ---
-  onEntryClick: (entry: CalendarDisplayEvent) => void;
+  onTimeblockClick: (timeblock: CalendarDisplayEvent) => void;
   onTimeRangeSelect: (selection: {
     date: Date;
     startHour: number;
@@ -82,7 +82,7 @@ interface CalendarControllerProps {
   }) => void;
 
   // --- Timeblock CRUD ---
-  onUpdateEntry: (
+  onTimeblockUpdate: (
     timeblockIdOrTimeblock: string | CalendarDisplayEvent,
     updates?: {
       startTime: Date;
@@ -93,9 +93,9 @@ interface CalendarControllerProps {
   onDeleteTimeblock: (timeblockId: string) => void;
 
   // --- Context menu actions ---
-  onDeleteTimeblockConfirm: (entry: CalendarDisplayEvent) => void;
-  onViewStats: (entry: CalendarDisplayEvent) => void;
-  onCopy: (entry: CalendarDisplayEvent) => void;
+  onDeleteTimeblockConfirm: (timeblock: CalendarDisplayEvent) => void;
+  onViewStats: (timeblock: CalendarDisplayEvent) => void;
+  onCopy: (timeblock: CalendarDisplayEvent) => void;
 
   // --- Navigation handlers ---
   onNavigate: (direction: 'prev' | 'next' | 'today') => void;
@@ -130,9 +130,9 @@ export function CalendarController({
   externalEvents,
   showWeekends,
   disabledTimeblockId,
-  onEntryClick,
+  onTimeblockClick,
   onTimeRangeSelect,
-  onUpdateEntry,
+  onTimeblockUpdate,
   onDeleteTimeblock,
   onDeleteTimeblockConfirm,
   onViewStats,
@@ -233,17 +233,17 @@ export function CalendarController({
   const { contextMenuEvent, contextMenuPosition, handleEventContextMenu, handleCloseContextMenu } =
     useCalendarContextMenu();
   const handleDuplicate = useCallback(
-    (entry: CalendarDisplayEvent) => {
-      const startAt = entry.startDate ?? entry.displayStartDate;
-      const endAt = entry.endDate ?? entry.displayEndDate;
-      const kind = entry.kind ?? resolveTimeblockDestination(endAt);
+    (timeblock: CalendarDisplayEvent) => {
+      const startAt = timeblock.startDate ?? timeblock.displayStartDate;
+      const endAt = timeblock.endDate ?? timeblock.displayEndDate;
+      const kind = timeblock.kind ?? resolveTimeblockDestination(endAt);
       openDuplicateInspector(
         createTimeblockDuplicateDraft({
-          sourceId: entry.id,
+          sourceId: timeblock.id,
           kind,
-          title: entry.title,
-          note: entry.description ?? null,
-          activityId: entry.activityId,
+          title: timeblock.title,
+          note: timeblock.description ?? null,
+          activityId: timeblock.activityId,
           startAt,
           endAt,
         }),
@@ -259,31 +259,31 @@ export function CalendarController({
   });
 
   // =========================================================================
-  // エントリ操作ハンドラ（Context経由で配信 — View以下でprops不要）
+  // タイムブロック操作ハンドラ（Context経由で配信 — View以下でprops不要）
   const timeblockActions = useMemo(
     () => ({
-      onEntryClick,
-      onEntryContextMenu: handleEventContextMenu,
-      onUpdateEntry,
+      onTimeblockClick,
+      onTimeblockContextMenu: handleEventContextMenu,
+      onTimeblockUpdate,
       onDeleteTimeblock,
       onTimeRangeSelect,
       disabledTimeblockId,
     }),
     [
-      onEntryClick,
+      onTimeblockClick,
       handleEventContextMenu,
-      onUpdateEntry,
+      onTimeblockUpdate,
       onDeleteTimeblock,
       onTimeRangeSelect,
       disabledTimeblockId,
     ],
   );
 
-  // View props（データ + ナビゲーションのみ。エントリ操作はContext経由）
+  // View props（データ + ナビゲーションのみ。タイムブロック操作はContext経由）
   const commonProps = useMemo(
     () => ({
       dateRange: viewDateRange,
-      entries: filteredTimeblocks,
+      timeblocks: filteredTimeblocks,
       allTimeblocks,
       externalEvents,
       currentDate,
@@ -291,11 +291,11 @@ export function CalendarController({
       // カレンダー内 review/diff パネル（CalendarReviewRail）は廃止済み（#2181 Step 6）。
       // グリッドの diff ハイライト自体は View 層に残すが、点灯させる経路が無くなったため常に空。
       showActualDiff: false,
-      dayDiffEntryIds: EMPTY_DAY_DIFF_ENTRY_IDS,
+      dayDiffTimeblockIds: EMPTY_DAY_DIFF_TIMEBLOCK_IDS,
       disabledTimeblockId,
-      onEntryClick,
-      onEntryContextMenu: handleEventContextMenu,
-      onUpdateEntry,
+      onTimeblockClick,
+      onTimeblockContextMenu: handleEventContextMenu,
+      onTimeblockUpdate,
       onDeleteTimeblock,
       onTimeRangeSelect,
       onViewChange,
@@ -311,9 +311,9 @@ export function CalendarController({
       currentDate,
       showWeekends,
       disabledTimeblockId,
-      onEntryClick,
+      onTimeblockClick,
       handleEventContextMenu,
-      onUpdateEntry,
+      onTimeblockUpdate,
       onDeleteTimeblock,
       onTimeRangeSelect,
       onViewChange,
@@ -360,7 +360,7 @@ export function CalendarController({
 
       {contextMenuEvent && contextMenuPosition ? (
         <EventContextMenu
-          entry={contextMenuEvent}
+          timeblock={contextMenuEvent}
           position={contextMenuPosition}
           onClose={handleCloseContextMenu}
           onDelete={onDeleteTimeblockConfirm}

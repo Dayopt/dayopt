@@ -54,15 +54,15 @@ vi.mock('@/features/calendar', () => ({
   TemplateList: ({
     templates,
     onApplyTemplate,
-    onCreateEntry,
+    onCreateTimeblock,
   }: {
     templates: ReadonlyArray<{ id: string; name: string }>;
     onApplyTemplate?: (templateId: string) => void;
-    onCreateEntry?: () => void;
+    onCreateTimeblock?: () => void;
   }) => (
     <div data-testid="template-list">
-      {onCreateEntry && (
-        <button type="button" onClick={onCreateEntry}>
+      {onCreateTimeblock && (
+        <button type="button" onClick={onCreateTimeblock}>
           create-template
         </button>
       )}

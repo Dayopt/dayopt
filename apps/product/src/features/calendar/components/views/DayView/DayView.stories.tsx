@@ -27,7 +27,7 @@ type Story = StoryObj<typeof meta>;
 const now = new Date();
 const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
-// 期限切れエントリのベース日（昨日）
+// 期限切れタイムブロックのベース日（昨日）
 const yesterday = new Date(today);
 yesterday.setDate(today.getDate() - 1);
 
@@ -89,8 +89,8 @@ const mockPlans: CalendarDisplayEvent[] = [
   },
 ];
 
-/** 期限切れ未完了エントリ（昨日のタスク）*/
-const overdueEntry: CalendarDisplayEvent = {
+/** 期限切れ未完了タイムブロック（昨日のタスク）*/
+const overdueTimeblock: CalendarDisplayEvent = {
   ...basePlan,
   id: 'overdue-1',
   title: '期限切れタスク（昨日）',
@@ -112,9 +112,9 @@ const todayRange: ViewDateRange = {
 // ─────────────────────────────────────────────────────────
 
 const defaultHandlers = {
-  onEntryClick: fn(),
-  onEntryContextMenu: fn(),
-  onUpdateEntry: fn(),
+  onTimeblockClick: fn(),
+  onTimeblockContextMenu: fn(),
+  onTimeblockUpdate: fn(),
   onDeleteTimeblock: fn(),
   onTimeRangeSelect: fn(),
   onViewChange: fn(),
@@ -138,7 +138,7 @@ export const Default: Story = {
     <div className="h-[700px]">
       <DayView
         dateRange={todayRange}
-        entries={mockPlans}
+        timeblocks={mockPlans}
         currentDate={today}
         {...defaultHandlers}
       />
@@ -155,7 +155,7 @@ export const TwelveHour: Story = {
     <div className="h-[700px]">
       <DayView
         dateRange={todayRange}
-        entries={mockPlans}
+        timeblocks={mockPlans}
         currentDate={today}
         {...defaultHandlers}
       />
@@ -167,7 +167,7 @@ export const TwelveHour: Story = {
 export const Empty: Story = {
   render: () => (
     <div className="h-[700px]">
-      <DayView dateRange={todayRange} entries={[]} currentDate={today} {...defaultHandlers} />
+      <DayView dateRange={todayRange} timeblocks={[]} currentDate={today} {...defaultHandlers} />
     </div>
   ),
 };
@@ -181,8 +181,8 @@ export const WithAllHandlers: Story = {
     <div className="h-[700px]">
       <DayView
         dateRange={todayRange}
-        entries={mockPlans}
-        allTimeblocks={[...mockPlans, overdueEntry]}
+        timeblocks={mockPlans}
+        allTimeblocks={[...mockPlans, overdueTimeblock]}
         currentDate={today}
         {...defaultHandlers}
       />
@@ -191,16 +191,16 @@ export const WithAllHandlers: Story = {
 };
 
 /**
- * 期限切れエントリあり
+ * 期限切れタイムブロックあり
  * allTimeblocks に昨日の未完了タスクを含めることで期限切れ表示を確認できる
  */
-export const WithOverdueEntry: Story = {
+export const WithOverdueTimeblock: Story = {
   render: () => (
     <div className="h-[700px]">
       <DayView
         dateRange={todayRange}
-        entries={mockPlans}
-        allTimeblocks={[...mockPlans, overdueEntry]}
+        timeblocks={mockPlans}
+        allTimeblocks={[...mockPlans, overdueTimeblock]}
         currentDate={today}
         {...defaultHandlers}
       />
@@ -255,7 +255,7 @@ function preset(
 /** 過去の記録（Record）の共通props */
 const recorded: Partial<CalendarDisplayEvent> = { kind: 'record' };
 
-const presetSampleEntries: CalendarDisplayEvent[] = [
+const presetSampleTimeblocks: CalendarDisplayEvent[] = [
   // 過去（記録済み）
   preset('preset-1', 'Morning Run', 'var(--category-teal)', 8, 0, 30, {
     ...recorded,
@@ -280,8 +280,8 @@ const presetSampleEntries: CalendarDisplayEvent[] = [
   preset('preset-7', 'Yoga', 'var(--category-teal)', 18, 0, 45, {}),
 ];
 
-const presetDiffEntryIds = computeCalendarDayDiffs(
-  presetSampleEntries,
+const presetDiffTimeblockIds = computeCalendarDayDiffs(
+  presetSampleTimeblocks,
   makeDate(today, 23, 0),
 ).timeblockIds;
 
@@ -291,7 +291,7 @@ export const PresetSampleDay: Story = {
     <div className="h-[700px]">
       <DayView
         dateRange={todayRange}
-        entries={presetSampleEntries}
+        timeblocks={presetSampleTimeblocks}
         currentDate={today}
         {...defaultHandlers}
       />
@@ -305,10 +305,10 @@ export const CompareMode: Story = {
     <div className="h-[700px]">
       <DayView
         dateRange={todayRange}
-        entries={presetSampleEntries}
+        timeblocks={presetSampleTimeblocks}
         currentDate={today}
         showActualDiff
-        dayDiffEntryIds={presetDiffEntryIds}
+        dayDiffTimeblockIds={presetDiffTimeblockIds}
         {...defaultHandlers}
       />
     </div>
@@ -322,24 +322,24 @@ export const AllPatterns: Story = {
       <div className="h-[500px] w-full">
         <DayView
           dateRange={todayRange}
-          entries={mockPlans}
-          allTimeblocks={[...mockPlans, overdueEntry]}
+          timeblocks={mockPlans}
+          allTimeblocks={[...mockPlans, overdueTimeblock]}
           currentDate={today}
           {...defaultHandlers}
         />
       </div>
 
       <div className="h-[500px] w-full">
-        <DayView dateRange={todayRange} entries={[]} currentDate={today} {...defaultHandlers} />
+        <DayView dateRange={todayRange} timeblocks={[]} currentDate={today} {...defaultHandlers} />
       </div>
 
       <div className="h-[500px] w-full">
         <DayView
           dateRange={todayRange}
-          entries={presetSampleEntries}
+          timeblocks={presetSampleTimeblocks}
           currentDate={today}
           showActualDiff
-          dayDiffEntryIds={presetDiffEntryIds}
+          dayDiffTimeblockIds={presetDiffTimeblockIds}
           {...defaultHandlers}
         />
       </div>
@@ -347,7 +347,7 @@ export const AllPatterns: Story = {
         <div className="h-[500px] w-full">
           <DayView
             dateRange={todayRange}
-            entries={mockPlans}
+            timeblocks={mockPlans}
             currentDate={today}
             {...defaultHandlers}
           />

@@ -27,7 +27,7 @@ describe('EventContextMenu', () => {
   it('auto_migrated Recordには削除操作を表示しない', () => {
     render(
       <EventContextMenu
-        entry={migratedRecord}
+        timeblock={migratedRecord}
         position={{ x: 0, y: 0 }}
         onClose={vi.fn()}
         onCopy={vi.fn()}
@@ -49,7 +49,7 @@ describe('EventContextMenu', () => {
 
     render(
       <EventContextMenu
-        entry={plan}
+        timeblock={plan}
         position={{ x: 0, y: 0 }}
         onClose={vi.fn()}
         onCopy={vi.fn()}

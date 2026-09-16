@@ -49,8 +49,8 @@ import { TwoLaneTimeblockRenderer } from './TwoLaneTimeblockRenderer';
 // Types
 // ========================================
 
-export function buildDragPreviewEntry(
-  entry: CalendarDisplayEvent,
+export function buildDragPreviewTimeblock(
+  timeblock: CalendarDisplayEvent,
   previewTime: { start: Date; end: Date },
 ): CalendarDisplayEvent {
   const duration = Math.max(
@@ -59,7 +59,7 @@ export function buildDragPreviewEntry(
   );
 
   return {
-    ...entry,
+    ...timeblock,
     startDate: previewTime.start,
     endDate: previewTime.end,
     displayStartDate: previewTime.start,
@@ -72,8 +72,8 @@ export function buildDragPreviewEntry(
 interface CalendarGridContentProps {
   /** この列が担当する日付 */
   date: Date;
-  /** 表示するエントリ一覧 */
-  entries: CalendarDisplayEvent[];
+  /** 表示するタイムブロック一覧 */
+  timeblocks: CalendarDisplayEvent[];
   /** ビューモード（useInteraction に渡す） */
   viewMode?: 'day' | '3day' | '5day' | 'week';
   /** この列の日付インデックス（DayView=0, Week/MultiDay=列番号） */
@@ -82,10 +82,11 @@ interface CalendarGridContentProps {
   allEventsForOverlapCheck?: CalendarDisplayEvent[];
   /** 表示日付リスト（週/複数日ビュー用） */
   displayDates?: Date[];
-  /** エントリクリック */
-  onEntryClick?: ((entry: CalendarDisplayEvent) => void) | undefined;
-  /** エントリ右クリック */
-  onEntryContextMenu?: ((entry: CalendarDisplayEvent, e: React.MouseEvent) => void) | undefined;
+  /** タイムブロッククリック */
+  onTimeblockClick?: ((timeblock: CalendarDisplayEvent) => void) | undefined;
+  /** タイムブロック右クリック */
+  onTimeblockContextMenu?:
+    ((timeblock: CalendarDisplayEvent, e: React.MouseEvent) => void) | undefined;
   /** D&D/リサイズ時の更新コールバック */
   onEventUpdate?:
     | ((
@@ -102,8 +103,8 @@ interface CalendarGridContentProps {
   onTimeRangeSelect?: ((selection: DateTimeSelection) => void) | undefined;
   /** DnDを無効化するTimeblock ID */
   disabledTimeblockId?: string | null | undefined;
-  /** compare Rail に出ている entry の ID 一覧 */
-  dayDiffEntryIds?: ReadonlySet<string> | undefined;
+  /** compare Rail に出ている timeblock の ID 一覧 */
+  dayDiffTimeblockIds?: ReadonlySet<string> | undefined;
   /** モバイルWeekで表示するレーン。選択レーンは日カラム全幅で表示する */
   laneDisplayMode?: 'both' | 'plan' | 'record' | undefined;
   /** 表示範囲分の外部カレンダー予定（ghost）。この日に出す分はここで絞る */
@@ -141,17 +142,17 @@ export function resolveCalendarLanePresentation(
 /** カレンダーグリッドの1日分コンテンツ（全ビュー共通） */
 export const CalendarGridContent = React.memo(function CalendarGridContent({
   date,
-  entries,
+  timeblocks,
   viewMode = 'day',
   dayIndex,
   allEventsForOverlapCheck,
   displayDates,
-  onEntryClick,
-  onEntryContextMenu,
+  onTimeblockClick,
+  onTimeblockContextMenu,
   onEventUpdate,
   onTimeRangeSelect,
   disabledTimeblockId,
-  dayDiffEntryIds,
+  dayDiffTimeblockIds,
   laneDisplayMode = 'both',
   externalEvents,
   className,
@@ -173,13 +174,15 @@ export const CalendarGridContent = React.memo(function CalendarGridContent({
     viewMode,
     laneDisplayMode,
   );
-  const visibleEntries = React.useMemo(() => {
-    if (laneDisplayMode === 'both') return entries;
-    return entries.filter((entry) => {
-      const kind = entry.kind ?? resolveTimeblockDestination(entry.endDate ?? entry.displayEndDate);
+  const visibleTimeblocks = React.useMemo(() => {
+    if (laneDisplayMode === 'both') return timeblocks;
+    return timeblocks.filter((timeblock) => {
+      const kind =
+        timeblock.kind ??
+        resolveTimeblockDestination(timeblock.endDate ?? timeblock.displayEndDate);
       return kind === laneDisplayMode;
     });
-  }, [entries, laneDisplayMode]);
+  }, [timeblocks, laneDisplayMode]);
 
   // ghost（#1962）。Plan レーンの領域を使うので、`laneDisplayMode === 'record'` では
   // planLaneWidthPercent が 0 になり結果的に描かれない（外部予定は実績ではない）。
@@ -222,17 +225,19 @@ export const CalendarGridContent = React.memo(function CalendarGridContent({
 
   const handlePlanRecord = useCallback(
     (planId: string, range: { start: Date; end: Date }) => {
-      const plan = entries.find((entry) => entry.id === planId && entry.kind === 'plan');
+      const plan = timeblocks.find(
+        (timeblock) => timeblock.id === planId && timeblock.kind === 'plan',
+      );
       if (!plan) return;
       createRecord.mutate(buildPlanRecordDropInput(plan, range));
     },
-    [createRecord, entries],
+    [createRecord, timeblocks],
   );
 
   // 統合インタラクション（drag/resize/click）
   const { state, handlers } = useInteraction({
     date,
-    events: visibleEntries,
+    events: visibleTimeblocks,
     ...(allEventsForOverlapCheck ? { allEventsForOverlapCheck } : {}),
     ...(displayDates ? { displayDates } : {}),
     viewMode,
@@ -240,11 +245,11 @@ export const CalendarGridContent = React.memo(function CalendarGridContent({
     planLaneWidthPercent,
     onPlanRecord: handlePlanRecord,
     ...(onEventUpdate ? { onEventUpdate: wrappedOnEventUpdate } : {}),
-    ...(onEntryClick ? { onEventClick: onEntryClick } : {}),
+    ...(onTimeblockClick ? { onEventClick: onTimeblockClick } : {}),
     ...(disabledTimeblockId != null
       ? {
           disabledPlanId: disabledTimeblockId,
-          // Mobile では Inspector 開いている entry も resize 可（PC は Phase 1 と同じ block 維持）
+          // Mobile では Inspector 開いている timeblock も resize 可（PC は Phase 1 と同じ block 維持）
           resizeDisabledPlanId: isMobile ? null : disabledTimeblockId,
         }
       : {}),
@@ -254,11 +259,11 @@ export const CalendarGridContent = React.memo(function CalendarGridContent({
   const isDragging = state.mode === 'dragging';
   const isResizing = state.mode === 'resizing';
 
-  // Step 8: 2レーン座標（plan=左/record=右）。entries は既に kind 付き CalendarDisplayEvent。
+  // Step 8: 2レーン座標（plan=左/record=右）。timeblocks は既に kind 付き CalendarDisplayEvent。
   const twoLaneStyles = React.useMemo(
     () =>
-      calculateTwoLaneStylesForCalendarEvents(visibleEntries, HOUR_HEIGHT, planLaneWidthPercent),
-    [visibleEntries, HOUR_HEIGHT, planLaneWidthPercent],
+      calculateTwoLaneStylesForCalendarEvents(visibleTimeblocks, HOUR_HEIGHT, planLaneWidthPercent),
+    [visibleTimeblocks, HOUR_HEIGHT, planLaneWidthPercent],
   );
 
   // ドラッグゴースト描画コールバック
@@ -270,22 +275,23 @@ export const CalendarGridContent = React.memo(function CalendarGridContent({
       timeblockId: string;
       previewTime: { start: Date; end: Date };
     }) => {
-      const entry = visibleEntries.find((e) => e.id === timeblockId);
-      if (!entry) return null;
-      const previewEntry = buildDragPreviewEntry(entry, previewTime);
-      const activity = entry.activityId ? getActivityById(entry.activityId) : null;
+      const timeblock = visibleTimeblocks.find((e) => e.id === timeblockId);
+      if (!timeblock) return null;
+      const previewTimeblock = buildDragPreviewTimeblock(timeblock, previewTime);
+      const activity = timeblock.activityId ? getActivityById(timeblock.activityId) : null;
       const ghostHeight = Math.max(twoLaneStyles[timeblockId]?.height ?? 20, isMobile ? 40 : 20);
       const sourceKind =
-        entry.kind ?? resolveTimeblockDestination(entry.endDate ?? entry.displayEndDate);
+        timeblock.kind ??
+        resolveTimeblockDestination(timeblock.endDate ?? timeblock.displayEndDate);
       const targetLane = useCalendarDragStore.getState().targetLane ?? sourceKind;
       const previewKind = isPlanRecordDrop(sourceKind, targetLane) ? 'record' : sourceKind;
       // #2250: ゴーストの幅も表示レイヤーと同じ動的判定に揃える。相手レーンに
-      // previewTime と重なる entry が無ければフル幅（境界の無いカラムへ「掴んだ瞬間
+      // previewTime と重なる timeblock が無ければフル幅（境界の無いカラムへ「掴んだ瞬間
       // 幅が縮む」ような不整合な見た目を出さない）。
       const counterpartKind = previewKind === 'plan' ? 'record' : 'plan';
       const hasGhostCounterpart = hasLaneCounterpart(
-        visibleEntries.filter((candidate) => {
-          if (candidate.id === entry.id) return false;
+        visibleTimeblocks.filter((candidate) => {
+          if (candidate.id === timeblock.id) return false;
           const kind =
             candidate.kind ??
             resolveTimeblockDestination(candidate.endDate ?? candidate.displayEndDate);
@@ -313,7 +319,7 @@ export const CalendarGridContent = React.memo(function CalendarGridContent({
         compact: compactCards,
         timeFormat,
         interactive: false,
-        showDayDiffMarker: dayDiffEntryIds?.has(entry.id) ?? false,
+        showDayDiffMarker: dayDiffTimeblockIds?.has(timeblock.id) ?? false,
         className: 'shadow-card',
       } as const;
 
@@ -321,7 +327,10 @@ export const CalendarGridContent = React.memo(function CalendarGridContent({
         return (
           <PlanLaneCard
             {...sharedProps}
-            event={calendarEventToPlanEvent(previewEntry, allEventsForOverlapCheck ?? entries)}
+            event={calendarEventToPlanEvent(
+              previewTimeblock,
+              allEventsForOverlapCheck ?? timeblocks,
+            )}
           />
         );
       }
@@ -329,23 +338,23 @@ export const CalendarGridContent = React.memo(function CalendarGridContent({
       const recordPreview =
         sourceKind === 'plan'
           ? {
-              ...previewEntry,
+              ...previewTimeblock,
               kind: 'record' as const,
             }
-          : previewEntry;
+          : previewTimeblock;
 
       return <RecordLaneCard {...sharedProps} event={calendarEventToRecordEvent(recordPreview)} />;
     },
     [
-      entries,
-      visibleEntries,
+      timeblocks,
+      visibleTimeblocks,
       allEventsForOverlapCheck,
       twoLaneStyles,
       getActivityById,
       isMobile,
       planLaneWidthPercent,
       compactCards,
-      dayDiffEntryIds,
+      dayDiffTimeblockIds,
       timeFormat,
     ],
   );
@@ -378,7 +387,7 @@ export const CalendarGridContent = React.memo(function CalendarGridContent({
         className={cn('absolute inset-0', enableCrossDayDrag && 'z-10')}
         onTimeRangeSelect={onTimeRangeSelect}
         disabled={isActive || !canUseProduct}
-        plans={allEventsForOverlapCheck ?? entries}
+        plans={allEventsForOverlapCheck ?? timeblocks}
         defaultDuration={defaultDuration}
         timeFormat={timeFormat}
       >
@@ -387,7 +396,7 @@ export const CalendarGridContent = React.memo(function CalendarGridContent({
         </div>
       </CalendarDragSelection>
 
-      {/* エントリ表示エリア。この absolute + z-20 が stacking context の境界で、
+      {/* タイムブロック表示エリア。この absolute + z-20 が stacking context の境界で、
           内側の zIndex（grid.constants.ts の Z_INDEX: 10-40）はグローバルな
           z-index トークン（z-dropdown: 50 等）と数値空間が別になる。意図的な分離 */}
       <div className="pointer-events-none absolute inset-0 z-20" style={{ height: gridHeight }}>
@@ -409,26 +418,26 @@ export const CalendarGridContent = React.memo(function CalendarGridContent({
             />
           );
         })}
-        {visibleEntries.map((entry) => {
-          const position = twoLaneStyles[entry.id];
+        {visibleTimeblocks.map((timeblock) => {
+          const position = twoLaneStyles[timeblock.id];
           if (!position) return null;
 
           return (
             <TwoLaneTimeblockRenderer
-              key={entry.id}
-              entry={entry}
+              key={timeblock.id}
+              timeblock={timeblock}
               position={position}
-              allEvents={allEventsForOverlapCheck ?? entries}
+              allEvents={allEventsForOverlapCheck ?? timeblocks}
               isDragging={isDragging}
               isResizing={isResizing}
               interactionState={state}
               dayIndex={dayIndex}
               enableCrossDayDrag={enableCrossDayDrag}
-              showDayDiffMarker={dayDiffEntryIds?.has(entry.id) ?? false}
+              showDayDiffMarker={dayDiffTimeblockIds?.has(timeblock.id) ?? false}
               compactCards={compactCards}
               timeFormat={timeFormat}
-              onEntryClick={onEntryClick}
-              onEntryContextMenu={onEntryContextMenu}
+              onTimeblockClick={onTimeblockClick}
+              onTimeblockContextMenu={onTimeblockContextMenu}
               onPointerDown={(...args) => {
                 if (canUseProduct) handlers.handlePointerDown(...args);
               }}
@@ -444,7 +453,7 @@ export const CalendarGridContent = React.memo(function CalendarGridContent({
 
         <DragSelectionHighlight
           hourHeight={HOUR_HEIGHT}
-          dayEntries={allEventsForOverlapCheck ?? entries}
+          dayTimeblocks={allEventsForOverlapCheck ?? timeblocks}
           {...(enableCrossDayDrag ? { date } : {})}
         />
       </div>

@@ -27,7 +27,7 @@ describe('useCalendarDragStore', () => {
     it('ドラッグしていない', () => {
       const state = useCalendarDragStore.getState();
       expect(state.isDragging).toBe(false);
-      expect(state.draggedEntryId).toBeNull();
+      expect(state.draggedTimeblockId).toBeNull();
     });
   });
 
@@ -36,8 +36,8 @@ describe('useCalendarDragStore', () => {
       useCalendarDragStore.getState().startDrag('plan-1', mockCalendarEvent, 2, 'plan');
       const state = useCalendarDragStore.getState();
       expect(state.isDragging).toBe(true);
-      expect(state.draggedEntryId).toBe('plan-1');
-      expect(state.draggedEntry).toEqual(mockCalendarEvent);
+      expect(state.draggedTimeblockId).toBe('plan-1');
+      expect(state.draggedTimeblock).toEqual(mockCalendarEvent);
       expect(state.originalDateIndex).toBe(2);
       expect(state.targetDateIndex).toBe(2);
       expect(state.sourceLane).toBe('plan');
@@ -50,7 +50,7 @@ describe('useCalendarDragStore', () => {
       useCalendarDragStore.getState().startDrag('plan-1', mockCalendarEvent, 0);
       useCalendarDragStore.getState().updateDrag({ targetDateIndex: 3 });
       expect(useCalendarDragStore.getState().targetDateIndex).toBe(3);
-      expect(useCalendarDragStore.getState().draggedEntryId).toBe('plan-1');
+      expect(useCalendarDragStore.getState().draggedTimeblockId).toBe('plan-1');
     });
 
     it('ターゲット日付を更新できる', () => {
@@ -89,7 +89,7 @@ describe('useCalendarDragStore', () => {
       useCalendarDragStore.getState().endDrag();
       const state = useCalendarDragStore.getState();
       expect(state.isDragging).toBe(false);
-      expect(state.draggedEntryId).toBeNull();
+      expect(state.draggedTimeblockId).toBeNull();
     });
   });
 });

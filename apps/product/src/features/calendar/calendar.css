@@ -83,13 +83,13 @@
 }
 
 /* ============================================
- * エントリ作成: 層1 の確認
+ * タイムブロック作成: 層1 の確認
  *
  * 以前は花びら 8 枚を 550-620ms 散らしていた。実質 confetti で、層1 の予算
  * 150-250ms を 2.5 倍超えており、毎回の作成で発火していた（層4 の「1 日 1 回程度の
  * 揃った瞬間」ではない）。褒めずに「受け取った」とだけ応える短い着地に置き換えた。
  * ============================================ */
-@keyframes entry-settle {
+@keyframes timeblock-settle {
   0% {
     opacity: 0;
     transform: scale(0.98);
@@ -100,12 +100,12 @@
   }
 }
 
-.animate-entry-settle {
-  animation: entry-settle 200ms var(--motion-ease-settle) both;
+.animate-timeblock-settle {
+  animation: timeblock-settle 200ms var(--motion-ease-settle) both;
 }
 
-/* 現在進行中エントリ: 左アクセントだけを呼吸させ、実行中のリアル感を出す */
-@keyframes entry-live-accent-pulse {
+/* 現在進行中タイムブロック: 左アクセントだけを呼吸させ、実行中のリアル感を出す */
+@keyframes timeblock-live-accent-pulse {
   0%,
   100% {
     opacity: 1;
@@ -117,8 +117,9 @@
   }
 }
 
-.entry-live-accent {
-  animation: entry-live-accent-pulse var(--motion-loop-breath) var(--motion-ease-standard) infinite;
+.timeblock-live-accent {
+  animation: timeblock-live-accent-pulse var(--motion-loop-breath) var(--motion-ease-standard)
+    infinite;
   will-change: opacity, filter;
 }
 
@@ -180,13 +181,13 @@
     transform: none !important;
   }
 
-  .animate-entry-settle {
+  .animate-timeblock-settle {
     animation: none !important;
     opacity: 1 !important;
     transform: none !important;
   }
 
-  .entry-live-accent {
+  .timeblock-live-accent {
     animation: none !important;
     filter: none !important;
     opacity: 1 !important;

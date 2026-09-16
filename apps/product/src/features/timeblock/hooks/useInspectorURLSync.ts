@@ -32,8 +32,8 @@ export function useInspectorURLSync() {
 
   // 前回の状態を追跡（無限ループ防止）
   const prevIsOpenRef = useRef(isOpen);
-  const prevEntryIdRef = useRef(timeblockId);
-  const prevEntryKindRef = useRef(timeblockKind);
+  const prevTimeblockIdRef = useRef(timeblockId);
+  const prevTimeblockKindRef = useRef(timeblockKind);
   const previousURLParamRef = useRef<string | null | undefined>(undefined);
 
   // URLパラメータからインスペクタを開く（検索結果などのclient navigationにも追従）。
@@ -63,30 +63,30 @@ export function useInspectorURLSync() {
     // 状態が実際に変更されたかチェック
     const stateChanged =
       prevIsOpenRef.current !== isOpen ||
-      prevEntryIdRef.current !== timeblockId ||
-      prevEntryKindRef.current !== timeblockKind;
+      prevTimeblockIdRef.current !== timeblockId ||
+      prevTimeblockKindRef.current !== timeblockKind;
     if (!stateChanged) return;
 
     // 状態を更新
     prevIsOpenRef.current = isOpen;
-    prevEntryIdRef.current = timeblockId;
-    prevEntryKindRef.current = timeblockKind;
+    prevTimeblockIdRef.current = timeblockId;
+    prevTimeblockKindRef.current = timeblockKind;
 
     const currentUrl = typeof window !== 'undefined' ? new URL(window.location.href) : null;
     const currentPathname = currentUrl?.pathname ?? pathname;
     const currentParams = currentUrl
       ? new URLSearchParams(currentUrl.search)
       : new URLSearchParams(searchParams.toString());
-    const currentEntryParam = currentParams.get(TIMEBLOCK_PARAM);
+    const currentTimeblockParam = currentParams.get(TIMEBLOCK_PARAM);
 
     if (isOpen && timeblockId) {
-      // 既存エントリでインスペクタが開いている場合
-      // 履歴エントリを追加 → 戻る/進むで復元可能にする（popstate 側で拾う）。
+      // 既存タイムブロックでインスペクタが開いている場合
+      // 履歴タイムブロックを追加 → 戻る/進むで復元可能にする（popstate 側で拾う）。
       // router.push は使わない。client navigation が走るとパネルが一度畳まれてから
       // 開き直り、別ブロックへ移る時に「またたき」になる。カレンダーの date / view も
       // 同じ理由で history API を直接使っている（CalendarNavigationContext）
       const serialized = serializeTimeblockParam(timeblockId, timeblockKind);
-      if (currentEntryParam !== serialized) {
+      if (currentTimeblockParam !== serialized) {
         currentParams.set(TIMEBLOCK_PARAM, serialized);
         previousURLParamRef.current = serialized;
         window.history.pushState(null, '', `${currentPathname}?${currentParams.toString()}`);
@@ -94,7 +94,7 @@ export function useInspectorURLSync() {
     } else {
       // インスペクタが閉じている、またはドラフトモード
       // replace で履歴を汚さない（閉じるたびに履歴が増えるのを防止）
-      if (currentEntryParam !== null) {
+      if (currentTimeblockParam !== null) {
         currentParams.delete(TIMEBLOCK_PARAM);
         const newUrl = currentParams.toString()
           ? `${currentPathname}?${currentParams.toString()}`

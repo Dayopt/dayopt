@@ -33,8 +33,8 @@ vi.mock('@/lib/toast', () => ({
 
 import { useTimeblockContextActions } from './useTimeblockContextActions';
 
-const classifiedEntry = {
-  id: 'entry-1',
+const classifiedTimeblock = {
+  id: 'timeblock-1',
   kind: 'plan',
   activityId: 'activity-1',
   startDate: new Date(2026, 2, 25, 9),
@@ -49,15 +49,15 @@ describe('useTimeblockContextActions - Review navigation', () => {
   it('/report へ遷移する（カレンダー内パネルは廃止済み、#2181 Step 4）', () => {
     const { result } = renderHook(() => useTimeblockContextActions());
 
-    act(() => result.current.handleViewStats(classifiedEntry));
+    act(() => result.current.handleViewStats(classifiedTimeblock));
 
     expect(mocks.push).toHaveBeenCalledWith('/ja/report?date=2026-03-25');
   });
 
-  it('tagなしentryではReviewを開かない', () => {
+  it('tagなしtimeblockではReviewを開かない', () => {
     const { result } = renderHook(() => useTimeblockContextActions());
 
-    act(() => result.current.handleViewStats({ ...classifiedEntry, activityId: null }));
+    act(() => result.current.handleViewStats({ ...classifiedTimeblock, activityId: null }));
 
     expect(mocks.push).not.toHaveBeenCalled();
   });
@@ -73,7 +73,7 @@ describe('useTimeblockContextActions - 削除', () => {
 
     act(() => {
       result.current.handleDeleteTimeblock({
-        ...classifiedEntry,
+        ...classifiedTimeblock,
         version: '2026-03-25T00:00:00.000Z',
       } as unknown as CalendarDisplayEvent);
     });
@@ -82,12 +82,12 @@ describe('useTimeblockContextActions - 削除', () => {
       { id: string; expectedUpdatedAt: string },
       { onSuccess: (deleted: { id: string; updated_at: string }) => void },
     ];
-    expect(input).toEqual({ id: 'entry-1', expectedUpdatedAt: '2026-03-25T00:00:00.000Z' });
+    expect(input).toEqual({ id: 'timeblock-1', expectedUpdatedAt: '2026-03-25T00:00:00.000Z' });
 
     // 削除が返した版で戻せるようにする
-    options.onSuccess({ id: 'entry-1', updated_at: '2026-03-25T00:00:05.000Z' });
+    options.onSuccess({ id: 'timeblock-1', updated_at: '2026-03-25T00:00:05.000Z' });
     expect(mocks.showDeleteUndo).toHaveBeenCalledWith('plan', {
-      id: 'entry-1',
+      id: 'timeblock-1',
       updated_at: '2026-03-25T00:00:05.000Z',
     });
   });
@@ -97,7 +97,7 @@ describe('useTimeblockContextActions - 削除', () => {
 
     act(() => {
       result.current.handleDeleteTimeblock({
-        ...classifiedEntry,
+        ...classifiedTimeblock,
         kind: 'record',
         recordSource: 'auto_migrated',
       } as unknown as CalendarDisplayEvent);

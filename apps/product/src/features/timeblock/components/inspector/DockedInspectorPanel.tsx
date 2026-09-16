@@ -36,7 +36,7 @@ const FOCUSABLE_SELECTOR =
  * 開き直すため、同じブロックを押しても閉じず、別のブロックへ移る時も一度畳まれて
  * から開く「またたき」になる（2026-09-10 User 指摘）。
  */
-const TIMEBLOCK_CARD_SELECTOR = '[data-entry-block]';
+const TIMEBLOCK_CARD_SELECTOR = '[data-timeblock-card]';
 
 const OVERLAY_LAYER_SELECTOR = [
   '[data-inspector-keep-open]',

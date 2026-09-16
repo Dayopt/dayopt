@@ -83,16 +83,16 @@ vi.mock('./DragSelectionHighlight', () => ({ DragSelectionHighlight: () => null 
 
 vi.mock('./TwoLaneTimeblockRenderer', () => ({
   TwoLaneTimeblockRenderer: ({
-    entry,
+    timeblock,
     position,
     showDayDiffMarker,
   }: {
-    entry: CalendarDisplayEvent;
+    timeblock: CalendarDisplayEvent;
     position: { left: number; width: number };
     showDayDiffMarker?: boolean;
   }) => (
     <div
-      data-testid={`two-lane-${entry.id}`}
+      data-testid={`two-lane-${timeblock.id}`}
       data-day-diff-marker={showDayDiffMarker ? 'true' : 'false'}
       data-lane-left={position.left}
       data-lane-width={position.width}
@@ -102,7 +102,7 @@ vi.mock('./TwoLaneTimeblockRenderer', () => ({
 
 import { useCalendarDragStore } from '../../../../stores/useCalendarDragStore';
 import {
-  buildDragPreviewEntry,
+  buildDragPreviewTimeblock,
   CalendarGridContent,
   resolveCalendarLanePresentation,
 } from './CalendarGridContent';
@@ -165,7 +165,7 @@ describe('CalendarGridContent', () => {
     const { rerender } = render(
       <CalendarGridContent
         date={new Date('2026-07-15T00:00:00.000Z')}
-        entries={[plan, record]}
+        timeblocks={[plan, record]}
         viewMode="week"
         dayIndex={0}
         laneDisplayMode="plan"
@@ -179,7 +179,7 @@ describe('CalendarGridContent', () => {
     rerender(
       <CalendarGridContent
         date={new Date('2026-07-15T00:00:00.000Z')}
-        entries={[plan, record]}
+        timeblocks={[plan, record]}
         viewMode="week"
         dayIndex={0}
         laneDisplayMode="record"
@@ -191,9 +191,9 @@ describe('CalendarGridContent', () => {
     expect(screen.queryByTestId('two-lane-plan-1')).not.toBeInTheDocument();
   });
 
-  it('drag preview は移動後の時刻で表示用 entry を作る', () => {
-    const entry = {
-      id: 'entry-1',
+  it('drag preview は移動後の時刻で表示用 timeblock を作る', () => {
+    const timeblock = {
+      id: 'timeblock-1',
       title: 'dev',
       startDate: new Date('2026-06-04T13:00:00.000Z'),
       endDate: new Date('2026-06-04T15:00:00.000Z'),
@@ -206,17 +206,17 @@ describe('CalendarGridContent', () => {
       kind: 'plan' as const,
     };
 
-    const previewEntry = buildDragPreviewEntry(entry, {
+    const previewTimeblock = buildDragPreviewTimeblock(timeblock, {
       start: new Date('2026-06-04T15:00:00.000Z'),
       end: new Date('2026-06-04T17:00:00.000Z'),
     });
 
-    expect(previewEntry.startDate?.toISOString()).toBe('2026-06-04T15:00:00.000Z');
-    expect(previewEntry.endDate?.toISOString()).toBe('2026-06-04T17:00:00.000Z');
-    expect(previewEntry.displayStartDate.toISOString()).toBe('2026-06-04T15:00:00.000Z');
-    expect(previewEntry.displayEndDate.toISOString()).toBe('2026-06-04T17:00:00.000Z');
-    expect(previewEntry.duration).toBe(120);
-    expect(previewEntry.kind).toBe('plan');
+    expect(previewTimeblock.startDate?.toISOString()).toBe('2026-06-04T15:00:00.000Z');
+    expect(previewTimeblock.endDate?.toISOString()).toBe('2026-06-04T17:00:00.000Z');
+    expect(previewTimeblock.displayStartDate.toISOString()).toBe('2026-06-04T15:00:00.000Z');
+    expect(previewTimeblock.displayEndDate.toISOString()).toBe('2026-06-04T17:00:00.000Z');
+    expect(previewTimeblock.duration).toBe(120);
+    expect(previewTimeblock.kind).toBe('plan');
   });
 
   it('Planのdrag previewはPlanレーンのoutlineカードで表示する（#2250: previewTime に重なる Record が存在する場合は split 幅）', () => {
@@ -235,7 +235,7 @@ describe('CalendarGridContent', () => {
     const { container } = render(
       <CalendarGridContent
         date={new Date('2026-07-15T00:00:00.000Z')}
-        entries={[plan, counterpartRecord]}
+        timeblocks={[plan, counterpartRecord]}
         dayIndex={0}
       />,
     );
@@ -255,7 +255,7 @@ describe('CalendarGridContent', () => {
     const { container } = render(
       <CalendarGridContent
         date={new Date('2026-07-15T00:00:00.000Z')}
-        entries={[plan]}
+        timeblocks={[plan]}
         dayIndex={0}
       />,
     );
@@ -281,7 +281,7 @@ describe('CalendarGridContent', () => {
     const { container } = render(
       <CalendarGridContent
         date={new Date('2026-07-15T00:00:00.000Z')}
-        entries={[plan, counterpartPlan]}
+        timeblocks={[plan, counterpartPlan]}
         dayIndex={0}
       />,
     );
@@ -301,7 +301,7 @@ describe('CalendarGridContent', () => {
     const { container } = render(
       <CalendarGridContent
         date={new Date('2026-07-15T00:00:00.000Z')}
-        entries={[plan]}
+        timeblocks={[plan]}
         dayIndex={0}
       />,
     );
@@ -319,7 +319,7 @@ describe('CalendarGridContent', () => {
     const { container } = render(
       <CalendarGridContent
         date={new Date('2026-07-15T00:00:00.000Z')}
-        entries={[record]}
+        timeblocks={[record]}
         dayIndex={0}
       />,
     );
@@ -330,7 +330,7 @@ describe('CalendarGridContent', () => {
 
   it('通常TwoLaneカードへCompare対象のmarker状態を渡す', () => {
     const first = {
-      id: 'entry-1',
+      id: 'timeblock-1',
       title: 'dev',
       startDate: new Date('2026-06-04T09:00:00.000Z'),
       endDate: new Date('2026-06-04T10:00:00.000Z'),
@@ -344,7 +344,7 @@ describe('CalendarGridContent', () => {
     } satisfies CalendarDisplayEvent;
     const second = {
       ...first,
-      id: 'entry-2',
+      id: 'timeblock-2',
       startDate: new Date('2026-06-04T10:00:00.000Z'),
       endDate: new Date('2026-06-04T11:00:00.000Z'),
       displayStartDate: new Date('2026-06-04T10:00:00.000Z'),
@@ -354,13 +354,19 @@ describe('CalendarGridContent', () => {
     render(
       <CalendarGridContent
         date={new Date('2026-06-04T00:00:00.000Z')}
-        entries={[first, second]}
+        timeblocks={[first, second]}
         dayIndex={0}
-        dayDiffEntryIds={new Set([first.id])}
+        dayDiffTimeblockIds={new Set([first.id])}
       />,
     );
 
-    expect(screen.getByTestId('two-lane-entry-1')).toHaveAttribute('data-day-diff-marker', 'true');
-    expect(screen.getByTestId('two-lane-entry-2')).toHaveAttribute('data-day-diff-marker', 'false');
+    expect(screen.getByTestId('two-lane-timeblock-1')).toHaveAttribute(
+      'data-day-diff-marker',
+      'true',
+    );
+    expect(screen.getByTestId('two-lane-timeblock-2')).toHaveAttribute(
+      'data-day-diff-marker',
+      'false',
+    );
   });
 });

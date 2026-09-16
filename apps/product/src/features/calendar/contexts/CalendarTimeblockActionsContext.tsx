@@ -3,7 +3,7 @@
 /**
  * CalendarTimeblockActionsContext
  *
- * エントリ操作ハンドラ（click, update, delete, timeRangeSelect）を提供する。
+ * タイムブロック操作ハンドラ（click, update, delete, timeRangeSelect）を提供する。
  * CalendarController で Provider を設置し、View以下のコンポーネントが
  * props drilling なしでアクセスできるようにする。
  */
@@ -12,10 +12,11 @@ import { createContext } from 'react';
 
 import type { CalendarDisplayEvent } from '../types/calendar.types';
 
-interface CalendarEntryActions {
-  onEntryClick?: ((entry: CalendarDisplayEvent) => void) | undefined;
-  onEntryContextMenu?: ((entry: CalendarDisplayEvent, e: React.MouseEvent) => void) | undefined;
-  onUpdateEntry?:
+interface CalendarTimeblockActions {
+  onTimeblockClick?: ((timeblock: CalendarDisplayEvent) => void) | undefined;
+  onTimeblockContextMenu?:
+    ((timeblock: CalendarDisplayEvent, e: React.MouseEvent) => void) | undefined;
+  onTimeblockUpdate?:
     | ((
         timeblockIdOrTimeblock: string | CalendarDisplayEvent,
         updates?: {
@@ -38,14 +39,14 @@ interface CalendarEntryActions {
   disabledTimeblockId?: string | null | undefined;
 }
 
-const CalendarTimeblockActionsContext = createContext<CalendarEntryActions>({});
+const CalendarTimeblockActionsContext = createContext<CalendarTimeblockActions>({});
 
 export function CalendarTimeblockActionsProvider({
   children,
   value,
 }: {
   children: React.ReactNode;
-  value: CalendarEntryActions;
+  value: CalendarTimeblockActions;
 }) {
   return (
     <CalendarTimeblockActionsContext.Provider value={value}>

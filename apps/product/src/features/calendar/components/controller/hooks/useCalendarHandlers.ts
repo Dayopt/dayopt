@@ -10,43 +10,47 @@ import { useInlineCreateStore } from '../../../stores/useInlineCreateStore';
 import type { CalendarDisplayEvent } from '../../../types/calendar.types';
 import type { DateTimeSelection } from '../../views/shared';
 
-/** エントリクリック・時間範囲選択など、カレンダー共通のUIイベントハンドラーを提供するフック */
+/** タイムブロッククリック・時間範囲選択など、カレンダー共通のUIイベントハンドラーを提供するフック */
 export function useCalendarHandlers() {
   const openTimeblockInspector = useTimeblockInspectorStore((state) => state.openInspector);
   const openCreateInspector = useTimeblockInspectorStore((state) => state.openCreate);
   const closeTimeblockInspector = useTimeblockInspectorStore((state) => state.closeInspector);
-  const inspectorEntryId = useTimeblockInspectorStore((state) => state.timeblockId);
+  const inspectorTimeblockId = useTimeblockInspectorStore((state) => state.timeblockId);
   const inspectorIsOpen = useTimeblockInspectorStore((state) => state.isOpen);
   const inspectorDuplicateDraft = useTimeblockInspectorStore((state) => state.duplicateDraft);
 
   const setPendingSelection = useInlineCreateStore.use.setPendingSelection();
 
   // Inspector で開いているTimeblockIDをDnD無効化用に計算
-  const disabledTimeblockId = inspectorIsOpen ? inspectorEntryId : null;
+  const disabledTimeblockId = inspectorIsOpen ? inspectorTimeblockId : null;
 
-  // エントリクリックハンドラー（開いているブロックをもう一度押したら閉じる）
+  // タイムブロッククリックハンドラー（開いているブロックをもう一度押したら閉じる）
   const handleTimeblockClick = useCallback(
-    (entry: CalendarDisplayEvent) => {
+    (timeblock: CalendarDisplayEvent) => {
       // 同じブロックの再クリックはトグルにする。開けた操作と同じ操作で閉じられる
       // （2026-09-10 User 指示）。複製の下書き中は閉じない — 下書きを黙って捨てる
       // ことになるため、従来どおり元ブロックの詳細へ開き直す
-      if (inspectorIsOpen && inspectorEntryId === entry.id && inspectorDuplicateDraft === null) {
+      if (
+        inspectorIsOpen &&
+        inspectorTimeblockId === timeblock.id &&
+        inspectorDuplicateDraft === null
+      ) {
         closeTimeblockInspector();
         return;
       }
 
-      openTimeblockInspector(entry.id, entry.kind ?? 'plan');
+      openTimeblockInspector(timeblock.id, timeblock.kind ?? 'plan');
 
       logger.log('Opening Timeblock Inspector:', {
-        timeblockId: entry.id,
-        title: entry.title,
-        kind: entry.kind,
+        timeblockId: timeblock.id,
+        title: timeblock.title,
+        kind: timeblock.kind,
       });
     },
     [
       closeTimeblockInspector,
       inspectorDuplicateDraft,
-      inspectorEntryId,
+      inspectorTimeblockId,
       inspectorIsOpen,
       openTimeblockInspector,
     ],

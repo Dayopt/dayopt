@@ -1,5 +1,5 @@
 // CalendarDisplayEvent は features/timeblock/types/calendar-event.ts の CalendarEvent が
-// canonical source (Timeblock の表示射影型のため owner は entry)。calendar 側では別名で
+// canonical source (Timeblock の表示射影型のため owner は timeblock)。calendar 側では別名で
 // re-export し、timeblock canonical 名との衝突（誤 import の温床）を避ける（#2221）。
 export type { CalendarEvent as CalendarDisplayEvent } from '@/features/timeblock';
 

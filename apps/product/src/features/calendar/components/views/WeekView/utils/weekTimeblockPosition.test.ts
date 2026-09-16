@@ -5,8 +5,8 @@ import { toWeekDayTimeblockPosition } from './weekTimeblockPosition';
 
 const basePosition: TimeblockPosition = {
   plan: {
-    id: 'entry-1',
-    title: 'Entry',
+    id: 'timeblock-1',
+    title: 'Timeblock',
     startDate: new Date('2026-06-04T13:00:00'),
     endDate: new Date('2026-06-04T14:00:00'),
     displayStartDate: new Date('2026-06-04T13:00:00'),

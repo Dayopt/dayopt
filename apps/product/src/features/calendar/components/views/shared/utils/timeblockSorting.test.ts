@@ -12,7 +12,7 @@ import {
 function makeTimeblock(id: string, startDate: Date | null): CalendarDisplayEvent {
   return {
     id,
-    title: `Entry ${id}`,
+    title: `Timeblock ${id}`,
     startDate,
     endDate: startDate ? new Date(startDate.getTime() + 3600000) : null,
     color: '#000',
@@ -28,32 +28,32 @@ function makeTimeblock(id: string, startDate: Date | null): CalendarDisplayEvent
 describe('timeblockSorting', () => {
   describe('sortEventsByTime', () => {
     it('時刻昇順でソートする', () => {
-      const entries = [
+      const timeblocks = [
         makeTimeblock('c', new Date('2026-02-21T14:00:00')),
         makeTimeblock('a', new Date('2026-02-21T09:00:00')),
         makeTimeblock('b', new Date('2026-02-21T11:00:00')),
       ];
-      const sorted = sortEventsByTime(entries);
+      const sorted = sortEventsByTime(timeblocks);
       expect(sorted.map((p) => p.id)).toEqual(['a', 'b', 'c']);
     });
 
     it('startDateがnullのイベントは先頭に来る', () => {
-      const entries = [
+      const timeblocks = [
         makeTimeblock('b', new Date('2026-02-21T10:00:00')),
         makeTimeblock('a', null),
       ];
-      const sorted = sortEventsByTime(entries);
+      const sorted = sortEventsByTime(timeblocks);
       expect(sorted[0]!.id).toBe('a');
     });
 
     it('元の配列を変更しない', () => {
-      const entries = [
+      const timeblocks = [
         makeTimeblock('b', new Date('2026-02-21T14:00:00')),
         makeTimeblock('a', new Date('2026-02-21T09:00:00')),
       ];
-      const original = [...entries];
-      sortEventsByTime(entries);
-      expect(entries.map((p) => p.id)).toEqual(original.map((p) => p.id));
+      const original = [...timeblocks];
+      sortEventsByTime(timeblocks);
+      expect(timeblocks.map((p) => p.id)).toEqual(original.map((p) => p.id));
     });
 
     it('空配列を処理できる', () => {
@@ -82,11 +82,11 @@ describe('timeblockSorting', () => {
 
   describe('sortEventsForAgenda', () => {
     it('sortEventsByTimeと同じ結果を返す', () => {
-      const entries = [
+      const timeblocks = [
         makeTimeblock('b', new Date('2026-02-21T14:00:00')),
         makeTimeblock('a', new Date('2026-02-21T09:00:00')),
       ];
-      const sorted = sortEventsForAgenda(entries);
+      const sorted = sortEventsForAgenda(timeblocks);
       expect(sorted.map((p) => p.id)).toEqual(['a', 'b']);
     });
   });

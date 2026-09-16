@@ -54,7 +54,7 @@ interface UseCalendarDataResult {
   isTimeblocksLoading: boolean;
   /** バックグラウンド再取得中も含めて取得中かどうか */
   isTimeblocksFetching: boolean;
-  /** エントリ取得を手動で再試行する */
+  /** タイムブロック取得を手動で再試行する */
   refetchTimeblocks: () => Promise<unknown>;
   /** ナビゲーション方向に対応する日付範囲を事前取得する */
   prefetchDirection: (direction: 'prev' | 'next' | 'today') => void;
@@ -94,7 +94,7 @@ export function useCalendarData({
     [listInput],
   );
 
-  // Step 8: entries を読まず、plans / records をそれぞれ取得する。
+  // Step 8: timeblocks を読まず、plans / records をそれぞれ取得する。
   const plansQuery = api.plans.list.useQuery(listInput);
   const recordsQuery = api.records.list.useQuery(listInput);
 
@@ -204,7 +204,7 @@ export function useCalendarData({
   );
 
   // フィルター関数と状態を取得（ストアに統一）
-  const isEntryVisible = useCalendarFilterStore((state) => state.isEntryVisible);
+  const matchesActivityFilter = useCalendarFilterStore((state) => state.matchesActivityFilter);
   // タグフィルタ変更時に useMemo を再実行させるためのリアクティブ依存
   // useDeferredValue でフィルター変更時のカレンダー再描画を遅延し、
   // チェックボックスUIの即時応答を維持する
@@ -296,12 +296,12 @@ export function useCalendarData({
 
     // サイドバーのフィルター設定を適用
     const visibilityFiltered = filtered.filter((event) => {
-      return isEntryVisible(event.activityId ?? null);
+      return matchesActivityFilter(event.activityId ?? null);
     });
 
     return visibilityFiltered;
     // eslint-disable-next-line react-hooks/exhaustive-deps -- visibleActivityIds はリアクティブ依存（関数参照は安定のため直接依存不可）
-  }, [viewDateRange, allCalendarEvents, timezone, isEntryVisible, visibleActivityIds]);
+  }, [viewDateRange, allCalendarEvents, timezone, matchesActivityFilter, visibleActivityIds]);
 
   return {
     viewDateRange,

@@ -32,10 +32,10 @@ export function useWeekView({
     weekStartsOn,
   });
 
-  // Phase 3統合フック: エントリ日付グループ化
-  const { entriesByDate: eventsByDate } = useTimeblocksByDate({
+  // Phase 3統合フック: タイムブロック日付グループ化
+  const { timeblocksByDate: eventsByDate } = useTimeblocksByDate({
     dates: weekDates,
-    entries: events,
+    timeblocks: events,
     sortType: 'standard',
     timezone,
   });

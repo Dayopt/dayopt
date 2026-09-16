@@ -4,9 +4,11 @@ import { describe, expect, it } from 'vitest';
 import type { CalendarDisplayEvent } from '../../../types/calendar.types';
 import { useWeekTimeblocks } from './hooks/useWeekTimeblocks';
 
-const createMockEntry = (overrides: Partial<CalendarDisplayEvent> = {}): CalendarDisplayEvent => ({
-  id: `entry-${Math.random().toString(36).slice(2)}`,
-  title: 'Test Entry',
+const createMockTimeblock = (
+  overrides: Partial<CalendarDisplayEvent> = {},
+): CalendarDisplayEvent => ({
+  id: `timeblock-${Math.random().toString(36).slice(2)}`,
+  title: 'Test Timeblock',
   startDate: new Date('2026-03-30T10:00:00'),
   endDate: new Date('2026-03-30T11:00:00'),
   displayStartDate: new Date('2026-03-30T10:00:00'),
@@ -27,24 +29,24 @@ const weekDates = Array.from({ length: 7 }, (_, i) => {
 });
 
 describe('useWeekTimeblocks', () => {
-  it('エントリがない場合は空のpositionsを返す', () => {
+  it('タイムブロックがない場合は空のpositionsを返す', () => {
     const { result } = renderHook(() =>
       useWeekTimeblocks({ weekDates, events: [], timezone: 'UTC' }),
     );
 
     expect(result.current.timeblockPositions).toEqual([]);
-    expect(result.current.maxConcurrentEntries).toBe(0);
+    expect(result.current.maxConcurrentTimeblocks).toBe(0);
   });
 
-  it('エントリを日付ごとにグループ化する', () => {
-    const mondayEntry = createMockEntry({
+  it('タイムブロックを日付ごとにグループ化する', () => {
+    const mondayTimeblock = createMockTimeblock({
       id: 'monday',
       startDate: new Date('2026-03-30T09:00:00'),
       endDate: new Date('2026-03-30T10:00:00'),
       displayStartDate: new Date('2026-03-30T09:00:00'),
       displayEndDate: new Date('2026-03-30T10:00:00'),
     });
-    const wednesdayEntry = createMockEntry({
+    const wednesdayTimeblock = createMockTimeblock({
       id: 'wednesday',
       startDate: new Date('2026-04-01T14:00:00'),
       endDate: new Date('2026-04-01T15:00:00'),
@@ -55,7 +57,7 @@ describe('useWeekTimeblocks', () => {
     const { result } = renderHook(() =>
       useWeekTimeblocks({
         weekDates,
-        events: [mondayEntry, wednesdayEntry],
+        events: [mondayTimeblock, wednesdayTimeblock],
         timezone: 'UTC',
       }),
     );
@@ -69,7 +71,7 @@ describe('useWeekTimeblocks', () => {
   });
 
   it('ユーザーTZの日付キーで週ビューに配置する', () => {
-    const tokyoMidnightEntry = createMockEntry({
+    const tokyoMidnightTimeblock = createMockTimeblock({
       id: 'tokyo-midnight',
       startDate: new Date('2026-03-29T15:30:00.000Z'),
       endDate: new Date('2026-03-29T16:30:00.000Z'),
@@ -80,18 +82,18 @@ describe('useWeekTimeblocks', () => {
     const { result } = renderHook(() =>
       useWeekTimeblocks({
         weekDates,
-        events: [tokyoMidnightEntry],
+        events: [tokyoMidnightTimeblock],
         timezone: 'Asia/Tokyo',
       }),
     );
 
     const position = result.current.timeblockPositions.find((p) => p.plan.id === 'tokyo-midnight');
     expect(position?.dayIndex).toBe(0);
-    expect(result.current.entriesByDate['2026-03-30']).toHaveLength(1);
+    expect(result.current.timeblocksByDate['2026-03-30']).toHaveLength(1);
   });
 
-  it('週の範囲外のエントリは除外される', () => {
-    const outsideEntry = createMockEntry({
+  it('週の範囲外のタイムブロックは除外される', () => {
+    const outsideTimeblock = createMockTimeblock({
       id: 'outside',
       startDate: new Date('2026-04-10T10:00:00'),
       endDate: new Date('2026-04-10T11:00:00'),
@@ -102,7 +104,7 @@ describe('useWeekTimeblocks', () => {
     const { result } = renderHook(() =>
       useWeekTimeblocks({
         weekDates,
-        events: [outsideEntry],
+        events: [outsideTimeblock],
         timezone: 'UTC',
       }),
     );
@@ -110,15 +112,15 @@ describe('useWeekTimeblocks', () => {
     expect(result.current.timeblockPositions).toHaveLength(0);
   });
 
-  it('同日の重複エントリで正しい位置が計算される', () => {
-    const entry1 = createMockEntry({
+  it('同日の重複タイムブロックで正しい位置が計算される', () => {
+    const timeblock1 = createMockTimeblock({
       id: 'e1',
       startDate: new Date('2026-03-30T10:00:00'),
       endDate: new Date('2026-03-30T11:00:00'),
       displayStartDate: new Date('2026-03-30T10:00:00'),
       displayEndDate: new Date('2026-03-30T11:00:00'),
     });
-    const entry2 = createMockEntry({
+    const timeblock2 = createMockTimeblock({
       id: 'e2',
       startDate: new Date('2026-03-30T10:30:00'),
       endDate: new Date('2026-03-30T11:30:00'),
@@ -129,17 +131,17 @@ describe('useWeekTimeblocks', () => {
     const { result } = renderHook(() =>
       useWeekTimeblocks({
         weekDates,
-        events: [entry1, entry2],
+        events: [timeblock1, timeblock2],
         timezone: 'UTC',
       }),
     );
 
     expect(result.current.timeblockPositions).toHaveLength(2);
-    expect(result.current.maxConcurrentEntries).toBe(2);
+    expect(result.current.maxConcurrentTimeblocks).toBe(2);
   });
 
   it('同じ時間帯では予定外記録を planned より前面にする', () => {
-    const unplanned = createMockEntry({
+    const unplanned = createMockTimeblock({
       id: 'gap-record',
       kind: 'record',
       startDate: new Date('2026-03-30T10:00:00'),
@@ -147,7 +149,7 @@ describe('useWeekTimeblocks', () => {
       displayStartDate: new Date('2026-03-30T10:00:00'),
       displayEndDate: new Date('2026-03-30T10:30:00'),
     });
-    const planned = createMockEntry({
+    const planned = createMockTimeblock({
       id: 'planned',
       kind: 'plan',
       startDate: new Date('2026-03-30T10:00:00'),

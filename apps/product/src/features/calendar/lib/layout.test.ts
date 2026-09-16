@@ -15,12 +15,12 @@ import {
 // テストヘルパー
 // ========================================
 
-function createTimedEntry(
+function createTimedTimeblock(
   overrides: Partial<TimedTimeblock> & { start: Date; end: Date },
 ): TimedTimeblock {
   return {
     id: 'test-1',
-    title: 'Test Entry',
+    title: 'Test Timeblock',
     startDate: overrides.start,
     endDate: overrides.end,
     displayStartDate: overrides.start,
@@ -42,13 +42,13 @@ describe('calculateTimeblockLayouts', () => {
     expect(calculateTimeblockLayouts([])).toEqual([]);
   });
 
-  it('単一エントリはfull widthで配置', () => {
-    const entry = createTimedEntry({
+  it('単一タイムブロックはfull widthで配置', () => {
+    const timeblock = createTimedTimeblock({
       id: 'a',
       start: new Date('2026-01-15T10:00:00'),
       end: new Date('2026-01-15T11:00:00'),
     });
-    const layouts = calculateTimeblockLayouts([entry]);
+    const layouts = calculateTimeblockLayouts([timeblock]);
 
     expect(layouts).toHaveLength(1);
     expect(layouts[0]!.column).toBe(0);
@@ -57,18 +57,18 @@ describe('calculateTimeblockLayouts', () => {
     expect(layouts[0]!.left).toBe(0);
   });
 
-  it('重複する2エントリは50%ずつに分割', () => {
-    const entry1 = createTimedEntry({
+  it('重複する2タイムブロックは50%ずつに分割', () => {
+    const timeblock1 = createTimedTimeblock({
       id: 'a',
       start: new Date('2026-01-15T10:00:00'),
       end: new Date('2026-01-15T11:00:00'),
     });
-    const entry2 = createTimedEntry({
+    const timeblock2 = createTimedTimeblock({
       id: 'b',
       start: new Date('2026-01-15T10:30:00'),
       end: new Date('2026-01-15T11:30:00'),
     });
-    const layouts = calculateTimeblockLayouts([entry1, entry2]);
+    const layouts = calculateTimeblockLayouts([timeblock1, timeblock2]);
 
     expect(layouts).toHaveLength(2);
     expect(layouts[0]!.totalColumns).toBe(2);
@@ -78,13 +78,13 @@ describe('calculateTimeblockLayouts', () => {
   });
 
   it('planned の未実行前半 gap に作った unplanned は右側に横割りする', () => {
-    const unplannedGapRecord = createTimedEntry({
+    const unplannedGapRecord = createTimedTimeblock({
       id: 'gap-record',
       start: new Date('2026-01-15T10:00:00'),
       end: new Date('2026-01-15T10:30:00'),
       kind: 'record',
     });
-    const planned = createTimedEntry({
+    const planned = createTimedTimeblock({
       id: 'planned',
       start: new Date('2026-01-15T10:00:00'),
       end: new Date('2026-01-15T11:00:00'),
@@ -100,13 +100,13 @@ describe('calculateTimeblockLayouts', () => {
   });
 
   it('planned の actual 範囲に重なる unplanned は従来通り横割りする', () => {
-    const planned = createTimedEntry({
+    const planned = createTimedTimeblock({
       id: 'planned',
       start: new Date('2026-01-15T10:00:00'),
       end: new Date('2026-01-15T11:00:00'),
       kind: 'plan',
     });
-    const overlappingRecord = createTimedEntry({
+    const overlappingRecord = createTimedTimeblock({
       id: 'overlap-record',
       start: new Date('2026-01-15T10:15:00'),
       end: new Date('2026-01-15T10:45:00'),
@@ -123,13 +123,13 @@ describe('calculateTimeblockLayouts', () => {
   });
 
   it('unplanned が少し早く始まっても planned を左、unplanned を右に配置する', () => {
-    const unplanned = createTimedEntry({
+    const unplanned = createTimedTimeblock({
       id: 'unplanned',
       start: new Date('2026-01-15T09:45:00'),
       end: new Date('2026-01-15T10:15:00'),
       kind: 'record',
     });
-    const planned = createTimedEntry({
+    const planned = createTimedTimeblock({
       id: 'planned',
       start: new Date('2026-01-15T10:00:00'),
       end: new Date('2026-01-15T11:00:00'),
@@ -144,18 +144,18 @@ describe('calculateTimeblockLayouts', () => {
     expect(unplannedLayout).toMatchObject({ column: 1, left: 50, width: 50, totalColumns: 2 });
   });
 
-  it('重複しない2エントリは各自full width', () => {
-    const entry1 = createTimedEntry({
+  it('重複しない2タイムブロックは各自full width', () => {
+    const timeblock1 = createTimedTimeblock({
       id: 'a',
       start: new Date('2026-01-15T10:00:00'),
       end: new Date('2026-01-15T11:00:00'),
     });
-    const entry2 = createTimedEntry({
+    const timeblock2 = createTimedTimeblock({
       id: 'b',
       start: new Date('2026-01-15T12:00:00'),
       end: new Date('2026-01-15T13:00:00'),
     });
-    const layouts = calculateTimeblockLayouts([entry1, entry2]);
+    const layouts = calculateTimeblockLayouts([timeblock1, timeblock2]);
 
     expect(layouts).toHaveLength(2);
     layouts.forEach((layout) => {
@@ -164,24 +164,24 @@ describe('calculateTimeblockLayouts', () => {
     });
   });
 
-  it('同一時刻のエントリはID順で配置', () => {
-    const planned = createTimedEntry({
+  it('同一時刻のタイムブロックはID順で配置', () => {
+    const planned = createTimedTimeblock({
       id: 'planned',
       start: new Date('2026-01-15T10:00:00'),
       end: new Date('2026-01-15T11:00:00'),
       kind: 'plan',
     });
-    const laterEntry = createTimedEntry({
-      id: 'later-entry',
+    const laterTimeblock = createTimedTimeblock({
+      id: 'later-timeblock',
       start: new Date('2026-01-15T10:00:00'),
       end: new Date('2026-01-15T11:00:00'),
       kind: 'plan',
     });
-    // 後発エントリを先に渡しても、早い方がcolumn 0になるべき
-    const layouts = calculateTimeblockLayouts([laterEntry, planned]);
+    // 後発タイムブロックを先に渡しても、早い方がcolumn 0になるべき
+    const layouts = calculateTimeblockLayouts([laterTimeblock, planned]);
 
     const plannedLayout = layouts.find((l) => l.timeblock.id === 'planned');
-    const laterLayout = layouts.find((l) => l.timeblock.id === 'later-entry');
+    const laterLayout = layouts.find((l) => l.timeblock.id === 'later-timeblock');
 
     expect(plannedLayout!.column).toBe(1);
     expect(laterLayout!.column).toBe(0);
@@ -193,25 +193,25 @@ describe('calculateTimeblockLayouts', () => {
 // ========================================
 
 describe('findOverlapGroups', () => {
-  it('重複するエントリをグループ化', () => {
-    const entries = [
-      createTimedEntry({
+  it('重複するタイムブロックをグループ化', () => {
+    const timeblocks = [
+      createTimedTimeblock({
         id: 'a',
         start: new Date('2026-01-15T10:00'),
         end: new Date('2026-01-15T11:00'),
       }),
-      createTimedEntry({
+      createTimedTimeblock({
         id: 'b',
         start: new Date('2026-01-15T10:30'),
         end: new Date('2026-01-15T11:30'),
       }),
-      createTimedEntry({
+      createTimedTimeblock({
         id: 'c',
         start: new Date('2026-01-15T14:00'),
         end: new Date('2026-01-15T15:00'),
       }),
     ];
-    const groups = findOverlapGroups(entries);
+    const groups = findOverlapGroups(timeblocks);
 
     expect(groups).toHaveLength(2);
     expect(groups[0]!.timeblocks).toHaveLength(2);
@@ -224,13 +224,13 @@ describe('findOverlapGroups', () => {
 // ========================================
 
 describe('isOverlapping', () => {
-  it('時間が重なるエントリはtrue', () => {
-    const a = createTimedEntry({
+  it('時間が重なるタイムブロックはtrue', () => {
+    const a = createTimedTimeblock({
       id: 'a',
       start: new Date('2026-01-15T10:00'),
       end: new Date('2026-01-15T11:00'),
     });
-    const b = createTimedEntry({
+    const b = createTimedTimeblock({
       id: 'b',
       start: new Date('2026-01-15T10:30'),
       end: new Date('2026-01-15T11:30'),
@@ -239,12 +239,12 @@ describe('isOverlapping', () => {
   });
 
   it('接触のみ（endとstartが同時刻）はfalse', () => {
-    const a = createTimedEntry({
+    const a = createTimedTimeblock({
       id: 'a',
       start: new Date('2026-01-15T10:00'),
       end: new Date('2026-01-15T11:00'),
     });
-    const b = createTimedEntry({
+    const b = createTimedTimeblock({
       id: 'b',
       start: new Date('2026-01-15T11:00'),
       end: new Date('2026-01-15T12:00'),
@@ -252,13 +252,13 @@ describe('isOverlapping', () => {
     expect(isOverlapping(a, b)).toBe(false);
   });
 
-  it('完全に離れたエントリはfalse', () => {
-    const a = createTimedEntry({
+  it('完全に離れたタイムブロックはfalse', () => {
+    const a = createTimedTimeblock({
       id: 'a',
       start: new Date('2026-01-15T10:00'),
       end: new Date('2026-01-15T11:00'),
     });
-    const b = createTimedEntry({
+    const b = createTimedTimeblock({
       id: 'b',
       start: new Date('2026-01-15T14:00'),
       end: new Date('2026-01-15T15:00'),
@@ -273,56 +273,56 @@ describe('isOverlapping', () => {
 
 describe('calculateMaxConcurrent', () => {
   it('重複なしは1を返す', () => {
-    const entries = [
-      createTimedEntry({
+    const timeblocks = [
+      createTimedTimeblock({
         id: 'a',
         start: new Date('2026-01-15T10:00'),
         end: new Date('2026-01-15T11:00'),
       }),
-      createTimedEntry({
+      createTimedTimeblock({
         id: 'b',
         start: new Date('2026-01-15T12:00'),
         end: new Date('2026-01-15T13:00'),
       }),
     ];
-    expect(calculateMaxConcurrent(entries)).toBe(1);
+    expect(calculateMaxConcurrent(timeblocks)).toBe(1);
   });
 
   it('2つ重複は2を返す', () => {
-    const entries = [
-      createTimedEntry({
+    const timeblocks = [
+      createTimedTimeblock({
         id: 'a',
         start: new Date('2026-01-15T10:00'),
         end: new Date('2026-01-15T11:00'),
       }),
-      createTimedEntry({
+      createTimedTimeblock({
         id: 'b',
         start: new Date('2026-01-15T10:30'),
         end: new Date('2026-01-15T11:30'),
       }),
     ];
-    expect(calculateMaxConcurrent(entries)).toBe(2);
+    expect(calculateMaxConcurrent(timeblocks)).toBe(2);
   });
 
   it('3つ同時重複は3を返す', () => {
-    const entries = [
-      createTimedEntry({
+    const timeblocks = [
+      createTimedTimeblock({
         id: 'a',
         start: new Date('2026-01-15T10:00'),
         end: new Date('2026-01-15T12:00'),
       }),
-      createTimedEntry({
+      createTimedTimeblock({
         id: 'b',
         start: new Date('2026-01-15T10:30'),
         end: new Date('2026-01-15T11:30'),
       }),
-      createTimedEntry({
+      createTimedTimeblock({
         id: 'c',
         start: new Date('2026-01-15T11:00'),
         end: new Date('2026-01-15T12:00'),
       }),
     ];
-    expect(calculateMaxConcurrent(entries)).toBe(3);
+    expect(calculateMaxConcurrent(timeblocks)).toBe(3);
   });
 });
 
@@ -335,20 +335,20 @@ describe('detectOverlapGroups', () => {
     expect(detectOverlapGroups([])).toEqual([]);
   });
 
-  it('重複するエントリを同一グループに', () => {
-    const entries = [
-      createTimedEntry({
+  it('重複するタイムブロックを同一グループに', () => {
+    const timeblocks = [
+      createTimedTimeblock({
         id: 'a',
         start: new Date('2026-01-15T10:00'),
         end: new Date('2026-01-15T11:00'),
       }),
-      createTimedEntry({
+      createTimedTimeblock({
         id: 'b',
         start: new Date('2026-01-15T10:30'),
         end: new Date('2026-01-15T11:30'),
       }),
     ];
-    const groups = detectOverlapGroups(entries);
+    const groups = detectOverlapGroups(timeblocks);
     expect(groups).toHaveLength(1);
     expect(groups[0]).toHaveLength(2);
   });
@@ -359,13 +359,13 @@ describe('detectOverlapGroups', () => {
 // ========================================
 
 describe('calculateTimeblockPosition', () => {
-  it('10:00-11:00のエントリを正しく配置（hourHeight=72）', () => {
-    const entry = createTimedEntry({
+  it('10:00-11:00のタイムブロックを正しく配置（hourHeight=72）', () => {
+    const timeblock = createTimedTimeblock({
       start: new Date('2026-01-15T10:00:00'),
       end: new Date('2026-01-15T11:00:00'),
     });
     const column = { timeblocks: [], columnIndex: 0, totalColumns: 1 };
-    const pos = calculateTimeblockPosition(entry, column, 72);
+    const pos = calculateTimeblockPosition(timeblock, column, 72);
 
     expect(pos.top).toBe(720); // 10 * 72
     expect(pos.height).toBe(72); // 1時間 * 72
@@ -374,23 +374,23 @@ describe('calculateTimeblockPosition', () => {
   });
 
   it('最小高さ14pxを保証', () => {
-    const entry = createTimedEntry({
+    const timeblock = createTimedTimeblock({
       start: new Date('2026-01-15T10:00:00'),
       end: new Date('2026-01-15T10:05:00'), // 5分 = 6px
     });
     const column = { timeblocks: [], columnIndex: 0, totalColumns: 1 };
-    const pos = calculateTimeblockPosition(entry, column, 72);
+    const pos = calculateTimeblockPosition(timeblock, column, 72);
 
     expect(pos.height).toBe(14);
   });
 
   it('2カラム中の2番目を正しく配置', () => {
-    const entry = createTimedEntry({
+    const timeblock = createTimedTimeblock({
       start: new Date('2026-01-15T10:00:00'),
       end: new Date('2026-01-15T11:00:00'),
     });
     const column = { timeblocks: [], columnIndex: 1, totalColumns: 2 };
-    const pos = calculateTimeblockPosition(entry, column, 72);
+    const pos = calculateTimeblockPosition(timeblock, column, 72);
 
     expect(pos.left).toBe(50);
     expect(pos.width).toBe(50);

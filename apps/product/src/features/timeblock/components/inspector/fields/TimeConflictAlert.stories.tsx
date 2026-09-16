@@ -45,11 +45,11 @@ export const StartAfterEnd: Story = {
   ),
 };
 
-/** 別のエントリーと重複している場合。 */
+/** 別のタイムブロックと重複している場合。 */
 export const ConflictWithOther: Story = {
   render: () => (
     <div className="w-72">
-      <TimeConflictAlert message="別のエントリーと時間が重複しています" />
+      <TimeConflictAlert message="別のタイムブロックと時間が重複しています" />
     </div>
   ),
 };
@@ -76,8 +76,8 @@ export const AllPatterns: Story = {
         <TimeConflictAlert message="開始時刻は終了時刻より前に設定してください" />
       </div>
       <div className="space-y-1">
-        <p className="text-muted-foreground text-xs">ConflictWithOther（別エントリーと重複）</p>
-        <TimeConflictAlert message="別のエントリーと時間が重複しています" />
+        <p className="text-muted-foreground text-xs">ConflictWithOther（別タイムブロックと重複）</p>
+        <TimeConflictAlert message="別のタイムブロックと時間が重複しています" />
       </div>
       <div className="space-y-1">
         <p className="text-muted-foreground text-xs">LongMessage（長文）</p>

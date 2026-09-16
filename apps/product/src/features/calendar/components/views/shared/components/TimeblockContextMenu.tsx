@@ -9,18 +9,18 @@ import { cn, overlaySurface } from '@dayopt/components';
 import type { CalendarDisplayEvent } from '../../../../types/calendar.types';
 
 interface TimeblockContextMenuProps {
-  entry: CalendarDisplayEvent;
+  timeblock: CalendarDisplayEvent;
   position: { x: number; y: number };
   onClose: () => void;
-  onDelete?: ((entry: CalendarDisplayEvent) => void) | undefined;
-  onViewStats?: ((entry: CalendarDisplayEvent) => void) | undefined;
-  onCopy?: ((entry: CalendarDisplayEvent) => void) | undefined;
-  onDuplicate?: ((entry: CalendarDisplayEvent) => void) | undefined;
+  onDelete?: ((timeblock: CalendarDisplayEvent) => void) | undefined;
+  onViewStats?: ((timeblock: CalendarDisplayEvent) => void) | undefined;
+  onCopy?: ((timeblock: CalendarDisplayEvent) => void) | undefined;
+  onDuplicate?: ((timeblock: CalendarDisplayEvent) => void) | undefined;
 }
 
-/** エントリの右クリックコンテキストメニューコンポーネント */
+/** タイムブロックの右クリックコンテキストメニューコンポーネント */
 export const EventContextMenu = ({
-  entry,
+  timeblock,
   position,
   onClose,
   onDelete,
@@ -109,11 +109,13 @@ export const EventContextMenu = ({
 
   // 共通の menu items 定義から取得（Inspector の TagRow と同じ source）
   const menuItems = getTimeblockMenuItems({
-    onViewStats: onViewStats ? () => onViewStats(entry) : undefined,
-    onCopy: onCopy ? () => onCopy(entry) : undefined,
-    onDuplicate: onDuplicate ? () => onDuplicate(entry) : undefined,
+    onViewStats: onViewStats ? () => onViewStats(timeblock) : undefined,
+    onCopy: onCopy ? () => onCopy(timeblock) : undefined,
+    onDuplicate: onDuplicate ? () => onDuplicate(timeblock) : undefined,
     onDelete:
-      onDelete && entry.recordSource !== 'auto_migrated' ? () => onDelete(entry) : undefined,
+      onDelete && timeblock.recordSource !== 'auto_migrated'
+        ? () => onDelete(timeblock)
+        : undefined,
   });
 
   if (menuItems.length === 0) return null;

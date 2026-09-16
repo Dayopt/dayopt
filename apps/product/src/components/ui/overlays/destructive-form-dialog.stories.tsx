@@ -66,12 +66,12 @@ export const WithForm: Story = {
             onClose={() => setOpen(false)}
             onConfirm={() => setOpen(false)}
             title="タグを削除しますか？"
-            description="関連エントリが3件あります。どう扱うか選んでください。"
+            description="関連タイムブロックが3件あります。どう扱うか選んでください。"
           >
             <RadioGroup value={strategy} onValueChange={setStrategy} className="space-y-2">
               <label htmlFor="r-delete" className="flex cursor-pointer items-center gap-4">
                 <RadioGroupItem value="delete" id="r-delete" />
-                <span className="text-sm">関連エントリも削除する</span>
+                <span className="text-sm">関連タイムブロックも削除する</span>
               </label>
               <label htmlFor="r-reassign" className="flex cursor-pointer items-center gap-4">
                 <RadioGroupItem value="reassign" id="r-reassign" />
