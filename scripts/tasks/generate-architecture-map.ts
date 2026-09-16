@@ -40,6 +40,10 @@ import {
   mapInventoryToConcepts,
   renderInventoryDocument,
 } from '../lib/architecture-map/concept-map.ts';
+import {
+  checkNavigationReferences,
+  collectConceptNavigation,
+} from '../lib/architecture-map/concept-navigation.ts';
 import { renderErDiagram, renderTableIndex } from '../lib/architecture-map/er-diagram.ts';
 import {
   buildFeatureDag,
@@ -260,6 +264,8 @@ export async function buildArchitectureMapDocs(): Promise<GeneratedDocument[]> {
       '> 実装（`apps/product/src` / `supabase`）から自動発見した項目に、`scripts/lib/glossary/terms.ts` の対応を重ねた snapshot。',
       '> **手で編集しない**。drift は `pnpm architecture:check`（docs-guard からも常時実行）が検出する。',
     ].join('\n'),
+    collectConceptNavigation(conceptMap, GLOSSARY, sources, relations),
+    likec4Sources.dag.edges,
   );
 
   const surface = renderSurfaceDocument(
@@ -370,6 +376,13 @@ export function checkArchitectureReferences(): ReferenceViolation[] {
     collectFeatureDependencies(sources),
   );
   const items = discoverInventory(ROOT, sources, schema);
+  const relations = collectRelations(ROOT, sources, items);
+  const callGraph = buildProductCallGraph(items, sources, schema, relations.mcpToolFiles);
+  const conceptMap = mapInventoryToConcepts(
+    attributeRoutesByCallGraph(items, callGraph.pages),
+    GLOSSARY,
+  );
+  const navigation = collectConceptNavigation(conceptMap, GLOSSARY, sources, relations);
   const mcpTools = new Set(items.filter((item) => item.kind === 'mcp-tool').map((item) => item.id));
   const mcpViolations: ReferenceViolation[] = [];
   for (const entry of GLOSSARY) {
@@ -384,6 +397,7 @@ export function checkArchitectureReferences(): ReferenceViolation[] {
   }
   return [
     ...mcpViolations,
+    ...checkNavigationReferences(ROOT, conceptMap, navigation),
     ...checkSurfaceConsistency(
       discoverSystemSurface(
         ROOT,
@@ -392,12 +406,7 @@ export function checkArchitectureReferences(): ReferenceViolation[] {
       ),
       items,
       sources,
-      buildProductCallGraph(
-        items,
-        sources,
-        schema,
-        collectRelations(ROOT, sources, items).mcpToolFiles,
-      ),
+      callGraph,
     ),
     ...checkGlossaryReferences(GLOSSARY, schema, sources, ROOT),
     ...checkTimeRuleMirrorReferences(timeRules.mirrors, sources),
