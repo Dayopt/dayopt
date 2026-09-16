@@ -1,0 +1,424 @@
+import { describe, expect, it } from 'vitest';
+
+import {
+  PRODUCERS,
+  evaluateValidation,
+  formatValidationResult,
+  selectTrustedRun,
+  toCommitStatus,
+} from './validation-evidence.mjs';
+import { createValidationPlan } from './validation-plan.mjs';
+
+const HEAD = 'a'.repeat(40);
+const BASE = 'b'.repeat(40);
+const OTHER = 'e'.repeat(40);
+const REPO = 'Dayopt/dayopt';
+const CI = '.github/workflows/ci.yml';
+const graph = new Map([['packages/components', new Set(['product', 'web'])]]);
+
+const plan = (files: string[], patch: Record<string, unknown> = {}) =>
+  createValidationPlan(
+    {
+      repository: REPO,
+      prNumber: 42,
+      headSha: HEAD,
+      baseSha: BASE,
+      testSha: 'c'.repeat(40),
+      policySha: BASE,
+      event: 'pull_request',
+      diff: { complete: true, files, hash: 'd'.repeat(64) },
+      ...patch,
+    },
+    { graph },
+  );
+
+type Job = { name: string; status: string; conclusion: string | null; runAttempt: number };
+const job = (
+  name: string,
+  conclusion: string | null,
+  runAttempt = 1,
+): Job & { htmlUrl: string } => ({
+  name,
+  status: conclusion === null ? 'in_progress' : 'completed',
+  conclusion,
+  runAttempt,
+  htmlUrl: `https://github.com/${REPO}/actions/runs/1/job/${name}`,
+});
+
+const ciRun = (jobs: ReturnType<typeof job>[], patch: Record<string, unknown> = {}) => ({
+  id: 100,
+  path: CI,
+  event: 'pull_request',
+  headSha: HEAD,
+  repository: REPO,
+  runAttempt: 1,
+  status: jobs.every((entry) => entry.status === 'completed') ? 'completed' : 'in_progress',
+  conclusion: 'success',
+  htmlUrl: `https://github.com/${REPO}/actions/runs/100`,
+  jobs,
+  ...patch,
+});
+
+const greenCi = () =>
+  ciRun([
+    job('🧭 Impact', 'success'),
+    job('🔍 Static Checks', 'success'),
+    job('📦 Unit Tests', 'success'),
+    job('Migration Safety Notice', 'skipped'),
+    job('🧪 Integration Tests', 'success'),
+  ]);
+
+const deployment = (environment: string, patch: Record<string, unknown> = {}) => ({
+  id: environment.includes('product') ? 6480165896 : 6480145195,
+  sha: HEAD,
+  environment,
+  productionEnvironment: false,
+  createdAt: '2026-09-16T11:51:09Z',
+  latestStatus: { state: 'success', environmentUrl: 'https://product-x.vercel.app' },
+  ...patch,
+});
+
+const status = (context: string, patch: Record<string, unknown> = {}) => ({
+  context,
+  state: 'success',
+  targetUrl: 'https://vercel.com/dayopt/product/x',
+  description: 'Deployment has completed',
+  ...patch,
+});
+
+const evidence = (patch: Record<string, unknown> = {}) => ({
+  repository: REPO,
+  headSha: HEAD,
+  fetchedAt: '2026-09-17T00:00:00.000Z',
+  pr: { number: 42, state: 'open', draft: false, headSha: HEAD, baseRef: 'main', fork: false },
+  baseCompare: 'ahead',
+  workflowRuns: [greenCi()],
+  statuses: [status('Vercel – product'), status('Vercel – web')],
+  deployments: [deployment('Preview – product'), deployment('Preview – web')],
+  ...patch,
+});
+
+const APP_FILE = 'apps/product/src/features/timeblock/domain/a.ts';
+
+describe('validation evidence: producer contract', () => {
+  it('maps every plan suite to a trusted producer', () => {
+    expect(Object.keys(plan(['README.md']).required).sort()).toEqual(Object.keys(PRODUCERS).sort());
+  });
+
+  it('selects the latest pull_request run of the trusted workflow for the head', () => {
+    const runs = [
+      ciRun([], { id: 1, conclusion: 'failure' }),
+      ciRun([], { id: 3 }),
+      ciRun([], { id: 9, path: '.github/workflows/evil.yml' }),
+      ciRun([], { id: 8, headSha: OTHER }),
+      ciRun([], { id: 7, event: 'workflow_dispatch' }),
+      ciRun([], { id: 6, repository: 'someone/dayopt' }),
+    ];
+    expect(selectTrustedRun(runs, { repository: REPO, headSha: HEAD, workflow: CI })?.id).toBe(3);
+  });
+});
+
+describe('validation evidence: positive paths', () => {
+  it('passes a product change with green CI and matching Preview deployments', () => {
+    const result = evaluateValidation({ plan: plan([APP_FILE]), evidence: evidence() });
+    expect(result.verdict).toBe('pass');
+    expect(result.suites.productPreview.evidence?.deploymentId).toBe(6480165896);
+    expect(result.suites.productJourney.status).toBe('deferred');
+    expect(result.suites.dbUpgrade.status).toBe('not-applicable');
+    expect(toCommitStatus(result).state).toBe('success');
+  });
+
+  it('accepts not-applicable suites for prose-only plans even when producers are absent', () => {
+    const result = evaluateValidation({
+      plan: plan(['README.md']),
+      evidence: evidence({
+        workflowRuns: [
+          ciRun([
+            job('🧭 Impact', 'success'),
+            job('🔍 Static Checks', 'success'),
+            job('📦 Unit Tests', 'skipped'),
+            job('🧪 Integration Tests', 'skipped'),
+          ]),
+        ],
+        statuses: [],
+        deployments: [],
+      }),
+    });
+    expect(result.verdict).toBe('pass');
+    expect(result.suites.productPreview.status).toBe('not-applicable');
+  });
+
+  it('does not stay pending for docs-only plans that produce no app checks', () => {
+    const result = evaluateValidation({
+      plan: plan(['README.md']),
+      evidence: evidence({
+        workflowRuns: [ciRun([job('🔍 Static Checks', 'success')])],
+        statuses: [],
+        deployments: [],
+      }),
+    });
+    expect(result.verdict).toBe('pass');
+  });
+});
+
+describe('validation evidence: rejected evidence', () => {
+  it.each([
+    ['failure', 'failed'],
+    ['cancelled', 'failed'],
+    ['timed_out', 'failed'],
+    ['neutral', 'failed'],
+    ['skipped', 'skipped'],
+  ])('does not accept a required job that concluded %s', (conclusion, expected) => {
+    const result = evaluateValidation({
+      plan: plan([APP_FILE]),
+      evidence: evidence({
+        workflowRuns: [
+          ciRun([
+            job('🔍 Static Checks', 'success'),
+            job('📦 Unit Tests', conclusion),
+            job('🧪 Integration Tests', 'success'),
+          ]),
+        ],
+      }),
+    });
+    expect(result.suites.productUnit.status).toBe(expected);
+    expect(result.verdict).toBe('blocked');
+    expect(toCommitStatus(result).state).toBe('failure');
+  });
+
+  it('treats a missing required job as unfulfilled, not as success', () => {
+    const result = evaluateValidation({
+      plan: plan([APP_FILE]),
+      evidence: evidence({
+        workflowRuns: [
+          ciRun([job('🔍 Static Checks', 'success'), job('📦 Unit Tests', 'success')]),
+        ],
+      }),
+    });
+    expect(result.suites.integration.status).toBe('missing');
+    expect(result.verdict).toBe('blocked');
+  });
+
+  it('keeps pending while the trusted run is still in progress', () => {
+    const result = evaluateValidation({
+      plan: plan([APP_FILE]),
+      evidence: evidence({
+        workflowRuns: [ciRun([job('🔍 Static Checks', 'success'), job('📦 Unit Tests', null)])],
+      }),
+    });
+    expect(result.suites.productUnit.status).toBe('pending');
+    expect(result.suites.integration.status).toBe('pending');
+    expect(result.verdict).toBe('pending');
+    expect(toCommitStatus(result).state).toBe('pending');
+  });
+
+  it('ignores same-name jobs from an untrusted workflow path', () => {
+    const result = evaluateValidation({
+      plan: plan([APP_FILE]),
+      evidence: evidence({
+        workflowRuns: [
+          ciRun([], { id: 5, path: '.github/workflows/evil.yml', jobs: greenCi().jobs }),
+        ],
+      }),
+    });
+    expect(result.suites.static.status).toBe('missing');
+    expect(result.verdict).toBe('blocked');
+  });
+
+  it('does not let an older successful run hide the latest failed attempt', () => {
+    const failed = ciRun(
+      [
+        job('🔍 Static Checks', 'success'),
+        job('📦 Unit Tests', 'failure', 2),
+        job('🧪 Integration Tests', 'success', 2),
+      ],
+      { id: 200, runAttempt: 2 },
+    );
+    const result = evaluateValidation({
+      plan: plan([APP_FILE]),
+      evidence: evidence({ workflowRuns: [greenCi(), failed] }),
+    });
+    expect(result.suites.productUnit.status).toBe('failed');
+    expect(result.suites.static.status).toBe('missing'); // stale attempt-1 job is not reused
+  });
+
+  it('rejects evidence for another head, PR or repository', () => {
+    for (const patch of [
+      { headSha: OTHER, pr: { ...evidence().pr, headSha: OTHER } },
+      { pr: { ...evidence().pr, number: 43 } },
+      { repository: 'someone/dayopt' },
+      { pr: { ...evidence().pr, headSha: OTHER } },
+    ]) {
+      const result = evaluateValidation({ plan: plan([APP_FILE]), evidence: evidence(patch) });
+      expect(result.verdict).toBe('indeterminate');
+      expect(Object.values(result.suites).every((suite) => suite.status === 'indeterminate')).toBe(
+        true,
+      );
+    }
+  });
+
+  it('never passes an indeterminate plan', () => {
+    const result = evaluateValidation({
+      plan: plan([APP_FILE], { policySha: HEAD }),
+      evidence: evidence(),
+    });
+    expect(result.verdict).toBe('indeterminate');
+    expect(result.reasons).toContain('policy must come from trusted base');
+  });
+
+  it('blocks when a plan-required suite has no wired producer instead of stubbing success', () => {
+    const result = evaluateValidation({
+      plan: plan(['supabase/migrations/20260917000000_a.sql']),
+      evidence: evidence(),
+    });
+    expect(result.suites.dbUpgrade.status).toBe('unwired');
+    expect(result.suites.oldConsumer.status).toBe('unwired');
+    expect(result.suites.dbFresh.status).toBe('satisfied');
+    expect(result.verdict).toBe('blocked');
+  });
+
+  it.each(['.github/workflows/ci.yml', 'scripts/ci/check.mjs', '.github/actions/setup/action.yml'])(
+    'does not trust a run whose producer definition %s is changed by the PR',
+    (file) => {
+      const result = evaluateValidation({ plan: plan([file, APP_FILE]), evidence: evidence() });
+      expect(result.suites.static.status).toBe('self-produced');
+      expect(result.suites.productUnit.status).toBe('self-produced');
+      expect(result.suites.productPreview.status).toBe('satisfied');
+      expect(result.verdict).toBe('blocked');
+    },
+  );
+
+  it('blocks on any failed trusted CI job even when the plan does not require it', () => {
+    const result = evaluateValidation({
+      plan: plan(['README.md']),
+      evidence: evidence({
+        workflowRuns: [
+          ciRun([job('🔍 Static Checks', 'success'), job('📦 Unit Tests', 'failure')]),
+        ],
+      }),
+    });
+    expect(result.verdict).toBe('blocked');
+    expect(result.reasons).toContain('failed check: 📦 Unit Tests (failure)');
+  });
+});
+
+describe('validation evidence: deployments', () => {
+  it('requires a Preview deployment record for the head, not only a green status', () => {
+    const result = evaluateValidation({
+      plan: plan([APP_FILE]),
+      evidence: evidence({ deployments: [deployment('Preview – web')] }),
+    });
+    expect(result.suites.productPreview.status).toBe('missing');
+    expect(result.verdict).toBe('blocked');
+  });
+
+  it('rejects a deployment of another head and a production environment', () => {
+    const other = evaluateValidation({
+      plan: plan([APP_FILE]),
+      evidence: evidence({
+        deployments: [deployment('Preview – product', { sha: OTHER }), deployment('Preview – web')],
+      }),
+    });
+    expect(other.suites.productPreview.status).toBe('missing');
+    const production = evaluateValidation({
+      plan: plan([APP_FILE]),
+      evidence: evidence({
+        deployments: [
+          deployment('Preview – product', { productionEnvironment: true }),
+          deployment('Preview – web'),
+        ],
+      }),
+    });
+    expect(production.suites.productPreview.status).toBe('failed');
+  });
+
+  it('uses the latest deployment for the head when the same SHA deployed twice', () => {
+    const result = evaluateValidation({
+      plan: plan([APP_FILE]),
+      evidence: evidence({
+        deployments: [
+          deployment('Preview – product', {
+            id: 1,
+            createdAt: '2026-09-16T03:05:50Z',
+            latestStatus: { state: 'success', environmentUrl: null },
+          }),
+          deployment('Preview – product', {
+            id: 2,
+            createdAt: '2026-09-16T03:08:12Z',
+            latestStatus: { state: 'failure', environmentUrl: null },
+          }),
+          deployment('Preview – web'),
+        ],
+      }),
+    });
+    expect(result.suites.productPreview.status).toBe('failed');
+    expect(result.suites.productPreview.evidence?.deploymentId).toBe(2);
+  });
+
+  it('fails when Vercel skipped a build the plan requires', () => {
+    const result = evaluateValidation({
+      plan: plan([APP_FILE]),
+      evidence: evidence({
+        statuses: [
+          status('Vercel – product', { description: 'Canceled by Ignored Build Step' }),
+          status('Vercel – web'),
+        ],
+      }),
+    });
+    expect(result.suites.productPreview.status).toBe('failed');
+  });
+
+  it('stays pending while the deployment status is pending', () => {
+    const result = evaluateValidation({
+      plan: plan([APP_FILE]),
+      evidence: evidence({
+        statuses: [status('Vercel – product', { state: 'pending' }), status('Vercel – web')],
+      }),
+    });
+    expect(result.suites.productPreview.status).toBe('pending');
+    expect(result.verdict).toBe('pending');
+    expect(toCommitStatus(result).state).toBe('pending');
+  });
+});
+
+describe('validation evidence: PR state and base', () => {
+  it('does not evaluate drafts or closed PRs', () => {
+    const draft = evaluateValidation({
+      plan: plan([APP_FILE]),
+      evidence: evidence({ pr: { ...evidence().pr, draft: true } }),
+    });
+    expect(draft.verdict).toBe('not-evaluated');
+    const closed = evaluateValidation({
+      plan: plan([APP_FILE]),
+      evidence: evidence({ pr: { ...evidence().pr, state: 'closed' } }),
+    });
+    expect(closed.verdict).toBe('not-evaluated');
+  });
+
+  it('requires update-branch when the base moved (strict up-to-date semantics)', () => {
+    for (const baseCompare of ['behind', 'diverged', 'unknown']) {
+      const result = evaluateValidation({
+        plan: plan([APP_FILE]),
+        evidence: evidence({ baseCompare }),
+      });
+      expect(result.verdict).toBe('pending');
+      expect(result.reasons[0]).toMatch(/update-branch/);
+    }
+  });
+
+  it('marks fork heads as indeterminate', () => {
+    const result = evaluateValidation({
+      plan: plan([APP_FILE]),
+      evidence: evidence({ pr: { ...evidence().pr, fork: true } }),
+    });
+    expect(result.verdict).toBe('indeterminate');
+  });
+
+  it('renders reasons, links and the shadow disclaimer', () => {
+    const result = evaluateValidation({ plan: plan([APP_FILE]), evidence: evidence() });
+    const text = formatValidationResult(result);
+    expect(text).toContain('Verdict: **pass**');
+    expect(text).toContain('[run](https://github.com/Dayopt/dayopt/actions/runs/1/job/');
+    expect(text).toContain('not a required check');
+  });
+});
