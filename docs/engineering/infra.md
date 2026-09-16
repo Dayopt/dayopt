@@ -443,6 +443,84 @@ association・thread の resolve 状態を機械確認するもので、返信�
 に出す。**required check ではない。** ruleset・`branch:finish`・既存 check は変更しない。
 GitHub native rule の管理者 bypass はこの check では防げない（bypass actor 0 の ruleset が担う）。
 
+### 新旧ゲートの切替計画と rollback（#2798）
+
+比較は `pnpm validation:shadow-report [--limit N] [--json]`（read-only。直近の非 draft PR について、
+旧経路で実際に走った job・runner 分・CI 秒、base policy で再計算した plan、controller が発行した
+`Validation (shadow)` / `Review policy (shadow)`、would-skip / would-add を 1 表にする。判定は人が
+行い、件数の少ない分類の p95 は出さない。Preview / review の待ち時間は未取得）。
+
+**順序: shadow 観察 → 比較 → 承認付き切替 → 観察 → 整理。既存の必須条件を先に削らない。**
+
+| 段階 | 変更                                                                                                  | 戻し方                                 | 承認                       |
+| ---- | ----------------------------------------------------------------------------------------------------- | -------------------------------------- | -------------------------- |
+| 0    | shadow（現状）: `Validation (shadow)` / `Review policy (shadow)` / `🧱 DB Upgrade (shadow)` は非必須  | workflow を Disable                    | 不要（AUTONOMOUS）         |
+| 1    | 比較レポートで docs / ui / logic / api-db / ci-policy 別に正例・負例と保証の退行が無いことを確認      | -                                      | -                          |
+| 2    | ruleset に `Validation (shadow)` を **既存 required と併走で追加**（旧条件は残す）                    | ruleset から context を外す            | User（CHECKPOINT）         |
+| 3    | 観察後、旧 required のうち新条件が包含するものだけを外す（trusted source を保つ native check は残す） | 下の snapshot どおり required を再追加 | User（EXPLICIT AUTHORITY） |
+| 4    | `branch:finish` の rollup 検査と shadow の重複を整理                                                  | git revert                             | -                          |
+
+切替は `gh api -X PUT repos/Dayopt/dayopt/rulesets/6790553` で行い、直前・直後に ruleset と対象 PR の
+check を再取得して旧条件と新条件の証拠を比較する。全 gate 無効化や force 公開を復旧手段にしない。
+名前だけ先に変えて永久 pending を作らない。
+
+切替前 snapshot（2026-09-17 UTC、`gh api repos/Dayopt/dayopt/rulesets/6790553`。rollback はこの
+required_status_checks を再適用する）:
+
+```json
+{
+  "bypass_actors": [],
+  "conditions": { "ref_name": { "exclude": [], "include": ["refs/heads/main"] } },
+  "enforcement": "active",
+  "id": 6790553,
+  "name": "Branch name pattern: main",
+  "rules": [
+    { "parameters": null, "type": "deletion" },
+    { "parameters": null, "type": "non_fast_forward" },
+    {
+      "parameters": {
+        "allowed_merge_methods": ["merge", "squash", "rebase"],
+        "dismiss_stale_reviews_on_push": true,
+        "dismissal_restriction": { "allowed_actors": [], "enabled": false },
+        "require_code_owner_review": false,
+        "require_extra_approval_for_unattributed_changes": true,
+        "require_last_push_approval": false,
+        "required_approving_review_count": 0,
+        "required_review_thread_resolution": true,
+        "required_reviewers": []
+      },
+      "type": "pull_request"
+    },
+    {
+      "parameters": {
+        "do_not_enforce_on_create": false,
+        "required_status_checks": [
+          { "context": "🔍 Static Checks", "integration_id": 15368 },
+          { "context": "📦 Unit Tests", "integration_id": 15368 },
+          { "context": "Vercel – product" },
+          { "context": "Vercel – web" },
+          { "context": "🧪 Integration Tests", "integration_id": 15368 }
+        ],
+        "strict_required_status_checks_policy": true
+      },
+      "type": "required_status_checks"
+    }
+  ],
+  "target": "branch"
+}
+```
+
+未有効化のもの（コード完了 ≠ 有効化。#2793 の受け入れ条件）:
+
+- 公開前 migration 反映確認は promote.yml に advisory で配線済み。有効化は read-only token を
+  `production-release` environment へ置く決定（secret の境界変更）と台帳更新を伴う別変更
+- Codex の自動起動（Review policy の trigger）は log のみ。実起動は `pull-requests: write` を
+  controller へ渡す判断を伴う別変更
+- release 差分基準の回帰（前回公開失敗後の docs-only merge、同一 SHA の再 deployment、片方だけ
+  未公開、burst merge）は `scripts/ci/release-impact.test.ts` / `scripts/ci/production-release.test.ts`
+  の既存 fixture（live 基準判定、preview / 別 integration の deployment 除外、superseded、mixed
+  release の rollback）が持つ。重複実装しない
+
 ### merge gate の required checks
 
 **merge gate は main の ruleset `6790553`（`Branch name pattern: main`）1 本。** 2026-09-07 の repo public 化で有効になり、required status checks（`🔍 Static Checks` / `📦 Unit Tests` / `🧪 Integration Tests` / `Vercel – product` / `Vercel – web`）、strict up-to-date、review thread resolution 必須、bypass actor 0 を GitHub 自身が local / cloud / UI / API / MCP のどの経路でも同じ条件で強制する（実状は `gh api repos/Dayopt/dayopt/rulesets/6790553`）。2026-09-13 に [#2640](https://github.com/Dayopt/dayopt/issues/2640) で `Production Config Audit` を required から外し、`🧪 Integration Tests` を足した。ruleset は skipped な required check を成功扱いにするので、DB を触らない PR で integration job が skip されても止まらない。`pnpm branch:finish`（`scripts/tasks/finish-branch.sh`）は merge と worktree / branch 掃除の入口で、その rollup 検査（affected 判定による `🧪 Integration Tests` の名前要求、Vercel context の存在確認）は ruleset と重複する冗長検査として残す。gate ではないので、UI / API / MCP から直接 merge しても条件は変わらない。2026-09-07 までは Free plan の private repo で ruleset API が 403 を返し、gate は finish-branch.sh だけだった（旧記述）。
