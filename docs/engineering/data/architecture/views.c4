@@ -33,7 +33,7 @@ views {
     autoLayout LeftRight
   }
   view unmapped {
-    title '未マッピング（どの概念からも辿れない要素）'
+    title '概念を足す候補（語彙を持たない層は除く）'
     include * where tag is #unmapped
     autoLayout TopBottom
   }
@@ -120,6 +120,26 @@ views {
   view concept_subscription_status of c_subscription-status {
     title 'Subscription status（subscription-status）'
     include c_subscription-status, c_subscription-status ->
+    autoLayout LeftRight
+  }
+  view concept_calendar_surface of c_calendar-surface {
+    title 'Calendar surface（calendar-surface）'
+    include c_calendar-surface, c_calendar-surface ->
+    autoLayout LeftRight
+  }
+  view concept_settings_surface of c_settings-surface {
+    title 'Settings surface（settings-surface）'
+    include c_settings-surface, c_settings-surface ->
+    autoLayout LeftRight
+  }
+  view concept_auth_surface of c_auth-surface {
+    title 'Auth surface（auth-surface）'
+    include c_auth-surface, c_auth-surface ->
+    autoLayout LeftRight
+  }
+  view concept_contact_surface of c_contact-surface {
+    title 'Contact surface（contact-surface）'
+    include c_contact-surface, c_contact-surface ->
     autoLayout LeftRight
   }
 }

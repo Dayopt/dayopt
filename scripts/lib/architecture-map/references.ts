@@ -49,6 +49,37 @@ export function collectProductSources(root: string): SourceFile[] {
   return files;
 }
 
+/**
+ * procedure の呼び出し元になりうる root。
+ *
+ * `collectProductSources` は `apps/product/src` しか見ないので、「どこからも呼ばれていない」の
+ * 根拠としては狭すぎる（web / 運用 script / Edge Function から呼ばれていても 0 と出る）。
+ * 判定に使う時はこちらを渡す。SQL / YAML は呼び出し形が違うので対象外（生成物にその旨を書く）。
+ */
+const CALLER_ROOTS = ['apps/product/src', 'apps/web/src', 'scripts', 'supabase/functions'];
+
+/** procedure の利用判定に使う、product より広い走査。存在しない root は黙って飛ばす。 */
+export function collectCallerSources(root: string): SourceFile[] {
+  const files: SourceFile[] = [];
+  const skipped = new Set(['node_modules', '.next', '.turbo', '.git', '.vercel']);
+  const walk = (dir: string): void => {
+    for (const entry of readdirSync(dir)) {
+      if (skipped.has(entry)) continue;
+      const full = join(dir, entry);
+      if (statSync(full).isDirectory()) {
+        walk(full);
+      } else if (/\.(ts|tsx|mts|mjs|js|jsx)$/.test(entry)) {
+        files.push({ path: relative(root, full), text: readFileSync(full, 'utf8') });
+      }
+    }
+  };
+  for (const relativeRoot of CALLER_ROOTS) {
+    const dir = join(root, relativeRoot);
+    if (existsSync(dir)) walk(dir);
+  }
+  return files;
+}
+
 const IDENTIFIER = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
 
 export function checkGlossaryReferences(

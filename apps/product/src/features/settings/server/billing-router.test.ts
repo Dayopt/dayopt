@@ -18,8 +18,6 @@ vi.mock('@/lib/supabase/oauth', () => ({
 vi.mock('./billing-service', () => ({
   getBillingInfo: vi.fn(),
   getBillingOverview: vi.fn(),
-  getPaymentMethod: vi.fn(),
-  getInvoices: vi.fn(),
   createCheckoutSession: vi.fn(),
   createPortalSession: vi.fn(),
   BillingServiceError: class BillingServiceError extends Error {
@@ -55,8 +53,8 @@ describe('billing-router', () => {
   });
 
   // 「未認証は UNAUTHORIZED」の契約は write-fence-coverage.test.ts が全 procedure 横断で
-  // 機械検証する（#2187 E-3）。ここでの個別 assert（getOverview / getInfo /
-  // createCheckoutSession の 3 件）は重複だったため削除した。
+  // 機械検証する（#2187 E-3）。ここでの個別 assert（getOverview /
+  // createCheckoutSession）は重複だったため削除した。
 
   describe('getOverview', () => {
     it('認証済みユーザーの課金情報を返す', async () => {

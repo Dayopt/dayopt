@@ -302,6 +302,7 @@ export const GLOSSARY: readonly GlossaryEntry[] = [
     en: 'Review',
     usage: 'ページ名・機能名。route は /report、i18n namespace も report',
     code: { feature: 'review', i18nNamespace: 'report' },
+    mcpTools: ['review.get'],
     note: 'feature dir / tRPC router は review、route と i18n namespace は report で割れている（コード識別子の整理は別 issue）',
     forbidden: [
       {
@@ -696,6 +697,49 @@ export const GLOSSARY: readonly GlossaryEntry[] = [
     usage:
       'free / trialing / active / past_due / canceled。値の意味は docs/product/specs/billing.md',
     db: ['profiles.subscription_status'],
+  },
+
+  // ─── feature 名（コード上の区画。UI 表記を持たないので layer: 'code'）───
+  // UI 用語ではなく `apps/product/src/features/*` の区画名。Architecture Inventory が
+  // 「この feature に属する router / store / Story / 画面」を辿る起点として使う。
+  // ここに無い feature は Inventory の未マッピングへ落ちる（それが検出の仕組み）。
+  {
+    id: 'calendar-surface',
+    layer: 'code',
+    status: 'current',
+    concept: 'Calendar surface',
+    usage:
+      'カレンダー画面そのものを組み立てる区画。表示モード・ナビゲーション・絞り込み・DnD・作成 UI を持ち、時間の中身は timeblock feature が持つ',
+    code: { feature: 'calendar', i18nNamespace: 'calendar' },
+    refs: ['docs/engineering/architecture.md'],
+  },
+  {
+    id: 'settings-surface',
+    layer: 'code',
+    status: 'current',
+    concept: 'Settings surface',
+    usage:
+      '設定画面の区画。アカウント / 表示 / データ / 課金 / 外部カレンダー / MCP 接続をまとめる composition で、他 feature を import してよい唯一の区画',
+    code: { feature: 'settings', i18nNamespace: 'settings' },
+    refs: ['AGENTS.md §アーキテクチャ'],
+  },
+  {
+    id: 'auth-surface',
+    layer: 'code',
+    status: 'current',
+    concept: 'Auth surface',
+    usage:
+      'サインイン / サインアップ / MFA / リカバリコード / アカウント削除の区画。他 feature に依存しない independent',
+    code: { feature: 'auth', i18nNamespace: 'auth' },
+    refs: ['docs/product/specs/auth.md'],
+  },
+  {
+    id: 'contact-surface',
+    layer: 'code',
+    status: 'current',
+    concept: 'Contact surface',
+    usage: '問い合わせフォームの区画。他 feature に依存しない independent',
+    code: { feature: 'contact', i18nNamespace: 'contact' },
   },
 ];
 

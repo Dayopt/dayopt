@@ -36,6 +36,7 @@ import { format as formatWithPrettier, resolveConfig as resolvePrettierConfig } 
 
 import { buildCallGraph, type CallGraph } from '../lib/architecture-map/call-graph.ts';
 import {
+  attributeRoutesByCallGraph,
   mapInventoryToConcepts,
   renderInventoryDocument,
 } from '../lib/architecture-map/concept-map.ts';
@@ -62,6 +63,7 @@ import { renderLikeC4Model, renderLikeC4Views } from '../lib/architecture-map/li
 import {
   checkGlossaryReferences,
   checkTimeRuleMirrorReferences,
+  collectCallerSources,
   collectProductSources,
   type ReferenceViolation,
 } from '../lib/architecture-map/references.ts';
@@ -73,6 +75,7 @@ import {
   parseTimeRulesSection,
   renderTimeRulesDiagram,
 } from '../lib/architecture-map/time-rules.ts';
+import { checkVocabularyScopeDeclarations } from '../lib/architecture-map/vocabulary-scope.ts';
 import { GLOSSARY } from '../lib/glossary/terms.ts';
 import { isDirectExecution } from '../lib/is-direct-execution.mjs';
 
@@ -226,15 +229,17 @@ export async function buildArchitectureMapDocs(): Promise<GeneratedDocument[]> {
   );
 
   const sources = collectProductSources(ROOT);
-  const items = discoverInventory(ROOT, sources, schema);
-  const conceptMap = mapInventoryToConcepts(items, GLOSSARY);
+  const discovered = discoverInventory(ROOT, sources, schema);
   const systemSurface = discoverSystemSurface(
     ROOT,
     sources,
-    items.filter((item) => item.kind === 'mcp-tool'),
+    discovered.filter((item) => item.kind === 'mcp-tool'),
   );
-  const relations = collectRelations(ROOT, sources, items);
-  const callGraph = buildProductCallGraph(items, sources, schema, relations.mcpToolFiles);
+  const relations = collectRelations(ROOT, sources, discovered, collectCallerSources(ROOT));
+  const callGraph = buildProductCallGraph(discovered, sources, schema, relations.mcpToolFiles);
+  // 画面の feature は call graph（画面 → procedure）が決めるので、概念の対応付けはその後に行う。
+  const items = attributeRoutesByCallGraph(discovered, callGraph.pages);
+  const conceptMap = mapInventoryToConcepts(items, GLOSSARY);
   const likec4Sources = {
     callGraph,
     map: conceptMap,
@@ -397,6 +402,10 @@ export function checkArchitectureReferences(): ReferenceViolation[] {
     ...checkGlossaryReferences(GLOSSARY, schema, sources, ROOT),
     ...checkTimeRuleMirrorReferences(timeRules.mirrors, sources),
     ...checkFeatureDagConsistency(dag).map((reason) => ({ source: 'feature-dag', reason })),
+    ...checkVocabularyScopeDeclarations(items).map((reason) => ({
+      source: 'vocabulary-scope',
+      reason,
+    })),
   ];
 }
 

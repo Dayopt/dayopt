@@ -12,14 +12,7 @@ import { createServiceRoleClient } from '@/lib/supabase/oauth';
 import { handleServiceError } from '@/lib/trpc/errors';
 import { createTRPCRouter, protectedProcedure } from '@/lib/trpc/procedures';
 
-import {
-  createCheckoutSession,
-  createPortalSession,
-  getBillingInfo,
-  getBillingOverview,
-  getInvoices,
-  getPaymentMethod,
-} from './billing-service';
+import { createCheckoutSession, createPortalSession, getBillingOverview } from './billing-service';
 
 const billingOperationInput = z
   .object({
@@ -50,19 +43,6 @@ export const billingRouter = createTRPCRouter({
       handleServiceError(error);
     }
   }),
-  /**
-   * 課金情報を取得
-   */
-  getInfo: protectedProcedure
-    .meta({ description: '課金情報取得（サブスクリプション状態）' })
-    .query(async ({ ctx }) => {
-      try {
-        return await getBillingInfo(ctx.supabase, ctx.userId);
-      } catch (error) {
-        handleServiceError(error);
-      }
-    }),
-
   /**
    * 課金情報を一括取得（N+1 解消）
    * billingInfo + paymentMethod + invoices を1回の profiles SELECT で返す
@@ -121,30 +101,6 @@ export const billingRouter = createTRPCRouter({
         handleServiceError(error);
       }
     }),
-
-  /**
-   * デフォルト支払い方法を取得
-   */
-  getPaymentMethod: protectedProcedure
-    .meta({ description: 'デフォルト支払い方法取得' })
-    .query(async ({ ctx }) => {
-      try {
-        return await getPaymentMethod(ctx.supabase, ctx.userId);
-      } catch (error) {
-        handleServiceError(error);
-      }
-    }),
-
-  /**
-   * 請求書一覧を取得
-   */
-  getInvoices: protectedProcedure.meta({ description: '請求書一覧取得' }).query(async ({ ctx }) => {
-    try {
-      return await getInvoices(ctx.supabase, ctx.userId);
-    } catch (error) {
-      handleServiceError(error);
-    }
-  }),
 
   /**
    * Stripe Customer Portal Session を作成し、URLを返す

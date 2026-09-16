@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  attributeRoutesByCallGraph,
   mapInventoryToConcepts,
   renderConceptDiagram,
   summarizeByKind,
@@ -27,6 +28,7 @@ import {
   discoverTrpcProcedures,
   discoverTrpcRouters,
   featureOf,
+  type InventoryItem,
   parseTableAliases,
 } from '../lib/architecture-map/inventory.ts';
 import {
@@ -63,6 +65,10 @@ import {
   parseTimeRulesSection,
   renderTimeRulesDiagram,
 } from '../lib/architecture-map/time-rules.ts';
+import {
+  checkVocabularyScopeDeclarations,
+  vocabularyExclusionReason,
+} from '../lib/architecture-map/vocabulary-scope.ts';
 import type { GlossaryEntry } from '../lib/glossary/core.ts';
 import {
   buildProductCallGraph,
@@ -598,13 +604,15 @@ describe('concept-map: 用語集で意味を付け、未マッピングを炙り
     ]);
   });
 
-  it('種別ごとの集計を出す', () => {
+  it('種別ごとの集計を出す。語彙を持たない層は候補と別に数える', () => {
+    // cron_heartbeats は usedBy が無い = app から触らないテーブルなので語彙対象外へ落ちる
     expect(summarizeByKind(map).find((s) => s.kind === 'table')).toEqual({
       kind: 'table',
       total: 2,
       direct: 1,
       viaFeature: 0,
-      unmapped: 1,
+      unmapped: 0,
+      outOfScope: 1,
     });
   });
 
@@ -614,6 +622,97 @@ describe('concept-map: 用語集で意味を付け、未マッピングを炙り
     expect(diagram).toContain('table_plans["DB テーブル<br/>plans"]');
     expect(diagram).toContain('mcp_tool_plans_list["MCP tool<br/>plans.list"]');
     expect(diagram).not.toContain('useTimeblockInspectorStore');
+  });
+
+  it('画面は call graph が出した procedure から feature を得て概念へ繋がる', () => {
+    const withProcedure = [
+      ...items,
+      {
+        kind: 'trpc-procedure' as const,
+        id: 'plans.list',
+        path: 'apps/product/src/features/timeblock/server/plans-router.ts',
+        feature: 'timeblock',
+      },
+    ];
+    const attributed = attributeRoutesByCallGraph(withProcedure, [
+      { route: '/[locale]/calendar', procedures: ['plans.list'] },
+    ]);
+    const route = attributed.find((item) => item.id === '/[locale]/calendar');
+    expect(route?.usedBy).toEqual(['timeblock']);
+    // usedBy が付いた結果、用語集の timeblock 概念（plan）へ feature 経由で辿れる
+    const linked = mapInventoryToConcepts(attributed, glossary).items.find(
+      (item) => item.id === '/[locale]/calendar',
+    );
+    expect(linked?.links).toEqual([{ conceptId: 'plan', via: 'feature' }]);
+  });
+
+  it('procedure が解決できない画面は据え置く（推測で feature を付けない）', () => {
+    const attributed = attributeRoutesByCallGraph(items, [
+      { route: '/[locale]/calendar', procedures: ['unknown.procedure'] },
+    ]);
+    expect(attributed.find((item) => item.id === '/[locale]/calendar')?.usedBy).toBeUndefined();
+  });
+});
+
+describe('vocabulary-scope: 概念が付かないことが正しい項目を分ける', () => {
+  const item = (overrides: Partial<InventoryItem> & Pick<InventoryItem, 'kind' | 'id'>) => ({
+    path: 'x',
+    ...overrides,
+  });
+
+  it('app から呼ばれない DB 関数は SQL 内部として除外する', () => {
+    expect(vocabularyExclusionReason(item({ kind: 'db-function', id: 'assert_x_v1' }))).toContain(
+      'SQL 内部',
+    );
+  });
+
+  it('利用元が app / lib だけの DB 関数は基盤として除外する', () => {
+    expect(
+      vocabularyExclusionReason(
+        item({ kind: 'db-function', id: 'claim_x_v1', usedBy: ['app', 'lib'] }),
+      ),
+    ).toContain('feature 横断の基盤');
+  });
+
+  it('feature から使われる DB 関数は候補に残す（概念を足せば繋がるため）', () => {
+    expect(
+      vocabularyExclusionReason(
+        item({ kind: 'db-function', id: 'claim_x_v1', usedBy: ['settings'] }),
+      ),
+    ).toBeUndefined();
+  });
+
+  it('認証 / OAuth の画面は下位 route まで除外する', () => {
+    expect(
+      vocabularyExclusionReason(item({ kind: 'route', id: '/[locale]/auth/login' })),
+    ).toContain('認証');
+    expect(
+      vocabularyExclusionReason(item({ kind: 'route', id: '/[locale]/calendar' })),
+    ).toBeUndefined();
+  });
+
+  it('feature に属さない Story だけを除外する', () => {
+    expect(
+      vocabularyExclusionReason(item({ kind: 'story', id: 'Product/Components/Ui' })),
+    ).toContain('共通 UI');
+    expect(
+      vocabularyExclusionReason(
+        item({ kind: 'story', id: 'Product/Calendar', feature: 'calendar' }),
+      ),
+    ).toBeUndefined();
+  });
+
+  it('実装から消えた宣言を検出する', () => {
+    // common / email などを 1 つも持たない inventory を渡すと、宣言が残っていることを報せる
+    const errors = checkVocabularyScopeDeclarations([
+      item({ kind: 'i18n-namespace', id: 'common' }),
+      item({ kind: 'route', id: '/[locale]' }),
+      item({ kind: 'route', id: '/[locale]/auth' }),
+      item({ kind: 'route', id: '/[locale]/oauth' }),
+      item({ kind: 'route', id: '/offline' }),
+    ]);
+    expect(errors.some((error) => error.includes("'legal'"))).toBe(true);
+    expect(errors.some((error) => error.includes("'common'"))).toBe(false);
   });
 });
 
@@ -977,7 +1076,7 @@ describe('relations: 呼び出し関係', () => {
     { kind: 'trpc-procedure' as const, id: 'plans.list', path: 'x/server/plans-router.ts' },
     {
       kind: 'trpc-procedure' as const,
-      id: 'billing.getInvoices',
+      id: 'billing.getLegacyInvoices',
       path: 'x/server/billing-router.ts',
     },
     {
@@ -999,11 +1098,11 @@ describe('relations: 呼び出し関係', () => {
       },
       {
         path: 'apps/product/src/features/settings/components/BillingSettings.stories.tsx',
-        text: 'api.billing.getInvoices.useQuery();',
+        text: 'api.billing.getLegacyInvoices.useQuery();',
       },
       {
         path: 'apps/product/src/features/settings/server/billing-router.ts',
-        text: 'export const billingRouter = createTRPCRouter({ getInvoices: protectedProcedure });',
+        text: 'export const billingRouter = createTRPCRouter({ getLegacyInvoices: protectedProcedure });',
       },
     ];
     const { usage, unused } = collectProcedureUsage(sources, procedures);
@@ -1011,7 +1110,7 @@ describe('relations: 呼び出し関係', () => {
     expect(byId.get('plans.list')?.callers.app).toHaveLength(1);
     expect(byId.get('activities.listActivities')?.callers.mcp).toHaveLength(1);
     // Story と router 定義そのものは呼び出し元に数えない
-    expect(unused).toEqual(['billing.getInvoices']);
+    expect(unused).toEqual(['billing.getLegacyInvoices']);
   });
 
   it('MCP registry の tool を file へ束ね、その file が呼ぶ procedure を出す', () => {

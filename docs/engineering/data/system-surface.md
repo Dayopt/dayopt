@@ -103,7 +103,7 @@ job 名を変数で渡す schedule と、jobid で消す unschedule は追えな
 
 | builder              | 使っている procedure 数 | 定義                                      |
 | -------------------- | ----------------------- | ----------------------------------------- |
-| `protectedProcedure` | 79                      | `apps/product/src/lib/trpc/procedures.ts` |
+| `protectedProcedure` | 68                      | `apps/product/src/lib/trpc/procedures.ts` |
 | `entitledProcedure`  | 4                       | `apps/product/src/lib/trpc/procedures.ts` |
 
 ### rate limit（21）
@@ -269,7 +269,7 @@ TS の `PRODUCT_EVENT_NAMES` と DB の CHECK 制約の両方で定義される�
 | `plans.list`, `records.list`                                                                                                             | `plans.list`, `records.list`                           | `apps/product/src/app/api/mcp/_tools/timeblock-list.ts`      |
 | `plans.create`, `plans.delete`, `plans.restore`, `plans.update`, `records.create`, `records.delete`, `records.restore`, `records.update` | tRPC を経由しない                                      | `apps/product/src/app/api/mcp/_tools/timeblock-mutations.ts` |
 
-### tRPC procedure の呼び出し元（83）
+### tRPC procedure の呼び出し元（72）
 
 呼び出し元は file 数。`api.x.y.useQuery` / `utils.x.y.invalidate` / `helpers.x.y.prefetch` /
 `trpc.x.y(`（MCP bridge）を数える。test と Story は数えない。
@@ -292,22 +292,12 @@ TS の `PRODUCT_EVENT_NAMES` と DB の CHECK 制約の両方で定義される�
 | `billing.createCheckoutSession`              | 1                   | 0                   |
 | `billing.createPortalSession`                | 3                   | 0                   |
 | `billing.getAccess`                          | 2                   | 0                   |
-| `billing.getInfo`                            | 0                   | 0                   |
-| `billing.getInvoices`                        | 0                   | 0                   |
 | `billing.getOverview`                        | 7                   | 0                   |
-| `billing.getPaymentMethod`                   | 0                   | 0                   |
 | `billing.startTrial`                         | 1                   | 0                   |
 | `contact.submit`                             | 1                   | 0                   |
-| `email.sendAccountDeletion`                  | 0                   | 0                   |
-| `email.sendCancellationConfirm`              | 0                   | 0                   |
 | `email.sendPasswordChanged`                  | 1                   | 0                   |
-| `email.sendPaymentFailed`                    | 0                   | 0                   |
-| `email.sendPaymentRecovered`                 | 0                   | 0                   |
-| `email.sendProStart`                         | 0                   | 0                   |
-| `email.sendTest`                             | 0                   | 0                   |
 | `email.sendTrialExpired`                     | 0                   | 0                   |
 | `email.sendTrialExpiring`                    | 0                   | 0                   |
-| `email.sendTrialStart`                       | 0                   | 0                   |
 | `email.sendWelcome`                          | 0                   | 0                   |
 | `externalCalendar.disconnect`                | 1                   | 0                   |
 | `externalCalendar.dismissEvent`              | 1                   | 0                   |
@@ -347,7 +337,6 @@ TS の `PRODUCT_EVENT_NAMES` と DB の CHECK 制約の両方で定義される�
 | `statistics.getMcpReview`                    | 0                   | 1                   |
 | `statistics.getTagEstimationFactors`         | 0                   | 0                   |
 | `timeblockContext.getConstraints`            | 0                   | 1                   |
-| `timeblockContext.getRevision`               | 0                   | 0                   |
 | `user.deleteAccount`                         | 1                   | 0                   |
 | `user.deleteAllData`                         | 1                   | 0                   |
 | `user.deleteBlocks`                          | 1                   | 0                   |
@@ -360,25 +349,19 @@ TS の `PRODUCT_EVENT_NAMES` と DB の CHECK 制約の両方で定義される�
 | `userSettings.update`                        | 1                   | 0                   |
 | `userSettings.updateProfile`                 | 2                   | 0                   |
 
-### どこからも呼ばれていない procedure（15）
+### どこからも呼ばれていない procedure（4）
 
-削除候補ではあるが、判断は別（外部契約に近いものがある）。ここは事実の提示だけ。
+削除候補ではあるが、判断は別（意図的な互換窓や、送信側が未実装のものがある）。ここは事実の提示だけ。
 
-- `billing.getInfo`
-- `billing.getInvoices`
-- `billing.getPaymentMethod`
-- `email.sendAccountDeletion`
-- `email.sendCancellationConfirm`
-- `email.sendPaymentFailed`
-- `email.sendPaymentRecovered`
-- `email.sendProStart`
-- `email.sendTest`
+走査範囲は `apps/product/src` / `apps/web/src` / `scripts` / `supabase/functions` の
+TS・JS。SQL と workflow YAML は呼び出し形が違うため見ていないので、**0 件は「この範囲に
+呼び出し元が無い」であって「未使用の証明」ではない**。消す前に公開契約（OAuth scope の
+allowlist、MCP registry）に載っていないかを併せて確かめる。
+
 - `email.sendTrialExpired`
 - `email.sendTrialExpiring`
-- `email.sendTrialStart`
 - `email.sendWelcome`
 - `statistics.getTagEstimationFactors`
-- `timeblockContext.getRevision`
 
 ### store の利用元
 
@@ -448,7 +431,7 @@ app から呼ぶ DB 関数 76 件のうち、integration test（TS / SQL）か�
 
 **test から呼ばれていない（15）**: `abandon_calendar_account_delete_revoke_v1`, `begin_calendar_account_deletion_v1`, `claim_stripe_webhook_event`, `clear_calendar_sync_cursor_command_v1`, `delete_all_user_data_command_v5`, `finalize_calendar_account_delete_revoke_v1`, `get_external_lifecycle_app_version_v3`, `get_timeblock_context_marker_v1`, `list_expired_calendar_account_deletion_intents_v1`, `normalize_calendar_account_deletion_intent_v1`, `prepare_calendar_account_delete_revoke_v1`, `prepare_user_data_purge_v1`, `replace_selected_calendars_command_v1`, `seal_calendar_account_deletion_v1`, `start_calendar_account_delete_provider_attempt_v1`
 
-### tRPC procedure → DB（78）
+### tRPC procedure → DB（68）
 
 型チェッカーで `procedure → service → .from() / .rpc()` を辿った結果。DI（`this.x.method`）や
 条件分岐で決まるテーブル名も解決する。ここに出ない procedure は DB を触らない。
@@ -471,21 +454,11 @@ app から呼ぶ DB 関数 76 件のうち、integration test（TS / SQL）か�
 | `billing.createCheckoutSession`            | `profiles`                                                                                                          | `abandon_billing_customer_provisioning_v2`, `claim_billing_customer_provisioning_v2`, `claim_billing_mutation_v3`, `complete_billing_customer_provisioning_v2`, `get_account_deletion_readiness_v1`, `get_external_lifecycle_app_version_v2`, `reconcile_billing_mutation_v4`, `start_billing_customer_provisioning_v2`, `start_billing_mutation_v2`                                                                                   |
 | `billing.createPortalSession`              | `profiles`                                                                                                          | `claim_billing_mutation_v3`, `get_account_deletion_readiness_v1`, `get_external_lifecycle_app_version_v2`, `reconcile_billing_mutation_v4`, `start_billing_mutation_v2`                                                                                                                                                                                                                                                                |
 | `billing.getAccess`                        | `profiles`                                                                                                          | —                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| `billing.getInfo`                          | `profiles`                                                                                                          | —                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| `billing.getInvoices`                      | `profiles`                                                                                                          | —                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | `billing.getOverview`                      | `profiles`                                                                                                          | —                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| `billing.getPaymentMethod`                 | `profiles`                                                                                                          | —                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | `billing.startTrial`                       | `product_events`, `profiles`                                                                                        | —                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| `email.sendAccountDeletion`                | `email_suppressions`, `user_settings`                                                                               | —                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| `email.sendCancellationConfirm`            | `email_suppressions`, `user_settings`                                                                               | —                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | `email.sendPasswordChanged`                | `email_suppressions`, `user_settings`                                                                               | —                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| `email.sendPaymentFailed`                  | `email_suppressions`, `user_settings`                                                                               | —                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| `email.sendPaymentRecovered`               | `email_suppressions`, `user_settings`                                                                               | —                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| `email.sendProStart`                       | `email_suppressions`, `user_settings`                                                                               | —                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| `email.sendTest`                           | `email_suppressions`                                                                                                | —                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | `email.sendTrialExpired`                   | `email_suppressions`, `user_settings`                                                                               | —                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | `email.sendTrialExpiring`                  | `email_suppressions`, `user_settings`                                                                               | —                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| `email.sendTrialStart`                     | `email_suppressions`, `user_settings`                                                                               | —                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | `email.sendWelcome`                        | `email_suppressions`, `user_settings`                                                                               | —                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | `externalCalendar.disconnect`              | `calendar_connections`, `external_calendar_events`, `plans`, `records`                                              | `get_external_lifecycle_app_version_v2`, `get_external_lifecycle_app_version_v3`                                                                                                                                                                                                                                                                                                                                                       |
 | `externalCalendar.dismissEvent`            | `external_calendar_events`, `profiles`                                                                              | —                                                                                                                                                                                                                                                                                                                                                                                                                                      |

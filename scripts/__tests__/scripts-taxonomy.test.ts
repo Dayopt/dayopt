@@ -39,6 +39,7 @@ const KNOWN_PLACEMENT_EXCEPTIONS = new Set<string>([
   'scripts/tasks/docs-guard/checks/decisions-append-only.ts',
   'scripts/tasks/docs-guard/checks/frontmatter-check.ts',
   'scripts/tasks/docs-guard/checks/glossary-sync.ts',
+  'scripts/tasks/docs-guard/checks/likec4-validate.ts',
   'scripts/tasks/docs-guard/checks/link-check.ts',
   'scripts/tasks/docs-guard/checks/naming-check.ts',
   'scripts/tasks/docs-guard/config.ts',
@@ -77,6 +78,10 @@ const KNOWN_PLACEMENT_EXCEPTIONS = new Set<string>([
   // 案内であって実行手順ではない（storage-objects-app-policy-names.mjs と同型）。
   'scripts/lib/glossary/core.ts',
   'scripts/lib/glossary/terms.ts',
+  // vocabulary-scope.ts: concept-map.ts / likec4-model.ts から import される lib だが、
+  // architecture.md と生成物が「判定規則はここが持つ」と名指しするため docs 参照が
+  // 先に当たって runbook 判定になる。terms.ts と同型（読者への案内であって手順ではない）。
+  'scripts/lib/architecture-map/vocabulary-scope.ts',
   'scripts/lib/scripts-taxonomy.ts',
   // protected-path-gate.mjs: impact.mjs（scripts/ci/、同じ --stdin 呼び出し規約）と
   // 同型で、finish-branch.sh から node 経由で呼ばれる ci unit。skill docs（audit-ai-

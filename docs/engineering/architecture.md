@@ -373,7 +373,7 @@ USING (auth.uid() = user_id);
 Dayopt は Supabase（PostgreSQL）を使用する。本番は Pro organization の `dayopt` project、PR ごとの検証は ephemeral Preview Branches を使い、永続 Staging project は置かない。
 RLS の正確な対象・policy・grant は自動生成の [`data/db/rls-snapshot.md`](./data/db/rls-snapshot.md) を正とする。
 
-実装から自動発見した項目（feature / テーブル / 関数 / router / procedure / MCP tool / store / Story / route / i18n）と用語集の概念との対応、および未マッピング項目は [`data/architecture-inventory.md`](./data/architecture-inventory.md)（生成物）を見る。
+実装から自動発見した項目（feature / テーブル / 関数 / router / procedure / MCP tool / store / Story / route / i18n）と用語集の概念との対応は [`data/architecture-inventory.md`](./data/architecture-inventory.md)（生成物）を見る。概念が付いていない項目は「概念を足す候補」と「語彙を持たない層」に分かれており、後者の判定規則は `scripts/lib/architecture-map/vocabulary-scope.ts` が持つ。
 
 外部との接点（HTTP route / 定期実行 / Edge Function）、権限と上限（OAuth scope / procedure builder / rate limit）、DB エラーコード、分析イベント、env 変数、package、および呼び出し関係（MCP tool → procedure、procedure の利用元と未使用、store の利用元、docs → feature、E2E → route、DB 関数の test 被覆）は [`data/system-surface.md`](./data/system-surface.md)（生成物）を見る。
 
