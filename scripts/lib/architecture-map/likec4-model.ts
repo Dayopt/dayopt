@@ -17,6 +17,7 @@ import type { InventoryKind } from './inventory.ts';
 import type { Relations } from './relations.ts';
 import type { SchemaModel } from './schema-model.ts';
 import type { SystemSurface } from './surface.ts';
+import { vocabularyExclusionReason } from './vocabulary-scope.ts';
 
 const KIND_PREFIX: Partial<Record<InventoryKind, string>> = {
   feature: 'f',
@@ -119,7 +120,11 @@ export function renderLikeC4Model({
             ? 'mcptool'
             : item.kind;
     out.push(`  ${kind} ${id} ${quote(item.id)} {`);
-    if (item.links.length === 0) out.push('    #unmapped');
+    // 語彙を持たないことが正しい要素（SQL 内部・認証の定型画面など）は #unmapped を付けない。
+    // 全部に付けると view が数百要素になり、判断すべき要素が読めなくなる。
+    if (item.links.length === 0 && vocabularyExclusionReason(item) === undefined) {
+      out.push('    #unmapped');
+    }
     // `kind` は LikeC4 の予約語（where kind is ...）なので metadata のキーに使えない
     const meta = [`inventoryKind ${quote(item.kind)}`];
     if (item.feature) meta.push(`feature ${quote(item.feature)}`);
@@ -296,7 +301,7 @@ export function renderLikeC4Views({ map, glossary }: LikeC4Sources): string {
   out.push('    autoLayout LeftRight');
   out.push('  }');
   out.push('  view unmapped {');
-  out.push("    title '未マッピング（どの概念からも辿れない要素）'");
+  out.push("    title '概念を足す候補（語彙を持たない層は除く）'");
   out.push('    include * where tag is #unmapped');
   out.push('    autoLayout TopBottom');
   out.push('  }');
