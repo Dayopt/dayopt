@@ -101,22 +101,39 @@ model {
     metadata { glossary 'subscription-status' layer 'code' }
     link ../../../../scripts/lib/glossary/terms.ts
   }
+  concept c_calendar-surface 'Calendar surface' {
+    description 'カレンダー画面そのものを組み立てる区画。表示モード・ナビゲーション・絞り込み・DnD・作成 UI を持ち、時間の中身は timeblock feature が持つ'
+    metadata { glossary 'calendar-surface' layer 'code' }
+    link ../../../../scripts/lib/glossary/terms.ts
+  }
+  concept c_settings-surface 'Settings surface' {
+    description '設定画面の区画。アカウント / 表示 / データ / 課金 / 外部カレンダー / MCP 接続をまとめる composition で、他 feature を import してよい唯一の区画'
+    metadata { glossary 'settings-surface' layer 'code' }
+    link ../../../../scripts/lib/glossary/terms.ts
+  }
+  concept c_auth-surface 'Auth surface' {
+    description 'サインイン / サインアップ / MFA / リカバリコード / アカウント削除の区画。他 feature に依存しない independent'
+    metadata { glossary 'auth-surface' layer 'code' }
+    link ../../../../scripts/lib/glossary/terms.ts
+  }
+  concept c_contact-surface 'Contact surface' {
+    description '問い合わせフォームの区画。他 feature に依存しない independent'
+    metadata { glossary 'contact-surface' layer 'code' }
+    link ../../../../scripts/lib/glossary/terms.ts
+  }
   feature f_activities 'activities' {
     metadata { inventoryKind 'feature' }
     link ../../../../apps/product/src/features/activities
   }
   feature f_auth 'auth' {
-    #unmapped
     metadata { inventoryKind 'feature' }
     link ../../../../apps/product/src/features/auth
   }
   feature f_calendar 'calendar' {
-    #unmapped
     metadata { inventoryKind 'feature' }
     link ../../../../apps/product/src/features/calendar
   }
   feature f_contact 'contact' {
-    #unmapped
     metadata { inventoryKind 'feature' }
     link ../../../../apps/product/src/features/contact
   }
@@ -129,7 +146,6 @@ model {
     link ../../../../apps/product/src/features/review
   }
   feature f_settings 'settings' {
-    #unmapped
     metadata { inventoryKind 'feature' }
     link ../../../../apps/product/src/features/settings
   }
@@ -154,12 +170,10 @@ model {
     link ../../../../supabase/migrations
   }
   table t_cron_heartbeats 'cron_heartbeats' {
-    #unmapped
     metadata { inventoryKind 'table' detail 'used by lib' }
     link ../../../../supabase/migrations
   }
   table t_email_suppressions 'email_suppressions' {
-    #unmapped
     metadata { inventoryKind 'table' detail 'used by app, lib' }
     link ../../../../supabase/migrations
   }
@@ -168,42 +182,34 @@ model {
     link ../../../../supabase/migrations
   }
   table t_mcp_environment_identity 'mcp_environment_identity' {
-    #unmapped
     metadata { inventoryKind 'table' detail 'app からの直接アクセスなし' }
     link ../../../../supabase/migrations
   }
   table t_mcp_mutation_control 'mcp_mutation_control' {
-    #unmapped
     metadata { inventoryKind 'table' detail 'used by lib' }
     link ../../../../supabase/migrations
   }
   table t_mcp_mutation_receipts 'mcp_mutation_receipts' {
-    #unmapped
     metadata { inventoryKind 'table' detail 'app からの直接アクセスなし' }
     link ../../../../supabase/migrations
   }
   table t_mfa_recovery_codes 'mfa_recovery_codes' {
-    #unmapped
     metadata { inventoryKind 'table' detail 'used by auth' }
     link ../../../../supabase/migrations
   }
   table t_oauth_audit_log 'oauth_audit_log' {
-    #unmapped
     metadata { inventoryKind 'table' detail 'app からの直接アクセスなし' }
     link ../../../../supabase/migrations
   }
   table t_oauth_authorization_codes 'oauth_authorization_codes' {
-    #unmapped
     metadata { inventoryKind 'table' detail 'app からの直接アクセスなし' }
     link ../../../../supabase/migrations
   }
   table t_oauth_connections 'oauth_connections' {
-    #unmapped
     metadata { inventoryKind 'table' detail 'used by lib, settings' }
     link ../../../../supabase/migrations
   }
   table t_oauth_tokens 'oauth_tokens' {
-    #unmapped
     metadata { inventoryKind 'table' detail 'used by lib' }
     link ../../../../supabase/migrations
   }
@@ -220,7 +226,6 @@ model {
     link ../../../../supabase/migrations
   }
   table t_product_events 'product_events' {
-    #unmapped
     metadata { inventoryKind 'table' detail 'used by lib' }
     link ../../../../supabase/migrations
   }
@@ -233,7 +238,6 @@ model {
     link ../../../../supabase/migrations
   }
   table t_reports 'reports' {
-    #unmapped
     metadata { inventoryKind 'table' detail 'app からの直接アクセスなし' }
     link ../../../../supabase/migrations
   }
@@ -246,22 +250,18 @@ model {
     link ../../../../supabase/migrations
   }
   table t_stripe_webhook_events 'stripe_webhook_events' {
-    #unmapped
     metadata { inventoryKind 'table' detail 'used by app, settings' }
     link ../../../../supabase/migrations
   }
   table t_undo_receipt_effects 'undo_receipt_effects' {
-    #unmapped
     metadata { inventoryKind 'table' detail 'app からの直接アクセスなし' }
     link ../../../../supabase/migrations
   }
   table t_undo_receipt_field_changes 'undo_receipt_field_changes' {
-    #unmapped
     metadata { inventoryKind 'table' detail 'app からの直接アクセスなし' }
     link ../../../../supabase/migrations
   }
   table t_undo_receipts 'undo_receipts' {
-    #unmapped
     metadata { inventoryKind 'table' detail 'app からの直接アクセスなし' }
     link ../../../../supabase/migrations
   }
@@ -270,17 +270,14 @@ model {
     link ../../../../supabase/migrations
   }
   table t_write_fence_control 'write_fence_control' {
-    #unmapped
     metadata { inventoryKind 'table' detail 'used by lib' }
     link ../../../../supabase/migrations
   }
   dbfunction fn_abandon_billing_customer_provisioning_v1 'abandon_billing_customer_provisioning_v1' {
-    #unmapped
     metadata { inventoryKind 'db-function' detail 'app からの .rpc 呼び出しなし' }
     link ../../../../supabase/migrations
   }
   dbfunction fn_abandon_billing_customer_provisioning_v2 'abandon_billing_customer_provisioning_v2' {
-    #unmapped
     metadata { inventoryKind 'db-function' detail 'used by settings' }
     link ../../../../supabase/migrations
   }
@@ -321,37 +318,30 @@ model {
     link ../../../../supabase/migrations
   }
   dbfunction fn_apply_undo_receipt_v1 'apply_undo_receipt_v1' {
-    #unmapped
     metadata { inventoryKind 'db-function' detail 'app からの .rpc 呼び出しなし' }
     link ../../../../supabase/migrations
   }
   dbfunction fn_assert_active_timeblock_activity_v1 'assert_active_timeblock_activity_v1' {
-    #unmapped
     metadata { inventoryKind 'db-function' detail 'app からの .rpc 呼び出しなし' }
     link ../../../../supabase/migrations
   }
   dbfunction fn_assert_timeblock_content_v1 'assert_timeblock_content_v1' {
-    #unmapped
     metadata { inventoryKind 'db-function' detail 'app からの .rpc 呼び出しなし' }
     link ../../../../supabase/migrations
   }
   dbfunction fn_assert_timeblock_external_event_v1 'assert_timeblock_external_event_v1' {
-    #unmapped
     metadata { inventoryKind 'db-function' detail 'app からの .rpc 呼び出しなし' }
     link ../../../../supabase/migrations
   }
   dbfunction fn_authorize_owned_storage_read_v1 'authorize_owned_storage_read_v1' {
-    #unmapped
     metadata { inventoryKind 'db-function' detail 'app からの .rpc 呼び出しなし' }
     link ../../../../supabase/migrations
   }
   dbfunction fn_authorize_owned_storage_write_v1 'authorize_owned_storage_write_v1' {
-    #unmapped
     metadata { inventoryKind 'db-function' detail 'app からの .rpc 呼び出しなし' }
     link ../../../../supabase/migrations
   }
   dbfunction fn_begin_account_deletion_v1 'begin_account_deletion_v1' {
-    #unmapped
     metadata { inventoryKind 'db-function' detail 'used by app' }
     link ../../../../supabase/migrations
   }
@@ -360,7 +350,6 @@ model {
     link ../../../../supabase/migrations
   }
   dbfunction fn_begin_calendar_oauth_attempt_v1 'begin_calendar_oauth_attempt_v1' {
-    #unmapped
     metadata { inventoryKind 'db-function' detail 'app からの .rpc 呼び出しなし' }
     link ../../../../supabase/migrations
   }
@@ -369,52 +358,42 @@ model {
     link ../../../../supabase/migrations
   }
   dbfunction fn_bind_billing_account_deletion_v1 'bind_billing_account_deletion_v1' {
-    #unmapped
     metadata { inventoryKind 'db-function' detail 'used by app' }
     link ../../../../supabase/migrations
   }
   dbfunction fn_bind_calendar_account_deletion_v1 'bind_calendar_account_deletion_v1' {
-    #unmapped
     metadata { inventoryKind 'db-function' detail 'used by app' }
     link ../../../../supabase/migrations
   }
   dbfunction fn_cancel_calendar_account_deletion_v1 'cancel_calendar_account_deletion_v1' {
-    #unmapped
     metadata { inventoryKind 'db-function' detail 'app からの .rpc 呼び出しなし' }
     link ../../../../supabase/migrations
   }
   dbfunction fn_claim_account_deletion_step_v1 'claim_account_deletion_step_v1' {
-    #unmapped
     metadata { inventoryKind 'db-function' detail 'used by app' }
     link ../../../../supabase/migrations
   }
   dbfunction fn_claim_billing_customer_provisioning_v1 'claim_billing_customer_provisioning_v1' {
-    #unmapped
     metadata { inventoryKind 'db-function' detail 'app からの .rpc 呼び出しなし' }
     link ../../../../supabase/migrations
   }
   dbfunction fn_claim_billing_customer_provisioning_v2 'claim_billing_customer_provisioning_v2' {
-    #unmapped
     metadata { inventoryKind 'db-function' detail 'used by settings' }
     link ../../../../supabase/migrations
   }
   dbfunction fn_claim_billing_mutation_v2 'claim_billing_mutation_v2' {
-    #unmapped
     metadata { inventoryKind 'db-function' detail 'app からの .rpc 呼び出しなし' }
     link ../../../../supabase/migrations
   }
   dbfunction fn_claim_billing_mutation_v3 'claim_billing_mutation_v3' {
-    #unmapped
     metadata { inventoryKind 'db-function' detail 'used by settings' }
     link ../../../../supabase/migrations
   }
   dbfunction fn_claim_calendar_oauth_attempt_v1 'claim_calendar_oauth_attempt_v1' {
-    #unmapped
     metadata { inventoryKind 'db-function' detail 'app からの .rpc 呼び出しなし' }
     link ../../../../supabase/migrations
   }
   dbfunction fn_claim_calendar_revoke_direct_attempt_v1 'claim_calendar_revoke_direct_attempt_v1' {
-    #unmapped
     metadata { inventoryKind 'db-function' detail 'app からの .rpc 呼び出しなし' }
     link ../../../../supabase/migrations
   }
@@ -423,72 +402,58 @@ model {
     link ../../../../supabase/migrations
   }
   dbfunction fn_claim_calendar_revoke_outbox_v2 'claim_calendar_revoke_outbox_v2' {
-    #unmapped
     metadata { inventoryKind 'db-function' detail 'app からの .rpc 呼び出しなし' }
     link ../../../../supabase/migrations
   }
   dbfunction fn_claim_stripe_webhook_event 'claim_stripe_webhook_event' {
-    #unmapped
     metadata { inventoryKind 'db-function' detail 'used by app' }
     link ../../../../supabase/migrations
   }
   dbfunction fn_classify_billing_customer_event_v1 'classify_billing_customer_event_v1' {
-    #unmapped
     metadata { inventoryKind 'db-function' detail 'used by settings' }
     link ../../../../supabase/migrations
   }
   dbfunction fn_cleanup_billing_account_deletion_terminal_receipts_v2 'cleanup_billing_account_deletion_terminal_receipts_v2' {
-    #unmapped
     metadata { inventoryKind 'db-function' detail 'used by settings' }
     link ../../../../supabase/migrations
   }
   dbfunction fn_cleanup_billing_mutation_claims_v1 'cleanup_billing_mutation_claims_v1' {
-    #unmapped
     metadata { inventoryKind 'db-function' detail 'app からの .rpc 呼び出しなし' }
     link ../../../../supabase/migrations
   }
   dbfunction fn_cleanup_billing_mutation_claims_v2 'cleanup_billing_mutation_claims_v2' {
-    #unmapped
     metadata { inventoryKind 'db-function' detail 'used by settings' }
     link ../../../../supabase/migrations
   }
   dbfunction fn_cleanup_calendar_authority_retention_v1 'cleanup_calendar_authority_retention_v1' {
-    #unmapped
     metadata { inventoryKind 'db-function' detail 'app からの .rpc 呼び出しなし' }
     link ../../../../supabase/migrations
   }
   dbfunction fn_cleanup_calendar_revoke_operations_v1 'cleanup_calendar_revoke_operations_v1' {
-    #unmapped
     metadata { inventoryKind 'db-function' detail 'app からの .rpc 呼び出しなし' }
     link ../../../../supabase/migrations
   }
   dbfunction fn_cleanup_integration_security_events_v1 'cleanup_integration_security_events_v1' {
-    #unmapped
     metadata { inventoryKind 'db-function' detail 'app からの .rpc 呼び出しなし' }
     link ../../../../supabase/migrations
   }
   dbfunction fn_cleanup_mcp_mutation_receipts_v1 'cleanup_mcp_mutation_receipts_v1' {
-    #unmapped
     metadata { inventoryKind 'db-function' detail 'app からの .rpc 呼び出しなし' }
     link ../../../../supabase/migrations
   }
   dbfunction fn_cleanup_oauth_access_tokens_v1 'cleanup_oauth_access_tokens_v1' {
-    #unmapped
     metadata { inventoryKind 'db-function' detail 'app からの .rpc 呼び出しなし' }
     link ../../../../supabase/migrations
   }
   dbfunction fn_cleanup_oauth_authorization_codes_v1 'cleanup_oauth_authorization_codes_v1' {
-    #unmapped
     metadata { inventoryKind 'db-function' detail 'app からの .rpc 呼び出しなし' }
     link ../../../../supabase/migrations
   }
   dbfunction fn_cleanup_oauth_connections_v1 'cleanup_oauth_connections_v1' {
-    #unmapped
     metadata { inventoryKind 'db-function' detail 'app からの .rpc 呼び出しなし' }
     link ../../../../supabase/migrations
   }
   dbfunction fn_cleanup_oauth_refresh_tokens_v1 'cleanup_oauth_refresh_tokens_v1' {
-    #unmapped
     metadata { inventoryKind 'db-function' detail 'app からの .rpc 呼び出しなし' }
     link ../../../../supabase/migrations
   }
@@ -497,17 +462,14 @@ model {
     link ../../../../supabase/migrations
   }
   dbfunction fn_complete_account_deletion_step_v1 'complete_account_deletion_step_v1' {
-    #unmapped
     metadata { inventoryKind 'db-function' detail 'used by app' }
     link ../../../../supabase/migrations
   }
   dbfunction fn_complete_billing_customer_provisioning_v1 'complete_billing_customer_provisioning_v1' {
-    #unmapped
     metadata { inventoryKind 'db-function' detail 'app からの .rpc 呼び出しなし' }
     link ../../../../supabase/migrations
   }
   dbfunction fn_complete_billing_customer_provisioning_v2 'complete_billing_customer_provisioning_v2' {
-    #unmapped
     metadata { inventoryKind 'db-function' detail 'used by settings' }
     link ../../../../supabase/migrations
   }
@@ -520,17 +482,14 @@ model {
     link ../../../../supabase/migrations
   }
   dbfunction fn_confirm_day_plans_to_records 'confirm_day_plans_to_records' {
-    #unmapped
     metadata { inventoryKind 'db-function' detail 'app からの .rpc 呼び出しなし' }
     link ../../../../supabase/migrations
   }
   dbfunction fn_count_unused_recovery_codes 'count_unused_recovery_codes' {
-    #unmapped
     metadata { inventoryKind 'db-function' detail 'used by auth, settings' }
     link ../../../../supabase/migrations
   }
   dbfunction fn_create_oauth_authorization_grant_v2 'create_oauth_authorization_grant_v2' {
-    #unmapped
     metadata { inventoryKind 'db-function' detail 'used by app' }
     link ../../../../supabase/migrations
   }
@@ -547,17 +506,14 @@ model {
     link ../../../../supabase/migrations
   }
   dbfunction fn_custom_access_token_hook 'custom_access_token_hook' {
-    #unmapped
     metadata { inventoryKind 'db-function' detail 'app からの .rpc 呼び出しなし' }
     link ../../../../supabase/migrations
   }
   dbfunction fn_delete_all_user_data_command_v3 'delete_all_user_data_command_v3' {
-    #unmapped
     metadata { inventoryKind 'db-function' detail 'app からの .rpc 呼び出しなし' }
     link ../../../../supabase/migrations
   }
   dbfunction fn_delete_all_user_data_command_v4 'delete_all_user_data_command_v4' {
-    #unmapped
     metadata { inventoryKind 'db-function' detail 'app からの .rpc 呼び出しなし' }
     link ../../../../supabase/migrations
   }
@@ -574,22 +530,18 @@ model {
     link ../../../../supabase/migrations
   }
   dbfunction fn_disconnect_calendar_connection_command_v1 'disconnect_calendar_connection_command_v1' {
-    #unmapped
     metadata { inventoryKind 'db-function' detail 'app からの .rpc 呼び出しなし' }
     link ../../../../supabase/migrations
   }
   dbfunction fn_exchange_oauth_authorization_code_v2 'exchange_oauth_authorization_code_v2' {
-    #unmapped
     metadata { inventoryKind 'db-function' detail 'used by lib' }
     link ../../../../supabase/migrations
   }
   dbfunction fn_expire_calendar_revoke_authority_v2 'expire_calendar_revoke_authority_v2' {
-    #unmapped
     metadata { inventoryKind 'db-function' detail 'app からの .rpc 呼び出しなし' }
     link ../../../../supabase/migrations
   }
   dbfunction fn_expire_calendar_revoke_authority_v3 'expire_calendar_revoke_authority_v3' {
-    #unmapped
     metadata { inventoryKind 'db-function' detail 'app からの .rpc 呼び出しなし' }
     link ../../../../supabase/migrations
   }
@@ -602,12 +554,10 @@ model {
     link ../../../../supabase/migrations
   }
   dbfunction fn_finalize_calendar_revoke_attempt_v2 'finalize_calendar_revoke_attempt_v2' {
-    #unmapped
     metadata { inventoryKind 'db-function' detail 'app からの .rpc 呼び出しなし' }
     link ../../../../supabase/migrations
   }
   dbfunction fn_finalize_calendar_revoke_guards_v1 'finalize_calendar_revoke_guards_v1' {
-    #unmapped
     metadata { inventoryKind 'db-function' detail 'app からの .rpc 呼び出しなし' }
     link ../../../../supabase/migrations
   }
@@ -616,12 +566,10 @@ model {
     link ../../../../supabase/migrations
   }
   dbfunction fn_get_account_deletion_customer_recovery_v1 'get_account_deletion_customer_recovery_v1' {
-    #unmapped
     metadata { inventoryKind 'db-function' detail 'used by settings' }
     link ../../../../supabase/migrations
   }
   dbfunction fn_get_account_deletion_readiness_v1 'get_account_deletion_readiness_v1' {
-    #unmapped
     metadata { inventoryKind 'db-function' detail 'used by app, settings' }
     link ../../../../supabase/migrations
   }
@@ -630,12 +578,10 @@ model {
     link ../../../../supabase/migrations
   }
   dbfunction fn_get_external_authority_maintenance_status_v1 'get_external_authority_maintenance_status_v1' {
-    #unmapped
     metadata { inventoryKind 'db-function' detail 'used by app' }
     link ../../../../supabase/migrations
   }
   dbfunction fn_get_external_lifecycle_app_version_v1 'get_external_lifecycle_app_version_v1' {
-    #unmapped
     metadata { inventoryKind 'db-function' detail 'app からの .rpc 呼び出しなし' }
     link ../../../../supabase/migrations
   }
@@ -644,12 +590,10 @@ model {
     link ../../../../supabase/migrations
   }
   dbfunction fn_get_external_lifecycle_app_version_v3 'get_external_lifecycle_app_version_v3' {
-    #unmapped
     metadata { inventoryKind 'db-function' detail 'used by lib' }
     link ../../../../supabase/migrations
   }
   dbfunction fn_get_mcp_environment_identity_v1 'get_mcp_environment_identity_v1' {
-    #unmapped
     metadata { inventoryKind 'db-function' detail 'used by app, lib' }
     link ../../../../supabase/migrations
   }
@@ -658,42 +602,34 @@ model {
     link ../../../../supabase/migrations
   }
   dbfunction fn_get_user_data_generation_v1 'get_user_data_generation_v1' {
-    #unmapped
     metadata { inventoryKind 'db-function' detail 'app からの .rpc 呼び出しなし' }
     link ../../../../supabase/migrations
   }
   dbfunction fn_get_user_timezone 'get_user_timezone' {
-    #unmapped
     metadata { inventoryKind 'db-function' detail 'app からの .rpc 呼び出しなし' }
     link ../../../../supabase/migrations
   }
   dbfunction fn_get_vault_secret 'get_vault_secret' {
-    #unmapped
     metadata { inventoryKind 'db-function' detail 'app からの .rpc 呼び出しなし' }
     link ../../../../supabase/migrations
   }
   dbfunction fn_invoke_edge_function 'invoke_edge_function' {
-    #unmapped
     metadata { inventoryKind 'db-function' detail 'app からの .rpc 呼び出しなし' }
     link ../../../../supabase/migrations
   }
   dbfunction fn_issue_oauth_token_pair 'issue_oauth_token_pair' {
-    #unmapped
     metadata { inventoryKind 'db-function' detail 'app からの .rpc 呼び出しなし' }
     link ../../../../supabase/migrations
   }
   dbfunction fn_list_expired_calendar_account_deletion_intents_v1 'list_expired_calendar_account_deletion_intents_v1' {
-    #unmapped
     metadata { inventoryKind 'db-function' detail 'used by app' }
     link ../../../../supabase/migrations
   }
   dbfunction fn_list_undoable_receipts_v1 'list_undoable_receipts_v1' {
-    #unmapped
     metadata { inventoryKind 'db-function' detail 'app からの .rpc 呼び出しなし' }
     link ../../../../supabase/migrations
   }
   dbfunction fn_lock_recordable_plan_v1 'lock_recordable_plan_v1' {
-    #unmapped
     metadata { inventoryKind 'db-function' detail 'app からの .rpc 呼び出しなし' }
     link ../../../../supabase/migrations
   }
@@ -702,12 +638,10 @@ model {
     link ../../../../supabase/migrations
   }
   dbfunction fn_mark_calendar_connection_reauth_command_v3 'mark_calendar_connection_reauth_command_v3' {
-    #unmapped
     metadata { inventoryKind 'db-function' detail 'app からの .rpc 呼び出しなし' }
     link ../../../../supabase/migrations
   }
   dbfunction fn_normalize_calendar_account_deletion_intent_v1 'normalize_calendar_account_deletion_intent_v1' {
-    #unmapped
     metadata { inventoryKind 'db-function' detail 'used by app' }
     link ../../../../supabase/migrations
   }
@@ -724,7 +658,6 @@ model {
     link ../../../../supabase/migrations
   }
   dbfunction fn_prepare_calendar_token_rotation_recovery_command_v2 'prepare_calendar_token_rotation_recovery_command_v2' {
-    #unmapped
     metadata { inventoryKind 'db-function' detail 'app からの .rpc 呼び出しなし' }
     link ../../../../supabase/migrations
   }
@@ -733,27 +666,22 @@ model {
     link ../../../../supabase/migrations
   }
   dbfunction fn_provision_calendar_authority_project_v1 'provision_calendar_authority_project_v1' {
-    #unmapped
     metadata { inventoryKind 'db-function' detail 'app からの .rpc 呼び出しなし' }
     link ../../../../supabase/migrations
   }
   dbfunction fn_provision_mcp_preview_environment_identity_v1 'provision_mcp_preview_environment_identity_v1' {
-    #unmapped
     metadata { inventoryKind 'db-function' detail 'app からの .rpc 呼び出しなし' }
     link ../../../../supabase/migrations
   }
   dbfunction fn_reconcile_billing_mutation_v2 'reconcile_billing_mutation_v2' {
-    #unmapped
     metadata { inventoryKind 'db-function' detail 'app からの .rpc 呼び出しなし' }
     link ../../../../supabase/migrations
   }
   dbfunction fn_reconcile_billing_mutation_v3 'reconcile_billing_mutation_v3' {
-    #unmapped
     metadata { inventoryKind 'db-function' detail 'app からの .rpc 呼び出しなし' }
     link ../../../../supabase/migrations
   }
   dbfunction fn_reconcile_billing_mutation_v4 'reconcile_billing_mutation_v4' {
-    #unmapped
     metadata { inventoryKind 'db-function' detail 'used by settings' }
     link ../../../../supabase/migrations
   }
@@ -762,12 +690,10 @@ model {
     link ../../../../supabase/migrations
   }
   dbfunction fn_record_undo_receipt_v1 'record_undo_receipt_v1' {
-    #unmapped
     metadata { inventoryKind 'db-function' detail 'app からの .rpc 呼び出しなし' }
     link ../../../../supabase/migrations
   }
   dbfunction fn_replace_mfa_recovery_codes_v1 'replace_mfa_recovery_codes_v1' {
-    #unmapped
     metadata { inventoryKind 'db-function' detail 'used by settings' }
     link ../../../../supabase/migrations
   }
@@ -776,7 +702,6 @@ model {
     link ../../../../supabase/migrations
   }
   dbfunction fn_restore_plan 'restore_plan' {
-    #unmapped
     metadata { inventoryKind 'db-function' detail 'app からの .rpc 呼び出しなし' }
     link ../../../../supabase/migrations
   }
@@ -785,7 +710,6 @@ model {
     link ../../../../supabase/migrations
   }
   dbfunction fn_restore_record 'restore_record' {
-    #unmapped
     metadata { inventoryKind 'db-function' detail 'app からの .rpc 呼び出しなし' }
     link ../../../../supabase/migrations
   }
@@ -798,12 +722,10 @@ model {
     link ../../../../supabase/migrations
   }
   dbfunction fn_revoke_oauth_connection 'revoke_oauth_connection' {
-    #unmapped
     metadata { inventoryKind 'db-function' detail 'used by settings' }
     link ../../../../supabase/migrations
   }
   dbfunction fn_rotate_oauth_refresh_token_v2 'rotate_oauth_refresh_token_v2' {
-    #unmapped
     metadata { inventoryKind 'db-function' detail 'used by lib' }
     link ../../../../supabase/migrations
   }
@@ -812,27 +734,22 @@ model {
     link ../../../../supabase/migrations
   }
   dbfunction fn_rotate_or_enqueue_calendar_refresh_token_command_v3 'rotate_or_enqueue_calendar_refresh_token_command_v3' {
-    #unmapped
     metadata { inventoryKind 'db-function' detail 'app からの .rpc 呼び出しなし' }
     link ../../../../supabase/migrations
   }
   dbfunction fn_save_calendar_connection_command_v1 'save_calendar_connection_command_v1' {
-    #unmapped
     metadata { inventoryKind 'db-function' detail 'app からの .rpc 呼び出しなし' }
     link ../../../../supabase/migrations
   }
   dbfunction fn_save_calendar_connection_command_v2 'save_calendar_connection_command_v2' {
-    #unmapped
     metadata { inventoryKind 'db-function' detail 'app からの .rpc 呼び出しなし' }
     link ../../../../supabase/migrations
   }
   dbfunction fn_seal_account_deletion_v1 'seal_account_deletion_v1' {
-    #unmapped
     metadata { inventoryKind 'db-function' detail 'used by app' }
     link ../../../../supabase/migrations
   }
   dbfunction fn_seal_billing_account_deletion_v1 'seal_billing_account_deletion_v1' {
-    #unmapped
     metadata { inventoryKind 'db-function' detail 'used by app' }
     link ../../../../supabase/migrations
   }
@@ -841,47 +758,38 @@ model {
     link ../../../../supabase/migrations
   }
   dbfunction fn_set_mcp_billing_enforcement_v1 'set_mcp_billing_enforcement_v1' {
-    #unmapped
     metadata { inventoryKind 'db-function' detail 'app からの .rpc 呼び出しなし' }
     link ../../../../supabase/migrations
   }
   dbfunction fn_set_mcp_client_write_control_v1 'set_mcp_client_write_control_v1' {
-    #unmapped
     metadata { inventoryKind 'db-function' detail 'app からの .rpc 呼び出しなし' }
     link ../../../../supabase/migrations
   }
   dbfunction fn_set_mcp_mutation_control_v1 'set_mcp_mutation_control_v1' {
-    #unmapped
     metadata { inventoryKind 'db-function' detail 'app からの .rpc 呼び出しなし' }
     link ../../../../supabase/migrations
   }
   dbfunction fn_set_plan_skipped_command_v1 'set_plan_skipped_command_v1' {
-    #unmapped
     metadata { inventoryKind 'db-function' detail 'app からの .rpc 呼び出しなし' }
     link ../../../../supabase/migrations
   }
   dbfunction fn_soft_delete_plan 'soft_delete_plan' {
-    #unmapped
     metadata { inventoryKind 'db-function' detail 'app からの .rpc 呼び出しなし' }
     link ../../../../supabase/migrations
   }
   dbfunction fn_soft_delete_record 'soft_delete_record' {
-    #unmapped
     metadata { inventoryKind 'db-function' detail 'app からの .rpc 呼び出しなし' }
     link ../../../../supabase/migrations
   }
   dbfunction fn_start_billing_customer_provisioning_v1 'start_billing_customer_provisioning_v1' {
-    #unmapped
     metadata { inventoryKind 'db-function' detail 'app からの .rpc 呼び出しなし' }
     link ../../../../supabase/migrations
   }
   dbfunction fn_start_billing_customer_provisioning_v2 'start_billing_customer_provisioning_v2' {
-    #unmapped
     metadata { inventoryKind 'db-function' detail 'used by settings' }
     link ../../../../supabase/migrations
   }
   dbfunction fn_start_billing_mutation_v2 'start_billing_mutation_v2' {
-    #unmapped
     metadata { inventoryKind 'db-function' detail 'used by settings' }
     link ../../../../supabase/migrations
   }
@@ -890,17 +798,14 @@ model {
     link ../../../../supabase/migrations
   }
   dbfunction fn_sync_billing_subscription_deleted_v1 'sync_billing_subscription_deleted_v1' {
-    #unmapped
     metadata { inventoryKind 'db-function' detail 'used by settings' }
     link ../../../../supabase/migrations
   }
   dbfunction fn_trunc_week_tz 'trunc_week_tz' {
-    #unmapped
     metadata { inventoryKind 'db-function' detail 'app からの .rpc 呼び出しなし' }
     link ../../../../supabase/migrations
   }
   dbfunction fn_update_personalization 'update_personalization' {
-    #unmapped
     metadata { inventoryKind 'db-function' detail 'used by settings' }
     link ../../../../supabase/migrations
   }
@@ -913,12 +818,10 @@ model {
     link ../../../../supabase/migrations
   }
   dbfunction fn_use_recovery_code 'use_recovery_code' {
-    #unmapped
     metadata { inventoryKind 'db-function' detail 'used by auth' }
     link ../../../../supabase/migrations
   }
   dbfunction fn_vault_secret_exists 'vault_secret_exists' {
-    #unmapped
     metadata { inventoryKind 'db-function' detail 'app からの .rpc 呼び出しなし' }
     link ../../../../supabase/migrations
   }
@@ -927,12 +830,10 @@ model {
     link ../../../../apps/product/src/features/activities/server/router.ts
   }
   router r_billing 'billing' {
-    #unmapped
     metadata { inventoryKind 'trpc-router' feature 'settings' detail 'billingRouter' }
     link ../../../../apps/product/src/features/settings/server/billing-router.ts
   }
   router r_contact 'contact' {
-    #unmapped
     metadata { inventoryKind 'trpc-router' feature 'contact' detail 'contactRouter' }
     link ../../../../apps/product/src/features/contact/server/router.ts
   }
@@ -946,7 +847,6 @@ model {
     link ../../../../apps/product/src/features/external-calendar/server/router.ts
   }
   router r_mcpConnections 'mcpConnections' {
-    #unmapped
     metadata { inventoryKind 'trpc-router' feature 'settings' detail 'mcpConnectionsRouter' }
     link ../../../../apps/product/src/features/settings/server/mcp-connections-router.ts
   }
@@ -983,12 +883,10 @@ model {
     link ../../../../apps/product/src/features/timeblock/server/timeblock-context-router.ts
   }
   router r_user 'user' {
-    #unmapped
     metadata { inventoryKind 'trpc-router' feature 'auth' detail 'userRouter' }
     link ../../../../apps/product/src/features/auth/server/router.ts
   }
   router r_userSettings 'userSettings' {
-    #unmapped
     metadata { inventoryKind 'trpc-router' feature 'settings' detail 'userSettingsRouter' }
     link ../../../../apps/product/src/features/settings/server/router.ts
   }
@@ -1065,47 +963,38 @@ model {
     link ../../../../apps/product/src/app/api/mcp/_tools/registry.ts
   }
   mcptool mcp_review_get 'review.get' {
-    #unmapped
     metadata { inventoryKind 'mcp-tool' detail 'read:stats' }
     link ../../../../apps/product/src/app/api/mcp/_tools/registry.ts
   }
   store s_useActivitySortStore 'useActivitySortStore' {
-    #unmapped
     metadata { inventoryKind 'store' feature 'calendar' }
     link ../../../../apps/product/src/features/calendar/stores/useActivitySortStore.ts
   }
   store s_useAuthStore 'useAuthStore' {
-    #unmapped
     metadata { inventoryKind 'store' feature 'auth' }
     link ../../../../apps/product/src/features/auth/stores/useAuthStore.ts
   }
   store s_useBillingPollStore 'useBillingPollStore' {
-    #unmapped
     metadata { inventoryKind 'store' feature 'settings' }
     link ../../../../apps/product/src/features/settings/stores/useBillingPollStore.ts
   }
   store s_useCalendarDisplayModeStore 'useCalendarDisplayModeStore' {
-    #unmapped
     metadata { inventoryKind 'store' feature 'calendar' }
     link ../../../../apps/product/src/features/calendar/stores/useCalendarDisplayModeStore.ts
   }
   store s_useCalendarDragStore 'useCalendarDragStore' {
-    #unmapped
     metadata { inventoryKind 'store' feature 'calendar' }
     link ../../../../apps/product/src/features/calendar/stores/useCalendarDragStore.ts
   }
   store s_useCalendarFilterStore 'useCalendarFilterStore' {
-    #unmapped
     metadata { inventoryKind 'store' feature 'calendar' }
     link ../../../../apps/product/src/features/calendar/stores/useCalendarFilterStore.ts
   }
   store s_useCalendarNavigationStore 'useCalendarNavigationStore' {
-    #unmapped
     metadata { inventoryKind 'store' feature 'calendar' }
     link ../../../../apps/product/src/features/calendar/stores/useCalendarNavigationStore.ts
   }
   store s_useInlineCreateStore 'useInlineCreateStore' {
-    #unmapped
     metadata { inventoryKind 'store' feature 'calendar' }
     link ../../../../apps/product/src/features/calendar/stores/useInlineCreateStore.ts
   }
@@ -1123,12 +1012,10 @@ model {
     link ../../../../apps/product/src/lib/stores/useShellStore.ts
   }
   store s_useTemplateSaveStore 'useTemplateSaveStore' {
-    #unmapped
     metadata { inventoryKind 'store' feature 'calendar' }
     link ../../../../apps/product/src/features/calendar/stores/useTemplateSaveStore.ts
   }
   store s_useTimeblockClipboardStore 'useTimeblockClipboardStore' {
-    #unmapped
     metadata { inventoryKind 'store' feature 'calendar' }
     link ../../../../apps/product/src/features/calendar/stores/useTimeblockClipboardStore.ts
   }
@@ -1362,6 +1249,7 @@ model {
   c_plan-template -> t_plan_template_blocks 'direct'
   c_plan-template -> t_plan_templates 'direct'
   c_review -> f_review 'direct'
+  c_review -> mcp_review_get 'direct'
   c_inspector -> f_timeblock 'direct'
   c_archive -> t_activities 'direct'
   c_archive -> t_categories 'direct'
@@ -1377,6 +1265,10 @@ model {
   c_note-vs-description -> t_plans 'direct'
   c_note-vs-description -> t_records 'direct'
   c_subscription-status -> t_profiles 'direct'
+  c_calendar-surface -> f_calendar 'direct'
+  c_settings-surface -> f_settings 'direct'
+  c_auth-surface -> f_auth 'direct'
+  c_contact-surface -> f_contact 'direct'
   f_calendar -> f_activities 'imports'
   f_calendar -> f_external-calendar 'imports'
   f_calendar -> f_timeblock 'imports'

@@ -16,6 +16,7 @@ import {
   type InventoryItem,
   type InventoryKind,
 } from './inventory.ts';
+import { vocabularyExclusionReason } from './vocabulary-scope.ts';
 
 export interface ConceptLink {
   conceptId: string;
@@ -95,12 +96,53 @@ export function mapInventoryToConcepts(
   return { items: mapped, byConcept };
 }
 
+/**
+ * 画面（route）に利用元 feature を付ける。
+ *
+ * route は file 位置からも用語集からも feature が決まらないので、素のままでは 16 件全部が
+ * 未マッピングへ落ちる。call graph が出した「画面 → 使う procedure」を procedure の所属
+ * feature へ畳み、`usedBy` として与える（`mapInventoryToConcepts` はそこから概念を辿る）。
+ *
+ * PageProcedures を構造的に受け取り call-graph.ts へは依存しない（この層は型チェッカーを
+ * 持ち込まずに単体で試せることを保つ）。
+ */
+export function attributeRoutesByCallGraph(
+  items: readonly InventoryItem[],
+  pages: readonly { route: string; procedures: readonly string[] }[],
+): InventoryItem[] {
+  const featureOfProcedure = new Map<string, string>();
+  for (const item of items) {
+    if (item.kind === 'trpc-procedure' && item.feature !== undefined) {
+      featureOfProcedure.set(item.id, item.feature);
+    }
+  }
+  const featuresOfRoute = new Map<string, string[]>();
+  for (const page of pages) {
+    const features = new Set<string>();
+    for (const procedure of page.procedures) {
+      const feature = featureOfProcedure.get(procedure);
+      if (feature !== undefined) features.add(feature);
+    }
+    if (features.size > 0) featuresOfRoute.set(page.route, [...features].sort());
+  }
+
+  return items.map((item) => {
+    if (item.kind !== 'route') return item;
+    const features = featuresOfRoute.get(item.id);
+    if (features === undefined) return item;
+    const usedBy = [...new Set([...(item.usedBy ?? []), ...features])].sort();
+    return { ...item, usedBy, detail: `uses ${usedBy.join(', ')}` };
+  });
+}
+
 export interface KindSummary {
   kind: InventoryKind;
   total: number;
   direct: number;
   viaFeature: number;
   unmapped: number;
+  /** 未マッピングのうち、語彙を持たないことが正しいもの */
+  outOfScope: number;
 }
 
 export function summarizeByKind(map: ConceptMap): KindSummary[] {
@@ -110,12 +152,15 @@ export function summarizeByKind(map: ConceptMap): KindSummary[] {
     const viaOnly = items.filter(
       (item) => item.links.length > 0 && !item.links.some((link) => link.via === 'direct'),
     );
+    const unmapped = items.filter((item) => item.links.length === 0);
+    const outOfScope = unmapped.filter((item) => vocabularyExclusionReason(item) !== undefined);
     return {
       kind,
       total: items.length,
       direct: direct.length,
       viaFeature: viaOnly.length,
-      unmapped: items.length - direct.length - viaOnly.length,
+      unmapped: unmapped.length - outOfScope.length,
+      outOfScope: outOfScope.length,
     };
   }).filter((summary) => summary.total > 0);
 }
@@ -153,16 +198,17 @@ export function renderInventoryDocument(
   out.push('# Architecture Inventory（自動生成）', '', header, '');
   out.push(
     '実装から自動発見した項目（事実）と、用語集（`scripts/lib/glossary/terms.ts`）が与える意味の対応。',
-    '「未マッピング」は、どの概念からも辿れない項目。用語集へ 1 行足すか、実装を消すかを人間が判断する。',
+    'どの概念からも辿れない項目は 2 つに分かれる。**概念を足す候補**（用語集へ 1 行足すか実装を消すかを人間が判断する）と、',
+    '**語彙を持たない層**（SQL 内部・認証の定型画面・共通 UI など、概念が付かないことが正しいもの）。',
     '',
   );
 
   out.push('## 概要', '');
-  out.push('| 種別 | 件数 | 概念へ直接 | feature 経由のみ | 未マッピング |');
-  out.push('| --- | --- | --- | --- | --- |');
+  out.push('| 種別 | 件数 | 概念へ直接 | feature 経由のみ | 語彙を持たない層 | 概念を足す候補 |');
+  out.push('| --- | --- | --- | --- | --- | --- |');
   for (const summary of summarizeByKind(map)) {
     out.push(
-      `| ${INVENTORY_KIND_LABELS[summary.kind]} | ${summary.total} | ${summary.direct} | ${summary.viaFeature} | ${summary.unmapped} |`,
+      `| ${INVENTORY_KIND_LABELS[summary.kind]} | ${summary.total} | ${summary.direct} | ${summary.viaFeature} | ${summary.outOfScope} | ${summary.unmapped} |`,
     );
   }
   out.push('');
@@ -197,16 +243,51 @@ export function renderInventoryDocument(
     out.push('');
   }
 
-  out.push('## 未マッピング', '');
   const unmapped = map.items.filter((item) => item.links.length === 0);
-  if (unmapped.length === 0) {
+  const candidates = unmapped.filter((item) => vocabularyExclusionReason(item) === undefined);
+  const outOfScope = unmapped.filter((item) => vocabularyExclusionReason(item) !== undefined);
+
+  out.push('## 概念を足す候補', '');
+  out.push(
+    'どの概念からも辿れず、かつ「語彙を持たない層」にも当たらない項目。',
+    '用語集へ 1 行足すか、実装を消すかを人間が判断する。',
+    '',
+  );
+  if (candidates.length === 0) {
     out.push('なし。', '');
   } else {
     out.push('| 種別 | 項目 | 発見元 | 補足 |', '| --- | --- | --- | --- |');
-    for (const item of unmapped) {
+    for (const item of candidates) {
       out.push(
         `| ${INVENTORY_KIND_LABELS[item.kind]} | ${code(item.id)} | ${code(item.path)} | ${item.detail ?? '—'} |`,
       );
+    }
+    out.push('');
+  }
+
+  out.push('## 語彙を持たない層（意図的）', '');
+  out.push(
+    '概念が付かないことが正しい項目。判定規則は `scripts/lib/architecture-map/vocabulary-scope.ts` が持つ。',
+    'ここに落ちるのが誤りだと思ったら、規則の方を直す（表を手で編集しない）。',
+    '',
+  );
+  if (outOfScope.length === 0) {
+    out.push('なし。', '');
+  } else {
+    const byReason = new Map<string, MappedItem[]>();
+    for (const item of outOfScope) {
+      const reason = vocabularyExclusionReason(item) ?? '';
+      byReason.set(reason, [...(byReason.get(reason) ?? []), item]);
+    }
+    out.push('| 理由 | 種別 | 件数 | 項目 |', '| --- | --- | --- | --- |');
+    for (const [reason, rows] of byReason) {
+      for (const kind of INVENTORY_KINDS) {
+        const ofKind = rows.filter((item) => item.kind === kind);
+        if (ofKind.length === 0) continue;
+        out.push(
+          `| ${reason} | ${INVENTORY_KIND_LABELS[kind]} | ${ofKind.length} | ${ofKind.map((item) => code(item.id)).join(', ')} |`,
+        );
+      }
     }
     out.push('');
   }
