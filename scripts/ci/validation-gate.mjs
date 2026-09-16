@@ -44,20 +44,23 @@ export function createGithubApi({ execFileImpl } = {}) {
   };
 }
 
+/**
+ * trusted event が指す commit。workflow_run と status はどちらも default branch の定義でしか
+ * 走らない event（docs: "only trigger a workflow run if the workflow file exists on the default branch"）。
+ */
+export function eventShaOf(eventName, event) {
+  if (eventName === 'workflow_run') return event?.workflow_run?.head_sha ?? null;
+  if (eventName === 'status') return event?.sha ?? null;
+  return null;
+}
+
 /** event から評価対象 PR を決める。PR 番号が取れなければ null（評価しない）。 */
 export function resolveTarget({ eventName, event, prArg, repository, api }) {
   if (prArg !== undefined) {
     const number = Number(prArg);
     return Number.isSafeInteger(number) && number > 0 ? { number, source: 'dispatch' } : null;
   }
-  // workflow_run と status はどちらも default branch の定義でしか走らない event
-  // （docs: "only trigger a workflow run if the workflow file exists on the default branch"）。
-  const sha =
-    eventName === 'workflow_run'
-      ? (event?.workflow_run?.head_sha ?? null)
-      : eventName === 'status'
-        ? (event?.sha ?? null)
-        : null;
+  const sha = eventShaOf(eventName, event);
   if (!SHA.test(sha ?? '')) return null;
   // stacked branch では commit を含む open PR が複数返る。head がその commit である PR だけを
   // 対象にする（祖先として含むだけの PR を選ぶと stale 判定で skip され、本来の PR が再評価されない）。
@@ -316,22 +319,21 @@ export function runValidationGate({
   const event = env.GITHUB_EVENT_PATH
     ? JSON.parse(readFileSync(env.GITHUB_EVENT_PATH, 'utf8'))
     : {};
-  const target = resolveTarget({ eventName: env.GITHUB_EVENT_NAME, event, prArg, repository, api });
-  if (!target) return { skipped: 'no open PR for this event', result: null };
-  const pr = api(`repos/${repository}/pulls/${target.number}`);
-  // 古い event（head が進んだ後に届いた完了通知）は評価しない。新しい head の event が別に来る。
-  if (target.eventSha !== undefined && target.eventSha !== pr.head.sha)
-    return { skipped: `event head ${target.eventSha} superseded by ${pr.head.sha}`, result: null };
-  const publishable = publish && TRUSTED_EVENTS.has(env.GITHUB_EVENT_NAME ?? '');
+  // trusted event から SHA を先に確保する（API に触る前）。以降の PR 解決・取得・収集・評価の
+  // どこで例外が起きても、この SHA へ failure を試行できる（Codex P2、3 巡）。
+  const eventSha = eventShaOf(env.GITHUB_EVENT_NAME, event);
+  const publishable =
+    publish && TRUSTED_EVENTS.has(env.GITHUB_EVENT_NAME ?? '') && SHA.test(eventSha ?? '');
   const runUrl = env.GITHUB_RUN_ID
     ? `${env.GITHUB_SERVER_URL ?? 'https://github.com'}/${repository}/actions/runs/${env.GITHUB_RUN_ID}`
     : '';
+  let statusSha = eventSha;
   const post = (context, status) =>
     postStatus([
       'api',
       '--method',
       'POST',
-      `repos/${repository}/statuses/${pr.head.sha}`,
+      `repos/${repository}/statuses/${statusSha}`,
       '-f',
       `state=${status.state}`,
       '-f',
@@ -340,16 +342,34 @@ export function runValidationGate({
       `description=${status.description.slice(0, 140)}`,
       ...(runUrl ? ['-f', `target_url=${runUrl}`] : []),
     ]);
-  // fail closed: 評価開始時に pending を置き、収集・評価（pending の発行自体も含む）が例外で
-  // 落ちても failure の発行を試みてから再 throw する。これが無いと、同じ head の以前の success が
-  // 最新 status として残り偽の green になる（Codex P2、2 巡）。
+  // fail closed: 対象 PR の解決から評価までを 1 つの try に置き、pending を置いた後はもちろん
+  // 置く前の例外でも failure の発行を試みてから再 throw する。これが無いと、同じ head の以前の
+  // success が最新 status として残り偽の green になる（Codex P2、2〜3 巡）。open PR が無い
+  // event（main への production deployment の status 等）では何も発行しない。
+  let pr = null;
   try {
+    const target = resolveTarget({
+      eventName: env.GITHUB_EVENT_NAME,
+      event,
+      prArg,
+      repository,
+      api,
+    });
+    if (!target) return { skipped: 'no open PR for this event', result: null };
+    pr = api(`repos/${repository}/pulls/${target.number}`);
+    // 古い event（head が進んだ後に届いた完了通知）は評価しない。新しい head の event が別に来る。
+    if (target.eventSha !== undefined && target.eventSha !== pr.head.sha)
+      return {
+        skipped: `event head ${target.eventSha} superseded by ${pr.head.sha}`,
+        result: null,
+      };
+    statusSha = pr.head.sha;
     if (publishable)
       post(VALIDATION_STATUS_CONTEXT, {
         state: 'pending',
         description: 'Evaluating trusted evidence',
       });
-    return evaluateAndPublish();
+    return evaluateAndPublish(target, pr);
   } catch (error) {
     const message = error instanceof Error ? error.message : 'evaluation failed';
     if (publishable)
@@ -364,7 +384,7 @@ export function runValidationGate({
     throw error;
   }
 
-  function evaluateAndPublish() {
+  function evaluateAndPublish(target, pr) {
     const plan = buildTrustedPlan({ repository, pr, policySha, cwd, fetchImpl });
     // Vercel Preview は CI 完了より遅れて success になる。deployment_status を trigger に
     // できない（PR 側の workflow 定義で走る）ため、pending の間だけ bounded に待って再取得する。

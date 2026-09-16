@@ -546,6 +546,57 @@ describe('validation gate controller', () => {
     ]);
   });
 
+  it('publishes failure to the event SHA when PR resolution itself fails', () => {
+    const posted: string[][] = [];
+    expect(() =>
+      runValidationGate({
+        env: env({
+          GITHUB_EVENT_NAME: 'workflow_run',
+          GITHUB_EVENT_PATH: writeEvent({ workflow_run: { head_sha: headSha } }),
+        }),
+        argv: [],
+        api: () => {
+          throw new Error('HTTP 502 on pulls');
+        },
+        cwd,
+        fetchImpl: () => {},
+        output: () => {},
+        postStatus: (args) => {
+          posted.push(args);
+          return '';
+        },
+      }),
+    ).toThrow('HTTP 502 on pulls');
+    expect(posted).toHaveLength(1);
+    expect(posted[0]).toContain(`repos/${REPO}/statuses/${headSha}`);
+    expect(posted[0]).toContain('state=failure');
+  });
+
+  it('publishes nothing for a trusted event without an open PR (main commits)', () => {
+    const { api } = fakeApi({ [`repos/${REPO}/commits/${headSha}/pulls?per_page=100`]: [] });
+    const posted: string[][] = [];
+    runValidationGate({
+      env: env({
+        GITHUB_EVENT_NAME: 'status',
+        GITHUB_EVENT_PATH: writeEvent({
+          sha: headSha,
+          context: 'Vercel – product',
+          state: 'success',
+        }),
+      }),
+      argv: [],
+      api,
+      cwd,
+      fetchImpl: () => {},
+      output: () => {},
+      postStatus: (args) => {
+        posted.push(args);
+        return '';
+      },
+    });
+    expect(posted).toHaveLength(0);
+  });
+
   it('re-evaluates from a Vercel status event and publishes', () => {
     const { api } = fakeApi();
     const posted: string[][] = [];
