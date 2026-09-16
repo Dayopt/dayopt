@@ -245,7 +245,7 @@ TS の `PRODUCT_EVENT_NAMES` と DB の CHECK 制約の両方で定義される�
 | package                 | exports                                          | 依存している workspace                                |
 | ----------------------- | ------------------------------------------------ | ----------------------------------------------------- |
 | `@dayopt/billing`       | `.`                                              | `@dayopt/product`, `@dayopt/web`                      |
-| `@dayopt/components`    | `.`                                              | `@dayopt/product`, `@dayopt/storybook`, `@dayopt/web` |
+| `@dayopt/components`    | `.`, `./testing/modal-menu`                      | `@dayopt/product`, `@dayopt/storybook`, `@dayopt/web` |
 | `@dayopt/config`        | `.`                                              | `@dayopt/i18n`, `@dayopt/product`, `@dayopt/web`      |
 | `@dayopt/foundations`   | `./og-colors`, `./scrollbar.css`, `./tokens.css` | `@dayopt/product`, `@dayopt/storybook`, `@dayopt/web` |
 | `@dayopt/i18n`          | `./navigation`, `./request`, `./routing`         | `@dayopt/product`, `@dayopt/web`                      |

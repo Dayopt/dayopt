@@ -82,7 +82,7 @@ export const MobileTouchHint = memo(function MobileTouchHint({ className }: Mobi
       <div className="flex items-start gap-4">
         <div className="flex-1">
           <p className="text-sm font-normal">{t('mobile.touchHint.title')}</p>
-          <p className="mt-1 text-xs opacity-90">{t('mobile.touchHint.description')}</p>
+          <p className="mt-1 text-xs">{t('mobile.touchHint.description')}</p>
         </div>
         <button
           type="button"
