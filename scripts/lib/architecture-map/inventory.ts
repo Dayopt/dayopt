@@ -388,7 +388,7 @@ export function discoverInventory(
     items.push({
       kind: 'table',
       id: table.name,
-      path: 'supabase/migrations',
+      path: 'apps/product/src/lib/database/generated/database.types.ts',
       usedBy,
       detail: usedBy.length > 0 ? `used by ${usedBy.join(', ')}` : 'app からの直接アクセスなし',
     });
@@ -399,7 +399,7 @@ export function discoverInventory(
     items.push({
       kind: 'db-function',
       id: fn,
-      path: 'supabase/migrations',
+      path: 'apps/product/src/lib/database/generated/database.types.ts',
       usedBy,
       detail: usedBy.length > 0 ? `used by ${usedBy.join(', ')}` : 'app からの .rpc 呼び出しなし',
     });

@@ -12,6 +12,7 @@
 import type { GlossaryEntry } from '../glossary/core.ts';
 import type { CallGraph } from './call-graph.ts';
 import type { ConceptMap, MappedItem } from './concept-map.ts';
+import { conceptAnchor } from './concept-navigation.ts';
 import type { FeatureDag } from './feature-dag.ts';
 import type { InventoryKind } from './inventory.ts';
 import type { Relations } from './relations.ts';
@@ -103,6 +104,9 @@ export function renderLikeC4Model({
     out.push(`    description ${quote(entry.usage)}`);
     out.push(`    metadata { glossary ${quote(entry.id)} layer ${quote(entry.layer)} }`);
     out.push(`    link ${REPO_ROOT_PREFIX}scripts/lib/glossary/terms.ts`);
+    out.push(
+      `    link https://github.com/Dayopt/dayopt/blob/main/docs/engineering/data/architecture-inventory.md#${conceptAnchor(entry.id)} '関連候補（main）'`,
+    );
     out.push('  }');
   }
 

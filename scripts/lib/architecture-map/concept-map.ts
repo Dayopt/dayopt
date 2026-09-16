@@ -11,6 +11,13 @@
 
 import type { GlossaryEntry } from '../glossary/core.ts';
 import {
+  conceptAnchor,
+  renderConceptNavigation,
+  sourceLink,
+  type ConceptNavigation,
+} from './concept-navigation.ts';
+import type { FeatureDependency } from './feature-dag.ts';
+import {
   INVENTORY_KIND_LABELS,
   INVENTORY_KINDS,
   type InventoryItem,
@@ -193,6 +200,8 @@ export function renderInventoryDocument(
   map: ConceptMap,
   glossary: readonly GlossaryEntry[],
   header: string,
+  navigation: ConceptNavigation = new Map(),
+  dependencies: readonly FeatureDependency[] = [],
 ): string {
   const out: string[] = [];
   out.push('# Architecture Inventory（自動生成）', '', header, '');
@@ -213,18 +222,46 @@ export function renderInventoryDocument(
   }
   out.push('');
 
-  out.push('## 概念 → 実装', '');
+  out.push(
+    '## 探索の入口',
+    '',
+    '関連候補の索引です。feature 経由は同じ所属から広く拾っており、変更の影響やテストの十分性を保証しません。',
+    'Story のリンクは実 Story のソースです。UI の実状態は既存 Storybook でその title を開いて確認します。',
+    'DB のリンクは migration から生成された型定義です。Production の実測ではありません。',
+    '',
+  );
+  for (const entry of glossary) {
+    if ((map.byConcept.get(entry.id) ?? []).length > 0)
+      out.push(`- [${entry.concept}](#${conceptAnchor(entry.id)})`);
+  }
+  out.push('', '## 概念 → 実装', '');
   out.push('用語集の順。直接対応する項目を図に、feature 経由を含む全項目を表に出す。', '');
   for (const entry of glossary) {
     const items = map.byConcept.get(entry.id) ?? [];
     if (items.length === 0) continue;
     const direct = items.filter((item) => isDirectFor(item, entry.id));
+    out.push(`<a id="${conceptAnchor(entry.id)}"></a>`, '');
     out.push(`### ${entry.concept}（${code(entry.id)}）`, '');
     out.push(entry.usage, '');
+    const dependencyFeatures = new Set(
+      dependencies.filter((edge) => edge.from === entry.code?.feature).map((edge) => edge.to),
+    );
+    const related = glossary.filter(
+      (candidate) =>
+        candidate.code?.feature !== undefined &&
+        dependencyFeatures.has(candidate.code.feature) &&
+        (map.byConcept.get(candidate.id) ?? []).length > 0,
+    );
+    if (related.length > 0)
+      out.push(
+        `依存先の概念（実 import に基づく。DB・API 等は各概念から辿る）: ${related.map((candidate) => `[${candidate.concept}](#${conceptAnchor(candidate.id)})`).join(' / ')}`,
+        '',
+      );
     if (direct.length > 0) {
       out.push('```mermaid', renderConceptDiagram(entry, items), '```', '');
     }
-    out.push('| 種別 | 項目 | 経路 |', '| --- | --- | --- |');
+    // 長いリンク列の桁揃えで生成物を膨らませない（GitHub で読む索引）。
+    out.push('<!-- prettier-ignore -->', '| 種別 | 項目 | 経路 |', '| --- | --- | --- |');
     for (const kind of INVENTORY_KINDS) {
       const ofKind = items.filter((item) => item.kind === kind);
       if (ofKind.length === 0) continue;
@@ -235,12 +272,14 @@ export function renderInventoryDocument(
         [viaRows, 'feature 経由'],
       ] as const) {
         if (rows.length === 0) continue;
-        out.push(
-          `| ${INVENTORY_KIND_LABELS[kind]} | ${rows.map((item) => code(item.id)).join(', ')} | ${label} |`,
-        );
+        for (const item of rows) {
+          out.push(
+            `| ${INVENTORY_KIND_LABELS[kind]} | ${sourceLink(item.path, item.id)} | ${label} |`,
+          );
+        }
       }
     }
-    out.push('');
+    out.push('', ...renderConceptNavigation(navigation.get(entry.id) ?? []));
   }
 
   const unmapped = map.items.filter((item) => item.links.length === 0);

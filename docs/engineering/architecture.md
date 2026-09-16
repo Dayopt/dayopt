@@ -10,6 +10,8 @@ Dayopt のシステム構成、データフロー、DB スキーマ、技術選�
 
 ---
 
+概念から変更候補を調べる入口: [Architecture Inventory](./data/architecture-inventory.md#探索の入口)。Plan / Record / Activity / Calendar surface から DB・API・UI/Story・テスト・docs の実ファイルへ辿れる。[更新と図の表示手順](./data/architecture/README.md)も参照。
+
 ## 技術スタック
 
 ここでは役割と採用理由だけを扱う。正確なversionはrootと各workspaceの`package.json`、DB runtimeはSupabase Dashboardを正とする。
