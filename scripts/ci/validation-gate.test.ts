@@ -301,10 +301,11 @@ describe('validation gate controller', () => {
     expect(outcome.result?.verdict).toBe('pass');
     expect(outcome.result?.suites.integration.status).toBe('not-applicable');
     expect(outcome.result?.suites.productPreview.status).toBe('satisfied');
-    expect(posted).toHaveLength(1);
-    expect(posted[0]).toContain(`repos/${REPO}/statuses/${headSha}`);
-    expect(posted[0]).toContain('state=success');
-    expect(posted[0]).toContain('context=Validation (shadow)');
+    expect(posted).toHaveLength(2); // pending → final
+    expect(posted[0]).toContain('state=pending');
+    expect(posted[1]).toContain(`repos/${REPO}/statuses/${headSha}`);
+    expect(posted[1]).toContain('state=success');
+    expect(posted[1]).toContain('context=Validation (shadow)');
     const saved = JSON.parse(readFileSync(resultPath, 'utf8'));
     expect(saved.plan.identity.policySha).toBe(baseSha);
     expect(saved.result.verdict).toBe('pass');
@@ -353,7 +354,7 @@ describe('validation gate controller', () => {
     });
     expect(outcome.result?.verdict).toBe('blocked');
     expect(outcome.result?.suites.productUnit.status).toBe('missing');
-    expect(posted[0]).toContain('state=failure');
+    expect(posted.at(-1)).toContain('state=failure');
   });
 
   it('skips a stale event whose head moved on instead of publishing for it', () => {
@@ -465,6 +466,62 @@ describe('validation gate controller', () => {
     });
     expect(outcome.result?.verdict).toBe('pending');
     expect(posted).toHaveLength(0); // --pr（ローカル）では発行しない
+  });
+
+  it('publishes pending first and failure when evidence collection throws (fail closed)', () => {
+    const { api } = fakeApi();
+    const posted: string[][] = [];
+    expect(() =>
+      runValidationGate({
+        env: env({
+          GITHUB_EVENT_NAME: 'workflow_run',
+          GITHUB_EVENT_PATH: writeEvent({ workflow_run: { head_sha: headSha } }),
+        }),
+        argv: [],
+        api: (path: string) => {
+          if (path.includes('/actions/runs?')) throw new Error('HTTP 502');
+          return api(path);
+        },
+        cwd,
+        fetchImpl: () => {},
+        output: () => {},
+        postStatus: (args) => {
+          posted.push(args);
+          return '';
+        },
+      }),
+    ).toThrow('HTTP 502');
+    expect(posted.map((args) => args.find((arg) => arg.startsWith('state=')))).toEqual([
+      'state=pending',
+      'state=failure',
+    ]);
+    expect(posted[1].join(' ')).toContain('indeterminate: HTTP 502');
+  });
+
+  it('re-evaluates from a Vercel status event and publishes', () => {
+    const { api } = fakeApi();
+    const posted: string[][] = [];
+    const outcome = runValidationGate({
+      env: env({
+        GITHUB_EVENT_NAME: 'status',
+        GITHUB_EVENT_PATH: writeEvent({
+          sha: headSha,
+          context: 'Vercel – product',
+          state: 'success',
+        }),
+      }),
+      argv: [],
+      api,
+      cwd,
+      fetchImpl: () => {},
+      output: () => {},
+      postStatus: (args) => {
+        posted.push(args);
+        return '';
+      },
+    });
+    expect(outcome.result?.verdict).toBe('pass');
+    expect(posted.at(-1)).toContain('state=success');
   });
 
   it('skips events that are not associated with an open PR', () => {

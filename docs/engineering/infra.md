@@ -367,14 +367,17 @@ base 規則の変更は次の PR から有効になり、当該 PR 自身の必�
 
 ### Validation の信頼済み controller（#2795、shadow）
 
-`validation-gate.yml` は `workflow_run`（CI 完了）だけで、**main の workflow 定義と checkout**
-を使って `scripts/ci/validation-gate.mjs` を実行する。`deployment_status` は使わない: この event は
+`validation-gate.yml` は `workflow_run`（CI 完了）と `status`（Vercel の commit status が success）
+で、**main の workflow 定義と checkout** を使って `scripts/ci/validation-gate.mjs` を実行する。
+どちらも GitHub docs で「workflow file が default branch にある時だけ走る」event。`deployment_status` は使わない: この event は
 deployment の commit（PR head）の workflow 定義で走る（2026-09-17、PR #2804 で実測）。
 `workflow_dispatch` も使わない: 任意 ref の定義で起動でき、PR branch で改変した controller が
 statuses:write 付きで走る（Codex review P2）。手動再評価は Actions の「Re-run jobs」。
-Vercel Preview が CI より遅れる分は job 内で bounded に待つ（`VALIDATION_WAIT_MINUTES`）。
-controller 自身も `GITHUB_REF` が main でない・event が workflow_run でない場合は評価も発行も
-しない。**PR が producer 定義（ci.yml / setup action / check.mjs / impact.mjs）を変えている
+Vercel Preview が CI より遅れる分は job 内で短く待ち（`VALIDATION_WAIT_MINUTES`）、上限後の
+完了は `status` event が再評価する。controller は評価開始時に pending を発行し、収集・評価が
+例外で落ちても failure を発行してから終了する（以前の success が偽の green として残らない）。
+controller 自身も `GITHUB_REF` が main でない・event が workflow_run / status でない場合は
+評価も発行もしない。**PR が producer 定義（ci.yml / setup action / check.mjs / impact.mjs）を変えている
 場合、その PR 自身の CI run は `self-produced` として信用しない**（job 名を保ったまま step を
 空にできるため）。この保証境界は job の配線ファイルまでで、vitest 設定や scripts の改変は
 review の観点に残る。PR 側のコード・依存・artifact は実行しない。

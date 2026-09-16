@@ -31,6 +31,8 @@ import { createValidationPlan } from '../lib/validation-plan.mjs';
 import { collectPlanInput } from './validation-plan-shadow.mjs';
 
 const SHA = /^[a-f0-9]{40}$/;
+/** default branch の workflow 定義でしか走らない event（status を発行してよい event）。 */
+const TRUSTED_EVENTS = new Set(['workflow_run', 'status']);
 
 /** gh api を JSON で読む。`--paginate` は配列 endpoint だけに使う。 */
 export function createGithubApi({ execFileImpl } = {}) {
@@ -48,7 +50,14 @@ export function resolveTarget({ eventName, event, prArg, repository, api }) {
     const number = Number(prArg);
     return Number.isSafeInteger(number) && number > 0 ? { number, source: 'dispatch' } : null;
   }
-  const sha = eventName === 'workflow_run' ? (event?.workflow_run?.head_sha ?? null) : null;
+  // workflow_run と status はどちらも default branch の定義でしか走らない event
+  // （docs: "only trigger a workflow run if the workflow file exists on the default branch"）。
+  const sha =
+    eventName === 'workflow_run'
+      ? (event?.workflow_run?.head_sha ?? null)
+      : eventName === 'status'
+        ? (event?.sha ?? null)
+        : null;
   if (!SHA.test(sha ?? '')) return null;
   const pulls = api(`repos/${repository}/commits/${sha}/pulls?per_page=100`, { paginate: true });
   const open = pulls.filter(
@@ -304,37 +313,11 @@ export function runValidationGate({
   // 古い event（head が進んだ後に届いた完了通知）は評価しない。新しい head の event が別に来る。
   if (target.eventSha !== undefined && target.eventSha !== pr.head.sha)
     return { skipped: `event head ${target.eventSha} superseded by ${pr.head.sha}`, result: null };
-  const plan = buildTrustedPlan({ repository, pr, policySha, cwd, fetchImpl });
-  // Vercel Preview は CI 完了より遅れて success になる。deployment_status を trigger に
-  // できない（PR 側の workflow 定義で走る）ため、pending の間だけ bounded に待って再取得する。
-  const waitBudgetMs = Number(env.VALIDATION_WAIT_MINUTES ?? '0') * 60_000;
-  const deadline = now().getTime() + (Number.isFinite(waitBudgetMs) ? waitBudgetMs : 0);
-  let evidence = collectEvidence({ repository, pr, api, now });
-  let result = evaluateValidation({ plan, evidence });
-  while (
-    result.verdict === 'pending' &&
-    !result.reasons.some((reason) => reason.startsWith('update-branch')) &&
-    now().getTime() + pollIntervalMs <= deadline
-  ) {
-    sleep(pollIntervalMs);
-    evidence = collectEvidence({ repository, pr, api, now });
-    result = evaluateValidation({ plan, evidence });
-  }
-  result.target = target;
-  const summary = formatValidationResult(result);
-  output(summary);
-  if (env.GITHUB_STEP_SUMMARY) appendFileSync(env.GITHUB_STEP_SUMMARY, summary);
-  const outPath = env.VALIDATION_RESULT_PATH ? resolve(env.VALIDATION_RESULT_PATH) : null;
-  if (outPath) writeFileSync(outPath, `${JSON.stringify({ plan, evidence, result }, null, 2)}\n`);
-  // status の発行は main の定義で走る workflow_run に限る。`--pr` はローカルの read-only
-  // 実行用で、dispatch で PR ref の定義を走らせる経路は workflow 側に無い（二重防御）。
-  if (publish && env.GITHUB_EVENT_NAME !== 'workflow_run')
-    output(`::notice::Validation gate: status not published for event ${env.GITHUB_EVENT_NAME}\n`);
-  if (publish && env.GITHUB_EVENT_NAME === 'workflow_run') {
-    const status = toCommitStatus(result);
-    const runUrl = env.GITHUB_RUN_ID
-      ? `${env.GITHUB_SERVER_URL ?? 'https://github.com'}/${repository}/actions/runs/${env.GITHUB_RUN_ID}`
-      : '';
+  const publishable = publish && TRUSTED_EVENTS.has(env.GITHUB_EVENT_NAME ?? '');
+  const runUrl = env.GITHUB_RUN_ID
+    ? `${env.GITHUB_SERVER_URL ?? 'https://github.com'}/${repository}/actions/runs/${env.GITHUB_RUN_ID}`
+    : '';
+  const post = (context, status) =>
     postStatus([
       'api',
       '--method',
@@ -343,13 +326,62 @@ export function runValidationGate({
       '-f',
       `state=${status.state}`,
       '-f',
-      `context=${VALIDATION_STATUS_CONTEXT}`,
+      `context=${context}`,
       '-f',
-      `description=${status.description}`,
+      `description=${status.description.slice(0, 140)}`,
       ...(runUrl ? ['-f', `target_url=${runUrl}`] : []),
     ]);
+  // fail closed: 評価開始時に pending を置き、収集・評価が例外で落ちても failure を必ず発行する。
+  // これが無いと、同じ head の以前の success が最新 status として残り偽の green になる（Codex P2）。
+  if (publishable)
+    post(VALIDATION_STATUS_CONTEXT, {
+      state: 'pending',
+      description: 'Evaluating trusted evidence',
+    });
+  try {
+    return evaluateAndPublish();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'evaluation failed';
+    if (publishable)
+      post(VALIDATION_STATUS_CONTEXT, {
+        state: 'failure',
+        description: `indeterminate: ${message}`,
+      });
+    throw error;
   }
-  return { skipped: null, result };
+
+  function evaluateAndPublish() {
+    const plan = buildTrustedPlan({ repository, pr, policySha, cwd, fetchImpl });
+    // Vercel Preview は CI 完了より遅れて success になる。deployment_status を trigger に
+    // できない（PR 側の workflow 定義で走る）ため、pending の間だけ bounded に待って再取得する。
+    const waitBudgetMs = Number(env.VALIDATION_WAIT_MINUTES ?? '0') * 60_000;
+    const deadline = now().getTime() + (Number.isFinite(waitBudgetMs) ? waitBudgetMs : 0);
+    let evidence = collectEvidence({ repository, pr, api, now });
+    let result = evaluateValidation({ plan, evidence });
+    while (
+      result.verdict === 'pending' &&
+      !result.reasons.some((reason) => reason.startsWith('update-branch')) &&
+      now().getTime() + pollIntervalMs <= deadline
+    ) {
+      sleep(pollIntervalMs);
+      evidence = collectEvidence({ repository, pr, api, now });
+      result = evaluateValidation({ plan, evidence });
+    }
+    result.target = target;
+    const summary = formatValidationResult(result);
+    output(summary);
+    if (env.GITHUB_STEP_SUMMARY) appendFileSync(env.GITHUB_STEP_SUMMARY, summary);
+    const outPath = env.VALIDATION_RESULT_PATH ? resolve(env.VALIDATION_RESULT_PATH) : null;
+    if (outPath) writeFileSync(outPath, `${JSON.stringify({ plan, evidence, result }, null, 2)}\n`);
+    // status の発行は main の定義で走る event（workflow_run / status）に限る。`--pr` はローカルの
+    // read-only 実行用で、dispatch で PR ref の定義を走らせる経路は workflow 側に無い（二重防御）。
+    if (publish && !publishable)
+      output(
+        `::notice::Validation gate: status not published for event ${env.GITHUB_EVENT_NAME}\n`,
+      );
+    if (publishable) post(VALIDATION_STATUS_CONTEXT, toCommitStatus(result));
+    return { skipped: null, result };
+  }
 }
 
 if (isDirectExecution(import.meta.url)) {
