@@ -16,7 +16,7 @@
 | DB テーブル    | 30   | 10         | 6                | 14               | 0              |
 | DB 関数        | 138  | 1          | 59               | 78               | 0              |
 | tRPC router    | 16   | 0          | 15               | 0                | 1              |
-| tRPC procedure | 72   | 0          | 68               | 0                | 4              |
+| tRPC procedure | 69   | 0          | 68               | 0                | 1              |
 | MCP tool       | 19   | 19         | 0                | 0                | 0              |
 | Zustand store  | 14   | 0          | 13               | 0                | 1              |
 | Story          | 114  | 0          | 90               | 24               | 0              |
@@ -525,9 +525,6 @@ graph LR
 | -------------- | --------------------------- | ---------------------------------------------- | ------------------ |
 | tRPC router    | `email`                     | `apps/product/src/lib/email/router.ts`         | emailRouter        |
 | tRPC procedure | `email.sendPasswordChanged` | `apps/product/src/lib/email/router.ts`         | protectedProcedure |
-| tRPC procedure | `email.sendTrialExpired`    | `apps/product/src/lib/email/router.ts`         | protectedProcedure |
-| tRPC procedure | `email.sendTrialExpiring`   | `apps/product/src/lib/email/router.ts`         | protectedProcedure |
-| tRPC procedure | `email.sendWelcome`         | `apps/product/src/lib/email/router.ts`         | protectedProcedure |
 | Zustand store  | `useShellStore`             | `apps/product/src/lib/stores/useShellStore.ts` | —                  |
 
 ## 語彙を持たない層（意図的）

@@ -15,6 +15,7 @@
 
 import { NextResponse } from 'next/server';
 
+import { deliverWelcomeEmailOnce } from '@/features/auth/server/welcome-email';
 import { logger } from '@/lib/logger';
 import { getSafeRedirectPath } from '@/lib/safe-redirect';
 import { observeAuthOperation } from '@/lib/sentry';
@@ -32,11 +33,16 @@ export async function GET(request: Request) {
     const supabase = await createClient();
 
     // AuthCodeをセッションに交換
-    const { error } = await observeAuthOperation('exchange_code_for_session', () =>
+    const { data, error } = await observeAuthOperation('exchange_code_for_session', () =>
       supabase.auth.exchangeCodeForSession(code),
     );
 
     if (!error) {
+      // 初回だけ歓迎メールを送る。2 回目以降は profiles の conditional UPDATE が
+      // 0 行になって即戻るので、サインインの体感には効かない。失敗しても throw しない。
+      const userId = data.session?.user?.id;
+      if (userId) await deliverWelcomeEmailOnce(userId);
+
       // 成功した場合は元のページまたはデフォルトページへリダイレクト
       return NextResponse.redirect(new URL(next, request.url));
     }

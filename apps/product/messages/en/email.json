@@ -52,26 +52,6 @@
     "noActionNote": "Check the end date and your payment schedule in Settings → Billing.",
     "ctaButton": "Open Dayopt"
   },
-  "trialExpiring": {
-    "subject": "Your Dayopt trial ends in 3 days",
-    "heading": "Your Dayopt trial ends in 3 days",
-    "body": "Your trial ends on {trialEndDate}. Check your payment schedule in Settings → Billing.",
-    "keepProHint": "If you'd like to keep Dayopt features, you can subscribe anytime from your account settings.",
-    "ctaButton": "View plans",
-    "freePlanNote": "Your saved calendar and reports remain available after access ends."
-  },
-  "trialExpired": {
-    "subject": "Your Dayopt trial has ended",
-    "heading": "Your Dayopt trial has ended",
-    "body": "Your trial has ended. Subscribe to continue creating and editing.",
-    "freeAccessIntro": "You can still use:",
-    "featureTimeboxing": "Saved plans",
-    "featureTracking": "Saved records and reports",
-    "featureCalendar": "Calendar viewing and data export",
-    "upgradeHint": "Subscribe to resume creating, editing, syncing and MCP / API access.",
-    "ctaButton": "Upgrade to Dayopt",
-    "thankYou": "Thanks for trying Dayopt."
-  },
   "proStart": {
     "subject": "Welcome to Dayopt",
     "heading": "Welcome to Dayopt",

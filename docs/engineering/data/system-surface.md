@@ -103,7 +103,7 @@ job 名を変数で渡す schedule と、jobid で消す unschedule は追えな
 
 | builder              | 使っている procedure 数 | 定義                                      |
 | -------------------- | ----------------------- | ----------------------------------------- |
-| `protectedProcedure` | 68                      | `apps/product/src/lib/trpc/procedures.ts` |
+| `protectedProcedure` | 65                      | `apps/product/src/lib/trpc/procedures.ts` |
 | `entitledProcedure`  | 4                       | `apps/product/src/lib/trpc/procedures.ts` |
 
 ### rate limit（21）
@@ -269,7 +269,7 @@ TS の `PRODUCT_EVENT_NAMES` と DB の CHECK 制約の両方で定義される�
 | `plans.list`, `records.list`                                                                                                             | `plans.list`, `records.list`                           | `apps/product/src/app/api/mcp/_tools/timeblock-list.ts`      |
 | `plans.create`, `plans.delete`, `plans.restore`, `plans.update`, `records.create`, `records.delete`, `records.restore`, `records.update` | tRPC を経由しない                                      | `apps/product/src/app/api/mcp/_tools/timeblock-mutations.ts` |
 
-### tRPC procedure の呼び出し元（72）
+### tRPC procedure の呼び出し元（69）
 
 呼び出し元は file 数。`api.x.y.useQuery` / `utils.x.y.invalidate` / `helpers.x.y.prefetch` /
 `trpc.x.y(`（MCP bridge）を数える。test と Story は数えない。
@@ -296,9 +296,6 @@ TS の `PRODUCT_EVENT_NAMES` と DB の CHECK 制約の両方で定義される�
 | `billing.startTrial`                         | 1                   | 0                   |
 | `contact.submit`                             | 1                   | 0                   |
 | `email.sendPasswordChanged`                  | 1                   | 0                   |
-| `email.sendTrialExpired`                     | 0                   | 0                   |
-| `email.sendTrialExpiring`                    | 0                   | 0                   |
-| `email.sendWelcome`                          | 0                   | 0                   |
 | `externalCalendar.disconnect`                | 1                   | 0                   |
 | `externalCalendar.dismissEvent`              | 1                   | 0                   |
 | `externalCalendar.getConnectionAvailability` | 1                   | 0                   |
@@ -349,7 +346,7 @@ TS の `PRODUCT_EVENT_NAMES` と DB の CHECK 制約の両方で定義される�
 | `userSettings.update`                        | 1                   | 0                   |
 | `userSettings.updateProfile`                 | 2                   | 0                   |
 
-### どこからも呼ばれていない procedure（4）
+### どこからも呼ばれていない procedure（1）
 
 削除候補ではあるが、判断は別（意図的な互換窓や、送信側が未実装のものがある）。ここは事実の提示だけ。
 
@@ -358,9 +355,6 @@ TS・JS。SQL と workflow YAML は呼び出し形が違うため見ていない
 呼び出し元が無い」であって「未使用の証明」ではない**。消す前に公開契約（OAuth scope の
 allowlist、MCP registry）に載っていないかを併せて確かめる。
 
-- `email.sendTrialExpired`
-- `email.sendTrialExpiring`
-- `email.sendWelcome`
 - `statistics.getTagEstimationFactors`
 
 ### store の利用元
@@ -431,7 +425,7 @@ app から呼ぶ DB 関数 76 件のうち、integration test（TS / SQL）か�
 
 **test から呼ばれていない（15）**: `abandon_calendar_account_delete_revoke_v1`, `begin_calendar_account_deletion_v1`, `claim_stripe_webhook_event`, `clear_calendar_sync_cursor_command_v1`, `delete_all_user_data_command_v5`, `finalize_calendar_account_delete_revoke_v1`, `get_external_lifecycle_app_version_v3`, `get_timeblock_context_marker_v1`, `list_expired_calendar_account_deletion_intents_v1`, `normalize_calendar_account_deletion_intent_v1`, `prepare_calendar_account_delete_revoke_v1`, `prepare_user_data_purge_v1`, `replace_selected_calendars_command_v1`, `seal_calendar_account_deletion_v1`, `start_calendar_account_delete_provider_attempt_v1`
 
-### tRPC procedure → DB（68）
+### tRPC procedure → DB（65）
 
 型チェッカーで `procedure → service → .from() / .rpc()` を辿った結果。DI（`this.x.method`）や
 条件分岐で決まるテーブル名も解決する。ここに出ない procedure は DB を触らない。
@@ -457,9 +451,6 @@ app から呼ぶ DB 関数 76 件のうち、integration test（TS / SQL）か�
 | `billing.getOverview`                      | `profiles`                                                                                                          | —                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | `billing.startTrial`                       | `product_events`, `profiles`                                                                                        | —                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | `email.sendPasswordChanged`                | `email_suppressions`, `user_settings`                                                                               | —                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| `email.sendTrialExpired`                   | `email_suppressions`, `user_settings`                                                                               | —                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| `email.sendTrialExpiring`                  | `email_suppressions`, `user_settings`                                                                               | —                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| `email.sendWelcome`                        | `email_suppressions`, `user_settings`                                                                               | —                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | `externalCalendar.disconnect`              | `calendar_connections`, `external_calendar_events`, `plans`, `records`                                              | `get_external_lifecycle_app_version_v2`, `get_external_lifecycle_app_version_v3`                                                                                                                                                                                                                                                                                                                                                       |
 | `externalCalendar.dismissEvent`            | `external_calendar_events`, `profiles`                                                                              | —                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | `externalCalendar.getSyncStatus`           | `calendar_connection_calendars`, `calendar_connections`                                                             | —                                                                                                                                                                                                                                                                                                                                                                                                                                      |
@@ -551,7 +542,7 @@ page から import を宣言元まで解決して辿った結果（barrel の再
 | feature             | source | test file | component | Story のある component |
 | ------------------- | ------ | --------- | --------- | ---------------------- |
 | `activities`        | 30     | 3         | 11        | 3 / 11                 |
-| `auth`              | 21     | 13        | 8         | 7 / 8                  |
+| `auth`              | 22     | 14        | 8         | 7 / 8                  |
 | `calendar`          | 194    | 97        | 60        | 32 / 60                |
 | `contact`           | 8      | 6         | 2         | 1 / 2                  |
 | `external-calendar` | 26     | 19        | 2         | 1 / 2                  |

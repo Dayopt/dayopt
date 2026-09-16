@@ -17,8 +17,6 @@ import { AccountDeletionEmail } from '@/emails/AccountDeletionEmail';
 import { createEmailTranslator, type EmailLocale } from '@/emails/i18n';
 import { MfaDisabledEmail } from '@/emails/MfaDisabledEmail';
 import { PasswordChangedEmail } from '@/emails/PasswordChangedEmail';
-import { TrialExpiredEmail } from '@/emails/TrialExpiredEmail';
-import { TrialExpiringEmail } from '@/emails/TrialExpiringEmail';
 import { WelcomeEmail } from '@/emails/WelcomeEmail';
 import { env } from '@/env';
 import { getAppUrl } from '@/lib/app-url';
@@ -210,6 +208,32 @@ export async function sendAccountDeletionEmail({
 }
 
 /**
+ * 新規登録の歓迎メールを送る
+ *
+ * サインアップ直後のサーバー経路（`features/auth/server/welcome-email.ts`）からのみ呼ぶため、
+ * procedure ではなく関数として公開する。「1 ユーザー 1 通」の保証はここではなく、
+ * 呼び出し元が `profiles.welcome_email_sent_at` を conditional UPDATE で掴むことで行う。
+ */
+export async function sendWelcomeEmail({
+  email,
+  userName,
+  locale,
+}: {
+  email: string;
+  userName: string;
+  locale: EmailLocale;
+}) {
+  const t = createEmailTranslator(locale);
+
+  return sendEmail({
+    to: email,
+    subject: t('welcome.subject'),
+    react: WelcomeEmail({ userName, locale, appUrl: APP_URL }),
+    context: 'Welcome email',
+  });
+}
+
+/**
  * MFA無効化（リカバリーコードによる多要素認証解除）の通知メールを送る
  *
  * `features/auth/server/recovery-service.ts` の `RecoveryService.verify()` からのみ呼ぶ。
@@ -252,97 +276,6 @@ export async function sendMfaDisabledEmail({
 
 /** トランザクショナルメール送信（ウェルカム / Trial / Pro / 課金 / アカウント削除）を提供する tRPC ルーター */
 export const emailRouter = createTRPCRouter({
-  sendWelcome: protectedProcedure
-    .meta({ description: 'ウェルカムメール送信' })
-    .input(
-      z.object({
-        email: z.string().email('Invalid email address'),
-        userName: z.string().min(1, 'User name is required'),
-      }),
-    )
-    .mutation(async ({ ctx, input }) => {
-      try {
-        await verifyEmailOwnership(ctx, input.email);
-        logger.info('Sending welcome email', { userId: ctx.userId });
-
-        const locale = await getUserLocale(ctx.supabase, ctx.userId);
-        const t = createEmailTranslator(locale);
-
-        return sendEmail({
-          to: input.email,
-          subject: t('welcome.subject'),
-          react: WelcomeEmail({ userName: input.userName, locale, appUrl: APP_URL }),
-          context: 'Welcome email',
-        });
-      } catch (error) {
-        return handleServiceError(error);
-      }
-    }),
-
-  sendTrialExpiring: protectedProcedure
-    .meta({ description: 'トライアル残3日メール送信' })
-    .input(
-      z.object({
-        email: z.string().email(),
-        userName: z.string().min(1),
-        trialEndDate: z.string().min(1),
-      }),
-    )
-    .mutation(async ({ ctx, input }) => {
-      try {
-        await verifyEmailOwnership(ctx, input.email);
-        logger.info('Sending trial expiring email', { userId: ctx.userId });
-
-        const locale = await getUserLocale(ctx.supabase, ctx.userId);
-        const t = createEmailTranslator(locale);
-
-        return sendEmail({
-          to: input.email,
-          subject: t('trialExpiring.subject'),
-          react: TrialExpiringEmail({
-            userName: input.userName,
-            trialEndDate: input.trialEndDate,
-            locale,
-            appUrl: APP_URL,
-          }),
-          context: 'Trial expiring email',
-        });
-      } catch (error) {
-        return handleServiceError(error);
-      }
-    }),
-
-  sendTrialExpired: protectedProcedure
-    .meta({ description: 'トライアル期限切れメール送信' })
-    .input(
-      z.object({
-        email: z.string().email(),
-        userName: z.string().min(1),
-      }),
-    )
-    .mutation(async ({ ctx, input }) => {
-      try {
-        await verifyEmailOwnership(ctx, input.email);
-        logger.info('Sending trial expired email', { userId: ctx.userId });
-
-        const locale = await getUserLocale(ctx.supabase, ctx.userId);
-        const t = createEmailTranslator(locale);
-
-        return sendEmail({
-          to: input.email,
-          subject: t('trialExpired.subject'),
-          react: TrialExpiredEmail({
-            userName: input.userName,
-            locale,
-            appUrl: APP_URL,
-          }),
-          context: 'Trial expired email',
-        });
-      } catch (error) {
-        return handleServiceError(error);
-      }
-    }),
-
   sendPasswordChanged: protectedProcedure
     .meta({ description: 'パスワード変更通知メール送信' })
     .input(

@@ -859,6 +859,7 @@ export type Database = {
           subscription_id: string | null;
           subscription_status: string;
           updated_at: string;
+          welcome_email_sent_at: string | null;
         };
         Insert: {
           app_trial_consumed_at?: string | null;
@@ -873,6 +874,7 @@ export type Database = {
           subscription_id?: string | null;
           subscription_status?: string;
           updated_at?: string;
+          welcome_email_sent_at?: string | null;
         };
         Update: {
           app_trial_consumed_at?: string | null;
@@ -887,6 +889,7 @@ export type Database = {
           subscription_id?: string | null;
           subscription_status?: string;
           updated_at?: string;
+          welcome_email_sent_at?: string | null;
         };
         Relationships: [];
       };

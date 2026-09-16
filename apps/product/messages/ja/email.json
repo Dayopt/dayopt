@@ -52,26 +52,6 @@
     "noActionNote": "終了日時とお支払い予定は、設定の請求管理で確認できます。",
     "ctaButton": "Dayopt を開く"
   },
-  "trialExpiring": {
-    "subject": "Dayopt トライアルが残り3日です",
-    "heading": "Dayopt トライアルが残り3日です",
-    "body": "無料体験は {trialEndDate} に終了します。お支払い予定は設定の請求管理で確認できます。",
-    "keepProHint": "Dayopt の機能を引き続きご利用いただくには、アカウント設定からいつでもサブスクリプションに登録できます。",
-    "ctaButton": "プランを見る",
-    "freePlanNote": "利用期間終了後も、保存済みカレンダーとレポートは閲覧できます。"
-  },
-  "trialExpired": {
-    "subject": "Dayopt トライアルが終了しました",
-    "heading": "Dayopt トライアルが終了しました",
-    "body": "無料体験が終了しました。作成・編集を続けるには購入してください。",
-    "freeAccessIntro": "引き続き利用できます：",
-    "featureTimeboxing": "保存済みの予定",
-    "featureTracking": "保存済みの記録とレポート",
-    "featureCalendar": "カレンダー閲覧とデータエクスポート",
-    "upgradeHint": "購入すると、作成・編集・同期・MCP / API の利用を再開できます。",
-    "ctaButton": "Dayopt にアップグレード",
-    "thankYou": "Dayopt をお試しいただきありがとうございました。"
-  },
   "proStart": {
     "subject": "Dayopt へようこそ",
     "heading": "Dayopt へようこそ",
