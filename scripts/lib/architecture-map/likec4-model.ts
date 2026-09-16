@@ -10,6 +10,7 @@
  */
 
 import type { GlossaryEntry } from '../glossary/core.ts';
+import type { CallGraph } from './call-graph.ts';
 import type { ConceptMap, MappedItem } from './concept-map.ts';
 import type { FeatureDag } from './feature-dag.ts';
 import type { InventoryKind } from './inventory.ts';
@@ -55,6 +56,7 @@ export interface LikeC4Sources {
   schema: SchemaModel;
   surface: SystemSurface;
   relations: Relations;
+  callGraph: CallGraph;
 }
 
 /** model file（docs/engineering/data/architecture/）から repo root へ戻る相対 prefix */
@@ -74,6 +76,7 @@ export function renderLikeC4Model({
   schema,
   surface,
   relations,
+  callGraph,
 }: LikeC4Sources): string {
   const out = [...HEADER];
   out.push('specification {');
@@ -202,6 +205,44 @@ export function renderLikeC4Model({
         if (routerIds.has(namespace)) {
           out.push(`  ${likec4Id('mcp', tool)} -> ${likec4Id('r', namespace)} 'calls'`);
         }
+      }
+    }
+  }
+  // tRPC router → テーブル / DB 関数（型チェッカーで辿った procedure の集約）
+  const routerReads = new Map<string, Set<string>>();
+  const routerCalls = new Map<string, Set<string>>();
+  for (const procedure of callGraph.procedures) {
+    const namespace = procedure.id.split('.')[0];
+    if (!routerIds.has(namespace)) continue;
+    for (const [target, bucket] of [
+      [procedure.tables, routerReads],
+      [procedure.functions, routerCalls],
+    ] as const) {
+      let set = bucket.get(namespace);
+      if (set === undefined) {
+        set = new Set();
+        bucket.set(namespace, set);
+      }
+      for (const name of target) set.add(name);
+    }
+  }
+  const tableElementIds = new Set(
+    map.items.filter((item) => item.kind === 'table').map((item) => item.id),
+  );
+  const functionElementIds = new Set(
+    map.items.filter((item) => item.kind === 'db-function').map((item) => item.id),
+  );
+  for (const [namespace, tables] of routerReads) {
+    for (const table of [...tables].sort()) {
+      if (tableElementIds.has(table)) {
+        out.push(`  ${likec4Id('r', namespace)} -> ${likec4Id('t', table)} 'reads'`);
+      }
+    }
+  }
+  for (const [namespace, functions] of routerCalls) {
+    for (const fn of [...functions].sort()) {
+      if (functionElementIds.has(fn)) {
+        out.push(`  ${likec4Id('r', namespace)} -> ${likec4Id('fn', fn)} 'calls'`);
       }
     }
   }

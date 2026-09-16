@@ -63,6 +63,8 @@ export interface FeatureCoverage {
 }
 
 export interface Relations {
+  /** MCP tool 名 → tool file（call graph の entry point に使う） */
+  mcpToolFiles: Map<string, string>;
   procedureUsage: ProcedureUsage[];
   unusedProcedures: string[];
   mcpToolProcedures: McpToolProcedures[];
@@ -412,10 +414,17 @@ export function collectRelations(
     items.filter((item) => item.kind === kind);
   const { usage, unused } = collectProcedureUsage(sources, ofKind('trpc-procedure'));
 
+  const mcpToolProcedures = collectMcpToolProcedures(sources);
+  const mcpToolFiles = new Map<string, string>();
+  for (const entry of mcpToolProcedures) {
+    for (const tool of entry.tools) mcpToolFiles.set(tool, entry.path);
+  }
+
   return {
     procedureUsage: usage,
     unusedProcedures: unused,
-    mcpToolProcedures: collectMcpToolProcedures(sources),
+    mcpToolProcedures,
+    mcpToolFiles,
     storeUsage: collectStoreUsage(sources, ofKind('store')),
     docCodeLinks: collectDocCodeLinks(root),
     e2eRoutes: collectE2eRoutes(root, ofKind('route')),
