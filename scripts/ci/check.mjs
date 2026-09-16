@@ -485,10 +485,16 @@ async function runImpact() {
   // ここで併せて出す。static job の deno check がこれを見る。`!isPr` を true 側へ
   // 倒すのは分離前の runStatic と同じ規約（workflow_dispatch では全部走らせる）。
   const functionsChanged = !isPr || filenames.some((f) => f.startsWith('supabase/functions/'));
+  // `migrations_added`: migration ファイルを含む PR だけ db-upgrade job（#2797）を起動する。
+  // 追加・編集・削除の区別は job 側の script が base との diff で行う（編集・削除は失敗）。
+  // `!isPr` を true 側へ倒すのは functions_changed と同じ規約。
+  const migrationsAdded =
+    !isPr || filenames.some((f) => /^supabase\/migrations\/\d{14}_.+\.sql$/.test(f));
 
   await writeGithubOutput([
     ...formatGithubOutput(impact).trim().split('\n'),
     `functions_changed=${functionsChanged}`,
+    `migrations_added=${migrationsAdded}`,
   ]);
 }
 

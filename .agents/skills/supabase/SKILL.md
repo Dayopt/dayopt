@@ -193,6 +193,14 @@ column / table の削除を伴う機能撤去は 3 段階に分け、1 PR に混
 
 **1 と 3 を同一 PR に束ねると CI が落とす**（`scripts/ci/check-destructive-migration.mjs` の coupled 判定。既存オブジェクトへの `REVOKE` / `DROP POLICY` / `DROP COLUMN` 等 + `apps/product/**` / `packages/**` の runtime 変更）。Supabase 連携は merge 時に即適用、Vercel promote は E2E 後なので、promote が失敗している間は旧 build が新 schema に当たる（2026-09-08、#2672 で 5 時間 4 分）。新規テーブル雛形の `REVOKE ALL` → `GRANT` や、同 PR で足した列への列レベル `REVOKE` は対象外。
 
+### CI が migration に要求する証拠（#2797）
+
+- `🧪 Integration Tests`（fresh）: candidate の migration 集合を空 DB へ適用し、RLS snapshot と生成型の一致を見る
+- `🧱 DB Upgrade (shadow)`（非必須）: base の migration 集合 + `seed.sql` まで戻し、PR が追加した migration だけを `migration up --include-all` で当てる。適用エラー、seed 行の消失、fresh との schema 不一致、base 世代の生成型が参照する table / column / view / function / enum 値の消失（旧アプリ × 新 DB の互換性）を落とす。適用済み migration の編集・削除も落とす（production は再実行しない）
+- 公開前: promote.yml が候補の migration 集合が production に反映済みかを read-only で確認する（`production-migration-readiness.mjs`）。未反映・失敗・対象不明なら公開しない。確認処理は適用も再試行もしない
+
+契約を縮める（column / function を消す）時は expand → migrate → contract の順に PR を分け、contract 段は旧アプリが参照しなくなった後に出す。
+
 ### 命名規則
 
 ```

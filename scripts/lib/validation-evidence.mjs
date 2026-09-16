@@ -79,9 +79,22 @@ export const PRODUCERS = Object.freeze({
     workflow: PROMOTE_WORKFLOW,
     job: '🌐 Web Build & E2E',
   },
-  dbUpgrade: { stage: 'merge', kind: 'unwired', issue: '#2797' },
-  oldConsumer: { stage: 'merge', kind: 'unwired', issue: '#2797' },
+  dbUpgrade: {
+    stage: 'merge',
+    kind: 'actions-job',
+    workflow: CI_WORKFLOW,
+    job: '🧱 DB Upgrade (shadow)',
+  },
+  oldConsumer: {
+    stage: 'merge',
+    kind: 'actions-job',
+    workflow: CI_WORKFLOW,
+    job: '🧱 DB Upgrade (shadow)',
+  },
 });
+
+/** Supabase GitHub integration の check run 名。branch が作られた PR だけ success になる。 */
+export const SUPABASE_PREVIEW_CHECK = 'Supabase Preview';
 
 const SHA = /^[a-f0-9]{40}$/;
 const SUCCESS = 'success';
@@ -107,10 +120,12 @@ export const PRODUCER_DEFINITIONS = Object.freeze([
  * @typedef {{ context: string, state: string, targetUrl: string | null, description: string | null }} StatusEvidence
  * @typedef {{ id: number, sha: string, environment: string, productionEnvironment: boolean,
  *   createdAt: string, latestStatus: { state: string, environmentUrl: string | null } | null }} DeploymentEvidence
+ * @typedef {{ id: number, name: string, appSlug: string, headSha: string, status: string,
+ *   conclusion: string | null, htmlUrl: string }} CheckRunEvidence
  * @typedef {{ repository: string, headSha: string, fetchedAt: string,
  *   pr: { number: number, state: string, draft: boolean, headSha: string, baseRef: string, fork: boolean },
  *   baseCompare: string, workflowRuns: WorkflowRunEvidence[], statuses: StatusEvidence[],
- *   deployments: DeploymentEvidence[] }} ValidationEvidence
+ *   deployments: DeploymentEvidence[], checkRuns?: CheckRunEvidence[] }} ValidationEvidence
  */
 
 /** 同一 head の信頼済み run を 1 本選ぶ。id 最大 = 最新 run。 */
@@ -195,7 +210,57 @@ function latestDeployment(deployments, { headSha, environment }) {
   );
 }
 
-function evaluateDeployment(producer, evidence) {
+/**
+ * DB を触る変更の product Preview は、隔離された PR 用 Supabase branch に接続していることを
+ * 要求する。Supabase integration は migration を含む PR でだけ branch を作り、その時
+ * `Supabase Preview` check run が success になる（skipped = branch 無し）。branch が無い
+ * Preview は shared / 不明な DB を指すので、DB 変更の検証環境として受理しない。
+ */
+function evaluateDatabaseIsolation(evidence, plan) {
+  const check = (evidence.checkRuns ?? [])
+    .filter((run) => run.name === SUPABASE_PREVIEW_CHECK && run.headSha === evidence.headSha)
+    .reduce((latest, run) => (!latest || run.id > latest.id ? run : latest), null);
+  const needed = plan?.environments?.databaseTests !== 'not-applicable';
+  if (!needed)
+    return { needed, status: 'not-applicable', reason: 'No migration in this PR', check };
+  if (!check)
+    return { needed, status: 'missing', reason: 'No Supabase Preview check for this head', check };
+  if (check.status !== 'completed')
+    return {
+      needed,
+      status: 'pending',
+      reason: 'Supabase Preview branch is still provisioning',
+      check,
+    };
+  if (check.conclusion === SUCCESS)
+    return {
+      needed,
+      status: 'satisfied',
+      reason: 'Isolated Supabase branch reported ready',
+      check,
+    };
+  return {
+    needed,
+    status: 'failed',
+    reason: `Supabase Preview concluded ${check.conclusion ?? 'unknown'}; no isolated database for a schema change`,
+    check,
+  };
+}
+
+function evaluateDeployment(producer, evidence, plan) {
+  if (producer.environment === 'Preview – product') {
+    const isolation = evaluateDatabaseIsolation(evidence, plan);
+    if (isolation.needed && isolation.status !== 'satisfied')
+      return {
+        status: isolation.status,
+        reason: isolation.reason,
+        evidence: {
+          environment: producer.environment,
+          supabasePreview: isolation.check?.htmlUrl ?? null,
+          url: null,
+        },
+      };
+  }
   const status = (evidence.statuses ?? []).find((entry) => entry.context === producer.context);
   const deployment = latestDeployment(evidence.deployments, {
     headSha: evidence.headSha,
@@ -282,7 +347,7 @@ function evaluateSuite(name, rule, evidence, plan) {
     case 'actions-job':
       return evaluateActionsJob(producer, evidence, plan);
     case 'deployment':
-      return evaluateDeployment(producer, evidence);
+      return evaluateDeployment(producer, evidence, plan);
     case 'release-gate':
       return {
         status: 'deferred',

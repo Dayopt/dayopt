@@ -500,6 +500,19 @@ jobs:
 
           echo "sha=$sha" >> "$GITHUB_OUTPUT"
 
+      # 公開前の migration 反映確認（#2797）。候補 SHA の migration 集合が production の
+      # schema_migrations に全て入っているかを read-only Management API で見る。適用・再試行は
+      # しない（writer は Supabase integration のまま）。
+      #
+      # **この PR では token を渡していない = 常に advisory（warning のみ）。** 有効化には
+      # read-only token を `production-release` environment へ置く決定（secret の境界変更、
+      # User 裁可）と、`docs/operations/secrets.md` の台帳・environment 同期 script・
+      # `ci-secret-ledger.test.ts` の同時更新が要る。有効化後は欠落が promote を止める。
+      # force（break-glass）では飛ばす。
+      - name: Verify candidate migrations are applied in Production
+        if: ${{ inputs.force != true }}
+        run: node scripts/ci/production-migration-readiness.mjs
+
       - name: Wait, smoke, and promote Production
         id: release
         env:

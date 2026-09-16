@@ -266,15 +266,86 @@ describe('validation evidence: rejected evidence', () => {
     expect(result.reasons).toContain('policy must come from trusted base');
   });
 
-  it('blocks when a plan-required suite has no wired producer instead of stubbing success', () => {
-    const result = evaluateValidation({
-      plan: plan(['supabase/migrations/20260917000000_a.sql']),
-      evidence: evidence(),
+  describe('migration PRs (#2797)', () => {
+    const MIGRATION = 'supabase/migrations/20260917000000_a.sql';
+    const supabasePreview = (conclusion: string | null, status = 'completed') => ({
+      id: 104781444130,
+      name: 'Supabase Preview',
+      appSlug: 'supabase',
+      headSha: HEAD,
+      status,
+      conclusion,
+      htmlUrl: `https://github.com/${REPO}/runs/104781444130`,
     });
-    expect(result.suites.dbUpgrade.status).toBe('unwired');
-    expect(result.suites.oldConsumer.status).toBe('unwired');
-    expect(result.suites.dbFresh.status).toBe('satisfied');
-    expect(result.verdict).toBe('blocked');
+    const dbUpgradeRun = (conclusion: string) =>
+      ciRun([...greenCi().jobs, job('🧱 DB Upgrade (shadow)', conclusion)]);
+
+    it('requires the DB Upgrade job and an isolated Supabase branch for the product Preview', () => {
+      const result = evaluateValidation({
+        plan: plan([MIGRATION]),
+        evidence: evidence({
+          workflowRuns: [dbUpgradeRun('success')],
+          checkRuns: [supabasePreview('success')],
+        }),
+      });
+      expect(result.suites.dbFresh.status).toBe('satisfied');
+      expect(result.suites.dbUpgrade.status).toBe('satisfied');
+      expect(result.suites.oldConsumer.status).toBe('satisfied');
+      expect(result.suites.productPreview.status).toBe('satisfied');
+      expect(result.verdict).toBe('pass');
+    });
+
+    it('does not stub the upgrade path with the fresh path when the job is absent or skipped', () => {
+      const absent = evaluateValidation({
+        plan: plan([MIGRATION]),
+        evidence: evidence({ checkRuns: [supabasePreview('success')] }),
+      });
+      expect(absent.suites.dbFresh.status).toBe('satisfied');
+      expect(absent.suites.dbUpgrade.status).toBe('missing');
+      expect(absent.verdict).toBe('blocked');
+      const skipped = evaluateValidation({
+        plan: plan([MIGRATION]),
+        evidence: evidence({
+          workflowRuns: [dbUpgradeRun('skipped')],
+          checkRuns: [supabasePreview('success')],
+        }),
+      });
+      expect(skipped.suites.oldConsumer.status).toBe('skipped');
+    });
+
+    it('rejects a product Preview without an isolated Supabase branch for a schema change', () => {
+      const none = evaluateValidation({
+        plan: plan([MIGRATION]),
+        evidence: evidence({ workflowRuns: [dbUpgradeRun('success')] }),
+      });
+      expect(none.suites.productPreview.status).toBe('missing');
+      expect(none.suites.productPreview.reason).toMatch(/Supabase Preview/);
+      const skipped = evaluateValidation({
+        plan: plan([MIGRATION]),
+        evidence: evidence({
+          workflowRuns: [dbUpgradeRun('success')],
+          checkRuns: [supabasePreview('skipped')],
+        }),
+      });
+      expect(skipped.suites.productPreview.status).toBe('failed');
+      expect(skipped.suites.productPreview.reason).toMatch(/no isolated database/);
+      const provisioning = evaluateValidation({
+        plan: plan([MIGRATION]),
+        evidence: evidence({
+          workflowRuns: [dbUpgradeRun('success')],
+          checkRuns: [supabasePreview(null, 'in_progress')],
+        }),
+      });
+      expect(provisioning.suites.productPreview.status).toBe('pending');
+    });
+
+    it('does not demand a Supabase branch for app-only changes', () => {
+      const result = evaluateValidation({
+        plan: plan([APP_FILE]),
+        evidence: evidence({ checkRuns: [supabasePreview('skipped')] }),
+      });
+      expect(result.suites.productPreview.status).toBe('satisfied');
+    });
   });
 
   it.each(['.github/workflows/ci.yml', 'scripts/ci/check.mjs', '.github/actions/setup/action.yml'])(

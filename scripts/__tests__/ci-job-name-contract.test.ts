@@ -51,15 +51,18 @@ const promoteNames = jobDisplayNames(readWorkflow('promote.yml'));
 const finishBranch = readFileSync(join(process.cwd(), 'scripts/tasks/finish-branch.sh'), 'utf8');
 
 describe('CI job 名の契約', () => {
-  it('ci.yml は impact / static / unit / migration-notice / integration の 5 job を持つ', () => {
+  it('ci.yml は impact / static / unit / migration-notice / integration / db-upgrade の 6 job を持つ', () => {
     // `Migration Safety Notice` は required check ではない（finish-branch.sh の
     // REQUIRED_CI_CHECKS に載せない。検知の無い PR では常に skip される）。
+    // `🧱 DB Upgrade (shadow)` も required ではない（#2797、migration を追加した PR だけ走る。
+    // Validation controller が plan の dbUpgrade / oldConsumer をこの名前に束縛する）。
     expect(ciNames).toEqual([
       '🧭 Impact',
       '🔍 Static Checks',
       '📦 Unit Tests',
       'Migration Safety Notice',
       '🧪 Integration Tests',
+      '🧱 DB Upgrade (shadow)',
     ]);
   });
 
@@ -316,7 +319,7 @@ describe('CI job 名の契約', () => {
     });
 
     it('実ファイルから名前を 1 つ以上抜けている（regex の空振りで全 assert が素通りしない）', () => {
-      expect(ciNames.length).toBe(5);
+      expect(ciNames.length).toBe(6);
       expect(nightlyNames.length).toBeGreaterThanOrEqual(3);
       expect(promoteNames.length).toBe(6);
     });

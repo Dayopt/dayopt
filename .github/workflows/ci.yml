@@ -95,6 +95,7 @@ jobs:
       mcp_conformance: ${{ steps.run.outputs.mcp_conformance }}
       integration: ${{ steps.run.outputs.integration }}
       functions_changed: ${{ steps.run.outputs.functions_changed }}
+      migrations_added: ${{ steps.run.outputs.migrations_added }}
     steps:
       # 判定は gh api の PR files 一覧だけを入力にするため、履歴は要らない。
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -353,6 +354,72 @@ jobs:
           NODE_ENV: test
           CI: true
         run: node scripts/ci/check.mjs integration
+
+      - name: Stop Supabase
+        if: always()
+        run: supabase stop
+
+  # ── DB upgrade / old-consumer（migration を追加した PR だけ。shadow、非必須）──────
+  #
+  # integration job の `supabase start` は candidate の migration 集合を **空 DB へ** 適用する
+  # fresh 経路しか証明しない（#2797）。この job は base の migration 集合 + seed（合成データ）まで
+  # reset し、PR が追加した migration だけを当てて、適用エラー・seed 行の消失・fresh との
+  # schema 不一致・base 世代の生成型が参照するオブジェクトの消失（旧アプリ × 新 DB）を
+  # 別々に検出する（scripts/ci/db-upgrade-check.mjs）。
+  #
+  # **required check ではない**（#2798 の比較・承認後に扱いを決める）。Validation controller
+  # は plan の dbUpgrade / oldConsumer をこの job 名に束縛する。job 名を変える時は
+  # validation-evidence の PRODUCERS と ci-job-name-contract.test.ts も直す。
+  #
+  # migration を追加していない PR では impact の `migrations_added` が空で skip される
+  # （plan 側も not-applicable）。`fetch-depth: 2` は merge commit の第 1 親（base）を
+  # `git ls-tree` / `git show` で読むため。接続先はローカル Docker だけ。
+  db-upgrade:
+    name: "\U0001F9F1 DB Upgrade (shadow)"
+    needs: impact
+    if: ${{ !cancelled() && github.event.pull_request.draft != true && needs.impact.outputs.migrations_added == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+
+      - uses: ./.github/actions/setup
+
+      - id: supabase-version
+        run: |
+          version=$(node -p "require('./package.json').devDependencies.supabase")
+          if [ "$version" = "undefined" ] || [ -z "$version" ]; then
+            echo "::error::supabase CLI version の抽出に失敗しました（root package.json の devDependencies.supabase を確認してください）: '$version'"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - uses: supabase/setup-cli@46f7f98c7f948ad727d22c1e67fab04c223a0520 # v3.0.0
+        with:
+          version: ${{ steps.supabase-version.outputs.version }}
+
+      - name: Start Supabase
+        run: supabase start
+
+      - name: Upgrade from the base migration set and compare with the fresh schema
+        env:
+          DB_UPGRADE_RESULT_PATH: db-upgrade-result.json
+          NODE_ENV: test
+          CI: true
+        run: node scripts/ci/db-upgrade-check.mjs
+
+      - name: Save upgrade result
+        if: always() && hashFiles('db-upgrade-result.json') != ''
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: db-upgrade-result-${{ github.run_attempt }}
+          path: db-upgrade-result.json
+          retention-days: 14
 
       - name: Stop Supabase
         if: always()

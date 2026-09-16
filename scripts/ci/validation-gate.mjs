@@ -274,6 +274,22 @@ export function collectEvidence({ repository, pr, api, now = () => new Date() })
         : null,
     };
   });
+  // 第三者 app の check run（Supabase Preview 等）。Actions の job は workflowRuns 側で見る。
+  const checkRunsRaw = api(`repos/${repository}/commits/${headSha}/check-runs?per_page=100`, {
+    paginate: true,
+  });
+  const checkRuns = checkRunsRaw
+    .flatMap((page) => page?.check_runs ?? [])
+    .filter((run) => run.app?.slug !== 'github-actions')
+    .map((run) => ({
+      id: run.id,
+      name: run.name,
+      appSlug: run.app?.slug ?? '',
+      headSha: run.head_sha,
+      status: run.status,
+      conclusion: run.conclusion ?? null,
+      htmlUrl: run.html_url,
+    }));
   let baseCompare = 'unknown';
   try {
     baseCompare =
@@ -297,6 +313,7 @@ export function collectEvidence({ repository, pr, api, now = () => new Date() })
     workflowRuns: runs,
     statuses,
     deployments,
+    checkRuns,
   };
 }
 
