@@ -5,6 +5,7 @@
  * 1 file で辿れるようにする。事実の正本はすべてコード側で、ここは view。
  */
 
+import type { CallGraph } from './call-graph.ts';
 import type { InventoryItem } from './inventory.ts';
 import type { Relations } from './relations.ts';
 import type { SystemSurface } from './surface.ts';
@@ -33,6 +34,7 @@ export function renderSurfaceDocument(
   surface: SystemSurface,
   relations: Relations,
   items: InventoryItem[],
+  callGraph: CallGraph,
   header: string,
 ): string {
   const out: string[] = ['# System Surface（自動生成）', '', header, ''];
@@ -346,6 +348,53 @@ export function renderSurfaceDocument(
         untested.map((fn) => fn.id),
         'なし',
       )}`,
+    ]),
+  );
+
+  out.push(
+    ...section(`### tRPC procedure → DB（${callGraph.procedures.length}）`, [
+      '型チェッカーで `procedure → service → .from() / .rpc()` を辿った結果。DI（`this.x.method`）や',
+      '条件分岐で決まるテーブル名も解決する。ここに出ない procedure は DB を触らない。',
+      '',
+      ...table(
+        ['procedure', 'テーブル', 'DB 関数'],
+        callGraph.procedures.map((procedure) => [
+          code(procedure.id),
+          joinCode(procedure.tables),
+          joinCode(procedure.functions),
+        ]),
+      ),
+    ]),
+  );
+
+  out.push(
+    ...section(`### MCP tool → DB（${callGraph.mcpTools.length}）`, [
+      'tRPC を経由しない書き込み tool は、receipt を残す `apply_mcp_*` 関数を必ず通る（`pnpm architecture:check` が検査する）。',
+      '',
+      ...table(
+        ['tool', 'テーブル', 'DB 関数'],
+        callGraph.mcpTools.map((tool) => [
+          code(tool.tool),
+          joinCode(tool.tables),
+          joinCode(tool.functions),
+        ]),
+      ),
+    ]),
+  );
+
+  out.push(
+    ...section('### 画面 → 使う procedure', [
+      'page から import を宣言元まで解決して辿った結果（barrel の再 export で無関係な feature を',
+      '引き込まない）。prefetch と client hook の両方を含む。',
+      '',
+      ...table(
+        ['route', '数', 'procedure'],
+        callGraph.pages.map((page) => [
+          code(page.route),
+          String(page.procedures.length),
+          joinCode(page.procedures),
+        ]),
+      ),
     ]),
   );
 
