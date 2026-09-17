@@ -47,7 +47,7 @@ description: 非 trivial な作業の成功条件・実行方法・モデル選�
 
 初期対象は repository-wide search、関連実装・テストの discovery、大量ログの分類など read-only の大量調査。主作業から独立し、短く検証可能な成果が返り、親の照合まで含めて利益がある場合に限る。architecture・debugging の判断、認可・migration・時間不変条件、重要な編集は主担当が持つ。
 
-read-only と repository scope を runtime で同時に機械強制できる adapter は現在ないため、大量の読み取り調査も委譲せず主担当が行う。将来、両方の境界を実測できる adapter が追加された場合だけ、Codex は Luna（`gpt-5.6-luna`）、Claude は Haiku 相当を候補にする。native `spawn_agent` / `Agent` は read-only sandbox と scope を観測できないため使わない。専用 security harness のモデル選択はこの読み取り調査の指定対象ではない。
+read-only と repository scope を runtime で同時に機械強制できる adapter は現在ないため、大量の読み取り調査も委譲せず主担当が行う。将来、両方の境界を実測できる adapter が追加された場合だけ、Codex は Luna（`gpt-5.6-luna`）、Claude は Haiku 相当を候補にする。native `spawn_agent` / `Agent` は read-only 経路には使わない。User が明示した write / browser task の委譲は、非重複 scope と既存の authority 契約に従って別途扱う。専用 security harness のモデル選択はこの読み取り調査の指定対象ではない。
 
 渡すものは成功条件、読む範囲、既知の制約、検証方法、禁止操作。返却は「確認した範囲／事実／file・symbol・location／未確認範囲／不足情報」に絞る。prompt の read-only 指示は security boundary ではないため、runtime の権限も合わせる。専用 security harness のレビューはこの通常調査とは別契約で行う。
 

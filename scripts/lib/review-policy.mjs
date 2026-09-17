@@ -295,7 +295,7 @@ export function evaluateReviewPolicy({
   // 既存証跡を使う場合も裁定確認を通す: PR の全 thread が「信頼済み人間の返信つきで resolve」で
   // なければ pending-adjudication のまま。ここから新しい reviewer は起動しない。
   const existingSummaryEvidence = summary.status === 'satisfied';
-  if (existingSummaryEvidence && ['unknown', 'failed', 'not-started', 'stale'].includes(state)) {
+  if (existingSummaryEvidence && ['unknown', 'failed'].includes(state)) {
     adjudication = adjudicationOf(evidence, new Set());
     if (adjudication.unresolved > 0 || adjudication.silent > 0) {
       state = 'pending-adjudication';

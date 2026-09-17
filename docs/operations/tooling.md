@@ -566,7 +566,7 @@ Codex でこの project を初めて開く時は、project trust を確認し、
 
 高リスク変更の immutable pack / role / envelope / validation は過去証跡を検証するため同 skill の `references/high-risk-review.md` と道具を保持するが、通常の追加 reviewer は停止中で実行しない。既存の `[review-summary]` は読み取り互換だけを残す。明示依頼された security sweep と不可逆操作の独立レビュー条件は通常レビューで置き換えない。
 
-read-only と repository scope を runtime で同時に強制できる delegate は現在ないため、大量の repository 読み取り調査は親担当が行う。native delegation も read-only / scope 境界を観測できないため使わない。将来、両方を実測できる adapter が追加された場合だけ、Luna / Haiku の候補と env・timeout・fallback 契約を再評価する。
+read-only と repository scope を runtime で同時に強制できる delegate は現在ないため、大量の repository 読み取り調査は親担当が行う。native delegation は read-only 経路には使わない。User が明示した write / browser task は、非重複 scope と既存の authority 契約に従って別途扱う。将来、両方を実測できる adapter が追加された場合だけ、Luna / Haiku の候補と env・timeout・fallback 契約を再評価する。
 
 ### pack の種別と契約 version
 

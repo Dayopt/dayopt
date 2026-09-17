@@ -167,15 +167,33 @@ describe('Codex shell and loader', () => {
 
 describe('Codex delegation boundary', () => {
   it.each(['spawn_agent', 'collaboration.spawn_agent'])(
-    'blocks native %s because its read-only scope is unobservable',
+    'blocks explicit read-only %s because its scope is unobservable',
     async (tool_name) => {
       const result = await evaluateCodex(
-        JSON.stringify({ cwd: root, tool_name, tool_input: { task: 'inspect files' } }),
+        JSON.stringify({
+          cwd: root,
+          tool_name,
+          tool_input: { readOnly: true, task: 'inspect files' },
+        }),
       );
       expect(result).toMatchObject({
         decision: 'block',
         message: expect.stringContaining('親担当'),
       });
+    },
+  );
+
+  it.each(['spawn_agent', 'collaboration.spawn_agent'])(
+    'allows an explicit write/browser %s path to remain available',
+    async (tool_name) => {
+      const result = await evaluateCodex(
+        JSON.stringify({
+          cwd: root,
+          tool_name,
+          tool_input: { mode: 'write', task: 'implement the scoped change' },
+        }),
+      );
+      expect(result).toEqual({ decision: 'allow' });
     },
   );
 });

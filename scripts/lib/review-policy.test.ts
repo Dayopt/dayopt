@@ -373,6 +373,21 @@ describe('review policy: completion evidence', () => {
     expect(result.reason).toMatch(/Existing fixed-diff review evidence/);
   });
 
+  it('does not let a fixed-diff summary replace a missing or stale Codex request', () => {
+    const notStarted = evaluate([APP], evidence({ comments: [highRiskSummary(HEAD)] }));
+    expect(notStarted.state).toBe('not-started');
+    expect(notStarted.verdict).toBe('pending');
+    expect(notStarted.trigger.shouldRequest).toBe(true);
+
+    const stale = evaluate(
+      [APP],
+      evidence({ reviews: [codexReview(OLD)], comments: [highRiskSummary(HEAD)] }),
+    );
+    expect(stale.state).toBe('stale');
+    expect(stale.verdict).toBe('pending');
+    expect(stale.trigger.shouldRequest).toBe(true);
+  });
+
   it('does not request a review of a blocked head or a draft', () => {
     const blocked = evaluate([APP], evidence(), { validationVerdict: 'blocked' });
     expect(blocked.trigger.shouldRequest).toBe(false);
