@@ -4,7 +4,7 @@ description: "How to use Dayopt's Calendar. Switching views, moving between date
 tags: ['calendar', 'tutorial', 'getting-started', 'schedule']
 author: 'Dayopt Team'
 publishedAt: '2026-08-17'
-updatedAt: '2026-08-17'
+updatedAt: '2026-09-17'
 order: 2
 featured: true
 category: 'plan'
@@ -76,6 +76,8 @@ Plans and Records on the calendar are both called "Timeblocks". There are four w
 
 Creating a Timeblock opens the Inspector, a detail panel where you can edit the title, date, time, activity, and notes.
 
+New Timeblocks land on quarter hours — :00, :15, :30, or :45. The shortest one you can create by dragging is 15 minutes.
+
 For more on editing Plans, see [Create Plans](/docs/plans).
 
 ## Drag to move or resize
@@ -84,6 +86,16 @@ For more on editing Plans, see [Create Plans](/docs/plans).
 - **Resize** — drag the bottom edge to change the end time
 
 Press `Escape` while dragging to cancel.
+
+Moving an existing Timeblock also works in 15-minute steps, but it is the **distance you drag** that snaps, not the clock. Drag a Timeblock that starts at 10:07 down one cell and it starts at 10:22. A precise time you typed into the Inspector is never rounded away by a later drag.
+
+Resizing moves only the edge you grabbed — pulling the bottom edge leaves the start time where it was. A Timeblock cannot be shorter than 5 minutes.
+
+## Set an exact time
+
+For a time that does not sit on a quarter hour, use the time fields in the Inspector. They accept single minutes, so you can type `10:07` directly. The 15-minute list that appears when you open a field is a shortcut to common times, not a limit.
+
+Place Timeblocks roughly by dragging on the calendar, then fine-tune them in the Inspector.
 
 ## Delete a Timeblock
 
