@@ -42,11 +42,15 @@ export const SEED_PATH = 'supabase/seed.sql';
 const MIGRATION_FILE = /^(\d{14})_.+\.sql$/;
 export const DB_UPGRADE_JOB = '🧱 DB Upgrade (shadow)';
 
-/** `information_schema` の全 base table の行数（public / auth）。psql `-At -F,` で読む。 */
-export const COUNT_SQL = `select table_schema || '.' || table_name, (xpath('/row/c/text()', query_to_xml(format('select count(*) as c from %I.%I', table_schema, table_name), false, true, '')))[1]::text::int from information_schema.tables where table_schema in ('public', 'auth') and table_type = 'BASE TABLE' order by 1`;
+/** 既存データ・catalog を見る schema。app が所有する private（trigger 経由の control rows）も含める。 */
+export const DATA_SCHEMAS = ['public', 'auth', 'private'];
+const SCHEMA_LIST = DATA_SCHEMAS.map((name) => `'${name}'`).join(', ');
+
+/** `information_schema` の全 base table の行数（DATA_SCHEMAS）。psql `-At -F,` で読む。 */
+export const COUNT_SQL = `select table_schema || '.' || table_name, (xpath('/row/c/text()', query_to_xml(format('select count(*) as c from %I.%I', table_schema, table_name), false, true, '')))[1]::text::int from information_schema.tables where table_schema in (${SCHEMA_LIST}) and table_type = 'BASE TABLE' order by 1`;
 
 /** primary key を持つ table とその列（`schema.table,col1|col2`）。行の同一性比較に使う。 */
-export const PK_SQL = `select tc.table_schema || '.' || tc.table_name, string_agg(kcu.column_name, '|' order by kcu.ordinal_position) from information_schema.table_constraints tc join information_schema.key_column_usage kcu on kcu.constraint_schema = tc.constraint_schema and kcu.constraint_name = tc.constraint_name and kcu.table_schema = tc.table_schema and kcu.table_name = tc.table_name where tc.constraint_type = 'PRIMARY KEY' and tc.table_schema in ('public', 'auth') group by 1 order by 1`;
+export const PK_SQL = `select tc.table_schema || '.' || tc.table_name, string_agg(kcu.column_name, '|' order by kcu.ordinal_position) from information_schema.table_constraints tc join information_schema.key_column_usage kcu on kcu.constraint_schema = tc.constraint_schema and kcu.constraint_name = tc.constraint_name and kcu.table_schema = tc.table_schema and kcu.table_name = tc.table_name where tc.constraint_type = 'PRIMARY KEY' and tc.table_schema in (${SCHEMA_LIST}) group by 1 order by 1`;
 
 /** `-At` の PK 一覧を Map<schema.table, string[]> にする。 */
 export function parsePrimaryKeys(output) {
@@ -95,10 +99,10 @@ export function compareRowIdentity(before, after) {
 }
 
 /**
- * public schema の index / constraint / trigger の catalog snapshot（生成型に現れない schema）。
- * fresh と upgraded で同じ文字列になることを要求する。
+ * DATA_SCHEMAS の index / constraint / 非 internal trigger の catalog snapshot（生成型に現れない
+ * schema。auth.users 上の custom trigger も含む）。fresh と upgraded で同じ文字列になることを要求する。
  */
-export const CATALOG_SQL = `select 'index:' || schemaname || '.' || indexname || ' ' || indexdef from pg_indexes where schemaname = 'public' union all select 'constraint:' || n.nspname || '.' || c.conrelid::regclass::text || '.' || c.conname || ' ' || pg_get_constraintdef(c.oid) from pg_constraint c join pg_namespace n on n.oid = c.connamespace where n.nspname = 'public' union all select 'trigger:' || t.tgrelid::regclass::text || '.' || t.tgname || ' ' || pg_get_triggerdef(t.oid) from pg_trigger t join pg_class r on r.oid = t.tgrelid join pg_namespace n on n.oid = r.relnamespace where n.nspname = 'public' and not t.tgisinternal order by 1`;
+export const CATALOG_SQL = `select 'index:' || schemaname || '.' || indexname || ' ' || indexdef from pg_indexes where schemaname in (${SCHEMA_LIST}) union all select 'constraint:' || n.nspname || '.' || c.conrelid::regclass::text || '.' || c.conname || ' ' || pg_get_constraintdef(c.oid) from pg_constraint c join pg_namespace n on n.oid = c.connamespace where n.nspname in (${SCHEMA_LIST}) union all select 'trigger:' || n.nspname || '.' || t.tgrelid::regclass::text || '.' || t.tgname || ' ' || pg_get_triggerdef(t.oid) from pg_trigger t join pg_class r on r.oid = t.tgrelid join pg_namespace n on n.oid = r.relnamespace where n.nspname in (${SCHEMA_LIST}) and not t.tgisinternal order by 1`;
 
 /**
  * Functions の 1 entity（`      name: {` の次行から `      };` の前まで）を Args / Returns に分ける。
@@ -178,6 +182,7 @@ export function extractSchemaContract(typesText) {
             columns: new Map(),
             insert: new Map(),
             update: new Map(),
+            relationships: new Set(),
           },
         );
       if (section === 'Views') contract.views.set(entity, { columns: new Map() });
@@ -209,6 +214,22 @@ export function extractSchemaContract(typesText) {
         }
         contract.enums.set(entity, new Set(values));
       }
+      continue;
+    }
+    if (section === 'Tables' && entity && /^ {8}Relationships: \[$/.test(line)) {
+      // `{ foreignKeyName; columns; isOneToOne; referencedRelation; referencedColumns }` を 1 件ずつ
+      // 正規化した文字列にする（旧 build の embedded relation 問い合わせが解決できる契約）
+      let j = i + 1;
+      let current = [];
+      while (j < lines.length && !/^ {8}\];$/.test(lines[j])) {
+        const text = lines[j].trim();
+        if (text === '{') current = [];
+        else if (text === '},' || text === '}')
+          contract.tables.get(entity).relationships.add(current.join(' '));
+        else current.push(text);
+        j += 1;
+      }
+      i = j;
       continue;
     }
     if ((section === 'Tables' || section === 'Views') && entity) {
@@ -251,6 +272,7 @@ export function compareSchemaContracts(base, candidate) {
     columns: [],
     columnTypes: [],
     writeContracts: [],
+    relationships: [],
     views: [],
     viewColumns: [],
     functions: [],
@@ -272,7 +294,13 @@ export function compareSchemaContracts(base, candidate) {
     for (const kind of /** @type {const} */ (['insert', 'update'])) {
       for (const [column, spec] of contract[kind]) {
         const nextSpec = next[kind].get(column);
-        if (!nextSpec) continue; // 列の消失は columns 側で数える
+        if (!nextSpec) {
+          // Row に残っていても書き込みから消えた列（generated / read-only 化）は旧 writer を壊す。
+          // Row からも消えた列は columns 側で数える
+          if (next.columns.has(column))
+            removed.writeContracts.push(`${table}.${column} (${kind}): no longer writable`);
+          continue;
+        }
         if (nextSpec.type !== spec.type)
           removed.writeContracts.push(
             `${table}.${column} (${kind}): ${spec.type} → ${nextSpec.type}`,
@@ -286,6 +314,9 @@ export function compareSchemaContracts(base, candidate) {
         removed.writeContracts.push(
           `${table}.${column} (insert): new required column (old writers omit it)`,
         );
+    for (const relationship of contract.relationships)
+      if (!next.relationships.has(relationship))
+        removed.relationships.push(`${table}: ${relationship}`);
   }
   for (const [view, contract] of base.views) {
     const next = candidate.views.get(view);
@@ -581,7 +612,7 @@ export function runDbUpgradeCheck({
       );
     } else
       result.checks.oldConsumer =
-        'every table / column (type and nullability) / view column / function signature / enum value used by the base types still exists';
+        'every table / column (type, nullability, writability) / relationship / view column / function signature / enum value used by the base types still exists';
     // 7. 生成型に現れない schema（index / constraint / trigger）も fresh と一致する。既存行の有無で
     //    分岐する migration は fresh と upgraded で違う catalog を作り得るので、ここで fresh を
     //    作り直して catalog を比較する（追加分は戻してあるので reset = candidate 全部）
