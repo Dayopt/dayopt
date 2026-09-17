@@ -586,6 +586,14 @@ required status checks の実状は ruleset が正本で、context の一覧を�
   のような「docs パスだが integration 対象」の PR で RLS drift 検査が一度も走らずに merge できる
   （#2552 で実際に空いていた穴。ci.yml の integration job の `if:` と同じ向きに揃える）。契約は
   `scripts/__tests__/finish-branch.test.ts` §軽量層（Static Checks / Unit Tests）の実走要求 が固定する
+- **docs-only PR の scripts suite は `🔍 Static Checks` が肩代わりする（2026-09-18、[#2822](https://github.com/Dayopt/dayopt/issues/2822)）。**
+  scripts のテストは `docs/` を入力に読む（`scripts/lib/scripts-taxonomy.ts` が docs 全体を walk して
+  script の分類を決める）。`📦 Unit Tests` の免除をそのままにすると、docs に 1 行足した PR が緑で merge され
+  **main で `pnpm check` が落ちる**（実際に 2 回踏んだ）。`scripts/ci/check.mjs` の `runStatic()` は
+  `shouldRunScriptsTestsInStatic(docsOnly)` が真の時だけ `pnpm test:scripts` を実行し、
+  `shouldRunStaticLanes` と排他になる（非 docs-only では `runUnit()` が同じ suite を走らせるので二重実行しない）。
+  docs を入力に持つテストだけを別 suite へ切り出す案は採らない（対象一覧を人手で維持すると、新しく docs を
+  読み始めたテストが静かに漏れる）
 - **`ci.yml` / `scripts/ci/check.mjs` は `INTEGRATION_GLOBS` に含める（#2539）。** integration を独立 job へ
   切り出した結果、job まるごとが `if:` で skip されうるようになった。配線を持つこの 2 ファイルを
   中立扱いのままにすると、**配線を変えた当の job を一度も実走させずに merge** できる（`nightly.yml` を
