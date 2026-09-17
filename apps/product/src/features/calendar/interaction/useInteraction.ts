@@ -17,7 +17,6 @@ import { useHapticFeedback } from '../hooks/accessibility/useHapticFeedback';
 
 import { isPlanRecordDrop } from '@/features/timeblock';
 import { checkClientSideOverlapByKind } from '../lib/overlap';
-import { hasCalendarActualRangeDiff } from '../lib/timeblock-time';
 import { DEFAULT_PLAN_LANE_WIDTH_PERCENT } from '../lib/two-lane-layout';
 import { useCalendarDragStore } from '../stores/useCalendarDragStore';
 
@@ -128,11 +127,9 @@ export function useInteraction(props: UseInteractionProps): UseInteractionReturn
         }
         return 3600000; // default 1h
       },
-      getResizeMinEndMinutes: (timeblockId: string) => {
-        const event = r.events.find((candidate) => candidate.id === timeblockId);
-        if (!hasCalendarActualRangeDiff(event) || !event?.actualStartDate) return null;
-        return event.actualStartDate.getHours() * 60 + event.actualStartDate.getMinutes();
-      },
+      // Plan / Record 分離モデルでは 1 件が持つ時刻は 1 組だけで、リサイズ下限を
+      // 確定済み実績で縛る必要がない（旧 entries 統合モデルの名残として 2026-09-16 に撤去）。
+      getResizeMinEndMinutes: () => null,
       // 自動記録モデルでは drag / resize とも「planned のみ移動・確定済み actual は固定」で
       // 重複判定が同一なため operation は使わない（machine の API 形状だけ維持する）
       checkOverlap: (timeblockId: string, start: Date, end: Date, operation: 'drag' | 'resize') => {

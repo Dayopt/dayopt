@@ -105,12 +105,12 @@ describe('computeSelectionMove', () => {
     expect(result.snapChanged).toBe(false);
   });
 
-  it('同一レーン（plan）の既存 entry と重なると isOverlapping になる', () => {
+  it('同一レーン（plan）の既存 timeblock と重なると isOverlapping になる', () => {
     const result = computeSelectionMove(makeInput({ plans: [makePlan(9, 10)] }));
     expect(result.isOverlapping).toBe(true);
   });
 
-  it('重ならない entry では isOverlapping にならない', () => {
+  it('重ならない timeblock では isOverlapping にならない', () => {
     const result = computeSelectionMove(makeInput({ plans: [makePlan(11, 12)] }));
     expect(result.isOverlapping).toBe(false);
   });

@@ -16,16 +16,16 @@ import type { CalendarDisplayEvent, CalendarViewType, ViewDateRange } from './ca
  */
 interface BaseViewProps {
   // Core data
-  entries: CalendarDisplayEvent[];
+  timeblocks: CalendarDisplayEvent[];
   currentDate: Date;
 
   // Display options
   className?: string | undefined;
 
   // Timeblock handlers（最小限）
-  onEntryClick?: ((entry: CalendarDisplayEvent) => void) | undefined;
-  onEntryContextMenu?:
-    ((entry: CalendarDisplayEvent, mouseEvent: React.MouseEvent) => void) | undefined;
+  onTimeblockClick?: ((timeblock: CalendarDisplayEvent) => void) | undefined;
+  onTimeblockContextMenu?:
+    ((timeblock: CalendarDisplayEvent, mouseEvent: React.MouseEvent) => void) | undefined;
 }
 
 /**
@@ -35,10 +35,10 @@ interface BaseViewProps {
 export interface GridViewProps extends BaseViewProps {
   // Core data
   dateRange: ViewDateRange;
-  /** 全エントリ（期限切れ未完了表示用、日付フィルタリング前） */
+  /** 全タイムブロック（期限切れ未完了表示用、日付フィルタリング前） */
   allTimeblocks?: CalendarDisplayEvent[] | undefined;
   /**
-   * 外部カレンダーの未変換予定（ghost、#1962）。読み取り専用で `entries` とは別に持つ。
+   * 外部カレンダーの未変換予定（ghost、#1962）。読み取り専用で `timeblocks` とは別に持つ。
    * plan / record と違い DB の EXCLUDE 制約が無いため重なり、座標計算も別系統になる。
    */
   externalEvents?: ExternalCalendarEvent[] | undefined;
@@ -47,14 +47,14 @@ export interface GridViewProps extends BaseViewProps {
   showWeekends?: boolean | undefined;
   /** compare の差分 Rail を表示する */
   showActualDiff?: boolean | undefined;
-  /** compare Rail に出ている entry の ID 一覧 */
-  dayDiffEntryIds?: ReadonlySet<string> | undefined;
+  /** compare Rail に出ている timeblock の ID 一覧 */
+  dayDiffTimeblockIds?: ReadonlySet<string> | undefined;
 
-  /** DnDを無効化するTimeblock ID（Inspector表示中のエントリなど） */
+  /** DnDを無効化するTimeblock ID（Inspector表示中のタイムブロックなど） */
   disabledTimeblockId?: string | null | undefined;
 
   // Timeblock handlers（グリッド操作用）
-  onUpdateEntry?:
+  onTimeblockUpdate?:
     | ((
         timeblockIdOrTimeblock: string | CalendarDisplayEvent,
         updates?: {
@@ -75,10 +75,10 @@ export interface GridViewProps extends BaseViewProps {
 }
 
 /**
- * エントリ位置情報の基本型
+ * タイムブロック位置情報の基本型
  * 4箇所で重複していた TimeblockPosition を統一
  */
-export interface BaseEntryPosition {
+export interface BaseTimeblockPosition {
   plan: CalendarDisplayEvent;
   top: number;
   height: number;

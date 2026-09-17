@@ -299,7 +299,7 @@ export const oauthTokenGlobalRateLimit = createRateLimiter(
 );
 
 /**
- * エントリ作成の日次上限
+ * タイムブロック作成の日次上限
  * 500リクエスト / 24時間 per user
  */
 export const timeblockCreateRateLimit = createRateLimiter(

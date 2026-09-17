@@ -19,7 +19,7 @@ import type { WeekViewProps } from '../../../types/week-view.types';
  * 1. shared/DateDisplay で7日分の日付表示
  * 2. ScrollableCalendarLayout（時間軸 + グリッド + 現在時刻線）
  * 3. 7つの WeekContent を横並び
- * 4. TimeblockCard でエントリ表示
+ * 4. TimeblockCard でタイムブロック表示
  *
  * レイアウト:
  * ┌────┬────┬────┬────┬────┬────┬────┬────┐
@@ -33,18 +33,18 @@ import type { WeekViewProps } from '../../../types/week-view.types';
  */
 export const WeekView = ({
   dateRange,
-  entries,
+  timeblocks,
   allTimeblocks,
   externalEvents,
   showWeekends = true,
   weekStartsOn: weekStartsOnProp,
   showActualDiff = false,
-  dayDiffEntryIds,
+  dayDiffTimeblockIds,
   className,
   disabledTimeblockId,
-  onEntryClick,
-  onEntryContextMenu,
-  onUpdateEntry,
+  onTimeblockClick,
+  onTimeblockContextMenu,
+  onTimeblockUpdate,
   onTimeRangeSelect,
 }: WeekViewProps) => {
   const weekStartsOnSetting = useUserPreferences((s) => s.weekStartsOn);
@@ -55,7 +55,7 @@ export const WeekView = ({
   // WeekView専用ロジック
   const { weekDates, eventsByDate, todayIndex } = useWeekView({
     startDate: dateRange.start,
-    events: entries,
+    events: timeblocks,
     timezone,
     weekStartsOn,
   });
@@ -69,19 +69,19 @@ export const WeekView = ({
     <CalendarViewAnimation viewType="week">
       <WeekGrid
         weekDates={displayDates}
-        events={entries}
+        events={timeblocks}
         allTimeblocks={allTimeblocks}
         externalEvents={externalEvents}
         eventsByDate={eventsByDate}
         todayIndex={todayIndex}
         disabledTimeblockId={disabledTimeblockId}
-        onEventClick={onEntryClick}
-        onEventContextMenu={onEntryContextMenu}
-        onEventUpdate={onUpdateEntry}
+        onEventClick={onTimeblockClick}
+        onEventContextMenu={onTimeblockContextMenu}
+        onEventUpdate={onTimeblockUpdate}
         onTimeRangeSelect={onTimeRangeSelect}
         className={className}
         showActualDiff={showActualDiff}
-        dayDiffEntryIds={dayDiffEntryIds}
+        dayDiffTimeblockIds={dayDiffTimeblockIds}
       />
     </CalendarViewAnimation>
   );

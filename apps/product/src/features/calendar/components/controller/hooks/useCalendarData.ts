@@ -54,7 +54,7 @@ interface UseCalendarDataResult {
   isTimeblocksLoading: boolean;
   /** バックグラウンド再取得中も含めて取得中かどうか */
   isTimeblocksFetching: boolean;
-  /** エントリ取得を手動で再試行する */
+  /** タイムブロック取得を手動で再試行する */
   refetchTimeblocks: () => Promise<unknown>;
   /** ナビゲーション方向に対応する日付範囲を事前取得する */
   prefetchDirection: (direction: 'prev' | 'next' | 'today') => void;
@@ -94,7 +94,7 @@ export function useCalendarData({
     [listInput],
   );
 
-  // Step 8: entries を読まず、plans / records をそれぞれ取得する。
+  // Step 8: timeblocks を読まず、plans / records をそれぞれ取得する。
   const plansQuery = api.plans.list.useQuery(listInput);
   const recordsQuery = api.records.list.useQuery(listInput);
 
@@ -204,7 +204,7 @@ export function useCalendarData({
   );
 
   // フィルター関数と状態を取得（ストアに統一）
-  const isEntryVisible = useCalendarFilterStore((state) => state.isEntryVisible);
+  const matchesActivityFilter = useCalendarFilterStore((state) => state.matchesActivityFilter);
   // タグフィルタ変更時に useMemo を再実行させるためのリアクティブ依存
   // useDeferredValue でフィルター変更時のカレンダー再描画を遅延し、
   // チェックボックスUIの即時応答を維持する
@@ -213,18 +213,16 @@ export function useCalendarData({
   );
   // 未分類(タグなし)フィルターの表示切替も同様にリアクティブ依存として渡す（#1576）
 
-  // Step 8 の表示互換射影。既存のカードと DnD の段階的置換が完了するまで
+  // plans / records から表示用射影（CalendarDisplayEvent）を組む。
   // CalendarDisplayEvent は view model としてだけ維持し、データ取得は time model に固定する。
   const allCalendarEvents = useMemo(() => {
     const visiblePlans = plansQuery.data ?? [];
     const visibleRecords = recordsQuery.data ?? [];
     const plans = visiblePlans;
     const records = visibleRecords;
-    const now = new Date();
     const planEvents = plans.map((plan) => {
       const startDate = new Date(plan.start_at);
       const endDate = new Date(plan.end_at);
-      const timeblockState = endDate <= now ? 'past' : startDate <= now ? 'active' : 'upcoming';
       return applyTimezoneToDisplayDates(
         {
           id: plan.id,
@@ -232,21 +230,13 @@ export function useCalendarData({
           description: plan.note ?? undefined,
           startDate,
           endDate,
-          status: timeblockState === 'past' ? 'closed' : 'open',
           color: '',
           activityId: plan.activity_id,
-          createdAt: new Date(plan.created_at),
-          updatedAt: new Date(plan.updated_at),
           version: plan.updated_at,
           displayStartDate: startDate,
           displayEndDate: endDate,
           duration: Math.round((endDate.getTime() - startDate.getTime()) / 60_000),
           isMultiDay: !tzIsSameDay(startDate, endDate, timezone),
-          timeblockState,
-          plannedStartDate: startDate,
-          plannedEndDate: endDate,
-          actualStartDate: null,
-          actualEndDate: null,
           kind: 'plan' as const,
         },
         timezone,
@@ -265,21 +255,13 @@ export function useCalendarData({
         description: record.note ?? undefined,
         startDate: record.startDate,
         endDate: record.endDate,
-        status: 'closed' as const,
         color: '',
         activityId: record.activityId,
-        createdAt: new Date(sourceRow.created_at),
-        updatedAt: new Date(sourceRow.updated_at),
         version: sourceRow.updated_at,
         displayStartDate: record.displayStartDate,
         displayEndDate: record.displayEndDate,
         duration: record.duration,
         isMultiDay: !tzIsSameDay(record.startDate, record.endDate, timezone),
-        timeblockState: 'past' as const,
-        actualStartDate: record.startDate,
-        actualEndDate: record.endDate,
-        plannedStartDate: null,
-        plannedEndDate: null,
         kind: 'record' as const,
         recordSource: sourceRow.source,
       };
@@ -314,12 +296,12 @@ export function useCalendarData({
 
     // サイドバーのフィルター設定を適用
     const visibilityFiltered = filtered.filter((event) => {
-      return isEntryVisible(event.activityId ?? null);
+      return matchesActivityFilter(event.activityId ?? null);
     });
 
     return visibilityFiltered;
     // eslint-disable-next-line react-hooks/exhaustive-deps -- visibleActivityIds はリアクティブ依存（関数参照は安定のため直接依存不可）
-  }, [viewDateRange, allCalendarEvents, timezone, isEntryVisible, visibleActivityIds]);
+  }, [viewDateRange, allCalendarEvents, timezone, matchesActivityFilter, visibleActivityIds]);
 
   return {
     viewDateRange,

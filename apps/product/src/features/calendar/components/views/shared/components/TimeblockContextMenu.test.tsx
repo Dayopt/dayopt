@@ -12,12 +12,9 @@ const migratedRecord: CalendarDisplayEvent = {
   id: 'record-1',
   kind: 'record',
   title: '移行済み実績',
-  status: 'closed',
   color: 'var(--primary)',
   startDate: new Date('2026-07-28T01:00:00.000Z'),
   endDate: new Date('2026-07-28T02:00:00.000Z'),
-  createdAt: new Date('2026-07-28T01:00:00.000Z'),
-  updatedAt: new Date('2026-07-28T03:00:00.000Z'),
   version: '2026-07-28T03:00:00.000001+00:00',
   displayStartDate: new Date('2026-07-28T01:00:00.000Z'),
   displayEndDate: new Date('2026-07-28T02:00:00.000Z'),
@@ -30,7 +27,7 @@ describe('EventContextMenu', () => {
   it('auto_migrated Recordには削除操作を表示しない', () => {
     render(
       <EventContextMenu
-        entry={migratedRecord}
+        timeblock={migratedRecord}
         position={{ x: 0, y: 0 }}
         onClose={vi.fn()}
         onCopy={vi.fn()}
@@ -52,7 +49,7 @@ describe('EventContextMenu', () => {
 
     render(
       <EventContextMenu
-        entry={plan}
+        timeblock={plan}
         position={{ x: 0, y: 0 }}
         onClose={vi.fn()}
         onCopy={vi.fn()}
