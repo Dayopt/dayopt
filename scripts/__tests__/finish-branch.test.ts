@@ -724,6 +724,17 @@ describe('実データの rollup（PR #1765）', () => {
 });
 
 describe('畳み込みで緩めてはいけない判定', () => {
+  it('advisory の shadow status が pending / failure でも required check が揃えば進む', () => {
+    const { status, stderr } = runScript([
+      ...requiredChecks(),
+      statusContext('Review policy (shadow)', 'PENDING', '2026-08-03T10:03:00Z'),
+      statusContext('Validation (shadow)', 'FAILURE', '2026-08-03T10:04:00Z'),
+    ]);
+    expect(stderr).not.toContain('失敗している check');
+    expect(stderr).not.toContain('実行中の check');
+    expect(status).toBe(0);
+  });
+
   it('単発の failure は従来どおり止める', () => {
     const { status, stderr } = runScript([
       checkRun('CI', 'SUCCESS', '2026-07-30T10:00:00Z'),
