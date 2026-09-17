@@ -90,9 +90,11 @@ describe('getLegalDocument', () => {
 
       expect(content).toContain('contactData:');
       expect(content).toContain('resend:');
-      expect(content).toContain('cloudflareEmail:');
+      expect(content).toContain('Email Routing');
       expect(content).toContain('google:');
-      expect(content).toContain('contact:');
+      expect(content).toContain('Gmail');
+      expect(content).toContain('billing:');
+      expect(content).toContain('HUMAN-05');
       expect(content).not.toContain("github: 'GitHub");
     }
   });

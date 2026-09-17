@@ -1,251 +1,170 @@
 ---
 title: 'Privacy Policy'
 description: 'How Dayopt handles your personal information'
-lastUpdated: 'Last Updated: 2026-08-17'
+lastUpdated: 'Review draft: 2026-09-17'
 ---
 
 <PrivacyDocument
   data={{
     sections: {
       introduction: {
-        title: 'Introduction',
+        title: 'Who operates Dayopt',
         content:
-          'Dayopt (the "Service") respects your privacy and is committed to protecting your personal information. This Privacy Policy explains how we collect, use, and protect your personal information.',
+          'Dayopt helps you plan and record your time. This policy covers the website, application and connected services. Data controller: [HUMAN-01: insert the legal operator name and business address before publication]. For privacy requests, contact support@dayopt.app.',
       },
       dataCollection: {
-        title: 'Information We Collect',
-        accountInfo: 'Account Information (email address, name, profile picture)',
-        usageData: 'Service Usage Data (tasks, calendar, settings)',
+        title: 'Information we collect',
+        accountInfo:
+          'Account information: email address, profile name and avatar, authentication and account settings.',
+        usageData:
+          'Service data: plans, records, activities, categories and preferences that you create or manage. Optional Google Calendar access is described below.',
+        billing:
+          'Billing information: subscription status, provider customer identifiers and payment history supplied by Stripe. Card details are collected by Stripe; Dayopt does not store full card numbers.',
         contactData:
-          'Contact correspondence (name, email address, category, message, and, for authenticated Product submissions, limited application and browser environment details)',
+          'Support correspondence: name, email, inquiry category and message. In-app inquiries may include limited browser and application diagnostics.',
         technicalData:
-          'Minimal Technical Diagnostics (application version, route path, browser or device type, and error or trace identifiers). Sentry events exclude request bodies, email addresses, URL query strings, cookies, and authorization credentials.',
-        cookies: 'Cookies and similar technologies',
+          'Technical information: request and security logs, error and performance diagnostics, and service usage events. We filter Sentry payloads to remove request bodies, email addresses, query strings, cookies and authorization credentials. Infrastructure logs may include IP addresses and user agents.',
+        cookies:
+          'Cookies and local storage used for authentication, preferences and consent choices. Optional browser telemetry is controlled by analytics consent.',
       },
-      dataUsage: {
-        title: 'How We Use Your Information',
-        serviceProvision: 'Providing, operating, and improving the Service',
-        userSupport: 'User support and responding to inquiries',
-        security: 'Preventing unauthorized use and maintaining security',
+      purposes: {
+        title: 'Purposes and legal bases',
+        service:
+          'Providing your account, plans, records, exports and requested integrations, and managing subscriptions: performance of the service contract, where that legal basis applies.',
+        support:
+          'Responding to inquiries and sending account or billing notices: performance of a contract or legitimate interests in supporting users, as applicable.',
+        security:
+          'Server and edge error monitoring, security and abuse prevention: legitimate interests in operating a reliable and secure service, subject to applicable law and your rights.',
         analytics:
-          'Production server and edge error monitoring for service reliability, plus browser error monitoring and performance analytics only after analytics consent',
-        communication: 'Sending important notices and service updates',
-      },
-      dataSharing: {
-        title: 'Third-Party Services',
-        intro: 'We work with the following service providers:',
-        supabase: 'Supabase (authentication & database)',
-        vercel:
-          'Vercel (hosting; Vercel Analytics and Speed Insights only after analytics consent)',
-        sentry:
-          'Sentry (Production server and edge error monitoring; browser error monitoring only after analytics consent; Session Replay is disabled). Product and Website data are kept in separate Sentry projects.',
-        resend: 'Resend (outbound contact and transactional email delivery)',
-        cloudflareEmail:
-          'Cloudflare Email Routing (routing inbound support email to the support mailbox)',
-        google: 'Google Gmail (access-controlled destination mailbox for support correspondence)',
-        cloudflare: 'Cloudflare Turnstile (bot protection for forms)',
-        note: 'These providers manage information according to their respective privacy policies.',
-      },
-      dataOwnership: {
-        title: 'Data Ownership',
-        content:
-          'You retain full ownership of all data you create, upload, or store through the Service. Dayopt does not claim any intellectual property rights over your data.',
-        export:
-          'You may export your data at any time through the account settings page. Exports are available in standard formats (JSON, CSV) to ensure portability.',
-        termination:
-          'Upon account deletion or service discontinuation, you will have at least 30 days to export your data before it is permanently removed from our systems.',
-      },
-      subProcessors: {
-        title: 'Sub-Processors',
-        intro: 'We use the following providers to assist in providing the Service:',
-        supabase:
-          'Supabase, Inc. — Authentication and database services. Data location: AWS US-East-1 (N. Virginia, USA)',
-        vercel:
-          'Vercel, Inc. — Hosting, serverless functions, and edge delivery. Vercel Analytics and Speed Insights run in the browser only after analytics consent. Data location: Global Edge Network',
-        sentry:
-          'Functional Software, Inc. (Sentry) — Sanitized Production server and edge error monitoring runs regardless of analytics consent. Browser error monitoring runs only after analytics consent. Session Replay is disabled because the current SDK cannot guarantee removal of URL query strings from Replay payloads. Product and Website data are kept in separate projects. Sentry events exclude request bodies, email addresses, URL query strings, cookies, and authorization credentials. Data location: United States',
-        stripe:
-          'Stripe, Inc. — Payment processing and subscription management. Data location: United States. Stripe is PCI DSS Level 1 certified. We do not store credit card numbers on our servers.',
-        anthropic:
-          "Anthropic, PBC — AI-powered features (chat, weekly review insights). Data location: United States. Your data is processed under Anthropic's API terms and is not used for model training.",
-        openai:
-          "OpenAI, LLC — AI-powered features (optional, when user provides their own API key). Data location: United States. Data processed via API is not used for model training per OpenAI's API data usage policy.",
-        resend:
-          'Resend, Inc. — Outbound contact and transactional email delivery (including account notifications and billing confirmations). Data location: United States',
-        upstash:
-          'Upstash, Inc. — Rate limiting and abuse prevention via serverless Redis. Data location: United States. Hashed technical request identifiers and request counts are stored temporarily.',
-        cloudflareEmail:
-          "Cloudflare, Inc. — Email Routing receives mail addressed to support@dayopt.app and forwards it to the access-controlled support mailbox. Data is processed on Cloudflare's global network.",
-        google:
-          "Google LLC — Gmail is the access-controlled destination mailbox used to receive, manage, and reply to support correspondence. Data location depends on Google's infrastructure and account configuration.",
-        cloudflare:
-          "Cloudflare, Inc. — Turnstile bot protection for forms. A Turnstile token and the requester's IP address are sent to Cloudflare for verification. Data is processed on Cloudflare's global network.",
-        axiom:
-          "Axiom, Inc. — Storage and search of runtime and build logs delivered via Vercel Log Drains. Includes our application's structured logs and Vercel request log metadata such as IP address and browser/user-agent information. Request log path and query strings are excluded from what we send. Data location: United States.",
-        changes:
-          'We will notify you at least 30 days before engaging a new sub-processor or making material changes to existing sub-processor arrangements.',
-      },
-      internationalTransfers: {
-        title: 'International Data Transfers',
-        content:
-          'Your data may be transferred to and processed in countries other than your country of residence.',
-        location:
-          'Primary data storage: AWS US-East-1 (N. Virginia, USA) via Supabase. Edge caching and serverless functions are distributed globally via Vercel.',
-        safeguards:
-          'For transfers from the EU/EEA, we rely on Standard Contractual Clauses (SCCs) approved by the European Commission to ensure adequate data protection.',
-        japan:
-          'For transfers from Japan, we comply with the Act on the Protection of Personal Information (APPI) requirements for cross-border data transfers, including obtaining consent and ensuring the recipient country provides an equivalent level of protection.',
-      },
-      legalBasis: {
-        title: 'Legal Basis for Processing',
-        intro:
-          'We process your personal data on the following legal bases (as applicable under GDPR and similar regulations):',
-        contract:
-          'Contract Performance — Processing necessary to provide the Service you have signed up for, including account management, task storage, and calendar synchronization',
-        consent:
-          'Consent — Browser Sentry, Vercel Analytics, and Speed Insights run only after you opt in to analytics',
-        legitimate:
-          'Legitimate Interests — Sanitized Production server and edge error monitoring, security monitoring, and fraud prevention, where these interests are not overridden by your rights',
+          'Optional browser error and performance monitoring: consent. Separately, server-side service usage events support product and billing analysis; these do not rely on the browser analytics switch. [HUMAN-02: confirm the legal basis and objection process for this analysis before publication.]',
         legal:
-          'Legal Obligation — Where processing is required to comply with applicable laws, regulations, or legal proceedings',
+          'Meeting applicable accounting, legal and regulatory requirements: legal obligation where applicable. We do not use automated decisions that produce legal or similarly significant effects on you.',
       },
-      aiFeatures: {
-        title: 'AI-Powered Features',
+      providers: {
+        title: 'Service providers and data processors',
         intro:
-          'The Service includes optional AI-powered features that process your data to provide productivity insights and suggestions:',
-        whatIsSent:
-          'When you use AI features, the following data may be sent to our AI providers (Anthropic or OpenAI): task titles and descriptions, time tracking data, energy mapping data, and calendar entries. This data is used solely to generate contextual suggestions and insights.',
-        noTraining:
-          'Your data is NOT used to train AI models. Both Anthropic and OpenAI process API requests without using the data for model training or improvement, as specified in their respective API data usage policies.',
-        byok: 'You may optionally provide your own API key (Bring Your Own Key) for OpenAI or Anthropic. When using your own key, requests are sent directly to the provider under your own API agreement. Your API key is encrypted and stored locally on your device, not on our servers.',
-        limitations:
-          'AI-generated content is provided for informational purposes only. We do not guarantee the accuracy, completeness, or reliability of AI outputs. You should review all AI-generated suggestions before acting on them.',
-        optOut:
-          'AI features are optional. You can use the Service without enabling any AI functionality. Free tier users are limited to 30 AI interactions per month.',
+          'We use the following services for the stated purposes. Providers may also retain information for their own legal obligations. User-selected external applications are described separately below.',
+        supabase:
+          'Supabase — authentication, database and file storage; account information and service content.',
+        vercel:
+          'Vercel — website and application hosting, request logs and delivery; browser Analytics and Speed Insights only after analytics consent.',
+        sentry:
+          'Sentry — filtered error and performance diagnostics. Production server and edge monitoring runs independently of browser consent; browser monitoring requires consent. Session Replay is disabled.',
+        stripe: 'Stripe — payment processing, subscriptions, fraud prevention and billing records.',
+        resend:
+          'Resend — transactional email, support replies and delivery status; recipient addresses and message content.',
+        upstash:
+          'Upstash — rate limiting and abuse prevention using short-lived request identifiers and counters.',
+        cloudflare:
+          'Cloudflare — Turnstile form protection (verification tokens, IP addresses and device signals), Email Routing for incoming support messages, and R2 storage backups of avatars and attachments.',
+        google:
+          'Google — Google Calendar integration when connected, and Gmail as the support mailbox for correspondence.',
+        axiom:
+          'Axiom — application and infrastructure logs delivered through Vercel Log Drains. Request metadata may include IP addresses and user agents; request paths and query strings are excluded from the configured drain.',
+        changes:
+          'We update this policy when these arrangements change and provide notices or obtain consent when required by applicable law or a material change in processing.',
+      },
+      transfers: {
+        title: 'Processing locations and international transfers',
+        content:
+          'Providers may process data outside your country, including in the United States and through globally distributed infrastructure.',
+        safeguards:
+          '[HUMAN-03: before publication, insert verified storage regions, contracting entities and the applicable transfer mechanism for each provider, including any required Japanese cross-border disclosures and EU/UK safeguards. Do not treat an unverified SCC or consent statement as an executed agreement.]',
       },
       googleCalendar: {
-        title: 'Google Calendar Integration',
+        title: 'Google Calendar integration',
         intro:
-          'If you connect a Google account, Dayopt reads your calendars so you can plan your day around commitments you already have. This is optional and one-way: Dayopt never creates, modifies, or deletes anything in your Google Calendar.',
-        whatWeAccess:
-          'What we access — the email address and account identifier of the Google account you connect, the list of your calendars so you can choose which ones to import, and the events on the calendars you select.',
-        connectedAccount:
-          "The connected account — we store the account's email address and its stable Google account identifier. We show you the email address so you can tell your connected accounts apart, and we use the identifier to confirm a reconnection is for the same account. The email address and the account identifier are deleted the moment you disconnect the account. Any technical records that might otherwise remain are removed by routine automated cleanup.",
-        whatWeStore:
-          "What we store — from each event, we keep its identifier, title, description, start and end time, whether it is active or cancelled, and the identifier and name of the calendar it came from, together with the usual account and sync bookkeeping we attach to any record we store (which of your connections it belongs to and when it was last synced). For a calendar someone shared with you, that identifier may be the sharing account's email address. Attendees, guest email addresses, locations, conferencing links, and attachments are never used, stored, or logged.",
-        calendarSelection:
-          "Your calendar selection — separately from the events, we store which calendars you chose (each one's Google identifier and name) along with a sync token that lets the next sync fetch only what changed. This is deleted when you deselect the calendar, disconnect the account, or delete your Dayopt account.",
-        howMuchWeRead:
-          'How much we read — the 90 days before and after now. Most syncs only ask Google what changed since the last one; about once a day we re-read the whole window, so the range keeps up with the current date. All-day events are not imported.',
-        howWeUseIt:
-          'How we use it — to help you plan around commitments you already have. We show these events alongside your own plan in your Dayopt timeline. Imported events are visible only to you, and we never share them with anyone else unless you set up a way for us to — for example by granting another application permission to read your entries, or by turning on a calendar feed you subscribe to from another calendar app.',
-        howProtected:
-          'How it is protected — the credentials that let Dayopt read your calendar are encrypted before they are stored.',
-        howToStop:
-          "How to stop it — disconnect the account at any time from Settings. We first delete every imported event you have not built on; if that step fails, we stop there and nothing else changes, so you can safely try again. Once it succeeds, we ask Google to revoke our access and delete the stored credentials and the connected account's email address. If Google had just issued us a replacement key, that replacement stays in an internal queue, encrypted, for up to 24 hours so that we can revoke it as well. If you have already turned an imported event into an entry of your own, we keep both, so we are not deleting part of your history without asking.",
-        accountDeletion:
-          'If you delete your Dayopt account — everything above is deleted, including imported events we would otherwise have kept. We keep a record that the revocation happened, including the identifier of the Google account it applied to, for up to 90 days, so that we can confirm it was carried out and notice if it silently failed.',
-        revokeFromGoogle:
-          "Revoking from Google's side — you can remove Dayopt's access directly from your Google account's security settings at any time, without going through us.",
+          'Connecting Google Calendar is optional. Dayopt reads selected calendars to display commitments alongside your plans; it does not create, change or delete events in Google Calendar.',
+        access:
+          'We request OpenID and email information to identify the connected account, and read-only access to the calendar list and events. We store the connected email address, account identifier, encrypted credentials and sync information.',
+        content:
+          'For selected calendars, we store calendar identifiers and names, event identifiers, titles, descriptions, times and status. We do not request structured attendee, location, conferencing or attachment fields. Titles and descriptions may themselves contain personal information entered in Google Calendar.',
+        window:
+          'Synchronization covers the 90 days before and after the current date. Incremental sync fetches changes; periodic full sync updates that window. All-day events are not imported.',
+        disconnect:
+          'Disconnect in Settings to stop synchronization. Unreferenced imported events, calendar selections and connection credentials are removed through the disconnect process. Imported events used by your own plans or records may remain to preserve that history. Revocation may involve encrypted retry records with limited lifetimes.',
+        deletion:
+          'Account deletion also removes imported events retained for your history. Limited revocation and security records follow the retention table below. You can also revoke access from your Google account security settings.',
         limitedUse:
-          "Dayopt's use of information received from Google APIs adheres to the Google API Services User Data Policy (https://developers.google.com/terms/api-services-user-data-policy), including the Limited Use requirements. We do not sell this data, do not use it for advertising, and do not use it to train AI or machine learning models.",
+          'Use and transfer of information received from Google APIs are subject to the Google API Services User Data Policy, including Limited Use requirements. We do not sell this information, use it for advertising or use it to train general AI models. External access to content derived from Google Calendar is described in the next section.',
+        policyLink: 'Google API Services User Data Policy',
       },
-      dataProcessing: {
-        title: 'Data Processing Details',
-        intro: 'The following describes how we process each category of personal data:',
-        accountData:
-          'Account Data (email, name, avatar) — Processed to create and manage your account, authenticate your identity, and communicate service-related notices',
-        usageData:
-          'Usage Data (tasks, plans, calendar entries, settings) — Processed to provide core Service functionality, generate productivity insights, and improve features',
-        technicalData:
-          'Minimal Technical Diagnostics (application version, route path, browser or device type, and error or trace identifiers) — Sanitized server and edge diagnostics are processed in Production to investigate unexpected failures. Browser diagnostics and performance data are processed only after analytics consent. Sentry events exclude request bodies, email addresses, URL query strings, cookies, and authorization credentials.',
-        automated:
-          'We do not engage in automated decision-making or profiling that produces legal or similarly significant effects on you. AI-powered features (such as weekly review insights) provide suggestions only and do not make decisions on your behalf.',
-        exportInfo:
-          'You can export your data in standard formats (JSON, CSV) at any time from your account settings. We support data portability to ensure you can move your data to another service if desired.',
+      externalConnections: {
+        title: 'External applications, MCP and AI assistants',
+        content:
+          'Dayopt does not provide an in-app AI assistant or send your data to an AI model for built-in AI features. You may connect your own external application or AI assistant through MCP or the API.',
+        access:
+          'An authorized client can read or change data within its granted permissions. This may include titles or descriptions copied from Google Calendar into your plans or records. The client and its provider receive the data returned to them; their terms govern any further processing, retention and model training. We cannot promise that every external provider excludes training.',
+        revoke:
+          'Revoke a connection in Settings to stop future authorized access. Revocation or deleting your Dayopt account does not erase copies already received by an external client. Request deletion from that provider where necessary.',
+        review:
+          '[HUMAN-04: publication is blocked until the Google-derived data transfer route, user disclosures and any required per-use consent or technical exclusion are verified against Google policies. Broad connection consent alone is not evidence of per-use opt-in.]',
       },
-      dataRetention: {
-        title: 'Data Retention',
-        active: 'We retain your data while your account is active',
-        deleted: 'Data is permanently deleted within 30 days after account deletion',
-        contact:
-          'Support correspondence is reviewed periodically and deleted after the inquiry is resolved when it is no longer needed, except where retention is required for legal, security, or dispute-handling purposes',
-        legal: 'Except where retention is required by law',
+      retention: {
+        title: 'Retention and deletion',
+        intro:
+          'Export the data you need before deleting your account. Account deletion does not provide a post-deletion export period. Subscription expiry is different: retained data remains available for viewing, export and deletion.',
+        columns: {
+          category: 'Category',
+          period: 'Retention and deletion',
+        },
+        rows: {
+          primary: {
+            category: 'Account and service data',
+            period:
+              'Kept while the account exists. Successful account deletion removes the account and associated primary data; provider cleanup failures may delay completion. Backups and limited technical records are separate.',
+          },
+          google: {
+            category: 'Google revocation records',
+            period:
+              'Encrypted retry credentials have limited lifetimes; newly rotated credentials queued for revocation have a 24-hour deadline. Revocation records may remain for up to 90 days, with periodic cleanup. Verify live cleanup before publication (HUMAN-05).',
+          },
+          technical: {
+            category: 'OAuth, MCP and usage records',
+            period:
+              'Expiry-based cleanup applies to tokens and authorization codes. MCP mutation receipts and service usage events have 90-day retention rules. Some security and deletion evidence is retained independently of the account. HUMAN-05 covers the exact category limits and cleanup delays.',
+          },
+          backup: {
+            category: 'Database and file backups',
+            period:
+              'Backups expire separately from live data. Cloudflare R2 file backups have a documented 35-day object lock; this is a minimum protection period, not proof of deletion after 35 days. [HUMAN-05: insert verified database backup expiry and R2 deletion/lifecycle limits.]',
+          },
+          providers: {
+            category: 'Diagnostics and provider logs',
+            period:
+              '[HUMAN-05: insert verified retention for Sentry, Axiom, Vercel, Supabase and email delivery logs, including backups and legal exceptions.]',
+          },
+          billing: {
+            category: 'Billing and support',
+            period:
+              'Billing providers may retain records to meet accounting, fraud prevention and legal obligations after account deletion. Support correspondence is reviewed for deletion once no longer needed. [HUMAN-05: confirm applicable statutory periods and the support deletion schedule.]',
+          },
+        },
+        note: 'A deletion request does not override retention required by law. A backup restore must preserve completed deletion requests. We do not promise that all copies held by every provider disappear within 30 days.',
       },
-      userRights: {
-        title: 'Your Rights',
-        access: 'Right to access your personal information',
-        correction: 'Right to correct your personal information',
-        deletion: 'Right to delete your personal information (right to be forgotten)',
-        portability: 'Right to data portability',
-        objection: 'Right to object to processing',
-        complaint:
-          'Right to lodge a complaint with a supervisory authority (e.g., your local data protection authority under GDPR, or the Personal Information Protection Commission in Japan)',
-        contact:
-          'To exercise these rights, please contact us through the settings page or contact form.',
+      rights: {
+        title: 'Your choices and rights',
+        content:
+          'Depending on applicable law, you may request access, correction, deletion, portability, restriction or objection, withdraw consent, and complain to the relevant supervisory authority. Contact support@dayopt.app; we may need proportionate identity verification. These rights may have legal exceptions.',
+        export:
+          'Settings provides JSON export of your profile, plans, records, categories, activities and settings. CSV contains plan and record rows. This self-service export is not a complete copy of provider logs, correspondence or billing records; request other personal information through support.',
+        consent:
+          'You can refuse analytics in the consent banner. To reset a saved choice today, clear this site’s local storage in your browser and reload, then choose again. This can reset other preferences. Server-side diagnostics and service usage processing described above continue. [HUMAN-09: provide and verify an accessible in-service withdrawal control before publication.]',
+        california:
+          'We do not sell personal information or share it for cross-context behavioral advertising. California statutory rights apply where the relevant law covers the service. [HUMAN-02: confirm applicability and request-handling obligations.]',
+        children:
+          'The service is not intended for children under 13. Where local law requires a higher age or a parent or guardian’s authorization, those requirements also apply. [HUMAN-02: approve the age rule and its implementation before publication.]',
+        policyLink: 'Cookie Policy',
       },
       security: {
-        title: 'Security Measures',
-        measures:
-          'We implement industry-standard security measures to protect your personal information from unauthorized access, loss, damage, alteration, and disclosure.',
-        encryption: 'SSL/TLS encryption for data transmission',
-        access: 'Access control and authentication systems',
-        monitoring: 'Regular security audits',
-      },
-      cookies: {
-        title: 'About Cookies',
-        intro:
-          'We use essential cookies and local storage to operate the Service. Optional browser telemetry is controlled by your analytics consent.',
-        essential: 'Essential Cookies (maintain login state)',
-        analytics:
-          'Optional Analytics Technologies (browser Sentry, Vercel Analytics, and Speed Insights)',
-        preference: 'Preference Cookies (save user settings)',
-        control:
-          'If you decline analytics, optional browser telemetry does not start and core features remain available. Sanitized Production server and edge error monitoring continues because it is required to diagnose service failures.',
-        policyLink:
-          'For detailed information about our use of cookies, please see our Cookie Policy.',
-      },
-      dataBreach: {
-        title: 'Data Breach Notification',
+        title: 'Security, incidents and changes',
         content:
-          'In the event of a personal data breach that is likely to result in a risk to your rights and freedoms, we will:',
-        notify:
-          'Notify the relevant supervisory authority within 72 hours of becoming aware of the breach, as required by GDPR Article 33',
-        inform:
-          'Inform affected users without undue delay when the breach is likely to result in a high risk to their rights and freedoms',
-        document: 'Document all breaches, including the facts, effects, and remedial actions taken',
-        measures:
-          'Take immediate steps to contain and remediate the breach, and implement measures to prevent recurrence',
-      },
-      ccpa: {
-        title: 'California Privacy Rights (CCPA/CPRA)',
-        intro:
-          'If you are a California resident, you have additional rights under the California Consumer Privacy Act (CCPA) and the California Privacy Rights Act (CPRA):',
-        know: 'Right to Know — You have the right to request information about the categories and specific pieces of personal information we have collected about you',
-        delete:
-          'Right to Delete — You have the right to request deletion of your personal information, subject to certain exceptions',
-        noSell:
-          'Right to Opt-Out of Sale — We do not sell your personal information to third parties. We do not share your personal information for cross-context behavioral advertising.',
-        nondiscrimination:
-          'Right to Non-Discrimination — We will not discriminate against you for exercising any of your CCPA/CPRA rights',
-        categories:
-          'Categories of personal information we collect: identifiers (email, name), commercial information (subscription status), internet activity (usage data, device info), and inferences drawn from the above',
-        contactPrefix: 'To exercise your California privacy rights, contact us at ',
-        contactSuffix: ' or through your account settings.',
-      },
-      children: {
-        title: "Children's Privacy",
-        content:
-          'Our Service is not intended for children under 13 years old, and we do not knowingly collect personal information from them.',
-      },
-      changes: {
-        title: 'Policy Changes',
-        content:
-          'This Privacy Policy may be updated due to legal changes or business reviews. We will notify users in advance of any significant changes.',
-      },
-      contact: {
-        title: 'Contact Us',
-        content: 'If you have any questions or concerns about privacy, please contact us at:',
+          'We use encrypted connections, access controls, authentication, dependency checks and code review. These measures reduce risk but cannot eliminate every security incident.',
+        breach:
+          'If a personal data incident occurs, we investigate, contain it and notify affected people and authorities where required by the applicable law and its deadlines. [HUMAN-06: confirm the incident response owner and notification procedure.]',
+        changes:
+          'We update this policy when our practices change and provide additional notice or obtain consent where required. The published version will state its effective date.',
+        policyLink: 'Security information',
       },
     },
     contactLabels: {

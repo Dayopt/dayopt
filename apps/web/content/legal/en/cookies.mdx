@@ -1,7 +1,7 @@
 ---
 title: 'Cookie Policy'
 description: 'How Dayopt uses cookies and similar technologies'
-lastUpdated: 'Last Updated: 2026-07-17'
+lastUpdated: 'Review draft: 2026-09-17'
 ---
 
 <CookieDocument
@@ -45,8 +45,8 @@ lastUpdated: 'Last Updated: 2026-07-17'
         },
       },
       specificCookies: {
-        title: 'Specific Cookies We Use',
-        headerName: 'Cookie Name',
+        title: 'Cookies and browser storage',
+        headerName: 'Technology or storage key',
         headerProvider: 'Provider',
         headerPurpose: 'Purpose',
         headerCategory: 'Category',
@@ -56,21 +56,23 @@ lastUpdated: 'Last Updated: 2026-07-17'
           provider: 'Supabase',
           purpose: 'Maintains your authenticated session',
           category: 'Essential',
-          duration: 'Session',
+          duration:
+            'Persistent; refreshed during use. SDK default maximum age is 400 days. Signing out removes the session cookies.',
         },
         nextLocale: {
           name: 'NEXT_LOCALE',
           provider: 'Next.js',
           purpose: 'Stores your language preference',
           category: 'Preference',
-          duration: '1 year',
+          duration:
+            'Session (routing default); verify actual response cookies before publication (HUMAN-09).',
         },
         theme: {
-          name: 'theme',
+          name: 'theme (local storage)',
           provider: 'Dayopt',
           purpose: 'Stores your theme preference (light/dark/system)',
           category: 'Preference',
-          duration: '1 year',
+          duration: 'Until cleared or changed',
         },
         cookieConsent: {
           name: 'dayopt_cookie_consent (local storage)',
@@ -80,11 +82,12 @@ lastUpdated: 'Last Updated: 2026-07-17'
           duration: 'Until cleared',
         },
         vercelAnalytics: {
-          name: 'va_*',
+          name: 'Vercel Analytics / Speed Insights scripts',
           provider: 'Vercel',
           purpose: 'Vercel Analytics and Speed Insights after analytics consent',
           category: 'Analytics',
-          duration: 'Session',
+          duration:
+            'Provider-controlled telemetry; no va_* cookie is asserted. Verify network and storage before publication (HUMAN-09).',
         },
         turnstile: {
           name: 'Cloudflare Turnstile browser technology',
@@ -102,7 +105,7 @@ lastUpdated: 'Last Updated: 2026-07-17'
         vercel:
           'Vercel — Hosting and delivery remain available without analytics consent. Vercel Analytics and Speed Insights run in the browser only after analytics consent.',
         sentry:
-          'Sentry — Sanitized Production server and edge error monitoring runs regardless of analytics consent. Browser Sentry runs only after analytics consent. Session Replay is disabled because the current SDK cannot guarantee removal of URL query strings from Replay payloads. Product and Website data are kept in separate Sentry projects. Sentry events exclude request bodies, email addresses, URL query strings, cookies, and authorization credentials.',
+          'Sentry — server and edge diagnostics continue independently of browser consent. Browser initialization and event sending require analytics consent; SDK code may be included before consent. We filter request bodies, email addresses, query strings, cookies and authorization credentials. Session Replay is disabled.',
         turnstile:
           "Cloudflare Turnstile — Essential bot protection on forms. A verification token and the requester's IP address are sent to Cloudflare. Cloudflare may use necessary browser storage and device signals under its Privacy Policy.",
         note: "Please refer to each provider's privacy policy for more information about its processing and use of browser technologies.",
@@ -110,7 +113,7 @@ lastUpdated: 'Last Updated: 2026-07-17'
       manageCookies: {
         title: 'How to Manage Cookies',
         intro:
-          'You can control and manage cookies through your browser settings. Please note that removing or blocking certain cookies may impact your experience and the functionality of the Service.',
+          'The consent banner offers acceptance or refusal of analytics. To change a saved choice today, clear this site’s local storage and reload, then choose again; this may reset other preferences. Website and application choices are stored separately. [HUMAN-09: a persistent in-service withdrawal control and live network verification are required before publication.]',
         chrome: 'Google Chrome: Settings > Privacy and Security > Cookies and other site data',
         firefox: 'Mozilla Firefox: Settings > Privacy & Security > Cookies and Site Data',
         safari: 'Safari: Preferences > Privacy > Manage Website Data',

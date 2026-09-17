@@ -11,7 +11,8 @@ type SectionBlock =
   | { type: 'note'; key: string }
   | { type: 'support-contact'; prefixKey: string; suffixKey: string }
   | { type: 'link'; labelKey: string; href?: string; hrefKey?: string }
-  | { type: 'contact' };
+  | { type: 'contact' }
+  | { type: 'table'; columns: readonly string[]; rows: readonly string[] };
 
 interface SectionLayout {
   key: string;
@@ -35,41 +36,18 @@ const PRIVACY_SECTIONS: readonly SectionLayout[] = [
     blocks: [
       {
         type: 'list',
-        keys: ['accountInfo', 'usageData', 'contactData', 'technicalData', 'cookies'],
+        keys: ['accountInfo', 'usageData', 'billing', 'contactData', 'technicalData', 'cookies'],
       },
     ],
   },
   {
-    key: 'dataUsage',
-    blocks: [
-      {
-        type: 'list',
-        keys: ['serviceProvision', 'userSupport', 'security', 'analytics', 'communication'],
-      },
-    ],
+    key: 'purposes',
+    blocks: [{ type: 'list', keys: ['service', 'support', 'security', 'analytics', 'legal'] }],
   },
   {
-    key: 'dataSharing',
+    key: 'providers',
     blocks: [
-      { type: 'paragraph', key: 'intro', position: 'before' },
-      {
-        type: 'list',
-        keys: ['supabase', 'vercel', 'sentry', 'resend', 'cloudflareEmail', 'google', 'cloudflare'],
-      },
-      { type: 'note', key: 'note' },
-    ],
-  },
-  {
-    key: 'dataOwnership',
-    blocks: [
-      { type: 'paragraph', key: 'content', position: 'before' },
-      { type: 'list', keys: ['export', 'termination'] },
-    ],
-  },
-  {
-    key: 'subProcessors',
-    blocks: [
-      { type: 'paragraph', key: 'intro', position: 'before' },
+      { type: 'paragraph', key: 'intro', position: 'after' },
       {
         type: 'list',
         keys: [
@@ -77,124 +55,72 @@ const PRIVACY_SECTIONS: readonly SectionLayout[] = [
           'vercel',
           'sentry',
           'stripe',
-          'anthropic',
-          'openai',
           'resend',
           'upstash',
-          'cloudflareEmail',
-          'google',
           'cloudflare',
+          'google',
           'axiom',
         ],
       },
-      { type: 'note', key: 'changes' },
+      { type: 'paragraph', key: 'changes', position: 'after' },
     ],
   },
   {
-    key: 'internationalTransfers',
+    key: 'transfers',
     blocks: [
-      { type: 'paragraph', key: 'content', position: 'before' },
-      { type: 'list', keys: ['location', 'safeguards', 'japan'] },
-    ],
-  },
-  {
-    key: 'legalBasis',
-    blocks: [
-      { type: 'paragraph', key: 'intro', position: 'before' },
-      { type: 'list', keys: ['contract', 'consent', 'legitimate', 'legal'] },
-    ],
-  },
-  {
-    key: 'dataProcessing',
-    blocks: [
-      { type: 'paragraph', key: 'intro', position: 'before' },
-      { type: 'list', keys: ['accountData', 'usageData', 'technicalData'] },
-      { type: 'paragraph', key: 'automated', position: 'after' },
-      { type: 'paragraph', key: 'exportInfo', position: 'after' },
-    ],
-  },
-  {
-    key: 'aiFeatures',
-    blocks: [
-      { type: 'paragraph', key: 'intro', position: 'before' },
-      {
-        type: 'list',
-        keys: ['whatIsSent', 'noTraining', 'byok', 'limitations', 'optOut'],
-      },
+      { type: 'paragraph', key: 'content', position: 'after' },
+      { type: 'paragraph', key: 'safeguards', position: 'after' },
     ],
   },
   {
     key: 'googleCalendar',
     blocks: [
-      { type: 'paragraph', key: 'intro', position: 'before' },
-      {
-        type: 'list',
-        keys: [
-          'whatWeAccess',
-          'connectedAccount',
-          'whatWeStore',
-          'calendarSelection',
-          'howMuchWeRead',
-          'howWeUseIt',
-          'howProtected',
-          'howToStop',
-          'accountDeletion',
-          'revokeFromGoogle',
-        ],
-      },
+      { type: 'paragraph', key: 'intro', position: 'after' },
+      { type: 'list', keys: ['access', 'content', 'window', 'disconnect', 'deletion'] },
       { type: 'paragraph', key: 'limitedUse', position: 'after' },
+      {
+        type: 'link',
+        labelKey: 'policyLink',
+        href: 'https://developers.google.com/terms/api-services-user-data-policy',
+      },
     ],
   },
   {
-    key: 'dataRetention',
-    blocks: [{ type: 'list', keys: ['active', 'deleted', 'contact', 'legal'] }],
+    key: 'externalConnections',
+    blocks: [
+      { type: 'paragraph', key: 'content', position: 'after' },
+      { type: 'list', keys: ['access', 'revoke'] },
+      { type: 'paragraph', key: 'review', position: 'after' },
+    ],
   },
   {
-    key: 'userRights',
+    key: 'retention',
     blocks: [
+      { type: 'paragraph', key: 'intro', position: 'after' },
       {
-        type: 'list',
-        keys: ['access', 'correction', 'deletion', 'portability', 'objection', 'complaint'],
+        type: 'table',
+        columns: ['category', 'period'],
+        rows: ['primary', 'google', 'technical', 'backup', 'providers', 'billing'],
       },
-      { type: 'note', key: 'contact' },
+      { type: 'paragraph', key: 'note', position: 'after' },
+    ],
+  },
+  {
+    key: 'rights',
+    blocks: [
+      { type: 'paragraph', key: 'content', position: 'after' },
+      { type: 'list', keys: ['export', 'consent', 'california', 'children'] },
+      { type: 'link', labelKey: 'policyLink', href: '/legal/cookies' },
     ],
   },
   {
     key: 'security',
     blocks: [
-      { type: 'paragraph', key: 'measures', position: 'before' },
-      { type: 'list', keys: ['encryption', 'access', 'monitoring'] },
+      { type: 'paragraph', key: 'content', position: 'after' },
+      { type: 'paragraph', key: 'breach', position: 'after' },
+      { type: 'paragraph', key: 'changes', position: 'after' },
+      { type: 'link', labelKey: 'policyLink', href: '/legal/security' },
     ],
-  },
-  {
-    key: 'cookies',
-    blocks: [
-      { type: 'paragraph', key: 'intro', position: 'before' },
-      { type: 'list', keys: ['essential', 'analytics', 'preference'] },
-      { type: 'note', key: 'control' },
-      { type: 'link', labelKey: 'policyLink', href: '/legal/cookies' },
-    ],
-  },
-  {
-    key: 'dataBreach',
-    blocks: [
-      { type: 'paragraph', key: 'content', position: 'before' },
-      { type: 'list', keys: ['notify', 'inform', 'document', 'measures'] },
-    ],
-  },
-  {
-    key: 'ccpa',
-    blocks: [
-      { type: 'paragraph', key: 'intro', position: 'before' },
-      { type: 'list', keys: ['know', 'delete', 'noSell', 'nondiscrimination', 'categories'] },
-      { type: 'support-contact', prefixKey: 'contactPrefix', suffixKey: 'contactSuffix' },
-    ],
-  },
-  { key: 'children', blocks: [{ type: 'paragraph', key: 'content' }] },
-  { key: 'changes', blocks: [{ type: 'paragraph', key: 'content' }] },
-  {
-    key: 'contact',
-    blocks: [{ type: 'paragraph', key: 'content', position: 'before' }, { type: 'contact' }],
   },
 ];
 
@@ -203,91 +129,36 @@ const TERMS_SECTIONS: readonly SectionLayout[] = [
   { key: 'serviceDescription', blocks: [{ type: 'paragraph', key: 'content' }] },
   {
     key: 'accountRegistration',
-    blocks: [{ type: 'list', keys: ['requirements', 'responsibility', 'security', 'age'] }],
+    blocks: [{ type: 'list', keys: ['requirements', 'responsibility', 'age'] }],
   },
+  { key: 'acceptableUse', blocks: [{ type: 'paragraph', key: 'content' }] },
   {
-    key: 'userResponsibilities',
-    blocks: [
-      { type: 'paragraph', key: 'intro', position: 'before' },
-      {
-        type: 'list',
-        keys: ['illegal', 'harmful', 'unauthorized', 'impersonation', 'spam', 'content'],
-      },
-    ],
+    key: 'dataOwnership',
+    blocks: [{ type: 'list', keys: ['ownership', 'export', 'termination'] }],
   },
-  {
-    key: 'intellectualProperty',
-    blocks: [{ type: 'list', keys: ['ownership', 'userContent', 'license'] }],
-  },
-  {
-    key: 'aiTerms',
-    blocks: [
-      { type: 'paragraph', key: 'intro', position: 'before' },
-      {
-        type: 'list',
-        keys: ['providers', 'noTraining', 'byok', 'accuracy', 'limits', 'liability'],
-      },
-    ],
-  },
+  { key: 'externalConnections', blocks: [{ type: 'paragraph', key: 'content' }] },
   {
     key: 'subscriptionPlans',
     blocks: [
-      { type: 'paragraph', key: 'intro', position: 'before' },
-      { type: 'list', keys: ['free', 'pro', 'changes', 'downgrade'] },
+      { type: 'paragraph', key: 'intro', position: 'after' },
+      { type: 'list', keys: ['trial', 'paid', 'expiry', 'changes'] },
     ],
   },
-  {
-    key: 'dataOwnership',
-    blocks: [{ type: 'list', keys: ['ownership', 'license', 'export', 'termination'] }],
-  },
-  {
-    key: 'acceptableUse',
-    blocks: [
-      { type: 'paragraph', key: 'intro', position: 'before' },
-      { type: 'list', keys: ['automation', 'reverse', 'abuse', 'resale', 'security'] },
-    ],
-  },
-  {
-    key: 'serviceLevel',
-    blocks: [{ type: 'list', keys: ['target', 'maintenance', 'status', 'credits'] }],
-  },
-  {
-    key: 'limitationOfLiability',
-    blocks: [{ type: 'list', keys: ['cap', 'indirect', 'forceMajeure', 'exceptions'] }],
-  },
-  {
-    key: 'indemnification',
-    blocks: [
-      { type: 'paragraph', key: 'obligation', position: 'before' },
-      { type: 'list', keys: ['violations', 'thirdParty', 'misuse'] },
-      { type: 'note', key: 'notification' },
-    ],
-  },
-  { key: 'dataBackup', blocks: [{ type: 'list', keys: ['responsibility', 'liability'] }] },
-  {
-    key: 'disclaimer',
-    blocks: [{ type: 'list', keys: ['availability', 'interruption', 'damages', 'thirdParty'] }],
-  },
-  {
-    key: 'termination',
-    blocks: [{ type: 'list', keys: ['userInitiated', 'serviceInitiated', 'dataRetention'] }],
-  },
+  { key: 'serviceLevel', blocks: [{ type: 'paragraph', key: 'content' }] },
+  { key: 'limitationOfLiability', blocks: [{ type: 'paragraph', key: 'content' }] },
   {
     key: 'cancellation',
     blocks: [
-      { type: 'paragraph', key: 'summary' },
+      { type: 'paragraph', key: 'summary', position: 'after' },
       { type: 'link', labelKey: 'details', hrefKey: 'detailsLink' },
     ],
   },
+  { key: 'termination', blocks: [{ type: 'paragraph', key: 'content' }] },
   { key: 'modifications', blocks: [{ type: 'paragraph', key: 'content' }] },
-  { key: 'governingLaw', blocks: [{ type: 'list', keys: ['law', 'jurisdiction'] }] },
-  {
-    key: 'generalProvisions',
-    blocks: [{ type: 'list', keys: ['severability', 'entireAgreement', 'waiver', 'assignment'] }],
-  },
+  { key: 'governingLaw', blocks: [{ type: 'paragraph', key: 'content' }] },
   {
     key: 'contact',
-    blocks: [{ type: 'paragraph', key: 'content', position: 'before' }, { type: 'contact' }],
+    blocks: [{ type: 'paragraph', key: 'content', position: 'after' }, { type: 'contact' }],
   },
 ];
 
@@ -367,6 +238,44 @@ function StandardLegalDocument({
                         {readLegalText(section, block.labelKey)}
                       </Link>
                     </p>
+                  );
+                case 'table':
+                  return (
+                    <div key={blockKey} className="overflow-x-auto">
+                      <table className="border-border w-full border text-left text-sm">
+                        <caption className="sr-only">{readLegalText(section, 'title')}</caption>
+                        <thead>
+                          <tr>
+                            {block.columns.map((column) => (
+                              <th key={column} scope="col" className="border-border border p-4">
+                                {readLegalText(section, 'columns', column)}
+                              </th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {block.rows.map((row) => (
+                            <tr key={row}>
+                              {block.columns.map((column, index) =>
+                                index === 0 ? (
+                                  <th
+                                    key={column}
+                                    scope="row"
+                                    className="border-border border p-4 align-top font-medium"
+                                  >
+                                    {readLegalText(section, 'rows', row, column)}
+                                  </th>
+                                ) : (
+                                  <td key={column} className="border-border border p-4 align-top">
+                                    {readLegalText(section, 'rows', row, column)}
+                                  </td>
+                                ),
+                              )}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
                   );
                 case 'contact':
                   return <LegalContactCard key={blockKey} data={data} />;

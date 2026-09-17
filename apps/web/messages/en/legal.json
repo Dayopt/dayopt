@@ -21,27 +21,28 @@
         },
         "refund": {
           "title": "Refund Policy",
-          "general": "We do not provide prorated refunds for partial billing periods.",
+          "general": "We do not normally provide prorated refunds for partial billing periods. This does not limit mandatory rights under applicable law.",
           "exception": "In exceptional circumstances, such as extended service outages or billing errors, we may issue refunds at our discretion.",
-          "request": "To request a refund for exceptional circumstances, please contact us at support@dayopt.app within 30 days of the charge."
+          "request": "Contact support@dayopt.app promptly about a billing error or refund request. [HUMAN-08: approve the final refund criteria and request process before publication.]"
         },
         "freeTrial": {
           "title": "Free Trial",
-          "content": "If you cancel during your free trial period, you will not be charged. No credit card is required to start a free trial."
+          "content": "Your card-free 45-day trial starts when you first open the application after authentication. Trial expiry does not automatically charge you. A purchase is required to continue paid use. After expiry, retained data remains available for viewing, export and deletion."
         },
         "howToCancel": {
           "title": "How to Cancel",
           "step1": "Log in to your Dayopt account",
-          "step2": "Go to Settings > Subscription",
-          "step3": "Click \"Cancel Subscription\"",
-          "step4": "Confirm your cancellation",
-          "note": "You will receive a confirmation email once your cancellation is processed."
+          "step2": "Open Settings > Billing",
+          "step3": "Open billing management",
+          "step4": "Follow the subscription cancellation steps and confirm the displayed end date",
+          "note": "Confirm cancellation and the end date in billing management. Deleting your Dayopt account is a separate operation and does not provide an export grace period. [HUMAN-07: verify the live cancellation flow before publication.]"
         },
         "contact": {
           "title": "Questions?",
           "content": "If you have any questions about cancellation or refunds, please contact us at:"
         }
-      }
+      },
+      "lastUpdated": "Review draft: 2026-09-17"
     },
     "navigation": {
       "backToApp": "← Back to Dayopt",

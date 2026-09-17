@@ -1,179 +1,95 @@
 ---
 title: 'Terms of Service'
 description: 'Our terms and conditions for using the Dayopt service'
-lastUpdated: 'Last Updated: 2026-03-23'
+lastUpdated: 'Review draft: 2026-09-17'
 ---
 
 <TermsDocument
   data={{
     sections: {
       introduction: {
-        title: 'Introduction',
+        title: 'Agreement and operator',
         content:
-          'These Terms of Service (the "Terms") govern your use of Dayopt (the "Service"). By using the Service, you agree to these Terms.',
+          'These terms govern your use of Dayopt. Operator: [HUMAN-01: insert legal operator name and address]. Please read the Privacy Policy together with these terms.',
       },
       serviceDescription: {
-        title: 'Service Description',
+        title: 'The service',
         content:
-          'The Service is a web application providing task management, calendar functionality, and productivity tools.',
+          'Dayopt lets you plan and record time, view reports, and optionally connect calendars and external applications. It does not include an in-app AI assistant.',
       },
       accountRegistration: {
-        title: 'Account Registration',
-        requirements: 'Provide accurate and current information',
-        responsibility: 'You are responsible for managing your account information',
-        security: 'Notify us immediately if you discover unauthorized use',
-        age: 'You must be at least 13 years old',
-      },
-      userResponsibilities: {
-        title: 'User Responsibilities',
-        intro: 'You must not engage in the following activities:',
-        illegal: 'Illegal activities',
-        harmful: 'Activities harmful to other users or the Service',
-        unauthorized: 'Unauthorized access or system interference',
-        impersonation: 'Impersonating others',
-        spam: 'Spam or abusive behavior',
-        content: 'Posting inappropriate content',
-      },
-      intellectualProperty: {
-        title: 'Intellectual Property',
-        ownership:
-          'All intellectual property rights related to the Service belong to us or the rightful owners.',
-        userContent: 'You retain copyright to content you create.',
-        license:
-          'However, you grant us a license to use your content to the extent necessary to provide the Service.',
-      },
-      dataOwnership: {
-        title: 'Data Ownership & Export',
-        ownership:
-          'You retain all rights, title, and interest in and to your data. Dayopt does not claim ownership of any data you create, upload, or store through the Service.',
-        license:
-          'You grant Dayopt a limited, non-exclusive, worldwide license to use, process, and store your data solely for the purpose of providing and improving the Service. This license terminates when you delete your account.',
-        export:
-          'You may export your data at any time through account settings in standard formats (JSON, CSV). We are committed to data portability and will not lock you into our platform.',
-        termination:
-          "If we discontinue the Service, you will have at least 30 days' advance notice and the ability to export all your data before the Service is shut down.",
-      },
-      aiTerms: {
-        title: 'AI-Powered Features',
-        intro:
-          'The Service includes optional AI-powered features. By using these features, you acknowledge and agree to the following:',
-        providers:
-          'AI features are powered by third-party providers (Anthropic and/or OpenAI). Your data may be transmitted to these providers for processing. See our Privacy Policy for details.',
-        noTraining:
-          'Data submitted through AI features is processed via API and is not used for training AI models by the providers.',
-        byok: "You may use your own API key (Bring Your Own Key) for AI providers. When doing so, your usage is subject to the respective provider's terms of service and you are responsible for any associated costs.",
-        accuracy:
-          'AI-generated content is provided "as is" for informational purposes only. We do not guarantee the accuracy, completeness, or suitability of AI outputs. You are solely responsible for reviewing and validating any AI-generated suggestions before acting on them.',
-        limits:
-          'Free plan users are limited to 30 AI interactions per month. Pro plan users have higher limits as described on the pricing page.',
-        liability:
-          'We are not liable for any decisions made or actions taken based on AI-generated content.',
-      },
-      subscriptionPlans: {
-        title: 'Subscription Plans',
-        intro: 'The Service is available in the following plans:',
-        free: 'Free Plan ($0/month) — Up to 3 projects, 1GB storage, basic analytics, 30 AI interactions per month',
-        pro: 'Pro Plan ($5/month) — Unlimited projects, 100GB storage, AI insights, advanced analytics, priority support, service credit eligibility',
-        changes:
-          'We reserve the right to modify plan features and pricing. Any price changes will be notified at least 30 days in advance and will apply to the next billing cycle.',
-        downgrade:
-          'If you downgrade from Pro to Free, any data exceeding the Free plan limits will be preserved but read-only until you reduce usage or upgrade again.',
+        title: 'Your account',
+        requirements: 'Provide accurate account information and keep it up to date.',
+        responsibility:
+          'Keep your credentials secure and notify support of suspected unauthorized use.',
+        age: 'You must be at least 13 and meet any higher age or guardian authorization requirement under applicable law. [HUMAN-02: final approval required.]',
       },
       acceptableUse: {
-        title: 'Acceptable Use Policy',
-        intro: 'In addition to the user responsibilities above, you agree not to:',
-        automation:
-          'Use automated means to access the Service beyond documented APIs without prior written consent',
-        reverse:
-          'Reverse engineer, decompile, disassemble, or otherwise attempt to derive the source code of the Service',
-        abuse:
-          'Exceed reasonable usage limits or intentionally abuse Service resources (e.g., excessive API calls, storage abuse)',
-        resale: 'Resell, sublicense, or redistribute access to the Service without authorization',
-        security:
-          'Attempt to probe, scan, or test the vulnerability of the Service without prior written authorization from our security team',
+        title: 'Responsible use',
+        content:
+          'Do not access another person’s data without authorization, disrupt the service, use it unlawfully, or evade access controls or usage limits. Use documented APIs within their permissions. Security testing requires prior coordination through security@dayopt.app and must follow the Security page.',
+      },
+      dataOwnership: {
+        title: 'Your data and export',
+        ownership:
+          'You retain your rights in the data you create or upload. Dayopt receives only the permission needed to store and process it to provide the service.',
+        export:
+          'Export supported account data as JSON or plan and record rows as CSV from Settings. Export before deleting your account: there is no post-deletion export period.',
+        termination:
+          'If we discontinue the service, we intend to provide advance notice and an opportunity to export where practicable and required by law. Account deletion and legally required retention are described in the Privacy Policy.',
+      },
+      externalConnections: {
+        title: 'Connected applications',
+        content:
+          'Only connect applications you trust. A client may read or change data within the permissions you grant. External providers control their own processing, retention and AI use. Revoking access does not erase data already received by them. You are responsible for reviewing requests before authorizing them.',
+      },
+      subscriptionPlans: {
+        title: 'Trial and subscription',
+        intro:
+          'Dayopt offers one paid service at $5 per month. [HUMAN-07: confirm currency, tax display and checkout configuration before publication.]',
+        trial:
+          'The 45-day trial starts when you first open the application after authentication. No card is required. Trial expiry does not automatically charge you; continuing paid use requires an explicit purchase.',
+        paid: 'A purchased subscription renews monthly until cancelled. The amount, next billing date and payment conditions are shown at checkout or in billing management.',
+        expiry:
+          'After the trial or paid period ends, retained calendar data and reports remain available for viewing, export, deletion and account or billing management. Creating, editing, new synchronization and ordinary MCP/API use require an active trial or subscription.',
+        changes:
+          'We disclose price or material contract changes before they take effect and provide notice or obtain agreement where required by applicable law.',
       },
       serviceLevel: {
-        title: 'Service Level & Availability',
-        target:
-          'We target 99.9% uptime for the Service, measured on a monthly basis, excluding scheduled maintenance windows.',
-        maintenance:
-          'Planned maintenance will be announced at least 48 hours in advance via email and in-app notification. We will schedule maintenance during low-usage periods whenever possible.',
-        status: 'Real-time service status and incident history are available on our status page.',
-        credits:
-          'Pro plan subscribers may be eligible for service credits if monthly uptime falls below our target. Credits are applied to future billing periods and must be requested within 30 days of the incident.',
+        title: 'Availability and maintenance',
+        content:
+          'We work to maintain service availability and address failures, but do not offer a contractual uptime percentage, fixed repair deadline or automatic service credits. We communicate significant interruptions and planned changes where practicable.',
       },
       limitationOfLiability: {
-        title: 'Limitation of Liability',
-        cap: 'To the maximum extent permitted by applicable law, our total aggregate liability to you for all claims arising out of or relating to the Service shall not exceed the total amount you paid to us in the twelve (12) months immediately preceding the event giving rise to the claim.',
-        indirect:
-          'In no event shall we be liable for any indirect, incidental, special, consequential, or punitive damages, including but not limited to loss of profits, data, business opportunities, or goodwill, regardless of whether we have been advised of the possibility of such damages.',
-        forceMajeure:
-          'We shall not be liable for any failure or delay in performance due to circumstances beyond our reasonable control, including but not limited to natural disasters, acts of government, internet or telecommunications failures, or third-party service provider outages.',
-        exceptions:
-          'Nothing in these Terms excludes or limits liability that cannot be lawfully excluded or limited under applicable law, including liability for fraud, gross negligence, or death or personal injury caused by our negligence.',
-      },
-      indemnification: {
-        title: 'Indemnification',
-        obligation:
-          "You agree to indemnify, defend, and hold harmless Dayopt, its officers, directors, employees, and agents from and against any claims, liabilities, damages, losses, and expenses (including reasonable attorneys' fees) arising out of or in connection with:",
-        violations: 'Your violation of these Terms or any applicable law or regulation',
-        thirdParty: "Your infringement of any third party's intellectual property or other rights",
-        misuse: 'Your misuse of the Service or any data obtained through the Service',
-        notification:
-          'We will promptly notify you of any claim subject to indemnification and provide reasonable cooperation in its defense.',
-      },
-      dataBackup: {
-        title: 'Data Backup',
-        responsibility: 'You are responsible for backing up your important data.',
-        liability: 'We are not liable for any data loss.',
-      },
-      disclaimer: {
-        title: 'Disclaimer',
-        availability:
-          'We do not guarantee the availability, accuracy, or completeness of the Service',
-        interruption: 'We are not liable for service interruptions or failures',
-        damages: 'We are not liable for damages arising from use of the Service',
-        thirdParty: 'We are not responsible for issues with third-party service integrations',
-      },
-      termination: {
-        title: 'Account Suspension/Deletion',
-        userInitiated: 'You may delete your account at any time through the settings page.',
-        serviceInitiated:
-          'We may suspend or delete accounts without prior notice for Terms violations or unauthorized use.',
-        dataRetention: 'Data is permanently deleted within 30 days after deletion.',
-      },
-      modifications: {
-        title: 'Terms Modifications',
+        title: 'Liability',
         content:
-          'We may modify these Terms as necessary. We will notify users in advance of any significant changes.',
+          'Nothing in these terms limits rights or liabilities that cannot be excluded under applicable law. [HUMAN-08: a qualified reviewer must approve the final liability cap, exceptions and consumer-law treatment before publication. No blanket exclusion for data loss or all service-related damages is proposed.]',
       },
       cancellation: {
-        title: 'Cancellation & Refunds',
+        title: 'Cancellation and refunds',
         summary:
-          'You may cancel your subscription at any time. No prorated refunds are provided for partial billing periods. Service remains available until the end of your current billing period.',
-        details: 'For full details, please see our Refund & Cancellation Policy.',
+          'Cancel renewal through Settings > Billing and the billing management page. Cancellation normally leaves access until the paid period ends. We do not normally provide prorated refunds, subject to mandatory legal rights and review of billing errors or exceptional outages.',
+        details: 'Refund and Cancellation Policy',
         detailsLink: '/legal/refund',
       },
-      governingLaw: {
-        title: 'Governing Law & Jurisdiction',
-        law: 'These Terms are governed by Japanese law',
-        jurisdiction:
-          'Tokyo District Court has exclusive jurisdiction over disputes related to these Terms',
+      termination: {
+        title: 'Account deletion and restrictions',
+        content:
+          'You may request account deletion in Settings. This removes access after completion and does not create an export grace period. Subscription cancellation and account deletion are different operations. We may restrict use for unlawful activity, serious breaches or security needs, subject to applicable law. Retained technical and billing records follow the Privacy Policy.',
       },
-      generalProvisions: {
-        title: 'General Provisions',
-        severability:
-          'If any provision of these Terms is found to be invalid or unenforceable by a court of competent jurisdiction, the remaining provisions shall continue in full force and effect. The invalid provision shall be modified to the minimum extent necessary to make it valid and enforceable.',
-        entireAgreement:
-          'These Terms, together with the Privacy Policy, Cookie Policy, and any other policies referenced herein, constitute the entire agreement between you and Dayopt regarding the use of the Service, and supersede all prior agreements and understandings.',
-        waiver:
-          'Our failure to exercise or enforce any right or provision of these Terms shall not constitute a waiver of such right or provision. Any waiver must be in writing and signed by us to be effective.',
-        assignment:
-          'You may not assign or transfer your rights or obligations under these Terms without our prior written consent. We may assign our rights and obligations under these Terms in connection with a merger, acquisition, reorganization, or sale of assets, or by operation of law.',
+      modifications: {
+        title: 'Changes to these terms',
+        content:
+          'We publish revised terms with their effective date and provide notice or obtain consent where applicable law requires it. [HUMAN-06: approve the notification and acceptance process before publication.]',
+      },
+      governingLaw: {
+        title: 'Governing law',
+        content:
+          'Japanese law governs these terms, without limiting mandatory protections applicable to consumers. [HUMAN-08: confirm operator location and final jurisdiction wording before publication.]',
       },
       contact: {
-        title: 'Contact Us',
-        content: 'If you have any questions about these Terms, please contact us at:',
+        title: 'Contact',
+        content: 'For questions about these terms or your account, contact:',
       },
     },
     contactLabels: {
