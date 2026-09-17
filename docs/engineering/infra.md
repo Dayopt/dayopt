@@ -462,13 +462,13 @@ would-add（Actions job と Vercel deployment の両方）を 1 表にする。�
 
 **順序: shadow 観察 → 比較 → 承認付き切替 → 観察 → 整理。既存の必須条件を先に削らない。**
 
-| 段階 | 変更                                                                                                  | 戻し方                                   | 承認                       |
-| ---- | ----------------------------------------------------------------------------------------------------- | ---------------------------------------- | -------------------------- |
-| 0    | shadow（現状）: `Validation (shadow)` / `Review policy (shadow)` / `🧱 DB Upgrade (shadow)` は非必須  | workflow を Disable                      | 不要（AUTONOMOUS）         |
-| 1    | 比較レポートで docs / ui / logic / api-db / ci-policy 別に正例・負例と保証の退行が無いことを確認      | -                                        | -                          |
-| 2    | ruleset に `Validation (shadow)` を **既存 required と併走で追加**（旧条件は残す）                    | ruleset から context を外す              | User（CHECKPOINT）         |
-| 3    | 観察後、旧 required のうち新条件が包含するものだけを外す（trusted source を保つ native check は残す） | その PUT 直前に保存した ruleset を再適用 | User（EXPLICIT AUTHORITY） |
-| 4    | `branch:finish` の rollup 検査と shadow の重複を整理                                                  | git revert                               | -                          |
+| 段階 | 変更                                                                                                                                                                              | 戻し方                                   | 承認                       |
+| ---- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- | -------------------------- |
+| 0    | shadow（現状）: `Validation (shadow)` / `Review policy (shadow)` / `🧱 DB Upgrade (shadow)` は非必須                                                                              | workflow を Disable                      | 不要（AUTONOMOUS）         |
+| 1    | 比較レポートで docs / ui / logic / api-db / ci-policy 別に正例・負例と保証の退行が無いことを確認                                                                                  | -                                        | -                          |
+| 2    | ruleset に `Validation (shadow)` と `Review policy (shadow)` を **既存 required と併走で追加**（旧条件は残す。片方だけだと Review policy が pending / blocked でも merge できる） | ruleset から context を外す              | User（CHECKPOINT）         |
+| 3    | 観察後、旧 required のうち新条件が包含するものだけを外す（trusted source を保つ native check は残す）                                                                             | その PUT 直前に保存した ruleset を再適用 | User（EXPLICIT AUTHORITY） |
+| 4    | `branch:finish` の rollup 検査と shadow の重複を整理                                                                                                                              | git revert                               | -                          |
 
 切替は `gh api -X PUT repos/Dayopt/dayopt/rulesets/6790553` で行い、**各 PUT の直前に
 `gh api repos/Dayopt/dayopt/rulesets/6790553` の完全な JSON をその操作固有の rollback 入力として

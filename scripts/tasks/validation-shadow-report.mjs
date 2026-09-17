@@ -35,14 +35,16 @@ export const VERCEL_CONTEXTS = {
 export const UNAVAILABLE = '未取得';
 export const UNDECIDED = '未判定';
 
-/** PR の変更領域を 5 分類に落とす（#2798 §1 の比較軸）。 */
+/** PR の変更領域を 5 分類に落とす（#2798 §1 の比較軸）。indeterminate な plan は「未判定」に隔離する。 */
 export function classifyPlan(plan) {
+  if (plan.status !== 'determinate') return UNDECIDED;
   const areas = new Set(plan.areas ?? []);
   const files = plan.files ?? [];
+  // DB / API 契約（docs/engineering/data/db/rls-snapshot.md 等）は path が docs/ でも api-db
+  if (areas.has('database') || areas.has('api') || areas.has('auth-billing')) return 'api-db';
+  if (areas.has('policy') || areas.has('dependencies')) return 'ci-policy';
   if (files.length > 0 && files.every((file) => /^(README\.md|LICENSE|docs\/)/.test(file)))
     return 'docs';
-  if (areas.has('policy') || areas.has('dependencies')) return 'ci-policy';
-  if (areas.has('database') || areas.has('api') || areas.has('auth-billing')) return 'api-db';
   if (areas.has('behavior')) return 'logic';
   if (areas.has('ui')) return 'ui';
   return 'other';
@@ -57,15 +59,17 @@ function legacyKey(producer) {
 }
 
 /**
- * plan と旧経路の実行結果を突き合わせる。plan が indeterminate なら比較しない（null）。
+ * plan と旧経路の実行結果を突き合わせる。plan が indeterminate、または旧経路の観測が確定して
+ * いない（CI run が無い / 未完了）なら比較しない（null。未取得を would-add に数えない）。
  * 「走った」は開始済みかつ skipped でない job（failure / cancelled も runner を使う）。
- * deployment producer は Vercel の status context の有無で「走った」を見る。
+ * deployment producer は Vercel の status が実 deployment を指す時だけ「走った」とする
+ * （`Canceled by Ignored Build Step` は context があっても未実行）。
  * @param {{ plan: any, jobs: { name: string, conclusion: string | null, started: boolean, minutes: number | null }[],
- *   statuses?: Record<string, string | null> }} input
+ *   statuses?: Record<string, { state: string, ran: boolean } | null>, legacyComplete?: boolean }} input
  * @returns {{ wouldSkip: string[], wouldAdd: string[] } | null}
  */
-export function comparePlanToLegacy({ plan, jobs, statuses = {} }) {
-  if (plan.status !== 'determinate') return null;
+export function comparePlanToLegacy({ plan, jobs, statuses = {}, legacyComplete = true }) {
+  if (plan.status !== 'determinate' || !legacyComplete) return null;
   const ranByName = new Map(jobs.map((job) => [job.name, job]));
   const wouldSkip = [];
   const wouldAdd = [];
@@ -81,7 +85,7 @@ export function comparePlanToLegacy({ plan, jobs, statuses = {} }) {
     let ran;
     let absent;
     if (producer.kind === 'deployment') {
-      ran = statuses[key] !== undefined && statuses[key] !== null;
+      ran = Boolean(statuses[key]?.ran);
       absent = !ran;
     } else {
       const job = ranByName.get(key);
@@ -161,8 +165,16 @@ export function collectPrRow({ pr, api }) {
       ? Math.round((Date.parse(latest.updated_at) - Date.parse(latest.created_at)) / 1000)
       : null;
   const vercel = Object.fromEntries(
-    Object.values(VERCEL_CONTEXTS).map((context) => [context, status(context)?.state ?? null]),
+    Object.values(VERCEL_CONTEXTS).map((context) => {
+      const entry = status(context);
+      if (!entry) return [context, null];
+      // validation-evidence と同じ規則: Ignored Build Step は deployment が走っていない
+      const ignored = /ignored build step/i.test(entry.description ?? '');
+      return [context, { state: ignored ? 'ignored' : entry.state, ran: !ignored }];
+    }),
   );
+  // 旧経路の観測が確定しているのは、最新 CI run が completed の時だけ
+  const legacyComplete = latest?.status === 'completed';
   return {
     number: pr.number,
     title: pr.title,
@@ -181,15 +193,16 @@ export function collectPrRow({ pr, api }) {
     runnerMinutes: latest ? sumOrNull(jobs.map((job) => job.minutes)) : null,
     ciSeconds,
     vercel: {
-      product: vercel['Vercel – product'] ?? UNAVAILABLE,
-      web: vercel['Vercel – web'] ?? UNAVAILABLE,
+      product: vercel['Vercel – product']?.state ?? UNAVAILABLE,
+      web: vercel['Vercel – web']?.state ?? UNAVAILABLE,
     },
+    legacyComplete,
     shadow: {
       validation: status(VALIDATION_STATUS_CONTEXT)?.state ?? '未発行',
       validationDetail: status(VALIDATION_STATUS_CONTEXT)?.description ?? '',
       review: status(REVIEW_STATUS_CONTEXT)?.state ?? '未発行',
     },
-    comparison: comparePlanToLegacy({ plan, jobs, statuses: vercel }),
+    comparison: comparePlanToLegacy({ plan, jobs, statuses: vercel, legacyComplete }),
   };
 }
 
@@ -239,7 +252,7 @@ export function formatReport(rows, { limit, fetchedAt, policyCheckout }) {
     );
   lines.push(
     '',
-    '注: would-skip は「旧経路で走った（failure / cancelled 含む）が plan が不要とする job / Vercel deployment」、would-add は「plan が要求するが旧経路が skip した / 無い job / Vercel deployment」。plan が indeterminate の行は比較しない（未判定）。',
+    '注: would-skip は「旧経路で走った（failure / cancelled 含む）が plan が不要とする job / Vercel deployment」、would-add は「plan が要求するが旧経路が skip した / 無い job / Vercel deployment」。Vercel の Ignored Build Step は未実行。plan が indeterminate の行は分類ごと「未判定」に隔離し、CI run が無い / 未完了の行は比較しない（未判定）。',
     '判定は人が行う。件数が少ない分類の分布は参考値で、p95 は出さない。Preview / review の待ち時間は未取得。',
   );
   return `${lines.join('\n')}\n`;

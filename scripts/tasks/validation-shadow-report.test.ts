@@ -34,6 +34,7 @@ describe('shadow report: classification and comparison', () => {
   it.each([
     [['README.md'], 'docs'],
     [['docs/engineering/infra.md'], 'docs'],
+    [['docs/engineering/data/db/rls-snapshot.md'], 'api-db'],
     [['AGENTS.md'], 'ci-policy'],
     [['.github/workflows/ci.yml'], 'ci-policy'],
     [['supabase/migrations/20260917000000_a.sql'], 'api-db'],
@@ -50,7 +51,8 @@ describe('shadow report: classification and comparison', () => {
     started: conclusion !== 'skipped',
     minutes,
   });
-  const green = { 'Vercel – product': 'success', 'Vercel – web': 'success' };
+  const ok = { state: 'success', ran: true };
+  const green = { 'Vercel – product': ok, 'Vercel – web': ok };
 
   it('reports would-skip when a job ran but no plan suite needs it, would-add when required but skipped', () => {
     const docs = comparePlanToLegacy({
@@ -104,11 +106,33 @@ describe('shadow report: classification and comparison', () => {
         j('📦 Unit Tests', 'success', 5),
         j('🧪 Integration Tests', 'skipped', 0),
       ],
-      statuses: { 'Vercel – product': null, 'Vercel – web': 'success' },
+      statuses: { 'Vercel – product': null, 'Vercel – web': ok },
     });
     expect(result!.wouldAdd).toEqual(['Vercel – product']);
     // product だけの UI 変更なので web Preview は plan 上 not-applicable = 走ったなら would-skip
     expect(result!.wouldSkip).toEqual(['Vercel – web']);
+  });
+
+  it('treats an Ignored Build Step status as a Preview that did not run', () => {
+    const ignored = { state: 'ignored', ran: false };
+    const result = comparePlanToLegacy({
+      plan: plan(['apps/product/src/features/x/components/A.tsx']),
+      jobs: [j('🔍 Static Checks', 'success', 2), j('📦 Unit Tests', 'success', 5)],
+      statuses: { 'Vercel – product': ignored, 'Vercel – web': ignored },
+    });
+    expect(result!.wouldAdd).toEqual(['Vercel – product']);
+    expect(result!.wouldSkip).not.toContain('Vercel – web');
+  });
+
+  it('does not compare while the legacy observation is incomplete (no or unfinished CI run)', () => {
+    expect(
+      comparePlanToLegacy({
+        plan: plan(['README.md']),
+        jobs: [],
+        statuses: green,
+        legacyComplete: false,
+      }),
+    ).toBeNull();
   });
 
   it('does not compare an indeterminate plan (never reports skippable jobs on missing input)', () => {
@@ -172,6 +196,7 @@ describe('shadow report: collection and rendering', () => {
             id: 100,
             path: '.github/workflows/ci.yml',
             event: 'pull_request',
+            status: 'completed',
             created_at: '2026-09-16T11:49:13Z',
             updated_at: '2026-09-16T11:52:23Z',
           },
@@ -257,7 +282,7 @@ describe('shadow report: collection and rendering', () => {
     expect(noRun.legacyJobs).toEqual([]);
     const text = formatReport([running, noRun], { limit: 2, fetchedAt: 'x', policyCheckout: 'p' });
     expect(text).toContain('| 未取得 | 190 |');
-    expect(text).toContain('| docs | 2 | 未取得 | 2 |');
+    expect(text).toContain('| docs | 2 | 未取得 | 2 | 2 | 0 | 1 |');
   });
 
   it('labels failed jobs with their conclusion in the legacy column', () => {
@@ -300,10 +325,13 @@ describe('shadow report: collection and rendering', () => {
   it('marks an incomplete file listing as indeterminate instead of planning on a partial diff', () => {
     const row = collectPrRow({ pr: { ...pr, changed_files: 5 }, api });
     expect(row.planStatus).toBe('indeterminate');
+    expect(row.classification).toBe('未判定');
     expect(row.comparison).toBeNull();
     const text = formatReport([row], { limit: 1, fetchedAt: 'x', policyCheckout: 'p' });
     expect(text).toContain('indeterminate');
     expect(text).toContain('| 未判定 | 未判定 |');
-    expect(text).toContain('| docs | 1 | 5 | 0 | 0 | 0 | 1 |');
+    // 分類別集計にも docs として混ぜない
+    expect(text).toContain('| 未判定 | 1 | 5 | 0 | 0 | 0 | 1 |');
+    expect(text).not.toContain('| docs | 1 |');
   });
 });
