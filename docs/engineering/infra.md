@@ -367,8 +367,10 @@ base 規則の変更は次の PR から有効になり、当該 PR 自身の必�
 
 ### Validation の信頼済み controller（#2795、shadow）
 
-`validation-gate.yml` は `workflow_run`（CI 完了）と `status`（Vercel の commit status が
-success / failure / error になった時。pending は除く）で、**main の workflow 定義と checkout** を使って `scripts/ci/validation-gate.mjs` を実行する。
+`validation-gate.yml` は `workflow_run`（CI 完了）、`status`（Vercel の commit status が
+success / failure / error になった時。pending は除く）、`issue_comment`（PR への comment の
+created / edited。`@codex review` 依頼、Codex の完了 comment と summary 表の編集、
+`[review-summary]` を拾う）で、**main の workflow 定義と checkout** を使って `scripts/ci/validation-gate.mjs` を実行する。
 どちらも GitHub docs で「workflow file が default branch にある時だけ走る」event。`deployment_status` は使わない: この event は
 deployment の commit（PR head）の workflow 定義で走る（2026-09-17、PR #2804 で実測）。
 `workflow_dispatch` も使わない: 任意 ref の定義で起動でき、PR branch で改変した controller が
@@ -398,6 +400,25 @@ producer は workflow path + job 名 + `pull_request` event + head SHA + reposit
 だけを理由付きで受理する。層 3（E2E / Web smoke）は promote.yml が merge 後・公開前に生産する
 証拠として `deferred` に分け、merge 判定には含めない。base が進んだ head は `update-branch` として
 pending（strict up-to-date の ruleset と同じ向き）。
+
+同じ controller が Review policy（#2796）も評価する: 計画の `review` 要件と PR の review /
+comment / thread（GraphQL の resolve 状態）から `not-required` / `not-started` / `pending` /
+`stale` / `complete` / `pending-adjudication` / `unknown` を判定し、commit status
+`Review policy (shadow)` に出す。状態の定義と完了証拠は `pr-cross-review` skill §Review policy。
+shadow 中は Codex を自動起動しない（workflow に `pull-requests: write` を渡していない）。
+review evidence の保証境界: review の submit と thread の resolve は issue_comment を出さないため、
+その直後は再評価されない。通常は修正 push → CI 完了の `workflow_run` で再評価される。
+`pull_request_review` 系は PR 側の定義で走るため trigger にしない。reviewThreads は cursor で
+最後まで読み、応答が欠けた時は failure を発行する。`[review-summary]` と `@codex review` 依頼は author_association が
+OWNER / MEMBER / COLLABORATOR の comment だけ受理し、`status:` は単独の `reviewed` か全要素が
+`role=reviewed` の時だけ満たす。依頼と head の対応は commit 日時ではなく、その head の最新の
+pull_request run 作成時刻（切替時刻）で照合する。Codex が無応答 / 失敗でも、現 head の信頼済み
+`[review-summary]` があれば「同等の独立レビュー」として満たす（可用性を gate にしない）。
+closed / merged PR と main 以外を base にする PR は評価も発行もしない。裁定は PR の全 review
+thread（代替レビューの指摘・対象不明の応答を含む）が「信頼済み人間の返信つきで resolve」で
+なければ pending-adjudication。**review evidence の保証境界はここまで**: GitHub 上の投稿者・
+association・thread の resolve 状態を機械確認するもので、返信内容の妥当性や、GitHub の外で
+行われた確認は証明しない。
 
 結果は Step Summary・`validation-result-<run>` artifact（14 日）・commit status `Validation (shadow)`
 に出す。**required check ではない。** ruleset・`branch:finish`・既存 check は変更しない。
