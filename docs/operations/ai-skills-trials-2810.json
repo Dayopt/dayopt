@@ -19,10 +19,10 @@
     "One run per condition; no statistical, cost or speed claim",
     "Input tokens include cached tokens; uncached input reported separately",
     "Agent wall time excludes provisioning and parent verification",
-    "candidate-pgwrite hit the Codex usage limit mid-run and is incomplete; the Postgres reference files were never reached",
     "Global skill catalog and host cache are not isolated; only project instructions and the fixture differ",
     "Read-only deletion fixture does not validate live authorization",
-    "skillsRead is derived from the agent shell commands, so a file read by another means would not appear"
+    "skillsRead is derived from the agent shell commands, so a file read by another means would not appear",
+    "pgwrite was re-run on 2026-09-17 in freshly created worktrees for both conditions; the first candidate attempt had aborted on the Codex usage limit and the first baseline run had reused a worktree carrying earlier cases changes"
   ],
   "prompts": {
     "react": "この実行は隔離された比較ケースです。指定作業を完了し、変更・検証コマンドと結果・未完了事項を報告してください。commit/push/外部への投稿/他agentの起動は禁止です。設定ファイルの改変は禁止です。秘密ファイルを読まないでください。機械的に外部ネットワークへの操作は許可されません。依存は用意済みです。\napps/product/src/app/[locale]/(app)/(workspace)/report/summary/page.tsx の性能をレビューしてください。コードは変更せず、問題と最小の修正方針だけを報告してください。\n環境: Node 24 は /opt/homebrew/opt/node@24/bin/node です。pnpm の実行には PATH=/opt/homebrew/opt/node@24/bin:$PATH を付けてください。\n",
@@ -90,22 +90,23 @@
       "final": "README.md の末尾に「開発チェック」節と次の1文を追加しました。\n\n> 開発時の検証の入口は、既存の `pnpm check` です。\n\n検証:\n- `python3`：既存本文の保持、追記内容、check 定義を確認して成功。\n- `git diff --check`：成功。\n- `git diff -- README.md`：指定の追記のみを確認。\n\n既存の他の変更には触れていません。文書追記のみのため `pnpm check` は未実行です。未完了事項はありません。"
     },
     {
-      "id": "after-pgwrite",
+      "id": "after-pgwrite-rerun",
       "case": "pgwrite",
       "condition": "candidate",
       "model": "gpt-6-astra",
       "reasoning": "medium",
-      "agentSeconds": 24.66,
-      "exitCode": 1,
+      "agentSeconds": 82.38,
+      "exitCode": 0,
       "promptSha256": "31703fe438e59df39790abdc1018ad169a6a59c9d8ab8df10c754a309063f984",
-      "inputTokens": null,
-      "cachedInputTokens": null,
-      "uncachedInputTokens": null,
-      "outputTokens": null,
-      "reasoningOutputTokens": null,
-      "commandCount": 3,
-      "skillsRead": ["routing", "supabase"],
-      "final": "`supabase` と `routing` スキルに従って進めます。検索は `status = 'active'` に限定し、`last_synced_at ASC NULLS FIRST` で最大500件を取得しています。この条件と並び順を支えるインデックスを確認・追加し、既存の未コミット差分は保持します。\n"
+      "inputTokens": 441612,
+      "cachedInputTokens": 398208,
+      "uncachedInputTokens": 43404,
+      "outputTokens": 1754,
+      "reasoningOutputTokens": 118,
+      "commandCount": 10,
+      "skillsRead": ["routing", "supabase", "supabase/references/postgres-query-indexes"],
+      "final": "[migration](supabase/migrations/20260917010000_add_calendar_connections_due_sync_index.sql) を追加しました。\n\n- `status = 'active'` の部分 index を、検索順と同じ `last_synced_at ASC NULLS FIRST` で作成。\n- `node scripts/ci/check-destructive-migration.mjs --stdin`：破壊的変更なし。\n- `git diff --no-index --check /dev/null <追加ファイル>`：空白エラーなし。\n\n未確認：DB適用と実行計画の比較。Docker はアクセス拒否、ローカル PostgreSQL は `postgres` バイナリ不足で実行できませんでした。\n\n変更は migration 1件のみ。禁止された操作は行っていません。",
+      "note": "2026-09-17 再実行。清潔な worktree を両条件で作り直した対の run"
     },
     {
       "id": "after-postgres",
@@ -239,22 +240,23 @@
       "final": "README.md の末尾に「開発チェック」節と「既存の `pnpm check` が検証の入口です。」を追加しました。他の内容は変更していません。\n\n- 検証：`git diff --check` 成功。`git diff -- README.md` で追記のみと確認。\n- `pnpm check`：文書追記のみのため未実行。\n- 未完了事項：なし。"
     },
     {
-      "id": "before-pgwrite",
+      "id": "before-pgwrite-rerun",
       "case": "pgwrite",
       "condition": "baseline",
       "model": "gpt-6-astra",
       "reasoning": "medium",
-      "agentSeconds": 62.66,
+      "agentSeconds": 58.77,
       "exitCode": 0,
       "promptSha256": "31703fe438e59df39790abdc1018ad169a6a59c9d8ab8df10c754a309063f984",
-      "inputTokens": 322424,
-      "cachedInputTokens": 281984,
-      "uncachedInputTokens": 40440,
-      "outputTokens": 1421,
-      "reasoningOutputTokens": 63,
+      "inputTokens": 374246,
+      "cachedInputTokens": 332928,
+      "uncachedInputTokens": 41318,
+      "outputTokens": 1263,
+      "reasoningOutputTokens": 74,
       "commandCount": 6,
-      "skillsRead": ["routing", "supabase"],
-      "final": "[migration](supabase/migrations/20260917000000_add_calendar_connections_due_sync_index.sql) を新規追加しました。\n\n- `status = 'active'` の部分インデックスを作成し、検索順の `last_synced_at ASC NULLS FIRST` に対応。\n- 検証：`/opt/homebrew/opt/node@24/bin/node scripts/ci/check-destructive-migration.mjs --stdin` に新規ファイルを渡し、破壊的変更なし。\n- 検証：`git diff --no-index --check /dev/null supabase/migrations/20260917000000_add_calendar_connections_due_sync_index.sql` は成功。\n- 未確認：DBへの適用と `EXPLAIN` による実行計画・性能の確認。\n\n既存差分・設定・秘密ファイルには触れず、commit／push／外部操作／他agent起動は行っていません。"
+      "skillsRead": ["supabase"],
+      "final": "[migration](supabase/migrations/20260917000000_index_calendar_connections_due_sync.sql) を追加しました。\n\n- `status = 'active'` の部分インデックス\n- 検索に合わせて `last_synced_at ASC NULLS FIRST`\n- ロック待ち5秒・実行60秒の上限を設定\n\n検証：\n- `node scripts/ci/check-destructive-migration.mjs --stdin`：破壊的変更の検出なし\n- `git diff --no-index --check /dev/null <追加ファイル>`：空白エラー出力なし\n\n未確認：DBへの適用と `EXPLAIN` による実行計画。インデックスの実際の採用・性能改善は未実測です。変更は新規SQL 1ファイルのみです。",
+      "note": "2026-09-17 再実行。清潔な worktree を両条件で作り直した対の run"
     },
     {
       "id": "before-postgres",
