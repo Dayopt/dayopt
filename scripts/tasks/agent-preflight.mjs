@@ -111,6 +111,12 @@ export function collectPreflight(cwd = process.cwd()) {
     codexHooks: existsSync(join(root, '.codex/hooks.json'))
       ? 'configured; runtime activation unverified'
       : 'missing',
+    readOnlyDelegation: {
+      wrapper: false,
+      codex: false,
+      claude: false,
+      native: 'unsupported; repository scope cannot be enforced at runtime',
+    },
   };
 }
 
@@ -138,6 +144,7 @@ export function renderPreflight(state) {
       .join(' ')} (${state.hooksPath ?? '未設定'})`,
     `**Shared skills**: ${state.skills ? 'present; session discovery unverified' : 'missing'}`,
     `**Codex hooks**: ${state.codexHooks}`,
+    `**Read-only delegation**: wrapper:${state.readOnlyDelegation?.wrapper ? 'yes' : 'no'} codex:${state.readOnlyDelegation?.codex ? 'yes' : 'no'} claude:${state.readOnlyDelegation?.claude ? 'yes' : 'no'}; native: ${state.readOnlyDelegation?.native ?? 'unverified'}`,
     `**gh identity**: ${renderGhIdentity(state.ghIdentity)}`,
   ];
   if (state.ghIdentity?.broadScopes.length)

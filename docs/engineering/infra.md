@@ -312,7 +312,7 @@ GitHub Code QualityはOrganization / Repositoryの両方で無効にし、PR品�
 
 - Required checksはrepository rulesetと`.github/workflows/ci.yml`を正とし、Code Quality由来のcheckを追加しない
 - **GitHub CodeQL は 2026-08-11 に無効化すると決めた。UI 操作は本記述時点で未実施で、現在も CodeQL は動いている**（残作業は #1934。現在状態は `gh api repos/Dayopt/dayopt/code-scanning/default-setup --jq '.state'` が `configured` を返すか `not-configured` を返すかで判定する。`not-configured` を確認したらこの一文を完了形へ更新する）。無効化を決めた理由は次のとおり。 default setup が `languages: ["actions"]` で有効化されており、**workflow YAML しか解析していなかった**（`apps/` 配下の JS / TS は対象外）。#1425 の Done 条件「JavaScript / TypeScript が対象になっていることを確認する」が満たされないまま COMPLETED で close されたため、誤った前提が docs 側に残り続けていた。無効化後のセキュリティ静的解析の担当: secret は gitleaks と `pnpm secrets:check`（#2483 以前は `.github/workflows/docs-guard.yml`、現在は `ci.yml` の static job（`scripts/ci/check.mjs`））、依存は Dependabot、深掘り SAST は `/claude-security`。**`.github/workflows/**` に対する PR ごとの自動解析だけは代替が無く、無効化で失われる**（受容済み。根拠と再評価の条件は決定ログ）。再有効化する場合は `languages` に `javascript-typescript` が入っていることを `gh api repos/Dayopt/dayopt/code-scanning/default-setup` で確認する（設定画面を開いた事実では確認にならない）。判断は2026-08-11 の決定ログ（削除済み、git 履歴参照）
-- **自動の外部レビューは Codex（`chatgpt-codex-connector[bot]`）だけにしていた（2026-08-03〜2026-08-13）。** 2026-08-03 に Gemini の ai-review を撤去し、Copilot も外した（直近マージ 10 PR の実測で review / comment がともに 0 件。原因は org の Copilot seat が 0 で、automatic review が実際には機能していなかったこと）。「外部の目」を Codex の 1 系統だけにし、実装・テスト・内部レビューはすべて Claude 系という前提で品質設計していたが、**Codex（外部レビュー）は 2026-08-13 に全 PR 適用を停止し、内製クロスレビューへ一本化した**が、2026-09-01 に**クロスレビュー必須 PR に限り必須の 2 系統目として再開した**（#2529。`@codex review` で起動し、Codex 自身の review object が現 HEAD に対して存在しないと `pnpm branch:finish` が止まる）。低リスク PR では従来どおり起動しない。現在の規則は `AGENTS.md` §レビュー規則、手順は `.agents/skills/pr-cross-review/SKILL.md`
+- **自動レビューの履歴と現在の入口**: 2026-08-03 に Gemini の ai-review と Copilot を撤去し、Codex の GitHub review も適用範囲を変更してきた（当時の判断・実測は git 履歴を参照）。現在の PR 独立レビューは、リスクにかかわらず GitHub の `@codex review` を使う。追加 reviewer は 2026-09-17 の User 指示で停止中で、可用性や無応答を理由に自動起動しない。現在の規則は `AGENTS.md` §レビュー規則、手順は `.agents/skills/pr-cross-review/SKILL.md`
 - **repo ruleset「Copilot automatic first review」は 2026-08-05 に削除した。** 上記の「外した」後も ruleset 自体は active で残っており、seat 付与後に復活したのか直近 PR（#1832）へ実際にレビューを投稿し、PR ごとに約 3 課金分の Actions 実行を発生させていた。private 化後の課金源かつ（当時の）Codex 一本化方針と二重のため ruleset ごと削除。再開する場合は org の Copilot seat 割り当て（Settings → Copilot → Access）と ruleset の再作成の両方が必要
 - カバレッジ閾値が必要になった場合はVitest / CIで直接管理する
 - Code Qualityを再評価する場合は、有効化前にbilling impactと既存品質ゲートとの差分を確認する
@@ -438,6 +438,8 @@ upgrade 成功の代用にしない。適用済み migration の編集・削除�
 comment / thread（GraphQL の resolve 状態）から `not-required` / `not-started` / `pending` /
 `stale` / `complete` / `pending-adjudication` / `unknown` を判定し、commit status
 `Review policy (shadow)` に出す。状態の定義と完了証拠は `pr-cross-review` skill §Review policy。
+追加 reviewer は停止中。保護対象 path でも現 head の GitHub レビューと指摘の裁定で満たし、
+固定差分レビューの欠落・古さ・partial を別の停止条件にしない。既存証跡の読み取り互換は維持する。
 shadow 中は Codex を自動起動しない（workflow に `pull-requests: write` を渡していない）。
 review evidence の保証境界: review の submit と thread の resolve は issue_comment を出さないため、
 その直後は再評価されない。通常は修正 push → CI 完了の `workflow_run` で再評価される。
@@ -446,7 +448,7 @@ review evidence の保証境界: review の submit と thread の resolve は is
 OWNER / MEMBER / COLLABORATOR の comment だけ受理し、`status:` は単独の `reviewed` か全要素が
 `role=reviewed` の時だけ満たす。依頼と head の対応は commit 日時ではなく、その head の最新の
 pull_request run 作成時刻（切替時刻）で照合する。Codex が無応答 / 失敗でも、現 head の信頼済み
-`[review-summary]` があれば「同等の独立レビュー」として満たす（可用性を gate にしない）。
+`[review-summary]` があれば、過去に記録されたレビュー証跡の互換経路として満たす（新しい reviewer は起動しない）。
 closed / merged PR と main 以外を base にする PR は評価も発行もしない。裁定は PR の全 review
 thread（代替レビューの指摘・対象不明の応答を含む）が「信頼済み人間の返信つきで resolve」で
 なければ pending-adjudication。**review evidence の保証境界はここまで**: GitHub 上の投稿者・
@@ -652,12 +654,9 @@ required status checks の実状は ruleset が正本で、context の一覧を�
   `ci.yml` paths-ignore 撤去（PR #1836）と同じく「永久に `expected` のまま」で全 PR が
   merge 不能になる。**2026-09-07 の public 化で ruleset が有効化され、この落とし穴が実際に発生した**
   （全 PR が `mergeStateStatus: BLOCKED`、5 日で 34 回の手動 dispatch で回避。2026-09-13 に [#2640](https://github.com/Dayopt/dayopt/issues/2640) で required から外して解消）
-- **外部モデルの自動 diff レビュー（ai-review / Gemini）は 2026-08-03 に撤去した。** レビューは
-  外部レビュー（Codex。2026-08-13 に全 PR 適用を停止し、2026-09-01 にクロスレビュー必須 PR 限定で
-  必須化して再開、#2529）と Claude の内部レビュー（`AGENTS.md §委任・報告の作法`
-  §Read-only delegation の `risk-reviewer` / `behavior-verifier` / `architecture-guard`）に一本化して
-  いたが、現在は内製クロスレビュー（`.agents/skills/pr-cross-review/SKILL.md`）が merge gate の標準を
-  担う。判定基準だった不変条件カタログは [invariants.md](./invariants.md) に残っている
+- **外部モデルの自動 diff レビュー（ai-review / Gemini）は 2026-08-03 に撤去した。** 現在の
+  PR 独立レビューは GitHub の `@codex review` で、追加の内部 / 外部 reviewer は停止中。
+  旧レビューで蓄積した不変条件カタログは [invariants.md](./invariants.md) に残っている。
 - `ci.yml` は docs / rules のみの変更でも **workflow 自体は起動し**、`gate` job（Impact Resolver）の
   判定を各 job の `if:` に配って skip する。**skip された job は required status check として success
   扱いになる**ため、実行コストを避けつつ merge gate も満たせる。`paths-ignore` は 2026-08-05 に撤去した

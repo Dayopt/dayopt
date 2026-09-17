@@ -3,13 +3,13 @@
 /**
  * Protected Path Gate - determines from a changed-files list whether a PR
  * touches a protected path, used as the signal for how heavily
- * `pr-cross-review` skill's advisory review should be applied (#2478,
- * tempo-linked review gate; downgraded from a merge-blocking gate to an
+ * GitHub `@codex review` should focus on the change (#2478,
+ * tempo-linked review signal; downgraded from a merge-blocking gate to an
  * advisory signal in #2596 - merge itself is blocked only by CI
  * status-check-rollup and the `gh pr merge` guard hook).
  *
- * The old design required internal cross-review on every PR uniformly. This
- * script narrows the "how heavily should this be reviewed" signal to PRs that
+ * The old design required an extra cross-review on every PR uniformly. This
+ * script narrows the "where should the standard review focus" signal to PRs that
  * touch protected paths. It is the single source of truth consumed by
  * `scripts/tasks/finish-branch.sh` (the glob list is not duplicated in bash to
  * avoid drift), which also reuses it to decide whether the `Production Config
@@ -77,7 +77,7 @@ export const PRODUCTION_CONFIG_AUDIT_CONTRACT_PATHS = [
 
 /**
  * Protected path globs (OR'd together). If any changed file matches one of
- * these, `pr-cross-review` skill's advisory review is recommended (#2596;
+ * these, the standard GitHub `@codex review` should pay closer attention (#2596;
  * no longer a merge-blocking requirement). Add or remove entries only in this
  * array (finish-branch.sh does not keep a copy).
  */
@@ -124,13 +124,16 @@ export const PROTECTED_PATH_GLOBS = [
   '.husky/**',
   '.codex/**',
   '.claude/settings.json',
+  // agent adapter は child の権限・scope・credential 境界を固定するため、変更時は
+  // 標準 GitHub review の重点確認対象にする。
+  'scripts/agent/**',
   'scripts/hooks/**',
   'scripts/tasks/finish-branch.sh',
   'scripts/ci/protected-path-gate.mjs',
   // CI の中枢。check.mjs は write 権限つき GH_TOKEN を PR コードから隔離する
   // 処理とどの test を skip するかの判定を持ち、ci.yml はその job / permissions
   // を決める。どちらも「壊れても CI は green のまま」になりうるため、
-  // guardrail として必須側に置く（#2483 クロスレビュー、risk-reviewer 指摘）。
+  // guardrail の重点確認対象として残す（#2483 の過去レビューで入った境界）。
   'scripts/ci/check.mjs',
   '.github/workflows/ci.yml',
   // promote.yml は production domain を切り替える唯一の経路で、2026-09-03 以降は
