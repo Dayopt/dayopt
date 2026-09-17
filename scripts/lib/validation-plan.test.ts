@@ -65,6 +65,37 @@ describe('trusted validation plan', () => {
     expect(result.required.productPreview.status).toBe('required');
     expect(result.required.webPreview.status).toBe('required');
   });
+  it.each([
+    '.agents/skills/supabase/SKILL.md',
+    '.agents/skills/supabase/references/postgres-rls-security.md',
+    '.claude/skills/supabase/SKILL.md',
+  ])('does not require integration for agent docs that only name supabase / rls: %s', (file) => {
+    // impact.mjs はこれらを docs-only（integration=false）と判定するので 🧪 Integration Tests は
+    // 起動しない。plan だけが database area を立てると、起動しない job を待って Validation が
+    // 恒久的に blocked になる（#2815、PR #2813 で実発生）
+    const result = plan([file]);
+    expect(result.areas).not.toContain('database');
+    expect(result.areas).not.toContain('unknown');
+    expect(result.required.integration.status).toBe('not-applicable');
+    expect(result.review.status).toBe('required');
+  });
+  it('still requires integration when the same change carries SQL', () => {
+    const result = plan([
+      '.agents/skills/supabase/SKILL.md',
+      'supabase/migrations/20260916000000_rls.sql',
+    ]);
+    expect(result.areas).toContain('database');
+    expect(result.required.integration.status).toBe('required');
+  });
+  it.each(['supabase/AGENTS.md', 'docs/engineering/data/db/rls-snapshot.md'])(
+    'keeps the database area outside the agent guidance directories: %s',
+    (file) => {
+      // #2815 の除外は `.agents/` `.claude/` `.codex/` 配下の Markdown だけ。`docs/` の DB 契約を
+      // api-db として扱う validation-shadow-report.mjs の判定がこの area に乗っている
+      expect(plan([file]).areas).toContain('database');
+      expect(plan([file]).required.integration.status).toBe('required');
+    },
+  );
   it('requires broad validation for unknown paths', () => {
     const result = plan(['new-root/file']);
     expect(Object.values(result.required).every((rule) => rule.status === 'required')).toBe(true);

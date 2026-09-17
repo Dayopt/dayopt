@@ -23,8 +23,18 @@ export function classifyPlanPath(file) {
   if (/\.(css|tsx)$/.test(file)) areas.push('ui');
   if (/\/(time|timeblock|calendar)\/|\/features\/.*\/(domain|server)\//.test(file))
     areas.push('behavior');
-  if (/\/api\/|\/mcp\/|\/oauth/.test(file)) areas.push('api');
-  if (/^supabase\/|\/database\/|\/supabase\/|rls/.test(file)) areas.push('database');
+  // `api` / `database` は suite を 1 つずつ足す（mcpConformance / integration）。**agent 向けの
+  // 手引き（`.agents/` `.claude/` `.codex/` 配下の Markdown）は契約そのものではない**ので掛けない。
+  // path に `supabase` / `rls` を含むだけの SKILL.md が integration を required にする一方、
+  // impact.mjs は同じ path を docs-only と判定して job を起動しないため、待っても満たされず
+  // 恒久的に blocked になっていた（#2815、`.agents/skills/supabase/SKILL.md` で実発生）。
+  // 契約が実際に変わる PR には SQL / TS / workflow が入り、そちらが area を立てる。
+  // `docs/` は除外しない（`docs/engineering/data/db/rls-snapshot.md` を api-db として扱う
+  // validation-shadow-report.mjs の判定がこの area に乗っている）。
+  const agentGuidance = /^(\.agents|\.claude|\.codex)\/.*\.md$/.test(file);
+  if (!agentGuidance && /\/api\/|\/mcp\/|\/oauth/.test(file)) areas.push('api');
+  if (!agentGuidance && /^supabase\/|\/database\/|\/supabase\/|rls/.test(file))
+    areas.push('database');
   if (/\/auth\/|\/oauth|\/stripe\/|\/billing\/|billing-|\/webhooks\//.test(file))
     areas.push('auth-billing');
   if (
