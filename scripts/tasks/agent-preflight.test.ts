@@ -56,7 +56,7 @@ describe('agent preflight', () => {
     expect(state.skills).toBe(true);
     expect(state.codexHooks).toContain('unverified');
     expect(state.readOnlyDelegation.wrapper).toBe(false);
-    expect(state.readOnlyDelegation.native).toContain('unverified');
+    expect(state.readOnlyDelegation.native).toContain('scope cannot be enforced');
     expect(renderPreflight(state)).toContain('Read-only delegation');
   });
   it('flags a User OAuth token (classic broad scopes) as an un-isolated gh identity', () => {

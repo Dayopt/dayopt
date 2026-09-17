@@ -92,13 +92,6 @@ export function collectPreflight(cwd = process.cwd()) {
       }
     }),
   );
-  let claude = false;
-  try {
-    execFileSync('which', ['claude'], { stdio: 'ignore' });
-    claude = true;
-  } catch {
-    // Keep the general CLI line backward compatible; Claude is reported below.
-  }
   const skills = existsSync(join(root, '.agents/skills/routing/SKILL.md'));
   const ghIdentity = collectGhIdentity({ ghPresent: cli.gh });
   return {
@@ -119,10 +112,10 @@ export function collectPreflight(cwd = process.cwd()) {
       ? 'configured; runtime activation unverified'
       : 'missing',
     readOnlyDelegation: {
-      wrapper: existsSync(join(root, 'scripts/agent/read-only-delegate.mjs')),
-      codex: cli.codex,
-      claude,
-      native: 'unsupported; runtime permission / hook coverage unverified',
+      wrapper: false,
+      codex: false,
+      claude: false,
+      native: 'unsupported; repository scope cannot be enforced at runtime',
     },
   };
 }

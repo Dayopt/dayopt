@@ -31,13 +31,13 @@ description: 非 trivial な作業の成功条件・実行方法・モデル選�
 
 難しさ・影響・検証可能性で初期選択する。具体名は運用上の目安であり、可用性や能力の保証ではない。
 
-| 作業                                                            | 初期候補                 |
-| --------------------------------------------------------------- | ------------------------ |
-| 検索・定型変換・集計・既存検査など結果が機械的に決まる          | script / 通常 tool       |
-| CLI だけで閉じない大量の読み取り調査を委譲する場合              | Luna（`gpt-5.6-luna`）   |
-| 狭い範囲で正解が明確、機械的に検証できる                        | 軽量 Codex（Terra 相当） |
-| 既存設計の中で判断する通常実装・不具合修正                      | Sol 相当                 |
-| 前提から考える設計、認可・時間不変条件、複合不具合、複数画面 UX | Astra 相当               |
+| 作業                                                                        | 初期候補                               |
+| --------------------------------------------------------------------------- | -------------------------------------- |
+| 検索・定型変換・集計・既存検査など結果が機械的に決まる                      | script / 通常 tool                     |
+| runtime で read-only と repository scope を機械強制できる大量の読み取り調査 | Luna（`gpt-5.6-luna`、現在は経路なし） |
+| 狭い範囲で正解が明確、機械的に検証できる                                    | 軽量 Codex（Terra 相当）               |
+| 既存設計の中で判断する通常実装・不具合修正                                  | Sol 相当                               |
+| 前提から考える設計、認可・時間不変条件、複合不具合、複数画面 UX             | Astra 相当                             |
 
 毎回、軽量 → Sol → Astra と順番に試さない。理解済みの担当を切り替える再理解コストも含める。実測が不足する領域の表は暫定のままにする。
 
@@ -47,7 +47,7 @@ description: 非 trivial な作業の成功条件・実行方法・モデル選�
 
 初期対象は repository-wide search、関連実装・テストの discovery、大量ログの分類など read-only の大量調査。主作業から独立し、短く検証可能な成果が返り、親の照合まで含めて利益がある場合に限る。architecture・debugging の判断、認可・migration・時間不変条件、重要な編集は主担当が持つ。
 
-この読み取り調査は `pnpm agent:readonly` の CLI adapter だけで実行する。Codex adapter は `codex --ask-for-approval untrusted exec --model gpt-5.6-luna --sandbox read-only --ephemeral`、Claude adapter は `claude -p --model haiku --effort low --permission-mode plan --tools Read,Glob,Grep --no-session-persistence` に固定し、scope は repo 相対 path の allowlist として wrapper が検証する。native `spawn_agent` / `Agent` は read-only sandbox と scope を観測できないため大量調査には使わない。CLI が無い、起動に失敗する、または preflight が native hook を未検証と示す場合は上位モデルへ自動 escalation せず、主担当が同じ範囲を調べる。専用 security harness のモデル選択はこの読み取り調査の指定対象ではない。
+read-only と repository scope を runtime で同時に機械強制できる adapter は現在ないため、大量の読み取り調査も委譲せず主担当が行う。将来、両方の境界を実測できる adapter が追加された場合だけ、Codex は Luna（`gpt-5.6-luna`）、Claude は Haiku 相当を候補にする。native `spawn_agent` / `Agent` は read-only sandbox と scope を観測できないため使わない。専用 security harness のモデル選択はこの読み取り調査の指定対象ではない。
 
 渡すものは成功条件、読む範囲、既知の制約、検証方法、禁止操作。返却は「確認した範囲／事実／file・symbol・location／未確認範囲／不足情報」に絞る。prompt の read-only 指示は security boundary ではないため、runtime の権限も合わせる。専用 security harness のレビューはこの通常調査とは別契約で行う。
 

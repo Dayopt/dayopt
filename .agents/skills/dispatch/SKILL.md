@@ -77,16 +77,7 @@ feature 開発と並行する非 feature 作業を issue ベースで回す定�
 Chat 等への外部依頼で生じた調査結果も、まず既存の対象 issue へ記録する。[Chat 連携手順](../../../docs/operations/chat-handoff.md) の依頼IDと投稿URLで照合し、調査結果の保存を採用・実装承認と混同しない。指定 issue へのコメント権限から、新規 issue 作成・本文変更・状態変更の権限を推定しない。新規起票を委ねる場合は repository、件数上限、対象範囲と本操作 B の規約を渡す。再送前には同じ依頼IDの投稿を確認し、既存ならそのURLを再利用する。
 
 1. `gh search issues` で既存 issue との重複を確認（close 済み含む）
-2. 重複なら既存 issue に本文追記 or コメントで統合。新規なら handoff-quality で起票。**RLS ポリシー・テナント境界・スキーマ変更に関わる起票では、攻撃シナリオの洗い出しが issue の品質を実質的に上げる場合だけ、別 context の read-only 調査に依頼し、出力を「## テストすべき攻撃シナリオ」として本文に貼る**。利用できる時は `pnpm agent:readonly` を使う:
-
-   ```bash
-   pnpm agent:readonly --provider codex \
-     --scope supabase/migrations --scope apps/product/src \
-     --task "テナント越えの読み書きができてしまう可能性のあるクエリ・操作パターンを
-     10個列挙し、それぞれ悪用手順を1行で添える。"
-   ```
-
-   Claude を使う場合は `--provider claude` に置き換える。別の runtime で read-only sandbox と scope allowlist を実測できない場合は委譲せず、親担当が確認する。これはレビューや merge 判定ではなく、起票前の読み取り補助である。出力をチケット本文に貼り、到達可能なシナリオだけをテスト候補へ残す。呼び出し失敗・タイムアウト時はスキップして本来のフローを続行する（best-effort）
+2. 重複なら既存 issue に本文追記 or コメントで統合。新規なら handoff-quality で起票。**RLS ポリシー・テナント境界・スキーマ変更に関わる起票では、攻撃シナリオの洗い出しが issue の品質を実質的に上げる場合だけ、親担当が別 context の read-only 調査を行い、出力を「## テストすべき攻撃シナリオ」として本文に貼る**。read-only と repository scope を runtime で同時に強制できる delegate は現在ないため、別 agent へは委譲しない。これはレビューや merge 判定ではなく、起票前の読み取り補助である。到達可能なシナリオだけをテスト候補へ残す。
 
    **これは起票時の攻撃シナリオ生成であり、実装の着手可否を決める gate ではない。** 本文を厚くするための best-effort な補助で、外部 provider の可用性を前提にしない
 

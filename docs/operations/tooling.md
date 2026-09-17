@@ -499,19 +499,19 @@ Chat は product / UX・research・仕様整理、Codex は repo に基づく判
 
 adapter の script が存在するだけでは tool call は止まらない。runtime 側で adapter が実行前 hook として登録・起動され、block 結果を尊重する必要がある。repo は user-global 設定、直接 shell、User 自身の UI 操作、未知の tool surface を強制できない。具体的な secret 境界と残余リスクは [secrets.md](./secrets.md) を正本とする。
 
-Codex でこの project を初めて開く時は、project trust を確認し、`/hooks` で `.codex/hooks.json` の command と有効状態を User が 1 回レビューする。repo の `.codex/config.toml` に `hooks = true` があっても、runtime が project を trust して hook を読み込んだ証拠にはならない。`pnpm agent:preflight`（機械利用は `pnpm agent:preflight --json`）は依存、Git hooks、CLI、skills、Codex hook 設定ファイル、read-only wrapper / CLI の存在を確認するが、runtime の trust や実際の hook 発火は判定できない。native delegation は preflight で unsupported / unverified と表示され、bulk read の経路に使わない。user-global 設定はこの onboarding で変更しない。
+Codex でこの project を初めて開く時は、project trust を確認し、`/hooks` で `.codex/hooks.json` の command と有効状態を User が 1 回レビューする。repo の `.codex/config.toml` に `hooks = true` があっても、runtime が project を trust して hook を読み込んだ証拠にはならない。`pnpm agent:preflight`（機械利用は `pnpm agent:preflight --json`）は依存、Git hooks、CLI、skills、Codex hook 設定ファイル、read-only delegation の状態を確認するが、runtime の trust や実際の hook 発火は判定できない。read-only delegation は scope を runtime で強制できないため unsupported と表示され、bulk read の経路に使わない。user-global 設定はこの onboarding で変更しない。
 
 ### 実行経路ごとの保護範囲
 
 「機械」は該当 hook が信頼・発火した場合の判定を指す。現時点の native Codex 発火は未確認である。
 
-| 分類・操作                                  | Claude Code                                                      | Codex                                                                            | Antigravity                                |
-| ------------------------------------------- | ---------------------------------------------------------------- | -------------------------------------------------------------------------------- | ------------------------------------------ |
-| 秘密情報: envファイル、vault参照            | Read/Write/Edit と Bash の個別パターンを機械検査                 | apply_patch の全対象・shell の個別パターンを機械検査。汎用read toolはsurface依存 | repo hook接続なし。指示で制御、実動未確認  |
-| 破壊的操作: 既存migration・他worktreeの編集 | Write/Editで機械検査。任意shell編集は保証外                      | apply_patch の変更元/先・symlinkを機械検査。任意shell編集は保証外                | 指示で制御、機械保護は未対応               |
-| Git運用: force push、no-verify、直接merge等 | Bashの列挙パターンを機械検査                                     | 共通Bash判定を再利用                                                             | 共通Git hookのみ。tool実行前の検査は未対応 |
-| 大量の読み取り調査                          | `pnpm agent:readonly --provider claude`（plan + Read/Glob/Grep） | `pnpm agent:readonly --provider codex`（Luna + read-only sandbox）               | read-only 境界を確認できないため委譲しない |
-| コスト・利便性                              | モデル名に基づく委任制限は撤去。起動確認は共通command            | 同左                                                                             | 共通commandを手動利用可能、実動未確認      |
+| 分類・操作                                  | Claude Code                                           | Codex                                                                            | Antigravity                                |
+| ------------------------------------------- | ----------------------------------------------------- | -------------------------------------------------------------------------------- | ------------------------------------------ |
+| 秘密情報: envファイル、vault参照            | Read/Write/Edit と Bash の個別パターンを機械検査      | apply_patch の全対象・shell の個別パターンを機械検査。汎用read toolはsurface依存 | repo hook接続なし。指示で制御、実動未確認  |
+| 破壊的操作: 既存migration・他worktreeの編集 | Write/Editで機械検査。任意shell編集は保証外           | apply_patch の変更元/先・symlinkを機械検査。任意shell編集は保証外                | 指示で制御、機械保護は未対応               |
+| Git運用: force push、no-verify、直接merge等 | Bashの列挙パターンを機械検査                          | 共通Bash判定を再利用                                                             | 共通Git hookのみ。tool実行前の検査は未対応 |
+| 大量の読み取り調査                          | scope を runtime で強制できないため委譲しない         | scope を runtime で強制できないため委譲しない                                    | read-only 境界を確認できないため委譲しない |
+| コスト・利便性                              | モデル名に基づく委任制限は撤去。起動確認は共通command | 同左                                                                             | 共通commandを手動利用可能、実動未確認      |
 
 **shell の任意編集は機械的に閉じていない**。`sed -i`、`perl -pi`、`cp`、`mv`、`tee`、出力redirect、任意scriptによる既存migration・他worktreeへの書き込みを、このadapterは一般には検出しない。Codexのファイル変更は原則 `apply_patch` を使い、shell編集へ切り替えてこの検査を迂回しない（指示による制御）。hookに到達しただけで全操作が保護されるわけではない。write_stdin、hosted/specialized tool、wrapper内部の処理も同じ保証を持たない。
 
@@ -566,7 +566,7 @@ Codex でこの project を初めて開く時は、project trust を確認し、
 
 高リスク変更の immutable pack / role / envelope / validation は過去証跡を検証するため同 skill の `references/high-risk-review.md` と道具を保持するが、通常の追加 reviewer は停止中で実行しない。既存の `[review-summary]` は読み取り互換だけを残す。明示依頼された security sweep と不可逆操作の独立レビュー条件は通常レビューで置き換えない。
 
-大量の repository 読み取り調査を委譲する時は `pnpm agent:readonly` を使う。Codex は Luna の read-only sandbox、Claude は Haiku 相当の plan mode と `Read,Glob,Grep` だけを wrapper が固定する。scope 検証、credential を含む環境変数の除去、失敗時の親担当への fallback は `scripts/agent/read-only-delegate.mjs` が担う。native delegation は read-only 境界を観測できないため大量調査には使わず、最終的な判断・編集・報告は親担当が行う。
+read-only と repository scope を runtime で同時に強制できる delegate は現在ないため、大量の repository 読み取り調査は親担当が行う。native delegation も read-only / scope 境界を観測できないため使わない。将来、両方を実測できる adapter が追加された場合だけ、Luna / Haiku の候補と env・timeout・fallback 契約を再評価する。
 
 ### pack の種別と契約 version
 

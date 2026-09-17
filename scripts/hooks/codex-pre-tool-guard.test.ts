@@ -174,7 +174,7 @@ describe('Codex delegation boundary', () => {
       );
       expect(result).toMatchObject({
         decision: 'block',
-        message: expect.stringContaining('agent:readonly'),
+        message: expect.stringContaining('親担当'),
       });
     },
   );
