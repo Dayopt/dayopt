@@ -1,0 +1,510 @@
+/**
+ * Vercel AI Gateway 経由で Jev（`typesafe-ai/jev`）を 1 回呼ぶための薄い adapter。
+ *
+ * #2827 Phase 0。この層の責務は「外部 API の不確実性を、型の決まった Annotation
+ * 1 個へ畳む」ことだけに限る。振り分け・権限・レビュー要件の合成は呼び出し側の
+ * コードが持ち、Jev の出力から shell / tool / 権限へは繋がない。
+ *
+ * 固定した設計点（いずれも #2827 の制約に直接対応する）:
+ *
+ * - **`maxRetries: 0`**。AI SDK の既定は 2 で、429 や 5xx を黙って 3 倍へ増幅する。
+ *   無料枠を溶かすのは本体より retry なので、再送は呼び出し側が明示的に決める。
+ * - **失敗を throw しない**。すべて `status` で返す。Jev が落ちても既存の作業・
+ *   独立レビューがそのまま成立することを、例外処理の有無ではなく型で強制する。
+ * - **回答は「こちらが出した question id と type」以外を受け付けない**。state に
+ *   入る issue 本文 / PR コメント / diff は非信頼データで、Jev 自身は state 内の
+ *   指示文を data と区別しない（TypeSafe の model 特性ページに明記がある）。
+ *   出力の形を state から動かせなくするのは prompt の注意書きではなくこの検証。
+ * - **残高は Gateway を正とする**。送信前に下限を割っていたら呼ばない。予算不足を
+ *   credits 購入・他モデルへの fallback で救済する経路はこのファイルに存在しない。
+ *
+ * 秘密の扱い: API key は `AI_GATEWAY_API_KEY` から受け取り、値をログ・Annotation・
+ * エラーメッセージへ載せない。呼び出しは `op run` 経由の inline `op://` 注入を想定する。
+ */
+import { createHash } from 'node:crypto';
+
+import { createGateway, GatewayError } from '@ai-sdk/gateway';
+import { experimental_evaluate as evaluate } from 'ai';
+
+/** Annotation の形を変えたら上げる。cache key に入るので古い注釈は自動で失効する。 */
+export const JEV_SCHEMA_VERSION = 1;
+
+export const JEV_MODEL_ID = 'typesafe-ai/jev';
+
+/** AI SDK 既定の 2 を明示的に打ち消す。理由はファイル冒頭。 */
+export const JEV_MAX_RETRIES = 0;
+
+export const JEV_DEFAULT_TIMEOUT_MS = 20_000;
+
+/**
+ * state の上限（文字数）。TypeSafe の公開値は「合計 64k tokens、state と最長の
+ * question で 32k tokens」。tokenizer が公開されていないので token 数は数えられず、
+ * 安全側に振って 1 token = 4 文字で見積もった 24k tokens 相当で頭打ちにする。
+ * 超えたら切り詰めずに abstain する（切り詰めた state で出た評価は、どの範囲を
+ * 見ていないのかが後から復元できないため）。
+ */
+export const JEV_MAX_STATE_CHARS = 96_000;
+
+/** 1 request に載せる質問数の上限。公開仕様が無いので運用側で先に固定する。 */
+export const JEV_MAX_QUESTIONS = 12;
+
+/** 残高がこれを下回ったら送信しない（USD）。無料枠 $5 に対する保守的な床。 */
+export const JEV_MIN_BALANCE_USD = 1;
+
+export type JevStatus = 'evaluated' | 'abstained' | 'unavailable' | 'budget_exhausted';
+
+/**
+ * 固定 reason code。Jev に文章を書かせないための語彙で、表示文言はここから
+ * テンプレートで組み立てる。
+ */
+export type JevReasonCode =
+  | 'ok'
+  | 'disabled'
+  | 'missing_credentials'
+  | 'invalid_request'
+  | 'input_too_large'
+  | 'balance_below_floor'
+  | 'balance_unknown'
+  | 'timeout'
+  | 'rate_limited'
+  | 'auth_failed'
+  | 'customer_verification_required'
+  | 'free_tier_restricted'
+  | 'budget_exceeded'
+  | 'insufficient_credits'
+  | 'invalid_response'
+  | 'provider_error';
+
+export type JevQuestion =
+  | { type: 'boolean'; instructions: string; criteria?: { true?: string; false?: string } }
+  | { type: 'choice'; instructions: string; criteria: Record<string, string> }
+  | { type: 'score'; instructions: string; criteria: string[] };
+
+/**
+ * state に載せてよい値。SDK の `EvaluationModelV4Input`（string | JSONObject |
+ * JSONValue[]）と構造的に一致させる。`unknown` を許すと Date や class instance が
+ * 混ざって、送信される JSON と hash 対象がずれる。
+ */
+export type JevJsonValue =
+  string | number | boolean | null | JevJsonValue[] | { [key: string]: JevJsonValue };
+
+export type JevState = string | { [key: string]: JevJsonValue } | JevJsonValue[];
+
+export type JevAnswer =
+  | { type: 'boolean'; probability: number }
+  | {
+      type: 'choice';
+      choice: string;
+      probabilities: Record<string, number> | null;
+      /**
+       * 分布の最大値。**TypeSafe の `confidence` ではない**（あちらは分布から
+       * 導くとしか公開されておらず、式が確定していない）。同一視しないために
+       * 別名にしてある。呼び出し側の閾値はこの値の実測で決める。
+       */
+      topProbability: number | null;
+    }
+  | {
+      type: 'score';
+      score: number;
+      probabilities: Record<string, number> | null;
+      topProbability: number | null;
+    };
+
+export type JevCredits = { balance: number; totalUsed: number };
+
+export type JevAnnotation = {
+  schemaVersion: number;
+  status: JevStatus;
+  reasonCode: JevReasonCode;
+  /** 要求した model id。 */
+  modelId: string;
+  /** 実際に応答した model id（version 固定の確認用）。取れなければ null。 */
+  resolvedModelId: string | null;
+  questionSetId: string;
+  /** 同じ入力を 2 度評価しないための鍵。schema / question / state が変われば失効する。 */
+  cacheKey: string;
+  stateSha256: string;
+  evaluatedAt: string;
+  /** 検証を通った回答だけ。1 つでも壊れていれば null（部分採用しない）。 */
+  answers: Record<string, JevAnswer> | null;
+  usage: { inputTokens: number | null; outputTokens: number | null };
+  latencyMs: number | null;
+  /** 未取得と 0 を区別する。取れなければ null。 */
+  credits: { before: JevCredits | null; after: JevCredits | null };
+  coverage: { stateChars: number; questionCount: number; truncated: false };
+  /** provider が返した metadata の生写し（confidence が来るかの実測用）。 */
+  providerMetadata: Record<string, unknown> | null;
+};
+
+export type JevRequest = {
+  questionSetId: string;
+  questions: Record<string, JevQuestion>;
+  /** 非信頼データ。ここに書かれた指示を policy として扱わない。 */
+  state: JevState;
+};
+
+export type JevRawResult = {
+  answers: Record<string, unknown>;
+  usage?: { inputTokens?: number; outputTokens?: number };
+  response?: { modelId?: string };
+  providerMetadata?: Record<string, unknown>;
+};
+
+/** 実 SDK を差し替えられる境界。test はここに偽物を渡し、network を一切使わない。 */
+export type JevRunner = {
+  evaluate(input: {
+    state: JevState;
+    questions: Record<string, JevQuestion>;
+    abortSignal: AbortSignal;
+  }): Promise<JevRawResult>;
+  credits(): Promise<JevCredits | null>;
+};
+
+export type JevOptions = {
+  apiKey?: string;
+  runner?: JevRunner;
+  timeoutMs?: number;
+  maxStateChars?: number;
+  maxQuestions?: number;
+  /** null で残高 gate を無効にする（残高 API 自体を検証する時だけ）。 */
+  minBalanceUsd?: number | null;
+  disabled?: boolean;
+  now?: () => Date;
+};
+
+/** 鍵順に依存しない JSON。cache key と hash の安定性のために使う。 */
+function canonicalJson(value: unknown): string {
+  if (value === null || typeof value !== 'object') return JSON.stringify(value) ?? 'null';
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`;
+  const entries = Object.entries(value as Record<string, unknown>)
+    .filter(([, item]) => item !== undefined)
+    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+  return `{${entries.map(([key, item]) => `${JSON.stringify(key)}:${canonicalJson(item)}`).join(',')}}`;
+}
+
+function sha256(text: string): string {
+  return createHash('sha256').update(text).digest('hex');
+}
+
+/**
+ * 要求の静的検査。ネットワークを使わないので `pnpm jev:check` からも呼べる。
+ * 返り値が空なら送ってよい。
+ */
+export function validateJevRequest(
+  request: JevRequest,
+  limits: { maxStateChars?: number; maxQuestions?: number } = {},
+): string[] {
+  const maxQuestions = limits.maxQuestions ?? JEV_MAX_QUESTIONS;
+  const errors: string[] = [];
+  if (!request.questionSetId.trim()) errors.push('questionSetId: 空');
+  const ids = Object.keys(request.questions);
+  if (ids.length === 0) errors.push('questions: 空');
+  if (ids.length > maxQuestions)
+    errors.push(`questions: ${ids.length} 件は上限 ${maxQuestions} 超`);
+  for (const [id, question] of Object.entries(request.questions)) {
+    if (!question.instructions.trim()) errors.push(`${id}.instructions: 空`);
+    if (question.type === 'choice') {
+      const options = Object.keys(question.criteria);
+      if (options.length < 2) errors.push(`${id}.criteria: choice は 2 件以上`);
+      for (const option of options)
+        if (!question.criteria[option]?.trim()) errors.push(`${id}.criteria.${option}: 空`);
+    }
+    if (question.type === 'score') {
+      if (question.criteria.length < 2) errors.push(`${id}.criteria: score は 2 段以上`);
+      question.criteria.forEach((level, index) => {
+        if (!level.trim()) errors.push(`${id}.criteria[${index}]: 空`);
+      });
+    }
+  }
+  return errors;
+}
+
+function topProbabilityOf(probabilities: Record<string, number> | null): number | null {
+  if (!probabilities) return null;
+  const values = Object.values(probabilities);
+  return values.length === 0 ? null : Math.max(...values);
+}
+
+function readProbabilities(raw: Record<string, unknown>, allowedKeys: Set<string>) {
+  const value = raw.probabilities;
+  if (value === undefined) return { ok: true as const, value: null };
+  if (typeof value !== 'object' || value === null || Array.isArray(value))
+    return { ok: false as const, value: null };
+  const result: Record<string, number> = {};
+  for (const [key, item] of Object.entries(value)) {
+    if (!allowedKeys.has(key)) return { ok: false as const, value: null };
+    if (typeof item !== 'number' || !Number.isFinite(item) || item < 0 || item > 1)
+      return { ok: false as const, value: null };
+    result[key] = item;
+  }
+  return { ok: true as const, value: result };
+}
+
+/**
+ * 1 問分の回答を、こちらが定義した形へ落とす。落とせなければ null。
+ *
+ * ここが state 由来の指示に対する実際の境界になる。question id・type・choice の
+ * 選択肢・score の段数はすべて要求側が決めた集合に閉じており、model が別の値を
+ * 返しても採用されない。
+ */
+export function normalizeJevAnswer(question: JevQuestion, raw: unknown): JevAnswer | null {
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return null;
+  const record = raw as Record<string, unknown>;
+  if (record.type !== question.type) return null;
+
+  if (question.type === 'boolean') {
+    const probability = record.probability;
+    if (typeof probability !== 'number' || !Number.isFinite(probability)) return null;
+    if (probability < 0 || probability > 1) return null;
+    return { type: 'boolean', probability };
+  }
+
+  if (question.type === 'choice') {
+    const choice = record.choice;
+    const options = Object.keys(question.criteria);
+    if (typeof choice !== 'string' || !options.includes(choice)) return null;
+    const probabilities = readProbabilities(record, new Set(options));
+    if (!probabilities.ok) return null;
+    return {
+      type: 'choice',
+      choice,
+      probabilities: probabilities.value,
+      topProbability: topProbabilityOf(probabilities.value),
+    };
+  }
+
+  const score = record.score;
+  const lastIndex = question.criteria.length - 1;
+  if (typeof score !== 'number' || !Number.isFinite(score)) return null;
+  if (score < 0 || score > lastIndex) return null;
+  const levelKeys = new Set(question.criteria.map((_, index) => String(index)));
+  const probabilities = readProbabilities(record, levelKeys);
+  if (!probabilities.ok) return null;
+  return {
+    type: 'score',
+    score,
+    probabilities: probabilities.value,
+    topProbability: topProbabilityOf(probabilities.value),
+  };
+}
+
+function normalizeAnswers(
+  questions: Record<string, JevQuestion>,
+  raw: Record<string, unknown>,
+): Record<string, JevAnswer> | null {
+  const ids = Object.keys(questions);
+  // 余分な id が来た時点で捨てる。部分採用すると「聞いていない判断」が混ざる。
+  for (const id of Object.keys(raw)) if (!ids.includes(id)) return null;
+  const answers: Record<string, JevAnswer> = {};
+  for (const id of ids) {
+    const answer = normalizeJevAnswer(questions[id], raw[id]);
+    if (!answer) return null;
+    answers[id] = answer;
+  }
+  return answers;
+}
+
+type Failure = { status: JevStatus; reasonCode: JevReasonCode };
+
+function isAbort(error: unknown): boolean {
+  if (typeof error !== 'object' || error === null) return false;
+  const name = (error as { name?: unknown }).name;
+  return name === 'AbortError' || name === 'TimeoutError';
+}
+
+/**
+ * 失敗の分類。budget 超過は AI SDK 7 で `GatewayInternalServerError` として
+ * 出ることがある（Vercel の budgets ドキュメントに明記）ので、class 名だけで
+ * 判定せず本文の `quota_for_entity_exceeded` も見る。
+ */
+export function classifyJevError(error: unknown): Failure {
+  if (isAbort(error)) return { status: 'unavailable', reasonCode: 'timeout' };
+
+  const message = error instanceof Error ? error.message : String(error);
+  if (message.includes('quota_for_entity_exceeded'))
+    return { status: 'budget_exhausted', reasonCode: 'budget_exceeded' };
+
+  const statusCode = GatewayError.isInstance(error)
+    ? error.statusCode
+    : typeof (error as { statusCode?: unknown })?.statusCode === 'number'
+      ? (error as { statusCode: number }).statusCode
+      : null;
+
+  if (statusCode === 401) return { status: 'unavailable', reasonCode: 'auth_failed' };
+  if (statusCode === 402) return { status: 'budget_exhausted', reasonCode: 'insufficient_credits' };
+  if (statusCode === 429) return { status: 'unavailable', reasonCode: 'rate_limited' };
+  if (statusCode === 403) {
+    if (message.includes('customer_verification'))
+      return { status: 'unavailable', reasonCode: 'customer_verification_required' };
+    if (/free[ -]tier/i.test(message))
+      return { status: 'unavailable', reasonCode: 'free_tier_restricted' };
+    return { status: 'unavailable', reasonCode: 'auth_failed' };
+  }
+  return { status: 'unavailable', reasonCode: 'provider_error' };
+}
+
+/** `"95.50"` のような文字列残高を数値へ。読めなければ null（0 にしない）。 */
+function parseCredits(raw: { balance?: unknown; totalUsed?: unknown }): JevCredits | null {
+  const balance = Number(raw.balance);
+  const totalUsed = Number(raw.totalUsed);
+  if (!Number.isFinite(balance) || !Number.isFinite(totalUsed)) return null;
+  return { balance, totalUsed };
+}
+
+/**
+ * 実 SDK を使う runner。`apiKey` は Gateway provider へ明示的に渡す（env への
+ * 暗黙依存にすると、どの経路で秘密が入ったのかが呼び出し側から見えなくなる）。
+ */
+export function createJevRunner(options: { apiKey: string; timeoutMs: number }): JevRunner {
+  // timeout は provider の fetch へ差し込む。`getCredits()` は abortSignal を
+  // 受け取らないので、ここを抜くと残高取得だけが無期限に待ち、評価へ進む前に
+  // 固まる（評価本体の signal は呼び出し側が渡すため、そちらだけ見ていると
+  // 見落とす）。SDK が signal を付けてくる経路では両方を束ねる。
+  const fetchWithTimeout: typeof fetch = (input, init) => {
+    const timeout = AbortSignal.timeout(options.timeoutMs);
+    const signal = init?.signal ? AbortSignal.any([init.signal, timeout]) : timeout;
+    return fetch(input, { ...init, signal });
+  };
+  const gateway = createGateway({ apiKey: options.apiKey, fetch: fetchWithTimeout });
+  return {
+    async evaluate(input) {
+      const result = await evaluate({
+        model: gateway.evaluationModel(JEV_MODEL_ID),
+        state: input.state,
+        questions: input.questions,
+        maxRetries: JEV_MAX_RETRIES,
+        abortSignal: input.abortSignal,
+      });
+      return {
+        answers: result.answers as Record<string, unknown>,
+        usage: result.usage,
+        response: { modelId: result.response?.modelId },
+        providerMetadata: result.providerMetadata as Record<string, unknown> | undefined,
+      };
+    },
+    async credits() {
+      try {
+        return parseCredits(await gateway.getCredits());
+      } catch {
+        // 残高が読めないこと自体は評価を止める理由にならない。未取得として返す。
+        return null;
+      }
+    },
+  };
+}
+
+export function jevCacheKey(request: JevRequest): string {
+  return sha256(
+    canonicalJson({
+      schemaVersion: JEV_SCHEMA_VERSION,
+      modelId: JEV_MODEL_ID,
+      questionSetId: request.questionSetId,
+      questions: request.questions,
+      state: request.state,
+    }),
+  );
+}
+
+/**
+ * Jev を 1 回呼び、Annotation を返す。**throw しない。**
+ */
+export async function evaluateWithJev(
+  request: JevRequest,
+  options: JevOptions = {},
+): Promise<JevAnnotation> {
+  const now = options.now ?? (() => new Date());
+  const maxStateChars = options.maxStateChars ?? JEV_MAX_STATE_CHARS;
+  const maxQuestions = options.maxQuestions ?? JEV_MAX_QUESTIONS;
+  const minBalanceUsd =
+    options.minBalanceUsd === undefined ? JEV_MIN_BALANCE_USD : options.minBalanceUsd;
+  const stateText = canonicalJson(request.state);
+
+  const base = {
+    schemaVersion: JEV_SCHEMA_VERSION,
+    modelId: JEV_MODEL_ID,
+    resolvedModelId: null,
+    questionSetId: request.questionSetId,
+    cacheKey: jevCacheKey(request),
+    stateSha256: sha256(stateText),
+    evaluatedAt: now().toISOString(),
+    answers: null,
+    usage: { inputTokens: null, outputTokens: null },
+    latencyMs: null,
+    credits: { before: null, after: null },
+    coverage: {
+      stateChars: stateText.length,
+      questionCount: Object.keys(request.questions).length,
+      truncated: false as const,
+    },
+    providerMetadata: null,
+  } satisfies Omit<JevAnnotation, 'status' | 'reasonCode'>;
+
+  const stop = (failure: Failure, extra: Partial<JevAnnotation> = {}): JevAnnotation => ({
+    ...base,
+    ...failure,
+    ...extra,
+  });
+
+  const disabled = options.disabled ?? process.env.JEV_DISABLED === '1';
+  if (disabled) return stop({ status: 'unavailable', reasonCode: 'disabled' });
+
+  if (validateJevRequest(request, { maxQuestions }).length > 0)
+    return stop({ status: 'abstained', reasonCode: 'invalid_request' });
+
+  if (stateText.length > maxStateChars)
+    return stop({ status: 'abstained', reasonCode: 'input_too_large' });
+
+  const apiKey = options.apiKey ?? process.env.AI_GATEWAY_API_KEY ?? '';
+  const runner =
+    options.runner ??
+    (apiKey
+      ? createJevRunner({ apiKey, timeoutMs: options.timeoutMs ?? JEV_DEFAULT_TIMEOUT_MS })
+      : null);
+  if (!runner) return stop({ status: 'unavailable', reasonCode: 'missing_credentials' });
+
+  const before = await runner.credits();
+  if (minBalanceUsd !== null) {
+    if (before === null) return stop({ status: 'budget_exhausted', reasonCode: 'balance_unknown' });
+    if (before.balance < minBalanceUsd)
+      return stop(
+        { status: 'budget_exhausted', reasonCode: 'balance_below_floor' },
+        {
+          credits: { before, after: null },
+        },
+      );
+  }
+
+  const startedAt = Date.now();
+  let raw: JevRawResult;
+  try {
+    raw = await runner.evaluate({
+      state: request.state,
+      questions: request.questions,
+      abortSignal: AbortSignal.timeout(options.timeoutMs ?? JEV_DEFAULT_TIMEOUT_MS),
+    });
+  } catch (error) {
+    // timeout でも課金済みの可能性があるため、失敗側でも残高を取り直す。
+    return stop(classifyJevError(error), {
+      latencyMs: Date.now() - startedAt,
+      credits: { before, after: await runner.credits() },
+    });
+  }
+
+  const latencyMs = Date.now() - startedAt;
+  const after = await runner.credits();
+  const answers = normalizeAnswers(request.questions, raw.answers ?? {});
+  const telemetry = {
+    latencyMs,
+    credits: { before, after },
+    resolvedModelId: raw.response?.modelId ?? null,
+    usage: {
+      inputTokens: typeof raw.usage?.inputTokens === 'number' ? raw.usage.inputTokens : null,
+      outputTokens: typeof raw.usage?.outputTokens === 'number' ? raw.usage.outputTokens : null,
+    },
+    providerMetadata: raw.providerMetadata ?? null,
+  };
+
+  if (!answers) return stop({ status: 'unavailable', reasonCode: 'invalid_response' }, telemetry);
+
+  return { ...base, status: 'evaluated', reasonCode: 'ok', answers, ...telemetry };
+}
