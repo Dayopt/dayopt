@@ -7,6 +7,7 @@ import {
   comparePlanToLegacy,
   formatReport,
   jobMinutes,
+  listRecentPulls,
   runReport,
   sumOrNull,
 } from './validation-shadow-report.mjs';
@@ -87,6 +88,19 @@ describe('shadow report: classification and comparison', () => {
       statuses: green,
     });
     expect(migration!.wouldAdd).toEqual(['🧱 DB Upgrade (shadow)']);
+  });
+
+  it('treats a cancelled job that never started as absent (would-add when required)', () => {
+    const result = comparePlanToLegacy({
+      plan: plan(['AGENTS.md']),
+      jobs: [
+        j('🔍 Static Checks', 'success', 2),
+        { name: '📦 Unit Tests', conclusion: 'cancelled', started: false, minutes: null },
+      ],
+      statuses: green,
+    });
+    expect(result!.wouldAdd).toEqual(['📦 Unit Tests']);
+    expect(result!.wouldSkip).not.toContain('📦 Unit Tests');
   });
 
   it('counts failed / cancelled jobs as ran (they used the runner), not as skipped', () => {
@@ -173,6 +187,31 @@ describe('shadow report: classification and comparison', () => {
   });
 });
 
+describe('shadow report: pull listing', () => {
+  it('stops paging once enough non-draft main PRs are collected and never uses --paginate', () => {
+    const requested: string[] = [];
+    const page = (n: number) =>
+      Array.from({ length: 100 }, (_, i) => ({
+        number: n * 1000 + i,
+        draft: i % 2 === 1,
+        base: { ref: i % 5 === 0 ? 'release' : 'main' },
+      }));
+    const api = (path: string, paginate?: boolean) => {
+      expect(paginate).toBeFalsy();
+      requested.push(path);
+      const n = Number(path.match(/&page=(\d+)/)![1]);
+      return n <= 3 ? page(n) : [];
+    };
+    const pulls = listRecentPulls({ api, limit: 5 });
+    expect(pulls).toHaveLength(5);
+    expect(pulls.every((pr) => !pr.draft && pr.base.ref === 'main')).toBe(true);
+    expect(requested).toHaveLength(1);
+    const all = listRecentPulls({ api, limit: 500 });
+    // 3 page 分（各 40 件が該当）で尽きる。空 page で止まり、上限 page 数を超えない
+    expect(all).toHaveLength(120);
+  });
+});
+
 describe('shadow report: collection and rendering', () => {
   const pr = {
     number: 2800,
@@ -184,11 +223,13 @@ describe('shadow report: collection and rendering', () => {
     merge_commit_sha: 'c'.repeat(40),
   };
   const routes: Record<string, unknown> = {
-    [`repos/${REPO}/pulls?state=all&sort=updated&direction=desc&per_page=30`]: [
+    [`repos/${REPO}/pulls?state=all&sort=updated&direction=desc&per_page=100&page=1`]: [
       { ...pr, number: 1, draft: true },
       pr,
     ],
-    [`repos/${REPO}/pulls/2800/files?per_page=100`]: [{ filename: 'README.md' }],
+    [`repos/${REPO}/compare/${BASE}...${HEAD}?per_page=100`]: [
+      { files: [{ filename: 'README.md' }] },
+    ],
     [`repos/${REPO}/actions/runs?head_sha=${HEAD}&per_page=50`]: [
       {
         workflow_runs: [

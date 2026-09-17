@@ -475,6 +475,18 @@ would-add（Actions job と Vercel deployment の両方）を 1 表にする。�
 | 3    | 観察後、旧 required のうち新条件が包含するものだけを外す（trusted source を保つ native check は残す）                                                                             | その PUT 直前に保存した ruleset を再適用 | User（EXPLICIT AUTHORITY） |
 | 4    | `branch:finish` の rollup 検査と shadow の重複を整理                                                                                                                              | git revert                               | -                          |
 
+**段階 2 の前提（発行元の分離）**: `Validation (shadow)` / `Review policy (shadow)` は現状
+validation-gate.yml が `GITHUB_TOKEN`（github-actions App、integration_id 15368）で発行している。
+同一 repo の PR workflow も `permissions: statuses: write` を宣言すれば同じ App 名義で同じ context を
+head SHA へ POST できるため、context 名（+ integration_id 15368）だけで required にしても「main の
+信頼済み controller が評価した」証拠にならない（status event の再評価は Vercel context だけを
+見るので、偽 status を controller が上書きする保証もない）。required 化の前に次のどちらかを
+User 裁可で決める: (a) controller の status を専用 GitHub App の installation token で発行し、
+ruleset の `required_status_checks[].integration_id` をその App に束縛する（推奨。PR workflow は
+その App の token を得られない）、(b) repo の Actions 既定権限を read に固定したうえで、PR
+workflow の `permissions` 宣言による昇格を組織 policy で禁止できることを実測してから進める。
+どちらも未実施の間は段階 2 へ進まない。
+
 切替は `gh api -X PUT repos/Dayopt/dayopt/rulesets/6790553` で行い、**各 PUT の直前に
 `gh api repos/Dayopt/dayopt/rulesets/6790553` の完全な JSON をその操作固有の rollback 入力として
 保存してから**実行し、直後に ruleset と対象 PR の check を再取得して旧条件と新条件の証拠を比較する。
@@ -534,6 +546,7 @@ rollback 入力ではない）:
   `production-release` environment へ置く決定（secret の境界変更）と台帳更新を伴う別変更
 - Codex の自動起動（Review policy の trigger）は log のみ。実起動は `pull-requests: write` を
   controller へ渡す判断を伴う別変更
+- controller の status 発行元の分離（専用 GitHub App）は未実施。段階 2 の前提（上記）
 - release 差分基準の回帰（前回公開失敗後の docs-only merge、同一 SHA の再 deployment、片方だけ
   未公開、burst merge）は `scripts/ci/release-impact.test.ts` / `scripts/ci/production-release.test.ts`
   の既存 fixture（live 基準判定、preview / 別 integration の deployment 除外、superseded、mixed

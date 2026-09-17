@@ -90,7 +90,8 @@ export function comparePlanToLegacy({ plan, jobs, statuses = {}, legacyComplete 
     } else {
       const job = ranByName.get(key);
       ran = Boolean(job && job.started && job.conclusion !== 'skipped');
-      absent = !job || job.conclusion === 'skipped';
+      // runner を取る前に cancelled された job（started_at 無し）も「走っていない」
+      absent = !job || !job.started || job.conclusion === 'skipped';
     }
     if (ran && !anyRequired) wouldSkip.push(key);
     if (anyRequired && absent) wouldAdd.push(key);
@@ -123,20 +124,22 @@ export function sumOrNull(values) {
 /** 1 PR 分の行を組み立てる。api は `(path, paginate?) => json`。 */
 export function collectPrRow({ pr, api }) {
   const headSha = pr.head?.sha ?? '';
-  const files = api(`repos/${REPO}/pulls/${pr.number}/files?per_page=100`, true).map(
-    (file) => file.filename,
+  const baseSha = pr.base?.sha ?? '';
+  // 変更ファイルは一覧時点の base / head SHA に固定した compare から取る（一覧後に push や
+  // base 更新が入っても、plan と CI run / status が同じ revision を指す）
+  const compared = api(`repos/${REPO}/compare/${baseSha}...${headSha}?per_page=100`, true).flatMap(
+    (page) => page.files ?? [],
   );
-  const previous = api(`repos/${REPO}/pulls/${pr.number}/files?per_page=100`, true)
-    .map((file) => file.previous_filename)
-    .filter(Boolean);
+  const files = compared.map((file) => file.filename);
+  const previous = compared.map((file) => file.previous_filename).filter(Boolean);
   const plan = createValidationPlan({
     repository: REPO,
     prNumber: pr.number,
     headSha,
-    baseSha: pr.base?.sha ?? '',
+    baseSha,
     testSha: SHA.test(pr.merge_commit_sha ?? '') ? pr.merge_commit_sha : headSha,
     // plan 契約上 policySha は base と一致させる。実際の規則は現 checkout のもの（header に明記）
-    policySha: pr.base?.sha ?? '',
+    policySha: baseSha,
     event: 'pull_request',
     diff: {
       complete: files.length === (pr.changed_files ?? files.length),
@@ -258,6 +261,23 @@ export function formatReport(rows, { limit, fetchedAt, policyCheckout }) {
   return `${lines.join('\n')}\n`;
 }
 
+/** 直近の非 draft・main base の PR を limit 件だけ集める。全 page を舐めず、必要件数で止める。 */
+export const PULL_PAGE_SIZE = 100;
+export const PULL_MAX_PAGES = 10;
+export function listRecentPulls({ api, limit }) {
+  const pulls = [];
+  for (let page = 1; page <= PULL_MAX_PAGES && pulls.length < limit; page += 1) {
+    const batch = api(
+      `repos/${REPO}/pulls?state=all&sort=updated&direction=desc&per_page=${PULL_PAGE_SIZE}&page=${page}`,
+    );
+    if (!Array.isArray(batch) || batch.length === 0) break;
+    for (const pr of batch)
+      if (!pr.draft && pr.base?.ref === 'main' && pulls.length < limit) pulls.push(pr);
+    if (batch.length < PULL_PAGE_SIZE) break;
+  }
+  return pulls;
+}
+
 function defaultPolicyCheckout() {
   return execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
 }
@@ -270,12 +290,7 @@ export function runReport({
 } = {}) {
   const limitIndex = argv.indexOf('--limit');
   const limit = limitIndex >= 0 ? Number(argv[limitIndex + 1]) : 10;
-  const pulls = api(
-    `repos/${REPO}/pulls?state=all&sort=updated&direction=desc&per_page=${Math.min(100, limit * 3)}`,
-    true,
-  )
-    .filter((pr) => !pr.draft && pr.base?.ref === 'main')
-    .slice(0, limit);
+  const pulls = listRecentPulls({ api, limit });
   const rows = pulls.map((pr) => collectPrRow({ pr, api }));
   const fetchedAt = now().toISOString();
   const checkout = policyCheckout();
