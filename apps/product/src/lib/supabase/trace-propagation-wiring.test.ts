@@ -1,0 +1,112 @@
+import { readFileSync, readdirSync } from 'node:fs';
+import path from 'node:path';
+
+import { describe, expect, it, vi } from 'vitest';
+
+const mocks = vi.hoisted(() => ({
+  createServerClient: vi.fn(),
+}));
+
+vi.mock('next/headers', () => ({
+  cookies: vi.fn().mockResolvedValue({ getAll: vi.fn().mockReturnValue([]), set: vi.fn() }),
+}));
+
+vi.mock('@supabase/ssr', () => ({
+  createServerClient: mocks.createServerClient,
+}));
+
+vi.mock('@/env', () => ({
+  env: {
+    NEXT_PUBLIC_SUPABASE_URL: 'https://example.supabase.co',
+    NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: 'test-anon-key',
+  },
+}));
+
+import { createClient as createSupabaseServerClient } from './server';
+
+const SRC_ROOT = path.resolve(import.meta.dirname, '../..');
+
+/**
+ * Node runtime で動く Supabase client factory。全て W3C traceparent を伝播する（#2728）。
+ * 新しい factory を足したらここへ追加する。列挙漏れは下の contract test が落とす。
+ */
+const TRACED_FACTORY_FILES = [
+  'features/external-calendar/server/account-deletion.ts',
+  'features/external-calendar/server/connection-service.ts',
+  'features/external-calendar/server/event-pruning.ts',
+  'features/external-calendar/server/fenced-sync-writer.ts',
+  'features/external-calendar/server/sync-service.ts',
+  'features/external-calendar/server/token-rotation.ts',
+  'features/timeblock/server/mcp-mutation-db.ts',
+  'features/timeblock/server/mcp-timeblock-read-client.ts',
+  'lib/mcp/access-db.ts',
+  'lib/oauth-server/db.ts',
+  'lib/supabase/oauth.ts',
+  'lib/supabase/server.ts',
+  'lib/trpc/context.ts',
+  'lib/trpc/server.ts',
+];
+
+/**
+ * 伝播しない factory と、その機構上の理由。
+ * どちらの Sentry SDK も OpenTelemetry の global propagator を登録しないため、
+ * 同じ option を渡しても extractor が空の carrier しか返さず header が付かない。
+ */
+const UNTRACED_FACTORY_FILES: Record<string, string> = {
+  'lib/supabase/client.ts': 'browser（@sentry/browser は @opentelemetry/api を使わない）',
+  'lib/supabase/middleware.ts': 'edge（@sentry/vercel-edge は @opentelemetry/api を持たない）',
+};
+
+const CLIENT_FACTORY_PATTERN = /create(?:Server|Browser)?Client</u;
+
+/** apps/product/src 配下の .ts / .tsx を再帰列挙する（test / generated を除く）。 */
+function listSourceFiles(dir: string): string[] {
+  return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    const absolute = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      // generated: 型定義のみ。test: E2E fixture で production 経路ではない。
+      return entry.name === 'generated' || entry.name === 'test' ? [] : listSourceFiles(absolute);
+    }
+    if (!/\.tsx?$/u.test(entry.name) || /\.(test|spec)\.tsx?$/u.test(entry.name)) return [];
+    return [absolute];
+  });
+}
+
+function findFactoryFiles(): string[] {
+  return listSourceFiles(SRC_ROOT)
+    .filter((absolute) => CLIENT_FACTORY_PATTERN.test(readFileSync(absolute, 'utf8')))
+    .map((absolute) => path.relative(SRC_ROOT, absolute).split(path.sep).join('/'))
+    .sort();
+}
+
+describe('Supabase client factory の trace 伝播配線', () => {
+  it('全ての factory が伝播対象か、理由付きの対象外かに分類されている', () => {
+    // 新しい factory を足して分類し忘れると、silent に伝播しない client が増える。
+    expect(findFactoryFiles()).toEqual(
+      [...TRACED_FACTORY_FILES, ...Object.keys(UNTRACED_FACTORY_FILES)].sort(),
+    );
+  });
+
+  it.each(TRACED_FACTORY_FILES)('%s が共有の opt-in を使っている', (relativePath) => {
+    const source = readFileSync(path.join(SRC_ROOT, relativePath), 'utf8');
+
+    expect(source).toContain('SUPABASE_TRACE_PROPAGATION');
+  });
+
+  it.each(Object.entries(UNTRACED_FACTORY_FILES))('%s は opt-in しない（%s）', (relativePath) => {
+    const source = readFileSync(path.join(SRC_ROOT, relativePath), 'utf8');
+
+    expect(source).not.toContain('SUPABASE_TRACE_PROPAGATION');
+  });
+
+  it('server factory は @supabase/ssr へ tracePropagation を渡す', async () => {
+    mocks.createServerClient.mockReturnValue({});
+
+    await createSupabaseServerClient();
+
+    const options = mocks.createServerClient.mock.calls[0]?.[2] as {
+      tracePropagation?: { enabled?: boolean };
+    };
+    expect(options.tracePropagation).toEqual({ enabled: true });
+  });
+});

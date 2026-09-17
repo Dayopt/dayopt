@@ -33,6 +33,11 @@ if (SENTRY_DSN && IS_SENTRY_PRODUCTION) {
 
     tracesSampler: ({ inheritOrSampleWith }) => inheritOrSampleWith(0.1),
 
+    // #2728: Supabase logs と trace_id で相関させるため、W3C traceparent を送出する。
+    // 既定は false で sentry-trace / baggage しか書かず、supabase-js は
+    // 「非 W3C propagator」として header を付けない。sampling 方針は変えない。
+    propagateTraceparent: true,
+
     // デバッグモード（開発環境のみ）
     debug: false,
 

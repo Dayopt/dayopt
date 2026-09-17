@@ -6,6 +6,7 @@ import { env } from '@/env';
 import type { Database, Json } from '@/lib/database';
 import { captureUnexpectedError } from '@/lib/sentry';
 
+import { SUPABASE_TRACE_PROPAGATION } from '@/lib/supabase/trace-propagation';
 import { resolveGoogleCalendarAuthorityIdentity } from './authority-config';
 
 /**
@@ -173,6 +174,7 @@ function createFencedSyncWriterClient(): FencedSyncWriterClient {
     env.NEXT_PUBLIC_SUPABASE_URL,
     env.SUPABASE_SECRET_KEY,
     {
+      tracePropagation: SUPABASE_TRACE_PROPAGATION,
       auth: { autoRefreshToken: false, persistSession: false },
       global: {
         fetch: (url, options) =>

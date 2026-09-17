@@ -5,6 +5,7 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { env } from '@/env';
 import type { Database } from '@/lib/database';
 import { captureUnexpectedDatabaseError } from '@/lib/sentry';
+import { SUPABASE_TRACE_PROPAGATION } from '@/lib/supabase/trace-propagation';
 
 const PLAN_TRASH_SELECT =
   'id, title, note, activity_id, start_at, end_at, source, deleted_at, created_at, updated_at' as const;
@@ -127,6 +128,7 @@ function createTimeblockTrashDbClient(): SupabaseClient<TimeblockTrashDatabase> 
     env.NEXT_PUBLIC_SUPABASE_URL,
     env.SUPABASE_SECRET_KEY,
     {
+      tracePropagation: SUPABASE_TRACE_PROPAGATION,
       auth: {
         autoRefreshToken: false,
         persistSession: false,
