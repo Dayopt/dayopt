@@ -62,15 +62,13 @@ const LONG_PRESS_HOLD_MS = 600;
  * `touches[0].clientY - rect.top` で時刻へ変換するので、実際の画面位置を渡す。
  */
 async function longPressHour(page: Page, hour: number) {
-  const { box, hourHeight } = await revealHour(page, hour);
-  const target = page
-    .locator(`[data-calendar-grid][data-calendar-day-index="0"] [data-calendar-hour="${hour}"]`)
-    .first();
+  const { grid, box, hourBox, hourHeight } = await revealHour(page, hour);
+  const target = grid.locator(`[data-calendar-hour="${hour}"]`).first();
   await expect(target).toBeAttached();
 
   const x = box.x + box.width * 0.6;
   // 15 分 snap の境界を跨がないよう、hour の頭から少しだけ下げる
-  const y = box.y + hourHeight * hour + hourHeight * 0.1;
+  const y = hourBox.y + hourHeight * 0.1;
   const touch = { identifier: 1, clientX: x, clientY: y, pageX: x, pageY: y };
 
   await target.dispatchEvent('touchstart', {
