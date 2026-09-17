@@ -14,7 +14,7 @@ import { usePathname, useSearchParams } from 'next/navigation';
 
 import { useCalendarNavigationStore } from '@/features/calendar/stores/useCalendarNavigationStore';
 import { MEDIA_QUERIES } from '@/lib/breakpoints';
-import { useInitialCalendarDate } from '@/lib/calendar-initial-date';
+import { useInitialCalendarDate, useNeedsBrowserCalendarDate } from '@/lib/calendar-initial-date';
 import { isValidCalendarViewToken } from '@/lib/calendar-view-tokens';
 import { useMediaQuery } from '@/lib/hooks/useMediaQuery';
 
@@ -158,6 +158,10 @@ export const CalendarNavigationProvider = ({ children }: { children: React.React
   const searchParams = useSearchParams();
 
   const dateKey = useInitialCalendarDate();
+  const needsBrowserDate = useNeedsBrowserCalendarDate();
+  const [restoreBrowserDate] = useState(
+    () => needsBrowserDate && !parseCalendarDateParam(searchParams?.get('date') ?? null),
+  );
   const [initial] = useState(() =>
     resolveCalendarProps(
       pathname,
@@ -196,6 +200,18 @@ export const CalendarNavigationProvider = ({ children }: { children: React.React
     const savedView = readLastCalendarView();
     if (savedView) startTransition(() => setViewType(savedView));
   }, [workspaceTab]);
+
+  // timezone cookie の無い初回認証 redirect は SSR が UTC に仮置きする。
+  // 最初の client render を合わせた後、明示 URL / 操作済み日付を上書きせず当日へ戻す。
+  React.useEffect(() => {
+    if (!restoreBrowserDate || readDateParamFromLocation()) return;
+    const browserToday = new Date();
+    startTransition(() =>
+      setCurrentDate((current) =>
+        current.getTime() === initialDate.getTime() ? browserToday : current,
+      ),
+    );
+  }, [restoreBrowserDate, initialDate, startTransition]);
 
   // ref同期 + グローバルストア同期（1つのeffectに統合）
   React.useEffect(() => {

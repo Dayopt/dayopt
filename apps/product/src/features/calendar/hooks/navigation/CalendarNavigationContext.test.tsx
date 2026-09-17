@@ -376,3 +376,26 @@ describe('CalendarNavigationProvider server initialization', () => {
     window.localStorage.removeItem('dayopt:last-calendar-view');
   });
 });
+
+it.each([undefined, '2026-04-22'])(
+  'timezone未確定の初回だけブラウザー当日へ補正する（date=%s）',
+  (date) => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-09-18T08:00:00Z'));
+    mockPathname = '/ja/calendar';
+    mockSearchParams = new URLSearchParams(date ? `date=${date}` : '');
+    window.history.replaceState(null, '', `/ja/calendar?${mockSearchParams}`);
+    try {
+      render(
+        <InitialCalendarDateProvider dateKey="2026-09-17" needsBrowserDate>
+          <CalendarNavigationProvider>
+            <TestConsumer />
+          </CalendarNavigationProvider>
+        </InitialCalendarDateProvider>,
+      );
+      expect(screen.getByTestId('date')).toHaveTextContent(date ?? '2026-09-18');
+    } finally {
+      vi.useRealTimers();
+    }
+  },
+);

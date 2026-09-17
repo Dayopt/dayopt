@@ -4,7 +4,7 @@ import React, { useMemo } from 'react';
 
 import { format, getWeek } from 'date-fns';
 
-import { isTodayInTimezone } from '@/lib/date/timezone';
+import { isTodayWallDateInTimezone } from '@/lib/date/timezone';
 import { useUserPreferences } from '@/lib/hooks/useUserPreferences';
 import { cn } from '@dayopt/components';
 
@@ -105,7 +105,7 @@ export function MultiDayView({
             showMonthYear={false}
             dayNameFormat="short"
             dateFormat="d"
-            isToday={isTodayInTimezone(date, timezone)}
+            isToday={isTodayWallDateInTimezone(date, timezone)}
             isSelected={false}
           />
         </div>

@@ -116,6 +116,15 @@ for (const { timezone, offset } of CASES) {
 
     test('server で先読みした範囲を browser から取り直さない', async ({ page }, testInfo) => {
       test.skip(testInfo.project.name.includes('Mobile'), 'desktop-only');
+      const hydrationErrors: string[] = [];
+      page.on('pageerror', (error) => {
+        if (/hydration|hydrating|#418|#425/i.test(error.message))
+          hydrationErrors.push(`${new URL(page.url()).pathname}: ${error.message}`);
+      });
+      page.on('console', (message) => {
+        if (message.type() === 'error' && /hydration|hydrating|#418|#425/i.test(message.text()))
+          hydrationErrors.push(`${new URL(page.url()).pathname}: ${message.text()}`);
+      });
       await suppressConsentBanner(page);
       const { data, error } = await adminSupabase.auth.admin.generateLink({
         type: 'magiclink',
@@ -129,16 +138,13 @@ for (const { timezone, offset } of CASES) {
       );
       await page.waitForURL(/\/ja\/calendar/i, { timeout: 15_000 });
       await page.waitForLoadState('networkidle');
+      const today = new Intl.DateTimeFormat('en-CA', { timeZone: timezone }).format(new Date());
+      // Cookie 未設定の magic-link 初回着地でも、表示日はブラウザーの当日になる。
+      await expect(page.locator('a[aria-label="レポートを開く"]').first()).toHaveAttribute(
+        'href',
+        `/ja/report?date=${today}`,
+      );
 
-      const hydrationErrors: string[] = [];
-      page.on('pageerror', (error) => {
-        if (/hydration|hydrating|#418|#425/i.test(error.message))
-          hydrationErrors.push(error.message);
-      });
-      page.on('console', (message) => {
-        if (message.type() === 'error' && /hydration|hydrating|#418|#425/i.test(message.text()))
-          hydrationErrors.push(message.text());
-      });
       // ここから数える。ログイン直後の「今日」の週とは別の範囲なので、先に温まった cache は使えない
       const rangeRequests: string[] = [];
       page.on('request', (request) => {

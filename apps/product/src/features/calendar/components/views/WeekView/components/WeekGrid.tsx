@@ -6,7 +6,7 @@ import { getWeek } from 'date-fns';
 
 import { useCalendarDisplayModeStore } from '@/features/calendar/stores/useCalendarDisplayModeStore';
 import { MEDIA_QUERIES } from '@/lib/breakpoints';
-import { isTodayInTimezone } from '@/lib/date/timezone';
+import { isTodayWallDateInTimezone } from '@/lib/date/timezone';
 import { useMediaQuery } from '@/lib/hooks/useMediaQuery';
 import { useUserPreferences } from '@/lib/hooks/useUserPreferences';
 import { cn } from '@dayopt/components';
@@ -111,7 +111,7 @@ export const WeekGrid = ({
             showMonthYear={false}
             dayNameFormat="short"
             dateFormat="d"
-            isToday={isTodayInTimezone(date, timezone)}
+            isToday={isTodayWallDateInTimezone(date, timezone)}
             isSelected={false}
           />
         </div>

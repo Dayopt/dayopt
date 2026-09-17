@@ -61,7 +61,10 @@ export default async function AppLayout({ children }: AppLayoutProps) {
   const dateKey = resolveInitialCalendarDate(new Date(), timezone);
   return (
     <IntlProvider namespaces={APP_NAMESPACES}>
-      <InitialCalendarDateProvider dateKey={dateKey}>
+      <InitialCalendarDateProvider
+        dateKey={dateKey}
+        needsBrowserDate={!requestHeaders.get('x-user-timezone')}
+      >
         <Providers dehydratedState={dehydratedState}>
           <BaseLayout>
             {/*

@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 
-import { isTodayInTimezone } from '@/lib/date/timezone';
+import { isTodayWallDateInTimezone } from '@/lib/date/timezone';
 import { useUserPreferences } from '@/lib/hooks/useUserPreferences';
 
 /**
@@ -13,5 +13,5 @@ import { useUserPreferences } from '@/lib/hooks/useUserPreferences';
  */
 export function useIsToday(date: Date): boolean {
   const timezone = useUserPreferences((s) => s.timezone);
-  return useMemo(() => isTodayInTimezone(date, timezone), [date, timezone]);
+  return useMemo(() => isTodayWallDateInTimezone(date, timezone), [date, timezone]);
 }
