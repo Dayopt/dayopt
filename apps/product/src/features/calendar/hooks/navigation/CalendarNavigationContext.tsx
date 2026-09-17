@@ -16,7 +16,9 @@ import { useCalendarNavigationStore } from '@/features/calendar/stores/useCalend
 import { MEDIA_QUERIES } from '@/lib/breakpoints';
 import { useInitialCalendarDate, useNeedsBrowserCalendarDate } from '@/lib/calendar-initial-date';
 import { isValidCalendarViewToken } from '@/lib/calendar-view-tokens';
+import { getDateKey } from '@/lib/date';
 import { useMediaQuery } from '@/lib/hooks/useMediaQuery';
+import { useUserPreferences } from '@/lib/hooks/useUserPreferences';
 
 import { getNextPeriod, getPreviousPeriod } from '../../domain/view-range';
 import { formatCalendarDateParam, parseCalendarDateParam } from '../../lib/date-param';
@@ -171,6 +173,7 @@ export const CalendarNavigationProvider = ({ children }: { children: React.React
     ),
   );
   const { initialDate, initialView } = initial;
+  const timezone = useUserPreferences((state) => state.timezone);
   const workspaceTab = resolveWorkspaceTab(pathname.replace(/^\/(ja|en)/, ''));
   const isCalendarPage = workspaceTab === 'calendar';
 
@@ -398,7 +401,7 @@ export const CalendarNavigationProvider = ({ children }: { children: React.React
       let newDate: Date;
 
       if (direction === 'today') {
-        newDate = new Date();
+        newDate = parseCalendarDateParam(getDateKey(new Date(), timezone)) ?? new Date();
       } else {
         newDate =
           direction === 'next'
@@ -408,7 +411,7 @@ export const CalendarNavigationProvider = ({ children }: { children: React.React
 
       navigateToDate(newDate, true);
     },
-    [navigateToDate],
+    [navigateToDate, timezone],
   );
 
   const contextValue = useMemo(

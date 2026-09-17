@@ -13,8 +13,8 @@
  * @see ./_overlays/GlobalOverlays.tsx - グローバルダイアログ群
  */
 import { InitialCalendarDateProvider } from '@/lib/calendar-initial-date';
-import { headers } from 'next/headers';
-import { prefetchAppShell, resolveInitialCalendarDate } from './_server/prefetch-app-shell';
+import { getRequestCalendarDate } from '@/lib/server/request-calendar-date';
+import { prefetchAppShell } from './_server/prefetch-app-shell';
 
 import type { Metadata } from 'next';
 
@@ -55,15 +55,15 @@ interface AppLayoutProps {
 }
 
 export default async function AppLayout({ children }: AppLayoutProps) {
-  const dehydratedState = await prefetchAppShell();
-  const requestHeaders = await headers();
-  const timezone = requestHeaders.get('x-user-timezone') ?? 'UTC';
-  const dateKey = resolveInitialCalendarDate(new Date(), timezone);
+  const [dehydratedState, requestCalendarDate] = await Promise.all([
+    prefetchAppShell(),
+    getRequestCalendarDate(),
+  ]);
   return (
     <IntlProvider namespaces={APP_NAMESPACES}>
       <InitialCalendarDateProvider
-        dateKey={dateKey}
-        needsBrowserDate={!requestHeaders.get('x-user-timezone')}
+        dateKey={requestCalendarDate.dateKey}
+        needsBrowserDate={!requestCalendarDate.hasBrowserTimezone}
       >
         <Providers dehydratedState={dehydratedState}>
           <BaseLayout>

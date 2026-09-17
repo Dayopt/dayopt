@@ -207,11 +207,15 @@ export function useCalendarData({
 
   // フィルター関数と状態を取得（ストアに統一）
   const filterInitialized = useCalendarFilterStore((state) => state.initialized);
+  const visibleActivityIds = useCalendarFilterStore((state) => state.visibleActivityIds);
   // タグフィルタ変更時に useMemo を再実行させるためのリアクティブ依存
   // useDeferredValue でフィルター変更時のカレンダー再描画を遅延し、
   // チェックボックスUIの即時応答を維持する
-  const visibleActivityIds = useDeferredValue(
-    useCalendarFilterStore((state) => state.visibleActivityIds),
+  const deferredFilterState = useDeferredValue(
+    useMemo(
+      () => ({ initialized: filterInitialized, visibleActivityIds }),
+      [filterInitialized, visibleActivityIds],
+    ),
   );
   // 未分類(タグなし)フィルターの表示切替も同様にリアクティブ依存として渡す（#1576）
 
@@ -298,11 +302,15 @@ export function useCalendarData({
 
     // サイドバーのフィルター設定を適用
     const visibilityFiltered = filtered.filter((event) => {
-      return isActivityVisible(event.activityId ?? null, filterInitialized, visibleActivityIds);
+      return isActivityVisible(
+        event.activityId ?? null,
+        deferredFilterState.initialized,
+        deferredFilterState.visibleActivityIds,
+      );
     });
 
     return visibilityFiltered;
-  }, [viewDateRange, allCalendarEvents, timezone, filterInitialized, visibleActivityIds]);
+  }, [viewDateRange, allCalendarEvents, timezone, deferredFilterState]);
 
   return {
     viewDateRange,

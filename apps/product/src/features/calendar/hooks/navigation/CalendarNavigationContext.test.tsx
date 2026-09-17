@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 let mockPathname = '/ja/calendar';
 let mockSearchParams = new URLSearchParams();
 const mockUseMediaQuery = vi.fn(() => false);
+let mockTimezone = 'UTC';
 
 vi.mock('next/navigation', () => ({
   usePathname: () => mockPathname,
@@ -14,6 +15,11 @@ vi.mock('next/navigation', () => ({
 
 vi.mock('@/lib/hooks/useMediaQuery', () => ({
   useMediaQuery: () => mockUseMediaQuery(),
+}));
+
+vi.mock('@/lib/hooks/useUserPreferences', () => ({
+  useUserPreferences: (selector: (state: { timezone: string }) => unknown) =>
+    selector({ timezone: mockTimezone }),
 }));
 
 import { CalendarNavigationProvider, useCalendarNavigation } from './CalendarNavigationContext';
@@ -44,6 +50,9 @@ function TestConsumer() {
       <button type="button" onClick={() => navigation.changeView('3day')}>
         3day
       </button>
+      <button type="button" onClick={() => navigation.navigateRelative('today')}>
+        today
+      </button>
     </div>
   );
 }
@@ -52,6 +61,7 @@ describe('CalendarNavigationProvider', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockUseMediaQuery.mockReturnValue(false);
+    mockTimezone = 'UTC';
     mockPathname = '/ja/calendar';
     mockSearchParams = new URLSearchParams('date=2026-03-25');
     window.history.replaceState(null, '', '/ja/calendar?date=2026-03-25');
@@ -420,6 +430,30 @@ it('初回モバイルのday切替は補正後の日付をURLへ書く', () => {
     expect(new URLSearchParams(window.location.search).get('view')).toBe('day');
   } finally {
     mockUseMediaQuery.mockReturnValue(false);
+    vi.useRealTimers();
+  }
+});
+
+it('today navigation uses the configured timezone wall date', () => {
+  vi.useFakeTimers();
+  vi.setSystemTime(new Date('2026-09-17T16:00:00.000Z'));
+  mockTimezone = 'Asia/Tokyo';
+  mockPathname = '/ja/calendar';
+  mockSearchParams = new URLSearchParams('date=2026-09-17');
+  window.history.replaceState(null, '', '/ja/calendar?date=2026-09-17');
+  try {
+    render(
+      <InitialCalendarDateProvider dateKey="2026-09-17">
+        <CalendarNavigationProvider>
+          <TestConsumer />
+        </CalendarNavigationProvider>
+      </InitialCalendarDateProvider>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'today' }));
+    expect(screen.getByTestId('date')).toHaveTextContent('2026-09-18');
+    expect(new URLSearchParams(window.location.search).get('date')).toBe('2026-09-18');
+  } finally {
+    mockTimezone = 'UTC';
     vi.useRealTimers();
   }
 });

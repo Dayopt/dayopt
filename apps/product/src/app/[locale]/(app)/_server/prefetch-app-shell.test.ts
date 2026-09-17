@@ -1,6 +1,6 @@
 import { QueryClient, dehydrate } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { prefetchAppShell, resolveInitialCalendarDate } from './prefetch-app-shell';
+import { prefetchAppShell } from './prefetch-app-shell';
 
 const mocks = vi.hoisted(() => ({
   create: vi.fn(),
@@ -96,15 +96,5 @@ describe('prefetchAppShell', () => {
     mocks.create.mockRejectedValue(new Error('context unavailable'));
     expect(await prefetchAppShell()).toBeUndefined();
     expect(mocks.settings).not.toHaveBeenCalled();
-  });
-});
-
-describe('initial request day', () => {
-  it.each([
-    ['Asia/Tokyo', '2026-09-17'],
-    ['US/Pacific', '2026-09-16'],
-    ['broken timezone', '2026-09-16'],
-  ])('resolves %s safely', (timezone, expected) => {
-    expect(resolveInitialCalendarDate(new Date('2026-09-16T23:30:00Z'), timezone)).toBe(expected);
   });
 });

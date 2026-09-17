@@ -1,4 +1,3 @@
-import { getDateKey } from '@/lib/date';
 import { logger } from '@/lib/logger';
 import { createServerHelpers, dehydrate } from '@/lib/trpc/server';
 import { defaultShouldDehydrateQuery } from '@tanstack/react-query';
@@ -29,14 +28,5 @@ export async function prefetchAppShell() {
   } catch (error) {
     logger.warn('App shell prefetch unavailable; client gates will retry', error);
     return undefined;
-  }
-}
-
-/** Cookie が壊れていても描画を止めず、既存の calendar prefetch と同じ UTC fallback を使う。 */
-export function resolveInitialCalendarDate(now: Date, timezone: string) {
-  try {
-    return getDateKey(now, timezone);
-  } catch {
-    return getDateKey(now, 'UTC');
   }
 }
