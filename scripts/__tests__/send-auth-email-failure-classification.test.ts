@@ -261,22 +261,70 @@ describe('captureEdgeFunctionEvent: Auth Hook の 5 秒予算を守る', () => {
   });
 });
 
+describe('classifySendAuthEmailFailure: idempotency 系のエラー（#2803）', () => {
+  it('並行する同一 key のリクエストは 503（先行が完走すれば再試行はキャッシュに当たる）', () => {
+    const result = classifySendAuthEmailFailure({ name: 'concurrent_idempotent_requests' }, 'send');
+
+    expect(result.status).toBe(503);
+    expect(result.kind).toBe('resend_idempotency_conflict');
+    expect(result.resendErrorName).toBe('concurrent_idempotent_requests');
+  });
+
+  // 同じ key で payload が違う / key 自体が不正なのはこちら側のバグ。再試行しても同じ結果。
+  it.each([['invalid_idempotent_request'], ['invalid_idempotency_key']])(
+    '%s は 500（non-retryable）',
+    (name) => {
+      const result = classifySendAuthEmailFailure({ name }, 'send');
+
+      expect(result.status).toBe(500);
+      expect(result.kind).toBe('resend_idempotency_conflict');
+      expect(result.resendErrorName).toBe(name);
+    },
+  );
+});
+
 describe('resolveSendAuthEmailStatus: 部分送信からの再試行を止める', () => {
   const unavailable = classifySendAuthEmailFailure({ name: 'internal_server_error' }, 'send');
 
   it('1 通も送れていなければ 503 のまま GoTrue の再試行に載せる', () => {
-    expect(resolveSendAuthEmailStatus(unavailable, { firstEmailAlreadySent: false })).toBe(503);
+    expect(
+      resolveSendAuthEmailStatus(unavailable, {
+        firstEmailAlreadySent: false,
+        idempotencyKeyInUse: false,
+      }),
+    ).toBe(503);
   });
 
-  it('email_change の 2 通目失敗では 500 へ落とす（1 通目の重複配送を防ぐ）', () => {
-    expect(resolveSendAuthEmailStatus(unavailable, { firstEmailAlreadySent: true })).toBe(500);
+  it('key が無い経路の email_change 2 通目失敗では 500 へ落とす（1 通目の重複配送を防ぐ）', () => {
+    expect(
+      resolveSendAuthEmailStatus(unavailable, {
+        firstEmailAlreadySent: true,
+        idempotencyKeyInUse: false,
+      }),
+    ).toBe(500);
   });
 
-  it('もともと non-retryable な失敗は部分送信の有無で変わらない', () => {
+  // key があれば 1 通目は Resend 側で重複排除されるので、降格の理由が消える（#2803）。
+  it('idempotency key を使っていれば部分送信でも 503 を維持する', () => {
+    expect(
+      resolveSendAuthEmailStatus(unavailable, {
+        firstEmailAlreadySent: true,
+        idempotencyKeyInUse: true,
+      }),
+    ).toBe(503);
+  });
+
+  it('もともと non-retryable な失敗は部分送信・key の有無で変わらない', () => {
     const rejected = classifySendAuthEmailFailure({ name: 'validation_error' }, 'send');
     const signature = classifySendAuthEmailFailure(new Error('bad'), 'verify');
 
-    expect(resolveSendAuthEmailStatus(rejected, { firstEmailAlreadySent: true })).toBe(500);
-    expect(resolveSendAuthEmailStatus(signature, { firstEmailAlreadySent: true })).toBe(401);
+    for (const idempotencyKeyInUse of [false, true]) {
+      expect(
+        resolveSendAuthEmailStatus(rejected, { firstEmailAlreadySent: true, idempotencyKeyInUse }),
+      ).toBe(500);
+      expect(
+        resolveSendAuthEmailStatus(signature, { firstEmailAlreadySent: true, idempotencyKeyInUse }),
+      ).toBe(401);
+    }
   });
 });

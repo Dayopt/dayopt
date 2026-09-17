@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-09-08
+last_verified: 2026-09-17
 ---
 
 # Dayopt 不変条件カタログ
@@ -109,6 +109,21 @@ docs へ残している。
   redirect allowlist（production は Dashboard が正本で repo から強制できず、CI 監査も fail-open）
   だけに依存しない。`redirect_to` の origin が allowlist 外なら `NEXT_PUBLIC_APP_URL` へ落とし、
   `next`（path + query）の受け渡しは変えない（#2616）
+- **Vercel preview host の allowlist は hash の桁まで固定し、team slug 境界を跨げる形を
+  許さない。** commit URL は `<project>-<9 文字の英数字>-<scope slug>.vercel.app` なので
+  `[a-z0-9]{9}` に固定すれば、一致には scope slug がちょうど `dayopt` である必要がある。
+  `[a-z0-9-]+` のようにハイフンを許すと、第三者が `evil-dayopt` という team slug を取るだけで
+  `product-<hash>-evil-dayopt.vercel.app` が一致し、`token_hash` の配送先や CSRF の許可 origin に
+  他テナントのホストが混ざる。branch URL 形（`<project>-git-<branch>-...`）は branch 名に
+  ハイフンが入るため同じ手口を regex で区別できず、**allowlist に入れない**（preview は
+  `NEXT_PUBLIC_APP_URL` 一致と `VERCEL_URL` 完全一致で救う）。写しは
+  `supabase/functions/send-auth-email/confirm-url.ts` と
+  `apps/web/src/platform/security/csrf-protection.ts` の 2 箇所（#2616）
+- **認証メールの Resend 送信には `webhook-id` 由来の idempotency key を必ず付ける。** GoTrue は
+  503 / 429 で最大 3 回 hook を呼び直すので、送信成功後に失敗応答を返すと二重配送になる。
+  key は `auth/<webhook-id>/<action>/<recipient role>` で、email / token / token_hash / 本文を
+  含めない。`webhook-id` が取れない時は**乱数へフォールバックせず key 無しで送り**、
+  `resolveSendAuthEmailStatus` の 503→500 降格を従来どおり効かせる（#2803）
 - `external-connection-maintenance` cron は calendar revoke outbox に **`MIN_BATCH_BUDGET_MS`
   以上の残り時間**を必ず渡す。outbox はこれを割ると 1 件も claim せずに break するため、retention の
   取り分を増やしすぎると provider への revoke request が永久に送られない（DB からは接続が消えている

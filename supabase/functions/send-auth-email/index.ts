@@ -24,6 +24,11 @@ import {
   resolveSendAuthEmailStatus,
   type SendAuthEmailFailurePhase,
 } from './failure.ts';
+import {
+  type AuthEmailRecipientRole,
+  buildAuthEmailIdempotencyKey,
+  resolveWebhookEventId,
+} from './idempotency.ts';
 import { MagicLinkEmail } from './MagicLinkEmail.tsx';
 import { PasswordResetEmail } from './PasswordResetEmail.tsx';
 import { authEmailSubjects } from './subjects.ts';
@@ -82,6 +87,8 @@ interface OutgoingEmail {
   to: string;
   subject: string;
   element: React.ReactElement;
+  /** idempotency key の末尾。同じ webhook 配送に属する 2 通を区別する（#2803） */
+  recipientRole: AuthEmailRecipientRole;
 }
 
 Deno.serve(async (req) => {
@@ -108,10 +115,18 @@ Deno.serve(async (req) => {
 
   const { user, email_data } = verified;
 
+  // Standard Webhooks の `webhook-id`。retry では同じ値・別イベントでは別の値になるので、
+  // そのまま idempotency key の素材にできる（#2803）。欠落時は undefined のまま扱い、
+  // 乱数へフォールバックしない。
+  const eventId = resolveWebhookEventId(headers);
+
   // Sentry へ送る context 用。宛先 email・本文・token_hash は含めない。
   let phase: SendAuthEmailFailurePhase = 'render';
   let sentCount = 0;
   let currentSubject = '';
+  // 「既に送った分がすべて idempotency key 付きだったか」。`eventId` の有無ではなく実際に
+  // 適用できた key を見る（key は 256 文字上限でも作られないため、両者は一致しない）。
+  let sentWithoutIdempotencyKey = false;
 
   try {
     const userName = user.user_metadata.full_name || 'there';
@@ -126,6 +141,7 @@ Deno.serve(async (req) => {
         emails.push({
           to: user.email,
           subject: subjects.signup,
+          recipientRole: 'single',
           element: React.createElement(ConfirmEmail, {
             userName,
             confirmUrl,
@@ -139,6 +155,7 @@ Deno.serve(async (req) => {
         emails.push({
           to: user.email,
           subject: subjects.recovery,
+          recipientRole: 'single',
           element: React.createElement(PasswordResetEmail, {
             userName,
             resetUrl: confirmUrl,
@@ -155,6 +172,7 @@ Deno.serve(async (req) => {
         emails.push({
           to: user.email,
           subject: subjects.magic_link,
+          recipientRole: 'single',
           element: React.createElement(MagicLinkEmail, {
             loginUrl: confirmUrl,
             locale,
@@ -178,6 +196,7 @@ Deno.serve(async (req) => {
           emails.push({
             to: user.email,
             subject: subjects.email_change_current,
+            recipientRole: 'current',
             element: React.createElement(EmailChangeEmail, {
               userName,
               confirmUrl: buildConfirmUrl(email_data, email_data.token_hash_new),
@@ -190,6 +209,7 @@ Deno.serve(async (req) => {
         emails.push({
           to: newEmail,
           subject: subjects.email_change_new,
+          recipientRole: 'new',
           element: React.createElement(EmailChangeEmail, {
             userName,
             confirmUrl: buildConfirmUrl(email_data, email_data.token_hash),
@@ -212,19 +232,31 @@ Deno.serve(async (req) => {
       }
     }
 
-    for (const { to, subject, element } of emails) {
+    for (const { to, subject, element, recipientRole } of emails) {
       currentSubject = subject;
 
       phase = 'render';
       const html = await renderAsync(element);
 
       phase = 'send';
-      const { error } = await resend.emails.send({
-        from: `Dayopt <${FROM_EMAIL}>`,
-        to: [to],
-        subject,
-        html,
+      // 同じ webhook 配送の再試行では同じ key になり、Resend 側で 24 時間のあいだ
+      // 重複配送が抑止される。テンプレートは決定的なので再 render しても payload は
+      // 一致し、payload 不一致の 409 を踏まない（#2803）。
+      const idempotencyKey = buildAuthEmailIdempotencyKey({
+        eventId,
+        emailActionType: email_data.email_action_type,
+        recipientRole,
       });
+
+      const { error } = await resend.emails.send(
+        {
+          from: `Dayopt <${FROM_EMAIL}>`,
+          to: [to],
+          subject,
+          html,
+        },
+        idempotencyKey ? { idempotencyKey } : undefined,
+      );
 
       if (error) {
         // 部分失敗（email_change の 2 通目など）を切り分けられるよう、宛先を含めず記録する
@@ -236,14 +268,19 @@ Deno.serve(async (req) => {
       }
 
       sentCount += 1;
+      if (!idempotencyKey) sentWithoutIdempotencyKey = true;
     }
   } catch (error) {
     const classified = classifySendAuthEmailFailure(error, phase);
     const { kind, resendErrorName, message } = classified;
     const firstEmailAlreadySent = sentCount > 0;
 
-    // 部分送信済みなら retryable status を返さない（判定理由は resolveSendAuthEmailStatus）
-    const status = resolveSendAuthEmailStatus(classified, { firstEmailAlreadySent });
+    // 部分送信済みなら retryable status を返さない（判定理由は resolveSendAuthEmailStatus）。
+    // ただし idempotency key を付けられていれば重複配送が起きないので降格しない。
+    const status = resolveSendAuthEmailStatus(classified, {
+      firstEmailAlreadySent,
+      idempotencyKeyInUse: !sentWithoutIdempotencyKey,
+    });
 
     // 401（署名不一致）は基本的には verify 段階の try/catch が処理するためここには来ないが、
     // 万一 classify が 401 を返しても capture しない（攻撃者由来のノイズを Issues に入れない）
@@ -258,7 +295,11 @@ Deno.serve(async (req) => {
           status: String(status),
           resend_error: resendErrorName ?? 'none',
         },
-        extra: { subject: currentSubject, firstEmailAlreadySent },
+        extra: {
+          subject: currentSubject,
+          firstEmailAlreadySent,
+          idempotencyKeyInUse: !sentWithoutIdempotencyKey,
+        },
       });
     }
 
