@@ -79,9 +79,24 @@ export const PRODUCERS = Object.freeze({
     workflow: PROMOTE_WORKFLOW,
     job: '🌐 Web Build & E2E',
   },
-  dbUpgrade: { stage: 'merge', kind: 'unwired', issue: '#2797' },
-  oldConsumer: { stage: 'merge', kind: 'unwired', issue: '#2797' },
+  dbUpgrade: {
+    stage: 'merge',
+    kind: 'actions-job',
+    workflow: CI_WORKFLOW,
+    job: '🧱 DB Upgrade (shadow)',
+  },
+  oldConsumer: {
+    stage: 'merge',
+    kind: 'actions-job',
+    workflow: CI_WORKFLOW,
+    job: '🧱 DB Upgrade (shadow)',
+  },
 });
+
+/** Supabase GitHub integration の check run 名。branch が作られた PR だけ success になる。 */
+export const SUPABASE_PREVIEW_CHECK = 'Supabase Preview';
+/** 公式 Supabase GitHub App の slug（app id 330661）。check 名は App 間で一意ではないので発行元も照合する。 */
+export const SUPABASE_APP_SLUG = 'supabase';
 
 const SHA = /^[a-f0-9]{40}$/;
 const SUCCESS = 'success';
@@ -100,6 +115,15 @@ export const PRODUCER_DEFINITIONS = Object.freeze([
 ]);
 
 /**
+ * producer 固有の定義ファイル（その suite の評価でだけ self-produced にする）。
+ * 🧱 DB Upgrade (shadow) の実体を migration と同時に改変した PR の緑は信用しないが、
+ * checker だけの保守 PR で Static / Unit まで self-produced にはしない。
+ */
+export const PRODUCER_SPECIFIC_DEFINITIONS = Object.freeze({
+  '🧱 DB Upgrade (shadow)': ['scripts/ci/db-upgrade-check.mjs'],
+});
+
+/**
  * @typedef {{ id: number, path: string, event: string, headSha: string, repository: string,
  *   runAttempt: number, status: string, conclusion: string | null, htmlUrl: string,
  *   jobs: { name: string, status: string, conclusion: string | null, runAttempt: number,
@@ -107,10 +131,12 @@ export const PRODUCER_DEFINITIONS = Object.freeze([
  * @typedef {{ context: string, state: string, targetUrl: string | null, description: string | null }} StatusEvidence
  * @typedef {{ id: number, sha: string, environment: string, productionEnvironment: boolean,
  *   createdAt: string, latestStatus: { state: string, environmentUrl: string | null } | null }} DeploymentEvidence
+ * @typedef {{ id: number, name: string, appSlug: string, headSha: string, status: string,
+ *   conclusion: string | null, htmlUrl: string }} CheckRunEvidence
  * @typedef {{ repository: string, headSha: string, fetchedAt: string,
  *   pr: { number: number, state: string, draft: boolean, headSha: string, baseRef: string, fork: boolean },
  *   baseCompare: string, workflowRuns: WorkflowRunEvidence[], statuses: StatusEvidence[],
- *   deployments: DeploymentEvidence[] }} ValidationEvidence
+ *   deployments: DeploymentEvidence[], checkRuns?: CheckRunEvidence[] }} ValidationEvidence
  */
 
 /** 同一 head の信頼済み run を 1 本選ぶ。id 最大 = 最新 run。 */
@@ -129,7 +155,11 @@ export function selectTrustedRun(runs, { repository, headSha, workflow }) {
 }
 
 function evaluateActionsJob(producer, evidence, plan) {
-  const modified = (plan?.files ?? []).filter((file) => PRODUCER_DEFINITIONS.includes(file));
+  const definitions = [
+    ...PRODUCER_DEFINITIONS,
+    ...(PRODUCER_SPECIFIC_DEFINITIONS[producer.job] ?? []),
+  ];
+  const modified = (plan?.files ?? []).filter((file) => definitions.includes(file));
   if (modified.length > 0)
     return {
       status: 'self-produced',
@@ -195,7 +225,70 @@ function latestDeployment(deployments, { headSha, environment }) {
   );
 }
 
-function evaluateDeployment(producer, evidence) {
+/**
+ * DB を触る変更の product Preview は、隔離された PR 用 Supabase branch に接続していることを
+ * 要求する。Supabase integration は migration を含む PR でだけ branch を作り、その時
+ * `Supabase Preview` check run が success になる（skipped = branch 無し）。発行元 App も照合する
+ * （別の installed App が同名の check を作っても受理しない）。branch が無い
+ * Preview は shared / 不明な DB を指すので、DB 変更の検証環境として受理しない。
+ */
+function evaluateDatabaseIsolation(evidence, plan) {
+  const check = (evidence.checkRuns ?? [])
+    .filter(
+      (run) =>
+        run.name === SUPABASE_PREVIEW_CHECK &&
+        run.appSlug === SUPABASE_APP_SLUG &&
+        run.headSha === evidence.headSha,
+    )
+    .reduce((latest, run) => (!latest || run.id > latest.id ? run : latest), null);
+  const needed = plan?.environments?.databaseTests !== 'not-applicable';
+  if (!needed)
+    return { needed, status: 'not-applicable', reason: 'No migration in this PR', check };
+  // integration が check run を作るのは CI 完了より遅れ得る。無いことは「未作成」であって拒否ではない
+  // ので pending（controller は bounded に待ち、check_run 完了の event で再評価する）
+  if (!check)
+    return {
+      needed,
+      status: 'pending',
+      reason: 'Supabase Preview check has not been created for this head yet',
+      check,
+    };
+  if (check.status !== 'completed')
+    return {
+      needed,
+      status: 'pending',
+      reason: 'Supabase Preview branch is still provisioning',
+      check,
+    };
+  if (check.conclusion === SUCCESS)
+    return {
+      needed,
+      status: 'satisfied',
+      reason: 'Isolated Supabase branch reported ready',
+      check,
+    };
+  return {
+    needed,
+    status: 'failed',
+    reason: `Supabase Preview concluded ${check.conclusion ?? 'unknown'}; no isolated database for a schema change`,
+    check,
+  };
+}
+
+function evaluateDeployment(producer, evidence, plan) {
+  if (producer.environment === 'Preview – product') {
+    const isolation = evaluateDatabaseIsolation(evidence, plan);
+    if (isolation.needed && isolation.status !== 'satisfied')
+      return {
+        status: isolation.status,
+        reason: isolation.reason,
+        evidence: {
+          environment: producer.environment,
+          supabasePreview: isolation.check?.htmlUrl ?? null,
+          url: null,
+        },
+      };
+  }
   const status = (evidence.statuses ?? []).find((entry) => entry.context === producer.context);
   const deployment = latestDeployment(evidence.deployments, {
     headSha: evidence.headSha,
@@ -282,7 +375,7 @@ function evaluateSuite(name, rule, evidence, plan) {
     case 'actions-job':
       return evaluateActionsJob(producer, evidence, plan);
     case 'deployment':
-      return evaluateDeployment(producer, evidence);
+      return evaluateDeployment(producer, evidence, plan);
     case 'release-gate':
       return {
         status: 'deferred',

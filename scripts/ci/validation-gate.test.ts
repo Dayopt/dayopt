@@ -132,6 +132,30 @@ function fakeApi(overrides: Record<string, unknown> = {}) {
       { id: 2, state: 'success', environment_url: 'https://product-x.vercel.app' },
     ],
     [`repos/${REPO}/compare/main...${headSha}`]: { status: 'ahead' },
+    [`repos/${REPO}/commits/${headSha}/check-runs?per_page=100`]: [
+      {
+        check_runs: [
+          {
+            id: 104781444130,
+            name: 'Supabase Preview',
+            app: { slug: 'supabase' },
+            head_sha: headSha,
+            status: 'completed',
+            conclusion: 'skipped',
+            html_url: `https://github.com/${REPO}/runs/104781444130`,
+          },
+          {
+            id: 1,
+            name: '🔍 Static Checks',
+            app: { slug: 'github-actions' },
+            head_sha: headSha,
+            status: 'completed',
+            conclusion: 'success',
+            html_url: '',
+          },
+        ],
+      },
+    ],
     [`repos/${REPO}/pulls/7/reviews?per_page=100`]: [
       {
         id: 5221740744,
@@ -331,6 +355,10 @@ describe('validation gate controller', () => {
     });
     expect(evidence.baseCompare).toBe('ahead');
     expect(evidence.pr.fork).toBe(false);
+    // Actions の job は workflowRuns 側で見るので check run からは除く
+    expect(evidence.checkRuns.map((run: { name: string }) => run.name)).toEqual([
+      'Supabase Preview',
+    ]);
   });
 
   it('resolves the target PR from the workflow_run head sha and ignores closed or stacked PRs', () => {
@@ -351,6 +379,16 @@ describe('validation gate controller', () => {
         api,
       }),
     ).toEqual({ number: 7, source: 'workflow_run', eventSha: headSha });
+    // Supabase Preview の check run 完了（default branch の定義で走る event）も head から PR を引く
+    expect(
+      resolveTarget({
+        eventName: 'check_run',
+        event: { check_run: { head_sha: headSha, app: { slug: 'supabase' } } },
+        prArg: undefined,
+        repository: REPO,
+        api,
+      }),
+    ).toEqual({ number: 7, source: 'check_run', eventSha: headSha });
     expect(
       resolveTarget({
         eventName: 'workflow_run',

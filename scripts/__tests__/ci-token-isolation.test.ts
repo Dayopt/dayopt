@@ -259,13 +259,14 @@ describe('ci.yml の token 分離（credential audit P2-6）', () => {
       expect(writeTokenOffenders(fine)).toEqual([]);
     });
 
-    it('実ファイルから 5 job を読めている（切り出しの空振りで全 assert が素通りしない）', () => {
+    it('実ファイルから 6 job を読めている（切り出しの空振りで全 assert が素通りしない）', () => {
       expect(ciJobs.map((job) => job.id)).toEqual([
         'impact',
         'static',
         'unit',
         'migration-notice',
         'integration',
+        'db-upgrade',
       ]);
     });
   });

@@ -38,7 +38,7 @@ import { collectPlanInput } from './validation-plan-shadow.mjs';
 
 const SHA = /^[a-f0-9]{40}$/;
 /** default branch の workflow 定義でしか走らない event（status を発行してよい event）。 */
-const TRUSTED_EVENTS = new Set(['workflow_run', 'status', 'issue_comment']);
+const TRUSTED_EVENTS = new Set(['workflow_run', 'status', 'issue_comment', 'check_run']);
 
 /** gh api を JSON で読む。`--paginate` は配列 endpoint だけに使う。 */
 export function createGithubApi({ execFileImpl } = {}) {
@@ -57,6 +57,8 @@ export function createGithubApi({ execFileImpl } = {}) {
 export function eventShaOf(eventName, event) {
   if (eventName === 'workflow_run') return event?.workflow_run?.head_sha ?? null;
   if (eventName === 'status') return event?.sha ?? null;
+  // 第三者 App の check run 完了（Supabase Preview）。default branch の定義でしか走らない event
+  if (eventName === 'check_run') return event?.check_run?.head_sha ?? null;
   return null;
 }
 
@@ -274,6 +276,22 @@ export function collectEvidence({ repository, pr, api, now = () => new Date() })
         : null,
     };
   });
+  // 第三者 app の check run（Supabase Preview 等）。Actions の job は workflowRuns 側で見る。
+  const checkRunsRaw = api(`repos/${repository}/commits/${headSha}/check-runs?per_page=100`, {
+    paginate: true,
+  });
+  const checkRuns = checkRunsRaw
+    .flatMap((page) => page?.check_runs ?? [])
+    .filter((run) => run.app?.slug !== 'github-actions')
+    .map((run) => ({
+      id: run.id,
+      name: run.name,
+      appSlug: run.app?.slug ?? '',
+      headSha: run.head_sha,
+      status: run.status,
+      conclusion: run.conclusion ?? null,
+      htmlUrl: run.html_url,
+    }));
   let baseCompare = 'unknown';
   try {
     baseCompare =
@@ -297,6 +315,7 @@ export function collectEvidence({ repository, pr, api, now = () => new Date() })
     workflowRuns: runs,
     statuses,
     deployments,
+    checkRuns,
   };
 }
 

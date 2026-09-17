@@ -61,6 +61,7 @@ import {
   formatGithubOutput,
   formatSummary as formatImpactSummary,
   resolveImpact,
+  ROOT_MIGRATION_PATH,
 } from './impact.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
@@ -485,10 +486,16 @@ async function runImpact() {
   // ここで併せて出す。static job の deno check がこれを見る。`!isPr` を true 側へ
   // 倒すのは分離前の runStatic と同じ規約（workflow_dispatch では全部走らせる）。
   const functionsChanged = !isPr || filenames.some((f) => f.startsWith('supabase/functions/'));
+  // `migrations_added`: root の migration ファイルを含む PR だけ db-upgrade job（#2797）を起動する。
+  // 判定は validation-plan.mjs の dbUpgrade / oldConsumer と同じ ROOT_MIGRATION_PATH（ずれると
+  // plan が要求する job が起動せず blocked になる）。追加・編集・削除の区別は job 側が行う。
+  // `!isPr` を true 側へ倒すのは functions_changed と同じ規約。
+  const migrationsAdded = !isPr || filenames.some((f) => ROOT_MIGRATION_PATH.test(f));
 
   await writeGithubOutput([
     ...formatGithubOutput(impact).trim().split('\n'),
     `functions_changed=${functionsChanged}`,
+    `migrations_added=${migrationsAdded}`,
   ]);
 }
 

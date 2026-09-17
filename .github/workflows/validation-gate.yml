@@ -13,11 +13,12 @@ name: Validation gate
 # **required check ではない。** 既存の必須 check / ruleset / branch:finish は変更しない。
 # 必須化は #2798 の比較と User の承認後に別変更で行う。
 #
-# トリガーは `workflow_run`（CI 完了）と `status`（Vercel の commit status が terminal になった時）。
-# どちらも GitHub docs で「workflow file が default branch にある時だけ走り、GITHUB_SHA は
-# default branch の最新」と定義された event。CI 完了後に Preview が遅れて success になっても
-# `status` で再評価されるので、pending のまま取り残されない（Codex review P2）。手動の再評価は
-# Actions 画面の「Re-run jobs」（main の定義のまま再実行される）。
+# トリガーは `workflow_run`（CI 完了）、`status`（Vercel の commit status が terminal になった時）、
+# `check_run`（Supabase Preview の check run 完了。migration PR の隔離 DB 証拠、#2797）。
+# いずれも GitHub docs で「workflow file が default branch にある時だけ走り、GITHUB_SHA は
+# default branch の最新」と定義された event。CI 完了後に Preview / Supabase branch が遅れて
+# success になっても `status` / `check_run` で再評価されるので、pending のまま取り残されない
+# （Codex review P2）。手動の再評価は Actions 画面の「Re-run jobs」（main の定義のまま再実行される）。
 #
 # **`workflow_dispatch` は使わない。** dispatch は任意の ref を指定でき、その ref の workflow
 # 定義とコードが statuses:write 付きで走る（Codex review P2、PR #2804）。workflow 内の `if` は
@@ -45,12 +46,16 @@ on:
   # 再評価して status を更新する（消えた証拠で success が残らない）。
   issue_comment:
     types: [created, edited, deleted]
+  # Supabase GitHub App の `Supabase Preview` check run（PR 用 branch の準備完了 / skipped）。
+  # job の if で app slug を supabase に限定する（github-actions 自身の check run では走らない）。
+  check_run:
+    types: [completed]
 
 permissions:
   contents: read
 
 concurrency:
-  group: validation-gate-${{ github.event.workflow_run.head_sha || github.event.sha || github.event.issue.number }}
+  group: validation-gate-${{ github.event.workflow_run.head_sha || github.event.sha || github.event.check_run.head_sha || github.event.issue.number }}
   cancel-in-progress: true
 
 jobs:
@@ -62,6 +67,7 @@ jobs:
     if: >-
       ${{ (github.event_name == 'workflow_run')
           || (github.event_name == 'status' && github.event.state != 'pending' && startsWith(github.event.context, 'Vercel – '))
+          || (github.event_name == 'check_run' && github.event.check_run.app.slug == 'supabase')
           || (github.event_name == 'issue_comment' && github.event.issue.pull_request != null) }}
     runs-on: ubuntu-latest
     timeout-minutes: 15

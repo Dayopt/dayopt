@@ -16,15 +16,16 @@ code:
 
 ## 層ごとの責務
 
-| 層                            | 証明すること                                 | Dayopt の例                                         | 回る場所                       |
-| ----------------------------- | -------------------------------------------- | --------------------------------------------------- | ------------------------------ |
-| Static                        | コードとして成立している                     | typecheck / lint / boundaries / knip                | pre-push、PR（ci.yml）         |
-| Unit（Vitest）                | 小さなロジックが正しい                       | 時刻計算、重なり判定、集計、状態遷移                | PR は related、nightly で full |
-| Storybook + Vitest            | UI 部品の状態・操作・a11y                    | editor、activity picker、Report 部品                | main push（promote.yml 層 3）  |
-| Integration（local Supabase） | 部品・DB・API をつないでも正しい             | RLS、RPC、migration 契約                            | DB を触る PR（ci.yml）         |
-| E2E（Playwright）             | ユーザーが中核の目的を end-to-end で達成する | Plan → Record → reload → Report（desktop / mobile） | main push（promote.yml 層 3）  |
-| 契約 / 監査                   | 横断リスク                                   | workflow contract、production config audit          | PR / main push / 日次          |
-| 探索（dogfooding）            | まだ知らない問題                             | 迷い、余計な一手、状態不整合                        | オンデマンド（gate にしない）  |
+| 層                            | 証明すること                                 | Dayopt の例                                         | 回る場所                                  |
+| ----------------------------- | -------------------------------------------- | --------------------------------------------------- | ----------------------------------------- |
+| Static                        | コードとして成立している                     | typecheck / lint / boundaries / knip                | pre-push、PR（ci.yml）                    |
+| Unit（Vitest）                | 小さなロジックが正しい                       | 時刻計算、重なり判定、集計、状態遷移                | PR は related、nightly で full            |
+| Storybook + Vitest            | UI 部品の状態・操作・a11y                    | editor、activity picker、Report 部品                | main push（promote.yml 層 3）             |
+| Integration（local Supabase） | 部品・DB・API をつないでも正しい             | RLS、RPC、migration 契約（fresh）                   | DB を触る PR（ci.yml）                    |
+| DB upgrade（local Supabase）  | 既存データからの更新と旧アプリ互換           | base + seed → candidate、fresh との一致、契約縮小   | migration を追加した PR（ci.yml、shadow） |
+| E2E（Playwright）             | ユーザーが中核の目的を end-to-end で達成する | Plan → Record → reload → Report（desktop / mobile） | main push（promote.yml 層 3）             |
+| 契約 / 監査                   | 横断リスク                                   | workflow contract、production config audit          | PR / main push / 日次                     |
+| 探索（dogfooding）            | まだ知らない問題                             | 迷い、余計な一手、状態不整合                        | オンデマンド（gate にしない）             |
 
 E2E は万能にしない。小さい問題は小さい層で守り、E2E は中核ループに絞る。mobile は全 spec を二重実行せず、`@mobile` tag を付けた test だけが `Mobile Chrome` project で走る（長押し作成・Drawer・ヘッダーナビのように desktop と操作境界が違うものだけ）。
 
