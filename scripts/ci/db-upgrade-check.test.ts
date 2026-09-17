@@ -41,7 +41,15 @@ const typesFixture = (extra = '') => `export type Database = {
           id?: string;
           name: string;
         };
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: 'activities_category_fkey';
+            columns: ['category_id'];
+            isOneToOne: false;
+            referencedRelation: 'categories';
+            referencedColumns: ['id'];
+          },
+        ];
       };
       categories: {
         Row: {
@@ -101,6 +109,10 @@ describe('schema contract extraction', () => {
       type: 'string',
       optional: true,
     });
+    expect([...contract.tables.get('activities')!.relationships]).toEqual([
+      "foreignKeyName: 'activities_category_fkey'; columns: ['category_id']; isOneToOne: false; referencedRelation: 'categories'; referencedColumns: ['id'];",
+    ]);
+    expect(contract.tables.get('categories')!.relationships.size).toBe(0);
     expect([...contract.views.keys()]).toEqual(['activity_stats_v1']);
     expect([...contract.views.get('activity_stats_v1')!.columns]).toEqual([
       ['total', 'number | null'],
@@ -243,6 +255,27 @@ describe('schema contract extraction', () => {
       ),
     );
     expect(compareSchemaContracts(base, optionalAdded).narrowing).toBe(false);
+    // Row には残るが Insert / Update から消えた列（generated 化）は旧 writer を壊す
+    const readOnly = extractSchemaContract(
+      typesFixture().replace(
+        '          archived_at?: string | null;\n          id?: string;\n          name: string;\n        };\n        Relationships: [\n',
+        '          id?: string;\n          name: string;\n        };\n        Relationships: [\n',
+      ),
+    );
+    expect(compareSchemaContracts(base, readOnly).removed.writeContracts).toEqual([
+      'activities.archived_at (insert): no longer writable',
+    ]);
+    expect(compareSchemaContracts(base, readOnly).removed.columns).toEqual([]);
+    // relationship の削除 / 付け替えも narrowing
+    const relDropped = extractSchemaContract(
+      typesFixture().replace(
+        "referencedRelation: 'categories';",
+        "referencedRelation: 'category_owners';",
+      ),
+    );
+    expect(compareSchemaContracts(base, relDropped).removed.relationships).toEqual([
+      "activities: foreignKeyName: 'activities_category_fkey'; columns: ['category_id']; isOneToOne: false; referencedRelation: 'categories'; referencedColumns: ['id'];",
+    ]);
   });
 });
 
@@ -328,7 +361,11 @@ describe('row count comparison', () => {
       'public.categories: 2 → 1 rows',
       'auth.users: table missing after upgrade',
     ]);
-    expect(COUNT_SQL).toContain("table_schema in ('public', 'auth')");
+    expect(COUNT_SQL).toContain("table_schema in ('public', 'auth', 'private')");
+    expect(PK_SQL).toContain("tc.table_schema in ('public', 'auth', 'private')");
+    expect(CATALOG_SQL).toContain(
+      "n.nspname in ('public', 'auth', 'private') and not t.tgisinternal",
+    );
   });
 });
 

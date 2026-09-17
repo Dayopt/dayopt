@@ -409,7 +409,12 @@ DB / Preview の証拠（#2797）: `dbFresh` は `🧪 Integration Tests`（cand
 オブジェクトの消失や契約変更（列の型・nullability、Insert / Update の型と optional → required、
 Insert の新規必須列、view の列、RPC の引数名・型・必須性と Returns）を別々に検出する。
 `scripts/ci/db-upgrade-check.mjs`。migration を追加した PR だけ走り、非必須。この script を
-migration と同時に変えた PR の緑は `self-produced` として信用しない）。追加分は timestamp に関わらず
+migration と同時に変えた PR の緑は `self-produced` として信用しない）。**保証境界**: 既存データと
+catalog の対象は `public` / `auth` / `private` schema、old-consumer の契約は commit 済み生成型
+（`database.types.ts`）に現れるもの（table の Row / Insert / Update / Relationships、view の Row、
+function の Args / Returns、enum 値）に限る。生成型に現れない契約（RLS の意味、trigger の挙動、
+extension、storage）は RLS snapshot・integration test・レビューが担い、この job は証明しない。
+この境界の内側への点追加は fix ではなく境界の記述で応答する（AGENTS.md §レビュー）。追加分は timestamp に関わらず
 reset から退避し、seed は base SHA の内容に差し替えるので、candidate の seed から旧形式の行を
 消しても「旧データに当てる」経路を通る。fresh 成功を
 upgrade 成功の代用にしない。適用済み migration の編集・削除は production が再実行しないので
