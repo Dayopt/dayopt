@@ -34,7 +34,7 @@ maxTurns: 20
 
 候補（安い順に選ぶ。全部やらない）:
 
-- 既存の失敗している test、または症状を写した新規 test
+- 既存の失敗している test、または症状を写した新規 test（実行は `pnpm test -- <path>` / `pnpm test:scripts <path>`。自作の runner を書かない）
 - `curl` / `pnpm exec tsx` での 1 コマンド再現
 - 既存の Playwright spec の 1 ケース
 - ローカル fixture（DB が要るなら `USE_LOCAL_DB=true` の条件を満たす）

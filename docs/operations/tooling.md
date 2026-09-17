@@ -554,6 +554,8 @@ Codex でこの project を初めて開く時は、project trust を確認し、
 2. Dayopt の境界（依存方向、tRPC、ユーザー分離、migration 運用）と衝突しないか判断する
 3. 取り込む差分だけを手で反映し、上表の SHA と取得日を同じ変更で更新する
 
+比較検証の記録と採否は [外部 skill 導入の比較検証（#2810）](./ai-skills-trials-2810.md)。Postgres 参照資料は入口の発見だけ確認済みで、参照到達の効果は未確認（同記録の残件）。
+
 **自動更新、未監査スクリプトの実行、runtime のリモート取得は行わない。** UI guidelines の `command.md` は skill 本体（vercel-labs/agent-skills）とは別 repo の依存であり、上表で別行として固定する。
 
 ## 6. Independent PR Review と追加契約
