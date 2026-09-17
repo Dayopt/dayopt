@@ -1,10 +1,10 @@
 'use client';
 
 /**
- * ドラッグ作成（Inspector 作成モード）の entry 作成ロジック
+ * ドラッグ作成（Inspector 作成モード）の timeblock 作成ロジック
  *
  * ドラッグ選択（pendingSelection）からの plan / record 作成、
- * 新規アクティビティ作成 → entry 作成、選択範囲の live 競合判定を担う。
+ * 新規アクティビティ作成 → timeblock 作成、選択範囲の live 競合判定を担う。
  *
  * アクティビティのホバーでは色と名前に加えて「普段の長さ」も先出しする。着せ替え先は
  * pendingSelection 自身なので、グリッドのハイライトの厚み・パネルの時刻・重なり判定・
@@ -50,7 +50,7 @@ export function useInlineCreate(extras: InlineCreateExtras = {}) {
   const { getMedianMinutes } = useActivityMedianDurations();
   const timezone = useUserPreferences((s) => s.timezone);
   const t = useTranslations('activities');
-  const tEntry = useTranslations('timeblock');
+  const tTimeblock = useTranslations('timeblock');
 
   const queryClient = useQueryClient();
   const openInspector = useTimeblockInspectorStore((state) => state.openInspector);
@@ -117,7 +117,7 @@ export function useInlineCreate(extras: InlineCreateExtras = {}) {
       );
       if (hasTimeblockLaneConflict(laneItems, utcStart, utcEnd)) {
         // パネルは開いたままにする。時間を直して選び直せる
-        toast.error(tEntry('errors.timeOverlap'));
+        toast.error(tTimeblock('errors.timeOverlap'));
         return;
       }
 
@@ -151,8 +151,8 @@ export function useInlineCreate(extras: InlineCreateExtras = {}) {
             clearPendingSelection();
             const message =
               destination === 'plan'
-                ? tEntry('editor.toast.planCreated')
-                : tEntry('editor.toast.recorded');
+                ? tTimeblock('editor.toast.planCreated')
+                : tTimeblock('editor.toast.recorded');
             // サイドバーのタップ作成（useActivityQuickCreate）と同じく取り消しを付ける。
             // 作成は可逆なので速く進め、間違えたらトーストから戻せるようにする（ルール4）
             if (created?.id) {
@@ -209,12 +209,12 @@ export function useInlineCreate(extras: InlineCreateExtras = {}) {
       closeInspector,
       openInspector,
       queryClient,
-      tEntry,
+      tTimeblock,
       tCommon,
     ],
   );
 
-  // 新規アクティビティ作成 → エントリ作成
+  // 新規アクティビティ作成 → タイムブロック作成
   const handleCreateAndSelect = useCallback(
     async (
       name: string,
@@ -246,7 +246,7 @@ export function useInlineCreate(extras: InlineCreateExtras = {}) {
     [pendingSelection, isCreating, createActivityMutation, handleCreate, t],
   );
 
-  // 現在の selection が他 entry と重なるかを live 判定（resize や外部更新に追随）。
+  // 現在の selection が他 timeblock と重なるかを live 判定（resize や外部更新に追随）。
   const hasConflict = useMemo(() => {
     if (!pendingSelection) return false;
     const { date: selDate, startHour, startMinute, endHour, endMinute } = pendingSelection;

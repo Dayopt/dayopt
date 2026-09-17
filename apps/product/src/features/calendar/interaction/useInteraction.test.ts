@@ -7,19 +7,17 @@ import type { CalendarDisplayEvent } from '../types/calendar.types';
 import { useInteraction, type UseInteractionProps } from './useInteraction';
 
 const baseEvent: CalendarDisplayEvent = {
-  id: 'entry-1',
-  title: 'test entry',
+  id: 'timeblock-1',
+  title: 'test timeblock',
   startDate: new Date('2026-01-15T09:00:00'),
   endDate: new Date('2026-01-15T10:00:00'),
   origin: 'manual',
-  actualStartDate: null,
-  actualEndDate: null,
   kind: 'plan',
   version: '2026-01-15T08:00:00.000000Z',
 } as unknown as CalendarDisplayEvent;
 
 /**
- * #2250: pointer→lane 判定は相手レーンに entry が無い時刻ではフル幅（境界不可視）扱いになり
+ * #2250: pointer→lane 判定は相手レーンに timeblock が無い時刻ではフル幅（境界不可視）扱いになり
  * sourceLane を維持する。「Record レーンへ入る」挙動そのものを検証する test では、
  * 判定対象の時間帯に必ず重なる counterpart Record（終日）を明示的に用意する。
  */
@@ -69,7 +67,7 @@ function completeDrag(hook: { result: { current: ReturnType<typeof useInteractio
   act(() => {
     hook.result.current.dispatch({
       type: 'POINTER_DOWN',
-      timeblockId: 'entry-1',
+      timeblockId: 'timeblock-1',
       point: { clientX: 20, clientY: 540 },
       originalPosition: rect,
       dateIndex: 0,
@@ -107,7 +105,7 @@ function dropIntoRecordLane(
   act(() => {
     hook.result.current.dispatch({
       type: 'POINTER_DOWN',
-      timeblockId: 'entry-1',
+      timeblockId: 'timeblock-1',
       point: { clientX: 20, clientY: 540 },
       originalPosition: rect,
       dateIndex: 0,
@@ -133,7 +131,7 @@ describe('useInteraction Plan → Record drop', () => {
       hook.result.current.dispatch({ type: 'POINTER_UP' });
     });
 
-    expect(onPlanRecord).toHaveBeenCalledWith('entry-1', {
+    expect(onPlanRecord).toHaveBeenCalledWith('timeblock-1', {
       start: new Date('2026-01-15T09:30:00'),
       end: new Date('2026-01-15T10:30:00'),
     });
@@ -157,7 +155,7 @@ describe('useInteraction Plan → Record drop', () => {
     act(() => {
       hook.result.current.dispatch({
         type: 'POINTER_DOWN',
-        timeblockId: 'entry-1',
+        timeblockId: 'timeblock-1',
         point: { clientX: 20, clientY: 540 },
         originalPosition: rect,
         dateIndex: 0,
@@ -188,7 +186,7 @@ describe('useInteraction Plan → Record drop', () => {
     act(() => {
       hook.result.current.dispatch({
         type: 'POINTER_DOWN',
-        timeblockId: 'entry-1',
+        timeblockId: 'timeblock-1',
         point: { clientX: 20, clientY: 540 },
         originalPosition: rect,
         dateIndex: 0,
@@ -224,7 +222,11 @@ describe('useInteraction Plan → Record drop', () => {
     );
 
     act(() => {
-      hook.result.current.handlers.handlePointerDown('entry-1', createMouseEvent(20, 540), rect);
+      hook.result.current.handlers.handlePointerDown(
+        'timeblock-1',
+        createMouseEvent(20, 540),
+        rect,
+      );
     });
     act(() => {
       document.dispatchEvent(new MouseEvent('mousemove', { clientX: 180, clientY: 570 }));
@@ -237,7 +239,11 @@ describe('useInteraction Plan → Record drop', () => {
     // 新しい drag を開始したら、前回の 'record' が stale state として引き継がれず、
     // 最初の mousemove で（x=40 は既定境界より左なので）'plan' に解決される。
     act(() => {
-      hook.result.current.handlers.handlePointerDown('entry-1', createMouseEvent(20, 540), rect);
+      hook.result.current.handlers.handlePointerDown(
+        'timeblock-1',
+        createMouseEvent(20, 540),
+        rect,
+      );
     });
     act(() => {
       document.dispatchEvent(new MouseEvent('mousemove', { clientX: 40, clientY: 600 }));
@@ -271,7 +277,7 @@ describe('useInteraction Plan → Record drop', () => {
     act(() => {
       hook.result.current.dispatch({
         type: 'POINTER_DOWN',
-        timeblockId: 'entry-1',
+        timeblockId: 'timeblock-1',
         point: { clientX: 20, clientY: 540 },
         originalPosition: rect,
         dateIndex: 0,
@@ -357,7 +363,7 @@ describe('useInteraction Plan → Record drop', () => {
     // 「呼ばれた」だけでは移動が反映された証拠にならないので、drag で 30 分ぶん
     // 下げた preview 時刻がそのまま渡ることまで見る。
     expect(onEventUpdate).toHaveBeenCalledWith(
-      'entry-1',
+      'timeblock-1',
       expect.objectContaining({
         startTime: new Date('2026-01-15T09:30:00'),
         endTime: new Date('2026-01-15T10:30:00'),
@@ -386,7 +392,7 @@ describe('useInteraction handlePointerDown: 詳細を開いているブロック
   it('別のブロックなら従来どおり drag の判定へ入る', () => {
     const onEventClick = vi.fn();
     const { result } = renderHook(() =>
-      useInteraction(makeProps({ disabledPlanId: 'entry-other', onEventClick })),
+      useInteraction(makeProps({ disabledPlanId: 'timeblock-other', onEventClick })),
     );
 
     act(() => {
@@ -403,8 +409,8 @@ describe('useInteraction handleResizeStart guard', () => {
     const { result } = renderHook(() =>
       useInteraction(
         makeProps({
-          disabledPlanId: 'entry-1',
-          resizeDisabledPlanId: 'entry-1',
+          disabledPlanId: 'timeblock-1',
+          resizeDisabledPlanId: 'timeblock-1',
         }),
       ),
     );
@@ -412,7 +418,7 @@ describe('useInteraction handleResizeStart guard', () => {
     expect(result.current.state.mode).toBe('idle');
 
     act(() => {
-      result.current.handlers.handleResizeStart('entry-1', 'bottom', createMouseEvent(), rect);
+      result.current.handlers.handleResizeStart('timeblock-1', 'bottom', createMouseEvent(), rect);
     });
 
     expect(result.current.state.mode).toBe('idle');
@@ -422,14 +428,14 @@ describe('useInteraction handleResizeStart guard', () => {
     const { result } = renderHook(() =>
       useInteraction(
         makeProps({
-          disabledPlanId: 'entry-1',
+          disabledPlanId: 'timeblock-1',
           resizeDisabledPlanId: null,
         }),
       ),
     );
 
     act(() => {
-      result.current.handlers.handleResizeStart('entry-1', 'bottom', createMouseEvent(), rect);
+      result.current.handlers.handleResizeStart('timeblock-1', 'bottom', createMouseEvent(), rect);
     });
 
     expect(result.current.state.mode).toBe('resizing');
@@ -439,24 +445,24 @@ describe('useInteraction handleResizeStart guard', () => {
     const { result } = renderHook(() => useInteraction(makeProps()));
 
     act(() => {
-      result.current.handlers.handleResizeStart('entry-1', 'bottom', createMouseEvent(), rect);
+      result.current.handlers.handleResizeStart('timeblock-1', 'bottom', createMouseEvent(), rect);
     });
 
     expect(result.current.state.mode).toBe('resizing');
   });
 
-  it('別 entry 対象: resizeDisabledPlanId が別 ID のとき RESIZE_START が dispatch される', () => {
+  it('別 timeblock 対象: resizeDisabledPlanId が別 ID のとき RESIZE_START が dispatch される', () => {
     const { result } = renderHook(() =>
       useInteraction(
         makeProps({
-          disabledPlanId: 'entry-other',
-          resizeDisabledPlanId: 'entry-other',
+          disabledPlanId: 'timeblock-other',
+          resizeDisabledPlanId: 'timeblock-other',
         }),
       ),
     );
 
     act(() => {
-      result.current.handlers.handleResizeStart('entry-1', 'bottom', createMouseEvent(), rect);
+      result.current.handlers.handleResizeStart('timeblock-1', 'bottom', createMouseEvent(), rect);
     });
 
     expect(result.current.state.mode).toBe('resizing');
@@ -464,23 +470,19 @@ describe('useInteraction handleResizeStart guard', () => {
 });
 
 describe('useInteraction resize completion', () => {
-  it('通常 entry の resize 完了時は actual 固定フラグを渡さない', () => {
+  it('通常 timeblock の resize 完了時は actual 固定フラグを渡さない', () => {
     const onEventUpdate = vi.fn();
-    const matchingEntry: CalendarDisplayEvent = {
+    const matchingTimeblock: CalendarDisplayEvent = {
       ...baseEvent,
-      plannedStartDate: baseEvent.startDate,
-      plannedEndDate: baseEvent.endDate,
-      actualStartDate: baseEvent.startDate,
-      actualEndDate: baseEvent.endDate,
     };
     const { result } = renderHook(() =>
-      useInteraction(makeProps({ events: [matchingEntry], onEventUpdate })),
+      useInteraction(makeProps({ events: [matchingTimeblock], onEventUpdate })),
     );
 
     act(() => {
       result.current.dispatch({
         type: 'RESIZE_START',
-        timeblockId: 'entry-1',
+        timeblockId: 'timeblock-1',
         direction: 'bottom',
         point: { clientX: 100, clientY: 600 },
         originalPosition: rect,
@@ -497,28 +499,24 @@ describe('useInteraction resize completion', () => {
     });
 
     expect(onEventUpdate).toHaveBeenCalledWith(
-      'entry-1',
+      'timeblock-1',
       expect.not.objectContaining({ keepActualTime: true }),
     );
   });
 
-  it('予定と記録がズレた entry の resize 完了時も actual 固定フラグは渡さない（自動記録モデルでは planned のみ更新）', () => {
+  it('予定と記録がズレた timeblock の resize 完了時も actual 固定フラグは渡さない（自動記録モデルでは planned のみ更新）', () => {
     const onEventUpdate = vi.fn();
-    const overtimeEntry: CalendarDisplayEvent = {
+    const overtimeTimeblock: CalendarDisplayEvent = {
       ...baseEvent,
-      plannedStartDate: baseEvent.startDate,
-      plannedEndDate: baseEvent.endDate,
-      actualStartDate: baseEvent.startDate,
-      actualEndDate: new Date('2026-01-15T10:10:00'),
     };
     const { result } = renderHook(() =>
-      useInteraction(makeProps({ events: [overtimeEntry], onEventUpdate })),
+      useInteraction(makeProps({ events: [overtimeTimeblock], onEventUpdate })),
     );
 
     act(() => {
       result.current.dispatch({
         type: 'RESIZE_START',
-        timeblockId: 'entry-1',
+        timeblockId: 'timeblock-1',
         direction: 'bottom',
         point: { clientX: 100, clientY: 600 },
         originalPosition: rect,
@@ -531,7 +529,7 @@ describe('useInteraction resize completion', () => {
     });
 
     expect(onEventUpdate).toHaveBeenCalledWith(
-      'entry-1',
+      'timeblock-1',
       expect.not.objectContaining({ keepActualTime: true }),
     );
   });
@@ -554,7 +552,7 @@ describe('useInteraction optimistic version', () => {
     );
 
     act(() => {
-      result.current.handlers.handlePointerDown('entry-1', createMouseEvent(20, 540), rect);
+      result.current.handlers.handlePointerDown('timeblock-1', createMouseEvent(20, 540), rect);
       result.current.dispatch({
         type: 'POINTER_MOVE',
         point: { clientX: 80, clientY: 570 },
@@ -565,7 +563,7 @@ describe('useInteraction optimistic version', () => {
     act(() => result.current.dispatch({ type: 'POINTER_UP' }));
 
     expect(onEventUpdate).toHaveBeenCalledWith(
-      'entry-1',
+      'timeblock-1',
       expect.objectContaining({ expectedUpdatedAt: originalVersion }),
     );
   });

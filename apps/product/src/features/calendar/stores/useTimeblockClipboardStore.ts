@@ -15,18 +15,18 @@ interface LastClickedPosition {
 }
 
 interface TimeblockClipboardState {
-  /** コピーされたエントリ */
+  /** コピーされたタイムブロック */
   copiedTimeblock: ClipboardTimeblock | null;
   /** 最後にクリックした位置（Cmd+Vでペーストする位置） */
   lastClickedPosition: LastClickedPosition | null;
 }
 
 interface TimeblockClipboardActions {
-  /** エントリをクリップボードにコピー */
-  copyTimeblock: (entry: ClipboardTimeblock) => void;
+  /** タイムブロックをクリップボードにコピー */
+  copyTimeblock: (timeblock: ClipboardTimeblock) => void;
   /** クリップボードをクリア */
   clearClipboard: () => void;
-  /** クリップボードにエントリがあるかチェック */
+  /** クリップボードにタイムブロックがあるかチェック */
   hasCopiedTimeblock: () => boolean;
   /** 最後にクリックした位置を設定（Googleカレンダー互換のCmd+Vペースト用） */
   setLastClickedPosition: (position: LastClickedPosition) => void;
@@ -37,11 +37,11 @@ interface TimeblockClipboardActions {
 type TimeblockClipboardStore = TimeblockClipboardState & TimeblockClipboardActions;
 
 /**
- * エントリクリップボードStore
+ * タイムブロッククリップボードStore
  *
- * エントリのコピー＆ペースト機能用のクリップボード管理
- * - コピー: エントリの情報を保存
- * - ペースト: 保存された情報を使って新規エントリをドラフトモードで作成
+ * タイムブロックのコピー＆ペースト機能用のクリップボード管理
+ * - コピー: タイムブロックの情報を保存
+ * - ペースト: 保存された情報を使って新規タイムブロックをドラフトモードで作成
  */
 export const useTimeblockClipboardStore = create<TimeblockClipboardStore>()(
   devtools(
@@ -51,8 +51,8 @@ export const useTimeblockClipboardStore = create<TimeblockClipboardStore>()(
       lastClickedPosition: null,
 
       // Actions
-      copyTimeblock: (entry) => {
-        set({ copiedTimeblock: entry });
+      copyTimeblock: (timeblock) => {
+        set({ copiedTimeblock: timeblock });
       },
 
       clearClipboard: () => {

@@ -12,7 +12,7 @@ import { MIN_TIMEBLOCK_DURATION_MINUTES } from '../domain/precision';
 /** SSRフォールバック用デフォルトの1時間高さ(px) */
 const DEFAULT_HOUR_HEIGHT = 72;
 
-/** イベントの最小高さ(px) — 1 分粒度 entry でも視認できる程度に低く設定 */
+/** イベントの最小高さ(px) — 1 分粒度 timeblock でも視認できる程度に低く設定 */
 export const MIN_EVENT_HEIGHT = 14;
 
 /** イベントスタイルの戻り値型（React.CSSProperties互換だがReact非依存） */
@@ -124,7 +124,7 @@ export function getDurationInMinutes(start: Date, end: Date): number {
 /** TimeblockLayout から top/height を計算する共通関数 */
 const ENTRY_PADDING = 2;
 
-export function layoutEntryToVerticalPosition(
+export function layoutTimeblockToVerticalPosition(
   start: Date,
   end: Date,
   hourHeight: number,
@@ -190,7 +190,7 @@ export function generateTimeSlots(
 // Timeblock Style Computation
 // ========================================
 
-/** エントリ位置情報 */
+/** タイムブロック位置情報 */
 interface TimeblockPositionInput {
   id: string;
   top: number;
@@ -201,7 +201,7 @@ interface TimeblockPositionInput {
   opacity?: number;
 }
 
-/** エントリ位置情報からCSSスタイルマップを生成（純粋関数） */
+/** タイムブロック位置情報からCSSスタイルマップを生成（純粋関数） */
 export function computeTimeblockStyles(positions: TimeblockPositionInput[]): Record<
   string,
   {

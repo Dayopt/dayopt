@@ -70,11 +70,8 @@ interface CalendarFilterActions {
   /** カテゴリー内アクティビティの表示状態を取得（all: 全ON, none: 全OFF, some: 一部） */
   getCategoryVisibility: (activityIds: string[]) => 'all' | 'none' | 'some';
 
-  /** アクティビティフィルタに一致するかチェック */
+  /** アクティビティフィルタに一致するかチェック（タイムブロックの表示判定もこれを使う） */
   matchesActivityFilter: (activityId: string | null) => boolean;
-
-  /** エントリが表示対象かチェック（アクティビティフィルター） */
-  isEntryVisible: (activityId: string | null) => boolean;
 }
 
 type CalendarFilterStore = CalendarFilterState & CalendarFilterActions;
@@ -256,10 +253,6 @@ export const useCalendarFilterStore = create<CalendarFilterStore>()(
           if (activityId === null) return true;
 
           return get().visibleActivityIds.has(activityId);
-        },
-
-        isEntryVisible: (activityId) => {
-          return get().matchesActivityFilter(activityId);
         },
       }),
       {

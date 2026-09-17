@@ -1,5 +1,5 @@
 /**
- * Plan レーン + Record レーンの 2 レーン座標計算（Step 5、read 側専用。
+ * Plan レーン + Record レーンの 2 レーン座標計算（read 側専用。
  * #2250 で常時固定幅分割から区間ごとの動的幅判定へ変更）。
  *
  * `plans_no_overlap` / `records_no_overlap`（DB EXCLUDE 制約、半開区間）により、
@@ -8,9 +8,9 @@
  * column を割り当てる sweep-line）は不要で、各レーン内は「その日の時刻から
  * 座標を出すだけ」で足りる。
  *
- * レーン幅は entry 単位で決める（時間軸の途中で 1 entry の幅が変わることはない）:
- * 相手レーンに時間の重なる entry が 1 件でもあれば従来どおり Plan=左・Record=右の
- * 固定幅分割、無ければその entry はフル幅（0-100%）で描画する。`DEFAULT_PLAN_LANE_WIDTH_PERCENT`
+ * レーン幅は timeblock 単位で決める（時間軸の途中で 1 件の幅が変わることはない）:
+ * 相手レーンに時間の重なる timeblock が 1 件でもあれば従来どおり Plan=左・Record=右の
+ * 固定幅分割、無ければその timeblock はフル幅（0-100%）で描画する。`DEFAULT_PLAN_LANE_WIDTH_PERCENT`
  * は「split 時の Plan レーン幅」であり、「常時のレーン幅」ではない点に注意する。
  *
  * この動的幅判定は表示だけでなく、ドラッグ中の pointer→lane 判定
@@ -21,14 +21,12 @@
  * Plan→Record 変換 mutation が発火する（#2250 plan-review で検出、P1 級）。
  *
  * 呼び出し側は対象日の plans/records だけを渡す想定（日をまたぐ絞り込みは
- * 呼び出し側の責務、TwoLaneDayColumn と同じ分担）。この日次スコープの前提により、
- * 日をまたぐ entry の重複判定も `displayStartDate`/`displayEndDate`（実時刻）を
+ * 呼び出し側の責務）。この日次スコープの前提により、
+ * 日をまたぐ timeblock の重複判定も `displayStartDate`/`displayEndDate`（実時刻）を
  * そのまま比較すれば足りる（px 座標は `timeToPosition` が 24:00 でクランプするが、
  * 相手レーンの候補リスト自体が既に当日分だけに絞られているため、実時刻ベースの
  * 判定と px 座標のクランプは競合しない）。
  */
-
-import type { PlanEvent, RecordEvent } from '@/features/timeblock';
 
 import type { CalendarDisplayEvent } from '../types/calendar.types';
 
@@ -44,22 +42,8 @@ export interface TwoLanePosition {
 }
 
 interface TwoLaneLayoutItem<T> {
-  entry: T;
+  timeblock: T;
   position: TwoLanePosition;
-}
-
-interface TwoLaneLayoutResult {
-  planLayouts: TwoLaneLayoutItem<PlanEvent>[];
-  recordLayouts: TwoLaneLayoutItem<RecordEvent>[];
-}
-
-interface CalculateTwoLaneLayoutOptions {
-  plans: ReadonlyArray<PlanEvent>;
-  records: ReadonlyArray<RecordEvent>;
-  /** 1 時間あたりの px */
-  hourHeight: number;
-  /** Plan レーンの幅（%）。既定 38（Record レーンが主役で広め、overview.md §4） */
-  planLaneWidthPercent?: number;
 }
 
 const DAY_MINUTES = 24 * 60;
@@ -68,12 +52,12 @@ export const DEFAULT_PLAN_LANE_WIDTH_PERCENT = 38;
 const TWO_LANE_MIN_GAP_PX: number = 2;
 
 /**
- * 相手レーンに時間の重なる entry が存在するか判定する。
+ * 相手レーンに時間の重なる timeblock が存在するか判定する。
  *
  * 重複判定は実時刻（`displayStartDate`/`displayEndDate`）の半開区間比較で行う
  * （`[targetStart, targetEnd)` と `[counterpart.start, counterpart.end)` が交差するか）。
  * `targetEnd <= targetStart`（0 秒以下・巻き戻り）の縮退区間は「重複なし」と
- * 誤判定してフル幅にすると 0 幅カードが全幅で他 entry と重なる事故になるため、
+ * 誤判定してフル幅にすると 0 幅カードが全幅で他の timeblock と重なる事故になるため、
  * 安全側（相手が存在する扱い = split 幅）に倒す。
  */
 export function hasLaneCounterpart(
@@ -95,7 +79,7 @@ export function hasLaneCounterpart(
 /**
  * カラム内の pointer X から Plan / Record の drop 先レーンを決める。
  *
- * `laneAvailability` を渡すと、その時刻に相手レーンの entry が存在しない
+ * `laneAvailability` を渡すと、その時刻に相手レーンの timeblock が存在しない
  * （= 画面上フル幅で境界が見えていない）場合は pointer の x 座標に関わらず
  * `sourceLane` をそのまま返す。境界の無いカラムで意図しない
  * Plan→Record 変換が起きるのを防ぐための安全弁（#2250）。省略時は従来どおり
@@ -127,10 +111,10 @@ function buildLaneLayout<T extends { displayStartDate: Date; displayEndDate: Dat
   hourHeight: number,
 ): Array<TwoLaneLayoutItem<T>> {
   const sorted = items
-    .map((entry) => {
+    .map((timeblock) => {
       const { top, height } = timeToPosition(
-        entry.displayStartDate,
-        entry.displayEndDate,
+        timeblock.displayStartDate,
+        timeblock.displayEndDate,
         hourHeight,
       );
       // 重複判定は実時刻ベース（px クランプ前）で行う。gap 調整は同一レーン内の
@@ -138,12 +122,12 @@ function buildLaneLayout<T extends { displayStartDate: Date; displayEndDate: Dat
       // gap 適用前の displayStartDate/displayEndDate を判定に使う。
       const hasCounterpart = hasLaneCounterpart(
         counterparts,
-        entry.displayStartDate,
-        entry.displayEndDate,
+        timeblock.displayStartDate,
+        timeblock.displayEndDate,
       );
-      return { entry, top, height, hasCounterpart };
+      return { timeblock, top, height, hasCounterpart };
     })
-    .sort((a, b) => a.top - b.top || a.entry.id.localeCompare(b.entry.id));
+    .sort((a, b) => a.top - b.top || a.timeblock.id.localeCompare(b.timeblock.id));
 
   const layouts: Array<TwoLaneLayoutItem<T>> = [];
   let previousOriginalBottomPx: number | null = null;
@@ -162,7 +146,7 @@ function buildLaneLayout<T extends { displayStartDate: Date; displayEndDate: Dat
       width: item.hasCounterpart ? splitWidth : 100,
     };
 
-    layouts.push({ entry: item.entry, position });
+    layouts.push({ timeblock: item.timeblock, position });
     previousOriginalBottomPx = item.top + item.height;
   }
 
@@ -190,27 +174,8 @@ function timeToPosition(
   return { top, height };
 }
 
-export function calculateTwoLaneLayout({
-  plans,
-  records,
-  hourHeight,
-  planLaneWidthPercent = DEFAULT_PLAN_LANE_WIDTH_PERCENT,
-}: CalculateTwoLaneLayoutOptions): TwoLaneLayoutResult {
-  const recordLaneWidthPercent = 100 - planLaneWidthPercent;
-  const planLayouts = buildLaneLayout(plans, records, 0, planLaneWidthPercent, hourHeight);
-  const recordLayouts = buildLaneLayout(
-    records,
-    plans,
-    planLaneWidthPercent,
-    recordLaneWidthPercent,
-    hourHeight,
-  );
-
-  return { planLayouts, recordLayouts };
-}
-
 /**
- * `CalendarDisplayEvent[]`（Step 8 の time model 射影、`kind` 付き）から直接 2 レーン座標を計算する。
+ * `CalendarDisplayEvent[]`（`kind` 付きの表示用射影）から 2 レーン座標を計算する。
  * `TwoLaneTimeblockRenderer` はインタラクション状態（drag/resize preview）を CalendarDisplayEvent 単位で
  * 持つ既存 `useInteraction` をそのまま使うため、PlanEvent/RecordEvent への変換を経由しない。
  */
@@ -243,24 +208,24 @@ export function calculateTwoLaneStylesForCalendarEvents(
     }
   }
 
-  for (const { entry, position } of buildLaneLayout(
+  for (const { timeblock, position } of buildLaneLayout(
     plans,
     records,
     0,
     planLaneWidthPercent,
     hourHeight,
   )) {
-    styles[entry.id] = position;
+    styles[timeblock.id] = position;
   }
 
-  for (const { entry, position } of buildLaneLayout(
+  for (const { timeblock, position } of buildLaneLayout(
     records,
     plans,
     planLaneWidthPercent,
     recordLaneWidthPercent,
     hourHeight,
   )) {
-    styles[entry.id] = position;
+    styles[timeblock.id] = position;
   }
 
   return styles;

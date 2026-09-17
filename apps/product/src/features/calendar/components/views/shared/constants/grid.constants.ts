@@ -60,7 +60,7 @@ export const CURRENT_TIME_DOT_SIZE = 6; // 現在時刻のドットサイズ(px)
 /**
  * Z-index層の定義（カレンダーグリッド内ローカル）
  *
- * これは CalendarGridContent のエントリ層（absolute + z-20）が作る
+ * これは CalendarGridContent のタイムブロック層（absolute + z-20）が作る
  * stacking context **内側**の数値空間で、tokens/z-index.css のグローバル
  * スケール（z-dropdown: 50 等）とは意図的に別。数値が同じでも競合しない。
  * グローバルスケールへ「統一」してはいけない — 例えば DRAGGING(30) を

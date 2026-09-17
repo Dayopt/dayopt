@@ -33,7 +33,7 @@ vi.mock('@/features/calendar/components/views/shared/hooks/useResponsiveHourHeig
 }));
 
 vi.mock('@/features/calendar/components/views/WeekView/hooks/useWeekTimeblocks', () => ({
-  useWeekTimeblocks: () => ({ entriesByDate: {} }),
+  useWeekTimeblocks: () => ({ timeblocksByDate: {} }),
 }));
 
 import { useCalendarDisplayModeStore } from '@/features/calendar/stores/useCalendarDisplayModeStore';

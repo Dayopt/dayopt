@@ -106,7 +106,7 @@ export const PlanWithRemaining: Story = {
       <Slot>
         <DragSelectionHighlight
           hourHeight={HOUR_HEIGHT}
-          dayEntries={[planOnDay(day, 13, 1), planOnDay(day, 15, 2)]}
+          dayTimeblocks={[planOnDay(day, 13, 1), planOnDay(day, 15, 2)]}
         />
       </Slot>
     );
@@ -121,7 +121,7 @@ export const RemainingNegative: Story = {
       <Slot>
         <DragSelectionHighlight
           hourHeight={HOUR_HEIGHT}
-          dayEntries={[planOnDay(day, 0, 8), planOnDay(day, 8, 8), planOnDay(day, 16, 7)]}
+          dayTimeblocks={[planOnDay(day, 0, 8), planOnDay(day, 8, 8), planOnDay(day, 16, 7)]}
         />
       </Slot>
     );
@@ -137,7 +137,7 @@ export const HoveredActivity: Story = {
     });
     return (
       <Slot>
-        <DragSelectionHighlight hourHeight={HOUR_HEIGHT} dayEntries={[planOnDay(day, 13, 1)]} />
+        <DragSelectionHighlight hourHeight={HOUR_HEIGHT} dayTimeblocks={[planOnDay(day, 13, 1)]} />
       </Slot>
     );
   },
@@ -149,7 +149,7 @@ export const RecordSelection: Story = {
     seedSelection(-2, 120, 'record');
     return (
       <Slot>
-        <DragSelectionHighlight hourHeight={HOUR_HEIGHT} dayEntries={[]} />
+        <DragSelectionHighlight hourHeight={HOUR_HEIGHT} dayTimeblocks={[]} />
       </Slot>
     );
   },
@@ -161,7 +161,7 @@ export const Compact: Story = {
     seedSelection(2, 30);
     return (
       <Slot hours={1}>
-        <DragSelectionHighlight hourHeight={HOUR_HEIGHT} dayEntries={[]} />
+        <DragSelectionHighlight hourHeight={HOUR_HEIGHT} dayTimeblocks={[]} />
       </Slot>
     );
   },
@@ -176,13 +176,13 @@ export const AllPatterns: Story = {
         <Slot>
           <DragSelectionHighlight
             hourHeight={HOUR_HEIGHT}
-            dayEntries={[planOnDay(day, 13, 1), planOnDay(day, 15, 2)]}
+            dayTimeblocks={[planOnDay(day, 13, 1), planOnDay(day, 15, 2)]}
           />
         </Slot>
         <Slot>
           <DragSelectionHighlight
             hourHeight={HOUR_HEIGHT}
-            dayEntries={[planOnDay(day, 0, 8), planOnDay(day, 8, 8), planOnDay(day, 16, 7)]}
+            dayTimeblocks={[planOnDay(day, 0, 8), planOnDay(day, 8, 8), planOnDay(day, 16, 7)]}
           />
         </Slot>
       </div>

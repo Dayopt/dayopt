@@ -35,7 +35,7 @@ import { Meta } from '@storybook/addon-docs/blocks';
 
 - 150〜250ms、バウンスなし
 - 遅延や曖昧な状態遷移は「静か」ではなく**不安**。応答性能を世界観の一部として扱う
-- 例: ブロック配置時の `animate-entry-settle`、hover / focus の色変化、モバイルの `tap`
+- 例: タイムブロック配置時の `animate-timeblock-settle`、hover / focus の色変化、モバイルの `tap`
 
 ### 層2 — 蓄積の可視化
 
@@ -62,7 +62,7 @@ import { Meta } from '@storybook/addon-docs/blocks';
 | バッジ / スコア                          | 外発的報酬が内発的動機を侵食する         |
 | 未達を赤字・警告色で責める               | ズレは事実であって失敗ではない           |
 
-> 2026-07-30 に、ブロック新規作成時の花びら演出（8枚・550〜620ms）を廃止した。実質 confetti で、層1 の予算を 2.5 倍超え、毎回の作成で発火していた。`animate-entry-settle`（200ms）に置き換えた。
+> 2026-07-30 に、タイムブロック新規作成時の花びら演出（8枚・550〜620ms）を廃止した。実質 confetti で、層1 の予算を 2.5 倍超え、毎回の作成で発火していた。`animate-timeblock-settle`（200ms）に置き換えた。
 
 ---
 

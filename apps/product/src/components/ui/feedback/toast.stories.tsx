@@ -32,13 +32,13 @@ export const Success: Story = {
         保存
       </Button>
       <Button variant="outline" onClick={() => toast.success('追加しました')}>
-        エントリー作成
+        タイムブロック作成
       </Button>
       <Button variant="outline" onClick={() => toast.success('更新しました')}>
-        エントリー更新
+        タイムブロック更新
       </Button>
       <Button variant="outline" onClick={() => toast.success('複製しました')}>
-        エントリー複製
+        タイムブロック複製
       </Button>
       <Button variant="outline" onClick={() => toast.success('コピーしました')}>
         コピー
