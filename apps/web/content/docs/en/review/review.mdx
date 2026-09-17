@@ -1,0 +1,120 @@
+---
+title: 'Read your Review'
+description: 'A guide to the report — reading the gap between Plans and Records by week, month, and year, and carrying it into your next plan.'
+tags: ['review', 'metrics', 'timeboxing']
+author: 'Dayopt Team'
+publishedAt: '2026-09-17'
+updatedAt: '2026-09-17'
+order: 4
+category: 'review'
+slug: 'review'
+
+ai:
+  relatedQuestions:
+    - 'What can I see in the Review?'
+    - 'How do I switch between week, month, and year?'
+    - 'How do I report on only some activities?'
+    - 'Why does a number show a dash instead of a value?'
+  relatedDocs:
+    - '/docs/plans'
+    - '/docs/records'
+  chunkStrategy: 'h2'
+  searchable: true
+  difficulty: 'beginner'
+  contentType: 'guide'
+---
+
+# Read your Review
+
+The Review quietly shows the distance between what you planned and what you recorded. It is something to read, not a dashboard. There are no scores and no streaks, and the only thing you are compared against is your own past.
+
+## Open it and pick a period
+
+The report lives on its own page at `/report`. You can read a week, a month, or a year, switched from the header. Use `‹` and `›` to move between periods.
+
+The period is separate from your calendar view. Even with the calendar on a 3-day view, the report stays on the week you chose. Weeks start on the day set in your settings.
+
+On mobile there is no period-switching control — swipe left or right to move between periods instead. A link you shared after looking at a month on desktop still opens on that month.
+
+## Three tabs
+
+Tabs are fixed by purpose. You cannot reorder them, add to them, or customize widgets. The period is a separate axis.
+
+| Tab                 | What you read                       |
+| ------------------- | ----------------------------------- |
+| **Time spent**      | Where the hours went                |
+| **Plan vs. record** | How your Plans and Records differed |
+| **Reflection**      | Whether it was time well spent      |
+
+Switching tabs redraws the page without recalculating anything.
+
+### Time spent
+
+Facts for the period, and nothing else.
+
+- **Three number cards** — recorded time, number of Records, and the median length of one Record, each with the change from the previous period
+- **Recorded time per day** — which days carried the weight
+- **Allocation** — a horizontal bar where your total recorded time is 100%. With records in two or more categories it splits by category; with only one, it splits by the activities inside it
+- **Activity list** — every activity with a record, none cut off. Sort by recorded time or by the change from the previous period
+- **Distribution by hour** — recorded time for each hour from 00:00 to 23:00
+- **Distribution of lengths** — how long a single Record tends to run
+
+Comparisons with the previous period add up only the activities you currently have visible. If there was not a single minute recorded in the previous period, no change is shown. Increases and decreases use an arrow and a sign, never a good-or-bad color.
+
+### Plan vs. record
+
+For each activity, a recorded bar sits next to a planned bar (dashed), with the ratio between them alongside.
+
+**Estimation mirror** surfaces up to three activities where your estimates are furthest off. To qualify, a row must have at least 30 minutes of ended Plans, at least one Record, and at least three ended Plans. There is no combined accuracy score.
+
+### Reflection
+
+**Compass** plots time invested against fulfillment. Activities with fewer than five fulfillment answers are not plotted — they wait in a list until there is enough to say.
+
+## Report on only some activities
+
+The sidebar — on mobile, a drawer opened from the button in the tab row — lists your categories and activities just like the calendar does. Press the eye icon on a row you don't want to count and every tab recalculates right away.
+
+- Leaving out a category leaves out everything inside it
+- Your choices are saved on this device only. New activities are counted automatically
+- Records with no activity have no row and are always counted
+
+Margin — time you did not record — does not move when you filter. It is the length of the period minus your total recorded time, and it appears as a number next to that total, never as a slice of the allocation.
+
+## When a number doesn't appear
+
+Dayopt will not build a ratio out of too few observations. When there isn't enough, you get a dash rather than a blank or a 0%.
+
+| Where                 | Stays silent when                                   |
+| --------------------- | --------------------------------------------------- |
+| Plan vs. record ratio | Ended Plans total under 15 minutes                  |
+| Estimation mirror     | Ended Plans total under 30 minutes, or fewer than 3 |
+| Compass point         | Fewer than 5 fulfillment answers                    |
+| Length distribution   | Fewer than 3 Records                                |
+
+Averages are never shown. Dayopt speaks in medians and counts.
+
+## Drill into the detail
+
+Press a row or a point to open the detail panel — a bottom sheet on mobile.
+
+You get total recorded time, the gap against your Plans, the median length of one Record, the spread of fulfillment answers, the estimation mirror, the distribution of lengths, the distribution by hour, the week-by-week trend, and the individual Records. The week-by-week trend is the one thing mobile leaves out.
+
+Press one of those Records and Dayopt opens its day in day view with that Record selected. The detail rows are the only way down to the calendar.
+
+You cannot create or edit anything from the report. Fixing things is the calendar's job.
+
+## Why there are no scores or streaks
+
+The Review is not a report card. It shows numbers and facts and leaves the judgement to you. No scores, no streaks, no coverage rates, no goal bars, and no nudging.
+
+The only thing you are compared against is your own past.
+
+## Free and Pro
+
+On the Free plan you get the weekly Review with no limit on which metrics you can see. Pro adds monthly and yearly overviews and comparison with your past self.
+
+## Next steps
+
+1. **[Create Plans](/docs/plans)** — how to create and edit Plans
+2. **[Record your time](/docs/records)** — how to capture the time you actually spent
