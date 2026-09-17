@@ -1,4 +1,6 @@
+import { InitialCalendarDateProvider } from '@/lib/calendar-initial-date';
 import { fireEvent, render, screen } from '@testing-library/react';
+import { renderToString } from 'react-dom/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 let mockPathname = '/ja/calendar';
@@ -160,6 +162,7 @@ describe('CalendarNavigationProvider', () => {
   // （overview.md §6-9 #1）。
   it('resolves currentDate from ?date= on /report without touching view', () => {
     window.history.replaceState(null, '', '/ja/report?date=2026-04-01');
+    mockSearchParams = new URLSearchParams('date=2026-04-01');
     mockPathname = '/ja/report';
 
     render(
@@ -175,6 +178,7 @@ describe('CalendarNavigationProvider', () => {
   // /report の URL を書く。/calendar へタブが飛ばないことを固定する。
   it('writes /report URL (not /calendar) when navigating date while on the report tab', () => {
     window.history.replaceState(null, '', '/ja/report?date=2026-04-01');
+    mockSearchParams = new URLSearchParams('date=2026-04-01');
     mockPathname = '/ja/report';
 
     render(
@@ -337,5 +341,38 @@ describe('CalendarNavigationProvider', () => {
     // /report 自体は view を持たない概念だが、Provider 内部の viewType は
     // 「カレンダーへ戻る」リンクの組み立てに使われるため、reload 前の day を保持する
     expect(screen.getByTestId('view')).toHaveTextContent('day');
+  });
+});
+
+describe('CalendarNavigationProvider server initialization', () => {
+  it('uses request search params rather than browser location during the first render', () => {
+    mockPathname = '/ja/calendar';
+    mockSearchParams = new URLSearchParams('date=2026-04-22&view=3day');
+    window.history.replaceState(null, '', '/ja/calendar?date=2025-01-01&view=day');
+    const html = renderToString(
+      <InitialCalendarDateProvider dateKey="2026-09-17">
+        <CalendarNavigationProvider>
+          <TestConsumer />
+        </CalendarNavigationProvider>
+      </InitialCalendarDateProvider>,
+    );
+    expect(html).toContain('2026-04-22');
+    expect(html).toContain('3day');
+    expect(html).not.toContain('2025-01-01');
+  });
+  it('uses the supplied request day when date is absent and ignores stored view until hydration', () => {
+    mockPathname = '/ja/report';
+    mockSearchParams = new URLSearchParams();
+    window.localStorage.setItem('dayopt:last-calendar-view', 'day');
+    const html = renderToString(
+      <InitialCalendarDateProvider dateKey="2026-01-01">
+        <CalendarNavigationProvider>
+          <TestConsumer />
+        </CalendarNavigationProvider>
+      </InitialCalendarDateProvider>,
+    );
+    expect(html).toContain('2026-01-01');
+    expect(html).toContain('week');
+    window.localStorage.removeItem('dayopt:last-calendar-view');
   });
 });

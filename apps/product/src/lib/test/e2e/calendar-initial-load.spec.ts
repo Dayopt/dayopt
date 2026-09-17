@@ -30,7 +30,15 @@ assertServiceRoleSuiteRunnable(SERVICE_ROLE_TARGET, 'Calendar initial load hydra
 const describeWithEnv = SERVICE_ROLE_TARGET.safe ? test.describe : test.describe.skip;
 
 /** client の useCalendarData が表示範囲で撃つ procedure。server が先読みする対象と同じ */
-const RANGE_PROCEDURES = ['plans.list', 'records.list', 'externalCalendar.listEvents'] as const;
+const RANGE_PROCEDURES = [
+  'plans.list',
+  'records.list',
+  'externalCalendar.listEvents',
+  'userSettings.get',
+  'billing.getAccess',
+  'activities.listActivities',
+  'activities.listCategories',
+] as const;
 
 /** 水曜。日曜始まり + 週末非表示の週は 04-20(月)〜04-24(金) */
 const TARGET_DATE = '2026-04-22';
@@ -54,6 +62,7 @@ for (const { timezone, offset } of CASES) {
     let adminSupabase: SupabaseClient;
     let userId: string;
     let email: string;
+    let activityId: string;
 
     test.beforeAll(async () => {
       const user = await createScopedTestUser(SUPABASE_URL!, SUPABASE_SERVICE_KEY!, 'initial-load');
@@ -84,6 +93,7 @@ for (const { timezone, offset } of CASES) {
         .select('id')
         .single();
       if (activityError) throw new Error(activityError.message);
+      activityId = activity.id;
       const { error: planError } = await adminSupabase.from('plans').insert({
         user_id: userId,
         activity_id: activity.id,
@@ -120,6 +130,15 @@ for (const { timezone, offset } of CASES) {
       await page.waitForURL(/\/ja\/calendar/i, { timeout: 15_000 });
       await page.waitForLoadState('networkidle');
 
+      const hydrationErrors: string[] = [];
+      page.on('pageerror', (error) => {
+        if (/hydration|hydrating|#418|#425/i.test(error.message))
+          hydrationErrors.push(error.message);
+      });
+      page.on('console', (message) => {
+        if (message.type() === 'error' && /hydration|hydrating|#418|#425/i.test(message.text()))
+          hydrationErrors.push(message.text());
+      });
       // ここから数える。ログイン直後の「今日」の週とは別の範囲なので、先に温まった cache は使えない
       const rangeRequests: string[] = [];
       page.on('request', (request) => {
@@ -145,6 +164,37 @@ for (const { timezone, offset } of CASES) {
       await page.waitForLoadState('networkidle');
 
       expect(rangeRequests, '初回表示で範囲系 procedure を取り直していないこと').toEqual([]);
+      for (const route of [
+        `/ja/report?date=${TARGET_DATE}`,
+        '/ja/settings',
+        '/ja/calendar',
+        `/en/calendar?view=week&date=${TARGET_DATE}`,
+      ]) {
+        rangeRequests.length = 0;
+        await page.goto(route);
+        await expect(page.locator('main')).toBeVisible();
+        await page.waitForLoadState('networkidle');
+        expect(
+          rangeRequests.filter(
+            (name) => name === 'userSettings.get' || name === 'billing.getAccess',
+          ),
+          route,
+        ).toEqual([]);
+      }
+      // 保存済みの非表示設定も hydrate 後に復元され、SSR との差で警告を起こさない。
+      await page.evaluate((id) => {
+        localStorage.setItem(
+          'calendar-filter-storage',
+          JSON.stringify({
+            state: { visibleActivityIds: [], knownActivityIds: [id], initialized: true },
+            version: 9,
+          }),
+        );
+      }, activityId);
+      await page.reload();
+      await page.waitForLoadState('networkidle');
+      await expect(seededCard).toHaveCount(0);
+      expect(hydrationErrors).toEqual([]);
     });
   });
 }

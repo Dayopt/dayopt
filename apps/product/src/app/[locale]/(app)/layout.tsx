@@ -12,6 +12,10 @@
  * @see src/shell/providers.tsx - フルProviders定義
  * @see ./_overlays/GlobalOverlays.tsx - グローバルダイアログ群
  */
+import { InitialCalendarDateProvider } from '@/lib/calendar-initial-date';
+import { headers } from 'next/headers';
+import { prefetchAppShell, resolveInitialCalendarDate } from './_server/prefetch-app-shell';
+
 import type { Metadata } from 'next';
 
 import { IntlProvider } from '@/lib/i18n';
@@ -51,21 +55,27 @@ interface AppLayoutProps {
 }
 
 export default async function AppLayout({ children }: AppLayoutProps) {
+  const dehydratedState = await prefetchAppShell();
+  const requestHeaders = await headers();
+  const timezone = requestHeaders.get('x-user-timezone') ?? 'UTC';
+  const dateKey = resolveInitialCalendarDate(new Date(), timezone);
   return (
     <IntlProvider namespaces={APP_NAMESPACES}>
-      <Providers>
-        <BaseLayout>
-          {/*
-           * GlobalOverlays は children より先に置く。React は effect を tree 順に実行するため、
-           * 後ろに置くと page の mount effect が Toaster の購読より先に走る。sonner は購読前に
-           * publish された toast を再生しないので、初回ロード時に page 側で出した toast が
-           * そのまま失われる（Stripe Checkout や Google Calendar OAuth の復帰はフルロードなので
-           * 必ずこの経路に当たる）。Toaster は fixed、dialog は portal なので描画順に依存しない。
-           */}
-          <GlobalOverlays />
-          {children}
-        </BaseLayout>
-      </Providers>
+      <InitialCalendarDateProvider dateKey={dateKey}>
+        <Providers dehydratedState={dehydratedState}>
+          <BaseLayout>
+            {/*
+             * GlobalOverlays は children より先に置く。React は effect を tree 順に実行するため、
+             * 後ろに置くと page の mount effect が Toaster の購読より先に走る。sonner は購読前に
+             * publish された toast を再生しないので、初回ロード時に page 側で出した toast が
+             * そのまま失われる（Stripe Checkout や Google Calendar OAuth の復帰はフルロードなので
+             * 必ずこの経路に当たる）。Toaster は fixed、dialog は portal なので描画順に依存しない。
+             */}
+            <GlobalOverlays />
+            {children}
+          </BaseLayout>
+        </Providers>
+      </InitialCalendarDateProvider>
     </IntlProvider>
   );
 }
