@@ -450,26 +450,32 @@ GitHub native rule の管理者 bypass はこの check では防げない（bypa
 ### 新旧ゲートの切替計画と rollback（#2798）
 
 比較は `pnpm validation:shadow-report [--limit N] [--json]`（read-only。直近の非 draft PR について、
-旧経路で実際に走った job・runner 分・CI 秒、base policy で再計算した plan、controller が発行した
-`Validation (shadow)` / `Review policy (shadow)`、would-skip / would-add を 1 表にする。判定は人が
-行い、件数の少ない分類の p95 は出さない。Preview / review の待ち時間は未取得）。
+旧経路で実際に走った job（failure / cancelled 含む）・Vercel status・runner 分・CI 秒、**実行した
+checkout の policy で遡及評価**した plan（各 PR の base 時点の policy ではない。header に checkout
+SHA を出す）、controller が発行した `Validation (shadow)` / `Review policy (shadow)`、would-skip /
+would-add（Actions job と Vercel deployment の両方）を 1 表にする。取得できない runner 分は
+未取得、plan が indeterminate の行は比較を未判定とし、0 や削減可能に丸めない。判定は人が行い、
+件数の少ない分類の p95 は出さない。Preview / review の待ち時間は未取得）。
 
 **順序: shadow 観察 → 比較 → 承認付き切替 → 観察 → 整理。既存の必須条件を先に削らない。**
 
-| 段階 | 変更                                                                                                  | 戻し方                                 | 承認                       |
-| ---- | ----------------------------------------------------------------------------------------------------- | -------------------------------------- | -------------------------- |
-| 0    | shadow（現状）: `Validation (shadow)` / `Review policy (shadow)` / `🧱 DB Upgrade (shadow)` は非必須  | workflow を Disable                    | 不要（AUTONOMOUS）         |
-| 1    | 比較レポートで docs / ui / logic / api-db / ci-policy 別に正例・負例と保証の退行が無いことを確認      | -                                      | -                          |
-| 2    | ruleset に `Validation (shadow)` を **既存 required と併走で追加**（旧条件は残す）                    | ruleset から context を外す            | User（CHECKPOINT）         |
-| 3    | 観察後、旧 required のうち新条件が包含するものだけを外す（trusted source を保つ native check は残す） | 下の snapshot どおり required を再追加 | User（EXPLICIT AUTHORITY） |
-| 4    | `branch:finish` の rollup 検査と shadow の重複を整理                                                  | git revert                             | -                          |
+| 段階 | 変更                                                                                                  | 戻し方                                   | 承認                       |
+| ---- | ----------------------------------------------------------------------------------------------------- | ---------------------------------------- | -------------------------- |
+| 0    | shadow（現状）: `Validation (shadow)` / `Review policy (shadow)` / `🧱 DB Upgrade (shadow)` は非必須  | workflow を Disable                      | 不要（AUTONOMOUS）         |
+| 1    | 比較レポートで docs / ui / logic / api-db / ci-policy 別に正例・負例と保証の退行が無いことを確認      | -                                        | -                          |
+| 2    | ruleset に `Validation (shadow)` を **既存 required と併走で追加**（旧条件は残す）                    | ruleset から context を外す              | User（CHECKPOINT）         |
+| 3    | 観察後、旧 required のうち新条件が包含するものだけを外す（trusted source を保つ native check は残す） | その PUT 直前に保存した ruleset を再適用 | User（EXPLICIT AUTHORITY） |
+| 4    | `branch:finish` の rollup 検査と shadow の重複を整理                                                  | git revert                               | -                          |
 
-切替は `gh api -X PUT repos/Dayopt/dayopt/rulesets/6790553` で行い、直前・直後に ruleset と対象 PR の
-check を再取得して旧条件と新条件の証拠を比較する。全 gate 無効化や force 公開を復旧手段にしない。
+切替は `gh api -X PUT repos/Dayopt/dayopt/rulesets/6790553` で行い、**各 PUT の直前に
+`gh api repos/Dayopt/dayopt/rulesets/6790553` の完全な JSON をその操作固有の rollback 入力として
+保存してから**実行し、直後に ruleset と対象 PR の check を再取得して旧条件と新条件の証拠を比較する。
+rollback はその直前 snapshot を再適用する（下の固定値ではない。段階 3 までに別変更で required check が
+増えていれば、古い一覧の再適用は gate を弱める）。全 gate 無効化や force 公開を復旧手段にしない。
 名前だけ先に変えて永久 pending を作らない。
 
-切替前 snapshot（2026-09-17 UTC、`gh api repos/Dayopt/dayopt/rulesets/6790553`。rollback はこの
-required_status_checks を再適用する）:
+参考 snapshot（2026-09-17 UTC、`gh api repos/Dayopt/dayopt/rulesets/6790553`。監査用の参考値で、
+rollback 入力ではない）:
 
 ```json
 {
