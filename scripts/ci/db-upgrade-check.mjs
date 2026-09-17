@@ -7,8 +7,11 @@
  *
  * 1. upgrade: base（PR の merge 元）の migration 集合 + seed（合成データ）まで reset し、
  *    PR が追加した migration だけを `migration up --include-all` で当てる。適用エラー、
- *    seed 行の消失（既存データ保持）、fresh と upgraded の schema 不一致（`gen types` の差）を落とす
- * 2. old consumer: base 世代の生成型（`database.types.ts`）が参照する table / column / view /
+ *    seed 行の消失（既存データ保持）、fresh と upgraded の schema 不一致（`gen types` の差と
+ *    index / constraint / trigger の catalog の差）を落とす。追加分は timestamp に関わらず
+ *    reset から退避し、seed 済みの base に当てる経路だけを通す
+ * 2. old consumer: base 世代の生成型（`database.types.ts`）が参照する table / column（型・
+ *    nullability・Insert / Update の必須性）/ view /
  *    function / enum 値が upgraded DB から消えていれば「旧アプリ × 新 DB」の互換性が
  *    壊れる候補として落とす（expand → migrate → contract の contract 段は明示承認の対象）
  * 3. 適用済み migration の編集・削除は production が再実行しないため落とす
@@ -17,7 +20,15 @@
  * 接続先はローカル Docker の Supabase だけ（production / linked には触れない）。
  */
 import { execFileSync, spawnSync } from 'node:child_process';
-import { appendFileSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import {
+  appendFileSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  renameSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -32,7 +43,16 @@ export const DB_UPGRADE_JOB = '🧱 DB Upgrade (shadow)';
 /** `information_schema` の全 base table の行数（public / auth）。psql `-At -F,` で読む。 */
 export const COUNT_SQL = `select table_schema || '.' || table_name, (xpath('/row/c/text()', query_to_xml(format('select count(*) as c from %I.%I', table_schema, table_name), false, true, '')))[1]::text::int from information_schema.tables where table_schema in ('public', 'auth') and table_type = 'BASE TABLE' order by 1`;
 
-/** 生成型の public schema から契約（table → column、view、function、enum → 値）を抜く。 */
+/**
+ * public schema の index / constraint / trigger の catalog snapshot（生成型に現れない schema）。
+ * fresh と upgraded で同じ文字列になることを要求する。
+ */
+export const CATALOG_SQL = `select 'index:' || schemaname || '.' || indexname || ' ' || indexdef from pg_indexes where schemaname = 'public' union all select 'constraint:' || n.nspname || '.' || c.conrelid::regclass::text || '.' || c.conname || ' ' || pg_get_constraintdef(c.oid) from pg_constraint c join pg_namespace n on n.oid = c.connamespace where n.nspname = 'public' union all select 'trigger:' || t.tgrelid::regclass::text || '.' || t.tgname || ' ' || pg_get_triggerdef(t.oid) from pg_trigger t join pg_class r on r.oid = t.tgrelid join pg_namespace n on n.oid = r.relnamespace where n.nspname = 'public' and not t.tgisinternal order by 1`;
+
+/**
+ * 生成型の public schema から契約を抜く。table は Row の列 → 型、Insert / Update の列 →
+ * { type, optional }（旧アプリの読み書き契約）、view、function、enum → 値。
+ */
 export function extractSchemaContract(typesText) {
   const lines = typesText.split('\n');
   const start = lines.findIndex((line) => line === '  public: {');
@@ -40,7 +60,8 @@ export function extractSchemaContract(typesText) {
   const contract = { tables: new Map(), views: new Set(), functions: new Set(), enums: new Map() };
   let section = null;
   let entity = null;
-  let inRow = false;
+  /** @type {'Row' | 'Insert' | 'Update' | null} */
+  let block = null;
   for (let i = start + 1; i < lines.length; i += 1) {
     const line = lines[i];
     if (line === '  };') break;
@@ -48,7 +69,7 @@ export function extractSchemaContract(typesText) {
     if (sectionMatch) {
       section = sectionMatch[1];
       entity = null;
-      inRow = false;
+      block = null;
       continue;
     }
     if (!section) continue;
@@ -56,9 +77,16 @@ export function extractSchemaContract(typesText) {
     const entityMatch = line.match(/^ {6}(\w+):(?: (?:\{|'|")|\s*$)/);
     if (entityMatch && !/^\s*\[_ in never\]/.test(line)) {
       entity = entityMatch[1];
-      inRow = false;
+      block = null;
       if (section === 'Tables')
-        contract.tables.set(entity, contract.tables.get(entity) ?? new Set());
+        contract.tables.set(
+          entity,
+          contract.tables.get(entity) ?? {
+            columns: new Map(),
+            insert: new Map(),
+            update: new Map(),
+          },
+        );
       if (section === 'Views') contract.views.add(entity);
       if (section === 'Functions') contract.functions.add(entity);
       if (section === 'Enums') {
@@ -74,31 +102,76 @@ export function extractSchemaContract(typesText) {
       continue;
     }
     if (section === 'Tables' && entity) {
-      if (/^ {8}Row: \{$/.test(line)) {
-        inRow = true;
+      const blockMatch = line.match(/^ {8}(Row|Insert|Update): \{$/);
+      if (blockMatch) {
+        block = /** @type {'Row' | 'Insert' | 'Update'} */ (blockMatch[1]);
         continue;
       }
-      if (inRow && /^ {8}\};$/.test(line)) {
-        inRow = false;
+      if (block && /^ {8}\};$/.test(line)) {
+        block = null;
         continue;
       }
-      const column = inRow && line.match(/^ {10}(\w+)\??: /);
-      if (column) contract.tables.get(entity).add(column[1]);
+      // 型は行末の `;` まで（複数行 union は生成型の Row / Insert / Update には現れない）
+      const column = block && line.match(/^ {10}(\w+)(\?)?: (.+);$/);
+      if (column) {
+        const table = contract.tables.get(entity);
+        if (block === 'Row') table.columns.set(column[1], column[3]);
+        else
+          table[block === 'Insert' ? 'insert' : 'update'].set(column[1], {
+            type: column[3],
+            optional: column[2] === '?',
+          });
+      }
     }
   }
   return contract;
 }
 
-/** base 契約に対して candidate で消えたもの（narrowing）。追加は互換なので数えない。 */
+/**
+ * base 契約に対して candidate で消えた・変わったもの（narrowing）。object の追加は互換なので
+ * 数えないが、Insert に **必須**の列が増えるのは旧アプリの insert を壊すので数える。
+ * Row の型変更（`text` → `integer`、nullable 化）は旧アプリの読み取りを、Insert / Update の
+ * 型変更と optional → required は旧アプリの書き込みを壊し得るので、どちらも narrowing。
+ */
 export function compareSchemaContracts(base, candidate) {
-  const removed = { tables: [], columns: [], views: [], functions: [], enumValues: [] };
-  for (const [table, columns] of base.tables) {
+  const removed = {
+    tables: [],
+    columns: [],
+    columnTypes: [],
+    writeContracts: [],
+    views: [],
+    functions: [],
+    enumValues: [],
+  };
+  for (const [table, contract] of base.tables) {
     const next = candidate.tables.get(table);
     if (!next) {
       removed.tables.push(table);
       continue;
     }
-    for (const column of columns) if (!next.has(column)) removed.columns.push(`${table}.${column}`);
+    for (const [column, type] of contract.columns) {
+      const nextType = next.columns.get(column);
+      if (nextType === undefined) removed.columns.push(`${table}.${column}`);
+      else if (nextType !== type)
+        removed.columnTypes.push(`${table}.${column}: ${type} → ${nextType}`);
+    }
+    for (const kind of /** @type {const} */ (['insert', 'update'])) {
+      for (const [column, spec] of contract[kind]) {
+        const nextSpec = next[kind].get(column);
+        if (!nextSpec) continue; // 列の消失は columns 側で数える
+        if (nextSpec.type !== spec.type)
+          removed.writeContracts.push(
+            `${table}.${column} (${kind}): ${spec.type} → ${nextSpec.type}`,
+          );
+        else if (spec.optional && !nextSpec.optional)
+          removed.writeContracts.push(`${table}.${column} (${kind}): optional → required`);
+      }
+    }
+    for (const [column, spec] of next.insert)
+      if (!contract.insert.has(column) && !spec.optional)
+        removed.writeContracts.push(
+          `${table}.${column} (insert): new required column (old writers omit it)`,
+        );
   }
   for (const view of base.views) if (!candidate.views.has(view)) removed.views.push(view);
   for (const fn of base.functions) if (!candidate.functions.has(fn)) removed.functions.push(fn);
@@ -190,7 +263,28 @@ const PSQL = [
 ];
 
 /**
+ * PR が追加した migration を一時的に `supabase/migrations` から退避して fn を実行し、必ず戻す。
+ * `db reset --version` は現在の checkout にある version 以下のファイルを全部当てるので、base の
+ * 最新より古い timestamp の追加 migration が seed より前（= 既存データの無い経路）に混ざる。
+ * 退避すれば reset は base の集合 + seed だけになり、追加分は後の `migration up` で当たる。
+ */
+function withAddedMigrationsStashed(added, { moveFile, makeTempDir }, fn) {
+  const stash = makeTempDir();
+  const moved = [];
+  try {
+    for (const name of added) {
+      moveFile(resolve(ROOT, MIGRATIONS_DIR, name), resolve(stash, name));
+      moved.push(name);
+    }
+    return fn();
+  } finally {
+    for (const name of moved) moveFile(resolve(stash, name), resolve(ROOT, MIGRATIONS_DIR, name));
+  }
+}
+
+/**
  * @param {{ exec?: typeof defaultExec, readFile?: (path: string) => string, listMigrations?: () => string[],
+ *   moveFile?: (from: string, to: string) => void, makeTempDir?: () => string,
  *   log?: (text: string) => void, summaryPath?: string | null, resultPath?: string | null }} deps
  */
 export function runDbUpgradeCheck({
@@ -198,6 +292,8 @@ export function runDbUpgradeCheck({
   readFile = (path) => readFileSync(resolve(ROOT, path), 'utf8'),
   listMigrations = () =>
     readdirSync(resolve(ROOT, MIGRATIONS_DIR)).filter((name) => MIGRATION_FILE.test(name)),
+  moveFile = renameSync,
+  makeTempDir = () => mkdtempSync(resolve(tmpdir(), 'db-upgrade-added-')),
   log = (text) => console.log(text),
   summaryPath = process.env.GITHUB_STEP_SUMMARY ?? null,
   resultPath = process.env.DB_UPGRADE_RESULT_PATH ?? null,
@@ -271,10 +367,11 @@ export function runDbUpgradeCheck({
     return finish();
   }
   try {
-    // 1. base の migration 集合 + seed まで戻す（reset は config の seed を適用する）
-    exec('supabase', ['db', 'reset', '--local', '--version', plan.baseVersion], {
-      stdio: ['ignore', 'pipe', 'pipe'],
-    });
+    // 1. base の migration 集合 + seed まで戻す（reset は config の seed を適用する）。追加分は
+    //    timestamp に関わらず退避し、production と同じ「既存データに当てる」経路だけを通す
+    withAddedMigrationsStashed(plan.added, { moveFile, makeTempDir }, () =>
+      exec('supabase', ['db', 'reset', '--local'], { stdio: ['ignore', 'pipe', 'pipe'] }),
+    );
     const before = parseCounts(exec('psql', [...PSQL, '-At', '-F,', '-c', COUNT_SQL]));
     // 2. candidate の migration だけを当てる（version 順に依存せず未適用を全部）
     exec('supabase', ['migration', 'up', '--local', '--include-all'], {
@@ -317,7 +414,24 @@ export function runDbUpgradeCheck({
       );
     } else
       result.checks.oldConsumer =
-        'every table / column / view / function / enum value used by the base types still exists';
+        'every table / column (type and nullability) / view / function / enum value used by the base types still exists';
+    // 7. 生成型に現れない schema（index / constraint / trigger）も fresh と一致する。既存行の有無で
+    //    分岐する migration は fresh と upgraded で違う catalog を作り得るので、ここで fresh を
+    //    作り直して catalog を比較する（追加分は戻してあるので reset = candidate 全部）
+    const upgradedCatalog = exec('psql', [...PSQL, '-At', '-c', CATALOG_SQL]);
+    exec('supabase', ['db', 'reset', '--local'], { stdio: ['ignore', 'pipe', 'pipe'] });
+    const freshCatalog = exec('psql', [...PSQL, '-At', '-c', CATALOG_SQL]);
+    if (upgradedCatalog !== freshCatalog) {
+      const upgradedSet = new Set(upgradedCatalog.split('\n'));
+      const freshSet = new Set(freshCatalog.split('\n'));
+      const onlyUpgraded = [...upgradedSet].filter((line) => line && !freshSet.has(line));
+      const onlyFresh = [...freshSet].filter((line) => line && !upgradedSet.has(line));
+      result.problems.push(
+        `upgraded catalog differs from the fresh catalog (only after upgrade: ${onlyUpgraded.join(' | ') || 'none'}; only in fresh: ${onlyFresh.join(' | ') || 'none'})`,
+      );
+    } else
+      result.checks.catalogEquivalence =
+        'indexes / constraints / triggers identical to the fresh database';
   } catch (error) {
     result.problems.push(error instanceof Error ? error.message : 'upgrade check failed');
   }

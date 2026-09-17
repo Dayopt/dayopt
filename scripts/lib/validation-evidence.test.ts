@@ -339,6 +339,28 @@ describe('validation evidence: rejected evidence', () => {
       expect(provisioning.suites.productPreview.status).toBe('pending');
     });
 
+    it('ignores a same-named check from another app and keeps the real skipped verdict', () => {
+      const impostor = {
+        ...supabasePreview('success'),
+        id: 104781444999,
+        appSlug: 'another-app',
+      };
+      const result = evaluateValidation({
+        plan: plan([MIGRATION]),
+        evidence: evidence({
+          workflowRuns: [dbUpgradeRun('success')],
+          checkRuns: [supabasePreview('skipped'), impostor],
+        }),
+      });
+      expect(result.suites.productPreview.status).toBe('failed');
+      expect(result.suites.productPreview.reason).toMatch(/no isolated database/);
+      const onlyImpostor = evaluateValidation({
+        plan: plan([MIGRATION]),
+        evidence: evidence({ workflowRuns: [dbUpgradeRun('success')], checkRuns: [impostor] }),
+      });
+      expect(onlyImpostor.suites.productPreview.status).toBe('missing');
+    });
+
     it('does not demand a Supabase branch for app-only changes', () => {
       const result = evaluateValidation({
         plan: plan([APP_FILE]),

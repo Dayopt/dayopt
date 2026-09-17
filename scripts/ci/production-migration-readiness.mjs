@@ -30,13 +30,20 @@ export function expectedMigrationVersions(root = ROOT) {
     .sort();
 }
 
+/** Supabase integration の非同期反映を待つ上限（bounded）。超えたら missing のまま止める。 */
+export const READINESS_ATTEMPTS = 6;
+export const READINESS_INTERVAL_MS = 30_000;
+
 /**
- * @returns {Promise<{ status: 'verified' | 'missing' | 'unverified', missing: string[], detail: string }>}
+ * @returns {Promise<{ status: 'verified' | 'missing' | 'unverified', missing: string[], detail: string, attempts: number }>}
  */
 export async function checkMigrationReadiness({
   token = process.env.SUPABASE_MIGRATION_READINESS_TOKEN,
   query = runReadOnlyQuery,
   root = ROOT,
+  attempts = READINESS_ATTEMPTS,
+  sleep = (ms) => new Promise((done) => setTimeout(done, ms)),
+  intervalMs = READINESS_INTERVAL_MS,
 } = {}) {
   const expected = expectedMigrationVersions(root);
   if (expected.length === 0) throw new Error('Repository migration list is empty');
@@ -44,24 +51,32 @@ export async function checkMigrationReadiness({
     return {
       status: 'unverified',
       missing: [],
+      attempts: 0,
       detail:
         'SUPABASE_MIGRATION_READINESS_TOKEN is not available in this environment; migration state was not verified',
     };
-  const rows = await query(
-    'SELECT version FROM supabase_migrations.schema_migrations ORDER BY version',
-    { token },
-  );
-  const { missing } = compareMigrationVersions(expected, rows);
-  if (missing.length)
-    return {
-      status: 'missing',
-      missing,
-      detail: `Production has not applied: ${missing.join(', ')}`,
-    };
+  let missing = [];
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    const rows = await query(
+      'SELECT version FROM supabase_migrations.schema_migrations ORDER BY version',
+      { token },
+    );
+    missing = compareMigrationVersions(expected, rows).missing;
+    if (missing.length === 0)
+      return {
+        status: 'verified',
+        missing: [],
+        attempts: attempt,
+        detail: `${expected.length} migration version(s) present in production`,
+      };
+    // 読むだけ。integration の非同期反映を bounded に待ち、適用・再試行はしない
+    if (attempt < attempts) await sleep(intervalMs);
+  }
   return {
-    status: 'verified',
-    missing: [],
-    detail: `${expected.length} migration version(s) present in production`,
+    status: 'missing',
+    missing,
+    attempts,
+    detail: `Production has not applied after ${attempts} attempt(s): ${missing.join(', ')}`,
   };
 }
 

@@ -95,6 +95,8 @@ export const PRODUCERS = Object.freeze({
 
 /** Supabase GitHub integration の check run 名。branch が作られた PR だけ success になる。 */
 export const SUPABASE_PREVIEW_CHECK = 'Supabase Preview';
+/** 公式 Supabase GitHub App の slug（app id 330661）。check 名は App 間で一意ではないので発行元も照合する。 */
+export const SUPABASE_APP_SLUG = 'supabase';
 
 const SHA = /^[a-f0-9]{40}$/;
 const SUCCESS = 'success';
@@ -213,12 +215,18 @@ function latestDeployment(deployments, { headSha, environment }) {
 /**
  * DB を触る変更の product Preview は、隔離された PR 用 Supabase branch に接続していることを
  * 要求する。Supabase integration は migration を含む PR でだけ branch を作り、その時
- * `Supabase Preview` check run が success になる（skipped = branch 無し）。branch が無い
+ * `Supabase Preview` check run が success になる（skipped = branch 無し）。発行元 App も照合する
+ * （別の installed App が同名の check を作っても受理しない）。branch が無い
  * Preview は shared / 不明な DB を指すので、DB 変更の検証環境として受理しない。
  */
 function evaluateDatabaseIsolation(evidence, plan) {
   const check = (evidence.checkRuns ?? [])
-    .filter((run) => run.name === SUPABASE_PREVIEW_CHECK && run.headSha === evidence.headSha)
+    .filter(
+      (run) =>
+        run.name === SUPABASE_PREVIEW_CHECK &&
+        run.appSlug === SUPABASE_APP_SLUG &&
+        run.headSha === evidence.headSha,
+    )
     .reduce((latest, run) => (!latest || run.id > latest.id ? run : latest), null);
   const needed = plan?.environments?.databaseTests !== 'not-applicable';
   if (!needed)

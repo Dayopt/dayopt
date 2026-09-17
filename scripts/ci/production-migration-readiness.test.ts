@@ -40,11 +40,17 @@ describe('production migration readiness', () => {
     expect(result.status).toBe('verified');
   });
 
-  it('reports missing versions instead of applying them', async () => {
+  it('reports missing versions after a bounded wait instead of applying them', async () => {
     const calls: string[] = [];
+    const sleeps: number[] = [];
     const result = await checkMigrationReadiness({
       token: 't',
       root,
+      attempts: 3,
+      intervalMs: 5,
+      sleep: async (ms: number) => {
+        sleeps.push(ms);
+      },
       query: async (sql: string) => {
         calls.push(sql);
         return [{ version: '00000000000000' }, { version: '20260916010000' }];
@@ -52,8 +58,32 @@ describe('production migration readiness', () => {
     });
     expect(result.status).toBe('missing');
     expect(result.missing).toEqual(['20260917000000']);
-    expect(calls).toHaveLength(1);
+    expect(result.attempts).toBe(3);
+    expect(calls).toHaveLength(3);
+    expect(sleeps).toEqual([5, 5]);
     expect(calls[0]).toMatch(/^SELECT version FROM supabase_migrations\.schema_migrations/);
+  });
+
+  it('verifies as soon as the asynchronous integration catches up', async () => {
+    let reads = 0;
+    const result = await checkMigrationReadiness({
+      token: 't',
+      root,
+      attempts: 4,
+      sleep: async () => {},
+      query: async () => {
+        reads += 1;
+        return reads < 2
+          ? [{ version: '00000000000000' }]
+          : [
+              { version: '00000000000000' },
+              { version: '20260916010000' },
+              { version: '20260917000000' },
+            ];
+      },
+    });
+    expect(result.status).toBe('verified');
+    expect(result.attempts).toBe(2);
   });
 
   it('is advisory (unverified, no query) while the token is absent', async () => {

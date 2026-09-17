@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import {
+  CATALOG_SQL,
   COUNT_SQL,
   TYPES_PATH,
   compareCounts,
@@ -82,7 +83,19 @@ describe('schema contract extraction', () => {
   it('reads tables, columns, views, functions and enum values from the public schema only', () => {
     const contract = extractSchemaContract(typesFixture());
     expect([...contract.tables.keys()]).toEqual(['activities', 'categories']);
-    expect([...contract.tables.get('activities')!]).toEqual(['archived_at', 'id', 'name']);
+    expect([...contract.tables.get('activities')!.columns]).toEqual([
+      ['archived_at', 'string | null'],
+      ['id', 'string'],
+      ['name', 'string'],
+    ]);
+    expect(contract.tables.get('activities')!.insert.get('name')).toEqual({
+      type: 'string',
+      optional: false,
+    });
+    expect(contract.tables.get('activities')!.insert.get('id')).toEqual({
+      type: 'string',
+      optional: true,
+    });
     expect([...contract.views]).toEqual(['activity_stats_v1']);
     expect([...contract.functions]).toEqual([
       'abandon_billing_customer_provisioning_v1',
@@ -96,9 +109,17 @@ describe('schema contract extraction', () => {
     const contract = extractSchemaContract(REAL_TYPES);
     expect(contract.tables.size).toBeGreaterThan(10);
     expect(contract.functions.size).toBeGreaterThan(10);
-    expect(contract.tables.get('activities')).toEqual(
-      new Set(['archived_at', 'category_id', 'created_at', 'id', 'name', 'updated_at', 'user_id']),
-    );
+    expect([...contract.tables.get('activities')!.columns.keys()]).toEqual([
+      'archived_at',
+      'category_id',
+      'created_at',
+      'id',
+      'name',
+      'updated_at',
+      'user_id',
+    ]);
+    expect(contract.tables.get('activities')!.columns.get('user_id')).toBe('string');
+    expect(contract.tables.get('activities')!.update.get('name')?.optional).toBe(true);
   });
 
   it('reports removed objects as narrowing and ignores additions', () => {
@@ -126,6 +147,53 @@ describe('schema contract extraction', () => {
       typesFixture().replace("record_kind: 'plan' | 'record';", "record_kind: 'plan';"),
     );
     expect(compareSchemaContracts(base, noEnum).removed.enumValues).toEqual(['record_kind.record']);
+  });
+
+  it('treats type, nullability and write-contract changes as narrowing (old consumer)', () => {
+    const base = extractSchemaContract(typesFixture());
+    const retyped = extractSchemaContract(
+      typesFixture().replace(
+        '          name: string;\n        };\n        Insert',
+        '          name: number;\n        };\n        Insert',
+      ),
+    );
+    expect(compareSchemaContracts(base, retyped).removed.columnTypes).toEqual([
+      'activities.name: string → number',
+    ]);
+    const nullable = extractSchemaContract(
+      typesFixture().replace(
+        '          id: string;\n          name: string;',
+        '          id: string;\n          name: string | null;',
+      ),
+    );
+    expect(compareSchemaContracts(base, nullable).removed.columnTypes).toEqual([
+      'activities.name: string → string | null',
+    ]);
+    const requiredInsert = extractSchemaContract(
+      typesFixture().replace(
+        '          id?: string;\n          name: string;',
+        '          id: string;\n          name: string;',
+      ),
+    );
+    expect(compareSchemaContracts(base, requiredInsert).removed.writeContracts).toEqual([
+      'activities.id (insert): optional → required',
+    ]);
+    const newRequired = extractSchemaContract(
+      typesFixture().replace(
+        '          color: string;\n        };\n        Relationships',
+        '          color: string;\n          owner_id: string;\n        };\n        Relationships',
+      ),
+    );
+    expect(compareSchemaContracts(base, newRequired).removed.writeContracts).toEqual([
+      'categories.owner_id (insert): new required column (old writers omit it)',
+    ]);
+    const optionalAdded = extractSchemaContract(
+      typesFixture().replace(
+        '          color: string;\n        };\n        Relationships',
+        '          color: string;\n          owner_id?: string | null;\n        };\n        Relationships',
+      ),
+    );
+    expect(compareSchemaContracts(base, optionalAdded).narrowing).toBe(false);
   });
 });
 
@@ -205,8 +273,13 @@ describe('runDbUpgradeCheck orchestration', () => {
     baseTypes = typesFixture(),
     changed = 'A\tsupabase/migrations/20260917000000_b.sql\n',
     migrationUpFails = false,
+    resetFails = false,
+    freshCatalog = 'index:public.activities_pkey CREATE UNIQUE INDEX ...\n',
   } = {}) {
     const calls: Call[] = [];
+    const moves: [string, string][] = [];
+    const resets: string[][] = [];
+    const inMigrationsDir = new Set(candidateMigrations);
     const exec = (file: string, args: string[]) => {
       calls.push([file, args]);
       const joined = `${file} ${args.join(' ')}`;
@@ -216,14 +289,23 @@ describe('runDbUpgradeCheck orchestration', () => {
         return 'supabase/migrations/00000000000000_baseline.sql\nsupabase/migrations/20260901000000_a.sql\n';
       if (joined.startsWith('git diff --name-status')) return changed;
       if (joined.startsWith('git show')) return baseTypes;
-      if (joined.startsWith('supabase db reset')) return '';
+      if (joined.startsWith('supabase db reset')) {
+        // reset は `supabase/migrations` に **今ある** ファイルを全部当てる
+        resets.push([...inMigrationsDir].sort());
+        if (resetFails) throw new Error('supabase db reset failed (exit 1): seed error');
+        return '';
+      }
       if (joined.startsWith('supabase migration up')) {
         if (migrationUpFails)
           throw new Error('supabase migration up failed (exit 1): ERROR: column exists');
         return '';
       }
+      if (joined.startsWith('psql') && args.includes(CATALOG_SQL))
+        return resets.length >= 2
+          ? freshCatalog
+          : 'index:public.activities_pkey CREATE UNIQUE INDEX ...\n';
       if (joined.startsWith('psql'))
-        return calls.filter(([f]) => f === 'psql').length === 1
+        return calls.filter(([f, a]) => f === 'psql' && !a.includes(CATALOG_SQL)).length === 1
           ? 'public.activities,3\nauth.users,1\n'
           : countsAfter;
       if (joined.startsWith('pnpm rls:snapshot:check')) return '';
@@ -235,20 +317,32 @@ describe('runDbUpgradeCheck orchestration', () => {
       exec,
       readFile: () => freshTypes,
       listMigrations: () => candidateMigrations,
+      moveFile: (from, to) => {
+        moves.push([from, to]);
+        const name = from.split('/').at(-1)!;
+        if (from.includes('/supabase/migrations/')) inMigrationsDir.delete(name);
+        else inMigrationsDir.add(name);
+      },
+      makeTempDir: () => '/tmp/stash',
       log: () => {},
       summaryPath: null,
       resultPath: null,
     });
-    return { result, calls };
+    return { result, calls, moves, resets, inMigrationsDir };
   }
 
-  it('resets to the base version with seed, applies only added migrations and passes', () => {
-    const { result, calls } = harness();
+  it('resets to the base set with seed (added migrations stashed), applies only added migrations and passes', () => {
+    const { result, calls, resets, inMigrationsDir } = harness();
     expect(result.status).toBe('pass');
-    expect(calls).toContainEqual([
-      'supabase',
-      ['db', 'reset', '--local', '--version', '20260901000000'],
+    expect(calls).toContainEqual(['supabase', ['db', 'reset', '--local']]);
+    // 1 回目の reset は base の集合だけ、2 回目（fresh 比較）は candidate 全部
+    expect(resets[0]).toEqual(['00000000000000_baseline.sql', '20260901000000_a.sql']);
+    expect(resets[1]).toEqual([
+      '00000000000000_baseline.sql',
+      '20260901000000_a.sql',
+      '20260917000000_b.sql',
     ]);
+    expect(inMigrationsDir.has('20260917000000_b.sql')).toBe(true);
     expect(calls).toContainEqual(['supabase', ['migration', 'up', '--local', '--include-all']]);
     expect(Object.keys(result.checks)).toEqual([
       'upgrade',
@@ -256,7 +350,39 @@ describe('runDbUpgradeCheck orchestration', () => {
       'rlsSnapshot',
       'freshEquivalence',
       'oldConsumer',
+      'catalogEquivalence',
     ]);
+  });
+
+  it('stashes an added migration with an older timestamp so the base reset cannot apply it before seed', () => {
+    const { resets, inMigrationsDir } = harness({
+      candidateMigrations: [
+        '00000000000000_baseline.sql',
+        '20260816000000_backfill.sql',
+        '20260901000000_a.sql',
+      ],
+      changed: 'A\tsupabase/migrations/20260816000000_backfill.sql\n',
+    });
+    expect(resets[0]).toEqual(['00000000000000_baseline.sql', '20260901000000_a.sql']);
+    expect(inMigrationsDir.has('20260816000000_backfill.sql')).toBe(true);
+  });
+
+  it('restores stashed migrations even when the reset fails', () => {
+    const { result, inMigrationsDir } = harness({ resetFails: true });
+    expect(result.status).toBe('fail');
+    expect(result.problems[0]).toMatch(/db reset failed/);
+    expect(inMigrationsDir.has('20260917000000_b.sql')).toBe(true);
+  });
+
+  it('fails when indexes / constraints / triggers differ between upgraded and fresh', () => {
+    const { result } = harness({
+      freshCatalog:
+        'index:public.activities_pkey CREATE UNIQUE INDEX ...\nindex:public.plans_user_idx CREATE INDEX ...\n',
+    });
+    expect(result.status).toBe('fail');
+    expect(result.problems[0]).toMatch(
+      /upgraded catalog differs from the fresh catalog \(only after upgrade: none; only in fresh: index:public.plans_user_idx/,
+    );
   });
 
   it('skips without touching the database when no migration is added', () => {

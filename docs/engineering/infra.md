@@ -404,18 +404,22 @@ pending（strict up-to-date の ruleset と同じ向き）。
 DB / Preview の証拠（#2797）: `dbFresh` は `🧪 Integration Tests`（candidate の migration 集合を
 空 DB へ適用）、`dbUpgrade` / `oldConsumer` は `🧱 DB Upgrade (shadow)`（base の migration 集合 +
 seed まで reset し、PR が追加した migration だけを当てて、適用エラー・seed 行の消失・fresh との
-schema 不一致・base 世代の生成型が参照するオブジェクトの消失を別々に検出する。
-`scripts/ci/db-upgrade-check.mjs`。migration を追加した PR だけ走り、非必須）。fresh 成功を
+schema 不一致（生成型と、index / constraint / trigger の catalog snapshot の両方）・base 世代の
+生成型が参照するオブジェクトの消失や契約変更（列の型・nullability、Insert / Update の型と
+optional → required、Insert の新規必須列）を別々に検出する。`scripts/ci/db-upgrade-check.mjs`。
+migration を追加した PR だけ走り、非必須）。追加分は timestamp に関わらず reset から退避するので、
+base の最新より古い timestamp の migration も seed 済みの base に当たる。fresh 成功を
 upgrade 成功の代用にしない。適用済み migration の編集・削除は production が再実行しないので
-落とす。schema 変更を含む PR の `Preview – product` は、同じ SHA の `Supabase Preview` check run が
-success（隔離された PR 用 branch）であることも要求し、skipped（branch 無し = shared / 不明な
-DB）は受理しない。app-only の PR には branch を要求しない（integration は migration を含む PR
+落とす。schema 変更を含む PR の `Preview – product` は、同じ SHA の `Supabase Preview` check run
+（発行元が公式 Supabase App `supabase` のもの）が success（隔離された PR 用 branch）であることも
+要求し、skipped（branch 無し = shared / 不明な DB）や別 App の同名 check は受理しない。app-only の PR には branch を要求しない（integration は migration を含む PR
 でだけ branch を作る）。
 
 公開前の migration 反映確認: promote.yml の release job が
 `scripts/ci/production-migration-readiness.mjs` で候補 SHA の migration 集合が production の
-`schema_migrations` に全て入っているかを read-only Management API で見る（適用・再試行はしない。
-writer は Supabase integration のまま）。**現状は token を渡しておらず常に advisory（warning）。**
+`schema_migrations` に全て入っているかを read-only Management API で見る（integration の非同期
+反映を最大 6 回 × 30 秒だけ待つ。適用・再試行はしない。writer は Supabase integration のまま）。
+**現状は token を渡しておらず常に advisory（warning）。**
 有効化は別変更で、read-only token を `production-release` environment へ置く決定（secret の
 境界変更、User 裁可）と台帳（`docs/operations/secrets.md`）・同期 script・
 `ci-secret-ledger.test.ts` の同時更新を伴う。有効化後は欠落が promote を止める（force では飛ばす）。
