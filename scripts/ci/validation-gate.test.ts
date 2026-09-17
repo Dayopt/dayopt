@@ -13,6 +13,7 @@ import {
   fetchAllReviewPages,
   resolveTarget,
   runValidationGate,
+  toStatusDescription,
 } from './validation-gate.mjs';
 
 const REPO = 'Dayopt/dayopt';
@@ -1072,5 +1073,40 @@ describe('ancestor Preview evidence (#2807)', () => {
         },
       ),
     ).toEqual([]);
+  });
+});
+
+describe('commit status description', () => {
+  // GitHub の commit status API は description に 4-byte Unicode を受け付けず 422 を返す。
+  // required job 名は emoji 始まりなので、blocked / failed の理由をそのまま渡すと gate が
+  // 判定を出せずに job ごと落ちる（#2814、PR #2813 で実発生）
+  const astral = (text: string) => [...text].some((char) => (char.codePointAt(0) ?? 0) > 0xffff);
+
+  it.each([
+    '🧪 Integration Tests was skipped although the plan requires it',
+    '🔍 Static Checks concluded failure',
+    '📦 Unit Tests is queued',
+    '🧱 DB Upgrade (shadow) was skipped although the plan requires it',
+  ])('drops 4-byte Unicode from %s', (reason) => {
+    const description = toStatusDescription(`blocked: integration: ${reason}`);
+    expect(astral(description)).toBe(false);
+    expect(description).toContain('blocked: integration:');
+    expect(description).toContain(reason.replace(/^\S+\s/, ''));
+  });
+
+  it('truncates after dropping, so no surrogate half survives the 140 char limit', () => {
+    const description = toStatusDescription(`${'a'.repeat(139)}🧪${'b'.repeat(40)}`);
+    expect(description).toHaveLength(140);
+    expect(astral(description)).toBe(false);
+    expect(description.endsWith('ab')).toBe(true);
+  });
+
+  it('keeps BMP text and collapses the whitespace left behind', () => {
+    expect(toStatusDescription('  pass:   all suites  satisfied ')).toBe(
+      'pass: all suites satisfied',
+    );
+    expect(toStatusDescription('indeterminate: Unresolved input: PR context unavailable')).toBe(
+      'indeterminate: Unresolved input: PR context unavailable',
+    );
   });
 });

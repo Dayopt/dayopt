@@ -17,8 +17,6 @@ import type Stripe from 'stripe';
 
 export const maxDuration = 30;
 
-import { Resend } from 'resend';
-
 import { CancellationConfirmEmail } from '@/emails/CancellationConfirmEmail';
 import { createEmailTranslator, type EmailLocale } from '@/emails/i18n';
 import { PaymentFailedEmail } from '@/emails/PaymentFailedEmail';
@@ -35,6 +33,7 @@ import {
 import { trackBillingEvent } from '@/lib/analytics/billing-events';
 import { trackProductEvent } from '@/lib/analytics/product-events';
 import { getAppUrl } from '@/lib/app-url';
+import { sendTransactionalEmail as deliverTransactionalEmail } from '@/lib/email/send';
 import { logger } from '@/lib/logger';
 import { isWriteFenceEnabled } from '@/lib/ops/write-fence';
 import {
@@ -57,7 +56,6 @@ import { parseStripeWebhookIdentity, verifyStripeWebhookIdentity } from './strip
 
 // ─── トランザクションメール送信 ─────────────────────────
 
-const FROM_EMAIL = env.RESEND_FROM_EMAIL || 'onboarding@resend.dev';
 const APP_URL = getAppUrl();
 
 function captureStripeWebhookFailure(
@@ -163,6 +161,11 @@ async function getUserByCustomerId(
 /**
  * トランザクションメール送信（fire-and-forget）
  * メール送信失敗は webhook 処理をブロックしない
+ *
+ * 送信そのものは `@/lib/email/send` が持つ。#2789 まではここで Resend を直接叩いており、
+ * bounce / complaint 済みアドレスへ課金メールを送り続けていた。suppression は共通経路側で
+ * 判定するので、ここは結果を Sentry へ翻訳するだけ。**throw しない**（webhook は 200 を
+ * 返し続ける。ここで 500 を返すと Stripe が retry し、課金状態の同期が不安定になる）。
  */
 async function sendTransactionalEmail(
   to: string,
@@ -171,20 +174,26 @@ async function sendTransactionalEmail(
   operation: string,
 ): Promise<void> {
   try {
-    const resend = new Resend(env.RESEND_API_KEY);
-    const { error } = await resend.emails.send({
-      from: `Dayopt <${FROM_EMAIL}>`,
-      to,
-      subject,
-      react,
-    });
+    const result = await deliverTransactionalEmail({ to, subject, react, context: operation });
 
-    if (error) {
+    if (result.status === 'failed') {
       logger.error('Transactional email delivery failed');
-      captureStripeWebhookFailure(error, operation);
-    } else {
-      logger.info('Transactional email sent', { operation });
+      captureStripeWebhookFailure(result.error, operation);
+      return;
     }
+
+    if (result.status === 'suppressed') {
+      // suppression は正常系だが、課金メールが届いていないことは運用上の事実なので
+      // webhook の operation 名付きで痕跡を残す（send 側の logger.warn だけでは
+      // どの課金イベントが落ちたか分からない）。
+      captureStripeWebhookFailure(
+        new Error('Billing email skipped: recipient is suppressed'),
+        operation,
+      );
+      return;
+    }
+
+    logger.info('Transactional email sent', { operation });
   } catch (error) {
     logger.error('Transactional email delivery failed unexpectedly');
     captureStripeWebhookFailure(error, operation);

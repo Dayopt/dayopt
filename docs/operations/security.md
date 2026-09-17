@@ -199,17 +199,22 @@ OWASP準拠のセキュリティ監視の全体像と、定期検査の cadence 
 | 実装中     | コード変更ごと           | `security` skill（OWASP 観点のガイド）/ risk に応じた主担当のセルフレビュー（`AGENTS.md §レーン運用`）                                                                                                                                                                                                           |
 | PR ごと    | CI（ready 後）+ merge 前 | `ci.yml` static job の secret scan（gitleaks + `secrets:check`）/ integration job（affected 時）の RLS snapshot drift 検査 / Vercel build の client bundle secret 検査（`verify:bundle`）/ `production-config-audit.yml` / GitHub の `@codex review` + 高リスク変更の追加レビュー契約（`pr-cross-review` skill） |
 | 継続       | 常時・自動               | Dependabot alerts（security update は schedule と無関係に即時 PR）/ Actions の SHA 固定 / Sentry / CSP 違反モニタリング / rate limit                                                                                                                                                                             |
-| 定期・随時 | 月次 + オンデマンド      | `/gardening` §5.7 のセキュリティ sweep（advisors + `pnpm security:check` + `/claude-security` 提案）/ `/security-review` / `/code-review`                                                                                                                                                                        |
+| 定期・随時 | 月次 + オンデマンド      | `/gardening` §5 のセキュリティ sweep（advisors + `pnpm security:check`）/ 深掘りが要る月は `security-sweep` skill を 1 境界（provider 非依存。`/claude-security` は任意の加速器）/ `/security-review` / `/code-review`                                                                                           |
 
 **束ねた PR のレビュー**: 通常 PR は GitHub の独立レビューを使い、高リスク変更の追加契約は `pr-cross-review` に従う。複数 Issue を束ねたことだけを理由に reviewer subagent を追加しない。
 
 ## 定期検査の cadence
 
-定期検査の正本は `/gardening` §5.7（月次セキュリティ sweep）とする。実施内容:
+定期検査の正本は `/gardening` §5（月次セキュリティ sweep）とする。実施内容:
 
 1. Supabase security advisors の確認（`mcp__supabase__get_advisors`、read-only）
 2. `pnpm security:check`（= `pnpm audit --audit-level=moderate`。後述のローカルパッチ済み advisory は `auditConfig` で除く）
-3. `/claude-security` の全体スキャン実行をユーザーへ提案
+3. 深掘りが要る月だけ `security-sweep` skill を 1 境界に回す（provider 非依存。実装前の既往照合は
+   [threat-model.md](../engineering/threat-model.md) の既往クラスと却下記録）
+
+**1・2 を毎月の既定とし、3 は常設化しない**（2026-09-17 判断、#2709）。sweep の実測コストは
+#2708 が現 HEAD で 1 周するまで分からず、`docs/decisions.md` 2026-09-10 の結果判定も
+2026-09-24 が期限。判定材料が揃う前に月次の必須項目へ格上げしない。
 
 2 は **CI では実行しない**。依存脆弱性の継続検知は Dependabot alerts が担当し（security update は schedule と無関係に即時 PR が出る）、CI に `pnpm audit` を足すと新しい advisory が公開された瞬間に無関係な PR まで落ちる。Actions 課金が PR 本数に比例する構造（`AGENTS.md §PR / git 運用` §PR 粒度）でもあるため、月次の手動実行に留める。
 

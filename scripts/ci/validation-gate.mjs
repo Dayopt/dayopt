@@ -530,6 +530,23 @@ export function fetchPullRefs({ number }, cwd) {
   );
 }
 
+/**
+ * commit status の `description` は 4-byte Unicode（astral plane）を受け付けない。含めると API が
+ * `422 Description doesn't accept 4-byte Unicode` を返し、`runGh` が throw して job ごと落ちる。
+ * required job 名は `🧪 Integration Tests` のように emoji で始まるため、blocked / failed の理由を
+ * そのまま渡すと **gate が判定を出せずに indeterminate へ化ける**（#2814。PR #2813 で実発生）。
+ *
+ * 落としてから 140 字へ切る。逆順だとサロゲートペアの片割れが末尾に残り、同じ 422 を踏む。
+ */
+export function toStatusDescription(text) {
+  return [...String(text ?? '')]
+    .filter((char) => (char.codePointAt(0) ?? 0) <= 0xffff)
+    .join('')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 140);
+}
+
 export function runValidationGate({
   env = process.env,
   argv = process.argv.slice(2),
@@ -587,7 +604,7 @@ export function runValidationGate({
           '-f',
           `context=${context}`,
           '-f',
-          `description=${status.description.slice(0, 140)}`,
+          `description=${toStatusDescription(status.description)}`,
           ...(runUrl ? ['-f', `target_url=${runUrl}`] : []),
         ]);
   // fail closed: 対象 PR の解決から評価までを 1 つの try に置き、pending を置いた後はもちろん

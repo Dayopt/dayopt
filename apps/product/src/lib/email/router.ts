@@ -8,7 +8,6 @@ import 'server-only';
  */
 
 import { TRPCError } from '@trpc/server';
-import { Resend } from 'resend';
 import { z } from 'zod';
 
 import type { SupabaseClient } from '@supabase/supabase-js';
@@ -18,25 +17,15 @@ import { createEmailTranslator, type EmailLocale } from '@/emails/i18n';
 import { MfaDisabledEmail } from '@/emails/MfaDisabledEmail';
 import { PasswordChangedEmail } from '@/emails/PasswordChangedEmail';
 import { WelcomeEmail } from '@/emails/WelcomeEmail';
-import { env } from '@/env';
 import { getAppUrl } from '@/lib/app-url';
 import { databaseTables } from '@/lib/database';
+import { sendTransactionalEmail } from '@/lib/email/send';
 import { logger } from '@/lib/logger';
-import {
-  captureUnexpectedDatabaseError,
-  captureUnexpectedError,
-  observeAuthOperation,
-} from '@/lib/sentry';
-import { createServiceRoleClient } from '@/lib/supabase/oauth';
+import { captureUnexpectedDatabaseError, observeAuthOperation } from '@/lib/sentry';
 import { handleServiceError } from '@/lib/trpc/errors';
 import type { Context } from '@/lib/trpc/procedures';
 import { createTRPCRouter, protectedProcedure } from '@/lib/trpc/procedures';
 
-function getResend() {
-  return new Resend(env.RESEND_API_KEY);
-}
-
-const FROM_EMAIL = env.RESEND_FROM_EMAIL || 'onboarding@resend.dev';
 const APP_URL = getAppUrl();
 
 /**
@@ -90,40 +79,12 @@ async function verifyEmailOwnership(ctx: Context, inputEmail: string): Promise<v
 }
 
 /**
- * サプレッションリストをチェックし、送信をスキップすべきか判定
- */
-async function isEmailSuppressed(email: string): Promise<boolean> {
-  const supabase = createServiceRoleClient();
-  const { data, error } = await supabase
-    .from(databaseTables.emailSuppressions)
-    .select('reason')
-    .eq('email', email.toLowerCase())
-    .limit(1);
-
-  if (error) {
-    logger.error('Failed to check email suppression');
-    const original = captureUnexpectedDatabaseError(error, {
-      feature: 'email',
-      operation: 'check_email_suppression',
-    });
-    throw new TRPCError({
-      code: 'INTERNAL_SERVER_ERROR',
-      message: 'Unable to verify email delivery status',
-      cause: original,
-    });
-  }
-
-  return data.length > 0;
-}
-
-/**
- * Resend APIでメールを送信する共通ヘルパー
+ * tRPC / service 経路のメール送信
  *
- * サプレッションリスト（バウンス/苦情）に含まれるアドレスへの送信をスキップ。
- * `securityNotification: true`（MFA無効化・パスワード変更などセキュリティ通知）
- * の場合、suppressed でも `logger.warn` だけでなく Sentry へ痕跡を残す（#2043）。
- * 配信評価保護という suppression 本来の目的（bounce/complaint 済みアドレスへ
- * 送り続けない）は維持しつつ、セキュリティ通知が無痕跡で落ちるのを防ぐ。
+ * 送信と suppression 判定そのものは `@/lib/email/send` が持つ（Stripe webhook と共有。
+ * #2789）。ここはその結果を tRPC の契約へ翻訳するだけ — 失敗は `handleServiceError` で
+ * TRPCError にして throw し、suppressed は成功として返す（呼び出し元の本体処理を
+ * 巻き戻さない。セキュリティ通知の痕跡は send 側が Sentry へ残す）。
  */
 async function sendEmail({
   to,
@@ -138,35 +99,30 @@ async function sendEmail({
   context: string;
   securityNotification?: boolean;
 }) {
-  if (await isEmailSuppressed(to)) {
-    logger.warn(`${context} skipped: email suppressed`);
-    if (securityNotification) {
-      captureUnexpectedError(new Error(`${context} skipped: recipient is suppressed`), {
-        feature: 'email',
-        operation: 'send_security_notification_suppressed',
-      });
-    }
-    return { success: true as const, emailId: undefined, suppressed: true as const };
-  }
-
-  const { data, error } = await getResend().emails.send({
-    from: `Dayopt <${FROM_EMAIL}>`,
+  const result = await sendTransactionalEmail({
     to,
     subject,
     react,
+    context,
+    securityNotification,
   });
 
-  if (error) {
-    logger.error(`${context} failed`);
-    const original =
-      error instanceof Error
-        ? error
-        : new Error('Transactional email provider failed', { cause: error });
-    handleServiceError(original);
+  if (result.status === 'failed') {
+    if (result.reason === 'suppression_lookup') {
+      throw new TRPCError({
+        code: 'INTERNAL_SERVER_ERROR',
+        message: 'Unable to verify email delivery status',
+        cause: result.error,
+      });
+    }
+    handleServiceError(result.error);
   }
 
-  logger.info(`${context} sent`, { emailId: data?.id });
-  return { success: true as const, emailId: data?.id };
+  if (result.status === 'suppressed') {
+    return { success: true as const, emailId: undefined, suppressed: true as const };
+  }
+
+  return { success: true as const, emailId: result.emailId };
 }
 
 /**

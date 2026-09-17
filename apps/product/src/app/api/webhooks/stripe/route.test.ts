@@ -51,6 +51,7 @@ const profileConsume = vi.hoisted(() =>
   vi.fn(() => ({ eq: () => ({ is: () => Promise.resolve({ error: null }) }) })),
 );
 const captureUnexpectedError = vi.hoisted(() => vi.fn());
+const deliverTransactionalEmail = vi.hoisted(() => vi.fn());
 const from = vi.hoisted(() =>
   vi.fn((table: string) => ({
     update: profileConsume,
@@ -80,6 +81,7 @@ vi.mock('@/lib/supabase/oauth', () => ({
   }),
 }));
 vi.mock('@/lib/analytics/product-events', () => ({ trackProductEvent }));
+vi.mock('@/lib/email/send', () => ({ sendTransactionalEmail: deliverTransactionalEmail }));
 vi.mock('@/features/settings/server/billing-service', () => ({
   classifyBillingCustomerEvent,
   syncDeletedSubscriptionStatus,
@@ -141,6 +143,7 @@ beforeEach(() => {
   profileMaybeSingle.mockResolvedValue({ data: null, error: null });
   writeFenceMaybeSingle.mockResolvedValue({ data: { fence_enabled: false }, error: null });
   getUserById.mockResolvedValue({ data: { user: null }, error: null });
+  deliverTransactionalEmail.mockResolvedValue({ status: 'sent', emailId: 'email-1' });
   trackProductEvent.mockResolvedValue(undefined);
   classifyBillingCustomerEvent.mockResolvedValue('live');
   syncSubscriptionStatus.mockResolvedValue(undefined);
@@ -205,6 +208,92 @@ describe('Stripe webhook route', () => {
 
     expect(duplicateResponse.status).toBe(200);
     expect(trackProductEvent).toHaveBeenCalledTimes(1);
+  });
+
+  /**
+   * #2789: 課金メールは suppression を見る共通経路を通る。ここで固定するのは
+   * 「共通経路を実際に呼ぶこと」と「その結果がどうであれ webhook は 200 を返し、
+   * 痕跡が Sentry に残ること」の 2 点。
+   */
+  describe('課金メールの共通送信経路（#2789）', () => {
+    function arrangeTrialCheckout() {
+      eventMock.type = 'checkout.session.completed';
+      eventMock.data.object = {
+        customer: 'cus_test123',
+        id: 'cs_test456',
+        mode: 'subscription',
+        subscription: 'sub_test456',
+      };
+      profileMaybeSingle.mockResolvedValueOnce({
+        data: { id: 'user-1', full_name: 'Test User' },
+        error: null,
+      });
+      getUserById.mockResolvedValue({
+        data: { user: { email: 'user@example.com', id: 'user-1' } },
+        error: null,
+      });
+    }
+
+    it('suppression を見る共通経路へ宛先を渡して送る', async () => {
+      arrangeTrialCheckout();
+
+      const response = await POST(request());
+
+      expect(response.status).toBe(200);
+      expect(deliverTransactionalEmail).toHaveBeenCalledTimes(1);
+      expect(deliverTransactionalEmail).toHaveBeenCalledWith(
+        expect.objectContaining({
+          context: 'send_trial_start_email',
+          to: 'user@example.com',
+        }),
+      );
+      expect(captureUnexpectedError).not.toHaveBeenCalled();
+    });
+
+    it('suppressed で skip された時も 200 を返し、operation 付きで Sentry に残す', async () => {
+      arrangeTrialCheckout();
+      deliverTransactionalEmail.mockResolvedValue({ status: 'suppressed' });
+
+      const response = await POST(request());
+
+      expect(response.status).toBe(200);
+      expect(deliverTransactionalEmail).toHaveBeenCalledTimes(1);
+      expect(captureUnexpectedError).toHaveBeenCalledTimes(1);
+      const [capturedError, context] = captureUnexpectedError.mock.calls[0] as [
+        Error,
+        Record<string, unknown>,
+      ];
+      expect(capturedError.message).toContain('suppressed');
+      expect(context).toMatchObject({
+        feature: 'billing',
+        operation: 'send_trial_start_email',
+        source: 'stripe_webhook',
+      });
+      // 課金状態の同期は続行する（メールは webhook をブロックしない）
+      expect(markStripeWebhookEventProcessed).toHaveBeenCalled();
+    });
+
+    it('送信失敗でも 200 を返し、Sentry へ通知する', async () => {
+      arrangeTrialCheckout();
+      const providerError = new Error('rate limited');
+      deliverTransactionalEmail.mockResolvedValue({
+        error: providerError,
+        reason: 'provider',
+        status: 'failed',
+      });
+
+      const response = await POST(request());
+
+      expect(response.status).toBe(200);
+      expect(captureUnexpectedError).toHaveBeenCalledWith(
+        providerError,
+        expect.objectContaining({
+          feature: 'billing',
+          operation: 'send_trial_start_email',
+        }),
+      );
+      expect(markStripeWebhookEventProcessed).toHaveBeenCalled();
+    });
   });
 
   it.each(['subscription_create', 'subscription_cycle'])(
