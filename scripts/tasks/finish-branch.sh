@@ -236,17 +236,36 @@ if [[ "$PR_STATE" == "OPEN" ]]; then
   # 数え方を 3 箇所で個別に変えると「代表は pending だが件数は 0」のズレを増やす。
   #
   # **ただし無条件に advisory にはしない。** workflow の `Enforce audit result` step は
-  #   (a) contract を変えた（設計上の failure。監査そのものは行っていない）
+  #   (a) contract を変えた（設計上の failure。**この head に監査結果は無い**）
   #   (b) 実際に Vercel の env metadata が Production contract と食い違う（本物の drift）
   # の**どちらでも exit 1** する。check run の conclusion と status の state だけでは
   # 両者を区別できない。区別できるのは status の `description` だけで、
-  #   (a) `Audit contract changed; trusted head audit is required`
-  #   (b) `Vercel metadata does not match the Production contract`
-  # と固定されている（`.github/workflows/production-config-audit.yml` の
-  # `Publish Production Config Audit status`）。**`gh pr view --json statusCheckRollup` は
-  # StatusContext の description を返さない**（context / state / startedAt / targetUrl のみ）ため、
-  # guard が落ちている時だけ head の status を直接引いて判定する。(b) を advisory にすると
-  # 本物の production 設定 drift を黙って通すので、そこは従来どおり止める。
+  # `.github/workflows/production-config-audit.yml` の `Publish Production Config Audit status`
+  # が次の 3 文言に固定している:
+  #   - `Audit contract changed; trusted head audit is required`（監査結果なし）
+  #   - `Vercel metadata matches the Production contract`（監査 pass）
+  #   - `Vercel metadata does not match the Production contract`（本物の drift）
+  # **`gh pr view --json statusCheckRollup` は StatusContext の description を返さない**
+  # （context / state / startedAt / targetUrl のみ）ため、guard が落ちている時だけ head の
+  # status を直接引いて判定する。
+  #
+  # **allowlist で判定する（fail closed）。** advisory にしてよいのは上の 2 文言（監査結果なし /
+  # 監査 pass）に**完全一致**した時だけで、drift・未知の文言・取得失敗・status 不在はすべて停止側。
+  # 既定を advisory 側に置くと、workflow が将来 failure 文言を追加した時に**本物の失敗が
+  # 無言で除外される**（#2834 の Codex レビュー P2）。
+  #
+  # **全ページ取る。** combined status API は既定で先頭 30 件しか返さず、controller の再評価で
+  # pending / terminal が積み上がると `Production Config Audit` が押し出される（本 PR 自身の head で
+  # 実測 28 件）。押し出されると description が空になり、fail closed 側に倒れて
+  # **contract 変更 PR の branch:finish が恒久的に止まる**。`validation-shadow-report.mjs` が
+  # 同じ理由で `per_page=100` + 全ページ取得をしているのに揃える。GitHub は新しい順に返すので
+  # 先頭行が最新（trusted dispatch を後から回した PR では設計上の failure の上に結果が積まれている）。
+  #
+  # **境界（この checkpoint が担保しないこと）**: contract を変えた PR で同時に live な drift が
+  # 起きていても、workflow は `CONTRACT_CHANGED` を `AUDIT_EXIT` より優先するため description は
+  # 「監査結果なし」になり、ここでは drift を検出できない。drift は PR の diff ではなく production の
+  # 現況なので、検出は push:main / nightly cron / promote の `runProductionConfigAudit` が担う
+  # （#2834 の Codex レビュー P2 への回答。merge の遮断は main の ruleset という #2640 の決定に従う）。
   JQ_GATE_DEFS='
     def check_name: (.name // .context // "");
     def is_trusted_audit_guard:
@@ -267,30 +286,37 @@ if [[ "$PR_STATE" == "OPEN" ]]; then
 
   AUDIT_GUARD_ADVISORY="false"
   if [[ "$TRUSTED_AUDIT_FAILURES" != "0" ]]; then
-    # 最新の status 1 件だけを見る（GitHub は新しい順に返す）。trusted dispatch を
-    # 後から回した PR では、設計上の failure の上に dispatch の結果が積まれている。
-    AUDIT_STATUS_DESCRIPTION="$(gh api "repos/{owner}/{repo}/commits/$HEAD_SHA/statuses" \
-      --jq 'map(select(.context == "Production Config Audit")) | .[0].description // ""' \
-      2>/dev/null || echo "__unavailable__")"
+    # 部分失敗に注意: `$(cmd || echo MARKER)` は cmd が出力した後で失敗しても両方を捕まえる。
+    # GitHub は新しい順に返すので、**先頭行**を採れば「1 ページ目で見つかった最新」か、
+    # 1 件も見つからないまま失敗した時の MARKER のどちらかになり、どちらも安全側。
+    AUDIT_STATUS_LINES="$(gh api --paginate \
+      "repos/{owner}/{repo}/commits/$HEAD_SHA/statuses?per_page=100" \
+      --jq '.[] | select(.context == "Production Config Audit") | .description // ""' \
+      2>/dev/null || printf '__unavailable__\n')"
+    AUDIT_STATUS_DESCRIPTION="$(printf '%s\n' "$AUDIT_STATUS_LINES" | sed -n '1p')"
 
     case "$AUDIT_STATUS_DESCRIPTION" in
-      *'does not match the Production contract'*)
-        # 本物の drift。advisory にしない（= 下の FAILED_CHECKS に数える）。
-        error "commit status「Production Config Audit」が本物の drift を報告しています:"
-        error "  $AUDIT_STATUS_DESCRIPTION"
-        error "Vercel の env metadata が Production contract と食い違っています。merge 前に解消してください。"
+      # ── advisory にしてよい 2 文言（完全一致のみ）──────────────────────
+      'Audit contract changed; trusted head audit is required')
+        AUDIT_GUARD_ADVISORY="true"
+        info "audit contract guard の failure $TRUSTED_AUDIT_FAILURES 件は advisory として扱い、失敗数から除外します（#2469。merge の遮断は main の ruleset）。"
+        info "  この head に監査結果はありません（contract 変更による設計上の failure）。live な drift の検出は push:main / nightly / promote が担います。"
         ;;
-      __unavailable__ | '')
-        # status を読めなかった / 存在しない。設計上の failure と本物の drift を
-        # 区別できないので、緩める側へは倒さない（fail closed）。
+      'Vercel metadata matches the Production contract')
+        AUDIT_GUARD_ADVISORY="true"
+        info "audit contract guard の failure $TRUSTED_AUDIT_FAILURES 件は advisory として扱い、失敗数から除外します（#2469）。"
+        info "  trusted dispatch の監査は pass しています。"
+        ;;
+      # ── 以降はすべて停止側（fail closed）───────────────────────────────
+      '' | __unavailable__)
         error "commit status「Production Config Audit」の description を取得できませんでした。"
-        error "audit contract guard の failure が設計上のものか本物の drift か判定できないため、advisory にしません。"
-        error "  gh api repos/{owner}/{repo}/commits/$HEAD_SHA/statuses"
+        error "audit contract guard の failure を advisory にしてよいか判定できないため、失敗数に数えます。"
+        error "  gh api --paginate 'repos/{owner}/{repo}/commits/$HEAD_SHA/statuses?per_page=100'"
         ;;
       *)
-        AUDIT_GUARD_ADVISORY="true"
-        info "audit contract guard（Audit Vercel metadata (trusted) / status「Production Config Audit」）の failure $TRUSTED_AUDIT_FAILURES 件は advisory として扱い、失敗数から除外します（#2469。merge の遮断は main の ruleset）。"
-        info "  status description: ${AUDIT_STATUS_DESCRIPTION}"
+        error "commit status「Production Config Audit」の description が advisory の allowlist と一致しません:"
+        error "  $AUDIT_STATUS_DESCRIPTION"
+        error "本物の drift または未知の失敗として扱い、失敗数に数えます（fail closed）。"
         ;;
     esac
   fi

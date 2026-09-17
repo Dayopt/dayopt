@@ -179,7 +179,7 @@ function runScript(
       hasNextPage?: boolean;
     }>;
   } = {},
-): { status: number | null; stderr: string } {
+): { status: number | null; stderr: string; auditStatusArgs: string } {
   // repo 直下ではなく os の temp に作る。プロセスが afterEach 前に落ちると untracked な
   // ディレクトリが repo に残り、まさにこのスクリプトの dirty ゲートが以後の掃除を止める。
   const temporaryDirectory = mkdtempSync(join(tmpdir(), 'finish-branch-test-'));
@@ -285,8 +285,13 @@ case "$1" in
     else
       case "$*" in
         *commits/*/statuses*)
+          # 実 gh は --jq が description を 1 行ずつ出す（新しい順）。空なら 1 件も無い状態。
+          # 呼び出し形は pagination 契約の test が読むので記録する。
+          printf '%s\n' "$*" >> "$FINISH_BRANCH_AUDIT_STATUS_ARGS"
           if [[ "\${FINISH_BRANCH_AUDIT_STATUS_EXIT:-0}" != "0" ]]; then exit 1; fi
-          printf '%s' "\${FINISH_BRANCH_AUDIT_STATUS_DESCRIPTION:-}"
+          if [[ -n "\${FINISH_BRANCH_AUDIT_STATUS_DESCRIPTION:-}" ]]; then
+            printf '%s\n' "\${FINISH_BRANCH_AUDIT_STATUS_DESCRIPTION}"
+          fi
           ;;
         *pulls/123/files*)
           cat "$FINISH_BRANCH_PR_FILES"
@@ -314,6 +319,8 @@ esac
   git('add', 'seed.txt');
   git('commit', '-m', 'seed');
 
+  const auditStatusArgsPath = join(temporaryDirectory, 'audit-status-args.txt');
+
   const result = spawnSync('bash', [scriptPath, '123', '--dry-run'], {
     cwd: temporaryDirectory,
     encoding: 'utf8',
@@ -332,10 +339,18 @@ esac
       FINISH_BRANCH_AUDIT_STATUS_DESCRIPTION:
         options.auditStatusDescription ?? 'Audit contract changed; trusted head audit is required',
       FINISH_BRANCH_AUDIT_STATUS_EXIT: options.auditStatusUnavailable ? '1' : '0',
+      FINISH_BRANCH_AUDIT_STATUS_ARGS: auditStatusArgsPath,
     },
   });
 
-  return { status: result.status, stderr: result.stderr ?? '' };
+  return {
+    status: result.status,
+    stderr: result.stderr ?? '',
+    /** statuses API を呼んだ時の gh の引数（1 行 1 回）。pagination 契約の検証用 */
+    auditStatusArgs: existsSync(auditStatusArgsPath)
+      ? readFileSync(auditStatusArgsPath, 'utf8')
+      : '',
+  };
 }
 
 /**
@@ -712,8 +727,39 @@ describe('audit contract guard の advisory 扱い（#2469）', () => {
       [guardFailure(), statusContext('Production Config Audit', 'FAILURE', '2026-08-03T00:25:36Z')],
       { auditStatusDescription: 'Vercel metadata does not match the Production contract' },
     );
-    expect(stderr).toContain('本物の drift');
+    expect(stderr).toContain('allowlist と一致しません');
     expect(stderr).toContain('失敗している check');
+    expect(status).toBe(1);
+  });
+
+  // 既定を advisory 側に置くと、workflow が将来 failure 文言を追加した時に本物の失敗が
+  // 無言で除外される（#2834 の Codex レビュー P2）。allowlist の完全一致だけを通す。
+  // combined status API は既定で先頭 30 件しか返さない。controller の再評価で status が
+  // 積み上がると `Production Config Audit` が押し出され、description が空になって
+  // fail closed 側へ倒れ、contract 変更 PR の branch:finish が恒久的に止まる。
+  // 本 PR 自身の head でも実測 28 件で、上限の手前まで来ていた（#2834 の Codex レビュー P2）。
+  it('statuses API を全ページ取得で呼ぶ（先頭 30 件で押し出されない）', () => {
+    const { auditStatusArgs } = runScript([guardFailure(), ...requiredChecks()]);
+    expect(auditStatusArgs).toContain('--paginate');
+    expect(auditStatusArgs).toContain('per_page=100');
+  });
+
+  it('未知の description は advisory にしない（allowlist の完全一致のみ）', () => {
+    const { status, stderr } = runScript([guardFailure(), ...requiredChecks()], {
+      auditStatusDescription: 'Vercel metadata check failed for an unexpected reason',
+    });
+    expect(stderr).toContain('allowlist と一致しません');
+    expect(stderr).toContain('失敗している check');
+    expect(status).toBe(1);
+  });
+
+  it('advisory の 2 文言は前方一致ではなく完全一致で判定する', () => {
+    // 既知文言を含むが末尾に別の理由が付いた description を advisory にしない。
+    const { status, stderr } = runScript([guardFailure(), ...requiredChecks()], {
+      auditStatusDescription:
+        'Vercel metadata matches the Production contract but the project settings drifted',
+    });
+    expect(stderr).toContain('allowlist と一致しません');
     expect(status).toBe(1);
   });
 

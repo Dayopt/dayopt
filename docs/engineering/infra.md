@@ -706,12 +706,26 @@ required status checks の実状は ruleset が正本で、context の一覧を�
   **無条件に advisory にはしない。** workflow の `Enforce audit result` は「contract を変えた」
   （設計上の failure）でも「Vercel の env metadata が Production contract と食い違う」（本物の drift）でも
   exit 1 するため、check run の conclusion と status の state では両者を区別できない。分けられるのは
-  status の `description` だけで、`Audit contract changed; trusted head audit is required` なら advisory、
-  `Vercel metadata does not match the Production contract` なら従来どおり停止する。
+  status の `description` だけで、**advisory にしてよい 2 文言の完全一致（allowlist）で判定する**:
+
+  | description                                              | 扱い                                       |
+  | -------------------------------------------------------- | ------------------------------------------ |
+  | `Audit contract changed; trusted head audit is required` | advisory（この head に監査結果は無い）     |
+  | `Vercel metadata matches the Production contract`        | advisory（trusted dispatch の監査が pass） |
+  | `Vercel metadata does not match the Production contract` | 停止                                       |
+  | 上記以外・取得失敗・status 不在                          | 停止（fail closed）                        |
+
+  既定を advisory 側に置くと、workflow が将来 failure 文言を追加した時に**本物の失敗が無言で除外される**。
   **`gh pr view --json statusCheckRollup` は StatusContext の description を返さない**
   （context / state / startedAt / targetUrl のみ）ので、guard が落ちている時だけ
-  `gh api repos/{owner}/{repo}/commits/<head>/statuses` を引いて最新 1 件の description を読む。
-  読めなかった場合・status が 1 件も無い場合は **advisory にしない**（fail closed）。
+  `gh api --paginate 'repos/{owner}/{repo}/commits/<head>/statuses?per_page=100'` を引いて最新 1 件を読む。
+  **全ページ取る**のは、combined status API が既定で先頭 30 件しか返さず、controller の再評価で
+  `Production Config Audit` が押し出されると contract 変更 PR の `branch:finish` が恒久的に止まるため
+  （PR #2834 の head で実測 28 件。`validation-shadow-report.mjs` が同じ理由で `per_page=100` を使っている）。
+  **境界**: contract を変えた PR で同時に live な drift が起きていても、workflow は `CONTRACT_CHANGED` を
+  `AUDIT_EXIT` より優先するため description は「監査結果なし」になり、ここでは drift を検出できない。
+  drift は PR の diff ではなく production の現況なので、検出は push:main / nightly / promote の
+  `runProductionConfigAudit` が担う。
   **2026-09-03（#2571）から 2026-09-18 まで、ここは contract 変更 PR に status success を必須にしていた。**
   撤去した理由は 3 つ。(1) merge の遮断は 2026-09-13（[#2640](https://github.com/Dayopt/dayopt/issues/2640)）以降 main の ruleset 1 本で、
   required checks に `Production Config Audit` は含まれない。この checkpoint は `branch:finish` だけに効く
