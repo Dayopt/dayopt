@@ -44,10 +44,21 @@ describe('trusted validation plan', () => {
     expect(result.required.scripts.status).toBe('required');
   });
   it('unions README and RLS requirements, including independent migration paths', () => {
-    const result = plan(['README.md', 'supabase/migrations/20260916_rls.sql']);
+    const result = plan(['README.md', 'supabase/migrations/20260916000000_rls.sql']);
     for (const name of ['integration', 'dbFresh', 'dbUpgrade', 'oldConsumer'] as const)
       expect(result.required[name].status).toBe('required');
     expect(result.authority.productionAuthorized).toBe(false);
+  });
+  it('does not require the upgrade job for archive / non-migration files under supabase/migrations', () => {
+    // 🧱 DB Upgrade (shadow) は root の migration ファイルでだけ起動する（check.mjs と同じ判定）。
+    // plan 側が広く要求すると、起動しない job を待って Validation が恒久的に blocked になる
+    const result = plan([
+      'supabase/migrations/_archive/20250101000000_old.sql',
+      'supabase/migrations/README.md',
+    ]);
+    expect(result.required.dbFresh.status).toBe('required');
+    expect(result.required.dbUpgrade.status).toBe('not-applicable');
+    expect(result.required.oldConsumer.status).toBe('not-applicable');
   });
   it('propagates shared workspace dependencies', () => {
     const result = plan(['packages/components/src/a.tsx']);

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /** Declarative plan only. Run from the trusted base checkout; never executes PR code. */
 import { createHash } from 'node:crypto';
-import { resolveImpact } from '../ci/impact.mjs';
+import { ROOT_MIGRATION_PATH, resolveImpact } from '../ci/impact.mjs';
 import { resolveProtectedPathGate } from '../ci/protected-path-gate.mjs';
 
 export const PLAN_VERSION = 1;
@@ -79,7 +79,10 @@ export function createValidationPlan(input, options = {}) {
     files.every((file) => classifyPlanPath(file).every((area) => area === 'prose'));
   const policy = areas.includes('policy');
   const database = areas.includes('database');
+  // integration job（fresh）は `supabase/migrations/**` 全体で走る。upgrade / old-consumer job は
+  // production に適用される root の migration ファイルだけで起動する（check.mjs と同じ判定）
   const migrations = files.some((file) => file.startsWith('supabase/migrations/'));
+  const rootMigrations = files.some((file) => ROOT_MIGRATION_PATH.test(file));
   const indeterminate = problems.length > 0;
   const suite = (required, reason) => ({
     status: indeterminate ? 'indeterminate' : required ? 'required' : 'not-applicable',
@@ -114,11 +117,11 @@ export function createValidationPlan(input, options = {}) {
     ),
     dbFresh: suite(migrations || unknown, 'Candidate migration set from empty database'),
     dbUpgrade: suite(
-      migrations || unknown,
+      rootMigrations || unknown,
       'Trusted baseline plus synthetic data upgraded to candidate',
     ),
     oldConsumer: suite(
-      migrations || unknown,
+      rootMigrations || unknown,
       'Live consumer must remain compatible after migration',
     ),
   };
