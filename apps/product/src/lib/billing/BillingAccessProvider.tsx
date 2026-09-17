@@ -18,11 +18,19 @@ export function useBillingAccess(): BillingAccess {
 }
 
 /** The authenticated application mounts this once; public pages never mount it. */
-export function BillingAccessProvider({ children }: { children: React.ReactNode }) {
+export function BillingAccessProvider({
+  children,
+  serverPrefetched = false,
+}: {
+  children: React.ReactNode;
+  serverPrefetched?: boolean;
+}) {
   const t = useTranslations('common');
   const utils = api.useUtils();
   const query = api.billing.getAccess.useQuery(undefined, {
     staleTime: 0,
+    // 同じ request で確定した access の初回二重取得だけを避ける。focus / interval は維持。
+    refetchOnMount: !serverPrefetched,
     refetchInterval: 60_000,
     refetchOnWindowFocus: 'always',
     meta: { persist: false },

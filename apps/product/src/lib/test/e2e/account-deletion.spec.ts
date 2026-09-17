@@ -174,8 +174,11 @@ describeWithEnv('Account Deletion: 削除 → セッション失効 → 再ロ�
     await expect(confirmButton).toBeEnabled();
     await confirmButton.click();
 
-    // AccountDeletionDialog.tsx onSuccess: signOut() → window.location.href = '/auth/login'
-    await page.waitForURL(/\/auth\/login/, { timeout: 15_000 });
+    // signOut・locale redirect の途中の document load は待たず、最終画面の成立を待つ。
+    // URL だけでは未完了の遷移も通るため、ログインフォームの表示も確認する。
+    await expect(page).toHaveURL(/\/ja\/auth\/login(?:\?|$)/, { timeout: 15_000 });
+    await expect(page.locator('input[name="email"]')).toBeVisible();
+    await expect(page.locator('input[name="password"]')).toBeVisible();
 
     // セッション失効: 保護ページへ行くと未認証としてログインへ戻される
     await page.goto('/ja/calendar');

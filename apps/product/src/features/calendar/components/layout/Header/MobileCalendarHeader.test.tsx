@@ -1,6 +1,8 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
+let mockTimezone = 'Asia/Tokyo';
+
 vi.mock('next-intl', () => ({
   useTranslations: () => (key: string) => key,
   useLocale: () => 'ja',
@@ -9,7 +11,7 @@ vi.mock('next-intl', () => ({
 vi.mock('@/lib/hooks/useUserPreferences', () => ({
   useUserPreferences: (
     selector: (state: { weekStartsOn: 1; showWeekNumbers: boolean; timezone: string }) => unknown,
-  ) => selector({ weekStartsOn: 1, showWeekNumbers: false, timezone: 'Asia/Tokyo' }),
+  ) => selector({ weekStartsOn: 1, showWeekNumbers: false, timezone: mockTimezone }),
 }));
 
 vi.mock('@/lib/stores/useShellStore', () => ({
@@ -106,4 +108,17 @@ it('閉じた日付選択は inert にし、展開時だけ操作可能に戻す
   expect(grid.closest('[inert]')).toBeNull();
   fireEvent.click(toggle);
   expect(grid.closest('[inert]')).not.toBeNull();
+});
+
+it('暦日をUTC instantへ読み替えず、Los Angelesの当日バッジを表示する', () => {
+  vi.useFakeTimers();
+  vi.setSystemTime(new Date('2026-09-17T06:00:00Z'));
+  mockTimezone = 'America/Los_Angeles';
+  try {
+    renderHeader({ currentDate: new Date(2026, 8, 16) });
+    expect(screen.queryByRole('button', { name: 'actions.goToToday' })).not.toBeInTheDocument();
+  } finally {
+    mockTimezone = 'Asia/Tokyo';
+    vi.useRealTimers();
+  }
 });

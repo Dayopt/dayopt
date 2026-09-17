@@ -133,10 +133,14 @@ export const PRODUCER_SPECIFIC_DEFINITIONS = Object.freeze({
  *   createdAt: string, latestStatus: { state: string, environmentUrl: string | null } | null }} DeploymentEvidence
  * @typedef {{ id: number, name: string, appSlug: string, headSha: string, status: string,
  *   conclusion: string | null, htmlUrl: string }} CheckRunEvidence
+ * @typedef {{ repository: string, prNumber: number, headSha: string, ancestorSha: string,
+ *   environment: string, deploymentId: number, url: string | null, unchanged: boolean,
+ *   productionEnvironment: boolean }} InheritedPreviewEvidence
  * @typedef {{ repository: string, headSha: string, fetchedAt: string,
  *   pr: { number: number, state: string, draft: boolean, headSha: string, baseRef: string, fork: boolean },
  *   baseCompare: string, workflowRuns: WorkflowRunEvidence[], statuses: StatusEvidence[],
- *   deployments: DeploymentEvidence[], checkRuns?: CheckRunEvidence[] }} ValidationEvidence
+ *   deployments: DeploymentEvidence[], inheritedPreviews?: InheritedPreviewEvidence[],
+ *   checkRuns?: CheckRunEvidence[] }} ValidationEvidence
  */
 
 /** 同一 head の信頼済み run を 1 本選ぶ。id 最大 = 最新 run。 */
@@ -313,12 +317,31 @@ function evaluateDeployment(producer, evidence, plan) {
       reason: `${producer.environment} deployment is marked as production`,
       evidence: detail,
     };
-  if (status && /ignored build step/i.test(status.description ?? ''))
+  if (status && /ignored build step/i.test(status.description ?? '')) {
+    const inherited = (evidence.inheritedPreviews ?? []).find(
+      (entry) =>
+        entry.repository === evidence.repository &&
+        entry.prNumber === evidence.pr.number &&
+        entry.headSha === evidence.headSha &&
+        entry.ancestorSha !== evidence.headSha &&
+        /^[a-f0-9]{40}$/.test(entry.ancestorSha) &&
+        entry.environment === producer.environment &&
+        entry.unchanged === true &&
+        entry.productionEnvironment === false &&
+        Number.isSafeInteger(entry.deploymentId),
+    );
+    if (status.state === SUCCESS && inherited)
+      return {
+        status: 'satisfied',
+        reason: `${producer.environment} inherited deployment ${inherited.deploymentId} from ${inherited.ancestorSha}; no application impact since that ancestor`,
+        evidence: { ...detail, ...inherited },
+      };
     return {
       status: 'failed',
       reason: `${producer.context} was cancelled by Ignored Build Step although the plan requires a build`,
       evidence: detail,
     };
+  }
   if (!status || status.state === 'pending')
     return { status: 'pending', reason: `${producer.context} is pending`, evidence: detail };
   if (status.state !== SUCCESS)

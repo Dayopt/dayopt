@@ -282,8 +282,8 @@ TS の `PRODUCT_EVENT_NAMES` と DB の CHECK 制約の両方で定義される�
 | `activities.createCategory`                  | 1                   | 0                   |
 | `activities.deleteActivity`                  | 2                   | 0                   |
 | `activities.deleteCategory`                  | 1                   | 0                   |
-| `activities.listActivities`                  | 3                   | 2                   |
-| `activities.listCategories`                  | 2                   | 1                   |
+| `activities.listActivities`                  | 4                   | 2                   |
+| `activities.listCategories`                  | 3                   | 1                   |
 | `activities.listTree`                        | 2                   | 0                   |
 | `activities.restoreActivity`                 | 1                   | 0                   |
 | `activities.restoreCategory`                 | 1                   | 0                   |
@@ -291,7 +291,7 @@ TS の `PRODUCT_EVENT_NAMES` と DB の CHECK 制約の両方で定義される�
 | `activities.updateCategory`                  | 1                   | 0                   |
 | `billing.createCheckoutSession`              | 1                   | 0                   |
 | `billing.createPortalSession`                | 3                   | 0                   |
-| `billing.getAccess`                          | 2                   | 0                   |
+| `billing.getAccess`                          | 3                   | 0                   |
 | `billing.getOverview`                        | 7                   | 0                   |
 | `billing.startTrial`                         | 1                   | 0                   |
 | `contact.submit`                             | 1                   | 0                   |
@@ -340,7 +340,7 @@ TS の `PRODUCT_EVENT_NAMES` と DB の CHECK 制約の両方で定義される�
 | `user.exportData`                            | 1                   | 0                   |
 | `user.requestEmailChange`                    | 1                   | 0                   |
 | `user.verifyRecoveryCode`                    | 2                   | 0                   |
-| `userSettings.get`                           | 9                   | 0                   |
+| `userSettings.get`                           | 10                  | 0                   |
 | `userSettings.getICalToken`                  | 1                   | 0                   |
 | `userSettings.regenerateICalToken`           | 1                   | 0                   |
 | `userSettings.update`                        | 1                   | 0                   |
@@ -543,7 +543,7 @@ page から import を宣言元まで解決して辿った結果（barrel の再
 | ------------------- | ------ | --------- | --------- | ---------------------- |
 | `activities`        | 30     | 3         | 11        | 3 / 11                 |
 | `auth`              | 22     | 14        | 8         | 7 / 8                  |
-| `calendar`          | 191    | 95        | 59        | 31 / 59                |
+| `calendar`          | 192    | 96        | 59        | 31 / 59                |
 | `contact`           | 8      | 6         | 2         | 1 / 2                  |
 | `external-calendar` | 26     | 19        | 2         | 1 / 2                  |
 | `review`            | 37     | 22        | 19        | 14 / 19                |

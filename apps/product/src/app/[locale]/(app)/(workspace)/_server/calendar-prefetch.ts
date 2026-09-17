@@ -1,5 +1,3 @@
-import { headers } from 'next/headers';
-
 import type { CalendarViewType } from '@/features/calendar';
 import {
   buildCalendarRangeInput,
@@ -8,28 +6,9 @@ import {
   DEFAULT_WEEK_STARTS_ON,
   parseCalendarDateParam,
 } from '@/features/calendar';
-import { getDateKey } from '@/lib/date';
 import { logger } from '@/lib/logger';
+import { getRequestCalendarDate } from '@/lib/server/request-calendar-date';
 import { createServerHelpers, dehydrate } from '@/lib/trpc/server';
-
-/** `user-tz` Cookie を proxy.ts が転送したヘッダー。初回アクセス（Cookie 未設定）は無い */
-const USER_TIMEZONE_HEADER = 'x-user-timezone';
-
-/**
- * 「今日」をブラウザの暦日で求める。
- *
- * client の `CalendarNavigationProvider` は `?date=` が無い時 `new Date()` をブラウザの
- * ローカル暦日で読む。server はブラウザ TZ を `user-tz` Cookie でしか知らないので、
- * user_settings.timezone ではなく Cookie 側で暦日を決める（両者が違う user でも key が揃う）。
- * 不正な TZ 文字列は UTC に落とす。
- */
-function resolveTodayDateKey(now: Date, browserTimezone: string): string {
-  try {
-    return getDateKey(now, browserTimezone);
-  } catch {
-    return getDateKey(now, 'UTC');
-  }
-}
 
 /**
  * カレンダービュー用 prefetch（day/week/Nday）
@@ -46,8 +25,7 @@ function resolveTodayDateKey(now: Date, browserTimezone: string): string {
 export async function prefetchCalendarData(view: CalendarViewType, dateParam: string | undefined) {
   const helpers = await createServerHelpers();
 
-  const headersList = await headers();
-  const browserTimezone = headersList.get(USER_TIMEZONE_HEADER) ?? 'UTC';
+  const requestCalendarDate = await getRequestCalendarDate();
 
   try {
     const settings = await helpers.userSettings.get.fetch();
@@ -55,12 +33,12 @@ export async function prefetchCalendarData(view: CalendarViewType, dateParam: st
     // parse 失敗（不正な ?date=）は client も今日に倒すので揃う
     const anchorDateKey = parseCalendarDateParam(dateParam)
       ? (dateParam as string)
-      : resolveTodayDateKey(new Date(), browserTimezone);
+      : requestCalendarDate.dateKey;
 
     const rangeOptions = {
       viewType: view,
       anchorDateKey,
-      timezone: settings?.timezone ?? browserTimezone,
+      timezone: settings?.timezone ?? requestCalendarDate.timezone,
       weekStartsOn: settings?.weekStartsOn ?? DEFAULT_WEEK_STARTS_ON,
       showWeekends: settings?.showWeekends ?? DEFAULT_SHOW_WEEKENDS,
     };
