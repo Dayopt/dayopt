@@ -70,8 +70,11 @@ describe('shadow report: classification and comparison', () => {
       wouldSkip: ['📦 Unit Tests', 'Vercel – product', 'Vercel – web'],
       wouldAdd: [],
     });
+    // fixture は `.claude/settings.json`。文書だけの policy 変更では ci.yml が
+    // `📦 Unit Tests` を skip し、plan もそれに合わせて required にしない（#2821）ため、
+    // 「required なのに skip された」を再現するには実行可能な policy ファイルを使う
     const policy = comparePlanToLegacy({
-      plan: plan(['AGENTS.md']),
+      plan: plan(['.claude/settings.json']),
       jobs: [j('🔍 Static Checks', 'success', 2), j('📦 Unit Tests', 'skipped', 0)],
       statuses: green,
     });
@@ -93,7 +96,7 @@ describe('shadow report: classification and comparison', () => {
 
   it('treats a cancelled job that never started as absent (would-add when required)', () => {
     const result = comparePlanToLegacy({
-      plan: plan(['AGENTS.md']),
+      plan: plan(['.claude/settings.json']),
       jobs: [
         j('🔍 Static Checks', 'success', 2),
         { name: '📦 Unit Tests', conclusion: 'cancelled', started: false, minutes: null },
