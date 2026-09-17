@@ -112,6 +112,8 @@ export const PRODUCER_DEFINITIONS = Object.freeze([
   '.github/actions/setup/action.yml',
   'scripts/ci/check.mjs',
   'scripts/ci/impact.mjs',
+  // 🧱 DB Upgrade (shadow) の実体。migration と同時に改変した PR の緑を信用しない
+  'scripts/ci/db-upgrade-check.mjs',
 ]);
 
 /**
