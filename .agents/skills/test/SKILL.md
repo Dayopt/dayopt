@@ -1,6 +1,6 @@
 ---
 name: test
-description: 新機能実装の完了時（tRPC procedure / React hook / pure function / component の新規作成後）、バグ修正の完了時（回帰防止用）、既存テストの assertion 追加が必要になる実装変更時に発動。Vitest + Testing Library の配置規約（対象ファイルの隣に `X.test.ts`。`__tests__/` は使わない）に従う。型定義のみ・UI 文言のみ・既存テストのリファクタリングのみの変更時は発動しない。
+description: バグ修正・挙動変更の着手時（実装前に症状を検出する失敗テストを書く）、新機能実装の完了時（tRPC procedure / React hook / pure function / component の新規作成後）、既存テストの assertion 追加が必要な実装変更時に発動。Vitest + Testing Library の配置規約（対象ファイルの隣に `X.test.ts`）と red → green の規約に従う。型定義のみ・UI 文言のみの変更では発動しない。
 effort: medium
 maxTurns: 15
 ---
@@ -13,11 +13,12 @@ Dayoptのテスト作成を支援するスキル。Vitest + Testing Libraryを�
 
 以下の状況で発動:
 
+- バグ修正・挙動変更に着手する時（**実装前に**対象症状を検出する失敗テストを書く）
 - 新規 tRPC procedure / service 関数 / React hook / pure function を実装完了した時
 - 複雑な状態遷移を持つ component を新規追加した時
 - Zod schema の制約を追加・変更した時（入力境界の test case 追加）
 - 既存の実装変更で分岐や境界条件が増えた時（未カバーの path が生まれる）
-- バグを修正した直後（同じ回帰を検知するテストを追加する）
+- バグを修正した直後（実装前に置けなかった場合に、同じ回帰を検知するテストを追加する）
 
 ## When NOT to Use
 
@@ -197,6 +198,20 @@ describe('myStore', () => {
 | エラー系     | 異常な入力、エラーハンドリング | 必須   |
 | エッジケース | 境界値、空配列、null           | 推奨   |
 
+## red → green の規約
+
+バグ修正と挙動変更では、**修正の前に**その症状で失敗するテストを書く。修正してから書くと、そのテストが本当に症状を検出できるか分からない。
+
+- **red は対象の不具合で失敗する**。import error、型エラー、fixture の不備で失敗しているだけの red は red ではない。失敗メッセージが症状を説明しているか確認する
+- **green は同じ検証コマンドで確認する**。red を出したコマンドをそのまま再実行する。別の条件で通しても証明にならない
+- **期待値は実装から逆算しない**。実装と同じ手順で期待値を計算する test は、実装が間違っていても通る（恒真）。既知のリテラル・手計算した値・仕様を使う
+- **1 cycle 1 slice**。1 つの境界に 1 つの test を書き、それを通す最小の実装を書く。テストを全部先に書いてから実装をまとめて書かない
+- **refactor は loop の外**。red → green の中で構造を変えない
+
+正しい seam（テストを置ける境界）が無い場合は、無理に作らず理由を報告する。原因調査そのものは `diagnosing-bugs` skill の領域で、この skill は signal を作る手段としての test を担当する。
+
+例と mock の境界は [`references/tdd-loop.md`](./references/tdd-loop.md) を読む（必要時のみ）。
+
 ## Assert 対象の規約（正本）
 
 **対象操作後にだけ生じるユーザー可視の結果または永続状態を assert する。** 操作前から存在する要素、generic な alert / class、または発火していない mock を確認しただけで test が成功すると、本番では対象操作が失敗しても回帰を検出できない（failure scenario）。
@@ -291,5 +306,6 @@ describe('useCalendarDrag', () => {
 
 ## 関連スキル
 
+- `/diagnosing-bugs` - 原因調査（再現 signal の設計、仮説の潰し方）
 - `/error-handling` - エラー処理のテスト
 - `/storybook` - UIコンポーネントのビジュアルテスト

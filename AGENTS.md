@@ -177,7 +177,10 @@ worktree で作業するセッション（レーン）は次を守る:
 | `error-handling`       | try/catch・tRPC onError・ErrorBoundary・Sentry連携                               |
 | `optimistic-update`    | tRPC mutation の楽観的更新                                                       |
 | `security`             | 認証/認可・RLS・外部入力を受けるフォーム                                         |
-| `test`                 | 新機能・バグ修正後のテスト                                                       |
+| `test`                 | バグ修正前の失敗テスト・新機能後のテスト                                         |
+| `diagnosing-bugs`      | 原因不明・複数層に跨る不具合の再現と切り分け                                     |
+| `react-performance`    | データ取得の waterfall・bundle・RSC 境界の性能判断                               |
+| `ui-audit`             | 指定 UI の操作性・アクセシビリティのコード監査（明示依頼時のみ）                 |
 | `pr-cross-review`      | GitHub の独立 PR レビューと高リスク変更の追加契約                                |
 | `security-sweep`       | 1 SHA の scope を読む security 調査（候補・反証・実行証拠を機械検査）            |
 | `docs-writing`         | ユーザー向けdocs・リリースノート・技術ドキュメント                               |
