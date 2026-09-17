@@ -8,6 +8,7 @@ import { afterAll, describe, expect, it } from 'vitest';
 import {
   buildTrustedPlan,
   collectEvidence,
+  collectInheritedPreviews,
   createGithubApi,
   fetchAllReviewPages,
   resolveTarget,
@@ -948,3 +949,128 @@ function writeEvent(payload: unknown) {
   writeFileSync(path, JSON.stringify(payload));
   return path;
 }
+
+describe('ancestor Preview evidence (#2807)', () => {
+  const previewPr = () =>
+    pull({ commits: 2, head: { sha: headSha, ref: 'candidate', repo: { full_name: REPO } } });
+  const routes = () => ({
+    [`repos/${REPO}/pulls/7/commits?per_page=100`]: [{ sha: baseSha }, { sha: headSha }],
+    [`repos/${REPO}/deployments?sha=${baseSha}&per_page=100`]: [
+      {
+        id: 987,
+        sha: baseSha,
+        ref: 'candidate',
+        environment: 'Preview – web',
+        production_environment: false,
+      },
+    ],
+    [`repos/${REPO}/commits/${baseSha}/pulls?per_page=100`]: [previewPr()],
+    [`repos/${REPO}/deployments/987/statuses?per_page=100`]: [
+      { id: 1, state: 'success', environment_url: 'https://preview.invalid' },
+    ],
+  });
+  const collect = (overrides: Record<string, unknown> = {}, pr = previewPr()) =>
+    collectInheritedPreviews({
+      repository: REPO,
+      pr,
+      api: fakeApi({ ...routes(), ...overrides }).api,
+      cwd,
+      statuses: [
+        {
+          context: 'Vercel – web',
+          state: 'success',
+          description: 'Canceled by Ignored Build Step',
+        },
+      ],
+    });
+  it('accepts an ancestor only for the unchanged app (product changed, web unchanged)', () => {
+    expect(collect()).toEqual([
+      expect.objectContaining({
+        ancestorSha: baseSha,
+        deploymentId: 987,
+        environment: 'Preview – web',
+        unchanged: true,
+      }),
+    ]);
+  });
+  it.each([
+    ['missing commits', { [`repos/${REPO}/pulls/7/commits?per_page=100`]: [] }],
+    [
+      'another PR',
+      { [`repos/${REPO}/commits/${baseSha}/pulls?per_page=100`]: [pull({ number: 8 })] },
+    ],
+    [
+      'failed deployment',
+      { [`repos/${REPO}/deployments/987/statuses?per_page=100`]: [{ id: 2, state: 'failure' }] },
+    ],
+    ['no deployment', { [`repos/${REPO}/deployments?sha=${baseSha}&per_page=100`]: [] }],
+  ])('rejects %s', (_name, overrides) => {
+    expect(collect(overrides)).toEqual([]);
+  });
+  it.each([
+    { ref: 'other' },
+    { environment: 'Production' },
+    { production_environment: true },
+    { sha: headSha },
+  ])('rejects mismatched deployment %j', (patch) => {
+    const original = routes()[`repos/${REPO}/deployments?sha=${baseSha}&per_page=100`];
+    expect(
+      collect({
+        [`repos/${REPO}/deployments?sha=${baseSha}&per_page=100`]: [{ ...original[0], ...patch }],
+      }),
+    ).toEqual([]);
+  });
+  it('accepts the SHA ref emitted by Vercel only with unambiguous PR association', () => {
+    const path = `repos/${REPO}/deployments?sha=${baseSha}&per_page=100`;
+    expect(collect({ [path]: [{ ...routes()[path][0], ref: baseSha }] })).toHaveLength(1);
+    expect(
+      collect({
+        [path]: [{ ...routes()[path][0], ref: baseSha }],
+        [`repos/${REPO}/commits/${baseSha}/pulls?per_page=100`]: [previewPr(), pull({ number: 8 })],
+      }),
+    ).toEqual([]);
+  });
+  it('rejects changed app', () => {
+    expect(
+      collectInheritedPreviews({
+        repository: REPO,
+        pr: previewPr(),
+        api: fakeApi(routes()).api,
+        cwd,
+        statuses: [
+          {
+            context: 'Vercel – product',
+            state: 'success',
+            description: 'Canceled by Ignored Build Step',
+          },
+        ],
+      }),
+    ).toEqual([]);
+  });
+  it('fails closed on a non-ancestor or unavailable git object', () => {
+    expect(() =>
+      collect({
+        [`repos/${REPO}/pulls/7/commits?per_page=100`]: [
+          { sha: conflictingMain },
+          { sha: headSha },
+        ],
+      }),
+    ).toThrow();
+    expect(() =>
+      collect({
+        [`repos/${REPO}/pulls/7/commits?per_page=100`]: [{ sha: 'f'.repeat(40) }, { sha: headSha }],
+      }),
+    ).toThrow();
+  });
+  it('rejects fork evidence', () => {
+    expect(
+      collect(
+        {},
+        {
+          ...previewPr(),
+          head: { sha: headSha, repo: { full_name: 'other/repo' } },
+        },
+      ),
+    ).toEqual([]);
+  });
+});

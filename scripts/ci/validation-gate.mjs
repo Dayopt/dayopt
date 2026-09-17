@@ -34,6 +34,7 @@ import {
   toCommitStatus,
 } from '../lib/validation-evidence.mjs';
 import { createValidationPlan } from '../lib/validation-plan.mjs';
+import { resolveImpact } from './impact.mjs';
 import { collectPlanInput } from './validation-plan-shadow.mjs';
 
 const SHA = /^[a-f0-9]{40}$/;
@@ -207,8 +208,101 @@ export function resolveTarget({ eventName, event, prArg, repository, api }) {
   return { number: open[0].number, source: eventName, eventSha: sha };
 }
 
+/** 同じ PR の祖先 Preview を、完全な git 差分で検証する。失敗は呼び出し元で fail closed。 */
+export function collectInheritedPreviews({ repository, pr, api, cwd, statuses }) {
+  const inherited = [];
+  if (pr.head.repo?.full_name !== repository || !SHA.test(pr.head.sha)) return inherited;
+  const skipped = ['product', 'web'].filter((app) =>
+    statuses.some(
+      (status) =>
+        status.context === `Vercel – ${app}` &&
+        status.state === 'success' &&
+        /ignored build step/i.test(status.description ?? ''),
+    ),
+  );
+  if (skipped.length === 0) return inherited;
+  const commits = api(`repos/${repository}/pulls/${pr.number}/commits?per_page=100`, {
+    paginate: true,
+  });
+  // REST は 250 commits まで。上限・欠落を完全な PR 履歴と見なさない。
+  if (!Number.isSafeInteger(pr.commits) || commits.length !== pr.commits || pr.commits >= 250)
+    return inherited;
+  const git = gitIn(cwd);
+  for (const app of skipped) {
+    for (const commit of [...commits].reverse()) {
+      if (!SHA.test(commit.sha) || commit.sha === pr.head.sha) continue;
+      // merge-base と diff は PR code を実行せず object だけ読む。
+      git(['merge-base', '--is-ancestor', commit.sha, pr.head.sha]);
+      const files = execFileSync(
+        'git',
+        ['diff', '--no-renames', '--name-only', '-z', commit.sha, pr.head.sha, '--'],
+        { cwd, encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 },
+      )
+        .split('\0')
+        .filter(Boolean);
+      if (files.length > 0 && resolveImpact(files)[app]) continue;
+      const deployments = api(`repos/${repository}/deployments?sha=${commit.sha}&per_page=100`, {
+        paginate: true,
+      });
+      const candidates = deployments.filter(
+        (entry) =>
+          entry.sha === commit.sha &&
+          (entry.ref === pr.head.ref || entry.ref === commit.sha) &&
+          entry.environment === `Preview – ${app}` &&
+          entry.production_environment === false &&
+          Number.isSafeInteger(entry.id),
+      );
+      candidates.sort((a, b) => b.id - a.id);
+      const deployment = candidates[0];
+      if (!deployment) continue;
+      const associated = api(`repos/${repository}/commits/${commit.sha}/pulls?per_page=100`, {
+        paginate: true,
+      });
+      if (
+        associated.length !== 1 ||
+        !associated.some(
+          (pull) =>
+            pull.number === pr.number &&
+            pull.head?.repo?.full_name === repository &&
+            pull.head?.ref === pr.head.ref,
+        )
+      )
+        continue;
+      const history = api(
+        `repos/${repository}/deployments/${deployment.id}/statuses?per_page=100`,
+        { paginate: true },
+      );
+      const latest = history.reduce(
+        (current, entry) => (!current || entry.id > current.id ? entry : current),
+        null,
+      );
+      // 新しい失敗・進行中の Preview を、さらに古い成功で覆い隠さない。
+      if (latest?.state !== 'success') break;
+      inherited.push({
+        repository,
+        prNumber: pr.number,
+        headSha: pr.head.sha,
+        ancestorSha: commit.sha,
+        environment: deployment.environment,
+        deploymentId: deployment.id,
+        url: latest.environment_url ?? null,
+        unchanged: true,
+        productionEnvironment: false,
+      });
+      break;
+    }
+  }
+  return inherited;
+}
+
 /** GitHub API の生 JSON を evidence の形へ正規化する（判定側は API の形を知らない）。 */
-export function collectEvidence({ repository, pr, api, now = () => new Date() }) {
+export function collectEvidence({
+  repository,
+  pr,
+  api,
+  cwd = process.cwd(),
+  now = () => new Date(),
+}) {
   const headSha = pr.head.sha;
   const runsRaw = api(`repos/${repository}/actions/runs?head_sha=${headSha}&per_page=100`, {
     paginate: true,
@@ -315,6 +409,7 @@ export function collectEvidence({ repository, pr, api, now = () => new Date() })
     workflowRuns: runs,
     statuses,
     deployments,
+    inheritedPreviews: collectInheritedPreviews({ repository, pr, api, cwd, statuses }),
     checkRuns,
   };
 }
@@ -554,7 +649,7 @@ export function runValidationGate({
     // できない（PR 側の workflow 定義で走る）ため、pending の間だけ bounded に待って再取得する。
     const waitBudgetMs = Number(env.VALIDATION_WAIT_MINUTES ?? '0') * 60_000;
     const deadline = now().getTime() + (Number.isFinite(waitBudgetMs) ? waitBudgetMs : 0);
-    let evidence = collectEvidence({ repository, pr, api, now });
+    let evidence = collectEvidence({ repository, pr, api, cwd, now });
     let result = evaluateValidation({ plan, evidence });
     while (
       result.verdict === 'pending' &&
@@ -562,7 +657,7 @@ export function runValidationGate({
       now().getTime() + pollIntervalMs <= deadline
     ) {
       sleep(pollIntervalMs);
-      evidence = collectEvidence({ repository, pr, api, now });
+      evidence = collectEvidence({ repository, pr, api, cwd, now });
       result = evaluateValidation({ plan, evidence });
     }
     result.target = target;
