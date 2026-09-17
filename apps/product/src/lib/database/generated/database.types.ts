@@ -2201,11 +2201,6 @@ export type Database = {
         Returns: number;
       };
       get_user_timezone: { Args: { p_user_id: string }; Returns: string };
-      get_vault_secret: { Args: { p_name: string }; Returns: string };
-      invoke_edge_function: {
-        Args: { p_body?: Json; p_function_name: string };
-        Returns: number;
-      };
       issue_oauth_token_pair: {
         Args: {
           p_access_expires_at: string;
