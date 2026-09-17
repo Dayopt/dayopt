@@ -72,11 +72,18 @@ const STATIC_IMPORT_PATTERN =
 const DYNAMIC_IMPORT_PATTERN =
   /\{([^{}\n]*)\}\s*=\s*await\s+import\(\s*'@supabase\/(?:supabase-js|ssr)'\s*\)/gu;
 
+/**
+ * import specifier から**元の名前**を取り出す。
+ * `createClient as createAdminClient`（static import の alias）と
+ * `createClient: createAdminClient`（dynamic import の分割代入 rename）の両方を
+ * 正規化するので、局所名が何であっても factory を見失わない。
+ */
+function importedName(specifier: string): string {
+  return (specifier.split(/\s+as\s+|:/u)[0] ?? '').trim();
+}
+
 function bindsSupabaseFactory(bindings: string): boolean {
-  return bindings
-    .split(',')
-    .map((binding) => binding.trim())
-    .some((binding) => FACTORY_NAMES.has(binding));
+  return bindings.split(',').some((specifier) => FACTORY_NAMES.has(importedName(specifier)));
 }
 
 function importsSupabaseFactory(source: string): boolean {
@@ -109,6 +116,27 @@ function findFactoryFiles(): string[] {
     .map((absolute) => path.relative(SRC_ROOT, absolute).split(path.sep).join('/'))
     .sort();
 }
+
+describe('factory の走査', () => {
+  // 取りこぼしは「分類テストが緑のまま factory が増える」形で出るので、
+  // 走査の性質自体を固定する。過去 2 巡とも取りこぼしの指摘だった（PR #2835）。
+  it.each([
+    ["import { createClient } from '@supabase/supabase-js';", true],
+    ["import { createClient as createAdminClient } from '@supabase/supabase-js';", true],
+    ["import { createServerClient as ssrClient } from '@supabase/ssr';", true],
+    ["import { createClient, type SupabaseClient } from '@supabase/supabase-js';", true],
+    ["const { createServerClient } = await import('@supabase/ssr');", true],
+    ["const { createServerClient: makeClient } = await import('@supabase/ssr');", true],
+    // 型だけの import は client を作らない
+    ["import type { SupabaseClient } from '@supabase/supabase-js';", false],
+    ["import type { User, Session } from '@supabase/supabase-js';", false],
+    // 別 module の同名 factory（`@/lib/supabase/client` 等）は対象外
+    ["import { createClient } from '@/lib/supabase/client';", false],
+    ['const supabase = createClient();', false],
+  ])('%s → %s', (source, expected) => {
+    expect(importsSupabaseFactory(source)).toBe(expected);
+  });
+});
 
 describe('Supabase client factory の trace 伝播配線', () => {
   it('全ての factory が伝播対象か、理由付きの対象外かに分類されている', () => {
