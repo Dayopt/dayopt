@@ -4,6 +4,7 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
 import { env } from '@/env';
 import type { Database } from '@/lib/database';
+import { SUPABASE_TRACE_PROPAGATION } from '@/lib/supabase/trace-propagation';
 
 /**
  * OAuth 用 service-role client が触れる surface だけに narrow した DB 型。
@@ -51,6 +52,7 @@ const OAUTH_DB_TIMEOUT_MS = 15_000;
 
 export function createOAuthDbClient(): OAuthSupabaseClient {
   return createClient<OAuthOnlyDatabase>(env.NEXT_PUBLIC_SUPABASE_URL, env.SUPABASE_SECRET_KEY, {
+    tracePropagation: SUPABASE_TRACE_PROPAGATION,
     auth: {
       autoRefreshToken: false,
       persistSession: false,

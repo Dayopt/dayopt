@@ -4,6 +4,7 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
 import { env } from '@/env';
 import type { Database } from '@/lib/database';
+import { SUPABASE_TRACE_PROPAGATION } from '@/lib/supabase/trace-propagation';
 
 /** Service-role surface used only while verifying an MCP access token. */
 type McpAccessDatabase = {
@@ -32,6 +33,7 @@ const MCP_ACCESS_DB_TIMEOUT_MS = 15_000;
 
 export function createMcpAccessDbClient(): McpAccessSupabaseClient {
   return createClient<McpAccessDatabase>(env.NEXT_PUBLIC_SUPABASE_URL, env.SUPABASE_SECRET_KEY, {
+    tracePropagation: SUPABASE_TRACE_PROPAGATION,
     auth: {
       autoRefreshToken: false,
       persistSession: false,
