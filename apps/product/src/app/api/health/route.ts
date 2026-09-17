@@ -8,6 +8,7 @@ import {
 } from '@/lib/oauth-server/database-identity';
 import { healthCheckGlobalRateLimit } from '@/lib/rate-limit/upstash';
 
+import { SUPABASE_TRACE_PROPAGATION } from '@/lib/supabase/trace-propagation';
 import { resolveHealthStatus, type OverallHealthStatus } from './health-status';
 
 /**
@@ -79,6 +80,7 @@ async function checkDatabase(): Promise<'ok' | 'error' | 'warning'> {
 
   try {
     const supabase = createClient(dbUrl, dbKey, {
+      tracePropagation: SUPABASE_TRACE_PROPAGATION,
       auth: { persistSession: false },
       global: {
         fetch: (url, options) =>

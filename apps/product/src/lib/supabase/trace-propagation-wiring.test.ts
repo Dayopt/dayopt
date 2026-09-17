@@ -31,6 +31,7 @@ const SRC_ROOT = path.resolve(import.meta.dirname, '../..');
  * 新しい factory を足したらここへ追加する。列挙漏れは下の contract test が落とす。
  */
 const TRACED_FACTORY_FILES = [
+  'app/api/health/route.ts',
   'features/external-calendar/server/account-deletion.ts',
   'features/external-calendar/server/connection-service.ts',
   'features/external-calendar/server/event-pruning.ts',
@@ -57,7 +58,37 @@ const UNTRACED_FACTORY_FILES: Record<string, string> = {
   'lib/supabase/middleware.ts': 'edge（@sentry/vercel-edge は @opentelemetry/api を持たない）',
 };
 
-const CLIENT_FACTORY_PATTERN = /create(?:Server|Browser)?Client</u;
+/**
+ * Supabase の factory を実際に import しているファイルだけを拾う。
+ * 呼び出しの形（generic の有無、static / dynamic import）に依存させない
+ * —— `createClient<Database>(` だけを見る形にすると `src/app/api/health/route.ts` の
+ * 非 generic な `createClient(` を取りこぼす（PR #2835 のレビュー指摘）。
+ */
+const FACTORY_NAMES = new Set(['createClient', 'createServerClient', 'createBrowserClient']);
+const STATIC_IMPORT_PATTERN =
+  /import\s+(type\s+)?\{([^}]*)\}\s*from\s*'@supabase\/(?:supabase-js|ssr)'/gu;
+// 分割代入は 1 行に収まる想定。`[^}]*` にすると手前の `{` から貪欲に食って
+// binding 名が一致しなくなる（lib/trpc/context.ts で実際に外した）。
+const DYNAMIC_IMPORT_PATTERN =
+  /\{([^{}\n]*)\}\s*=\s*await\s+import\(\s*'@supabase\/(?:supabase-js|ssr)'\s*\)/gu;
+
+function bindsSupabaseFactory(bindings: string): boolean {
+  return bindings
+    .split(',')
+    .map((binding) => binding.trim())
+    .some((binding) => FACTORY_NAMES.has(binding));
+}
+
+function importsSupabaseFactory(source: string): boolean {
+  for (const match of source.matchAll(STATIC_IMPORT_PATTERN)) {
+    // `import type { ... }` は型だけなので factory を作らない。
+    if (!match[1] && bindsSupabaseFactory(match[2] ?? '')) return true;
+  }
+  for (const match of source.matchAll(DYNAMIC_IMPORT_PATTERN)) {
+    if (bindsSupabaseFactory(match[1] ?? '')) return true;
+  }
+  return false;
+}
 
 /** apps/product/src 配下の .ts / .tsx を再帰列挙する（test / generated を除く）。 */
 function listSourceFiles(dir: string): string[] {
@@ -74,7 +105,7 @@ function listSourceFiles(dir: string): string[] {
 
 function findFactoryFiles(): string[] {
   return listSourceFiles(SRC_ROOT)
-    .filter((absolute) => CLIENT_FACTORY_PATTERN.test(readFileSync(absolute, 'utf8')))
+    .filter((absolute) => importsSupabaseFactory(readFileSync(absolute, 'utf8')))
     .map((absolute) => path.relative(SRC_ROOT, absolute).split(path.sep).join('/'))
     .sort();
 }
@@ -87,10 +118,11 @@ describe('Supabase client factory の trace 伝播配線', () => {
     );
   });
 
-  it.each(TRACED_FACTORY_FILES)('%s が共有の opt-in を使っている', (relativePath) => {
+  it.each(TRACED_FACTORY_FILES)('%s が共有の opt-in を option として渡している', (relativePath) => {
     const source = readFileSync(path.join(SRC_ROOT, relativePath), 'utf8');
 
-    expect(source).toContain('SUPABASE_TRACE_PROPAGATION');
+    // import の有無だけを見ると、option を外して import が残った状態で緑になる。
+    expect(source).toContain('tracePropagation: SUPABASE_TRACE_PROPAGATION');
   });
 
   it.each(Object.entries(UNTRACED_FACTORY_FILES))('%s は opt-in しない（%s）', (relativePath) => {
