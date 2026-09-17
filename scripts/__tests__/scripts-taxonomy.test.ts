@@ -108,6 +108,9 @@ const KNOWN_PLACEMENT_EXCEPTIONS = new Set<string>([
   // family と同型のペア構成（内部結合の強い unit）。loader は settings.json から
   // 参照されるため hooks 判定になり、rules だけがこの例外で hooks/ に揃える。
   'scripts/hooks/pre-tool-guard-rules.mjs',
+  // read-only-delegate.mjs: package.json の agent:readonly エントリと skill/docs の
+  // 利用者向け記述から tasks 判定になるが、agent-facing adapter として agent/ に置く。
+  'scripts/agent/read-only-delegate.mjs',
 ]);
 
 describe('scripts/ 呼ばれ方別 taxonomy', () => {

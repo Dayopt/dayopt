@@ -26,7 +26,7 @@
 
 ## 検証
 
-<!-- 実行したcommand（pnpm check 等）、確認した画面・API・DB状態、実施した反証レビュー（read-only subagent）があれば対象。再現可能な証拠を書く。 -->
+<!-- 実行したcommand（pnpm check 等）、確認した画面・API・DB状態、実施したレビューや明示的な security-sweep evidence があれば対象。再現可能な証拠を書く。 -->
 
 ## Rollback・外部状態
 

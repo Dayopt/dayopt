@@ -165,6 +165,21 @@ describe('Codex shell and loader', () => {
   });
 });
 
+describe('Codex delegation boundary', () => {
+  it.each(['spawn_agent', 'collaboration.spawn_agent'])(
+    'blocks native %s because its read-only scope is unobservable',
+    async (tool_name) => {
+      const result = await evaluateCodex(
+        JSON.stringify({ cwd: root, tool_name, tool_input: { task: 'inspect files' } }),
+      );
+      expect(result).toMatchObject({
+        decision: 'block',
+        message: expect.stringContaining('agent:readonly'),
+      });
+    },
+  );
+});
+
 it('validates env references in the actual per-command workdir', async () => {
   const nested = join(root, 'nested');
   mkdirSync(nested);

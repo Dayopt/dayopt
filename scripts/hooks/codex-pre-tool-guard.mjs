@@ -9,6 +9,10 @@ function deny(message) {
   return { decision: 'block', message: `BLOCKED: ${message}` };
 }
 
+// Codex の native delegation は read-only sandbox / scope 制限を tool input から証明できない。
+// 大量の読み取りは scripts/agent/read-only-delegate.mjs の CLI adapter だけを使う。
+const NATIVE_DELEGATION_TOOLS = new Set(['spawn_agent', 'collaboration.spawn_agent']);
+
 /** Extract every touched path, including both sides of a rename, before evaluating any. */
 export function parsePatch(command) {
   if (typeof command !== 'string') throw new Error('patch is missing');
@@ -86,6 +90,10 @@ export async function evaluateCodex(rawInput, options = {}) {
   if (typeof suppliedCwd !== 'string' || !isAbsolute(suppliedCwd))
     return deny('cwd を確認できません');
   const cwd = realpathSync(suppliedCwd);
+  if (NATIVE_DELEGATION_TOOLS.has(tool))
+    return deny(
+      'native delegation は read-only 実行境界を証明できないため禁止です（pnpm agent:readonly を使用してください）',
+    );
   const { evaluate } = await import('./pre-tool-guard-rules.mjs');
   const check = (name, args) =>
     evaluate(JSON.stringify({ tool_name: name, tool_input: args }), { cwd });

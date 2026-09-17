@@ -27,7 +27,7 @@ pnpm handoff:validate --context /tmp/dayopt-context.json --file /tmp/dayopt-hand
 
 対象 HEAD・選択した source の作業中の内容・ctx のハッシュが変われば再利用できない。引き渡す前に ctx を再取得して検査する。資料の生成時点から対象が変わったら新しい出力先へ作り直し、変化した事実だけ再確認する。PR は現在の HEAD が PR head SHA と一致する checkout で作る。snapshot と snapshotId は編集しない。
 
-検査結果は `ready` / `partial` / `stale` / `invalid`。`ready` 以外は非 0 exit で、未実行や未確認を完了扱いしない。これは鮮度・形式・根拠参照の検査であり、記述の真偽・コマンドの実行・安全性は証明しない。選択していないファイルの変化も保証外。L2・L3 は論点に必要な一次資料と結果を確認する。独立レビューへ L1 の安全性の結論を引き継がない。通常 PR は GitHub、高リスク変更で固定差分レビューを使う時は `pr-cross-review` の追加契約に従う。
+検査結果は `ready` / `partial` / `stale` / `invalid`。`ready` 以外は非 0 exit で、未実行や未確認を完了扱いしない。これは鮮度・形式・根拠参照の検査であり、記述の真偽・コマンドの実行・安全性は証明しない。選択していないファイルの変化も保証外。L2・L3 は論点に必要な一次資料と結果を確認する。独立レビューへ L1 の安全性の結論を引き継がない。高リスク変更も GitHub の `@codex review` を使う。追加 reviewer は User が明示的に再開を指示するまで停止する（`pr-cross-review` skill）。
 
 ### 効果の回収
 

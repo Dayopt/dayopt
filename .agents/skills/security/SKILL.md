@@ -159,11 +159,11 @@ pnpm security:check
 3. **`handleServiceError()` を使用** - 直接TRPCErrorをthrowしない
 4. **守るべき前提を作ったら `docs/engineering/invariants.md` を同じ PR で更新** - 新しい
    Pro 限定機能、新しい公開エンドポイント種別、新しい table パターンなど。カタログは
-   内製クロスレビュー（`.agents/skills/pr-cross-review/SKILL.md`）が
+   GitHub の `@codex review` が
    「あるべき検査の不在」を判定する時の照合先なので、更新を怠ると新機能の穴が構造的に
    見えなくなる。**判定は自動では走らない**（merge の hard gate ではない advisory
-   レビュー。別 provider の反証は User が必要時に使う任意経路。AGENTS.md §レビュー規則、
-   #2596）。危険クラスの diff では merge 前に `pr-cross-review` skill を明示的に実行する
+   レビュー。追加 reviewer は停止中。AGENTS.md §レビュー規則）。危険クラスの diff では
+   merge 前に `@codex review` を依頼する
 
 5. **実装前に `docs/engineering/threat-model.md` の既往クラスと却下記録を読む** - Dayopt で
    実際に起きた欠陥のクラスと、反証つきで却下済みの候補が並んでいる。同じ穴を掘り直さない
@@ -172,7 +172,7 @@ pnpm security:check
 
 ## 関連する検査経路
 
-- **`pr-cross-review` skill** — auth / RLS / service role / OAuth / webhook / billing / redirect / migration を扱う PR の merge 前クロスレビュー
+- **`pr-cross-review` skill** — auth / RLS / service role / OAuth / webhook / billing / redirect / migration を扱う PR の `@codex review` と裁定
 - **`security-sweep` skill** — PR 差分ではなく 1 SHA の scope を読む provider 非依存の調査。候補・反証・実行証拠を候補集合として残し、その結果が `docs/engineering/threat-model.md` へ戻る
 - **`/claude-security`** — 既存コードの深掘りスキャン。`security-sweep` の researcher 段の任意の加速器で、必須ではない
 

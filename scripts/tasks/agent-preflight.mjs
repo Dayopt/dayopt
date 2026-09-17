@@ -92,6 +92,13 @@ export function collectPreflight(cwd = process.cwd()) {
       }
     }),
   );
+  let claude = false;
+  try {
+    execFileSync('which', ['claude'], { stdio: 'ignore' });
+    claude = true;
+  } catch {
+    // Keep the general CLI line backward compatible; Claude is reported below.
+  }
   const skills = existsSync(join(root, '.agents/skills/routing/SKILL.md'));
   const ghIdentity = collectGhIdentity({ ghPresent: cli.gh });
   return {
@@ -111,6 +118,12 @@ export function collectPreflight(cwd = process.cwd()) {
     codexHooks: existsSync(join(root, '.codex/hooks.json'))
       ? 'configured; runtime activation unverified'
       : 'missing',
+    readOnlyDelegation: {
+      wrapper: existsSync(join(root, 'scripts/agent/read-only-delegate.mjs')),
+      codex: cli.codex,
+      claude,
+      native: 'unsupported; runtime permission / hook coverage unverified',
+    },
   };
 }
 
@@ -138,6 +151,7 @@ export function renderPreflight(state) {
       .join(' ')} (${state.hooksPath ?? '未設定'})`,
     `**Shared skills**: ${state.skills ? 'present; session discovery unverified' : 'missing'}`,
     `**Codex hooks**: ${state.codexHooks}`,
+    `**Read-only delegation**: wrapper:${state.readOnlyDelegation?.wrapper ? 'yes' : 'no'} codex:${state.readOnlyDelegation?.codex ? 'yes' : 'no'} claude:${state.readOnlyDelegation?.claude ? 'yes' : 'no'}; native: ${state.readOnlyDelegation?.native ?? 'unverified'}`,
     `**gh identity**: ${renderGhIdentity(state.ghIdentity)}`,
   ];
   if (state.ghIdentity?.broadScopes.length)
