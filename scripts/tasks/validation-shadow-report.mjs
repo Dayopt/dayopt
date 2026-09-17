@@ -32,7 +32,20 @@ export const VERCEL_CONTEXTS = {
   'Preview – product': 'Vercel – product',
   'Preview – web': 'Vercel – web',
 };
+/** compare API が返す変更ファイルの上限（GitHub 仕様）。到達したら diff が不完全とみなす。 */
+export const COMPARE_FILE_CAP = 300;
 export const UNAVAILABLE = '未取得';
+
+/** `/commits/{sha}/statuses` の全件から context ごとの最新（id 最大）を選ぶ。 */
+export function latestStatusByContext(statuses) {
+  const latest = new Map();
+  for (const entry of statuses ?? []) {
+    if (!entry?.context) continue;
+    const current = latest.get(entry.context);
+    if (!current || (entry.id ?? 0) > (current.id ?? 0)) latest.set(entry.context, entry);
+  }
+  return latest;
+}
 export const UNDECIDED = '未判定';
 
 /** PR の変更領域を 5 分類に落とす（#2798 §1 の比較軸）。indeterminate な plan は「未判定」に隔離する。 */
@@ -132,6 +145,9 @@ export function collectPrRow({ pr, api }) {
   );
   const files = compared.map((file) => file.filename);
   const previous = compared.map((file) => file.previous_filename).filter(Boolean);
+  // compare API は比較全体で最大 COMPARE_FILE_CAP 件しか返さない（pagination しても増えない）。
+  // 上限に達した diff は末尾の migration / policy を落とし得るので plan を indeterminate にする
+  const complete = compared.length < COMPARE_FILE_CAP;
   const plan = createValidationPlan({
     repository: REPO,
     prNumber: pr.number,
@@ -142,7 +158,7 @@ export function collectPrRow({ pr, api }) {
     policySha: baseSha,
     event: 'pull_request',
     diff: {
-      complete: files.length === (pr.changed_files ?? files.length),
+      complete,
       files: [...files, ...previous],
       hash: 'a'.repeat(64),
     },
@@ -161,8 +177,12 @@ export function collectPrRow({ pr, api }) {
           minutes: jobMinutes(job),
         }))
     : [];
-  const statuses = api(`repos/${REPO}/commits/${headSha}/status`).statuses ?? [];
-  const status = (context) => statuses.find((entry) => entry.context === context) ?? null;
+  // combined status は先頭 30 件しか返さない。controller の再評価で pending / terminal が積み重なると
+  // Vercel context が押し出されるので、全 status を page で取り context ごとの最新（id 最大）を選ぶ
+  const statuses = latestStatusByContext(
+    api(`repos/${REPO}/commits/${headSha}/statuses?per_page=100`, true),
+  );
+  const status = (context) => statuses.get(context) ?? null;
   const ciSeconds =
     latest?.created_at && latest?.updated_at
       ? Math.round((Date.parse(latest.updated_at) - Date.parse(latest.created_at)) / 1000)

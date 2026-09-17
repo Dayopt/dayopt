@@ -7,6 +7,7 @@ import {
   comparePlanToLegacy,
   formatReport,
   jobMinutes,
+  latestStatusByContext,
   listRecentPulls,
   runReport,
   sumOrNull,
@@ -268,16 +269,22 @@ describe('shadow report: collection and rendering', () => {
         ],
       },
     ],
-    [`repos/${REPO}/commits/${HEAD}/status`]: {
-      statuses: [
-        { context: 'Vercel – product', state: 'success', description: 'Deployment has completed' },
-        {
-          context: 'Validation (shadow)',
-          state: 'success',
-          description: 'All merge-stage evidence verified',
-        },
-      ],
-    },
+    [`repos/${REPO}/commits/${HEAD}/statuses?per_page=100`]: [
+      // 古い pending が後ろに並んでいても id 最大の terminal を選ぶ
+      {
+        id: 3,
+        context: 'Vercel – product',
+        state: 'success',
+        description: 'Deployment has completed',
+      },
+      { id: 1, context: 'Vercel – product', state: 'pending', description: 'Deployment started' },
+      {
+        id: 2,
+        context: 'Validation (shadow)',
+        state: 'success',
+        description: 'All merge-stage evidence verified',
+      },
+    ],
   };
   const api = (path: string) => {
     if (!(path in routes)) throw new Error(`unexpected: ${path}`);
@@ -363,8 +370,26 @@ describe('shadow report: collection and rendering', () => {
     expect(json.policyCheckout).toBe('f'.repeat(40));
   });
 
-  it('marks an incomplete file listing as indeterminate instead of planning on a partial diff', () => {
-    const row = collectPrRow({ pr: { ...pr, changed_files: 5 }, api });
+  it('picks the latest status per context across pages', () => {
+    const latest = latestStatusByContext([
+      { id: 5, context: 'a', state: 'pending' },
+      { id: 9, context: 'a', state: 'success' },
+      { id: 7, context: 'b', state: 'failure' },
+      { context: null },
+    ]);
+    expect(latest.get('a')?.state).toBe('success');
+    expect(latest.get('b')?.id).toBe(7);
+    expect(latest.size).toBe(2);
+  });
+
+  it('marks a diff that hits the compare API file cap as indeterminate instead of planning on a partial diff', () => {
+    const row = collectPrRow({
+      pr,
+      api: (path: string) =>
+        path.includes('/compare/')
+          ? [{ files: Array.from({ length: 300 }, (_, i) => ({ filename: `docs/${i}.md` })) }]
+          : api(path),
+    });
     expect(row.planStatus).toBe('indeterminate');
     expect(row.classification).toBe('未判定');
     expect(row.comparison).toBeNull();
