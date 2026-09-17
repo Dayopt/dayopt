@@ -630,14 +630,6 @@ model {
     metadata { inventoryKind 'db-function' detail 'app からの .rpc 呼び出しなし' }
     link ../../../../apps/product/src/lib/database/generated/database.types.ts
   }
-  dbfunction fn_get_vault_secret 'get_vault_secret' {
-    metadata { inventoryKind 'db-function' detail 'app からの .rpc 呼び出しなし' }
-    link ../../../../apps/product/src/lib/database/generated/database.types.ts
-  }
-  dbfunction fn_invoke_edge_function 'invoke_edge_function' {
-    metadata { inventoryKind 'db-function' detail 'app からの .rpc 呼び出しなし' }
-    link ../../../../apps/product/src/lib/database/generated/database.types.ts
-  }
   dbfunction fn_issue_oauth_token_pair 'issue_oauth_token_pair' {
     metadata { inventoryKind 'db-function' detail 'app からの .rpc 呼び出しなし' }
     link ../../../../apps/product/src/lib/database/generated/database.types.ts
