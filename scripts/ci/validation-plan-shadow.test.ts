@@ -12,12 +12,12 @@ git('init', '-b', 'main');
 git('config', 'user.email', 'fixture@example.invalid');
 git('config', 'user.name', 'Fixture');
 mkdirSync(join(cwd, 'supabase/migrations'), { recursive: true });
-writeFileSync(join(cwd, 'supabase/migrations/base.sql'), 'select 1;\n');
+writeFileSync(join(cwd, 'supabase/migrations/20260901000000_base.sql'), 'select 1;\n');
 git('add', 'supabase');
 git('commit', '-m', 'baseline');
 const baseSha = git('rev-parse', 'HEAD');
 git('checkout', '-b', 'candidate');
-renameSync(join(cwd, 'supabase/migrations/base.sql'), join(cwd, 'README.md'));
+renameSync(join(cwd, 'supabase/migrations/20260901000000_base.sql'), join(cwd, 'README.md'));
 git('add', '-A');
 git('commit', '-m', 'rename protected file to prose');
 const headSha = git('rev-parse', 'HEAD');
@@ -39,7 +39,7 @@ afterAll(() => rmSync(cwd, { recursive: true, force: true }));
 describe('complete git collector', () => {
   it('retains deleted source and new destination of a rename', () => {
     const input = collectPlanInput(params);
-    expect(input.diff.files).toEqual(['README.md', 'supabase/migrations/base.sql']);
+    expect(input.diff.files).toEqual(['README.md', 'supabase/migrations/20260901000000_base.sql']);
     const result = createValidationPlan(input);
     expect(result.required.dbUpgrade.status).toBe('required');
     expect(result.review.status).toBe('required');

@@ -39,6 +39,14 @@ import { fileURLToPath } from 'node:url';
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
 /** 出力キー。消費側（finish-branch.sh / release / CI）はこの集合に依存する。 */
+/**
+ * production に適用される root の migration ファイル（`_archive/` や README は含まない）。
+ * `🧱 DB Upgrade (shadow)` の起動（check.mjs の `migrations_added`）と plan の
+ * dbUpgrade / oldConsumer は必ずこの 1 本を共有する（判定がずれると plan が要求する job が
+ * 起動せず Validation が恒久的に blocked になる）。
+ */
+export const ROOT_MIGRATION_PATH = /^supabase\/migrations\/\d{14}_.+\.sql$/;
+
 export const IMPACT_KEYS = [
   'product',
   'web',
