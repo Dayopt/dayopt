@@ -403,12 +403,15 @@ pending（strict up-to-date の ruleset と同じ向き）。
 
 DB / Preview の証拠（#2797）: `dbFresh` は `🧪 Integration Tests`（candidate の migration 集合を
 空 DB へ適用）、`dbUpgrade` / `oldConsumer` は `🧱 DB Upgrade (shadow)`（base の migration 集合 +
-seed まで reset し、PR が追加した migration だけを当てて、適用エラー・seed 行の消失・fresh との
-schema 不一致（生成型と、index / constraint / trigger の catalog snapshot の両方）・base 世代の
-生成型が参照するオブジェクトの消失や契約変更（列の型・nullability、Insert / Update の型と
-optional → required、Insert の新規必須列）を別々に検出する。`scripts/ci/db-upgrade-check.mjs`。
-migration を追加した PR だけ走り、非必須）。追加分は timestamp に関わらず reset から退避するので、
-base の最新より古い timestamp の migration も seed 済みの base に当たる。fresh 成功を
+**base の seed** まで reset し、PR が追加した migration だけを当てて、適用エラー・seed 行の消失
+（table ごとの件数と主キーによる同一性。同数の入れ替えも落とす）・fresh との schema 不一致
+（生成型と、index / constraint / trigger の catalog snapshot の両方）・base 世代の生成型が参照する
+オブジェクトの消失や契約変更（列の型・nullability、Insert / Update の型と optional → required、
+Insert の新規必須列、view の列、RPC の引数名・型・必須性と Returns）を別々に検出する。
+`scripts/ci/db-upgrade-check.mjs`。migration を追加した PR だけ走り、非必須。この script を
+migration と同時に変えた PR の緑は `self-produced` として信用しない）。追加分は timestamp に関わらず
+reset から退避し、seed は base SHA の内容に差し替えるので、candidate の seed から旧形式の行を
+消しても「旧データに当てる」経路を通る。fresh 成功を
 upgrade 成功の代用にしない。適用済み migration の編集・削除は production が再実行しないので
 落とす。schema 変更を含む PR の `Preview – product` は、同じ SHA の `Supabase Preview` check run
 （発行元が公式 Supabase App `supabase` のもの）が success（隔離された PR 用 branch）であることも

@@ -368,6 +368,19 @@ describe('validation evidence: rejected evidence', () => {
       });
       expect(result.suites.productPreview.status).toBe('satisfied');
     });
+
+    it('does not trust the DB Upgrade job when the PR also changes its implementation', () => {
+      const result = evaluateValidation({
+        plan: plan([MIGRATION, 'scripts/ci/db-upgrade-check.mjs']),
+        evidence: evidence({
+          workflowRuns: [dbUpgradeRun('success')],
+          checkRuns: [supabasePreview('success')],
+        }),
+      });
+      expect(result.suites.dbUpgrade.status).toBe('self-produced');
+      expect(result.suites.oldConsumer.status).toBe('self-produced');
+      expect(result.verdict).toBe('blocked');
+    });
   });
 
   it.each(['.github/workflows/ci.yml', 'scripts/ci/check.mjs', '.github/actions/setup/action.yml'])(

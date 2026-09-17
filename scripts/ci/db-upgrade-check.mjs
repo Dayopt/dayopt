@@ -37,11 +37,62 @@ import { isDirectExecution } from '../lib/is-direct-execution.mjs';
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 export const TYPES_PATH = 'apps/product/src/lib/database/generated/database.types.ts';
 export const MIGRATIONS_DIR = 'supabase/migrations';
+/** reset が投入する seed（config.toml の [db.seed].sql_paths）。base 側の内容で baseline を作る。 */
+export const SEED_PATH = 'supabase/seed.sql';
 const MIGRATION_FILE = /^(\d{14})_.+\.sql$/;
 export const DB_UPGRADE_JOB = '🧱 DB Upgrade (shadow)';
 
 /** `information_schema` の全 base table の行数（public / auth）。psql `-At -F,` で読む。 */
 export const COUNT_SQL = `select table_schema || '.' || table_name, (xpath('/row/c/text()', query_to_xml(format('select count(*) as c from %I.%I', table_schema, table_name), false, true, '')))[1]::text::int from information_schema.tables where table_schema in ('public', 'auth') and table_type = 'BASE TABLE' order by 1`;
+
+/** primary key を持つ table とその列（`schema.table,col1|col2`）。行の同一性比較に使う。 */
+export const PK_SQL = `select tc.table_schema || '.' || tc.table_name, string_agg(kcu.column_name, '|' order by kcu.ordinal_position) from information_schema.table_constraints tc join information_schema.key_column_usage kcu on kcu.constraint_schema = tc.constraint_schema and kcu.constraint_name = tc.constraint_name and kcu.table_schema = tc.table_schema and kcu.table_name = tc.table_name where tc.constraint_type = 'PRIMARY KEY' and tc.table_schema in ('public', 'auth') group by 1 order by 1`;
+
+/** `-At` の PK 一覧を Map<schema.table, string[]> にする。 */
+export function parsePrimaryKeys(output) {
+  const keys = new Map();
+  for (const line of output.split('\n')) {
+    const [table, columns] = line.split(',');
+    if (table && columns) keys.set(table, columns.split('|'));
+  }
+  return keys;
+}
+
+const quoteIdent = (name) => `"${name.replace(/"/g, '""')}"`;
+const quoteLiteral = (text) => `'${text.replace(/'/g, "''")}'`;
+
+/**
+ * 各 table の主キー値を `schema.table,(v1,v2)` の行で列挙する SQL。upgrade 前の行が upgrade 後にも
+ * 同じ主キーで残ることを見る（同数の入れ替え・作り直しは count では見えない）。
+ */
+export function rowIdentitySql(primaryKeys) {
+  const selects = [];
+  for (const [table, columns] of primaryKeys) {
+    const [schema, name] = table.split('.');
+    const pk = columns.map(quoteIdent).join(', ');
+    selects.push(
+      `select ${quoteLiteral(table)} || ',' || row(${pk})::text from ${quoteIdent(schema)}.${quoteIdent(name)}`,
+    );
+  }
+  return selects.length ? `${selects.join(' union all ')} order by 1` : 'select null where false';
+}
+
+/** upgrade 前の主キー集合 ⊆ upgrade 後。消えた行を table ごとに数える。 */
+export function compareRowIdentity(before, after) {
+  const afterSet = new Set(after.split('\n').filter(Boolean));
+  const missing = new Map();
+  for (const line of before.split('\n').filter(Boolean)) {
+    if (afterSet.has(line)) continue;
+    const table = line.slice(0, line.indexOf(','));
+    const entry = missing.get(table) ?? { count: 0, sample: line.slice(table.length + 1) };
+    entry.count += 1;
+    missing.set(table, entry);
+  }
+  return [...missing].map(
+    ([table, entry]) =>
+      `${table}: ${entry.count} seeded row(s) no longer present by primary key (e.g. ${entry.sample})`,
+  );
+}
 
 /**
  * public schema の index / constraint / trigger の catalog snapshot（生成型に現れない schema）。
@@ -50,14 +101,56 @@ export const COUNT_SQL = `select table_schema || '.' || table_name, (xpath('/row
 export const CATALOG_SQL = `select 'index:' || schemaname || '.' || indexname || ' ' || indexdef from pg_indexes where schemaname = 'public' union all select 'constraint:' || n.nspname || '.' || c.conrelid::regclass::text || '.' || c.conname || ' ' || pg_get_constraintdef(c.oid) from pg_constraint c join pg_namespace n on n.oid = c.connamespace where n.nspname = 'public' union all select 'trigger:' || t.tgrelid::regclass::text || '.' || t.tgname || ' ' || pg_get_triggerdef(t.oid) from pg_trigger t join pg_class r on r.oid = t.tgrelid join pg_namespace n on n.oid = r.relnamespace where n.nspname = 'public' and not t.tgisinternal order by 1`;
 
 /**
+ * Functions の 1 entity（`      name: {` の次行から `      };` の前まで）を Args / Returns に分ける。
+ * 単一 signature だけ構造化し、overload（Args が複数）や読めない形は raw 比較に落とす。
+ */
+function parseFunctionBlock(blockLines) {
+  const raw = blockLines.join(' ').replace(/\s+/g, ' ').trim();
+  const argsIndexes = blockLines
+    .map((line, i) => (/^ {8}Args:/.test(line) ? i : -1))
+    .filter((i) => i >= 0);
+  const returnsIndex = blockLines.findIndex((line) => /^ {8}Returns:/.test(line));
+  if (argsIndexes.length !== 1 || returnsIndex === -1) return { raw, args: null, returns: null };
+  const args = new Map();
+  const argsLine = blockLines[argsIndexes[0]];
+  const inline = argsLine.match(/^ {8}Args: \{ ?(.*?) ?\};$/);
+  if (inline) {
+    for (const entry of inline[1].split(';')) {
+      const match = entry.trim().match(/^(\w+)(\?)?: (.+)$/);
+      if (match) args.set(match[1], { type: match[3], optional: match[2] === '?' });
+    }
+  } else if (/^ {8}Args: \{$/.test(argsLine)) {
+    for (
+      let j = argsIndexes[0] + 1;
+      j < blockLines.length && !/^ {8}\};$/.test(blockLines[j]);
+      j += 1
+    ) {
+      const match = blockLines[j].match(/^ {10}(\w+)(\?)?: (.+);$/);
+      if (match) args.set(match[1], { type: match[3], optional: match[2] === '?' });
+    }
+  } else if (!/^ {8}Args: (never|Record<PropertyKey, never>);$/.test(argsLine)) {
+    return { raw, args: null, returns: null };
+  }
+  const returns = blockLines
+    .slice(returnsIndex)
+    .join(' ')
+    .replace(/\s+/g, ' ')
+    .replace(/^ ?Returns: /, '')
+    .replace(/;$/, '')
+    .trim();
+  return { raw, args, returns };
+}
+
+/**
  * 生成型の public schema から契約を抜く。table は Row の列 → 型、Insert / Update の列 →
- * { type, optional }（旧アプリの読み書き契約）、view、function、enum → 値。
+ * { type, optional }（旧アプリの読み書き契約）、view は Row の列 → 型、function は
+ * Args（名前 → { type, optional }）と Returns、enum → 値。
  */
 export function extractSchemaContract(typesText) {
   const lines = typesText.split('\n');
   const start = lines.findIndex((line) => line === '  public: {');
   if (start === -1) throw new Error('public schema not found in generated types');
-  const contract = { tables: new Map(), views: new Set(), functions: new Set(), enums: new Map() };
+  const contract = { tables: new Map(), views: new Map(), functions: new Map(), enums: new Map() };
   let section = null;
   let entity = null;
   /** @type {'Row' | 'Insert' | 'Update' | null} */
@@ -87,8 +180,25 @@ export function extractSchemaContract(typesText) {
             update: new Map(),
           },
         );
-      if (section === 'Views') contract.views.add(entity);
-      if (section === 'Functions') contract.functions.add(entity);
+      if (section === 'Views') contract.views.set(entity, { columns: new Map() });
+      if (section === 'Functions') {
+        // 1 行形式 `name: { Args: {...}; Returns: T };` は Args / Returns の 2 行に展開する
+        const inline = line.match(/^ {6}\w+: \{ (Args: .*); (Returns: .*) \};$/);
+        if (inline) {
+          contract.functions.set(
+            entity,
+            parseFunctionBlock([`        ${inline[1]};`, `        ${inline[2]};`]),
+          );
+          continue;
+        }
+        const block = [];
+        let j = i + 1;
+        // entity の閉じ `      };` か section の境界（4 space 始まり）で止める
+        while (j < lines.length && !/^ {6}\};$/.test(lines[j]) && !/^ {4}\S/.test(lines[j]))
+          block.push(lines[j++]);
+        contract.functions.set(entity, parseFunctionBlock(block));
+        i = j;
+      }
       if (section === 'Enums') {
         const values = [...line.matchAll(/'([^']*)'/g)].map((match) => match[1]);
         // 複数行の union は次の行以降に続く
@@ -101,7 +211,7 @@ export function extractSchemaContract(typesText) {
       }
       continue;
     }
-    if (section === 'Tables' && entity) {
+    if ((section === 'Tables' || section === 'Views') && entity) {
       const blockMatch = line.match(/^ {8}(Row|Insert|Update): \{$/);
       if (blockMatch) {
         block = /** @type {'Row' | 'Insert' | 'Update'} */ (blockMatch[1]);
@@ -113,7 +223,9 @@ export function extractSchemaContract(typesText) {
       }
       // 型は行末の `;` まで（複数行 union は生成型の Row / Insert / Update には現れない）
       const column = block && line.match(/^ {10}(\w+)(\?)?: (.+);$/);
-      if (column) {
+      if (column && section === 'Views') {
+        if (block === 'Row') contract.views.get(entity).columns.set(column[1], column[3]);
+      } else if (column) {
         const table = contract.tables.get(entity);
         if (block === 'Row') table.columns.set(column[1], column[3]);
         else
@@ -140,7 +252,9 @@ export function compareSchemaContracts(base, candidate) {
     columnTypes: [],
     writeContracts: [],
     views: [],
+    viewColumns: [],
     functions: [],
+    functionSignatures: [],
     enumValues: [],
   };
   for (const [table, contract] of base.tables) {
@@ -173,8 +287,45 @@ export function compareSchemaContracts(base, candidate) {
           `${table}.${column} (insert): new required column (old writers omit it)`,
         );
   }
-  for (const view of base.views) if (!candidate.views.has(view)) removed.views.push(view);
-  for (const fn of base.functions) if (!candidate.functions.has(fn)) removed.functions.push(fn);
+  for (const [view, contract] of base.views) {
+    const next = candidate.views.get(view);
+    if (!next) {
+      removed.views.push(view);
+      continue;
+    }
+    for (const [column, type] of contract.columns) {
+      const nextType = next.columns.get(column);
+      if (nextType === undefined) removed.viewColumns.push(`${view}.${column}`);
+      else if (nextType !== type)
+        removed.viewColumns.push(`${view}.${column}: ${type} → ${nextType}`);
+    }
+  }
+  for (const [fn, contract] of base.functions) {
+    const next = candidate.functions.get(fn);
+    if (!next) {
+      removed.functions.push(fn);
+      continue;
+    }
+    if (!contract.args || !next.args) {
+      if (contract.raw !== next.raw) removed.functionSignatures.push(`${fn}: signature changed`);
+      continue;
+    }
+    for (const [arg, spec] of contract.args) {
+      const nextSpec = next.args.get(arg);
+      if (!nextSpec) removed.functionSignatures.push(`${fn}(${arg}): argument removed`);
+      else if (nextSpec.type !== spec.type)
+        removed.functionSignatures.push(`${fn}(${arg}): ${spec.type} → ${nextSpec.type}`);
+      else if (spec.optional && !nextSpec.optional)
+        removed.functionSignatures.push(`${fn}(${arg}): optional → required`);
+    }
+    for (const [arg, spec] of next.args)
+      if (!contract.args.has(arg) && !spec.optional)
+        removed.functionSignatures.push(
+          `${fn}(${arg}): new required argument (old callers omit it)`,
+        );
+    if (contract.returns !== next.returns)
+      removed.functionSignatures.push(`${fn}: returns ${contract.returns} → ${next.returns}`);
+  }
   for (const [name, values] of base.enums) {
     const next = candidate.enums.get(name);
     for (const value of values)
@@ -263,33 +414,41 @@ const PSQL = [
 ];
 
 /**
- * PR が追加した migration を一時的に `supabase/migrations` から退避して fn を実行し、必ず戻す。
- * `db reset --version` は現在の checkout にある version 以下のファイルを全部当てるので、base の
- * 最新より古い timestamp の追加 migration が seed より前（= 既存データの無い経路）に混ざる。
- * 退避すれば reset は base の集合 + seed だけになり、追加分は後の `migration up` で当たる。
+ * baseline reset の間だけ入力を base 側に揃えて fn を実行し、必ず戻す:
+ * - PR が追加した migration を `supabase/migrations` から退避する。`db reset --version` は現在の
+ *   checkout にある version 以下のファイルを全部当てるので、base の最新より古い timestamp の
+ *   追加分が seed より前（= 既存データの無い経路）に混ざる
+ * - `supabase/seed.sql` を base SHA の内容に差し替える。candidate の seed から旧形式の行を消した
+ *   PR は、そのままだと「旧データに当てる」経路を通らない
+ * 戻した後の `migration up` と fresh reset は candidate の入力で走る。
  */
-function withAddedMigrationsStashed(added, { moveFile, makeTempDir }, fn) {
+function withBaseInputs({ added, baseSeed }, { moveFile, makeTempDir, readFile, writeFile }, fn) {
   const stash = makeTempDir();
   const moved = [];
+  const candidateSeed = readFile(SEED_PATH);
   try {
     for (const name of added) {
       moveFile(resolve(ROOT, MIGRATIONS_DIR, name), resolve(stash, name));
       moved.push(name);
     }
+    writeFile(SEED_PATH, baseSeed);
     return fn();
   } finally {
+    writeFile(SEED_PATH, candidateSeed);
     for (const name of moved) moveFile(resolve(stash, name), resolve(ROOT, MIGRATIONS_DIR, name));
   }
 }
 
 /**
  * @param {{ exec?: typeof defaultExec, readFile?: (path: string) => string, listMigrations?: () => string[],
+ *   writeFile?: (path: string, text: string) => void,
  *   moveFile?: (from: string, to: string) => void, makeTempDir?: () => string,
  *   log?: (text: string) => void, summaryPath?: string | null, resultPath?: string | null }} deps
  */
 export function runDbUpgradeCheck({
   exec = defaultExec,
   readFile = (path) => readFileSync(resolve(ROOT, path), 'utf8'),
+  writeFile = (path, text) => writeFileSync(resolve(ROOT, path), text),
   listMigrations = () =>
     readdirSync(resolve(ROOT, MIGRATIONS_DIR)).filter((name) => MIGRATION_FILE.test(name)),
   moveFile = renameSync,
@@ -367,12 +526,18 @@ export function runDbUpgradeCheck({
     return finish();
   }
   try {
-    // 1. base の migration 集合 + seed まで戻す（reset は config の seed を適用する）。追加分は
-    //    timestamp に関わらず退避し、production と同じ「既存データに当てる」経路だけを通す
-    withAddedMigrationsStashed(plan.added, { moveFile, makeTempDir }, () =>
-      exec('supabase', ['db', 'reset', '--local'], { stdio: ['ignore', 'pipe', 'pipe'] }),
+    // 1. base の migration 集合 + base の seed まで戻す（reset は config の seed を適用する）。
+    //    追加分は timestamp に関わらず退避し、production と同じ「既存データに当てる」経路だけを通す
+    const baseSeed = exec('git', ['show', `${baseSha}:${SEED_PATH}`]);
+    withBaseInputs(
+      { added: plan.added, baseSeed },
+      { moveFile, makeTempDir, readFile, writeFile },
+      () => exec('supabase', ['db', 'reset', '--local'], { stdio: ['ignore', 'pipe', 'pipe'] }),
     );
     const before = parseCounts(exec('psql', [...PSQL, '-At', '-F,', '-c', COUNT_SQL]));
+    const primaryKeys = parsePrimaryKeys(exec('psql', [...PSQL, '-At', '-F,', '-c', PK_SQL]));
+    const identitySql = rowIdentitySql(primaryKeys);
+    const beforeRows = exec('psql', [...PSQL, '-At', '-c', identitySql]);
     // 2. candidate の migration だけを当てる（version 順に依存せず未適用を全部）
     exec('supabase', ['migration', 'up', '--local', '--include-all'], {
       stdio: ['ignore', 'pipe', 'pipe'],
@@ -380,9 +545,11 @@ export function runDbUpgradeCheck({
     result.checks.upgrade = `applied ${plan.added.length} migration(s) on top of ${plan.baseVersion} + seed`;
     // 3. 既存データの保持
     const after = parseCounts(exec('psql', [...PSQL, '-At', '-F,', '-c', COUNT_SQL]));
-    const lost = compareCounts(before, after);
+    const afterRows = exec('psql', [...PSQL, '-At', '-c', identitySql]);
+    const lost = [...compareCounts(before, after), ...compareRowIdentity(beforeRows, afterRows)];
     if (lost.length) result.problems.push(...lost.map((entry) => `seeded rows lost: ${entry}`));
-    else result.checks.dataPreserved = `${before.size} table(s) kept their seeded rows`;
+    else
+      result.checks.dataPreserved = `${before.size} table(s) kept their seeded rows (count and primary-key identity across ${primaryKeys.size} keyed table(s))`;
     // 4. RLS / GRANT snapshot は upgraded DB でも一致する
     exec('pnpm', ['rls:snapshot:check']);
     result.checks.rlsSnapshot = 'matches on the upgraded database';
@@ -414,7 +581,7 @@ export function runDbUpgradeCheck({
       );
     } else
       result.checks.oldConsumer =
-        'every table / column (type and nullability) / view / function / enum value used by the base types still exists';
+        'every table / column (type and nullability) / view column / function signature / enum value used by the base types still exists';
     // 7. 生成型に現れない schema（index / constraint / trigger）も fresh と一致する。既存行の有無で
     //    分岐する migration は fresh と upgraded で違う catalog を作り得るので、ここで fresh を
     //    作り直して catalog を比較する（追加分は戻してあるので reset = candidate 全部）

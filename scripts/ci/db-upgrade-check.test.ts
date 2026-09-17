@@ -6,12 +6,17 @@ import { describe, expect, it } from 'vitest';
 import {
   CATALOG_SQL,
   COUNT_SQL,
+  PK_SQL,
+  SEED_PATH,
   TYPES_PATH,
   compareCounts,
+  compareRowIdentity,
   compareSchemaContracts,
   extractSchemaContract,
   parseCounts,
+  parsePrimaryKeys,
   planDbUpgrade,
+  rowIdentitySql,
   runDbUpgradeCheck,
 } from './db-upgrade-check.mjs';
 
@@ -96,11 +101,19 @@ describe('schema contract extraction', () => {
       type: 'string',
       optional: true,
     });
-    expect([...contract.views]).toEqual(['activity_stats_v1']);
-    expect([...contract.functions]).toEqual([
+    expect([...contract.views.keys()]).toEqual(['activity_stats_v1']);
+    expect([...contract.views.get('activity_stats_v1')!.columns]).toEqual([
+      ['total', 'number | null'],
+    ]);
+    expect([...contract.functions.keys()]).toEqual([
       'abandon_billing_customer_provisioning_v1',
       'get_plan_v2',
     ]);
+    expect(contract.functions.get('get_plan_v2')).toEqual({
+      raw: 'Args: { p_id: string }; Returns: string;',
+      args: new Map([['p_id', { type: 'string', optional: false }]]),
+      returns: 'string',
+    });
     expect([...contract.enums.get('record_kind')!]).toEqual(['plan', 'record']);
     expect([...contract.enums.get('mcp_scope')!]).toEqual(['read', 'write']);
   });
@@ -120,6 +133,42 @@ describe('schema contract extraction', () => {
     ]);
     expect(contract.tables.get('activities')!.columns.get('user_id')).toBe('string');
     expect(contract.tables.get('activities')!.update.get('name')?.optional).toBe(true);
+    // 1 行形式の function（`vault_secret_exists: { Args: {...}; Returns: boolean };`）と
+    // 複数行の Args / object Returns も構造化される。section の末尾を飲み込まない
+    const fns = [...contract.functions.values()];
+    expect(fns.every((fn) => fn.args !== null)).toBe(true);
+    expect(contract.functions.get('vault_secret_exists')).toMatchObject({ returns: 'boolean' });
+    expect(compareSchemaContracts(contract, contract).narrowing).toBe(false);
+  });
+
+  it('treats view column and RPC signature changes as narrowing (old consumer)', () => {
+    const base = extractSchemaContract(typesFixture());
+    const viewNarrowed = extractSchemaContract(
+      typesFixture().replace('          total: number | null;\n', ''),
+    );
+    expect(compareSchemaContracts(base, viewNarrowed).removed.viewColumns).toEqual([
+      'activity_stats_v1.total',
+    ]);
+    const argRenamed = extractSchemaContract(
+      typesFixture().replace('Args: { p_id: string };', 'Args: { p_plan_id: string };'),
+    );
+    expect(compareSchemaContracts(base, argRenamed).removed.functionSignatures).toEqual([
+      'get_plan_v2(p_id): argument removed',
+      'get_plan_v2(p_plan_id): new required argument (old callers omit it)',
+    ]);
+    const argOptionalAdded = extractSchemaContract(
+      typesFixture().replace('Args: { p_id: string };', 'Args: { p_id: string; p_tz?: string };'),
+    );
+    expect(compareSchemaContracts(base, argOptionalAdded).narrowing).toBe(false);
+    const returnsChanged = extractSchemaContract(
+      typesFixture().replace(
+        '        Returns: string;\n      };\n    };',
+        '        Returns: string | null;\n      };\n    };',
+      ),
+    );
+    expect(compareSchemaContracts(base, returnsChanged).removed.functionSignatures).toEqual([
+      'get_plan_v2: returns string → string | null',
+    ]);
   });
 
   it('reports removed objects as narrowing and ignores additions', () => {
@@ -247,6 +296,30 @@ describe('upgrade plan', () => {
   });
 });
 
+describe('row identity comparison', () => {
+  it('builds one identity query from the primary keys and detects same-count replacement', () => {
+    const keys = parsePrimaryKeys(
+      'public.activities,id\npublic.plan_activities,plan_id|activity_id\n',
+    );
+    const sql = rowIdentitySql(keys);
+    expect(sql).toContain(
+      `select 'public.activities' || ',' || row("id")::text from "public"."activities"`,
+    );
+    expect(sql).toContain('row("plan_id", "activity_id")::text from "public"."plan_activities"');
+    expect(sql).toMatch(/ union all .* order by 1$/);
+    expect(rowIdentitySql(new Map())).toBe('select null where false');
+    const before =
+      'public.activities,(a1)\npublic.activities,(a2)\npublic.plan_activities,(p1,a1)\n';
+    // 同数の入れ替え（a2 → a3）と新規行の追加（a4）: 追加は互換、入れ替えは消失
+    const after =
+      'public.activities,(a1)\npublic.activities,(a3)\npublic.activities,(a4)\npublic.plan_activities,(p1,a1)\n';
+    expect(compareRowIdentity(before, after)).toEqual([
+      'public.activities: 1 seeded row(s) no longer present by primary key (e.g. (a2))',
+    ]);
+    expect(compareRowIdentity(before, before)).toEqual([]);
+  });
+});
+
 describe('row count comparison', () => {
   it('flags lost rows and missing tables, not growth or new tables', () => {
     const before = parseCounts('public.activities,5\npublic.categories,2\nauth.users,1\n');
@@ -274,12 +347,15 @@ describe('runDbUpgradeCheck orchestration', () => {
     changed = 'A\tsupabase/migrations/20260917000000_b.sql\n',
     migrationUpFails = false,
     resetFails = false,
+    rowsAfter = 'public.activities,(a1)\npublic.activities,(a2)\npublic.activities,(a3)\n',
     freshCatalog = 'index:public.activities_pkey CREATE UNIQUE INDEX ...\n',
   } = {}) {
     const calls: Call[] = [];
     const moves: [string, string][] = [];
     const resets: string[][] = [];
+    const seedAtReset: string[] = [];
     const inMigrationsDir = new Set(candidateMigrations);
+    const files = new Map<string, string>([[SEED_PATH, 'candidate seed']]);
     const exec = (file: string, args: string[]) => {
       calls.push([file, args]);
       const joined = `${file} ${args.join(' ')}`;
@@ -288,10 +364,12 @@ describe('runDbUpgradeCheck orchestration', () => {
       if (joined.startsWith('git ls-tree'))
         return 'supabase/migrations/00000000000000_baseline.sql\nsupabase/migrations/20260901000000_a.sql\n';
       if (joined.startsWith('git diff --name-status')) return changed;
+      if (joined.startsWith('git show') && args[1].endsWith(SEED_PATH)) return 'base seed';
       if (joined.startsWith('git show')) return baseTypes;
       if (joined.startsWith('supabase db reset')) {
         // reset は `supabase/migrations` に **今ある** ファイルを全部当てる
         resets.push([...inMigrationsDir].sort());
+        seedAtReset.push(files.get(SEED_PATH)!);
         if (resetFails) throw new Error('supabase db reset failed (exit 1): seed error');
         return '';
       }
@@ -300,12 +378,18 @@ describe('runDbUpgradeCheck orchestration', () => {
           throw new Error('supabase migration up failed (exit 1): ERROR: column exists');
         return '';
       }
+      if (joined.startsWith('psql') && args.includes(PK_SQL)) return 'public.activities,id\n';
+      if (joined.startsWith('psql') && args.some((a) => a.includes('row("id")::text')))
+        return calls.filter(([f, a]) => f === 'psql' && a.some((x) => x.includes('row(')))
+          .length === 1
+          ? 'public.activities,(a1)\npublic.activities,(a2)\npublic.activities,(a3)\n'
+          : rowsAfter;
       if (joined.startsWith('psql') && args.includes(CATALOG_SQL))
         return resets.length >= 2
           ? freshCatalog
           : 'index:public.activities_pkey CREATE UNIQUE INDEX ...\n';
       if (joined.startsWith('psql'))
-        return calls.filter(([f, a]) => f === 'psql' && !a.includes(CATALOG_SQL)).length === 1
+        return calls.filter(([f, a]) => f === 'psql' && a.includes(COUNT_SQL)).length === 1
           ? 'public.activities,3\nauth.users,1\n'
           : countsAfter;
       if (joined.startsWith('pnpm rls:snapshot:check')) return '';
@@ -315,7 +399,8 @@ describe('runDbUpgradeCheck orchestration', () => {
     };
     const result = runDbUpgradeCheck({
       exec,
-      readFile: () => freshTypes,
+      readFile: (path) => (path === SEED_PATH ? files.get(SEED_PATH)! : freshTypes),
+      writeFile: (path, text) => files.set(path, text),
       listMigrations: () => candidateMigrations,
       moveFile: (from, to) => {
         moves.push([from, to]);
@@ -328,11 +413,11 @@ describe('runDbUpgradeCheck orchestration', () => {
       summaryPath: null,
       resultPath: null,
     });
-    return { result, calls, moves, resets, inMigrationsDir };
+    return { result, calls, moves, resets, inMigrationsDir, seedAtReset, files };
   }
 
   it('resets to the base set with seed (added migrations stashed), applies only added migrations and passes', () => {
-    const { result, calls, resets, inMigrationsDir } = harness();
+    const { result, calls, resets, inMigrationsDir, seedAtReset, files } = harness();
     expect(result.status).toBe('pass');
     expect(calls).toContainEqual(['supabase', ['db', 'reset', '--local']]);
     // 1 回目の reset は base の集合だけ、2 回目（fresh 比較）は candidate 全部
@@ -343,6 +428,9 @@ describe('runDbUpgradeCheck orchestration', () => {
       '20260917000000_b.sql',
     ]);
     expect(inMigrationsDir.has('20260917000000_b.sql')).toBe(true);
+    // 1 回目の reset は base の seed、fresh 比較の reset は candidate の seed。終了後は candidate に戻る
+    expect(seedAtReset).toEqual(['base seed', 'candidate seed']);
+    expect(files.get(SEED_PATH)).toBe('candidate seed');
     expect(calls).toContainEqual(['supabase', ['migration', 'up', '--local', '--include-all']]);
     expect(Object.keys(result.checks)).toEqual([
       'upgrade',
@@ -367,11 +455,22 @@ describe('runDbUpgradeCheck orchestration', () => {
     expect(inMigrationsDir.has('20260816000000_backfill.sql')).toBe(true);
   });
 
-  it('restores stashed migrations even when the reset fails', () => {
-    const { result, inMigrationsDir } = harness({ resetFails: true });
+  it('restores stashed migrations and the candidate seed even when the reset fails', () => {
+    const { result, inMigrationsDir, files } = harness({ resetFails: true });
     expect(result.status).toBe('fail');
     expect(result.problems[0]).toMatch(/db reset failed/);
     expect(inMigrationsDir.has('20260917000000_b.sql')).toBe(true);
+    expect(files.get(SEED_PATH)).toBe('candidate seed');
+  });
+
+  it('fails when seeded rows are replaced by different rows with the same count', () => {
+    const { result } = harness({
+      rowsAfter: 'public.activities,(a1)\npublic.activities,(a2)\npublic.activities,(a9)\n',
+    });
+    expect(result.status).toBe('fail');
+    expect(result.problems[0]).toMatch(
+      /seeded rows lost: public.activities: 1 seeded row\(s\) no longer present by primary key \(e.g. \(a3\)\)/,
+    );
   });
 
   it('fails when indexes / constraints / triggers differ between upgraded and fresh', () => {
