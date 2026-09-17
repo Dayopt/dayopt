@@ -1301,6 +1301,35 @@ locale 不正 / path 不在    → [locale]/error.tsx, not-found.tsx, root not-f
 
 Next.js のビルド時最適化（PPR、prefetch、bundle 最適化等）は [`conventions-frontend.md`](./conventions-frontend.md) の「Next.js パフォーマンス最適化」セクションを参照。
 
+### Sentry trace と Supabase logs の相関（#2728）
+
+Supabase 宛の request に W3C `traceparent` を付け、Sentry の trace と Supabase の API Gateway / Edge Function logs を同じ `trace_id` で突き合わせる。
+
+**3 点が揃って初めて header が付く。1 つでも欠けると silent に no-op になる**（supabase-js は warn を 1 度出すだけで、request 自体は成功する）。
+
+| #   | 場所                                               | 内容                                                                                                                                                         |
+| --- | -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1   | `apps/product/src/instrumentation.ts` の Node 分岐 | `import '@supabase/supabase-js/tracing'`。OpenTelemetry の trace context extractor を `globalThis` へ登録する                                                |
+| 2   | `apps/product/sentry.server.config.ts`             | `propagateTraceparent: true`。**SDK の既定は `false`** で `sentry-trace` / `baggage` しか書かず、supabase-js は「非 W3C propagator」として header を付けない |
+| 3   | 各 Supabase client factory                         | `tracePropagation: SUPABASE_TRACE_PROPAGATION`（`apps/product/src/lib/supabase/trace-propagation.ts`）                                                       |
+
+**Node runtime だけが対象**。経路ごとの可否は SDK の実装で決まっていて、設定では変えられない。
+
+| runtime                                               | 伝播   | 理由                                                                               |
+| ----------------------------------------------------- | ------ | ---------------------------------------------------------------------------------- |
+| Node（Route Handler / RSC / tRPC / cron）             | する   | `@sentry/node` が `propagation.setGlobalPropagator(new SentryPropagator())` を呼ぶ |
+| Edge（`src/proxy.ts` → `lib/supabase/middleware.ts`） | しない | `@sentry/vercel-edge` は `@opentelemetry/api` を持たない                           |
+| Browser（`lib/supabase/client.ts`）                   | しない | `@sentry/browser` は `@opentelemetry/api` を使わない                               |
+
+browser を将来カバーするなら、Sentry browser 側の `tracePropagationTargets` に Supabase origin を足して `propagateTraceparent` を有効化する別経路になる（全 outgoing fetch と CORS への影響を伴う）。
+
+**触る時の注意**:
+
+- 新しい client factory を足したら `apps/product/src/lib/supabase/trace-propagation-wiring.test.ts` の分類へ追加する。列挙漏れは同 test が落とす
+- 伝播先は supabase-js が Supabase の origin に限定する。第三者へ header は出ない
+- `respectSamplingDecision` は既定の `true` のまま。未 sample の trace にも `traceparent` だけが付き、`tracestate` / `baggage` は落ちる（相関には十分なので、相関のために sampling は上げない）
+- `sendOperationData` 等の追加収集は有効化しない（PII 最小化の維持）
+
 ---
 
 ## 開発コマンド一覧

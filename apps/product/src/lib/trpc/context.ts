@@ -19,6 +19,7 @@ import { trpcPreAuthIpRateLimit } from '@/lib/rate-limit/upstash';
 import { extractClientIp } from '@/lib/security/ip-validation';
 import { captureUnexpectedError } from '@/lib/sentry';
 import { AuthMode, createServiceRoleClient, detectAuthMode } from '@/lib/supabase/oauth';
+import { SUPABASE_TRACE_PROPAGATION } from '@/lib/supabase/trace-propagation';
 import { resolveSessionAuthContext, type MfaAssurance } from '@/lib/trpc/session-auth-context';
 
 /**
@@ -178,6 +179,7 @@ async function createTRPCContext(opts: {
       env.NEXT_PUBLIC_SUPABASE_URL,
       env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
       {
+        tracePropagation: SUPABASE_TRACE_PROPAGATION,
         cookies: {
           getAll() {
             return Object.entries(req.cookies).map(([name, value]) => ({
