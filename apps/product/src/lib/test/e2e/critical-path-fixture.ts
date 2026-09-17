@@ -171,29 +171,41 @@ export async function openDay(page: Page, dateParam: string) {
 }
 
 /**
- * 1 日目のグリッドを「hour 時の 1 時間前」までスクロールし、グリッドの box と 1 時間の高さを返す。
+ * 1 日目のグリッドを「hour 時の 1 時間前」までスクロールし、実際の時間セルの位置と高さを返す。
  * html の scroll-behavior: smooth でアニメーションすると直後の boundingBox が確定しないので instant で動かす。
  */
 export async function revealHour(page: Page, hour: number) {
-  const grid = page.locator('[data-calendar-grid][data-calendar-day-index="0"]').first();
+  // ルート遷移中は旧ビューが DOM に残る。旧ビューは高さ0の時間セルを
+  // 持つことがあるため、表示中の最新グリッドを操作対象にする。
+  const grid = page.locator('[data-calendar-grid][data-calendar-day-index="0"]:visible').last();
   await expect(grid).toBeVisible({ timeout: 10_000 });
 
-  const gridHeight = await grid.evaluate((el) => el.getBoundingClientRect().height);
-  const hourHeight = gridHeight / 24;
+  // 外側の grid は flex の再計算中に viewport 高へ一時的に縮むことがある。
+  // ここを24分割すると、アプリが選択処理に使う実際の hourHeight とズレて
+  // 1時間のつもりのドラッグが数時間分になる。時間セル自身はアプリと同じ
+  // HOUR_HEIGHT を style で持つため、座標と高さの基準にする。
+  const hourCell = grid.locator(`[data-calendar-hour="${hour}"]`).first();
+  await expect(hourCell).toBeAttached();
+  await expect
+    .poll(() => hourCell.evaluate((el) => el.getBoundingClientRect().height), {
+      timeout: 10_000,
+    })
+    .toBeGreaterThan(0);
+  const hourHeight = await hourCell.evaluate((el) => el.getBoundingClientRect().height);
 
-  await page
-    .locator('[data-calendar-scroll]')
-    .first()
-    .evaluate(
-      (el, top) => {
-        el.scrollTo({ top, behavior: 'instant' });
-      },
-      hourHeight * (hour - 1),
-    );
+  const scroll = grid.locator('xpath=ancestor::*[@data-calendar-scroll][1]');
+  await expect(scroll).toBeVisible();
+  await scroll.evaluate(
+    (el, top) => {
+      el.scrollTo({ top, behavior: 'instant' });
+    },
+    hourHeight * (hour - 1),
+  );
 
   const box = await grid.boundingBox();
-  if (!box) throw new Error('calendar grid is not visible');
-  return { grid, box, hourHeight };
+  const hourBox = await hourCell.boundingBox();
+  if (!box || !hourBox) throw new Error('calendar grid is not visible');
+  return { grid, box, hourBox, hourHeight };
 }
 
 /**
