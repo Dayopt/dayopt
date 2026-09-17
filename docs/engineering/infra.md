@@ -420,7 +420,9 @@ reset から退避し、seed は base SHA の内容に差し替えるので、ca
 upgrade 成功の代用にしない。適用済み migration の編集・削除は production が再実行しないので
 落とす。schema 変更を含む PR の `Preview – product` は、同じ SHA の `Supabase Preview` check run
 （発行元が公式 Supabase App `supabase` のもの）が success（隔離された PR 用 branch）であることも
-要求し、skipped（branch 無し = shared / 不明な DB）や別 App の同名 check は受理しない。app-only の PR には branch を要求しない（integration は migration を含む PR
+要求し、skipped（branch 無し = shared / 不明な DB）や別 App の同名 check は受理しない。check run が
+まだ無い間は pending（controller が bounded に待ち、`check_run` 完了 event で再評価する。missing と
+して blocked にはしない）。app-only の PR には branch を要求しない（integration は migration を含む PR
 でだけ branch を作る）。
 
 公開前の migration 反映確認: promote.yml の release job が

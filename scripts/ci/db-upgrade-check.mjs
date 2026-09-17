@@ -104,6 +104,20 @@ export function compareRowIdentity(before, after) {
  */
 export const CATALOG_SQL = `select 'index:' || schemaname || '.' || indexname || ' ' || indexdef from pg_indexes where schemaname in (${SCHEMA_LIST}) union all select 'constraint:' || n.nspname || '.' || c.conrelid::regclass::text || '.' || c.conname || ' ' || pg_get_constraintdef(c.oid) from pg_constraint c join pg_namespace n on n.oid = c.connamespace where n.nspname in (${SCHEMA_LIST}) union all select 'trigger:' || n.nspname || '.' || t.tgrelid::regclass::text || '.' || t.tgname || ' ' || pg_get_triggerdef(t.oid) from pg_trigger t join pg_class r on r.oid = t.tgrelid join pg_namespace n on n.oid = r.relnamespace where n.nspname in (${SCHEMA_LIST}) and not t.tgisinternal order by 1`;
 
+/** relationship 契約の 5 項目。生成順・契約外フィールドに依存せず固定順で直列化する。 */
+const RELATIONSHIP_FIELDS = [
+  'foreignKeyName',
+  'columns',
+  'isOneToOne',
+  'referencedRelation',
+  'referencedColumns',
+];
+function normalizeRelationship(fields) {
+  return RELATIONSHIP_FIELDS.map(
+    (name) => `${name}=${(fields.get(name) ?? '').replace(/\s+/g, '')}`,
+  ).join(' ');
+}
+
 /**
  * Functions の 1 entity（`      name: {` の次行から `      };` の前まで）を Args / Returns に分ける。
  * 単一 signature だけ構造化し、overload（Args が複数）や読めない形は raw 比較に落とす。
@@ -220,13 +234,16 @@ export function extractSchemaContract(typesText) {
       // `{ foreignKeyName; columns; isOneToOne; referencedRelation; referencedColumns }` を 1 件ずつ
       // 正規化した文字列にする（旧 build の embedded relation 問い合わせが解決できる契約）
       let j = i + 1;
-      let current = [];
+      let current = new Map();
       while (j < lines.length && !/^ {8}\];$/.test(lines[j])) {
         const text = lines[j].trim();
-        if (text === '{') current = [];
+        if (text === '{') current = new Map();
         else if (text === '},' || text === '}')
-          contract.tables.get(entity).relationships.add(current.join(' '));
-        else current.push(text);
+          contract.tables.get(entity).relationships.add(normalizeRelationship(current));
+        else {
+          const field = text.match(/^(\w+): (.+);$/);
+          if (field) current.set(field[1], field[2]);
+        }
         j += 1;
       }
       i = j;

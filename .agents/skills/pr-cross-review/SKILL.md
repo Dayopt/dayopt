@@ -46,7 +46,7 @@ Validation controller（`validation-gate.yml`、[infra.md](../../../docs/enginee
 
 - 完了証拠は `chatgpt-codex-connector[bot]` 名義の submitted review（`Reviewed commit` が head に一致。PENDING / DISMISSED は除外）か「Codex Review: Didn't find any major issues」comment だけ。依頼 comment の投稿成功・👀 / 👍 反応・summary 表の行は完了にしない
 - `[review-summary]` は OWNER / MEMBER / COLLABORATOR の comment だけ受理し、`status:` は `reviewed` または `role=reviewed, ...` の全 role が reviewed の時だけ満たす（partial / stale / not-run は不足、他は unknown）
-- 再評価は CI 完了（workflow_run）、Vercel の status、PR への comment（issue_comment）で起きる。review の submit / thread の resolve 直後は再評価されないので、裁定後は comment を残すか修正 push で CI を回す
+- 再評価は CI 完了（workflow_run）、Vercel の status、Supabase Preview の check run 完了（check_run）、PR への comment（issue_comment）で起きる。review の submit / thread の resolve 直後は再評価されないので、裁定後は comment を残すか修正 push で CI を回す
 - 高リスク（保護対象 path / policy）は上記に加えて `[review-summary]` の `head:` が現 head で `status:` が reviewed であることを別条件にする（`partial` / `stale` / `not-run` は不足）
 - 本番操作の `EXPLICIT AUTHORITY` は PR 本文の checkbox・label・レビュー結果から推定しない。常に別の明示承認が要る
 - shadow 中は Codex を自動起動しない（起動要否は log に残すだけ）。現行の advisory 規則との差分: 切替後（#2798）は `satisfied` / `not-required` 以外で merge を止め、`unknown` / `failed` は同等の独立レビュー（固定差分レビュー等）で代替する。ruleset / Codex 設定の変更は本 skill の範囲外
