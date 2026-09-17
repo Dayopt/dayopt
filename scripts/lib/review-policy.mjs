@@ -38,7 +38,8 @@ export const REVIEW_RESPONSE_TIMEOUT_MS = 30 * 60 * 1000;
  * @typedef {{ id: number, authorLogin: string, authorType: string, authorAssociation?: string,
  *   body: string, createdAt: string, htmlUrl: string }} CommentEvidence
  * @typedef {{ id: string, isResolved: boolean, isOutdated: boolean, path: string | null,
- *   comments: { authorLogin: string, reviewId: string | null, body: string }[] }} ThreadEvidence
+ *   comments: { authorLogin: string, authorType?: string, authorAssociation?: string,
+ *   reviewId: string | null, body: string }[] }} ThreadEvidence
  * @typedef {{ headSha: string, headCommittedAt: string | null, headObservedAt?: string | null,
  *   pr: { number: number, state: string, draft: boolean },
  *   reviews: ReviewEvidence[], comments: CommentEvidence[], threads: ThreadEvidence[],
@@ -109,19 +110,28 @@ export function readCodexSummaryRow(evidence, headSha) {
   return rows.find((row) => row.commit && matchesHead(row.commit, headSha)) ?? null;
 }
 
-/** 現 head の bot review に属する thread の裁定状況。 */
+/**
+ * 裁定状況。**class ごと閉じる**: 現 head の Codex review に属する thread だけでなく、PR の全
+ * review thread（代替レビューの指摘・対象不明の応答・第三者の thread を含む）を対象にし、
+ * 「resolve 済みで、信頼済み人間（OWNER / MEMBER / COLLABORATOR、bot ではない）の返信がある」
+ * 以外は裁定済みと数えない。`findings` は現 head の Codex review に属する thread 数。
+ */
 function adjudicationOf(evidence, headReviewIds) {
-  const threads = (evidence.threads ?? []).filter(
+  const threads = (evidence.threads ?? []).filter((thread) => thread.comments.length > 0);
+  const findings = threads.filter(
     (thread) =>
-      thread.comments.length > 0 &&
       isBot(thread.comments[0]) &&
       thread.comments.some((comment) => headReviewIds.has(comment.reviewId ?? '')),
   );
+  const adjudicated = (comment) =>
+    !isBot(comment) &&
+    comment.authorType !== 'Bot' &&
+    TRUSTED_ASSOCIATIONS.has(comment.authorAssociation ?? '');
   const unresolved = threads.filter((thread) => !thread.isResolved);
   const silent = threads.filter(
-    (thread) => thread.isResolved && !thread.comments.some((comment) => !isBot(comment)),
+    (thread) => thread.isResolved && !thread.comments.some(adjudicated),
   );
-  return { findings: threads.length, unresolved: unresolved.length, silent: silent.length };
+  return { findings: findings.length, unresolved: unresolved.length, silent: silent.length };
 }
 
 /** 高リスクの固定差分契約（`[review-summary]`）の現 head 分。 */
@@ -283,10 +293,18 @@ export function evaluateReviewPolicy({
         ? 'Fixed-diff review summary matches this head'
         : `Fixed-diff review summary for this head is ${highRisk.status}`;
   }
+  // 代替レビューも裁定確認を通す: PR の全 thread が「信頼済み人間の返信つきで resolve」でなければ
+  // pending-adjudication のまま（代替レビューの指摘を黙って resolve した経路を閉じる）。
   const alternativeReview = summary.status === 'satisfied';
   if (alternativeReview && ['unknown', 'failed', 'not-started', 'stale'].includes(state)) {
-    state = 'complete';
-    reason = `Independent fixed-diff review recorded for ${headSha.slice(0, 9)} (Codex: ${reason})`;
+    adjudication = adjudicationOf(evidence, new Set());
+    if (adjudication.unresolved > 0 || adjudication.silent > 0) {
+      state = 'pending-adjudication';
+      reason = `${adjudication.unresolved + adjudication.silent} thread(s) not adjudicated by a trusted human reply`;
+    } else {
+      state = 'complete';
+      reason = `Independent fixed-diff review recorded for ${headSha.slice(0, 9)} (Codex: ${reason})`;
+    }
   }
 
   const shouldRequest =

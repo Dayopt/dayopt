@@ -78,7 +78,7 @@ const REVIEW_THREADS_QUERY = `query($owner: String!, $name: String!, $number: In
         pageInfo { hasNextPage endCursor }
         nodes {
           id isResolved isOutdated path
-          comments(first: 50) { nodes { author { login } body pullRequestReview { id } } }
+          comments(first: 50) { nodes { author { login __typename } authorAssociation body pullRequestReview { id } } }
         }
       }
     }
@@ -160,6 +160,8 @@ export function collectReviewEvidence({ repository, pr, api, graphql, headObserv
     path: thread.path ?? null,
     comments: (thread.comments?.nodes ?? []).map((comment) => ({
       authorLogin: comment.author?.login ?? '',
+      authorType: comment.author?.__typename ?? '',
+      authorAssociation: comment.authorAssociation ?? '',
       reviewId: comment.pullRequestReview?.id ?? null,
       body: comment.body ?? '',
     })),
@@ -500,6 +502,14 @@ export function runValidationGate({
     // status を closed PR の証拠で上書きしない。Codex P2）。
     if (pr.state !== 'open')
       return { skipped: `PR #${pr.number} is ${pr.state}`, result: null, review: null };
+    // 対象は main 向けの PR だけ。同じ head を持つ stacked PR（別 base）の評価で SHA 単位の status を
+    // 上書きしない（Codex P2）。
+    if (pr.base?.ref !== 'main' || pr.base?.repo?.full_name !== repository)
+      return {
+        skipped: `PR #${pr.number} does not target ${repository} main`,
+        result: null,
+        review: null,
+      };
     statusSha = pr.head.sha;
     if (publishable)
       for (const context of [VALIDATION_STATUS_CONTEXT, REVIEW_STATUS_CONTEXT])

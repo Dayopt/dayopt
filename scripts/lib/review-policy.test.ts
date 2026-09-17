@@ -92,7 +92,15 @@ const thread = (
       body: '**P2 Badge** Patch の変化で diff hash を検証する',
     },
     ...(reply
-      ? [{ authorLogin: 't3-nico', reviewId: 'PRR_2', body: 'f57bf894e で対応しました。' }]
+      ? [
+          {
+            authorLogin: 't3-nico',
+            authorType: 'User',
+            authorAssociation: 'OWNER',
+            reviewId: 'PRR_2',
+            body: 'f57bf894e で対応しました。',
+          },
+        ]
       : []),
   ],
 });
@@ -314,6 +322,43 @@ describe('review policy: completion evidence', () => {
       evidence({ reviews: [{ ...stale, submittedAt: '2026-09-16T11:55:00Z' }] }),
     );
     expect(after.state).toBe('unknown');
+  });
+
+  it('does not count replies from outsiders or other bots as adjudication', () => {
+    const outsiderReply = {
+      ...thread('PRR_1'),
+      comments: [
+        { authorLogin: CODEX_LOGIN, reviewId: 'PRR_1', body: 'P2' },
+        {
+          authorLogin: 'stranger',
+          authorType: 'User',
+          authorAssociation: 'NONE',
+          reviewId: null,
+          body: 'lgtm',
+        },
+      ],
+    };
+    const result = evaluate(
+      [APP],
+      evidence({ reviews: [codexReview(HEAD)], threads: [outsiderReply] }),
+    );
+    expect(result.state).toBe('pending-adjudication');
+    expect(result.reason).toMatch(/without a reply/);
+  });
+
+  it('applies adjudication to the alternative review path as well', () => {
+    const late = new Date(Date.parse('2026-09-16T11:45:00Z') + REVIEW_RESPONSE_TIMEOUT_MS + 1);
+    const silentThread = { ...thread('PRR_9', { reply: false }), id: 'PRRT_alt' };
+    const result = evaluate(
+      [APP],
+      evidence({
+        comments: [request('2026-09-16T11:45:00Z'), highRiskSummary(HEAD)],
+        threads: [silentThread],
+      }),
+      { now: late },
+    );
+    expect(result.state).toBe('pending-adjudication');
+    expect(result.verdict).toBe('blocked');
   });
 
   it('lets a trusted fixed-diff review satisfy the policy when Codex is unavailable', () => {

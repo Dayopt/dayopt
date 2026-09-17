@@ -414,7 +414,11 @@ OWNER / MEMBER / COLLABORATOR の comment だけ受理し、`status:` は単独�
 `role=reviewed` の時だけ満たす。依頼と head の対応は commit 日時ではなく、その head の最新の
 pull_request run 作成時刻（切替時刻）で照合する。Codex が無応答 / 失敗でも、現 head の信頼済み
 `[review-summary]` があれば「同等の独立レビュー」として満たす（可用性を gate にしない）。
-closed / merged PR は評価も発行もしない。
+closed / merged PR と main 以外を base にする PR は評価も発行もしない。裁定は PR の全 review
+thread（代替レビューの指摘・対象不明の応答を含む）が「信頼済み人間の返信つきで resolve」で
+なければ pending-adjudication。**review evidence の保証境界はここまで**: GitHub 上の投稿者・
+association・thread の resolve 状態を機械確認するもので、返信内容の妥当性や、GitHub の外で
+行われた確認は証明しない。
 
 結果は Step Summary・`validation-result-<run>` artifact（14 日）・commit status `Validation (shadow)`
 に出す。**required check ではない。** ruleset・`branch:finish`・既存 check は変更しない。

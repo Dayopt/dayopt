@@ -201,7 +201,8 @@ function fakeGraphql(threads: unknown[] = []) {
                         pullRequestReview: { id: 'PRR_1' },
                       },
                       {
-                        author: { login: 't3-nico' },
+                        author: { login: 't3-nico', __typename: 'User' },
+                        authorAssociation: 'OWNER',
                         body: '対応済み',
                         pullRequestReview: { id: 'PRR_2' },
                       },
@@ -838,6 +839,33 @@ describe('validation gate controller', () => {
         api,
       }),
     ).toBeNull();
+  });
+
+  it('does not publish for a PR whose base is not main (stacked PR sharing the head)', () => {
+    const { api } = fakeApi({
+      [`repos/${REPO}/pulls/7`]: pull({
+        base: { ref: 'feature/x', sha: baseSha, repo: { full_name: REPO } },
+      }),
+    });
+    const posted: string[][] = [];
+    const outcome = runValidationGate({
+      env: env({
+        GITHUB_EVENT_NAME: 'issue_comment',
+        GITHUB_EVENT_PATH: writeEvent({ issue: { number: 7, pull_request: { url: 'x' } } }),
+      }),
+      argv: [],
+      api,
+      graphql: fakeGraphql(),
+      cwd,
+      fetchImpl: () => {},
+      output: () => {},
+      postStatus: (args) => {
+        posted.push(args);
+        return '';
+      },
+    });
+    expect(outcome.skipped).toMatch(/does not target/);
+    expect(posted).toHaveLength(0);
   });
 
   it('does not evaluate or publish for a closed PR reached through issue_comment', () => {
