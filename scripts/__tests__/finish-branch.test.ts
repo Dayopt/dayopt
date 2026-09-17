@@ -160,6 +160,15 @@ function runScript(
     /** reviewThreads の 1 ページ目が hasNextPage: true で終わり、2 ページ目を用意しない状態にする */
     threadsTruncated?: boolean;
     /**
+     * commit status「Production Config Audit」の description。audit contract guard の
+     * failure が設計上のもの（`Audit contract changed; …`）か本物の drift
+     * （`Vercel metadata does not match …`）かを決める唯一の手がかり。
+     * 省略時は設計上の failure（= advisory になる形）。
+     */
+    auditStatusDescription?: string;
+    /** status 取得 API を失敗させる（description 不明の fail closed 経路の検証） */
+    auditStatusUnavailable?: boolean;
+    /**
      * reviewThreads を複数ページに分けてレスポンスを組み立てる。指定時は `threads` /
      * `threadsTruncated` より優先する。各要素が 1 ページ分。`hasNextPage` を省略した
      * 要素は「最後の要素以外は true、最後は false」として扱う（20 ページ上限の
@@ -275,6 +284,10 @@ case "$1" in
       fi
     else
       case "$*" in
+        *commits/*/statuses*)
+          if [[ "\${FINISH_BRANCH_AUDIT_STATUS_EXIT:-0}" != "0" ]]; then exit 1; fi
+          printf '%s' "\${FINISH_BRANCH_AUDIT_STATUS_DESCRIPTION:-}"
+          ;;
         *pulls/123/files*)
           cat "$FINISH_BRANCH_PR_FILES"
           if [[ "\${FINISH_BRANCH_FILES_EXIT:-0}" != "0" ]]; then exit 1; fi
@@ -316,6 +329,9 @@ esac
         ? join(temporaryDirectory, 'missing-threads-dir')
         : threadsDirectory,
       FINISH_BRANCH_FILES_EXIT: options.filesPartialFailure ? '1' : '0',
+      FINISH_BRANCH_AUDIT_STATUS_DESCRIPTION:
+        options.auditStatusDescription ?? 'Audit contract changed; trusted head audit is required',
+      FINISH_BRANCH_AUDIT_STATUS_EXIT: options.auditStatusUnavailable ? '1' : '0',
     },
   });
 
@@ -685,6 +701,53 @@ describe('audit contract guard の advisory 扱い（#2469）', () => {
     ]);
     expect(stderr).toContain('失敗している check');
     expect(status).toBe(1);
+  });
+
+  // ── 本物の drift は advisory にしない ──────────────────────────────────
+  // workflow の `Enforce audit result` は「contract を変えた（設計上の failure）」でも
+  // 「Vercel の env metadata が Production contract と食い違う（本物の drift）」でも
+  // exit 1 する。conclusion / state では区別できず、status の description だけが分ける。
+  it('status description が本物の drift を報告していたら止める', () => {
+    const { status, stderr } = runScript(
+      [guardFailure(), statusContext('Production Config Audit', 'FAILURE', '2026-08-03T00:25:36Z')],
+      { auditStatusDescription: 'Vercel metadata does not match the Production contract' },
+    );
+    expect(stderr).toContain('本物の drift');
+    expect(stderr).toContain('失敗している check');
+    expect(status).toBe(1);
+  });
+
+  it('status description を取得できなければ advisory にしない（fail closed）', () => {
+    // 設計上の failure か本物の drift かを判定できない以上、緩める側へ倒さない。
+    const { status, stderr } = runScript([guardFailure()], { auditStatusUnavailable: true });
+    expect(stderr).toContain('description を取得できませんでした');
+    expect(stderr).toContain('失敗している check');
+    expect(status).toBe(1);
+  });
+
+  it('status が 1 件も無ければ advisory にしない（fail closed）', () => {
+    // requiredChecks() を足して「成功 check が 0 件」で落ちる経路を塞ぎ、
+    // **guard の failure を数えたこと**が停止の理由であることを固定する。
+    const { status, stderr } = runScript([guardFailure(), ...requiredChecks()], {
+      auditStatusDescription: '',
+    });
+    expect(stderr).toContain('description を取得できませんでした');
+    expect(stderr).toContain('失敗している check');
+    expect(status).toBe(1);
+  });
+
+  it('trusted dispatch が通った後（status = matches）も advisory のまま', () => {
+    // dispatch を回した PR では設計上の failure の上に成功 status が積まれる。
+    const { status, stderr } = runScript(
+      [
+        guardFailure(),
+        statusContext('Production Config Audit', 'SUCCESS', '2026-08-03T00:25:36Z'),
+        ...requiredChecks(),
+      ],
+      { auditStatusDescription: 'Vercel metadata matches the Production contract' },
+    );
+    expect(stderr).not.toContain('失敗している check');
+    expect(status).toBe(0);
   });
 
   it('guard が advisory でも、同居する他の failure は止める', () => {

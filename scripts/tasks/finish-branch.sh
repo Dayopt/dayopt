@@ -234,6 +234,19 @@ if [[ "$PR_STATE" == "OPEN" ]]; then
   # pending / success の数え方は変えない —— guard の check run も status も最終的に
   # failure として確定するため pending に留まらず、除外しても待ち時間が縮まらない一方、
   # 数え方を 3 箇所で個別に変えると「代表は pending だが件数は 0」のズレを増やす。
+  #
+  # **ただし無条件に advisory にはしない。** workflow の `Enforce audit result` step は
+  #   (a) contract を変えた（設計上の failure。監査そのものは行っていない）
+  #   (b) 実際に Vercel の env metadata が Production contract と食い違う（本物の drift）
+  # の**どちらでも exit 1** する。check run の conclusion と status の state だけでは
+  # 両者を区別できない。区別できるのは status の `description` だけで、
+  #   (a) `Audit contract changed; trusted head audit is required`
+  #   (b) `Vercel metadata does not match the Production contract`
+  # と固定されている（`.github/workflows/production-config-audit.yml` の
+  # `Publish Production Config Audit status`）。**`gh pr view --json statusCheckRollup` は
+  # StatusContext の description を返さない**（context / state / startedAt / targetUrl のみ）ため、
+  # guard が落ちている時だけ head の status を直接引いて判定する。(b) を advisory にすると
+  # 本物の production 設定 drift を黙って通すので、そこは従来どおり止める。
   JQ_GATE_DEFS='
     def check_name: (.name // .context // "");
     def is_trusted_audit_guard:
@@ -242,24 +255,52 @@ if [[ "$PR_STATE" == "OPEN" ]]; then
         and (.name // "") == "Audit Vercel metadata (trusted)")
       or ((.__typename // "") == "StatusContext"
         and (.context // "") == "Production Config Audit");
-    def is_advisory:
-      check_name == "Validation (shadow)"
-      or check_name == "Review policy (shadow)"
-      or is_trusted_audit_guard;
+    def is_shadow_advisory:
+      check_name == "Validation (shadow)" or check_name == "Review policy (shadow)";
     def is_failed:
       ((.conclusion // "") | ascii_downcase | . == "failure" or . == "cancelled" or . == "timed_out")
       or ((.state // "") | ascii_downcase | . == "failure" or . == "error");
   '
 
-  TRUSTED_AUDIT_ADVISORY="$(printf '%s' "$ROLLUP" | jq -r "$JQ_GATE_DEFS"'
+  TRUSTED_AUDIT_FAILURES="$(printf '%s' "$ROLLUP" | jq -r "$JQ_GATE_DEFS"'
     map(select(is_trusted_audit_guard and is_failed)) | length')"
 
-  if [[ "$TRUSTED_AUDIT_ADVISORY" != "0" ]]; then
-    info "audit contract guard（Audit Vercel metadata (trusted) / status「Production Config Audit」）の failure $TRUSTED_AUDIT_ADVISORY 件は advisory として扱い、失敗数から除外します（#2469。merge の遮断は main の ruleset）。"
+  AUDIT_GUARD_ADVISORY="false"
+  if [[ "$TRUSTED_AUDIT_FAILURES" != "0" ]]; then
+    # 最新の status 1 件だけを見る（GitHub は新しい順に返す）。trusted dispatch を
+    # 後から回した PR では、設計上の failure の上に dispatch の結果が積まれている。
+    AUDIT_STATUS_DESCRIPTION="$(gh api "repos/{owner}/{repo}/commits/$HEAD_SHA/statuses" \
+      --jq 'map(select(.context == "Production Config Audit")) | .[0].description // ""' \
+      2>/dev/null || echo "__unavailable__")"
+
+    case "$AUDIT_STATUS_DESCRIPTION" in
+      *'does not match the Production contract'*)
+        # 本物の drift。advisory にしない（= 下の FAILED_CHECKS に数える）。
+        error "commit status「Production Config Audit」が本物の drift を報告しています:"
+        error "  $AUDIT_STATUS_DESCRIPTION"
+        error "Vercel の env metadata が Production contract と食い違っています。merge 前に解消してください。"
+        ;;
+      __unavailable__ | '')
+        # status を読めなかった / 存在しない。設計上の failure と本物の drift を
+        # 区別できないので、緩める側へは倒さない（fail closed）。
+        error "commit status「Production Config Audit」の description を取得できませんでした。"
+        error "audit contract guard の failure が設計上のものか本物の drift か判定できないため、advisory にしません。"
+        error "  gh api repos/{owner}/{repo}/commits/$HEAD_SHA/statuses"
+        ;;
+      *)
+        AUDIT_GUARD_ADVISORY="true"
+        info "audit contract guard（Audit Vercel metadata (trusted) / status「Production Config Audit」）の failure $TRUSTED_AUDIT_FAILURES 件は advisory として扱い、失敗数から除外します（#2469。merge の遮断は main の ruleset）。"
+        info "  status description: ${AUDIT_STATUS_DESCRIPTION}"
+        ;;
+    esac
   fi
 
-  FAILED_CHECKS="$(printf '%s' "$ROLLUP" | jq -r "$JQ_GATE_DEFS"'
-    map(select((is_advisory | not) and is_failed)) | length')"
+  FAILED_CHECKS="$(printf '%s' "$ROLLUP" | jq -r --arg audit_advisory "$AUDIT_GUARD_ADVISORY" "$JQ_GATE_DEFS"'
+    map(select(
+      (is_shadow_advisory | not)
+      and (if $audit_advisory == "true" then (is_trusted_audit_guard | not) else true end)
+      and is_failed))
+    | length')"
 
   if [[ "$FAILED_CHECKS" != "0" ]]; then
     error "失敗している check が $FAILED_CHECKS 件あります。マージを中止します。"

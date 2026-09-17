@@ -703,6 +703,15 @@ required status checks の実状は ruleset が正本で、context の一覧を�
   固定 context `Production Config Audit` の status を、`Validation (shadow)` / `Review policy (shadow)` と
   同じ advisory として失敗数から外す（照合は 型 + workflow 名 + check 名 / context の完全一致のみ。
   同名でも別 workflow の check、同じ workflow の別 job、その他の failure は従来どおり merge を止める）。
+  **無条件に advisory にはしない。** workflow の `Enforce audit result` は「contract を変えた」
+  （設計上の failure）でも「Vercel の env metadata が Production contract と食い違う」（本物の drift）でも
+  exit 1 するため、check run の conclusion と status の state では両者を区別できない。分けられるのは
+  status の `description` だけで、`Audit contract changed; trusted head audit is required` なら advisory、
+  `Vercel metadata does not match the Production contract` なら従来どおり停止する。
+  **`gh pr view --json statusCheckRollup` は StatusContext の description を返さない**
+  （context / state / startedAt / targetUrl のみ）ので、guard が落ちている時だけ
+  `gh api repos/{owner}/{repo}/commits/<head>/statuses` を引いて最新 1 件の description を読む。
+  読めなかった場合・status が 1 件も無い場合は **advisory にしない**（fail closed）。
   **2026-09-03（#2571）から 2026-09-18 まで、ここは contract 変更 PR に status success を必須にしていた。**
   撤去した理由は 3 つ。(1) merge の遮断は 2026-09-13（[#2640](https://github.com/Dayopt/dayopt/issues/2640)）以降 main の ruleset 1 本で、
   required checks に `Production Config Audit` は含まれない。この checkpoint は `branch:finish` だけに効く
