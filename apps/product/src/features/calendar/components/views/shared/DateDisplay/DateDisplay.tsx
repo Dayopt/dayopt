@@ -6,7 +6,7 @@ import { format } from 'date-fns';
 import { enUS, ja } from 'date-fns/locale';
 import { useLocale } from 'next-intl';
 
-import { isTodayInTimezone } from '@/lib/date/timezone';
+import { isTodayWallDateInTimezone } from '@/lib/date/timezone';
 import { useUserPreferences } from '@/lib/hooks/useUserPreferences';
 import { cn } from '@dayopt/components';
 
@@ -155,7 +155,7 @@ export const DateDisplay = ({
   onDoubleClick,
 }: DateDisplayProps) => {
   const timezone = useUserPreferences((s) => s.timezone);
-  const today = todayProp ?? isTodayInTimezone(date, timezone);
+  const today = todayProp ?? isTodayWallDateInTimezone(date, timezone);
 
   const { dayName, dateString, monthYear } = useDateFormats(
     date,

@@ -2124,7 +2124,7 @@ graph LR
 </details>
 
 <details>
-<summary>test の候補（95）</summary>
+<summary>test の候補（96）</summary>
 
 <!-- prettier-ignore -->
 | ファイル | 対応の根拠 |
@@ -2174,6 +2174,7 @@ graph LR
 | [apps/product/src/features/calendar/components/views/WeekView/components/WeekGrid.test.tsx](<../../../apps/product/src/features/calendar/components/views/WeekView/components/WeekGrid.test.tsx>) | feature: calendar |
 | [apps/product/src/features/calendar/components/views/WeekView/useWeekTimeblocks.test.ts](<../../../apps/product/src/features/calendar/components/views/WeekView/useWeekTimeblocks.test.ts>) | feature: calendar |
 | [apps/product/src/features/calendar/components/views/WeekView/utils/weekTimeblockPosition.test.ts](<../../../apps/product/src/features/calendar/components/views/WeekView/utils/weekTimeblockPosition.test.ts>) | feature: calendar |
+| [apps/product/src/features/calendar/domain/activity-visibility.test.ts](<../../../apps/product/src/features/calendar/domain/activity-visibility.test.ts>) | feature: calendar |
 | [apps/product/src/features/calendar/domain/calendar-query-input.test.ts](<../../../apps/product/src/features/calendar/domain/calendar-query-input.test.ts>) | feature: calendar |
 | [apps/product/src/features/calendar/domain/interaction/machine-drag-initiation.test.ts](<../../../apps/product/src/features/calendar/domain/interaction/machine-drag-initiation.test.ts>) | feature: calendar |
 | [apps/product/src/features/calendar/domain/interaction/machine-dragging.test.ts](<../../../apps/product/src/features/calendar/domain/interaction/machine-dragging.test.ts>) | feature: calendar |

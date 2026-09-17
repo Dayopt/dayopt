@@ -14,6 +14,8 @@ import { api } from '@/lib/trpc';
 
 import { useCalendarFilterStore } from '@/features/calendar/stores/useCalendarFilterStore';
 
+import { isActivityVisible } from '../../../domain/activity-visibility';
+
 import {
   buildCalendarRangeInput,
   buildTimeblockListInput,
@@ -204,12 +206,16 @@ export function useCalendarData({
   );
 
   // フィルター関数と状態を取得（ストアに統一）
-  const matchesActivityFilter = useCalendarFilterStore((state) => state.matchesActivityFilter);
+  const filterInitialized = useCalendarFilterStore((state) => state.initialized);
+  const visibleActivityIds = useCalendarFilterStore((state) => state.visibleActivityIds);
   // タグフィルタ変更時に useMemo を再実行させるためのリアクティブ依存
   // useDeferredValue でフィルター変更時のカレンダー再描画を遅延し、
   // チェックボックスUIの即時応答を維持する
-  const visibleActivityIds = useDeferredValue(
-    useCalendarFilterStore((state) => state.visibleActivityIds),
+  const deferredFilterState = useDeferredValue(
+    useMemo(
+      () => ({ initialized: filterInitialized, visibleActivityIds }),
+      [filterInitialized, visibleActivityIds],
+    ),
   );
   // 未分類(タグなし)フィルターの表示切替も同様にリアクティブ依存として渡す（#1576）
 
@@ -296,12 +302,15 @@ export function useCalendarData({
 
     // サイドバーのフィルター設定を適用
     const visibilityFiltered = filtered.filter((event) => {
-      return matchesActivityFilter(event.activityId ?? null);
+      return isActivityVisible(
+        event.activityId ?? null,
+        deferredFilterState.initialized,
+        deferredFilterState.visibleActivityIds,
+      );
     });
 
     return visibilityFiltered;
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- visibleActivityIds はリアクティブ依存（関数参照は安定のため直接依存不可）
-  }, [viewDateRange, allCalendarEvents, timezone, matchesActivityFilter, visibleActivityIds]);
+  }, [viewDateRange, allCalendarEvents, timezone, deferredFilterState]);
 
   return {
     viewDateRange,

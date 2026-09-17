@@ -3,7 +3,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { buildCalendarRangeInput, buildTimeblockListInput } from '@/features/calendar';
 
 const mocks = vi.hoisted(() => ({
-  headers: new Map<string, string>(),
+  requestCalendarDate: {
+    dateKey: '2026-09-15',
+    timezone: 'Asia/Tokyo',
+    hasBrowserTimezone: true,
+  },
   settings: vi.fn(),
   plansPrefetch: vi.fn(),
   recordsPrefetch: vi.fn(),
@@ -11,8 +15,8 @@ const mocks = vi.hoisted(() => ({
   activityStatsPrefetch: vi.fn(),
 }));
 
-vi.mock('next/headers', () => ({
-  headers: vi.fn(async () => ({ get: (key: string) => mocks.headers.get(key) ?? null })),
+vi.mock('@/lib/server/request-calendar-date', () => ({
+  getRequestCalendarDate: vi.fn(async () => mocks.requestCalendarDate),
 }));
 
 vi.mock('@/lib/logger', () => ({
@@ -36,8 +40,12 @@ import { prefetchCalendarData } from './calendar-prefetch';
 describe('prefetchCalendarData', () => {
   beforeEach(() => {
     vi.useFakeTimers();
-    mocks.headers.clear();
     vi.clearAllMocks();
+    mocks.requestCalendarDate = {
+      dateKey: '2026-09-15',
+      timezone: 'Asia/Tokyo',
+      hasBrowserTimezone: true,
+    };
   });
 
   afterEach(() => {
@@ -47,7 +55,6 @@ describe('prefetchCalendarData', () => {
   it('client の useCalendarData と同じ builder・同じ設定値で plans / records / ghost を先読みする', async () => {
     // JST では 2026-09-15 の朝、UTC ではまだ 09-14
     vi.setSystemTime(new Date('2026-09-14T23:30:00.000Z'));
-    mocks.headers.set('x-user-timezone', 'Asia/Tokyo');
     mocks.settings.mockResolvedValue({
       timezone: 'Asia/Tokyo',
       weekStartsOn: 0,
@@ -80,7 +87,6 @@ describe('prefetchCalendarData', () => {
 
   it('?date= は TZ 変換を掛けず、その暦日を基準にする（負オフセット TZ で前日にずれない）', async () => {
     vi.setSystemTime(new Date('2026-09-14T12:00:00.000Z'));
-    mocks.headers.set('x-user-timezone', 'America/Los_Angeles');
     mocks.settings.mockResolvedValue({
       timezone: 'America/Los_Angeles',
       weekStartsOn: 1,
@@ -99,7 +105,11 @@ describe('prefetchCalendarData', () => {
 
   it('不正な ?date= は client と同じく今日（ブラウザ TZ の暦日）に倒す', async () => {
     vi.setSystemTime(new Date('2026-09-14T12:00:00.000Z'));
-    mocks.headers.set('x-user-timezone', 'UTC');
+    mocks.requestCalendarDate = {
+      dateKey: '2026-09-14',
+      timezone: 'UTC',
+      hasBrowserTimezone: true,
+    };
     mocks.settings.mockResolvedValue({ timezone: 'UTC', weekStartsOn: 1, showWeekends: true });
 
     await prefetchCalendarData('day', '2026-13-01');
@@ -111,7 +121,11 @@ describe('prefetchCalendarData', () => {
 
   it('user_settings の row が無い新規ユーザーは client の既定（browser TZ / 月曜 / 週末表示）に合わせる', async () => {
     vi.setSystemTime(new Date('2026-09-14T12:00:00.000Z'));
-    mocks.headers.set('x-user-timezone', 'Europe/Berlin');
+    mocks.requestCalendarDate = {
+      dateKey: '2026-09-14',
+      timezone: 'Europe/Berlin',
+      hasBrowserTimezone: true,
+    };
     mocks.settings.mockResolvedValue(null);
 
     await prefetchCalendarData('week', '2026-09-16');

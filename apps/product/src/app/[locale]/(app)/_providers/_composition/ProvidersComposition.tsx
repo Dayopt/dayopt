@@ -7,6 +7,8 @@
  */
 'use client';
 
+import { HydrationBoundary, type DehydratedState } from '@tanstack/react-query';
+
 import dynamic from 'next/dynamic';
 import { useState } from 'react';
 
@@ -81,10 +83,11 @@ const GlobalCategoryRenameModal = dynamic(
 
 interface ProvidersCompositionProps {
   children: React.ReactNode;
+  dehydratedState?: DehydratedState | undefined;
 }
 
 /** 認証必須ページ用フルProviders（composition 本体） */
-export function ProvidersComposition({ children }: ProvidersCompositionProps) {
+export function ProvidersComposition({ children, dehydratedState }: ProvidersCompositionProps) {
   const [queryClient] = useState(() => createAppQueryClient());
   const [trpcClient] = useState(() => createAppTrpcClient());
   // 永続化 cache は認証済み user ごとに分ける（#2619）。復元は auth store が session を
@@ -123,22 +126,33 @@ export function ProvidersComposition({ children }: ProvidersCompositionProps) {
         <AuthStoreInitializer />
         {/* 認証主体が変わったら memory / 永続 cache を破棄する（#2619） */}
         <QueryCacheAuthBoundary />
-        <ThemeProvider>
-          {/* セッション失効通知・PWA 登録は children を gate しない副作用なので並列配置 */}
-          <SessionMonitorProvider />
-          <ServiceWorkerProvider />
-          {/* UserSettings の hydration が完了するまで children を render しない。
+        <HydrationBoundary state={dehydratedState}>
+          <ThemeProvider>
+            {/* セッション失効通知・PWA 登録は children を gate しない副作用なので並列配置 */}
+            <SessionMonitorProvider />
+            <ServiceWorkerProvider />
+            {/* UserSettings の hydration が完了するまで children を render しない。
               timezone 等が defaults のまま timezone-dependent mutation が実行
               されるのを防ぐ。TanStack Query の永続 cache が効けば体感遅延は極小。 */}
-          <UserSettingsInitializer>
-            <BillingAccessProvider>
-              {children}
-              <GlobalActivityCreateModal />
-              <GlobalActivityRenameModal />
-              <GlobalCategoryRenameModal />
-            </BillingAccessProvider>
-          </UserSettingsInitializer>
-        </ThemeProvider>
+            <UserSettingsInitializer>
+              <BillingAccessProvider
+                serverPrefetched={
+                  dehydratedState?.queries.some(
+                    (query) =>
+                      JSON.stringify(query.queryKey[0]) ===
+                        JSON.stringify(['billing', 'getAccess']) &&
+                      query.state.status === 'success',
+                  ) ?? false
+                }
+              >
+                {children}
+                <GlobalActivityCreateModal />
+                <GlobalActivityRenameModal />
+                <GlobalCategoryRenameModal />
+              </BillingAccessProvider>
+            </UserSettingsInitializer>
+          </ThemeProvider>
+        </HydrationBoundary>
         {/* 開発ツール（開発環境のみ） */}
         {process.env.NODE_ENV === 'development' && <AxeAccessibilityChecker />}
       </api.Provider>

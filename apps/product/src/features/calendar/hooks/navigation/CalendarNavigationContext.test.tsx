@@ -1,9 +1,12 @@
+import { InitialCalendarDateProvider } from '@/lib/calendar-initial-date';
 import { fireEvent, render, screen } from '@testing-library/react';
+import { renderToString } from 'react-dom/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 let mockPathname = '/ja/calendar';
 let mockSearchParams = new URLSearchParams();
 const mockUseMediaQuery = vi.fn(() => false);
+let mockTimezone = 'UTC';
 
 vi.mock('next/navigation', () => ({
   usePathname: () => mockPathname,
@@ -12,6 +15,11 @@ vi.mock('next/navigation', () => ({
 
 vi.mock('@/lib/hooks/useMediaQuery', () => ({
   useMediaQuery: () => mockUseMediaQuery(),
+}));
+
+vi.mock('@/lib/hooks/useUserPreferences', () => ({
+  useUserPreferences: (selector: (state: { timezone: string }) => unknown) =>
+    selector({ timezone: mockTimezone }),
 }));
 
 import { CalendarNavigationProvider, useCalendarNavigation } from './CalendarNavigationContext';
@@ -42,6 +50,9 @@ function TestConsumer() {
       <button type="button" onClick={() => navigation.changeView('3day')}>
         3day
       </button>
+      <button type="button" onClick={() => navigation.navigateRelative('today')}>
+        today
+      </button>
     </div>
   );
 }
@@ -50,6 +61,7 @@ describe('CalendarNavigationProvider', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockUseMediaQuery.mockReturnValue(false);
+    mockTimezone = 'UTC';
     mockPathname = '/ja/calendar';
     mockSearchParams = new URLSearchParams('date=2026-03-25');
     window.history.replaceState(null, '', '/ja/calendar?date=2026-03-25');
@@ -160,6 +172,7 @@ describe('CalendarNavigationProvider', () => {
   // （overview.md §6-9 #1）。
   it('resolves currentDate from ?date= on /report without touching view', () => {
     window.history.replaceState(null, '', '/ja/report?date=2026-04-01');
+    mockSearchParams = new URLSearchParams('date=2026-04-01');
     mockPathname = '/ja/report';
 
     render(
@@ -175,6 +188,7 @@ describe('CalendarNavigationProvider', () => {
   // /report の URL を書く。/calendar へタブが飛ばないことを固定する。
   it('writes /report URL (not /calendar) when navigating date while on the report tab', () => {
     window.history.replaceState(null, '', '/ja/report?date=2026-04-01');
+    mockSearchParams = new URLSearchParams('date=2026-04-01');
     mockPathname = '/ja/report';
 
     render(
@@ -338,4 +352,108 @@ describe('CalendarNavigationProvider', () => {
     // 「カレンダーへ戻る」リンクの組み立てに使われるため、reload 前の day を保持する
     expect(screen.getByTestId('view')).toHaveTextContent('day');
   });
+});
+
+describe('CalendarNavigationProvider server initialization', () => {
+  it('uses request search params rather than browser location during the first render', () => {
+    mockPathname = '/ja/calendar';
+    mockSearchParams = new URLSearchParams('date=2026-04-22&view=3day');
+    window.history.replaceState(null, '', '/ja/calendar?date=2025-01-01&view=day');
+    const html = renderToString(
+      <InitialCalendarDateProvider dateKey="2026-09-17">
+        <CalendarNavigationProvider>
+          <TestConsumer />
+        </CalendarNavigationProvider>
+      </InitialCalendarDateProvider>,
+    );
+    expect(html).toContain('2026-04-22');
+    expect(html).toContain('3day');
+    expect(html).not.toContain('2025-01-01');
+  });
+  it('uses the supplied request day when date is absent and ignores stored view until hydration', () => {
+    mockPathname = '/ja/report';
+    mockSearchParams = new URLSearchParams();
+    window.localStorage.setItem('dayopt:last-calendar-view', 'day');
+    const html = renderToString(
+      <InitialCalendarDateProvider dateKey="2026-01-01">
+        <CalendarNavigationProvider>
+          <TestConsumer />
+        </CalendarNavigationProvider>
+      </InitialCalendarDateProvider>,
+    );
+    expect(html).toContain('2026-01-01');
+    expect(html).toContain('week');
+    window.localStorage.removeItem('dayopt:last-calendar-view');
+  });
+});
+
+it.each([undefined, '2026-04-22'])(
+  'timezone未確定の初回だけブラウザー当日へ補正する（date=%s）',
+  (date) => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-09-18T08:00:00Z'));
+    mockPathname = '/ja/calendar';
+    mockSearchParams = new URLSearchParams(date ? `date=${date}` : '');
+    window.history.replaceState(null, '', `/ja/calendar?${mockSearchParams}`);
+    try {
+      render(
+        <InitialCalendarDateProvider dateKey="2026-09-17" needsBrowserDate>
+          <CalendarNavigationProvider>
+            <TestConsumer />
+          </CalendarNavigationProvider>
+        </InitialCalendarDateProvider>,
+      );
+      expect(screen.getByTestId('date')).toHaveTextContent(date ?? '2026-09-18');
+    } finally {
+      vi.useRealTimers();
+    }
+  },
+);
+
+it('初回モバイルのday切替は補正後の日付をURLへ書く', () => {
+  vi.useFakeTimers();
+  vi.setSystemTime(new Date('2026-09-18T08:00:00Z'));
+  mockUseMediaQuery.mockReturnValue(true);
+  mockPathname = '/ja/calendar';
+  mockSearchParams = new URLSearchParams();
+  window.history.replaceState(null, '', '/ja/calendar');
+  try {
+    render(
+      <InitialCalendarDateProvider dateKey="2026-09-17" needsBrowserDate>
+        <CalendarNavigationProvider>
+          <TestConsumer />
+        </CalendarNavigationProvider>
+      </InitialCalendarDateProvider>,
+    );
+    expect(screen.getByTestId('date')).toHaveTextContent('2026-09-18');
+    expect(new URLSearchParams(window.location.search).get('date')).toBe('2026-09-18');
+    expect(new URLSearchParams(window.location.search).get('view')).toBe('day');
+  } finally {
+    mockUseMediaQuery.mockReturnValue(false);
+    vi.useRealTimers();
+  }
+});
+
+it('today navigation uses the configured timezone wall date', () => {
+  vi.useFakeTimers();
+  vi.setSystemTime(new Date('2026-09-17T16:00:00.000Z'));
+  mockTimezone = 'Asia/Tokyo';
+  mockPathname = '/ja/calendar';
+  mockSearchParams = new URLSearchParams('date=2026-09-17');
+  window.history.replaceState(null, '', '/ja/calendar?date=2026-09-17');
+  try {
+    render(
+      <InitialCalendarDateProvider dateKey="2026-09-17">
+        <CalendarNavigationProvider>
+          <TestConsumer />
+        </CalendarNavigationProvider>
+      </InitialCalendarDateProvider>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'today' }));
+    expect(screen.getByTestId('date')).toHaveTextContent('2026-09-18');
+    expect(new URLSearchParams(window.location.search).get('date')).toBe('2026-09-18');
+  } finally {
+    mockTimezone = 'UTC';
+    vi.useRealTimers();
+  }
 });

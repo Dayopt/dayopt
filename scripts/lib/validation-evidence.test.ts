@@ -542,3 +542,50 @@ describe('validation evidence: PR state and base', () => {
     expect(text).toContain('not a required check');
   });
 });
+
+describe('inherited Preview (#2807)', () => {
+  const inherited = (app: string, patch: Record<string, unknown> = {}) => ({
+    repository: REPO,
+    prNumber: 42,
+    headSha: HEAD,
+    ancestorSha: OTHER,
+    environment: `Preview – ${app}`,
+    deploymentId: 123,
+    unchanged: true,
+    productionEnvironment: false,
+    ...patch,
+  });
+  it.each(['product', 'web'])('accepts verified %s inheritance and records provenance', (app) => {
+    const result = evaluateValidation({
+      plan: plan([`apps/${app}/src/page.tsx`]),
+      evidence: evidence({
+        statuses: [status(`Vercel – ${app}`, { description: 'Canceled by Ignored Build Step' })],
+        deployments: [],
+        inheritedPreviews: [inherited(app)],
+      }),
+    });
+    expect(result.suites[`${app}Preview`]).toMatchObject({
+      status: 'satisfied',
+      evidence: { ancestorSha: OTHER, deploymentId: 123 },
+    });
+  });
+  it.each([
+    { repository: 'other/repo' },
+    { prNumber: 43 },
+    { headSha: OTHER },
+    { ancestorSha: HEAD },
+    { unchanged: false },
+    { productionEnvironment: true },
+    { environment: 'Preview – web' },
+  ])('rejects mismatched inheritance %j', (patch) => {
+    const result = evaluateValidation({
+      plan: plan([APP_FILE]),
+      evidence: evidence({
+        statuses: [status('Vercel – product', { description: 'Canceled by Ignored Build Step' })],
+        deployments: [],
+        inheritedPreviews: [inherited('product', patch)],
+      }),
+    });
+    expect(result.suites.productPreview.status).toBe('failed');
+  });
+});
