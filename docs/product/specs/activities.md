@@ -5,7 +5,6 @@ code: apps/product/src/features/activities
 public_docs:
   - activities
 lp:
-  - 'Activities'
   - 'Unlimited activities'
 ---
 

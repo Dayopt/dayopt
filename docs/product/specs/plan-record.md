@@ -6,7 +6,7 @@ public_docs:
   - plans
   - records
 lp:
-  - 'Plan and Record tracking'
+  - 'Plan and Record (timeboxing)'
 ---
 
 # Plan / Record（予定 / 記録）
