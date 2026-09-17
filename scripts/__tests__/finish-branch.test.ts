@@ -599,80 +599,54 @@ describe('畳み込みが失敗を消さないこと', () => {
   });
 });
 
-describe('trusted dispatch で解除された audit guard の免除', () => {
+describe('audit contract guard の advisory 扱い（#2469）', () => {
   // production-config-audit.yml は audit contract 保護対象を変更する PR で
-  // check run「Audit Vercel metadata (trusted)」を設計として必ず failure にする。
-  // 解除は trusted dispatch（workflow_dispatch）で、成功すると commit status
-  // 「Production Config Audit」だけが head SHA へ success で発行される。
-  // dispatch run の check run は rollup に紐づかないため、畳み込みでは解消できない。
-  const guardFailure = () =>
+  // check run「Audit Vercel metadata (trusted)」を **設計として必ず failure にする**。
+  // この failure は「contract 4 path を触った」という事実だけを表し、diff の良し悪しを
+  // 一切表していない。本物の監査結果は workflow_dispatch run 側にあり rollup に載らない。
+  //
+  // 2026-09-18（#2469）に、この guard を shadow status と同じ advisory へ格下げした。
+  // merge の遮断は main の ruleset 1 本（#2640）で、そこに `Production Config Audit` は
+  // 無く、この checkpoint は branch:finish だけに効く非対称な gate だった。
+  const guardFailure = (workflowName = 'Production Config Audit') =>
     checkRun(
       'Audit Vercel metadata (trusted)',
       'FAILURE',
       '2026-08-03T00:25:00Z',
       'COMPLETED',
-      'Production Config Audit',
+      workflowName,
     );
 
-  it('status「Production Config Audit」が success なら guard の failure を免除する', () => {
-    // PR #1799 で実測した形: guard の FAILURE と status の SUCCESS が共存する。
+  it('status success が無くても guard の failure では止まらない', () => {
+    // 撤去前はここで「trusted dispatch が必要です」と exit 1 していた（#2571）。
     const { status, stderr } = runScript([
       guardFailure(),
-      statusContext('Production Config Audit', 'SUCCESS', '2026-08-03T00:25:36Z'),
       checkRun('CI', 'SUCCESS', '2026-08-03T00:20:00Z'),
       ...requiredChecks(),
     ]);
-    expect(stderr).toContain('trusted dispatch により解除済み');
+    expect(stderr).toContain('advisory として扱い');
     expect(stderr).not.toContain('失敗している check');
+    expect(stderr).not.toContain('trusted dispatch が必要');
     expect(status).toBe(0);
   });
 
-  it('status が failure なら免除しない（dispatch 未実行 / audit 実失敗）', () => {
-    // (a) audit が本当に落ちた PR も (b) dispatch 未実行の contract 変更 PR も、
-    // status は failure のまま。免除は発動せず従来どおり止まる。
+  it('status「Production Config Audit」の failure でも止まらない', () => {
+    // dispatch 未実行の contract 変更 PR では status も failure（"trusted head audit is
+    // required"）のまま残る。guard と同じ発行元の advisory なので数えない。
     const { status, stderr } = runScript([
       guardFailure(),
       statusContext('Production Config Audit', 'FAILURE', '2026-08-03T00:25:36Z'),
       checkRun('CI', 'SUCCESS', '2026-08-03T00:20:00Z'),
+      ...requiredChecks(),
     ]);
-    expect(stderr).toContain('失敗している check');
-    expect(status).toBe(1);
+    expect(stderr).not.toContain('失敗している check');
+    expect(status).toBe(0);
   });
 
-  it('別名の check run の failure は status success があっても免除しない', () => {
-    // 免除が「guard 1 check の完全一致」に閉じていること。status success を
-    // 見ただけで他の failure まで握りつぶす実装だとここで緩む。
-    const { status, stderr } = runScript([
-      checkRun('E2E', 'FAILURE', '2026-08-03T00:25:00Z'),
-      statusContext('Production Config Audit', 'SUCCESS', '2026-08-03T00:25:36Z'),
-      checkRun('CI', 'SUCCESS', '2026-08-03T00:20:00Z'),
-    ]);
-    expect(stderr).toContain('失敗している check');
-    expect(status).toBe(1);
-  });
-
-  it('同名 check でも workflow が違えば免除しない', () => {
-    // 照合は 型 + workflow 名 + check 名。name だけの一致で免除すると、
-    // 別 workflow が同名 job を持った時に本物の failure が消える。
-    const { status, stderr } = runScript([
-      checkRun(
-        'Audit Vercel metadata (trusted)',
-        'FAILURE',
-        '2026-08-03T00:25:00Z',
-        'COMPLETED',
-        'CI',
-      ),
-      statusContext('Production Config Audit', 'SUCCESS', '2026-08-03T00:25:36Z'),
-    ]);
-    expect(stderr).toContain('失敗している check');
-    expect(status).toBe(1);
-  });
-
-  it('guard が cancelled なら status success があっても免除しない', () => {
-    // 免除対象は設計上の意図的 failure（enforce step の exit 1）だけ。cancelled /
-    // timed_out は「監査が完走していない」状態で、古い run の success status が残った
-    // まま再発火 run が publish 前に cancel された場合に免除すると fail-open になる。
-    const { status, stderr } = runScript([
+  it('guard が cancelled / timed_out でも止まらない', () => {
+    // 免除ではなく advisory なので、conclusion の種別で分岐しない。監査の完走は
+    // push:main / nightly / promote の runProductionConfigAudit が担保する。
+    const { status } = runScript([
       checkRun(
         'Audit Vercel metadata (trusted)',
         'CANCELLED',
@@ -680,18 +654,44 @@ describe('trusted dispatch で解除された audit guard の免除', () => {
         'COMPLETED',
         'Production Config Audit',
       ),
-      statusContext('Production Config Audit', 'SUCCESS', '2026-08-03T00:24:00Z'),
       checkRun('CI', 'SUCCESS', '2026-08-03T00:20:00Z'),
+      ...requiredChecks(),
+    ]);
+    expect(status).toBe(0);
+  });
+
+  // ── ここから先は「緩めていない」ことの負例。advisory 判定は 型 + workflow 名 +
+  // check 名 / context の完全一致のみで、それ以外の failure は従来どおり merge を止める。
+  it('同名 check でも workflow が違えば advisory にしない', () => {
+    // name だけで advisory 判定すると、別 workflow が同名 job を持った時に本物の
+    // failure が消える。
+    const { status, stderr } = runScript([guardFailure('CI'), ...requiredChecks()]);
+    expect(stderr).toContain('失敗している check');
+    expect(status).toBe(1);
+  });
+
+  it('同じ workflow の別 job の failure は止める', () => {
+    // advisory にするのは pull_request_target が必ず落とす guard job だけ。
+    // 同じ workflow の別 job（例: 実監査 job）が落ちたら従来どおり止まる。
+    const { status, stderr } = runScript([
+      checkRun(
+        'Audit Vercel metadata',
+        'FAILURE',
+        '2026-08-03T00:25:00Z',
+        'COMPLETED',
+        'Production Config Audit',
+      ),
+      ...requiredChecks(),
     ]);
     expect(stderr).toContain('失敗している check');
     expect(status).toBe(1);
   });
 
-  it('免除が効いても、同居する他の failure は止める', () => {
+  it('guard が advisory でも、同居する他の failure は止める', () => {
     const { status, stderr } = runScript([
       guardFailure(),
-      statusContext('Production Config Audit', 'SUCCESS', '2026-08-03T00:25:36Z'),
       checkRun('CI', 'FAILURE', '2026-08-03T00:20:00Z'),
+      ...requiredChecks(),
     ]);
     expect(stderr).toContain('失敗している check');
     expect(status).toBe(1);
