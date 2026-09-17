@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-08-19
+last_verified: 2026-09-16
 ---
 
 # インフラ・環境・API/Routing 総覧
@@ -21,18 +21,22 @@ Dayopt の標準ルートは `local → PR Preview → production`。Vercel Prev
 | **PR Preview** | PR ごとの Supabase Preview Branch | Vercel Preview (`product`)                 | `*.vercel.app`   |
 | **Production** | `dayopt` main                     | main merge で自動 promote（`promote.yml`） | `app.dayopt.app` |
 
+web（`dayopt.app`）と product（`app.dayopt.app`）は別ドメインで配信する。web から product へは絶対 URL でリンクし、path ベースの Multi-Zones（web の rewrites で `/settings` や `/app-static` を product へ proxy する構成）は使わない。production で既に 404 になっていたため 2026-09-14 に設定を撤去した（#2747）。security headers の正本は各 app の `next.config.mjs` の `headers()` で、`vercel.json` には置かない。
+
 persistent staging は常設しない。固定 URL が必要な Stripe / OAuth callback / closed beta 検証が出た時だけ、Vercel staging と Supabase persistent branch を追加する。
 
 ### テスト自動化の現在地
+
+層ごとの責務・いつ回すか・回帰テストの基準・retry 方針・Actions 予算は [testing.md](testing.md) が正本。ここは suite ごとの現況だけを持つ。
 
 | Suite                          | CI       | 現在の役割                                                               |
 | ------------------------------ | -------- | ------------------------------------------------------------------------ |
 | Vitest unit（product / web）   | required | ロジックとcomponentの回帰検知                                            |
 | Playwright `chromium`          | required | 認証必須含む `apps/product/src/lib/test/e2e` の全specをCIで実行          |
-| Playwright `Mobile Chrome`     | local    | ローカルでservice roleが使える環境でmobile shellを確認                   |
-| Storybook browser light / dark | local    | interaction / a11yの既知failureを #1499 / #1586 で解消後にCI昇格を再判断 |
+| Playwright `Mobile Chrome`     | required | `@mobile` tag の test だけを promote 層 3 で chromium と同じ実行に入れる |
+| Storybook browser light / dark | promote  | collect・render・play・a11y。失敗時は通常の production 昇格を止める      |
 
-e2e job は `supabase/setup-cli` + `supabase start` でlocal Supabase stackを立てる。認証必須specは `create-scoped-test-user.ts`（`apps/product/src/lib/test/e2e/`）でspecファイルごとに専用の使い捨てユーザーをservice role経由で作成する（#2246）。単一の共有test accountだと`workers`並列実行下でtRPCのin-memory rate limiter（userId単位）を超過するため、spec単位でaccountを分離してrate limit予算も分離している。旧`scripts/ci/create-e2e-test-user.mjs`（全specで単一accountを共有する方式）は撤去済み。これにより認証必須testも含めて全specがCIでskipされずに実行される。Mobile Chromeも同じ方式でCI実行は技術的に可能だが、chromiumと同じspecを二重実行するだけなのでlocal専用のままとする。Playwright Test Agents（planner / generator の opt-in 採用、healer は不採用）は 2026-07-13 に限定採用したが、3週間利用ゼロのまま E2E 追加が手書きで行われたため 2026-08-03 に撤去した。再導入する場合は Playwright に定義を再生成させ、リポジトリ固有制約（healer 不採用、単一フロー限定、`test.skip()` / 固定 wait / `networkidle` 禁止）を planner / generator へ戻す。healer 不採用と CI の正を `chromium` とする判断は撤去後も有効で、根拠は 2026-08-03-playwright-test-agents-retirement.md（削除済み、git 履歴参照） に引き継いだ。
+e2e job は `supabase/setup-cli` + `supabase start` でlocal Supabase stackを立てる。認証必須specは `create-scoped-test-user.ts`（`apps/product/src/lib/test/e2e/`）でspecファイルごとに専用の使い捨てユーザーをservice role経由で作成する（#2246）。単一の共有test accountだと`workers`並列実行下でtRPCのin-memory rate limiter（userId単位）を超過するため、spec単位でaccountを分離してrate limit予算も分離している。旧`scripts/ci/create-e2e-test-user.mjs`（全specで単一accountを共有する方式）は撤去済み。これにより認証必須testも含めて全specがCIでskipされずに実行される。Mobile Chromeは全specを二重実行せず、`@mobile` tag を付けた mobile 固有の操作境界（長押し作成・Drawer・ヘッダーナビ）の test だけを持つ（2026-09-14、#2743。local 専用だった間に mobile の assertion が UI 変更に追従せず腐っていた）。Playwright Test Agents（planner / generator の opt-in 採用、healer は不採用）は 2026-07-13 に限定採用したが、3週間利用ゼロのまま E2E 追加が手書きで行われたため 2026-08-03 に撤去した。再導入する場合は Playwright に定義を再生成させ、リポジトリ固有制約（healer 不採用、単一フロー限定、`test.skip()` / 固定 wait / `networkidle` 禁止）を planner / generator へ戻す。healer 不採用と CI の正を `chromium` とする判断は撤去後も有効で、根拠は 2026-08-03-playwright-test-agents-retirement.md（削除済み、git 履歴参照） に引き継いだ。
 
 ### Supabase Project
 
@@ -343,9 +347,218 @@ Code Qualityを採用しない判断と2026-07-21時点の外部設定証跡は�
     「定常状態のdrift検出」が目的の静的チェックなのでrelease実行中の一時的な状態と衝突する。
     env監査（key/target/type）はrelease gateでも従来どおり実行する
 
+### 共通検証計画の shadow（#2793 / #2794）
+
+`validation-shadow.yml` は ready PR の base checkout にある `validation-plan-shadow.mjs` を実行する。
+PR 側は git diff のデータとして読み、依存 install やスクリプト実行には使わない。
+base の policy / workspace manifest、head、実際の merge revision、完全な patch hash を固定し、
+削除・rename の両側を含めて分類する。base に producer がない導入 PR は bootstrap pending と表示し、
+有効な計画や検証成功とは数えない。取得失敗・不明な revision は成功計画を作らない。
+
+schema v1 の計画は Actions summary と `validation-plan` artifact（14 日）に残る。
+`required` / `not-applicable` / `indeterminate` を検査ごとに記録し、README の説明文と
+AGENTS・skills・実行される MDX・契約文書を区別する。コードのレビュー要件から本番操作の
+承認を推定しない。計画は宣言であり、CI / review / deployment の成功証拠ではない。
+
+現段階は **shadow のみ**。既存の必須 check、skip、release、ruleset は変更しない。
+この workflow 自体は PR 側で変更できるため、その artifact を信頼済み合格証拠として採用しない。
+後続 #2795 の controller が信頼済み source と revision を照合し、#2798 の比較・承認後に切り替える。
+base 規則の変更は次の PR から有効になり、当該 PR 自身の必要条件を緩めない。
+
+### Validation の信頼済み controller（#2795、shadow）
+
+`validation-gate.yml` は `workflow_run`（CI 完了）、`status`（Vercel の commit status が
+success / failure / error になった時。pending は除く）、`issue_comment`（PR への comment の
+created / edited。`@codex review` 依頼、Codex の完了 comment と summary 表の編集、
+`[review-summary]` を拾う）で、**main の workflow 定義と checkout** を使って `scripts/ci/validation-gate.mjs` を実行する。
+どちらも GitHub docs で「workflow file が default branch にある時だけ走る」event。`deployment_status` は使わない: この event は
+deployment の commit（PR head）の workflow 定義で走る（2026-09-17、PR #2804 で実測）。
+`workflow_dispatch` も使わない: 任意 ref の定義で起動でき、PR branch で改変した controller が
+statuses:write 付きで走る（Codex review P2）。手動再評価は Actions の「Re-run jobs」。
+Vercel Preview が CI より遅れる分は job 内で短く待ち（`VALIDATION_WAIT_MINUTES`）、上限後の
+完了は `status` event が再評価する。controller は評価開始時に pending を発行し、収集・評価が
+例外で落ちても（pending の発行自体が失敗した場合も含めて）failure の発行を試みてから終了する
+（以前の success が偽の green として残らない）。合成 merge commit の日時は固定値で、同じ
+base / head / tree なら再評価でも同じ testSha・planId になる。
+controller 自身も `GITHUB_REF` が main でない・event が workflow_run / status でない場合は
+評価も発行もしない。**PR が producer 定義（ci.yml / setup action / check.mjs / impact.mjs）を変えている
+場合、その PR 自身の CI run は `self-produced` として信用しない**（job 名を保ったまま step を
+空にできるため）。この保証境界は job の配線ファイルまでで、vitest 設定や scripts の改変は
+review の観点に残る。PR 側のコード・依存・artifact は実行しない。
+計画は毎回 base policy から再生成し、validation-shadow.yml の artifact は読まない。test merge は
+GitHub の `refs/pull/N/merge`（遅延更新で base が古いことがある）ではなく、main HEAD と
+`refs/pull/N/head` から `git merge-tree` で自前生成する。PR の tree は git object として diff に
+読むだけで実行しない。conflict は indeterminate。
+
+証拠は GitHub API から取り、controller が import する純粋な評価関数（validation-evidence）が判定する。
+producer は workflow path + job 名 + `pull_request` event + head SHA + repository で照合し、
+同名 check を別 workflow が出しても採用しない。同一 head の複数 run は最新 run の最新 attempt
+だけを見る。Preview は commit status の緑に加えて、同じ SHA の `Preview – product` /
+`Preview – web` deployment とその最新 status を要求し、production environment は拒否する。
+必要 suite は明示的な success だけが satisfied で、skipped / cancelled / timed_out / 不在 /
+計画 indeterminate はいずれも合格にしない。計画上 not-applicable
+だけを理由付きで受理する。層 3（E2E / Web smoke）は promote.yml が merge 後・公開前に生産する
+証拠として `deferred` に分け、merge 判定には含めない。base が進んだ head は `update-branch` として
+pending（strict up-to-date の ruleset と同じ向き）。
+
+DB / Preview の証拠（#2797）: `dbFresh` は `🧪 Integration Tests`（candidate の migration 集合を
+空 DB へ適用）、`dbUpgrade` / `oldConsumer` は `🧱 DB Upgrade (shadow)`（base の migration 集合 +
+**base の seed** まで reset し、PR が追加した migration だけを当てて、適用エラー・seed 行の消失
+（table ごとの件数と主キーによる同一性。同数の入れ替えも落とす）・fresh との schema 不一致
+（生成型と、index / constraint / trigger の catalog snapshot の両方）・base 世代の生成型が参照する
+オブジェクトの消失や契約変更（列の型・nullability、Insert / Update の型と optional → required、
+Insert の新規必須列、view の列、RPC の引数名・型・必須性と Returns）を別々に検出する。
+`scripts/ci/db-upgrade-check.mjs`。migration を追加した PR だけ走り、非必須。この script を
+migration と同時に変えた PR の緑は `self-produced` として信用しない）。**保証境界**: 既存データと
+catalog の対象は `public` / `auth` / `private` schema、old-consumer の契約は commit 済み生成型
+（`database.types.ts`）に現れるもの（table の Row / Insert / Update / Relationships、view の Row、
+function の Args / Returns、enum 値）に限る。生成型に現れない契約（RLS の意味、trigger の挙動、
+extension、storage）は RLS snapshot・integration test・レビューが担い、この job は証明しない。
+この境界の内側への点追加は fix ではなく境界の記述で応答する（AGENTS.md §レビュー）。追加分は timestamp に関わらず
+reset から退避し、seed は base SHA の内容に差し替えるので、candidate の seed から旧形式の行を
+消しても「旧データに当てる」経路を通る。fresh 成功を
+upgrade 成功の代用にしない。適用済み migration の編集・削除は production が再実行しないので
+落とす。schema 変更を含む PR の `Preview – product` は、同じ SHA の `Supabase Preview` check run
+（発行元が公式 Supabase App `supabase` のもの）が success（隔離された PR 用 branch）であることも
+要求し、skipped（branch 無し = shared / 不明な DB）や別 App の同名 check は受理しない。check run が
+まだ無い間は pending（controller が bounded に待ち、`check_run` 完了 event で再評価する。missing と
+して blocked にはしない）。app-only の PR には branch を要求しない（integration は migration を含む PR
+でだけ branch を作る）。
+
+公開前の migration 反映確認: promote.yml の release job が
+`scripts/ci/production-migration-readiness.mjs` で候補 SHA の migration 集合が production の
+`schema_migrations` に全て入っているかを read-only Management API で見る（integration の非同期
+反映を最大 6 回 × 30 秒だけ待つ。適用・再試行はしない。writer は Supabase integration のまま）。
+**現状は token を渡しておらず常に advisory（warning）。**
+有効化は別変更で、read-only token を `production-release` environment へ置く決定（secret の
+境界変更、User 裁可）と台帳（`docs/operations/secrets.md`）・同期 script・
+`ci-secret-ledger.test.ts` の同時更新を伴う。有効化後は欠落が promote を止める（force では飛ばす）。
+
+同じ controller が Review policy（#2796）も評価する: 計画の `review` 要件と PR の review /
+comment / thread（GraphQL の resolve 状態）から `not-required` / `not-started` / `pending` /
+`stale` / `complete` / `pending-adjudication` / `unknown` を判定し、commit status
+`Review policy (shadow)` に出す。状態の定義と完了証拠は `pr-cross-review` skill §Review policy。
+shadow 中は Codex を自動起動しない（workflow に `pull-requests: write` を渡していない）。
+review evidence の保証境界: review の submit と thread の resolve は issue_comment を出さないため、
+その直後は再評価されない。通常は修正 push → CI 完了の `workflow_run` で再評価される。
+`pull_request_review` 系は PR 側の定義で走るため trigger にしない。reviewThreads は cursor で
+最後まで読み、応答が欠けた時は failure を発行する。`[review-summary]` と `@codex review` 依頼は author_association が
+OWNER / MEMBER / COLLABORATOR の comment だけ受理し、`status:` は単独の `reviewed` か全要素が
+`role=reviewed` の時だけ満たす。依頼と head の対応は commit 日時ではなく、その head の最新の
+pull_request run 作成時刻（切替時刻）で照合する。Codex が無応答 / 失敗でも、現 head の信頼済み
+`[review-summary]` があれば「同等の独立レビュー」として満たす（可用性を gate にしない）。
+closed / merged PR と main 以外を base にする PR は評価も発行もしない。裁定は PR の全 review
+thread（代替レビューの指摘・対象不明の応答を含む）が「信頼済み人間の返信つきで resolve」で
+なければ pending-adjudication。**review evidence の保証境界はここまで**: GitHub 上の投稿者・
+association・thread の resolve 状態を機械確認するもので、返信内容の妥当性や、GitHub の外で
+行われた確認は証明しない。
+
+結果は Step Summary・`validation-result-<run>` artifact（14 日）・commit status `Validation (shadow)`
+に出す。**required check ではない。** ruleset・`branch:finish`・既存 check は変更しない。
+GitHub native rule の管理者 bypass はこの check では防げない（bypass actor 0 の ruleset が担う）。
+
+### 新旧ゲートの切替計画と rollback（#2798）
+
+比較は `pnpm validation:shadow-report [--limit N] [--json]`（read-only。直近の非 draft PR について、
+旧経路で実際に走った job（failure / cancelled 含む）・Vercel status・runner 分・CI 秒、**実行した
+checkout の policy で遡及評価**した plan（各 PR の base 時点の policy ではない。header に checkout
+SHA を出す）、controller が発行した `Validation (shadow)` / `Review policy (shadow)`、would-skip /
+would-add（Actions job と Vercel deployment の両方）を 1 表にする。取得できない runner 分は
+未取得、plan が indeterminate の行は比較を未判定とし、0 や削減可能に丸めない。判定は人が行い、
+件数の少ない分類の p95 は出さない。Preview / review の待ち時間は未取得）。
+
+**順序: shadow 観察 → 比較 → 承認付き切替 → 観察 → 整理。既存の必須条件を先に削らない。**
+
+| 段階 | 変更                                                                                                                                                                              | 戻し方                                   | 承認                       |
+| ---- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- | -------------------------- |
+| 0    | shadow（現状）: `Validation (shadow)` / `Review policy (shadow)` / `🧱 DB Upgrade (shadow)` は非必須                                                                              | workflow を Disable                      | 不要（AUTONOMOUS）         |
+| 1    | 比較レポートで docs / ui / logic / api-db / ci-policy 別に正例・負例と保証の退行が無いことを確認                                                                                  | -                                        | -                          |
+| 2    | ruleset に `Validation (shadow)` と `Review policy (shadow)` を **既存 required と併走で追加**（旧条件は残す。片方だけだと Review policy が pending / blocked でも merge できる） | ruleset から context を外す              | User（CHECKPOINT）         |
+| 3    | 観察後、旧 required のうち新条件が包含するものだけを外す（trusted source を保つ native check は残す）                                                                             | その PUT 直前に保存した ruleset を再適用 | User（EXPLICIT AUTHORITY） |
+| 4    | `branch:finish` の rollup 検査と shadow の重複を整理                                                                                                                              | git revert                               | -                          |
+
+**段階 2 の前提（発行元の分離）**: `Validation (shadow)` / `Review policy (shadow)` は現状
+validation-gate.yml が `GITHUB_TOKEN`（github-actions App、integration_id 15368）で発行している。
+同一 repo の PR workflow も `permissions: statuses: write` を宣言すれば同じ App 名義で同じ context を
+head SHA へ POST できるため、context 名（+ integration_id 15368）だけで required にしても「main の
+信頼済み controller が評価した」証拠にならない（status event の再評価は Vercel context だけを
+見るので、偽 status を controller が上書きする保証もない）。required 化の前に次のどちらかを
+User 裁可で決める: (a) controller の status を専用 GitHub App の installation token で発行し、
+ruleset の `required_status_checks[].integration_id` をその App に束縛する（推奨。PR workflow は
+その App の token を得られない）、(b) repo の Actions 既定権限を read に固定したうえで、PR
+workflow の `permissions` 宣言による昇格を組織 policy で禁止できることを実測してから進める。
+どちらも未実施の間は段階 2 へ進まない。
+
+切替は `gh api -X PUT repos/Dayopt/dayopt/rulesets/6790553` で行い、**各 PUT の直前に
+`gh api repos/Dayopt/dayopt/rulesets/6790553` の完全な JSON をその操作固有の rollback 入力として
+保存してから**実行し、直後に ruleset と対象 PR の check を再取得して旧条件と新条件の証拠を比較する。
+rollback はその直前 snapshot を再適用する（下の固定値ではない。段階 3 までに別変更で required check が
+増えていれば、古い一覧の再適用は gate を弱める）。全 gate 無効化や force 公開を復旧手段にしない。
+名前だけ先に変えて永久 pending を作らない。
+
+参考 snapshot（2026-09-17 UTC、`gh api repos/Dayopt/dayopt/rulesets/6790553`。監査用の参考値で、
+rollback 入力ではない）:
+
+```json
+{
+  "bypass_actors": [],
+  "conditions": { "ref_name": { "exclude": [], "include": ["refs/heads/main"] } },
+  "enforcement": "active",
+  "id": 6790553,
+  "name": "Branch name pattern: main",
+  "rules": [
+    { "parameters": null, "type": "deletion" },
+    { "parameters": null, "type": "non_fast_forward" },
+    {
+      "parameters": {
+        "allowed_merge_methods": ["merge", "squash", "rebase"],
+        "dismiss_stale_reviews_on_push": true,
+        "dismissal_restriction": { "allowed_actors": [], "enabled": false },
+        "require_code_owner_review": false,
+        "require_extra_approval_for_unattributed_changes": true,
+        "require_last_push_approval": false,
+        "required_approving_review_count": 0,
+        "required_review_thread_resolution": true,
+        "required_reviewers": []
+      },
+      "type": "pull_request"
+    },
+    {
+      "parameters": {
+        "do_not_enforce_on_create": false,
+        "required_status_checks": [
+          { "context": "🔍 Static Checks", "integration_id": 15368 },
+          { "context": "📦 Unit Tests", "integration_id": 15368 },
+          { "context": "Vercel – product" },
+          { "context": "Vercel – web" },
+          { "context": "🧪 Integration Tests", "integration_id": 15368 }
+        ],
+        "strict_required_status_checks_policy": true
+      },
+      "type": "required_status_checks"
+    }
+  ],
+  "target": "branch"
+}
+```
+
+未有効化のもの（コード完了 ≠ 有効化。#2793 の受け入れ条件）:
+
+- 公開前 migration 反映確認は promote.yml に advisory で配線済み。有効化は read-only token を
+  `production-release` environment へ置く決定（secret の境界変更）と台帳更新を伴う別変更
+- Codex の自動起動（Review policy の trigger）は log のみ。実起動は `pull-requests: write` を
+  controller へ渡す判断を伴う別変更
+- controller の status 発行元の分離（専用 GitHub App）は未実施。段階 2 の前提（上記）
+- release 差分基準の回帰（前回公開失敗後の docs-only merge、同一 SHA の再 deployment、片方だけ
+  未公開、burst merge）は `scripts/ci/release-impact.test.ts` / `scripts/ci/production-release.test.ts`
+  の既存 fixture（live 基準判定、preview / 別 integration の deployment 除外、superseded、mixed
+  release の rollback）が持つ。重複実装しない
+
 ### merge gate の required checks
 
-**merge gate は 2 段で、GitHub 側の ruleset と `pnpm branch:finish`（`scripts/tasks/finish-branch.sh`）が両方効く。** 2026-09-07 の repo public 化で main の ruleset `6790553`（`Branch name pattern: main`）が有効になり、required status checks（`🔍 Static Checks` / `📦 Unit Tests` / `Production Config Audit` / `Vercel – product` / `Vercel – web`）、strict up-to-date、review thread resolution 必須、bypass actor 0 を GitHub 自身が強制する（2026-09-08 実測。`gh api repos/Dayopt/dayopt/rulesets/6790553`）。2026-09-07 までは Free plan の private repo で ruleset API が 403 を返し、gate は finish-branch.sh だけだった（旧記述）。ruleset は skipped な required check を成功扱いにするので、finish-branch.sh が **success を名前で要求する**検査（`🧪 Integration Tests` の affected 判定、Vercel context の存在確認）は ruleset の上位互換として残す。UI / API から直接 merge する経路は ruleset だけを通る（Integration Tests を ruleset に足すかは [#2640](https://github.com/Dayopt/dayopt/issues/2640)）。`Production Config Audit` が required に入っているのは #2640 で外す（下記「ruleset の required 指定に使ってはいけない」の落とし穴が public 化で実際に発生した）。
+**merge gate は main の ruleset `6790553`（`Branch name pattern: main`）1 本。** 2026-09-07 の repo public 化で有効になり、required status checks（`🔍 Static Checks` / `📦 Unit Tests` / `🧪 Integration Tests` / `Vercel – product` / `Vercel – web`）、strict up-to-date、review thread resolution 必須、bypass actor 0 を GitHub 自身が local / cloud / UI / API / MCP のどの経路でも同じ条件で強制する（実状は `gh api repos/Dayopt/dayopt/rulesets/6790553`）。2026-09-13 に [#2640](https://github.com/Dayopt/dayopt/issues/2640) で `Production Config Audit` を required から外し、`🧪 Integration Tests` を足した。ruleset は skipped な required check を成功扱いにするので、DB を触らない PR で integration job が skip されても止まらない。`pnpm branch:finish`（`scripts/tasks/finish-branch.sh`）は merge と worktree / branch 掃除の入口で、その rollup 検査（affected 判定による `🧪 Integration Tests` の名前要求、Vercel context の存在確認）は ruleset と重複する冗長検査として残す。gate ではないので、UI / API / MCP から直接 merge しても条件は変わらない。2026-09-07 までは Free plan の private repo で ruleset API が 403 を返し、gate は finish-branch.sh だけだった（旧記述）。
+
+**private 化の前提（2026-09-14 決定、未実施）**: org を GitHub Team へ上げてから repo を private に戻す。Team の private repo では ruleset がそのまま強制されるので、merge gate は変わらない。**Free plan のまま private にすると上の旧状態（ruleset 不在、gate は finish-branch.sh だけ）へ戻る**ため、順序を逆にしない。切り替え後は ruleset が active のままか（`gh api repos/Dayopt/dayopt/rulesets/6790553 --jq .enforcement`）と、agent の fine-grained PAT で `gh pr view <N> --json statusCheckRollup` が空にならないか（`pnpm branch:finish` の rollup 検査が依存する）を実測する。
 
 finish-branch.sh が名前で success を要求するのは `ci.yml` の 3 job（`🔍 Static Checks` / `📦 Unit Tests` / `🧪 Integration Tests`）に加えて次を含める。`🧪 Integration Tests` は 2026-09-02、[#2539](https://github.com/Dayopt/dayopt/issues/2539) で `📦 Unit Tests` から分離した。同じ #2539 で affected 判定を `🧭 Impact` job へ切り出し、`impact →（static ∥ unit ∥ integration）`の並列構成にしている（実測で CI 全体が 16 分 55 秒 → 6〜7 分台。run 33588708693 → 33615047182 / 33618057064。**この数値が構成の基準値の正本**で、`ci.yml` / `check.mjs` 側のコメントには数値を置かない）。**`🧭 Impact` は required にしない** — 下流 3 job は `needs.impact.result` を条件にせず、impact が落ちても空 output を fail closed（全実行）として受けて必ず走るため、検査そのものは常に行われる（この設計は Codex / 内製 risk-reviewer の P2 指摘で入れた。要求すると impact 障害時に全 job が skip され検査ゼロになる）。**`🧪 Integration Tests` は DB を触る PR でだけ走る**ため、`branch:finish` も affected な PR でだけ名前で要求する。
 
@@ -353,30 +566,9 @@ finish-branch.sh が名前で success を要求するのは `ci.yml` の 3 job�
 
 **2026-08-20、CI 4 層再設計（[#2269](https://github.com/Dayopt/dayopt/issues/2269)）により `🎭 E2E Tests` / `🌐 Web Build & E2E` は required checks から除去した。** この 2 job は `.github/workflows/ci.yml` から `.github/workflows/heavy-post-merge.yml` へ移設され、pull_request では発火しなくなった（nightly + workflow_dispatch のみ。push:main は #2382（2026-08-25）で per-merge 実行のコストを理由に廃止済み）。旧記述（4 job が required）は誤り。#2483（2026-08-28）で `heavy-post-merge.yml` は `nightly.yml` へ吸収され、**2026-09-03 に `promote.yml` へ再移設した**（merge 連動 promote。per-PR で required にしない扱いは不変で、走るのは merge 後の promote 経路。影響のある suite だけが走る）。 詳細は 2026-08-20 の決定ログ（削除済み、git 履歴参照）、per-PR 検証の後継はレーンのローカル影響 spec 実走義務（`AGENTS.md §レーン運用` §条件付き事前 E2E）を参照。
 
-| context                   | 発行元                                                  | 目的                                                                    |
-| ------------------------- | ------------------------------------------------------- | ----------------------------------------------------------------------- |
-| `🛡️ docs & secrets guard` | GitHub Actions                                          | docs lifecycle と secret 漏えい防止の検査が成功すること                 |
-| `Production Config Audit` | GitHub Actions                                          | live な Vercel env metadata が Production 契約を満たすこと              |
-| `Vercel – product`        | Vercel GitHub App                                       | Product の Preview build が成功すること                                 |
-| `Vercel – web`            | Vercel GitHub App                                       | Web の Preview build が成功すること                                     |
-| `dayopt/internal-review`  | `pnpm review:marker` が生成する `gh api` を Main が実行 | 内製クロスレビューが実施されたこと（クロスレビュー必須 PR のみ。#2562） |
+required status checks の実状は ruleset が正本で、context の一覧をここへ写さない（`gh api repos/Dayopt/dayopt/rulesets/6790553 --jq '.rules[] | select(.type=="required_status_checks") | .parameters.required_status_checks[].context'` で引く）。
 
-**`dayopt/internal-review` は他の context と性質が違う。** GitHub Actions / Vercel が発行するのではなく、
-Main が `pnpm review:marker` の出力（`gh api --method POST repos/{owner}/{repo}/statuses/<head>`）を
-目視してから実行して作る。description は `p1=<int> p2=<int> fp=<hash> fpa=<hash> coverage=<...> agents=<csv>` の
-機械可読フィールド固定で、gate は `p1` / `p2` を数値として読み（数値以外・欠落は fail closed）、
-`fp` / `fpa` を **レビュー指紋**として読む。
-
-- **束縛**: 現 HEAD の status が無くても、旧 HEAD の status の指紋が現在の PR diff の指紋と一致すれば
-  有効（#2558）。指紋は `git diff <base>...<head>` の変更行のうち保護対象 path だけ（`review:full` の
-  PR では全 file）を正規化した sha256 の先頭 16 桁で、hunk header と context 行を含まないため
-  **追従 merge では変わらない**。docs だけの push・追従で `@codex review` と CI をやり直す無駄を消す
-- **旧設計との違い**: 2026-09 以前は `[internal-review]` marker 付き PR コメントを正規表現で読んでいた。
-  zerolike 判定の破綻・取得窓に残る壊れた marker・短縮 SHA 手打ちの捏造という 3 事故クラスが
-  材料そのものから来ていたため、commit status へ移した（#2562）。summary コメントは
-  `[review-summary]` marker で残るが、**gate は読まない**（`pnpm trace` の分析用）
-
-`🛡️ docs & secrets guard` は #1868 で main ruleset の required check へ追加した。
+**過去に required だった 2 context は、もう存在しない**（2026-09-16 に旧記述を撤去）。`🛡️ docs & secrets guard` の検査は `ci.yml` の static job（`scripts/ci/check.mjs`）へ吸収され、内製クロスレビューの commit status `dayopt/internal-review` は 2026-09-04 のクロスレビュー廃止方針で撤去した（`pnpm review:marker` という script も無い）。`Production Config Audit` は 2026-09-13 に required から外し、nightly / 定期実行として残っている。
 
 - `Vercel – product` / `Vercel – web` の区切り文字は en dash（U+2013）で、hyphen ではない
 - **`branch:finish` は `🔍 Static Checks` / `📦 Unit Tests` / `🧪 Integration Tests` も名前で success を要求する（2026-08-26、[#2415](https://github.com/Dayopt/dayopt/issues/2415)。3 つ目は 2026-09-02、[#2539](https://github.com/Dayopt/dayopt/issues/2539)）。**
@@ -444,12 +636,10 @@ Main が `pnpm review:marker` の出力（`gh api --method POST repos/{owner}/{r
   101 件・未解決 0 の PR #1820 を偽陰性で止めた）。取得失敗・20 ページ（2000 件）超は
   従来どおり停止に倒す（fail closed）。解決の 3 択は `AGENTS.md §PR / git 運用` §レビュー
 - `Production Release` は merge 後の証跡であり、required check にはしない
-- **Storybook browser suite（`pnpm test-storybook` / `test-storybook:dark`）は CI に載っていない。**
-  `@dayopt/product` の vitest project（`--project storybook` / `storybook-dark`）として実体はあるが、
-  `ci.yml` にも `pnpm check` にも入っていないため、required check 以前に**そもそも実行されていない**。
-  除外の理由だった「light / dark とも既知 failure がある」は解消済みで、#1499 / #1586 は両方 closed、
-  2026-07-30 のローカル実測では light / dark とも 136 tests 全 pass（42 files pass / 33 skip）。
-  CI へ載せるかは job 数 = 課金分の判断（`AGENTS.md §PR / git 運用` §PR 粒度）なので、別途決める
+- **Storybook browser suite は `promote.yml` の専用 job で実行する。**
+  product / web / 共有 UI / Storybook 設定の変更に対して、collect 検査と light / dark を実行し、
+  通常の production 昇格条件と失敗通知に接続する。per-PR の全件実行は追加しない。
+  詳細は [testing.md](testing.md#storybook-の実行契約)、実測証跡は #2737 / #2743 を参照。
 - **`pull_request_target` の job でも check run は PR の `statusCheckRollup` に出る。**
   2026-07-30 に PR #1760 で実測: `production-config-audit.yml`（`pull_request_target`）の job が
   `Audit Vercel metadata (trusted)` という CheckRun として出ている。したがって trusted base 実行の
@@ -461,7 +651,7 @@ Main が `pnpm review:marker` の出力（`gh api --method POST repos/{owner}/{r
   それ以外の PR では status も check run も存在しない。required にすると、2026-08-05 の
   `ci.yml` paths-ignore 撤去（PR #1836）と同じく「永久に `expected` のまま」で全 PR が
   merge 不能になる。**2026-09-07 の public 化で ruleset が有効化され、この落とし穴が実際に発生した**
-  （全 PR が `mergeStateStatus: BLOCKED`、PR ごとの手動 dispatch で回避中。解消は [#2640](https://github.com/Dayopt/dayopt/issues/2640)）
+  （全 PR が `mergeStateStatus: BLOCKED`、5 日で 34 回の手動 dispatch で回避。2026-09-13 に [#2640](https://github.com/Dayopt/dayopt/issues/2640) で required から外して解消）
 - **外部モデルの自動 diff レビュー（ai-review / Gemini）は 2026-08-03 に撤去した。** レビューは
   外部レビュー（Codex。2026-08-13 に全 PR 適用を停止し、2026-09-01 にクロスレビュー必須 PR 限定で
   必須化して再開、#2529）と Claude の内部レビュー（`AGENTS.md §委任・報告の作法`
@@ -511,8 +701,7 @@ Main が `pnpm review:marker` の出力（`gh api --method POST repos/{owner}/{r
   `finish-branch.sh` は **workflow の起動有無と独立に**、contract を変えた PR へ status
   `Production Config Audit` の success を要求する（判定は `protected-path-gate.mjs` の `auditContract`）。
   **変更ファイル一覧そのものを取得できなかった PR も要求する** — contract 変更を否定できない以上、
-  通す理由が無い（#2586 で Codex と architecture-guard の両系統から同じ指摘）。その PR は同じ理由で
-  `REVIEW_GATE_REQUIRED` も fail closed で立ち、内製証跡（commit status `dayopt/internal-review`）と Codex の独立 2 系統も必須になる。解除は **push ごとに** `gh workflow run production-config-audit.yml --ref <branch>`
+  通す理由が無い（#2586 で Codex と architecture-guard の両系統から同じ指摘）。解除は **push ごとに** `gh workflow run production-config-audit.yml --ref <branch>`
   の trusted dispatch を実行する。成功すると commit status `Production Config Audit` が head SHA へ
   success で発行される。workflow_dispatch run の check run は PR の `statusCheckRollup` に紐づかないため
   畳み込みでは解消できず、`finish-branch.sh` は **status `Production Config Audit` が success の時に限り**
@@ -718,6 +907,7 @@ Product / Webの`src/app/api/**`配下にある主要REST / Webhook endpoint総�
 | App     | Path                                         | Method               | 認証                               | Rate Limit                      | Runtime                  | 副作用 / 説明                                                                                                              |
 | ------- | -------------------------------------------- | -------------------- | ---------------------------------- | ------------------------------- | ------------------------ | -------------------------------------------------------------------------------------------------------------------------- |
 | Product | `/api/health`                                | GET                  | なし                               | なし                            | nodejs                   | DB / Upstash Redisの疎通をcheckし`healthy / degraded / unhealthy`を返す。Productionは`{ status }`だけを公開                |
+| Product | `/api/health/version`                        | GET                  | なし                               | なし                            | nodejs                   | ビルドの`{ version, commitSha }`をno-storeで返す（外部I/Oなし）。開いたままのタブの新deploy検知に使う                      |
 | Product | `/api/csp-report`                            | POST                 | なし                               | IP 20/分 + 全体120/分           | nodejs                   | Product originの16 KiB以下のCSP reportだけを検証し、URL queryを除去してSentryへ送信                                        |
 | Product | `/api/trpc/[trpc]`                           | GET / POST           | procedure依存                      | procedure依存                   | nodejs                   | tRPC procedureのルーティング本体。Contactは認証済み`contact.submit`を使う                                                  |
 | Product | `/api/oauth/token`                           | POST                 | OAuth client（PKCE）               | IP 10/分 + 全体120/分           | nodejs                   | MCP client向けにaccess / refresh tokenを発行・回転する（`authorization_code` / `refresh_token`）。公開pathは`/oauth/token` |
@@ -933,159 +1123,44 @@ export type TagRow = Database['public']['Tables']['tags']['Row'];
 
 ## App Routes Overview
 
-`src/app/[locale]/**` 配下の Next.js App Router routing を総覧。Route Group / Composition Layer / 認証境界の関係を一望できるようまとめる。`/api/**` は上記「API Endpoints Overview」を参照。
+Next.js App Router の**構造の決まり**を書く。実在する route の一覧は生成物を見る（この doc に書くと必ず古くなる。2026-09-16 に `/day` `/week` `playground/` など存在しない route の表を撤去した）。
 
-策定日: 2026-04-26（最終更新: 2026-05-12 に onboarding route group 削除を反映）
-スコープ: `src/app/**` 配下の Next.js App Router 全 route。`/api/**` は除外。`(public)` Route Group は現時点で存在しない。
+| 知りたいこと                        | 見る場所                                                                      |
+| ----------------------------------- | ----------------------------------------------------------------------------- |
+| 画面（page）の一覧                  | [`data/architecture-inventory.md`](./data/architecture-inventory.md) の route |
+| route handler の一覧（method 付き） | [`data/system-surface.md`](./data/system-surface.md) の HTTP route            |
+| 画面ごとの E2E 被覆                 | [`data/system-surface.md`](./data/system-surface.md) の E2E spec → route      |
 
-### Route Group 構造
+### Route Group の役割
 
-```
-src/app/
-├── layout.tsx                  ← ルート layout（HTML / theme / font / globals.css）
-├── error.tsx, global-error.tsx ← root-level error boundaries
-├── not-found.tsx               ← root-level 404
-├── sitemap.ts                  ← 多言語 sitemap（app 側の最小公開 URL のみ）
-├── opengraph-image.tsx         ← OG image generator (edge runtime)
-├── maintenance/route.ts        ← /maintenance（locale プレフィックスなし、Provider バイパス）
-├── offline/page.tsx            ← /offline（PWA フォールバック）
-├── api/                        ← REST / Webhook（API Endpoints Overview 参照）
-└── [locale]/
-    ├── layout.tsx              ← locale-scoped HTML lang / dir / metadata
-    ├── page.tsx                ← / → /{locale}/week へ redirect
-    ├── error.tsx               ← locale-scoped error boundary
-    ├── (app)/                  ← 認証必須グループ
-    │   ├── layout.tsx          ← IntlProvider + Providers + BaseLayout
-    │   ├── error.tsx, not-found.tsx
-    │   ├── (workspace)/        ← day / week / [nday]（Review / Diffはquery panel）
-    │   ├── settings/
-    │   ├── playground/
-    │   ├── _providers/         ← Providers ツリー
-    │   ├── _shell/             ← Shell layout components
-    │   └── _overlays/          ← グローバルダイアログ群
-    ├── (auth)/                 ← 認証フロー（login / signup / reset / mfa-verify）
-    │   ├── layout.tsx          ← IntlProvider (auth namespace) + AuthClientLayout
-    │   ├── loading.tsx
-    │   └── auth/{login,signup,password,reset-password,mfa-verify}/page.tsx
-    └── playground/             ← dev playground（locale 直下）
-```
+| Group                | 置くもの                                  | 前提                                                                   |
+| -------------------- | ----------------------------------------- | ---------------------------------------------------------------------- |
+| `[locale]/(app)/`    | 認証必須の画面                            | `layout.tsx` が Providers（tRPC / Query / Theme 等）と shell を注入    |
+| `(app)/(workspace)/` | 日々使う作業画面                          | `_composition/` の client ツリーを `page.tsx` から薄く呼ぶ             |
+| `[locale]/(auth)/`   | 認証フロー                                | `PublicProviders`（Theme + Tooltip）だけ。データ層を持たない           |
+| `src/app/` 直下      | locale を持たない route と metadata route | root layout / error / sitemap / OG image / `/maintenance` / `/offline` |
 
-### (app) Group: 認証必須ページ
+### Auth 境界
 
-すべて `Supabase Auth` のセッションが前提。`(app)/layout.tsx` で `Providers`（tRPC / TanStack Query / Auth Store / Calendar Settings / Theme）を注入し、`BaseLayout` で sidebar + header を提供する。
+- auth check は **proxy（`src/proxy.ts`）に一元化**する。page / layout 単位の auth ガードは置かない
+- 認証が要る画面は `(app)` 配下に置けばよい。認証をスキップする画面は `(auth)` 配下に置く
+- 認証済みで `(auth)` を踏むのが正常系の path は除外する（`isAuthPathAllowedWhileAuthenticated`、`src/lib/auth/domain/access-policy.ts`）。`/auth/mfa-verify`、`/auth/confirm`、`/auth/callback`、`/auth/reset-password` が対象
 
-#### Layout 系
+### composition layer
 
-| Path                  | Type           | 責務                                                                                                                           |
-| --------------------- | -------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| `(app)/layout.tsx`    | layout         | IntlProvider（app namespace のみ）+ Providers + BaseLayout + GlobalOverlays。`metadata.robots: noindex` で認証ページを検索除外 |
-| `(app)/error.tsx`     | error boundary | (app) Group 内のページエラーを BaseLayout 内側で表示。i18n 対応、Sentry にも記録                                               |
-| `(app)/not-found.tsx` | not-found      | (app) Group 内の 404。BaseLayout 内側で表示し、ナビ崩れを防ぐ                                                                  |
-
-#### (workspace) — メインモード
-
-| Path                                        | Type           | 責務 / 主な合成元                                                                                                    |
-| ------------------------------------------- | -------------- | -------------------------------------------------------------------------------------------------------------------- |
-| `(workspace)/day/page.tsx`                  | page (server)  | `prefetchCalendarData` → `HydrationBoundary` → `CalendarViewClient`（day view）。`generateMetadata` で i18n タイトル |
-| `(workspace)/week/page.tsx`                 | page (server)  | week view。同上の prefetch + Suspense streaming                                                                      |
-| `(workspace)/[nday]/page.tsx`               | page (server)  | 多日数 view（2day〜9day）。`[nday]` で動的セグメント                                                                 |
-| `(workspace)/{day,week,[nday]}/loading.tsx` | loading        | 共通 `CalendarSkeleton` を表示                                                                                       |
-| `(workspace)/{day,week,[nday]}/error.tsx`   | error boundary | calendar segment 専用エラー                                                                                          |
-| `(workspace)/_composition/`                 | —              | `CalendarViewClient` ほか、各 view の合成 layer                                                                      |
-| `(workspace)/_server/`                      | —              | `prefetchCalendarData` / `parseDateParam` / `CalendarSkeleton` 等の server-only ヘルパ                               |
-
-#### settings
-
-| Path                           | Type            | 責務                                                                                |
-| ------------------------------ | --------------- | ----------------------------------------------------------------------------------- |
-| `settings/page.tsx`            | page (client)   | settings 一覧。client component、`useAuthStore` + `SETTINGS_CATEGORIES` で nav 表示 |
-| `settings/layout.tsx`          | layout (client) | settings 用の slot 構造                                                             |
-| `settings/[category]/page.tsx` | page (client)   | カテゴリ別 settings（`SettingsContent` を render）                                  |
-
-#### playground
-
-| Path                           | Type | 責務                                                                      |
-| ------------------------------ | ---- | ------------------------------------------------------------------------- |
-| `playground/dnd-tags/page.tsx` | page | dnd-kit 検証用の dev playground（production では `noindex` 継承で隠れる） |
-
-### composition layer の使い方
-
-各 mode の `_composition/` には「ページから見た合成 hub」を集める:
-
-- 入力: `params` / `searchParams` / `prefetched data`
-- 合成対象: feature barrel (`@/features/calendar`, `@/features/review`, `@/features/timeblock` 等)
-- 出力: 1 つの client component ツリー
-
-`page.tsx` 自体は薄く保つ（prefetch + Suspense + 合成 component の呼出）。view の差し替えやデータ取得方式の変更は composition layer 内で完結させる。詳細は AGENTS.md / `pr-cross-review` skill の Composition Layer / Composition Hub を参照。
+各 mode の `_composition/` は「ページから見た合成 hub」。入力は `params` / `searchParams` / prefetch 済みデータ、合成対象は feature barrel、出力は 1 つの client component ツリー。`page.tsx` は prefetch と合成の呼び出しだけに保ち、view の差し替えは composition layer 内で完結させる。
 
 ### providers / shell / overlays
 
-| Path                                 | 責務                                                                                                                                                                                                                                          |
-| ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `(app)/_providers/Providers.tsx`     | tRPC / TanStack Query / Auth Store / Calendar Settings / Theme などのデータ層                                                                                                                                                                 |
-| `(app)/_shell/base-layout.tsx`       | sidebar + header + main の UI shell                                                                                                                                                                                                           |
-| `(app)/_overlays/GlobalOverlays.tsx` | ContactDialog / SettingsDialog / TimeblockSearchDialog / ShortcutCheatSheetDialog / TimeblockInspector / Toaster を集約マウント。keyboard shortcut の global listener（`useShortcutRegistry` / `useTimeblockSearchShortcut`）もここで購読する |
+| Path                | 責務                                                                       |
+| ------------------- | -------------------------------------------------------------------------- |
+| `(app)/_providers/` | データ層（tRPC / TanStack Query / Auth Store / Theme など）の合成          |
+| `(app)/_shell/`     | sidebar + header + main の UI shell                                        |
+| `(app)/_overlays/`  | グローバルダイアログと keyboard shortcut の global listener を集約マウント |
 
-### Auth 境界の確認
+Provider の実際の入れ子は `ProvidersComposition.tsx` を読む（順序は副作用の依存で決まるため、ここに写さない）。
 
-- `(app)` 配下の page で auth check は **proxy（`src/proxy.ts`）に一元化されている**（未認証で protected path → `/auth/login?redirect=`、MFA 未検証なら `/auth/mfa-verify`）。page / layout 単位の auth ガードは持たない
-- ページ単体での auth ガードは不要。新規 page を追加するときは `(app)` 配下に置けば自動的に認証必須となる
-- 認証スキップしたい page は `(auth)/` に置く（下記参照）
-
-### (auth) Group: 認証フロー
-
-未認証ユーザー向けの login / signup / reset 系ページ。`AuthClientLayout` で軽量な `PublicProviders`（Theme + Tooltip のみ）を注入し、`AuthLayout` で UI を組み立てる。tRPC / TanStack Query などのデータ層は持たない（Supabase Auth Client SDK を直接利用）。
-
-認証済みユーザーが `(auth)` 配下へ来た場合は proxy が `/week` へ流すが、**セッションを持ったまま踏むのが正常系のパスは除外する**（`isAuthPathAllowedWhileAuthenticated`、`src/lib/auth/domain/access-policy.ts`）。対象は `/auth/mfa-verify`（aal2 への昇格）、`/auth/confirm`（メール内リンクの `token_hash` 検証。ログイン中のメールアドレス変更が通る）、`/auth/callback`（OAuth の code 交換）、`/auth/reset-password`（confirm でセッション確立後に着地）。
-
-#### Layout 系
-
-| Path                 | Type            | 責務                                                                                                       |
-| -------------------- | --------------- | ---------------------------------------------------------------------------------------------------------- |
-| `(auth)/layout.tsx`  | layout (server) | IntlProvider（`common` / `auth` / `error` namespace のみ）+ `AuthClientLayout`。`metadata.robots: noindex` |
-| `(auth)/loading.tsx` | loading         | 認証フロー共通のローディング表示                                                                           |
-
-#### Pages
-
-| Path                                  | Type          | 責務                                                                                                                            |
-| ------------------------------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| `(auth)/auth/page.tsx`                | page (server) | `/auth` ルートへの直接アクセス時の入口（リダイレクト or 案内）                                                                  |
-| `(auth)/auth/login/page.tsx`          | page (server) | `LoginForm` を中央配置で render                                                                                                 |
-| `(auth)/auth/signup/page.tsx`         | page (server) | `SignupForm`                                                                                                                    |
-| `(auth)/auth/password/page.tsx`       | page (server) | `PasswordResetForm`（リセットメール送信）                                                                                       |
-| `(auth)/auth/reset-password/page.tsx` | page (server) | `ResetPasswordForm`（リセットリンク経由の新パスワード設定）                                                                     |
-| `(auth)/auth/mfa-verify/page.tsx`     | page (server) | MFA TOTP コード検証                                                                                                             |
-| `(auth)/auth/mfa-verify/layout.tsx`   | layout        | MFA 専用 wrapper                                                                                                                |
-| `(auth)/auth/confirm/route.ts`        | route handler | 認証メール内リンクの着地点。`token_hash` + `type` を `verifyOtp` し `next` へ redirect（signup / recovery / email_change 共通） |
-| `(auth)/auth/callback/route.ts`       | route handler | OAuth の `code` をセッションへ交換                                                                                              |
-
-### [locale] 直下
-
-locale ルーティングの境界。HTML lang / dir、metadata、redirect を担う。
-
-| Path                                       | Type            | 責務                                                                                          |
-| ------------------------------------------ | --------------- | --------------------------------------------------------------------------------------------- |
-| `[locale]/layout.tsx`                      | layout (server) | `<html lang dir>` の確定、`generateMetadata` で多言語 OG / canonical、未対応 locale を 404 に |
-| `[locale]/page.tsx`                        | page (server)   | `/{locale}` → `/{locale}/week` redirect。`force-dynamic`                                      |
-| `[locale]/error.tsx`                       | error boundary  | locale 全体のエラー（IntlProvider 未マウントケース含む）                                      |
-| `[locale]/playground/dnd-multi-container/` | dev             | dnd-kit Multiple Containers の検証用                                                          |
-
-### ルート直下（src/app/）
-
-locale プレフィックスを持たない routing と Next.js metadata route 群。
-
-| Path                   | Type                | 責務                                                                                                                 |
-| ---------------------- | ------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| `layout.tsx`           | root layout         | HTML 骨格 / theme provider / font / `globals.css` の読み込み。**この layout は触らない** が原則（影響範囲が全 page） |
-| `error.tsx`            | root error boundary | App router の最上位エラー                                                                                            |
-| `global-error.tsx`     | global error        | layout も含めた致命エラー時の最終手段（`<html>` から自前で組む）                                                     |
-| `not-found.tsx`        | root 404            | 全 path 共通の 404                                                                                                   |
-| `sitemap.ts`           | metadata route      | 多言語 sitemap。app 側は SaaS のため公開 URL 最小（マーケは web/ 側）                                                |
-| `opengraph-image.tsx`  | metadata route      | edge runtime で動的 OG 画像生成。`@/lib/og-colors` で色固定                                                          |
-| `maintenance/route.ts` | route handler       | `/maintenance`。Route Handler で raw HTML を返し、Provider ツリーをバイパスして CSP を回避                           |
-| `offline/page.tsx`     | page (client)       | PWA オフラインフォールバック。`navigator.language` で ja/en を切替                                                   |
-
-### 認証境界の全体像
+### 落ちた時にどこへ行くか
 
 ```
 未認証 → (auth)            : login / signup / reset / mfa
@@ -1098,7 +1173,7 @@ locale 不正 / path 不在    → [locale]/error.tsx, not-found.tsx, root not-f
 
 ### 関連ドキュメント
 
-- Feature 境界: AGENTS.md / `pr-cross-review` skill
+- Feature 境界: [AGENTS.md](../../AGENTS.md)、実際の依存は [architecture.md](./architecture.md) の生成ブロック
 
 ---
 
@@ -1219,149 +1294,17 @@ npm run check               # typecheck + lint + test:run（一括）
 
 ### 全コマンド一覧
 
-#### 開発サーバー
+**一覧はここに置かない**。`package.json` の `scripts` が正本で、写すと必ず古くなる（2026-09-16 に、存在しない 12 script を並べた表を撤去した）。
 
 ```bash
-pnpm dev                    # .op-env.agent + op run 経由で next dev
-pnpm dev:raw                # 素の next dev（一時作業用）
-npm run storybook           # Storybook（ポート6006）
+# root の script 名を引く
+node -e "console.log(Object.keys(require('./package.json').scripts).join('\n'))"
+
+# workspace 個別（product / web / storybook / packages）
+pnpm --filter @dayopt/product run
 ```
 
-#### ビルド
-
-```bash
-npm run build               # next build
-npm run build-storybook     # Storybook ビルド
-npm run bundle:analyze      # バンドル解析付きビルド
-```
-
-#### コード品質
-
-```bash
-npm run lint                # ESLint（--max-warnings 0）
-npm run lint:fix            # ESLint 自動修正
-npm run lint:boundaries     # feature間の直接importを検出
-npm run lint:boundaries:update  # 許可リスト更新
-npm run lint:tokens         # Tailwindセマンティックトークンチェック
-npm run typecheck           # tsc --noEmit
-npm run format              # Prettier フォーマット
-npm run format:check        # Prettier チェックのみ
-```
-
-#### テスト
-
-```bash
-npm run test                # Vitest（watchモード）
-npm run test:run            # Vitest（1回実行）
-npm run test:unit           # ユニットテスト
-npm run test:watch          # ウォッチモード
-npm run test:ui             # Vitest UI
-npm run test:coverage       # カバレッジ付き実行
-npm run test:coverage:summary  # カバレッジサマリー表示
-npm run test-storybook      # Storybook テスト
-npm run test:integration    # 統合テスト（前提: ローカル Supabase 起動。未起動なら失敗する。#2178）
-npm run test:e2e            # Playwright E2Eテスト
-npm run test:e2e:smoke      # E2Eスモークテスト
-npm run test:e2e:critical   # E2Eクリティカルパス
-npm run test:e2e:ui         # Playwright UIモード
-npm run test:e2e:headed     # ブラウザ表示付きE2E
-```
-
-> **既知の問題: ローカル node が 26 系だと localStorage 系 unit test が偽陽性で落ちる**（#2198）。repo の要求は `engines: node 24.x`（`.nvmrc` も `24`）だが、ローカルの実行環境が pin に従わず node 26 のままだと、node 26 の `ExperimentalWarning: localStorage is not available because --localstorage-file was not provided` により zustand persist / localStorage 依存の test が失敗する。CI は node 24 で実行するため常に green（偽陽性はローカル限定）。
->
-> 2026-08-19 実測（node `v26.5.0`、`pnpm test:run`）: **10 ファイル・74 テスト**が失敗する。失敗ファイル一覧:
->
-> - `__tests__/instrumentation-client.test.ts`
-> - `src/features/calendar/components/views/WeekView/components/__tests__/WeekGrid.test.tsx`
-> - `src/features/calendar/hooks/keyboard/__tests__/useShortcutRegistry.test.tsx`
-> - `src/features/calendar/hooks/keyboard/__tests__/useTimeblockSearchShortcut.test.ts`
-> - `src/features/calendar/stores/__tests__/useCalendarDisplayModeStore.test.ts`
-> - `src/features/calendar/stores/__tests__/useCalendarFilterStore.test.ts`
-> - `src/lib/__tests__/cookie-consent.test.ts`
-> - `src/lib/analytics/__tests__/DeferredAnalytics.test.tsx`
-> - `src/lib/stores/__tests__/usePageTitleStore.test.ts`
-> - `src/lib/stores/__tests__/useShellStore.test.ts`
->
-> **切り分け手順**: 失敗したファイル集合を上のリストと突き合わせる。完全に一致する（または部分集合である）なら node バージョン起因の偽陽性であり、自分の変更が原因ではない。一致しない・上記以外のファイルも失敗している場合は実際の regression を疑う。
->
-> **根治**: ローカル node を 24 系へ固定する（`.nvmrc` は既に `24`。`nvm use` や `mise install` 等で実行環境側を pin に合わせる。repo 側の対応はここまでで、実行環境の切り替えは各自のローカル設定に依存する）。数値は node / 依存の更新で変動しうるため、再遭遇時は本節の記載を鵜呑みにせず `pnpm test:run` を再実行して突き合わせる。
-
-#### Supabase / DB
-
-```bash
-npm run db:reset            # ローカルDB リセット
-npm run db:reset-linked:unsafe # 手動リンク先をリセット（緊急時のみ）
-npm run db:seed             # 開発データ投入
-npm run db:fresh            # リセット + シード
-npm run migration:create    # マイグレーション作成
-npm run migration:list      # マイグレーション一覧
-npm run migration:status    # DB差分確認
-npm run types:generate          # Supabase production main から apps/product/src/lib/database に型生成
-npm run types:generate:production # production main から apps/product/src/lib/database に型生成
-npm run types:generate:local    # ローカルから apps/product/src/lib/database に型生成
-```
-
-#### 環境変数
-
-```bash
-pnpm env:check           # secret 値を表示せず env の存在確認
-pnpm secrets:check       # tracked files と untracked .env* の literal secret 検出
-pnpm 1password:check     # 1Password schema の vault/item/field 存在確認
-pnpm vercel:env          # Vercel 環境変数一覧
-pnpm vercel:env:pull:unsafe  # apps/product/.env.local に一時同期
-```
-
-#### i18n
-
-```bash
-npm run i18n:check          # 翻訳キーの整合性チェック
-npm run i18n:unused         # 未使用の翻訳キーを検出
-```
-
-#### セキュリティ・ライセンス
-
-```bash
-npm run license:check       # ライセンスチェック
-npm run license:audit       # ライセンスサマリー
-npm run license:report      # ライセンスCSVレポート
-npm run security:audit      # npm audit（production）
-npm run security:check      # npm audit（moderate以上）
-npm run security:full       # audit + typecheck + lint
-npm run security:audit:actions  # GitHub Actions監査
-```
-
-#### パフォーマンス
-
-```bash
-npm run size:budget         # バンドルサイズバジェットチェック（check-bundle-budget.ts）
-npm run perf:lighthouse     # Lighthouse CI
-npm run deps:circular       # 循環依存検出
-npm run deps:outdated       # 古いパッケージ一覧
-```
-
-#### ドキュメント
-
-```bash
-npm run docs:check          # コード-ドキュメント整合性
-npm run docs:validate       # リンク + ルール検証
-```
-
-#### Sentry
-
-```bash
-pnpm --filter @dayopt/product exec vitest --project unit run src/app/api/csp-report/__tests__/route.test.ts
-pnpm --filter @dayopt/product exec vitest --project unit run src/lib/sentry/__tests__/scrub-pii.test.ts
-```
-
-runtimeとsource map uploadはVercel Productionだけで有効にする。CI / Preview buildではSentry credentialsを渡さない。Production smokeは恒久scriptにせず、対象projectと一時endpointの撤去条件を決めてから実施する。
-
-#### Git ログ
-
-```bash
-npm run log:feat            # feat: コミットのみ表示
-npm run log:fix             # fix: コミットのみ表示
-npm run log:type            # 型別コミット一覧（最新20件）
-```
+script の追加・改名は permission allowlist と docs 参照の同時更新まで含めて 1 変更にする（AGENTS.md の Non-Negotiables）。どのコマンドをいつ使うかは、テストは [testing.md](./testing.md)、DB は [supabase skill](../../.agents/skills/supabase/SKILL.md)、release は [releasing skill](../../.agents/skills/releasing/SKILL.md) を見る。
 
 ### pre-commit フック（自動実行）
 
@@ -1961,39 +1904,38 @@ ALTER TABLE public.entries DROP COLUMN IF EXISTS deleted_at;
 > **ロールバック非推奨**: pg_cronジョブ、Edge Function呼び出しが全て停止する。
 
 ```sql
--- CASCADE: 依存する関数 (get_vault_secret, vault_secret_exists, invoke_edge_function) も削除される
+-- CASCADE: 依存する関数 (vault_secret_exists) も削除される
 DROP EXTENSION IF EXISTS supabase_vault CASCADE;
 ```
 
 #### 15. `20260319000001_vault_helper_functions.sql`
 
-| 項目       | 値                                    |
-| ---------- | ------------------------------------- |
-| 内容       | get_vault_secret, vault_secret_exists |
-| リスク     | MEDIUM                                |
-| データ損失 | なし                                  |
-| 依存       | **先に #16 をロールバックすること**   |
+| 項目       | 値                                                                            |
+| ---------- | ----------------------------------------------------------------------------- |
+| 内容       | get_vault_secret（**撤去済み**）, vault_secret_exists                         |
+| リスク     | MEDIUM                                                                        |
+| データ損失 | なし                                                                          |
+| 依存       | `get_vault_secret` は `20260917050000` が撤去済み。#16 の事前 rollback は不要 |
 
 ```sql
 DROP FUNCTION IF EXISTS public.vault_secret_exists(TEXT);
-DROP FUNCTION IF EXISTS public.get_vault_secret(TEXT);
 ```
 
 #### 16. `20260319000003_vault_invoke_edge_function.sql`
 
-| 項目       | 値                       |
-| ---------- | ------------------------ |
-| 内容       | invoke_edge_function関数 |
-| リスク     | MEDIUM                   |
-| データ損失 | なし                     |
+| 項目       | 値                                       |
+| ---------- | ---------------------------------------- |
+| 内容       | invoke_edge_function関数（**撤去済み**） |
+| リスク     | —                                        |
+| データ損失 | なし                                     |
 
-```sql
--- 事前: cronジョブを確認・停止
--- SELECT * FROM cron.job WHERE command LIKE '%invoke_edge_function%';
--- SELECT cron.unschedule('check-reminders');
+`20260917050000_drop_vault_edge_invoke.sql`（[#2733](https://github.com/Dayopt/dayopt/issues/2733)）が
+`invoke_edge_function` と `get_vault_secret`、および vault secret の `service_role_key` /
+`supabase_url` を撤去した。**この migration へのロールバック手順はもう要らない。**
 
-DROP FUNCTION IF EXISTS public.invoke_edge_function(TEXT, JSONB);
-```
+撤去の根拠（#2517 の production read-only 実測）: `cron.job` は 5 本でどれも Edge も pg_net も
+呼ばず、`net._http_response` が存在しない（pg_net 自体が未導入）。TS からの `.rpc` 呼び出しも
+ゼロだった。定義を戻す必要が生じた場合は `20260319000001` / `20260319000003` を再適用する。
 
 #### 17. `20260319083000_rls_audit_fixes.sql`
 
@@ -2032,7 +1974,7 @@ DROP TABLE IF EXISTS public.stripe_webhook_events CASCADE;
 
 ```
 #17 → #13 (soft_delete)     ← #17が13のdeleted_atカラムに依存
-#16 → #15 → #14 (vault)     ← invoke_edge_function → helpers → extension
+#15 → #14 (vault)           ← vault_secret_exists → extension（#16 は撤去済みで鎖から外れた）
 #12 → #11 → #10 (stats)     ← summary → fix → kpi_functions
 ```
 
@@ -2069,12 +2011,12 @@ WHERE version = '20260319090000';  -- 該当バージョンに置き換え
 
 ### リスクサマリー
 
-| リスク     | マイグレーション                                                                   |
-| ---------- | ---------------------------------------------------------------------------------- |
-| **HIGH**   | #5 (stripe billing), #13 (soft delete), #14 (vault)                                |
-| **MEDIUM** | #4 (ical token), #9 (email suppressions), #15 (vault helpers), #16 (edge function) |
-| **LOW**    | #1-3, #6, #8, #10-12, #17-18                                                       |
-| **非推奨** | #1 (IDOR fix), #11 (auth.uid() check), #14 (vault extension)                       |
+| リスク     | マイグレーション                                                              |
+| ---------- | ----------------------------------------------------------------------------- |
+| **HIGH**   | #5 (stripe billing), #13 (soft delete), #14 (vault)                           |
+| **MEDIUM** | #4 (ical token), #9 (email suppressions), #15 (vault helpers)。#16 は撤去済み |
+| **LOW**    | #1-3, #6, #8, #10-12, #17-18                                                  |
+| **非推奨** | #1 (IDOR fix), #11 (auth.uid() check), #14 (vault extension)                  |
 
 ## 出口コスト台帳
 

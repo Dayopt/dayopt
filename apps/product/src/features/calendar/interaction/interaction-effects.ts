@@ -80,9 +80,10 @@ export function processInteractionEffects(
           dragLaneRef.current &&
           isPlanRecordDrop(dragLaneRef.current.source, dragLaneRef.current.target)
         ) {
-          const now = Date.now();
-          const planEnd = event.endDate ?? event.displayEndDate;
-          const canCreateRecord = planEnd.getTime() <= now && effect.time.end.getTime() <= now;
+          // 制約は drop 先の時間帯だけ（DT005: Record は未来に終われない）。Plan が
+          // 未来に終わるかは見ない — 「未来 Plan」の特別扱いは #2598 で撤去済みで、
+          // DB も過去に終わる Record を未来 Plan へ紐付けられる（#2645）
+          const canCreateRecord = effect.time.end.getTime() <= Date.now();
           if (canCreateRecord) {
             r.onPlanRecord?.(effect.timeblockId, effect.time);
           }
@@ -107,7 +108,7 @@ export function processInteractionEffects(
 
       case 'RESIZE_COMPLETE': {
         // 自動記録モデル: planned の resize は planned のみ更新（確定済み actual は固定、
-        // 未編集 actual は NULL のまま）。buildTimeUpdateData が origin 別に処理するため
+        // 未編集 actual は NULL のまま）。buildTimeUpdateData が kind 別に処理するため
         // ここで actual の扱いを指定する必要はない。
         r.onEventUpdate?.(effect.timeblockId, {
           startTime: effect.time.start,
@@ -128,12 +129,14 @@ export function processInteractionEffects(
       case 'SELECT_COMPLETE': {
         const selDate = r.displayDates?.[effect.dateIndex] ?? r.date;
         const endMinutes = getMinutesFromDayStart(selDate, effect.range.end);
+        // SELECT_COMPLETE は閾値以上動かした（範囲を引いた）時だけ出る
         r.onTimeRangeSelect?.({
           date: selDate,
           startHour: effect.range.start.getHours(),
           startMinute: effect.range.start.getMinutes(),
           endHour: Math.floor(endMinutes / 60),
           endMinute: endMinutes % 60,
+          durationSource: 'dragged',
         });
         break;
       }

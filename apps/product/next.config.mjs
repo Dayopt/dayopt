@@ -44,10 +44,6 @@ const nextConfig = {
   // env での無効化手段は無く、この top-level flag が唯一の opt-out。
   agentRules: false,
 
-  // Multi-zones設定: LP（web）とアプリ（app）を同一ドメインで運用
-  // @see https://nextjs.org/docs/app/building-your-application/deploying/multi-zones
-  assetPrefix: process.env.NODE_ENV === 'production' ? '/app-static' : undefined,
-
   // セキュリティ: X-Powered-By ヘッダーを削除（サーバー情報漏洩防止）
   poweredByHeader: false,
 
@@ -55,7 +51,8 @@ const nextConfig = {
   env: {
     NEXT_PUBLIC_SUPABASE_URL:
       process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co',
-    NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder',
+    NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY:
+      process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || 'placeholder',
     NEXT_PUBLIC_TURNSTILE_SITE_KEY: process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || '',
     NEXT_PUBLIC_APP_VERSION: releaseVersion,
     NEXT_PUBLIC_MCP_RESOURCE_URI: resolveProductPublicMcpResourceUri(process.env),
@@ -73,8 +70,11 @@ const nextConfig = {
     ignoreBuildErrors: false,
   },
 
-  // Multi-zones用リライト設定
-  // assetPrefixで設定したパスを実際の_nextパスにリライト
+  // 旧 assetPrefix（`/app-static`）の互換 rewrite。
+  // path ベースの Multi-Zones を撤去して asset は `/_next/...` から直接配信するが（#2747）、
+  // 撤去前に開いたタブと SW の DYNAMIC cache に残る HTML は `/app-static/_next/...` を参照する。
+  // それらが遅延 chunk を取りに来ても 404 にしないため、1 リリース分だけ残す。
+  // 撤去条件: この変更を含む release の次の release（それ以前の HTML が配信・cache から消える）。
   async rewrites() {
     return {
       beforeFiles: [
@@ -233,8 +233,12 @@ const nextConfig = {
     // Supabase SSR cache-header / refresh-cookie continuity と競合させない）。
     // @see https://nextjs.org/docs/app/api-reference/config/next-config-js/cacheComponents
 
-    // Next.js 15 Router Cache再有効化（デフォルトで無効化された）
-    // ページ遷移パフォーマンス向上のため、クライアント側キャッシュを有効化
+    // Router Cache の保持時間。dynamic は Next.js の既定 0 から 30 秒に延ばす。2026-09-14 実測（#2747）。
+    // workspace tab（calendar ⇄ report）の Link 往復で、既定のままだと戻るたびに RSC を取り直し
+    // server が calendar の prefetch をやり直す（production build + local Supabase で calendar への
+    // 戻り 約 875ms、RSC 1 回/遷移）。30 秒保持なら RSC 0 回・36〜83ms で戻れる。
+    // server state の鮮度は TanStack Query（staleTime / invalidate）が持つので、30 秒の RSC 再利用で
+    // 古いデータは表示されない。static は web と違い対象 route が無いので既定と同等。
     // @see https://nextjs.org/docs/app/api-reference/config/next-config-js/staleTimes
     staleTimes: {
       dynamic: 30, // 動的ルート: 30秒キャッシュ（[locale]等）

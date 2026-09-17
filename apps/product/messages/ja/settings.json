@@ -249,21 +249,8 @@
       "viewWeek": "週表示",
       "density": "密度",
       "densityCompact": "コンパクト",
-      "densityDefault": "デフォルト",
+      "densityDefault": "標準",
       "densitySpacious": "ゆったり"
-    },
-    "sleepSchedule": {
-      "title": "睡眠スケジュール",
-      "enabled": "睡眠時間帯を表示",
-      "description": "カレンダーのグリッドに睡眠時間帯を背景色で表示",
-      "bedtime": "就寝時刻",
-      "wakeTime": "起床時刻",
-      "duration": "睡眠時間",
-      "hours": "{hours}時間",
-      "preview": "プレビュー",
-      "legendSleep": "睡眠",
-      "legendActivity": "活動",
-      "settingsSaved": "睡眠スケジュールを保存しました"
     },
     "preferences": {
       "settingsSaved": "環境設定を保存しました",
@@ -367,10 +354,10 @@
       },
       "mcp": {
         "title": "MCP / API",
-        "description": "Claude DesktopなどのAIアシスタントからDayoptのデータに接続。",
+        "description": "Claude・ChatGPT・CursorなどのAIアシスタントからDayoptのデータに接続。",
         "serverUrl": "MCPサーバーURL",
         "copied": "クリップボードにコピーしました",
-        "connectionGuide": "上記のURLをClaude Desktopの設定に追加してください。",
+        "connectionGuide": "上記のURLを、お使いのAIアシスタントのカスタムコネクタまたはMCPサーバーの設定に追加してください。",
         "proRequired": "無料体験中または契約中に利用できます。",
         "upgrade": "購入する"
       },
@@ -385,7 +372,11 @@
         "confirmDeleteAll": "すべてのデータが完全に削除されます。アカウントは残りますが、タイムブロック、アクティビティ、設定はすべて削除されます。",
         "typeToConfirm": "確認のため「{keyword}」と入力してください",
         "confirmKeyword": "削除",
-        "deleting": "削除中..."
+        "deleting": "削除中...",
+        "blocksDeleted": "{count} 件のタイムブロックを削除しました",
+        "blocksDeleteFailed": "タイムブロックを削除できませんでした。もう一度お試しください",
+        "allDataDeleted": "すべてのデータを削除しました",
+        "allDataDeleteFailed": "データを削除できませんでした。もう一度お試しください"
       }
     },
     "integrations": {

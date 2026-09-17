@@ -28,8 +28,12 @@ cat > "$PUSH_INPUT_FILE" || {
 
 while read -r _local_ref local_sha remote_ref _remote_sha; do
   # main への直接 push を禁止する。マージは PR + pnpm branch:finish 経由に限定する。
-  # private repo + Free plan では GitHub 側の branch protection が強制されないため、
-  # この hook が唯一の main 保護になる（tag push や他 branch は通す）。
+  # GitHub 側の merge gate は main の ruleset（required status checks / review thread
+  # resolution 等。docs/engineering/infra.md §merge gate）で、GitHub Team の private repo
+  # でも強制される。ただし ruleset が直接 push をどこまで拒否するかは repo の docs に
+  # 書かれていない（実状は gh api repos/Dayopt/dayopt/rulesets/6790553 が正）ため、
+  # ruleset の設定に依存せず push 前にローカルで止める防御としてこの hook を残す
+  # （tag push や他 branch は通す）。
   if [ "$remote_ref" = "refs/heads/main" ]; then
     echo "✗ main への直接 push は禁止です。PR を作成し pnpm branch:finish でマージしてください。" >&2
     exit 1

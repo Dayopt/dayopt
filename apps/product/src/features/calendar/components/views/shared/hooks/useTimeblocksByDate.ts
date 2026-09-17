@@ -1,5 +1,5 @@
 /**
- * エントリ日付グループ化統一フック
+ * タイムブロック日付グループ化統一フック
  */
 
 import { useMemo } from 'react';
@@ -10,37 +10,37 @@ import { isValidEvent } from '../utils/dateHelpers';
 import { sortAgendaEventsByDateKeys, sortEventsByDateKeys } from '../utils/timeblockSorting';
 
 /** useTimeblocksByDate フックのオプション */
-interface UseEntriesByDateOptions {
+interface UseTimeblocksByDateOptions {
   dates: Date[];
-  entries: CalendarDisplayEvent[];
+  timeblocks: CalendarDisplayEvent[];
   sortType?: 'standard' | 'agenda';
   timezone?: string;
 }
 
 /** useTimeblocksByDate フックの戻り値 */
-interface UseEntriesByDateReturn {
-  entriesByDate: Record<string, CalendarDisplayEvent[]>;
-  totalEntries: number;
-  hasEntries: boolean;
+interface UseTimeblocksByDateReturn {
+  timeblocksByDate: Record<string, CalendarDisplayEvent[]>;
+  totalTimeblocks: number;
+  hasTimeblocks: boolean;
 }
 
 /**
- * エントリを日付ごとにグループ化する統一フック
+ * タイムブロックを日付ごとにグループ化する統一フック
  *
  * @description
  * 以前は各ビューで80-90行の重複ロジックがあったが、これで統一
  * - WeekView, ThreeDayView, FiveDayView で共通使用
- * - マルチデイエントリ対応
- * - 無効エントリの自動フィルタリング
+ * - マルチデイタイムブロック対応
+ * - 無効タイムブロックの自動フィルタリング
  * - 時刻ソート
  */
 export function useTimeblocksByDate({
   dates,
-  entries = [],
+  timeblocks = [],
   sortType = 'standard',
   timezone,
-}: UseEntriesByDateOptions): UseEntriesByDateReturn {
-  const entriesByDate = useMemo(() => {
+}: UseTimeblocksByDateOptions): UseTimeblocksByDateReturn {
+  const timeblocksByDate = useMemo(() => {
     const grouped: Record<string, CalendarDisplayEvent[]> = {};
 
     // Step 1: 各日付のキーを初期化
@@ -49,30 +49,30 @@ export function useTimeblocksByDate({
       grouped[dateKey] = [];
     });
 
-    // Step 2: エントリを適切な日付に配置
-    entries.forEach((entry) => {
-      if (!isValidEvent(entry)) {
+    // Step 2: タイムブロックを適切な日付に配置
+    timeblocks.forEach((timeblock) => {
+      if (!isValidEvent(timeblock)) {
         return;
       }
 
       // startDateがnullまたはundefinedの場合はスキップ
-      if (!entry.startDate) {
+      if (!timeblock.startDate) {
         return;
       }
 
       // より柔軟な日付正規化
       const timeblockStart =
-        entry.startDate instanceof Date ? entry.startDate : new Date(entry.startDate);
+        timeblock.startDate instanceof Date ? timeblock.startDate : new Date(timeblock.startDate);
 
       // 無効な日付は除外
       if (isNaN(timeblockStart.getTime())) {
         return;
       }
 
-      // マルチデイエントリの場合は複数日にまたがって表示
-      if (entry.isMultiDay && entry.endDate) {
+      // マルチデイタイムブロックの場合は複数日にまたがって表示
+      if (timeblock.isMultiDay && timeblock.endDate) {
         const timeblockEnd =
-          entry.endDate instanceof Date ? entry.endDate : new Date(entry.endDate);
+          timeblock.endDate instanceof Date ? timeblock.endDate : new Date(timeblock.endDate);
 
         if (!isNaN(timeblockEnd.getTime())) {
           const startKey = getDateKey(timeblockStart, timezone);
@@ -82,7 +82,7 @@ export function useTimeblocksByDate({
             const dateKey = getDateKey(date, timezone);
             if (dateKey >= startKey && dateKey <= endKey) {
               if (grouped[dateKey]) {
-                grouped[dateKey].push(entry);
+                grouped[dateKey].push(timeblock);
               }
             }
           });
@@ -90,35 +90,38 @@ export function useTimeblocksByDate({
         }
       }
 
-      // 単日エントリの場合
+      // 単日タイムブロックの場合
       const timeblockDateKey = getDateKey(timeblockStart, timezone);
       dates.forEach((date) => {
         const dateKey = getDateKey(date, timezone);
         if (timeblockDateKey === dateKey) {
           if (grouped[dateKey]) {
-            grouped[dateKey].push(entry);
+            grouped[dateKey].push(timeblock);
           }
         }
       });
     });
 
-    // Step 3: 各日のエントリを適切にソート
+    // Step 3: 各日のタイムブロックを適切にソート
     const sortedResult =
       sortType === 'agenda' ? sortAgendaEventsByDateKeys(grouped) : sortEventsByDateKeys(grouped);
 
     return sortedResult;
-  }, [dates, entries, sortType, timezone]);
+  }, [dates, timeblocks, sortType, timezone]);
 
   // 統計情報も提供
-  const totalEntries = useMemo(() => {
-    return Object.values(entriesByDate).reduce((total, dayEntries) => total + dayEntries.length, 0);
-  }, [entriesByDate]);
+  const totalTimeblocks = useMemo(() => {
+    return Object.values(timeblocksByDate).reduce(
+      (total, dayTimeblocks) => total + dayTimeblocks.length,
+      0,
+    );
+  }, [timeblocksByDate]);
 
-  const hasEntries = totalEntries > 0;
+  const hasTimeblocks = totalTimeblocks > 0;
 
   return {
-    entriesByDate,
-    totalEntries,
-    hasEntries,
+    timeblocksByDate,
+    totalTimeblocks,
+    hasTimeblocks,
   };
 }

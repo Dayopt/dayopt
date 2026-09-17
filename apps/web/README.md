@@ -15,10 +15,10 @@
 rootから実行する。
 
 ```bash
-pnpm dev:web
+pnpm --filter @dayopt/web dev
 pnpm build:web
-pnpm lint:web
-pnpm typecheck:web
+pnpm --filter @dayopt/web lint
+pnpm --filter @dayopt/web typecheck
 pnpm test:web
 pnpm --filter @dayopt/web test:e2e:smoke
 pnpm --filter @dayopt/web validate:content
@@ -43,15 +43,15 @@ repo rootの`.op-env.agent`に`op://`参照だけを置き、通常はroot comma
 | `content/releases` | 公開release notes    |
 | `messages/{en,ja}` | web用copy            |
 
-公開コンテンツの執筆規約は`.claude/skills/docs-writing/SKILL.md`を使う。内部設計・開発規約はroot [`docs/README.md`](../../docs/README.md)へ置き、このapp配下に二重管理しない。
+公開コンテンツの執筆規約は`.agents/skills/docs-writing/SKILL.md`を使う（`.claude/skills` は互換 symlink で正本ではない）。内部設計・開発規約はroot [`docs/README.md`](../../docs/README.md)へ置き、このapp配下に二重管理しない。
 
 ## Verification
 
 webだけの変更では、変更内容に応じて次を実行する。
 
 ```bash
-pnpm lint:web
-pnpm typecheck:web
+pnpm --filter @dayopt/web lint
+pnpm --filter @dayopt/web typecheck
 pnpm test:web
 pnpm build:web
 ```

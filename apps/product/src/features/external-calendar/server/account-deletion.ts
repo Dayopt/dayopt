@@ -137,7 +137,7 @@ const CLIENT_FLOOR_TIMEOUT_MS = 15_000;
 function createCalendarAccountDeletionClient(): CalendarAccountDeletionClient {
   return createClient<CalendarAccountDeletionDatabase>(
     env.NEXT_PUBLIC_SUPABASE_URL,
-    env.SUPABASE_SERVICE_ROLE_KEY,
+    env.SUPABASE_SECRET_KEY,
     {
       auth: {
         autoRefreshToken: false,

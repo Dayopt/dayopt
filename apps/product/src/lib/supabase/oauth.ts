@@ -102,7 +102,7 @@ export function extractBearerToken(authHeader: string | null): string {
  */
 export function createServiceRoleClient(): SupabaseClient<Database> {
   const supabaseUrl = env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceRoleKey = env.SUPABASE_SERVICE_ROLE_KEY;
+  const serviceRoleKey = env.SUPABASE_SECRET_KEY;
 
   return createClient<Database>(supabaseUrl, serviceRoleKey, {
     auth: {

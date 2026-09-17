@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-08-13
+last_verified: 2026-09-16
 code:
   - apps/product/src/features/settings/components/EmailChangeDialog.tsx
   - apps/product/src/features/settings/components/PasswordChangeDialog.tsx
@@ -33,6 +33,7 @@ Supabase Auth ベースの認証機能。
 - Supabase Auth によるセッション管理（メール/パスワード、MFA検証フローを含む）
 - ソーシャルログインは Google のみ。Apple（有料 Developer Program が必須）と Meta（アプリ審査コスト）は不採用（2026-07 決定、ログ（削除済み、git 履歴参照））。本番の provider 設定は Supabase Dashboard が正本
 - 認証メール（signup 確認 / パスワードリセット / メールアドレス変更）は Auth send_email hook → Edge Function `send-auth-email` → Resend で送信する。メールアドレス変更は Secure Email Change により現・新両アドレスへ確認メールを 2 通送る
+- 歓迎メールは認証メールとは別経路で、session が張れた着地点（`/auth/callback` と `signup` の `/auth/confirm`）から送る。「1 ユーザー 1 通」は `profiles.welcome_email_sent_at` の conditional UPDATE を掴めた 1 リクエストだけが送ることで保証し、アプリ側で初回判定をしない。送信失敗でサインインは止めない
 - `protectedProcedure` で保護された tRPC procedure が `ctx.userId` でデータアクセスを制限する
 - MFA登録済みで session assurance level が `aal1` のブラウザセッションは、画面遷移だけでなく HTTP / RSC の両 tRPC context でも protected procedure を拒否する
 - RLS（Row Level Security）によるDBレベルでの認可を併用する
@@ -67,19 +68,19 @@ Google でのみ登録したユーザーはパスワードを持たない。こ�
 
 **メールアドレス変更は2層になっている**（#2024、中間案）。Secure Email Change（GoTrue が server 側で強制する、config 依存の層）に加えて、変更前パスワード再認証（アプリ側が明示的に要求する、code 依存の層）を課す。後者はアカウント削除と同じ service-role 経由 `signInWithPassword`（captcha 免除）で、公開 endpoint は使わない。
 
-| 操作               | 本人確認の担い手                                                                                                  | 依存する production 設定                                                                      | 設定が崩れた時の向き                    |
-| ------------------ | ----------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- | --------------------------------------- |
-| メールアドレス変更 | (a) Secure Email Change（旧・新双方への確認メール）+ (b) 変更前パスワード再認証（service-role 経由 captcha 免除） | (a) `mailer_secure_email_change_enabled` / (b) `SUPABASE_SERVICE_ROLE_KEY` が legacy JWT 形式 | (a) **fail-open** / (b) **fail-closed** |
-| パスワード変更     | `updateUser({ password, current_password })` の検証                                                               | `security_update_password_require_current_password`                                           | **fail-open**                           |
-| アカウント削除     | service-role 経由の `signInWithPassword`（captcha 免除）                                                          | `SUPABASE_SERVICE_ROLE_KEY` が **legacy JWT 形式**                                            | **fail-closed**                         |
+| 操作               | 本人確認の担い手                                                                                                  | 依存する production 設定                                                                                | 設定が崩れた時の向き                    |
+| ------------------ | ----------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- | --------------------------------------- |
+| メールアドレス変更 | (a) Secure Email Change（旧・新双方への確認メール）+ (b) 変更前パスワード再認証（service-role 経由 captcha 免除） | (a) `mailer_secure_email_change_enabled` / (b) gateway が `SUPABASE_SECRET_KEY` を admin 権限へ解決する | (a) **fail-open** / (b) **fail-closed** |
+| パスワード変更     | `updateUser({ password, current_password })` の検証                                                               | `security_update_password_require_current_password`                                                     | **fail-open**                           |
+| アカウント削除     | service-role 経由の `signInWithPassword`（captcha 免除）                                                          | gateway が `SUPABASE_SECRET_KEY` を admin 権限へ解決する                                                | **fail-closed**                         |
 
 **故障の向きが逆のものが同じ表に並んでいる。** 設定依存の層（メールアドレス変更(a)・パスワード変更）は設定が false になると**本人確認が黙って消える**（fail-open）。service-role 依存の層（メールアドレス変更(b)・アカウント削除）は依存が崩れると**操作が黙ってできなくなる**（fail-closed）。監視を設計する時に「値が false になったら警報」の一方向だけで組むと、fail-closed 側の故障を永久に検出できない（[#1926](https://github.com/Dayopt/dayopt/issues/1926)）。
 
 **メールアドレス変更は fail-closed 側が壊れても fail-open 側（Secure Email Change）が生きている限り、乗っ取りには直結しない。** (b) が壊れて `unavailable` になれば変更自体が止まる（fail closed）。(a) が壊れて false になると、正規ユーザー経由の申請でもパスワード再認証さえ突破すれば片側確認で通ってしまうが、盗まれた session からの直接 API 呼び出しに対する防御は元々 (b) 止まりだった（下記「アカウント削除・メールアドレス変更が service-role 経由 `signInWithPassword` を使う理由」参照）。
 
-**service role key を回転する、または新形式（`sb_secret_`）へ移行する場合、この経路の再検証を先に行う。** 新形式は Bearer として送られないため admin と解釈されず、captcha 免除が成立しなくなって削除が止まる。Supabase の legacy JWT key 廃止は外部の都合で動き、アプリ側の canary は**事後にしか鳴らない**。検証はローカルで `supabase/config.toml` の `[auth.captcha]` を有効化し、user-scoped 経路が失敗し service-role 経路が成功することを確認する。
+**secret key の回転・移行前に、この経路を captcha 有効の隔離環境で検証する。** `sb_secret_` は JWT ではないが、それだけで captcha 免除不可とはいえない。Supabase の[公開 gateway 実装](https://github.com/supabase/supabase/blob/2bd67ef91b497a775e86b35719976e9f88867223/docker/volumes/api/kong-entrypoint.sh)は `apikey` の opaque secret key を内部 service_role JWT へ変換し、[Auth middleware](https://github.com/supabase/auth/blob/4eee58f296d9698a1c2c0ae14d7a0b379c7622d3/internal/api/middleware.go)は admin credential で captcha を免除する。これは upstream の静的根拠であり、Dayopt の hosted 環境の実測ではない。
 
-この再検証は人間の手順だけに委ねず、**production build gate が鍵の形式を機械的に検査する**（`apps/product/production-build-gate.mjs`、[#1952](https://github.com/Dayopt/dayopt/issues/1952)）。legacy JWT 形式でない値が入った production build は失敗し、error message が削除フローへの影響と対処（Turnstile 方式への切替 = [#1925](https://github.com/Dayopt/dayopt/issues/1925) の (c) 案）を示す。日次 audit ではなく build gate に置いたのは、`production-auth-config-audit.mjs` の cron job に service role key を配ると RLS 全バイパスの鍵の配布先が増えるため（build env には値が既にあり、新たな配布が要らない）。検知は「鍵を差し替えた次の deploy」= 変更が効き始める瞬間になる。**検査するのは値が入っている時の形式だけで、欠落は見ない** — 回転は変数を消さないため。
+production build gate（`apps/product/production-build-gate.mjs`）は `SUPABASE_SECRET_KEY` の secret 形式または互換用 legacy JWT 形式を許可し、publishable key や不明な形式を拒否する。形式確認は鍵の有効性・接続先・captcha 免除を保証しない。**Production 切替前には、新しい鍵で captcha 有効時の正しい password の成功、誤った password の拒否、検証専用 session の local signOut、アカウント削除とメール変更の本人確認を隔離環境で確認する。** SDK を intercepted fetch で試す unit test は送信 header と local signOut のみを証明し、gateway/Auth の成功を代用しない。失敗時は canary と fail-closed を維持し、未検証のまま本番の鍵を切り替えない。
 
 **設定依存の層（メールアドレス変更(a)・パスワード変更）は code では担保できない。** 設定が production で無効化されると、アプリ側は何も変わらないまま本人確認だけが消える。
 
@@ -166,7 +167,7 @@ gateを有効にした後は、同じユーザーの操作をDB内で直列化�
 
 判定は `data.session?.access_token` で行う。auth-js は `access_token` を伴う session だけを保存する（cookie が書かれる）ので、truthy 判定だと token 無しの session オブジェクトで保護ページへ送ってしまう。
 
-**着地先を login ページにはしない。** `proxy.ts` は認証済みユーザーが auth 系 path に来ると `/week` へ送るため、ログイン中の browser で確認リンクを開くとメッセージが出る前に弾かれる。`/auth/confirmed` は `authPathsAllowedWhileAuthenticated`（`lib/auth/domain/access-policy.ts`）に登録してあり、認証済み・未認証のどちらでも表示できる。**このページを allowlist から外すと本件が再発する。**
+**着地先を login ページにはしない。** `proxy.ts` は認証済みユーザーが auth 系 path に来ると `/calendar` へ送るため、ログイン中の browser で確認リンクを開くとメッセージが出る前に弾かれる。`/auth/confirmed` は `authPathsAllowedWhileAuthenticated`（`lib/auth/domain/access-policy.ts`）に登録してあり、認証済み・未認証のどちらでも表示できる。**このページを allowlist から外すと本件が再発する。**
 
 ## Auth REST API は存在しない
 
@@ -185,7 +186,7 @@ gateを有効にした後は、同じユーザーの操作をDB内で直列化�
 - MFA登録済み `aal1 -> aal2` の状態は `FORBIDDEN`、MFA未登録 `aal1 -> aal1` と検証済み `aal2 -> aal2` は通過する
 - `user.verifyRecoveryCode` は recovery-code 検証により MFA factor を解除するため、既知の `aal1 -> aal2` 状態でも通過を許可する。呼び出し元はログインフロー（`/auth/mfa-verify`）と password-reset flow（`ResetPasswordForm.tsx`、MFA有効アカウントの自己復旧、#2013）の2箇所。password-reset 経路はメールボックス制御のみで到達できるため、login 経路（パスワード保有が前提）より広い攻撃者集合に開かれることを明示的に引き受けている（判断根拠は 2026-08-13-mfa-recovery-password-reset-boundary.md（削除済み、git 履歴参照））。password-reset の別経路として、TOTP の `mfa.challenge`+`mfa.verify` によるセッション昇格（MFAは無効化しない）も両方許可している
 - OAuth bearer mode: token を `oauth_tokens` で検証し、`client_id` と `scopes` を tRPC context に保持する
-- OAuth token は **MCP endpoint（`/api/mcp`）内部からの実行だけ**が tRPC に到達できる。公開 tRPC endpoint（`/api/trpc`）へ同じ token を投げても、scope 判定より手前で `FORBIDDEN` になる（context の `oauthExecution: 'mcp_internal'` が無いため）
+- OAuth token は **MCP endpoint（`/api/mcp`）内部からの実行だけ**が tRPC に到達できる。公開 tRPC endpoint（`/api/trpc`）へ同じ token を投げても、context が DB lookup より手前で `UNAUTHORIZED` を返す（`createFetchTRPCContext`）。procedure 内の `FORBIDDEN` はその後ろの backstop
 - MCP 内部実行でも、procedure path ごとの allowlist（`MCP_TRPC_SCOPE_REQUIREMENTS`、`apps/product/src/lib/trpc/procedures.ts`）と scope が一致した場合だけ許可する。現在の集合:
 
   | procedure                                                 | scope              |

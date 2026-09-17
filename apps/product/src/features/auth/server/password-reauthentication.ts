@@ -8,7 +8,7 @@ import 'server-only';
  *
  * ⚠ このモジュールは **captcha を意図的に免除している**（#1925）。
  *
- * - service-role client の `Authorization` を GoTrue が admin role として解釈するため、
+ * - gateway を経た request を GoTrue が admin role として解釈するため、
  *   `verifyCaptcha` が skip される。これが免除の仕組みそのもの
  * - **この endpoint の将来の captcha 強化も、ここでは効かない**。
  *   Supabase の Bot Protection 設定を変えてもこの経路は影響を受けないので、
@@ -31,9 +31,11 @@ import 'server-only';
  *
  * ## 依存
  *
- * `SUPABASE_SERVICE_ROLE_KEY` が **legacy JWT 形式**であること。新形式（`sb_secret_`）は
- * Bearer として送られないため admin と解釈されず、captcha 免除が成立しなくなる
- * （その場合は削除が fail-closed で止まる。鍵の回転前に再検証すること）。
+ * `SUPABASE_SECRET_KEY` を gateway が service_role として扱うこと。opaque key は
+ * apikey に送り、gateway が内部 JWT へ変換する。JWT 形式でないこと自体は captcha
+ * 免除不可の根拠ではない。ただし SDK の通信試験だけでは hosted gateway と Auth の
+ * 配備状態まで証明できないため、切替前に captcha 有効環境で正誤 password を検証する。
+ * 免除が成立しない場合は既存 canary + unavailable で fail-closed にする。
  */
 
 import { TRPCError } from '@trpc/server';

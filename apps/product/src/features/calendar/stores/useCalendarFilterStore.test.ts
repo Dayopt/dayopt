@@ -325,18 +325,18 @@ describe('useCalendarFilterStore', () => {
       expect(useCalendarFilterStore.getState().matchesActivityFilter(null)).toBe(true);
     });
 
-    it('isEntryVisible(null) は常に true', () => {
-      expect(useCalendarFilterStore.getState().isEntryVisible(null)).toBe(true);
+    it('matchesActivityFilter(null) は常に true', () => {
+      expect(useCalendarFilterStore.getState().matchesActivityFilter(null)).toBe(true);
       useCalendarFilterStore.getState().showOnlyActivity('tag-1');
-      expect(useCalendarFilterStore.getState().isEntryVisible(null)).toBe(true);
+      expect(useCalendarFilterStore.getState().matchesActivityFilter(null)).toBe(true);
     });
   });
 
   describe('クエリ系', () => {
     it('isActivityVisible', () => {
       useCalendarFilterStore.getState().showAllActivities(['tag-1']);
-      expect(useCalendarFilterStore.getState().isActivityVisible('tag-1')).toBe(true);
-      expect(useCalendarFilterStore.getState().isActivityVisible('tag-99')).toBe(false);
+      expect(useCalendarFilterStore.getState().matchesActivityFilter('tag-1')).toBe(true);
+      expect(useCalendarFilterStore.getState().matchesActivityFilter('tag-99')).toBe(false);
     });
 
     it('getCategoryVisibility: all / none / some', () => {
@@ -370,11 +370,11 @@ describe('useCalendarFilterStore', () => {
       expect(useCalendarFilterStore.getState().matchesActivityFilter('tag-99')).toBe(false);
     });
 
-    it('isEntryVisible: アクティビティフィルターのチェック', () => {
+    it('matchesActivityFilter: アクティビティフィルターのチェック', () => {
       useCalendarFilterStore.getState().showAllActivities(['tag-1']);
-      expect(useCalendarFilterStore.getState().isEntryVisible('tag-1')).toBe(true);
-      expect(useCalendarFilterStore.getState().isEntryVisible('tag-99')).toBe(false);
-      expect(useCalendarFilterStore.getState().isEntryVisible(null)).toBe(true);
+      expect(useCalendarFilterStore.getState().matchesActivityFilter('tag-1')).toBe(true);
+      expect(useCalendarFilterStore.getState().matchesActivityFilter('tag-99')).toBe(false);
+      expect(useCalendarFilterStore.getState().matchesActivityFilter(null)).toBe(true);
     });
   });
 });

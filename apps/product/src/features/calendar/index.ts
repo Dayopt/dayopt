@@ -56,6 +56,7 @@ export {
 export { useCalendarSettings } from './hooks/useCalendarSettings';
 export { useCalendarNavigationStore } from './stores/useCalendarNavigationStore';
 export type { UserSettings } from './stores/userSettings';
+export { useTemplateSaveStore } from './stores/useTemplateSaveStore';
 export { useTimeblockClipboardStore } from './stores/useTimeblockClipboardStore';
 // =============================================================================
 // Hooks
@@ -76,7 +77,12 @@ export { CALENDAR_SHORTCUT_CATALOG } from './lib/calendar-shortcut-catalog';
 // =============================================================================
 // Domain（Calendar 固有の仕様ルール）
 // =============================================================================
-export { calculateViewDateRange } from './domain/view-range';
+export {
+  DEFAULT_SHOW_WEEKENDS,
+  DEFAULT_WEEK_STARTS_ON,
+  buildCalendarRangeInput,
+  buildTimeblockListInput,
+} from './domain/calendar-query-input';
 
 // =============================================================================
 // Lib / Utils

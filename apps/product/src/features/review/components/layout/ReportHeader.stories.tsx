@@ -7,7 +7,8 @@ import { ReportHeader } from './ReportHeader';
  *
  * カレンダーと同じ器（`AppHeader`）と同じ部品（`DateRangeDisplay` / `DateNavigator`）で
  * 組み、粒度切替だけがレポート固有。並ぶ順序と余白もカレンダーの中央グループに
- * 揃えてある（期間ラベル → `‹ 今日 ›` → 粒度、を左に固める）。
+ * 揃えてある（期間ラベル → `‹ 今日 ›` → 粒度、を左に固める）。面の切替（`ReportTabs`）は
+ * ヘッダーには入れず、下の 2 行目に置く。
  */
 const meta = {
   title: 'Product/Features/Review/Layout/ReportHeader',
@@ -97,6 +98,18 @@ export const WithSlots: Story = {
 
 /** すべての粒度を並べる（ADR-023 の AllPatterns）。 */
 export const AllPatterns: Story = {
+  parameters: {
+    a11y: {
+      config: {
+        // 同じヘッダーを並べて見せる一覧なので、banner landmark が必ず重なる。
+        // 実画面では 1 ページに 1 つしか描かないため、この重複は起きない
+        rules: [
+          { id: 'landmark-no-duplicate-banner', enabled: false },
+          { id: 'landmark-unique', enabled: false },
+        ],
+      },
+    },
+  },
   args: BASE_ARGS,
   render: function AllPatternsReportHeader() {
     return (

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { MCP_CONTEXT_RANGE_SCHEMA } from './context-range-schema';
+import { MCP_CONTEXT_RANGE_INPUT_SCHEMA } from './context-range-schema';
 import { MCP_TIMEBLOCK_TIMESTAMP_SCHEMA } from './timeblock-timestamp-schema';
 import { MCP_TOOL_SCHEMA_VERSION } from './tool-result';
 
@@ -72,7 +72,7 @@ export const MCP_CATEGORY_LIST_OUTPUT_SCHEMA = z
   })
   .strict();
 
-export const MCP_CONSTRAINTS_GET_INPUT_SCHEMA = MCP_CONTEXT_RANGE_SCHEMA;
+export const MCP_CONSTRAINTS_GET_INPUT_SCHEMA = MCP_CONTEXT_RANGE_INPUT_SCHEMA;
 
 export const MCP_CONSTRAINTS_GET_OUTPUT_SCHEMA = z
   .object({
@@ -124,30 +124,5 @@ export const MCP_CONSTRAINTS_GET_OUTPUT_SCHEMA = z
           .strict(),
       })
       .strict(),
-  })
-  .strict();
-
-/**
- * セグメント（分析用の保存されたクエリ）の一覧。
- *
- * アーカイブ概念を持たないので archive filter を取らない（segments テーブルに
- * archived_at が無い。#2162 §4-3）。セグメントは軽量な保存クエリなので、
- * アーカイブではなく削除で足りるという設計判断。
- */
-export const MCP_SEGMENT_LIST_OUTPUT_SCHEMA = z
-  .object({
-    schemaVersion: z.literal(MCP_TOOL_SCHEMA_VERSION),
-    count: z.number().int().nonnegative(),
-    segments: z.array(
-      z
-        .object({
-          id: z.string().uuid(),
-          name: z.string(),
-          // セグメントが保持するのはアクティビティの集合だけ。期間・指標・並べ替えは
-          // 持たない（#2162 §6-4。レポートビルダー化を構造で防ぐ）。
-          activityIds: z.array(z.string().uuid()),
-        })
-        .strict(),
-    ),
   })
   .strict();

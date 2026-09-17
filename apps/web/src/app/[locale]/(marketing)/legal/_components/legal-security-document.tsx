@@ -1,6 +1,6 @@
 import { dayoptContact } from '@dayopt/config';
 import { Link } from '@dayopt/i18n/navigation';
-import { AlertTriangle, ExternalLink, FileText, Lock, Mail, type LucideIcon } from 'lucide-react';
+import { AlertTriangle, FileText, Lock, Mail, type LucideIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
 
 import { readLegalText, readLegalTree, type LegalContentTree } from './legal-content-tree';
@@ -101,6 +101,7 @@ export function SecurityDocument({ data }: { data: LegalContentTree }) {
 
         <div className="prose dark:prose-invert max-w-none">
           <h3 className="text-lg font-medium">{readLegalText(contacts, 'title')}</h3>
+          <p>{readLegalText(contacts, 'description')}</p>
           <ul className="space-y-2">
             <li className="flex items-center gap-2">
               <Mail className="size-4" />
@@ -110,18 +111,6 @@ export function SecurityDocument({ data }: { data: LegalContentTree }) {
                 className="text-primary hover:underline"
               >
                 {dayoptContact.securityEmail}
-              </a>
-            </li>
-            <li className="flex items-center gap-2">
-              <ExternalLink className="size-4" />
-              <strong>{readLegalText(contacts, 'github')}</strong>:{' '}
-              <a
-                href="https://github.com/Dayopt/dayopt/security/advisories/new"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-primary hover:underline"
-              >
-                {readLegalText(contacts, 'githubLink')}
               </a>
             </li>
           </ul>
@@ -201,37 +190,22 @@ export function SecurityDocument({ data }: { data: LegalContentTree }) {
       <section className="mb-12">
         <SectionHeading icon={FileText}>{readLegalText(relatedDocs, 'title')}</SectionHeading>
 
+        {/*
+         * 報告窓口・関連ドキュメントに GitHub リポジトリへのリンクを置かない。リポジトリを
+         * private にすると外部の研究者から辿れなくなるため（2026-09-14）。窓口はメールだけにする。
+         */}
         <div className="grid gap-4 md:grid-cols-2">
-          {[
-            {
-              key: 'securityPolicy',
-              href: 'https://github.com/Dayopt/dayopt/blob/main/docs/legal/SECURITY.md',
-              external: true,
-            },
-            {
-              key: 'vulnerabilityDisclosure',
-              href: 'https://github.com/Dayopt/dayopt/blob/main/docs/legal/VULNERABILITY_DISCLOSURE.md',
-              external: true,
-            },
-            {
-              key: 'incidentResponse',
-              href: 'https://github.com/Dayopt/dayopt/blob/main/docs/legal/INCIDENT_RESPONSE.md',
-              external: true,
-            },
-            { key: 'privacyPolicy', href: '/legal/privacy', external: false },
-          ].map(({ key, href, external }) => (
-            <Link
-              key={key}
-              href={href}
-              {...(external ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
-              className="border-border hover:border-primary block rounded-2xl border p-4 transition-colors"
-            >
-              <h3 className="mb-2 font-medium">{readLegalText(relatedDocs, key, 'title')}</h3>
-              <p className="text-muted-foreground text-sm">
-                {readLegalText(relatedDocs, key, 'description')}
-              </p>
-            </Link>
-          ))}
+          <Link
+            href="/legal/privacy"
+            className="border-border hover:border-primary block rounded-2xl border p-4 transition-colors"
+          >
+            <h3 className="mb-2 font-medium">
+              {readLegalText(relatedDocs, 'privacyPolicy', 'title')}
+            </h3>
+            <p className="text-muted-foreground text-sm">
+              {readLegalText(relatedDocs, 'privacyPolicy', 'description')}
+            </p>
+          </Link>
         </div>
       </section>
 

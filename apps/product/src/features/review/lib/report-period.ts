@@ -1,7 +1,7 @@
 /**
  * レポートの期間契約（週 / 月 / 年）
  *
- * `/report` の 4 章すべてが、この 1 箇所が返す `[startAt, endAt)` と `buckets` の上に乗る。
+ * `/report` のすべてのタブが、この 1 箇所が返す `[startAt, endAt)` と `buckets` の上に乗る。
  * client（表示の列見出し・期間移動）と server（集計）の両方から呼ぶため `server-only` は付けない。
  *
  * **半開区間で通す。** `lib/date/timezone.ts` の `tzWeekEnd()` / `toTZEndISO()` は
@@ -98,7 +98,7 @@ function toZonedDateKey(date: Date, timezone: string): string {
 /**
  * instant（UTC ISO）を、指定 timezone の壁時計日付キー（`YYYY-MM-DD`）へ。
  *
- * 4 章のジャンプ先（`/calendar?view=day&date=`）を組むのに使う。UTC のまま日付を切ると、
+ * カレンダーへのジャンプ先（`/calendar?view=day&date=`）を組むのに使う。UTC のまま日付を切ると、
  * 深夜の記録が前後の日へずれてカレンダーが「何も無い日」を開く。
  */
 export function resolveZonedDayKey(instant: string, timezone: string): string {
@@ -137,22 +137,6 @@ function resolvePeriodStartDay(
 }
 
 /**
- * 次の期間の初日（`YYYY-MM-DD`、ユーザーの壁時計日付）。
- *
- * 4 章「カレンダーで組む ›」のジャンプ先。週なら次週の開始曜日、月なら翌月 1 日、
- * 年なら翌年 1 月 1 日。**年粒度の bucket キーは `YYYY-MM` なので流用できない**ため、
- * 期間の先頭日を粒度ごとに解いて日付キーで返す。
- */
-export function resolveNextPeriodStartDayKey(
-  anchorDate: string,
-  granularity: ReportGranularity,
-  weekStartsOn: ReportWeekStartsOn,
-): string {
-  const nextAnchor = parseDateKey(shiftReportAnchor(anchorDate, granularity, 1));
-  return formatDateKey(resolvePeriodStartDay(nextAnchor, granularity, weekStartsOn));
-}
-
-/**
  * 時間帯の 6 バケット（仕様 §6-4）。**配列の順序がそのまま棒の並び**になる。
  *
  * 深夜（0–300）が最後なのは「1 日の先頭だが、読み手にとっては 1 日の終わり」だから
@@ -179,7 +163,46 @@ export function distributeToTimeOfDay(
   blockEndAt: string,
   timezone: string,
 ): number[] {
-  const totals = REPORT_TIME_OF_DAY_BUCKETS.map(() => 0);
+  return distributeToDayMinuteRanges(
+    blockStartAt,
+    blockEndAt,
+    timezone,
+    REPORT_TIME_OF_DAY_BUCKETS,
+  );
+}
+
+/**
+ * 1 時間刻みの 24 バケット（`[h:00, h+1:00)`）。時間の使い方の「時間帯の分布」が使う。
+ * 詳細パネルの 6 バケットより細かいのは、期間全体を 1 枚で見る面だから。
+ */
+export const REPORT_HOUR_BUCKETS = Array.from({ length: 24 }, (_, hour) => ({
+  key: String(hour),
+  startMinute: hour * 60,
+  endMinute: (hour + 1) * 60,
+}));
+
+/** ブロックを 1 時間刻みの 24 バケットへ按分する（分）。規則は `distributeToTimeOfDay` と同じ。 */
+export function distributeToHours(
+  blockStartAt: string,
+  blockEndAt: string,
+  timezone: string,
+): number[] {
+  return distributeToDayMinuteRanges(blockStartAt, blockEndAt, timezone, REPORT_HOUR_BUCKETS);
+}
+
+/**
+ * ブロックを壁時計の分範囲（`[startMinute, endMinute)`）のバケットへ按分する（分）。
+ *
+ * **0 時またぎは日境界で分割してから按分する。** 壁時計での位置が要るので、境界はユーザーの
+ * timezone で解く。
+ */
+function distributeToDayMinuteRanges(
+  blockStartAt: string,
+  blockEndAt: string,
+  timezone: string,
+  buckets: readonly { startMinute: number; endMinute: number }[],
+): number[] {
+  const totals = buckets.map(() => 0);
   const startMs = Date.parse(blockStartAt);
   const endMs = Date.parse(blockEndAt);
   if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || endMs <= startMs) return totals;
@@ -201,7 +224,7 @@ export function distributeToTimeOfDay(
       const fromMinute = (segmentStart - dayStartMs) / 60_000;
       const toMinute = (segmentEnd - dayStartMs) / 60_000;
 
-      REPORT_TIME_OF_DAY_BUCKETS.forEach((bucket, bucketIndex) => {
+      buckets.forEach((bucket, bucketIndex) => {
         const overlap =
           Math.min(toMinute, bucket.endMinute) - Math.max(fromMinute, bucket.startMinute);
         if (overlap > 0) totals[bucketIndex] = (totals[bucketIndex] ?? 0) + overlap;
@@ -363,25 +386,6 @@ export function resolvePreviousReportRange(
 ): ReportRange {
   return resolveReportRange(
     shiftReportAnchor(anchorDate, granularity, -1),
-    granularity,
-    timezone,
-    weekStartsOn,
-  );
-}
-
-/**
- * 次期間（4 章「来週はすでに N 分の箱が置かれています」）。
- *
- * @public 直接 import されず tRPC の推論経由で使われるため、knip には見えない。
- */
-export function resolveNextReportRange(
-  anchorDate: string,
-  granularity: ReportGranularity,
-  timezone: string,
-  weekStartsOn: ReportWeekStartsOn,
-): ReportRange {
-  return resolveReportRange(
-    shiftReportAnchor(anchorDate, granularity, 1),
     granularity,
     timezone,
     weekStartsOn,

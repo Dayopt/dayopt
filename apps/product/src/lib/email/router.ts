@@ -8,42 +8,24 @@ import 'server-only';
  */
 
 import { TRPCError } from '@trpc/server';
-import { Resend } from 'resend';
 import { z } from 'zod';
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 import { AccountDeletionEmail } from '@/emails/AccountDeletionEmail';
-import { CancellationConfirmEmail } from '@/emails/CancellationConfirmEmail';
 import { createEmailTranslator, type EmailLocale } from '@/emails/i18n';
 import { MfaDisabledEmail } from '@/emails/MfaDisabledEmail';
 import { PasswordChangedEmail } from '@/emails/PasswordChangedEmail';
-import { PaymentFailedEmail } from '@/emails/PaymentFailedEmail';
-import { PaymentRecoveredEmail } from '@/emails/PaymentRecoveredEmail';
-import { ProStartEmail } from '@/emails/ProStartEmail';
-import { TrialExpiredEmail } from '@/emails/TrialExpiredEmail';
-import { TrialExpiringEmail } from '@/emails/TrialExpiringEmail';
-import { TrialStartEmail } from '@/emails/TrialStartEmail';
 import { WelcomeEmail } from '@/emails/WelcomeEmail';
-import { env } from '@/env';
 import { getAppUrl } from '@/lib/app-url';
 import { databaseTables } from '@/lib/database';
+import { sendTransactionalEmail } from '@/lib/email/send';
 import { logger } from '@/lib/logger';
-import {
-  captureUnexpectedDatabaseError,
-  captureUnexpectedError,
-  observeAuthOperation,
-} from '@/lib/sentry';
-import { createServiceRoleClient } from '@/lib/supabase/oauth';
+import { captureUnexpectedDatabaseError, observeAuthOperation } from '@/lib/sentry';
 import { handleServiceError } from '@/lib/trpc/errors';
 import type { Context } from '@/lib/trpc/procedures';
 import { createTRPCRouter, protectedProcedure } from '@/lib/trpc/procedures';
 
-function getResend() {
-  return new Resend(env.RESEND_API_KEY);
-}
-
-const FROM_EMAIL = env.RESEND_FROM_EMAIL || 'onboarding@resend.dev';
 const APP_URL = getAppUrl();
 
 /**
@@ -97,40 +79,12 @@ async function verifyEmailOwnership(ctx: Context, inputEmail: string): Promise<v
 }
 
 /**
- * サプレッションリストをチェックし、送信をスキップすべきか判定
- */
-async function isEmailSuppressed(email: string): Promise<boolean> {
-  const supabase = createServiceRoleClient();
-  const { data, error } = await supabase
-    .from(databaseTables.emailSuppressions)
-    .select('reason')
-    .eq('email', email.toLowerCase())
-    .limit(1);
-
-  if (error) {
-    logger.error('Failed to check email suppression');
-    const original = captureUnexpectedDatabaseError(error, {
-      feature: 'email',
-      operation: 'check_email_suppression',
-    });
-    throw new TRPCError({
-      code: 'INTERNAL_SERVER_ERROR',
-      message: 'Unable to verify email delivery status',
-      cause: original,
-    });
-  }
-
-  return data.length > 0;
-}
-
-/**
- * Resend APIでメールを送信する共通ヘルパー
+ * tRPC / service 経路のメール送信
  *
- * サプレッションリスト（バウンス/苦情）に含まれるアドレスへの送信をスキップ。
- * `securityNotification: true`（MFA無効化・パスワード変更などセキュリティ通知）
- * の場合、suppressed でも `logger.warn` だけでなく Sentry へ痕跡を残す（#2043）。
- * 配信評価保護という suppression 本来の目的（bounce/complaint 済みアドレスへ
- * 送り続けない）は維持しつつ、セキュリティ通知が無痕跡で落ちるのを防ぐ。
+ * 送信と suppression 判定そのものは `@/lib/email/send` が持つ（Stripe webhook と共有。
+ * #2789）。ここはその結果を tRPC の契約へ翻訳するだけ — 失敗は `handleServiceError` で
+ * TRPCError にして throw し、suppressed は成功として返す（呼び出し元の本体処理を
+ * 巻き戻さない。セキュリティ通知の痕跡は send 側が Sentry へ残す）。
  */
 async function sendEmail({
   to,
@@ -145,35 +99,30 @@ async function sendEmail({
   context: string;
   securityNotification?: boolean;
 }) {
-  if (await isEmailSuppressed(to)) {
-    logger.warn(`${context} skipped: email suppressed`);
-    if (securityNotification) {
-      captureUnexpectedError(new Error(`${context} skipped: recipient is suppressed`), {
-        feature: 'email',
-        operation: 'send_security_notification_suppressed',
-      });
-    }
-    return { success: true as const, emailId: undefined, suppressed: true as const };
-  }
-
-  const { data, error } = await getResend().emails.send({
-    from: `Dayopt <${FROM_EMAIL}>`,
+  const result = await sendTransactionalEmail({
     to,
     subject,
     react,
+    context,
+    securityNotification,
   });
 
-  if (error) {
-    logger.error(`${context} failed`);
-    const original =
-      error instanceof Error
-        ? error
-        : new Error('Transactional email provider failed', { cause: error });
-    handleServiceError(original);
+  if (result.status === 'failed') {
+    if (result.reason === 'suppression_lookup') {
+      throw new TRPCError({
+        code: 'INTERNAL_SERVER_ERROR',
+        message: 'Unable to verify email delivery status',
+        cause: result.error,
+      });
+    }
+    handleServiceError(result.error);
   }
 
-  logger.info(`${context} sent`, { emailId: data?.id });
-  return { success: true as const, emailId: data?.id };
+  if (result.status === 'suppressed') {
+    return { success: true as const, emailId: undefined, suppressed: true as const };
+  }
+
+  return { success: true as const, emailId: result.emailId };
 }
 
 /**
@@ -211,6 +160,32 @@ export async function sendAccountDeletionEmail({
       appUrl: APP_URL,
     }),
     context: 'Account deletion email',
+  });
+}
+
+/**
+ * 新規登録の歓迎メールを送る
+ *
+ * サインアップ直後のサーバー経路（`features/auth/server/welcome-email.ts`）からのみ呼ぶため、
+ * procedure ではなく関数として公開する。「1 ユーザー 1 通」の保証はここではなく、
+ * 呼び出し元が `profiles.welcome_email_sent_at` を conditional UPDATE で掴むことで行う。
+ */
+export async function sendWelcomeEmail({
+  email,
+  userName,
+  locale,
+}: {
+  email: string;
+  userName: string;
+  locale: EmailLocale;
+}) {
+  const t = createEmailTranslator(locale);
+
+  return sendEmail({
+    to: email,
+    subject: t('welcome.subject'),
+    react: WelcomeEmail({ userName, locale, appUrl: APP_URL }),
+    context: 'Welcome email',
   });
 }
 
@@ -257,225 +232,6 @@ export async function sendMfaDisabledEmail({
 
 /** トランザクショナルメール送信（ウェルカム / Trial / Pro / 課金 / アカウント削除）を提供する tRPC ルーター */
 export const emailRouter = createTRPCRouter({
-  sendWelcome: protectedProcedure
-    .meta({ description: 'ウェルカムメール送信' })
-    .input(
-      z.object({
-        email: z.string().email('Invalid email address'),
-        userName: z.string().min(1, 'User name is required'),
-      }),
-    )
-    .mutation(async ({ ctx, input }) => {
-      try {
-        await verifyEmailOwnership(ctx, input.email);
-        logger.info('Sending welcome email', { userId: ctx.userId });
-
-        const locale = await getUserLocale(ctx.supabase, ctx.userId);
-        const t = createEmailTranslator(locale);
-
-        return sendEmail({
-          to: input.email,
-          subject: t('welcome.subject'),
-          react: WelcomeEmail({ userName: input.userName, locale, appUrl: APP_URL }),
-          context: 'Welcome email',
-        });
-      } catch (error) {
-        return handleServiceError(error);
-      }
-    }),
-
-  sendTrialStart: protectedProcedure
-    .meta({ description: 'トライアル開始メール送信' })
-    .input(
-      z.object({
-        email: z.string().email(),
-        userName: z.string().min(1),
-        trialEndDate: z.string().min(1),
-      }),
-    )
-    .mutation(async ({ ctx, input }) => {
-      try {
-        await verifyEmailOwnership(ctx, input.email);
-        logger.info('Sending trial start email', { userId: ctx.userId });
-
-        const locale = await getUserLocale(ctx.supabase, ctx.userId);
-        const t = createEmailTranslator(locale);
-
-        return sendEmail({
-          to: input.email,
-          subject: t('trialStart.subject'),
-          react: TrialStartEmail({
-            userName: input.userName,
-            trialEndDate: input.trialEndDate,
-            locale,
-            appUrl: APP_URL,
-          }),
-          context: 'Trial start email',
-        });
-      } catch (error) {
-        return handleServiceError(error);
-      }
-    }),
-
-  sendTrialExpiring: protectedProcedure
-    .meta({ description: 'トライアル残3日メール送信' })
-    .input(
-      z.object({
-        email: z.string().email(),
-        userName: z.string().min(1),
-        trialEndDate: z.string().min(1),
-      }),
-    )
-    .mutation(async ({ ctx, input }) => {
-      try {
-        await verifyEmailOwnership(ctx, input.email);
-        logger.info('Sending trial expiring email', { userId: ctx.userId });
-
-        const locale = await getUserLocale(ctx.supabase, ctx.userId);
-        const t = createEmailTranslator(locale);
-
-        return sendEmail({
-          to: input.email,
-          subject: t('trialExpiring.subject'),
-          react: TrialExpiringEmail({
-            userName: input.userName,
-            trialEndDate: input.trialEndDate,
-            locale,
-            appUrl: APP_URL,
-          }),
-          context: 'Trial expiring email',
-        });
-      } catch (error) {
-        return handleServiceError(error);
-      }
-    }),
-
-  sendTrialExpired: protectedProcedure
-    .meta({ description: 'トライアル期限切れメール送信' })
-    .input(
-      z.object({
-        email: z.string().email(),
-        userName: z.string().min(1),
-      }),
-    )
-    .mutation(async ({ ctx, input }) => {
-      try {
-        await verifyEmailOwnership(ctx, input.email);
-        logger.info('Sending trial expired email', { userId: ctx.userId });
-
-        const locale = await getUserLocale(ctx.supabase, ctx.userId);
-        const t = createEmailTranslator(locale);
-
-        return sendEmail({
-          to: input.email,
-          subject: t('trialExpired.subject'),
-          react: TrialExpiredEmail({
-            userName: input.userName,
-            locale,
-            appUrl: APP_URL,
-          }),
-          context: 'Trial expired email',
-        });
-      } catch (error) {
-        return handleServiceError(error);
-      }
-    }),
-
-  sendProStart: protectedProcedure
-    .meta({ description: 'Pro開始メール送信' })
-    .input(
-      z.object({
-        email: z.string().email(),
-        userName: z.string().min(1),
-      }),
-    )
-    .mutation(async ({ ctx, input }) => {
-      try {
-        await verifyEmailOwnership(ctx, input.email);
-        logger.info('Sending Pro start email', { userId: ctx.userId });
-
-        const locale = await getUserLocale(ctx.supabase, ctx.userId);
-        const t = createEmailTranslator(locale);
-
-        return sendEmail({
-          to: input.email,
-          subject: t('proStart.subject'),
-          react: ProStartEmail({
-            userName: input.userName,
-            locale,
-            appUrl: APP_URL,
-          }),
-          context: 'Pro start email',
-        });
-      } catch (error) {
-        return handleServiceError(error);
-      }
-    }),
-
-  sendPaymentFailed: protectedProcedure
-    .meta({ description: '支払い失敗メール送信' })
-    .input(
-      z.object({
-        email: z.string().email(),
-        userName: z.string().min(1),
-        portalUrl: z.string().url().optional(),
-      }),
-    )
-    .mutation(async ({ ctx, input }) => {
-      try {
-        await verifyEmailOwnership(ctx, input.email);
-        logger.info('Sending payment failed email', { userId: ctx.userId });
-
-        const locale = await getUserLocale(ctx.supabase, ctx.userId);
-        const t = createEmailTranslator(locale);
-
-        return sendEmail({
-          to: input.email,
-          subject: t('paymentFailed.subject'),
-          react: PaymentFailedEmail({
-            userName: input.userName,
-            ...(input.portalUrl ? { portalUrl: input.portalUrl } : {}),
-            locale,
-            appUrl: APP_URL,
-          }),
-          context: 'Payment failed email',
-        });
-      } catch (error) {
-        return handleServiceError(error);
-      }
-    }),
-
-  sendPaymentRecovered: protectedProcedure
-    .meta({ description: '支払い復旧メール送信' })
-    .input(
-      z.object({
-        email: z.string().email(),
-        userName: z.string().min(1),
-      }),
-    )
-    .mutation(async ({ ctx, input }) => {
-      try {
-        await verifyEmailOwnership(ctx, input.email);
-        logger.info('Sending payment recovered email', { userId: ctx.userId });
-
-        const locale = await getUserLocale(ctx.supabase, ctx.userId);
-        const t = createEmailTranslator(locale);
-
-        return sendEmail({
-          to: input.email,
-          subject: t('paymentRecovered.subject'),
-          react: PaymentRecoveredEmail({
-            userName: input.userName,
-            locale,
-            appUrl: APP_URL,
-          }),
-          context: 'Payment recovered email',
-        });
-      } catch (error) {
-        return handleServiceError(error);
-      }
-    }),
-
   sendPasswordChanged: protectedProcedure
     .meta({ description: 'パスワード変更通知メール送信' })
     .input(
@@ -502,108 +258,6 @@ export const emailRouter = createTRPCRouter({
           }),
           context: 'Password changed email',
           securityNotification: true,
-        });
-      } catch (error) {
-        return handleServiceError(error);
-      }
-    }),
-
-  sendCancellationConfirm: protectedProcedure
-    .meta({ description: 'Pro解約確認メール送信' })
-    .input(
-      z.object({
-        email: z.string().email(),
-        userName: z.string().min(1),
-        periodEndDate: z.string().min(1),
-      }),
-    )
-    .mutation(async ({ ctx, input }) => {
-      try {
-        await verifyEmailOwnership(ctx, input.email);
-        logger.info('Sending cancellation confirm email', { userId: ctx.userId });
-
-        const locale = await getUserLocale(ctx.supabase, ctx.userId);
-        const t = createEmailTranslator(locale);
-
-        return sendEmail({
-          to: input.email,
-          subject: t('cancellationConfirm.subject'),
-          react: CancellationConfirmEmail({
-            userName: input.userName,
-            periodEndDate: input.periodEndDate,
-            locale,
-            appUrl: APP_URL,
-          }),
-          context: 'Cancellation confirm email',
-        });
-      } catch (error) {
-        return handleServiceError(error);
-      }
-    }),
-
-  sendAccountDeletion: protectedProcedure
-    .meta({ description: 'アカウント削除確認メール送信（GDPR対応）' })
-    .input(
-      z.object({
-        email: z.string().email(),
-        userName: z.string().min(1),
-      }),
-    )
-    .mutation(async ({ ctx, input }) => {
-      try {
-        await verifyEmailOwnership(ctx, input.email);
-        logger.info('Sending account deletion email', { userId: ctx.userId });
-
-        return await sendAccountDeletionEmail({
-          email: input.email,
-          userName: input.userName,
-          locale: await getUserLocale(ctx.supabase, ctx.userId),
-        });
-      } catch (error) {
-        return handleServiceError(error);
-      }
-    }),
-
-  sendTest: protectedProcedure
-    .meta({ description: 'テストメール送信（開発環境のみ）', deprecated: true })
-    .input(
-      z.object({
-        to: z.string().email('Invalid email address'),
-        subject: z.string().min(1, 'Subject is required').default('Test Email from Dayopt'),
-      }),
-    )
-    .mutation(async ({ ctx, input }) => {
-      try {
-        if (process.env.NODE_ENV === 'production' || process.env.VERCEL) {
-          throw new TRPCError({
-            code: 'FORBIDDEN',
-            message: 'Test endpoint is only available in local development',
-          });
-        }
-
-        const userId = ctx.userId;
-        if (userId) {
-          const { data: userData } = await observeAuthOperation('email_test_get_user', () =>
-            ctx.supabase.auth.getUser(),
-          );
-          if (userData?.user?.email && userData.user.email !== input.to) {
-            throw new TRPCError({
-              code: 'FORBIDDEN',
-              message: 'Can only send test emails to your own address',
-            });
-          }
-        }
-
-        logger.info('Sending test email', { userId: ctx.userId });
-
-        return sendEmail({
-          to: input.to,
-          subject: input.subject,
-          react: WelcomeEmail({
-            userName: 'Test User',
-            appUrl: getAppUrl(),
-          }),
-          context: 'Test email',
         });
       } catch (error) {
         return handleServiceError(error);

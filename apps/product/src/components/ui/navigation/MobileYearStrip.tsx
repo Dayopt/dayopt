@@ -109,7 +109,7 @@ export const MobileYearStrip = memo<MobileYearStripProps>(
                 // eslint-disable-next-line tailwindcss/no-arbitrary-value -- 擬似要素を描くには content が要り、空文字以外に書きようがない
                 'relative after:absolute after:inset-x-0 after:top-1/2 after:h-11 after:-translate-y-1/2 after:content-[""]',
                 isActive
-                  ? 'border-primary text-primary border font-medium'
+                  ? 'border-primary text-primary-text border font-medium'
                   : 'border-border text-muted-foreground hover:text-foreground border',
               )}
               aria-current={isActive ? 'true' : undefined}

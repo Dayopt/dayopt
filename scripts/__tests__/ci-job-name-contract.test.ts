@@ -23,8 +23,10 @@ import { describe, expect, it } from 'vitest';
  * risk-reviewer P1）。ci.yml の job は PR branch のコードとその全依存（postinstall・vitest
  * transform・eslint plugin）を実行するため、`persist-credentials` を既定（true）のままに
  * すると `.git/config` の `http.extraheader` に GITHUB_TOKEN が残り、PR 側のコードから
- * `git config --get-all http.https://github.com/.extraheader` で読み出せる。unit job は
- * `pull-requests: write` / `issues: write` を持つので、これは書き込み権限の奪取に直結する。
+ * `git config --get-all http.https://github.com/.extraheader` で読み出せる。当時の unit job は
+ * `pull-requests: write` / `issues: write` を持っていたので、これは書き込み権限の奪取に直結した
+ * （2026-09-14 の credential audit P2-6 で write 権限は checkout しない migration-notice job へ
+ * 移した。PR コードを実行する job に write token を置かない契約は ci-token-isolation.test.ts）。
  * この契約は **repo の全 workflow に適用する**。#2539 の時点で ci.yml は 4 件中 0 件、
  * nightly.yml は 6 件中 3 件が未指定だった（create-release.yml も未指定で、しかも
  * `contents: write` を持つ）。件数ではなく checkout ブロック単位で見る。
@@ -49,12 +51,18 @@ const promoteNames = jobDisplayNames(readWorkflow('promote.yml'));
 const finishBranch = readFileSync(join(process.cwd(), 'scripts/tasks/finish-branch.sh'), 'utf8');
 
 describe('CI job 名の契約', () => {
-  it('ci.yml は impact / static / unit / integration の 4 job を持つ', () => {
+  it('ci.yml は impact / static / unit / migration-notice / integration / db-upgrade の 6 job を持つ', () => {
+    // `Migration Safety Notice` は required check ではない（finish-branch.sh の
+    // REQUIRED_CI_CHECKS に載せない。検知の無い PR では常に skip される）。
+    // `🧱 DB Upgrade (shadow)` も required ではない（#2797、migration を追加した PR だけ走る。
+    // Validation controller が plan の dbUpgrade / oldConsumer をこの名前に束縛する）。
     expect(ciNames).toEqual([
       '🧭 Impact',
       '🔍 Static Checks',
       '📦 Unit Tests',
+      'Migration Safety Notice',
       '🧪 Integration Tests',
+      '🧱 DB Upgrade (shadow)',
     ]);
   });
 
@@ -70,7 +78,7 @@ describe('CI job 名の契約', () => {
     }
   });
 
-  it('promote.yml は impact と層 3 の 2 suite、失敗の起票、release を持つ', () => {
+  it('promote.yml は impact と層 3 の 3 suite、失敗の起票、release を持つ', () => {
     // 層 3 は 2026-09-03 に nightly.yml から移設した。名前は check-run gate の
     // 入力ではなくなったが、run を読む人と `gh run view` の識別子として残る。
     // `File promote failure` は 2026-09-07（#2643）に足した失敗の可視化 job で、
@@ -78,6 +86,7 @@ describe('CI job 名の契約', () => {
     expect(promoteNames).toEqual([
       '🧭 Release Impact',
       '🎭 E2E Tests',
+      'Storybook light / dark',
       '🌐 Web Build & E2E',
       'File promote failure',
       'Promote Production',
@@ -203,6 +212,8 @@ describe('CI job 名の契約', () => {
       'workflows/nightly.yml',
       'workflows/production-config-audit.yml',
       'workflows/promote.yml',
+      'workflows/validation-gate.yml',
+      'workflows/validation-shadow.yml',
     ];
 
     it.each(SCAN_TARGETS.map((target) => [target.label, target.path]))(
@@ -271,7 +282,8 @@ describe('CI job 名の契約', () => {
       // 走査が `.github/workflows/` 直下だけだった頃は、`.github/actions/setup/action.yml`
       // へ checkout を 1 step 足すと未指定でも it.each の対象外・網羅性 assert も green
       // のまま通った。composite action は呼び出し元 job の token 権限で走るため、
-      // ci.yml unit job（`pull-requests: write`）経由で同じ露出が復活する。
+      // write 権限を持つ job から呼べば同じ露出が復活する（当時は ci.yml unit job が
+      // `pull-requests: write` を持っていた）。
       expect(SCAN_TARGETS.map((target) => target.label)).toContain('actions/setup/action.yml');
 
       const regressed = [
@@ -307,9 +319,9 @@ describe('CI job 名の契約', () => {
     });
 
     it('実ファイルから名前を 1 つ以上抜けている（regex の空振りで全 assert が素通りしない）', () => {
-      expect(ciNames.length).toBe(4);
+      expect(ciNames.length).toBe(6);
       expect(nightlyNames.length).toBeGreaterThanOrEqual(3);
-      expect(promoteNames.length).toBe(5);
+      expect(promoteNames.length).toBe(6);
     });
   });
 });

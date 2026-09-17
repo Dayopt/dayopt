@@ -26,6 +26,7 @@ function MockHeaderTabs() {
       <div
         role="tab"
         aria-selected="true"
+        aria-label="カレンダー"
         className="bg-state-selected text-foreground flex size-8 items-center justify-center rounded-lg"
       >
         <CalendarDays className="size-4" />
@@ -33,6 +34,7 @@ function MockHeaderTabs() {
       <div
         role="tab"
         aria-selected="false"
+        aria-label="レポート"
         className="text-muted-foreground flex size-8 items-center justify-center rounded-lg"
       >
         <BarChart3 className="size-4" />

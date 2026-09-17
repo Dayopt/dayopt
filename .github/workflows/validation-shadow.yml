@@ -1,0 +1,50 @@
+name: Validation shadow
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: validation-shadow-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  plan:
+    name: Validation plan (shadow)
+    if: github.event.pull_request.draft != true
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      # Only base policy and manifests are executed. Candidate is data for git diff.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: trusted
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: candidate
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Generate trusted plan
+        working-directory: trusted
+        env:
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+        run: |
+          if [ ! -f scripts/ci/validation-plan-shadow.mjs ]; then
+            echo '## Validation shadow: bootstrap pending' >> "$GITHUB_STEP_SUMMARY"
+            echo 'Base policy has no plan producer yet. This is not evidence of a valid plan.' >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          node scripts/ci/validation-plan-shadow.mjs ../candidate ../validation-plan.json
+      - name: Save declarative plan
+        if: hashFiles('validation-plan.json') != ''
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: validation-plan
+          path: validation-plan.json
+          retention-days: 14

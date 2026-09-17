@@ -236,7 +236,8 @@ function McpApiSection() {
           />
         </div>
       </LabeledRow>
-      {/* Connection guide（公開 docs の MCP ガイドは未執筆のためリンクは張らない） */}
+      {/* Connection guide（`apps/web/content/docs/{en,ja}/data/api-mcp.mdx` は
+          draft:true で未公開のため、公開後にここへリンクを追加する） */}
       <InfoBox className="mt-4 p-4">
         <p className="text-muted-foreground text-base md:text-sm">{t('connectionGuide')}</p>
       </InfoBox>
@@ -274,23 +275,23 @@ function DeletionSection() {
 
   const deleteBlocksMutation = api.user.deleteBlocks.useMutation({
     onSuccess: (data) => {
-      toast.success(t('deleteBlocks') + ` (${data.deletedCount})`);
+      toast.success(t('blocksDeleted', { count: data.deletedCount }));
       setTarget(null);
       setConfirmInput('');
     },
     onError: () => {
-      toast.error(t('deleteBlocks'));
+      toast.error(t('blocksDeleteFailed'));
     },
   });
 
   const deleteAllDataMutation = api.user.deleteAllData.useMutation({
     onSuccess: () => {
-      toast.success(t('deleteAllData'));
+      toast.success(t('allDataDeleted'));
       setTarget(null);
       setConfirmInput('');
     },
     onError: () => {
-      toast.error(t('deleteAllData'));
+      toast.error(t('allDataDeleteFailed'));
     },
   });
 

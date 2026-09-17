@@ -17,7 +17,11 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 function Frame({ children }: { children: React.ReactNode }) {
-  return <div className="w-56">{children}</div>;
+  return (
+    <div role="list" className="w-56">
+      {children}
+    </div>
+  );
 }
 
 function makeTemplate(overrides: Partial<TemplateView> = {}): TemplateView {

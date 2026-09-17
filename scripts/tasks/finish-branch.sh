@@ -281,8 +281,8 @@ if [[ "$PR_STATE" == "OPEN" ]]; then
     exit 1
   fi
 
-  # 実行中・待機中の check も待つ。private repo + Free plan では GitHub 側の
-  # required check 強制が効かないため、ここで止めないと CI 完了前にマージできてしまう。
+  # 実行中・待機中の check も待つ。main の ruleset も pending の required check を
+  # 拒むが、ここでも止めて「なぜ止まったか」を名前で示す（#2640 以降、gate は ruleset）。
   # 畳み込み側の is_pending（§ROLLUP）と同じ集合にする。片方だけ直すと
   # 「代表は pending だが件数は 0」のようなズレが出る。`expected` は
   # StatusState の「status 到着待ち」で、failure でも success でもない。
@@ -302,8 +302,8 @@ if [[ "$PR_STATE" == "OPEN" ]]; then
   # 検証が実際に行われたことを確認する。statusCheckRollup が空、または全ての
   # check が skipped の場合、上の failure / pending 判定はどちらも 0 件になり
   # 「CI が 1 本も走っていない PR」を green と区別できないまま素通りする。
-  # private repo + Free plan では GitHub 側の required check 強制が効かないため、
-  # ここが唯一の防波堤になる。
+  # main の ruleset は required check が存在しない PR を expected のまま止めるが、
+  # ここでも「success が 1 件も無い」構成異常を名前で検出する（冗長検査）。
   #
   # ci.yml は docs のみの変更なら paths-ignore で skip されるので、「CI が
   # 走らない PR」自体は異常ではない。ただし Docs Guard は paths フィルタを持たず
@@ -331,8 +331,8 @@ if [[ "$PR_STATE" == "OPEN" ]]; then
   # 以上」は Static / Unit / Docs Guard だけで満たされ、build が一度も走らないまま
   # merge できてしまう（fail-open）。status が付かない経路は実在する: Vercel
   # integration の切断・障害、Ignored Build Step の設定、project rename。
-  # private repo + Free plan では ruleset の required check を強制できないので、
-  # 「あるはずの context が無い」ことをここで能動的に検出する。
+  # Vercel context は ruleset でも required だが、affected な project の判定は
+  # Impact Resolver が持つため、「あるはずの context が無い」ことをここでも検出する。
   #
   # **どの context を「あるはず」とするかは Impact Resolver が決める**
   # （scripts/ci/impact.mjs。旧 docs/projects/_archive/ci-monorepo-refactor/overview.md §5、
@@ -688,9 +688,8 @@ if [[ "$PR_STATE" == "OPEN" ]]; then
 
   # ── 保護対象 path の判定（advisory レビューの目安、#2596） ──────────────
   #
-  # Codex / 内製 marker の hard gate は #2596 で撤回した（merge の遮断は CI
-  # status-check-rollup 判定と pre-tool-guard の `gh pr merge` 直接実行 block だけで
-  # 行う。AGENTS.md §レビュー）。保護対象 path の判定自体は削除せず、Main が
+  # Codex / 内製 marker の hard gate は #2596 で撤回した（merge の遮断は main の
+  # ruleset が全経路で行う。#2640。AGENTS.md §レビュー）。保護対象 path の判定自体は削除せず、Main が
   # pr-cross-review skill での advisory レビューをどこまで重く行うかの目安として
   # 残す — ここでの判定結果は merge を止めない（情報表示のみ）。
   #

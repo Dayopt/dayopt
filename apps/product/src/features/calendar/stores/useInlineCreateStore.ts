@@ -10,16 +10,44 @@ import { createSelectors } from '@/lib/zustand/createSelectors';
  * ドラッグ終了 → pendingSelection セット → グリッドに DragSelectionHighlight を描き、
  * 同時に Inspector を作成モード（InlineCreatePanel）で開く。
  * アクティビティ選択で作成、パネルを閉じると破棄 → clearPendingSelection。
+ *
+ * アクティビティにホバーすると、その「普段の長さ」（記録の中央値）を選択範囲へ着せる
+ * （`previewActivityDuration`）。プレビューと作成が食い違わないよう、着せる先は表示用の
+ * 別状態ではなく pendingSelection 自身にする。グリッドのハイライト・パネルの時刻入力・
+ * 重なり判定・作成が同じ 1 つの値を読む。
+ *
+ * ただし長さをユーザーが決めた後は着せない。範囲を引いたドラッグ、リサイズ、時刻入力は
+ * 「どれだけの長さにするか」の明示的な指定なので、そちらを優先する。着せる対象は
+ * クリック / タップ起点（既定の長さで置いただけ）の選択に限る（2026-09-14 User 判断。
+ * それまでは引いた範囲も「置き場所の指定」と見なして上書きしていた）。
  */
 
+/** 1 日の終端（23:59）。`createInstantSelection` と同じクランプ規則を使う */
+const MAX_END_MINUTES = 24 * 60 - 1;
+
+function durationMinutesOf(selection: {
+  startHour: number;
+  startMinute: number;
+  endHour: number;
+  endMinute: number;
+}): number {
+  return (
+    selection.endHour * 60 +
+    selection.endMinute -
+    (selection.startHour * 60 + selection.startMinute)
+  );
+}
+
 /** ドラッグ選択で確定した時間範囲 */
-interface PendingSelection {
+export interface PendingSelection {
   date: Date;
   startHour: number;
   startMinute: number;
   endHour: number;
   endMinute: number;
   creationSource?: 'planned-gap' | undefined;
+  /** `dragged` は範囲を引いて長さまで決めた選択。普段の長さで上書きしない */
+  durationSource?: 'dragged' | undefined;
   /** Step 5 のレーン起点。保存先は最終的に end_at のルールが優先する。 */
   lane?: 'plan' | 'record' | undefined;
   /**
@@ -36,7 +64,22 @@ interface InlineCreateState {
    * パネルとハイライトは別コンポーネントなので、hook の local state では伝わらない。
    */
   hoveredActivity: HoveredActivityInfo | null;
+  /**
+   * 選択時の長さ（分。クリック / タップ起点なら既定の長さ）。ホバーを外した時・
+   * 中央値の無いアクティビティへ移った時にここへ戻す。
+   */
+  baseDurationMinutes: number | null;
+  /**
+   * ユーザーがリサイズや時刻入力で長さを直したか。直した後はアクティビティの
+   * 普段の長さで上書きしない。
+   */
+  hasUserSetDuration: boolean;
   setHoveredActivity: (activity: HoveredActivityInfo | null) => void;
+  /**
+   * ホバー中のアクティビティの普段の長さ（分）を選択範囲へ着せる。
+   * `null` を渡すと選択時の長さへ戻す。長さをユーザーが決めた選択では no-op。
+   */
+  previewActivityDuration: (minutes: number | null) => void;
   setPendingSelection: (selection: PendingSelection) => void;
   clearPendingSelection: () => void;
   /** ユーザーが選んだ種別を設定する（null 時 no-op） */
@@ -54,9 +97,37 @@ const useInlineCreateStoreBase = create<InlineCreateState>()(
     (set) => ({
       pendingSelection: null,
       hoveredActivity: null,
+      baseDurationMinutes: null,
+      hasUserSetDuration: false,
       setHoveredActivity: (activity) => set({ hoveredActivity: activity }),
-      setPendingSelection: (selection) => set({ pendingSelection: selection }),
-      clearPendingSelection: () => set({ pendingSelection: null, hoveredActivity: null }),
+      previewActivityDuration: (minutes) =>
+        set((state) => {
+          const selection = state.pendingSelection;
+          // ユーザーが長さを直した後は着せ替えない（明示の指定が勝つ）
+          if (!selection || state.hasUserSetDuration) return state;
+          const target = minutes ?? state.baseDurationMinutes;
+          if (target == null) return state;
+          const startTotal = selection.startHour * 60 + selection.startMinute;
+          const endTotal = Math.min(startTotal + target, MAX_END_MINUTES);
+          const endHour = Math.floor(endTotal / 60);
+          const endMinute = endTotal % 60;
+          if (endHour === selection.endHour && endMinute === selection.endMinute) return state;
+          return { pendingSelection: { ...selection, endHour, endMinute } };
+        }),
+      setPendingSelection: (selection) =>
+        set({
+          pendingSelection: selection,
+          baseDurationMinutes: durationMinutesOf(selection),
+          // 範囲を引いた選択は最初から「ユーザーが長さを決めた」扱い
+          hasUserSetDuration: selection.durationSource === 'dragged',
+        }),
+      clearPendingSelection: () =>
+        set({
+          pendingSelection: null,
+          hoveredActivity: null,
+          baseDurationMinutes: null,
+          hasUserSetDuration: false,
+        }),
       setSelectionKind: (kind) =>
         set((state) =>
           state.pendingSelection
@@ -70,11 +141,20 @@ const useInlineCreateStoreBase = create<InlineCreateState>()(
             : state,
         ),
       updateSelectionTimes: (partial) =>
-        set((state) =>
-          state.pendingSelection
-            ? { pendingSelection: { ...state.pendingSelection, ...partial } }
-            : state,
-        ),
+        set((state) => {
+          const selection = state.pendingSelection;
+          if (!selection) return state;
+          const next = { ...selection, ...partial };
+          // 長さが変わった時だけ「ユーザーが指定した」と見なす。long-press 移動のように
+          // 長さを保ったまま位置だけ動かす操作は、着せ替えを止める理由にならない
+          const nextDuration = durationMinutesOf(next);
+          if (nextDuration === durationMinutesOf(selection)) return { pendingSelection: next };
+          return {
+            pendingSelection: next,
+            baseDurationMinutes: nextDuration,
+            hasUserSetDuration: true,
+          };
+        }),
     }),
     { name: 'inline-create-store', enabled: process.env.NODE_ENV !== 'production' },
   ),

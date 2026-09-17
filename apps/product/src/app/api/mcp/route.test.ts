@@ -448,12 +448,11 @@ describe('MCP route scope preflight', () => {
 
     expect(response.status).toBe(401);
     expect(response.headers.get('cache-control')).toBe('no-store');
-    // 初回 challenge は広告済み read scope 一式 (write 系は step-up 専用で含めない)
+    // 初回 challenge は広告済み scope 一式。write を含めないと client は write を
+    // 要求せず、gate を開いても書き込み権限が付かない（付与側は consent で降格する）
     expect(response.headers.get('www-authenticate')).toContain(
-      'scope="read:entries read:activities read:constraints read:stats"',
+      'scope="read:entries read:activities read:constraints read:stats write:plans delete:plans write:records delete:records"',
     );
-    expect(response.headers.get('www-authenticate')).not.toContain('write:');
-    expect(response.headers.get('www-authenticate')).not.toContain('delete:');
     expect(response.headers.get('www-authenticate')).toContain('resource_metadata=');
     expect(response.headers.get('www-authenticate')).not.toContain('error=');
     await expect(response.text()).resolves.toBe('');
@@ -507,9 +506,9 @@ describe('MCP route scope preflight', () => {
     expect(response.headers.get('www-authenticate')).toContain('error="invalid_token"');
     expect(response.headers.get('www-authenticate')).toContain('resource_metadata=');
     // 3 経路ある challenge のうちこの経路だけ scope が未固定だった。再認可で
-    // read 4 種へ広がる契約を discovery 経路と同じ exact 文字列で守る
+    // 広告済み 8 scope へ広がる契約を discovery 経路と同じ exact 文字列で守る
     expect(response.headers.get('www-authenticate')).toContain(
-      'scope="read:entries read:activities read:constraints read:stats"',
+      'scope="read:entries read:activities read:constraints read:stats write:plans delete:plans write:records delete:records"',
     );
     await expect(response.json()).resolves.toEqual({
       error: 'invalid_token',
@@ -526,7 +525,7 @@ describe('MCP route scope preflight', () => {
     expect(response.headers.get('cache-control')).toBe('no-store');
     expect(response.headers.get('www-authenticate')).toContain('Bearer error="invalid_request"');
     expect(response.headers.get('www-authenticate')).toContain(
-      'scope="read:entries read:activities read:constraints read:stats"',
+      'scope="read:entries read:activities read:constraints read:stats write:plans delete:plans write:records delete:records"',
     );
     await expect(response.json()).resolves.toEqual({
       error: 'invalid_request',

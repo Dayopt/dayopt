@@ -2,20 +2,24 @@
 
 import { useCallback, useDeferredValue, useEffect, useMemo } from 'react';
 
-import { addDays, subDays } from 'date-fns';
-
 import { useActivities, useArchivedActivities } from '@/features/activities';
 import {
   useExternalCalendarEvents,
   type ExternalCalendarEvent,
 } from '@/features/external-calendar';
 import { getDateKey } from '@/lib/date';
-import { toTZEndISO, toTZStartISO, tzIsSameDay } from '@/lib/date/timezone';
+import { tzIsSameDay } from '@/lib/date/timezone';
 import { useUserPreferences } from '@/lib/hooks/useUserPreferences';
 import { api } from '@/lib/trpc';
 
 import { useCalendarFilterStore } from '@/features/calendar/stores/useCalendarFilterStore';
 
+import { isActivityVisible } from '../../../domain/activity-visibility';
+
+import {
+  buildCalendarRangeInput,
+  buildTimeblockListInput,
+} from '../../../domain/calendar-query-input';
 import {
   calculateViewDateRange,
   getNextPeriod,
@@ -52,7 +56,7 @@ interface UseCalendarDataResult {
   isTimeblocksLoading: boolean;
   /** バックグラウンド再取得中も含めて取得中かどうか */
   isTimeblocksFetching: boolean;
-  /** エントリ取得を手動で再試行する */
+  /** タイムブロック取得を手動で再試行する */
   refetchTimeblocks: () => Promise<unknown>;
   /** ナビゲーション方向に対応する日付範囲を事前取得する */
   prefetchDirection: (direction: 'prev' | 'next' | 'today') => void;
@@ -79,27 +83,22 @@ export function useCalendarData({
     return calculateViewDateRange(viewType, currentDate, weekStartsOn, showWeekends);
   }, [viewType, currentDate, weekStartsOn, showWeekends]);
 
-  // 日付範囲をISO 8601形式に変換（サーバーサイドフィルタ用）
-  // toISOString()はTZ依存のためユーザーTZのローカル深夜をUTC ISOに変換して使用
+  // query input は server prefetch（calendar-prefetch.ts）と同じ builder で組む。
+  // 別実装にすると query key がずれ、server で先読みした cache を初回表示で使えない（#2747）。
+  const anchorDateKey = getDateKey(currentDate);
+  const listInput = useMemo(
+    () =>
+      buildTimeblockListInput({ viewType, anchorDateKey, timezone, weekStartsOn, showWeekends }),
+    [viewType, anchorDateKey, timezone, weekStartsOn, showWeekends],
+  );
   const dateFilter = useMemo(
-    () => ({
-      startDate: toTZStartISO(viewDateRange.start, timezone),
-      endDate: toTZEndISO(viewDateRange.end, timezone),
-    }),
-    [viewDateRange, timezone],
+    () => ({ startDate: listInput.startDate, endDate: listInput.endDate }),
+    [listInput],
   );
 
-  // Step 8: entries を読まず、plans / records をそれぞれ取得する。
-  const plansQuery = api.plans.list.useQuery({
-    ...dateFilter,
-    sortBy: 'start_at',
-    sortOrder: 'asc',
-  });
-  const recordsQuery = api.records.list.useQuery({
-    ...dateFilter,
-    sortBy: 'start_at',
-    sortOrder: 'asc',
-  });
+  // Step 8: timeblocks を読まず、plans / records をそれぞれ取得する。
+  const plansQuery = api.plans.list.useQuery(listInput);
+  const recordsQuery = api.records.list.useQuery(listInput);
 
   // 外部カレンダーの ghost（#1962）。接続の有無を先に確かめると waterfall になるので、
   // enabled ゲートは置かず plans / records と同じ範囲で常に撃つ。未接続なら即 0 件が返る。
@@ -139,54 +138,21 @@ export function useCalendarData({
   // tRPC utils（プリフェッチ用）
   const utils = api.useUtils();
 
-  // 隣接期間のプリフェッチ（ナビゲーション高速化、viewType別に最適化）
-  useEffect(() => {
-    const prefetchRange = (date: Date, view: CalendarViewType = viewType) => {
-      const range = calculateViewDateRange(view, date, weekStartsOn, showWeekends);
-      const input = {
-        startDate: toTZStartISO(range.start, timezone),
-        endDate: toTZEndISO(range.end, timezone),
-        sortBy: 'start_at' as const,
-        sortOrder: 'asc' as const,
-      };
+  const prefetchRange = useCallback(
+    (options: Parameters<typeof buildTimeblockListInput>[0]) => {
+      const input = buildTimeblockListInput(options);
       void Promise.all([
         utils.plans.list.prefetch(input),
         utils.records.list.prefetch(input),
         // ghost も一緒に温める。載せないと日送りのたびに plan / record だけ即出て、
         // 外部予定が後追いでポップインする。
-        utils.externalCalendar.listEvents.prefetch({
-          startDate: input.startDate,
-          endDate: input.endDate,
-        }),
+        utils.externalCalendar.listEvents.prefetch(buildCalendarRangeInput(options)),
       ]);
-    };
+    },
+    [utils.records.list, utils.plans.list, utils.externalCalendar.listEvents],
+  );
 
-    if (viewType === 'day') {
-      // dayビュー: 前後3日を個別にprefetch（日送りでのキャッシュヒット率向上）
-      for (let i = 1; i <= 3; i++) {
-        prefetchRange(subDays(currentDate, i));
-        prefetchRange(addDays(currentDate, i));
-      }
-    } else if (isMultiDayView(viewType)) {
-      // multi-dayビュー: 前後1期間分をprefetch
-      prefetchRange(getPreviousPeriod(viewType, currentDate, showWeekends));
-      prefetchRange(getNextPeriod(viewType, currentDate, showWeekends));
-    } else {
-      // weekビュー: 前後1週間をprefetch
-      prefetchRange(subDays(currentDate, 7));
-      prefetchRange(addDays(currentDate, 7));
-    }
-  }, [
-    currentDate,
-    viewType,
-    weekStartsOn,
-    showWeekends,
-    timezone,
-    utils.records.list,
-    utils.plans.list,
-    utils.externalCalendar.listEvents,
-  ]);
-
+  // 未表示の期間は自動取得せず、ナビゲーション操作時に対象期間だけ先読みする。
   // 指定方向のナビゲーション先を事前取得（ホバー/タッチ時に呼ばれる）
   const prefetchDirection = useCallback(
     (direction: 'prev' | 'next' | 'today') => {
@@ -214,90 +180,55 @@ export function useCalendarData({
         }
       }
 
-      const range = calculateViewDateRange(viewType, targetDate, weekStartsOn, showWeekends);
-      const input = {
-        startDate: toTZStartISO(range.start, timezone),
-        endDate: toTZEndISO(range.end, timezone),
-        sortBy: 'start_at' as const,
-        sortOrder: 'asc' as const,
-      };
-      void Promise.all([
-        utils.plans.list.prefetch(input),
-        utils.records.list.prefetch(input),
-        // ghost も一緒に温める。載せないと日送りのたびに plan / record だけ即出て、
-        // 外部予定が後追いでポップインする。
-        utils.externalCalendar.listEvents.prefetch({
-          startDate: input.startDate,
-          endDate: input.endDate,
-        }),
-      ]);
+      prefetchRange({
+        viewType,
+        anchorDateKey: getDateKey(targetDate),
+        timezone,
+        weekStartsOn,
+        showWeekends,
+      });
     },
-    [
-      currentDate,
-      viewType,
-      weekStartsOn,
-      showWeekends,
-      timezone,
-      utils.records.list,
-      utils.plans.list,
-      utils.externalCalendar.listEvents,
-    ],
+    [prefetchRange, currentDate, viewType, weekStartsOn, showWeekends, timezone],
   );
 
   // ビュー切り替え先の日付範囲を即座にprefetch（useEffect経由の1レンダー遅延を回避）
   const prefetchForView = useCallback(
     (newViewType: CalendarViewType) => {
-      const range = calculateViewDateRange(newViewType, currentDate, weekStartsOn, showWeekends);
-      const input = {
-        startDate: toTZStartISO(range.start, timezone),
-        endDate: toTZEndISO(range.end, timezone),
-        sortBy: 'start_at' as const,
-        sortOrder: 'asc' as const,
-      };
-      void Promise.all([
-        utils.plans.list.prefetch(input),
-        utils.records.list.prefetch(input),
-        // ghost も一緒に温める。載せないと日送りのたびに plan / record だけ即出て、
-        // 外部予定が後追いでポップインする。
-        utils.externalCalendar.listEvents.prefetch({
-          startDate: input.startDate,
-          endDate: input.endDate,
-        }),
-      ]);
+      prefetchRange({
+        viewType: newViewType,
+        anchorDateKey,
+        timezone,
+        weekStartsOn,
+        showWeekends,
+      });
     },
-    [
-      currentDate,
-      weekStartsOn,
-      showWeekends,
-      timezone,
-      utils.records.list,
-      utils.plans.list,
-      utils.externalCalendar.listEvents,
-    ],
+    [prefetchRange, anchorDateKey, weekStartsOn, showWeekends, timezone],
   );
 
   // フィルター関数と状態を取得（ストアに統一）
-  const isEntryVisible = useCalendarFilterStore((state) => state.isEntryVisible);
+  const filterInitialized = useCalendarFilterStore((state) => state.initialized);
+  const visibleActivityIds = useCalendarFilterStore((state) => state.visibleActivityIds);
   // タグフィルタ変更時に useMemo を再実行させるためのリアクティブ依存
   // useDeferredValue でフィルター変更時のカレンダー再描画を遅延し、
   // チェックボックスUIの即時応答を維持する
-  const visibleActivityIds = useDeferredValue(
-    useCalendarFilterStore((state) => state.visibleActivityIds),
+  const deferredFilterState = useDeferredValue(
+    useMemo(
+      () => ({ initialized: filterInitialized, visibleActivityIds }),
+      [filterInitialized, visibleActivityIds],
+    ),
   );
   // 未分類(タグなし)フィルターの表示切替も同様にリアクティブ依存として渡す（#1576）
 
-  // Step 8 の表示互換射影。既存のカードと DnD の段階的置換が完了するまで
+  // plans / records から表示用射影（CalendarDisplayEvent）を組む。
   // CalendarDisplayEvent は view model としてだけ維持し、データ取得は time model に固定する。
   const allCalendarEvents = useMemo(() => {
     const visiblePlans = plansQuery.data ?? [];
     const visibleRecords = recordsQuery.data ?? [];
     const plans = visiblePlans;
     const records = visibleRecords;
-    const now = new Date();
     const planEvents = plans.map((plan) => {
       const startDate = new Date(plan.start_at);
       const endDate = new Date(plan.end_at);
-      const timeblockState = endDate <= now ? 'past' : startDate <= now ? 'active' : 'upcoming';
       return applyTimezoneToDisplayDates(
         {
           id: plan.id,
@@ -305,22 +236,13 @@ export function useCalendarData({
           description: plan.note ?? undefined,
           startDate,
           endDate,
-          status: timeblockState === 'past' ? 'closed' : 'open',
           color: '',
           activityId: plan.activity_id,
-          createdAt: new Date(plan.created_at),
-          updatedAt: new Date(plan.updated_at),
           version: plan.updated_at,
           displayStartDate: startDate,
           displayEndDate: endDate,
           duration: Math.round((endDate.getTime() - startDate.getTime()) / 60_000),
           isMultiDay: !tzIsSameDay(startDate, endDate, timezone),
-          origin: 'planned',
-          timeblockState,
-          plannedStartDate: startDate,
-          plannedEndDate: endDate,
-          actualStartDate: null,
-          actualEndDate: null,
           kind: 'plan' as const,
         },
         timezone,
@@ -339,22 +261,13 @@ export function useCalendarData({
         description: record.note ?? undefined,
         startDate: record.startDate,
         endDate: record.endDate,
-        status: 'closed' as const,
         color: '',
         activityId: record.activityId,
-        createdAt: new Date(sourceRow.created_at),
-        updatedAt: new Date(sourceRow.updated_at),
         version: sourceRow.updated_at,
         displayStartDate: record.displayStartDate,
         displayEndDate: record.displayEndDate,
         duration: record.duration,
         isMultiDay: !tzIsSameDay(record.startDate, record.endDate, timezone),
-        origin: 'unplanned' as const,
-        timeblockState: 'past' as const,
-        actualStartDate: record.startDate,
-        actualEndDate: record.endDate,
-        plannedStartDate: null,
-        plannedEndDate: null,
         kind: 'record' as const,
         recordSource: sourceRow.source,
       };
@@ -389,12 +302,15 @@ export function useCalendarData({
 
     // サイドバーのフィルター設定を適用
     const visibilityFiltered = filtered.filter((event) => {
-      return isEntryVisible(event.activityId ?? null);
+      return isActivityVisible(
+        event.activityId ?? null,
+        deferredFilterState.initialized,
+        deferredFilterState.visibleActivityIds,
+      );
     });
 
     return visibilityFiltered;
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- visibleActivityIds はリアクティブ依存（関数参照は安定のため直接依存不可）
-  }, [viewDateRange, allCalendarEvents, timezone, isEntryVisible, visibleActivityIds]);
+  }, [viewDateRange, allCalendarEvents, timezone, deferredFilterState]);
 
   return {
     viewDateRange,

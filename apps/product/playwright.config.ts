@@ -51,16 +51,17 @@ export default defineConfig({
     video: 'retain-on-failure',
   },
 
-  // CI は chromium で全 spec を実行する。
-  // Mobile Chrome は認証情報を持つローカル検証用。CI では認証必須テストが skip され、
-  // 未認証ケースだけを二重実行するため対象外とする。
-  // @see 決定ログ（削除済み、git 履歴参照）
+  // chromium は全 spec、Mobile Chrome は `@mobile` tag の test だけを持つ（#2743）。
+  // 全 spec を mobile で二重実行せず、mobile 固有の操作境界（長押し作成・Drawer・
+  // ヘッダーナビ）を通す test だけを CI（promote.yml 層 3）で同じ invocation に入れる。
+  // 方針の正本は docs/engineering/testing.md。
   projects: [
     // ==========================================
     // デスクトップ（Chromiumのみ）
     // ==========================================
     {
       name: 'chromium',
+      grepInvert: /@mobile/,
       use: {
         ...devices['Desktop Chrome'],
         viewport: { width: 1920, height: 1080 },
@@ -72,6 +73,7 @@ export default defineConfig({
     // ==========================================
     {
       name: 'Mobile Chrome',
+      grep: /@mobile/,
       use: {
         ...devices['Pixel 5'],
       },

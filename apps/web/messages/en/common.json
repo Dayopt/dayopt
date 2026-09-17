@@ -230,7 +230,7 @@
       "plan": "Plan your day",
       "track": "Track your time",
       "review": "Look back",
-      "organize": "Organize with tags",
+      "organize": "Organize with activities",
       "data": "Use your data elsewhere",
       "troubleshooting": "When something breaks",
       "account": "Account",
@@ -241,8 +241,7 @@
       "loading": "Loading...",
       "noHeadings": "No headings found",
       "links": "Links",
-      "reportIssue": "Report an issue",
-      "viewSource": "View source"
+      "reportIssue": "Report an issue"
     },
     "sidebar": {
       "searchPlaceholder": "Search docs..."

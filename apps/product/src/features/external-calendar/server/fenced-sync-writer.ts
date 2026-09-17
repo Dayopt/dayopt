@@ -171,7 +171,7 @@ type FencedSyncWriterClient = SupabaseClient<FencedSyncWriterDatabase>;
 function createFencedSyncWriterClient(): FencedSyncWriterClient {
   return createClient<FencedSyncWriterDatabase>(
     env.NEXT_PUBLIC_SUPABASE_URL,
-    env.SUPABASE_SERVICE_ROLE_KEY,
+    env.SUPABASE_SECRET_KEY,
     {
       auth: { autoRefreshToken: false, persistSession: false },
       global: {

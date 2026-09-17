@@ -24,7 +24,7 @@ const loggerWarn = vi.hoisted(() => vi.fn());
 vi.mock('@/env', () => ({
   env: {
     NEXT_PUBLIC_SUPABASE_URL: 'https://project.supabase.co',
-    SUPABASE_SERVICE_ROLE_KEY: 'service-role-key',
+    SUPABASE_SECRET_KEY: 'service-role-key',
     CALENDAR_TOKEN_ENCRYPTION_KEY: 'A'.repeat(43) + '=',
   },
 }));
@@ -196,9 +196,10 @@ function event(overrides: Record<string, unknown> = {}) {
   };
 }
 
-function activeConnection() {
+function activeConnection(consecutiveFailures = 2) {
   return {
     data_generation: 3,
+    consecutive_failures: consecutiveFailures,
     id: CONNECTION_ID,
     user_id: USER_ID,
     status: 'active',
@@ -577,6 +578,92 @@ describe('syncConnection — 認可と鍵', () => {
     expect(patch.last_sync_error).toBe('encryption_key_invalid');
     // 鍵の設定ミスで全ユーザーを再同意に追い込まない
     expect(patch.status).toBeUndefined();
+    // 前進しなかった run は「最終同期」を進めず、連続失敗数を積む（#2687）
+    expect(patch).not.toHaveProperty('last_synced_at');
+    expect(patch.consecutive_failures).toBe(3);
+  });
+
+  it('startSession の provider 障害は last_synced_at を進めず連続失敗数を積む（#2687）', async () => {
+    const { calls } = setupDb({ connection: activeConnection(5), calendars: oneCalendar() });
+    startSession.mockRejectedValue(new CalendarProviderError('busy', 'rate_limited', 'rate', 429));
+
+    const result = await syncConnection({ connectionId: CONNECTION_ID, userId: USER_ID });
+
+    expect(result.outcome).toBe('partial_failure');
+    const update = findCall(calls, 'calendar_connections', 'update')!;
+    const patch = argsOf(update, 'update')[0] as Record<string, unknown>;
+    expect(patch).toEqual({ last_sync_error: 'rate_limited', consecutive_failures: 6 });
+  });
+
+  it('全カレンダーが失敗した run は last_synced_at を進めず連続失敗数を積む（#2687）', async () => {
+    const { calls } = setupDb({ connection: activeConnection(0), calendars: oneCalendar() });
+    syncCalendar.mockRejectedValue(new CalendarProviderError('gone', 'not_found', 'gone', 404));
+
+    const result = await syncConnection({ connectionId: CONNECTION_ID, userId: USER_ID });
+
+    expect(result.outcome).toBe('partial_failure');
+    const update = findCall(calls, 'calendar_connections', 'update')!;
+    const patch = argsOf(update, 'update')[0] as Record<string, unknown>;
+    expect(patch).toEqual({ last_sync_error: 'partial_failure', consecutive_failures: 1 });
+  });
+
+  it('一部のカレンダーだけ失敗した run は前進として last_synced_at を進め、連続失敗数を 0 に戻す（#2687）', async () => {
+    // 共有を外されたカレンダーが 1 つ混ざっているだけで、健全なカレンダーごと cron から外さない
+    const { calls } = setupDb({
+      connection: activeConnection(5),
+      calendars: [
+        {
+          id: 'cal-row-1',
+          provider_calendar_id: CALENDAR_ID,
+          calendar_name: 'Work',
+          sync_token: null,
+        },
+        {
+          id: 'cal-row-2',
+          provider_calendar_id: 'unshared',
+          calendar_name: 'Gone',
+          sync_token: null,
+        },
+      ],
+    });
+    syncCalendar
+      .mockResolvedValueOnce(syncResult())
+      .mockRejectedValueOnce(new CalendarProviderError('gone', 'not_found', 'gone', 404));
+
+    const result = await syncConnection({ connectionId: CONNECTION_ID, userId: USER_ID });
+
+    expect(result).toMatchObject({
+      outcome: 'partial_failure',
+      calendarsSynced: 1,
+      calendarsFailed: 1,
+    });
+    const updates = recordersFor(calls, 'calendar_connections').filter((recorder) =>
+      recorder.chain.some((entry) => entry.method === 'update'),
+    );
+    const patch = argsOf(updates.at(-1)!, 'update')[0] as Record<string, unknown>;
+    expect(patch).toEqual({
+      last_sync_error: 'partial_failure',
+      last_synced_at: RUN_ISO,
+      consecutive_failures: 0,
+    });
+  });
+
+  it('成功した run は last_synced_at を進め、連続失敗数を 0 に戻す（#2687）', async () => {
+    const { calls } = setupDb({ connection: activeConnection(7), calendars: oneCalendar() });
+    syncCalendar.mockResolvedValue(syncResult());
+
+    const result = await syncConnection({ connectionId: CONNECTION_ID, userId: USER_ID });
+
+    expect(result.outcome).toBe('synced');
+    const updates = recordersFor(calls, 'calendar_connections').filter((recorder) =>
+      recorder.chain.some((entry) => entry.method === 'update'),
+    );
+    const patch = argsOf(updates.at(-1)!, 'update')[0] as Record<string, unknown>;
+    expect(patch).toEqual({
+      last_sync_error: null,
+      last_synced_at: RUN_ISO,
+      consecutive_failures: 0,
+    });
   });
 
   // 空配列に畳むと「0 件を同期して成功」になり、last_synced_at だけが進む（Step 7）
@@ -595,10 +682,10 @@ describe('syncConnection — 認可と鍵', () => {
     const update = findCall(calls, 'calendar_connections', 'update')!;
     const patch = argsOf(update, 'update')[0] as Record<string, unknown>;
     expect(patch.last_sync_error).toBe('partial_failure');
-    // last_synced_at は「最後に試した時刻」。他の失敗経路（鍵不正 / startSession 失敗）と
-    // 揃える。進めないと dispatcher の due 判定（last_synced_at < staleBefore）に毎 tick
-    // 引っかかり、この接続だけが backoff 無しで回り続ける。
-    expect(patch.last_synced_at).toBe(RUN_ISO);
+    // last_synced_at は「最後に成功した時刻」のまま据え置く（#2687）。毎 tick due に
+    // 引っかかる問題は、連続失敗数が閾値に達した時点で dispatcher が due から外して止める。
+    expect(patch).not.toHaveProperty('last_synced_at');
+    expect(patch.consecutive_failures).toBe(3);
   });
 
   it('選択カレンダーが 0 件なら成功として記録する', async () => {
@@ -666,6 +753,8 @@ describe('syncConnection — 予算切れ（#1965）', () => {
     // リトライ導線の文言が異なる。
     expect(patch.last_sync_error).toBe('partial_timeout');
     expect(patch.last_synced_at).toBe(RUN_ISO);
+    // 1 カレンダーは完走しているので前進扱い（#2687）
+    expect(patch.consecutive_failures).toBe(0);
   });
 
   it('予算切れ前に完走したカレンダーの進捗（sync_token）は保存される', async () => {

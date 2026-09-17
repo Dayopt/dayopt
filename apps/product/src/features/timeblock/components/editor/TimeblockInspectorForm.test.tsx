@@ -103,17 +103,30 @@ vi.mock('../../hooks/useTimeblockWriteMutations', () => ({
   },
 }));
 
+// 選択一覧へ渡す「普段の長さ」。集計そのものは statistics service 側で検証済み
+vi.mock('../../hooks/useActivityMedianDurations', () => ({
+  useActivityMedianDurations: () => ({
+    medianByActivityId: new Map([['activity-2', 45]]),
+    getMedianMinutes: () => 45,
+  }),
+}));
+
 vi.mock('../inspector/fields', () => ({
   ActivityFieldRow: ({
     activityName,
     onActivityChange,
+    durationByActivityId,
   }: {
     activityName: string;
     onActivityChange: (activityId: string | null) => void;
+    durationByActivityId?: ReadonlyMap<string, number> | undefined;
   }) => (
-    <button type="button" onClick={() => onActivityChange('activity-2')}>
-      {activityName}
-    </button>
+    <>
+      <button type="button" onClick={() => onActivityChange('activity-2')}>
+        {activityName}
+      </button>
+      <span data-testid="activity-median">{durationByActivityId?.get('activity-2') ?? 'none'}</span>
+    </>
   ),
   InspectorHeaderActions: ({
     menuItems,
@@ -196,6 +209,7 @@ vi.mock('./TimeblockEditor', () => ({
     onDateTimeChange,
     onNoteChange,
     dateTimeError,
+    beforeDateTimeSlot,
   }: {
     value: {
       note: string;
@@ -211,8 +225,11 @@ vi.mock('./TimeblockEditor', () => ({
     }) => void;
     onNoteChange: (note: string) => void;
     dateTimeError?: string;
+    beforeDateTimeSlot?: React.ReactNode;
   }) => (
     <>
+      {/* 実物と同じく日時グルーピングの上に置く（フィードフォワードの配線を見える化する） */}
+      {beforeDateTimeSlot}
       <output data-testid="current-end">{value.endAt.toISOString()}</output>
       {dateTimeError ? <output data-testid="date-time-error">{dateTimeError}</output> : null}
       <button
@@ -744,5 +761,11 @@ describe('TimeblockInspectorForm', () => {
     });
     expect(input).not.toHaveProperty('planId');
     expect(onDuplicateCreated).toHaveBeenCalledWith('record-copy', 'record');
+  });
+
+  it('アクティビティ選択一覧へ普段の長さを渡す', () => {
+    render(<TimeblockInspectorForm kind="plan" plan={futurePlan} onDeleted={vi.fn()} />);
+
+    expect(screen.getByTestId('activity-median')).toHaveTextContent('45');
   });
 });

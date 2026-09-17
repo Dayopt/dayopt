@@ -201,7 +201,8 @@ describe('Upstash Rate Limit', () => {
 
     const enabledModule = await import('./upstash');
     // #2024 で reauthRateLimit を追加（15 → 16）
-    expect(constructorOptions).toHaveLength(16);
+    // #2721 で oauth-token の pre-body / refresh、tRPC の pre-auth 2 本、health を追加（16 → 21）
+    expect(constructorOptions).toHaveLength(21);
     for (const options of constructorOptions) {
       expect(options.analytics).toBe(false);
       expect(options.timeout).toBe(RATE_LIMIT_TIMEOUT_MS);
@@ -221,7 +222,7 @@ describe('Upstash Rate Limit', () => {
   });
 
   it('#2011: loads without touching @/env even when its schema validation would throw', async () => {
-    // generic Preview deployment は SUPABASE_SERVICE_ROLE_KEY を持たない
+    // generic Preview deployment は SUPABASE_SECRET_KEY を持たない
     // （決定ログ（削除済み、git 履歴参照））ため、`@/env` の
     // Proxy に触れると schema 全体の検証が走り無関係に throw する。この module は
     // Upstash の2変数しか要らないので `@/env` を経由しないことを固定する。

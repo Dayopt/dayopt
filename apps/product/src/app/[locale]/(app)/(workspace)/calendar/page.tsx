@@ -8,11 +8,7 @@ import { HydrationBoundary } from '@/lib/trpc/server';
 import type { Locale } from '@dayopt/i18n/routing';
 
 import { CalendarViewClient } from '../_composition/CalendarViewClient';
-import {
-  getCalendarTranslations,
-  parseCalendarViewParam,
-  parseDateParam,
-} from '../_server/calendar-page-params';
+import { getCalendarTranslations, parseCalendarViewParam } from '../_server/calendar-page-params';
 import { prefetchCalendarData } from '../_server/calendar-prefetch';
 import { CalendarSkeleton } from '../_server/CalendarSkeleton';
 
@@ -52,10 +48,8 @@ async function CalendarPageContent({
   locale: Locale;
   date: string | undefined;
 }) {
-  const initialDate = parseDateParam(date);
-  const targetDate = initialDate ?? new Date();
   const translations = await getCalendarTranslations(locale);
-  const { dehydratedState } = await prefetchCalendarData(viewType, targetDate);
+  const { dehydratedState } = await prefetchCalendarData(viewType, date);
 
   return (
     <HydrationBoundary state={dehydratedState}>

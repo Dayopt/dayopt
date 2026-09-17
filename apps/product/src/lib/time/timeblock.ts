@@ -1,4 +1,3 @@
-export const timeblockOrigins = ['planned', 'unplanned'] as const;
 export const planSources = ['manual', 'external_calendar', 'api'] as const;
 export const recordSources = [
   'manual',
@@ -8,7 +7,6 @@ export const recordSources = [
   'api',
 ] as const;
 
-export type TimeblockOrigin = (typeof timeblockOrigins)[number];
 export type PlanSource = (typeof planSources)[number];
 export type RecordSource = (typeof recordSources)[number];
 

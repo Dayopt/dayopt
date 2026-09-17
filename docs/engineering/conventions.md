@@ -72,11 +72,11 @@ features/{name}/
 
 #### domain を作った判断（実例）
 
-| Feature      | domain の中身                                                                                            |
-| ------------ | -------------------------------------------------------------------------------------------------------- |
-| `timeblock`  | `timeblock-destination` / `estimation-accuracy` / `plan-template-compose` / `activity-estimation-factor` |
-| `activities` | `activity-tree-cache`                                                                                    |
-| `review`     | `variance` / `timePL/`（薄い構成）                                                                       |
+| Feature      | domain の中身                                                                                               |
+| ------------ | ----------------------------------------------------------------------------------------------------------- |
+| `timeblock`  | `timeblock-destination` / `plan-template-duration` / `plan-template-compose` / `activity-estimation-factor` |
+| `activities` | `activity-tree-cache`                                                                                       |
+| `review`     | `variance` / `timePL/`（薄い構成）                                                                          |
 
 ### DAG Layer
 
@@ -313,32 +313,26 @@ const mutation = api.planCommands.update.useMutation({
 
 確立済みの命名規則:
 
-| プレフィックス | 用途                                           | 例                            |
-| -------------- | ---------------------------------------------- | ----------------------------- |
-| `aggregate`    | pure aggregation（複数行 → 集計）              | `aggregateTagStats`           |
-| `transform`    | pure transform（snake → camel、shape 変換）    | `transformEstimationAccuracy` |
-| `unpack`       | RPC field の default 埋め（単一 RPC field 用） | `unpackEntryRate`             |
-| `calculate`    | pure 計算（streak、平均、差分など）            | `calculateStreak`             |
-| `build`        | 入力から構造化された出力を構築                 | `buildTagDashboard`           |
+| プレフィックス | 用途                                           | 例                          |
+| -------------- | ---------------------------------------------- | --------------------------- |
+| `aggregate`    | pure aggregation（複数行 → 集計）              | `aggregateActivityStats`    |
+| `transform`    | pure transform（snake → camel、shape 変換）    | `transformDbActivity`       |
+| `unpack`       | RPC field の default 埋め（単一 RPC field 用） | —                           |
+| `calculate`    | pure 計算（streak、平均、差分など）            | `calculateTimeblockLayouts` |
+| `build`        | 入力から構造化された出力を構築                 | `buildInkColumns`           |
 
 ### 1 procedure 1 file 原則
 
 server transformer は基本的に **1 procedure 1 file**。
 
 ```
-features/timeblock/server/
-  statistics-overview-transform.ts
-  statistics-time-by-tag-transform.ts
-  statistics-kpi-unpackers.ts          # ← 例外: 4 unpacker を集約
+features/activities/server/
+  activity-row-transform.ts            # ← 例外: 同じ DB 行 → フロント型の変換 2 つを集約
 ```
 
-**例外**: 同ドメインの subset shape を扱う関連 unpacker は 1 file に集約してよい。
+**例外**: 同ドメインの subset shape を扱う関連 transformer は 1 file に集約してよい。
 
-例: `statistics-kpi-unpackers.ts` は 4 つの KPI unpacker (`unpackCumulativeTime` / `unpackPlanRate` / `unpackContextSwitches` / `unpackBlankRate`) を集約。これらは:
-
-- 全て `get_stats_kpi_summary` の subset shape を扱う
-- 全て同じ default / rename ロジックを共有
-- 個別 KPI procedure と `transformStatsOverviewResponse` の両方から呼ばれる
+例: `activity-row-transform.ts` は `transformDbCategory` / `transformDbActivity` を集約。どちらも DB 行をフロントエンド型へ写す同じ規則（列の選択と rename）を共有している。
 
 「同じ shape を返すから」だけで統合しない。**同じ default / rename / 変換ルールを共有しているか** で判断する。
 
@@ -379,43 +373,38 @@ planRate: {
 
 ### 実例
 
-#### domain の例: `aggregateMonthlyTrend`
+#### domain の例: `aggregateActivityMedianDurations`
 
 ```ts
-// features/timeblock/domain/monthly-trend.ts
-export function aggregateMonthlyTrend(
-  rows: MonthlyTrendRow[],
-  nowYear: number,
-  nowMonth: number,
-  monthCount: number,
-): MonthTrendSlot[] {
-  // 月跨ぎ / leap year / 負数 modulo 補正を含む pure logic
+// features/timeblock/domain/plan-template-duration.ts
+export function aggregateActivityMedianDurations(
+  records: ReadonlyArray<TemplateDurationRecordRow>,
+): Map<string, number> {
+  // auto_migrated の除外 / 0 分以下の除外 / 中央値の算出を含む pure logic
   // ...
 }
 ```
 
-- TZ 形式化は呼び出し元 (server procedure) が行い、`nowYear` / `nowMonth` を引数で受ける
-- domain は TZ 非依存に保たれる
-- unit test で leap year / 年跨ぎ を網羅できる
+- 期間の切り出し（直近の窓）は呼び出し元 (server service) が行い、絞った行だけを引数で受ける
+- domain は DB・TZ 非依存に保たれる
+- unit test で境界（サンプル不足・0 分・偶数個の中央値）を網羅できる
 
-#### server transformer の例: `transformStatsOverviewResponse`
+#### server transformer の例: `transformDbActivity`
 
 ```ts
-// features/timeblock/server/statistics-overview-transform.ts
-export function transformStatsOverviewResponse(data: unknown): StatsOverviewResult {
-  const result = data as Partial<StatsKpiSummaryRpcResult> | null | undefined;
+// features/activities/server/activity-row-transform.ts
+export function transformDbActivity(dbActivity: DbActivityRow): Activity {
   return {
-    cumulativeTime: unpackCumulativeTime(result?.cumulativeTime),
-    planRate: unpackPlanRate(result?.planRate),
-    contextSwitches: unpackContextSwitches(result?.contextSwitches),
-    blankRate: unpackBlankRate(result?.blankRate),
+    id: dbActivity.id,
+    name: dbActivity.name,
+    // ...
   };
 }
 ```
 
-- RPC `get_stats_kpi_summary` の response shape (camelCase + `planRate` 構造) に密結合
-- default 埋めは RPC↔tRPC adapter の役割
-- domain には置けない（RPC shape を握っている）
+- DB の行型 (`Row<'activities'>`) に密結合
+- DB↔tRPC adapter の役割
+- domain には置けない（DB の shape を握っている）
 
 ---
 

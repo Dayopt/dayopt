@@ -126,7 +126,7 @@ export const Error: Story = {
 export const AvailableActions: Story = {
   render: () => (
     <Frame>
-      <TemplateList templates={[]} onCreateEntry={fn()} onOpenSettings={fn()} />
+      <TemplateList templates={[]} onCreateTimeblock={fn()} onOpenSettings={fn()} />
     </Frame>
   ),
 };
@@ -151,7 +151,7 @@ export const AllPatterns: Story = {
         </Frame>
       </div>
       <Frame>
-        <TemplateList templates={[]} onCreateEntry={fn()} onOpenSettings={fn()} />
+        <TemplateList templates={[]} onCreateTimeblock={fn()} onOpenSettings={fn()} />
       </Frame>
     </div>
   ),

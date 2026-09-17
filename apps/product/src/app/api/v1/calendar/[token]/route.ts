@@ -3,7 +3,7 @@
  *
  * GET /api/v1/calendar/{token}.ics
  *
- * 秘密トークンURLでユーザーのエントリをiCalendar形式で返却。
+ * 秘密トークンURLでユーザーのタイムブロックをiCalendar形式で返却。
  * Google Calendar等で「URLで追加」して購読可能。
  *
  * 認証: トークンベース（Cookie/JWT不要、RLSバイパス）
@@ -51,12 +51,12 @@ async function getUserIdByToken(token: string): Promise<string | null> {
 }
 
 /**
- * ユーザーのエントリを取得（タグ名含む）
+ * ユーザーのタイムブロックを取得（タグ名含む）
  */
 async function getPlansForFeed(userId: string) {
   const supabase = createServiceRoleClient();
 
-  // 過去90日〜未来90日のエントリを取得
+  // 過去90日〜未来90日のタイムブロックを取得
   const now = new Date();
   const past = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000).toISOString();
   const future = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000).toISOString();
@@ -90,17 +90,7 @@ async function getPlansForFeed(userId: string) {
     });
   }
 
-  return (plans ?? []).map((plan) => {
-    return {
-      id: plan.id,
-      title: plan.title,
-      description: plan.note,
-      start_time: plan.start_at,
-      end_time: plan.end_at,
-      created_at: plan.created_at,
-      updated_at: plan.updated_at,
-    };
-  });
+  return plans ?? [];
 }
 
 /**
@@ -342,7 +332,7 @@ export async function GET(
       );
     }
 
-    // エントリ取得 → iCal変換
+    // タイムブロック取得 → iCal変換
     const plans = await getPlansForFeed(userId);
     const ical = plansToICal(plans);
 

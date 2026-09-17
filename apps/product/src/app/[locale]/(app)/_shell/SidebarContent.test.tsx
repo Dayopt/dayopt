@@ -13,6 +13,8 @@ vi.mock('@dayopt/i18n/navigation', () => ({
 }));
 
 const applyMutate = vi.hoisted(() => vi.fn());
+/** テンプレート保存モードの起動（サイドバーの「+」） */
+const startSaving = vi.hoisted(() => vi.fn());
 /** 適用 mutation の実行中フラグ。連打ガードの検証で切り替える */
 const applyState = vi.hoisted(() => ({ isPending: false }));
 const templateRows = vi.hoisted(() => [
@@ -39,6 +41,9 @@ vi.mock('@/features/calendar', () => ({
   // カレンダーが表示中の日（壁時計 Date）。テンプレート適用の宛先になる
   useCalendarNavigationStore: (selector: (state: { viewedDate: Date }) => unknown) =>
     selector({ viewedDate: new Date(2026, 2, 25) }),
+  useTemplateSaveStore: (
+    selector: (state: { startSaving: (dateKey: string) => void }) => unknown,
+  ) => selector({ startSaving }),
   toTemplateView: (template: { id: string; name: string }) => ({ ...template, blocks: [] }),
   ActivityFilterList: ({
     betweenCategoriesAndUncategorized,
@@ -49,11 +54,18 @@ vi.mock('@/features/calendar', () => ({
   TemplateList: ({
     templates,
     onApplyTemplate,
+    onCreateTimeblock,
   }: {
     templates: ReadonlyArray<{ id: string; name: string }>;
     onApplyTemplate?: (templateId: string) => void;
+    onCreateTimeblock?: () => void;
   }) => (
     <div data-testid="template-list">
+      {onCreateTimeblock && (
+        <button type="button" onClick={onCreateTimeblock}>
+          create-template
+        </button>
+      )}
       {templates.map((template) => (
         <button key={template.id} type="button" onClick={() => onApplyTemplate?.(template.id)}>
           {template.name}
@@ -85,7 +97,6 @@ vi.mock('@/components/ui/inputs/mini-calendar', () => ({
 
 vi.mock('@/features/review', () => ({
   ReportFilterList: () => <div data-testid="report-filter-list" />,
-  SegmentList: () => <div data-testid="segment-list" />,
 }));
 
 vi.mock('@/lib/hooks/useTheme', () => ({
@@ -121,7 +132,7 @@ describe('SidebarContent', () => {
     expect(activityFilter.contains(templateList)).toBe(true);
   });
 
-  it('renders ReportSidebar（カテゴリーフィルタ + セグメント一覧、calendar の view-switcher/activity-filter は出さない）on /report', () => {
+  it('renders ReportSidebar（分析フィルタだけ、calendar の view-switcher/activity-filter は出さない）on /report', () => {
     pathnameMock.mockReturnValue('/report');
 
     render(<SidebarContent />);
@@ -130,7 +141,6 @@ describe('SidebarContent', () => {
     expect(screen.queryByTestId('activity-filter-list')).not.toBeInTheDocument();
     expect(screen.queryByTestId('template-list')).not.toBeInTheDocument();
     expect(screen.getByTestId('report-filter-list')).toBeInTheDocument();
-    expect(screen.getByTestId('segment-list')).toBeInTheDocument();
   });
 
   it('取得したテンプレートを一覧へ渡し、クリックで表示中の日へ適用する（#2567）', () => {
@@ -139,6 +149,14 @@ describe('SidebarContent', () => {
     fireEvent.click(screen.getByRole('button', { name: '朝のルーティン' }));
 
     expect(applyMutate).toHaveBeenCalledWith({ templateId: 'template-1', date: '2026-03-25' });
+  });
+
+  it('見出しの「+」で、表示中の日をテンプレートとして保存するモードに入る', () => {
+    render(<SidebarContent />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'create-template' }));
+
+    expect(startSaving).toHaveBeenCalledWith('2026-03-25');
   });
 
   it('適用中はもう一度クリックしても送らない（2 通目は必ず重複で失敗し、巻き戻しが 1 通目を消す）', () => {

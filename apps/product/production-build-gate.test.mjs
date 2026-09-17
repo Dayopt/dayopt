@@ -16,6 +16,8 @@ import {
 function completeProductionEnv() {
   return {
     VERCEL_ENV: 'production',
+    NEXT_PUBLIC_SUPABASE_URL: 'https://isolated.supabase.co',
+    NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_safe-dummy-key',
     RESEND_API_KEY: 'safe-dummy-key',
     RESEND_FROM_EMAIL: 'noreply@dayopt.app',
     RESEND_WEBHOOK_SECRET: 'safe-dummy-webhook-secret',
@@ -23,9 +25,8 @@ function completeProductionEnv() {
     UPSTASH_REDIS_REST_URL: 'https://example.upstash.io',
     UPSTASH_REDIS_REST_TOKEN: 'safe-dummy-token',
     RECOVERY_CODE_PEPPER: 'safe-dummy-recovery-pepper',
-    // 現行 production と同じ legacy JWT 形式。他の test がこの fixture をそのまま通すことが、
-    // 形式チェックが通常経路を塞いでいないことの positive proof になる。
-    SUPABASE_SERVICE_ROLE_KEY: 'eyJ-safe-dummy-service-role-key',
+    // 形式検査用 fixture。実在する鍵や本番の有効性を表さない。
+    SUPABASE_SECRET_KEY: 'eyJ-safe-dummy-service-role-key',
   };
 }
 
@@ -37,8 +38,8 @@ function completePreviewEnv() {
     VERCEL_BRANCH_URL: branchUrl,
     VERCEL_GIT_COMMIT_REF: 'codex/mcp-preview',
     NEXT_PUBLIC_SUPABASE_URL: 'https://previewbranchref.supabase.co',
-    NEXT_PUBLIC_SUPABASE_ANON_KEY: 'safe-dummy-anon-key',
-    SUPABASE_SERVICE_ROLE_KEY: 'safe-dummy-service-role-key',
+    NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: 'safe-dummy-anon-key',
+    SUPABASE_SECRET_KEY: 'safe-dummy-service-role-key',
     UPSTASH_REDIS_REST_URL: 'https://preview-example.upstash.io',
     UPSTASH_REDIS_REST_TOKEN: 'safe-dummy-upstash-token',
     RECOVERY_CODE_PEPPER: 'safe-dummy-recovery-pepper',
@@ -186,86 +187,48 @@ describe('Product operational production build gate', () => {
     ).toThrow('Product production build requires a valid UPSTASH_REDIS_REST_URL');
   });
 
-  // #1952: アカウント削除の captcha 免除は service role key が legacy JWT 形式である間だけ
-  // 成立する。鍵を新形式へ回した deploy を出荷させない。
-  it('accepts the current legacy JWT service role key format', () => {
-    expect(assertProductOperationalProductionBuildEnv(completeProductionEnv())).toBe(true);
-  });
-
-  it('rejects a service role key rotated to the new format', () => {
-    expect(() =>
-      assertProductOperationalProductionBuildEnv({
-        ...completeProductionEnv(),
-        SUPABASE_SERVICE_ROLE_KEY: 'sb_secret_safe-dummy-value',
-      }),
-    ).toThrow('Product production build requires a legacy JWT SUPABASE_SERVICE_ROLE_KEY');
-  });
-
-  // 失敗した人が「何が壊れるか」と「次に何を決めるか」まで読めることを固定する。
-  // 形式が違う事実だけを伝えても、削除フローとの因果が分からないと対処へ辿り着けない。
-  it('explains the deletion impact and the remedy when the format check fails', () => {
-    let message = '';
-    try {
-      assertProductOperationalProductionBuildEnv({
-        ...completeProductionEnv(),
-        SUPABASE_SERVICE_ROLE_KEY: 'sb_secret_safe-dummy-value',
-      });
-    } catch (error) {
-      message = error.message;
-    }
-
-    expect(message).toContain('deletion fails closed');
-    expect(message).toContain('#1925');
-  });
-
-  // 値そのものを漏らさない。secret を error message に載せると build log に残る。
-  it('does not echo the service role key value', () => {
-    const secret = 'sb_secret_do-not-leak-this-value';
-    let message = '';
-    try {
-      assertProductOperationalProductionBuildEnv({
-        ...completeProductionEnv(),
-        SUPABASE_SERVICE_ROLE_KEY: secret,
-      });
-    } catch (error) {
-      message = error.message;
-    }
-
-    expect(message).not.toContain(secret);
-    expect(message).not.toContain('do-not-leak-this-value');
-  });
-
-  // 保証境界の明示（gate の docstring と対）。欠落は別クラスの故障で、この gate は見ない。
-  it('leaves an absent service role key to the runtime env validation', () => {
-    const env = completeProductionEnv();
-    delete env.SUPABASE_SERVICE_ROLE_KEY;
-
-    expect(assertProductOperationalProductionBuildEnv(env)).toBe(true);
-  });
-
-  // Vercel env pull が付ける literal `\n` と空白で偽陽性を出さない。偽陽性は production
-  // deploy を止める側の誤りなので、判定は runtime（src/env.ts）と同じ正規化に寄せる。
   it.each([
-    ['trailing literal newline', 'eyJ-safe-dummy-service-role-key\\n'],
-    ['leading literal newline', '\\neyJ-safe-dummy-service-role-key'],
-    ['surrounding whitespace', '  eyJ-safe-dummy-service-role-key  '],
-  ])('accepts a legacy key with %s', (_label, value) => {
+    'sb_secret_safe-dummy-value',
+    'eyJ-safe-dummy-service-role-key',
+    '  \\nsb_secret_safe-dummy-value\\n  ',
+    '  \\neyJ-safe-dummy-service-role-key\\n  ',
+  ])('accepts supported server key formats after env normalization: %s', (value) => {
     expect(
       assertProductOperationalProductionBuildEnv({
         ...completeProductionEnv(),
-        SUPABASE_SERVICE_ROLE_KEY: value,
+        SUPABASE_SECRET_KEY: value,
       }),
     ).toBe(true);
   });
 
-  // 正規化しても新形式は新形式のまま。上の緩和が検査そのものを骨抜きにしていないこと。
-  it('still rejects a new-format key wrapped in the same artifacts', () => {
-    expect(() =>
-      assertProductOperationalProductionBuildEnv({
-        ...completeProductionEnv(),
-        SUPABASE_SERVICE_ROLE_KEY: '  \\nsb_secret_safe-dummy-value\\n  ',
-      }),
-    ).toThrow('Product production build requires a legacy JWT SUPABASE_SERVICE_ROLE_KEY');
+  it.each(['sb_publishable_do-not-leak', 'not-a-key-do-not-leak', 'sb_secret_'])(
+    'rejects an unsupported server key without disclosing it: %s',
+    (value) => {
+      let message = '';
+      try {
+        assertProductOperationalProductionBuildEnv({
+          ...completeProductionEnv(),
+          SUPABASE_SECRET_KEY: value,
+        });
+      } catch (error) {
+        message = error.message;
+      }
+      expect(message).toContain('requires a server-only SUPABASE_SECRET_KEY');
+      expect(message).not.toContain(value);
+      expect(message).toContain('Verify password reauthentication');
+    },
+  );
+
+  it.each([
+    'NEXT_PUBLIC_SUPABASE_URL',
+    'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY',
+    'SUPABASE_SECRET_KEY',
+  ])('rejects deployment with missing or empty %s', (name) => {
+    const env = completeProductionEnv();
+    delete env[name];
+    expect(() => assertProductOperationalProductionBuildEnv(env)).toThrow(name);
+    env[name] = '  ';
+    expect(() => assertProductOperationalProductionBuildEnv(env)).toThrow(name);
   });
 });
 

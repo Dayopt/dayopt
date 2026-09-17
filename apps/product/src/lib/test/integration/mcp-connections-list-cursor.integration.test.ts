@@ -22,8 +22,8 @@ import type { Database } from '@/lib/database';
  */
 
 const LOCAL_DB_URL = 'http://127.0.0.1:54321';
-const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-const ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const SERVICE_ROLE_KEY = process.env.SUPABASE_SECRET_KEY!;
+const ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!;
 const RUN_LOCAL = process.env.USE_LOCAL_DB === 'true';
 
 // mcp-connections-service.ts の MCP_LIST_PAGE_SIZE と同じ値。
@@ -140,6 +140,16 @@ describe.skipIf(!RUN_LOCAL)('MCP connections list cursor integration', () => {
   afterAll(async () => {
     await ownerClient.auth.signOut();
     await admin.auth.admin.deleteUser(ownerId);
+  });
+
+  it('再認証期限の前後でも未revoke接続を一覧から消さない（V-11）', async () => {
+    const ids = insertConnections(['2026-08-01T00:00:00Z', '2026-08-02T00:00:00Z']);
+    psql(`UPDATE public.oauth_connections SET reauth_required_at = now() - interval '1 second' WHERE id = '${ids[0]}';
+      UPDATE public.oauth_connections SET reauth_required_at = now() + interval '1 hour' WHERE id = '${ids[1]}';`);
+    const { items } = await collectAllPages();
+    expect(new Set(items.map((row) => row.id))).toEqual(new Set(ids));
+    // The settings contract exposes no validity flag. A retained row is not proof of usable authority.
+    expect(items.every((row) => !('reauth_required_at' in row))).toBe(true);
   });
 
   it('ページ境界を跨いで authorized_at が全件同値でも、全 connection を 1 度ずつ返す', async () => {

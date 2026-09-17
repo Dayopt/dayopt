@@ -77,13 +77,6 @@ interface ShellStoreState {
   /** Calendar rail の表示領域を確保するための一時的な非表示状態（persist 対象外） */
   sidebarSuppressed: boolean;
 
-  /**
-   * 表示中のページを制御する Service Worker が新バージョンへ切り替わったか
-   * （persist 対象外。`ServiceWorkerProvider` が `useServiceWorker()` の
-   * `updateAvailable` をここへ同期する。#2232）。
-   */
-  serviceWorkerUpdateAvailable: boolean;
-
   /** ページタイトル（PageHeaderで表示） */
   pageTitle: string;
 
@@ -130,9 +123,6 @@ interface ShellStoreActions {
   // Category rename modal convenience
   openCategoryRenameModal: (category: CategoryRenameTarget) => void;
   closeCategoryRenameModal: () => void;
-
-  // Service Worker update convenience
-  setServiceWorkerUpdateAvailable: (available: boolean) => void;
 }
 
 // ── Store ──
@@ -149,7 +139,6 @@ const useShellStoreBase = create<ShellStoreState & ShellStoreActions>()(
           width: DEFAULT_SIDEBAR_WIDTH,
         },
         sidebarSuppressed: false,
-        serviceWorkerUpdateAvailable: false,
         pageTitle: '',
         activeSheet: null,
 
@@ -252,14 +241,6 @@ const useShellStoreBase = create<ShellStoreState & ShellStoreActions>()(
             set({ activeSheet: null }, false, 'closeCategoryRenameModal');
           }
         },
-
-        // ── Service Worker Update Convenience ──
-        setServiceWorkerUpdateAvailable: (available) =>
-          set(
-            { serviceWorkerUpdateAvailable: available },
-            false,
-            'setServiceWorkerUpdateAvailable',
-          ),
       }),
       {
         name: 'shell-storage',

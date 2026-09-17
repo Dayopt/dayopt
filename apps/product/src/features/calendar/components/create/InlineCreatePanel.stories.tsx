@@ -93,6 +93,13 @@ const trpcMocks = {
   'activities.listTree': ACTIVITY_TREE,
   'plans.list': [],
   'records.list': [],
+  // 一覧に添える「普段の長さ」。中央値のあるアクティビティにだけ出る
+  'statistics.getActivityStats': {
+    counts: {},
+    planCounts: {},
+    lastUsed: {},
+    medianMinutes: { development: 90, meeting: 30 },
+  },
 };
 
 /** 対象日の 9:00–10:00 を選択済みにする */

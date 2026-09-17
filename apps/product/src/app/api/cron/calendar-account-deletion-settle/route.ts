@@ -4,6 +4,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 
 import { env } from '@/env';
 import { logger } from '@/lib/logger';
+import { writeCronHeartbeat } from '@/lib/ops/cron-heartbeat';
 import { isWriteFenceEnabled } from '@/lib/ops/write-fence';
 import { captureUnexpectedError } from '@/lib/sentry';
 import { createServiceRoleClient } from '@/lib/supabase/oauth';
@@ -17,7 +18,7 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
-// SETTLE_WORST_CASE_MS（settle-dispatcher.ts）に対して 10s の hard-kill margin を残す
+// SETTLE_WORST_CASE_MS に対して、最大3sのheartbeat記録を含め7sのhard-kill marginを残す
 // （他の cron route と同じ導出。route.test.ts が実測で固定する）。export するのは
 // route.test.ts の予算不等式チェックがこの値をリテラル複製せず import するため
 // （pr-cross-review 指摘。値がずれたまま test が両方 pass する事故を防ぐ）。
@@ -65,6 +66,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     );
   }
 
+  const heartbeatStartedAt = new Date().toISOString();
+  await writeCronHeartbeat('calendar-account-deletion-settle', 'started', heartbeatStartedAt);
   try {
     const summary = await dispatchCalendarAccountDeletionSettle({
       deadlineAt: Date.now() + TIME_BUDGET_MS,
@@ -80,6 +83,9 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       });
     }
 
+    if (!summary.skipped) {
+      await writeCronHeartbeat('calendar-account-deletion-settle', 'completed', heartbeatStartedAt);
+    }
     return noStoreJson({ ok: true, ...summary });
   } catch (error) {
     // 常に新しい generic Error で capture する（raw error インスタンス自体は Sentry の

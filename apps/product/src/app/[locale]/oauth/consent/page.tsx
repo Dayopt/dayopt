@@ -4,7 +4,10 @@ import { getTranslations } from 'next-intl/server';
 
 import type { ScopedMessageKey } from '@/lib/i18n';
 import {
+  createOAuthDbClient,
   hasWriteScope,
+  isConsentWriteEnabled,
+  resolveGrantableScopes,
   validateAuthorizeInput,
   type AuthorizeValidationError,
   type SupportedScope,
@@ -69,6 +72,15 @@ export default async function ConsentPage({ searchParams }: ConsentPageProps) {
   const t = await getTranslations('oauth.consent');
   const clientName = validation.client.displayName;
 
+  // 広告は全 scope なので client は write も要求してくる。実際に付与するのは
+  // runtime gate が開いている client だけで、閉じていれば read へ降格する
+  // （actions.ts 側でも同じ計算を再実行する。hidden field は信用しない）。
+  const grantableScopes = resolveGrantableScopes(
+    validation.scopes,
+    await isConsentWriteEnabled(createOAuthDbClient(), validation.client.id),
+  );
+  const writeDowngraded = hasWriteScope(validation.scopes) && !hasWriteScope(grantableScopes);
+
   return (
     <div className="bg-card border-border-subtle w-full max-w-md rounded-lg border p-6 shadow-sm">
       <h1 className="text-foreground mb-2 text-lg font-medium">{t('heading', { clientName })}</h1>
@@ -81,16 +93,18 @@ export default async function ConsentPage({ searchParams }: ConsentPageProps) {
           {t('scopesLabel')}
         </p>
         <ul className="text-foreground space-y-1 text-sm">
-          {validation.scopes.map((scope) => (
+          {grantableScopes.map((scope) => (
             <li key={scope}>• {scopeLabel(t, scope)}</li>
           ))}
         </ul>
       </div>
 
       <p className="text-muted-foreground mb-6 text-xs leading-relaxed">
-        {hasWriteScope(validation.scopes)
+        {hasWriteScope(grantableScopes)
           ? t('writeNotice', { clientName })
-          : t('readOnlyNotice', { clientName })}
+          : writeDowngraded
+            ? t('writeUnavailableNotice', { clientName })
+            : t('readOnlyNotice', { clientName })}
       </p>
 
       {user?.email && (
@@ -103,7 +117,7 @@ export default async function ConsentPage({ searchParams }: ConsentPageProps) {
         <input type="hidden" name="client_id" value={validation.client.id} />
         <input type="hidden" name="redirect_uri" value={validation.redirectUri} />
         <input type="hidden" name="code_challenge" value={validation.codeChallenge} />
-        <input type="hidden" name="scope" value={validation.scopes.join(' ')} />
+        <input type="hidden" name="scope" value={grantableScopes.join(' ')} />
         <input type="hidden" name="resource" value={validation.resourceUri} />
         {validation.state && <input type="hidden" name="state" value={validation.state} />}
 

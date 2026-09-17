@@ -151,7 +151,7 @@ export function PlanMock() {
                 >
                   <div className="flex items-start justify-between">
                     <span className="text-foreground text-xs font-medium">{block.label}</span>
-                    <span className="text-muted-foreground text-[10px]">{block.duration}</span>
+                    <span className="text-foreground text-[10px]">{block.duration}</span>
                   </div>
                 </div>
               ))}

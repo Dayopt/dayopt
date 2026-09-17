@@ -2,7 +2,18 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { buildAuthorizationServerMetadata, buildProtectedResourceMetadata } from './metadata';
 
-const READ_SCOPES = ['read:entries', 'read:activities', 'read:constraints', 'read:stats'];
+// 広告は SUPPORTED_SCOPES 全量。write は「この AS が理解する scope」の宣言であって
+// 付与の約束ではない（実際の付与は consent の resolveGrantableScopes が決める）。
+const ADVERTISED = [
+  'read:entries',
+  'read:activities',
+  'read:constraints',
+  'read:stats',
+  'write:plans',
+  'delete:plans',
+  'write:records',
+  'delete:records',
+];
 
 describe('OAuth metadata scopes', () => {
   afterEach(() => {
@@ -18,7 +29,7 @@ describe('OAuth metadata scopes', () => {
       grant_types_supported: ['authorization_code', 'refresh_token'],
       code_challenge_methods_supported: ['S256'],
       token_endpoint_auth_methods_supported: ['none'],
-      scopes_supported: READ_SCOPES,
+      scopes_supported: ADVERTISED,
     });
   });
 
@@ -27,7 +38,7 @@ describe('OAuth metadata scopes', () => {
       resource: 'https://mcp.dayopt.app',
       authorization_servers: ['https://app.dayopt.app'],
       bearer_methods_supported: ['header'],
-      scopes_supported: READ_SCOPES,
+      scopes_supported: ADVERTISED,
     });
   });
 

@@ -34,7 +34,7 @@ import { describe, expect, it } from 'vitest';
  * あれば、個別 query に `.abortSignal()` を付け忘れても無制限にはならない。個別の
  * `.abortSignal()` はより短い上書きとして併用してよい。
  */
-const SERVICE_ROLE_KEY_REFERENCE = 'SUPABASE_SERVICE_ROLE_KEY';
+const SERVICE_ROLE_KEY_REFERENCE = 'SUPABASE_SECRET_KEY';
 
 describe('service-role client timeout contract', () => {
   it('service-role client の factory は global.fetch に上限を持つ', () => {

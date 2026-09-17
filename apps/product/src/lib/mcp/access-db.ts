@@ -31,22 +31,18 @@ type McpAccessSupabaseClient = SupabaseClient<McpAccessDatabase>;
 const MCP_ACCESS_DB_TIMEOUT_MS = 15_000;
 
 export function createMcpAccessDbClient(): McpAccessSupabaseClient {
-  return createClient<McpAccessDatabase>(
-    env.NEXT_PUBLIC_SUPABASE_URL,
-    env.SUPABASE_SERVICE_ROLE_KEY,
-    {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-      },
-      global: {
-        fetch: (url, options) => {
-          return fetch(url, {
-            ...options,
-            signal: options?.signal ?? AbortSignal.timeout(MCP_ACCESS_DB_TIMEOUT_MS),
-          });
-        },
+  return createClient<McpAccessDatabase>(env.NEXT_PUBLIC_SUPABASE_URL, env.SUPABASE_SECRET_KEY, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+    global: {
+      fetch: (url, options) => {
+        return fetch(url, {
+          ...options,
+          signal: options?.signal ?? AbortSignal.timeout(MCP_ACCESS_DB_TIMEOUT_MS),
+        });
       },
     },
-  );
+  });
 }

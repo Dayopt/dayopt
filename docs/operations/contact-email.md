@@ -32,7 +32,7 @@ Resend delivery failure → app別POST /api/webhooks/resend → PIIなしSentry 
 
 | 用途                | 1Password                                  | Replica / scope                                               |
 | ------------------- | ------------------------------------------ | ------------------------------------------------------------- |
-| Product / Web送信   | `agent/resend`                             | 各Vercel projectのProductionだけ。Preview / Developmentは禁止 |
+| Product / Web送信   | `human/resend-send`                        | 各Vercel projectのProductionだけ。Preview / Developmentは禁止 |
 | Product webhook署名 | `human/resend`                             | Product Productionだけ                                        |
 | Web webhook署名     | `human/resend-web`                         | Web Productionだけ。Productと異なる値                         |
 | Gmail返信SMTP       | `human/resend-support-replies`             | Gmail Send mail asだけ。Sending access・`dayopt.app`限定      |
@@ -79,7 +79,7 @@ DNS移管で到達性を失った場合は、Vercel Registrarのnameserverを元
 
 既存1Password環境では`setup-1password.sh`を実行しない。このscriptは空のvault向け初回bootstrap専用なので、masterを次の順で手動更新する。
 
-1. `agent/resend`にapp配送用`RESEND_API_KEY` / `RESEND_FROM_EMAIL`があることを確認する
+1. `human/resend-send`にapp配送用`RESEND_API_KEY` / `RESEND_FROM_EMAIL`があることを確認する（2026-09-14 に agent から移動）
 2. `human/resend`のProduct用`RESEND_WEBHOOK_SECRET`を確認する
 3. `human/resend-web`を作成し、Productと異なるWeb用`RESEND_WEBHOOK_SECRET`を保存する
 4. 前節で作成した`human/resend-support-replies`を確認する

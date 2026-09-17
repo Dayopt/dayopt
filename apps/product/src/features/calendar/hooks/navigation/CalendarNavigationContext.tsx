@@ -10,12 +10,15 @@ import React, {
   useTransition,
 } from 'react';
 
-import { usePathname } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 
 import { useCalendarNavigationStore } from '@/features/calendar/stores/useCalendarNavigationStore';
 import { MEDIA_QUERIES } from '@/lib/breakpoints';
+import { useInitialCalendarDate, useNeedsBrowserCalendarDate } from '@/lib/calendar-initial-date';
 import { isValidCalendarViewToken } from '@/lib/calendar-view-tokens';
+import { getDateKey } from '@/lib/date';
 import { useMediaQuery } from '@/lib/hooks/useMediaQuery';
+import { useUserPreferences } from '@/lib/hooks/useUserPreferences';
 
 import { getNextPeriod, getPreviousPeriod } from '../../domain/view-range';
 import { formatCalendarDateParam, parseCalendarDateParam } from '../../lib/date-param';
@@ -90,19 +93,23 @@ function writeLastCalendarView(view: CalendarViewType): void {
  * （旧 docs/projects/_archive/workspace-shell-restructure/overview.md §6-10 B、
  * docs/projects 全廃に伴い #2473 で削除。git 履歴参照）。
  */
-function resolveCalendarProps(pathname: string, fallbackDate?: Date) {
+function resolveCalendarProps(pathname: string, fallbackDate?: Date, initialSearch?: string) {
+  const params = new URLSearchParams(
+    initialSearch ?? (typeof window === 'undefined' ? '' : window.location.search),
+  );
+  const resolvedDate = parseCalendarDateParam(params.get('date')) ?? fallbackDate ?? new Date();
   const pathWithoutLocale = pathname.replace(/^\/(ja|en)/, '');
   const workspaceTab = resolveWorkspaceTab(pathWithoutLocale);
 
   if (workspaceTab === 'report') {
-    const initialDate = readDateParamFromLocation() ?? fallbackDate ?? new Date();
+    const initialDate = resolvedDate;
     return {
       isCalendarPage: false as const,
       workspaceTab,
       initialDate,
       // /report の URL は view を持たないため、直前に /calendar にいた時の view を
       // localStorage から復元する（無ければ week。readLastCalendarView 参照）。
-      initialView: readLastCalendarView() ?? 'week',
+      initialView: initialSearch === undefined ? (readLastCalendarView() ?? 'week') : 'week',
     };
   }
 
@@ -115,10 +122,9 @@ function resolveCalendarProps(pathname: string, fallbackDate?: Date) {
     };
   }
 
-  const viewParam =
-    typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('view') : null;
+  const viewParam = params.get('view');
   const view: CalendarViewType = viewParam && isValidViewType(viewParam) ? viewParam : 'week';
-  const initialDate = readDateParamFromLocation() ?? new Date();
+  const initialDate = resolvedDate;
 
   return {
     isCalendarPage: true as const,
@@ -149,16 +155,27 @@ const CalendarNavigationContext = createContext<CalendarNavigationContextValue |
  */
 export const CalendarNavigationProvider = ({ children }: { children: React.ReactNode }) => {
   const pathname = usePathname() ?? '/';
+  // 初回は SSR と共有する URL を読む。以後は遷移完了の合図として使い、
+  // 操作途中の search 更新で現在日付を巻き戻さない。
+  const searchParams = useSearchParams();
 
-  // pathname + window.location.search からワークスペースタブ判定と初期値を計算。
-  // render 中は ref を読めない（react-hooks/refs）ため fallbackDate は渡さない —
-  // 'other'（/settings 等）の initialDate が pathname 変化のたびに new Date() へ
-  // 空転する点は overview.md §6-10 B も「害は無い」と明記しており、event handler
-  // 側（popstate。下記）でだけ currentDateRef を使う。
-  const { isCalendarPage, initialDate, initialView } = useMemo(
-    () => resolveCalendarProps(pathname),
-    [pathname],
+  const dateKey = useInitialCalendarDate();
+  const needsBrowserDate = useNeedsBrowserCalendarDate();
+  const [restoreBrowserDate] = useState(
+    () => needsBrowserDate && !parseCalendarDateParam(searchParams?.get('date') ?? null),
   );
+  const [browserDateReady, setBrowserDateReady] = useState(!restoreBrowserDate);
+  const [initial] = useState(() =>
+    resolveCalendarProps(
+      pathname,
+      dateKey ? parseCalendarDateParam(dateKey) : undefined,
+      searchParams?.toString() ?? '',
+    ),
+  );
+  const { initialDate, initialView } = initial;
+  const timezone = useUserPreferences((state) => state.timezone);
+  const workspaceTab = resolveWorkspaceTab(pathname.replace(/^\/(ja|en)/, ''));
+  const isCalendarPage = workspaceTab === 'calendar';
 
   // useRefで最新値を保持し、コールバックの依存配列を安定化
   const currentDateRef = useRef<Date>(initialDate);
@@ -181,6 +198,28 @@ export const CalendarNavigationProvider = ({ children }: { children: React.React
   // 現在のlocaleを取得（例: /ja/day -> ja）
   const locale = pathname?.split('/')[1] || 'ja';
   const localeRef = useRef(locale);
+
+  React.useEffect(() => {
+    if (workspaceTab !== 'report') return;
+    const savedView = readLastCalendarView();
+    if (savedView) startTransition(() => setViewType(savedView));
+  }, [workspaceTab]);
+
+  // timezone cookie の無い初回認証 redirect は SSR が UTC に仮置きする。
+  // 最初の client render を合わせた後、明示 URL / 操作済み日付を上書きせず当日へ戻す。
+  React.useEffect(() => {
+    if (!restoreBrowserDate) return;
+    const explicitDate = readDateParamFromLocation();
+    const browserToday = new Date();
+    startTransition(() => {
+      if (!explicitDate) {
+        setCurrentDate((current) =>
+          current.getTime() === initialDate.getTime() ? browserToday : current,
+        );
+      }
+      setBrowserDateReady(true);
+    });
+  }, [restoreBrowserDate, initialDate, startTransition]);
 
   // ref同期 + グローバルストア同期（1つのeffectに統合）
   React.useEffect(() => {
@@ -236,14 +275,19 @@ export const CalendarNavigationProvider = ({ children }: { children: React.React
   // モバイルで未対応のビュー（day 以外）が設定された場合、dayへ切替
   // （URL直アクセスやブラウザ戻る/進むで week〜7day の URL に遷移した場合のガード）
   React.useEffect(() => {
-    if (isCalendarPage && isMobile && !isMobileCalendarViewSupported(viewType)) {
+    if (
+      browserDateReady &&
+      isCalendarPage &&
+      isMobile &&
+      !isMobileCalendarViewSupported(viewType)
+    ) {
       startTransition(() => {
         setViewType('day');
       });
       // URLもday viewに更新
       writeWorkspaceUrl('day', currentDateRef.current, 'replace');
     }
-  }, [isCalendarPage, isMobile, viewType, writeWorkspaceUrl]);
+  }, [browserDateReady, isCalendarPage, isMobile, viewType, writeWorkspaceUrl]);
 
   // URL に view= が明示されていたら viewType を同期する
   // （ブラウザ戻る/進む、直接URL入力時）。
@@ -263,17 +307,36 @@ export const CalendarNavigationProvider = ({ children }: { children: React.React
     if (viewParam === viewType) return;
     if (isMobileRef.current && !isMobileCalendarViewSupported(viewParam)) return;
     setViewType(viewParam);
-  }, [isCalendarPage, pathname, viewType]);
+  }, [isCalendarPage, pathname, searchParams, viewType]);
 
-  // URL由来の initialDate が変更されたら currentDate を同期
-  // （ブラウザ戻る/進む、直接URL入力時）
+  // /report → /calendar の client 遷移では pathname が先に変わり、その render で読む
+  // window.location はまだ /report のもの（date= が古い）。上の `initialDate` は
+  // [pathname] にしか反応しないので、URL が確定した後にもう一度 date= を読み直す
+  // （レポートの明細 → その日のカレンダー、「カレンダーで組む」が直前の日付のまま
+  // 開いていた。2026-09-14 実測）。
+  //
+  // 読み直すのは「pathname が変わった後、window.location がその pathname に追いついた
+  // 最初の 1 回」だけ。calendar 内の view / date 変更も history API で URL を書き
+  // （writeWorkspaceUrl）、Next はそれを useSearchParams へ反映するので、常に読み直すと
+  // 検索結果ジャンプのように「view を先に書いて date を後から直す」経路で、途中の
+  // 古い date= を拾って戻してしまう余地がある
+  const pendingDateResyncRef = useRef(false);
+  const resyncPathnameRef = useRef(pathname);
   React.useEffect(() => {
-    if (isCalendarPage && initialDate.getTime() !== currentDateRef.current.getTime()) {
-      startTransition(() => {
-        setCurrentDate(initialDate);
-      });
+    if (resyncPathnameRef.current !== pathname) {
+      resyncPathnameRef.current = pathname;
+      pendingDateResyncRef.current = true;
     }
-  }, [isCalendarPage, initialDate, startTransition]);
+    if (workspaceTab === 'other' || !pendingDateResyncRef.current) return;
+    // まだ URL が前の route のまま（search も古い）。次の searchParams 更新を待つ
+    if (window.location.pathname !== pathname) return;
+    pendingDateResyncRef.current = false;
+    const dateFromUrl = readDateParamFromLocation();
+    if (!dateFromUrl || dateFromUrl.getTime() === currentDateRef.current.getTime()) return;
+    startTransition(() => {
+      setCurrentDate(dateFromUrl);
+    });
+  }, [workspaceTab, pathname, searchParams, startTransition]);
 
   React.useEffect(() => {
     const handlePopState = () => {
@@ -338,7 +401,7 @@ export const CalendarNavigationProvider = ({ children }: { children: React.React
       let newDate: Date;
 
       if (direction === 'today') {
-        newDate = new Date();
+        newDate = parseCalendarDateParam(getDateKey(new Date(), timezone)) ?? new Date();
       } else {
         newDate =
           direction === 'next'
@@ -348,7 +411,7 @@ export const CalendarNavigationProvider = ({ children }: { children: React.React
 
       navigateToDate(newDate, true);
     },
-    [navigateToDate],
+    [navigateToDate, timezone],
   );
 
   const contextValue = useMemo(

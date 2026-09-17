@@ -74,6 +74,8 @@ feature 開発と並行する非 feature 作業を issue ベースで回す定�
 
 作業依頼・発見事項・監査結果が issue の外にある状態を作らない。
 
+Chat 等への外部依頼で生じた調査結果も、まず既存の対象 issue へ記録する。[Chat 連携手順](../../../docs/operations/chat-handoff.md) の依頼IDと投稿URLで照合し、調査結果の保存を採用・実装承認と混同しない。指定 issue へのコメント権限から、新規 issue 作成・本文変更・状態変更の権限を推定しない。新規起票を委ねる場合は repository、件数上限、対象範囲と本操作 B の規約を渡す。再送前には同じ依頼IDの投稿を確認し、既存ならそのURLを再利用する。
+
 1. `gh search issues` で既存 issue との重複を確認（close 済み含む）
 2. 重複なら既存 issue に本文追記 or コメントで統合。新規なら handoff-quality で起票。**RLS ポリシー・テナント境界・スキーマ変更に関わる起票では、攻撃シナリオ生成が issue の品質を実質的に上げる場合だけ、別 context の read-only reviewer に依頼し、出力を「## テストすべき攻撃シナリオ」として本文に貼る**。OpenAI / Codex の CLI adapter 例:
 

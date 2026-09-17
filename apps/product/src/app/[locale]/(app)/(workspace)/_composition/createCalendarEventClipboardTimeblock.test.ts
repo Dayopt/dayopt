@@ -11,10 +11,7 @@ function makeEvent(overrides: Partial<CalendarDisplayEvent> = {}): CalendarDispl
     description: '第3章まで',
     startDate: new Date('2026-07-14T00:15:00.000Z'),
     endDate: new Date('2026-07-14T01:45:00.000Z'),
-    status: 'open',
     color: 'blue',
-    createdAt: new Date('2026-07-14T00:00:00.000Z'),
-    updatedAt: new Date('2026-07-14T00:00:00.000Z'),
     version: '2026-07-14T00:00:00.000000Z',
     displayStartDate: new Date(2026, 6, 14, 9, 15),
     displayEndDate: new Date(2026, 6, 14, 10, 45),
@@ -35,9 +32,5 @@ describe('createCalendarEventClipboardTimeblock', () => {
       startHour: 9,
       startMinute: 15,
     });
-  });
-
-  it('種別を持たないCalendarDisplayEventはコピー対象にしない', () => {
-    expect(createCalendarEventClipboardTimeblock(makeEvent({ kind: undefined }))).toBeNull();
   });
 });

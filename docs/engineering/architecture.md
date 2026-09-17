@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-08-20
+last_verified: 2026-09-16
 code: apps/product/src
 ---
 
@@ -9,6 +9,8 @@ code: apps/product/src
 Dayopt のシステム構成、データフロー、DB スキーマ、技術選定理由、monorepo の package 境界をまとめる。「全体構成の現在地は?」の正。
 
 ---
+
+概念から変更候補を調べる入口: [Architecture Inventory](./data/architecture-inventory.md#探索の入口)。Plan / Record / Activity / Calendar surface から DB・API・UI/Story・テスト・docs の実ファイルへ辿れる。[更新と図の表示手順](./data/architecture/README.md)も参照。
 
 ## 技術スタック
 
@@ -25,7 +27,7 @@ Dayopt のシステム構成、データフロー、DB スキーマ、技術選�
 
 ### バックエンド
 
-- **Supabase (PostgreSQL)** — 認証・DB・リアルタイムを一体で提供する BaaS。PostgreSQL（SQL が使える）、RLS によるセキュリティ、オープンソースである点が採用理由
+- **Supabase (PostgreSQL)** — 認証と DB。PostgreSQL（SQL が使える）、RLS によるセキュリティ、オープンソースである点が採用理由。**Realtime は採用していない**（`postgres_changes` 購読ゼロ、publication 0 件。キャッシュ整合は TanStack Query の invalidate で取る）
 - **tRPC** — クライアント⇔サーバー間の E2E 型安全な API 通信。スキーマ自動生成不要、型の不整合はコンパイルエラーになる
 - **Zod** — バリデーション。型推論と tRPC 統合
 
@@ -44,7 +46,7 @@ Dayopt のシステム構成、データフロー、DB スキーマ、技術選�
 | tRPC           | E2E 型安全、コード量削減             |
 | Zustand        | シンプル、Redux 不要                 |
 | TanStack Query | キャッシング、リフェッチ             |
-| Supabase       | 認証、DB、リアルタイム一体型         |
+| Supabase       | 認証、DB、RLS を一体で提供           |
 | Tailwind CSS   | ユーティリティファースト             |
 | shadcn/ui      | カスタマイズ可能、Radix UI ベース    |
 | Zod            | 型推論、tRPC と統合                  |
@@ -75,7 +77,7 @@ User["👤 ユーザー操作"]
 
     subgraph Server["⚙️ サーバー"]
         API["/api/trpc/[trpc]"]
-        MW["Middleware<br/>(認証・Rate Limit)"]
+        MW["createFetchTRPCContext<br/>(認証前 rate limit・session 解決)"]
         TRPC_R["tRPC Router<br/>(protectedProcedure)"]
         SVC["Service Layer<br/>(ビジネスロジック)"]
     end
@@ -100,87 +102,102 @@ User["👤 ユーザー操作"]
 
 ### 認証フロー
 
-```mermaid
-graph LR
-subgraph AuthModes["認証モード（自動判定）"]
-S["Session<br/>(Cookie)"]
-O["OAuth 2.1<br/>(Bearer Token)"]
-SR["Service-Role<br/>(API Key)"]
-end
+OAuth bearer が tRPC へ到達する経路は **MCP endpoint の内部実行だけ**で、公開 HTTP 境界の
+`/api/trpc` へ同じ token を投げても DB を引く前に 401 になる。rate limit は 2 段で、
+認証前（cookie 付きのみ、IP 単位）と認証後（user 単位）は別の bucket。
 
-    subgraph Middleware
-        CTX["createFetchTRPCContext"]
-        RL["Rate Limit<br/>(300 req/min)"]
+```mermaid
+graph TD
+    subgraph Public["公開 HTTP 境界"]
+        TRPC["/api/trpc<br/>Session (Cookie) のみ"]
+        MCP["/api/mcp<br/>OAuth 2.1 Bearer"]
     end
 
-    S --> CTX
-    O --> CTX
-    SR --> CTX
-    CTX -->|"userId 抽出"| RL
-    RL --> Router["tRPC Router"]
+    subgraph Ctx["createFetchTRPCContext"]
+        REJECT["OAuth bearer → 401<br/>(MCP 以外では受理しない)"]
+        PRE["pre-auth rate limit<br/>cookie 付きのみ / IP 単位"]
+        SESSION["session 解決 (getUser)"]
+    end
+
+    subgraph Proc["protectedProcedure"]
+        MFA["MFA assurance"]
+        BILLING["利用権"]
+        FENCE["write fence (mutation)"]
+        RL["user rate limit<br/>300 req/min"]
+    end
+
+    BRIDGE["lib/mcp/trpc-bridge<br/>createCaller(oauthExecution: mcp_internal)"]
+
+    TRPC --> REJECT --> PRE --> SESSION --> MFA
+    MCP -->|"token 検証後"| BRIDGE --> MFA
+    MFA --> BILLING --> FENCE --> RL --> Router["tRPC Router"]
 ```
+
+- `service-role`（`X-API-Key`）モードは context に存在するが、全 procedure が `ctx.userId` を
+  要求するため公開境界からは到達できない（内部 caller 専用）
+- OAuth caller は user rate limit を消費しない（MCP 側の専用 limiter で一度だけ制限する）
 
 ### Provider 階層
 
-```mermaid
-graph TD
-    P["Providers (root)"]
-    P --> QC["QueryClientProvider"]
-    P --> TC["api.Provider (tRPC)"]
-    P --> AS["AuthStoreInitializer"]
-    P --> TP["ThemeProvider"]
-    P --> SW["ServiceWorkerProvider (lazy)"]
-    P --> GT["GlobalTagMergeModal (lazy)"]
-```
+実体は `app/[locale]/(app)/_providers/_composition/ProvidersComposition.tsx`。**入れ子の順序をここに写さない**
+（2026-09-16 に、実装と食い違ったまま残っていた図を撤去した。#2747 で並びが変わっている）。
+
+守る規則だけを書く:
+
+- Context を張るのは `PersistQueryClientProvider` → `api.Provider`（tRPC）→ `ThemeProvider` の 3 つだけ
+- 副作用だけの component（`AuthStoreInitializer` / `QueryCacheAuthBoundary` / `SessionMonitorProvider` / `ServiceWorkerProvider`）は children を包まず並列に置く。包むと遅延ロードが描画を止める
+- children を包むのは、データを待たせる必要がある `UserSettingsInitializer` と `BillingAccessProvider` だけ
 
 ### キャッシュ戦略
 
-```mermaid
-graph LR
-subgraph Cache["TanStack Query キャッシュ"]
-E["plans / records / calendars<br/>stale: 5min, gc: 10min"]
-AC["activities / categories<br/>stale: 5min, gc: 10min"]
-US["userSettings<br/>stale: 1h, gc: 2h"]
-end
+既定値は `src/lib/trpc/query-client.ts` が正本（2026-09-16 時点で staleTime 5 分 / gcTime 2 時間、gcTime は
+IndexedDB 永続化の上限と同じ値）。hook 側で個別に上書きするものがあるため、**この doc に数値を写さない**。
 
-    WF["refetchOnWindowFocus"] -.->|"stale時 再取得"| E
-    WF -.->|"stale時 再取得"| AC
-```
+方針:
+
+- サーバーデータは TanStack Query に置き、Zustand へ複製しない
+- 変更が自分の操作でしか起きないものは invalidate で整合を取る（Realtime は使わない）
+- 永続化の対象は `should-persist-query.ts` が決める。認証主体が変われば `QueryCacheAuthBoundary` が cache を捨てる
 
 ### Feature 間の依存（Composition Layer）
 
+<!-- architecture-map:feature-dag:start — 正本 apps/product/eslint.config.mjs の no-restricted-imports と features/ の実 import / 再生成 pnpm architecture:generate / 検証 pnpm architecture:check。この範囲は手編集しない -->
+
+実際の runtime import（stories / test を除く）を描く。層は依存の最長経路、種別（Layer 0 / independent / composition）は ESLint の規則から取る。
+
 ```mermaid
 graph TD
-subgraph Features
-ACT["activities (Layer 0)"]
-TB["timeblock (Layer 1)"]
-CAL["calendar (Layer 2 / hub)"]
-REV["review (Layer 2)"]
-AUTH["auth (independent)"]
-CONTACT["contact (independent)"]
-SET["settings (composition)"]
-end
-
-    subgraph Composition["Composition Layer"]
-        APP["app/**/_composition + layout"]
-        LIB["lib/*"]
-        STORE["lib/stores/*"]
-    end
-
-    TB --> ACT
-    CAL --> TB
-    CAL --> ACT
-    REV --> TB
-    REV --> ACT
-    APP --> CAL
-    APP --> REV
-    APP --> AUTH
-    SET --> STORE
-    CAL --> STORE
-    LIB --> STORE
+  subgraph L0["Layer 0"]
+    activities["activities (Layer 0)"]
+    external_calendar["external-calendar (Layer 0)"]
+  end
+  subgraph L1["Layer 1"]
+    review["review (Layer 1)"]
+    timeblock["timeblock (Layer 1)"]
+  end
+  subgraph L2["Layer 2"]
+    calendar["calendar (Layer 2)"]
+  end
+  subgraph Composition
+    settings["settings (composition)"]
+  end
+  subgraph Independent
+    auth["auth (independent)"]
+    contact["contact (independent)"]
+  end
+  calendar --> activities
+  calendar --> external_calendar
+  calendar --> timeblock
+  review --> activities
+  settings --> auth
+  settings --> calendar
+  settings --> external_calendar
+  timeblock --> activities
 ```
 
-依存方向の正はリポジトリルートの [AGENTS.md / `pr-cross-review` skill](../../AGENTS.md / `pr-cross-review` skill) と
+<!-- architecture-map:feature-dag:end -->
+
+依存方向の正はリポジトリルートの [AGENTS.md](../../AGENTS.md) と
 `apps/product/eslint.config.mjs`。`settings` は cross-cutting composition、`calendar` はページ全体を合成する hub として扱う。
 
 ### Calendar の Plan / Record と UI state
@@ -189,10 +206,9 @@ Calendar は Plan（予定）と Record（記録）を別レーンで描画し�
 
 ```mermaid
 flowchart LR
-    URL["URL: date / view / panel"] --> NAV["CalendarNavigationContext"]
+    URL["URL: date / view"] --> NAV["CalendarNavigationContext"]
     NAV --> CLIENT["CalendarViewClient"]
     CLIENT --> CTRL["CalendarController"]
-    CLIENT --> PANEL["right-side panel: review / diff"]
     CTRL --> QUERY["tRPC + TanStack Query"]
     QUERY --> SERVICE["timeblock router / service"]
     SERVICE --> DB["Supabase: plans / records"]
@@ -200,8 +216,9 @@ flowchart LR
     NAV -.->|"command / mirror only"| ZS
 ```
 
-- 日付・view range・右パネルの表示可否は URL と `CalendarNavigationContext` が source of truth。
-- `CalendarViewClient` が `CalendarController` と右側パネルを合成する。Review/Diff は独立ページではなく Calendar shell に追従する。
+- 日付と view range は URL と `CalendarNavigationContext` が source of truth。
+- 振り返りは `/report` として独立した画面。かつて Calendar shell の右パネル（`panel=review` / `panel=diff`）だったが、
+  現在その query は legacy redirect の入口としてだけ残る（`panel-url.ts` / `proxy.ts`。2026-09-16 に記述を更新）。
 - Zustand は drag、inline create、clipboard、inspector、shell などの一時 UI state と、表示モード・アクティビティフィルターのユーザー設定だけを担う。URL/Context の値を永続化しない。
 - Plan / Record / activity などのサーバーデータは Zustand に複製せず、tRPC / TanStack Query 経由で扱う。
 
@@ -353,28 +370,34 @@ USING (auth.uid() = user_id);
 
 ## Database Architecture
 
-> **RLS 対象 public テーブル数**: 27 | **PostgreSQL**: v17
+> **PostgreSQL**: v17。RLS 対象テーブル数・policy 数は [`data/db/rls-snapshot.md`](./data/db/rls-snapshot.md) の集計行を正とする（ここに書くと二重管理になり陳腐化する）
 
 Dayopt は Supabase（PostgreSQL）を使用する。本番は Pro organization の `dayopt` project、PR ごとの検証は ephemeral Preview Branches を使い、永続 Staging project は置かない。
 RLS の正確な対象・policy・grant は自動生成の [`data/db/rls-snapshot.md`](./data/db/rls-snapshot.md) を正とする。
 
-### テーブル一覧
+実装から自動発見した項目（feature / テーブル / 関数 / router / procedure / MCP tool / store / Story / route / i18n）と用語集の概念との対応は [`data/architecture-inventory.md`](./data/architecture-inventory.md)（生成物）を見る。概念が付いていない項目は「概念を足す候補」と「語彙を持たない層」に分かれており、後者の判定規則は `scripts/lib/architecture-map/vocabulary-scope.ts` が持つ。
 
-#### コアビジネス（7テーブル）
+外部との接点（HTTP route / 定期実行 / Edge Function）、権限と上限（OAuth scope / procedure builder / rate limit）、DB エラーコード、分析イベント、env 変数、package、および呼び出し関係（MCP tool → procedure、procedure の利用元と未使用、store の利用元、docs → feature、E2E → route、DB 関数の test 被覆）は [`data/system-surface.md`](./data/system-surface.md)（生成物）を見る。
+
+### テーブルの役割（手書き）
+
+一覧・列・FK は下の生成ブロックが正で、ここは役割の説明だけを持つ。ここに無いテーブルは生成ブロックのテーブル一覧で見る。
+
+#### コアビジネス
 
 | テーブル                     | 役割                                                             | 主要カラム                                                                                                               |
 | ---------------------------- | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
 | **plans**                    | Plan（予定）。これからやる時間の宣言                             | title, activity_id, start_at, end_at, source, external_calendar_event_id                                                 |
 | **records**                  | Record（記録）。予定とは独立                                     | title, activity_id, start_at, end_at, source, external_calendar_event_id                                                 |
-| **external_calendar_events** | 外部カレンダー同期ミラー（テーブルのみ存在。同期実装は Phase 2） | connection_id, provider, provider_calendar_id, provider_event_id, start_at, end_at, status, dismissed_at, last_synced_at |
+| **external_calendar_events** | 外部カレンダー同期ミラー（Google の取り込みが稼働中）            | connection_id, provider, provider_calendar_id, provider_event_id, start_at, end_at, status, dismissed_at, last_synced_at |
 | **categories**               | 所属の主軸。単一所属（`activities.category_id` 1本で表現）       | name, color, icon, archived_at                                                                                           |
 | **activities**               | Plan / Record の分類単位。所属カテゴリーから色・アイコンを継承   | category_id, name, archived_at                                                                                           |
-| **segments**                 | 分析用の保存クエリ（横断参照、重複を許す）                       | name                                                                                                                     |
-| **segment_activities**       | セグメントとアクティビティの多対多 junction                      | segment_id, activity_id                                                                                                  |
+| **segments**                 | 撤去済み（2026-09-15）。UI / tRPC / MCP は無く、table だけが残る | name                                                                                                                     |
+| **segment_activities**       | 同上（drop は不可逆なので別変更）                                | segment_id, activity_id                                                                                                  |
 
-#### 外部カレンダー連携（2テーブル）
+#### 外部カレンダー連携
 
-Phase 2（external-calendar-import）で追加。OAuth / 同期 / UI は Step 2 以降。
+外部カレンダー取り込みで追加。取り込みは `calendar-sync` の定期実行が動いている（間隔は [`data/system-surface.md`](./data/system-surface.md) の定期実行を見る）。
 
 | テーブル                          | 役割                                                              | 主要カラム                                                                                       |
 | --------------------------------- | ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
@@ -383,119 +406,541 @@ Phase 2（external-calendar-import）で追加。OAuth / 同期 / UI は Step 2 
 
 `calendar_connections.refresh_token_enc` / `granted_scopes` / `provider_account_id` は authenticated へ GRANT しない（column-scoped SELECT）。詳細は [`data/db/rls-snapshot.md`](./data/db/rls-snapshot.md)。
 
-#### ユーザー設定（2テーブル）
+#### ユーザー設定
 
-| テーブル          | 役割                                    | 主要カラム                                                                                                      |
-| ----------------- | --------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| **profiles**      | ユーザープロフィール（auth.usersと1:1） | email, username, full_name, avatar_url                                                                          |
-| **user_settings** | 表示設定                                | timezone, theme, time format, snap interval, business hours。物理スキーマの legacy 列はプロダクト契約に含めない |
+| テーブル          | 役割                                    | 主要カラム                                                                                                         |
+| ----------------- | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| **profiles**      | ユーザープロフィール（auth.usersと1:1） | email, username, full_name, avatar_url                                                                             |
+| **user_settings** | 表示設定                                | timezone, theme, time format, default duration, business hours。物理スキーマの legacy 列はプロダクト契約に含めない |
 
-#### セキュリティ/監査（1テーブル）
+#### セキュリティ/監査
 
 | テーブル               | 役割                | 主要カラム                  |
 | ---------------------- | ------------------- | --------------------------- |
 | **mfa_recovery_codes** | MFAリカバリーコード | code_hash(SHA-256), used_at |
 
-### ER図
+<!-- architecture-map:er:start — 正本 apps/product/src/lib/database/generated/database.types.ts / 再生成 pnpm architecture:generate / 検証 pnpm architecture:check。この範囲は手編集しない -->
 
+### テーブル一覧（public、30 テーブル）
+
+| テーブル                        | 列数 | FK 参照先                                                       |
+| ------------------------------- | ---- | --------------------------------------------------------------- |
+| `activities`                    | 7    | `categories`                                                    |
+| `calendar_connection_calendars` | 9    | `calendar_connections`                                          |
+| `calendar_connections`          | 18   | —                                                               |
+| `categories`                    | 8    | —                                                               |
+| `cron_heartbeats`               | 4    | —                                                               |
+| `email_suppressions`            | 5    | —                                                               |
+| `external_calendar_events`      | 16   | `calendar_connections`                                          |
+| `mcp_environment_identity`      | 6    | —                                                               |
+| `mcp_mutation_control`          | 6    | —                                                               |
+| `mcp_mutation_receipts`         | 16   | `oauth_connections`                                             |
+| `mfa_recovery_codes`            | 5    | —                                                               |
+| `oauth_audit_log`               | 6    | `oauth_tokens`                                                  |
+| `oauth_authorization_codes`     | 12   | `mcp_environment_identity`, `oauth_connections`                 |
+| `oauth_connections`             | 16   | `mcp_environment_identity`                                      |
+| `oauth_tokens`                  | 14   | `mcp_environment_identity`, `oauth_connections`, `oauth_tokens` |
+| `plan_template_blocks`          | 7    | `activities`, `plan_templates`                                  |
+| `plan_templates`                | 5    | —                                                               |
+| `plans`                         | 12   | `activities`, `external_calendar_events`                        |
+| `product_events`                | 5    | —                                                               |
+| `profiles`                      | 13   | —                                                               |
+| `records`                       | 13   | `activities`, `external_calendar_events`                        |
+| `reports`                       | 8    | —                                                               |
+| `segment_activities`            | 3    | `activities`, `segments`                                        |
+| `segments`                      | 5    | —                                                               |
+| `stripe_webhook_events`         | 6    | —                                                               |
+| `undo_receipt_effects`          | 7    | `plans`, `records`, `undo_receipts`                             |
+| `undo_receipt_field_changes`    | 5    | `undo_receipt_effects`                                          |
+| `undo_receipts`                 | 12   | `oauth_connections`                                             |
+| `user_settings`                 | 16   | —                                                               |
+| `write_fence_control`           | 3    | —                                                               |
+
+### ER 図: 概念に紐づくテーブル
+
+用語集（`docs/product/glossary.md`）の DB 列が指すテーブルだけを描く。部分集合の外へ向かう FK は全体図で見る。
+
+```mermaid
+erDiagram
+  activities {
+    string archived_at "nullable"
+    string category_id FK "nullable"
+    string created_at
+    string id
+    string name
+    string updated_at
+    string user_id FK
+  }
+  categories {
+    string archived_at "nullable"
+    string color "nullable"
+    string created_at
+    string icon "nullable"
+    string id
+    string name
+    string updated_at
+    string user_id
+  }
+  external_calendar_events {
+    string calendar_name "nullable"
+    string connection_id FK "nullable"
+    string created_at
+    string description "nullable"
+    string dismissed_at "nullable"
+    string end_at "nullable"
+    string id
+    string last_synced_at
+    string provider
+    string provider_calendar_id
+    string provider_event_id
+    string start_at "nullable"
+    string status
+    string title "nullable"
+    string updated_at
+    string user_id FK
+  }
+  plan_template_blocks {
+    string activity_id FK "nullable"
+    number anchor_minute
+    string created_at
+    string id
+    string template_id FK
+    string title
+    string user_id FK
+  }
+  plan_templates {
+    string created_at
+    string id
+    string name
+    string updated_at
+    string user_id
+  }
+  plans {
+    string activity_id FK "nullable"
+    string created_at
+    string deleted_at "nullable"
+    string end_at
+    string external_calendar_event_id FK "nullable"
+    string id
+    string note "nullable"
+    string source
+    string start_at
+    string title
+    string updated_at
+    string user_id FK
+  }
+  profiles {
+    string app_trial_consumed_at "nullable"
+    string app_trial_ends_at "nullable"
+    string app_trial_started_at "nullable"
+    string avatar_url "nullable"
+    string created_at
+    string email
+    string full_name "nullable"
+    string id
+    string stripe_customer_id "nullable"
+    string subscription_id "nullable"
+    string subscription_status
+    string updated_at
+    string welcome_email_sent_at "nullable"
+  }
+  records {
+    string activity_id FK "nullable"
+    string created_at
+    string deleted_at "nullable"
+    string end_at
+    string external_calendar_event_id FK "nullable"
+    string fulfillment "nullable"
+    string id
+    string note "nullable"
+    string source
+    string start_at
+    string title
+    string updated_at
+    string user_id FK
+  }
+  segment_activities {
+    string activity_id FK
+    string segment_id FK
+    string user_id FK
+  }
+  segments {
+    string created_at
+    string id
+    string name
+    string updated_at
+    string user_id
+  }
+  activities }o--|| categories : "category_id, user_id"
+  plan_template_blocks }o--|| activities : "activity_id, user_id"
+  plan_template_blocks }o--|| plan_templates : "template_id, user_id"
+  plans }o--|| activities : "activity_id, user_id"
+  plans }o--|| external_calendar_events : "external_calendar_event_id"
+  records }o--|| activities : "activity_id, user_id"
+  records }o--|| external_calendar_events : "external_calendar_event_id"
+  segment_activities }o--|| activities : "activity_id, user_id"
+  segment_activities }o--|| segments : "segment_id, user_id"
 ```
-                          ┌──────────────────┐
-                          │    auth.users     │
-                          │  (Supabase管理)   │
-                          │──────────────────│
-                          │ id (PK, UUID)     │
-                          │ email             │
-                          └────────┬─────────┘
-                                   │
-         ┌─────────────────────────┼─────────────────────────┐
-         │                         │                         │
-         ▼                         ▼                         ▼
-┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐
-│    profiles       │  │  user_settings    │  │     categories     │
-│    (1:1)          │  │    (1:1)          │  │──────────────────│
-│──────────────────│  │──────────────────│  │ id (PK)           │
-│ id (PK=FK)        │  │ user_id (FK,UQ)   │  │ user_id (FK)      │
-│ email, username   │  │ timezone, theme   │  │ name, color, icon │
-└──────────────────┘  └──────────────────┘  │ archived_at       │
-                                              └────────┬─────────┘
-                                                       │ category_id (nullable)
-                                                       ▼
-                                              ┌──────────────────┐
-                                              │    activities      │
-                                              │──────────────────│
-                                              │ id (PK)           │
-                                              │ user_id (FK)      │
-                                              │ category_id (FK,  │
-                                              │   nullable)       │
-                                              │ name, archived_at │
-                                              └────────┬─────────┘
-                                                       │ activity_id (nullable, both)
-                              ┌─────────────────────────┤
-                              │                         │
-                              ▼                         ▼
-                    ┌──────────────────┐      ┌──────────────────┐
-                    │      plans        │      │      records       │
-                    │──────────────────│      │──────────────────│
-                    │ id (PK)           │      │ id (PK)            │
-                    │ user_id (FK)      │      │ user_id (FK)       │
-                    │ title, note       │      │ title, note        │
-                    │ start_at/end_at   │      │ start_at/end_at    │
-                    │ source            │      │ source             │
-                    │ external_calendar_│      │ external_calendar_ │
-                    │  event_id (FK)    │      │  event_id (FK)     │
-                    └────────┬─────────┘      └─────────┬──────────┘
-                             │                            │
-                             └─────────────┬──────────────┘
-                                           ▼
-                              ┌───────────────────────────┐
-                              │  external_calendar_events  │
-                              │  (同期ミラー)              │
-                              │───────────────────────────│
-                              │ id (PK)                    │
-                              │ user_id (FK)                │
-                              │ connection_id (FK, NULL)    │
-                              │ provider, provider_calendar_ │
-                              │  id, provider_event_id      │
-                              │ start_at/end_at, status     │
-                              │ dismissed_at, last_synced_at │
-                              └─────────────┬─────────────┘
-                                            │ connection_id (ON DELETE SET NULL)
-                                            ▼
-                              ┌───────────────────────────┐
-                              │   calendar_connections     │
-                              │  (provider アカウント接続) │
-                              │───────────────────────────│
-                              │ id (PK)                    │
-                              │ user_id (FK)                │
-                              │ provider, provider_account_ │
-                              │  id, provider_account_email │
-                              │ granted_scopes              │
-                              │ refresh_token_enc           │
-                              │ status, last_synced_at      │
-                              └─────────────┬─────────────┘
-                                            │ (id, user_id) 複合 FK
-                                            ▼
-                              ┌───────────────────────────┐
-                              │ calendar_connection_       │
-                              │   calendars (選択カレンダー)│
-                              │───────────────────────────│
-                              │ id (PK)                    │
-                              │ connection_id, user_id (FK) │
-                              │ provider_calendar_id        │
-                              │ calendar_name, sync_token   │
-                              └───────────────────────────┘
 
-=== セキュリティ/監査 ===
+### ER 図: 全テーブル
 
-┌──────────────────┐
-│ mfa_recovery_    │
-│ codes            │
-│──────────────────│
-│ user_id (FK)     │
-│ code_hash        │
-│ used_at           │
-└──────────────────┘
+```mermaid
+erDiagram
+  activities {
+    string archived_at "nullable"
+    string category_id FK "nullable"
+    string created_at
+    string id
+    string name
+    string updated_at
+    string user_id FK
+  }
+  calendar_connection_calendars {
+    string calendar_name "nullable"
+    string connection_id FK
+    string created_at
+    string id
+    string last_synced_at "nullable"
+    string provider_calendar_id
+    string sync_token "nullable"
+    string updated_at
+    string user_id FK
+  }
+  calendar_connections {
+    number authority_epoch "nullable"
+    string authority_fence_id "nullable"
+    number consecutive_failures
+    string created_at
+    number data_generation
+    string_array granted_scopes
+    string id
+    string last_sync_error "nullable"
+    string last_synced_at "nullable"
+    string provider
+    string provider_account_email "nullable"
+    string provider_account_id
+    string refresh_token_enc
+    string refresh_token_rotation_operation_id "nullable"
+    string status
+    number sync_sequence
+    string updated_at
+    string user_id
+  }
+  categories {
+    string archived_at "nullable"
+    string color "nullable"
+    string created_at
+    string icon "nullable"
+    string id
+    string name
+    string updated_at
+    string user_id
+  }
+  cron_heartbeats {
+    string job_name
+    string last_completed_at "nullable"
+    string last_started_at
+    json last_summary "nullable"
+  }
+  email_suppressions {
+    string created_at
+    string email
+    string id
+    string reason
+    string source_event_id "nullable"
+  }
+  external_calendar_events {
+    string calendar_name "nullable"
+    string connection_id FK "nullable"
+    string created_at
+    string description "nullable"
+    string dismissed_at "nullable"
+    string end_at "nullable"
+    string id
+    string last_synced_at
+    string provider
+    string provider_calendar_id
+    string provider_event_id
+    string start_at "nullable"
+    string status
+    string title "nullable"
+    string updated_at
+    string user_id FK
+  }
+  mcp_environment_identity {
+    string authorization_server_uri
+    string environment
+    string provisioned_at
+    string resource_uri
+    boolean singleton_key
+    string supabase_project_ref "nullable"
+  }
+  mcp_mutation_control {
+    boolean billing_enforced
+    string changed_at
+    string_array enabled_client_ids
+    number revision
+    boolean singleton_key
+    boolean writes_enabled
+  }
+  mcp_mutation_receipts {
+    string applied_at
+    string client_id
+    number data_generation
+    number digest_version
+    number envelope_version
+    string operation_id
+    string origin_connection_id FK "nullable"
+    string purged_at "nullable"
+    number purged_generation "nullable"
+    string request_digest
+    string resource_deleted_at "nullable"
+    string resource_id
+    string resource_type
+    string resource_version
+    string tool_name
+    string user_id
+  }
+  mfa_recovery_codes {
+    string code_hash
+    string created_at
+    string id
+    string used_at "nullable"
+    string user_id
+  }
+  oauth_audit_log {
+    string called_at
+    string client_id
+    string id
+    string token_id FK "nullable"
+    string tool_name
+    string user_id
+  }
+  oauth_authorization_codes {
+    string client_id FK
+    string code_challenge
+    string code_challenge_method
+    string code_hash
+    string connection_id FK "nullable"
+    string consumed_at "nullable"
+    string created_at
+    string expires_at
+    string redirect_uri
+    string resource_uri FK "nullable"
+    string_array scopes
+    string user_id FK
+  }
+  oauth_connections {
+    string authorized_at
+    string client_id
+    number consent_version
+    string created_at
+    string id
+    string last_refreshed_at "nullable"
+    string last_used_at "nullable"
+    boolean legacy_read_only
+    string reauth_required_at
+    string resource_uri FK
+    string revoked_at "nullable"
+    string revoked_reason "nullable"
+    string_array scopes
+    string updated_at
+    string user_id
+    string write_enabled_at "nullable"
+  }
+  oauth_tokens {
+    string client_id FK
+    string connection_id FK "nullable"
+    string created_at
+    string expires_at
+    string id
+    string last_used_at "nullable"
+    string parent_token_id FK "nullable"
+    string resource_uri FK "nullable"
+    string revoked_at "nullable"
+    string rotated_at "nullable"
+    string_array scopes
+    string token_hash
+    string token_type
+    string user_id FK
+  }
+  plan_template_blocks {
+    string activity_id FK "nullable"
+    number anchor_minute
+    string created_at
+    string id
+    string template_id FK
+    string title
+    string user_id FK
+  }
+  plan_templates {
+    string created_at
+    string id
+    string name
+    string updated_at
+    string user_id
+  }
+  plans {
+    string activity_id FK "nullable"
+    string created_at
+    string deleted_at "nullable"
+    string end_at
+    string external_calendar_event_id FK "nullable"
+    string id
+    string note "nullable"
+    string source
+    string start_at
+    string title
+    string updated_at
+    string user_id FK
+  }
+  product_events {
+    string created_at
+    string event_name
+    string id
+    json properties
+    string user_id
+  }
+  profiles {
+    string app_trial_consumed_at "nullable"
+    string app_trial_ends_at "nullable"
+    string app_trial_started_at "nullable"
+    string avatar_url "nullable"
+    string created_at
+    string email
+    string full_name "nullable"
+    string id
+    string stripe_customer_id "nullable"
+    string subscription_id "nullable"
+    string subscription_status
+    string updated_at
+    string welcome_email_sent_at "nullable"
+  }
+  records {
+    string activity_id FK "nullable"
+    string created_at
+    string deleted_at "nullable"
+    string end_at
+    string external_calendar_event_id FK "nullable"
+    string fulfillment "nullable"
+    string id
+    string note "nullable"
+    string source
+    string start_at
+    string title
+    string updated_at
+    string user_id FK
+  }
+  reports {
+    json content
+    string created_at
+    string id
+    string period_end
+    string period_start
+    string period_type
+    string summary
+    string user_id
+  }
+  segment_activities {
+    string activity_id FK
+    string segment_id FK
+    string user_id FK
+  }
+  segments {
+    string created_at
+    string id
+    string name
+    string updated_at
+    string user_id
+  }
+  stripe_webhook_events {
+    string claimed_at
+    string event_id
+    string event_type
+    string id
+    string processed_at "nullable"
+    string status
+  }
+  undo_receipt_effects {
+    string effect_kind
+    string id
+    string plan_id FK "nullable"
+    string receipt_id FK
+    string record_id FK "nullable"
+    string resource_type "nullable"
+    string user_id FK
+  }
+  undo_receipt_field_changes {
+    json after_value
+    json before_value
+    string effect_id FK
+    string field_name
+    string user_id FK
+  }
+  undo_receipts {
+    string command_name
+    string created_at
+    boolean had_origin_connection
+    string id
+    string operation_id
+    string origin_connection_id FK "nullable"
+    string_array origin_scopes_snapshot "nullable"
+    number recorded_effect_count
+    string undo_expires_at
+    string undone_at "nullable"
+    string undone_operation_id "nullable"
+    string user_id FK
+  }
+  user_settings {
+    string created_at
+    number default_duration
+    string default_view
+    string hour_height_density
+    string ical_feed_token "nullable"
+    string id
+    json personalization "nullable"
+    string preferred_locale
+    boolean show_week_numbers
+    boolean show_weekends
+    string theme
+    string time_format
+    string timezone
+    string updated_at
+    string user_id
+    number week_starts_on
+  }
+  write_fence_control {
+    boolean fence_enabled
+    boolean singleton_key
+    string updated_at
+  }
+  activities }o--|| categories : "category_id, user_id"
+  calendar_connection_calendars }o--|| calendar_connections : "connection_id, user_id"
+  external_calendar_events }o--|| calendar_connections : "connection_id, user_id"
+  mcp_mutation_receipts }o--|| oauth_connections : "origin_connection_id"
+  oauth_audit_log }o--|| oauth_tokens : "token_id"
+  oauth_authorization_codes }o--|| oauth_connections : "connection_id, user_id, client_id, resource_uri"
+  oauth_authorization_codes }o--|| mcp_environment_identity : "resource_uri"
+  oauth_connections }o--|| mcp_environment_identity : "resource_uri"
+  oauth_tokens }o--|| oauth_connections : "connection_id, user_id, client_id, resource_uri"
+  oauth_tokens }o--|| mcp_environment_identity : "resource_uri"
+  oauth_tokens }o--|| oauth_tokens : "parent_token_id"
+  plan_template_blocks }o--|| activities : "activity_id, user_id"
+  plan_template_blocks }o--|| plan_templates : "template_id, user_id"
+  plans }o--|| activities : "activity_id, user_id"
+  plans }o--|| external_calendar_events : "external_calendar_event_id"
+  records }o--|| activities : "activity_id, user_id"
+  records }o--|| external_calendar_events : "external_calendar_event_id"
+  segment_activities }o--|| activities : "activity_id, user_id"
+  segment_activities }o--|| segments : "segment_id, user_id"
+  undo_receipt_effects }o--|| plans : "plan_id, user_id"
+  undo_receipt_effects }o--|| undo_receipts : "receipt_id, user_id"
+  undo_receipt_effects }o--|| records : "record_id, user_id"
+  undo_receipt_field_changes }o--|| undo_receipt_effects : "effect_id, user_id"
+  undo_receipts }o--|| oauth_connections : "origin_connection_id, user_id"
 ```
+
+<!-- architecture-map:er:end -->
 
 ### 設計判断
 
@@ -525,6 +970,8 @@ Phase 2（external-calendar-import）で追加。OAuth / 同期 / UI は Step 2 
 #### トランザクション関数
 
 複数テーブルを跨ぐ操作は DB 関数で原子性を保証:
+
+アプリ（`features/timeblock/server/timeblock-command-client.ts`）が呼ぶのは `*_command_v1` 系。下の旧名は凍結資産で、現在は integration test が互換境界として直接呼ぶだけになっている。
 
 - `soft_delete_plan()` / `restore_plan()` — Plan のソフトデリート / 復元
 - `soft_delete_record()` / `restore_record()` — Record のソフトデリート / 復元
@@ -609,7 +1056,7 @@ apps/product, apps/web
 `packages/foundations`, `packages/components`, `packages/config`, `packages/observability` は最小の公開面を持つ package として運用中。
 `packages/i18n` は `packages/config` の locale 定義を使い、product / web に共通する next-intl adapter の公開面を環境別 subpath に限定して提供する。
 `packages/observability` のroot exportはprovider非依存のprivacy / consent契約だけを公開する。Sentryの初期化、DSN値、sampling、upload実行、app固有routeは各appに残し、Production build gateの純粋な検証policyだけを`./build-gate` subpathで共有する。
-`apps/product/src/lib/time`（旧 `packages/domain`）は Dayopt の意味を表すpure TypeScriptで、`TimeRange`, `TimeblockOrigin`, `ReviewPeriod`, `UserPreference`等の軽い型・定数・helperを持つ。
+`apps/product/src/lib/time`（旧 `packages/domain`）は Dayopt の意味を表すpure TypeScriptで、`TimeRange`, `PlanSource`, `ReviewPeriod`, `UserPreference`等の軽い型・定数・helperを持つ。
 
 DB boundary は `apps/product/src/lib/database`（旧 `packages/database`、product-local 化済み）が Supabase generated types と DB row helper を担う。DB access を含む service は product 側に残す。
 `packages/billing` は Free / Pro の公開 plan model, subscription status, entitlement map（`entitlementKeys` / `planEntitlements`）, pricing 表示用定数の境界として運用中。Stripe SDK / secret / webhook / checkout / portal は product 側の server-only 境界に残す。

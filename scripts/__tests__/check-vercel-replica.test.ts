@@ -135,13 +135,13 @@ describe('findUnlistedKeys（台帳との突合）', () => {
 describe('buildLedger / allowedNonLedgerKeys（schema との接続）', () => {
   it('onePasswordEnvSchema の envName を含み、未知の key を含まない', () => {
     const ledger = buildLedger();
-    expect(ledger.has('SUPABASE_SERVICE_ROLE_KEY')).toBe(true);
+    expect(ledger.has('SUPABASE_SECRET_KEY')).toBe(true);
     expect(ledger.has('SENTRY_AUTH_TOKEN')).toBe(true);
     expect(ledger.has('TOTALLY_UNKNOWN_KEY')).toBe(false);
   });
 
   it('allowlist の各 entry は理由必須（空が既定。#2094 で integration-managed 11 件、#2458 で再注入された SUPABASE_ANON_KEY を例外登録済み。docs/operations/secrets.md §Vercel Production の integration-managed 例外）', () => {
-    expect(allowedNonLedgerKeys.size).toBe(12);
+    expect(allowedNonLedgerKeys.size).toBe(10);
     for (const reason of allowedNonLedgerKeys.values()) {
       expect(reason.length).toBeGreaterThan(0);
     }
@@ -150,6 +150,13 @@ describe('buildLedger / allowedNonLedgerKeys（schema との接続）', () => {
   // #2458: #2094 が「手動残骸」として削除した key が、同じ integration から
   // 再注入された（configurationId icfg_ZZhIJpCa3ksZJLqBXjg257gb、2026-08-24）。
   // 削除しても戻るため allowlist 側で扱う。台帳（1Password）へは入れない。
+  it('runtime が使う modern keys は未台帳例外にしない', () => {
+    for (const key of ['SUPABASE_SECRET_KEY', 'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY']) {
+      expect(buildLedger().has(key)).toBe(true);
+      expect(allowedNonLedgerKeys.has(key)).toBe(false);
+    }
+  });
+
   it('SUPABASE_ANON_KEY は allowlist にあり台帳には無い', () => {
     expect(allowedNonLedgerKeys.has('SUPABASE_ANON_KEY')).toBe(true);
     expect(buildLedger().has('SUPABASE_ANON_KEY')).toBe(false);
@@ -192,7 +199,7 @@ describe('runReplicaCheck（end-to-end 契約）', () => {
     const payload = envsResponse([
       ...floorEnvs('product'),
       { key: 'NOT_IN_LEDGER', value: SECRET_VALUE, target: ['production'] },
-      { key: 'SUPABASE_SERVICE_ROLE_KEY', value: SECRET_VALUE, target: ['production'] },
+      { key: 'SUPABASE_SECRET_KEY', value: SECRET_VALUE, target: ['production'] },
     ]);
     const findings = await runReplicaCheck({
       token: 'x',

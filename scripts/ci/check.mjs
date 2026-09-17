@@ -47,8 +47,8 @@
  */
 
 import { execFileSync, spawn, spawnSync } from 'node:child_process';
-import { appendFileSync, readFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { appendFileSync, readdirSync, readFileSync } from 'node:fs';
+import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import {
@@ -61,10 +61,10 @@ import {
   formatGithubOutput,
   formatSummary as formatImpactSummary,
   resolveImpact,
+  ROOT_MIGRATION_PATH,
 } from './impact.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
-const MIGRATION_LABEL = 'db:destructive-migration';
 
 // DI 用の簡略型（`typeof execFileSync` 等の strict overload 型をそのまま JSDoc に
 // 使うと、test の単純な mock（`vi.fn(() => 'stdout')` 等）が Node の完全な戻り値型
@@ -82,7 +82,7 @@ const MIGRATION_LABEL = 'db:destructive-migration';
 
 /**
  * `env` は gh の実行環境。省略時は execFileSync の既定どおり process.env を継承する。
- * runTest() は PR コードへ write 権限つき GH_TOKEN を渡さないため process.env から
+ * runUnit() は PR コードの依存へ GH_TOKEN を継承させないため process.env から
  * それを削除しており、その文脈から呼ぶ場合は token を含む env を明示的に渡す必要が
  * ある（渡さないと gh が「GH_TOKEN を設定してください」で失敗する）。
  * @param {{ repo?: string, prNumber?: string | number, execImpl?: ExecFileImpl, env?: NodeJS.ProcessEnv }} opts
@@ -104,10 +104,25 @@ export function fetchPrFilenames({ repo, prNumber, execImpl = execFileSync, env 
 }
 
 /**
- * migration safety の git fallback。`gh api` が使えない時に、base ref との two-dot diff から
- * `{ filename, status }` を組み立てる。shallow checkout でも動くよう merge-base（`...`）は使わず、
- * base ref が無ければ `git fetch --depth=1` を 1 回試す（public repo なので credential 不要）。
+ * migration safety の git fallback。`gh api` が使えない時に two-dot diff から
+ * `{ filename, status }` を組み立てる。shallow checkout でも動くよう merge-base（`...`）は使わない。
  * 判定できなければ null（呼び出し側が fail closed にする）。
+ *
+ * base の探し方は 3 段。**認証を要さない経路から先に試す**:
+ *
+ * 1. 解決できる base ref（ローカル実行では `origin/main` がある）
+ * 2. `refs/pull/N/merge` の第 1 親 `HEAD^1`。`pull_request` の checkout は merge ref を
+ *    取るので、第 1 親が base 側になる。**`ci.yml` の unit job checkout が
+ *    `fetch-depth: 2` であることに依存する**（1 に戻すと親 object が無くこの段は落ち、
+ *    3 へ進んで結局 null → `undeterminable` → job が赤くなる。静かに gate は開かない）
+ * 3. `git fetch --depth=1`。**private repo では認証が無いので失敗する見込み**
+ *    （`推定`。private 化は未実施）。#2750 がこの段だけに頼る状態を問題にした
+ *
+ * 2 は `HEAD^2` の存在確認で「HEAD が merge commit であること」と「depth >= 2 が実際に
+ * fetch されていること」を同時に見る。`^{commit}` の peel を外すと、shallow で親 object が
+ * 無くても commit の parent 欄から sha が返ってしまうので外さない。merge commit でなければ
+ * `HEAD^1` は「PR branch の 1 つ前の commit」というもっともらしい誤答になるため、
+ * ここを緩めない。
  * @param {{ baseRef?: string, execImpl?: ExecFileImpl, spawnImpl?: SpawnImpl, env?: NodeJS.ProcessEnv }} opts
  * @returns {{ filename: string, status: string }[] | null}
  */
@@ -118,18 +133,34 @@ export function fetchPrFilesFromGit({
   env,
 } = {}) {
   const opts = { encoding: 'utf8', cwd: ROOT, ...(env ? { env } : {}) };
-  const hasRef = () =>
-    spawnImpl('git', ['rev-parse', '--verify', '--quiet', `${baseRef}^{commit}`], opts).status ===
-    0;
-  if (!hasRef()) {
+  const hasRev = (rev) =>
+    spawnImpl('git', ['rev-parse', '--verify', '--quiet', `${rev}^{commit}`], opts).status === 0;
+
+  /** @returns {string | null} diff の base に使える rev */
+  const resolveBase = () => {
+    if (hasRev(baseRef)) return baseRef;
+    // merge commit の第 1 親（credential 不要。private repo でもここで解決する）
+    if (hasRev('HEAD^2') && hasRev('HEAD^1')) return 'HEAD^1';
     const remote = baseRef.split('/')[0];
     const branch = baseRef.slice(remote.length + 1);
-    spawnImpl('git', ['fetch', '--depth=1', remote, `${branch}:refs/remotes/${baseRef}`], opts);
-    if (!hasRef()) return null;
-  }
+    const fetched = spawnImpl(
+      'git',
+      ['fetch', '--depth=1', remote, `${branch}:refs/remotes/${baseRef}`],
+      opts,
+    );
+    if (fetched.status !== 0) {
+      // private repo で認証が無い時の 401 / 404 をログへ残す。黙って null にしない
+      console.log(`::notice::git fetch ${baseRef} が失敗した（status ${fetched.status}）`);
+    }
+    return hasRev(baseRef) ? baseRef : null;
+  };
+
+  const base = resolveBase();
+  if (base === null) return null;
+
   let out;
   try {
-    out = execImpl('git', ['diff', '--name-status', '-M', baseRef, 'HEAD'], opts);
+    out = execImpl('git', ['diff', '--name-status', '-M', base, 'HEAD'], opts);
   } catch {
     return null;
   }
@@ -208,9 +239,128 @@ export function shouldRunProductUnitTests(productUnit) {
   return !isFalseFlag(productUnit);
 }
 
+/** Protocol failures must fail the existing required unit job, not a detached advisory job. */
+export function runMcpConformance(affected, execute = run) {
+  if (!isFalseFlag(affected)) {
+    execute('pnpm', ['--filter', '@dayopt/product', 'test:mcp:conformance']);
+  }
+}
+
 /** DB を触らない PR では Supabase の起動自体を省略する（affected 判定）。 */
 export function shouldRunIntegrationTests(integrationAffected) {
   return !isFalseFlag(integrationAffected);
+}
+
+// ─── product unit の範囲（PR では related、nightly で full）──────────────
+//
+// **product unit は Unit job 248 秒のうち 178 秒を占め、しかも PR push のたびに全件走っていた**
+// （2026-09-14 実測、run 34792874608）。repo を private に戻すと Actions は分課金になり、
+// 月の消費は 1 run の重さより回数（週 100 PR push）で決まる（docs/engineering/testing.md §予算）。
+//
+// PR では `vitest related <変更ファイル>` で、変更が import graph で届く test だけを走らせる。
+// graph で追えない依存は 3 種類あり、それぞれ別の手で閉じる:
+//
+// 1. **build 済みで読む依存**（`packages/*` は dist 経由）・**設定 / test setup / toolchain** →
+//    その path を含む PR は full に倒す（`PRODUCT_UNIT_TRACEABLE` にも `NEUTRAL` にも無い path は全部 full）
+// 2. **src をファイルとして読む契約 test**（service role 境界など）→ `findFsReadingProductTests` が
+//    `node:fs` を使う test を毎回見つけて、related とは別に必ず走らせる
+// 3. **それでも漏れる経路**（削除した module を vi.mock 文字列で参照する等）→ nightly.yml の
+//    `product-unit-full` が main を毎日 full で走らせる。検出の遅れは最大 1 日で、層 3 の E2E は
+//    merge ごとに走る
+//
+// 判定できない時は必ず full（PR ファイル一覧が取れない / API 上限 / PR context が無い）。
+
+/** related に渡せば import graph で追える path。`src/lib/test/` は setup を含むので除く。 */
+function isProductUnitTraceable(file) {
+  if (file.startsWith('apps/product/src/lib/test/')) return false;
+  return (
+    file.startsWith('apps/product/src/') ||
+    file.startsWith('apps/product/messages/') ||
+    (file.startsWith('scripts/') && !file.startsWith('scripts/ci/check.mjs'))
+  );
+}
+
+/** product の unit test に届かないと分かっている path（届くか分からないものは入れない）。 */
+function isProductUnitNeutral(file) {
+  if (['AGENTS.md', 'CLAUDE.md', 'README.md'].includes(file)) return true;
+  if (file === '.github/actions/setup/action.yml' || file === '.github/workflows/ci.yml') {
+    return false;
+  }
+  return [
+    'docs/',
+    '.claude/',
+    '.agents/',
+    '.codex/',
+    '.husky/',
+    '.vscode/',
+    '.github/',
+    'apps/web/',
+    'apps/storybook/',
+    'supabase/',
+  ].some((prefix) => file.startsWith(prefix));
+}
+
+/** GitHub の PR files API が返す上限。ちょうど届いたら一覧が切れている可能性がある。 */
+const PR_FILES_API_LIMIT = 3000;
+
+/**
+ * @param {{ isPr: boolean, unitMode?: string, files: string[] | null }} input
+ * @returns {{ scope: 'full', reason: string } | { scope: 'related', targets: string[], reason: string }}
+ */
+export function resolveProductUnitScope({ isPr, unitMode, files }) {
+  if (unitMode === 'full') return { scope: 'full', reason: 'CI_UNIT_MODE=full' };
+  if (!isPr) return { scope: 'full', reason: 'PR context が無い（schedule / dispatch）' };
+  if (!files || files.length === 0) {
+    return { scope: 'full', reason: 'PR のファイル一覧を取得できない' };
+  }
+  if (files.length >= PR_FILES_API_LIMIT) {
+    return { scope: 'full', reason: `PR のファイル数が API 上限（${PR_FILES_API_LIMIT}）に届いた` };
+  }
+
+  const targets = [];
+  for (const file of files) {
+    if (isProductUnitTraceable(file)) targets.push(file);
+    else if (!isProductUnitNeutral(file)) {
+      return { scope: 'full', reason: `import graph で追えない変更を含む: ${file}` };
+    }
+  }
+  return {
+    scope: 'related',
+    targets,
+    reason: `変更 ${files.length} ファイル中 ${targets.length} ファイルから related を解決`,
+  };
+}
+
+const FS_READ_PATTERN = /from ['"](?:node:)?fs(?:\/promises)?['"]|\breadFileSync\b|\breaddirSync\b/;
+
+/**
+ * product の unit test のうち、ファイルを fs で読むもの（import graph に乗らない依存を持つ）を返す。
+ * integration test（`.integration.test.`）は別 job なので含めない。path は apps/product 基準。
+ * @param {{ productDir?: string, readdirImpl?: typeof readdirSync, readFileImpl?: ReadFileImpl }} [opts]
+ */
+export function findFsReadingProductTests({
+  productDir = join(ROOT, 'apps/product'),
+  readdirImpl = readdirSync,
+  readFileImpl = readFileSync,
+} = {}) {
+  const found = [];
+  const walk = (dir) => {
+    for (const entry of readdirImpl(dir, { withFileTypes: true })) {
+      if (entry.name === 'node_modules' || entry.name.startsWith('.')) continue;
+      const path = join(dir, entry.name);
+      if (entry.isDirectory()) {
+        walk(path);
+      } else if (
+        /\.test\.tsx?$/.test(entry.name) &&
+        !entry.name.includes('.integration.test.') &&
+        FS_READ_PATTERN.test(readFileImpl(path, 'utf8'))
+      ) {
+        found.push(relative(productDir, path).split('\\').join('/'));
+      }
+    }
+  };
+  walk(join(productDir, 'src'));
+  return found.sort();
 }
 
 // ─── diff 範囲の解決（gitleaks / docs reminder で共有）────────────────
@@ -336,10 +486,16 @@ async function runImpact() {
   // ここで併せて出す。static job の deno check がこれを見る。`!isPr` を true 側へ
   // 倒すのは分離前の runStatic と同じ規約（workflow_dispatch では全部走らせる）。
   const functionsChanged = !isPr || filenames.some((f) => f.startsWith('supabase/functions/'));
+  // `migrations_added`: root の migration ファイルを含む PR だけ db-upgrade job（#2797）を起動する。
+  // 判定は validation-plan.mjs の dbUpgrade / oldConsumer と同じ ROOT_MIGRATION_PATH（ずれると
+  // plan が要求する job が起動せず blocked になる）。追加・編集・削除の区別は job 側が行う。
+  // `!isPr` を true 側へ倒すのは functions_changed と同じ規約。
+  const migrationsAdded = !isPr || filenames.some((f) => ROOT_MIGRATION_PATH.test(f));
 
   await writeGithubOutput([
     ...formatGithubOutput(impact).trim().split('\n'),
     `functions_changed=${functionsChanged}`,
+    `migrations_added=${migrationsAdded}`,
   ]);
 }
 
@@ -435,15 +591,16 @@ async function runStatic() {
 // ─── unit モード（DB 非依存。Supabase を起動しない job で走る）────────
 
 async function runUnit() {
-  // ── write 権限つき GH_TOKEN を PR コードの実行から隔離する ──────────
-  // このジョブは permissions: pull-requests: write / issues: write を宣言し、
-  // その GITHUB_TOKEN を GH_TOKEN として step env に受け取る。以降の run()
-  // 呼び出しは PR branch のテストコードと全依存（postinstall・vitest
-  // transform・plugin を含む）を実行するため、env を明示指定しない
-  // spawnSync はこのトークンをそのまま子プロセスへ継承してしまう
-  // （token 分離原則: 子プロセスへ継承させる env から押収し、
-  // 押収した値は migration safety の gh 呼び出しにだけ明示的に渡す。
-  // push前反証レビュー risk-reviewer 指摘、P1、PR #2484）。
+  // ── GH_TOKEN を PR コードの依存から隔離する ────────────────────────
+  // **この job の token は read-only**（contents: read / pull-requests: read）。
+  // PR head のコードと全依存を実行する job に書き込み token を置かないため、
+  // 破壊的 migration のラベル付与・コメント投稿は ci.yml の `migration-notice` job
+  // （checkout も依存 install もしない）へ移した（2026-09-14、credential audit P2-6。
+  // それ以前はこの job が pull-requests: write / issues: write を持ち、ここでの押収だけが
+  // 防御だった。PR #2484 の P1 指摘）。read-only でも PR の変更ファイル一覧を読める
+  // token であることに変わりはないため、以降の run()（postinstall・vitest transform・
+  // plugin を含む）へ継承させない押収は残す。押収した値は migration safety の
+  // ファイル一覧取得にだけ明示的に渡す。
   const ghToken = process.env.GH_TOKEN;
   delete process.env.GH_TOKEN;
 
@@ -478,6 +635,9 @@ async function runUnit() {
     });
     if (safety.coupled) coupledMigration = safety.coupling;
     if (safety.undeterminable) migrationSafetyUndeterminable = true;
+    // 通知（ラベル + コメント）は write 権限を持つ下流 job が行う。unit test の失敗で
+    // step が落ちても GITHUB_OUTPUT は step 終了時に処理されるため、検知直後に書く。
+    await writeGithubOutput(formatMigrationSafetyOutput(safety));
   }
 
   run('pnpm', ['build:packages']);
@@ -495,10 +655,11 @@ async function runUnit() {
   run('pnpm', ['--dir', 'apps/web', 'exec', 'vitest', 'run', 'production-build-gate.test.mjs']);
 
   if (productUnit) {
-    run('pnpm', ['--filter', '@dayopt/product', 'test:run']);
+    runProductUnit({ isPr, repo, prNumber, ghToken });
   } else {
     console.log('product 影響なしのため product unit test を skip します。');
   }
+  runMcpConformance(process.env.MCP_CONFORMANCE);
   run('pnpm', ['test:web']);
   run('pnpm', ['--filter', '@dayopt/billing', 'test:run']);
   run('pnpm', ['--filter', '@dayopt/i18n', 'test:run']);
@@ -518,6 +679,70 @@ async function runUnit() {
   }
 }
 
+/**
+ * product の unit test を PR では related + fs 契約 test、それ以外は full で走らせる
+ * （判定の設計は resolveProductUnitScope の上のコメント）。
+ */
+function runProductUnit({ isPr, repo, prNumber, ghToken }) {
+  let files = null;
+  if (isPr) {
+    try {
+      files = fetchPrFilenames({ repo, prNumber, env: { ...process.env, GH_TOKEN: ghToken } });
+    } catch (error) {
+      console.log(
+        `::notice::PR のファイル一覧を取得できないため product unit を full で走らせます: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
+  const decision = resolveProductUnitScope({
+    isPr,
+    unitMode: process.env.CI_UNIT_MODE,
+    files,
+  });
+
+  if (decision.scope === 'full') {
+    console.log(`product unit: full（${decision.reason}）`);
+    run('pnpm', ['--filter', '@dayopt/product', 'test:run']);
+    return;
+  }
+
+  const fsTests = findFsReadingProductTests();
+  console.log(
+    `product unit: related（${decision.reason}）+ fs を読む契約 test ${fsTests.length} 件`,
+  );
+  if (decision.targets.length > 0) {
+    run('pnpm', [
+      '--dir',
+      'apps/product',
+      'exec',
+      'vitest',
+      'related',
+      ...decision.targets.map((file) => join(ROOT, file)),
+      '--project',
+      'unit',
+      '--project',
+      'unit-dom',
+      '--run',
+      '--passWithNoTests',
+    ]);
+  }
+  if (fsTests.length > 0) {
+    run('pnpm', [
+      '--dir',
+      'apps/product',
+      'exec',
+      'vitest',
+      '--project',
+      'unit',
+      '--project',
+      'unit-dom',
+      'run',
+      ...fsTests,
+    ]);
+  }
+}
+
 // ─── integration モード（Supabase 起動済みの job で走る）──────────────
 
 async function runIntegration() {
@@ -534,15 +759,46 @@ async function runIntegration() {
   }
 
   run('pnpm', ['test:integration']);
+  run(
+    'psql',
+    [
+      '-h',
+      '127.0.0.1',
+      '-p',
+      '54322',
+      '-U',
+      'postgres',
+      '-d',
+      'postgres',
+      '-v',
+      'ON_ERROR_STOP=1',
+      '-c',
+      'SET app.isolated_validation = on',
+      '-f',
+      'supabase/tests/cron-heartbeats.sql',
+    ],
+    { env: { ...process.env, PGPASSWORD: 'postgres' } },
+  );
   run('pnpm', ['rls:snapshot:check']);
+  run('pnpm', ['types:generate:local']);
+  run('git', [
+    'diff',
+    '--exit-code',
+    '--',
+    'apps/product/src/lib/database/generated/database.types.ts',
+  ]);
 }
 
 /**
- * migration safety の検知〜通知。plain な destructive 検知は「検知しても job は失敗させない」
+ * migration safety の検知。plain な destructive 検知は「検知しても job は失敗させない」
  * （fail open）設計を維持する。戻り値の `coupled`（既存オブジェクトの契約を縮める migration と
- * product runtime 変更が同一 PR、#2680）だけは呼び出し側（runUnit）が hard fail にする。ラベル付与より先にコメント投稿を行う（旧 integration.yml と
- * 同じ crash-safety の理由: cancel-in-progress で通知前に打ち切られても、
- * ラベルだけ残って以後永久に通知されない状態を避ける）。
+ * product runtime 変更が同一 PR、#2680）だけは呼び出し側（runUnit）が hard fail にする。
+ *
+ * **通知（ラベル付与・PR コメント）はここでは行わない**（2026-09-14、credential audit P2-6）。
+ * この関数は PR head のコードと全依存を実行する unit job で走るため、write 権限の token を
+ * 持たせない。`notify` と `summary` を返し、runUnit が formatMigrationSafetyOutput() で
+ * job output へ出し、ci.yml の `migration-notice` job（checkout も依存 install もしない）が
+ * コメント投稿 → ラベル付与を行う（順序と「付与済みなら再通知しない」規約はそちらが持つ）。
  *
  * 実行に使う関数はすべて注入可能にしてある（test では gh / fs へ実際に触れずに
  * 分岐を検証する。strip-status-labels.mjs と同じ DI の型）。
@@ -551,8 +807,6 @@ async function runIntegration() {
  *   prNumber?: string | number,
  *   fetchFilesImpl?: typeof fetchPrFilesWithStatus,
  *   readFileImpl?: ReadFileImpl,
- *   execFileImpl?: ExecFileImpl,
- *   spawnImpl?: SpawnImpl,
  *   writeStepSummaryImpl?: typeof writeStepSummary,
  *   gitFallbackImpl?: typeof fetchPrFilesFromGit,
  *   sleepImpl?: (ms: number) => Promise<void>,
@@ -564,16 +818,13 @@ export async function runMigrationSafety({
   prNumber,
   fetchFilesImpl = fetchPrFilesWithStatus,
   readFileImpl = readFileSync,
-  execFileImpl = execFileSync,
-  spawnImpl = spawnSync,
   writeStepSummaryImpl = writeStepSummary,
   gitFallbackImpl = fetchPrFilesFromGit,
   sleepImpl = (ms) => new Promise((resolvePromise) => setTimeout(resolvePromise, ms)),
   env = process.env,
 }) {
-  // env は gh 呼び出し 2 箇所（ファイル一覧の取得とラベル確認）の両方へ渡す。
-  // runTest() が process.env から GH_TOKEN を外しているため、片方でも漏らすと
-  // その gh が「GH_TOKEN を設定してください」で失敗する。
+  // env はファイル一覧取得の gh 呼び出しへ渡す。runUnit() が process.env から
+  // GH_TOKEN を外しているため、渡し漏らすと gh が「GH_TOKEN を設定してください」で失敗する。
   //
   // 取得失敗は fail open に倒す（内製クロスレビュー risk-reviewer 指摘、P2）。
   // この呼び出しは #2483 で unit test 群より前へ移したため、例外を素通しすると
@@ -585,7 +836,7 @@ export async function runMigrationSafety({
   //
   // ただし coupled 判定（#2680）は hard fail の保証なので、取得失敗で黙って gate が開く
   // 形にはしない（push 前反証レビュー指摘、P2）: gh api を 1 回だけ再試行し、それでも
-  // 駄目なら base ref との git diff で代替する。どちらも判定できなければ `undeterminable`
+  // 駄目なら git diff（base ref または merge commit の第 1 親）で代替する。どちらも判定できなければ `undeterminable`
   // を返し、呼び出し側（runUnit）が unit test 完走後に job を落とす（再実行で直る
   // 一時障害なら再実行、token 配線の壊れなら「静かに失効したガードレール」ではなく
   // 赤い job として見える）。
@@ -609,14 +860,15 @@ export async function runMigrationSafety({
         );
         return {
           results: [],
-          notified: false,
+          notify: false,
+          summary: '',
           skipped: true,
           coupled: false,
           undeterminable: true,
         };
       }
       files = fromGit;
-      fallbackNote = `\n> ⚠️ PR のファイル一覧は gh api が失敗したため base ref との git diff で代替した（${firstMessage.slice(0, 160)}）。\n`;
+      fallbackNote = `\n> ⚠️ PR のファイル一覧は gh api が失敗したため git diff（base ref または merge commit の第 1 親）で代替した（${firstMessage.slice(0, 160)}）。\n`;
     }
   }
   const withContent = files
@@ -643,68 +895,24 @@ export async function runMigrationSafety({
     fallbackNote +
     (coupling.coupled ? `\n${formatCoupledSummary(coupling)}` : '');
   await writeStepSummaryImpl(summary);
-  if (results.length === 0) return { results, notified: false, coupled: false, coupling };
+  return { results, notify: results.length > 0, summary, coupled: coupling.coupled, coupling };
+}
 
-  let hasLabel = false;
-  try {
-    hasLabel = JSON.parse(
-      execFileImpl(
-        'gh',
-        [
-          'api',
-          `repos/${repo}/issues/${prNumber}/labels`,
-          '--jq',
-          `[.[] | select(.name == "${MIGRATION_LABEL}")] | length > 0`,
-        ],
-        { encoding: 'utf8', env },
-      ),
-    );
-  } catch {
-    hasLabel = false; // 取得失敗は「未検知」扱いで通知を試みる（fail open）
-  }
-  if (hasLabel) return { results, notified: false, coupled: coupling.coupled, coupling }; // round ごとの追い push で毎回コメントしない
-
-  spawnImpl(
-    'gh',
-    [
-      'label',
-      'create',
-      MIGRATION_LABEL,
-      '--repo',
-      repo,
-      '--color',
-      'B60205',
-      '--description',
-      '破壊的 migration を検知（EXPLICIT AUTHORITY 要確認）',
-    ],
-    { env },
-  );
-
-  const commentResult = spawnImpl(
-    'gh',
-    ['pr', 'comment', String(prNumber), '--repo', repo, '--body', summary],
-    { env },
-  );
-  if (commentResult.status === 0) {
-    spawnImpl(
-      'gh',
-      [
-        'api',
-        '--method',
-        'POST',
-        `repos/${repo}/issues/${prNumber}/labels`,
-        '-f',
-        `labels[]=${MIGRATION_LABEL}`,
-      ],
-      { env },
-    );
-    return { results, notified: true, coupled: coupling.coupled, coupling };
-  }
-  // fork PR では pull_request イベントの GITHUB_TOKEN が構造的に read-only になる
-  console.log(
-    '::warning::migration safety のコメント投稿に失敗しました（fork PR 等で write 権限が無い可能性）。Step Summary の検知結果を確認してください。',
-  );
-  return { results, notified: false, coupled: coupling.coupled, coupling };
+/**
+ * runMigrationSafety の結果を GITHUB_OUTPUT の行へ変換する。受け手は ci.yml の
+ * `migration-notice` job で、`migration_destructive` は `true` / `false` の 2 値だけ、
+ * コメント本文は改行や delimiter を含みうる markdown なので 1 行の base64 にする
+ * （複数行 output の heredoc delimiter を本文で偽装されない形にするため）。
+ * 受け手はこの output を「PR head のコードが書いた値」として allowlist で検証する。
+ * @param {{ notify?: boolean, summary?: string }} safety
+ * @returns {string[]}
+ */
+export function formatMigrationSafetyOutput(safety) {
+  const notify = safety?.notify === true && typeof safety.summary === 'string';
+  return [
+    `migration_destructive=${notify ? 'true' : 'false'}`,
+    `migration_comment_b64=${notify ? Buffer.from(safety.summary, 'utf8').toString('base64') : ''}`,
+  ];
 }
 
 // ─── CLI ────────────────────────────────────────────────────────────

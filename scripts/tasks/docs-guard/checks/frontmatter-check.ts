@@ -16,7 +16,15 @@ import { glob } from 'glob';
 import { existsSync, readFileSync } from 'node:fs';
 import { isAbsolute, relative, resolve } from 'node:path';
 
-import { colors, DOCS_DIR, GENERATED_DOCS, ROOT, ROOT_STOCK_FILES, STOCK_DIRS } from '../config.ts';
+import {
+  colors,
+  DOCS_DIR,
+  GENERATED_DOC_CONTRACTS,
+  GENERATED_DOCS,
+  ROOT,
+  ROOT_STOCK_FILES,
+  STOCK_DIRS,
+} from '../config.ts';
 import { toRepoPath } from '../git-changes.ts';
 
 export interface FrontmatterViolation {
@@ -222,8 +230,10 @@ export function validateDocumentMetadata({
   if (!kind) return [];
 
   if (kind === 'generated') {
-    return content.includes('scripts/tasks/generate-rls-snapshot.ts') &&
-      content.includes('pnpm rls:snapshot') &&
+    const contract = GENERATED_DOC_CONTRACTS[relativePath];
+    return contract !== undefined &&
+      content.includes(contract.source) &&
+      content.includes(contract.command) &&
       content.includes('手で編集しない')
       ? []
       : ['generated snapshotに生成元・command・手編集禁止の表示がない'];

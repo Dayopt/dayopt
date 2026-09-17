@@ -39,10 +39,14 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-# pull-requests: read は impact job の判定（PR の変更ファイル一覧取得）に、
-# issues: write は unit job の migration safety のラベル付与に要る（job 単位で
-# 追加宣言する。ここでは最小に絞る。integration job は gh を呼ばないため
-# contents: read だけに絞ってある）。
+# pull-requests: read は impact job の判定と unit job の migration safety（PR の変更
+# ファイル一覧取得）に要る。書き込み権限（pull-requests: write / issues: write）は
+# migration-notice job だけが job 単位で宣言する。integration job は gh を呼ばないため
+# contents: read だけに絞ってある。
+#
+# **token 分離原則: PR head のコードや依存（checkout / setup / pnpm / node scripts）を
+# 実行する job に write 権限を持たせない**（2026-09-14、credential audit P2-6）。
+# scripts/__tests__/ci-token-isolation.test.ts が job 単位で機械検査する。
 permissions:
   contents: read
   pull-requests: read
@@ -88,8 +92,10 @@ jobs:
     outputs:
       docs_only: ${{ steps.run.outputs.docs_only }}
       product_unit: ${{ steps.run.outputs.product_unit }}
+      mcp_conformance: ${{ steps.run.outputs.mcp_conformance }}
       integration: ${{ steps.run.outputs.integration }}
       functions_changed: ${{ steps.run.outputs.functions_changed }}
+      migrations_added: ${{ steps.run.outputs.migrations_added }}
     steps:
       # 判定は gh api の PR files 一覧だけを入力にするため、履歴は要らない。
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -157,26 +163,119 @@ jobs:
     if: ${{ !cancelled() && github.event.pull_request.draft != true && needs.impact.outputs.docs_only != 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 35
+    # **write 権限を持たない**（2026-09-14、credential audit P2-6）。この job は PR head の
+    # テストコードと全依存（postinstall・vitest transform・plugin）を実行する。以前は
+    # migration safety の通知のために pull-requests: write / issues: write を持ち、
+    # check.mjs 内で GH_TOKEN を env から押収するだけが防御だった（同じ step で動く
+    # PR head の check.mjs 自身は token を読める）。通知は下流の migration-notice job へ
+    # 移し、ここは検知結果を job output へ出すだけにする。GH_TOKEN は read-only で、
+    # PR の変更ファイル一覧の取得（gh api）にだけ使う。
     permissions:
       contents: read
-      pull-requests: write
-      issues: write
+      pull-requests: read
+    outputs:
+      migration_destructive: ${{ steps.run.outputs.migration_destructive }}
+      migration_comment_b64: ${{ steps.run.outputs.migration_comment_b64 }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          # migration safety の git fallback（check.mjs の fetchPrFilesFromGit）が
+          # `refs/pull/N/merge` の第 1 親を diff base に使う。1（既定の shallow）へ
+          # 戻すと親 object が無く、認証の要る `git fetch` しか残らないので private repo で
+          # fallback が死ぬ（→ undeterminable → この job が赤。#2750）
+          fetch-depth: 2
           persist-credentials: false
 
       - uses: ./.github/actions/setup
 
+      # product unit は PR では変更から届く test（vitest related）+ fs を読む契約 test に絞り、
+      # full は nightly.yml の product-unit-full が毎日走らせる（check.mjs resolveProductUnitScope、#2743）。
       - name: Run unit tests (+ migration safety)
+        id: run
         env:
           GH_TOKEN: ${{ github.token }}
           GITHUB_EVENT_NAME: ${{ github.event_name }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           PRODUCT_UNIT: ${{ needs.impact.outputs.product_unit }}
+          MCP_CONFORMANCE: ${{ needs.impact.outputs.mcp_conformance }}
           NODE_ENV: test
           CI: true
         run: node scripts/ci/check.mjs unit
+
+  # ── migration safety の通知（ラベル + PR コメント）───────────────────
+  #
+  # **write 権限を持つ唯一の job。checkout も依存 install もせず、repo のコードを
+  # 1 行も実行しない**（2026-09-14、credential audit P2-6）。runner 同梱の gh / base64 だけで
+  # 完結する。入力の unit job output は PR head のコードが書いた値なので信用しない:
+  # フラグは `true` 完全一致、本文は base64 の文字集合を検証してから decode し、
+  # シェルへは env 経由でだけ渡す（`${{ }}` を run に展開しない）。PR 番号と repo は
+  # event context から取る。
+  #
+  # 挙動は unit job に同居していた頃（check.mjs の runMigrationSafety）と同じ:
+  # 付与済みなら再通知しない → ラベル作成（既存なら無視）→ コメント投稿 → 成功時だけ
+  # ラベル付与（crash-safety: 通知前に打ち切られてラベルだけ残る状態を避ける）。
+  # 失敗はすべて fail open（warning のみで exit 0）。finish-branch.sh は rollup の
+  # failure を merge 阻止に使うため、通知の失敗で merge を止めない。
+  #
+  # `!cancelled()`: coupled migration で unit job が hard fail した PR こそ通知が要る。
+  # unit が skip（draft / docs-only）なら output が空で skip される。**required check に
+  # しない**（検知が無い PR では常に skip され、名前照合の gate に載せる意味がない）。
+  migration-notice:
+    name: Migration Safety Notice
+    needs: unit
+    if: ${{ !cancelled() && github.event_name == 'pull_request' && needs.unit.outputs.migration_destructive == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+    steps:
+      - name: Label and comment destructive migration
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          MIGRATION_DESTRUCTIVE: ${{ needs.unit.outputs.migration_destructive }}
+          MIGRATION_COMMENT_B64: ${{ needs.unit.outputs.migration_comment_b64 }}
+        run: |
+          label='db:destructive-migration'
+          if [ "${MIGRATION_DESTRUCTIVE:-}" != 'true' ]; then
+            echo "migration_destructive が true ではないため通知しません。"
+            exit 0
+          fi
+          if ! [[ "${PR_NUMBER:-}" =~ ^[1-9][0-9]*$ ]] || ! [[ "${GH_REPO:-}" =~ ^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$ ]]; then
+            echo "::warning::migration safety: PR 番号または repo を解決できないため通知しません。"
+            exit 0
+          fi
+          if ! [[ "${MIGRATION_COMMENT_B64:-}" =~ ^[A-Za-z0-9+/]+={0,2}$ ]] || (( ${#MIGRATION_COMMENT_B64} % 4 != 0 )); then
+            echo "::warning::migration safety: コメント本文の output が不正なため通知しません。Unit Tests の Step Summary を確認してください。"
+            exit 0
+          fi
+          body_file="${RUNNER_TEMP:?}/migration-safety-comment.md"
+          if ! printf '%s' "$MIGRATION_COMMENT_B64" | base64 -d > "$body_file" 2>/dev/null; then
+            echo "::warning::migration safety: コメント本文を decode できないため通知しません。Unit Tests の Step Summary を確認してください。"
+            exit 0
+          fi
+
+          # round ごとの追い push で毎回コメントしない。取得失敗は未付与扱い（fail open）。
+          has_label=$(gh api "repos/$GH_REPO/issues/$PR_NUMBER/labels" \
+            --jq "[.[] | select(.name == \"$label\")] | length > 0" 2>/dev/null) || has_label=false
+          if [ "$has_label" = 'true' ]; then
+            echo "$label は付与済みのため再通知しません。"
+            exit 0
+          fi
+
+          gh label create "$label" --repo "$GH_REPO" --color B60205 \
+            --description '破壊的 migration を検知（EXPLICIT AUTHORITY 要確認）' > /dev/null 2>&1 || true
+
+          if gh pr comment "$PR_NUMBER" --repo "$GH_REPO" --body-file "$body_file"; then
+            gh api --method POST "repos/$GH_REPO/issues/$PR_NUMBER/labels" \
+              -f "labels[]=$label" > /dev/null || true
+          else
+            # fork PR では pull_request イベントの GITHUB_TOKEN が構造的に read-only になる
+            echo "::warning::migration safety のコメント投稿に失敗しました（fork PR 等で write 権限が無い可能性）。Unit Tests の Step Summary の検知結果を確認してください。"
+          fi
 
   # ── integration / RLS（DB を触る PR だけ。unit job と並列に走る）──────
   #
@@ -205,7 +304,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 35
     # gh を呼ばないため write 権限も GH_TOKEN も渡さない（migration safety は
-    # unit job 側が担う）。PR コードを実行する job に書き込み token を置かない
+    # unit job と migration-notice job 側が担う）。PR コードを実行する job に書き込み token を置かない
     # という token 分離原則（PR #2484 の P1 指摘）を、権限そのものを与えない形で満たす。
     permissions:
       contents: read
@@ -236,8 +335,8 @@ jobs:
         id: supabase
         run: |
           API_URL=$(supabase status --output json | jq -r '.API_URL')
-          ANON_KEY=$(supabase status --output json | jq -r '.ANON_KEY')
-          SERVICE_ROLE_KEY=$(supabase status --output json | jq -r '.SERVICE_ROLE_KEY')
+          ANON_KEY=$(supabase status --output json | jq -er '.PUBLISHABLE_KEY // .ANON_KEY | select(type == "string" and length > 0)')
+          SERVICE_ROLE_KEY=$(supabase status --output json | jq -er '.SECRET_KEY // .SERVICE_ROLE_KEY | select(type == "string" and length > 0)')
           DB_URL=$(supabase status --output json | jq -r '.DB_URL')
           echo "api_url=$API_URL" >> $GITHUB_OUTPUT
           echo "anon_key=$ANON_KEY" >> $GITHUB_OUTPUT
@@ -248,13 +347,79 @@ jobs:
         env:
           INTEGRATION_AFFECTED: ${{ needs.impact.outputs.integration }}
           NEXT_PUBLIC_SUPABASE_URL: ${{ steps.supabase.outputs.api_url }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ steps.supabase.outputs.anon_key }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ steps.supabase.outputs.service_role_key }}
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ steps.supabase.outputs.anon_key }}
+          SUPABASE_SECRET_KEY: ${{ steps.supabase.outputs.service_role_key }}
           DATABASE_URL: ${{ steps.supabase.outputs.db_url }}
           USE_LOCAL_DB: 'true'
           NODE_ENV: test
           CI: true
         run: node scripts/ci/check.mjs integration
+
+      - name: Stop Supabase
+        if: always()
+        run: supabase stop
+
+  # ── DB upgrade / old-consumer（migration を追加した PR だけ。shadow、非必須）──────
+  #
+  # integration job の `supabase start` は candidate の migration 集合を **空 DB へ** 適用する
+  # fresh 経路しか証明しない（#2797）。この job は base の migration 集合 + seed（合成データ）まで
+  # reset し、PR が追加した migration だけを当てて、適用エラー・seed 行の消失・fresh との
+  # schema 不一致・base 世代の生成型が参照するオブジェクトの消失（旧アプリ × 新 DB）を
+  # 別々に検出する（scripts/ci/db-upgrade-check.mjs）。
+  #
+  # **required check ではない**（#2798 の比較・承認後に扱いを決める）。Validation controller
+  # は plan の dbUpgrade / oldConsumer をこの job 名に束縛する。job 名を変える時は
+  # validation-evidence の PRODUCERS と ci-job-name-contract.test.ts も直す。
+  #
+  # migration を追加していない PR では impact の `migrations_added` が空で skip される
+  # （plan 側も not-applicable）。`fetch-depth: 2` は merge commit の第 1 親（base）を
+  # `git ls-tree` / `git show` で読むため。接続先はローカル Docker だけ。
+  db-upgrade:
+    name: "\U0001F9F1 DB Upgrade (shadow)"
+    needs: impact
+    if: ${{ !cancelled() && github.event.pull_request.draft != true && needs.impact.outputs.migrations_added == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+
+      - uses: ./.github/actions/setup
+
+      - id: supabase-version
+        run: |
+          version=$(node -p "require('./package.json').devDependencies.supabase")
+          if [ "$version" = "undefined" ] || [ -z "$version" ]; then
+            echo "::error::supabase CLI version の抽出に失敗しました（root package.json の devDependencies.supabase を確認してください）: '$version'"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - uses: supabase/setup-cli@46f7f98c7f948ad727d22c1e67fab04c223a0520 # v3.0.0
+        with:
+          version: ${{ steps.supabase-version.outputs.version }}
+
+      - name: Start Supabase
+        run: supabase start
+
+      - name: Upgrade from the base migration set and compare with the fresh schema
+        env:
+          DB_UPGRADE_RESULT_PATH: db-upgrade-result.json
+          NODE_ENV: test
+          CI: true
+        run: node scripts/ci/db-upgrade-check.mjs
+
+      - name: Save upgrade result
+        if: always() && hashFiles('db-upgrade-result.json') != ''
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: db-upgrade-result-${{ github.run_attempt }}
+          path: db-upgrade-result.json
+          retention-days: 14
 
       - name: Stop Supabase
         if: always()

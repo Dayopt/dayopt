@@ -124,12 +124,28 @@ docs へ残している。
 
 ## MCP の DB 書き込み境界
 
+- OAuth metadata が広告する `scopes_supported` は `SUPPORTED_SCOPES` 全量（write 込み）。
+  広告は「AS が理解する scope」の宣言であって付与の約束ではない。実際に付与するのは
+  consent の `resolveGrantableScopes` で、**env allowlist（`MCP_WRITE_ENABLED_CLIENTS`）と
+  DB gate（`mcp_mutation_control`）の AND**（`isConsentWriteEnabled`、DB が読めない時は
+  write を落とす fail-closed）が閉じていれば write scope を落として read-only の grant に
+  する。付与後に gate が閉じた場合は `applyDurableWriteGate` が token 側で同じ降格を行い、
+  判定規則そのものは `isWriteEnabledByMutationControl` を両者で共有する。
+  authorize 検証は gate を見ない（見ると gate 閉の client が read-only 接続すら作れない）
 - MCP mutation の global gate は DB 上で既定 `OFF`、`enabled_client_ids` は既定 `[]`。
   両方が許可した client だけがwrite grant/applyを通る。各gateはrevision付きの
   service-role-only RPC以外から変更しない
 - Candidate 1では `global OFF AND client list empty` をProductionの停止条件とする。
   旧UI direct UPDATE、tag mergeのlock順、legacy confirm-dayとdirect Recordのraceは、
   Stage 2のapp command移行と競合testが終わるまでMCP writeから到達不能にする
+- **MCP の読み取りは service-role client で tRPC を呼ぶため RLS が効かず、テナント分離は
+  各 service の user filter（`.eq('user_id', ctx.userId)` / `rpc(p_user_id)`）だけが持つ。**
+  書き込みには `assert_timeblock_writer_row_v1` の row trigger という二重の網があるが、
+  読み取りには DB 側の網が無い。**新しい read tool を足す時は
+  `lib/test/integration/mcp-read-tenant-isolation.integration.test.ts` にも case を足す**
+  （2026-09-11、[#2721](https://github.com/Dayopt/dayopt/issues/2721) D-08。RPC へ寄せても
+  アプリが `p_user_id` を渡す構造なら独立した認可は増えないため、現行 + この suite で
+  class を閉じる判断）
 - MCP apply RPC は `service_role` だけが実行できる。各 apply transaction 内で user、
   connection、access token、DB-owned environment/resource、scope、期限、
   connection/token の失効状態を共通writer fence内で再検証する
@@ -259,15 +275,50 @@ docs へ残している。
 テストが緑のまま隠す（#2598 の後に #2622 が必要になった件）。撤去 PR ではこの表を
 grep 対象にする。
 
-| 分類          | 場所                                                                                    | 役割                                       | 消してよいか                                  |
-| ------------- | --------------------------------------------------------------------------------------- | ------------------------------------------ | --------------------------------------------- |
-| (a) 契約変換  | `features/timeblock/server/timeblock-command-client.ts` の `EXPECTED_COMMAND_ERRORS`    | DT コード → `TimeblockServiceError` code   | 不可（UI が code で分岐する）                 |
-| (a) 契約変換  | `features/timeblock/server/mcp-mutation-client.ts` の `EXPECTED_ERROR_CODES`            | DT コード → `McpMutationErrorCode`         | 不可（MCP の公開契約）                        |
-| (a) 契約変換  | `features/timeblock/server/timeblock-context-contract.ts` の `TIMEBLOCK_CONTEXT_RULES`  | MCP `constraints.get` が返す規則の宣言     | 不可（公開契約）                              |
-| (b) UX 先回り | `features/timeblock/schemas/timeblock.ts` の `timeRangeRefine`                          | 往復前に `end > start` を弾く              | 可（server が同じ規則で拒否する）             |
-| (b) UX 先回り | `features/timeblock/domain/timeblock-destination.ts`                                    | `end_at` から Plan / Record の宛先を決める | 不可（規則の写しではなく宛先の決定そのもの）  |
-| (b) UX 先回り | `features/calendar/lib/overlap.ts` + `lib/time/time-conflict.ts`                        | 重なりの事前表示                           | 可（overlap は DB 側 `TIME_OVERLAP` が正）    |
-| (b) UX 先回り | `features/calendar/hooks/operations/useTimeblockOperations.ts` の record 未来移動ガード | ドラッグ中に `timeLocked` を出す           | 可（server 拒否でも同じ toast が出る。#2628） |
+| 分類          | 場所                                                                                    | 役割                                              | 消してよいか                                  |
+| ------------- | --------------------------------------------------------------------------------------- | ------------------------------------------------- | --------------------------------------------- |
+| (a) 契約変換  | `features/timeblock/server/timeblock-command-client.ts` の `EXPECTED_COMMAND_ERRORS`    | DT コード → `TimeblockServiceError` code          | 不可（UI が code で分岐する）                 |
+| (a) 契約変換  | `features/timeblock/server/mcp-mutation-client.ts` の `EXPECTED_ERROR_CODES`            | DT コード → `McpMutationErrorCode`                | 不可（MCP の公開契約）                        |
+| (a) 契約変換  | `features/timeblock/server/timeblock-context-contract.ts` の `TIMEBLOCK_CONTEXT_RULES`  | MCP `constraints.get` が返す規則の宣言            | 不可（公開契約）                              |
+| (b) UX 先回り | `features/timeblock/schemas/timeblock.ts` の `timeRangeRefine`                          | 往復前に `end > start` を弾く                     | 可（server が同じ規則で拒否する）             |
+| (b) UX 先回り | `features/timeblock/domain/timeblock-destination.ts`                                    | `end_at` から Plan / Record の宛先を決める        | 不可（規則の写しではなく宛先の決定そのもの）  |
+| (b) UX 先回り | `features/calendar/lib/overlap.ts` + `lib/time/time-conflict.ts`                        | 重なりの事前表示                                  | 可（overlap は DB 側 `TIME_OVERLAP` が正）    |
+| (b) UX 先回り | `features/calendar/hooks/operations/useTimeblockOperations.ts` の record 未来移動ガード | ドラッグ中に `timeLocked` を出す                  | 可（server 拒否でも同じ toast が出る。#2628） |
+| (b) UX 先回り | `features/calendar/interaction/interaction-effects.ts` の `case 'DROP'` の記録化経路    | Record レーンへの drop 先が未来なら記録を作らない | 可（server が `DT005` で拒否する。#2645）     |
+
+<!-- architecture-map:time-rules:start — 正本 直上の「規則の写しと、その分類」表 / 再生成 pnpm architecture:generate / 検証 pnpm architecture:check。この範囲は手編集しない -->
+
+```mermaid
+flowchart LR
+  subgraph db["DB trigger（正）"]
+    DT003["DT003<br/>end_at #gt; start_at"]
+    DT005["DT005<br/>end_at #lt;= now"]
+  end
+  subgraph contract["(a) 契約変換"]
+    contract1["timeblock-command-client.ts<br/>EXPECTED_COMMAND_ERRORS<br/>消せない"]
+    contract2["mcp-mutation-client.ts<br/>EXPECTED_ERROR_CODES<br/>消せない"]
+    contract3["timeblock-context-contract.ts<br/>TIMEBLOCK_CONTEXT_RULES<br/>消せない"]
+  end
+  subgraph ux["(b) UX 先回り"]
+    ux1["timeblock.ts<br/>timeRangeRefine<br/>消してよい"]
+    ux2["timeblock-destination.ts<br/>消せない"]
+    ux3["overlap.ts<br/>time-conflict.ts<br/>消してよい"]
+    ux4["useTimeblockOperations.ts<br/>消してよい"]
+    ux5["interaction-effects.ts<br/>case 'DROP'<br/>消してよい"]
+  end
+  db --> contract1
+  db --> contract2
+  db --> contract3
+  db -.-> ux1
+  db -.-> ux2
+  db -.-> ux3
+  db -.-> ux4
+  db -.-> ux5
+  classDef removable stroke-dasharray: 4 2
+  class ux1,ux3,ux4,ux5 removable
+```
+
+<!-- architecture-map:time-rules:end -->
 
 server が拒否した時に UI が汎用の `saveFailed` へ退化しないよう、`INVALID_TIME_RANGE` /
 `RECORD_IN_FUTURE` は `lib/trpc/client-safe-service-code.ts` の allowlist に載せ、

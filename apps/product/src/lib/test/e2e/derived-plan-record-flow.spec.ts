@@ -8,10 +8,11 @@ import {
   resolveServiceRoleTarget,
 } from '../service-role-target-guard';
 import { createScopedTestUser, deleteScopedTestUser } from './create-scoped-test-user';
+import { REPORT_EXECUTION, REPORT_TAB_PARAM } from './report-selectors';
 import { suppressConsentBanner } from './suppress-consent-banner';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SECRET_KEY;
 const SERVICE_ROLE_TARGET = resolveServiceRoleTarget(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 assertServiceRoleSuiteRunnable(SERVICE_ROLE_TARGET, 'Derived Plan / Record browser flow');
 const describeWithEnv = SERVICE_ROLE_TARGET.safe ? test.describe : test.describe.skip;
@@ -132,8 +133,10 @@ describeWithEnv('Derived Plan / Record browser flow', () => {
   }
 
   async function expectPlanRatio(page: Page) {
-    await page.goto(`/ja/report?date=${PAST_DATE}&range=week`);
-    const row = page.locator('[data-report-rows="execution"] > li', {
+    // 予実の行は差分の面（`?tab=diff`）にある。既定タブは「時間の使い方」なので
+    // tab を指定しないと `ExecutionChapter` そのものが描かれない（#2773 の 3 タブ再編）
+    await page.goto(`/ja/report?date=${PAST_DATE}&range=week&tab=${REPORT_TAB_PARAM.diff}`);
+    const row = page.locator(REPORT_EXECUTION.rows, {
       hasText: ACTIVITY_NAME,
     });
     await expect(row).toContainText('予定比 150%', { timeout: 15_000 });
@@ -180,7 +183,11 @@ describeWithEnv('Derived Plan / Record browser flow', () => {
     await expect
       .poll(() => page.evaluate(() => document.body.style.cursor), { timeout: 5_000 })
       .toBe('grabbing');
-    await page.mouse.move(x, yFrom + (115 / 60) * hourHeight, { steps: 12 });
+    // ドラッグは 15 分刻みの**相対 snap**（移動量だけを量子化し、元の分 :05 は保持する。
+    // `domain/precision.ts` の `DEFAULT_DRAG_SNAP_MINUTES` と `time-math.ts` の
+    // `snapDeltaMinutes`）。移動量は 15 の倍数にしておく —— 115 分だと snap 境界の
+    // 中点 112.5 分まで 2.5 分しかなく、ピクセル誤差で 105 分側へ倒れて flaky になる。
+    await page.mouse.move(x, yFrom + (120 / 60) * hourHeight, { steps: 12 });
     await page.mouse.up();
 
     await expect
@@ -197,7 +204,7 @@ describeWithEnv('Derived Plan / Record browser flow', () => {
         },
         { timeout: 15_000 },
       )
-      .toBe(`${isoAt('11:00')}/${isoAt('12:30')}`);
+      .toBe(`${isoAt('11:05')}/${isoAt('12:35')}`);
 
     await openDay(page);
     await page.locator('[data-plan-lane-card]', { hasText: ACTIVITY_NAME }).first().click();

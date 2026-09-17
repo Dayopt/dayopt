@@ -208,7 +208,7 @@ export function TimeblockSearchContent({
         })}
       </CommandGroup>
       {hasMore ? (
-        <p className="border-border text-muted-foreground border-t px-4 py-2 text-xs" role="note">
+        <p className="border-border text-muted-foreground border-t px-4 py-2 text-xs">
           {t('calendar.search.overflow', { count: SEARCH_DISPLAY_LIMIT })}
         </p>
       ) : null}
@@ -402,15 +402,14 @@ export function TimeblockSearchDialog({
           {t('common.actions.cancel')}
         </Button>
       </div>
-      {hasResultList ? (
-        <CommandList
-          className="max-h-none min-h-0 flex-1 md:max-h-80 md:flex-none"
-          aria-busy={false}
-          data-sentry-block
-        >
-          {searchContent}
-        </CommandList>
-      ) : (
+      <CommandList
+        className={hasResultList ? 'max-h-none min-h-0 flex-1 md:max-h-80 md:flex-none' : 'sr-only'}
+        aria-busy={false}
+        data-sentry-block
+      >
+        {hasResultList ? searchContent : null}
+      </CommandList>
+      {!hasResultList && (
         <div
           // mobile: 空状態メッセージが利用可能な高さいっぱいで中央寄せされるよう
           // このラッパー自身を flex-col コンテナにする。justify-center が主軸

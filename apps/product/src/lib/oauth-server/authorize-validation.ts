@@ -1,11 +1,6 @@
 import 'server-only';
 
-import {
-  isAllowedRedirectUri,
-  isRuntimeClientWriteEnabled,
-  resolveClient,
-  type OAuthClient,
-} from './clients';
+import { isAllowedRedirectUri, resolveClient, type OAuthClient } from './clients';
 import { resolveRequestedResource, type CanonicalResourceUri } from './resource';
 import { hasWriteScope, parseRequestedScope, type SupportedScope } from './scopes';
 
@@ -70,10 +65,12 @@ export function validateAuthorizeInput(input: AuthorizeInput): AuthorizeValidati
   }
   const scopes = parseRequestedScope(input.scope);
   const requestsWrite = scopes !== null && hasWriteScope(scopes);
-  if (
-    scopes === null ||
-    (requestsWrite && (!scopes.includes('read:entries') || !isRuntimeClientWriteEnabled(client.id)))
-  ) {
+  // write gate（env / DB）の判定はここでは行わない。metadata が全 scope を広告する以上、
+  // gate が閉じている client も write を要求してくるのが正常系で、ここで弾くと
+  // read-only 接続まで作れなくなる。付与時に consent 側が write を落とす
+  // （`resolveGrantableScopes`）。DB の整合条件である read:entries の同伴だけ、
+  // grant RPC より前に 400 で返す。
+  if (scopes === null || (requestsWrite && !scopes.includes('read:entries'))) {
     return { ok: false, error: 'invalid_scope' };
   }
   return {

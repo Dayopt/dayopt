@@ -1,13 +1,7 @@
 const protectedProductPaths = [
   '/calendar',
   '/report',
-  '/tasks',
   '/settings',
-  '/box',
-  '/table',
-  '/board',
-  '/add',
-  '/tags',
   '/oauth/authorize',
   '/oauth/consent',
 ] as const;

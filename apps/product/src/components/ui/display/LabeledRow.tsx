@@ -91,7 +91,10 @@ export function LabeledRow({
     return (
       <button
         type="button"
-        className="hover:bg-state-hover focus-visible:ring-ring w-full rounded-lg text-left focus-visible:ring-2 focus-visible:outline-hidden"
+        className={cn(
+          'focus-visible:ring-ring w-full rounded-lg text-left focus-visible:ring-2 focus-visible:outline-hidden',
+          isAction ? 'hover:bg-destructive-tint' : 'hover:bg-state-hover',
+        )}
         onClick={onClick}
       >
         {content}

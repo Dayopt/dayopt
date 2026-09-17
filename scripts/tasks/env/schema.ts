@@ -16,6 +16,16 @@ export type EnvSchemaEntry = {
    * すでに status 行だけで自明なため）。
    */
   pendingReason?: string;
+  /**
+   * GitHub Actions Secret（replica）の名前が envName と違う時だけ持つ。workflow は
+   * `secrets.<githubSecret>` を step の env `<envName>` へ渡す。
+   */
+  githubSecret?: string;
+  /**
+   * GitHub Actions の environment 名。CI の Secret は repo 単位ではなく、main からだけ使える
+   * environment に置く（2026-09-14）。同じ Secret を複数の environment に複製する時は全部並べる。
+   */
+  githubEnvironments?: string[];
 };
 
 export type OperationalItem = {
@@ -83,16 +93,10 @@ export const envSchema: EnvSchemaEntry[] = [
   envEntry('STRIPE_WEBHOOK_SECRET', false, 'secret', 'staging', agent, 'stripe-test'),
   envEntry('NEXT_PUBLIC_STRIPE_PRO_PRICE_ID', false, 'public', 'staging', agent, 'stripe-test'),
 
-  envEntry('RESEND_API_KEY', false, 'secret', 'shared', agent, 'resend'),
-  envEntry('RESEND_FROM_EMAIL', false, 'public', 'shared', agent, 'resend'),
-  pendingEnvEntry(
-    'RESEND_WEBHOOK_SECRET',
-    'secret',
-    'staging',
-    agent,
-    'resend',
-    '旧 Staging/resend（human/resend-old-staging に退避中）から agent/resend への field 統合待ち（#2086 cutover）',
-  ),
+  // Resend は agent に置かない（2026-09-14、Secret / Credential 監査）。送信 key は
+  // production ドメインから送れる本番 credential で、agent vault の「漏れても 1 日で
+  // 戻せる」定義に入らない。master は human/resend-send（productionEnvSchema）。local dev
+  // では送信しない（env.ts が Resend を必須にするのは Vercel Production だけ）。
 
   envEntry('NEXT_PUBLIC_APP_URL', true, 'public', 'local', agent, 'app'),
   envEntry('NEXT_PUBLIC_SITE_URL', false, 'public', 'staging', agent, 'app'),
@@ -109,26 +113,16 @@ export const envSchema: EnvSchemaEntry[] = [
 
   envEntry('NEXT_PUBLIC_TURNSTILE_SITE_KEY', false, 'public', 'shared', agent, 'turnstile'),
   envEntry('TURNSTILE_SECRET_KEY', false, 'secret', 'shared', agent, 'turnstile'),
-  envEntry('ANTHROPIC_API_KEY', false, 'secret', 'shared', agent, 'anthropic'),
 
-  envEntry('VERCEL_TOKEN', false, 'secret', 'shared', ci, 'vercel'),
-  envEntry('VERCEL_TEAM_ID', false, 'public', 'shared', ci, 'vercel'),
-  envEntry('VERCEL_PROJECT_ID_STAGING', false, 'public', 'shared', ci, 'vercel'),
-  envEntry('VERCEL_PROJECT_ID_PRODUCTION', false, 'public', 'shared', ci, 'vercel'),
-  // agent 用 Vercel token（#2086 plan v2）。CI と agent の VERCEL_TOKEN 二重用途を
-  // 解消するため agent は別発行 token を使う。発行までは replica:check を User 実行に倒す
-  pendingEnvEntry(
-    'VERCEL_TOKEN',
-    'secret',
-    'shared',
-    agent,
-    'vercel',
-    'agent 用 token 未発行（#2086 plan v2）。User 発行後に item を作り replica:check の参照を切り替える',
-  ),
+  // ci vault（Vercel / Supabase 監査 / backup）の entry は下の ciSecretSchema にまとめる。
+  // agent 用 Vercel token は置かない（2026-09-14、監査 P1-2）。Vercel の token は scope を
+  // 絞れず team 全権になるため、agent vault の「漏れても 1 日で戻せる」定義に入らない。
+  // 未使用のまま置かれていた agent/vercel は Vercel 側で revoke し item を archive した。
+  // agent の Vercel 読み取りは CLI の読み取り系サブコマンドだけで行う（pre-tool-guard）。
 
-  envEntry('GOOGLE_SITE_VERIFICATION', false, 'public', 'shared', agent, 'google'),
-  envEntry('YANDEX_VERIFICATION', false, 'public', 'shared', agent, 'google'),
-  envEntry('YAHOO_VERIFICATION', false, 'public', 'shared', agent, 'google'),
+  // ANTHROPIC_API_KEY（consumer 無し）と webmaster verification 3 件（値が空で Vercel にも
+  // replica 無し）は、2026-09-14 に agent の item ごと削除したため entry を置かない。
+  // verification を使う時は公開値なので human/app 等の production item に足す。
 
   // 外部カレンダー取り込み用の専用 OAuth client（Supabase Auth の Google provider とは別物）。
   // agent（旧 Dayopt-Staging）/google-calendar item は 2026-08-14 実測時点で 1Password に
@@ -160,8 +154,8 @@ export const productionEnvSchema: EnvSchemaEntry[] = [
   // .op-env.human 経由の管理者運用（緊急時のユーザー復旧）が op run の
   // 参照解決で止まる。
   envEntry('NEXT_PUBLIC_SUPABASE_URL', true, 'public', 'production', human, 'supabase'),
-  envEntry('NEXT_PUBLIC_SUPABASE_ANON_KEY', true, 'public', 'production', human, 'supabase'),
-  envEntry('SUPABASE_SERVICE_ROLE_KEY', true, 'secret', 'production', human, 'supabase'),
+  envEntry('NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY', true, 'public', 'production', human, 'supabase'),
+  envEntry('SUPABASE_SECRET_KEY', true, 'secret', 'production', human, 'supabase'),
   // SUPABASE_ACCESS_TOKEN は 2026-08-17 に human/supabase-cli へ専用 item として切り出した
   // （#2127）。「アプリが env として消費する値の束」と「人間・CLI が使う operational
   // credential（rotation 対象、有効期限 field 必須）」を分離する命名規約に合わせたもの。
@@ -208,6 +202,10 @@ export const productionEnvSchema: EnvSchemaEntry[] = [
     'stripe-live',
     '課金未有効化のため未設定（2026-08-11 実測、#1669）',
   ),
+  // Product / Web の Production が共用する送信 credential。2026-09-14 に agent/resend から移した。
+  // webhook 署名（app 別）の human/resend・human/resend-web とは item を分ける。
+  envEntry('RESEND_API_KEY', false, 'secret', 'production', human, 'resend-send'),
+  envEntry('RESEND_FROM_EMAIL', false, 'public', 'production', human, 'resend-send'),
   envEntry('RESEND_WEBHOOK_SECRET', false, 'secret', 'production', human, 'resend'),
   envEntry('RESEND_WEBHOOK_SECRET', false, 'secret', 'production', human, 'resend-web'),
   envEntry('NEXT_PUBLIC_SENTRY_DSN', true, 'public', 'production', human, 'sentry'),
@@ -218,10 +216,10 @@ export const productionEnvSchema: EnvSchemaEntry[] = [
   envEntry('SENTRY_DSN', true, 'public', 'production', human, 'sentry-web'),
   envEntry('SENTRY_ORG', true, 'public', 'production', human, 'sentry-web'),
   envEntry('SENTRY_PROJECT', true, 'public', 'production', human, 'sentry-web'),
-  // item 名は sentry ではなく sentry-login（2026-08-14 実測の命名 drift、#2063）。
-  // 修正前は op の曖昧解決で偶然通っていたが、1password:check の恒久 red の
-  // 直接原因だった（required entry が MISSING_ITEM で fail）。
-  envEntry('SENTRY_AUTH_TOKEN', true, 'secret', 'production', human, 'sentry-login'),
+  // Vercel Production build の source map upload token。master は ci/sentry-release-token
+  // （#2085 で release 用 token を分離）。human/sentry-login は GUI ログイン item で token field を
+  // 持たない（2026-09-14 実測で MISSING_FIELD、#2696）。
+  envEntry('SENTRY_AUTH_TOKEN', true, 'secret', 'production', ci, 'sentry-release-token'),
   // NEXT_PUBLIC_APP_URL / NEXT_PUBLIC_SITE_URL / RECOVERY_CODE_PEPPER は
   // replica（Vercel Production Env）に値がある可能性がある「反映漏れ」枠。
   // schema先行（機能未展開）ではないため pendingReason は付けない。EMPTY の場合は
@@ -247,7 +245,7 @@ export const productionEnvSchema: EnvSchemaEntry[] = [
       'production',
       human,
       'app',
-      '#1754（MCP OAuth epic、status:watching）の production 未展開分',
+      '#2553（#1754 epic の Production 有効化ゲート）の production 未展開分',
     ),
   ),
 
@@ -295,9 +293,12 @@ export const productionEnvSchema: EnvSchemaEntry[] = [
 // schema の不在（envSchema 側）と実在の禁止（ここ）は別物なので両方を持つ。
 export const forbiddenFields: ForbiddenField[] = [
   ...[
-    'NEXT_PUBLIC_SUPABASE_URL',
+    // 移行後も旧名で production credential が agent に複製されるのを防ぐ。
     'NEXT_PUBLIC_SUPABASE_ANON_KEY',
     'SUPABASE_SERVICE_ROLE_KEY',
+    'NEXT_PUBLIC_SUPABASE_URL',
+    'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY',
+    'SUPABASE_SECRET_KEY',
     'SUPABASE_DB_PASSWORD',
   ].map((field) => ({
     vault: agent,
@@ -316,6 +317,14 @@ export const forbiddenFields: ForbiddenField[] = [
     field: 'SUPABASE_ACCESS_TOKEN',
     reason: 'human 正本へ一本化済み（#1933）',
   },
+  // agent/resend から human/resend-send へ移した時に持ち込まれた webhook 署名の複製。
+  // webhook 署名の master は app 別の human/resend・human/resend-web（2026-09-14）。
+  {
+    vault: human,
+    item: 'resend-send',
+    field: 'RESEND_WEBHOOK_SECRET',
+    reason: 'webhook 署名は human/resend・human/resend-web が正本。送信 item に複製を置かない',
+  },
 ];
 
 export const operationalItems: OperationalItem[] = [
@@ -327,6 +336,91 @@ export const operationalItems: OperationalItem[] = [
   { vault: human, item: 'supabase-login', required: true },
   // Upstash Console の GUI ログイン。op:// では参照されない（#2127）。
   { vault: human, item: 'upstash-login', required: true },
+  // Agent セッションの gh / git push が使う fine-grained PAT（Dayopt/dayopt repo 限定、
+  // Administration / Secrets / Workflows 無し）。op run では消費せず、User が
+  // `GH_CONFIG_DIR=~/.config/gh-agent gh auth login --with-token` で replica を作る。
+  // 発行手順と権限一覧は docs/operations/secrets.md §Agent の gh identity。
+  { vault: agent, item: 'github-agent', required: true },
+  // Agent が production Supabase を読む時の scoped access token（read 権限だけ、期限付き）。
+  // supabase MCP（--read-only）と supabase-mgmt-safe-get.mjs が inline op:// で使う。
+  // write を含む human/supabase-cli を agent が解決しないための分離（2026-09-14 監査 P2-7）。
+  // field は日本語ロケールでも id が credential。docs/operations/secrets.md §Agent の Supabase 読み取り token。
+  { vault: agent, item: 'supabase-agent', required: true },
+  // Agent の Sentry 読み取り token（org の read scope だけ。2026-09-14 に access を実測、#2696）。
+  // sentry CLI が inline op:// で使う。mcp-usage skill §Sentry。
+  { vault: agent, item: 'sentry-cli-readonly', required: true },
 ];
 
-export const onePasswordEnvSchema = [...envSchema, ...productionEnvSchema];
+// CI（GitHub Actions）が消費する automation credential の master（vault ci）。replica は
+// GitHub Actions Secrets（repo 単位）。envName は workflow の step env 名で、Secret 名が違う時だけ
+// githubSecret を持つ。workflow の secrets.* 参照とこの表の対応は
+// scripts/__tests__/ci-secret-ledger.test.ts が名前で双方向に検査する（2026-09-14 監査）。
+// どれが欠けても本番 promote・監査・backup のいずれかが止まるため、すべて required。
+// 本番 release（promote.yml）と、監査・backup・replica check（production-config-audit.yml /
+// nightly.yml）で environment を分ける。どちらも deployment branch policy は main だけ。
+const RELEASE_AND_OPS = ['production-release', 'production-ops'];
+const OPS = ['production-ops'];
+
+const rcloneFields = [
+  'TYPE',
+  'PROVIDER',
+  'ENDPOINT',
+  'REGION',
+  'ACCESS_KEY_ID',
+  'SECRET_ACCESS_KEY',
+];
+
+function ciEntry(
+  envName: string,
+  visibility: EnvVisibility,
+  item: string,
+  githubEnvironments: string[],
+  options: { field?: string; githubSecret?: string } = {},
+): EnvSchemaEntry {
+  return {
+    ...envEntry(envName, true, visibility, 'production', ci, item, options.field),
+    ...(options.githubSecret ? { githubSecret: options.githubSecret } : {}),
+    githubEnvironments,
+  };
+}
+
+function rcloneEntries(side: 'SOURCE' | 'DEST', item: string): EnvSchemaEntry[] {
+  return rcloneFields.map((suffix) =>
+    ciEntry(
+      `RCLONE_CONFIG_${side}_${suffix}`,
+      suffix.endsWith('KEY') || suffix.endsWith('KEY_ID') ? 'secret' : 'public',
+      item,
+      OPS,
+    ),
+  );
+}
+
+export const ciSecretSchema: EnvSchemaEntry[] = [
+  // item 名は 2026-09-14 に vercel から vercel-production へ変更（用途を名前で分かるように）。
+  // token は team 全権で、promote / rollback（promote.yml）と読み取り監査で共用する。
+  // Vercel の token は scope を絞れないため、分けても被害範囲は変わらない。
+  ciEntry('VERCEL_TOKEN', 'secret', 'vercel-production', RELEASE_AND_OPS),
+  ciEntry('VERCEL_TEAM_ID', 'public', 'vercel-production', RELEASE_AND_OPS, {
+    githubSecret: 'VERCEL_ORG_ID',
+  }),
+  ciEntry('VERCEL_BYPASS_PRODUCT', 'secret', 'vercel-production', ['production-release'], {
+    field: 'VERCEL_AUTOMATION_BYPASS_PRODUCT',
+    githubSecret: 'VERCEL_AUTOMATION_BYPASS_PRODUCT',
+  }),
+  ciEntry('VERCEL_BYPASS_WEB', 'secret', 'vercel-production', ['production-release'], {
+    field: 'VERCEL_AUTOMATION_BYPASS_WEB',
+    githubSecret: 'VERCEL_AUTOMATION_BYPASS_WEB',
+  }),
+  // Supabase Management API の scoped token。field id は日本語ロケールでも credential。
+  ciEntry('SUPABASE_AUTH_AUDIT_TOKEN', 'secret', 'supabase-auth-audit', OPS, {
+    field: 'credential',
+  }),
+  ciEntry('SUPABASE_STORAGE_RLS_AUDIT_TOKEN', 'secret', 'supabase-storage-rls-audit', OPS, {
+    field: 'credential',
+  }),
+  // nightly の Storage backup（rclone）。SOURCE は Supabase Storage の S3 接続、DEST は Cloudflare R2。
+  ...rcloneEntries('SOURCE', 'Supabase-StorageS3-backupsource'),
+  ...rcloneEntries('DEST', 'Cloudflare-R2-storagebackup'),
+];
+
+export const onePasswordEnvSchema = [...envSchema, ...productionEnvSchema, ...ciSecretSchema];

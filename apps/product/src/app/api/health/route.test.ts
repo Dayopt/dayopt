@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   loggerError: vi.fn(),
   loggerWarn: vi.fn(),
   envValidationError: false,
+  healthLimit: vi.fn(),
 }));
 
 vi.mock('@supabase/supabase-js', () => ({
@@ -35,6 +36,10 @@ vi.mock('@/lib/logger', () => ({
   },
 }));
 
+vi.mock('@/lib/rate-limit/upstash', () => ({
+  healthCheckGlobalRateLimit: { limit: mocks.healthLimit },
+}));
+
 vi.mock('@/env', () => ({
   env: new Proxy(
     {},
@@ -54,8 +59,8 @@ import { GET } from './route';
 describe('GET /api/health', () => {
   beforeEach(() => {
     vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://example.supabase.co');
-    vi.stubEnv('SUPABASE_SERVICE_ROLE_KEY', 'service-role-sentinel');
-    vi.stubEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY', 'anon-key-sentinel');
+    vi.stubEnv('SUPABASE_SECRET_KEY', 'service-role-sentinel');
+    vi.stubEnv('NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY', 'anon-key-sentinel');
     vi.stubEnv('NEXT_PUBLIC_APP_VERSION', '0.32.0');
     vi.stubEnv('VERCEL_ENV', '');
     vi.stubEnv('VERCEL_TARGET_ENV', '');
@@ -67,6 +72,7 @@ describe('GET /api/health', () => {
 
     mocks.envValidationError = false;
     mocks.redisConstructorOptions = [];
+    mocks.healthLimit.mockResolvedValue({ success: true });
     mocks.rpc.mockImplementation(() =>
       Promise.resolve({
         data: [
@@ -148,13 +154,7 @@ describe('GET /api/health', () => {
   it('OAuth-enabled Previewをproject refと依存必須かつ詳細非公開として扱う', async () => {
     stubPreviewOperationalEnvironment();
     vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://abcdefghijklmnopqrst.supabase.co');
-    vi.stubEnv(
-      'SUPABASE_SERVICE_ROLE_KEY',
-      createUnsignedTestJwt({
-        role: 'service_role',
-        ref: 'abcdefghijklmnopqrst',
-      }),
-    );
+    vi.stubEnv('SUPABASE_SECRET_KEY', 'sb_secret_isolated-fixture');
     vi.stubEnv('UPSTASH_REDIS_REST_URL', 'https://preview-example.upstash.io');
     vi.stubEnv('UPSTASH_REDIS_REST_TOKEN', 'preview-redis-token-sentinel');
 
@@ -167,14 +167,8 @@ describe('GET /api/health', () => {
 
   it('OAuth-enabled PreviewはSupabase project ref driftをunhealthyにする', async () => {
     stubPreviewOperationalEnvironment();
-    vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://abcdefghijklmnopqrst.supabase.co');
-    vi.stubEnv(
-      'SUPABASE_SERVICE_ROLE_KEY',
-      createUnsignedTestJwt({
-        role: 'service_role',
-        ref: 'zyxwvutsrqponmlkjihg',
-      }),
-    );
+    vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://zyxwvutsrqponmlkjihg.supabase.co');
+    vi.stubEnv('SUPABASE_SECRET_KEY', 'sb_secret_isolated-fixture');
     vi.stubEnv('UPSTASH_REDIS_REST_URL', 'https://preview-example.upstash.io');
     vi.stubEnv('UPSTASH_REDIS_REST_TOKEN', 'preview-redis-token-sentinel');
 
@@ -266,8 +260,8 @@ describe('GET /api/health', () => {
 
   it('非productionのDB設定不足をdegradedとしてclientを作らず返す', async () => {
     vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', '');
-    vi.stubEnv('SUPABASE_SERVICE_ROLE_KEY', '');
-    vi.stubEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY', '');
+    vi.stubEnv('SUPABASE_SECRET_KEY', '');
+    vi.stubEnv('NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY', '');
 
     const response = await GET();
 
@@ -278,7 +272,7 @@ describe('GET /api/health', () => {
   });
 
   it('productionのservice-role secret不足をunhealthyとして扱う', async () => {
-    vi.stubEnv('SUPABASE_SERVICE_ROLE_KEY', '');
+    vi.stubEnv('SUPABASE_SECRET_KEY', '');
     vi.stubEnv('VERCEL_ENV', 'production');
     vi.stubEnv('UPSTASH_REDIS_REST_URL', 'https://example.upstash.io');
     vi.stubEnv('UPSTASH_REDIS_REST_TOKEN', 'redis-token-sentinel');
@@ -374,6 +368,61 @@ describe('GET /api/health', () => {
     expect((await response.json()).status).toBe('unhealthy');
     expect(JSON.stringify(mocks.loggerError.mock.calls)).not.toContain('redis-token-sentinel');
   });
+
+  it('上限を超えたら依存を叩かずに直近の結果を返す', async () => {
+    // 無認証・無制限のままだと、1 リクエストごとに service-role client の生成 →
+    // identity RPC → profiles SELECT → Redis PING を駆動できる（#2721 D-09）。
+    const first = await GET();
+    expect(first.status).toBe(200);
+    const callsAfterFirst = mocks.createClient.mock.calls.length;
+    expect(callsAfterFirst).toBeGreaterThan(0);
+
+    mocks.healthLimit.mockResolvedValueOnce({ success: false });
+    const replayed = await GET();
+
+    expect(replayed.status).toBe(first.status);
+    expect(replayed.headers.get('X-Health-Check-Replayed')).toBe('true');
+    // 依存を一切叩いていない。
+    expect(mocks.createClient.mock.calls.length).toBe(callsAfterFirst);
+  });
+
+  it('障害中の結果も記憶し、古い healthy を返さない', async () => {
+    // 成功だけを覚えると、障害が始まった後に上限を超えた瞬間から最大 60 秒
+    // 「古い healthy」を返し、外形監視のアラートがその分遅れる。
+    const healthy = await GET();
+    expect(healthy.status).toBe(200);
+
+    mocks.limit.mockResolvedValueOnce({
+      data: null,
+      error: {
+        code: 'PGRST202',
+        message: 'database-message-sentinel',
+        details: 'database-details-sentinel',
+        hint: 'database-hint-sentinel',
+      },
+    });
+    const unhealthy = await GET();
+    expect(unhealthy.status).toBe(503);
+
+    mocks.healthLimit.mockResolvedValueOnce({ success: false });
+    const replayed = await GET();
+
+    expect(replayed.status).toBe(503);
+    expect(replayed.headers.get('X-Health-Check-Replayed')).toBe('true');
+    // 監視側が stale を判別できるよう経過時間を出す。
+    expect(Number(replayed.headers.get('X-Health-Check-Age-Ms'))).toBeGreaterThanOrEqual(0);
+  });
+
+  it('limiter が落ちても通常の check を続ける', async () => {
+    // 監視の入口なので、limiter 障害では止めない（fail-open）。
+    mocks.healthLimit.mockRejectedValueOnce(new Error('redis unavailable'));
+
+    const response = await GET();
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('X-Health-Check-Replayed')).toBeNull();
+    expect(mocks.createClient).toHaveBeenCalled();
+  });
 });
 
 function stubPreviewOperationalEnvironment(): void {
@@ -391,12 +440,4 @@ function stubPreviewOperationalEnvironment(): void {
     'MCP_CANONICAL_RESOURCE_URI',
     'https://product-git-codex-mcp-preview-dayopt.vercel.app',
   );
-}
-
-function createUnsignedTestJwt(payload: Record<string, string>): string {
-  return [
-    Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url'),
-    Buffer.from(JSON.stringify(payload)).toString('base64url'),
-    'signature',
-  ].join('.');
 }

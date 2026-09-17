@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-09-10
+last_verified: 2026-09-14
 code: apps/product/src/lib/pwa
 ---
 
@@ -37,12 +37,12 @@ fallback from ever pointing at a previous account.
 
 ## Service Worker Cache Strategy
 
-| Request            | Strategy               | Behavior                                                                     |
-| ------------------ | ---------------------- | ---------------------------------------------------------------------------- |
-| Navigation         | Stale While Revalidate | Cached page first, refresh cache in the background, then `/offline` fallback |
-| Static assets      | Cache First            | JS, CSS, fonts, and images use the network as fallback                       |
-| Other GET requests | Network First          | Use a cached response only when the network fails                            |
-| Auth and tRPC      | No Cache               | Dynamic authenticated requests bypass the Service Worker cache               |
+| Request            | Strategy      | Behavior                                                                    |
+| ------------------ | ------------- | --------------------------------------------------------------------------- |
+| Navigation         | Network First | Network page first and refresh the cache, then cached page, then `/offline` |
+| Static assets      | Cache First   | JS, CSS, fonts, and images use the network as fallback                      |
+| Other GET requests | Network First | Use a cached response only when the network fails                           |
+| Auth and tRPC      | No Cache      | Dynamic authenticated requests bypass the Service Worker cache              |
 
 Cache names carry the deploying commit SHA (`dayopt-static-v<sha>`, `dayopt-dynamic-v<sha>`), passed
 in as a query string when the page registers the worker (`/sw.js?v=<sha>`, see
@@ -76,10 +76,35 @@ keep-alive workarounds.
 It does not initialize a mutation processor or display synchronization status.
 
 `public/sw.js` calls `self.skipWaiting()` on install, so a new Service Worker version activates
-automatically as soon as it is detected — but that does not reach pages already open. `useServiceWorker`
-tracks the `controllerchange` event fired when an already-open page's controller switches to the new
-worker and exposes it as `updateAvailable`. The hook never reloads on its own (to avoid discarding
-in-progress edits); calling `applyUpdate()` reloads the page to pick up the new version.
+automatically as soon as it is detected — but that does not reach pages already open.
+
+### Applying a new deploy without a prompt
+
+Dayopt has no update banner. A page that is older than the serving deploy reloads itself at a moment
+when no edit can be lost.
+
+`useServiceWorker` decides whether the open page is stale by comparing commit SHAs. The page knows its
+own SHA from `getBuildSha()` in `src/lib/app-info.ts`. It learns the deployed SHA in two ways:
+
+- **`controllerchange`**: another tab loaded the new deploy and its Service Worker took control. The new
+  worker's `scriptURL` carries `?v=<sha>`. When that matches the page's own SHA, the page is the one that
+  started the new worker and nothing happens. Comparing is what keeps a freshly loaded page from being
+  told to reload.
+- **Tab return**: on `visibilitychange` to visible or `focus`, at most once a minute, the page fetches
+  `/api/health/version`. That route returns the build SHA without touching the database. A periodic
+  `registration.update()` alone cannot find a new deploy, because the page keeps polling its own
+  `/sw.js?v=<old sha>` URL.
+
+`useApplyUpdateWhenSafe`, next to `ServiceWorkerProvider`, reloads the page once the page is stale,
+visible, online, and safe. Safe means no mutation is in flight, the Inspector holds no create-mode or
+duplicate draft, no dialog, sheet, or menu is open in the DOM, and no input has focus. A component that
+keeps unsaved input outside those signals registers `useBlockAutoReload` from
+`src/lib/pwa/auto-reload-blockers.ts`; the Inspector form does this while a write is unresolved. When the
+page is not safe it does nothing and checks again on the next tab return. It never reloads the instant the
+page becomes safe, because the user was just interacting. A `sessionStorage` flag
+(`dayopt:auto-update-reloaded`) records the target SHA, so a delayed CDN rollout cannot cause a reload loop.
+
+Navigation requests are Network First, so the first load after a promote already renders the new HTML.
 
 ### ChunkLoadError recovery
 
@@ -117,6 +142,8 @@ Until those conditions are met, failed or unavailable mutations follow the norma
 
 ```text
 src/lib/pwa/
+├── auto-reload-blockers.ts
+├── build-staleness.ts
 ├── chunk-load-recovery.ts
 ├── install-prompt.ts
 └── ios-workarounds.ts
@@ -138,7 +165,7 @@ public/
 ## Verification
 
 ```bash
-pnpm test -- useServiceWorker
+pnpm test -- useServiceWorker build-staleness useApplyUpdateWhenSafe
 pnpm test:e2e -- src/lib/test/e2e/pwa/pwa.spec.ts
 pnpm build
 ```

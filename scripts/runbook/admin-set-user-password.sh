@@ -12,7 +12,7 @@
 # 前提:
 #   - .op-env.human が存在し、以下を含む:
 #       NEXT_PUBLIC_SUPABASE_URL=op://...
-#       SUPABASE_SERVICE_ROLE_KEY=op://...
+#       SUPABASE_SECRET_KEY=op://...
 #   - 1Password CLI (op) に signin 済み (op signin)
 #   - password を保存する 1Password item を事前に作成済み
 #   - 対象 user の auth.users エントリが既に存在する
@@ -39,6 +39,7 @@ PASSWORD_ITEM_ID="${PASSWORD_ITEM_ID:-}"
 
 require_user_email_and_password_item "admin-set-user-password.sh"
 require_supabase_env_verbose
+require_target_confirmation "$(supabase_ref_from_url "$NEXT_PUBLIC_SUPABASE_URL")" "user の password 上書き（${USER_EMAIL}）"
 
 auth_headers_json
 

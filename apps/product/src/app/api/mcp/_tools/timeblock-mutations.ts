@@ -39,7 +39,7 @@ const fulfillmentUpdateSchema = z
     'Subjective fulfillment felt during this Record: low, medium, or high. Omitting this field leaves the existing rating unchanged; pass null explicitly to clear it.',
   );
 
-const planCreateInputSchema = z
+export const MCP_PLAN_CREATE_INPUT_SCHEMA = z
   .object({
     operationId: operationIdSchema,
     title: titleSchema,
@@ -50,7 +50,7 @@ const planCreateInputSchema = z
   })
   .strict();
 
-const planUpdateInputSchema = z
+export const MCP_PLAN_UPDATE_INPUT_SCHEMA = z
   .object({
     operationId: operationIdSchema,
     planId: resourceIdSchema,
@@ -63,7 +63,7 @@ const planUpdateInputSchema = z
   })
   .strict();
 
-const planVersionedInputSchema = z
+export const MCP_PLAN_VERSIONED_INPUT_SCHEMA = z
   .object({
     operationId: operationIdSchema,
     planId: resourceIdSchema,
@@ -71,7 +71,7 @@ const planVersionedInputSchema = z
   })
   .strict();
 
-const recordCreateInputSchema = z
+export const MCP_RECORD_CREATE_INPUT_SCHEMA = z
   .object({
     operationId: operationIdSchema,
     title: titleSchema,
@@ -89,7 +89,7 @@ const recordCreateInputSchema = z
   })
   .strict();
 
-const recordUpdateInputSchema = z
+export const MCP_RECORD_UPDATE_INPUT_SCHEMA = z
   .object({
     operationId: operationIdSchema,
     recordId: resourceIdSchema,
@@ -103,7 +103,7 @@ const recordUpdateInputSchema = z
   })
   .strict();
 
-const recordVersionedInputSchema = z
+export const MCP_RECORD_VERSIONED_INPUT_SCHEMA = z
   .object({
     operationId: operationIdSchema,
     recordId: resourceIdSchema,
@@ -131,10 +131,10 @@ function mutationReceiptOutputSchema(resourceType: 'plan' | 'record', deleted: b
     .strict();
 }
 
-const planActiveReceiptSchema = mutationReceiptOutputSchema('plan', false);
-const planDeletedReceiptSchema = mutationReceiptOutputSchema('plan', true);
-const recordActiveReceiptSchema = mutationReceiptOutputSchema('record', false);
-const recordDeletedReceiptSchema = mutationReceiptOutputSchema('record', true);
+export const MCP_PLAN_ACTIVE_RECEIPT_SCHEMA = mutationReceiptOutputSchema('plan', false);
+export const MCP_PLAN_DELETED_RECEIPT_SCHEMA = mutationReceiptOutputSchema('plan', true);
+export const MCP_RECORD_ACTIVE_RECEIPT_SCHEMA = mutationReceiptOutputSchema('record', false);
+export const MCP_RECORD_DELETED_RECEIPT_SCHEMA = mutationReceiptOutputSchema('record', true);
 
 export function registerPlansCreateTool(server: McpServer, ctx: McpRequestContext) {
   server.registerTool(
@@ -142,8 +142,8 @@ export function registerPlansCreateTool(server: McpServer, ctx: McpRequestContex
     {
       title: 'Create a Dayopt plan',
       description: 'Create one future Plan as canonical Dayopt data.',
-      inputSchema: planCreateInputSchema,
-      outputSchema: planActiveReceiptSchema,
+      inputSchema: MCP_PLAN_CREATE_INPUT_SCHEMA,
+      outputSchema: MCP_PLAN_ACTIVE_RECEIPT_SCHEMA,
       annotations: { destructiveHint: false, idempotentHint: true },
     },
     async (input) => {
@@ -167,8 +167,8 @@ export function registerPlansUpdateTool(server: McpServer, ctx: McpRequestContex
     {
       title: 'Update a Dayopt plan',
       description: 'Update one active Plan using its exact updated_at version.',
-      inputSchema: planUpdateInputSchema,
-      outputSchema: planActiveReceiptSchema,
+      inputSchema: MCP_PLAN_UPDATE_INPUT_SCHEMA,
+      outputSchema: MCP_PLAN_ACTIVE_RECEIPT_SCHEMA,
       annotations: { destructiveHint: true, idempotentHint: true },
     },
     async (input) => {
@@ -197,8 +197,8 @@ export function registerPlansDeleteTool(server: McpServer, ctx: McpRequestContex
     {
       title: 'Move a Dayopt plan to trash',
       description: 'Soft-delete one active Plan using its exact updated_at version.',
-      inputSchema: planVersionedInputSchema,
-      outputSchema: planDeletedReceiptSchema,
+      inputSchema: MCP_PLAN_VERSIONED_INPUT_SCHEMA,
+      outputSchema: MCP_PLAN_DELETED_RECEIPT_SCHEMA,
       annotations: { destructiveHint: true, idempotentHint: true },
     },
     async (input) => {
@@ -220,8 +220,8 @@ export function registerPlansRestoreTool(server: McpServer, ctx: McpRequestConte
     {
       title: 'Restore a Dayopt plan',
       description: 'Restore one trashed Plan using its exact updated_at version.',
-      inputSchema: planVersionedInputSchema,
-      outputSchema: planActiveReceiptSchema,
+      inputSchema: MCP_PLAN_VERSIONED_INPUT_SCHEMA,
+      outputSchema: MCP_PLAN_ACTIVE_RECEIPT_SCHEMA,
       annotations: { destructiveHint: false, idempotentHint: true },
     },
     async (input) => {
@@ -243,8 +243,8 @@ export function registerRecordsCreateTool(server: McpServer, ctx: McpRequestCont
     {
       title: 'Create a Dayopt record',
       description: 'Create one past Record as canonical Dayopt data.',
-      inputSchema: recordCreateInputSchema,
-      outputSchema: recordActiveReceiptSchema,
+      inputSchema: MCP_RECORD_CREATE_INPUT_SCHEMA,
+      outputSchema: MCP_RECORD_ACTIVE_RECEIPT_SCHEMA,
       annotations: { destructiveHint: false, idempotentHint: true },
     },
     async (input) => {
@@ -270,8 +270,8 @@ export function registerRecordsUpdateTool(server: McpServer, ctx: McpRequestCont
     {
       title: 'Update a Dayopt record',
       description: 'Update one active Record using its exact updated_at version.',
-      inputSchema: recordUpdateInputSchema,
-      outputSchema: recordActiveReceiptSchema,
+      inputSchema: MCP_RECORD_UPDATE_INPUT_SCHEMA,
+      outputSchema: MCP_RECORD_ACTIVE_RECEIPT_SCHEMA,
       annotations: { destructiveHint: true, idempotentHint: true },
     },
     async (input) => {
@@ -301,8 +301,8 @@ export function registerRecordsDeleteTool(server: McpServer, ctx: McpRequestCont
     {
       title: 'Move a Dayopt record to trash',
       description: 'Soft-delete one active Record using its exact updated_at version.',
-      inputSchema: recordVersionedInputSchema,
-      outputSchema: recordDeletedReceiptSchema,
+      inputSchema: MCP_RECORD_VERSIONED_INPUT_SCHEMA,
+      outputSchema: MCP_RECORD_DELETED_RECEIPT_SCHEMA,
       annotations: { destructiveHint: true, idempotentHint: true },
     },
     async (input) => {
@@ -324,8 +324,8 @@ export function registerRecordsRestoreTool(server: McpServer, ctx: McpRequestCon
     {
       title: 'Restore a Dayopt record',
       description: 'Restore one trashed Record using its exact updated_at version.',
-      inputSchema: recordVersionedInputSchema,
-      outputSchema: recordActiveReceiptSchema,
+      inputSchema: MCP_RECORD_VERSIONED_INPUT_SCHEMA,
+      outputSchema: MCP_RECORD_ACTIVE_RECEIPT_SCHEMA,
       annotations: { destructiveHint: false, idempotentHint: true },
     },
     async (input) => {

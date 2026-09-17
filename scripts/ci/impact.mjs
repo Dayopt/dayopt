@@ -39,6 +39,14 @@ import { fileURLToPath } from 'node:url';
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
 /** 出力キー。消費側（finish-branch.sh / release / CI）はこの集合に依存する。 */
+/**
+ * production に適用される root の migration ファイル（`_archive/` や README は含まない）。
+ * `🧱 DB Upgrade (shadow)` の起動（check.mjs の `migrations_added`）と plan の
+ * dbUpgrade / oldConsumer は必ずこの 1 本を共有する（判定がずれると plan が要求する job が
+ * 起動せず Validation が恒久的に blocked になる）。
+ */
+export const ROOT_MIGRATION_PATH = /^supabase\/migrations\/\d{14}_.+\.sql$/;
+
 export const IMPACT_KEYS = [
   'product',
   'web',
@@ -48,6 +56,7 @@ export const IMPACT_KEYS = [
   'webCi',
   'webPreviewSmoke',
   'docsOnly',
+  'mcpConformance',
 ];
 
 // ─── docs 系（app build に影響しない）────────────────────────────────
@@ -293,6 +302,7 @@ const ALL_AFFECTED = {
   webCi: true,
   webPreviewSmoke: true,
   docsOnly: false,
+  mcpConformance: true,
 };
 
 /**
@@ -318,6 +328,7 @@ export function resolveImpact(changedFiles, options = {}) {
   let integration = false;
   let ciToolchain = false;
   let docsOnly = true;
+  let mcpConformance = false;
   /** @type {Record<string, string>} 各キーを最初に true にしたファイル（説明用） */
   const reasons = {};
   /** @type {string[]} どの規則にも該当しなかったファイル */
@@ -328,6 +339,28 @@ export function resolveImpact(changedFiles, options = {}) {
   };
 
   for (const file of files) {
+    // Include dependency manifests/lockfile conservatively: SDK transitive changes
+    // can alter the advertised protocol even when application code is unchanged.
+    if (
+      file.startsWith('apps/product/src/app/api/mcp/') ||
+      file.startsWith('apps/product/src/app/mcp/') ||
+      file.startsWith('apps/product/src/lib/mcp/') ||
+      file.startsWith('apps/product/src/lib/oauth-server/') ||
+      file.startsWith('apps/product/scripts/mcp-conformance') ||
+      [
+        'apps/product/package.json',
+        'pnpm-lock.yaml',
+        'pnpm-workspace.yaml',
+        'package.json',
+        'scripts/ci/impact.mjs',
+        'scripts/ci/check.mjs',
+        '.github/workflows/ci.yml',
+      ].includes(file) ||
+      CI_TOOLCHAIN_FILES.has(file)
+    ) {
+      mcpConformance = true;
+      mark('mcpConformance', file);
+    }
     // integration は docs とも app とも独立に判定する（rls-snapshot.md のように
     // docs パスが integration の対象になるものがあるため、先に見る）。
     if (isIntegrationPath(file)) {
@@ -429,6 +462,7 @@ export function resolveImpact(changedFiles, options = {}) {
     webCi: web || ciToolchain,
     webPreviewSmoke: web,
     docsOnly,
+    mcpConformance,
     reasons,
     unknown,
   };
@@ -491,7 +525,8 @@ export function formatGithubOutput(impact) {
   const productUnit = impact?.productUnit === false ? 'false' : 'true';
   const webCi = impact?.webCi === false ? 'false' : 'true';
   const integration = impact?.integration === false ? 'false' : 'true';
-  return `docs_only=${docsOnly}\nproduct_unit=${productUnit}\nweb_ci=${webCi}\nintegration=${integration}\n`;
+  const mcpConformance = impact?.mcpConformance === false ? 'false' : 'true';
+  return `docs_only=${docsOnly}\nproduct_unit=${productUnit}\nweb_ci=${webCi}\nintegration=${integration}\nmcp_conformance=${mcpConformance}\n`;
 }
 
 // ─── Vercel Ignored Build Step（`--vercel <product|web>`）────────────

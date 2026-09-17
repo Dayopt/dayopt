@@ -8,11 +8,7 @@ import { AppHeader } from '@/components/shell/AppHeader';
 import { Sidebar } from '@/components/shell/sidebar';
 import { useAuthStore } from '@/features/auth';
 import { isCalendarViewPath, resolveWorkspaceTab } from '@/features/calendar';
-import {
-  REPORT_DETAIL_PANEL_WIDTH,
-  REPORT_DETAIL_SLOT_KEY,
-  useReportDetailStore,
-} from '@/features/review';
+import { REPORT_DETAIL_SLOT_KEY, useReportDetailStore } from '@/features/review';
 import { TIMEBLOCK_INSPECTOR_SLOT_KEY, useTimeblockInspectorStore } from '@/features/timeblock';
 import { setDomSlot } from '@/lib/dom-slots/useDomSlot';
 import { getAvatarUrl, getDisplayName } from '@/lib/user';
@@ -41,7 +37,8 @@ const INSPECTOR_PANEL_WIDTH = 400;
  * - Sidebar（256px、開閉可能）← 全ページ共通 Sidebar
  * - PageHeader + MainContent
  * - Inspector（400px、Timeblock 選択時のみ開く。@/features/timeblock が portal で描画）
- * - Report detail（250px、`/report` で行・点を選んだ時のみ開く。@/features/review が portal で描画）
+ * - Report detail（既定 360px・250〜560px で可変。`/report` で行・点を選んだ時のみ開く。
+ *   @/features/review が portal で描画し、幅は review の store が持つ）
  *
  * **右のパネルは 2 枚とも DOM 上に常に存在する**（`AnimatedWidthPanel` が幅 0 で畳む）が、
  * inspector はカレンダー、report detail はレポートに属するので同時には開かない。slot を
@@ -60,6 +57,8 @@ export function DesktopLayout({ children }: DesktopLayoutProps) {
     setDomSlot(TIMEBLOCK_INSPECTOR_SLOT_KEY, element);
   }, []);
   const isReportDetailOpen = useReportDetailStore((s) => s.isOpen);
+  const reportDetailWidth = useReportDetailStore((s) => s.width);
+  const isReportDetailResizing = useReportDetailStore((s) => s.isResizing);
   const setReportDetailSlot = useCallback((element: HTMLDivElement | null) => {
     setDomSlot(REPORT_DETAIL_SLOT_KEY, element);
   }, []);
@@ -141,11 +140,13 @@ export function DesktopLayout({ children }: DesktopLayoutProps) {
           <div ref={setInspectorSlot} className="h-full" />
         </AnimatedWidthPanel>
 
-        {/* Report detail（固定幅、`/report` で行・点を選んだ時のみ開く） */}
+        {/* Report detail（可変幅、`/report` で行・点を選んだ時のみ開く） */}
         <AnimatedWidthPanel
           data-panel="report-detail"
           open={isReportDetailOpen}
-          width={REPORT_DETAIL_PANEL_WIDTH}
+          width={reportDetailWidth}
+          // ドラッグ中は補間を切る。200ms の追従だと指の位置とパネルの端がずれる
+          disableTransition={isReportDetailResizing}
           side="right"
           className="border-border h-full border-l"
           innerClassName="h-full"

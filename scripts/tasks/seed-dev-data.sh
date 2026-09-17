@@ -20,14 +20,17 @@ LOCAL_ANON_KEY="sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH"
 if [ "${USE_LINKED_DB:-}" = "true" ]; then
   echo "☁️  linked Supabase モード（緊急時のみ）"
   SUPABASE_URL="${NEXT_PUBLIC_SUPABASE_URL:-}"
-  ANON_KEY="${NEXT_PUBLIC_SUPABASE_ANON_KEY:-}"
+  ANON_KEY="${NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY:-}"
 
   if [ -z "$SUPABASE_URL" ] || [ -z "$ANON_KEY" ]; then
-    echo "❌ NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY が未設定です"
+    echo "❌ NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY が未設定です"
     echo "   op run --env-file=.op-env.human -- env USE_LINKED_DB=true pnpm db:seed を実行してください"
     exit 1
   fi
   DB_TARGET="--linked"
+  # linked は production に既知 password の user を作る。対象 ref の打ち返しを要求する（監査 P2-2）
+  source "$(dirname "${BASH_SOURCE[0]}")/confirm-target.sh"
+  require_target_confirmation "$(supabase_ref_from_url "$SUPABASE_URL")" "linked DB への開発用 user とデータの投入"
 else
   echo "🔧 ローカルDB モード"
   SUPABASE_URL="$LOCAL_URL"
@@ -67,7 +70,10 @@ echo "ユーザー作成成功: $USER_ID"
 # ========================================
 echo "サンプルPlan / Recordを作成中..."
 
-cat > /tmp/seed_timeblocks.sql <<EOF
+# 固定 path だと別 uid から読める・symlink を置かれうる。0600 の一時 file にして終了時に消す
+SEED_SQL_FILE=$(mktemp "${TMPDIR:-/tmp}/seed_timeblocks.XXXXXX")
+trap 'rm -f "$SEED_SQL_FILE"' EXIT
+cat > "$SEED_SQL_FILE" <<EOF
 DO \$\$
 BEGIN
 -- サンプルPlan 1
@@ -137,7 +143,7 @@ END;
 \$\$;
 EOF
 
-supabase db query --file /tmp/seed_timeblocks.sql $DB_TARGET
+supabase db query --file "$SEED_SQL_FILE" $DB_TARGET
 
 echo "サンプルデータ投入完了"
 echo ""
