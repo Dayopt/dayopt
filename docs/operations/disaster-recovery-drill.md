@@ -293,7 +293,9 @@ DB 内の hook function が戻っても、**GoTrue 側の hook 登録は引き�
 
 ### Vault / 秘密情報（**案β で最も壊れやすい箇所**）
 
-`vault.secrets` には production の要である 9 件が入っている（`stripe_secret_key` / `stripe_webhook_secret` / `resend_api_key` / `resend_webhook_secret` / `service_role_key` / `cron_secret` / `recovery_code_pepper` / `anthropic_api_key` / `supabase_url`）。**暗号鍵は project 単位で管理されるため、案β（別 project への復元）では復号できない可能性が高い。**
+`vault.secrets` には production の要である 7 件が入っている（`stripe_secret_key` / `stripe_webhook_secret` / `resend_api_key` / `resend_webhook_secret` / `cron_secret` / `recovery_code_pepper` / `anthropic_api_key`）。**暗号鍵は project 単位で管理されるため、案β（別 project への復元）では復号できない可能性が高い。**
+
+`service_role_key` / `supabase_url` の 2 件は `20260917050000_drop_vault_edge_invoke.sql`（[#2733](https://github.com/Dayopt/dayopt/issues/2733)）で撤去した。読んでいたのが撤去済みの `invoke_edge_function` だけだったため、復元対象ではない。
 
 - [ ] `vault.secrets` の**値が実際に復号できるか**確認する（行の存在確認だけでは不十分）
 - [ ] `PLACEHOLDER_REPLACE_ME` のままの行が無いか確認する（migration の seed 値）
