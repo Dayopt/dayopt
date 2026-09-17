@@ -194,14 +194,14 @@ OWASP準拠のセキュリティ監視の全体像と、定期検査の cadence 
 
 セキュリティレビューは 4 層で構成する。どの層も単独では完全でなく、コード変更起点（1・2）と時間経過起点（3・4）を組み合わせて成立させる。
 
-| 層         | タイミング               | 実体                                                                                                                                                                                                                                                                                                             |
-| ---------- | ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 実装中     | コード変更ごと           | `security` skill（OWASP 観点のガイド）/ risk に応じた主担当のセルフレビュー（`AGENTS.md §レーン運用`）                                                                                                                                                                                                           |
-| PR ごと    | CI（ready 後）+ merge 前 | `ci.yml` static job の secret scan（gitleaks + `secrets:check`）/ integration job（affected 時）の RLS snapshot drift 検査 / Vercel build の client bundle secret 検査（`verify:bundle`）/ `production-config-audit.yml` / GitHub の `@codex review` + 高リスク変更の追加レビュー契約（`pr-cross-review` skill） |
-| 継続       | 常時・自動               | Dependabot alerts（security update は schedule と無関係に即時 PR）/ Actions の SHA 固定 / Sentry / CSP 違反モニタリング / rate limit                                                                                                                                                                             |
-| 定期・随時 | 月次 + オンデマンド      | `/gardening` §5 のセキュリティ sweep（advisors + `pnpm security:check`）/ 深掘りが要る月は `security-sweep` skill を 1 境界（provider 非依存。`/claude-security` は任意の加速器）/ `/security-review` / `/code-review`                                                                                           |
+| 層         | タイミング               | 実体                                                                                                                                                                                                                                                                                       |
+| ---------- | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 実装中     | コード変更ごと           | `security` skill（OWASP 観点のガイド）/ risk に応じた主担当のセルフレビュー（`AGENTS.md §レーン運用`）                                                                                                                                                                                     |
+| PR ごと    | CI（ready 後）+ merge 前 | `ci.yml` static job の secret scan（gitleaks + `secrets:check`）/ integration job（affected 時）の RLS snapshot drift 検査 / Vercel build の client bundle secret 検査（`verify:bundle`）/ `production-config-audit.yml` / GitHub の `@codex review`（高リスクでも追加 reviewer は停止中） |
+| 継続       | 常時・自動               | Dependabot alerts（security update は schedule と無関係に即時 PR）/ Actions の SHA 固定 / Sentry / CSP 違反モニタリング / rate limit                                                                                                                                                       |
+| 定期・随時 | 月次 + オンデマンド      | `/gardening` §5 のセキュリティ sweep（advisors + `pnpm security:check`）/ 深掘りが要る月は `security-sweep` skill を 1 境界（provider 非依存。`/claude-security` は任意の加速器）/ `/security-review` / `/code-review`                                                                     |
 
-**束ねた PR のレビュー**: 通常 PR は GitHub の独立レビューを使い、高リスク変更の追加契約は `pr-cross-review` に従う。複数 Issue を束ねたことだけを理由に reviewer subagent を追加しない。
+**束ねた PR のレビュー**: 通常 PR は GitHub の独立レビューを使い、高リスク変更も同じ `@codex review` とセルフレビューで確認する。複数 Issue を束ねたことだけを理由に reviewer subagent を追加しない。
 
 ## 定期検査の cadence
 

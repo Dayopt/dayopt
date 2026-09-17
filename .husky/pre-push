@@ -85,7 +85,8 @@ PAUSE: push 前の確認（この commit set では初回。4 点に答えてか
 1. index は意図どおりか（git diff --cached を見たか）
 2. 直前の修正コミットが新しい穴を開けていないか
 3. auth / RLS / billing / migration / 公開契約 / cross-feature を含む diff なら、
-   反証レビュー（risk-reviewer / behavior-verifier / architecture-guard）をかけたか
+   セルフレビューの根拠と、PR 作成後に GitHub の `@codex review` を依頼する段取りを確認したか
+   （追加 reviewer は起動しない）
 4. 配線と不等式は確認したか（env の受け渡し、timeout / 予算などの定数関係）
 
 なぜこの 4 点か: AGENTS.md §レーン運用（push 前セルフレビュー）

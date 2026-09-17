@@ -1,13 +1,13 @@
 ---
 name: pr-cross-review
-description: PR の独立レビューを依頼・裁定する時に使う。通常は GitHub の @codex review、高リスク変更は追加の固定差分レビュー契約へ案内する。実装中のセルフレビューや repository 全体の security sweep は対象外。
+description: PR の独立レビューを依頼・裁定する時に使う。高リスク変更も GitHub の @codex review を使い、追加 reviewer は停止する。実装中のセルフレビューや repository 全体の security sweep は対象外。
 effort: medium
 maxTurns: 20
 ---
 
 # Independent PR Review
 
-通常 PR の独立レビューは GitHub の `@codex review` を標準にする。独立性は別 provider の名前ではなく、実装 session の推論を引き継がず PR diff・Issue・repo・検証結果から評価することに置く。実装 session 内で reviewer subagent を常時起動しない。
+通常 PR の独立レビューは GitHub の `@codex review` を標準にする。独立性は別 provider の名前ではなく、実装 session の推論を引き継がず PR diff・Issue・repo・検証結果から評価することに置く。追加の reviewer subagent / 外部 provider レビューは停止中。高リスク変更や GitHub の無応答も自動起動の理由にせず、User が明示的に再開を指示するまで起動しない。
 
 ## When to Use
 
@@ -47,14 +47,12 @@ Validation controller（`validation-gate.yml`、[infra.md](../../../docs/enginee
 - 完了証拠は `chatgpt-codex-connector[bot]` 名義の submitted review（`Reviewed commit` が head に一致。PENDING / DISMISSED は除外）か「Codex Review: Didn't find any major issues」comment だけ。依頼 comment の投稿成功・👀 / 👍 反応・summary 表の行は完了にしない
 - `[review-summary]` は OWNER / MEMBER / COLLABORATOR の comment だけ受理し、`status:` は `reviewed` または `role=reviewed, ...` の全 role が reviewed の時だけ満たす（partial / stale / not-run は不足、他は unknown）
 - 再評価は CI 完了（workflow_run）、Vercel の status、Supabase Preview の check run 完了（check_run）、PR への comment（issue_comment）で起きる。review の submit / thread の resolve 直後は再評価されないので、裁定後は comment を残すか修正 push で CI を回す
-- 高リスク（保護対象 path / policy）は上記に加えて `[review-summary]` の `head:` が現 head で `status:` が reviewed であることを別条件にする（`partial` / `stale` / `not-run` は不足）
+- 高リスク（保護対象 path / policy）も GitHub の現 head のレビューと指摘の裁定で満たす。`[review-summary]` は任意の既存証跡として読み、欠落・古さ・partial を追加の停止条件にしない
 - 本番操作の `EXPLICIT AUTHORITY` は PR 本文の checkbox・label・レビュー結果から推定しない。常に別の明示承認が要る
-- shadow 中は Codex を自動起動しない（起動要否は log に残すだけ）。現行の advisory 規則との差分: 切替後（#2798）は `satisfied` / `not-required` 以外で merge を止め、`unknown` / `failed` は同等の独立レビュー（固定差分レビュー等）で代替する。ruleset / Codex 設定の変更は本 skill の範囲外
+- shadow 中は Codex を自動起動しない（起動要否は log に残すだけ）。現行の advisory 規則との差分: 切替後（#2798）は `satisfied` / `not-required` 以外で merge を止め、`unknown` / `failed` は既存の独立レビュー証跡があれば読み取り互換で扱う。証跡が無ければ未完了と報告し、追加 reviewer を起動しない。ruleset / Codex 設定の変更は本 skill の範囲外
 
-## 高リスク変更の追加契約
+## 追加レビューの停止
 
-auth / RLS / service role / OAuth / billing / webhook / migration / 公開契約 / ガードレールの変更は、[固定差分レビュー](references/high-risk-review.md) の必要な role を使う。通常 PR と異なり、immutable pack・role ごとの所見・SHA 照合・result validation の契約を維持する。通常レビューで確認済みの範囲と追加レビューの対象を明示し、同じ観点を無条件に重ねない。
+2026-09-17 の User 指示により、固定差分レビューと追加 reviewer の実行を停止する。高リスク変更もセルフレビューと GitHub の `@codex review` を標準にする。モデルを下げて追加 reviewer を起動することも停止対象。
 
-時間・挙動・cross-feature の追加反証が必要な場合も、この参照先から必要な role だけ選ぶ。別 provider の反証は任意で、可用性を gate にしない。
-
-`security-sweep` の repository 調査・候補・反証・実行証拠の契約は独立して維持する。通常の `@codex review` で置き換えない。
+[固定差分レビュー手順](references/high-risk-review.md) と pack / result の道具は、過去の証跡を読めるよう残す。User が明示的に再開を指示するまで実行しない。明示依頼された `security-sweep` と本番操作の `EXPLICIT AUTHORITY` はそれぞれの契約を維持する。

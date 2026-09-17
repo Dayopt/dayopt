@@ -17,8 +17,7 @@
  * - 指摘は「裁定の存在」を機械確認する: thread が resolve 済みで、bot 以外の返信がある。
  *   黙って resolve した thread、未解決 thread は合格にしない。裁定内容の正しさは証明しない
  * - 古い head の review は stale。head / policy が動いたら再評価する
- * - 高リスク（plan.review.protected）は `[review-summary]`（pr-cross-review skill の固定差分契約）
- *   の `head:` が現 head と一致し `status:` が reviewed であることを別条件として要求する
+ * - 高リスクでも追加レビューは要求しない。既存の `[review-summary]` は任意の証跡として読む
  * - EXPLICIT AUTHORITY（本番操作）は本文 checkbox や label から推定しない。常に未承認として表示する
  */
 
@@ -266,7 +265,7 @@ export function evaluateReviewPolicy({
     const waited = now.getTime() - Date.parse(latest.createdAt);
     if (waited > REVIEW_RESPONSE_TIMEOUT_MS) {
       state = 'unknown';
-      reason = `No Codex response ${Math.round(waited / 60000)} min after the request; provide an equivalent independent review`;
+      reason = `No Codex response ${Math.round(waited / 60000)} min after the request; use only already-recorded review evidence if available`;
     } else {
       state = 'pending';
       reason = 'Codex review requested; awaiting a response for this head';
@@ -282,8 +281,8 @@ export function evaluateReviewPolicy({
     reason = 'No independent review for this head';
   }
 
-  // 固定差分レビュー（信頼済み [review-summary]）は、保護対象では追加契約、それ以外では Codex が
-  // unknown / failed の時の「同等の独立レビュー」として扱う（Codex の可用性を gate にしない）。
+  // 追加レビューは停止中。既存の固定差分証跡は参考表示と過去証跡の互換性のために読むが、
+  // 保護対象でも必須にしない。この判定から reviewer を起動することはない。
   const summary = readHighRiskSummary(evidence, headSha);
   let highRisk = null;
   if (base.protected) {
@@ -293,17 +292,17 @@ export function evaluateReviewPolicy({
         ? 'Fixed-diff review summary matches this head'
         : `Fixed-diff review summary for this head is ${highRisk.status}`;
   }
-  // 代替レビューも裁定確認を通す: PR の全 thread が「信頼済み人間の返信つきで resolve」でなければ
-  // pending-adjudication のまま（代替レビューの指摘を黙って resolve した経路を閉じる）。
-  const alternativeReview = summary.status === 'satisfied';
-  if (alternativeReview && ['unknown', 'failed', 'not-started', 'stale'].includes(state)) {
+  // 既存証跡を使う場合も裁定確認を通す: PR の全 thread が「信頼済み人間の返信つきで resolve」で
+  // なければ pending-adjudication のまま。ここから新しい reviewer は起動しない。
+  const existingSummaryEvidence = summary.status === 'satisfied';
+  if (existingSummaryEvidence && ['unknown', 'failed'].includes(state)) {
     adjudication = adjudicationOf(evidence, new Set());
     if (adjudication.unresolved > 0 || adjudication.silent > 0) {
       state = 'pending-adjudication';
       reason = `${adjudication.unresolved + adjudication.silent} thread(s) not adjudicated by a trusted human reply`;
     } else {
       state = 'complete';
-      reason = `Independent fixed-diff review recorded for ${headSha.slice(0, 9)} (Codex: ${reason})`;
+      reason = `Existing fixed-diff review evidence recorded for ${headSha.slice(0, 9)} (Codex: ${reason})`;
     }
   }
 
@@ -325,17 +324,10 @@ export function evaluateReviewPolicy({
             : `No request needed (${state})`,
   };
 
-  // blocked = 自動では前へ進まない状態（無応答 / 失敗 / 未裁定 / 対象不明 / 契約の partial）。
-  // pending = まだ行うべき手順が残っている状態（未依頼 / 依頼中 / stale / 固定差分レビュー未実施）。
-  const highRiskOk = !highRisk || highRisk.status === 'satisfied';
-  const highRiskBlocked = highRisk !== null && ['partial', 'unknown'].includes(highRisk.status);
+  // blocked = 自動では前へ進まない状態（無応答 / 失敗 / 未裁定 / 対象不明）。
+  // pending = まだ行うべき手順が残っている状態（未依頼 / 依頼中 / stale）。
   const stateBlocked = ['unknown', 'failed', 'pending-adjudication'].includes(state);
-  const verdict =
-    stateBlocked || highRiskBlocked
-      ? 'blocked'
-      : state === 'complete' && highRiskOk
-        ? 'satisfied'
-        : 'pending';
+  const verdict = stateBlocked ? 'blocked' : state === 'complete' ? 'satisfied' : 'pending';
   return {
     ...base,
     state,
@@ -370,7 +362,9 @@ export function formatReviewPolicy(result) {
     `Trigger: ${result.trigger.shouldRequest ? 'would request' : 'no request'} — ${result.trigger.reason}`,
   ];
   if (result.highRisk)
-    lines.push(`High-risk contract: ${result.highRisk.status} — ${result.highRisk.reason}`);
+    lines.push(
+      `Optional fixed-diff evidence: ${result.highRisk.status} — ${result.highRisk.reason}`,
+    );
   lines.push(
     `Authority: code=${result.authority.code}; production=${result.authority.production} (authorized: ${result.authority.productionAuthorized})`,
   );

@@ -165,6 +165,49 @@ describe('Codex shell and loader', () => {
   });
 });
 
+describe('Codex delegation boundary', () => {
+  it.each(['spawn_agent', 'collaboration.spawn_agent'])(
+    'blocks the actual ambiguous %s schema because its scope is unobservable',
+    async (tool_name) => {
+      const result = await evaluateCodex(
+        JSON.stringify({
+          cwd: root,
+          tool_name,
+          tool_input: {
+            task_name: 'inspect-files',
+            message: 'read-only repository inventory',
+            fork_turns: 'none',
+          },
+        }),
+      );
+      expect(result).toMatchObject({
+        decision: 'block',
+        message: expect.stringContaining('親担当'),
+      });
+    },
+  );
+
+  it.each([
+    'spawn_agent.write',
+    'spawn_agent.browser',
+    'collaboration.spawn_agent.write',
+    'collaboration.spawn_agent.browser',
+  ])('allows a separately typed %s path to remain available', async (tool_name) => {
+    const result = await evaluateCodex(
+      JSON.stringify({
+        cwd: root,
+        tool_name,
+        tool_input: {
+          task_name: 'implement-scoped-change',
+          message: 'write only within the assigned non-overlapping scope',
+          fork_turns: 'none',
+        },
+      }),
+    );
+    expect(result).toEqual({ decision: 'allow' });
+  });
+});
+
 it('validates env references in the actual per-command workdir', async () => {
   const nested = join(root, 'nested');
   mkdirSync(nested);

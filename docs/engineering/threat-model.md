@@ -6,7 +6,7 @@ last_verified: 2026-09-17
 # Threat Model
 
 `security-sweep` skill が scope を決める時と、`security` skill が実装前に既往を照合する時の参照先。
-`pr-cross-review` の `risk-reviewer` も `--source` でこのファイルを受け取る。
+明示的な `security-sweep` では、このファイルを context / source として researcher・critic が参照する。
 
 **このファイルは全体の脅威モデルではない。** 1 つの信頼境界ずつ、実際に sweep を回した範囲だけを書く。
 書かれていない境界は「安全」ではなく **未着手**。所見ゼロを clean と読む前に §未検査の境界 を見る。

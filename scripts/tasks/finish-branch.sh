@@ -200,6 +200,11 @@ if [[ "$PR_STATE" == "OPEN" ]]; then
   fi
 
   # 失敗している check がないか確認する（CheckRun は .conclusion、StatusContext は .state を持つ）。
+  # `Validation (shadow)` / `Review policy (shadow)` は merge の required check ではなく、
+  # 信頼済み controller の advisory status。これらの pending / failure を全 check の
+  # pending / failure と同じに数えると、追加レビュー停止後も branch:finish が shadow の
+  # 判定待ちで止まり、ruleset が要求する required check だけで merge できなくなる。
+  # advisory status 自体はログ・PR の status として残し、required check の判定からだけ除外する。
   #
   # ── 唯一の免除: trusted dispatch で解除済みの audit guard ──────────
   #
@@ -229,6 +234,8 @@ if [[ "$PR_STATE" == "OPEN" ]]; then
   # 残ったまま再発火 run が publish 前に cancel された時に、監査されていない commit が
   # 素通りする（fail-open）。cancelled / timed_out は従来どおり停止し、再実行を強制する。
   JQ_GATE_DEFS='
+    def check_name: (.name // .context // "");
+    def is_advisory: (check_name == "Validation (shadow)" or check_name == "Review policy (shadow)");
     def is_failed:
       ((.conclusion // "") | ascii_downcase | . == "failure" or . == "cancelled" or . == "timed_out")
       or ((.state // "") | ascii_downcase | . == "failure" or . == "error");
@@ -255,8 +262,8 @@ if [[ "$PR_STATE" == "OPEN" ]]; then
 
   FAILED_CHECKS="$(printf '%s' "$ROLLUP" | jq -r "$JQ_GATE_DEFS"'
     (if trusted_audit_cleared
-     then map(select(is_failed and (is_trusted_audit_guard_failure | not)))
-     else map(select(is_failed)) end)
+     then map(select((is_advisory | not) and is_failed and (is_trusted_audit_guard_failure | not)))
+     else map(select((is_advisory | not) and is_failed)) end)
     | length')"
 
   if [[ "$FAILED_CHECKS" != "0" ]]; then
@@ -288,8 +295,12 @@ if [[ "$PR_STATE" == "OPEN" ]]; then
   # StatusState の「status 到着待ち」で、failure でも success でもない。
   PENDING_CHECKS="$(printf '%s' "$ROLLUP" | jq -r '
     map(select(
-        ((.status // "") | ascii_downcase | . == "in_progress" or . == "queued" or . == "pending" or . == "waiting" or . == "requested")
-        or ((.state // "") | ascii_downcase | . == "pending" or . == "expected")
+        ((.name // .context // "") != "Validation (shadow)"
+          and (.name // .context // "") != "Review policy (shadow)")
+        and (
+          ((.status // "") | ascii_downcase | . == "in_progress" or . == "queued" or . == "pending" or . == "waiting" or . == "requested")
+          or ((.state // "") | ascii_downcase | . == "pending" or . == "expected")
+        )
       ))
     | length')"
 
@@ -310,8 +321,12 @@ if [[ "$PR_STATE" == "OPEN" ]]; then
   # 全 PR で走るため、success が 1 件も無い状態は構成の異常を意味する。
   SUCCESS_CHECKS="$(printf '%s' "$ROLLUP" | jq -r '
     map(select(
-        ((.conclusion // "") | ascii_downcase | . == "success")
-        or ((.state // "") | ascii_downcase | . == "success")
+        ((.name // .context // "") != "Validation (shadow)"
+          and (.name // .context // "") != "Review policy (shadow)")
+        and (
+          ((.conclusion // "") | ascii_downcase | . == "success")
+          or ((.state // "") | ascii_downcase | . == "success")
+        )
       ))
     | length')"
 
@@ -533,7 +548,7 @@ if [[ "$PR_STATE" == "OPEN" ]]; then
 
   # ── レビュー thread の解決を要求する ────────────────────────────────
   #
-  # レビュー（内製クロスレビュー等）の指摘 thread が未解決のまま merge できると、指摘の
+  # GitHub review の指摘 thread が未解決のまま merge できると、指摘の
   # 黙殺が構造的に可能になる。「解決」は 3 択のいずれか: ① fix を積んで resolve、
   # ② 反論・根拠を reply して resolve、③ 別 issue へ切り出し番号を reply して
   # resolve（`AGENTS.md §PR / git 運用` §レビュー）。
@@ -688,9 +703,9 @@ if [[ "$PR_STATE" == "OPEN" ]]; then
 
   # ── 保護対象 path の判定（advisory レビューの目安、#2596） ──────────────
   #
-  # Codex / 内製 marker の hard gate は #2596 で撤回した（merge の遮断は main の
+  # Codex / 追加 reviewer marker の hard gate は #2596 で撤回した（merge の遮断は main の
   # ruleset が全経路で行う。#2640。AGENTS.md §レビュー）。保護対象 path の判定自体は削除せず、Main が
-  # pr-cross-review skill での advisory レビューをどこまで重く行うかの目安として
+  # GitHub の @codex review でどこを重点的に読むかの目安として
   # 残す — ここでの判定結果は merge を止めない（情報表示のみ）。
   #
   # 判定は scripts/ci/protected-path-gate.mjs（正本）へ委譲する。入力は
@@ -746,9 +761,9 @@ if [[ "$PR_STATE" == "OPEN" ]]; then
 
   if [[ "$ADVISORY_REVIEW_RECOMMENDED" == "true" ]]; then
     ADVISORY_REVIEW_REASON_JOINED="$(IFS=', '; echo "${ADVISORY_REVIEW_REASONS[*]}")"
-    echo "advisory review recommended (${ADVISORY_REVIEW_REASON_JOINED}) — merge は止めません" >&2
+    echo "GitHub @codex review focus recommended (${ADVISORY_REVIEW_REASON_JOINED}) — merge は止めません" >&2
   else
-    echo "advisory review: 保護対象 path に該当なし" >&2
+    echo "GitHub @codex review focus: 保護対象 path に該当なし" >&2
   fi
 
   # ── audit contract 変更 PR は trusted dispatch の status を必ず要求する（#2571）──
