@@ -379,6 +379,16 @@ describe('validation gate controller', () => {
         api,
       }),
     ).toEqual({ number: 7, source: 'workflow_run', eventSha: headSha });
+    // Supabase Preview の check run 完了（default branch の定義で走る event）も head から PR を引く
+    expect(
+      resolveTarget({
+        eventName: 'check_run',
+        event: { check_run: { head_sha: headSha, app: { slug: 'supabase' } } },
+        prArg: undefined,
+        repository: REPO,
+        api,
+      }),
+    ).toEqual({ number: 7, source: 'check_run', eventSha: headSha });
     expect(
       resolveTarget({
         eventName: 'workflow_run',

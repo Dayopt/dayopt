@@ -110,8 +110,16 @@ describe('schema contract extraction', () => {
       optional: true,
     });
     expect([...contract.tables.get('activities')!.relationships]).toEqual([
-      "foreignKeyName: 'activities_category_fkey'; columns: ['category_id']; isOneToOne: false; referencedRelation: 'categories'; referencedColumns: ['id'];",
+      "foreignKeyName='activities_category_fkey' columns=['category_id'] isOneToOne=false referencedRelation='categories' referencedColumns=['id']",
     ]);
+    // field 順の入れ替えと契約外 field の追加（CLI 更新）は同じ契約
+    const reordered = extractSchemaContract(
+      typesFixture().replace(
+        "            foreignKeyName: 'activities_category_fkey';\n            columns: ['category_id'];",
+        "            columns: ['category_id'];\n            foreignKeyName: 'activities_category_fkey';\n            deferrable: false;",
+      ),
+    );
+    expect(compareSchemaContracts(contract, reordered).narrowing).toBe(false);
     expect(contract.tables.get('categories')!.relationships.size).toBe(0);
     expect([...contract.views.keys()]).toEqual(['activity_stats_v1']);
     expect([...contract.views.get('activity_stats_v1')!.columns]).toEqual([
@@ -274,7 +282,7 @@ describe('schema contract extraction', () => {
       ),
     );
     expect(compareSchemaContracts(base, relDropped).removed.relationships).toEqual([
-      "activities: foreignKeyName: 'activities_category_fkey'; columns: ['category_id']; isOneToOne: false; referencedRelation: 'categories'; referencedColumns: ['id'];",
+      "activities: foreignKeyName='activities_category_fkey' columns=['category_id'] isOneToOne=false referencedRelation='categories' referencedColumns=['id']",
     ]);
   });
 });

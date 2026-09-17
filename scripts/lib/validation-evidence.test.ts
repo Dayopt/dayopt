@@ -318,8 +318,10 @@ describe('validation evidence: rejected evidence', () => {
         plan: plan([MIGRATION]),
         evidence: evidence({ workflowRuns: [dbUpgradeRun('success')] }),
       });
-      expect(none.suites.productPreview.status).toBe('missing');
-      expect(none.suites.productPreview.reason).toMatch(/Supabase Preview/);
+      expect(none.suites.productPreview.status).toBe('pending');
+      expect(none.suites.productPreview.reason).toMatch(
+        /Supabase Preview check has not been created/,
+      );
       const skipped = evaluateValidation({
         plan: plan([MIGRATION]),
         evidence: evidence({
@@ -358,7 +360,7 @@ describe('validation evidence: rejected evidence', () => {
         plan: plan([MIGRATION]),
         evidence: evidence({ workflowRuns: [dbUpgradeRun('success')], checkRuns: [impostor] }),
       });
-      expect(onlyImpostor.suites.productPreview.status).toBe('missing');
+      expect(onlyImpostor.suites.productPreview.status).toBe('pending');
     });
 
     it('does not demand a Supabase branch for app-only changes', () => {
@@ -379,7 +381,19 @@ describe('validation evidence: rejected evidence', () => {
       });
       expect(result.suites.dbUpgrade.status).toBe('self-produced');
       expect(result.suites.oldConsumer.status).toBe('self-produced');
+      expect(result.suites.static.status).toBe('satisfied');
       expect(result.verdict).toBe('blocked');
+    });
+
+    it('lets a checker-only maintenance PR (no migration) pass on its unrelated suites', () => {
+      const result = evaluateValidation({
+        plan: plan(['scripts/ci/db-upgrade-check.mjs']),
+        evidence: evidence(),
+      });
+      expect(result.suites.dbUpgrade.status).toBe('not-applicable');
+      expect(result.suites.static.status).toBe('satisfied');
+      expect(result.suites.scripts.status).toBe('satisfied');
+      expect(result.verdict).toBe('pass');
     });
   });
 

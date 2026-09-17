@@ -112,9 +112,16 @@ export const PRODUCER_DEFINITIONS = Object.freeze([
   '.github/actions/setup/action.yml',
   'scripts/ci/check.mjs',
   'scripts/ci/impact.mjs',
-  // 🧱 DB Upgrade (shadow) の実体。migration と同時に改変した PR の緑を信用しない
-  'scripts/ci/db-upgrade-check.mjs',
 ]);
+
+/**
+ * producer 固有の定義ファイル（その suite の評価でだけ self-produced にする）。
+ * 🧱 DB Upgrade (shadow) の実体を migration と同時に改変した PR の緑は信用しないが、
+ * checker だけの保守 PR で Static / Unit まで self-produced にはしない。
+ */
+export const PRODUCER_SPECIFIC_DEFINITIONS = Object.freeze({
+  '🧱 DB Upgrade (shadow)': ['scripts/ci/db-upgrade-check.mjs'],
+});
 
 /**
  * @typedef {{ id: number, path: string, event: string, headSha: string, repository: string,
@@ -148,7 +155,11 @@ export function selectTrustedRun(runs, { repository, headSha, workflow }) {
 }
 
 function evaluateActionsJob(producer, evidence, plan) {
-  const modified = (plan?.files ?? []).filter((file) => PRODUCER_DEFINITIONS.includes(file));
+  const definitions = [
+    ...PRODUCER_DEFINITIONS,
+    ...(PRODUCER_SPECIFIC_DEFINITIONS[producer.job] ?? []),
+  ];
+  const modified = (plan?.files ?? []).filter((file) => definitions.includes(file));
   if (modified.length > 0)
     return {
       status: 'self-produced',
@@ -233,8 +244,15 @@ function evaluateDatabaseIsolation(evidence, plan) {
   const needed = plan?.environments?.databaseTests !== 'not-applicable';
   if (!needed)
     return { needed, status: 'not-applicable', reason: 'No migration in this PR', check };
+  // integration が check run を作るのは CI 完了より遅れ得る。無いことは「未作成」であって拒否ではない
+  // ので pending（controller は bounded に待ち、check_run 完了の event で再評価する）
   if (!check)
-    return { needed, status: 'missing', reason: 'No Supabase Preview check for this head', check };
+    return {
+      needed,
+      status: 'pending',
+      reason: 'Supabase Preview check has not been created for this head yet',
+      check,
+    };
   if (check.status !== 'completed')
     return {
       needed,
