@@ -18,10 +18,10 @@ export function useTimeblockContextActions() {
   const showDeleteUndo = useTimeblockDeleteUndo();
 
   const handleDeleteTimeblock = useCallback(
-    (entry: CalendarDisplayEvent) => {
-      if (entry.recordSource === 'auto_migrated') return;
-      const kind = entry.kind ?? 'plan';
-      const input = { id: entry.id, expectedUpdatedAt: entry.version };
+    (timeblock: CalendarDisplayEvent) => {
+      if (timeblock.recordSource === 'auto_migrated') return;
+      const kind = timeblock.kind ?? 'plan';
+      const input = { id: timeblock.id, expectedUpdatedAt: timeblock.version };
       // 右クリックからの削除も、キーボードや Inspector と同じ戻し方にする
       const onSuccess = (deleted: { id: string; updated_at: string }) =>
         showDeleteUndo(kind, deleted);
@@ -35,11 +35,11 @@ export function useTimeblockContextActions() {
   );
 
   const handleViewStats = useCallback(
-    (entry: CalendarDisplayEvent) => {
-      if (!entry.activityId) return;
+    (timeblock: CalendarDisplayEvent) => {
+      if (!timeblock.activityId) return;
       // カレンダー内パネル（CalendarReviewRail）は廃止済み（#2181 Step 4）。
       // アクティビティによるセグメント絞り込みは Step 5（セグメント配線）で復元する。
-      router.push(buildReportPath(locale, entry.startDate ?? entry.actualStartDate ?? new Date()));
+      router.push(buildReportPath(locale, timeblock.startDate ?? new Date()));
     },
     [router, locale],
   );

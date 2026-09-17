@@ -28,7 +28,7 @@ function setup() {
 
 function addCard(container: HTMLElement, top: number) {
   const card = document.createElement('div');
-  card.dataset.entryId = 'selected';
+  card.dataset.timeblockId = 'selected';
   vi.spyOn(card, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, top, 100, 60));
   container.append(card);
 }

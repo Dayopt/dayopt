@@ -64,26 +64,13 @@ function minutesBetween(a: Date | null, b: Date | null): number {
   return Math.round((b.getTime() - a.getTime()) / 60_000);
 }
 
-function plannedRange(timeblock: CalendarDisplayEvent): { start: Date | null; end: Date | null } {
-  return {
-    start: timeblock.plannedStartDate ?? timeblock.startDate,
-    end: timeblock.plannedEndDate ?? timeblock.endDate,
-  };
-}
-
-function actualRange(timeblock: CalendarDisplayEvent): { start: Date | null; end: Date | null } {
-  if (timeblock.kind === 'record') {
-    return {
-      start: timeblock.actualStartDate ?? timeblock.startDate,
-      end: timeblock.actualEndDate ?? timeblock.endDate,
-    };
-  }
-
-  const planned = plannedRange(timeblock);
-  return {
-    start: timeblock.actualStartDate ?? planned.start,
-    end: timeblock.actualEndDate ?? planned.end,
-  };
+/**
+ * Plan / Record いずれも時刻は `startDate` / `endDate` の 1 組しか持たない。
+ * 旧 entries 統合モデルでは 1 件が予定と実績の両方を抱えていたが、Plan / Record
+ * 分離モデルでは予定レンジと実績レンジが同一になる。
+ */
+function timeblockRange(timeblock: CalendarDisplayEvent): { start: Date | null; end: Date | null } {
+  return { start: timeblock.startDate, end: timeblock.endDate };
 }
 
 function resolveOptions(input: CalendarDayDiffOptions | Date): CalendarDayDiffOptions {
@@ -117,10 +104,9 @@ export function filterCalendarDayDiffTimeblocks(
   return timeblocks.filter((timeblock) => {
     if (!isActivityVisible(timeblock.activityId ?? null)) return false;
 
-    const planned = clipRange(plannedRange(timeblock), bounds);
-    const actual = clipRange(actualRange(timeblock), bounds);
+    const range = clipRange(timeblockRange(timeblock), bounds);
 
-    return diffMinutes(planned.start, planned.end) > 0 || diffMinutes(actual.start, actual.end) > 0;
+    return diffMinutes(range.start, range.end) > 0;
   });
 }
 
@@ -169,44 +155,21 @@ export function computeCalendarDayDiffs(
   for (const timeblock of timeblocks) {
     if (timeblock.isDraft) continue;
 
-    const planned = clipRange(plannedRange(timeblock), bounds);
-    const actual = clipRange(actualRange(timeblock), bounds);
-    const plannedDuration = diffMinutes(planned.start, planned.end);
-    const actualDuration = diffMinutes(actual.start, actual.end);
-    const countedActualDuration = actualDuration;
-    const hasActualEdit = timeblock.actualStartDate != null || timeblock.actualEndDate != null;
-
-    if (timeblock.kind !== 'record') {
-      plannedMinutes += plannedDuration;
-    }
-    actualMinutes += countedActualDuration;
+    const range = clipRange(timeblockRange(timeblock), bounds);
+    const duration = diffMinutes(range.start, range.end);
 
     if (timeblock.kind === 'record') {
-      if (actualDuration > 0) {
-        unplannedMinutes += actualDuration;
-        items.push(makeItem(timeblock, 'unplanned', { start: null, end: null }, actual));
+      actualMinutes += duration;
+      if (duration > 0) {
+        unplannedMinutes += duration;
+        items.push(makeItem(timeblock, 'unplanned', { start: null, end: null }, range));
       }
       continue;
     }
 
-    const hasActual = actual.start != null && actual.end != null && actualDuration > 0;
-    if (!hasActual) {
-      if (plannedDuration > 0 && hasActualEdit) {
-        items.push(makeItem(timeblock, 'shifted', planned, { start: null, end: null }));
-      }
-      continue;
-    }
-
-    const startDiffMinutes = minutesBetween(planned.start, actual.start);
-    const endDiffMinutes = minutesBetween(planned.end, actual.end);
-    const durationDiffMinutes = actualDuration - plannedDuration;
-
-    if (startDiffMinutes === 0 && endDiffMinutes === 0 && durationDiffMinutes === 0) {
-      continue;
-    }
-
-    const kind: CalendarDayDiffKind = startDiffMinutes === 0 ? 'resized' : 'shifted';
-    items.push(makeItem(timeblock, kind, planned, actual));
+    // Plan は予定レンジと実績レンジが一致するため shifted / resized は生じない。
+    plannedMinutes += duration;
+    actualMinutes += duration;
   }
 
   items.sort((a, b) => a.sortTime - b.sortTime || a.title.localeCompare(b.title));

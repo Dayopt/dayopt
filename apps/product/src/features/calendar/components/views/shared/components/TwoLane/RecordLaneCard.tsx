@@ -39,7 +39,7 @@ interface RecordLaneCardProps {
   isActive?: boolean | undefined;
   /** auto_migrated など RLS で不変な record。ドラッグ・リサイズを禁止する */
   disableDrag?: boolean | undefined;
-  /** Compare panel に表示中の entry であることを示す */
+  /** Compare panel に表示中の timeblock であることを示す */
   showDayDiffMarker?: boolean | undefined;
   /** 複数日表示の狭い列では secondary detail と余白を減らす */
   compact?: boolean | undefined;
@@ -127,8 +127,8 @@ export function RecordLaneCard({
   return (
     <div
       data-record-lane-card
-      data-entry-block={interactive ? 'true' : undefined}
-      data-entry-id={interactive ? event.id : undefined}
+      data-timeblock-card={interactive ? 'true' : undefined}
+      data-timeblock-id={interactive ? event.id : undefined}
       tabIndex={interactive ? 0 : undefined}
       role={interactive ? 'button' : undefined}
       aria-label={interactive ? displayName : undefined}

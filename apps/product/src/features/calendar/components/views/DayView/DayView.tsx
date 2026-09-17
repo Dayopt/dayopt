@@ -18,18 +18,18 @@ import { useDayView } from './hooks/useDayView';
 /** 1日表示のカレンダービューコンポーネント */
 export const DayView = ({
   dateRange: _dateRange,
-  entries,
+  timeblocks,
   allTimeblocks,
   externalEvents,
   currentDate,
   showWeekends: _showWeekends = true,
   showActualDiff: _showActualDiff = false,
-  dayDiffEntryIds,
+  dayDiffTimeblockIds,
   className,
   disabledTimeblockId,
-  onEntryClick,
-  onEntryContextMenu,
-  onUpdateEntry,
+  onTimeblockClick,
+  onTimeblockContextMenu,
+  onTimeblockUpdate,
   onDeleteTimeblock: _onDeleteTimeblock,
   onTimeRangeSelect,
   onViewChange: _onViewChange,
@@ -53,7 +53,7 @@ export const DayView = ({
     throw new Error('Display date is undefined');
   }
 
-  // ドラッグイベント用のハンドラー（エントリ時間更新）
+  // ドラッグイベント用のハンドラー（タイムブロック時間更新）
   const handleEventTimeUpdate = React.useCallback(
     async (
       eventId: string,
@@ -63,24 +63,24 @@ export const DayView = ({
         resetActualTime?: boolean;
       },
     ) => {
-      if (onUpdateEntry) {
-        // 返り値を伝播（繰り返しエントリ編集時の skipToast フラグ用）
-        return await onUpdateEntry(eventId, updates);
+      if (onTimeblockUpdate) {
+        // 返り値を伝播（繰り返しタイムブロック編集時の skipToast フラグ用）
+        return await onTimeblockUpdate(eventId, updates);
       }
     },
-    [onUpdateEntry],
+    [onTimeblockUpdate],
   );
 
-  // DayView専用ロジック（CalendarControllerから渡されたエントリデータを使用）
+  // DayView専用ロジック（CalendarControllerから渡されたタイムブロックデータを使用）
   const {
-    dayEntries: dayEvents,
+    dayTimeblocks: dayEvents,
     timeblockStyles: _eventStyles,
     isToday,
     timeSlots: _timeSlots,
   } = useDayView({
     date,
-    entries: entries || [],
-    ...(onUpdateEntry && { onEntryUpdate: onUpdateEntry }),
+    timeblocks: timeblocks || [],
+    ...(onTimeblockUpdate && { onTimeblockUpdate: onTimeblockUpdate }),
     timezone,
   });
 
@@ -121,17 +121,17 @@ export const DayView = ({
           {/* 日のコンテンツ */}
           <CalendarGridContent
             date={date}
-            entries={dayEvents}
+            timeblocks={dayEvents}
             externalEvents={externalEvents}
             viewMode="day"
             dayIndex={0}
-            allEventsForOverlapCheck={allTimeblocks ?? entries}
-            onEntryClick={onEntryClick}
-            onEntryContextMenu={onEntryContextMenu}
+            allEventsForOverlapCheck={allTimeblocks ?? timeblocks}
+            onTimeblockClick={onTimeblockClick}
+            onTimeblockContextMenu={onTimeblockContextMenu}
             onEventUpdate={handleEventTimeUpdate}
             onTimeRangeSelect={onTimeRangeSelect}
             disabledTimeblockId={disabledTimeblockId}
-            dayDiffEntryIds={dayDiffEntryIds}
+            dayDiffTimeblockIds={dayDiffTimeblockIds}
             className="absolute inset-y-0 right-0 left-0"
           />
         </ScrollableCalendarLayout>

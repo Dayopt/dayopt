@@ -47,7 +47,7 @@ export function resolveTargetDate(ctx: InteractionContext, targetDateIndex: numb
 /**
  * 移動後の開始時刻（分）を相対 snap で求める。
  *
- * 移動量だけを snap interval で量子化するので、10:07 の entry を 1 マス下げると
+ * 移動量だけを snap interval で量子化するので、10:07 の timeblock を 1 マス下げると
  * 10:22 になり 10:15 へ潰れない。ブロック全体が当日へ収まるよう
  * `[0, 24:00 - duration]` に clamp する。
  */
@@ -95,7 +95,7 @@ export function resolveResizeStartMinutes(originalTopPx: number, hourHeight: num
 /**
  * リサイズ後の終了時刻（分）を相対 snap で求める。
  *
- * 下限は「開始 + 最小ブロック長」と、Plan / Record がズレた entry の
+ * 下限は「開始 + 最小ブロック長」と、Plan / Record がズレた timeblock の
  * `minEndMinutes`（確定済み actual start）の大きい方。後者はグリッド由来ではない
  * 実データの制約なので snap interval へ切り上げない。
  */

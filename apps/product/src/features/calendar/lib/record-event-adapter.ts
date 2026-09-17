@@ -1,7 +1,7 @@
 /**
  * Record の物理テーブル `records` の行 -> `RecordEvent` 変換アダプター（read 側専用）
  *
- * `entry-adapter.ts`（entries -> CalendarDisplayEvent）と同じ配置パターンで、
+ * `timeblock-adapter.ts`（records -> CalendarDisplayEvent）と同じ配置パターンで、
  * 物理 `records` -> RecordEvent の境界射影を担う。
  */
 

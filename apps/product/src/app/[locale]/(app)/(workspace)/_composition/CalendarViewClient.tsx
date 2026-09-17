@@ -97,9 +97,9 @@ export function CalendarViewClient({ translations }: CalendarViewClientProps) {
           externalEvents={composition.externalEvents}
           showWeekends={composition.showWeekends}
           disabledTimeblockId={composition.disabledTimeblockId}
-          onEntryClick={composition.onEntryClick}
+          onTimeblockClick={composition.onTimeblockClick}
           onTimeRangeSelect={composition.onTimeRangeSelect}
-          onUpdateEntry={composition.onUpdateEntry}
+          onTimeblockUpdate={composition.onTimeblockUpdate}
           onDeleteTimeblock={composition.onDeleteTimeblock}
           onDeleteTimeblockConfirm={composition.onDeleteTimeblockConfirm}
           onViewStats={composition.onViewStats}

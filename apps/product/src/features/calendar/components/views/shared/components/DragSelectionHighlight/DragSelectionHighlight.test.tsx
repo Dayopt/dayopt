@@ -141,13 +141,13 @@ describe('DragSelectionHighlight の残り時間（#2096）', () => {
 
   it('24h からその日の予定合計と選択中の長さを引いた残りを出す', () => {
     const day = seedSelection();
-    const dayEntries = [
+    const dayTimeblocks = [
       planEvent(utcAt(day, 13), utcAt(day, 14)),
       planEvent(utcAt(day, 15), utcAt(day, 16)),
     ];
 
     const { container } = render(
-      <DragSelectionHighlight hourHeight={60} dayEntries={dayEntries} />,
+      <DragSelectionHighlight hourHeight={60} dayTimeblocks={dayTimeblocks} />,
     );
 
     // 24h - 予定 2h - 選択 2h = 20h
@@ -165,7 +165,7 @@ describe('DragSelectionHighlight の残り時間（#2096）', () => {
     const { container } = render(
       <DragSelectionHighlight
         hourHeight={60}
-        dayEntries={[planEvent(utcAt(otherDay, 13), utcAt(otherDay, 14))]}
+        dayTimeblocks={[planEvent(utcAt(otherDay, 13), utcAt(otherDay, 14))]}
       />,
     );
 
@@ -190,12 +190,12 @@ describe('DragSelectionHighlight の残り時間（#2096）', () => {
       },
     });
 
-    const { container } = render(<DragSelectionHighlight hourHeight={60} dayEntries={[]} />);
+    const { container } = render(<DragSelectionHighlight hourHeight={60} dayTimeblocks={[]} />);
 
     expect(container.querySelector('[data-remaining-day-minutes]')).toBeNull();
   });
 
-  it('dayEntries が未配線なら出さない', () => {
+  it('dayTimeblocks が未配線なら出さない', () => {
     seedSelection();
 
     const { container } = render(<DragSelectionHighlight hourHeight={60} />);
@@ -216,7 +216,7 @@ describe('DragSelectionHighlight の残り時間（#2096）', () => {
     });
 
     // 30 分 x hourHeight 60 = 30px < 40px
-    const { container } = render(<DragSelectionHighlight hourHeight={60} dayEntries={[]} />);
+    const { container } = render(<DragSelectionHighlight hourHeight={60} dayTimeblocks={[]} />);
 
     expect(container.querySelector('[data-remaining-day-minutes]')).toBeNull();
   });

@@ -9,7 +9,7 @@ import { describe, expect, it } from 'vitest';
 
 import { convertToTimezone } from '@/lib/date/timezone';
 
-import { layoutEntryToVerticalPosition } from './grid';
+import { layoutTimeblockToVerticalPosition } from './grid';
 
 describe('タイムゾーンエッジケース', () => {
   describe('DST遷移（米国: 3月第2日曜 spring forward）', () => {
@@ -55,21 +55,21 @@ describe('タイムゾーンエッジケース', () => {
 
   describe('位置計算のTZ一貫性', () => {
     it('同じ時刻はTZに関わらず同じY位置を返す', () => {
-      // 10:00 AM のエントリは timezone に関わらず同じ top を持つべき
+      // 10:00 AM のタイムブロックは timezone に関わらず同じ top を持つべき
       const hourHeight = 72;
       const start10 = new Date('2026-03-30T10:00:00');
       const end11 = new Date('2026-03-30T11:00:00');
 
-      const pos = layoutEntryToVerticalPosition(start10, end11, hourHeight);
+      const pos = layoutTimeblockToVerticalPosition(start10, end11, hourHeight);
       expect(pos.top).toBe(10 * hourHeight); // 10時 × 72px
       expect(pos.height).toBe(hourHeight - 2); // 1時間 - padding
     });
 
-    it('15分エントリは最小高さを保証', () => {
+    it('15分タイムブロックは最小高さを保証', () => {
       const start = new Date('2026-03-30T10:00:00');
       const end = new Date('2026-03-30T10:15:00');
 
-      const pos = layoutEntryToVerticalPosition(start, end, 72);
+      const pos = layoutTimeblockToVerticalPosition(start, end, 72);
       expect(pos.height).toBeGreaterThanOrEqual(14); // MIN_EVENT_HEIGHT
     });
   });

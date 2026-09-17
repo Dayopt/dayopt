@@ -59,11 +59,11 @@ interface CalendarCompositionResult {
   disabledTimeblockId: string | null;
 
   // === Timeblock click handlers ===
-  onEntryClick: ReturnType<typeof useCalendarCrudHandlers>['onEntryClick'];
+  onTimeblockClick: ReturnType<typeof useCalendarCrudHandlers>['onTimeblockClick'];
   onTimeRangeSelect: ReturnType<typeof useCalendarCrudHandlers>['onTimeRangeSelect'];
 
   // === Timeblock CRUD ===
-  onUpdateEntry: ReturnType<typeof useCalendarCrudHandlers>['onUpdateEntry'];
+  onTimeblockUpdate: ReturnType<typeof useCalendarCrudHandlers>['onTimeblockUpdate'];
   onDeleteTimeblock: ReturnType<typeof useCalendarCrudHandlers>['onDeleteTimeblock'];
 
   // === Context menu actions ===

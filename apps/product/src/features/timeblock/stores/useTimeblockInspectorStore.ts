@@ -18,7 +18,7 @@ import type { TimeblockDuplicateDraft } from '../lib/timeblock-duplicate';
 interface TimeblockInspectorState {
   /** Inspector が開いているか */
   isOpen: boolean;
-  /** 対象エントリのID（plan または record の UUID） */
+  /** 対象タイムブロックのID（plan または record の UUID） */
   timeblockId: string | null;
   /** 対象が plan / record のどちらか */
   timeblockKind: TimeblockDestination;

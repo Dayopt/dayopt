@@ -89,7 +89,7 @@ describe('CANCEL', () => {
 // Context: getTimeblockDurationMs
 // ========================================
 
-describe('Custom entry duration', () => {
+describe('Custom timeblock duration', () => {
   it('uses getTimeblockDurationMs for 30-minute event', () => {
     const ctx = createCtx({
       getTimeblockDurationMs: () => 30 * 60 * 1000, // 30 min

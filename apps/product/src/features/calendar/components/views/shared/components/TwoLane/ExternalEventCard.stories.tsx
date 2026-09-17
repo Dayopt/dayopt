@@ -235,7 +235,7 @@ export const CrossingMidnight: Story = {
 /**
  * ghost と自分の Plan が同じ時刻に重なるケース。
  *
- * ghost は entries より先に描かれ、plan が上に乗る。plan 側が `bg-transparent` なので、
+ * ghost は timeblocks より先に描かれ、plan が上に乗る。plan 側が `bg-transparent` なので、
  * ghost に塗りを敷くと plan の背景として透けてしまう — ここで飲まれていないことを目で見る。
  */
 export const BehindPlanCard: Story = {

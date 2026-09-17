@@ -3,17 +3,17 @@ import { useIsToday } from '../../shared/hooks/useIsToday';
 import { useTimeblockStyles } from '../../shared/hooks/useTimeblockStyles';
 import { useTimeSlots } from '../../shared/hooks/useTimeSlots';
 
-import { useDayEntries } from './useDayEntries';
+import { useDayTimeblocks } from './useDayTimeblocks';
 
-/** DayView のエントリ取得・スタイル計算・今日判定を集約したフック */
+/** DayView のタイムブロック取得・スタイル計算・今日判定を集約したフック */
 export function useDayView({
   date,
-  entries,
-  onEntryUpdate: _onEntryUpdate,
+  timeblocks,
+  onTimeblockUpdate: _onTimeblockUpdate,
   timezone,
 }: UseDayViewOptions): UseDayViewReturn {
-  // エントリデータ処理
-  const { dayEntries, timeblockPositions } = useDayEntries({ date, entries, timezone });
+  // タイムブロックデータ処理
+  const { dayTimeblocks, timeblockPositions } = useDayTimeblocks({ date, timeblocks, timezone });
 
   // 今日かどうかの判定
   const isTodayFlag = useIsToday(date);
@@ -21,13 +21,13 @@ export function useDayView({
   // 時間スロットの生成（0:00-23:45、15分間隔）
   const timeSlots = useTimeSlots();
 
-  // エントリのCSSスタイルを計算
+  // タイムブロックのCSSスタイルを計算
   const timeblockStyles = useTimeblockStyles(timeblockPositions);
 
   // スクロール処理はScrollableCalendarLayoutに委譲
 
   return {
-    dayEntries,
+    dayTimeblocks,
     timeblockStyles,
     isToday: isTodayFlag,
     timeSlots,

@@ -95,7 +95,7 @@ export function pixelsToMinutesUnsnapped(
  * 移動量 px → snap 済みの移動量（分）
  *
  * 相対 snap の核。絶対位置ではなく deltaY だけを snap interval で量子化するので、
- * 10:07 の entry を 1 マス下げると 10:22 になる（10:15 へ吸着しない）。
+ * 10:07 の timeblock を 1 マス下げると 10:22 になる（10:15 へ吸着しない）。
  */
 export function snapDeltaMinutes(
   deltaPx: number,

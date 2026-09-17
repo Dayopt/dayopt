@@ -53,7 +53,7 @@ describe('RESIZE_START', () => {
     }
   });
 
-  it('keeps initial resize preview duration positive for short off-grid entries', () => {
+  it('keeps initial resize preview duration positive for short off-grid timeblocks', () => {
     const { state } = dispatch(
       IDLE,
       {
@@ -70,7 +70,7 @@ describe('RESIZE_START', () => {
 
     if (state.mode === 'resizing') {
       const durationMs = state.previewTime.end.getTime() - state.previewTime.start.getTime();
-      // 掴んだ時点では時刻を変えない: 10:08-10:16 の 8 分 entry をそのまま保持する
+      // 掴んだ時点では時刻を変えない: 10:08-10:16 の 8 分 timeblock をそのまま保持する
       expect(state.snappedHeight).toBe(8);
       expect(state.previewTime.start.getHours()).toBe(10);
       expect(state.previewTime.start.getMinutes()).toBe(8);
@@ -124,7 +124,7 @@ describe('POINTER_MOVE while resizing', () => {
     }
   });
 
-  it('予定と記録がズレた entry は planned end を actual start より前へ縮めない', () => {
+  it('予定と記録がズレた timeblock は planned end を actual start より前へ縮めない', () => {
     const movedPoint = { clientX: origin.clientX, clientY: origin.clientY - 60 };
     const { state } = dispatch(
       resizingState,
@@ -154,7 +154,7 @@ describe('POINTER_MOVE while resizing', () => {
     }
   });
 
-  it('開始時刻は 15 分 snap でも動かさない（10:07 の entry を縮めても 10:07 のまま）', () => {
+  it('開始時刻は 15 分 snap でも動かさない（10:07 の timeblock を縮めても 10:07 のまま）', () => {
     const offGridResizing: InteractionState = {
       mode: 'resizing',
       timeblockId: 'a',

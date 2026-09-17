@@ -19,7 +19,7 @@
 | tRPC procedure | 69   | 0          | 68               | 0                | 1              |
 | MCP tool       | 19   | 19         | 0                | 0                | 0              |
 | Zustand store  | 14   | 0          | 13               | 0                | 1              |
-| Story          | 114  | 0          | 90               | 24               | 0              |
+| Story          | 113  | 0          | 89               | 24               | 0              |
 | route          | 16   | 0          | 6                | 10               | 0              |
 | i18n namespace | 15   | 7          | 0                | 8                | 0              |
 
@@ -183,7 +183,7 @@ graph LR
 </details>
 
 <details>
-<summary>test の候補（78）</summary>
+<summary>test の候補（77）</summary>
 
 <!-- prettier-ignore -->
 | ファイル | 対応の根拠 |
@@ -216,7 +216,6 @@ graph LR
 | [apps/product/src/features/timeblock/hooks/useTimeblockRecordMutations.test.tsx](<../../../apps/product/src/features/timeblock/hooks/useTimeblockRecordMutations.test.tsx>) | feature: timeblock |
 | [apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.inline-error.test.tsx](<../../../apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.inline-error.test.tsx>) | feature: timeblock |
 | [apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.test.ts](<../../../apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.test.ts>) | feature: timeblock |
-| [apps/product/src/features/timeblock/lib/actual-time-overlay.test.ts](<../../../apps/product/src/features/timeblock/lib/actual-time-overlay.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/lib/datetime.test.ts](<../../../apps/product/src/features/timeblock/lib/datetime.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/lib/inspector-url.test.ts](<../../../apps/product/src/features/timeblock/lib/inspector-url.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/lib/plan-to-ical.test.ts](<../../../apps/product/src/features/timeblock/lib/plan-to-ical.test.ts>) | feature: timeblock |
@@ -421,7 +420,7 @@ graph LR
 </details>
 
 <details>
-<summary>test の候補（78）</summary>
+<summary>test の候補（77）</summary>
 
 <!-- prettier-ignore -->
 | ファイル | 対応の根拠 |
@@ -454,7 +453,6 @@ graph LR
 | [apps/product/src/features/timeblock/hooks/useTimeblockRecordMutations.test.tsx](<../../../apps/product/src/features/timeblock/hooks/useTimeblockRecordMutations.test.tsx>) | feature: timeblock |
 | [apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.inline-error.test.tsx](<../../../apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.inline-error.test.tsx>) | feature: timeblock |
 | [apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.test.ts](<../../../apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.test.ts>) | feature: timeblock |
-| [apps/product/src/features/timeblock/lib/actual-time-overlay.test.ts](<../../../apps/product/src/features/timeblock/lib/actual-time-overlay.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/lib/datetime.test.ts](<../../../apps/product/src/features/timeblock/lib/datetime.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/lib/inspector-url.test.ts](<../../../apps/product/src/features/timeblock/lib/inspector-url.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/lib/plan-to-ical.test.ts](<../../../apps/product/src/features/timeblock/lib/plan-to-ical.test.ts>) | feature: timeblock |
@@ -659,7 +657,7 @@ graph LR
 </details>
 
 <details>
-<summary>test の候補（78）</summary>
+<summary>test の候補（77）</summary>
 
 <!-- prettier-ignore -->
 | ファイル | 対応の根拠 |
@@ -692,7 +690,6 @@ graph LR
 | [apps/product/src/features/timeblock/hooks/useTimeblockRecordMutations.test.tsx](<../../../apps/product/src/features/timeblock/hooks/useTimeblockRecordMutations.test.tsx>) | feature: timeblock |
 | [apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.inline-error.test.tsx](<../../../apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.inline-error.test.tsx>) | feature: timeblock |
 | [apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.test.ts](<../../../apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.test.ts>) | feature: timeblock |
-| [apps/product/src/features/timeblock/lib/actual-time-overlay.test.ts](<../../../apps/product/src/features/timeblock/lib/actual-time-overlay.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/lib/datetime.test.ts](<../../../apps/product/src/features/timeblock/lib/datetime.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/lib/inspector-url.test.ts](<../../../apps/product/src/features/timeblock/lib/inspector-url.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/lib/plan-to-ical.test.ts](<../../../apps/product/src/features/timeblock/lib/plan-to-ical.test.ts>) | feature: timeblock |
@@ -1145,7 +1142,7 @@ graph LR
 </details>
 
 <details>
-<summary>test の候補（78）</summary>
+<summary>test の候補（77）</summary>
 
 <!-- prettier-ignore -->
 | ファイル | 対応の根拠 |
@@ -1178,7 +1175,6 @@ graph LR
 | [apps/product/src/features/timeblock/hooks/useTimeblockRecordMutations.test.tsx](<../../../apps/product/src/features/timeblock/hooks/useTimeblockRecordMutations.test.tsx>) | feature: timeblock |
 | [apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.inline-error.test.tsx](<../../../apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.inline-error.test.tsx>) | feature: timeblock |
 | [apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.test.ts](<../../../apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.test.ts>) | feature: timeblock |
-| [apps/product/src/features/timeblock/lib/actual-time-overlay.test.ts](<../../../apps/product/src/features/timeblock/lib/actual-time-overlay.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/lib/datetime.test.ts](<../../../apps/product/src/features/timeblock/lib/datetime.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/lib/inspector-url.test.ts](<../../../apps/product/src/features/timeblock/lib/inspector-url.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/lib/plan-to-ical.test.ts](<../../../apps/product/src/features/timeblock/lib/plan-to-ical.test.ts>) | feature: timeblock |
@@ -1483,7 +1479,7 @@ graph LR
 </details>
 
 <details>
-<summary>test の候補（78）</summary>
+<summary>test の候補（77）</summary>
 
 <!-- prettier-ignore -->
 | ファイル | 対応の根拠 |
@@ -1516,7 +1512,6 @@ graph LR
 | [apps/product/src/features/timeblock/hooks/useTimeblockRecordMutations.test.tsx](<../../../apps/product/src/features/timeblock/hooks/useTimeblockRecordMutations.test.tsx>) | feature: timeblock |
 | [apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.inline-error.test.tsx](<../../../apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.inline-error.test.tsx>) | feature: timeblock |
 | [apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.test.ts](<../../../apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.test.ts>) | feature: timeblock |
-| [apps/product/src/features/timeblock/lib/actual-time-overlay.test.ts](<../../../apps/product/src/features/timeblock/lib/actual-time-overlay.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/lib/datetime.test.ts](<../../../apps/product/src/features/timeblock/lib/datetime.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/lib/inspector-url.test.ts](<../../../apps/product/src/features/timeblock/lib/inspector-url.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/lib/plan-to-ical.test.ts](<../../../apps/product/src/features/timeblock/lib/plan-to-ical.test.ts>) | feature: timeblock |
@@ -2054,7 +2049,6 @@ graph LR
 | Story | [Product/Features/Calendar/TwoLane/ExternalEventCard](<../../../apps/product/src/features/calendar/components/views/shared/components/TwoLane/ExternalEventCard.stories.tsx>) | feature 経由 |
 | Story | [Product/Features/Calendar/TwoLane/PlanLaneCard](<../../../apps/product/src/features/calendar/components/views/shared/components/TwoLane/PlanLaneCard.stories.tsx>) | feature 経由 |
 | Story | [Product/Features/Calendar/TwoLane/RecordLaneCard](<../../../apps/product/src/features/calendar/components/views/shared/components/TwoLane/RecordLaneCard.stories.tsx>) | feature 経由 |
-| Story | [Product/Features/Calendar/TwoLane/TwoLaneDayColumn](<../../../apps/product/src/features/calendar/components/views/shared/components/TwoLane/TwoLaneDayColumn.stories.tsx>) | feature 経由 |
 | Story | [Product/Features/Calendar/Views/DateDisplay](<../../../apps/product/src/features/calendar/components/views/shared/DateDisplay/DateDisplay.stories.tsx>) | feature 経由 |
 | Story | [Product/Features/Calendar/Views/DayView](<../../../apps/product/src/features/calendar/components/views/DayView/DayView.stories.tsx>) | feature 経由 |
 | Story | [Product/Features/Calendar/Views/WeekView](<../../../apps/product/src/features/calendar/components/views/WeekView/WeekView.stories.tsx>) | feature 経由 |
@@ -2062,7 +2056,7 @@ graph LR
 | i18n namespace | [calendar](<../../../apps/product/messages/en/calendar.json>) | 直接 |
 
 <details>
-<summary>UI の候補（60）</summary>
+<summary>UI の候補（59）</summary>
 
 <!-- prettier-ignore -->
 | ファイル | 対応の根拠 |
@@ -2116,7 +2110,6 @@ graph LR
 | [apps/product/src/features/calendar/components/views/shared/components/TwoLane/ExternalEventCard.tsx](<../../../apps/product/src/features/calendar/components/views/shared/components/TwoLane/ExternalEventCard.tsx>) | feature: calendar |
 | [apps/product/src/features/calendar/components/views/shared/components/TwoLane/PlanLaneCard.tsx](<../../../apps/product/src/features/calendar/components/views/shared/components/TwoLane/PlanLaneCard.tsx>) | feature: calendar |
 | [apps/product/src/features/calendar/components/views/shared/components/TwoLane/RecordLaneCard.tsx](<../../../apps/product/src/features/calendar/components/views/shared/components/TwoLane/RecordLaneCard.tsx>) | feature: calendar |
-| [apps/product/src/features/calendar/components/views/shared/components/TwoLane/TwoLaneDayColumn.tsx](<../../../apps/product/src/features/calendar/components/views/shared/components/TwoLane/TwoLaneDayColumn.tsx>) | feature: calendar |
 | [apps/product/src/features/calendar/components/views/shared/components/TwoLaneTimeblockRenderer.tsx](<../../../apps/product/src/features/calendar/components/views/shared/components/TwoLaneTimeblockRenderer.tsx>) | feature: calendar |
 | [apps/product/src/features/calendar/components/views/shared/DateDisplay/DateDisplay.tsx](<../../../apps/product/src/features/calendar/components/views/shared/DateDisplay/DateDisplay.tsx>) | feature: calendar |
 | [apps/product/src/features/calendar/components/views/shared/DateDisplay/index.tsx](<../../../apps/product/src/features/calendar/components/views/shared/DateDisplay/index.tsx>) | feature: calendar |
@@ -2131,7 +2124,7 @@ graph LR
 </details>
 
 <details>
-<summary>test の候補（97）</summary>
+<summary>test の候補（95）</summary>
 
 <!-- prettier-ignore -->
 | ファイル | 対応の根拠 |
@@ -2215,7 +2208,6 @@ graph LR
 | [apps/product/src/features/calendar/lib/overlap.test.ts](<../../../apps/product/src/features/calendar/lib/overlap.test.ts>) | feature: calendar |
 | [apps/product/src/features/calendar/lib/panel-url.test.ts](<../../../apps/product/src/features/calendar/lib/panel-url.test.ts>) | feature: calendar |
 | [apps/product/src/features/calendar/lib/plan-data-adapter.test.ts](<../../../apps/product/src/features/calendar/lib/plan-data-adapter.test.ts>) | feature: calendar |
-| [apps/product/src/features/calendar/lib/plan-event-adapter.test.ts](<../../../apps/product/src/features/calendar/lib/plan-event-adapter.test.ts>) | feature: calendar |
 | [apps/product/src/features/calendar/lib/plan-record-drop.test.ts](<../../../apps/product/src/features/calendar/lib/plan-record-drop.test.ts>) | feature: calendar |
 | [apps/product/src/features/calendar/lib/record-event-adapter.test.ts](<../../../apps/product/src/features/calendar/lib/record-event-adapter.test.ts>) | feature: calendar |
 | [apps/product/src/features/calendar/lib/remaining-day-minutes.test.ts](<../../../apps/product/src/features/calendar/lib/remaining-day-minutes.test.ts>) | feature: calendar |
@@ -2223,7 +2215,6 @@ graph LR
 | [apps/product/src/features/calendar/lib/timeblock-clipboard-paste.test.ts](<../../../apps/product/src/features/calendar/lib/timeblock-clipboard-paste.test.ts>) | feature: calendar |
 | [apps/product/src/features/calendar/lib/timeblock-search-path.test.ts](<../../../apps/product/src/features/calendar/lib/timeblock-search-path.test.ts>) | feature: calendar |
 | [apps/product/src/features/calendar/lib/timeblock-search-results.test.ts](<../../../apps/product/src/features/calendar/lib/timeblock-search-results.test.ts>) | feature: calendar |
-| [apps/product/src/features/calendar/lib/timeblock-time.test.ts](<../../../apps/product/src/features/calendar/lib/timeblock-time.test.ts>) | feature: calendar |
 | [apps/product/src/features/calendar/lib/timezone-edge-cases.test.ts](<../../../apps/product/src/features/calendar/lib/timezone-edge-cases.test.ts>) | feature: calendar |
 | [apps/product/src/features/calendar/lib/two-lane-layout.test.ts](<../../../apps/product/src/features/calendar/lib/two-lane-layout.test.ts>) | feature: calendar |
 | [apps/product/src/features/calendar/stores/calendarScrollStore.test.ts](<../../../apps/product/src/features/calendar/stores/calendarScrollStore.test.ts>) | feature: calendar |

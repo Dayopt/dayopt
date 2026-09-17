@@ -28,8 +28,8 @@ import type { CalendarDisplayEvent } from '../../../../types/calendar.types';
 import { PlanLaneCard } from './TwoLane/PlanLaneCard';
 import { RecordLaneCard } from './TwoLane/RecordLaneCard';
 
-interface TwoLaneEntryRendererProps {
-  entry: CalendarDisplayEvent;
+interface TwoLaneTimeblockRendererProps {
+  timeblock: CalendarDisplayEvent;
   position: TwoLanePosition;
   allEvents: CalendarDisplayEvent[];
   isDragging: boolean;
@@ -40,8 +40,9 @@ interface TwoLaneEntryRendererProps {
   showDayDiffMarker?: boolean | undefined;
   compactCards: boolean;
   timeFormat: TimeFormat;
-  onEntryClick?: ((entry: CalendarDisplayEvent) => void) | undefined;
-  onEntryContextMenu?: ((entry: CalendarDisplayEvent, e: React.MouseEvent) => void) | undefined;
+  onTimeblockClick?: ((timeblock: CalendarDisplayEvent) => void) | undefined;
+  onTimeblockContextMenu?:
+    ((timeblock: CalendarDisplayEvent, e: React.MouseEvent) => void) | undefined;
   onPointerDown: (
     timeblockId: string,
     e: React.MouseEvent,
@@ -63,17 +64,17 @@ interface TwoLaneEntryRendererProps {
 }
 
 /** auto_migrated record はドラッグ/リサイズを禁止する。 */
-function isDragDisabled(entry: CalendarDisplayEvent): boolean {
-  return entry.recordSource === 'auto_migrated';
+function isDragDisabled(timeblock: CalendarDisplayEvent): boolean {
+  return timeblock.recordSource === 'auto_migrated';
 }
 
-/** entry.id を絶対座標 rect として渡すためのヘルパー（useInteraction の TimeblockRect 契約） */
+/** timeblock.id を絶対座標 rect として渡すためのヘルパー（useInteraction の TimeblockRect 契約） */
 function toRect(position: TwoLanePosition) {
   return { top: position.top, left: position.left, width: position.width, height: position.height };
 }
 
 export function TwoLaneTimeblockRenderer({
-  entry,
+  timeblock,
   position,
   allEvents,
   isDragging,
@@ -84,25 +85,29 @@ export function TwoLaneTimeblockRenderer({
   showDayDiffMarker = false,
   compactCards,
   timeFormat,
-  onEntryClick,
-  onEntryContextMenu,
+  onTimeblockClick,
+  onTimeblockContextMenu,
   onPointerDown,
   onTouchStart,
   onResizeStart,
-}: TwoLaneEntryRendererProps) {
-  const inspectorEntryId = useTimeblockInspectorStore((state) => state.timeblockId);
+}: TwoLaneTimeblockRendererProps) {
+  const inspectorTimeblockId = useTimeblockInspectorStore((state) => state.timeblockId);
   const isInspectorOpen = useTimeblockInspectorStore((state) => state.isOpen);
   const hoveredActivity = useTimeblockInspectorStore((state) => state.hoveredActivity);
   const { getActivityById } = useActivitiesMap();
 
   const timeblockDragging =
-    isDragging && interactionState.mode === 'dragging' && interactionState.timeblockId === entry.id;
+    isDragging &&
+    interactionState.mode === 'dragging' &&
+    interactionState.timeblockId === timeblock.id;
   const timeblockResizing =
-    isResizing && interactionState.mode === 'resizing' && interactionState.timeblockId === entry.id;
+    isResizing &&
+    interactionState.mode === 'resizing' &&
+    interactionState.timeblockId === timeblock.id;
 
-  // リサイズ中はプレビュー高さを反映する（TimeblockRenderer の buildResizePreviewEntry 相当）
+  // リサイズ中はプレビュー高さを反映する（TimeblockRenderer の buildResizePreviewTimeblock 相当）
   const previewPosition: TwoLanePosition =
-    interactionState.mode === 'resizing' && interactionState.timeblockId === entry.id
+    interactionState.mode === 'resizing' && interactionState.timeblockId === timeblock.id
       ? { ...position, height: interactionState.snappedHeight }
       : position;
 
@@ -112,8 +117,8 @@ export function TwoLaneTimeblockRenderer({
       ? { zIndex: 1000 }
       : {};
 
-  const isActive = isInspectorOpen && inspectorEntryId === entry.id;
-  const activity = entry.activityId ? getActivityById(entry.activityId) : undefined;
+  const isActive = isInspectorOpen && inspectorTimeblockId === timeblock.id;
+  const activity = timeblock.activityId ? getActivityById(timeblock.activityId) : undefined;
   // 開いているブロックでアクティビティをホバー中なら、選ぶ前に色・アイコン・名前を
   // カードへ先出しする（ドラッグ作成のハイライトと同じ扱い。2026-09-07 User 指示）
   const isPreviewingHover = isActive && hoveredActivity !== null;
@@ -122,43 +127,44 @@ export function TwoLaneTimeblockRenderer({
   const activityIcon = isPreviewingHover ? hoveredActivity.icon : (activity?.icon ?? null);
   // カードは「未分類（categoryId === null）」で icon 領域を隠す。プレビュー中は
   // ホバー候補の色の有無で判定する（hoveredActivity は categoryId を持たないため、
-  // 実 entry の categoryId をそのまま使うと候補と無関係な値になる）
+  // 実 timeblock の categoryId をそのまま使うと候補と無関係な値になる）
   const activityCategoryId = isPreviewingHover
     ? hoveredActivity.color != null
       ? 'preview'
       : null
     : (activity?.categoryId ?? null);
-  const disableDrag = isDragDisabled(entry);
+  const disableDrag = isDragDisabled(timeblock);
   const disableResize = disableDrag;
   const rect = toRect(position);
 
   const handleClick = (_target: unknown) => {
-    onEntryClick?.(entry);
+    onTimeblockClick?.(timeblock);
   };
 
   const handleContextMenu = (_target: unknown, e: React.MouseEvent) => {
     if (timeblockDragging || timeblockResizing) return;
-    onEntryContextMenu?.(entry, e);
+    onTimeblockContextMenu?.(timeblock, e);
   };
 
   const handlePointerDown = (_target: unknown, e: React.MouseEvent) => {
-    onPointerDown(entry.id, e, rect, enableCrossDayDrag ? dayIndex : undefined);
+    onPointerDown(timeblock.id, e, rect, enableCrossDayDrag ? dayIndex : undefined);
   };
 
   const handleTouchStart = (_target: unknown, e: React.TouchEvent) => {
-    onTouchStart(entry.id, e, rect, enableCrossDayDrag ? dayIndex : undefined);
+    onTouchStart(timeblock.id, e, rect, enableCrossDayDrag ? dayIndex : undefined);
   };
 
   const handleResizeStart = (_target: unknown, e: React.MouseEvent | React.TouchEvent) => {
-    onResizeStart(entry.id, 'bottom', e, rect);
+    onResizeStart(timeblock.id, 'bottom', e, rect);
   };
 
-  const kind = entry.kind ?? resolveTimeblockDestination(entry.endDate ?? entry.displayEndDate);
+  const kind =
+    timeblock.kind ?? resolveTimeblockDestination(timeblock.endDate ?? timeblock.displayEndDate);
 
   if (kind === 'plan') {
     return (
       <PlanLaneCard
-        event={calendarEventToPlanEvent(entry, allEvents)}
+        event={calendarEventToPlanEvent(timeblock, allEvents)}
         position={previewPosition}
         activityName={activityName}
         activityColor={activityColor}
@@ -182,7 +188,7 @@ export function TwoLaneTimeblockRenderer({
 
   return (
     <RecordLaneCard
-      event={calendarEventToRecordEvent(entry)}
+      event={calendarEventToRecordEvent(timeblock)}
       position={previewPosition}
       activityName={activityName}
       activityColor={activityColor}

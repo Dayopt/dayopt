@@ -8,24 +8,19 @@ import {
   planRangesFromCalendarEvents,
 } from './remaining-day-minutes';
 
-function entry(overrides: Partial<CalendarDisplayEvent> = {}): CalendarDisplayEvent {
+function timeblock(overrides: Partial<CalendarDisplayEvent> = {}): CalendarDisplayEvent {
   const start = new Date('2026-06-18T09:00:00.000Z');
   const end = new Date('2026-06-18T10:00:00.000Z');
 
   return {
-    id: 'entry-1',
+    id: 'timeblock-1',
     title: 'Focus',
     startDate: start,
     endDate: end,
-    plannedStartDate: start,
-    plannedEndDate: end,
     displayStartDate: start,
     displayEndDate: end,
-    status: 'closed',
     color: 'var(--category-blue)',
     activityId: 'activity-1',
-    createdAt: start,
-    updatedAt: end,
     version: '2026-07-15T00:00:00.000000Z',
     duration: 60,
     isMultiDay: false,
@@ -127,35 +122,25 @@ describe('computeRemainingDayMinutes', () => {
 });
 
 describe('planRangesFromCalendarEvents', () => {
-  it('記録は落とし、planned の時刻を優先する', () => {
-    const plannedStart = new Date('2026-06-18T09:00:00.000Z');
-    const plannedEnd = new Date('2026-06-18T10:30:00.000Z');
+  it('Record は落とし、Plan の startDate / endDate を使う', () => {
+    const planStart = new Date('2026-06-18T20:00:00.000Z');
+    const planEnd = new Date('2026-06-18T21:00:00.000Z');
 
     const ranges = planRangesFromCalendarEvents([
-      entry({
-        plannedStartDate: plannedStart,
-        plannedEndDate: plannedEnd,
-        startDate: new Date('2026-06-18T20:00:00.000Z'),
-        endDate: new Date('2026-06-18T21:00:00.000Z'),
-      }),
-      entry({ id: 'record-1', kind: 'record' }),
+      timeblock({ startDate: planStart, endDate: planEnd }),
+      timeblock({ id: 'record-1', kind: 'record' }),
     ]);
 
-    expect(ranges).toEqual([{ start: plannedStart, end: plannedEnd, isDraft: undefined }]);
+    expect(ranges).toEqual([{ start: planStart, end: planEnd, isDraft: undefined }]);
   });
 
-  it('planned が無ければ startDate / endDate を使い、時刻欠損は落とす', () => {
+  it('時刻欠損の Plan は落とす', () => {
     const ranges = planRangesFromCalendarEvents([
-      entry({
-        plannedStartDate: undefined,
-        plannedEndDate: undefined,
-      }),
-      entry({
+      timeblock(),
+      timeblock({
         id: 'no-time',
         startDate: null,
         endDate: null,
-        plannedStartDate: undefined,
-        plannedEndDate: undefined,
       }),
     ]);
 
@@ -164,7 +149,7 @@ describe('planRangesFromCalendarEvents', () => {
   });
 
   it('isDraft を引き継ぐ', () => {
-    const ranges = planRangesFromCalendarEvents([entry({ isDraft: true })]);
+    const ranges = planRangesFromCalendarEvents([timeblock({ isDraft: true })]);
 
     expect(ranges[0]?.isDraft).toBe(true);
   });

@@ -86,7 +86,7 @@ export function CalendarSidebar() {
             onApplyTemplate={handleApply}
             onRenameTemplate={handleRename}
             onDeleteTemplate={handleDelete}
-            onCreateEntry={handleCreate}
+            onCreateTimeblock={handleCreate}
           />
         }
       />

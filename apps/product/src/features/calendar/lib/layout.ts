@@ -1,17 +1,13 @@
 /**
  * レイアウト計算エンジン — React/DOM依存ゼロの純粋関数
  *
- * Googleカレンダー風のsweep-lineアルゴリズムによる重複検出・カラム割り当て、
- * タイムブロックカードの位置計算、予定vs記録の差分オーバーレイ計算を提供。
+ * Googleカレンダー風のsweep-lineアルゴリズムによる重複検出・カラム割り当てと、
+ * タイムブロックカードの位置計算を提供。
  */
 
 import type { TimeblockColumn, TimedTimeblock } from '../types/timeblock.types';
 
 import { MIN_EVENT_HEIGHT } from './grid';
-
-// 予定 vs 記録 差分オーバーレイは Timeblock ドメインのロジック
-// canonical source: @/features/timeblock
-export { computeActualTimeDiffOverlay } from '@/features/timeblock';
 
 // ========================================
 // 型定義

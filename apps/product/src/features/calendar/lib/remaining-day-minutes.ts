@@ -7,8 +7,8 @@
  *
  * `day-diff.ts` の `computeCalendarDayDiffs` を呼ばない理由: あちらは clip / diff item /
  * sort / Set 確保を伴い、日の切り方も `dayStart` / `dayEnd` 境界なので、ドラッグ中に毎フレーム
- * 呼ぶには重い。予定合計の意味（`kind !== 'record'` を予定と見る、`plannedStartDate ?? startDate`、
- * `isDraft` を除外、非正の長さは 0）だけをここへ写す。
+ * 呼ぶには重い。予定合計の意味（`kind !== 'record'` を予定と見る、`isDraft` を除外、
+ * 非正の長さは 0）だけをここへ写す。
  */
 
 import type { CalendarDisplayEvent } from '../types/calendar.types';
@@ -57,8 +57,7 @@ export function planRangesFromCalendarEvents(
   for (const event of events) {
     if (event.kind === 'record') continue;
 
-    const start = event.plannedStartDate ?? event.startDate;
-    const end = event.plannedEndDate ?? event.endDate;
+    const { startDate: start, endDate: end } = event;
     if (!start || !end) continue;
 
     ranges.push({ start, end, isDraft: event.isDraft });

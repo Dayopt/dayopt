@@ -22,7 +22,7 @@ export interface TimeRange {
   end: Date;
 }
 
-/** グリッド上のエントリ位置（px） */
+/** グリッド上のタイムブロック位置（px） */
 export interface TimeblockRect {
   top: number;
   left: number;
@@ -82,7 +82,7 @@ export interface DraggingState {
   snappedTop: number;
   /** Preview time range at current position */
   previewTime: TimeRange;
-  /** Whether the current position overlaps with same-origin entries */
+  /** Whether the current position overlaps with same-origin timeblocks */
   isOverlapping: boolean;
 }
 
@@ -174,11 +174,11 @@ export interface InteractionContext {
   viewMode: 'day' | '3day' | '5day' | 'week';
   /** Snap interval in minutes (default: DEFAULT_DRAG_SNAP_MINUTES = 1) */
   snapIntervalMinutes?: number;
-  /** Get entry duration in milliseconds by ID */
+  /** Get timeblock duration in milliseconds by ID */
   getTimeblockDurationMs: (timeblockId: string) => number;
   /** planned resize の終了時刻に必要な下限（分 of day）。未指定なら通常の最小durationのみ。 */
   getResizeMinEndMinutes?: (timeblockId: string) => number | null;
-  /** Check if a time range overlaps with other same-origin entries */
+  /** Check if a time range overlaps with other same-origin timeblocks */
   checkOverlap: (
     timeblockId: string,
     start: Date,
