@@ -271,6 +271,18 @@ CREATE INDEX idx_new_table_user_id ON public.new_table(user_id);
 - [ ] `pnpm rls:snapshot` で RLS / GRANT / Realtime publication の差分を確認したか
 - [ ] preview branch で適用確認したか
 
+### Postgres の判断が要る時の参照資料
+
+index の設計、RLS policy の性能、lock と制約追加で判断が要る時だけ、該当する 1 ファイルを読む。**全文を毎回読まない。** 出典と調整点は各ファイル冒頭と `docs/operations/tooling.md` の外部 skill 導入一覧にある。
+
+| 資料                                                                             | 読む時                                                              |
+| -------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| [`references/postgres-query-indexes.md`](./references/postgres-query-indexes.md) | index を足す / 消す、query が遅い、FK に index が要るか判断する     |
+| [`references/postgres-rls-security.md`](./references/postgres-rls-security.md)   | RLS policy が遅い、GRANT / REVOKE の粒度、SECURITY DEFINER helper   |
+| [`references/postgres-locks.md`](./references/postgres-locks.md)                 | migration が大きいテーブルを触る、制約を後から足す、既存 job を直す |
+
+これらは判断材料であり、**この skill の §絶対ルール と `docs/engineering/invariants.md` を上書きしない**。性能を理由に RLS を外す・迂回する提案はしない。新規の集計・ビジネスロジックは TS service 層に置き、既存 PL/pgSQL 関数は凍結資産として bug fix のみ。index を足す時は対象 query と `explain (analyze, buffers)` の実測を根拠にする。
+
 ## Seed 戦略
 
 ### 方針: 最小限

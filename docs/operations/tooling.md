@@ -520,7 +520,43 @@ Codex でこの project を初めて開く時は、project trust を確認し、
 
 新規・更新時は `.agents/skills/skill-design/SKILL.md` に従う。description / When to Use は provider-neutral にし、特定 model の名前を発火条件や必須 tier にしない。provider 固有の adapter は capability、scope、出力契約、generic fallback、実際の保証境界を併記する。
 
-## 5. Independent PR Review と追加契約
+## 5. 外部 skill の導入一覧
+
+外部 skill は **Dayopt 向けの調整版**として取り込む。公式原文そのままではなく、上流を fork した配布物でもない。runtime にリモートを取得する構成（上流の `web-design-guidelines` が `main/command.md` を毎回 fetch する形）は採らず、下表の commit SHA で固定したスナップショットを正本にする。
+
+| Dayopt skill             | 上流                                                                                                         | 固定 commit SHA                            | 取得日     | License / 表示                                                                                           | 取り込んだファイル                                                                        |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------ | ------------------------------------------ | ---------- | -------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| `react-performance`      | [vercel-labs/agent-skills](https://github.com/vercel-labs/agent-skills) `skills/react-best-practices/rules/` | `063bee94c3f4df8453406c830b0a7df0f2860278` | 2026-09-17 | LICENSE ファイル無し。README と SKILL.md frontmatter が MIT を宣言。**転記すべき著作権表示は存在しない** | `references/async.md`（async 系 6 本）、`references/bundle.md`（bundle 系 6 本）          |
+| `ui-audit`               | [vercel-labs/web-interface-guidelines](https://github.com/vercel-labs/web-interface-guidelines) `command.md` | `e3d624baaf29dc1fc645aff3e38f03e564d2d6b1` | 2026-09-17 | MIT, Copyright (c) 2025 Vercel Labs（表示を各ファイル冒頭に保持）                                        | `references/web-interface-guidelines.md`                                                  |
+| `diagnosing-bugs`        | [mattpocock/skills](https://github.com/mattpocock/skills) `skills/engineering/diagnosing-bugs/`              | `959a8e9f1edc3adbe2f7e3054bb6fbefa6696260` | 2026-09-17 | MIT, Copyright (c) 2026 Matt Pocock                                                                      | 骨格のみ（ファイル転記なし。`SKILL.md` に出典を記載）                                     |
+| `test`（既存へ統合）     | [mattpocock/skills](https://github.com/mattpocock/skills) `skills/engineering/tdd/`                          | `959a8e9f1edc3adbe2f7e3054bb6fbefa6696260` | 2026-09-17 | MIT, Copyright (c) 2026 Matt Pocock（表示を各ファイル冒頭に保持）                                        | `references/tdd-loop.md`（`tests.md` / `mocking.md` の抜粋）                              |
+| `supabase`（既存へ統合） | [supabase/agent-skills](https://github.com/supabase/agent-skills) `skills/supabase-postgres-best-practices/` | `8331f910845103c08d51f6ca1d86ebb7d1f745e3` | 2026-09-17 | MIT, Copyright (c) 2026 Supabase（表示を各ファイル冒頭に保持）                                           | `references/postgres-query-indexes.md` / `postgres-rls-security.md` / `postgres-locks.md` |
+
+### 適用除外（上流をそのまま適用しない点）
+
+| 対象                                                       | 除外した理由                                                                                                                  |
+| ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `bundle-barrel-imports` を内部 import へ適用すること       | Dayopt は feature 間の barrel 経由が必須で、`pnpm lint:boundaries` が deep import を機械的に禁止する。第三者 package のみ対象 |
+| `client-swr-dedup` ほか SWR 前提の規則                     | 新規 API は tRPC が正本。SWR を新規依存として足さない                                                                         |
+| `server-cache-lru` / `js-cache-function-results`           | ユーザーをキーに含めない module cache はユーザー間でデータが混ざる（REVIEW-1）。cache は認可・request 境界を確認して設計する  |
+| React の server / client / rerender / js 系 70 本の全量    | 上流 `AGENTS.md` は 3810 行。索引と全量 vendoring は読む量に見合わない。必要時は固定 SHA から読む                             |
+| UI guidelines の runtime fetch（`WebFetch`）               | 規則が固定されず再現しない。スナップショットを正本にする                                                                      |
+| UI guidelines の Title Case / カーリークォート規則         | 英語だけに効く copy 規則。ja / en の文言は用語集と `pnpm copy:check:strict` が正本                                            |
+| `nuqs` / `virtua` などの library 提案                      | 既存の state 管理・描画で解く。依存追加は AGENTS.md の基準で別途判断する                                                      |
+| `diagnosing-bugs` の仮説 3〜5 個・100x / 1000 入力の固定値 | 反復回数と仮説数は症状ごとに決める。一律の下限を全バグへ課さない                                                              |
+| `tdd` の「seam をテスト前にユーザーへ確認する」規則        | 可逆な作業で不要な停止を作る（AGENTS.md の AUTONOMOUS）。境界の判断は実装者が持つ                                             |
+| Postgres の conn / data / monitor / partitioning 系        | Supavisor は Supabase が管理し、現状の規模で判断材料にならない                                                                |
+| 上流 skill の `scripts/` `agents/*.yaml`                   | `.agents/skills/**` の `.md` 以外は CI の docs-only 判定を外す（`scripts/ci/impact.test.ts`）。現状不要                       |
+
+### 更新方法
+
+1. 上表の固定 SHA と上流の最新 SHA の差分を読む（例: `gh api repos/vercel-labs/agent-skills/compare/<固定SHA>...main`）
+2. Dayopt の境界（依存方向、tRPC、ユーザー分離、migration 運用）と衝突しないか判断する
+3. 取り込む差分だけを手で反映し、上表の SHA と取得日を同じ変更で更新する
+
+**自動更新、未監査スクリプトの実行、runtime のリモート取得は行わない。** UI guidelines の `command.md` は skill 本体（vercel-labs/agent-skills）とは別 repo の依存であり、上表で別行として固定する。
+
+## 6. Independent PR Review と追加契約
 
 通常 PR の独立レビューは GitHub の `@codex review`。依頼・対象 SHA の照合・所見の裁定・再レビューは `.agents/skills/pr-cross-review/SKILL.md` を正本とする。実装 session の reviewer subagent や独自 pack を日常の必須工程にしない。未応答・古い結果・未実行は指摘0とは異なる。
 
@@ -552,7 +588,7 @@ pnpm review:validate --pack <directory> --result <result.json> [--result <result
 - `rejected` / `undetermined` には `counterevidence` を要求する。`confirmed` には要求しない（落とす判断にだけ反証を求める）
 - `reproduced` / `failed-to-reproduce` は実行した `command` と `testPath` の提示を要求する。到達証拠のない失敗は `not-run` / `environment-missing` へ落とす。`statically-confirmed` は件数を結果に出して、実行できた候補が逃げていないか見えるようにする
 
-## 6. Migration acceptance と handoff
+## 7. Migration acceptance と handoff
 
 native worktree root の fresh Codex session による共通指示・skills の発見と、サブディレクトリ起動の別 Codex session への review pack 引き継ぎを確認した。Codex の project trust と実 hook 発火、Antigravity の skill discovery と review adapter は未検証であり、設定ファイルの存在を有効化の証拠にしない。
 
