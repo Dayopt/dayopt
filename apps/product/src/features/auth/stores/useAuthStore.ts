@@ -111,6 +111,7 @@ export const useAuthStore = create<AuthState>()(
             user: data.session?.user ?? null,
             loading: false,
             error: null,
+            _sessionExpired: false,
           });
 
           // Auth state changeリスナーは非同期で設定（ブロックしない）
@@ -122,6 +123,10 @@ export const useAuthStore = create<AuthState>()(
               set({
                 session,
                 user: session?.user ?? null,
+                // 主体が戻ったら失効フラグを下ろす。logout → login は soft navigation
+                // なので module state が生き残り、下ろさないと再ログイン直後に
+                // SessionMonitorProvider が再発火して login へ弾き戻す。
+                ...(session?.user ? { _sessionExpired: false } : {}),
               });
 
               // C2: セッション失効の検出 — 以前ログイン済みだったのに session が消えた場合
@@ -164,8 +169,10 @@ export const useAuthStore = create<AuthState>()(
             password,
             options: {
               // 確認メールのリンク検証後の着地先。send-auth-email hook が
-              // origin + path を confirm route の next に変換する
-              emailRedirectTo: `${window.location.origin}/week`,
+              // origin + path を confirm route の next に変換する。
+              // 旧 route（/week）を指すと proxy の legacy 写像に依存し、その削除で
+              // 確認リンクの着地が 404 になるため、現行の契約 URL を直接指す。
+              emailRedirectTo: `${window.location.origin}/calendar`,
               ...(options?.captchaToken && { captchaToken: options.captchaToken }),
               ...(options?.metadata && { data: options.metadata }),
             },
@@ -227,6 +234,9 @@ export const useAuthStore = create<AuthState>()(
               user: result.data.user,
               loading: false,
               error: null,
+              // listener が張られていない公開ページ（PublicProviders）からの
+              // サインインでも失効フラグを下ろす
+              ...(result.data.session ? { _sessionExpired: false } : {}),
             });
           }
 
