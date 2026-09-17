@@ -4,8 +4,8 @@ last_verified: 2026-08-20
 code: apps/product/src/features/calendar
 public_docs:
   - calendar
-lp:
-  - 'Calendar — day, week, and multi-day views'
+# カレンダーは LP の単独の約束ではなく、plan-record の 'Plan and Record (timeboxing)' が置かれる面として約束されている
+lp: []
 ---
 
 # Calendar（カレンダー）

@@ -4,11 +4,10 @@ description: 'How to organize your Plans and Records in Dayopt with activities. 
 tags: ['activities', 'categories', 'organization']
 author: 'Dayopt Team'
 publishedAt: '2026-08-17'
-updatedAt: '2026-09-15'
+updatedAt: '2026-09-17'
 order: 5
 category: 'organize'
 slug: 'activities'
-draft: true
 
 ai:
   relatedQuestions:
@@ -32,15 +31,24 @@ Group activities into a category to tell them apart by color and icon. When you 
 
 ## Creating an activity
 
-Create an activity from a block's activity picker, or from the sidebar. It only needs a name — color and icon are not set here.
+Create an activity from a timeblock's activity picker, or from the sidebar. It only needs a name — color and icon are not set here.
 
 - There's no limit on how many you create. Making fine-grained activities doesn't add to your workload
 - Each activity belongs to at most one category. It can't span more than one
 - An activity not in any category is treated as uncategorized
 
-## Adding an activity to a block
+## Adding an activity to a timeblock
 
-Each Plan and Record takes exactly one activity. You can't add more than one to the same block.
+Each Plan and Record takes exactly one activity. You can't add more than one to the same timeblock.
+
+## Your usual length, shown as a hint
+
+In the activity picker, each name carries its usual length on the right — the median of your recorded lengths over the last four weeks, rounded to 5 minutes. It shows up both in the Inspector's activity picker and in the calendar's create panel.
+
+- An activity with fewer than three records shows nothing
+- Tapping an activity in the sidebar to create a timeblock uses this length by default, falling back to the default length in your settings
+
+The line above the date and time in the Inspector when you plan is a different figure. That one is the ratio between what you planned and what you recorded; this one is the median of the records themselves.
 
 ## Grouping with categories
 
@@ -65,8 +73,8 @@ Like the calendar, the report sidebar lists your categories with their activitie
 
 Activities and categories you no longer use can be archived instead of deleted.
 
-- An archived item disappears from the picker. You can't add it to a new block
-- Blocks that already used it keep their original name and color after archiving
+- An archived item disappears from the picker. You can't add it to a new timeblock
+- Timeblocks that already used it keep their original name and color after archiving
 - Archiving a category doesn't archive the activities in it — you just can't add new activities to that category
 
 Archived activities and categories can be restored later.
@@ -75,7 +83,7 @@ Archived activities and categories can be restored later.
 
 Deleting for good shows a confirmation screen with the count of Plans and Records it's attached to. Your time records themselves aren't deleted.
 
-- Deleting an activity leaves its blocks with no activity attached
+- Deleting an activity leaves its timeblocks with no activity attached
 - Deleting a category returns its activities to uncategorized
 
 ## Next steps

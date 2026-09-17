@@ -4,7 +4,7 @@ description: 'How to use Plans in Dayopt — create, edit, add activities, copy 
 tags: ['plans', 'timeboxing', 'tutorial', 'getting-started', 'productivity']
 author: 'Dayopt Team'
 publishedAt: '2026-02-19'
-updatedAt: '2026-09-07'
+updatedAt: '2026-09-17'
 order: 1
 featured: true
 category: 'plan'
@@ -36,12 +36,12 @@ Plans are the core of timeboxing in Dayopt. A Plan is something you intend to do
 
 There are four ways to create a Plan.
 
-| Method                    | How                                                    |
-| ------------------------- | ------------------------------------------------------ |
-| **Click on the calendar** | Click an empty time slot                               |
-| **Drag on the calendar**  | Drag across a time range to set the start and end time |
-| **`C`**                   | Create a block                                         |
-| **`Shift+C`**             | Create a 15-minute block starting at the current time  |
+| Method                    | How                                                       |
+| ------------------------- | --------------------------------------------------------- |
+| **Click on the calendar** | Click an empty time slot                                  |
+| **Drag on the calendar**  | Drag across a time range to set the start and end time    |
+| **`C`**                   | Create a timeblock                                        |
+| **`Shift+C`**             | Create a 15-minute timeblock starting at the current time |
 
 The Inspector opens when the Plan is created. Type a title and it saves as you go.
 
@@ -52,10 +52,19 @@ Click a Plan on the calendar to open the **Inspector**. You can edit these field
 - **Title** — saves automatically as you type
 - **Date** — move the Plan to a different date
 - **Time** — adjust the start and end (duration is shown automatically)
-- **Activity** — one activity per block
+- **Activity** — one activity per timeblock
 - **Note** — write down what the Plan is about
 
-Inside the Inspector, use `↑` / `k` and `↓` / `j` to move between blocks. Press `Escape` to close it.
+Inside the Inspector, use `↑` / `k` and `↓` / `j` to move between timeblocks. Press `Escape` to close it.
+
+## Check recent actuals before setting the length
+
+Pick an activity and a line appears directly above the date and time fields — "Recent actuals for this activity are around 45m". It lets you see how long this thing usually takes before you commit to a time.
+
+The figure is your recorded time over the last four weeks divided by your ended planned time over the same period, applied to the length you are currently drafting, and rounded to 5 minutes.
+
+- It only appears while the end time is in the future. Move the end into the past and the Plan becomes a Record, so the line disappears
+- If the activity has fewer than three ended Plans in the last four weeks, nothing is shown
 
 ## Drag and Drop
 
@@ -68,7 +77,7 @@ Press `Escape` during a drag to cancel.
 
 Each Plan takes one activity. Sort your time by how you spend it — "Deep work", "Meeting", "Admin" — and you can see where the hours went when you review.
 
-A block holds one activity. You cannot add more than one.
+A timeblock holds one activity. You cannot add more than one.
 
 ## Recording time from a Plan
 
@@ -80,21 +89,21 @@ The Plan Inspector lists **"Records during this time"** for the same activity wi
 
 Open the Inspector menu and select **"Duplicate"** to create another Plan with the same details. You can also copy the Plan and paste it at another time.
 
-## Switching the sidebar
+## Using the sidebar
 
-The sidebar has two tabs: **Calendar** and **List**. The List tab shows your Plans in a list.
+The sidebar is where you switch views (day, several days, week), filter which categories and activities are shown, and manage your templates.
 
 ## Keyboard Shortcuts
 
-| Shortcut          | Action                              |
-| ----------------- | ----------------------------------- |
-| `C`               | Create a block                      |
-| `Shift+C`         | Create a block at the current time  |
-| `Escape`          | Close the Inspector / cancel a drag |
-| `↑` or `k`        | Previous block                      |
-| `↓` or `j`        | Next block                          |
-| `Cmd+C` / `Cmd+V` | Copy / paste                        |
-| `Delete`          | Delete the selected block           |
+| Shortcut          | Action                                 |
+| ----------------- | -------------------------------------- |
+| `C`               | Create a timeblock                     |
+| `Shift+C`         | Create a timeblock at the current time |
+| `Escape`          | Close the Inspector / cancel a drag    |
+| `↑` or `k`        | Previous timeblock                     |
+| `↓` or `j`        | Next timeblock                         |
+| `Cmd+C` / `Cmd+V` | Copy / paste                           |
+| `Delete`          | Delete the selected timeblock          |
 
 On Windows and Linux, use `Ctrl` instead of `Cmd`. Press `Shift+?` to see the full list.
 

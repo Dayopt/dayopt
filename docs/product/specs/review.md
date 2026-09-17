@@ -5,8 +5,8 @@ code: apps/product/src/features/review
 public_docs:
   - review
 lp:
-  - 'Core Review metrics'
-  - 'All Review metrics'
+  - 'Weekly review'
+  - 'Monthly and yearly overviews with past-self comparison'
 ---
 
 # Review（振り返り）

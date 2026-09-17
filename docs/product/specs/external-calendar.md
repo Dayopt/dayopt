@@ -5,7 +5,7 @@ code: apps/product/src/features/external-calendar
 public_docs:
   - google-calendar
 lp:
-  - 'Calendar — day, week, and multi-day views'
+  - 'Google Calendar sync'
 ---
 
 # External Calendar（外部カレンダー連携）
