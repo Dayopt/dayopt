@@ -24,10 +24,7 @@ interface TemplateBlockDraft {
   anchorMinute: number;
 }
 
-type ComposeSource = Pick<
-  CalendarEvent,
-  'kind' | 'activityId' | 'title' | 'startDate' | 'plannedStartDate'
->;
+type ComposeSource = Pick<CalendarEvent, 'kind' | 'activityId' | 'title' | 'startDate'>;
 
 export function deriveTemplateBlocksFromDay(
   events: ReadonlyArray<ComposeSource>,
@@ -37,7 +34,7 @@ export function deriveTemplateBlocksFromDay(
   const candidates: Array<TemplateBlockDraft & { startMs: number }> = [];
   for (const event of events) {
     if (event.kind !== 'plan') continue;
-    const start = event.plannedStartDate ?? event.startDate;
+    const start = event.startDate;
     if (!start) continue;
     if (instantToDateKey(start, timezone) !== dateKey) continue;
     const title = event.title.trim();

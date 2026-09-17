@@ -39,7 +39,7 @@ interface CalendarCrudHandlersInput {
 
 interface CalendarCrudHandlersResult {
   disabledTimeblockId: string | null;
-  onEntryClick: (entry: CalendarDisplayEvent) => void;
+  onTimeblockClick: (timeblock: CalendarDisplayEvent) => void;
   onTimeRangeSelect: (selection: {
     date: Date;
     startHour: number;
@@ -47,7 +47,7 @@ interface CalendarCrudHandlersResult {
     endHour: number;
     endMinute: number;
   }) => void;
-  onUpdateEntry: (
+  onTimeblockUpdate: (
     timeblockIdOrTimeblock: string | CalendarDisplayEvent,
     updates?: {
       startTime: Date;
@@ -57,9 +57,9 @@ interface CalendarCrudHandlersResult {
     },
   ) => void | Promise<void> | Promise<{ skipToast: true } | void>;
   onDeleteTimeblock: (timeblockId: string) => Promise<boolean>;
-  onDeleteTimeblockConfirm: (entry: CalendarDisplayEvent) => void;
-  onViewStats: (entry: CalendarDisplayEvent) => void;
-  onCopy: (entry: CalendarDisplayEvent) => void;
+  onDeleteTimeblockConfirm: (timeblock: CalendarDisplayEvent) => void;
+  onViewStats: (timeblock: CalendarDisplayEvent) => void;
+  onCopy: (timeblock: CalendarDisplayEvent) => void;
 }
 
 // =============================================================================
@@ -94,7 +94,7 @@ export function useCalendarCrudHandlers({
   // =========================================================================
   // Timeblock Keyboard Shortcuts
   // =========================================================================
-  const getInitialEntryData = useCallback((): { start_time?: string; end_time?: string } => {
+  const getInitialTimeblockData = useCallback((): { start_time?: string; end_time?: string } => {
     const now = new Date();
     const start = startOfHour(now);
     const end = addHours(start, 1);
@@ -104,23 +104,21 @@ export function useCalendarCrudHandlers({
     };
   }, []);
 
-  const getSelectedEntryTitle = useCallback(() => {
+  const getSelectedTimeblockTitle = useCallback(() => {
     if (!selectedTimeblockId) return null;
-    const entry = filteredEvents.find((p) => p.id === selectedTimeblockId);
-    return entry?.title ?? null;
+    const timeblock = filteredEvents.find((p) => p.id === selectedTimeblockId);
+    return timeblock?.title ?? null;
   }, [selectedTimeblockId, filteredEvents]);
 
-  const getSelectedEntryForCopy = useCallback(() => {
+  const getSelectedTimeblockForCopy = useCallback(() => {
     if (!selectedTimeblockId) return null;
-    const entry = filteredEvents.find((p) => p.id === selectedTimeblockId);
-    return entry ? createCalendarEventClipboardTimeblock(entry) : null;
+    const timeblock = filteredEvents.find((p) => p.id === selectedTimeblockId);
+    return timeblock ? createCalendarEventClipboardTimeblock(timeblock) : null;
   }, [selectedTimeblockId, filteredEvents]);
 
   const handleCopy = useCallback(
-    (entry: CalendarDisplayEvent) => {
-      const timeblock = createCalendarEventClipboardTimeblock(entry);
-      if (!timeblock) return;
-      copyTimeblock(timeblock);
+    (timeblock: CalendarDisplayEvent) => {
+      copyTimeblock(createCalendarEventClipboardTimeblock(timeblock));
       toast.success(t('common.toast.copied'));
     },
     [copyTimeblock, t],
@@ -138,9 +136,9 @@ export function useCalendarCrudHandlers({
   useCalendarEventKeyboard({
     enabled: true,
     onDeleteTimeblock: deleteTimeblockAsync,
-    getSelectedEntryTitle,
-    getInitialEntryData,
-    getSelectedEntryForCopy,
+    getSelectedTimeblockTitle,
+    getInitialTimeblockData,
+    getSelectedTimeblockForCopy,
     getPasteDateForKeyboard,
   });
 
@@ -150,9 +148,9 @@ export function useCalendarCrudHandlers({
   return useMemo(
     () => ({
       disabledTimeblockId,
-      onEntryClick: handleTimeblockClick,
+      onTimeblockClick: handleTimeblockClick,
       onTimeRangeSelect: handleDateTimeRangeSelect,
-      onUpdateEntry: handleTimeblockUpdate,
+      onTimeblockUpdate: handleTimeblockUpdate,
       onDeleteTimeblock: deleteTimeblock,
       onDeleteTimeblockConfirm: handleDeleteTimeblockConfirm,
       onViewStats: handleViewStats,

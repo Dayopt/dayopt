@@ -23,7 +23,7 @@
  * 数値ユーティリティをそのまま使う。spacing / font-size と同じ扱い。
  *
  *   duration-150  色・状態の変化（既定。ほぼ全てこれ）
- *   duration-200  transform・位置の変化、一過性の着地（entry-settle）
+ *   duration-200  transform・位置の変化、一過性の着地（timeblock-settle）
  *   duration-300  大きい面の開閉（sheet, accordion）
  *
  * この 3 段以外は使わない。任意値（duration-[420ms]）も使わない。

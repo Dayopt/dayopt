@@ -40,7 +40,7 @@ describe('TemplateList available actions', () => {
   it('runs each available action without introducing an extra step', () => {
     const create = vi.fn();
     const settings = vi.fn();
-    render(<TemplateList templates={[]} onCreateEntry={create} onOpenSettings={settings} />);
+    render(<TemplateList templates={[]} onCreateTimeblock={create} onOpenSettings={settings} />);
     fireEvent.click(screen.getByRole('button', { name: 'calendar.templates.createLabel' }));
     expect(create).toHaveBeenCalledTimes(1);
     expect(settings).not.toHaveBeenCalled();

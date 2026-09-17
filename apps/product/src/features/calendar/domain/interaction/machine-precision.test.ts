@@ -58,10 +58,10 @@ describe('snapToGrid', () => {
   });
 });
 describe('precision regression: 移動 / リサイズは相対 snap で元の分を保持する', () => {
-  // 10:07 entry を表す originalPosition: top=607（hourHeight=60 で 10*60+7=607）
+  // 10:07 timeblock を表す originalPosition: top=607（hourHeight=60 で 10*60+7=607）
   const off607: TimeblockRect = { top: 607, left: 0, width: 200, height: 60 };
 
-  it('LONGPRESS_FIRED on 10:07 entry → preview start keeps 10:07（移動量ゼロ）', () => {
+  it('LONGPRESS_FIRED on 10:07 timeblock → preview start keeps 10:07（移動量ゼロ）', () => {
     const longpressState: InteractionState = {
       mode: 'longpress-pending',
       timeblockId: 'a',
@@ -191,7 +191,7 @@ describe('precision regression: 移動 / リサイズは相対 snap で元の分
     }
   });
 
-  it('移動では duration を丸めない（47 分 entry は 47 分のまま動く）', () => {
+  it('移動では duration を丸めない（47 分 timeblock は 47 分のまま動く）', () => {
     const off913: TimeblockRect = { top: 913, left: 0, width: 200, height: 47 };
     const draggingState: InteractionState = {
       mode: 'dragging',
@@ -227,7 +227,7 @@ describe('precision regression: 移動 / リサイズは相対 snap で元の分
     }
   });
 
-  it('移動では終了境界も snap しない（48分entryは48分のまま）', () => {
+  it('移動では終了境界も snap しない（48分timeblockは48分のまま）', () => {
     const off913: TimeblockRect = { top: 913, left: 0, width: 200, height: 48 };
     const draggingState: InteractionState = {
       mode: 'dragging',
@@ -263,7 +263,7 @@ describe('precision regression: 移動 / リサイズは相対 snap で元の分
     }
   });
 
-  it('RESIZE_START on 10:07 entry → preview range keeps 10:07-11:07（掴んだだけでは動かない）', () => {
+  it('RESIZE_START on 10:07 timeblock → preview range keeps 10:07-11:07（掴んだだけでは動かない）', () => {
     const { state } = dispatch(IDLE, {
       type: 'RESIZE_START',
       timeblockId: 'a',
@@ -280,7 +280,7 @@ describe('precision regression: 移動 / リサイズは相対 snap で元の分
     }
   });
 
-  it('resize 10:07-11:07 entry を +15px → 10:07-11:22（開始は動かさず終端だけ 15 分伸ばす）', () => {
+  it('resize 10:07-11:07 timeblock を +15px → 10:07-11:22（開始は動かさず終端だけ 15 分伸ばす）', () => {
     const resizingState: InteractionState = {
       mode: 'resizing',
       timeblockId: 'a',
@@ -313,7 +313,7 @@ describe('precision regression: 移動 / リサイズは相対 snap で元の分
 // ========================================
 
 describe('day-end boundary regression', () => {
-  it('dragging a 1-hour entry to 23:00 keeps the end at next-day 00:00', () => {
+  it('dragging a 1-hour timeblock to 23:00 keeps the end at next-day 00:00', () => {
     const draggingState: InteractionState = {
       mode: 'dragging',
       timeblockId: 'a',

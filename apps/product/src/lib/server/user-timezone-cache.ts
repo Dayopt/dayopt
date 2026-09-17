@@ -1,7 +1,7 @@
 /**
  * ユーザータイムゾーンの短寿命キャッシュ（30秒 TTL）
  *
- * エントリ操作（高頻度 mutation）の getUserTimezone 呼び出しで DB ラウンドトリップ
+ * タイムブロック操作（高頻度 mutation）の getUserTimezone 呼び出しで DB ラウンドトリップ
  * を削減する目的。TTL が短いため、通常運用では設定変更から 30 秒以内に反映される。
  *
  * settings の timezone が更新された時は `invalidateUserTimezoneCache(userId)` で

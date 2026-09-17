@@ -40,7 +40,7 @@ vi.mock('@/lib/logger', () => ({
 
 const { useCalendarHandlers } = await import('./useCalendarHandlers');
 
-const entry = { id: 'plan-1', title: '開発', kind: 'plan' } as unknown as CalendarDisplayEvent;
+const timeblock = { id: 'plan-1', title: '開発', kind: 'plan' } as unknown as CalendarDisplayEvent;
 
 describe('useCalendarHandlers.handleTimeblockClick', () => {
   beforeEach(() => {
@@ -51,7 +51,7 @@ describe('useCalendarHandlers.handleTimeblockClick', () => {
   it('閉じている時は開く', () => {
     const { result } = renderHook(() => useCalendarHandlers());
 
-    result.current.handleTimeblockClick(entry);
+    result.current.handleTimeblockClick(timeblock);
 
     expect(openInspector).toHaveBeenCalledWith('plan-1', 'plan');
     expect(closeInspector).not.toHaveBeenCalled();
@@ -61,7 +61,7 @@ describe('useCalendarHandlers.handleTimeblockClick', () => {
     inspectorState.value = { isOpen: true, timeblockId: 'plan-1', duplicateDraft: null };
     const { result } = renderHook(() => useCalendarHandlers());
 
-    result.current.handleTimeblockClick(entry);
+    result.current.handleTimeblockClick(timeblock);
 
     expect(closeInspector).toHaveBeenCalledTimes(1);
     expect(openInspector).not.toHaveBeenCalled();
@@ -71,7 +71,7 @@ describe('useCalendarHandlers.handleTimeblockClick', () => {
     inspectorState.value = { isOpen: true, timeblockId: 'plan-other', duplicateDraft: null };
     const { result } = renderHook(() => useCalendarHandlers());
 
-    result.current.handleTimeblockClick(entry);
+    result.current.handleTimeblockClick(timeblock);
 
     expect(openInspector).toHaveBeenCalledWith('plan-1', 'plan');
     expect(closeInspector).not.toHaveBeenCalled();
@@ -85,7 +85,7 @@ describe('useCalendarHandlers.handleTimeblockClick', () => {
     };
     const { result } = renderHook(() => useCalendarHandlers());
 
-    result.current.handleTimeblockClick(entry);
+    result.current.handleTimeblockClick(timeblock);
 
     expect(closeInspector).not.toHaveBeenCalled();
     expect(openInspector).toHaveBeenCalledWith('plan-1', 'plan');

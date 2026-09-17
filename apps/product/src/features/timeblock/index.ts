@@ -33,7 +33,7 @@ export { useTimeblockInspectorStore } from './stores/useTimeblockInspectorStore'
 // =============================================================================
 // Lib (actual-time overlay)
 // =============================================================================
-export { computeActualTimeDiffOverlay, formatDiffMinutes } from './lib/actual-time-overlay';
+export { formatDiffMinutes } from './lib/actual-time-overlay';
 export { TIMEBLOCK_INSPECTOR_SLOT_KEY } from './lib/inspector-slot';
 export { TIMEBLOCK_PARAM, serializeTimeblockParam } from './lib/inspector-url';
 

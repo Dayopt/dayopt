@@ -238,7 +238,7 @@ describe('snapDeltaMinutes', () => {
     expect(snapDeltaMinutes(30, HOUR_HEIGHT, 0)).toBe(0);
   });
 
-  it('precision regression: 10:07 entry を 30 分動かしても :07 が保持される', () => {
+  it('precision regression: 10:07 timeblock を 30 分動かしても :07 が保持される', () => {
     const originalStart = pixelsToMinutesUnsnapped(607, HOUR_HEIGHT); // 10:07
     const moved = originalStart + snapDeltaMinutes(30, HOUR_HEIGHT, 15);
     expect(moved).toBe(10 * 60 + 37);

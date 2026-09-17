@@ -96,25 +96,28 @@ export function useInteractionListeners({
       if ((dragState.mode === 'pending' || dragState.mode === 'dragging') && targetColumn) {
         const rect = targetColumn.getBoundingClientRect();
 
-        // #2250: 相手レーンに entry が無い時刻（= 画面上フル幅で境界が見えない）では、
+        // #2250: 相手レーンに timeblock が無い時刻（= 画面上フル幅で境界が見えない）では、
         // x 座標に関わらず sourceLane を維持する。表示だけフル幅にして pointer 判定を
         // 旧固定境界のまま残すと、境界の見えないカラムで意図しない Plan→Record 変換が
         // 発火する（plan-review で検出した P1 故障モード）。
-        const draggedEntry = r.events.find((event) => event.id === dragState.timeblockId);
+        const draggedTimeblock = r.events.find((event) => event.id === dragState.timeblockId);
         const sourceLane: 'plan' | 'record' =
-          draggedEntry?.kind ??
-          (draggedEntry
-            ? resolveTimeblockDestination(draggedEntry.endDate ?? draggedEntry.displayEndDate)
+          draggedTimeblock?.kind ??
+          (draggedTimeblock
+            ? resolveTimeblockDestination(
+                draggedTimeblock.endDate ?? draggedTimeblock.displayEndDate,
+              )
             : 'plan');
         // dragging は直近 tick の previewTime（1 frame 遅れ、体感上は無視できる）、
-        // pending はまだ previewTime が無いので entry 自身の現在時刻で近似する。
-        const entryStart = draggedEntry?.displayStartDate ?? draggedEntry?.startDate ?? null;
-        const entryEnd = draggedEntry?.displayEndDate ?? draggedEntry?.endDate ?? null;
+        // pending はまだ previewTime が無いので timeblock 自身の現在時刻で近似する。
+        const timeblockStart =
+          draggedTimeblock?.displayStartDate ?? draggedTimeblock?.startDate ?? null;
+        const timeblockEnd = draggedTimeblock?.displayEndDate ?? draggedTimeblock?.endDate ?? null;
         const targetTime =
           dragState.mode === 'dragging'
             ? dragState.previewTime
-            : entryStart && entryEnd
-              ? { start: entryStart, end: entryEnd }
+            : timeblockStart && timeblockEnd
+              ? { start: timeblockStart, end: timeblockEnd }
               : null;
         const counterpartKind = sourceLane === 'plan' ? 'record' : 'plan';
         const hasCounterpart = targetTime
@@ -125,7 +128,7 @@ export function useInteractionListeners({
                 if (kind !== counterpartKind) return [];
                 const start = event.displayStartDate ?? event.startDate;
                 const end = event.displayEndDate ?? event.endDate;
-                // display*/startDate/endDate が両方欠けた entry は判定できないため除外する
+                // display*/startDate/endDate が両方欠けた timeblock は判定できないため除外する
                 // （hasLaneCounterpart 自体は非 null Date を要求する契約を維持する）。
                 if (!start || !end) return [];
                 return [{ displayStartDate: start, displayEndDate: end }];
@@ -133,7 +136,7 @@ export function useInteractionListeners({
               targetTime.start,
               targetTime.end,
             )
-          : true; // entry 不明時は安全側（変換を許容する既存挙動）に倒す
+          : true; // timeblock 不明時は安全側（変換を許容する既存挙動）に倒す
 
         const targetLane = resolveTwoLaneFromPointer(
           point.clientX,

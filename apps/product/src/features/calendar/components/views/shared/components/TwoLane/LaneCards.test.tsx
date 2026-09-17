@@ -161,7 +161,7 @@ describe('TwoLane cards', () => {
     )) {
       expect(card).toHaveClass('pointer-events-none');
       expect(card).not.toHaveAttribute('tabindex');
-      expect(card).not.toHaveAttribute('data-entry-block');
+      expect(card).not.toHaveAttribute('data-timeblock-card');
       expect(card).toHaveAttribute('aria-hidden', 'true');
     }
   });
@@ -171,7 +171,7 @@ describe('TwoLane cards', () => {
       <PlanLaneCard event={plan} position={position} activityName="Deep Work" showDayDiffMarker />,
     );
 
-    expect(container.querySelector('[data-entry-day-diff-marker]')).not.toBeNull();
+    expect(container.querySelector('[data-timeblock-day-diff-marker]')).not.toBeNull();
   });
 
   it('Compare対象のRecordカードにmarkerを表示する', () => {
@@ -184,7 +184,7 @@ describe('TwoLane cards', () => {
       />,
     );
 
-    expect(container.querySelector('[data-entry-day-diff-marker]')).not.toBeNull();
+    expect(container.querySelector('[data-timeblock-day-diff-marker]')).not.toBeNull();
   });
 
   it('Compare対象でないカードにはmarkerを表示しない', () => {
@@ -195,7 +195,7 @@ describe('TwoLane cards', () => {
       </div>,
     );
 
-    expect(container.querySelector('[data-entry-day-diff-marker]')).toBeNull();
+    expect(container.querySelector('[data-timeblock-day-diff-marker]')).toBeNull();
   });
 
   it('Recordカードは差分0のbadgeを隠し、差分がある場合も中立色で表示する', () => {
