@@ -1904,39 +1904,38 @@ ALTER TABLE public.entries DROP COLUMN IF EXISTS deleted_at;
 > **ロールバック非推奨**: pg_cronジョブ、Edge Function呼び出しが全て停止する。
 
 ```sql
--- CASCADE: 依存する関数 (get_vault_secret, vault_secret_exists, invoke_edge_function) も削除される
+-- CASCADE: 依存する関数 (vault_secret_exists) も削除される
 DROP EXTENSION IF EXISTS supabase_vault CASCADE;
 ```
 
 #### 15. `20260319000001_vault_helper_functions.sql`
 
-| 項目       | 値                                    |
-| ---------- | ------------------------------------- |
-| 内容       | get_vault_secret, vault_secret_exists |
-| リスク     | MEDIUM                                |
-| データ損失 | なし                                  |
-| 依存       | **先に #16 をロールバックすること**   |
+| 項目       | 値                                                                            |
+| ---------- | ----------------------------------------------------------------------------- |
+| 内容       | get_vault_secret（**撤去済み**）, vault_secret_exists                         |
+| リスク     | MEDIUM                                                                        |
+| データ損失 | なし                                                                          |
+| 依存       | `get_vault_secret` は `20260917050000` が撤去済み。#16 の事前 rollback は不要 |
 
 ```sql
 DROP FUNCTION IF EXISTS public.vault_secret_exists(TEXT);
-DROP FUNCTION IF EXISTS public.get_vault_secret(TEXT);
 ```
 
 #### 16. `20260319000003_vault_invoke_edge_function.sql`
 
-| 項目       | 値                       |
-| ---------- | ------------------------ |
-| 内容       | invoke_edge_function関数 |
-| リスク     | MEDIUM                   |
-| データ損失 | なし                     |
+| 項目       | 値                                       |
+| ---------- | ---------------------------------------- |
+| 内容       | invoke_edge_function関数（**撤去済み**） |
+| リスク     | —                                        |
+| データ損失 | なし                                     |
 
-```sql
--- 事前: cronジョブを確認・停止
--- SELECT * FROM cron.job WHERE command LIKE '%invoke_edge_function%';
--- SELECT cron.unschedule('check-reminders');
+`20260917050000_drop_vault_edge_invoke.sql`（[#2733](https://github.com/Dayopt/dayopt/issues/2733)）が
+`invoke_edge_function` と `get_vault_secret`、および vault secret の `service_role_key` /
+`supabase_url` を撤去した。**この migration へのロールバック手順はもう要らない。**
 
-DROP FUNCTION IF EXISTS public.invoke_edge_function(TEXT, JSONB);
-```
+撤去の根拠（#2517 の production read-only 実測）: `cron.job` は 5 本でどれも Edge も pg_net も
+呼ばず、`net._http_response` が存在しない（pg_net 自体が未導入）。TS からの `.rpc` 呼び出しも
+ゼロだった。定義を戻す必要が生じた場合は `20260319000001` / `20260319000003` を再適用する。
 
 #### 17. `20260319083000_rls_audit_fixes.sql`
 
@@ -1975,7 +1974,7 @@ DROP TABLE IF EXISTS public.stripe_webhook_events CASCADE;
 
 ```
 #17 → #13 (soft_delete)     ← #17が13のdeleted_atカラムに依存
-#16 → #15 → #14 (vault)     ← invoke_edge_function → helpers → extension
+#15 → #14 (vault)           ← vault_secret_exists → extension（#16 は撤去済みで鎖から外れた）
 #12 → #11 → #10 (stats)     ← summary → fix → kpi_functions
 ```
 
@@ -2012,12 +2011,12 @@ WHERE version = '20260319090000';  -- 該当バージョンに置き換え
 
 ### リスクサマリー
 
-| リスク     | マイグレーション                                                                   |
-| ---------- | ---------------------------------------------------------------------------------- |
-| **HIGH**   | #5 (stripe billing), #13 (soft delete), #14 (vault)                                |
-| **MEDIUM** | #4 (ical token), #9 (email suppressions), #15 (vault helpers), #16 (edge function) |
-| **LOW**    | #1-3, #6, #8, #10-12, #17-18                                                       |
-| **非推奨** | #1 (IDOR fix), #11 (auth.uid() check), #14 (vault extension)                       |
+| リスク     | マイグレーション                                                              |
+| ---------- | ----------------------------------------------------------------------------- |
+| **HIGH**   | #5 (stripe billing), #13 (soft delete), #14 (vault)                           |
+| **MEDIUM** | #4 (ical token), #9 (email suppressions), #15 (vault helpers)。#16 は撤去済み |
+| **LOW**    | #1-3, #6, #8, #10-12, #17-18                                                  |
+| **非推奨** | #1 (IDOR fix), #11 (auth.uid() check), #14 (vault extension)                  |
 
 ## 出口コスト台帳
 
