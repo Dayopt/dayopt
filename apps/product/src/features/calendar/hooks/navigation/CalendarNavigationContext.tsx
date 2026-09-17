@@ -162,6 +162,7 @@ export const CalendarNavigationProvider = ({ children }: { children: React.React
   const [restoreBrowserDate] = useState(
     () => needsBrowserDate && !parseCalendarDateParam(searchParams?.get('date') ?? null),
   );
+  const [browserDateReady, setBrowserDateReady] = useState(!restoreBrowserDate);
   const [initial] = useState(() =>
     resolveCalendarProps(
       pathname,
@@ -204,13 +205,17 @@ export const CalendarNavigationProvider = ({ children }: { children: React.React
   // timezone cookie の無い初回認証 redirect は SSR が UTC に仮置きする。
   // 最初の client render を合わせた後、明示 URL / 操作済み日付を上書きせず当日へ戻す。
   React.useEffect(() => {
-    if (!restoreBrowserDate || readDateParamFromLocation()) return;
+    if (!restoreBrowserDate) return;
+    const explicitDate = readDateParamFromLocation();
     const browserToday = new Date();
-    startTransition(() =>
-      setCurrentDate((current) =>
-        current.getTime() === initialDate.getTime() ? browserToday : current,
-      ),
-    );
+    startTransition(() => {
+      if (!explicitDate) {
+        setCurrentDate((current) =>
+          current.getTime() === initialDate.getTime() ? browserToday : current,
+        );
+      }
+      setBrowserDateReady(true);
+    });
   }, [restoreBrowserDate, initialDate, startTransition]);
 
   // ref同期 + グローバルストア同期（1つのeffectに統合）
@@ -267,14 +272,19 @@ export const CalendarNavigationProvider = ({ children }: { children: React.React
   // モバイルで未対応のビュー（day 以外）が設定された場合、dayへ切替
   // （URL直アクセスやブラウザ戻る/進むで week〜7day の URL に遷移した場合のガード）
   React.useEffect(() => {
-    if (isCalendarPage && isMobile && !isMobileCalendarViewSupported(viewType)) {
+    if (
+      browserDateReady &&
+      isCalendarPage &&
+      isMobile &&
+      !isMobileCalendarViewSupported(viewType)
+    ) {
       startTransition(() => {
         setViewType('day');
       });
       // URLもday viewに更新
       writeWorkspaceUrl('day', currentDateRef.current, 'replace');
     }
-  }, [isCalendarPage, isMobile, viewType, writeWorkspaceUrl]);
+  }, [browserDateReady, isCalendarPage, isMobile, viewType, writeWorkspaceUrl]);
 
   // URL に view= が明示されていたら viewType を同期する
   // （ブラウザ戻る/進む、直接URL入力時）。

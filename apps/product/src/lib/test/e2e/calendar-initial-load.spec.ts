@@ -202,5 +202,29 @@ for (const { timezone, offset } of CASES) {
       await expect(seededCard).toHaveCount(0);
       expect(hydrationErrors).toEqual([]);
     });
+
+    test('cookie未設定の初回は表示日とmobile URLが当日で揃う @mobile', async ({ page }) => {
+      const hydrationErrors: string[] = [];
+      page.on('pageerror', (error) => hydrationErrors.push(error.message));
+      await suppressConsentBanner(page);
+      const { data, error } = await adminSupabase.auth.admin.generateLink({
+        type: 'magiclink',
+        email,
+      });
+      if (error || !data.properties?.hashed_token) throw new Error('magic link failed');
+      await page.goto(
+        `/ja/auth/confirm?token_hash=${encodeURIComponent(data.properties.hashed_token)}&type=magiclink&next=%2Fja%2Fcalendar`,
+      );
+      await page.waitForURL(/\/ja\/calendar/);
+      await page.waitForLoadState('networkidle');
+      const today = new Intl.DateTimeFormat('en-CA', { timeZone: timezone }).format(new Date());
+      await expect(page.locator('a[aria-label="レポートを開く"]').first()).toHaveAttribute(
+        'href',
+        `/ja/report?date=${today}`,
+      );
+      expect(new URL(page.url()).searchParams.get('date')).toBe(today);
+      expect(new URL(page.url()).searchParams.get('view')).toBe('day');
+      expect(hydrationErrors).toEqual([]);
+    });
   });
 }

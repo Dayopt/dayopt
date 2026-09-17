@@ -399,3 +399,27 @@ it.each([undefined, '2026-04-22'])(
     }
   },
 );
+
+it('初回モバイルのday切替は補正後の日付をURLへ書く', () => {
+  vi.useFakeTimers();
+  vi.setSystemTime(new Date('2026-09-18T08:00:00Z'));
+  mockUseMediaQuery.mockReturnValue(true);
+  mockPathname = '/ja/calendar';
+  mockSearchParams = new URLSearchParams();
+  window.history.replaceState(null, '', '/ja/calendar');
+  try {
+    render(
+      <InitialCalendarDateProvider dateKey="2026-09-17" needsBrowserDate>
+        <CalendarNavigationProvider>
+          <TestConsumer />
+        </CalendarNavigationProvider>
+      </InitialCalendarDateProvider>,
+    );
+    expect(screen.getByTestId('date')).toHaveTextContent('2026-09-18');
+    expect(new URLSearchParams(window.location.search).get('date')).toBe('2026-09-18');
+    expect(new URLSearchParams(window.location.search).get('view')).toBe('day');
+  } finally {
+    mockUseMediaQuery.mockReturnValue(false);
+    vi.useRealTimers();
+  }
+});
