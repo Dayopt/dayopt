@@ -9,20 +9,11 @@ function deny(message) {
   return { decision: 'block', message: `BLOCKED: ${message}` };
 }
 
-// Native delegation は read-only sandbox / repository scope を tool input から証明できない。
-// 明示された read-only delegation だけをここで拒否し、User が明示した write/browser task
-// まで一律に塞がない。read-only task は runtime scope を実測できる経路がないため親担当が行う。
+// Native delegation の実際の tool input（task_name / message / fork_turns）には
+// read-only と write/browser を区別する機械的な型がない。判別不能な呼び出しは
+// read-only worker の scope を prompt だけで広げるため拒否する。write/browser は
+// runtime が別名の typed tool を提供した時だけ、下の allowlist を拡張して通す。
 const NATIVE_DELEGATION_TOOLS = new Set(['spawn_agent', 'collaboration.spawn_agent']);
-
-function isExplicitReadOnlyDelegation(input) {
-  return (
-    input.readOnly === true ||
-    input.read_only === true ||
-    ['read-only', 'readonly'].includes(input.mode) ||
-    ['read-only', 'readonly'].includes(input.delegationType) ||
-    ['read-only', 'readonly'].includes(input.delegation_type)
-  );
-}
 
 /** Extract every touched path, including both sides of a rename, before evaluating any. */
 export function parsePatch(command) {
@@ -101,9 +92,9 @@ export async function evaluateCodex(rawInput, options = {}) {
   if (typeof suppliedCwd !== 'string' || !isAbsolute(suppliedCwd))
     return deny('cwd を確認できません');
   const cwd = realpathSync(suppliedCwd);
-  if (NATIVE_DELEGATION_TOOLS.has(tool) && isExplicitReadOnlyDelegation(input))
+  if (NATIVE_DELEGATION_TOOLS.has(tool))
     return deny(
-      'native の read-only delegation は read-only と repository scope の実行境界を証明できないため禁止です（親担当が調査してください）',
+      'native delegation は read-only / write を機械的に区別できず、repository scope の実行境界も証明できないため禁止です（親担当が調査してください）',
     );
   const { evaluate } = await import('./pre-tool-guard-rules.mjs');
   const check = (name, args) =>
