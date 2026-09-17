@@ -39,9 +39,14 @@ describe('trusted validation plan', () => {
     expect(plan([file]).review.status).toBe('required');
   });
   it('does not confuse policy review with app build', () => {
+    // 元の assertion は `scripts` も required に固定していたが、producer の `📦 Unit Tests` は
+    // ci.yml が docs-only で skip するため満たされず、恒久 blocked になっていた（#2821）。
+    // policy 文書に求めるのは review と static の 2 つで、app build は要らない、が本来の意図。
     const result = plan(['AGENTS.md']);
     expect(result.required.productPreview.status).toBe('not-applicable');
-    expect(result.required.scripts.status).toBe('required');
+    expect(result.required.static.status).toBe('required');
+    expect(result.review.status).toBe('required');
+    expect(result.review.protected).toBe(true);
   });
   it('unions README and RLS requirements, including independent migration paths', () => {
     const result = plan(['README.md', 'supabase/migrations/20260916000000_rls.sql']);
@@ -96,6 +101,29 @@ describe('trusted validation plan', () => {
       expect(plan([file]).required.integration.status).toBe('required');
     },
   );
+  it.each([
+    'AGENTS.md',
+    '.agents/skills/test/SKILL.md',
+    'docs/operations/tooling.md',
+    'docs/engineering/data/architecture/model.c4',
+  ])('does not require the scripts suite for documentation-only changes: %s', (file) => {
+    // producer は `📦 Unit Tests` で、ci.yml は `needs.impact.outputs.docs_only == 'true'` で
+    // これを skip する。plan が required にすると起動しない job を待って恒久 blocked になる
+    // （#2821、PR #2819 で実発生）
+    const result = plan([file]);
+    expect(result.required.scripts.status).toBe('not-applicable');
+    expect(result.required.static.status).toBe('required');
+    expect(result.review.status).toBe('required');
+  });
+  it.each([
+    'scripts/ci/impact.mjs',
+    '.github/workflows/ci.yml',
+    '.claude/settings.json',
+    '.codex/hooks.json',
+    'apps/product/src/a.ts',
+  ])('keeps the scripts suite required when behavior can change: %s', (file) => {
+    expect(plan([file]).required.scripts.status).toBe('required');
+  });
   it('requires broad validation for unknown paths', () => {
     const result = plan(['new-root/file']);
     expect(Object.values(result.required).every((rule) => rule.status === 'required')).toBe(true);

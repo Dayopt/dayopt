@@ -104,7 +104,16 @@ export function createValidationPlan(input, options = {}) {
   });
   const required = {
     static: suite(true, 'Every change requires static integrity checks'),
-    scripts: suite(!proseOnly, 'Executable code and policy need script contract tests'),
+    // producer は `📦 Unit Tests`。ci.yml は docs-only の diff でこれを skip するので、
+    // 文書だけの変更で required にすると**起動しない job を待って恒久 blocked になる**
+    // （#2821。`README.md` / `LICENSE` 以外の Markdown は proseOnly にならないため、
+    // AGENTS.md・skill・docs の更新が全部これに当たっていた）。`impact.docsOnly` は
+    // 実行可能なポリシー（`scripts/**`、`.github/workflows/**`、`.claude/settings.json`、
+    // `.codex/hooks.json`）を false にするので、挙動を変えうる変更では required のまま残る。
+    scripts: suite(
+      !proseOnly && !impact.docsOnly,
+      'Executable code and policy need script contract tests',
+    ),
     productUnit: suite(
       impact.productUnit || unknown,
       impact.reasons.productUnit ?? 'Workspace impact',
