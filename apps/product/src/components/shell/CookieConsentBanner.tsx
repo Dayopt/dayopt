@@ -4,6 +4,10 @@ import { useEffect, useState } from 'react';
 
 import { acceptAllCookies, acceptNecessaryOnly, needsCookieConsent } from '@/lib/cookie-consent';
 import { createDayoptUrl, dayoptUrls } from '@dayopt/config';
+import {
+  BROWSER_TELEMETRY_CONSENT_EVENT,
+  isBrowserTelemetryConsentStorageChange,
+} from '@dayopt/observability';
 import { useLocale, useTranslations } from 'next-intl';
 import { usePathname } from 'next/navigation';
 
@@ -43,14 +47,32 @@ export function CookieConsentBanner() {
       }
     };
 
+    // 設定（データ設定の分析同意セクション）や別タブで選択が確定したら、
+    // 同じ質問を繰り返さないようバナーを閉じる。逆に未選択へ戻れば再び出す。
+    const syncWithStoredConsent = () => setShowBanner(needsCookieConsent());
+    const handleStorage = (event: StorageEvent) => {
+      if (!isBrowserTelemetryConsentStorageChange(event.key)) return;
+      syncWithStoredConsent();
+    };
+
+    window.addEventListener(BROWSER_TELEMETRY_CONSENT_EVENT, syncWithStoredConsent);
+    window.addEventListener('storage', handleStorage);
+
+    let cancelInitialCheck: () => void;
     if ('requestIdleCallback' in window) {
       const handle = requestIdleCallback(checkConsent, { timeout: 2000 });
-      return () => cancelIdleCallback(handle);
+      cancelInitialCheck = () => cancelIdleCallback(handle);
     } else {
       // フォールバック: 1秒後にチェック
       const timer = setTimeout(checkConsent, 1000);
-      return () => clearTimeout(timer);
+      cancelInitialCheck = () => clearTimeout(timer);
     }
+
+    return () => {
+      cancelInitialCheck();
+      window.removeEventListener(BROWSER_TELEMETRY_CONSENT_EVENT, syncWithStoredConsent);
+      window.removeEventListener('storage', handleStorage);
+    };
   }, [isAuthPage]);
 
   const handleAcceptAll = () => {
