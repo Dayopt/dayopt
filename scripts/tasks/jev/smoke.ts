@@ -23,6 +23,7 @@ import {
   JEV_MODEL_ID,
   JEV_SCHEMA_VERSION,
   evaluateWithJev,
+  isExpectedJevModelId,
   type JevAnnotation,
 } from '../../lib/jev-adapter.ts';
 import { JEV_SMOKE_CASES } from '../../lib/jev-smoke-cases.ts';
@@ -165,15 +166,22 @@ async function run(): Promise<number> {
     }
   }
 
-  // 実モデル ID の確認は Phase 0 の目的そのもの。evaluated だけを成功条件にすると、
-  // SDK や Gateway の変更で modelId が欠落・変化しても素通りする。
+  // Phase 0 の目的は「評価が返ること」だけではなく、**実モデル ID と実費を確認できること**。
+  // evaluated だけを成功条件にすると、SDK や Gateway の変更で modelId が欠落しても、
+  // cost が取れなくなっても、目的を達成したことにしてしまう。
+  const shortfalls = results.flatMap((item) => {
+    if (item.annotation.status !== 'evaluated') return [];
+    const reasons: string[] = [];
+    if (!isExpectedJevModelId(item.annotation.resolvedModelId))
+      reasons.push(`応答のモデルが Jev でない: ${item.annotation.resolvedModelId ?? '(無し)'}`);
+    if (item.annotation.costUsd === null) reasons.push('実費を取得できていない');
+    return reasons.map((reason) => ({ id: item.id, reason }));
+  });
   const succeeded = results.filter(
     (item) =>
-      item.annotation.status === 'evaluated' && item.annotation.resolvedModelId === JEV_MODEL_ID,
-  );
-  const wrongModel = results.filter(
-    (item) =>
-      item.annotation.status === 'evaluated' && item.annotation.resolvedModelId !== JEV_MODEL_ID,
+      item.annotation.status === 'evaluated' &&
+      isExpectedJevModelId(item.annotation.resolvedModelId) &&
+      item.annotation.costUsd !== null,
   );
 
   if (asJson) {
@@ -186,12 +194,9 @@ async function run(): Promise<number> {
     );
   } else {
     console.log(
-      `${succeeded.length} / ${results.length} 件が evaluated（実モデル ID の一致を含む）`,
+      `${succeeded.length} / ${results.length} 件が evaluated（実モデル ID と実費の取得を含む）`,
     );
-    for (const item of wrongModel)
-      console.error(
-        `[${item.id}] 応答のモデルが ${JEV_MODEL_ID} でない: ${item.annotation.resolvedModelId ?? '(無し)'}`,
-      );
+    for (const item of shortfalls) console.error(`[${item.id}] ${item.reason}`);
   }
 
   return succeeded.length === cases.length ? 0 : 1;

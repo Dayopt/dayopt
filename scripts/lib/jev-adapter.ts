@@ -340,6 +340,42 @@ export function readTypesafeConfidence(
   return result;
 }
 
+/**
+ * score が分布の確率加重平均と一致するか。
+ *
+ * 許容誤差は丸めから導く。provider が各確率を小数 d 桁へ丸めると 1 つあたり
+ * 最大 0.5 * 10^-d ずれ、加重平均ではそれが段の index 分だけ積み上がる
+ * （合計 0.5 * 10^-d * n(n-1)/2）。d は応答の `rounding` で変わりうるので
+ * 保守的に 2 桁と仮定し、score 自身の丸め分を足す。固定値にすると段数の多い
+ * rubric で正常な応答を落とす。
+ */
+function scoreMatchesDistribution(
+  score: number,
+  probabilities: Record<string, number>,
+  question: Extract<JevQuestion, { type: 'score' }>,
+): boolean {
+  const levels = question.criteria.length;
+  const weighted = Object.entries(probabilities).reduce(
+    (sum, [key, value]) => sum + Number(key) * value,
+    0,
+  );
+  const tolerance = 0.005 * ((levels * (levels - 1)) / 2) + 0.01;
+  return Math.abs(score - weighted) <= tolerance;
+}
+
+/**
+ * smoke や呼び出し側が「Jev が応答したか」を判定するための述語。
+ *
+ * 2026-09-18 の実測では Gateway 経由の `response.modelId` は要求した alias
+ * （`typesafe-ai/jev`）のまま返り、TypeSafe 直 API の `jev-1.13.0` のような版は
+ * 付かなかった。ただし Gateway が将来 version 付きを返す可能性はあるので、
+ * alias と `alias-<version>` の両方を受理する。別モデルは受理しない。
+ */
+export function isExpectedJevModelId(modelId: string | null): boolean {
+  if (modelId === null) return false;
+  return modelId === JEV_MODEL_ID || modelId.startsWith(`${JEV_MODEL_ID}-`);
+}
+
 function topProbabilityOf(probabilities: Record<string, number> | null): number | null {
   if (!probabilities) return null;
   const values = Object.values(probabilities);
@@ -431,6 +467,12 @@ export function normalizeJevAnswer(
   const levelKeys = new Set(question.criteria.map((_, index) => String(index)));
   const probabilities = readProbabilities(record, levelKeys);
   if (!probabilities.ok) return null;
+  // choice の argmax と同じ性質を score にも要求する。回答値が分布と食い違う応答は
+  // どちらの型でも採用しない。score は分布の確率加重平均と定義されているので、
+  // それを再計算して照合する（`score: 0` と `{2: 1}` のような相反は下流で
+  // 「score 0 かつ topProbability 1」という読みようのない注釈になる）。
+  if (probabilities.value && !scoreMatchesDistribution(score, probabilities.value, question))
+    return null;
   return {
     type: 'score',
     score,

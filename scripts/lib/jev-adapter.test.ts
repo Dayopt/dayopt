@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   classifyJevError,
   evaluateWithJev,
+  isExpectedJevModelId,
   jevCacheKey,
   jevInputBytes,
   normalizeJevAnswer,
@@ -67,7 +68,8 @@ function runnerWith(
       return {
         answers: overrides.answers ?? okAnswers,
         usage: { inputTokens: 283, outputTokens: 21 },
-        response: { modelId: 'typesafe-ai/jev-1.13.0' },
+        // 2026-09-18 の実測では Gateway は alias をそのまま返す（version は付かない）
+        response: { modelId: 'typesafe-ai/jev' },
         providerMetadata: {
           typesafe: { confidence: { lane: 0.52, evidence: 1 } },
           gateway: { generationId: 'gen_test', cost: '0.000013524' },
@@ -101,7 +103,7 @@ describe('Jev adapter の正常系', () => {
 
     expect(annotation.status).toBe('evaluated');
     expect(annotation.reasonCode).toBe('ok');
-    expect(annotation.resolvedModelId).toBe('typesafe-ai/jev-1.13.0');
+    expect(annotation.resolvedModelId).toBe('typesafe-ai/jev');
     expect(annotation.usage).toEqual({ inputTokens: 283, outputTokens: 21 });
     // confidence は provider 由来、topProbability はこちらの導出。2026-09-18 の
     // smoke で両者は実際にずれたので、同じ値に丸めない。
@@ -307,6 +309,18 @@ describe('残高取得の失敗を予算問題へ潰さない', () => {
     const annotation = await run({ runner });
     expect(annotation.status).toBe('evaluated');
     expect(annotation.credits.after).toBeNull();
+  });
+});
+
+describe('Jev の応答かどうかの判定', () => {
+  it.each([
+    ['実測どおりの alias', 'typesafe-ai/jev', true],
+    ['version 付き（将来 Gateway が返す可能性）', 'typesafe-ai/jev-1.13.0', true],
+    ['別モデル', 'openai/gpt-5.6-sol', false],
+    ['前方一致だが別モデル', 'typesafe-ai/jevx', false],
+    ['欠落', null, false],
+  ])('%s → %s', (_label, modelId, expected) => {
+    expect(isExpectedJevModelId(modelId as string | null)).toBe(expected);
   });
 });
 
@@ -516,6 +530,28 @@ describe('分布はあるなら完全で整合していることを要求する'
         probabilities: { routine: 0.32, standard: 0.67, frontier: 0 },
       }),
     ).toMatchObject({ choice: 'standard', topProbability: 0.67 });
+  });
+
+  it('score が分布の加重平均と食い違えば採用しない', () => {
+    // score 0 と topProbability 1 が同時に下流へ渡る形。choice の argmax と同じ性質
+    expect(
+      normalizeJevAnswer(questions.evidence, {
+        type: 'score',
+        score: 0,
+        probabilities: { '0': 0, '1': 0, '2': 1 },
+      }),
+    ).toBeNull();
+  });
+
+  it('丸めの範囲なら score と分布のずれを許容する', () => {
+    // 加重平均 2.98 に対し score 2.97（provider が桁を丸めた形）
+    expect(
+      normalizeJevAnswer(questions.evidence, {
+        type: 'score',
+        score: 1.97,
+        probabilities: { '0': 0, '1': 0.02, '2': 0.98 },
+      }),
+    ).toMatchObject({ type: 'score', score: 1.97 });
   });
 
   it('score も段が欠けていれば採用しない', () => {
