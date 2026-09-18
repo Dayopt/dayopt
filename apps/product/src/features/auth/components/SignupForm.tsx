@@ -283,7 +283,17 @@ export function SignupForm({ className, ...props }: React.ComponentProps<'div'>)
               </Field>
 
               {turnstile.enabled && (
-                <Field>
+                <Field
+                  /*
+                   * `appearance: 'interaction-only'` の widget は普段 高さ 0 になるが、
+                   * FieldGroup の `gap-6` は残るので空の段が空く。対話も到達不能の案内も
+                   * 出ていない間だけ、その gap を打ち消す。
+                   *
+                   * 打ち消しに失敗しても widget は出たままで、前の Field と詰まって
+                   * 見えるだけ。利用者が challenge を見られなくなる方向へは倒れない。
+                   */
+                  className={turnstile.interactive || turnstile.unavailable ? undefined : '-mt-6'}
+                >
                   <div className="flex justify-center">
                     <Turnstile
                       key={turnstile.widgetKey}
@@ -292,6 +302,7 @@ export function SignupForm({ className, ...props }: React.ComponentProps<'div'>)
                       onError={turnstile.onError}
                       onExpire={turnstile.onExpire}
                       onUnsupported={turnstile.onUnsupported}
+                      onBeforeInteractive={turnstile.onBeforeInteractive}
                       locale={turnstileLocale}
                     />
                   </div>

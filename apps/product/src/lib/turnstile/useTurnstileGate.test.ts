@@ -139,6 +139,34 @@ describe('useTurnstileGate', () => {
     expect(result.current.unavailable).toBe(false);
   });
 
+  // `appearance: 'interaction-only'` の widget は普段 高さ 0 で、対話を求められた時だけ
+  // 場所を取る。余白の出し分けにだけ使う信号なので、送信可否は変えない。
+  it('対話を求められたら interactive になるが、送信可否は変わらない', () => {
+    const { result } = renderHook(() => useTurnstileGate());
+
+    expect(result.current.interactive).toBe(false);
+
+    act(() => result.current.onBeforeInteractive());
+
+    expect(result.current.interactive).toBe(true);
+    expect(result.current.blocksSubmit).toBe(true);
+    expect(result.current.unavailable).toBe(false);
+  });
+
+  // 解いた直後に畳むと余白が跳ねる。widget を作り直す時まで保持する。
+  it('token が来ても interactive は維持し、reset で戻す', () => {
+    const { result } = renderHook(() => useTurnstileGate());
+
+    act(() => result.current.onBeforeInteractive());
+    act(() => result.current.onSuccess('token-a'));
+
+    expect(result.current.interactive).toBe(true);
+
+    act(() => result.current.reset());
+
+    expect(result.current.interactive).toBe(false);
+  });
+
   it('site key が無い環境では送信を止めない', () => {
     config.enabled = false;
     const { result } = renderHook(() => useTurnstileGate());
