@@ -12,6 +12,7 @@ function renderWithProviders(ui: React.ReactElement) {
 // モックの設定
 const mockPush = vi.fn();
 const mockSignIn = vi.fn();
+const mockResendConfirmation = vi.fn();
 
 // MFAモックの状態を管理（テストごとに変更可能）
 const mockMfaGetAAL = vi.fn();
@@ -40,8 +41,12 @@ vi.mock('@dayopt/i18n/navigation', async () => {
 });
 
 vi.mock('@/features/auth/stores/useAuthStore', () => ({
-  useAuthStore: (selector: (state: { signIn: typeof mockSignIn }) => typeof mockSignIn) =>
-    selector({ signIn: mockSignIn }),
+  useAuthStore: (
+    selector: (state: {
+      signIn: typeof mockSignIn;
+      resendConfirmation: typeof mockResendConfirmation;
+    }) => unknown,
+  ) => selector({ signIn: mockSignIn, resendConfirmation: mockResendConfirmation }),
 }));
 
 vi.mock('@/lib/supabase/client', () => ({
@@ -329,5 +334,111 @@ describe('LoginForm', () => {
         expect(mockPush).toHaveBeenCalledWith('/ja/calendar');
       });
     });
+  });
+});
+
+// ログインの失敗は OWASP に従って 1 つのキーへ丸めるので、「メールの確認がまだ」だと
+// 利用者は文言から知れない。再送の導線が無いと、確認リンクを踏んでいない人は詰む。
+describe('LoginForm の確認メール再送', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockMfaGetAAL.mockResolvedValue({
+      data: { currentLevel: 'aal1', nextLevel: 'aal1' },
+      error: null,
+    });
+    mockResendConfirmation.mockResolvedValue({ error: null });
+  });
+
+  async function submitFailingLogin() {
+    const user = userEvent.setup();
+    renderWithProviders(<LoginForm />);
+    await user.type(screen.getByLabelText(/auth\.loginForm\.email/), 'user@example.com');
+    await user.type(screen.getByLabelText(/auth\.loginForm\.password/), 'Passw0rd!23');
+    await user.click(screen.getByRole('button', { name: 'auth.loginForm.loginButton' }));
+    return user;
+  }
+
+  it('ログイン成功時は再送の導線を出さない', async () => {
+    mockSignIn.mockResolvedValue({ data: { user: { id: 'u1' } }, error: null });
+    const user = userEvent.setup();
+    renderWithProviders(<LoginForm />);
+
+    await user.type(screen.getByLabelText(/auth\.loginForm\.email/), 'user@example.com');
+    await user.type(screen.getByLabelText(/auth\.loginForm\.password/), 'Passw0rd!23');
+    await user.click(screen.getByRole('button', { name: 'auth.loginForm.loginButton' }));
+
+    await waitFor(() => expect(mockSignIn).toHaveBeenCalled());
+    expect(
+      screen.queryByRole('button', { name: 'auth.loginForm.resendConfirmation' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('ログイン失敗時に再送の導線を出す', async () => {
+    mockSignIn.mockResolvedValue({
+      data: null,
+      error: { message: 'Invalid login credentials', code: 'invalid_credentials' },
+    });
+    await submitFailingLogin();
+
+    await waitFor(() =>
+      expect(
+        screen.getByRole('button', { name: 'auth.loginForm.resendConfirmation' }),
+      ).toBeInTheDocument(),
+    );
+  });
+
+  it('再送は直前に試したアドレスを宛先にする', async () => {
+    mockSignIn.mockResolvedValue({
+      data: null,
+      error: { message: 'Invalid login credentials', code: 'invalid_credentials' },
+    });
+    const user = await submitFailingLogin();
+
+    const resendButton = await screen.findByRole('button', {
+      name: 'auth.loginForm.resendConfirmation',
+    });
+    await user.click(resendButton);
+
+    await waitFor(() => expect(mockResendConfirmation).toHaveBeenCalledWith('user@example.com'));
+  });
+
+  // 結果で表示を変えると「再送できた = 未確認の登録済み」という存在確認になる
+  it('未登録でも確認済みでも同じ文言を出す', async () => {
+    mockSignIn.mockResolvedValue({
+      data: null,
+      error: { message: 'Invalid login credentials', code: 'invalid_credentials' },
+    });
+    mockResendConfirmation.mockResolvedValue({
+      error: { message: 'User already confirmed', code: 'email_exists' },
+    });
+    const user = await submitFailingLogin();
+
+    await user.click(
+      await screen.findByRole('button', { name: 'auth.loginForm.resendConfirmation' }),
+    );
+
+    await waitFor(() =>
+      expect(screen.getByText('auth.loginForm.confirmationResent')).toBeInTheDocument(),
+    );
+  });
+
+  it('captcha 失敗だけは伝えて再送し直せるようにする', async () => {
+    mockSignIn.mockResolvedValue({
+      data: null,
+      error: { message: 'Invalid login credentials', code: 'invalid_credentials' },
+    });
+    mockResendConfirmation.mockResolvedValue({
+      error: { message: 'captcha protection: request disallowed', code: 'captcha_failed' },
+    });
+    const user = await submitFailingLogin();
+
+    await user.click(
+      await screen.findByRole('button', { name: 'auth.loginForm.resendConfirmation' }),
+    );
+
+    await waitFor(() =>
+      expect(screen.getByText(/auth\.errors\.captchaFailed/)).toBeInTheDocument(),
+    );
+    expect(screen.queryByText('auth.loginForm.confirmationResent')).not.toBeInTheDocument();
   });
 });

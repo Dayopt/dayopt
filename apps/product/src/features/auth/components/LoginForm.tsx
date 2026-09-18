@@ -52,6 +52,7 @@ export function LoginForm({ className, ...props }: React.ComponentProps<'div'>) 
   const locale = (params?.locale as string) || 'ja';
   const t = useTranslations();
   const signIn = useAuthStore((state) => state.signIn);
+  const resendConfirmation = useAuthStore((state) => state.resendConfirmation);
   const signInWithOAuth = useAuthStore((state) => state.signInWithOAuth);
   const redirectPath = getSafeRedirectPath(searchParams?.get('redirect'));
 
@@ -70,6 +71,9 @@ export function LoginForm({ className, ...props }: React.ComponentProps<'div'>) 
 
   const [showPassword, setShowPassword] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  // 直前に試したアドレス。確認メールの再送はこれを宛先にする
+  const [attemptedEmail, setAttemptedEmail] = useState<string | null>(null);
+  const [resendState, setResendState] = useState<'idle' | 'sending' | 'sent'>('idle');
   const turnstile = useTurnstileGate();
   const turnstileLocale: 'ja' | 'en' | 'auto' =
     locale === 'ja' ? 'ja' : locale === 'en' ? 'en' : 'auto';
@@ -103,6 +107,35 @@ export function LoginForm({ className, ...props }: React.ComponentProps<'div'>) 
     },
   });
 
+  /**
+   * 確認メールの再送。
+   *
+   * ログインの失敗は OWASP に従って 1 つのキーへ丸めるため、「メールの確認がまだ」
+   * という状態を利用者は文言から知れない（`lib/auth-error.ts`）。丸めたままにすると、
+   * 確認リンクを踏んでいない人は原因も出口も分からず詰む。
+   *
+   * **結果で表示を変えない。** 未登録でも確認済みでも未確認でも同じ文言を出す。
+   * 変えると「再送できた = 未確認の登録済み」という存在確認になる。captcha 失敗だけは
+   * 本人が解き直せば解決するので伝える。
+   */
+  const handleResendConfirmation = async () => {
+    if (!attemptedEmail) return;
+
+    setResendState('sending');
+    const { error } = turnstile.token
+      ? await resendConfirmation(attemptedEmail, { captchaToken: turnstile.token })
+      : await resendConfirmation(attemptedEmail);
+    turnstile.reset();
+
+    if (error?.code === 'captcha_failed') {
+      setSubmitError(t('auth.errors.captchaFailed'));
+      setResendState('idle');
+      return;
+    }
+
+    setResendState('sent');
+  };
+
   const onSubmit = async (data: LoginFormData) => {
     setSubmitError(null);
 
@@ -119,6 +152,8 @@ export function LoginForm({ className, ...props }: React.ComponentProps<'div'>) 
           'login',
         );
         setSubmitError(t(errorKey));
+        setAttemptedEmail(data.email);
+        setResendState('idle');
         // Turnstile token は single-use / short-lived。失敗時は widget を reset して
         // 次の retry で新しい challenge token を取得させる
         turnstile.reset();
@@ -182,6 +217,29 @@ export function LoginForm({ className, ...props }: React.ComponentProps<'div'>) 
                 <FieldError announceImmediately className="text-center">
                   {serverError}
                 </FieldError>
+              )}
+
+              {submitError && attemptedEmail && (
+                <FieldDescription className="text-center" data-slot="resend-confirmation">
+                  {resendState === 'sent' ? (
+                    t('auth.loginForm.confirmationResent')
+                  ) : (
+                    <>
+                      {t('auth.loginForm.resendConfirmationHint')}{' '}
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-auto p-0"
+                        loading={resendState === 'sending'}
+                        disabled={turnstile.blocksSubmit}
+                        onClick={handleResendConfirmation}
+                      >
+                        {t('auth.loginForm.resendConfirmation')}
+                      </Button>
+                    </>
+                  )}
+                </FieldDescription>
               )}
 
               <Field>
