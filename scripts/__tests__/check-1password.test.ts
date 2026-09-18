@@ -64,6 +64,8 @@ function createFakeOpDirectory(): string {
 
 interface CheckOptions {
   emptyField?: string;
+  /** fixture から丸ごと取り除く field。EMPTY ではなく MISSING_FIELD の経路を通す */
+  omitField?: string;
   missingItem?: string;
   mode?: 'error' | 'invalid-json';
   /** true にすると agent/supabase と human/resend-send が禁止 field を持ったまま残っている状態を再現する */
@@ -111,9 +113,12 @@ function runCheck(options: CheckOptions = {}) {
       .filter((entry) => entry.vault === 'agent' && entry.item === 'supabase')
       .map((entry) => entry.field),
   );
+  const presentFields = options.omitField
+    ? fields.filter((field) => field.id !== options.omitField)
+    : fields;
   const stagingSupabaseFields = options.leakForbidden
-    ? fields
-    : fields.filter((field) => !forbiddenNames.has(field.id));
+    ? presentFields
+    : presentFields.filter((field) => !forbiddenNames.has(field.id));
   // human/resend-send も webhook secret の複製を持たない（是正済みの状態）
   const resendSendForbidden = new Set(
     forbiddenFields
@@ -121,15 +126,15 @@ function runCheck(options: CheckOptions = {}) {
       .map((entry) => entry.field),
   );
   const resendSendFields = options.leakForbidden
-    ? fields
-    : fields.filter((field) => !resendSendForbidden.has(field.id));
+    ? presentFields
+    : presentFields.filter((field) => !resendSendForbidden.has(field.id));
 
   return spawnSync('pnpm', ['exec', 'tsx', 'scripts/tasks/env/check-1password.ts'], {
     cwd: rootDir,
     encoding: 'utf8',
     env: {
       ...process.env,
-      FAKE_OP_ITEM_JSON: JSON.stringify({ fields }),
+      FAKE_OP_ITEM_JSON: JSON.stringify({ fields: presentFields }),
       FAKE_OP_MISSING_ITEM: options.missingItem ?? '',
       FAKE_OP_MISSING_VAULT: options.missingVault ?? '',
       FAKE_OP_MODE: options.mode ?? '',
@@ -184,14 +189,34 @@ describe('check-1password.ts', () => {
     expect(result.status).toBe(1);
   });
 
-  it('operational item の必須 field が欠けていれば失敗する', () => {
+  it('operational item の必須 field が実在しなければ失敗する', () => {
     const declared = operationalItems.find((item) => item.requiredFields?.length);
     expect(declared, 'requiredFields を宣言した operational item が無い').toBeDefined();
+    const field = declared?.requiredFields?.[0] ?? '';
+
+    // 空値ではなく field ごと取り除く。getField の欠落検出が壊れた回帰を捕まえる
+    const result = runCheck({ omitField: field });
+
+    expect(result.stdout).toContain(
+      `${declared?.vault} / ${declared?.item} / ${field}: MISSING_FIELD`,
+    );
+    expect(result.status).toBe(1);
+  });
+
+  it('operational item の必須 field が空でも失敗する', () => {
+    const declared = operationalItems.find((item) => item.requiredFields?.length);
     const field = declared?.requiredFields?.[0] ?? '';
 
     const result = runCheck({ emptyField: field });
 
     expect(result.stdout).toContain(`${declared?.vault} / ${declared?.item} / ${field}: EMPTY`);
+    expect(result.status).toBe(1);
+  });
+
+  it.each(['2026-02-30', '2026-13-01'])('正規化される不正な日付 %s は期限として認めない', (raw) => {
+    const result = runCheck({ expiry: { label: '有効期限', value: raw } });
+
+    expect(result.stdout).toContain('EXPIRY_UNREADABLE');
     expect(result.status).toBe(1);
   });
 

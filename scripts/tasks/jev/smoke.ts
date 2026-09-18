@@ -36,7 +36,11 @@ function argValue(flag: string): ArgResult {
   if (index < 0) return { status: 'absent' };
   const value = process.argv[index + 1];
   if (value === undefined || value.startsWith('-')) return { status: 'missing-value' };
-  return { status: 'ok', value };
+  // `--delay "$JEV_DELAY"` の env が未設定だと空文字が渡る。`Number('')` は 0 なので、
+  // そのまま通すと安全間隔が黙って無効になる（実測で 3 件目が 429 になる条件）。
+  const trimmed = value.trim();
+  if (trimmed === '') return { status: 'missing-value' };
+  return { status: 'ok', value: trimmed };
 }
 
 const DEFAULT_DELAY_MS = 6_000;
@@ -74,14 +78,8 @@ function describe(annotation: JevAnnotation): string[] {
 }
 
 async function run(): Promise<number> {
-  if (!process.env.AI_GATEWAY_API_KEY) {
-    console.error('AI_GATEWAY_API_KEY が無い。op run で注入して実行する:');
-    console.error(
-      '  AI_GATEWAY_API_KEY="op://agent/vercel-ai-gateway/credential" op run -- pnpm jev:smoke',
-    );
-    return 1;
-  }
-
+  // 引数の検証を credential より先に行う。使い方の誤りは認証の有無と無関係で、
+  // ここで落とせば外部呼び出しも課金も起きない。
   const only = argValue('--case');
   if (only.status === 'missing-value') {
     console.error('--case に値がない。ケース名を渡すか、flag ごと外して全件実行する');
@@ -105,6 +103,14 @@ async function run(): Promise<number> {
   const delayMs = delayArg.status === 'ok' ? Number(delayArg.value) : DEFAULT_DELAY_MS;
   if (!Number.isFinite(delayMs) || delayMs < 0) {
     console.error('--delay は 0 以上のミリ秒で指定する');
+    return 1;
+  }
+
+  if (!process.env.AI_GATEWAY_API_KEY) {
+    console.error('AI_GATEWAY_API_KEY が無い。op run で注入して実行する:');
+    console.error(
+      '  AI_GATEWAY_API_KEY="op://agent/vercel-ai-gateway/credential" op run -- pnpm jev:smoke',
+    );
     return 1;
   }
 

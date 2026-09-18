@@ -230,7 +230,12 @@ function expiryEpochMs(field: OnePasswordField): number | null {
   if (/^[0-9]{9,11}$/.test(raw)) return Number(raw) * 1000;
   if (/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(raw)) {
     const parsed = Date.parse(`${raw}T00:00:00Z`);
-    return Number.isNaN(parsed) ? null : parsed;
+    if (Number.isNaN(parsed)) return null;
+    // Date.parse は 2026-02-30 を 2026-03-02 へ正規化して通してしまう。手入力の
+    // 日付 typo が「有効な期限」として扱われると、意図した期限を過ぎても key が
+    // 有効なままになる。往復で一致しなければ日付として認めない。
+    if (new Date(parsed).toISOString().slice(0, 10) !== raw) return null;
+    return parsed;
   }
   return null;
 }

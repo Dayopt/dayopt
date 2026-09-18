@@ -6,6 +6,7 @@ import {
   jevCacheKey,
   jevInputBytes,
   normalizeJevAnswer,
+  parseCredits,
   readGatewayCostUsd,
   readTypesafeConfidence,
   validateJevRequest,
@@ -200,6 +201,16 @@ describe('入力上限はバイトで測る（多言語でも token 上限を超
     });
   });
 
+  it('question id も予算に含める', () => {
+    const longId: JevRequest = {
+      ...request,
+      questions: { ['x'.repeat(300)]: questions.localized },
+    };
+    const shortId: JevRequest = { ...request, questions: { q: questions.localized } };
+    // id は payload のキーとして送られる。内容だけ測ると長い id が検査をすり抜ける
+    expect(jevInputBytes(longId) - jevInputBytes(shortId)).toBeGreaterThan(290);
+  });
+
   it('最長 question も同じ予算に含める', () => {
     const withLongQuestion: JevRequest = {
       ...request,
@@ -233,6 +244,17 @@ describe('残高取得の失敗を予算問題へ潰さない', () => {
       status: 'budget_exhausted',
       reasonCode: 'balance_unknown',
     });
+  });
+
+  it.each([
+    ['null', null],
+    ['空文字', ''],
+    ['空白のみ', '   '],
+    ['数値でない文字列', 'n/a'],
+  ])('残高が %s なら 0 とみなさず unreadable にする', (_label, balance) => {
+    // Number(null) も Number('') も 0 になる。素通りさせると欠損が「残高ゼロ」に化け、
+    // balance_unknown ではなく balance_below_floor として予算問題へ誤分類される
+    expect(parseCredits({ balance, totalUsed: '0' })).toBeNull();
   });
 
   it('評価後の残高取得が失敗しても注釈は落とさない', async () => {
@@ -398,6 +420,52 @@ describe('schema confinement の限界（prompt injection 対策ではない）'
     expect(keys).not.toContain('reviewRequirement');
     expect(keys).not.toContain('humanApprovalRequired');
     expect(keys).not.toContain('authority');
+  });
+});
+
+describe('分布はあるなら完全で整合していることを要求する', () => {
+  it.each([
+    ['キーが欠けた分布', { type: 'choice', choice: 'routine', probabilities: { routine: 1 } }],
+    ['空の分布', { type: 'choice', choice: 'routine', probabilities: {} }],
+    [
+      '合計が 1 から外れた分布',
+      {
+        type: 'choice',
+        choice: 'routine',
+        probabilities: { routine: 0.2, standard: 0.2, frontier: 0.2 },
+      },
+    ],
+    [
+      'choice が最大値と食い違う分布',
+      {
+        type: 'choice',
+        choice: 'routine',
+        probabilities: { routine: 0.1, standard: 0.2, frontier: 0.7 },
+      },
+    ],
+  ])('%s は採用しない', (_label, answer) => {
+    expect(normalizeJevAnswer(questions.lane, answer)).toBeNull();
+  });
+
+  it('丸めによる誤差は許容する', () => {
+    // provider は桁を丸めて返す。合計 0.99 を弾くと正常な応答を落とす
+    expect(
+      normalizeJevAnswer(questions.lane, {
+        type: 'choice',
+        choice: 'standard',
+        probabilities: { routine: 0.32, standard: 0.67, frontier: 0 },
+      }),
+    ).toMatchObject({ choice: 'standard', topProbability: 0.67 });
+  });
+
+  it('score も段が欠けていれば採用しない', () => {
+    expect(
+      normalizeJevAnswer(questions.evidence, {
+        type: 'score',
+        score: 2,
+        probabilities: { '2': 1 },
+      }),
+    ).toBeNull();
   });
 });
 

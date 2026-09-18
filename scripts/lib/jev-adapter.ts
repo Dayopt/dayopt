@@ -259,8 +259,10 @@ export function readGatewayCostUsd(
  */
 export function jevInputBytes(request: JevRequest): number {
   const stateBytes = utf8Bytes(canonicalJson(request.state));
-  const questionBytes = Object.values(request.questions).map((question) =>
-    utf8Bytes(canonicalJson(question)),
+  // id も payload のキーとして送られる。内容だけ測ると、長い id を付けた質問が
+  // 事前検査を通ったあと provider 側で上限に当たる。
+  const questionBytes = Object.entries(request.questions).map(
+    ([id, question]) => utf8Bytes(id) + utf8Bytes(canonicalJson(question)),
   );
   return stateBytes + Math.max(0, ...questionBytes);
 }
@@ -325,6 +327,19 @@ function topProbabilityOf(probabilities: Record<string, number> | null): number 
   return values.length === 0 ? null : Math.max(...values);
 }
 
+/**
+ * 分布の許容誤差。provider は桁を丸めて返すことがある（結果の `rounding` に桁数が載る）。
+ * 3 択を小数 2 桁へ丸めた場合の最大ずれが 0.015 なので、その倍を取る。
+ */
+const PROBABILITY_TOLERANCE = 0.03;
+
+/**
+ * 分布の検証。**省略は許すが、あるなら完全で整合していることを要求する。**
+ *
+ * 部分的な分布を通していた頃は、`choice: 'routine'` に対して `{ frontier: 1 }` のような
+ * 矛盾した応答が正規化され、回答は routine のまま `topProbability: 1` になった。
+ * confidence が無い経路では、下流がそれを確信度の高い routine 判定として読む。
+ */
 function readProbabilities(raw: Record<string, unknown>, allowedKeys: Set<string>) {
   const value = raw.probabilities;
   if (value === undefined) return { ok: true as const, value: null };
@@ -337,6 +352,10 @@ function readProbabilities(raw: Record<string, unknown>, allowedKeys: Set<string
       return { ok: false as const, value: null };
     result[key] = item;
   }
+  // 欠けたキーがあれば分布として読めない（残りに確率を割り振れない）
+  if (Object.keys(result).length !== allowedKeys.size) return { ok: false as const, value: null };
+  const total = Object.values(result).reduce((sum, item) => sum + item, 0);
+  if (Math.abs(total - 1) > PROBABILITY_TOLERANCE) return { ok: false as const, value: null };
   return { ok: true as const, value: result };
 }
 
@@ -369,6 +388,11 @@ export function normalizeJevAnswer(
     if (typeof choice !== 'string' || !options.includes(choice)) return null;
     const probabilities = readProbabilities(record, new Set(options));
     if (!probabilities.ok) return null;
+    // SDK の契約上 choice は分布の最大値を取る option。食い違う応答は採用しない。
+    if (probabilities.value) {
+      const top = Math.max(...Object.values(probabilities.value));
+      if (top - (probabilities.value[choice] ?? 0) > PROBABILITY_TOLERANCE) return null;
+    }
     return {
       type: 'choice',
       choice,
@@ -450,11 +474,25 @@ export function classifyJevError(error: unknown): Failure {
   return { status: 'unavailable', reasonCode: 'provider_error' };
 }
 
-/** `"95.50"` のような文字列残高を数値へ。読めなければ null（0 にしない）。 */
-function parseCredits(raw: { balance?: unknown; totalUsed?: unknown }): JevCredits | null {
-  const balance = Number(raw.balance);
-  const totalUsed = Number(raw.totalUsed);
-  if (!Number.isFinite(balance) || !Number.isFinite(totalUsed)) return null;
+/**
+ * `"95.50"` のような文字列を数値へ。**`Number()` に直接渡さない。**
+ * `Number(null)` と `Number('')` はどちらも 0 になるため、欠損した残高が
+ * 「残高ゼロ」として通り、`balance_unknown` ではなく `balance_below_floor` に化ける。
+ */
+function numericField(value: unknown): number | null {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  if (trimmed === '') return null;
+  const parsed = Number(trimmed);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+/** 読めなければ null（0 にしない）。呼び出し側は unreadable として扱う。 */
+export function parseCredits(raw: { balance?: unknown; totalUsed?: unknown }): JevCredits | null {
+  const balance = numericField(raw.balance);
+  const totalUsed = numericField(raw.totalUsed);
+  if (balance === null || totalUsed === null) return null;
   return { balance, totalUsed };
 }
 
