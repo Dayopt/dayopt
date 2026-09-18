@@ -240,6 +240,22 @@ function expiryEpochMs(field: OnePasswordField): number | null {
   return null;
 }
 
+/**
+ * 期限を必須 field として宣言した item。読めない期限をここだけ失敗にする。
+ *
+ * 全 item で失敗にすると、期限 field が読めない既存 item（2026-09-18 時点で
+ * `agent/app` / `human/resend` / `human/resend-web` / `ci/sentry-release-token` の 4 件）
+ * を巻き込んで共有 gate が赤くなる。それらは実際に期限監視が効いていない状態だが、
+ * 本変更の範囲外なので別途直す。宣言した item だけを先に締める。
+ */
+const expiryRequired = new Set(
+  operationalItems.flatMap((item) =>
+    (item.requiredFields ?? [])
+      .filter((field) => EXPIRY_LABEL_PATTERN.test(field))
+      .map(() => `${item.vault}/${item.item}`),
+  ),
+);
+
 const now = Date.now();
 for (const [key, itemResult] of itemCache) {
   if (itemResult.status !== 'OK') continue;
@@ -254,7 +270,7 @@ for (const [key, itemResult] of itemCache) {
       console.log(
         '  └ 期限 field を日付として読めません（1Password の日付 field か YYYY-MM-DD にする）',
       );
-      hasFailure = true;
+      if (expiryRequired.has(key)) hasFailure = true;
       continue;
     }
     const date = new Date(expiresAt).toISOString().slice(0, 10);
