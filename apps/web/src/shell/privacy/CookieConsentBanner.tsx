@@ -2,6 +2,10 @@
 
 import { Button } from '@dayopt/components';
 import { Link } from '@dayopt/i18n/navigation';
+import {
+  BROWSER_TELEMETRY_CONSENT_EVENT,
+  isBrowserTelemetryConsentStorageChange,
+} from '@dayopt/observability';
 import { useTranslations } from 'next-intl';
 import { useEffect, useState } from 'react';
 
@@ -23,6 +27,8 @@ interface CookieConsentBannerViewProps {
   allowAnalyticsLabel: string;
   onNecessaryOnly: () => void;
   onAllowAnalytics: () => void;
+  /** 選択の保存に失敗したときなど、操作の結果を伝える 1 行。初回バナーでは渡さない。 */
+  notice?: string;
 }
 
 export function CookieConsentBannerView({
@@ -34,6 +40,7 @@ export function CookieConsentBannerView({
   allowAnalyticsLabel,
   onNecessaryOnly,
   onAllowAnalytics,
+  notice,
 }: CookieConsentBannerViewProps) {
   const titleId = `${idPrefix}-title`;
   const descriptionId = `${idPrefix}-description`;
@@ -59,6 +66,11 @@ export function CookieConsentBannerView({
               {learnMoreLabel}
             </Link>
           </p>
+          {notice && (
+            <p role="alert" className="text-destructive mt-2 text-sm">
+              {notice}
+            </p>
+          )}
         </div>
 
         <div className="flex flex-col gap-2 sm:flex-row sm:gap-4">
@@ -86,13 +98,30 @@ export function CookieConsentBanner() {
       cancelIdleCallback?: (handle: number) => void;
     };
 
+    // footer の常設 Cookie 設定や別タブで選択が確定したら、同じ質問を繰り返さない
+    // ようバナーを閉じる。逆に未選択へ戻れば再び出す。
+    const handleStorage = (event: StorageEvent) => {
+      if (!isBrowserTelemetryConsentStorageChange(event.key)) return;
+      checkConsent();
+    };
+
+    window.addEventListener(BROWSER_TELEMETRY_CONSENT_EVENT, checkConsent);
+    window.addEventListener('storage', handleStorage);
+
+    let cancelInitialCheck: () => void;
     if (idleWindow.requestIdleCallback && idleWindow.cancelIdleCallback) {
       const handle = idleWindow.requestIdleCallback(checkConsent, { timeout: 2000 });
-      return () => idleWindow.cancelIdleCallback?.(handle);
+      cancelInitialCheck = () => idleWindow.cancelIdleCallback?.(handle);
+    } else {
+      const timer = globalThis.setTimeout(checkConsent, 1000);
+      cancelInitialCheck = () => globalThis.clearTimeout(timer);
     }
 
-    const timer = globalThis.setTimeout(checkConsent, 1000);
-    return () => globalThis.clearTimeout(timer);
+    return () => {
+      cancelInitialCheck();
+      window.removeEventListener(BROWSER_TELEMETRY_CONSENT_EVENT, checkConsent);
+      window.removeEventListener('storage', handleStorage);
+    };
   }, []);
 
   const chooseConsent = (analytics: boolean) => {

@@ -39,6 +39,8 @@ vi.mock('@/lib/trpc', () => ({
   },
 }));
 
+import { toast } from '@/lib/toast';
+
 import { DataSettings } from './DataSettings';
 
 const CONSENT_KEY = BROWSER_TELEMETRY_CONSENT_STORAGE_KEY;
@@ -140,6 +142,42 @@ describe('AnalyticsConsentSection', () => {
     );
 
     expect(await screen.findByText(ENABLED)).toBeInTheDocument();
+  });
+
+  it('保存だけが失敗する環境では、撤回を成功扱いにせず確認ダイアログを閉じない', async () => {
+    const user = userEvent.setup();
+    storeConsent(true);
+    render(<DataSettings />);
+
+    // 容量超過やブラウザの保存ポリシーで「読めるが書けない」状態。
+    // setCookieConsent / acceptNecessaryOnly は例外を握りつぶすので、
+    // 呼べたこと自体を成功の根拠にできない。
+    const realStorage = window.localStorage;
+    const failingStorage = {
+      getItem: (key: string) => realStorage.getItem(key),
+      setItem: () => {
+        throw new DOMException('quota', 'QuotaExceededError');
+      },
+      removeItem: () => {
+        throw new DOMException('quota', 'QuotaExceededError');
+      },
+    };
+    const spy = vi
+      .spyOn(window, 'localStorage', 'get')
+      .mockReturnValue(failingStorage as unknown as Storage);
+
+    try {
+      await user.click(await screen.findByRole('button', { name: REVOKE }));
+      await user.click(await screen.findByRole('button', { name: REVOKE_CONFIRM }));
+
+      // 保存値は許可のまま = telemetry も止まっていないので、閉じない。
+      expect(screen.getByRole('button', { name: REVOKE_CONFIRM })).toBeInTheDocument();
+      expect(toast.error).toHaveBeenCalledWith('settings.legal.cookies.saveFailed');
+    } finally {
+      spy.mockRestore();
+    }
+
+    expect(readConsent()?.analytics).toBe(true);
   });
 
   it('localStorage が使えない環境でも throw せず「未選択」を出す', async () => {

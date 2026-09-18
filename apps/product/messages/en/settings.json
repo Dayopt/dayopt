@@ -559,8 +559,9 @@
         "allow": "Allow analytics",
         "revoke": "Withdraw analytics",
         "revokeConfirmTitle": "Withdraw analytics consent?",
-        "revokeConfirmDescription": "The page reloads so that browser analytics and error monitoring stop completely.",
+        "revokeConfirmDescription": "The page reloads so that browser analytics and error monitoring stop completely. Anything you have typed but not saved is lost.",
         "revokeConfirmLabel": "Withdraw",
+        "saveFailed": "Could not save your choice. Browser storage rejected the write, so analytics was not changed.",
         "independentOrigins": "Choices made on the website and in the app are stored separately.",
         "manage": "Manage cookie settings",
         "lastUpdated": "Last updated"

@@ -106,7 +106,12 @@
           "allowed": "Analytics is currently allowed.",
           "refused": "Analytics is currently refused.",
           "unset": "You have not chosen yet."
-        }
+        },
+        "revokeConfirmTitle": "Refuse analytics?",
+        "revokeConfirmDescription": "The page reloads so that browser analytics and error monitoring stop completely. Anything you have typed but not sent is lost.",
+        "revokeConfirmLabel": "Refuse and reload",
+        "revokeCancelLabel": "Keep current choice",
+        "saveFailed": "Could not save your choice. Browser storage rejected the write, so analytics was not changed."
       }
     }
   },

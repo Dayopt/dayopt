@@ -4,7 +4,7 @@ import {
   BROWSER_TELEMETRY_CONSENT_STORAGE_KEY,
   type BrowserTelemetryConsent,
 } from '@dayopt/observability';
-import { render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { NextIntlClientProvider } from 'next-intl';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -24,12 +24,16 @@ vi.mock('@dayopt/i18n/navigation', () => ({
   ),
 }));
 
+import { CookieConsentBanner } from './CookieConsentBanner';
 import { CookieConsentSettings } from './CookieConsentSettings';
 
 const KEY = BROWSER_TELEMETRY_CONSENT_STORAGE_KEY;
 const TRIGGER = messages.common.cookies.settings.trigger;
 const ALLOW = messages.common.cookies.banner.allowAnalytics;
 const NECESSARY_ONLY = messages.common.cookies.banner.necessaryOnly;
+const REVOKE_CONFIRM = messages.common.cookies.settings.revokeConfirmLabel;
+const REVOKE_CANCEL = messages.common.cookies.settings.revokeCancelLabel;
+const BANNER_TITLE = messages.common.cookies.banner.title;
 
 function storeConsent(analytics: boolean) {
   const consent: BrowserTelemetryConsent = {
@@ -91,7 +95,7 @@ describe('CookieConsentSettings', () => {
     expectStatusShown(messages.common.cookies.settings.status.allowed);
   });
 
-  it('撤回すると analytics:false が保存され、パネルが閉じる', async () => {
+  it('許可済みからの撤回は確認を経てから保存し、パネルが閉じる', async () => {
     const user = userEvent.setup();
     storeConsent(true);
     renderSettings();
@@ -99,8 +103,105 @@ describe('CookieConsentSettings', () => {
     await user.click(trigger());
     await user.click(screen.getByRole('button', { name: NECESSARY_ONLY }));
 
+    // production では撤回で instrumentation-client がページを再読み込みするため、
+    // 未送信の入力が消えることを先に伝える。この時点では保存していない。
+    expect(
+      screen.getByText(messages.common.cookies.settings.revokeConfirmDescription),
+    ).toBeTruthy();
+    expect(readConsent()?.analytics).toBe(true);
+
+    await user.click(screen.getByRole('button', { name: REVOKE_CONFIRM }));
+
     expect(readConsent()?.analytics).toBe(false);
     expect(trigger().getAttribute('aria-expanded')).toBe('false');
+  });
+
+  it('撤回の確認をキャンセルすると許可のまま選択画面へ戻る', async () => {
+    const user = userEvent.setup();
+    storeConsent(true);
+    renderSettings();
+
+    await user.click(trigger());
+    await user.click(screen.getByRole('button', { name: NECESSARY_ONLY }));
+    await user.click(screen.getByRole('button', { name: REVOKE_CANCEL }));
+
+    expect(readConsent()?.analytics).toBe(true);
+    expectStatusShown(messages.common.cookies.settings.status.allowed);
+  });
+
+  it('保存だけが失敗する環境では閉じず、保存できなかったことを伝える', async () => {
+    const user = userEvent.setup();
+    storeConsent(true);
+    renderSettings();
+
+    await user.click(trigger());
+    await user.click(screen.getByRole('button', { name: NECESSARY_ONLY }));
+
+    // 容量超過などで「読めるが書けない」状態。persistBrowserTelemetryConsent は
+    // 例外を握りつぶすので、呼べたこと自体を成功の根拠にできない。
+    const realStorage = window.localStorage;
+    const descriptor = Object.getOwnPropertyDescriptor(window, 'localStorage');
+    Object.defineProperty(window, 'localStorage', {
+      configurable: true,
+      get: () => ({
+        getItem: (key: string) => realStorage.getItem(key),
+        setItem: () => {
+          throw new DOMException('quota', 'QuotaExceededError');
+        },
+        removeItem: () => {
+          throw new DOMException('quota', 'QuotaExceededError');
+        },
+      }),
+    });
+
+    try {
+      await user.click(screen.getByRole('button', { name: REVOKE_CONFIRM }));
+
+      expect(screen.getByRole('alert').textContent).toBe(
+        messages.common.cookies.settings.saveFailed,
+      );
+      expect(trigger().getAttribute('aria-expanded')).toBe('true');
+    } finally {
+      if (descriptor) Object.defineProperty(window, 'localStorage', descriptor);
+    }
+
+    expect(readConsent()?.analytics).toBe(true);
+  });
+
+  it('初回バナーと同時に出ているとき、設定側で選ぶとバナーも閉じる', () => {
+    vi.useFakeTimers();
+    // requestIdleCallback の有無は環境依存なので fallback の setTimeout 経路に固定する。
+    const idleDescriptor = Object.getOwnPropertyDescriptor(window, 'requestIdleCallback');
+    Reflect.deleteProperty(window, 'requestIdleCallback');
+    Reflect.deleteProperty(window, 'cancelIdleCallback');
+
+    try {
+      render(
+        <NextIntlClientProvider locale="en" messages={messages}>
+          <CookieConsentBanner />
+          <CookieConsentSettings />
+        </NextIntlClientProvider>,
+      );
+
+      act(() => {
+        vi.advanceTimersByTime(1100);
+      });
+      expect(screen.getByRole('heading', { name: BANNER_TITLE })).toBeTruthy();
+
+      // footer 側の設定から選ぶ（バナー自身の onClick は通らない経路）。
+      act(() => {
+        fireEvent.click(screen.getByRole('button', { name: TRIGGER }));
+      });
+      act(() => {
+        fireEvent.click(screen.getAllByRole('button', { name: ALLOW })[0]!);
+      });
+
+      expect(readConsent()?.analytics).toBe(true);
+      expect(screen.queryByRole('heading', { name: BANNER_TITLE })).toBeNull();
+    } finally {
+      vi.useRealTimers();
+      if (idleDescriptor) Object.defineProperty(window, 'requestIdleCallback', idleDescriptor);
+    }
   });
 
   it('拒否済みからの再許可では marketing を true にしない', async () => {

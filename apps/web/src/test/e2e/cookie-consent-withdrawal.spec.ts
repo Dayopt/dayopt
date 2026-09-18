@@ -54,9 +54,13 @@ test('footer の Cookie 設定から、保存済みの分析同意を撤回・�
   await otherTab.getByRole('button', { name: settings.trigger }).click();
   await expect(otherTab.getByText(settings.status.allowed, { exact: false })).toBeVisible();
 
-  // 5. 元タブで撤回すると、別タブへ storage event で伝わる
+  // 5. 元タブで撤回する。許可済みからの撤回は再読み込みを伴うので確認を挟む
   await page.getByRole('button', { name: settings.trigger }).click();
   await page.getByRole('button', { name: banner.necessaryOnly }).click();
+  await expect(page.getByText(settings.revokeConfirmDescription)).toBeVisible();
+  // 確認前に保存してしまっていないこと
+  expect(await readStoredConsent(page)).toMatchObject({ analytics: true });
+  await page.getByRole('button', { name: settings.revokeConfirmLabel }).click();
   expect(await readStoredConsent(page)).toMatchObject({ analytics: false });
   await expect(otherTab.getByText(settings.status.refused, { exact: false })).toBeVisible();
 

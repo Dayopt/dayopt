@@ -215,18 +215,40 @@ function AnalyticsConsentSection() {
     };
   }, []);
 
-  const handleAllow = useCallback(() => {
-    // バナーの acceptAllCookies は marketing も true にするが、Dayopt は
-    // マーケティング Cookie を使っていないので analytics だけを許可する。
-    setCookieConsent({ analytics: true, marketing: false });
-    setConsent(getCookieConsent());
+  /**
+   * 同意を書き、**保存値を読み直して意図どおりになったときだけ true を返す**。
+   *
+   * `setCookieConsent` / `acceptNecessaryOnly` は localStorage の書き込み失敗を
+   * 握りつぶす（`@/lib/cookie-consent`）。容量超過などで「読めるが書けない」環境では、
+   * 撤回したつもりで保存値が許可のまま残り telemetry も止まらないので、
+   * 成功を推定せず実際の保存値で判定する。
+   */
+  const applyAnalyticsConsent = useCallback((analytics: boolean) => {
+    if (analytics) {
+      // バナーの acceptAllCookies は marketing も true にするが、Dayopt は
+      // マーケティング Cookie を使っていないので analytics だけを許可する。
+      setCookieConsent({ analytics: true, marketing: false });
+    } else {
+      acceptNecessaryOnly();
+    }
+
+    const stored = getCookieConsent();
+    setConsent(stored);
+    return stored?.analytics === analytics;
   }, []);
 
+  const handleAllow = useCallback(() => {
+    if (!applyAnalyticsConsent(true)) toast.error(t('saveFailed'));
+  }, [applyAnalyticsConsent, t]);
+
   const handleRevoke = useCallback(() => {
-    acceptNecessaryOnly();
-    setConsent(getCookieConsent());
+    // 撤回を確認できないときは確認ダイアログを閉じない（撤回できたように見せない）。
+    if (!applyAnalyticsConsent(false)) {
+      toast.error(t('saveFailed'));
+      return;
+    }
     setIsConfirmingRevoke(false);
-  }, []);
+  }, [applyAnalyticsConsent, t]);
 
   const analyticsStatus =
     consent === null
