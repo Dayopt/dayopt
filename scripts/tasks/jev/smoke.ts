@@ -8,9 +8,14 @@
  *
  * 秘密の扱い: key は env から adapter へ渡すだけで、出力にも例外にも載せない。
  *
- * 直列に 1 request ずつ送る。予算・rate limit の実測値が無い段階で並列化すると、
- * 429 と課金がどちらも同時に増えて切り分けられなくなる。budget 系の失敗が出たら
- * そこで打ち切り、credits 購入や他モデルへの迂回はしない。
+ * 直列に 1 request ずつ、間隔を空けて送る。budget 系の失敗が出たらそこで打ち切り、
+ * credits 購入や他モデルへの迂回はしない。
+ *
+ * **間隔が要る理由（2026-09-18 実測）**: 無料枠の Jev は連続 3 request 目で 429 を
+ * 返した。Vercel は無料枠の上限値を公開していないが、smoke の規模でも当たる。
+ * ここで retry を足さないのは意図的で、adapter は 429 を status へ落とすだけにし、
+ * 待つかどうかは呼び出し側が明示的に決める（AI SDK 既定の retry を 0 に固定して
+ * いるのと同じ理由。隠れた再送で無料枠と 429 が同時に増えるのを避ける）。
  */
 import {
   JEV_MODEL_ID,
@@ -23,6 +28,12 @@ import { JEV_SMOKE_CASES } from '../../lib/jev-smoke-cases.ts';
 function argValue(flag: string): string | null {
   const index = process.argv.indexOf(flag);
   return index >= 0 ? (process.argv[index + 1] ?? null) : null;
+}
+
+const DEFAULT_DELAY_MS = 6_000;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function costOf(annotation: JevAnnotation): number | null {
@@ -65,9 +76,11 @@ async function run(): Promise<number> {
   }
 
   const asJson = process.argv.includes('--json');
+  const delayMs = Number(argValue('--delay') ?? DEFAULT_DELAY_MS);
   const results: Array<{ id: string; purpose: string; annotation: JevAnnotation }> = [];
 
-  for (const smokeCase of cases) {
+  for (const [index, smokeCase] of cases.entries()) {
+    if (index > 0 && delayMs > 0) await sleep(delayMs);
     const annotation = await evaluateWithJev(smokeCase.request);
     results.push({ id: smokeCase.id, purpose: smokeCase.purpose, annotation });
 
@@ -81,6 +94,9 @@ async function run(): Promise<number> {
       if (!asJson) console.error('予算・残高の壁に当たったので以降を中止する（購入はしない）');
       break;
     }
+
+    if (annotation.reasonCode === 'rate_limited' && !asJson)
+      console.error(`rate limit に当たった。--delay を ${delayMs} ms より広げて再実行する`);
   }
 
   const evaluated = results.filter((item) => item.annotation.status === 'evaluated');

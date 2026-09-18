@@ -5,6 +5,7 @@ import {
   evaluateWithJev,
   jevCacheKey,
   normalizeJevAnswer,
+  readTypesafeConfidence,
   validateJevRequest,
   type JevAnnotation,
   type JevCredits,
@@ -62,7 +63,10 @@ function runnerWith(
         answers: overrides.answers ?? okAnswers,
         usage: { inputTokens: 283, outputTokens: 21 },
         response: { modelId: 'typesafe-ai/jev-1.13.0' },
-        providerMetadata: { gateway: { generationId: 'gen_test' } },
+        providerMetadata: {
+          typesafe: { confidence: { lane: 0.52, evidence: 1 } },
+          gateway: { generationId: 'gen_test' },
+        },
       };
     },
     async credits() {
@@ -90,13 +94,22 @@ describe('Jev adapter の正常系', () => {
     expect(annotation.reasonCode).toBe('ok');
     expect(annotation.resolvedModelId).toBe('typesafe-ai/jev-1.13.0');
     expect(annotation.usage).toEqual({ inputTokens: 283, outputTokens: 21 });
+    // confidence は provider 由来、topProbability はこちらの導出。2026-09-18 の
+    // smoke で両者は実際にずれたので、同じ値に丸めない。
     expect(annotation.answers?.lane).toEqual({
       type: 'choice',
       choice: 'routine',
       probabilities: { routine: 0.9, standard: 0.08, frontier: 0.02 },
+      confidence: 0.52,
       topProbability: 0.9,
     });
-    expect(annotation.providerMetadata).toEqual({ gateway: { generationId: 'gen_test' } });
+    // boolean には confidence が付かない（TypeSafe の仕様）
+    expect(annotation.answers?.localized).toEqual({
+      type: 'boolean',
+      probability: 0.94,
+      confidence: null,
+      topProbability: null,
+    });
     expect(runner.calls.evaluate).toBe(1);
   });
 
@@ -253,8 +266,39 @@ describe('Jev の回答は要求した集合の外へ出られない', () => {
       type: 'choice',
       choice: 'standard',
       probabilities: null,
+      confidence: null,
       topProbability: null,
     });
+  });
+});
+
+describe('confidence は回答を落とさない補助情報として扱う', () => {
+  it.each([
+    ['metadata 自体が無い', undefined],
+    ['typesafe が入っていない', { gateway: {} }],
+    ['confidence が配列', { typesafe: { confidence: [0.5] } }],
+    ['値が範囲外', { typesafe: { confidence: { lane: 1.4 } } }],
+    ['値が文字列', { typesafe: { confidence: { lane: '0.5' } } }],
+  ])('%s なら空として扱う', (_label, metadata) => {
+    expect(readTypesafeConfidence(metadata as Record<string, unknown> | undefined)).toEqual({});
+  });
+
+  it('confidence が壊れていても評価そのものは捨てない', async () => {
+    const annotation = await run({
+      runner: {
+        ...runnerWith(),
+        async evaluate() {
+          return {
+            answers: okAnswers,
+            usage: { inputTokens: 1, outputTokens: 1 },
+            response: { modelId: 'typesafe-ai/jev' },
+            providerMetadata: { typesafe: { confidence: 'broken' } },
+          };
+        },
+      },
+    });
+    expect(annotation.status).toBe('evaluated');
+    expect(annotation.answers?.lane).toMatchObject({ confidence: null, topProbability: 0.9 });
   });
 });
 

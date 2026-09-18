@@ -90,25 +90,33 @@ export type JevJsonValue =
 
 export type JevState = string | { [key: string]: JevJsonValue } | JevJsonValue[];
 
+/**
+ * すべての回答が持つ 2 つの確信度。**別物なので混ぜない。**
+ *
+ * - `confidence` は TypeSafe が自分で計算して `providerMetadata.typesafe.confidence`
+ *   に載せてくる値。閾値で振り分けるならこちらを使う。
+ * - `topProbability` は分布の最大値で、こちらが導いた代替。2026-09-18 の smoke で
+ *   両者は実際にずれた（choice の `lane` が分布 0.68 に対し confidence 0.52）。
+ *   boolean には confidence が付かない（TypeSafe の仕様どおり、空で返る）ので、
+ *   その場合の代替としてだけ使う。
+ */
+type JevConfidence = {
+  confidence: number | null;
+  topProbability: number | null;
+};
+
 export type JevAnswer =
-  | { type: 'boolean'; probability: number }
-  | {
+  | ({ type: 'boolean'; probability: number } & JevConfidence)
+  | ({
       type: 'choice';
       choice: string;
       probabilities: Record<string, number> | null;
-      /**
-       * 分布の最大値。**TypeSafe の `confidence` ではない**（あちらは分布から
-       * 導くとしか公開されておらず、式が確定していない）。同一視しないために
-       * 別名にしてある。呼び出し側の閾値はこの値の実測で決める。
-       */
-      topProbability: number | null;
-    }
-  | {
+    } & JevConfidence)
+  | ({
       type: 'score';
       score: number;
       probabilities: Record<string, number> | null;
-      topProbability: number | null;
-    };
+    } & JevConfidence);
 
 export type JevCredits = { balance: number; totalUsed: number };
 
@@ -219,6 +227,27 @@ export function validateJevRequest(
   return errors;
 }
 
+/**
+ * `providerMetadata.typesafe.confidence` を質問 ID → 数値で取り出す。
+ *
+ * 壊れていても評価そのものは捨てない。confidence は振り分けの補助であって回答では
+ * なく、ここで annotation 全体を落とすと「答えは正しいのに使えない」状態を作る。
+ * 読めない項目は null にして、呼び出し側が閾値を当てられないことを明示する。
+ */
+export function readTypesafeConfidence(
+  providerMetadata: Record<string, unknown> | null | undefined,
+): Record<string, number> {
+  const typesafe = providerMetadata?.typesafe;
+  if (typeof typesafe !== 'object' || typesafe === null) return {};
+  const raw = (typesafe as Record<string, unknown>).confidence;
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return {};
+  const result: Record<string, number> = {};
+  for (const [id, value] of Object.entries(raw))
+    if (typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 1)
+      result[id] = value;
+  return result;
+}
+
 function topProbabilityOf(probabilities: Record<string, number> | null): number | null {
   if (!probabilities) return null;
   const values = Object.values(probabilities);
@@ -247,7 +276,11 @@ function readProbabilities(raw: Record<string, unknown>, allowedKeys: Set<string
  * 選択肢・score の段数はすべて要求側が決めた集合に閉じており、model が別の値を
  * 返しても採用されない。
  */
-export function normalizeJevAnswer(question: JevQuestion, raw: unknown): JevAnswer | null {
+export function normalizeJevAnswer(
+  question: JevQuestion,
+  raw: unknown,
+  confidence: number | null = null,
+): JevAnswer | null {
   if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return null;
   const record = raw as Record<string, unknown>;
   if (record.type !== question.type) return null;
@@ -256,7 +289,7 @@ export function normalizeJevAnswer(question: JevQuestion, raw: unknown): JevAnsw
     const probability = record.probability;
     if (typeof probability !== 'number' || !Number.isFinite(probability)) return null;
     if (probability < 0 || probability > 1) return null;
-    return { type: 'boolean', probability };
+    return { type: 'boolean', probability, confidence, topProbability: null };
   }
 
   if (question.type === 'choice') {
@@ -269,6 +302,7 @@ export function normalizeJevAnswer(question: JevQuestion, raw: unknown): JevAnsw
       type: 'choice',
       choice,
       probabilities: probabilities.value,
+      confidence,
       topProbability: topProbabilityOf(probabilities.value),
     };
   }
@@ -284,6 +318,7 @@ export function normalizeJevAnswer(question: JevQuestion, raw: unknown): JevAnsw
     type: 'score',
     score,
     probabilities: probabilities.value,
+    confidence,
     topProbability: topProbabilityOf(probabilities.value),
   };
 }
@@ -291,13 +326,14 @@ export function normalizeJevAnswer(question: JevQuestion, raw: unknown): JevAnsw
 function normalizeAnswers(
   questions: Record<string, JevQuestion>,
   raw: Record<string, unknown>,
+  confidences: Record<string, number>,
 ): Record<string, JevAnswer> | null {
   const ids = Object.keys(questions);
   // 余分な id が来た時点で捨てる。部分採用すると「聞いていない判断」が混ざる。
   for (const id of Object.keys(raw)) if (!ids.includes(id)) return null;
   const answers: Record<string, JevAnswer> = {};
   for (const id of ids) {
-    const answer = normalizeJevAnswer(questions[id], raw[id]);
+    const answer = normalizeJevAnswer(questions[id], raw[id], confidences[id] ?? null);
     if (!answer) return null;
     answers[id] = answer;
   }
@@ -492,7 +528,11 @@ export async function evaluateWithJev(
 
   const latencyMs = Date.now() - startedAt;
   const after = await runner.credits();
-  const answers = normalizeAnswers(request.questions, raw.answers ?? {});
+  const answers = normalizeAnswers(
+    request.questions,
+    raw.answers ?? {},
+    readTypesafeConfidence(raw.providerMetadata),
+  );
   const telemetry = {
     latencyMs,
     credits: { before, after },
