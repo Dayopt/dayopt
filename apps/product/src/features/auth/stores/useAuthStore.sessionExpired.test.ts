@@ -14,6 +14,7 @@ type AuthChangeHandler = (
 ) => void | Promise<void>;
 
 const listeners: AuthChangeHandler[] = [];
+const unsubscribed: number[] = [];
 const mockGetSession = vi.fn();
 const mockSignInWithPassword = vi.fn();
 const mockSignUp = vi.fn();
@@ -25,8 +26,18 @@ vi.mock('@/lib/supabase/client', () => ({
       signInWithPassword: mockSignInWithPassword,
       signUp: mockSignUp,
       onAuthStateChange: (handler: AuthChangeHandler) => {
+        const index = listeners.length;
         listeners.push(handler);
-        return { data: { subscription: { unsubscribe: vi.fn() } } };
+        return {
+          data: {
+            subscription: {
+              unsubscribe: () => {
+                unsubscribed.push(index);
+                listeners[index] = () => undefined;
+              },
+            },
+          },
+        };
       },
     },
   }),
@@ -45,7 +56,7 @@ vi.mock('@/lib/tanstack-query/persist-storage', () => ({
   clearPersistedQueryCache: vi.fn().mockResolvedValue(undefined),
 }));
 
-import { selectSessionExpired, useAuthStore } from './useAuthStore';
+import { resetAuthSubscriptionForTest, selectSessionExpired, useAuthStore } from './useAuthStore';
 
 const SESSION = { user: { id: 'user-a' } };
 
@@ -58,7 +69,9 @@ async function emit(event: string, session: { user: { id: string } } | null): Pr
 describe('useAuthStore の _sessionExpired', () => {
   beforeEach(async () => {
     vi.clearAllMocks();
+    resetAuthSubscriptionForTest();
     listeners.length = 0;
+    unsubscribed.length = 0;
     useAuthStore.setState({ user: null, session: null, loading: true, error: null });
     mockGetSession.mockResolvedValue({ data: { session: SESSION }, error: null });
     await useAuthStore.getState().initialize();
@@ -149,5 +162,42 @@ describe('signUp の emailRedirectTo', () => {
         }),
       }),
     );
+  });
+});
+
+// `AuthStoreInitializer` の guard は mount ごと。`(app)` ↔ `(auth)` を行き来すると
+// initialize が再実行され、解除しないと listener が積み上がる。1 イベントで同じ
+// `set` が何度も走り、購読も leak する。
+describe('auth state listener の張り直し', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    resetAuthSubscriptionForTest();
+    listeners.length = 0;
+    unsubscribed.length = 0;
+    useAuthStore.setState({ user: null, session: null, loading: true, error: null });
+    mockGetSession.mockResolvedValue({ data: { session: SESSION }, error: null });
+  });
+
+  it('initialize を繰り返しても生きている listener は 1 本だけ', async () => {
+    await useAuthStore.getState().initialize();
+    await useAuthStore.getState().initialize();
+    await useAuthStore.getState().initialize();
+
+    expect(listeners.length).toBe(3);
+    // 最後の 1 本を残して前は解除されている
+    expect(unsubscribed).toEqual([0, 1]);
+  });
+
+  it('解除済みの listener はイベントを処理しない', async () => {
+    await useAuthStore.getState().initialize();
+    await useAuthStore.getState().initialize();
+
+    // 解除済みの 0 番へ流しても状態は動かない
+    await listeners[0]!('SIGNED_OUT', null);
+    expect(selectSessionExpired(useAuthStore.getState())).toBe(false);
+
+    // 生きている 1 番は従来どおり動く
+    await listeners[1]!('SIGNED_OUT', null);
+    expect(selectSessionExpired(useAuthStore.getState())).toBe(true);
   });
 });

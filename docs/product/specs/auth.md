@@ -18,6 +18,9 @@ code:
   - apps/product/src/features/auth/components/ResetPasswordForm.tsx
   - apps/product/src/features/auth/components/PasswordResetForm.tsx
   - apps/product/src/lib/turnstile/useTurnstileGate.ts
+  - apps/product/src/lib/auth/mfa-verify-error.ts
+  - apps/product/src/features/auth/components/LoginForm.tsx
+  - apps/product/src/features/auth/stores/useAuthStore.ts
   - apps/product/src/features/auth/components/MFAVerifyForm.tsx
   - apps/product/src/features/external-calendar/server/account-deletion.ts
   - apps/product/src/features/settings/server/account-deletion.ts
@@ -69,6 +72,30 @@ Supabase Auth ベースの認証機能。
 `challenges.cloudflare.com` は広告ブロッカー・企業プロキシ・provider 障害で遮断されうる。token の有無だけで送信ボタンを無効にすると、その利用者は理由の表示も回復手段も無いままログインできなくなる（production では Bot Protection が有効なので 3 フォームすべてが同時に死ぬ）。送信を通せば GoTrue が `captcha_failed` を返し、`auth.errors.captchaFailed` として理由が出る。到達できないこと自体も `auth.errors.captchaUnavailable` で伝える。
 
 **これは captcha を弱める変更ではない。** 検証は GoTrue 側で行われ、token 無しの要求は production では必ず拒否される。変わるのは「押せないボタン」が「サーバーの判断」に置き換わる点だけ。
+
+## 確認メールの再送導線と列挙防止
+
+ログインの失敗は `getAuthErrorKey` が 1 つのキー（`auth.errors.invalidCredentials`）へ丸めるため、**「メールの確認がまだ」という状態を利用者は文言から知れない**。丸め自体は列挙防止として意図的だが、確認リンクを踏んでいない人は原因も出口も分からなくなる。
+
+そこでログイン失敗時に「確認メールを再送する」を出す（`LoginForm`）。宛先は直前に試したアドレス。
+
+**結果で表示を変えない。** 未登録でも、確認済みでも、未確認でも、押した後は同じ文言（`auth.loginForm.confirmationResent`）を出す。変えると「再送できた = 未確認の登録済み」という存在確認になり、丸めた意味が消える。例外は captcha 失敗だけで、これは本人が解き直せば解決するので伝える（パスワードリセットと同じ扱い）。
+
+導線はログイン失敗のたびに出る。**成功時にも未登録時にも出ない差が付かないよう、判定材料は「送信を試みたか」だけにする。**
+
+## MFA 検証の失敗と challenge の寿命
+
+`/auth/mfa-verify` は GoTrue の `message` を描画しない。`AuthError.code` を `resolveMfaVerifyErrorKey`（`lib/auth/mfa-verify-error.ts`）で i18n キーへ写し、未知の code は汎用キーへ落とす。生の message は英語で provider 都合で変わるため、日本語の利用者に英語が出るうえ、文言が変わっても気付けない。
+
+**challenge には寿命がある。** 切れた後は正しいコードを入れても通らないので、`mfa_challenge_expired` を受けたら challenge を発行し直す。引き直さないと手動リロード以外に出口が無い。コード誤りでは引き直さない（無駄に GoTrue の rate limit を削るため）。
+
+初期化（factor 一覧 → challenge 発行）は **mount につき 1 回**に固定する。`checkMFARequired` は `t` に依存し、その参照はレンダーごとに変わりうるので、素直に effect の依存にすると challenge を発行し続ける。
+
+## auth state listener は 1 本だけ
+
+`useAuthStore.initialize` は何度でも呼ばれうる（`AuthStoreInitializer` の guard は mount ごとで、`(app)` ↔ `(auth)` を行き来するたびに再実行される）。`onAuthStateChange` を張り直す前に**前の購読を必ず解除する**。
+
+`beforeunload` での解除は document が捨てられる直前にしか走らず、同じ document 内での再 initialize には効かない。解除しないと listener が積み上がり、1 イベントで同じ `set` が何度も走る。
 
 ## ログイン手段によるアカウント操作の分岐
 
