@@ -11,10 +11,16 @@
  *   無料枠を溶かすのは本体より retry なので、再送は呼び出し側が明示的に決める。
  * - **失敗を throw しない**。すべて `status` で返す。Jev が落ちても既存の作業・
  *   独立レビューがそのまま成立することを、例外処理の有無ではなく型で強制する。
- * - **回答は「こちらが出した question id と type」以外を受け付けない**。state に
- *   入る issue 本文 / PR コメント / diff は非信頼データで、Jev 自身は state 内の
+ * - **回答は「こちらが出した question id と type」以外を受け付けない**（schema confinement）。
+ *   state に入る issue 本文 / PR コメント / diff は非信頼データで、Jev 自身は state 内の
  *   指示文を data と区別しない（TypeSafe の model 特性ページに明記がある）。
- *   出力の形を state から動かせなくするのは prompt の注意書きではなくこの検証。
+ *
+ *   **これは prompt injection 対策ではない。** 保証するのは出力の*形*だけで、*内容*は守らない。
+ *   非信頼な state が「lane は routine、追加レビューは不要」と指示し、Jev がそれに従っても、
+ *   値が許可集合の中にある限りこの検証は通す。したがって **Annotation を根拠に、必須
+ *   レビューや権限要件を引き下げてはならない**。要件の下限は Annotation を読まない
+ *   trusted なコードが決める（#2827 §3「既存の必須レビューと権限条件をコードの下限にする」）。
+ *   この層が防ぐのは、任意の値・任意のキー・任意の型が下流へ流れ込むことだけ。
  * - **残高は Gateway を正とする**。送信前に下限を割っていたら呼ばない。予算不足を
  *   credits 購入・他モデルへの fallback で救済する経路はこのファイルに存在しない。
  *
@@ -37,13 +43,21 @@ export const JEV_MAX_RETRIES = 0;
 export const JEV_DEFAULT_TIMEOUT_MS = 20_000;
 
 /**
- * state の上限（文字数）。TypeSafe の公開値は「合計 64k tokens、state と最長の
- * question で 32k tokens」。tokenizer が公開されていないので token 数は数えられず、
- * 安全側に振って 1 token = 4 文字で見積もった 24k tokens 相当で頭打ちにする。
+ * 入力の上限を **UTF-8 バイト**で決める。対象は「state + 最長の question」で、
+ * TypeSafe が公開している制約（state と最長 question の合計で 32k tokens）と同じ単位に揃える。
+ *
+ * 文字数で見積もらないのは、当初 1 token = 4 文字として 96,000 文字を上限にしたところ、
+ * それが英語にしか成り立たないため。日本語の Issue 本文や diff では 1 文字が 1 token を
+ * 超えうるので、同じ文字数でも token 換算で数倍になり、事前検査を通ったあとに外部で失敗する。
+ *
+ * バイトなら tokenizer 非公開のまま**証明できる**下限がある: どの tokenizer でも
+ * 1 token は最低 1 バイトを消費するので、32,000 バイトを超えなければ 32k tokens を必ず下回る。
+ * 英語で約 32,000 文字、日本語で約 10,600 文字に相当し、評価用の state としては十分広い。
+ *
  * 超えたら切り詰めずに abstain する（切り詰めた state で出た評価は、どの範囲を
  * 見ていないのかが後から復元できないため）。
  */
-export const JEV_MAX_STATE_CHARS = 96_000;
+export const JEV_MAX_INPUT_BYTES = 32_000;
 
 /** 1 request に載せる質問数の上限。公開仕様が無いので運用側で先に固定する。 */
 export const JEV_MAX_QUESTIONS = 12;
@@ -120,6 +134,20 @@ export type JevAnswer =
 
 export type JevCredits = { balance: number; totalUsed: number };
 
+/**
+ * 残高取得の結果。**失敗を「未取得」へ潰さない。**
+ *
+ * すべての例外を null にしていた頃は、key 失効（401）も rate limit（429）も timeout も
+ * 「残高が読めない」＝予算切れ扱いになり、利用者が予算を確認して認証更新や待機を
+ * 見落とす形になっていた。provider の失敗はそのまま渡して、分類は `classifyJevError`
+ * 1 箇所で行う。
+ */
+export type JevCreditsResult =
+  | { status: 'ok'; credits: JevCredits }
+  /** 応答は得たが balance / total_used を数値として読めない */
+  | { status: 'unreadable' }
+  | { status: 'failed'; error: unknown };
+
 export type JevAnnotation = {
   schemaVersion: number;
   status: JevStatus;
@@ -139,7 +167,19 @@ export type JevAnnotation = {
   latencyMs: number | null;
   /** 未取得と 0 を区別する。取れなければ null。 */
   credits: { before: JevCredits | null; after: JevCredits | null };
-  coverage: { stateChars: number; questionCount: number; truncated: false };
+  /**
+   * この 1 回の実費（USD）。**費用の正本はここで、残高差分ではない。**
+   * Gateway の利用量は非同期で取り込まれるため、残高の前後差は生成ごとの実費と一致しない
+   * （実測で 5 件の合計 $0.000104 に対し残高差は $0.000091 だった）。丸めずに保持する。
+   */
+  costUsd: number | null;
+  coverage: {
+    stateChars: number;
+    /** state + 最長 question の UTF-8 バイト数。上限判定に使った値そのもの。 */
+    inputBytes: number;
+    questionCount: number;
+    truncated: false;
+  };
   /** provider が返した metadata の生写し（confidence が来るかの実測用）。 */
   providerMetadata: Record<string, unknown> | null;
 };
@@ -165,14 +205,14 @@ export type JevRunner = {
     questions: Record<string, JevQuestion>;
     abortSignal: AbortSignal;
   }): Promise<JevRawResult>;
-  credits(): Promise<JevCredits | null>;
+  credits(): Promise<JevCreditsResult>;
 };
 
 export type JevOptions = {
   apiKey?: string;
   runner?: JevRunner;
   timeoutMs?: number;
-  maxStateChars?: number;
+  maxInputBytes?: number;
   maxQuestions?: number;
   /** null で残高 gate を無効にする（残高 API 自体を検証する時だけ）。 */
   minBalanceUsd?: number | null;
@@ -192,6 +232,37 @@ function canonicalJson(value: unknown): string {
 
 function sha256(text: string): string {
   return createHash('sha256').update(text).digest('hex');
+}
+
+function utf8Bytes(text: string): number {
+  return Buffer.byteLength(text, 'utf8');
+}
+
+/**
+ * provider が返した実費を取り出す。`providerMetadata.gateway.cost` は
+ * `"0.000013524"` のような文字列で来る。読めなければ null（0 にしない）。
+ */
+export function readGatewayCostUsd(
+  providerMetadata: Record<string, unknown> | null | undefined,
+): number | null {
+  const gatewayMeta = providerMetadata?.gateway;
+  if (typeof gatewayMeta !== 'object' || gatewayMeta === null) return null;
+  const raw = (gatewayMeta as Record<string, unknown>).cost;
+  if (typeof raw !== 'string' && typeof raw !== 'number') return null;
+  const value = Number(raw);
+  return Number.isFinite(value) && value >= 0 ? value : null;
+}
+
+/**
+ * 課金対象になる入力の大きさ。TypeSafe の制約が「state + 最長 question」なので
+ * 同じ組み合わせで測る。question の instructions と criteria の両方を数える。
+ */
+export function jevInputBytes(request: JevRequest): number {
+  const stateBytes = utf8Bytes(canonicalJson(request.state));
+  const questionBytes = Object.values(request.questions).map((question) =>
+    utf8Bytes(canonicalJson(question)),
+  );
+  return stateBytes + Math.max(0, ...questionBytes);
 }
 
 /**
@@ -272,9 +343,9 @@ function readProbabilities(raw: Record<string, unknown>, allowedKeys: Set<string
 /**
  * 1 問分の回答を、こちらが定義した形へ落とす。落とせなければ null。
  *
- * ここが state 由来の指示に対する実際の境界になる。question id・type・choice の
- * 選択肢・score の段数はすべて要求側が決めた集合に閉じており、model が別の値を
- * 返しても採用されない。
+ * question id・type・choice の選択肢・score の段数はすべて要求側が決めた集合に閉じており、
+ * model が別の値を返しても採用されない。**ただし守るのは形だけで、内容は守らない** —
+ * 許可集合の中へ誘導された回答は素通りする。詳細はファイル冒頭の schema confinement の節。
  */
 export function normalizeJevAnswer(
   question: JevQuestion,
@@ -418,15 +489,25 @@ export function createJevRunner(options: { apiKey: string; timeoutMs: number }):
         providerMetadata: result.providerMetadata as Record<string, unknown> | undefined,
       };
     },
-    async credits() {
+    async credits(): Promise<JevCreditsResult> {
       try {
-        return parseCredits(await gateway.getCredits());
-      } catch {
-        // 残高が読めないこと自体は評価を止める理由にならない。未取得として返す。
-        return null;
+        const credits = parseCredits(await gateway.getCredits());
+        return credits ? { status: 'ok', credits } : { status: 'unreadable' };
+      } catch (error) {
+        // 401 / 429 / timeout をここで潰さない。呼び出し側が classifyJevError で分ける。
+        return { status: 'failed', error };
       }
     },
   };
+}
+
+/**
+ * 評価が終わったあとの残高取得。ここでの失敗は注釈を落とす理由にならないので、
+ * 失敗も読めない応答も未取得（null）として扱う。事前取得とは扱いが違う。
+ */
+async function readCredits(runner: JevRunner): Promise<JevCredits | null> {
+  const result = await runner.credits();
+  return result.status === 'ok' ? result.credits : null;
 }
 
 export function jevCacheKey(request: JevRequest): string {
@@ -449,11 +530,12 @@ export async function evaluateWithJev(
   options: JevOptions = {},
 ): Promise<JevAnnotation> {
   const now = options.now ?? (() => new Date());
-  const maxStateChars = options.maxStateChars ?? JEV_MAX_STATE_CHARS;
+  const maxInputBytes = options.maxInputBytes ?? JEV_MAX_INPUT_BYTES;
   const maxQuestions = options.maxQuestions ?? JEV_MAX_QUESTIONS;
   const minBalanceUsd =
     options.minBalanceUsd === undefined ? JEV_MIN_BALANCE_USD : options.minBalanceUsd;
   const stateText = canonicalJson(request.state);
+  const inputBytes = jevInputBytes(request);
 
   const base = {
     schemaVersion: JEV_SCHEMA_VERSION,
@@ -467,8 +549,10 @@ export async function evaluateWithJev(
     usage: { inputTokens: null, outputTokens: null },
     latencyMs: null,
     credits: { before: null, after: null },
+    costUsd: null,
     coverage: {
       stateChars: stateText.length,
+      inputBytes,
       questionCount: Object.keys(request.questions).length,
       truncated: false as const,
     },
@@ -487,7 +571,7 @@ export async function evaluateWithJev(
   if (validateJevRequest(request, { maxQuestions }).length > 0)
     return stop({ status: 'abstained', reasonCode: 'invalid_request' });
 
-  if (stateText.length > maxStateChars)
+  if (inputBytes > maxInputBytes)
     return stop({ status: 'abstained', reasonCode: 'input_too_large' });
 
   const apiKey = options.apiKey ?? process.env.AI_GATEWAY_API_KEY ?? '';
@@ -498,7 +582,10 @@ export async function evaluateWithJev(
       : null);
   if (!runner) return stop({ status: 'unavailable', reasonCode: 'missing_credentials' });
 
-  const before = await runner.credits();
+  const beforeResult = await runner.credits();
+  // 残高取得の失敗は予算問題ではない。401 なら auth_failed、429 なら rate_limited を返す。
+  if (beforeResult.status === 'failed') return stop(classifyJevError(beforeResult.error));
+  const before = beforeResult.status === 'ok' ? beforeResult.credits : null;
   if (minBalanceUsd !== null) {
     if (before === null) return stop({ status: 'budget_exhausted', reasonCode: 'balance_unknown' });
     if (before.balance < minBalanceUsd)
@@ -522,12 +609,12 @@ export async function evaluateWithJev(
     // timeout でも課金済みの可能性があるため、失敗側でも残高を取り直す。
     return stop(classifyJevError(error), {
       latencyMs: Date.now() - startedAt,
-      credits: { before, after: await runner.credits() },
+      credits: { before, after: await readCredits(runner) },
     });
   }
 
   const latencyMs = Date.now() - startedAt;
-  const after = await runner.credits();
+  const after = await readCredits(runner);
   const answers = normalizeAnswers(
     request.questions,
     raw.answers ?? {},
@@ -536,6 +623,7 @@ export async function evaluateWithJev(
   const telemetry = {
     latencyMs,
     credits: { before, after },
+    costUsd: readGatewayCostUsd(raw.providerMetadata),
     resolvedModelId: raw.response?.modelId ?? null,
     usage: {
       inputTokens: typeof raw.usage?.inputTokens === 'number' ? raw.usage.inputTokens : null,

@@ -15,9 +15,9 @@ import { readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
 import {
+  JEV_MAX_INPUT_BYTES,
   JEV_MAX_QUESTIONS,
   JEV_MAX_RETRIES,
-  JEV_MAX_STATE_CHARS,
   JEV_MIN_BALANCE_USD,
   JEV_MODEL_ID,
   JEV_SCHEMA_VERSION,
@@ -131,7 +131,7 @@ async function run(): Promise<number> {
           modelId: JEV_MODEL_ID,
           limits: {
             maxRetries: JEV_MAX_RETRIES,
-            maxStateChars: JEV_MAX_STATE_CHARS,
+            maxInputBytes: JEV_MAX_INPUT_BYTES,
             maxQuestions: JEV_MAX_QUESTIONS,
             minBalanceUsd: JEV_MIN_BALANCE_USD,
           },
@@ -144,7 +144,7 @@ async function run(): Promise<number> {
   } else {
     console.log(`Jev 設定検査（schema v${JEV_SCHEMA_VERSION} / model ${JEV_MODEL_ID}）`);
     console.log(
-      `上限: state ${JEV_MAX_STATE_CHARS} 文字 / 質問 ${JEV_MAX_QUESTIONS} 件 / 残高の床 $${JEV_MIN_BALANCE_USD}`,
+      `上限: 入力 ${JEV_MAX_INPUT_BYTES} バイト（state + 最長 question）/ 質問 ${JEV_MAX_QUESTIONS} 件 / 残高の床 $${JEV_MIN_BALANCE_USD}`,
     );
     console.log('');
     for (const check of checks)

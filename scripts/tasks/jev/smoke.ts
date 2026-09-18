@@ -25,9 +25,18 @@ import {
 } from '../../lib/jev-adapter.ts';
 import { JEV_SMOKE_CASES } from '../../lib/jev-smoke-cases.ts';
 
-function argValue(flag: string): string | null {
+type ArgResult =
+  | { status: 'absent' }
+  | { status: 'ok'; value: string }
+  /** flag はあるが値が無い。全件送信へ倒すと課金付きで 3 件出てしまうので分ける。 */
+  | { status: 'missing-value' };
+
+function argValue(flag: string): ArgResult {
   const index = process.argv.indexOf(flag);
-  return index >= 0 ? (process.argv[index + 1] ?? null) : null;
+  if (index < 0) return { status: 'absent' };
+  const value = process.argv[index + 1];
+  if (value === undefined || value.startsWith('-')) return { status: 'missing-value' };
+  return { status: 'ok', value };
 }
 
 const DEFAULT_DELAY_MS = 6_000;
@@ -36,10 +45,15 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function costOf(annotation: JevAnnotation): number | null {
-  const { before, after } = annotation.credits;
-  if (!before || !after) return null;
-  return Number((before.balance - after.balance).toFixed(6));
+/**
+ * 表示用の実費。provider が返した値をそのまま使う。
+ *
+ * 残高差分を使わないのは、Gateway の利用量取り込みが非同期で前後差が実費と一致しないため。
+ * 丸めないのは、この model の 1 件が $0.0000135 で、小数 6 桁に丸めると $0.000014 になり
+ * Phase 0 が測りたい費用を 4% 過大に報告するため。
+ */
+function formatCost(annotation: JevAnnotation): string {
+  return annotation.costUsd === null ? '(未取得)' : annotation.costUsd.toString();
 }
 
 function describe(annotation: JevAnnotation): string[] {
@@ -49,7 +63,7 @@ function describe(annotation: JevAnnotation): string[] {
     `  usage         in=${annotation.usage.inputTokens ?? '?'} out=${annotation.usage.outputTokens ?? '?'}`,
     `  latency       ${annotation.latencyMs ?? '?'} ms`,
     `  balance       ${annotation.credits.before?.balance ?? '?'} -> ${annotation.credits.after?.balance ?? '?'}`,
-    `  cost          ${costOf(annotation) ?? '(未取得)'}`,
+    `  cost          ${formatCost(annotation)}`,
   ];
   if (annotation.answers)
     for (const [id, answer] of Object.entries(annotation.answers))
@@ -69,14 +83,32 @@ async function run(): Promise<number> {
   }
 
   const only = argValue('--case');
-  const cases = only ? JEV_SMOKE_CASES.filter((item) => item.id === only) : JEV_SMOKE_CASES;
+  if (only.status === 'missing-value') {
+    console.error('--case に値がない。ケース名を渡すか、flag ごと外して全件実行する');
+    console.error(`  指定できるケース: ${JEV_SMOKE_CASES.map((item) => item.id).join(', ')}`);
+    return 1;
+  }
+  const cases =
+    only.status === 'ok'
+      ? JEV_SMOKE_CASES.filter((item) => item.id === only.value)
+      : JEV_SMOKE_CASES;
   if (cases.length === 0) {
-    console.error(`--case ${only} に一致する合成ケースが無い`);
+    console.error(`--case ${only.status === 'ok' ? only.value : ''} に一致する合成ケースが無い`);
+    return 1;
+  }
+
+  const delayArg = argValue('--delay');
+  if (delayArg.status === 'missing-value') {
+    console.error('--delay に値がない。ミリ秒を渡すか、flag ごと外して既定値を使う');
+    return 1;
+  }
+  const delayMs = delayArg.status === 'ok' ? Number(delayArg.value) : DEFAULT_DELAY_MS;
+  if (!Number.isFinite(delayMs) || delayMs < 0) {
+    console.error('--delay は 0 以上のミリ秒で指定する');
     return 1;
   }
 
   const asJson = process.argv.includes('--json');
-  const delayMs = Number(argValue('--delay') ?? DEFAULT_DELAY_MS);
   const results: Array<{ id: string; purpose: string; annotation: JevAnnotation }> = [];
 
   for (const [index, smokeCase] of cases.entries()) {
@@ -95,8 +127,14 @@ async function run(): Promise<number> {
       break;
     }
 
-    if (annotation.reasonCode === 'rate_limited' && !asJson)
-      console.error(`rate limit に当たった。--delay を ${delayMs} ms より広げて再実行する`);
+    // 429 に当たった窓は数分単位で塞がる。残りを送っても同じ 429 を積むだけなので止める。
+    if (annotation.reasonCode === 'rate_limited') {
+      if (!asJson)
+        console.error(
+          `rate limit に当たったので以降を中止する（窓の回復は実測で 2〜4 分。--delay は現在 ${delayMs} ms）`,
+        );
+      break;
+    }
   }
 
   const evaluated = results.filter((item) => item.annotation.status === 'evaluated');

@@ -32,6 +32,13 @@ export type OperationalItem = {
   vault: string;
   item: string;
   required: boolean;
+  /**
+   * 実在と非空を検査する field。item の存在だけを見ていると、中身が空でも
+   * `1password:check` が通り、`op://` の解決が実行時まで失敗しない。
+   * 期限 field を挙げておくと、期限なしの token が「期限つき」として扱われるのも防げる。
+   * 既存 item の挙動を変えないよう、宣言した item だけが対象。
+   */
+  requiredFields?: string[];
 };
 
 /** 実在してはいけない field。存在すれば 1password:check を失敗させる。 */
@@ -355,7 +362,14 @@ export const operationalItems: OperationalItem[] = [
   // agent vault の基準「漏れても rotate すれば 1 日で戻せるもの」は、key 側の budget
   // （$4 / monthly）と expiration（90 日）で満たす。key は Vercel dashboard 発行で、
   // 作成まで 1password:check はこの item を MISSING_ITEM として落とす（fail-closed）。
-  { vault: agent, item: 'vercel-ai-gateway', required: true },
+  {
+    vault: agent,
+    item: 'vercel-ai-gateway',
+    required: true,
+    // credential が欠けると smoke の op:// 解決が実行時まで失敗せず、expires が無いと
+    // コメント上の 90 日制約を満たさない key が通ってしまう。両方をここで落とす。
+    requiredFields: ['credential', 'expires'],
+  },
 ];
 
 // CI（GitHub Actions）が消費する automation credential の master（vault ci）。replica は

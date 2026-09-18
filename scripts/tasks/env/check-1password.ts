@@ -161,6 +161,14 @@ for (const item of operationalItems) {
 
   console.log(`${item.vault} / ${item.item}: ${status}`);
   if (item.required && status !== 'OK') hasFailure = true;
+
+  // 宣言された field は実在と非空まで見る。item があるだけでは op:// は解決できない。
+  if (status === 'OK')
+    for (const field of item.requiredFields ?? []) {
+      const fieldStatus = checkField(item.vault, item.item, field);
+      console.log(`${item.vault} / ${item.item} / ${field}: ${fieldStatus}`);
+      if (item.required && fieldStatus !== 'OK') hasFailure = true;
+    }
 }
 
 // 禁止 field は「存在しないこと」が期待値。schema から entry を消しただけでは
@@ -235,10 +243,13 @@ for (const [key, itemResult] of itemCache) {
     if (!EXPIRY_LABEL_PATTERN.test((field.label ?? '').trim())) continue;
     const expiresAt = expiryEpochMs(field);
     if (expiresAt === null) {
+      // 読めない期限は期限として機能しない。警告で流すと、期限切れの検出が
+      // 黙って無効になったまま気づけない（2026-09-18、#2836 のレビュー指摘）。
       console.log(`${label}: EXPIRY_UNREADABLE`);
       console.log(
         '  └ 期限 field を日付として読めません（1Password の日付 field か YYYY-MM-DD にする）',
       );
+      hasFailure = true;
       continue;
     }
     const date = new Date(expiresAt).toISOString().slice(0, 10);

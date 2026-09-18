@@ -5,11 +5,13 @@ import { join, resolve } from 'node:path';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { forbiddenFields, onePasswordEnvSchema } from '../tasks/env/schema';
+import { forbiddenFields, onePasswordEnvSchema, operationalItems } from '../tasks/env/schema';
 
 const rootDir = resolve(import.meta.dirname, '../..');
 const temporaryDirectories: string[] = [];
 const sentinelSecret = 'sentinel-secret-must-not-appear';
+/** check-1password.ts の EXPIRY_LABEL_PATTERN と同じ。fixture の値を日付にするため。 */
+const EXPIRY_LIKE_LABEL = /^(有効期限|expires?|expiry|expiration|valid until)$/i;
 
 const fakeOpScript = `#!/bin/sh
 case "$1" in
@@ -78,11 +80,21 @@ function runCheck(options: CheckOptions = {}) {
     ...new Set([
       ...onePasswordEnvSchema.map((entry) => entry.field),
       ...forbiddenFields.map((entry) => entry.field),
+      // operational item が必須と宣言した field も揃った状態を既定にする。
+      // ここを足さないと、item は在るのに field が無い状態が既定になってしまう。
+      ...operationalItems.flatMap((item) => item.requiredFields ?? []),
     ]),
   ].map((field) => ({
     id: field,
     label: field,
-    value: field === options.emptyField ? '' : sentinelSecret,
+    value:
+      field === options.emptyField
+        ? ''
+        : // 期限を表すラベルには日付を入れる。sentinel 文字列のままだと
+          // EXPIRY_UNREADABLE として落ちる（それは別のテストで確かめる）
+          EXPIRY_LIKE_LABEL.test(field)
+          ? '2099-01-01'
+          : sentinelSecret,
   }));
   if (options.expiry) {
     fields.push({
@@ -163,11 +175,24 @@ describe('check-1password.ts', () => {
     expect(result.stdout).not.toContain('EXPIRED');
   });
 
-  it('期限 field を日付として読めない時は値を出さずに知らせる', () => {
+  it('期限 field を日付として読めない時は値を出さずに失敗する', () => {
     const result = runCheck({ expiry: { label: '有効期限', value: sentinelSecret } });
 
     expect(result.stdout).toContain('EXPIRY_UNREADABLE');
     expect(result.stdout).not.toContain(sentinelSecret);
+    // 読めない期限は期限として機能しない。警告で流すと期限切れ検出が黙って無効になる
+    expect(result.status).toBe(1);
+  });
+
+  it('operational item の必須 field が欠けていれば失敗する', () => {
+    const declared = operationalItems.find((item) => item.requiredFields?.length);
+    expect(declared, 'requiredFields を宣言した operational item が無い').toBeDefined();
+    const field = declared?.requiredFields?.[0] ?? '';
+
+    const result = runCheck({ emptyField: field });
+
+    expect(result.stdout).toContain(`${declared?.vault} / ${declared?.item} / ${field}: EMPTY`);
+    expect(result.status).toBe(1);
   });
 
   it('参照先と状態だけを表示し、取得した値を出力しない', () => {
