@@ -1031,6 +1031,8 @@ UptimeRobot は 5 分間隔の HTTP status 監視で、**503 も 504 も同じ�
 
 alert policy の文言は「`/api/health` が 503 を返す」なので、504 が出た場合も unhealthy と読む（原因不明の 504 が出たら `checkRedis` 以外の予期しない hang を疑う）。
 
+**`/api/health` は Sentry の transaction としては観測できない。** Sentry の inbound filter `filtered-transaction` が名前で health check を落とすため、この route の transaction / span は ingest 時に 100% 破棄される（2026-09-18 実測。詳細と ingest 生死の正しい測り方は [monitoring](../operations/monitoring.md) §Sentry runtime contract）。この route の可用性の正本は UptimeRobot と Vercel function log であって Sentry ではない。
+
 #### tRPC が 60 の理由（旧 300 から #1965 で引き下げ）
 
 `/api/trpc/[trpc]` は**全 procedure を 1 function で捌く**ため、最長 procedure に律速される。300 秒だった当時は `externalCalendar` の `syncNow` / `updateSelectedCalendars` が呼ぶ `syncConnection` が wall-clock 予算を持たず（deadline は接続と接続の「間」でしか判定されなかった）、これが 300 に張り付かせていた唯一の既知の理由だった。2026-08-14、PR #2075 で `syncConnection` に wall-clock 予算を持たせ、`router.ts` が `deadlineAt` を渡すようになったため **`maxDuration` を 60 へ引き下げた**（`apps/product/src/app/api/trpc/[trpc]/route.ts`）。
