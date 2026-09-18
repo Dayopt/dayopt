@@ -13,6 +13,7 @@ function renderWithProviders(ui: React.ReactElement) {
 const mockPush = vi.fn();
 const mockSignIn = vi.fn();
 const mockResendConfirmation = vi.fn();
+const mockSignInWithOAuth = vi.fn();
 
 // MFAモックの状態を管理（テストごとに変更可能）
 const mockMfaGetAAL = vi.fn();
@@ -45,8 +46,14 @@ vi.mock('@/features/auth/stores/useAuthStore', () => ({
     selector: (state: {
       signIn: typeof mockSignIn;
       resendConfirmation: typeof mockResendConfirmation;
+      signInWithOAuth: typeof mockSignInWithOAuth;
     }) => unknown,
-  ) => selector({ signIn: mockSignIn, resendConfirmation: mockResendConfirmation }),
+  ) =>
+    selector({
+      signIn: mockSignIn,
+      resendConfirmation: mockResendConfirmation,
+      signInWithOAuth: mockSignInWithOAuth,
+    }),
 }));
 
 vi.mock('@/lib/supabase/client', () => ({
@@ -347,6 +354,7 @@ describe('LoginForm の確認メール再送', () => {
       error: null,
     });
     mockResendConfirmation.mockResolvedValue({ error: null });
+    mockSignInWithOAuth.mockResolvedValue({ error: null });
   });
 
   async function submitFailingLogin() {
@@ -440,5 +448,108 @@ describe('LoginForm の確認メール再送', () => {
       expect(screen.getByText(/auth\.errors\.captchaFailed/)).toBeInTheDocument(),
     );
     expect(screen.queryByText('auth.loginForm.confirmationResent')).not.toBeInTheDocument();
+  });
+});
+
+// 再送は「今の失敗」にだけ紐付ける。前の失敗の宛先が残ると、無関係な
+// アドレスへメールを送りうる。
+describe('LoginForm の再送先の紐付け', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockMfaGetAAL.mockResolvedValue({
+      data: { currentLevel: 'aal1', nextLevel: 'aal1' },
+      error: null,
+    });
+    mockResendConfirmation.mockResolvedValue({ error: null });
+    mockSignInWithOAuth.mockResolvedValue({ error: null });
+  });
+
+  async function failLoginWith(user: ReturnType<typeof userEvent.setup>, email: string) {
+    const emailInput = screen.getByLabelText(/auth\.loginForm\.email/);
+    const passwordInput = screen.getByLabelText(/auth\.loginForm\.password/);
+    await user.clear(emailInput);
+    await user.clear(passwordInput);
+    await user.type(emailInput, email);
+    await user.type(passwordInput, 'Passw0rd!23');
+    await user.click(screen.getByRole('button', { name: 'auth.loginForm.loginButton' }));
+  }
+
+  it('Google ログインが失敗しても前のアドレスの再送導線は残らない', async () => {
+    mockSignIn.mockResolvedValue({
+      data: null,
+      error: { message: 'Invalid login credentials', code: 'invalid_credentials' },
+    });
+    const user = userEvent.setup();
+    renderWithProviders(<LoginForm />);
+
+    await failLoginWith(user, 'first@example.com');
+    expect(
+      await screen.findByRole('button', { name: 'auth.loginForm.resendConfirmation' }),
+    ).toBeInTheDocument();
+
+    mockSignInWithOAuth.mockResolvedValue({ error: { message: 'oauth boom' } });
+    await user.click(screen.getByRole('button', { name: 'auth.loginForm.loginWithGoogle' }));
+
+    await waitFor(() => expect(mockSignInWithOAuth).toHaveBeenCalled());
+    expect(
+      screen.queryByRole('button', { name: 'auth.loginForm.resendConfirmation' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('2 回目の失敗では新しいアドレスを宛先にする', async () => {
+    mockSignIn.mockResolvedValue({
+      data: null,
+      error: { message: 'Invalid login credentials', code: 'invalid_credentials' },
+    });
+    const user = userEvent.setup();
+    renderWithProviders(<LoginForm />);
+
+    await failLoginWith(user, 'first@example.com');
+    await screen.findByRole('button', { name: 'auth.loginForm.resendConfirmation' });
+
+    await failLoginWith(user, 'second@example.com');
+    await user.click(
+      await screen.findByRole('button', { name: 'auth.loginForm.resendConfirmation' }),
+    );
+
+    await waitFor(() => expect(mockResendConfirmation).toHaveBeenCalledWith('second@example.com'));
+    expect(mockResendConfirmation).not.toHaveBeenCalledWith('first@example.com');
+  });
+
+  // 完了するとボタンが消えるので、読み上げ経路が無いと結果が伝わらない
+  it('再送完了は live region で伝える', async () => {
+    mockSignIn.mockResolvedValue({
+      data: null,
+      error: { message: 'Invalid login credentials', code: 'invalid_credentials' },
+    });
+    const user = userEvent.setup();
+    renderWithProviders(<LoginForm />);
+
+    await failLoginWith(user, 'user@example.com');
+    await user.click(
+      await screen.findByRole('button', { name: 'auth.loginForm.resendConfirmation' }),
+    );
+
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent('auth.loginForm.confirmationResent'),
+    );
+  });
+
+  // AGENTS.md §Non-Negotiables: タッチターゲット最小 44x44px
+  it('再送ボタンのタッチ領域を潰さない', async () => {
+    mockSignIn.mockResolvedValue({
+      data: null,
+      error: { message: 'Invalid login credentials', code: 'invalid_credentials' },
+    });
+    const user = userEvent.setup();
+    renderWithProviders(<LoginForm />);
+
+    await failLoginWith(user, 'user@example.com');
+
+    const button = await screen.findByRole('button', {
+      name: 'auth.loginForm.resendConfirmation',
+    });
+    expect(button.className).toContain('min-h-11');
+    expect(button.className).not.toContain('h-auto');
   });
 });

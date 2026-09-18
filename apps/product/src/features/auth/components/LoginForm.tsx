@@ -58,6 +58,9 @@ export function LoginForm({ className, ...props }: React.ComponentProps<'div'>) 
 
   const handleOAuthLogin = async (provider: 'google') => {
     setSubmitError(null);
+    // 再送はメール + パスワードの失敗にだけ紐付ける。ここでクリアしないと、
+    // 直前のメールログイン失敗のアドレスが残り、無関係な宛先へ送りうる。
+    clearResendTarget();
     try {
       const { error } = await signInWithOAuth(provider);
       if (error) {
@@ -107,6 +110,11 @@ export function LoginForm({ className, ...props }: React.ComponentProps<'div'>) 
     },
   });
 
+  const clearResendTarget = () => {
+    setAttemptedEmail(null);
+    setResendState('idle');
+  };
+
   /**
    * 確認メールの再送。
    *
@@ -138,6 +146,9 @@ export function LoginForm({ className, ...props }: React.ComponentProps<'div'>) 
 
   const onSubmit = async (data: LoginFormData) => {
     setSubmitError(null);
+    // 前回の失敗の宛先を持ち越さない。この試行が失敗した時だけ、その時の
+    // アドレスを宛先として設定し直す。
+    clearResendTarget();
 
     try {
       // ステップ1: ログイン試行（最小依存で実行）
@@ -153,7 +164,6 @@ export function LoginForm({ className, ...props }: React.ComponentProps<'div'>) 
         );
         setSubmitError(t(errorKey));
         setAttemptedEmail(data.email);
-        setResendState('idle');
         // Turnstile token は single-use / short-lived。失敗時は widget を reset して
         // 次の retry で新しい challenge token を取得させる
         turnstile.reset();
@@ -221,16 +231,19 @@ export function LoginForm({ className, ...props }: React.ComponentProps<'div'>) 
 
               {submitError && attemptedEmail && (
                 <FieldDescription className="text-center" data-slot="resend-confirmation">
-                  {resendState === 'sent' ? (
-                    t('auth.loginForm.confirmationResent')
-                  ) : (
+                  {/* 完了時にボタンがアンマウントされるため、支援技術へは live region で伝える */}
+                  <span role="status">
+                    {resendState === 'sent' ? t('auth.loginForm.confirmationResent') : null}
+                  </span>
+                  {resendState !== 'sent' && (
                     <>
                       {t('auth.loginForm.resendConfirmationHint')}{' '}
+                      {/* タッチ領域は 44x44px 以上を保つ（AGENTS.md §Non-Negotiables） */}
                       <Button
                         type="button"
                         variant="ghost"
                         size="sm"
-                        className="h-auto p-0"
+                        className="min-h-11 px-2"
                         loading={resendState === 'sending'}
                         disabled={turnstile.blocksSubmit}
                         onClick={handleResendConfirmation}
