@@ -586,6 +586,14 @@ required status checks の実状は ruleset が正本で、context の一覧を�
   のような「docs パスだが integration 対象」の PR で RLS drift 検査が一度も走らずに merge できる
   （#2552 で実際に空いていた穴。ci.yml の integration job の `if:` と同じ向きに揃える）。契約は
   `scripts/__tests__/finish-branch.test.ts` §軽量層（Static Checks / Unit Tests）の実走要求 が固定する
+- **docs-only PR の scripts suite は `🔍 Static Checks` が肩代わりする（2026-09-18、[#2822](https://github.com/Dayopt/dayopt/issues/2822)）。**
+  scripts のテストは `docs/` を入力に読む（`scripts/lib/scripts-taxonomy.ts` が docs 全体を walk して
+  script の分類を決める）。`📦 Unit Tests` の免除をそのままにすると、docs に 1 行足した PR が緑で merge され
+  **main で `pnpm check` が落ちる**（実際に 2 回踏んだ）。`scripts/ci/check.mjs` の `runStatic()` は
+  `shouldRunScriptsTestsInStatic(docsOnly)` が真の時だけ `pnpm test:scripts` を実行し、
+  `shouldRunStaticLanes` と排他になる（非 docs-only では `runUnit()` が同じ suite を走らせるので二重実行しない）。
+  docs を入力に持つテストだけを別 suite へ切り出す案は採らない（対象一覧を人手で維持すると、新しく docs を
+  読み始めたテストが静かに漏れる）
 - **`ci.yml` / `scripts/ci/check.mjs` は `INTEGRATION_GLOBS` に含める（#2539）。** integration を独立 job へ
   切り出した結果、job まるごとが `if:` で skip されうるようになった。配線を持つこの 2 ファイルを
   中立扱いのままにすると、**配線を変えた当の job を一度も実走させずに merge** できる（`nightly.yml` を
@@ -647,7 +655,7 @@ required status checks の実状は ruleset が正本で、context の一覧を�
   `Audit Vercel metadata (trusted)` という CheckRun として出ている。したがって trusted base 実行の
   workflow でも、gate のために commit status を自分で publish する必要は無い。
   `Production Config Audit` という StatusContext が別に存在するのは、job 名から独立した固定 context を
-  持たせるため（`finish-branch.sh` の trusted dispatch 免除がこの context 名で照合する）。
+  持たせるため（`finish-branch.sh` はこの context 名と guard の check 名で advisory 判定を行う）。
   **ただしこの context を ruleset の required 指定に使ってはいけない**（2026-09-03、#2571）。
   PR で publish されるのは `pull_request_target` の `paths` に一致する contract 変更 PR だけになり、
   それ以外の PR では status も check run も存在しない。required にすると、2026-08-05 の
@@ -685,31 +693,53 @@ required status checks の実状は ruleset が正本で、context の一覧を�
   名前を特定できない entry は畳まず全件残す。契約は
   `scripts/__tests__/finish-branch.test.ts` が固定する（#1768）
 
-- **audit contract 変更 PR の guard failure は trusted dispatch で解除する。**
+- **audit contract 変更 PR の guard failure は advisory（2026-09-18、[#2469](https://github.com/Dayopt/dayopt/issues/2469)）。merge は止めない。**
   `production-config-audit.yml` は audit contract 保護対象（`scripts/ci/production-config-audit.mjs` /
   各 `production-build-gate.mjs` / workflow 自身）を変更する PR で、`pull_request_target` の check run
   `Audit Vercel metadata (trusted)` を設計として必ず failure にする（PR code に contract 変更を
-  自己検証させないため）。**2026-09-03（#2571）以降、`pull_request_target` にはこの 4 path の
-  `paths` filter が付いており、そもそも contract 変更 PR でしか workflow が起動しない**
-  （それ以外の PR では check run も status も存在しないので、免除の判定自体が走らない）。
-  live な env drift の検出は日次 cron・`push:main`・promote 経路の `runProductionConfigAudit` が担う。
-  **ただし checkpoint を `paths` だけに委ねてはいない。** workflow が起動しない条件は `paths` の
-  意味論だけでなく、Actions の一時 Disable・base 側の workflow 定義の破損（`pull_request_target` は
-  base 側の定義で評価される）・`paths` の書き間違い・changed files が 3,000 件を超えた時の GitHub 仕様を
-  含み、いずれも「PR code に contract 変更を自己検証させない」設計を静かに無効化する。そこで
-  `finish-branch.sh` は **workflow の起動有無と独立に**、contract を変えた PR へ status
-  `Production Config Audit` の success を要求する（判定は `protected-path-gate.mjs` の `auditContract`）。
-  **変更ファイル一覧そのものを取得できなかった PR も要求する** — contract 変更を否定できない以上、
-  通す理由が無い（#2586 で Codex と architecture-guard の両系統から同じ指摘）。解除は **push ごとに** `gh workflow run production-config-audit.yml --ref <branch>`
-  の trusted dispatch を実行する。成功すると commit status `Production Config Audit` が head SHA へ
-  success で発行される。workflow_dispatch run の check run は PR の `statusCheckRollup` に紐づかないため
-  畳み込みでは解消できず、`finish-branch.sh` は **status `Production Config Audit` が success の時に限り**
-  guard check run の failure を失敗数から除外する（照合は 型 + workflow 名 + check 名 / context の完全一致のみ）。
-  fail-closed: audit が本当に落ちた PR も dispatch 未実行の contract 変更 PR も status は failure のまま
-  免除は発動せず、status は SHA ごとの発行なので新しい push で自動的にリセットされる。免除対象は
-  guard の `conclusion: failure` だけで、`cancelled` / `timed_out`（監査が完走していない状態）は
-  従来どおり停止する。**dispatch は branch 側の workflow 定義と audit script に `VERCEL_TOKEN` を
-  渡して実行される**ため、contract 変更 PR の diff をレビューした後に、ユーザーの明示指示で実行する。
+  自己検証させないため）。**この failure は「contract 4 path を触った」という事実だけを表し、
+  diff の良し悪しを一切表していない。** 本物の監査結果は `workflow_dispatch` run 側にあり、
+  その run の check は PR の `statusCheckRollup` に載らない。`finish-branch.sh` はこの check run と
+  固定 context `Production Config Audit` の status を、`Validation (shadow)` / `Review policy (shadow)` と
+  同じ advisory として失敗数から外す（照合は 型 + workflow 名 + check 名 / context の完全一致のみ。
+  同名でも別 workflow の check、同じ workflow の別 job、その他の failure は従来どおり merge を止める）。
+  **無条件に advisory にはしない。** workflow の `Enforce audit result` は「contract を変えた」
+  （設計上の failure）でも「Vercel の env metadata が Production contract と食い違う」（本物の drift）でも
+  exit 1 するため、check run の conclusion と status の state では両者を区別できない。分けられるのは
+  status の `description` だけで、**advisory にしてよい 2 文言の完全一致（allowlist）で判定する**:
+
+  | description                                              | 扱い                                       |
+  | -------------------------------------------------------- | ------------------------------------------ |
+  | `Audit contract changed; trusted head audit is required` | advisory（この head に監査結果は無い）     |
+  | `Vercel metadata matches the Production contract`        | advisory（trusted dispatch の監査が pass） |
+  | `Vercel metadata does not match the Production contract` | 停止                                       |
+  | 上記以外・取得失敗・status 不在                          | 停止（fail closed）                        |
+
+  既定を advisory 側に置くと、workflow が将来 failure 文言を追加した時に**本物の失敗が無言で除外される**。
+  **`gh pr view --json statusCheckRollup` は StatusContext の description を返さない**
+  （context / state / startedAt / targetUrl のみ）ので、guard が落ちている時だけ
+  `gh api --paginate 'repos/{owner}/{repo}/commits/<head>/statuses?per_page=100'` を引いて最新 1 件を読む。
+  **全ページ取る**のは、combined status API が既定で先頭 30 件しか返さず、controller の再評価で
+  `Production Config Audit` が押し出されると contract 変更 PR の `branch:finish` が恒久的に止まるため
+  （PR #2834 の head で実測 28 件。`validation-shadow-report.mjs` が同じ理由で `per_page=100` を使っている）。
+  **境界**: contract を変えた PR で同時に live な drift が起きていても、workflow は `CONTRACT_CHANGED` を
+  `AUDIT_EXIT` より優先するため description は「監査結果なし」になり、ここでは drift を検出できない。
+  drift は PR の diff ではなく production の現況なので、検出は push:main / nightly / promote の
+  `runProductionConfigAudit` が担う。
+  **2026-09-03（#2571）から 2026-09-18 まで、ここは contract 変更 PR に status success を必須にしていた。**
+  撤去した理由は 3 つ。(1) merge の遮断は 2026-09-13（[#2640](https://github.com/Dayopt/dayopt/issues/2640)）以降 main の ruleset 1 本で、
+  required checks に `Production Config Audit` は含まれない。この checkpoint は `branch:finish` だけに効く
+  非対称な local gate で、`gh api` 直叩きの merge は同じ PR をそのまま通していた。(2) status は SHA ごとの
+  発行なので、**追従 merge だけの push にも同じ重さの人間 gate**を要求した（[#2464](https://github.com/Dayopt/dayopt/pull/2464) で 1 PR に 3 回。
+  3 回目はレーンの変更を 1 行も含まない main 取り込み）。(3) contract 変更の可視化は
+  `protected-path-gate.mjs` 由来の advisory review 推奨が担い、live な env drift の検出は日次 cron・
+  `push:main`・promote 経路の `runProductionConfigAudit` が担う。
+  **trusted dispatch は残っている。** merge 前に手で確かめたい時は、contract 変更 PR の diff を
+  レビューしたうえで `gh workflow run production-config-audit.yml --ref <branch>` を実行する。
+  **dispatch は branch 側の workflow 定義と audit script に `VERCEL_TOKEN` を渡して実行される**ため、
+  ユーザーの明示指示で実行する（merge の条件ではなく、任意の pre-merge 確認）。
+  なお `pull_request_target` には contract 4 path の `paths` filter が付いており、それ以外の PR では
+  check run も status も存在しない。
   契約は同じく `scripts/__tests__/finish-branch.test.ts` が固定する
 
 段階的導入案と当時の計測値は履歴であり、現行構成として複製しない。経緯は ADR-016（削除済み、git 履歴参照） に残す。
