@@ -24,6 +24,9 @@ import {
   evaluateWithJev,
   validateJevRequest,
 } from '../../lib/jev-adapter.ts';
+import { SHADOW_QUESTION_IDS } from '../../lib/jev-shadow-questions.ts';
+import { SHADOW_SYNTHETIC_CASES } from '../../lib/jev-shadow-synthetic.ts';
+import { buildShadowRequest } from '../../lib/jev-shadow-truth.ts';
 import { JEV_SMOKE_CASES } from '../../lib/jev-smoke-cases.ts';
 
 // tsx は scripts/ の .ts を CJS へ落とすため `import.meta.url` は使えない。
@@ -112,6 +115,15 @@ async function run(): Promise<number> {
       detail: errors.join(' / ') || smokeCase.purpose,
     });
   }
+
+  // Phase 1 の質問セットも同じ静的検査に通す。質問文を足した時に上限や空欄で落ちるのを
+  // 課金前に捕まえる（合成 state は代表として shadow の合成ケースを 1 件使う）。
+  const shadowErrors = validateJevRequest(buildShadowRequest(SHADOW_SYNTHETIC_CASES[0].state));
+  checks.push({
+    name: 'shadow 質問セットが静的検査を通る',
+    ok: shadowErrors.length === 0,
+    detail: shadowErrors.join(' / ') || `${SHADOW_QUESTION_IDS.length} 問`,
+  });
 
   // 無効化した経路。runner も apiKey も渡さないので、外部へは出ない。
   const disabled = await evaluateWithJev(JEV_SMOKE_CASES[0].request, { disabled: true });
