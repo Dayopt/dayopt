@@ -58,7 +58,13 @@ Supabase Auth ベースの認証機能。
 
 ## Turnstile へ到達できない利用者の扱い
 
-`useTurnstileGate`（`apps/product/src/lib/turnstile/useTurnstileGate.ts`）が login / signup / パスワードリセットの 3 フォームで captcha の状態を持つ。token が来るまで送信を止めるが、**widget が error を返した場合と、15 秒沈黙した場合は送信を通す**。
+`useTurnstileGate`（`apps/product/src/lib/turnstile/useTurnstileGate.ts`）が login / signup / パスワードリセットの 3 フォームで captcha の状態を持つ。token が来るまで送信を止めるが、次の 3 つに当たったら送信を通す。
+
+1. 15 秒以内に widget が**載らなかった**（script ごと遮断された）
+2. widget が error を返した
+3. 環境が非対応だと widget 自身が言った
+
+**待たせている最中の widget は到達不能に含めない。** 時間切れは token ではなく `onWidgetLoad` を待つ。managed widget は対話操作を求めることがあり、スクリーンリーダー利用者や操作に時間のかかる利用者は数十秒かかる。そこを打ち切ると、解けるはずの人へ「このまま送信できます」と案内して `captcha_failed` を踏ませ、widget が作り直されて同じ失敗を繰り返す。
 
 `challenges.cloudflare.com` は広告ブロッカー・企業プロキシ・provider 障害で遮断されうる。token の有無だけで送信ボタンを無効にすると、その利用者は理由の表示も回復手段も無いままログインできなくなる（production では Bot Protection が有効なので 3 フォームすべてが同時に死ぬ）。送信を通せば GoTrue が `captcha_failed` を返し、`auth.errors.captchaFailed` として理由が出る。到達できないこと自体も `auth.errors.captchaUnavailable` で伝える。
 

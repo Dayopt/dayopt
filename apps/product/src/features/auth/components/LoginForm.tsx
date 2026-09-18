@@ -302,9 +302,11 @@ export function LoginForm({ className, ...props }: React.ComponentProps<'div'>) 
                   <div className="flex justify-center">
                     <Turnstile
                       key={turnstile.widgetKey}
+                      onWidgetLoad={turnstile.onWidgetLoad}
                       onSuccess={turnstile.onSuccess}
                       onError={turnstile.onError}
                       onExpire={turnstile.onExpire}
+                      onUnsupported={turnstile.onUnsupported}
                       locale={turnstileLocale}
                     />
                   </div>

@@ -42,11 +42,22 @@ vi.mock('@/lib/turnstile', async (importOriginal) => {
   const React = await import('react');
   const MockTurnstile = React.forwardRef(
     (
-      { onSuccess, onError }: { onSuccess: (token: string) => void; onError: () => void },
+      {
+        onSuccess,
+        onError,
+        onWidgetLoad,
+      }: {
+        onSuccess: (token: string) => void;
+        onError: () => void;
+        onWidgetLoad?: () => void;
+      },
       _ref: React.Ref<unknown>,
     ) => {
       React.useEffect(() => {
         mockTurnstileMount();
+        onWidgetLoad?.();
+        // 実 widget と同じく mount 直後に 1 度だけ載ったことを通知する
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- mount 時の 1 回だけでよい
       }, []);
       return React.createElement(React.Fragment, null, [
         React.createElement(
