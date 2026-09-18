@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-09-16
+last_verified: 2026-09-18
 code:
   - apps/product/src/features/settings/components/EmailChangeDialog.tsx
   - apps/product/src/features/settings/components/PasswordChangeDialog.tsx
@@ -16,6 +16,8 @@ code:
   - apps/product/src/features/auth/server/password-reauthentication.ts
   - apps/product/src/features/auth/server/recovery-service.ts
   - apps/product/src/features/auth/components/ResetPasswordForm.tsx
+  - apps/product/src/features/auth/components/PasswordResetForm.tsx
+  - apps/product/src/lib/turnstile/useTurnstileGate.ts
   - apps/product/src/features/auth/components/MFAVerifyForm.tsx
   - apps/product/src/features/external-calendar/server/account-deletion.ts
   - apps/product/src/features/settings/server/account-deletion.ts
@@ -45,6 +47,28 @@ Supabase Auth ベースの認証機能。
 ただしこれは**エラーメッセージ内の文言差**だけを防ぐ設計であり、**画面遷移そのものの差**は別の保証に依存する。`SignupForm.tsx` は `result.data.session` の有無で「そのままアプリへ」（session あり）と「確認メール待ち画面」（session なし）を分岐する。GoTrue は email confirmation が必須（`enable_confirmations = true` 相当）の場合、**新規登録でも既登録でも** confirmation 待ちの obfuscated レスポンス（session なし）を返す設計になっており、この対称性があって初めて「新規登録者と既登録者で画面遷移が区別できない」という列挙防止が成立する。
 
 **もし production の email confirmation 必須設定が drift して無効化されると**、新規登録は即座に session ありで成功する一方、既登録アドレスへの signup は `getAuthErrorKey` のエラー画面（`signupUnavailable`）に落ちるため、**エラー文言を丸めていても画面遷移の有無で存在が判別可能になる**。この設定（GoTrue の `mailer_autoconfirm`、`expected: false`）は `scripts/ci/production-auth-config-audit.mjs` が既に pin しており、`true`（確認省略）への drift は fail-open として検出される。
+
+## パスワードリセットのユーザー列挙防止
+
+`PasswordResetForm` は送信結果で画面を変えない。未登録アドレスは GoTrue が 200 を返して早期 return する一方、登録済みアドレスは再送間隔（`max_frequency`）の 429 などで失敗しうるため、エラーをそのまま出すと「エラー画面が出る = 登録済み」という存在確認になる。**成功画面はすべての結果に対して出す。**
+
+例外は captcha 失敗（`captcha_failed`）だけで、これは本人が解き直せば解決する。captcha 判定は Turnstile の到達可否に依存し、アカウントの存在とは無関係なので oracle にならない。
+
+失敗そのものの記録は `useAuthStore.resetPassword` の `captureUnexpectedAuthError`（Sentry）が持つ。画面を黙らせても観測は落ちない。
+
+## Turnstile へ到達できない利用者の扱い
+
+`useTurnstileGate`（`apps/product/src/lib/turnstile/useTurnstileGate.ts`）が login / signup / パスワードリセットの 3 フォームで captcha の状態を持つ。token が来るまで送信を止めるが、次の 3 つに当たったら送信を通す。
+
+1. 15 秒以内に widget が**載らなかった**（script ごと遮断された）
+2. widget が error を返した
+3. 環境が非対応だと widget 自身が言った
+
+**待たせている最中の widget は到達不能に含めない。** 時間切れは token ではなく `onWidgetLoad` を待つ。managed widget は対話操作を求めることがあり、スクリーンリーダー利用者や操作に時間のかかる利用者は数十秒かかる。そこを打ち切ると、解けるはずの人へ「このまま送信できます」と案内して `captcha_failed` を踏ませ、widget が作り直されて同じ失敗を繰り返す。
+
+`challenges.cloudflare.com` は広告ブロッカー・企業プロキシ・provider 障害で遮断されうる。token の有無だけで送信ボタンを無効にすると、その利用者は理由の表示も回復手段も無いままログインできなくなる（production では Bot Protection が有効なので 3 フォームすべてが同時に死ぬ）。送信を通せば GoTrue が `captcha_failed` を返し、`auth.errors.captchaFailed` として理由が出る。到達できないこと自体も `auth.errors.captchaUnavailable` で伝える。
+
+**これは captcha を弱める変更ではない。** 検証は GoTrue 側で行われ、token 無しの要求は production では必ず拒否される。変わるのは「押せないボタン」が「サーバーの判断」に置き換わる点だけ。
 
 ## ログイン手段によるアカウント操作の分岐
 

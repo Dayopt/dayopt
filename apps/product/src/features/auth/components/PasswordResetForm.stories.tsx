@@ -93,18 +93,22 @@ export const Success: Story = {
 };
 
 /**
- * サーバーエラー表示状態。
+ * captcha 失敗のエラー表示。
  *
- * resetPassword がエラーを返すようにモックし、送信後にエラーメッセージが
- * フォーム上部に表示されることを確認する。
+ * 本人が解き直せば解決するので、これだけはエラーとして伝える。
  */
-export const ServerError: Story = {
+export const CaptchaError: Story = {
   parameters: {
     storeMocks: {
       useAuthStore: {
         resetPassword: () =>
           Promise.resolve({
-            error: { message: 'Email rate limit exceeded', name: 'AuthError', status: 429 },
+            error: {
+              message: 'captcha protection: request disallowed',
+              code: 'captcha_failed',
+              name: 'AuthError',
+              status: 400,
+            },
           } as never),
       },
     },
@@ -120,6 +124,43 @@ export const ServerError: Story = {
 
     // エラーメッセージが表示されることを確認
     await expect(canvas.getByRole('alert')).toBeInTheDocument();
+  },
+};
+
+/**
+ * 再送間隔の 429 でも成功画面を出す（ユーザー列挙の防止）。
+ *
+ * 未登録アドレスは GoTrue が 200 を返す一方、登録済みアドレスは再送間隔で 429 に
+ * なりうる。画面が分かれると、その差自体がアカウント存在の確認手段になる。
+ */
+export const RateLimitedShowsSuccess: Story = {
+  parameters: {
+    storeMocks: {
+      useAuthStore: {
+        resetPassword: () =>
+          Promise.resolve({
+            error: {
+              message: 'For security purposes, you can only request this after 47 seconds.',
+              code: 'over_email_send_rate_limit',
+              name: 'AuthError',
+              status: 429,
+            },
+          } as never),
+      },
+    },
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    const emailInput = canvas.getByLabelText(/メールアドレス/i);
+    await userEvent.type(emailInput, 'forgot@example.com');
+
+    const submitButton = canvas.getByRole('button', { name: /リセット用リンクを送信/i });
+    await userEvent.click(submitButton);
+
+    // 成功と同じ画面になる（エラー表示は出ない）
+    await expect(canvas.getByRole('heading', { level: 1 })).toBeInTheDocument();
+    await expect(canvas.queryByRole('alert')).not.toBeInTheDocument();
   },
 };
 

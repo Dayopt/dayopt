@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 
 import { createDayoptUrl, dayoptUrls } from '@dayopt/config';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -12,7 +12,7 @@ import { Link } from '@dayopt/i18n/navigation';
 import { useForm } from 'react-hook-form';
 
 import { logger } from '@/lib/logger';
-import { isTurnstileEnabled, Turnstile, type TurnstileInstance } from '@/lib/turnstile';
+import { Turnstile, useTurnstileGate } from '@/lib/turnstile';
 import {
   Button,
   Card,
@@ -82,9 +82,7 @@ export function SignupForm({ className, ...props }: React.ComponentProps<'div'>)
   };
   const [emailConfirmationPending, setEmailConfirmationPending] = useState(false);
   const [pendingEmail, setPendingEmail] = useState('');
-  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
-  const turnstileRef = useRef<TurnstileInstance | null>(null);
-  const turnstileEnabled = isTurnstileEnabled();
+  const turnstile = useTurnstileGate();
   const turnstileLocale: 'ja' | 'en' | 'auto' =
     locale === 'ja' ? 'ja' : locale === 'en' ? 'en' : 'auto';
 
@@ -115,8 +113,8 @@ export function SignupForm({ className, ...props }: React.ComponentProps<'div'>)
     }
 
     try {
-      const result = turnstileToken
-        ? await signUp(data.email, data.password, { captchaToken: turnstileToken })
+      const result = turnstile.token
+        ? await signUp(data.email, data.password, { captchaToken: turnstile.token })
         : await signUp(data.email, data.password);
       if (result.error) {
         const errorKey = getAuthErrorKey(
@@ -126,8 +124,7 @@ export function SignupForm({ className, ...props }: React.ComponentProps<'div'>)
         setServerError(t(errorKey));
         // Turnstile token は single-use / short-lived。失敗時は widget を reset して次の retry で
         // 新しい challenge token を取得させる（captcha 使い回しによる連続失敗を防ぐ）
-        setTurnstileToken(null);
-        turnstileRef.current?.reset();
+        turnstile.reset();
       } else if (result.data.session) {
         // メール確認不要 — そのままアプリへ
         router.push(`/${locale}/calendar`);
@@ -139,8 +136,7 @@ export function SignupForm({ className, ...props }: React.ComponentProps<'div'>)
     } catch (err) {
       logger.error('[SignupForm] Signup error:', err);
       setServerError(t('auth.errors.unexpectedError'));
-      setTurnstileToken(null);
-      turnstileRef.current?.reset();
+      turnstile.reset();
     }
   };
 
@@ -169,7 +165,6 @@ export function SignupForm({ className, ...props }: React.ComponentProps<'div'>)
     <div className={cn('flex flex-col gap-6', className)} {...props}>
       <Card className="overflow-hidden p-0">
         <CardContent className="p-0">
-          {/* eslint-disable-next-line react-hooks/refs -- onSubmit は submit 時のみ turnstileRef.current を読む event handler。handleSubmit(onSubmit) の closure 解析による誤検知を抑制 */}
           <form className="p-6 md:p-8" onSubmit={handleSubmit(onSubmit)}>
             <FieldGroup>
               <div className="flex flex-col items-center text-center">
@@ -287,17 +282,24 @@ export function SignupForm({ className, ...props }: React.ComponentProps<'div'>)
                 )}
               </Field>
 
-              {turnstileEnabled && (
+              {turnstile.enabled && (
                 <Field>
                   <div className="flex justify-center">
                     <Turnstile
-                      ref={turnstileRef}
-                      onSuccess={(token) => setTurnstileToken(token)}
-                      onError={() => setTurnstileToken(null)}
-                      onExpire={() => setTurnstileToken(null)}
+                      key={turnstile.widgetKey}
+                      onWidgetLoad={turnstile.onWidgetLoad}
+                      onSuccess={turnstile.onSuccess}
+                      onError={turnstile.onError}
+                      onExpire={turnstile.onExpire}
+                      onUnsupported={turnstile.onUnsupported}
                       locale={turnstileLocale}
                     />
                   </div>
+                  {turnstile.unavailable && (
+                    <FieldDescription data-slot="turnstile-unavailable">
+                      {t('auth.errors.captchaUnavailable')}
+                    </FieldDescription>
+                  )}
                 </Field>
               )}
 
@@ -305,7 +307,7 @@ export function SignupForm({ className, ...props }: React.ComponentProps<'div'>)
                 <Button
                   type="submit"
                   loading={isSubmitting}
-                  disabled={turnstileEnabled && !turnstileToken}
+                  disabled={turnstile.blocksSubmit}
                   className="w-full"
                 >
                   {t('auth.signupForm.createAccountButton')}

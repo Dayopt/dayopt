@@ -2492,7 +2492,7 @@ graph LR
 </details>
 
 <details>
-<summary>test の候補（16）</summary>
+<summary>test の候補（17）</summary>
 
 <!-- prettier-ignore -->
 | ファイル | 対応の根拠 |
@@ -2510,6 +2510,7 @@ graph LR
 | [apps/product/src/features/auth/server/user-service.test.ts](<../../../apps/product/src/features/auth/server/user-service.test.ts>) | feature: auth |
 | [apps/product/src/features/auth/server/welcome-email.test.ts](<../../../apps/product/src/features/auth/server/welcome-email.test.ts>) | feature: auth |
 | [apps/product/src/features/auth/stores/resolve-user-id.test.ts](<../../../apps/product/src/features/auth/stores/resolve-user-id.test.ts>) | feature: auth |
+| [apps/product/src/features/auth/stores/useAuthStore.sessionExpired.test.ts](<../../../apps/product/src/features/auth/stores/useAuthStore.sessionExpired.test.ts>) | feature: auth |
 | [apps/product/src/features/auth/stores/useAuthStore.updatePassword.test.ts](<../../../apps/product/src/features/auth/stores/useAuthStore.updatePassword.test.ts>) | feature: auth |
 | [apps/product/src/lib/test/integration/mfa-recovery-codes-lockdown.integration.test.ts](<../../../apps/product/src/lib/test/integration/mfa-recovery-codes-lockdown.integration.test.ts>) | DB 関数: count_unused_recovery_codes |
 | [apps/product/src/lib/test/integration/rls-access.integration.test.ts](<../../../apps/product/src/lib/test/integration/rls-access.integration.test.ts>) | DB 関数: count_unused_recovery_codes / DB 関数: use_recovery_code |
