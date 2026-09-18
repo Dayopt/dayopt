@@ -17,6 +17,8 @@
  * 待つかどうかは呼び出し側が明示的に決める（AI SDK 既定の retry を 0 に固定して
  * いるのと同じ理由。隠れた再送で無料枠と 429 が同時に増えるのを避ける）。
  */
+import { realpathSync } from 'node:fs';
+
 import {
   JEV_MODEL_ID,
   JEV_SCHEMA_VERSION,
@@ -25,22 +27,53 @@ import {
 } from '../../lib/jev-adapter.ts';
 import { JEV_SMOKE_CASES } from '../../lib/jev-smoke-cases.ts';
 
-type ArgResult =
-  | { status: 'absent' }
-  | { status: 'ok'; value: string }
-  /** flag はあるが値が無い。全件送信へ倒すと課金付きで 3 件出てしまうので分ける。 */
-  | { status: 'missing-value' };
+/**
+ * argv を既知の flag と値へ**完全に**解釈する。未知の option も余分な positional も
+ * usage error にする。
+ *
+ * 個別の flag だけを `indexOf` で拾っていた頃は、`--cas minimal` のような打ち間違いが
+ * 「--case は無い」と読まれて全 3 件の課金リクエストへ化けた。知らない引数を無視する
+ * 設計そのものをやめる。
+ */
+export type SmokeArgs = { caseId: string | null; delayMs: number; asJson: boolean };
 
-function argValue(flag: string): ArgResult {
-  const index = process.argv.indexOf(flag);
-  if (index < 0) return { status: 'absent' };
-  const value = process.argv[index + 1];
-  if (value === undefined || value.startsWith('-')) return { status: 'missing-value' };
-  // `--delay "$JEV_DELAY"` の env が未設定だと空文字が渡る。`Number('')` は 0 なので、
-  // そのまま通すと安全間隔が黙って無効になる（実測で 3 件目が 429 になる条件）。
-  const trimmed = value.trim();
-  if (trimmed === '') return { status: 'missing-value' };
-  return { status: 'ok', value: trimmed };
+export function parseSmokeArgs(
+  argv: readonly string[],
+): { ok: true; args: SmokeArgs } | { ok: false; message: string } {
+  let caseId: string | null = null;
+  let delayMs = DEFAULT_DELAY_MS;
+  let asJson = false;
+
+  for (let index = 0; index < argv.length; index += 1) {
+    const token = argv[index];
+    if (token === '--') continue;
+    if (token === '--json') {
+      asJson = true;
+      continue;
+    }
+    if (token !== '--case' && token !== '--delay')
+      return { ok: false, message: `未知の引数: ${token}` };
+
+    const raw = argv[index + 1];
+    if (raw === undefined || raw.startsWith('-'))
+      return { ok: false, message: `${token} に値がない` };
+    // `--delay "$JEV_DELAY"` の env が未設定だと空文字が渡る。`Number('')` は 0 なので、
+    // そのまま通すと安全間隔が黙って無効になる（実測で 3 件目が 429 になる条件）。
+    const value = raw.trim();
+    if (value === '') return { ok: false, message: `${token} の値が空` };
+    index += 1;
+
+    if (token === '--case') {
+      caseId = value;
+      continue;
+    }
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed) || parsed < 0)
+      return { ok: false, message: '--delay は 0 以上のミリ秒で指定する' };
+    delayMs = parsed;
+  }
+
+  return { ok: true, args: { caseId, delayMs, asJson } };
 }
 
 const DEFAULT_DELAY_MS = 6_000;
@@ -80,29 +113,19 @@ function describe(annotation: JevAnnotation): string[] {
 async function run(): Promise<number> {
   // 引数の検証を credential より先に行う。使い方の誤りは認証の有無と無関係で、
   // ここで落とせば外部呼び出しも課金も起きない。
-  const only = argValue('--case');
-  if (only.status === 'missing-value') {
-    console.error('--case に値がない。ケース名を渡すか、flag ごと外して全件実行する');
-    console.error(`  指定できるケース: ${JEV_SMOKE_CASES.map((item) => item.id).join(', ')}`);
+  const parsed = parseSmokeArgs(process.argv.slice(2));
+  if (!parsed.ok) {
+    console.error(parsed.message);
+    console.error(`  使い方: pnpm jev:smoke [--case <id>] [--delay <ms>] [--json]`);
+    console.error(`  ケース: ${JEV_SMOKE_CASES.map((item) => item.id).join(', ')}`);
     return 1;
   }
-  const cases =
-    only.status === 'ok'
-      ? JEV_SMOKE_CASES.filter((item) => item.id === only.value)
-      : JEV_SMOKE_CASES;
-  if (cases.length === 0) {
-    console.error(`--case ${only.status === 'ok' ? only.value : ''} に一致する合成ケースが無い`);
-    return 1;
-  }
+  const { caseId, delayMs, asJson } = parsed.args;
 
-  const delayArg = argValue('--delay');
-  if (delayArg.status === 'missing-value') {
-    console.error('--delay に値がない。ミリ秒を渡すか、flag ごと外して既定値を使う');
-    return 1;
-  }
-  const delayMs = delayArg.status === 'ok' ? Number(delayArg.value) : DEFAULT_DELAY_MS;
-  if (!Number.isFinite(delayMs) || delayMs < 0) {
-    console.error('--delay は 0 以上のミリ秒で指定する');
+  const cases = caseId ? JEV_SMOKE_CASES.filter((item) => item.id === caseId) : JEV_SMOKE_CASES;
+  if (cases.length === 0) {
+    console.error(`--case ${caseId} に一致する合成ケースが無い`);
+    console.error(`  ケース: ${JEV_SMOKE_CASES.map((item) => item.id).join(', ')}`);
     return 1;
   }
 
@@ -114,7 +137,6 @@ async function run(): Promise<number> {
     return 1;
   }
 
-  const asJson = process.argv.includes('--json');
   const results: Array<{ id: string; purpose: string; annotation: JevAnnotation }> = [];
 
   for (const [index, smokeCase] of cases.entries()) {
@@ -143,7 +165,16 @@ async function run(): Promise<number> {
     }
   }
 
-  const evaluated = results.filter((item) => item.annotation.status === 'evaluated');
+  // 実モデル ID の確認は Phase 0 の目的そのもの。evaluated だけを成功条件にすると、
+  // SDK や Gateway の変更で modelId が欠落・変化しても素通りする。
+  const succeeded = results.filter(
+    (item) =>
+      item.annotation.status === 'evaluated' && item.annotation.resolvedModelId === JEV_MODEL_ID,
+  );
+  const wrongModel = results.filter(
+    (item) =>
+      item.annotation.status === 'evaluated' && item.annotation.resolvedModelId !== JEV_MODEL_ID,
+  );
 
   if (asJson) {
     console.log(
@@ -154,18 +185,43 @@ async function run(): Promise<number> {
       ),
     );
   } else {
-    console.log(`${evaluated.length} / ${results.length} 件が evaluated`);
+    console.log(
+      `${succeeded.length} / ${results.length} 件が evaluated（実モデル ID の一致を含む）`,
+    );
+    for (const item of wrongModel)
+      console.error(
+        `[${item.id}] 応答のモデルが ${JEV_MODEL_ID} でない: ${item.annotation.resolvedModelId ?? '(無し)'}`,
+      );
   }
 
-  return evaluated.length === results.length && results.length === cases.length ? 0 : 1;
+  return succeeded.length === cases.length ? 0 : 1;
 }
 
-run().then(
-  (code) => {
-    process.exitCode = code;
-  },
-  (error: unknown) => {
-    console.error(error);
-    process.exitCode = 1;
-  },
-);
+/**
+ * 直接実行された時だけ走らせる。test が `parseSmokeArgs` を import するだけで
+ * CLI 本体が動き、credential が環境にあれば実リクエストまで飛ぶのを防ぐ。
+ *
+ * `scripts/lib/is-direct-execution.mjs` は `import.meta.url` を受け取る形だが、
+ * tsx は scripts の .ts を CJS へ落とすため `import.meta` を使えない。
+ * 同じ判定を `__filename` で行う。
+ */
+function isDirectExecution(): boolean {
+  if (!process.argv[1]) return false;
+  try {
+    return realpathSync(process.argv[1]) === realpathSync(__filename);
+  } catch {
+    return false;
+  }
+}
+
+if (isDirectExecution()) {
+  run().then(
+    (code) => {
+      process.exitCode = code;
+    },
+    (error: unknown) => {
+      console.error(error);
+      process.exitCode = 1;
+    },
+  );
+}

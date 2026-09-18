@@ -189,9 +189,9 @@ describe('入力上限はバイトで測る（多言語でも token 上限を超
 
     // 文字数で測っていた頃は両方とも通っていた。日本語は 1 文字 3 バイトなので
     // 同じ 400 文字でも実際の入力量は 3 倍になる。
-    expect(jevInputBytes(japanese)).toBeGreaterThan(jevInputBytes(ascii) * 2);
+    expect(jevInputBytes(japanese).longest).toBeGreaterThan(jevInputBytes(ascii).longest * 2);
 
-    const limit = jevInputBytes(ascii) + 50;
+    const limit = jevInputBytes(ascii).longest + 50;
     expect((await run({ runner: runnerWith(), maxInputBytes: limit }, ascii)).status).toBe(
       'evaluated',
     );
@@ -201,6 +201,39 @@ describe('入力上限はバイトで測る（多言語でも token 上限を超
     });
   });
 
+  it('最長 question が小さくても合計が大きければ落とす', async () => {
+    // 1 件あたりは小さいが数で total を押し上げる形。longest だけ見ていると素通りする
+    const many: JevRequest = {
+      ...request,
+      state: { body: 'a'.repeat(100) },
+      questions: Object.fromEntries(
+        Array.from({ length: 10 }, (_, index) => [
+          `q${index}`,
+          { type: 'boolean' as const, instructions: 'b'.repeat(2000) },
+        ]),
+      ),
+    };
+    const budget = jevInputBytes(many);
+    expect(budget.total).toBeGreaterThan(budget.longest * 5);
+
+    const annotation = await run(
+      {
+        runner: runnerWith(),
+        maxQuestions: 20,
+        maxInputBytes: budget.longest + 100,
+        maxTotalInputBytes: budget.total - 100,
+      },
+      many,
+    );
+    expect(annotation).toMatchObject({ status: 'abstained', reasonCode: 'input_too_large' });
+  });
+
+  it('total は送る payload そのものから測る', () => {
+    // 個々の項目を足し合わせるのではなく { state, questions } を丸ごと測っているか
+    const budget = jevInputBytes(request);
+    expect(budget.total).toBeGreaterThan(budget.longest);
+  });
+
   it('question id も予算に含める', () => {
     const longId: JevRequest = {
       ...request,
@@ -208,7 +241,7 @@ describe('入力上限はバイトで測る（多言語でも token 上限を超
     };
     const shortId: JevRequest = { ...request, questions: { q: questions.localized } };
     // id は payload のキーとして送られる。内容だけ測ると長い id が検査をすり抜ける
-    expect(jevInputBytes(longId) - jevInputBytes(shortId)).toBeGreaterThan(290);
+    expect(jevInputBytes(longId).longest - jevInputBytes(shortId).longest).toBeGreaterThan(290);
   });
 
   it('最長 question も同じ予算に含める', () => {
@@ -219,7 +252,9 @@ describe('入力上限はバイトで測る（多言語でも token 上限を超
         verbose: { type: 'boolean', instructions: 'あ'.repeat(500) },
       },
     };
-    expect(jevInputBytes(withLongQuestion)).toBeGreaterThan(jevInputBytes(request) + 1000);
+    expect(jevInputBytes(withLongQuestion).longest).toBeGreaterThan(
+      jevInputBytes(request).longest + 1000,
+    );
   });
 });
 
@@ -450,8 +485,26 @@ describe('分布はあるなら完全で整合していることを要求する'
         probabilities: { routine: 0.1, standard: 0.2, frontier: 0.7 },
       },
     ],
+    [
+      '僅差で最大でない choice（合計の許容誤差を argmax へ流用しない）',
+      {
+        type: 'choice',
+        choice: 'routine',
+        probabilities: { routine: 0.49, standard: 0.51, frontier: 0 },
+      },
+    ],
   ])('%s は採用しない', (_label, answer) => {
     expect(normalizeJevAnswer(questions.lane, answer)).toBeNull();
+  });
+
+  it('同率最大は受理する', () => {
+    expect(
+      normalizeJevAnswer(questions.lane, {
+        type: 'choice',
+        choice: 'routine',
+        probabilities: { routine: 0.5, standard: 0.5, frontier: 0 },
+      }),
+    ).toMatchObject({ choice: 'routine', topProbability: 0.5 });
   });
 
   it('丸めによる誤差は許容する', () => {

@@ -3,6 +3,8 @@ import { resolve } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
+import { parseSmokeArgs } from './smoke.ts';
+
 const rootDir = resolve(import.meta.dirname, '../../..');
 
 /**
@@ -18,8 +20,38 @@ function runSmoke(args: string[]) {
   });
 }
 
+describe('parseSmokeArgs は未知の引数を無視しない', () => {
+  it.each([
+    ['打ち間違えた flag', ['--cas', 'minimal']],
+    ['未知の option', ['--verbose']],
+    ['余分な positional', ['minimal']],
+    ['値の無い --case', ['--case']],
+    ['空文字の --delay', ['--delay', '']],
+  ])('%s は ok にしない', (_label, argv) => {
+    expect(parseSmokeArgs(argv).ok).toBe(false);
+  });
+
+  it('既定値は安全側（間隔あり・全件）', () => {
+    const parsed = parseSmokeArgs([]);
+    expect(parsed.ok).toBe(true);
+    if (parsed.ok) {
+      expect(parsed.args.delayMs).toBeGreaterThan(0);
+      expect(parsed.args.caseId).toBeNull();
+    }
+  });
+
+  it('正しい引数は解釈する', () => {
+    const parsed = parseSmokeArgs(['--case', 'minimal', '--delay', '1500', '--json']);
+    expect(parsed.ok).toBe(true);
+    if (parsed.ok) expect(parsed.args).toEqual({ caseId: 'minimal', delayMs: 1500, asJson: true });
+  });
+});
+
 describe('jev:smoke の引数検証', () => {
   it.each([
+    ['--case の打ち間違い（全件送信へ化ける形）', ['--cas', 'minimal']],
+    ['未知の option', ['--verbose']],
+    ['余分な positional', ['minimal']],
     ['--case に値が無い', ['--case']],
     ['--case の次が別の flag', ['--case', '--json']],
     ['--case が空文字（env 未設定の展開）', ['--case', '']],

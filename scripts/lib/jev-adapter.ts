@@ -59,6 +59,13 @@ export const JEV_DEFAULT_TIMEOUT_MS = 20_000;
  */
 export const JEV_MAX_INPUT_BYTES = 32_000;
 
+/**
+ * payload 全体の上限（UTF-8 バイト）。TypeSafe の制約は 2 本あり、
+ * 「state + 最長 question で 32k tokens」に加えて「合計 64k tokens」がある。
+ * 前者だけを見ていると、小さい state に大きな question を多数付けた形が素通りする。
+ */
+export const JEV_MAX_TOTAL_INPUT_BYTES = 64_000;
+
 /** 1 request に載せる質問数の上限。公開仕様が無いので運用側で先に固定する。 */
 export const JEV_MAX_QUESTIONS = 12;
 
@@ -175,8 +182,10 @@ export type JevAnnotation = {
   costUsd: number | null;
   coverage: {
     stateChars: number;
-    /** state + 最長 question の UTF-8 バイト数。上限判定に使った値そのもの。 */
+    /** state + 最長 question の UTF-8 バイト数。 */
     inputBytes: number;
+    /** payload 全体の UTF-8 バイト数。 */
+    totalInputBytes: number;
     questionCount: number;
     truncated: false;
   };
@@ -213,6 +222,7 @@ export type JevOptions = {
   runner?: JevRunner;
   timeoutMs?: number;
   maxInputBytes?: number;
+  maxTotalInputBytes?: number;
   maxQuestions?: number;
   /** null で残高 gate を無効にする（残高 API 自体を検証する時だけ）。 */
   minBalanceUsd?: number | null;
@@ -254,17 +264,26 @@ export function readGatewayCostUsd(
 }
 
 /**
- * 課金対象になる入力の大きさ。TypeSafe の制約が「state + 最長 question」なので
- * 同じ組み合わせで測る。question の instructions と criteria の両方を数える。
+ * 入力の大きさ。**送る payload そのものから測る。**
+ *
+ * 部分を足し合わせて見積もっていた頃は、抜けが 3 度見つかった（文字数を token の
+ * 代理にした、question id を数えなかった、合計上限を見なかった）。数え上げをやめ、
+ * 実際に送る形（`{ state, questions }`）をそのまま測ることで、項目を足し忘れる余地を消す。
+ *
+ * TypeSafe の制約は 2 本あるので両方返す。
+ * - `longest`: state + 最長 question（32k tokens 制約に対応）
+ * - `total`: payload 全体（64k tokens 制約に対応）
  */
-export function jevInputBytes(request: JevRequest): number {
+export function jevInputBytes(request: JevRequest): { longest: number; total: number } {
   const stateBytes = utf8Bytes(canonicalJson(request.state));
-  // id も payload のキーとして送られる。内容だけ測ると、長い id を付けた質問が
-  // 事前検査を通ったあと provider 側で上限に当たる。
   const questionBytes = Object.entries(request.questions).map(
     ([id, question]) => utf8Bytes(id) + utf8Bytes(canonicalJson(question)),
   );
-  return stateBytes + Math.max(0, ...questionBytes);
+  return {
+    longest: stateBytes + Math.max(0, ...questionBytes),
+    // provider へ渡すオブジェクトそのもの。個々の項目を足し合わせない
+    total: utf8Bytes(canonicalJson({ state: request.state, questions: request.questions })),
+  };
 }
 
 /**
@@ -389,9 +408,12 @@ export function normalizeJevAnswer(
     const probabilities = readProbabilities(record, new Set(options));
     if (!probabilities.ok) return null;
     // SDK の契約上 choice は分布の最大値を取る option。食い違う応答は採用しない。
+    // **許容誤差は合計にだけ使い、ここには持ち込まない。** 誤差を認めると
+    // { routine: 0.49, standard: 0.51 } に対する choice: routine のような、
+    // 最大でない option を据えた応答が通ってしまう。同率最大は受理する。
     if (probabilities.value) {
       const top = Math.max(...Object.values(probabilities.value));
-      if (top - (probabilities.value[choice] ?? 0) > PROBABILITY_TOLERANCE) return null;
+      if ((probabilities.value[choice] ?? -1) < top) return null;
     }
     return {
       type: 'choice',
@@ -569,11 +591,12 @@ export async function evaluateWithJev(
 ): Promise<JevAnnotation> {
   const now = options.now ?? (() => new Date());
   const maxInputBytes = options.maxInputBytes ?? JEV_MAX_INPUT_BYTES;
+  const maxTotalInputBytes = options.maxTotalInputBytes ?? JEV_MAX_TOTAL_INPUT_BYTES;
   const maxQuestions = options.maxQuestions ?? JEV_MAX_QUESTIONS;
   const minBalanceUsd =
     options.minBalanceUsd === undefined ? JEV_MIN_BALANCE_USD : options.minBalanceUsd;
   const stateText = canonicalJson(request.state);
-  const inputBytes = jevInputBytes(request);
+  const inputBudget = jevInputBytes(request);
 
   const base = {
     schemaVersion: JEV_SCHEMA_VERSION,
@@ -590,7 +613,8 @@ export async function evaluateWithJev(
     costUsd: null,
     coverage: {
       stateChars: stateText.length,
-      inputBytes,
+      inputBytes: inputBudget.longest,
+      totalInputBytes: inputBudget.total,
       questionCount: Object.keys(request.questions).length,
       truncated: false as const,
     },
@@ -609,7 +633,7 @@ export async function evaluateWithJev(
   if (validateJevRequest(request, { maxQuestions }).length > 0)
     return stop({ status: 'abstained', reasonCode: 'invalid_request' });
 
-  if (inputBytes > maxInputBytes)
+  if (inputBudget.longest > maxInputBytes || inputBudget.total > maxTotalInputBytes)
     return stop({ status: 'abstained', reasonCode: 'input_too_large' });
 
   const apiKey = options.apiKey ?? process.env.AI_GATEWAY_API_KEY ?? '';
