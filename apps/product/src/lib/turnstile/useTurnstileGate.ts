@@ -22,6 +22,14 @@ interface TurnstileGate {
   token: string | null;
   /** widget に到達できない（script 遮断 / provider 障害 / 非対応環境）と判定した */
   unavailable: boolean;
+  /**
+   * Cloudflare が対話を求めた（= widget が場所を取り始めた）。
+   * `appearance: 'interaction-only'` では普段 widget の高さが 0 なので、
+   * 余白を出すかどうかの判断にだけ使う。**表示の可否には使わない**
+   * （false の側で widget を隠すと、対話を求められた利用者が challenge を
+   * 見られず送信もできなくなる）。
+   */
+  interactive: boolean;
   /** 送信を止めるべきか。到達できない時は止めない（サーバーの本当のエラーまで通す） */
   blocksSubmit: boolean;
   /**
@@ -37,6 +45,7 @@ interface TurnstileGate {
   onError: () => void;
   onExpire: () => void;
   onUnsupported: () => void;
+  onBeforeInteractive: () => void;
   /** 送信後に token を捨てて widget を作り直す */
   reset: () => void;
 }
@@ -58,6 +67,7 @@ export function useTurnstileGate(): TurnstileGate {
   const [token, setToken] = useState<string | null>(null);
   const [unavailable, setUnavailable] = useState(false);
   const [widgetLoaded, setWidgetLoaded] = useState(false);
+  const [interactive, setInteractive] = useState(false);
   const [widgetKey, setWidgetKey] = useState(0);
 
   useEffect(() => {
@@ -88,6 +98,13 @@ export function useTurnstileGate(): TurnstileGate {
     setUnavailable(true);
   }, []);
 
+  // 対話を求められたら widget が場所を取る。解けた後も widget が畳まれるまでの
+  // 間があるので、ここで false へ戻さず `reset()` まで保持する（戻すと解いた瞬間に
+  // レイアウトが跳ねる）。
+  const onBeforeInteractive = useCallback(() => {
+    setInteractive(true);
+  }, []);
+
   // 期限切れは widget 自身が新しい challenge を出す。載っている事実は変わらないので
   // 待ち直しの対象にしない（ここで時間切れを再開すると対話中の利用者を打ち切る）。
   const onExpire = useCallback(() => {
@@ -98,6 +115,7 @@ export function useTurnstileGate(): TurnstileGate {
     setToken(null);
     setUnavailable(false);
     setWidgetLoaded(false);
+    setInteractive(false);
     setWidgetKey((key) => key + 1);
   }, []);
 
@@ -105,6 +123,7 @@ export function useTurnstileGate(): TurnstileGate {
     enabled,
     token,
     unavailable,
+    interactive,
     blocksSubmit: enabled && token === null && !unavailable,
     widgetKey,
     onWidgetLoad,
@@ -112,6 +131,7 @@ export function useTurnstileGate(): TurnstileGate {
     onError,
     onExpire,
     onUnsupported,
+    onBeforeInteractive,
     reset,
   };
 }

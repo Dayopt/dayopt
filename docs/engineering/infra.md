@@ -777,10 +777,12 @@ Dayopt は bot 対策として **Cloudflare Turnstile** を使う。reCAPTCHA v3
 
 ### 適用範囲
 
-| 画面                | repo | 対象フロー             | 検証主体                       |
-| ------------------- | ---- | ---------------------- | ------------------------------ |
-| `/contact` フォーム | web  | Resendメール配送前     | 自前 siteverify POST           |
-| `/signup` フォーム  | app  | `supabase.auth.signUp` | Supabase Auth (Bot Protection) |
+| 画面                      | repo | 対象フロー                            | 検証主体                       |
+| ------------------------- | ---- | ------------------------------------- | ------------------------------ |
+| `/contact` フォーム       | web  | Resendメール配送前                    | 自前 siteverify POST           |
+| `/auth/signup` フォーム   | app  | `supabase.auth.signUp`                | Supabase Auth (Bot Protection) |
+| `/auth/login` フォーム    | app  | `signInWithPassword` / 確認メール再送 | Supabase Auth (Bot Protection) |
+| `/auth/password` フォーム | app  | `resetPasswordForEmail`               | Supabase Auth (Bot Protection) |
 
 widget は 1 つ（`agent/turnstile`）で **1 widget 複数 hostname**（`dayopt.app` / `localhost` / `*.vercel.app`）をカバーする。環境別に site-key を分けない。
 
@@ -790,14 +792,17 @@ widget は 1 つ（`agent/turnstile`）で **1 widget 複数 hostname**（`dayop
 
 ```
 src/lib/turnstile/
-├── config.ts       # SITE_KEY + isTurnstileEnabled()
-├── Turnstile.tsx   # <Turnstile> widget ラッパ
-└── index.ts        # barrel
+├── config.ts             # SITE_KEY + isTurnstileEnabled()
+├── Turnstile.tsx         # <Turnstile> widget ラッパ
+├── useTurnstileGate.ts   # 3 フォーム共通の状態（到達不能判定・送信可否）
+└── index.ts              # barrel
 ```
 
-- `SignupForm.tsx` が `<Turnstile onSuccess={setToken}>` で token を state に保持
-- `useAuthStore.signUp(email, password, { captchaToken })` で Supabase へ渡す
+- login / signup / パスワードリセットの 3 フォームが `useTurnstileGate` で token を保持
+- `useAuthStore.signIn / signUp / resetPassword(..., { captchaToken })` で Supabase へ渡す
 - Supabase が secret 検証する（app は secret を持たない）
+- **app の widget は `appearance: 'interaction-only'`**（2026-09-18）。通常は高さ 0 で見えず、Cloudflare が対話を求めた時だけチェックボックスが出る。challenge の実行も token の検証も `always` と同じで、bot 対策は弱まらない。dashboard 側の widget type は **Managed** のままにする（`invisible` / `non-interactive` へ変えると、疑われた利用者に解き直す経路が無くなり `captcha_failed` で詰む。site key は web の問い合わせフォームと共有なので影響範囲も広い）
+- widget が場所を取り始めたかは `onBeforeInteractive`（`useTurnstileGate.interactive`）で受け、フォーム側は**余白の出し分けにだけ**使う。表示の可否には使わない
 
 #### web repo
 
@@ -921,7 +926,6 @@ Cloudflare 公式の dev 用テストキーを使う場合でも、repo docs や
 
 - **app の API route 化**: signup / signin は client-side Supabase 直呼び。将来 server-side で追加の anti-abuse（IP 評価、メールドメイン検査など）を挟むなら、その時点で route と rate limiter を新設する。かつて存在した `/api/auth` route は呼び出し元ゼロの攻撃面だったため #1942 で削除済みで、再利用できる残骸は無い
 - **Turnstile analytics 活用**: Cloudflare dashboard の challenge 通過率 / 失敗率を週次で確認する運用を確立する
-- **ログイン flow への適用**: ブルートフォース対策として login にも Turnstile を追加する余地あり（現状は rate limit のみ）
 
 ---
 

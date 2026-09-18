@@ -73,6 +73,16 @@ Supabase Auth ベースの認証機能。
 
 **これは captcha を弱める変更ではない。** 検証は GoTrue 側で行われ、token 無しの要求は production では必ず拒否される。変わるのは「押せないボタン」が「サーバーの判断」に置き換わる点だけ。
 
+### widget は普段見せない（`appearance: 'interaction-only'`）
+
+3 フォームの widget は通常 高さ 0 で表示されず、Cloudflare が対話を求めた時だけチェックボックスが出る（2026-09-18）。疑われていない利用者は「私は人間です」を押す手が要らず、疑われた利用者には従来と同じ challenge が出る。
+
+**表示を隠しただけで、判定は何も変わらない。** challenge の実行も token の検証も `appearance: 'always'` と同じで、Bot Protection は GoTrue 側で従来どおり効く。
+
+**`interactive` を表示の可否に使わない。** `onBeforeInteractive`（`useTurnstileGate.interactive`）は widget が場所を取り始めた合図で、フォームは余白の出し分けにだけ使う。false の側で widget を隠す実装にすると、対話を求められた利用者が challenge を見られないまま送信もできず、上の 3 つの到達不能判定にも当たらないので無言で詰む。
+
+**Cloudflare dashboard の widget type は Managed のままにする。** `invisible` / `non-interactive` へ変えると、疑われた利用者は対話で解き直す経路を失い `captcha_failed` から回復できない。site key は web の問い合わせフォームと共有なので、dashboard 側の変更は app だけに閉じない。
+
 ## 確認メールの再送導線と列挙防止
 
 ログインの失敗は `getAuthErrorKey` が 1 つのキー（`auth.errors.invalidCredentials`）へ丸めるため、**「メールの確認がまだ」という状態を利用者は文言から知れない**。丸め自体は列挙防止として意図的だが、確認リンクを踏んでいない人は原因も出口も分からなくなる。
