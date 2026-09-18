@@ -333,7 +333,9 @@ export function readTypesafeConfidence(
   if (typeof typesafe !== 'object' || typesafe === null) return {};
   const raw = (typesafe as Record<string, unknown>).confidence;
   if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return {};
-  const result: Record<string, number> = {};
+  // question id は任意の文字列なので、通常の object だと `toString` で継承メソッドを
+  // 拾い、`__proto__` で prototype を書き換えてしまう。map は常に null-prototype にする。
+  const result = Object.create(null) as Record<string, number>;
   for (const [id, value] of Object.entries(raw))
     if (typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 1)
       result[id] = value;
@@ -400,7 +402,7 @@ function readProbabilities(raw: Record<string, unknown>, allowedKeys: Set<string
   if (value === undefined) return { ok: true as const, value: null };
   if (typeof value !== 'object' || value === null || Array.isArray(value))
     return { ok: false as const, value: null };
-  const result: Record<string, number> = {};
+  const result = Object.create(null) as Record<string, number>;
   for (const [key, item] of Object.entries(value)) {
     if (!allowedKeys.has(key)) return { ok: false as const, value: null };
     if (typeof item !== 'number' || !Number.isFinite(item) || item < 0 || item > 1)
@@ -449,7 +451,8 @@ export function normalizeJevAnswer(
     // 最大でない option を据えた応答が通ってしまう。同率最大は受理する。
     if (probabilities.value) {
       const top = Math.max(...Object.values(probabilities.value));
-      if ((probabilities.value[choice] ?? -1) < top) return null;
+      const chosen = Object.hasOwn(probabilities.value, choice) ? probabilities.value[choice] : -1;
+      if (chosen < top) return null;
     }
     return {
       type: 'choice',
@@ -490,9 +493,14 @@ function normalizeAnswers(
   const ids = Object.keys(questions);
   // 余分な id が来た時点で捨てる。部分採用すると「聞いていない判断」が混ざる。
   for (const id of Object.keys(raw)) if (!ids.includes(id)) return null;
-  const answers: Record<string, JevAnswer> = {};
+  // `__proto__` という id で `answers[id] = answer` が prototype 変更になり、
+  // 検証を通ったのに JSON 化で回答が消える、という形を避ける。
+  const answers = Object.create(null) as Record<string, JevAnswer>;
   for (const id of ids) {
-    const answer = normalizeJevAnswer(questions[id], raw[id], confidences[id] ?? null);
+    // `toString` のような id で継承メソッドを拾わないよう own-property だけを見る
+    if (!Object.hasOwn(raw, id)) return null;
+    const confidence = Object.hasOwn(confidences, id) ? confidences[id] : null;
+    const answer = normalizeJevAnswer(questions[id], raw[id], confidence);
     if (!answer) return null;
     answers[id] = answer;
   }

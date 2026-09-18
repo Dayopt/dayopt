@@ -565,6 +565,67 @@ describe('分布はあるなら完全で整合していることを要求する'
   });
 });
 
+describe('予約済み property 名の question id を安全に扱う', () => {
+  // **object literal の `__proto__:` はキーにならず prototype を差し替える。**
+  // 危険な id を持つ map は代入で組み立てる（provider の JSON.parse 経由と同じ形）。
+  const RESERVED_IDS = ['toString', '__proto__', 'constructor'] as const;
+
+  function reservedIdMap<T>(make: (id: string) => T): Record<string, T> {
+    const map = Object.create(null) as Record<string, T>;
+    for (const id of RESERVED_IDS) map[id] = make(id);
+    return map;
+  }
+
+  const hostileQuestions = reservedIdMap<JevQuestion>((id) => ({
+    type: 'boolean',
+    instructions: `予約済み名 ${id} を id に持つ質問`,
+  }));
+  const hostileRequest: JevRequest = {
+    questionSetId: 'hostile-v1',
+    questions: hostileQuestions,
+    state: 'x',
+  };
+  const hostileAnswers = reservedIdMap<unknown>(() => ({ type: 'boolean', probability: 0.5 }));
+
+  function hostileRunner(providerMetadata?: Record<string, unknown>): JevRunner {
+    return {
+      ...runnerWith(),
+      async evaluate() {
+        return {
+          answers: hostileAnswers as Record<string, unknown>,
+          usage: { inputTokens: 1, outputTokens: 1 },
+          response: { modelId: 'typesafe-ai/jev' },
+          providerMetadata,
+        };
+      },
+    };
+  }
+
+  it('前提: 危険な id が実際に own property として載っている', () => {
+    expect(Object.keys(hostileQuestions).sort()).toEqual([...RESERVED_IDS].sort());
+  });
+
+  it('継承メソッドを confidence として拾わない', async () => {
+    // confidence は空。通常の object だと confidences['toString'] が関数になる
+    const annotation = await run(
+      { runner: hostileRunner({ typesafe: { confidence: {} } }) },
+      hostileRequest,
+    );
+
+    expect(annotation.status).toBe('evaluated');
+    for (const id of RESERVED_IDS)
+      expect(annotation.answers?.[id]).toMatchObject({ type: 'boolean', confidence: null });
+  });
+
+  it('回答が JSON 化で消えない（prototype ではなく own property に載る）', async () => {
+    const annotation = await run({ runner: hostileRunner() }, hostileRequest);
+
+    // 検証を通ったのに JSON 化すると消えている、という形になっていないこと
+    const roundTripped = JSON.parse(JSON.stringify(annotation.answers)) as Record<string, unknown>;
+    expect(Object.keys(roundTripped).sort()).toEqual([...RESERVED_IDS].sort());
+  });
+});
+
 describe('confidence は回答を落とさない補助情報として扱う', () => {
   it.each([
     ['metadata 自体が無い', undefined],
