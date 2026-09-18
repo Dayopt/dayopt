@@ -1,11 +1,17 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 import { useBillingAccess } from '@/lib/billing/BillingAccessProvider';
+import { acceptNecessaryOnly, getCookieConsent, setCookieConsent } from '@/lib/cookie-consent';
 import { useShellStore } from '@/lib/stores/useShellStore';
 import { toast } from '@/lib/toast';
 import { dayoptUrls } from '@dayopt/config';
+import {
+  BROWSER_TELEMETRY_CONSENT_EVENT,
+  type BrowserTelemetryConsent,
+  isBrowserTelemetryConsentStorageChange,
+} from '@dayopt/observability';
 import { Check, Copy, Crown, Download, Trash2 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 
@@ -38,6 +44,7 @@ export function DataSettings() {
   return (
     <div className="space-y-6 sm:space-y-8">
       <ExportSection />
+      <AnalyticsConsentSection />
       <McpApiSection />
       <DeletionSection />
     </div>
@@ -167,6 +174,106 @@ function ExportSection() {
           {isExporting ? t('exporting') : t('exportButton')}
         </Button>
       </LabeledRow>
+    </SectionCard>
+  );
+}
+
+// ─── Analytics consent ───────────────────────────────
+
+/**
+ * 分析同意セクション — 保存済みの選択を確認し、撤回・再許可する（#2831）
+ *
+ * 同意値の正本は localStorage（`@dayopt/observability` の consent contract）で、
+ * 撤回を受け取る側（DeferredAnalytics / instrumentation-client）は既に
+ * `cookieConsentChanged` と別タブの `storage` を購読している。ここは
+ * 「利用者が後から選び直す入口」だけを足し、保存形式も購読側も変えない。
+ *
+ * production では撤回時に instrumentation-client が Sentry を止めるため
+ * ページを再読み込みする。確認ダイアログでそれを予告する。
+ */
+function AnalyticsConsentSection() {
+  const t = useTranslations('settings.legal.cookies');
+  // localStorage は SSR で読めないので、mount 後に読んで購読で追従させる。
+  const [consent, setConsent] = useState<BrowserTelemetryConsent | null>(null);
+  const [isConfirmingRevoke, setIsConfirmingRevoke] = useState(false);
+
+  useEffect(() => {
+    // event の detail は信用せず保存値を読み直す（reset は detail: null で飛ぶ）。
+    const sync = () => setConsent(getCookieConsent());
+    sync();
+
+    const handleStorage = (event: StorageEvent) => {
+      if (!isBrowserTelemetryConsentStorageChange(event.key)) return;
+      sync();
+    };
+
+    window.addEventListener(BROWSER_TELEMETRY_CONSENT_EVENT, sync);
+    window.addEventListener('storage', handleStorage);
+    return () => {
+      window.removeEventListener(BROWSER_TELEMETRY_CONSENT_EVENT, sync);
+      window.removeEventListener('storage', handleStorage);
+    };
+  }, []);
+
+  const handleAllow = useCallback(() => {
+    // バナーの acceptAllCookies は marketing も true にするが、Dayopt は
+    // マーケティング Cookie を使っていないので analytics だけを許可する。
+    setCookieConsent({ analytics: true, marketing: false });
+    setConsent(getCookieConsent());
+  }, []);
+
+  const handleRevoke = useCallback(() => {
+    acceptNecessaryOnly();
+    setConsent(getCookieConsent());
+    setIsConfirmingRevoke(false);
+  }, []);
+
+  const analyticsStatus =
+    consent === null
+      ? t('unset')
+      : consent.analytics
+        ? t('current.enabled')
+        : t('current.disabled');
+  const lastUpdated =
+    consent === null
+      ? undefined
+      : `${t('lastUpdated')}: ${new Date(consent.timestamp).toLocaleString()}`;
+
+  return (
+    <SectionCard title={t('title')}>
+      <p className="text-muted-foreground mb-2 text-base md:text-sm">{t('description')}</p>
+      <LabeledRow label={t('current.necessary')} variant="display">
+        <span className="text-muted-foreground text-base md:text-sm">
+          {t('current.necessaryStatus')}
+        </span>
+      </LabeledRow>
+      <LabeledRow label={t('current.analytics')} description={lastUpdated}>
+        <div className="flex items-center gap-3">
+          <span className="text-muted-foreground text-base md:text-sm">{analyticsStatus}</span>
+          {consent?.analytics ? (
+            <Button variant="outline" size="sm" onClick={() => setIsConfirmingRevoke(true)}>
+              {t('revoke')}
+            </Button>
+          ) : (
+            <Button variant="outline" size="sm" onClick={handleAllow}>
+              {t('allow')}
+            </Button>
+          )}
+        </div>
+      </LabeledRow>
+      <InfoBox className="mt-4 p-4">
+        <p className="text-muted-foreground text-base md:text-sm">{t('independentOrigins')}</p>
+      </InfoBox>
+
+      <ConfirmDialog
+        open={isConfirmingRevoke}
+        onClose={() => setIsConfirmingRevoke(false)}
+        onConfirm={handleRevoke}
+        title={t('revokeConfirmTitle')}
+        description={t('revokeConfirmDescription')}
+        confirmLabel={t('revokeConfirmLabel')}
+        variant="warning"
+      />
     </SectionCard>
   );
 }

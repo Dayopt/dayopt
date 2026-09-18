@@ -11,6 +11,11 @@ import {
 } from '@web/platform/privacy/browser-telemetry-consent';
 
 interface CookieConsentBannerViewProps {
+  /**
+   * DOM id の接頭辞。常設の Cookie 設定パネル（CookieConsentSettings）と初回バナーが
+   * 同時に描画されうるため、id が衝突しないよう呼び出し側で分ける。
+   */
+  idPrefix?: string;
   title: string;
   description: string;
   learnMoreLabel: string;
@@ -21,6 +26,7 @@ interface CookieConsentBannerViewProps {
 }
 
 export function CookieConsentBannerView({
+  idPrefix = 'cookie-consent',
   title,
   description,
   learnMoreLabel,
@@ -29,19 +35,22 @@ export function CookieConsentBannerView({
   onNecessaryOnly,
   onAllowAnalytics,
 }: CookieConsentBannerViewProps) {
+  const titleId = `${idPrefix}-title`;
+  const descriptionId = `${idPrefix}-description`;
+
   return (
     <aside
       className="border-border-subtle bg-card z-modal shadow-card fixed inset-x-4 bottom-4 mx-auto max-w-5xl rounded-2xl border p-4 sm:p-6"
       role="region"
-      aria-labelledby="cookie-consent-title"
-      aria-describedby="cookie-consent-description"
+      aria-labelledby={titleId}
+      aria-describedby={descriptionId}
     >
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex-1">
-          <h2 id="cookie-consent-title" className="text-foreground mb-2 text-base font-medium">
+          <h2 id={titleId} className="text-foreground mb-2 text-base font-medium">
             {title}
           </h2>
-          <p id="cookie-consent-description" className="text-muted-foreground text-sm">
+          <p id={descriptionId} className="text-muted-foreground text-sm">
             {description}{' '}
             <Link
               href="/legal/cookies"

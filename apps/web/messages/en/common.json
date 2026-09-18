@@ -97,6 +97,16 @@
         "learnMore": "Cookie Policy",
         "necessaryOnly": "Necessary only",
         "allowAnalytics": "Allow analytics"
+      },
+      "settings": {
+        "trigger": "Cookie settings",
+        "title": "Change your cookie choice",
+        "independentOrigins": "Choices made on this website and in the app are stored separately.",
+        "status": {
+          "allowed": "Analytics is currently allowed.",
+          "refused": "Analytics is currently refused.",
+          "unset": "You have not chosen yet."
+        }
       }
     }
   },

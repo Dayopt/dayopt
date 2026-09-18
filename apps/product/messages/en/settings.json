@@ -555,6 +555,13 @@
           "enabled": "Enabled",
           "disabled": "Disabled"
         },
+        "unset": "Not selected",
+        "allow": "Allow analytics",
+        "revoke": "Withdraw analytics",
+        "revokeConfirmTitle": "Withdraw analytics consent?",
+        "revokeConfirmDescription": "The page reloads so that browser analytics and error monitoring stop completely.",
+        "revokeConfirmLabel": "Withdraw",
+        "independentOrigins": "Choices made on the website and in the app are stored separately.",
         "manage": "Manage cookie settings",
         "lastUpdated": "Last updated"
       },
