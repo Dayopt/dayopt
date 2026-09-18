@@ -1,12 +1,12 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 
 import { useParams } from 'next/navigation';
 
 import { Link } from '@dayopt/i18n/navigation';
 
-import { isTurnstileEnabled, Turnstile, type TurnstileInstance } from '@/lib/turnstile';
+import { Turnstile, useTurnstileGate } from '@/lib/turnstile';
 
 import {
   Button,
@@ -36,9 +36,7 @@ export function PasswordResetForm({ className, ...props }: React.ComponentProps<
   const resetPassword = useAuthStore((state) => state.resetPassword);
   const params = useParams();
   const locale = (params?.locale as string) || 'ja';
-  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
-  const turnstileRef = useRef<TurnstileInstance | null>(null);
-  const turnstileEnabled = isTurnstileEnabled();
+  const turnstile = useTurnstileGate();
   const turnstileLocale: 'ja' | 'en' | 'auto' =
     locale === 'ja' ? 'ja' : locale === 'en' ? 'en' : 'auto';
 
@@ -48,27 +46,26 @@ export function PasswordResetForm({ className, ...props }: React.ComponentProps<
     setError(null);
 
     try {
-      const { error } = turnstileToken
-        ? await resetPassword(email, { captchaToken: turnstileToken })
+      const { error } = turnstile.token
+        ? await resetPassword(email, { captchaToken: turnstile.token })
         : await resetPassword(email);
 
-      if (error) {
-        const errorKey = getAuthErrorKey(
-          { message: error.message, code: error.code },
-          'resetPassword',
-        );
-        setError(t(errorKey));
+      // OWASP: 送信結果で画面を変えない。未登録アドレスは GoTrue が 200 を返す一方、
+      // 登録済みアドレスは再送間隔（max_frequency）の 429 などで失敗しうる。エラーを
+      // そのまま出すと「エラー画面が出る = 登録済み」という存在確認になる（spec
+      // docs/product/specs/auth.md の列挙防止）。失敗の記録は store 側の Sentry が持つ。
+      // 例外は captcha 失敗で、これは本人が解き直せば解決するので伝える。
+      if (error?.code === 'captcha_failed') {
+        setError(t(getAuthErrorKey({ message: error.message, code: error.code }, 'resetPassword')));
         // Turnstile token は single-use。失敗時は widget を reset して次の retry で
         // 新しい challenge token を取得させる
-        setTurnstileToken(null);
-        turnstileRef.current?.reset();
+        turnstile.reset();
       } else {
         setSuccess(true);
       }
     } catch {
       setError(t('auth.errors.unexpectedError'));
-      setTurnstileToken(null);
-      turnstileRef.current?.reset();
+      turnstile.reset();
     } finally {
       setLoading(false);
     }
@@ -142,17 +139,24 @@ export function PasswordResetForm({ className, ...props }: React.ComponentProps<
                 />
               </Field>
 
-              {turnstileEnabled && (
+              {turnstile.enabled && (
                 <Field>
                   <div className="flex justify-center">
                     <Turnstile
-                      ref={turnstileRef}
-                      onSuccess={(token) => setTurnstileToken(token)}
-                      onError={() => setTurnstileToken(null)}
-                      onExpire={() => setTurnstileToken(null)}
+                      key={turnstile.widgetKey}
+                      onWidgetLoad={turnstile.onWidgetLoad}
+                      onSuccess={turnstile.onSuccess}
+                      onError={turnstile.onError}
+                      onExpire={turnstile.onExpire}
+                      onUnsupported={turnstile.onUnsupported}
                       locale={turnstileLocale}
                     />
                   </div>
+                  {turnstile.unavailable && (
+                    <FieldDescription data-slot="turnstile-unavailable">
+                      {t('auth.errors.captchaUnavailable')}
+                    </FieldDescription>
+                  )}
                 </Field>
               )}
 
@@ -161,7 +165,7 @@ export function PasswordResetForm({ className, ...props }: React.ComponentProps<
                   type="submit"
                   loading={loading}
                   loadingText={t('auth.passwordResetForm.sending')}
-                  disabled={turnstileEnabled && !turnstileToken}
+                  disabled={turnstile.blocksSubmit}
                 >
                   {t('auth.passwordResetForm.sendResetLink')}
                 </Button>

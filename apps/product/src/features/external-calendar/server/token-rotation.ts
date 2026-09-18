@@ -7,6 +7,7 @@ import { databaseTables, type Database } from '@/lib/database';
 import { isPredecessorMissingFunction } from '@/lib/database/external-lifecycle-version';
 import { captureUnexpectedError } from '@/lib/sentry';
 
+import { SUPABASE_TRACE_PROPAGATION } from '@/lib/supabase/trace-propagation';
 import type { CalendarProviderAdapter } from './providers/types';
 import { encryptToken } from './token-crypto';
 
@@ -104,6 +105,7 @@ function createCalendarTokenRotationClient(): CalendarTokenRotationClient {
     env.NEXT_PUBLIC_SUPABASE_URL,
     env.SUPABASE_SECRET_KEY,
     {
+      tracePropagation: SUPABASE_TRACE_PROPAGATION,
       auth: {
         autoRefreshToken: false,
         persistSession: false,

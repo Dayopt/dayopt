@@ -4,6 +4,7 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
 import { env } from '@/env';
 import type { Database } from '@/lib/database';
+import { SUPABASE_TRACE_PROPAGATION } from '@/lib/supabase/trace-propagation';
 
 /** Service-role surface restricted to typed MCP mutation RPCs. */
 type NoDatabaseObjects = { [_ in never]: never };
@@ -91,6 +92,7 @@ type RecordRestoreRpcArgs = Database['public']['Functions']['apply_mcp_record_re
 
 function createMcpMutationDbClient(): McpMutationDbClient {
   return createClient<McpMutationDatabase>(env.NEXT_PUBLIC_SUPABASE_URL, env.SUPABASE_SECRET_KEY, {
+    tracePropagation: SUPABASE_TRACE_PROPAGATION,
     auth: {
       autoRefreshToken: false,
       persistSession: false,

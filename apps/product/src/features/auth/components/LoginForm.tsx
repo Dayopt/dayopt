@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Eye, EyeOff } from 'lucide-react';
@@ -15,7 +15,7 @@ import { logger } from '@/lib/logger';
 import { getSafeLocalizedRedirectPath, getSafeRedirectPath } from '@/lib/safe-redirect';
 import { captureUnexpectedAuthError, observeAuthOperation } from '@/lib/sentry';
 import { createClient } from '@/lib/supabase/client';
-import { isTurnstileEnabled, Turnstile, type TurnstileInstance } from '@/lib/turnstile';
+import { Turnstile, useTurnstileGate } from '@/lib/turnstile';
 import {
   Button,
   Card,
@@ -70,9 +70,7 @@ export function LoginForm({ className, ...props }: React.ComponentProps<'div'>) 
 
   const [showPassword, setShowPassword] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
-  const turnstileRef = useRef<TurnstileInstance | null>(null);
-  const turnstileEnabled = isTurnstileEnabled();
+  const turnstile = useTurnstileGate();
   const turnstileLocale: 'ja' | 'en' | 'auto' =
     locale === 'ja' ? 'ja' : locale === 'en' ? 'en' : 'auto';
 
@@ -110,8 +108,8 @@ export function LoginForm({ className, ...props }: React.ComponentProps<'div'>) 
 
     try {
       // ステップ1: ログイン試行（最小依存で実行）
-      const { error: signInError, data: signInData } = turnstileToken
-        ? await signIn(data.email, data.password, { captchaToken: turnstileToken })
+      const { error: signInError, data: signInData } = turnstile.token
+        ? await signIn(data.email, data.password, { captchaToken: turnstile.token })
         : await signIn(data.email, data.password);
 
       if (signInError) {
@@ -123,8 +121,7 @@ export function LoginForm({ className, ...props }: React.ComponentProps<'div'>) 
         setSubmitError(t(errorKey));
         // Turnstile token は single-use / short-lived。失敗時は widget を reset して
         // 次の retry で新しい challenge token を取得させる
-        setTurnstileToken(null);
-        turnstileRef.current?.reset();
+        turnstile.reset();
       } else if (signInData) {
         // ログイン成功
 
@@ -167,8 +164,7 @@ export function LoginForm({ className, ...props }: React.ComponentProps<'div'>) 
       logger.error('[LoginForm] Unexpected error:', err);
       captureUnexpectedAuthError(err, { operation: 'login_form' });
       setSubmitError(t('auth.errors.unexpectedError') || 'An unexpected error occurred');
-      setTurnstileToken(null);
-      turnstileRef.current?.reset();
+      turnstile.reset();
     }
   };
 
@@ -176,7 +172,6 @@ export function LoginForm({ className, ...props }: React.ComponentProps<'div'>) 
     <div className={cn('flex flex-col gap-6', className)} {...props}>
       <Card className="overflow-hidden p-0">
         <CardContent className="p-0">
-          {/* eslint-disable-next-line react-hooks/refs -- onSubmit は submit 時のみ turnstileRef.current を読む event handler。handleSubmit(onSubmit) の closure 解析による誤検知を抑制 */}
           <form className="p-6 md:p-8" onSubmit={handleSubmit(onSubmit)}>
             <FieldGroup>
               <div className="flex flex-col items-center text-center">
@@ -302,17 +297,24 @@ export function LoginForm({ className, ...props }: React.ComponentProps<'div'>) 
                 )}
               </Field>
 
-              {turnstileEnabled && (
+              {turnstile.enabled && (
                 <Field>
                   <div className="flex justify-center">
                     <Turnstile
-                      ref={turnstileRef}
-                      onSuccess={(token) => setTurnstileToken(token)}
-                      onError={() => setTurnstileToken(null)}
-                      onExpire={() => setTurnstileToken(null)}
+                      key={turnstile.widgetKey}
+                      onWidgetLoad={turnstile.onWidgetLoad}
+                      onSuccess={turnstile.onSuccess}
+                      onError={turnstile.onError}
+                      onExpire={turnstile.onExpire}
+                      onUnsupported={turnstile.onUnsupported}
                       locale={turnstileLocale}
                     />
                   </div>
+                  {turnstile.unavailable && (
+                    <FieldDescription data-slot="turnstile-unavailable">
+                      {t('auth.errors.captchaUnavailable')}
+                    </FieldDescription>
+                  )}
                 </Field>
               )}
 
@@ -320,7 +322,7 @@ export function LoginForm({ className, ...props }: React.ComponentProps<'div'>) 
                 <Button
                   type="submit"
                   loading={isSubmitting}
-                  disabled={turnstileEnabled && !turnstileToken}
+                  disabled={turnstile.blocksSubmit}
                   className="w-full"
                 >
                   {t('auth.loginForm.loginButton')}

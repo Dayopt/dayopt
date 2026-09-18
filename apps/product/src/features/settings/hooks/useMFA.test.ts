@@ -166,6 +166,28 @@ const verifiedFactorsList = {
   error: null,
 } satisfies AuthMFAListFactorsResponse;
 
+const UNVERIFIED_FACTOR = {
+  id: 'factor-stale',
+  friendly_name: 'Authenticator App',
+  factor_type: 'totp' as const,
+  status: 'unverified' as const,
+  created_at: '2026-01-01T00:00:00.000Z',
+  updated_at: '2026-01-01T00:00:00.000Z',
+};
+
+// 未検証 factor は `all` にしか入らない（auth-js の _listFactors は verified だけを
+// factor_type 別の配列へ詰める）。fixture もその形に合わせる。
+const unverifiedFactorsList = {
+  data: {
+    all: [UNVERIFIED_FACTOR],
+    totp: [],
+    phone: [],
+    webauthn: [],
+    recovery_code: [],
+  },
+  error: null,
+} satisfies AuthMFAListFactorsResponse;
+
 describe('useMFA', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -200,6 +222,52 @@ describe('useMFA', () => {
       expect(result.current.showMFASetup).toBe(true);
       expect(result.current.isLoading).toBe(false);
       expect(result.current.error).toBeNull();
+    });
+
+    // 設定は inline なので、QR を出したまま再読み込み / 離脱すると未検証 factor が残る。
+    // 同じ friendly name で enroll し直すと GoTrue が衝突で弾き、MFA を二度と有効化できない。
+    it('残っている未検証factorを片付けてから登録する', async () => {
+      mockListFactors.mockResolvedValue(unverifiedFactorsList);
+      mockUnenroll.mockResolvedValue(unenrollSuccess);
+      mockEnroll.mockResolvedValue(enrollSuccess);
+      const { result } = renderHook(() => useMFA());
+
+      await act(async () => {
+        await result.current.enrollMFA();
+      });
+
+      expect(mockUnenroll).toHaveBeenCalledWith({ factorId: 'factor-stale' });
+      expect(result.current.showMFASetup).toBe(true);
+      expect(result.current.error).toBeNull();
+    });
+
+    it('検証済みfactorは消さない', async () => {
+      mockListFactors.mockResolvedValue(verifiedFactorsList);
+      mockEnroll.mockResolvedValue(enrollSuccess);
+      const { result } = renderHook(() => useMFA());
+
+      await act(async () => {
+        await result.current.enrollMFA();
+      });
+
+      expect(mockUnenroll).not.toHaveBeenCalled();
+    });
+
+    it('片付けに失敗しても登録は試みる', async () => {
+      mockListFactors.mockResolvedValue(unverifiedFactorsList);
+      mockUnenroll.mockResolvedValue({
+        data: null,
+        error: { message: 'nope', name: 'AuthApiError', status: 500 },
+      });
+      mockEnroll.mockResolvedValue(enrollSuccess);
+      const { result } = renderHook(() => useMFA());
+
+      await act(async () => {
+        await result.current.enrollMFA();
+      });
+
+      expect(mockEnroll).toHaveBeenCalled();
+      expect(result.current.showMFASetup).toBe(true);
     });
 
     it('失敗時、エラーメッセージをセットしshowMFASetupはfalseのまま', async () => {

@@ -23,6 +23,11 @@ vi.mock('@/lib/sentry/scrub-pii', () => ({
 
 import { onRequestError, register } from './instrumentation';
 
+/** supabase-js が tracing runtime を探す globalThis key（dist/tracingRegistry の実測値）。 */
+const SUPABASE_TRACE_EXTRACTOR_KEY = Symbol.for('@supabase/supabase-js.traceContextExtractor');
+
+type MutableGlobal = typeof globalThis & Record<symbol, unknown>;
+
 const request = {
   path: '/day?query=private',
   method: 'GET',
@@ -78,5 +83,17 @@ describe('Product onRequestError', () => {
         environment: 'production',
       }),
     );
+  });
+
+  it('Node entry で Supabase tracing runtime を登録する（#2728）', async () => {
+    // supabase-js は fetch のたびにこの key を読む。未登録だと tracePropagation を
+    // 有効にしていても warn を 1 度出すだけで header が付かない（silent no-op）。
+    // 副作用 import は externalize されて module registry のリセットが効かないため、
+    // key を消して再 import する形にはしない（消すと再登録できない）。
+    vi.stubEnv('NEXT_RUNTIME', 'nodejs');
+
+    await register();
+
+    expect(typeof (globalThis as MutableGlobal)[SUPABASE_TRACE_EXTRACTOR_KEY]).toBe('function');
   });
 });

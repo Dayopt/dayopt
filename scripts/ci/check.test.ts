@@ -16,6 +16,7 @@ import {
   runMigrationSafety,
   shouldRunIntegrationTests,
   shouldRunProductUnitTests,
+  shouldRunScriptsTestsInStatic,
   shouldRunStaticLanes,
 } from './check.mjs';
 
@@ -39,6 +40,29 @@ describe('shouldRunStaticLanes', () => {
     expect(shouldRunStaticLanes(false)).toBe(true);
     expect(shouldRunStaticLanes(undefined)).toBe(true);
   });
+});
+
+describe('shouldRunScriptsTestsInStatic', () => {
+  // scripts のテストは docs/ を入力に読む（scripts-taxonomy が docs 全体を walk する）。
+  // docs-only PR は `📦 Unit Tests` が job ごと skip されるので、static job が
+  // `pnpm test:scripts` を肩代わりしないと docs 起因の失敗が main で初めて出る（#2822）。
+  it("docsOnly=true / 'true' なら static 側で scripts suite を実行する", () => {
+    expect(shouldRunScriptsTestsInStatic(true)).toBe(true);
+    expect(shouldRunScriptsTestsInStatic('true')).toBe(true);
+  });
+  it('docsOnly=false / undefined なら static 側では実行しない（unit job が走らせる）', () => {
+    expect(shouldRunScriptsTestsInStatic(false)).toBe(false);
+    expect(shouldRunScriptsTestsInStatic(undefined)).toBe(false);
+  });
+  // 片側だけを見る test は「もともと通っていた」で緑になりうる。lane と scripts suite が
+  // **ちょうど片方ずつ**立つこと（= どの docsOnly でも scripts suite が 1 回だけ走ること）を
+  // 同じ入力集合で固定する。両方 true になれば二重実行、両方 false なら coverage の穴。
+  it.each([true, 'true', false, undefined, 'false', ''])(
+    'docsOnly=%p で static lane と scripts suite が排他になる',
+    (docsOnly) => {
+      expect(shouldRunScriptsTestsInStatic(docsOnly)).toBe(!shouldRunStaticLanes(docsOnly));
+    },
+  );
 });
 
 describe('shouldRunProductUnitTests', () => {

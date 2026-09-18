@@ -530,21 +530,49 @@ export function fetchPullRefs({ number }, cwd) {
   );
 }
 
+/** 正規化で中身が全部落ちた時に publish する文字列。空 description は「何が起きたか」を読めなくする。 */
+export const STATUS_DESCRIPTION_FALLBACK = 'Status unavailable';
+
+/**
+ * `description` に載せられない文字を判定する（BMP 外・lone surrogate・制御文字）。
+ *
+ * **正規化の結果だけでなく入力そのものにも使える述語として export する。** 通す側だけの test は
+ * 「もともと通っていた」で緑になりうるため、生の入力が本当に不正文字を含むことを同じ述語で
+ * 固定できるようにしておく（#2816）。
+ */
+export function isUnsafeStatusDescriptionChar(char) {
+  const code = char.codePointAt(0) ?? 0;
+  // 4-byte UTF-8（astral plane）。GitHub が 422 で弾く。
+  if (code > 0xffff) return true;
+  // ペアを組めなかった surrogate の片割れ。単体では不正な UTF-8 になる。
+  if (code >= 0xd800 && code <= 0xdfff) return true;
+  // C0 / C1 制御文字と DEL。description は 1 行の平文で、改行もここで落とす。
+  if (code <= 0x1f || (code >= 0x7f && code <= 0x9f)) return true;
+  return false;
+}
+
 /**
  * commit status の `description` は 4-byte Unicode（astral plane）を受け付けない。含めると API が
  * `422 Description doesn't accept 4-byte Unicode` を返し、`runGh` が throw して job ごと落ちる。
  * required job 名は `🧪 Integration Tests` のように emoji で始まるため、blocked / failed の理由を
  * そのまま渡すと **gate が判定を出せずに indeterminate へ化ける**（#2814。PR #2813 で実発生）。
+ * Codex の review summary（`🔄 **Running** since …`）を description に載せた時も同じ 422 で
+ * `Validation (shadow)` / `Review policy (shadow)` が両方 indeterminate になった（#2816。PR #2812 / #2817）。
  *
  * 落としてから 140 字へ切る。逆順だとサロゲートペアの片割れが末尾に残り、同じ 422 を踏む。
+ * **空白の畳み込みは除去より先**に行う。改行・タブも制御文字なので、先に落とすと
+ * `pass:\nall suites` が `pass:all suites` になって単語が繋がる（区切りとして機能している
+ * 空白だけを空白 1 個へ寄せてから、残った不正文字を落とす）。
+ * この関数は例外を投げない — 整形の失敗で publish 自体を止めないため（fail-closed の
+ * status 発行は呼び出し側の構造が担う）。
  */
 export function toStatusDescription(text) {
-  return [...String(text ?? '')]
-    .filter((char) => (char.codePointAt(0) ?? 0) <= 0xffff)
+  const normalized = [...String(text ?? '').replace(/\s+/g, ' ')]
+    .filter((char) => !isUnsafeStatusDescriptionChar(char))
     .join('')
-    .replace(/\s+/g, ' ')
     .trim()
     .slice(0, 140);
+  return normalized || STATUS_DESCRIPTION_FALLBACK;
 }
 
 export function runValidationGate({

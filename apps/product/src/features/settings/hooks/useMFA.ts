@@ -162,6 +162,30 @@ export function useMFA(): UseMFAReturn {
     setSuccess(null);
 
     try {
+      // 設定画面の登録は inline なので、QR を出したまま離脱すると未検証 factor が残る。
+      // friendly name は固定なので、残ったまま登録し直すと GoTrue が名前衝突で弾き、
+      // MFA を二度と有効化できなくなる。検証済み factor には触れない。
+      const { data: existingFactors, error: listError } = await supabase.auth.mfa.listFactors();
+      if (listError) {
+        captureMfaAuthFailure(listError, 'list_factors');
+      } else {
+        // listFactors の `totp` は verified だけを詰める（auth-js 2.116.0 の
+        // _listFactors 実装）。未検証 factor は `all` にしか現れない。
+        const staleFactors = (existingFactors?.all ?? []).filter(
+          (factor) => factor.factor_type === 'totp' && factor.status === 'unverified',
+        );
+        for (const stale of staleFactors) {
+          const { error: unenrollError } = await observeAuthOperation(
+            'unenroll_stale_mfa_factor',
+            () => supabase.auth.mfa.unenroll({ factorId: stale.id }),
+          );
+          // 片付けに失敗しても登録は試みる（enroll が通るなら残骸は無害）
+          if (unenrollError) {
+            captureMfaAuthFailure(unenrollError, 'unenroll_stale');
+          }
+        }
+      }
+
       const { data, error: enrollError } = await supabase.auth.mfa.enroll({
         factorType: 'totp',
         friendlyName: 'Authenticator App',

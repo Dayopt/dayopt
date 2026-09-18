@@ -542,7 +542,7 @@ page から import を宣言元まで解決して辿った結果（barrel の再
 | feature             | source | test file | component | Story のある component |
 | ------------------- | ------ | --------- | --------- | ---------------------- |
 | `activities`        | 30     | 3         | 11        | 3 / 11                 |
-| `auth`              | 22     | 14        | 8         | 7 / 8                  |
+| `auth`              | 22     | 15        | 8         | 7 / 8                  |
 | `calendar`          | 192    | 96        | 59        | 31 / 59                |
 | `contact`           | 8      | 6         | 2         | 1 / 2                  |
 | `external-calendar` | 26     | 19        | 2         | 1 / 2                  |

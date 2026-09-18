@@ -60,6 +60,7 @@ import { cookies } from 'next/headers';
 
 import { env } from '@/env';
 import type { Database } from '@/lib/database';
+import { SUPABASE_TRACE_PROPAGATION } from '@/lib/supabase/trace-propagation';
 
 /**
  * Server用Supabaseクライアント作成
@@ -75,6 +76,7 @@ export async function createClient() {
     env.NEXT_PUBLIC_SUPABASE_URL,
     env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
     {
+      tracePropagation: SUPABASE_TRACE_PROPAGATION,
       cookies: {
         getAll() {
           return cookieStore.getAll();
