@@ -37,6 +37,7 @@
     "ai:usage": "node scripts/tasks/ai-usage.mjs",
     "ctx": "node scripts/tasks/ctx.mjs",
     "jev:check": "pnpm exec tsx scripts/tasks/jev/check.ts",
+    "jev:shadow": "pnpm exec tsx scripts/tasks/jev/shadow.ts",
     "jev:smoke": "pnpm exec tsx scripts/tasks/jev/smoke.ts",
     "handoff:create": "node scripts/tasks/factory-handoff.mjs create",
     "handoff:validate": "node scripts/tasks/factory-handoff.mjs validate",
