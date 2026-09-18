@@ -282,9 +282,16 @@ describe('費用は provider の値を正本にする', () => {
     expect(annotation.costUsd).toBe(0.000013524);
   });
 
-  it('metadata に cost が無ければ 0 ではなく null', () => {
-    expect(readGatewayCostUsd({ gateway: {} })).toBeNull();
-    expect(readGatewayCostUsd(undefined)).toBeNull();
+  it.each([
+    ['gateway が空', { gateway: {} }],
+    ['metadata が無い', undefined],
+    ['cost が空文字', { gateway: { cost: '' } }],
+    ['cost が空白のみ', { gateway: { cost: '  ' } }],
+    ['cost が null', { gateway: { cost: null } }],
+    ['cost が数値でない', { gateway: { cost: 'free' } }],
+  ])('%s なら 0 ではなく null にする', (_label, metadata) => {
+    // 残高・--delay と同じ「空値が Number() で 0 に化ける」型。実費ゼロと未取得は別物
+    expect(readGatewayCostUsd(metadata as Record<string, unknown> | undefined)).toBeNull();
   });
 });
 

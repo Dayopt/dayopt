@@ -247,10 +247,10 @@ export function readGatewayCostUsd(
 ): number | null {
   const gatewayMeta = providerMetadata?.gateway;
   if (typeof gatewayMeta !== 'object' || gatewayMeta === null) return null;
-  const raw = (gatewayMeta as Record<string, unknown>).cost;
-  if (typeof raw !== 'string' && typeof raw !== 'number') return null;
-  const value = Number(raw);
-  return Number.isFinite(value) && value >= 0 ? value : null;
+  // `Number('')` は 0 になる。残高・--delay と同じ型の穴で、空文字の cost を
+  // 「実費ゼロ」として報告してしまう。共通の numericField に通して未取得へ倒す。
+  const value = numericField((gatewayMeta as Record<string, unknown>).cost);
+  return value !== null && value >= 0 ? value : null;
 }
 
 /**
