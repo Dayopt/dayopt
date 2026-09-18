@@ -173,6 +173,35 @@ describe('Go 条件の指標', () => {
   });
 });
 
+describe('score は加重平均で返る', () => {
+  // 2026-09-18 の live pilot で実測: evidenceSufficiency が 0.06 / 1.79 / 1.95、
+  // ambiguity が 1.04 / 1.73 / 0.35。離散の段ではなく分布の確率加重平均。
+  it('最も近い段へ丸めて分布を数える', () => {
+    const score = (value: number): JevAnswer => ({
+      type: 'score',
+      score: value,
+      probabilities: null,
+      confidence: 0.9,
+      topProbability: null,
+    });
+    const metrics = computeMetrics([
+      shadowCase({
+        id: 'a',
+        annotation: annotation({ lane: lane('standard'), evidenceSufficiency: score(1.79) }),
+      }),
+      shadowCase({
+        id: 'b',
+        annotation: annotation({ lane: lane('standard'), evidenceSufficiency: score(1.95) }),
+      }),
+      shadowCase({
+        id: 'c',
+        annotation: annotation({ lane: lane('standard'), evidenceSufficiency: score(0.06) }),
+      }),
+    ]);
+    expect(metrics.scoreDistribution.evidenceSufficiency).toEqual({ '0': 1, '2': 2 });
+  });
+});
+
 describe('層別', () => {
   it('split と state 由来で分ける', () => {
     const strata = computeStrata([

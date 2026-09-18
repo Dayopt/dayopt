@@ -108,8 +108,11 @@ export function computeMetrics(cases: ShadowCase[]): ShadowMetrics {
         confidences.push(answer.confidence);
       } else metrics.confidence.withoutConfidence += 1;
       if (answer.type === 'score') {
+        // score は離散の段ではなく**分布の確率加重平均**として返る（2026-09-18 の実測で
+        // 0.06 / 1.04 / 1.79 / 1.95 など）。生の値で bucket を作ると 1 件 1 bucket になり
+        // 分布として読めないので、最も近い段へ丸めて数える。
         const bucket = (metrics.scoreDistribution[id] ??= {});
-        const key = String(answer.score);
+        const key = String(Math.round(answer.score));
         bucket[key] = (bucket[key] ?? 0) + 1;
       }
     }
