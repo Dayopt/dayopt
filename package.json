@@ -36,6 +36,8 @@
     "green:watch": "node scripts/tasks/green-watch.mjs",
     "ai:usage": "node scripts/tasks/ai-usage.mjs",
     "ctx": "node scripts/tasks/ctx.mjs",
+    "jev:check": "pnpm exec tsx scripts/tasks/jev/check.ts",
+    "jev:smoke": "pnpm exec tsx scripts/tasks/jev/smoke.ts",
     "handoff:create": "node scripts/tasks/factory-handoff.mjs create",
     "handoff:validate": "node scripts/tasks/factory-handoff.mjs validate",
     "trace": "node scripts/tasks/trace.mjs",
@@ -109,6 +111,7 @@
     "review:validate": "node scripts/tasks/review-pack.mjs validate"
   },
   "devDependencies": {
+    "@ai-sdk/gateway": "4.0.85",
     "@axe-core/playwright": "catalog:tooling",
     "@axe-core/react": "catalog:tooling",
     "@commitlint/cli": "^20.5.3",
@@ -135,6 +138,7 @@
     "@vitest/coverage-istanbul": "catalog:tooling",
     "@vitest/ui": "catalog:tooling",
     "@vueless/storybook-dark-mode": "catalog:tooling",
+    "ai": "7.0.105",
     "babel-plugin-react-compiler": "catalog:tooling",
     "eslint": "catalog:tooling",
     "eslint-config-next": "catalog:tooling",
