@@ -161,6 +161,14 @@ for (const item of operationalItems) {
 
   console.log(`${item.vault} / ${item.item}: ${status}`);
   if (item.required && status !== 'OK') hasFailure = true;
+
+  // 宣言された field は実在と非空まで見る。item があるだけでは op:// は解決できない。
+  if (status === 'OK')
+    for (const field of item.requiredFields ?? []) {
+      const fieldStatus = checkField(item.vault, item.item, field);
+      console.log(`${item.vault} / ${item.item} / ${field}: ${fieldStatus}`);
+      if (item.required && fieldStatus !== 'OK') hasFailure = true;
+    }
 }
 
 // 禁止 field は「存在しないこと」が期待値。schema から entry を消しただけでは
@@ -222,10 +230,31 @@ function expiryEpochMs(field: OnePasswordField): number | null {
   if (/^[0-9]{9,11}$/.test(raw)) return Number(raw) * 1000;
   if (/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(raw)) {
     const parsed = Date.parse(`${raw}T00:00:00Z`);
-    return Number.isNaN(parsed) ? null : parsed;
+    if (Number.isNaN(parsed)) return null;
+    // Date.parse は 2026-02-30 を 2026-03-02 へ正規化して通してしまう。手入力の
+    // 日付 typo が「有効な期限」として扱われると、意図した期限を過ぎても key が
+    // 有効なままになる。往復で一致しなければ日付として認めない。
+    if (new Date(parsed).toISOString().slice(0, 10) !== raw) return null;
+    return parsed;
   }
   return null;
 }
+
+/**
+ * 期限を必須 field として宣言した item。読めない期限をここだけ失敗にする。
+ *
+ * 全 item で失敗にすると、期限 field が読めない既存 item（2026-09-18 時点で
+ * `agent/app` / `human/resend` / `human/resend-web` / `ci/sentry-release-token` の 4 件）
+ * を巻き込んで共有 gate が赤くなる。それらは実際に期限監視が効いていない状態だが、
+ * 本変更の範囲外なので別途直す。宣言した item だけを先に締める。
+ */
+const expiryRequired = new Set(
+  operationalItems.flatMap((item) =>
+    (item.requiredFields ?? [])
+      .filter((field) => EXPIRY_LABEL_PATTERN.test(field))
+      .map(() => `${item.vault}/${item.item}`),
+  ),
+);
 
 const now = Date.now();
 for (const [key, itemResult] of itemCache) {
@@ -235,10 +264,13 @@ for (const [key, itemResult] of itemCache) {
     if (!EXPIRY_LABEL_PATTERN.test((field.label ?? '').trim())) continue;
     const expiresAt = expiryEpochMs(field);
     if (expiresAt === null) {
+      // 読めない期限は期限として機能しない。警告で流すと、期限切れの検出が
+      // 黙って無効になったまま気づけない（2026-09-18、#2836 のレビュー指摘）。
       console.log(`${label}: EXPIRY_UNREADABLE`);
       console.log(
         '  └ 期限 field を日付として読めません（1Password の日付 field か YYYY-MM-DD にする）',
       );
+      if (expiryRequired.has(key)) hasFailure = true;
       continue;
     }
     const date = new Date(expiresAt).toISOString().slice(0, 10);
