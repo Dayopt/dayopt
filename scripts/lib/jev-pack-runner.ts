@@ -306,6 +306,7 @@ export async function runPackCollect<I, T, E>({
   now,
   policyCheckout,
   asJson = false,
+  legacyOut,
 }: {
   pack: EvaluationPack<I, T, E>;
   out: string;
@@ -315,14 +316,27 @@ export async function runPackCollect<I, T, E>({
   now: () => Date;
   policyCheckout: () => string;
   asJson?: boolean;
+  /**
+   * 別の保存形式で残っている課金済み注釈の場所（shadow-e1 の `tmp/jev-shadow`）。
+   * 同じ id の注釈を初回だけ引き継ぐ。有効性は cacheKey が判定するので、形式が違っても
+   * 注釈だけを持ち込んで安全。
+   */
+  legacyOut?: string;
 }): Promise<string> {
   const prs = fetchPrEvidence({ api, graphql, limit });
   const stored: PackCase<I, T>[] = [];
+  const inheritAnnotation = (id: string): JevAnnotation | null => {
+    const previous = readCase<PackCase<I, T>>(out, id);
+    if (previous?.annotation) return previous.annotation;
+    if (!legacyOut) return null;
+    return (
+      readCase<{ id: string; annotation?: JevAnnotation | null }>(legacyOut, id)?.annotation ?? null
+    );
+  };
 
   for (const candidate of pack.deriveCases(prs)) {
     const truth = pack.truth ? pack.truth(candidate.evidence) : null;
     const { state, dropped } = pack.buildState(candidate.input);
-    const previous = readCase<PackCase<I, T>>(out, candidate.id);
     const item = decideCase(pack, {
       id: candidate.id,
       packId: pack.id,
@@ -334,7 +348,7 @@ export async function runPackCollect<I, T, E>({
       droppedSections: dropped,
       truth,
       // 収集し直しても課金済みの注釈を消さない。有効性の判定は evaluate 側の cacheKey 比較が持つ。
-      annotation: previous?.annotation ?? null,
+      annotation: inheritAnnotation(candidate.id),
       baseline: null,
       decision: null,
     });
@@ -343,7 +357,6 @@ export async function runPackCollect<I, T, E>({
   }
 
   for (const synthetic of pack.synthetic ?? []) {
-    const previous = readCase<PackCase<I, T>>(out, synthetic.id);
     const item = decideCase(pack, {
       id: synthetic.id,
       packId: pack.id,
@@ -356,7 +369,7 @@ export async function runPackCollect<I, T, E>({
       state: synthetic.state,
       droppedSections: [],
       truth: null,
-      annotation: previous?.annotation ?? null,
+      annotation: inheritAnnotation(synthetic.id),
       baseline: null,
       decision: null,
     });

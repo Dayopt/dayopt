@@ -21,6 +21,7 @@
  */
 import {
   JEV_MAX_INPUT_BYTES,
+  jevCacheKey,
   jevInputBytes,
   type JevAnnotation,
   type JevJsonValue,
@@ -132,12 +133,29 @@ export function exceedsPackInputBudget(
   return longest > JEV_MAX_INPUT_BYTES;
 }
 
+/**
+ * annotation が**現在の request に対する**ものか。再収集で本文が変わった、質問セットを
+ * 上げた、といった時に cacheKey がずれる。ずれた注釈は保存はしておく（evaluate が
+ * cacheKey で送り直す）が、policy には渡さない。渡すと古い回答が `source: 'jev'` の
+ * Decision として再採用され、metrics を汚す。
+ */
+export function isFreshAnnotation<I, T>(
+  pack: Pick<AnyPack, 'id' | 'questionVersion' | 'questions'>,
+  item: Pick<PackCase<I, T>, 'state' | 'annotation'>,
+): boolean {
+  return (
+    item.annotation !== null &&
+    item.annotation.cacheKey === jevCacheKey(buildPackRequest(pack, item.state))
+  );
+}
+
 /** baseline と decision を（再）計算する。annotation には触れない。 */
 export function decideCase<I, T>(
   pack: EvaluationPack<I, T, unknown>,
   item: PackCase<I, T>,
 ): PackCase<I, T> {
   const baseline = item.input === null ? null : pack.baseline(item.input);
-  const decision = pack.policy(item.annotation, item.input, baseline);
+  const annotation = isFreshAnnotation(pack, item) ? item.annotation : null;
+  const decision = pack.policy(annotation, item.input, baseline);
   return { ...item, baseline, decision };
 }

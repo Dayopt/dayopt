@@ -2,7 +2,13 @@ import { describe, expect, it } from 'vitest';
 
 import { jevCacheKey, type JevAnnotation } from './jev-adapter.ts';
 import { createShadowPack } from './jev-pack-shadow.ts';
-import { buildPackRequest, decideCase, packQuestionSetId, type PackCase } from './jev-pack.ts';
+import {
+  buildPackRequest,
+  decideCase,
+  isFreshAnnotation,
+  packQuestionSetId,
+  type PackCase,
+} from './jev-pack.ts';
 import { SHADOW_QUESTION_SET_ID } from './jev-shadow-questions.ts';
 import { buildShadowRequest, type ShadowState, type ShadowTruth } from './jev-shadow-truth.ts';
 
@@ -105,7 +111,9 @@ describe('decideCase', () => {
   });
 
   it('評価済みなら Jev の答えを picks にし、annotation は触らない', () => {
+    const currentKey = jevCacheKey(buildPackRequest(shadowPack, base.state));
     const evaluated = annotation({
+      cacheKey: currentKey,
       answers: {
         lane: {
           type: 'choice',
@@ -124,6 +132,26 @@ describe('decideCase', () => {
       uncertain: ['localized'],
     });
     expect(decided.annotation).toBe(evaluated);
-    expect(decided.annotation?.cacheKey).toBe('k');
+    expect(decided.annotation?.cacheKey).toBe(currentKey);
+  });
+
+  it('cacheKey が現在の request と違う（stale な）注釈は policy へ渡さず、保存は残す', () => {
+    const stale = annotation({
+      cacheKey: 'old',
+      answers: {
+        lane: {
+          type: 'choice',
+          choice: 'frontier',
+          probabilities: { routine: 0.1, standard: 0.2, frontier: 0.7 },
+          confidence: 0.6,
+          topProbability: 0.7,
+        },
+      },
+    });
+    expect(isFreshAnnotation(shadowPack, { state: base.state, annotation: stale })).toBe(false);
+    const decided = decideCase(shadowPack, { ...base, annotation: stale });
+    expect(decided.decision?.source).toBe('baseline');
+    expect(decided.decision?.picks).toEqual({ lane: 'standard' });
+    expect(decided.annotation).toBe(stale);
   });
 });

@@ -36,6 +36,8 @@ import { loadSkillRoster } from '../../lib/jev-skill-roster.ts';
 const ROOT = resolve(__dirname, '../../..');
 
 export const PACK_IDS = ['shadow-e1', 'skill-suggestion'] as const;
+/** `pnpm jev:shadow` の既定保存先。pack runner とは case の形式が違うので注釈だけ引き継ぐ。 */
+export const SHADOW_LEGACY_OUT = join('tmp', 'jev-shadow');
 export type PackId = (typeof PACK_IDS)[number];
 
 export type PackArgs = RunnerFlags & {
@@ -132,6 +134,8 @@ export async function run(argv: readonly string[]): Promise<number> {
         now: () => new Date(),
         policyCheckout: readPolicyCheckout,
         asJson: args.asJson,
+        // Phase 1 の課金済み注釈（旧形式の保存先）を shadow-e1 だけ引き継ぐ。
+        legacyOut: args.packId === 'shadow-e1' ? SHADOW_LEGACY_OUT : undefined,
       })}\n`,
     );
     return 0;

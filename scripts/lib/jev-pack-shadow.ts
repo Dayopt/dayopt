@@ -137,6 +137,10 @@ export function createShadowPack({
       const sections = [formatCoverage(coverage), '', formatMetrics(strata.overall, '全体')];
       for (const [split, metrics] of Object.entries(strata.bySplit))
         sections.push('', formatMetrics(metrics, `split: ${split}`));
+      // PR 由来 state には事後情報が混ざりうる（Phase 1 の実測）。issue / PR / synthetic の
+      // 層別を落とすと、PR 由来だけで出た数字を全体性能として読んでしまう。
+      for (const [source, metrics] of Object.entries(strata.byStateSource))
+        sections.push('', formatMetrics(metrics, `state 由来: ${source}`));
       for (const [bucket, metrics] of Object.entries(strata.byEvidence))
         sections.push('', formatMetrics(metrics, bucket));
       return {

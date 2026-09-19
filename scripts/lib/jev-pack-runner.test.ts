@@ -17,6 +17,7 @@ import {
   runPackCollect,
   runPackEvaluate,
   runPackReport,
+  writeCase,
   type RunnerFlags,
 } from './jev-pack-runner.ts';
 import {
@@ -350,6 +351,32 @@ describe('runPackCollect', () => {
       questionSetId: 'skill-suggestion-v1',
       counts: { total: 1, withTruth: 1 },
     });
+  });
+
+  it('旧形式の保存先（legacyOut）から同じ id の注釈を引き継ぐ', async () => {
+    const legacy = outDir();
+    const dir = outDir();
+    // `pnpm jev:shadow` が書く StoredCase の形。pack runner の PackCase とは違う。
+    writeCase(legacy, {
+      id: 'issue-42',
+      prNumber: 42,
+      split: 'tune',
+      annotation: { status: 'evaluated', cacheKey: 'legacy' } as unknown as JevAnnotation,
+    });
+    await runPackCollect({
+      pack: pack(),
+      out: dir,
+      limit: 10,
+      api: fakeApi(),
+      graphql: fakeGraphql([prNode(1)]),
+      now: () => new Date('2026-09-19T00:00:00Z'),
+      policyCheckout: () => 'abc123',
+      legacyOut: legacy,
+    });
+    const item = listCases<SkillCase>(dir)[0];
+    expect(item?.annotation?.cacheKey).toBe('legacy');
+    // 引き継いだだけで、現在の request と合わない注釈は Decision には使わない。
+    expect(item?.decision?.source).toBe('baseline');
   });
 
   it('再収集しても課金済みの注釈を消さない', async () => {

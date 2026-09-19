@@ -46,8 +46,13 @@ export type SkillSuggestionInput = {
 
 export type SkillSuggestionEvidence = {
   filesComplete: boolean;
+  /**
+   * diff を 1 つの issue に帰属できるか。複数 issue を閉じる PR は、どの変更がどの issue の
+   * ものか分からないので正解を作らない（null）。候補としては評価する。
+   */
+  attributable: boolean;
   files: string[];
-  diffSignals: { onMutate: boolean; errorHandling: boolean };
+  diffSignals: { onMutate: boolean; clientMutation: boolean; errorHandling: boolean };
 };
 
 /** null は「file からは決められない」。false と区別する。 */
@@ -98,21 +103,36 @@ export function buildSkillQuestions(roster: readonly SkillDoc[]): Record<string,
 
 const ADDED_LINE = /^\+(?!\+\+)/;
 
-/** diff の**追加行**だけを見る。既存行に `onMutate` があっても新規実装ではない。 */
+/**
+ * diff の**追加行**だけを見る。既存行に `onMutate` があっても新規実装ではない。
+ *
+ * 正解は「skill が要る作業をしたか」であって「skill どおりに実装したか」ではない。
+ * `onMutate` の有無だけを正解にすると、mutation を足したのに楽観的更新を忘れた PR
+ * （まさに skill が要った PR）が false になり、正しく提案した Jev が減点される。
+ * だから `useMutation(` の追加（client mutation の実装）も印に含める。error-handling も
+ * 同じ理由で、正規化の呼び出しだけでなく try / catch / onError の追加を印にする。
+ */
 export function extractDiffSignals(
   files: readonly PrFile[],
 ): SkillSuggestionEvidence['diffSignals'] {
   let onMutate = false;
+  let clientMutation = false;
   let errorHandling = false;
   for (const file of files) {
     if (!file.patch) continue;
     for (const line of file.patch.split('\n')) {
       if (!ADDED_LINE.test(line)) continue;
       if (/\bonMutate\b/.test(line)) onMutate = true;
-      if (/captureException|ErrorBoundary|ServiceError/.test(line)) errorHandling = true;
+      if (/\buseMutation\s*\(/.test(line)) clientMutation = true;
+      if (
+        /captureException|ErrorBoundary|ServiceError|\btry\s*\{|\bcatch\s*[({]|\bonError\b/.test(
+          line,
+        )
+      )
+        errorHandling = true;
     }
   }
-  return { onMutate, errorHandling };
+  return { onMutate, clientMutation, errorHandling };
 }
 
 const STORE_PATH = /(?:^|\/)lib\/stores\/|^apps\/product\/src\/features\/[^/]+\/stores\//;
@@ -124,14 +144,15 @@ export function deriveSkillTruth(
 ): SkillSuggestionTruth {
   const truth = {} as SkillSuggestionTruth;
   for (const doc of roster) truth[doc.id] = null;
-  if (!evidence.filesComplete) return truth;
+  if (!evidence.filesComplete || !evidence.attributable) return truth;
 
   const fromPaths = new Set(mapSkills(evidence.files));
   for (const doc of roster) {
     if (doc.id === 'diagnosing-bugs' || doc.id === 'react-performance') continue;
     if (doc.id === 'store-creating')
       truth[doc.id] = evidence.files.some((file) => STORE_PATH.test(file));
-    else if (doc.id === 'optimistic-update') truth[doc.id] = evidence.diffSignals.onMutate;
+    else if (doc.id === 'optimistic-update')
+      truth[doc.id] = evidence.diffSignals.onMutate || evidence.diffSignals.clientMutation;
     else if (doc.id === 'error-handling') truth[doc.id] = evidence.diffSignals.errorHandling;
     else truth[doc.id] = fromPaths.has(doc.id);
   }
@@ -247,6 +268,10 @@ export function extractExistingPaths(
  * PR を closing issue 単位に束ねる。closing issue の無い PR は、着手前の入力が存在しない
  * （PR 本文は実装後に書かれる）ので候補にしない。同じ issue を閉じる PR が複数あれば
  * 変更 file と diff の印を合算し、1 つでも file 未取得なら全体を未取得にする。
+ *
+ * 複数の issue を閉じる PR（この repo は `Closes #N` を issue ごとに 1 行書ける）は、
+ * 全部の issue を候補にするが、diff をどの issue に帰属させるかは決められないので
+ * `attributable: false`（正解なし）にする。先頭だけ採ると配列順で評価データが欠ける。
  */
 export function groupPrsByIssue(
   prs: readonly PrEvidence[],
@@ -257,45 +282,53 @@ export function groupPrsByIssue(
     PackCandidate<SkillSuggestionInput, SkillSuggestionEvidence> & { prNumbers: number[] }
   >();
   for (const pr of prs) {
-    const issue = pr.closingIssues[0];
-    if (!issue) continue;
+    const attributable = pr.closingIssues.length === 1;
     const signals = extractDiffSignals(pr.files);
-    const existing = byIssue.get(issue.number);
-    if (existing) {
-      existing.prNumbers.push(pr.number);
-      existing.evidence.filesComplete = existing.evidence.filesComplete && pr.filesComplete;
-      existing.evidence.files = [
-        ...new Set([...existing.evidence.files, ...pr.files.map((file) => file.filename)]),
-      ];
-      existing.evidence.diffSignals = {
-        onMutate: existing.evidence.diffSignals.onMutate || signals.onMutate,
-        errorHandling: existing.evidence.diffSignals.errorHandling || signals.errorHandling,
-      };
-      continue;
+    for (const issue of pr.closingIssues) {
+      const existing = byIssue.get(issue.number);
+      if (existing) {
+        existing.prNumbers.push(pr.number);
+        existing.evidence.filesComplete = existing.evidence.filesComplete && pr.filesComplete;
+        existing.evidence.attributable = existing.evidence.attributable && attributable;
+        existing.evidence.files = [
+          ...new Set([...existing.evidence.files, ...pr.files.map((file) => file.filename)]),
+        ];
+        existing.evidence.diffSignals = {
+          onMutate: existing.evidence.diffSignals.onMutate || signals.onMutate,
+          clientMutation: existing.evidence.diffSignals.clientMutation || signals.clientMutation,
+          errorHandling: existing.evidence.diffSignals.errorHandling || signals.errorHandling,
+        };
+        continue;
+      }
+      const body = stripHtmlComments(issue.body).trim();
+      byIssue.set(issue.number, {
+        id: `issue-${issue.number}`,
+        split: resolveSplit(issue.number),
+        input: {
+          issueNumber: issue.number,
+          title: issue.title,
+          body,
+          labels: sanitizeLabels(issue.labels),
+          pathTokens: extractExistingPaths(body, pathExists),
+        },
+        evidence: {
+          filesComplete: pr.filesComplete,
+          attributable,
+          files: pr.files.map((file) => file.filename),
+          diffSignals: signals,
+        },
+        facets: {},
+        prNumbers: [pr.number],
+      });
     }
-    const body = stripHtmlComments(issue.body).trim();
-    byIssue.set(issue.number, {
-      id: `issue-${issue.number}`,
-      split: resolveSplit(issue.number),
-      input: {
-        issueNumber: issue.number,
-        title: issue.title,
-        body,
-        labels: sanitizeLabels(issue.labels),
-        pathTokens: extractExistingPaths(body, pathExists),
-      },
-      evidence: {
-        filesComplete: pr.filesComplete,
-        files: pr.files.map((file) => file.filename),
-        diffSignals: signals,
-      },
-      facets: {},
-      prNumbers: [pr.number],
-    });
   }
   return [...byIssue.values()].map(({ prNumbers, ...candidate }) => ({
     ...candidate,
-    facets: { issueNumber: candidate.input.issueNumber, prNumbers: prNumbers.join(',') },
+    facets: {
+      issueNumber: candidate.input.issueNumber,
+      prNumbers: prNumbers.join(','),
+      attributable: candidate.evidence.attributable ? 1 : 0,
+    },
   }));
 }
 
@@ -360,13 +393,16 @@ export type SkillMetricsSummary = {
   micro: { jev: ReturnType<typeof scored>; baseline: ReturnType<typeof scored> };
 };
 
+/**
+ * F1 は `2tp / (2tp + fp + fn)` で直接出す。P と R から組み立てると、正例があるのに
+ * 真陽性ゼロ（P = R = 0、または予測ゼロで P が未定義）の skill が null になり、
+ * macro-F1 の分母から**最も悪い skill が消える**。null は tp + fp + fn = 0（対が無い）の時だけ。
+ */
 function scored(c: Confusion) {
   const precision = c.tp + c.fp > 0 ? c.tp / (c.tp + c.fp) : null;
   const recall = c.tp + c.fn > 0 ? c.tp / (c.tp + c.fn) : null;
-  const f1 =
-    precision !== null && recall !== null && precision + recall > 0
-      ? (2 * precision * recall) / (precision + recall)
-      : null;
+  const denominator = 2 * c.tp + c.fp + c.fn;
+  const f1 = denominator > 0 ? (2 * c.tp) / denominator : null;
   return { ...c, precision, recall, f1 };
 }
 

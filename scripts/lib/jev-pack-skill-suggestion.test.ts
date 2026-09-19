@@ -106,19 +106,53 @@ describe('B1: 語彙の overlap', () => {
 describe('truth', () => {
   it('file 未取得なら全部 null', () => {
     const truth = deriveSkillTruth(
-      { filesComplete: false, files: [], diffSignals: { onMutate: true, errorHandling: true } },
+      {
+        filesComplete: false,
+        attributable: true,
+        files: [],
+        diffSignals: { onMutate: true, clientMutation: true, errorHandling: true },
+      },
       mapSkills,
       roster,
     );
     expect(Object.values(truth).every((value) => value === null)).toBe(true);
   });
 
+  it('複数 issue を閉じる PR（帰属不能）なら全部 null', () => {
+    const truth = deriveSkillTruth(
+      {
+        filesComplete: true,
+        attributable: false,
+        files: ['supabase/migrations/1.sql'],
+        diffSignals: { onMutate: true, clientMutation: true, errorHandling: true },
+      },
+      mapSkills,
+      roster,
+    );
+    expect(Object.values(truth).every((value) => value === null)).toBe(true);
+  });
+
+  it('mutation を足したのに onMutate を忘れた PR でも optimistic-update は true', () => {
+    const truth = deriveSkillTruth(
+      {
+        filesComplete: true,
+        attributable: true,
+        files: ['apps/product/src/features/x/hooks.ts'],
+        diffSignals: { onMutate: false, clientMutation: true, errorHandling: false },
+      },
+      mapSkills,
+      roster,
+    );
+    expect(truth['optimistic-update']).toBe(true);
+  });
+
   it('path 規則 + stores path + diff の印で決め、決められない skill は null', () => {
     const truth = deriveSkillTruth(
       {
         filesComplete: true,
+        attributable: true,
         files: ['supabase/migrations/1.sql', 'apps/product/src/lib/stores/ui-store.ts'],
-        diffSignals: { onMutate: true, errorHandling: false },
+        diffSignals: { onMutate: true, clientMutation: false, errorHandling: false },
       },
       mapSkills,
       roster,
@@ -144,7 +178,19 @@ describe('truth', () => {
       { filename: 'b.ts', previousFilename: null, patch: '+++ b/b.ts\n+  onMutate: () => {}' },
       { filename: 'c.bin', previousFilename: null, patch: null },
     ]);
-    expect(signals).toEqual({ onMutate: true, errorHandling: false });
+    expect(signals).toEqual({ onMutate: true, clientMutation: false, errorHandling: false });
+  });
+
+  it('useMutation の追加と try / catch / onError の追加も印にする', () => {
+    const signals = extractDiffSignals([
+      {
+        filename: 'a.tsx',
+        previousFilename: null,
+        patch: '+const create = trpc.plans.create.useMutation({\n+  onError: () => toast(),\n+});',
+      },
+      { filename: 'b.ts', previousFilename: null, patch: '+  } catch (error) {' },
+    ]);
+    expect(signals).toEqual({ onMutate: false, clientMutation: true, errorHandling: true });
   });
 });
 
@@ -197,11 +243,29 @@ describe('groupPrsByIssue', () => {
       },
       evidence: {
         filesComplete: false,
+        attributable: true,
         files: ['a.ts'],
-        diffSignals: { onMutate: true, errorHandling: false },
+        diffSignals: { onMutate: true, clientMutation: false, errorHandling: false },
       },
-      facets: { issueNumber: 42, prNumbers: '1,2' },
+      facets: { issueNumber: 42, prNumbers: '1,2', attributable: 1 },
     });
+  });
+
+  it('複数 issue を閉じる PR は全 issue を候補にし、正解は帰属不能にする', () => {
+    const first = { number: 7, title: 'a', body: 'a', labels: [] };
+    const second = { number: 8, title: 'b', body: 'b', labels: [] };
+    const cases = groupPrsByIssue(
+      [
+        pr({ number: 1, closingIssues: [first, second] }),
+        pr({ number: 2, closingIssues: [second] }),
+      ],
+      () => false,
+    );
+    expect(cases.map((item) => item.id).sort()).toEqual(['issue-7', 'issue-8']);
+    for (const item of cases) {
+      expect(item.evidence.attributable).toBe(false);
+      expect(item.facets.attributable).toBe(0);
+    }
   });
 });
 
@@ -363,7 +427,9 @@ describe('baseline と metrics', () => {
     expect(test).toMatchObject({ pairs: 1, positives: 0 });
     expect(summary.rows.find((row) => row.skill === 'diagnosing-bugs')?.pairs).toBe(0);
     expect(summary.macroF1.jev).toBeCloseTo(2 / 3);
-    expect(summary.macroF1.baseline).toBeNull();
+    // 正例があるのに真陽性ゼロの skill は F1 = 0 として分母に残る（null で消えない）。
+    expect(supabase?.baseline.f1).toBe(0);
+    expect(summary.macroF1.baseline).toBe(0);
   });
 });
 
