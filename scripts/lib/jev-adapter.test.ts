@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import {
   classifyJevError,
+  describeFailure,
   evaluateWithJev,
   isExpectedJevModelId,
   jevCacheKey,
@@ -380,6 +381,69 @@ describe('Jev adapter の失敗分類', () => {
       status: 'budget_exhausted',
       reasonCode: 'budget_exceeded',
     });
+  });
+
+  it('gateway に包まれた中断を timeout として読む（provider_error に落とさない）', () => {
+    // `@ai-sdk/gateway` の asGatewayError は、undici の文字列 code を持たない中断を
+    // statusCode 500 の GatewayInternalServerError へ包み、原因を cause に入れる。
+    // 表層の name だけ見ていた頃は、20,003 ms ちょうどの失敗 3 件が provider_error に化けた。
+    const aborted = Object.assign(new Error('The operation was aborted'), {
+      name: 'TimeoutError',
+    });
+    const wrapped = Object.assign(
+      new Error('Gateway request failed: The operation was aborted', { cause: aborted }),
+      { statusCode: 500, name: 'GatewayInternalServerError' },
+    );
+    expect(classifyJevError(wrapped)).toEqual({ status: 'unavailable', reasonCode: 'timeout' });
+  });
+
+  it('cause が循環していても判定が止まる', () => {
+    const outer = Object.assign(new Error('outer'), { name: 'GatewayInternalServerError' });
+    const inner = Object.assign(new Error('inner'), { name: 'GatewayInternalServerError' });
+    (outer as { cause?: unknown }).cause = inner;
+    (inner as { cause?: unknown }).cause = outer;
+    expect(classifyJevError(outer)).toEqual({
+      status: 'unavailable',
+      reasonCode: 'provider_error',
+    });
+  });
+
+  it('GatewayTimeoutError の 408 を timeout として読む', () => {
+    const error = Object.assign(new Error('Gateway request timed out'), {
+      statusCode: 408,
+      name: 'GatewayTimeoutError',
+    });
+    expect(classifyJevError(error)).toEqual({ status: 'unavailable', reasonCode: 'timeout' });
+  });
+
+  it('失敗の形を注釈へ残す（分類を後から検算できるようにする）', async () => {
+    const aborted = Object.assign(new Error('The operation was aborted'), {
+      name: 'TimeoutError',
+    });
+    const error = Object.assign(new Error('Gateway request failed', { cause: aborted }), {
+      statusCode: 500,
+      name: 'GatewayInternalServerError',
+    });
+    const annotation = await run({ runner: runnerWith({ error }) });
+    expect(annotation.failure).toEqual({
+      names: ['GatewayInternalServerError', 'TimeoutError'],
+      message: 'Gateway request failed',
+      messageTruncated: false,
+      statusCode: 500,
+    });
+  });
+
+  it('成功した注釈は failure を持たない', async () => {
+    const annotation = await run({ runner: runnerWith() });
+    expect(annotation.status).toBe('evaluated');
+    expect(annotation.failure).toBeNull();
+  });
+
+  it('長い message は切り詰めて、切り詰めたことを残す', () => {
+    const error = new Error('あ'.repeat(400));
+    const detail = describeFailure(error);
+    expect(detail.message).toHaveLength(300);
+    expect(detail.messageTruncated).toBe(true);
   });
 
   it('timeout でも課金済みの可能性があるので残高を取り直す', async () => {
