@@ -130,30 +130,49 @@ const LEGAL_CONTRACT_CASES: readonly LegalContractCase[] = [
     slug: 'privacy',
     metadataTitle: 'Privacy Policy - Dayopt',
     metadataDescription: 'How Dayopt handles your personal information',
-    lastUpdated: 'Last Updated: 2026-08-17',
-    bodyHash: '3ce8648f59685487d6cd70b2d012b8155deefbbc64e24752d597ab2ba4af2edf',
-    hrefs: ['/legal/cookies'],
-    counts: { h2: 20, h3: 0, tables: 0, lists: 16 },
+    lastUpdated: 'Review draft: 2026-09-17',
+    bodyHash: 'e11ff1029108a645912ff7718f2633d28027f96e12fe9b8d8152957cb5dc7602',
+    hrefs: [
+      'https://developers.google.com/terms/api-services-user-data-policy',
+      '/legal/cookies',
+      '/legal/security',
+    ],
+    counts: {
+      h2: 10,
+      h3: 0,
+      tables: 1,
+      lists: 6,
+    },
   },
   {
     locale: 'en',
     slug: 'terms',
     metadataTitle: 'Terms of Service - Dayopt',
     metadataDescription: 'Our terms and conditions for using the Dayopt service',
-    lastUpdated: 'Last Updated: 2026-03-23',
-    bodyHash: '5fc2330a36f9431d809be15641f025c596ff43e4f65b13a03983cdeb7e82ad48',
+    lastUpdated: 'Review draft: 2026-09-17',
+    bodyHash: 'ec49aace33ea3661a6e93e9110f868121419d6625765c9de90e32b8169eafd3a',
     hrefs: ['/legal/refund'],
-    counts: { h2: 20, h3: 0, tables: 0, lists: 15 },
+    counts: {
+      h2: 14,
+      h3: 0,
+      tables: 0,
+      lists: 3,
+    },
   },
   {
     locale: 'en',
     slug: 'cookies',
     metadataTitle: 'Cookie Policy - Dayopt',
     metadataDescription: 'How Dayopt uses cookies and similar technologies',
-    lastUpdated: 'Last Updated: 2026-07-17',
-    bodyHash: 'b113bd6e71ca4bbbe3be13fb30d9c7fff808e4ecc73b10b2090e1199b3db0490',
+    lastUpdated: 'Review draft: 2026-09-17',
+    bodyHash: '43b96db13c0fa583d04af2f890754df4f8dae957c6aa4203a8fbdcf99db40f2a',
     hrefs: ['/legal/privacy'],
-    counts: { h2: 10, h3: 4, tables: 1, lists: 2 },
+    counts: {
+      h2: 10,
+      h3: 4,
+      tables: 1,
+      lists: 2,
+    },
   },
   {
     locale: 'en',
@@ -161,84 +180,119 @@ const LEGAL_CONTRACT_CASES: readonly LegalContractCase[] = [
     metadataTitle: 'Specified Commercial Transactions Act - Dayopt',
     metadataDescription:
       'Information required under the Act on Specified Commercial Transactions (Japan)',
-    lastUpdated: 'Last Updated: 2025-12-07',
-    bodyHash: 'a2f763a39d7f99d256a65c32d9da611f9928e30ab5701964ff1291382ab5101a',
+    lastUpdated: 'Review draft: 2026-09-17',
+    bodyHash: '1fdd92bd6747897f66863da146cf4af3cb60651f7b5cfbf5070117ebacf3d58c',
     hrefs: [],
-    counts: { h2: 0, h3: 0, tables: 1, lists: 4 },
+    counts: {
+      h2: 0,
+      h3: 0,
+      tables: 1,
+      lists: 4,
+    },
   },
   {
     locale: 'en',
     slug: 'security',
     metadataTitle: 'Security - Dayopt',
-    metadataDescription:
-      'Dayopt implements the highest standards of security to protect your information.',
-    lastUpdated: 'Last Updated: September 14, 2026',
-    bodyHash: '4b298c951e2009fb40156eff8b5ab881825cd23ad90fdfed257beb061047767f',
+    metadataDescription: 'Security practices and vulnerability reporting for Dayopt',
+    lastUpdated: 'Review draft: 2026-09-17',
+    bodyHash: 'cb1983ca9111de056a00141afaf9a20d36f96555485046a7f2f4d39d0e553089',
     hrefs: [
       'mailto:security@dayopt.app',
       '/legal/privacy',
       'mailto:security@dayopt.app',
       'mailto:support@dayopt.app',
     ],
-    counts: { h2: 5, h3: 7, tables: 2, lists: 5 },
+    counts: {
+      h2: 5,
+      h3: 7,
+      tables: 1,
+      lists: 5,
+    },
   },
   {
     locale: 'ja',
     slug: 'privacy',
     metadataTitle: 'プライバシーポリシー - Dayopt',
     metadataDescription: 'Dayoptにおける個人情報の取り扱いについて',
-    lastUpdated: '最終更新日: 2026-08-17',
-    bodyHash: '36908111bf623bf80628127ffa4b1aaf190d6975df5b2180d892aa985bf7a47f',
-    // PrivacyDocument の Link は @dayopt/i18n/navigation 経由（localizeHref 対象）。
-    // as-needed prefix により ja は /ja が付く。
-    hrefs: ['/ja/legal/cookies'],
-    counts: { h2: 20, h3: 0, tables: 0, lists: 16 },
+    lastUpdated: 'レビュー原稿: 2026-09-17',
+    bodyHash: '531e9ac22ca1ad8e7222641a8d3ac50c324f69622bf5fe9af9c5c46e79269da9',
+    hrefs: [
+      'https://developers.google.com/terms/api-services-user-data-policy',
+      '/ja/legal/cookies',
+      '/ja/legal/security',
+    ],
+    counts: {
+      h2: 10,
+      h3: 0,
+      tables: 1,
+      lists: 6,
+    },
   },
   {
     locale: 'ja',
     slug: 'terms',
     metadataTitle: '利用規約 - Dayopt',
     metadataDescription: 'Dayoptサービスの利用に関する規約',
-    lastUpdated: '最終更新日: 2026-03-23',
-    bodyHash: '2529cb009705185d1b089f6585c49be2fb71ec84933aae4273dbb4ce3f322d2e',
+    lastUpdated: 'レビュー原稿: 2026-09-17',
+    bodyHash: '5c139e107917d19d8f8dac26b6634314044e4a163595766533d980a5679d93b2',
     hrefs: ['/ja/legal/refund'],
-    counts: { h2: 20, h3: 0, tables: 0, lists: 15 },
+    counts: {
+      h2: 14,
+      h3: 0,
+      tables: 0,
+      lists: 3,
+    },
   },
   {
     locale: 'ja',
     slug: 'cookies',
     metadataTitle: 'Cookieポリシー - Dayopt',
     metadataDescription: 'Dayoptにおけるクッキーおよび類似技術の使用について',
-    lastUpdated: '最終更新日: 2026-07-17',
-    bodyHash: '59c4ccd3399f7cf02b2139e46a7977bd1a535b9053892b3d054f82fe4da3b871',
+    lastUpdated: 'レビュー原稿: 2026-09-17',
+    bodyHash: '073d48adb096acbcf314f3e58622a2a7665af5db7cd17de9e34937a23f00cd43',
     hrefs: ['/ja/legal/privacy'],
-    counts: { h2: 10, h3: 4, tables: 1, lists: 2 },
+    counts: {
+      h2: 10,
+      h3: 4,
+      tables: 1,
+      lists: 2,
+    },
   },
   {
     locale: 'ja',
     slug: 'tokushoho',
     metadataTitle: '特定商取引法に基づく表記 - Dayopt',
     metadataDescription: '特定商取引法に基づく通信販売業者の表示義務に関する情報',
-    lastUpdated: '最終更新日: 2025-12-07',
-    bodyHash: 'b872197d12c3fc8a15833e13d45e11b35a09fb6d1319c7200f2a09f2cf48771f',
+    lastUpdated: 'レビュー原稿: 2026-09-17',
+    bodyHash: '448b42103e9b29f050e743b727913de2cec2c22db6c42a657ff9d5f5960fb340',
     hrefs: [],
-    counts: { h2: 0, h3: 0, tables: 1, lists: 4 },
+    counts: {
+      h2: 0,
+      h3: 0,
+      tables: 1,
+      lists: 4,
+    },
   },
   {
     locale: 'ja',
     slug: 'security',
     metadataTitle: 'セキュリティ - Dayopt',
-    metadataDescription:
-      'Dayoptは、ユーザーの皆様の情報を保護するために、最高水準のセキュリティ対策を実施しています。',
-    lastUpdated: '最終更新日: 2026-09-14',
-    bodyHash: '8e324446c8f78f06690c6db6d1fd3ea9c46f1ab63b936c0f0babdf22931736ef',
+    metadataDescription: 'Dayoptの安全管理と脆弱性の報告窓口',
+    lastUpdated: 'レビュー原稿: 2026-09-17',
+    bodyHash: '1e9875fcf3585aad130447705ef108c1003e37351424b662256a4a7a0da43574',
     hrefs: [
       'mailto:security@dayopt.app',
       '/ja/legal/privacy',
       'mailto:security@dayopt.app',
       'mailto:support@dayopt.app',
     ],
-    counts: { h2: 5, h3: 7, tables: 2, lists: 5 },
+    counts: {
+      h2: 5,
+      h3: 7,
+      tables: 1,
+      lists: 5,
+    },
   },
 ];
 
@@ -324,6 +378,31 @@ describe('legal document repository visibility independence', () => {
         anchor.getAttribute('href'),
       );
       expect(reportLinks).toEqual([`mailto:${dayoptContact.securityEmail}`]);
+    });
+  }
+});
+
+describe('legal review factual boundaries', () => {
+  for (const testCase of LEGAL_CONTRACT_CASES) {
+    it(`${testCase.locale}/${testCase.slug} に未提供機能の保証を再導入しない`, async () => {
+      const container = await renderLegalBody(testCase);
+      expect(container.textContent).not.toMatch(
+        /BYOK|30 AI interactions|AI interactions per month|Prisma|99\.9%|100GB|1GB|energy mapping|エネルギーマッピング|月.{0,3}30回/,
+      );
+      if (testCase.slug === 'privacy') {
+        expect(container.querySelectorAll('table')).toHaveLength(1);
+        expect(container.textContent).toMatch(/MCP/);
+        expect(container.textContent).toMatch(/R2/);
+        expect(container.textContent).toMatch(/support@dayopt.app/);
+        expect(container.textContent).not.toMatch(
+          /at least 30 days to export|削除後30日間.*エクスポート/,
+        );
+      }
+      if (testCase.slug === 'terms') {
+        expect(container.textContent).toMatch(/45/);
+        expect(container.textContent).toMatch(/\$5/);
+        expect(container.textContent).toMatch(/does not automatically charge|自動課金されません/);
+      }
     });
   }
 });
