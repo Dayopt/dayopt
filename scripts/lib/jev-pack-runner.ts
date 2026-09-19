@@ -5,7 +5,7 @@
  *
  * 外部呼び出し（gh / Jev）は引数で注入する。test は fake を渡し、network を使わない。
  */
-import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import {
@@ -15,7 +15,7 @@ import {
   type JevOptions,
   type JevRequest,
 } from './jev-adapter.ts';
-import { fetchPrEvidence, type GhApi, type GhGraphql } from './jev-gh-prs.ts';
+import { fetchPrEvidence, MAX_FETCHABLE_PRS, type GhApi, type GhGraphql } from './jev-gh-prs.ts';
 import {
   buildPackRequest,
   decideCase,
@@ -138,8 +138,11 @@ export function parseRunnerFlags(
     if (token === '--threshold') {
       if (parsed > 1) return { ok: false, message: '--threshold は 0 以上 1 以下' };
       flags.threshold = parsed;
-    } else if (token === '--limit') flags.limit = parsed;
-    else if (token === '--max') flags.max = parsed;
+    } else if (token === '--limit') {
+      if (parsed > MAX_FETCHABLE_PRS)
+        return { ok: false, message: `--limit は ${MAX_FETCHABLE_PRS} 以下（取得の上限）` };
+      flags.limit = parsed;
+    } else if (token === '--max') flags.max = parsed;
     else if (token === '--delay') flags.delayMs = parsed;
     else flags.rateLimitWaitMs = parsed;
   }
@@ -416,8 +419,8 @@ export async function runPackCollect<I, T, E>({
 }
 
 /**
- * manifest が持つ「今回の収集で作った case」の集合で絞る。manifest が無い・古くて
- * `caseIds` を持たない場合は絞らない（後方互換）。
+ * manifest が持つ「今回の収集で作った case」の集合で絞る。manifest が無い、または古くて
+ * `caseIds` field を持たない場合だけ絞らない（後方互換）。空配列は空集合として扱う。
  */
 export function selectActiveCases<I, T>(
   out: string,
@@ -427,9 +430,11 @@ export function selectActiveCases<I, T>(
   if (!existsSync(manifestPath)) return [...cases];
   try {
     const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as { caseIds?: unknown };
+    // field 自体が無い時だけ従来形式へ fallback する。**空配列は空集合として尊重する** ──
+    // 「収集ゼロ件なら全部見せる」にすると、`--limit 0` や closing issue ゼロの再収集の後に
+    // 古い case を全部復活させてしまう（古い入力への課金送信と指標の汚染）。
     if (!Array.isArray(manifest.caseIds)) return [...cases];
     const active = new Set(manifest.caseIds.filter((id): id is string => typeof id === 'string'));
-    if (active.size === 0) return [...cases];
     return cases.filter((item) => active.has(item.id));
   } catch {
     return [...cases];

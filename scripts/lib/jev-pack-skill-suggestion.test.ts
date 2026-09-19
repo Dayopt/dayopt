@@ -104,16 +104,25 @@ describe('B1: 語彙の overlap', () => {
 });
 
 describe('truth', () => {
+  const evidence = (
+    overrides: Partial<Parameters<typeof deriveSkillTruth>[0]> = {},
+  ): Parameters<typeof deriveSkillTruth>[0] => ({
+    filesComplete: true,
+    attributable: true,
+    patchComplete: true,
+    files: [],
+    diffSignals: {
+      optimisticUpdate: false,
+      errorHandling: false,
+      trpcProcedure: false,
+      authBoundary: false,
+    },
+    ...overrides,
+  });
+
   it('file 未取得なら全部 null', () => {
     const truth = deriveSkillTruth(
-      {
-        filesComplete: false,
-        attributable: true,
-        patchComplete: true,
-        files: [],
-        diffSignals: { onMutate: true, clientMutation: true, errorHandling: true },
-      },
-      mapSkills,
+      evidence({ filesComplete: false, files: ['supabase/migrations/1.sql'] }),
       roster,
     );
     expect(Object.values(truth).every((value) => value === null)).toBe(true);
@@ -121,14 +130,7 @@ describe('truth', () => {
 
   it('複数 issue を閉じる PR（帰属不能）なら全部 null', () => {
     const truth = deriveSkillTruth(
-      {
-        filesComplete: true,
-        attributable: false,
-        patchComplete: true,
-        files: ['supabase/migrations/1.sql'],
-        diffSignals: { onMutate: true, clientMutation: true, errorHandling: true },
-      },
-      mapSkills,
+      evidence({ attributable: false, files: ['supabase/migrations/1.sql'] }),
       roster,
     );
     expect(Object.values(truth).every((value) => value === null)).toBe(true);
@@ -136,14 +138,10 @@ describe('truth', () => {
 
   it('patch が欠けていれば diff 由来の正解は null、path 由来は残る', () => {
     const truth = deriveSkillTruth(
-      {
-        filesComplete: true,
-        attributable: true,
+      evidence({
         patchComplete: false,
         files: ['supabase/migrations/1.sql', 'apps/product/src/features/x/Panel.test.tsx'],
-        diffSignals: { onMutate: false, clientMutation: false, errorHandling: false },
-      },
-      mapSkills,
+      }),
       roster,
     );
     expect(truth).toMatchObject({
@@ -151,34 +149,22 @@ describe('truth', () => {
       test: true,
       'optimistic-update': null,
       'error-handling': null,
+      security: null,
+      'trpc-router-creating': null,
     });
   });
 
-  it('mutation を足したのに onMutate を忘れた PR でも optimistic-update は true', () => {
+  it('path 由来と diff 由来を表のとおりに決め、証明できない skill は null', () => {
     const truth = deriveSkillTruth(
-      {
-        filesComplete: true,
-        attributable: true,
-        patchComplete: true,
-        files: ['apps/product/src/features/x/hooks.ts'],
-        diffSignals: { onMutate: false, clientMutation: true, errorHandling: false },
-      },
-      mapSkills,
-      roster,
-    );
-    expect(truth['optimistic-update']).toBe(true);
-  });
-
-  it('path 規則 + stores path + diff の印で決め、決められない skill は null', () => {
-    const truth = deriveSkillTruth(
-      {
-        filesComplete: true,
-        attributable: true,
-        patchComplete: true,
+      evidence({
         files: ['supabase/migrations/1.sql', 'apps/product/src/lib/stores/ui-store.ts'],
-        diffSignals: { onMutate: true, clientMutation: false, errorHandling: false },
-      },
-      mapSkills,
+        diffSignals: {
+          optimisticUpdate: true,
+          errorHandling: false,
+          trpcProcedure: false,
+          authBoundary: false,
+        },
+      }),
       roster,
     );
     expect(truth).toMatchObject({
@@ -186,10 +172,52 @@ describe('truth', () => {
       'store-creating': true,
       'optimistic-update': true,
       'error-handling': false,
+      security: false,
       test: false,
       'diagnosing-bugs': null,
       'react-performance': null,
     });
+  });
+
+  // ここが 4 巡目で設計を変えた理由。候補規則（`mapSkills`）は `server/` 配下の file すべてに
+  // security を返すが、正解は認可の境界に触れた diff でしか true にしない。
+  it('server 配下の test を直しただけでは security を true にしない', () => {
+    const truth = deriveSkillTruth(
+      evidence({ files: ['apps/product/src/features/foo/server/service.test.ts'] }),
+      roster,
+    );
+    expect(truth.security).toBe(false);
+    expect(truth['trpc-router-creating']).toBe(false);
+    expect(truth.test).toBe(true);
+    // 候補規則はこの path に security を返す（正解には使わないことの対比）。
+    expect(mapSkills(['apps/product/src/features/foo/server/service.test.ts'])).toContain('test');
+  });
+
+  it('認可の境界に触れた diff なら security は true', () => {
+    const truth = deriveSkillTruth(
+      evidence({
+        files: ['apps/product/src/features/foo/server/router.ts'],
+        diffSignals: {
+          optimisticUpdate: false,
+          errorHandling: false,
+          trpcProcedure: true,
+          authBoundary: true,
+        },
+      }),
+      roster,
+    );
+    expect(truth).toMatchObject({ security: true, 'trpc-router-creating': true });
+  });
+
+  it('component を触っただけでは storybook を true にしない（.stories.tsx が発動条件）', () => {
+    expect(
+      deriveSkillTruth(evidence({ files: ['packages/components/src/Button.tsx'] }), roster)
+        .storybook,
+    ).toBe(false);
+    expect(
+      deriveSkillTruth(evidence({ files: ['packages/components/src/Button.stories.tsx'] }), roster)
+        .storybook,
+    ).toBe(true);
   });
 
   it('diff の印は追加行だけ見る', () => {
@@ -202,7 +230,7 @@ describe('truth', () => {
       { filename: 'b.ts', previousFilename: null, patch: '+++ b/b.ts\n+  onMutate: () => {}' },
       { filename: 'c.bin', previousFilename: null, patch: null },
     ]);
-    expect(signals).toEqual({ onMutate: true, clientMutation: false, errorHandling: false });
+    expect(signals).toMatchObject({ optimisticUpdate: true, errorHandling: false });
   });
 
   it('useMutation の追加と try / catch / onError の追加も印にする', () => {
@@ -214,7 +242,7 @@ describe('truth', () => {
       },
       { filename: 'b.ts', previousFilename: null, patch: '+  } catch (error) {' },
     ]);
-    expect(signals).toEqual({ onMutate: false, clientMutation: true, errorHandling: true });
+    expect(signals).toMatchObject({ optimisticUpdate: true, errorHandling: true });
   });
 });
 
@@ -271,7 +299,7 @@ describe('groupPrsByIssue', () => {
         attributable: true,
         patchComplete: true,
         files: ['a.ts'],
-        diffSignals: { onMutate: true, clientMutation: false, errorHandling: false },
+        diffSignals: { optimisticUpdate: true, errorHandling: false },
       },
       facets: { issueNumber: 42, prNumbers: '1,2', attributable: 1, patchComplete: 1 },
     });

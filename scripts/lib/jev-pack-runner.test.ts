@@ -20,6 +20,7 @@ import {
   runPackReport,
   selectActiveCases,
   writeCase,
+  writeManifest,
   type RunnerFlags,
 } from './jev-pack-runner.ts';
 import {
@@ -54,6 +55,7 @@ describe('parseRunnerFlags', () => {
     [['--split', 'other'], '--split'],
     [['--delay', 'abc'], '0 以上'],
     [['--threshold', '1.5'], '--threshold'],
+    [['--limit', '501'], '取得の上限'],
     [['extra'], '未知の引数'],
   ])('%j を usage error にする', (argv, expected) => {
     const parsed = parseRunnerFlags(argv, defaults);
@@ -468,6 +470,18 @@ describe('runPackEvaluate と runPackReport', () => {
       'skill-suggestion',
     );
     expect(findPackStoreMismatch(pack(), dir, listCases<SkillCase>(dir))).toBeNull();
+  });
+
+  it('manifest の caseIds が空配列なら空集合として尊重する（全 case へ戻さない）', () => {
+    const dir = outDir();
+    writeCase(dir, { id: 'issue-1' } as unknown as SkillCase);
+    const cases = listCases<SkillCase>(dir);
+    // field 自体が無ければ従来形式として絞らない。
+    writeManifest(dir, { packId: 'skill-suggestion' });
+    expect(selectActiveCases(dir, cases)).toHaveLength(1);
+    // 空配列は「今回の収集はゼロ件」なので、古い case を復活させない。
+    writeManifest(dir, { packId: 'skill-suggestion', caseIds: [] });
+    expect(selectActiveCases(dir, cases)).toHaveLength(0);
   });
 
   it('直近の収集から外れた古い case は evaluate も report も対象にしない', async () => {

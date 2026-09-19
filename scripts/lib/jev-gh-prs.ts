@@ -42,6 +42,12 @@ export function readPolicyCheckout(): string {
 
 export const PR_PAGE_SIZE = 50;
 export const MAX_PAGES = 10;
+/**
+ * 1 回の収集で取れる PR の上限。これを超える `--limit` は黙って打ち切ると、manifest には
+ * 要求値が残ったまま不完全な corpus を正常収集として扱ってしまう。呼び出し側（flag 解釈）
+ * で usage error にする。
+ */
+export const MAX_FETCHABLE_PRS = PR_PAGE_SIZE * MAX_PAGES;
 /** `pulls/N/files` は 3,000 件までしか返さない。超えたら path 由来の label を unknown にする。 */
 export const FILES_CAP = 300;
 

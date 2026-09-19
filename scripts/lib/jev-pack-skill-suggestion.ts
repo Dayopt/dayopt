@@ -6,7 +6,7 @@
  * この判断を Jev に残す理由（Phase 1 で lane / 観点が負けた基準に照らして）:
  * - 着手前の入力は文章だけで、path が無い。`ctx.mjs` の `mapSkills` は path → skill の
  *   規則なので issue 時点では空になる。決定的な代替が弱い
- * - 正解は着手後の diff から機械的に作れる（merged PR の変更 file → `mapSkills` 拡張）
+ * - 正解は着手後の成果物（変更 file / diff の追加行）から機械的に作れる
  * - 間違えても害は skill を 1 つ余計に読む / 読み忘れるだけ。権限・レビュー・merge に
  *   触れない
  *
@@ -58,7 +58,7 @@ export type SkillSuggestionEvidence = {
    */
   patchComplete: boolean;
   files: string[];
-  diffSignals: { onMutate: boolean; clientMutation: boolean; errorHandling: boolean };
+  diffSignals: Record<DiffSignal, boolean>;
 };
 
 /** null は「file からは決められない」。false と区別する。 */
@@ -110,76 +110,114 @@ export function buildSkillQuestions(roster: readonly SkillDoc[]): Record<string,
 const ADDED_LINE = /^\+(?!\+\+)/;
 
 /**
- * diff の**追加行**だけを見る。既存行に `onMutate` があっても新規実装ではない。
- *
- * 正解は「skill が要る作業をしたか」であって「skill どおりに実装したか」ではない。
- * `onMutate` の有無だけを正解にすると、mutation を足したのに楽観的更新を忘れた PR
- * （まさに skill が要った PR）が false になり、正しく提案した Jev が減点される。
- * だから `useMutation(` の追加（client mutation の実装）も印に含める。error-handling も
- * 同じ理由で、正規化の呼び出しだけでなく try / catch / onError の追加を印にする。
+ * diff の追加行から読む印。**追加行だけ**を見る（既存行に `onMutate` があっても新規実装ではない）。
  */
+const DIFF_SIGNAL_PATTERNS: Record<DiffSignal, RegExp> = {
+  // mutation を足したこと自体を印にする。`onMutate` の有無だけだと、mutation を足したのに
+  // 楽観的更新を忘れた PR（まさに skill が要った PR）が false になる。
+  optimisticUpdate: /\bonMutate\b|\buseMutation\s*\(/,
+  errorHandling:
+    /captureException|ErrorBoundary|ServiceError|\btry\s*\{|\bcatch\s*[({]|\bonError\b/,
+  trpcProcedure: /\bcreateTRPCRouter\b|\b(?:public|protected)Procedure\b|\.(?:query|mutation)\s*\(/,
+  // 認可の境界に触れたこと。security skill の発動条件（procedure の auth 境界、
+  // `ctx.userId` フィルタ、RLS / Storage policy、Auth 設定）に対応させる。
+  authBoundary:
+    /\bprotectedProcedure\b|\bctx\.userId\b|\b(?:create|alter|drop)\s+policy\b|\bauth\.uid\s*\(|\brow\s+level\s+security\b|\bstorage\.objects\b/i,
+};
+
 export function extractDiffSignals(
   files: readonly PrFile[],
 ): SkillSuggestionEvidence['diffSignals'] {
-  let onMutate = false;
-  let clientMutation = false;
-  let errorHandling = false;
+  const signals = {
+    optimisticUpdate: false,
+    errorHandling: false,
+    trpcProcedure: false,
+    authBoundary: false,
+  };
   for (const file of files) {
     if (!file.patch) continue;
     for (const line of file.patch.split('\n')) {
       if (!ADDED_LINE.test(line)) continue;
-      if (/\bonMutate\b/.test(line)) onMutate = true;
-      if (/\buseMutation\s*\(/.test(line)) clientMutation = true;
-      if (
-        /captureException|ErrorBoundary|ServiceError|\btry\s*\{|\bcatch\s*[({]|\bonError\b/.test(
-          line,
-        )
-      )
-        errorHandling = true;
+      for (const [signal, pattern] of Object.entries(DIFF_SIGNAL_PATTERNS))
+        if (pattern.test(line)) signals[signal as DiffSignal] = true;
     }
   }
-  return { onMutate, clientMutation, errorHandling };
+  return signals;
 }
-
-const STORE_PATH = /(?:^|\/)lib\/stores\/|^apps\/product\/src\/features\/[^/]+\/stores\//;
-/** `ctx.mjs` の path 規則は `.test.ts` しか見ない。`.test.tsx` / `.spec.*` / `__tests__/` も test の成果物。 */
-const TEST_PATH = /\.(?:test|spec)\.[jt]sx?$|(?:^|\/)__tests__\//;
 
 /**
  * 正解の保証境界（変えない限りここが正本）:
  *
  * 正解は**成果物から観測できる必要性**で、「skill を読むべきだったか」そのものではない。
- * file や diff に痕跡が残る作業（migration を足した、mutation を足した、test を足した）は
- * true / false を出せるが、「本来 test を書くべきだったのに書かなかった」のような、
- * 成果物に痕跡が無い必要性は検出できず false 側に倒れる。したがって正解の false には
- * 偽陰性が混ざり、Jev の正しい提案が FP として数えられうる。**Jev の precision は下限**
- * として読む。観測できないことが分かっている時（file 未取得・帰属不能・patch 欠落・
- * file から決められない skill）は false ではなく null にして分母から外す。
+ *
+ * **`ctx.mjs` の `mapSkills` は候補生成器であって正解生成器ではない。** 候補は広く出して
+ * 構わない（読んで外れても害が小さい）が、正解に流用すると偽陽性が入る。実例:
+ * `features/foo/server/service.test.ts` を直しただけの PR に `mapSkills` は `security` を
+ * 返すが、認可の境界には触れていないので、正しく false と答えた Jev が減点される。
+ *
+ * そこで skill ごとに**何から証明するか**を 1 つ選び、表にする（下の `TRUTH_RULES`）:
+ *
+ * - `path`: path が発動条件と 1 対 1（migration を足した、翻訳ファイルを編集した）
+ * - `diff`: path では決まらず、diff の追加行で証明する（procedure を足した、認可に触れた）
+ * - `unprovable`: 成果物からは証明できない。**null** にして分母から外す
+ *
+ * この 3 択に割り当てられない skill は roster へ入れない。skill が増えても表に 1 行足すだけで、
+ * 個別の例外を積み増さない。
+ *
+ * 残る偽陰性: 「本来やるべきだったのに痕跡が無い」作業（test を書き忘れた挙動変更など）は
+ * どの根拠でも検出できず false 側に倒れる。したがって Jev の FP には正解側の偽陰性が混ざり、
+ * **precision は下限**として読む。観測できないと分かっている時（file 未取得・帰属不能・
+ * patch 欠落・unprovable）は false ではなく null にする。
  */
+export type DiffSignal = 'optimisticUpdate' | 'errorHandling' | 'trpcProcedure' | 'authBoundary';
+
+type TruthRule =
+  | { from: 'path'; matches: (file: string) => boolean }
+  | { from: 'diff'; signal: DiffSignal }
+  | { from: 'unprovable' };
+
+const STORE_PATH = /(?:^|\/)lib\/stores\/|^apps\/product\/src\/features\/[^/]+\/stores\//;
+/** `ctx.mjs` の候補規則は `.test.ts` しか見ない。`.test.tsx` / `.spec.*` / `__tests__/` も test の成果物。 */
+const TEST_PATH = /\.(?:test|spec)\.[jt]sx?$|(?:^|\/)__tests__\//;
+
+export const TRUTH_RULES: Record<SkillId, TruthRule> = {
+  supabase: {
+    from: 'path',
+    matches: (file) =>
+      file.startsWith('supabase/migrations/') || file.startsWith('supabase/functions/'),
+  },
+  i18n: { from: 'path', matches: (file) => file.startsWith('apps/product/messages/') },
+  // `.stories.tsx` は発動条件そのもの。`packages/components/` 全体は「component を触った」
+  // でしかなく Story 作成を証明しないので入れない。
+  storybook: { from: 'path', matches: (file) => file.endsWith('.stories.tsx') },
+  test: { from: 'path', matches: (file) => TEST_PATH.test(file) },
+  'store-creating': { from: 'path', matches: (file) => STORE_PATH.test(file) },
+  'docs-writing': {
+    from: 'path',
+    matches: (file) => file.startsWith('apps/web/content/') || file.startsWith('docs/'),
+  },
+  'trpc-router-creating': { from: 'diff', signal: 'trpcProcedure' },
+  'optimistic-update': { from: 'diff', signal: 'optimisticUpdate' },
+  'error-handling': { from: 'diff', signal: 'errorHandling' },
+  security: { from: 'diff', signal: 'authBoundary' },
+  'diagnosing-bugs': { from: 'unprovable' },
+  'react-performance': { from: 'unprovable' },
+};
 
 export function deriveSkillTruth(
   evidence: SkillSuggestionEvidence,
-  mapSkills: MapSkills,
   roster: readonly SkillDoc[],
 ): SkillSuggestionTruth {
   const truth = {} as SkillSuggestionTruth;
   for (const doc of roster) truth[doc.id] = null;
   if (!evidence.filesComplete || !evidence.attributable) return truth;
 
-  const fromPaths = new Set(mapSkills(evidence.files));
   for (const doc of roster) {
-    if (doc.id === 'diagnosing-bugs' || doc.id === 'react-performance') continue;
-    if (doc.id === 'store-creating')
-      truth[doc.id] = evidence.files.some((file) => STORE_PATH.test(file));
-    else if (doc.id === 'test')
-      truth[doc.id] = fromPaths.has('test') || evidence.files.some((file) => TEST_PATH.test(file));
-    else if (doc.id === 'optimistic-update')
-      truth[doc.id] = evidence.patchComplete
-        ? evidence.diffSignals.onMutate || evidence.diffSignals.clientMutation
-        : null;
-    else if (doc.id === 'error-handling')
-      truth[doc.id] = evidence.patchComplete ? evidence.diffSignals.errorHandling : null;
-    else truth[doc.id] = fromPaths.has(doc.id);
+    const rule = TRUTH_RULES[doc.id];
+    if (!rule || rule.from === 'unprovable') continue;
+    if (rule.from === 'path') truth[doc.id] = evidence.files.some((file) => rule.matches(file));
+    // patch が欠けていれば diff からは証明できない（false と確定させない）。
+    else truth[doc.id] = evidence.patchComplete ? evidence.diffSignals[rule.signal] : null;
   }
   return truth;
 }
@@ -605,7 +643,7 @@ export function createSkillSuggestionPack(
       return skillPolicy(annotation, input, baseline, policyDeps);
     },
     truth(evidence) {
-      return deriveSkillTruth(evidence, deps.mapSkills, deps.roster);
+      return deriveSkillTruth(evidence, deps.roster);
     },
     metrics(cases) {
       const summary = computeSkillMetrics(cases, deps.roster);
