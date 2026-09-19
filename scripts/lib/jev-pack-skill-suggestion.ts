@@ -57,7 +57,14 @@ export type SkillSuggestionEvidence = {
    * 正解（optimistic-update / error-handling）は null にする。
    */
   patchComplete: boolean;
+  /**
+   * 全 file の `status` を読めたか。false なら「追加された file」を確定できないので、
+   * `addedPath` 根拠の正解（store-creating）は null にする。
+   */
+  statusComplete: boolean;
   files: string[];
+  /** この PR 群が**追加**した file（renamed の新名を含む）。 */
+  addedFiles: string[];
   diffSignals: Record<DiffSignal, boolean>;
 };
 
@@ -157,7 +164,10 @@ export function extractDiffSignals(
  *
  * そこで skill ごとに**何から証明するか**を 1 つ選び、表にする（下の `TRUTH_RULES`）:
  *
- * - `path`: path が発動条件と 1 対 1（migration を足した、翻訳ファイルを編集した）
+ * - `path`: 変更された path が発動条件と 1 対 1（migration を足した、翻訳ファイルを編集した）
+ * - `addedPath`: **追加された** path で証明する。「新規に作る時」が発動条件の skill は
+ *   編集を true にしてはいけない（既存 store 配下の test を直しただけで store-creating が
+ *   true になる、が実例）
  * - `diff`: path では決まらず、diff の追加行で証明する（procedure を足した、認可に触れた）
  * - `unprovable`: 成果物からは証明できない。**null** にして分母から外す
  *
@@ -172,7 +182,10 @@ export function extractDiffSignals(
 export type DiffSignal = 'optimisticUpdate' | 'errorHandling' | 'trpcProcedure' | 'authBoundary';
 
 type TruthRule =
+  /** 変更された file の path が発動条件と 1 対 1（編集でも発動する skill）。 */
   | { from: 'path'; matches: (file: string) => boolean }
+  /** **追加された** file の path で証明する（「新規に作る時」が発動条件の skill）。 */
+  | { from: 'addedPath'; matches: (file: string) => boolean }
   | { from: 'diff'; signal: DiffSignal }
   | { from: 'unprovable' };
 
@@ -191,7 +204,12 @@ export const TRUTH_RULES: Record<SkillId, TruthRule> = {
   // でしかなく Story 作成を証明しないので入れない。
   storybook: { from: 'path', matches: (file) => file.endsWith('.stories.tsx') },
   test: { from: 'path', matches: (file) => TEST_PATH.test(file) },
-  'store-creating': { from: 'path', matches: (file) => STORE_PATH.test(file) },
+  // 発動条件は「新規 Zustand store を**追加**する時」。既存 store 配下の helper や test を
+  // 直しただけでは発動しないので、`path` ではなく `addedPath`（かつ test file を除く）。
+  'store-creating': {
+    from: 'addedPath',
+    matches: (file) => STORE_PATH.test(file) && !TEST_PATH.test(file),
+  },
   'docs-writing': {
     from: 'path',
     matches: (file) => file.startsWith('apps/web/content/') || file.startsWith('docs/'),
@@ -216,7 +234,11 @@ export function deriveSkillTruth(
     const rule = TRUTH_RULES[doc.id];
     if (!rule || rule.from === 'unprovable') continue;
     if (rule.from === 'path') truth[doc.id] = evidence.files.some((file) => rule.matches(file));
-    // patch が欠けていれば diff からは証明できない（false と確定させない）。
+    // status / patch が欠けていれば、その根拠では証明できない（false と確定させない）。
+    else if (rule.from === 'addedPath')
+      truth[doc.id] = evidence.statusComplete
+        ? evidence.addedFiles.some((file) => rule.matches(file))
+        : null;
     else truth[doc.id] = evidence.patchComplete ? evidence.diffSignals[rule.signal] : null;
   }
   return truth;
@@ -395,7 +417,15 @@ export function groupPrsByIssue(
       filesComplete: related.every((pr) => pr.filesComplete),
       attributable,
       patchComplete: files.every((file) => file.patch !== null),
+      statusComplete: files.every((file) => typeof file.status === 'string'),
       files: [...new Set(files.map((file) => file.filename))],
+      addedFiles: [
+        ...new Set(
+          files
+            .filter((file) => file.status === 'added' || file.status === 'renamed')
+            .map((file) => file.filename),
+        ),
+      ],
       diffSignals: extractDiffSignals(files),
     };
     return {
@@ -414,6 +444,7 @@ export function groupPrsByIssue(
         prNumbers: related.map((pr) => pr.number).join(','),
         attributable: attributable ? 1 : 0,
         patchComplete: evidence.patchComplete ? 1 : 0,
+        statusComplete: evidence.statusComplete ? 1 : 0,
       },
     };
   });

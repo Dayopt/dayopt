@@ -110,7 +110,9 @@ describe('truth', () => {
     filesComplete: true,
     attributable: true,
     patchComplete: true,
+    statusComplete: true,
     files: [],
+    addedFiles: [],
     diffSignals: {
       optimisticUpdate: false,
       errorHandling: false,
@@ -158,6 +160,7 @@ describe('truth', () => {
     const truth = deriveSkillTruth(
       evidence({
         files: ['supabase/migrations/1.sql', 'apps/product/src/lib/stores/ui-store.ts'],
+        addedFiles: ['apps/product/src/lib/stores/ui-store.ts'],
         diffSignals: {
           optimisticUpdate: true,
           errorHandling: false,
@@ -191,6 +194,34 @@ describe('truth', () => {
     expect(truth.test).toBe(true);
     // 候補規則はこの path に security を返す（正解には使わないことの対比）。
     expect(mapSkills(['apps/product/src/features/foo/server/service.test.ts'])).toContain('test');
+  });
+
+  // 5 巡目の指摘。store-creating の発動条件は「新規 store を**追加**する時」なので、
+  // 既存 store 配下の helper / test を直しただけでは true にしない。
+  it('既存 store 配下の test を直しただけでは store-creating を true にしない', () => {
+    const file = 'apps/product/src/features/auth/stores/resolve-user-id.test.ts';
+    expect(deriveSkillTruth(evidence({ files: [file] }), roster)['store-creating']).toBe(false);
+    // 追加された file でも test なら store の追加ではない。
+    expect(
+      deriveSkillTruth(evidence({ files: [file], addedFiles: [file] }), roster)['store-creating'],
+    ).toBe(false);
+    const store = 'apps/product/src/features/auth/stores/session-store.ts';
+    expect(
+      deriveSkillTruth(evidence({ files: [store], addedFiles: [store] }), roster)['store-creating'],
+    ).toBe(true);
+  });
+
+  it('status が取れなければ addedPath 由来の正解は null', () => {
+    const truth = deriveSkillTruth(
+      evidence({
+        statusComplete: false,
+        files: ['apps/product/src/lib/stores/ui-store.ts', 'supabase/migrations/1.sql'],
+      }),
+      roster,
+    );
+    expect(truth['store-creating']).toBeNull();
+    // path 由来（編集でも発動する skill）は残る。
+    expect(truth.supabase).toBe(true);
   });
 
   it('認可の境界に触れた diff なら security は true', () => {
@@ -298,10 +329,17 @@ describe('groupPrsByIssue', () => {
         filesComplete: false,
         attributable: true,
         patchComplete: true,
+        statusComplete: false,
         files: ['a.ts'],
         diffSignals: { optimisticUpdate: true, errorHandling: false },
       },
-      facets: { issueNumber: 42, prNumbers: '1,2', attributable: 1, patchComplete: 1 },
+      facets: {
+        issueNumber: 42,
+        prNumbers: '1,2',
+        attributable: 1,
+        patchComplete: 1,
+        statusComplete: 0,
+      },
     });
   });
 
@@ -336,6 +374,11 @@ describe('groupPrsByIssue', () => {
       (path) => path !== 'apps/old/legacy.ts',
     );
     expect(cases[0]?.input.pathTokens).toEqual(['apps/old/legacy.ts', 'apps/keep/x.ts']);
+    // status が読めた PR では、追加 file（renamed の新名を含む）を evidence に持つ。
+    expect(cases[0]?.evidence).toMatchObject({
+      statusComplete: true,
+      addedFiles: ['apps/new/router.ts'],
+    });
   });
 
   it('patch が欠けた file があれば patchComplete を false にし、closing issue が取り切れていなければ帰属不能', () => {
