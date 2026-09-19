@@ -514,8 +514,13 @@ export function runReport({ args }: { args: ShadowArgs }): string {
     sections.push('', formatMetrics(metrics, `split: ${split}`));
   for (const [source, metrics] of Object.entries(strata.byStateSource))
     sections.push('', formatMetrics(metrics, `state 由来: ${source}`));
+  for (const [bucket, metrics] of Object.entries(strata.byEvidence))
+    sections.push('', formatMetrics(metrics, bucket));
   sections.push(
     '',
+    '注記: Go 条件（過少振り分けゼロ）は `evidenceSufficiency >= 0.5` の層で読む。証拠が無い state に対して',
+    'lane の argmax を採ると、Jev が confidence 0.02 で「判断材料が無い」と申告した case まで振り分けてしまう',
+    '（2026-09-18 の tune 実測で、過少振り分け 2 件はどちらも本文が空の case だった）。',
     '注記: `localized` の正解は変更 file の領域数で導いているため、翻訳ファイルや隣接 test を含む変更は非局所側に寄る。',
     '注記: 保護対象の判定は現 checkout の定義で遡及的に行っている。',
     '注記: PR 由来 state は `## Review focus` / `## 検証` と見出しなしの本文を落としているが、`## 作業計画` の',

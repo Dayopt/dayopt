@@ -174,10 +174,34 @@ export function computeMetrics(cases: ShadowCase[]): ShadowMetrics {
   return metrics;
 }
 
+/**
+ * 「証拠が足りている」と Jev 自身が答えた境界（#2827 §3 の abstain）。
+ *
+ * 2026-09-18 の tune 76 件で、本文が空の 39 件は `evidenceSufficiency` が最大 0.15、
+ * 本文のある 31 件は 30 件が 0.5 以上と、完全に分かれた。過少振り分け 2 件は
+ * どちらも本文が空の側で、`argmax` を lane として採った結果だった。
+ */
+export const EVIDENCE_SUFFICIENCY_FLOOR = 0.5;
+
+/**
+ * 証拠が足りているか。**未評価・未回答は足りていない側へ倒す**
+ * （unknown を false と同じ扱いにしない、ではなく「判定対象から外す」側へ寄せる）。
+ */
+export function hasSufficientEvidence(
+  item: ShadowCase,
+  floor: number = EVIDENCE_SUFFICIENCY_FLOOR,
+): boolean {
+  const answer = answerOf(item.annotation, 'evidenceSufficiency');
+  if (!answer || answer.type !== 'score') return false;
+  return answer.score >= floor;
+}
+
 export type ShadowStrata = {
   overall: ShadowMetrics;
   bySplit: Record<string, ShadowMetrics>;
   byStateSource: Record<string, ShadowMetrics>;
+  /** `evidenceSufficiency` の床で分けた層。Go 条件はこの「足りている」側で読む。 */
+  byEvidence: Record<string, ShadowMetrics>;
 };
 
 export function computeStrata(cases: ShadowCase[]): ShadowStrata {
@@ -197,6 +221,11 @@ export function computeStrata(cases: ShadowCase[]): ShadowStrata {
     overall: computeMetrics(cases),
     bySplit: group((item) => item.split),
     byStateSource: group((item) => item.stateSource),
+    byEvidence: group((item) =>
+      hasSufficientEvidence(item)
+        ? `evidenceSufficiency >= ${EVIDENCE_SUFFICIENCY_FLOOR}`
+        : `evidenceSufficiency < ${EVIDENCE_SUFFICIENCY_FLOOR}（証拠不足・未評価）`,
+    ),
   };
 }
 

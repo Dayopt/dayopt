@@ -36,7 +36,18 @@ function annotation(
       truncated: false,
     },
     providerMetadata: null,
+    failure: null,
     ...overrides,
+  };
+}
+
+function score(value: number): JevAnswer {
+  return {
+    type: 'score',
+    score: value,
+    probabilities: null,
+    confidence: 0.6,
+    topProbability: null,
   };
 }
 
@@ -212,6 +223,42 @@ describe('層別', () => {
     expect(strata.bySplit.tune?.total).toBe(2);
     expect(strata.bySplit.holdout?.total).toBe(1);
     expect(strata.byStateSource.synthetic?.total).toBe(1);
+  });
+
+  it('証拠が足りている層だけで Go 条件を読めるようにする', () => {
+    // 証拠が無い case の lane を argmax で採ると過少振り分けに数えられる。
+    // 床を超えた層では、同じ母集団でもゼロになることを固定する。
+    const underRouted = truth({
+      deepReviewNeeded: true,
+      protectedCategories: ['auth-mcp'],
+      narrow: false,
+    });
+    const strata = computeStrata([
+      shadowCase({
+        id: 'pr-no-evidence',
+        truth: underRouted,
+        annotation: annotation({ lane: lane('routine'), evidenceSufficiency: score(0.04) }),
+      }),
+      shadowCase({
+        id: 'pr-with-evidence',
+        truth: underRouted,
+        annotation: annotation({ lane: lane('frontier'), evidenceSufficiency: score(1.9) }),
+      }),
+    ]);
+    const sufficient = strata.byEvidence['evidenceSufficiency >= 0.5'];
+    const insufficient = strata.byEvidence['evidenceSufficiency < 0.5（証拠不足・未評価）'];
+    expect(sufficient?.underRouting).toMatchObject({ count: 0, denominator: 1 });
+    expect(insufficient?.underRouting).toMatchObject({ count: 1, denominator: 1 });
+    expect(strata.overall.underRouting.count).toBe(1);
+  });
+
+  it('evidenceSufficiency を答えていない注釈は証拠不足側へ置く', () => {
+    const strata = computeStrata([
+      shadowCase({ id: 'pr-none', annotation: null }),
+      shadowCase({ id: 'pr-no-score', annotation: annotation({ lane: lane('standard') }) }),
+    ]);
+    expect(strata.byEvidence['evidenceSufficiency < 0.5（証拠不足・未評価）']?.total).toBe(2);
+    expect(strata.byEvidence['evidenceSufficiency >= 0.5']).toBeUndefined();
   });
 });
 

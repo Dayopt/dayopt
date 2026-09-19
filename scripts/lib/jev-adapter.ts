@@ -191,6 +191,17 @@ export type JevAnnotation = {
   };
   /** provider が返した metadata の生写し（confidence が来るかの実測用）。 */
   providerMetadata: Record<string, unknown> | null;
+  /** 失敗した時だけ入る観測値。分類の根拠ではなく、分類を後から検算するための記録。 */
+  failure: JevFailureDetail | null;
+};
+
+/** 失敗の形。`reasonCode` と違い、ここは分類せずに見えたものを残す。 */
+export type JevFailureDetail = {
+  /** `cause` を辿った name の並び。表層だけ見ると包まれた中断を見落とす。 */
+  names: string[];
+  message: string;
+  messageTruncated: boolean;
+  statusCode: number | null;
 };
 
 export type JevRequest = {
@@ -509,10 +520,29 @@ function normalizeAnswers(
 
 type Failure = { status: JevStatus; reasonCode: JevReasonCode };
 
+/** `cause` を辿る深さの上限。循環参照でも止まるように固定する。 */
+const CAUSE_DEPTH_LIMIT = 5;
+
+/**
+ * timeout / abort の判定。**`cause` を辿る。**
+ *
+ * `@ai-sdk/gateway` の `asGatewayError` は、undici の文字列 code を持たない中断を
+ * timeout と見なさず、`statusCode: 500` の `GatewayInternalServerError` へ包んで
+ * `cause` に原因を入れる。`AbortSignal.timeout()` が投げる DOMException は
+ * `code` が数値なのでこの経路へ入り、表層の name だけを見ていると
+ * 「provider が壊れた」と「こちらが待ちきれなかった」を取り違える
+ * （2026-09-19 の shadow 評価で、20,003 ms ちょうどの失敗 3 件が `provider_error`
+ * として記録された）。
+ */
 function isAbort(error: unknown): boolean {
-  if (typeof error !== 'object' || error === null) return false;
-  const name = (error as { name?: unknown }).name;
-  return name === 'AbortError' || name === 'TimeoutError';
+  let current: unknown = error;
+  for (let depth = 0; depth <= CAUSE_DEPTH_LIMIT; depth += 1) {
+    if (typeof current !== 'object' || current === null) return false;
+    const name = (current as { name?: unknown }).name;
+    if (name === 'AbortError' || name === 'TimeoutError') return true;
+    current = (current as { cause?: unknown }).cause;
+  }
+  return false;
 }
 
 /**
@@ -535,6 +565,8 @@ export function classifyJevError(error: unknown): Failure {
 
   if (statusCode === 401) return { status: 'unavailable', reasonCode: 'auth_failed' };
   if (statusCode === 402) return { status: 'budget_exhausted', reasonCode: 'insufficient_credits' };
+  // `GatewayTimeoutError`（undici の header/body/connect timeout 経路）は 408 で来る。
+  if (statusCode === 408) return { status: 'unavailable', reasonCode: 'timeout' };
   if (statusCode === 429) return { status: 'unavailable', reasonCode: 'rate_limited' };
   if (statusCode === 403) {
     if (message.includes('customer_verification'))
@@ -544,6 +576,39 @@ export function classifyJevError(error: unknown): Failure {
     return { status: 'unavailable', reasonCode: 'auth_failed' };
   }
   return { status: 'unavailable', reasonCode: 'provider_error' };
+}
+
+/** 診断に残す message の長さ。全文を持たないのは、外部文言を無制限に保存しないため。 */
+const FAILURE_MESSAGE_LIMIT = 300;
+
+/**
+ * 失敗の**形**を記録する。`reasonCode` しか残さないと、分類が外れた時に
+ * 原因を後から追えない（2026-09-19、timeout が `provider_error` として 3 件記録され、
+ * error の形は SDK の実装を読んで推定するしかなかった）。
+ *
+ * name は `cause` を辿って並べる。分類は `classifyJevError` が持ち、ここは観測だけ。
+ */
+export function describeFailure(error: unknown): JevFailureDetail {
+  const names: string[] = [];
+  let current: unknown = error;
+  for (let depth = 0; depth <= CAUSE_DEPTH_LIMIT; depth += 1) {
+    if (typeof current !== 'object' || current === null) break;
+    const name = (current as { name?: unknown }).name;
+    names.push(typeof name === 'string' && name ? name : '(名前なし)');
+    current = (current as { cause?: unknown }).cause;
+  }
+  const rawMessage = error instanceof Error ? error.message : String(error);
+  const statusCode = GatewayError.isInstance(error)
+    ? error.statusCode
+    : typeof (error as { statusCode?: unknown })?.statusCode === 'number'
+      ? (error as { statusCode: number }).statusCode
+      : null;
+  return {
+    names,
+    message: rawMessage.slice(0, FAILURE_MESSAGE_LIMIT),
+    messageTruncated: rawMessage.length > FAILURE_MESSAGE_LIMIT,
+    statusCode,
+  };
 }
 
 /**
@@ -669,6 +734,7 @@ export async function evaluateWithJev(
       truncated: false as const,
     },
     providerMetadata: null,
+    failure: null,
   } satisfies Omit<JevAnnotation, 'status' | 'reasonCode'>;
 
   const stop = (failure: Failure, extra: Partial<JevAnnotation> = {}): JevAnnotation => ({
@@ -696,7 +762,10 @@ export async function evaluateWithJev(
 
   const beforeResult = await runner.credits();
   // 残高取得の失敗は予算問題ではない。401 なら auth_failed、429 なら rate_limited を返す。
-  if (beforeResult.status === 'failed') return stop(classifyJevError(beforeResult.error));
+  if (beforeResult.status === 'failed')
+    return stop(classifyJevError(beforeResult.error), {
+      failure: describeFailure(beforeResult.error),
+    });
   const before = beforeResult.status === 'ok' ? beforeResult.credits : null;
   if (minBalanceUsd !== null) {
     if (before === null) return stop({ status: 'budget_exhausted', reasonCode: 'balance_unknown' });
@@ -720,6 +789,7 @@ export async function evaluateWithJev(
   } catch (error) {
     // timeout でも課金済みの可能性があるため、失敗側でも残高を取り直す。
     return stop(classifyJevError(error), {
+      failure: describeFailure(error),
       latencyMs: Date.now() - startedAt,
       credits: { before, after: await readCredits(runner) },
     });

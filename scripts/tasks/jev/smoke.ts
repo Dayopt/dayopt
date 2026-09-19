@@ -108,6 +108,14 @@ function describe(annotation: JevAnnotation): string[] {
       lines.push(`  answer.${id}  ${JSON.stringify(answer)}`);
   if (annotation.providerMetadata)
     lines.push(`  metadata      ${JSON.stringify(annotation.providerMetadata)}`);
+  // 失敗の形は分類の検算に要る。reasonCode だけを見ていた頃、包まれた timeout が
+  // provider_error として 3 件記録され、原因は SDK の実装を読んで推定するしかなかった。
+  if (annotation.failure)
+    lines.push(
+      `  failure       ${annotation.failure.names.join(' <- ')}` +
+        ` / status=${annotation.failure.statusCode ?? '(なし)'}` +
+        ` / ${annotation.failure.message}${annotation.failure.messageTruncated ? '…' : ''}`,
+    );
   return lines;
 }
 
