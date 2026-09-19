@@ -11,7 +11,13 @@
  */
 import type { JevAnnotation, JevState } from './jev-adapter.ts';
 import type { PrEvidence } from './jev-gh-prs.ts';
-import type { EvaluationPack, PackCase, PackDecision } from './jev-pack.ts';
+import {
+  isFreshAnnotation,
+  type AnyPack,
+  type EvaluationPack,
+  type PackCase,
+  type PackDecision,
+} from './jev-pack.ts';
 import { SHADOW_QUESTIONS } from './jev-shadow-questions.ts';
 import {
   computeCoverage,
@@ -73,7 +79,15 @@ function shadowPolicy(
   return { policyVersion: SHADOW_PACK_POLICY_VERSION, source: 'jev', picks, uncertain };
 }
 
-function toShadowCase(item: PackCase<ShadowPackInput, ShadowTruth>): ShadowCase {
+/**
+ * `computeStrata` は生の annotation を採点するので、ここで **fresh なものだけ**渡す。
+ * `decideCase` が Decision 側で stale を弾いても、metrics が生の annotation を読むなら
+ * 意味が無い（再収集で本文が変わった後も旧回答で指標が出る）。
+ */
+function toShadowCase(
+  pack: Pick<AnyPack, 'id' | 'questionVersion' | 'questions'>,
+  item: PackCase<ShadowPackInput, ShadowTruth>,
+): ShadowCase {
   const prNumber = item.facets.prNumber;
   const stateSource = item.facets.stateSource;
   return {
@@ -83,7 +97,7 @@ function toShadowCase(item: PackCase<ShadowPackInput, ShadowTruth>): ShadowCase 
     stateSource: (typeof stateSource === 'string' ? stateSource : 'synthetic') as ShadowStateSource,
     collectionStatus: item.collectionStatus,
     truth: item.truth,
-    annotation: item.annotation,
+    annotation: isFreshAnnotation(pack, item) ? item.annotation : null,
   };
 }
 
@@ -92,6 +106,11 @@ export function createShadowPack({
 }: {
   resolveGate: ResolveProtectedGate;
 }): EvaluationPack<ShadowPackInput, ShadowTruth, PrEvidence> {
+  const identity = {
+    id: SHADOW_PACK_ID,
+    questionVersion: SHADOW_PACK_QUESTION_VERSION,
+    questions: SHADOW_QUESTIONS,
+  };
   return {
     id: SHADOW_PACK_ID,
     questionVersion: SHADOW_PACK_QUESTION_VERSION,
@@ -131,7 +150,7 @@ export function createShadowPack({
       return deriveTruth(evidence, { resolveGate });
     },
     metrics(cases) {
-      const shadowCases = cases.map(toShadowCase);
+      const shadowCases = cases.map((item) => toShadowCase(identity, item));
       const strata = computeStrata(shadowCases);
       const coverage = computeCoverage(shadowCases);
       const sections = [formatCoverage(coverage), '', formatMetrics(strata.overall, '全体')];

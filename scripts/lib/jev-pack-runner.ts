@@ -323,6 +323,12 @@ export async function runPackCollect<I, T, E>({
    */
   legacyOut?: string;
 }): Promise<string> {
+  // 取得（gh 呼び出し）と書き戻しの前に、保存先が別 pack のものでないことを確かめる。
+  // ここで止めないと、別 pack の case 群へ異物を混ぜたうえで manifest まで上書きし、
+  // どちらの pack も evaluate / report が止まる状態になる（手で直すしかなくなる）。
+  const mismatch = findPackStoreMismatch(pack, out, listCases<PackCase<I, T>>(out));
+  if (mismatch) throw new Error(`${mismatch}。収集せずに止める`);
+
   const prs = fetchPrEvidence({ api, graphql, limit });
   const stored: PackCase<I, T>[] = [];
   const inheritAnnotation = (id: string): JevAnnotation | null => {
@@ -393,6 +399,11 @@ export async function runPackCollect<I, T, E>({
     policyCheckout: policyCheckout(),
     limit,
     counts,
+    // 今回の収集で作った case の集合。`--limit` を減らして再収集した時に、前回の
+    // 収集だけに含まれていた古い case（issue 本文も正解も更新されていない）が
+    // evaluate / report の母集団に残り続けるのを防ぐ。**file は消さない** ──
+    // 課金済みの注釈は次の収集で戻ってきた時に再利用するため。
+    caseIds: stored.map((item) => item.id),
   };
   writeManifest(out, manifest);
 
@@ -402,6 +413,27 @@ export async function runPackCollect<I, T, E>({
     `policy checkout: ${manifest.policyCheckout}`,
     `ready ${counts.ready} / 入力上限超過 ${counts.inputTooLarge} / tune ${counts.tune} / holdout ${counts.holdout} / 正解あり ${counts.withTruth}`,
   ].join('\n');
+}
+
+/**
+ * manifest が持つ「今回の収集で作った case」の集合で絞る。manifest が無い・古くて
+ * `caseIds` を持たない場合は絞らない（後方互換）。
+ */
+export function selectActiveCases<I, T>(
+  out: string,
+  cases: readonly PackCase<I, T>[],
+): PackCase<I, T>[] {
+  const manifestPath = join(out, 'manifest.json');
+  if (!existsSync(manifestPath)) return [...cases];
+  try {
+    const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as { caseIds?: unknown };
+    if (!Array.isArray(manifest.caseIds)) return [...cases];
+    const active = new Set(manifest.caseIds.filter((id): id is string => typeof id === 'string'));
+    if (active.size === 0) return [...cases];
+    return cases.filter((item) => active.has(item.id));
+  } catch {
+    return [...cases];
+  }
 }
 
 /**
@@ -451,16 +483,18 @@ export async function runPackEvaluate<I, T>({
   log?: (line: string) => void;
   sleepImpl?: (ms: number) => Promise<void>;
 }): Promise<number> {
-  const all = listCases<PackCase<I, T>>(out);
-  if (all.length === 0) {
+  const stored = listCases<PackCase<I, T>>(out);
+  if (stored.length === 0) {
     log(`case が無い。先に collect を実行する（--out ${out}）`);
     return 1;
   }
-  const mismatch = findPackStoreMismatch(pack, out, all);
+  const mismatch = findPackStoreMismatch(pack, out, stored);
   if (mismatch) {
     log(`${mismatch}。送信せずに止める`);
     return 1;
   }
+  // 直近の収集に含まれない case は送らない（古い issue 内容のまま課金するのを防ぐ）。
+  const all = selectActiveCases(out, stored);
   const targets = all.filter(
     (item) => item.collectionStatus === 'ready' && (split === 'all' || item.split === split),
   );
@@ -496,7 +530,7 @@ export function runPackReport<I, T>({
   const stored = listCases<PackCase<I, T>>(out);
   const mismatch = findPackStoreMismatch(pack, out, stored);
   if (mismatch) throw new Error(mismatch);
-  const all = stored.map((item) => {
+  const all = selectActiveCases(out, stored).map((item) => {
     const decided = decideCase(pack, item);
     if (JSON.stringify(decided) !== JSON.stringify(item)) writeCase(out, decided);
     return decided;

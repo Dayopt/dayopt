@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { jevCacheKey, type JevAnnotation } from './jev-adapter.ts';
+import { jevCacheKey, jevInputBytes, type JevAnnotation } from './jev-adapter.ts';
 import { createShadowPack } from './jev-pack-shadow.ts';
 import {
   buildPackRequest,
   decideCase,
+  exceedsPackInputBudget,
   isFreshAnnotation,
   packQuestionSetId,
   type PackCase,
@@ -133,6 +134,17 @@ describe('decideCase', () => {
     });
     expect(decided.annotation).toBe(evaluated);
     expect(decided.annotation?.cacheKey).toBe(currentKey);
+  });
+
+  it('入力上限は state + 最長 question と payload 全体の両方で判定する', () => {
+    const many: Record<string, { type: 'boolean'; instructions: string }> = {};
+    // 個々は短いが、合計が payload の上限（64 KB）を超える質問セット。
+    for (let index = 0; index < 12; index += 1)
+      many[`q${index}`] = { type: 'boolean', instructions: 'x'.repeat(6_000) };
+    const wide = { id: 'wide', questionVersion: 'v1', questions: many };
+    const state = { source: 'issue', title: 't', body: 'b', labels: [] };
+    expect(jevInputBytes(buildPackRequest(wide, state)).longest).toBeLessThan(32_000);
+    expect(exceedsPackInputBudget(wide, state)).toBe(true);
   });
 
   it('cacheKey が現在の request と違う（stale な）注釈は policy へ渡さず、保存は残す', () => {

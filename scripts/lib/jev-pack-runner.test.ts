@@ -18,6 +18,7 @@ import {
   runPackCollect,
   runPackEvaluate,
   runPackReport,
+  selectActiveCases,
   writeCase,
   type RunnerFlags,
 } from './jev-pack-runner.ts';
@@ -467,6 +468,66 @@ describe('runPackEvaluate と runPackReport', () => {
       'skill-suggestion',
     );
     expect(findPackStoreMismatch(pack(), dir, listCases<SkillCase>(dir))).toBeNull();
+  });
+
+  it('直近の収集から外れた古い case は evaluate も report も対象にしない', async () => {
+    const dir = outDir();
+    // 1 回目: issue 42 と 45 を閉じる 2 PR
+    const second = { ...issue, number: 45 };
+    await runPackCollect({
+      pack: pack(),
+      out: dir,
+      limit: 10,
+      api: fakeApi(),
+      graphql: fakeGraphql([
+        prNode(1),
+        { ...prNode(2), closingIssuesReferences: { nodes: [second] } },
+      ]),
+      now: () => new Date('2026-09-19T00:00:00Z'),
+      policyCheckout: () => 'abc123',
+    });
+    expect(
+      listCases<SkillCase>(dir)
+        .map((item) => item.id)
+        .sort(),
+    ).toEqual(['issue-42', 'issue-45']);
+
+    // 2 回目: issue 42 だけ。file は残るが母集団からは外れる。
+    await collect(dir, [prNode(1)]);
+    const stored = listCases<SkillCase>(dir);
+    expect(stored.map((item) => item.id).sort()).toEqual(['issue-42', 'issue-45']);
+    expect(selectActiveCases(dir, stored).map((item) => item.id)).toEqual(['issue-42']);
+
+    const runner = runnerReturning([okResult()]);
+    await runPackEvaluate({
+      pack: pack(),
+      out: dir,
+      split: 'all',
+      max: null,
+      delayMs: 0,
+      rateLimitWaitMs: 0,
+      jevOptions: { runner: runner.runner },
+      log: () => {},
+      sleepImpl: async () => {},
+    });
+    expect(runner.calls()).toBe(1);
+  });
+
+  it('別 pack の保存先には collect も書き込まない', async () => {
+    const dir = outDir();
+    await collect(dir);
+    const foreign = { ...pack(), id: 'other-pack' };
+    await expect(
+      runPackCollect({
+        pack: foreign,
+        out: dir,
+        limit: 10,
+        api: fakeApi(),
+        graphql: fakeGraphql([prNode(1)]),
+        now: () => new Date('2026-09-19T00:00:00Z'),
+        policyCheckout: () => 'abc123',
+      }),
+    ).rejects.toThrow('skill-suggestion');
   });
 
   it('case が無ければ evaluate は送らずに 1 を返す', async () => {

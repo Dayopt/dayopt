@@ -21,6 +21,7 @@
  */
 import {
   JEV_MAX_INPUT_BYTES,
+  JEV_MAX_TOTAL_INPUT_BYTES,
   jevCacheKey,
   jevInputBytes,
   type JevAnnotation,
@@ -124,13 +125,17 @@ export function buildPackRequest(
 /**
  * 上限判定は raw の本文長ではなく **実 request の直列化結果**で行う
  * （`jev-shadow-truth.ts` の `exceedsInputBudget` と同じ理由）。
+ *
+ * adapter は「state + 最長 question」と「payload 全体」の 2 つを見るので、ここも両方見る。
+ * 片方しか見ないと、質問数の多い pack で collect は `ready` と書くのに evaluate は必ず
+ * abstain する（manifest の上限超過件数も嘘になる）。
  */
 export function exceedsPackInputBudget(
   pack: Pick<AnyPack, 'id' | 'questionVersion' | 'questions'>,
   state: JevState,
 ): boolean {
-  const { longest } = jevInputBytes(buildPackRequest(pack, state));
-  return longest > JEV_MAX_INPUT_BYTES;
+  const { longest, total } = jevInputBytes(buildPackRequest(pack, state));
+  return longest > JEV_MAX_INPUT_BYTES || total > JEV_MAX_TOTAL_INPUT_BYTES;
 }
 
 /**
