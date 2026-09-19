@@ -395,7 +395,9 @@ export type ShadowState = {
  * linked issue があればそれを使う（着手前に存在した文書なので漏れが少ない）。無ければ
  * PR 本文を着手時 section だけに削る。
  */
-export function buildShadowState(pr: ShadowPrEvidence): {
+export function buildShadowState(
+  pr: Pick<ShadowPrEvidence, 'title' | 'body' | 'labels' | 'closingIssues'>,
+): {
   state: ShadowState;
   droppedSections: string[];
 } {

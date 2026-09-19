@@ -22,11 +22,16 @@ import {
   JEV_MODEL_ID,
   JEV_SCHEMA_VERSION,
   evaluateWithJev,
+  jevCacheKey,
   validateJevRequest,
 } from '../../lib/jev-adapter.ts';
-import { SHADOW_QUESTION_IDS } from '../../lib/jev-shadow-questions.ts';
+import { createShadowPack } from '../../lib/jev-pack-shadow.ts';
+import { createSkillSuggestionPack } from '../../lib/jev-pack-skill-suggestion.ts';
+import { buildPackRequest, packQuestionSetId } from '../../lib/jev-pack.ts';
+import { SHADOW_QUESTION_IDS, SHADOW_QUESTION_SET_ID } from '../../lib/jev-shadow-questions.ts';
 import { SHADOW_SYNTHETIC_CASES } from '../../lib/jev-shadow-synthetic.ts';
 import { buildShadowRequest } from '../../lib/jev-shadow-truth.ts';
+import { SKILL_ROSTER_IDS, loadSkillRoster } from '../../lib/jev-skill-roster.ts';
 import { JEV_SMOKE_CASES } from '../../lib/jev-smoke-cases.ts';
 
 // tsx は scripts/ の .ts を CJS へ落とすため `import.meta.url` は使えない。
@@ -123,6 +128,47 @@ async function run(): Promise<number> {
     name: 'shadow 質問セットが静的検査を通る',
     ok: shadowErrors.length === 0,
     detail: shadowErrors.join(' / ') || `${SHADOW_QUESTION_IDS.length} 問`,
+  });
+
+  // pack 0（shadow-e1）が Phase 1 と同じ questionSetId / cacheKey を作ること。ここが
+  // ずれると `tmp/jev-shadow` の課金済み注釈 76 件が pack runner から見えなくなる。
+  const shadowPack = createShadowPack({
+    resolveGate: () => ({ required: false, auditContract: false }),
+  });
+  const shadowState = SHADOW_SYNTHETIC_CASES[0].state;
+  const packRequest = buildPackRequest(shadowPack, shadowState as never);
+  checks.push({
+    name: 'pack shadow-e1 が Phase 1 と同じ questionSetId と cacheKey を作る',
+    ok:
+      packQuestionSetId(shadowPack) === SHADOW_QUESTION_SET_ID &&
+      jevCacheKey(packRequest) === jevCacheKey(buildShadowRequest(shadowState)),
+    detail: packQuestionSetId(shadowPack),
+  });
+
+  // skill-suggestion の 12 問。roster は実 repo の SKILL.md から読む。description か
+  // When to Use が空の skill があれば、質問文が欠けたまま課金する前にここで落とす。
+  const roster = loadSkillRoster(ROOT);
+  const rosterGaps = roster
+    .filter((doc) => !doc.description || doc.whenToUse.length === 0)
+    .map((doc) => doc.id);
+  const skillPack = createSkillSuggestionPack({
+    roster,
+    mapSkills: () => [],
+    pathExists: () => false,
+  });
+  const skillErrors = validateJevRequest(
+    buildPackRequest(skillPack, { source: 'issue', title: 'x', body: 'y', labels: [] }),
+  );
+  checks.push({
+    name: 'skill-suggestion の質問セットが静的検査を通り、roster が欠けていない',
+    ok:
+      skillErrors.length === 0 &&
+      rosterGaps.length === 0 &&
+      roster.length === SKILL_ROSTER_IDS.length,
+    detail:
+      [...skillErrors, ...rosterGaps.map((id) => `${id}: description / When to Use が空`)].join(
+        ' / ',
+      ) || `${Object.keys(skillPack.questions).length} 問 / 上限 ${JEV_MAX_QUESTIONS}`,
   });
 
   // 無効化した経路。runner も apiKey も渡さないので、外部へは出ない。
