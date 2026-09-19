@@ -109,6 +109,7 @@ describe('truth', () => {
       {
         filesComplete: false,
         attributable: true,
+        patchComplete: true,
         files: [],
         diffSignals: { onMutate: true, clientMutation: true, errorHandling: true },
       },
@@ -123,6 +124,7 @@ describe('truth', () => {
       {
         filesComplete: true,
         attributable: false,
+        patchComplete: true,
         files: ['supabase/migrations/1.sql'],
         diffSignals: { onMutate: true, clientMutation: true, errorHandling: true },
       },
@@ -132,11 +134,32 @@ describe('truth', () => {
     expect(Object.values(truth).every((value) => value === null)).toBe(true);
   });
 
+  it('patch が欠けていれば diff 由来の正解は null、path 由来は残る', () => {
+    const truth = deriveSkillTruth(
+      {
+        filesComplete: true,
+        attributable: true,
+        patchComplete: false,
+        files: ['supabase/migrations/1.sql', 'apps/product/src/features/x/Panel.test.tsx'],
+        diffSignals: { onMutate: false, clientMutation: false, errorHandling: false },
+      },
+      mapSkills,
+      roster,
+    );
+    expect(truth).toMatchObject({
+      supabase: true,
+      test: true,
+      'optimistic-update': null,
+      'error-handling': null,
+    });
+  });
+
   it('mutation を足したのに onMutate を忘れた PR でも optimistic-update は true', () => {
     const truth = deriveSkillTruth(
       {
         filesComplete: true,
         attributable: true,
+        patchComplete: true,
         files: ['apps/product/src/features/x/hooks.ts'],
         diffSignals: { onMutate: false, clientMutation: true, errorHandling: false },
       },
@@ -151,6 +174,7 @@ describe('truth', () => {
       {
         filesComplete: true,
         attributable: true,
+        patchComplete: true,
         files: ['supabase/migrations/1.sql', 'apps/product/src/lib/stores/ui-store.ts'],
         diffSignals: { onMutate: true, clientMutation: false, errorHandling: false },
       },
@@ -209,6 +233,7 @@ describe('groupPrsByIssue', () => {
       reviewThreads: [],
       timeline: [],
       closingIssues: [],
+      closingIssuesComplete: true,
       ...overrides,
     };
   }
@@ -244,11 +269,61 @@ describe('groupPrsByIssue', () => {
       evidence: {
         filesComplete: false,
         attributable: true,
+        patchComplete: true,
         files: ['a.ts'],
         diffSignals: { onMutate: true, clientMutation: false, errorHandling: false },
       },
-      facets: { issueNumber: 42, prNumbers: '1,2', attributable: 1 },
+      facets: { issueNumber: 42, prNumbers: '1,2', attributable: 1, patchComplete: 1 },
     });
+  });
+
+  it('PR が新設した path は着手時に無かったものとして rule から外し、削除した path は残す', () => {
+    const issue = {
+      number: 43,
+      title: 't',
+      body: '`apps/new/router.ts` を作り `apps/old/legacy.ts` を消す。`apps/keep/x.ts` は触らない',
+      labels: [],
+    };
+    const cases = groupPrsByIssue(
+      [
+        pr({
+          number: 1,
+          closingIssues: [issue],
+          files: [
+            {
+              filename: 'apps/new/router.ts',
+              previousFilename: null,
+              patch: '+x',
+              status: 'added',
+            },
+            {
+              filename: 'apps/old/legacy.ts',
+              previousFilename: null,
+              patch: '-x',
+              status: 'removed',
+            },
+          ],
+        }),
+      ],
+      (path) => path !== 'apps/old/legacy.ts',
+    );
+    expect(cases[0]?.input.pathTokens).toEqual(['apps/old/legacy.ts', 'apps/keep/x.ts']);
+  });
+
+  it('patch が欠けた file があれば patchComplete を false にし、closing issue が取り切れていなければ帰属不能', () => {
+    const issue = { number: 44, title: 't', body: 'b', labels: [] };
+    const cases = groupPrsByIssue(
+      [
+        pr({
+          number: 1,
+          closingIssues: [issue],
+          closingIssuesComplete: false,
+          files: [{ filename: 'big.ts', previousFilename: null, patch: null }],
+        }),
+      ],
+      () => false,
+    );
+    expect(cases[0]?.evidence).toMatchObject({ attributable: false, patchComplete: false });
   });
 
   it('複数 issue を閉じる PR は全 issue を候補にし、正解は帰属不能にする', () => {
@@ -348,6 +423,17 @@ describe('baseline と metrics', () => {
     expect(baselines).toEqual({ b0: ['test'], b1: ['supabase'], rule: ['test'] });
   });
 
+  it('labels も baseline の材料にする（Jev の state と同じ入力）', () => {
+    const docs = withVocabulary('i18n', ['messages を編集する時', '翻訳 キーを足す時']);
+    const baselines = computeBaselines(
+      input({ body: '文言を直す', labels: ['area:i18n', 'kind:messages'] }),
+      { roster: docs, mapSkills },
+    );
+    // `area:i18n` は skill 名の明示（B0）として扱う。
+    expect(baselines.b0).toEqual(['i18n']);
+    expect(baselines.b1).toEqual(['i18n']);
+  });
+
   it('B0 の対と null の truth を分母から外し、jev と baseline を同じ対で数える', () => {
     const truth = (values: Partial<SkillSuggestionTruth>): SkillSuggestionTruth => {
       const result = {} as SkillSuggestionTruth;
@@ -412,6 +498,8 @@ describe('baseline と metrics', () => {
         baselineOf({ supabase: true }),
         baselineOf({}),
       ),
+      // 正解が全部 null（帰属不能）の case は、Jev が答えていても母数に入らない。
+      item('issue-4', 'x', truth({}), decision({ supabase: true }), baselineOf({})),
     ];
     const summary = computeSkillMetrics(cases, roster);
     expect(summary.eligibleCases).toBe(2);

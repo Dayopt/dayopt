@@ -51,6 +51,12 @@ export type SkillSuggestionEvidence = {
    * ものか分からないので正解を作らない（null）。候補としては評価する。
    */
   attributable: boolean;
+  /**
+   * 全 file の patch を読めたか。GitHub は大きい diff や binary で patch を省くので、
+   * 省かれた file に `useMutation` や `try` があっても見えない。false なら diff 由来の
+   * 正解（optimistic-update / error-handling）は null にする。
+   */
+  patchComplete: boolean;
   files: string[];
   diffSignals: { onMutate: boolean; clientMutation: boolean; errorHandling: boolean };
 };
@@ -136,6 +142,20 @@ export function extractDiffSignals(
 }
 
 const STORE_PATH = /(?:^|\/)lib\/stores\/|^apps\/product\/src\/features\/[^/]+\/stores\//;
+/** `ctx.mjs` の path 規則は `.test.ts` しか見ない。`.test.tsx` / `.spec.*` / `__tests__/` も test の成果物。 */
+const TEST_PATH = /\.(?:test|spec)\.[jt]sx?$|(?:^|\/)__tests__\//;
+
+/**
+ * 正解の保証境界（変えない限りここが正本）:
+ *
+ * 正解は**成果物から観測できる必要性**で、「skill を読むべきだったか」そのものではない。
+ * file や diff に痕跡が残る作業（migration を足した、mutation を足した、test を足した）は
+ * true / false を出せるが、「本来 test を書くべきだったのに書かなかった」のような、
+ * 成果物に痕跡が無い必要性は検出できず false 側に倒れる。したがって正解の false には
+ * 偽陰性が混ざり、Jev の正しい提案が FP として数えられうる。**Jev の precision は下限**
+ * として読む。観測できないことが分かっている時（file 未取得・帰属不能・patch 欠落・
+ * file から決められない skill）は false ではなく null にして分母から外す。
+ */
 
 export function deriveSkillTruth(
   evidence: SkillSuggestionEvidence,
@@ -151,9 +171,14 @@ export function deriveSkillTruth(
     if (doc.id === 'diagnosing-bugs' || doc.id === 'react-performance') continue;
     if (doc.id === 'store-creating')
       truth[doc.id] = evidence.files.some((file) => STORE_PATH.test(file));
+    else if (doc.id === 'test')
+      truth[doc.id] = fromPaths.has('test') || evidence.files.some((file) => TEST_PATH.test(file));
     else if (doc.id === 'optimistic-update')
-      truth[doc.id] = evidence.diffSignals.onMutate || evidence.diffSignals.clientMutation;
-    else if (doc.id === 'error-handling') truth[doc.id] = evidence.diffSignals.errorHandling;
+      truth[doc.id] = evidence.patchComplete
+        ? evidence.diffSignals.onMutate || evidence.diffSignals.clientMutation
+        : null;
+    else if (doc.id === 'error-handling')
+      truth[doc.id] = evidence.patchComplete ? evidence.diffSignals.errorHandling : null;
     else truth[doc.id] = fromPaths.has(doc.id);
   }
   return truth;
@@ -228,12 +253,23 @@ export function ruleSkills(
 
 export type SkillBaselines = { b0: SkillId[]; b1: SkillId[]; rule: SkillId[] };
 
+/**
+ * baseline が読む文章。Jev の state と同じ材料（title / body / labels）にする。labels を
+ * Jev だけに見せると、`area:auth` から security を選べる差が「意味判断の差」として
+ * macro-F1 に載ってしまう。
+ */
+export function baselineText(
+  input: Pick<SkillSuggestionInput, 'title' | 'body' | 'labels'>,
+): string {
+  return [input.title, input.body, ...input.labels].join('\n');
+}
+
 export function computeBaselines(
   input: SkillSuggestionInput,
   deps: Pick<SkillSuggestionDeps, 'roster' | 'mapSkills'>,
   vocabulary = buildVocabulary(deps.roster),
 ): SkillBaselines {
-  const text = `${input.title}\n${input.body}`;
+  const text = baselineText(input);
   return {
     b0: detectExplicitMentions(text, deps.roster),
     b1: detectKeywordMatches(text, vocabulary),
@@ -250,12 +286,34 @@ export function computeBaselines(
  */
 const PATH_TOKEN_RE = /[\w@./-]+\.(?:ts|tsx|mjs|cjs|js|md|mdx|sql|yml|yaml|json|sh)(?!\w)/g;
 
+/**
+ * issue 本文の path のうち、**着手時点で存在した**もの。
+ *
+ * collect は merge 後に動くので、現在の checkout で存在判定すると、その PR が新設した path
+ * （issue が「この router を作る」と書き、PR が実際に作った）が rule baseline に採用され、
+ * 実装結果で baseline と Decision を押し上げる。PR が追加した path は「当時は無かった」、
+ * PR が削除した path は「当時はあった」として扱う。どちらも `pulls/N/files` の status から
+ * 分かるので、追加の取得は要らない。
+ */
 export function extractExistingPaths(
   body: string,
   pathExists: (path: string) => boolean,
+  files: readonly PrFile[] = [],
 ): string[] {
+  const addedByPr = new Set<string>();
+  const removedByPr = new Set<string>();
+  for (const file of files) {
+    if (file.status === 'added') addedByPr.add(file.filename);
+    if (file.status === 'removed') removedByPr.add(file.filename);
+    if (file.status === 'renamed') {
+      addedByPr.add(file.filename);
+      if (file.previousFilename) removedByPr.add(file.previousFilename);
+    }
+  }
   const tokens = [...new Set(body.match(PATH_TOKEN_RE) ?? [])];
   return tokens.filter((token) => {
+    if (removedByPr.has(token)) return true;
+    if (addedByPr.has(token)) return false;
     try {
       return pathExists(token);
     } catch {
@@ -277,59 +335,50 @@ export function groupPrsByIssue(
   prs: readonly PrEvidence[],
   pathExists: (path: string) => boolean,
 ): PackCandidate<SkillSuggestionInput, SkillSuggestionEvidence>[] {
-  const byIssue = new Map<
+  const groups = new Map<
     number,
-    PackCandidate<SkillSuggestionInput, SkillSuggestionEvidence> & { prNumbers: number[] }
+    { issue: PrEvidence['closingIssues'][number]; prs: PrEvidence[] }
   >();
   for (const pr of prs) {
-    const attributable = pr.closingIssues.length === 1;
-    const signals = extractDiffSignals(pr.files);
     for (const issue of pr.closingIssues) {
-      const existing = byIssue.get(issue.number);
-      if (existing) {
-        existing.prNumbers.push(pr.number);
-        existing.evidence.filesComplete = existing.evidence.filesComplete && pr.filesComplete;
-        existing.evidence.attributable = existing.evidence.attributable && attributable;
-        existing.evidence.files = [
-          ...new Set([...existing.evidence.files, ...pr.files.map((file) => file.filename)]),
-        ];
-        existing.evidence.diffSignals = {
-          onMutate: existing.evidence.diffSignals.onMutate || signals.onMutate,
-          clientMutation: existing.evidence.diffSignals.clientMutation || signals.clientMutation,
-          errorHandling: existing.evidence.diffSignals.errorHandling || signals.errorHandling,
-        };
-        continue;
-      }
-      const body = stripHtmlComments(issue.body).trim();
-      byIssue.set(issue.number, {
-        id: `issue-${issue.number}`,
-        split: resolveSplit(issue.number),
-        input: {
-          issueNumber: issue.number,
-          title: issue.title,
-          body,
-          labels: sanitizeLabels(issue.labels),
-          pathTokens: extractExistingPaths(body, pathExists),
-        },
-        evidence: {
-          filesComplete: pr.filesComplete,
-          attributable,
-          files: pr.files.map((file) => file.filename),
-          diffSignals: signals,
-        },
-        facets: {},
-        prNumbers: [pr.number],
-      });
+      const group = groups.get(issue.number);
+      if (group) group.prs.push(pr);
+      else groups.set(issue.number, { issue, prs: [pr] });
     }
   }
-  return [...byIssue.values()].map(({ prNumbers, ...candidate }) => ({
-    ...candidate,
-    facets: {
-      issueNumber: candidate.input.issueNumber,
-      prNumbers: prNumbers.join(','),
-      attributable: candidate.evidence.attributable ? 1 : 0,
-    },
-  }));
+  return [...groups.values()].map(({ issue, prs: related }) => {
+    const files = related.flatMap((pr) => pr.files);
+    const body = stripHtmlComments(issue.body).trim();
+    // closing issue を全件取れていない PR は、他にどの issue を閉じたか分からないので帰属不能。
+    const attributable = related.every(
+      (pr) => pr.closingIssues.length === 1 && pr.closingIssuesComplete,
+    );
+    const evidence: SkillSuggestionEvidence = {
+      filesComplete: related.every((pr) => pr.filesComplete),
+      attributable,
+      patchComplete: files.every((file) => file.patch !== null),
+      files: [...new Set(files.map((file) => file.filename))],
+      diffSignals: extractDiffSignals(files),
+    };
+    return {
+      id: `issue-${issue.number}`,
+      split: resolveSplit(issue.number),
+      input: {
+        issueNumber: issue.number,
+        title: issue.title,
+        body,
+        labels: sanitizeLabels(issue.labels),
+        pathTokens: extractExistingPaths(body, pathExists, files),
+      },
+      evidence,
+      facets: {
+        issueNumber: issue.number,
+        prNumbers: related.map((pr) => pr.number).join(','),
+        attributable: attributable ? 1 : 0,
+        patchComplete: evidence.patchComplete ? 1 : 0,
+      },
+    };
+  });
 }
 
 // --- policy -------------------------------------------------------------------------
@@ -449,13 +498,14 @@ export function computeSkillMetrics(
 
   for (const item of cases) {
     if (!item.input || !item.truth || item.decision?.source !== 'jev' || !item.baseline) continue;
-    eligibleCases += 1;
-    const b0 = new Set(detectExplicitMentions(`${item.input.title}\n${item.input.body}`, roster));
+    const b0 = new Set(detectExplicitMentions(baselineText(item.input), roster));
+    let scorablePairs = 0;
     for (const doc of roster) {
       const actual = item.truth[doc.id];
       if (actual === null || actual === undefined || b0.has(doc.id)) continue;
       const bucket = perSkill.get(doc.id);
       if (!bucket) continue;
+      scorablePairs += 1;
       bucket.pairs += 1;
       if (actual) bucket.positives += 1;
       if (item.decision.uncertain.includes(doc.id)) bucket.uncertain += 1;
@@ -466,6 +516,8 @@ export function computeSkillMetrics(
       count(microJev, predictedJev, actual);
       count(microBaseline, predictedBaseline, actual);
     }
+    // 全 skill が null（帰属不能・file 未取得）や B0 で全部落ちた case は母数に入れない。
+    if (scorablePairs > 0) eligibleCases += 1;
   }
 
   const rows: SkillMetricRow[] = [...perSkill.entries()].map(([skill, bucket]) => ({
@@ -498,8 +550,8 @@ function prf(row: { precision: number | null; recall: number | null; f1: number 
 
 export function formatSkillMetrics(summary: SkillMetricsSummary): string {
   const lines = [
-    `対象 case（Jev 由来の decision があり、正解を持つ）: ${summary.eligibleCases}`,
-    '対は truth が null でなく、本文に skill 名が明示されていない (issue, skill) だけ。',
+    `対象 case（Jev 由来の decision があり、採点できる対が 1 つ以上ある）: ${summary.eligibleCases}`,
+    '対は truth が null でなく、title / body / labels に skill 名が明示されていない (issue, skill) だけ。',
     '',
     '| skill | 対 | 正例 | jev∪rule P / R / F1 | rule∪B1 P / R / F1 | 不確か |',
     '| --- | ---: | ---: | --- | --- | ---: |',
@@ -514,6 +566,8 @@ export function formatSkillMetrics(summary: SkillMetricsSummary): string {
     `micro P / R / F1: jev∪rule ${prf(summary.micro.jev)} / rule∪B1 ${prf(summary.micro.baseline)}`,
     '',
     '注記: diagnosing-bugs / react-performance は file から正解を作れないので分母に入らない。',
+    '注記: 正解は成果物（変更 file / diff の追加行）から観測できる必要性で、「本来やるべきだったが痕跡が無い」作業は false 側に倒れる。',
+    '      そのぶん Jev の FP には正解側の偽陰性が混ざるので、precision は下限として読む。観測できない時は false ではなく null。',
     '注記: Go 条件は holdout で macro-F1 が +0.10 以上、かつ recall を 0.2 以上落とす skill が無いこと（事前登録、#2827）。',
   );
   return lines.join('\n');

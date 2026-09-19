@@ -11,6 +11,7 @@ import {
 } from './jev-adapter.ts';
 import {
   computeAnnotationStats,
+  findPackStoreMismatch,
   listCases,
   parseRunnerFlags,
   runEvaluateLoop,
@@ -339,7 +340,8 @@ describe('runPackCollect', () => {
       decision: { source: 'baseline' },
     });
     const raw = readFileSync(join(dir, 'cases', 'issue-42.json'), 'utf8');
-    expect(raw).not.toContain('patch');
+    // diff 本文は保存しない（facets の patchComplete は真偽値の要約で、本文ではない）。
+    expect(raw).not.toContain('"patch"');
     expect(raw).not.toContain('create table');
     // 人間が書いた review 観点も正解 label も state へ入れない。
     expect(JSON.stringify(item?.state)).not.toContain('Review focus');
@@ -440,6 +442,31 @@ describe('runPackEvaluate と runPackReport', () => {
 
     const json = JSON.parse(runPackReport({ pack: pack(), out: dir, split: 'all', asJson: true }));
     expect(json).toMatchObject({ packId: 'skill-suggestion', stats: { evaluated: 1, stale: 0 } });
+  });
+
+  it('別 pack の保存先なら evaluate は送らずに止まり、report は失敗する', async () => {
+    const dir = outDir();
+    await collect(dir);
+    const foreign = { ...pack(), id: 'other-pack' };
+    const runner = runnerReturning([okResult()]);
+    const logs: string[] = [];
+    const code = await runPackEvaluate({
+      pack: foreign,
+      out: dir,
+      split: 'all',
+      max: null,
+      delayMs: 0,
+      rateLimitWaitMs: 0,
+      jevOptions: { runner: runner.runner },
+      log: (line) => logs.push(line),
+    });
+    expect(code).toBe(1);
+    expect(runner.calls()).toBe(0);
+    expect(logs.join('\n')).toContain('skill-suggestion');
+    expect(() => runPackReport({ pack: foreign, out: dir, split: 'all' })).toThrow(
+      'skill-suggestion',
+    );
+    expect(findPackStoreMismatch(pack(), dir, listCases<SkillCase>(dir))).toBeNull();
   });
 
   it('case が無ければ evaluate は送らずに 1 を返す', async () => {

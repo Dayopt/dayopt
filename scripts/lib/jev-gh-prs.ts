@@ -52,7 +52,7 @@ export const PR_QUERY = `query($owner:String!,$name:String!,$size:Int!,$cursor:S
       nodes{
         number title body createdAt mergedAt changedFiles
         labels(first:30){nodes{name}}
-        closingIssuesReferences(first:5){nodes{number title body labels(first:30){nodes{name}}}}
+        closingIssuesReferences(first:10){pageInfo{hasNextPage} nodes{number title body labels(first:30){nodes{name}}}}
         reviewThreads(first:100){nodes{comments(first:1){nodes{author{login} body}}}}
         timelineItems(itemTypes:[READY_FOR_REVIEW_EVENT,PULL_REQUEST_COMMIT,HEAD_REF_FORCE_PUSHED_EVENT],last:100){
           nodes{
@@ -76,6 +76,7 @@ export type RawPrNode = {
   changedFiles: number;
   labels: { nodes: { name: string }[] };
   closingIssuesReferences: {
+    pageInfo?: { hasNextPage: boolean };
     nodes: {
       number: number;
       title: string;
@@ -98,12 +99,18 @@ export type RawPrNode = {
 export type PrFile = {
   filename: string;
   previousFilename: string | null;
-  /** unified diff。REST が返さない（binary 等）場合は null。 */
+  /** unified diff。REST が返さない（binary・大きすぎる diff）場合は null。 */
   patch: string | null;
+  /** REST の `status`（added / removed / modified / renamed …）。取れなければ null。 */
+  status?: string | null;
 };
 
 /** `ShadowPrEvidence` と構造互換（files だけ patch を持つ）。 */
-export type PrEvidence = Omit<ShadowPrEvidence, 'files'> & { files: PrFile[] };
+export type PrEvidence = Omit<ShadowPrEvidence, 'files'> & {
+  files: PrFile[];
+  /** closing issue を全件取れたか。`first:10` を超える PR は false。 */
+  closingIssuesComplete: boolean;
+};
 
 export function normalizePrNode(
   node: RawPrNode,
@@ -134,6 +141,7 @@ export function normalizePrNode(
         return [{ type: 'commit' as const, at: item.commit?.committedDate ?? null }];
       return [];
     }),
+    closingIssuesComplete: node.closingIssuesReferences.pageInfo?.hasNextPage !== true,
     closingIssues: node.closingIssuesReferences.nodes.map((issue) => ({
       number: issue.number,
       title: issue.title,
@@ -203,7 +211,7 @@ export function fetchPrFiles({
   if (!filesComplete) return { files: [], filesComplete };
   const raw = api(`repos/${owner}/${name}/pulls/${prNumber}/files?per_page=100`, true);
   const list = Array.isArray(raw)
-    ? (raw as { filename: string; previous_filename?: string; patch?: string }[])
+    ? (raw as { filename: string; previous_filename?: string; patch?: string; status?: string }[])
     : [];
   return {
     filesComplete,
@@ -211,6 +219,7 @@ export function fetchPrFiles({
       filename: file.filename,
       previousFilename: file.previous_filename ?? null,
       patch: typeof file.patch === 'string' ? file.patch : null,
+      status: typeof file.status === 'string' ? file.status : null,
     })),
   };
 }

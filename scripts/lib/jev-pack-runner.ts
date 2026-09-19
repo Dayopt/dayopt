@@ -404,6 +404,32 @@ export async function runPackCollect<I, T, E>({
   ].join('\n');
 }
 
+/**
+ * 保存先が別 pack のものでないことを、外部呼び出しや書き戻しの前に確かめる。
+ * `--out` を取り違えると、別 pack の case を今の質問セットで課金送信したり、input の形が
+ * 違う case で `decideCase` が落ちたりする。manifest と全 case の `packId` を見る。
+ */
+export function findPackStoreMismatch<I, T>(
+  pack: Pick<EvaluationPack<I, T, unknown>, 'id'>,
+  out: string,
+  cases: readonly PackCase<I, T>[],
+): string | null {
+  const manifestPath = join(out, 'manifest.json');
+  if (existsSync(manifestPath)) {
+    try {
+      const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as { packId?: unknown };
+      if (typeof manifest.packId === 'string' && manifest.packId !== pack.id)
+        return `保存先 ${out} は pack ${manifest.packId} のもの（今の pack は ${pack.id}）`;
+    } catch {
+      // manifest が壊れていても case 側の packId で判定する。
+    }
+  }
+  const foreign = cases.filter((item) => item.packId !== pack.id);
+  if (foreign.length > 0)
+    return `保存先 ${out} に別 pack の case が ${foreign.length} 件ある（例: ${foreign[0]?.id} は ${foreign[0]?.packId}）`;
+  return null;
+}
+
 export async function runPackEvaluate<I, T>({
   pack,
   out,
@@ -428,6 +454,11 @@ export async function runPackEvaluate<I, T>({
   const all = listCases<PackCase<I, T>>(out);
   if (all.length === 0) {
     log(`case が無い。先に collect を実行する（--out ${out}）`);
+    return 1;
+  }
+  const mismatch = findPackStoreMismatch(pack, out, all);
+  if (mismatch) {
+    log(`${mismatch}。送信せずに止める`);
     return 1;
   }
   const targets = all.filter(
@@ -462,7 +493,10 @@ export function runPackReport<I, T>({
   split: SplitFilter;
   asJson?: boolean;
 }): string {
-  const all = listCases<PackCase<I, T>>(out).map((item) => {
+  const stored = listCases<PackCase<I, T>>(out);
+  const mismatch = findPackStoreMismatch(pack, out, stored);
+  if (mismatch) throw new Error(mismatch);
+  const all = stored.map((item) => {
     const decided = decideCase(pack, item);
     if (JSON.stringify(decided) !== JSON.stringify(item)) writeCase(out, decided);
     return decided;
