@@ -173,3 +173,20 @@ test('ダークモードと動きを減らす設定でもHeroの物語を読め�
     .evaluate((element) => getComputedStyle(element).backgroundColor);
   expect(background).not.toBe('rgb(255, 255, 255)');
 });
+
+test('連携セクションはライト・ダークそれぞれの明度階層に沿う', async ({ page }) => {
+  for (const colorScheme of ['light', 'dark'] as const) {
+    await page.emulateMedia({ colorScheme });
+    await page.goto('/ja');
+
+    const colors = await page.locator('#integrations').evaluate((section) => ({
+      pageBackground: getComputedStyle(document.body).backgroundColor,
+      pageForeground: getComputedStyle(document.body).color,
+      sectionBackground: getComputedStyle(section).backgroundColor,
+      sectionForeground: getComputedStyle(section).color,
+    }));
+
+    expect(colors.sectionBackground).not.toBe(colors.pageForeground);
+    expect(colors.sectionForeground).not.toBe(colors.pageBackground);
+  }
+});
