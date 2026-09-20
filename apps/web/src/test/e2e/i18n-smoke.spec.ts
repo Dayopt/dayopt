@@ -190,3 +190,20 @@ test('連携セクションはライト・ダークそれぞれの明度階層�
     expect(colors.sectionForeground).not.toBe(colors.pageBackground);
   }
 });
+
+test('セクションの階層を外周ボーダーに頼らず表現する', async ({ page }) => {
+  await page.goto('/ja');
+
+  for (const selector of [
+    '#calendar-preview',
+    '#activities',
+    '#learning',
+    '#review',
+    '#integrations',
+    '#pricing',
+    '#faq',
+    '#next-day',
+  ]) {
+    await expect(page.locator(selector)).toHaveCSS('border-top-width', '0px');
+  }
+});

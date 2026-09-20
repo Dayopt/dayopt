@@ -99,7 +99,6 @@
 
 .journey {
   min-width: 0;
-  border-block: 1px solid var(--lp-line);
 }
 
 .journeyMotion {
@@ -238,7 +237,6 @@
   align-items: center;
   gap: 18px;
   min-height: 52px;
-  border-top: 1px solid var(--lp-line);
   color: var(--lp-muted);
   font-size: 12px;
 }
@@ -276,10 +274,6 @@
 
 .replayButton:hover {
   color: var(--lp-ink);
-}
-
-.section {
-  border-top: 1px solid var(--lp-line);
 }
 
 .section .content,
@@ -362,10 +356,9 @@
 .productWindow {
   margin: 0;
   overflow: hidden;
-  border: 1px solid var(--lp-line);
   border-radius: 8px;
   background: var(--card);
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--shadow-md);
 }
 
 .productToolbar {
@@ -374,7 +367,7 @@
   gap: 18px;
   min-height: 58px;
   padding-inline: 24px;
-  border-bottom: 1px solid var(--lp-line);
+  background: var(--container);
   font-size: 13px;
 }
 
@@ -400,7 +393,7 @@
   flex-direction: column;
   gap: 11px;
   padding: 22px 17px;
-  border-right: 1px solid var(--lp-line);
+  background: var(--container);
   color: var(--lp-muted);
   font-size: 12px;
 }
@@ -452,7 +445,6 @@
   align-items: center;
   gap: 11px;
   height: 49px;
-  border-bottom: 1px solid var(--lp-line);
   font-size: 12px;
 }
 
@@ -478,7 +470,6 @@
 
 .events {
   position: relative;
-  border-left: 1px solid var(--lp-line);
   background: repeating-linear-gradient(
     to bottom,
     transparent 0,
@@ -581,7 +572,7 @@
   flex-direction: column;
   align-items: start;
   padding: 26px 20px;
-  border-left: 1px solid var(--lp-line);
+  background: var(--container);
 }
 
 .stepCount {
@@ -623,7 +614,6 @@
   flex-wrap: wrap;
   gap: 12px;
   padding: 17px 24px;
-  border-top: 1px solid var(--lp-line);
   color: var(--lp-muted);
   font-size: 12px;
 }
@@ -646,20 +636,14 @@
 .activityLibrary {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  padding-block: 36px;
-  border-block: 1px solid var(--lp-line);
+  gap: 16px;
 }
 
 .activityGroup {
-  padding: 0 30px;
-}
-
-.activityGroup:first-child {
-  padding-left: 0;
-}
-
-.activityGroup + .activityGroup {
-  border-left: 1px solid var(--lp-line);
+  padding: 28px;
+  border-radius: 8px;
+  background: var(--card);
+  box-shadow: var(--shadow-sm);
 }
 
 .activityGroup p {
@@ -712,9 +696,15 @@
 .templateDemo {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 56px;
-  padding-block: 36px;
-  border-block: 1px solid var(--lp-line);
+  gap: 18px;
+}
+
+.templateSource,
+.templateTarget {
+  padding: 28px;
+  border-radius: 8px;
+  background: var(--card);
+  box-shadow: var(--shadow-sm);
 }
 
 .templateSource h3 {
@@ -786,8 +776,6 @@
 
 .templateTarget {
   min-width: 0;
-  padding-left: 44px;
-  border-left: 1px solid var(--lp-line);
 }
 
 .templateTargetHead {
@@ -897,9 +885,9 @@
 }
 
 .reviewPaper {
-  border: 1px solid var(--lp-line);
   border-radius: 8px;
   background: var(--card);
+  box-shadow: var(--shadow-md);
 }
 
 .reviewTop,
@@ -913,7 +901,7 @@
   display: flex;
   justify-content: space-between;
   gap: 15px;
-  border-bottom: 1px solid var(--lp-line);
+  background: var(--container);
   font-size: 13px;
 }
 
@@ -947,7 +935,6 @@
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 54px;
-  border-top: 1px solid var(--lp-line);
 }
 
 .reportLabel {
@@ -1002,8 +989,9 @@
   display: flex;
   justify-content: space-between;
   gap: 12px;
-  padding-block: 13px;
-  border-block: 1px solid var(--lp-line);
+  padding: 13px;
+  border-radius: 6px;
+  background: var(--container);
   font-size: 13px;
 }
 
@@ -1030,7 +1018,6 @@
   align-items: center;
   gap: 16px;
   padding: 82px 24px;
-  border-top: 1px solid var(--lp-line);
   background: var(--container);
   text-align: center;
 }
@@ -1053,7 +1040,6 @@
 }
 
 .integrations {
-  border-top: 1px solid var(--lp-line);
   background: var(--container);
 }
 
@@ -1062,7 +1048,6 @@
   grid-template-columns: 0.9fr 1.1fr;
   gap: 50px;
   padding-block: 40px;
-  border-block: 1px solid var(--lp-line);
 }
 
 .googleBridge h3,
@@ -1097,9 +1082,9 @@
   gap: 14px;
   min-height: 172px;
   padding: 20px;
-  border: 1px solid var(--lp-line);
   border-radius: 8px;
   background: var(--card);
+  box-shadow: var(--shadow-sm);
   font-size: 12px;
 }
 
@@ -1182,9 +1167,9 @@
 .conversation {
   align-self: start;
   padding: 25px;
-  border: 1px solid var(--lp-line);
   border-radius: 8px;
   background: var(--card);
+  box-shadow: var(--shadow-sm);
   font-size: 14px;
   line-height: 1.8;
 }
@@ -1226,7 +1211,6 @@
 
 .contextSlip {
   padding: 12px 15px;
-  border: 1px solid var(--lp-line);
   border-radius: 6px;
   background: var(--container);
 }
@@ -1255,12 +1239,13 @@
   flex-direction: column;
   min-height: 440px;
   padding: 28px;
-  border: 1px solid var(--lp-line);
   border-radius: 8px;
+  background: var(--card);
+  box-shadow: var(--shadow-sm);
 }
 
 .priceCard:nth-child(2) {
-  border-color: var(--lp-ink);
+  box-shadow: var(--shadow-md);
 }
 
 .priceName {
@@ -1363,7 +1348,6 @@
   align-items: center;
   gap: 25px;
   padding: 100px 24px;
-  border-top: 1px solid var(--lp-line);
   text-align: center;
 }
 
@@ -1482,12 +1466,11 @@
   }
 
   .activityGroup {
-    padding: 20px 0;
+    padding: 24px;
   }
 
   .activityGroup + .activityGroup {
     border-left: 0;
-    border-top: 1px solid var(--lp-line);
   }
 
   .activityGroup p {
@@ -1499,8 +1482,7 @@
   }
 
   .templateTarget {
-    padding: 25px 0 0;
-    border-top: 1px solid var(--lp-line);
+    padding: 28px;
     border-left: 0;
   }
 
@@ -1513,7 +1495,6 @@
   }
 
   .experienceInsight {
-    border-top: 1px solid var(--lp-line);
     border-left: 0;
   }
 
@@ -1533,7 +1514,6 @@
   .reviewColumns > div + div,
   .reviewBottom > div + div {
     padding-top: 25px;
-    border-top: 1px solid var(--lp-line);
   }
 
   .googleBridge .featureDetail {
