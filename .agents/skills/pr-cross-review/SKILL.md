@@ -17,7 +17,7 @@ maxTurns: 20
 ## When NOT to Use
 
 - 実装や push 前のセルフレビュー（`AGENTS.md` に従う）
-- repository 全体や特定境界の security sweep（`gardening` skill §5 の月次 sweep の領域）
+- repository 全体や特定境界の security sweep（明示依頼は `security` skill §関連する検査経路 の `/claude-security` と Supabase advisors、月次は `gardening` skill §5。`docs/operations/security.md` の cadence 表が正本）
 - provider の可用性を新しい merge gate にするため
 
 ## 通常 PR
