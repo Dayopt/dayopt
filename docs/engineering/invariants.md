@@ -126,8 +126,10 @@ docs へ残している。
   `resolveSendAuthEmailStatus` の 503→500 降格を従来どおり効かせる（#2803）
 - **パスワード変更通知は Auth event だけを根拠に送る。** クライアントから任意に呼べる
   tRPC / REST 送信 endpoint は置かない。`password_changed_notification` を send_email hook で
-  受け、同じ `webhook-id` の再試行だけを冪等化する。production の通知有効化は
-  `mailer_notifications_password_changed_enabled` を Auth config audit で固定する（#2848）
+  受け、同じ `webhook-id` の再試行だけを冪等化する。送信前に `email_suppressions` を service
+  role で確認し、suppressed または判定不能なら送信せず PII なしの運用痕跡を残して 200 を返す。
+  production の通知有効化は `mailer_notifications_password_changed_enabled` を Auth config audit
+  で固定する（#2848）
 - `external-connection-maintenance` cron は calendar revoke outbox に **`MIN_BATCH_BUDGET_MS`
   以上の残り時間**を必ず渡す。outbox はこれを割ると 1 件も claim せずに break するため、retention の
   取り分を増やしすぎると provider への revoke request が永久に送られない（DB からは接続が消えている

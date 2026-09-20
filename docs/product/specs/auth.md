@@ -37,7 +37,7 @@ Supabase Auth ベースの認証機能。
 
 - Supabase Auth によるセッション管理（メール/パスワード、MFA検証フローを含む）
 - ソーシャルログインは Google のみ。Apple（有料 Developer Program が必須）と Meta（アプリ審査コスト）は不採用（2026-07 決定、ログ（削除済み、git 履歴参照））。本番の provider 設定は Supabase Dashboard が正本
-- 認証メール（signup 確認 / パスワードリセット / メールアドレス変更 / パスワード変更通知）は Auth send_email hook → Edge Function `send-auth-email` → Resend で送信する。メールアドレス変更は Secure Email Change により現・新両アドレスへ確認メールを 2 通送る。パスワード変更通知は `password_changed_notification` だけを根拠にし、クライアントから任意送信できる endpoint を持たない
+- 認証メール（signup 確認 / パスワードリセット / メールアドレス変更 / パスワード変更通知）は Auth send_email hook → Edge Function `send-auth-email` → Resend で送信する。メールアドレス変更は Secure Email Change により現・新両アドレスへ確認メールを 2 通送る。パスワード変更通知は `password_changed_notification` だけを根拠にし、クライアントから任意送信できる endpoint を持たない。送信前に bounce / complaint の suppression を確認し、判定不能時も送らない
 - 歓迎メールは認証メールとは別経路で、session が張れた着地点（`/auth/callback` と `signup` の `/auth/confirm`）から送る。「1 ユーザー 1 通」は `profiles.welcome_email_sent_at` の conditional UPDATE を掴めた 1 リクエストだけが送ることで保証し、アプリ側で初回判定をしない。送信失敗でサインインは止めない
 - `protectedProcedure` で保護された tRPC procedure が `ctx.userId` でデータアクセスを制限する
 - MFA登録済みで session assurance level が `aal1` のブラウザセッションは、画面遷移だけでなく HTTP / RSC の両 tRPC context でも protected procedure を拒否する

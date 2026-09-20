@@ -45,24 +45,30 @@ const APP_URL = Deno.env.get('NEXT_PUBLIC_APP_URL') || 'https://app.dayopt.app';
 
 type Locale = 'en' | 'ja';
 
-/**
- * user_settings から preferred_locale を取得する
- * 取得できない場合は 'en' にフォールバック
- */
-async function getUserLocale(userId: string): Promise<Locale> {
+function createAuthEmailServiceClient() {
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
-  if (!supabaseUrl) return 'en';
+  if (!supabaseUrl) return undefined;
+
   const secretKey = resolveAuthEmailSecretKey({
     supabaseUrl,
     secretKey: Deno.env.get('SUPABASE_SECRET_KEY'),
     secretKeys: Deno.env.get('SUPABASE_SECRET_KEYS'),
     localServiceRoleKey: Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'),
   });
+  if (!secretKey) return undefined;
 
-  if (!secretKey) return 'en';
+  return createClient(supabaseUrl, secretKey);
+}
+
+/**
+ * user_settings から preferred_locale を取得する
+ * 取得できない場合は 'en' にフォールバック
+ */
+async function getUserLocale(userId: string): Promise<Locale> {
+  const supabase = createAuthEmailServiceClient();
+  if (!supabase) return 'en';
 
   try {
-    const supabase = createClient(supabaseUrl, secretKey);
     const { data } = await supabase
       .from('user_settings')
       .select('preferred_locale')
@@ -75,6 +81,24 @@ async function getUserLocale(userId: string): Promise<Locale> {
   } catch {
     return 'en';
   }
+}
+
+/**
+ * bounce / complaint 済みの宛先かを service role で確認する。
+ * 判定不能時は caller が fail-closed で通知を落とし、PIIなしの運用痕跡を残す。
+ */
+async function isEmailSuppressed(email: string): Promise<boolean> {
+  const supabase = createAuthEmailServiceClient();
+  if (!supabase) throw new Error('Email suppression lookup is unavailable');
+
+  const { data, error } = await supabase
+    .from('email_suppressions')
+    .select('reason')
+    .eq('email', email)
+    .limit(1);
+
+  if (error) throw new Error('Email suppression lookup failed');
+  return data.length > 0;
 }
 
 /**
@@ -136,23 +160,43 @@ Deno.serve(async (req) => {
     const subjects = authEmailSubjects[locale];
 
     const emails: OutgoingEmail[] = [];
-    const passwordChangedEmails = resolvePasswordChangedNotificationEmails({
+    const passwordChangedResolution = await resolvePasswordChangedNotificationEmails({
       emailActionType: email_data.email_action_type,
       user,
       locale,
+      isEmailSuppressed,
     });
 
-    if (passwordChangedEmails) {
+    if (passwordChangedResolution?.status === 'send') {
       emails.push(
-        ...passwordChangedEmails.map(({ userName: passwordChangedUserName, ...email }) => ({
-          ...email,
-          element: React.createElement(PasswordChangedEmail, {
-            userName: passwordChangedUserName,
-            locale,
-            appUrl: APP_URL,
+        ...passwordChangedResolution.emails.map(
+          ({ userName: passwordChangedUserName, ...email }) => ({
+            ...email,
+            element: React.createElement(PasswordChangedEmail, {
+              userName: passwordChangedUserName,
+              locale,
+              appUrl: APP_URL,
+            }),
           }),
-        })),
+        ),
       );
+    } else if (passwordChangedResolution) {
+      const reason = passwordChangedResolution.status;
+      console.warn('[send-auth-email] password changed notification skipped', { reason });
+      await captureEdgeFunctionEvent(Deno.env.get('SENTRY_DSN'), {
+        functionName: 'send-auth-email',
+        message: 'Password changed notification skipped',
+        level: 'warning',
+        tags: {
+          action: email_data.email_action_type,
+          phase: 'suppression',
+          kind: reason,
+        },
+      });
+      return new Response(JSON.stringify({}), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
     } else {
       switch (email_data.email_action_type) {
         case 'signup': {

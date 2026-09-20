@@ -54,6 +54,10 @@ Resendのidempotency keyは**24時間保持・256文字まで・同じkeyでpayl
 
 **最後の行にkeyを足さない。** provider retryが走らないのでkeyが防ぐものが無い。パスワード変更通知は Auth Hook へ移し、`webhook-id` というイベント単位の安定IDで同一イベントの再試行だけを抑止する（#2848）。
 
+パスワード変更通知も送信前に`email_suppressions`を確認する。suppressedまたは判定不能なら
+Resendへ送らず、宛先を含まないSentry eventを残してAuth Hookへ200を返す。認証メールと同じ
+From domainの評価を、既知のbounce / complaint先への再送で落とさないためである。
+
 `webhook-id`が取れない時は**乱数へフォールバックしない**。毎回違うkeyはidempotencyとして無意味で、「冪等になったつもり」で`resolveSendAuthEmailStatus`の503→500降格を外すとかえって二重配送が増える。keyを作れない時はkey無しで送り、降格を従来どおり効かせる。
 
 ## 一時API keyの扱い
