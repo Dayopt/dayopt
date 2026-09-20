@@ -69,6 +69,25 @@ export const JEV_MAX_TOTAL_INPUT_BYTES = 64_000;
 /** 1 request に載せる質問数の上限。公開仕様が無いので運用側で先に固定する。 */
 export const JEV_MAX_QUESTIONS = 12;
 
+/**
+ * 1 つの分布が持てるキー数の上限（choice の選択肢、score の段）。
+ *
+ * **固定の許容誤差で証明できる範囲へ入力側を閉じる**ための上限で、検証の前提を
+ * provider の実装（応答の `rounding`）に依存させないために置く。
+ *
+ * 根拠は `PROBABILITY_TOLERANCE = 0.03` から逆算する。provider が各確率を小数 2 桁へ
+ * 丸めると 1 つあたり最大 0.005 ずれるので、キー数 n の合計は最大 n * 0.005 動く。
+ * n = 6 は 0.03 ちょうどに見えるが、実際の合計 1.03 は倍精度では 1 との差が
+ * 0.030000000000000027 になり `> 0.03` で**落ちる**。つまり 6 択は「各値が正常な
+ * 丸め結果なのに `invalid_response` として捨てられる」形になりうる（#2842 の 2）。
+ * 余裕を残して 5 とし、最悪でも 0.025 に収める。
+ *
+ * score 側は加重平均の許容誤差が段数に対して二次で増える（`scoreMatchesDistribution`）。
+ * 同じ上限で 5 段なら 0.06 で、段の間隔 1 の半分をはるかに下回る。上限が無いと
+ * 21 段で 1.06 まで膨らみ、`score: 0` と加重平均 1 の食い違いが素通りする（#2842 の 1）。
+ */
+export const JEV_MAX_DISTRIBUTION_KEYS = 5;
+
 /** 残高がこれを下回ったら送信しない（USD）。無料枠 $5 に対する保守的な床。 */
 export const JEV_MIN_BALANCE_USD = 1;
 
@@ -303,9 +322,10 @@ export function jevInputBytes(request: JevRequest): { longest: number; total: nu
  */
 export function validateJevRequest(
   request: JevRequest,
-  limits: { maxStateChars?: number; maxQuestions?: number } = {},
+  limits: { maxQuestions?: number; maxDistributionKeys?: number } = {},
 ): string[] {
   const maxQuestions = limits.maxQuestions ?? JEV_MAX_QUESTIONS;
+  const maxKeys = limits.maxDistributionKeys ?? JEV_MAX_DISTRIBUTION_KEYS;
   const errors: string[] = [];
   if (!request.questionSetId.trim()) errors.push('questionSetId: 空');
   const ids = Object.keys(request.questions);
@@ -317,11 +337,15 @@ export function validateJevRequest(
     if (question.type === 'choice') {
       const options = Object.keys(question.criteria);
       if (options.length < 2) errors.push(`${id}.criteria: choice は 2 件以上`);
+      if (options.length > maxKeys)
+        errors.push(`${id}.criteria: ${options.length} 択は上限 ${maxKeys} 超`);
       for (const option of options)
         if (!question.criteria[option]?.trim()) errors.push(`${id}.criteria.${option}: 空`);
     }
     if (question.type === 'score') {
       if (question.criteria.length < 2) errors.push(`${id}.criteria: score は 2 段以上`);
+      if (question.criteria.length > maxKeys)
+        errors.push(`${id}.criteria: ${question.criteria.length} 段は上限 ${maxKeys} 超`);
       question.criteria.forEach((level, index) => {
         if (!level.trim()) errors.push(`${id}.criteria[${index}]: 空`);
       });
@@ -359,8 +383,12 @@ export function readTypesafeConfidence(
  * 許容誤差は丸めから導く。provider が各確率を小数 d 桁へ丸めると 1 つあたり
  * 最大 0.5 * 10^-d ずれ、加重平均ではそれが段の index 分だけ積み上がる
  * （合計 0.5 * 10^-d * n(n-1)/2）。d は応答の `rounding` で変わりうるので
- * 保守的に 2 桁と仮定し、score 自身の丸め分を足す。固定値にすると段数の多い
- * rubric で正常な応答を落とす。
+ * 保守的に 2 桁と仮定し、score 自身の丸め分を足す。
+ *
+ * **この式が使えるのは段数が小さい間だけ**なので、`JEV_MAX_DISTRIBUTION_KEYS` で
+ * 入力側を閉じる。段数に対して二次で増えるため、上限が無いと 21 段で 1.06 まで
+ * 膨らみ、`score: 0` と加重平均 1 の食い違いが素通りする（#2842 の 1）。上限 5 段なら
+ * 最大 0.06 で、段の間隔 1 の半分を大きく下回る。
  */
 function scoreMatchesDistribution(
   score: number,
@@ -383,10 +411,18 @@ function scoreMatchesDistribution(
  * （`typesafe-ai/jev`）のまま返り、TypeSafe 直 API の `jev-1.13.0` のような版は
  * 付かなかった。ただし Gateway が将来 version 付きを返す可能性はあるので、
  * alias と `alias-<version>` の両方を受理する。別モデルは受理しない。
+ *
+ * version 部分は**数字とドットだけ**に限る。前方一致にすると `typesafe-ai/jev-preview`
+ * のような別系統や、末尾がハイフンだけの `typesafe-ai/jev-` まで受理してしまい、
+ * 「alias か alias-<version> を保証する」という上の約束を満たさない（#2842 の 3）。
  */
+const JEV_MODEL_ID_PATTERN = new RegExp(
+  String.raw`^${JEV_MODEL_ID.replaceAll('.', String.raw`\.`)}(-\d+(\.\d+)*)?$`,
+);
+
 export function isExpectedJevModelId(modelId: string | null): boolean {
   if (modelId === null) return false;
-  return modelId === JEV_MODEL_ID || modelId.startsWith(`${JEV_MODEL_ID}-`);
+  return JEV_MODEL_ID_PATTERN.test(modelId);
 }
 
 function topProbabilityOf(probabilities: Record<string, number> | null): number | null {
@@ -398,6 +434,10 @@ function topProbabilityOf(probabilities: Record<string, number> | null): number 
 /**
  * 分布の許容誤差。provider は桁を丸めて返すことがある（結果の `rounding` に桁数が載る）。
  * 3 択を小数 2 桁へ丸めた場合の最大ずれが 0.015 なので、その倍を取る。
+ *
+ * **この値は選択肢数・段数と対で意味を持つ。** キー数 n の合計は最大 n * 0.005 動くので、
+ * 緩めずに済む上限が `JEV_MAX_DISTRIBUTION_KEYS`。片方だけを動かすと、正常な丸め結果を
+ * 捨てる（n を増やす）か、食い違いを見逃す（この値を増やす）かのどちらかになる。
  */
 const PROBABILITY_TOLERANCE = 0.03;
 
