@@ -43,6 +43,74 @@ pnpm jev:check         # ネットワーク不要の静的検査。ここが落�
 
 ## コマンド
 
+### 判断材料を用意する assist（採用評価前）
+
+`context-relevance` と `claim-support` は独立した shadow 用途。明示呼び出しで使えるが、現時点で `ctx --post`、通常の `ctx`、`routing` の手順や150行briefへは接続していない。人手評価後の運用接続は別PRにする。既存の要求・権限・必須検証・独立レビューの原資料を置き換えない。
+
+```bash
+pnpm jev:assist context --issue 2853
+pnpm jev:assist context --issue 2853 --cache-only --json
+pnpm jev:assist claims --input /absolute/path/claims.json
+```
+
+標準出力は日本語の候補一覧、`--json` は構造化レポート。全候補の原文・参照・分類・評価時点を別成果物へ残す。上位5件に無いことは、資料が無いことでも、問題が無いことでもない。
+
+- contextは既存ctxと同じ自己生成コメント除外を使い、表示用に切り詰める前のコメント・関連Issue/PR・決定ログから最新24件を選ぶ。対象外も件数と参照を保存する。Issue本文は要求として保持し、ランキングでは除外しない。
+- 6候補・12問を1送信とし、関連度→分類の優先度（制約・決定・問い・検証・進捗）→新しい順で上位5件を選ぶ。既存の必須条件はこの順位で削らない。
+- claimsは主担当が指定した主張と証拠だけを照合する。「支持」は提示資料との関係であり、本番や他条件での正しさを証明しない。
+- `--cache-only` はJevを呼ばない。入力の鮮度確認のためGitHubの読み取りは行う。内容・質問version・対象SHAが変わると古い注釈を使わない。
+- 自動で1Passwordを起動しない。注入済みkeyが無ければ未評価。timeout・429も待機や再送をせず返す。再試行は次の明示実行に委ねる。
+- assist・既存batch・smokeは、全worktree共通の60秒間隔を使う。24候補なら通常4回の明示実行が必要。途中結果を完全なランキングと扱わない。API入力上限を超える資料は黙って切らず未評価にする。
+
+claims入力例（SHAは公開済みの対象commitに置き換える）:
+
+```json
+{
+  "schemaVersion": 1,
+  "target": { "number": 2853, "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" },
+  "claims": [
+    { "id": "c1", "text": "異なるユーザーの読み取りを拒否するテストがある", "evidenceIds": ["e1"] }
+  ],
+  "evidence": [
+    {
+      "id": "e1",
+      "kind": "blob",
+      "path": "scripts/lib/jev-adapter.test.ts",
+      "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    }
+  ]
+}
+```
+
+`blob` は公開Dayopt repositoryの指定SHAから取得する相対path。`github` は同repositoryのIssue/PR本文・issueコメント・Actions run URLを受け取る。任意URL、範囲外path、env、鍵ファイル、存在しない証拠IDを送信前に拒否する。会話・セッションログ・ローカルコードは自動収集しない。入力JSON自体もenvを指すsymlinkや256KB超を拒否する。主張に秘密を書かないこと。
+
+ファイルの存在と公開commit、Actionsの対象SHA・status・conclusionはGitHubから検査する。Actions conclusionからコマンド終了コードを創作しない（`exitCode: null`）。コメント中の「テスト成功」は自己申告として保持する。不足・SHA不一致は、反証ではなく判断不能にする。
+
+### 保存と評価の引き継ぎ
+
+既定保存先は `git rev-parse --git-common-dir` 配下の `jev/`。worktree削除では失われない。`annotations/` に注釈、`assist/` に内容ハッシュ付きレポート、`packs/<packId>/` に既存packの評価資料、`legacy-shadow/` に旧入口の資料、`send-slots/` に送信枠を置く。秘密のkeyは保存しない。古い `tmp/jev-*` は自動移動せず、既存CLIの `--out` で明示的に参照できる。
+
+送信予約中にprocessが強制終了した場合、`send-slots/reservation.lock` を残して安全側で停止する。全Jev processの停止を確認してから、担当者がこの1ファイルだけを除いて復旧する。時間経過だけで他processのlockを自動解除しない。contextの対象SHAは現在のHEADで、公開済みcommitであることを要求する。
+
+採用評価の入力ひな型とオフライン集計:
+
+```bash
+pnpm jev:assist-eval template context-relevance
+pnpm jev:assist-eval template claim-support
+pnpm jev:assist-eval report --input /absolute/path/evaluation.json
+```
+
+ひな型は未確認の空欄で、正解ではない。原資料、対象ID、baselineの規則と結果、質問version、split、採用基準を送信前に人が確認し、共有保存先に凍結して残す。`reviewedBy`・`rationale`・`sourceRefs` を埋める。`frozenAt` は固定記録の時刻。CLIは申告された記録を集計するだけで、人手確認の実施や後からの改変を保証しない。元の凍結資料との照合はレビューで行う。
+
+- contextは30 Issue（tune10 / holdout20）。`candidateIds` 全体に対する人手の `usefulIds` と `requiredIds`、Jev・最新順・既存キーワード規則の各上位5件を記録する。Recall@5が強いbaselineを平均0.10以上上回り、baselineが拾った必須制約を新たに落とさないこと。
+- claimsは60組、4分類各15組（各分類tune5 / holdout10）。単純baselineは常に判断不能。holdoutのmacro-F1が0.75以上かつbaseline +0.10以上で、反証・判断不能を支持と誤分類しないこと。
+- holdoutは一度だけ。見た後に閾値を調整しない。欠測・未確認・入力不足はGoにしない。集計の `GO_CANDIDATE` は運用接続の許可ではなく、原資料を人が照合するための候補結果。
+- `skill-suggestion` の採用評価は #2852 の条件で別途完了させる。他packの合格で代替しない。
+- 合格したpackだけ、次のPRでctxへの保存済み注釈表示・`ctx --post`の評価・routingでの明示claims呼び出しを接続する。接続後20件で入力準備・待ち時間を含む時間、有用/不要候補、見逃しをbaselineと比較し、品質・時間で届かないpackを明示呼び出しに戻す。
+- 継続判断日は **2026-10-19**。baselineを上回って実際に使われるpackがあるかを確認し、継続・停止を記録する。
+
+### 既存batch入口
+
 | コマンド                          | 何をするか                                                                                 | 課金 |
 | --------------------------------- | ------------------------------------------------------------------------------------------ | ---- |
 | `pnpm jev:check`                  | 設定・質問セット・pack status の静的検査                                                   | なし |
@@ -138,4 +206,4 @@ Phase 1 の shadow 評価（実 PR 100 + 合成 4、tune 76 件を完走）で�
 
 `pnpm jev:eval` / `jev:annotate` / `jev:periodic` は #2827 の起票時に置いた CLI の案で、**作らない**。収集・評価・集計は `pnpm jev:pack <packId> <collect|evaluate|report>` に統一した。
 
-batch 用の queue や常駐プロセスも作らない。バースト約 5 件・持続約 1 件/分という実測に対して、プロセス内の間隔制御で足りる。
+batch 用の queue や常駐プロセスも作らない。既存batchの待機処理に加え、共有git directoryで全入口・worktree間の送信間隔を制御する。assistは送信枠がなければ待たず未評価で返す。

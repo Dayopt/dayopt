@@ -34,6 +34,7 @@ import {
   type AnyPack,
   type PackId,
 } from '../../lib/jev-pack.ts';
+import { jevStoreRoot } from '../../lib/jev-send-budget.ts';
 import type { ResolveProtectedGate } from '../../lib/jev-shadow-truth.ts';
 import { loadSkillRoster } from '../../lib/jev-skill-roster.ts';
 
@@ -63,7 +64,7 @@ export function parsePackArgs(
       message: `subcommand は collect / evaluate / report のいずれか（受け取った値: ${command ?? 'なし'}）`,
     };
   const parsed = parseRunnerFlags(rest, {
-    out: join('tmp', 'jev', packId),
+    out: join(jevStoreRoot(), 'packs', packId),
     limit: DEFAULT_LIMIT,
     max: null,
     split: command === 'evaluate' ? 'tune' : 'all',
@@ -148,7 +149,12 @@ export async function run(argv: readonly string[]): Promise<number> {
         policyCheckout: readPolicyCheckout,
         asJson: args.asJson,
         // Phase 1 の課金済み注釈（旧形式の保存先）を shadow-e1 だけ引き継ぐ。
-        legacyOut: args.packId === 'shadow-e1' ? SHADOW_LEGACY_OUT : undefined,
+        legacyOut:
+          args.packId === 'shadow-e1'
+            ? existsSync(join(jevStoreRoot(), 'legacy-shadow'))
+              ? join(jevStoreRoot(), 'legacy-shadow')
+              : SHADOW_LEGACY_OUT
+            : undefined,
       })}\n`,
     );
     return 0;

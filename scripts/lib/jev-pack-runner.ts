@@ -161,9 +161,17 @@ export type EvaluateLoopOptions<C extends EvaluateLoopCase> = {
   delayMs: number;
   rateLimitWaitMs: number;
   jevOptions?: JevOptions;
+  evaluate?: typeof evaluateWithJev;
   log?: (line: string) => void;
   sleepImpl?: (ms: number) => Promise<void>;
 };
+
+const persistentSendStateReasons = new Set([
+  'rate_locked',
+  'rate_state_invalid',
+  'rate_state_unreadable',
+  'rate_state_unwritable',
+]);
 
 /**
  * case を 1 件ずつ順に評価する。並列にしない（バースト約 5 件で 429 になる実測に合わせる）。
@@ -181,6 +189,7 @@ export async function runEvaluateLoop<C extends EvaluateLoopCase>({
   delayMs,
   rateLimitWaitMs,
   jevOptions = {},
+  evaluate = evaluateWithJev,
   log = () => {},
   sleepImpl = sleep,
 }: EvaluateLoopOptions<C>): Promise<{ sent: number; stopped: boolean }> {
@@ -198,11 +207,11 @@ export async function runEvaluateLoop<C extends EvaluateLoopCase>({
     }
     if (sent > 0) await sleepImpl(delayMs);
 
-    let annotation = await evaluateWithJev(request, jevOptions);
+    let annotation = await evaluate(request, jevOptions);
     if (annotation.reasonCode === 'rate_limited') {
       log(`rate limited: ${item.id} — ${rateLimitWaitMs}ms 待って同じ case を再試行`);
       await sleepImpl(rateLimitWaitMs);
-      annotation = await evaluateWithJev(request, jevOptions);
+      annotation = await evaluate(request, jevOptions);
     }
     sent += 1;
     persist(item, annotation);
@@ -213,6 +222,11 @@ export async function runEvaluateLoop<C extends EvaluateLoopCase>({
 
     if (annotation.reasonCode === 'rate_limited') {
       log('同じ case で 2 回連続の rate limit。停止する');
+      stopped = true;
+      break;
+    }
+    if (persistentSendStateReasons.has(annotation.reasonCode)) {
+      log(`送信予約状態を確認・修復するまで停止する（${annotation.reasonCode}）`);
       stopped = true;
       break;
     }

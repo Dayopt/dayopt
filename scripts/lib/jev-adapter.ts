@@ -31,6 +31,7 @@ import { createHash } from 'node:crypto';
 
 import { createGateway, GatewayError } from '@ai-sdk/gateway';
 import { experimental_evaluate as evaluate } from 'ai';
+import { jevStoreRoot, reserveJevSend } from './jev-send-budget.ts';
 
 /** Annotation の形を変えたら上げる。cache key に入るので古い注釈は自動で失効する。 */
 export const JEV_SCHEMA_VERSION = 1;
@@ -106,7 +107,12 @@ export type JevReasonCode =
   | 'balance_below_floor'
   | 'balance_unknown'
   | 'timeout'
+  | 'cooldown'
   | 'rate_limited'
+  | 'rate_locked'
+  | 'rate_state_invalid'
+  | 'rate_state_unreadable'
+  | 'rate_state_unwritable'
   | 'auth_failed'
   | 'customer_verification_required'
   | 'free_tier_restricted'
@@ -816,6 +822,17 @@ export async function evaluateWithJev(
           credits: { before, after: null },
         },
       );
+  }
+
+  // Reserve immediately before evaluation, not before potentially slow credit lookup.
+  // All real entrypoints share this floor; injected test runners never touch git.
+  if (!options.runner) {
+    try {
+      const sendBlock = reserveJevSend(jevStoreRoot());
+      if (sendBlock) return stop({ status: 'unavailable', reasonCode: sendBlock });
+    } catch {
+      return stop({ status: 'unavailable', reasonCode: 'provider_error' });
+    }
   }
 
   const startedAt = Date.now();
