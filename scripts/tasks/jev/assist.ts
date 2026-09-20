@@ -19,6 +19,7 @@ import {
   atomicJson,
   evaluateAssist,
   jevStoreRoot,
+  type AssistEvaluation,
   type AssistEvaluationOptions,
 } from '../../lib/jev-assist-store.ts';
 
@@ -79,10 +80,36 @@ export function readClaimsInput(path: string) {
   return result.data;
 }
 
+const localAssistReasons = new Set([
+  'not_cached',
+  'cache_invalid',
+  'cache_unreadable',
+  'invalid_request',
+  'input_too_large',
+]);
+
+function shouldStopAssistEvaluation(result: AssistEvaluation): boolean {
+  return (
+    result.source === 'live' ||
+    (result.source === 'unavailable' && !localAssistReasons.has(result.reason))
+  );
+}
+
+function deferredAssistEvaluation(reason: string): AssistEvaluation {
+  return { source: 'unavailable', reason, annotation: null };
+}
+
 export async function assistContext(input: ContextInput, options: AssistEvaluationOptions) {
   const rows = [];
-  for (const batch of contextRequests(input))
-    rows.push(...contextRows(batch.candidates, await evaluateAssist(batch.request, options)));
+  let deferredReason: string | null = null;
+  for (const batch of contextRequests(input)) {
+    const result: AssistEvaluation = deferredReason
+      ? deferredAssistEvaluation(deferredReason)
+      : await evaluateAssist(batch.request, options);
+    rows.push(...contextRows(batch.candidates, result));
+    if (deferredReason === null && shouldStopAssistEvaluation(result))
+      deferredReason = result.source === 'live' ? 'deferred_after_live' : 'deferred_after_failure';
+  }
   const { omitted } = selectContextCandidates(input);
   return {
     schemaVersion: 1,
@@ -105,11 +132,16 @@ export async function assistClaims(
   options: AssistEvaluationOptions,
 ) {
   const rows = [];
+  let deferredReason: string | null = null;
   for (const item of claimRequests(material.input, material.evidence)) {
-    const result = item.missing.length
+    const result: AssistEvaluation = item.missing.length
       ? { source: 'unavailable' as const, reason: 'missing_evidence', annotation: null }
-      : await evaluateAssist(item.request, options);
+      : deferredReason
+        ? deferredAssistEvaluation(deferredReason)
+        : await evaluateAssist(item.request, options);
     rows.push(claimRow(item.claim, material.evidence, item.missing, result));
+    if (item.missing.length === 0 && deferredReason === null && shouldStopAssistEvaluation(result))
+      deferredReason = result.source === 'live' ? 'deferred_after_live' : 'deferred_after_failure';
   }
   return {
     schemaVersion: 1,
@@ -167,7 +199,7 @@ export function formatAssist(report: AssistReport, artifact: string): string {
   lines.push(
     `全資料・注釈: ${artifact}`,
     manualRecovery
-      ? '送信予約状態が手動復旧待ち。全Jev processを停止して reservation.lock を確認・復旧してから明示再実行する。'
+      ? '送信状態が手動復旧待ち。全Jev processを停止して jev/send-slots の reservation.lock・スロットファイル・保存先権限を確認・復旧してから明示再実行する。'
       : 'cooldown の未評価分は60秒以上後の明示再実行で続行。資格情報不在では外部評価しない。',
   );
   return lines.join('\n');

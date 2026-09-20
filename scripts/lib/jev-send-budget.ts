@@ -23,15 +23,19 @@ export type JevSendBlock =
 /** Serialize the check+reservation, including callers straddling a minute boundary. */
 export function reserveJevSend(root: string, now = Date.now()): JevSendBlock | null {
   const slots = join(root, 'send-slots');
-  mkdirSync(slots, { recursive: true });
+  try {
+    mkdirSync(slots, { recursive: true });
+  } catch {
+    return 'rate_state_unwritable';
+  }
   const lock = join(slots, 'reservation.lock');
   try {
     writeFileSync(lock, JSON.stringify({ pid: process.pid, reservedAt: now }), {
       flag: 'wx',
       mode: 0o600,
     });
-  } catch {
-    return 'rate_locked';
+  } catch (error) {
+    return errorCode(error) === 'EEXIST' ? 'rate_locked' : 'rate_state_unwritable';
   }
   try {
     return reserveSlot(slots, now);
@@ -39,6 +43,12 @@ export function reserveJevSend(root: string, now = Date.now()): JevSendBlock | n
     // Never reclaim another caller's lock by age. A crash requires explicit operator recovery.
     unlinkSync(lock);
   }
+}
+
+function errorCode(error: unknown): string | null {
+  if (typeof error !== 'object' || error === null || !('code' in error)) return null;
+  const code = error.code;
+  return typeof code === 'string' ? code : null;
 }
 
 function reserveSlot(slots: string, now: number): JevSendBlock | null {

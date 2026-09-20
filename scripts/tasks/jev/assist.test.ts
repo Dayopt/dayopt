@@ -123,9 +123,11 @@ describe('推定を主担当用の成果物にする', () => {
     expect(first.rows).toHaveLength(24);
     expect(first.omitted).toHaveLength(1);
     expect(first.rows.filter((row) => row.relevance !== null)).toHaveLength(6);
+    expect(first.rows.slice(6).every((row) => row.reason === 'deferred_after_live')).toBe(true);
     expect(first.complete).toBe(false);
     const second = await assistContext(input, { ...options, now: () => 120_000 });
     expect(second.rows.filter((row) => row.relevance !== null)).toHaveLength(12);
+    expect(second.rows.slice(12).every((row) => row.reason === 'deferred_after_live')).toBe(true);
     expect(evaluate).toHaveBeenCalledTimes(2);
   });
 });

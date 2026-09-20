@@ -198,4 +198,21 @@ describe('共通保存と待たない送信制御', () => {
     ).toBe('rate_locked');
     expect(evaluate).not.toHaveBeenCalled();
   });
+
+  it('送信状態の保存先を書けなければロック待ちと誤分類しない', async () => {
+    const root = temporary();
+    writeFileSync(join(root, 'send-slots'), 'not a directory');
+    const evaluate = await evaluator();
+    expect(
+      (
+        await evaluateAssist(request, {
+          root,
+          allowNetwork: true,
+          credentialAvailable: true,
+          evaluate,
+        })
+      ).reason,
+    ).toBe('rate_state_unwritable');
+    expect(evaluate).not.toHaveBeenCalled();
+  });
 });

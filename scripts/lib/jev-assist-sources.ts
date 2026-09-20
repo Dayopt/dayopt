@@ -27,6 +27,7 @@ const itemSchema = z
     title: z.string().optional(),
     body: z.string().nullable().optional(),
     html_url: z.string().optional(),
+    issue_url: z.string().optional(),
     updated_at: z.string().optional(),
     updatedAt: z.string().optional(),
     created_at: z.string().optional(),
@@ -127,8 +128,16 @@ export async function collectAssistContext(
   return input;
 }
 
+type EvidenceEndpoint = {
+  endpoint: string;
+  kind: 'text' | 'run';
+  resource?: 'issues' | 'pull';
+  number?: number;
+  commentId?: number;
+};
+
 /** Accept only supported URLs from this public repository, never arbitrary fetch targets. */
-export function evidenceEndpoint(url: string): { endpoint: string; kind: 'text' | 'run' } {
+export function evidenceEndpoint(url: string): EvidenceEndpoint {
   const parsed = new URL(url);
   if (parsed.origin !== 'https://github.com' || parsed.username || parsed.password || parsed.search)
     throw new Error('証拠URLは公開Dayopt repository内に限定');
@@ -137,15 +146,52 @@ export function evidenceEndpoint(url: string): { endpoint: string; kind: 'text' 
   const tail = parsed.pathname.slice(prefix.length);
   const item = /^(issues|pull)\/([1-9]\d*)$/.exec(tail);
   if (item) {
-    if (!parsed.hash) return { endpoint: `repos/${ASSIST_REPO}/issues/${item[2]}`, kind: 'text' };
+    const resource = item[1] as 'issues' | 'pull';
+    const number = Number(item[2]);
+    if (!parsed.hash)
+      return { endpoint: `repos/${ASSIST_REPO}/issues/${item[2]}`, kind: 'text', resource, number };
     const comment = /^#issuecomment-([1-9]\d*)$/.exec(parsed.hash);
     if (comment)
-      return { endpoint: `repos/${ASSIST_REPO}/issues/comments/${comment[1]}`, kind: 'text' };
+      return {
+        endpoint: `repos/${ASSIST_REPO}/issues/comments/${comment[1]}`,
+        kind: 'text',
+        resource,
+        number,
+        commentId: Number(comment[1]),
+      };
   }
   const run = /^actions\/runs\/([1-9]\d*)$/.exec(tail);
   if (run && !parsed.hash)
     return { endpoint: `repos/${ASSIST_REPO}/actions/runs/${run[1]}`, kind: 'run' };
   throw new Error('未対応の証拠URL');
+}
+
+function normalizeGithubPath(value: string): string | null {
+  try {
+    const parsed = new URL(value);
+    if (parsed.origin === 'https://github.com') return parsed.pathname;
+    if (parsed.origin === 'https://api.github.com') {
+      const match = /^\/repos\/(Dayopt\/dayopt)\/(.+)$/.exec(parsed.pathname);
+      return match ? `/${match[1]}/${match[2]}` : null;
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+function assertTextEvidenceOwnership(value: unknown, target: EvidenceEndpoint): void {
+  if (target.resource === undefined || target.number === undefined)
+    throw new Error('証拠の対象が不明');
+  const item = itemSchema.parse(value);
+  const expectedPath = `/${ASSIST_REPO}/${target.resource}/${target.number}`;
+  const paths = [item.issue_url, item.html_url]
+    .filter((candidate): candidate is string => typeof candidate === 'string')
+    .map(normalizeGithubPath)
+    .filter((candidate): candidate is string => candidate !== null);
+  if (!paths.includes(expectedPath)) throw new Error('証拠コメントの対象が入力URLと一致しない');
+  if (target.commentId !== undefined && item.id !== undefined && item.id !== target.commentId)
+    throw new Error('証拠コメントIDが入力URLと一致しない');
 }
 
 export function loadClaimEvidence(
@@ -202,6 +248,7 @@ export function loadClaimEvidence(
           facts: { status: run.status, conclusion: run.conclusion, exitCode: null },
         };
       }
+      assertTextEvidenceOwnership(value, target);
       const item = itemSchema.parse(value);
       return {
         id: ref.id,

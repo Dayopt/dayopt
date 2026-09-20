@@ -81,6 +81,36 @@ describe('公開資料だけを参照する', () => {
       facts: { conclusion: 'failure', exitCode: null },
     });
   });
+  it('コメント応答が入力URLのIssueに属さなければ不足として残す', () => {
+    const api = vi.fn((path: string) => {
+      if (path.endsWith('dayopt')) return { full_name: 'Dayopt/dayopt', private: false };
+      if (path.includes('/commits/')) return { sha };
+      return {
+        id: 123,
+        body: '別Issueの本文',
+        html_url: 'https://github.com/Dayopt/dayopt/issues/2#issuecomment-123',
+        issue_url: 'https://api.github.com/repos/Dayopt/dayopt/issues/2',
+      };
+    });
+    const value = loadClaimEvidence(
+      {
+        ...input,
+        evidence: [
+          {
+            id: 'e',
+            kind: 'github',
+            url: 'https://github.com/Dayopt/dayopt/issues/1#issuecomment-123',
+          },
+        ],
+      },
+      api,
+    );
+    expect(value.evidence[0]).toMatchObject({
+      id: 'e',
+      missing: 'source_unavailable',
+      text: '',
+    });
+  });
   it('コメント原文を切り詰めず、関連PR・決定ログにも参照を付ける', () => {
     const result = contextFromSource(1, sha, {
       title: 'title',
