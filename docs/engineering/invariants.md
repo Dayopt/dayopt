@@ -31,8 +31,9 @@ docs へ残している。
   `managementMutations` に無いもの）は、UI から送らない。** server の判定が正で、UI は
   `useBillingAccess().canUseProduct` / `useProductAccessGate` による写し。写しが無いと optimistic
   update が一度成功して見えた後に rollback され、汎用の失敗 toast だけが残って障害と区別できない
-  （2026-09-20、Google Calendar 設定と archive / restore で実発生。終了後も許す削除・切断・export は
-  gate しない）
+  （2026-09-20、Google Calendar 設定 / activity・category の archive・restore /
+  テンプレートの apply・create・rename で実発生。終了後も許す削除・切断・export は gate しない。
+  **規則を足す時は同じ class の呼び出し元を洗う** — 触った経路だけ塞ぐと、残りが同じ症状で残る）
 - 外部カレンダー連携は **Pro 限定**。OAuth の開始・callback・cron 同期の**すべての入口**で
   entitlement を検査する（2026-07 に callback の検査漏れが実際に起きたクラス）
 - Pro 限定機能の server 入口は `entitledProcedure(key)` を使うか、明示的に entitlement を検査する

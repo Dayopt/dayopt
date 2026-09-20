@@ -19,6 +19,7 @@ import {
   usePlanTemplateMutations,
   useTimeblockInspectorStore,
 } from '@/features/timeblock';
+import { useProductAccessGate } from '@/lib/billing/useProductAccessGate';
 import { getDateKey } from '@/lib/date';
 import { useUserPreferences } from '@/lib/hooks/useUserPreferences';
 
@@ -166,6 +167,8 @@ export function CalendarController({
   const stopSaving = useTemplateSaveStore((state) => state.stopSaving);
   const timezone = useUserPreferences((preferences) => preferences.timezone);
   const { createTemplate } = usePlanTemplateMutations();
+  // 作成は終了後に server が拒否する（operation-access.ts の managementMutations に無い）
+  const gateProductAccess = useProductAccessGate();
 
   // `currentDate` は壁時計 Date（navigation 由来）なので timezone 無しで暦日を読む（#2017）
   const templateDateKey = getDateKey(currentDate);
@@ -221,12 +224,14 @@ export function CalendarController({
 
   const handleSaveAsTemplate = useCallback(
     (name: string) => {
-      createTemplate.mutate(
-        { name, blocks: templateDayBlocks },
-        { onSuccess: closeSaveAsTemplate },
+      gateProductAccess(() =>
+        createTemplate.mutate(
+          { name, blocks: templateDayBlocks },
+          { onSuccess: closeSaveAsTemplate },
+        ),
       );
     },
-    [closeSaveAsTemplate, createTemplate, templateDayBlocks],
+    [closeSaveAsTemplate, createTemplate, gateProductAccess, templateDayBlocks],
   );
 
   // コンテキストメニュー管理
