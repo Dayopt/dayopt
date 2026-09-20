@@ -185,7 +185,7 @@ MCP の tool set には `buy_domain` / `buy_pro` / `buy_credits` / `pause_projec
 
 ### MCP を持たない経路
 
-GitHub は `gh` CLI を使う（`--json` + `--jq` で必要な情報へ絞る）。Agent セッションの `gh` は `GH_CONFIG_DIR` 経由の fine-grained PAT（`agent/github-agent`、Dayopt/dayopt 限定、Administration / Secrets / Workflows 無し）で動く。ruleset・GitHub Secret・org 設定の変更は scope に無いので失敗する。それらは User の terminal で行う（`docs/operations/secrets.md` §Agent の gh identity）。通常のブラウザ操作は現在の runtime のブラウザ機能を使う。Claude Code の Browser tool は互換経路であり必須ではない。認証済みセッションが要る検証は、専用 MCP を足さず既存の Playwright / E2E harness（`apps/product` の storageState 生成経路）を使う。
+GitHub は `gh` CLI を使う（`--json` + `--jq` で必要な情報へ絞る）。Agent セッションの `gh` は `GH_CONFIG_DIR` 経由の fine-grained PAT（`agent/github-agent`、Dayopt/dayopt 限定、Administration / Secrets / Workflows 無し）で動く。ruleset・GitHub Secret・org 設定の変更は scope に無いので失敗する。それらは User の terminal で行う（`docs/operations/secrets.md` §Agent の gh identity）。通常のブラウザ操作は現在の runtime のブラウザ機能を使う。Claude Code の Browser tool は互換経路であり必須ではない。認証済みセッションが要る検証は、専用 MCP を足さず既存の E2E harness を使う（`apps/product/src/lib/test/e2e/create-scoped-test-user.ts` が service role で spec 専用の使い捨て user を作り、各 spec がその資格情報で sign in する）。storageState を事前生成する経路は持たない。
 
 ### UptimeRobot (`mcp__uptimerobot__*`)
 

@@ -201,7 +201,7 @@ OWASP準拠のセキュリティ監視の全体像と、定期検査の cadence 
 | 実装中     | コード変更ごと           | `security` skill（OWASP 観点のガイド）/ risk に応じた主担当のセルフレビュー（`AGENTS.md §レーン運用`）                                                                                                                                                                                     |
 | PR ごと    | CI（ready 後）+ merge 前 | `ci.yml` static job の secret scan（gitleaks + `secrets:check`）/ integration job（affected 時）の RLS snapshot drift 検査 / Vercel build の client bundle secret 検査（`verify:bundle`）/ `production-config-audit.yml` / GitHub の `@codex review`（高リスクでも追加 reviewer は停止中） |
 | 継続       | 常時・自動               | Dependabot alerts（security update は schedule と無関係に即時 PR）/ Actions の SHA 固定 / Sentry / CSP 違反モニタリング / rate limit                                                                                                                                                       |
-| 定期・随時 | 月次 + オンデマンド      | `/gardening` §5 のセキュリティ sweep（advisors + `pnpm security:check`）/ 深掘りが要る月は `/claude-security` を 1 境界 / `/security-review` / `/code-review`                                                                                                                              |
+| 定期・随時 | 月次 + オンデマンド      | `/gardening` §5 のセキュリティ sweep（advisors + `pnpm security:check`）/ 明示依頼は `security` skill §オンデマンド sweep の手順（provider 非依存。`/claude-security` は任意の加速器）/ `/security-review` / `/code-review`                                                                |
 
 **束ねた PR のレビュー**: 通常 PR は GitHub の独立レビューを使い、高リスク変更も同じ `@codex review` とセルフレビューで確認する。複数 Issue を束ねたことだけを理由に reviewer subagent を追加しない。
 
@@ -211,12 +211,14 @@ OWASP準拠のセキュリティ監視の全体像と、定期検査の cadence 
 
 1. Supabase security advisors の確認（`mcp__supabase__get_advisors`、read-only）
 2. `pnpm security:check`（= `pnpm audit --audit-level=moderate`。後述のローカルパッチ済み advisory は `auditConfig` で除く）
-3. 深掘りが要る月だけ `/claude-security` を 1 境界に回す（実装前の既往照合は
+3. 深掘りが要る月だけ 1 境界を読む（手順は `security` skill §オンデマンド sweep の手順。
+   `/claude-security` は任意の加速器で、Claude 以外の runtime では使わない。実装前の既往照合は
    [threat-model.md](../engineering/threat-model.md) の既往クラスと却下記録）
 
 **1・2 を毎月の既定とし、3 は常設化しない**（2026-09-17 判断、#2709）。専用の pack / envelope 契約を
 持つ `security-sweep` skill は 2026-09-20 に撤去した（常設化の見送りから 3 日で実走がなく、
-既存の却下記録もその契約を通していなかった）。
+既存の却下記録もその契約を通していなかった）。月次外の明示依頼も同じ手順 3 を使い、
+「repository 全体」の依頼は境界を列挙して 1 つずつ回す（1 回で読み切ったことにしない）。
 
 2 は **CI では実行しない**。依存脆弱性の継続検知は Dependabot alerts が担当し（security update は schedule と無関係に即時 PR が出る）、CI に `pnpm audit` を足すと新しい advisory が公開された瞬間に無関係な PR まで落ちる。Actions 課金が PR 本数に比例する構造（`AGENTS.md §PR / git 運用` §PR 粒度）でもあるため、月次の手動実行に留める。
 

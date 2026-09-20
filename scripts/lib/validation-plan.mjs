@@ -54,6 +54,9 @@ export function classifyPlanPath(file) {
   //
   // fail closed は残す: `apps/` `packages/` 配下でも repo 直下でもない**未知のディレクトリ**
   // （`terraform/` 等が増えた場合）は従来どおり `unknown` にする。
+  // `patches/**` は pnpm の `patchedDependencies`。impact.mjs 側は両 app の build 影響として
+  // 扱うので、plan 側も未分類にしない（area は依存設定と同じ `dependencies`）。
+  if (file.startsWith('patches/')) areas.push('dependencies');
   const repoConfig = !file.includes('/') || file.startsWith('.vscode/');
   if (areas.length === 0)
     areas.push(/^(apps|packages)\//.test(file) ? 'behavior' : repoConfig ? 'policy' : 'unknown');

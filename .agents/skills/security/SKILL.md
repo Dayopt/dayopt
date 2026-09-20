@@ -174,9 +174,18 @@ pnpm security:check
 
 - **`pr-cross-review` skill** — auth / RLS / service role / OAuth / webhook / billing / redirect / migration を扱う PR の `@codex review` と裁定
 - **`gardening` skill §5** — 月次の sweep（Supabase の `get_advisors` + `pnpm security:check`）。所見は issue へ、既往は `docs/engineering/threat-model.md` へ戻る
-- **`/claude-security`** — 既存コードの深掘りスキャン。**月次以外に「repository 全体 / この境界を sweep して」と明示依頼された時の受け皿でもある**。scope を 1 境界に絞り、所見は issue、既往クラスと却下記録は `docs/engineering/threat-model.md` へ戻す（月次の必須項目ではない）
+- **オンデマンド sweep** — 月次以外に「repository 全体 / この境界を sweep して」と明示依頼された時の手順（下記）。provider を問わず同じ順序で回す
+- **`/claude-security`** — 既存コードの深掘りスキャン。上の手順の **任意の加速器**で、無くても完走する（Claude 以外の runtime では使えない）
 
-> このスキルは「実装時のガイド」、上記は「既存コードの検査」。新規コード実装時はこのスキルを、既存コードのスキャンは `/claude-security` を使う。
+### オンデマンド sweep の手順（provider 非依存）
+
+1. **scope を決める**: 「repository 全体」の依頼は 1 回で読み切らず、`docs/engineering/threat-model.md` §未検査の境界 と既往クラスの表から**境界を列挙し、1 つずつ回す**。列挙した境界と、今回どこまでやるかを最初に宣言する
+2. **機械検査を先に通す**: Supabase の `get_advisors`（security、read-only）と `pnpm security:check`。ここで出るものは調査せずそのまま所見にする
+3. **既往を照合する**: `docs/engineering/threat-model.md` の既往クラスと却下記録。**既に反証済みの疑いを掘り返さない**
+4. **境界ごとに読む**: 対象境界の入口（route / procedure / policy）から、認可・テナント分離・入力検証・外部契約の順に確認する。`/claude-security` を使える runtime ならこの段の加速に使ってよい
+5. **記録する**: 所見は issue。新しい既往クラスと、反証して落とした疑いは `docs/engineering/threat-model.md` へ戻す。**所見ゼロを「安全」と書かない** — 読んだ境界と読んでいない境界を明記する
+
+> このスキルは「実装時のガイド」、上記は「既存コードの検査」。新規コード実装時はこのスキルを、既存コードのスキャンは上のオンデマンド手順を使う。
 
 ## 関連スキル
 
