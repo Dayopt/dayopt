@@ -40,6 +40,26 @@ export const PACK_IDS = ['shadow-e1', 'skill-suggestion'] as const;
 export const SHADOW_LEGACY_OUT = join('tmp', 'jev-shadow');
 export type PackId = (typeof PACK_IDS)[number];
 
+/**
+ * pack ごとの有効・無効（#2827 の不変条件「各 pack は独立して無効化・撤去できる」）。
+ *
+ * `JEV_DISABLED=1` は adapter 全体の kill switch で、粒度が粗すぎる。事前登録した
+ * Go 条件を満たさなかった pack を止めるには、**その pack だけ**送信を止められる必要がある。
+ *
+ * 止めるのは `evaluate`（課金と外部送信が起きる経路）だけにする。`collect` と `report` は
+ * 通す — negative result を後から読み返せなくなると、止めた判断の根拠ごと失われるため。
+ */
+export const PACK_STATUS: Record<PackId, { status: 'active' | 'disabled'; reason?: string }> = {
+  // Phase 1 の 8 問は、決定的な代替（protected-path-gate / 本文長）を上回らなかった。
+  // 質問文の問題ではなく「コードが確定できることを推測させていた」設計の問題なので、
+  // 質問セットを作り直すまで送信しない。集計済みの結果は report で読める。
+  'shadow-e1': {
+    status: 'disabled',
+    reason: 'Phase 1 で決定的な baseline を上回らなかった（#2827 の 2026-09-19 の判定）',
+  },
+  'skill-suggestion': { status: 'active' },
+};
+
 export type PackArgs = RunnerFlags & {
   packId: PackId;
   command: 'collect' | 'evaluate' | 'report';
@@ -106,6 +126,17 @@ export async function run(argv: readonly string[]): Promise<number> {
     return 1;
   }
   const args = parsed.args;
+
+  // 無効な pack は key の確認より先に止める。「key が無い」と「pack を止めてある」を
+  // 取り違えると、承認を取りに行ってから初めて止まっていたと分かる。
+  const packStatus = PACK_STATUS[args.packId];
+  if (args.command === 'evaluate' && packStatus.status === 'disabled') {
+    process.stderr.write(
+      `pack ${args.packId} は無効化されている: ${packStatus.reason ?? '(理由の記載なし)'}\n` +
+        `collect / report は使える。再開するには scripts/tasks/jev/pack.ts の PACK_STATUS を戻す\n`,
+    );
+    return 1;
+  }
 
   if (args.command === 'evaluate' && !process.env.AI_GATEWAY_API_KEY?.trim()) {
     process.stderr.write(

@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import { mapSkills } from '../ctx.mjs';
-import { PACK_IDS, parsePackArgs } from './pack.ts';
+import { PACK_IDS, PACK_STATUS, parsePackArgs } from './pack.ts';
 
 const repoRoot = join(import.meta.dirname, '../../..');
 
@@ -99,5 +99,46 @@ describe('CLI として起動できる', () => {
     );
     expect(result.status).toBe(1);
     expect(result.stderr).toContain('AI_GATEWAY_API_KEY');
+  });
+});
+
+/**
+ * #2827 の不変条件「各 pack は独立して無効化・撤去できる」。`JEV_DISABLED=1` は
+ * adapter 全体の kill switch なので、pack 単位で止める手段がこれとは別に要る。
+ */
+describe('無効化した pack は evaluate だけが止まる', () => {
+  it('shadow-e1 は無効で理由を持ち、skill-suggestion は有効', () => {
+    expect(PACK_STATUS['shadow-e1']).toMatchObject({ status: 'disabled' });
+    expect(PACK_STATUS['shadow-e1'].reason?.trim()).toBeTruthy();
+    expect(PACK_STATUS['skill-suggestion'].status).toBe('active');
+    // status の付け忘れた pack を残さない
+    expect(Object.keys(PACK_STATUS).sort()).toEqual([...PACK_IDS].sort());
+  });
+
+  it('evaluate は credential を持っていても送信前に止まる', () => {
+    const result = spawnSync(
+      'pnpm',
+      ['exec', 'tsx', 'scripts/tasks/jev/pack.ts', 'shadow-e1', 'evaluate'],
+      {
+        cwd: repoRoot,
+        encoding: 'utf8',
+        // key がある状態でも止まることを見る（止まる理由が「key が無い」ではない）
+        env: { ...process.env, AI_GATEWAY_API_KEY: 'test-key-not-used' },
+      },
+    );
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('無効化');
+    expect(result.stderr).toContain(PACK_STATUS['shadow-e1'].reason ?? '');
+  });
+
+  it('report は無効な pack でも読める（negative result を失わない）', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'jev-pack-disabled-'));
+    const result = spawnSync(
+      'pnpm',
+      ['exec', 'tsx', 'scripts/tasks/jev/pack.ts', 'shadow-e1', 'report', '--out', dir, '--json'],
+      { cwd: repoRoot, encoding: 'utf8' },
+    );
+    expect(result.status).toBe(0);
+    expect(JSON.parse(result.stdout)).toMatchObject({ packId: 'shadow-e1' });
   });
 });

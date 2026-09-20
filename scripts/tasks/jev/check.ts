@@ -15,6 +15,7 @@ import { readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
 import {
+  JEV_MAX_DISTRIBUTION_KEYS,
   JEV_MAX_INPUT_BYTES,
   JEV_MAX_QUESTIONS,
   JEV_MAX_RETRIES,
@@ -33,6 +34,7 @@ import { SHADOW_SYNTHETIC_CASES } from '../../lib/jev-shadow-synthetic.ts';
 import { buildShadowRequest } from '../../lib/jev-shadow-truth.ts';
 import { SKILL_ROSTER_IDS, loadSkillRoster } from '../../lib/jev-skill-roster.ts';
 import { JEV_SMOKE_CASES } from '../../lib/jev-smoke-cases.ts';
+import { PACK_IDS, PACK_STATUS } from './pack.ts';
 
 // tsx は scripts/ の .ts を CJS へ落とすため `import.meta.url` は使えない。
 // 他の scripts/tasks/*.ts と同じ `__dirname` 起点に揃える。
@@ -173,6 +175,21 @@ async function run(): Promise<number> {
 
   // 無効化した経路。runner も apiKey も渡さないので、外部へは出ない。
   const disabled = await evaluateWithJev(JEV_SMOKE_CASES[0].request, { disabled: true });
+  // 無効化した pack を「理由なく止まっているもの」にしない。理由が消えると、
+  // 再開してよいのか作り直しが要るのかが後から判断できなくなる。
+  const statusGaps = PACK_IDS.filter((id) => {
+    const entry = PACK_STATUS[id];
+    return !entry || (entry.status === 'disabled' && !entry.reason?.trim());
+  });
+  checks.push({
+    name: '全 pack に status があり、無効な pack には理由が書かれている',
+    ok: statusGaps.length === 0,
+    detail:
+      statusGaps.length === 0
+        ? PACK_IDS.map((id) => `${id}=${PACK_STATUS[id]?.status ?? '(無し)'}`).join(' ')
+        : `理由や status が欠けている: ${statusGaps.join(', ')}`,
+  });
+
   checks.push({
     name: '無効化した経路は外部呼び出しなしで unavailable を返す',
     ok: disabled.status === 'unavailable' && disabled.reasonCode === 'disabled',
@@ -191,6 +208,7 @@ async function run(): Promise<number> {
             maxRetries: JEV_MAX_RETRIES,
             maxInputBytes: JEV_MAX_INPUT_BYTES,
             maxQuestions: JEV_MAX_QUESTIONS,
+            maxDistributionKeys: JEV_MAX_DISTRIBUTION_KEYS,
             minBalanceUsd: JEV_MIN_BALANCE_USD,
           },
           checks,
@@ -202,7 +220,7 @@ async function run(): Promise<number> {
   } else {
     console.log(`Jev 設定検査（schema v${JEV_SCHEMA_VERSION} / model ${JEV_MODEL_ID}）`);
     console.log(
-      `上限: 入力 ${JEV_MAX_INPUT_BYTES} バイト（state + 最長 question）/ 質問 ${JEV_MAX_QUESTIONS} 件 / 残高の床 $${JEV_MIN_BALANCE_USD}`,
+      `上限: 入力 ${JEV_MAX_INPUT_BYTES} バイト（state + 最長 question）/ 質問 ${JEV_MAX_QUESTIONS} 件 / 選択肢・段 ${JEV_MAX_DISTRIBUTION_KEYS} / 残高の床 $${JEV_MIN_BALANCE_USD}`,
     );
     console.log('');
     for (const check of checks)
