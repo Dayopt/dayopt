@@ -2,10 +2,7 @@ import { captureUnexpectedError } from '@/lib/sentry';
 import { createServiceRoleClient } from '@/lib/supabase/oauth';
 
 type CronJob =
-  | 'calendar-sync'
-  | 'external-connection-maintenance'
-  | 'calendar-account-deletion-settle'
-  | 'billing-reconciliation';
+  'calendar-sync' | 'external-connection-maintenance' | 'calendar-account-deletion-settle';
 
 /** Telemetry failure must not prevent retention/deletion work. Two calls cost at most 3 seconds. */
 export async function writeCronHeartbeat(

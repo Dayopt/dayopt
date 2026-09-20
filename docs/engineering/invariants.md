@@ -45,10 +45,13 @@ docs へ残している。
 - `withUpstashRateLimit` のIP rate limitはVercel由来の`X-Real-IP`だけを使い、`X-Forwarded-For`へfallbackしない。欠落・不正値は共有`ip:unknown`でfail closedにする
 - rate limitのRedis keyは`ip:` / `email:`のpurpose prefixを付けてHMAC化し、生のIP / emailを保存・記録しない。account bucketを併用する場合はIP-firstで短絡し、IP bucketが拒否したらaccount bucketを消費しない
 - cron ルート（`app/api/cron/**`）は `CRON_SECRET` を検証する
-- **Vercel cron の 4 route は全て `writeCronHeartbeat` で開始・完了を記録し、
-  `scripts/ci/production-cron-heartbeat-audit.mjs` の `JOB_MAX_AGE_MINUTES` と 1:1 で対応する。**
-  検出専用の cron（`billing-reconciliation`）も例外にしない。heartbeat の無い cron は
-  `CRON_SECRET` 欠落や cron 設定の消失で止まっても誰にも見えない（2026-09-20 まで実際にそうだった）
+- **`writeCronHeartbeat` に渡せる job 名は `cron_heartbeats_job_name_check`（CHECK 制約）が
+  決める。** 制約に無い名前で書くと毎回 CHECK violation になり、`writeCronHeartbeat` は例外を
+  握って Sentry へ送るだけなので **行は永遠に作られない**。監査
+  （`production-cron-heartbeat-audit.mjs` の `JOB_MAX_AGE_MINUTES`）へ job を足すのは、
+  制約を広げる migration と**同じ変更**で行う（片方だけ足すと監査が恒久 missing になる）。
+  現状 **Vercel cron 4 本のうち `billing-reconciliation` だけ heartbeat を持たない**ため、
+  止まっても検知されない（2026-09-20 に PR #2863 の `@codex review` で判明、#2864 で塞ぐ）
 - redirect 先はユーザー入力をそのまま使わず、`lib/safe-redirect.ts` の検証を通す
 
 ## メール通知

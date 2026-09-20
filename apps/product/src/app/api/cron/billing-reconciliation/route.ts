@@ -8,7 +8,6 @@ import {
   reconcileBillingWebhookEvents,
 } from '@/features/settings/server';
 import { logger } from '@/lib/logger';
-import { writeCronHeartbeat } from '@/lib/ops/cron-heartbeat';
 import { captureUnexpectedError } from '@/lib/sentry';
 import { parseStripeWebhookIdentity } from '@/lib/stripe/webhook-identity';
 
@@ -62,14 +61,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     return noStoreJson({ error: 'Billing reconciliation is not configured' }, 503);
   }
 
-  // 検出専用の cron でも「走っている」証拠は要る。`CRON_SECRET` 欠落や Vercel cron の消失で
-  // 止まると、失われた Stripe event が誰にも見えないまま残る。heartbeat は照合が実行できた
-  // 事実だけを記録し、差分の有無（503 + Sentry）とは独立させる。
-  const heartbeatStartedAt = new Date().toISOString();
-  await writeCronHeartbeat('billing-reconciliation', 'started', heartbeatStartedAt);
   try {
     const summary = await reconcileBillingWebhookEvents(identity);
-    await writeCronHeartbeat('billing-reconciliation', 'completed', heartbeatStartedAt);
     if (hasBillingWebhookReconciliationDiscrepancy(summary)) {
       logger.error('[billing-reconciliation] webhook discrepancies detected', summary);
       captureUnexpectedError(new Error('Billing webhook reconciliation discrepancy'), {

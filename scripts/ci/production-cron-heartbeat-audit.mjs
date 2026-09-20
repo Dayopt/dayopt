@@ -7,8 +7,6 @@ export const JOB_MAX_AGE_MINUTES = {
   'calendar-sync': 45,
   'external-connection-maintenance': 45,
   'calendar-account-deletion-settle': 180,
-  // 日次 02:15 UTC（vercel.json）。1 回の遅延を許容し、2 回連続で欠けたら異常にする
-  'billing-reconciliation': 1560,
   'expire-calendar-revoke-outbox': 3,
   'cleanup-product-events': 4320,
   'cleanup-calendar-authority-retention': 180,
