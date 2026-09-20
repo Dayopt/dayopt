@@ -1476,7 +1476,14 @@ export async function runProductionRelease({
     // 再配備は「live と同じ commit を、別の deployment で出し直す」操作に限る。live が
     // 別の commit なら通常の dispatch で足りる（影響判定が candidate 選択まで届く）ので、
     // ID 固定の口を広げない。ここまでは読み取りだけで、production は未変更。
-    if (redeployPending && redeployLive?.sha !== sha) {
+    //
+    // **判定は `redeployPending` ではなく `redeploy` の有無で行う。** 名指しの ID が既に
+    // live でも、その live が別 commit なら「同じ commit の出し直し」ではない。ID 一致だけで
+    // 素通りさせると `redeployPending` が false になって下の candidate 選択へ落ち、
+    // **運用者が名指ししていない最新 target deployment を promote する**（控えた ID を
+    // dispatch するまでの間に main が進んだ時に起きる）。承認は「この deployment を
+    // 出し直す」であって「別 commit を公開する」ではないので、ここで止める。
+    if (redeploy && redeployLive?.sha !== sha) {
       throw Object.assign(
         new ReleaseError(
           `Refusing to redeploy ${redeploy.deploymentId}: ${redeploy.projectName} serves ` +

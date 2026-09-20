@@ -2844,6 +2844,20 @@ describe('runProductionRelease（同一 commit の再配備）', () => {
     expect(world.pointCalls).toEqual([]);
   });
 
+  it('名指しの ID が live でも、その live が別 commit なら拒否する', async () => {
+    // 控えた ID を dispatch するまでの間に main が進んだ場合。ID 一致で素通りさせると
+    // 通常の candidate 選択へ落ち、運用者が名指ししていない最新 build を promote する。
+    const world = createReleaseWorld();
+
+    await expect(
+      release({
+        fetchImpl: world.fetchImpl,
+        redeploy: { projectName: 'product', deploymentId: 'dpl_product_old' },
+      }),
+    ).rejects.toThrow(/only replaces a deployment of the same commit/);
+    expect(world.pointCalls).toEqual([]);
+  });
+
   it('live が別の commit なら再配備を拒否し、通常 dispatch へ誘導する', async () => {
     const world = createReleaseWorld();
     world.store.dpl_product_redeploy = deploymentRecord('dpl_product_redeploy', SHA, 3000, {
