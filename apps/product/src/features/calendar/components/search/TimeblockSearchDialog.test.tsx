@@ -106,7 +106,9 @@ describe('TimeblockSearchDialog', () => {
     renderDialog();
 
     expect(screen.getByRole('dialog').querySelector('[data-sentry-block]')).toBeInTheDocument();
-    expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+    expect(
+      document.getElementById(screen.getByRole('combobox').getAttribute('aria-controls')!),
+    ).toBe(screen.getByRole('listbox'));
 
     expect(mockPlansUseQuery).toHaveBeenLastCalledWith(
       expect.objectContaining({ search: '' }),
@@ -327,6 +329,6 @@ describe('TimeblockSearchContent', () => {
   it('20件を超える場合の絞り込み案内を表示する', () => {
     renderContent({ hasMore: true });
 
-    expect(screen.getByRole('note')).toHaveTextContent('calendar.search.overflow');
+    expect(screen.getByText('calendar.search.overflow')).toBeVisible();
   });
 });

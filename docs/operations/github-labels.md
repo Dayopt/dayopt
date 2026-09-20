@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-09-01
+last_verified: 2026-09-11
 code: .github/dependabot.yml
 ---
 
@@ -14,11 +14,11 @@ code: .github/dependabot.yml
 - 未知のラベルを AI が推測して作成しない。
 - `priority:` は 0/1 個、`status:` は 0/1 個を付与する（通常 1 個）。
 - `size:` は **deprecated**（2026-08-10、#1912。編成時に issue 本文から毎回判定する方式へ移行）。新規 issue に付けない。既存 issue からは剥がさない。
-- `risk:` は 0/1 個。`judgment:` は複数の issue / PR に付くが 1 件あたり 1 個。
+- `risk:` は 0/1 個。
 - `type:`、`area:`、`quality:` は複数可。
 - 技術名、担当者名、Workflow名、Phase、実装ファイル種別をラベル化しない。
 - namespace の無い裸のラベルを作らない。`ops` は 2026-08-11（#1915）に `area:operations` へ付け替えたうえで削除した。
-- 新しいラベルが必要な場合は、既存 namespace（`type` / `priority` / `status` / `area` / `scope` / `quality` / `risk` / `judgment` / `review`）では表現できないことを確認したうえで判断する。
+- 新しいラベルが必要な場合は、既存 namespace（`type` / `priority` / `status` / `area` / `scope` / `quality` / `risk` / `db` / `review`）では表現できないことを確認したうえで判断する。
 
 ## 正規ラベル一覧
 
@@ -89,17 +89,10 @@ code: .github/dependabot.yml
 
 - `risk:authority` — issue の実行自体に `EXPLICIT AUTHORITY` の不可逆操作を含む場合のみ付与。運用は `.agents/skills/dispatch/SKILL.md` 操作 B
 
-### judgment
-
-- `judgment:diverged` — Main（dispatch skill を実行する session）の推奨と User の判断が分かれた記録（未判定 or 判定材料待ち）。判定を書いたら外さず `judgment:judged` へ付け替える
-- `judgment:judged` — 個別判定を書き終えた状態（2026-08-27、User 裁可の新設。`judgment` namespace 内の追加のため既存 2 値体系への例外にあたる。経緯は `dispatch` skill（旧 orchestration.md、#2479 で再編） §判断ジャーナル）。`docs/decisions.md` への反映はラベル→月次 sync 機構ではなく、判定時点での直接追記に一本化済み（2026-08-28、#2475）
-
-運用は `dispatch` skill（旧 orchestration.md、#2479 で再編） §判断ジャーナル
-
 ### review
 
 - `review:full` — **Issue / PR 共通の「User 自身が重く見て目を通す」印**（2026-09-04、[#2596](https://github.com/Dayopt/dayopt/issues/2596) で機械 gate から情報ラベルへ格下げ。旧: Issue / PR 共通の高リスクシグナルとして必須レビューを機械判定していた [#2529](https://github.com/Dayopt/dayopt/issues/2529) / [#2530](https://github.com/Dayopt/dayopt/issues/2530) は撤回）。手で付ける明示的なエスカレーションで、AI が自動付与する仕組みは作らない
-  - **PR に付いている場合**: `pr-cross-review` skill による advisory レビューをより丁寧に行う目安になる（merge を止める機械 gate ではない）。判定材料として `scripts/ci/protected-path-gate.mjs` の保護対象 path 判定と併せて使う
+  - **PR に付いている場合**: User が GitHub の `@codex review` を重点的に確認する目安になる（merge を止める機械 gate ではない）。判定材料として `scripts/ci/protected-path-gate.mjs` の保護対象 path 判定と併せて使う
   - **Issue に付いている場合**: 実装着手前に User 自身が目を通すべき合図（機械 gate はない）
   - ラベルの有無は merge / 着手可否の機械判定に使わない
 

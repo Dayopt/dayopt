@@ -6,6 +6,7 @@ import { env } from '@/env';
 import { databaseTables, type Database } from '@/lib/database';
 import { logger } from '@/lib/logger';
 import { captureUnexpectedDatabaseError, captureUnexpectedError } from '@/lib/sentry';
+import { SUPABASE_TRACE_PROPAGATION } from '@/lib/supabase/trace-propagation';
 
 /**
  * ミラー（`external_calendar_events`）から「plans / records に参照されていない行」だけを
@@ -73,20 +74,17 @@ type EventPruningDatabase = {
 type EventPruningClient = SupabaseClient<EventPruningDatabase>;
 
 function createEventPruningClient(): EventPruningClient {
-  return createClient<EventPruningDatabase>(
-    env.NEXT_PUBLIC_SUPABASE_URL,
-    env.SUPABASE_SERVICE_ROLE_KEY,
-    {
-      auth: { autoRefreshToken: false, persistSession: false },
-      global: {
-        fetch: (url, options) =>
-          fetch(url, {
-            ...options,
-            signal: options?.signal ?? AbortSignal.timeout(DB_REQUEST_TIMEOUT_MS),
-          }),
-      },
+  return createClient<EventPruningDatabase>(env.NEXT_PUBLIC_SUPABASE_URL, env.SUPABASE_SECRET_KEY, {
+    tracePropagation: SUPABASE_TRACE_PROPAGATION,
+    auth: { autoRefreshToken: false, persistSession: false },
+    global: {
+      fetch: (url, options) =>
+        fetch(url, {
+          ...options,
+          signal: options?.signal ?? AbortSignal.timeout(DB_REQUEST_TIMEOUT_MS),
+        }),
     },
-  );
+  });
 }
 
 /** plans / records の両方から、与えた id を参照している external_calendar_event_id を集める。 */

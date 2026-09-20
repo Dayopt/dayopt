@@ -72,8 +72,8 @@ async function main(): Promise<void> {
   // なければ起動を拒否する。
   const requiredDummyEnv: Record<string, string> = {
     NEXT_PUBLIC_SUPABASE_URL: 'https://dummy.supabase.co',
-    NEXT_PUBLIC_SUPABASE_ANON_KEY: 'dummy',
-    SUPABASE_SERVICE_ROLE_KEY: 'dummy',
+    NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: 'dummy',
+    SUPABASE_SECRET_KEY: 'dummy',
   };
   for (const [key, expected] of Object.entries(requiredDummyEnv)) {
     if (process.env[key] !== expected) {

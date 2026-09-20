@@ -9,6 +9,18 @@ function deny(message) {
   return { decision: 'block', message: `BLOCKED: ${message}` };
 }
 
+// Native delegation の実際の tool input（task_name / message / fork_turns）には
+// read-only と write/browser を区別する機械的な型がない。判別不能な呼び出しは
+// read-only worker の scope を prompt だけで広げるため拒否する。write/browser は
+// runtime が別名の typed tool を提供した時だけ、下の allowlist に追加して通す。
+const NATIVE_DELEGATION_TOOLS = new Set(['spawn_agent', 'collaboration.spawn_agent']);
+const TYPED_NATIVE_WRITE_OR_BROWSER_TOOLS = new Set([
+  'spawn_agent.write',
+  'spawn_agent.browser',
+  'collaboration.spawn_agent.write',
+  'collaboration.spawn_agent.browser',
+]);
+
 /** Extract every touched path, including both sides of a rename, before evaluating any. */
 export function parsePatch(command) {
   if (typeof command !== 'string') throw new Error('patch is missing');
@@ -86,6 +98,11 @@ export async function evaluateCodex(rawInput, options = {}) {
   if (typeof suppliedCwd !== 'string' || !isAbsolute(suppliedCwd))
     return deny('cwd を確認できません');
   const cwd = realpathSync(suppliedCwd);
+  if (NATIVE_DELEGATION_TOOLS.has(tool))
+    return deny(
+      'native delegation は read-only / write を機械的に区別できず、repository scope の実行境界も証明できないため禁止です（親担当が調査してください）',
+    );
+  if (TYPED_NATIVE_WRITE_OR_BROWSER_TOOLS.has(tool)) return { decision: 'allow' };
   const { evaluate } = await import('./pre-tool-guard-rules.mjs');
   const check = (name, args) =>
     evaluate(JSON.stringify({ tool_name: name, tool_input: args }), { cwd });

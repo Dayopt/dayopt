@@ -79,204 +79,25 @@ Root系3ページが英語固定な理由: これらが表示される = `NextIn
 
 ---
 
-## ErrorBoundary 自動復旧システム
+## ErrorBoundary
 
-4段階の復旧戦略（自動→手動→リロード→ホーム）を持つエラーハンドリングシステム。
+**2026-09-16 にこの節を書き直した。** それまでは「4 段階の自動復旧システム」として `GlobalErrorBoundary` / `ErrorFallbacks` / `useAutoRetry` / `src/config/error-patterns.ts` / `src/constants/errorCodes.ts` を前提に 200 行あったが、**いずれも実装されていない**（`rg` で 0 件）。
 
-### 主要機能
+### 実在するもの
 
-- **全画面レベル保護** — アプリケーション全体をエラーから守る
-- **自動エラー分析** — エラーの種類・重要度・復旧可能性を自動判定
-- **段階的復旧** — 自動→手動→リロード→ホームの4段階
-- **カテゴリ別フォールバック** — エラータイプに最適化されたUI
+| 役割                     | 実体                                                             |
+| ------------------------ | ---------------------------------------------------------------- |
+| Error Boundary component | `src/components/ui/feedback/error-boundary.tsx`                  |
+| route 単位のエラー画面   | App Router の `error.tsx` / `global-error.tsx` / `not-found.tsx` |
+| 監視への送信             | `src/lib/sentry/`                                                |
 
-### システム構成
+### 置き方
 
-```
-src/
-├── components/
-│   ├── common/
-│   │   ├── GlobalErrorBoundary.tsx      # 全画面レベルエラーバウンダリー
-│   │   └── ErrorFallbacks.tsx           # カテゴリ別フォールバック
-│   └── error-boundary.tsx               # ErrorBoundary, FeatureErrorBoundary
-├── hooks/
-│   └── useAutoRetry.ts                  # 自動リトライフック群
-├── config/
-│   └── error-patterns.ts                # エラーパターン辞書
-└── constants/
-    └── errorCodes.ts                    # エラーコード体系
-```
+- **機能単位で置く**。アプリ全体を 1 つの boundary でラップしない（1 か所の失敗で全画面を落とさない）
+- boundary の内側で回復できないもの（認証切れ、致命的な設定エラー）は route の `error.tsx` へ委ねる
+- 再試行はデータ取得層（TanStack Query の `retry`）に任せ、boundary 側で独自のリトライ機構を持たない
 
-エラーコード体系・Sentry連携の詳細は [`conventions-api.md`](./conventions-api.md) のエラーパターン辞書セクションを参照。
-
-### 基本的な使い方
-
-#### グローバルエラーバウンダリー（自動適用済み）
-
-```tsx
-// src/app/layout.tsx
-<GlobalErrorBoundary maxRetries={3} retryDelay={1000} onError={handleGlobalError}>
-  <Providers>
-    {children}
-    <ToastContainer />
-  </Providers>
-</GlobalErrorBoundary>
-```
-
-#### コンポーネント別エラーバウンダリー
-
-```tsx
-import { SmartErrorBoundary, DatabaseErrorFallback } from '@/lib/components/common'
-
-// 自動判定（推奨）
-<SmartErrorBoundary>
-  <YourComponent />
-</SmartErrorBoundary>
-
-// 特定のフォールバックを指定
-<SmartErrorBoundary fallbackComponent={DatabaseErrorFallback}>
-  <DatabaseComponent />
-</SmartErrorBoundary>
-```
-
-#### 自動リトライフック
-
-```tsx
-import { useApiRetry, useDataFetchRetry } from '@/lib/components/common';
-
-// API呼び出し用
-const { execute, isLoading, retry, error } = useApiRetry(async () => {
-  const response = await fetch('/api/data');
-  if (!response.ok) throw new Error(`API Error: ${response.status}`);
-  return response.json();
-});
-
-// データフェッチ用
-const dataRetry = useDataFetchRetry(async () => {
-  return await fetchUserData();
-});
-```
-
-### カテゴリ別フォールバック
-
-| フォールバック          | 用途                   | 特徴                   |
-| ----------------------- | ---------------------- | ---------------------- |
-| `NetworkErrorFallback`  | ネットワーク接続エラー | Wi-Fi・接続確認の案内  |
-| `DatabaseErrorFallback` | データベースエラー     | 自動修復中の表示       |
-| `APIErrorFallback`      | API通信エラー          | サーバー通信問題の説明 |
-| `AuthErrorFallback`     | 認証エラー             | ログインページへの誘導 |
-| `UIErrorFallback`       | UIコンポーネントエラー | 軽量な再表示ボタン     |
-| `GenericErrorFallback`  | 汎用エラー             | あらゆるエラーに対応   |
-
-#### 自動選択（推奨）
-
-```tsx
-import { selectErrorFallback } from '@/lib/components/common'
-
-const FallbackComponent = selectErrorFallback(error)
-<FallbackComponent error={error} resetErrorBoundary={reset} />
-```
-
-### 復旧戦略の階層
-
-#### 1. 自動リトライ（バックグラウンド）
-
-- 指数バックオフ（1秒 → 2秒 → 4秒）
-- 最大3回まで自動実行
-- ユーザーの操作を中断しない
-
-#### 2. 手動リトライ（ユーザー操作）
-
-- 「手動再試行」ボタン
-- リトライ回数表示
-
-#### 3. ページ再読み込み（確実な復旧）
-
-- 「ページ再読み込み」ボタン
-- アプリケーション全体をリセット
-
-#### 4. ホーム画面誘導（最終手段）
-
-- 「ホームに戻る」ボタン
-- 安全な画面への誘導
-
-### 設定オプション
-
-#### GlobalErrorBoundary設定
-
-```tsx
-<GlobalErrorBoundary
-  maxRetries={3} // 最大リトライ回数
-  retryDelay={1000} // 初期遅延時間（ms）
-  onError={(error, errorInfo, retryCount) => {
-    // Sentryへの送信など
-  }}
->
-  {children}
-</GlobalErrorBoundary>
-```
-
-#### useAutoRetry設定
-
-```tsx
-const config = {
-  maxRetries: 3,
-  initialDelay: 1000,
-  backoffFactor: 2,
-  maxDelay: 30000,
-  shouldRetry: (error: Error, retryCount: number) => {
-    return error.message.includes('network') && retryCount < 3;
-  },
-  onRetry: (error: Error, retryCount: number) => {
-    // リトライ時のコールバック
-  },
-  onFinalFailure: (error: Error, retryCount: number) => {
-    // 最終失敗時のコールバック
-  },
-};
-```
-
-### ベストプラクティス
-
-#### エラーバウンダリーの配置
-
-```tsx
-// ❌ 全体を1つのエラーバウンダリーでラップ
-<ErrorBoundary>
-  <Header />
-  <Sidebar />
-  <Main />
-</ErrorBoundary>
-
-// ✅ 重要なコンポーネントごとに配置
-<div>
-  <Header />
-  <SmartErrorBoundary>
-    <Sidebar />
-  </SmartErrorBoundary>
-  <SmartErrorBoundary>
-    <Main />
-  </SmartErrorBoundary>
-</div>
-```
-
-#### リトライ設定の最適化
-
-```tsx
-// API呼び出し：積極的にリトライ
-const apiRetry = useApiRetry(apiCall, {
-  maxRetries: 3,
-  initialDelay: 1000,
-});
-
-// ユーザーアクション：控えめにリトライ
-const userActionRetry = useUserActionRetry(userAction, {
-  maxRetries: 1,
-  initialDelay: 2000,
-});
-```
-
----
+エラーの正規化と通知の組み合わせは [`error-handling` skill](../../.agents/skills/error-handling/SKILL.md)、service 側のコード体系は [`conventions-api.md`](./conventions-api.md) を見る。
 
 ## Hooks Pattern
 
@@ -747,55 +568,50 @@ Dayoptで実装済みのNext.js App Router向けパフォーマンス最適化�
 
 | カテゴリ        | 実装内容                                     | ファイル                       |
 | --------------- | -------------------------------------------- | ------------------------------ |
-| PPR             | Partial Prerendering有効化                   | `next.config.mjs`              |
 | Server Prefetch | tRPC Server-side helpers + HydrationBoundary | `src/lib/trpc/server.ts`       |
-| Router Cache    | staleTimes設定                               | `next.config.mjs`              |
+| Router Cache    | staleTimes設定（product のみ）               | `next.config.mjs`              |
 | Link最適化      | ネットワーク条件に応じたprefetch             | `nav-main.tsx`                 |
 | LCP最適化       | priority属性追加                             | エラーページ各種               |
 | SW最適化        | キャッシュ自動バージョニング                 | `useServiceWorker.ts`, `sw.js` |
 | Bundle最適化    | optimizePackageImports拡張                   | `next.config.mjs`              |
 | 遅延ロード      | Novel Editor dynamic import                  | `PlanInspectorContent.tsx`     |
 
-### Phase 1: PPR + Server-side Prefetch
+### Phase 1: Router Cache + Server-side Prefetch
 
-#### PPR (Partial Prerendering)
+PPR / Cache Components は web・product とも採用していない（#2519。理由は各 `next.config.mjs` のコメント）。
 
-```js
-// next.config.mjs
-experimental: {
-  ppr: true,
-  staleTimes: {
-    dynamic: 30,
-    static: 180,
-  },
-}
-```
+#### Router Cache（staleTimes）
 
-**効果**: 静的シェルを即座に表示、動的部分を後からストリーミング。FCPの大幅改善。
+`experimental.staleTimes` は app ごとに実測して決めた（2026-09-14、#2747）。
+
+| app     | 設定                                            | 理由（実測）                                                                                                                                        |
+| ------- | ----------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| product | `dynamic: 30` / `static: 180`                   | workspace tab（calendar ⇄ report）の Link 往復。既定のままだと戻るたびに RSC を取り直し calendar への戻りが約 875ms。30 秒保持で RSC 0 回・36〜83ms |
+| web     | 指定しない（既定 `dynamic: 0` / `static: 300`） | 全ページが SSG で dynamic の対象が無い。`static: 180` は既定より短く、Link で戻る遷移を 200 秒後に 1 回余計に取り直していた                         |
+
+server state の鮮度は TanStack Query が持つので、Router Cache で RSC を再利用しても古いデータは表示されない。
 
 #### tRPC Server-side Prefetch
 
+server で prefetch した query は、client が **同じ input** で query した時だけ hydrate された cache に当たる（query key に input が含まれるため）。input を server / client で別々に組むと、画面は正しく出たまま同じ範囲を browser から取り直す。calendar は `features/calendar/domain/calendar-query-input.ts` の builder を両側で使う（#2747）。
+
 ```tsx
-// src/app/[locale]/(app)/calendar/[view]/page.tsx
-import { dehydrate, HydrationBoundary } from '@tanstack/react-query';
-import { createServerHelpers } from '@/lib/trpc/server';
-
-export default async function CalendarPage() {
-  const helpers = await createServerHelpers();
-
-  await helpers.plans.list.prefetch();
-  await helpers.records.list.prefetch();
-  await helpers.activities.list.prefetch();
-
-  return (
-    <HydrationBoundary state={dehydrate(helpers.queryClient)}>
-      <CalendarClient />
-    </HydrationBoundary>
-  );
-}
+// src/app/[locale]/(app)/(workspace)/_server/calendar-prefetch.ts（要点）
+const settings = await helpers.userSettings.get.fetch();
+const listInput = buildTimeblockListInput({
+  viewType,
+  anchorDateKey,
+  timezone: settings?.timezone ?? browserTimezone,
+  weekStartsOn: settings?.weekStartsOn ?? DEFAULT_WEEK_STARTS_ON,
+  showWeekends: settings?.showWeekends ?? DEFAULT_SHOW_WEEKENDS,
+});
+await Promise.all([
+  helpers.plans.list.prefetch(listInput),
+  helpers.records.list.prefetch(listInput),
+]);
 ```
 
-**効果**: 初回レンダリング時にデータが既にキャッシュ済み。クライアントでの追加フェッチ不要。
+**効果**: 初回レンダリング時にデータが既にキャッシュ済み。`calendar-initial-load.spec.ts` が「初回 load で範囲系 procedure を browser から撃たない」ことを固定している。
 
 ### Phase 2: Link Prefetch最適化
 
@@ -844,12 +660,9 @@ const shouldPrefetch = useMemo(() => {
 #### キャッシュ自動バージョニング
 
 ```ts
-// src/hooks/useServiceWorker.ts
-const swVersion =
-  process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA?.slice(0, 8) ||
-  process.env.NEXT_PUBLIC_BUILD_ID ||
-  '';
-const swUrl = swVersion ? `/sw.js?v=${swVersion}` : '/sw.js';
+// src/lib/hooks/useServiceWorker.ts（getBuildSha は src/lib/app-info.ts）
+const buildSha = getBuildSha();
+const swUrl = buildSha ? `/sw.js?v=${buildSha}` : '/sw.js';
 ```
 
 **効果**: デプロイ時にSWが自動更新、古いキャッシュの自動クリーンアップ。

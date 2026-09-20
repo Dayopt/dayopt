@@ -360,6 +360,32 @@ describe('detectJudgmentRecords', () => {
     ).toMatchObject({ brief: false });
   });
 
+  it('#2560 項目 6: 信頼できない author の marker 風コメントは判定から除外されない（DoD を隠せない）', () => {
+    // 以前は prefix 一致だけで除外していたため、第三者が CTX_MARKER で始まる
+    // コメントを投稿するだけで、そのコメントを DoD/分解表 の走査対象から外せた。
+    const spoofed = {
+      user: { login: 'randomuser' },
+      author_association: 'NONE',
+      body: `${CTX_MARKER}\n完了の定義: 本物の DoD がここにある`,
+    };
+
+    expect(detectJudgmentRecords([spoofed], '')).toMatchObject({
+      dod: true,
+      // 偽 marker なので brief 自体は あり にならない（F2 の既存挙動）。
+      brief: false,
+    });
+  });
+
+  it('#2560 項目 6: 信頼できない author の marker 風コメントは分解表の走査からも外れない', () => {
+    const spoofed = {
+      user: { login: 'randomuser' },
+      author_association: 'NONE',
+      body: `${CTX_MARKER}\n## 分解表\n本文`,
+    };
+
+    expect(detectJudgmentRecords([spoofed], '')).toMatchObject({ breakdown: true });
+  });
+
   it('全て なし の場合', () => {
     expect(detectJudgmentRecords([], '')).toEqual({ dod: false, breakdown: false, brief: false });
   });
@@ -542,6 +568,58 @@ describe('nextStep', () => {
         unresolvedThreads: 0,
       }),
     ).toBe('CI の完走を待つ（pending 1）');
+  });
+
+  it('#2560 項目 3: draft かつ未解決 thread あり は「未取得」と騙らず状態を名指しする', () => {
+    const result = nextStep({
+      kind: 'pr',
+      number: 42,
+      isDraft: true,
+      ciRollup: { success: 3, failure: 0, pending: 0 },
+      unresolvedThreads: 2,
+    });
+
+    // 3 つとも取得できているので「未取得」とは言わない。
+    expect(result).not.toContain('未取得');
+    expect(result).toBe('thread を resolve してから ready 化する（未解決 2、gh pr ready 42）');
+  });
+
+  it('#2560 項目 3: 3 つとも取得できていれば、どの組み合わせでも「未取得」と言わない', () => {
+    // 「未取得」を名乗ってよいのは実際に取得できていない時だけ、という不変条件を
+    // 組み合わせ網羅で固定する。項目 3 の実バグ（draft かつ未解決 thread あり）は
+    // この網羅の 1 ケースで、同じ穴が別の組み合わせで再発しても落ちる。
+    const drafts = [true, false];
+    const threadCounts = [0, 2];
+    const rollups = [
+      { success: 3, failure: 0, pending: 0 },
+      { success: 0, failure: 1, pending: 0 },
+      { success: 1, failure: 0, pending: 2 },
+      { success: 0, failure: 0, pending: 0 },
+    ];
+    const mergeStates = ['', 'CLEAN', 'BLOCKED'];
+
+    for (const isDraft of drafts) {
+      for (const unresolvedThreads of threadCounts) {
+        for (const ciRollup of rollups) {
+          for (const mergeStateStatus of mergeStates) {
+            const result = nextStep({
+              kind: 'pr',
+              number: 42,
+              isDraft,
+              ciRollup,
+              unresolvedThreads,
+              mergeStateStatus,
+            });
+
+            expect(
+              result,
+              `isDraft=${isDraft} threads=${unresolvedThreads} ci=${JSON.stringify(ciRollup)} merge=${mergeStateStatus}`,
+            ).not.toContain('未取得');
+            expect(result).not.toBe('');
+          }
+        }
+      }
+    }
   });
 
   it('CI rollup・未解決 thread・isDraft のいずれかが未取得（null）なら判断保留にする（branch:finish の fail-open 防止）', () => {
@@ -1056,6 +1134,230 @@ describe('renderMarkdown', () => {
     expect(markdown).toContain('不足: 検証コマンド');
     expect(markdown).toContain('#### 判断の記録');
     expect(markdown).toContain('次の一手: pnpm branch:finish 9999');
+  });
+
+  it('#2560 項目 5: 決定ログと受け入れ条件が巨大でも 150 行に収める', () => {
+    // 既存の pressure test は decisionLines を空、linkedIssues に acceptanceText 無しで
+    // 組んでいたため、この 2 セクションは一度も圧力下で評価されていなかった。
+    const pack = {
+      number: 8888,
+      kind: 'pr' as const,
+      header: {
+        title: '決定ログが厚い PR',
+        state: 'OPEN',
+        labels: [],
+        milestone: null,
+        assignee: null,
+        url: 'x',
+        headRefName: 'opus/heavy',
+        baseRefName: 'main',
+        isDraft: false,
+        mergeStateStatus: 'CLEAN',
+        reviewDecision: null,
+        ciRollup: { success: 1, failure: 0, pending: 0 },
+        unresolvedThreads: 0,
+      },
+      body: {
+        text: Array.from({ length: 80 }, (_, i) => `本文 ${i}`).join('\n'),
+        truncated: false,
+        remaining: 0,
+      },
+      comments: [],
+      related: {
+        parentEpic: null,
+        prs: null,
+        linkedIssues: [
+          {
+            number: 100,
+            state: 'open',
+            title: 'issue A',
+            labels: [],
+            acceptanceText: Array.from({ length: 60 }, (_, i) => `受け入れ条件 ${i}`).join('\n'),
+          },
+        ],
+      },
+      files: null,
+      protectedRequired: null,
+      // 決定ログは以前は上限が無く、全件そのまま描画されていた。
+      decisionLines: Array.from({ length: 200 }, (_, i) => `- 2026-09-0${(i % 9) + 1}: 決定 ${i}`),
+      skills: [],
+      judgmentRecords: { dod: true, breakdown: true, brief: true },
+      nextStep: 'pnpm branch:finish 8888',
+      nextStepSecondary: null,
+    };
+
+    const markdown = renderMarkdown(pack);
+
+    expect(markdown.split('\n').length).toBeLessThanOrEqual(150);
+    // 末尾セクションは必ず残る。
+    expect(markdown).toContain('#### 判断の記録');
+    expect(markdown).toContain('次の一手: pnpm branch:finish 8888');
+  });
+
+  it('#2560 項目 5: 受け入れ条件は最終段でセクションごと落ちる（省略行だけ残さない）', () => {
+    // acceptanceMaxLines を 0 まで絞った段で「…（N 行省略）」だけが残ると、
+    // 段階縮小の最終段が 0 行まで縮まず 150 行を守れない場合がある。
+    const pack = {
+      number: 8891,
+      kind: 'pr' as const,
+      header: {
+        title: 'x',
+        state: 'OPEN',
+        labels: [],
+        milestone: null,
+        assignee: null,
+        url: 'x',
+        headRefName: 'a',
+        baseRefName: 'main',
+        isDraft: false,
+        mergeStateStatus: 'CLEAN',
+        reviewDecision: null,
+        ciRollup: { success: 1, failure: 0, pending: 0 },
+        unresolvedThreads: 0,
+      },
+      body: {
+        text: Array.from({ length: 400 }, (_, i) => `本文 ${i}`).join('\n'),
+        truncated: false,
+        remaining: 0,
+      },
+      comments: Array.from({ length: 60 }, (_, i) => ({
+        author: `u${i}`,
+        date: '2026-09-01',
+        body: `c${i}`,
+      })),
+      related: {
+        parentEpic: null,
+        prs: null,
+        linkedIssues: [
+          {
+            number: 100,
+            state: 'open',
+            title: 'issue A',
+            labels: [],
+            acceptanceText: Array.from({ length: 300 }, (_, i) => `受け入れ ${i}`).join('\n'),
+          },
+        ],
+      },
+      files: Array.from({ length: 200 }, (_, i) => `src/f${i}.ts`),
+      protectedRequired: true,
+      decisionLines: Array.from({ length: 300 }, (_, i) => `- 決定 ${i}`),
+      skills: [],
+      judgmentRecords: { dod: true, breakdown: true, brief: true },
+      nextStep: 'pnpm branch:finish 8891',
+      nextStepSecondary: null,
+    };
+
+    const markdown = renderMarkdown(pack);
+
+    expect(markdown.split('\n').length).toBeLessThanOrEqual(150);
+    // 最終段まで縮んだ時は見出しごと消える（省略行だけの残骸を作らない）。
+    if (!markdown.includes('#### linked issue の受け入れ条件')) {
+      expect(markdown).not.toMatch(/…（\d+ 行省略）/);
+    }
+    expect(markdown).toContain('次の一手: pnpm branch:finish 8891');
+  });
+
+  it('#2560 項目 5: 決定ログを縮めた時は省略件数を出す', () => {
+    const basePack = {
+      number: 8889,
+      kind: 'issue' as const,
+      header: {
+        title: 'issue',
+        state: 'open',
+        labels: [],
+        milestone: null,
+        assignee: null,
+        url: 'x',
+      },
+      body: {
+        text: Array.from({ length: 300 }, (_, i) => `本文 ${i}`).join('\n'),
+        truncated: false,
+        remaining: 0,
+      },
+      comments: [],
+      related: { parentEpic: null, prs: null, linkedIssues: null },
+      files: null,
+      protectedRequired: null,
+      decisionLines: Array.from({ length: 300 }, (_, i) => `- 決定 ${i}`),
+      skills: [],
+      nextStep: '分解表を issue コメントに書く（routing skill）',
+    };
+
+    const markdown = renderMarkdown(basePack);
+
+    expect(markdown.split('\n').length).toBeLessThanOrEqual(150);
+    expect(markdown).toMatch(/…他 \d+ 件省略（150 行上限）/);
+    expect(markdown).toContain('次の一手: 分解表を issue コメントに書く（routing skill）');
+  });
+
+  it('#2560 項目 5: 末尾セクションだけで 150 行を超えるなら黙らず warn する', () => {
+    const warn = vi.fn();
+    const pack = {
+      number: 8890,
+      kind: 'issue' as const,
+      header: {
+        title: 'x',
+        state: 'open',
+        labels: [],
+        milestone: null,
+        assignee: null,
+        url: 'x',
+      },
+      body: null,
+      comments: [],
+      related: { parentEpic: null, prs: null, linkedIssues: null },
+      files: null,
+      protectedRequired: null,
+      decisionLines: [],
+      skills: [],
+      // 末尾セクションは行数としては小さいが、値自体が改行を含むと膨らむ。
+      // 縮小対象が 1 つも無いこの経路が、超過版を黙って返していた異常系。
+      routing: {
+        level: 'L3',
+        ready: false,
+        preparation: 'L1',
+        reasons: [Array.from({ length: 200 }, (_, i) => `理由 ${i}`).join('\n')],
+        missing: [],
+        preparationGoal: '整理する',
+      },
+      nextStep: '次の一手',
+    };
+
+    const markdown = renderMarkdown(pack, { warn });
+
+    // 超過版でも「次の一手」は落とさない。
+    expect(markdown).toContain('次の一手: 次の一手');
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn.mock.calls[0][0]).toContain('150 行に収まりませんでした');
+  });
+
+  it('150 行に収まる時は warn しない', () => {
+    const warn = vi.fn();
+    renderMarkdown(
+      {
+        number: 1,
+        kind: 'issue' as const,
+        header: {
+          title: 'x',
+          state: 'open',
+          labels: [],
+          milestone: null,
+          assignee: null,
+          url: 'x',
+        },
+        body: { text: '短い本文', truncated: false, remaining: 0 },
+        comments: [],
+        related: { parentEpic: null, prs: null, linkedIssues: null },
+        files: null,
+        protectedRequired: null,
+        decisionLines: [],
+        skills: [],
+        nextStep: '次の一手',
+      },
+      { warn },
+    );
+
+    expect(warn).not.toHaveBeenCalled();
   });
 
   it('PR mode: linked issue の acceptanceText を `#### linked issue の受け入れ条件` として ≤25 行で描画する', () => {

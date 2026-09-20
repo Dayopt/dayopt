@@ -1,23 +1,5 @@
 [
   {
-    "name": "@apm-js-collab/code-transformer",
-    "version": "0.18.0",
-    "license": "Apache-2.0",
-    "repository": "https://github.com/nodejs/orchestrion-js.git"
-  },
-  {
-    "name": "@apm-js-collab/code-transformer-bundler-plugins",
-    "version": "0.6.2",
-    "license": "MIT",
-    "repository": "https://github.com/apm-js-collab/code-transformer-bundler-plugins"
-  },
-  {
-    "name": "@apm-js-collab/tracing-hooks",
-    "version": "0.13.0",
-    "license": "Apache-2.0",
-    "repository": "https://github.com/apm-js-collab/tracing-hooks.git"
-  },
-  {
     "name": "@babel/code-frame",
     "version": "7.29.7",
     "license": "MIT",
@@ -144,6 +126,24 @@
     "publisher": "The Babel Team (https://babel.dev/team)"
   },
   {
+    "name": "@eloqnt/config",
+    "version": "0.1.0",
+    "license": "MIT",
+    "repository": "https://cli.eloqnt.dev/docs/configuration"
+  },
+  {
+    "name": "@eloqnt/format-json",
+    "version": "0.1.0",
+    "license": "MIT",
+    "repository": "https://cli.eloqnt.dev/docs/configuration"
+  },
+  {
+    "name": "@eloqnt/format-po",
+    "version": "0.1.0",
+    "license": "MIT",
+    "repository": "https://cli.eloqnt.dev/docs/formats/po"
+  },
+  {
     "name": "@esbuild/darwin-arm64",
     "version": "0.28.1",
     "license": "MIT",
@@ -225,14 +225,14 @@
   },
   {
     "name": "@img/sharp-darwin-arm64",
-    "version": "0.35.3",
+    "version": "0.35.4",
     "license": "Apache-2.0",
     "repository": "https://github.com/lovell/sharp.git",
     "publisher": "Lovell Fuller <npm@lovell.info>"
   },
   {
     "name": "@img/sharp-libvips-darwin-arm64",
-    "version": "1.3.2",
+    "version": "1.3.3",
     "license": "LGPL-3.0-or-later",
     "repository": "https://github.com/lovell/sharp-libvips.git",
     "publisher": "Lovell Fuller <npm@lovell.info>"
@@ -281,7 +281,7 @@
   },
   {
     "name": "@marsidev/react-turnstile",
-    "version": "1.5.3",
+    "version": "1.6.1",
     "license": "MIT",
     "repository": "https://github.com/marsidev/react-turnstile.git",
     "publisher": "Luis Marsiglia <marsiglia.business@gmail.com>"
@@ -295,14 +295,14 @@
   },
   {
     "name": "@next/env",
-    "version": "16.3.3",
+    "version": "16.3.5",
     "license": "MIT",
     "repository": "https://github.com/vercel/next.js",
     "publisher": "Next.js Team <support@vercel.com>"
   },
   {
     "name": "@next/swc-darwin-arm64",
-    "version": "16.3.3",
+    "version": "16.3.5",
     "license": "MIT",
     "repository": "https://github.com/vercel/next.js"
   },
@@ -376,50 +376,50 @@
   },
   {
     "name": "@playwright/test",
-    "version": "1.61.1",
+    "version": "1.63.0",
     "license": "Apache-2.0",
     "repository": "https://github.com/microsoft/playwright.git",
     "publisher": "Microsoft Corporation"
   },
   {
     "name": "@radix-ui/number",
-    "version": "1.1.2",
+    "version": "1.1.3",
     "license": "MIT",
     "repository": "https://github.com/radix-ui/primitives.git"
   },
   {
     "name": "@radix-ui/primitive",
-    "version": "1.1.6",
+    "version": "1.1.7",
     "license": "MIT",
     "repository": "https://github.com/radix-ui/primitives.git"
   },
   {
     "name": "@radix-ui/react-alert-dialog",
-    "version": "1.1.20",
+    "version": "1.1.23",
     "license": "MIT",
     "repository": "https://github.com/radix-ui/primitives.git"
   },
   {
     "name": "@radix-ui/react-arrow",
-    "version": "1.1.12",
+    "version": "1.1.15",
     "license": "MIT",
     "repository": "https://github.com/radix-ui/primitives.git"
   },
   {
     "name": "@radix-ui/react-avatar",
-    "version": "1.2.3",
+    "version": "1.2.6",
     "license": "MIT",
     "repository": "https://github.com/radix-ui/primitives.git"
   },
   {
     "name": "@radix-ui/react-checkbox",
-    "version": "1.3.8",
+    "version": "1.3.11",
     "license": "MIT",
     "repository": "https://github.com/radix-ui/primitives.git"
   },
   {
     "name": "@radix-ui/react-collection",
-    "version": "1.1.12",
+    "version": "1.1.15",
     "license": "MIT",
     "repository": "https://github.com/radix-ui/primitives.git"
   },
@@ -430,44 +430,50 @@
     "repository": "https://github.com/radix-ui/primitives.git"
   },
   {
+    "name": "@radix-ui/react-compose-refs",
+    "version": "1.1.5",
+    "license": "MIT",
+    "repository": "https://github.com/radix-ui/primitives.git"
+  },
+  {
     "name": "@radix-ui/react-context",
-    "version": "1.2.0",
+    "version": "1.2.2",
     "license": "MIT",
     "repository": "https://github.com/radix-ui/primitives.git"
   },
   {
     "name": "@radix-ui/react-dialog",
-    "version": "1.1.20",
+    "version": "1.1.23",
     "license": "MIT",
     "repository": "https://github.com/radix-ui/primitives.git"
   },
   {
     "name": "@radix-ui/react-direction",
-    "version": "1.1.2",
-    "license": "MIT",
-    "repository": "https://github.com/radix-ui/primitives.git"
-  },
-  {
-    "name": "@radix-ui/react-dismissable-layer",
-    "version": "1.1.16",
-    "license": "MIT",
-    "repository": "https://github.com/radix-ui/primitives.git"
-  },
-  {
-    "name": "@radix-ui/react-dropdown-menu",
-    "version": "2.1.21",
-    "license": "MIT",
-    "repository": "https://github.com/radix-ui/primitives.git"
-  },
-  {
-    "name": "@radix-ui/react-focus-guards",
     "version": "1.1.4",
     "license": "MIT",
     "repository": "https://github.com/radix-ui/primitives.git"
   },
   {
+    "name": "@radix-ui/react-dismissable-layer",
+    "version": "1.1.19",
+    "license": "MIT",
+    "repository": "https://github.com/radix-ui/primitives.git"
+  },
+  {
+    "name": "@radix-ui/react-dropdown-menu",
+    "version": "2.1.24",
+    "license": "MIT",
+    "repository": "https://github.com/radix-ui/primitives.git"
+  },
+  {
+    "name": "@radix-ui/react-focus-guards",
+    "version": "1.1.6",
+    "license": "MIT",
+    "repository": "https://github.com/radix-ui/primitives.git"
+  },
+  {
     "name": "@radix-ui/react-focus-scope",
-    "version": "1.1.13",
+    "version": "1.1.16",
     "license": "MIT",
     "repository": "https://github.com/radix-ui/primitives.git"
   },
@@ -478,38 +484,50 @@
     "repository": "https://github.com/radix-ui/primitives.git"
   },
   {
+    "name": "@radix-ui/react-id",
+    "version": "1.1.4",
+    "license": "MIT",
+    "repository": "https://github.com/radix-ui/primitives.git"
+  },
+  {
     "name": "@radix-ui/react-label",
-    "version": "2.1.12",
+    "version": "2.1.15",
     "license": "MIT",
     "repository": "https://github.com/radix-ui/primitives.git"
   },
   {
     "name": "@radix-ui/react-menu",
-    "version": "2.1.21",
+    "version": "2.1.24",
     "license": "MIT",
     "repository": "https://github.com/radix-ui/primitives.git"
   },
   {
     "name": "@radix-ui/react-popover",
-    "version": "1.1.20",
+    "version": "1.1.23",
     "license": "MIT",
     "repository": "https://github.com/radix-ui/primitives.git"
   },
   {
     "name": "@radix-ui/react-popper",
-    "version": "1.3.4",
+    "version": "1.3.7",
     "license": "MIT",
     "repository": "https://github.com/radix-ui/primitives.git"
   },
   {
     "name": "@radix-ui/react-portal",
-    "version": "1.1.14",
+    "version": "1.1.17",
     "license": "MIT",
     "repository": "https://github.com/radix-ui/primitives.git"
   },
   {
     "name": "@radix-ui/react-presence",
-    "version": "1.1.8",
+    "version": "1.1.10",
+    "license": "MIT",
+    "repository": "https://github.com/radix-ui/primitives.git"
+  },
+  {
+    "name": "@radix-ui/react-primitive",
+    "version": "2.1.10",
     "license": "MIT",
     "repository": "https://github.com/radix-ui/primitives.git"
   },
@@ -521,31 +539,31 @@
   },
   {
     "name": "@radix-ui/react-radio-group",
-    "version": "1.4.4",
+    "version": "1.4.7",
     "license": "MIT",
     "repository": "https://github.com/radix-ui/primitives.git"
   },
   {
     "name": "@radix-ui/react-roving-focus",
-    "version": "1.1.16",
+    "version": "1.1.19",
     "license": "MIT",
     "repository": "https://github.com/radix-ui/primitives.git"
   },
   {
     "name": "@radix-ui/react-scroll-area",
-    "version": "1.2.15",
+    "version": "1.2.18",
     "license": "MIT",
     "repository": "https://github.com/radix-ui/primitives.git"
   },
   {
     "name": "@radix-ui/react-select",
-    "version": "2.3.4",
+    "version": "2.3.7",
     "license": "MIT",
     "repository": "https://github.com/radix-ui/primitives.git"
   },
   {
     "name": "@radix-ui/react-separator",
-    "version": "1.1.12",
+    "version": "1.1.15",
     "license": "MIT",
     "repository": "https://github.com/radix-ui/primitives.git"
   },
@@ -556,32 +574,38 @@
     "repository": "https://github.com/radix-ui/primitives.git"
   },
   {
+    "name": "@radix-ui/react-slot",
+    "version": "1.3.3",
+    "license": "MIT",
+    "repository": "https://github.com/radix-ui/primitives.git"
+  },
+  {
     "name": "@radix-ui/react-switch",
-    "version": "1.3.4",
+    "version": "1.3.7",
     "license": "MIT",
     "repository": "https://github.com/radix-ui/primitives.git"
   },
   {
     "name": "@radix-ui/react-use-callback-ref",
-    "version": "1.1.2",
+    "version": "1.1.4",
     "license": "MIT",
     "repository": "https://github.com/radix-ui/primitives.git"
   },
   {
     "name": "@radix-ui/react-use-controllable-state",
-    "version": "1.2.4",
+    "version": "1.2.6",
     "license": "MIT",
     "repository": "https://github.com/radix-ui/primitives.git"
   },
   {
     "name": "@radix-ui/react-use-effect-event",
-    "version": "0.0.3",
+    "version": "0.0.5",
     "license": "MIT",
     "repository": "https://github.com/radix-ui/primitives.git"
   },
   {
     "name": "@radix-ui/react-use-is-hydrated",
-    "version": "0.1.1",
+    "version": "0.1.3",
     "license": "MIT",
     "repository": "https://github.com/radix-ui/primitives.git"
   },
@@ -592,32 +616,38 @@
     "repository": "https://github.com/radix-ui/primitives.git"
   },
   {
+    "name": "@radix-ui/react-use-layout-effect",
+    "version": "1.1.4",
+    "license": "MIT",
+    "repository": "https://github.com/radix-ui/primitives.git"
+  },
+  {
     "name": "@radix-ui/react-use-previous",
-    "version": "1.1.2",
+    "version": "1.1.4",
     "license": "MIT",
     "repository": "https://github.com/radix-ui/primitives.git"
   },
   {
     "name": "@radix-ui/react-use-rect",
-    "version": "1.1.2",
+    "version": "1.1.4",
     "license": "MIT",
     "repository": "https://github.com/radix-ui/primitives.git"
   },
   {
     "name": "@radix-ui/react-use-size",
-    "version": "1.1.2",
+    "version": "1.1.4",
     "license": "MIT",
     "repository": "https://github.com/radix-ui/primitives.git"
   },
   {
     "name": "@radix-ui/react-visually-hidden",
-    "version": "1.2.8",
+    "version": "1.2.11",
     "license": "MIT",
     "repository": "https://github.com/radix-ui/primitives.git"
   },
   {
     "name": "@radix-ui/rect",
-    "version": "1.1.2",
+    "version": "1.1.3",
     "license": "MIT",
     "repository": "https://github.com/radix-ui/primitives.git"
   },
@@ -671,14 +701,14 @@
   },
   {
     "name": "@sentry/browser",
-    "version": "10.66.0",
+    "version": "10.74.0",
     "license": "MIT",
     "repository": "git://github.com/getsentry/sentry-javascript.git",
     "publisher": "Sentry"
   },
   {
     "name": "@sentry/browser-utils",
-    "version": "10.66.0",
+    "version": "10.74.0",
     "license": "MIT",
     "repository": "git://github.com/getsentry/sentry-javascript.git",
     "publisher": "Sentry"
@@ -711,77 +741,77 @@
   },
   {
     "name": "@sentry/core",
-    "version": "10.66.0",
+    "version": "10.74.0",
     "license": "MIT",
     "repository": "git://github.com/getsentry/sentry-javascript.git",
     "publisher": "Sentry"
   },
   {
     "name": "@sentry/feedback",
-    "version": "10.66.0",
+    "version": "10.74.0",
     "license": "MIT",
     "repository": "git://github.com/getsentry/sentry-javascript.git",
     "publisher": "Sentry"
   },
   {
     "name": "@sentry/nextjs",
-    "version": "10.66.0",
+    "version": "10.74.0",
     "license": "MIT",
     "repository": "git://github.com/getsentry/sentry-javascript.git",
     "publisher": "Sentry"
   },
   {
     "name": "@sentry/node",
-    "version": "10.66.0",
+    "version": "10.74.0",
     "license": "MIT",
     "repository": "git://github.com/getsentry/sentry-javascript.git",
     "publisher": "Sentry"
   },
   {
     "name": "@sentry/node-core",
-    "version": "10.66.0",
+    "version": "10.74.0",
     "license": "MIT",
     "repository": "git://github.com/getsentry/sentry-javascript.git",
     "publisher": "Sentry"
   },
   {
     "name": "@sentry/opentelemetry",
-    "version": "10.66.0",
+    "version": "10.74.0",
     "license": "MIT",
     "repository": "git://github.com/getsentry/sentry-javascript.git",
     "publisher": "Sentry"
   },
   {
     "name": "@sentry/react",
-    "version": "10.66.0",
+    "version": "10.74.0",
     "license": "MIT",
     "repository": "git://github.com/getsentry/sentry-javascript.git",
     "publisher": "Sentry"
   },
   {
     "name": "@sentry/replay",
-    "version": "10.66.0",
+    "version": "10.74.0",
     "license": "MIT",
     "repository": "https://github.com/getsentry/sentry-javascript.git",
     "publisher": "Sentry"
   },
   {
     "name": "@sentry/replay-canvas",
-    "version": "10.66.0",
+    "version": "10.74.0",
     "license": "MIT",
     "repository": "https://github.com/getsentry/sentry-javascript.git",
     "publisher": "Sentry"
   },
   {
     "name": "@sentry/server-utils",
-    "version": "10.66.0",
+    "version": "10.74.0",
     "license": "MIT",
     "repository": "git://github.com/getsentry/sentry-javascript.git",
     "publisher": "Sentry"
   },
   {
     "name": "@sentry/vercel-edge",
-    "version": "10.66.0",
+    "version": "10.74.0",
     "license": "MIT",
     "repository": "git://github.com/getsentry/sentry-javascript.git",
     "publisher": "Sentry"
@@ -808,14 +838,14 @@
   },
   {
     "name": "@supabase/auth-js",
-    "version": "2.110.7",
+    "version": "2.116.0",
     "license": "MIT",
     "repository": "https://github.com/supabase/supabase-js.git",
     "publisher": "Supabase"
   },
   {
     "name": "@supabase/functions-js",
-    "version": "2.110.7",
+    "version": "2.116.0",
     "license": "MIT",
     "repository": "https://github.com/supabase/supabase-js.git",
     "publisher": "Supabase"
@@ -829,49 +859,49 @@
   },
   {
     "name": "@supabase/postgrest-js",
-    "version": "2.110.7",
+    "version": "2.116.0",
     "license": "MIT",
     "repository": "https://github.com/supabase/supabase-js.git",
     "publisher": "Supabase"
   },
   {
     "name": "@supabase/realtime-js",
-    "version": "2.110.7",
+    "version": "2.116.0",
     "license": "MIT",
     "repository": "https://github.com/supabase/supabase-js.git",
     "publisher": "Supabase"
   },
   {
     "name": "@supabase/ssr",
-    "version": "0.12.3",
+    "version": "0.12.7",
     "license": "MIT",
     "repository": "https://github.com/supabase/ssr.git",
     "publisher": "Supabase, Inc."
   },
   {
     "name": "@supabase/storage-js",
-    "version": "2.110.7",
+    "version": "2.116.0",
     "license": "MIT",
     "repository": "https://github.com/supabase/supabase-js.git",
     "publisher": "Supabase"
   },
   {
     "name": "@supabase/supabase-js",
-    "version": "2.110.7",
+    "version": "2.116.0",
     "license": "MIT",
     "repository": "https://github.com/supabase/supabase-js.git",
     "publisher": "Supabase"
   },
   {
     "name": "@swc/core",
-    "version": "1.15.43",
+    "version": "1.16.2",
     "license": "Apache-2.0",
     "repository": "https://github.com/swc-project/swc.git",
     "publisher": "강동윤 <kdy1997.dev@gmail.com>"
   },
   {
     "name": "@swc/core-darwin-arm64",
-    "version": "1.15.43",
+    "version": "1.16.2",
     "license": "Apache-2.0 AND MIT",
     "repository": "https://github.com/swc-project/swc.git",
     "publisher": "강동윤 <kdy1997.dev@gmail.com>"
@@ -892,7 +922,7 @@
   },
   {
     "name": "@swc/types",
-    "version": "0.1.27",
+    "version": "0.1.28",
     "license": "Apache-2.0",
     "repository": "https://github.com/swc-project/swc.git",
     "publisher": "강동윤 <kdy1997.dev@gmail.com>"
@@ -905,28 +935,28 @@
   },
   {
     "name": "@tanstack/query-core",
-    "version": "5.101.2",
+    "version": "5.102.8",
     "license": "MIT",
     "repository": "https://github.com/TanStack/query.git",
     "publisher": "tannerlinsley"
   },
   {
     "name": "@tanstack/query-persist-client-core",
-    "version": "5.101.2",
+    "version": "5.102.8",
     "license": "MIT",
     "repository": "https://github.com/TanStack/query.git",
     "publisher": "tannerlinsley"
   },
   {
     "name": "@tanstack/react-query",
-    "version": "5.101.2",
+    "version": "5.102.8",
     "license": "MIT",
     "repository": "https://github.com/TanStack/query.git",
     "publisher": "tannerlinsley"
   },
   {
     "name": "@tanstack/react-query-persist-client",
-    "version": "5.101.2",
+    "version": "5.102.8",
     "license": "MIT",
     "repository": "https://github.com/TanStack/query.git",
     "publisher": "tannerlinsley"
@@ -989,6 +1019,12 @@
     "repository": "https://github.com/DefinitelyTyped/DefinitelyTyped.git"
   },
   {
+    "name": "@types/node",
+    "version": "24.13.4",
+    "license": "MIT",
+    "repository": "https://github.com/DefinitelyTyped/DefinitelyTyped.git"
+  },
+  {
     "name": "@types/react",
     "version": "19.2.17",
     "license": "MIT",
@@ -1020,7 +1056,7 @@
   },
   {
     "name": "@upstash/redis",
-    "version": "1.38.0",
+    "version": "1.38.4",
     "license": "MIT",
     "repository": "git@github.com:upstash/redis-js.git",
     "publisher": "Andreas Thomas <dev@chronark.com>"
@@ -1236,13 +1272,6 @@
     "publisher": "Anton Korzunov <thekashey@gmail.com>"
   },
   {
-    "name": "astring",
-    "version": "1.9.0",
-    "license": "MIT",
-    "repository": "https://github.com/davidbonnet/astring.git",
-    "publisher": "David Bonnet <david@bonnet.cc>"
-  },
-  {
     "name": "atomically",
     "version": "2.1.1",
     "license": "MIT",
@@ -1281,6 +1310,12 @@
     "repository": "https://github.com/web-platform-dx/baseline-browser-mapping.git"
   },
   {
+    "name": "baseline-browser-mapping",
+    "version": "2.11.23",
+    "license": "Apache-2.0",
+    "repository": "https://github.com/web-platform-dx/baseline-browser-mapping.git"
+  },
+  {
     "name": "body-parser",
     "version": "2.3.0",
     "license": "MIT",
@@ -1294,7 +1329,7 @@
   },
   {
     "name": "browserslist",
-    "version": "4.28.7",
+    "version": "4.28.9",
     "license": "MIT",
     "repository": "browserslist/browserslist",
     "publisher": "Andrey Sitnik <andrey@sitnik.es>"
@@ -1336,6 +1371,13 @@
   {
     "name": "caniuse-lite",
     "version": "1.0.30001806",
+    "license": "CC-BY-4.0",
+    "repository": "browserslist/caniuse-lite",
+    "publisher": "Ben Briggs"
+  },
+  {
+    "name": "caniuse-lite",
+    "version": "1.0.30001810",
     "license": "CC-BY-4.0",
     "repository": "browserslist/caniuse-lite",
     "publisher": "Ben Briggs"
@@ -1664,7 +1706,7 @@
   },
   {
     "name": "electron-to-chromium",
-    "version": "1.5.402",
+    "version": "1.5.427",
     "license": "ISC",
     "repository": "https://github.com/Kilian/electron-to-chromium.git",
     "publisher": "Kilian Valkhof"
@@ -1768,13 +1810,6 @@
     "version": "5.1.1",
     "license": "BSD-2-Clause",
     "repository": "eslint/eslint-scope"
-  },
-  {
-    "name": "esquery",
-    "version": "1.7.0",
-    "license": "BSD-3-Clause",
-    "repository": "https://github.com/estools/esquery.git",
-    "publisher": "Joel Feenstra <jrfeenst+esquery@gmail.com>"
   },
   {
     "name": "esrecurse",
@@ -1913,12 +1948,6 @@
   },
   {
     "name": "fsevents",
-    "version": "2.3.2",
-    "license": "MIT",
-    "repository": "https://github.com/fsevents/fsevents.git"
-  },
-  {
-    "name": "fsevents",
     "version": "2.3.3",
     "license": "MIT",
     "repository": "https://github.com/fsevents/fsevents.git"
@@ -2015,7 +2044,7 @@
   },
   {
     "name": "hono",
-    "version": "4.13.0",
+    "version": "4.13.7",
     "license": "MIT",
     "repository": "https://github.com/honojs/hono.git",
     "publisher": "Yusuke Wada <yusuke@kamawada.com> (https://github.com/yusukebe)"
@@ -2071,7 +2100,7 @@
   },
   {
     "name": "icu-minify",
-    "version": "4.13.2",
+    "version": "4.14.4",
     "license": "MIT",
     "repository": "https://github.com/amannn/next-intl.git",
     "publisher": "Jan Amann <jan@amann.work>"
@@ -2091,7 +2120,7 @@
   },
   {
     "name": "input-otp",
-    "version": "1.4.2",
+    "version": "1.5.0",
     "license": "MIT",
     "repository": "https://github.com/guilhermerodz/input-otp.git",
     "publisher": "Guilherme Rodz <g@rodz.dev>"
@@ -2242,6 +2271,18 @@
     "publisher": "KillyMXI"
   },
   {
+    "name": "lightningcss",
+    "version": "1.33.0",
+    "license": "MPL-2.0",
+    "repository": "https://github.com/parcel-bundler/lightningcss.git"
+  },
+  {
+    "name": "lightningcss-darwin-arm64",
+    "version": "1.33.0",
+    "license": "MPL-2.0",
+    "repository": "https://github.com/parcel-bundler/lightningcss.git"
+  },
+  {
     "name": "loader-runner",
     "version": "4.3.2",
     "license": "MIT",
@@ -2346,13 +2387,6 @@
     "publisher": "Stephen Sugden <me@stephensugden.com>"
   },
   {
-    "name": "meriyah",
-    "version": "6.1.4",
-    "license": "ISC",
-    "repository": "https://github.com/meriyah/meriyah.git",
-    "publisher": "Kenny F."
-  },
-  {
     "name": "mime-db",
     "version": "1.52.0",
     "license": "MIT",
@@ -2444,23 +2478,23 @@
   },
   {
     "name": "next",
-    "version": "16.3.3",
+    "version": "16.3.5",
     "license": "MIT",
     "repository": "vercel/next.js"
   },
   {
     "name": "next-intl",
-    "version": "4.13.2",
+    "version": "4.14.4",
     "license": "MIT",
     "repository": "https://github.com/amannn/next-intl.git",
     "publisher": "Jan Amann <jan@amann.work>"
   },
   {
     "name": "next-intl-swc-plugin-extractor",
-    "version": "4.13.2",
+    "version": "4.14.4",
     "license": "MIT",
     "repository": "https://github.com/amannn/next-intl.git",
-    "publisher": "강동윤 <kdy1997.dev@gmail.com>"
+    "publisher": "Jan Amann <jan@amann.work>"
   },
   {
     "name": "next-themes",
@@ -2483,7 +2517,7 @@
   },
   {
     "name": "node-releases",
-    "version": "2.0.52",
+    "version": "2.0.55",
     "license": "MIT",
     "repository": "https://github.com/chicoxyzzy/node-releases.git",
     "publisher": "Sergey Rubanov <chi187@gmail.com>"
@@ -2646,14 +2680,14 @@
   },
   {
     "name": "playwright",
-    "version": "1.61.1",
+    "version": "1.63.0",
     "license": "Apache-2.0",
     "repository": "https://github.com/microsoft/playwright.git",
     "publisher": "Microsoft Corporation"
   },
   {
     "name": "playwright-core",
-    "version": "1.61.1",
+    "version": "1.63.0",
     "license": "Apache-2.0",
     "repository": "https://github.com/microsoft/playwright.git",
     "publisher": "Microsoft Corporation"
@@ -2666,14 +2700,14 @@
   },
   {
     "name": "po-parser",
-    "version": "2.1.1",
+    "version": "2.2.0",
     "license": "MIT",
     "repository": "git@github.com:amannn/po-parser.git",
     "publisher": "Jan Amann <jan@amann.work>"
   },
   {
     "name": "postal-mime",
-    "version": "2.7.4",
+    "version": "2.7.5",
     "license": "MIT-0",
     "repository": "https://github.com/postalsys/postal-mime.git",
     "publisher": "Andris Reinman"
@@ -2687,7 +2721,7 @@
   },
   {
     "name": "postcss",
-    "version": "8.5.25",
+    "version": "8.5.28",
     "license": "MIT",
     "repository": "postcss/postcss",
     "publisher": "Andrey Sitnik <andrey@sitnik.es>"
@@ -2700,7 +2734,7 @@
   },
   {
     "name": "prettier",
-    "version": "3.9.5",
+    "version": "3.9.6",
     "license": "MIT",
     "repository": "prettier/prettier",
     "publisher": "James Long"
@@ -2775,15 +2809,15 @@
   },
   {
     "name": "react",
-    "version": "19.2.7",
+    "version": "19.3.0",
     "license": "MIT",
-    "repository": "https://github.com/facebook/react.git"
+    "repository": "https://github.com/react/react.git"
   },
   {
     "name": "react-dom",
-    "version": "19.2.7",
+    "version": "19.3.0",
     "license": "MIT",
-    "repository": "https://github.com/facebook/react.git"
+    "repository": "https://github.com/react/react.git"
   },
   {
     "name": "react-dropzone",
@@ -2794,13 +2828,13 @@
   },
   {
     "name": "react-email",
-    "version": "6.9.0",
+    "version": "6.9.5",
     "license": "MIT",
     "repository": "https://github.com/resend/react-email.git"
   },
   {
     "name": "react-hook-form",
-    "version": "7.82.0",
+    "version": "7.88.0",
     "license": "MIT",
     "repository": "https://github.com/react-hook-form/react-hook-form",
     "publisher": "Beier(Bill) Luo <bluebill1049@hotmail.com>"
@@ -2869,7 +2903,7 @@
   },
   {
     "name": "resend",
-    "version": "6.17.2",
+    "version": "6.28.0",
     "license": "MIT",
     "repository": "https://github.com/resend/resend-node.git"
   },
@@ -2896,9 +2930,9 @@
   },
   {
     "name": "scheduler",
-    "version": "0.27.0",
+    "version": "0.28.0",
     "license": "MIT",
-    "repository": "https://github.com/facebook/react.git"
+    "repository": "https://github.com/react/react.git"
   },
   {
     "name": "schema-utils",
@@ -2913,13 +2947,6 @@
     "license": "MIT",
     "repository": "https://github.com/mxxii/selderee.git",
     "publisher": "KillyMXI"
-  },
-  {
-    "name": "semifies",
-    "version": "1.0.0",
-    "license": "Apache-2.0",
-    "repository": "https://github.com/holepunchto/semifies.git",
-    "publisher": "Holepunch Inc"
   },
   {
     "name": "semver",
@@ -2971,7 +2998,7 @@
   },
   {
     "name": "sharp",
-    "version": "0.35.3",
+    "version": "0.35.4",
     "license": "Apache-2.0",
     "repository": "https://github.com/lovell/sharp.git",
     "publisher": "Lovell Fuller <npm@lovell.info>"
@@ -3045,7 +3072,7 @@
   },
   {
     "name": "sonner",
-    "version": "2.0.7",
+    "version": "2.0.8",
     "license": "MIT",
     "repository": "https://github.com/emilkowalski/sonner.git",
     "publisher": "Emil Kowalski <e@emilkowal.ski>"
@@ -3281,10 +3308,10 @@
   },
   {
     "name": "update-browserslist-db",
-    "version": "1.2.3",
+    "version": "1.3.3",
     "license": "MIT",
     "repository": "browserslist/update-db",
-    "publisher": "Andrey Sitnik <andrey@sitnik.ru>"
+    "publisher": "Andrey Sitnik <andrey@sitnik.es>"
   },
   {
     "name": "use-callback-ref",
@@ -3295,7 +3322,7 @@
   },
   {
     "name": "use-intl",
-    "version": "4.13.2",
+    "version": "4.14.4",
     "license": "MIT",
     "repository": "https://github.com/amannn/next-intl.git",
     "publisher": "Jan Amann <jan@amann.work>"
@@ -3467,7 +3494,7 @@
   },
   {
     "name": "zustand",
-    "version": "5.0.14",
+    "version": "5.0.15",
     "license": "MIT",
     "repository": "https://github.com/pmndrs/zustand.git",
     "publisher": "Paul Henschel"

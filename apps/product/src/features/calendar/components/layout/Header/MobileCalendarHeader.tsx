@@ -7,7 +7,7 @@ import { useLocale, useTranslations } from 'next-intl';
 import { memo, useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 
 import { AppHeader } from '@/components/shell/AppHeader';
-import { isPastDayInTimezone, isTodayInTimezone } from '@/lib/date/timezone';
+import { isPastWallDateInTimezone, isTodayWallDateInTimezone } from '@/lib/date/timezone';
 import { useUserPreferences } from '@/lib/hooks/useUserPreferences';
 import { useShellStore } from '@/lib/stores/useShellStore';
 import { Button, cn } from '@dayopt/components';
@@ -78,10 +78,10 @@ export const MobileCalendarHeader = memo<MobileCalendarHeaderProps>(
     const dayNumber = format(currentDate, 'd');
     const daySuffix = locale === 'ja' ? '日' : '';
     const weekdayShort = format(currentDate, 'EEE', { locale: dateFnsLocale });
-    const today = isTodayInTimezone(currentDate, timezone);
+    const today = isTodayWallDateInTimezone(currentDate, timezone);
     // 過去日を見ている: Redo（時間を進めて今日へ戻る）。未来日を見ている: Undo
     // （時間を戻して今日へ戻る）。today の時はボタン自体を非表示にする（#2302）
-    const isPast = !today && isPastDayInTimezone(currentDate, timezone);
+    const isPast = !today && isPastWallDateInTimezone(currentDate, timezone);
     const TodayIcon = isPast ? Redo2 : Undo2;
     const weekNumber = getWeek(currentDate, { weekStartsOn });
 

@@ -1,18 +1,25 @@
 /**
  * Interaction State Machine — POINTER_MOVE handler (per-mode routing)
+ *
+ * 既存ブロックの移動・リサイズは相対 snap（`../precision` 参照）。移動量だけを
+ * snap interval で量子化し、元ブロックの分と duration を保持する。リサイズは
+ * 終端だけを動かし、開始時刻には触れない。
  */
 
-import { crossedHapticBoundary, MIN_TIMEBLOCK_DURATION_MINUTES } from '../precision';
+import { crossedHapticBoundary } from '../precision';
 import {
-  buildDragTimeRange,
+  buildMoveTimeRange,
   buildSelectionRange,
-  clampSnappedTopToDay,
   maxAbsDelta,
+  minutesToDate,
+  resizeHeightPx,
+  resolveMoveStartMinutes,
+  resolveResizeEndMinutes,
+  resolveResizeStartMinutes,
   resolveTargetDate,
-  snapEndToGrid,
 } from './grid-geometry';
 import { DRAG_THRESHOLD_PX, IDLE, TOUCH_SCROLL_THRESHOLD_PX } from './machine-constants';
-import { snapToGrid } from './time-math';
+import { minutesToPixels } from './time-math';
 import type {
   InteractionContext,
   InteractionEffect,
@@ -21,6 +28,32 @@ import type {
   Point,
   TimeRange,
 } from './types';
+
+/** 移動後の開始位置（分 / px）と preview を相対 snap でまとめて求める。 */
+function computeMovePreview(
+  ctx: InteractionContext,
+  timeblockId: string,
+  originalTopPx: number,
+  deltaPx: number,
+  targetDateIndex: number,
+  interval: number,
+): { startMinutes: number; snappedTop: number; previewTime: TimeRange } {
+  const durationMinutes = Math.round(ctx.getTimeblockDurationMs(timeblockId) / 60_000);
+  const startMinutes = resolveMoveStartMinutes({
+    originalTopPx,
+    deltaPx,
+    hourHeight: ctx.hourHeight,
+    intervalMin: interval,
+    durationMinutes,
+  });
+  const targetDate = resolveTargetDate(ctx, targetDateIndex);
+
+  return {
+    startMinutes,
+    snappedTop: minutesToPixels(startMinutes, ctx.hourHeight),
+    previewTime: buildMoveTimeRange(targetDate, startMinutes, durationMinutes),
+  };
+}
 
 export function handlePointerMove(
   state: InteractionState,
@@ -35,19 +68,15 @@ export function handlePointerMove(
         return { state, effects };
       }
       // Threshold crossed → transition to dragging
-      const deltaY = action.point.clientY - state.startPoint.clientY;
-      const durationMs = ctx.getTimeblockDurationMs(state.timeblockId);
-      const durationPx = (durationMs / 60_000) * (ctx.hourHeight / 60);
-      const rawTop = clampSnappedTopToDay(
-        state.originalPosition.top + deltaY,
-        ctx.hourHeight,
-        durationPx,
-      );
-      const startSnap = snapToGrid(rawTop, ctx.hourHeight, interval);
-      const endSnap = snapEndToGrid(rawTop + durationPx, ctx.hourHeight, interval);
       const targetDateIndex = action.targetDateIndex ?? state.dateIndex;
-      const targetDate = resolveTargetDate(ctx, targetDateIndex);
-      const previewTime = buildDragTimeRange(targetDate, startSnap, endSnap, interval);
+      const { snappedTop, previewTime } = computeMovePreview(
+        ctx,
+        state.timeblockId,
+        state.originalPosition.top,
+        action.point.clientY - state.startPoint.clientY,
+        targetDateIndex,
+        interval,
+      );
       const isOverlapping = ctx.checkOverlap(
         state.timeblockId,
         previewTime.start,
@@ -70,7 +99,7 @@ export function handlePointerMove(
           originalPosition: state.originalPosition,
           dateIndex: state.dateIndex,
           targetDateIndex,
-          snappedTop: startSnap.snappedTop,
+          snappedTop,
           previewTime,
           isOverlapping,
         },
@@ -87,19 +116,15 @@ export function handlePointerMove(
     }
 
     case 'dragging': {
-      const deltaY = action.point.clientY - state.startPoint.clientY;
-      const durationMs = ctx.getTimeblockDurationMs(state.timeblockId);
-      const durationPx = (durationMs / 60_000) * (ctx.hourHeight / 60);
-      const rawTop = clampSnappedTopToDay(
-        state.originalPosition.top + deltaY,
-        ctx.hourHeight,
-        durationPx,
-      );
-      const startSnap = snapToGrid(rawTop, ctx.hourHeight, interval);
-      const endSnap = snapEndToGrid(rawTop + durationPx, ctx.hourHeight, interval);
       const targetDateIndex = action.targetDateIndex ?? state.targetDateIndex;
-      const targetDate = resolveTargetDate(ctx, targetDateIndex);
-      const previewTime = buildDragTimeRange(targetDate, startSnap, endSnap, interval);
+      const { startMinutes, snappedTop, previewTime } = computeMovePreview(
+        ctx,
+        state.timeblockId,
+        state.originalPosition.top,
+        action.point.clientY - state.startPoint.clientY,
+        targetDateIndex,
+        interval,
+      );
       const isOverlapping = ctx.checkOverlap(
         state.timeblockId,
         previewTime.start,
@@ -108,8 +133,7 @@ export function handlePointerMove(
       );
 
       const prevStartMinutes = Math.round((state.snappedTop / ctx.hourHeight) * 60);
-      const nextStartMinutes = startSnap.hour * 60 + startSnap.minute;
-      if (crossedHapticBoundary(prevStartMinutes, nextStartMinutes)) {
+      if (crossedHapticBoundary(prevStartMinutes, startMinutes)) {
         effects.push({ type: 'HAPTIC', pattern: 'tap' });
       }
       effects.push({ type: 'DRAG_STORE_UPDATE', targetDateIndex });
@@ -119,7 +143,7 @@ export function handlePointerMove(
           ...state,
           currentPoint: action.point,
           targetDateIndex,
-          snappedTop: startSnap.snappedTop,
+          snappedTop,
           previewTime,
           isOverlapping,
         },
@@ -129,41 +153,25 @@ export function handlePointerMove(
 
     case 'resizing': {
       const deltaY = action.point.clientY - state.startPoint.clientY;
-      const minHeight = (ctx.hourHeight / 60) * Math.max(interval, MIN_TIMEBLOCK_DURATION_MINUTES);
-      const resizeMinEndMinutes = ctx.getResizeMinEndMinutes?.(state.timeblockId) ?? null;
-      const resizeMinEndTop =
-        resizeMinEndMinutes == null
-          ? 0
-          : (Math.ceil(resizeMinEndMinutes / interval) * interval * ctx.hourHeight) / 60;
-      // upper cap: end が当日内に収まる範囲
-      const startSnap = snapToGrid(state.originalPosition.top, ctx.hourHeight, interval);
-      const maxHeight = Math.max(minHeight, 24 * ctx.hourHeight - startSnap.snappedTop);
-      const rawEndTop = Math.min(
-        24 * ctx.hourHeight,
-        Math.max(
-          startSnap.snappedTop + minHeight,
-          resizeMinEndTop,
-          state.originalPosition.top + state.originalPosition.height + deltaY,
-        ),
-      );
-      const endSnap = snapEndToGrid(rawEndTop, ctx.hourHeight, interval);
-      const newHeight = Math.min(
-        maxHeight,
-        Math.max(minHeight, endSnap.snappedTop - startSnap.snappedTop),
-      );
+      // 開始時刻は動かさない。終端だけを相対 snap する。
+      const startMinutes = resolveResizeStartMinutes(state.originalPosition.top, ctx.hourHeight);
+      const endMinutes = resolveResizeEndMinutes({
+        startMinutes,
+        originalEndPx: state.originalPosition.top + state.originalPosition.height,
+        deltaPx: deltaY,
+        hourHeight: ctx.hourHeight,
+        intervalMin: interval,
+        minEndMinutes: ctx.getResizeMinEndMinutes?.(state.timeblockId) ?? null,
+      });
+      const newHeight = resizeHeightPx(startMinutes, endMinutes, ctx.hourHeight);
 
-      const prevEndMinutes = Math.round(
-        ((startSnap.snappedTop + state.snappedHeight) / ctx.hourHeight) * 60,
-      );
-      const nextEndMinutes = Math.round(((startSnap.snappedTop + newHeight) / ctx.hourHeight) * 60);
-      if (crossedHapticBoundary(prevEndMinutes, nextEndMinutes)) {
+      const prevEndMinutes = startMinutes + Math.round((state.snappedHeight / ctx.hourHeight) * 60);
+      if (crossedHapticBoundary(prevEndMinutes, endMinutes)) {
         effects.push({ type: 'HAPTIC', pattern: 'tap' });
       }
 
-      const start = new Date(ctx.date);
-      start.setHours(startSnap.hour, startSnap.minute, 0, 0);
-      const end = new Date(ctx.date);
-      end.setHours(endSnap.hour, endSnap.minute, 0, 0);
+      const start = minutesToDate(ctx.date, startMinutes);
+      const end = minutesToDate(ctx.date, endMinutes);
 
       const previewTime: TimeRange = { start, end };
       const isOverlapping = ctx.checkOverlap(state.timeblockId, start, end, 'resize');

@@ -1,6 +1,6 @@
 ---
 name: optimistic-update
-description: tRPC mutation を新規実装する時、ユーザー操作に直接対応する mutation で即座の UI フィードバックが必要な時、既存 mutation に Realtime 購読との競合対策を追加する時、`onMutate` / `onError` / `onSettled` の実装漏れを検出した時に発動。キャッシュ操作とロールバック、Realtime 競合対策を指導する。read-only query の実装時や server-side mutation のみの時は発動しない。
+description: tRPC mutation を新規実装する時、ユーザー操作に直接対応する mutation で即座の UI フィードバックが必要な時、`onMutate` / `onError` / `onSettled` の実装漏れを検出した時に発動。キャッシュ操作とロールバックを指導する。read-only query の実装時や server-side mutation のみの時は発動しない。
 effort: medium
 maxTurns: 15
 ---
@@ -14,7 +14,6 @@ tRPC + TanStack Queryを使用した楽観的更新（Optimistic Updates）の�
 以下の状況で発動:
 
 - 新規 tRPC mutation を実装する時（ユーザー操作起点のもの）
-- 同じ resource を Realtime 購読と mutation の両方で扱う実装を追加する時
 - TanStack Query のキャッシュ操作（`utils.xxx.setData` / `utils.xxx.invalidate`）を直接書く時
 - 既存 mutation に `onMutate` / `onError` / `onSettled` が欠けていると気付いた時
 - UI 応答性の改善依頼（「操作後のレスポンスが遅い」「即座に反映したい」）が出た時
@@ -165,68 +164,12 @@ export function useDeleteEntity() {
 }
 ```
 
-## Realtime競合対策
+## Realtime は採用していない
 
-Supabase Realtimeと楽観的更新を併用する場合、競合を防ぐためにフラグを使用する。
-
-```typescript
-// stores/useEntityCacheStore.ts
-import { create } from 'zustand';
-
-interface EntityCacheStore {
-  isMutating: boolean;
-  setMutating: (value: boolean) => void;
-}
-
-export const useEntityCacheStore = create<EntityCacheStore>((set) => ({
-  isMutating: false,
-  setMutating: (value) => set({ isMutating: value }),
-}));
-```
-
-```typescript
-// hooks/useEntityRealtime.ts
-export function useEntityRealtime() {
-  const utils = api.useUtils();
-  const isMutating = useEntityCacheStore((s) => s.isMutating);
-
-  useEffect(() => {
-    const channel = supabase
-      .channel('entities')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'entities' }, () => {
-        // mutation中はRealtimeによるキャッシュ更新をスキップ
-        if (!isMutating) {
-          void utils.entity.list.invalidate();
-        }
-      })
-      .subscribe();
-
-    return () => {
-      void supabase.removeChannel(channel);
-    };
-  }, [isMutating, utils]);
-}
-```
-
-```typescript
-// mutationでフラグを管理
-export function useCreateEntity() {
-  const utils = api.useUtils();
-  const setMutating = useEntityCacheStore((s) => s.setMutating);
-
-  return api.entity.create.useMutation({
-    onMutate: async (input) => {
-      setMutating(true); // mutation開始
-      // ... 楽観的更新
-    },
-
-    onSettled: () => {
-      setMutating(false); // mutation完了
-      void utils.entity.list.invalidate();
-    },
-  });
-}
-```
+Dayopt は Supabase Realtime を使っていない（`postgres_changes` の購読ゼロ、
+publication 0 件。`docs/engineering/data/db/rls-snapshot.md` の集計行）。
+mutation 後の整合は `onSettled` の invalidate だけで取る。購読を新設する判断が
+出たらこの節を書き直す。
 
 ## 楽観的更新が不要な場合
 
@@ -248,7 +191,6 @@ export function useCreateEntity() {
 - [ ] ユーザー操作に対応するか？ → 楽観的更新を実装
 - [ ] 不可逆操作か？ → 楽観的更新なし、確認ダイアログを表示
 - [ ] 複数キャッシュに影響するか？ → 全キャッシュを更新
-- [ ] Realtimeと併用するか？ → isMutatingフラグで競合防止
 
 実装時：
 

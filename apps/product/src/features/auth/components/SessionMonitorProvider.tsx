@@ -1,6 +1,5 @@
 'use client';
 
-import type { ReactNode } from 'react';
 import { useEffect } from 'react';
 
 import { toast } from '@/lib/toast';
@@ -13,10 +12,6 @@ import { useSessionMonitor } from '../hooks/useSessionMonitor';
 
 import { SessionTimeoutDialog } from './SessionTimeoutDialog';
 
-interface SessionMonitorProviderProps {
-  children: ReactNode;
-}
-
 /**
  * セッション監視プロバイダー
  *
@@ -24,15 +19,16 @@ interface SessionMonitorProviderProps {
  * タイムアウト警告時にダイアログを表示
  * セッション失効時にトースト通知 + ログインへリダイレクト
  *
+ * Context を持たない副作用だけの component なので children を包まず、app 本体と並べて置く。
+ * 包むと遅延ロードの chunk 到着まで本体の描画が止まる（#2747）。
+ *
  * @example
  * ```tsx
- * // layout.tsx
- * <SessionMonitorProvider>
- *   {children}
- * </SessionMonitorProvider>
+ * <SessionMonitorProvider />
+ * {children}
  * ```
  */
-export function SessionMonitorProvider({ children }: SessionMonitorProviderProps) {
+export function SessionMonitorProvider() {
   const { showTimeoutWarning, remainingTime, extendSession, logout } = useSessionMonitor();
   const sessionExpired = useAuthStore(selectSessionExpired);
   const router = useRouter();
@@ -50,14 +46,11 @@ export function SessionMonitorProvider({ children }: SessionMonitorProviderProps
   }, [sessionExpired, router, t]);
 
   return (
-    <>
-      {children}
-      <SessionTimeoutDialog
-        open={showTimeoutWarning}
-        remainingTime={remainingTime}
-        onExtend={extendSession}
-        onLogout={logout}
-      />
-    </>
+    <SessionTimeoutDialog
+      open={showTimeoutWarning}
+      remainingTime={remainingTime}
+      onExtend={extendSession}
+      onLogout={logout}
+    />
   );
 }

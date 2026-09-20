@@ -252,19 +252,6 @@
       "densityDefault": "Default",
       "densitySpacious": "Spacious"
     },
-    "sleepSchedule": {
-      "title": "Sleep schedule",
-      "enabled": "Show sleep hours",
-      "description": "Highlight sleep hours with background color on the calendar grid",
-      "bedtime": "Bedtime",
-      "wakeTime": "Wake time",
-      "duration": "Sleep duration",
-      "hours": "{hours} hours",
-      "preview": "Preview",
-      "legendSleep": "Sleep",
-      "legendActivity": "Active",
-      "settingsSaved": "Sleep schedule saved"
-    },
     "preferences": {
       "settingsSaved": "Preferences saved successfully",
       "languageAndTheme": "Language & theme",
@@ -367,10 +354,10 @@
       },
       "mcp": {
         "title": "MCP / API",
-        "description": "Connect AI assistants like Claude Desktop to your Dayopt data.",
+        "description": "Connect AI assistants like Claude, ChatGPT, or Cursor to your Dayopt data.",
         "serverUrl": "MCP server URL",
         "copied": "Copied to clipboard",
-        "connectionGuide": "Add the URL to your Claude Desktop settings.",
+        "connectionGuide": "Add this URL as a custom connector or MCP server in your AI assistant's settings.",
         "proRequired": "An active trial or subscription is required.",
         "upgrade": "Subscribe"
       },
@@ -385,7 +372,11 @@
         "confirmDeleteAll": "This will permanently delete all your data. Your account will remain but all timeblocks, activities, and settings will be removed.",
         "typeToConfirm": "Type \"{keyword}\" to confirm",
         "confirmKeyword": "DELETE",
-        "deleting": "Deleting..."
+        "deleting": "Deleting...",
+        "blocksDeleted": "{count, plural, one {1 timeblock} other {# timeblocks}} deleted",
+        "blocksDeleteFailed": "Could not delete the timeblocks. Please try again",
+        "allDataDeleted": "All data deleted",
+        "allDataDeleteFailed": "Could not delete your data. Please try again"
       }
     },
     "integrations": {
@@ -564,6 +555,14 @@
           "enabled": "Enabled",
           "disabled": "Disabled"
         },
+        "unset": "Not selected",
+        "allow": "Allow analytics",
+        "revoke": "Withdraw analytics",
+        "revokeConfirmTitle": "Withdraw analytics consent?",
+        "revokeConfirmDescription": "The page reloads so that browser analytics and error monitoring stop completely. Anything you have typed but not saved is lost.",
+        "revokeConfirmLabel": "Withdraw",
+        "saveFailed": "Could not save your choice. Browser storage rejected the write, so analytics was not changed.",
+        "independentOrigins": "Choices made on the website and in the app are stored separately.",
         "manage": "Manage cookie settings",
         "lastUpdated": "Last updated"
       },
@@ -637,6 +636,7 @@
       "pastDueDescription": "Your last payment failed. Please update your payment method to avoid losing access.",
       "updatePayment": "Update payment",
       "checkoutSuccess": "Your subscription is active. Welcome to Dayopt.",
+      "checkoutDelayed": "We couldn't confirm your subscription yet. Refresh Billing in a moment. If it still hasn't changed, contact support.",
       "checkoutCanceled": "Checkout was canceled. You can upgrade anytime.",
       "stripeNotConfigured": "Stripe is not configured yet",
       "loadError": "Failed to load billing information",

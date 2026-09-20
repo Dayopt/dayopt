@@ -9,13 +9,16 @@
  */
 'use client';
 
+import type { DehydratedState } from '@tanstack/react-query';
+
 import { ProvidersComposition } from './_composition/ProvidersComposition';
 
 interface ProvidersProps {
   children: React.ReactNode;
+  dehydratedState?: DehydratedState | undefined;
 }
 
 /** 認証必須ページ用フルProviders（shell） */
-export function Providers({ children }: ProvidersProps) {
-  return <ProvidersComposition>{children}</ProvidersComposition>;
+export function Providers({ children, dehydratedState }: ProvidersProps) {
+  return <ProvidersComposition dehydratedState={dehydratedState}>{children}</ProvidersComposition>;
 }

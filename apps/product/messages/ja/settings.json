@@ -249,21 +249,8 @@
       "viewWeek": "週表示",
       "density": "密度",
       "densityCompact": "コンパクト",
-      "densityDefault": "デフォルト",
+      "densityDefault": "標準",
       "densitySpacious": "ゆったり"
-    },
-    "sleepSchedule": {
-      "title": "睡眠スケジュール",
-      "enabled": "睡眠時間帯を表示",
-      "description": "カレンダーのグリッドに睡眠時間帯を背景色で表示",
-      "bedtime": "就寝時刻",
-      "wakeTime": "起床時刻",
-      "duration": "睡眠時間",
-      "hours": "{hours}時間",
-      "preview": "プレビュー",
-      "legendSleep": "睡眠",
-      "legendActivity": "活動",
-      "settingsSaved": "睡眠スケジュールを保存しました"
     },
     "preferences": {
       "settingsSaved": "環境設定を保存しました",
@@ -367,10 +354,10 @@
       },
       "mcp": {
         "title": "MCP / API",
-        "description": "Claude DesktopなどのAIアシスタントからDayoptのデータに接続。",
+        "description": "Claude・ChatGPT・CursorなどのAIアシスタントからDayoptのデータに接続。",
         "serverUrl": "MCPサーバーURL",
         "copied": "クリップボードにコピーしました",
-        "connectionGuide": "上記のURLをClaude Desktopの設定に追加してください。",
+        "connectionGuide": "上記のURLを、お使いのAIアシスタントのカスタムコネクタまたはMCPサーバーの設定に追加してください。",
         "proRequired": "無料体験中または契約中に利用できます。",
         "upgrade": "購入する"
       },
@@ -385,7 +372,11 @@
         "confirmDeleteAll": "すべてのデータが完全に削除されます。アカウントは残りますが、タイムブロック、アクティビティ、設定はすべて削除されます。",
         "typeToConfirm": "確認のため「{keyword}」と入力してください",
         "confirmKeyword": "削除",
-        "deleting": "削除中..."
+        "deleting": "削除中...",
+        "blocksDeleted": "{count} 件のタイムブロックを削除しました",
+        "blocksDeleteFailed": "タイムブロックを削除できませんでした。もう一度お試しください",
+        "allDataDeleted": "すべてのデータを削除しました",
+        "allDataDeleteFailed": "データを削除できませんでした。もう一度お試しください"
       }
     },
     "integrations": {
@@ -564,6 +555,14 @@
           "enabled": "有効",
           "disabled": "無効"
         },
+        "unset": "未選択",
+        "allow": "分析を許可",
+        "revoke": "分析を撤回",
+        "revokeConfirmTitle": "分析への同意を撤回しますか？",
+        "revokeConfirmDescription": "ブラウザの計測とエラー監視を完全に停止するため、この画面を再読み込みします。入力途中で保存していない内容は失われます。",
+        "revokeConfirmLabel": "撤回する",
+        "saveFailed": "選択を保存できませんでした。ブラウザの保存領域が書き込みを拒否したため、分析の設定は変わっていません。",
+        "independentOrigins": "ウェブサイトとアプリの選択は、それぞれ別に保存されます。",
         "manage": "Cookie設定を管理",
         "lastUpdated": "最終更新"
       },
@@ -637,6 +636,7 @@
       "pastDueDescription": "前回のお支払いに失敗しました。アクセスを維持するため、お支払い方法を更新してください。",
       "updatePayment": "支払い方法を更新",
       "checkoutSuccess": "契約が有効になりました。Dayoptをご利用いただきありがとうございます。",
+      "checkoutDelayed": "契約状態をまだ確認できません。しばらくしてから課金情報を再読み込みしてください。変わらない場合はサポートへご連絡ください。",
       "checkoutCanceled": "チェックアウトがキャンセルされました。いつでもアップグレードできます。",
       "stripeNotConfigured": "まだStripeが設定されていません",
       "loadError": "課金情報を読み込めませんでした。もう一度お試しください",

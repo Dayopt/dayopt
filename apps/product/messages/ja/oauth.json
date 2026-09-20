@@ -17,6 +17,7 @@
       },
       "readOnlyNotice": "読み取りのみです。{clientName} があなたの記録を変更することはできません。",
       "writeNotice": "{clientName} は選択された Dayopt のデータを直接変更できます。設定からいつでも接続を解除できます。",
+      "writeUnavailableNotice": "書き込みは現在この接続では有効になっていないため、読み取り権限のみを許可します。",
       "approve": "接続を許可",
       "deny": "キャンセル",
       "userLabel": "{email} として接続します"

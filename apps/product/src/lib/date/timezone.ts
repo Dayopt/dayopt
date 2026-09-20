@@ -239,3 +239,21 @@ export function toTZEndISO(date: Date, timezone: string): string {
   const localDateStr = getDateKey(date);
   return fromZonedTime(new Date(`${localDateStr}T23:59:59.999`), timezone).toISOString();
 }
+
+/** カレンダーの壁時計 Date（暦日）は instant に変換せず比較する。 */
+export function isTodayWallDateInTimezone(
+  date: Date,
+  timezone: string,
+  now: Date = new Date(),
+): boolean {
+  return getDateKey(date) === getDateKey(now, timezone);
+}
+
+/** カレンダーの壁時計 Date が、ユーザー TZ の今日より前かを判定する。 */
+export function isPastWallDateInTimezone(
+  date: Date,
+  timezone: string,
+  now: Date = new Date(),
+): boolean {
+  return getDateKey(date) < getDateKey(now, timezone);
+}

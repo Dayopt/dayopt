@@ -185,6 +185,9 @@ export async function listGhostEvents(
   range: EventRangeInput,
 ): Promise<ExternalCalendarEventSummary[]> {
   const selectedCalendarKeys = await loadSelectedCalendarKeys(supabase, userId);
+  // 選択集合が空なら、下のループはどの候補行も採用しない（全行が selection の allowlist で落ちる）。
+  // 未接続のユーザーは表示範囲が変わるたびにここへ来るので、結果の決まっているミラー読みを省く（#2678）。
+  if (selectedCalendarKeys.size === 0) return [];
 
   const events: ExternalCalendarEventSummary[] = [];
   let cursor: string | null = null;

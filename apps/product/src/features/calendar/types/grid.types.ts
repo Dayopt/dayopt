@@ -5,8 +5,15 @@ export interface TimeColumnProps {
   hourHeight?: number | undefined;
   format?: '12h' | '24h' | undefined; // 時刻表示形式
   className?: string | undefined;
-  /** 列の幅（px）。未指定時は TIME_COLUMN_WIDTH（PC 既定値）にフォールバック */
+  /** 列の幅（px）。未指定時は format / dense から resolveTimeColumnWidth で解く */
   width?: number | undefined;
+  /** 狭い列（モバイル）向けにラベルを一段小さくする */
+  dense?: boolean | undefined;
+  /**
+   * 現在時刻バッジが重なる位置（0:00 からの分）。近い時刻ラベルを隠して
+   * バッジと重ならないようにする。null / undefined なら隠さない
+   */
+  occludedMinutes?: number | null | undefined;
 }
 
 /** 現在時刻線コンポーネントのプロパティ */

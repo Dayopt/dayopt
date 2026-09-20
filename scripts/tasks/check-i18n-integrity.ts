@@ -37,12 +37,12 @@ const MULTI_KEY_EXCEPTIONS: Record<string, string[]> = {
   email: [
     'emailCommon',
     'welcome',
-    'passwordChanged',
+    // passwordChanged は Supabase Auth Hook の inline en/ja 辞書へ移した（#2848）。
     'mfaDisabled',
     'accountDeletion',
     'trialStart',
-    'trialExpiring',
-    'trialExpired',
+    // trialExpiring / trialExpired は撤去した。トライアルの催促メールは送らない方針
+    // （docs/product/specs/billing.md「終了7日前からアプリ内案内を出す。新しい催促メールは送らない」）
     'proStart',
     'paymentFailed',
     'paymentRecovered',

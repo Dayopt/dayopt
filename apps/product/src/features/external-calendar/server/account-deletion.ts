@@ -8,6 +8,7 @@ import { env } from '@/env';
 import type { Database } from '@/lib/database';
 import { captureUnexpectedError } from '@/lib/sentry';
 
+import { SUPABASE_TRACE_PROPAGATION } from '@/lib/supabase/trace-propagation';
 import {
   resolveGoogleCalendarAuthorityIdentity,
   type GoogleCalendarAuthorityIdentity,
@@ -137,8 +138,9 @@ const CLIENT_FLOOR_TIMEOUT_MS = 15_000;
 function createCalendarAccountDeletionClient(): CalendarAccountDeletionClient {
   return createClient<CalendarAccountDeletionDatabase>(
     env.NEXT_PUBLIC_SUPABASE_URL,
-    env.SUPABASE_SERVICE_ROLE_KEY,
+    env.SUPABASE_SECRET_KEY,
     {
+      tracePropagation: SUPABASE_TRACE_PROPAGATION,
       auth: {
         autoRefreshToken: false,
         persistSession: false,

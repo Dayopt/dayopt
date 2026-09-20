@@ -23,9 +23,9 @@ describe('Grid selection (mouse)', () => {
       expect(state.gridStartY).toBe(540);
       expect(state.selectionRange.start.getHours()).toBe(9);
       expect(state.selectionRange.start.getMinutes()).toBe(0);
-      // Minimum 5-min selection (MIN_TIMEBLOCK_DURATION_MINUTES)
+      // 初期選択は 1 snap 分（15 分）
       expect(state.selectionRange.end.getHours()).toBe(9);
-      expect(state.selectionRange.end.getMinutes()).toBe(5);
+      expect(state.selectionRange.end.getMinutes()).toBe(15);
     }
   });
 
@@ -193,7 +193,7 @@ describe('Upward selection', () => {
       expect(state.selectionRange.start.getHours()).toBe(10);
       expect(state.selectionRange.start.getMinutes()).toBe(0);
       expect(state.selectionRange.end.getHours()).toBe(10);
-      expect(state.selectionRange.end.getMinutes()).toBe(5);
+      expect(state.selectionRange.end.getMinutes()).toBe(15);
     }
   });
 });

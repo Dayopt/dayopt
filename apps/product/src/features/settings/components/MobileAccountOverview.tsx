@@ -32,7 +32,7 @@ import { useLocale, useTranslations } from 'next-intl';
 
 import { AppHeader } from '@/components/shell/AppHeader';
 import { useAuthStore } from '@/features/auth';
-import { APP_NAME, APP_RELEASES_URL, APP_VERSION } from '@/lib/app-info';
+import { APP_NAME, APP_VERSION, getReleaseNotesUrl } from '@/lib/app-info';
 import { useLogout } from '@/lib/hooks/useLogout';
 import type { MessageKey } from '@/lib/i18n';
 import { useShellStore } from '@/lib/stores/useShellStore';
@@ -81,7 +81,7 @@ export function MobileAccountOverview({
   }> = [
     {
       labelKey: 'settings.accountPage.releaseNotes',
-      href: APP_RELEASES_URL,
+      href: getReleaseNotesUrl(locale),
       icon: Megaphone,
       external: true,
     },

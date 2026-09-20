@@ -115,7 +115,7 @@ secret の**利用**は制限しない。agent は `op run` 経由（`pnpm dev`�
 **Supabase Management API の `config/*` と `branches*` は、規律ではなく機械で閉じる（#2293）。** 2026-08-11 に denylist keyword フィルタと部分一致 keyword フィルタが 2 回とも漏れ（`db_pass` が `password` denylist を素通り、`security_captcha_secret` が `CAPTCHA` 部分一致に誤ヒット）、jq 射影の「形」を agent が都度書く運用そのものが再発を防げないと判明した。`scripts/hooks/pre-tool-guard-rules.mjs` が `curl` / `wget` によるこれらエンドポイントへの直接アクセスを **jq 射影の有無を問わず無条件で block** する（jq の形が正しい allowlist かどうかは regex では検証できないため。shell 展開回避と同型の壁）。安全な代替は `scripts/agent/supabase-mgmt-safe-get.mjs` に一本化する:
 
 ```bash
-SUPABASE_ACCESS_TOKEN="op://human/supabase-cli/SUPABASE_ACCESS_TOKEN" \
+SUPABASE_ACCESS_TOKEN="op://agent/supabase-agent/credential" \
   op run -- node scripts/agent/supabase-mgmt-safe-get.mjs auth-config security_captcha_enabled external_email_enabled disable_signup
 ```
 
@@ -239,18 +239,22 @@ vault は 2026-08-14 の信頼境界軸再編（[#2086](https://github.com/Dayop
 
 **常設 staging 環境は存在しない**（Supabase の branch は `main` のみ）。そのため Supabase の接続情報（`NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` / `SUPABASE_SERVICE_ROLE_KEY` / `SUPABASE_DB_PASSWORD`）はこの vault に置かない。置けば production の複製にしかならず、実際 2026-08-11 まで 4 field とも `human/supabase` と同一値だった（[#1929](https://github.com/Dayopt/dayopt/issues/1929)）。local dev の Supabase 接続は `scripts/tasks/dev-with-op.sh` が `supabase status -o env` から注入し、1Password を経由しない。この境界は `scripts/__tests__/staging-supabase-boundary.test.ts` が固定する。
 
-| Item              | Fields                                                                                                                                                                                                                                                                                                                                               | 用途                                                                                            |
-| ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| `supabase`        | `CRON_SECRET`, `SEND_EMAIL_HOOK_SECRET`                                                                                                                                                                                                                                                                                                              | staging 用 optional secret（cron / send-email hook の local dev 検証）                          |
-| `upstash`         | `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`                                                                                                                                                                                                                                                                                                 | Redis rate limit / cache                                                                        |
-| `stripe-test`     | `STRIPE_SECRET_KEY`, `STRIPE_ACCOUNT_ID`, `STRIPE_LIVEMODE`, `STRIPE_WEBHOOK_SECRET`, `NEXT_PUBLIC_STRIPE_PRO_PRICE_ID`                                                                                                                                                                                                                              | Stripe test mode                                                                                |
-| `resend`          | `RESEND_API_KEY`, `RESEND_FROM_EMAIL`, `RESEND_WEBHOOK_SECRET`                                                                                                                                                                                                                                                                                       | Production email sending master（旧 Shared から統合）+ optional staging の Product webhook 署名 |
-| `app`             | `NEXT_PUBLIC_APP_URL`, `NEXT_PUBLIC_SITE_URL`, `RECOVERY_CODE_PEPPER`, `OAUTH_CLAUDE_REDIRECT_URIS`, `OAUTH_CHATGPT_REDIRECT_URIS`, `OAUTH_CURSOR_REDIRECT_URIS`, `MCP_OAUTH_ENVIRONMENT`, `OAUTH_AUTHORIZATION_SERVER_URI`, `MCP_CANONICAL_RESOURCE_URI`, `MCP_OAUTH_PREVIEW_BRANCH`, `MCP_OAUTH_PREVIEW_UPSTASH_HOST`, `MCP_WRITE_ENABLED_CLIENTS` | App URL / recovery code HMAC pepper / MCP OAuth beta                                            |
-| `google-calendar` | `GOOGLE_CALENDAR_CLIENT_ID`, `GOOGLE_CALENDAR_PROJECT_NUMBER`, `GOOGLE_CALENDAR_CLIENT_SECRET`, `CALENDAR_TOKEN_ENCRYPTION_KEY`, `GOOGLE_CALENDAR_REDIRECT_URIS`                                                                                                                                                                                     | 外部カレンダー取り込みの OAuth client（local dev 用）                                           |
-| `turnstile`       | `NEXT_PUBLIC_TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY`                                                                                                                                                                                                                                                                                             | Cloudflare Turnstile（旧 Shared）                                                               |
-| `anthropic`       | `ANTHROPIC_API_KEY`                                                                                                                                                                                                                                                                                                                                  | optional / legacy key。現行 runtime consumer なし（旧 Shared）                                  |
-| `google`          | `GOOGLE_SITE_VERIFICATION`, `YANDEX_VERIFICATION`, `YAHOO_VERIFICATION`                                                                                                                                                                                                                                                                              | Webmaster verification（旧 Shared）                                                             |
-| `vercel`          | `VERCEL_TOKEN`（agent 用別発行、未発行 pending）                                                                                                                                                                                                                                                                                                     | `pnpm replica:check` 用。CI の token（ci/vercel）とは別発行で共用しない（#2086 plan v2）        |
+| Item                  | Fields                                                                                                                                                                                                                                                                                                                                               | 用途                                                                                                                                                                                                            |
+| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `supabase`            | `CRON_SECRET`, `SEND_EMAIL_HOOK_SECRET`, `SENTRY_DSN`（Edge Function send-auth-email 用、任意）                                                                                                                                                                                                                                                      | staging 用 optional secret（cron / send-email hook の local dev 検証）                                                                                                                                          |
+| `upstash`             | `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`                                                                                                                                                                                                                                                                                                 | Redis rate limit / cache                                                                                                                                                                                        |
+| `stripe-test`         | `STRIPE_SECRET_KEY`, `STRIPE_ACCOUNT_ID`, `STRIPE_LIVEMODE`, `STRIPE_WEBHOOK_SECRET`, `NEXT_PUBLIC_STRIPE_PRO_PRICE_ID`                                                                                                                                                                                                                              | Stripe test mode                                                                                                                                                                                                |
+| `app`                 | `NEXT_PUBLIC_APP_URL`, `NEXT_PUBLIC_SITE_URL`, `RECOVERY_CODE_PEPPER`, `OAUTH_CLAUDE_REDIRECT_URIS`, `OAUTH_CHATGPT_REDIRECT_URIS`, `OAUTH_CURSOR_REDIRECT_URIS`, `MCP_OAUTH_ENVIRONMENT`, `OAUTH_AUTHORIZATION_SERVER_URI`, `MCP_CANONICAL_RESOURCE_URI`, `MCP_OAUTH_PREVIEW_BRANCH`, `MCP_OAUTH_PREVIEW_UPSTASH_HOST`, `MCP_WRITE_ENABLED_CLIENTS` | App URL / recovery code HMAC pepper / MCP OAuth beta                                                                                                                                                            |
+| `google-calendar`     | `GOOGLE_CALENDAR_CLIENT_ID`, `GOOGLE_CALENDAR_PROJECT_NUMBER`, `GOOGLE_CALENDAR_CLIENT_SECRET`, `CALENDAR_TOKEN_ENCRYPTION_KEY`, `GOOGLE_CALENDAR_REDIRECT_URIS`                                                                                                                                                                                     | 外部カレンダー取り込みの OAuth client（local dev 用）                                                                                                                                                           |
+| `turnstile`           | `NEXT_PUBLIC_TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY`                                                                                                                                                                                                                                                                                             | Cloudflare Turnstile（旧 Shared）                                                                                                                                                                               |
+| `github-agent`        | `credential`（fine-grained PAT、Dayopt/dayopt 限定）, `expires`                                                                                                                                                                                                                                                                                      | Agent セッションの `gh` / git push 用 identity。op run では消費せず `GH_CONFIG_DIR` の replica で使う（下記 §Agent の gh identity）                                                                             |
+| `supabase-agent`      | `credential`（Supabase scoped access token、read 権限だけ、90 日期限）, `expires`                                                                                                                                                                                                                                                                    | Agent の production Supabase 読み取り（supabase MCP `--read-only`、`supabase-mgmt-safe-get.mjs`）。下記 §Agent の Supabase 読み取り token                                                                       |
+| `sentry-cli-readonly` | `credential`（Sentry user auth token、read scope だけ）                                                                                                                                                                                                                                                                                              | Agent の Sentry 読み取り（`sentry` CLI を inline `op://` で起動）。org `dayopt` での access は `alerts:read` / `member:read` / `project:read` / `team:read` / `org:read` / `event:read` だけ（2026-09-14 実測） |
+| `vercel-ai-gateway`   | `credential`（AI Gateway API key、budget $4 / 月、90 日期限）, `expires`                                                                                                                                                                                                                                                                             | 評価モデル Jev の呼び出し（`pnpm jev:*` を inline `op://` で起動）。下記 §評価モデル Jev の Gateway key                                                                                                         |
+
+**`agent/app` の `RECOVERY_CODE_PEPPER` は production と別値**（2026-09-14、User が値を表示しない比較で `different` を確認）。local dev の recovery code が production で通ることはない。
+
+**2026-09-14 に agent から外したもの**（Secret / Credential 監査）: `resend`（production ドメインから送れる送信 key。`human/resend-send` へ移動）、`anthropic`（consumer 無し、値も空）、`google`（webmaster verification。値が空で Vercel にも replica 無し）、`vercel`（未使用の team 全権 token。revoke 済み）。agent には「漏れても rotate すれば 1 日で戻せるもの」だけを置く。local dev は Resend 無しで動く（Supabase local の認証メールは Inbucket、問い合わせ送信は Production 限定、welcome / trial 系メールは送信失敗を handle する）。
 
 `SUPABASE_ACCESS_TOKEN`（Supabase Management API 用。cloud の `supabase` MCP server と `scripts/runbook/enable-auth-hook.sh` が使う）は `human/supabase` を正本に一本化した（[#1933](https://github.com/Dayopt/dayopt/issues/1933)）。以前は `human/supabase` と同一値のまま `agent/supabase` にも複製されていたが、production を指す token を staging item から読む理由が無いため repo 側の参照はすべて production へ切り替えた。**item 自体は残す**（`CRON_SECRET` / `SEND_EMAIL_HOOK_SECRET` は cron / send-email hook の local dev 検証に使うため、廃止しない）。
 
@@ -268,20 +272,21 @@ vault は 2026-08-14 の信頼境界軸再編（[#2086](https://github.com/Dayop
 
 | Item                     | Fields                                                                                                                                                                                                                                                                                 |
 | ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `supabase`               | `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_DB_PASSWORD`, `CRON_SECRET`, `SEND_EMAIL_HOOK_SECRET`（`SUPABASE_ACCESS_TOKEN` は `supabase-cli` へ切り出し済み。同名 field は削除済み）                                           |
+| `supabase`               | `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY`, `SUPABASE_DB_PASSWORD`, `CRON_SECRET`, `SEND_EMAIL_HOOK_SECRET`（`SUPABASE_ACCESS_TOKEN` は `supabase-cli` へ切り出し済み。同名 field は削除済み）                                          |
 | `supabase-cli`           | `SUPABASE_ACCESS_TOKEN` + 有効期限 field。CLI / MCP が使う operational credential 専用 item（rotation 対象、#2127）                                                                                                                                                                    |
 | `supabase-login`         | Supabase Dashboard の GUI ログイン（LOGIN item、OTP 付き）。op:// では参照されない、ブラウザでの手動サインイン専用（#2127）                                                                                                                                                            |
 | `upstash`                | `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`                                                                                                                                                                                                                                   |
 | `upstash-login`          | Upstash Console の GUI ログイン（LOGIN item）。op:// では参照されない、ブラウザでの手動サインイン専用（#2127）                                                                                                                                                                         |
 | `stripe-live`            | `STRIPE_SECRET_KEY`, `STRIPE_ACCOUNT_ID`, `STRIPE_LIVEMODE`, `STRIPE_WEBHOOK_SECRET`, `NEXT_PUBLIC_STRIPE_PRO_PRICE_ID`                                                                                                                                                                |
 | `resend`                 | `RESEND_WEBHOOK_SECRET`（Product）                                                                                                                                                                                                                                                     |
+| `resend-send`            | `RESEND_API_KEY`, `RESEND_FROM_EMAIL`（Product / Web の Production が共用する送信 credential。2026-09-14 に agent から移動）                                                                                                                                                           |
 | `resend-web`             | `RESEND_WEBHOOK_SECRET`（Web、Productと別値）                                                                                                                                                                                                                                          |
 | `sentry`                 | `NEXT_PUBLIC_SENTRY_DSN`, `SENTRY_DSN`, `SENTRY_ORG`, `SENTRY_PROJECT`（Product）                                                                                                                                                                                                      |
 | `sentry-web`             | `NEXT_PUBLIC_SENTRY_DSN`, `SENTRY_DSN`, `SENTRY_ORG`, `SENTRY_PROJECT`（Web）                                                                                                                                                                                                          |
 | `app`                    | `NEXT_PUBLIC_APP_URL`, `NEXT_PUBLIC_SITE_URL`, `RECOVERY_CODE_PEPPER`, `OAUTH_CLAUDE_REDIRECT_URIS`, `OAUTH_CHATGPT_REDIRECT_URIS`, `OAUTH_CURSOR_REDIRECT_URIS`, `MCP_OAUTH_ENVIRONMENT`, `OAUTH_AUTHORIZATION_SERVER_URI`, `MCP_CANONICAL_RESOURCE_URI`, `MCP_WRITE_ENABLED_CLIENTS` |
 | `google-calendar`        | `GOOGLE_CALENDAR_CLIENT_ID`, `GOOGLE_CALENDAR_PROJECT_NUMBER`, `GOOGLE_CALENDAR_CLIENT_SECRET`, `CALENDAR_TOKEN_ENCRYPTION_KEY`, `GOOGLE_CALENDAR_REDIRECT_URIS`                                                                                                                       |
 | `google-auth`            | `SUPABASE_AUTH_GOOGLE_CLIENT_ID`, `SUPABASE_AUTH_GOOGLE_SECRET`                                                                                                                                                                                                                        |
-| `sentry-login`           | `SENTRY_AUTH_TOKEN` + account login（旧 Shared）                                                                                                                                                                                                                                       |
+| `sentry-login`           | Sentry Dashboard の GUI ログイン（LOGIN item、recovery codes を含む）。token field は持たず op:// では参照されない。build 用 token は `ci/sentry-release-token`、agent の読み取り用は `agent/sentry-cli-readonly`（旧 Shared）                                                         |
 | `github-login`           | password, TOTP, recovery codes（旧 Shared）                                                                                                                                                                                                                                            |
 | `github-ssh`             | SSH private key（旧 Shared）                                                                                                                                                                                                                                                           |
 | `domain`                 | registrar login, TOTP, recovery codes（旧 Shared）                                                                                                                                                                                                                                     |
@@ -305,21 +310,86 @@ vault は 2026-08-14 の信頼境界軸再編（[#2086](https://github.com/Dayop
 
 ### `ci`
 
-**CI が消費する値の master を置く。** 現在 CI は 1Password を直接読まず GitHub Secrets replica で動くため、この vault の読み手は同期作業の人間だけ。Service Account を導入する時は、この vault を SA の read scope にする（[#2086](https://github.com/Dayopt/dayopt/issues/2086)）。
+**CI が消費する値の master を置く。** GitHub Actions Secrets との対応は `scripts/tasks/env/schema.ts` の `ciSecretSchema` が正本で、workflow の `secrets.*` 参照と名前で双方向に一致することを `scripts/__tests__/ci-secret-ledger.test.ts` が検査する。 現在 CI は 1Password を直接読まず GitHub Secrets replica で動くため、この vault の読み手は同期作業の人間だけ。Service Account を導入する時は、この vault を SA の read scope にする（[#2086](https://github.com/Dayopt/dayopt/issues/2086)）。
 
-| Item                         | Fields                                                                                        | 用途                                                                                                                                                                                                                                                                 |
-| ---------------------------- | --------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `vercel`                     | `VERCEL_TOKEN`, `VERCEL_TEAM_ID`, `VERCEL_PROJECT_ID_STAGING`, `VERCEL_PROJECT_ID_PRODUCTION` | Production Config Audit / Production Release / project metadata                                                                                                                                                                                                      |
-| `supabase-auth-audit`        | `credential`                                                                                  | Production Auth Config Audit 専用 scoped token（Auth の Read のみ）                                                                                                                                                                                                  |
-| `supabase-storage-rls-audit` | `credential`                                                                                  | Production Storage RLS Audit 専用 scoped token（`database_read` のみ、90 日期限）。`production-config-audit.yml` の `storage-rls` job が参照し、GitHub Secret `SUPABASE_STORAGE_RLS_AUDIT_TOKEN` へ同期する（[#2345](https://github.com/Dayopt/dayopt/issues/2345)） |
+| Item                              | Fields                                                                                                        | 用途                                                                                                                                                                                                                                                                                                                              |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `vercel-production`               | `VERCEL_TOKEN`, `VERCEL_TEAM_ID`, `VERCEL_AUTOMATION_BYPASS_PRODUCT`, `VERCEL_AUTOMATION_BYPASS_WEB`          | Production Release（promote / rollback / smoke の Deployment Protection bypass）、Production Config Audit、replica check。2026-09-14 に `vercel` から改名。token は team 全権で期限 2027-07-24                                                                                                                                    |
+| `supabase-auth-audit`             | `credential`                                                                                                  | Production Auth Config Audit 専用 scoped token（Auth の Read のみ）                                                                                                                                                                                                                                                               |
+| `supabase-storage-rls-audit`      | `credential`                                                                                                  | Production Storage RLS Audit 専用 scoped token（`database_read` のみ、90 日期限）。`production-config-audit.yml` の `storage-rls` job が参照し、GitHub Secret `SUPABASE_STORAGE_RLS_AUDIT_TOKEN` へ同期する（[#2345](https://github.com/Dayopt/dayopt/issues/2345)）                                                              |
+| `Supabase-StorageS3-backupsource` | `RCLONE_CONFIG_SOURCE_TYPE` / `_PROVIDER` / `_ENDPOINT` / `_REGION` / `_ACCESS_KEY_ID` / `_SECRET_ACCESS_KEY` | nightly の Storage backup の読み出し元（Supabase Storage の S3 接続）。**この key は全 bucket への書き込み・削除ができ RLS も効かない**。Supabase は読み取り専用や bucket 限定の S3 key を提供していないため、service role と同格に扱う（2026-09-14 に公式 docs で確認）                                                          |
+| `Cloudflare-R2-storagebackup`     | `RCLONE_CONFIG_DEST_*`（6 field）, `Token value`                                                              | nightly の Storage backup の書き込み先（Cloudflare R2、Bucket Locks 35 日）。R2 の token は「Object Read & Write」を backup 先 bucket だけに限定して発行する。`Token value` は同じ token の Cloudflare API 用の表現で rclone には使わないが、S3 用の key はこの token から派生するため **token を revoke すると backup も止まる** |
+| `sentry-release-token`            | `SENTRY_AUTH_TOKEN`                                                                                           | Vercel Production build の source map upload（#2085 で分離）。GitHub Actions からは使わない                                                                                                                                                                                                                                       |
 
 **Supabase Management API の scoped access token（`sbp_` prefix）は Account Settings → Access Tokens（https://supabase.com/dashboard/account/tokens）で発行する。** Project の Settings → API Keys ページ（`sb_sec...` prefix、Data API 用の secret key）とは別物で Management API には使えない。2026-08-25、`supabase-storage-rls-audit` token の発行でこの取り違えにより 401 が発生した（[#2345](https://github.com/Dayopt/dayopt/issues/2345) コメント参照）。
-
-予定（#2090 の実施後に追加する）: `VERCEL_AUTOMATION_BYPASS_PRODUCT` / `VERCEL_AUTOMATION_BYPASS_WEB`（bypass secret の 1Password 登録先）。
 
 `VERCEL_TOKEN`はautomation専用とし、local CLIのloginや`--token`引数には使わない。Production Config AuditとProduction Releaseが環境変数からprocess内で読み、Authorization headerにだけ設定する。Production Releaseはenv metadataの読取に加えて、Production deploymentのpromoteとrollbackを行う。localの確認方法とrotation順序は[Environment Secrets](./security/environment-secrets.md)を正とする。agent からは読まない（agent の `replica:check` は agent 用の別発行 token を使う。発行までは User 実行）。
 
 ---
+
+## Agent の gh identity（fine-grained PAT）
+
+策定日: 2026-09-14（Secret / Credential 監査 P1-1、User 裁可）。Agent セッション（Claude Code / Codex）の `gh` と git push（credential helper は `gh auth git-credential`）は、User 本人の OAuth token（`admin:org` / `delete_repo` / `repo` / `workflow`）ではなく **Dayopt/dayopt repo だけに効く fine-grained PAT** で動かす。hook の regex で `gh api` の書き込みを数え上げるのではなく、token の scope に無い操作（ruleset 変更・Secret 上書き・repo 削除・workflow 編集）を構造的に不可能にするのが目的。User の terminal の `gh`（keyring）は変更しない。
+
+**identity の分け方**: `GH_CONFIG_DIR` で config dir を分ける。User は既定（`~/.config/gh`、keyring）、Agent は `~/.config/gh-agent`（plaintext `hosts.yml`、0600）。keyring は host / user 単位で 1 token しか持てず、同じ account の 2 token が衝突するため、Agent 側だけ `--insecure-storage` を使う。この file は replica で、master は `agent/github-agent`（上記 Replica 台帳）。
+
+**PAT の権限（これ以外は No access）**: Resource owner = Dayopt org、Only select repositories = dayopt、有効期限 1 年。Repository permissions: Actions R / Commit statuses R / Contents **RW** / Issues **RW** / Metadata R / Pull requests **RW**。Organization permissions: なし。Contents RW は git push と `gh pr create` に要る。Checks は fine-grained PAT の選択肢に無い。private repo で CI 結果（check run）がこの token で読めるかは、login 後に `gh pr checks` で実測して追記する。`Administration` / `Secrets` / `Workflows` / `Environments` は付けない（付けると P1-1 が戻る）。
+
+**帰結: `.github/workflows/` を変える commit を agent は push できない。** GitHub が「`workflow` scope の無い token による workflow の作成・更新」を拒否する（2026-09-14、PR #2761 で実測）。workflow を変える PR は、agent が commit まで作り、push だけ User が自分の terminal（既定の `gh` identity）で行う。PAT に Workflows を足して回避しない。workflow は `GITHUB_TOKEN` の権限と secret の配布先を決めるので、agent が書き換えられると P1-1 と同じ穴が開く。
+
+**発行と登録（User の GUI / terminal、値は表示しない）**:
+
+1. GitHub → Settings → Developer settings → Personal access tokens → Fine-grained → Generate（上記権限）。Dayopt org 側で fine-grained PAT が許可・承認されているか確認する
+2. 1Password GUI: vault `agent` に API Credential item `github-agent`、field `credential` に値、`expires` に期限、タグ `dayopt/github`
+3. `mkdir -p ~/.config/gh-agent && chmod 700 ~/.config/gh-agent`
+4. `op read "op://agent/github-agent/credential" | GH_CONFIG_DIR=~/.config/gh-agent gh auth login --hostname github.com --git-protocol https --with-token --insecure-storage`（pipe で渡すので値は表示されない。agent の Bash tool では `op read` が block されるため User の terminal で行う）
+5. Agent セッションへ `GH_CONFIG_DIR=<絶対パス>/.config/gh-agent` を渡す。Claude Code は `.claude/settings.local.json`（gitignored）の `env`、Codex は `~/.codex/config.toml` の `[shell_environment_policy.set]`。tracked の `.claude/settings.json` には機種依存の絶対パスを書かない
+
+**検証**: Agent セッションで `gh auth status` に `admin:org` / `delete_repo` が出ないこと、`gh api repos/Dayopt/dayopt/rulesets` が読めること、`gh api orgs/Dayopt/actions/secrets` が 403 / 404 になること（admin 不在の証明。書き込みは試さない）。`pnpm agent:preflight` の `gh identity` 行が classic scope を検出すると警告を出す（speed bump、fail はしない）。`pnpm 1password:check` は `agent/github-agent` の実在を検査する（`operationalItems`）。
+
+**rotation**: §短命トークンのローテーション（expiry 付き再発行）に従う。新 PAT を発行 → 1Password 更新 → 上記 4 を再実行 → GitHub の token 一覧で新 token の Last used が更新されたことを確認 → 旧 PAT を revoke。
+
+## Agent の vercel CLI（読み取り系だけ）
+
+策定日: 2026-09-14（Secret / Credential 監査 P1-2、User 裁可）。agent の `vercel` CLI は User 本人の対話 login で動き、team `Dayopt` の全権を持つ。Vercel の token は scope を絞れないため、GitHub のような identity 分離はできない。そこで **agent から実行してよい vercel サブコマンドを読み取り系に固定する**。
+
+**agent 用 Vercel token は置かない。** 以前は `agent/vercel` を「agent 用の別発行 token（発行待ち）」として schema に持っていたが、実際には未使用の team 全権 token が入っていた。agent vault の定義（漏れても 1 日で戻せるもの）に合わないため、2026-09-14 に Vercel 側で revoke し、1Password の item を archive した。
+
+**許可するもの（`scripts/hooks/pre-tool-guard-rules.mjs` の allowlist）**: `ls` / `list` / `inspect` / `logs` / `whoami` / `help` / `--version`、`teams ls`、`project ls|inspect`、`env ls`、`domains ls|inspect`、`dns ls`、`certs ls`、`alias ls`、`integration list`、`api`（GET かつ body なし）。
+
+**それ以外は block する。** 引数なしの `vercel`（= deploy）、`deploy` / `promote` / `rollback` / `redeploy` / `remove`、`env add|rm|pull`、`pull` / `dev` / `build`（実値を file や process へ引き出す）、`link`、`domains` / `certs` / `dns` / `alias` / `project` の変更、`api` の非 GET と body 付き。書き込み系を数え上げると新しいサブコマンドで穴が開くので、許可する側を固定している。
+
+**判定の保証境界**: コマンド文字列を quote を解釈して区切り（quote 外の `;` `&` `|` 改行 括弧 `$(` backtick）で分け、各区切りの先頭の `vercel` を見る。env 代入、`env` / `command` / `exec` / `npx` / `pnpm exec|dlx` / `bunx` / `xargs` / `op run ... --` の前置きと、`sh|bash|zsh -c` の中身は辿る。変数展開、wrapper script、npm script の内側（例: `pnpm vercel:env:pull:unsafe`）は見えない。hook は speed bump で、production 変更を止める本体は User の明示操作と `AGENTS.md` の EXPLICIT AUTHORITY。契約は `scripts/__tests__/pre-tool-guard.test.ts` が固定する。
+
+**受け入れる誤検知**: heredoc の本文は区切りを解釈しないので、行頭が書き込み系の vercel コマンドで始まる行を含むと落ちる。commit message や PR 本文にコマンド例を書く時は Write / Edit で file に書いてから `-F` / `--body-file` で渡す。quote 内の `|`（`rg "A|B"` 等）や、コマンド位置にない vercel の言及は落とさない。
+
+**User が行うもの**: production の env 変更、promote / rollback の手動実行、domain / cert、project 設定。いずれも User の terminal か Vercel Dashboard で行う。
+
+## Agent の Supabase 読み取り token
+
+策定日: 2026-09-14（Secret / Credential 監査 P2-7、User 裁可）。Agent が production Supabase を読む経路（supabase MCP `--read-only`、`scripts/agent/supabase-mgmt-safe-get.mjs`）は、これまで `human/supabase-cli` を inline `op://` で解決していた。この token は Auth Config **Write** を含むため、MCP の `--read-only` flag だけが書き込みを止めていた。flag は client 側の設定で、token 自体は書ける。そこで読み取り専用の scoped token を `agent/supabase-agent` に置き、Agent の読み取りはこちらだけを使う。
+
+**発行（User、Supabase Dashboard → Account → Access Tokens。Project の API Keys ページではない）**: 有効期限 90 日、対象 project は production（`yvglwblxrnrenfifsnje`）だけ。権限は **読み取りだけ**を選ぶ: Database / Migrations / Advisors / Logs（Analytics）/ Auth config / Edge Functions の read。**Write 系、Secrets、API keys、Branches は付けない**（API keys と Branches は credential を返す）。値は 1Password GUI で `agent/supabase-agent` の `credential` に入れ、`expires` に期限を書く。
+
+**PII の扱い**: Database read は table 単位に絞れず、`auth.users` などの個人情報も読める。Agent は個人情報を含む行を User の明示指示がある時だけ読む（`AGENTS.md` の CHECKPOINT）。schema・件数・policy・advisor の読み取りは自律で行ってよい。
+
+**`human/supabase-cli` の位置づけ**: Auth config の write を要する `scripts/runbook/enable-auth-hook.sh` など、User が明示操作で使う operational credential として残す。次回 rotation 時に read 系 permission を外し、write が要る作業の時だけ発行する形へ寄せる。
+
+**rotation**: §短命トークンのローテーション に従う。期限切れは MCP / safe-get の 401 で表面化する。
+
+## 評価モデル Jev の Gateway key
+
+策定日: 2026-09-17（[#2827](https://github.com/Dayopt/dayopt/issues/2827)）。評価モデル Jev は Vercel AI Gateway 経由で呼ぶ。key は `agent/vercel-ai-gateway` の `credential` に置き、**inline `op://` でそのプロセスだけへ注入する**。
+
+```bash
+AI_GATEWAY_API_KEY="op://agent/vercel-ai-gateway/credential" op run -- pnpm jev:smoke
+```
+
+**`.op-env.agent` には入れない。** 入れると `pnpm dev` が Jev の key に依存し、評価を回さない日でも 1Password の承認が要るようになる。Jev を呼ぶコマンドだけが承認を求める形を保つ。
+
+**agent vault に置いてよい理由**: key 側に budget（$4 / 月）と有効期限（90 日）が設定してあり、漏れても損害が上限で止まる。Gateway の credits は購入せず、無料枠（$5）の内側だけで使う（[#2827](https://github.com/Dayopt/dayopt/issues/2827) の制約）。
+
+**rotation**: §短命トークンのローテーション に従う。期限切れは `pnpm jev:*` の `auth_failed` で表面化する。運用手順と停止方法は [jev.md](./jev.md)。
 
 ## Service Account（無人実行用、設計のみ・未導入）
 
@@ -367,7 +437,7 @@ op run --env-file=.op-env.human -- env USER_EMAIL=foo@example.com bash scripts/r
 
 雛形は接続 3 field に加えて `SUPABASE_DB_PASSWORD` を持つ。`USE_LINKED_DB=true` の `seed-dev-data.sh` が最後に `supabase db query --linked` を実行するためで、**欠けると Auth API での user 作成だけ成功して DB 投入で止まり、既知 password の user が production に残る**（部分適用）。同じ理由で `human/supabase/SUPABASE_DB_PASSWORD` は `required` にしてある。
 
-Sentry runtime と source map upload は Production 限定のため、local の `.op-env.agent`、GitHub Actions、Vercel Preview / Development に Sentry env を複製しない。Vercel の `product` と `web` は同じ標準 env 名を使い、それぞれ `human/sentry` と `human/sentry-web` の値を Production target だけへ同期する。`SENTRY_AUTH_TOKEN` は `human/sentry-login` の単一 fieldをmasterとし、両projectのProduction targetへSensitive replicaとして同期する。
+Sentry runtime と source map upload は Production 限定のため、local の `.op-env.agent`、GitHub Actions、Vercel Preview / Development に Sentry env を複製しない。Vercel の `product` と `web` は同じ標準 env 名を使い、それぞれ `human/sentry` と `human/sentry-web` の値を Production target だけへ同期する。`SENTRY_AUTH_TOKEN` は `ci/sentry-release-token` をmasterとし、両projectのProduction targetへSensitive replicaとして同期する。
 
 `.op-env.agent` には `op://` 参照だけを書く。実値、dummy secret、placeholder secret は書かない。
 
@@ -386,16 +456,17 @@ pnpm replica:check   # 要 VERCEL_TOKEN / VERCEL_TEAM_ID（下記）
 
 - `env:check` — required env を `OK / EMPTY / MISSING` だけで確認する
 - `secrets:check` — tracked files と untracked `.env*` を scan し、literal secret は `value: [redacted]` で報告する。CI では ready 後の PR で走る（`ci.yml` の static job、`scripts/ci/check.mjs`。#2483 で docs-guard.yml から移設）
-- `replica:check` — Vercel Production Env（product / web）の **key 名だけ**を取得し、1Password 台帳（`scripts/tasks/env/schema.ts` の `onePasswordEnvSchema`）に無い key を検出する（replica ⊆ 台帳。基本方針 7 の機械検証、[#2084](https://github.com/Dayopt/dayopt/issues/2084)）。`production-config-audit.mjs` が「台帳側の必須 key が Vercel に揃っているか」を見るのと逆方向。値は取得も表示もしない。**日次 cron（`.github/workflows/nightly.yml` の replica-check job、06:30 JST。#2483 で replica-check.yml から統合）で定期実行する**（[#2111](https://github.com/Dayopt/dayopt/issues/2111)。初回実運用の NG 13 件分類が #2094/#2101 の merge で完了したため、local 専用だった制約は解除した）。token は production-config-audit と同じ GitHub Secrets（`ci/vercel` の replica）を再利用し、新規 token 発行は不要。手元での単発実行も引き続き可能（下の実行例は `ci` vault を inline 参照で解決するため、agent はコピペ実行しない。agent 用 token（`agent/vercel`、発行待ち）が入ったら agent も自走できる）。実行例:
+- `replica:check` — Vercel Production Env（product / web）の **key 名だけ**を取得し、1Password 台帳（`scripts/tasks/env/schema.ts` の `onePasswordEnvSchema`）に無い key を検出する（replica ⊆ 台帳。基本方針 7 の機械検証、[#2084](https://github.com/Dayopt/dayopt/issues/2084)）。`production-config-audit.mjs` が「台帳側の必須 key が Vercel に揃っているか」を見るのと逆方向。値は取得も表示もしない。**日次 cron（`.github/workflows/nightly.yml` の replica-check job、06:30 JST。#2483 で replica-check.yml から統合）で定期実行する**（[#2111](https://github.com/Dayopt/dayopt/issues/2111)。初回実運用の NG 13 件分類が #2094/#2101 の merge で完了したため、local 専用だった制約は解除した）。token は production-config-audit と同じ GitHub Secrets（`ci/vercel` の replica）を再利用し、新規 token 発行は不要。手元での単発実行も引き続き可能（下の実行例は `ci` vault を inline 参照で解決するため、agent はコピペ実行しない。agent 用の Vercel token は発行しない方針のため、手元実行は User が行う。実行例:
 
   ```bash
-  VERCEL_TOKEN="op://ci/vercel/VERCEL_TOKEN" VERCEL_TEAM_ID="op://ci/vercel/VERCEL_TEAM_ID" op run -- pnpm replica:check
+  VERCEL_TOKEN="op://ci/vercel-production/VERCEL_TOKEN" VERCEL_TEAM_ID="op://ci/vercel-production/VERCEL_TEAM_ID" op run -- pnpm replica:check
   ```
 
   検出された key の対応は 2 択: master（1Password）へ登録して schema に entry を足すか、Vercel 側から撤去する。台帳に無いが存在してよい key は script 内 `allowedNonLedgerKeys` に理由付きで載せる（空が正常。ただし Supabase↔Vercel integration 由来の 11 件は構造的に台帳登録できないため例外として載せている。詳細は下記 §Vercel Production の integration-managed 例外）。契約は `scripts/__tests__/check-vercel-replica.test.ts` が固定する
 
 secret scan は 2 本立てで、担当範囲が違う。gitleaks は「この PR で新しく入った commit 範囲」だけを見る（全履歴には削除済みプレースホルダ由来の既知ノイズが積もっており、毎回 re-flag すると gate として機能しなくなるため）。`secrets:check` は「現在の tracked tree 全体」を見る。片方だけでは、既に main に入っている literal が誰にも検出されない。
 
+- `1password:check` は取得した item の**有効期限 field**（ラベル `有効期限` / `expires` 等。1Password の日付 field か `YYYY-MM-DD`）も読む。期限切れは `EXPIRED` で失敗、30 日以内は `EXPIRES_SOON` で警告する。表示するのは日付だけで値は出さない。期限 field の無い token は対象外なので、短命 token を発行したら item に期限を書く（2026-09-14）
 - `1password:check` — 1Password の vault / item / field / empty 状態だけを確認する。schemaで`required: true`のentryまたはoperational itemが不足・空の場合だけ失敗し、optional entryは不足・空の状態を表示しても成功する。item の作成・変更・削除はしない
 - `1password:check` は **禁止 field の実在**も検査する（`scripts/tasks/env/schema.ts` の `forbiddenFields`）。schema から entry を消すのは「参照しない」宣言でしかなく、実 vault に field が残っていれば依然として取得できてしまう。`agent/supabase` の接続 4 field と `SUPABASE_ACCESS_TOKEN`（production 正本への一本化後、#1933）はここに登録してあり、残っていれば `FORBIDDEN_PRESENT` で失敗する。`SUPABASE_ACCESS_TOKEN` field の実削除（1Password 側、User 手作業）が済むまで `1password:check` は意図どおり red になる（fail-closed。接続 4 field の時と同型）
 
@@ -426,15 +497,16 @@ master へ値を戻す時は GUI か対象を限定した `op item create` / `op
 
 基本方針 7「値がどこに存在していようと、必ず 1Password にもある」を検査可能にするための列挙。**この表に載っていない場所に長寿命の実値が存在したら、それ自体が違反**（発見したら master へ登録するか撤去し、この表を更新する）。
 
-| 場所                                         | master                                                                                                                      | 機械検証                                                                                                                                   |
-| -------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| Vercel Production Env（product / web）       | `scripts/tasks/env/schema.ts` の各 entry                                                                                    | `production-config-audit.mjs`（台帳 → replica）+ `pnpm replica:check`（replica → 台帳、§Verification）                                     |
-| Vercel Preview Env（`RECOVERY_CODE_PEPPER`） | `agent` / `human` の `app`（Preview 維持の経緯は [Environment Secrets](./security/environment-secrets.md) §Vercel）         | 無し                                                                                                                                       |
-| GitHub Secrets                               | 各 entry（[Environment Secrets](./security/environment-secrets.md) §GitHub の表と 1:1。2026-08-14 に未参照 6 件を削除済み） | 無し（残る機械検証の設計は [#2090](https://github.com/Dayopt/dayopt/issues/2090) / [#2084](https://github.com/Dayopt/dayopt/issues/2084)） |
-| Supabase Dashboard Secrets                   | `agent/turnstile` 等（下記 §Supabase Dashboard Secrets）                                                                    | 無し                                                                                                                                       |
-| PR Preview Branch credentials                | 1Password 非保存（基本方針の既知の例外。ephemeral）                                                                         | —                                                                                                                                          |
+| 場所                                                                          | master                                                                                                              | 機械検証                                                                                                                                                           |
+| ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Vercel Production Env（product / web）                                        | `scripts/tasks/env/schema.ts` の各 entry                                                                            | `production-config-audit.mjs`（台帳 → replica）+ `pnpm replica:check`（replica → 台帳、§Verification）                                                             |
+| Vercel Preview Env（`RECOVERY_CODE_PEPPER`）                                  | `agent` / `human` の `app`（Preview 維持の経緯は [Environment Secrets](./security/environment-secrets.md) §Vercel） | 無し                                                                                                                                                               |
+| GitHub Actions environment secrets（`production-release` / `production-ops`） | `ci` vault（`scripts/tasks/env/schema.ts` の `ciSecretSchema`）                                                     | `scripts/__tests__/ci-secret-ledger.test.ts`（workflow が参照する名前 ⇔ 台帳。値と、どの workflow も参照しない Secret は見ない。一覧 API は admin 権限が要るため） |
+| Supabase Dashboard Secrets                                                    | `agent/turnstile` 等（下記 §Supabase Dashboard Secrets）                                                            | 無し                                                                                                                                                               |
+| PR Preview Branch credentials                                                 | 1Password 非保存（基本方針の既知の例外。ephemeral）                                                                 | —                                                                                                                                                                  |
+| `~/.config/gh-agent/hosts.yml`（開発機、0600）                                | `agent/github-agent`                                                                                                | `pnpm agent:preflight` の gh identity 行（classic scope が見えたら警告）                                                                                           |
 
-**未台帳（invariant 違反候補、2026-08-14 実測）**: `VERCEL_AUTOMATION_BYPASS_PRODUCT` / `VERCEL_AUTOMATION_BYPASS_WEB` は GitHub Secrets と Vercel（Protection Bypass for Automation）に存在するが、`ci/vercel` item（旧 Dayopt-Shared/vercel）に対応 field が無い（field label のみ実測、値は未取得）。処遇（1Password への登録、または再生成して登録）は [#2090](https://github.com/Dayopt/dayopt/issues/2090) の判断リストで扱う。
+**未台帳だった bypass secret は解消済み**: `VERCEL_AUTOMATION_BYPASS_PRODUCT` / `VERCEL_AUTOMATION_BYPASS_WEB` は 2026-08-14 の実測で GitHub Secrets と Vercel にだけ存在していたが、2026-09-14 に `ci/vercel-production` へ登録した（field 名を実測、値は未取得）。
 
 ### Bootstrap 例外台帳
 
@@ -457,6 +529,10 @@ master へ値を戻す時は GUI か対象を限定した `op item create` / `op
 
 **preview target には同名 `SUPABASE_URL` / `SUPABASE_ANON_KEY` が integration 注入として存在し続ける**（`configurationId` 一致で確認）。production target の手動残骸を削除しただけで、preview 側の integration 注入分は対象外・維持。`replica:check` は production target だけを見る設計のため影響しない。
 
+### #2517 のコード移行契約
+
+上の integration-managed 分類は当時の記録。#2517 では `SUPABASE_SECRET_KEY` と `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` を runtime が使用するため、Production 台帳へ移し、未台帳例外から外す。実値の所有関係・同期確認はまだ完了を主張しない。Preview の integration 管理は維持する。配備前条件とrollbackは [Supabase API keys の移行](./supabase-api-keys.md) を参照。
+
 ### Vercel Env
 
 Vercel Production Env は runtime / build 用の replica。1Password を先に更新し、必要な値だけ Vercel Dashboard に手動同期する。Vercel 側で値を直接変更した場合は、必ず同じ変更を 1Password master に戻す。
@@ -471,9 +547,24 @@ Contact送信用の`RESEND_API_KEY` / `RESEND_FROM_EMAIL`とapp別`RESEND_WEBHOO
 
 GitHub Actions Secrets は CI/CD 用の replica。build / e2e 用 public env などは 1Password から手動同期する。Migration は Supabase GitHub integration が担当するため、GitHub Actions から `supabase db push` しない。
 
+**CI の Secret は repo 単位ではなく environment に置く**（2026-09-14、ci vault 整理）。repo 単位の Secret は、同じ repo の任意の branch に workflow を足すだけで読める（`pull_request` の同一 repo branch にも渡る）。GitHub App（Claude / Codex / Slack）は workflows の書き込み権限を持つため、この経路は実際に開いていた。environment の deployment branch policy を `main` だけにすると、他 branch の workflow が `environment:` を宣言しても secrets を受け取れない。
+
+| environment          | 使う job                                                                                                 | Secret                                                                                                                                                       |
+| -------------------- | -------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `production-release` | `promote.yml` の impact / release                                                                        | `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_AUTOMATION_BYPASS_PRODUCT`, `VERCEL_AUTOMATION_BYPASS_WEB`                                                          |
+| `production-ops`     | `production-config-audit.yml` の Vercel / Supabase 監査、`nightly.yml` の replica check / Storage backup | `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `SUPABASE_AUTH_AUDIT_TOKEN`, `SUPABASE_STORAGE_RLS_AUDIT_TOKEN`, `RCLONE_CONFIG_SOURCE_*`（6）, `RCLONE_CONFIG_DEST_*`（6） |
+
+- **deployment 記録は作らない**: release job 以外は `environment: { name, deployment: false }` で宣言する（15 分おきの監査が deployment を積まないため）。branch policy は `deployment: false` でも効く
+- **`pull_request_target` と `schedule`**: GitHub は default branch（`main`）の ref で policy を評価するので、Production Config Audit の PR 検査と定期実行はそのまま通る。`workflow_dispatch` を `main` 以外の ref で起動すると、environment が拒否する
+- **同期の手順**: `scripts/runbook/sync-ci-environment-secrets.sh` を User の terminal で実行する（既定 dry-run、`--execute` で反映、`--only <Secret 名>` で 1 つだけ）。値は `op read` から `gh secret set --env` へ pipe で渡し、表示しない。一覧は `ciSecretSchema` の `githubEnvironments` と 1:1 で、`scripts/__tests__/ci-secret-ledger.test.ts` が workflow の宣言・script の一覧と照合する
+- **rotation 時**: 1Password master を更新したら、この script の `--only` で該当 Secret を environment へ同期する。`VERCEL_TOKEN` / `VERCEL_ORG_ID` は 2 つの environment に複製しているので、両方が更新される
+- **Team プランの private repo でも使える**: environment secret と deployment branch policy は GitHub Team の private repo で使える。required reviewers は Enterprise が要るので使わない
+
 ### Supabase Dashboard Secrets
 
 Supabase Auth Bot Protection、Auth hooks、Edge Functions、Vault secrets は Supabase Dashboard 側の replica。Turnstile secret などは 1Password から値をコピーし、Dashboard 側だけで変更しない。PR Preview Branch credentials は Supabase が短命に発行するため 1Password 管理外。
+
+`SENTRY_DSN`（Edge Function `send-auth-email` 用、任意）も同じ replica 経路。Edge Function secret として未投入の状態が既定で、その場合 Sentry capture は no-op になる（#2682）。
 
 production の Auth `uri_allow_list` に **localhost を入れない**。かつて `http://localhost:3000/**` が入っていたのは、local dev から production Supabase へ繋ぐ escape hatch（`DAYOPT_SUPABASE_TARGET=op`）が `window.location.origin` を `redirectTo` に渡していたためで、その hatch を廃止した今は依存する経路が無い（[#1929](https://github.com/Dayopt/dayopt/issues/1929)。local dev の redirect は `supabase/config.toml` の local 設定、Preview は ephemeral Preview Branch がそれぞれ持つ）。
 
@@ -492,7 +583,7 @@ production の Auth `uri_allow_list` に **localhost を入れない**。かつ�
 存在確認の例（agent の Bash tool 経由では `op item get` の既定 human-readable 形式・`--reveal` なしを使う。`op read` は #2293 により agent からの直接実行を無条件で block しているため、この用途には使わない。位置引数は item 名のみで、vault は `--vault` flag で指定する）:
 
 ```bash
-op item get supabase --vault human --fields SUPABASE_SERVICE_ROLE_KEY
+op item get supabase --vault human --fields SUPABASE_SECRET_KEY
 ```
 
 ### 短命トークンのローテーション（expiry 付き再発行）

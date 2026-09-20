@@ -130,8 +130,8 @@ echo "  [human]"
 run item create --category=apicredential --vault=human --title=supabase \
   --tags=dayopt/supabase notesPlain="$NOTES" \
   'NEXT_PUBLIC_SUPABASE_URL[text]=' \
-  'NEXT_PUBLIC_SUPABASE_ANON_KEY[concealed]=' \
-  'SUPABASE_SERVICE_ROLE_KEY[concealed]=' \
+  'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY[concealed]=' \
+  'SUPABASE_SECRET_KEY[concealed]=' \
   'SEND_EMAIL_HOOK_SECRET[concealed]=' \
   'CRON_SECRET[concealed]=' \
   'SUPABASE_DB_PASSWORD[concealed]=' \
@@ -195,23 +195,19 @@ run item create --category=apicredential --vault=human --title=app \
 # ----- 旧 Dayopt-Shared 分（agent / ci / human へ分配） -----
 echo "  [旧 Dayopt-Shared 分 → agent / ci / human]"
 
-run item create --category=apicredential --vault=agent --title=anthropic \
-  --tags=dayopt/anthropic notesPlain="$NOTES" \
-  'ANTHROPIC_API_KEY[concealed]='
-
-run item create --category=apicredential --vault=agent --title=resend \
-  --tags=dayopt/resend notesPlain="$NOTES"$'\nwebhook secret は Product=resend / Web=resend-web として環境ごとに分離' \
+# Resend の送信 credential は production から送れるため human に置く（2026-09-14）。
+# webhook 署名は Product=resend / Web=resend-web として別 item。
+run item create --category=apicredential --vault=human --title=resend-send \
+  --tags=dayopt/resend notesPlain="$NOTES"$'\nProduct / Web の Production が共用する送信 key。webhook 署名とは item を分ける' \
   'RESEND_API_KEY[concealed]=' \
-  'RESEND_FROM_EMAIL[text]=' \
-  'RESEND_WEBHOOK_SECRET[concealed]='
+  'RESEND_FROM_EMAIL[text]='
 
 run item create --category=apicredential --vault=human --title=resend-support-replies \
   --tags=dayopt/resend notesPlain="$NOTES"$'\nGmail Send mail as 専用。Sending access / dayopt.app限定。アプリ用keyと共用しない。' \
   'RESEND_SMTP_API_KEY[concealed]='
 
-# 実 item 名は sentry-login（Sentry の login 情報と同居。#2063 で判明した命名 drift、
-# schema.ts と揃える）
-run item create --category=apicredential --vault=human --title=sentry-login \
+# Vercel Production build の source map upload token。release 用として ci に置く（#2085）。
+run item create --category=apicredential --vault=ci --title=sentry-release-token \
   --tags=dayopt/sentry notesPlain="$NOTES" \
   'SENTRY_AUTH_TOKEN[concealed]='
 
@@ -231,18 +227,12 @@ run item create --category=securenote --vault=human --title=github-ssh \
   --tags=dayopt/github \
   notesPlain="GitHub SSH key operational item. 既存 item がある場合は move + merge する。"
 
-run item create --category=apicredential --vault=ci --title=vercel \
+run item create --category=apicredential --vault=ci --title=vercel-production \
   --tags=dayopt/vercel notesPlain="$NOTES" \
   'VERCEL_TOKEN[concealed]=' \
   'VERCEL_TEAM_ID[text]=' \
-  'VERCEL_PROJECT_ID_STAGING[text]=' \
-  'VERCEL_PROJECT_ID_PRODUCTION[text]='
-
-run item create --category=apicredential --vault=agent --title=google \
-  --tags=dayopt/google notesPlain="$NOTES" \
-  'GOOGLE_SITE_VERIFICATION[text]=' \
-  'YANDEX_VERIFICATION[text]=' \
-  'YAHOO_VERIFICATION[text]='
+  'VERCEL_AUTOMATION_BYPASS_PRODUCT[concealed]=' \
+  'VERCEL_AUTOMATION_BYPASS_WEB[concealed]='
 
 run item create --category=login --vault=human --title=domain \
   --tags=recovery notesPlain="$NOTES"$'\n⚠️ レジストラ乗っ取られたら事業終了。recovery codes を別メディアに二重バックアップ' \

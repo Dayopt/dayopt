@@ -24,6 +24,7 @@ import {
   TemplateList,
   toTemplateView,
   useCalendarNavigationStore,
+  useTemplateSaveStore,
   ViewSwitcherList,
 } from '@/features/calendar';
 import { usePlanTemplateMutations } from '@/features/timeblock';
@@ -34,7 +35,14 @@ export function CalendarSidebar() {
   const { data, isPending, isError, refetch } = api.planTemplates.list.useQuery();
   const { getActivityById } = useActivitiesMap();
   const viewedDate = useCalendarNavigationStore((state) => state.viewedDate);
+  const startSaving = useTemplateSaveStore((state) => state.startSaving);
   const { applyToDay, renameTemplate, deleteTemplate } = usePlanTemplateMutations();
+
+  // 見出しの「+」: 今見ている日の並びをテンプレートとして保存する（CalendarController が
+  // 日ビューへ切り替えて保存ヘッダーを出す）。表示メニューと同じ保存フローを使う
+  const handleCreate = useCallback(() => {
+    startSaving(getDateKey(viewedDate));
+  }, [startSaving, viewedDate]);
 
   const templates = useMemo(
     () => (data ?? []).map((template) => toTemplateView(template, getActivityById)),
@@ -78,6 +86,7 @@ export function CalendarSidebar() {
             onApplyTemplate={handleApply}
             onRenameTemplate={handleRename}
             onDeleteTemplate={handleDelete}
+            onCreateTimeblock={handleCreate}
           />
         }
       />

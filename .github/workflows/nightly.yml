@@ -42,6 +42,7 @@ on:
           - replica-check
           - status-label-sweep
           - storage-backup
+          - unit-full
           - all
         default: replica-check
       dry_run:
@@ -85,11 +86,46 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: node scripts/ci/strip-status-labels.mjs bulk --execute --budget-seconds 480
 
+  # ─── product unit の full 実行（#2743）──────────────────────────────
+  # PR の Unit job は product unit を `vitest related`（変更が import graph で届く test）に
+  # 絞っている（scripts/ci/check.mjs resolveProductUnitScope）。graph で追えない漏れ
+  # （削除した module を vi.mock の文字列で参照する等）を最大 1 日で拾う backstop。
+  # 04:30 JST の cron（status-label-sweep と同じ枠）に同居させ、cron を増やさない。
+  product-unit-full:
+    name: Product unit tests (full)
+    if: github.event.schedule == '30 19 * * *' || (github.event_name == 'workflow_dispatch' && (github.event.inputs.jobs == 'unit-full' || github.event.inputs.jobs == 'all'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    concurrency:
+      group: nightly-product-unit-full
+      cancel-in-progress: true
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: ./.github/actions/setup
+
+      - name: Run unit tests (full)
+        env:
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+          CI_UNIT_MODE: full
+          NODE_ENV: test
+          CI: true
+        run: node scripts/ci/check.mjs unit
+
   # ─── replica-check（旧 replica-check.yml）───────────────────────────
   replica-check:
     name: Check Vercel replica against 1Password ledger
     if: github.event.schedule == '30 21 * * *' || (github.event_name == 'workflow_dispatch' && (github.event.inputs.jobs == 'replica-check' || github.event.inputs.jobs == 'all'))
     runs-on: ubuntu-latest
+    # Secret は main からだけ使える environment に置く（2026-09-14、ci vault 整理）。
+    # 他 branch の workflow から secrets を読めないようにするためで、deployment 記録は作らない
+    environment:
+      name: production-ops
+      deployment: false
     timeout-minutes: 5
     concurrency:
       group: nightly-replica-check
@@ -117,6 +153,11 @@ jobs:
     name: Export Supabase Storage to R2
     if: github.event.schedule == '0 22 * * *' || (github.event_name == 'workflow_dispatch' && (github.event.inputs.jobs == 'storage-backup' || github.event.inputs.jobs == 'all'))
     runs-on: ubuntu-latest
+    # Secret は main からだけ使える environment に置く（2026-09-14、ci vault 整理）。
+    # 他 branch の workflow から secrets を読めないようにするためで、deployment 記録は作らない
+    environment:
+      name: production-ops
+      deployment: false
     timeout-minutes: 30
     concurrency:
       group: nightly-storage-backup-export
@@ -189,3 +230,83 @@ jobs:
           RCLONE_CONFIG_DEST_SECRET_ACCESS_KEY: ${{ secrets.RCLONE_CONFIG_DEST_SECRET_ACCESS_KEY }}
           DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
         run: bash scripts/ci/storage-backup.sh
+
+  # ─── nightly の失敗を issue にする ────────────────────────────────────
+  # 3 job とも失敗しても issue も commit status も出ず、schedule 起動の既定メールだけ
+  # だった（2026-09-08 Production Reality Audit。2026-08-31 / 09-01 の失敗 run は誰にも
+  # 届かず、ログは GitHub の保持期限で既に取得不能）。特に storage-backup-export は
+  # DR で唯一「演習済み」の復元経路（#2026）の搬出元なので、静かな停止は復元元が
+  # 古くなることを意味する。promote.yml notify_failure と同じ title-prefix 方式。
+  # skipped（cron 振り分けで走らない job）は失敗ではない。
+  notify-failure:
+    name: File nightly failure
+    needs: [status-label-sweep, product-unit-full, replica-check, storage-backup-export]
+    if: >-
+      ${{ !cancelled()
+          && ( needs.status-label-sweep.result == 'failure'
+               || needs.product-unit-full.result == 'failure'
+               || needs.replica-check.result == 'failure'
+               || needs.storage-backup-export.result == 'failure' ) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: File or update nightly failure issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          SWEEP_RESULT: ${{ needs.status-label-sweep.result }}
+          UNIT_RESULT: ${{ needs.product-unit-full.result }}
+          REPLICA_RESULT: ${{ needs.replica-check.result }}
+          BACKUP_RESULT: ${{ needs.storage-backup-export.result }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          title_prefix="[auto] Nightly job が失敗しました"
+          hints=""
+          if [ "$BACKUP_RESULT" = "failure" ]; then
+            hints="$hints
+          - **storage-backup-export**: Supabase Storage → Cloudflare R2 の日次搬出が止まっている。**連続すると DR の復元元（\`docs/operations/disaster-recovery-drill.md\` §Storage）が古くなる。** secrets 未投入なら run log の \`未設定の GitHub Secrets\` を見る。rclone の失敗なら \`scripts/ci/storage-backup.sh\` の \`--max-delete\` 上限（暫定 1000）に当たっていないか確認する"
+          fi
+          if [ "$REPLICA_RESULT" = "failure" ]; then
+            hints="$hints
+          - **replica-check**: Vercel production env と 1Password 台帳（\`scripts/tasks/env/schema.ts\`）の不一致。\`pnpm replica:check\` を手元で再現し、\`docs/operations/secrets.md\` に従って同期する"
+          fi
+          if [ "$UNIT_RESULT" = "failure" ]; then
+            hints="$hints
+          - **product-unit-full**: PR では related に絞った product unit が main の full 実行で落ちた。PR の判定（\`scripts/ci/check.mjs\` の \`resolveProductUnitScope\`）が拾えなかった依存があるので、落ちた test を直すのに加え、その依存の種類を full 側へ倒す規則に足す（docs/engineering/testing.md §いつ回すか）"
+          fi
+          if [ "$SWEEP_RESULT" = "failure" ]; then
+            hints="$hints
+          - **status-label-sweep**: \`scripts/ci/strip-status-labels.mjs bulk\` の失敗。実害は closed issue に \`status:*\` が残るだけ（queue 検索は \`is:open\` 付きが通常）。翌日の cron で再試行される"
+          fi
+          body="nightly の job が失敗した（起動: \`$EVENT_NAME\`）。
+
+          | job | result |
+          | --- | --- |
+          | status:* ラベルの batch sweep | \`$SWEEP_RESULT\` |
+          | Product unit tests (full) | \`$UNIT_RESULT\` |
+          | Check Vercel replica against 1Password ledger | \`$REPLICA_RESULT\` |
+          | Export Supabase Storage to R2 | \`$BACKUP_RESULT\` |
+
+          run: $RUN_URL
+          $hints
+
+          直したら **この issue は手で close する**（自動で閉じる経路は無い）。同じ title prefix の open issue があれば追記するので、失敗が続いても issue は増えない。
+
+          このコメントは \`nightly.yml\` の \`notify-failure\` job による自動起票/追記。"
+
+          existing=$(TITLE_PREFIX="$title_prefix" gh issue list --repo "$GITHUB_REPOSITORY" \
+            --label "area:operations" --state open --json number,title \
+            --jq '[.[] | select(.title | startswith(env.TITLE_PREFIX))][0].number // empty')
+
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --repo "$GITHUB_REPOSITORY" --body "$body"
+          else
+            gh issue create --repo "$GITHUB_REPOSITORY" \
+              --title "$title_prefix" \
+              --label "area:operations,priority:p2" \
+              --body "$body"
+          fi

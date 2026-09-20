@@ -44,7 +44,7 @@ const REQUIRED_PRODUCTION_FLOOR: Record<(typeof PROJECTS)[number], readonly stri
  * 追加する時は必ず理由を書く。空にできている状態が正常で、ここが増えるのは
  * 台帳へ登録できない構造的理由がある時だけ。
  *
- * 以下 11 件は Supabase↔Vercel Marketplace integration（configurationId
+ * 以下は Supabase↔Vercel Marketplace integration（configurationId
  * icfg_ZZhIJpCa3ksZJLqBXjg257gb、slug: supabase）が product project の
  * Production へ自動注入する固定セット。Vercel API の `configurationId` で
  * integration 由来と確認済み（#2094 調査）。Supabase 公式ドキュメントの
@@ -53,6 +53,8 @@ const REQUIRED_PRODUCTION_FLOOR: Record<(typeof PROJECTS)[number], readonly stri
  * integration 自体の切断もできない。アプリコードからの参照は 0 件
  * （production runtime / build-gate / env.ts のいずれにも無い）。
  * 実値は integration が管理し 1Password には置かない。
+ * #2517: runtime が使う SUPABASE_SECRET_KEY と NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+ * は production 台帳へ移した。Preview の値は引き続き integration が管理する。
  */
 export const allowedNonLedgerKeys: ReadonlyMap<string, string> = new Map<string, string>([
   ['POSTGRES_DATABASE', 'Supabase↔Vercel integration 自動注入。アプリ未参照（#2094）'],
@@ -64,11 +66,6 @@ export const allowedNonLedgerKeys: ReadonlyMap<string, string> = new Map<string,
   ['POSTGRES_USER', 'Supabase↔Vercel integration 自動注入。アプリ未参照（#2094）'],
   ['SUPABASE_JWT_SECRET', 'Supabase↔Vercel integration 自動注入。アプリ未参照（#2094）'],
   ['SUPABASE_PUBLISHABLE_KEY', 'Supabase↔Vercel integration 自動注入。アプリ未参照（#2094）'],
-  ['SUPABASE_SECRET_KEY', 'Supabase↔Vercel integration 自動注入。アプリ未参照（#2094）'],
-  [
-    'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY',
-    'Supabase↔Vercel integration 自動注入。アプリ未参照（#2094）',
-  ],
   // #2094 では configurationId が無い「手動残骸」と判定して 2026-08-17 に削除したが、
   // 2026-08-24 に同じ integration（icfg_ZZhIJpCa3ksZJLqBXjg257gb）が再注入した。
   // 注入セットが 11 件から増えた形で、削除しても戻るため allowlist へ移す（#2458）。

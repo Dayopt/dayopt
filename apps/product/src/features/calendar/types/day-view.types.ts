@@ -10,34 +10,34 @@ export type DayViewProps = GridViewProps;
 /** useDayView フックのオプション */
 export interface UseDayViewOptions {
   date: Date;
-  entries: CalendarDisplayEvent[];
-  onEntryUpdate?: (entry: CalendarDisplayEvent) => void;
+  timeblocks: CalendarDisplayEvent[];
+  onTimeblockUpdate?: (timeblock: CalendarDisplayEvent) => void;
   timezone: string;
 }
 
 /** useDayView フックの戻り値 */
 export interface UseDayViewReturn {
-  dayEntries: CalendarDisplayEvent[];
+  dayTimeblocks: CalendarDisplayEvent[];
   timeblockStyles: Record<string, CSSProperties>;
   isToday: boolean;
   timeSlots: TimeSlot[];
 }
 
-/** useDayEntries フックのオプション */
-export interface UseDayEntriesOptions {
+/** useDayTimeblocks フックのオプション */
+export interface UseDayTimeblocksOptions {
   date: Date;
-  entries: CalendarDisplayEvent[];
+  timeblocks: CalendarDisplayEvent[];
   timezone: string;
 }
 
-/** useDayEntries フックの戻り値 */
-export interface UseDayEntriesReturn {
-  dayEntries: CalendarDisplayEvent[];
+/** useDayTimeblocks フックの戻り値 */
+export interface UseDayTimeblocksReturn {
+  dayTimeblocks: CalendarDisplayEvent[];
   timeblockPositions: TimeblockPosition[];
-  maxConcurrentEntries: number;
+  maxConcurrentTimeblocks: number;
 }
 
-/** エントリの計算済み位置情報 */
+/** タイムブロックの計算済み位置情報 */
 export interface TimeblockPosition {
   plan: CalendarDisplayEvent;
   top: number;

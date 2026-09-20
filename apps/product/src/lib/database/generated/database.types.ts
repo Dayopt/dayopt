@@ -114,6 +114,7 @@ export type Database = {
         Row: {
           authority_epoch: number | null;
           authority_fence_id: string | null;
+          consecutive_failures: number;
           created_at: string;
           data_generation: number;
           granted_scopes: string[];
@@ -133,6 +134,7 @@ export type Database = {
         Insert: {
           authority_epoch?: number | null;
           authority_fence_id?: string | null;
+          consecutive_failures?: number;
           created_at?: string;
           data_generation?: number;
           granted_scopes: string[];
@@ -152,6 +154,7 @@ export type Database = {
         Update: {
           authority_epoch?: number | null;
           authority_fence_id?: string | null;
+          consecutive_failures?: number;
           created_at?: string;
           data_generation?: number;
           granted_scopes?: string[];
@@ -200,6 +203,27 @@ export type Database = {
           name?: string;
           updated_at?: string;
           user_id?: string;
+        };
+        Relationships: [];
+      };
+      cron_heartbeats: {
+        Row: {
+          job_name: string;
+          last_completed_at: string | null;
+          last_started_at: string;
+          last_summary: Json | null;
+        };
+        Insert: {
+          job_name: string;
+          last_completed_at?: string | null;
+          last_started_at: string;
+          last_summary?: Json | null;
+        };
+        Update: {
+          job_name?: string;
+          last_completed_at?: string | null;
+          last_started_at?: string;
+          last_summary?: Json | null;
         };
         Relationships: [];
       };
@@ -321,6 +345,7 @@ export type Database = {
       };
       mcp_mutation_control: {
         Row: {
+          billing_enforced: boolean;
           changed_at: string;
           enabled_client_ids: string[];
           revision: number;
@@ -328,6 +353,7 @@ export type Database = {
           writes_enabled: boolean;
         };
         Insert: {
+          billing_enforced?: boolean;
           changed_at?: string;
           enabled_client_ids?: string[];
           revision?: number;
@@ -335,6 +361,7 @@ export type Database = {
           writes_enabled?: boolean;
         };
         Update: {
+          billing_enforced?: boolean;
           changed_at?: string;
           enabled_client_ids?: string[];
           revision?: number;
@@ -348,6 +375,7 @@ export type Database = {
           applied_at: string;
           client_id: string;
           data_generation: number;
+          digest_version: number;
           envelope_version: number;
           operation_id: string;
           origin_connection_id: string | null;
@@ -365,6 +393,7 @@ export type Database = {
           applied_at?: string;
           client_id: string;
           data_generation?: number;
+          digest_version?: number;
           envelope_version: number;
           operation_id: string;
           origin_connection_id?: string | null;
@@ -382,6 +411,7 @@ export type Database = {
           applied_at?: string;
           client_id?: string;
           data_generation?: number;
+          digest_version?: number;
           envelope_version?: number;
           operation_id?: string;
           origin_connection_id?: string | null;
@@ -829,6 +859,7 @@ export type Database = {
           subscription_id: string | null;
           subscription_status: string;
           updated_at: string;
+          welcome_email_sent_at: string | null;
         };
         Insert: {
           app_trial_consumed_at?: string | null;
@@ -843,6 +874,7 @@ export type Database = {
           subscription_id?: string | null;
           subscription_status?: string;
           updated_at?: string;
+          welcome_email_sent_at?: string | null;
         };
         Update: {
           app_trial_consumed_at?: string | null;
@@ -857,6 +889,7 @@ export type Database = {
           subscription_id?: string | null;
           subscription_status?: string;
           updated_at?: string;
+          welcome_email_sent_at?: string | null;
         };
         Relationships: [];
       };
@@ -2168,11 +2201,6 @@ export type Database = {
         Returns: number;
       };
       get_user_timezone: { Args: { p_user_id: string }; Returns: string };
-      get_vault_secret: { Args: { p_name: string }; Returns: string };
-      invoke_edge_function: {
-        Args: { p_body?: Json; p_function_name: string };
-        Returns: number;
-      };
       issue_oauth_token_pair: {
         Args: {
           p_access_expires_at: string;
@@ -2601,6 +2629,14 @@ export type Database = {
           p_user_id: string;
         };
         Returns: boolean;
+      };
+      set_mcp_billing_enforcement_v1: {
+        Args: { p_billing_enforced: boolean; p_expected_revision: number };
+        Returns: {
+          billing_enforced: boolean;
+          changed_at: string;
+          revision: number;
+        }[];
       };
       set_mcp_client_write_control_v1: {
         Args: {

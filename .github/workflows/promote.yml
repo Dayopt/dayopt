@@ -43,6 +43,13 @@ on:
       simulate_failure:
         description: 'Drill only: smoke:<p> | promote:<p> | production-smoke:<p> (p = web | product)'
         required: false
+      # 同一 commit の再配備（#2735）。env だけを更新して build し直した deployment は
+      # source SHA が live と同じなので、通常 dispatch では `already serving` で終わる。
+      # 名指しの deployment だけを、層 3・smoke・Production Config Audit を維持したまま
+      # promote する。force とは併用できない（script が拒否する）。
+      redeploy:
+        description: 'Same-commit redeploy: <web|product>:<dpl_ id>. Keeps every gate. Not with force.'
+        required: false
 
 # statuses: write は release job にだけ置く（層 3 job へ commit status 発行権限を
 # 配らない）。
@@ -60,12 +67,18 @@ jobs:
   impact:
     name: "\U0001F9ED Release Impact"
     runs-on: ubuntu-latest
+    # Secret は main からだけ使える environment に置く（2026-09-14、ci vault 整理）。
+    # 他 branch の workflow から secrets を読めないようにするためで、deployment 記録は作らない
+    environment:
+      name: production-release
+      deployment: false
     timeout-minutes: 10
     permissions:
       contents: read
     outputs:
       product_affected: ${{ steps.run.outputs.product_affected }}
       web_affected: ${{ steps.run.outputs.web_affected }}
+      storybook_affected: ${{ steps.run.outputs.storybook_affected }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -89,6 +102,9 @@ jobs:
           # uses the canonical 1Password/schema name VERCEL_TEAM_ID.
           VERCEL_TEAM_ID: ${{ secrets.VERCEL_ORG_ID }}
           RELEASE_SHA: ${{ github.sha }}
+          # 再配備で名指しされた project は live が target SHA でも affected にし、層 3 を
+          # 走らせる。release job と **同じ値**を渡すこと（片方だけだと impact-mismatch）。
+          RELEASE_REDEPLOY: ${{ github.event_name == 'workflow_dispatch' && inputs.redeploy || '' }}
         run: node scripts/ci/release-impact.mjs
 
   # ─── 層 3（CI 4 層再設計 #2269。2026-09-03 に nightly.yml から移設）──────────
@@ -107,7 +123,12 @@ jobs:
     name: "\U0001F3AD E2E Tests"
     needs: impact
     if: ${{ needs.impact.outputs.product_affected == 'true' && github.event.inputs.force != 'true' }}
-    runs-on: ubuntu-latest
+    # repo variable `PROMOTE_E2E_RUNNER`（JSON。例: ["self-hosted","linux","dayopt-e2e"]）で
+    # self-hosted runner へ寄せられる。未設定なら ubuntu-latest（従来どおり）。private repo の
+    # Actions 分課金で最大の main push job を runner 側へ逃がすための切替で、戻す時は変数を
+    # 消すだけ（docs/operations/self-hosted-runner.md、#2743）。**寄せてよいのはこの job だけ**:
+    # web / release / notify は token を持つか外部へ書くので GitHub-hosted に固定する。
+    runs-on: ${{ fromJSON(vars.PROMOTE_E2E_RUNNER || '"ubuntu-latest"') }}
     timeout-minutes: 20
     concurrency:
       group: promote-layer3-e2e-${{ github.ref }}
@@ -118,6 +139,14 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+
+      # 以降の step は apt（--with-deps）/ jq / Docker を前提にする。self-hosted を macOS で
+      # 登録すると途中で分かりにくく落ちるので、入口で止める。
+      - name: Require a Linux runner
+        if: runner.os != 'Linux'
+        run: |
+          echo "::error::E2E job は Linux runner 前提です（runner.os=${RUNNER_OS}）。PROMOTE_E2E_RUNNER を見直すか削除してください。"
+          exit 1
 
       - uses: ./.github/actions/setup
 
@@ -144,18 +173,21 @@ jobs:
         id: supabase
         run: |
           API_URL=$(supabase status --output json | jq -r '.API_URL')
-          ANON_KEY=$(supabase status --output json | jq -r '.ANON_KEY')
-          SERVICE_ROLE_KEY=$(supabase status --output json | jq -r '.SERVICE_ROLE_KEY')
+          ANON_KEY=$(supabase status --output json | jq -er '.PUBLISHABLE_KEY // .ANON_KEY | select(type == "string" and length > 0)')
+          SERVICE_ROLE_KEY=$(supabase status --output json | jq -er '.SECRET_KEY // .SERVICE_ROLE_KEY | select(type == "string" and length > 0)')
           echo "api_url=$API_URL" >> $GITHUB_OUTPUT
           echo "anon_key=$ANON_KEY" >> $GITHUB_OUTPUT
           echo "service_role_key=$SERVICE_ROLE_KEY" >> $GITHUB_OUTPUT
 
+      # Mobile Chrome は `@mobile` tag の test だけを持つ（playwright.config.ts の grep）。
+      # 同じ invocation に入れて build / webServer を 1 回で済ませる（#2743）。
       - name: Run E2E tests
-        run: pnpm --dir apps/product exec playwright test --project="chromium"
+        id: e2e
+        run: pnpm --dir apps/product exec playwright test --project="chromium" --project="Mobile Chrome"
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ steps.supabase.outputs.api_url }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ steps.supabase.outputs.anon_key }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ steps.supabase.outputs.service_role_key }}
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ steps.supabase.outputs.anon_key }}
+          SUPABASE_SECRET_KEY: ${{ steps.supabase.outputs.service_role_key }}
           NEXT_PUBLIC_APP_URL: http://localhost:3000
           NEXT_PUBLIC_STRIPE_PRO_PRICE_ID: price_e2e_dummy
           # service role suite が env の欠落で丸ごと skip されても「0 failed」で緑に
@@ -166,12 +198,22 @@ jobs:
         if: always()
         run: supabase stop
 
+      # retry-pass（初回失敗 → retry で成功）を「最終的に緑」に埋もれさせない（#2743）。
+      # retry-pass では落とさず、Step Summary と warning 注釈で見せる。
+      - name: Report E2E retries
+        if: always()
+        env:
+          E2E_TEST_OUTCOME: ${{ steps.e2e.outcome }}
+        run: node scripts/ci/e2e-retry-report.mjs apps/product/test-results/e2e-results.json --label product --file-prefix apps/product/src/lib/test/e2e/
+
       - name: Upload report
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
           name: playwright-report
-          path: apps/product/playwright-report/
+          path: |
+            apps/product/playwright-report/
+            apps/product/test-results/e2e-results.json
           retention-days: 7
 
       - name: Upload screenshots on failure
@@ -180,6 +222,36 @@ jobs:
         with:
           name: screenshots
           path: apps/product/test-results/
+          retention-days: 7
+
+  storybook:
+    name: Storybook light / dark
+    needs: impact
+    if: ${{ needs.impact.outputs.storybook_affected == 'true' && github.event.inputs.force != 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    concurrency:
+      group: promote-layer3-storybook-${{ github.ref }}
+      cancel-in-progress: true
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+      - name: Install Chromium
+        run: pnpm --filter @dayopt/product exec playwright install --with-deps chromium
+      - name: Check Storybook collection
+        run: pnpm exec tsx scripts/tasks/check-story-coverage.ts --collected
+      - name: Test Storybook light and dark
+        run: pnpm --filter @dayopt/product exec vitest run --project storybook --project storybook-dark --reporter=default --reporter=json --outputFile=storybook-results.json
+      - name: Upload Storybook results
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: storybook-results-${{ github.run_attempt }}
+          path: apps/product/storybook-results.json
           retention-days: 7
 
   web:
@@ -213,14 +285,23 @@ jobs:
         run: pnpm --filter @dayopt/web exec playwright install --with-deps chromium chromium-headless-shell
 
       - name: Run web E2E tests
+        id: web_e2e
         run: pnpm --filter @dayopt/web test:e2e:smoke
+
+      - name: Report web E2E retries
+        if: always()
+        env:
+          E2E_TEST_OUTCOME: ${{ steps.web_e2e.outcome }}
+        run: node scripts/ci/e2e-retry-report.mjs apps/web/test-results/e2e-results.json --label web --file-prefix apps/web/src/test/e2e/
 
       - name: Upload web report
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
           name: web-playwright-report
-          path: apps/web/playwright-report/
+          path: |
+            apps/web/playwright-report/
+            apps/web/test-results/e2e-results.json
           retention-days: 7
 
       - name: Upload web test results on failure
@@ -250,7 +331,7 @@ jobs:
   # 意図的に落とせば、起票までを本番の経路で確認できる。専用 input は増やさない。
   notify_failure:
     name: File promote failure
-    needs: [impact, e2e, web, release]
+    needs: [impact, e2e, web, storybook, release]
     # `superseded` は異常ではない。burst merge で後発 run が先に promote すると先発は
     # superseded で exit 1 するが、その commit の内容は既に production に入っている。
     # result だけを見ると正常な追い越しを P1 として起票し、runbook Playbook 2（rollback
@@ -260,6 +341,7 @@ jobs:
           && ( needs.impact.result == 'failure'
                || needs.e2e.result == 'failure'
                || needs.web.result == 'failure'
+               || needs.storybook.result == 'failure'
                || ( needs.release.result == 'failure'
                     && needs.release.outputs.release_status != 'superseded' ) ) }}
     runs-on: ubuntu-latest
@@ -278,6 +360,7 @@ jobs:
           IMPACT_RESULT: ${{ needs.impact.result }}
           E2E_RESULT: ${{ needs.e2e.result }}
           WEB_RESULT: ${{ needs.web.result }}
+          STORYBOOK_RESULT: ${{ needs.storybook.result }}
           RELEASE_RESULT: ${{ needs.release.result }}
         run: |
           set -euo pipefail
@@ -289,6 +372,7 @@ jobs:
           | Release Impact | \`$IMPACT_RESULT\` |
           | E2E Tests | \`$E2E_RESULT\` |
           | Web Build & E2E | \`$WEB_RESULT\` |
+          | Storybook light / dark | \`$STORYBOOK_RESULT\` |
           | Promote Production | \`$RELEASE_RESULT\` |
 
           対象 SHA: \`$SHA\`
@@ -314,7 +398,7 @@ jobs:
   # ─── promote 本体（層 4）────────────────────────────────────────────────
   release:
     name: Promote Production
-    needs: [impact, e2e, web]
+    needs: [impact, e2e, web, storybook]
     # **「suite を免除してよいのは impact が明示的に false と言った時だけ」**を
     # 肯定形で書く。`!= 'true'` 形にすると **空文字が免除側に落ちる**: impact job の
     # `outputs:` キー名 / step の `id:` / `impactKey` のどれか 1 つを改名すると、
@@ -342,7 +426,8 @@ jobs:
           && ( github.event.inputs.force == 'true'
                || ( needs.impact.result == 'success'
                     && (needs.impact.outputs.product_affected == 'false' || needs.e2e.result == 'success')
-                    && (needs.impact.outputs.web_affected == 'false' || needs.web.result == 'success') ) ) }}
+                    && (needs.impact.outputs.web_affected == 'false' || needs.web.result == 'success')
+                    && (needs.impact.outputs.storybook_affected == 'false' || needs.storybook.result == 'success') ) ) }}
     runs-on: ubuntu-latest
     # この environment には deployment branch policy（main のみ）が設定済みで、
     # main 以外の ref からの dispatch は job 開始前に GitHub 側で拒否される
@@ -425,6 +510,19 @@ jobs:
 
           echo "sha=$sha" >> "$GITHUB_OUTPUT"
 
+      # 公開前の migration 反映確認（#2797）。候補 SHA の migration 集合が production の
+      # schema_migrations に全て入っているかを read-only Management API で見る。適用・再試行は
+      # しない（writer は Supabase integration のまま）。
+      #
+      # **この PR では token を渡していない = 常に advisory（warning のみ）。** 有効化には
+      # read-only token を `production-release` environment へ置く決定（secret の境界変更、
+      # User 裁可）と、`docs/operations/secrets.md` の台帳・environment 同期 script・
+      # `ci-secret-ledger.test.ts` の同時更新が要る。有効化後は欠落が promote を止める。
+      # force（break-glass）では飛ばす。
+      - name: Verify candidate migrations are applied in Production
+        if: ${{ inputs.force != true }}
+        run: node scripts/ci/production-migration-readiness.mjs
+
       - name: Wait, smoke, and promote Production
         id: release
         env:
@@ -457,6 +555,7 @@ jobs:
           # により release は run 開始時点の値ではなく false を expected として掃く。
           RELEASE_EXPECT_AUTO_ASSIGN: 'false'
           RELEASE_SIMULATE_FAILURE: ${{ github.event_name == 'workflow_dispatch' && inputs.simulate_failure || '' }}
+          RELEASE_REDEPLOY: ${{ github.event_name == 'workflow_dispatch' && inputs.redeploy || '' }}
           # project ごとに live SHA が分かれうるため、「この run の後どこが何を配信
           # しているか」を artifact に残す。部分失敗の復旧で一次情報になる。
           RELEASE_MANIFEST_PATH: release-manifest.json

@@ -14,6 +14,7 @@ import {
 import { logger } from '@/lib/logger';
 import { captureUnexpectedError } from '@/lib/sentry';
 
+import { SUPABASE_TRACE_PROPAGATION } from '@/lib/supabase/trace-propagation';
 import { deleteUnreferencedEvents } from './event-pruning';
 import { ExternalCalendarServiceError } from './external-calendar-service-error';
 import { replaceSelectedCalendars, resolveProjectKey } from './fenced-sync-writer';
@@ -66,8 +67,9 @@ export const CALENDAR_CONNECTION_DB_TIMEOUT_MS = 15_000;
 function createCalendarConnectionDbClient(): CalendarConnectionClient {
   return createClient<CalendarConnectionDatabase>(
     env.NEXT_PUBLIC_SUPABASE_URL,
-    env.SUPABASE_SERVICE_ROLE_KEY,
+    env.SUPABASE_SECRET_KEY,
     {
+      tracePropagation: SUPABASE_TRACE_PROPAGATION,
       auth: {
         autoRefreshToken: false,
         persistSession: false,
@@ -127,6 +129,8 @@ export async function saveConnection(input: SaveConnectionInput): Promise<void> 
       refresh_token_enc: encryptToken(input.refreshToken, input.encryptionKey),
       status: 'active',
       last_sync_error: null,
+      // 接続し直したら連続失敗の履歴も捨てる（#2687。due から外れていた接続が cron に戻る）
+      consecutive_failures: 0,
     },
     { onConflict: 'user_id,provider,provider_account_id' },
   );
@@ -189,6 +193,8 @@ export async function reconnectExistingConnection(
       refresh_token_enc: encryptToken(input.refreshToken, input.encryptionKey),
       status: 'active',
       last_sync_error: null,
+      // 接続し直したら連続失敗の履歴も捨てる（#2687。due から外れていた接続が cron に戻る）
+      consecutive_failures: 0,
     })
     .eq('id', input.connectionId)
     .eq('user_id', input.userId)

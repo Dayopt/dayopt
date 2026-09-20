@@ -13,59 +13,48 @@ import { EventContextMenu } from './TimeblockContextMenu';
 const past = new Date('2026-03-18T10:00:00');
 const pastEnd = new Date('2026-03-18T11:00:00');
 
-/** 完了済み planned entry（全項目表示の前提） */
-const completedPlannedEntry: CalendarDisplayEvent = {
-  id: 'entry-1',
+/** 完了済み planned timeblock（全項目表示の前提） */
+const completedPlanTimeblock: CalendarDisplayEvent = {
+  id: 'timeblock-1',
   kind: 'plan',
   title: 'デザインレビュー',
   description: '週次デザインシンク',
   startDate: past,
   endDate: pastEnd,
-  status: 'closed',
   color: 'var(--primary)',
-  createdAt: new Date(),
-  updatedAt: new Date(),
   version: '2026-07-15T00:00:00.000000Z',
   displayStartDate: past,
   displayEndDate: pastEnd,
   duration: 60,
   isMultiDay: false,
-  origin: 'planned',
-  actualStartDate: past,
-  actualEndDate: pastEnd,
 };
 
-/** タグなし entry（振り返り非表示） */
-const noTagEntry: CalendarDisplayEvent = {
-  ...completedPlannedEntry,
-  id: 'entry-2',
+/** タグなし timeblock（振り返り非表示） */
+const noActivityTimeblock: CalendarDisplayEvent = {
+  ...completedPlanTimeblock,
+  id: 'timeblock-2',
 };
 
-/** 未来の planned entry（記録が存在し得ないため「予定外にする」非表示） */
+/** 未来の planned timeblock（記録が存在し得ないため「予定外にする」非表示） */
 const futureStart = new Date('2099-01-01T10:00:00');
 const futureEnd = new Date('2099-01-01T11:00:00');
-const upcomingPlannedEntry: CalendarDisplayEvent = {
-  ...completedPlannedEntry,
-  id: 'entry-3',
+const upcomingPlanTimeblock: CalendarDisplayEvent = {
+  ...completedPlanTimeblock,
+  id: 'timeblock-3',
   startDate: futureStart,
   endDate: futureEnd,
   displayStartDate: futureStart,
   displayEndDate: futureEnd,
-  plannedStartDate: futureStart,
-  plannedEndDate: futureEnd,
-  actualStartDate: null,
-  actualEndDate: null,
 };
 
-/** Unplanned entry（計画に戻す表示） */
-const unplannedEntry: CalendarDisplayEvent = {
-  ...completedPlannedEntry,
-  id: 'entry-4',
+/** Unplanned timeblock（計画に戻す表示） */
+const recordTimeblock: CalendarDisplayEvent = {
+  ...completedPlanTimeblock,
+  id: 'timeblock-4',
   kind: 'record',
-  origin: 'unplanned',
 };
 
-/** エントリコンテキストメニュー。右クリックメニューとして使用する。 */
+/** タイムブロックコンテキストメニュー。右クリックメニューとして使用する。 */
 const meta = {
   title: 'Product/Features/Calendar/Interaction/TimeblockContextMenu',
   component: EventContextMenu,
@@ -74,7 +63,7 @@ const meta = {
   },
   tags: ['autodocs'],
   args: {
-    entry: completedPlannedEntry,
+    timeblock: completedPlanTimeblock,
     position: { x: 0, y: 0 },
     onClose: fn(),
   },
@@ -92,10 +81,10 @@ type Story = StoryObj<typeof meta>;
 
 /** 右クリックでコンテキストメニューを開くラッパー。 */
 function ContextMenuTrigger({
-  entry,
+  timeblock,
   menuProps,
 }: {
-  entry: CalendarDisplayEvent;
+  timeblock: CalendarDisplayEvent;
   menuProps?: Partial<React.ComponentProps<typeof EventContextMenu>>;
 }) {
   const [menuState, setMenuState] = useState<{ x: number; y: number } | null>(null);
@@ -111,7 +100,7 @@ function ContextMenuTrigger({
       <span className="text-muted-foreground text-sm">右クリックでメニューを開く</span>
       {menuState && (
         <EventContextMenu
-          entry={entry}
+          timeblock={timeblock}
           position={menuState}
           onClose={() => setMenuState(null)}
           {...menuProps}
@@ -132,16 +121,16 @@ const allHandlers = {
 // Stories
 // ─────────────────────────────────────────────────────────
 
-/** デフォルト（全項目あり：完了済み planned entry）。 */
+/** デフォルト（全項目あり：完了済み planned timeblock）。 */
 export const Default: Story = {
-  render: () => <ContextMenuTrigger entry={completedPlannedEntry} menuProps={allHandlers} />,
+  render: () => <ContextMenuTrigger timeblock={completedPlanTimeblock} menuProps={allHandlers} />,
 };
 
 /** コピー・複製と削除。 */
 export const CopyAndDelete: Story = {
   render: () => (
     <ContextMenuTrigger
-      entry={completedPlannedEntry}
+      timeblock={completedPlanTimeblock}
       menuProps={{
         onCopy: fn(),
         onDuplicate: fn(),
@@ -156,7 +145,7 @@ export const DirectDisplay: Story = {
   render: () => (
     <div className="relative" style={{ height: 300 }}>
       <EventContextMenu
-        entry={completedPlannedEntry}
+        timeblock={completedPlanTimeblock}
         position={{ x: 20, y: 20 }}
         onClose={fn()}
         {...allHandlers}
@@ -173,7 +162,7 @@ export const AllPatterns: Story = {
         <span className="text-muted-foreground text-xs">完了済み planned（全項目）</span>
         <div className="relative" style={{ height: 180 }}>
           <EventContextMenu
-            entry={completedPlannedEntry}
+            timeblock={completedPlanTimeblock}
             position={{ x: 0, y: 0 }}
             onClose={fn()}
             {...allHandlers}
@@ -184,7 +173,7 @@ export const AllPatterns: Story = {
         <span className="text-muted-foreground text-xs">タグなし（振り返り非表示）</span>
         <div className="relative" style={{ height: 140 }}>
           <EventContextMenu
-            entry={noTagEntry}
+            timeblock={noActivityTimeblock}
             position={{ x: 0, y: 0 }}
             onClose={fn()}
             {...allHandlers}
@@ -195,7 +184,7 @@ export const AllPatterns: Story = {
         <span className="text-muted-foreground text-xs">未来の予定（予定外にする非表示）</span>
         <div className="relative" style={{ height: 140 }}>
           <EventContextMenu
-            entry={upcomingPlannedEntry}
+            timeblock={upcomingPlanTimeblock}
             position={{ x: 0, y: 0 }}
             onClose={fn()}
             {...allHandlers}
@@ -206,7 +195,7 @@ export const AllPatterns: Story = {
         <span className="text-muted-foreground text-xs">Unplanned（計画に戻す表示）</span>
         <div className="relative" style={{ height: 180 }}>
           <EventContextMenu
-            entry={unplannedEntry}
+            timeblock={recordTimeblock}
             position={{ x: 0, y: 0 }}
             onClose={fn()}
             {...allHandlers}
@@ -217,7 +206,7 @@ export const AllPatterns: Story = {
         <span className="text-muted-foreground text-xs">コピー・複製と削除</span>
         <div className="relative" style={{ height: 80 }}>
           <EventContextMenu
-            entry={completedPlannedEntry}
+            timeblock={completedPlanTimeblock}
             position={{ x: 0, y: 0 }}
             onClose={fn()}
             onCopy={fn()}

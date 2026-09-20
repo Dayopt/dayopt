@@ -39,7 +39,8 @@ describe('resolveConfirmOrigin', () => {
   });
 
   it('appUrl 自身の origin は許可する（Preview branch は appUrl が preview URL になる）', () => {
-    const previewAppUrl = 'https://product-abc123-dayopt.vercel.app';
+    // allowlist から外した branch URL 形でも、appUrl 自身なら通る。preview の救済経路。
+    const previewAppUrl = 'https://product-git-feat-x-dayopt.vercel.app';
     expect(resolveConfirmOrigin(`${previewAppUrl}/calendar`, previewAppUrl)).toBe(previewAppUrl);
   });
 
@@ -48,20 +49,27 @@ describe('resolveConfirmOrigin', () => {
   });
 
   it.each([
-    ['hash 付き preview', 'https://product-abc123-dayopt.vercel.app'],
-    ['branch 付き preview', 'https://product-git-feat-x-dayopt.vercel.app'],
+    ['commit URL（hash は 9 文字）', 'https://product-k94imlgmq-dayopt.vercel.app'],
     ['production alias', 'https://product-dayopt.vercel.app'],
   ])('Vercel の %s を許可する', (_label, origin) => {
     expect(resolveConfirmOrigin(`${origin}/calendar`, APP_URL)).toBe(origin);
   });
 
-  // wildcard の `*` はドットを含まない。サブドメインを足して allowlist をすり抜ける形を塞ぐ。
+  // hash を 9 文字の英数字に固定しているので、`product-` と `-dayopt` の間に
+  // team slug 境界を紛れ込ませる形が塞がる（#2616）。
   it.each([
     ['ドット入りのサブドメイン', 'https://product-x.evil-dayopt.vercel.app/calendar'],
-    ['末尾に追加ラベル', 'https://product-abc-dayopt.vercel.app.evil.example/calendar'],
-    ['接尾辞の偽装', 'https://product-abc-dayopt.vercel.appx/calendar'],
+    ['末尾に追加ラベル', 'https://product-k94imlgmq-dayopt.vercel.app.evil.example/calendar'],
+    ['接尾辞の偽装', 'https://product-k94imlgmq-dayopt.vercel.appx/calendar'],
     ['http へのダウングレード', 'http://app.dayopt.app/calendar'],
-    ['別 project 名', 'https://web-abc123-dayopt.vercel.app/calendar'],
+    ['別 project 名', 'https://web-k94imlgmq-dayopt.vercel.app/calendar'],
+    // 第三者が `evil-dayopt` という team slug を取った時の commit URL。
+    ['第三者 team slug の commit URL', 'https://product-k94imlgmq-evil-dayopt.vercel.app/calendar'],
+    ['第三者 team slug（hash 抜き）', 'https://product-evil-dayopt.vercel.app/calendar'],
+    // branch URL 形は branch 名にハイフンが入るため regex で区別できず、allowlist から外した。
+    ['branch URL 形', 'https://product-git-feat-x-dayopt.vercel.app/calendar'],
+    ['hash が 8 文字', 'https://product-k94imlgm-dayopt.vercel.app/calendar'],
+    ['hash が 10 文字', 'https://product-k94imlgmqz-dayopt.vercel.app/calendar'],
   ])('%s は拒否して appUrl へ落とす', (_label, redirectTo) => {
     expect(resolveConfirmOrigin(redirectTo, APP_URL)).toBe(APP_URL);
   });
@@ -107,17 +115,17 @@ describe('buildConfirmUrl', () => {
     expect(url.searchParams.get('next')).toBe('/x?y=1');
   });
 
-  it('許可された preview origin はそのまま採用する', () => {
+  it('許可された preview の commit URL はそのまま採用する', () => {
     const url = new URL(
       buildConfirmUrl({
         emailData: emailData({
-          redirect_to: 'https://product-abc123-dayopt.vercel.app/calendar?view=day',
+          redirect_to: 'https://product-k94imlgmq-dayopt.vercel.app/calendar?view=day',
         }),
         appUrl: APP_URL,
       }),
     );
 
-    expect(url.origin).toBe('https://product-abc123-dayopt.vercel.app');
+    expect(url.origin).toBe('https://product-k94imlgmq-dayopt.vercel.app');
     expect(url.searchParams.get('next')).toBe('/calendar?view=day');
   });
 

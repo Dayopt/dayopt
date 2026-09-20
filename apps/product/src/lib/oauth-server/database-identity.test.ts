@@ -137,71 +137,32 @@ describe('database OAuth identity', () => {
     });
   });
 
-  it('derives the same Preview project ref from the API origin and service-role JWT', () => {
+  it('derives the expected Preview project from its API origin without decoding an API key', () => {
     expect(
       resolveDatabaseOAuthProjectRef({
         environment: 'preview',
         supabaseUrl: `https://${previewProjectRef}.supabase.co`,
-        serviceRoleKey: createUnsignedTestJwt({
-          role: 'service_role',
-          ref: previewProjectRef,
-        }),
       }),
     ).toBe(previewProjectRef);
   });
 
   it.each([
-    {
-      name: 'missing JWT ref',
-      supabaseUrl: `https://${previewProjectRef}.supabase.co`,
-      serviceRoleKey: createUnsignedTestJwt({ role: 'service_role' }),
-    },
-    {
-      name: 'wrong JWT role',
-      supabaseUrl: `https://${previewProjectRef}.supabase.co`,
-      serviceRoleKey: createUnsignedTestJwt({
-        role: 'anon',
-        ref: previewProjectRef,
-      }),
-    },
-    {
-      name: 'project drift',
-      supabaseUrl: `https://${previewProjectRef}.supabase.co`,
-      serviceRoleKey: createUnsignedTestJwt({
-        role: 'service_role',
-        ref: 'zyxwvutsrqponmlkjihg',
-      }),
-    },
-    {
-      name: 'new secret key without JWT claims',
-      supabaseUrl: `https://${previewProjectRef}.supabase.co`,
-      serviceRoleKey: 'sb_secret_test',
-    },
-  ])('fails closed for $name', ({ supabaseUrl, serviceRoleKey }) => {
-    expect(() =>
-      resolveDatabaseOAuthProjectRef({
-        environment: 'preview',
-        supabaseUrl,
-        serviceRoleKey,
-      }),
-    ).toThrow(DatabaseOAuthIdentityError);
+    undefined,
+    'not-a-url',
+    `http://${previewProjectRef}.supabase.co`,
+    `https://${previewProjectRef}.supabase.co.attacker.example`,
+    `https://${previewProjectRef}.supabase.co/path`,
+    `https://user:password@${previewProjectRef}.supabase.co`,
+    `https://${previewProjectRef}.supabase.co?project=other`,
+  ])('rejects an invalid Preview API origin: %s', (supabaseUrl) => {
+    expect(() => resolveDatabaseOAuthProjectRef({ environment: 'preview', supabaseUrl })).toThrow(
+      DatabaseOAuthIdentityError,
+    );
   });
 
   it('does not require a project ref for an established Production identity', () => {
     expect(
-      resolveDatabaseOAuthProjectRef({
-        environment: 'production',
-        supabaseUrl: undefined,
-        serviceRoleKey: undefined,
-      }),
+      resolveDatabaseOAuthProjectRef({ environment: 'production', supabaseUrl: undefined }),
     ).toBeNull();
   });
 });
-
-function createUnsignedTestJwt(payload: Record<string, string>): string {
-  return [
-    Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url'),
-    Buffer.from(JSON.stringify(payload)).toString('base64url'),
-    'signature',
-  ].join('.');
-}

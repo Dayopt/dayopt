@@ -92,7 +92,6 @@ describe('Codex shell and loader', () => {
   it.each([
     'git push --force',
     'git commit --no-verify',
-    'gh pr merge 123',
     'op read op://agent/item/field',
     'cat .env.local',
     'cat supabase/.env.test',
@@ -148,7 +147,7 @@ describe('Codex shell and loader', () => {
       input: JSON.stringify({
         cwd: root,
         tool_name: 'Bash',
-        tool_input: { command: 'gh pr merge 123' },
+        tool_input: { command: 'git push --force' },
       }),
       encoding: 'utf8',
     });
@@ -163,6 +162,49 @@ describe('Codex shell and loader', () => {
       }),
     });
     expect(allowed.status).toBe(0);
+  });
+});
+
+describe('Codex delegation boundary', () => {
+  it.each(['spawn_agent', 'collaboration.spawn_agent'])(
+    'blocks the actual ambiguous %s schema because its scope is unobservable',
+    async (tool_name) => {
+      const result = await evaluateCodex(
+        JSON.stringify({
+          cwd: root,
+          tool_name,
+          tool_input: {
+            task_name: 'inspect-files',
+            message: 'read-only repository inventory',
+            fork_turns: 'none',
+          },
+        }),
+      );
+      expect(result).toMatchObject({
+        decision: 'block',
+        message: expect.stringContaining('親担当'),
+      });
+    },
+  );
+
+  it.each([
+    'spawn_agent.write',
+    'spawn_agent.browser',
+    'collaboration.spawn_agent.write',
+    'collaboration.spawn_agent.browser',
+  ])('allows a separately typed %s path to remain available', async (tool_name) => {
+    const result = await evaluateCodex(
+      JSON.stringify({
+        cwd: root,
+        tool_name,
+        tool_input: {
+          task_name: 'implement-scoped-change',
+          message: 'write only within the assigned non-overlapping scope',
+          fork_turns: 'none',
+        },
+      }),
+    );
+    expect(result).toEqual({ decision: 'allow' });
   });
 });
 

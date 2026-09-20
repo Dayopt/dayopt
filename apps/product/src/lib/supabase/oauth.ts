@@ -31,6 +31,7 @@ import { createClient } from '@supabase/supabase-js';
 
 import { env } from '@/env';
 import type { Database } from '@/lib/database';
+import { SUPABASE_TRACE_PROPAGATION } from '@/lib/supabase/trace-propagation';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 /**
@@ -102,9 +103,10 @@ export function extractBearerToken(authHeader: string | null): string {
  */
 export function createServiceRoleClient(): SupabaseClient<Database> {
   const supabaseUrl = env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceRoleKey = env.SUPABASE_SERVICE_ROLE_KEY;
+  const serviceRoleKey = env.SUPABASE_SECRET_KEY;
 
   return createClient<Database>(supabaseUrl, serviceRoleKey, {
+    tracePropagation: SUPABASE_TRACE_PROPAGATION,
     auth: {
       autoRefreshToken: false,
       persistSession: false,

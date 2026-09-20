@@ -22,7 +22,7 @@ interface TemplateListProps {
   onRenameTemplate?: ((templateId: string, name: string) => void) | undefined;
   onDeleteTemplate?: ((templateId: string) => void) | undefined;
   /** 見出しの「+」（カテゴリ / 未分類と同じ hover アクション）。実配線は #2567。 */
-  onCreateEntry?: (() => void) | undefined;
+  onCreateTimeblock?: (() => void) | undefined;
   /** 見出しの歯車（カテゴリ / 未分類と同じ hover アクション）。実配線は #2567。 */
   onOpenSettings?: (() => void) | undefined;
 }
@@ -50,7 +50,7 @@ export function TemplateList({
   onEditTemplate,
   onRenameTemplate,
   onDeleteTemplate,
-  onCreateEntry,
+  onCreateTimeblock,
   onOpenSettings,
 }: TemplateListProps) {
   const t = useTranslations();
@@ -74,14 +74,14 @@ export function TemplateList({
           // 常時は隠し、見出し行にホバー / フォーカスした時だけ出す
           // （「未分類」の action と同じ visibility パターン）
           <span className="flex items-center gap-1 opacity-0 transition-opacity group-hover/section:opacity-100 group-has-[:focus-visible]/section:opacity-100 has-[:focus-visible]:opacity-100 [@media(hover:none)]:opacity-100">
-            {onCreateEntry && (
+            {onCreateTimeblock && (
               <HoverTooltip content={t('calendar.templates.createLabel')} side="top">
                 <Button
                   variant="ghost"
                   icon
                   className="size-6"
                   aria-label={t('calendar.templates.createLabel')}
-                  onClick={onCreateEntry}
+                  onClick={onCreateTimeblock}
                 >
                   <Plus className="size-4" />
                 </Button>

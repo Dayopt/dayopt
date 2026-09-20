@@ -160,6 +160,15 @@ function runScript(
     /** reviewThreads の 1 ページ目が hasNextPage: true で終わり、2 ページ目を用意しない状態にする */
     threadsTruncated?: boolean;
     /**
+     * commit status「Production Config Audit」の description。audit contract guard の
+     * failure が設計上のもの（`Audit contract changed; …`）か本物の drift
+     * （`Vercel metadata does not match …`）かを決める唯一の手がかり。
+     * 省略時は設計上の failure（= advisory になる形）。
+     */
+    auditStatusDescription?: string;
+    /** status 取得 API を失敗させる（description 不明の fail closed 経路の検証） */
+    auditStatusUnavailable?: boolean;
+    /**
      * reviewThreads を複数ページに分けてレスポンスを組み立てる。指定時は `threads` /
      * `threadsTruncated` より優先する。各要素が 1 ページ分。`hasNextPage` を省略した
      * 要素は「最後の要素以外は true、最後は false」として扱う（20 ページ上限の
@@ -170,7 +179,7 @@ function runScript(
       hasNextPage?: boolean;
     }>;
   } = {},
-): { status: number | null; stderr: string } {
+): { status: number | null; stderr: string; auditStatusArgs: string } {
   // repo 直下ではなく os の temp に作る。プロセスが afterEach 前に落ちると untracked な
   // ディレクトリが repo に残り、まさにこのスクリプトの dirty ゲートが以後の掃除を止める。
   const temporaryDirectory = mkdtempSync(join(tmpdir(), 'finish-branch-test-'));
@@ -275,6 +284,15 @@ case "$1" in
       fi
     else
       case "$*" in
+        *commits/*/statuses*)
+          # 実 gh は --jq が description を 1 行ずつ出す（新しい順）。空なら 1 件も無い状態。
+          # 呼び出し形は pagination 契約の test が読むので記録する。
+          printf '%s\n' "$*" >> "$FINISH_BRANCH_AUDIT_STATUS_ARGS"
+          if [[ "\${FINISH_BRANCH_AUDIT_STATUS_EXIT:-0}" != "0" ]]; then exit 1; fi
+          if [[ -n "\${FINISH_BRANCH_AUDIT_STATUS_DESCRIPTION:-}" ]]; then
+            printf '%s\n' "\${FINISH_BRANCH_AUDIT_STATUS_DESCRIPTION}"
+          fi
+          ;;
         *pulls/123/files*)
           cat "$FINISH_BRANCH_PR_FILES"
           if [[ "\${FINISH_BRANCH_FILES_EXIT:-0}" != "0" ]]; then exit 1; fi
@@ -301,6 +319,8 @@ esac
   git('add', 'seed.txt');
   git('commit', '-m', 'seed');
 
+  const auditStatusArgsPath = join(temporaryDirectory, 'audit-status-args.txt');
+
   const result = spawnSync('bash', [scriptPath, '123', '--dry-run'], {
     cwd: temporaryDirectory,
     encoding: 'utf8',
@@ -316,10 +336,21 @@ esac
         ? join(temporaryDirectory, 'missing-threads-dir')
         : threadsDirectory,
       FINISH_BRANCH_FILES_EXIT: options.filesPartialFailure ? '1' : '0',
+      FINISH_BRANCH_AUDIT_STATUS_DESCRIPTION:
+        options.auditStatusDescription ?? 'Audit contract changed; trusted head audit is required',
+      FINISH_BRANCH_AUDIT_STATUS_EXIT: options.auditStatusUnavailable ? '1' : '0',
+      FINISH_BRANCH_AUDIT_STATUS_ARGS: auditStatusArgsPath,
     },
   });
 
-  return { status: result.status, stderr: result.stderr ?? '' };
+  return {
+    status: result.status,
+    stderr: result.stderr ?? '',
+    /** statuses API を呼んだ時の gh の引数（1 行 1 回）。pagination 契約の検証用 */
+    auditStatusArgs: existsSync(auditStatusArgsPath)
+      ? readFileSync(auditStatusArgsPath, 'utf8')
+      : '',
+  };
 }
 
 /**
@@ -599,80 +630,54 @@ describe('畳み込みが失敗を消さないこと', () => {
   });
 });
 
-describe('trusted dispatch で解除された audit guard の免除', () => {
+describe('audit contract guard の advisory 扱い（#2469）', () => {
   // production-config-audit.yml は audit contract 保護対象を変更する PR で
-  // check run「Audit Vercel metadata (trusted)」を設計として必ず failure にする。
-  // 解除は trusted dispatch（workflow_dispatch）で、成功すると commit status
-  // 「Production Config Audit」だけが head SHA へ success で発行される。
-  // dispatch run の check run は rollup に紐づかないため、畳み込みでは解消できない。
-  const guardFailure = () =>
+  // check run「Audit Vercel metadata (trusted)」を **設計として必ず failure にする**。
+  // この failure は「contract 4 path を触った」という事実だけを表し、diff の良し悪しを
+  // 一切表していない。本物の監査結果は workflow_dispatch run 側にあり rollup に載らない。
+  //
+  // 2026-09-18（#2469）に、この guard を shadow status と同じ advisory へ格下げした。
+  // merge の遮断は main の ruleset 1 本（#2640）で、そこに `Production Config Audit` は
+  // 無く、この checkpoint は branch:finish だけに効く非対称な gate だった。
+  const guardFailure = (workflowName = 'Production Config Audit') =>
     checkRun(
       'Audit Vercel metadata (trusted)',
       'FAILURE',
       '2026-08-03T00:25:00Z',
       'COMPLETED',
-      'Production Config Audit',
+      workflowName,
     );
 
-  it('status「Production Config Audit」が success なら guard の failure を免除する', () => {
-    // PR #1799 で実測した形: guard の FAILURE と status の SUCCESS が共存する。
+  it('status success が無くても guard の failure では止まらない', () => {
+    // 撤去前はここで「trusted dispatch が必要です」と exit 1 していた（#2571）。
     const { status, stderr } = runScript([
       guardFailure(),
-      statusContext('Production Config Audit', 'SUCCESS', '2026-08-03T00:25:36Z'),
       checkRun('CI', 'SUCCESS', '2026-08-03T00:20:00Z'),
       ...requiredChecks(),
     ]);
-    expect(stderr).toContain('trusted dispatch により解除済み');
+    expect(stderr).toContain('advisory として扱い');
     expect(stderr).not.toContain('失敗している check');
+    expect(stderr).not.toContain('trusted dispatch が必要');
     expect(status).toBe(0);
   });
 
-  it('status が failure なら免除しない（dispatch 未実行 / audit 実失敗）', () => {
-    // (a) audit が本当に落ちた PR も (b) dispatch 未実行の contract 変更 PR も、
-    // status は failure のまま。免除は発動せず従来どおり止まる。
+  it('status「Production Config Audit」の failure でも止まらない', () => {
+    // dispatch 未実行の contract 変更 PR では status も failure（"trusted head audit is
+    // required"）のまま残る。guard と同じ発行元の advisory なので数えない。
     const { status, stderr } = runScript([
       guardFailure(),
       statusContext('Production Config Audit', 'FAILURE', '2026-08-03T00:25:36Z'),
       checkRun('CI', 'SUCCESS', '2026-08-03T00:20:00Z'),
+      ...requiredChecks(),
     ]);
-    expect(stderr).toContain('失敗している check');
-    expect(status).toBe(1);
+    expect(stderr).not.toContain('失敗している check');
+    expect(status).toBe(0);
   });
 
-  it('別名の check run の failure は status success があっても免除しない', () => {
-    // 免除が「guard 1 check の完全一致」に閉じていること。status success を
-    // 見ただけで他の failure まで握りつぶす実装だとここで緩む。
-    const { status, stderr } = runScript([
-      checkRun('E2E', 'FAILURE', '2026-08-03T00:25:00Z'),
-      statusContext('Production Config Audit', 'SUCCESS', '2026-08-03T00:25:36Z'),
-      checkRun('CI', 'SUCCESS', '2026-08-03T00:20:00Z'),
-    ]);
-    expect(stderr).toContain('失敗している check');
-    expect(status).toBe(1);
-  });
-
-  it('同名 check でも workflow が違えば免除しない', () => {
-    // 照合は 型 + workflow 名 + check 名。name だけの一致で免除すると、
-    // 別 workflow が同名 job を持った時に本物の failure が消える。
-    const { status, stderr } = runScript([
-      checkRun(
-        'Audit Vercel metadata (trusted)',
-        'FAILURE',
-        '2026-08-03T00:25:00Z',
-        'COMPLETED',
-        'CI',
-      ),
-      statusContext('Production Config Audit', 'SUCCESS', '2026-08-03T00:25:36Z'),
-    ]);
-    expect(stderr).toContain('失敗している check');
-    expect(status).toBe(1);
-  });
-
-  it('guard が cancelled なら status success があっても免除しない', () => {
-    // 免除対象は設計上の意図的 failure（enforce step の exit 1）だけ。cancelled /
-    // timed_out は「監査が完走していない」状態で、古い run の success status が残った
-    // まま再発火 run が publish 前に cancel された場合に免除すると fail-open になる。
-    const { status, stderr } = runScript([
+  it('guard が cancelled / timed_out でも止まらない', () => {
+    // 免除ではなく advisory なので、conclusion の種別で分岐しない。監査の完走は
+    // push:main / nightly / promote の runProductionConfigAudit が担保する。
+    const { status } = runScript([
       checkRun(
         'Audit Vercel metadata (trusted)',
         'CANCELLED',
@@ -680,18 +685,122 @@ describe('trusted dispatch で解除された audit guard の免除', () => {
         'COMPLETED',
         'Production Config Audit',
       ),
-      statusContext('Production Config Audit', 'SUCCESS', '2026-08-03T00:24:00Z'),
       checkRun('CI', 'SUCCESS', '2026-08-03T00:20:00Z'),
+      ...requiredChecks(),
+    ]);
+    expect(status).toBe(0);
+  });
+
+  // ── ここから先は「緩めていない」ことの負例。advisory 判定は 型 + workflow 名 +
+  // check 名 / context の完全一致のみで、それ以外の failure は従来どおり merge を止める。
+  it('同名 check でも workflow が違えば advisory にしない', () => {
+    // name だけで advisory 判定すると、別 workflow が同名 job を持った時に本物の
+    // failure が消える。
+    const { status, stderr } = runScript([guardFailure('CI'), ...requiredChecks()]);
+    expect(stderr).toContain('失敗している check');
+    expect(status).toBe(1);
+  });
+
+  it('同じ workflow の別 job の failure は止める', () => {
+    // advisory にするのは pull_request_target が必ず落とす guard job だけ。
+    // 同じ workflow の別 job（例: 実監査 job）が落ちたら従来どおり止まる。
+    const { status, stderr } = runScript([
+      checkRun(
+        'Audit Vercel metadata',
+        'FAILURE',
+        '2026-08-03T00:25:00Z',
+        'COMPLETED',
+        'Production Config Audit',
+      ),
+      ...requiredChecks(),
     ]);
     expect(stderr).toContain('失敗している check');
     expect(status).toBe(1);
   });
 
-  it('免除が効いても、同居する他の failure は止める', () => {
+  // ── 本物の drift は advisory にしない ──────────────────────────────────
+  // workflow の `Enforce audit result` は「contract を変えた（設計上の failure）」でも
+  // 「Vercel の env metadata が Production contract と食い違う（本物の drift）」でも
+  // exit 1 する。conclusion / state では区別できず、status の description だけが分ける。
+  it('status description が本物の drift を報告していたら止める', () => {
+    const { status, stderr } = runScript(
+      [guardFailure(), statusContext('Production Config Audit', 'FAILURE', '2026-08-03T00:25:36Z')],
+      { auditStatusDescription: 'Vercel metadata does not match the Production contract' },
+    );
+    expect(stderr).toContain('allowlist と一致しません');
+    expect(stderr).toContain('失敗している check');
+    expect(status).toBe(1);
+  });
+
+  // 既定を advisory 側に置くと、workflow が将来 failure 文言を追加した時に本物の失敗が
+  // 無言で除外される（#2834 の Codex レビュー P2）。allowlist の完全一致だけを通す。
+  // combined status API は既定で先頭 30 件しか返さない。controller の再評価で status が
+  // 積み上がると `Production Config Audit` が押し出され、description が空になって
+  // fail closed 側へ倒れ、contract 変更 PR の branch:finish が恒久的に止まる。
+  // 本 PR 自身の head でも実測 28 件で、上限の手前まで来ていた（#2834 の Codex レビュー P2）。
+  it('statuses API を全ページ取得で呼ぶ（先頭 30 件で押し出されない）', () => {
+    const { auditStatusArgs } = runScript([guardFailure(), ...requiredChecks()]);
+    expect(auditStatusArgs).toContain('--paginate');
+    expect(auditStatusArgs).toContain('per_page=100');
+  });
+
+  it('未知の description は advisory にしない（allowlist の完全一致のみ）', () => {
+    const { status, stderr } = runScript([guardFailure(), ...requiredChecks()], {
+      auditStatusDescription: 'Vercel metadata check failed for an unexpected reason',
+    });
+    expect(stderr).toContain('allowlist と一致しません');
+    expect(stderr).toContain('失敗している check');
+    expect(status).toBe(1);
+  });
+
+  it('advisory の 2 文言は前方一致ではなく完全一致で判定する', () => {
+    // 既知文言を含むが末尾に別の理由が付いた description を advisory にしない。
+    const { status, stderr } = runScript([guardFailure(), ...requiredChecks()], {
+      auditStatusDescription:
+        'Vercel metadata matches the Production contract but the project settings drifted',
+    });
+    expect(stderr).toContain('allowlist と一致しません');
+    expect(status).toBe(1);
+  });
+
+  it('status description を取得できなければ advisory にしない（fail closed）', () => {
+    // 設計上の failure か本物の drift かを判定できない以上、緩める側へ倒さない。
+    const { status, stderr } = runScript([guardFailure()], { auditStatusUnavailable: true });
+    expect(stderr).toContain('description を取得できませんでした');
+    expect(stderr).toContain('失敗している check');
+    expect(status).toBe(1);
+  });
+
+  it('status が 1 件も無ければ advisory にしない（fail closed）', () => {
+    // requiredChecks() を足して「成功 check が 0 件」で落ちる経路を塞ぎ、
+    // **guard の failure を数えたこと**が停止の理由であることを固定する。
+    const { status, stderr } = runScript([guardFailure(), ...requiredChecks()], {
+      auditStatusDescription: '',
+    });
+    expect(stderr).toContain('description を取得できませんでした');
+    expect(stderr).toContain('失敗している check');
+    expect(status).toBe(1);
+  });
+
+  it('trusted dispatch が通った後（status = matches）も advisory のまま', () => {
+    // dispatch を回した PR では設計上の failure の上に成功 status が積まれる。
+    const { status, stderr } = runScript(
+      [
+        guardFailure(),
+        statusContext('Production Config Audit', 'SUCCESS', '2026-08-03T00:25:36Z'),
+        ...requiredChecks(),
+      ],
+      { auditStatusDescription: 'Vercel metadata matches the Production contract' },
+    );
+    expect(stderr).not.toContain('失敗している check');
+    expect(status).toBe(0);
+  });
+
+  it('guard が advisory でも、同居する他の failure は止める', () => {
     const { status, stderr } = runScript([
       guardFailure(),
-      statusContext('Production Config Audit', 'SUCCESS', '2026-08-03T00:25:36Z'),
       checkRun('CI', 'FAILURE', '2026-08-03T00:20:00Z'),
+      ...requiredChecks(),
     ]);
     expect(stderr).toContain('失敗している check');
     expect(status).toBe(1);
@@ -724,6 +833,17 @@ describe('実データの rollup（PR #1765）', () => {
 });
 
 describe('畳み込みで緩めてはいけない判定', () => {
+  it('advisory の shadow status が pending / failure でも required check が揃えば進む', () => {
+    const { status, stderr } = runScript([
+      ...requiredChecks(),
+      statusContext('Review policy (shadow)', 'PENDING', '2026-08-03T10:03:00Z'),
+      statusContext('Validation (shadow)', 'FAILURE', '2026-08-03T10:04:00Z'),
+    ]);
+    expect(stderr).not.toContain('失敗している check');
+    expect(stderr).not.toContain('実行中の check');
+    expect(status).toBe(0);
+  });
+
   it('単発の failure は従来どおり止める', () => {
     const { status, stderr } = runScript([
       checkRun('CI', 'SUCCESS', '2026-07-30T10:00:00Z'),

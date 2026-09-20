@@ -1,6 +1,6 @@
 import type { ExternalCalendarEvent } from '@/features/external-calendar';
 
-import type { BaseEntryPosition, GridViewProps } from './base.types';
+import type { BaseTimeblockPosition, GridViewProps } from './base.types';
 import type { CalendarDisplayEvent } from './calendar.types';
 
 import type { DateTimeSelection } from '../components/views/shared';
@@ -14,7 +14,7 @@ export interface WeekViewProps extends GridViewProps {
 export interface WeekGridProps {
   weekDates: Date[];
   events: CalendarDisplayEvent[];
-  /** 全エントリ（期限切れ未完了表示用） */
+  /** 全タイムブロック（期限切れ未完了表示用） */
   allTimeblocks?: CalendarDisplayEvent[] | undefined;
   /** 外部カレンダーの未変換予定（ghost、読み取り専用） */
   externalEvents?: ExternalCalendarEvent[] | undefined;
@@ -22,9 +22,9 @@ export interface WeekGridProps {
   todayIndex: number;
   /** DnDを無効化するTimeblock ID（Inspector表示中のTimeblock など） */
   disabledTimeblockId?: string | null | undefined;
-  onEventClick?: ((entry: CalendarDisplayEvent) => void) | undefined;
+  onEventClick?: ((timeblock: CalendarDisplayEvent) => void) | undefined;
   onEventContextMenu?:
-    ((entry: CalendarDisplayEvent, mouseEvent: React.MouseEvent) => void) | undefined;
+    ((timeblock: CalendarDisplayEvent, mouseEvent: React.MouseEvent) => void) | undefined;
   onEventUpdate?:
     | ((
         timeblockIdOrTimeblock: string | CalendarDisplayEvent,
@@ -38,8 +38,8 @@ export interface WeekGridProps {
   onTimeRangeSelect?: ((selection: DateTimeSelection) => void) | undefined;
   /** compare の差分 marker を表示する */
   showActualDiff?: boolean | undefined;
-  /** compare Rail に出ている entry の ID 一覧 */
-  dayDiffEntryIds?: ReadonlySet<string> | undefined;
+  /** compare Rail に出ている timeblock の ID 一覧 */
+  dayDiffTimeblockIds?: ReadonlySet<string> | undefined;
   className?: string | undefined;
 }
 
@@ -69,7 +69,7 @@ export interface UseWeekViewReturn {
 }
 
 /** useWeekTimeblocks フックのオプション */
-export interface UseWeekEntriesOptions {
+export interface UseWeekTimeblocksOptions {
   weekDates: Date[];
   events: CalendarDisplayEvent[];
   hourHeight?: number;
@@ -77,13 +77,13 @@ export interface UseWeekEntriesOptions {
 }
 
 /** useWeekTimeblocks フックの戻り値 */
-export interface UseWeekEntriesReturn {
-  entriesByDate: Record<string, CalendarDisplayEvent[]>;
-  timeblockPositions: WeekEntryPosition[];
-  maxConcurrentEntries: number;
+export interface UseWeekTimeblocksReturn {
+  timeblocksByDate: Record<string, CalendarDisplayEvent[]>;
+  timeblockPositions: WeekTimeblockPosition[];
+  maxConcurrentTimeblocks: number;
 }
 
-/** 週ビューでのエントリ位置情報（BaseEntryPosition に dayIndex を追加） */
-export interface WeekEntryPosition extends BaseEntryPosition {
+/** 週ビューでのタイムブロック位置情報（BaseTimeblockPosition に dayIndex を追加） */
+export interface WeekTimeblockPosition extends BaseTimeblockPosition {
   dayIndex: number;
 }

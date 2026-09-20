@@ -24,6 +24,7 @@ import {
   useDeleteActivity,
   useDeleteCategory,
 } from '@/features/activities';
+import { useProductAccessGate } from '@/lib/billing/useProductAccessGate';
 import { useIsMobile } from '@/lib/hooks/useIsMobile';
 import { api } from '@/lib/trpc';
 import {
@@ -158,6 +159,8 @@ export function ActivityFilterList({ betweenCategoriesAndUncategorized }: Activi
   const deleteCategoryMutation = useDeleteCategory();
   const archiveActivityMutation = useArchiveActivity();
   const archiveCategoryMutation = useArchiveCategory();
+  // archive / restore は利用権無しで server が拒否する（delete は許す）。送る前に止める
+  const gateProductAccess = useProductAccessGate();
   const { openActivityCreateModal } = useActivityModalNavigation();
 
   const visibleActivityIds = useCalendarFilterStore((s) => s.visibleActivityIds);
@@ -251,16 +254,16 @@ export function ActivityFilterList({ betweenCategoriesAndUncategorized }: Activi
 
   const handleArchiveActivity = useCallback(
     (id: string) => {
-      archiveActivityMutation.mutate({ id });
+      gateProductAccess(() => archiveActivityMutation.mutate({ id }));
     },
-    [archiveActivityMutation],
+    [archiveActivityMutation, gateProductAccess],
   );
 
   const handleArchiveCategory = useCallback(
     (id: string) => {
-      archiveCategoryMutation.mutate({ id });
+      gateProductAccess(() => archiveCategoryMutation.mutate({ id }));
     },
-    [archiveCategoryMutation],
+    [archiveCategoryMutation, gateProductAccess],
   );
 
   const handleConfirmDelete = async () => {

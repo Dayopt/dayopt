@@ -27,6 +27,7 @@ export const GLOSSARY: readonly GlossaryEntry[] = [
     en: 'Timeblock',
     usage: 'カレンダー上の時間ブロック。予定 / 記録の総称',
     code: { feature: 'timeblock', i18nNamespace: 'timeblock' },
+    mcpTools: ['entries.list', 'constraints.get'],
     refs: ['decisions.md 2026-09-07'],
     forbidden: [
       {
@@ -122,6 +123,15 @@ export const GLOSSARY: readonly GlossaryEntry[] = [
     usage: 'これからやる時間の宣言。時間軸のどこにでも置ける独立エンティティ',
     code: { identifiers: ['PlanEvent'], feature: 'timeblock' },
     db: ['plans'],
+    mcpTools: [
+      'plans.list',
+      'plans.get',
+      'plans.create',
+      'plans.update',
+      'plans.delete',
+      'plans.restore',
+      'plans.trash.list',
+    ],
     forbidden: [
       {
         term: '計画',
@@ -142,6 +152,15 @@ export const GLOSSARY: readonly GlossaryEntry[] = [
     usage: '実際に使った時間。予定とは独立して保存し、未来には終われない',
     code: { identifiers: ['RecordEvent'], feature: 'timeblock' },
     db: ['records'],
+    mcpTools: [
+      'records.list',
+      'records.get',
+      'records.create',
+      'records.update',
+      'records.delete',
+      'records.restore',
+      'records.trash.list',
+    ],
     forbidden: [
       {
         term: '実績',
@@ -173,6 +192,7 @@ export const GLOSSARY: readonly GlossaryEntry[] = [
     usage: '予定と記録の単位。最も具体的な分類で、無限に増えてよい',
     code: { feature: 'activities', i18nNamespace: 'activities' },
     db: ['activities'],
+    mcpTools: ['activities.list'],
     refs: ['#2162'],
     forbidden: [
       {
@@ -201,16 +221,18 @@ export const GLOSSARY: readonly GlossaryEntry[] = [
     en: 'Category',
     usage: '所属の主軸。1 アクティビティは最大 1 カテゴリー。色とアイコンを持つ',
     db: ['categories'],
+    mcpTools: ['categories.list'],
     refs: ['#2162'],
   },
   {
     id: 'segment',
     layer: 'ui',
-    status: 'current',
+    status: 'deprecated',
     concept: 'Segment',
     ja: 'セグメント',
     en: 'Segment',
-    usage: '分析用の保存されたクエリ。所属ではなく横断参照なので合計比率を持たない',
+    usage:
+      '旧: 分析用の保存されたクエリ。2026-09-15 に UI / tRPC / MCP から撤去し、/report のアクティビティ単位フィルタへ置き換えた。DB テーブルだけが残る',
     code: { feature: 'review' },
     db: ['segments', 'segment_activities'],
     refs: ['#2162'],
@@ -280,6 +302,7 @@ export const GLOSSARY: readonly GlossaryEntry[] = [
     en: 'Review',
     usage: 'ページ名・機能名。route は /report、i18n namespace も report',
     code: { feature: 'review', i18nNamespace: 'report' },
+    mcpTools: ['review.get'],
     note: 'feature dir / tRPC router は review、route と i18n namespace は report で割れている（コード識別子の整理は別 issue）',
     forbidden: [
       {
@@ -314,7 +337,7 @@ export const GLOSSARY: readonly GlossaryEntry[] = [
     ja: 'ドラフト',
     en: 'Draft',
     usage: '未保存のプレビュー状態のタイムブロック。ドラッグ中・複製直後など',
-    code: { identifiers: ['isDraft', 'DraftTimeblock'] },
+    code: { identifiers: ['isDraft'] },
   },
   {
     id: 'archive',
@@ -452,7 +475,37 @@ export const GLOSSARY: readonly GlossaryEntry[] = [
     ],
   },
 
-  // ─── UI 用語: /report の 4 章 ───
+  // ─── UI 用語: /report のタブと面 ───
+  {
+    id: 'report-tab-usage',
+    layer: 'ui',
+    status: 'current',
+    concept: 'Time spent (report tab)',
+    ja: '時間の使い方',
+    en: 'Time spent',
+    usage: 'タブ。事実だけで何にいくら使ったかを見る面。中身は配分の面',
+    code: { identifiers: ['ReportTabs'] },
+  },
+  {
+    id: 'report-tab-diff',
+    layer: 'ui',
+    status: 'current',
+    concept: 'Plan vs. record (report tab)',
+    ja: '差分',
+    en: 'Plan vs. record',
+    usage: 'タブ。予定と記録の違いを見る面。中身は執行の面。「レビュー」は禁止語なので付けない',
+    code: { identifiers: ['ReportTabs'] },
+  },
+  {
+    id: 'report-tab-reflect',
+    layer: 'ui',
+    status: 'current',
+    concept: 'Reflection (report tab)',
+    ja: '振り返り',
+    en: 'Reflection',
+    usage: 'タブ。それが良い使い方だったかを見る面。中身は質の面。ja はページ名（Review）と同じ語',
+    code: { identifiers: ['ReportTabs'] },
+  },
   {
     id: 'report-chapter-allocation',
     layer: 'ui',
@@ -483,16 +536,6 @@ export const GLOSSARY: readonly GlossaryEntry[] = [
     usage: '3 章。投下時間と充実 / 消耗の関係を見る。中の散布図が「羅針盤」',
     code: { identifiers: ['QualityChapter'] },
   },
-  {
-    id: 'report-chapter-tidy',
-    layer: 'ui',
-    status: 'current',
-    concept: 'Tidy (chapter 4)',
-    ja: '整える',
-    en: 'Tidy',
-    usage: '4 章。未変換の外部カレンダー予定など、来週へ持ち越す前に片づけるもの',
-    code: { identifiers: ['TidyChapter'] },
-  },
 
   // ─── 設計語（UI 文言には出さない） ───
   {
@@ -512,7 +555,8 @@ export const GLOSSARY: readonly GlossaryEntry[] = [
     concept: 'Margin',
     ja: '余白',
     en: 'Margin',
-    usage: '記録が書かれていない時間。分母には入るが塗らない。フィルタで動かない',
+    usage:
+      '記録が書かれていない時間。見出しに数字で出すだけで、配分には混ぜず塗らない。フィルタで動かない',
     code: { identifiers: ['marginMinutes'] },
     forbidden: [
       {
@@ -654,15 +698,48 @@ export const GLOSSARY: readonly GlossaryEntry[] = [
       'free / trialing / active / past_due / canceled。値の意味は docs/product/specs/billing.md',
     db: ['profiles.subscription_status'],
   },
+
+  // ─── feature 名（コード上の区画。UI 表記を持たないので layer: 'code'）───
+  // UI 用語ではなく `apps/product/src/features/*` の区画名。Architecture Inventory が
+  // 「この feature に属する router / store / Story / 画面」を辿る起点として使う。
+  // ここに無い feature は Inventory の未マッピングへ落ちる（それが検出の仕組み）。
   {
-    id: 'timeblock-origin',
+    id: 'calendar-surface',
     layer: 'code',
-    status: 'deprecated',
-    concept: 'Timeblock origin',
+    status: 'current',
+    concept: 'Calendar surface',
     usage:
-      "'planned' | 'unplanned'。旧表示型で Plan / Record を表す kind の代替として残る。主要な呼び出し側は kind から再計算しており、撤去は別 issue",
-    code: { identifiers: ['TimeblockOrigin'] },
-    refs: ['#2637'],
+      'カレンダー画面そのものを組み立てる区画。表示モード・ナビゲーション・絞り込み・DnD・作成 UI を持ち、時間の中身は timeblock feature が持つ',
+    code: { feature: 'calendar', i18nNamespace: 'calendar' },
+    refs: ['docs/engineering/architecture.md'],
+  },
+  {
+    id: 'settings-surface',
+    layer: 'code',
+    status: 'current',
+    concept: 'Settings surface',
+    usage:
+      '設定画面の区画。アカウント / 表示 / データ / 課金 / 外部カレンダー / MCP 接続をまとめる composition で、他 feature を import してよい唯一の区画',
+    code: { feature: 'settings', i18nNamespace: 'settings' },
+    refs: ['AGENTS.md §アーキテクチャ'],
+  },
+  {
+    id: 'auth-surface',
+    layer: 'code',
+    status: 'current',
+    concept: 'Auth surface',
+    usage:
+      'サインイン / サインアップ / MFA / リカバリコード / アカウント削除の区画。他 feature に依存しない independent',
+    code: { feature: 'auth', i18nNamespace: 'auth' },
+    refs: ['docs/product/specs/auth.md'],
+  },
+  {
+    id: 'contact-surface',
+    layer: 'code',
+    status: 'current',
+    concept: 'Contact surface',
+    usage: '問い合わせフォームの区画。他 feature に依存しない independent',
+    code: { feature: 'contact', i18nNamespace: 'contact' },
   },
 ];
 
@@ -708,7 +785,8 @@ export const KEY_NAME_RULES: readonly KeyNameRule[] = [
     token: 'tag',
     preferred: 'activity / category / segment',
     enforcement: 'active',
-    reason: '#2162 で廃止した Tag 機能の名残',
+    reason:
+      '#2162 で廃止した機能の名残。#2694 でclient/serviceをactivityへ改名。旧tRPC名は配信確認まで互換aliasとして残す',
   },
   {
     token: 'tags',

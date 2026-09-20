@@ -9,7 +9,7 @@
  * @see _composition/useCalendarComposition.ts
  */
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo } from 'react';
 
 import type { ExternalCalendarEvent } from '@/features/external-calendar';
 import {
@@ -36,6 +36,7 @@ import { initializePreload } from './controller/utils';
 import { SaveAsTemplateHeader } from './templates/SaveAsTemplateHeader';
 
 import type { UserSettings } from '@/features/calendar/stores/userSettings';
+import { useTemplateSaveStore } from '@/features/calendar/stores/useTemplateSaveStore';
 import { CalendarLayout } from './layout/CalendarLayout';
 import { EventContextMenu, MobileTouchHint } from './views/shared/components';
 
@@ -44,7 +45,7 @@ initializePreload();
 
 // diff ハイライトを点灯させる経路が無くなったため、常にこの空集合を渡す
 // （#2181 Step 6）。render のたびに new Set() すると参照が変わり無駄な再計算を招く。
-const EMPTY_DAY_DIFF_ENTRY_IDS: ReadonlySet<string> = new Set();
+const EMPTY_DAY_DIFF_TIMEBLOCK_IDS: ReadonlySet<string> = new Set();
 
 // =============================================================================
 // Props
@@ -71,7 +72,7 @@ interface CalendarControllerProps {
   disabledTimeblockId: string | null;
 
   // --- Timeblock click handlers ---
-  onEntryClick: (entry: CalendarDisplayEvent) => void;
+  onTimeblockClick: (timeblock: CalendarDisplayEvent) => void;
   onTimeRangeSelect: (selection: {
     date: Date;
     startHour: number;
@@ -81,7 +82,7 @@ interface CalendarControllerProps {
   }) => void;
 
   // --- Timeblock CRUD ---
-  onUpdateEntry: (
+  onTimeblockUpdate: (
     timeblockIdOrTimeblock: string | CalendarDisplayEvent,
     updates?: {
       startTime: Date;
@@ -92,9 +93,9 @@ interface CalendarControllerProps {
   onDeleteTimeblock: (timeblockId: string) => void;
 
   // --- Context menu actions ---
-  onDeleteTimeblockConfirm: (entry: CalendarDisplayEvent) => void;
-  onViewStats: (entry: CalendarDisplayEvent) => void;
-  onCopy: (entry: CalendarDisplayEvent) => void;
+  onDeleteTimeblockConfirm: (timeblock: CalendarDisplayEvent) => void;
+  onViewStats: (timeblock: CalendarDisplayEvent) => void;
+  onCopy: (timeblock: CalendarDisplayEvent) => void;
 
   // --- Navigation handlers ---
   onNavigate: (direction: 'prev' | 'next' | 'today') => void;
@@ -102,7 +103,6 @@ interface CalendarControllerProps {
   onNavigatePrev: () => void;
   onNavigateNext: () => void;
   onNavigateToday: () => void;
-  onToggleWeekends: () => void;
   onDateSelect: (date: Date) => void;
 
   // --- Prefetch ---
@@ -130,9 +130,9 @@ export function CalendarController({
   externalEvents,
   showWeekends,
   disabledTimeblockId,
-  onEntryClick,
+  onTimeblockClick,
   onTimeRangeSelect,
-  onUpdateEntry,
+  onTimeblockUpdate,
   onDeleteTimeblock,
   onDeleteTimeblockConfirm,
   onViewStats,
@@ -142,7 +142,6 @@ export function CalendarController({
   onNavigatePrev,
   onNavigateNext,
   onNavigateToday,
-  onToggleWeekends,
   onPrefetch,
   onSettingsChange,
   onDateSelect,
@@ -161,7 +160,10 @@ export function CalendarController({
   // =========================================================================
   // 保存中はヘッダーの中身だけを名前入力へ差し替える。メインの盤面は触らない
   // （保存されるのは「今見えている日の盤面そのもの」という関係を UI で保つ）。
-  const [savingDateKey, setSavingDateKey] = useState<string | null>(null);
+  // 起動元は表示メニュー（日ビュー）とサイドバーの「+」の 2 つなので store で持つ
+  const savingDateKey = useTemplateSaveStore((state) => state.savingDateKey);
+  const setSavingDateKey = useTemplateSaveStore((state) => state.startSaving);
+  const stopSaving = useTemplateSaveStore((state) => state.stopSaving);
   const timezone = useUserPreferences((preferences) => preferences.timezone);
   const { createTemplate } = usePlanTemplateMutations();
 
@@ -177,7 +179,19 @@ export function CalendarController({
   // 実際に保存される日がずれる。state ではなく導出で持ち、閉じ忘れの経路を作らない。
   const isSavingAsTemplate = savingDateKey === templateDateKey && viewType === 'day';
 
-  const closeSaveAsTemplate = useCallback(() => setSavingDateKey(null), []);
+  const closeSaveAsTemplate = useCallback(() => stopSaving(), [stopSaving]);
+
+  // /report 等へ移って戻ると Controller は再マウントするが、store は生き残る。
+  // 同じ日・日ビューのままなら保存ヘッダーが勝手に再開するので、離れる時に落とす
+  useEffect(() => () => stopSaving(), [stopSaving]);
+
+  // サイドバーの「+」は週ビューからも押せる。保存対象の日が今見えている日なら
+  // 日ビューへ切り替えて保存ヘッダーを出す（別の日なら何もせず、日を動かした時と
+  // 同じく自然に閉じる）
+  useEffect(() => {
+    if (savingDateKey === null || savingDateKey !== templateDateKey || viewType === 'day') return;
+    onViewChange('day');
+  }, [savingDateKey, templateDateKey, viewType, onViewChange]);
 
   // 移動系は保存状態を落としてから元のハンドラへ渡す（同じ日へ戻った時に
   // 空のヘッダーが復活しないようにする）
@@ -219,17 +233,17 @@ export function CalendarController({
   const { contextMenuEvent, contextMenuPosition, handleEventContextMenu, handleCloseContextMenu } =
     useCalendarContextMenu();
   const handleDuplicate = useCallback(
-    (entry: CalendarDisplayEvent) => {
-      const startAt = entry.startDate ?? entry.displayStartDate;
-      const endAt = entry.endDate ?? entry.displayEndDate;
-      const kind = entry.kind ?? resolveTimeblockDestination(endAt);
+    (timeblock: CalendarDisplayEvent) => {
+      const startAt = timeblock.startDate ?? timeblock.displayStartDate;
+      const endAt = timeblock.endDate ?? timeblock.displayEndDate;
+      const kind = timeblock.kind ?? resolveTimeblockDestination(endAt);
       openDuplicateInspector(
         createTimeblockDuplicateDraft({
-          sourceId: entry.id,
+          sourceId: timeblock.id,
           kind,
-          title: entry.title,
-          note: entry.description ?? null,
-          activityId: entry.activityId,
+          title: timeblock.title,
+          note: timeblock.description ?? null,
+          activityId: timeblock.activityId,
           startAt,
           endAt,
         }),
@@ -242,35 +256,34 @@ export function CalendarController({
     viewType,
     onNavigate: handleNavigate,
     onViewChange: handleViewChange,
-    onToggleWeekends,
   });
 
   // =========================================================================
-  // エントリ操作ハンドラ（Context経由で配信 — View以下でprops不要）
+  // タイムブロック操作ハンドラ（Context経由で配信 — View以下でprops不要）
   const timeblockActions = useMemo(
     () => ({
-      onEntryClick,
-      onEntryContextMenu: handleEventContextMenu,
-      onUpdateEntry,
+      onTimeblockClick,
+      onTimeblockContextMenu: handleEventContextMenu,
+      onTimeblockUpdate,
       onDeleteTimeblock,
       onTimeRangeSelect,
       disabledTimeblockId,
     }),
     [
-      onEntryClick,
+      onTimeblockClick,
       handleEventContextMenu,
-      onUpdateEntry,
+      onTimeblockUpdate,
       onDeleteTimeblock,
       onTimeRangeSelect,
       disabledTimeblockId,
     ],
   );
 
-  // View props（データ + ナビゲーションのみ。エントリ操作はContext経由）
+  // View props（データ + ナビゲーションのみ。タイムブロック操作はContext経由）
   const commonProps = useMemo(
     () => ({
       dateRange: viewDateRange,
-      entries: filteredTimeblocks,
+      timeblocks: filteredTimeblocks,
       allTimeblocks,
       externalEvents,
       currentDate,
@@ -278,11 +291,11 @@ export function CalendarController({
       // カレンダー内 review/diff パネル（CalendarReviewRail）は廃止済み（#2181 Step 6）。
       // グリッドの diff ハイライト自体は View 層に残すが、点灯させる経路が無くなったため常に空。
       showActualDiff: false,
-      dayDiffEntryIds: EMPTY_DAY_DIFF_ENTRY_IDS,
+      dayDiffTimeblockIds: EMPTY_DAY_DIFF_TIMEBLOCK_IDS,
       disabledTimeblockId,
-      onEntryClick,
-      onEntryContextMenu: handleEventContextMenu,
-      onUpdateEntry,
+      onTimeblockClick,
+      onTimeblockContextMenu: handleEventContextMenu,
+      onTimeblockUpdate,
       onDeleteTimeblock,
       onTimeRangeSelect,
       onViewChange,
@@ -298,9 +311,9 @@ export function CalendarController({
       currentDate,
       showWeekends,
       disabledTimeblockId,
-      onEntryClick,
+      onTimeblockClick,
       handleEventContextMenu,
-      onUpdateEntry,
+      onTimeblockUpdate,
       onDeleteTimeblock,
       onTimeRangeSelect,
       onViewChange,
@@ -347,7 +360,7 @@ export function CalendarController({
 
       {contextMenuEvent && contextMenuPosition ? (
         <EventContextMenu
-          entry={contextMenuEvent}
+          timeblock={contextMenuEvent}
           position={contextMenuPosition}
           onClose={handleCloseContextMenu}
           onDelete={onDeleteTimeblockConfirm}

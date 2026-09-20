@@ -6,7 +6,7 @@ import { computeTimeblockStyles } from '../../../../lib/grid';
 import type { TimeblockPosition } from './useViewTimeblocks';
 
 /**
- * エントリ位置情報からCSSスタイルを計算するフック
+ * タイムブロック位置情報からCSSスタイルを計算するフック
  * engine/grid.ts の computeTimeblockStyles の React ラッパー
  */
 export function useTimeblockStyles(

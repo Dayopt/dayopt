@@ -50,9 +50,9 @@ export function useMultiDayView({
 
   const centerIndex = Math.floor(dayCount / 2);
 
-  const { entriesByDate: eventsByDate } = useTimeblocksByDate({
+  const { timeblocksByDate: eventsByDate } = useTimeblocksByDate({
     dates: displayDates,
-    entries: events,
+    timeblocks: events,
     sortType: 'standard',
     timezone,
   });

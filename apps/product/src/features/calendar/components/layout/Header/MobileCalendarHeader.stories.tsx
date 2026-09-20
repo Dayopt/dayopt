@@ -153,17 +153,21 @@ export const Interactive: Story = {
 export const AllPatterns: Story = {
   render: () => (
     <div className="grid gap-6">
-      <MobileCalendarHeader
-        currentDate={new Date(2026, 2, 25)}
-        onNavigate={fn()}
-        onDateSelect={fn()}
-      />
-      <MobileCalendarHeader
-        currentDate={new Date(2026, 2, 25)}
-        onNavigate={fn()}
-        onDateSelect={fn()}
-        defaultExpanded
-      />
+      <article>
+        <MobileCalendarHeader
+          currentDate={new Date(2026, 2, 25)}
+          onNavigate={fn()}
+          onDateSelect={fn()}
+        />
+      </article>
+      <article>
+        <MobileCalendarHeader
+          currentDate={new Date(2026, 2, 25)}
+          onNavigate={fn()}
+          onDateSelect={fn()}
+          defaultExpanded
+        />
+      </article>
     </div>
   ),
 };

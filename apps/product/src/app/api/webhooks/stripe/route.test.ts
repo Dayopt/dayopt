@@ -3,6 +3,7 @@ import Stripe from 'stripe';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { resetWriteFenceCacheForTestsOnly } from '@/lib/ops/write-fence';
+import { resetWebhookSignatureFailureCaptureForTestsOnly } from '@/lib/webhooks/signature-failure-monitor';
 
 const envMock = vi.hoisted(() => ({
   RESEND_API_KEY: undefined,
@@ -50,6 +51,7 @@ const profileConsume = vi.hoisted(() =>
   vi.fn(() => ({ eq: () => ({ is: () => Promise.resolve({ error: null }) }) })),
 );
 const captureUnexpectedError = vi.hoisted(() => vi.fn());
+const deliverTransactionalEmail = vi.hoisted(() => vi.fn());
 const from = vi.hoisted(() =>
   vi.fn((table: string) => ({
     update: profileConsume,
@@ -79,6 +81,7 @@ vi.mock('@/lib/supabase/oauth', () => ({
   }),
 }));
 vi.mock('@/lib/analytics/product-events', () => ({ trackProductEvent }));
+vi.mock('@/lib/email/send', () => ({ sendTransactionalEmail: deliverTransactionalEmail }));
 vi.mock('@/features/settings/server/billing-service', () => ({
   classifyBillingCustomerEvent,
   syncDeletedSubscriptionStatus,
@@ -121,6 +124,7 @@ beforeEach(() => {
   trackBillingEvent.mockResolvedValue(true);
   vi.clearAllMocks();
   resetWriteFenceCacheForTestsOnly();
+  resetWebhookSignatureFailureCaptureForTestsOnly();
   envMock.STRIPE_WEBHOOK_SECRET = 'fixture';
   constructEvent.mockImplementation(() => eventMock);
   eventMock.account = null;
@@ -139,6 +143,7 @@ beforeEach(() => {
   profileMaybeSingle.mockResolvedValue({ data: null, error: null });
   writeFenceMaybeSingle.mockResolvedValue({ data: { fence_enabled: false }, error: null });
   getUserById.mockResolvedValue({ data: { user: null }, error: null });
+  deliverTransactionalEmail.mockResolvedValue({ status: 'sent', emailId: 'email-1' });
   trackProductEvent.mockResolvedValue(undefined);
   classifyBillingCustomerEvent.mockResolvedValue('live');
   syncSubscriptionStatus.mockResolvedValue(undefined);
@@ -149,6 +154,24 @@ beforeEach(() => {
 });
 
 describe('Stripe webhook route', () => {
+  it('idempotency claim失敗をSentryへ通知して500を返す', async () => {
+    const claimError = new Error('database claim failed');
+    claimStripeWebhookEvent.mockRejectedValueOnce(claimError);
+
+    const response = await POST(request());
+
+    expect(response.status).toBe(500);
+    expect(captureUnexpectedError).toHaveBeenCalledWith(
+      claimError,
+      expect.objectContaining({
+        feature: 'billing',
+        operation: 'claim',
+        source: 'stripe_webhook',
+      }),
+    );
+    expect(syncDeletedSubscriptionStatus).not.toHaveBeenCalled();
+  });
+
   it('subscription checkoutをprocessedにした後で一度だけ記録し、duplicateでは再記録しない', async () => {
     eventMock.type = 'checkout.session.completed';
     eventMock.data.object = {
@@ -185,6 +208,92 @@ describe('Stripe webhook route', () => {
 
     expect(duplicateResponse.status).toBe(200);
     expect(trackProductEvent).toHaveBeenCalledTimes(1);
+  });
+
+  /**
+   * #2789: 課金メールは suppression を見る共通経路を通る。ここで固定するのは
+   * 「共通経路を実際に呼ぶこと」と「その結果がどうであれ webhook は 200 を返し、
+   * 痕跡が Sentry に残ること」の 2 点。
+   */
+  describe('課金メールの共通送信経路（#2789）', () => {
+    function arrangeTrialCheckout() {
+      eventMock.type = 'checkout.session.completed';
+      eventMock.data.object = {
+        customer: 'cus_test123',
+        id: 'cs_test456',
+        mode: 'subscription',
+        subscription: 'sub_test456',
+      };
+      profileMaybeSingle.mockResolvedValueOnce({
+        data: { id: 'user-1', full_name: 'Test User' },
+        error: null,
+      });
+      getUserById.mockResolvedValue({
+        data: { user: { email: 'user@example.com', id: 'user-1' } },
+        error: null,
+      });
+    }
+
+    it('suppression を見る共通経路へ宛先を渡して送る', async () => {
+      arrangeTrialCheckout();
+
+      const response = await POST(request());
+
+      expect(response.status).toBe(200);
+      expect(deliverTransactionalEmail).toHaveBeenCalledTimes(1);
+      expect(deliverTransactionalEmail).toHaveBeenCalledWith(
+        expect.objectContaining({
+          context: 'send_trial_start_email',
+          to: 'user@example.com',
+        }),
+      );
+      expect(captureUnexpectedError).not.toHaveBeenCalled();
+    });
+
+    it('suppressed で skip された時も 200 を返し、operation 付きで Sentry に残す', async () => {
+      arrangeTrialCheckout();
+      deliverTransactionalEmail.mockResolvedValue({ status: 'suppressed' });
+
+      const response = await POST(request());
+
+      expect(response.status).toBe(200);
+      expect(deliverTransactionalEmail).toHaveBeenCalledTimes(1);
+      expect(captureUnexpectedError).toHaveBeenCalledTimes(1);
+      const [capturedError, context] = captureUnexpectedError.mock.calls[0] as [
+        Error,
+        Record<string, unknown>,
+      ];
+      expect(capturedError.message).toContain('suppressed');
+      expect(context).toMatchObject({
+        feature: 'billing',
+        operation: 'send_trial_start_email',
+        source: 'stripe_webhook',
+      });
+      // 課金状態の同期は続行する（メールは webhook をブロックしない）
+      expect(markStripeWebhookEventProcessed).toHaveBeenCalled();
+    });
+
+    it('送信失敗でも 200 を返し、Sentry へ通知する', async () => {
+      arrangeTrialCheckout();
+      const providerError = new Error('rate limited');
+      deliverTransactionalEmail.mockResolvedValue({
+        error: providerError,
+        reason: 'provider',
+        status: 'failed',
+      });
+
+      const response = await POST(request());
+
+      expect(response.status).toBe(200);
+      expect(captureUnexpectedError).toHaveBeenCalledWith(
+        providerError,
+        expect.objectContaining({
+          feature: 'billing',
+          operation: 'send_trial_start_email',
+        }),
+      );
+      expect(markStripeWebhookEventProcessed).toHaveBeenCalled();
+    });
   });
 
   it.each(['subscription_create', 'subscription_cycle'])(
@@ -307,6 +416,31 @@ describe('Stripe webhook route', () => {
     expect(releaseStripeWebhookEvent).toHaveBeenCalledWith(expect.anything(), 'evt_test123');
   });
 
+  it('解約予約中は期間終了までactiveのまま（予約時点で利用権を落とさない）', async () => {
+    // Stripe は解約を予約しても status: 'active' のまま cancel_at_period_end を立て、
+    // 期間終了時に customer.subscription.deleted を送る。予約の updated を
+    // canceled として取り込むと、支払い済みの期間が残っているユーザーの書き込みが
+    // その場で止まる（#2629 の状態×操作表では契約中と同じ扱い）。
+    eventMock.type = 'customer.subscription.updated';
+    eventMock.data.object = {
+      customer: 'cus_test123',
+      id: 'sub_test456',
+      status: 'active',
+      cancel_at_period_end: true,
+    };
+
+    const response = await POST(request());
+
+    expect(response.status).toBe(200);
+    expect(syncSubscriptionStatus).toHaveBeenCalledWith(
+      expect.anything(),
+      'cus_test123',
+      'sub_test456',
+      'active',
+    );
+    expect(syncDeletedSubscriptionStatus).not.toHaveBeenCalled();
+  });
+
   it('activation前は現行のsubscription削除経路を維持する', async () => {
     resolveBillingLifecycleMode.mockResolvedValue('legacy');
 
@@ -426,14 +560,21 @@ describe('Stripe webhook 署名検証', () => {
   });
 
   it('署名検証がthrowしたら401で拒否し、業務処理へ進めない', async () => {
-    constructEvent.mockImplementationOnce(() => {
+    constructEvent.mockImplementation(() => {
       throw new Error('No signatures found matching the expected signature for payload');
     });
 
-    const response = await POST(request());
+    const responses = await Promise.all(Array.from({ length: 5 }, () => POST(request())));
 
-    expect(response.status).toBe(401);
-    await expect(response.json()).resolves.toEqual({ error: 'Invalid signature' });
+    expect(responses.every((response) => response.status === 401)).toBe(true);
+    await expect(responses[0]!.json()).resolves.toEqual({ error: 'Invalid signature' });
+    expect(captureUnexpectedError).toHaveBeenCalledOnce();
+    expect(captureUnexpectedError).toHaveBeenCalledWith(expect.any(Error), {
+      feature: 'billing',
+      operation: 'signature_verification',
+      route: '/api/webhooks/stripe',
+      source: 'stripe_webhook',
+    });
     expect(claimStripeWebhookEvent).not.toHaveBeenCalled();
     expect(syncDeletedSubscriptionStatus).not.toHaveBeenCalled();
   });

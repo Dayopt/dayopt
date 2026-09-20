@@ -51,6 +51,7 @@ const ROUTE_DURATION_CONTRACT = {
   // 外部 I/O 無し
   'src/app/.well-known/oauth-authorization-server/route.ts': 15,
   'src/app/.well-known/oauth-protected-resource/route.ts': 15,
+  'src/app/api/health/version/route.ts': 15,
   'src/app/api/v1/system/[...retired]/route.ts': 5,
   'src/app/maintenance/route.ts': 15,
 
@@ -76,6 +77,7 @@ const ROUTE_DURATION_CONTRACT = {
   // 最大 10 件）。予算不等式は settle-dispatcher.ts の SETTLE_WORST_CASE_MS を route.test.ts が
   // 実測で固定する。
   'src/app/api/cron/calendar-account-deletion-settle/route.ts': 60,
+  'src/app/api/cron/billing-reconciliation/route.ts': 60,
   'src/app/api/cron/calendar-sync/route.ts': 60,
   'src/app/api/cron/external-connection-maintenance/route.ts': 60,
   'src/app/api/integrations/google-calendar/start/route.ts': 60,
@@ -109,6 +111,7 @@ const ROUTE_DURATION_CONTRACT = {
 const NO_EXTERNAL_IO_ROUTES = new Set<string>([
   'src/app/.well-known/oauth-authorization-server/route.ts',
   'src/app/.well-known/oauth-protected-resource/route.ts',
+  'src/app/api/health/version/route.ts',
   'src/app/api/v1/system/[...retired]/route.ts',
   'src/app/maintenance/route.ts',
 ]);

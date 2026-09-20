@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { resetWriteFenceCacheForTestsOnly } from '@/lib/ops/write-fence';
+import { resetWebhookSignatureFailureCaptureForTestsOnly } from '@/lib/webhooks/signature-failure-monitor';
 
 const mocks = vi.hoisted(() => ({
   verifyWebhook: vi.fn(),
@@ -82,6 +83,7 @@ describe('Product Resend webhook', () => {
       from: fromWithWriteFence(() => undefined),
     });
     resetWriteFenceCacheForTestsOnly();
+    resetWebhookSignatureFailureCaptureForTestsOnly();
     mocks.captureUnexpectedDatabaseError.mockImplementation((error: unknown) =>
       error instanceof Error ? error : new Error('Unexpected database failure', { cause: error }),
     );
@@ -109,6 +111,55 @@ describe('Product Resend webhook', () => {
     expect(JSON.stringify(mocks.logger)).not.toContain('private@example.com');
     expect(mocks.completeResendWebhookEvent).toHaveBeenCalledWith('event-1', 'lease-1');
   });
+
+  it('transient bounce（mailbox full 等）では suppression を書かない', async () => {
+    // Resend の email.bounced は data.bounce.type に permanent / transient / undetermined を
+    // 載せる（resend SDK `EmailBouncedEvent`）。transient を恒久 suppression にすると、
+    // 解除経路が無いためその address 宛の transactional mail が永久に止まる。
+    const upsert = vi.fn().mockResolvedValue({ error: null });
+    mocks.createServiceRoleClient.mockReturnValue({ from: fromWithWriteFence(() => ({ upsert })) });
+    mocks.verifyWebhook.mockReturnValue({
+      type: 'email.bounced',
+      data: {
+        to: ['private@example.com'],
+        email_id: 'email-transient',
+        bounce: { type: 'transient', subType: 'MailboxFull', message: 'mailbox full' },
+      },
+    });
+
+    const response = await POST(request());
+
+    expect(response.status).toBe(200);
+    expect(upsert).not.toHaveBeenCalled();
+    expect(JSON.stringify(mocks.logger)).not.toContain('private@example.com');
+    expect(mocks.completeResendWebhookEvent).toHaveBeenCalledWith('event-1', 'lease-1');
+  });
+
+  it.each(['permanent', 'undetermined', 'Permanent'])(
+    'bounce.type=%s は suppression を書く（undetermined は保守的に suppress）',
+    async (type) => {
+      const upsert = vi.fn().mockResolvedValue({ error: null });
+      mocks.createServiceRoleClient.mockReturnValue({
+        from: fromWithWriteFence(() => ({ upsert })),
+      });
+      mocks.verifyWebhook.mockReturnValue({
+        type: 'email.bounced',
+        data: {
+          to: ['private@example.com'],
+          email_id: 'email-hard',
+          bounce: { type, subType: 'General', message: 'no such user' },
+        },
+      });
+
+      const response = await POST(request());
+
+      expect(response.status).toBe(200);
+      expect(upsert).toHaveBeenCalledWith(
+        expect.objectContaining({ email: 'private@example.com', reason: 'bounce' }),
+        { onConflict: 'email,reason' },
+      );
+    },
+  );
 
   it('captures a suppression DB failure once without address PII and releases the lease', async () => {
     const dbError = { code: 'PGRST500', message: 'database unavailable' };
@@ -231,10 +282,20 @@ describe('Product Resend webhook', () => {
     });
     expect((await POST(missingHeaders)).status).toBe(401);
 
-    mocks.verifyWebhook.mockImplementationOnce(() => {
+    mocks.verifyWebhook.mockImplementation(() => {
       throw new Error('invalid signature');
     });
-    expect((await POST(request())).status).toBe(401);
+    const invalidResponses = await Promise.all(Array.from({ length: 5 }, () => POST(request())));
+    expect(invalidResponses.every((response) => response.status === 401)).toBe(true);
+    expect(mocks.captureUnexpectedError).toHaveBeenCalledOnce();
+    expect(mocks.captureUnexpectedError).toHaveBeenCalledWith(expect.any(Error), {
+      feature: 'email',
+      operation: 'signature_verification',
+      route: '/api/webhooks/resend',
+      source: 'resend_webhook',
+    });
+
+    mocks.verifyWebhook.mockReset();
 
     const oversized = request('x');
     oversized.headers.set('content-length', String(64 * 1024 + 1));

@@ -123,9 +123,9 @@
         "title": "Dayopt",
         "description": "Turn your plans and records into a better next day.",
         "perMonth": "/month",
-        "trial": "Try every feature free for {days} days. No card required.",
+        "trial": "Try every feature free for {days} days after you first open the app. No card required.",
         "included": "Calendar, weekly, monthly and yearly report views, Google Calendar sync, MCP and API. Everything included.",
-        "afterTrial": "Your trial starts when you first open the app. Subscribe to continue after it ends. You can still view, export and delete your saved data.",
+        "afterTrial": "No automatic charge when the trial ends. Subscribe for $5/month to continue creating and syncing; subscriptions renew monthly until canceled. You can still view saved calendar and reports, export, and delete.",
         "cta": "Try Dayopt free"
       }
     },

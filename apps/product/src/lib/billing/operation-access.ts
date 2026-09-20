@@ -20,7 +20,6 @@ const managementMutations = new Set([
   'planCommands.delete',
   'recordCommands.delete',
   'planTemplates.delete',
-  'review.deleteSegment',
   'review.trackOpened',
 ]);
 

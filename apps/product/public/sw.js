@@ -4,21 +4,20 @@
  * オフライン対応とキャッシング戦略を提供
  *
  * バージョニング戦略:
- * - SW自体はクエリパラメータでバージョン管理（useServiceWorker.ts）
- * - キャッシュ名にはメジャーバージョンのみ含める
- * - 破壊的変更がない限りキャッシュは引き継ぐ
+ * - SW自体はクエリパラメータでバージョン管理（useServiceWorker.ts が
+ *   `/sw.js?v=<commit sha>` で登録する）
+ * - キャッシュ名にはそのバージョン文字列をそのまま含める。commit SHA は deploy ごとに
+ *   変わるため、deploy のたびにキャッシュ名が自動的にローテーションし、
+ *   `activate` イベントが旧バージョンのキャッシュを削除する（手動インクリメント不要）
+ * - v が付かない登録（ローカル開発等）では 'dev' にフォールバックする
  */
 
 // SW内ログ: 開発時のみ出力（本番ではno-op）
 const __SW_DEBUG__ = typeof location !== 'undefined' && location.hostname === 'localhost';
 const swLog = __SW_DEBUG__ ? console.log.bind(console) : () => {};
 
-// キャッシュバージョン: 破壊的変更時のみインクリメント
-// 4: primary を紺へ変更しアイコン / splash / manifest を作り直した（#1757）。
-//    STATIC_ASSETS に manifest.json とアイコンが含まれるため、上げないと
-//    既存インストールに旧ブランドが残り続ける
-const CACHE_VERSION = '4';
-const CACHE_NAME = `dayopt-v${CACHE_VERSION}`;
+// キャッシュバージョン: 登録 URL のクエリパラメータ（commit SHA）から取得する
+const CACHE_VERSION = new URL(self.location.href).searchParams.get('v') || 'dev';
 const STATIC_CACHE_NAME = `dayopt-static-v${CACHE_VERSION}`;
 const DYNAMIC_CACHE_NAME = `dayopt-dynamic-v${CACHE_VERSION}`;
 
@@ -122,7 +121,7 @@ self.addEventListener('fetch', (event) => {
 
   // ナビゲーションリクエスト（HTMLページ）
   if (request.mode === 'navigate') {
-    event.respondWith(handleNavigationRequest(request, event));
+    event.respondWith(handleNavigationRequest(request));
     return;
   }
 
@@ -138,44 +137,37 @@ self.addEventListener('fetch', (event) => {
 
 /**
  * ナビゲーションリクエストの処理
- * Stale-While-Revalidate: キャッシュがあれば即返し、
- * バックグラウンドでネットワークfetchしてキャッシュを更新する
+ * Network First: 常にネットワークの HTML を返し、成功したらキャッシュを更新する。
+ * ネットワークが使えない時だけキャッシュ → `/offline` の順にフォールバックする。
+ *
+ * 以前は Stale-While-Revalidate で、deploy 直後の 1 回目の表示が必ず前のビルドの HTML に
+ * なっていた（新しい版を見るのにもう一度リロードが要った）。認証済みの動的なアプリで
+ * 古い HTML を先に返す利点は無いため、オフライン時の読み取りだけをキャッシュに任せる。
  */
-async function handleNavigationRequest(request, event) {
+async function handleNavigationRequest(request) {
   const cache = await caches.open(DYNAMIC_CACHE_NAME);
-  const cached = await cache.match(request);
 
-  // バックグラウンドでネットワークfetch → キャッシュ更新（次回用）
-  const fetchPromise = fetch(request)
-    .then((response) => {
-      if (response.ok) {
-        cache.put(request, response.clone());
-      }
-      return response;
-    })
-    .catch(() => null);
-
-  if (cached) {
-    // バックグラウンドfetchをworkerのlifetimeに結びつける
-    event.waitUntil(fetchPromise);
-    return cached;
-  }
-
-  // キャッシュがない場合はネットワークを待つ
-  const networkResponse = await fetchPromise;
-  if (networkResponse) {
+  try {
+    const networkResponse = await fetch(request);
+    if (networkResponse.ok) {
+      cache.put(request, networkResponse.clone());
+    }
     return networkResponse;
-  }
+  } catch (error) {
+    const cached = await cache.match(request);
+    if (cached) {
+      return cached;
+    }
 
-  // どちらもない場合はオフラインフォールバック
-  const offlineResponse = await caches.match('/offline');
-  if (offlineResponse) {
-    return offlineResponse;
+    const offlineResponse = await caches.match('/offline');
+    if (offlineResponse) {
+      return offlineResponse;
+    }
+    return new Response('オフラインです', {
+      status: 503,
+      headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+    });
   }
-  return new Response('オフラインです', {
-    status: 503,
-    headers: { 'Content-Type': 'text/plain; charset=utf-8' },
-  });
 }
 
 /**

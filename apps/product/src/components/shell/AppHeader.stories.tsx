@@ -110,26 +110,26 @@ export const WithRightSlot: Story = {
 export const AllPatterns: Story = {
   render: () => (
     <div className="flex flex-col items-start gap-6">
-      <div className="border-border w-full border">
+      <article className="border-border w-full border">
         <AppHeader>
           <h1 className="truncate text-lg leading-8 font-medium">タイトルのみ</h1>
         </AppHeader>
-      </div>
-      <div className="border-border w-full border">
+      </article>
+      <article className="border-border w-full border">
         <AppHeader leftSlot={<StubLeftSlot />}>
           <h1 className="truncate text-lg leading-8 font-medium">leftSlot付き</h1>
         </AppHeader>
-      </div>
-      <div className="border-border w-full border">
+      </article>
+      <article className="border-border w-full border">
         <AppHeader rightSlot={<StubRightSlot />}>
           <h1 className="truncate text-lg leading-8 font-medium">rightSlot付き</h1>
         </AppHeader>
-      </div>
-      <div className="border-border w-full border">
+      </article>
+      <article className="border-border w-full border">
         <AppHeader leftSlot={<StubLeftSlot />} rightSlot={<StubRightSlot />}>
           <h1 className="truncate text-lg leading-8 font-medium">全スロット</h1>
         </AppHeader>
-      </div>
+      </article>
     </div>
   ),
 };

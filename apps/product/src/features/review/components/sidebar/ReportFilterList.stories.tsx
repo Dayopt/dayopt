@@ -3,29 +3,18 @@ import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { ReportFilterList } from './ReportFilterList';
 
 /**
- * `/report` サイドバーの「カテゴリ」（分母から出し入れ）。
+ * `/report` サイドバーの分析フィルタ（分母から出し入れする一覧）。
  *
- * カテゴリー・未分類・余白の 3 種類だけを並べ、アクティビティは並べない。
+ * 骨格・余白・ホバーはカレンダーの `ActivityFilterList` と同じ（「カテゴリ」「未分類」の 2 見出し、
+ * 右端の 👁 は見えている行ならホバーで出る）。
  * `activities.listTree` を tRPC でモックし、トグル状態は `useReportViewStore` で作る。
  */
-const MOCK_SEGMENTS = [
-  {
-    id: 'seg-1',
-    name: '深い仕事',
-    activityIds: ['act-dev'],
-    createdAt: '2026-01-01T00:00:00.000Z',
-    updatedAt: '2026-01-01T00:00:00.000Z',
-  },
-];
-
 const meta = {
   title: 'Product/Features/Review/Sidebar/ReportFilterList',
   component: ReportFilterList,
   parameters: {
     layout: 'padded',
-    // レンズの生死は `review.listSegments` で決まる（`useActiveSegment`）。
-    // ここを落とすと LensActive が「レンズ無し」に見えてしまう
-    trpcMocks: { 'activities.listTree': MOCK_TREE(), 'review.listSegments': MOCK_SEGMENTS },
+    trpcMocks: { 'activities.listTree': MOCK_TREE() },
   },
   tags: ['autodocs'],
   decorators: [
@@ -42,9 +31,7 @@ type Story = StoryObj<typeof meta>;
 
 const ALL_VISIBLE = {
   hiddenCategoryIds: [],
-  uncategorizedHidden: false,
-  marginHidden: false,
-  segmentId: null,
+  hiddenActivityIds: [],
 };
 
 /** 既定。すべてのカテゴリーと未分類・余白が分母に入っている。 */
@@ -52,38 +39,38 @@ export const Default: Story = {
   parameters: { storeMocks: { useReportViewStore: ALL_VISIBLE } },
 };
 
-/** 睡眠を分母から外した状態。ラベルが muted になる（余白の値は動かない）。 */
+/** 睡眠を分母から外した状態。見出しと配下が muted になる（余白の値は動かない）。 */
 export const CategoryHidden: Story = {
   parameters: {
     storeMocks: { useReportViewStore: { ...ALL_VISIBLE, hiddenCategoryIds: ['cat-sleep'] } },
   },
 };
 
-/** 余白オフ。インクだけを分母にして、セグメントの合計が 100% になる。 */
-export const MarginOff: Story = {
-  parameters: { storeMocks: { useReportViewStore: { ...ALL_VISIBLE, marginHidden: true } } },
+/** アクティビティを 1 つだけ外した状態。カテゴリーの 👁 は「一部」として常時出る。 */
+export const ActivityHidden: Story = {
+  parameters: {
+    storeMocks: { useReportViewStore: { ...ALL_VISIBLE, hiddenActivityIds: ['act-review'] } },
+  },
 };
 
-/** レンズ選択中。余白は分母に入りようがないので行ごと無効化し、理由を添える。 */
-export const LensActive: Story = {
-  parameters: { storeMocks: { useReportViewStore: { ...ALL_VISIBLE, segmentId: 'seg-1' } } },
-};
-
-/** カテゴリーが 1 つも無い状態。見出しと未分類・余白だけが残る。 */
+/** カテゴリーも未分類も無い状態。2 つの見出しに空の文言が出る。 */
 export const NoCategories: Story = {
   parameters: {
-    trpcMocks: {
-      'activities.listTree': { categories: [], uncategorized: [] },
-      'review.listSegments': MOCK_SEGMENTS,
-    },
+    trpcMocks: { 'activities.listTree': { categories: [], uncategorized: [] } },
     storeMocks: { useReportViewStore: ALL_VISIBLE },
   },
 };
 
-/** すべての状態を 1 画面に並べる（ADR-023 の AllPatterns）。 */
+/** すべての状態を 1 画面に並べる（ADR-023 の AllPatterns）。見えている / 一部 / 外したが同居する。 */
 export const AllPatterns: Story = {
   parameters: {
-    storeMocks: { useReportViewStore: { ...ALL_VISIBLE, hiddenCategoryIds: ['cat-sleep'] } },
+    storeMocks: {
+      useReportViewStore: {
+        ...ALL_VISIBLE,
+        hiddenCategoryIds: ['cat-sleep'],
+        hiddenActivityIds: ['act-review'],
+      },
+    },
   },
   render: function AllPatternsReportFilterList() {
     return (
@@ -122,7 +109,10 @@ function MOCK_TREE() {
     categories: [
       {
         category: category('cat-work', '仕事', 'blue', 'briefcase'),
-        activities: [activity('act-dev', '実装', 'cat-work')],
+        activities: [
+          activity('act-dev', '実装', 'cat-work'),
+          activity('act-review', 'レビュー', 'cat-work'),
+        ],
       },
       {
         category: category('cat-sleep', '睡眠', 'indigo', 'moon'),

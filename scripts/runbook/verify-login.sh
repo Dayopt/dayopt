@@ -26,8 +26,8 @@ if [[ -z "$USER_EMAIL" || -z "$PASSWORD_ITEM_ID" ]]; then
   exit 1
 fi
 
-if [[ -z "${NEXT_PUBLIC_SUPABASE_URL:-}" || -z "${NEXT_PUBLIC_SUPABASE_ANON_KEY:-}" ]]; then
-  echo "エラー: NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY が未設定です" >&2
+if [[ -z "${NEXT_PUBLIC_SUPABASE_URL:-}" || -z "${NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY:-}" ]]; then
+  echo "エラー: NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY が未設定です" >&2
   exit 1
 fi
 
@@ -60,7 +60,7 @@ trap 'rm -f "$RESPONSE_FILE"' EXIT
 HTTP_STATUS=$(curl -sS -o "$RESPONSE_FILE" -w "%{http_code}" \
   -X POST \
   "${NEXT_PUBLIC_SUPABASE_URL}/auth/v1/token?grant_type=password" \
-  -H "apikey: ${NEXT_PUBLIC_SUPABASE_ANON_KEY}" \
+  -H "apikey: ${NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY}" \
   -H "Content-Type: application/json" \
   -d "$REQUEST_BODY")
 

@@ -97,6 +97,21 @@
         "learnMore": "Cookie Policy",
         "necessaryOnly": "Necessary only",
         "allowAnalytics": "Allow analytics"
+      },
+      "settings": {
+        "trigger": "Cookie settings",
+        "title": "Change your cookie choice",
+        "independentOrigins": "Choices made on this website and in the app are stored separately.",
+        "status": {
+          "allowed": "Analytics is currently allowed.",
+          "refused": "Analytics is currently refused.",
+          "unset": "You have not chosen yet."
+        },
+        "revokeConfirmTitle": "Refuse analytics?",
+        "revokeConfirmDescription": "The page reloads so that browser analytics and error monitoring stop completely. Anything you have typed but not sent is lost.",
+        "revokeConfirmLabel": "Refuse and reload",
+        "revokeCancelLabel": "Keep current choice",
+        "saveFailed": "Could not save your choice. Browser storage rejected the write, so analytics was not changed."
       }
     }
   },
@@ -230,7 +245,7 @@
       "plan": "Plan your day",
       "track": "Track your time",
       "review": "Look back",
-      "organize": "Organize with tags",
+      "organize": "Organize with activities",
       "data": "Use your data elsewhere",
       "troubleshooting": "When something breaks",
       "account": "Account",
@@ -241,8 +256,7 @@
       "loading": "Loading...",
       "noHeadings": "No headings found",
       "links": "Links",
-      "reportIssue": "Report an issue",
-      "viewSource": "View source"
+      "reportIssue": "Report an issue"
     },
     "sidebar": {
       "searchPlaceholder": "Search docs..."

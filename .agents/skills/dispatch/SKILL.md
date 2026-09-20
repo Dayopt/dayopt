@@ -67,24 +67,17 @@ feature 開発と並行する非 feature 作業を issue ベースで回す定�
 `size:*` ラベルには依存しない（`size:*` は deprecated。操作 B 手順 3 参照）。編成のたびに issue 本文の内容から次の 3 区分のいずれかを判定する:
 
 - **直接実装**: 手順が既存パターンの追従で完結する。plan 不要
-- **plan 先行**: 複数ファイル・複数 Step にまたがる、または既存 contract に触れる。worker に `AGENTS.md` §実装 Plan の必須セクション に従った plan を先に出させてから実装。複数 issue を束ねた PR は merge 前に `pr-cross-review` skill による advisory クロスレビューを受ける対象になりやすい（merge を止めるものではない）
+- **plan 先行**: 複数ファイル・複数 Step にまたがる、または既存 contract に触れる。worker に `AGENTS.md` §実装 Plan の必須セクション に従った plan を先に出させてから実装。複数 issue を束ねた PR は merge 前に GitHub の `@codex review` で重点的に読む対象になりやすい（merge を止めるものではない）
 - **裁定 session で実施**: spike / 設計判断を含む issue、または `risk:authority` が付いた issue。権限・比較・rollback を判断できる担当が実施し、provider の model tier 名では固定しない
 
 ## 操作 B: intake — 新しい作業を issue 化する
 
 作業依頼・発見事項・監査結果が issue の外にある状態を作らない。
 
+Chat 等への外部依頼で生じた調査結果も、まず既存の対象 issue へ記録する。[Chat 連携手順](../../../docs/operations/chat-handoff.md) の依頼IDと投稿URLで照合し、調査結果の保存を採用・実装承認と混同しない。指定 issue へのコメント権限から、新規 issue 作成・本文変更・状態変更の権限を推定しない。新規起票を委ねる場合は repository、件数上限、対象範囲と本操作 B の規約を渡す。再送前には同じ依頼IDの投稿を確認し、既存ならそのURLを再利用する。
+
 1. `gh search issues` で既存 issue との重複を確認（close 済み含む）
-2. 重複なら既存 issue に本文追記 or コメントで統合。新規なら handoff-quality で起票。**RLS ポリシー・テナント境界・スキーマ変更に関わる起票では、攻撃シナリオ生成が issue の品質を実質的に上げる場合だけ、別 context の read-only reviewer に依頼し、出力を「## テストすべき攻撃シナリオ」として本文に貼る**。OpenAI / Codex の CLI adapter 例:
-
-   ```bash
-   codex exec --sandbox read-only \
-     "supabase/migrations/ 配下のスキーマと RLS ポリシーを読み、
-      テナント越えの読み書きができてしまう可能性のあるクエリ・操作パターンを
-      10個列挙せよ。それぞれ悪用手順を1行で添えること。"
-   ```
-
-   同等の read-only reviewer を利用できる runtime では、上記 command の代わりに同じ prompt・scope・出力契約を渡してよい。出力をチケット本文に貼り、到達可能なシナリオだけをテスト候補へ残す。呼び出し失敗・タイムアウト時はスキップして本来のフローを続行する（best-effort）
+2. 重複なら既存 issue に本文追記 or コメントで統合。新規なら handoff-quality で起票。**RLS ポリシー・テナント境界・スキーマ変更に関わる起票では、攻撃シナリオの洗い出しが issue の品質を実質的に上げる場合だけ、親担当が別 context の read-only 調査を行い、出力を「## テストすべき攻撃シナリオ」として本文に貼る**。read-only と repository scope を runtime で同時に強制できる delegate は現在ないため、別 agent へは委譲しない。これはレビューや merge 判定ではなく、起票前の読み取り補助である。到達可能なシナリオだけをテスト候補へ残す。
 
    **これは起票時の攻撃シナリオ生成であり、実装の着手可否を決める gate ではない。** 本文を厚くするための best-effort な補助で、外部 provider の可用性を前提にしない
 

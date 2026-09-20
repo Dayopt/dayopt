@@ -27,7 +27,7 @@ vi.mock('@trpc/react-query/server', () => ({
 vi.mock('@/env', () => ({
   env: {
     NEXT_PUBLIC_SUPABASE_URL: 'https://example.supabase.co',
-    NEXT_PUBLIC_SUPABASE_ANON_KEY: 'test-anon-key',
+    NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: 'test-anon-key',
   },
 }));
 
@@ -119,5 +119,27 @@ describe('HTTP/RSC tRPC context parity', () => {
       'rsc_trpc_get_session_for_mfa',
       'rsc_trpc_get_authenticator_assurance_level',
     ]);
+  });
+
+  it('HTTPとRSCの両方でW3C trace伝播をopt-inする（#2728）', async () => {
+    // 片方だけ有効だと、同じ画面でも経路によって Supabase logs と相関できたり
+    // できなかったりする。両方が同じ option を渡すことを固定する。
+    mocks.createServerClient.mockReturnValue({
+      auth: {
+        getUser: vi.fn().mockResolvedValue({ data: { user: null }, error: null }),
+        getSession: vi.fn().mockResolvedValue({ data: { session: null }, error: null }),
+      },
+    });
+
+    await createFetchTRPCContext({
+      req: new Request('https://app.dayopt.app/api/trpc'),
+      resHeaders: new Headers(),
+    } as never);
+    await createServerHelpers();
+
+    const passedOptions = mocks.createServerClient.mock.calls.map(
+      ([, , options]) => (options as { tracePropagation?: unknown }).tracePropagation,
+    );
+    expect(passedOptions).toEqual([{ enabled: true }, { enabled: true }]);
   });
 });

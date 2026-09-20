@@ -17,7 +17,7 @@ import { captureUnexpectedError } from '@/lib/sentry';
 
 /**
  * `@/env` の `env.X` は初回アクセス時に schema 全体（Supabase 必須3変数を含む）を検証する
- * all-or-nothing Proxy（`src/env.ts`）。generic Preview deployment は `SUPABASE_SERVICE_ROLE_KEY`
+ * all-or-nothing Proxy（`src/env.ts`）。generic Preview deployment は `SUPABASE_SECRET_KEY`
  * を持たない（決定ログ（削除済み、git 履歴参照））ため、この module を
  * 経由するどの route も import 時点で無関係に crash していた（#2011）。Upstash 側は本来
  * `UPSTASH_REDIS_REST_URL` / `_TOKEN` の2変数しか要らないので、`process.env` を直接読む
@@ -254,6 +254,44 @@ export const oauthTokenIpRateLimit = createRateLimiter(
   'ratelimit:product:oauth-token:ip',
 );
 
+/**
+ * OAuth token endpoint の body を読む前に置く粗い IP 上限。
+ *
+ * grant_type ごとに bucket を分けるには body を読む必要があり、その body 読み取り自体を
+ * 無制限にしないための層。DBを引かない安価な処理だけがこの内側にある。
+ */
+export const oauthTokenPreBodyIpRateLimit = createRateLimiter(
+  Ratelimit.slidingWindow(600, '1 m'),
+  'ratelimit:product:oauth-token:pre-body-ip',
+);
+
+/**
+ * refresh grant 用: refresh token 単位の上限。
+ *
+ * claude.ai / ChatGPT のような server-side client は全ユーザー分の refresh を少数の
+ * egress IP から送る。access token は 5 分で切れるため、IP 単位の 10/分 に refresh を
+ * 相乗りさせると、同一 provider 経由の接続が増えた時点で **全ユーザーの refresh が
+ * 巻き添えで 429 になる**（#2721 D-01）。token 単位なら他の接続に波及しない。
+ */
+export const oauthTokenRefreshRateLimit = createRateLimiter(
+  Ratelimit.slidingWindow(30, '1 m'),
+  'ratelimit:product:oauth-token:refresh',
+);
+
+/**
+ * refresh grant の IP 単位上限。**token 単位の上限と AND で使う。**
+ *
+ * bucket key の材料（refresh token）は検証前の body なので、攻撃者は毎回別の値を
+ * 送って per-token bucket を無限に作れる。token 単位だけだと 1 IP から全体上限
+ * （`oauthTokenGlobalRateLimit`）を飽和させられ、正規ユーザーの token 更新が
+ * 巻き添えで止まる。共有 egress IP を締め出さないよう、`authorization_code` 用の
+ * 10/分 より緩くする。
+ */
+export const oauthTokenRefreshIpRateLimit = createRateLimiter(
+  Ratelimit.slidingWindow(120, '1 m'),
+  'ratelimit:product:oauth-token:refresh-ip',
+);
+
 /** OAuth token endpoint全体のDB負荷上限。 */
 export const oauthTokenGlobalRateLimit = createRateLimiter(
   Ratelimit.slidingWindow(120, '1 m'),
@@ -261,7 +299,7 @@ export const oauthTokenGlobalRateLimit = createRateLimiter(
 );
 
 /**
- * エントリ作成の日次上限
+ * タイムブロック作成の日次上限
  * 500リクエスト / 24時間 per user
  */
 export const timeblockCreateRateLimit = createRateLimiter(
@@ -288,6 +326,32 @@ export const icalFeedRateLimit = createRateLimiter(
 export const icalFeedIpRateLimit = createRateLimiter(
   Ratelimit.slidingWindow(60, '1 m'),
   'ratelimit:product:ical-feed-ip',
+);
+
+/**
+ * 認証前の tRPC 境界用: cookie 付きリクエストの IP 単位上限。
+ *
+ * `protectedProcedure` の 300/分 は `ctx.userId` が確定した後にしか働かない
+ * （`procedures.ts`）。cookie を持つ未認証リクエストは、その手前で毎回
+ * Supabase Auth の `getUser()` を駆動できる（#2721 D-06）。cookie 無しは
+ * auth-js が外部通信せず短絡するため、この層は cookie 付きだけに掛ける。
+ *
+ * ユーザー単位の 300/分 より緩くして、NAT 越しの同居ユーザーを巻き込まない。
+ */
+export const trpcPreAuthIpRateLimit = createRateLimiter(
+  Ratelimit.slidingWindow(600, '1 m'),
+  'ratelimit:product:trpc:pre-auth-ip',
+);
+
+/**
+ * `/api/health` 用の全体上限。
+ *
+ * 無認証・無制限で service-role の DB 疎通と Redis PING を駆動できる（#2721 D-09）。
+ * 外形監視を止めないため、超過時は 503 ではなく直近の結果を返す。
+ */
+export const healthCheckGlobalRateLimit = createRateLimiter(
+  Ratelimit.slidingWindow(120, '1 m'),
+  'ratelimit:product:health:global',
 );
 
 /** iCalフィード全体の集約上限（暫定値）。service-role DB lookupを保護する。 */

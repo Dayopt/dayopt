@@ -57,6 +57,12 @@ export const CALENDAR_SHORTCUT_CATALOG: ShortcutCatalog = {
     },
     {
       groupId: 'views',
+      labelKey: 'calendar.shortcuts.actions.weekView',
+      keys: ['W'],
+      order: 105,
+    },
+    {
+      groupId: 'views',
       labelKey: 'calendar.shortcuts.actions.twoDayView',
       keys: ['2'],
       order: 110,

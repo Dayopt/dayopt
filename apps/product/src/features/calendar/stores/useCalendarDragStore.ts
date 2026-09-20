@@ -12,9 +12,9 @@ import type { CalendarDisplayEvent } from '../types/calendar.types';
 
 interface CalendarDragState {
   /** ドラッグ中のTimeblockID */
-  draggedEntryId: string | null;
+  draggedTimeblockId: string | null;
   /** ドラッグ中のTimeblockデータ */
-  draggedEntry: CalendarDisplayEvent | null;
+  draggedTimeblock: CalendarDisplayEvent | null;
   /** 元の日付インデックス */
   originalDateIndex: number;
   /** 現在のターゲット日付インデックス */
@@ -34,21 +34,21 @@ interface CalendarDragActions {
   /** カレンダー内ドラッグ開始 */
   startDrag: (
     timeblockId: string,
-    entry: CalendarDisplayEvent,
+    timeblock: CalendarDisplayEvent,
     dateIndex: number,
     lane?: 'plan' | 'record',
   ) => void;
   /** ドラッグ中の状態更新 */
   updateDrag: (
-    updates: Partial<Omit<CalendarDragState, 'draggedEntryId' | 'draggedEntry'>>,
+    updates: Partial<Omit<CalendarDragState, 'draggedTimeblockId' | 'draggedTimeblock'>>,
   ) => void;
   /** ドラッグ終了 */
   endDrag: () => void;
 }
 
 const initialState: CalendarDragState = {
-  draggedEntryId: null,
-  draggedEntry: null,
+  draggedTimeblockId: null,
+  draggedTimeblock: null,
   originalDateIndex: 0,
   targetDateIndex: 0,
   isDragging: false,
@@ -64,10 +64,10 @@ export const useCalendarDragStore = create<CalendarDragState & CalendarDragActio
     (set) => ({
       ...initialState,
 
-      startDrag: (timeblockId, entry, dateIndex, lane = 'plan') =>
+      startDrag: (timeblockId, timeblock, dateIndex, lane = 'plan') =>
         set({
-          draggedEntryId: timeblockId,
-          draggedEntry: entry,
+          draggedTimeblockId: timeblockId,
+          draggedTimeblock: timeblock,
           originalDateIndex: dateIndex,
           targetDateIndex: dateIndex,
           isDragging: true,

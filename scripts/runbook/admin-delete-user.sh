@@ -12,8 +12,11 @@
 #
 # 使い方:
 #   op run --env-file=.op-env.human -- \
-#     env USER_EMAIL=foo@example.com \
+#     env USER_EMAIL=foo@example.com DAYOPT_CONFIRM_TARGET=<project-ref> \
 #     bash scripts/runbook/admin-delete-user.sh
+#
+# DAYOPT_CONFIRM_TARGET は NEXT_PUBLIC_SUPABASE_URL から導いた project ref と
+# 一致しないと削除しない（confirm-target.sh）。
 # ========================================
 
 set -euo pipefail
@@ -24,6 +27,7 @@ USER_EMAIL="${USER_EMAIL:-}"
 
 require_user_email
 require_supabase_env
+require_target_confirmation "$(supabase_ref_from_url "$NEXT_PUBLIC_SUPABASE_URL")" "user の hard delete（${USER_EMAIL}、関連 row も CASCADE 削除）"
 
 auth_headers_json
 

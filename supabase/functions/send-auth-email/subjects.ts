@@ -9,7 +9,12 @@
 export type AuthEmailLocale = 'en' | 'ja';
 
 export type AuthEmailSubjectKey =
-  'signup' | 'recovery' | 'magic_link' | 'email_change_current' | 'email_change_new';
+  | 'signup'
+  | 'recovery'
+  | 'magic_link'
+  | 'email_change_current'
+  | 'email_change_new'
+  | 'password_changed_notification';
 
 export const authEmailSubjects: Record<AuthEmailLocale, Record<AuthEmailSubjectKey, string>> = {
   en: {
@@ -18,6 +23,7 @@ export const authEmailSubjects: Record<AuthEmailLocale, Record<AuthEmailSubjectK
     magic_link: 'Log in to Dayopt',
     email_change_current: 'Approve your Dayopt email change',
     email_change_new: 'Confirm your new Dayopt email',
+    password_changed_notification: 'Your Dayopt password was changed',
   },
   ja: {
     signup: 'Dayopt メールアドレスの確認',
@@ -25,5 +31,6 @@ export const authEmailSubjects: Record<AuthEmailLocale, Record<AuthEmailSubjectK
     magic_link: 'Dayopt にログイン',
     email_change_current: 'Dayopt メールアドレス変更の承認',
     email_change_new: 'Dayopt 新しいメールアドレスの確認',
+    password_changed_notification: 'Dayopt パスワードが変更されました',
   },
 };

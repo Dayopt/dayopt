@@ -5,6 +5,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { env } from '@/env';
 import { dispatchCalendarSync } from '@/features/external-calendar/server/sync-dispatcher';
 import { logger } from '@/lib/logger';
+import { writeCronHeartbeat } from '@/lib/ops/cron-heartbeat';
 import { isWriteFenceEnabled } from '@/lib/ops/write-fence';
 import { captureUnexpectedError } from '@/lib/sentry';
 import { createServiceRoleClient } from '@/lib/supabase/oauth';
@@ -60,11 +61,14 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     );
   }
 
+  const heartbeatStartedAt = new Date().toISOString();
+  await writeCronHeartbeat('calendar-sync', 'started', heartbeatStartedAt);
   try {
     const summary = await dispatchCalendarSync({
       now: new Date(),
       deadlineAt: Date.now() + TIME_BUDGET_MS,
     });
+    await writeCronHeartbeat('calendar-sync', 'completed', heartbeatStartedAt);
     return NextResponse.json({ ok: true, ...summary });
   } catch (error) {
     captureUnexpectedError(error instanceof Error ? error : new Error('calendar cron failed'), {

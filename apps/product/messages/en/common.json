@@ -228,9 +228,7 @@
     "inlineBanner": {
       "paymentError": "There is a payment issue",
       "checkPayment": "Check payment info",
-      "conflict": "Changes were made elsewhere",
-      "reload": "Reload",
-      "updateAvailable": "A new version is available"
+      "conflict": "Changes were made elsewhere"
     },
     "pwa": {
       "installTitle": "Install Dayopt",
@@ -365,6 +363,9 @@
         "challengeFailed": "Challenge error",
         "verifyFailed": "Verification error",
         "codeInvalid": "Invalid code. Please try again.",
+        "challengeExpired": "This verification step timed out. Enter a new code from your authenticator app and try again.",
+        "verificationRejected": "Verification was rejected. Please try again in a moment.",
+        "tooManyAttempts": "Too many attempts. Please wait a moment and try again.",
         "verificationFailed": "Code verification failed. Please try again",
         "factorListFailed": "Factor retrieval error",
         "noFactorFound": "No valid MFA factor found",

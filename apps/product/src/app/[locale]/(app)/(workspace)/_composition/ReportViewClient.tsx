@@ -2,20 +2,23 @@
 
 import { CalendarDays, PanelLeft } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 
 import { useCalendarNavigation } from '@/features/calendar';
 import {
+  buildReportHref,
   ConnectedReportDetailPanel,
   ReportBody,
-  ReportFilterChipRow,
+  ReportFilterDrawer,
   ReportHeader,
   ReportMobileHeader,
+  ReportTabs,
   resolveReportRange,
   resolveZonedDayKey,
   shiftReportAnchor,
   todayReportAnchor,
   type ReportGranularity,
+  type ReportTab,
 } from '@/features/review';
 import { MEDIA_QUERIES } from '@/lib/breakpoints';
 import { useHasMounted } from '@/lib/hooks/useHasMounted';
@@ -31,6 +34,8 @@ import { useReportJump } from './useReportJump';
 
 interface ReportViewClientProps {
   granularity: ReportGranularity;
+  /** 面（時間の使い方 / 差分 / 振り返り）。`?tab=` を page が解釈して渡す。 */
+  tab: ReportTab;
 }
 
 /**
@@ -51,7 +56,7 @@ interface ReportViewClientProps {
  * サイドバートグルとモバイルのアカウントボタンもここから `ReportHeader` の slot へ渡す
  * （`CalendarViewClient` が `CalendarLayout` に渡しているのと同じ形）。
  */
-export function ReportViewClient({ granularity }: ReportViewClientProps) {
+export function ReportViewClient({ granularity, tab }: ReportViewClientProps) {
   const t = useTranslations();
   const navigation = useCalendarNavigation();
   const router = useRouter();
@@ -72,8 +77,20 @@ export function ReportViewClient({ granularity }: ReportViewClientProps) {
   const hasMounted = useHasMounted();
   const anchorDate = formatAnchor(navigation?.currentDate);
 
-  // 4 章からカレンダーへのジャンプ（仕様 §7）。review は router を持たない
-  const jump = useReportJump({ anchorDate, granularity, weekStartsOn });
+  // 詳細パネルの明細からカレンダーへのジャンプ（仕様 §7）。review は router を持たない
+  const jump = useReportJump();
+
+  /**
+   * 表示中のタブ。**押した瞬間に切り替える**ため、URL（server の prop）より先に client で持つ。
+   * `router.replace` は RSC を取り直すので、prop だけを正本にすると押してから面が変わるまで
+   * 往復ぶん待たされる。戻る / 共有リンクなど外から prop が変わった時はそちらへ寄せる。
+   */
+  const [activeTab, setActiveTab] = useState(tab);
+  const [prevTab, setPrevTab] = useState(tab);
+  if (tab !== prevTab) {
+    setPrevTab(tab);
+    setActiveTab(tab);
+  }
 
   const range = useMemo(
     () => resolveReportRange(anchorDate, granularity, timezone, weekStartsOn),
@@ -117,9 +134,21 @@ export function ReportViewClient({ granularity }: ReportViewClientProps) {
 
   const handleGranularityChange = useCallback(
     (next: ReportGranularity) => {
-      router.push(`/report?date=${anchorDate}&range=${next}`);
+      router.push(buildReportHref({ anchorDate, granularity: next, tab: activeTab }));
     },
-    [anchorDate, router],
+    [activeTab, anchorDate, router],
+  );
+
+  /**
+   * タブの切替。**履歴に積まない**（`replace`）。面の行き来で戻るボタンが埋まると、
+   * `/report` から前の画面へ戻れなくなる。期間（`date` / `range`）はそのまま引き継ぐ。
+   */
+  const handleTabChange = useCallback(
+    (next: ReportTab) => {
+      setActiveTab(next);
+      router.replace(buildReportHref({ anchorDate, granularity, tab: next }), { scroll: false });
+    },
+    [anchorDate, granularity, router],
   );
 
   /**
@@ -218,8 +247,12 @@ export function ReportViewClient({ granularity }: ReportViewClientProps) {
             onDateSelect={handleDateSelect}
             rightSlot={mobileActions}
           />
-          {/* サイドバーを持たない面のフィルタとレンズ。読み書きは同じ store */}
-          <ReportFilterChipRow />
+          {/* タブ行の右端にフィルタ。サイドバーを持たない面なので、同じ一覧を Drawer で開く。
+              ヘッダー → タブ → チップの 3 段だったものを 2 段に畳んだ（2026-09-15 User 裁可） */}
+          <div className="flex items-center justify-between gap-2 px-4 pt-2">
+            <ReportTabs value={activeTab} onValueChange={handleTabChange} />
+            <ReportFilterDrawer />
+          </div>
         </>
       ) : (
         <ReportHeader
@@ -234,13 +267,21 @@ export function ReportViewClient({ granularity }: ReportViewClientProps) {
         />
       )}
 
+      {/* デスクトップのタブはヘッダーの下の 2 行目（2026-09-15 User 指示で 1 行から戻した）。
+          期間（ヘッダー）と面（タブ）を別の行に分けて読ませる。モバイルは上のタブ行が同じ役目 */}
+      {!isMobile && (
+        <div className="px-4 pt-1 md:px-6">
+          <ReportTabs value={activeTab} onValueChange={handleTabChange} />
+        </div>
+      )}
+
       {/* 詳細の器はここが選ぶ（デスクトップ = shell の 4 カラム目へ portal / モバイル =
           ボトムシート）。review 本体に tRPC query を持ち込まないため、ここから描く */}
       <ConnectedReportDetailPanel
         anchorDate={anchorDate}
         granularity={granularity}
-        onOpenCalendarDay={jump.onJumpToDay}
         surface={isMobile ? 'sheet' : 'panel'}
+        onJumpToRecord={jump.onJumpToRecord}
       />
 
       <div
@@ -248,13 +289,7 @@ export function ReportViewClient({ granularity }: ReportViewClientProps) {
         ref={swipeRef as React.RefObject<HTMLDivElement>}
         {...swipeHandlers}
       >
-        <ReportBody
-          anchorDate={anchorDate}
-          granularity={granularity}
-          onJumpToDay={jump.onJumpToDay}
-          onJumpToNextPeriod={jump.onJumpToNextPeriod}
-          onJumpToRecord={jump.onJumpToRecord}
-        />
+        <ReportBody anchorDate={anchorDate} granularity={granularity} tab={activeTab} />
       </div>
     </div>
   );

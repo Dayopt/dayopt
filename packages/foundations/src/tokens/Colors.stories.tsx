@@ -220,6 +220,7 @@ export const AllColors: Story = {
 
       <ColorGroup title="Primary">
         <ColorSwatch tailwindClass="bg-primary" description="主要アクションの背景" />
+        <ColorSwatch tailwindClass="text-primary-text" description="リンク・選択文字" />
         <ColorSwatch
           tailwindClass="text-primary-foreground"
           description="Primary上のテキスト"
@@ -755,7 +756,7 @@ export const Text: Story = {
     ] as const;
 
     const semanticTexts = [
-      { token: 'text-primary', cls: 'text-primary', label: 'リンク、アクション' },
+      { token: 'text-primary-text', cls: 'text-primary-text', label: 'リンク、アクション' },
       { token: 'text-destructive', cls: 'text-destructive', label: 'エラー H25' },
       { token: 'text-warning', cls: 'text-warning', label: '警告 H70' },
       { token: 'text-success', cls: 'text-success', label: '成功 H150' },
@@ -871,7 +872,7 @@ export const Text: Story = {
 <p className="text-muted-foreground">説明</p>
 
 // リンク
-<a className="text-primary">リンク</a>
+<a className="text-primary-text">リンク</a>
 
 // エラーメッセージ
 <p className="text-destructive">入力エラー</p>`}</pre>

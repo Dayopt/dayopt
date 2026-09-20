@@ -5,6 +5,7 @@ import { dayoptBrand } from '@dayopt/config';
 import { Link } from '@dayopt/i18n/navigation';
 import { LanguageSwitcher } from '@web/components/ui/actions/language-switcher';
 import { ThemeToggle } from '@web/components/ui/actions/theme-toggle';
+import { CookieConsentSettings } from '@web/shell/privacy/CookieConsentSettings';
 import { useTranslations } from 'next-intl';
 
 // SNS Icons
@@ -148,6 +149,10 @@ export function Footer() {
                     </Link>
                   </li>
                 ))}
+                {/* 常設の同意撤回導線。Cookie ポリシーの隣に置く（#2831） */}
+                <li>
+                  <CookieConsentSettings />
+                </li>
               </ul>
             </div>
           </div>

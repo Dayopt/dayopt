@@ -132,7 +132,7 @@ const config: StorybookConfig = {
     config.define = {
       ...config.define,
       'process.env.NEXT_PUBLIC_SUPABASE_URL': JSON.stringify('https://storybook.supabase.co'),
-      'process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY': JSON.stringify('storybook-anon-key'),
+      'process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY': JSON.stringify('storybook-anon-key'),
       // McpApiSection は deploy ごとの resource URI が空だと接続導線を出さない。
       // Storybook では production 相当の値を与えてセクションを描画する。
       'process.env.NEXT_PUBLIC_MCP_RESOURCE_URI': JSON.stringify('https://mcp.dayopt.app'),

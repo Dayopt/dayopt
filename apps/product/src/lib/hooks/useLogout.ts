@@ -31,9 +31,11 @@ export function useLogout() {
     try {
       const supabase = createClient();
       await observeAuthOperation('sign_out', () => supabase.auth.signOut());
-      // 永続化された query cache（IndexedDB）を破棄する（#2619）。sign-out は soft
-      // navigation なので、消さないと同じブラウザの次のユーザーに前ユーザーの
-      // plan / record が復元されうる。memory 側は QueryCacheAuthBoundary が閉じる。
+      // 永続化された query cache（IndexedDB）を破棄する（#2619）。消さないと同じ
+      // ブラウザの次のユーザーに前ユーザーの plan / record が復元されうる。
+      // IndexedDB は document を跨いで残るので、この push が hard navigation でも
+      // （2026-09-18 に実測。window の値は消えるが cache は残る）必要。
+      // memory 側は QueryCacheAuthBoundary が閉じる。
       await clearPersistedQueryCache();
       toast.success(t('navigation.navUser.logoutSuccess'));
       router.push('/auth/login');

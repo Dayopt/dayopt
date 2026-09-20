@@ -5,6 +5,7 @@ import { useCallback } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 
 import { useTheme } from '@/lib/hooks/useTheme';
+import { useUpdateUserSettings } from '@/lib/hooks/useUpdateUserSettings';
 import {
   Select,
   SelectContent,
@@ -35,16 +36,21 @@ export function DisplaySettings() {
   const router = useRouter();
   const pathname = usePathname();
   const { settings, saveSettings, isPending } = useUserSettings();
+  const updateUserSettings = useUpdateUserSettings();
 
   const handleLanguageChange = useCallback(
     (value: string) => {
       const newLocale = value as Locale;
       if (newLocale !== locale) {
+        // 画面の言語（URL locale）と一緒に、メール等の配信言語（preferred_locale）も
+        // 揃える。URL だけ変えると DB は初期値の en のままになり、日本語 UI の人に
+        // 英語のメールが届く（2026-09-14 UI レビュー）
+        updateUserSettings.mutate({ preferredLocale: newLocale });
         router.replace(pathname, { locale: newLocale });
         router.refresh();
       }
     },
-    [locale, pathname, router],
+    [locale, pathname, router, updateUserSettings],
   );
 
   const handleThemeChange = useCallback(

@@ -1,4 +1,4 @@
-import { expect, type Page, test } from '@playwright/test';
+import { expect, type Page } from '@playwright/test';
 import { createClient } from '@supabase/supabase-js';
 
 import type { Database } from '@/lib/database';
@@ -8,9 +8,12 @@ import {
   resolveServiceRoleTarget,
 } from '../service-role-target-guard';
 import { suppressConsentBanner } from './suppress-consent-banner';
+import { test } from './trpc-budget-fixture';
+
+test.use({ trpcProcedureBudget: 28 });
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SECRET_KEY;
 const SERVICE_ROLE_TARGET = resolveServiceRoleTarget(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 // CI（E2E_REQUIRE_SERVICE_ROLE_SUITES=1）では skip を許さない。env が壊れて suite が
 // 丸ごと消えても「0 failed」で緑になるのを防ぐ。

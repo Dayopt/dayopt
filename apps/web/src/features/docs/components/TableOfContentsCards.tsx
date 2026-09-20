@@ -22,7 +22,7 @@ export function TableOfContentsCards({ content }: TableOfContentsCardsProps) {
       <div className="bg-card text-card-foreground border-border-subtle rounded-lg border p-4 shadow-sm">
         <ClientTableOfContents content={content} showLinks={false} />
       </div>
-      {/* card 2: リンク（Issue 報告 / ソース） */}
+      {/* card 2: リンク（問題の報告） */}
       <div className="bg-card text-card-foreground border-border-subtle rounded-lg border p-4 shadow-sm">
         <TocLinks />
       </div>

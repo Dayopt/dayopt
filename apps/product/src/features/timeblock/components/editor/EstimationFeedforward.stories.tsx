@@ -8,12 +8,21 @@ const FACTORS = [
   { activityId: 'activity-learning', factor: 0.75, sampleCount: 6 },
 ];
 
-const withFactors = { trpcMocks: { 'statistics.getTagEstimationFactors': FACTORS } };
+const withFactors = { trpcMocks: { 'statistics.getActivityEstimationFactors': FACTORS } };
 
 const meta = {
   title: 'Product/Features/Timeblock/EstimationFeedforward',
   component: EstimationFeedforward,
   tags: ['autodocs'],
+  // Inspector の実幅（PC の docked panel）に近い器で見る。バッジは日時グルーピングの
+  // 直上に置くので、パネル幅で文が折り返すかどうかがそのまま見え方になる
+  decorators: [
+    (Story) => (
+      <div className="w-[360px]">
+        <Story />
+      </div>
+    ),
+  ],
   parameters: { layout: 'padded', ...withFactors },
   args: {
     destination: 'plan',
@@ -50,7 +59,7 @@ export const InsufficientSamples: Story = {
 
 /** 取得に失敗しても ErrorState を出さず、静かに消える。 */
 export const QueryFailed: Story = {
-  parameters: { trpcMocks: { 'statistics.getTagEstimationFactors': undefined } },
+  parameters: { trpcMocks: { 'statistics.getActivityEstimationFactors': undefined } },
 };
 
 /** 全パターン一覧。何も出ないケースは高さ 0 になる。 */

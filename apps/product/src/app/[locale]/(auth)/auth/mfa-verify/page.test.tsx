@@ -121,12 +121,18 @@ const mockUser = {
 
 // mock 戻り値は satisfies で auth-js の実型に固定し、仮定 mock の形骸化を防ぐ
 const verifiedFactorsList = {
-  data: { all: [VERIFIED_FACTOR], totp: [VERIFIED_FACTOR], phone: [], webauthn: [] },
+  data: {
+    all: [VERIFIED_FACTOR],
+    totp: [VERIFIED_FACTOR],
+    phone: [],
+    webauthn: [],
+    recovery_code: [],
+  },
   error: null,
 } satisfies AuthMFAListFactorsResponse;
 
 const emptyFactorsList = {
-  data: { all: [], totp: [], phone: [], webauthn: [] },
+  data: { all: [], totp: [], phone: [], webauthn: [], recovery_code: [] },
   error: null,
 } satisfies AuthMFAListFactorsResponse;
 
@@ -175,11 +181,10 @@ describe('MFAVerifyPage', () => {
     it('mount時に検証済みfactorのfactorIdでchallengeを発行する', async () => {
       await renderAndWaitForInit();
 
-      // supabase クライアントが毎レンダー再生成される実装の副作用で checkMFARequired の
-      // 参照が変わり続け、listFactors は複数回呼ばれうる（既知の挙動。呼び出し回数の
-      // 厳密検証はしない）。ここでは初期化が実行されたことと、正しい factorId で
-      // challenge が呼ばれたことだけを確認する。
-      expect(mockListFactors).toHaveBeenCalled();
+      // 初期化は mount につき 1 回。以前は checkMFARequired の参照が毎レンダー変わり
+      // effect が回り続けていたが、ref で 1 回に固定した（#2838）。
+      expect(mockListFactors).toHaveBeenCalledTimes(1);
+      expect(mockChallenge).toHaveBeenCalledTimes(1);
       expect(mockChallenge).toHaveBeenCalledWith({ factorId: 'factor-1' });
     });
 
@@ -239,17 +244,74 @@ describe('MFAVerifyPage', () => {
       await waitFor(() => expect(mockPush).toHaveBeenCalledWith('/ja/calendar'));
     });
 
-    it('verify失敗時、エラーメッセージを表示し入力をクリアする', async () => {
-      mockVerify.mockResolvedValue({ data: null, error: { message: 'Invalid code' } });
+    // GoTrue の message は英語。そのまま出すと日本語の利用者に英語が出る。
+    it('verify失敗時、code に対応する文言を表示し入力をクリアする', async () => {
+      mockVerify.mockResolvedValue({
+        data: null,
+        error: { message: 'Invalid TOTP code entered', code: 'mfa_verification_failed' },
+      });
       await renderAndWaitForInit();
 
       fireEvent.change(getOtpInput(), { target: { value: '123456' } });
 
       await waitFor(() => {
-        expect(screen.getByRole('alert')).toHaveTextContent('Invalid code');
+        expect(screen.getByRole('alert')).toHaveTextContent('common.errors.mfa.codeInvalid');
       });
+      expect(screen.getByRole('alert')).not.toHaveTextContent('Invalid TOTP code entered');
       expect(getOtpInput()).toHaveValue('');
       expect(mockPush).not.toHaveBeenCalledWith('/ja/calendar');
+    });
+
+    it('未知の code でも英語の生メッセージは出さない', async () => {
+      mockVerify.mockResolvedValue({
+        data: null,
+        error: { message: 'Some brand new GoTrue wording', code: 'some_new_code' },
+      });
+      await renderAndWaitForInit();
+
+      fireEvent.change(getOtpInput(), { target: { value: '123456' } });
+
+      await waitFor(() => {
+        expect(screen.getByRole('alert')).toHaveTextContent('common.errors.mfa.verificationFailed');
+      });
+      expect(screen.getByRole('alert')).not.toHaveTextContent('Some brand new GoTrue wording');
+    });
+
+    // challenge は mount 時の 1 度きり。寿命が切れた後に引き直さないと、正しいコードを
+    // 入れ続けても永久に通らず、手動リロード以外に出口が無い。
+    it('challenge 期限切れなら新しい challenge を発行して復帰させる', async () => {
+      mockVerify.mockResolvedValue({
+        data: null,
+        error: { message: 'MFA challenge has expired', code: 'mfa_challenge_expired' },
+      });
+      await renderAndWaitForInit();
+      const challengeCallsBefore = mockChallenge.mock.calls.length;
+
+      fireEvent.change(getOtpInput(), { target: { value: '123456' } });
+
+      await waitFor(() => {
+        expect(screen.getByRole('alert')).toHaveTextContent('common.errors.mfa.challengeExpired');
+      });
+      await waitFor(() => {
+        expect(mockChallenge.mock.calls.length).toBeGreaterThan(challengeCallsBefore);
+      });
+      expect(mockChallenge).toHaveBeenLastCalledWith({ factorId: 'factor-1' });
+    });
+
+    it('コード誤りでは challenge を引き直さない', async () => {
+      mockVerify.mockResolvedValue({
+        data: null,
+        error: { message: 'Invalid TOTP code entered', code: 'mfa_verification_failed' },
+      });
+      await renderAndWaitForInit();
+      const challengeCallsBefore = mockChallenge.mock.calls.length;
+
+      fireEvent.change(getOtpInput(), { target: { value: '123456' } });
+
+      await waitFor(() => {
+        expect(screen.getByRole('alert')).toHaveTextContent('common.errors.mfa.codeInvalid');
+      });
+      expect(mockChallenge.mock.calls.length).toBe(challengeCallsBefore);
     });
   });
 

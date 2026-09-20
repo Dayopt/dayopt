@@ -20,6 +20,7 @@ import {
 } from '@/lib/rate-limit/upstash';
 import { captureUnexpectedDatabaseError, captureUnexpectedError } from '@/lib/sentry';
 import { createServiceRoleClient } from '@/lib/supabase/oauth';
+import { captureWebhookSignatureFailure } from '@/lib/webhooks/signature-failure-monitor';
 
 export const maxDuration = 30;
 export const runtime = 'nodejs';
@@ -46,7 +47,23 @@ type EmailEventData = {
   email_id: string;
   to: string[];
   tags?: Record<string, string>;
+  /** `email.bounced` だけが持つ。Resend SDK の `EmailBouncedEvent['data']['bounce']` と同形。 */
+  bounce?: { type?: string; subType?: string; message?: string };
 };
+
+/**
+ * suppression に書く bounce かどうか。
+ *
+ * Resend は `bounce.type` に `permanent` / `transient` / `undetermined` を載せる。
+ * `email_suppressions` は書いたら消す経路が無い恒久リストなので、mailbox full や
+ * greylisting のような transient を書くと、その address 宛の transactional mail
+ * （password changed / MFA disabled / billing 通知）が永久に止まる。auth mail は
+ * Edge Function が suppression を見ないため届き続け、利用者は気づけない。
+ * transient だけを除外し、`undetermined` と欠落は配信評価を守る側（suppress）に倒す。
+ */
+function isSuppressibleBounce(data: EmailEventData): boolean {
+  return data.bounce?.type?.toLowerCase() !== 'transient';
+}
 
 function isEmailEventData(data: unknown): data is EmailEventData {
   if (!data || typeof data !== 'object') return false;
@@ -181,6 +198,11 @@ export async function POST(request: NextRequest) {
       });
     } catch {
       logger.warn('Resend webhook signature verification failed');
+      captureWebhookSignatureFailure({
+        feature: 'email',
+        route: '/api/webhooks/resend',
+        source: 'resend_webhook',
+      });
       return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
     }
 
@@ -219,6 +241,13 @@ export async function POST(request: NextRequest) {
           isContactDelivery(event.data, dayoptContactDeliverySources.product)
         ) {
           contactDeliveryFailure = { eventType: event.type, data: event.data };
+          break;
+        }
+        if (isEmailEventData(event.data) && !isSuppressibleBounce(event.data)) {
+          logger.warn('Transient email bounce ignored for suppression', {
+            emailId: event.data.email_id,
+            bounceType: event.data.bounce?.type,
+          });
           break;
         }
         await recordSuppression(event.data.to, 'bounce', event.data.email_id);

@@ -420,7 +420,7 @@ export function BillingSettings() {
                             href={invoice.hostedInvoiceUrl}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-primary text-sm hover:underline"
+                            className="text-primary-text text-sm hover:underline"
                           >
                             {t('settings.subscription.invoiceView')}
                           </a>

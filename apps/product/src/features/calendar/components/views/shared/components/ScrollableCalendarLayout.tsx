@@ -4,7 +4,7 @@
  * リファクタリング済み: ロジックは専用フックに分離
  * - useScrollableCalendar: スクロール管理・キーボードナビゲーション
  * - useCurrentTimeLine: 現在時刻線のロジック
- * - useSleepHoursLayout: グリッドレイアウト計算
+ * - useCalendarGridLayout: グリッド高さ・今日の列位置の計算
  */
 
 'use client';
@@ -17,15 +17,15 @@ import { formatTimeString } from '@/lib/date';
 import { useIsMobile } from '@/lib/hooks/useIsMobile';
 import { useUserPreferences } from '@/lib/hooks/useUserPreferences';
 
-import { MOBILE_TIME_COLUMN_WIDTH, TIME_COLUMN_WIDTH } from '../constants/grid.constants';
+import { resolveTimeColumnWidth } from '../constants/grid.constants';
 import { CurrentTimeLine } from '../grid/CurrentTimeLine';
 import { TimeColumn } from '../grid/TimeColumn/TimeColumn';
+import { useCalendarGridLayout } from '../hooks/useCalendarGridLayout';
 import { useContainerHeight } from '../hooks/useContainerHeight';
 import { useCurrentTimeLine } from '../hooks/useCurrentTimeLine';
 import { useHourHeightSync, useResponsiveHourHeight } from '../hooks/useResponsiveHourHeight';
 import { useScrollableCalendar } from '../hooks/useScrollableCalendar';
 import { useScrollTimeblockIntoView } from '../hooks/useScrollTimeblockIntoView';
-import { useSleepHoursLayout } from '../hooks/useSleepHoursLayout';
 import { TimezoneOffset } from './TimezoneOffset';
 
 /** ScrollableCalendarLayout コンポーネントのプロパティ */
@@ -56,13 +56,18 @@ interface CalendarDateHeaderProps {
 }
 
 /**
- * 時間列のデフォルト幅。モバイルでは短い時刻ラベルの左側余白を抑えるため縮小する。
- * timeColumnWidth を明示指定しない呼び出し元（CalendarDateHeader / ScrollableCalendarLayout
- * 共通）が同じ値源を見るための共有 hook。
+ * 時間列の既定メトリクス。モバイルは幅を詰めつつ、ラベルを一段小さくして
+ * 左右 8px の余白が消えないようにする。12h 表記（`12:00 PM`）は 24h より広い。
+ *
+ * timeColumnWidth を明示指定しない呼び出し元（CalendarDateHeader /
+ * ScrollableCalendarLayout 共通）が同じ値源を見るための共有 hook。片方だけ幅を
+ * 変えるとヘッダーとグリッドの列がズレる。
  */
-function useDefaultTimeColumnWidth(): number {
+function useDefaultTimeColumnMetrics(): { width: number; dense: boolean } {
   const isMobile = useIsMobile();
-  return isMobile ? MOBILE_TIME_COLUMN_WIDTH : TIME_COLUMN_WIDTH;
+  const timeFormat = useUserPreferences((s) => s.timeFormat);
+
+  return { width: resolveTimeColumnWidth(timeFormat, isMobile), dense: isMobile };
 }
 
 /**
@@ -77,8 +82,8 @@ export const CalendarDateHeader = ({
   className,
 }: CalendarDateHeaderProps) => {
   const showWeekNumbers = useUserPreferences((s) => s.showWeekNumbers);
-  const defaultTimeColumnWidth = useDefaultTimeColumnWidth();
-  const resolvedTimeColumnWidth = timeColumnWidth ?? defaultTimeColumnWidth;
+  const defaultTimeColumn = useDefaultTimeColumnMetrics();
+  const resolvedTimeColumnWidth = timeColumnWidth ?? defaultTimeColumn.width;
 
   // 設定がオンで週番号が渡されている場合のみ表示
   const shouldShowWeekNumber = showWeekNumbers && weekNumber != null;
@@ -141,8 +146,8 @@ export const ScrollableCalendarLayout = ({
   enableKeyboardNavigation = true,
   onScrollPositionChange,
 }: ScrollableCalendarLayoutProps) => {
-  const defaultTimeColumnWidth = useDefaultTimeColumnWidth();
-  const resolvedTimeColumnWidth = timeColumnWidth ?? defaultTimeColumnWidth;
+  const defaultTimeColumn = useDefaultTimeColumnMetrics();
+  const resolvedTimeColumnWidth = timeColumnWidth ?? defaultTimeColumn.width;
 
   // scroll container の ref を先に確保し、実測高の観測と useScrollableCalendar 双方で共有する
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
@@ -153,7 +158,7 @@ export const ScrollableCalendarLayout = ({
   const HOUR_HEIGHT = useResponsiveHourHeight();
 
   // グリッドレイアウト計算（フック利用）
-  const { gridHeight, hasToday } = useSleepHoursLayout({
+  const { gridHeight, hasToday } = useCalendarGridLayout({
     hourHeight: HOUR_HEIGHT,
     displayDates,
   });
@@ -170,10 +175,12 @@ export const ScrollableCalendarLayout = ({
   // Mobile + Inspector open / Tag draft open のとき、対象が Drawer に隠れないよう自動スクロール
   useScrollTimeblockIntoView({ scrollContainerRef, hourHeight: HOUR_HEIGHT });
 
-  // 現在時刻線ロジック（フック利用）
+  // 現在時刻線ロジック（フック利用）。線と同じ user TZ で計算する
+  const timezone = useUserPreferences((s) => s.timezone);
   const { currentTime, currentTimePosition } = useCurrentTimeLine({
     hourHeight: HOUR_HEIGHT,
     showCurrentTime,
+    timezone,
   });
 
   // 現在時刻のフォーマット（設定に応じて 24h/12h）
@@ -240,8 +247,14 @@ export const ScrollableCalendarLayout = ({
                 format={timeFormat}
                 className="h-full"
                 width={resolvedTimeColumnWidth}
+                dense={defaultTimeColumn.dense}
+                occludedMinutes={
+                  shouldShowCurrentTimeLine && hasToday
+                    ? currentTime.getHours() * 60 + currentTime.getMinutes()
+                    : null
+                }
               />
-              {/* 現在時刻ラベル（Apple Calendar風） */}
+              {/* 現在時刻ラベル（Apple Calendar風）。重なる時刻ラベルは TimeColumn 側で隠す */}
               {shouldShowCurrentTimeLine && hasToday && (
                 <div
                   className="bg-now-indicator text-now-indicator-foreground pointer-events-none absolute right-1 z-20 rounded-lg px-1 py-1 text-xs font-medium tabular-nums"

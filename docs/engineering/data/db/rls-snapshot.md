@@ -5,7 +5,7 @@
 > **手で編集しない**。migration 変更時は CI（`pnpm rls:snapshot:check`）が drift を検出する。
 > 再生成で更新すること。
 >
-> 集計: public スキーマの policy 62 件 / RLS 対象テーブル 29 件 / GRANT 234 件 / storage.objects の policy（app 所有）8 件 / 想定外 policy 0 件 / private schema のオブジェクト ACL（owner 以外）1 件 / 列レベル ACL（owner 以外）0 件 / function EXECUTE（owner 以外）1 件 / custom type USAGE（owner 以外）0 件 / schema USAGE（owner 以外）1 件 / Realtime publication 0 件。
+> 集計: public スキーマの policy 62 件 / RLS 対象テーブル 30 件 / GRANT 233 件 / storage.objects の policy（app 所有）8 件 / 想定外 policy 0 件 / private schema のオブジェクト ACL（owner 以外）1 件 / 列レベル ACL（owner 以外）0 件 / function EXECUTE（owner 以外）1 件 / custom type USAGE（owner 以外）0 件 / schema USAGE（owner 以外）1 件 / Realtime publication 0 件。
 
 ## RLS 有効状態（public テーブル）
 
@@ -15,6 +15,7 @@
 | calendar_connection_calendars | ✅          | —      |
 | calendar_connections          | ✅          | —      |
 | categories                    | ✅          | —      |
+| cron_heartbeats               | ✅          | —      |
 | email_suppressions            | ✅          | —      |
 | external_calendar_events      | ✅          | —      |
 | mcp_environment_identity      | ✅          | —      |
@@ -411,9 +412,7 @@ allow-list 外の policy を検出した場合、`pnpm rls:snapshot` は snapsho
 | routine     | public.get_user_data_generation_v1(p_user_id uuid)                                                                                                                                                                                                                                                                                                                                                                                                                                     | service_role        | EXECUTE                                                                 |
 | routine     | public.get_user_timezone(p_user_id uuid)                                                                                                                                                                                                                                                                                                                                                                                                                                               | authenticated       | EXECUTE                                                                 |
 | routine     | public.get_user_timezone(p_user_id uuid)                                                                                                                                                                                                                                                                                                                                                                                                                                               | service_role        | EXECUTE                                                                 |
-| routine     | public.get_vault_secret(p_name text)                                                                                                                                                                                                                                                                                                                                                                                                                                                   | service_role        | EXECUTE                                                                 |
 | routine     | public.handle_new_user()                                                                                                                                                                                                                                                                                                                                                                                                                                                               | service_role        | EXECUTE                                                                 |
-| routine     | public.invoke_edge_function(p_function_name text, p_body jsonb)                                                                                                                                                                                                                                                                                                                                                                                                                        | service_role        | EXECUTE                                                                 |
 | routine     | public.issue_oauth_token_pair(p_user_id uuid, p_client_id text, p_scopes text[], p_refresh_hash text, p_access_hash text, p_refresh_expires_at timestamp with time zone, p_access_expires_at timestamp with time zone, p_parent_refresh_id uuid)                                                                                                                                                                                                                                       | service_role        | EXECUTE                                                                 |
 | routine     | public.list_expired_calendar_account_deletion_intents_v1(p_project_key text, p_limit integer)                                                                                                                                                                                                                                                                                                                                                                                          | service_role        | EXECUTE                                                                 |
 | routine     | public.list_undoable_receipts_v1(p_user_id uuid)                                                                                                                                                                                                                                                                                                                                                                                                                                       | service_role        | EXECUTE                                                                 |
@@ -477,6 +476,7 @@ allow-list 外の policy を検出した場合、`pnpm rls:snapshot` は snapsho
 | table       | public.calendar_connections                                                                                                                                                                                                                                                                                                                                                                                                                                                            | service_role        | DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE |
 | table       | public.categories                                                                                                                                                                                                                                                                                                                                                                                                                                                                      | authenticated       | DELETE, SELECT                                                          |
 | table       | public.categories                                                                                                                                                                                                                                                                                                                                                                                                                                                                      | service_role        | DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE |
+| table       | public.cron_heartbeats                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | service_role        | INSERT, SELECT, UPDATE                                                  |
 | table       | public.email_suppressions                                                                                                                                                                                                                                                                                                                                                                                                                                                              | service_role        | DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE |
 | table       | public.external_calendar_events                                                                                                                                                                                                                                                                                                                                                                                                                                                        | service_role        | DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE |
 | table       | public.mcp_mutation_control                                                                                                                                                                                                                                                                                                                                                                                                                                                            | service_role        | SELECT                                                                  |
@@ -526,14 +526,41 @@ privileges 列の `*` は WITH GRANT OPTION 付き（psql の `\dp` と同じ表
 
 **この snapshot が保証するのは「migration を素の DB に当てた結果」であって production の実 state
 ではない。** 生成元は migration から構築した local DB で、CI の drift check も同じく ephemeral な
-local DB に対してのみ走る。production に対する同等のチェックは存在しないため、production で
-migration を経由しない手動変更が行われた場合、その差分はここに現れない。
+local DB に加え、production-config-audit.yml から同じ読取queryとbaselineを使ってproductionを比較する。
+migration を経由しない権限変更も差分として検出し、本番からbaselineを上書きしない。
 
 対象は schema USAGE（`nspacl`）/ オブジェクト ACL（`relacl`）/ 列レベル ACL（`attacl`）/
-function EXECUTE（`proacl`）/ custom type・domain USAGE（`typacl`）の 5 catalog。次の 1 つは対象外:
+function EXECUTE（`proacl`）/ custom type・domain USAGE（`typacl`）の 5 catalog と、次節の default privileges。
 
-- **default privileges（`pg_default_acl`）** — local と production で非対称なことが分かっており、
-  扱いは #1715 が決める（現時点で private の default ACL は 0 件）
+- default privileges は次節で比較する。差分検出は権限変更の承認を意味しない。
+
+### default privileges（public / private / global）
+
+local と production の差は検出し、権限方針の判断は #1715 で行う。
+
+| owner          | schema | object type | grantee       | privileges                                                              |
+| -------------- | ------ | ----------- | ------------- | ----------------------------------------------------------------------- |
+| postgres       | public | f           | postgres      | EXECUTE                                                                 |
+| postgres       | public | r           | anon          | MAINTAIN, REFERENCES, TRIGGER, TRUNCATE                                 |
+| postgres       | public | r           | authenticated | MAINTAIN, REFERENCES, TRIGGER, TRUNCATE                                 |
+| postgres       | public | r           | postgres      | DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE |
+| postgres       | public | r           | service_role  | MAINTAIN, REFERENCES, TRIGGER, TRUNCATE                                 |
+| postgres       | public | S           | anon          | UPDATE                                                                  |
+| postgres       | public | S           | authenticated | UPDATE                                                                  |
+| postgres       | public | S           | postgres      | SELECT, UPDATE, USAGE                                                   |
+| postgres       | public | S           | service_role  | UPDATE                                                                  |
+| supabase_admin | public | f           | anon          | EXECUTE                                                                 |
+| supabase_admin | public | f           | authenticated | EXECUTE                                                                 |
+| supabase_admin | public | f           | postgres      | EXECUTE                                                                 |
+| supabase_admin | public | f           | service_role  | EXECUTE                                                                 |
+| supabase_admin | public | r           | anon          | DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE |
+| supabase_admin | public | r           | authenticated | DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE |
+| supabase_admin | public | r           | postgres      | DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE |
+| supabase_admin | public | r           | service_role  | DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE |
+| supabase_admin | public | S           | anon          | SELECT, UPDATE, USAGE                                                   |
+| supabase_admin | public | S           | authenticated | SELECT, UPDATE, USAGE                                                   |
+| supabase_admin | public | S           | postgres      | SELECT, UPDATE, USAGE                                                   |
+| supabase_admin | public | S           | service_role  | SELECT, UPDATE, USAGE                                                   |
 
 ### private の owner（ACL 一覧から除外している主体）
 
@@ -613,6 +640,7 @@ function EXECUTE（`proacl`）/ custom type・domain USAGE（`typacl`）の 5 ca
 | function | private.reject_mcp_preview_oauth_client_state_v1()                                                                                                                                                                                                                                                                                                                                  | postgres |
 | function | private.require_mcp_environment_resource_v1(p_resource_uri text)                                                                                                                                                                                                                                                                                                                    | postgres |
 | function | private.resolve_calendar_authority_project_fence_v1(p_project_key text)                                                                                                                                                                                                                                                                                                             | postgres |
+| function | private.resolve_mcp_create_replay_v2(p_user_id uuid, p_client_id text, p_operation_id uuid, p_tool_name text, p_request_digest bytea, p_legacy_digest bytea, p_resource_type text)                                                                                                                                                                                                  | postgres |
 | function | private.resolve_mcp_mutation_replay_v1(p_user_id uuid, p_client_id text, p_operation_id uuid, p_tool_name text, p_request_digest bytea, p_envelope_version smallint, p_resource_type text)                                                                                                                                                                                          | postgres |
 | function | private.restore_plan_unserialized_v1(p_user_id uuid, p_plan_id uuid, p_expected_updated_at timestamp with time zone)                                                                                                                                                                                                                                                                | postgres |
 | function | private.restore_record_unserialized_v1(p_user_id uuid, p_record_id uuid, p_expected_updated_at timestamp with time zone)                                                                                                                                                                                                                                                            | postgres |

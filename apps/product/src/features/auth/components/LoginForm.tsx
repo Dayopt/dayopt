@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Eye, EyeOff } from 'lucide-react';
@@ -12,10 +12,10 @@ import { useForm } from 'react-hook-form';
 
 import type { MessageKey } from '@/lib/i18n';
 import { logger } from '@/lib/logger';
-import { getSafeRedirectPath } from '@/lib/safe-redirect';
+import { getSafeLocalizedRedirectPath, getSafeRedirectPath } from '@/lib/safe-redirect';
 import { captureUnexpectedAuthError, observeAuthOperation } from '@/lib/sentry';
 import { createClient } from '@/lib/supabase/client';
-import { isTurnstileEnabled, Turnstile, type TurnstileInstance } from '@/lib/turnstile';
+import { Turnstile, useTurnstileGate } from '@/lib/turnstile';
 import {
   Button,
   Card,
@@ -52,11 +52,15 @@ export function LoginForm({ className, ...props }: React.ComponentProps<'div'>) 
   const locale = (params?.locale as string) || 'ja';
   const t = useTranslations();
   const signIn = useAuthStore((state) => state.signIn);
+  const resendConfirmation = useAuthStore((state) => state.resendConfirmation);
   const signInWithOAuth = useAuthStore((state) => state.signInWithOAuth);
   const redirectPath = getSafeRedirectPath(searchParams?.get('redirect'));
 
   const handleOAuthLogin = async (provider: 'google') => {
     setSubmitError(null);
+    // 再送はメール + パスワードの失敗にだけ紐付ける。ここでクリアしないと、
+    // 直前のメールログイン失敗のアドレスが残り、無関係な宛先へ送りうる。
+    clearResendTarget();
     try {
       const { error } = await signInWithOAuth(provider);
       if (error) {
@@ -70,9 +74,10 @@ export function LoginForm({ className, ...props }: React.ComponentProps<'div'>) 
 
   const [showPassword, setShowPassword] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
-  const turnstileRef = useRef<TurnstileInstance | null>(null);
-  const turnstileEnabled = isTurnstileEnabled();
+  // 直前に試したアドレス。確認メールの再送はこれを宛先にする
+  const [attemptedEmail, setAttemptedEmail] = useState<string | null>(null);
+  const [resendState, setResendState] = useState<'idle' | 'sending' | 'sent'>('idle');
+  const turnstile = useTurnstileGate();
   const turnstileLocale: 'ja' | 'en' | 'auto' =
     locale === 'ja' ? 'ja' : locale === 'en' ? 'en' : 'auto';
 
@@ -105,13 +110,50 @@ export function LoginForm({ className, ...props }: React.ComponentProps<'div'>) 
     },
   });
 
+  const clearResendTarget = () => {
+    setAttemptedEmail(null);
+    setResendState('idle');
+  };
+
+  /**
+   * 確認メールの再送。
+   *
+   * ログインの失敗は OWASP に従って 1 つのキーへ丸めるため、「メールの確認がまだ」
+   * という状態を利用者は文言から知れない（`lib/auth-error.ts`）。丸めたままにすると、
+   * 確認リンクを踏んでいない人は原因も出口も分からず詰む。
+   *
+   * **結果で表示を変えない。** 未登録でも確認済みでも未確認でも同じ文言を出す。
+   * 変えると「再送できた = 未確認の登録済み」という存在確認になる。captcha 失敗だけは
+   * 本人が解き直せば解決するので伝える。
+   */
+  const handleResendConfirmation = async () => {
+    if (!attemptedEmail) return;
+
+    setResendState('sending');
+    const { error } = turnstile.token
+      ? await resendConfirmation(attemptedEmail, { captchaToken: turnstile.token })
+      : await resendConfirmation(attemptedEmail);
+    turnstile.reset();
+
+    if (error?.code === 'captcha_failed') {
+      setSubmitError(t('auth.errors.captchaFailed'));
+      setResendState('idle');
+      return;
+    }
+
+    setResendState('sent');
+  };
+
   const onSubmit = async (data: LoginFormData) => {
     setSubmitError(null);
+    // 前回の失敗の宛先を持ち越さない。この試行が失敗した時だけ、その時の
+    // アドレスを宛先として設定し直す。
+    clearResendTarget();
 
     try {
       // ステップ1: ログイン試行（最小依存で実行）
-      const { error: signInError, data: signInData } = turnstileToken
-        ? await signIn(data.email, data.password, { captchaToken: turnstileToken })
+      const { error: signInError, data: signInData } = turnstile.token
+        ? await signIn(data.email, data.password, { captchaToken: turnstile.token })
         : await signIn(data.email, data.password);
 
       if (signInError) {
@@ -121,10 +163,10 @@ export function LoginForm({ className, ...props }: React.ComponentProps<'div'>) 
           'login',
         );
         setSubmitError(t(errorKey));
+        setAttemptedEmail(data.email);
         // Turnstile token は single-use / short-lived。失敗時は widget を reset して
         // 次の retry で新しい challenge token を取得させる
-        setTurnstileToken(null);
-        turnstileRef.current?.reset();
+        turnstile.reset();
       } else if (signInData) {
         // ログイン成功
 
@@ -137,7 +179,7 @@ export function LoginForm({ className, ...props }: React.ComponentProps<'div'>) 
 
         // MFA検証画面へのリダイレクトURL構築
         // MFAVerifyPage は searchParams.get('next') でlocale付きパスを受け取る
-        const fullRedirectPath = `/${locale}${redirectPath}`;
+        const fullRedirectPath = getSafeLocalizedRedirectPath(redirectPath, locale);
         const buildMfaUrl = () => {
           const base = `/${locale}/auth/mfa-verify`;
           return redirectPath !== '/calendar'
@@ -167,8 +209,7 @@ export function LoginForm({ className, ...props }: React.ComponentProps<'div'>) 
       logger.error('[LoginForm] Unexpected error:', err);
       captureUnexpectedAuthError(err, { operation: 'login_form' });
       setSubmitError(t('auth.errors.unexpectedError') || 'An unexpected error occurred');
-      setTurnstileToken(null);
-      turnstileRef.current?.reset();
+      turnstile.reset();
     }
   };
 
@@ -176,7 +217,6 @@ export function LoginForm({ className, ...props }: React.ComponentProps<'div'>) 
     <div className={cn('flex flex-col gap-6', className)} {...props}>
       <Card className="overflow-hidden p-0">
         <CardContent className="p-0">
-          {/* eslint-disable-next-line react-hooks/refs -- onSubmit は submit 時のみ turnstileRef.current を読む event handler。handleSubmit(onSubmit) の closure 解析による誤検知を抑制 */}
           <form className="p-6 md:p-8" onSubmit={handleSubmit(onSubmit)}>
             <FieldGroup>
               <div className="flex flex-col items-center text-center">
@@ -187,6 +227,32 @@ export function LoginForm({ className, ...props }: React.ComponentProps<'div'>) 
                 <FieldError announceImmediately className="text-center">
                   {serverError}
                 </FieldError>
+              )}
+
+              {submitError && attemptedEmail && (
+                <FieldDescription className="text-center" data-slot="resend-confirmation">
+                  {/* 完了時にボタンがアンマウントされるため、支援技術へは live region で伝える */}
+                  <span role="status">
+                    {resendState === 'sent' ? t('auth.loginForm.confirmationResent') : null}
+                  </span>
+                  {resendState !== 'sent' && (
+                    <>
+                      {t('auth.loginForm.resendConfirmationHint')}{' '}
+                      {/* タッチ領域は 44x44px 以上を保つ（AGENTS.md §Non-Negotiables） */}
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="min-h-11 px-2"
+                        loading={resendState === 'sending'}
+                        disabled={turnstile.blocksSubmit}
+                        onClick={handleResendConfirmation}
+                      >
+                        {t('auth.loginForm.resendConfirmation')}
+                      </Button>
+                    </>
+                  )}
+                </FieldDescription>
               )}
 
               <Field>
@@ -302,17 +368,35 @@ export function LoginForm({ className, ...props }: React.ComponentProps<'div'>) 
                 )}
               </Field>
 
-              {turnstileEnabled && (
-                <Field>
+              {turnstile.enabled && (
+                <Field
+                  /*
+                   * `appearance: 'interaction-only'` の widget は普段 高さ 0 になるが、
+                   * FieldGroup の `gap-6` は残るので空の段が空く。対話も到達不能の案内も
+                   * 出ていない間だけ、その gap を打ち消す。
+                   *
+                   * 打ち消しに失敗しても widget は出たままで、前の Field と詰まって
+                   * 見えるだけ。利用者が challenge を見られなくなる方向へは倒れない。
+                   */
+                  className={turnstile.interactive || turnstile.unavailable ? undefined : '-mt-6'}
+                >
                   <div className="flex justify-center">
                     <Turnstile
-                      ref={turnstileRef}
-                      onSuccess={(token) => setTurnstileToken(token)}
-                      onError={() => setTurnstileToken(null)}
-                      onExpire={() => setTurnstileToken(null)}
+                      key={turnstile.widgetKey}
+                      onWidgetLoad={turnstile.onWidgetLoad}
+                      onSuccess={turnstile.onSuccess}
+                      onError={turnstile.onError}
+                      onExpire={turnstile.onExpire}
+                      onUnsupported={turnstile.onUnsupported}
+                      onBeforeInteractive={turnstile.onBeforeInteractive}
                       locale={turnstileLocale}
                     />
                   </div>
+                  {turnstile.unavailable && (
+                    <FieldDescription data-slot="turnstile-unavailable">
+                      {t('auth.errors.captchaUnavailable')}
+                    </FieldDescription>
+                  )}
                 </Field>
               )}
 
@@ -320,7 +404,7 @@ export function LoginForm({ className, ...props }: React.ComponentProps<'div'>) 
                 <Button
                   type="submit"
                   loading={isSubmitting}
-                  disabled={turnstileEnabled && !turnstileToken}
+                  disabled={turnstile.blocksSubmit}
                   className="w-full"
                 >
                   {t('auth.loginForm.loginButton')}

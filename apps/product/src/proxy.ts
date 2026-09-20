@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 
 import { dayoptDomains } from '@dayopt/config';
 
+import { OG_IMAGE_PATH } from '@/lib/app-url';
 import {
   isAuthPathAllowedWhileAuthenticated,
   isAuthProductPath,
@@ -341,8 +342,14 @@ export async function proxy(request: NextRequest) {
     return nextWithCsp(request, contentSecurityPolicy);
   }
 
-  // メンテナンス / オフラインページは言語処理をスキップ
-  if (pathname === '/maintenance' || pathname === '/offline') {
+  // メンテナンス / オフライン / OG 画像は言語処理をスキップ
+  //
+  // `/opengraph-image` は App Router の metadata file convention（`app/opengraph-image.tsx`）で
+  // 配信される root 直下の path。`[locale]` 配下に同名は無いので、next-intl の
+  // `localePrefix: 'as-needed'` に渡すと `/en/opengraph-image` へ rewrite されて 404 になる
+  // （#2573）。config.matcher でも除外しているが、percent-encode された変種は matcher を
+  // すり抜けるため canonical pathname でも同じ扱いにする。
+  if (pathname === '/maintenance' || pathname === '/offline' || pathname === OG_IMAGE_PATH) {
     return nextWithCsp(request, contentSecurityPolicy);
   }
 
@@ -570,7 +577,10 @@ export const config = {
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
      * - public files (images, etc)
+     * - opengraph-image (metadata file convention。拡張子が無いので `.*\\..*` に
+     *   引っかからず、除外しないと next-intl が `/en/opengraph-image` へ rewrite して
+     *   404 になる。#2573)
      */
-    '/((?!api|_next/static|_next/image|favicon.ico|.*\\..*|robots.txt|sitemap.xml).*)',
+    '/((?!api|_next/static|_next/image|favicon.ico|.*\\..*|robots.txt|sitemap.xml|opengraph-image).*)',
   ],
 };

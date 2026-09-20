@@ -21,13 +21,18 @@ import {
   resolveTimeblockKindChoice,
   useTimeblockInspectorStore,
 } from '@/features/timeblock';
-import { formatTimeString } from '@/lib/date';
+import { formatTimeString, getDateKey } from '@/lib/date';
 import { convertFromTimezone } from '@/lib/date/timezone';
 import { useUserPreferences } from '@/lib/hooks/useUserPreferences';
 import { cn } from '@dayopt/components';
 
 import { MIN_TIMEBLOCK_DURATION_MINUTES } from '../../../../../domain/precision';
 import { useHapticFeedback } from '../../../../../hooks/accessibility/useHapticFeedback';
+import {
+  computeRemainingDayMinutes,
+  formatRemainingDuration,
+  planRangesFromCalendarEvents,
+} from '../../../../../lib/remaining-day-minutes';
 import {
   DEFAULT_PLAN_LANE_WIDTH_PERCENT,
   hasLaneCounterpart,
@@ -50,17 +55,17 @@ interface DragSelectionHighlightProps {
   /** このカラムの日付（複数日ビューで対象カラムのみ表示するため） */
   date?: Date | undefined;
   /**
-   * 相手レーンとの重複判定に使う、その日の全 entry（plan+record 両方）。
+   * 相手レーンとの重複判定に使う、その日の全 timeblock（plan+record 両方）。
    * 未指定時は counterpart 無し扱いにはせず、常に split 幅（既存挙動）を保つ。
    */
-  dayEntries?: CalendarDisplayEvent[] | undefined;
+  dayTimeblocks?: CalendarDisplayEvent[] | undefined;
 }
 
 /** ドラッグ選択の範囲をグリッド上にカードとして描き、リサイズ / 移動を受け付ける */
 export function DragSelectionHighlight({
   hourHeight,
   date,
-  dayEntries,
+  dayTimeblocks,
 }: DragSelectionHighlightProps) {
   const pendingSelection = useInlineCreateStore.use.pendingSelection();
   const clearPendingSelection = useInlineCreateStore.use.clearPendingSelection();
@@ -70,7 +75,7 @@ export function DragSelectionHighlight({
   const hoveredActivity = useInlineCreateStore.use.hoveredActivity();
   const timezone = useUserPreferences((s) => s.timezone);
   const tCalendar = useTranslations('calendar');
-  const tEntry = useTranslations('timeblock');
+  const tTimeblock = useTranslations('timeblock');
   const { tap, impact } = useHapticFeedback();
 
   const highlightRef = useRef<HTMLDivElement>(null);
@@ -124,15 +129,15 @@ export function DragSelectionHighlight({
   );
   const isPlan = destination === 'plan';
 
-  // #2250: 相手レーンに重なる entry が無ければフル幅にする（表示層・選択プレビューと
+  // #2250: 相手レーンに重なる timeblock が無ければフル幅にする（表示層・選択プレビューと
   // 同じ判定）。selectionStartLocal/EndLocal は displayStartDate/displayEndDate と
   // 同じ wall-clock 座標系（timezone 変換前）で構築しているため、そのまま比較できる。
   const counterpartKind = isPlan ? 'record' : 'plan';
   const hasCounterpart =
-    dayEntries === undefined
+    dayTimeblocks === undefined
       ? true
       : hasLaneCounterpart(
-          dayEntries.filter((event) => {
+          dayTimeblocks.filter((event) => {
             const eventKind =
               event.kind ?? resolveTimeblockDestination(event.endDate ?? event.displayEndDate);
             return eventKind === counterpartKind;
@@ -146,6 +151,20 @@ export function DragSelectionHighlight({
     : isPlan
       ? DEFAULT_PLAN_LANE_WIDTH_PERCENT
       : 100 - DEFAULT_PLAN_LANE_WIDTH_PERCENT;
+
+  // #2096: 予定を置く瞬間だけ、その日の残り時間を静かに示す。
+  // 記録の選択・重なり表示中・compact（40px 未満）では出さない。
+  // dayTimeblocks は範囲全体の未フィルタ一覧なので activity filter の影響を受けない。
+  // pendingSelection.date は壁時計 Date なので getDateKey に timezone を渡さない（#2017 同型）。
+  const remainingMinutes =
+    isPlan && selectionHeight >= 40 && dayTimeblocks !== undefined
+      ? computeRemainingDayMinutes({
+          plans: planRangesFromCalendarEvents(dayTimeblocks),
+          dateKey: getDateKey(pendingSelection.date),
+          timezone,
+          selectionMinutes: endMinutes - startMinutes,
+        })
+      : null;
 
   // ホバー中アクティビティが継承する色を解決
   const hoveredColorClasses = hoveredActivity
@@ -199,7 +218,7 @@ export function DragSelectionHighlight({
         >
           {hasConflict ? (
             <ConflictOverlay
-              message={tEntry('errors.timeOverlap')}
+              message={tTimeblock('errors.timeOverlap')}
               timeLabel={timeLabel}
               compact={selectionHeight < 40}
               className="absolute inset-0"
@@ -245,6 +264,16 @@ export function DragSelectionHighlight({
                 </div>
               </div>
               <span className="text-muted-foreground truncate tabular-nums">{timeLabel}</span>
+              {remainingMinutes !== null && (
+                <span
+                  data-remaining-day-minutes={remainingMinutes}
+                  className="text-muted-foreground truncate tabular-nums"
+                >
+                  {tCalendar('timeblock.preview.remaining', {
+                    duration: formatRemainingDuration(remainingMinutes),
+                  })}
+                </span>
+              )}
             </>
           )}
           {/* 下端リサイズ横棒は非表示統一。実際のリサイズは slider が担保。 */}

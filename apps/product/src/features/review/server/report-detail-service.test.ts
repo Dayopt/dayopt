@@ -24,6 +24,7 @@ interface RecordSeed {
   title?: string;
   note?: string | null;
   fulfillment?: string | null;
+  source?: string;
 }
 
 interface PlanSeed {
@@ -42,6 +43,7 @@ function createFakeClient(seed: { records?: RecordSeed[]; plans?: PlanSeed[] }):
       title: '記録',
       note: null,
       fulfillment: null,
+      source: 'manual',
       ...row,
     })),
     plans: (seed.plans ?? []).map((row) => ({
@@ -276,6 +278,171 @@ describe('ReportDetailService.getActivityDetail', () => {
 
     expect(result.trend).toEqual([]);
     expect(result.recordedMinutes).toBe(60);
+  });
+
+  it('auto_migrated の記録は合計に入るが中央値からは除く', async () => {
+    const service = createReportDetailService(
+      createFakeClient({
+        records: [
+          record('r1', '2026-09-01', '10:00', '11:00'),
+          record('r2', '2026-09-02', '10:00', '12:00'),
+          // 自動移行の 6 時間。合計には入るが代表値は押し上げない
+          record('r3', '2026-09-03', '10:00', '16:00', { source: 'auto_migrated' }),
+        ],
+      }),
+    );
+
+    const result = await service.getActivityDetail(USER_ID, baseInput(), NOW);
+
+    expect(result.recordedMinutes).toBe(60 + 120 + 360);
+    // 60 / 120 の中央値。360 は数えない
+    expect(result.medianBoxMinutes).toBe(90);
+  });
+
+  it('auto_migrated しか無ければ中央値は null', async () => {
+    const service = createReportDetailService(
+      createFakeClient({
+        records: [record('r1', '2026-09-01', '10:00', '11:00', { source: 'auto_migrated' })],
+      }),
+    );
+
+    const result = await service.getActivityDetail(USER_ID, baseInput(), NOW);
+
+    expect(result.recordedMinutes).toBe(60);
+    expect(result.medianBoxMinutes).toBeNull();
+  });
+
+  it('明細は source を持ち、auto_migrated も残る', async () => {
+    const service = createReportDetailService(
+      createFakeClient({
+        records: [
+          record('r1', '2026-09-01', '10:00', '11:00'),
+          record('r2', '2026-09-02', '10:00', '11:00', { source: 'auto_migrated' }),
+        ],
+      }),
+    );
+
+    const result = await service.getActivityDetail(USER_ID, baseInput(), NOW);
+
+    expect(result.records.map((row) => row.source)).toEqual(['manual', 'auto_migrated']);
+  });
+
+  it('推移の各期間に中央値を持ち、記録の無い期間は null', async () => {
+    const service = createReportDetailService(
+      createFakeClient({
+        records: [
+          record('r-now-1', '2026-09-01', '10:00', '11:00'),
+          record('r-now-2', '2026-09-02', '10:00', '13:00'),
+          // 2 週前（08-17〜08-24）に 1 件だけ
+          record('r-old', '2026-08-19', '10:00', '13:00'),
+        ],
+      }),
+    );
+
+    const result = await service.getActivityDetail(USER_ID, baseInput(), NOW);
+
+    // 表示中の週は 60 / 180 → 120
+    expect(result.trend[5]?.medianBoxMinutes).toBe(120);
+    expect(result.trend[3]?.medianBoxMinutes).toBe(180);
+    expect(result.trend[4]?.medianBoxMinutes).toBeNull();
+  });
+
+  it('過去予定の中央値は now と期間で clip した長さで出す', async () => {
+    const service = createReportDetailService(
+      createFakeClient({
+        plans: [
+          // 60 分（過去）
+          {
+            id: 'p1',
+            activity_id: 'act-1',
+            start_at: jst('2026-09-02', '10:00'),
+            end_at: jst('2026-09-02', '11:00'),
+          },
+          // 180 分（過去）
+          {
+            id: 'p2',
+            activity_id: 'act-1',
+            start_at: jst('2026-09-03', '10:00'),
+            end_at: jst('2026-09-03', '13:00'),
+          },
+          // 実行中（11:00 開始、14:00 終了）。now = 12:00 なので 60 分ぶんだけ数える
+          {
+            id: 'p3',
+            activity_id: 'act-1',
+            start_at: jst('2026-09-04', '11:00'),
+            end_at: jst('2026-09-04', '14:00'),
+          },
+          // 未来。数えない（数えると長い先の予定が見積もりを押し上げる）
+          {
+            id: 'p4',
+            activity_id: 'act-1',
+            start_at: jst('2026-09-06', '10:00'),
+            end_at: jst('2026-09-06', '20:00'),
+          },
+        ],
+      }),
+    );
+
+    const result = await service.getActivityDetail(USER_ID, baseInput(), NOW);
+
+    // 60 / 180 / 60 の中央値
+    expect(result.medianPlanBoxMinutes).toBe(60);
+  });
+
+  it('過去予定が無ければ予定の中央値は null', async () => {
+    const service = createReportDetailService(
+      createFakeClient({
+        plans: [
+          {
+            id: 'p1',
+            activity_id: 'act-1',
+            start_at: jst('2026-09-06', '10:00'),
+            end_at: jst('2026-09-06', '12:00'),
+          },
+        ],
+      }),
+    );
+
+    const result = await service.getActivityDetail(USER_ID, baseInput(), NOW);
+
+    expect(result.medianPlanBoxMinutes).toBeNull();
+  });
+
+  it('分布は明細の 200 件上限に切られず、全件から出す', async () => {
+    // 210 件。明細は古い順に 200 件で切られるが、代表値は全件で決まる
+    const records = Array.from({ length: 210 }, (_, index) =>
+      record(`r${String(index).padStart(3, '0')}`, '2026-09-01', '00:00', '00:00', {
+        start_at: jst('2026-09-01', '00:00'),
+        // 先頭 200 件は 60 分、末尾 10 件は 600 分
+        end_at: new Date(
+          Date.parse(jst('2026-09-01', '00:00')) + (index < 200 ? 60 : 600) * 60_000,
+        ).toISOString(),
+      }),
+    );
+    const service = createReportDetailService(createFakeClient({ records }));
+
+    const result = await service.getActivityDetail(USER_ID, baseInput(), NOW);
+
+    expect(result.records).toHaveLength(200);
+    expect(result.durationDistribution?.n).toBe(210);
+    expect(result.durationDistribution?.max).toBe(600);
+    expect(result.durationDistribution?.median).toBe(result.medianBoxMinutes);
+  });
+
+  it('分布は 3 件未満なら null（中央値カードは出る）', async () => {
+    const service = createReportDetailService(
+      createFakeClient({
+        records: [
+          record('r1', '2026-09-01', '10:00', '11:00'),
+          record('r2', '2026-09-02', '10:00', '12:00'),
+        ],
+      }),
+    );
+
+    const result = await service.getActivityDetail(USER_ID, baseInput(), NOW);
+
+    expect(result.durationDistribution).toBeNull();
+    expect(result.medianBoxMinutes).toBe(90);
   });
 
   /** アクティビティ未設定の記録も明細を開ける（`.eq(null)` では引けない）。 */

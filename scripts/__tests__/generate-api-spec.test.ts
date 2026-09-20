@@ -17,9 +17,9 @@ function runGenerator(...args: string[]) {
       encoding: 'utf8',
       env: {
         ...process.env,
-        NEXT_PUBLIC_SUPABASE_ANON_KEY: 'dummy',
+        NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: 'dummy',
         NEXT_PUBLIC_SUPABASE_URL: 'https://dummy.supabase.co',
-        SUPABASE_SERVICE_ROLE_KEY: 'dummy',
+        SUPABASE_SECRET_KEY: 'dummy',
       },
     },
   );

@@ -12,8 +12,15 @@ import { memo } from 'react';
 import { useTranslations } from 'next-intl';
 
 import { resolveTimeblockDestination } from '@/features/timeblock';
+import { getDateKey } from '@/lib/date';
+import { useUserPreferences } from '@/lib/hooks/useUserPreferences';
 import { cn } from '@dayopt/components';
 
+import {
+  computeRemainingDayMinutes,
+  formatRemainingDuration,
+  planRangesFromCalendarEvents,
+} from '../../../../../lib/remaining-day-minutes';
 import {
   DEFAULT_PLAN_LANE_WIDTH_PERCENT,
   hasLaneCounterpart,
@@ -34,7 +41,7 @@ interface DragSelectionPreviewProps {
   /** 1時間あたりの高さ（px） */
   hourHeight?: number | undefined;
   /**
-   * 相手レーンとの重複判定に使う、その日の全 entry（plan+record 両方）。
+   * 相手レーンとの重複判定に使う、その日の全 timeblock（plan+record 両方）。
    * `CalendarDragSelection` の `plans` prop と同じ実体（呼び出し元の命名慣習）。
    * 未指定時は counterpart 無し扱い（フル幅）にはせず、常に split 幅（既存挙動）を保つ。
    */
@@ -55,7 +62,8 @@ export const DragSelectionPreview = memo(function DragSelectionPreview({
   allDayEvents,
 }: DragSelectionPreviewProps) {
   const tCalendar = useTranslations('calendar');
-  const tEntry = useTranslations('timeblock');
+  const tTimeblock = useTranslations('timeblock');
+  const timezone = useUserPreferences((s) => s.timezone);
 
   // 選択範囲のスタイルを計算
   const startMinutes = selection.startHour * 60 + selection.startMinute;
@@ -74,7 +82,7 @@ export const DragSelectionPreview = memo(function DragSelectionPreview({
   const kind = endDateTime.getTime() > nowForPastCheck ? 'plan' : 'record';
   const isPlan = kind === 'plan';
 
-  // #2250: 相手レーンに重なる entry が無ければフル幅にする（表示層と同じ判定）。
+  // #2250: 相手レーンに重なる timeblock が無ければフル幅にする（表示層と同じ判定）。
   // allDayEvents 未指定時（呼び出し元が配線していない場合）は従来どおり split 幅を保つ。
   const counterpartKind = isPlan ? 'record' : 'plan';
   const hasCounterpart =
@@ -99,7 +107,7 @@ export const DragSelectionPreview = memo(function DragSelectionPreview({
   if (isOverlapping) {
     return (
       <ConflictOverlay
-        message={tEntry('errors.timeOverlap')}
+        message={tTimeblock('errors.timeOverlap')}
         timeLabel={timeLabel}
         compact={height < 40}
         className="pointer-events-none absolute"
@@ -110,6 +118,19 @@ export const DragSelectionPreview = memo(function DragSelectionPreview({
 
   // 通常時: 確定後の TwoLane カードと同じレーン位置・surface・角丸・余白。
   const isCompact = height < 40;
+
+  // #2096: 予定を置く瞬間だけ、その日の残り時間を静かに示す。
+  // 記録の選択・重なり表示中（上で早期 return）・compact では出さない。
+  // allDayEvents は範囲全体の未フィルタ一覧なので activity filter の影響を受けない。
+  const remainingMinutes =
+    isPlan && !isCompact && allDayEvents !== undefined
+      ? computeRemainingDayMinutes({
+          plans: planRangesFromCalendarEvents(allDayEvents),
+          dateKey: getDateKey(date),
+          timezone,
+          selectionMinutes: endMinutes - startMinutes,
+        })
+      : null;
 
   return (
     <div
@@ -138,6 +159,16 @@ export const DragSelectionPreview = memo(function DragSelectionPreview({
         <>
           <span className="truncate font-medium">{tCalendar('timeblock.selectActivity')}</span>
           <span className="text-muted-foreground truncate tabular-nums">{timeLabel}</span>
+          {remainingMinutes !== null && (
+            <span
+              data-remaining-day-minutes={remainingMinutes}
+              className="text-muted-foreground truncate tabular-nums"
+            >
+              {tCalendar('timeblock.preview.remaining', {
+                duration: formatRemainingDuration(remainingMinutes),
+              })}
+            </span>
+          )}
         </>
       )}
     </div>

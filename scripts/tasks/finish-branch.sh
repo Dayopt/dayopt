@@ -200,63 +200,132 @@ if [[ "$PR_STATE" == "OPEN" ]]; then
   fi
 
   # 失敗している check がないか確認する（CheckRun は .conclusion、StatusContext は .state を持つ）。
+  # `Validation (shadow)` / `Review policy (shadow)` は merge の required check ではなく、
+  # 信頼済み controller の advisory status。これらの pending / failure を全 check の
+  # pending / failure と同じに数えると、追加レビュー停止後も branch:finish が shadow の
+  # 判定待ちで止まり、ruleset が要求する required check だけで merge できなくなる。
+  # advisory status 自体はログ・PR の status として残し、required check の判定からだけ除外する。
   #
-  # ── 唯一の免除: trusted dispatch で解除済みの audit guard ──────────
+  # ── audit contract guard も advisory として扱う（2026-09-18、#2469）──────
   #
   # production-config-audit.yml は audit contract 保護対象（audit script /
   # production-build-gate / workflow 自身）を変更する PR で、pull_request_target の
   # check run「Audit Vercel metadata (trusted)」を**設計として必ず failure にする**
-  # （PR code に contract 変更を自己検証させないため）。解除経路は
-  # `gh workflow run production-config-audit.yml --ref <branch>` の trusted dispatch で、
-  # 成功すると commit status「Production Config Audit」が head SHA へ success で
-  # 発行される。しかし workflow_dispatch run の check run は PR の rollup に
-  # 紐づかないため、rollup には pull_request_target 側の failure だけが残り続け、
-  # 畳み込みでは解消できない（別 run が rollup に存在しないので代表になれない）。
+  # （PR code に contract 変更を自己検証させないため）。**この failure は PR の diff の
+  # 良し悪しを一切表していない** —— contract 4 path を触ったという事実だけで付く。
+  # 本物の監査結果は `workflow run production-config-audit.yml --ref <branch>` の
+  # workflow_dispatch run 側にあり、その run の check は PR の rollup に載らない。
   #
-  # そこで status「Production Config Audit」が success の時に限り、この 1 check の
-  # failure を数えから除外する。fail-closed の根拠:
-  #   (a) audit が本当に落ちた PR では status も failure になる → 免除は発動しない
-  #   (b) contract 変更 PR で dispatch 未実行なら status は
-  #       「trusted head audit is required」の failure のまま → 発動しない
-  #   (c) status は SHA ごとに発行されるため、新しい push では guard の failure だけが
-  #       付き直り、免除は自動的にリセットされる（push ごとに dispatch が要る）
-  # 照合は 型 + workflow 名 + check 名 / context の**完全一致のみ**。
-  # 他の check の failure はこの免除では消えない。
+  # 以前はこの failure を「status『Production Config Audit』が success の時だけ免除」し、
+  # さらに contract 変更 PR には status success を**必須**にしていた（#2571）。撤去した理由:
+  #   (a) merge の遮断は 2026-09-13（#2640）以降 main の ruleset 1 本で、required checks に
+  #       `Production Config Audit` は含まれない。この checkpoint は local の branch:finish
+  #       だけに効く非対称な gate で、`gh api` 直叩きの merge は素通りしていた
+  #   (b) status は SHA ごとなので、**追従 merge だけの push でも同じ重さの人間 gate**を
+  #       要求した（#2464 では 1 PR で 3 回。3 回目はレーンの変更を 1 行も含まない）
+  #   (c) contract 変更の可視化は `protected-path-gate.mjs` の advisory review 推奨が担い、
+  #       live な env drift の検出は push:main / nightly / promote の runProductionConfigAudit
+  #       が担う。trusted dispatch は「merge 前に手で確認したい時に User の指示で回す」任意の
+  #       手段として残る（実行すると VERCEL_TOKEN を branch 側のコードへ渡す点も変わらない）
   #
-  # 免除対象は guard の `conclusion: failure` **だけ**に絞る。設計上の意図的 failure は
-  # enforce step の exit 1 が作る failure のみで、cancelled / timed_out は「監査が
-  # 完走していない」状態にすぎない。これらまで免除すると、古い run の success status が
-  # 残ったまま再発火 run が publish 前に cancel された時に、監査されていない commit が
-  # 素通りする（fail-open）。cancelled / timed_out は従来どおり停止し、再実行を強制する。
+  # したがって rollup 上のこの 1 check（と固定 context の status）は shadow status と同じ
+  # advisory 扱いにし、**失敗数から外す**。**照合は 型 + workflow 名 + check 名 / context の
+  # 完全一致のみ**で、同名でも別 workflow の check や別名の check は従来どおり merge を止める。
+  # pending / success の数え方は変えない —— guard の check run も status も最終的に
+  # failure として確定するため pending に留まらず、除外しても待ち時間が縮まらない一方、
+  # 数え方を 3 箇所で個別に変えると「代表は pending だが件数は 0」のズレを増やす。
+  #
+  # **ただし無条件に advisory にはしない。** workflow の `Enforce audit result` step は
+  #   (a) contract を変えた（設計上の failure。**この head に監査結果は無い**）
+  #   (b) 実際に Vercel の env metadata が Production contract と食い違う（本物の drift）
+  # の**どちらでも exit 1** する。check run の conclusion と status の state だけでは
+  # 両者を区別できない。区別できるのは status の `description` だけで、
+  # `.github/workflows/production-config-audit.yml` の `Publish Production Config Audit status`
+  # が次の 3 文言に固定している:
+  #   - `Audit contract changed; trusted head audit is required`（監査結果なし）
+  #   - `Vercel metadata matches the Production contract`（監査 pass）
+  #   - `Vercel metadata does not match the Production contract`（本物の drift）
+  # **`gh pr view --json statusCheckRollup` は StatusContext の description を返さない**
+  # （context / state / startedAt / targetUrl のみ）ため、guard が落ちている時だけ head の
+  # status を直接引いて判定する。
+  #
+  # **allowlist で判定する（fail closed）。** advisory にしてよいのは上の 2 文言（監査結果なし /
+  # 監査 pass）に**完全一致**した時だけで、drift・未知の文言・取得失敗・status 不在はすべて停止側。
+  # 既定を advisory 側に置くと、workflow が将来 failure 文言を追加した時に**本物の失敗が
+  # 無言で除外される**（#2834 の Codex レビュー P2）。
+  #
+  # **全ページ取る。** combined status API は既定で先頭 30 件しか返さず、controller の再評価で
+  # pending / terminal が積み上がると `Production Config Audit` が押し出される（本 PR 自身の head で
+  # 実測 28 件）。押し出されると description が空になり、fail closed 側に倒れて
+  # **contract 変更 PR の branch:finish が恒久的に止まる**。`validation-shadow-report.mjs` が
+  # 同じ理由で `per_page=100` + 全ページ取得をしているのに揃える。GitHub は新しい順に返すので
+  # 先頭行が最新（trusted dispatch を後から回した PR では設計上の failure の上に結果が積まれている）。
+  #
+  # **境界（この checkpoint が担保しないこと）**: contract を変えた PR で同時に live な drift が
+  # 起きていても、workflow は `CONTRACT_CHANGED` を `AUDIT_EXIT` より優先するため description は
+  # 「監査結果なし」になり、ここでは drift を検出できない。drift は PR の diff ではなく production の
+  # 現況なので、検出は push:main / nightly cron / promote の `runProductionConfigAudit` が担う
+  # （#2834 の Codex レビュー P2 への回答。merge の遮断は main の ruleset という #2640 の決定に従う）。
   JQ_GATE_DEFS='
+    def check_name: (.name // .context // "");
+    def is_trusted_audit_guard:
+      ((.__typename // "") == "CheckRun"
+        and (.workflowName // "") == "Production Config Audit"
+        and (.name // "") == "Audit Vercel metadata (trusted)")
+      or ((.__typename // "") == "StatusContext"
+        and (.context // "") == "Production Config Audit");
+    def is_shadow_advisory:
+      check_name == "Validation (shadow)" or check_name == "Review policy (shadow)";
     def is_failed:
       ((.conclusion // "") | ascii_downcase | . == "failure" or . == "cancelled" or . == "timed_out")
       or ((.state // "") | ascii_downcase | . == "failure" or . == "error");
-    def trusted_audit_cleared:
-      any(.[];
-        (.__typename // "") == "StatusContext"
-        and (.context // "") == "Production Config Audit"
-        and ((.state // "") | ascii_downcase) == "success");
-    def is_trusted_audit_guard_failure:
-      (.__typename // "") == "CheckRun"
-      and (.workflowName // "") == "Production Config Audit"
-      and (.name // "") == "Audit Vercel metadata (trusted)"
-      and ((.conclusion // "") | ascii_downcase) == "failure";
   '
 
-  TRUSTED_AUDIT_EXEMPTED="$(printf '%s' "$ROLLUP" | jq -r "$JQ_GATE_DEFS"'
-    if trusted_audit_cleared
-    then map(select(is_trusted_audit_guard_failure)) | length
-    else 0 end')"
+  TRUSTED_AUDIT_FAILURES="$(printf '%s' "$ROLLUP" | jq -r "$JQ_GATE_DEFS"'
+    map(select(is_trusted_audit_guard and is_failed)) | length')"
 
-  if [[ "$TRUSTED_AUDIT_EXEMPTED" != "0" ]]; then
-    info "check「Audit Vercel metadata (trusted)」の failure は trusted dispatch により解除済みです（status「Production Config Audit」= success）。失敗数から除外します。"
+  AUDIT_GUARD_ADVISORY="false"
+  if [[ "$TRUSTED_AUDIT_FAILURES" != "0" ]]; then
+    # 部分失敗に注意: `$(cmd || echo MARKER)` は cmd が出力した後で失敗しても両方を捕まえる。
+    # GitHub は新しい順に返すので、**先頭行**を採れば「1 ページ目で見つかった最新」か、
+    # 1 件も見つからないまま失敗した時の MARKER のどちらかになり、どちらも安全側。
+    AUDIT_STATUS_LINES="$(gh api --paginate \
+      "repos/{owner}/{repo}/commits/$HEAD_SHA/statuses?per_page=100" \
+      --jq '.[] | select(.context == "Production Config Audit") | .description // ""' \
+      2>/dev/null || printf '__unavailable__\n')"
+    AUDIT_STATUS_DESCRIPTION="$(printf '%s\n' "$AUDIT_STATUS_LINES" | sed -n '1p')"
+
+    case "$AUDIT_STATUS_DESCRIPTION" in
+      # ── advisory にしてよい 2 文言（完全一致のみ）──────────────────────
+      'Audit contract changed; trusted head audit is required')
+        AUDIT_GUARD_ADVISORY="true"
+        info "audit contract guard の failure $TRUSTED_AUDIT_FAILURES 件は advisory として扱い、失敗数から除外します（#2469。merge の遮断は main の ruleset）。"
+        info "  この head に監査結果はありません（contract 変更による設計上の failure）。live な drift の検出は push:main / nightly / promote が担います。"
+        ;;
+      'Vercel metadata matches the Production contract')
+        AUDIT_GUARD_ADVISORY="true"
+        info "audit contract guard の failure $TRUSTED_AUDIT_FAILURES 件は advisory として扱い、失敗数から除外します（#2469）。"
+        info "  trusted dispatch の監査は pass しています。"
+        ;;
+      # ── 以降はすべて停止側（fail closed）───────────────────────────────
+      '' | __unavailable__)
+        error "commit status「Production Config Audit」の description を取得できませんでした。"
+        error "audit contract guard の failure を advisory にしてよいか判定できないため、失敗数に数えます。"
+        error "  gh api --paginate 'repos/{owner}/{repo}/commits/$HEAD_SHA/statuses?per_page=100'"
+        ;;
+      *)
+        error "commit status「Production Config Audit」の description が advisory の allowlist と一致しません:"
+        error "  $AUDIT_STATUS_DESCRIPTION"
+        error "本物の drift または未知の失敗として扱い、失敗数に数えます（fail closed）。"
+        ;;
+    esac
   fi
 
-  FAILED_CHECKS="$(printf '%s' "$ROLLUP" | jq -r "$JQ_GATE_DEFS"'
-    (if trusted_audit_cleared
-     then map(select(is_failed and (is_trusted_audit_guard_failure | not)))
-     else map(select(is_failed)) end)
+  FAILED_CHECKS="$(printf '%s' "$ROLLUP" | jq -r --arg audit_advisory "$AUDIT_GUARD_ADVISORY" "$JQ_GATE_DEFS"'
+    map(select(
+      (is_shadow_advisory | not)
+      and (if $audit_advisory == "true" then (is_trusted_audit_guard | not) else true end)
+      and is_failed))
     | length')"
 
   if [[ "$FAILED_CHECKS" != "0" ]]; then
@@ -281,15 +350,19 @@ if [[ "$PR_STATE" == "OPEN" ]]; then
     exit 1
   fi
 
-  # 実行中・待機中の check も待つ。private repo + Free plan では GitHub 側の
-  # required check 強制が効かないため、ここで止めないと CI 完了前にマージできてしまう。
+  # 実行中・待機中の check も待つ。main の ruleset も pending の required check を
+  # 拒むが、ここでも止めて「なぜ止まったか」を名前で示す（#2640 以降、gate は ruleset）。
   # 畳み込み側の is_pending（§ROLLUP）と同じ集合にする。片方だけ直すと
   # 「代表は pending だが件数は 0」のようなズレが出る。`expected` は
   # StatusState の「status 到着待ち」で、failure でも success でもない。
   PENDING_CHECKS="$(printf '%s' "$ROLLUP" | jq -r '
     map(select(
-        ((.status // "") | ascii_downcase | . == "in_progress" or . == "queued" or . == "pending" or . == "waiting" or . == "requested")
-        or ((.state // "") | ascii_downcase | . == "pending" or . == "expected")
+        ((.name // .context // "") != "Validation (shadow)"
+          and (.name // .context // "") != "Review policy (shadow)")
+        and (
+          ((.status // "") | ascii_downcase | . == "in_progress" or . == "queued" or . == "pending" or . == "waiting" or . == "requested")
+          or ((.state // "") | ascii_downcase | . == "pending" or . == "expected")
+        )
       ))
     | length')"
 
@@ -302,16 +375,20 @@ if [[ "$PR_STATE" == "OPEN" ]]; then
   # 検証が実際に行われたことを確認する。statusCheckRollup が空、または全ての
   # check が skipped の場合、上の failure / pending 判定はどちらも 0 件になり
   # 「CI が 1 本も走っていない PR」を green と区別できないまま素通りする。
-  # private repo + Free plan では GitHub 側の required check 強制が効かないため、
-  # ここが唯一の防波堤になる。
+  # main の ruleset は required check が存在しない PR を expected のまま止めるが、
+  # ここでも「success が 1 件も無い」構成異常を名前で検出する（冗長検査）。
   #
   # ci.yml は docs のみの変更なら paths-ignore で skip されるので、「CI が
   # 走らない PR」自体は異常ではない。ただし Docs Guard は paths フィルタを持たず
   # 全 PR で走るため、success が 1 件も無い状態は構成の異常を意味する。
   SUCCESS_CHECKS="$(printf '%s' "$ROLLUP" | jq -r '
     map(select(
-        ((.conclusion // "") | ascii_downcase | . == "success")
-        or ((.state // "") | ascii_downcase | . == "success")
+        ((.name // .context // "") != "Validation (shadow)"
+          and (.name // .context // "") != "Review policy (shadow)")
+        and (
+          ((.conclusion // "") | ascii_downcase | . == "success")
+          or ((.state // "") | ascii_downcase | . == "success")
+        )
       ))
     | length')"
 
@@ -331,8 +408,8 @@ if [[ "$PR_STATE" == "OPEN" ]]; then
   # 以上」は Static / Unit / Docs Guard だけで満たされ、build が一度も走らないまま
   # merge できてしまう（fail-open）。status が付かない経路は実在する: Vercel
   # integration の切断・障害、Ignored Build Step の設定、project rename。
-  # private repo + Free plan では ruleset の required check を強制できないので、
-  # 「あるはずの context が無い」ことをここで能動的に検出する。
+  # Vercel context は ruleset でも required だが、affected な project の判定は
+  # Impact Resolver が持つため、「あるはずの context が無い」ことをここでも検出する。
   #
   # **どの context を「あるはず」とするかは Impact Resolver が決める**
   # （scripts/ci/impact.mjs。旧 docs/projects/_archive/ci-monorepo-refactor/overview.md §5、
@@ -533,7 +610,7 @@ if [[ "$PR_STATE" == "OPEN" ]]; then
 
   # ── レビュー thread の解決を要求する ────────────────────────────────
   #
-  # レビュー（内製クロスレビュー等）の指摘 thread が未解決のまま merge できると、指摘の
+  # GitHub review の指摘 thread が未解決のまま merge できると、指摘の
   # 黙殺が構造的に可能になる。「解決」は 3 択のいずれか: ① fix を積んで resolve、
   # ② 反論・根拠を reply して resolve、③ 別 issue へ切り出し番号を reply して
   # resolve（`AGENTS.md §PR / git 運用` §レビュー）。
@@ -688,10 +765,9 @@ if [[ "$PR_STATE" == "OPEN" ]]; then
 
   # ── 保護対象 path の判定（advisory レビューの目安、#2596） ──────────────
   #
-  # Codex / 内製 marker の hard gate は #2596 で撤回した（merge の遮断は CI
-  # status-check-rollup 判定と pre-tool-guard の `gh pr merge` 直接実行 block だけで
-  # 行う。AGENTS.md §レビュー）。保護対象 path の判定自体は削除せず、Main が
-  # pr-cross-review skill での advisory レビューをどこまで重く行うかの目安として
+  # Codex / 追加 reviewer marker の hard gate は #2596 で撤回した（merge の遮断は main の
+  # ruleset が全経路で行う。#2640。AGENTS.md §レビュー）。保護対象 path の判定自体は削除せず、Main が
+  # GitHub の @codex review でどこを重点的に読むかの目安として
   # 残す — ここでの判定結果は merge を止めない（情報表示のみ）。
   #
   # 判定は scripts/ci/protected-path-gate.mjs（正本）へ委譲する。入力は
@@ -747,53 +823,33 @@ if [[ "$PR_STATE" == "OPEN" ]]; then
 
   if [[ "$ADVISORY_REVIEW_RECOMMENDED" == "true" ]]; then
     ADVISORY_REVIEW_REASON_JOINED="$(IFS=', '; echo "${ADVISORY_REVIEW_REASONS[*]}")"
-    echo "advisory review recommended (${ADVISORY_REVIEW_REASON_JOINED}) — merge は止めません" >&2
+    echo "GitHub @codex review focus recommended (${ADVISORY_REVIEW_REASON_JOINED}) — merge は止めません" >&2
   else
-    echo "advisory review: 保護対象 path に該当なし" >&2
+    echo "GitHub @codex review focus: 保護対象 path に該当なし" >&2
   fi
 
-  # ── audit contract 変更 PR は trusted dispatch の status を必ず要求する（#2571）──
+  # ── audit contract 変更 PR の trusted dispatch は任意の確認手段（2026-09-18、#2469）──
   #
-  # `production-config-audit.yml` の `pull_request_target` は contract 4 path の `paths`
-  # filter を持つ（Actions の削減）。**workflow が起動したかどうかに checkpoint を委ねない。**
-  # 起動しない条件は `paths` の意味論だけでなく次のクラスを含み、いずれも「PR code に
-  # contract 変更を自己検証させない」という設計を静かに無効化する:
+  # 2026-09-03（#2571）から 2026-09-18 まで、ここは contract 変更 PR に commit status
+  # `Production Config Audit` の success を**必須**にしていた。撤去した理由は上の
+  # §audit contract guard も advisory として扱う と同じ:
   #
-  #   - Actions を一時 Disable している間（incident 対応で実際に行う運用がある）
-  #   - base branch の workflow 定義が壊れている / 消えている（`pull_request_target` は
-  #     **base 側の定義**で評価されるため、PR 側を直しても効かない）
-  #   - `paths` の書き間違いで対象を取りこぼす
-  #   - GitHub の `paths` 仕様（changed files が 3,000 件を超え、一致するファイルが
-  #     先頭 3,000 件に無いと起動しない）
+  #   - merge の遮断は main の ruleset 1 本（2026-09-13、#2640）で、そこに
+  #     `Production Config Audit` は無い。この checkpoint は branch:finish だけに効く
+  #     非対称な gate で、`gh api` 直叩きの merge は同じ PR をそのまま通していた
+  #   - status は SHA ごとに発行されるため、**追従 merge だけの push でも同じ重さの
+  #     人間 gate**を要求した（#2464 で 1 PR に 3 回。3 回目はレーンの変更を含まない）
+  #   - contract 変更の可視化は下の `protected-path-gate.mjs` 由来の advisory review 推奨が
+  #     担い、live な env drift は push:main / nightly / promote の runProductionConfigAudit
+  #     が検出する。merge 前に手で確かめたい時は、diff をレビューしたうえで
+  #     `gh workflow run production-config-audit.yml --ref <branch>` を回せばよい
+  #     （VERCEL_TOKEN を branch 側のコードへ渡すため、User の明示指示で実行する）
   #
-  # そこで changed-files 由来の判定（`protected-path-gate.mjs` の `auditContract`）で
-  # commit status `Production Config Audit` の success（= trusted dispatch 実行済み）を
-  # 要求する。**判定できなかった場合（`unknown`）も要求する** —— contract 変更を否定
-  # できない以上、通す理由が無い（fail closed。Codex / architecture-guard の両系統から
-  # 同じ指摘。#2586）。`unknown` になるのは変更ファイル一覧そのものを取得できなかった
-  # 時（API 失敗 / 3,000 件 truncation / node 不在）だけで、その PR は同じ理由で
-  # `ADVISORY_REVIEW_RECOMMENDED` も立っている。
-  #
-  # status の照合は上の免除ロジックと同じ述語（`$JQ_GATE_DEFS` の `trusted_audit_cleared`）
-  # を使う。コピーすると、context 名や条件を片方だけ変えた時に **checkpoint 側だけが
-  # 無言で無効化される**（免除側だけズレても「うるさいが安全」側に倒れるので非対称）。
+  # `AUDIT_CONTRACT_CHANGED` 自体は残す —— contract を触った PR では下の advisory review
+  # 推奨の理由として名前を出し、判定不能（`unknown`）も同じく推奨側へ倒す。
   if [[ "$AUDIT_CONTRACT_CHANGED" != "false" ]]; then
-    AUDIT_STATUS_OK="$(printf '%s' "$ROLLUP" | jq -r "$JQ_GATE_DEFS"'
-      if trusted_audit_cleared then "true" else "false" end' 2>/dev/null || echo "")"
-    if [[ "$AUDIT_STATUS_OK" != "true" ]]; then
-      if [[ "$AUDIT_CONTRACT_CHANGED" == "unknown" ]]; then
-        error "変更ファイル一覧を取得できず、audit contract を変更したか判定できませんでした。"
-        error "contract 変更を否定できないため、trusted dispatch を要求します（fail closed）。"
-      else
-        error "この PR は audit contract（audit script / production-build-gate / workflow 自身）を変更しています。"
-      fi
-      error "commit status「Production Config Audit」が現 HEAD で success になっていません。"
-      error "PR code に contract 変更を自己検証させないため、trusted dispatch が必要です:"
-      error "  gh workflow run production-config-audit.yml --ref $BRANCH"
-      error "完了後に再実行してください（status は SHA ごとなので push のたびに要ります）。"
-      exit 1
-    fi
-    info "audit contract の trusted dispatch を確認しました（status「Production Config Audit」= success）。"
+    info "この PR は audit contract（audit script / production-build-gate / workflow 自身）に触れている可能性があります（judgement: ${AUDIT_CONTRACT_CHANGED}）。"
+    info "merge は止めません。手で確認したい場合のみ: gh workflow run production-config-audit.yml --ref $BRANCH"
   fi
 
 

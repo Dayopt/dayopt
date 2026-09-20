@@ -127,14 +127,26 @@ function disallowedVaultRefs(text) {
 // =====================================================================
 
 function runGitCapture(args, cwd, execFileImpl) {
+  return runGitResult(args, cwd, execFileImpl).out;
+}
+
+/**
+ * `runGitCapture` と同じ実行だが、**「空を返した」と「失敗した」を区別する**。
+ *
+ * `git ls-tree` は「その path が tree に無い」を exit 0 + 空出力で返すため、
+ * 空文字だけでは「無い（= allow してよい）」と「git が動かなかった（= 判定
+ * 不能なので block）」が見分けられない。fail-closed を保つ判定はこちらを使う。
+ */
+function runGitResult(args, cwd, execFileImpl) {
   try {
-    return execFileImpl('git', args, {
+    const out = execFileImpl('git', args, {
       cwd,
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'ignore'],
-    }).trim();
+    });
+    return { ok: true, out: typeof out === 'string' ? out.trim() : '' };
   } catch {
-    return '';
+    return { ok: false, out: '' };
   }
 }
 
@@ -323,6 +335,50 @@ function isRegularFile(p) {
 }
 
 /**
+ * 既存 migration が **`origin/main` に載っているか**（= 適用済みとみなすか）。
+ *
+ * migration は main へ merge された時点で production へ適用されるため、
+ * 「origin/main の tree に在る」を適用済みの判定に使う（#2185）。逆に、未 merge の
+ * PR ブランチにしか無い migration は production はもちろんどの共有環境にも
+ * 適用されていないので、同じ PR 内で書き直してよい（レビュー指摘の反映や設計の
+ * 訂正で普通に起きる。以前はここが一律 block で、そのつど User の例外裁可が要った）。
+ *
+ * **判定不能はすべて block**（fail-closed）: origin/main の ref が無い、git が
+ * 動かない、path を repo root からの相対へ直せない、のいずれも「適用済みでない」
+ * 証明にはならない。ref が古いだけの時は `git fetch origin main` で判定し直せる。
+ *
+ * 注意: push 済み・未 merge の migration を書き換えると、Supabase preview branch は
+ * 同じ version を再適用しないため preview 側だけ古い定義が残る（`supabase` skill）。
+ */
+function isMigrationOnOriginMain(filePath, cwd, execFileImpl) {
+  const ref = 'refs/remotes/origin/main';
+  if (!runGitCapture(['rev-parse', '--verify', '--quiet', ref], cwd, execFileImpl)) return true;
+
+  const roots = resolveRoots(cwd, execFileImpl);
+  if (!roots) return true;
+
+  const relative = repoRelativePath(filePath, roots.currentRoot, cwd);
+  if (!relative) return true;
+
+  const result = runGitResult(['ls-tree', '--name-only', ref, '--', relative], cwd, execFileImpl);
+  if (!result.ok) return true;
+  return result.out !== '';
+}
+
+/**
+ * 絶対 path を repo root からの相対 path へ直す。root 配下でなければ symlink を
+ * 解決してもう一度試し（repo root 自体が symlink 越しの checkout でも効くように）、
+ * それでも配下でなければ空文字（呼び出し元は判定不能として扱う）。
+ */
+function repoRelativePath(filePath, currentRoot, cwd) {
+  for (const candidate of [filePath, resolvePhysicalPath(filePath, cwd)]) {
+    if (!candidate) continue;
+    if (candidate.startsWith(`${currentRoot}/`)) return candidate.slice(currentRoot.length + 1);
+  }
+  return '';
+}
+
+/**
  * Write は content、Edit は new_string、MultiEdit は edits[].new_string、
  * NotebookEdit は new_source に書き込み内容が入る。jq:
  *   [.tool_input.content?, .tool_input.new_string?, .tool_input.new_source?,
@@ -388,9 +444,15 @@ function checkWriteGuards(filePath, root, cwd, execFileImpl) {
     }
   }
 
-  if (candidates.some((p) => isExistingMigrationSqlPath(p) && isRegularFile(p))) {
+  const appliedMigration = candidates.some(
+    (p) =>
+      isExistingMigrationSqlPath(p) &&
+      isRegularFile(p) &&
+      isMigrationOnOriginMain(p, cwd, execFileImpl),
+  );
+  if (appliedMigration) {
     block(
-      `BLOCKED: 既存マイグレーションファイルの変更は禁止です。新しいマイグレーションを作成してください${via}`,
+      `BLOCKED: origin/main に載っている（適用済みの）マイグレーションファイルの変更は禁止です。新しいマイグレーションを作成してください${via}。未 merge のマイグレーションがこう判定される場合は origin/main の取得が古いので、git fetch origin main のうえで再実行してください`,
     );
   }
 }
@@ -652,6 +714,224 @@ function checkVercelToken(commandJoined, commandUnquoted) {
   }
 }
 
+// ---------------------------------------------------------------------
+// vercel CLI: 読み取り系サブコマンドだけを通す（2026-09-14、Secret / Credential 監査 P1-2）
+// ---------------------------------------------------------------------
+//
+// agent の vercel CLI は User 本人の対話 login（team 全権）で動く。Vercel の token は
+// scope を絞れないため、identity 分離ではなく「コマンド位置の vercel が読み取り系か」
+// で止める。書き込み系を数え上げると新サブコマンドで穴が開くので、**許可する側を
+// 固定する**（env-file の判定と同じ理由）。引数なしの `vercel` は deploy なので落とす。
+// `env pull` / `pull` / `dev` / `build` は実値を file や process へ引き出すので読み取り
+// 扱いにしない。
+//
+// 保証境界: adapter が渡したコマンド文字列を quote を解釈して区切り（quote 外の
+// ; & | 改行 括弧 $( backtick）で分け、各区切りの先頭にある vercel を見る。env 代入・env / command / exec / npx / pnpm exec|dlx / bunx /
+// xargs / op run ... -- / sh|bash|zsh -c の前置きは剥がして辿る。変数展開や wrapper
+// script、`pnpm vercel:env:pull:unsafe` のような npm script の内側は見えない（speed
+// bump であり、production 変更を止める本体は User の明示操作と EXPLICIT AUTHORITY）。
+const VERCEL_READ_SUBCOMMANDS = {
+  ls: null,
+  list: null,
+  inspect: null,
+  logs: null,
+  whoami: null,
+  help: null,
+  teams: ['ls', 'list'],
+  project: ['ls', 'list', 'inspect'],
+  projects: ['ls', 'list', 'inspect'],
+  env: ['ls', 'list'],
+  domains: ['ls', 'list', 'inspect'],
+  dns: ['ls', 'list'],
+  certs: ['ls', 'list'],
+  alias: ['ls', 'list'],
+  integration: ['list', 'ls'],
+};
+const VERCEL_VALUE_FLAGS = new Set([
+  '--scope',
+  '-S',
+  '--team',
+  '-T',
+  '--cwd',
+  '--local-config',
+  '-A',
+  '--global-config',
+  '-Q',
+]);
+const VERCEL_API_METHOD_FLAGS = new Set(['-X', '--method']);
+const VERCEL_API_BODY_FLAG_RE = /^(-d|--data|--input|-F|--field|--raw-field|-f)(=|$)/;
+const SHELL_WRAPPERS = new Set(['sh', 'bash', 'zsh']);
+
+function stripVercelPrefix(tokens) {
+  let i = 0;
+  for (;;) {
+    const t = tokens[i];
+    if (t === undefined) return tokens.slice(i);
+    if (/^[A-Za-z_][A-Za-z0-9_]*=/.test(t)) {
+      i += 1;
+    } else if (t === 'env' || t === 'command' || t === 'exec' || t === 'time') {
+      i += 1;
+      while (tokens[i]?.startsWith('-')) i += 1;
+    } else if (t === 'npx' || t === 'bunx' || t === 'xargs') {
+      i += 1;
+      while (tokens[i]?.startsWith('-')) i += 1;
+    } else if (t === 'pnpm' && (tokens[i + 1] === 'exec' || tokens[i + 1] === 'dlx')) {
+      i += 2;
+      while (tokens[i]?.startsWith('-')) i += 1;
+    } else if (t === 'op' && tokens[i + 1] === 'run') {
+      const dashdash = tokens.indexOf('--', i + 2);
+      if (dashdash === -1) return [];
+      i = dashdash + 1;
+    } else {
+      return tokens.slice(i);
+    }
+  }
+}
+
+/** vercel 呼び出し 1 件の引数列が読み取りだけか。null なら許可、文字列なら block 理由。 */
+function vercelInvocationViolation(args) {
+  const positional = [];
+  let method = null;
+  let hasBody = false;
+  for (let i = 0; i < args.length; i += 1) {
+    const a = args[i];
+    if (VERCEL_VALUE_FLAGS.has(a)) {
+      i += 1;
+    } else if (VERCEL_API_METHOD_FLAGS.has(a)) {
+      method = (args[i + 1] ?? '').toUpperCase();
+      i += 1;
+    } else if (/^(-X|--method)=/.test(a)) {
+      method = a.split('=')[1].toUpperCase();
+    } else if (/^-X[A-Za-z]+$/.test(a)) {
+      method = a.slice(2).toUpperCase();
+    } else if (VERCEL_API_BODY_FLAG_RE.test(a)) {
+      hasBody = true;
+      if (!a.includes('=')) i += 1;
+    } else if (a === '--help' || a === '-h' || a === '--version' || a === '-v') {
+      return null;
+    } else if (a.startsWith('-')) {
+      // 値を取らない flag（--prod / --yes / --json 等）はそのまま読み飛ばす
+    } else {
+      positional.push(a);
+    }
+  }
+  const [sub, action] = positional;
+  if (sub === undefined) return '引数なしの vercel は deploy です';
+  if (sub === 'api') {
+    if ((method !== null && method !== 'GET') || hasBody)
+      return 'vercel api は GET（body なし）だけを許可します';
+    return null;
+  }
+  if (!Object.hasOwn(VERCEL_READ_SUBCOMMANDS, sub))
+    return `vercel ${sub} は読み取り系ではありません`;
+  const actions = VERCEL_READ_SUBCOMMANDS[sub];
+  if (actions === null) return null;
+  if (
+    action === undefined &&
+    (sub === 'env' || sub === 'teams' || sub === 'project' || sub === 'projects')
+  )
+    return null; // 既定動作が一覧表示
+  if (!actions.includes(action)) return `vercel ${sub} ${action ?? ''} は読み取り系ではありません`;
+  return null;
+}
+
+/**
+ * quote を解釈して「区切りごとの token 列」に分ける最小の shell 字句解析。
+ * quote の内側の `|` `;` は区切りにしない（`rg "A|B" file` を誤検知しないため）。
+ * `$(` と backtick は内側のコマンドの始まりとして区切り扱いにする。
+ * 変数展開・glob・brace 展開はしない（見えないものは見えないまま）。
+ */
+function splitShellSegments(command) {
+  const segments = [];
+  let tokens = [];
+  let token = '';
+  let hasToken = false;
+  let quote = null;
+  const endToken = () => {
+    if (hasToken) tokens.push(token);
+    token = '';
+    hasToken = false;
+  };
+  const endSegment = () => {
+    endToken();
+    if (tokens.length > 0) segments.push(tokens);
+    tokens = [];
+  };
+  for (let i = 0; i < command.length; i += 1) {
+    const c = command[i];
+    if (quote === "'") {
+      if (c === "'") quote = null;
+      else token += c;
+      continue;
+    }
+    if (quote === '"') {
+      if (c === '"') quote = null;
+      else if (c === '\\' && i + 1 < command.length) token += command[(i += 1)];
+      else token += c;
+      continue;
+    }
+    if (c === '\\') {
+      if (command[i + 1] === '\n') i += 1;
+      else if (i + 1 < command.length) {
+        token += command[(i += 1)];
+        hasToken = true;
+      }
+      continue;
+    }
+    if (c === '$' && (command[i + 1] === "'" || command[i + 1] === '"')) {
+      quote = command[(i += 1)];
+      hasToken = true;
+      continue;
+    }
+    if (c === "'" || c === '"') {
+      quote = c;
+      hasToken = true;
+      continue;
+    }
+    if (c === '$' && command[i + 1] === '(') {
+      i += 1;
+      endSegment();
+      continue;
+    }
+    if (';&|\n()`'.includes(c)) {
+      endSegment();
+      continue;
+    }
+    if (' \t\v\f\r'.includes(c)) {
+      endToken();
+      continue;
+    }
+    token += c;
+    hasToken = true;
+  }
+  endSegment();
+  return segments;
+}
+
+function scanVercelCommand(command, depth) {
+  if (depth > 3) return;
+  for (const segment of splitShellSegments(command)) {
+    const tokens = stripVercelPrefix(segment);
+    if (tokens.length === 0) continue;
+    const head = tokens[0].split('/').pop();
+    if (SHELL_WRAPPERS.has(head) && tokens[1] === '-c' && tokens[2] !== undefined) {
+      scanVercelCommand(tokens[2], depth + 1);
+      continue;
+    }
+    if (head !== 'vercel') continue;
+    const violation = vercelInvocationViolation(tokens.slice(1));
+    if (violation !== null) {
+      block(
+        `BLOCKED: ${violation}。agent から vercel CLI で実行してよいのは読み取り系（ls / inspect / logs / whoami / env ls / project ls 等、api は GET のみ）だけです。agent の vercel は User の team 全権 login で動くため、deploy / promote / rollback / env add・rm・pull / domains / certs / link / pull 等は User の terminal か Dashboard で行ってください（docs/operations/secrets.md §Agent の vercel CLI）`,
+      );
+    }
+  }
+}
+
+function checkVercelWrite(rawCommand) {
+  scanVercelCommand(rawCommand, 0);
+}
+
 const SUPABASE_MGMT_DANGER_ENDPOINT_RE =
   /api\.supabase\.com\/v1\/(projects\/[^ \t\n\v\f\r"']*\/(config|branches)|branches)/;
 
@@ -666,42 +946,19 @@ function checkSupabaseMgmtDangerEndpoint(commandJoined, commandUnquoted) {
 }
 
 // ---------------------------------------------------------------------
-// gh pr merge / gh api ...pulls/.../merge の直接実行（cost guard、#2596）
+// merge の直接実行は block しない（2026-09-13、#2640）
 // ---------------------------------------------------------------------
-// merge 経路を `pnpm branch:finish <N>` 1 本に機械的に絞る（#2596）。free plan の
-// private repo では branch protection / ruleset が使えず、CI red の遮断は
-// finish-branch.sh の statusCheckRollup 判定だけが担っている。Bash tool からの
-// `gh pr merge` / `gh api ... -X PUT .../pulls/<N>/merge` 直接実行を許すと、この
-// 唯一の遮断を素通りできてしまう。
+// 2026-09-04（#2596）から 2026-09-13 までは `gh pr merge` / `gh api ... PUT
+// .../pulls/<N>/merge` を block し、merge 経路を `pnpm branch:finish <N>` 1 本に
+// 絞っていた。Free plan の private repo では ruleset が使えず、CI red の遮断を
+// finish-branch.sh の rollup 判定だけが担っていたため。
 //
-// finish-branch.sh 自身が内部で `gh api -X PUT .../pulls/$PR_NUMBER/merge` を実行
-// するが、それは spawn されたシェルの中の呼び出しであり、Bash tool には
-// `pnpm branch:finish <N>` という外側の1行しか見えないため、この rule では
-// 素通りする（#2596 実装 plan で確認済み）。
-//
-// **security guard ではなく cost guard**。迂回されても漏洩は起きない（CI red の
-// merge を試みるだけ）ので、判定は単純な正規表現に留める。
-const GH_PR_MERGE_RE =
-  /(^|[ \t\n\v\f\r;&|/])gh[ \t\n\v\f\r]+pr[ \t\n\v\f\r]+merge([ \t\n\v\f\r]|$)/;
-const GH_API_PULLS_MERGE_RE =
-  /(^|[ \t\n\v\f\r;&|/])gh[ \t\n\v\f\r]+api[ \t\n\v\f\r][^\n]*pulls\/[^ \t\n\v\f\r"']*\/merge/;
-const PUT_METHOD_FLAG_RE =
-  /(^|[ \t\n\v\f\r;&|])(-X|--method)[ \t\n\v\f\r=]*put([ \t\n\v\f\r;&|]|$)/i;
-
-function checkGhMergeDirectExecution(commandJoined, commandUnquoted) {
-  for (const scanned of [commandJoined, commandUnquoted]) {
-    if (GH_PR_MERGE_RE.test(scanned)) {
-      block(
-        'BLOCKED: gh pr merge を直接実行しないでください（#2596）。pnpm branch:finish <PR番号> を使ってください（CI red での merge を機械的に遮断します。この文字列に言及しただけでも落ちます。docs や commit message に書く時は文面を変えるか、Write / Edit で file に書いてから渡してください）',
-      );
-    }
-    if (GH_API_PULLS_MERGE_RE.test(scanned) && PUT_METHOD_FLAG_RE.test(scanned)) {
-      block(
-        'BLOCKED: gh api で pulls/<N>/merge へ PUT する直接実行は禁止です（#2596）。pnpm branch:finish <PR番号> を使ってください（CI red での merge を機械的に遮断します。この文字列に言及しただけでも落ちます。docs や commit message に書く時は文面を変えるか、Write / Edit で file に書いてから渡してください）',
-      );
-    }
-  }
-}
+// 2026-09-07 の repo public 化で main の ruleset（required status checks / strict
+// up-to-date / thread resolution、bypass actor 0）が有効になり、CI red の merge は
+// GitHub 自身がどの経路（local / cloud / UI / API / MCP）でも拒む。この guard は
+// Bash の `gh` 文字列しか見えず、MCP の merge tool は素通りしていたので、経路ごとに
+// 条件が違う非対称だけが残っていた。ruleset を唯一の gate にし、この rule は撤去した。
+// `pnpm branch:finish` は worktree / branch 掃除の入口として残る（gate ではない）。
 
 const OP_READ_RE = /(^|[ \t\n\v\f\r;&|/])op[ \t\n\v\f\r]+read([ \t\n\v\f\r]|$)/;
 
@@ -748,9 +1005,9 @@ function checkBashCommand(rawCommand, cwd, execFileImpl) {
   checkOpItemGetReveal(commandJoined, commandUnquoted);
   checkSupabaseBranchesGet(commandJoined, commandUnquoted);
   checkVercelToken(commandJoined, commandUnquoted);
+  checkVercelWrite(rawCommand);
   checkSupabaseMgmtDangerEndpoint(commandJoined, commandUnquoted);
   checkOpRead(commandJoined, commandUnquoted);
-  checkGhMergeDirectExecution(commandJoined, commandUnquoted);
 }
 
 // =====================================================================

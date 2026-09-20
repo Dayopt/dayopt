@@ -65,6 +65,7 @@ describe('useServiceWorker', () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
     vi.clearAllMocks();
   });
 
@@ -92,6 +93,21 @@ describe('useServiceWorker', () => {
 
       await waitFor(() => {
         expect(navigator.serviceWorker.register).toHaveBeenCalledWith('/sw.js', {
+          scope: '/',
+        });
+      });
+    });
+
+    it('commit SHA があれば ?v= 付きで登録する（キャッシュ名の deploy ごとローテーション）', async () => {
+      // sw.js は登録 URL の `v` から CACHE_VERSION を導出する。ここが無言で
+      // bare `/sw.js` に戻ると全 deploy が `dayopt-*-vdev` を共有し、#2688 の
+      // 修正が効かなくなる
+      vi.stubEnv('NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA', 'abcdef1234567890');
+
+      renderHook(() => useServiceWorker());
+
+      await waitFor(() => {
+        expect(navigator.serviceWorker.register).toHaveBeenCalledWith('/sw.js?v=abcdef12', {
           scope: '/',
         });
       });
@@ -205,6 +221,45 @@ describe('useServiceWorker', () => {
       expect(result.current.updateAvailable).toBe(true);
     });
 
+    it('新しい SW の版がページ自身と同じなら updateAvailable は false のまま（promote 後に開いたページ）', async () => {
+      vi.stubEnv('NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA', 'abcdef1234567890');
+      const { result } = renderHook(() => useServiceWorker());
+
+      await waitFor(() => {
+        expect(result.current.isRegistered).toBe(true);
+      });
+
+      // このページが登録した新 SW が制御を得る
+      Object.assign(navigator.serviceWorker, {
+        controller: { scriptURL: 'https://app.dayopt.app/sw.js?v=abcdef12' },
+      });
+      act(() => {
+        getControllerChangeHandler()();
+      });
+
+      expect(result.current.updateAvailable).toBe(false);
+    });
+
+    it('新しい SW の版がページと違えば updateAvailable が true になり、その版を latestVersion に持つ', async () => {
+      vi.stubEnv('NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA', 'abcdef1234567890');
+      const { result } = renderHook(() => useServiceWorker());
+
+      await waitFor(() => {
+        expect(result.current.isRegistered).toBe(true);
+      });
+
+      // 別タブが新しい deploy を開き、その SW がこのページの制御も奪う
+      Object.assign(navigator.serviceWorker, {
+        controller: { scriptURL: 'https://app.dayopt.app/sw.js?v=99999999' },
+      });
+      act(() => {
+        getControllerChangeHandler()();
+      });
+
+      expect(result.current.updateAvailable).toBe(true);
+      expect(result.current.latestVersion).toBe('99999999');
+    });
+
     it('applyUpdate はページをリロードする', async () => {
       const reloadMock = vi.fn();
       Object.defineProperty(window, 'location', {
@@ -223,6 +278,141 @@ describe('useServiceWorker', () => {
       });
 
       expect(reloadMock).toHaveBeenCalledOnce();
+    });
+  });
+  describe('タブ復帰時の版確認', () => {
+    const START = new Date('2026-09-14T09:00:00Z');
+
+    function setVisibility(state: DocumentVisibilityState) {
+      Object.defineProperty(document, 'visibilityState', { value: state, configurable: true });
+    }
+
+    function returnToTab() {
+      setVisibility('visible');
+      document.dispatchEvent(new Event('visibilitychange'));
+    }
+
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ['Date'] });
+      vi.setSystemTime(START);
+      vi.stubEnv('NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA', 'abcdef1234567890');
+      setVisibility('visible');
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    function stubDeployedSha(commitSha: string) {
+      const fetchMock = vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ version: '1.0.0', commitSha }),
+      });
+      vi.stubGlobal('fetch', fetchMock);
+      return fetchMock;
+    }
+
+    it('配信中の SHA が違えば updateAvailable が true になる', async () => {
+      const fetchMock = stubDeployedSha('99999999');
+      const { result } = renderHook(() => useServiceWorker());
+
+      vi.setSystemTime(START.getTime() + 61_000);
+      act(() => {
+        returnToTab();
+      });
+
+      await waitFor(() => {
+        expect(result.current.updateAvailable).toBe(true);
+      });
+      expect(result.current.latestVersion).toBe('99999999');
+      expect(fetchMock).toHaveBeenCalledWith('/api/health/version', { cache: 'no-store' });
+    });
+
+    it('配信中の SHA が同じなら updateAvailable は false のまま', async () => {
+      const fetchMock = stubDeployedSha('abcdef12');
+      const { result } = renderHook(() => useServiceWorker());
+
+      vi.setSystemTime(START.getTime() + 61_000);
+      act(() => {
+        returnToTab();
+      });
+
+      await waitFor(() => {
+        expect(fetchMock).toHaveBeenCalledOnce();
+      });
+      // fetch の解決を待ってから判定する
+      await act(async () => {
+        await Promise.resolve();
+      });
+      expect(result.current.updateAvailable).toBe(false);
+    });
+
+    it('fetch が失敗しても updateAvailable は false のまま', async () => {
+      const fetchMock = vi.fn().mockRejectedValue(new TypeError('Failed to fetch'));
+      vi.stubGlobal('fetch', fetchMock);
+      const { result } = renderHook(() => useServiceWorker());
+
+      vi.setSystemTime(START.getTime() + 61_000);
+      act(() => {
+        returnToTab();
+      });
+
+      await waitFor(() => {
+        expect(fetchMock).toHaveBeenCalledOnce();
+      });
+      await act(async () => {
+        await Promise.resolve();
+      });
+      expect(result.current.updateAvailable).toBe(false);
+    });
+
+    it('前回の確認から 1 分以内の復帰では fetch しない', async () => {
+      const fetchMock = stubDeployedSha('abcdef12');
+      renderHook(() => useServiceWorker());
+
+      // 読み込み直後の復帰は確認しない
+      act(() => {
+        returnToTab();
+      });
+      expect(fetchMock).not.toHaveBeenCalled();
+
+      vi.setSystemTime(START.getTime() + 61_000);
+      act(() => {
+        returnToTab();
+      });
+      expect(fetchMock).toHaveBeenCalledOnce();
+
+      vi.setSystemTime(START.getTime() + 90_000);
+      act(() => {
+        returnToTab();
+      });
+      expect(fetchMock).toHaveBeenCalledOnce();
+    });
+
+    it('タブが見えていない時は fetch しない', () => {
+      const fetchMock = stubDeployedSha('99999999');
+      renderHook(() => useServiceWorker());
+
+      vi.setSystemTime(START.getTime() + 61_000);
+      act(() => {
+        setVisibility('hidden');
+        document.dispatchEvent(new Event('visibilitychange'));
+      });
+
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('SHA を持たないビルドでは確認しない', () => {
+      vi.stubEnv('NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA', '');
+      const fetchMock = stubDeployedSha('99999999');
+      renderHook(() => useServiceWorker());
+
+      vi.setSystemTime(START.getTime() + 61_000);
+      act(() => {
+        returnToTab();
+      });
+
+      expect(fetchMock).not.toHaveBeenCalled();
     });
   });
 });

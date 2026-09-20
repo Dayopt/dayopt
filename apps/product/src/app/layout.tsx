@@ -23,6 +23,7 @@ import { headers } from 'next/headers';
 import { Suspense } from 'react';
 
 import { DeferredAnalytics } from '@/lib/analytics/DeferredAnalytics';
+import { THEME_BOOTSTRAP_SCRIPT } from '@/lib/theme/theme-bootstrap-script';
 import { cn } from '@dayopt/components';
 
 // next/font による最適化されたフォント読み込み（Variable Font: wght軸のみ）
@@ -123,6 +124,8 @@ const RootLayout = async ({ children, params }: RootLayoutProps) => {
       className={`${sourceSans.variable} ${notoSansJP.variable}`}
     >
       <head>
+        {/* 初回描画前にテーマ class を付ける（ダークテーマの白フラッシュ防止） */}
+        <script nonce={nonce} dangerouslySetInnerHTML={{ __html: THEME_BOOTSTRAP_SCRIPT }} />
         {/* LCP改善: Supabase API への早期接続確立（preconnect + dns-prefetch） */}
         {process.env.NEXT_PUBLIC_SUPABASE_URL && (
           <>

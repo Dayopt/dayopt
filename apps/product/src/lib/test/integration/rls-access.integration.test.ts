@@ -24,10 +24,10 @@ const SUPABASE_URL =
     ? LOCAL_DB_URL
     : process.env.NEXT_PUBLIC_SUPABASE_URL || LOCAL_DB_URL;
 const SUPABASE_SERVICE_KEY =
-  process.env.SUPABASE_SERVICE_ROLE_KEY ||
+  process.env.SUPABASE_SECRET_KEY ||
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU';
 const SUPABASE_ANON_KEY =
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5Nn0.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0';
 
 const TEST_USER_A_ID = crypto.randomUUID();
@@ -259,7 +259,7 @@ const userOwnedCases: UserOwnedRlsCase[] = [
     update: { name: 'foreign update' },
   },
   {
-    // #2162 Step 5。service-role client の test（segment-schema / segments-service）は
+    // #2162 Step 5。service-role client の test（segment-schema）は
     // 複合 FK を検証できるが RLS は素通りするため、実 anon client で見る場所がここになる。
     table: 'segments',
     idColumn: 'id',

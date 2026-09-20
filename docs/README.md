@@ -84,10 +84,12 @@ code: apps/product/src/features/timeblock # 任意。repo 内の実在 path
 | 全体 architecture / state flow | `engineering/architecture.md`                                                        |
 | coding / API / frontend 規約   | `engineering/conventions*.md` と `AGENTS.md`                                         |
 | 不可解な失敗の切り分け手順     | `engineering/diagnostics.md`                                                         |
+| テスト方針・CI 予算            | `engineering/testing.md`, `operations/self-hosted-runner.md`                         |
 | env・deploy・secret            | `engineering/infra.md`, `operations/secrets.md`                                      |
 | 障害対応・release              | `operations/runbook.md`                                                              |
 | 監視・alert                    | `operations/monitoring.md`                                                           |
 | security                       | `operations/security.md`                                                             |
+| 信頼境界・既往クラス・却下記録 | `engineering/threat-model.md`                                                        |
 | 外部 OAuth の審査申請          | `operations/google-oauth-verification.md`                                            |
 | 契約サービス                   | `company/accounts.md`                                                                |
 | 進行中・完了 Project           | 該当 epic issue 本文と merge 済み PR（`docs/projects/` は 2026-08-28 に全廃、#2473） |
@@ -121,4 +123,4 @@ code: apps/product/src/features/timeblock # 任意。repo 内の実在 path
 - 月次 `/gardening` は journal を持たない。判断は `decisions.md`、所見は issue（数値は `pnpm ai:usage` で再計算できる）
 - `pnpm docs:check` はlink、metadata、path、naming、`decisions.md` の append-only 契約を検証する
 
-テンプレートは [`_templates/`](./_templates/)、AIの自発的な更新責務はroot [`CLAUDE.md`](../CLAUDE.md)を参照する。
+テンプレートは [`_templates/`](./_templates/)、AIの自発的な更新責務はroot [`AGENTS.md`](../AGENTS.md)を参照する（`CLAUDE.md` は AGENTS.md を import するだけの adapter）。

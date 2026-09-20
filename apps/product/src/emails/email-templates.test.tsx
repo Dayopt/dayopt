@@ -13,8 +13,6 @@ import { PasswordResetEmail } from './PasswordResetEmail';
 import { PaymentFailedEmail } from './PaymentFailedEmail';
 import { PaymentRecoveredEmail } from './PaymentRecoveredEmail';
 import { ProStartEmail } from './ProStartEmail';
-import { TrialExpiredEmail } from './TrialExpiredEmail';
-import { TrialExpiringEmail } from './TrialExpiringEmail';
 import { TrialStartEmail } from './TrialStartEmail';
 import { WelcomeEmail } from './WelcomeEmail';
 
@@ -79,14 +77,6 @@ function createEmailFixtures(locale: 'en' | 'ja'): EmailFixture[] {
     {
       name: `TrialStartEmail (${locale})`,
       element: TrialStartEmail({ userName: 'Tomoya', trialEndDate: '2026-07-31', locale }),
-    },
-    {
-      name: `TrialExpiringEmail (${locale})`,
-      element: TrialExpiringEmail({ userName: 'Tomoya', trialEndDate: '2026-07-31', locale }),
-    },
-    {
-      name: `TrialExpiredEmail (${locale})`,
-      element: TrialExpiredEmail({ userName: 'Tomoya', locale }),
     },
     {
       name: `ProStartEmail (${locale})`,
@@ -165,6 +155,20 @@ describe('React Email templates', () => {
       expect(html.match(/your settings/g)).toHaveLength(2);
       expect(html).toContain('href="https://app.dayopt.app/settings/account"');
       expect(countHtmlOccurrences(html, resetUrl)).toBe(3);
+    });
+
+    it('password changed notification links to a new reset request and support', async () => {
+      const html = await render(
+        PasswordChangedEmail({
+          userName: 'Tomoya',
+          locale: 'en',
+          appUrl: 'https://app.dayopt.test',
+        }),
+      );
+
+      expect(html).toContain('The password for your Dayopt account was changed.');
+      expect(html).toContain('href="https://app.dayopt.test/auth/password"');
+      expect(html).toContain('href="mailto:support@dayopt.app"');
     });
 
     it('現アドレス宛は変更先アドレスを本文に出し、変更されない旨を伝える', async () => {

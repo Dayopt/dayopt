@@ -4,6 +4,7 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 
 import { REPO, runGhJson } from '../lib/gh.mjs';
+import { resolveMainCheckoutRoot } from '../lib/git-roots.mjs';
 import { isDirectExecution } from '../lib/is-direct-execution.mjs';
 
 /**
@@ -32,6 +33,11 @@ import { isDirectExecution } from '../lib/is-direct-execution.mjs';
  * エントリを持つ script を `scripts/tasks/` に置くことを要求する。共有 lib 化は
  * せず、知識だけこのヘッダへ複製する。drift が実害化したら共有化ではなく hook を
  * 削る方向で解く（月次ビューは週次ビューの上位集合）。
+ *
+ * 例外は git worktree 家系の解決だけで、`scripts/lib/git-roots.mjs` を使う（#2674）。
+ * pre-tool-guard も同じ解決を必要とするが、あちらは「node 標準ライブラリしか
+ * import しない」不変条件があるため自前の実装を持ち続ける。共有ではなく複製 +
+ * contract test（scripts/lib/git-roots.test.ts）で drift を検出する。
  *
  * deferred（次回以降）: 円 / ドル換算（per-token 価格がローカルに無い）、
  * push 回数・review round・MTTR（PR ごと timeline API が N 回必要）、
@@ -979,11 +985,38 @@ function buildAggregateObject({ since, until, projectsDir, cwdPrefix }) {
   return { sinceMs, untilMs, agg };
 }
 
-function getRepoRoot({ execFileImpl = execFileSync } = {}) {
+/**
+ * 集計対象の cwd prefix に使う repo root を返す（#2674）。
+ *
+ * **`git rev-parse --show-toplevel` は使わない。** worktree から実行すると
+ * `.claude/worktrees/<name>` が返り、`scanProjects` の prefix 一致が
+ * 「この worktree 配下の cwd を持つセッション」だけになる。main checkout と
+ * 兄弟 worktree のセッションは無音で除外され、月次の数値が黙って小さくなる
+ * （#2596 の実測: worktree 実行だと 8 月分が全項目「未取得」、9 月の Opus output は
+ * main checkout の 1/7）。
+ *
+ * 代わりに家系の main checkout root を返す。worktree は main checkout 配下の
+ * `.claude/worktrees/*` に作る運用（AGENTS.md §PR / git 運用）なので、main root の
+ * prefix 一致で家系全体が 1 つの repo として集計に入る。
+ *
+ * @param {{
+ *   execFileImpl?: typeof execFileSync,
+ *   cwd?: string,
+ *   realpathImpl?: typeof import('node:fs').realpathSync,
+ * }} [options] realpathImpl は test 用の注入点
+ */
+export function getRepoRoot({
+  execFileImpl = execFileSync,
+  cwd = process.cwd(),
+  realpathImpl,
+} = {}) {
+  const mainRoot = resolveMainCheckoutRoot(cwd, execFileImpl, { realpathImpl });
+  if (mainRoot) return mainRoot;
+  // 家系を解けない時（git が無い / 非 git ディレクトリ）は従来どおりの縮退。
   try {
     return execFileImpl('git', ['rev-parse', '--show-toplevel'], { encoding: 'utf8' }).trim();
   } catch {
-    return process.cwd();
+    return cwd;
   }
 }
 

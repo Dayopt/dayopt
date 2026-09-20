@@ -26,7 +26,7 @@ export function LearnVisual() {
           </div>
           <div className="flex gap-4">
             <div className="flex flex-col">
-              <span className="text-primary text-base font-medium tabular-nums">22.5h</span>
+              <span className="text-primary-text text-base font-medium tabular-nums">22.5h</span>
               <span className="text-muted-foreground text-[9px]">Plan</span>
             </div>
             <div className="flex flex-col">

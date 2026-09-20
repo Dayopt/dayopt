@@ -26,8 +26,8 @@
           "request": "例外的な状況での返金をご希望の場合は、請求日から30日以内に support@dayopt.app までご連絡ください。"
         },
         "freeTrial": {
-          "title": "無料トライアル",
-          "content": "無料トライアル期間中に解約した場合、料金は発生しません。無料トライアルの開始にクレジットカードは不要です。"
+          "title": "無料体験",
+          "content": "無料体験に支払いカードは不要で、期間終了時に自動課金されません。料金が発生するのは、ご自身で有料契約を購入した場合のみです。"
         },
         "howToCancel": {
           "title": "解約方法",
@@ -85,8 +85,7 @@
     "packageList": "パッケージリスト（{count}件）",
     "footer": {
       "notice": "完全なライセンステキストとNOTICEファイルについては：",
-      "thirdPartyNotices": "THIRD_PARTY_NOTICES.txt",
-      "githubRepository": "GitHubリポジトリ"
+      "thirdPartyNotices": "THIRD_PARTY_NOTICES.txt"
     }
   }
 }

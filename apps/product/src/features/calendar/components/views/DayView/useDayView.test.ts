@@ -9,44 +9,44 @@ vi.mock('@/lib/hooks/useUserPreferences', () => ({
 import type { CalendarDisplayEvent } from '../../../types/calendar.types';
 import { useDayView } from './hooks/useDayView';
 
-const createMockEntry = (overrides: Partial<CalendarDisplayEvent> = {}): CalendarDisplayEvent => ({
-  id: `entry-${Math.random().toString(36).slice(2)}`,
-  title: 'Test Entry',
+const createMockTimeblock = (
+  overrides: Partial<CalendarDisplayEvent> = {},
+): CalendarDisplayEvent => ({
+  id: `timeblock-${Math.random().toString(36).slice(2)}`,
+  title: 'Test Timeblock',
   startDate: new Date('2026-03-30T10:00:00'),
   endDate: new Date('2026-03-30T11:00:00'),
   displayStartDate: new Date('2026-03-30T10:00:00'),
   displayEndDate: new Date('2026-03-30T11:00:00'),
-  status: 'open',
   color: 'blue',
   duration: 60,
   isMultiDay: false,
-  createdAt: new Date(),
-  updatedAt: new Date(),
   version: '2026-07-15T00:00:00.000000Z',
+  kind: 'plan',
   ...overrides,
 });
 
 describe('useDayView', () => {
   const baseDate = new Date('2026-03-30');
 
-  it('エントリがない場合は空の配列を返す', () => {
+  it('タイムブロックがない場合は空の配列を返す', () => {
     const { result } = renderHook(() =>
-      useDayView({ date: baseDate, entries: [], timezone: 'Asia/Tokyo' }),
+      useDayView({ date: baseDate, timeblocks: [], timezone: 'Asia/Tokyo' }),
     );
 
-    expect(result.current.dayEntries).toEqual([]);
+    expect(result.current.dayTimeblocks).toEqual([]);
     expect(result.current.timeblockStyles).toEqual({});
   });
 
-  it('指定日のエントリのみをフィルタする', () => {
-    const todayEntry = createMockEntry({
+  it('指定日のタイムブロックのみをフィルタする', () => {
+    const todayTimeblock = createMockTimeblock({
       id: 'today',
       startDate: new Date('2026-03-30T10:00:00'),
       endDate: new Date('2026-03-30T11:00:00'),
       displayStartDate: new Date('2026-03-30T10:00:00'),
       displayEndDate: new Date('2026-03-30T11:00:00'),
     });
-    const tomorrowEntry = createMockEntry({
+    const tomorrowTimeblock = createMockTimeblock({
       id: 'tomorrow',
       startDate: new Date('2026-03-31T10:00:00'),
       endDate: new Date('2026-03-31T11:00:00'),
@@ -57,19 +57,19 @@ describe('useDayView', () => {
     const { result } = renderHook(() =>
       useDayView({
         date: baseDate,
-        entries: [todayEntry, tomorrowEntry],
+        timeblocks: [todayTimeblock, tomorrowTimeblock],
         timezone: 'UTC',
       }),
     );
 
-    expect(result.current.dayEntries).toHaveLength(1);
-    expect(result.current.dayEntries[0]?.id).toBe('today');
+    expect(result.current.dayTimeblocks).toHaveLength(1);
+    expect(result.current.dayTimeblocks[0]?.id).toBe('today');
   });
 
-  it('エントリのCSSスタイルが計算される', () => {
-    const entry = createMockEntry({ id: 'styled' });
+  it('タイムブロックのCSSスタイルが計算される', () => {
+    const timeblock = createMockTimeblock({ id: 'styled' });
     const { result } = renderHook(() =>
-      useDayView({ date: baseDate, entries: [entry], timezone: 'UTC' }),
+      useDayView({ date: baseDate, timeblocks: [timeblock], timezone: 'UTC' }),
     );
 
     const styles = result.current.timeblockStyles;
@@ -81,7 +81,7 @@ describe('useDayView', () => {
 
   it('timeSlotsが生成される', () => {
     const { result } = renderHook(() =>
-      useDayView({ date: baseDate, entries: [], timezone: 'UTC' }),
+      useDayView({ date: baseDate, timeblocks: [], timezone: 'UTC' }),
     );
 
     // 24時間 × 4 (15分刻み) = 96スロット
@@ -90,15 +90,15 @@ describe('useDayView', () => {
     expect(result.current.timeSlots[0]?.minute).toBe(0);
   });
 
-  it('重複エントリに正しい幅が設定される', () => {
-    const entry1 = createMockEntry({
+  it('重複タイムブロックに正しい幅が設定される', () => {
+    const timeblock1 = createMockTimeblock({
       id: 'overlap-1',
       startDate: new Date('2026-03-30T10:00:00'),
       endDate: new Date('2026-03-30T11:00:00'),
       displayStartDate: new Date('2026-03-30T10:00:00'),
       displayEndDate: new Date('2026-03-30T11:00:00'),
     });
-    const entry2 = createMockEntry({
+    const timeblock2 = createMockTimeblock({
       id: 'overlap-2',
       startDate: new Date('2026-03-30T10:30:00'),
       endDate: new Date('2026-03-30T11:30:00'),
@@ -109,7 +109,7 @@ describe('useDayView', () => {
     const { result } = renderHook(() =>
       useDayView({
         date: baseDate,
-        entries: [entry1, entry2],
+        timeblocks: [timeblock1, timeblock2],
         timezone: 'UTC',
       }),
     );
@@ -124,17 +124,17 @@ describe('useDayView', () => {
   });
 
   it('同じ時間帯では予定外記録を planned より前面にする', () => {
-    const unplanned = createMockEntry({
+    const unplanned = createMockTimeblock({
       id: 'gap-record',
-      origin: 'unplanned',
+      kind: 'record',
       startDate: new Date('2026-03-30T10:00:00'),
       endDate: new Date('2026-03-30T10:30:00'),
       displayStartDate: new Date('2026-03-30T10:00:00'),
       displayEndDate: new Date('2026-03-30T10:30:00'),
     });
-    const planned = createMockEntry({
+    const planned = createMockTimeblock({
       id: 'planned',
-      origin: 'planned',
+      kind: 'plan',
       startDate: new Date('2026-03-30T10:00:00'),
       endDate: new Date('2026-03-30T11:00:00'),
       displayStartDate: new Date('2026-03-30T10:00:00'),
@@ -144,7 +144,7 @@ describe('useDayView', () => {
     const { result } = renderHook(() =>
       useDayView({
         date: baseDate,
-        entries: [unplanned, planned],
+        timeblocks: [unplanned, planned],
         timezone: 'UTC',
       }),
     );

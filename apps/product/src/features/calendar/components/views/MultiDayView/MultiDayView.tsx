@@ -4,7 +4,7 @@ import React, { useMemo } from 'react';
 
 import { format, getWeek } from 'date-fns';
 
-import { isTodayInTimezone } from '@/lib/date/timezone';
+import { isTodayWallDateInTimezone } from '@/lib/date/timezone';
 import { useUserPreferences } from '@/lib/hooks/useUserPreferences';
 import { cn } from '@dayopt/components';
 
@@ -27,19 +27,19 @@ import { useMultiDayView } from './hooks/useMultiDayView';
 export function MultiDayView({
   dayCount,
   dateRange: _dateRange,
-  entries,
+  timeblocks,
   allTimeblocks,
   externalEvents,
   currentDate,
   centerDate: _centerDate,
   showWeekends = true,
   showActualDiff: _showActualDiff = false,
-  dayDiffEntryIds,
+  dayDiffTimeblockIds,
   className,
   disabledTimeblockId,
-  onEntryClick,
-  onEntryContextMenu,
-  onUpdateEntry,
+  onTimeblockClick,
+  onTimeblockContextMenu,
+  onTimeblockUpdate,
   onDeleteTimeblock: _onDeleteTimeblock,
   onTimeRangeSelect,
   onViewChange: _onViewChange,
@@ -61,18 +61,18 @@ export function MultiDayView({
     centerDate: displayCenterDate,
     dayCount,
     timezone,
-    events: entries,
+    events: timeblocks,
     showWeekends,
   });
 
-  const { entriesByDate } = useMultiDayTimeblockPositions({
+  const { timeblocksByDate } = useMultiDayTimeblockPositions({
     displayDates,
-    entries,
+    timeblocks,
     hourHeight: HOUR_HEIGHT,
     timezone,
   });
 
-  // onUpdateEntry を CalendarGridContent が期待する (eventId, { startTime, endTime }) 型に変換
+  // onTimeblockUpdate を CalendarGridContent が期待する (eventId, { startTime, endTime }) 型に変換
   const handleEventUpdate = React.useCallback(
     async (
       eventId: string,
@@ -82,10 +82,10 @@ export function MultiDayView({
         resetActualTime?: boolean;
       },
     ) => {
-      if (!onUpdateEntry) return;
-      return onUpdateEntry(eventId, updates);
+      if (!onTimeblockUpdate) return;
+      return onTimeblockUpdate(eventId, updates);
     },
-    [onUpdateEntry],
+    [onTimeblockUpdate],
   );
 
   const weekNumber = useMemo(() => {
@@ -105,7 +105,7 @@ export function MultiDayView({
             showMonthYear={false}
             dayNameFormat="short"
             dateFormat="d"
-            isToday={isTodayInTimezone(date, timezone)}
+            isToday={isTodayWallDateInTimezone(date, timezone)}
             isSelected={false}
           />
         </div>
@@ -125,7 +125,7 @@ export function MultiDayView({
         >
           {displayDates.map((date, dayIndex) => {
             const dateKey = format(date, 'yyyy-MM-dd');
-            const dayEntries = entriesByDate.get(dateKey) || [];
+            const dayTimeblocks = timeblocksByDate.get(dateKey) || [];
 
             return (
               <div
@@ -135,18 +135,18 @@ export function MultiDayView({
               >
                 <CalendarGridContent
                   date={date}
-                  entries={dayEntries}
+                  timeblocks={dayTimeblocks}
                   externalEvents={externalEvents}
                   viewMode={viewMode}
                   dayIndex={dayIndex}
-                  allEventsForOverlapCheck={allTimeblocks ?? entries}
+                  allEventsForOverlapCheck={allTimeblocks ?? timeblocks}
                   displayDates={displayDates}
-                  onEntryClick={onEntryClick}
-                  onEntryContextMenu={onEntryContextMenu}
+                  onTimeblockClick={onTimeblockClick}
+                  onTimeblockContextMenu={onTimeblockContextMenu}
                   onEventUpdate={handleEventUpdate}
                   onTimeRangeSelect={onTimeRangeSelect}
                   disabledTimeblockId={disabledTimeblockId}
-                  dayDiffEntryIds={dayDiffEntryIds}
+                  dayDiffTimeblockIds={dayDiffTimeblockIds}
                   className="h-full"
                 />
               </div>

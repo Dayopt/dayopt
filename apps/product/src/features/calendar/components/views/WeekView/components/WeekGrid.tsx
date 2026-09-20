@@ -6,7 +6,7 @@ import { getWeek } from 'date-fns';
 
 import { useCalendarDisplayModeStore } from '@/features/calendar/stores/useCalendarDisplayModeStore';
 import { MEDIA_QUERIES } from '@/lib/breakpoints';
-import { isTodayInTimezone } from '@/lib/date/timezone';
+import { isTodayWallDateInTimezone } from '@/lib/date/timezone';
 import { useMediaQuery } from '@/lib/hooks/useMediaQuery';
 import { useUserPreferences } from '@/lib/hooks/useUserPreferences';
 import { cn } from '@dayopt/components';
@@ -48,7 +48,7 @@ export const WeekGrid = ({
   onTimeRangeSelect,
   className,
   showActualDiff: _showActualDiff = false,
-  dayDiffEntryIds,
+  dayDiffTimeblockIds,
 }: WeekGridProps) => {
   const timezone = useUserPreferences((s) => s.timezone);
   const weekStartsOn = useUserPreferences((s) => s.weekStartsOn);
@@ -80,8 +80,8 @@ export const WeekGrid = ({
     [onEventUpdate],
   );
 
-  // エントリ位置計算（TZ変換済みの日付グルーピングも取得）
-  const { entriesByDate: tzEntriesByDate } = useWeekTimeblocks({
+  // タイムブロック位置計算（TZ変換済みの日付グルーピングも取得）
+  const { timeblocksByDate: tzTimeblocksByDate } = useWeekTimeblocks({
     weekDates,
     events,
     hourHeight,
@@ -111,7 +111,7 @@ export const WeekGrid = ({
             showMonthYear={false}
             dayNameFormat="short"
             dateFormat="d"
-            isToday={isTodayInTimezone(date, timezone)}
+            isToday={isTodayWallDateInTimezone(date, timezone)}
             isSelected={false}
           />
         </div>
@@ -141,8 +141,8 @@ export const WeekGrid = ({
         {/* 7日分のグリッド */}
         {weekDates.map((date, dayIndex) => {
           const dateKey = getDateKey(date, timezone);
-          // TZ変換済みのentriesByDateを使用（eventsByDateはTZ未対応）
-          const dayEvents = tzEntriesByDate[dateKey] || [];
+          // TZ変換済みのtimeblocksByDateを使用（eventsByDateはTZ未対応）
+          const dayEvents = tzTimeblocksByDate[dateKey] || [];
 
           return (
             <div
@@ -152,18 +152,18 @@ export const WeekGrid = ({
             >
               <CalendarGridContent
                 date={date}
-                entries={dayEvents}
+                timeblocks={dayEvents}
                 externalEvents={externalEvents}
                 viewMode="week"
                 dayIndex={dayIndex}
                 allEventsForOverlapCheck={allTimeblocks ?? events}
                 displayDates={weekDates}
-                onEntryClick={onEventClick}
-                onEntryContextMenu={onEventContextMenu}
+                onTimeblockClick={onEventClick}
+                onTimeblockContextMenu={onEventContextMenu}
                 onEventUpdate={handleEventUpdate}
                 onTimeRangeSelect={onTimeRangeSelect}
                 disabledTimeblockId={disabledTimeblockId}
-                dayDiffEntryIds={dayDiffEntryIds}
+                dayDiffTimeblockIds={dayDiffTimeblockIds}
                 laneDisplayMode={laneDisplayMode}
                 className="h-full"
               />

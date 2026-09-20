@@ -5,6 +5,7 @@ const dispatchCalendarAccountDeletionSettle = vi.hoisted(() => vi.fn());
 const captureUnexpectedError = vi.hoisted(() => vi.fn());
 const loggerError = vi.hoisted(() => vi.fn());
 const loggerWarn = vi.hoisted(() => vi.fn());
+const writeCronHeartbeat = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
 const isWriteFenceEnabled = vi.hoisted(() => vi.fn());
 const envMock = vi.hoisted(
   () => ({ CRON_SECRET: 'super-secret-cron' }) as { CRON_SECRET?: string | undefined },
@@ -25,6 +26,7 @@ vi.mock('@/lib/logger', () => ({
     debug: vi.fn(),
   },
 }));
+vi.mock('@/lib/ops/cron-heartbeat', () => ({ writeCronHeartbeat }));
 vi.mock('@/lib/ops/write-fence', () => ({ isWriteFenceEnabled }));
 vi.mock('@/lib/supabase/oauth', () => ({ createServiceRoleClient: vi.fn(() => ({})) }));
 
@@ -198,7 +200,7 @@ describe('calendar account deletion settle cron', () => {
   // causeCode が無い場合（例: client 生成失敗）は stage 自身の code へフォールバックする。
   it('causeCode が無い CalendarAccountDeletionSettleError は自身の stage code を errorCode に使う', async () => {
     const error = new CalendarAccountDeletionSettleError('client', {
-      message: 'missing SUPABASE_SERVICE_ROLE_KEY',
+      message: 'missing SUPABASE_SECRET_KEY',
     });
     dispatchCalendarAccountDeletionSettle.mockRejectedValue(error);
 
@@ -210,7 +212,48 @@ describe('calendar account deletion settle cron', () => {
       operation: 'cron_dispatch',
       route: '/api/cron/calendar-account-deletion-settle',
       errorCode: 'ACCOUNT_DELETION_SETTLE_CLIENT_FAILED',
-      errorMessage: 'missing SUPABASE_SERVICE_ROLE_KEY',
+      errorMessage: 'missing SUPABASE_SECRET_KEY',
     });
   });
+});
+
+describe('calendar-account-deletion-settle heartbeat wiring', () => {
+  it('records start and completion only around successful authorized work', async () => {
+    await GET(request());
+    expect(writeCronHeartbeat).not.toHaveBeenCalled();
+    const response = await GET(request('Bearer super-secret-cron'));
+    expect(response.status).toBe(200);
+    expect(writeCronHeartbeat).toHaveBeenNthCalledWith(
+      1,
+      'calendar-account-deletion-settle',
+      'started',
+      expect.any(String),
+    );
+    expect(writeCronHeartbeat).toHaveBeenNthCalledWith(
+      2,
+      'calendar-account-deletion-settle',
+      'completed',
+      writeCronHeartbeat.mock.calls[0]![2],
+    );
+    expect(writeCronHeartbeat.mock.invocationCallOrder[0]).toBeLessThan(
+      dispatchCalendarAccountDeletionSettle.mock.invocationCallOrder[0]!,
+    );
+    expect(writeCronHeartbeat.mock.invocationCallOrder[1]).toBeGreaterThan(
+      dispatchCalendarAccountDeletionSettle.mock.invocationCallOrder[0]!,
+    );
+  });
+  it('keeps failed dispatch distinguishable from completion', async () => {
+    dispatchCalendarAccountDeletionSettle.mockRejectedValueOnce(new Error('fixture failure'));
+    expect((await GET(request('Bearer super-secret-cron'))).status).toBe(500);
+    expect(writeCronHeartbeat).toHaveBeenCalledTimes(1);
+    expect(writeCronHeartbeat.mock.calls[0]![1]).toBe('started');
+  });
+});
+
+it('authority identity不足で未実行なら完了heartbeatを更新しない', async () => {
+  dispatchCalendarAccountDeletionSettle.mockResolvedValue({ ...SUMMARY, skipped: true });
+  const response = await GET(request('Bearer super-secret-cron'));
+  expect(response.status).toBe(200);
+  expect(await response.json()).toMatchObject({ skipped: true });
+  expect(writeCronHeartbeat.mock.calls.map((call) => call[1])).toEqual(['started']);
 });

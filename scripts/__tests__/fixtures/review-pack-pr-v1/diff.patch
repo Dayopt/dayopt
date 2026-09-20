@@ -1,0 +1,7 @@
+diff --git a/logic.ts b/logic.ts
+index efeee5d..44439d5 100644
+--- a/logic.ts
++++ b/logic.ts
+@@ -1 +1 @@
+-export const value = 1;
++export const value = 2;

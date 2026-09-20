@@ -80,6 +80,8 @@ type PublicOutboxSummary = Omit<
 };
 
 type ExternalConnectionMaintenanceSummary = {
+  /** migration未適用等で保守処理を実行できない。heartbeatの成功と区別する。 */
+  schemaUnavailable?: true;
   complete: boolean;
   outbox: PublicOutboxSummary;
   retention: RetentionSummary;
@@ -231,7 +233,8 @@ export async function dispatchExternalConnectionMaintenance(params: {
   const lifecycleVersion = await getExternalLifecycleAppVersion(db);
   if (lifecycleVersion === 0) {
     const predecessorSummary: ExternalConnectionMaintenanceSummary = {
-      complete: true,
+      schemaUnavailable: true,
+      complete: false,
       outbox: {
         claimed: 0,
         revoked: 0,
@@ -314,11 +317,14 @@ export async function dispatchExternalConnectionMaintenance(params: {
     mcpMutationReceiptsDeleted: 0,
   };
 
+  let schemaUnavailable = false;
   for (const step of CLEANUP_STEPS) {
     try {
       // null は「その schema に関数がまだ無い」。件数 0 のまま進めれば due flag が残り、
       // complete: false として報告される（migration 適用後に自然に解消する）。
-      retention[step.key] = (await cleanup(db, step.operation)) ?? 0;
+      const deleted = await cleanup(db, step.operation);
+      if (deleted === null) schemaUnavailable = true;
+      retention[step.key] = deleted ?? 0;
     } catch (error) {
       firstFailure ??=
         error instanceof Error ? error : new ExternalConnectionMaintenanceError(step.operation);
@@ -372,6 +378,7 @@ export async function dispatchExternalConnectionMaintenance(params: {
   const hasMore = Object.values(due).some(Boolean);
   const revokeUnavailable = !outbox.encryptionAvailable && status.calendar_revoke_total > 0;
   const complete =
+    !schemaUnavailable &&
     outbox.expired === 0 &&
     outbox.retried === 0 &&
     !outbox.deadlineReached &&
@@ -381,6 +388,7 @@ export async function dispatchExternalConnectionMaintenance(params: {
   const calendarFinalizeStuck = Number(status.calendar_finalize_stuck_count ?? 0);
 
   const summary: ExternalConnectionMaintenanceSummary = {
+    ...(schemaUnavailable ? { schemaUnavailable: true as const } : {}),
     complete,
     outbox: {
       claimed: outbox.claimed,

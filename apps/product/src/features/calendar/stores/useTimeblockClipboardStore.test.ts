@@ -3,9 +3,9 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import type { ClipboardTimeblock } from './useTimeblockClipboardStore';
 import { useTimeblockClipboardStore } from './useTimeblockClipboardStore';
 
-const mockEntry: ClipboardTimeblock = {
+const mockTimeblock: ClipboardTimeblock = {
   kind: 'plan',
-  title: 'テストエントリ',
+  title: 'テストタイムブロック',
   description: '説明文',
   duration: 60,
   startHour: 10,
@@ -32,27 +32,29 @@ describe('useTimeblockClipboardStore', () => {
   });
 
   describe('copyTimeblock', () => {
-    it('エントリをコピーできる', () => {
-      useTimeblockClipboardStore.getState().copyTimeblock(mockEntry);
-      expect(useTimeblockClipboardStore.getState().copiedTimeblock).toEqual(mockEntry);
+    it('タイムブロックをコピーできる', () => {
+      useTimeblockClipboardStore.getState().copyTimeblock(mockTimeblock);
+      expect(useTimeblockClipboardStore.getState().copiedTimeblock).toEqual(mockTimeblock);
     });
 
     it('hasCopiedTimeblockがtrueになる', () => {
-      useTimeblockClipboardStore.getState().copyTimeblock(mockEntry);
+      useTimeblockClipboardStore.getState().copyTimeblock(mockTimeblock);
       expect(useTimeblockClipboardStore.getState().hasCopiedTimeblock()).toBe(true);
     });
 
     it('上書きコピーできる', () => {
-      useTimeblockClipboardStore.getState().copyTimeblock(mockEntry);
-      const newEntry = { ...mockEntry, title: '新しいエントリ' };
-      useTimeblockClipboardStore.getState().copyTimeblock(newEntry);
-      expect(useTimeblockClipboardStore.getState().copiedTimeblock?.title).toBe('新しいエントリ');
+      useTimeblockClipboardStore.getState().copyTimeblock(mockTimeblock);
+      const newTimeblock = { ...mockTimeblock, title: '新しいタイムブロック' };
+      useTimeblockClipboardStore.getState().copyTimeblock(newTimeblock);
+      expect(useTimeblockClipboardStore.getState().copiedTimeblock?.title).toBe(
+        '新しいタイムブロック',
+      );
     });
   });
 
   describe('clearClipboard', () => {
     it('クリップボードをクリアできる', () => {
-      useTimeblockClipboardStore.getState().copyTimeblock(mockEntry);
+      useTimeblockClipboardStore.getState().copyTimeblock(mockTimeblock);
       useTimeblockClipboardStore.getState().clearClipboard();
       expect(useTimeblockClipboardStore.getState().copiedTimeblock).toBeNull();
       expect(useTimeblockClipboardStore.getState().hasCopiedTimeblock()).toBe(false);

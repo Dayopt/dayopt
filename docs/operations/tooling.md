@@ -487,16 +487,11 @@ BSD-2-Clause: 12 packages (1.3%)
 
 ## 2. Routing の基準
 
-特定 provider の model tier や「coordinator は実装しない」という役割固定は持たない。作業ごとに次を順に決める。
+通常開発は ChatGPT Chat + Codex。短い協働原則は `AGENTS.md`、モデル選択と委譲の詳細は `.agents/skills/routing/SKILL.md` を正本とする。同じ主担当が調査・判断・実装・検証・修正まで完了し、初期の委譲対象は実行時に read-only 境界を検証できる大量調査に限る。
 
-1. ユーザーが確認できる成功条件、対象範囲、検証方法を固定する
-2. repo / docs / issue / command output で確認した事実と、未実測の仮説を分ける
-3. 決定的な script / CLI、担当 agent の直接実行、scoped delegation、別 provider の反証を意味のある選択肢として比較する
-4. 委譲は bounded scope と独立検証が可能で、引き渡し・待ち・統合の費用を上回る時だけ行う
-5. diff、実行結果、必要な UI / API / data flow を成功条件と突き合わせる
-6. issue / PR がある作業は、判断・進捗・ブロック・検証をそこへ残す
+Chat は product / UX・research・仕様整理、Codex は repo に基づく判断と実装を担う。受け渡しが必要な時だけ [Chat 連携手順](./chat-handoff.md) を読む。承認済みの目的・仕様・リスク境界内の技術判断を毎回 Chat に戻さない。
 
-OpenAI / Codex は実装を含む primary provider として使う。他 provider は auth / RLS / billing / migration / 公開契約などで、独立した反証の便益が費用を上回る時に任意で追加する。外部 provider の可用性は merge gate にしない。
+モデル名は難しさ・影響・検証可能性に応じた初期目安であり、実測なしに効率を主張しない。`pnpm ctx` の既存 L0〜L3 / preparation は助言として維持し、別 agent の起動指示にしない。
 
 ## 3. Hook の共有と保証境界
 
@@ -504,7 +499,7 @@ OpenAI / Codex は実装を含む primary provider として使う。他 provide
 
 adapter の script が存在するだけでは tool call は止まらない。runtime 側で adapter が実行前 hook として登録・起動され、block 結果を尊重する必要がある。repo は user-global 設定、直接 shell、User 自身の UI 操作、未知の tool surface を強制できない。具体的な secret 境界と残余リスクは [secrets.md](./secrets.md) を正本とする。
 
-Codex でこの project を初めて開く時は、project trust を確認し、`/hooks` で `.codex/hooks.json` の command と有効状態を User が 1 回レビューする。repo の `.codex/config.toml` に `hooks = true` があっても、runtime が project を trust して hook を読み込んだ証拠にはならない。`pnpm agent:preflight`（機械利用は `pnpm agent:preflight --json`）は依存、Git hooks、CLI、skills、Codex hook 設定ファイルの存在を確認するが、runtime の trust や実際の hook 発火は判定できない。user-global 設定はこの onboarding で変更しない。
+Codex でこの project を初めて開く時は、project trust を確認し、`/hooks` で `.codex/hooks.json` の command と有効状態を User が 1 回レビューする。repo の `.codex/config.toml` に `hooks = true` があっても、runtime が project を trust して hook を読み込んだ証拠にはならない。`pnpm agent:preflight`（機械利用は `pnpm agent:preflight --json`）は依存、Git hooks、CLI、skills、Codex hook 設定ファイル、read-only delegation の状態を確認するが、runtime の trust や実際の hook 発火は判定できない。read-only delegation は scope を runtime で強制できないため unsupported と表示され、bulk read の経路に使わない。user-global 設定はこの onboarding で変更しない。
 
 ### 実行経路ごとの保護範囲
 
@@ -515,6 +510,7 @@ Codex でこの project を初めて開く時は、project trust を確認し、
 | 秘密情報: envファイル、vault参照            | Read/Write/Edit と Bash の個別パターンを機械検査      | apply_patch の全対象・shell の個別パターンを機械検査。汎用read toolはsurface依存 | repo hook接続なし。指示で制御、実動未確認  |
 | 破壊的操作: 既存migration・他worktreeの編集 | Write/Editで機械検査。任意shell編集は保証外           | apply_patch の変更元/先・symlinkを機械検査。任意shell編集は保証外                | 指示で制御、機械保護は未対応               |
 | Git運用: force push、no-verify、直接merge等 | Bashの列挙パターンを機械検査                          | 共通Bash判定を再利用                                                             | 共通Git hookのみ。tool実行前の検査は未対応 |
+| 大量の読み取り調査                          | scope を runtime で強制できないため委譲しない         | scope を runtime で強制できないため委譲しない                                    | read-only 境界を確認できないため委譲しない |
 | コスト・利便性                              | モデル名に基づく委任制限は撤去。起動確認は共通command | 同左                                                                             | 共通commandを手動利用可能、実動未確認      |
 
 **shell の任意編集は機械的に閉じていない**。`sed -i`、`perl -pi`、`cp`、`mv`、`tee`、出力redirect、任意scriptによる既存migration・他worktreeへの書き込みを、このadapterは一般には検出しない。Codexのファイル変更は原則 `apply_patch` を使い、shell編集へ切り替えてこの検査を迂回しない（指示による制御）。hookに到達しただけで全操作が保護されるわけではない。write_stdin、hosted/specialized tool、wrapper内部の処理も同じ保証を持たない。
@@ -525,41 +521,92 @@ Codex でこの project を初めて開く時は、project trust を確認し、
 
 新規・更新時は `.agents/skills/skill-design/SKILL.md` に従う。description / When to Use は provider-neutral にし、特定 model の名前を発火条件や必須 tier にしない。provider 固有の adapter は capability、scope、出力契約、generic fallback、実際の保証境界を併記する。
 
-## 5. Portable review interface
+## 5. 外部 skill の導入一覧
 
-クロスレビューの一次情報は provider の session ではなく immutable review pack に固定する。
+外部 skill は **Dayopt 向けの調整版**として取り込む。公式原文そのままではなく、上流を fork した配布物でもない。runtime にリモートを取得する構成（上流の `web-design-guidelines` が `main/command.md` を毎回 fetch する形）は採らず、下表の commit SHA で固定したスナップショットを正本にする。
+
+| Dayopt skill             | 上流                                                                                                         | 固定 commit SHA                            | 取得日     | License / 表示                                                                                           | 取り込んだファイル                                                               |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------ | ------------------------------------------ | ---------- | -------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| `react-performance`      | [vercel-labs/agent-skills](https://github.com/vercel-labs/agent-skills) `skills/react-best-practices/rules/` | `063bee94c3f4df8453406c830b0a7df0f2860278` | 2026-09-17 | LICENSE ファイル無し。README と SKILL.md frontmatter が MIT を宣言。**転記すべき著作権表示は存在しない** | `references/async.md`（async 系 6 本）、`references/bundle.md`（bundle 系 6 本） |
+| `ui-audit`               | [vercel-labs/web-interface-guidelines](https://github.com/vercel-labs/web-interface-guidelines) `command.md` | `e3d624baaf29dc1fc645aff3e38f03e564d2d6b1` | 2026-09-17 | MIT, Copyright (c) 2025 Vercel Labs（表示を各ファイル冒頭に保持）                                        | `references/web-interface-guidelines.md`                                         |
+| `diagnosing-bugs`        | [mattpocock/skills](https://github.com/mattpocock/skills) `skills/engineering/diagnosing-bugs/`              | `959a8e9f1edc3adbe2f7e3054bb6fbefa6696260` | 2026-09-17 | MIT, Copyright (c) 2026 Matt Pocock                                                                      | 骨格のみ（ファイル転記なし。`SKILL.md` に出典を記載）                            |
+| `test`（既存へ統合）     | [mattpocock/skills](https://github.com/mattpocock/skills) `skills/engineering/tdd/`                          | `959a8e9f1edc3adbe2f7e3054bb6fbefa6696260` | 2026-09-17 | MIT, Copyright (c) 2026 Matt Pocock（表示を各ファイル冒頭に保持）                                        | `references/tdd-loop.md`（`tests.md` / `mocking.md` の抜粋）                     |
+| `supabase`（**見送り**） | [supabase/agent-skills](https://github.com/supabase/agent-skills) `skills/supabase-postgres-best-practices/` | `8331f910845103c08d51f6ca1d86ebb7d1f745e3` | 2026-09-17 | MIT, Copyright (c) 2026 Supabase                                                                         | 取り込んだが 2026-09-17 に撤去（比較で便益を確認できず。下記の理由）             |
+
+### 適用除外（上流をそのまま適用しない点）
+
+| 対象                                                       | 除外した理由                                                                                                                                                                                                                    |
+| ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `bundle-barrel-imports` を内部 import へ適用すること       | Dayopt は feature 間の barrel 経由が必須で、`pnpm lint:boundaries` が deep import を機械的に禁止する。第三者 package のみ対象                                                                                                   |
+| `client-swr-dedup` ほか SWR 前提の規則                     | 新規 API は tRPC が正本。SWR を新規依存として足さない                                                                                                                                                                           |
+| `server-cache-lru` / `js-cache-function-results`           | ユーザーをキーに含めない module cache はユーザー間でデータが混ざる（REVIEW-1）。cache は認可・request 境界を確認して設計する                                                                                                    |
+| React の server / client / rerender / js 系 70 本の全量    | 上流 `AGENTS.md` は 3810 行。索引と全量 vendoring は読む量に見合わない。必要時は固定 SHA から読む                                                                                                                               |
+| UI guidelines の runtime fetch（`WebFetch`）               | 規則が固定されず再現しない。スナップショットを正本にする                                                                                                                                                                        |
+| UI guidelines の Title Case / カーリークォート規則         | 英語だけに効く copy 規則。ja / en の文言は用語集と `pnpm copy:check:strict` が正本                                                                                                                                              |
+| `nuqs` / `virtua` などの library 提案                      | 既存の state 管理・描画で解く。依存追加は AGENTS.md の基準で別途判断する                                                                                                                                                        |
+| `diagnosing-bugs` の仮説 3〜5 個・100x / 1000 入力の固定値 | 反復回数と仮説数は症状ごとに決める。一律の下限を全バグへ課さない                                                                                                                                                                |
+| `tdd` の「seam をテスト前にユーザーへ確認する」規則        | 可逆な作業で不要な停止を作る（AGENTS.md の AUTONOMOUS）。境界の判断は実装者が持つ                                                                                                                                               |
+| Postgres の conn / data / monitor / partitioning 系        | Supavisor は Supabase が管理し、現状の規模で判断材料にならない                                                                                                                                                                  |
+| Postgres 参照資料そのもの（撤去済み）                      | index / RLS / lock の 3 本を `supabase` skill へ置いたが、migration 追加ケースの比較で **baseline と同じ index 定義**にしか到達せず、候補だけ lock ガードを落とした。便益を確認できないものは常設しない（#2810 の受け入れ条件） |
+| 上流 skill の `scripts/` `agents/*.yaml`                   | `.agents/skills/**` の `.md` 以外は CI の docs-only 判定を外す（`scripts/ci/impact.test.ts`）。現状不要                                                                                                                         |
+
+### 更新方法
+
+1. 上表の固定 SHA と上流の最新 SHA の差分を読む（例: `gh api repos/vercel-labs/agent-skills/compare/<固定SHA>...main`）
+2. Dayopt の境界（依存方向、tRPC、ユーザー分離、migration 運用）と衝突しないか判断する
+3. 取り込む差分だけを手で反映し、上表の SHA と取得日を同じ変更で更新する
+
+比較検証の記録と採否は [外部 skill 導入の比較検証（#2810）](./ai-skills-trials-2810.md)。**入口から参照資料へ到達することと、その資料が結果を良くすることは別**で、Postgres 参照資料は前者だけを満たしたため撤去した。
+
+**自動更新、未監査スクリプトの実行、runtime のリモート取得は行わない。** UI guidelines の `command.md` は skill 本体（vercel-labs/agent-skills）とは別 repo の依存であり、上表で別行として固定する。
+
+## 6. Independent PR Review
+
+通常 PR の独立レビューは GitHub の `@codex review`。依頼・対象 SHA の照合・所見の裁定・再レビューは `.agents/skills/pr-cross-review/SKILL.md` を正本とする。実装 session の reviewer subagent や独自 pack を日常の必須工程にしない。未応答・古い結果・未実行は指摘0とは異なる。
+
+高リスク変更の immutable pack / role / envelope / validation は過去証跡を検証するため同 skill の `references/high-risk-review.md` と道具を保持するが、通常の追加 reviewer は停止中で実行しない。既存の `[review-summary]` は読み取り互換だけを残す。明示依頼された security sweep と不可逆操作の独立レビュー条件は通常レビューで置き換えない。
+
+read-only と repository scope を runtime で同時に強制できる delegate は現在ないため、大量の repository 読み取り調査は親担当が行う。現行 native delegation は実際の入力に read-only / write を区別する型がなく、判別不能な経路として read-only を含めて拒否する。runtime が別名の typed write / browser tool を提供した時だけ、User が明示した非重複 scope と既存の authority 契約に従って扱う。将来、両方を実測できる adapter が追加された場合だけ、Luna / Haiku の候補と env・timeout・fallback 契約を再評価する。
+
+### pack の種別と契約 version
+
+pack は `kind`（`pr` / `sweep`）と `contractVersion` を manifest に持ち、artifact 集合はその組から literal registry で決まる。**role 一覧から artifact 名を導出しない** — 導出していた頃は role を 1 つ足すだけで生成済み pack が一斉に `invalid` になった。`kind` を持たない manifest は `pr` / version 1 として読み、未知の kind / version は fail closed で `invalid` にする。契約変更前に生成した PR pack を `scripts/__tests__/fixtures/review-pack-pr-v1/` に凍結してあり、整形するとバイト列が変わって pack の破損になるため `.prettierignore` の対象にしている。
+
+`sweep` は PR の差分ではなく 1 つの SHA における scope を読む（`security-sweep` skill）。`baseSha` / `headSha` を持たず `targetSha` 1 本と `scopePaths` を持ち、`diff.patch` と `verification.md` は作らない。envelope に `baseSha` / `headSha` が入っていれば PR envelope の流用として `invalid` にする。
 
 ```bash
-pnpm review:pack --base <ref> --head <ref> \
-  --context <context-markdown-path> --verification <verification-markdown-path> \
-  --source <repo-relative-file> --out <new-directory>
+pnpm review:sweep --at <commit-ish> --scope <repo 相対 path（繰り返し可）> \
+  --context <context-markdown-path> --threat-model <threat-model-path> --out <new-directory>
 ```
 
-pack は exact base / head SHA、pack ID、base から head への直接 diff、変更 path の before / after source、関連 source、role ごとの prompt と result-body schema を持つ。`--source` は繰り返せる。binary、欠落、1 MiB 超の source は omission として記録される。context と verification は非空、出力先は新規 directory とする。
-
-reviewer は read-only sandbox で provider 固有の tool を使い、同じ pack を読む。資料確認の `cat` / `rg` / `git show` 相当は許可するが、test や package install を含むコード実行、状態変更、nested agent は許可しない。result body を schema に合わせ、その外側に `packId`、`baseSha`、`headSha`、`provider`、`model`、`modelFamily`、`sessionId`、`independence`、`role` を持つ JSON envelope を付ける。`independence` は実態に応じて `separate-session` または `different-model-family` を記録する。固定 model、Claude Workflow、provider の多数決は共通契約に含めない。
+sweep の後段（`security-critic` / `security-reproducer`）は候補集合と突き合わせる。`--result` は繰り返せ、上限や中断で分割した同一 role の結果を 1 回の検証で合流させる。
 
 ```bash
-pnpm review:validate --pack <directory> --result <result.json>
+pnpm review:validate --pack <directory> --result <result.json> [--result <result2.json>] \
+  [--candidates <candidates.json>] [--verdicts <critic.json>] [--emit-candidates <new-path>]
 ```
 
-validator は `not-run`、`stale`、`partial`、`reviewed`、`invalid` を区別する。`invalid` は envelope / result の schema 違反で、必須 string が空白だけの場合も含む。`not-run` / `stale` / `partial` / `invalid` は非 0 exit、`reviewed` は findings の件数に関係なく 0 exit である。これは transport と provenance の検証であり、レビュー品質や merge 可否の判定ではない。`not-run`、`partial`、未収集 provider を指摘 0 件として集計しない。
+- `candidateId` / `signature` / `candidateSetHash` は**生成側が導出**し、reviewer の申告を採らない
+- 判定が返っていない候補、候補集合に無い id への判定、食い違う判定、別 run の候補集合を**別々の理由で**検出する
+- `undetermined`（critic）と `not-run` / `environment-missing`（reproducer）は裁定が決まっていないものとして `partial` に留める。id が入っていることを「判定済み」と数えない
+- `--emit-candidates` は**内容の違う**候補集合で既存ファイルを置き換えない（同一内容の再検証は冪等に通る）。分割した envelope は `--result` を並べて 1 回で検証する
+- reproducer の母集合は `--verdicts` に渡した critic envelope から**その場で再計算**する。実行待ち集合をファイルに残すと、分割した critic の一部だけで書いた部分集合が古いまま残り、渡していない round の `needs-execution` が母集合にも `missing` にも現れなくなる。裁定が全候補に届いていない critic に対して reproducer を `reviewed` にはしない
+- `rejected` / `undetermined` には `counterevidence` を要求する。`confirmed` には要求しない（落とす判断にだけ反証を求める）
+- `reproduced` / `failed-to-reproduce` は実行した `command` と `testPath` の提示を要求する。到達証拠のない失敗は `not-run` / `environment-missing` へ落とす。`statically-confirmed` は件数を結果に出して、実行できた候補が逃げていないか見えるようにする
 
-OpenAI / Codex を primary reviewer とする。auth / RLS / billing / migration / 公開契約などで独立した反証の価値がある時は、Claude Code や Antigravity を optional counterreview として追加できる。各 provider の所見は個別に failure scenario と一次情報を照合し、多数決で棄却しない。role の選択と投稿手順は `.agents/skills/pr-cross-review/SKILL.md` を正本とする。
-
-## 6. Migration acceptance と handoff
+## 7. Migration acceptance と handoff
 
 native worktree root の fresh Codex session による共通指示・skills の発見と、サブディレクトリ起動の別 Codex session への review pack 引き継ぎを確認した。Codex の project trust と実 hook 発火、Antigravity の skill discovery と review adapter は未検証であり、設定ファイルの存在を有効化の証拠にしない。
 
 2026-09-07、`scripts/tasks` から新規 Codex read-only セッション（gpt-5.6-sol、session `01a0796e-8943-7303-9bb3-6184e41a9b2f`）を起動し、base `393f432c6` → head `bbdb9510a` の移行差分を pack で手渡した。result envelope は `reviewed`、recommendation は `revise`、指摘 1 件だった。指摘は shell の任意編集に対する保証の過大解釈で、経路別の保護表へ保証外の操作を明記した。これは別 OpenAI セッションの反証であり、別モデル系列の反証や native hook 発火の証拠ではない。旧 SHA の所見を後続 SHA の指摘ゼロとして再利用しない。
 
-次の 3 trial は将来の実 PR で各 1 件行い、証跡はその issue / PR comment に残す。ここに別の常設 tracker は作らない。Antigravity は高リスク変更で独立した反証が有益な時の任意 adapter であり、trial の合格条件にはしない。
+次の 3 trial は過去の移行計画として記録したもので、2026-09-17 の User 指示により追加 reviewer の試行は行わない。ここに別の常設 tracker は作らない。明示依頼された `security-sweep` の契約だけは維持する。
 
 | trial                    | 対象                                                 | status  |
 | ------------------------ | ---------------------------------------------------- | ------- |
-| **通常バグ修正**         | 1 feature 内の再現可能な bug fix 1 件                | pending |
-| **複数ファイル変更**     | 複数 file / connection point を含む変更 1 件         | pending |
-| **高リスク diff review** | auth / RLS / billing / migration / 公開契約など 1 件 | pending |
+| **通常バグ修正**         | 1 feature 内の再現可能な bug fix 1 件                | stopped |
+| **複数ファイル変更**     | 複数 file / connection point を含む変更 1 件         | stopped |
+| **高リスク diff review** | auth / RLS / billing / migration / 公開契約など 1 件 | stopped |
 
 各 trial は次の 4 軸で評価する。
 
@@ -575,6 +622,8 @@ native worktree root の fresh Codex session による共通指示・skills の�
 ---
 
 ## 履歴: Opus 4.7 Skill Triggers Migration
+
+以下は当時の移行記録であり、現在の発火規約ではない。旧モデル向けの要素数・形式・自動起動の推奨を現在のモデルへ自動適用しない。現行の正本は `skill-design` と各 skill。
 
 **Date**: 2026-04-17
 **Scope**: 現在の `.agents/skills/` に移行済みの project skills 12 個
@@ -729,26 +778,28 @@ op run --env-file=.op-env.human -- \
 
 **`.op-env.agent`（通常の local dev 用）ではなく `.op-env.human` を使う。** `pnpm dev` の Supabase 接続先は local 固定で、`.op-env.agent` は Supabase の接続情報を持たない（[secrets.md](./secrets.md) の `agent` 節）。admin script は Supabase Auth Admin API を service role で叩くため、専用の env-file を分けている。
 
-`.op-env.human.example` は `human/supabase` を参照する。**つまりこれらの script の実行は production への操作**であり、実行したら手動作業ログを残す。local の Supabase を対象にしたい場合は `supabase status -o env` の値を `env` で直接渡す。
+`.op-env.human.example` は `human/supabase` を参照する。**つまりこれらの script の実行は production への操作**であり、実行したら手動作業ログを残す。
+
+**書き換え・削除をする script は対象の打ち返しを要求する**（2026-09-14、Secret / Credential 監査 P2-2）。`admin-delete-user.sh` / `admin-set-user-password.sh` / `enable-auth-hook.sh` / `USE_LINKED_DB=true` の `seed-dev-data.sh` / `pnpm db:reset-linked:unsafe` は、操作対象から導いた Supabase project ref を `DAYOPT_CONFIRM_TARGET` に渡さない限り、ネットワークへ出る前に止まる。止まった時のメッセージに対象 ref が出るので、正しい対象だと確かめてから付けて再実行する。期待値は URL（admin 系・seed）か `supabase/.temp/project-ref`（linked reset）から導くため、別 project を指したまま確認を通すことはできない。正本は `scripts/tasks/confirm-target.sh`、契約は `scripts/__tests__/confirm-target.test.ts`。local の Supabase を対象にしたい場合は `supabase status -o env` の値を `env` で直接渡す。
 
 ## スクリプト一覧
 
-| スクリプト                    | 用途                                                      | 必須 env                         |
-| ----------------------------- | --------------------------------------------------------- | -------------------------------- |
-| `admin-create-user.sh`        | email + password で user を新規作成（即 login 可能）      | `USER_EMAIL`, `PASSWORD_ITEM_ID` |
-| `admin-delete-user.sh`        | user を hard delete（関連 row も CASCADE 削除）           | `USER_EMAIL`                     |
-| `admin-ensure-profile.sh`     | trigger 未発火時に `profiles` row を手動 upsert           | `USER_EMAIL`                     |
-| `admin-generate-magiclink.sh` | captcha / UI form の bug を bypass する magic link を発行 | `USER_EMAIL`                     |
-| `admin-set-user-password.sh`  | 既存 user の password を上書き + email 確認済みにする     | `USER_EMAIL`, `PASSWORD_ITEM_ID` |
-| `admin-show-user.sh`          | email から `auth.users` の状態を dump（read-only）        | `USER_EMAIL`                     |
+| スクリプト                    | 用途                                                      | 必須 env                                                  |
+| ----------------------------- | --------------------------------------------------------- | --------------------------------------------------------- |
+| `admin-create-user.sh`        | email + password で user を新規作成（即 login 可能）      | `USER_EMAIL`, `PASSWORD_ITEM_ID`                          |
+| `admin-delete-user.sh`        | user を hard delete（関連 row も CASCADE 削除）           | `USER_EMAIL`, `DAYOPT_CONFIRM_TARGET`                     |
+| `admin-ensure-profile.sh`     | trigger 未発火時に `profiles` row を手動 upsert           | `USER_EMAIL`                                              |
+| `admin-generate-magiclink.sh` | captcha / UI form の bug を bypass する magic link を発行 | `USER_EMAIL`                                              |
+| `admin-set-user-password.sh`  | 既存 user の password を上書き + email 確認済みにする     | `USER_EMAIL`, `PASSWORD_ITEM_ID`, `DAYOPT_CONFIRM_TARGET` |
+| `admin-show-user.sh`          | email から `auth.users` の状態を dump（read-only）        | `USER_EMAIL`                                              |
 
 `PASSWORD_ITEM_ID` は password を保存した 1Password item の ID。
 
 ## 関連スクリプト
 
-| スクリプト            | 用途                                                                                                                                                                                                                                                                                                                                                                           | 必須 env                                                                                      |
-| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------- |
-| `enable-auth-hook.sh` | Production project の `custom_access_token` hook を有効化する。**現在は実行しない** — production では意図的に無効で（[#1946](https://github.com/Dayopt/dayopt/issues/1946) で決着）、`BILLING_ENFORCED` が未設定の間この hook が消せる DB クエリは無い。実行してよい条件と、同じ変更で `production-auth-config-audit.mjs` の期待値を `true` にする手順は script のヘッダが正本 | `SUPABASE_ACCESS_TOKEN`                                                                       |
-| `verify-login.sh`     | email + password の組合せで直接 `/auth/v1/token` を叩き、login 可否を確認する（read-only）                                                                                                                                                                                                                                                                                     | `USER_EMAIL`, `PASSWORD_ITEM_ID`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` |
+| スクリプト            | 用途                                                                                                                                                                                                                                                                                                                                                                           | 必須 env                                                                                             |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------- |
+| `enable-auth-hook.sh` | Production project の `custom_access_token` hook を有効化する。**現在は実行しない** — production では意図的に無効で（[#1946](https://github.com/Dayopt/dayopt/issues/1946) で決着）、`BILLING_ENFORCED` が未設定の間この hook が消せる DB クエリは無い。実行してよい条件と、同じ変更で `production-auth-config-audit.mjs` の期待値を `true` にする手順は script のヘッダが正本 | `SUPABASE_ACCESS_TOKEN`, `DAYOPT_CONFIRM_TARGET`                                                     |
+| `verify-login.sh`     | email + password の組合せで直接 `/auth/v1/token` を叩き、login 可否を確認する（read-only）                                                                                                                                                                                                                                                                                     | `USER_EMAIL`, `PASSWORD_ITEM_ID`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` |
 
 `verify-login.sh` が成功すれば password 自体は正しい（UI / CSP / form 側の問題）。失敗すれば `admin-set-user-password.sh` で password を再設定する。

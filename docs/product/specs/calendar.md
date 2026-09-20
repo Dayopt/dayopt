@@ -4,8 +4,8 @@ last_verified: 2026-08-20
 code: apps/product/src/features/calendar
 public_docs:
   - calendar
-lp:
-  - 'Calendar — day, week, and multi-day views'
+# カレンダーは LP の単独の約束ではなく、plan-record の 'Plan and Record (timeboxing)' が置かれる面として約束されている
+lp: []
 ---
 
 # Calendar（カレンダー）
@@ -21,7 +21,8 @@ Plan（予定）とRecord（記録）を同じ時間軸で配置・閲覧する�
 - モバイルはDay / Weekを提供する。Weekでは予定または記録を切り替えて日カラム全幅に表示し、最後に選んだ表示を端末へ保持する。既定は記録
 - モバイルの検索、作成、Inspector、activity / 日時picker、振り返りpanelは[Mobile overlays](./mobile-overlays.md)のmodal性とdismiss契約に従う
 - 新規作成時の保存先は`end_at > now`ならPlan、`end_at <= now`ならRecordとして自動決定し、既存Plan / Recordの編集では種別を維持する
-- 15分gridへのsnap、dragによる移動・resize、keyboard操作、activity filterを提供する
+- 作成中の選択が予定として保存される時、ドラッグ中のpreview・確定後のハイライト・作成パネルに、その日の残り時間「あと {duration}」を出す。残り = 24h − その日の予定合計 − 選択中の長さ。activity filterの影響を受けず、睡眠や外部カレンダーの予定は引かない。マイナスは符号だけで示し、色や警告は付けない。重なりエラー表示中・記録の選択・カードが狭い時は出さない
+- dragによる作成・移動・resizeは15分刻み、Inspectorの時間入力は1分刻みとする。移動・resizeは移動量だけを15分刻みにするため、10:07のタイムブロックを1コマ下げると10:22になり15分gridへ吸着しない。keyboard操作、activity filterも提供する
 - `?`キーまたはSidebar右端のヘルプメニューから、現在登録されているkeyboard shortcut一覧を背景overlayなしの横長2列で開く。操作行の区切り線は表示しない。キー表記は利用中platform、説明はlocaleに合わせる
 - Calendarの時間軸、card、選択 / drag preview、Diff panelの時刻表示はユーザー設定の12時間 / 24時間表記に従う。Inspectorの入力・保存値は`HH:mm`を正とする
 - scroll keyはfocus中のCalendar gridだけが処理し、入力、IME、menu / dialog中はglobal shortcutを実行しない
@@ -29,7 +30,7 @@ Plan（予定）とRecord（記録）を同じ時間軸で配置・閲覧する�
 - Diffは符号と方向を数字・iconで示し、増減そのものをsuccess / destructive色で評価しない
 - 過去Planの時間も通常どおり編集できる。Recordは終了を未来へ動かす編集だけ不可
 - 既存カードのdrag previewは移動先のレーンと同じカードで表示する。Planはoutline、RecordとPlan→Recordの記録化previewは塗りで区別する
-- 過去PlanをRecordレーンへdragすると、drop previewの時間帯へアクティビティとメモをコピーした独立Recordを作る。元Planは変更しない
+- PlanをRecordレーンへdragすると、drop previewの時間帯へアクティビティとメモをコピーした独立Recordを作る。元Planは変更しない。可否はdrop先の時間帯だけで決まり、Plan自身が未来に終わるかは問わない（Recordは未来に終われない = `DT005`）
 - PlanとRecordが時間的に少しでも重なる区間はactivityに関係なく左右へ分ける。詳細の「この時間帯の記録」は同じactivityで15分以上重なるRecordを表示する
 - Plan / Recordカードへ予定別の差分は表示しない。予実比較は期間内のRecord合計 / 経過済みPlan合計から導出する
 - 差分の正負は符号と方向iconで示し、成功・失敗を意味する色は使わない

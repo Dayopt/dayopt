@@ -44,7 +44,7 @@ const ADMIN_EXAMPLE = `${HUMAN}.example`;
 const AGENT = `.op-env${'.'}agent`;
 const LOCAL_EXAMPLE = `${AGENT}.example`;
 
-const PROD_REF = `op://human/supabase/SUPABASE_SERVICE_ROLE_KEY`;
+const PROD_REF = `op://human/supabase/SUPABASE_SECRET_KEY`;
 const AGENT_REF = `op://agent/supabase/SUPABASE_ACCESS_TOKEN`;
 
 type Decision = 'block' | 'allow';
@@ -93,6 +93,20 @@ function git(args: string[], cwd: string): void {
   if (result.status !== 0) {
     throw new Error(`git ${args.join(' ')} failed in ${cwd}: ${result.stderr}`);
   }
+}
+
+// 対象 path を commit して origin/main へ push し、`refs/remotes/origin/main` を生やす。
+// migration ガードの「適用済み」判定はこの ref を見る（#2185）。
+function commitAndPush(cwd: string, ...paths: string[]): void {
+  git(['add', '--', ...paths], cwd);
+  git(['-c', 'user.email=t@example.com', '-c', 'user.name=t', 'commit', '-q', '-m', 'm'], cwd);
+  git(['push', '-q', 'origin', 'HEAD:main'], cwd);
+}
+
+// commit だけして push しない（origin/main には載らない）。
+function commitOnly(cwd: string, ...paths: string[]): void {
+  git(['add', '--', ...paths], cwd);
+  git(['-c', 'user.email=t@example.com', '-c', 'user.name=t', 'commit', '-q', '-m', 'local'], cwd);
 }
 
 function write(filePath: string, content = ''): Record<string, unknown> {
@@ -972,6 +986,12 @@ describe('pre-tool-guard.mjs: symlink 経由の保護ファイル判定（#2566�
       ],
       repoDir,
     );
+    // migration 判定は origin/main 基準になった（#2185）。この describe が証明したいのは
+    // 「symlink 別名でも保護判定が外れない」ことなので、origin/main 不在による
+    // fail-closed で block が出る状態にはしない（それでは symlink 解決が壊れても緑になる）。
+    const remoteDir = join(fixtureRoot, 'remote.git');
+    git(['init', '-q', '--bare', remoteDir], fixtureRoot);
+    git(['remote', 'add', 'origin', remoteDir], repoDir);
 
     // 実体（保護対象）
     writeFileSync(join(repoDir, '.env'), 'SECRET=1\n');
@@ -981,6 +1001,7 @@ describe('pre-tool-guard.mjs: symlink 経由の保護ファイル判定（#2566�
     mkdirSync(join(repoDir, 'supabase', 'migrations'), { recursive: true });
     migrationPath = join(repoDir, 'supabase', 'migrations', '20260101000000_init.sql');
     writeFileSync(migrationPath, 'select 1;\n');
+    commitAndPush(repoDir, 'supabase/migrations/20260101000000_init.sql');
 
     // 保護対象を指す別名（basename からは保護対象と分からない形）
     mkdirSync(join(repoDir, 'tmp'));
@@ -1022,7 +1043,7 @@ describe('pre-tool-guard.mjs: symlink 経由の保護ファイル判定（#2566�
     expect(runGuard(write(alias, `A=${PROD_REF}\n`), repoDir)).toBe('block');
   });
 
-  it('既存 migration を指す symlink への Write も block する', () => {
+  it('origin/main に載っている migration を指す symlink への Write も block する', () => {
     expect(runGuard(write(join(repoDir, 'tmp', 'alias-d')), repoDir)).toBe('block');
   });
 
@@ -1390,6 +1411,91 @@ describe('pre-tool-guard.mjs: #2293 vercel --token / -t（07-22 incident 再現�
   });
 });
 
+describe('pre-tool-guard.mjs: vercel CLI は読み取り系だけを通す（2026-09-14 監査 P1-2）', () => {
+  const V = 'vercel';
+
+  it.each([
+    `${V} ls`,
+    `${V} list --scope dayopt`,
+    `${V} inspect https://x.vercel.app`,
+    `${V} inspect --logs https://x.vercel.app`,
+    `${V} logs https://x.vercel.app --json`,
+    `${V} whoami`,
+    `${V} --version`,
+    `${V} teams ls`,
+    `${V} project ls`,
+    `${V} env ls`,
+    `${V} env ls production`,
+    `${V} domains ls`,
+    `${V} api /v5/user/tokens`,
+    `${V} api /v9/projects/product -X GET`,
+    `npx ${V} ls`,
+    `pnpm exec ${V} env ls`,
+    `/opt/homebrew/bin/${V} whoami`,
+    `${V} ls | head -20`,
+    `${V} api /v5/user/tokens | jq .tokens`,
+  ])('読み取り系は通す: %s', (command) => {
+    expect(runGuard(bash(command))).toBe('allow');
+  });
+
+  it.each([
+    [`${V}`, '引数なしは deploy'],
+    [`${V} --prod`, 'flag だけでも deploy'],
+    [`${V} deploy --prod`, 'deploy'],
+    [`${V} promote https://x.vercel.app`, 'promote'],
+    [`${V} rollback`, 'rollback'],
+    [`${V} redeploy https://x.vercel.app`, 'redeploy'],
+    [`${V} env add SUPABASE_SECRET_KEY production`, 'env 追加'],
+    [`${V} env rm SUPABASE_SECRET_KEY production --yes`, 'env 削除'],
+    [`${V} env pull .env.local`, '実値を file へ引き出す'],
+    [`${V} pull --environment production`, '実値を file へ引き出す'],
+    [`${V} dev`, '実値を process へ引き出す'],
+    [`${V} domains rm dayopt.app`, 'domain 削除'],
+    [`${V} certs issue dayopt.app`, 'cert'],
+    [`${V} project rm product`, 'project 削除'],
+    [`${V} remove product --yes`, 'deployment 削除'],
+    [`${V} link --yes`, 'link'],
+    [`${V} api /v10/projects/product/env -X POST`, 'api の非 GET'],
+    [`${V} api /v9/projects/product --method=DELETE`, 'api の非 GET（= 形）'],
+    [`${V} api /v10/projects/product/env -d x`, 'api に body'],
+    [`${V} --scope dayopt env rm X production`, 'value flag を読み飛ばした後の書き込み'],
+  ])('書き込み系は落とす: %s（%s）', (command) => {
+    expect(runGuard(bash(command))).toBe('block');
+  });
+
+  it.each([
+    `npx --yes ${V} env rm X production`,
+    `pnpm dlx ${V} promote https://x.vercel.app`,
+    `env FOO=1 ${V} env rm X production`,
+    `FOO=1 ${V} deploy`,
+    `command ${V} rollback`,
+    `op run -- ${V} env add X production`,
+    `sh -c "${V} env rm X production"`,
+    `echo hi && ${V} domains rm dayopt.app`,
+    `true; ${V} deploy`,
+    `echo x | xargs ${V} env rm`,
+    `(${V} deploy)`,
+    `echo $(${V} env rm X production)`,
+    `bash -c '${V} promote https://x.vercel.app'`,
+    `true\n${V} deploy`,
+    `cd apps/product\n${V} env rm X production`,
+  ])('前置きや区切りを挟んでも書き込み系は落とす: %s', (command) => {
+    expect(runGuard(bash(command))).toBe('block');
+  });
+
+  it.each([
+    `rg ${V} docs/operations`,
+    `git log --oneline -- ${V}.json`,
+    `ls apps/product/${V}.json`,
+    `echo ${V} deploy`,
+    `rg -n "VERCEL|${V}" scripts/__tests__/check-1password.test.ts`,
+    `grep -E 'deploy|${V} env rm' docs/operations/secrets.md`,
+    `git commit -m "docs: ${V} env rm は User が行う"`,
+  ])('コマンド位置にない vercel の言及は落とさない: %s', (command) => {
+    expect(runGuard(bash(command))).toBe('allow');
+  });
+});
+
 describe('pre-tool-guard.mjs: #2293 Supabase Management API secret endpoint（08-11 incident 再現 ×2）', () => {
   it('08-11 incident 1 の実行形（config/auth への直接 curl）は落ちる', () => {
     expect(
@@ -1507,13 +1613,13 @@ describe('pre-tool-guard.mjs: #2293 vercel invoke anchor の抜け穴修正（pu
 
 describe('pre-tool-guard.mjs: #2293 op read（--reveal 相当の masking を持たず、例外なく block）', () => {
   it('redirect なしの op read は落ちる', () => {
-    expect(runGuard(bash('op read "op://human/supabase/SUPABASE_SERVICE_ROLE_KEY"'))).toBe('block');
+    expect(runGuard(bash('op read "op://human/supabase/SUPABASE_SECRET_KEY"'))).toBe('block');
   });
 
   it('後続コマンドと ; で連結しても落ちる', () => {
-    expect(
-      runGuard(bash('op read "op://human/supabase/SUPABASE_SERVICE_ROLE_KEY" && echo done')),
-    ).toBe('block');
+    expect(runGuard(bash('op read "op://human/supabase/SUPABASE_SECRET_KEY" && echo done'))).toBe(
+      'block',
+    );
   });
 
   // 当初は `>/dev/null` への破棄 redirect があれば通す設計だったが、push前
@@ -1524,16 +1630,14 @@ describe('pre-tool-guard.mjs: #2293 op read（--reveal 相当の masking を持�
   // block する設計へ変更した（接続確認は (a) の既定 masked 出力で代替できる）。
   it('stdout への破棄 redirect（>/dev/null）があっても、例外なく落ちる（設計変更）', () => {
     expect(
-      runGuard(
-        bash('op read "op://human/supabase/SUPABASE_SERVICE_ROLE_KEY" >/dev/null && echo OK'),
-      ),
+      runGuard(bash('op read "op://human/supabase/SUPABASE_SECRET_KEY" >/dev/null && echo OK')),
     ).toBe('block');
   });
 
   it('stderr のみの破棄（2>/dev/null）は stdout の実値を隠さない（旧設計の穴の回帰防止）', () => {
-    expect(
-      runGuard(bash('op read "op://human/supabase/SUPABASE_SERVICE_ROLE_KEY" 2>/dev/null')),
-    ).toBe('block');
+    expect(runGuard(bash('op read "op://human/supabase/SUPABASE_SECRET_KEY" 2>/dev/null'))).toBe(
+      'block',
+    );
   });
 
   it('複数の op read が混在し、片方だけ redirect されていても両方落ちる（旧設計の穴の回帰防止）', () => {
@@ -1545,18 +1649,18 @@ describe('pre-tool-guard.mjs: #2293 op read（--reveal 相当の masking を持�
   });
 
   it('op run -- の後ろに空白1つで置かれた op read も落ちる（anchor 限定の抜け穴修正）', () => {
-    expect(
-      runGuard(bash('op run -- op read "op://human/supabase/SUPABASE_SERVICE_ROLE_KEY"')),
-    ).toBe('block');
+    expect(runGuard(bash('op run -- op read "op://human/supabase/SUPABASE_SECRET_KEY"'))).toBe(
+      'block',
+    );
   });
 
   // merge前クロスレビューで発見: 絶対パス起動（/usr/local/bin/op 等）は直前の
   // 文字が `/` で境界集合 [[:space:];&|] のどれにも一致せず素通りした。
   // 境界集合に `/` を追加して修正した。
   it('絶対パス起動（/usr/local/bin/op read）でも落ちる', () => {
-    expect(
-      runGuard(bash('/usr/local/bin/op read "op://human/supabase/SUPABASE_SERVICE_ROLE_KEY"')),
-    ).toBe('block');
+    expect(runGuard(bash('/usr/local/bin/op read "op://human/supabase/SUPABASE_SECRET_KEY"'))).toBe(
+      'block',
+    );
   });
 
   it('代替経路（op item get --fields、既定形式）は影響を受けない', () => {
@@ -1587,6 +1691,124 @@ describe('pre-tool-guard.mjs: migrations 配下の既存ファイル編集（#25
     expect(
       runGuard(write(resolve(rootDir, 'supabase/migrations/99999999999999_new.sql'), 'SELECT 1;')),
     ).toBe('allow');
+  });
+});
+
+// migration ガードの「適用済み」判定を、ディスク上の存在から **origin/main の tree に
+// 在るか** へ寄せた（#2185）。main へ merge された migration は production へ適用される
+// ので改変を止める必要があるが、未 merge の PR ブランチにしか無い migration は
+// どの共有環境にも適用されておらず、同じ PR 内で直すのは正当な操作だった。
+//
+// 敵対的に見た時の懸念は「判定不能を allow へ倒して guard を無力化されること」なので、
+// origin/main が無い / git が動かない / path を repo 相対へ直せない、を個別に block 側で
+// 固定する。**allow のケースだけでなく、これら fail-closed のケースを必ず対で置く**。
+describe('pre-tool-guard.mjs: migration の適用済み判定は origin/main 基準（#2185）', () => {
+  let fixtureRoot: string;
+  let repoDir: string;
+  let appliedSql: string;
+  let localOnlySql: string;
+  let uncommittedSql: string;
+
+  beforeAll(() => {
+    fixtureRoot = mkdtempSync(join(tmpdir(), 'pre-tool-guard-migration-origin-'));
+    repoDir = join(fixtureRoot, 'repo');
+    mkdirSync(repoDir);
+    git(['init', '-q', '.'], repoDir);
+    git(
+      [
+        '-c',
+        'user.email=t@example.com',
+        '-c',
+        'user.name=t',
+        'commit',
+        '-q',
+        '--allow-empty',
+        '-m',
+        'init',
+      ],
+      repoDir,
+    );
+    git(['init', '-q', '--bare', join(fixtureRoot, 'remote.git')], fixtureRoot);
+    git(['remote', 'add', 'origin', join(fixtureRoot, 'remote.git')], repoDir);
+
+    mkdirSync(join(repoDir, 'supabase', 'migrations'), { recursive: true });
+
+    // (1) origin/main に載っている = 適用済み
+    appliedSql = join(repoDir, 'supabase', 'migrations', '20260101000000_applied.sql');
+    writeFileSync(appliedSql, 'select 1;\n');
+    commitAndPush(repoDir, 'supabase/migrations/20260101000000_applied.sql');
+
+    // (2) ローカル commit のみ（未 push）
+    localOnlySql = join(repoDir, 'supabase', 'migrations', '20260202000000_local.sql');
+    writeFileSync(localOnlySql, 'select 2;\n');
+    commitOnly(repoDir, 'supabase/migrations/20260202000000_local.sql');
+
+    // (3) 未 commit
+    uncommittedSql = join(repoDir, 'supabase', 'migrations', '20260303000000_wip.sql');
+    writeFileSync(uncommittedSql, 'select 3;\n');
+
+    // 未 push の migration を指す symlink（正規化後の path で判定していることの確認）
+    mkdirSync(join(repoDir, 'tmp'));
+    symlinkSync(uncommittedSql, join(repoDir, 'tmp', 'wip-alias'), 'file');
+  });
+
+  afterAll(() => {
+    rmSync(fixtureRoot, { recursive: true, force: true });
+  });
+
+  it('origin/main に載っている migration の Edit は block する', () => {
+    expect(runGuard(edit(appliedSql, 'DROP TABLE x;'), repoDir)).toBe('block');
+  });
+
+  it('origin/main に載っている migration の Write も block する', () => {
+    expect(runGuard(write(appliedSql, 'DROP TABLE x;'), repoDir)).toBe('block');
+  });
+
+  it('ローカル commit のみ（未 push）の migration は allow する', () => {
+    expect(runGuard(edit(localOnlySql, 'ALTER TABLE x;'), repoDir)).toBe('allow');
+  });
+
+  it('未 commit の migration は allow する', () => {
+    expect(runGuard(edit(uncommittedSql, 'ALTER TABLE x;'), repoDir)).toBe('allow');
+  });
+
+  it('未 push の migration を指す symlink も allow する（正規化後の path で判定している）', () => {
+    expect(runGuard(write(join(repoDir, 'tmp', 'wip-alias'), 'select 9;'), repoDir)).toBe('allow');
+  });
+
+  it('origin/main の ref が無い repo では block する（fail-closed）', () => {
+    const noOriginRoot = mkdtempSync(join(tmpdir(), 'pre-tool-guard-migration-no-origin-'));
+    try {
+      git(['init', '-q', '.'], noOriginRoot);
+      git(
+        [
+          '-c',
+          'user.email=t@example.com',
+          '-c',
+          'user.name=t',
+          'commit',
+          '-q',
+          '--allow-empty',
+          '-m',
+          'init',
+        ],
+        noOriginRoot,
+      );
+      mkdirSync(join(noOriginRoot, 'supabase', 'migrations'), { recursive: true });
+      const sql = join(noOriginRoot, 'supabase', 'migrations', '20260101000000_x.sql');
+      writeFileSync(sql, 'select 1;\n');
+      expect(runGuard(edit(sql, 'DROP TABLE x;'), noOriginRoot)).toBe('block');
+    } finally {
+      rmSync(noOriginRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('git が使えない（PATH に git が無い）環境では block する（fail-closed）', () => {
+    // guard は git を PATH から引く。git が引けない時に allow へ倒れると、
+    // PATH を細工するだけで適用済み migration を書き換えられてしまう。
+    expect(runGuard(edit(appliedSql, 'DROP TABLE x;'), repoDir, { PATH: '/nonexistent' })).toBe(
+      'block',
+    );
   });
 });
 
@@ -1676,74 +1898,28 @@ describe('pre-tool-guard.mjs: env-file 名の直後の非 ASCII 空白（NBSP）
 });
 
 // =====================================================================
-// gh pr merge / gh api ...pulls/.../merge の直接実行（cost guard、#2596）
+// merge の直接実行は block しない（2026-09-13、#2640）
 // =====================================================================
-// merge 経路を `pnpm branch:finish <N>` 1 本に機械的に絞る。free plan の private
-// repo では branch protection / ruleset が使えず、CI red の遮断は
-// finish-branch.sh の statusCheckRollup 判定だけが担っている。
-//
-// 他の Bash guard と同じく、**文字列に言及しただけでも落ちる**（コマンド本文を
-// 走査するため）。docs や commit message へ書く時は Write / Edit で file に
-// 書いてから渡す。
-describe('pre-tool-guard.mjs: gh pr merge 直接実行（#2596）', () => {
+// #2596 で入れた `gh pr merge` / `gh api ... PUT .../pulls/<N>/merge` の block は、
+// Free plan の private repo で ruleset が使えなかった時代の代替だった。2026-09-07 の
+// public 化で main の ruleset（bypass actor 0）が CI red の merge を全経路で拒むため、
+// guard 側の block は撤去し、ruleset を唯一の gate にした。この describe は
+// 「再導入しない」ことを固定する（block に戻すなら #2640 の決定を先に覆す）。
+describe('pre-tool-guard.mjs: merge の直接実行は ruleset に任せる（#2640）', () => {
   const bash = (command: string) => ({ tool_name: 'Bash', tool_input: { command } });
 
-  it('gh pr merge を直接実行すると block する', () => {
-    expect(runGuard(bash('gh pr merge 2596'))).toBe('block');
+  it('gh pr merge を block しない', () => {
+    expect(runGuard(bash('gh pr merge 2640 --merge'))).toBe('allow');
   });
 
-  it('gh pr merge に追加フラグが付いていても block する', () => {
-    expect(runGuard(bash('gh pr merge 2596 --merge --delete-branch'))).toBe('block');
-  });
-
-  it('引用符付きの PR 番号でも block する', () => {
-    expect(runGuard(bash('gh pr merge "2596"'))).toBe('block');
-  });
-
-  it('gh api で pulls/<N>/merge へ -X PUT する直接実行を block する', () => {
+  it('gh api で pulls/<N>/merge へ PUT しても block しない', () => {
     expect(
-      runGuard(
-        bash(
-          'gh api -X PUT repos/Dayopt/dayopt/pulls/2596/merge -f merge_method=merge -f sha=abc123',
-        ),
-      ),
-    ).toBe('block');
+      runGuard(bash('gh api -X PUT repos/Dayopt/dayopt/pulls/2640/merge -f merge_method=merge')),
+    ).toBe('allow');
   });
 
-  it('--method PUT（フラグの別表記）でも block する', () => {
-    expect(
-      runGuard(
-        bash('gh api --method PUT repos/Dayopt/dayopt/pulls/2596/merge -f merge_method=merge'),
-      ),
-    ).toBe('block');
-  });
-
-  it('--method put（小文字）でも block する', () => {
-    expect(
-      runGuard(
-        bash('gh api --method put repos/Dayopt/dayopt/pulls/2596/merge -f merge_method=merge'),
-      ),
-    ).toBe('block');
-  });
-
-  it('pnpm branch:finish は通す（誘導先を塞がない）', () => {
-    expect(runGuard(bash('pnpm branch:finish 2596'))).toBe('allow');
-  });
-
-  it('bash scripts/tasks/finish-branch.sh の直接起動も通す', () => {
-    expect(runGuard(bash('bash scripts/tasks/finish-branch.sh 2596'))).toBe('allow');
-  });
-
-  it('gh pr view 等 merge 以外の pr 操作は通す', () => {
-    expect(runGuard(bash('gh pr view 2596'))).toBe('allow');
-  });
-
-  it('PUT を伴わない gh api での pulls/.../merge 参照（状態確認）は通す', () => {
-    expect(runGuard(bash('gh api repos/Dayopt/dayopt/pulls/2596/merge'))).toBe('allow');
-  });
-
-  it('merge を含まない別コマンド名（word boundary）は通す', () => {
-    expect(runGuard(bash('gh pr merger-status 2596'))).toBe('allow');
+  it('pnpm branch:finish は引き続き通す（掃除の入口）', () => {
+    expect(runGuard(bash('pnpm branch:finish 2640'))).toBe('allow');
   });
 });
 

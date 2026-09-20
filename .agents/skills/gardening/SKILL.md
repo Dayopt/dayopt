@@ -31,7 +31,7 @@ description: ユーザーが月次の改善ループの実施を明示依頼し�
 2. **前月の `結果(未):` を回収する**。判定材料が揃っていれば `結果(YYYY-MM-DD):` 行を追記して恒久化 / 撤回を明記する。揃っていなければ期限を 1 行で延ばす
 3. **判断層の検証**（`AGENTS.md` §シンプルルール）: ①今月このルールに戻った場面はあったか（1 度も戻らないルールは削る候補）②無言で破られたルールは無いか ③先月触らなかった機能はどれか（ルール 5。削除候補は `dispatch` intake で起票）
 4. **レビューの歩留まり**: provider を問わず P1 / P2 で同じ構造の指摘が当月 2 回以上、または通算 2 回以上なら機械化（test / lint / CI）の issue を起票する。指摘ゼロが続く reviewer / provider は、費用と独立性を再評価し、縮小か廃止の候補にする
-5. **security sweep**: cloud Supabase MCP をオンデマンド登録して `get_advisors`（security）、あわせて `pnpm security:check`。所見は issue、使用後に登録解除（`mcp-usage` skill）
+5. **security sweep**: cloud Supabase MCP をオンデマンド登録して `get_advisors`（security）、あわせて `pnpm security:check`。所見は issue、使用後に登録解除（`mcp-usage` skill）。深掘りが要る月は `security-sweep` skill を 1 境界だけ回す（provider 非依存。`/claude-security` は任意の加速器で、無くても完走する）
    - `pnpm-workspace.yaml` の `overrides` / `patchedDependencies` / `audit.ignore` の棚卸しを同時に行う。**lockfile に対象 version が無いことを stale の根拠にしない** — 効いている override はその version を消すので、不在はむしろ現役の証拠。1 件ずつ外して `pnpm install` し、`pnpm audit` の advisory と lockfile の `packages:` 件数が両方とも変わらないものだけを削除する
 6. **成果物**: ルール・skill・docs に変更があれば docs 束 PR（`{agent}/gardening-YYYY-MM`）。無ければ **無音**。journal ファイルも常設 issue も作らない（再計算できる数値は複製せず、残す判断は `decisions.md` に入れる）
 

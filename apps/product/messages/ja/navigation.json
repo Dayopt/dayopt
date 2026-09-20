@@ -8,6 +8,8 @@
       "views": "ビュー",
       "quickCreate": "作成",
       "theme": "テーマ",
+      "switchToDark": "ダークモードに切り替え",
+      "switchToLight": "ライトモードに切り替え",
       "getHelp": "ヘルプ",
       "toggleSidebar": "サイドバーを開閉",
       "closeSidebar": "サイドバーを閉じる",

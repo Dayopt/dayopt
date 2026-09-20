@@ -3,11 +3,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useTimeblockInspectorStore } from '../stores/useTimeblockInspectorStore';
 
-const push = vi.hoisted(() => vi.fn());
-
 vi.mock('next/navigation', () => ({
   usePathname: () => '/ja/calendar',
-  useRouter: () => ({ push }),
   useSearchParams: () => new URLSearchParams(window.location.search),
 }));
 
@@ -24,14 +21,33 @@ describe('useInspectorURLSync', () => {
     renderHook(() => useInspectorURLSync());
 
     act(() => useTimeblockInspectorStore.getState().openInspector('same-id', 'plan'));
-    expect(push).toHaveBeenLastCalledWith('/ja/calendar?timeblock=plan%3Asame-id', {
-      scroll: false,
-    });
+    expect(window.location.search).toBe('?timeblock=plan%3Asame-id');
 
     act(() => useTimeblockInspectorStore.getState().openInspector('same-id', 'record'));
-    expect(push).toHaveBeenLastCalledWith('/ja/calendar?timeblock=record%3Asame-id', {
-      scroll: false,
-    });
+    expect(window.location.search).toBe('?timeblock=record%3Asame-id');
+  });
+
+  it('開く時は client navigation を起こさず履歴だけ積む（パネルをまたたかせない）', () => {
+    const lengthBefore = window.history.length;
+    renderHook(() => useInspectorURLSync());
+
+    act(() => useTimeblockInspectorStore.getState().openInspector('plan-1', 'plan'));
+
+    expect(window.location.search).toBe('?timeblock=plan%3Aplan-1');
+    expect(window.history.length).toBeGreaterThan(lengthBefore);
+  });
+
+  it('閉じた直後に古い searchParams が届いても開き直さない', () => {
+    const { rerender } = renderHook(() => useInspectorURLSync());
+
+    act(() => useTimeblockInspectorStore.getState().openInspector('plan-1', 'plan'));
+    act(() => useTimeblockInspectorStore.getState().closeInspector());
+    expect(window.location.search).toBe('');
+
+    // 遅れて届く navigation の再描画を模す（URL は既に param 無しへ戻っている）
+    rerender();
+
+    expect(useTimeblockInspectorStore.getState().isOpen).toBe(false);
   });
 
   it('popstateで同じUUIDのkindだけが変わった場合もstoreを更新する', () => {

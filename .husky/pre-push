@@ -28,8 +28,12 @@ cat > "$PUSH_INPUT_FILE" || {
 
 while read -r _local_ref local_sha remote_ref _remote_sha; do
   # main への直接 push を禁止する。マージは PR + pnpm branch:finish 経由に限定する。
-  # private repo + Free plan では GitHub 側の branch protection が強制されないため、
-  # この hook が唯一の main 保護になる（tag push や他 branch は通す）。
+  # GitHub 側の merge gate は main の ruleset（required status checks / review thread
+  # resolution 等。docs/engineering/infra.md §merge gate）で、GitHub Team の private repo
+  # でも強制される。ただし ruleset が直接 push をどこまで拒否するかは repo の docs に
+  # 書かれていない（実状は gh api repos/Dayopt/dayopt/rulesets/6790553 が正）ため、
+  # ruleset の設定に依存せず push 前にローカルで止める防御としてこの hook を残す
+  # （tag push や他 branch は通す）。
   if [ "$remote_ref" = "refs/heads/main" ]; then
     echo "✗ main への直接 push は禁止です。PR を作成し pnpm branch:finish でマージしてください。" >&2
     exit 1
@@ -81,7 +85,8 @@ PAUSE: push 前の確認（この commit set では初回。4 点に答えてか
 1. index は意図どおりか（git diff --cached を見たか）
 2. 直前の修正コミットが新しい穴を開けていないか
 3. auth / RLS / billing / migration / 公開契約 / cross-feature を含む diff なら、
-   反証レビュー（risk-reviewer / behavior-verifier / architecture-guard）をかけたか
+   セルフレビューの根拠と、PR 作成後に GitHub の `@codex review` を依頼する段取りを確認したか
+   （追加 reviewer は起動しない）
 4. 配線と不等式は確認したか（env の受け渡し、timeout / 予算などの定数関係）
 
 なぜこの 4 点か: AGENTS.md §レーン運用（push 前セルフレビュー）

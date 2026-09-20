@@ -35,7 +35,7 @@ import { suppressConsentBanner } from './suppress-consent-banner';
  */
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SECRET_KEY;
 // service role で auth user / profile を作って消すため、実行先が安全な時だけ有効にする
 const SERVICE_ROLE_TARGET = resolveServiceRoleTarget(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 // CI（E2E_REQUIRE_SERVICE_ROLE_SUITES=1）では skip を許さない。env が壊れて suite が
@@ -174,8 +174,11 @@ describeWithEnv('Account Deletion: 削除 → セッション失効 → 再ロ�
     await expect(confirmButton).toBeEnabled();
     await confirmButton.click();
 
-    // AccountDeletionDialog.tsx onSuccess: signOut() → window.location.href = '/auth/login'
-    await page.waitForURL(/\/auth\/login/, { timeout: 15_000 });
+    // signOut・locale redirect の途中の document load は待たず、最終画面の成立を待つ。
+    // URL だけでは未完了の遷移も通るため、ログインフォームの表示も確認する。
+    await expect(page).toHaveURL(/\/ja\/auth\/login(?:\?|$)/, { timeout: 15_000 });
+    await expect(page.locator('input[name="email"]')).toBeVisible();
+    await expect(page.locator('input[name="password"]')).toBeVisible();
 
     // セッション失効: 保護ページへ行くと未認証としてログインへ戻される
     await page.goto('/ja/calendar');

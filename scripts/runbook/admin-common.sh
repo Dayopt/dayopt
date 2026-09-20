@@ -8,6 +8,9 @@
 #   source "$(dirname "${BASH_SOURCE[0]}")/admin-common.sh"
 # ========================================
 
+# 破壊的な操作の対象確認（DAYOPT_CONFIRM_TARGET）。confirm-target.sh が正本。
+source "$(dirname "${BASH_SOURCE[0]}")/../tasks/confirm-target.sh"
+
 require_user_email() {
   if [[ -z "${USER_EMAIL:-}" ]]; then
     echo "エラー: USER_EMAIL を指定してください" >&2
@@ -31,8 +34,8 @@ require_user_email_and_password_item() {
 }
 
 require_supabase_env() {
-  if [[ -z "${NEXT_PUBLIC_SUPABASE_URL:-}" || -z "${SUPABASE_SERVICE_ROLE_KEY:-}" ]]; then
-    echo "エラー: NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY が未設定です" >&2
+  if [[ -z "${NEXT_PUBLIC_SUPABASE_URL:-}" || -z "${SUPABASE_SECRET_KEY:-}" ]]; then
+    echo "エラー: NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SECRET_KEY が未設定です" >&2
     exit 1
   fi
 }
@@ -45,25 +48,21 @@ require_supabase_env_verbose() {
     exit 1
   fi
 
-  if [[ -z "${SUPABASE_SERVICE_ROLE_KEY:-}" ]]; then
-    echo "エラー: SUPABASE_SERVICE_ROLE_KEY が未設定です (op run --env-file=.op-env.human 経由で実行してください)" >&2
+  if [[ -z "${SUPABASE_SECRET_KEY:-}" ]]; then
+    echo "エラー: SUPABASE_SECRET_KEY が未設定です (op run --env-file=.op-env.human 経由で実行してください)" >&2
     exit 1
   fi
 }
 
-# AUTH_HEADERS に apikey / Authorization を設定する（Content-Type なし）。
+# Modern keys go in apikey only; legacy local JWTs also require Bearer.
 auth_headers() {
-  AUTH_HEADERS=(
-    -H "apikey: ${SUPABASE_SERVICE_ROLE_KEY}"
-    -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}"
-  )
+  AUTH_HEADERS=(-H "apikey: ${SUPABASE_SECRET_KEY}")
+  if [[ "$SUPABASE_SECRET_KEY" != sb_secret_* ]]; then
+    AUTH_HEADERS+=(-H "Authorization: Bearer ${SUPABASE_SECRET_KEY}")
+  fi
 }
 
-# AUTH_HEADERS に apikey / Authorization / Content-Type: application/json を設定する。
 auth_headers_json() {
-  AUTH_HEADERS=(
-    -H "apikey: ${SUPABASE_SERVICE_ROLE_KEY}"
-    -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}"
-    -H "Content-Type: application/json"
-  )
+  auth_headers
+  AUTH_HEADERS+=(-H "Content-Type: application/json")
 }

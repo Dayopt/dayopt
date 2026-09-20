@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-08-25
+last_verified: 2026-09-14
 code:
   - packages/observability
   - apps/product/src/instrumentation.ts
@@ -16,17 +16,46 @@ Dayoptのproduction監視はSentry、Vercel、Supabase、`/api/health`、UptimeR
 
 ## Monitoring surfaces
 
-| Surface         | 見るもの                                                                                                                                           | 正本                                                                                                                         |
-| --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| Sentry          | unexpected error、正規化済みCSP violation、performance trace                                                                                       | Sentry dashboard + Product / Web の runtime config                                                                           |
-| Vercel          | deployment、function error / duration、traffic、build failure                                                                                      | Vercel dashboard                                                                                                             |
-| Supabase        | database health、connection、API error、storage、Auth                                                                                              | Supabase dashboard                                                                                                           |
-| Health endpoint | app、database、必要な環境設定の疎通                                                                                                                | `GET /api/health`                                                                                                            |
-| UptimeRobot     | 外形監視（`/api/health` のHTTP status、5分間隔）、uptime、incident、response time                                                                  | UptimeRobot dashboard + メール通知。AI調査経路は[mcp-usage](../../`mcp-usage` skill)のUptimeRobot節（read-onlyオンデマンド） |
-| GitHub Actions  | type / lint / test / build / secret scan / docs 整合性チェック（`ci.yml` の impact →（static ∥ unit ∥ integration）job に統合済み、#2483 / #2539） | `.github/workflows/`                                                                                                         |
-| Axiom（未実施） | Vercel Log Drains 経由の runtime / build / static log（契約表に載らない経路も含む全量）                                                            | Axiom dashboard（`vercel` dataset）。導入手順は下記 §Log Drains（Axiom）（未実施）                                           |
+| Surface                     | 見るもの                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | 正本                                                                                                                         |
+| --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| Sentry                      | unexpected error、正規化済みCSP violation、performance trace                                                                                                                                                                                                                                                                                                                                                                                                                           | Sentry dashboard + Product / Web の runtime config                                                                           |
+| Vercel                      | deployment、function error / duration、traffic、build failure                                                                                                                                                                                                                                                                                                                                                                                                                          | Vercel dashboard                                                                                                             |
+| Supabase                    | database health、connection、API error、storage、Auth                                                                                                                                                                                                                                                                                                                                                                                                                                  | Supabase dashboard                                                                                                           |
+| Health endpoint             | app、database、必要な環境設定の疎通                                                                                                                                                                                                                                                                                                                                                                                                                                                    | `GET /api/health`                                                                                                            |
+| UptimeRobot                 | 外形監視（`/api/health` のHTTP status、5分間隔）、uptime、incident、response time                                                                                                                                                                                                                                                                                                                                                                                                      | UptimeRobot dashboard + メール通知。AI調査経路は[mcp-usage](../../`mcp-usage` skill)のUptimeRobot節（read-onlyオンデマンド） |
+| GitHub Actions              | type / lint / test / build / secret scan / docs 整合性チェック（`ci.yml` の impact →（static ∥ unit ∥ integration）job に統合済み、#2483 / #2539）。**失敗の自動起票**: `promote.yml`（Production Release）、`production-config-audit.yml`（deploy-health、Supabase Auth / Storage RLS audit）、`nightly.yml`（R2 storage backup / replica-check / label sweep）はいずれも title-prefix 方式で `[auto] ...` issue を 1 本立てて追記する。**自動で閉じないので直したら手で close する** | `.github/workflows/`                                                                                                         |
+| Axiom（未実施）             | Vercel Log Drains 経由の runtime / build / static log（契約表に載らない経路も含む全量）                                                                                                                                                                                                                                                                                                                                                                                                | Axiom dashboard（`vercel` dataset）。導入手順は下記 §Log Drains（Axiom）（未実施）                                           |
+| Supabase Edge Function logs | `send-auth-email` の `send failed` / `capture failed`（Sentry envelope の送信自体が失敗した場合。#2682）                                                                                                                                                                                                                                                                                                                                                                               | Supabase Dashboard → Edge Functions → Logs                                                                                   |
 
 provider plan、sampling rate、SDK versionなどの値は変わるため、package manifest・runtime config・dashboardを正とする。
+
+## Cron heartbeat と本番 schema・権限監査
+
+実行主体は GitHub Actions の `production-config-audit.yml`。main への push と定期実行だけが本番監査用資格情報を受け取る。PR や branch の手動実行には渡さない。読取経路は Supabase Management API の `read_only: true` で、対象 project は既存監査と同じ production に固定する。
+
+| 対象                                                                                                      | 監査頻度                   | 異常条件                                               |
+| --------------------------------------------------------------------------------------------------------- | -------------------------- | ------------------------------------------------------ |
+| calendar-sync / external-connection-maintenance                                                           | 15分                       | 最終完了から45分超                                     |
+| calendar-account-deletion-settle                                                                          | 15分                       | 最終完了から180分超                                    |
+| expire-calendar-revoke-outbox                                                                             | 15分                       | 最終完了から3分超                                      |
+| cleanup-product-events                                                                                    | 15分                       | 最終完了から4320分超                                   |
+| cleanup-calendar-authority-retention / expire-calendar-revoke-authority / finalize-calendar-revoke-guards | 15分                       | 最終完了から180分超                                    |
+| migration / schema / RLS / ACL / default privileges                                                       | 毎日06:00 JST、main push時 | 未適用migration、repository snapshotとの差分、読取失敗 |
+
+GitHub の schedule は実行時刻を保証しない。15分は起動予定の頻度であり、検知・通知の最大遅延の保証ではない。記録欠落、無効時刻、資格情報不足、API失敗も監査失敗とする。本番だけにある migration version は履歴差として表示し、schema / ACL の比較は省略しない。baseline は migration から生成し、本番から上書きしない。CI は隔離DBから型を再生成して committed types と比較する。default privileges の方針変更は #1715 で判断する。この監査はmigration履歴・RLS・ACLの比較で、列型・constraint・trigger/function本文すべての同一性を保証するものではない。
+
+完了記録は `public.cron_heartbeats`。利用者ID・入力・資格情報を含めず、job名、開始・完了時刻、成功と所要時間だけを保存する。Vercel側の記録失敗は Sentry に送るが保守処理を止めない（各書込1.5秒、開始・終了合計3秒）。pg_cron は元の schedule / owner / command を保持して同じトランザクションで記録する。処理が失敗すれば開始記録も rollback され、最後の成功が古くなることで検出する。authority identity不足で処理をskipした実行は完了を記録しない。heartbeat は正常終了の証拠であり、処理対象がゼロになった証拠ではない。
+
+通知先は既存の `[auto] Production Supabase audit が失敗しました` Issue。異常ごとに同じ未解決Issueへ job の結果、run URL、調査先を追記し、GitHubの購読通知を受けるリポジトリ運用者が一次対応する。監査用 job は `contents: read` のみで、通知 job だけが `issues: write` を持つ。Issue の自動クローズはしない。運用移管時に運用者の購読設定と実通知の受信を確認する。
+
+復旧手順:
+
+1. 通知の run URL で対象job・実行SHA・最終完了時刻を特定する。監査不能を利用ゼロや成功として扱わない。
+2. heartbeat異常なら Vercel / pg_cron の履歴、`CRON_SECRET` の設定有無、write fence、DB job の owner / database / active を確認する。資格情報の実値や cron command の内容をログへ出さない。
+3. schema異常なら配信SHAとmigration履歴を照合する。配備途中か未適用か、手動変更かを分ける。production baselineを再生成して差分を隠さない。修正操作は [runbook](./runbook.md) と本番変更の承認境界に従う。
+4. 原因を修正後、通常の保守処理が完了し、次の監査が成功した証拠をIssueに残して手動で閉じる。時刻を手で更新して監視だけ緑にしない。
+
+導入直後は各jobの初回完了が揃うまで監査が失敗する。日次jobの初回実行を含めて観測し、8件すべての実行記録と通知受信を確認してから #2681 / #2683 を閉じる。ローカルの異常fixtureは通知スクリプトへの到達を検証するが、本番の通知受信の代わりにはならない。MCP cleanupの滞留は #1908 の件数・遅延測定と合わせて判断する。
 
 ## Sentry runtime contract
 
@@ -40,6 +69,9 @@ provider plan、sampling rate、SDK versionなどの値は変わるため、pack
 - sanitizer と同意判定は `packages/observability`、app 固有の初期化は各 app の instrumentation / Sentry config を正とする
 - user context は内部 ID だけを使う。email、user content、request body、request header、cookie、authorization、URL query は送信しない
 - `event_id`、`trace_id`、`span_id`、release、environment など Sentry protocol 値は変更しない
+- **`/api/health` は Sentry 上に存在しない**。inbound filter `filtered-transaction`（health check transactions）が両 project で有効で、`GET /api/health` は ingest 時に 100% 破棄される（`GET /api/health/version` は名前が `*/health` に一致しないため通る。90 日で前者 0 件 / 後者 1 件、2026-09-18 実測）。UptimeRobot の 5 分間隔 ping で quota を焼かないための正しい挙動なので filter は外さない。**`/api/health` へ request を送って span が出るかで ingest の生死を測ってはいけない** — 送出側（sampler / propagator）が正常でも必ずゼロになる。ingest の生死は [Organization Stats](https://dayopt.sentry.io/stats/) の accepted / filtered / rate_limited の内訳で見る
+- **discover / events API は `dataset=spans` を使う**。当 organization は span (EAP) dataset へ移行済みで、`dataset=transactions` は全 project・全期間で 0 件を返す。存在確認に `transactions` を使うと「記録されていない」と誤診する（2026-09-18 実測）
+- **span ゼロの窓それ自体は異常ではない**。production のトラフィックが少ないため、30〜60 分にわたり accepted span が 0 件の時間帯は平常時にも現れる（2026-09-17 の 12:00Z / 14:00Z など）。沈黙を障害と読む前に、同じ期間の outcome 内訳で `rate_limited` と `filtered` を確認する
 
 主なcapture経路:
 
@@ -48,6 +80,7 @@ provider plan、sampling rate、SDK versionなどの値は変わるため、pack
 - `/api/csp-report`の有効なCSP violation
 - Stripe webhook等のroute handlerで捕捉したunexpected error
 - loggerのerror / warn breadcrumb
+- `send-auth-email`（Supabase Edge Function、DSN 未投入なら no-op）: render / Resend 送信失敗（HTTP 500 / 503）。tags は `action` / `phase` / `kind` / `status` / `resend_error`、extra は `subject` / `firstEmailAlreadySent`。宛先 email・本文・token_hash は送らない。署名不一致（HTTP 401）は攻撃者由来のノイズを Issues に入れないため capture しない。DSN は Supabase secret `SENTRY_DSN`（[secrets](./secrets.md)）。**status の意味**: Auth Hook は 503 / 429 を retryable として扱い、5 秒の総予算内で最大 3 回まで同じ hook を呼び直す（2026-09-10 実測）。そのため Resend の availability 失敗だけを 503 にし、`email_change` の 2 通目失敗のように**すでに 1 通送信済み**の状態では 500 へ落とす（再試行すると 1 通目が重複配送されるため）。capture 自体は 1 秒で打ち切り、観測のために hook を timeout させない
 
 expected auth / validation / not-found / conflict、Web Vitals、正常な login / billing event は Issues に送らない。性能は trace と Speed Insights、正常系行動は既存 analytics で確認する。
 
@@ -148,6 +181,8 @@ Supabase 公式ドキュメント（[Manage Logs usage](https://supabase.com/doc
 - `/api/health`が503を返す
 - login、Calendar data load、Plan / Record write、Stripe webhook等のcritical pathが継続失敗
 - production deployment失敗
+- cron heartbeatの完了時刻が閾値超過、記録欠落、または監査不能（上記の頻度・復旧手順を適用）
+- production schema・RLS・ACL・default privilegesのdriftまたは未適用migration
 
 ### Scheduled review
 
@@ -155,6 +190,7 @@ Supabase 公式ドキュメント（[Manage Logs usage](https://supabase.com/doc
 - Vercel function duration、bandwidth、build trend: 週次
 - Supabase database size、connection、slow query: 週次
 - provider usage / plan limit: 月次（Supabase Logs ingest/query の quota 確認基準は §Supabase `log_connections` 参照。enforcement 稼働後に対象化）
+- **`send-auth-email` の error 件数: 月次**（#2682）。Sentry で `tags[function]:send-auth-email` を検索し、件数が 0 であることを確認する。0 件でなければ Resend availability（503）か render / Resend 拒否（500）が起きている。署名不一致（401）はここに含まれない（capture 対象外のため）
 - **browser client telemetry の生死確認: 月次**（#2029）。Sentry で `environment:production has:browser.name` を直近30日で検索し、件数が0でないことを確認する。0件なら consent gate・DSN・CSP・SDK 初期化のどこかが壊れている可能性が高く、決定ログ（削除済み、git 履歴参照） の contract に沿って client 側の初期化パス（`instrumentation-client.ts` / `packages/observability/src/consent.ts`）を調査する。新しい常設 canary surface は作らない（2026-07-16〜23 に一時追加した operator smoke surface は複雑さに見合わず撤去済み）
 - **体感速度北極星（production LCP p95 / INP p95）の月次確認: 月次**（#2294）。product（Sentry project `dayopt`）の Web Vitals を [LCP saved query](https://dayopt.sentry.io/explore/traces/?query=has%3Ameasurements.lcp+environment%3Aproduction&project=4509737836412928&aggregateField=%7B%22yAxes%22%3A%5B%22count%28%29%22%2C%22p75%28measurements.lcp%29%22%2C%22p95%28measurements.lcp%29%22%5D%7D&mode=aggregate&sort=-count%28%29&statsPeriod=30d&table=span) / [INP saved query](https://dayopt.sentry.io/explore/traces/?query=has%3Ameasurements.inp&project=4509737836412928&aggregateField=%7B%22yAxes%22%3A%5B%22count%28%29%22%2C%22p75%28measurements.inp%29%22%2C%22p95%28measurements.inp%29%22%5D%7D&mode=aggregate&sort=-count%28%29&statsPeriod=30d&table=span) で開き、p95 と n（count）を確認する。budget は `docs/engineering/infra.md` §速度指標（LCP p95≤2.5s、INP p95≤200ms）。2026-08-24 baseline: LCP p75=1318ms/p95=2101.2ms（n=110）、INP p75=96ms/p95=103.84ms（n=104）、いずれも budget 内。**INP query はあえて `environment:production` を付けない** — INP は Sentry SDK の仕様で standalone span に `environment` タグが付かないため（`environment:production` で絞ると誤って count=0 になる）。product は `enabled: IS_SENTRY_PRODUCTION`（`apps/product/instrumentation-client.ts:66`）で `Sentry.init` の `enabled` オプション自体を production 限定にし、web は `isProduction` 定数（`apps/web/instrumentation-client.ts:24`）で `initializeBrowserSentry()`（`Sentry.init` 呼び出し自体）を production 以外で実行しない lazy init gate にしている（web 側の `Sentry.init` の `enabled` は `true` 固定）。実装形は異なるが、両者とも production 以外で SDK 自体を init しない構造的 gate という不変条件は同じため、フィルタなしでも値は production 限定と確定できる。**n を必ず確認する** — p95 は少数サンプルで暴れるため、n が前月比で大きく変動した月（consent UI 変更、計測ソース変更、トラフィック構成変化など）は単純比較せず断点として本節にコメントで残す。閾値アラートは n がまだ小さく統計的に成立しないため作らない（この月次確認と `docs/engineering/infra.md` §行動ルール の「p95悪化 → 改善Issue必須」で代替する）。時系列比較が要る時は saved query の期間を切って再取得する（journal は持たない。2026-09-02、gardening 統合）
 

@@ -30,6 +30,7 @@
         "nextPeriod": "Go to the next period",
         "today": "Go to today",
         "dayView": "Show 1 day",
+        "weekView": "Show week",
         "twoDayView": "Show 2 days",
         "threeDayView": "Show 3 days",
         "fourDayView": "Show 4 days",
@@ -69,7 +70,8 @@
       "selectActivity": "Select activity...",
       "preview": {
         "plan": "Plan",
-        "record": "Record"
+        "record": "Record",
+        "remaining": "{duration} left"
       }
     },
     "contextMenu": {
@@ -223,7 +225,8 @@
         "applyFailed": "Couldn't apply the template. Please try again",
         "saveFailed": "Couldn't save the template. Please try again",
         "renameFailed": "Couldn't rename the template. Please try again",
-        "deleteFailed": "Couldn't delete the template. Please try again"
+        "deleteFailed": "Couldn't delete the template. Please try again",
+        "applied": "{count, plural, one {1 plan} other {# plans}} added"
       }
     },
     "activitySelector": {
@@ -242,28 +245,6 @@
       "recordUnavailableFuture": "Records cannot end in the future",
       "allCategories": "All",
       "categoryFilterLabel": "Filter by category"
-    },
-    "stats": {
-      "review": {
-        "segments": {
-          "title": "Segments",
-          "create": "Create segment",
-          "namePlaceholder": "e.g. Deep work",
-          "emptyTitle": "No segments yet",
-          "emptyDescription": "Save an activity combination you review often",
-          "editActivities": "Edit activities",
-          "delete": "Delete",
-          "deleteConfirmTitle": "Delete this segment?",
-          "deleteConfirmDescription": "This deletes \"{name}\". This action cannot be undone.",
-          "created": "Segment created",
-          "duplicateName": "A segment with this name already exists",
-          "createFailed": "Failed to create segment",
-          "renameFailed": "Failed to rename segment",
-          "updateFailed": "Failed to update segment",
-          "deleted": "Segment deleted",
-          "deleteFailed": "Failed to delete segment"
-        }
-      }
     },
     "mobile": {
       "weekLaneSwitcher": {

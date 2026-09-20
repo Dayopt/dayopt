@@ -41,6 +41,7 @@
 import type { EmailOtpType } from '@supabase/auth-js';
 import { type NextRequest, NextResponse } from 'next/server';
 
+import { deliverWelcomeEmailOnce } from '@/features/auth/server/welcome-email';
 import { getSafeRedirectPath } from '@/lib/safe-redirect';
 import { observeAuthOperation } from '@/lib/sentry';
 import { createClient } from '@/lib/supabase/server';
@@ -77,6 +78,11 @@ export async function GET(request: NextRequest) {
       // `session?.access_token` がある時だけ `_saveSession` を呼ぶ（GoTrueClient）ので、
       // token を伴わない session オブジェクトでは cookie が書かれない。truthy 判定だと
       // その場合に保護ページへ送ってしまい、直したはずの無言バウンスが再現する。
+      // 新規登録の確認だけを歓迎の合図にする。email_change / recovery は既存ユーザーの操作。
+      // user を optional に読むのは、歓迎メールの都合で確認の着地を壊さないため。
+      const signupUserId = type === 'signup' ? data.session?.user?.id : undefined;
+      if (signupUserId) await deliverWelcomeEmailOnce(signupUserId);
+
       if (data.session?.access_token) {
         // recovery だけ next を無視して固定 path へ送る（#1928）。実際の発生原因は
         // production の Redirect URLs allowlist に `/auth/reset-password` が未登録で、

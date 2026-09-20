@@ -78,6 +78,8 @@ export interface GlossaryEntry {
     i18nNamespace?: string;
   };
   db?: readonly string[];
+  /** この概念に対応する MCP tool 名（`apps/product/src/app/api/mcp/_tools/registry.ts`）。Architecture Inventory の対応付けに使う */
+  mcpTools?: readonly string[];
   forbidden?: readonly ForbiddenTerm[];
   /** decisions.md の日付や issue 番号 */
   refs?: readonly string[];

@@ -33,7 +33,7 @@ vi.mock('@/lib/supabase/oauth', () => ({
   }),
 }));
 
-vi.mock('@/lib/email/router', () => ({ getUserLocale, sendMfaDisabledEmail }));
+vi.mock('@/lib/email/notifications', () => ({ getUserLocale, sendMfaDisabledEmail }));
 
 const USER_ID = '00000000-0000-4000-8000-000000000001';
 const CODE = 'ABCD-EFGH';

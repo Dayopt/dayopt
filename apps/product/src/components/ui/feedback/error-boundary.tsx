@@ -106,6 +106,14 @@ class ErrorBoundary extends Component<Props, State> {
   }
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    // **ここでは ChunkLoadError の自動リロードを行わない**（#2688）。
+    //
+    // この boundary は feature 単位で使われ、カレンダーワークスペースでは
+    // Inspector / InlineCreatePanel の編集途中の state（persist を持たない store）を
+    // 抱えたまま発火しうる。無確認でリロードすると未保存の編集が黙って消える。
+    // 自動リロードは page 全体が既に死んでいる route 境界（`app/**/error.tsx`）に限定する。
+    // ここでは通常どおり fallback UI を出し、リロードするかはユーザーが決める。
+
     // Sentryにエラーを送信（自動分類・優先度付き）
     handleReactError(error, errorInfo, {
       route: typeof window !== 'undefined' ? window.location.pathname : 'unknown',

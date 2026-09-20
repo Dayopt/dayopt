@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-09-08
+last_verified: 2026-09-20
 ---
 
 # Dayopt 不変条件カタログ
@@ -14,8 +14,8 @@ last_verified: 2026-09-08
 更新経路は 3 つ:
 
 1. 実装側 — security skill（Dayopt 固有ルール 4）が、前提を作った PR での更新を義務付ける
-2. レビュー側 — `risk-reviewer`（`pr-cross-review` スキル経由）が、カタログに無い新しい前提を
-   見つけたら追記を提案する。危険クラスの diff を読む立場にいるため、抜けに最初に気づける
+2. レビュー側 — セルフレビューと GitHub の `@codex review` で、カタログに無い新しい前提を
+   見つけたら追記を提案する。差分の実際の failure scenario と一次情報を添えて判断する
 3. 月次ガーデニング — 鮮度を見る
 
 なお、このカタログの**削除・緩和**を含む PR は人間が diff で直接確認する
@@ -27,6 +27,18 @@ docs へ残している。
 
 ## 課金・entitlement
 
+- **利用権が終わった後に server が拒否する mutation（`lib/billing/operation-access.ts` の
+  `managementMutations` に無いもの）は、UI から送らない。** server の判定が正で、UI は
+  `useBillingAccess().canUseProduct` / `useProductAccessGate` による写し。写しが無いと optimistic
+  update が一度成功して見えた後に rollback され、汎用の失敗 toast だけが残って障害と区別できない
+  （2026-09-20、Google Calendar 設定と activity / category の archive・restore で実発生。
+  終了後も許す削除・切断・export は gate しない）
+  - **まだ閉じていない経路がある**: `planTemplates` の `applyToDay` / `create` / `rename` は
+    終了後に server が拒否するのに UI から送る（#2865）。gate を足すには先に
+    `BillingAccessProvider.tsx` から `useBillingAccess` を切り出す必要がある。
+    同 file が `api.billing.*` を呼ぶため、hook を import した component が page から到達すると
+    その page の procedure 面に `billing.*` が混ざり、`architecture-map` の
+    「画面から使う procedure」検査が落ちる（calendar で実測）
 - 外部カレンダー連携は **Pro 限定**。OAuth の開始・callback・cron 同期の**すべての入口**で
   entitlement を検査する（2026-07 に callback の検査漏れが実際に起きたクラス）
 - Pro 限定機能の server 入口は `entitledProcedure(key)` を使うか、明示的に entitlement を検査する
@@ -39,7 +51,24 @@ docs へ残している。
 - `withUpstashRateLimit` のIP rate limitはVercel由来の`X-Real-IP`だけを使い、`X-Forwarded-For`へfallbackしない。欠落・不正値は共有`ip:unknown`でfail closedにする
 - rate limitのRedis keyは`ip:` / `email:`のpurpose prefixを付けてHMAC化し、生のIP / emailを保存・記録しない。account bucketを併用する場合はIP-firstで短絡し、IP bucketが拒否したらaccount bucketを消費しない
 - cron ルート（`app/api/cron/**`）は `CRON_SECRET` を検証する
+- **`writeCronHeartbeat` に渡せる job 名は `cron_heartbeats_job_name_check`（CHECK 制約）が
+  決める。** 制約に無い名前で書くと毎回 CHECK violation になり、`writeCronHeartbeat` は例外を
+  握って Sentry へ送るだけなので **行は永遠に作られない**。監査
+  （`production-cron-heartbeat-audit.mjs` の `JOB_MAX_AGE_MINUTES`）へ job を足すのは、
+  制約を広げる migration と**同じ変更**で行う（片方だけ足すと監査が恒久 missing になる）。
+  現状 **Vercel cron 4 本のうち `billing-reconciliation` だけ heartbeat を持たない**ため、
+  止まっても検知されない（2026-09-20 に PR #2863 の `@codex review` で判明、#2864 で塞ぐ）
 - redirect 先はユーザー入力をそのまま使わず、`lib/safe-redirect.ts` の検証を通す
+
+## メール通知
+
+- **`email_suppressions` は書いたら消す経路が無い恒久リスト**なので、Resend の `email.bounced` は
+  `bounce.type` が `transient` のものを書かない（`permanent` / `undetermined` / 欠落は配信評価を
+  守る側に倒して書く）。transient を書くと、その address 宛の product transactional mail（password
+  changed / MFA disabled / account deletion / Stripe 系）が永久に止まる一方、auth mail は Edge
+  Function が suppression を見ないため届き続け、利用者は気づけない（2026-09-20）
+- suppression を消す経路を足す時は、account deletion / purge の列挙（`EMAIL_KEYED_WITHOUT_USER_ID`）
+  と Privacy Policy の保持期間の記述を同じ変更で直す
 
 ## 認証・MFA
 
@@ -81,6 +110,12 @@ docs へ残している。
   足りない。`_v<N>` 命名は旧 version と新 version を並存させて可逆に cutover するための前提。
   強制は `private.assert_public_contract_exposure_v1()`（migration 適用時）と
   `pnpm rls:snapshot:check`（CI での継続 drift 検出）の 2 層
+- **`user_id` を持たず `email` 列を持つ `public` table は purge 列挙の母集合に入らない。**
+  `auth.users` から `ON DELETE CASCADE` で到達できるもの（`profiles` など）はアカウント削除で
+  消えるので対象外。**どちらでもない table**は `user-data-purge-enumeration.integration.test.ts` の
+  `EMAIL_KEYED_WITHOUT_USER_ID` に扱いを理由付きで書く（消すなら削除経路へ足して allowlist から
+  外す）。`email_suppressions` は 2026-09-20 時点で「未裁定・保持」であり、account deletion 後も
+  raw email が残る（#2859）
 - **`user_id` を持つ `public` table は、account-preserving purge
   （`delete_all_user_data_command_v3`）が直接消すか、そこから `ON DELETE CASCADE` で
   到達できるか、理由付きの allowlist に載っているかのいずれかでなければならない。**
@@ -109,6 +144,27 @@ docs へ残している。
   redirect allowlist（production は Dashboard が正本で repo から強制できず、CI 監査も fail-open）
   だけに依存しない。`redirect_to` の origin が allowlist 外なら `NEXT_PUBLIC_APP_URL` へ落とし、
   `next`（path + query）の受け渡しは変えない（#2616）
+- **Vercel preview host の allowlist は hash の桁まで固定し、team slug 境界を跨げる形を
+  許さない。** commit URL は `<project>-<9 文字の英数字>-<scope slug>.vercel.app` なので
+  `[a-z0-9]{9}` に固定すれば、一致には scope slug がちょうど `dayopt` である必要がある。
+  `[a-z0-9-]+` のようにハイフンを許すと、第三者が `evil-dayopt` という team slug を取るだけで
+  `product-<hash>-evil-dayopt.vercel.app` が一致し、`token_hash` の配送先や CSRF の許可 origin に
+  他テナントのホストが混ざる。branch URL 形（`<project>-git-<branch>-...`）は branch 名に
+  ハイフンが入るため同じ手口を regex で区別できず、**allowlist に入れない**（preview は
+  `NEXT_PUBLIC_APP_URL` 一致と `VERCEL_URL` 完全一致で救う）。写しは
+  `supabase/functions/send-auth-email/confirm-url.ts` と
+  `apps/web/src/platform/security/csrf-protection.ts` の 2 箇所（#2616）
+- **認証メールの Resend 送信には `webhook-id` 由来の idempotency key を必ず付ける。** GoTrue は
+  503 / 429 で最大 3 回 hook を呼び直すので、送信成功後に失敗応答を返すと二重配送になる。
+  key は `auth/<webhook-id>/<action>/<recipient role>` で、email / token / token_hash / 本文を
+  含めない。`webhook-id` が取れない時は**乱数へフォールバックせず key 無しで送り**、
+  `resolveSendAuthEmailStatus` の 503→500 降格を従来どおり効かせる（#2803）
+- **パスワード変更通知は Auth event だけを根拠に送る。** クライアントから任意に呼べる
+  tRPC / REST 送信 endpoint は置かない。`password_changed_notification` を send_email hook で
+  受け、同じ `webhook-id` の再試行だけを冪等化する。送信前に `email_suppressions` を service
+  role で確認し、suppressed または判定不能なら送信せず PII なしの運用痕跡を残して 200 を返す。
+  production の通知有効化は `mailer_notifications_password_changed_enabled` を Auth config audit
+  で固定する（#2848）
 - `external-connection-maintenance` cron は calendar revoke outbox に **`MIN_BATCH_BUDGET_MS`
   以上の残り時間**を必ず渡す。outbox はこれを割ると 1 件も claim せずに break するため、retention の
   取り分を増やしすぎると provider への revoke request が永久に送られない（DB からは接続が消えている
@@ -124,12 +180,28 @@ docs へ残している。
 
 ## MCP の DB 書き込み境界
 
+- OAuth metadata が広告する `scopes_supported` は `SUPPORTED_SCOPES` 全量（write 込み）。
+  広告は「AS が理解する scope」の宣言であって付与の約束ではない。実際に付与するのは
+  consent の `resolveGrantableScopes` で、**env allowlist（`MCP_WRITE_ENABLED_CLIENTS`）と
+  DB gate（`mcp_mutation_control`）の AND**（`isConsentWriteEnabled`、DB が読めない時は
+  write を落とす fail-closed）が閉じていれば write scope を落として read-only の grant に
+  する。付与後に gate が閉じた場合は `applyDurableWriteGate` が token 側で同じ降格を行い、
+  判定規則そのものは `isWriteEnabledByMutationControl` を両者で共有する。
+  authorize 検証は gate を見ない（見ると gate 閉の client が read-only 接続すら作れない）
 - MCP mutation の global gate は DB 上で既定 `OFF`、`enabled_client_ids` は既定 `[]`。
   両方が許可した client だけがwrite grant/applyを通る。各gateはrevision付きの
   service-role-only RPC以外から変更しない
 - Candidate 1では `global OFF AND client list empty` をProductionの停止条件とする。
   旧UI direct UPDATE、tag mergeのlock順、legacy confirm-dayとdirect Recordのraceは、
   Stage 2のapp command移行と競合testが終わるまでMCP writeから到達不能にする
+- **MCP の読み取りは service-role client で tRPC を呼ぶため RLS が効かず、テナント分離は
+  各 service の user filter（`.eq('user_id', ctx.userId)` / `rpc(p_user_id)`）だけが持つ。**
+  書き込みには `assert_timeblock_writer_row_v1` の row trigger という二重の網があるが、
+  読み取りには DB 側の網が無い。**新しい read tool を足す時は
+  `lib/test/integration/mcp-read-tenant-isolation.integration.test.ts` にも case を足す**
+  （2026-09-11、[#2721](https://github.com/Dayopt/dayopt/issues/2721) D-08。RPC へ寄せても
+  アプリが `p_user_id` を渡す構造なら独立した認可は増えないため、現行 + この suite で
+  class を閉じる判断）
 - MCP apply RPC は `service_role` だけが実行できる。各 apply transaction 内で user、
   connection、access token、DB-owned environment/resource、scope、期限、
   connection/token の失効状態を共通writer fence内で再検証する
@@ -259,15 +331,50 @@ docs へ残している。
 テストが緑のまま隠す（#2598 の後に #2622 が必要になった件）。撤去 PR ではこの表を
 grep 対象にする。
 
-| 分類          | 場所                                                                                    | 役割                                       | 消してよいか                                  |
-| ------------- | --------------------------------------------------------------------------------------- | ------------------------------------------ | --------------------------------------------- |
-| (a) 契約変換  | `features/timeblock/server/timeblock-command-client.ts` の `EXPECTED_COMMAND_ERRORS`    | DT コード → `TimeblockServiceError` code   | 不可（UI が code で分岐する）                 |
-| (a) 契約変換  | `features/timeblock/server/mcp-mutation-client.ts` の `EXPECTED_ERROR_CODES`            | DT コード → `McpMutationErrorCode`         | 不可（MCP の公開契約）                        |
-| (a) 契約変換  | `features/timeblock/server/timeblock-context-contract.ts` の `TIMEBLOCK_CONTEXT_RULES`  | MCP `constraints.get` が返す規則の宣言     | 不可（公開契約）                              |
-| (b) UX 先回り | `features/timeblock/schemas/timeblock.ts` の `timeRangeRefine`                          | 往復前に `end > start` を弾く              | 可（server が同じ規則で拒否する）             |
-| (b) UX 先回り | `features/timeblock/domain/timeblock-destination.ts`                                    | `end_at` から Plan / Record の宛先を決める | 不可（規則の写しではなく宛先の決定そのもの）  |
-| (b) UX 先回り | `features/calendar/lib/overlap.ts` + `lib/time/time-conflict.ts`                        | 重なりの事前表示                           | 可（overlap は DB 側 `TIME_OVERLAP` が正）    |
-| (b) UX 先回り | `features/calendar/hooks/operations/useTimeblockOperations.ts` の record 未来移動ガード | ドラッグ中に `timeLocked` を出す           | 可（server 拒否でも同じ toast が出る。#2628） |
+| 分類          | 場所                                                                                    | 役割                                              | 消してよいか                                  |
+| ------------- | --------------------------------------------------------------------------------------- | ------------------------------------------------- | --------------------------------------------- |
+| (a) 契約変換  | `features/timeblock/server/timeblock-command-client.ts` の `EXPECTED_COMMAND_ERRORS`    | DT コード → `TimeblockServiceError` code          | 不可（UI が code で分岐する）                 |
+| (a) 契約変換  | `features/timeblock/server/mcp-mutation-client.ts` の `EXPECTED_ERROR_CODES`            | DT コード → `McpMutationErrorCode`                | 不可（MCP の公開契約）                        |
+| (a) 契約変換  | `features/timeblock/server/timeblock-context-contract.ts` の `TIMEBLOCK_CONTEXT_RULES`  | MCP `constraints.get` が返す規則の宣言            | 不可（公開契約）                              |
+| (b) UX 先回り | `features/timeblock/schemas/timeblock.ts` の `timeRangeRefine`                          | 往復前に `end > start` を弾く                     | 可（server が同じ規則で拒否する）             |
+| (b) UX 先回り | `features/timeblock/domain/timeblock-destination.ts`                                    | `end_at` から Plan / Record の宛先を決める        | 不可（規則の写しではなく宛先の決定そのもの）  |
+| (b) UX 先回り | `features/calendar/lib/overlap.ts` + `lib/time/time-conflict.ts`                        | 重なりの事前表示                                  | 可（overlap は DB 側 `TIME_OVERLAP` が正）    |
+| (b) UX 先回り | `features/calendar/hooks/operations/useTimeblockOperations.ts` の record 未来移動ガード | ドラッグ中に `timeLocked` を出す                  | 可（server 拒否でも同じ toast が出る。#2628） |
+| (b) UX 先回り | `features/calendar/interaction/interaction-effects.ts` の `case 'DROP'` の記録化経路    | Record レーンへの drop 先が未来なら記録を作らない | 可（server が `DT005` で拒否する。#2645）     |
+
+<!-- architecture-map:time-rules:start — 正本 直上の「規則の写しと、その分類」表 / 再生成 pnpm architecture:generate / 検証 pnpm architecture:check。この範囲は手編集しない -->
+
+```mermaid
+flowchart LR
+  subgraph db["DB trigger（正）"]
+    DT003["DT003<br/>end_at #gt; start_at"]
+    DT005["DT005<br/>end_at #lt;= now"]
+  end
+  subgraph contract["(a) 契約変換"]
+    contract1["timeblock-command-client.ts<br/>EXPECTED_COMMAND_ERRORS<br/>消せない"]
+    contract2["mcp-mutation-client.ts<br/>EXPECTED_ERROR_CODES<br/>消せない"]
+    contract3["timeblock-context-contract.ts<br/>TIMEBLOCK_CONTEXT_RULES<br/>消せない"]
+  end
+  subgraph ux["(b) UX 先回り"]
+    ux1["timeblock.ts<br/>timeRangeRefine<br/>消してよい"]
+    ux2["timeblock-destination.ts<br/>消せない"]
+    ux3["overlap.ts<br/>time-conflict.ts<br/>消してよい"]
+    ux4["useTimeblockOperations.ts<br/>消してよい"]
+    ux5["interaction-effects.ts<br/>case 'DROP'<br/>消してよい"]
+  end
+  db --> contract1
+  db --> contract2
+  db --> contract3
+  db -.-> ux1
+  db -.-> ux2
+  db -.-> ux3
+  db -.-> ux4
+  db -.-> ux5
+  classDef removable stroke-dasharray: 4 2
+  class ux1,ux3,ux4,ux5 removable
+```
+
+<!-- architecture-map:time-rules:end -->
 
 server が拒否した時に UI が汎用の `saveFailed` へ退化しないよう、`INVALID_TIME_RANGE` /
 `RECORD_IN_FUTURE` は `lib/trpc/client-safe-service-code.ts` の allowlist に載せ、

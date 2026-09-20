@@ -1,33 +1,32 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const treeState = vi.hoisted(() => ({
-  current: {
-    data: {
-      categories: [
-        { category: { id: 'cat-work', name: '仕事', color: 'blue', icon: 'briefcase' } },
-        { category: { id: 'cat-sleep', name: '睡眠', color: 'indigo', icon: 'moon' } },
+const TREE = {
+  categories: [
+    {
+      category: { id: 'cat-work', name: '仕事', color: 'blue', icon: 'briefcase' },
+      activities: [
+        { id: 'act-dev', name: '実装' },
+        { id: 'act-mtg', name: '会議' },
       ],
-      uncategorized: [],
-    } as unknown,
-    isPending: false,
-  },
+    },
+    {
+      category: { id: 'cat-sleep', name: '睡眠', color: 'indigo', icon: 'moon' },
+      activities: [{ id: 'act-nap', name: '昼寝' }],
+    },
+  ],
+  uncategorized: [{ id: 'act-walk', name: '散歩' }],
+};
+
+const treeState = vi.hoisted(() => ({
+  current: { data: undefined as unknown, isPending: false },
 }));
 
-const segmentsState = vi.hoisted(() => ({
-  current: {
-    data: [{ id: 'seg-1', name: '深い仕事', activityIds: ['act-dev'] }] as unknown,
-    isPending: false,
-  },
-}));
-
+/** `t(key, values)` は `key 値...` を返す。どの行の操作かを名前で引けるようにする。 */
 vi.mock('next-intl', () => ({
-  useTranslations: () => (key: string) => key,
-}));
-
-vi.mock('../../hooks/useSegments', () => ({
-  useSegments: () => segmentsState.current,
+  useTranslations: () => (key: string, values?: Record<string, unknown>) =>
+    values ? `${key} ${Object.values(values).join(' ')}` : key,
 }));
 
 vi.mock('@/features/activities', () => ({
@@ -41,22 +40,27 @@ vi.mock('@/lib/hooks/useMediaQuery', () => ({
   useMediaQuery: () => isTouch.current,
 }));
 
-vi.mock('@/components/shell/sidebar', () => ({
-  SidebarSection: ({ title, children }: { title: string; children: React.ReactNode }) => (
-    <section aria-label={title}>{children}</section>
-  ),
-}));
-
 import { useReportViewStore } from '../../stores/useReportViewStore';
 import { ReportFilterList } from './ReportFilterList';
 
 function resetStore() {
   useReportViewStore.setState({
     hiddenCategoryIds: [],
-    uncategorizedHidden: false,
-    marginHidden: false,
-    segmentId: null,
+    hiddenActivityIds: [],
   });
+}
+
+/** 行の 👁。見えている行は `hide 名前`、外している行は `show 名前` という名前を持つ。 */
+function eye(action: 'show' | 'hide', name: string) {
+  return screen.getByRole('button', { name: `${action} ${name}` });
+}
+
+/** 見出し（SidebarSection）の中身を引く。chevron の名前が見出しのタイトルと同じ。 */
+function section(title: string) {
+  const toggle = screen.getByRole('button', { name: title });
+  const node = toggle.closest('section');
+  if (node === null) throw new Error(`section not found: ${title}`);
+  return node;
 }
 
 describe('ReportFilterList', () => {
@@ -64,137 +68,237 @@ describe('ReportFilterList', () => {
     localStorage.clear();
     resetStore();
     isTouch.current = false;
-    segmentsState.current = {
-      data: [{ id: 'seg-1', name: '深い仕事', activityIds: ['act-dev'] }],
-      isPending: false,
-    };
-    treeState.current = {
-      data: {
-        categories: [
-          { category: { id: 'cat-work', name: '仕事', color: 'blue', icon: 'briefcase' } },
-          { category: { id: 'cat-sleep', name: '睡眠', color: 'indigo', icon: 'moon' } },
-        ],
-        uncategorized: [],
-      },
-      isPending: false,
-    };
+    treeState.current = { data: TREE, isPending: false };
   });
 
-  it('カテゴリー・未分類・余白を並べ、アクティビティは並べない', () => {
+  /** 骨格はカレンダーのサイドバーと同じ「カテゴリ」「未分類」の 2 見出し。 */
+  it('カテゴリの見出しにカテゴリー → アクティビティ、未分類の見出しに未分類のアクティビティを並べる', () => {
     render(<ReportFilterList />);
 
-    expect(screen.getByRole('checkbox', { name: /仕事/ })).toBeInTheDocument();
-    expect(screen.getByRole('checkbox', { name: /睡眠/ })).toBeInTheDocument();
-    expect(screen.getByRole('checkbox', { name: /uncategorized/ })).toBeInTheDocument();
-    expect(screen.getByRole('checkbox', { name: /margin/ })).toBeInTheDocument();
+    const categories = section('categoriesHeading');
+    for (const name of ['仕事', '実装', '会議', '睡眠', '昼寝']) {
+      expect(within(categories).getByText(name)).toBeInTheDocument();
+    }
+    expect(within(categories).queryByText('散歩')).toBeNull();
 
-    // 葉（アクティビティ）はレポートの分母の単位ではないので出さない
-    expect(screen.queryByText('実装')).not.toBeInTheDocument();
-    expect(screen.getAllByRole('checkbox')).toHaveLength(4);
+    const uncategorized = section('uncategorized');
+    expect(within(uncategorized).getByText('散歩')).toBeInTheDocument();
+    // 未分類の見出し自体には出し入れの口が無い（カレンダーと同じ）
+    expect(screen.queryByRole('button', { name: /^(show|hide) uncategorized$/ })).toBeNull();
   });
 
-  it('label が checkbox に紐付いている', () => {
+  it('チェックボックスもセグメントの口も持たない', () => {
     render(<ReportFilterList />);
 
-    // htmlFor / id で結ばれていないと getByLabelText は見つけられない
-    expect(screen.getByLabelText('仕事')).toHaveAttribute('role', 'checkbox');
-  });
-
-  it('カテゴリーのトグルが store の hiddenCategoryIds を書き換える', async () => {
-    const user = userEvent.setup();
-    render(<ReportFilterList />);
-
-    await user.click(screen.getByRole('checkbox', { name: /睡眠/ }));
-    expect(useReportViewStore.getState().hiddenCategoryIds).toEqual(['cat-sleep']);
-
-    await user.click(screen.getByRole('checkbox', { name: /睡眠/ }));
-    expect(useReportViewStore.getState().hiddenCategoryIds).toEqual([]);
-  });
-
-  it('未分類と余白のトグルがそれぞれの state を書き換える', async () => {
-    const user = userEvent.setup();
-    render(<ReportFilterList />);
-
-    await user.click(screen.getByRole('checkbox', { name: /uncategorized/ }));
-    expect(useReportViewStore.getState().uncategorizedHidden).toBe(true);
-
-    await user.click(screen.getByRole('checkbox', { name: /margin/ }));
-    expect(useReportViewStore.getState().marginHidden).toBe(true);
-  });
-
-  it('レンズ選択中は余白行を無効化し、理由を読み上げに載せる', () => {
-    useReportViewStore.setState({ segmentId: 'seg-1' });
-    render(<ReportFilterList />);
-
-    const margin = screen.getByRole('checkbox', { name: /margin/ });
-    expect(margin).toBeDisabled();
-    expect(margin).toHaveAccessibleDescription('marginLensDisabled');
-
-    // カテゴリー側は無効化しない（レンズはフィルタと交差する）
-    expect(screen.getByRole('checkbox', { name: /仕事/ })).not.toBeDisabled();
+    expect(screen.queryAllByRole('checkbox')).toHaveLength(0);
+    expect(screen.queryByText(/segment|セグメント/i)).toBeNull();
   });
 
   /**
-   * 別タブでセグメントを消しても `segmentId` は localStorage に残る。生の
-   * `segmentId` で無効化を決めると、画面のどこにもレンズが無いのに余白行だけが
-   * 押せないまま固定され、戻す手がかりが無くなる。
+   * カレンダーの `ActivityRow` と同じ出し方: 見えている行の 👁 は行ホバーまで隠し、
+   * 外している行の 👁 は常時出す（戻す手段を隠さない）。
    */
-  it('削除済みセグメントを指していたら余白行を無効化しない', () => {
-    useReportViewStore.setState({ segmentId: 'seg-deleted' });
+  it('見えている行の 👁 はホバーで出し、外した行の 👁 は常に出す', () => {
+    useReportViewStore.setState({ hiddenActivityIds: ['act-mtg'] });
     render(<ReportFilterList />);
 
-    expect(screen.getByRole('checkbox', { name: /margin/ })).not.toBeDisabled();
+    expect(eye('hide', '実装')).toHaveClass('opacity-0');
+    expect(eye('show', '会議')).not.toHaveClass('opacity-0');
+    // 一部だけ外したカテゴリーの 👁 は常時出す
+    expect(eye('show', '仕事')).not.toHaveClass('opacity-0');
+    expect(eye('hide', '睡眠')).toHaveClass('opacity-0');
   });
 
-  /**
-   * `listTree` が先に解決した窓で余白を押せると、`marginHidden` だけが永続化されて
-   * レンズ確定後は無視される。後日「すべて」へ戻した時に理由の分からない状態が残る。
-   */
-  it('レンズの解決を待つ間も余白行を無効化する', () => {
-    useReportViewStore.setState({ segmentId: 'seg-1' });
-    segmentsState.current = { data: undefined, isPending: true };
-    render(<ReportFilterList />);
+  describe('アクティビティの 👁', () => {
+    it('押すとそのアクティビティだけが hidden に入り、行が muted になる', async () => {
+      const user = userEvent.setup();
+      render(<ReportFilterList />);
 
-    expect(screen.getByRole('checkbox', { name: /margin/ })).toBeDisabled();
+      await user.click(eye('hide', '実装'));
+
+      expect(useReportViewStore.getState().hiddenActivityIds).toEqual(['act-dev']);
+      expect(useReportViewStore.getState().hiddenCategoryIds).toEqual([]);
+      expect(screen.getByRole('button', { name: '実装', pressed: false })).toHaveClass(
+        'text-muted-foreground',
+      );
+      expect(eye('hide', '会議')).toBeInTheDocument();
+    });
+
+    it('行の余白を押しても切り替わる', async () => {
+      const user = userEvent.setup();
+      render(<ReportFilterList />);
+
+      const row = screen.getByText('会議').closest('[data-report-filter-row="activity"]');
+      if (!(row instanceof HTMLElement)) throw new Error('row not found');
+      await user.click(row);
+
+      expect(useReportViewStore.getState().hiddenActivityIds).toEqual(['act-mtg']);
+    });
+
+    /**
+     * カテゴリーが外れている間に子を押す意図は「この 1 行だけ見る」。カテゴリーだけを戻すと
+     * 兄弟までまとめて出てしまうので、兄弟を個別に隠す。
+     */
+    it('カテゴリーが外れている間に押すと、その 1 行だけが見える状態になる', async () => {
+      const user = userEvent.setup();
+      useReportViewStore.setState({ hiddenCategoryIds: ['cat-work'] });
+      render(<ReportFilterList />);
+
+      await user.click(eye('show', '実装'));
+
+      const state = useReportViewStore.getState();
+      expect(state.hiddenCategoryIds).toEqual([]);
+      expect(state.hiddenActivityIds).toEqual(['act-mtg']);
+      expect(eye('hide', '実装')).toBeInTheDocument();
+      expect(eye('show', '会議')).toBeInTheDocument();
+    });
+
+    it('未分類のアクティビティも個別に出し入れできる', async () => {
+      const user = userEvent.setup();
+      render(<ReportFilterList />);
+
+      await user.click(eye('hide', '散歩'));
+      expect(useReportViewStore.getState().hiddenActivityIds).toEqual(['act-walk']);
+
+      await user.click(eye('show', '散歩'));
+      expect(useReportViewStore.getState().hiddenActivityIds).toEqual([]);
+    });
   });
 
-  it('レンズ未選択なら listSegments を待たずに余白を押せる', () => {
-    segmentsState.current = { data: undefined, isPending: true };
-    render(<ReportFilterList />);
+  describe('カテゴリーの 👁', () => {
+    it('全部見えている時に押すとカテゴリーごと外れ、配下も外れて見える', async () => {
+      const user = userEvent.setup();
+      render(<ReportFilterList />);
 
-    expect(screen.getByRole('checkbox', { name: /margin/ })).not.toBeDisabled();
+      await user.click(eye('hide', '睡眠'));
+
+      expect(useReportViewStore.getState().hiddenCategoryIds).toEqual(['cat-sleep']);
+      expect(eye('show', '睡眠')).toBeInTheDocument();
+      expect(eye('show', '昼寝')).toBeInTheDocument();
+    });
+
+    it('一部だけ外れている時に押すと配下の個別 hidden を解いて全部見せる', async () => {
+      const user = userEvent.setup();
+      useReportViewStore.setState({ hiddenActivityIds: ['act-dev', 'act-walk'] });
+      render(<ReportFilterList />);
+
+      await user.click(eye('show', '仕事'));
+
+      // 別グループ（未分類の散歩）には触らない
+      expect(useReportViewStore.getState().hiddenActivityIds).toEqual(['act-walk']);
+      expect(useReportViewStore.getState().hiddenCategoryIds).toEqual([]);
+      expect(eye('hide', '仕事')).toBeInTheDocument();
+    });
+
+    it('外れている時に押すとカテゴリーを戻し、配下の個別 hidden も解く', async () => {
+      const user = userEvent.setup();
+      useReportViewStore.setState({
+        hiddenCategoryIds: ['cat-work'],
+        hiddenActivityIds: ['act-dev'],
+      });
+      render(<ReportFilterList />);
+
+      await user.click(eye('show', '仕事'));
+
+      expect(useReportViewStore.getState().hiddenCategoryIds).toEqual([]);
+      expect(useReportViewStore.getState().hiddenActivityIds).toEqual([]);
+    });
+  });
+
+  describe('折りたたみ', () => {
+    /** カレンダーの `CategoryHeader` と同じく、見出し行のどこを押しても開閉する。 */
+    it('カテゴリー見出しの行を押すと配下が畳まれ、フィルタの状態は変わらない', async () => {
+      const user = userEvent.setup();
+      useReportViewStore.setState({ hiddenActivityIds: ['act-dev'] });
+      render(<ReportFilterList />);
+
+      const header = screen.getByText('仕事').closest('[data-report-filter-row="category"]');
+      if (!(header instanceof HTMLElement)) throw new Error('header not found');
+      await user.click(header);
+
+      expect(screen.queryByText('実装')).toBeNull();
+      expect(screen.getByRole('button', { name: 'expandCategory 仕事' })).toHaveAttribute(
+        'aria-expanded',
+        'false',
+      );
+      expect(useReportViewStore.getState().hiddenActivityIds).toEqual(['act-dev']);
+    });
+
+    it('展開中の chevron は行ホバーまで隠し、畳んでいる間は常に出す', async () => {
+      const user = userEvent.setup();
+      render(<ReportFilterList />);
+
+      const chevron = screen.getByRole('button', { name: 'collapseCategory 仕事' });
+      expect(chevron).toHaveClass('opacity-0');
+
+      await user.click(chevron);
+
+      expect(screen.getByRole('button', { name: 'expandCategory 仕事' })).not.toHaveClass(
+        'opacity-0',
+      );
+    });
+
+    it('未分類の見出しも畳める', async () => {
+      const user = userEvent.setup();
+      render(<ReportFilterList />);
+
+      await user.click(screen.getByRole('button', { name: 'uncategorized' }));
+
+      expect(screen.queryByText('散歩')).toBeNull();
+    });
   });
 
   /**
    * 幅 < 768px では `mobile-layout` が Sidebar ごと描かないので、`useIsMobile()` では
    * この分岐に到達できない。実際にタッチで触られるのは iPad 縦のような
-   * 「幅は広いが coarse pointer」の面。
+   * 「幅は広いが coarse pointer」の面。ホバーが無いので 👁 も常時出す。
    */
-  it('タッチ面では行を 44px にする', () => {
+  it('タッチ面では行を 44px にし、👁 を常に出す', () => {
     isTouch.current = true;
     render(<ReportFilterList />);
 
-    expect(screen.getByText('仕事').closest('label')).toHaveClass('min-h-11');
+    expect(screen.getByText('実装').closest('[data-report-filter-row]')).toHaveClass('h-11');
+    expect(eye('hide', '実装')).not.toHaveClass('opacity-0');
   });
 
-  it('マウス面では行を詰める', () => {
+  it('マウス面では行を 32px にする', () => {
     render(<ReportFilterList />);
 
-    expect(screen.getByText('仕事').closest('label')).toHaveClass('min-h-8');
+    expect(screen.getByText('実装').closest('[data-report-filter-row]')).toHaveClass('h-8');
+    expect(screen.getByText('仕事').closest('[data-report-filter-row]')).toHaveClass('h-8');
   });
 
-  it('store が知らないカテゴリーは既定で可視（checked）', () => {
-    useReportViewStore.setState({ hiddenCategoryIds: ['cat-sleep'] });
+  it('カテゴリーも未分類も無ければ、それぞれの見出しに空の文言を出す', () => {
+    treeState.current = { data: { categories: [], uncategorized: [] }, isPending: false };
     render(<ReportFilterList />);
 
-    expect(screen.getByRole('checkbox', { name: /仕事/ })).toBeChecked();
-    expect(screen.getByRole('checkbox', { name: /睡眠/ })).not.toBeChecked();
+    expect(within(section('categoriesHeading')).getByRole('status')).toHaveTextContent('empty');
+    expect(within(section('uncategorized')).getByRole('status')).toHaveTextContent(
+      'noUncategorized',
+    );
+  });
+
+  /**
+   * 空状態を一覧の**中**へ入れない（#2752）。`role="status"` は list の子として
+   * 許されず、`<ul>` 直下に置くと axe が 2 つ違反を出す（role が要素に不許可 /
+   * list の直下に許されない子）。テキストの有無だけを見る上の test では、
+   * 一覧の中へ戻しても緑のまま通ってしまう。
+   */
+  it('空状態は一覧（role=list）の外に置く', () => {
+    treeState.current = { data: { categories: [], uncategorized: [] }, isPending: false };
+    render(<ReportFilterList />);
+
+    const statuses = screen.getAllByRole('status');
+    expect(statuses).toHaveLength(2);
+    for (const status of statuses) {
+      expect(status.closest('[role="list"], ul, ol')).toBeNull();
+    }
   });
 
   it('読み込み中は骨組みを出す', () => {
     treeState.current = { data: undefined, isPending: true };
     render(<ReportFilterList />);
 
-    expect(screen.queryAllByRole('checkbox')).toHaveLength(0);
+    expect(screen.queryByText('categoriesHeading')).toBeNull();
   });
 });

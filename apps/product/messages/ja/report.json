@@ -11,6 +11,12 @@
       "month": "月",
       "year": "年"
     },
+    "tabs": {
+      "label": "レポートの面",
+      "usage": "時間の使い方",
+      "diff": "差分",
+      "reflect": "振り返り"
+    },
     "nav": {
       "current": {
         "week": "今週へ",
@@ -19,41 +25,84 @@
       }
     },
     "allocation": {
-      "kick": "1 · 配分 — 何にいくら使ったか",
-      "subtitleWithMargin": "記録 {recorded} ・ 余白 {margin}",
-      "subtitleInkOnly": "インクのみ表示（余白チップ・オフ）",
-      "deltaPrevious": {
-        "week": "前週",
-        "month": "前月",
-        "year": "前年"
+      "kick": "時間の使い方",
+      "cards": {
+        "recorded": "記録時間",
+        "count": "記録件数",
+        "median": "1件の中央値",
+        "countValue": "{count}件",
+        "countDelta": "{diff}件",
+        "deltaLabel": {
+          "week": "前週比",
+          "month": "前月比",
+          "year": "前年比"
+        },
+        "percent": "（{percent}%）",
+        "noPrevious": "前期間の記録なし",
+        "unavailable": "—",
+        "margin": "余白 {margin}"
       },
-      "uncategorizedShare": "未分類 {percent}%",
-      "uncategorized": "未分類",
-      "legendEmpty": {
-        "week": "この週にインクはまだありません",
-        "month": "この月にインクはまだありません",
-        "year": "この年にインクはまだありません"
-      },
-      "segments": {
-        "heading": "セグメント — 重なってよい・合計しない",
-        "empty": "セグメントはまだありません"
-      },
-      "ink": {
+      "daily": {
         "heading": {
-          "week": "日別のインク",
-          "month": "週別のインク",
-          "year": "月別のインク"
+          "week": "日ごとの記録時間",
+          "month": "週ごとの記録時間",
+          "year": "月ごとの記録時間"
+        },
+        "empty": {
+          "week": "この週に記録はまだありません",
+          "month": "この月に記録はまだありません",
+          "year": "この年に記録はまだありません"
         },
         "weekdays": ["月", "火", "水", "木", "金", "土", "日"],
+        "dayLabel": "{month}/{day}（{weekday}）",
         "weekColumn": "W{index}",
-        "monthColumn": "{month}月"
+        "monthColumn": "{month}月",
+        "axisHours": "{hours}h",
+        "barAriaLabel": "{label} 記録 {recorded}"
       },
-      "barAriaLabel": "カテゴリー別の配分",
-      "lensLabel": "セグメント: {name}",
-      "barAriaLabelLens": "アクティビティ別の配分"
+      "breakdown": {
+        "heading": {
+          "category": "カテゴリー別の配分",
+          "activity": "アクティビティ別の配分"
+        },
+        "uncategorized": "未分類"
+      },
+      "table": {
+        "heading": "アクティビティ一覧",
+        "columns": {
+          "activity": "アクティビティ",
+          "recorded": "記録時間",
+          "count": "件数",
+          "median": "中央値",
+          "delta": "前期間比"
+        },
+        "sort": {
+          "recorded": "記録時間の多い順に並べる",
+          "delta": "前期間との差の大きい順に並べる"
+        },
+        "unavailable": "—",
+        "empty": "この期間に記録のあるアクティビティはありません",
+        "unnamed": "名前のないアクティビティ",
+        "rowAriaLabel": "{name} 記録 {recorded}"
+      },
+      "hours": {
+        "heading": "時間帯の分布",
+        "empty": "記録はまだありません",
+        "axis": "{hour}時",
+        "barAriaLabel": "{hour}時台 記録 {recorded}"
+      },
+      "durations": {
+        "heading": "1件の長さの分布",
+        "empty": "記録はまだありません",
+        "range": "{from}〜{to}分",
+        "rangeOpen": "{from}分以上",
+        "tickMinutes": "{minutes}分",
+        "tickHours": "{hours}時間",
+        "barAriaLabel": "{label} {count}件"
+      }
     },
     "execution": {
-      "kick": "2 · 執行 — 計画どおりだったか",
+      "kick": "予定と記録 — 計画どおりだったか",
       "empty": {
         "week": "この週に動きのあるアクティビティはまだありません",
         "month": "この月に動きのあるアクティビティはまだありません",
@@ -75,7 +124,7 @@
       }
     },
     "quality": {
-      "kick": "3 · 質 — それは良い配分だったか",
+      "kick": "質 — それは良い配分だったか",
       "unnamed": "名前のないアクティビティ",
       "axis": {
         "time": "投下時間 →",
@@ -92,38 +141,12 @@
       "waitingSeparator": "、",
       "footnote": "濃度＝回答数 · 点は回答 n≥{threshold} で生まれます"
     },
-    "tidy": {
-      "kick": "4 · 整える — そして来週へ",
-      "none": "なし",
-      "uncategorized": {
-        "label": "未分類の記録が {count} 件",
-        "action": "仕分ける"
-      },
-      "externalEvents": {
-        "label": "未確認の外部カレンダー予定が {count} 件",
-        "action": "確認する"
-      },
-      "nextPeriod": {
-        "planned": {
-          "week": "来週はすでに {duration} のタイムブロックが置かれています",
-          "month": "来月はすでに {duration} のタイムブロックが置かれています",
-          "year": "来年はすでに {duration} のタイムブロックが置かれています"
-        },
-        "empty": {
-          "week": "来週のタイムブロックはまだありません",
-          "month": "来月のタイムブロックはまだありません",
-          "year": "来年のタイムブロックはまだありません"
-        },
-        "action": "カレンダーで組む"
-      }
-    },
     "detail": {
       "ariaLabel": "アクティビティの明細",
       "close": "閉じる",
       "unassigned": "アクティビティ未設定",
       "uncategorized": "未分類",
       "error": "明細を読み込めませんでした",
-      "openCalendar": "カレンダーで見る",
       "subtitle": {
         "week": "{category} · この週の明細",
         "month": "{category} · この月の明細",
@@ -151,6 +174,15 @@
         "coefficient": "予定に対して ×{coefficient}",
         "notEnough": "まだ傾向を出せる回数がない"
       },
+      "strip": {
+        "heading": "1 件あたりの長さ",
+        "count": "（n={count}）",
+        "notEnough": "件数不足（3 件から出します）",
+        "dotAriaLabel": "{duration} の記録 {count} 件",
+        "median": "中央値 {duration}",
+        "iqr": "25–75% は {low} 〜 {high}",
+        "planMedian": "予定の中央値 {duration}"
+      },
       "timeOfDay": {
         "heading": "時間帯の分布 — いつやっているか",
         "labels": ["朝", "午前", "昼", "午後", "夜", "深夜"]
@@ -160,11 +192,14 @@
           "week": "週別の推移（6 週）",
           "month": "月別の推移（6 か月）",
           "year": "年別の推移（6 年）"
-        }
+        },
+        "legend": "棒: 合計　線: 1 件あたりの中央値",
+        "median": "中央値 {duration}"
       },
       "records": {
         "heading": "記録（{count}件）",
         "empty": "この期間に記録はありません",
+        "openInCalendar": "カレンダーでこの記録を開く",
         "unanswered": "—",
         "weekdays": ["日", "月", "火", "水", "木", "金", "土"],
         "fulfillment": {
@@ -172,22 +207,24 @@
           "medium": "普通",
           "low": "消耗"
         }
-      }
+      },
+      "resize": "パネルの幅を変える"
     },
     "sidebar": {
       "categoriesHeading": "カテゴリ",
       "uncategorized": "未分類",
-      "margin": "余白（未記録）",
-      "marginLensDisabled": "セグメントを選んでいる間、余白は分母に入りません",
       "empty": "カテゴリーはまだありません",
-      "lensHeading": "セグメント",
-      "lensAll": "すべて",
-      "segmentMenu": "{name} のメニュー"
+      "noUncategorized": "未分類のアクティビティはありません",
+      "show": "{name} を分母に入れる",
+      "hide": "{name} を分母から外す",
+      "expandCategory": "{name} を展開",
+      "collapseCategory": "{name} を折りたたむ"
     },
     "mobile": {
-      "lens": {
-        "chip": "セグメント",
-        "open": "セグメントを選ぶ"
+      "filter": {
+        "open": "フィルタ",
+        "title": "分母に入れるもの",
+        "description": "カテゴリーとアクティビティを分母から出し入れします"
       },
       "periodFormat": {
         "weekDay": "M月d日",

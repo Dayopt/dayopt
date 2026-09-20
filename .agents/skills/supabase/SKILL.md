@@ -128,6 +128,12 @@ git push
 
 **帰結**: `supabase/` を触らない PR の Vercel Preview には Supabase env が注入されず、auth など DB 接続が要る挙動は検証できない（env validation で 500 になる）。**Preview での実挙動確認に依存した検証計画を立てない。** local + production 確認で回すのが既定（[#1461](https://github.com/Dayopt/dayopt/issues/1461)）。
 
+### 未 merge の migration を書き直す時
+
+pre-tool guard が止めるのは **`origin/main` に載っている migration** だけになった（[#2185](https://github.com/Dayopt/dayopt/issues/2185)）。main へ merge された migration は production へ適用されるため改変を禁じるが、未 merge の PR ブランチにしか無い migration は同じ PR 内で直してよい（レビュー指摘の反映・設計の訂正）。guard が古い判定を出す時は `git fetch origin main` を先に実行する。
+
+**ただし push 済みの migration を書き換えた場合、その PR の Supabase preview branch は同じ version を再適用しない**（`supabase_migrations.schema_migrations` に version が残っているため）。preview で実挙動を確認する必要があるなら、preview branch を作り直すか、打ち消し用の migration を別途足す。未 push のうちに直せば、この問題は起きない。
+
 ### CLI から preview branch を作る時
 
 調査目的などで手動に作る場合、次の 2 点を外すと確実に失敗する。
@@ -184,6 +190,16 @@ column / table の削除を伴う機能撤去は 3 段階に分け、1 PR に混
 3. **migration drop** — 参照ゼロを確認してから `DROP COLUMN` / `DROP TABLE` migration を別 PR で適用する
 
 先に drop すると、旧コードが動いている deploy 間隙で本番エラーになる。core column 削除で確立した手順。
+
+**1 と 3 を同一 PR に束ねると CI が落とす**（`scripts/ci/check-destructive-migration.mjs` の coupled 判定。既存オブジェクトへの `REVOKE` / `DROP POLICY` / `DROP COLUMN` 等 + `apps/product/**` / `packages/**` の runtime 変更）。Supabase 連携は merge 時に即適用、Vercel promote は E2E 後なので、promote が失敗している間は旧 build が新 schema に当たる（2026-09-08、#2672 で 5 時間 4 分）。新規テーブル雛形の `REVOKE ALL` → `GRANT` や、同 PR で足した列への列レベル `REVOKE` は対象外。
+
+### CI が migration に要求する証拠（#2797）
+
+- `🧪 Integration Tests`（fresh）: candidate の migration 集合を空 DB へ適用し、RLS snapshot と生成型の一致を見る
+- `🧱 DB Upgrade (shadow)`（非必須）: base の migration 集合 + base の `seed.sql` まで戻し（追加分は timestamp に関わらず退避、seed は base SHA の内容）、PR が追加した migration だけを `migration up --include-all` で当てる。適用エラー、seed 行の消失（件数と主キー同一性）、fresh との schema 不一致（生成型と index / constraint / trigger の catalog）、base 世代の生成型が参照する table / column / view / function / enum 値の消失と契約変更（列の型・nullability・Insert / Update の必須化・Insert の新規必須列・view の列・RPC の引数と Returns。旧アプリ × 新 DB の互換性）を落とす。適用済み migration の編集・削除も落とす（production は再実行しない）
+- 公開前: promote.yml が候補の migration 集合が production に反映済みかを read-only で確認する（`production-migration-readiness.mjs`）。未反映・失敗・対象不明なら公開しない。確認処理は適用も再試行もしない
+
+契約を縮める（column / function を消す）時は expand → migrate → contract の順に PR を分け、contract 段は旧アプリが参照しなくなった後に出す。
 
 ### 命名規則
 
@@ -428,7 +444,7 @@ npx supabase functions deploy send-auth-email --use-api --project-ref=<PROD_REF>
 **Supabase platform 自動注入(触らない):**
 
 - `SUPABASE_URL`
-- `SUPABASE_SERVICE_ROLE_KEY`
+- `SUPABASE_SECRET_KEY`
 
 #### 設定方法
 
@@ -488,7 +504,7 @@ npx supabase secrets set --env-file .env.edge.<env> --project-ref=<REF>
 
 ### Secrets
 
-- `SUPABASE_SERVICE_ROLE_KEY` / `RESEND_API_KEY` 等の秘匿値を**ログ出力・commit しない**
+- `SUPABASE_SECRET_KEY` / `RESEND_API_KEY` 等の秘匿値を**ログ出力・commit しない**
 - `.env.edge.*` は `.gitignore` 対象
 - secrets の値を `console.log` / `logger` に含めない
 

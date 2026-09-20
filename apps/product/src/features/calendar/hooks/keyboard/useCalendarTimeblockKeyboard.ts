@@ -27,11 +27,11 @@ interface UseCalendarTimeblockKeyboardOptions {
   /** 現在選択中（Inspector表示中）のTimeblockを削除する関数 */
   onDeleteTimeblock?: (timeblockId: string) => Promise<boolean | void>;
   /** 現在選択中のTimeblockのタイトルを取得する関数 */
-  getSelectedEntryTitle?: () => string | null;
+  getSelectedTimeblockTitle?: () => string | null;
   /** 新規Timeblock作成時の初期データ取得関数（現在の日時など） */
-  getInitialEntryData?: () => { start_time?: string; end_time?: string } | undefined;
+  getInitialTimeblockData?: () => { start_time?: string; end_time?: string } | undefined;
   /** 現在選択中のTimeblockのコピー情報を取得する関数 */
-  getSelectedEntryForCopy?: () => ClipboardTimeblock | null;
+  getSelectedTimeblockForCopy?: () => ClipboardTimeblock | null;
   /** ペースト先の日付を取得する関数（デフォルトは現在表示中の日付） */
   getPasteDateForKeyboard?: () => Date;
 }
@@ -50,9 +50,9 @@ interface UseCalendarTimeblockKeyboardOptions {
 export function useCalendarEventKeyboard({
   enabled = true,
   onDeleteTimeblock,
-  getSelectedEntryTitle,
-  getInitialEntryData,
-  getSelectedEntryForCopy,
+  getSelectedTimeblockTitle,
+  getInitialTimeblockData,
+  getSelectedTimeblockForCopy,
   getPasteDateForKeyboard,
 }: UseCalendarTimeblockKeyboardOptions) {
   const t = useTranslations();
@@ -63,9 +63,9 @@ export function useCalendarEventKeyboard({
 
   // コールバックの最新値を参照
   const onDeleteTimeblockRef = useRef(onDeleteTimeblock);
-  const getSelectedEntryTitleRef = useRef(getSelectedEntryTitle);
-  const getInitialEntryDataRef = useRef(getInitialEntryData);
-  const getSelectedEntryForCopyRef = useRef(getSelectedEntryForCopy);
+  const getSelectedTimeblockTitleRef = useRef(getSelectedTimeblockTitle);
+  const getInitialTimeblockDataRef = useRef(getInitialTimeblockData);
+  const getSelectedTimeblockForCopyRef = useRef(getSelectedTimeblockForCopy);
   const getPasteDateForKeyboardRef = useRef(getPasteDateForKeyboard);
   const createPlanRef = useRef(createPlan);
   const createRecordRef = useRef(createRecord);
@@ -78,9 +78,9 @@ export function useCalendarEventKeyboard({
 
   useEffect(() => {
     onDeleteTimeblockRef.current = onDeleteTimeblock;
-    getSelectedEntryTitleRef.current = getSelectedEntryTitle;
-    getInitialEntryDataRef.current = getInitialEntryData;
-    getSelectedEntryForCopyRef.current = getSelectedEntryForCopy;
+    getSelectedTimeblockTitleRef.current = getSelectedTimeblockTitle;
+    getInitialTimeblockDataRef.current = getInitialTimeblockData;
+    getSelectedTimeblockForCopyRef.current = getSelectedTimeblockForCopy;
     getPasteDateForKeyboardRef.current = getPasteDateForKeyboard;
     createPlanRef.current = createPlan;
     createRecordRef.current = createRecord;
@@ -92,9 +92,9 @@ export function useCalendarEventKeyboard({
     timezoneRef.current = timezone;
   }, [
     onDeleteTimeblock,
-    getSelectedEntryTitle,
-    getInitialEntryData,
-    getSelectedEntryForCopy,
+    getSelectedTimeblockTitle,
+    getInitialTimeblockData,
+    getSelectedTimeblockForCopy,
     getPasteDateForKeyboard,
     createPlan,
     createRecord,
@@ -147,7 +147,7 @@ export function useCalendarEventKeyboard({
                     closeInspectorRef.current();
                   }
                 })
-                .catch(() => logger.error('Failed to delete entry'));
+                .catch(() => logger.error('Failed to delete timeblock'));
             }
           }
         },
@@ -169,7 +169,7 @@ export function useCalendarEventKeyboard({
                     closeInspectorRef.current();
                   }
                 })
-                .catch(() => logger.error('Failed to delete entry'));
+                .catch(() => logger.error('Failed to delete timeblock'));
             }
           }
         },
@@ -181,7 +181,7 @@ export function useCalendarEventKeyboard({
         handler: (e) => {
           if (isInDialogOrInspector()) return;
           if (isOpenRef.current && timeblockIdRef.current) {
-            const timeblockData = getSelectedEntryForCopyRef.current?.();
+            const timeblockData = getSelectedTimeblockForCopyRef.current?.();
             if (timeblockData) {
               e.preventDefault();
               useTimeblockClipboardStore.getState().copyTimeblock(timeblockData);
@@ -220,7 +220,7 @@ export function useCalendarEventKeyboard({
                 openInspectorRef.current(result.id, paste.kind);
               }
             };
-            const onPasteFailed = () => logger.error('Failed to paste entry');
+            const onPasteFailed = () => logger.error('Failed to paste timeblock');
             if (paste.kind === 'plan') {
               createPlanRef.current.mutateAsync(paste.input).then(onPasted).catch(onPasteFailed);
             } else {
@@ -243,7 +243,7 @@ export function useCalendarEventKeyboard({
           const roundedStart = new Date(Math.ceil(now.getTime() / (60 * 1000)) * 60 * 1000);
           const defaultEnd = new Date(roundedStart.getTime() + QUICK_CREATE_DURATION_MS);
 
-          const initialData = e.shiftKey ? undefined : getInitialEntryDataRef.current?.();
+          const initialData = e.shiftKey ? undefined : getInitialTimeblockDataRef.current?.();
           const startAt = initialData?.start_time ?? roundedStart.toISOString();
           const endAt = initialData?.end_time ?? defaultEnd.toISOString();
           const destination = resolveTimeblockDestination(endAt);
@@ -257,7 +257,7 @@ export function useCalendarEventKeyboard({
               openInspectorRef.current(result.id, destination);
             }
           };
-          const onCreateFailed = () => logger.error('Failed to create entry');
+          const onCreateFailed = () => logger.error('Failed to create timeblock');
           if (destination === 'plan') {
             createPlanRef.current.mutateAsync(createInput).then(onCreated).catch(onCreateFailed);
           } else {
@@ -287,7 +287,7 @@ export function useCalendarEventKeyboard({
               openInspectorRef.current(result.id, destination);
             }
           };
-          const onCreateFailed = () => logger.error('Failed to create entry');
+          const onCreateFailed = () => logger.error('Failed to create timeblock');
           if (destination === 'plan') {
             createPlanRef.current.mutateAsync(createInput).then(onCreated).catch(onCreateFailed);
           } else {

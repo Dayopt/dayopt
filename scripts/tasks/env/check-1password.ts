@@ -11,6 +11,7 @@ type CommandResult = {
 type OnePasswordField = {
   id?: string;
   label?: string;
+  type?: string;
   value?: unknown;
 };
 
@@ -160,6 +161,14 @@ for (const item of operationalItems) {
 
   console.log(`${item.vault} / ${item.item}: ${status}`);
   if (item.required && status !== 'OK') hasFailure = true;
+
+  // 宣言された field は実在と非空まで見る。item があるだけでは op:// は解決できない。
+  if (status === 'OK')
+    for (const field of item.requiredFields ?? []) {
+      const fieldStatus = checkField(item.vault, item.item, field);
+      console.log(`${item.vault} / ${item.item} / ${field}: ${fieldStatus}`);
+      if (item.required && fieldStatus !== 'OK') hasFailure = true;
+    }
 }
 
 // 禁止 field は「存在しないこと」が期待値。schema から entry を消しただけでは
@@ -202,6 +211,82 @@ for (const forbidden of forbiddenFields) {
   }
 
   console.log(`${label}: ABSENT`);
+}
+
+// 有効期限の検査（2026-09-14、Secret / Credential 監査）。短命 token の期限切れは
+// CI の監査 job や agent の読み取りを 401 で黙って止めるため、切れる前に気づけるようにする。
+// 見るのは上で取得済みの item だけで、ラベルが期限を表す field の日付だけを読む。値は出さない。
+//
+// 保証境界: 期限 field を持つ item だけが対象。期限 field の無い token（Vercel の CI token 等）は
+// 検査できない。期限切れは失敗、30 日以内は警告（exit code は変えない）。
+const EXPIRY_LABEL_PATTERN = /^(有効期限|expires?|expiry|expiration|valid until)$/i;
+const EXPIRY_WARNING_DAYS = 30;
+const DAY_MS = 86_400_000;
+
+function expiryEpochMs(field: OnePasswordField): number | null {
+  if (typeof field.value !== 'string' && typeof field.value !== 'number') return null;
+  const raw = String(field.value).trim();
+  // 1Password の DATE field は epoch 秒。手入力の text field は YYYY-MM-DD だけを受け付ける
+  if (/^[0-9]{9,11}$/.test(raw)) return Number(raw) * 1000;
+  if (/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(raw)) {
+    const parsed = Date.parse(`${raw}T00:00:00Z`);
+    if (Number.isNaN(parsed)) return null;
+    // Date.parse は 2026-02-30 を 2026-03-02 へ正規化して通してしまう。手入力の
+    // 日付 typo が「有効な期限」として扱われると、意図した期限を過ぎても key が
+    // 有効なままになる。往復で一致しなければ日付として認めない。
+    if (new Date(parsed).toISOString().slice(0, 10) !== raw) return null;
+    return parsed;
+  }
+  return null;
+}
+
+/**
+ * 期限を必須 field として宣言した item。読めない期限をここだけ失敗にする。
+ *
+ * 全 item で失敗にすると、期限 field が読めない既存 item（2026-09-18 時点で
+ * `agent/app` / `human/resend` / `human/resend-web` / `ci/sentry-release-token` の 4 件）
+ * を巻き込んで共有 gate が赤くなる。それらは実際に期限監視が効いていない状態だが、
+ * 本変更の範囲外なので別途直す。宣言した item だけを先に締める。
+ */
+const expiryRequired = new Set(
+  operationalItems.flatMap((item) =>
+    (item.requiredFields ?? [])
+      .filter((field) => EXPIRY_LABEL_PATTERN.test(field))
+      .map(() => `${item.vault}/${item.item}`),
+  ),
+);
+
+const now = Date.now();
+for (const [key, itemResult] of itemCache) {
+  if (itemResult.status !== 'OK') continue;
+  const label = key.replace('/', ' / ');
+  for (const field of itemResult.item.fields ?? []) {
+    if (!EXPIRY_LABEL_PATTERN.test((field.label ?? '').trim())) continue;
+    const expiresAt = expiryEpochMs(field);
+    if (expiresAt === null) {
+      // 読めない期限は期限として機能しない。警告で流すと、期限切れの検出が
+      // 黙って無効になったまま気づけない（2026-09-18、#2836 のレビュー指摘）。
+      console.log(`${label}: EXPIRY_UNREADABLE`);
+      console.log(
+        '  └ 期限 field を日付として読めません（1Password の日付 field か YYYY-MM-DD にする）',
+      );
+      if (expiryRequired.has(key)) hasFailure = true;
+      continue;
+    }
+    const date = new Date(expiresAt).toISOString().slice(0, 10);
+    const daysLeft = Math.floor((expiresAt - now) / DAY_MS);
+    if (expiresAt <= now) {
+      console.log(`${label}: EXPIRED ${date}`);
+      console.log(
+        '  └ 再発行して 1Password と replica を更新する（docs/operations/secrets.md §短命トークンのローテーション）',
+      );
+      hasFailure = true;
+    } else if (daysLeft <= EXPIRY_WARNING_DAYS) {
+      console.log(`${label}: EXPIRES_SOON ${date}（残り ${daysLeft} 日）`);
+    } else {
+      console.log(`${label}: EXPIRES ${date}`);
+    }
+  }
 }
 
 if (hasFailure) {

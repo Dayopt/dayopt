@@ -19,15 +19,17 @@ name: Production Config Audit
 #     promote 側が見ている（`production-release.mjs` が `runProductionConfigAudit` を呼ぶ）。
 #     main へ merge する時点の drift は出荷を止めないので、検出遅延 1 日で足りる
 #   - backstop は日次 cron（06:00 JST）と下の push:main。dashboard の手動変更もそこで拾う
-#   - merge は deadlock しない。Free plan の private repo では ruleset / branch protection が
-#     使えず（`gh api .../rulesets` は 403）、唯一の gate である `finish-branch.sh` は
-#     **失敗数と pending 数を数えるだけ**で check run の「存在」を要求しない。run が無ければ
+#   - merge は deadlock しない。merge gate は main の ruleset（2026-09-07 から有効。
+#     GitHub Team の private repo でも強制される）で、その required checks に
+#     `Production Config Audit` は含まれない（2026-09-13 に #2640 で外した）。
+#     `finish-branch.sh` の rollup 検査もこの check の「存在」は要求せず、run が無ければ
 #     rollup に entry が出ないだけで通る
 #   - 2026-08-05 の `ci.yml` paths-ignore 撤去（PR #1836）の再演にはならない。あの事故の原因は
 #     `paths` 単体ではなく「ruleset が required にした check が永久に expected で残る」ことで、
-#     ruleset を使えない今は同じ経路が成立しない。**将来 Pro へ上げて ruleset を使う時は、
-#     `Production Config Audit` を required にしないこと**（PR で publish されるのは
-#     contract 変更 PR だけなので blanket な required check に使えない）
+#     この check が required でない限り同じ経路は成立しない。**`Production Config Audit` を
+#     ruleset の required checks に戻さないこと**（PR で publish されるのは contract 変更 PR
+#     だけなので blanket な required check に使えない。2026-09-07 に ruleset が有効化された
+#     直後、required に入っていたこの check が原因で全 PR が merge 不能になった）
 #   - contract ファイルを別 path へ動かして `paths` をすり抜ける経路は、
 #     `scripts/__tests__/protected-path-gate-contract.test.ts` が
 #     「各 glob が tracked file に 1 件以上一致する」ことを CI で毎回検査するので先に落ちる
@@ -89,12 +91,18 @@ on:
       - 'scripts/ci/production-config-audit.mjs'
       - 'scripts/ci/production-auth-config-audit.mjs'
       - 'scripts/ci/production-storage-rls-audit.mjs'
+      - 'scripts/ci/production-cron-heartbeat-audit.mjs'
+      - 'scripts/ci/production-schema-drift-audit.mjs'
+      - 'scripts/lib/production-db-readonly.mjs'
+      - 'scripts/tasks/generate-rls-snapshot.ts'
+      - 'docs/engineering/data/db/rls-snapshot.md'
       - 'apps/product/production-build-gate.mjs'
       - 'apps/web/production-build-gate.mjs'
       - '.github/workflows/production-config-audit.yml'
   schedule:
     # 06:00 JST。merge が無い日でも dashboard 手動変更の drift を 1 日以内に検出する
     - cron: '0 21 * * *'
+    - cron: '*/15 * * * *'
   workflow_dispatch:
 
 permissions:
@@ -103,7 +111,7 @@ permissions:
   statuses: write
 
 concurrency:
-  group: production-config-audit-${{ github.event.pull_request.number || github.ref }}
+  group: production-config-audit-${{ github.event.pull_request.number || github.ref }}-${{ github.event.schedule == '*/15 * * * *' && 'heartbeat' || 'full' }}
   cancel-in-progress: true
 
 jobs:
@@ -111,8 +119,13 @@ jobs:
     name: Audit Vercel metadata (trusted)
     # draft の間は走らせない。skip は conclusion: skipped の check run になり、
     # finish-branch.sh の畳み込みが「判定を持つ entry を優先」で処理する（ci.yml の重量 job と同型）。
-    if: github.event_name != 'pull_request_target' || github.event.pull_request.draft == false
+    if: github.event.schedule != '*/15 * * * *' && (github.event_name != 'pull_request_target' || github.event.pull_request.draft == false)
     runs-on: ubuntu-latest
+    # Secret は main からだけ使える environment に置く（2026-09-14、ci vault 整理）。
+    # 他 branch の workflow から secrets を読めないようにするためで、deployment 記録は作らない
+    environment:
+      name: production-ops
+      deployment: false
     timeout-minutes: 5
     steps:
       # pull_request_target must execute only the trusted base revision, never PR code.
@@ -232,8 +245,13 @@ jobs:
   # 巻き込まれ、無関係な contract test が壊れる（2026-08-17、PR #2130 で実際に発生）。
   deploy-health:
     name: Check production deploy health (trusted)
-    if: github.event_name == 'push' || github.event_name == 'schedule'
+    if: github.event_name == 'push' || (github.event_name == 'schedule' && github.event.schedule != '*/15 * * * *')
     runs-on: ubuntu-latest
+    # Secret は main からだけ使える environment に置く（2026-09-14、ci vault 整理）。
+    # 他 branch の workflow から secrets を読めないようにするためで、deployment 記録は作らない
+    environment:
+      name: production-ops
+      deployment: false
     timeout-minutes: 5
     permissions:
       contents: read
@@ -353,8 +371,13 @@ jobs:
   # 続くが、commit status は発行しないため上記 contract test は変わらず green のまま。
   auth-config:
     name: Audit Supabase Auth config (trusted)
-    if: github.event_name == 'push' || github.event_name == 'schedule'
+    if: github.event_name == 'push' || (github.event_name == 'schedule' && github.event.schedule != '*/15 * * * *')
     runs-on: ubuntu-latest
+    # Secret は main からだけ使える environment に置く（2026-09-14、ci vault 整理）。
+    # 他 branch の workflow から secrets を読めないようにするためで、deployment 記録は作らない
+    environment:
+      name: production-ops
+      deployment: false
     timeout-minutes: 5
     permissions:
       contents: read
@@ -398,8 +421,13 @@ jobs:
   # 曖昧な中間状態を持たない。
   storage-rls:
     name: Audit production storage.objects RLS (trusted)
-    if: github.event_name == 'push' || github.event_name == 'schedule'
+    if: github.event_name == 'push' || (github.event_name == 'schedule' && github.event.schedule != '*/15 * * * *')
     runs-on: ubuntu-latest
+    # Secret は main からだけ使える environment に置く（2026-09-14、ci vault 整理）。
+    # 他 branch の workflow から secrets を読めないようにするためで、deployment 記録は作らない
+    environment:
+      name: production-ops
+      deployment: false
     timeout-minutes: 5
     permissions:
       contents: read
@@ -419,3 +447,139 @@ jobs:
           set -o pipefail
           node scripts/ci/production-storage-rls-audit.mjs | tee storage-rls-audit-output.txt
           grep -q 'Production Storage RLS Audit passed' storage-rls-audit-output.txt
+
+  # ─── Supabase 側 audit の失敗を issue にする ─────────────────────────────
+  # auth-config / storage-rls は commit status も issue も出さず、失敗は workflow の
+  # 赤色と schedule 起動の既定メールだけだった（2026-09-08 Production Reality Audit）。
+  # Supabase Auth の Dashboard drift や production の storage.objects RLS drift は
+  # Actions タブを開く人がいなければ気づかない。deploy-health / promote.yml
+  # notify_failure と同じ title-prefix 方式で 1 本の issue に集約する。
+  #
+  # **監査 job 自体には触れない。** Supabase PAT を持つ job の permissions は
+  # `contents: read` のままにし、起票は別 job で行う（token を branch code へ渡さない
+  # 設計と、「auth-config 以降の job は commit status を発行しない」契約 test を保つ。
+  # この job は `gh issue` しか呼ばず、checkout も置かない）。
+  cron-heartbeat:
+    name: Audit production cron heartbeats (trusted)
+    if: github.event_name == 'push' || github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    # Secret は main からだけ使える environment に置く（2026-09-14、ci vault 整理）。
+    # 他 branch の workflow から secrets を読めないようにするためで、deployment 記録は作らない
+    environment:
+      name: production-ops
+      deployment: false
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+      - name: Audit cron completion freshness
+        env:
+          SUPABASE_STORAGE_RLS_AUDIT_TOKEN: ${{ secrets.SUPABASE_STORAGE_RLS_AUDIT_TOKEN }}
+        run: |
+          set -o pipefail
+          node scripts/ci/production-cron-heartbeat-audit.mjs | tee cron-heartbeat-output.txt
+          grep -q 'Production Cron Heartbeat Audit passed' cron-heartbeat-output.txt
+
+  schema-drift:
+    name: Audit production schema and ACL (trusted)
+    if: github.event_name == 'push' || (github.event_name == 'schedule' && github.event.schedule != '*/15 * * * *')
+    runs-on: ubuntu-latest
+    # Secret は main からだけ使える environment に置く（2026-09-14、ci vault 整理）。
+    # 他 branch の workflow から secrets を読めないようにするためで、deployment 記録は作らない
+    environment:
+      name: production-ops
+      deployment: false
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+      - name: Audit migration versions and schema snapshot
+        env:
+          SUPABASE_STORAGE_RLS_AUDIT_TOKEN: ${{ secrets.SUPABASE_STORAGE_RLS_AUDIT_TOKEN }}
+        run: |
+          set -o pipefail
+          node scripts/ci/production-schema-drift-audit.mjs | tee schema-drift-output.txt
+          grep -q 'Production Schema Drift Audit passed' schema-drift-output.txt
+
+  notify-supabase-audit-failure:
+    name: File Supabase audit failure
+    needs: [auth-config, storage-rls, cron-heartbeat, schema-drift]
+    if: >-
+      ${{ !cancelled()
+          && ( needs.auth-config.result == 'failure'
+               || needs.storage-rls.result == 'failure'
+               || needs.cron-heartbeat.result == 'failure'
+               || needs.schema-drift.result == 'failure' ) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: File or update Supabase audit failure issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          AUTH_RESULT: ${{ needs.auth-config.result }}
+          STORAGE_RESULT: ${{ needs.storage-rls.result }}
+          HEARTBEAT_RESULT: ${{ needs.cron-heartbeat.result }}
+          SCHEMA_RESULT: ${{ needs.schema-drift.result }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          title_prefix="[auto] Production Supabase audit が失敗しました"
+          hints=""
+          if [ "$AUTH_RESULT" = "failure" ]; then
+            hints="$hints
+          - **Auth config**: Supabase Dashboard 側の drift の可能性。\`scripts/ci/production-auth-config-audit.mjs\` の \`AUTH_CONFIG_CONTRACT\` と実値を突き合わせる（値は run log に出ない。\`docs/operations/security/environment-secrets.md\` §Supabase Auth config の手順で手元確認）。redirect allowlist / captcha / MFA / signup の緩和は production ユーザーに直結する"
+          fi
+          if [ "$STORAGE_RESULT" = "failure" ]; then
+            hints="$hints
+          - **Storage RLS**: 401 なら \`SUPABASE_STORAGE_RLS_AUDIT_TOKEN\` の 90 日期限（2026-08-25 発行、#2345）または失効。\`docs/operations/secrets.md\` の \`ci/supabase-storage-rls-audit\` を再発行して GitHub Secret を更新する。それ以外は production の \`storage.objects\` policy / \`avatars\` bucket の drift（#2316 と同クラス）。**この job が止まっている間、production の storage RLS を見る目は無い**"
+          fi
+          if [ "$HEARTBEAT_RESULT" = "failure" ]; then
+            hints="$hints
+          - **Cron heartbeat**: 最終完了が閾値を超過、または監査不能。run log の job 名から実行履歴・CRON_SECRET・write fence・DB job owner/active を確認する。docs/operations/monitoring.md の復旧手順を参照。"
+          fi
+          if [ "$SCHEMA_RESULT" = "failure" ]; then
+            hints="$hints
+          - **Schema/ACL**: 未適用migrationまたは権限・policy・default privilegesの差分。productionからbaselineを上書きせず、対象SHAとDB metadataを照合する。default privileges方針は #1715。"
+          fi
+          body="production の Supabase 側 audit が失敗した（起動: \`$EVENT_NAME\`）。
+
+          | job | result |
+          | --- | --- |
+          | Audit Supabase Auth config | \`$AUTH_RESULT\` |
+          | Audit production storage.objects RLS | \`$STORAGE_RESULT\` |
+          | Audit production cron heartbeats | \`$HEARTBEAT_RESULT\` |
+          | Audit production schema and ACL | \`$SCHEMA_RESULT\` |
+
+          run: $RUN_URL
+          $hints
+
+          直したら **この issue は手で close する**（自動で閉じる経路は無い）。同じ title prefix の open issue があれば追記するので、失敗が続いても issue は増えない。
+
+          このコメントは \`production-config-audit.yml\` の \`notify-supabase-audit-failure\` job による自動起票/追記。"
+
+          existing=$(TITLE_PREFIX="$title_prefix" gh issue list --repo "$GITHUB_REPOSITORY" \
+            --label "area:operations" --state open --json number,title \
+            --jq '[.[] | select(.title | startswith(env.TITLE_PREFIX))][0].number // empty')
+
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --repo "$GITHUB_REPOSITORY" --body "$body"
+          else
+            gh issue create --repo "$GITHUB_REPOSITORY" \
+              --title "$title_prefix" \
+              --label "area:operations,quality:security,priority:p1" \
+              --body "$body"
+          fi

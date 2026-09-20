@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-07-30
+last_verified: 2026-09-16
 ---
 
 # セキュリティ方針
@@ -19,7 +19,7 @@ GitHub Actionsのセキュリティ設定、OWASP準拠のセキュリティ監�
 .github/
   dependabot.yml              # 依存関係自動更新
   workflows/
-    ci.yml                    # impact（affected 判定）→ static（gitleaks + secrets:check + docs:check + lint/typecheck/knip）∥ unit（+ migration safety）∥ integration（affected 時の RLS/integration）の並列 4 job
+    ci.yml                    # impact（affected 判定）→ static（gitleaks + secrets:check + docs:check + lint/typecheck/knip）∥ unit（+ migration safety の検知）∥ integration（affected 時の RLS/integration）の並列 4 job + unit 後の migration-notice（検知時だけラベル + コメント）
     production-config-audit.yml  # Vercel environment metadata 監査
     nightly.yml               # status-label-sweep + replica-check + storage-backup-export の 3 job（#2483 で旧ファイルから統合。night-watch job は 2026-09-02、層 3 と integration は 2026-09-03 に撤去）
     create-release.yml        # GitHub Release 作成
@@ -28,32 +28,47 @@ GitHub Actionsのセキュリティ設定、OWASP準拠のセキュリティ監�
 
 ## 権限設計
 
-全ワークフローで最小権限の原則を適用。`pull-requests: write` を持つワークフローは無い
-（唯一持っていた `ai-review.yml` は 2026-08-03 に撤去した）。
+全ワークフローで最小権限の原則を適用。`pull-requests: write` を持つのは `ci.yml` の
+migration-notice job だけ（`ai-review.yml` は 2026-08-03 に撤去した）。
+
+**PR head のコードや依存を実行する job に write 権限の token を持たせない**（2026-09-14、
+credential audit P2-6）。`ci.yml` の job が checkout / setup（`pnpm install`）/ `node` を
+含むなら実効 permissions は read のみで、write 権限を持つ job は checkout も `uses:` も
+持たない。`scripts/__tests__/ci-token-isolation.test.ts` が job 単位で機械検査する。
+以前は unit job が migration safety の通知のために `pull-requests: write` /
+`issues: write` を持ち、`check.mjs` 内で `GH_TOKEN` を env から押収するだけが防御だった
+（同じ step で動く PR head の `check.mjs` 自身は token を読める）。
 
 ### ワークフロー別 permissions
 
-| ワークフロー                                        | permissions                                                  | 理由                                                                                          |
-| --------------------------------------------------- | ------------------------------------------------------------ | --------------------------------------------------------------------------------------------- |
-| `ci.yml`（impact job）                              | `contents: read` / `pull-requests: read`                     | PR の変更ファイル一覧の取得（gh api）を行う唯一の job                                         |
-| `ci.yml`（static job）                              | `contents: read` / `pull-requests: read`                     | コード読み取りのみ（gh を呼ばないため step env に `GH_TOKEN` を渡さない）                     |
-| `ci.yml`（unit job）                                | `contents: read` / `pull-requests: write` / `issues: write`  | migration safety の通知                                                                       |
-| `ci.yml`（integration job）                         | `contents: read`                                             | gh を呼ばないため job 単位で最小へ絞る（PR コードを実行する job に書き込み token を置かない） |
-| `nightly.yml`（replica-check / storage-backup job） | `contents: read`                                             | コード読み取りのみ                                                                            |
-| `nightly.yml`（status-label-sweep job）             | `issues: write` / `contents: read`                           | ラベル一括剥がし                                                                              |
-| `production-config-audit.yml`                       | `contents: read` / `pull-requests: read` / `statuses: write` | 固定 context 名での status 発行                                                               |
-| `promote.yml`（impact / 層 3 job）                  | `contents: read`                                             | コード読み取りのみ（層 3 は local Supabase で完結し secret を読まない）                       |
-| `promote.yml`（release job）                        | `contents: read` / `statuses: write`                         | `Production Release` context の status 発行。workflow レベルには置かない                      |
-| `create-release.yml`                                | `contents: write`                                            | タグからリリース作成                                                                          |
+| ワークフロー                                                                       | permissions                                                  | 理由                                                                                          |
+| ---------------------------------------------------------------------------------- | ------------------------------------------------------------ | --------------------------------------------------------------------------------------------- |
+| `ci.yml`（impact job）                                                             | `contents: read` / `pull-requests: read`                     | PR の変更ファイル一覧の取得（gh api）による affected 判定                                     |
+| `ci.yml`（static job）                                                             | `contents: read` / `pull-requests: read`                     | コード読み取りのみ（gh を呼ばないため step env に `GH_TOKEN` を渡さない）                     |
+| `ci.yml`（unit job）                                                               | `contents: read` / `pull-requests: read`                     | PR コードの unit test + migration safety の検知（PR files の読み取り。結果は job output）     |
+| `ci.yml`（migration-notice job）                                                   | `contents: read` / `pull-requests: write` / `issues: write`  | migration safety の通知。checkout・依存 install をせず、unit の output は allowlist 検証する  |
+| `ci.yml`（integration job）                                                        | `contents: read`                                             | gh を呼ばないため job 単位で最小へ絞る（PR コードを実行する job に書き込み token を置かない） |
+| `nightly.yml`（replica-check / storage-backup job）                                | `contents: read`                                             | コード読み取りのみ                                                                            |
+| `nightly.yml`（status-label-sweep job）                                            | `issues: write` / `contents: read`                           | ラベル一括剥がし                                                                              |
+| `nightly.yml`（notify-failure job）                                                | `issues: write` / `contents: read`                           | 失敗時の issue 通知                                                                           |
+| `production-config-audit.yml`（deploy-health / notify-supabase-audit-failure job） | `issues: write` ほか                                         | 失敗時の issue 通知                                                                           |
+| `promote.yml`（notify_failure job）                                                | `issues: write` / `contents: read`                           | 失敗時の issue 通知                                                                           |
+| `production-config-audit.yml`                                                      | `contents: read` / `pull-requests: read` / `statuses: write` | 固定 context 名での status 発行                                                               |
+| `promote.yml`（impact / 層 3 job）                                                 | `contents: read`                                             | コード読み取りのみ（層 3 は local Supabase で完結し secret を読まない）                       |
+| `promote.yml`（release job）                                                       | `contents: read` / `statuses: write`                         | `Production Release` context の status 発行。workflow レベルには置かない                      |
+| `create-release.yml`                                                               | `contents: write`                                            | タグからリリース作成                                                                          |
 
 `production-config-audit.yml` は `pull_request_target` で走るが、
 **`pull_request_target` でも job の check run は PR の `statusCheckRollup` に出る**
 （2026-07-30 に PR #1760 で実測。詳細は [infra.md §merge gate の required checks](../engineering/infra.md#merge-gate-の-required-checks)）。
 それでも `statuses: write` を持つのは、job 名から独立した固定 context
-（`Production Config Audit`）を `finish-branch.sh` の trusted dispatch 免除が照合するため。
+（`Production Config Audit`）を `finish-branch.sh` の advisory 判定が照合するため
+（2026-09-18 に #2469 で trusted dispatch の必須要求を撤去し、guard の failure は
+merge を止めない advisory になった）。
 **この context を ruleset の required 指定に使ってはいけない**（2026-09-03、#2571。PR で
 publish されるのは `paths` に一致する contract 変更 PR だけなので、required にすると
-それ以外の PR が永久に `expected` で止まる。詳細は
+それ以外の PR が永久に `expected` で止まる。2026-09-07 の public 化で実際に required に入り
+全 PR が止まった。2026-09-13 に #2640 で外した。詳細は
 [infra.md §merge gate の required checks](../engineering/infra.md#merge-gate-の-required-checks)）。
 
 `contents: write` は持たない（外部 API の結果を受けて動く job に書き込み権限を与えない）。
@@ -92,7 +107,7 @@ publish されるのは `paths` に一致する contract 変更 PR だけなの�
 
 どの context を required にするかは [infra.md §merge gate の required checks](../engineering/infra.md#merge-gate-の-required-checks) を正本とする。ここには複製しない（job 名を変えるたびに 2 箇所が乖離するため）。
 
-2026-09-07 の repo public 化以降、main の ruleset `6790553` が required status checks / strict up-to-date / thread resolution を GitHub 側で強制する（bypass actor 0）。実状は `gh api repos/Dayopt/dayopt/rulesets/6790553` で確認できる。`scripts/tasks/finish-branch.sh` はその上位互換の検査（`🧪 Integration Tests` / Vercel context の名前要求）を追加で行う。public 化前（Free plan の private repo）は ruleset API が 403 を返し finish-branch.sh だけが gate だった。
+2026-09-07 の repo public 化以降、main の ruleset `6790553` が required status checks（`🧪 Integration Tests` を含む。2026-09-13、#2640）/ strict up-to-date / thread resolution を GitHub 側で全経路に強制する（bypass actor 0）。これが唯一の merge gate で、実状は `gh api repos/Dayopt/dayopt/rulesets/6790553` で確認できる。`scripts/tasks/finish-branch.sh` は merge と掃除の入口で、その rollup 検査は ruleset と重複する冗長検査。public 化前（Free plan の private repo）は ruleset API が 403 を返し finish-branch.sh だけが gate だった。
 
 ### Fork Pull Request
 
@@ -127,14 +142,14 @@ pin-github-action .github/workflows/*.yml
 
 ### 使用中の Secrets
 
-| Secret                          | 用途              | ワークフロー                   |
-| ------------------------------- | ----------------- | ------------------------------ |
-| `NEXT_PUBLIC_SUPABASE_URL`      | Supabase 接続     | ci, e2e                        |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase 匿名キー | ci, e2e                        |
-| `NEXT_PUBLIC_APP_URL`           | アプリ URL        | ci, e2e                        |
-| `SUPABASE_ACCESS_TOKEN`         | Supabase CLI 認証 | emergency only / local scripts |
-| `VERCEL_TOKEN`                  | Vercel API 監査   | production-config-audit        |
-| `VERCEL_ORG_ID`                 | Vercel team 特定  | production-config-audit        |
+| Secret                                 | 用途              | ワークフロー                   |
+| -------------------------------------- | ----------------- | ------------------------------ |
+| `NEXT_PUBLIC_SUPABASE_URL`             | Supabase 接続     | ci, e2e                        |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Supabase 匿名キー | ci, e2e                        |
+| `NEXT_PUBLIC_APP_URL`                  | アプリ URL        | ci, e2e                        |
+| `SUPABASE_ACCESS_TOKEN`                | Supabase CLI 認証 | emergency only / local scripts |
+| `VERCEL_TOKEN`                         | Vercel API 監査   | production-config-audit        |
+| `VERCEL_ORG_ID`                        | Vercel team 特定  | production-config-audit        |
 
 `GEMINI_API_KEY` は外部モデル diff レビュー（ai-review）専用だったが、2026-08-03 の撤去に
 合わせて **key 自体を失効させた**。GitHub repo secret の削除に加え、Google AI Studio 側の
@@ -181,22 +196,27 @@ OWASP準拠のセキュリティ監視の全体像と、定期検査の cadence 
 
 セキュリティレビューは 4 層で構成する。どの層も単独では完全でなく、コード変更起点（1・2）と時間経過起点（3・4）を組み合わせて成立させる。
 
-| 層         | タイミング               | 実体                                                                                                                                                                                                                                                                                                                  |
-| ---------- | ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 実装中     | コード変更ごと           | `security` skill（OWASP 観点のガイド）/ `risk-reviewer` の自動委任（`AGENTS.md §委任・報告の作法` §Read-only delegation）                                                                                                                                                                                             |
-| PR ごと    | CI（ready 後）+ merge 前 | `ci.yml` static job の secret scan（gitleaks + `secrets:check`）/ integration job（affected 時）の RLS snapshot drift 検査 / Vercel build の client bundle secret 検査（`verify:bundle`）/ `production-config-audit.yml` / 内製クロスレビュー（`pr-cross-review` skill、外部レビュー廃止後は merge 前に指揮台が発火） |
-| 継続       | 常時・自動               | Dependabot alerts（security update は schedule と無関係に即時 PR）/ Actions の SHA 固定 / Sentry / CSP 違反モニタリング / rate limit                                                                                                                                                                                  |
-| 定期・随時 | 月次 + オンデマンド      | `/gardening` §5.7 のセキュリティ sweep（advisors + `pnpm security:check` + `/claude-security` 提案）/ `/security-review` / `/code-review`                                                                                                                                                                             |
+| 層         | タイミング               | 実体                                                                                                                                                                                                                                                                                       |
+| ---------- | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 実装中     | コード変更ごと           | `security` skill（OWASP 観点のガイド）/ risk に応じた主担当のセルフレビュー（`AGENTS.md §レーン運用`）                                                                                                                                                                                     |
+| PR ごと    | CI（ready 後）+ merge 前 | `ci.yml` static job の secret scan（gitleaks + `secrets:check`）/ integration job（affected 時）の RLS snapshot drift 検査 / Vercel build の client bundle secret 検査（`verify:bundle`）/ `production-config-audit.yml` / GitHub の `@codex review`（高リスクでも追加 reviewer は停止中） |
+| 継続       | 常時・自動               | Dependabot alerts（security update は schedule と無関係に即時 PR）/ Actions の SHA 固定 / Sentry / CSP 違反モニタリング / rate limit                                                                                                                                                       |
+| 定期・随時 | 月次 + オンデマンド      | `/gardening` §5 のセキュリティ sweep（advisors + `pnpm security:check`）/ 深掘りが要る月は `security-sweep` skill を 1 境界（provider 非依存。`/claude-security` は任意の加速器）/ `/security-review` / `/code-review`                                                                     |
 
-**束ねた PR のレビュー**: 複数 issue / Step を束ねた PR は merge 前に read-only subagent のクロスレビューを必須とする（`AGENTS.md §PR / git 運用` §PR 粒度）。
+**束ねた PR のレビュー**: 通常 PR は GitHub の独立レビューを使い、高リスク変更も同じ `@codex review` とセルフレビューで確認する。複数 Issue を束ねたことだけを理由に reviewer subagent を追加しない。
 
 ## 定期検査の cadence
 
-定期検査の正本は `/gardening` §5.7（月次セキュリティ sweep）とする。実施内容:
+定期検査の正本は `/gardening` §5（月次セキュリティ sweep）とする。実施内容:
 
 1. Supabase security advisors の確認（`mcp__supabase__get_advisors`、read-only）
 2. `pnpm security:check`（= `pnpm audit --audit-level=moderate`。後述のローカルパッチ済み advisory は `auditConfig` で除く）
-3. `/claude-security` の全体スキャン実行をユーザーへ提案
+3. 深掘りが要る月だけ `security-sweep` skill を 1 境界に回す（provider 非依存。実装前の既往照合は
+   [threat-model.md](../engineering/threat-model.md) の既往クラスと却下記録）
+
+**1・2 を毎月の既定とし、3 は常設化しない**（2026-09-17 判断、#2709）。sweep の実測コストは
+#2708 が現 HEAD で 1 周するまで分からず、`docs/decisions.md` 2026-09-10 の結果判定も
+2026-09-24 が期限。判定材料が揃う前に月次の必須項目へ格上げしない。
 
 2 は **CI では実行しない**。依存脆弱性の継続検知は Dependabot alerts が担当し（security update は schedule と無関係に即時 PR が出る）、CI に `pnpm audit` を足すと新しい advisory が公開された瞬間に無関係な PR まで落ちる。Actions 課金が PR 本数に比例する構造（`AGENTS.md §PR / git 運用` §PR 粒度）でもあるため、月次の手動実行に留める。
 
@@ -269,7 +289,7 @@ marketplace が見つからない場合は先に `claude plugin marketplace add 
 | アプリ例外・セキュリティイベント | Sentry（CSP 違反は `csp-violation` として directive 単位の固定 fingerprint で送信）                                   |
 | rate limit 超過                  | **専用の記録なし**（下記参照）                                                                                        |
 
-**OAuth token のライフサイクル（発行・更新・失効）を記録するテーブルは存在しない。** `oauth_audit_log` は名前に反して MCP tool call 用のスキーマ（`supabase/schemas/017_tables_oauth.sql`）で、token 操作の記録には使えない。インシデント対応時に「記録が残っているはず」と仮定しない。
+**OAuth token のライフサイクル（発行・更新・失効）を記録するテーブルは存在しない。** `oauth_audit_log` は名前に反して MCP tool call 用のスキーマ（列は `docs/engineering/architecture.md` の生成 ER 図、定義は `supabase/migrations/` が正）で、token 操作の記録には使えない。インシデント対応時に「記録が残っているはず」と仮定しない。
 
 **rate limit の超過も記録されない。** `Ratelimit` は product / web とも `analytics: false` で構築しており（raw identifier を保存しないための意図的な設定）、Upstash の request metrics からは拒否されたリクエストを判別できない。
 
