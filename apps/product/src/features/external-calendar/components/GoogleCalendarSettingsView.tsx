@@ -30,6 +30,8 @@ export type GoogleCalendarConnectionViewProps = {
   statusVariant: BadgeProps['variant'];
   persistedError: string | null;
   needsReauth: boolean;
+  /** 利用権が無く、server が選択更新・手動同期を拒否する状態。切断だけ残す */
+  readOnly?: boolean;
   reconnectAvailable: boolean;
   calendars: GoogleCalendarOption[];
   selectedCalendarIds: ReadonlySet<string>;
@@ -116,6 +118,7 @@ export function GoogleCalendarConnectionView({
   statusVariant,
   persistedError,
   needsReauth,
+  readOnly = false,
   reconnectAvailable,
   calendars,
   selectedCalendarIds,
@@ -133,6 +136,7 @@ export function GoogleCalendarConnectionView({
   onDisconnect,
 }: GoogleCalendarConnectionViewProps) {
   const t = useTranslations('settings.integrations.googleCalendar');
+  const tSettings = useTranslations('settings');
 
   return (
     <article className="border-border rounded-2xl border p-4">
@@ -168,7 +172,9 @@ export function GoogleCalendarConnectionView({
         <p className="text-muted-foreground mb-2 text-xs font-medium tracking-wide uppercase">
           {t('calendars')}
         </p>
-        {needsReauth ? (
+        {readOnly ? (
+          <InlineBanner visible message={tSettings('dataControls.mcp.proRequired')} />
+        ) : needsReauth ? (
           <p className="text-muted-foreground py-3 text-sm">{t('reconnectToChoose')}</p>
         ) : calendarsLoading ? (
           <div className="space-y-2 py-2" aria-label={t('loadingCalendars')}>
@@ -207,7 +213,14 @@ export function GoogleCalendarConnectionView({
         <Button
           size="sm"
           onClick={onApply}
-          disabled={needsReauth || calendarsLoading || calendarsError || !selectionDirty || syncing}
+          disabled={
+            readOnly ||
+            needsReauth ||
+            calendarsLoading ||
+            calendarsError ||
+            !selectionDirty ||
+            syncing
+          }
           loading={applying}
           loadingText={t('applying')}
         >
@@ -217,7 +230,7 @@ export function GoogleCalendarConnectionView({
           variant="outline"
           size="sm"
           onClick={onSync}
-          disabled={needsReauth || applying}
+          disabled={readOnly || needsReauth || applying}
           loading={syncing}
           loadingText={t('syncing')}
         >
