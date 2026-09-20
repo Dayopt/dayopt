@@ -850,11 +850,6 @@ model {
     metadata { inventoryKind 'trpc-router' feature 'contact' detail 'contactRouter' }
     link ../../../../apps/product/src/features/contact/server/router.ts
   }
-  router r_email 'email' {
-    #unmapped
-    metadata { inventoryKind 'trpc-router' detail 'emailRouter' }
-    link ../../../../apps/product/src/lib/email/router.ts
-  }
   router r_externalCalendar 'externalCalendar' {
     metadata { inventoryKind 'trpc-router' feature 'external-calendar' detail 'externalCalendarRouter' }
     link ../../../../apps/product/src/features/external-calendar/server/router.ts
@@ -1428,8 +1423,6 @@ model {
   r_activities -> t_categories 'reads'
   r_billing -> t_product_events 'reads'
   r_billing -> t_profiles 'reads'
-  r_email -> t_email_suppressions 'reads'
-  r_email -> t_user_settings 'reads'
   r_externalCalendar -> t_calendar_connection_calendars 'reads'
   r_externalCalendar -> t_calendar_connections 'reads'
   r_externalCalendar -> t_external_calendar_events 'reads'

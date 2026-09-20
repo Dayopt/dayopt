@@ -270,6 +270,14 @@ export const AUTH_CONFIG_CONTRACT = [
     why: '認証メール送信 hook。off で確認・リセットメールが届かなくなる',
   },
   {
+    key: 'mailer_notifications_password_changed_enabled',
+    expected: true,
+    // パスワード変更通知は client mutation ではなく Auth event を根拠にする。off になると
+    // パスワード変更自体は成功する一方、本人が不正変更に気づく経路だけが消える（#2848）。
+    failureMode: 'fail-closed',
+    why: 'パスワード変更通知。off で変更成功後のセキュリティ通知だけが届かなくなる',
+  },
+  {
     key: 'hook_custom_access_token_enabled',
     expected: false,
     failureMode: 'fail-open',

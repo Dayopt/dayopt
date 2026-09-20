@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { getUserLocale, sendWelcomeEmail } from '@/lib/email/router';
+import { getUserLocale, sendWelcomeEmail } from '@/lib/email/notifications';
 import { logger } from '@/lib/logger';
 import { captureUnexpectedDatabaseError, captureUnexpectedError } from '@/lib/sentry';
 import { createServiceRoleClient } from '@/lib/supabase/oauth';

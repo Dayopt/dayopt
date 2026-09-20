@@ -30,6 +30,8 @@ import {
   resolveWebhookEventId,
 } from './idempotency.ts';
 import { MagicLinkEmail } from './MagicLinkEmail.tsx';
+import { resolvePasswordChangedNotificationEmails } from './password-changed-notification.ts';
+import { PasswordChangedEmail } from './PasswordChangedEmail.tsx';
 import { PasswordResetEmail } from './PasswordResetEmail.tsx';
 import { authEmailSubjects } from './subjects.ts';
 import { resolveAuthEmailSecretKey } from './supabase-key.ts';
@@ -130,105 +132,125 @@ Deno.serve(async (req) => {
 
   try {
     const userName = user.user_metadata.full_name || 'there';
-    const confirmUrl = buildConfirmUrl(email_data);
     const locale = await getUserLocale(user.id);
     const subjects = authEmailSubjects[locale];
 
     const emails: OutgoingEmail[] = [];
+    const passwordChangedEmails = resolvePasswordChangedNotificationEmails({
+      emailActionType: email_data.email_action_type,
+      user,
+      locale,
+    });
 
-    switch (email_data.email_action_type) {
-      case 'signup': {
-        emails.push({
-          to: user.email,
-          subject: subjects.signup,
-          recipientRole: 'single',
-          element: React.createElement(ConfirmEmail, {
-            userName,
-            confirmUrl,
+    if (passwordChangedEmails) {
+      emails.push(
+        ...passwordChangedEmails.map(({ userName: passwordChangedUserName, ...email }) => ({
+          ...email,
+          element: React.createElement(PasswordChangedEmail, {
+            userName: passwordChangedUserName,
             locale,
             appUrl: APP_URL,
           }),
-        });
-        break;
-      }
-      case 'recovery': {
-        emails.push({
-          to: user.email,
-          subject: subjects.recovery,
-          recipientRole: 'single',
-          element: React.createElement(PasswordResetEmail, {
-            userName,
-            resetUrl: confirmUrl,
-            locale,
-            appUrl: APP_URL,
-          }),
-        });
-        break;
-      }
-      // hook payload の JSON Schema は 'magiclink'、公式サンプルは 'magic_link' 表記。
-      // アプリは magic link 未使用だが、どちらが来ても処理できるよう両対応する
-      case 'magic_link':
-      case 'magiclink': {
-        emails.push({
-          to: user.email,
-          subject: subjects.magic_link,
-          recipientRole: 'single',
-          element: React.createElement(MagicLinkEmail, {
-            loginUrl: confirmUrl,
-            locale,
-            appUrl: APP_URL,
-          }),
-        });
-        break;
-      }
-      case 'email_change': {
-        const newEmail = user.new_email;
-        if (!newEmail) {
-          return new Response(
-            JSON.stringify({ error: { message: 'email_change payload missing new_email' } }),
-            { status: 400, headers: { 'Content-Type': 'application/json' } },
-          );
-        }
-        // Secure Email Change 有効時は 2 通送る。token hash のフィールド名は
-        // 後方互換のため逆転している（公式 docs 明記）:
-        //   現アドレス宛 → token_hash_new / 新アドレス宛 → token_hash
-        if (email_data.token_hash_new) {
+        })),
+      );
+    } else {
+      switch (email_data.email_action_type) {
+        case 'signup': {
+          const confirmUrl = buildConfirmUrl(email_data);
           emails.push({
             to: user.email,
-            subject: subjects.email_change_current,
-            recipientRole: 'current',
+            subject: subjects.signup,
+            recipientRole: 'single',
+            element: React.createElement(ConfirmEmail, {
+              userName,
+              confirmUrl,
+              locale,
+              appUrl: APP_URL,
+            }),
+          });
+          break;
+        }
+        case 'recovery': {
+          const confirmUrl = buildConfirmUrl(email_data);
+          emails.push({
+            to: user.email,
+            subject: subjects.recovery,
+            recipientRole: 'single',
+            element: React.createElement(PasswordResetEmail, {
+              userName,
+              resetUrl: confirmUrl,
+              locale,
+              appUrl: APP_URL,
+            }),
+          });
+          break;
+        }
+        // hook payload の JSON Schema は 'magiclink'、公式サンプルは 'magic_link' 表記。
+        // アプリは magic link 未使用だが、どちらが来ても処理できるよう両対応する
+        case 'magic_link':
+        case 'magiclink': {
+          const confirmUrl = buildConfirmUrl(email_data);
+          emails.push({
+            to: user.email,
+            subject: subjects.magic_link,
+            recipientRole: 'single',
+            element: React.createElement(MagicLinkEmail, {
+              loginUrl: confirmUrl,
+              locale,
+              appUrl: APP_URL,
+            }),
+          });
+          break;
+        }
+        case 'email_change': {
+          const newEmail = user.new_email;
+          if (!newEmail) {
+            return new Response(
+              JSON.stringify({ error: { message: 'email_change payload missing new_email' } }),
+              { status: 400, headers: { 'Content-Type': 'application/json' } },
+            );
+          }
+          // Secure Email Change 有効時は 2 通送る。token hash のフィールド名は
+          // 後方互換のため逆転している（公式 docs 明記）:
+          //   現アドレス宛 → token_hash_new / 新アドレス宛 → token_hash
+          if (email_data.token_hash_new) {
+            emails.push({
+              to: user.email,
+              subject: subjects.email_change_current,
+              recipientRole: 'current',
+              element: React.createElement(EmailChangeEmail, {
+                userName,
+                confirmUrl: buildConfirmUrl(email_data, email_data.token_hash_new),
+                newEmail,
+                variant: 'current',
+                locale,
+              }),
+            });
+          }
+          emails.push({
+            to: newEmail,
+            subject: subjects.email_change_new,
+            recipientRole: 'new',
             element: React.createElement(EmailChangeEmail, {
               userName,
-              confirmUrl: buildConfirmUrl(email_data, email_data.token_hash_new),
+              confirmUrl: buildConfirmUrl(email_data, email_data.token_hash),
               newEmail,
-              variant: 'current',
+              variant: 'new',
               locale,
             }),
           });
+          break;
         }
-        emails.push({
-          to: newEmail,
-          subject: subjects.email_change_new,
-          recipientRole: 'new',
-          element: React.createElement(EmailChangeEmail, {
-            userName,
-            confirmUrl: buildConfirmUrl(email_data, email_data.token_hash),
-            newEmail,
-            variant: 'new',
-            locale,
-          }),
-        });
-        break;
-      }
-      default: {
-        return new Response(
-          JSON.stringify({
-            error: {
-              message: `Unknown email action type: ${email_data.email_action_type}`,
-            },
-          }),
-          { status: 400, headers: { 'Content-Type': 'application/json' } },
-        );
+        default: {
+          return new Response(
+            JSON.stringify({
+              error: {
+                message: `Unknown email action type: ${email_data.email_action_type}`,
+              },
+            }),
+            { status: 400, headers: { 'Content-Type': 'application/json' } },
+          );
+        }
       }
     }
 
