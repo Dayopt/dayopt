@@ -890,14 +890,14 @@ function tryOr(fn, fallback) {
 
 const DECISIONS_PATH = 'docs/decisions.md';
 
-function collectDecisionLines(readFileImpl, cwd, numbers) {
+function collectDecisionLines(readFileImpl, cwd, numbers, truncate = true) {
   const raw = tryOr(() => readFileImpl(join(cwd, DECISIONS_PATH), 'utf8'), null);
   if (raw === null) return [];
   const needles = numbers.map((n) => `#${n}`);
   return raw
     .split('\n')
     .filter((line) => needles.some((needle) => line.includes(needle)))
-    .map((line) => line.trim().slice(0, 200));
+    .map((line) => (truncate ? line.trim().slice(0, 200) : line.trim()));
 }
 
 // GraphQL ページングの安全上限（無限ループ防止。100 件 × 30 頁 = 3000 thread は
@@ -1036,6 +1036,7 @@ export function buildContextPack(options, deps = {}) {
 
   // --- 関連 ---
   const related = { parentEpic: null, prs: null, linkedIssues: null };
+  const assistRelated = [];
   let linkedNumbers = [];
 
   if (kind === 'issue') {
@@ -1043,6 +1044,7 @@ export function buildContextPack(options, deps = {}) {
       const epicNumber = extractParentEpic(rawBody);
       if (!epicNumber) return null;
       const epic = runGhJson(['api', `repos/${REPO}/issues/${epicNumber}`], { execFileImpl });
+      assistRelated.push(epic);
       return { number: epicNumber, state: epic.state, title: epic.title };
     }, null);
 
@@ -1055,7 +1057,7 @@ export function buildContextPack(options, deps = {}) {
           REPO,
           `#${number}`,
           '--json',
-          'number,title,state,body',
+          options.assist ? 'number,title,state,body,updatedAt' : 'number,title,state,body',
           '--limit',
           '20',
         ],
@@ -1065,6 +1067,7 @@ export function buildContextPack(options, deps = {}) {
     }, null);
 
     if (matchedPrs !== null) {
+      assistRelated.push(...matchedPrs);
       // 触るファイル用に上位 3 件だけ headRefName + files を追加取得する。
       const enriched = matchedPrs.slice(0, 3).map((pr) =>
         tryOr(
@@ -1099,6 +1102,7 @@ export function buildContextPack(options, deps = {}) {
         tryOr(
           () => {
             const issue = runGhJson(['api', `repos/${REPO}/issues/${n}`], { execFileImpl });
+            assistRelated.push(issue);
             return {
               number: n,
               state: issue.state,
@@ -1181,6 +1185,31 @@ export function buildContextPack(options, deps = {}) {
   return {
     number,
     kind,
+    ...(options.assist
+      ? {
+          assistSource: {
+            title: header.title,
+            body: rawBody,
+            url: header.url,
+            updatedAt: base?.updated_at ?? null,
+            comments:
+              commentsRaw === null
+                ? null
+                : selectComments(commentsRaw, Number.MAX_SAFE_INTEGER, allComments),
+            related: assistRelated,
+            decisions: collectDecisionLines(readFileImpl, cwd, decisionNumbers, false),
+            missing: [
+              ...(kind === 'issue' && related.prs === null ? ['related_prs_unavailable'] : []),
+              ...(extractParentEpic(rawBody) && !related.parentEpic && kind === 'issue'
+                ? ['parent_issue_unavailable']
+                : []),
+              ...(related.linkedIssues ?? [])
+                .filter((item) => item.state === '未取得')
+                .map((item) => `linked_issue_${item.number}_unavailable`),
+            ],
+          },
+        }
+      : {}),
     bodySha256: createHash('sha256').update(rawBody).digest('hex'),
     header,
     body: bodyResult,

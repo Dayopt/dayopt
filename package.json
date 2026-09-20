@@ -37,6 +37,8 @@
     "ai:usage": "node scripts/tasks/ai-usage.mjs",
     "ctx": "node scripts/tasks/ctx.mjs",
     "jev:check": "pnpm exec tsx scripts/tasks/jev/check.ts",
+    "jev:assist": "pnpm exec tsx scripts/tasks/jev/assist.ts",
+    "jev:assist-eval": "pnpm exec tsx scripts/tasks/jev/assist-eval.ts",
     "jev:pack": "pnpm exec tsx scripts/tasks/jev/pack.ts",
     "jev:shadow": "pnpm exec tsx scripts/tasks/jev/shadow.ts",
     "jev:smoke": "pnpm exec tsx scripts/tasks/jev/smoke.ts",
@@ -113,6 +115,7 @@
     "review:validate": "node scripts/tasks/review-pack.mjs validate"
   },
   "devDependencies": {
+    "zod": "4.3.6",
     "@ai-sdk/gateway": "4.0.85",
     "@axe-core/playwright": "catalog:tooling",
     "@axe-core/react": "catalog:tooling",
