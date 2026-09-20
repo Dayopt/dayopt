@@ -250,6 +250,7 @@ vault は 2026-08-14 の信頼境界軸再編（[#2086](https://github.com/Dayop
 | `github-agent`        | `credential`（fine-grained PAT、Dayopt/dayopt 限定）, `expires`                                                                                                                                                                                                                                                                                      | Agent セッションの `gh` / git push 用 identity。op run では消費せず `GH_CONFIG_DIR` の replica で使う（下記 §Agent の gh identity）                                                                             |
 | `supabase-agent`      | `credential`（Supabase scoped access token、read 権限だけ、90 日期限）, `expires`                                                                                                                                                                                                                                                                    | Agent の production Supabase 読み取り（supabase MCP `--read-only`、`supabase-mgmt-safe-get.mjs`）。下記 §Agent の Supabase 読み取り token                                                                       |
 | `sentry-cli-readonly` | `credential`（Sentry user auth token、read scope だけ）                                                                                                                                                                                                                                                                                              | Agent の Sentry 読み取り（`sentry` CLI を inline `op://` で起動）。org `dayopt` での access は `alerts:read` / `member:read` / `project:read` / `team:read` / `org:read` / `event:read` だけ（2026-09-14 実測） |
+| `vercel-ai-gateway`   | `credential`（AI Gateway API key、budget $4 / 月、90 日期限）, `expires`                                                                                                                                                                                                                                                                             | 評価モデル Jev の呼び出し（`pnpm jev:*` を inline `op://` で起動）。下記 §評価モデル Jev の Gateway key                                                                                                         |
 
 **`agent/app` の `RECOVERY_CODE_PEPPER` は production と別値**（2026-09-14、User が値を表示しない比較で `different` を確認）。local dev の recovery code が production で通ることはない。
 
@@ -375,6 +376,20 @@ vault は 2026-08-14 の信頼境界軸再編（[#2086](https://github.com/Dayop
 **`human/supabase-cli` の位置づけ**: Auth config の write を要する `scripts/runbook/enable-auth-hook.sh` など、User が明示操作で使う operational credential として残す。次回 rotation 時に read 系 permission を外し、write が要る作業の時だけ発行する形へ寄せる。
 
 **rotation**: §短命トークンのローテーション に従う。期限切れは MCP / safe-get の 401 で表面化する。
+
+## 評価モデル Jev の Gateway key
+
+策定日: 2026-09-17（[#2827](https://github.com/Dayopt/dayopt/issues/2827)）。評価モデル Jev は Vercel AI Gateway 経由で呼ぶ。key は `agent/vercel-ai-gateway` の `credential` に置き、**inline `op://` でそのプロセスだけへ注入する**。
+
+```bash
+AI_GATEWAY_API_KEY="op://agent/vercel-ai-gateway/credential" op run -- pnpm jev:smoke
+```
+
+**`.op-env.agent` には入れない。** 入れると `pnpm dev` が Jev の key に依存し、評価を回さない日でも 1Password の承認が要るようになる。Jev を呼ぶコマンドだけが承認を求める形を保つ。
+
+**agent vault に置いてよい理由**: key 側に budget（$4 / 月）と有効期限（90 日）が設定してあり、漏れても損害が上限で止まる。Gateway の credits は購入せず、無料枠（$5）の内側だけで使う（[#2827](https://github.com/Dayopt/dayopt/issues/2827) の制約）。
+
+**rotation**: §短命トークンのローテーション に従う。期限切れは `pnpm jev:*` の `auth_failed` で表面化する。運用手順と停止方法は [jev.md](./jev.md)。
 
 ## Service Account（無人実行用、設計のみ・未導入）
 
