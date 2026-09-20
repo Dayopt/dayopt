@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-09-17
+last_verified: 2026-09-20
 ---
 
 # Dayopt 不変条件カタログ
@@ -27,6 +27,18 @@ docs へ残している。
 
 ## 課金・entitlement
 
+- **利用権が終わった後に server が拒否する mutation（`lib/billing/operation-access.ts` の
+  `managementMutations` に無いもの）は、UI から送らない。** server の判定が正で、UI は
+  `useBillingAccess().canUseProduct` / `useProductAccessGate` による写し。写しが無いと optimistic
+  update が一度成功して見えた後に rollback され、汎用の失敗 toast だけが残って障害と区別できない
+  （2026-09-20、Google Calendar 設定と activity / category の archive・restore で実発生。
+  終了後も許す削除・切断・export は gate しない）
+  - **まだ閉じていない経路がある**: `planTemplates` の `applyToDay` / `create` / `rename` は
+    終了後に server が拒否するのに UI から送る（#2865）。gate を足すには先に
+    `BillingAccessProvider.tsx` から `useBillingAccess` を切り出す必要がある。
+    同 file が `api.billing.*` を呼ぶため、hook を import した component が page から到達すると
+    その page の procedure 面に `billing.*` が混ざり、`architecture-map` の
+    「画面から使う procedure」検査が落ちる（calendar で実測）
 - 外部カレンダー連携は **Pro 限定**。OAuth の開始・callback・cron 同期の**すべての入口**で
   entitlement を検査する（2026-07 に callback の検査漏れが実際に起きたクラス）
 - Pro 限定機能の server 入口は `entitledProcedure(key)` を使うか、明示的に entitlement を検査する
@@ -39,7 +51,24 @@ docs へ残している。
 - `withUpstashRateLimit` のIP rate limitはVercel由来の`X-Real-IP`だけを使い、`X-Forwarded-For`へfallbackしない。欠落・不正値は共有`ip:unknown`でfail closedにする
 - rate limitのRedis keyは`ip:` / `email:`のpurpose prefixを付けてHMAC化し、生のIP / emailを保存・記録しない。account bucketを併用する場合はIP-firstで短絡し、IP bucketが拒否したらaccount bucketを消費しない
 - cron ルート（`app/api/cron/**`）は `CRON_SECRET` を検証する
+- **`writeCronHeartbeat` に渡せる job 名は `cron_heartbeats_job_name_check`（CHECK 制約）が
+  決める。** 制約に無い名前で書くと毎回 CHECK violation になり、`writeCronHeartbeat` は例外を
+  握って Sentry へ送るだけなので **行は永遠に作られない**。監査
+  （`production-cron-heartbeat-audit.mjs` の `JOB_MAX_AGE_MINUTES`）へ job を足すのは、
+  制約を広げる migration と**同じ変更**で行う（片方だけ足すと監査が恒久 missing になる）。
+  現状 **Vercel cron 4 本のうち `billing-reconciliation` だけ heartbeat を持たない**ため、
+  止まっても検知されない（2026-09-20 に PR #2863 の `@codex review` で判明、#2864 で塞ぐ）
 - redirect 先はユーザー入力をそのまま使わず、`lib/safe-redirect.ts` の検証を通す
+
+## メール通知
+
+- **`email_suppressions` は書いたら消す経路が無い恒久リスト**なので、Resend の `email.bounced` は
+  `bounce.type` が `transient` のものを書かない（`permanent` / `undetermined` / 欠落は配信評価を
+  守る側に倒して書く）。transient を書くと、その address 宛の product transactional mail（password
+  changed / MFA disabled / account deletion / Stripe 系）が永久に止まる一方、auth mail は Edge
+  Function が suppression を見ないため届き続け、利用者は気づけない（2026-09-20）
+- suppression を消す経路を足す時は、account deletion / purge の列挙（`EMAIL_KEYED_WITHOUT_USER_ID`）
+  と Privacy Policy の保持期間の記述を同じ変更で直す
 
 ## 認証・MFA
 
@@ -81,6 +110,12 @@ docs へ残している。
   足りない。`_v<N>` 命名は旧 version と新 version を並存させて可逆に cutover するための前提。
   強制は `private.assert_public_contract_exposure_v1()`（migration 適用時）と
   `pnpm rls:snapshot:check`（CI での継続 drift 検出）の 2 層
+- **`user_id` を持たず `email` 列を持つ `public` table は purge 列挙の母集合に入らない。**
+  `auth.users` から `ON DELETE CASCADE` で到達できるもの（`profiles` など）はアカウント削除で
+  消えるので対象外。**どちらでもない table**は `user-data-purge-enumeration.integration.test.ts` の
+  `EMAIL_KEYED_WITHOUT_USER_ID` に扱いを理由付きで書く（消すなら削除経路へ足して allowlist から
+  外す）。`email_suppressions` は 2026-09-20 時点で「未裁定・保持」であり、account deletion 後も
+  raw email が残る（#2859）
 - **`user_id` を持つ `public` table は、account-preserving purge
   （`delete_all_user_data_command_v3`）が直接消すか、そこから `ON DELETE CASCADE` で
   到達できるか、理由付きの allowlist に載っているかのいずれかでなければならない。**
