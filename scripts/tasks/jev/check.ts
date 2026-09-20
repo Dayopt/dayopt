@@ -26,6 +26,7 @@ import {
   jevCacheKey,
   validateJevRequest,
 } from '../../lib/jev-adapter.ts';
+import { ASSIST_PACKS, claimRequests, contextRequests } from '../../lib/jev-assist-packs.ts';
 import { createShadowPack } from '../../lib/jev-pack-shadow.ts';
 import { createSkillSuggestionPack } from '../../lib/jev-pack-skill-suggestion.ts';
 import { PACK_IDS, PACK_STATUS, buildPackRequest, packQuestionSetId } from '../../lib/jev-pack.ts';
@@ -121,6 +122,54 @@ async function run(): Promise<number> {
       detail: errors.join(' / ') || smokeCase.purpose,
     });
   }
+
+  const sha = 'a'.repeat(40);
+  const context = contextRequests({
+    number: 1,
+    sha,
+    title: '要求',
+    body: '原文',
+    url: 'https://github.com/Dayopt/dayopt/issues/1',
+    missing: [],
+    candidates: Array.from({ length: 6 }, (_, index) => ({
+      id: `c${index}`,
+      text: '制約',
+      url: 'https://github.com/Dayopt/dayopt/issues/1',
+      updatedAt: '2026-09-20',
+      kind: 'comment' as const,
+    })),
+  });
+  const claims = claimRequests(
+    {
+      schemaVersion: 1,
+      target: { number: 1, sha },
+      claims: [{ id: 'c', text: '主張', evidenceIds: ['e'] }],
+      evidence: [{ id: 'e', kind: 'blob', path: 'AGENTS.md', sha }],
+    },
+    [
+      {
+        id: 'e',
+        text: '原文',
+        url: 'https://github.com/Dayopt/dayopt',
+        sha,
+        missing: null,
+        facts: { existsAtSha: true },
+      },
+    ],
+  );
+  for (const request of [...context, ...claims].map((batch) => batch.request)) {
+    const errors = validateJevRequest(request);
+    checks.push({
+      name: `assist ${request.questionSetId} の質問契約`,
+      ok: errors.length === 0,
+      detail: errors.join(' / ') || `${Object.keys(request.questions).length} 問`,
+    });
+  }
+  checks.push({
+    name: 'assistは採用評価前のshadowで、権限・レビューを変更しない',
+    ok: Object.values(ASSIST_PACKS).every((pack) => pack.mode === 'shadow'),
+    detail: 'ctx/routingへの自動接続は別PRのGo判定後',
+  });
 
   // Phase 1 の質問セットも同じ静的検査に通す。質問文を足した時に上限や空欄で落ちるのを
   // 課金前に捕まえる（合成 state は代表として shadow の合成ケースを 1 件使う）。

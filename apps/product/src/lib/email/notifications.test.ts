@@ -56,9 +56,9 @@ vi.mock('@/lib/supabase/oauth', () => ({
   }),
 }));
 
-import { sendAccountDeletionEmail, sendMfaDisabledEmail } from './router';
+import { sendAccountDeletionEmail, sendMfaDisabledEmail } from './notifications';
 
-describe('email router: suppression と security notification', () => {
+describe('server-side email notifications: suppression と security notification', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.resendSend.mockResolvedValue({ data: { id: 'email-1' }, error: null });

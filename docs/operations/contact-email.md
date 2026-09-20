@@ -50,9 +50,13 @@ Resendのidempotency keyは**24時間保持・256文字まで・同じkeyでpayl
 | Contact（Product / Web）                                    | ユーザーの再送信                              | Resend idempotency key。client生成の`submissionId`を使い、本文を編集したら新しいUUIDにする                                              |
 | Welcome                                                     | サインイン経路の再実行                        | DB claim。`profiles.welcome_email_sent_at`の条件付きUPDATEで掴んでから送る                                                              |
 | Stripe由来の課金メール                                      | Stripeのwebhook再送                           | DB claim。`stripe-webhook-idempotency.ts`                                                                                               |
-| password changed / MFA disabled / account deletion          | なし（tRPC mutationの1回呼び出し）            | 何もしない                                                                                                                              |
+| MFA disabled / account deletion                             | なし（server-side service の1回呼び出し）     | 何もしない                                                                                                                              |
 
-**最後の行にkeyを足さない。** provider retryが走らないのでkeyが防ぐものが無い一方、これらは同じ宛先・同じ本文なので「24時間以内の正当な2回目のパスワード変更通知」が先行のidempotencyキャッシュに当たって届かなくなる。ここを冪等にしたくなったら、keyではなくイベント単位の安定ID（auth userの`updated_at`等）を先に用意する。
+**最後の行にkeyを足さない。** provider retryが走らないのでkeyが防ぐものが無い。パスワード変更通知は Auth Hook へ移し、`webhook-id` というイベント単位の安定IDで同一イベントの再試行だけを抑止する（#2848）。
+
+パスワード変更通知も送信前に`email_suppressions`を確認する。suppressedまたは判定不能なら
+Resendへ送らず、宛先を含まないSentry eventを残してAuth Hookへ200を返す。認証メールと同じ
+From domainの評価を、既知のbounce / complaint先への再送で落とさないためである。
 
 `webhook-id`が取れない時は**乱数へフォールバックしない**。毎回違うkeyはidempotencyとして無意味で、「冪等になったつもり」で`resolveSendAuthEmailStatus`の503→500降格を外すとかえって二重配送が増える。keyを作れない時はkey無しで送り、降格を従来どおり効かせる。
 

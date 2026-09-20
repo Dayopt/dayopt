@@ -9,12 +9,15 @@
  * **運用の担当も review gate も変えない。** Jev の出力を記録して集計するだけで、
  * ここから振り分けや merge 可否へ繋がる経路は作らない。
  *
- * 保存形式（`tmp/jev-shadow/cases/*.json`）は Phase 1 のまま。評価ループ・保存関数・
+ * 保存形式（`cases/*.json`）は Phase 1 のまま。既定は共通git directoryのjev/legacy-shadow。
+ * 古い保存先は --out tmp/jev-shadow で読める。評価ループ・保存関数・
  * gh 取得は `scripts/lib/jev-pack-runner.ts` / `jev-gh-prs.ts` へ移し、この file は
  * 引数解釈と結線だけを持つ。同じ質問セットを pack として扱う入口は
  * `pnpm jev:pack shadow-e1`（`jev-pack-shadow.ts`）。
  */
 import { realpathSync } from 'node:fs';
+import { join } from 'node:path';
+import { jevStoreRoot } from '../../lib/jev-send-budget.ts';
 
 import type { JevAnnotation, JevOptions } from '../../lib/jev-adapter.ts';
 import {
@@ -60,8 +63,6 @@ import {
 
 export type { GhApi, GhGraphql };
 
-const DEFAULT_OUT = 'tmp/jev-shadow';
-
 type StoredCase = {
   id: string;
   prNumber: number | null;
@@ -92,7 +93,7 @@ export function parseShadowArgs(
       message: `subcommand は collect / evaluate / report のいずれか（受け取った値: ${command ?? 'なし'}）`,
     };
   const parsed = parseRunnerFlags(rest, {
-    out: DEFAULT_OUT,
+    out: join(jevStoreRoot(), 'legacy-shadow'),
     limit: DEFAULT_LIMIT,
     max: null,
     split: command === 'evaluate' ? 'tune' : 'all',

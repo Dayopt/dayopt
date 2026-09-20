@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
+import { jevStoreRoot } from '../../lib/jev-assist-store.ts';
 import { PACK_IDS, PACK_STATUS } from '../../lib/jev-pack.ts';
 import { mapSkills } from '../ctx.mjs';
 import { parsePackArgs } from './pack.ts';
@@ -28,11 +29,11 @@ describe('引数は完全に解釈する', () => {
     const evaluate = parsePackArgs(['skill-suggestion', 'evaluate']);
     const report = parsePackArgs(['shadow-e1', 'report', '--threshold', '0.6']);
     expect(evaluate.ok && evaluate.args).toMatchObject({
-      out: join('tmp', 'jev', 'skill-suggestion'),
+      out: join(jevStoreRoot(repoRoot), 'packs', 'skill-suggestion'),
       split: 'tune',
     });
     expect(report.ok && report.args).toMatchObject({
-      out: join('tmp', 'jev', 'shadow-e1'),
+      out: join(jevStoreRoot(repoRoot), 'packs', 'shadow-e1'),
       split: 'all',
       threshold: 0.6,
     });

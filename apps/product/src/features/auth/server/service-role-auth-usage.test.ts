@@ -70,7 +70,7 @@ function usesServiceRoleAuth(source: string): boolean {
 
   // `(?<![.\w$])` が要る。素の `\b` だと `ctx.supabase.auth.getUser()` のような
   // **別オブジェクトのプロパティ**にも一致し、user-scoped client の呼び出しを
-  // service-role の迂回と誤検出する（lib/email/router.ts で実際に踏んだ）
+  // service-role の迂回と誤検出する（lib/email/notifications.ts で実際に踏んだ）
   return collectClientIdentifiers(source).some((identifier) =>
     new RegExp(`(?<![.\\w$])${identifier}\\s*\\.\\s*auth\\s*\\.\\s*(?!admin\\b)\\w`).test(source),
   );

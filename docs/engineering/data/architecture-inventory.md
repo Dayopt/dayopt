@@ -15,8 +15,8 @@
 | feature        | 8    | 8          | 0                | 0                | 0              |
 | DB テーブル    | 30   | 10         | 6                | 14               | 0              |
 | DB 関数        | 136  | 1          | 59               | 76               | 0              |
-| tRPC router    | 16   | 0          | 15               | 0                | 1              |
-| tRPC procedure | 69   | 0          | 68               | 0                | 1              |
+| tRPC router    | 15   | 0          | 15               | 0                | 0              |
+| tRPC procedure | 68   | 0          | 68               | 0                | 0              |
 | MCP tool       | 19   | 19         | 0                | 0                | 0              |
 | Zustand store  | 14   | 0          | 13               | 0                | 1              |
 | Story          | 113  | 0          | 89               | 24               | 0              |
@@ -2594,11 +2594,9 @@ graph LR
 どの概念からも辿れず、かつ「語彙を持たない層」にも当たらない項目。
 用語集へ 1 行足すか、実装を消すかを人間が判断する。
 
-| 種別           | 項目                        | 発見元                                         | 補足               |
-| -------------- | --------------------------- | ---------------------------------------------- | ------------------ |
-| tRPC router    | `email`                     | `apps/product/src/lib/email/router.ts`         | emailRouter        |
-| tRPC procedure | `email.sendPasswordChanged` | `apps/product/src/lib/email/router.ts`         | protectedProcedure |
-| Zustand store  | `useShellStore`             | `apps/product/src/lib/stores/useShellStore.ts` | —                  |
+| 種別          | 項目            | 発見元                                         | 補足 |
+| ------------- | --------------- | ---------------------------------------------- | ---- |
+| Zustand store | `useShellStore` | `apps/product/src/lib/stores/useShellStore.ts` | —    |
 
 ## 語彙を持たない層（意図的）
 
