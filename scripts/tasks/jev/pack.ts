@@ -28,17 +28,20 @@ import {
 } from '../../lib/jev-pack-runner.ts';
 import { createShadowPack } from '../../lib/jev-pack-shadow.ts';
 import { createSkillSuggestionPack } from '../../lib/jev-pack-skill-suggestion.ts';
-import type { AnyPack } from '../../lib/jev-pack.ts';
+import {
+  PACK_IDS,
+  assertPackEvaluationAllowed,
+  type AnyPack,
+  type PackId,
+} from '../../lib/jev-pack.ts';
 import type { ResolveProtectedGate } from '../../lib/jev-shadow-truth.ts';
 import { loadSkillRoster } from '../../lib/jev-skill-roster.ts';
 
 // tsx は scripts/ の .ts を CJS へ落とすため `import.meta.url` は使えない。
 const ROOT = resolve(__dirname, '../../..');
 
-export const PACK_IDS = ['shadow-e1', 'skill-suggestion'] as const;
 /** `pnpm jev:shadow` の既定保存先。pack runner とは case の形式が違うので注釈だけ引き継ぐ。 */
 export const SHADOW_LEGACY_OUT = join('tmp', 'jev-shadow');
-export type PackId = (typeof PACK_IDS)[number];
 
 export type PackArgs = RunnerFlags & {
   packId: PackId;
@@ -106,6 +109,16 @@ export async function run(argv: readonly string[]): Promise<number> {
     return 1;
   }
   const args = parsed.args;
+
+  // 無効な pack は key の確認より先に止める。「key が無い」と「pack を止めてある」を
+  // 取り違えると、承認を取りに行ってから初めて止まっていたと分かる。
+  if (args.command === 'evaluate') {
+    const blocked = assertPackEvaluationAllowed(args.packId);
+    if (blocked) {
+      process.stderr.write(blocked);
+      return 1;
+    }
+  }
 
   if (args.command === 'evaluate' && !process.env.AI_GATEWAY_API_KEY?.trim()) {
     process.stderr.write(

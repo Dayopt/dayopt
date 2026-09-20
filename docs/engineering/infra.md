@@ -215,6 +215,16 @@ run の結果は `release-manifest-<attempt>` artifact（保持 90 日、`github
 対象 SHA より新しい Production deployment が既に live の場合は promote せず、`Production Release` status
 を failure にする。live でない commit に tag を打てないようにするためで、run 自体も失敗として扱う。
 
+**同一 commit の再配備**（#2735）: env だけを更新して build し直した deployment は source SHA が live と
+同じなので、影響判定は `already serving` になり candidate 選択へ届かない。`workflow_dispatch` の
+`redeploy` input（`<project>:<deployment id>`）を渡した run だけ、名指しの project を affected として扱い、
+「SHA の最新 deployment」ではなく **その ID の deployment だけ**を candidate にする。層 3・candidate smoke・
+Production Config Audit・production domain smoke・live 検証・自動 rollback は通常の release と同じ。
+受理するのは「同じ project の、release 対象と同じ commit の GitHub 連携 production build で、live より
+後に作られたもの」だけで、どれかが読めない時も拒否する（fail closed）。Force Promote とは併用できない。
+release 対象が `github.sha` である点は変わらず、任意の SHA を指定する口にはならない。手順は
+[runbook](../operations/runbook.md) §同一 commit の再配備。
+
 **Vercel 側の既知バグへの対処**: promote endpoint は project 設定の `autoAssignCustomDomains` を
 `true` へ戻す（[vercel/vercel#15095](https://github.com/vercel/vercel/issues/15095)、未修正）。放置すると
 次の main merge が gate を通らず直接公開される。release script は promote / rollback の直前に観測した値を
