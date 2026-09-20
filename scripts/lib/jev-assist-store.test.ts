@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
@@ -100,6 +100,25 @@ describe('共通保存と待たない送信制御', () => {
     expect(evaluate).toHaveBeenCalledTimes(1);
     expect((await evaluateAssist(request, { ...options, now: () => 120_000 })).source).toBe('live');
     expect(evaluate).toHaveBeenCalledTimes(2);
+  });
+
+  it('失敗annotationを保存せず、成功キャッシュを上書きしない', async () => {
+    const root = temporary();
+    const evaluate = vi.fn(async () => {
+      const failed = await evaluateWithJev(request, { disabled: true });
+      return { ...failed, status: 'unavailable' as const, reasonCode: 'rate_limited' as const };
+    });
+    const result = await evaluateAssist(request, {
+      root,
+      allowNetwork: true,
+      credentialAvailable: true,
+      evaluate,
+    });
+    expect(result.source).toBe('unavailable');
+    expect(() =>
+      readFileSync(join(root, 'annotations', `${jevCacheKey(request)}.json`), 'utf8'),
+    ).toThrow();
+    expect(evaluate).toHaveBeenCalledTimes(1);
   });
 
   it('資格情報不在・停止・入力超過は送信しない', async () => {

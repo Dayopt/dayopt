@@ -96,7 +96,8 @@ export function evaluateAssistDataset(raw: unknown) {
   if (!dataset.frozenAt) blockers.push('評価前の母集団・質問・基準の固定記録が必要');
   if (dataset.cases.some((item) => !item.review.reviewedBy))
     blockers.push('人手ラベルの確認が未完了');
-  if (holdout.some((item) => !item.complete)) blockers.push('holdoutが未評価または入力不足');
+  if (dataset.cases.some((item) => !item.complete))
+    blockers.push('tuneまたはholdoutが未評価または入力不足');
   if (dataset.packId === 'context-relevance') {
     if (tune.length !== 10 || holdout.length !== 20)
       blockers.push('30 Issue（tune 10 / holdout 20）が必要');

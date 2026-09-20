@@ -115,8 +115,13 @@ export async function evaluateAssist(
     if (blocked) return unavailable(blocked);
   }
   const annotation = await (options.evaluate ?? evaluateWithJev)(request);
-  mkdirSync(cacheDir, { recursive: true });
-  atomicJson(cachePath, annotation);
+  // A rate-limit/provider failure is advisory state, not a reusable annotation. In particular,
+  // do not let a slower failed process overwrite a successful annotation written by a concurrent
+  // worktree after both observed the same cache miss.
+  if (annotation.status === 'evaluated') {
+    mkdirSync(cacheDir, { recursive: true });
+    atomicJson(cachePath, annotation);
+  }
   return {
     source: annotation.status === 'evaluated' ? 'live' : 'unavailable',
     reason: annotation.reasonCode,

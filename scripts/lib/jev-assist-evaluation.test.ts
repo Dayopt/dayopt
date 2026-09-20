@@ -39,6 +39,9 @@ describe('Go候補は事前登録した条件を全て満たす時だけ', () =>
     ).toBe('NOT_GO');
     data.cases[6].complete = false;
     expect(evaluateAssistDataset(data).verdict).toBe('NOT_GO');
+    const tuneIncomplete = claims();
+    tuneIncomplete.cases[0].complete = false;
+    expect(evaluateAssistDataset(tuneIncomplete).verdict).toBe('NOT_GO');
   });
   it('高いF1でも反証を支持とした場合は停止する', () => {
     const data = claims();
