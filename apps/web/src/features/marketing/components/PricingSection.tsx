@@ -6,7 +6,6 @@ import {
   CardDescription,
   CardFooter,
   CardHeader,
-  CardTitle,
   Container,
 } from '@dayopt/components';
 import { dayoptProductUrls } from '@dayopt/config';
@@ -23,7 +22,7 @@ export async function PricingSection({ locale }: PricingSectionProps) {
       <Container>
         <Card className="mx-auto max-w-xl">
           <CardHeader className="text-center">
-            <CardTitle>{t('title')}</CardTitle>
+            <h2 className="text-2xl leading-none font-medium">{t('title')}</h2>
             <CardDescription>{t('description')}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4 text-center">
