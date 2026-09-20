@@ -102,9 +102,11 @@ docs へ残している。
   強制は `private.assert_public_contract_exposure_v1()`（migration 適用時）と
   `pnpm rls:snapshot:check`（CI での継続 drift 検出）の 2 層
 - **`user_id` を持たず `email` 列を持つ `public` table は purge 列挙の母集合に入らない。**
-  `user-data-purge-enumeration.integration.test.ts` の `EMAIL_KEYED_WITHOUT_USER_ID` に扱いを
-  理由付きで書く（消すなら削除経路へ足して allowlist から外す）。`email_suppressions` は
-  2026-09-20 時点で「未裁定・保持」であり、account deletion 後も raw email が残る（#2859）
+  `auth.users` から `ON DELETE CASCADE` で到達できるもの（`profiles` など）はアカウント削除で
+  消えるので対象外。**どちらでもない table**は `user-data-purge-enumeration.integration.test.ts` の
+  `EMAIL_KEYED_WITHOUT_USER_ID` に扱いを理由付きで書く（消すなら削除経路へ足して allowlist から
+  外す）。`email_suppressions` は 2026-09-20 時点で「未裁定・保持」であり、account deletion 後も
+  raw email が残る（#2859）
 - **`user_id` を持つ `public` table は、account-preserving purge
   （`delete_all_user_data_command_v3`）が直接消すか、そこから `ON DELETE CASCADE` で
   到達できるか、理由付きの allowlist に載っているかのいずれかでなければならない。**

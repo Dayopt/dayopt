@@ -89,14 +89,16 @@ const INTENTIONALLY_RETAINED: Record<string, string> = {
 };
 
 /**
- * `user_id` を持たないが個人データ（email）を持つ table と、purge / account deletion が
- * それをどう扱うか。
+ * email を持ちながら、**アカウント削除でも purge でも消えない** table と、その理由。
  *
  * 上の列挙 test は「`user_id` を持つ public table」だけを母集合にするため、email を key に
  * 持つ table はそもそも検査対象に入らない。2026-09-20 の境界検証で `email_suppressions` が
  * この死角にあった（account deletion 後も raw email が残り、Privacy Policy の「削除後 30 日
  * 以内に完全削除」と食い違う）。ここに載せるのは「決めた」ことの記録であって、正当化ではない。
  * 消す方針にした時はこの allowlist から外し、削除経路（account deletion coordinator）へ足す。
+ *
+ * **`auth.users` から `ON DELETE CASCADE` で到達できる table は対象外**（`profiles` など）。
+ * それらは `user_id` 列を持たなくてもアカウント削除で確実に消えるので、ここで決める話が無い。
  */
 const EMAIL_KEYED_WITHOUT_USER_ID: Record<string, string> = {
   email_suppressions:
@@ -254,15 +256,31 @@ describe.skipIf(!RUN_LOCAL)('account-preserving purge の列挙 (#2444)', () => 
     ).toEqual([]);
   });
 
-  it('user_id を持たず email を持つ public table は、扱いが理由付きで決まっている', () => {
+  it('email を持ちアカウント削除でも消えない public table は、扱いが理由付きで決まっている', () => {
     // 列挙 test の母集合（user_id を持つ table）から漏れる PII 保持 table を機械で拾う。
-    // email 列を持つのに user_id が無い table は、purge でも CASCADE でも消えない。
+    //
+    // `user_id` が無いだけでは「消えない」根拠にならない。`profiles` は `id` が
+    // `auth.users(id)` を `ON DELETE CASCADE` で参照するのでアカウント削除で消える。
+    // 残すべき問いは「email を持つのに、`auth.users` の削除からも purge からも
+    // 到達されない table」だけなので、CASCADE 到達分を DB 側で引いてから比べる。
     const rows = runOwnerSql(`
+      WITH RECURSIVE account_cascade(oid) AS (
+        SELECT users.oid
+        FROM pg_class AS users
+        JOIN pg_namespace AS auth_ns ON auth_ns.oid = users.relnamespace
+        WHERE auth_ns.nspname = 'auth' AND users.relname = 'users'
+        UNION
+        SELECT child.conrelid
+        FROM pg_constraint AS child
+        JOIN account_cascade ON account_cascade.oid = child.confrelid
+        WHERE child.contype = 'f' AND child.confdeltype = 'c'
+      )
       SELECT relation.relname
       FROM pg_class AS relation
       JOIN pg_namespace AS ns ON ns.oid = relation.relnamespace
       WHERE ns.nspname = 'public'
         AND relation.relkind = 'r'
+        AND relation.oid NOT IN (SELECT oid FROM account_cascade)
         AND EXISTS (
           SELECT 1 FROM pg_attribute AS email_column
           WHERE email_column.attrelid = relation.oid
@@ -287,12 +305,17 @@ describe.skipIf(!RUN_LOCAL)('account-preserving purge の列挙 (#2444)', () => 
       undecided,
       undecided.length === 0
         ? ''
-        : `email を持つが user_id を持たない table の扱いが未決: ${undecided.join(', ')}。` +
+        : `email を持ちアカウント削除でも消えない table の扱いが未決: ${undecided.join(', ')}。` +
             '消すなら削除経路へ足し、消さないなら EMAIL_KEYED_WITHOUT_USER_ID へ理由を書く',
     ).toEqual([]);
 
     const stale = Object.keys(EMAIL_KEYED_WITHOUT_USER_ID).filter((name) => !rows.includes(name));
-    expect(stale).toEqual([]);
+    expect(
+      stale,
+      stale.length === 0
+        ? ''
+        : `allowlist に死んだエントリ: ${stale.join(', ')}。削除経路へ入ったなら allowlist から外す`,
+    ).toEqual([]);
   });
 
   it('allowlist に死んだエントリが残っていない', () => {
