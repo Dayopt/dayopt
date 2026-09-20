@@ -54,12 +54,19 @@ function isOriginAllowed(origin: string | null): boolean {
     return true;
   }
 
-  // dayopt team の Vercel preview/production URL のみ許可
-  // フォーマット: `<project>-<hash>-dayopt.vercel.app` /
-  //              `<project>-git-<branch>-dayopt.vercel.app`
-  // 全 `*.vercel.app` を許可すると他テナントの悪意あるアプリから
-  // CSRF が通ってしまうため team slug でロックダウンする。
-  if (origin.match(/^https:\/\/[a-z0-9-]+-dayopt\.vercel\.app$/)) {
+  // dayopt team の Vercel deployment URL のみ許可（#2616）。
+  // フォーマット: `<project>-dayopt.vercel.app`（CLI / production alias）と
+  //              `<project>-<9 文字の英数字>-dayopt.vercel.app`（commit URL）。
+  // 全 `*.vercel.app` を許可すると他テナントの悪意あるアプリから CSRF が通るため
+  // team slug でロックダウンするが、旧 `[a-z0-9-]+-dayopt` は slug 境界を跨げた:
+  // 第三者が `evil-dayopt` という team slug を取れば `web-<hash>-evil-dayopt` が一致する。
+  // hash を 9 文字（Vercel docs 明記、ハイフンなし）に固定すると、一致には slug が
+  // ちょうど `dayopt` である必要があり、その経路が閉じる。
+  //
+  // branch URL 形（`<project>-git-<branch>-dayopt`）は branch 名にハイフンが入るため
+  // 同じ手口を regex で区別できず、許可しない。自分自身宛の POST は
+  // `getAllowedOrigins()` の `https://${VERCEL_URL}`（そのデプロイの commit URL）で通る。
+  if (origin.match(/^https:\/\/(?:product|web)(?:-[a-z0-9]{9})?-dayopt\.vercel\.app$/)) {
     return true;
   }
 

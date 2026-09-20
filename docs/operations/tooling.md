@@ -487,7 +487,7 @@ BSD-2-Clause: 12 packages (1.3%)
 
 ## 2. Routing の基準
 
-通常開発は ChatGPT Chat + Codex。短い協働原則は `AGENTS.md`、モデル選択と委譲の詳細は `.agents/skills/routing/SKILL.md` を正本とする。同じ主担当が調査・判断・実装・検証・修正まで完了し、初期の委譲対象は独立した read-only の大量調査に限る。
+通常開発は ChatGPT Chat + Codex。短い協働原則は `AGENTS.md`、モデル選択と委譲の詳細は `.agents/skills/routing/SKILL.md` を正本とする。同じ主担当が調査・判断・実装・検証・修正まで完了し、初期の委譲対象は実行時に read-only 境界を検証できる大量調査に限る。
 
 Chat は product / UX・research・仕様整理、Codex は repo に基づく判断と実装を担う。受け渡しが必要な時だけ [Chat 連携手順](./chat-handoff.md) を読む。承認済みの目的・仕様・リスク境界内の技術判断を毎回 Chat に戻さない。
 
@@ -499,7 +499,7 @@ Chat は product / UX・research・仕様整理、Codex は repo に基づく判
 
 adapter の script が存在するだけでは tool call は止まらない。runtime 側で adapter が実行前 hook として登録・起動され、block 結果を尊重する必要がある。repo は user-global 設定、直接 shell、User 自身の UI 操作、未知の tool surface を強制できない。具体的な secret 境界と残余リスクは [secrets.md](./secrets.md) を正本とする。
 
-Codex でこの project を初めて開く時は、project trust を確認し、`/hooks` で `.codex/hooks.json` の command と有効状態を User が 1 回レビューする。repo の `.codex/config.toml` に `hooks = true` があっても、runtime が project を trust して hook を読み込んだ証拠にはならない。`pnpm agent:preflight`（機械利用は `pnpm agent:preflight --json`）は依存、Git hooks、CLI、skills、Codex hook 設定ファイルの存在を確認するが、runtime の trust や実際の hook 発火は判定できない。user-global 設定はこの onboarding で変更しない。
+Codex でこの project を初めて開く時は、project trust を確認し、`/hooks` で `.codex/hooks.json` の command と有効状態を User が 1 回レビューする。repo の `.codex/config.toml` に `hooks = true` があっても、runtime が project を trust して hook を読み込んだ証拠にはならない。`pnpm agent:preflight`（機械利用は `pnpm agent:preflight --json`）は依存、Git hooks、CLI、skills、Codex hook 設定ファイル、read-only delegation の状態を確認するが、runtime の trust や実際の hook 発火は判定できない。read-only delegation は scope を runtime で強制できないため unsupported と表示され、bulk read の経路に使わない。user-global 設定はこの onboarding で変更しない。
 
 ### 実行経路ごとの保護範囲
 
@@ -510,6 +510,7 @@ Codex でこの project を初めて開く時は、project trust を確認し、
 | 秘密情報: envファイル、vault参照            | Read/Write/Edit と Bash の個別パターンを機械検査      | apply_patch の全対象・shell の個別パターンを機械検査。汎用read toolはsurface依存 | repo hook接続なし。指示で制御、実動未確認  |
 | 破壊的操作: 既存migration・他worktreeの編集 | Write/Editで機械検査。任意shell編集は保証外           | apply_patch の変更元/先・symlinkを機械検査。任意shell編集は保証外                | 指示で制御、機械保護は未対応               |
 | Git運用: force push、no-verify、直接merge等 | Bashの列挙パターンを機械検査                          | 共通Bash判定を再利用                                                             | 共通Git hookのみ。tool実行前の検査は未対応 |
+| 大量の読み取り調査                          | scope を runtime で強制できないため委譲しない         | scope を runtime で強制できないため委譲しない                                    | read-only 境界を確認できないため委譲しない |
 | コスト・利便性                              | モデル名に基づく委任制限は撤去。起動確認は共通command | 同左                                                                             | 共通commandを手動利用可能、実動未確認      |
 
 **shell の任意編集は機械的に閉じていない**。`sed -i`、`perl -pi`、`cp`、`mv`、`tee`、出力redirect、任意scriptによる既存migration・他worktreeへの書き込みを、このadapterは一般には検出しない。Codexのファイル変更は原則 `apply_patch` を使い、shell編集へ切り替えてこの検査を迂回しない（指示による制御）。hookに到達しただけで全操作が保護されるわけではない。write_stdin、hosted/specialized tool、wrapper内部の処理も同じ保証を持たない。
@@ -559,11 +560,13 @@ Codex でこの project を初めて開く時は、project trust を確認し、
 
 **自動更新、未監査スクリプトの実行、runtime のリモート取得は行わない。** UI guidelines の `command.md` は skill 本体（vercel-labs/agent-skills）とは別 repo の依存であり、上表で別行として固定する。
 
-## 6. Independent PR Review と追加契約
+## 6. Independent PR Review
 
 通常 PR の独立レビューは GitHub の `@codex review`。依頼・対象 SHA の照合・所見の裁定・再レビューは `.agents/skills/pr-cross-review/SKILL.md` を正本とする。実装 session の reviewer subagent や独自 pack を日常の必須工程にしない。未応答・古い結果・未実行は指摘0とは異なる。
 
-高リスク変更の immutable pack / role / envelope / validation は同 skill の `references/high-risk-review.md` に保持する。OpenAI / Codex を primary とし、別 provider の追加反証は任意。専用 security sweep と不可逆操作の独立レビュー条件は通常レビューで置き換えない。
+高リスク変更の immutable pack / role / envelope / validation は過去証跡を検証するため同 skill の `references/high-risk-review.md` と道具を保持するが、通常の追加 reviewer は停止中で実行しない。既存の `[review-summary]` は読み取り互換だけを残す。明示依頼された security sweep と不可逆操作の独立レビュー条件は通常レビューで置き換えない。
+
+read-only と repository scope を runtime で同時に強制できる delegate は現在ないため、大量の repository 読み取り調査は親担当が行う。現行 native delegation は実際の入力に read-only / write を区別する型がなく、判別不能な経路として read-only を含めて拒否する。runtime が別名の typed write / browser tool を提供した時だけ、User が明示した非重複 scope と既存の authority 契約に従って扱う。将来、両方を実測できる adapter が追加された場合だけ、Luna / Haiku の候補と env・timeout・fallback 契約を再評価する。
 
 ### pack の種別と契約 version
 
@@ -597,13 +600,13 @@ native worktree root の fresh Codex session による共通指示・skills の�
 
 2026-09-07、`scripts/tasks` から新規 Codex read-only セッション（gpt-5.6-sol、session `01a0796e-8943-7303-9bb3-6184e41a9b2f`）を起動し、base `393f432c6` → head `bbdb9510a` の移行差分を pack で手渡した。result envelope は `reviewed`、recommendation は `revise`、指摘 1 件だった。指摘は shell の任意編集に対する保証の過大解釈で、経路別の保護表へ保証外の操作を明記した。これは別 OpenAI セッションの反証であり、別モデル系列の反証や native hook 発火の証拠ではない。旧 SHA の所見を後続 SHA の指摘ゼロとして再利用しない。
 
-次の 3 trial は将来の実 PR で各 1 件行い、証跡はその issue / PR comment に残す。ここに別の常設 tracker は作らない。Antigravity は高リスク変更で独立した反証が有益な時の任意 adapter であり、trial の合格条件にはしない。
+次の 3 trial は過去の移行計画として記録したもので、2026-09-17 の User 指示により追加 reviewer の試行は行わない。ここに別の常設 tracker は作らない。明示依頼された `security-sweep` の契約だけは維持する。
 
 | trial                    | 対象                                                 | status  |
 | ------------------------ | ---------------------------------------------------- | ------- |
-| **通常バグ修正**         | 1 feature 内の再現可能な bug fix 1 件                | pending |
-| **複数ファイル変更**     | 複数 file / connection point を含む変更 1 件         | pending |
-| **高リスク diff review** | auth / RLS / billing / migration / 公開契約など 1 件 | pending |
+| **通常バグ修正**         | 1 feature 内の再現可能な bug fix 1 件                | stopped |
+| **複数ファイル変更**     | 複数 file / connection point を含む変更 1 件         | stopped |
+| **高リスク diff review** | auth / RLS / billing / migration / 公開契約など 1 件 | stopped |
 
 各 trial は次の 4 軸で評価する。
 

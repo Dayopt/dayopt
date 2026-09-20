@@ -416,6 +416,31 @@ describe('Stripe webhook route', () => {
     expect(releaseStripeWebhookEvent).toHaveBeenCalledWith(expect.anything(), 'evt_test123');
   });
 
+  it('解約予約中は期間終了までactiveのまま（予約時点で利用権を落とさない）', async () => {
+    // Stripe は解約を予約しても status: 'active' のまま cancel_at_period_end を立て、
+    // 期間終了時に customer.subscription.deleted を送る。予約の updated を
+    // canceled として取り込むと、支払い済みの期間が残っているユーザーの書き込みが
+    // その場で止まる（#2629 の状態×操作表では契約中と同じ扱い）。
+    eventMock.type = 'customer.subscription.updated';
+    eventMock.data.object = {
+      customer: 'cus_test123',
+      id: 'sub_test456',
+      status: 'active',
+      cancel_at_period_end: true,
+    };
+
+    const response = await POST(request());
+
+    expect(response.status).toBe(200);
+    expect(syncSubscriptionStatus).toHaveBeenCalledWith(
+      expect.anything(),
+      'cus_test123',
+      'sub_test456',
+      'active',
+    );
+    expect(syncDeletedSubscriptionStatus).not.toHaveBeenCalled();
+  });
+
   it('activation前は現行のsubscription削除経路を維持する', async () => {
     resolveBillingLifecycleMode.mockResolvedValue('legacy');
 

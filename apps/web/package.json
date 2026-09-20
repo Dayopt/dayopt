@@ -32,7 +32,7 @@
     "build": "next build",
     "start": "next start",
     "start:e2e": "next start -p 3001",
-    "test:e2e:smoke": "playwright test src/test/e2e/i18n-smoke.spec.ts",
+    "test:e2e:smoke": "playwright test src/test/e2e/i18n-smoke.spec.ts src/test/e2e/cookie-consent-withdrawal.spec.ts",
     "lint": "eslint src",
     "lint:fix": "eslint src --fix",
     "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,json,css,md}\"",

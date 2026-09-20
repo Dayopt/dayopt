@@ -1,9 +1,10 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 
+import { isMfaChallengeExpired, resolveMfaVerifyErrorKey } from '@/lib/auth/mfa-verify-error';
 import { logger } from '@/lib/logger';
 import { getSafeRedirectPath } from '@/lib/safe-redirect';
 import { captureUnexpectedError, observeAuthOperation } from '@/lib/sentry';
@@ -24,7 +25,10 @@ export default function MFAVerifyPage() {
   const params = useParams();
   const locale = (params?.locale as string) || 'ja';
   const t = useTranslations();
-  const supabase = createClient();
+  // 参照を固定する。@supabase/ssr は browser で singleton を返すのでここは保険だが、
+  // 固定しないと下の useCallback が毎レンダー作り直され、初期化の effect が回り続けて
+  // challenge を発行し直す（GoTrue の challenge rate limit を無駄に削る）。
+  const supabase = useMemo(() => createClient(), []);
 
   const [mode, setMode] = useState<VerifyMode>('totp');
   const [verificationCode, setVerificationCode] = useState('');
@@ -33,6 +37,29 @@ export default function MFAVerifyPage() {
   const [error, setError] = useState<string | null>(null);
   const [factorId, setFactorId] = useState<string | null>(null);
   const [challengeId, setChallengeId] = useState<string | null>(null);
+
+  /**
+   * challenge を発行して id を保持する。challenge には寿命があり、切れた後は
+   * 何を入力しても通らない。期限切れを検出したらここを呼び直して復帰させる。
+   */
+  const issueChallenge = useCallback(
+    async (targetFactorId: string): Promise<boolean> => {
+      const { data, error: challengeError } = await observeAuthOperation(
+        'mfa_challenge',
+        () => supabase.auth.mfa.challenge({ factorId: targetFactorId }),
+        { route: '/auth/mfa-verify' },
+      );
+
+      if (challengeError || !data) {
+        setChallengeId(null);
+        return false;
+      }
+
+      setChallengeId(data.id);
+      return true;
+    },
+    [supabase],
+  );
 
   const checkMFARequired = useCallback(async () => {
     try {
@@ -52,19 +79,10 @@ export default function MFAVerifyPage() {
         if (verifiedFactor) {
           setFactorId(verifiedFactor.id);
 
-          const { data: challengeData, error: challengeError } = await observeAuthOperation(
-            'mfa_challenge',
-            () => supabase.auth.mfa.challenge({ factorId: verifiedFactor.id }),
-            { route: '/auth/mfa-verify' },
-          );
-
-          if (challengeError) {
+          const issued = await issueChallenge(verifiedFactor.id);
+          if (!issued) {
             setError(t('common.errors.mfa.challengeFailed'));
             return;
-          }
-
-          if (challengeData) {
-            setChallengeId(challengeData.id);
           }
         } else {
           router.push(`/${locale}/calendar`);
@@ -83,9 +101,15 @@ export default function MFAVerifyPage() {
       });
       setError(t('common.errors.mfa.verifyFailed'));
     }
-  }, [router, supabase, t, locale]);
+  }, [router, supabase, t, locale, issueChallenge]);
 
+  // 初期化は mount につき 1 回。`checkMFARequired` は `t` に依存しており、その参照は
+  // レンダーごとに変わりうる。素直に依存させると effect が回り続け、そのたびに
+  // challenge を発行し直して GoTrue の rate limit を無駄に削る。
+  const initializedRef = useRef(false);
   useEffect(() => {
+    if (initializedRef.current) return;
+    initializedRef.current = true;
     queueMicrotask(() => void checkMFARequired());
   }, [checkMFARequired]);
 
@@ -116,15 +140,29 @@ export default function MFAVerifyPage() {
       );
 
       if (verifyError) {
-        throw new Error(verifyError.message);
+        // GoTrue の message は英語で provider 都合で変わる。構造化 code で写す。
+        setError(t(resolveMfaVerifyErrorKey(verifyError.code)));
+        setVerificationCode('');
+        // 期限切れは challenge を引き直せば回復する。引き直さないと、正しいコードを
+        // 入れ続けても永久に通らず、手動リロード以外に出口が無くなる。
+        if (isMfaChallengeExpired(verifyError.code)) {
+          await issueChallenge(factorId);
+        }
+        return;
       }
 
       const next = getSafeRedirectPath(searchParams?.get('next') ?? null, `/${locale}/calendar`);
       router.refresh();
       router.push(next);
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : t('common.errors.mfa.codeInvalid');
-      setError(errorMessage);
+      logger.error('MFA verify failed:', err);
+      captureUnexpectedError(err instanceof Error ? err : new Error('Unknown MFA verify error'), {
+        feature: 'auth',
+        source: 'mfa_verify',
+        operation: 'verify',
+        route: '/auth/mfa-verify',
+      });
+      setError(t('common.errors.mfa.verificationFailed'));
       setVerificationCode('');
     } finally {
       setIsVerifying(false);

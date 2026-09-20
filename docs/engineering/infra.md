@@ -312,7 +312,7 @@ GitHub Code QualityはOrganization / Repositoryの両方で無効にし、PR品�
 
 - Required checksはrepository rulesetと`.github/workflows/ci.yml`を正とし、Code Quality由来のcheckを追加しない
 - **GitHub CodeQL は 2026-08-11 に無効化すると決めた。UI 操作は本記述時点で未実施で、現在も CodeQL は動いている**（残作業は #1934。現在状態は `gh api repos/Dayopt/dayopt/code-scanning/default-setup --jq '.state'` が `configured` を返すか `not-configured` を返すかで判定する。`not-configured` を確認したらこの一文を完了形へ更新する）。無効化を決めた理由は次のとおり。 default setup が `languages: ["actions"]` で有効化されており、**workflow YAML しか解析していなかった**（`apps/` 配下の JS / TS は対象外）。#1425 の Done 条件「JavaScript / TypeScript が対象になっていることを確認する」が満たされないまま COMPLETED で close されたため、誤った前提が docs 側に残り続けていた。無効化後のセキュリティ静的解析の担当: secret は gitleaks と `pnpm secrets:check`（#2483 以前は `.github/workflows/docs-guard.yml`、現在は `ci.yml` の static job（`scripts/ci/check.mjs`））、依存は Dependabot、深掘り SAST は `/claude-security`。**`.github/workflows/**` に対する PR ごとの自動解析だけは代替が無く、無効化で失われる**（受容済み。根拠と再評価の条件は決定ログ）。再有効化する場合は `languages` に `javascript-typescript` が入っていることを `gh api repos/Dayopt/dayopt/code-scanning/default-setup` で確認する（設定画面を開いた事実では確認にならない）。判断は2026-08-11 の決定ログ（削除済み、git 履歴参照）
-- **自動の外部レビューは Codex（`chatgpt-codex-connector[bot]`）だけにしていた（2026-08-03〜2026-08-13）。** 2026-08-03 に Gemini の ai-review を撤去し、Copilot も外した（直近マージ 10 PR の実測で review / comment がともに 0 件。原因は org の Copilot seat が 0 で、automatic review が実際には機能していなかったこと）。「外部の目」を Codex の 1 系統だけにし、実装・テスト・内部レビューはすべて Claude 系という前提で品質設計していたが、**Codex（外部レビュー）は 2026-08-13 に全 PR 適用を停止し、内製クロスレビューへ一本化した**が、2026-09-01 に**クロスレビュー必須 PR に限り必須の 2 系統目として再開した**（#2529。`@codex review` で起動し、Codex 自身の review object が現 HEAD に対して存在しないと `pnpm branch:finish` が止まる）。低リスク PR では従来どおり起動しない。現在の規則は `AGENTS.md` §レビュー規則、手順は `.agents/skills/pr-cross-review/SKILL.md`
+- **自動レビューの履歴と現在の入口**: 2026-08-03 に Gemini の ai-review と Copilot を撤去し、Codex の GitHub review も適用範囲を変更してきた（当時の判断・実測は git 履歴を参照）。現在の PR 独立レビューは、リスクにかかわらず GitHub の `@codex review` を使う。追加 reviewer は 2026-09-17 の User 指示で停止中で、可用性や無応答を理由に自動起動しない。現在の規則は `AGENTS.md` §レビュー規則、手順は `.agents/skills/pr-cross-review/SKILL.md`
 - **repo ruleset「Copilot automatic first review」は 2026-08-05 に削除した。** 上記の「外した」後も ruleset 自体は active で残っており、seat 付与後に復活したのか直近 PR（#1832）へ実際にレビューを投稿し、PR ごとに約 3 課金分の Actions 実行を発生させていた。private 化後の課金源かつ（当時の）Codex 一本化方針と二重のため ruleset ごと削除。再開する場合は org の Copilot seat 割り当て（Settings → Copilot → Access）と ruleset の再作成の両方が必要
 - カバレッジ閾値が必要になった場合はVitest / CIで直接管理する
 - Code Qualityを再評価する場合は、有効化前にbilling impactと既存品質ゲートとの差分を確認する
@@ -438,6 +438,8 @@ upgrade 成功の代用にしない。適用済み migration の編集・削除�
 comment / thread（GraphQL の resolve 状態）から `not-required` / `not-started` / `pending` /
 `stale` / `complete` / `pending-adjudication` / `unknown` を判定し、commit status
 `Review policy (shadow)` に出す。状態の定義と完了証拠は `pr-cross-review` skill §Review policy。
+追加 reviewer は停止中。保護対象 path でも現 head の GitHub レビューと指摘の裁定で満たし、
+固定差分レビューの欠落・古さ・partial を別の停止条件にしない。既存証跡の読み取り互換は維持する。
 shadow 中は Codex を自動起動しない（workflow に `pull-requests: write` を渡していない）。
 review evidence の保証境界: review の submit と thread の resolve は issue_comment を出さないため、
 その直後は再評価されない。通常は修正 push → CI 完了の `workflow_run` で再評価される。
@@ -446,7 +448,7 @@ review evidence の保証境界: review の submit と thread の resolve は is
 OWNER / MEMBER / COLLABORATOR の comment だけ受理し、`status:` は単独の `reviewed` か全要素が
 `role=reviewed` の時だけ満たす。依頼と head の対応は commit 日時ではなく、その head の最新の
 pull_request run 作成時刻（切替時刻）で照合する。Codex が無応答 / 失敗でも、現 head の信頼済み
-`[review-summary]` があれば「同等の独立レビュー」として満たす（可用性を gate にしない）。
+`[review-summary]` があれば、過去に記録されたレビュー証跡の互換経路として満たす（新しい reviewer は起動しない）。
 closed / merged PR と main 以外を base にする PR は評価も発行もしない。裁定は PR の全 review
 thread（代替レビューの指摘・対象不明の応答を含む）が「信頼済み人間の返信つきで resolve」で
 なければ pending-adjudication。**review evidence の保証境界はここまで**: GitHub 上の投稿者・
@@ -584,6 +586,14 @@ required status checks の実状は ruleset が正本で、context の一覧を�
   のような「docs パスだが integration 対象」の PR で RLS drift 検査が一度も走らずに merge できる
   （#2552 で実際に空いていた穴。ci.yml の integration job の `if:` と同じ向きに揃える）。契約は
   `scripts/__tests__/finish-branch.test.ts` §軽量層（Static Checks / Unit Tests）の実走要求 が固定する
+- **docs-only PR の scripts suite は `🔍 Static Checks` が肩代わりする（2026-09-18、[#2822](https://github.com/Dayopt/dayopt/issues/2822)）。**
+  scripts のテストは `docs/` を入力に読む（`scripts/lib/scripts-taxonomy.ts` が docs 全体を walk して
+  script の分類を決める）。`📦 Unit Tests` の免除をそのままにすると、docs に 1 行足した PR が緑で merge され
+  **main で `pnpm check` が落ちる**（実際に 2 回踏んだ）。`scripts/ci/check.mjs` の `runStatic()` は
+  `shouldRunScriptsTestsInStatic(docsOnly)` が真の時だけ `pnpm test:scripts` を実行し、
+  `shouldRunStaticLanes` と排他になる（非 docs-only では `runUnit()` が同じ suite を走らせるので二重実行しない）。
+  docs を入力に持つテストだけを別 suite へ切り出す案は採らない（対象一覧を人手で維持すると、新しく docs を
+  読み始めたテストが静かに漏れる）
 - **`ci.yml` / `scripts/ci/check.mjs` は `INTEGRATION_GLOBS` に含める（#2539）。** integration を独立 job へ
   切り出した結果、job まるごとが `if:` で skip されうるようになった。配線を持つこの 2 ファイルを
   中立扱いのままにすると、**配線を変えた当の job を一度も実走させずに merge** できる（`nightly.yml` を
@@ -645,19 +655,16 @@ required status checks の実状は ruleset が正本で、context の一覧を�
   `Audit Vercel metadata (trusted)` という CheckRun として出ている。したがって trusted base 実行の
   workflow でも、gate のために commit status を自分で publish する必要は無い。
   `Production Config Audit` という StatusContext が別に存在するのは、job 名から独立した固定 context を
-  持たせるため（`finish-branch.sh` の trusted dispatch 免除がこの context 名で照合する）。
+  持たせるため（`finish-branch.sh` はこの context 名と guard の check 名で advisory 判定を行う）。
   **ただしこの context を ruleset の required 指定に使ってはいけない**（2026-09-03、#2571）。
   PR で publish されるのは `pull_request_target` の `paths` に一致する contract 変更 PR だけになり、
   それ以外の PR では status も check run も存在しない。required にすると、2026-08-05 の
   `ci.yml` paths-ignore 撤去（PR #1836）と同じく「永久に `expected` のまま」で全 PR が
   merge 不能になる。**2026-09-07 の public 化で ruleset が有効化され、この落とし穴が実際に発生した**
   （全 PR が `mergeStateStatus: BLOCKED`、5 日で 34 回の手動 dispatch で回避。2026-09-13 に [#2640](https://github.com/Dayopt/dayopt/issues/2640) で required から外して解消）
-- **外部モデルの自動 diff レビュー（ai-review / Gemini）は 2026-08-03 に撤去した。** レビューは
-  外部レビュー（Codex。2026-08-13 に全 PR 適用を停止し、2026-09-01 にクロスレビュー必須 PR 限定で
-  必須化して再開、#2529）と Claude の内部レビュー（`AGENTS.md §委任・報告の作法`
-  §Read-only delegation の `risk-reviewer` / `behavior-verifier` / `architecture-guard`）に一本化して
-  いたが、現在は内製クロスレビュー（`.agents/skills/pr-cross-review/SKILL.md`）が merge gate の標準を
-  担う。判定基準だった不変条件カタログは [invariants.md](./invariants.md) に残っている
+- **外部モデルの自動 diff レビュー（ai-review / Gemini）は 2026-08-03 に撤去した。** 現在の
+  PR 独立レビューは GitHub の `@codex review` で、追加の内部 / 外部 reviewer は停止中。
+  旧レビューで蓄積した不変条件カタログは [invariants.md](./invariants.md) に残っている。
 - `ci.yml` は docs / rules のみの変更でも **workflow 自体は起動し**、`gate` job（Impact Resolver）の
   判定を各 job の `if:` に配って skip する。**skip された job は required status check として success
   扱いになる**ため、実行コストを避けつつ merge gate も満たせる。`paths-ignore` は 2026-08-05 に撤去した
@@ -686,31 +693,53 @@ required status checks の実状は ruleset が正本で、context の一覧を�
   名前を特定できない entry は畳まず全件残す。契約は
   `scripts/__tests__/finish-branch.test.ts` が固定する（#1768）
 
-- **audit contract 変更 PR の guard failure は trusted dispatch で解除する。**
+- **audit contract 変更 PR の guard failure は advisory（2026-09-18、[#2469](https://github.com/Dayopt/dayopt/issues/2469)）。merge は止めない。**
   `production-config-audit.yml` は audit contract 保護対象（`scripts/ci/production-config-audit.mjs` /
   各 `production-build-gate.mjs` / workflow 自身）を変更する PR で、`pull_request_target` の check run
   `Audit Vercel metadata (trusted)` を設計として必ず failure にする（PR code に contract 変更を
-  自己検証させないため）。**2026-09-03（#2571）以降、`pull_request_target` にはこの 4 path の
-  `paths` filter が付いており、そもそも contract 変更 PR でしか workflow が起動しない**
-  （それ以外の PR では check run も status も存在しないので、免除の判定自体が走らない）。
-  live な env drift の検出は日次 cron・`push:main`・promote 経路の `runProductionConfigAudit` が担う。
-  **ただし checkpoint を `paths` だけに委ねてはいない。** workflow が起動しない条件は `paths` の
-  意味論だけでなく、Actions の一時 Disable・base 側の workflow 定義の破損（`pull_request_target` は
-  base 側の定義で評価される）・`paths` の書き間違い・changed files が 3,000 件を超えた時の GitHub 仕様を
-  含み、いずれも「PR code に contract 変更を自己検証させない」設計を静かに無効化する。そこで
-  `finish-branch.sh` は **workflow の起動有無と独立に**、contract を変えた PR へ status
-  `Production Config Audit` の success を要求する（判定は `protected-path-gate.mjs` の `auditContract`）。
-  **変更ファイル一覧そのものを取得できなかった PR も要求する** — contract 変更を否定できない以上、
-  通す理由が無い（#2586 で Codex と architecture-guard の両系統から同じ指摘）。解除は **push ごとに** `gh workflow run production-config-audit.yml --ref <branch>`
-  の trusted dispatch を実行する。成功すると commit status `Production Config Audit` が head SHA へ
-  success で発行される。workflow_dispatch run の check run は PR の `statusCheckRollup` に紐づかないため
-  畳み込みでは解消できず、`finish-branch.sh` は **status `Production Config Audit` が success の時に限り**
-  guard check run の failure を失敗数から除外する（照合は 型 + workflow 名 + check 名 / context の完全一致のみ）。
-  fail-closed: audit が本当に落ちた PR も dispatch 未実行の contract 変更 PR も status は failure のまま
-  免除は発動せず、status は SHA ごとの発行なので新しい push で自動的にリセットされる。免除対象は
-  guard の `conclusion: failure` だけで、`cancelled` / `timed_out`（監査が完走していない状態）は
-  従来どおり停止する。**dispatch は branch 側の workflow 定義と audit script に `VERCEL_TOKEN` を
-  渡して実行される**ため、contract 変更 PR の diff をレビューした後に、ユーザーの明示指示で実行する。
+  自己検証させないため）。**この failure は「contract 4 path を触った」という事実だけを表し、
+  diff の良し悪しを一切表していない。** 本物の監査結果は `workflow_dispatch` run 側にあり、
+  その run の check は PR の `statusCheckRollup` に載らない。`finish-branch.sh` はこの check run と
+  固定 context `Production Config Audit` の status を、`Validation (shadow)` / `Review policy (shadow)` と
+  同じ advisory として失敗数から外す（照合は 型 + workflow 名 + check 名 / context の完全一致のみ。
+  同名でも別 workflow の check、同じ workflow の別 job、その他の failure は従来どおり merge を止める）。
+  **無条件に advisory にはしない。** workflow の `Enforce audit result` は「contract を変えた」
+  （設計上の failure）でも「Vercel の env metadata が Production contract と食い違う」（本物の drift）でも
+  exit 1 するため、check run の conclusion と status の state では両者を区別できない。分けられるのは
+  status の `description` だけで、**advisory にしてよい 2 文言の完全一致（allowlist）で判定する**:
+
+  | description                                              | 扱い                                       |
+  | -------------------------------------------------------- | ------------------------------------------ |
+  | `Audit contract changed; trusted head audit is required` | advisory（この head に監査結果は無い）     |
+  | `Vercel metadata matches the Production contract`        | advisory（trusted dispatch の監査が pass） |
+  | `Vercel metadata does not match the Production contract` | 停止                                       |
+  | 上記以外・取得失敗・status 不在                          | 停止（fail closed）                        |
+
+  既定を advisory 側に置くと、workflow が将来 failure 文言を追加した時に**本物の失敗が無言で除外される**。
+  **`gh pr view --json statusCheckRollup` は StatusContext の description を返さない**
+  （context / state / startedAt / targetUrl のみ）ので、guard が落ちている時だけ
+  `gh api --paginate 'repos/{owner}/{repo}/commits/<head>/statuses?per_page=100'` を引いて最新 1 件を読む。
+  **全ページ取る**のは、combined status API が既定で先頭 30 件しか返さず、controller の再評価で
+  `Production Config Audit` が押し出されると contract 変更 PR の `branch:finish` が恒久的に止まるため
+  （PR #2834 の head で実測 28 件。`validation-shadow-report.mjs` が同じ理由で `per_page=100` を使っている）。
+  **境界**: contract を変えた PR で同時に live な drift が起きていても、workflow は `CONTRACT_CHANGED` を
+  `AUDIT_EXIT` より優先するため description は「監査結果なし」になり、ここでは drift を検出できない。
+  drift は PR の diff ではなく production の現況なので、検出は push:main / nightly / promote の
+  `runProductionConfigAudit` が担う。
+  **2026-09-03（#2571）から 2026-09-18 まで、ここは contract 変更 PR に status success を必須にしていた。**
+  撤去した理由は 3 つ。(1) merge の遮断は 2026-09-13（[#2640](https://github.com/Dayopt/dayopt/issues/2640)）以降 main の ruleset 1 本で、
+  required checks に `Production Config Audit` は含まれない。この checkpoint は `branch:finish` だけに効く
+  非対称な local gate で、`gh api` 直叩きの merge は同じ PR をそのまま通していた。(2) status は SHA ごとの
+  発行なので、**追従 merge だけの push にも同じ重さの人間 gate**を要求した（[#2464](https://github.com/Dayopt/dayopt/pull/2464) で 1 PR に 3 回。
+  3 回目はレーンの変更を 1 行も含まない main 取り込み）。(3) contract 変更の可視化は
+  `protected-path-gate.mjs` 由来の advisory review 推奨が担い、live な env drift の検出は日次 cron・
+  `push:main`・promote 経路の `runProductionConfigAudit` が担う。
+  **trusted dispatch は残っている。** merge 前に手で確かめたい時は、contract 変更 PR の diff を
+  レビューしたうえで `gh workflow run production-config-audit.yml --ref <branch>` を実行する。
+  **dispatch は branch 側の workflow 定義と audit script に `VERCEL_TOKEN` を渡して実行される**ため、
+  ユーザーの明示指示で実行する（merge の条件ではなく、任意の pre-merge 確認）。
+  なお `pull_request_target` には contract 4 path の `paths` filter が付いており、それ以外の PR では
+  check run も status も存在しない。
   契約は同じく `scripts/__tests__/finish-branch.test.ts` が固定する
 
 段階的導入案と当時の計測値は履歴であり、現行構成として複製しない。経緯は ADR-016（削除済み、git 履歴参照） に残す。
@@ -748,10 +777,12 @@ Dayopt は bot 対策として **Cloudflare Turnstile** を使う。reCAPTCHA v3
 
 ### 適用範囲
 
-| 画面                | repo | 対象フロー             | 検証主体                       |
-| ------------------- | ---- | ---------------------- | ------------------------------ |
-| `/contact` フォーム | web  | Resendメール配送前     | 自前 siteverify POST           |
-| `/signup` フォーム  | app  | `supabase.auth.signUp` | Supabase Auth (Bot Protection) |
+| 画面                      | repo | 対象フロー                            | 検証主体                       |
+| ------------------------- | ---- | ------------------------------------- | ------------------------------ |
+| `/contact` フォーム       | web  | Resendメール配送前                    | 自前 siteverify POST           |
+| `/auth/signup` フォーム   | app  | `supabase.auth.signUp`                | Supabase Auth (Bot Protection) |
+| `/auth/login` フォーム    | app  | `signInWithPassword` / 確認メール再送 | Supabase Auth (Bot Protection) |
+| `/auth/password` フォーム | app  | `resetPasswordForEmail`               | Supabase Auth (Bot Protection) |
 
 widget は 1 つ（`agent/turnstile`）で **1 widget 複数 hostname**（`dayopt.app` / `localhost` / `*.vercel.app`）をカバーする。環境別に site-key を分けない。
 
@@ -761,14 +792,17 @@ widget は 1 つ（`agent/turnstile`）で **1 widget 複数 hostname**（`dayop
 
 ```
 src/lib/turnstile/
-├── config.ts       # SITE_KEY + isTurnstileEnabled()
-├── Turnstile.tsx   # <Turnstile> widget ラッパ
-└── index.ts        # barrel
+├── config.ts             # SITE_KEY + isTurnstileEnabled()
+├── Turnstile.tsx         # <Turnstile> widget ラッパ
+├── useTurnstileGate.ts   # 3 フォーム共通の状態（到達不能判定・送信可否）
+└── index.ts              # barrel
 ```
 
-- `SignupForm.tsx` が `<Turnstile onSuccess={setToken}>` で token を state に保持
-- `useAuthStore.signUp(email, password, { captchaToken })` で Supabase へ渡す
+- login / signup / パスワードリセットの 3 フォームが `useTurnstileGate` で token を保持
+- `useAuthStore.signIn / signUp / resetPassword(..., { captchaToken })` で Supabase へ渡す
 - Supabase が secret 検証する（app は secret を持たない）
+- **app の widget は `appearance: 'interaction-only'`**（2026-09-18）。通常は高さ 0 で見えず、Cloudflare が対話を求めた時だけチェックボックスが出る。challenge の実行も token の検証も `always` と同じで、bot 対策は弱まらない。dashboard 側の widget type は **Managed** のままにする（`invisible` / `non-interactive` へ変えると、疑われた利用者に解き直す経路が無くなり `captcha_failed` で詰む。site key は web の問い合わせフォームと共有なので影響範囲も広い）
+- widget が場所を取り始めたかは `onBeforeInteractive`（`useTurnstileGate.interactive`）で受け、フォーム側は**余白の出し分けにだけ**使う。表示の可否には使わない
 
 #### web repo
 
@@ -892,7 +926,6 @@ Cloudflare 公式の dev 用テストキーを使う場合でも、repo docs や
 
 - **app の API route 化**: signup / signin は client-side Supabase 直呼び。将来 server-side で追加の anti-abuse（IP 評価、メールドメイン検査など）を挟むなら、その時点で route と rate limiter を新設する。かつて存在した `/api/auth` route は呼び出し元ゼロの攻撃面だったため #1942 で削除済みで、再利用できる残骸は無い
 - **Turnstile analytics 活用**: Cloudflare dashboard の challenge 通過率 / 失敗率を週次で確認する運用を確立する
-- **ログイン flow への適用**: ブルートフォース対策として login にも Turnstile を追加する余地あり（現状は rate limit のみ）
 
 ---
 
@@ -1001,6 +1034,8 @@ product の contract test は「外部 I/O をする route は **Supabase 1 往�
 UptimeRobot は 5 分間隔の HTTP status 監視で、**503 も 504 も同じく DOWN 扱い**なので alert の発火条件は変わらない。`checkRedis` の `redis.ping()` は #1967（2026-08-13）で `AbortSignal.timeout(REDIS_CHECK_TIMEOUT_MS = 5_000)` を fetch レイヤの signal として渡すようになり、Upstash が無応答でも 5 秒で abort して `logger.error('[health] dependency check failed', ...)` + 503 を返す。maxDuration 30 秒まで張り付いて 504 になる窓は閉じた。
 
 alert policy の文言は「`/api/health` が 503 を返す」なので、504 が出た場合も unhealthy と読む（原因不明の 504 が出たら `checkRedis` 以外の予期しない hang を疑う）。
+
+**`/api/health` は Sentry の transaction としては観測できない。** Sentry の inbound filter `filtered-transaction` が名前で health check を落とすため、この route の transaction / span は ingest 時に 100% 破棄される（2026-09-18 実測。詳細と ingest 生死の正しい測り方は [monitoring](../operations/monitoring.md) §Sentry runtime contract）。この route の可用性の正本は UptimeRobot と Vercel function log であって Sentry ではない。
 
 #### tRPC が 60 の理由（旧 300 から #1965 で引き下げ）
 
@@ -1271,6 +1306,35 @@ locale 不正 / path 不在    → [locale]/error.tsx, not-found.tsx, root not-f
 監視・計測の運用は `docs/operations/monitoring.md` を参照。
 
 Next.js のビルド時最適化（PPR、prefetch、bundle 最適化等）は [`conventions-frontend.md`](./conventions-frontend.md) の「Next.js パフォーマンス最適化」セクションを参照。
+
+### Sentry trace と Supabase logs の相関（#2728）
+
+Supabase 宛の request に W3C `traceparent` を付け、Sentry の trace と Supabase の API Gateway / Edge Function logs を同じ `trace_id` で突き合わせる。
+
+**3 点が揃って初めて header が付く。1 つでも欠けると silent に no-op になる**（supabase-js は warn を 1 度出すだけで、request 自体は成功する）。
+
+| #   | 場所                                               | 内容                                                                                                                                                         |
+| --- | -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1   | `apps/product/src/instrumentation.ts` の Node 分岐 | `import '@supabase/supabase-js/tracing'`。OpenTelemetry の trace context extractor を `globalThis` へ登録する                                                |
+| 2   | `apps/product/sentry.server.config.ts`             | `propagateTraceparent: true`。**SDK の既定は `false`** で `sentry-trace` / `baggage` しか書かず、supabase-js は「非 W3C propagator」として header を付けない |
+| 3   | 各 Supabase client factory                         | `tracePropagation: SUPABASE_TRACE_PROPAGATION`（`apps/product/src/lib/supabase/trace-propagation.ts`）                                                       |
+
+**Node runtime だけが対象**。経路ごとの可否は SDK の実装で決まっていて、設定では変えられない。
+
+| runtime                                               | 伝播   | 理由                                                                               |
+| ----------------------------------------------------- | ------ | ---------------------------------------------------------------------------------- |
+| Node（Route Handler / RSC / tRPC / cron）             | する   | `@sentry/node` が `propagation.setGlobalPropagator(new SentryPropagator())` を呼ぶ |
+| Edge（`src/proxy.ts` → `lib/supabase/middleware.ts`） | しない | `@sentry/vercel-edge` は `@opentelemetry/api` を持たない                           |
+| Browser（`lib/supabase/client.ts`）                   | しない | `@sentry/browser` は `@opentelemetry/api` を使わない                               |
+
+browser を将来カバーするなら、Sentry browser 側の `tracePropagationTargets` に Supabase origin を足して `propagateTraceparent` を有効化する別経路になる（全 outgoing fetch と CORS への影響を伴う）。
+
+**触る時の注意**:
+
+- 新しい client factory を足したら `apps/product/src/lib/supabase/trace-propagation-wiring.test.ts` の分類へ追加する。列挙漏れは同 test が落とす
+- 伝播先は supabase-js が Supabase の origin に限定する。第三者へ header は出ない
+- `respectSamplingDecision` は既定の `true` のまま。未 sample の trace にも `traceparent` だけが付き、`tracestate` / `baggage` は落ちる（相関には十分なので、相関のために sampling は上げない）
+- `sendOperationData` 等の追加収集は有効化しない（PII 最小化の維持）
 
 ---
 

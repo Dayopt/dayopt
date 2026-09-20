@@ -53,16 +53,16 @@ const ACTIVITY_NAME = IDENTITY.activityName;
 /**
  * カレンダーグリッド上を hourFrom → hourTo までドラッグ選択する。
  *
- * - グリッドは 00:00-24:00 を等分するので hourHeight = grid高さ / 24
+ * - 実際の時間セルから hourHeight を測り、レンダー中の外側グリッド高さには依存しない
  * - ドラッグ選択は mouse イベント + 5px 超の移動で成立（useDragSelection.ts）
  * - 対象時間帯が viewport 外だと mouse 座標が届かないため、先にスクロールで露出させる
  */
 async function dragSelect(page: Page, hourFrom: number, hourTo: number) {
-  const { box, hourHeight } = await revealHour(page, hourFrom);
+  const { box, hourBox, hourHeight } = await revealHour(page, hourFrom);
 
   const x = box.x + box.width * 0.6; // record lane 側
-  const yFrom = box.y + hourHeight * hourFrom;
-  const yTo = box.y + hourHeight * hourTo;
+  const yFrom = hourBox.y;
+  const yTo = hourBox.y + hourHeight * (hourTo - hourFrom);
 
   await page.mouse.move(x, yFrom);
   await page.mouse.down();

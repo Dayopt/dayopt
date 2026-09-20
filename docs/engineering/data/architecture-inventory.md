@@ -2352,13 +2352,14 @@ graph LR
 </details>
 
 <details>
-<summary>test の候補（56）</summary>
+<summary>test の候補（57）</summary>
 
 <!-- prettier-ignore -->
 | ファイル | 対応の根拠 |
 | --- | --- |
 | [apps/product/src/features/settings/components/AccountDeletionDialog.retry.test.tsx](<../../../apps/product/src/features/settings/components/AccountDeletionDialog.retry.test.tsx>) | feature: settings |
 | [apps/product/src/features/settings/components/BillingSettings.billing-operation.test.tsx](<../../../apps/product/src/features/settings/components/BillingSettings.billing-operation.test.tsx>) | feature: settings |
+| [apps/product/src/features/settings/components/DataSettings.analytics-consent.test.tsx](<../../../apps/product/src/features/settings/components/DataSettings.analytics-consent.test.tsx>) | feature: settings |
 | [apps/product/src/features/settings/components/DataSettings.csv-export.test.tsx](<../../../apps/product/src/features/settings/components/DataSettings.csv-export.test.tsx>) | feature: settings |
 | [apps/product/src/features/settings/components/DataSettings.mcp-url.test.tsx](<../../../apps/product/src/features/settings/components/DataSettings.mcp-url.test.tsx>) | feature: settings |
 | [apps/product/src/features/settings/components/DisplaySettings.test.tsx](<../../../apps/product/src/features/settings/components/DisplaySettings.test.tsx>) | feature: settings |
@@ -2492,7 +2493,7 @@ graph LR
 </details>
 
 <details>
-<summary>test の候補（16）</summary>
+<summary>test の候補（17）</summary>
 
 <!-- prettier-ignore -->
 | ファイル | 対応の根拠 |
@@ -2510,6 +2511,7 @@ graph LR
 | [apps/product/src/features/auth/server/user-service.test.ts](<../../../apps/product/src/features/auth/server/user-service.test.ts>) | feature: auth |
 | [apps/product/src/features/auth/server/welcome-email.test.ts](<../../../apps/product/src/features/auth/server/welcome-email.test.ts>) | feature: auth |
 | [apps/product/src/features/auth/stores/resolve-user-id.test.ts](<../../../apps/product/src/features/auth/stores/resolve-user-id.test.ts>) | feature: auth |
+| [apps/product/src/features/auth/stores/useAuthStore.sessionExpired.test.ts](<../../../apps/product/src/features/auth/stores/useAuthStore.sessionExpired.test.ts>) | feature: auth |
 | [apps/product/src/features/auth/stores/useAuthStore.updatePassword.test.ts](<../../../apps/product/src/features/auth/stores/useAuthStore.updatePassword.test.ts>) | feature: auth |
 | [apps/product/src/lib/test/integration/mfa-recovery-codes-lockdown.integration.test.ts](<../../../apps/product/src/lib/test/integration/mfa-recovery-codes-lockdown.integration.test.ts>) | DB 関数: count_unused_recovery_codes |
 | [apps/product/src/lib/test/integration/rls-access.integration.test.ts](<../../../apps/product/src/lib/test/integration/rls-access.integration.test.ts>) | DB 関数: count_unused_recovery_codes / DB 関数: use_recovery_code |

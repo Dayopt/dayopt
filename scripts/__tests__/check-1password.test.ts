@@ -5,11 +5,13 @@ import { join, resolve } from 'node:path';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { forbiddenFields, onePasswordEnvSchema } from '../tasks/env/schema';
+import { forbiddenFields, onePasswordEnvSchema, operationalItems } from '../tasks/env/schema';
 
 const rootDir = resolve(import.meta.dirname, '../..');
 const temporaryDirectories: string[] = [];
 const sentinelSecret = 'sentinel-secret-must-not-appear';
+/** check-1password.ts の EXPIRY_LABEL_PATTERN と同じ。fixture の値を日付にするため。 */
+const EXPIRY_LIKE_LABEL = /^(有効期限|expires?|expiry|expiration|valid until)$/i;
 
 const fakeOpScript = `#!/bin/sh
 case "$1" in
@@ -62,6 +64,8 @@ function createFakeOpDirectory(): string {
 
 interface CheckOptions {
   emptyField?: string;
+  /** fixture から丸ごと取り除く field。EMPTY ではなく MISSING_FIELD の経路を通す */
+  omitField?: string;
   missingItem?: string;
   mode?: 'error' | 'invalid-json';
   /** true にすると agent/supabase と human/resend-send が禁止 field を持ったまま残っている状態を再現する */
@@ -78,11 +82,21 @@ function runCheck(options: CheckOptions = {}) {
     ...new Set([
       ...onePasswordEnvSchema.map((entry) => entry.field),
       ...forbiddenFields.map((entry) => entry.field),
+      // operational item が必須と宣言した field も揃った状態を既定にする。
+      // ここを足さないと、item は在るのに field が無い状態が既定になってしまう。
+      ...operationalItems.flatMap((item) => item.requiredFields ?? []),
     ]),
   ].map((field) => ({
     id: field,
     label: field,
-    value: field === options.emptyField ? '' : sentinelSecret,
+    value:
+      field === options.emptyField
+        ? ''
+        : // 期限を表すラベルには日付を入れる。sentinel 文字列のままだと
+          // EXPIRY_UNREADABLE として落ちる（それは別のテストで確かめる）
+          EXPIRY_LIKE_LABEL.test(field)
+          ? '2099-01-01'
+          : sentinelSecret,
   }));
   if (options.expiry) {
     fields.push({
@@ -99,9 +113,12 @@ function runCheck(options: CheckOptions = {}) {
       .filter((entry) => entry.vault === 'agent' && entry.item === 'supabase')
       .map((entry) => entry.field),
   );
+  const presentFields = options.omitField
+    ? fields.filter((field) => field.id !== options.omitField)
+    : fields;
   const stagingSupabaseFields = options.leakForbidden
-    ? fields
-    : fields.filter((field) => !forbiddenNames.has(field.id));
+    ? presentFields
+    : presentFields.filter((field) => !forbiddenNames.has(field.id));
   // human/resend-send も webhook secret の複製を持たない（是正済みの状態）
   const resendSendForbidden = new Set(
     forbiddenFields
@@ -109,15 +126,15 @@ function runCheck(options: CheckOptions = {}) {
       .map((entry) => entry.field),
   );
   const resendSendFields = options.leakForbidden
-    ? fields
-    : fields.filter((field) => !resendSendForbidden.has(field.id));
+    ? presentFields
+    : presentFields.filter((field) => !resendSendForbidden.has(field.id));
 
   return spawnSync('pnpm', ['exec', 'tsx', 'scripts/tasks/env/check-1password.ts'], {
     cwd: rootDir,
     encoding: 'utf8',
     env: {
       ...process.env,
-      FAKE_OP_ITEM_JSON: JSON.stringify({ fields }),
+      FAKE_OP_ITEM_JSON: JSON.stringify({ fields: presentFields }),
       FAKE_OP_MISSING_ITEM: options.missingItem ?? '',
       FAKE_OP_MISSING_VAULT: options.missingVault ?? '',
       FAKE_OP_MODE: options.mode ?? '',
@@ -163,11 +180,44 @@ describe('check-1password.ts', () => {
     expect(result.stdout).not.toContain('EXPIRED');
   });
 
-  it('期限 field を日付として読めない時は値を出さずに知らせる', () => {
+  it('期限 field を日付として読めない時は値を出さずに失敗する', () => {
     const result = runCheck({ expiry: { label: '有効期限', value: sentinelSecret } });
 
     expect(result.stdout).toContain('EXPIRY_UNREADABLE');
     expect(result.stdout).not.toContain(sentinelSecret);
+    // 読めない期限は期限として機能しない。警告で流すと期限切れ検出が黙って無効になる
+    expect(result.status).toBe(1);
+  });
+
+  it('operational item の必須 field が実在しなければ失敗する', () => {
+    const declared = operationalItems.find((item) => item.requiredFields?.length);
+    expect(declared, 'requiredFields を宣言した operational item が無い').toBeDefined();
+    const field = declared?.requiredFields?.[0] ?? '';
+
+    // 空値ではなく field ごと取り除く。getField の欠落検出が壊れた回帰を捕まえる
+    const result = runCheck({ omitField: field });
+
+    expect(result.stdout).toContain(
+      `${declared?.vault} / ${declared?.item} / ${field}: MISSING_FIELD`,
+    );
+    expect(result.status).toBe(1);
+  });
+
+  it('operational item の必須 field が空でも失敗する', () => {
+    const declared = operationalItems.find((item) => item.requiredFields?.length);
+    const field = declared?.requiredFields?.[0] ?? '';
+
+    const result = runCheck({ emptyField: field });
+
+    expect(result.stdout).toContain(`${declared?.vault} / ${declared?.item} / ${field}: EMPTY`);
+    expect(result.status).toBe(1);
+  });
+
+  it.each(['2026-02-30', '2026-13-01'])('正規化される不正な日付 %s は期限として認めない', (raw) => {
+    const result = runCheck({ expiry: { label: '有効期限', value: raw } });
+
+    expect(result.stdout).toContain('EXPIRY_UNREADABLE');
+    expect(result.status).toBe(1);
   });
 
   it('参照先と状態だけを表示し、取得した値を出力しない', () => {

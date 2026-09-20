@@ -47,6 +47,20 @@ describe('Product server/edge Sentry runtime configuration', () => {
     expect(edgeSampler({ inheritOrSampleWith: (sampleRate) => sampleRate })).toBe(0.05);
   });
 
+  it('NodeだけW3C traceparentを送出する（#2728）', async () => {
+    vi.stubEnv('VERCEL_ENV', 'production');
+
+    await import('./sentry.server.config');
+    await import('./sentry.edge.config');
+
+    // SDK の既定は false で sentry-trace / baggage しか書かない。false のままだと
+    // supabase-js は「非 W3C propagator」として header を付けない。
+    expect(sentry.init.mock.calls[0]?.[0].propagateTraceparent).toBe(true);
+    // Edge の @sentry/vercel-edge は OpenTelemetry の global propagator を登録しないので、
+    // 有効にしても Supabase への伝播には効かない。非対称を意図として固定する。
+    expect(sentry.init.mock.calls[1]?.[0].propagateTraceparent).toBeUndefined();
+  });
+
   it.each(['preview', 'development'])('%sでは初期化しない', async (vercelEnv) => {
     vi.stubEnv('VERCEL_ENV', vercelEnv);
 

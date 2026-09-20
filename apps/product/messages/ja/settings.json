@@ -555,6 +555,14 @@
           "enabled": "有効",
           "disabled": "無効"
         },
+        "unset": "未選択",
+        "allow": "分析を許可",
+        "revoke": "分析を撤回",
+        "revokeConfirmTitle": "分析への同意を撤回しますか？",
+        "revokeConfirmDescription": "ブラウザの計測とエラー監視を完全に停止するため、この画面を再読み込みします。入力途中で保存していない内容は失われます。",
+        "revokeConfirmLabel": "撤回する",
+        "saveFailed": "選択を保存できませんでした。ブラウザの保存領域が書き込みを拒否したため、分析の設定は変わっていません。",
+        "independentOrigins": "ウェブサイトとアプリの選択は、それぞれ別に保存されます。",
         "manage": "Cookie設定を管理",
         "lastUpdated": "最終更新"
       },

@@ -22,7 +22,7 @@ Dayopt が運用時に依存する外部サービスの索引。ここでは用�
 | Google Gmail             | 問い合わせの運用受信箱・返信                                                                               | [contact email](../operations/contact-email.md)                                                     | Google account settings                   |
 | 1Password                | secret の master 管理とローカル注入                                                                        | `.op-env.agent.example`、`scripts/env/`、[secrets](../operations/secrets.md)                        | 1Password admin console / invoice         |
 | Anthropic（Claude）      | 開発エージェント（Claude Code）、月次改善ループ（gardening、ローカル session で実施。Routine は不使用）    | `CLAUDE.md`、`.claude/`                                                                             | claude.ai / Anthropic console             |
-| OpenAI（ChatGPT）        | 情報収集、Codex クラウドレビュー（クロスレビュー必須 PR / `review:full` Issue で必須。規則は `AGENTS.md`） | `AGENTS.md`                                                                                         | ChatGPT settings                          |
+| OpenAI（ChatGPT）        | 情報収集、GitHub の Codex review（PR の標準独立レビュー。追加 reviewer は停止中。規則は `AGENTS.md` 参照） | `AGENTS.md`                                                                                         | ChatGPT settings                          |
 | Vercel Registrar         | `dayopt.app`の登録・更新・nameserver設定（DNSレコード自体はCloudflareが保持）                              | [infra.md §DNS管理](../engineering/infra.md#dns-管理cloudflare)                                     | Vercel dashboard / invoice                |
 
 ## 更新ルール

@@ -34,6 +34,7 @@ import superjson from 'superjson';
 
 import { env } from '@/env';
 import type { Database } from '@/lib/database';
+import { SUPABASE_TRACE_PROPAGATION } from '@/lib/supabase/trace-propagation';
 import type { Context } from '@/lib/trpc/context';
 import { appRouter } from '@/lib/trpc/root';
 import { resolveSessionAuthContext } from '@/lib/trpc/session-auth-context';
@@ -51,6 +52,7 @@ async function createSupabaseServerClient() {
     env.NEXT_PUBLIC_SUPABASE_URL,
     env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
     {
+      tracePropagation: SUPABASE_TRACE_PROPAGATION,
       cookies: {
         getAll() {
           return cookieStore.getAll();

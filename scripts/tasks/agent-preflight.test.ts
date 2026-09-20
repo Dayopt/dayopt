@@ -26,6 +26,8 @@ describe('agent preflight', () => {
     const state = collectPreflight(root);
     expect(state.dependencies).toBe(false);
     expect(state.hooks['pre-push']).toBe(false);
+    expect(state.readOnlyDelegation.wrapper).toBe(false);
+    expect(state.readOnlyDelegation.native).toContain('unsupported');
     expect(renderPreflight(state)).toContain('commit / push 前に');
   });
   it('uses repository root from a subdirectory and verifies configured hook files', () => {
@@ -53,6 +55,9 @@ describe('agent preflight', () => {
     expect(state.hooks['pre-push']).toBe(true);
     expect(state.skills).toBe(true);
     expect(state.codexHooks).toContain('unverified');
+    expect(state.readOnlyDelegation.wrapper).toBe(false);
+    expect(state.readOnlyDelegation.native).toContain('scope cannot be enforced');
+    expect(renderPreflight(state)).toContain('Read-only delegation');
   });
   it('flags a User OAuth token (classic broad scopes) as an un-isolated gh identity', () => {
     // 監査 P1-1 の実測形。token 行は parse 対象にしない
