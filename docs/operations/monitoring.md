@@ -33,14 +33,15 @@ provider plan、sampling rate、SDK versionなどの値は変わるため、pack
 
 実行主体は GitHub Actions の `production-config-audit.yml`。main への push と定期実行だけが本番監査用資格情報を受け取る。PR や branch の手動実行には渡さない。読取経路は Supabase Management API の `read_only: true` で、対象 project は既存監査と同じ production に固定する。
 
-| 対象                                                                                                      | 監査頻度                   | 異常条件                                               |
-| --------------------------------------------------------------------------------------------------------- | -------------------------- | ------------------------------------------------------ |
-| calendar-sync / external-connection-maintenance                                                           | 15分                       | 最終完了から45分超                                     |
-| calendar-account-deletion-settle                                                                          | 15分                       | 最終完了から180分超                                    |
-| expire-calendar-revoke-outbox                                                                             | 15分                       | 最終完了から3分超                                      |
-| cleanup-product-events                                                                                    | 15分                       | 最終完了から4320分超                                   |
-| cleanup-calendar-authority-retention / expire-calendar-revoke-authority / finalize-calendar-revoke-guards | 15分                       | 最終完了から180分超                                    |
-| migration / schema / RLS / ACL / default privileges                                                       | 毎日06:00 JST、main push時 | 未適用migration、repository snapshotとの差分、読取失敗 |
+| 対象                                                                                                      | 監査頻度                   | 異常条件                                                   |
+| --------------------------------------------------------------------------------------------------------- | -------------------------- | ---------------------------------------------------------- |
+| calendar-sync / external-connection-maintenance                                                           | 15分                       | 最終完了から45分超                                         |
+| calendar-account-deletion-settle                                                                          | 15分                       | 最終完了から180分超                                        |
+| billing-reconciliation                                                                                    | 15分                       | 最終完了から1560分超（日次 02:15 UTC の 1 回遅延まで許容） |
+| expire-calendar-revoke-outbox                                                                             | 15分                       | 最終完了から3分超                                          |
+| cleanup-product-events                                                                                    | 15分                       | 最終完了から4320分超                                       |
+| cleanup-calendar-authority-retention / expire-calendar-revoke-authority / finalize-calendar-revoke-guards | 15分                       | 最終完了から180分超                                        |
+| migration / schema / RLS / ACL / default privileges                                                       | 毎日06:00 JST、main push時 | 未適用migration、repository snapshotとの差分、読取失敗     |
 
 GitHub の schedule は実行時刻を保証しない。15分は起動予定の頻度であり、検知・通知の最大遅延の保証ではない。記録欠落、無効時刻、資格情報不足、API失敗も監査失敗とする。本番だけにある migration version は履歴差として表示し、schema / ACL の比較は省略しない。baseline は migration から生成し、本番から上書きしない。CI は隔離DBから型を再生成して committed types と比較する。default privileges の方針変更は #1715 で判断する。この監査はmigration履歴・RLS・ACLの比較で、列型・constraint・trigger/function本文すべての同一性を保証するものではない。
 

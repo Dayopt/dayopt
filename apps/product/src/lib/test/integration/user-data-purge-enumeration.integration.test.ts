@@ -88,6 +88,22 @@ const INTENTIONALLY_RETAINED: Record<string, string> = {
   oauth_tokens: '削除ではなく revoked_at を打って失効させる',
 };
 
+/**
+ * `user_id` を持たないが個人データ（email）を持つ table と、purge / account deletion が
+ * それをどう扱うか。
+ *
+ * 上の列挙 test は「`user_id` を持つ public table」だけを母集合にするため、email を key に
+ * 持つ table はそもそも検査対象に入らない。2026-09-20 の境界検証で `email_suppressions` が
+ * この死角にあった（account deletion 後も raw email が残り、Privacy Policy の「削除後 30 日
+ * 以内に完全削除」と食い違う）。ここに載せるのは「決めた」ことの記録であって、正当化ではない。
+ * 消す方針にした時はこの allowlist から外し、削除経路（account deletion coordinator）へ足す。
+ */
+const EMAIL_KEYED_WITHOUT_USER_ID: Record<string, string> = {
+  email_suppressions:
+    '未裁定。bounce / complaint 済み address の配信評価保護が目的で、account deletion でも消さない。' +
+    '削除後も raw email が残るため Privacy Policy と不整合（#2859 で裁定する）',
+};
+
 function runOwnerSql(sql: string): string {
   const result = spawnSync(
     'psql',
@@ -236,6 +252,47 @@ describe.skipIf(!RUN_LOCAL)('account-preserving purge の列挙 (#2444)', () => 
             'どちらでもない状態＝「決め忘れ」であり、#2162 / #2444 で 2 回起きた漏れの正体。',
           ].join('\n'),
     ).toEqual([]);
+  });
+
+  it('user_id を持たず email を持つ public table は、扱いが理由付きで決まっている', () => {
+    // 列挙 test の母集合（user_id を持つ table）から漏れる PII 保持 table を機械で拾う。
+    // email 列を持つのに user_id が無い table は、purge でも CASCADE でも消えない。
+    const rows = runOwnerSql(`
+      SELECT relation.relname
+      FROM pg_class AS relation
+      JOIN pg_namespace AS ns ON ns.oid = relation.relnamespace
+      WHERE ns.nspname = 'public'
+        AND relation.relkind = 'r'
+        AND EXISTS (
+          SELECT 1 FROM pg_attribute AS email_column
+          WHERE email_column.attrelid = relation.oid
+            AND email_column.attname = 'email'
+            AND email_column.attnum > 0
+            AND NOT email_column.attisdropped
+        )
+        AND NOT EXISTS (
+          SELECT 1 FROM pg_attribute AS owner_column
+          WHERE owner_column.attrelid = relation.oid
+            AND owner_column.attname = 'user_id'
+            AND owner_column.attnum > 0
+            AND NOT owner_column.attisdropped
+        )
+      ORDER BY relation.relname;
+    `)
+      .split('\n')
+      .filter(Boolean);
+
+    const undecided = rows.filter((name) => !(name in EMAIL_KEYED_WITHOUT_USER_ID));
+    expect(
+      undecided,
+      undecided.length === 0
+        ? ''
+        : `email を持つが user_id を持たない table の扱いが未決: ${undecided.join(', ')}。` +
+            '消すなら削除経路へ足し、消さないなら EMAIL_KEYED_WITHOUT_USER_ID へ理由を書く',
+    ).toEqual([]);
+
+    const stale = Object.keys(EMAIL_KEYED_WITHOUT_USER_ID).filter((name) => !rows.includes(name));
+    expect(stale).toEqual([]);
   });
 
   it('allowlist に死んだエントリが残っていない', () => {

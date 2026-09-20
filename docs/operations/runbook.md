@@ -428,7 +428,7 @@ force は層 3・smoke・Production Config Audit をすべて skip する。**�
 - [ ] Sentry → Issues → `tags.source:stripe_webhook` でフィルタ
 - [ ] エラー詳細とスタックトレースを確認
 - [ ] `src/app/api/webhooks/stripe/route.ts` のイベントハンドラを確認
-- [ ] 処理対象イベント: `checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.payment_failed`
+- [ ] 処理対象イベント: `checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.paid`, `invoice.payment_failed`（正本は `docs/product/specs/billing.md`。durable mode ではこれ以外の event は 500 で retry され続けるため、endpoint の購読 event をこの 5 種に限定する）
 - [ ] 修正 → push → 自動デプロイ
 - [ ] Stripe Dashboard → 失敗イベントの「Resend」
 

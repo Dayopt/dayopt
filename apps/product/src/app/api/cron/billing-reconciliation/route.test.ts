@@ -35,6 +35,8 @@ vi.mock('@/features/settings/server', () => ({
     summary.truncated,
   reconcileBillingWebhookEvents,
 }));
+const writeCronHeartbeat = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
+vi.mock('@/lib/ops/cron-heartbeat', () => ({ writeCronHeartbeat }));
 vi.mock('@/lib/sentry', () => ({ captureUnexpectedError }));
 vi.mock('@/lib/logger', () => ({
   logger: { error: loggerError, warn: vi.fn() },
@@ -99,6 +101,40 @@ describe('billing reconciliation cron', () => {
       route: '/api/cron/billing-reconciliation',
       source: 'stripe_webhook',
     });
+  });
+
+  it('照合が走った事実を heartbeat に残す（差分の有無とは独立）', async () => {
+    reconcileBillingWebhookEvents.mockResolvedValueOnce({ ...CLEAN_SUMMARY, missing: 1 });
+
+    const response = await GET(request('Bearer super-secret-cron'));
+
+    expect(response.status).toBe(503);
+    expect(writeCronHeartbeat).toHaveBeenNthCalledWith(
+      1,
+      'billing-reconciliation',
+      'started',
+      expect.any(String),
+    );
+    expect(writeCronHeartbeat).toHaveBeenNthCalledWith(
+      2,
+      'billing-reconciliation',
+      'completed',
+      writeCronHeartbeat.mock.calls[0]?.[2],
+    );
+  });
+
+  it('照合自体が失敗した時は completed を書かない（最終成功が古くなって検出される）', async () => {
+    reconcileBillingWebhookEvents.mockRejectedValueOnce(new Error('stripe down'));
+
+    const response = await GET(request('Bearer super-secret-cron'));
+
+    expect(response.status).toBe(500);
+    expect(writeCronHeartbeat).toHaveBeenCalledTimes(1);
+    expect(writeCronHeartbeat).toHaveBeenCalledWith(
+      'billing-reconciliation',
+      'started',
+      expect.any(String),
+    );
   });
 
   it('差分なしは件数だけを200で返す', async () => {
