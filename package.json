@@ -106,10 +106,7 @@
     "build-storybook": "pnpm --filter @dayopt/storybook build",
     "build:web": "pnpm --filter @dayopt/web build",
     "test:web": "pnpm --filter @dayopt/web test",
-    "agent:preflight": "node scripts/tasks/agent-preflight.mjs",
-    "review:pack": "node scripts/tasks/review-pack.mjs create",
-    "review:sweep": "node scripts/tasks/review-pack.mjs sweep",
-    "review:validate": "node scripts/tasks/review-pack.mjs validate"
+    "agent:preflight": "node scripts/tasks/agent-preflight.mjs"
   },
   "devDependencies": {
     "@ai-sdk/gateway": "4.0.85",

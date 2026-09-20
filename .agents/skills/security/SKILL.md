@@ -173,8 +173,8 @@ pnpm security:check
 ## 関連する検査経路
 
 - **`pr-cross-review` skill** — auth / RLS / service role / OAuth / webhook / billing / redirect / migration を扱う PR の `@codex review` と裁定
-- **`security-sweep` skill** — PR 差分ではなく 1 SHA の scope を読む provider 非依存の調査。候補・反証・実行証拠を候補集合として残し、その結果が `docs/engineering/threat-model.md` へ戻る
-- **`/claude-security`** — 既存コードの深掘りスキャン。`security-sweep` の researcher 段の任意の加速器で、必須ではない
+- **`gardening` skill §5** — 月次の sweep（Supabase の `get_advisors` + `pnpm security:check`）。所見は issue へ、既往は `docs/engineering/threat-model.md` へ戻る
+- **`/claude-security`** — 既存コードの深掘りスキャン。深掘りが要る月だけの任意の加速器で、必須ではない
 
 > このスキルは「実装時のガイド」、上記は「既存コードの検査」。新規コード実装時はこのスキルを、既存コードのスキャンは `/claude-security` を使う。
 

@@ -17,7 +17,7 @@ maxTurns: 20
 ## When NOT to Use
 
 - 実装や push 前のセルフレビュー（`AGENTS.md` に従う）
-- repository 全体や特定境界の security sweep（`security-sweep` skill の領域）
+- repository 全体や特定境界の security sweep（`gardening` skill §5 の月次 sweep の領域）
 - provider の可用性を新しい merge gate にするため
 
 ## 通常 PR
@@ -55,4 +55,4 @@ Validation controller（`validation-gate.yml`、[infra.md](../../../docs/enginee
 
 2026-09-17 の User 指示により、固定差分レビューと追加 reviewer の実行を停止する。高リスク変更もセルフレビューと GitHub の `@codex review` を標準にする。モデルを下げて追加 reviewer を起動することも停止対象。
 
-[固定差分レビュー手順](references/high-risk-review.md) と pack / result の道具は、過去の証跡を読めるよう残す。User が明示的に再開を指示するまで実行しない。明示依頼された `security-sweep` と本番操作の `EXPLICIT AUTHORITY` はそれぞれの契約を維持する。
+固定差分レビュー手順と pack / result の道具は 2026-09-20 に撤去した（停止から 3 日で一度も再開されず、pack を通した証跡も残っていない）。再開する時は過去の実装を git history から読む。本番操作の `EXPLICIT AUTHORITY` は従来どおり契約を維持する。
