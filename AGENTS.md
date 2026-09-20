@@ -189,7 +189,6 @@ worktree で作業するセッション（レーン）は次を守る:
 | `gardening`            | 月次改善ループ: ai:usage の 4 問 → 月に 1 変数 → 結果(未) 回収（明示依頼時のみ） |
 | `audit-ai-config`      | AI設定の棚卸し・audit                                                            |
 | `blog-ideas`           | ブログネタ提案とissue起票                                                        |
-| `usability-probe`      | repo blind な browser-only ユーザビリティプローブ実行                            |
 | `decision`             | `docs/decisions.md` への意思決定1行追記                                          |
 
 ## Deploy / Release
