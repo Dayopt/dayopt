@@ -142,6 +142,28 @@ describe('trusted validation plan', () => {
     );
     expect(result.review.status).toBe('indeterminate');
   });
+  // #2811 / PR #2868: repo 直下の設定と editor 設定が unknown へ落ちると databaseTests が
+  // applicable になり、migration が無い PR が隔離 Supabase branch を待って恒久 blocked になる。
+  it.each(['.gitignore', '.prettierignore', '.prettierrc', 'turbo.json', '.vscode/settings.json'])(
+    'treats repo config %s as policy, not an unsatisfiable database requirement',
+    (file) => {
+      const result = plan([file]);
+      expect(result.areas).not.toContain('unknown');
+      expect(result.areas).toContain('policy');
+      // migration が無いので隔離 DB は要求しない（Supabase Preview は起動しようがない）
+      expect(result.environments.databaseTests).toBe('not-applicable');
+      expect(result.review.protected).toBe(true);
+    },
+  );
+  it('still fails closed for an unrecognized nested directory', () => {
+    const result = plan(['terraform/main.tf']);
+    expect(result.areas).toContain('unknown');
+    expect(result.environments.databaseTests).toBe('disposable-local');
+  });
+  it('keeps requiring an isolated database when the PR really has a migration', () => {
+    const result = plan(['supabase/migrations/20260920000000_add_column.sql']);
+    expect(result.environments.databaseTests).toBe('disposable-local');
+  });
   it('is deterministic and explains revisions and legacy differences', () => {
     const result = plan(['AGENTS.md']);
     expect(plan(['AGENTS.md'])).toEqual(result);

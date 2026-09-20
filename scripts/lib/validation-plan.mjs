@@ -43,7 +43,20 @@ export function classifyPlanPath(file) {
     )
   )
     areas.push('dependencies');
-  if (areas.length === 0) areas.push(/^(apps|packages)\//.test(file) ? 'behavior' : 'unknown');
+  // repo 直下の設定ファイルと editor 設定は **repo の規約**であって未分類ではない。
+  // `impact.mjs` は同じ集合を `rootNeutral` / 中立 prefix（`.vscode/`）として既に知っており、
+  // plan 側だけが `unknown` へ落としていた（#2811 のコメント、#2815 と同じ class）。
+  //
+  // `unknown` は全 suite を required にするだけでなく `databaseTests` まで applicable にし、
+  // `evaluateDatabaseIsolation` が隔離 Supabase branch を要求する。しかし Supabase Preview は
+  // migration が無ければ起動しないので **PR 側に満たす手段が無く恒久 blocked** になる。
+  // `.gitignore` の 3 行削除で実発生（PR #2868 の `Validation (shadow)`）。
+  //
+  // fail closed は残す: `apps/` `packages/` 配下でも repo 直下でもない**未知のディレクトリ**
+  // （`terraform/` 等が増えた場合）は従来どおり `unknown` にする。
+  const repoConfig = !file.includes('/') || file.startsWith('.vscode/');
+  if (areas.length === 0)
+    areas.push(/^(apps|packages)\//.test(file) ? 'behavior' : repoConfig ? 'policy' : 'unknown');
   return areas;
 }
 
