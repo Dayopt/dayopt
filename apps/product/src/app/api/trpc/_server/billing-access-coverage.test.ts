@@ -74,14 +74,8 @@ function allowedAfterEnd(candidates: { path: string; type: string }[]): string[]
  * 増減には根拠が要る。許可してよいのは #2614 の状態×操作表にある「閲覧・export・削除・
  * 請求管理・再契約」だけ。
  *
- * ここに **入っていない** ことに理由がある path:
- *
- * - `email.sendPasswordChanged`: パスワード変更の通知メール。終了後のユーザーは通知を
- *   受け取れないが、これは意図した状態として固定する。この procedure は変更イベントとの
- *   紐付けも冪等性も endpoint 固有の送信上限も持たず、上限は tRPC 共通の 300 req/min
- *   だけなので、許可すると失効済みアカウントから共有送信ドメインの quota と reputation を
- *   恒久的に消費できる。体験の 45 日で自然に閉じる窓を無期限にしてしまう。
- *   通知を届けるなら Auth の変更イベントを根拠にするか一度限りの claim が要る（#2848）。
+ * パスワード変更通知は tRPC mutation ではなく Auth の変更イベントを根拠にするため、
+ * この集合にも拒否集合にも現れない（#2848）。
  */
 const MUTATIONS_ALLOWED_AFTER_END = [
   'activities.deleteActivity',

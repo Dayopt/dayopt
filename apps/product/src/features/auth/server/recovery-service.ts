@@ -4,7 +4,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 
 import { verifyRecoveryCode } from '@/lib/auth/recovery-codes';
 import type { Database } from '@/lib/database';
-import { getUserLocale, sendMfaDisabledEmail } from '@/lib/email/router';
+import { getUserLocale, sendMfaDisabledEmail } from '@/lib/email/notifications';
 import { logger } from '@/lib/logger';
 import {
   captureUnexpectedDatabaseError,

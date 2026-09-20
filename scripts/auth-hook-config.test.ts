@@ -36,6 +36,17 @@ function readFunctionBlock(slug: string): string {
     .join('\n');
 }
 
+function readConfigBlock(section: string): string {
+  const config = readFileSync(configPath, 'utf8');
+  const start = config.indexOf(`[${section}]`);
+  if (start === -1) {
+    throw new Error(`[${section}] が config.toml に宣言されていません`);
+  }
+  const rest = config.slice(start + 1);
+  const nextSection = rest.indexOf('\n[');
+  return nextSection === -1 ? config.slice(start) : config.slice(start, start + 1 + nextSection);
+}
+
 describe('supabase/config.toml の send-auth-email', () => {
   it('自動デプロイ対象として宣言されている', () => {
     // 宣言が無いと Preview / production へ配布されず、変更をマージしても本番に届かない
@@ -69,5 +80,12 @@ describe('supabase/config.toml の send-auth-email', () => {
 
     const importMapPath = resolve(import.meta.dirname, '../supabase', match![1]!);
     expect(() => readFileSync(importMapPath, 'utf8')).not.toThrow();
+  });
+});
+
+describe('supabase/config.toml の password changed notification', () => {
+  it('Auth event 起点の通知が有効', () => {
+    const block = readConfigBlock('auth.email.notification.password_changed');
+    expect(block).toMatch(/enabled\s*=\s*true/);
   });
 });

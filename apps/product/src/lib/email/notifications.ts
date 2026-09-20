@@ -1,30 +1,23 @@
 import 'server-only';
 
 /**
- * Email tRPC Router
+ * Server-side Email Notifications
  *
- * メール送信のtRPCエンドポイント
- * Resend + React Emailを使用
+ * 認証・アカウント処理から呼ぶ、クライアントに公開しない通知メール。
  */
 
-import { TRPCError } from '@trpc/server';
-import { z } from 'zod';
-
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { TRPCError } from '@trpc/server';
 
 import { AccountDeletionEmail } from '@/emails/AccountDeletionEmail';
 import { createEmailTranslator, type EmailLocale } from '@/emails/i18n';
 import { MfaDisabledEmail } from '@/emails/MfaDisabledEmail';
-import { PasswordChangedEmail } from '@/emails/PasswordChangedEmail';
 import { WelcomeEmail } from '@/emails/WelcomeEmail';
 import { getAppUrl } from '@/lib/app-url';
 import { databaseTables } from '@/lib/database';
 import { sendTransactionalEmail } from '@/lib/email/send';
-import { logger } from '@/lib/logger';
-import { captureUnexpectedDatabaseError, observeAuthOperation } from '@/lib/sentry';
+import { captureUnexpectedDatabaseError } from '@/lib/sentry';
 import { handleServiceError } from '@/lib/trpc/errors';
-import type { Context } from '@/lib/trpc/procedures';
-import { createTRPCRouter, protectedProcedure } from '@/lib/trpc/procedures';
 
 const APP_URL = getAppUrl();
 
@@ -53,36 +46,10 @@ export async function getUserLocale(
 }
 
 /**
- * 送信先メールアドレスがログインユーザー自身のものか検証する
- * 他ユーザーへのスパム送信を防止
- */
-async function verifyEmailOwnership(ctx: Context, inputEmail: string): Promise<void> {
-  const {
-    data: { user },
-    error,
-  } = await observeAuthOperation('email_verify_ownership', () => ctx.supabase.auth.getUser());
-
-  if (error) {
-    throw new TRPCError({
-      code: 'UNAUTHORIZED',
-      message: 'Authentication required',
-      cause: error,
-    });
-  }
-
-  if (!user?.email || user.email !== inputEmail) {
-    throw new TRPCError({
-      code: 'FORBIDDEN',
-      message: 'Can only send emails to your own address',
-    });
-  }
-}
-
-/**
- * tRPC / service 経路のメール送信
+ * server-side service 経路のメール送信
  *
  * 送信と suppression 判定そのものは `@/lib/email/send` が持つ（Stripe webhook と共有。
- * #2789）。ここはその結果を tRPC の契約へ翻訳するだけ — 失敗は `handleServiceError` で
+ * #2789）。ここはその結果を server-side service の契約へ翻訳するだけ — 失敗は `handleServiceError` で
  * TRPCError にして throw し、suppressed は成功として返す（呼び出し元の本体処理を
  * 巻き戻さない。セキュリティ通知の痕跡は send 側が Sentry へ残す）。
  */
@@ -229,38 +196,3 @@ export async function sendMfaDisabledEmail({
     securityNotification: true,
   });
 }
-
-/** トランザクショナルメール送信（ウェルカム / Trial / Pro / 課金 / アカウント削除）を提供する tRPC ルーター */
-export const emailRouter = createTRPCRouter({
-  sendPasswordChanged: protectedProcedure
-    .meta({ description: 'パスワード変更通知メール送信' })
-    .input(
-      z.object({
-        email: z.string().email(),
-        userName: z.string().min(1),
-      }),
-    )
-    .mutation(async ({ ctx, input }) => {
-      try {
-        await verifyEmailOwnership(ctx, input.email);
-        logger.info('Sending password changed email', { userId: ctx.userId });
-
-        const locale = await getUserLocale(ctx.supabase, ctx.userId);
-        const t = createEmailTranslator(locale);
-
-        return sendEmail({
-          to: input.email,
-          subject: t('passwordChanged.subject'),
-          react: PasswordChangedEmail({
-            userName: input.userName,
-            locale,
-            appUrl: APP_URL,
-          }),
-          context: 'Password changed email',
-          securityNotification: true,
-        });
-      } catch (error) {
-        return handleServiceError(error);
-      }
-    }),
-});

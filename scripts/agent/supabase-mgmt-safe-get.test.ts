@@ -82,6 +82,7 @@ describe('runAuthConfigSafeGet', () => {
       'jwt_exp',
       'mailer_allow_unverified_email_sign_ins',
       'mailer_autoconfirm',
+      'mailer_notifications_password_changed_enabled',
       'mailer_otp_exp',
       'mailer_secure_email_change_enabled',
       'mfa_allow_low_aal',

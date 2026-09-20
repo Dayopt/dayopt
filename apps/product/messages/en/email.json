@@ -16,12 +16,6 @@
     "valueProp": "Dayopt combines planning, time tracking, and calendar views in one place — so you can see where your time actually goes.",
     "ctaButton": "Get started"
   },
-  "passwordChanged": {
-    "subject": "Your password has been changed",
-    "heading": "Your password has been changed",
-    "body": "Your Dayopt password was successfully changed.",
-    "securityWarning": "If you didn't make this change, please reset your password immediately at {resetLink} and contact us at {supportEmail}"
-  },
   "mfaDisabled": {
     "subject": "Multi-factor authentication has been disabled",
     "heading": "Multi-factor authentication has been disabled",

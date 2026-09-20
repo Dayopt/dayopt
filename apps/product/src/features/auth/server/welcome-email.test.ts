@@ -21,7 +21,7 @@ const chain = vi.hoisted(
     },
 );
 
-vi.mock('@/lib/email/router', () => ({ sendWelcomeEmail, getUserLocale }));
+vi.mock('@/lib/email/notifications', () => ({ sendWelcomeEmail, getUserLocale }));
 vi.mock('@/lib/logger', () => ({ logger: { warn: loggerWarn, info: vi.fn(), error: vi.fn() } }));
 vi.mock('@/lib/sentry', () => ({ captureUnexpectedError, captureUnexpectedDatabaseError }));
 vi.mock('@/lib/supabase/oauth', () => ({
