@@ -32,6 +32,7 @@ import {
   gitDiffFiles,
   gitHeadSha,
   gitIsAncestor,
+  parseRedeployRequest,
   resolveProjectImpact,
 } from './production-release.mjs';
 
@@ -112,6 +113,13 @@ export async function resolveReleaseImpact({
   projectImpactImpl = resolveProjectImpact,
   storybookImpactImpl = resolveStorybookImpact,
   isAncestorImpl = gitIsAncestor,
+  /**
+   * 同一 commit の再配備要求（`production-release.mjs` の `parseRedeployRequest`）。
+   * 名指しの project は live が target SHA でも affected になり、層 3 が走る。
+   * release 側は「promote 対象 ⊆ 層 3 を通した project」を強制するので（#2574）、
+   * ここで affected にしないと再配備は必ず impact-mismatch で止まる。
+   */
+  redeploy = null,
 }) {
   // target SHA が壊れている時点で live との diff は取れない。全 suite を走らせる。
   if (!SHA_PATTERN.test(sha ?? '')) {
@@ -140,6 +148,7 @@ export async function resolveReleaseImpact({
         baseSha: state?.production?.sha,
         targetSha: sha,
         checkoutAtTarget,
+        redeployDeploymentId: redeploy?.projectName === project.name ? redeploy.deploymentId : null,
       });
       results.push({
         project,
@@ -190,11 +199,17 @@ function appendTo(envPath, body) {
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
-  resolveReleaseImpact({
-    sha: process.env.RELEASE_SHA,
-    token: process.env.VERCEL_TOKEN,
-    teamId: process.env.VERCEL_TEAM_ID,
-  })
+  // 形式不正な再配備要求は下の catch が全 suite 実行へ倒す。release job 側の同じ
+  // parse が run を失敗させるので、production には届かない。
+  Promise.resolve()
+    .then(() =>
+      resolveReleaseImpact({
+        sha: process.env.RELEASE_SHA,
+        token: process.env.VERCEL_TOKEN,
+        teamId: process.env.VERCEL_TEAM_ID,
+        redeploy: parseRedeployRequest(process.env.RELEASE_REDEPLOY),
+      }),
+    )
     .then((results) => {
       appendTo(process.env.GITHUB_OUTPUT, formatOutputs(results));
       appendTo(

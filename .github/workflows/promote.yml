@@ -43,6 +43,13 @@ on:
       simulate_failure:
         description: 'Drill only: smoke:<p> | promote:<p> | production-smoke:<p> (p = web | product)'
         required: false
+      # 同一 commit の再配備（#2735）。env だけを更新して build し直した deployment は
+      # source SHA が live と同じなので、通常 dispatch では `already serving` で終わる。
+      # 名指しの deployment だけを、層 3・smoke・Production Config Audit を維持したまま
+      # promote する。force とは併用できない（script が拒否する）。
+      redeploy:
+        description: 'Same-commit redeploy: <web|product>:<dpl_ id>. Keeps every gate. Not with force.'
+        required: false
 
 # statuses: write は release job にだけ置く（層 3 job へ commit status 発行権限を
 # 配らない）。
@@ -95,6 +102,9 @@ jobs:
           # uses the canonical 1Password/schema name VERCEL_TEAM_ID.
           VERCEL_TEAM_ID: ${{ secrets.VERCEL_ORG_ID }}
           RELEASE_SHA: ${{ github.sha }}
+          # 再配備で名指しされた project は live が target SHA でも affected にし、層 3 を
+          # 走らせる。release job と **同じ値**を渡すこと（片方だけだと impact-mismatch）。
+          RELEASE_REDEPLOY: ${{ github.event_name == 'workflow_dispatch' && inputs.redeploy || '' }}
         run: node scripts/ci/release-impact.mjs
 
   # ─── 層 3（CI 4 層再設計 #2269。2026-09-03 に nightly.yml から移設）──────────
@@ -545,6 +555,7 @@ jobs:
           # により release は run 開始時点の値ではなく false を expected として掃く。
           RELEASE_EXPECT_AUTO_ASSIGN: 'false'
           RELEASE_SIMULATE_FAILURE: ${{ github.event_name == 'workflow_dispatch' && inputs.simulate_failure || '' }}
+          RELEASE_REDEPLOY: ${{ github.event_name == 'workflow_dispatch' && inputs.redeploy || '' }}
           # project ごとに live SHA が分かれうるため、「この run の後どこが何を配信
           # しているか」を artifact に残す。部分失敗の復旧で一次情報になる。
           RELEASE_MANIFEST_PATH: release-manifest.json
