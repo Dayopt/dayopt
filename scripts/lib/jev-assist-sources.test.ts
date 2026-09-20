@@ -91,8 +91,9 @@ describe('公開資料だけを参照する', () => {
       related: [{ number: 2, title: 'PR', body: 'constraint' }],
       decisions: ['- 2026-09-19: #1 制約'],
     });
-    expect(result.candidates[0].text.split('\n')).toHaveLength(21);
+    expect(result.candidates[1].text.split('\n')).toHaveLength(21);
     expect(result.candidates.map((candidate) => candidate.kind)).toEqual([
+      'issue',
       'comment',
       'related',
       'decision',

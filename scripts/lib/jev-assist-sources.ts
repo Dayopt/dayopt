@@ -46,6 +46,13 @@ const sourceSchema = z.object({
 export function contextFromSource(number: number, sha: string, raw: unknown): ContextInput {
   const source = sourceSchema.parse(raw);
   const candidates: ContextCandidate[] = [];
+  candidates.push({
+    id: `issue-${number}`,
+    kind: 'issue',
+    text: `${source.title}\n${source.body}`,
+    url: source.url,
+    updatedAt: source.updatedAt ?? '',
+  });
   for (const comment of source.comments ?? []) {
     if (comment.id === undefined) continue;
     candidates.push({

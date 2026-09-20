@@ -139,6 +139,9 @@ export function formatAssist(report: AssistReport, artifact: string): string {
   ];
   if ('top' in report) {
     lines.push(report.complete ? '評価対象の評価完了' : '部分評価または未評価（候補の順位は暫定）');
+    lines.push(
+      `対象本文: ${line(report.input.title)}\n  ${line(report.input.body)}\n  ${report.input.url}`,
+    );
     for (const row of report.top)
       lines.push(
         `- 読む候補 ${row.id}: ${row.relevance?.toFixed(2)} / ${row.category} / ${row.evaluatedAt}\n  ${line(row.text)}\n  ${row.url}`,
@@ -157,9 +160,15 @@ export function formatAssist(report: AssistReport, artifact: string): string {
       for (const evidence of row.evidence) lines.push(`  ${evidence.id}: ${evidence.url}`);
     }
   }
+  const reasons = report.rows.map((row) => row.reason);
+  const manualRecovery = reasons.some(
+    (reason) => reason.startsWith('rate_') && reason !== 'rate_limited',
+  );
   lines.push(
     `全資料・注釈: ${artifact}`,
-    'cooldown の未評価分は60秒以上後の明示再実行で続行。資格情報不在では外部評価しない。',
+    manualRecovery
+      ? '送信予約状態が手動復旧待ち。全Jev processを停止して reservation.lock を確認・復旧してから明示再実行する。'
+      : 'cooldown の未評価分は60秒以上後の明示再実行で続行。資格情報不在では外部評価しない。',
   );
   return lines.join('\n');
 }

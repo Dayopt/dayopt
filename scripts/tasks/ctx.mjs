@@ -1018,13 +1018,19 @@ export function buildContextPack(options, deps = {}) {
 
   const bodyResult = truncateBody(rawBody, bodyLines);
 
-  const commentsRaw = tryOr(
-    () =>
-      runGhJson(['api', `repos/${REPO}/issues/${number}/comments?per_page=100`, '--paginate'], {
-        execFileImpl,
-      }),
-    null,
-  );
+  const commentsRaw = tryOr(() => {
+    const raw = runGhJson(
+      [
+        'api',
+        `repos/${REPO}/issues/${number}/comments?per_page=100`,
+        '--paginate',
+        ...(options.assist ? ['--slurp'] : []),
+      ],
+      { execFileImpl },
+    );
+    // `--slurp` returns one array per page. Keep the normal ctx path byte-for-byte compatible.
+    return options.assist && Array.isArray(raw) ? raw.flat() : raw;
+  }, null);
   const comments =
     commentsRaw === null
       ? null

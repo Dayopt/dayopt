@@ -7,6 +7,7 @@ import {
   contextRequests,
   contextRows,
   rankContext,
+  selectContextCandidates,
   type ContextInput,
 } from './jev-assist-packs.ts';
 
@@ -28,6 +29,23 @@ const input: ContextInput = {
 };
 
 describe('判断材料の意味と参照を保存する', () => {
+  it('24件を超えても対象Issue本文を選択対象から落とさない', () => {
+    const candidates = [
+      { id: 'issue-1', kind: 'issue' as const, text: '要求', url: input.url, updatedAt: '' },
+      ...Array.from({ length: 24 }, (_, index) => ({
+        id: `new-${index}`,
+        kind: 'comment' as const,
+        text: '新しい進捗',
+        url: input.url,
+        updatedAt: `2026-09-${String(index + 1).padStart(2, '0')}`,
+      })),
+    ];
+    const result = selectContextCandidates({ ...input, candidates });
+    expect(result.selected).toHaveLength(24);
+    expect(result.selected[0]?.id).toBe('issue-1');
+    expect(result.omitted).toHaveLength(1);
+  });
+
   it('最新24件を6件ずつに分け、古い制約も12問以下で候補に残す', () => {
     const batches = contextRequests(input);
     expect(batches).toHaveLength(4);

@@ -688,7 +688,7 @@ describe('nextStep', () => {
 
 describe('buildContextPack (execFileImpl 経由の gh 呼び出し形)', () => {
   it('assistだけ切り詰め前の資料を持ち、通常出力と自己生成コメント除外は維持する', () => {
-    const comments = Array.from({ length: 9 }, (_, index) => ({
+    const comments = Array.from({ length: 101 }, (_, index) => ({
       id: index + 1,
       user: { login: 'tomoya' },
       created_at: `2026-09-${String(index + 1).padStart(2, '0')}T00:00:00Z`,
@@ -702,7 +702,8 @@ describe('buildContextPack (execFileImpl 経由の gh 呼び出し形)', () => {
     });
     const deps = {
       execFileImpl: (_cmd: string, args: string[]) => {
-        if (args[1]?.includes('/comments')) return JSON.stringify(comments);
+        if (args[1]?.includes('/comments'))
+          return JSON.stringify(args.includes('--slurp') ? [comments] : comments);
         if (args[0] === 'search') return '[]';
         return JSON.stringify({
           title: 'issue',
@@ -720,7 +721,7 @@ describe('buildContextPack (execFileImpl 経由の gh 呼び出し形)', () => {
     expect(unchanged).toEqual(normal);
     expect(normal).not.toHaveProperty('assistSource');
     if (!assistSource?.comments) throw new Error('assist資料が無い');
-    expect(assistSource.comments).toHaveLength(9);
+    expect(assistSource.comments).toHaveLength(101);
     expect(assistSource.comments[0].body).toBe(comments[0].body);
     expect(assistSource.decisions[0].length).toBeGreaterThan(200);
   });

@@ -13,8 +13,15 @@ export function jevStoreRoot(cwd = process.cwd()): string {
   );
 }
 
+export type JevSendBlock =
+  | 'cooldown'
+  | 'rate_locked'
+  | 'rate_state_invalid'
+  | 'rate_state_unreadable'
+  | 'rate_state_unwritable';
+
 /** Serialize the check+reservation, including callers straddling a minute boundary. */
-export function reserveJevSend(root: string, now = Date.now()): string | null {
+export function reserveJevSend(root: string, now = Date.now()): JevSendBlock | null {
   const slots = join(root, 'send-slots');
   mkdirSync(slots, { recursive: true });
   const lock = join(slots, 'reservation.lock');
@@ -34,7 +41,7 @@ export function reserveJevSend(root: string, now = Date.now()): string | null {
   }
 }
 
-function reserveSlot(slots: string, now: number): string | null {
+function reserveSlot(slots: string, now: number): JevSendBlock | null {
   const slot = Math.floor(now / 60_000);
   const previous = join(slots, `${slot - 1}.json`);
   if (existsSync(previous)) {

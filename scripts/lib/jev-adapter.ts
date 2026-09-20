@@ -107,7 +107,12 @@ export type JevReasonCode =
   | 'balance_below_floor'
   | 'balance_unknown'
   | 'timeout'
+  | 'cooldown'
   | 'rate_limited'
+  | 'rate_locked'
+  | 'rate_state_invalid'
+  | 'rate_state_unreadable'
+  | 'rate_state_unwritable'
   | 'auth_failed'
   | 'customer_verification_required'
   | 'free_tier_restricted'
@@ -823,8 +828,8 @@ export async function evaluateWithJev(
   // All real entrypoints share this floor; injected test runners never touch git.
   if (!options.runner) {
     try {
-      if (reserveJevSend(jevStoreRoot()))
-        return stop({ status: 'unavailable', reasonCode: 'rate_limited' });
+      const sendBlock = reserveJevSend(jevStoreRoot());
+      if (sendBlock) return stop({ status: 'unavailable', reasonCode: sendBlock });
     } catch {
       return stop({ status: 'unavailable', reasonCode: 'provider_error' });
     }

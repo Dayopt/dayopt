@@ -121,7 +121,14 @@ export function selectContextCandidates(input: ContextInput): {
   const sorted = [...input.candidates].sort(
     (a, b) => b.updatedAt.localeCompare(a.updatedAt) || a.id.localeCompare(b.id),
   );
-  return { selected: sorted.slice(0, 24), omitted: sorted.slice(24) };
+  const selected = sorted.slice(0, 24);
+  const issue = sorted.find((candidate) => candidate.kind === 'issue');
+  if (issue && !selected.includes(issue)) {
+    selected.pop();
+    selected.unshift(issue);
+  }
+  const selectedIds = new Set(selected.map((candidate) => candidate.id));
+  return { selected, omitted: sorted.filter((candidate) => !selectedIds.has(candidate.id)) };
 }
 
 export function contextRequests(
