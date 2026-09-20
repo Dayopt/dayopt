@@ -28,7 +28,6 @@ import {
   ViewSwitcherList,
 } from '@/features/calendar';
 import { usePlanTemplateMutations } from '@/features/timeblock';
-import { useProductAccessGate } from '@/lib/billing/useProductAccessGate';
 import { getDateKey } from '@/lib/date';
 import { api } from '@/lib/trpc';
 
@@ -38,9 +37,6 @@ export function CalendarSidebar() {
   const viewedDate = useCalendarNavigationStore((state) => state.viewedDate);
   const startSaving = useTemplateSaveStore((state) => state.startSaving);
   const { applyToDay, renameTemplate, deleteTemplate } = usePlanTemplateMutations();
-  // 終了後に server が許すテンプレート操作は delete だけ（operation-access.ts）。
-  // apply / rename は拒否されるので送る前に止める
-  const gateProductAccess = useProductAccessGate();
 
   // 見出しの「+」: 今見ている日の並びをテンプレートとして保存する（CalendarController が
   // 日ビューへ切り替えて保存ヘッダーを出す）。表示メニューと同じ保存フローを使う
@@ -58,16 +54,16 @@ export function CalendarSidebar() {
       // 連打を止める。2 通目は必ず重複で失敗し、その rollback が 1 通目の確定行を
       // 巻き戻してしまう（onSettled の再取得まで画面に偽の行が残る）
       if (applyToDay.isPending) return;
-      gateProductAccess(() => applyToDay.mutate({ templateId, date: getDateKey(viewedDate) }));
+      applyToDay.mutate({ templateId, date: getDateKey(viewedDate) });
     },
-    [applyToDay, gateProductAccess, viewedDate],
+    [applyToDay, viewedDate],
   );
 
   const handleRename = useCallback(
     (templateId: string, name: string) => {
-      gateProductAccess(() => renameTemplate.mutate({ templateId, name }));
+      renameTemplate.mutate({ templateId, name });
     },
-    [gateProductAccess, renameTemplate],
+    [renameTemplate],
   );
 
   const handleDelete = useCallback(
