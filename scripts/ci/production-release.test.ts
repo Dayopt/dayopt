@@ -10,6 +10,7 @@ import {
   buildManifest,
   findDeploymentForSha,
   gitDiffFiles,
+  parseRedeployRequest,
   readImpactAffected,
   resolveProjectImpact,
   runProductionRelease,
@@ -73,7 +74,12 @@ function deployment(uid: string, sha: string, readyState = 'READY', created = 20
 }
 
 /** GET /v13/deployments/{id} が返す形。 */
-function deploymentRecord(id: string, sha: string, createdAt = 1000) {
+function deploymentRecord(
+  id: string,
+  sha: string,
+  createdAt = 1000,
+  extra: { projectId?: string; readyState?: string } = {},
+) {
   return {
     id,
     url: `${id}.vercel.app`,
@@ -81,6 +87,7 @@ function deploymentRecord(id: string, sha: string, createdAt = 1000) {
     createdAt,
     target: 'production',
     meta: { githubCommitSha: sha },
+    ...extra,
   };
 }
 
@@ -2662,5 +2669,212 @@ describe('writeReleaseStatus', () => {
     const path = outputFile();
     writeReleaseStatus('promoted\nmalicious=1', { env: { GITHUB_OUTPUT: path } });
     expect(() => readFileSync(path, 'utf8')).toThrow();
+  });
+});
+
+/**
+ * 同一 commit の再配備（#2735）。env だけを更新して build し直した deployment は
+ * source SHA が live と同じなので、通常 dispatch では `already serving` で終わる。
+ * 名指しの deployment だけを、通常と同じ gate を通して promote する経路を検証する。
+ */
+describe('runProductionRelease（同一 commit の再配備）', () => {
+  const REDEPLOY = { projectName: 'product', deploymentId: 'dpl_product_redeploy' };
+
+  /** 両 project が既に target SHA を配信中で、product に env 更新後の build がある世界。 */
+  function createRedeployWorld(
+    record: ReturnType<typeof deploymentRecord> = deploymentRecord(
+      'dpl_product_redeploy',
+      SHA,
+      3000,
+      { projectId: 'prj_product' },
+    ),
+  ) {
+    const world = createReleaseWorld({ productionSha: SHA });
+    world.store.dpl_product_redeploy = record;
+    return world;
+  }
+
+  const listedBySha = (world: ReturnType<typeof createReleaseWorld>) =>
+    world.fetchImpl.mock.calls.filter(([input]) => String(input).includes('/v7/deployments'));
+
+  it('入力が無ければ再配備として扱わない', () => {
+    expect(parseRedeployRequest(undefined)).toBeNull();
+    expect(parseRedeployRequest('  ')).toBeNull();
+    expect(parseRedeployRequest('product:dpl_abc123')).toEqual({
+      projectName: 'product',
+      deploymentId: 'dpl_abc123',
+    });
+  });
+
+  it.each(['product', 'dpl_abc123', 'storybook:dpl_abc123', 'product:abc123', 'product:dpl_a/b'])(
+    '形式不正な入力 %s を通常 dispatch へ落とさず拒否する',
+    (raw) => {
+      expect(() => parseRedeployRequest(raw)).toThrow(/RELEASE_REDEPLOY must be/);
+    },
+  );
+
+  it('名指しされた project だけ、同じ SHA でも affected にする', () => {
+    const project = RELEASE_PROJECTS.find((entry) => entry.name === 'product')!;
+    const base = { project, baseSha: SHA, targetSha: SHA };
+
+    expect(resolveProjectImpact(base).affected).toBe(false);
+    // .mjs（checkJs off）は既定値 null から引数型を推論するため、文字列を渡すには緩める。
+    expect(resolveProjectImpact({ ...base, redeployDeploymentId: 'dpl_x' as never })).toEqual({
+      affected: true,
+      reason: expect.stringContaining('redeploy of dpl_x'),
+    });
+  });
+
+  it('名指しの deployment だけを gate へ通して promote し、戻し先を残す', async () => {
+    const world = createRedeployWorld();
+
+    const result = await release({ fetchImpl: world.fetchImpl, redeploy: REDEPLOY });
+
+    expect(result.status).toBe('promoted');
+    expect(result.gateChecksRan).toBe(true);
+    expect(world.pointCalls).toEqual([
+      { project: 'product', deploymentId: 'dpl_product_redeploy' },
+    ]);
+    // 候補は ID で固定する。「SHA の最新 deployment」を探す経路は通らない。
+    expect(listedBySha(world)).toEqual([]);
+    // candidate 自体を smoke している（production domain の smoke とは別）。
+    expect(
+      world.fetchImpl.mock.calls.some(([input]) =>
+        String(input).includes('dpl_product_redeploy.vercel.app'),
+      ),
+    ).toBe(true);
+
+    const manifest = result.manifest as ReleaseManifest;
+    expect(manifest.projects.find((entry) => entry.name === 'product')).toMatchObject({
+      action: 'promoted',
+      deploymentId: 'dpl_product_redeploy',
+      previousDeploymentId: 'dpl_product_new',
+    });
+    // web は動かさないが、run の後も gate を通した deployment として残る。
+    expect(manifest.projects.find((entry) => entry.name === 'web')).toMatchObject({
+      action: 'already-serving',
+      deploymentId: 'dpl_web_new',
+    });
+  });
+
+  it('promote 後の production smoke が落ちたら、元の deployment へ戻す', async () => {
+    const world = createRedeployWorld();
+
+    await expect(
+      release({
+        fetchImpl: world.fetchImpl,
+        redeploy: REDEPLOY,
+        simulateFailure: 'production-smoke:product',
+      }),
+    ).rejects.toThrow();
+
+    expect(world.pointCalls).toEqual([
+      { project: 'product', deploymentId: 'dpl_product_redeploy' },
+      { project: 'product', deploymentId: 'dpl_product_new' },
+    ]);
+    expect(world.live.product).toBe('dpl_product_new');
+  });
+
+  it('candidate の smoke が落ちたら promote しない', async () => {
+    const world = createRedeployWorld();
+
+    const error = (await release({
+      fetchImpl: world.fetchImpl,
+      redeploy: REDEPLOY,
+      simulateFailure: 'smoke:product',
+    }).catch((caught: unknown) => caught)) as ReleaseError;
+
+    expect(error).toBeInstanceOf(Error);
+    expect(world.pointCalls).toEqual([]);
+    // live は run 開始時点のまま。同じ commit でも「戻せ」とは案内しない。
+    expect(error.manifest?.projects.find((entry) => entry.name === 'product')).toMatchObject({
+      action: 'pending',
+      deploymentId: 'dpl_product_new',
+    });
+  });
+
+  it('層 3 を通していない project の再配備は production を触らずに止める', async () => {
+    const world = createRedeployWorld();
+
+    await expect(
+      release({
+        fetchImpl: world.fetchImpl,
+        redeploy: REDEPLOY,
+        impactAffected: { web: false, product: false },
+      }),
+    ).rejects.toThrow(/without layer 3/);
+    expect(world.pointCalls).toEqual([]);
+  });
+
+  it.each([
+    [
+      'live より古い build（env 更新前）',
+      deploymentRecord('dpl_product_redeploy', SHA, 1500, { projectId: 'prj_product' }),
+      /not newer than/,
+    ],
+    [
+      '別 project の deployment',
+      deploymentRecord('dpl_product_redeploy', SHA, 3000, { projectId: 'prj_web' }),
+      /does not belong to product/,
+    ],
+    [
+      'project が読めない deployment',
+      deploymentRecord('dpl_product_redeploy', SHA, 3000),
+      /does not belong to product/,
+    ],
+    [
+      '別 commit の build',
+      deploymentRecord('dpl_product_redeploy', OLD_SHA, 3000, { projectId: 'prj_product' }),
+      /not a production build of/,
+    ],
+    [
+      'build に失敗した deployment',
+      deploymentRecord('dpl_product_redeploy', SHA, 3000, {
+        projectId: 'prj_product',
+        readyState: 'ERROR',
+      }),
+      /ended in ERROR/,
+    ],
+  ])('%s は candidate にしない', async (_label, record, message) => {
+    const world = createRedeployWorld(record);
+
+    await expect(release({ fetchImpl: world.fetchImpl, redeploy: REDEPLOY })).rejects.toThrow(
+      message,
+    );
+    expect(world.pointCalls).toEqual([]);
+  });
+
+  it('live が別の commit なら再配備を拒否し、通常 dispatch へ誘導する', async () => {
+    const world = createReleaseWorld();
+    world.store.dpl_product_redeploy = deploymentRecord('dpl_product_redeploy', SHA, 3000, {
+      projectId: 'prj_product',
+    });
+
+    await expect(release({ fetchImpl: world.fetchImpl, redeploy: REDEPLOY })).rejects.toThrow(
+      /only replaces a deployment of the same commit/,
+    );
+    expect(world.pointCalls).toEqual([]);
+  });
+
+  it('Force Promote とは組み合わせられない', async () => {
+    const world = createRedeployWorld();
+
+    await expect(
+      release({ fetchImpl: world.fetchImpl, redeploy: REDEPLOY, force: true }),
+    ).rejects.toThrow(/cannot be combined with Force Promote/);
+    expect(world.fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it('名指しの deployment が既に live なら promote せず、gate を通して認証する', async () => {
+    const world = createRedeployWorld();
+
+    const result = await release({
+      fetchImpl: world.fetchImpl,
+      redeploy: { projectName: 'product', deploymentId: 'dpl_product_new' },
+    });
+
+    expect(result.status).toBe('already-released');
+    expect(result.gateChecksRan).toBe(true);
+    expect(world.pointCalls).toEqual([]);
   });
 });

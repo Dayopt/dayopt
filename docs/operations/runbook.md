@@ -134,10 +134,31 @@ op run --env-file=.op-env.human -- pnpm mcp:gate -- --expect-url='<approved-supa
 
 1. 対象ユーザーの利用権と現在の gate を確認する。全体の課金切替は下記の rollout に従い、MCP 接続のためだけに `BILLING_ENFORCED` を切り替えない。
 2. Vercel Production env `MCP_WRITE_ENABLED_CLIENTS` に `<id>` を追加する。
-3. env 設定後に作成された main HEAD の Production build を確認し、実際に配信中の deployment ID・SHA・env 設定時刻との前後を照合する。live より新しい main HEAD に Product の変更がある場合は `gh workflow run promote.yml --ref main` で通常の検証を経て配信できる。**live と main HEAD が同じ SHA の場合、redeploy しても通常 dispatch は `already serving` と判定し、新しい deployment を選ばない。** この場合は gate を閉じたまま停止し、#2735 で追跡する「deployment ID を指定し通常の検証を維持する再配備経路」の整備後に続行する。`force=true` はこの SHA 判定を変えず検証を省略するため、代替手順にしない。
+3. env 設定後に作成された Production build を配信する。実際に配信中の deployment ID・SHA と env 設定時刻の前後を先に照合する。
+   - **live より新しい main HEAD に Product の変更がある場合**: `gh workflow run promote.yml --ref main` で通常の検証を経て配信する。
+   - **live と main HEAD が同じ SHA の場合**: 通常 dispatch は `already serving` と判定し、redeploy で作った新しい deployment を選ばない。下記「同一 commit の再配備」で deployment ID を名指しして配信する。`force=true` はこの SHA 判定を変えず検証を省略するため、代替手順にしない。
 4. 承認済みの DB 操作を1回ずつ行う: `--enable-billing`（体験利用を許可する場合）→ `--enable-global` → `--enable-client=<id>`。毎回期待 URL・環境を指定する。
 5. 対象ユーザーが再 consent し、付与 scope と `write_enabled_at`、実際の tool 一覧を確認する。広告 scope だけを write 開放の証拠にしない。
 6. 過去に終了した Record を作成し、receipt と Calendar 反映を確認する。未来終了の Record は DT005 で拒否される。
+
+**同一 commit の再配備**（env だけを更新した build を配信する。#2735）:
+
+実行主体は Production の変更を承認した人間。agent は dispatch しない。
+
+1. Vercel Dashboard で対象 project の **現在 live の Production deployment** を Redeploy し、新しい deployment ID（`dpl_...`）を控える。Auto-assign は無効なので、この時点では production domain は動かない。
+2. main HEAD が live と同じ SHA であることを確認して dispatch する。
+
+   ```bash
+   gh workflow run promote.yml --ref main -f redeploy='product:dpl_xxxxxxxx'
+   ```
+
+3. run は通常の release と同じ検証を通す: 名指しした project の層 3 → candidate の smoke → Production Config Audit → promote → 全 project の production domain smoke → live 検証。失敗時は promote 済みの分を元の deployment へ自動で戻し、戻し先は release manifest の `previousDeploymentId` に残る。
+4. 次のいずれかに当たる deployment は candidate にせず、production を触らずに失敗する: 別 project の deployment / release 対象と違う commit の build / GitHub 連携以外で作った build（source SHA を持たない）/ **live より前に作られた build**（env 更新前の古い build の取り違えを防ぐ）/ build 失敗。live が別の commit を配信している時も拒否するので、その場合は `redeploy` を付けずに dispatch する。
+5. 名指しした deployment が既に live の場合は promote せず、`already-released` として smoke と audit だけを通す。
+
+戻し方: run が成功した後で元へ戻す場合は、manifest の `previousDeploymentId` を Vercel の Instant Rollback で指定する（Playbook 2 の手動 rollback と同じ）。
+
+実測（2026-09-20、Vercel API read-only）: 過去の redeploy 1 件（`dpl_7eQX37xB…`、`meta.action=redeploy`）は `target=production` と `meta.githubCommitSha` を引き継いでいた。Dashboard と CLI で差が出るかは未確認。引き継がない deployment は上記 4 の「source SHA を持たない」で拒否され、production は変わらない。
 
 `scopes_supported` は常に全 8 scope を広告する。client（Claude など）は広告された scope をそのまま要求するため、広告しないと **gate を全部開けても write が一度も要求されない**。付与するかどうかは consent が client 単位で決め、**env allowlist と DB gate の両方が開いている時だけ** write を付ける。どちらかが閉じていれば write を落とした read-only の grant になり、consent は失敗しない（`isConsentWriteEnabled` / `resolveGrantableScopes`）。したがって緊急停止で DB gate だけを先に閉じても、その client の read-only 接続は作り続けられる。
 
