@@ -43,14 +43,14 @@ pnpm jev:check         # ネットワーク不要の静的検査。ここが落�
 
 ## コマンド
 
-| コマンド                          | 何をするか                                           | 課金 |
-| --------------------------------- | ---------------------------------------------------- | ---- |
-| `pnpm jev:check`                  | 設定・質問セット・pack status の静的検査             | なし |
-| `pnpm jev:smoke`                  | 合成データで少数回の実呼び出し。接続と応答形式の確認 | あり |
-| `pnpm jev:pack <packId> collect`  | 評価対象の収集（GitHub から。Jev は呼ばない）        | なし |
-| `pnpm jev:pack <packId> evaluate` | 収集済み case を 1 件ずつ評価                        | あり |
-| `pnpm jev:pack <packId> report`   | 保存済みの注釈から集計を出し直す                     | なし |
-| `pnpm jev:shadow`                 | Phase 1 の旧 CLI。保存先の互換のために残している     | あり |
+| コマンド                          | 何をするか                                                                                 | 課金 |
+| --------------------------------- | ------------------------------------------------------------------------------------------ | ---- |
+| `pnpm jev:check`                  | 設定・質問セット・pack status の静的検査                                                   | なし |
+| `pnpm jev:smoke`                  | 合成データで少数回の実呼び出し。接続と応答形式の確認                                       | あり |
+| `pnpm jev:pack <packId> collect`  | 評価対象の収集（GitHub から。Jev は呼ばない）                                              | なし |
+| `pnpm jev:pack <packId> evaluate` | 収集済み case を 1 件ずつ評価                                                              | あり |
+| `pnpm jev:pack <packId> report`   | 保存済みの注釈から集計を出し直す                                                           | なし |
+| `pnpm jev:shadow`                 | Phase 1 の旧 CLI。保存先の互換のために残している。evaluate は `shadow-e1` の status に従う | あり |
 
 課金するコマンドは key を inline で注入して起動する。
 
@@ -87,7 +87,7 @@ AI_GATEWAY_API_KEY="op://agent/vercel-ai-gateway/credential" op run -- \
 
 3 段ある。**必要な一番小さいものを使う。**
 
-1. **pack 1 つを止める** — `PACK_STATUS` を `disabled` にして理由を書く。`evaluate` だけが止まり、`collect` と `report` は通る（negative result を読み返せなくなると、止めた判断の根拠ごと失われるため）。`pnpm jev:check` が理由の欠落を落とす
+1. **pack 1 つを止める** — `PACK_STATUS` を `disabled` にして理由を書く。`evaluate` だけが止まり、`collect` と `report` は通る（negative result を読み返せなくなると、止めた判断の根拠ごと失われるため）。`pnpm jev:check` が理由の欠落を落とす。**表は共有で、`pnpm jev:pack` と旧 `pnpm jev:shadow` の両方が送信前に見る**（入口が 2 つあることを理由に片方から迂回できてはいけない）
 2. **Jev 全体を止める** — `JEV_DISABLED=1`。外部呼び出しの前に `unavailable` を返す
 3. **撤去する** — key を失効させ、`pnpm jev:*` の scripts と `scripts/tasks/jev/` を消す。アプリは依存していない（SDK は root の devDependencies だけで、product にも web にも入らない）ので、消しても製品は動く
 

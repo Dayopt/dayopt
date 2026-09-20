@@ -28,13 +28,12 @@ import {
 } from '../../lib/jev-adapter.ts';
 import { createShadowPack } from '../../lib/jev-pack-shadow.ts';
 import { createSkillSuggestionPack } from '../../lib/jev-pack-skill-suggestion.ts';
-import { buildPackRequest, packQuestionSetId } from '../../lib/jev-pack.ts';
+import { PACK_IDS, PACK_STATUS, buildPackRequest, packQuestionSetId } from '../../lib/jev-pack.ts';
 import { SHADOW_QUESTION_IDS, SHADOW_QUESTION_SET_ID } from '../../lib/jev-shadow-questions.ts';
 import { SHADOW_SYNTHETIC_CASES } from '../../lib/jev-shadow-synthetic.ts';
 import { buildShadowRequest } from '../../lib/jev-shadow-truth.ts';
 import { SKILL_ROSTER_IDS, loadSkillRoster } from '../../lib/jev-skill-roster.ts';
 import { JEV_SMOKE_CASES } from '../../lib/jev-smoke-cases.ts';
-import { PACK_IDS, PACK_STATUS } from './pack.ts';
 
 // tsx は scripts/ の .ts を CJS へ落とすため `import.meta.url` は使えない。
 // 他の scripts/tasks/*.ts と同じ `__dirname` 起点に揃える。

@@ -38,6 +38,7 @@ import {
   writeManifest,
   type RunnerFlags,
 } from '../../lib/jev-pack-runner.ts';
+import { assertPackEvaluationAllowed } from '../../lib/jev-pack.ts';
 import {
   computeCoverage,
   computeStrata,
@@ -285,6 +286,15 @@ export async function run(argv: readonly string[]): Promise<number> {
       })}\n`,
     );
     return 0;
+  }
+
+  // この CLI が送るのは pack `shadow-e1` と同じ質問セット（`jev:check` が cacheKey の
+  // 一致を固定している）。入口が違うだけで無効化を迂回できてはいけないので、
+  // `jev:pack` と同じ表を見る。key の確認より先に止めるのも同じ理由。
+  const blocked = assertPackEvaluationAllowed('shadow-e1');
+  if (blocked) {
+    process.stderr.write(blocked);
+    return 1;
   }
 
   if (!process.env.AI_GATEWAY_API_KEY?.trim()) {

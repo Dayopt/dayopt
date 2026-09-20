@@ -4,8 +4,9 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
+import { PACK_IDS, PACK_STATUS } from '../../lib/jev-pack.ts';
 import { mapSkills } from '../ctx.mjs';
-import { PACK_IDS, PACK_STATUS, parsePackArgs } from './pack.ts';
+import { parsePackArgs } from './pack.ts';
 
 const repoRoot = join(import.meta.dirname, '../../..');
 
@@ -126,6 +127,19 @@ describe('無効化した pack は evaluate だけが止まる', () => {
         env: { ...process.env, AI_GATEWAY_API_KEY: 'test-key-not-used' },
       },
     );
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('無効化');
+    expect(result.stderr).toContain(PACK_STATUS['shadow-e1'].reason ?? '');
+  });
+
+  it('旧 CLI（pnpm jev:shadow）からも迂回できない', () => {
+    // `jev:shadow evaluate` は pack shadow-e1 と同じ質問セットを送る。入口が 2 つある
+    // ことを理由に無効化が片方だけに効くと、docs が案内している旧コマンドで課金できる
+    const result = spawnSync('pnpm', ['exec', 'tsx', 'scripts/tasks/jev/shadow.ts', 'evaluate'], {
+      cwd: repoRoot,
+      encoding: 'utf8',
+      env: { ...process.env, AI_GATEWAY_API_KEY: 'test-key-not-used' },
+    });
     expect(result.status).toBe(1);
     expect(result.stderr).toContain('無効化');
     expect(result.stderr).toContain(PACK_STATUS['shadow-e1'].reason ?? '');
