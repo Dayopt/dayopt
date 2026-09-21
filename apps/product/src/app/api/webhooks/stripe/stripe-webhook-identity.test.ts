@@ -4,7 +4,7 @@ import {
   matchesStripeWebhookIdentity,
   parseStripeWebhookIdentity,
   verifyStripeWebhookIdentity,
-} from './stripe-webhook-identity';
+} from '@/lib/stripe/webhook-identity';
 
 describe('Stripe webhook identity', () => {
   it('accountとmodeの設定を正規identityへ変換する', () => {

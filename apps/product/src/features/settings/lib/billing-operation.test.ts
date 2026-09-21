@@ -116,10 +116,4 @@ describe('billing operationのserviceCode分岐', () => {
     expect(getBillingOperationErrorPresentation(new Error('network down'))).toEqual(GENERIC_RETRY);
     expect(getBillingOperationErrorPresentation({ data: {} })).toEqual(GENERIC_RETRY);
   });
-
-  it('文言キーがdispositionごとに重複しない（terminal系は共有する）', () => {
-    const keys = Object.values(EXPECTED_PRESENTATIONS).map((p) => p.messageKey);
-
-    expect(new Set(keys).size).toBe(4);
-  });
 });

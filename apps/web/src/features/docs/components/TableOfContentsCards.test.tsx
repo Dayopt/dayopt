@@ -42,24 +42,24 @@ describe('TOC のリンク', () => {
     cleanup();
   });
 
-  it('リンク card（docs / blog 記事）は問題の報告をお問い合わせページへ送り、GitHub へ誘導しない', async () => {
-    render(<TableOfContentsCards content={CONTENT} />);
+  it.each(['cards', 'auto'] as const)(
+    '%s は GitHub へ誘導せず問い合わせへ送る',
+    async (variant) => {
+      render(
+        variant === 'cards' ? (
+          <TableOfContentsCards content={CONTENT} />
+        ) : (
+          <AutoTableOfContents content={CONTENT} />
+        ),
+      );
 
-    // 目次 card の描画（useEffect 後）を待ってから全リンクを検査する
-    await screen.findByText('First heading');
+      await screen.findByText('First heading');
 
-    expect(screen.getByRole('link', { name: 'reportIssue' }).getAttribute('href')).toBe('/contact');
-    expect(screen.queryByText('viewSource')).toBeNull();
-    expectNoRepositoryLinks();
-  });
-
-  it('リンク内包表示（showLinks 既定）でも GitHub へ誘導しない', async () => {
-    render(<AutoTableOfContents content={CONTENT} />);
-
-    await screen.findByText('First heading');
-
-    expect(screen.getByRole('link', { name: 'reportIssue' }).getAttribute('href')).toBe('/contact');
-    expect(screen.queryByText('viewSource')).toBeNull();
-    expectNoRepositoryLinks();
-  });
+      expect(screen.getByRole('link', { name: 'reportIssue' }).getAttribute('href')).toBe(
+        '/contact',
+      );
+      expect(screen.queryByText('viewSource')).toBeNull();
+      expectNoRepositoryLinks();
+    },
+  );
 });
