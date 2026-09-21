@@ -501,6 +501,15 @@ adapter の script が存在するだけでは tool call は止まらない。ru
 
 Codex でこの project を初めて開く時は、project trust を確認し、`/hooks` で `.codex/hooks.json` の command と有効状態を User が 1 回レビューする。repo の `.codex/config.toml` に `hooks = true` があっても、runtime が project を trust して hook を読み込んだ証拠にはならない。`pnpm agent:preflight`（機械利用は `pnpm agent:preflight --json`）は依存、Git hooks、CLI、skills、Codex hook 設定ファイル、read-only delegation の状態を確認するが、runtime の trust や実際の hook 発火は判定できない。read-only delegation は scope を runtime で強制できないため unsupported と表示され、bulk read の経路に使わない。user-global 設定はこの onboarding で変更しない。
 
+### Local / Codex Cloud の実行環境
+
+Node.js と package manager は実行場所ごとに暗黙で選ばせず、repository contract に揃える。
+
+- `.nvmrc` と `package.json#packageManager` が runtime の正本。`pnpm agent:preflight` は Node.js の major、pnpm の version、依存、hook を表示し、不一致なら exit 1 にする
+- Codex Cloud の Dayopt 環境は自動 package-manager detection を使わず、setup / maintenance script で `nvm` から `.nvmrc` の Node.js を選び、標準の [`scripts/runbook/codex-cloud-setup.sh`](../../scripts/runbook/codex-cloud-setup.sh) で `packageManager` の pnpm を検証して `pnpm install --frozen-lockfile` を一度だけ実行する
+- Cloud の setup / maintenance はネットワークが有効な setup phase で実行し、agent phase のインターネットアクセスは無効のままにする。自動検出が各 workspace へ npm を実行して `catalog:` / `workspace:` を壊す経路を作らない
+- Cloud で Docker・local Supabase・実ブラウザ・vault が必要な検証は完了扱いにせず、対応する local または CI の証跡を別に残す
+
 ### 実行経路ごとの保護範囲
 
 「機械」は該当 hook が信頼・発火した場合の判定を指す。現時点の native Codex 発火は未確認である。

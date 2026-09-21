@@ -89,19 +89,34 @@ describe('lane card のクリック配送', () => {
     expect(onClick).toHaveBeenCalledOnce();
   });
 
-  it('キーボードの Enter は mousedown を伴わないので届ける', () => {
+  it.each([
+    ['Plan', 'Enter', 'plan'] as const,
+    ['Plan', ' ', 'plan'] as const,
+    ['Record', 'Enter', 'record'] as const,
+    ['Record', ' ', 'record'] as const,
+  ])('%s card delivers %s keyboard activation', (_label, key, cardKind) => {
     const onClick = vi.fn();
     render(
-      <PlanLaneCard
-        event={plan}
-        position={position}
-        activityName="確認"
-        onClick={onClick}
-        onPointerDown={vi.fn()}
-      />,
+      cardKind === 'plan' ? (
+        <PlanLaneCard
+          event={plan}
+          position={position}
+          activityName="確認"
+          onClick={onClick}
+          onPointerDown={vi.fn()}
+        />
+      ) : (
+        <RecordLaneCard
+          event={record}
+          position={position}
+          activityName="確認"
+          onClick={onClick}
+          onPointerDown={vi.fn()}
+        />
+      ),
     );
 
-    fireEvent.keyDown(screen.getByRole('button', { name: '確認' }), { key: 'Enter' });
+    fireEvent.keyDown(screen.getByRole('button', { name: '確認' }), { key });
 
     expect(onClick).toHaveBeenCalledOnce();
   });
