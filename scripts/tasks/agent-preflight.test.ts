@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -38,6 +38,28 @@ describe('agent preflight', () => {
     writeFileSync(join(root, '.nvmrc'), `${currentMajor + 1}\n`);
     const state = collectPreflight(root);
     expect(state.nodeMatches).toBe(false);
+  });
+  it('uses Corepack when only the Corepack pnpm entrypoint is available', () => {
+    const root = fixture();
+    writeFileSync(join(root, 'package.json'), '{"packageManager":"pnpm@11.26.0"}\n');
+    const bin = join(root, 'bin');
+    mkdirSync(bin);
+    const corepack = join(bin, 'corepack');
+    writeFileSync(
+      corepack,
+      '#!/bin/sh\n[ "$1" = "pnpm" ] && [ "$2" = "--version" ] || exit 1\nprintf \'11.26.0\\n\'\n',
+    );
+    chmodSync(corepack, 0o755);
+    const previousPath = process.env.PATH;
+    process.env.PATH = `${bin}:/usr/bin:/bin`;
+    try {
+      const state = collectPreflight(root);
+      expect(state.pnpm).toBe('11.26.0');
+      expect(state.pnpmMatches).toBe(true);
+    } finally {
+      if (previousPath === undefined) delete process.env.PATH;
+      else process.env.PATH = previousPath;
+    }
   });
   it('uses repository root from a subdirectory and verifies configured hook files', () => {
     const root = fixture();

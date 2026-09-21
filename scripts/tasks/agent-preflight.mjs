@@ -3,6 +3,10 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+// SessionStart の外側 timeout は 10 秒（.codex/hooks.json）。外部 command は
+// gh と pnpm を逐次確認するため、各々に同じ短い上限を持たせて合計を内側に収める。
+const PREFLIGHT_COMMAND_TIMEOUT_MS = 2_000;
+
 function git(args, cwd) {
   try {
     return execFileSync('git', args, {
@@ -51,7 +55,7 @@ export function collectGhIdentity({ env = process.env, ghPresent = true, statusT
         text = execFileSync('gh', ['auth', 'status'], {
           encoding: 'utf8',
           stdio: ['ignore', 'pipe', 'pipe'],
-          timeout: 5000,
+          timeout: PREFLIGHT_COMMAND_TIMEOUT_MS,
         });
       } catch (error) {
         text = [error?.stdout, error?.stderr].filter(Boolean).join('\n') || null;
@@ -69,17 +73,22 @@ export function collectGhIdentity({ env = process.env, ghPresent = true, statusT
   };
 }
 
-function collectPnpmVersion(pnpmPresent) {
-  if (!pnpmPresent) return null;
-  try {
-    return execFileSync('pnpm', ['--version'], {
-      encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'ignore'],
-      timeout: 5000,
-    }).trim();
-  } catch {
-    return null;
+function collectPnpmVersion({ pnpmPresent, corepackPresent }) {
+  const commands = [];
+  if (pnpmPresent) commands.push(['pnpm']);
+  if (corepackPresent) commands.push(['corepack', 'pnpm']);
+  for (const [command, ...args] of commands) {
+    try {
+      return execFileSync(command, [...args, '--version'], {
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'ignore'],
+        timeout: PREFLIGHT_COMMAND_TIMEOUT_MS,
+      }).trim();
+    } catch {
+      // A broken pnpm shim can coexist with a working Corepack entrypoint.
+    }
   }
+  return null;
 }
 
 function packageManagerVersion(root) {
@@ -126,10 +135,12 @@ export function collectPreflight(cwd = process.cwd()) {
   );
   const skills = existsSync(join(root, '.agents/skills/routing/SKILL.md'));
   const ghIdentity = collectGhIdentity({ ghPresent: cli.gh });
+  const pnpmPresent = commandPresent('pnpm');
+  const corepackPresent = commandPresent('corepack');
   const expectedNode = readFileSync(join(root, '.nvmrc'), 'utf8').trim();
   const expectedNodeMajor = nodeMajor(expectedNode);
   const expectedPnpm = packageManagerVersion(root);
-  const actualPnpm = collectPnpmVersion(commandPresent('pnpm'));
+  const actualPnpm = collectPnpmVersion({ pnpmPresent, corepackPresent });
   return {
     cwd,
     root,
