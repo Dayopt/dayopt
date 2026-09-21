@@ -46,6 +46,7 @@ export function LabeledRow({
   const isNavigate = variant === 'navigate';
   const isAction = variant === 'action';
   const isControl = variant === 'control';
+  const hasDescription = description !== undefined && description !== null;
 
   // control variant の子要素に aria-labelledby を自動注入
   const enhancedChildren =
@@ -65,6 +66,7 @@ export function LabeledRow({
     <div
       className={cn(
         'flex min-h-11 items-center gap-4 py-2',
+        hasDescription && 'flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:gap-4',
         isNavigate && 'active:bg-state-pressed cursor-pointer',
         isAction && 'cursor-pointer',
       )}
@@ -80,7 +82,7 @@ export function LabeledRow({
           <div className="text-muted-foreground mt-1 text-sm">{description}</div>
         ) : null}
       </div>
-      <div className="flex shrink-0 items-center gap-2">
+      <div className="flex shrink-0 items-center justify-end gap-2">
         {enhancedChildren}
         {isNavigate && <ChevronRight className="text-muted-foreground size-4" />}
       </div>
