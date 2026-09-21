@@ -5,7 +5,7 @@ last_verified: 2026-09-21
 
 # サインアップ → ウェルカムメール
 
-<!-- learn:generated:start — 正本 このファイルの learn:journey ブロック / 再生成 pnpm learn:generate / 検証 pnpm docs:check。この範囲は手編集しない -->
+<!-- learn:generated:start — 正本 このファイルの learn:journey の JSON / 再生成 pnpm learn:generate / 検証 pnpm docs:check。この範囲は手編集しない -->
 
 メールアドレスで登録し、確認メールのリンクを押す。確認が済むと、1 回だけウェルカムメールが届く。メールは 2 つの別経路で送られる。
 
@@ -38,7 +38,7 @@ flowchart TD
 
 #### この経路を守るテスト
 
-- 経路全体を通しで守るテストは紐付いていない（段ごとのテストを見る）
+- [`apps/product/src/lib/test/e2e/auth.spec.ts`](../../../apps/product/src/lib/test/e2e/auth.spec.ts) で `test('サインアップページがフォームと規約・ログイン導線を配信する'` を探す（画面が出るところまで。登録からメールまでを通しで守る E2E は無い）
 
 ### 1. 登録フォーム（Turnstile と漏洩パスワード確認）（ブラウザ）
 
@@ -150,6 +150,9 @@ profiles.welcome_email_sent_at が空の行だけを更新し、更新できた 
 - **コード**:
   - [`apps/product/src/features/auth/server/welcome-email.ts`](../../../apps/product/src/features/auth/server/welcome-email.ts) で `.is('welcome_email_sent_at', null)` を探す
   - [`docs/engineering/invariants.md`](../../engineering/invariants.md) で `## メール通知` を探す
+- **この段を守るテスト**:
+  - [`apps/product/src/features/auth/server/welcome-email.test.ts`](../../../apps/product/src/features/auth/server/welcome-email.test.ts) で `it('掴めなければ送らない（2 通目を出さないことがこの関数の存在理由）'` を探す
+  - [`apps/product/src/features/auth/server/welcome-email.test.ts`](../../../apps/product/src/features/auth/server/welcome-email.test.ts) で `it('claim が失敗したら送らず Sentry へ残す'` を探す
 
 <details>
 <summary>⚡ 送信記録の更新が失敗する — 画面: 何も起きない / データ: 変化なし / 再試行: 次の機会に / 痕跡: Sentry</summary>
@@ -183,6 +186,9 @@ profiles.welcome_email_sent_at が空の行だけを更新し、更新できた 
 - **コード**:
   - [`apps/product/src/lib/email/send.ts`](../../../apps/product/src/lib/email/send.ts) で `export async function sendTransactionalEmail` を探す
   - [`apps/product/src/lib/email/send.ts`](../../../apps/product/src/lib/email/send.ts) で `isEmailSuppressed` を探す
+- **この段を守るテスト**:
+  - [`apps/product/src/lib/email/send.test.ts`](../../../apps/product/src/lib/email/send.test.ts) で `it('suppression に載っているアドレスへは Resend を呼ばず suppressed を返す'` を探す
+  - [`apps/product/src/lib/email/send.test.ts`](../../../apps/product/src/lib/email/send.test.ts) で `it('Resend が error を返しても throw せず failed(provider) を返す'` を探す
 
 <details>
 <summary>⚡ Resend が送れない — 画面: 何も起きない / データ: 欠落する / 再試行: しない / 痕跡: Sentry</summary>
@@ -232,6 +238,8 @@ Resend が /api/webhooks/resend へ bounce / 苦情を送る。svix の署名を
 - **コード**:
   - [`apps/product/src/app/api/webhooks/resend/route.ts`](../../../apps/product/src/app/api/webhooks/resend/route.ts) で `claimResendWebhookEvent` を探す
   - [`apps/product/src/app/api/webhooks/resend/route.ts`](../../../apps/product/src/app/api/webhooks/resend/route.ts) で `isSuppressibleBounce` を探す
+- **この段を守るテスト**:
+  - [`apps/product/src/app/api/webhooks/resend/route.test.ts`](../../../apps/product/src/app/api/webhooks/resend/route.test.ts) で `it('transient bounce（mailbox full 等）では suppression を書かない'` を探す
 
 <details>
 <summary>⚡ 署名が一致しない — 画面: 何も起きない / データ: 変化なし / 再試行: 相手が再送 / 痕跡: 監視が拾う</summary>
@@ -269,7 +277,8 @@ Resend が /api/webhooks/resend へ bounce / 苦情を送る。svix の署名を
 {
   "id": "signup",
   "title": "サインアップ → ウェルカムメール",
-  "order": 30,
+  "order": 70,
+  "group": "account",
   "intro": "メールアドレスで登録し、確認メールのリンクを押す。確認が済むと、1 回だけウェルカムメールが届く。メールは 2 つの別経路で送られる。",
   "play": "▶ 登録する",
   "hops": [
@@ -648,7 +657,17 @@ Resend が /api/webhooks/resend へ bounce / 苦情を送る。svix の署名を
         "url": "/ja/calendar",
         "blocks": [],
         "note": "サインインした状態でカレンダーに着地"
-      }
+      },
+      "tests": [
+        {
+          "path": "apps/product/src/features/auth/server/welcome-email.test.ts",
+          "find": "it('掴めなければ送らない（2 通目を出さないことがこの関数の存在理由）'"
+        },
+        {
+          "path": "apps/product/src/features/auth/server/welcome-email.test.ts",
+          "find": "it('claim が失敗したら送らず Sentry へ残す'"
+        }
+      ]
     },
     {
       "id": "transactional-send",
@@ -796,7 +815,17 @@ Resend が /api/webhooks/resend へ bounce / 苦情を送る。svix の署名を
             "state": "read"
           }
         ]
-      }
+      },
+      "tests": [
+        {
+          "path": "apps/product/src/lib/email/send.test.ts",
+          "find": "it('suppression に載っているアドレスへは Resend を呼ばず suppressed を返す'"
+        },
+        {
+          "path": "apps/product/src/lib/email/send.test.ts",
+          "find": "it('Resend が error を返しても throw せず failed(provider) を返す'"
+        }
+      ]
     },
     {
       "id": "resend-webhook",
@@ -859,9 +888,22 @@ Resend が /api/webhooks/resend へ bounce / 苦情を送る。svix の署名を
         }
       ],
       "short": "配送結果を受ける",
-      "via": "webhook"
+      "via": "webhook",
+      "tests": [
+        {
+          "path": "apps/product/src/app/api/webhooks/resend/route.test.ts",
+          "find": "it('transient bounce（mailbox full 等）では suppression を書かない'"
+        }
+      ]
     }
   ],
-  "lanes": ["browser", "vercel", "supabase", "resend"]
+  "lanes": ["browser", "vercel", "supabase", "resend"],
+  "tests": [
+    {
+      "path": "apps/product/src/lib/test/e2e/auth.spec.ts",
+      "find": "test('サインアップページがフォームと規約・ログイン導線を配信する'",
+      "why": "画面が出るところまで。登録からメールまでを通しで守る E2E は無い"
+    }
+  ]
 }
 ```

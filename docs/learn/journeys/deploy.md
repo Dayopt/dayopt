@@ -5,7 +5,7 @@ last_verified: 2026-09-21
 
 # merge → 本番公開
 
-<!-- learn:generated:start — 正本 このファイルの learn:journey ブロック / 再生成 pnpm learn:generate / 検証 pnpm docs:check。この範囲は手編集しない -->
+<!-- learn:generated:start — 正本 このファイルの learn:journey の JSON / 再生成 pnpm learn:generate / 検証 pnpm docs:check。この範囲は手編集しない -->
 
 PR を main へ merge する。merge と本番公開は分かれていて、公開するのは Production Release workflow だけ。DB の migration は merge の時点で先に本番へ入る。
 
@@ -166,7 +166,8 @@ release job が、migration が本番に入っていることを確かめ、候�
 {
   "id": "deploy",
   "title": "merge → 本番公開",
-  "order": 50,
+  "order": 150,
+  "group": "ops",
   "intro": "PR を main へ merge する。merge と本番公開は分かれていて、公開するのは Production Release workflow だけ。DB の migration は merge の時点で先に本番へ入る。",
   "play": "▶ merge する",
   "hops": [

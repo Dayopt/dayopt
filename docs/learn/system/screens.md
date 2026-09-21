@@ -5,7 +5,7 @@ last_verified: 2026-09-21
 
 # 画面マップ
 
-<!-- learn:generated:start — 正本 このファイルの learn:screens ブロック / 再生成 pnpm learn:generate / 検証 pnpm docs:check。この範囲は手編集しない -->
+<!-- learn:generated:start — 正本 このファイルの learn:screens の JSON / 再生成 pnpm learn:generate / 検証 pnpm docs:check。この範囲は手編集しない -->
 
 Dayopt の画面と、画面どうしの移り方。画面を押すと、そこへ来る条件・読み込むデータ・触るサービス・壊れた時の見え方と、その画面を通る経路が出る。URL は日本語の場合（英語は /ja が付かない）。
 
@@ -66,7 +66,7 @@ flowchart LR
 - **触るサービス**: ブラウザ、Supabase、その他の外部
 - **壊れた時**: 認証エラーはフォームの下に文言で出る。想定内のエラーは Sentry に出ない。
 - **移る先**: 多要素認証（MFA が必要）、カレンダー（サインイン成功）、パスワード再設定の依頼（パスワードを忘れた）
-- **この画面を通る経路**: [ログイン（MFA 含む）](../journeys/login.md)
+- **この画面を通る経路**: [ログイン（MFA 含む）](../journeys/login.md)、[パスワードを再設定する](../journeys/password-reset.md)
 - **コードと文書**:
   - [`apps/product/src/app/[locale]/(auth)/auth/login/page.tsx`](<../../../apps/product/src/app/[locale]/(auth)/auth/login/page.tsx>) で `LoginForm` を探す
   - [`apps/product/src/proxy.ts`](../../../apps/product/src/proxy.ts) で `loginUrl.searchParams.set('redirect'` を探す
@@ -106,6 +106,7 @@ flowchart LR
 - **触るサービス**: ブラウザ、Supabase、Resend
 - **壊れた時**: リンクのメールは確認メールと同じく Edge Function から Resend で送る。
 - **移る先**: 新しいパスワード（リセットのリンク）
+- **この画面を通る経路**: [パスワードを再設定する](../journeys/password-reset.md)
 - **コードと文書**:
   - [`apps/product/src/app/[locale]/(auth)/auth/password/page.tsx`](<../../../apps/product/src/app/[locale]/(auth)/auth/password/page.tsx>) で `PasswordResetForm` を探す
 
@@ -117,6 +118,7 @@ flowchart LR
 - **読み込むデータ**: なし
 - **触るサービス**: ブラウザ、Supabase
 - **壊れた時**: セッションが無ければ /auth（→ /auth/login）へ。
+- **この画面を通る経路**: [パスワードを再設定する](../journeys/password-reset.md)
 - **コードと文書**:
   - [`apps/product/src/app/[locale]/(auth)/auth/reset-password/page.tsx`](<../../../apps/product/src/app/[locale]/(auth)/auth/reset-password/page.tsx>) で ``redirect(`/${locale}/auth`)`` を探す
 
@@ -129,7 +131,7 @@ flowchart LR
 - **触るサービス**: ブラウザ、Supabase、Vercel（Next.js）
 - **壊れた時**: challenge の失敗は「もう一度試す」ボタン付きで出る。
 - **移る先**: カレンダー（認証成功）
-- **この画面を通る経路**: [ログイン（MFA 含む）](../journeys/login.md)
+- **この画面を通る経路**: [ログイン（MFA 含む）](../journeys/login.md)、[パスワードを再設定する](../journeys/password-reset.md)
 - **コードと文書**:
   - [`apps/product/src/app/[locale]/(auth)/auth/mfa-verify/page.tsx`](<../../../apps/product/src/app/[locale]/(auth)/auth/mfa-verify/page.tsx>) で `supabase.auth.mfa.challenge` を探す
 
@@ -167,7 +169,7 @@ flowchart LR
 - **触るサービス**: ブラウザ、Vercel（Next.js）、Supabase
 - **壊れた時**: セグメント単位の error.tsx（CalendarError）が受ける。回線が無ければ Service Worker が /offline を出す。
 - **移る先**: サインイン（未ログイン / サインアウト）、多要素認証（aal2 が必要（proxy））、セッション確認エラー（AAL の確認に失敗）、レポート（タブ）、設定（設定を開く）、オフライン（回線なし（SW））
-- **この画面を通る経路**: [Plan を保存](../journeys/save-plan.md)、[ログイン（MFA 含む）](../journeys/login.md)、[Google Calendar 連携](../journeys/google-calendar.md)、[merge → 本番公開](../journeys/deploy.md)
+- **この画面を通る経路**: [Plan を保存](../journeys/save-plan.md)、[Plan / Record を動かす・直す](../journeys/edit-timeblock.md)、[Record を作る・Plan を記録する](../journeys/record-plan.md)、[削除と取り消し](../journeys/delete-undo.md)、[AI クライアントから Plan を作る（MCP）](../journeys/mcp.md)、[ログイン（MFA 含む）](../journeys/login.md)、[Google Calendar 連携](../journeys/google-calendar.md)、[merge → 本番公開](../journeys/deploy.md)
 - **コードと文書**:
   - [`apps/product/src/app/[locale]/(app)/(workspace)/_server/calendar-prefetch.ts`](<../../../apps/product/src/app/[locale]/(app)/(workspace)/_server/calendar-prefetch.ts>) で `helpers.plans.list.prefetch` を探す
   - [`apps/product/src/app/[locale]/(app)/(workspace)/calendar/error.tsx`](<../../../apps/product/src/app/[locale]/(app)/(workspace)/calendar/error.tsx>) で `CalendarError` を探す
@@ -181,6 +183,7 @@ flowchart LR
 - **触るサービス**: ブラウザ、Vercel（Next.js）、Supabase
 - **壊れた時**: カレンダーと同じ CalendarError。読み込み中は loading.tsx。
 - **移る先**: カレンダー（タブ）
+- **この画面を通る経路**: [レポートを開く（集計）](../journeys/report.md)
 - **コードと文書**:
   - [`apps/product/src/features/review/hooks/useReportPeriod.ts`](../../../apps/product/src/features/review/hooks/useReportPeriod.ts) で `review.getReportPeriod.useQuery` を探す
   - [`apps/product/src/app/[locale]/(app)/_shell/WorkspaceTabs.tsx`](<../../../apps/product/src/app/[locale]/(app)/_shell/WorkspaceTabs.tsx>) で `/report` を探す
@@ -194,6 +197,7 @@ flowchart LR
 - **触るサービス**: ブラウザ、Vercel（Next.js）、Supabase
 - **壊れた時**: 専用の error.tsx は無く、(app) 全体の error.tsx が受ける。
 - **移る先**: 設定 › 連携（連携）
+- **この画面を通る経路**: [Pro を契約する（課金）](../journeys/billing.md)、[データを書き出す](../journeys/data-export.md)、[アカウントを削除する（不可逆）](../journeys/account-deletion.md)、[問い合わせを送る](../journeys/contact.md)
 - **コードと文書**:
   - [`apps/product/src/features/settings/constants.ts`](../../../apps/product/src/features/settings/constants.ts) で `SETTINGS_CATEGORIES` を探す
   - [`apps/product/src/app/[locale]/(app)/settings/_composition/settings-route.tsx`](<../../../apps/product/src/app/[locale]/(app)/settings/_composition/settings-route.tsx>) で `router.replace(DESKTOP_SETTINGS_EXIT_PATH)` を探す
@@ -233,6 +237,7 @@ Google 側の画面。アカウントを選び、カレンダーの読み取り�
 - **触るサービス**: Vercel（Next.js）、Supabase
 - **壊れた時**: パラメータが不正ならエラーパネル。
 - **移る先**: MCP の同意（パラメータが正しい）
+- **この画面を通る経路**: [AI クライアントから Plan を作る（MCP）](../journeys/mcp.md)
 - **コードと文書**:
   - [`apps/product/src/app/[locale]/oauth/authorize/page.tsx`](../../../apps/product/src/app/[locale]/oauth/authorize/page.tsx) で `OAuthErrorPanel` を探す
 
@@ -244,6 +249,7 @@ MCP クライアントに渡す権限（scope）を利用者が承認する。
 - **読み込むデータ**: OAuth 用 DB（許可できる scope）
 - **触るサービス**: Vercel（Next.js）、Supabase
 - **壊れた時**: 外部契約（MCP / OAuth scope）なので、変更は既存クライアントを壊さないか確かめる。
+- **この画面を通る経路**: [AI クライアントから Plan を作る（MCP）](../journeys/mcp.md)
 - **コードと文書**:
   - [`apps/product/src/app/[locale]/oauth/consent/page.tsx`](../../../apps/product/src/app/[locale]/oauth/consent/page.tsx) で `processConsent` を探す
 
@@ -305,7 +311,7 @@ MCP クライアントに渡す権限（scope）を利用者が承認する。
           "find": "loginUrl.searchParams.set('redirect'"
         }
       ],
-      "flows": ["login"]
+      "flows": ["login", "password-reset"]
     },
     {
       "id": "signup",
@@ -391,7 +397,7 @@ MCP クライアントに渡す権限（scope）を利用者が承認する。
           "find": "PasswordResetForm"
         }
       ],
-      "flows": []
+      "flows": ["password-reset"]
     },
     {
       "id": "reset-password",
@@ -418,7 +424,7 @@ MCP クライアントに渡す権限（scope）を利用者が承認する。
           "find": "redirect(`/${locale}/auth`)"
         }
       ],
-      "flows": []
+      "flows": ["password-reset"]
     },
     {
       "id": "mfa-verify",
@@ -446,7 +452,7 @@ MCP クライアントに渡す権限（scope）を利用者が承認する。
           "find": "supabase.auth.mfa.challenge"
         }
       ],
-      "flows": ["login"]
+      "flows": ["login", "password-reset"]
     },
     {
       "id": "session-error",
@@ -539,7 +545,16 @@ MCP クライアントに渡す権限（scope）を利用者が承認する。
           "find": "CalendarError"
         }
       ],
-      "flows": ["save-plan", "login", "google-calendar", "deploy"]
+      "flows": [
+        "save-plan",
+        "edit-timeblock",
+        "record-plan",
+        "delete-undo",
+        "mcp",
+        "login",
+        "google-calendar",
+        "deploy"
+      ]
     },
     {
       "id": "report",
@@ -570,7 +585,7 @@ MCP クライアントに渡す権限（scope）を利用者が承認する。
           "find": "/report"
         }
       ],
-      "flows": []
+      "flows": ["report"]
     },
     {
       "id": "settings",
@@ -605,7 +620,7 @@ MCP クライアントに渡す権限（scope）を利用者が承認する。
           "find": "router.replace(DESKTOP_SETTINGS_EXIT_PATH)"
         }
       ],
-      "flows": []
+      "flows": ["billing", "data-export", "account-deletion", "contact"]
     },
     {
       "id": "integrations",
@@ -686,7 +701,7 @@ MCP クライアントに渡す権限（scope）を利用者が承認する。
           "find": "OAuthErrorPanel"
         }
       ],
-      "flows": []
+      "flows": ["mcp"]
     },
     {
       "id": "oauth-consent",
@@ -716,7 +731,7 @@ MCP クライアントに渡す権限（scope）を利用者が承認する。
           "find": "processConsent"
         }
       ],
-      "flows": []
+      "flows": ["mcp"]
     },
     {
       "id": "offline",

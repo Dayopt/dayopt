@@ -5,7 +5,7 @@ last_verified: 2026-09-21
 
 # ログイン（MFA 含む）
 
-<!-- learn:generated:start — 正本 このファイルの learn:journey ブロック / 再生成 pnpm learn:generate / 検証 pnpm docs:check。この範囲は手編集しない -->
+<!-- learn:generated:start — 正本 このファイルの learn:journey の JSON / 再生成 pnpm learn:generate / 検証 pnpm docs:check。この範囲は手編集しない -->
 
 メールアドレスとパスワードでサインインする。多要素認証（MFA）を登録している人は、6 桁のコードを求められる。認証の通信はブラウザから Supabase Auth へ直接行き、tRPC を通らない。
 
@@ -36,7 +36,7 @@ flowchart TD
 
 #### この経路を守るテスト
 
-- 経路全体を通しで守るテストは紐付いていない（段ごとのテストを見る）
+- [`apps/product/src/lib/test/e2e/auth.spec.ts`](../../../apps/product/src/lib/test/e2e/auth.spec.ts) で `test('正しい認証情報でログインしカレンダーへ遷移する'` を探す
 
 ### 1. サインイン画面で入力する（ブラウザ）
 
@@ -68,6 +68,8 @@ flowchart TD
 - **コード**:
   - [`apps/product/src/features/auth/stores/useAuthStore.ts`](../../../apps/product/src/features/auth/stores/useAuthStore.ts) で `supabase.auth.signInWithPassword` を探す
   - [`apps/product/src/lib/sentry/integration.ts`](../../../apps/product/src/lib/sentry/integration.ts) で `export function isExpectedAuthError` を探す
+- **この段を守るテスト**:
+  - [`apps/product/src/lib/test/e2e/auth.spec.ts`](../../../apps/product/src/lib/test/e2e/auth.spec.ts) で `test('誤った認証情報でエラー表示'` を探す
 
 <details>
 <summary>⚡ パスワードが違う — 画面: エラー表示 / データ: 変化なし / 再試行: 利用者がやり直す / 痕跡: 残らない</summary>
@@ -140,6 +142,8 @@ flowchart TD
   - [`apps/product/src/app/[locale]/(auth)/auth/mfa-verify/page.tsx`](<../../../apps/product/src/app/[locale]/(auth)/auth/mfa-verify/page.tsx>) で `vanillaTrpc.user.verifyRecoveryCode.mutate` を探す
   - [`apps/product/src/lib/trpc/procedures.ts`](../../../apps/product/src/lib/trpc/procedures.ts) で `MFA_CHALLENGE_TRPC_PATHS` を探す
   - [`apps/product/src/features/auth/server/recovery-service.ts`](../../../apps/product/src/features/auth/server/recovery-service.ts) で `sendMfaDisabledEmail` を探す
+- **この段を守るテスト**:
+  - [`apps/product/src/features/auth/components/MFAVerifyForm.test.tsx`](../../../apps/product/src/features/auth/components/MFAVerifyForm.test.tsx) で `it('6桁入力でonVerifyTotpが呼ばれる'` を探す
 
 <details>
 <summary>⚡ challenge を発行できない — 画面: エラー表示 / データ: 変化なし / 再試行: 利用者がやり直す / 痕跡: 残らない</summary>
@@ -211,6 +215,8 @@ mfa.verify で検証する。通ればセッションが aal2 に上がり、nex
   - [`apps/product/src/proxy.ts`](../../../apps/product/src/proxy.ts) で `resolveMfaAssurance` を探す
   - [`apps/product/src/proxy.ts`](../../../apps/product/src/proxy.ts) で `loginUrl.searchParams.set('redirect'` を探す
   - [`apps/product/src/lib/auth/domain/access-policy.ts`](../../../apps/product/src/lib/auth/domain/access-policy.ts) で `protectedProductPaths` を探す
+- **この段を守るテスト**:
+  - [`apps/product/src/lib/test/integration/mfa-aal-cookie-tampering.integration.test.ts`](../../../apps/product/src/lib/test/integration/mfa-aal-cookie-tampering.integration.test.ts) で `it('resolveMfaAssuranceは改竄後もserver検証済みfactorsでnextLevel=aal2を要求する'` を探す（cookie を書き換えられても MFA を要求し続ける）
 
 <details>
 <summary>⚡ セッションが無い・切れた — 画面: 別の画面へ / データ: 変化なし / 再試行: 利用者がやり直す / 痕跡: 残らない</summary>
@@ -247,6 +253,8 @@ mfa.verify で検証する。通ればセッションが aal2 に上がり、nex
   - [`apps/product/src/lib/safe-redirect.ts`](../../../apps/product/src/lib/safe-redirect.ts) で `getSafeRedirectPath` を探す
   - [`apps/product/src/lib/auth/session-config.ts`](../../../apps/product/src/lib/auth/session-config.ts) で `/auth/login?reason=timeout` を探す
   - [`apps/product/src/lib/hooks/useLogout.ts`](../../../apps/product/src/lib/hooks/useLogout.ts) で `supabase.auth.signOut()` を探す
+- **この段を守るテスト**:
+  - [`apps/product/src/lib/safe-redirect.test.ts`](../../../apps/product/src/lib/safe-redirect.test.ts) で `it('rejects absolute and protocol-relative URLs'` を探す
 
 <details>
 <summary>⚡ redirect に外部 URL が入っている — 画面: 何も起きない / データ: 変化なし / 再試行: 不要 / 痕跡: 残らない</summary>
@@ -271,7 +279,8 @@ mfa.verify で検証する。通ればセッションが aal2 に上がり、nex
 {
   "id": "login",
   "title": "ログイン（MFA 含む）",
-  "order": 20,
+  "order": 60,
+  "group": "account",
   "intro": "メールアドレスとパスワードでサインインする。多要素認証（MFA）を登録している人は、6 桁のコードを求められる。認証の通信はブラウザから Supabase Auth へ直接行き、tRPC を通らない。",
   "play": "▶ サインインを押す",
   "lanes": ["browser", "vercel", "supabase"],
@@ -483,6 +492,12 @@ mfa.verify で検証する。通ればセッションが aal2 に上がり、nex
             "error": "確認に失敗しました。解決しない場合はサポートへ"
           }
         }
+      ],
+      "tests": [
+        {
+          "path": "apps/product/src/lib/test/e2e/auth.spec.ts",
+          "find": "test('誤った認証情報でエラー表示'"
+        }
       ]
     },
     {
@@ -629,6 +644,12 @@ mfa.verify で検証する。通ればセッションが aal2 に上がり、nex
             "alt": "リカバリーコードを使用",
             "error": "リカバリーコードを使い切っています"
           }
+        }
+      ],
+      "tests": [
+        {
+          "path": "apps/product/src/features/auth/components/MFAVerifyForm.test.tsx",
+          "find": "it('6桁入力でonVerifyTotpが呼ばれる'"
         }
       ]
     },
@@ -815,6 +836,13 @@ mfa.verify で検証する。通ればセッションが aal2 に上がり、nex
             "button": "もう一度試す"
           }
         }
+      ],
+      "tests": [
+        {
+          "path": "apps/product/src/lib/test/integration/mfa-aal-cookie-tampering.integration.test.ts",
+          "find": "it('resolveMfaAssuranceは改竄後もserver検証済みfactorsでnextLevel=aal2を要求する'",
+          "why": "cookie を書き換えられても MFA を要求し続ける"
+        }
       ]
     },
     {
@@ -876,7 +904,19 @@ mfa.verify で検証する。通ればセッションが aal2 に上がり、nex
             "trace": "none"
           }
         }
+      ],
+      "tests": [
+        {
+          "path": "apps/product/src/lib/safe-redirect.test.ts",
+          "find": "it('rejects absolute and protocol-relative URLs'"
+        }
       ]
+    }
+  ],
+  "tests": [
+    {
+      "path": "apps/product/src/lib/test/e2e/auth.spec.ts",
+      "find": "test('正しい認証情報でログインしカレンダーへ遷移する'"
     }
   ]
 }

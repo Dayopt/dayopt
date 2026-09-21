@@ -5,7 +5,7 @@ last_verified: 2026-09-21
 
 # Google Calendar 連携
 
-<!-- learn:generated:start — 正本 このファイルの learn:journey ブロック / 再生成 pnpm learn:generate / 検証 pnpm docs:check。この範囲は手編集しない -->
+<!-- learn:generated:start — 正本 このファイルの learn:journey の JSON / 再生成 pnpm learn:generate / 検証 pnpm docs:check。この範囲は手編集しない -->
 
 設定の「連携」で Google アカウントを接続し、Google の予定を Dayopt のカレンダーに取り込む。接続（OAuth）と取り込み（15 分ごとの cron）は別の経路で、接続した瞬間には取り込まない。
 
@@ -272,6 +272,8 @@ CRON_SECRET で呼び出し元を確かめ、write fence を見て、開始と�
 - **コード**:
   - [`apps/product/src/features/external-calendar/server/sync-service.ts`](../../../apps/product/src/features/external-calendar/server/sync-service.ts) で `external_calendar_events` を探す
   - [`apps/product/src/features/external-calendar/server/fenced-sync-writer.ts`](../../../apps/product/src/features/external-calendar/server/fenced-sync-writer.ts) で `p_tombstone_event_ids` を探す
+- **この段を守るテスト**:
+  - [`apps/product/src/features/external-calendar/server/sync-service.test.ts`](../../../apps/product/src/features/external-calendar/server/sync-service.test.ts) で `it('connection_id と user_id を全行に載せる（複合 FK）'` を探す
 
 ### 11. カレンダーに Google の予定が薄く出る（ブラウザ）
 
@@ -292,7 +294,8 @@ CRON_SECRET で呼び出し元を確かめ、write fence を見て、開始と�
 {
   "id": "google-calendar",
   "title": "Google Calendar 連携",
-  "order": 40,
+  "order": 90,
+  "group": "integration",
   "intro": "設定の「連携」で Google アカウントを接続し、Google の予定を Dayopt のカレンダーに取り込む。接続（OAuth）と取り込み（15 分ごとの cron）は別の経路で、接続した瞬間には取り込まない。",
   "play": "▶ 接続を押す",
   "lanes": ["browser", "vercel", "google", "supabase"],
@@ -857,7 +860,13 @@ CRON_SECRET で呼び出し元を確かめ、write fence を見て、開始と�
           "find": "p_tombstone_event_ids"
         }
       ],
-      "fails": []
+      "fails": [],
+      "tests": [
+        {
+          "path": "apps/product/src/features/external-calendar/server/sync-service.test.ts",
+          "find": "it('connection_id と user_id を全行に載せる（複合 FK）'"
+        }
+      ]
     },
     {
       "id": "show-ghost",

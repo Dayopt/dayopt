@@ -105,10 +105,24 @@ const hopSchema = z.strictObject({
   fails: z.array(failSchema),
 });
 
+/** 対話画面のタブをまとめる単位。表示名は JOURNEY_GROUPS */
+export const JOURNEY_GROUPS = {
+  calendar: 'カレンダー',
+  account: 'アカウント',
+  integration: '外部連携',
+  ops: '運用',
+} as const;
+
 export const journeySchema = z.strictObject({
   id: z.string().min(1),
   title: z.string().min(1),
   order: z.number().int(),
+  group: z.enum(
+    Object.keys(JOURNEY_GROUPS) as [
+      keyof typeof JOURNEY_GROUPS,
+      ...(keyof typeof JOURNEY_GROUPS)[],
+    ],
+  ),
   intro: z.string().min(1),
   play: z.string().min(1),
   lanes: z.array(z.string().min(1)).min(1),
@@ -188,6 +202,7 @@ export interface LearnSource<T> {
 export interface LearnData {
   repo: string;
   tags: typeof FAILURE_TAGS;
+  groups: typeof JOURNEY_GROUPS;
   services: LearnServices['services'];
   outages: LearnServices['outages'];
   screens: LearnScreens;
@@ -363,12 +378,19 @@ export function collectLearnData(root: string): CollectResult {
   if (!screens) errors.push('learn:screens の block が無い');
   if (services && screens) errors.push(...crossCheck(journeys, services, screens));
 
-  journeys.sort((a, b) => a.value.order - b.value.order);
+  // 対話画面のタブと README の一覧は、まとまり（JOURNEY_GROUPS の並び）→ order の順
+  const groupRank = Object.keys(JOURNEY_GROUPS);
+  journeys.sort(
+    (a, b) =>
+      groupRank.indexOf(a.value.group) - groupRank.indexOf(b.value.group) ||
+      a.value.order - b.value.order,
+  );
   const data =
     services && screens && errors.length === 0
       ? {
           repo: REPO_BLOB_URL,
           tags: FAILURE_TAGS,
+          groups: JOURNEY_GROUPS,
           services: services.value.services,
           outages: services.value.outages,
           screens: screens.value,

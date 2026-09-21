@@ -5,7 +5,7 @@
  * 生成ブロックの外（見出し・手書きの注釈・JSON block）には触れない。
  */
 
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { dirname, relative, resolve } from 'node:path';
 
 import { format as formatWithPrettier, resolveConfig as resolvePrettierConfig } from 'prettier';
@@ -16,6 +16,7 @@ import {
 } from '../architecture-map/generated-block.ts';
 import {
   FAILURE_TAGS,
+  JOURNEY_GROUPS,
   type CollectResult,
   type LearnJourney,
   type LearnRef,
@@ -23,9 +24,14 @@ import {
   type LearnServices,
 } from './data.ts';
 
+const SOURCE_KINDS = new Set(['journey', 'services', 'screens']);
+
 export function learnMarkers(kind: string): GeneratedBlockMarkers {
+  const source = SOURCE_KINDS.has(kind)
+    ? `このファイルの learn:${kind} の JSON`
+    : `docs/learn/journeys の JSON（${kind}）`;
   return {
-    start: `<!-- learn:generated:start — 正本 このファイルの learn:${kind} ブロック / 再生成 pnpm learn:generate / 検証 pnpm docs:check。この範囲は手編集しない -->`,
+    start: `<!-- learn:generated:start — 正本 ${source} / 再生成 pnpm learn:generate / 検証 pnpm docs:check。この範囲は手編集しない -->`,
     end: '<!-- learn:generated:end -->',
   };
 }
@@ -248,6 +254,81 @@ export function renderScreens(
   return out.join('\n');
 }
 
+/** 章 6: 経路の段ごとに、それを守るテストと、守るテストが無い段を並べる。 */
+export function renderTestMap(docFile: string, result: CollectResult): string {
+  const out: string[] = [
+    '経路の各段に紐付いたテストの一覧。段の「この段を守るテスト」と、経路全体を通しで守るテストを集めた。',
+    '**テストが紐付いていない段は、守られていないとは限らない**（紐付けていないだけのこともある）。変更前に、その段のコードの隣の `*.test.ts` を探す。',
+  ];
+  const untested: string[] = [];
+  for (const { file, value: journey } of result.journeys) {
+    const link = `[${journey.title}](${relLink(docFile, file)})`;
+    out.push('', `### ${journey.title}`, '');
+    if (journey.tests?.length)
+      out.push('- **経路全体**:', ...refList(docFile, journey.tests, '  '));
+    journey.hops.forEach((hop, index) => {
+      if (hop.tests?.length)
+        out.push(`- **${index + 1}. ${hop.short}**:`, ...refList(docFile, hop.tests, '  '));
+      else untested.push(`- ${link} の ${index + 1}. ${hop.short}`);
+    });
+    if (!journey.tests?.length && !journey.hops.some((hop) => hop.tests?.length))
+      out.push('- 紐付いたテストは無い');
+  }
+  out.push('', '### テストが紐付いていない段', '', ...(untested.length ? untested : ['- なし']));
+  return out.join('\n');
+}
+
+/** 章 12: コードのファイルごとに、それを参照する経路の段と「ここを変えると」を逆引きする。 */
+export function renderChangeMap(docFile: string, result: CollectResult): string {
+  const byPath = new Map<string, string[]>();
+  for (const { file, value: journey } of result.journeys) {
+    journey.hops.forEach((hop, index) => {
+      const paths = new Set(
+        hop.refs.map((ref) => ref.path).filter((path) => !path.startsWith('docs/')),
+      );
+      for (const path of paths) {
+        const line = `[${journey.title}](${relLink(docFile, file)}) の ${index + 1}. ${hop.short}${hop.change ? ` — ${hop.change}` : ''}`;
+        byPath.set(path, [...(byPath.get(path) ?? []), line]);
+      }
+    });
+  }
+  const out: string[] = [
+    '経路の段が参照しているコードを、ファイルごとに逆引きした一覧。あるファイルを変える時、どの操作のどの段に響くか、その段に書いた「ここを変えると」を並べる。',
+    '一覧に無いファイルは、どの経路からも参照していないだけで、影響が無いとは限らない。',
+  ];
+  for (const path of [...byPath.keys()].sort()) {
+    out.push(
+      '',
+      `#### ${inlineCode(path)}`,
+      '',
+      ...(byPath.get(path) ?? []).map((line) => `- ${line}`),
+    );
+  }
+  return out.join('\n');
+}
+
+/** README: 経路の一覧を、対話画面のタブと同じまとまりで並べる。 */
+export function renderJourneyIndex(docFile: string, result: CollectResult): string {
+  const out: string[] = [];
+  for (const [group, label] of Object.entries(JOURNEY_GROUPS)) {
+    const journeys = result.journeys.filter((j) => j.value.group === group);
+    if (journeys.length === 0) continue;
+    out.push('', `**${label}**`, '');
+    for (const { file, value } of journeys) {
+      const lead = value.intro.split('。')[0];
+      out.push(`- [${value.title}](${relLink(docFile, file)}) — ${lead}。`);
+    }
+  }
+  return out.join('\n').trim();
+}
+
+/** 経路 data から生成する章。ファイルがある時だけ生成する。 */
+const INDEX_DOCS = [
+  { file: 'docs/learn/README.md', kind: 'journey-index', render: renderJourneyIndex },
+  { file: 'docs/learn/06-testing.md', kind: 'test-map', render: renderTestMap },
+  { file: 'docs/learn/12-change.md', kind: 'change-map', render: renderChangeMap },
+] as const;
+
 export interface RenderedDoc {
   file: string;
   current: string;
@@ -287,6 +368,12 @@ export async function renderLearnDocs(root: string, result: CollectResult): Prom
       ),
     },
   ];
+
+  for (const index of INDEX_DOCS) {
+    if (existsSync(resolve(root, index.file))) {
+      targets.push({ file: index.file, kind: index.kind, body: index.render(index.file, result) });
+    }
+  }
 
   const docs: RenderedDoc[] = [];
   for (const { file, kind, body } of targets) {

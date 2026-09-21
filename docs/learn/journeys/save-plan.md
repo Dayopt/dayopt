@@ -5,7 +5,7 @@ last_verified: 2026-09-21
 
 # Plan を保存
 
-<!-- learn:generated:start — 正本 このファイルの learn:journey ブロック / 再生成 pnpm learn:generate / 検証 pnpm docs:check。この範囲は手編集しない -->
+<!-- learn:generated:start — 正本 このファイルの learn:journey の JSON / 再生成 pnpm learn:generate / 検証 pnpm docs:check。この範囲は手編集しない -->
 
 カレンダーで時間帯をドラッグし、作成パネルでアクティビティを選ぶ。選んだ瞬間に保存が走る。
 
@@ -40,24 +40,33 @@ flowchart TD
 
 通るサービス: ブラウザ / Vercel（Next.js） / Supabase。段 10・失敗 13 種。
 
+同じ操作を別の入口から行う経路: [mcp](mcp.md)
+
 #### この経路を守るテスト
 
-- 経路全体を通しで守るテストは紐付いていない（段ごとのテストを見る）
+- [`apps/product/src/lib/test/e2e/critical-path.spec.ts`](../../../apps/product/src/lib/test/e2e/critical-path.spec.ts) で `test('ドラッグ選択とアクティビティ選択で明日の Plan を作成し、リロード後も残る'` を探す（E2E。保存して再読み込みしても残ることまで見る）
 
 ### 1. Plan か Record かを決める（ブラウザ）
 
 終了時刻が今より未来なら Plan、過去なら Record が既定になる。過去の時間帯でだけ Plan へ切り替えられる。通信のない純粋な関数。
 
+- **なぜ必要か**: 作成画面の既定を正しくし、手数を増やさないため。規則そのものは DB が持つので、ここは先回りの写し。
+- **入力 → 出力**: 選んだ時間帯の end_at と現在時刻 → 'plan' か 'record'
 - **ここを変えると**: 時刻の規則を強制しているのは DB trigger で、ここはその写し。ここだけ変えても保存できるかどうかは変わらない。規則を撤去・変更する時は invariants.md §時刻 の写し表を全部たどる。
 - **コード**:
   - [`apps/product/src/features/timeblock/domain/timeblock-destination.ts`](../../../apps/product/src/features/timeblock/domain/timeblock-destination.ts) で `resolveTimeblockDestination` を探す
   - [`apps/product/src/features/timeblock/domain/timeblock-destination.ts`](../../../apps/product/src/features/timeblock/domain/timeblock-destination.ts) で `resolveTimeblockKindChoice` を探す
   - [`docs/engineering/invariants.md`](../../engineering/invariants.md) で `### 規則の写しと、その分類` を探す（写しの一覧（契約変換 / UX 先回り））
+- **この段を守るテスト**:
+  - [`apps/product/src/features/timeblock/domain/timeblock-destination.test.ts`](../../../apps/product/src/features/timeblock/domain/timeblock-destination.test.ts) で `it('終了が現在より未来なら Plan を返す'` を探す
+  - [`apps/product/src/features/calendar/components/create/InlineCreatePanel.test.tsx`](../../../apps/product/src/features/calendar/components/create/InlineCreatePanel.test.tsx) で `it('未来スロットでは記録タブが選べず、選択すると Plan を作る'` を探す
 
 ### 2. アクティビティを選ぶと作成を依頼する（ブラウザ）
 
 作成パネルでアクティビティを選んだ瞬間に mutation を呼ぶ。送る前に、画面が持っているデータで重なりを先に確かめる（往復を減らすための写し）。成功すると「取り消し」付きのトーストを出し、取り消しは作ったものを削除する。
 
+- **なぜ必要か**: 保存ボタンを置かず、選んだ瞬間に作ることで Google Calendar / Toggl より一手少なくする。間違えてもトーストから戻せる。
+- **入力 → 出力**: 時間帯 + アクティビティ → createPlan の呼び出し
 - **ここを変えると**: 作成の入口はここと、サイドバーのアクティビティタップの 2 つ。手数を変える時は両方を見る。
 - **コード**:
   - [`apps/product/src/features/calendar/components/create/useInlineCreate.ts`](../../../apps/product/src/features/calendar/components/create/useInlineCreate.ts) で `mutation.mutate(` を探す
@@ -80,11 +89,15 @@ flowchart TD
 
 サーバーの返事を待たず、一時 ID（temp-…）の Plan を一覧のキャッシュへ差し込む。その直前に一覧の snapshot を取っておき、失敗したらそこへ戻す。
 
+- **なぜ必要か**: 通信を待つ間も画面を止めないため。失敗した時に元へ戻せるよう、差し込む前の状態を持っておく。
+- **入力 → 出力**: 作成の入力 → 一時 ID の行が入ったキャッシュと snapshot
 - **ここを変えると**: キャッシュのキーや一覧の絞り込み条件を変えると、差し込み先と巻き戻し対象がずれる。書き込み mutation を足す時は optimistic-update skill の手順に従う。
 - **コード**:
   - [`apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.ts`](../../../apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.ts) で `const createPlan = api.planCommands.create.useMutation` を探す
   - [`apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.ts`](../../../apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.ts) で `snapshotTimeblockLists` を探す
   - [`docs/engineering/architecture.md`](../../engineering/architecture.md) で `### 楽観的更新のフロー` を探す
+- **この段を守るテスト**:
+  - [`apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.test.ts`](../../../apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.test.ts) で `it('表示期間と重なる行だけを対象にする（offset付きcreateは除外）'` を探す
 
 <details>
 <summary>⚡ ブラウザがオフライン — 画面: 待ち状態 / データ: 変化なし / 再試行: 自動で再試行 / 痕跡: 残らない</summary>
@@ -104,6 +117,8 @@ flowchart TD
 
 1 本の httpBatchLink で /api/trpc へ POST する（query も POST。入力を URL やログに残さないため）。送り直し用の link は無く、timeblock の mutation は retry: false。
 
+- **なぜ必要か**: 型の付いた 1 本の通路にまとめ、認証切れの扱い・エラー表示・Sentry を全 API で共通にするため。
+- **入力 → 出力**: procedure 名と入力 → POST /api/trpc（まとめて送る）
 - **ここを変えると**: link を足す・変える影響は全 API に及ぶ。エラーを受ける共通処理（401 で画面ごとログインへ移動、Sentry 送信）は QueryClient 側にある。
 - **コード**:
   - [`apps/product/src/lib/trpc/browser-client.ts`](../../../apps/product/src/lib/trpc/browser-client.ts) で `httpBatchLink` を探す
@@ -129,6 +144,8 @@ flowchart TD
 
 Vercel の Function（Node.js、上限 60 秒）。context を作って認証方式（session / oauth / service role）を判定し、認証前に IP 単位の rate limit を見る。
 
+- **なぜ必要か**: 全 tRPC の共通の入口で、認証方式の判定と認証前の乱用対策を 1 か所で行うため。
+- **入力 → 出力**: HTTP リクエスト（cookie） → ctx（userId・認証方式・Supabase client）
 - **ここを変えると**: ここは全 tRPC 共通の入口。context に項目を足すと全 procedure の実行前コストが増える。
 - **コード**:
   - [`apps/product/src/app/api/trpc/[trpc]/route.ts`](../../../apps/product/src/app/api/trpc/[trpc]/route.ts) で `createFetchTRPCContext` を探す
@@ -165,10 +182,14 @@ Vercel の Function（Node.js、上限 60 秒）。context を作って認証方
 
 順に、ログインしているか → MFA の要件 → 利用権（課金）→ write fence（運用で書き込みを止めるスイッチ）→ ユーザー単位の rate limit（1 分 300 回）を見る。
 
+- **なぜ必要か**: どの procedure でも同じ順序で守りを通すため。個々の router に書くと、どこかで抜ける。
+- **入力 → 出力**: ctx と procedure 名 → 通過、または TRPCError
 - **ここを変えると**: 順序に理由がある。write fence を rate limit より先に見るのは、止めている間の依頼で自分の枠を使い切り、復旧直後に締め出されるのを避けるため。
 - **コード**:
   - [`apps/product/src/lib/trpc/procedures.ts`](../../../apps/product/src/lib/trpc/procedures.ts) で `isWriteFenceEnabled` を探す
   - [`apps/product/src/lib/trpc/procedures.ts`](../../../apps/product/src/lib/trpc/procedures.ts) で `async function isUserRateLimited` を探す
+- **この段を守るテスト**:
+  - [`apps/product/src/lib/test/integration/mfa-aal-cookie-tampering.integration.test.ts`](../../../apps/product/src/lib/test/integration/mfa-aal-cookie-tampering.integration.test.ts) で `it('protectedProcedure経由でも改竄クライアントはFORBIDDEN(MFA verification required)になる'` を探す（local Supabase が要る integration）
 
 <details>
 <summary>⚡ セッションが切れている（401） — 画面: 別の画面へ / データ: 変化なし / 再試行: しない / 痕跡: 残らない</summary>
@@ -215,6 +236,8 @@ Vercel の Function（Node.js、上限 60 秒）。context を作って認証方
 
 Router が zod で入力を検証して Service を呼ぶ。Service は command client で書き込み、成功後に利用記録（plan_created）を product_events へ送る。
 
+- **なぜ必要か**: 入力の検証（Router）と業務の処理（Service）を分け、MCP など別の入口からも同じ Service を使えるようにするため。
+- **入力 → 出力**: 検証前の入力 → command client への呼び出しと利用記録
 - **ここを変えると**: 業務ロジックは Service に置き、Router に書かない（trpc-router-creating skill）。利用記録は best-effort で、失敗しても保存は取り消さない。
 - **コード**:
   - [`apps/product/src/features/timeblock/server/plan-commands-router.ts`](../../../apps/product/src/features/timeblock/server/plan-commands-router.ts) で `handleServiceError` を探す
@@ -225,11 +248,16 @@ Router が zod で入力を検証して Service を呼ぶ。Service は command 
 
 service role の client で create_plan_command_v1 を呼び、user_id を引数で渡す。利用者のセッションからは plans / records へ直接書き込めない（authenticated には SELECT だけ許可）。Postgres のエラーコードをアプリのコードへ訳す。
 
+- **なぜ必要か**: 書き込みを 1 つの DB 関数（1 トランザクション）にまとめ、途中で壊れた状態を残さないため。強い権限（service role）はこの adapter の中に閉じ込める。
+- **入力 → 出力**: userId と Plan の値 → 作られた行、またはアプリのエラーコード
 - **ここを変えると**: service role は RLS を越える。テナント分離は「この adapter が必ず user_id を渡す」ことで守っている。ここへ command を足す時は REVIEW-1（ユーザー分離）の観点で読む。
 - **コード**:
   - [`apps/product/src/features/timeblock/server/timeblock-command-client.ts`](../../../apps/product/src/features/timeblock/server/timeblock-command-client.ts) で `create_plan_command_v1` を探す
   - [`apps/product/src/features/timeblock/server/timeblock-command-client.ts`](../../../apps/product/src/features/timeblock/server/timeblock-command-client.ts) で `EXPECTED_COMMAND_ERRORS` を探す
   - [`supabase/migrations/20260730090300_revoke_authenticated_timeblock_dml.sql`](../../../supabase/migrations/20260730090300_revoke_authenticated_timeblock_dml.sql) で `GRANT SELECT` を探す
+- **この段を守るテスト**:
+  - [`apps/product/src/features/timeblock/server/timeblock-command-client.test.ts`](../../../apps/product/src/features/timeblock/server/timeblock-command-client.test.ts) で `it('tenantとnullable fieldを原子的create commandへ閉じ込める'` を探す
+  - [`apps/product/src/features/timeblock/server/timeblock-command-client.test.ts`](../../../apps/product/src/features/timeblock/server/timeblock-command-client.test.ts) で `it('deadlockだけをserver内で一度再試行する'` を探す
 
 <details>
 <summary>⚡ deadlock（40P01） — 画面: 何も起きない / データ: 保存される / 再試行: 自動で再試行 / 痕跡: 残らない</summary>
@@ -275,10 +303,14 @@ service role の client で create_plan_command_v1 を呼び、user_id を引数
 
 規則は 2 本だけ。end_at > start_at（DT003）と、Record は未来に終われない（DT005）。重なりは排他制約（23P01）で弾く。
 
+- **なぜ必要か**: UI・MCP・将来の入口のどこから来ても、同じ規則を必ず通すため。アプリ側の確認は往復を減らす写しにすぎない。
+- **入力 → 出力**: INSERT される行 → 通過、または DT003 / DT005 / 23P01
 - **ここを変えると**: 規則の正本はここ。変える時は DB → service → UI の写しを 1 変更で全部変える。DB だけ緩めて UI の写しが残ると「操作はできるのに保存されない」になる。
 - **コード**:
   - [`supabase/migrations/20260904080216_simplify_timeblock_temporal_rules.sql`](../../../supabase/migrations/20260904080216_simplify_timeblock_temporal_rules.sql) で `DT003` を探す
   - [`docs/engineering/invariants.md`](../../engineering/invariants.md) で `## 時刻` を探す
+- **この段を守るテスト**:
+  - [`apps/product/src/lib/test/integration/timeblock-atomic-commands.integration.test.ts`](../../../apps/product/src/lib/test/integration/timeblock-atomic-commands.integration.test.ts) で `it('rejects future Records and ignores the drained legacy link argument'` を探す（DT005 を DB で確かめる）
 
 <details>
 <summary>⚡ 時刻の規則に反する（DT003 / DT005） — 画面: エラー表示 / データ: 変化なし / 再試行: しない / 痕跡: 残らない</summary>
@@ -311,6 +343,8 @@ service role の client で create_plan_command_v1 を呼び、user_id を引数
 
 一時 ID の行をサーバーの行へ差し替える。成功・失敗どちらでも statistics / review / plans / records を取り直す。Realtime の購読は無いので、別のタブや端末には次の取り直し（フォーカス復帰など）で反映される。手動で作った Plan を Google Calendar へ書き出す処理はこの経路に無い。
 
+- **なぜ必要か**: 先に出した表示を、サーバーが確定させた事実に揃えるため。
+- **入力 → 出力**: サーバーの行、またはエラー → 確定した一覧と、取り直した集計
 - **ここを変えると**: 新しい集計画面を足したら、ここの取り直し対象に入れないと保存後も古い数字が残る。
 - **コード**:
   - [`apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.ts`](../../../apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.ts) で `insertIntoMatchingLists('plans', created, context?.tempId)` を探す
@@ -328,6 +362,7 @@ service role の client で create_plan_command_v1 を呼び、user_id を引数
   "id": "save-plan",
   "title": "Plan を保存",
   "order": 10,
+  "group": "calendar",
   "intro": "カレンダーで時間帯をドラッグし、作成パネルでアクティビティを選ぶ。選んだ瞬間に保存が走る。",
   "play": "▶ 保存を押す",
   "hops": [
@@ -336,6 +371,11 @@ service role の client で create_plan_command_v1 を呼び、user_id を引数
       "svc": "browser",
       "title": "Plan か Record かを決める",
       "what": "終了時刻が今より未来なら Plan、過去なら Record が既定になる。過去の時間帯でだけ Plan へ切り替えられる。通信のない純粋な関数。",
+      "why": "作成画面の既定を正しくし、手数を増やさないため。規則そのものは DB が持つので、ここは先回りの写し。",
+      "io": {
+        "in": "選んだ時間帯の end_at と現在時刻",
+        "out": "'plan' か 'record'"
+      },
       "change": "時刻の規則を強制しているのは DB trigger で、ここはその写し。ここだけ変えても保存できるかどうかは変わらない。規則を撤去・変更する時は invariants.md §時刻 の写し表を全部たどる。",
       "refs": [
         {
@@ -364,13 +404,28 @@ service role の client で create_plan_command_v1 を呼び、user_id を引数
           }
         ],
         "note": "ドラッグで時間帯を選んだところ"
-      }
+      },
+      "tests": [
+        {
+          "path": "apps/product/src/features/timeblock/domain/timeblock-destination.test.ts",
+          "find": "it('終了が現在より未来なら Plan を返す'"
+        },
+        {
+          "path": "apps/product/src/features/calendar/components/create/InlineCreatePanel.test.tsx",
+          "find": "it('未来スロットでは記録タブが選べず、選択すると Plan を作る'"
+        }
+      ]
     },
     {
       "id": "inline-create",
       "svc": "browser",
       "title": "アクティビティを選ぶと作成を依頼する",
       "what": "作成パネルでアクティビティを選んだ瞬間に mutation を呼ぶ。送る前に、画面が持っているデータで重なりを先に確かめる（往復を減らすための写し）。成功すると「取り消し」付きのトーストを出し、取り消しは作ったものを削除する。",
+      "why": "保存ボタンを置かず、選んだ瞬間に作ることで Google Calendar / Toggl より一手少なくする。間違えてもトーストから戻せる。",
+      "io": {
+        "in": "時間帯 + アクティビティ",
+        "out": "createPlan の呼び出し"
+      },
       "change": "作成の入口はここと、サイドバーのアクティビティタップの 2 つ。手数を変える時は両方を見る。",
       "refs": [
         {
@@ -440,6 +495,11 @@ service role の client で create_plan_command_v1 を呼び、user_id を引数
       "svc": "browser",
       "title": "先に画面へ出す（楽観的更新）",
       "what": "サーバーの返事を待たず、一時 ID（temp-…）の Plan を一覧のキャッシュへ差し込む。その直前に一覧の snapshot を取っておき、失敗したらそこへ戻す。",
+      "why": "通信を待つ間も画面を止めないため。失敗した時に元へ戻せるよう、差し込む前の状態を持っておく。",
+      "io": {
+        "in": "作成の入力",
+        "out": "一時 ID の行が入ったキャッシュと snapshot"
+      },
       "change": "キャッシュのキーや一覧の絞り込み条件を変えると、差し込み先と巻き戻し対象がずれる。書き込み mutation を足す時は optimistic-update skill の手順に従う。",
       "refs": [
         {
@@ -505,13 +565,24 @@ service role の client で create_plan_command_v1 を呼び、user_id を引数
           }
         ],
         "note": "サーバーの返事を待たずに出す。以降の段の間、利用者はこの表示のまま操作を続けられる"
-      }
+      },
+      "tests": [
+        {
+          "path": "apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.test.ts",
+          "find": "it('表示期間と重なる行だけを対象にする（offset付きcreateは除外）'"
+        }
+      ]
     },
     {
       "id": "trpc-client",
       "svc": "browser",
       "title": "tRPC で /api/trpc へ送る",
       "what": "1 本の httpBatchLink で /api/trpc へ POST する（query も POST。入力を URL やログに残さないため）。送り直し用の link は無く、timeblock の mutation は retry: false。",
+      "why": "型の付いた 1 本の通路にまとめ、認証切れの扱い・エラー表示・Sentry を全 API で共通にするため。",
+      "io": {
+        "in": "procedure 名と入力",
+        "out": "POST /api/trpc（まとめて送る）"
+      },
       "change": "link を足す・変える影響は全 API に及ぶ。エラーを受ける共通処理（401 で画面ごとログインへ移動、Sentry 送信）は QueryClient 側にある。",
       "refs": [
         {
@@ -580,6 +651,11 @@ service role の client で create_plan_command_v1 を呼び、user_id を引数
       "svc": "vercel",
       "title": "/api/trpc で受ける",
       "what": "Vercel の Function（Node.js、上限 60 秒）。context を作って認証方式（session / oauth / service role）を判定し、認証前に IP 単位の rate limit を見る。",
+      "why": "全 tRPC の共通の入口で、認証方式の判定と認証前の乱用対策を 1 か所で行うため。",
+      "io": {
+        "in": "HTTP リクエスト（cookie）",
+        "out": "ctx（userId・認証方式・Supabase client）"
+      },
       "change": "ここは全 tRPC 共通の入口。context に項目を足すと全 procedure の実行前コストが増える。",
       "refs": [
         {
@@ -675,6 +751,11 @@ service role の client で create_plan_command_v1 を呼び、user_id を引数
       "svc": "vercel",
       "title": "protectedProcedure の関門を通る",
       "what": "順に、ログインしているか → MFA の要件 → 利用権（課金）→ write fence（運用で書き込みを止めるスイッチ）→ ユーザー単位の rate limit（1 分 300 回）を見る。",
+      "why": "どの procedure でも同じ順序で守りを通すため。個々の router に書くと、どこかで抜ける。",
+      "io": {
+        "in": "ctx と procedure 名",
+        "out": "通過、または TRPCError"
+      },
       "change": "順序に理由がある。write fence を rate limit より先に見るのは、止めている間の依頼で自分の枠を使い切り、復旧直後に締め出されるのを避けるため。",
       "refs": [
         {
@@ -800,13 +881,25 @@ service role の client で create_plan_command_v1 を呼び、user_id を引数
           }
         }
       ],
-      "short": "関門チェック"
+      "short": "関門チェック",
+      "tests": [
+        {
+          "path": "apps/product/src/lib/test/integration/mfa-aal-cookie-tampering.integration.test.ts",
+          "find": "it('protectedProcedure経由でも改竄クライアントはFORBIDDEN(MFA verification required)になる'",
+          "why": "local Supabase が要る integration"
+        }
+      ]
     },
     {
       "id": "router-service",
       "svc": "vercel",
       "title": "Router → Service",
       "what": "Router が zod で入力を検証して Service を呼ぶ。Service は command client で書き込み、成功後に利用記録（plan_created）を product_events へ送る。",
+      "why": "入力の検証（Router）と業務の処理（Service）を分け、MCP など別の入口からも同じ Service を使えるようにするため。",
+      "io": {
+        "in": "検証前の入力",
+        "out": "command client への呼び出しと利用記録"
+      },
       "change": "業務ロジックは Service に置き、Router に書かない（trpc-router-creating skill）。利用記録は best-effort で、失敗しても保存は取り消さない。",
       "refs": [
         {
@@ -830,6 +923,11 @@ service role の client で create_plan_command_v1 を呼び、user_id を引数
       "svc": "supabase",
       "title": "Supabase の RPC で書き込む",
       "what": "service role の client で create_plan_command_v1 を呼び、user_id を引数で渡す。利用者のセッションからは plans / records へ直接書き込めない（authenticated には SELECT だけ許可）。Postgres のエラーコードをアプリのコードへ訳す。",
+      "why": "書き込みを 1 つの DB 関数（1 トランザクション）にまとめ、途中で壊れた状態を残さないため。強い権限（service role）はこの adapter の中に閉じ込める。",
+      "io": {
+        "in": "userId と Plan の値",
+        "out": "作られた行、またはアプリのエラーコード"
+      },
       "change": "service role は RLS を越える。テナント分離は「この adapter が必ず user_id を渡す」ことで守っている。ここへ command を足す時は REVIEW-1（ユーザー分離）の観点で読む。",
       "refs": [
         {
@@ -957,13 +1055,28 @@ service role の client で create_plan_command_v1 を呼び、user_id を引数
         }
       ],
       "short": "RPC で書き込む",
-      "via": "RPC"
+      "via": "RPC",
+      "tests": [
+        {
+          "path": "apps/product/src/features/timeblock/server/timeblock-command-client.test.ts",
+          "find": "it('tenantとnullable fieldを原子的create commandへ閉じ込める'"
+        },
+        {
+          "path": "apps/product/src/features/timeblock/server/timeblock-command-client.test.ts",
+          "find": "it('deadlockだけをserver内で一度再試行する'"
+        }
+      ]
     },
     {
       "id": "db-trigger",
       "svc": "supabase",
       "title": "DB が時刻の規則を強制する",
       "what": "規則は 2 本だけ。end_at > start_at（DT003）と、Record は未来に終われない（DT005）。重なりは排他制約（23P01）で弾く。",
+      "why": "UI・MCP・将来の入口のどこから来ても、同じ規則を必ず通すため。アプリ側の確認は往復を減らす写しにすぎない。",
+      "io": {
+        "in": "INSERT される行",
+        "out": "通過、または DT003 / DT005 / 23P01"
+      },
       "change": "規則の正本はここ。変える時は DB → service → UI の写しを 1 変更で全部変える。DB だけ緩めて UI の写しが残ると「操作はできるのに保存されない」になる。",
       "refs": [
         {
@@ -1051,13 +1164,25 @@ service role の client で create_plan_command_v1 を呼び、user_id を引数
           }
         }
       ],
-      "short": "時刻の規則で検査"
+      "short": "時刻の規則で検査",
+      "tests": [
+        {
+          "path": "apps/product/src/lib/test/integration/timeblock-atomic-commands.integration.test.ts",
+          "find": "it('rejects future Records and ignores the drained legacy link argument'",
+          "why": "DT005 を DB で確かめる"
+        }
+      ]
     },
     {
       "id": "settle",
       "svc": "browser",
       "title": "返事で画面を確定し、関連を取り直す",
       "what": "一時 ID の行をサーバーの行へ差し替える。成功・失敗どちらでも statistics / review / plans / records を取り直す。Realtime の購読は無いので、別のタブや端末には次の取り直し（フォーカス復帰など）で反映される。手動で作った Plan を Google Calendar へ書き出す処理はこの経路に無い。",
+      "why": "先に出した表示を、サーバーが確定させた事実に揃えるため。",
+      "io": {
+        "in": "サーバーの行、またはエラー",
+        "out": "確定した一覧と、取り直した集計"
+      },
       "change": "新しい集計画面を足したら、ここの取り直し対象に入れないと保存後も古い数字が残る。",
       "refs": [
         {
@@ -1090,6 +1215,14 @@ service role の client で create_plan_command_v1 を呼び、user_id を引数
       }
     }
   ],
-  "lanes": ["browser", "vercel", "supabase"]
+  "lanes": ["browser", "vercel", "supabase"],
+  "twin": "mcp",
+  "tests": [
+    {
+      "path": "apps/product/src/lib/test/e2e/critical-path.spec.ts",
+      "find": "test('ドラッグ選択とアクティビティ選択で明日の Plan を作成し、リロード後も残る'",
+      "why": "E2E。保存して再読み込みしても残ることまで見る"
+    }
+  ]
 }
 ```

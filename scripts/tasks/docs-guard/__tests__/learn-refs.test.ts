@@ -10,7 +10,7 @@ import { checkLearnRefs, runLearnRefsCheck } from '../checks/learn-refs.ts';
 
 const FM = '---\nstatus: current\nlast_verified: 2026-09-21\n---\n\n';
 const MARK = (kind: string) =>
-  `<!-- learn:generated:start — 正本 このファイルの learn:${kind} ブロック / 再生成 pnpm learn:generate / 検証 pnpm docs:check。この範囲は手編集しない -->\n\n<!-- learn:generated:end -->\n`;
+  `<!-- learn:generated:start — 正本 このファイルの learn:${kind} の JSON / 再生成 pnpm learn:generate / 検証 pnpm docs:check。この範囲は手編集しない -->\n\n<!-- learn:generated:end -->\n`;
 const block = (kind: string, value: unknown) =>
   `\n\`\`\`json learn:${kind}\n${JSON.stringify(value, null, 2)}\n\`\`\`\n`;
 
@@ -23,6 +23,7 @@ const journey = (find: string) => ({
   id: 'demo',
   title: 'デモ',
   order: 10,
+  group: 'calendar',
   intro: 'i',
   play: '▶',
   lanes: ['browser'],

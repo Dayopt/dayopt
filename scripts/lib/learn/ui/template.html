@@ -35,6 +35,7 @@
         --svc-github: #b8641b;
         --svc-external: #6b675f;
         --svc-google: #0f8b8d;
+        --svc-stripe: #635bff;
         color-scheme: light;
       }
       @media (prefers-color-scheme: dark) {
@@ -62,6 +63,7 @@
           --svc-github: #e0a263;
           --svc-external: #a29e95;
           --svc-google: #4fc3c5;
+          --svc-stripe: #9a94ff;
           color-scheme: dark;
         }
       }
@@ -89,6 +91,7 @@
         --svc-github: #e0a263;
         --svc-external: #a29e95;
         --svc-google: #4fc3c5;
+        --svc-stripe: #9a94ff;
         color-scheme: dark;
       }
       * {
@@ -141,13 +144,30 @@
       }
       .tabs {
         display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
+        flex-direction: column;
+        gap: 6px;
         margin: 20px 0 16px;
+      }
+      .tab-row {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 6px;
+      }
+      .tab-row-label {
+        flex: none;
+        width: 5.5em;
+        font-size: 0.75em;
+        color: var(--muted);
+      }
+      @media (max-width: 560px) {
+        .tab-row-label {
+          width: 100%;
+        }
       }
       .tab {
         min-height: 44px;
-        padding: 8px 16px;
+        padding: 6px 14px;
         border: 1px solid var(--border);
         border-radius: 999px;
         background: var(--surface);
@@ -1203,7 +1223,15 @@
         var viewEl = document.getElementById('view');
         var SVG = 'http://www.w3.org/2000/svg';
         var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-        var tabs = [{ id: 'screens', title: data.screens.title }].concat(data.scenarios, [{ id: 'outages', title: data.outages.title }]);
+        var tabs = [
+          { id: 'screens', title: data.screens.title, groupLabel: '地図' },
+          { id: 'outages', title: data.outages.title, groupLabel: '地図' },
+        ].concat(
+          data.scenarios.map(function (sc) {
+            sc.groupLabel = data.groups[sc.group];
+            return sc;
+          }),
+        );
         var state = { tab: 0, hop: 0, fail: null, outage: null, screen: null, token: 0 };
         var resizeObserver = null;
 
@@ -1280,7 +1308,16 @@
         // ---------- タブ ----------
         function renderTabs() {
           tabsEl.textContent = '';
+          var row = null;
+          var rowLabel = null;
           tabs.forEach(function (t, i) {
+            if (t.groupLabel !== rowLabel) {
+              rowLabel = t.groupLabel;
+              row = el('div', { class: 'tab-row', role: 'presentation' }, [
+                el('span', { class: 'tab-row-label', 'aria-hidden': 'true', text: rowLabel }),
+              ]);
+              tabsEl.appendChild(row);
+            }
             var b = el('button', {
               class: 'tab',
               role: 'tab',
@@ -1299,7 +1336,7 @@
               selectTab(next);
               document.getElementById('tab-' + tabs[next].id).focus();
             });
-            tabsEl.appendChild(b);
+            row.appendChild(b);
           });
           viewEl.setAttribute('role', 'tabpanel');
           viewEl.setAttribute('aria-labelledby', 'tab-' + tabs[state.tab].id);
@@ -1354,6 +1391,18 @@
             playScenario(sc);
           });
           btns.appendChild(play);
+          if (sc.twin && scenarioTabIndex(sc.twin) >= 0) {
+            var twinIndex = scenarioTabIndex(sc.twin);
+            var twin = el('button', {
+              class: 'ghost',
+              type: 'button',
+              text: '↔ 同じ操作を別の入口から: ' + tabs[twinIndex].title,
+            });
+            twin.addEventListener('click', function () {
+              selectTab(twinIndex);
+            });
+            btns.appendChild(twin);
+          }
           if (info) {
             var reset = el('button', { class: 'ghost', type: 'button', text: '失敗を解除' });
             reset.addEventListener('click', function () {

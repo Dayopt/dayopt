@@ -5,7 +5,7 @@ last_verified: 2026-09-21
 
 # 外部サービスと停止マップ
 
-<!-- learn:generated:start — 正本 このファイルの learn:services ブロック / 再生成 pnpm learn:generate / 検証 pnpm docs:check。この範囲は手編集しない -->
+<!-- learn:generated:start — 正本 このファイルの learn:services の JSON / 再生成 pnpm learn:generate / 検証 pnpm docs:check。この範囲は手編集しない -->
 
 外部サービスが 1 つ止まったら、何が壊れ、何は動き続け、どこから見るか。乗り換えの重さ（出口コスト）は infra.md の台帳が正本。
 
@@ -232,6 +232,16 @@ flowchart LR
       "label": "Google",
       "var": "--svc-google",
       "sub": "OAuth / Calendar API"
+    },
+    "stripe": {
+      "label": "Stripe",
+      "var": "--svc-stripe",
+      "sub": "Checkout / Billing / Webhook"
+    },
+    "aiclient": {
+      "label": "AI クライアント",
+      "var": "--svc-external",
+      "sub": "Claude / ChatGPT / Cursor（MCP）"
     }
   },
   "outages": {
