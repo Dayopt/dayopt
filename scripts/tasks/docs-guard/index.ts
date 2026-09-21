@@ -9,7 +9,7 @@
  *  - decisions-append-only   : docs/decisions.md の append-only 契約
  *  - glossary-sync           : 用語集の生成ブロックが terms.ts と一致するか
  *  - architecture-map        : Architecture Map の生成ブロック drift と参照切れ
- *  - walkthrough-refs        : engineering/walkthrough.html の参照先（path + find）の存在
+ *  - learn-refs              : docs/learn の正本 schema・参照（path + find）の実在・生成ブロックの drift
  *  - likec4-validate         : LikeC4 model の構文（生成器か .c4 が変わった時だけ / advisory）
  *
  * 各ドメイン log/ の凍結契約チェック（append-only-guard）は、domain log/ 全廃
@@ -31,10 +31,10 @@ import {
 } from './checks/decisions-append-only.ts';
 import { reportFrontmatterCheck, runFrontmatterCheck } from './checks/frontmatter-check.ts';
 import { reportGlossarySyncCheck, runGlossarySyncCheck } from './checks/glossary-sync.ts';
+import { reportLearnRefsCheck, runLearnRefsCheck } from './checks/learn-refs.ts';
 import { reportLikeC4ValidateCheck, runLikeC4ValidateCheck } from './checks/likec4-validate.ts';
 import { reportLinkCheck, runLinkCheck } from './checks/link-check.ts';
 import { reportNamingCheck, runNamingCheck } from './checks/naming-check.ts';
-import { reportWalkthroughRefsCheck, runWalkthroughRefsCheck } from './checks/walkthrough-refs.ts';
 import { colors } from './config.ts';
 
 async function main(): Promise<void> {
@@ -59,7 +59,7 @@ async function main(): Promise<void> {
   const architectureMapViolations = await runArchitectureMapCheck();
   const architectureMapOk = reportArchitectureMapCheck(architectureMapViolations);
 
-  const walkthroughRefsOk = reportWalkthroughRefsCheck(runWalkthroughRefsCheck());
+  const learnRefsOk = reportLearnRefsCheck(await runLearnRefsCheck());
 
   // advisory（常に true）。生成器か .c4 が変わった PR でだけ likec4 を取ってきて構文検査する。
   const likec4Ok = reportLikeC4ValidateCheck(runLikeC4ValidateCheck());
@@ -73,7 +73,7 @@ async function main(): Promise<void> {
     decisionsAppendOnlyOk &&
     glossarySyncOk &&
     architectureMapOk &&
-    walkthroughRefsOk &&
+    learnRefsOk &&
     likec4Ok;
 
   if (ok) {

@@ -1,0 +1,399 @@
+/**
+ * Dayopt Learning System の正本（docs/learn/**\/*.md の `json learn:*` block）を集めて検証する。
+ *
+ * 正本は Markdown の中の JSON block。説明文と Mermaid は render-markdown.ts が、
+ * 対話 UI は tasks/learn.ts がここで集めた data から生成する。参照 {path, find} の実在は
+ * docs-guard の learn-refs が検査する。
+ */
+
+import { glob } from 'glob';
+import { fromMarkdown } from 'mdast-util-from-markdown';
+import { readFileSync } from 'node:fs';
+import { relative, resolve } from 'node:path';
+import { z } from 'zod';
+
+export const REPO_BLOB_URL = 'https://github.com/Dayopt/dayopt/blob/main/';
+
+/** 失敗時の 4 観点。[見出し, 色の分類]。UI とテキスト生成の両方がこの辞書を使う。 */
+export const FAILURE_TAGS = {
+  screen: {
+    none: ['何も起きない', 'ok'],
+    toast: ['エラー表示', 'bad'],
+    redirect: ['別の画面へ', 'warn'],
+    wait: ['待ち状態', 'warn'],
+    blocked: ['押せない', 'warn'],
+    down: ['使えない', 'bad'],
+    old: ['旧版のまま', 'warn'],
+    depends: ['設定次第', 'warn'],
+  },
+  data: {
+    unchanged: ['変化なし', 'neutral'],
+    saved: ['保存される', 'ok'],
+    unknown: ['どちらもありうる', 'warn'],
+    lost: ['欠落する', 'bad'],
+    mixed: ['DB だけ新しい', 'warn'],
+  },
+  retry: {
+    none: ['しない', 'neutral'],
+    auto: ['自動で再試行', 'ok'],
+    user: ['利用者がやり直す', 'neutral'],
+    provider: ['相手が再送', 'ok'],
+    next: ['次の機会に', 'warn'],
+    na: ['不要', 'ok'],
+    depends: ['条件次第', 'warn'],
+  },
+  trace: {
+    sentry: ['Sentry', 'ok'],
+    log: ['ログだけ', 'warn'],
+    none: ['残らない', 'neutral'],
+    issue: ['GitHub issue', 'ok'],
+    monitor: ['監視が拾う', 'ok'],
+  },
+} as const satisfies Record<string, Record<string, readonly [string, string]>>;
+
+type TagKey<K extends keyof typeof FAILURE_TAGS> = keyof (typeof FAILURE_TAGS)[K] & string;
+
+function tagEnum<K extends keyof typeof FAILURE_TAGS>(kind: K) {
+  const keys = Object.keys(FAILURE_TAGS[kind]) as [TagKey<K>, ...TagKey<K>[]];
+  return z.enum(keys);
+}
+
+const refSchema = z.strictObject({
+  path: z.string().min(1),
+  find: z.string().min(1),
+  why: z.string().min(1).optional(),
+});
+
+const screenSchema = z.looseObject({
+  t: z.enum(['calendar', 'form', 'inbox', 'page', 'consent', 'settings', 'blank']),
+});
+
+const failSchema = z.strictObject({
+  id: z.string().min(1),
+  label: z.string().min(1),
+  screen: z.string().min(1),
+  data: z.string().min(1),
+  retry: z.string().min(1),
+  trace: z.string().min(1),
+  look: z.string().min(1),
+  refs: z.array(refSchema),
+  tags: z.strictObject({
+    screen: tagEnum('screen'),
+    data: tagEnum('data'),
+    retry: tagEnum('retry'),
+    trace: tagEnum('trace'),
+  }),
+  to: z.string().min(1).optional(),
+  back: z.string().min(1).optional(),
+  screenAfter: screenSchema.optional(),
+  continues: z.boolean().optional(),
+});
+
+const hopSchema = z.strictObject({
+  id: z.string().min(1),
+  svc: z.string().min(1),
+  short: z.string().min(1),
+  title: z.string().min(1),
+  what: z.string().min(1),
+  why: z.string().min(1).optional(),
+  io: z.strictObject({ in: z.string().min(1), out: z.string().min(1) }).optional(),
+  change: z.string().min(1).optional(),
+  via: z.string().min(1).optional(),
+  screen: screenSchema.optional(),
+  refs: z.array(refSchema),
+  tests: z.array(refSchema).optional(),
+  fails: z.array(failSchema),
+});
+
+export const journeySchema = z.strictObject({
+  id: z.string().min(1),
+  title: z.string().min(1),
+  order: z.number().int(),
+  intro: z.string().min(1),
+  play: z.string().min(1),
+  lanes: z.array(z.string().min(1)).min(1),
+  /** 同じ操作を別の入口から行う journey（例: UI と MCP）。id を指す */
+  twin: z.string().min(1).optional(),
+  lab: z.string().min(1).optional(),
+  tests: z.array(refSchema).optional(),
+  hops: z.array(hopSchema).min(1),
+});
+
+const serviceSchema = z.strictObject({
+  label: z.string().min(1),
+  var: z.string().regex(/^--svc-[a-z]+$/),
+  sub: z.string(),
+});
+
+const outageItemSchema = z.strictObject({
+  id: z.string().min(1),
+  svc: z.string().min(1),
+  name: z.string().min(1),
+  role: z.string().min(1),
+  breaks: z.string().min(1),
+  keeps: z.string().min(1),
+  behavior: z.string().min(1),
+  env: z.array(z.string()),
+  look: z.string().min(1),
+  refs: z.array(refSchema),
+  impacts: z.record(z.string(), z.enum(['down', 'degraded'])),
+});
+
+export const servicesSchema = z.strictObject({
+  services: z.record(z.string(), serviceSchema),
+  outages: z.strictObject({
+    title: z.string().min(1),
+    intro: z.string().min(1),
+    features: z.array(z.strictObject({ id: z.string().min(1), label: z.string().min(1) })),
+    items: z.array(outageItemSchema),
+  }),
+});
+
+const screenNodeSchema = z.strictObject({
+  id: z.string().min(1),
+  label: z.string().min(1),
+  url: z.string().min(1),
+  col: z.number().int().min(1),
+  row: z.number().int().min(1),
+  group: z.enum(['auth', 'app', 'ext']),
+  what: z.string().min(1),
+  arrive: z.string().min(1),
+  loads: z.string().min(1),
+  svcs: z.array(z.string().min(1)),
+  fails: z.string().min(1),
+  screen: screenSchema,
+  refs: z.array(refSchema),
+  flows: z.array(z.string().min(1)),
+});
+
+export const screensSchema = z.strictObject({
+  title: z.string().min(1),
+  intro: z.string().min(1),
+  columns: z.array(z.string().min(1)),
+  nodes: z.array(screenNodeSchema),
+  edges: z.array(z.tuple([z.string().min(1), z.string().min(1), z.string().min(1)])),
+});
+
+export type LearnRef = z.infer<typeof refSchema>;
+export type LearnJourney = z.infer<typeof journeySchema>;
+export type LearnServices = z.infer<typeof servicesSchema>;
+export type LearnScreens = z.infer<typeof screensSchema>;
+
+export interface LearnSource<T> {
+  /** repo-relative path of the Markdown file holding the block */
+  file: string;
+  value: T;
+}
+
+export interface LearnData {
+  repo: string;
+  tags: typeof FAILURE_TAGS;
+  services: LearnServices['services'];
+  outages: LearnServices['outages'];
+  screens: LearnScreens;
+  scenarios: LearnJourney[];
+}
+
+export interface CollectResult {
+  data: LearnData | undefined;
+  journeys: LearnSource<LearnJourney>[];
+  services: LearnSource<LearnServices> | undefined;
+  screens: LearnSource<LearnScreens> | undefined;
+  errors: string[];
+}
+
+export interface LearnBlock {
+  kind: string;
+  file: string;
+  json: string;
+}
+
+/** Markdown から `json learn:<kind>` の fenced block を取り出す。 */
+export function extractLearnBlocks(markdown: string, file: string): LearnBlock[] {
+  const blocks: LearnBlock[] = [];
+  const visit = (node: unknown): void => {
+    if (!node || typeof node !== 'object') return;
+    const candidate = node as {
+      type?: string;
+      lang?: string | null;
+      meta?: string | null;
+      value?: string;
+      children?: unknown[];
+    };
+    if (
+      candidate.type === 'code' &&
+      candidate.lang === 'json' &&
+      candidate.meta?.startsWith('learn:')
+    ) {
+      blocks.push({
+        kind: candidate.meta.slice('learn:'.length).trim(),
+        file,
+        json: candidate.value ?? '',
+      });
+    }
+    candidate.children?.forEach(visit);
+  };
+  visit(fromMarkdown(markdown));
+  return blocks;
+}
+
+function formatIssues(file: string, label: string, error: z.ZodError): string[] {
+  return error.issues.map(
+    (issue) => `${file}: ${label} の ${issue.path.join('.') || '(root)'}: ${issue.message}`,
+  );
+}
+
+function parseBlock<T>(block: LearnBlock, schema: z.ZodType<T>, errors: string[]): T | undefined {
+  let raw: unknown;
+  try {
+    raw = JSON.parse(block.json);
+  } catch (error) {
+    errors.push(`${block.file}: learn:${block.kind} の JSON が壊れている: ${String(error)}`);
+    return undefined;
+  }
+  const parsed = schema.safeParse(raw);
+  if (!parsed.success) {
+    errors.push(...formatIssues(block.file, `learn:${block.kind}`, parsed.error));
+    return undefined;
+  }
+  return parsed.data;
+}
+
+function duplicates(ids: readonly string[]): string[] {
+  const seen = new Set<string>();
+  const dup = new Set<string>();
+  for (const id of ids) (seen.has(id) ? dup : seen).add(id);
+  return [...dup];
+}
+
+/** block 間の整合（svc / lane / fail.to / 画面の辺 / 停止マップの機能 id）を確かめる。 */
+export function crossCheck(
+  journeys: readonly LearnSource<LearnJourney>[],
+  services: LearnSource<LearnServices>,
+  screens: LearnSource<LearnScreens>,
+): string[] {
+  const errors: string[] = [];
+  const svcIds = new Set(Object.keys(services.value.services));
+  const journeyIds = new Set(journeys.map((j) => j.value.id));
+
+  for (const id of duplicates(journeys.map((j) => j.value.id)))
+    errors.push(`journey id が重複: ${id}`);
+  for (const order of duplicates(journeys.map((j) => String(j.value.order)))) {
+    errors.push(`journey の order が重複: ${order}`);
+  }
+
+  for (const { file, value: j } of journeys) {
+    for (const lane of j.lanes)
+      if (!svcIds.has(lane)) errors.push(`${file}: lanes に未定義のサービス ${lane}`);
+    if (j.twin && !journeyIds.has(j.twin))
+      errors.push(`${file}: twin が存在しない journey を指す: ${j.twin}`);
+    const hopIds = new Set(j.hops.map((h) => h.id));
+    for (const id of duplicates(j.hops.map((h) => h.id)))
+      errors.push(`${file}: hop id が重複: ${id}`);
+    for (const hop of j.hops) {
+      if (!j.lanes.includes(hop.svc))
+        errors.push(`${file}: hop ${hop.id} の svc ${hop.svc} が lanes に無い`);
+      for (const id of duplicates(hop.fails.map((f) => f.id)))
+        errors.push(`${file}: hop ${hop.id} の fail id が重複: ${id}`);
+      for (const fail of hop.fails) {
+        if (fail.to && !hopIds.has(fail.to))
+          errors.push(`${file}: fail ${fail.id} の to が存在しない hop を指す: ${fail.to}`);
+        if (fail.to && !fail.back)
+          errors.push(`${file}: fail ${fail.id} は to があるのに back が無い`);
+      }
+    }
+  }
+
+  const features = new Set(services.value.outages.features.map((f) => f.id));
+  for (const item of services.value.outages.items) {
+    if (!svcIds.has(item.svc))
+      errors.push(`${services.file}: 停止マップ ${item.id} の svc ${item.svc} が未定義`);
+    for (const feature of Object.keys(item.impacts)) {
+      if (!features.has(feature))
+        errors.push(`${services.file}: 停止マップ ${item.id} の impacts に未定義の機能 ${feature}`);
+    }
+  }
+
+  const nodeIds = new Set(screens.value.nodes.map((n) => n.id));
+  for (const id of duplicates(screens.value.nodes.map((n) => n.id)))
+    errors.push(`${screens.file}: 画面 id が重複: ${id}`);
+  for (const node of screens.value.nodes) {
+    for (const svc of node.svcs)
+      if (!svcIds.has(svc)) errors.push(`${screens.file}: 画面 ${node.id} の svcs に未定義 ${svc}`);
+    for (const flow of node.flows)
+      if (!journeyIds.has(flow))
+        errors.push(`${screens.file}: 画面 ${node.id} の flows に未定義の journey ${flow}`);
+  }
+  for (const [from, to] of screens.value.edges) {
+    if (!nodeIds.has(from) || !nodeIds.has(to))
+      errors.push(`${screens.file}: 画面の辺 ${from} → ${to} が未定義の画面を指す`);
+  }
+  return errors;
+}
+
+export function collectLearnData(root: string): CollectResult {
+  const learnDir = resolve(root, 'docs/learn');
+  const files = glob.sync('**/*.md', { cwd: learnDir, absolute: true }).sort();
+  const errors: string[] = [];
+  const journeys: LearnSource<LearnJourney>[] = [];
+  let services: LearnSource<LearnServices> | undefined;
+  let screens: LearnSource<LearnScreens> | undefined;
+
+  for (const abs of files) {
+    const file = relative(root, abs);
+    for (const block of extractLearnBlocks(readFileSync(abs, 'utf8'), file)) {
+      if (block.kind === 'journey') {
+        const value = parseBlock(block, journeySchema, errors);
+        if (value) journeys.push({ file, value });
+      } else if (block.kind === 'services') {
+        if (services) errors.push(`${file}: learn:services が 2 つある（${services.file}）`);
+        const value = parseBlock(block, servicesSchema, errors);
+        if (value) services = { file, value };
+      } else if (block.kind === 'screens') {
+        if (screens) errors.push(`${file}: learn:screens が 2 つある（${screens.file}）`);
+        const value = parseBlock(block, screensSchema, errors);
+        if (value) screens = { file, value };
+      } else {
+        errors.push(`${file}: 未知の block learn:${block.kind}`);
+      }
+    }
+  }
+
+  if (!services) errors.push('learn:services の block が無い');
+  if (!screens) errors.push('learn:screens の block が無い');
+  if (services && screens) errors.push(...crossCheck(journeys, services, screens));
+
+  journeys.sort((a, b) => a.value.order - b.value.order);
+  const data =
+    services && screens && errors.length === 0
+      ? {
+          repo: REPO_BLOB_URL,
+          tags: FAILURE_TAGS,
+          services: services.value.services,
+          outages: services.value.outages,
+          screens: screens.value,
+          scenarios: journeys.map((j) => j.value),
+        }
+      : undefined;
+  return { data, journeys, services, screens, errors };
+}
+
+/** data 中のすべての参照（refs と tests）を列挙する。 */
+export function listLearnRefs(result: CollectResult): { file: string; ref: LearnRef }[] {
+  const out: { file: string; ref: LearnRef }[] = [];
+  const push = (file: string, refs: readonly LearnRef[] | undefined) =>
+    refs?.forEach((ref) => out.push({ file, ref }));
+  for (const { file, value: j } of result.journeys) {
+    push(file, j.tests);
+    for (const hop of j.hops) {
+      push(file, hop.refs);
+      push(file, hop.tests);
+      for (const fail of hop.fails) push(file, fail.refs);
+    }
+  }
+  if (result.services)
+    for (const item of result.services.value.outages.items) push(result.services.file, item.refs);
+  if (result.screens)
+    for (const node of result.screens.value.nodes) push(result.screens.file, node.refs);
+  return out;
+}

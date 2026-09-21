@@ -62,7 +62,7 @@ Zustand と TanStack Query の使い分け:
 
 Dayopt におけるデータの流れ。ユーザー操作から DB までの全レイヤーを図解する。
 
-操作を 1 つ選んで経路を辿り、各段で失敗させた時の画面・データ・再試行・確認先を見るには [walkthrough.html](walkthrough.html) をブラウザで開く（画面マップ、Plan の保存、ログイン、サインアップ、Google Calendar 連携、merge → 本番公開、外部サービスの停止）。各段で利用者の画面がどう見えるかも出る。
+操作を 1 つ選んで経路を辿り、各段で失敗させた時の画面・データ・再試行・確認先を見るには [Dayopt Learning System](../learn/README.md) を使う（`pnpm learn` で対話画面が開く）。
 
 ### 全体像
 
