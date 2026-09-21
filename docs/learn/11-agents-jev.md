@@ -41,6 +41,7 @@ flowchart LR
 
 ## 正本
 
+- [AI まわりの仕組みの地図](system/agents.md) — 指示書・skill 24 個・guard / hook・memory の置き場所と効くタイミング
 - [AGENTS.md](../../AGENTS.md) — レビュー規則、シンプルルール、Non-Negotiables、委任・報告の作法
 - [docs/operations/jev.md](../operations/jev.md) — Jev の境界・予算・pack
 - [docs/engineering/infra.md](../engineering/infra.md) の「merge gate の required checks」
