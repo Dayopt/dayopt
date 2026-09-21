@@ -33,8 +33,8 @@ flowchart TD
 [経路: Plan を保存](journeys/save-plan.md) を開いて、`pnpm learn` の ▶ で流してみる。押さえる点は 3 つ。
 
 1. **再試行しない書き込み**: timeblock の mutation は `retry: false`。通信が途中で切れると、画面は元に戻るが、DB では保存済みだったこともある。その場合は一覧の取り直しで Plan が再び現れる。ここで押し直すと、同じ時間帯なら排他制約で弾かれるが、サイドバーからの作成は次の空き時間に置くので、時間をずらした 2 つ目ができる（[lab: 通信を壊す](labs/break-network.md) で実測）
-2. **関門の順序**: IP 単位の rate limit（context。cookie がある時だけ）→ 認証 → MFA → 利用権 → write fence（mutation だけ）→ 利用者単位の rate limit。write fence を rate limit より先に見るのは、止めている間の依頼で自分の枠を使い切らないため
-3. **書き込みは 1 つの DB 関数**: `create_plan_command_v1` を service role で呼び、user_id は引数で渡す。途中で壊れた状態を残さない
+2. **関門の順序**: IP 単位の rate limit（context。cookie がある時だけ）→ 認証 → MFA → 利用権 → write fence（mutation だけ）→ 利用者単位の rate limit。write fence は、障害対応などで運用が書き込みだけを止めるスイッチ（読み取りは動く。[7 章](07-failures.md)）。これを rate limit より先に見るのは、止めている間の依頼で自分の枠を使い切らないため
+3. **書き込みは 1 つの DB 関数**: `create_plan_command_v1` を service role（RLS を越えて全行に触れる server 専用の強い鍵。[3 章](03-data-auth-rls.md)）で呼び、user_id は引数で渡す。途中で壊れた状態を残さない
 
 同じ型の経路:
 
