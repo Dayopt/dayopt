@@ -6,7 +6,7 @@ import { useProductAccessGate } from './useProductAccessGate';
 const access = vi.hoisted(() => ({ canUseProduct: true }));
 const openSettings = vi.hoisted(() => vi.fn());
 
-vi.mock('@/lib/billing/BillingAccessProvider', () => ({
+vi.mock('@/lib/billing/billing-access-context', () => ({
   useBillingAccess: () => ({
     state: access.canUseProduct ? 'trial' : 'expired',
     canUseProduct: access.canUseProduct,

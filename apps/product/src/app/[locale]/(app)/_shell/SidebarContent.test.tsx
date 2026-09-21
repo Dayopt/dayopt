@@ -13,10 +13,21 @@ vi.mock('@dayopt/i18n/navigation', () => ({
 }));
 
 const applyMutate = vi.hoisted(() => vi.fn());
+const renameMutate = vi.hoisted(() => vi.fn());
+const deleteMutate = vi.hoisted(() => vi.fn());
 /** テンプレート保存モードの起動（サイドバーの「+」） */
 const startSaving = vi.hoisted(() => vi.fn());
 /** 適用 mutation の実行中フラグ。連打ガードの検証で切り替える */
 const applyState = vi.hoisted(() => ({ isPending: false }));
+const accessMocks = vi.hoisted(() => {
+  const state = { canUseProduct: true };
+  const openSettings = vi.fn();
+  const gateProductAccess = vi.fn((run: () => void) => {
+    if (state.canUseProduct) run();
+    else openSettings('billing');
+  });
+  return { state, openSettings, gateProductAccess };
+});
 const templateRows = vi.hoisted(() => [
   {
     id: 'template-1',
@@ -55,10 +66,14 @@ vi.mock('@/features/calendar', () => ({
     templates,
     onApplyTemplate,
     onCreateTimeblock,
+    onRenameTemplate,
+    onDeleteTemplate,
   }: {
     templates: ReadonlyArray<{ id: string; name: string }>;
     onApplyTemplate?: (templateId: string) => void;
     onCreateTimeblock?: () => void;
+    onRenameTemplate?: (templateId: string, name: string) => void;
+    onDeleteTemplate?: (templateId: string) => void;
   }) => (
     <div data-testid="template-list">
       {onCreateTimeblock && (
@@ -67,12 +82,24 @@ vi.mock('@/features/calendar', () => ({
         </button>
       )}
       {templates.map((template) => (
-        <button key={template.id} type="button" onClick={() => onApplyTemplate?.(template.id)}>
-          {template.name}
-        </button>
+        <div key={template.id}>
+          <button type="button" onClick={() => onApplyTemplate?.(template.id)}>
+            {template.name}
+          </button>
+          <button type="button" onClick={() => onRenameTemplate?.(template.id, '新しい名前')}>
+            rename-template
+          </button>
+          <button type="button" onClick={() => onDeleteTemplate?.(template.id)}>
+            delete-template
+          </button>
+        </div>
       ))}
     </div>
   ),
+}));
+
+vi.mock('@/lib/billing/useProductAccessGate', () => ({
+  useProductAccessGate: () => accessMocks.gateProductAccess,
 }));
 
 vi.mock('@/lib/trpc', () => ({
@@ -86,8 +113,8 @@ vi.mock('@/features/activities', () => ({
 vi.mock('@/features/timeblock', () => ({
   usePlanTemplateMutations: () => ({
     applyToDay: { mutate: applyMutate, isPending: applyState.isPending },
-    renameTemplate: { mutate: vi.fn() },
-    deleteTemplate: { mutate: vi.fn() },
+    renameTemplate: { mutate: renameMutate },
+    deleteTemplate: { mutate: deleteMutate },
   }),
 }));
 
@@ -109,6 +136,7 @@ describe('SidebarContent', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     applyState.isPending = false;
+    accessMocks.state.canUseProduct = true;
     pathnameMock.mockReturnValue('/calendar');
   });
 
@@ -151,6 +179,14 @@ describe('SidebarContent', () => {
     expect(applyMutate).toHaveBeenCalledWith({ templateId: 'template-1', date: '2026-03-25' });
   });
 
+  it('利用権があれば改名を送る', () => {
+    render(<SidebarContent />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'rename-template' }));
+
+    expect(renameMutate).toHaveBeenCalledWith({ templateId: 'template-1', name: '新しい名前' });
+  });
+
   it('見出しの「+」で、表示中の日をテンプレートとして保存するモードに入る', () => {
     render(<SidebarContent />);
 
@@ -166,6 +202,30 @@ describe('SidebarContent', () => {
     fireEvent.click(screen.getByRole('button', { name: '朝のルーティン' }));
 
     expect(applyMutate).not.toHaveBeenCalled();
+  });
+
+  it('利用権が無い時は適用・改名を送らず課金設定を開く', () => {
+    accessMocks.state.canUseProduct = false;
+
+    render(<SidebarContent />);
+
+    fireEvent.click(screen.getByRole('button', { name: '朝のルーティン' }));
+    fireEvent.click(screen.getByRole('button', { name: 'rename-template' }));
+
+    expect(applyMutate).not.toHaveBeenCalled();
+    expect(renameMutate).not.toHaveBeenCalled();
+    expect(accessMocks.openSettings).toHaveBeenCalledTimes(2);
+    expect(accessMocks.openSettings).toHaveBeenLastCalledWith('billing');
+  });
+
+  it('利用権が無くても削除は送る', () => {
+    accessMocks.state.canUseProduct = false;
+
+    render(<SidebarContent />);
+    fireEvent.click(screen.getByRole('button', { name: 'delete-template' }));
+
+    expect(deleteMutate).toHaveBeenCalledWith({ templateId: 'template-1' });
+    expect(accessMocks.openSettings).not.toHaveBeenCalled();
   });
 
   it('falls back to CalendarSidebar on workspace-external paths (e.g. /settings)', () => {
