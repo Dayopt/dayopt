@@ -14,6 +14,11 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { legalMdxComponents } from './_components/legal-mdx-components';
 import { LEGAL_MDX_OPTIONS } from './_components/legal-mdx-options';
 import { getLegalDocument, type LegalDocumentSlug } from './_lib/legal-content';
+import { generateMetadata as generateCookiesMetadata } from './cookies/page';
+import { generateMetadata as generatePrivacyMetadata } from './privacy/page';
+import { generateMetadata as generateSecurityMetadata } from './security/page';
+import { generateMetadata as generateTermsMetadata } from './terms/page';
+import { generateMetadata as generateTokushohoMetadata } from './tokushoho/page';
 
 const legalLinkState = vi.hoisted(() => ({ locale: 'en' as 'en' | 'ja' }));
 
@@ -47,6 +52,14 @@ const LEGAL_CONTRACT_CASES: readonly LegalContractCase[] = [
   { locale: 'ja', slug: 'security', lastUpdated: '最終更新日: 2026-09-14' },
 ];
 
+const LEGAL_PAGE_METADATA = {
+  privacy: generatePrivacyMetadata,
+  terms: generateTermsMetadata,
+  cookies: generateCookiesMetadata,
+  tokushoho: generateTokushohoMetadata,
+  security: generateSecurityMetadata,
+} satisfies Record<LegalDocumentSlug, typeof generatePrivacyMetadata>;
+
 afterEach(() => {
   cleanup();
 });
@@ -66,6 +79,12 @@ describe('legal document contract', () => {
     it(`${testCase.locale}/${testCase.slug} は安全設定で compile でき、更新日を表示する`, async () => {
       const document = getLegalDocument(testCase.locale, testCase.slug);
       expect(document.frontMatter.lastUpdated).toBe(testCase.lastUpdated);
+
+      const metadata = await LEGAL_PAGE_METADATA[testCase.slug]({
+        params: Promise.resolve({ locale: testCase.locale }),
+      });
+      expect(metadata.title).toBe(`${document.frontMatter.title} - Dayopt`);
+      expect(metadata.description).toBe(document.frontMatter.description);
 
       const container = await renderLegalBody(testCase);
       expect(container.textContent).toBeTruthy();
