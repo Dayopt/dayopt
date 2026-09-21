@@ -22,7 +22,7 @@ last_verified: 2026-09-21
 ## 準備
 
 - local Supabase を起動している
-- psql が使える（`postgresql://postgres:postgres@127.0.0.1:54322/postgres`）
+- psql が使える（接続先は `supabase status` が表示する `DB_URL`）
 
 ## 手順
 
