@@ -132,7 +132,7 @@
 }
 
 .moment:nth-child(1) {
-  right: 0;
+  left: 0;
   top: 38px;
 }
 
@@ -142,7 +142,7 @@
 }
 
 .moment:nth-child(3) {
-  left: 0;
+  right: 0;
   bottom: 27px;
 }
 

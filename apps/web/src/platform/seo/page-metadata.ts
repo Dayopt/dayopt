@@ -5,6 +5,8 @@ import { siteConfig } from './site-config';
 
 export interface SEOData {
   title?: string;
+  /** Browser tab title; defaults to the page title derived from `title`. */
+  documentTitle?: string;
   /** Social cards use the brand name when the page headline is editorial copy. */
   ogTitle?: string;
   description?: string;
@@ -47,6 +49,7 @@ function formatLocaleForOpenGraph(locale: string): string {
 export function generateSEOMetadata(data: SEOData = {}): Metadata {
   const {
     title,
+    documentTitle,
     ogTitle,
     description = siteConfig.description,
     keywords = [],
@@ -63,7 +66,7 @@ export function generateSEOMetadata(data: SEOData = {}): Metadata {
     noindex = false,
   } = data;
 
-  const pageTitle = title ? `${title} | ${siteConfig.name}` : siteConfig.title;
+  const pageTitle = documentTitle || (title ? `${title} | ${siteConfig.name}` : siteConfig.title);
   const socialTitle = ogTitle || pageTitle;
   const normalizedPath = normalizePath(stripLocaleFromUrl(url || ''));
   const canonicalUrl =

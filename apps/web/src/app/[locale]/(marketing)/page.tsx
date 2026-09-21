@@ -22,6 +22,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
   return generateSEOMetadata({
     title: t('landing.hero.title1') + (locale === 'ja' ? '' : ' ') + t('landing.hero.title2'),
+    documentTitle: dayoptBrand.name,
     ogTitle: dayoptBrand.name,
     description: t('landing.hero.body1') + (locale === 'ja' ? '' : ' ') + t('landing.hero.body2'),
     url: `/${locale}`,

@@ -43,7 +43,7 @@ export function HeroJourney({ copy }: { copy: JourneyCopy }) {
         >
           <path
             pathLength="1"
-            d="M535 86 H388 Q364 86 364 109 V168 Q364 192 340 192 H219 Q195 192 195 215 V276 Q195 300 172 300 H60"
+            d="M60 86 H172 Q195 86 195 109 V168 Q195 192 219 192 H340 Q364 192 364 215 V276 Q364 300 388 300 H535"
           />
         </svg>
         <div className={styles.journeyMoments}>

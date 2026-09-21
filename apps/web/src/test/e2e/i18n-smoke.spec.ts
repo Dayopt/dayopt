@@ -39,14 +39,13 @@ test('登録 CTA が product signup に統一されている', async ({ page }) 
 });
 
 test('LP metadata と OG image が新コピーに整合する', async ({ page }) => {
-  const title = 'One day at a time, closer to who you want to be.';
   const ogTitle = 'Dayopt';
   const description =
     "Your plans and records, together in one calendar. What you learn today makes tomorrow's plan a little better.";
 
   await page.goto('/');
 
-  await expect(page).toHaveTitle(`${title} | Dayopt`);
+  await expect(page).toHaveTitle('Dayopt');
   await expect(page.locator('meta[name="description"]')).toHaveAttribute('content', description);
   await expect(page.locator('meta[property="og:title"]')).toHaveAttribute('content', ogTitle);
 

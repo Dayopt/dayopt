@@ -102,12 +102,13 @@ describe('generateSEOMetadata', () => {
   it('ページ見出しとソーシャルカードのタイトルを分けられる', () => {
     const metadata = generateSEOMetadata({
       title: 'One day at a time',
+      documentTitle: 'Dayopt',
       ogTitle: 'Dayopt',
       description: 'A description',
     });
     const imageUrl = (metadata.openGraph?.images as Array<{ url: string }>)[0]?.url;
 
-    expect(metadata.title).toBe('One day at a time | Dayopt');
+    expect(metadata.title).toBe('Dayopt');
     expect(metadata.openGraph?.title).toBe('Dayopt');
     expect(metadata.twitter?.title).toBe('Dayopt');
     expect(new URL(imageUrl).searchParams.get('title')).toBe('Dayopt');
