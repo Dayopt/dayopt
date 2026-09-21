@@ -5,8 +5,7 @@ last_verified: 2026-09-20
 
 # Threat Model
 
-`security-sweep` skill が scope を決める時と、`security` skill が実装前に既往を照合する時の参照先。
-明示的な `security-sweep` では、このファイルを context / source として researcher・critic が参照する。
+`security` skill が実装前に既往を照合する時と、`/gardening` §5 の月次 sweep が scope を決める時の参照先。
 
 **このファイルは全体の脅威モデルではない。** 1 つの信頼境界ずつ、実際に sweep を回した範囲だけを書く。
 書かれていない境界は「安全」ではなく **未着手**。所見ゼロを clean と読む前に §未検査の境界 を見る。
@@ -162,7 +161,7 @@ hash 入力なので、同じ欠陥に別の語を当てると同一候補とし
 ### 境界横断の検証で否定した疑い（2026-09-20、`048a8ce`）
 
 sweep ではなく、「境界をまたいだ時に成立しない条件」を探す単発の敵対的検証（PR で記録）。
-`security-sweep` の pack / envelope は通していないので、上の 3 件と同じ却下記録の扱いにはしない。
+1 境界を通して読む sweep の手順は踏んでいないので、上の 3 件と同じ却下記録の扱いにはしない。
 ここに書くのは **将来のセッションが同じ疑いを掘り返さないため**の反証であり、免除ではない。
 同じ検証で確認できた問題のうち E-1（transient bounce の恒久 suppression）と O-9（終了後の UI gating）は
 同 PR で修正し、D-1（Privacy Policy の 30 日 export 窓 vs 即時削除）/ D-2（`email_suppressions` が

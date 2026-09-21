@@ -1,10 +1,10 @@
 /**
  * `skill-suggestion` pack が候補にする skill の一覧と、SKILL.md の読み取り（#2827）。
  *
- * **候補は code で絞る（deck を作る）。** 26 skill のうち Jev に聞くのは、issue の内容から
+ * **候補は code で絞る（deck を作る）。** 24 skill のうち Jev に聞くのは、issue の内容から
  * 発火する 12 個だけ。「明示依頼時のみ」の skill（audit-ai-config / blog-ideas / decision /
- * docs-audit / gardening / releasing / security-sweep / ui-audit）と、工程で発火する skill
- * （dispatch / routing / mcp-usage / pr-cross-review / skill-design / usability-probe）は
+ * docs-audit / gardening / releasing / ui-audit）と、工程で発火する skill
+ * （dispatch / routing / mcp-usage / pr-cross-review / skill-design）は
  * issue 本文からは決まらないので聞かない。pr-cross-review は今どおり path / 保護対象 gate
  * から機械的に出す（`ctx.mjs` の `mapSkills`）。
  *

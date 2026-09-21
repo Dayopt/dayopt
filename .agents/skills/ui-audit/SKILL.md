@@ -16,7 +16,6 @@ maxTurns: 15
 - 「この画面／component を監査して」「アクセシビリティを確認して」と対象を指定された時
 - 新規 UI を出す前に、操作不能・キーボード到達不可・コントラスト不足を洗い出すよう指示された時
 - 既存画面の操作性の問題を、コードから列挙するよう指示された時
-- `usability-probe` の所見をコード側で裏取りするよう指示された時
 
 ## When NOT to Use
 
@@ -25,7 +24,7 @@ maxTurns: 15
 - PR の不具合レビュー → AGENTS.md §レビュー規則（diff が生む不具合だけを指摘する）
 - Story の新規作成・design token の選択 → `storybook` skill
 - UI 文言・用語・翻訳の判断 → `i18n` skill
-- 実ブラウザーでの操作検証 → `usability-probe` skill、または既存 Playwright / Storybook
+- 実ブラウザーでの操作検証 → 既存 Playwright / Storybook
 - データ取得・bundle の性能 → `react-performance` skill
 
 ## 手順
@@ -56,4 +55,3 @@ Y.tsx:88 - outline-none に focus-visible の代替が無い → キーボード
 
 - `storybook` - Story 作成・design token
 - `i18n` - 文言・用語・禁止表記
-- `usability-probe` - 実ブラウザーでの操作検証

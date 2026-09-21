@@ -100,7 +100,6 @@
     "vercel:env:pull:unsafe": "vercel env pull apps/product/.env.local --environment preview",
     "deps:circular": "pnpm --filter @dayopt/product deps:circular",
     "size:budget": "pnpm --filter @dayopt/product size:budget",
-    "probe:setup": "pnpm --filter @dayopt/product probe:setup",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,mjs,cjs,json,md,yml,yaml}\"",
     "format:check": "pnpm exec prettier --check \"apps/product/src/**/*.{ts,tsx,js,jsx,json,md}\" && pnpm exec prettier --check \"packages/*/src/**/*.{ts,tsx,css,md,mdx}\" && pnpm exec prettier --check \"package.json\" \"packages/*/package.json\" \"apps/*/package.json\" \"docs/**/*.md\" && pnpm exec prettier --check \"scripts/**/*.{ts,json}\" \"**/*.{mjs,cjs}\"",
     "security:check": "pnpm --filter @dayopt/product security:check",
@@ -109,10 +108,7 @@
     "build-storybook": "pnpm --filter @dayopt/storybook build",
     "build:web": "pnpm --filter @dayopt/web build",
     "test:web": "pnpm --filter @dayopt/web test",
-    "agent:preflight": "node scripts/tasks/agent-preflight.mjs",
-    "review:pack": "node scripts/tasks/review-pack.mjs create",
-    "review:sweep": "node scripts/tasks/review-pack.mjs sweep",
-    "review:validate": "node scripts/tasks/review-pack.mjs validate"
+    "agent:preflight": "node scripts/tasks/agent-preflight.mjs"
   },
   "devDependencies": {
     "zod": "4.3.6",

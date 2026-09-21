@@ -142,6 +142,56 @@ describe('trusted validation plan', () => {
     );
     expect(result.review.status).toBe('indeterminate');
   });
+  // #2811 / PR #2868: repo 直下の設定と editor 設定が unknown へ落ちると databaseTests が
+  // applicable になり、migration が無い PR が隔離 Supabase branch を待って恒久 blocked になる。
+  it.each([
+    '.gitignore',
+    '.prettierignore',
+    '.prettierrc',
+    'turbo.json',
+    '.vscode/settings.json',
+    '.gitleaks.toml',
+    '.boundary-budget.json',
+    '.op-env.agent.example',
+  ])('treats repo config %s as policy, not an unsatisfiable database requirement', (file) => {
+    const result = plan([file]);
+    expect(result.areas).not.toContain('unknown');
+    expect(result.areas).toContain('policy');
+    // 実効 unknown は areas と impact の OR。片側だけ直しても恒久 blocked は消えない
+    expect(result.legacyImpact.unknown).toEqual([]);
+    // migration が無いので隔離 DB は要求しない（Supabase Preview は起動しようがない）
+    expect(result.environments.databaseTests).toBe('not-applicable');
+    expect(result.review.protected).toBe(true);
+  });
+  // plan 側では既に `dependencies` に分類されていたが impact 側が未分類だったもの。
+  // 実効 unknown は両者の OR なので、impact 側だけでも恒久 blocked を作る
+  it.each(['lint-staged.config.mjs', 'tsconfig.scripts.json'])(
+    'does not let impact-side unknown make %s wait for an isolated database',
+    (file) => {
+      const result = plan([file]);
+      expect(result.legacyImpact.unknown).toEqual([]);
+      expect(result.environments.databaseTests).toBe('not-applicable');
+    },
+  );
+  it('treats a dependency patch as a build input, not an unknown path', () => {
+    const result = plan(['patches/image-size@2.0.2.patch']);
+    expect(result.areas).not.toContain('unknown');
+    expect(result.areas).toContain('dependencies');
+    expect(result.legacyImpact.unknown).toEqual([]);
+    // pnpm の patchedDependencies は両 app の node_modules を変える
+    expect(result.legacyImpact.product).toBe(true);
+    expect(result.legacyImpact.web).toBe(true);
+    expect(result.environments.databaseTests).toBe('not-applicable');
+  });
+  it('still fails closed for an unrecognized nested directory', () => {
+    const result = plan(['terraform/main.tf']);
+    expect(result.areas).toContain('unknown');
+    expect(result.environments.databaseTests).toBe('disposable-local');
+  });
+  it('keeps requiring an isolated database when the PR really has a migration', () => {
+    const result = plan(['supabase/migrations/20260920000000_add_column.sql']);
+    expect(result.environments.databaseTests).toBe('disposable-local');
+  });
   it('is deterministic and explains revisions and legacy differences', () => {
     const result = plan(['AGENTS.md']);
     expect(plan(['AGENTS.md'])).toEqual(result);

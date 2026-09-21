@@ -564,35 +564,9 @@ Codex でこの project を初めて開く時は、project trust を確認し、
 
 通常 PR の独立レビューは GitHub の `@codex review`。依頼・対象 SHA の照合・所見の裁定・再レビューは `.agents/skills/pr-cross-review/SKILL.md` を正本とする。実装 session の reviewer subagent や独自 pack を日常の必須工程にしない。未応答・古い結果・未実行は指摘0とは異なる。
 
-高リスク変更の immutable pack / role / envelope / validation は過去証跡を検証するため同 skill の `references/high-risk-review.md` と道具を保持するが、通常の追加 reviewer は停止中で実行しない。既存の `[review-summary]` は読み取り互換だけを残す。明示依頼された security sweep と不可逆操作の独立レビュー条件は通常レビューで置き換えない。
+高リスク変更の immutable pack / role / envelope / validation（`pnpm review:pack` / `review:sweep` / `review:validate` と固定差分レビュー手順）は 2026-09-20 に撤去した。追加 reviewer の停止から 3 日で一度も再開されず、pack を通した証跡も残っていなかったため、読むためだけの実装を維持しない。再開する時は git history から読む。既存の `[review-summary]` は読み取り互換だけを残す。不可逆操作の独立レビュー条件は通常レビューで置き換えない。
 
 read-only と repository scope を runtime で同時に強制できる delegate は現在ないため、大量の repository 読み取り調査は親担当が行う。現行 native delegation は実際の入力に read-only / write を区別する型がなく、判別不能な経路として read-only を含めて拒否する。runtime が別名の typed write / browser tool を提供した時だけ、User が明示した非重複 scope と既存の authority 契約に従って扱う。将来、両方を実測できる adapter が追加された場合だけ、Luna / Haiku の候補と env・timeout・fallback 契約を再評価する。
-
-### pack の種別と契約 version
-
-pack は `kind`（`pr` / `sweep`）と `contractVersion` を manifest に持ち、artifact 集合はその組から literal registry で決まる。**role 一覧から artifact 名を導出しない** — 導出していた頃は role を 1 つ足すだけで生成済み pack が一斉に `invalid` になった。`kind` を持たない manifest は `pr` / version 1 として読み、未知の kind / version は fail closed で `invalid` にする。契約変更前に生成した PR pack を `scripts/__tests__/fixtures/review-pack-pr-v1/` に凍結してあり、整形するとバイト列が変わって pack の破損になるため `.prettierignore` の対象にしている。
-
-`sweep` は PR の差分ではなく 1 つの SHA における scope を読む（`security-sweep` skill）。`baseSha` / `headSha` を持たず `targetSha` 1 本と `scopePaths` を持ち、`diff.patch` と `verification.md` は作らない。envelope に `baseSha` / `headSha` が入っていれば PR envelope の流用として `invalid` にする。
-
-```bash
-pnpm review:sweep --at <commit-ish> --scope <repo 相対 path（繰り返し可）> \
-  --context <context-markdown-path> --threat-model <threat-model-path> --out <new-directory>
-```
-
-sweep の後段（`security-critic` / `security-reproducer`）は候補集合と突き合わせる。`--result` は繰り返せ、上限や中断で分割した同一 role の結果を 1 回の検証で合流させる。
-
-```bash
-pnpm review:validate --pack <directory> --result <result.json> [--result <result2.json>] \
-  [--candidates <candidates.json>] [--verdicts <critic.json>] [--emit-candidates <new-path>]
-```
-
-- `candidateId` / `signature` / `candidateSetHash` は**生成側が導出**し、reviewer の申告を採らない
-- 判定が返っていない候補、候補集合に無い id への判定、食い違う判定、別 run の候補集合を**別々の理由で**検出する
-- `undetermined`（critic）と `not-run` / `environment-missing`（reproducer）は裁定が決まっていないものとして `partial` に留める。id が入っていることを「判定済み」と数えない
-- `--emit-candidates` は**内容の違う**候補集合で既存ファイルを置き換えない（同一内容の再検証は冪等に通る）。分割した envelope は `--result` を並べて 1 回で検証する
-- reproducer の母集合は `--verdicts` に渡した critic envelope から**その場で再計算**する。実行待ち集合をファイルに残すと、分割した critic の一部だけで書いた部分集合が古いまま残り、渡していない round の `needs-execution` が母集合にも `missing` にも現れなくなる。裁定が全候補に届いていない critic に対して reproducer を `reviewed` にはしない
-- `rejected` / `undetermined` には `counterevidence` を要求する。`confirmed` には要求しない（落とす判断にだけ反証を求める）
-- `reproduced` / `failed-to-reproduce` は実行した `command` と `testPath` の提示を要求する。到達証拠のない失敗は `not-run` / `environment-missing` へ落とす。`statically-confirmed` は件数を結果に出して、実行できた候補が逃げていないか見えるようにする
 
 ## 7. Migration acceptance と handoff
 
@@ -600,7 +574,7 @@ native worktree root の fresh Codex session による共通指示・skills の�
 
 2026-09-07、`scripts/tasks` から新規 Codex read-only セッション（gpt-5.6-sol、session `01a0796e-8943-7303-9bb3-6184e41a9b2f`）を起動し、base `393f432c6` → head `bbdb9510a` の移行差分を pack で手渡した。result envelope は `reviewed`、recommendation は `revise`、指摘 1 件だった。指摘は shell の任意編集に対する保証の過大解釈で、経路別の保護表へ保証外の操作を明記した。これは別 OpenAI セッションの反証であり、別モデル系列の反証や native hook 発火の証拠ではない。旧 SHA の所見を後続 SHA の指摘ゼロとして再利用しない。
 
-次の 3 trial は過去の移行計画として記録したもので、2026-09-17 の User 指示により追加 reviewer の試行は行わない。ここに別の常設 tracker は作らない。明示依頼された `security-sweep` の契約だけは維持する。
+次の 3 trial は過去の移行計画として記録したもので、2026-09-17 の User 指示により追加 reviewer の試行は行わない。ここに別の常設 tracker は作らない。
 
 | trial                    | 対象                                                 | status  |
 | ------------------------ | ---------------------------------------------------- | ------- |

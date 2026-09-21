@@ -182,14 +182,12 @@ worktree で作業するセッション（レーン）は次を守る:
 | `react-performance`    | データ取得の waterfall・bundle・RSC 境界の性能判断                               |
 | `ui-audit`             | 指定 UI の操作性・アクセシビリティのコード監査（明示依頼時のみ）                 |
 | `pr-cross-review`      | GitHub の独立 PR レビュー（追加 reviewer は停止中）                              |
-| `security-sweep`       | 1 SHA の scope を読む security 調査（候補・反証・実行証拠を機械検査）            |
 | `docs-writing`         | ユーザー向けdocs・リリースノート・技術ドキュメント                               |
 | `docs-audit`           | 公開docsの監査                                                                   |
 | `releasing`            | リリース作業end-to-end（明示依頼時のみ）                                         |
 | `gardening`            | 月次改善ループ: ai:usage の 4 問 → 月に 1 変数 → 結果(未) 回収（明示依頼時のみ） |
 | `audit-ai-config`      | AI設定の棚卸し・audit                                                            |
 | `blog-ideas`           | ブログネタ提案とissue起票                                                        |
-| `usability-probe`      | repo blind な browser-only ユーザビリティプローブ実行                            |
 | `decision`             | `docs/decisions.md` への意思決定1行追記                                          |
 
 ## Deploy / Release
