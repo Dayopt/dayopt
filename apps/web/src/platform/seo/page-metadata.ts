@@ -5,6 +5,8 @@ import { siteConfig } from './site-config';
 
 export interface SEOData {
   title?: string;
+  /** Social cards use the brand name when the page headline is editorial copy. */
+  ogTitle?: string;
   description?: string;
   keywords?: string[];
   image?: string;
@@ -45,6 +47,7 @@ function formatLocaleForOpenGraph(locale: string): string {
 export function generateSEOMetadata(data: SEOData = {}): Metadata {
   const {
     title,
+    ogTitle,
     description = siteConfig.description,
     keywords = [],
     image,
@@ -61,6 +64,7 @@ export function generateSEOMetadata(data: SEOData = {}): Metadata {
   } = data;
 
   const pageTitle = title ? `${title} | ${siteConfig.name}` : siteConfig.title;
+  const socialTitle = ogTitle || pageTitle;
   const normalizedPath = normalizePath(stripLocaleFromUrl(url || ''));
   const canonicalUrl =
     locale === 'en'
@@ -68,7 +72,7 @@ export function generateSEOMetadata(data: SEOData = {}): Metadata {
       : `${siteConfig.url}/${locale}${normalizedPath}`;
 
   const ogSearchParams = new URLSearchParams({
-    title: title || siteConfig.title,
+    title: ogTitle || title || siteConfig.title,
     description,
   });
   const pageImage = image
@@ -117,7 +121,7 @@ export function generateSEOMetadata(data: SEOData = {}): Metadata {
       type: type as 'website' | 'article',
       locale: formatLocaleForOpenGraph(locale),
       url: canonicalUrl,
-      title: pageTitle,
+      title: socialTitle,
       description,
       siteName: siteConfig.name,
       images: [
@@ -125,7 +129,7 @@ export function generateSEOMetadata(data: SEOData = {}): Metadata {
           url: pageImage,
           width: 1200,
           height: 630,
-          alt: title || siteConfig.title,
+          alt: ogTitle || title || siteConfig.title,
         },
       ],
       ...(type === 'article' && {
@@ -138,7 +142,7 @@ export function generateSEOMetadata(data: SEOData = {}): Metadata {
     },
     twitter: {
       card: 'summary_large_image',
-      title: pageTitle,
+      title: socialTitle,
       description,
       images: [pageImage],
       creator: siteConfig.twitterHandle,

@@ -132,8 +132,8 @@
 }
 
 .moment:nth-child(1) {
-  left: 0;
-  bottom: 27px;
+  right: 0;
+  top: 38px;
 }
 
 .moment:nth-child(2) {
@@ -142,8 +142,8 @@
 }
 
 .moment:nth-child(3) {
-  right: 0;
-  top: 38px;
+  left: 0;
+  bottom: 27px;
 }
 
 .momentMeta,

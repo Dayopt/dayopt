@@ -40,6 +40,7 @@ test('登録 CTA が product signup に統一されている', async ({ page }) 
 
 test('LP metadata と OG image が新コピーに整合する', async ({ page }) => {
   const title = 'One day at a time, closer to who you want to be.';
+  const ogTitle = 'Dayopt';
   const description =
     "Your plans and records, together in one calendar. What you learn today makes tomorrow's plan a little better.";
 
@@ -47,13 +48,14 @@ test('LP metadata と OG image が新コピーに整合する', async ({ page })
 
   await expect(page).toHaveTitle(`${title} | Dayopt`);
   await expect(page.locator('meta[name="description"]')).toHaveAttribute('content', description);
+  await expect(page.locator('meta[property="og:title"]')).toHaveAttribute('content', ogTitle);
 
   const ogImage = await page.locator('meta[property="og:image"]').getAttribute('content');
   expect(ogImage).not.toBeNull();
 
   const ogUrl = new URL(ogImage as string);
   expect(ogUrl.pathname).toBe('/api/og');
-  expect(ogUrl.searchParams.get('title')).toBe(title);
+  expect(ogUrl.searchParams.get('title')).toBe(ogTitle);
   expect(ogUrl.searchParams.get('description')).toBe(description);
 
   const response = await page.request.get(`/api/og?${ogUrl.searchParams.toString()}`);

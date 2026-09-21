@@ -1,3 +1,4 @@
+import { dayoptBrand } from '@dayopt/config';
 import { routing } from '@dayopt/i18n/routing';
 import { LandingPage } from '@web/features/marketing';
 import { generateSEOMetadata } from '@web/platform/seo/metadata';
@@ -21,6 +22,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
   return generateSEOMetadata({
     title: t('landing.hero.title1') + (locale === 'ja' ? '' : ' ') + t('landing.hero.title2'),
+    ogTitle: dayoptBrand.name,
     description: t('landing.hero.body1') + (locale === 'ja' ? '' : ' ') + t('landing.hero.body2'),
     url: `/${locale}`,
     locale: locale,
