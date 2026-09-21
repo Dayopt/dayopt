@@ -64,6 +64,9 @@ describe('Date Core Utilities', () => {
     expect(endOfMonth(new Date('2024-02-15T10:00:00'))).toEqual(
       new Date('2024-02-29T23:59:59.999'),
     );
+    expect(endOfMonth(new Date('2025-02-15T10:00:00'))).toEqual(
+      new Date('2025-02-28T23:59:59.999'),
+    );
   });
 
   it.each([
@@ -138,7 +141,10 @@ describe('Date Core Utilities', () => {
   });
 
   it('generates an inclusive range, including a single-day range', () => {
-    expect(generateDateRange(new Date('2024-01-15'), new Date('2024-01-18'))).toHaveLength(4);
+    const range = generateDateRange(new Date('2024-01-15'), new Date('2024-01-18'));
+    expect(range).toHaveLength(4);
+    expect(range[0]).toEqual(new Date('2024-01-15'));
+    expect(range[3]).toEqual(new Date('2024-01-18'));
     expect(generateDateRange(new Date('2024-01-15'), new Date('2024-01-15'))).toHaveLength(1);
   });
 

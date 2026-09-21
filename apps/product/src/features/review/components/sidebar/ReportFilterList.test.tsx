@@ -103,7 +103,9 @@ describe('ReportFilterList', () => {
     expect(screen.getByText('実装').closest('[data-report-filter-row="activity"]')).toHaveClass(
       'h-11',
     );
-    expect(screen.getByRole('button', { name: 'hide 実装' })).toBeInTheDocument();
+    const toggle = screen.getByRole('button', { name: 'hide 実装' });
+    expect(toggle).toBeInTheDocument();
+    expect(toggle).not.toHaveClass('opacity-0');
   });
 
   describe('アクティビティの 👁', () => {
