@@ -159,15 +159,16 @@ VERCEL_ENV が production でなければ送らずに失敗する。RESEND_API_K
   - [`apps/product/src/features/contact/server/contact-service.test.ts`](../../../apps/product/src/features/contact/server/contact-service.test.ts) で `it('stops waiting after ten seconds while retaining the idempotency key for retry'` を探す
 
 <details>
-<summary>⚡ Preview / 開発環境で送る — 画面: エラー表示 / データ: 変化なし / 再試行: しない / 痕跡: Sentry</summary>
+<summary>⚡ Preview / 開発環境で送る — 画面: エラー表示 / データ: 変化なし / 再試行: しない / 痕跡: ログだけ</summary>
 
 - 画面: 送信失敗の toast。
 - データ: 送らない（仕様）。
 - 再試行: しない。何度送っても同じ。
-- 痕跡: Sentry（CONTACT_DELIVERY_FAILED は INTERNAL_SERVER_ERROR に写るので想定外として送られる）。
+- 痕跡: 残らない（Function のログだけ）。サーバーの Sentry は VERCEL_ENV=production の時しか初期化されないので、CONTACT_DELIVERY_FAILED が「想定外」に分類されても Preview・開発環境では送られない。
 - **最初に見る場所**: 仕様どおり。Preview で配送を試す手段は無い。env が揃っているかは運用手順の preflight で見る。
 - 根拠:
   - [`docs/product/specs/contact.md`](../../product/specs/contact.md) で `credentialが存在してもProduction以外では配送しない` を探す
+  - [`apps/product/sentry.server.config.ts`](../../../apps/product/sentry.server.config.ts) で `const IS_SENTRY_PRODUCTION = VERCEL_ENV === 'production';` を探す
 
 </details>
 
@@ -566,19 +567,23 @@ Resend は配送の結果を webhook で送ってくる。宛先が support@dayo
           "screen": "送信失敗の toast。",
           "data": "送らない（仕様）。",
           "retry": "しない。何度送っても同じ。",
-          "trace": "Sentry（CONTACT_DELIVERY_FAILED は INTERNAL_SERVER_ERROR に写るので想定外として送られる）。",
+          "trace": "残らない（Function のログだけ）。サーバーの Sentry は VERCEL_ENV=production の時しか初期化されないので、CONTACT_DELIVERY_FAILED が「想定外」に分類されても Preview・開発環境では送られない。",
           "look": "仕様どおり。Preview で配送を試す手段は無い。env が揃っているかは運用手順の preflight で見る。",
           "refs": [
             {
               "path": "docs/product/specs/contact.md",
               "find": "credentialが存在してもProduction以外では配送しない"
+            },
+            {
+              "path": "apps/product/sentry.server.config.ts",
+              "find": "const IS_SENTRY_PRODUCTION = VERCEL_ENV === 'production';"
             }
           ],
           "tags": {
             "screen": "toast",
             "data": "unchanged",
             "retry": "none",
-            "trace": "sentry"
+            "trace": "log"
           },
           "to": "result",
           "back": "送信失敗の案内"

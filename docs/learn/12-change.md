@@ -60,6 +60,10 @@ last_verified: 2026-09-21
 
 - [Plan / Record を動かす・直す](journeys/edit-timeblock.md) の 2. 更新を依頼 — 時刻の規則の写し。規則を変える時は invariants.md §時刻 の写し表に沿ってここも消す。移行された Record を黙って無視する分岐は、UI 側で動かせないようにしている前提に立つ。
 
+#### `apps/product/sentry.server.config.ts`
+
+- [問い合わせを送る](journeys/contact.md) の 5. Resend へ送る — 件名は [Dayopt Contact][Product][カテゴリ] の固定形、tags の source は contact-product。後段の Resend webhook はこの source と宛先で問い合わせの配送だと判定するので、変えると配送失敗が Sentry に出なくなる。LP（apps/web）のフォームは別実装で、Idempotency-Key の名前空間を contact-web- に分けてある。
+
 #### `apps/product/src/app/[locale]/(app)/(workspace)/_composition/ReportViewClient.tsx`
 
 - [レポートを開く（集計）](journeys/report.md) の 1. 期間を決める — date を server component の prop で受けると、期間の ‹ › 移動が画面に反映されなくなる（移動は history.replaceState で URL を書くだけで、server component は再描画されない）。page.tsx と ReportViewClient のコメントが理由を持つ。

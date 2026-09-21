@@ -218,7 +218,7 @@ profile・カテゴリ・アクティビティ・user_settings は利用者の�
 
 CSV は Plan と Record だけを 1 つの表にし、kind 列で plan / record を分ける。列は固定（id・title・note・activity_id・start_at・end_at・source・fulfillment・created_at・updated_at・deleted_at）。先頭が = + - @ などの値は文字列として扱われるよう ' を前置する。JSON は profile・カテゴリ・アクティビティ・設定も含む全体をそのまま整形して書く。
 
-- **なぜ必要か**: CSV はスプレッドシートで開く用途で、title や note が数式として実行されないようにする必要がある。JSON はバックアップ・復元用で全体を持つ。
+- **なぜ必要か**: CSV はスプレッドシートで開く用途で、title や note が数式として実行されないようにする必要がある。JSON は画面では「バックアップ・復元用」と書かれているが、中身は profile・Plan・Record・カテゴリ・アクティビティ・user_settings の 6 種類だけで、テンプレート（plan_templates）などは入らない。書き出したファイルを取り込む（復元する）経路も repo に無い。
 - **入力 → 出力**: 絞った Plan / Record（CSV）または全データ（JSON） → Blob（text/csv または application/json）
 - **ここを変えると**: CSV の列を足すと、既存のスプレッドシートの取り込み手順が壊れうる（外部に渡る形式）。列は TIMEBLOCK_CSV_COLUMNS 1 か所で決まる。CSV にはカテゴリとアクティビティの名前が入らず、activity_id だけになる。
 - **コード**:
@@ -742,7 +742,7 @@ Blob から一時 URL を作り、見えないリンクの download 属性に da
       "short": "CSV か JSON にする",
       "title": "CSV か JSON に変換する",
       "what": "CSV は Plan と Record だけを 1 つの表にし、kind 列で plan / record を分ける。列は固定（id・title・note・activity_id・start_at・end_at・source・fulfillment・created_at・updated_at・deleted_at）。先頭が = + - @ などの値は文字列として扱われるよう ' を前置する。JSON は profile・カテゴリ・アクティビティ・設定も含む全体をそのまま整形して書く。",
-      "why": "CSV はスプレッドシートで開く用途で、title や note が数式として実行されないようにする必要がある。JSON はバックアップ・復元用で全体を持つ。",
+      "why": "CSV はスプレッドシートで開く用途で、title や note が数式として実行されないようにする必要がある。JSON は画面では「バックアップ・復元用」と書かれているが、中身は profile・Plan・Record・カテゴリ・アクティビティ・user_settings の 6 種類だけで、テンプレート（plan_templates）などは入らない。書き出したファイルを取り込む（復元する）経路も repo に無い。",
       "io": {
         "in": "絞った Plan / Record（CSV）または全データ（JSON）",
         "out": "Blob（text/csv または application/json）"

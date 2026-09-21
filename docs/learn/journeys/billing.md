@@ -171,7 +171,7 @@ Stripe がホストする Checkout ページ。カード情報は Dayopt を通�
   - [`apps/product/src/lib/test/e2e/billing.spec.ts`](../../../apps/product/src/lib/test/e2e/billing.spec.ts) で `Checkout 成功復帰（?success=true）で成功 toast が表示される` を探す
 
 <details>
-<summary>⚡ 30 秒待っても webhook が反映されない — 画面: エラー表示 / データ: DB だけ新しい / 再試行: 相手が再送 / 痕跡: Sentry</summary>
+<summary>⚡ 30 秒待っても webhook が反映されない — 画面: エラー表示 / データ: 食い違いが残る / 再試行: 相手が再送 / 痕跡: Sentry</summary>
 
 - 画面: 「契約状態をまだ確認できません。しばらくしてから課金情報を再読み込みしてください。変わらない場合はサポートへご連絡ください。」の toast。
 - データ: Stripe では支払い済み、DB の profiles はまだ free。webhook が後で届けば直る。
@@ -198,7 +198,7 @@ Stripe がホストする Checkout ページ。カード情報は Dayopt を通�
   - [`apps/product/src/app/api/webhooks/stripe/route.test.ts`](../../../apps/product/src/app/api/webhooks/stripe/route.test.ts) で `describe('Stripe webhook 署名検証'` を探す
 
 <details>
-<summary>⚡ 署名が合わない（secret の食い違い） — 画面: 何も起きない / データ: DB だけ新しい / 再試行: 相手が再送 / 痕跡: Sentry</summary>
+<summary>⚡ 署名が合わない（secret の食い違い） — 画面: 何も起きない / データ: 食い違いが残る / 再試行: 相手が再送 / 痕跡: Sentry</summary>
 
 - 画面: 利用者には何も出ない。戻り直後の取り直しが 30 秒で打ち切られる。
 - データ: profiles は更新されない。Stripe では支払い済み。
@@ -270,7 +270,7 @@ checkout.session.completed なら Stripe から subscription を取り直し、�
   - [`apps/product/src/app/api/webhooks/stripe/route.test.ts`](../../../apps/product/src/app/api/webhooks/stripe/route.test.ts) で `it('解約予約中は期間終了までactiveのまま（予約時点で利用権を落とさない）'` を探す
 
 <details>
-<summary>⚡ stripe_customer_id に一致する profile が無い — 画面: 何も起きない / データ: DB だけ新しい / 再試行: 相手が再送 / 痕跡: Sentry</summary>
+<summary>⚡ stripe_customer_id に一致する profile が無い — 画面: 何も起きない / データ: 食い違いが残る / 再試行: 相手が再送 / 痕跡: Sentry</summary>
 
 - 画面: 利用者には何も出ない。反映待ちが打ち切られる。
 - データ: 更新 0 行を失敗として扱い、予約を failed に戻す。

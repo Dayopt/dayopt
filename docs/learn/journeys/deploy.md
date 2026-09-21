@@ -81,7 +81,7 @@ merge ごとに Production build を作るが、domain は割り当てない（A
   - [`docs/engineering/infra.md`](../../engineering/infra.md) で `### merge と Production 公開の分離` を探す
 
 <details>
-<summary>⚡ build が失敗 — 画面: 旧版のまま / データ: DB だけ新しい / 再試行: しない / 痕跡: GitHub issue</summary>
+<summary>⚡ build が失敗 — 画面: 旧版のまま / データ: 食い違いが残る / 再試行: しない / 痕跡: GitHub issue</summary>
 
 - 画面: 利用者は旧版を使い続ける。
 - データ: 変化なし（migration は先に入っている）。
@@ -112,7 +112,7 @@ Production Release workflow が起動し、product / web / storybook それぞ�
   - [`docs/engineering/testing.md`](../../engineering/testing.md) で `E2E` を探す
 
 <details>
-<summary>⚡ E2E が失敗 — 画面: 旧版のまま / データ: DB だけ新しい / 再試行: しない / 痕跡: GitHub issue</summary>
+<summary>⚡ E2E が失敗 — 画面: 旧版のまま / データ: 食い違いが残る / 再試行: しない / 痕跡: GitHub issue</summary>
 
 - 画面: 利用者は旧版を使い続ける。
 - データ: コードは旧版のまま。migration だけ新しい。
@@ -134,7 +134,7 @@ release job が migration の反映を確かめ（今は advisory で warning �
   - [`scripts/ci/production-release.mjs`](../../../scripts/ci/production-release.mjs) で `promote` を探す
 
 <details>
-<summary>⚡ smoke が失敗 — 画面: 旧版のまま / データ: DB だけ新しい / 再試行: しない / 痕跡: GitHub issue</summary>
+<summary>⚡ smoke が失敗 — 画面: 旧版のまま / データ: 食い違いが残る / 再試行: しない / 痕跡: GitHub issue</summary>
 
 - 画面: 利用者は旧版を使い続ける。
 - データ: 変化なし。
@@ -148,13 +148,14 @@ release job が migration の反映を確かめ（今は advisory で warning �
 
 ### 7. 開いているタブが新版に気づく（ブラウザ）
 
-タブへ戻った時に /api/health/version の SHA を比べ、古ければ新版があると判断する。通知は出さず、編集中（保存中の mutation、作成中の下書き、開いたダイアログ、入力欄のフォーカス）でない瞬間にだけ黙って再読み込みする。
+タブへ戻った時（前回の確認から 1 分以上たっている時だけ）に /api/health/version の SHA を比べ、古ければ新版があると判断する。通知は出さない。その時点で編集中でなければ（保存中の mutation、作成中の下書き、開いたダイアログ、入力欄のフォーカスが無ければ）黙って再読み込みする。編集中だった時は、ダイアログを閉じても追いかけて再読み込みはせず、次にタブへ戻った時に判定し直す。
 
 - **ここを変えると**: API の入出力を変えた直後は、旧版の画面が新版のサーバーを呼ぶ時間がある。tRPC の入力を必須化する変更は、旧画面からの呼び出しを壊す。
 - **コード**:
   - [`apps/product/src/lib/hooks/useServiceWorker.ts`](../../../apps/product/src/lib/hooks/useServiceWorker.ts) で `DEPLOYED_VERSION_ENDPOINT` を探す
   - [`docs/engineering/pwa.md`](../../engineering/pwa.md) で `/api/health/version` を探す
   - [`apps/product/src/app/[locale]/(app)/_providers/useApplyUpdateWhenSafe.ts`](<../../../apps/product/src/app/[locale]/(app)/_providers/useApplyUpdateWhenSafe.ts>) で `export function useApplyUpdateWhenSafe` を探す
+  - [`apps/product/src/lib/hooks/useServiceWorker.ts`](../../../apps/product/src/lib/hooks/useServiceWorker.ts) で `DEPLOYED_VERSION_PROBE_INTERVAL_MS = 60_000` を探す
 
 <!-- learn:generated:end -->
 
@@ -446,7 +447,7 @@ release job が migration の反映を確かめ（今は advisory で warning �
       "id": "tab-update",
       "svc": "browser",
       "title": "開いているタブが新版に気づく",
-      "what": "タブへ戻った時に /api/health/version の SHA を比べ、古ければ新版があると判断する。通知は出さず、編集中（保存中の mutation、作成中の下書き、開いたダイアログ、入力欄のフォーカス）でない瞬間にだけ黙って再読み込みする。",
+      "what": "タブへ戻った時（前回の確認から 1 分以上たっている時だけ）に /api/health/version の SHA を比べ、古ければ新版があると判断する。通知は出さない。その時点で編集中でなければ（保存中の mutation、作成中の下書き、開いたダイアログ、入力欄のフォーカスが無ければ）黙って再読み込みする。編集中だった時は、ダイアログを閉じても追いかけて再読み込みはせず、次にタブへ戻った時に判定し直す。",
       "change": "API の入出力を変えた直後は、旧版の画面が新版のサーバーを呼ぶ時間がある。tRPC の入力を必須化する変更は、旧画面からの呼び出しを壊す。",
       "refs": [
         {
@@ -460,6 +461,10 @@ release job が migration の反映を確かめ（今は advisory で warning �
         {
           "path": "apps/product/src/app/[locale]/(app)/_providers/useApplyUpdateWhenSafe.ts",
           "find": "export function useApplyUpdateWhenSafe"
+        },
+        {
+          "path": "apps/product/src/lib/hooks/useServiceWorker.ts",
+          "find": "DEPLOYED_VERSION_PROBE_INTERVAL_MS = 60_000"
         }
       ],
       "fails": [],

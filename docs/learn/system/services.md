@@ -177,12 +177,13 @@ flowchart LR
 - **影響する機能**: 外部カレンダー取り込み（止まる）
 - **壊れる**: 外部カレンダーの予定の取り込み・連携の開始。
 - **動き続ける**: Dayopt 内の Plan / Record。手動で作った Plan は Google へ書き出さないので影響しない。
-- **コードの挙動**: 15 分ごとの calendar-sync Cron が取り込む。API は 15 秒で打ち切る。失敗は Sentry。
-- **関係する env**: `GOOGLE_CALENDAR_CLIENT_ID`, `CALENDAR_TOKEN_ENCRYPTION_KEY`
-- **最初に見る場所**: Google Cloud の status → Sentry（feature: external-calendar 周辺）→ Cron heartbeat。
+- **コードの挙動**: 15 分ごとの calendar-sync Cron が取り込む（取り込むカレンダーを選んだ接続だけ）。API は 15 秒で打ち切る。痕跡は失敗の種類で違う: 5xx・時間切れは Sentry（feature: external_calendar）、429 と sync token の失効はログだけ、許可の取り消し（reauth_required）は接続の状態に残して Sentry には送らない。
+- **関係する env**: `GOOGLE_CALENDAR_CLIENT_ID`, `GOOGLE_CALENDAR_CLIENT_SECRET`, `GOOGLE_CALENDAR_PROJECT_NUMBER`, `GOOGLE_CALENDAR_REDIRECT_URIS`, `CALENDAR_TOKEN_ENCRYPTION_KEY`
+- **最初に見る場所**: Google Cloud の status → Sentry（feature: external_calendar）→ calendar_connections の status / last_sync_error → Cron heartbeat。
 - **コードと文書**:
   - [`apps/product/src/features/external-calendar/server/providers/google.ts`](../../../apps/product/src/features/external-calendar/server/providers/google.ts) で `GOOGLE_API_TIMEOUT_MS` を探す
   - [`apps/product/src/app/api/cron/calendar-sync/route.ts`](../../../apps/product/src/app/api/cron/calendar-sync/route.ts) で `writeCronHeartbeat` を探す
+  - [`apps/product/src/features/external-calendar/server/sync-service.ts`](../../../apps/product/src/features/external-calendar/server/sync-service.ts) で `(error.kind === 'rate_limited' || error.kind === 'cursor_invalid')` を探す
 
 ### UptimeRobot が止まったら
 
@@ -487,9 +488,15 @@ flowchart LR
         "role": "外部カレンダーの取り込み（Supabase の Google ログインとは別の OAuth）",
         "breaks": "外部カレンダーの予定の取り込み・連携の開始。",
         "keeps": "Dayopt 内の Plan / Record。手動で作った Plan は Google へ書き出さないので影響しない。",
-        "behavior": "15 分ごとの calendar-sync Cron が取り込む。API は 15 秒で打ち切る。失敗は Sentry。",
-        "env": ["GOOGLE_CALENDAR_CLIENT_ID", "CALENDAR_TOKEN_ENCRYPTION_KEY"],
-        "look": "Google Cloud の status → Sentry（feature: external-calendar 周辺）→ Cron heartbeat。",
+        "behavior": "15 分ごとの calendar-sync Cron が取り込む（取り込むカレンダーを選んだ接続だけ）。API は 15 秒で打ち切る。痕跡は失敗の種類で違う: 5xx・時間切れは Sentry（feature: external_calendar）、429 と sync token の失効はログだけ、許可の取り消し（reauth_required）は接続の状態に残して Sentry には送らない。",
+        "env": [
+          "GOOGLE_CALENDAR_CLIENT_ID",
+          "GOOGLE_CALENDAR_CLIENT_SECRET",
+          "GOOGLE_CALENDAR_PROJECT_NUMBER",
+          "GOOGLE_CALENDAR_REDIRECT_URIS",
+          "CALENDAR_TOKEN_ENCRYPTION_KEY"
+        ],
+        "look": "Google Cloud の status → Sentry（feature: external_calendar）→ calendar_connections の status / last_sync_error → Cron heartbeat。",
         "refs": [
           {
             "path": "apps/product/src/features/external-calendar/server/providers/google.ts",
@@ -498,6 +505,10 @@ flowchart LR
           {
             "path": "apps/product/src/app/api/cron/calendar-sync/route.ts",
             "find": "writeCronHeartbeat"
+          },
+          {
+            "path": "apps/product/src/features/external-calendar/server/sync-service.ts",
+            "find": "(error.kind === 'rate_limited' || error.kind === 'cursor_invalid')"
           }
         ],
         "impacts": {

@@ -177,7 +177,7 @@ begin_account_deletion_v1 が、この人の削除を 1 件だけ作る。すで
   - [`apps/product/src/lib/test/integration/account-deletion-gate.integration.test.ts`](../../../apps/product/src/lib/test/integration/account-deletion-gate.integration.test.ts) で `blocks new Calendar, billing, and Storage writes once closing starts` を探す
 
 <details>
-<summary>⚡ 課金の操作や別の削除とぶつかる（contention） — 画面: エラー表示 / データ: DB だけ新しい / 再試行: 利用者がやり直す / 痕跡: ログだけ</summary>
+<summary>⚡ 課金の操作や別の削除とぶつかる（contention） — 画面: エラー表示 / データ: 食い違いが残る / 再試行: 利用者がやり直す / 痕跡: ログだけ</summary>
 
 - 画面: 「アカウントを削除できませんでした。…」のトースト。
 - データ: 閉鎖中の印が付いたまま残りうる。済んだ段はそのまま。
@@ -219,7 +219,7 @@ claim で 5 分の lease を取り、この段の担当を 1 人に絞る。接�
 </details>
 
 <details>
-<summary>⚡ Google を呼んだ直後に Function が落ちる — 画面: エラー表示 / データ: DB だけ新しい / 再試行: 次の機会に / 痕跡: ログだけ</summary>
+<summary>⚡ Google を呼んだ直後に Function が落ちる — 画面: エラー表示 / データ: 食い違いが残る / 再試行: 次の機会に / 痕跡: ログだけ</summary>
 
 - 画面: 「アカウントを削除できませんでした。…」のトースト（応答が返らなければ通信エラー）。
 - データ: 段は途中。「呼んだ」印だけが残り、結果は記録されていない。
@@ -247,7 +247,7 @@ avatars と attachments の 2 つの bucket で、userId 配下を再帰的に�
   - [`apps/product/src/app/api/trpc/_server/_composition/account-deletion-coordinator.test.ts`](../../../apps/product/src/app/api/trpc/_server/_composition/account-deletion-coordinator.test.ts) で `Storage listのnull responseを空扱いせずfail closedにする` を探す
 
 <details>
-<summary>⚡ Storage の列挙・削除が失敗する — 画面: エラー表示 / データ: DB だけ新しい / 再試行: 利用者がやり直す / 痕跡: Sentry</summary>
+<summary>⚡ Storage の列挙・削除が失敗する — 画面: エラー表示 / データ: 食い違いが残る / 再試行: 利用者がやり直す / 痕跡: Sentry</summary>
 
 - 画面: 「アカウントを削除できませんでした。…」のトースト。
 - データ: Calendar の段は完了のまま、Storage は途中。一部のファイルだけ消えていることがある。
@@ -276,7 +276,7 @@ avatars と attachments の 2 つの bucket で、userId 配下を再帰的に�
   - [`apps/product/src/app/api/trpc/_server/_composition/account-deletion-coordinator.test.ts`](../../../apps/product/src/app/api/trpc/_server/_composition/account-deletion-coordinator.test.ts) で `Stripe identity照合に失敗したらCalendar、Storage、Billing receiptへ進まない` を探す
 
 <details>
-<summary>⚡ Stripe が応答しない・エラーを返す — 画面: エラー表示 / データ: DB だけ新しい / 再試行: 利用者がやり直す / 痕跡: Sentry</summary>
+<summary>⚡ Stripe が応答しない・エラーを返す — 画面: エラー表示 / データ: 食い違いが残る / 再試行: 利用者がやり直す / 痕跡: Sentry</summary>
 
 - 画面: 「アカウントを削除できませんでした。…」のトースト。
 - データ: Calendar と Storage は完了のまま。サブスクリプションは解約済みで顧客だけ残る、という途中の状態がありうる。
@@ -289,7 +289,7 @@ avatars と attachments の 2 つの bucket で、userId 配下を再帰的に�
 </details>
 
 <details>
-<summary>⚡ 顧客の metadata や Stripe の account が一致しない — 画面: エラー表示 / データ: DB だけ新しい / 再試行: しない / 痕跡: Sentry</summary>
+<summary>⚡ 顧客の metadata や Stripe の account が一致しない — 画面: エラー表示 / データ: 食い違いが残る / 再試行: しない / 痕跡: Sentry</summary>
 
 - 画面: 「アカウントを削除できませんでした。…こちらで削除します」のトースト。
 - データ: Stripe には触らない。閉鎖中のまま止まる。
@@ -318,7 +318,7 @@ seal_account_deletion_v1 で 3 段がすべて済んだことを封じる。そ�
   - [`apps/product/src/features/auth/server/user-service.test.ts`](../../../apps/product/src/features/auth/server/user-service.test.ts) で `外部データの準備を完了してからauth userを削除する` を探す
 
 <details>
-<summary>⚡ deleteUser が失敗する（trigger の拒否を含む） — 画面: エラー表示 / データ: DB だけ新しい / 再試行: 利用者がやり直す / 痕跡: Sentry</summary>
+<summary>⚡ deleteUser が失敗する（trigger の拒否を含む） — 画面: エラー表示 / データ: 食い違いが残る / 再試行: 利用者がやり直す / 痕跡: Sentry</summary>
 
 - 画面: 「アカウントを削除できませんでした。…」のトースト。
 - データ: 外側の後始末は全部済み、DB の行は残っている。閉鎖中のまま。
@@ -386,7 +386,7 @@ Vercel cron が毎時 5 分に /api/cron/calendar-account-deletion-settle を CR
   - [`apps/product/src/app/api/cron/calendar-account-deletion-settle/route.test.ts`](../../../apps/product/src/app/api/cron/calendar-account-deletion-settle/route.test.ts) で `in_flight / other が残る時は warn を出す` を探す
 
 <details>
-<summary>⚡ cron が止まる（secret 未設定・dispatch の失敗） — 画面: 何も起きない / データ: DB だけ新しい / 再試行: 次の機会に / 痕跡: 監視が拾う</summary>
+<summary>⚡ cron が止まる（secret 未設定・dispatch の失敗） — 画面: 何も起きない / データ: 食い違いが残る / 再試行: 次の機会に / 痕跡: 監視が拾う</summary>
 
 - 画面: 利用者には見えない。途中で止まった削除を押し直しても、Calendar の段で止まり続ける。
 - データ: 閉鎖中のアカウントが残る。

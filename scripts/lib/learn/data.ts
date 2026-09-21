@@ -31,7 +31,8 @@ export const FAILURE_TAGS = {
     saved: ['保存される', 'ok'],
     unknown: ['どちらもありうる', 'warn'],
     lost: ['欠落する', 'bad'],
-    mixed: ['DB だけ新しい', 'warn'],
+    // 2 か所の状態が食い違ったまま残る（deploy: DB だけ新しい、課金: Stripe だけ新しい など。向きは本文に書く）
+    mixed: ['食い違いが残る', 'warn'],
   },
   retry: {
     none: ['しない', 'neutral'],
