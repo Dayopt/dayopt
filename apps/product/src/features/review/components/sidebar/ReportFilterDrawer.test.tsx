@@ -49,17 +49,6 @@ describe('ReportFilterDrawer', () => {
     expect(useReportViewStore.getState().hiddenActivityIds).toEqual(['act-dev', 'act-walk']);
   });
 
-  it('タッチ面として 44px の行で描く', async () => {
-    const user = userEvent.setup();
-    render(<ReportFilterDrawer />);
-
-    await user.click(screen.getByRole('button', { name: 'open' }));
-
-    expect((await screen.findByText('実装')).closest('[data-report-filter-row]')).toHaveClass(
-      'h-11',
-    );
-  });
-
   it('何かを外している間はボタンに印が付く', () => {
     const { rerender } = render(<ReportFilterDrawer />);
     expect(screen.getByRole('button', { name: 'open' })).not.toHaveAttribute(

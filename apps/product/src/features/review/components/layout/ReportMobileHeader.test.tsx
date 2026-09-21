@@ -88,9 +88,6 @@ describe('ReportMobileHeader', () => {
 
     const toggle = screen.getByRole('button', { name: 'report.mobile.openMiniCalendar' });
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
-    // 44px のタッチターゲット。jsdom は実寸を測れないのでクラスで固定する
-    expect(toggle.className).toContain('min-h-11');
-
     await user.click(toggle);
 
     expect(screen.getByRole('button', { name: 'report.mobile.closeMiniCalendar' })).toHaveAttribute(

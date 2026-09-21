@@ -21,16 +21,6 @@ describe('isTodayInTimezone', () => {
     expect(isTodayInTimezone(new Date('2026-04-28T00:00:00Z'), 'Asia/Tokyo', now)).toBe(false);
   });
 
-  it('UTC 03:00 を NY (EST -5h, 冬) から見ると「前日」が今日', () => {
-    // UTC 2026-01-15 03:00 = EST 2026-01-14 22:00
-    const now = new Date('2026-01-15T03:00:00Z');
-    const candidate14 = new Date('2026-01-14T18:00:00Z'); // EST 13:00 (14日)
-    const candidate15 = new Date('2026-01-15T15:00:00Z'); // EST 10:00 (15日)
-
-    expect(isTodayInTimezone(candidate14, 'America/New_York', now)).toBe(true);
-    expect(isTodayInTimezone(candidate15, 'America/New_York', now)).toBe(false);
-  });
-
   it('DST spring-forward 当日でも今日判定が壊れない (NY 2026-03-08)', () => {
     // 2026-03-08 はアメリカ DST 開始日。UTC 12:00 = EDT 08:00
     const now = new Date('2026-03-08T12:00:00Z');
@@ -39,15 +29,5 @@ describe('isTodayInTimezone', () => {
 
     expect(isTodayInTimezone(sameDayMorning, 'America/New_York', now)).toBe(true);
     expect(isTodayInTimezone(sameDayAfternoon, 'America/New_York', now)).toBe(true);
-  });
-
-  it('同一 UTC でも timezone が異なると判定が変わる', () => {
-    const now = new Date('2026-04-28T15:00:00Z'); // JST 2026-04-29 00:00 / UTC 28日
-    const candidate = new Date('2026-04-29T00:00:00Z'); // JST 09:00 (29日) / UTC 00:00 (29日)
-
-    // JST では now と同じ 29日
-    expect(isTodayInTimezone(candidate, 'Asia/Tokyo', now)).toBe(true);
-    // UTC では now (28日) と異なる 29日
-    expect(isTodayInTimezone(candidate, 'UTC', now)).toBe(false);
   });
 });

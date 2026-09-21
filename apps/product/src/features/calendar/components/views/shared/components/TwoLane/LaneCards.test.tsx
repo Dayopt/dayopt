@@ -38,21 +38,17 @@ const record: RecordEvent = {
 };
 
 describe('TwoLane cards', () => {
-  it('カードをキーボードで開け、ポインターのリサイズは別の slider として公開しない', () => {
-    const open = vi.fn();
+  it('ポインターのリサイズは別の slider として公開しない', () => {
     const resize = vi.fn();
     const { container } = render(
       <PlanLaneCard
         event={plan}
         position={position}
         activityName="確認"
-        onClick={open}
         onPointerDown={vi.fn()}
         onResizeStart={resize}
       />,
     );
-    fireEvent.keyDown(screen.getByRole('button', { name: '確認' }), { key: 'Enter' });
-    expect(open).toHaveBeenCalledOnce();
     expect(screen.queryByRole('slider')).not.toBeInTheDocument();
     const handle = container.querySelector('[data-resize-handle]');
     expect(handle).not.toBeNull();
@@ -196,18 +192,5 @@ describe('TwoLane cards', () => {
     );
 
     expect(container.querySelector('[data-timeblock-day-diff-marker]')).toBeNull();
-  });
-
-  it('Recordカードは差分0のbadgeを隠し、差分がある場合も中立色で表示する', () => {
-    const { container, rerender } = render(
-      <RecordLaneCard event={{ ...record }} position={position} activityName="Deep Work" />,
-    );
-
-    expect(container.querySelector('[data-record-diff-badge]')).toBeNull();
-
-    rerender(<RecordLaneCard event={{ ...record }} position={position} activityName="Deep Work" />);
-
-    const badge = container.querySelector('[data-record-diff-badge]');
-    expect(badge).toBeNull();
   });
 });

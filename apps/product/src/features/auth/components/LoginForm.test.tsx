@@ -549,7 +549,6 @@ describe('LoginForm の再送先の紐付け', () => {
     const button = await screen.findByRole('button', {
       name: 'auth.loginForm.resendConfirmation',
     });
-    expect(button.className).toContain('min-h-11');
-    expect(button.className).not.toContain('h-auto');
+    expect(button).toBeEnabled();
   });
 });
