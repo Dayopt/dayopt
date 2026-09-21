@@ -2,7 +2,7 @@
 
 import { useCallback } from 'react';
 
-import { useBillingAccess } from '@/lib/billing/BillingAccessProvider';
+import { useBillingAccess } from '@/lib/billing/billing-access-context';
 import { useShellStore } from '@/lib/stores/useShellStore';
 
 /**

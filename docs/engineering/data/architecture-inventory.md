@@ -2124,7 +2124,7 @@ graph LR
 </details>
 
 <details>
-<summary>test の候補（96）</summary>
+<summary>test の候補（97）</summary>
 
 <!-- prettier-ignore -->
 | ファイル | 対応の根拠 |
@@ -2135,6 +2135,7 @@ graph LR
 | [apps/product/src/features/calendar/components/activity-filter/components/CategoryCreateDialog.test.tsx](<../../../apps/product/src/features/calendar/components/activity-filter/components/CategoryCreateDialog.test.tsx>) | feature: calendar |
 | [apps/product/src/features/calendar/components/activity-filter/hooks/useActivityQuickCreate.test.ts](<../../../apps/product/src/features/calendar/components/activity-filter/hooks/useActivityQuickCreate.test.ts>) | feature: calendar |
 | [apps/product/src/features/calendar/components/activity-filter/sort-activities.test.ts](<../../../apps/product/src/features/calendar/components/activity-filter/sort-activities.test.ts>) | feature: calendar |
+| [apps/product/src/features/calendar/components/CalendarController.test.tsx](<../../../apps/product/src/features/calendar/components/CalendarController.test.tsx>) | feature: calendar |
 | [apps/product/src/features/calendar/components/controller/components/CalendarViewRenderer.test.ts](<../../../apps/product/src/features/calendar/components/controller/components/CalendarViewRenderer.test.ts>) | feature: calendar |
 | [apps/product/src/features/calendar/components/controller/hooks/useCalendarHandlers.test.ts](<../../../apps/product/src/features/calendar/components/controller/hooks/useCalendarHandlers.test.ts>) | feature: calendar |
 | [apps/product/src/features/calendar/components/controller/hooks/useCalendarNavigationHandlers.test.tsx](<../../../apps/product/src/features/calendar/components/controller/hooks/useCalendarNavigationHandlers.test.tsx>) | feature: calendar |
