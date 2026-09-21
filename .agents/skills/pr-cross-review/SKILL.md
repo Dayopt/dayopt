@@ -27,6 +27,7 @@ maxTurns: 20
 3. 応答の対象 commit と内容を確認し、最新 head に対応しているか照合する。依頼コメントの投稿成功はレビュー完了の証拠ではない。未応答・起動失敗・対象不明・古い結果を「指摘0」にしない。
 4. `AGENTS.md` の日本語 P1 / P2 規則で、到達可能な failure scenario、原因、最小の安全な修正を一次情報と突き合わせる。修正・根拠付き反論・Issue 化で裁定し、review thread を未解決のまま merge しない。
 5. 対象 SHA、レビュー応答へのリンク、所見と裁定、必要な検証を PR に残す。修正後は影響する範囲を検証し、必要な場合だけ最新 head のレビューを依頼する。
+6. 採用した finding を、現在の差分だけの修正、再利用可能な `AGENTS.md` / skill 規則、test / lint / CI / contract による機械化、`docs/decisions.md` の永続判断、別 Issue のいずれかへ分類する。scope 外の昇格はその場で広げず、PR / Issue に参照と未対応理由を残す。詳細は [`AI開発標準ループ`](../../../docs/operations/ai-development-loop.md) §レビュー知見の昇格を使う。
 
 レビューは advisory。CI / E2E / test や repository ruleset を置き換えない。GitHub 側が利用できない場合は未実行と報告し、自動的に複数 reviewer を起動しない。不可逆操作に独立レビューが必要な場合は `AGENTS.md` の権限条件を別途満たす。
 
