@@ -42,22 +42,14 @@ describe('ReportFilterDrawer', () => {
 
     const dialog = await screen.findByRole('dialog');
     expect(dialog).toHaveTextContent('title');
+    expect(screen.getByText('実装').closest('[data-report-filter-row="activity"]')).toHaveClass(
+      'h-11',
+    );
     // アクティビティ単位の出し入れがモバイルにもある（チップ列の時は無かった）
     await user.click(screen.getByRole('button', { name: 'hide 実装' }));
     expect(useReportViewStore.getState().hiddenActivityIds).toEqual(['act-dev']);
     await user.click(screen.getByRole('button', { name: 'hide 散歩' }));
     expect(useReportViewStore.getState().hiddenActivityIds).toEqual(['act-dev', 'act-walk']);
-  });
-
-  it('タッチ面として 44px の行で描く', async () => {
-    const user = userEvent.setup();
-    render(<ReportFilterDrawer />);
-
-    await user.click(screen.getByRole('button', { name: 'open' }));
-
-    expect((await screen.findByText('実装')).closest('[data-report-filter-row]')).toHaveClass(
-      'h-11',
-    );
   });
 
   it('何かを外している間はボタンに印が付く', () => {
