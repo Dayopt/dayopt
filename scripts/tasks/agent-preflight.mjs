@@ -69,6 +69,42 @@ export function collectGhIdentity({ env = process.env, ghPresent = true, statusT
   };
 }
 
+function collectPnpmVersion(pnpmPresent) {
+  if (!pnpmPresent) return null;
+  try {
+    return execFileSync('pnpm', ['--version'], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+      timeout: 5000,
+    }).trim();
+  } catch {
+    return null;
+  }
+}
+
+function packageManagerVersion(root) {
+  try {
+    const packageJson = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
+    const value = packageJson.packageManager;
+    return typeof value === 'string' && value.startsWith('pnpm@') ? value.slice(5) : null;
+  } catch {
+    return null;
+  }
+}
+
+function nodeMajor(version) {
+  return version.match(/^v?(\d+)/)?.[1] ?? null;
+}
+
+function commandPresent(name) {
+  try {
+    execFileSync('which', [name], { stdio: 'ignore' });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function collectPreflight(cwd = process.cwd()) {
   const root = git(['rev-parse', '--show-toplevel'], cwd);
   if (!root) throw new Error('Git worktree を確認できません');
@@ -83,24 +119,28 @@ export function collectPreflight(cwd = process.cwd()) {
     ]),
   );
   const cli = Object.fromEntries(
-    ['gh', 'codex', 'op', 'supabase', 'gitleaks', 'vercel'].map((name) => {
-      try {
-        execFileSync('which', [name], { stdio: 'ignore' });
-        return [name, true];
-      } catch {
-        return [name, false];
-      }
-    }),
+    ['gh', 'codex', 'op', 'supabase', 'gitleaks', 'vercel'].map((name) => [
+      name,
+      commandPresent(name),
+    ]),
   );
   const skills = existsSync(join(root, '.agents/skills/routing/SKILL.md'));
   const ghIdentity = collectGhIdentity({ ghPresent: cli.gh });
+  const expectedNode = readFileSync(join(root, '.nvmrc'), 'utf8').trim();
+  const expectedNodeMajor = nodeMajor(expectedNode);
+  const expectedPnpm = packageManagerVersion(root);
+  const actualPnpm = collectPnpmVersion(commandPresent('pnpm'));
   return {
     cwd,
     root,
     branch: git(['branch', '--show-current'], root) || 'detached',
     changes: git(['status', '--short'], root),
     node: process.version,
-    expectedNode: readFileSync(join(root, '.nvmrc'), 'utf8').trim(),
+    expectedNode,
+    nodeMatches: expectedNodeMajor !== null && nodeMajor(process.version) === expectedNodeMajor,
+    pnpm: actualPnpm,
+    expectedPnpm,
+    pnpmMatches: expectedPnpm !== null && actualPnpm === expectedPnpm,
     dependencies: existsSync(join(root, 'node_modules/.pnpm')),
     hooksPath,
     hooks,
@@ -135,7 +175,9 @@ export function renderPreflight(state) {
     `**Branch**: ${state.branch}`,
     `**Changes**: ${state.changes === null ? '未取得' : state.changes || 'clean'}`,
     '### Environment',
-    `**node**: ${state.node} (.nvmrc: ${state.expectedNode}) | **deps**: ${state.dependencies ? 'ok' : 'missing (pnpm install --frozen-lockfile)'}`,
+    `**node**: ${state.node} (.nvmrc: ${state.expectedNode}) | ${state.nodeMatches ? 'match' : 'MISMATCH'}`,
+    `**pnpm**: ${state.pnpm ?? 'unavailable'} (packageManager: ${state.expectedPnpm ?? 'unavailable'}) | ${state.pnpmMatches ? 'match' : 'MISMATCH'}`,
+    `**deps**: ${state.dependencies ? 'ok' : 'missing (pnpm install --frozen-lockfile)'}`,
     `**cli**: ${Object.entries(state.cli)
       .map(([name, present]) => `${name}:${present ? 'yes' : 'no'}`)
       .join(' ')}`,
@@ -155,6 +197,8 @@ export function renderPreflight(state) {
     lines.push(
       '- gh なし: ctx / trace / branch:finish の GitHub 情報は未取得。利用可能な接続で確認する',
     );
+  if (!state.nodeMatches || !state.pnpmMatches)
+    lines.push('- Node.js / pnpm の version が repository contract と一致しません');
   if (!state.dependencies || Object.values(state.hooks).some((ready) => !ready)) {
     lines.push('- commit / push 前に依存と Git hooks を準備してください');
   }
@@ -168,7 +212,13 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
       throw new Error('Usage: pnpm agent:preflight [--json]');
     const state = collectPreflight();
     console.log(args.includes('--json') ? JSON.stringify(state, null, 2) : renderPreflight(state));
-    if (!state.dependencies || Object.values(state.hooks).some((ready) => !ready) || !state.skills)
+    if (
+      !state.nodeMatches ||
+      !state.pnpmMatches ||
+      !state.dependencies ||
+      Object.values(state.hooks).some((ready) => !ready) ||
+      !state.skills
+    )
       process.exitCode = 1;
   } catch (error) {
     console.error(`未取得: ${error.message}`);

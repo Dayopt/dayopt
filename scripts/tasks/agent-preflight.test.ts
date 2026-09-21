@@ -25,6 +25,9 @@ describe('agent preflight', () => {
     const root = fixture();
     const state = collectPreflight(root);
     expect(state.dependencies).toBe(false);
+    expect(state.nodeMatches).toBe(false);
+    expect(state.pnpmMatches).toBe(false);
+    expect(state.expectedPnpm).toBe(null);
     expect(state.hooks['pre-push']).toBe(false);
     expect(state.readOnlyDelegation.wrapper).toBe(false);
     expect(state.readOnlyDelegation.native).toContain('unsupported');
