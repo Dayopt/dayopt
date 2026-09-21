@@ -46,7 +46,7 @@ last_verified: 2026-09-21
 - **3. 先に画面へ出す**:
   - [`apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.test.ts`](../../apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.test.ts) で `it('表示期間と重なる行だけを対象にする（offset付きcreateは除外）'` を探す
 - **6. 関門チェック**:
-  - [`apps/product/src/lib/test/integration/mfa-aal-cookie-tampering.integration.test.ts`](../../apps/product/src/lib/test/integration/mfa-aal-cookie-tampering.integration.test.ts) で `it('protectedProcedure経由でも改竄クライアントはFORBIDDEN(MFA verification required)になる'` を探す（local Supabase が要る integration）
+  - [`apps/product/src/lib/test/integration/mfa-aal-cookie-tampering.integration.test.ts`](../../apps/product/src/lib/test/integration/mfa-aal-cookie-tampering.integration.test.ts) で `it('protectedProcedure経由でも改竄クライアントはFORBIDDEN(MFA verification required)になる'` を探す（MFA の関門だけを守る。関門の順序を通しで守るテストは紐付いていない）
 - **8. RPC で書き込む**:
   - [`apps/product/src/features/timeblock/server/timeblock-command-client.test.ts`](../../apps/product/src/features/timeblock/server/timeblock-command-client.test.ts) で `it('tenantとnullable fieldを原子的create commandへ閉じ込める'` を探す
   - [`apps/product/src/features/timeblock/server/timeblock-command-client.test.ts`](../../apps/product/src/features/timeblock/server/timeblock-command-client.test.ts) で `it('deadlockだけをserver内で一度再試行する'` を探す
@@ -137,8 +137,6 @@ last_verified: 2026-09-21
 - **2. 集計を問い合わせる**:
   - [`apps/product/src/features/review/components/report/ReportBody.test.tsx`](../../apps/product/src/features/review/components/report/ReportBody.test.tsx) で `it('タブを切り替えても期間の query は同じ引数のまま（往復しない）'` を探す
   - [`apps/product/src/features/review/components/report/ReportBody.test.tsx`](../../apps/product/src/features/review/components/report/ReportBody.test.tsx) で `it('項目が足りない古い形の集計が復元されても描ける'` を探す
-- **3. /api/trpc と関門**:
-  - [`apps/product/src/lib/trpc/query-client.test.ts`](../../apps/product/src/lib/trpc/query-client.test.ts) で `it('does not retry a query rejected with TOO_MANY_REQUESTS'` を探す
 - **4. Router で検証**:
   - [`apps/product/src/features/review/server/router.test.ts`](../../apps/product/src/features/review/server/router.test.ts) で `it('client 入力ではなく認証済み context の userId で集計する'` を探す
   - [`apps/product/src/features/review/server/router.test.ts`](../../apps/product/src/features/review/server/router.test.ts) で ``it('不正な粒度を受け付けない（`day` は廃止した）'`` を探す
@@ -270,8 +268,8 @@ last_verified: 2026-09-21
 
 ### Google Calendar 連携
 
-- **10. 予定を保存**:
-  - [`apps/product/src/features/external-calendar/server/sync-service.test.ts`](../../apps/product/src/features/external-calendar/server/sync-service.test.ts) で `it('connection_id と user_id を全行に載せる（複合 FK）'` を探す
+- **11. 予定を保存**:
+  - [`apps/product/src/features/external-calendar/server/sync-service.test.ts`](../../apps/product/src/features/external-calendar/server/sync-service.test.ts) で `it('connection_id と user_id を全行に載せる（複合 FK）'` を探す（保存先の列を守る。plans に入らないこと・tombstone は別のテスト）
 
 ### Pro を契約する（課金）
 
@@ -357,6 +355,7 @@ last_verified: 2026-09-21
 - [Plan / Record を動かす・直す](journeys/edit-timeblock.md) の 5. Router → Service
 - [Record を作る・Plan を記録する](journeys/record-plan.md) の 5. Router → Service
 - [削除と取り消し](journeys/delete-undo.md) の 4. Router → Service
+- [レポートを開く（集計）](journeys/report.md) の 3. /api/trpc と関門
 - [ログイン（MFA 含む）](journeys/login.md) の 1. サインイン画面
 - [ログイン（MFA 含む）](journeys/login.md) の 3. MFA が要るか確かめる
 - [ログイン（MFA 含む）](journeys/login.md) の 5. コードを検証
@@ -379,9 +378,10 @@ last_verified: 2026-09-21
 - [Google Calendar 連携](journeys/google-calendar.md) の 5. code を token に交換
 - [Google Calendar 連携](journeys/google-calendar.md) の 6. 暗号化して保存
 - [Google Calendar 連携](journeys/google-calendar.md) の 7. 設定に戻る（接続済み）
-- [Google Calendar 連携](journeys/google-calendar.md) の 8. 15 分ごとの同期 cron
-- [Google Calendar 連携](journeys/google-calendar.md) の 9. 予定を差分で取得
-- [Google Calendar 連携](journeys/google-calendar.md) の 11. カレンダーに薄く表示
+- [Google Calendar 連携](journeys/google-calendar.md) の 8. 取り込むカレンダーを選ぶ
+- [Google Calendar 連携](journeys/google-calendar.md) の 9. 15 分ごとの同期 cron
+- [Google Calendar 連携](journeys/google-calendar.md) の 10. 予定を差分で取得
+- [Google Calendar 連携](journeys/google-calendar.md) の 12. カレンダーに薄く表示
 - [Pro を契約する（課金）](journeys/billing.md) の 3. Stripe の決済ページ
 - [問い合わせを送る](journeys/contact.md) の 1. ダイアログを開く
 - [問い合わせを送る](journeys/contact.md) の 4. 送り主を確かめる

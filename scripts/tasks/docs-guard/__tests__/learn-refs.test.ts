@@ -128,6 +128,50 @@ describe('runLearnRefsCheck', () => {
     );
   });
 
+  it('章や lab の learn:refs が指すコードの消失を報告する', async () => {
+    const root = fixture();
+    writeFileSync(
+      join(root, 'docs/learn/00-chapter.md'),
+      `${FM}# 章\n${block('refs', [{ path: 'real.ts', find: 'removedSymbol' }])}`,
+    );
+    const violations = await runLearnRefsCheck(root);
+    expect(violations.some((v) => v.ref.includes('00-chapter.md: real.ts :: removedSymbol'))).toBe(
+      true,
+    );
+  });
+
+  it('言語が json でない learn: block を黙って無視しない', async () => {
+    const root = fixture();
+    writeFileSync(
+      join(root, 'docs/learn/00-chapter.md'),
+      `${FM}# 章\n\n\`\`\`jsonc learn:refs\n[]\n\`\`\`\n`,
+    );
+    const violations = await runLearnRefsCheck(root);
+    expect(violations.some((v) => v.reason.includes('言語が json ではない'))).toBe(true);
+  });
+
+  it('片方向の twin を報告する', async () => {
+    const root = fixture();
+    const other = { ...journey('createPlan'), id: 'other', order: 20, twin: 'demo' };
+    writeFileSync(
+      join(root, 'docs/learn/journeys/other.md'),
+      `${FM}# 別\n\n${MARK('journey')}${block('journey', other)}`,
+    );
+    const violations = await runLearnRefsCheck(root);
+    expect(violations.some((v) => v.reason.includes('twin が片方向'))).toBe(true);
+  });
+
+  it('生成範囲のマーカーが複製されていたら報告する（後ろの範囲が drift 検査をすり抜けない）', async () => {
+    const root = fixture();
+    const path = join(root, 'docs/learn/journeys/demo.md');
+    writeFileSync(
+      path,
+      readFileSync(path, 'utf8').replace(MARK('journey'), MARK('journey') + MARK('journey')),
+    );
+    const violations = await runLearnRefsCheck(root);
+    expect(violations.some((v) => v.reason.includes('マーカーが 2 個ある'))).toBe(true);
+  });
+
   it('壊れた JSON を報告する', async () => {
     const root = fixture();
     const path = join(root, 'docs/learn/journeys/demo.md');

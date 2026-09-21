@@ -5,7 +5,7 @@ last_verified: 2026-09-21
 
 # Lab: UI を迂回して規則を破る
 
-時刻の規則（`DT003` / `DT005`）と重なりの制約を、UI を通さずに DB へ直接ぶつけて、**DB が最後の砦**であることを確かめる。ついでに「superuser の psql は本番の再現にならない」ことも踏む。
+時刻の規則（`DT003` / `DT005`）と重なりの制約を、UI を通さずに DB へ直接ぶつけて、**DB が最後の砦**であることを確かめる。ついでに「`postgres` として繋いだ psql は本番の経路の再現にならない」ことも踏む。
 
 ## 目的
 
@@ -38,9 +38,9 @@ SELECT id FROM public.create_plan_command_v1(
 ROLLBACK;
 ```
 
-同じ形で、2〜4 も試す（`create_record_command_v1` の引数は `\df public.create_record_command_v1` で見る）。
+3 と 4 も同じ形で psql から試す。3 は、seed の利用者の Plan と重ならない空いた時間帯（例: 数年先の日付）を選ぶ（既存の Plan と重なると 1 つ目から 23P01 になる）。2（未来の Record）だけは psql ではなく API から送る（理由は実測結果を見る）。`create_record_command_v1` の引数は `\df public.create_record_command_v1` で見る。
 
-2 の未来の Record は、psql ではなく API から送る（理由は結果を見る）:
+2 の未来の Record を API から送る:
 
 ```bash
 KEY=$(supabase status -o json | python3 -c "import json,sys; print(json.load(sys.stdin)['SERVICE_ROLE_KEY'])")
@@ -58,8 +58,8 @@ curl -s -X POST http://127.0.0.1:54321/rest/v1/rpc/create_record_command_v1 \
 - 1: `DT003 Plan end must be after start`
 - 3: 2 つ目で `23P01`（排他制約。利用者ごとに `[start, end)` の半開区間が重なってはいけない）
 - 4: 過去の Plan は作れた（未来だけの特別扱いは 2026-09-04 に撤去済み）
-- 2: **psql から送ると作れてしまった**。trigger `validate_record_temporal_write_v1` は、`SESSION_USER` が `postgres` / `supabase_admin` の時だけ未来の Record を許す（migration と seed のための例外）。API から送ると `{"code":"DT005","message":"Records cannot end in the future"}` で拒否され、行は 0 件だった。アプリの依頼は API 経由（`authenticator`）なので、本番で規則は効いている
-- 教訓: **superuser の psql での確認は、本番の経路の再現にならない**。規則の確認は、アプリと同じ入口から行う
+- 2: **psql（postgres として接続）から送ると作れてしまった**。trigger `validate_record_temporal_write_v1` は、`SESSION_USER` が `postgres` / `supabase_admin` の時だけ未来の Record を許す（migration と seed のための例外）。API から送ると `{"code":"DT005","message":"Records cannot end in the future"}` で拒否され、行は 0 件だった。アプリの依頼は API 経由（`authenticator`）なので、本番で規則は効いている
+- 教訓: **`postgres` / `supabase_admin` として繋いだ psql での確認は、本番の経路の再現にならない**（local の postgres は superuser ではないが、trigger が接続ユーザーの名前で例外にしている）。規則の確認は、アプリと同じ入口から行う
 
 </details>
 
@@ -72,3 +72,24 @@ psql の分は ROLLBACK で残らない。API から送った分は拒否され�
 - [経路: Record を作る・Plan を記録する](../journeys/record-plan.md)、[経路: Plan を保存](../journeys/save-plan.md) の 9 段
 - [0. Dayopt とは](../00-product.md)（規則は 2 本だけ）、[2. UI → DB](../02-ui-to-db.md)
 - [docs/engineering/invariants.md](../../engineering/invariants.md) の「時刻」
+
+## 参照（検査用）
+
+このページの本文が名指ししているコード。`pnpm docs:check` が、ファイルが在り `find` の文字列を含むことを検査する。本文を書き換えたらここも直す。
+
+```json learn:refs
+[
+  {
+    "path": "supabase/migrations/20260729062435_timeblock_atomic_commands.sql",
+    "find": "AND SESSION_USER NOT IN ('postgres', 'supabase_admin') THEN"
+  },
+  {
+    "path": "supabase/migrations/20260729073122_mcp_stage1_user_write_serialization.sql",
+    "find": "FUNCTION private.assert_timeblock_service_role_request_v1"
+  },
+  {
+    "path": "supabase/migrations/20260708232500_add_time_model_tables.sql",
+    "find": "ADD CONSTRAINT plans_no_overlap"
+  }
+]
+```

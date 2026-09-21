@@ -283,8 +283,16 @@ export function renderChangeMap(docFile: string, result: CollectResult): string 
   const byPath = new Map<string, string[]>();
   for (const { file, value: journey } of result.journeys) {
     journey.hops.forEach((hop, index) => {
+      // 段のコードと、その段の失敗の根拠（失敗時の挙動を決めるファイル）の両方を逆引きに入れる。
+      // テストは章 6 の一覧が持つので含めない
+      const refs = [...hop.refs, ...hop.fails.flatMap((fail) => fail.refs)];
       const paths = new Set(
-        hop.refs.map((ref) => ref.path).filter((path) => !path.startsWith('docs/')),
+        refs
+          .map((ref) => ref.path)
+          .filter(
+            (path) =>
+              !path.startsWith('docs/') && !/\.(test|spec|integration\.test)\.[jt]sx?$/.test(path),
+          ),
       );
       for (const path of paths) {
         const line = `[${journey.title}](${relLink(docFile, file)}) の ${index + 1}. ${hop.short}${hop.change ? ` — ${hop.change}` : ''}`;
@@ -293,7 +301,7 @@ export function renderChangeMap(docFile: string, result: CollectResult): string 
     });
   }
   const out: string[] = [
-    '経路の段が参照しているコードを、ファイルごとに逆引きした一覧。あるファイルを変える時、どの操作のどの段に響くか、その段に書いた「ここを変えると」を並べる。',
+    '経路の段と、その段の失敗の根拠が参照しているコードを、ファイルごとに逆引きした一覧。あるファイルを変える時、どの操作のどの段に響くか、その段に書いた「ここを変えると」を並べる。',
     '一覧に無いファイルは、どの経路からも参照していないだけで、影響が無いとは限らない。',
   ];
   for (const path of [...byPath.keys()].sort()) {
@@ -379,7 +387,16 @@ export async function renderLearnDocs(root: string, result: CollectResult): Prom
   for (const { file, kind, body } of targets) {
     const filepath = resolve(root, file);
     const current = readFileSync(filepath, 'utf8');
-    const replaced = replaceGeneratedBlock(current, learnMarkers(kind), body, file);
+    const markers = learnMarkers(kind);
+    // replaceGeneratedBlock は最初の 1 組しか置き換えない。複製された範囲が drift 検査をすり抜けないよう、
+    // 開始・終了がちょうど 1 つずつであることを先に確かめる
+    for (const marker of [markers.start, markers.end]) {
+      const count = current.split(marker).length - 1;
+      if (count !== 1) {
+        throw new Error(`${file}: 生成範囲のマーカーが ${count} 個ある（ちょうど 1 個にする）`);
+      }
+    }
+    const replaced = replaceGeneratedBlock(current, markers, body, file);
     const config = (await resolvePrettierConfig(filepath)) ?? {};
     docs.push({
       file,

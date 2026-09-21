@@ -76,7 +76,7 @@ flowchart TD
 <details>
 <summary>1. Alice のセッションで Bob の Plan ID を指定して更新を送ったら、何が返るか</summary>
 
-`update_plan_command_v1` の `WHERE plan.user_id = p_user_id` に当たらず `DT001 Plan not found`。アプリはこれを NOT_FOUND 系として扱い、Bob の Plan が存在することも漏らさない。
+`update_plan_command_v1` の `WHERE plan.user_id = p_user_id` に当たらず `DT001 Plan not found`。更新はアプリが DT001 を `STALE_TARGET`（tRPC の CONFLICT）に訳す。削除済み・版ずれと同じ応答なので、Bob の Plan が存在することは漏れない。
 
 </details>
 
@@ -93,3 +93,48 @@ flowchart TD
 service role なので RLS は助けてくれず、他人の行を返しうる。`mcp-read-tenant-isolation.integration.test.ts` が落ちるはず。
 
 </details>
+
+## 参照（検査用）
+
+このページの本文が名指ししているコード。`pnpm docs:check` が、ファイルが在り `find` の文字列を含むことを検査する。本文を書き換えたらここも直す。
+
+```json learn:refs
+[
+  {
+    "path": "supabase/migrations/20260730090300_revoke_authenticated_timeblock_dml.sql",
+    "find": "GRANT SELECT ON TABLE public.plans TO authenticated;"
+  },
+  {
+    "path": "supabase/migrations/20260708232500_add_time_model_tables.sql",
+    "find": "Users can view own plans"
+  },
+  {
+    "path": "supabase/migrations/20260729062435_timeblock_atomic_commands.sql",
+    "find": "RAISE EXCEPTION 'Plan not found' USING ERRCODE = 'DT001';"
+  },
+  {
+    "path": "apps/product/src/features/timeblock/server/timeblock-command-client.ts",
+    "find": "VERSIONED_TARGET_OPERATIONS.has(operation) ? 'STALE_TARGET' : 'NOT_FOUND'"
+  },
+  {
+    "path": "apps/product/src/lib/trpc/error-code-map.ts",
+    "find": "STALE_TARGET: 'CONFLICT'"
+  },
+  {
+    "path": "supabase/migrations/20260908022927_add_mcp_billing_access_switch.sql",
+    "find": "authorize_mcp_mutation_v1"
+  },
+  {
+    "path": "docs/engineering/invariants.md",
+    "find": "MCP の読み取りは service-role client で tRPC を呼ぶため RLS が効かず"
+  },
+  {
+    "path": "apps/product/src/lib/test/integration/rls-access.integration.test.ts",
+    "find": "it('authenticatedはown Plan / Recordをreadできるが直接writeできない'"
+  },
+  {
+    "path": "apps/product/src/lib/test/integration/mcp-read-tenant-isolation.integration.test.ts",
+    "find": "it('keeps plans and records in the caller lane for list reads'"
+  }
+]
+```

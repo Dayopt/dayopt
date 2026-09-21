@@ -18,7 +18,7 @@ last_verified: 2026-09-21
 ```mermaid
 flowchart TD
   UI["UI（component / hook）"] -->|"楽観的更新で先に画面へ"| C["tRPC client"]
-  C -->|"POST /api/trpc"| R["route + protectedProcedure<br/>（認証・MFA・利用権・write fence・rate limit）"]
+  C -->|"POST /api/trpc"| R["route + protectedProcedure<br/>（IP 単位 rate limit・認証・MFA・利用権・write fence・利用者単位 rate limit）"]
   R --> S["Router → Service"]
   S -->|"service role で RPC"| DB["DB 関数 + trigger<br/>（規則の強制点）"]
   DB -->|"応答"| UI
@@ -32,8 +32,8 @@ flowchart TD
 
 [経路: Plan を保存](journeys/save-plan.md) を開いて、`pnpm learn` の ▶ で流してみる。押さえる点は 3 つ。
 
-1. **再試行しない書き込み**: timeblock の mutation は `retry: false`。通信が途中で切れると、画面は元に戻るが、DB では保存済みだったこともある。その場合は一覧の取り直しで Plan が再び現れる（二重作成が起きうる唯一の筋）
-2. **関門の順序**: 認証 → MFA → 利用権 → write fence → rate limit。write fence を rate limit より先に見るのは、止めている間の依頼で自分の枠を使い切らないため
+1. **再試行しない書き込み**: timeblock の mutation は `retry: false`。通信が途中で切れると、画面は元に戻るが、DB では保存済みだったこともある。その場合は一覧の取り直しで Plan が再び現れる。ここで押し直すと、同じ時間帯なら排他制約で弾かれるが、サイドバーからの作成は次の空き時間に置くので、時間をずらした 2 つ目ができる（[lab: 通信を壊す](labs/break-network.md) で実測）
+2. **関門の順序**: IP 単位の rate limit（context。cookie がある時だけ）→ 認証 → MFA → 利用権 → write fence（mutation だけ）→ 利用者単位の rate limit。write fence を rate limit より先に見るのは、止めている間の依頼で自分の枠を使い切らないため
 3. **書き込みは 1 つの DB 関数**: `create_plan_command_v1` を service role で呼び、user_id は引数で渡す。途中で壊れた状態を残さない
 
 同じ型の経路:
@@ -76,3 +76,36 @@ flowchart TD
 保存後に取り直す対象（`onSettled` の invalidate）に、その画面の query が入っているか。入っていないと古い数字が残る。
 
 </details>
+
+## 参照（検査用）
+
+このページの本文が名指ししているコード。`pnpm docs:check` が、ファイルが在り `find` の文字列を含むことを検査する。本文を書き換えたらここも直す。
+
+```json learn:refs
+[
+  {
+    "path": "apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.ts",
+    "find": "retry: false"
+  },
+  {
+    "path": "apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.ts",
+    "find": "onSettled: invalidate"
+  },
+  {
+    "path": "apps/product/src/lib/trpc/context.ts",
+    "find": "isPreAuthRateLimited"
+  },
+  {
+    "path": "apps/product/src/lib/trpc/procedures.ts",
+    "find": "isWriteFenceEnabled"
+  },
+  {
+    "path": "apps/product/src/features/timeblock/server/timeblock-command-client.ts",
+    "find": "create_plan_command_v1"
+  },
+  {
+    "path": "supabase/migrations/20260708232500_add_time_model_tables.sql",
+    "find": "ADD CONSTRAINT plans_no_overlap"
+  }
+]
+```

@@ -7,7 +7,7 @@ last_verified: 2026-09-21
 
 <!-- learn:generated:start — 正本 このファイルの learn:journey の JSON / 再生成 pnpm learn:generate / 検証 pnpm docs:check。この範囲は手編集しない -->
 
-設定の「請求」で購入ボタンを押すと、Stripe の決済ページ（Checkout）へ移り、戻ってくる。契約状態を確定させるのは戻りの URL ではなく、Stripe が別経路で送ってくる webhook。課金の強制（BILLING_ENFORCED）は既定で無効で、無効の間は契約の有無にかかわらず全員が全機能を使える。
+設定の「請求」で購入ボタンを押すと、Stripe の決済ページ（Checkout）へ移り、戻ってくる。契約状態を確定させるのは戻りの URL ではなく、Stripe が別経路で送ってくる webhook。課金の強制（BILLING_ENFORCED）は既定で無効で、無効の間は画面（tRPC）では契約の有無にかかわらず全員が全機能を使える。ただし MCP からの書き込みだけは、DB 側の既定で契約中（active / trialing / past_due）の人に限られる。
 
 ```mermaid
 flowchart TD
@@ -314,12 +314,13 @@ BILLING_ENFORCED が 'true' でなければ、DB を読まずに全員へ canUse
 
 - **なぜ必要か**: 契約状態（Stripe の写し）と「使えるか」を 1 箇所で決め、画面・tRPC・MCP が同じ答えを見るため。
 - **入力 → 出力**: userId（と BILLING_ENFORCED） → { state, canUseProduct, trialEndsAt, enforced }
-- **ここを変えると**: BILLING_ENFORCED は既定 false で、公開手順の文書は本番を false のまま保つと書く（本番の実値はこの教材では未確認）。つまり今の利用者は、契約してもしなくても全機能を使え、45 日体験も始まらない。契約すれば Stripe での課金は実際に走る。true へ切り替える時は DB 側と MCP の切り替えを先に行う順序がある（rollout §公開順序 6）。env だけ変えると MCP と書き込みの判定がずれる。
+- **ここを変えると**: BILLING_ENFORCED は既定 false で、公開手順の文書は本番を false のまま保つと書く（本番の実値はこの教材では未確認）。つまり今の利用者は、画面では契約してもしなくても全機能を使え、45 日体験も始まらない。ただし MCP からの書き込みは DB 側の mcp_mutation_control.billing_enforced（既定 false）の判定で契約中だけに限られ、未契約者は DM005 になる。契約すれば Stripe での課金は実際に走る。true へ切り替える時は DB 側と MCP の切り替えを先に行う順序がある（rollout §公開順序 6）。env だけ変えると MCP と書き込みの判定がずれる。
 - **コード**:
   - [`apps/product/src/lib/billing/access-service.ts`](../../../apps/product/src/lib/billing/access-service.ts) で `return { state: 'not_started', canUseProduct: true, trialEndsAt: null, enforced: false };` を探す
   - [`apps/product/src/lib/billing/enforcement-flag.ts`](../../../apps/product/src/lib/billing/enforcement-flag.ts) で `return env.BILLING_ENFORCED === 'true';` を探す
   - [`apps/product/src/lib/trpc/procedures.ts`](../../../apps/product/src/lib/trpc/procedures.ts) で `cause: new ServiceError('BILLING_ACCESS_ENDED', 'Product access has ended'),` を探す
   - [`docs/operations/billing-single-plan-rollout.md`](../../operations/billing-single-plan-rollout.md) で ``課金制限のフラグは引き続き `BILLING_ENFORCED=false` とし`` を探す
+  - [`supabase/migrations/20260908022927_add_mcp_billing_access_switch.sql`](../../../supabase/migrations/20260908022927_add_mcp_billing_access_switch.sql) で `IF NOT v_billing_enforced THEN` を探す
 - **この段を守るテスト**:
   - [`apps/product/src/lib/billing/access-service.test.ts`](../../../apps/product/src/lib/billing/access-service.test.ts) で `it('does not read new schema or start a trial while disabled'` を探す
   - [`packages/billing/src/access.test.ts`](../../../packages/billing/src/access.test.ts) で `resolveBillingAccess` を探す
@@ -417,7 +418,7 @@ Vercel cron が毎日 /api/cron/billing-reconciliation を叩く。Stripe の直
   "title": "Pro を契約する（課金）",
   "order": 100,
   "group": "integration",
-  "intro": "設定の「請求」で購入ボタンを押すと、Stripe の決済ページ（Checkout）へ移り、戻ってくる。契約状態を確定させるのは戻りの URL ではなく、Stripe が別経路で送ってくる webhook。課金の強制（BILLING_ENFORCED）は既定で無効で、無効の間は契約の有無にかかわらず全員が全機能を使える。",
+  "intro": "設定の「請求」で購入ボタンを押すと、Stripe の決済ページ（Checkout）へ移り、戻ってくる。契約状態を確定させるのは戻りの URL ではなく、Stripe が別経路で送ってくる webhook。課金の強制（BILLING_ENFORCED）は既定で無効で、無効の間は画面（tRPC）では契約の有無にかかわらず全員が全機能を使える。ただし MCP からの書き込みだけは、DB 側の既定で契約中（active / trialing / past_due）の人に限られる。",
   "play": "▶ 購入を押す",
   "lanes": ["browser", "vercel", "stripe", "supabase"],
   "tests": [
@@ -1048,7 +1049,7 @@ Vercel cron が毎日 /api/cron/billing-reconciliation を叩く。Stripe の直
         "in": "userId（と BILLING_ENFORCED）",
         "out": "{ state, canUseProduct, trialEndsAt, enforced }"
       },
-      "change": "BILLING_ENFORCED は既定 false で、公開手順の文書は本番を false のまま保つと書く（本番の実値はこの教材では未確認）。つまり今の利用者は、契約してもしなくても全機能を使え、45 日体験も始まらない。契約すれば Stripe での課金は実際に走る。true へ切り替える時は DB 側と MCP の切り替えを先に行う順序がある（rollout §公開順序 6）。env だけ変えると MCP と書き込みの判定がずれる。",
+      "change": "BILLING_ENFORCED は既定 false で、公開手順の文書は本番を false のまま保つと書く（本番の実値はこの教材では未確認）。つまり今の利用者は、画面では契約してもしなくても全機能を使え、45 日体験も始まらない。ただし MCP からの書き込みは DB 側の mcp_mutation_control.billing_enforced（既定 false）の判定で契約中だけに限られ、未契約者は DM005 になる。契約すれば Stripe での課金は実際に走る。true へ切り替える時は DB 側と MCP の切り替えを先に行う順序がある（rollout §公開順序 6）。env だけ変えると MCP と書き込みの判定がずれる。",
       "refs": [
         {
           "path": "apps/product/src/lib/billing/access-service.ts",
@@ -1065,6 +1066,10 @@ Vercel cron が毎日 /api/cron/billing-reconciliation を叩く。Stripe の直
         {
           "path": "docs/operations/billing-single-plan-rollout.md",
           "find": "課金制限のフラグは引き続き `BILLING_ENFORCED=false` とし"
+        },
+        {
+          "path": "supabase/migrations/20260908022927_add_mcp_billing_access_switch.sql",
+          "find": "IF NOT v_billing_enforced THEN"
         }
       ],
       "tests": [

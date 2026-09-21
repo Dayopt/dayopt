@@ -57,13 +57,21 @@ export async function runLearnRefsCheck(root = ROOT): Promise<LearnViolation[]> 
   }));
   violations.push(...checkLearnRefs(listLearnRefs(result), root));
   if (result.errors.length === 0) {
-    for (const doc of await renderLearnDocs(root, result)) {
-      if (doc.current !== doc.expected) {
-        violations.push({
-          ref: doc.file,
-          reason: '生成ブロックが正本と一致しない。pnpm learn:generate を実行する',
-        });
+    try {
+      for (const doc of await renderLearnDocs(root, result)) {
+        if (doc.current !== doc.expected) {
+          violations.push({
+            ref: doc.file,
+            reason: '生成ブロックが正本と一致しない。pnpm learn:generate を実行する',
+          });
+        }
       }
+    } catch (error) {
+      // マーカーの欠落・重複など、生成範囲を特定できない状態
+      violations.push({
+        ref: 'docs/learn',
+        reason: error instanceof Error ? error.message : String(error),
+      });
     }
   }
   return violations;

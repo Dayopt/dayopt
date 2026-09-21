@@ -7,28 +7,29 @@ last_verified: 2026-09-21
 
 <!-- learn:generated:start — 正本 このファイルの learn:journey の JSON / 再生成 pnpm learn:generate / 検証 pnpm docs:check。この範囲は手編集しない -->
 
-設定の「連携」で Google アカウントを接続し、Google の予定を Dayopt のカレンダーに取り込む。接続（OAuth）と取り込み（15 分ごとの cron）は別の経路で、接続した瞬間には取り込まない。
+設定の「連携」で Google アカウントを接続し、Google の予定を Dayopt のカレンダーに取り込む。接続（OAuth）と取り込みは別の経路で、接続した直後は取り込むカレンダーが未選択なので何も取り込まない。取り込むカレンダーを選んで「適用」を押した時に最初の同期が走り、以後は 15 分ごとの cron が差分を取る。
 
 ```mermaid
 flowchart TD
   subgraph s_browser["ブラウザ"]
     n1["1. 連携設定で接続"]
     n7["7. 設定に戻る（接続済み）"]
-    n11["11. カレンダーに薄く表示"]
+    n8["8. 取り込むカレンダーを選ぶ"]
+    n12["12. カレンダーに薄く表示"]
   end
   subgraph s_vercel["Vercel（Next.js）"]
     n2["2. /start で準備"]
     n4["4. callback で検証"]
-    n8["8. 15 分ごとの同期 cron"]
+    n9["9. 15 分ごとの同期 cron"]
   end
   subgraph s_google["Google"]
     n3["3. Google の同意画面"]
     n5["5. code を token に交換"]
-    n9["9. 予定を差分で取得"]
+    n10["10. 予定を差分で取得"]
   end
   subgraph s_supabase["Supabase"]
     n6["6. 暗号化して保存"]
-    n10["10. 予定を保存"]
+    n11["11. 予定を保存"]
   end
   n1 -->|"GET /api/…/start"| n2
   n2 -->|"302 → Google"| n3
@@ -36,13 +37,14 @@ flowchart TD
   n4 -->|"token 交換"| n5
   n5 -->|"calendar_connections"| n6
   n6 -->|"302 → ?calendar=connected"| n7
-  n7 -->|"最大 15 分後"| n8
-  n8 -->|"Calendar API"| n9
-  n9 -->|"upsert"| n10
-  n10 -->|"externalCalendar.listEvents"| n11
+  n7 --> n8
+  n8 -->|"以後 15 分ごと"| n9
+  n9 -->|"Calendar API"| n10
+  n10 -->|"upsert"| n11
+  n11 -->|"externalCalendar.listEvents"| n12
 ```
 
-通るサービス: ブラウザ / Vercel（Next.js） / Google / Supabase。段 11・失敗 10 種。
+通るサービス: ブラウザ / Vercel（Next.js） / Google / Supabase。段 12・失敗 11 種。
 
 #### この経路を守るテスト
 
@@ -72,7 +74,7 @@ flowchart TD
 
 ### 2. /start が関門を通して Google へ送る（Vercel（Next.js））
 
-ログイン → MFA → 利用権 → rate limit の順に確かめ、state と PKCE を作って cookie に入れ、Google の同意画面へ 302 する。求める権限はカレンダー一覧と予定の読み取りだけ（書き込みはしない）。
+ログイン → MFA → 利用権 → rate limit の順に確かめ、state と PKCE を作って cookie に入れ、Google の同意画面へ 302 する。求める権限は openid・email と、カレンダー一覧と予定の読み取りだけ（書き込みはしない）。
 
 - **ここを変えると**: MFA を利用権や rate limit より先に見るのは、MFA 不足で断る時に DB 読み取りや枠を消費しないため。
 - **コード**:
@@ -142,13 +144,14 @@ flowchart TD
 <details>
 <summary>⚡ state が合わない・cookie が切れた — 画面: エラー表示 / データ: 変化なし / 再試行: 利用者がやり直す / 痕跡: 残らない</summary>
 
-- 画面: 設定に戻り、もう一度試すよう案内される。
+- 画面: 設定に戻り「Google カレンダーに接続できませんでした」。state の不一致・cookie 切れは汎用の失敗文言にまとめられ、やり直しの案内は出ない。
 - データ: 変化なし。
 - 再試行: 利用者がもう一度接続する。
 - 痕跡: 想定内。
 - **最初に見る場所**: 不要（別タブで接続し直した等）。
 - 根拠:
   - [`apps/product/src/app/api/integrations/google-calendar/callback/route.ts`](../../../apps/product/src/app/api/integrations/google-calendar/callback/route.ts) で `state_mismatch` を探す
+  - [`apps/product/src/features/external-calendar/lib/calendar-callback-result.ts`](../../../apps/product/src/features/external-calendar/lib/calendar-callback-result.ts) で `?? 'generic'` を探す
 
 </details>
 
@@ -177,7 +180,7 @@ code を access token と refresh token に交換し、許可された権限が�
 <details>
 <summary>⚡ 一部の権限だけ許可された — 画面: エラー表示 / データ: 変化なし / 再試行: 利用者がやり直す / 痕跡: 残らない</summary>
 
-- 画面: 設定に戻り「必要な権限の一部が許可されませんでした」。
+- 画面: 設定に戻り「必要な権限の一部が許可されませんでした。表示された権限をすべて許可して、もう一度お試しください。」
 - データ: 得た許可は Google 側で取り消す。
 - 再試行: 利用者がすべて許可してやり直す。
 - 痕跡: 想定内。
@@ -198,15 +201,25 @@ refresh token を AES-256-GCM で暗号化し、calendar_connections に保存�
 
 ### 7. 設定画面に戻り、接続済みになる（ブラウザ）
 
-/settings/integrations?calendar=connected へ戻り、トーストを出してから URL の印を消す。この時点では予定はまだ取り込んでいない。
+/settings/integrations?calendar=connected へ戻り、トーストを出してから URL の印を消す。この時点では取り込むカレンダーがまだ選ばれていないので、予定は 1 件も取り込まれていない。
 
 - **ここを変えると**: デスクトップでは設定はモーダルなので、戻ってきた後にカレンダーの上で開き直す。
 - **コード**:
   - [`apps/product/src/app/[locale]/(app)/settings/[category]/page.tsx`](<../../../apps/product/src/app/[locale]/(app)/settings/[category]/page.tsx>) で `removeCalendarCallbackParams` を探す
 
-### 8. Vercel Cron が 15 分ごとに同期を回す（Vercel（Next.js））
+### 8. 取り込むカレンダーを選んで「適用」を押す（ブラウザ）
 
-CRON_SECRET で呼び出し元を確かめ、write fence を見て、開始と完了を heartbeat に記録する。同期が必要な接続を順に、50 秒の持ち時間の中で処理する。設定の「今すぐ同期」も同じ処理を呼ぶ。
+接続した Google アカウントのカレンダー一覧から取り込むものを選び、「適用」を押す。updateSelectedCalendars が選択を保存し、その場で全件の同期を 1 回走らせる。ここで初めて予定が取り込まれる。
+
+- **なぜ必要か**: 何を取り込むかは利用者が決める（仕事用だけ、など）。接続しただけで全部を流し込まない。
+- **ここを変えると**: 選択を変えるたびに即時の全件同期が走る。選択の保存と同期は同じ procedure の中なので、同期が遅いと「適用中...」が長くなる。
+- **コード**:
+  - [`apps/product/src/features/external-calendar/server/router.ts`](../../../apps/product/src/features/external-calendar/server/router.ts) で `取り込むカレンダーの選択を差し替え、即時同期する` を探す
+  - [`apps/product/src/features/external-calendar/server/sync-service.ts`](../../../apps/product/src/features/external-calendar/server/sync-service.ts) で `load_selected_calendars` を探す
+
+### 9. Vercel Cron が 15 分ごとに同期を回す（Vercel（Next.js））
+
+CRON_SECRET で呼び出し元を確かめ、write fence を見て、開始と完了を heartbeat に記録する。同期が必要な接続を順に、50 秒の持ち時間の中で処理する。取り込むカレンダーが選ばれていない接続では何も取らない。設定の「今すぐ同期」も同じ同期処理を呼ぶ。
 
 - **ここを変えると**: 取りこぼした回を埋め直さない。止まったことは heartbeat の完了時刻が古くなることで気づく（production の監査が見る）。
 - **コード**:
@@ -228,7 +241,7 @@ CRON_SECRET で呼び出し元を確かめ、write fence を見て、開始と�
 
 </details>
 
-### 9. Google から予定を差分で取る（Google）
+### 10. Google から予定を差分で取る（Google）
 
 保存した refresh token で access token を取り直し、前回の sync token から差分だけ取る。1 日 1 回は全件、Google が sync token を無効にした時（410）も全件で取り直す。1 回の API は 15 秒で打ち切る。
 
@@ -252,19 +265,34 @@ CRON_SECRET で呼び出し元を確かめ、write fence を見て、開始と�
 </details>
 
 <details>
-<summary>⚡ Google が 429 / 5xx / 時間切れ — 画面: 何も起きない / データ: どちらもありうる / 再試行: 自動で再試行 / 痕跡: ログだけ</summary>
+<summary>⚡ Google が 429（rate limit） — 画面: 何も起きない / データ: どちらもありうる / 再試行: 自動で再試行 / 痕跡: ログだけ</summary>
 
-- 画面: 設定の行が「確認が必要」になりうる。カレンダーは前回までの予定のまま。
+- 画面: 設定の行が「確認が必要」になりうる。「Google カレンダーの利用が一時的に制限されています。時間をおいてお試しください。」カレンダーは前回までの予定のまま。
 - データ: 一部だけ取り込まれることがある。
-- 再試行: rate limit は 1 回だけ即座に再試行。それ以外は次の cron で。
-- 痕跡: last_sync_error（rate_limited / provider_unavailable）。
-- **最初に見る場所**: Google Cloud の status と quota。
+- 再試行: 1〜2 秒待って 1 回だけ再試行する（残り時間が足りなければしない）。それでも駄目なら次の cron で。
+- 痕跡: 想定内として Sentry には送らない（quota を焼く増幅経路になるため）。logger.warn と、接続の last_sync_error = rate_limited に残る。
+- **最初に見る場所**: Google Cloud の quota。calendar_connections の last_sync_error。
 - 根拠:
   - [`apps/product/src/features/external-calendar/server/providers/google.ts`](../../../apps/product/src/features/external-calendar/server/providers/google.ts) で `requestWithRateLimitRetry` を探す
+  - [`apps/product/src/features/external-calendar/server/sync-service.ts`](../../../apps/product/src/features/external-calendar/server/sync-service.ts) で `(error.kind === 'rate_limited' || error.kind === 'cursor_invalid')` を探す
 
 </details>
 
-### 10. external_calendar_events に保存する（Supabase）
+<details>
+<summary>⚡ Google が 5xx・時間切れ（15 秒） — 画面: 何も起きない / データ: どちらもありうる / 再試行: 次の機会に / 痕跡: Sentry</summary>
+
+- 画面: 設定の行が「確認が必要」になりうる。「Google カレンダーを一時的に利用できません。時間をおいてお試しください。」カレンダーは前回までの予定のまま。
+- データ: 一部だけ取り込まれることがある。
+- 再試行: その場ではしない。次の cron で。
+- 痕跡: Sentry に送る（feature: external_calendar、source: google_calendar_api）。接続の last_sync_error = provider_unavailable にも残る。
+- **最初に見る場所**: Sentry の external_calendar → Google Cloud の status。
+- 根拠:
+  - [`apps/product/src/features/external-calendar/server/providers/google.ts`](../../../apps/product/src/features/external-calendar/server/providers/google.ts) で `GOOGLE_API_TIMEOUT_MS` を探す
+  - [`apps/product/src/features/external-calendar/server/sync-service.ts`](../../../apps/product/src/features/external-calendar/server/sync-service.ts) で `source: 'google_calendar_api',` を探す
+
+</details>
+
+### 11. external_calendar_events に保存する（Supabase）
 
 取った予定は plans ではなく external_calendar_events に upsert する。消えた予定は tombstone で消す。Google の予定はこの段階ではまだ Plan ではない。
 
@@ -273,9 +301,9 @@ CRON_SECRET で呼び出し元を確かめ、write fence を見て、開始と�
   - [`apps/product/src/features/external-calendar/server/sync-service.ts`](../../../apps/product/src/features/external-calendar/server/sync-service.ts) で `external_calendar_events` を探す
   - [`apps/product/src/features/external-calendar/server/fenced-sync-writer.ts`](../../../apps/product/src/features/external-calendar/server/fenced-sync-writer.ts) で `p_tombstone_event_ids` を探す
 - **この段を守るテスト**:
-  - [`apps/product/src/features/external-calendar/server/sync-service.test.ts`](../../../apps/product/src/features/external-calendar/server/sync-service.test.ts) で `it('connection_id と user_id を全行に載せる（複合 FK）'` を探す
+  - [`apps/product/src/features/external-calendar/server/sync-service.test.ts`](../../../apps/product/src/features/external-calendar/server/sync-service.test.ts) で `it('connection_id と user_id を全行に載せる（複合 FK）'` を探す（保存先の列を守る。plans に入らないこと・tombstone は別のテスト）
 
-### 11. カレンダーに Google の予定が薄く出る（ブラウザ）
+### 12. カレンダーに Google の予定が薄く出る（ブラウザ）
 
 カレンダーは Plan・Record と一緒に Google の予定も取り、薄い見た目で重ねて出す（読み取り専用）。タップすると Plan（または Record）に変換され、ここから「Plan を保存」と同じ経路に入る。
 
@@ -296,7 +324,7 @@ CRON_SECRET で呼び出し元を確かめ、write fence を見て、開始と�
   "title": "Google Calendar 連携",
   "order": 90,
   "group": "integration",
-  "intro": "設定の「連携」で Google アカウントを接続し、Google の予定を Dayopt のカレンダーに取り込む。接続（OAuth）と取り込み（15 分ごとの cron）は別の経路で、接続した瞬間には取り込まない。",
+  "intro": "設定の「連携」で Google アカウントを接続し、Google の予定を Dayopt のカレンダーに取り込む。接続（OAuth）と取り込みは別の経路で、接続した直後は取り込むカレンダーが未選択なので何も取り込まない。取り込むカレンダーを選んで「適用」を押した時に最初の同期が走り、以後は 15 分ごとの cron が差分を取る。",
   "play": "▶ 接続を押す",
   "lanes": ["browser", "vercel", "google", "supabase"],
   "hops": [
@@ -311,7 +339,7 @@ CRON_SECRET で呼び出し元を確かめ、write fence を見て、開始と�
         "t": "settings",
         "url": "/ja/settings/integrations",
         "title": "連携 › Google カレンダー",
-        "rows": [["Google アカウント", "未接続", "neutral"]],
+        "rows": [["Google アカウント", "（未接続）", "neutral"]],
         "button": "Google アカウントを接続"
       },
       "refs": [
@@ -349,7 +377,7 @@ CRON_SECRET で呼び出し元を確かめ、write fence を見て、開始と�
             "t": "settings",
             "url": "/ja/settings/integrations",
             "title": "連携 › Google カレンダー",
-            "rows": [["Google アカウント", "未接続", "neutral"]],
+            "rows": [["Google アカウント", "（未接続）", "neutral"]],
             "banner": "この環境ではGoogle カレンダーに接続できません。",
             "bannerTone": "warn"
           }
@@ -362,7 +390,7 @@ CRON_SECRET で呼び出し元を確かめ、write fence を見て、開始と�
       "short": "/start で準備",
       "via": "GET /api/…/start",
       "title": "/start が関門を通して Google へ送る",
-      "what": "ログイン → MFA → 利用権 → rate limit の順に確かめ、state と PKCE を作って cookie に入れ、Google の同意画面へ 302 する。求める権限はカレンダー一覧と予定の読み取りだけ（書き込みはしない）。",
+      "what": "ログイン → MFA → 利用権 → rate limit の順に確かめ、state と PKCE を作って cookie に入れ、Google の同意画面へ 302 する。求める権限は openid・email と、カレンダー一覧と予定の読み取りだけ（書き込みはしない）。",
       "change": "MFA を利用権や rate limit より先に見るのは、MFA 不足で断る時に DB 読み取りや枠を消費しないため。",
       "screen": {
         "t": "blank",
@@ -440,7 +468,7 @@ CRON_SECRET で呼び出し元を確かめ、write fence を見て、開始と�
             "t": "form",
             "title": "多要素認証",
             "url": "/ja/auth/mfa-verify",
-            "fields": [["認証アプリの6桁のコード", "– – – – – –"]],
+            "fields": [["認証コード", "– – – – – –"]],
             "button": "認証",
             "alt": "リカバリーコードを使用"
           }
@@ -460,7 +488,7 @@ CRON_SECRET で呼び出し元を確かめ、write fence を見て、開始と�
         "host": "accounts.google.com",
         "url": "/o/oauth2/…",
         "title": "Dayopt が Google アカウントへのアクセスを求めています",
-        "scopes": ["カレンダーの一覧を見る", "予定を見る（読み取りのみ）"]
+        "scopes": ["メールアドレスを見る", "カレンダーの一覧を見る", "予定を見る（読み取りのみ）"]
       },
       "refs": [
         {
@@ -499,7 +527,7 @@ CRON_SECRET で呼び出し元を確かめ、write fence を見て、開始と�
             "t": "settings",
             "url": "/ja/settings/integrations",
             "title": "連携 › Google カレンダー",
-            "rows": [["Google アカウント", "未接続", "neutral"]],
+            "rows": [["Google アカウント", "（未接続）", "neutral"]],
             "toast": "Google カレンダーへのアクセスが許可されませんでした",
             "toastTone": "bad"
           }
@@ -537,7 +565,7 @@ CRON_SECRET で呼び出し元を確かめ、write fence を見て、開始と�
         {
           "id": "state-mismatch",
           "label": "state が合わない・cookie が切れた",
-          "screen": "設定に戻り、もう一度試すよう案内される。",
+          "screen": "設定に戻り「Google カレンダーに接続できませんでした」。state の不一致・cookie 切れは汎用の失敗文言にまとめられ、やり直しの案内は出ない。",
           "data": "変化なし。",
           "retry": "利用者がもう一度接続する。",
           "trace": "想定内。",
@@ -546,6 +574,10 @@ CRON_SECRET で呼び出し元を確かめ、write fence を見て、開始と�
             {
               "path": "apps/product/src/app/api/integrations/google-calendar/callback/route.ts",
               "find": "state_mismatch"
+            },
+            {
+              "path": "apps/product/src/features/external-calendar/lib/calendar-callback-result.ts",
+              "find": "?? 'generic'"
             }
           ],
           "tags": {
@@ -560,8 +592,8 @@ CRON_SECRET で呼び出し元を確かめ、write fence を見て、開始と�
             "t": "settings",
             "url": "/ja/settings/integrations",
             "title": "連携 › Google カレンダー",
-            "rows": [["Google アカウント", "未接続", "neutral"]],
-            "toast": "接続用のリンクの有効期限が切れました。もう一度お試しください。",
+            "rows": [["Google アカウント", "（未接続）", "neutral"]],
+            "toast": "Google カレンダーに接続できませんでした",
             "toastTone": "bad"
           }
         },
@@ -591,7 +623,7 @@ CRON_SECRET で呼び出し元を確かめ、write fence を見て、開始と�
             "t": "settings",
             "url": "/ja/settings/integrations",
             "title": "連携 › Google カレンダー",
-            "rows": [["Google アカウント", "未接続", "neutral"]],
+            "rows": [["Google アカウント", "（未接続）", "neutral"]],
             "toast": "Google カレンダーに接続できませんでした",
             "toastTone": "bad"
           }
@@ -620,7 +652,7 @@ CRON_SECRET で呼び出し元を確かめ、write fence を見て、開始と�
         {
           "id": "scope-not-granted",
           "label": "一部の権限だけ許可された",
-          "screen": "設定に戻り「必要な権限の一部が許可されませんでした」。",
+          "screen": "設定に戻り「必要な権限の一部が許可されませんでした。表示された権限をすべて許可して、もう一度お試しください。」",
           "data": "得た許可は Google 側で取り消す。",
           "retry": "利用者がすべて許可してやり直す。",
           "trace": "想定内。",
@@ -643,8 +675,8 @@ CRON_SECRET で呼び出し元を確かめ、write fence を見て、開始と�
             "t": "settings",
             "url": "/ja/settings/integrations",
             "title": "連携 › Google カレンダー",
-            "rows": [["Google アカウント", "未接続", "neutral"]],
-            "toast": "必要な権限の一部が許可されませんでした",
+            "rows": [["Google アカウント", "（未接続）", "neutral"]],
+            "toast": "必要な権限の一部が許可されませんでした。表示された権限をすべて許可して、もう一度お試しください。",
             "toastTone": "bad"
           }
         }
@@ -676,7 +708,7 @@ CRON_SECRET で呼び出し元を確かめ、write fence を見て、開始と�
       "short": "設定に戻る（接続済み）",
       "via": "302 → ?calendar=connected",
       "title": "設定画面に戻り、接続済みになる",
-      "what": "/settings/integrations?calendar=connected へ戻り、トーストを出してから URL の印を消す。この時点では予定はまだ取り込んでいない。",
+      "what": "/settings/integrations?calendar=connected へ戻り、トーストを出してから URL の印を消す。この時点では取り込むカレンダーがまだ選ばれていないので、予定は 1 件も取り込まれていない。",
       "change": "デスクトップでは設定はモーダルなので、戻ってきた後にカレンダーの上で開き直す。",
       "screen": {
         "t": "settings",
@@ -697,12 +729,43 @@ CRON_SECRET で呼び出し元を確かめ、write fence を見て、開始と�
       "fails": []
     },
     {
+      "id": "select-calendars",
+      "svc": "browser",
+      "short": "取り込むカレンダーを選ぶ",
+      "title": "取り込むカレンダーを選んで「適用」を押す",
+      "what": "接続した Google アカウントのカレンダー一覧から取り込むものを選び、「適用」を押す。updateSelectedCalendars が選択を保存し、その場で全件の同期を 1 回走らせる。ここで初めて予定が取り込まれる。",
+      "why": "何を取り込むかは利用者が決める（仕事用だけ、など）。接続しただけで全部を流し込まない。",
+      "change": "選択を変えるたびに即時の全件同期が走る。選択の保存と同期は同じ procedure の中なので、同期が遅いと「適用中...」が長くなる。",
+      "screen": {
+        "t": "settings",
+        "url": "/ja/settings/integrations",
+        "title": "連携 › Google カレンダー",
+        "rows": [
+          ["m@example.com", "接続済み", "ok"],
+          ["取り込むカレンダー", ""],
+          ["☑ メイン", ""]
+        ],
+        "button": "適用"
+      },
+      "refs": [
+        {
+          "path": "apps/product/src/features/external-calendar/server/router.ts",
+          "find": "取り込むカレンダーの選択を差し替え、即時同期する"
+        },
+        {
+          "path": "apps/product/src/features/external-calendar/server/sync-service.ts",
+          "find": "load_selected_calendars"
+        }
+      ],
+      "fails": []
+    },
+    {
       "id": "cron-sync",
       "svc": "vercel",
       "short": "15 分ごとの同期 cron",
-      "via": "最大 15 分後",
+      "via": "以後 15 分ごと",
       "title": "Vercel Cron が 15 分ごとに同期を回す",
-      "what": "CRON_SECRET で呼び出し元を確かめ、write fence を見て、開始と完了を heartbeat に記録する。同期が必要な接続を順に、50 秒の持ち時間の中で処理する。設定の「今すぐ同期」も同じ処理を呼ぶ。",
+      "what": "CRON_SECRET で呼び出し元を確かめ、write fence を見て、開始と完了を heartbeat に記録する。同期が必要な接続を順に、50 秒の持ち時間の中で処理する。取り込むカレンダーが選ばれていない接続では何も取らない。設定の「今すぐ同期」も同じ同期処理を呼ぶ。",
       "change": "取りこぼした回を埋め直さない。止まったことは heartbeat の完了時刻が古くなることで気づく（production の監査が見る）。",
       "screen": {
         "t": "settings",
@@ -813,16 +876,20 @@ CRON_SECRET で呼び出し元を確かめ、write fence を見て、開始と�
         },
         {
           "id": "google-429",
-          "label": "Google が 429 / 5xx / 時間切れ",
-          "screen": "設定の行が「確認が必要」になりうる。カレンダーは前回までの予定のまま。",
+          "label": "Google が 429（rate limit）",
+          "screen": "設定の行が「確認が必要」になりうる。「Google カレンダーの利用が一時的に制限されています。時間をおいてお試しください。」カレンダーは前回までの予定のまま。",
           "data": "一部だけ取り込まれることがある。",
-          "retry": "rate limit は 1 回だけ即座に再試行。それ以外は次の cron で。",
-          "trace": "last_sync_error（rate_limited / provider_unavailable）。",
-          "look": "Google Cloud の status と quota。",
+          "retry": "1〜2 秒待って 1 回だけ再試行する（残り時間が足りなければしない）。それでも駄目なら次の cron で。",
+          "trace": "想定内として Sentry には送らない（quota を焼く増幅経路になるため）。logger.warn と、接続の last_sync_error = rate_limited に残る。",
+          "look": "Google Cloud の quota。calendar_connections の last_sync_error。",
           "refs": [
             {
               "path": "apps/product/src/features/external-calendar/server/providers/google.ts",
               "find": "requestWithRateLimitRetry"
+            },
+            {
+              "path": "apps/product/src/features/external-calendar/server/sync-service.ts",
+              "find": "(error.kind === 'rate_limited' || error.kind === 'cursor_invalid')"
             }
           ],
           "tags": {
@@ -836,7 +903,40 @@ CRON_SECRET で呼び出し元を確かめ、write fence を見て、開始と�
             "url": "/ja/settings/integrations",
             "title": "連携 › Google カレンダー",
             "rows": [["m@example.com", "確認が必要", "warn"]],
-            "banner": "Google カレンダーを一時的に利用できません。",
+            "banner": "Google カレンダーの利用が一時的に制限されています。時間をおいてお試しください。",
+            "bannerTone": "warn"
+          }
+        },
+        {
+          "id": "google-5xx",
+          "label": "Google が 5xx・時間切れ（15 秒）",
+          "screen": "設定の行が「確認が必要」になりうる。「Google カレンダーを一時的に利用できません。時間をおいてお試しください。」カレンダーは前回までの予定のまま。",
+          "data": "一部だけ取り込まれることがある。",
+          "retry": "その場ではしない。次の cron で。",
+          "trace": "Sentry に送る（feature: external_calendar、source: google_calendar_api）。接続の last_sync_error = provider_unavailable にも残る。",
+          "look": "Sentry の external_calendar → Google Cloud の status。",
+          "refs": [
+            {
+              "path": "apps/product/src/features/external-calendar/server/providers/google.ts",
+              "find": "GOOGLE_API_TIMEOUT_MS"
+            },
+            {
+              "path": "apps/product/src/features/external-calendar/server/sync-service.ts",
+              "find": "source: 'google_calendar_api',"
+            }
+          ],
+          "tags": {
+            "screen": "none",
+            "data": "unknown",
+            "retry": "next",
+            "trace": "sentry"
+          },
+          "screenAfter": {
+            "t": "settings",
+            "url": "/ja/settings/integrations",
+            "title": "連携 › Google カレンダー",
+            "rows": [["m@example.com", "確認が必要", "warn"]],
+            "banner": "Google カレンダーを一時的に利用できません。時間をおいてお試しください。",
             "bannerTone": "warn"
           }
         }
@@ -864,7 +964,8 @@ CRON_SECRET で呼び出し元を確かめ、write fence を見て、開始と�
       "tests": [
         {
           "path": "apps/product/src/features/external-calendar/server/sync-service.test.ts",
-          "find": "it('connection_id と user_id を全行に載せる（複合 FK）'"
+          "find": "it('connection_id と user_id を全行に載せる（複合 FK）'",
+          "why": "保存先の列を守る。plans に入らないこと・tombstone は別のテスト"
         }
       ]
     },

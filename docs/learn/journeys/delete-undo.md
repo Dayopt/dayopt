@@ -42,7 +42,7 @@ flowchart TD
 
 ### 1. 削除の入口は 3 つ（ブラウザ）
 
-(1) Inspector のメニューの「削除」。(2) カレンダーの右クリックメニュー。(3) Inspector を開いた状態で、入力欄の外から Delete / Backspace キー。どれも確認ダイアログは出さない。移行された Record（auto_migrated）は、どの入口でも消さない。カレンダーの 2 つは一覧のキャッシュが持つ版をそのまま使う。
+(1) Inspector のメニューの「削除」。(2) カレンダーの右クリックメニュー。(3) Inspector を開いた状態で、フォーカスが Inspector とダイアログの外にある時の Delete / Backspace キー。どれも確認ダイアログは出さない。移行された Record（auto_migrated）は、どの入口でも消さない。カレンダーの 2 つは一覧のキャッシュが持つ版をそのまま使う。
 
 - **なぜ必要か**: 消すのは可逆なので速くする（ルール 4）。確認を挟まない代わりに、どの入口でも同じ取り消しトーストを出す。
 - **入力 → 出力**: 消したい行の id（と版） → deletePlan / deleteRecord の呼び出し
@@ -101,7 +101,7 @@ Inspector の削除は、メモの保存待ちを止めて最新の入力を保�
 - 画面: 消えた行が戻り「削除できませんでした。もう一度お試しください」。Inspector からなら操作を止めて「保存結果を確認できません」の案内も出る。
 - データ: どちらもありうる（DB で確定した後に返事だけ失われた場合、削除済み）。
 - 再試行: しない。一覧を取り直すので、削除が確定していれば再び消える。
-- 痕跡: ブラウザから Sentry へ（source: trpc_client_transport、分析の同意がある時だけ）。
+- 痕跡: ブラウザから Sentry へ（source: trpc_client_transport、本番（VERCEL_ENV=production）で、かつ分析の同意がある時だけ）。
 - **最初に見る場所**: Sentry と、同じ時刻の Vercel の /api/trpc ログ。
 - 根拠:
   - [`apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.ts`](../../../apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.ts) で `onSettled: invalidate,` を探す
@@ -135,7 +135,7 @@ service role の client で delete_plan_command_v1 / delete_record_command_v1 �
   - [`apps/product/src/lib/test/integration/timeblock-atomic-commands.integration.test.ts`](../../../apps/product/src/lib/test/integration/timeblock-atomic-commands.integration.test.ts) で `it('keeps auto-migrated Records immutable for service-role commands'` を探す
 
 <details>
-<summary>⚡ 別の場所で先に変わっていた・消されていた（DT002 / DT001） — 画面: エラー表示 / データ: 変化なし / 再試行: 利用者がやり直す / 痕跡: 残らない</summary>
+<summary>⚡ 別の場所で先に変わっていた・消されていた（DT002 / DT001） — 画面: エラー表示 / データ: 変化なし / 再試行: しない / 痕跡: 残らない</summary>
 
 - 画面: 消えた行が戻り「削除できませんでした。もう一度お試しください」。競合専用の文言にはならない。
 - データ: 変化なし（別の場所の値が残る。消されていたなら一覧の取り直しで消える）。
@@ -250,7 +250,7 @@ restore は先に描かない（snapshot を取るだけ）。返ってきた行
       "id": "entrances",
       "svc": "browser",
       "title": "削除の入口は 3 つ",
-      "what": "(1) Inspector のメニューの「削除」。(2) カレンダーの右クリックメニュー。(3) Inspector を開いた状態で、入力欄の外から Delete / Backspace キー。どれも確認ダイアログは出さない。移行された Record（auto_migrated）は、どの入口でも消さない。カレンダーの 2 つは一覧のキャッシュが持つ版をそのまま使う。",
+      "what": "(1) Inspector のメニューの「削除」。(2) カレンダーの右クリックメニュー。(3) Inspector を開いた状態で、フォーカスが Inspector とダイアログの外にある時の Delete / Backspace キー。どれも確認ダイアログは出さない。移行された Record（auto_migrated）は、どの入口でも消さない。カレンダーの 2 つは一覧のキャッシュが持つ版をそのまま使う。",
       "why": "消すのは可逆なので速くする（ルール 4）。確認を挟まない代わりに、どの入口でも同じ取り消しトーストを出す。",
       "io": {
         "in": "消したい行の id（と版）",
@@ -400,7 +400,7 @@ restore は先に描かない（snapshot を取るだけ）。返ってきた行
           "screen": "消えた行が戻り「削除できませんでした。もう一度お試しください」。Inspector からなら操作を止めて「保存結果を確認できません」の案内も出る。",
           "data": "どちらもありうる（DB で確定した後に返事だけ失われた場合、削除済み）。",
           "retry": "しない。一覧を取り直すので、削除が確定していれば再び消える。",
-          "trace": "ブラウザから Sentry へ（source: trpc_client_transport、分析の同意がある時だけ）。",
+          "trace": "ブラウザから Sentry へ（source: trpc_client_transport、本番（VERCEL_ENV=production）で、かつ分析の同意がある時だけ）。",
           "look": "Sentry と、同じ時刻の Vercel の /api/trpc ログ。",
           "refs": [
             {
@@ -521,7 +521,7 @@ restore は先に描かない（snapshot を取るだけ）。返ってきた行
           "tags": {
             "screen": "toast",
             "data": "unchanged",
-            "retry": "user",
+            "retry": "none",
             "trace": "none"
           },
           "to": "optimistic",

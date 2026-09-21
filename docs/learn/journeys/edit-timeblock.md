@@ -141,7 +141,7 @@ Inspector には保存ボタンが無く、時刻・アクティビティ・充�
 - 画面: カレンダーのドラッグなら元の位置へ戻り「保存に失敗」のトースト。Inspector なら同じトーストに加え、入力を残したまま操作を止めて「保存結果を確認できません。…開き直してください」を出す。
 - データ: どちらもありうる（DB で確定した後に返事だけ失われた場合）。
 - 再試行: しない。Inspector は待っている変更も自動では送らず止める。一覧は成功・失敗どちらでも取り直す。
-- 痕跡: サーバーの形をしていない通信エラーとしてブラウザから Sentry へ（分析の同意がある時だけ）。
+- 痕跡: サーバーの形をしていない通信エラーとしてブラウザから Sentry へ（本番（VERCEL_ENV=production）で、かつ分析の同意がある時だけ）。
 - **最初に見る場所**: Sentry の source:trpc_client_transport と、同じ時刻の Vercel の /api/trpc ログ。
 - 根拠:
   - [`apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.ts`](../../../apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.ts) で `export function isTimeblockUncertainError` を探す
@@ -177,15 +177,16 @@ service role の client で update_plan_command_v1 / update_record_command_v1 �
   - [`apps/product/src/features/timeblock/server/timeblock-command-client.test.ts`](../../../apps/product/src/features/timeblock/server/timeblock-command-client.test.ts) で `it('deadlock再発、lock待ち、timeoutはclient再送向けにせず分類する'` を探す
 
 <details>
-<summary>⚡ lock 待ち・timeout・deadlock の再発 — 画面: エラー表示 / データ: 変化なし / 再試行: しない / 痕跡: 残らない</summary>
+<summary>⚡ lock 待ち・timeout・deadlock の再発 — 画面: エラー表示 / データ: 変化なし / 再試行: しない / 痕跡: Sentry</summary>
 
 - 画面: ドラッグなら元の位置へ戻り「保存に失敗」のトースト。Inspector なら操作を止めて「保存結果を確認できません」の案内。
 - データ: 変化なし（RPC のトランザクションごと取り消される）。
 - 再試行: しない。利用者が画面を開き直してから直す。
-- 痕跡: 想定内のコード（RETRYABLE_CONTENTION / TEMPORARY_FAILURE）なので Sentry には出ない。
+- 痕跡: lock 待ち・deadlock の再発（RETRYABLE_CONTENTION → CONFLICT）は Sentry に出ない。statement の時間切れ（TEMPORARY_FAILURE → TIMEOUT）はサーバーから Sentry へ送られる（source: trpc_service）。
 - **最初に見る場所**: 頻発するなら Supabase の Postgres ログで lock を見る（command は利用者単位の lock を取ってから書く）。
 - 根拠:
   - [`apps/product/src/features/timeblock/server/timeblock-command-client.ts`](../../../apps/product/src/features/timeblock/server/timeblock-command-client.ts) で `throwExpectedCommandError('RETRYABLE_CONTENTION');` を探す
+  - [`apps/product/src/lib/trpc/error-code-map.ts`](../../../apps/product/src/lib/trpc/error-code-map.ts) で `TEMPORARY_FAILURE: 'TIMEOUT'` を探す
 
 </details>
 
@@ -219,7 +220,7 @@ service role の client で update_plan_command_v1 / update_record_command_v1 �
 </details>
 
 <details>
-<summary>⚡ 既存と重なる（23P01） — 画面: エラー表示 / データ: 変化なし / 再試行: 利用者がやり直す / 痕跡: 残らない</summary>
+<summary>⚡ 既存と重なる（23P01） — 画面: エラー表示 / データ: 変化なし / 再試行: しない / 痕跡: 残らない</summary>
 
 - 画面: ドラッグなら元の位置へ戻り重なりのトースト。Inspector なら日時の欄の下に案内（今の入力と同じ時刻の拒否だった時だけ）。
 - データ: 変化なし。
@@ -260,15 +261,16 @@ service role の client で update_plan_command_v1 / update_record_command_v1 �
   - [`apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.inline-error.test.tsx`](../../../apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.inline-error.test.tsx) で `it('update commandの返却行とraw versionを一覧・詳細cacheの正本にする'` を探す
 
 <details>
-<summary>⚡ 取り消す前に同じ行をもう一度動かした — 画面: エラー表示 / データ: 変化なし / 再試行: しない / 痕跡: 残らない</summary>
+<summary>⚡ 取り消しトーストが出ている間に、別の場所で同じ行が変わった — 画面: エラー表示 / データ: 変化なし / 再試行: しない / 痕跡: 残らない</summary>
 
-- 画面: 取り消しを押すと「別の場所で変更されたため、最新の内容を読み込みました」。
+- 画面: 取り消しを押すと「別の場所で変更されたため、最新の内容を読み込みました」。Inspector・別タブ・MCP で同じ行を変えた時に起きる。ドラッグし直した場合は、トーストが 1 つしか出ないので新しい「元に戻す」付きのトーストに置き換わり、この経路にはならない。
 - データ: 変化なし。後から動かした位置が残る。
 - 再試行: しない。
 - 痕跡: 何も残らない。
 - **最初に見る場所**: 仕様どおり。取り消しは直前の 1 回ぶんの版しか持たない。
 - 根拠:
   - [`apps/product/src/features/calendar/hooks/operations/useTimeblockOperations.ts`](../../../apps/product/src/features/calendar/hooks/operations/useTimeblockOperations.ts) で `const showTimeChangeUndoToast = useCallback(` を探す
+  - [`apps/product/src/components/ui/feedback/toast.tsx`](../../../apps/product/src/components/ui/feedback/toast.tsx) で `visibleToasts={1}` を探す
 
 </details>
 
@@ -554,7 +556,7 @@ service role の client で update_plan_command_v1 / update_record_command_v1 �
           "screen": "カレンダーのドラッグなら元の位置へ戻り「保存に失敗」のトースト。Inspector なら同じトーストに加え、入力を残したまま操作を止めて「保存結果を確認できません。…開き直してください」を出す。",
           "data": "どちらもありうる（DB で確定した後に返事だけ失われた場合）。",
           "retry": "しない。Inspector は待っている変更も自動では送らず止める。一覧は成功・失敗どちらでも取り直す。",
-          "trace": "サーバーの形をしていない通信エラーとしてブラウザから Sentry へ（分析の同意がある時だけ）。",
+          "trace": "サーバーの形をしていない通信エラーとしてブラウザから Sentry へ（本番（VERCEL_ENV=production）で、かつ分析の同意がある時だけ）。",
           "look": "Sentry の source:trpc_client_transport と、同じ時刻の Vercel の /api/trpc ログ。",
           "refs": [
             {
@@ -672,19 +674,23 @@ service role の client で update_plan_command_v1 / update_record_command_v1 �
           "screen": "ドラッグなら元の位置へ戻り「保存に失敗」のトースト。Inspector なら操作を止めて「保存結果を確認できません」の案内。",
           "data": "変化なし（RPC のトランザクションごと取り消される）。",
           "retry": "しない。利用者が画面を開き直してから直す。",
-          "trace": "想定内のコード（RETRYABLE_CONTENTION / TEMPORARY_FAILURE）なので Sentry には出ない。",
+          "trace": "lock 待ち・deadlock の再発（RETRYABLE_CONTENTION → CONFLICT）は Sentry に出ない。statement の時間切れ（TEMPORARY_FAILURE → TIMEOUT）はサーバーから Sentry へ送られる（source: trpc_service）。",
           "look": "頻発するなら Supabase の Postgres ログで lock を見る（command は利用者単位の lock を取ってから書く）。",
           "refs": [
             {
               "path": "apps/product/src/features/timeblock/server/timeblock-command-client.ts",
               "find": "throwExpectedCommandError('RETRYABLE_CONTENTION');"
+            },
+            {
+              "path": "apps/product/src/lib/trpc/error-code-map.ts",
+              "find": "TEMPORARY_FAILURE: 'TIMEOUT'"
             }
           ],
           "tags": {
             "screen": "toast",
             "data": "unchanged",
             "retry": "none",
-            "trace": "none"
+            "trace": "sentry"
           },
           "to": "optimistic",
           "back": "巻き戻し + トースト",
@@ -806,7 +812,7 @@ service role の client で update_plan_command_v1 / update_record_command_v1 �
           "tags": {
             "screen": "toast",
             "data": "unchanged",
-            "retry": "user",
+            "retry": "none",
             "trace": "none"
           },
           "to": "optimistic",
@@ -896,8 +902,8 @@ service role の client で update_plan_command_v1 / update_record_command_v1 �
       "fails": [
         {
           "id": "undo-stale",
-          "label": "取り消す前に同じ行をもう一度動かした",
-          "screen": "取り消しを押すと「別の場所で変更されたため、最新の内容を読み込みました」。",
+          "label": "取り消しトーストが出ている間に、別の場所で同じ行が変わった",
+          "screen": "取り消しを押すと「別の場所で変更されたため、最新の内容を読み込みました」。Inspector・別タブ・MCP で同じ行を変えた時に起きる。ドラッグし直した場合は、トーストが 1 つしか出ないので新しい「元に戻す」付きのトーストに置き換わり、この経路にはならない。",
           "data": "変化なし。後から動かした位置が残る。",
           "retry": "しない。",
           "trace": "何も残らない。",
@@ -906,6 +912,10 @@ service role の client で update_plan_command_v1 / update_record_command_v1 �
             {
               "path": "apps/product/src/features/calendar/hooks/operations/useTimeblockOperations.ts",
               "find": "const showTimeChangeUndoToast = useCallback("
+            },
+            {
+              "path": "apps/product/src/components/ui/feedback/toast.tsx",
+              "find": "visibleToasts={1}"
             }
           ],
           "tags": {

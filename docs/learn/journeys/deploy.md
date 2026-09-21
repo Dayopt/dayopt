@@ -51,7 +51,7 @@ main の repository ruleset が required checks（Static / Unit / Integration / 
 
 ### 2. migration が本番 DB に入る（Supabase）
 
-Supabase の GitHub 連携が、merge の時点で production へ migration を適用する。この repo の workflow は適用しない（確認するだけ）。
+Supabase の GitHub 連携が、merge の時点で production へ migration を適用する。この repo の workflow は適用しない。release job に反映の確認はあるが、今は warning を出すだけ（advisory）。
 
 - **ここを変えると**: ここから promote が終わるまで、新しい schema の上で旧コードが動く時間がある（E2E が完走するまで）。migration は旧コードでも壊れない形で書く。
 - **コード**:
@@ -59,13 +59,13 @@ Supabase の GitHub 連携が、merge の時点で production へ migration を�
   - [`.agents/skills/supabase/SKILL.md`](../../../.agents/skills/supabase/SKILL.md) で `migration` を探す
 
 <details>
-<summary>⚡ migration の適用が失敗 — 画面: 旧版のまま / データ: 変化なし / 再試行: しない / 痕跡: GitHub issue</summary>
+<summary>⚡ migration の適用が失敗 — 画面: 設定次第 / データ: 変化なし / 再試行: しない / 痕跡: ログだけ</summary>
 
-- 画面: 利用者は旧版を使い続ける。
-- データ: 本番 DB は適用前のまま（失敗した migration による）。
+- 画面: 利用者は新しい版を使う（promote は止まらない）。新しいコードが、まだ入っていない schema を読むと失敗しうる。
+- データ: 本番 DB は適用前のまま。コードだけが新しくなりうる。
 - 再試行: 自動ではしない。
-- 痕跡: release job の「Verify candidate migrations are applied in Production」が未適用を検出し、promote しない。
-- **最初に見る場所**: Supabase のダッシュボードの branch / migration 履歴 → runbook の Playbook 1。
+- 痕跡: 自動では止まらない。release job の「Verify candidate migrations are applied in Production」は現在 advisory（promote.yml が確認用の token を渡していない）で、未確認の warning を出して promote を続ける。
+- **最初に見る場所**: Supabase のダッシュボードの migration 履歴を直接見る → runbook の Playbook 1。Production Release の run に warning が出ていないかも見る。
 - 根拠:
   - [`.github/workflows/promote.yml`](../../../.github/workflows/promote.yml) で `Verify candidate migrations are applied in Production` を探す
   - [`scripts/ci/production-migration-readiness.mjs`](../../../scripts/ci/production-migration-readiness.mjs) で `schema_migrations` を探す
@@ -126,9 +126,9 @@ Production Release workflow が起動し、product / web / storybook それぞ�
 
 ### 6. smoke してから本番へ切り替える（GitHub Actions）
 
-release job が、migration が本番に入っていることを確かめ、候補を smoke してから Production domain へ promote する。
+release job が migration の反映を確かめ（今は advisory で warning だけ）、候補を smoke してから Production domain へ promote する。
 
-- **ここを変えると**: 緊急時の Force Promote は理由の入力が必須。層 3 を飛ばすので、使ったら記録を残す。
+- **ここを変えると**: 緊急時の Force Promote は理由の入力が必須。層 3・smoke・Production Config Audit・migration の確認をすべて飛ばすので、使ったら記録を残す。
 - **コード**:
   - [`.github/workflows/promote.yml`](../../../.github/workflows/promote.yml) で `Wait, smoke, and promote Production` を探す
   - [`scripts/ci/production-release.mjs`](../../../scripts/ci/production-release.mjs) で `promote` を探す
@@ -206,7 +206,7 @@ release job が、migration が本番に入っていることを確かめ、候�
       "id": "migration",
       "svc": "supabase",
       "title": "migration が本番 DB に入る",
-      "what": "Supabase の GitHub 連携が、merge の時点で production へ migration を適用する。この repo の workflow は適用しない（確認するだけ）。",
+      "what": "Supabase の GitHub 連携が、merge の時点で production へ migration を適用する。この repo の workflow は適用しない。release job に反映の確認はあるが、今は warning を出すだけ（advisory）。",
       "change": "ここから promote が終わるまで、新しい schema の上で旧コードが動く時間がある（E2E が完走するまで）。migration は旧コードでも壊れない形で書く。",
       "refs": [
         {
@@ -222,11 +222,11 @@ release job が、migration が本番に入っていることを確かめ、候�
         {
           "id": "migration-fail",
           "label": "migration の適用が失敗",
-          "screen": "利用者は旧版を使い続ける。",
-          "data": "本番 DB は適用前のまま（失敗した migration による）。",
+          "screen": "利用者は新しい版を使う（promote は止まらない）。新しいコードが、まだ入っていない schema を読むと失敗しうる。",
+          "data": "本番 DB は適用前のまま。コードだけが新しくなりうる。",
           "retry": "自動ではしない。",
-          "trace": "release job の「Verify candidate migrations are applied in Production」が未適用を検出し、promote しない。",
-          "look": "Supabase のダッシュボードの branch / migration 履歴 → runbook の Playbook 1。",
+          "trace": "自動では止まらない。release job の「Verify candidate migrations are applied in Production」は現在 advisory（promote.yml が確認用の token を渡していない）で、未確認の warning を出して promote を続ける。",
+          "look": "Supabase のダッシュボードの migration 履歴を直接見る → runbook の Playbook 1。Production Release の run に warning が出ていないかも見る。",
           "refs": [
             {
               "path": ".github/workflows/promote.yml",
@@ -238,13 +238,11 @@ release job が、migration が本番に入っていることを確かめ、候�
             }
           ],
           "tags": {
-            "screen": "old",
+            "screen": "depends",
             "data": "unchanged",
             "retry": "none",
-            "trace": "issue"
+            "trace": "log"
           },
-          "to": "tab-update",
-          "back": "旧版のまま配信",
           "screenAfter": {
             "t": "calendar",
             "url": "/ja/calendar",
@@ -254,8 +252,8 @@ release job が、migration が本番に入っていることを確かめ、候�
                 "label": "仕事"
               }
             ],
-            "title": "カレンダー（旧版）",
-            "note": "利用者は旧版を使い続ける。通知は出ない"
+            "title": "カレンダー（新版）",
+            "note": "migration が入っていないまま新版が公開されうる"
           }
         }
       ],
@@ -393,8 +391,8 @@ release job が、migration が本番に入っていることを確かめ、候�
       "id": "promote",
       "svc": "github",
       "title": "smoke してから本番へ切り替える",
-      "what": "release job が、migration が本番に入っていることを確かめ、候補を smoke してから Production domain へ promote する。",
-      "change": "緊急時の Force Promote は理由の入力が必須。層 3 を飛ばすので、使ったら記録を残す。",
+      "what": "release job が migration の反映を確かめ（今は advisory で warning だけ）、候補を smoke してから Production domain へ promote する。",
+      "change": "緊急時の Force Promote は理由の入力が必須。層 3・smoke・Production Config Audit・migration の確認をすべて飛ばすので、使ったら記録を残す。",
       "refs": [
         {
           "path": ".github/workflows/promote.yml",

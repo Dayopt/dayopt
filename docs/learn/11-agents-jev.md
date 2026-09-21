@@ -32,7 +32,7 @@ flowchart LR
 - `scripts/hooks/pre-tool-guard.sh` — AI のツール実行の前に危険なコマンドを止める
 - `.husky/pre-push` — push の前の確認（DO-CONFIRM）
 - main の repository ruleset — required checks と review thread の解決が揃わないと merge できない。bypass できる人はいない
-- `scripts/ci/protected-path-gate.mjs` — 外部契約・不可逆の path に触った変更を、レビューで重点的に読む範囲として示す（merge を止めるものではない）
+- `scripts/ci/protected-path-gate.mjs` — 外部契約・不可逆の path に触った変更を、レビューで重点的に読む範囲として示す。ruleset の merge は止めない。ただし監査の契約（`auditContract`）に触れた PR では、`pnpm branch:finish` が Production Config Audit の結果を待つ
 - `pnpm docs:check` — この教材の参照切れもここで止まる
 
 **Jev** は Vercel AI Gateway 経由の小さな評価モデル。**最終意思決定者ではない**。権限・必須レビュー・test の結果・path の policy は決定的なコードが持ち、Jev は非構造の文章から意味の特徴を足すだけ。予算と停止条件（残高が下限を下回ると送らない、`JEV_DISABLED=1` で止まる）が先に決めてある。
@@ -68,3 +68,28 @@ flowchart LR
 不可逆な操作なので EXPLICIT AUTHORITY の段。明示の指示・独立レビュー・dry-run か backup が揃うまで実行しない。揃わなければ実行せずに報告させる。
 
 </details>
+
+## 参照（検査用）
+
+このページの本文が名指ししているコード。`pnpm docs:check` が、ファイルが在り `find` の文字列を含むことを検査する。本文を書き換えたらここも直す。
+
+```json learn:refs
+[
+  {
+    "path": "docs/operations/jev.md",
+    "find": "**Jev は最終意思決定者ではない。**"
+  },
+  {
+    "path": "scripts/ci/protected-path-gate.mjs",
+    "find": "still a merge"
+  },
+  {
+    "path": ".husky/pre-push",
+    "find": "pause point"
+  },
+  {
+    "path": "scripts/hooks/pre-tool-guard.sh",
+    "find": "pre-tool-guard.mjs"
+  }
+]
+```

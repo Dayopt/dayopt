@@ -14,7 +14,7 @@ last_verified: 2026-09-21
 
 - Plan か Record かの既定は終了時刻で決まる（UI の写し）
 - アクティビティを選んだ瞬間に作る。先に画面へ出し（楽観的更新）、失敗したら戻す
-- tRPC で `/api/trpc` へ。関門は 認証 → MFA → 利用権 → write fence → rate limit
+- tRPC で `/api/trpc` へ。関門は IP 単位 rate limit → 認証 → MFA → 利用権 → write fence → 利用者単位 rate limit
 - Router → Service → service role の command adapter → `create_plan_command_v1`（user_id は引数、1 トランザクション）
 - DB trigger が時刻の規則を強制する（`DT003`、Record なら `DT005`）
 - 返事で一時の行を差し替え、成功・失敗どちらでも関連を取り直す。Realtime は無い
@@ -29,7 +29,7 @@ last_verified: 2026-09-21
 <summary>答えに含まれているべきこと</summary>
 
 - 画面の Plan は消え、「保存できませんでした…」のトースト。書き込みは自動で再試行しない
-- 返事だけが失われた場合、DB には入っていて、取り直しで Plan が現れる（二重作成が起きうる筋）
+- 返事だけが失われた場合、DB には入っていて、取り直しで Plan が現れる。押し直すと、同じ時間帯なら排他制約で弾かれるが、サイドバーからの作成は次の空き時間に 2 つ目を作る
 - deadlock だけは server の中で 1 回だけ再試行する
 - 想定外の DB エラーは Sentry に残る。Supabase 全体の停止なら `/api/health` が 503 になり UptimeRobot が通知する
 - 表示はキャッシュが残る
@@ -58,10 +58,10 @@ last_verified: 2026-09-21
 <details>
 <summary>答えに含まれているべきこと</summary>
 
-- PR ごとに Supabase Preview Branch と Vercel Preview
+- PR ごとに Vercel Preview。migration を含む PR は Supabase Preview Branch も
 - main の ruleset（required checks・review thread の解決）を通って merge
 - merge の時点で migration が本番 DB に入る。Vercel は本番候補を作る（domain は未割当）
-- Production Release が影響を判定し、E2E などを回し、緑なら smoke して promote。赤なら公開せず issue が立つ
+- Production Release が影響を判定し、E2E などを回し、緑なら smoke して promote。赤なら公開せず issue が立つ。migration の反映確認は今は warning だけで、promote を止めない
 - 開いているタブは、編集中でない瞬間に黙って新しい版になる
 
 読み直す: [merge → 本番公開](journeys/deploy.md)、[9. デプロイ](09-deployment.md)
@@ -90,7 +90,7 @@ last_verified: 2026-09-21
 - 認証は OAuth の bearer token（hash で照合、事前登録のクライアントだけ、PKCE）
 - 読み取りは `/api/mcp` の中から tRPC を呼ぶ。OAuth token で `/api/trpc` を直接叩いても通らない
 - 書き込みは tRPC を通らず `apply_mcp_*` の DB 関数へ。user_id は接続から DB が決め、最後は UI と同じ `create_plan_command_v1`
-- write fence は効かず、MCP 専用の gate で止める。rate limit も MCP 専用で、Upstash が落ちると止まる（UI は通す）
+- tool の書き込みには write fence が効かず（新規接続の token 発行だけ止める）、MCP 専用の gate で止める。rate limit も MCP 専用で、Upstash が落ちると止まる（UI は通す）
 - `operationId` で送り直しても 2 つ目を作らない。UI には冪等の鍵が無い
 - 読み取りの分離は RLS ではなく service の絞り込み
 - ツール名・scope は外部契約

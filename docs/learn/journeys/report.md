@@ -36,7 +36,7 @@ flowchart TD
   n8 --> n9
 ```
 
-通るサービス: ブラウザ / Vercel（Next.js） / Supabase。段 9・失敗 8 種。
+通るサービス: ブラウザ / Vercel（Next.js） / Supabase。段 9・失敗 7 種。
 
 #### この経路を守るテスト
 
@@ -45,7 +45,7 @@ flowchart TD
 
 ### 1. 表示する期間と条件を決める（ブラウザ）
 
-/report はサーバーで先読みしない。表示中の日付（URL の date）はカレンダーと共通のナビゲーションから、粒度（range）とタブ（tab）は URL から取る。timezone と週の開始曜日はユーザー設定から読み、URL には載せない。
+/report はサーバーで先読みしない。表示中の日付（URL の date）はカレンダーと共通のナビゲーションから、粒度（range）とタブ（tab）は URL から取る。timezone と週の開始曜日はユーザー設定から読み、URL には載せない。 設定が確定するまで、アプリは画面全体を描かない（UserSettingsInitializer）。設定の行がまだ無い新規の利用者だけ、ブラウザの timezone・月曜始まりで数える。
 
 - **なぜ必要か**: 週の境界は timezone と週の開始曜日で決まる。サーバー（UTC）で組むと、UTC 以外の利用者の週がずれるため、ブラウザで条件を揃えてから問い合わせる。
 - **入力 → 出力**: URL（date / range / tab）+ ユーザー設定（timezone / 週の開始曜日） → anchorDate・granularity・timezone・weekStartsOn の 4 つ
@@ -54,22 +54,9 @@ flowchart TD
   - [`apps/product/src/app/[locale]/(app)/(workspace)/report/page.tsx`](<../../../apps/product/src/app/[locale]/(app)/(workspace)/report/page.tsx>) で `server prefetch はしない` を探す
   - [`apps/product/src/app/[locale]/(app)/(workspace)/_composition/ReportViewClient.tsx`](<../../../apps/product/src/app/[locale]/(app)/(workspace)/_composition/ReportViewClient.tsx>) で ``**表示中の日付の正本は `useCalendarNavigation().currentDate`**`` を探す
   - [`apps/product/src/features/review/hooks/useReportPeriod.ts`](../../../apps/product/src/features/review/hooks/useReportPeriod.ts) で `const timezone = useUserPreferences((s) => s.timezone);` を探す
+  - [`apps/product/src/features/settings/components/UserSettingsInitializer.tsx`](../../../apps/product/src/features/settings/components/UserSettingsInitializer.tsx) で `children を render しない` を探す
 - **この段を守るテスト**:
   - [`apps/product/src/features/review/lib/report-tab.test.ts`](../../../apps/product/src/features/review/lib/report-tab.test.ts) で `it('省略と不正値は時間の使い方へ丸める'` を探す
-
-<details>
-<summary>⚡ ユーザー設定がまだ読めていない — 画面: 何も起きない / データ: 変化なし / 再試行: 自動で再試行 / 痕跡: 残らない</summary>
-
-- 画面: 一瞬、ブラウザの timezone・月曜始まりで数えた数字が出て、設定が届くと差し替わることがある。
-- データ: 変化なし（読むだけ）。
-- 再試行: 設定が届くと問い合わせの引数（timezone / weekStartsOn）が変わるので、別の問い合わせとして取り直す。
-- 痕跡: 残らない。
-- **最初に見る場所**: 設定の timezone とブラウザの timezone が違う利用者でだけ起きる。useUserPreferences の既定値（設定が無い時）を見る。
-- 根拠:
-  - [`apps/product/src/lib/hooks/useUserPreferences.ts`](../../../apps/product/src/lib/hooks/useUserPreferences.ts) で `timezone: getBrowserTimezone(),` を探す
-  - [`apps/product/src/lib/hooks/useUserPreferences.ts`](../../../apps/product/src/lib/hooks/useUserPreferences.ts) で `weekStartsOn: 1,` を探す
-
-</details>
 
 ### 2. 期間集計を 1 本だけ問い合わせる（ブラウザ）
 
@@ -110,8 +97,6 @@ context がセッションの cookie から利用者を決め、その利用者�
   - [`apps/product/src/lib/trpc/context.ts`](../../../apps/product/src/lib/trpc/context.ts) で `const { createServerClient } = await import` を探す
   - [`apps/product/src/lib/trpc/procedures.ts`](../../../apps/product/src/lib/trpc/procedures.ts) で `if (requiresProductAccess(path, type, ctx.authMode === 'oauth')) {` を探す
   - [`apps/product/src/lib/billing/operation-access.ts`](../../../apps/product/src/lib/billing/operation-access.ts) で `if (type !== 'mutation') return false;` を探す
-- **この段を守るテスト**:
-  - [`apps/product/src/lib/trpc/query-client.test.ts`](../../../apps/product/src/lib/trpc/query-client.test.ts) で `it('does not retry a query rejected with TOO_MANY_REQUESTS'` を探す
 
 <details>
 <summary>⚡ セッションが切れている（401） — 画面: 別の画面へ / データ: 変化なし / 再試行: しない / 痕跡: 残らない</summary>
@@ -173,7 +158,7 @@ zod で anchorDate（YYYY-MM-DD）・粒度（week / month / year。day は無�
 
 ### 6. Plan / Record / アクティビティ / カテゴリを並行で取る（Supabase）
 
-今期間の Record と Plan、前期間の Record、アクティビティ全件、カテゴリ全件の 5 本を並行で取る。期間は開始ではなく重なりで選ぶ（start_at < 終了 かつ end_at > 開始）。削除済み（deleted_at あり）は除き、アーカイブ済みのアクティビティは除かない。行は 500 件ずつ全部読み切る。
+今期間の Record と Plan、前期間の Record、アクティビティ全件、カテゴリ全件の 5 本を並行で取る。期間は開始ではなく重なりで選ぶ（start_at < 終了 かつ end_at > 開始）。削除済み（deleted_at あり）は除き、アーカイブ済みのアクティビティは除かない。Plan と Record は 500 件ずつ全部読み切る。アクティビティとカテゴリは 1 回の select。
 
 - **なぜ必要か**: 開始だけで選ぶと、日曜 23 時〜月曜 7 時のような期間を跨ぐ Record が片側の期間に丸ごと入り、跨いだ先から消える。アーカイブは未来にだけ効く操作なので、過去の Record は数え続ける。
 - **入力 → 出力**: userId と期間 → Plan / Record の行（id・activity_id・start_at・end_at 等）とアクティビティ・カテゴリの行
@@ -252,7 +237,7 @@ SQL ではなく TypeScript で集計する。アクティビティごとに、�
 - 画面: ページ単位のエラー境界に切り替わる。/report もカレンダーと共通の CalendarError を使うので、文言は「カレンダーを読み込めませんでした」になる。
 - データ: 変化なし。
 - 再試行: 利用者が開き直す。
-- 痕跡: ブラウザから Sentry へ送る（feature: calendar、source: calendar_error_boundary）。report ではなく calendar として記録される点に注意。ブラウザの Sentry は分析の同意がある時だけ動く。
+- 痕跡: ブラウザから Sentry へ送る（feature: calendar、source: calendar_error_boundary）。report ではなく calendar として記録される点に注意。ブラウザの Sentry は本番（VERCEL_ENV=production）で、かつ分析の同意がある時だけ動く。
 - **最初に見る場所**: Sentry で source:calendar_error_boundary を探し、route が /report かを見る。直前にデプロイした集計の形の変更と normalizeReportPeriodPayload。
 - 根拠:
   - [`apps/product/src/app/[locale]/(app)/(workspace)/report/error.tsx`](<../../../apps/product/src/app/[locale]/(app)/(workspace)/report/error.tsx>) で `export { CalendarError as default } from '../_server/CalendarError';` を探す
@@ -323,7 +308,7 @@ SQL ではなく TypeScript で集計する。アクティビティごとに、�
       "svc": "browser",
       "short": "期間を決める",
       "title": "表示する期間と条件を決める",
-      "what": "/report はサーバーで先読みしない。表示中の日付（URL の date）はカレンダーと共通のナビゲーションから、粒度（range）とタブ（tab）は URL から取る。timezone と週の開始曜日はユーザー設定から読み、URL には載せない。",
+      "what": "/report はサーバーで先読みしない。表示中の日付（URL の date）はカレンダーと共通のナビゲーションから、粒度（range）とタブ（tab）は URL から取る。timezone と週の開始曜日はユーザー設定から読み、URL には載せない。 設定が確定するまで、アプリは画面全体を描かない（UserSettingsInitializer）。設定の行がまだ無い新規の利用者だけ、ブラウザの timezone・月曜始まりで数える。",
       "why": "週の境界は timezone と週の開始曜日で決まる。サーバー（UTC）で組むと、UTC 以外の利用者の週がずれるため、ブラウザで条件を揃えてから問い合わせる。",
       "io": {
         "in": "URL（date / range / tab）+ ユーザー設定（timezone / 週の開始曜日）",
@@ -342,6 +327,10 @@ SQL ではなく TypeScript で集計する。アクティビティごとに、�
         {
           "path": "apps/product/src/features/review/hooks/useReportPeriod.ts",
           "find": "const timezone = useUserPreferences((s) => s.timezone);"
+        },
+        {
+          "path": "apps/product/src/features/settings/components/UserSettingsInitializer.tsx",
+          "find": "children を render しない"
         }
       ],
       "tests": [
@@ -350,34 +339,7 @@ SQL ではなく TypeScript で集計する。アクティビティごとに、�
           "find": "it('省略と不正値は時間の使い方へ丸める'"
         }
       ],
-      "fails": [
-        {
-          "id": "settings-not-loaded",
-          "label": "ユーザー設定がまだ読めていない",
-          "screen": "一瞬、ブラウザの timezone・月曜始まりで数えた数字が出て、設定が届くと差し替わることがある。",
-          "data": "変化なし（読むだけ）。",
-          "retry": "設定が届くと問い合わせの引数（timezone / weekStartsOn）が変わるので、別の問い合わせとして取り直す。",
-          "trace": "残らない。",
-          "look": "設定の timezone とブラウザの timezone が違う利用者でだけ起きる。useUserPreferences の既定値（設定が無い時）を見る。",
-          "refs": [
-            {
-              "path": "apps/product/src/lib/hooks/useUserPreferences.ts",
-              "find": "timezone: getBrowserTimezone(),"
-            },
-            {
-              "path": "apps/product/src/lib/hooks/useUserPreferences.ts",
-              "find": "weekStartsOn: 1,"
-            }
-          ],
-          "tags": {
-            "screen": "none",
-            "data": "unchanged",
-            "retry": "auto",
-            "trace": "none"
-          },
-          "continues": true
-        }
-      ],
+      "fails": [],
       "screen": {
         "t": "blank",
         "url": "/ja/report",
@@ -549,12 +511,6 @@ SQL ではなく TypeScript で集計する。アクティビティごとに、�
             "body": "時間をおいて開き直してください"
           }
         }
-      ],
-      "tests": [
-        {
-          "path": "apps/product/src/lib/trpc/query-client.test.ts",
-          "find": "it('does not retry a query rejected with TOO_MANY_REQUESTS'"
-        }
       ]
     },
     {
@@ -639,7 +595,7 @@ SQL ではなく TypeScript で集計する。アクティビティごとに、�
       "short": "行を取る",
       "title": "Plan / Record / アクティビティ / カテゴリを並行で取る",
       "via": "PostgREST",
-      "what": "今期間の Record と Plan、前期間の Record、アクティビティ全件、カテゴリ全件の 5 本を並行で取る。期間は開始ではなく重なりで選ぶ（start_at < 終了 かつ end_at > 開始）。削除済み（deleted_at あり）は除き、アーカイブ済みのアクティビティは除かない。行は 500 件ずつ全部読み切る。",
+      "what": "今期間の Record と Plan、前期間の Record、アクティビティ全件、カテゴリ全件の 5 本を並行で取る。期間は開始ではなく重なりで選ぶ（start_at < 終了 かつ end_at > 開始）。削除済み（deleted_at あり）は除き、アーカイブ済みのアクティビティは除かない。Plan と Record は 500 件ずつ全部読み切る。アクティビティとカテゴリは 1 回の select。",
       "why": "開始だけで選ぶと、日曜 23 時〜月曜 7 時のような期間を跨ぐ Record が片側の期間に丸ごと入り、跨いだ先から消える。アーカイブは未来にだけ効く操作なので、過去の Record は数え続ける。",
       "io": {
         "in": "userId と期間",
@@ -824,7 +780,7 @@ SQL ではなく TypeScript で集計する。アクティビティごとに、�
           "screen": "ページ単位のエラー境界に切り替わる。/report もカレンダーと共通の CalendarError を使うので、文言は「カレンダーを読み込めませんでした」になる。",
           "data": "変化なし。",
           "retry": "利用者が開き直す。",
-          "trace": "ブラウザから Sentry へ送る（feature: calendar、source: calendar_error_boundary）。report ではなく calendar として記録される点に注意。ブラウザの Sentry は分析の同意がある時だけ動く。",
+          "trace": "ブラウザから Sentry へ送る（feature: calendar、source: calendar_error_boundary）。report ではなく calendar として記録される点に注意。ブラウザの Sentry は本番（VERCEL_ENV=production）で、かつ分析の同意がある時だけ動く。",
           "look": "Sentry で source:calendar_error_boundary を探し、route が /report かを見る。直前にデプロイした集計の形の変更と normalizeReportPeriodPayload。",
           "refs": [
             {

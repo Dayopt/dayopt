@@ -30,7 +30,7 @@ flowchart TD
 - **文言から逆引きする**: 画面の文言は `apps/product/messages/ja/*.json` にある。キーを検索すれば、それを出しているコードに辿れる。各経路の「⚡ 失敗」は、どの文言がどの失敗から出るかを段ごとに持っている
 - **想定内として Sentry に送らないもの**: tRPC の BAD_REQUEST / UNAUTHORIZED / FORBIDDEN / NOT_FOUND / CONFLICT / TOO_MANY_REQUESTS など（`lib/trpc/errors.ts` の `EXPECTED_TRPC_CODES`）、write fence による停止、パスワード違いなど想定内の認証エラー
 - **Sentry が見えない場所**: `/api/health` の transaction は inbound filter で捨てている。ブラウザの Sentry は分析の同意がある時だけ動く。Sentry 自体は Production 以外では動かない
-- **write fence**: 運用で書き込みだけを止めるスイッチ。読み取りは動く。止めている間の失敗は Sentry に送らない（障害の観測中に Sentry を埋めないため）。**MCP の書き込みは write fence で止まらない**（別のスイッチ `mcp_mutation_control`）
+- **write fence**: 運用で書き込みだけを止めるスイッチ。読み取りは動く。止めている間の失敗は Sentry に送らない（障害の観測中に Sentry を埋めないため）。**MCP の tool からの書き込みは write fence で止まらない**（別のスイッチ `mcp_mutation_control`。write fence が止めるのは AI クライアントの新規接続の token 発行だけ）
 - **cron**: 取りこぼした回を埋め直さない。止まったことは完了記録（heartbeat）が古くなることで気づく
 
 ## 関連する経路
@@ -64,7 +64,7 @@ flowchart TD
 <details>
 <summary>2. UptimeRobot が DOWN を通知した。アプリは本当に止まっているか</summary>
 
-`/api/health` は DB と Redis を確かめて 503 を返す。Upstash だけが落ちていても DOWN になるが、保存は通っている。どの依存が error かを health の応答で見る。
+`/api/health` は DB と Redis を確かめて 503 を返す。Upstash だけが落ちていても DOWN になるが、画面からの保存は通っている。本番の health の応答は status しか返さないので、どの依存が error かは Vercel の Function ログ（`[health] dependency check failed` の database / redis）で見る。
 
 </details>
 
@@ -74,3 +74,44 @@ flowchart TD
 write fence（runbook の「Write Fence 有効化」）。tRPC の mutation と cron・callback の書き込みが止まる。読み取りと、MCP の書き込み gate（別スイッチ）は対象外。
 
 </details>
+
+## 参照（検査用）
+
+このページの本文が名指ししているコード。`pnpm docs:check` が、ファイルが在り `find` の文字列を含むことを検査する。本文を書き換えたらここも直す。
+
+```json learn:refs
+[
+  {
+    "path": "apps/product/src/lib/trpc/errors.ts",
+    "find": "const EXPECTED_TRPC_CODES"
+  },
+  {
+    "path": "apps/product/src/lib/trpc/errors.ts",
+    "find": "isWriteFencedError"
+  },
+  {
+    "path": "apps/product/src/lib/trpc/client-errors.ts",
+    "find": "trpc_client_transport"
+  },
+  {
+    "path": "apps/product/instrumentation-client.ts",
+    "find": "hasAnalyticsConsent"
+  },
+  {
+    "path": "apps/product/sentry.server.config.ts",
+    "find": "const IS_SENTRY_PRODUCTION = VERCEL_ENV === 'production';"
+  },
+  {
+    "path": "apps/product/src/app/api/health/route.ts",
+    "find": "[health] dependency check failed"
+  },
+  {
+    "path": "apps/product/src/app/api/oauth/token/route.ts",
+    "find": "'temporarily_unavailable'"
+  },
+  {
+    "path": "docs/operations/monitoring.md",
+    "find": "## Incident triage"
+  }
+]
+```

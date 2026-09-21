@@ -59,7 +59,7 @@ local の Supabase と product で、実際に壊して観察する。各 lab �
 
 - [1 つの依頼を端から端まで追う](labs/trace-request.md) — 壊さずに、依頼の数・DB の行・取り直しを見る
 - [通信を壊す](labs/break-network.md) — 届く前に切れた時と、返事だけ失われた時
-- [UI を迂回して規則を破る](labs/break-rules.md) — DB が最後の砦であること、superuser の psql は再現にならないこと
+- [UI を迂回して規則を破る](labs/break-rules.md) — DB が最後の砦であること、`postgres` として繋いだ psql は本番の再現にならないこと
 - [別の利用者のデータへ手を伸ばす](labs/break-isolation.md) — RLS・GRANT・関数の照合がどこで止めるか
 
 Supabase そのものを止める lab と、メール送信を壊す lab はまだ無い。local の Supabase は他の作業と共有しているので、止める手順を安全に確かめられていないため。

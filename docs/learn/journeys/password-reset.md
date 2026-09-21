@@ -68,10 +68,11 @@ flowchart TD
 - 画面: フォームに理由が出る。Turnstile の widget を作り直す。
 - データ: メールは送られない。
 - 再試行: しない。token は 1 回限りなので、利用者が解き直して押し直す。
-- 痕跡: captcha_failed は想定内の code ではないので Sentry に出る（captureUnexpectedAuthError）。
+- 痕跡: token 側の既知の問題（期限切れ・重複・token 無し）なら Sentry に出ない。secret の設定ミスなど未知の理由なら Sentry に出る（captureUnexpectedAuthError）。
 - **最初に見る場所**: Supabase の Bot Protection の secret と、NEXT_PUBLIC_TURNSTILE_SITE_KEY の組み合わせ。
 - 根拠:
   - [`apps/product/src/features/auth/components/PasswordResetForm.tsx`](../../../apps/product/src/features/auth/components/PasswordResetForm.tsx) で `turnstile.reset();` を探す
+  - [`apps/product/src/lib/sentry/integration.ts`](../../../apps/product/src/lib/sentry/integration.ts) で `EXPECTED_CAPTCHA_TOKEN_ISSUE_MESSAGES` を探す
 
 </details>
 
@@ -437,12 +438,16 @@ updateUser が成功したら signOut({ scope: 'others' }) で、この端末以
           "screen": "フォームに理由が出る。Turnstile の widget を作り直す。",
           "data": "メールは送られない。",
           "retry": "しない。token は 1 回限りなので、利用者が解き直して押し直す。",
-          "trace": "captcha_failed は想定内の code ではないので Sentry に出る（captureUnexpectedAuthError）。",
+          "trace": "token 側の既知の問題（期限切れ・重複・token 無し）なら Sentry に出ない。secret の設定ミスなど未知の理由なら Sentry に出る（captureUnexpectedAuthError）。",
           "look": "Supabase の Bot Protection の secret と、NEXT_PUBLIC_TURNSTILE_SITE_KEY の組み合わせ。",
           "refs": [
             {
               "path": "apps/product/src/features/auth/components/PasswordResetForm.tsx",
               "find": "turnstile.reset();"
+            },
+            {
+              "path": "apps/product/src/lib/sentry/integration.ts",
+              "find": "EXPECTED_CAPTCHA_TOKEN_ISSUE_MESSAGES"
             }
           ],
           "tags": {

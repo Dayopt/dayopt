@@ -32,7 +32,7 @@ flowchart LR
 - **レポートは client で取る**: `/report` は server で先に取らず、ブラウザの hook が tRPC で取る → [経路: レポートを開く](journeys/report.md)
 - **書き込みの hook は client**: `useTimeblockWriteMutations.ts` などは `'use client'`
 - **route handler は Node.js runtime**: `app/api/trpc/[trpc]/route.ts` などは `export const runtime = 'nodejs'` を明示している
-- **強い鍵の封じ込め**: service role の client を作る `lib/supabase/oauth.ts` と、セッションの server client `lib/supabase/server.ts` は先頭で `import 'server-only'` する。client component から import すると build が失敗するので、ブラウザの bundle に入らない。加えて Vercel の build の中で `check-client-bundle-secrets` が client の bundle に secret の値が混ざっていないかを検査する（実 env がある build なので、本物の値の漏れも捕まる）
+- **強い鍵の封じ込め**: service role の client を作る `lib/supabase/oauth.ts` と、セッションの server client `lib/supabase/server.ts` は先頭で `import 'server-only'` する。client component から import すると build が失敗するので、ブラウザの bundle に入らない。加えて Vercel の build の中で `check-client-bundle-secrets` が、client の bundle に secret の env 名や、Stripe・GitHub などの既知の値の接頭辞（`sk_live_`・`whsec_`・`ghp_` など）が混ざっていないかを検査する。実 env のある build なので、接頭辞を持つ値の漏れは捕まる。接頭辞の無い値（Supabase の secret key など）の漏れは、この検査では捕まらない
 
 **判断のしかた**: ファイル先頭の `'use client'`、置き場所（`app/api/**`・`server/`）、`import 'server-only'` の 3 つを見る。
 
@@ -69,3 +69,44 @@ server 側の `prefetchCalendarData`（Plan・Record・Google の予定・統計
 最初の表示に必須で、URL から決まるなら server で先に取る（カレンダーの型）。操作して初めて要るもの・重いものは client で遅らせる（レポートの詳細パネルの型）。
 
 </details>
+
+## 参照（検査用）
+
+このページの本文が名指ししているコード。`pnpm docs:check` が、ファイルが在り `find` の文字列を含むことを検査する。本文を書き換えたらここも直す。
+
+```json learn:refs
+[
+  {
+    "path": "apps/product/src/app/[locale]/(app)/(workspace)/calendar/page.tsx",
+    "find": "export const dynamic = 'force-dynamic';"
+  },
+  {
+    "path": "apps/product/src/app/[locale]/(app)/(workspace)/calendar/page.tsx",
+    "find": "HydrationBoundary"
+  },
+  {
+    "path": "apps/product/src/app/[locale]/(app)/(workspace)/_server/calendar-prefetch.ts",
+    "find": "helpers.plans.list.prefetch"
+  },
+  {
+    "path": "apps/product/src/app/api/trpc/[trpc]/route.ts",
+    "find": "export const runtime = 'nodejs';"
+  },
+  {
+    "path": "apps/product/src/lib/supabase/oauth.ts",
+    "find": "import 'server-only';"
+  },
+  {
+    "path": "apps/product/src/lib/supabase/server.ts",
+    "find": "import 'server-only';"
+  },
+  {
+    "path": "scripts/tasks/check-client-bundle-secrets.mjs",
+    "find": "'whsec_',"
+  },
+  {
+    "path": "apps/product/package.json",
+    "find": "check-client-bundle-secrets.mjs"
+  }
+]
+```

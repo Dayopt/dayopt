@@ -56,7 +56,7 @@ Cloudflare Turnstile の token を取り、パスワードが既知の漏洩に�
 - 画面: 何も起きない。登録は続く。
 - データ: 登録される。
 - 再試行: しない。確認を諦めて通す（fail-open）。
-- 痕跡: logger.warn だけ。Sentry には出ない。
+- 痕跡: logger（通信失敗・時間切れは error、応答が正常でない時は warn）のログだけ。Sentry の issue にはならない。
 - **最初に見る場所**: 急ぎではない。
 - 根拠:
   - [`apps/product/src/features/auth/components/SignupForm.tsx`](../../../apps/product/src/features/auth/components/SignupForm.tsx) で `safeCheckPasswordPwned` を探す
@@ -122,7 +122,7 @@ Supabase Auth の send_email hook が Edge Function send-auth-email を呼び、
 
 ### 4. 確認リンクで着地する（Vercel（Next.js））
 
-/auth/confirm が verifyOtp で確認する。成否は verify の結果ではなく session の有無で分け、失敗しても素のエラーではなく /auth/confirmed?status=… に着地させる。新規登録の確認の時だけウェルカムメールを依頼する。
+/auth/confirm が verifyOtp で確かめる。成否は verifyOtp の error で分ける。成功した時、session があれば next（既定は /calendar）へ、無ければ /auth/confirmed?status=email_confirmed へ送る。失敗（無効・期限切れ・使用済み）は素のエラーではなく /auth/confirmed?status=failed に着地させる。新規登録の確認が成功した時だけウェルカムメールを依頼する。
 
 - **ここを変えると**: email_change / recovery も同じ route を通る。ウェルカムメールは type が signup の時だけ。
 - **コード**:
@@ -159,7 +159,7 @@ profiles.welcome_email_sent_at が空の行だけを更新し、更新できた 
 
 - 画面: 何も起きない。ログインは完了する。
 - データ: 記録されず、メールも送らない。
-- 再試行: しない。次に確認リンクを通った時に、まだ空なら送る。
+- 再試行: しない。確認リンクは 1 回しか使えないので、次に新しく発行した確認リンクか Google の callback を通った時だけ、まだ空なら送る。パスワードだけの利用者には、実質やり直しの機会が無い。
 - 痕跡: Sentry（feature: auth / operation: claim_welcome_email）。
 - **最初に見る場所**: Sentry → Supabase の Postgres ログ。
 - 根拠:
@@ -168,13 +168,13 @@ profiles.welcome_email_sent_at が空の行だけを更新し、更新できた 
 </details>
 
 <details>
-<summary>⚡ 確認リンクを 2 回押す — 画面: 何も起きない / データ: 変化なし / 再試行: 不要 / 痕跡: 残らない</summary>
+<summary>⚡ 確認リンクを 2 回押す — 画面: 別の画面へ / データ: 変化なし / 再試行: 不要 / 痕跡: 残らない</summary>
 
-- 画面: 何も起きない。
-- データ: 2 回目は更新できる行が無いので送らない。
-- 再試行: 該当なし。
-- 痕跡: 何も残らない（正常）。
-- **最初に見る場所**: 不要。
+- 画面: 2 回目はリンクが使用済みなので「リンクを確認できませんでした」の画面に着地する。1 回目でサインインは済んでいる。
+- データ: 変化なし。2 回目は verifyOtp で失敗するので、ウェルカムメールの処理には届かない。
+- 再試行: 不要。
+- 痕跡: 何も残らない（想定内）。
+- **最初に見る場所**: 不要。サインインできない時は /auth/login から入る。
 
 </details>
 
@@ -309,7 +309,7 @@ Resend が /api/webhooks/resend へ bounce / 苦情を送る。svix の署名を
           "screen": "何も起きない。登録は続く。",
           "data": "登録される。",
           "retry": "しない。確認を諦めて通す（fail-open）。",
-          "trace": "logger.warn だけ。Sentry には出ない。",
+          "trace": "logger（通信失敗・時間切れは error、応答が正常でない時は warn）のログだけ。Sentry の issue にはならない。",
           "look": "急ぎではない。",
           "refs": [
             {
@@ -514,7 +514,7 @@ Resend が /api/webhooks/resend へ bounce / 苦情を送る。svix の署名を
       "id": "confirm-route",
       "svc": "vercel",
       "title": "確認リンクで着地する",
-      "what": "/auth/confirm が verifyOtp で確認する。成否は verify の結果ではなく session の有無で分け、失敗しても素のエラーではなく /auth/confirmed?status=… に着地させる。新規登録の確認の時だけウェルカムメールを依頼する。",
+      "what": "/auth/confirm が verifyOtp で確かめる。成否は verifyOtp の error で分ける。成功した時、session があれば next（既定は /calendar）へ、無ければ /auth/confirmed?status=email_confirmed へ送る。失敗（無効・期限切れ・使用済み）は素のエラーではなく /auth/confirmed?status=failed に着地させる。新規登録の確認が成功した時だけウェルカムメールを依頼する。",
       "change": "email_change / recovery も同じ route を通る。ウェルカムメールは type が signup の時だけ。",
       "refs": [
         {
@@ -550,11 +550,11 @@ Resend が /api/webhooks/resend へ bounce / 苦情を送る。svix の署名を
           },
           "screenAfter": {
             "t": "page",
-            "url": "/ja/auth/confirmed?status=…",
+            "url": "/ja/auth/confirmed?status=failed",
             "tone": "warn",
-            "title": "メールアドレスの確認",
-            "body": "状態に応じた案内とサインインへのボタン",
-            "button": "サインインへ"
+            "title": "リンクを確認できませんでした",
+            "body": "（リンクが無効・期限切れ・使用済みである旨）",
+            "button": "サインイン画面へ"
           }
         }
       ],
@@ -595,7 +595,7 @@ Resend が /api/webhooks/resend へ bounce / 苦情を送る。svix の署名を
           "label": "送信記録の更新が失敗する",
           "screen": "何も起きない。ログインは完了する。",
           "data": "記録されず、メールも送らない。",
-          "retry": "しない。次に確認リンクを通った時に、まだ空なら送る。",
+          "retry": "しない。確認リンクは 1 回しか使えないので、次に新しく発行した確認リンクか Google の callback を通った時だけ、まだ空なら送る。パスワードだけの利用者には、実質やり直しの機会が無い。",
           "trace": "Sentry（feature: auth / operation: claim_welcome_email）。",
           "look": "Sentry → Supabase の Postgres ログ。",
           "refs": [
@@ -630,23 +630,25 @@ Resend が /api/webhooks/resend へ bounce / 苦情を送る。svix の署名を
         {
           "id": "double-click",
           "label": "確認リンクを 2 回押す",
-          "screen": "何も起きない。",
-          "data": "2 回目は更新できる行が無いので送らない。",
-          "retry": "該当なし。",
-          "trace": "何も残らない（正常）。",
-          "look": "不要。",
+          "screen": "2 回目はリンクが使用済みなので「リンクを確認できませんでした」の画面に着地する。1 回目でサインインは済んでいる。",
+          "data": "変化なし。2 回目は verifyOtp で失敗するので、ウェルカムメールの処理には届かない。",
+          "retry": "不要。",
+          "trace": "何も残らない（想定内）。",
+          "look": "不要。サインインできない時は /auth/login から入る。",
           "refs": [],
           "tags": {
-            "screen": "none",
+            "screen": "redirect",
             "data": "unchanged",
             "retry": "na",
             "trace": "none"
           },
           "screenAfter": {
-            "t": "calendar",
-            "url": "/ja/calendar",
-            "blocks": [],
-            "note": "2 回目は何も送らない"
+            "t": "page",
+            "url": "/ja/auth/confirmed?status=failed",
+            "tone": "warn",
+            "title": "リンクを確認できませんでした",
+            "body": "（リンクが無効・期限切れ・使用済みである旨）",
+            "button": "サインイン画面へ"
           }
         }
       ],

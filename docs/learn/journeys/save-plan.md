@@ -132,8 +132,8 @@ flowchart TD
 
 - 画面: 一時 ID の Plan が消え（snapshot へ戻す）、「保存に失敗」のトーストが出る。
 - データ: 2 通りある。届く前に切れたなら DB は変わらない。DB で確定した後に返事だけ失われたなら、DB には Plan がある。
-- 再試行: 自動では送り直さない（retry: false）。代わりに成功・失敗どちらでも一覧を取り直す（onSettled）。後者なら取り直しで Plan が再び現れる。利用者がもう一度作ると二重になりうるのはこのケース。
-- 痕跡: サーバーの形をしていない通信エラーとして、ブラウザから Sentry へ送る（source: trpc_client_transport）。ブラウザの Sentry は分析の同意がある時だけ動くので、無いこともある。
+- 再試行: 自動では送り直さない（retry: false）。代わりに成功・失敗どちらでも一覧を取り直す（onSettled）。DB で確定していたなら取り直しで Plan が再び現れる。この時に利用者がもう一度作ると、同じ時間帯なら排他制約（23P01）で弾かれるが、サイドバーからの作成は次の空き時間に置くので、時間をずらした 2 つ目ができる。
+- 痕跡: サーバーの形をしていない通信エラーとして、ブラウザから Sentry へ送る（source: trpc_client_transport）。ブラウザの Sentry は本番（VERCEL_ENV=production）で、かつ分析の同意がある時だけ動くので、無いこともある。
 - **最初に見る場所**: Sentry で source:trpc_client_transport を探し、同じ時刻の Vercel の /api/trpc ログで、サーバーまで届いていたかを見る。
 - 根拠:
   - [`apps/product/src/lib/trpc/client-errors.ts`](../../../apps/product/src/lib/trpc/client-errors.ts) で `trpc_client_transport` を探す
@@ -168,12 +168,12 @@ Vercel の Function（Node.js、上限 60 秒）。context を作って認証方
 </details>
 
 <details>
-<summary>⚡ Function が落ちる・時間切れ — 画面: エラー表示 / データ: どちらもありうる / 再試行: しない / 痕跡: ログだけ</summary>
+<summary>⚡ Function が落ちる・時間切れ — 画面: エラー表示 / データ: どちらもありうる / 再試行: しない / 痕跡: Sentry</summary>
 
 - 画面: 「保存に失敗」のトースト。一時 Plan は消える。
 - データ: どこまで進んだかは分からない（「通信が途中で切れる」と同じ 2 通り）。
 - 再試行: 自動ではしない。一覧の取り直しで実際の状態に揃う。
-- 痕跡: Vercel の Function ログ。例外なら server 側 Sentry。
+- 痕跡: Vercel の Function ログ。例外なら server 側の Sentry。応答が tRPC の形でない（504 や HTML）ので、ブラウザからも Sentry へ送る（本番で、かつ分析の同意がある時だけ。source: trpc_client_transport）。
 - **最初に見る場所**: Vercel の status、Function ログ、直近の deploy。直近に promote があったなら runbook の Playbook 2。
 - 根拠:
   - [`docs/operations/monitoring.md`](../../operations/monitoring.md) で `## Incident triage` を探す
@@ -182,7 +182,7 @@ Vercel の Function（Node.js、上限 60 秒）。context を作って認証方
 
 ### 6. protectedProcedure の関門を通る（Vercel（Next.js））
 
-順に、ログインしているか → MFA の要件 → 利用権（課金）→ write fence（運用で書き込みを止めるスイッチ）→ ユーザー単位の rate limit（1 分 300 回）を見る。
+順に、ログインしているか → MFA の要件 → 利用権（課金）→ write fence（運用で書き込みを止めるスイッチ。mutation だけ）→ ユーザー単位の rate limit（1 分 300 回）を見る。その前に、context が認証前の IP 単位の rate limit（cookie がある時だけ）を見ている。
 
 - **なぜ必要か**: どの procedure でも同じ順序で守りを通すため。個々の router に書くと、どこかで抜ける。
 - **入力 → 出力**: ctx と procedure 名 → 通過、または TRPCError
@@ -191,7 +191,7 @@ Vercel の Function（Node.js、上限 60 秒）。context を作って認証方
   - [`apps/product/src/lib/trpc/procedures.ts`](../../../apps/product/src/lib/trpc/procedures.ts) で `isWriteFenceEnabled` を探す
   - [`apps/product/src/lib/trpc/procedures.ts`](../../../apps/product/src/lib/trpc/procedures.ts) で `async function isUserRateLimited` を探す
 - **この段を守るテスト**:
-  - [`apps/product/src/lib/test/integration/mfa-aal-cookie-tampering.integration.test.ts`](../../../apps/product/src/lib/test/integration/mfa-aal-cookie-tampering.integration.test.ts) で `it('protectedProcedure経由でも改竄クライアントはFORBIDDEN(MFA verification required)になる'` を探す（local Supabase が要る integration）
+  - [`apps/product/src/lib/test/integration/mfa-aal-cookie-tampering.integration.test.ts`](../../../apps/product/src/lib/test/integration/mfa-aal-cookie-tampering.integration.test.ts) で `it('protectedProcedure経由でも改竄クライアントはFORBIDDEN(MFA verification required)になる'` を探す（MFA の関門だけを守る。関門の順序を通しで守るテストは紐付いていない）
 
 <details>
 <summary>⚡ セッションが切れている（401） — 画面: 別の画面へ / データ: 変化なし / 再試行: しない / 痕跡: 残らない</summary>
@@ -227,7 +227,7 @@ Vercel の Function（Node.js、上限 60 秒）。context を作って認証方
 - 画面: 何も起きない。保存は通る。
 - データ: 正常に保存される。
 - 再試行: 不要。rate limit は Function のメモリ上の判定へ退避する（インスタンスごとなので制限は緩くなる）。
-- 痕跡: Sentry（feature: rate_limit / operation: trpc_user_rate_limit_check）。加えて本番の /api/health は Redis の失敗を error として 503 を返すので、UptimeRobot が DOWN を通知する。
+- 痕跡: Sentry に 2 種（認証前の IP 単位の trpc_pre_auth_rate_limit_check と、利用者単位の trpc_user_rate_limit_check）が出る。加えて本番の /api/health は Redis の失敗を error として 503 を返すので、UptimeRobot が DOWN を通知する。
 - **最初に見る場所**: Upstash の status。DOWN 通知が来ても、アプリ本体が動いているかを先に確かめる。可用性を優先して通す設計なので、保存は止まっていない。
 - 根拠:
   - [`apps/product/src/lib/trpc/procedures.ts`](../../../apps/product/src/lib/trpc/procedures.ts) で `trpc_user_rate_limit_check` を探す
@@ -291,13 +291,14 @@ service role の client で create_plan_command_v1 を呼び、user_id を引数
 <details>
 <summary>⚡ Supabase が落ちている — 画面: 使えない / データ: 変化なし / 再試行: しない / 痕跡: 監視が拾う</summary>
 
-- 画面: 保存も表示も失敗する。キャッシュにある表示は残る（query は offlineFirst）。
+- 画面: Auth まで落ちていると、サーバーが利用者を確かめられず UNAUTHORIZED になり、ログイン画面へ画面ごと移動する。DB（PostgREST）だけが落ちた時は「保存できませんでした…」のトーストになり、取り直しも失敗するので、前に取れていた表示が残る。
 - データ: 変化なし。
 - 再試行: 書き込みはしない。読み取りは最大 3 回、間隔を広げて送り直す。
 - 痕跡: Sentry に大量に出る。UptimeRobot が /api/health の 503 で DOWN を通知する。
 - **最初に見る場所**: Supabase の status page → runbook の Playbook 1。
 - 根拠:
   - [`docs/operations/runbook.md`](../../operations/runbook.md) で `## Playbook 1: Supabase障害（P0）` を探す
+  - [`apps/product/src/lib/trpc/session-auth-context.ts`](../../../apps/product/src/lib/trpc/session-auth-context.ts) で `if (userError || !user) return {};` を探す
 
 </details>
 
@@ -606,8 +607,8 @@ service role の client で create_plan_command_v1 を呼び、user_id を引数
           "label": "通信が途中で切れる",
           "screen": "一時 ID の Plan が消え（snapshot へ戻す）、「保存に失敗」のトーストが出る。",
           "data": "2 通りある。届く前に切れたなら DB は変わらない。DB で確定した後に返事だけ失われたなら、DB には Plan がある。",
-          "retry": "自動では送り直さない（retry: false）。代わりに成功・失敗どちらでも一覧を取り直す（onSettled）。後者なら取り直しで Plan が再び現れる。利用者がもう一度作ると二重になりうるのはこのケース。",
-          "trace": "サーバーの形をしていない通信エラーとして、ブラウザから Sentry へ送る（source: trpc_client_transport）。ブラウザの Sentry は分析の同意がある時だけ動くので、無いこともある。",
+          "retry": "自動では送り直さない（retry: false）。代わりに成功・失敗どちらでも一覧を取り直す（onSettled）。DB で確定していたなら取り直しで Plan が再び現れる。この時に利用者がもう一度作ると、同じ時間帯なら排他制約（23P01）で弾かれるが、サイドバーからの作成は次の空き時間に置くので、時間をずらした 2 つ目ができる。",
+          "trace": "サーバーの形をしていない通信エラーとして、ブラウザから Sentry へ送る（source: trpc_client_transport）。ブラウザの Sentry は本番（VERCEL_ENV=production）で、かつ分析の同意がある時だけ動くので、無いこともある。",
           "look": "Sentry で source:trpc_client_transport を探し、同じ時刻の Vercel の /api/trpc ログで、サーバーまで届いていたかを見る。",
           "refs": [
             {
@@ -715,7 +716,7 @@ service role の client で create_plan_command_v1 を呼び、user_id を引数
           "screen": "「保存に失敗」のトースト。一時 Plan は消える。",
           "data": "どこまで進んだかは分からない（「通信が途中で切れる」と同じ 2 通り）。",
           "retry": "自動ではしない。一覧の取り直しで実際の状態に揃う。",
-          "trace": "Vercel の Function ログ。例外なら server 側 Sentry。",
+          "trace": "Vercel の Function ログ。例外なら server 側の Sentry。応答が tRPC の形でない（504 や HTML）ので、ブラウザからも Sentry へ送る（本番で、かつ分析の同意がある時だけ。source: trpc_client_transport）。",
           "look": "Vercel の status、Function ログ、直近の deploy。直近に promote があったなら runbook の Playbook 2。",
           "refs": [
             {
@@ -727,7 +728,7 @@ service role の client で create_plan_command_v1 を呼び、user_id を引数
             "screen": "toast",
             "data": "unknown",
             "retry": "none",
-            "trace": "log"
+            "trace": "sentry"
           },
           "to": "optimistic",
           "back": "巻き戻し + トースト",
@@ -752,7 +753,7 @@ service role の client で create_plan_command_v1 を呼び、user_id を引数
       "id": "procedure",
       "svc": "vercel",
       "title": "protectedProcedure の関門を通る",
-      "what": "順に、ログインしているか → MFA の要件 → 利用権（課金）→ write fence（運用で書き込みを止めるスイッチ）→ ユーザー単位の rate limit（1 分 300 回）を見る。",
+      "what": "順に、ログインしているか → MFA の要件 → 利用権（課金）→ write fence（運用で書き込みを止めるスイッチ。mutation だけ）→ ユーザー単位の rate limit（1 分 300 回）を見る。その前に、context が認証前の IP 単位の rate limit（cookie がある時だけ）を見ている。",
       "why": "どの procedure でも同じ順序で守りを通すため。個々の router に書くと、どこかで抜ける。",
       "io": {
         "in": "ctx と procedure 名",
@@ -799,14 +800,14 @@ service role の client で create_plan_command_v1 を呼び、user_id を引数
           "screenAfter": {
             "t": "form",
             "title": "サインイン",
-            "url": "/ja/auth/login?redirect=/calendar",
+            "url": "/ja/auth/login?redirect=%2Fja%2Fcalendar",
             "fields": [
               ["メールアドレス", "m@example.com"],
               ["パスワード", "••••••••"]
             ],
             "extra": "Cloudflare Turnstile ✓",
             "button": "サインイン",
-            "alt": "Google で続ける"
+            "alt": "Google でサインイン"
           }
         },
         {
@@ -854,7 +855,7 @@ service role の client で create_plan_command_v1 を呼び、user_id を引数
           "screen": "何も起きない。保存は通る。",
           "data": "正常に保存される。",
           "retry": "不要。rate limit は Function のメモリ上の判定へ退避する（インスタンスごとなので制限は緩くなる）。",
-          "trace": "Sentry（feature: rate_limit / operation: trpc_user_rate_limit_check）。加えて本番の /api/health は Redis の失敗を error として 503 を返すので、UptimeRobot が DOWN を通知する。",
+          "trace": "Sentry に 2 種（認証前の IP 単位の trpc_pre_auth_rate_limit_check と、利用者単位の trpc_user_rate_limit_check）が出る。加えて本番の /api/health は Redis の失敗を error として 503 を返すので、UptimeRobot が DOWN を通知する。",
           "look": "Upstash の status。DOWN 通知が来ても、アプリ本体が動いているかを先に確かめる。可用性を優先して通す設計なので、保存は止まっていない。",
           "refs": [
             {
@@ -888,7 +889,7 @@ service role の client で create_plan_command_v1 を呼び、user_id を引数
         {
           "path": "apps/product/src/lib/test/integration/mfa-aal-cookie-tampering.integration.test.ts",
           "find": "it('protectedProcedure経由でも改竄クライアントはFORBIDDEN(MFA verification required)になる'",
-          "why": "local Supabase が要る integration"
+          "why": "MFA の関門だけを守る。関門の順序を通しで守るテストは紐付いていない"
         }
       ]
     },
@@ -1022,7 +1023,7 @@ service role の client で create_plan_command_v1 を呼び、user_id を引数
         {
           "id": "supabase-down",
           "label": "Supabase が落ちている",
-          "screen": "保存も表示も失敗する。キャッシュにある表示は残る（query は offlineFirst）。",
+          "screen": "Auth まで落ちていると、サーバーが利用者を確かめられず UNAUTHORIZED になり、ログイン画面へ画面ごと移動する。DB（PostgREST）だけが落ちた時は「保存できませんでした…」のトーストになり、取り直しも失敗するので、前に取れていた表示が残る。",
           "data": "変化なし。",
           "retry": "書き込みはしない。読み取りは最大 3 回、間隔を広げて送り直す。",
           "trace": "Sentry に大量に出る。UptimeRobot が /api/health の 503 で DOWN を通知する。",
@@ -1031,6 +1032,10 @@ service role の client で create_plan_command_v1 を呼び、user_id を引数
             {
               "path": "docs/operations/runbook.md",
               "find": "## Playbook 1: Supabase障害（P0）"
+            },
+            {
+              "path": "apps/product/src/lib/trpc/session-auth-context.ts",
+              "find": "if (userError || !user) return {};"
             }
           ],
           "tags": {
@@ -1040,19 +1045,18 @@ service role の client で create_plan_command_v1 を呼び、user_id を引数
             "trace": "monitor"
           },
           "to": "optimistic",
-          "back": "保存も表示も失敗",
+          "back": "ログイン画面へ / 保存失敗",
           "screenAfter": {
-            "t": "calendar",
-            "url": "/ja/calendar",
-            "blocks": [
-              {
-                "state": "gone",
-                "label": "消えた"
-              }
+            "t": "form",
+            "title": "サインイン",
+            "url": "/ja/auth/login?redirect=%2Fja%2Fcalendar",
+            "fields": [
+              ["メールアドレス", ""],
+              ["パスワード", ""]
             ],
-            "toast": "保存できませんでした。入力内容は保持されています。もう一度お試しください",
-            "toastTone": "bad",
-            "note": "一覧の取り直しも失敗し、キャッシュの表示が残る"
+            "button": "サインイン",
+            "alt": "Google でサインイン",
+            "note": "Auth まで落ちた時。DB だけなら保存失敗のトースト"
           }
         }
       ],

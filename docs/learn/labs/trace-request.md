@@ -32,8 +32,9 @@ last_verified: 2026-09-21
 3. DB を見る:
 
 ```bash
-psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -c "SELECT id, source, start_at, end_at, created_at FROM public.plans ORDER BY created_at DESC LIMIT 1;"
-psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -c "SELECT event_name, created_at FROM public.product_events ORDER BY created_at DESC LIMIT 1;"
+DB_URL=$(supabase status -o json | python3 -c "import json,sys; print(json.load(sys.stdin)['DB_URL'])")
+psql "$DB_URL" -c "SELECT id, source, start_at, end_at, created_at FROM public.plans ORDER BY created_at DESC LIMIT 1;"
+psql "$DB_URL" -c "SELECT event_name, created_at FROM public.product_events ORDER BY created_at DESC LIMIT 1;"
 ```
 
 ## 観察する 5 点
@@ -68,3 +69,20 @@ psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -c "SELECT event_
 - [経路: Plan を保存](../journeys/save-plan.md)
 - [2. UI → DB](../02-ui-to-db.md)
 - 次の lab: [通信を壊す](break-network.md)
+
+## 参照（検査用）
+
+このページの本文が名指ししているコード。`pnpm docs:check` が、ファイルが在り `find` の文字列を含むことを検査する。本文を書き換えたらここも直す。
+
+```json learn:refs
+[
+  {
+    "path": "apps/product/src/features/timeblock/server/timeblock-command-service.ts",
+    "find": "plan_created"
+  },
+  {
+    "path": "apps/product/src/lib/trpc/browser-client.ts",
+    "find": "httpBatchLink"
+  }
+]
+```

@@ -27,9 +27,11 @@ last_verified: 2026-09-21
 
 **env の扱い**は `apps/product/src/env.ts` にある。
 
-- Supabase の 3 つ（URL・publishable key・secret key）は必須で、欠けると起動時に throw する
-- Resend・Stripe・Google Calendar・Upstash は任意。ただし **Vercel の Production では組で揃っていることを要求する**（一部だけ設定されている状態を拒否する）
-- 組の検査に別のライフサイクルの secret を相乗りさせると、1 つ欠けただけでアプリ全体が起動しなくなる。足す前に `env.ts` の既存の組を確かめる
+- Supabase の 3 つ（URL・publishable key・secret key）は必須
+- Vercel の Production では、Resend（API key・送信元・webhook secret）と Upstash も必須。Stripe（secret key と webhook secret）と Google Calendar（4 つ）は「全部あるか、全部無いか」で、一部だけの設定を拒否する
+- 検査は起動の瞬間ではなく、最初に `env` を読んだ時に走る（テスト・build・CI では飛ばす）
+- 本番の build は Sentry の DSN などが無いと失敗する（build gate）。逆に MCP の OAuth を有効にした Preview の build では、Resend・Stripe・Google・Sentry の env を置くこと自体を禁じている（`production-build-gate.mjs`）
+- 組の検査に別のライフサイクルの secret を相乗りさせると、1 つ欠けただけでアプリ全体が動かなくなる。足す前に `env.ts` の既存の組を確かめる
 
 **乗り換えの重さ**は infra.md の出口コスト台帳にある。Supabase が唯一の最深依存（Auth・DB・Storage・Edge Functions）。
 
@@ -51,7 +53,7 @@ last_verified: 2026-09-21
 <details>
 <summary>1. Upstash が落ちた。利用者は困るか。監視は何を言うか</summary>
 
-保存は通る（fail-open）。ただし本番の `/api/health` が Redis の失敗で 503 を返すので、UptimeRobot が DOWN を通知する。アプリ本体が動いていることを先に確かめる。
+画面からの保存は通る（fail-open）。一方で MCP・問い合わせ・アカウント削除の本人確認は止まる（fail-closed）。本番の `/api/health` は Redis の失敗で 503 を返すので、UptimeRobot が DOWN を通知する。どの経路が止まっているかを先に切り分ける。
 
 </details>
 
@@ -65,6 +67,43 @@ last_verified: 2026-09-21
 <details>
 <summary>3. Sentry が無音。障害は無いと言えるか</summary>
 
-言えない。DSN が無いと黙って初期化しない。`/api/health` の transaction は inbound filter で捨てている。痕跡が無い時は Vercel の Function ログへ。
+言えない。Preview と local では DSN が無いと黙って初期化しない（本番の build は DSN が無いと失敗する）。`/api/health` の transaction は inbound filter で捨てている。痕跡が無い時は Vercel の Function ログへ。
 
 </details>
+
+## 参照（検査用）
+
+このページの本文が名指ししているコード。`pnpm docs:check` が、ファイルが在り `find` の文字列を含むことを検査する。本文を書き換えたらここも直す。
+
+```json learn:refs
+[
+  {
+    "path": "apps/product/src/env.ts",
+    "find": "values.every(Boolean) || !values.some(Boolean)"
+  },
+  {
+    "path": "apps/product/src/env.ts",
+    "find": "はVercel Productionで必須です"
+  },
+  {
+    "path": "apps/product/production-build-gate.mjs",
+    "find": "FORBIDDEN_PRODUCT_PREVIEW_BUILD_ENV"
+  },
+  {
+    "path": "packages/observability/build-gate.mjs",
+    "find": "Sentry production build requires a valid"
+  },
+  {
+    "path": "apps/product/src/lib/mcp/request-rate-limit.ts",
+    "find": "return 'unavailable';"
+  },
+  {
+    "path": "apps/product/src/features/contact/server/router.ts",
+    "find": "Contact rate-limit service is unavailable"
+  },
+  {
+    "path": "apps/product/src/lib/email/send.ts",
+    "find": "suppression_lookup"
+  }
+]
+```

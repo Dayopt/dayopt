@@ -148,7 +148,7 @@ AI クライアントが code と PKCE の code_verifier を POST する。publi
 <details>
 <summary>⚡ Write Fence が ON の間に新しく接続する — 画面: エラー表示 / データ: 変化なし / 再試行: 条件次第 / 痕跡: 残らない</summary>
 
-- 画面: AI クライアント側で接続が失敗する（503 temporarily_unavailable、Retry-After 30 秒）。
+- 画面: fence 中は同意の時点で止まり、code を発行せず redirect_uri へ error=temporarily_unavailable で戻す。AI クライアント側で接続が失敗する。token endpoint の 503（Retry-After 30 秒）は、同意と交換の間に fence が入った時だけ。
 - データ: 変化なし。code は消費されない。
 - 再試行: クライアント次第。fence が解けるまで同じ結果。
 - 痕跡: 運用が意図した停止なので Sentry には出さない。
@@ -156,6 +156,7 @@ AI クライアントが code と PKCE の code_verifier を POST する。publi
 - 根拠:
   - [`apps/product/src/app/api/oauth/token/route.ts`](../../../apps/product/src/app/api/oauth/token/route.ts) で `error_description: 'Writes are temporarily paused for maintenance',` を探す
   - [`docs/operations/runbook.md`](../../operations/runbook.md) で `### Write Fence 有効化（API層の書き込み停止）` を探す
+  - [`apps/product/src/app/[locale]/oauth/consent/actions.ts`](../../../apps/product/src/app/[locale]/oauth/consent/actions.ts) で `consent grant blocked by write fence` を探す
 
 </details>
 
@@ -320,7 +321,7 @@ McpMutationClient が、apply RPC 8 本だけに絞った service role client �
 - データ: 変化なし。
 - 再試行: しない。
 - 痕跡: 想定内のコードなので Sentry には出ない。
-- **最初に見る場所**: 2 つのスイッチの食い違い。BILLING_ENFORCED だけ true にすると、体験中の利用者は読めるのに書けない。順序は runbook と billing-single-plan-rollout.md。
+- **最初に見る場所**: 既定（両スイッチ off）でも、未契約者の MCP からの書き込みは DM005 になる（画面では書けるのに）。env の BILLING_ENFORCED だけ true にすると、さらに体験中の利用者も読めるのに書けなくなる。順序は runbook と billing-single-plan-rollout.md。
 - 根拠:
   - [`apps/product/src/features/timeblock/server/mcp-mutation-client.ts`](../../../apps/product/src/features/timeblock/server/mcp-mutation-client.ts) で `DM005: 'PRO_REQUIRED',` を探す
   - [`docs/operations/runbook.md`](../../operations/runbook.md) で ``env だけ `true` にすると、体験中ユーザーは読めるのに書き込みだけ `DM005` で落ちる`` を探す
@@ -655,7 +656,11 @@ Realtime の購読は無いので、MCP で作った Plan はすぐには画面�
             "title": "Claude を Dayopt に接続",
             "rows": [
               ["予定と記録の閲覧", ""],
-              ["書き込みは現在この接続では有効になっていません", "読み取りのみ", "warn"]
+              [
+                "書き込みは現在この接続では有効になっていないため、読み取り権限のみを許可します。",
+                "",
+                "warn"
+              ]
             ],
             "button": "接続を許可",
             "note": "plans.create は tool 一覧に出てこない（段 7）"
@@ -706,7 +711,7 @@ Realtime の購読は無いので、MCP で作った Plan はすぐには画面�
         {
           "id": "token-write-fence",
           "label": "Write Fence が ON の間に新しく接続する",
-          "screen": "AI クライアント側で接続が失敗する（503 temporarily_unavailable、Retry-After 30 秒）。",
+          "screen": "fence 中は同意の時点で止まり、code を発行せず redirect_uri へ error=temporarily_unavailable で戻す。AI クライアント側で接続が失敗する。token endpoint の 503（Retry-After 30 秒）は、同意と交換の間に fence が入った時だけ。",
           "data": "変化なし。code は消費されない。",
           "retry": "クライアント次第。fence が解けるまで同じ結果。",
           "trace": "運用が意図した停止なので Sentry には出さない。",
@@ -719,6 +724,10 @@ Realtime の購読は無いので、MCP で作った Plan はすぐには画面�
             {
               "path": "docs/operations/runbook.md",
               "find": "### Write Fence 有効化（API層の書き込み停止）"
+            },
+            {
+              "path": "apps/product/src/app/[locale]/oauth/consent/actions.ts",
+              "find": "consent grant blocked by write fence"
             }
           ],
           "tags": {
@@ -1132,7 +1141,7 @@ Realtime の購読は無いので、MCP で作った Plan はすぐには画面�
           "data": "変化なし。",
           "retry": "しない。",
           "trace": "想定内のコードなので Sentry には出ない。",
-          "look": "2 つのスイッチの食い違い。BILLING_ENFORCED だけ true にすると、体験中の利用者は読めるのに書けない。順序は runbook と billing-single-plan-rollout.md。",
+          "look": "既定（両スイッチ off）でも、未契約者の MCP からの書き込みは DM005 になる（画面では書けるのに）。env の BILLING_ENFORCED だけ true にすると、さらに体験中の利用者も読めるのに書けなくなる。順序は runbook と billing-single-plan-rollout.md。",
           "refs": [
             {
               "path": "apps/product/src/features/timeblock/server/mcp-mutation-client.ts",

@@ -46,7 +46,7 @@ flowchart TD
   n10 -->|"Vercel cron"| n11
 ```
 
-通るサービス: ブラウザ / Vercel（Next.js） / Stripe / Google / Supabase / Resend。段 11・失敗 13 種。
+通るサービス: ブラウザ / Vercel（Next.js） / Stripe / Google / Supabase / Resend。段 11・失敗 14 種。
 
 #### この経路を守るテスト
 
@@ -107,16 +107,29 @@ user.deleteAccount（protectedProcedure）が getUser で本人を引き、パ�
 </details>
 
 <details>
-<summary>⚡ 照合の手段そのものが使えない（captcha 免除の故障・rate limit・Upstash 障害） — 画面: エラー表示 / データ: 変化なし / 再試行: 利用者がやり直す / 痕跡: Sentry</summary>
+<summary>⚡ 照合の手段そのものが壊れている（captcha 免除の故障・Upstash 障害） — 画面: エラー表示 / データ: 変化なし / 再試行: 利用者がやり直す / 痕跡: Sentry</summary>
 
 - 画面: 「アカウントを削除できませんでした。繰り返す場合は support@dayopt.app にご連絡ください。こちらで削除します」のトースト。
 - データ: 変化なし。削除は通さない（fail closed）。
 - 再試行: しない。時間をおいて利用者が押し直す。
-- 痕跡: 構成の故障（captcha_failed など）なら Sentry（account_deletion_reauthenticate）。rate limit は想定内として鳴らさない。
+- 痕跡: 構成の故障（captcha_failed など）は Sentry に送る（account_deletion_reauthenticate / captcha_bypass）。Upstash の障害も Sentry に記録される。
 - **最初に見る場所**: Sentry → SUPABASE_SECRET_KEY が gateway で service role として扱われているか。
 - 根拠:
   - [`apps/product/src/features/auth/server/password-reauthentication.ts`](../../../apps/product/src/features/auth/server/password-reauthentication.ts) で `source: 'captcha_bypass',` を探す
   - [`apps/product/src/features/auth/server/user-service.ts`](../../../apps/product/src/features/auth/server/user-service.ts) で `throw new UserServiceError('REAUTH_UNAVAILABLE', 'Reauthentication unavailable');` を探す
+
+</details>
+
+<details>
+<summary>⚡ Supabase Auth の rate limit（429 / over_request_rate_limit） — 画面: エラー表示 / データ: 変化なし / 再試行: 利用者がやり直す / 痕跡: 残らない</summary>
+
+- 画面: 「アカウントを削除できませんでした。繰り返す場合は support@dayopt.app にご連絡ください。こちらで削除します」のトースト。
+- データ: 変化なし。削除は通さない（fail closed）。
+- 再試行: しない。時間をおいて利用者が押し直す。
+- 痕跡: 想定内として Sentry には送らない（NON_ALERTING_ERROR_CODES）。サーバーから呼ぶので egress IP を全利用者で共有しており、1 人の連打が他の人の削除にも響きうる。
+- **最初に見る場所**: Supabase の Auth ログ。時間をおいて押し直してもらう。
+- 根拠:
+  - [`apps/product/src/features/auth/server/password-reauthentication.ts`](../../../apps/product/src/features/auth/server/password-reauthentication.ts) で `'over_request_rate_limit',` を探す
 
 </details>
 
@@ -553,11 +566,11 @@ Vercel cron が毎時 5 分に /api/cron/calendar-account-deletion-settle を CR
         },
         {
           "id": "reauth-unavailable",
-          "label": "照合の手段そのものが使えない（captcha 免除の故障・rate limit・Upstash 障害）",
+          "label": "照合の手段そのものが壊れている（captcha 免除の故障・Upstash 障害）",
           "screen": "「アカウントを削除できませんでした。繰り返す場合は support@dayopt.app にご連絡ください。こちらで削除します」のトースト。",
           "data": "変化なし。削除は通さない（fail closed）。",
           "retry": "しない。時間をおいて利用者が押し直す。",
-          "trace": "構成の故障（captcha_failed など）なら Sentry（account_deletion_reauthenticate）。rate limit は想定内として鳴らさない。",
+          "trace": "構成の故障（captcha_failed など）は Sentry に送る（account_deletion_reauthenticate / captcha_bypass）。Upstash の障害も Sentry に記録される。",
           "look": "Sentry → SUPABASE_SECRET_KEY が gateway で service role として扱われているか。",
           "refs": [
             {
@@ -574,6 +587,41 @@ Vercel cron が毎時 5 分に /api/cron/calendar-account-deletion-settle を CR
             "data": "unchanged",
             "retry": "user",
             "trace": "sentry"
+          },
+          "to": "deletion-dialog",
+          "back": "トースト",
+          "screenAfter": {
+            "t": "form",
+            "title": "アカウント削除の確認",
+            "url": "/ja/settings/account",
+            "fields": [
+              ["パスワードで確認", "••••••••"],
+              ["確認のため「DELETE」と入力", "DELETE"]
+            ],
+            "button": "削除を実行",
+            "toast": "アカウントを削除できませんでした。繰り返す場合は support@dayopt.app にご連絡ください。こちらで削除します",
+            "toastTone": "bad"
+          }
+        },
+        {
+          "id": "reauth-rate-limited",
+          "label": "Supabase Auth の rate limit（429 / over_request_rate_limit）",
+          "screen": "「アカウントを削除できませんでした。繰り返す場合は support@dayopt.app にご連絡ください。こちらで削除します」のトースト。",
+          "data": "変化なし。削除は通さない（fail closed）。",
+          "retry": "しない。時間をおいて利用者が押し直す。",
+          "trace": "想定内として Sentry には送らない（NON_ALERTING_ERROR_CODES）。サーバーから呼ぶので egress IP を全利用者で共有しており、1 人の連打が他の人の削除にも響きうる。",
+          "look": "Supabase の Auth ログ。時間をおいて押し直してもらう。",
+          "refs": [
+            {
+              "path": "apps/product/src/features/auth/server/password-reauthentication.ts",
+              "find": "'over_request_rate_limit',"
+            }
+          ],
+          "tags": {
+            "screen": "toast",
+            "data": "unchanged",
+            "retry": "user",
+            "trace": "none"
           },
           "to": "deletion-dialog",
           "back": "トースト",
@@ -1138,8 +1186,7 @@ Vercel cron が毎時 5 分に /api/cron/calendar-account-deletion-settle を CR
           ["パスワード", ""]
         ],
         "button": "サインイン",
-        "toast": "アカウントを削除しました。",
-        "toastTone": ""
+        "toast": "アカウントを削除しました。"
       }
     },
     {

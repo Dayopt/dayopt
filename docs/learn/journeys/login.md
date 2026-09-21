@@ -40,7 +40,7 @@ flowchart TD
 
 ### 1. サインイン画面で入力する（ブラウザ）
 
-メールアドレスとパスワードを入れ、Cloudflare Turnstile の確認が済むとボタンが押せる。Google で続けるボタンは別経路（Supabase の OAuth → /auth/callback）。
+メールアドレスとパスワードを入れ、Cloudflare Turnstile の確認が済むとボタンが押せる。Google でサインインボタンは別経路（Supabase の OAuth → /auth/callback）。
 
 - **ここを変えると**: ボタンの活性は Turnstile の状態で決まる。Turnstile の設定を変える時はこの画面と登録画面の両方を見る。
 - **コード**:
@@ -48,15 +48,16 @@ flowchart TD
   - [`apps/product/src/app/[locale]/(auth)/auth/callback/route.ts`](<../../../apps/product/src/app/[locale]/(auth)/auth/callback/route.ts>) で `exchangeCodeForSession` を探す（Google で続けた場合の着地）
 
 <details>
-<summary>⚡ Turnstile の確認が終わらない — 画面: 押せない / データ: 変化なし / 再試行: 利用者がやり直す / 痕跡: 残らない</summary>
+<summary>⚡ Turnstile の確認が終わらない・読み込めない — 画面: 押せない / データ: 変化なし / 再試行: 利用者がやり直す / 痕跡: 残らない</summary>
 
-- 画面: ボタンが押せないまま。
+- 画面: widget が載って応答を待つ間はボタンが押せない。15 秒たっても載らない・エラー・非対応の時は押せるようになり、「確認ウィジェットを読み込めませんでした…」が出る。site key が空なら widget 自体が出ず、何も止めない。
 - データ: 変化なし。
-- 再試行: 利用者が待つか、再読み込みする。
+- 再試行: 利用者が待つ。読み込めなかった時はそのまま送れるが、Supabase の Bot Protection が有効なら token が無いので拒否されうる。
 - 痕跡: 何も残らない（通信前）。
 - **最初に見る場所**: Cloudflare の status。全員に起きているなら site key の設定。
 - 根拠:
   - [`apps/product/src/features/auth/components/LoginForm.tsx`](../../../apps/product/src/features/auth/components/LoginForm.tsx) で `turnstile.blocksSubmit` を探す
+  - [`apps/product/src/lib/turnstile/useTurnstileGate.ts`](../../../apps/product/src/lib/turnstile/useTurnstileGate.ts) で `TURNSTILE_LOAD_TIMEOUT_MS` を探す
 
 </details>
 
@@ -87,13 +88,14 @@ flowchart TD
 <details>
 <summary>⚡ 試行が多すぎる（Supabase の制限） — 画面: エラー表示 / データ: 変化なし / 再試行: 利用者がやり直す / 痕跡: 残らない</summary>
 
-- 画面: 「一時的にロックされています。…分後に再試行してください」。
+- 画面: 「セキュリティのため、このアカウントは一時的にロックされています…」の文言。ただし画面は分数の値を渡さずに訳しているので、「…分後」の部分が実際にどう表示されるかは未確認。
 - データ: 変化なし。
 - 再試行: 時間を置くしかない。回数はアプリ側では数えていない。
 - 痕跡: Sentry には出ない。
 - **最初に見る場所**: Supabase の Auth ログ（アプリの DB には記録が無い）。
 - 根拠:
   - [`apps/product/src/lib/auth-error.ts`](../../../apps/product/src/lib/auth-error.ts) で `auth.errors.accountLocked` を探す
+  - [`apps/product/src/features/auth/components/LoginForm.tsx`](../../../apps/product/src/features/auth/components/LoginForm.tsx) で `setSubmitError(t(errorKey));` を探す
 
 </details>
 
@@ -120,12 +122,12 @@ flowchart TD
   - [`apps/product/src/features/auth/components/LoginForm.tsx`](../../../apps/product/src/features/auth/components/LoginForm.tsx) で `router.push(buildMfaUrl())` を探す
 
 <details>
-<summary>⚡ AAL の問い合わせが失敗 — 画面: 別の画面へ / データ: 変化なし / 再試行: 不要 / 痕跡: ログだけ</summary>
+<summary>⚡ AAL の問い合わせが失敗 — 画面: 別の画面へ / データ: 変化なし / 再試行: 不要 / 痕跡: Sentry</summary>
 
 - 画面: MFA を登録していなくても MFA 画面へ進む。
 - データ: 変化なし。
 - 再試行: 不要。MFA 画面が登録の有無を確かめ直し、未登録ならカレンダーへ送る。
-- 痕跡: logger.warn だけ。
+- 痕跡: 想定内の認証エラーなら何も残らない（logger.warn）。想定外（5xx など）は observeAuthOperation が Sentry に送る。
 - **最初に見る場所**: Supabase の Auth ログ。
 - 根拠:
   - [`apps/product/src/features/auth/components/LoginForm.tsx`](../../../apps/product/src/features/auth/components/LoginForm.tsx) で `MFA check failed, redirecting to MFA verify for safety` を探す
@@ -146,22 +148,23 @@ flowchart TD
   - [`apps/product/src/features/auth/components/MFAVerifyForm.test.tsx`](../../../apps/product/src/features/auth/components/MFAVerifyForm.test.tsx) で `it('6桁入力でonVerifyTotpが呼ばれる'` を探す
 
 <details>
-<summary>⚡ challenge を発行できない — 画面: エラー表示 / データ: 変化なし / 再試行: 利用者がやり直す / 痕跡: 残らない</summary>
+<summary>⚡ challenge を発行できない — 画面: エラー表示 / データ: 変化なし / 再試行: 利用者がやり直す / 痕跡: Sentry</summary>
 
 - 画面: エラーと「もう一度試す」ボタンが出る。
 - データ: 変化なし。
 - 再試行: 利用者がボタンで発行し直す。
-- 痕跡: 画面に出るだけ。
+- 痕跡: 想定内の認証エラーは画面に出るだけ。想定外（5xx など）は observeAuthOperation が Sentry に送る。
 - **最初に見る場所**: Supabase の Auth ログ。
 - 根拠:
   - [`apps/product/src/app/[locale]/(auth)/auth/mfa-verify/page.tsx`](<../../../apps/product/src/app/[locale]/(auth)/auth/mfa-verify/page.tsx>) で `checkMFARequired` を探す
+  - [`apps/product/src/lib/sentry/integration.ts`](../../../apps/product/src/lib/sentry/integration.ts) で `captureUnexpectedAuthError(result.error, { ...context, operation });` を探す
 
 </details>
 
 <details>
 <summary>⚡ リカバリーコードを使い切っている — 画面: エラー表示 / データ: 変化なし / 再試行: しない / 痕跡: 残らない</summary>
 
-- 画面: 使い切った旨の表示。先へ進めない。
+- 画面: 「すべてのリカバリーコードが使用済みです」。先へ進めない。
 - データ: 変化なし。
 - 再試行: できない。サポートへの連絡が要る。
 - 痕跡: 想定内。
@@ -194,9 +197,9 @@ mfa.verify で検証する。通ればセッションが aal2 に上がり、nex
 </details>
 
 <details>
-<summary>⚡ challenge の期限切れ — 画面: 何も起きない / データ: 変化なし / 再試行: 自動で再試行 / 痕跡: 残らない</summary>
+<summary>⚡ challenge の期限切れ — 画面: エラー表示 / データ: 変化なし / 再試行: 自動で再試行 / 痕跡: 残らない</summary>
 
-- 画面: 入力が消えるだけ。
+- 画面: 「確認の待ち時間が過ぎました。認証アプリの新しいコードを入力して、もう一度お試しください」と出て、入力が消える。
 - データ: 変化なし。
 - 再試行: 新しい challenge を自動で発行する。
 - 痕跡: 何も残らない。
@@ -248,11 +251,12 @@ mfa.verify で検証する。通ればセッションが aal2 に上がり、nex
 
 サインイン前に開こうとしていた画面（redirect）があればそこへ、無ければ /calendar へ。カレンダーは Plan・Record・Google の予定・統計を server で先に取ってから描く。
 
-- **ここを変えると**: しばらく操作しないと自動でサインアウトし、/auth/login?reason=timeout へ戻る。
+- **ここを変えると**: 無操作・発行からそれぞれ 30 日を超えるとサインアウトし、/auth/login?reason=timeout へ戻る（無操作の方は 30 日なので実質無効）。
 - **コード**:
   - [`apps/product/src/lib/safe-redirect.ts`](../../../apps/product/src/lib/safe-redirect.ts) で `getSafeRedirectPath` を探す
   - [`apps/product/src/lib/auth/session-config.ts`](../../../apps/product/src/lib/auth/session-config.ts) で `/auth/login?reason=timeout` を探す
   - [`apps/product/src/lib/hooks/useLogout.ts`](../../../apps/product/src/lib/hooks/useLogout.ts) で `supabase.auth.signOut()` を探す
+  - [`apps/product/src/lib/auth/session-config.ts`](../../../apps/product/src/lib/auth/session-config.ts) で `idleTimeout: 30 * 24 * 60 * 60` を探す
 - **この段を守るテスト**:
   - [`apps/product/src/lib/safe-redirect.test.ts`](../../../apps/product/src/lib/safe-redirect.test.ts) で `it('rejects absolute and protocol-relative URLs'` を探す
 
@@ -290,7 +294,7 @@ mfa.verify で検証する。通ればセッションが aal2 に上がり、nex
       "svc": "browser",
       "short": "サインイン画面",
       "title": "サインイン画面で入力する",
-      "what": "メールアドレスとパスワードを入れ、Cloudflare Turnstile の確認が済むとボタンが押せる。Google で続けるボタンは別経路（Supabase の OAuth → /auth/callback）。",
+      "what": "メールアドレスとパスワードを入れ、Cloudflare Turnstile の確認が済むとボタンが押せる。Google でサインインボタンは別経路（Supabase の OAuth → /auth/callback）。",
       "change": "ボタンの活性は Turnstile の状態で決まる。Turnstile の設定を変える時はこの画面と登録画面の両方を見る。",
       "screen": {
         "t": "form",
@@ -302,7 +306,7 @@ mfa.verify で検証する。通ればセッションが aal2 に上がり、nex
         ],
         "extra": "Cloudflare Turnstile ✓",
         "button": "サインイン",
-        "alt": "Google で続ける"
+        "alt": "Google でサインイン"
       },
       "refs": [
         {
@@ -318,16 +322,20 @@ mfa.verify で検証する。通ればセッションが aal2 に上がり、nex
       "fails": [
         {
           "id": "turnstile-block",
-          "label": "Turnstile の確認が終わらない",
-          "screen": "ボタンが押せないまま。",
+          "label": "Turnstile の確認が終わらない・読み込めない",
+          "screen": "widget が載って応答を待つ間はボタンが押せない。15 秒たっても載らない・エラー・非対応の時は押せるようになり、「確認ウィジェットを読み込めませんでした…」が出る。site key が空なら widget 自体が出ず、何も止めない。",
           "data": "変化なし。",
-          "retry": "利用者が待つか、再読み込みする。",
+          "retry": "利用者が待つ。読み込めなかった時はそのまま送れるが、Supabase の Bot Protection が有効なら token が無いので拒否されうる。",
           "trace": "何も残らない（通信前）。",
           "look": "Cloudflare の status。全員に起きているなら site key の設定。",
           "refs": [
             {
               "path": "apps/product/src/features/auth/components/LoginForm.tsx",
               "find": "turnstile.blocksSubmit"
+            },
+            {
+              "path": "apps/product/src/lib/turnstile/useTurnstileGate.ts",
+              "find": "TURNSTILE_LOAD_TIMEOUT_MS"
             }
           ],
           "tags": {
@@ -344,9 +352,9 @@ mfa.verify で検証する。通ればセッションが aal2 に上がり、nex
               ["メールアドレス", "m@example.com"],
               ["パスワード", "••••••••"]
             ],
-            "extra": "Turnstile 確認中…",
+            "extra": "Turnstile 確認中…（15 秒で解除）",
             "button": "サインイン",
-            "alt": "Google で続ける",
+            "alt": "Google でサインイン",
             "disabled": true
           }
         }
@@ -370,7 +378,7 @@ mfa.verify で検証する。通ればセッションが aal2 に上がり、nex
         ],
         "extra": "Cloudflare Turnstile ✓",
         "button": "サインイン",
-        "alt": "Google で続ける",
+        "alt": "Google でサインイン",
         "busy": true
       },
       "refs": [
@@ -416,14 +424,14 @@ mfa.verify で検証する。通ればセッションが aal2 に上がり、nex
             ],
             "extra": "Cloudflare Turnstile ✓",
             "button": "サインイン",
-            "alt": "Google で続ける",
+            "alt": "Google でサインイン",
             "error": "メールアドレスまたはパスワードが正しくありません"
           }
         },
         {
           "id": "auth-rate-limited",
           "label": "試行が多すぎる（Supabase の制限）",
-          "screen": "「一時的にロックされています。…分後に再試行してください」。",
+          "screen": "「セキュリティのため、このアカウントは一時的にロックされています…」の文言。ただし画面は分数の値を渡さずに訳しているので、「…分後」の部分が実際にどう表示されるかは未確認。",
           "data": "変化なし。",
           "retry": "時間を置くしかない。回数はアプリ側では数えていない。",
           "trace": "Sentry には出ない。",
@@ -432,6 +440,10 @@ mfa.verify で検証する。通ればセッションが aal2 に上がり、nex
             {
               "path": "apps/product/src/lib/auth-error.ts",
               "find": "auth.errors.accountLocked"
+            },
+            {
+              "path": "apps/product/src/features/auth/components/LoginForm.tsx",
+              "find": "setSubmitError(t(errorKey));"
             }
           ],
           "tags": {
@@ -452,8 +464,8 @@ mfa.verify で検証する。通ればセッションが aal2 に上がり、nex
             ],
             "extra": "Cloudflare Turnstile ✓",
             "button": "サインイン",
-            "alt": "Google で続ける",
-            "error": "セキュリティのため、このアカウントは一時的にロックされています"
+            "alt": "Google でサインイン",
+            "error": "セキュリティのため、このアカウントは一時的にロックされています（分数の表示は未確認）"
           }
         },
         {
@@ -488,8 +500,8 @@ mfa.verify で検証する。通ればセッションが aal2 に上がり、nex
             ],
             "extra": "Cloudflare Turnstile ✓",
             "button": "サインイン",
-            "alt": "Google で続ける",
-            "error": "確認に失敗しました。解決しない場合はサポートへ"
+            "alt": "Google でサインイン",
+            "error": "確認に失敗しました。解決しない場合はサポート（support@dayopt.app）までご連絡ください"
           }
         }
       ],
@@ -524,7 +536,7 @@ mfa.verify で検証する。通ればセッションが aal2 に上がり、nex
           "screen": "MFA を登録していなくても MFA 画面へ進む。",
           "data": "変化なし。",
           "retry": "不要。MFA 画面が登録の有無を確かめ直し、未登録ならカレンダーへ送る。",
-          "trace": "logger.warn だけ。",
+          "trace": "想定内の認証エラーなら何も残らない（logger.warn）。想定外（5xx など）は observeAuthOperation が Sentry に送る。",
           "look": "Supabase の Auth ログ。",
           "refs": [
             {
@@ -536,13 +548,13 @@ mfa.verify で検証する。通ればセッションが aal2 に上がり、nex
             "screen": "redirect",
             "data": "unchanged",
             "retry": "na",
-            "trace": "log"
+            "trace": "sentry"
           },
           "screenAfter": {
             "t": "form",
             "title": "多要素認証",
             "url": "/ja/auth/mfa-verify",
-            "fields": [["認証アプリの6桁のコード", "– – – – – –"]],
+            "fields": [["認証コード", "– – – – – –"]],
             "button": "認証",
             "alt": "リカバリーコードを使用"
           },
@@ -562,7 +574,7 @@ mfa.verify で検証する。通ればセッションが aal2 に上がり、nex
         "t": "form",
         "title": "多要素認証",
         "url": "/ja/auth/mfa-verify",
-        "fields": [["認証アプリの6桁のコード", "– – – – – –"]],
+        "fields": [["認証コード", "– – – – – –"]],
         "button": "認証",
         "alt": "リカバリーコードを使用"
       },
@@ -591,25 +603,29 @@ mfa.verify で検証する。通ればセッションが aal2 に上がり、nex
           "screen": "エラーと「もう一度試す」ボタンが出る。",
           "data": "変化なし。",
           "retry": "利用者がボタンで発行し直す。",
-          "trace": "画面に出るだけ。",
+          "trace": "想定内の認証エラーは画面に出るだけ。想定外（5xx など）は observeAuthOperation が Sentry に送る。",
           "look": "Supabase の Auth ログ。",
           "refs": [
             {
               "path": "apps/product/src/app/[locale]/(auth)/auth/mfa-verify/page.tsx",
               "find": "checkMFARequired"
+            },
+            {
+              "path": "apps/product/src/lib/sentry/integration.ts",
+              "find": "captureUnexpectedAuthError(result.error, { ...context, operation });"
             }
           ],
           "tags": {
             "screen": "toast",
             "data": "unchanged",
             "retry": "user",
-            "trace": "none"
+            "trace": "sentry"
           },
           "screenAfter": {
             "t": "form",
             "title": "多要素認証",
             "url": "/ja/auth/mfa-verify",
-            "fields": [["認証アプリの6桁のコード", "– – – – – –"]],
+            "fields": [["認証コード", "– – – – – –"]],
             "button": "もう一度試す",
             "alt": "リカバリーコードを使用",
             "error": "チャレンジエラー"
@@ -618,7 +634,7 @@ mfa.verify で検証する。通ればセッションが aal2 に上がり、nex
         {
           "id": "recovery-exhausted",
           "label": "リカバリーコードを使い切っている",
-          "screen": "使い切った旨の表示。先へ進めない。",
+          "screen": "「すべてのリカバリーコードが使用済みです」。先へ進めない。",
           "data": "変化なし。",
           "retry": "できない。サポートへの連絡が要る。",
           "trace": "想定内。",
@@ -639,10 +655,10 @@ mfa.verify で検証する。通ればセッションが aal2 に上がり、nex
             "t": "form",
             "title": "多要素認証",
             "url": "/ja/auth/mfa-verify",
-            "fields": [["認証アプリの6桁のコード", "– – – – – –"]],
+            "fields": [["認証コード", "– – – – – –"]],
             "button": "認証",
             "alt": "リカバリーコードを使用",
-            "error": "リカバリーコードを使い切っています"
+            "error": "すべてのリカバリーコードが使用済みです"
           }
         }
       ],
@@ -665,7 +681,7 @@ mfa.verify で検証する。通ればセッションが aal2 に上がり、nex
         "t": "form",
         "title": "多要素認証",
         "url": "/ja/auth/mfa-verify",
-        "fields": [["認証アプリの6桁のコード", "1 2 3 4 5 6"]],
+        "fields": [["認証コード", "1 2 3 4 5 6"]],
         "button": "認証",
         "alt": "リカバリーコードを使用",
         "busy": true
@@ -707,7 +723,7 @@ mfa.verify で検証する。通ればセッションが aal2 に上がり、nex
             "t": "form",
             "title": "多要素認証",
             "url": "/ja/auth/mfa-verify",
-            "fields": [["認証アプリの6桁のコード", "– – – – – –"]],
+            "fields": [["認証コード", "– – – – – –"]],
             "button": "認証",
             "alt": "リカバリーコードを使用",
             "error": "コードが正しくありません。もう一度お試しください"
@@ -716,7 +732,7 @@ mfa.verify で検証する。通ればセッションが aal2 に上がり、nex
         {
           "id": "challenge-expired",
           "label": "challenge の期限切れ",
-          "screen": "入力が消えるだけ。",
+          "screen": "「確認の待ち時間が過ぎました。認証アプリの新しいコードを入力して、もう一度お試しください」と出て、入力が消える。",
           "data": "変化なし。",
           "retry": "新しい challenge を自動で発行する。",
           "trace": "何も残らない。",
@@ -728,7 +744,7 @@ mfa.verify で検証する。通ればセッションが aal2 に上がり、nex
             }
           ],
           "tags": {
-            "screen": "none",
+            "screen": "toast",
             "data": "unchanged",
             "retry": "auto",
             "trace": "none"
@@ -737,9 +753,10 @@ mfa.verify で検証する。通ればセッションが aal2 に上がり、nex
             "t": "form",
             "title": "多要素認証",
             "url": "/ja/auth/mfa-verify",
-            "fields": [["認証アプリの6桁のコード", "– – – – – –"]],
+            "fields": [["認証コード", "– – – – – –"]],
             "button": "認証",
-            "alt": "リカバリーコードを使用"
+            "alt": "リカバリーコードを使用",
+            "error": "確認の待ち時間が過ぎました。認証アプリの新しいコードを入力して、もう一度お試しください"
           }
         }
       ]
@@ -804,7 +821,7 @@ mfa.verify で検証する。通ればセッションが aal2 に上がり、nex
             ],
             "extra": "Cloudflare Turnstile ✓",
             "button": "サインイン",
-            "alt": "Google で続ける"
+            "alt": "Google でサインイン"
           }
         },
         {
@@ -832,7 +849,7 @@ mfa.verify で検証する。通ればセッションが aal2 に上がり、nex
             "url": "/ja/auth/session-error",
             "tone": "warn",
             "title": "セッションを確認できませんでした",
-            "body": "もう一度お試しください。解決しない場合はサインアウトしてください。",
+            "body": "一時的な問題である可能性があります。もう一度お試しください。解決しない場合はサインアウトしてください。",
             "button": "もう一度試す"
           }
         }
@@ -851,7 +868,7 @@ mfa.verify で検証する。通ればセッションが aal2 に上がり、nex
       "short": "カレンダーに着地",
       "title": "カレンダーに着地する",
       "what": "サインイン前に開こうとしていた画面（redirect）があればそこへ、無ければ /calendar へ。カレンダーは Plan・Record・Google の予定・統計を server で先に取ってから描く。",
-      "change": "しばらく操作しないと自動でサインアウトし、/auth/login?reason=timeout へ戻る。",
+      "change": "無操作・発行からそれぞれ 30 日を超えるとサインアウトし、/auth/login?reason=timeout へ戻る（無操作の方は 30 日なので実質無効）。",
       "screen": {
         "t": "calendar",
         "url": "/ja/calendar",
@@ -880,6 +897,10 @@ mfa.verify で検証する。通ればセッションが aal2 に上がり、nex
         {
           "path": "apps/product/src/lib/hooks/useLogout.ts",
           "find": "supabase.auth.signOut()"
+        },
+        {
+          "path": "apps/product/src/lib/auth/session-config.ts",
+          "find": "idleTimeout: 30 * 24 * 60 * 60"
         }
       ],
       "fails": [

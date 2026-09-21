@@ -77,7 +77,7 @@ window.fetch = async function (input, init) {
 - 画面の時系列: 押して 30ms で一時 ID（`temp-`）の Plan が出る → 150ms で巻き戻って消える → **400ms で本物の Plan が再び現れる**（取り直しで、DB に入っていた行を読んだ）
 - トースト: A と**同じ**「保存できませんでした。…もう一度お試しください」。600ms の時点で、このトーストと、保存済みの Plan が**同時に**画面にあった
 - DB: 行が入っている
-- 二重登録: トーストに従ってもう一度押すと、同じ内容の Plan が 2 つになる。これが UI からの保存で二重作成が起きる唯一の筋。MCP からの作成は `operationId` で送り直しても 2 つ目を作らない（[経路: MCP](../journeys/mcp.md)）
+- 二重登録: トーストに従ってサイドバーのアクティビティをもう一度押すと、2 つ目の Plan が **1 つ目の直後の空き時間に**作られた（実測: 13:28–13:58 の次に 13:58–14:58）。同じ時間帯に作り直した場合は、同じ利用者の Plan どうしの排他制約（`[start, end)` の重なり、23P01）で弾かれるので二重にはならない。つまり「同じ時間帯の二重」は DB が防ぎ、「時間をずらした重複」は防がない。MCP からの作成は `operationId` で送り直しても 2 つ目を作らない（[経路: MCP](../journeys/mcp.md)）
 
 </details>
 
@@ -95,3 +95,24 @@ window.fetch = async function (input, init) {
 
 - [経路: Plan を保存](../journeys/save-plan.md) の「⚡ 通信が途中で切れる」
 - [2. UI → DB](../02-ui-to-db.md)、[7. 障害](../07-failures.md)
+
+## 参照（検査用）
+
+このページの本文が名指ししているコード。`pnpm docs:check` が、ファイルが在り `find` の文字列を含むことを検査する。本文を書き換えたらここも直す。
+
+```json learn:refs
+[
+  {
+    "path": "apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.ts",
+    "find": "onSettled: invalidate"
+  },
+  {
+    "path": "supabase/migrations/20260708232500_add_time_model_tables.sql",
+    "find": "ADD CONSTRAINT plans_no_overlap"
+  },
+  {
+    "path": "apps/product/src/lib/trpc/browser-client.ts",
+    "find": "httpBatchLink"
+  }
+]
+```

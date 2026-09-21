@@ -44,12 +44,14 @@ flowchart LR
   f_calendar["外部カレンダー取り込み"]
   f_monitor["障害の検知"]
   f_deploy["本番公開"]
+  f_ai["AI クライアント（MCP）"]
   s_supabase -->|"止まる"| f_login
   s_supabase -->|"止まる"| f_save
   s_supabase -.->|"弱まる"| f_view
   s_supabase -->|"止まる"| f_email
   s_supabase -.->|"弱まる"| f_billing
   s_supabase -->|"止まる"| f_calendar
+  s_supabase -->|"止まる"| f_ai
   s_vercel -->|"止まる"| f_login
   s_vercel -->|"止まる"| f_save
   s_vercel -.->|"弱まる"| f_view
@@ -57,9 +59,11 @@ flowchart LR
   s_vercel -.->|"弱まる"| f_billing
   s_vercel -->|"止まる"| f_calendar
   s_vercel -->|"止まる"| f_deploy
+  s_vercel -->|"止まる"| f_ai
   s_github -->|"止まる"| f_deploy
   s_upstash -.->|"弱まる"| f_email
   s_upstash -.->|"弱まる"| f_monitor
+  s_upstash -->|"止まる"| f_ai
   s_resend -.->|"弱まる"| f_login
   s_resend -->|"止まる"| f_email
   s_sentry -.->|"弱まる"| f_monitor
@@ -71,7 +75,7 @@ flowchart LR
 
 ### Supabase が止まったら
 
-- **影響する機能**: ログイン・登録（止まる）、Plan / Record の保存（止まる）、カレンダーの表示（弱まる）、メール（止まる）、課金（弱まる）、外部カレンダー取り込み（止まる）
+- **影響する機能**: ログイン・登録（止まる）、Plan / Record の保存（止まる）、カレンダーの表示（弱まる）、メール（止まる）、課金（弱まる）、外部カレンダー取り込み（止まる）、AI クライアント（MCP）（止まる）
 - **壊れる**: ログイン、全データの読み書き、認証メール（Edge Function）、/api/health（503）。
 - **動き続ける**: キャッシュ済みの表示（query は offlineFirst、IndexedDB に最大 2 時間）。公開サイト（apps/web）。
 - **コードの挙動**: 必須の env が欠けると起動時に throw。実行時の失敗は各経路で Sentry。
@@ -83,9 +87,9 @@ flowchart LR
 
 ### Vercel が止まったら
 
-- **影響する機能**: ログイン・登録（止まる）、Plan / Record の保存（止まる）、カレンダーの表示（弱まる）、メール（弱まる）、課金（弱まる）、外部カレンダー取り込み（止まる）、本番公開（止まる）
+- **影響する機能**: ログイン・登録（止まる）、Plan / Record の保存（止まる）、カレンダーの表示（弱まる）、メール（弱まる）、課金（弱まる）、外部カレンダー取り込み（止まる）、本番公開（止まる）、AI クライアント（MCP）（止まる）
 - **壊れる**: アプリ全体、tRPC、webhook の受信、Cron（calendar-sync など）。
-- **動き続ける**: DB のデータ。一度開いたページとデータはキャッシュから表示できる（書き込みはできない）。Stripe / Resend は webhook を再送するので、復旧後に追いつく。
+- **動き続ける**: DB のデータ。通信そのものが失敗した時だけ、一度開いたページとデータをキャッシュから出す（書き込みはできない）。Vercel が 5xx のエラーページを返す停止では、そのエラーがそのまま表示される。Stripe / Resend は webhook を再送するので、復旧後に追いつく。
 - **コードの挙動**: Cron は次の予定時刻に走るだけで、取りこぼした回を埋め直さない。完了記録（heartbeat）が古くなることで気づく。
 - **関係する env**: `CRON_SECRET`
 - **最初に見る場所**: Vercel の status → runbook Playbook 2 → monitoring.md の Cron heartbeat。
@@ -108,15 +112,17 @@ flowchart LR
 
 ### Upstash Redis が止まったら
 
-- **影響する機能**: メール（弱まる）、障害の検知（弱まる）
-- **壊れる**: rate limit が Function のメモリ上の判定へ退避し緩くなる。Resend webhook の処理。本番の /api/health が 503 を返し、UptimeRobot が DOWN を通知する（アプリ本体は動いているのに）。
-- **動き続ける**: 保存・表示など通常の操作（可用性を優先して通す）。
-- **コードの挙動**: fail-open。Sentry に記録。
+- **影響する機能**: メール（弱まる）、障害の検知（弱まる）、AI クライアント（MCP）（止まる）
+- **壊れる**: MCP（本番では 503 で止める）、AI クライアントの接続（OAuth の token 発行）、アカウント削除とメール変更の本人確認、問い合わせの送信。Resend webhook の処理。本番の /api/health も 503 を返し、UptimeRobot が DOWN を通知する。
+- **動き続ける**: 保存・表示など通常の画面の操作。tRPC の利用者単位の rate limit はメモリ上の判定へ退避して通す（緩くなる）。
+- **コードの挙動**: 経路で違う。通常の tRPC は fail-open（利用者単位はメモリへ退避、認証前の IP 単位は通す）。MCP・OAuth token・本人確認・問い合わせは fail-closed（503 / SERVICE_UNAVAILABLE）。どちらも Sentry に記録。
 - **関係する env**: `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`
 - **最初に見る場所**: Upstash の status。
 - **コードと文書**:
   - [`apps/product/src/lib/rate-limit/upstash.ts`](../../../apps/product/src/lib/rate-limit/upstash.ts) で `isUpstashEnabled` を探す
   - [`apps/product/src/app/api/health/route.ts`](../../../apps/product/src/app/api/health/route.ts) で `checkRedis` を探す
+  - [`apps/product/src/lib/mcp/request-rate-limit.ts`](../../../apps/product/src/lib/mcp/request-rate-limit.ts) で `return 'unavailable';` を探す（MCP は fail-closed）
+  - [`apps/product/src/features/contact/server/router.ts`](../../../apps/product/src/features/contact/server/router.ts) で `Contact rate-limit service is unavailable` を探す
 
 ### Resend が止まったら
 
@@ -135,7 +141,7 @@ flowchart LR
 - **影響する機能**: 障害の検知（弱まる）
 - **壊れる**: 障害の痕跡が見えなくなる。資格情報が欠けると production build が失敗する。
 - **動き続ける**: アプリの動作（送信は fire-and-forget）。
-- **コードの挙動**: DSN が無ければ黙って初期化しない。/api/health の transaction は inbound filter で捨てるので、Sentry が無音でも health が無事とは限らない。
+- **コードの挙動**: 本番の build は DSN などが無いと失敗する（build gate）。Preview と local では DSN が無ければ黙って初期化しない。/api/health の transaction は inbound filter で捨てるので、Sentry が無音でも health が無事とは限らない。
 - **関係する env**: `NEXT_PUBLIC_SENTRY_DSN`, `SENTRY_DSN`
 - **最初に見る場所**: Sentry の status。痕跡が無い時は Vercel の Function ログへ。
 - **コードと文書**:
@@ -278,7 +284,8 @@ flowchart LR
           "view": "degraded",
           "email": "down",
           "billing": "degraded",
-          "calendar": "down"
+          "calendar": "down",
+          "ai": "down"
         }
       },
       {
@@ -287,7 +294,7 @@ flowchart LR
         "name": "Vercel",
         "role": "product / web の配信・Function・Cron",
         "breaks": "アプリ全体、tRPC、webhook の受信、Cron（calendar-sync など）。",
-        "keeps": "DB のデータ。一度開いたページとデータはキャッシュから表示できる（書き込みはできない）。Stripe / Resend は webhook を再送するので、復旧後に追いつく。",
+        "keeps": "DB のデータ。通信そのものが失敗した時だけ、一度開いたページとデータをキャッシュから出す（書き込みはできない）。Vercel が 5xx のエラーページを返す停止では、そのエラーがそのまま表示される。Stripe / Resend は webhook を再送するので、復旧後に追いつく。",
         "behavior": "Cron は次の予定時刻に走るだけで、取りこぼした回を埋め直さない。完了記録（heartbeat）が古くなることで気づく。",
         "env": ["CRON_SECRET"],
         "look": "Vercel の status → runbook Playbook 2 → monitoring.md の Cron heartbeat。",
@@ -313,7 +320,8 @@ flowchart LR
           "email": "degraded",
           "billing": "degraded",
           "calendar": "down",
-          "deploy": "down"
+          "deploy": "down",
+          "ai": "down"
         }
       },
       {
@@ -345,9 +353,9 @@ flowchart LR
         "svc": "external",
         "name": "Upstash Redis",
         "role": "rate limit・Resend webhook の 1 回処理",
-        "breaks": "rate limit が Function のメモリ上の判定へ退避し緩くなる。Resend webhook の処理。本番の /api/health が 503 を返し、UptimeRobot が DOWN を通知する（アプリ本体は動いているのに）。",
-        "keeps": "保存・表示など通常の操作（可用性を優先して通す）。",
-        "behavior": "fail-open。Sentry に記録。",
+        "breaks": "MCP（本番では 503 で止める）、AI クライアントの接続（OAuth の token 発行）、アカウント削除とメール変更の本人確認、問い合わせの送信。Resend webhook の処理。本番の /api/health も 503 を返し、UptimeRobot が DOWN を通知する。",
+        "keeps": "保存・表示など通常の画面の操作。tRPC の利用者単位の rate limit はメモリ上の判定へ退避して通す（緩くなる）。",
+        "behavior": "経路で違う。通常の tRPC は fail-open（利用者単位はメモリへ退避、認証前の IP 単位は通す）。MCP・OAuth token・本人確認・問い合わせは fail-closed（503 / SERVICE_UNAVAILABLE）。どちらも Sentry に記録。",
         "env": ["UPSTASH_REDIS_REST_URL", "UPSTASH_REDIS_REST_TOKEN"],
         "look": "Upstash の status。",
         "refs": [
@@ -358,11 +366,21 @@ flowchart LR
           {
             "path": "apps/product/src/app/api/health/route.ts",
             "find": "checkRedis"
+          },
+          {
+            "path": "apps/product/src/lib/mcp/request-rate-limit.ts",
+            "find": "return 'unavailable';",
+            "why": "MCP は fail-closed"
+          },
+          {
+            "path": "apps/product/src/features/contact/server/router.ts",
+            "find": "Contact rate-limit service is unavailable"
           }
         ],
         "impacts": {
           "email": "degraded",
-          "monitor": "degraded"
+          "monitor": "degraded",
+          "ai": "down"
         }
       },
       {
@@ -397,7 +415,7 @@ flowchart LR
         "role": "エラー監視・production build の gate",
         "breaks": "障害の痕跡が見えなくなる。資格情報が欠けると production build が失敗する。",
         "keeps": "アプリの動作（送信は fire-and-forget）。",
-        "behavior": "DSN が無ければ黙って初期化しない。/api/health の transaction は inbound filter で捨てるので、Sentry が無音でも health が無事とは限らない。",
+        "behavior": "本番の build は DSN などが無いと失敗する（build gate）。Preview と local では DSN が無ければ黙って初期化しない。/api/health の transaction は inbound filter で捨てるので、Sentry が無音でも health が無事とは限らない。",
         "env": ["NEXT_PUBLIC_SENTRY_DSN", "SENTRY_DSN"],
         "look": "Sentry の status。痕跡が無い時は Vercel の Function ログへ。",
         "refs": [
@@ -539,6 +557,10 @@ flowchart LR
       {
         "id": "deploy",
         "label": "本番公開"
+      },
+      {
+        "id": "ai",
+        "label": "AI クライアント（MCP）"
       }
     ]
   }

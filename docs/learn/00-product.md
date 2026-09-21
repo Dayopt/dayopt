@@ -31,7 +31,7 @@ flowchart LR
 
 - **Todo エンジンを作らない**。子の Todo・優先度・期限・ボードは作らない（一度作って捨てた）。だからデータの中心は Todo ではなく**アクティビティ**（`開発` の下の `API` など）
 - **AI は外にいる**。アプリの中に AI 機能を持たず、MCP で Claude / ChatGPT から読み書きさせる → [経路: AI クライアントから Plan を作る](journeys/mcp.md)
-- **自動生成はゴーストまで、確定は人間のワンタップ**。Google の予定も AI の書き込みも、まず未確定として現れ、人が押して初めて Plan / Record になる → [経路: Google Calendar 連携](journeys/google-calendar.md) の最後の段
+- **自動生成はゴーストまで、確定は人間のワンタップ**（原則）。Google の予定は実際にこの形で、未確定として薄く現れ、人が押して初めて Plan / Record になる → [経路: Google Calendar 連携](journeys/google-calendar.md) の最後の段。**ただし現行の MCP は原則と違い、Plan / Record を直接作る**（AI の書き込みをゴースト経由にするかは `docs/product/principles.md` の未決事項）→ [経路: MCP](journeys/mcp.md)
 - **軽い・早い・少ない**。保存ボタンを置かず、アクティビティを選んだ瞬間に作る → [経路: Plan を保存](journeys/save-plan.md)
 
 **時間の規則は 2 本だけ**。「終了は開始より後」と「Record は未来に終われない」。これ以外で過去・未来の操作を出し分けない（2026-09-04 に特別扱いを撤去した）。強制するのは DB の trigger で、UI の確認はその写しにすぎない → [経路: Record を作る・Plan を記録する](journeys/record-plan.md)
@@ -65,7 +65,7 @@ flowchart LR
 <details>
 <summary>2. 「AI が自動で Record を作る」機能はどこで止まるべきか</summary>
 
-「自動生成はゴーストまで、確定は人間のワンタップ」。AI の書き込みは未確定として現れ、人が確定する。記録の確定は人間の儀式（strategy §4-3, 4-4）。
+原則は「自動生成はゴーストまで、確定は人間のワンタップ」「記録の確定は人間の儀式」（strategy §4-3, 4-4）。ただし現行の MCP は Plan / Record を直接作れるので、原則どおりにするなら MCP の書き込みをゴースト経由にする変更が要る（principles.md の未決事項）。**原則と現状は別物**として確かめる。
 
 </details>
 

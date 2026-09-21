@@ -132,7 +132,7 @@ planCommands.record を呼ぶ。作成や更新と違い、一時 ID の Record 
 - 画面: 「記録できませんでした。もう一度お試しください」のトースト。Inspector は操作を止めて「保存結果を確認できません」の案内を出す。
 - データ: どちらもありうる（DB で確定した後に返事だけ失われた場合、Record はある）。
 - 再試行: しない。一覧を取り直すので、確定していれば Record が現れる。
-- 痕跡: ブラウザから Sentry へ（source: trpc_client_transport、分析の同意がある時だけ）。
+- 痕跡: ブラウザから Sentry へ（source: trpc_client_transport、本番（VERCEL_ENV=production）で、かつ分析の同意がある時だけ）。
 - **最初に見る場所**: Sentry と、同じ時刻の Vercel の /api/trpc ログ。
 - 根拠:
   - [`apps/product/src/features/timeblock/hooks/useTimeblockRecordMutations.ts`](../../../apps/product/src/features/timeblock/hooks/useTimeblockRecordMutations.ts) で `t('toast.recordFailed')` を探す
@@ -486,7 +486,7 @@ Plan を FOR UPDATE で押さえ、削除済みなら DT001、版が違えば DT
           "screen": "「記録できませんでした。もう一度お試しください」のトースト。Inspector は操作を止めて「保存結果を確認できません」の案内を出す。",
           "data": "どちらもありうる（DB で確定した後に返事だけ失われた場合、Record はある）。",
           "retry": "しない。一覧を取り直すので、確定していれば Record が現れる。",
-          "trace": "ブラウザから Sentry へ（source: trpc_client_transport、分析の同意がある時だけ）。",
+          "trace": "ブラウザから Sentry へ（source: trpc_client_transport、本番（VERCEL_ENV=production）で、かつ分析の同意がある時だけ）。",
           "look": "Sentry と、同じ時刻の Vercel の /api/trpc ログ。",
           "refs": [
             {

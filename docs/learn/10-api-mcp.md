@@ -68,6 +68,48 @@ last_verified: 2026-09-21
 <details>
 <summary>3. MCP からの書き込みだけを今すぐ止めたい</summary>
 
-`mcp_mutation_control` の gate を閉じる（runbook の「MCP write gate の開閉」、`pnpm mcp:gate`）。write fence では MCP の書き込みは止まらない（しかも UI の書き込みまで止めてしまう）。
+`mcp_mutation_control` の gate を閉じる（runbook の「MCP write gate の開閉」、`pnpm mcp:gate`）。write fence では、接続済みの AI クライアントの書き込みは止まらない（止まるのは新規接続の token 発行だけで、しかも UI の書き込みまで止めてしまう）。
 
 </details>
+
+## 参照（検査用）
+
+このページの本文が名指ししているコード。`pnpm docs:check` が、ファイルが在り `find` の文字列を含むことを検査する。本文を書き換えたらここも直す。
+
+```json learn:refs
+[
+  {
+    "path": "apps/product/src/lib/oauth-server/tokens.ts",
+    "find": "export function hashToken(token: string): string {"
+  },
+  {
+    "path": "apps/product/src/lib/oauth-server/clients.ts",
+    "find": "Phase 1 static client allowlist"
+  },
+  {
+    "path": "apps/product/src/lib/trpc/procedures.ts",
+    "find": "if (ctx.oauthExecution !== 'mcp_internal') {"
+  },
+  {
+    "path": "apps/product/src/features/timeblock/server/mcp-mutation-db.ts",
+    "find": "apply_mcp_plan_create_v1"
+  },
+  {
+    "path": "supabase/migrations/20260914000000_version_mcp_create_digest.sql",
+    "find": "FROM public.create_plan_command_v1("
+  },
+  {
+    "path": "apps/product/src/app/api/mcp/_tools/timeblock-mutations.ts",
+    "find": "Create one future Plan as canonical Dayopt data.",
+    "why": "tool の説明（外部契約）。過去の Plan も作れるのに future と書いてある"
+  },
+  {
+    "path": "apps/product/src/app/api/mcp/_tools/list-tools.test.ts",
+    "find": "describe('MCP list tools public contract'"
+  },
+  {
+    "path": "apps/product/src/features/settings/server/mcp-connections-service.ts",
+    "find": "async revoke(userId: string, connectionId: string)"
+  }
+]
+```

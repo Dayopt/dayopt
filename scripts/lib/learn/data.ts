@@ -64,9 +64,88 @@ const refSchema = z.strictObject({
   why: z.string().min(1).optional(),
 });
 
-const screenSchema = z.looseObject({
-  t: z.enum(['calendar', 'form', 'inbox', 'page', 'consent', 'settings', 'blank']),
-});
+// 利用者の画面の模型。対話画面の描画（ui/template.html の mock*）が読む項目を型ごとに検査する。
+// 未知の項目や欠けた必須項目を通すと、その段を開いた時だけ画面が壊れるため strict にする。
+const tone = z.enum(['ok', 'warn', 'bad', 'neutral']);
+const screenCommon = {
+  url: z.string().optional(),
+  host: z.string().optional(),
+  title: z.string().optional(),
+  note: z.string().optional(),
+  banner: z.string().optional(),
+  bannerTone: tone.optional(),
+  toast: z.string().optional(),
+  toastTone: tone.optional(),
+  toastAction: z.string().optional(),
+};
+const blockState = z.enum(['select', 'temp', 'saved', 'record', 'ext', 'gone']);
+const screenSchema = z.discriminatedUnion('t', [
+  z.strictObject({
+    t: z.literal('calendar'),
+    ...screenCommon,
+    blocks: z
+      .array(
+        z.strictObject({
+          state: blockState,
+          label: z.string(),
+          from: z.number().optional(),
+          len: z.number().optional(),
+        }),
+      )
+      .optional(),
+    drawer: z
+      .strictObject({ title: z.string(), items: z.array(z.string()), on: z.number().int() })
+      .optional(),
+  }),
+  z.strictObject({
+    t: z.literal('form'),
+    ...screenCommon,
+    title: z.string(),
+    fields: z.array(z.tuple([z.string(), z.string()])).optional(),
+    extra: z.string().optional(),
+    button: z.string().optional(),
+    alt: z.string().optional(),
+    error: z.string().optional(),
+    busy: z.boolean().optional(),
+    disabled: z.boolean().optional(),
+  }),
+  z.strictObject({
+    t: z.literal('inbox'),
+    ...screenCommon,
+    mails: z
+      .array(
+        z.strictObject({
+          subject: z.string(),
+          from: z.string().optional(),
+          state: z.enum(['new', 'read', 'missing']).optional(),
+        }),
+      )
+      .min(1),
+  }),
+  z.strictObject({
+    t: z.literal('page'),
+    ...screenCommon,
+    title: z.string(),
+    body: z.string().optional(),
+    tone: tone.optional(),
+    button: z.string().optional(),
+  }),
+  z.strictObject({
+    t: z.literal('consent'),
+    ...screenCommon,
+    title: z.string(),
+    scopes: z.array(z.string()).optional(),
+  }),
+  z.strictObject({
+    t: z.literal('settings'),
+    ...screenCommon,
+    rows: z
+      .array(z.union([z.tuple([z.string(), z.string()]), z.tuple([z.string(), z.string(), tone])]))
+      .min(1),
+    button: z.string().optional(),
+  }),
+  z.strictObject({ t: z.literal('blank'), ...screenCommon, text: z.string().optional() }),
+]);
 
 const failSchema = z.strictObject({
   id: z.string().min(1),
@@ -214,6 +293,8 @@ export interface CollectResult {
   journeys: LearnSource<LearnJourney>[];
   services: LearnSource<LearnServices> | undefined;
   screens: LearnSource<LearnScreens> | undefined;
+  /** 章や lab の手書きの本文が名指しするコード（learn:refs）。本文と同じファイルに置く */
+  extraRefs: LearnSource<LearnRef[]>[];
   errors: string[];
 }
 
@@ -221,6 +302,8 @@ export interface LearnBlock {
   kind: string;
   file: string;
   json: string;
+  /** code block の言語。json 以外なら書き間違いとして報告する */
+  lang: string;
 }
 
 /** Markdown から `json learn:<kind>` の fenced block を取り出す。 */
@@ -235,15 +318,13 @@ export function extractLearnBlocks(markdown: string, file: string): LearnBlock[]
       value?: string;
       children?: unknown[];
     };
-    if (
-      candidate.type === 'code' &&
-      candidate.lang === 'json' &&
-      candidate.meta?.startsWith('learn:')
-    ) {
+    // 言語が json でなくても learn: の block は拾い、collect 側で報告する（黙って検査から外れないように）
+    if (candidate.type === 'code' && candidate.meta?.trim().startsWith('learn:')) {
       blocks.push({
-        kind: candidate.meta.slice('learn:'.length).trim(),
+        kind: candidate.meta.trim().slice('learn:'.length).trim(),
         file,
         json: candidate.value ?? '',
+        lang: candidate.lang ?? '',
       });
     }
     candidate.children?.forEach(visit);
@@ -302,6 +383,9 @@ export function crossCheck(
       if (!svcIds.has(lane)) errors.push(`${file}: lanes に未定義のサービス ${lane}`);
     if (j.twin && !journeyIds.has(j.twin))
       errors.push(`${file}: twin が存在しない journey を指す: ${j.twin}`);
+    const twin = journeys.find((other) => other.value.id === j.twin);
+    if (twin && twin.value.twin !== j.id)
+      errors.push(`${file}: twin が片方向（${j.twin} の twin が ${j.id} を指していない）`);
     const hopIds = new Set(j.hops.map((h) => h.id));
     for (const id of duplicates(j.hops.map((h) => h.id)))
       errors.push(`${file}: hop id が重複: ${id}`);
@@ -353,10 +437,17 @@ export function collectLearnData(root: string): CollectResult {
   const journeys: LearnSource<LearnJourney>[] = [];
   let services: LearnSource<LearnServices> | undefined;
   let screens: LearnSource<LearnScreens> | undefined;
+  const extraRefs: LearnSource<LearnRef[]>[] = [];
 
   for (const abs of files) {
     const file = relative(root, abs);
     for (const block of extractLearnBlocks(readFileSync(abs, 'utf8'), file)) {
+      if (block.lang !== 'json') {
+        errors.push(
+          `${file}: learn:${block.kind} の block の言語が json ではない（${block.lang || '無し'}）。検査から外れるので json にする`,
+        );
+        continue;
+      }
       if (block.kind === 'journey') {
         const value = parseBlock(block, journeySchema, errors);
         if (value) journeys.push({ file, value });
@@ -364,6 +455,9 @@ export function collectLearnData(root: string): CollectResult {
         if (services) errors.push(`${file}: learn:services が 2 つある（${services.file}）`);
         const value = parseBlock(block, servicesSchema, errors);
         if (value) services = { file, value };
+      } else if (block.kind === 'refs') {
+        const value = parseBlock(block, z.array(refSchema).min(1), errors);
+        if (value) extraRefs.push({ file, value });
       } else if (block.kind === 'screens') {
         if (screens) errors.push(`${file}: learn:screens が 2 つある（${screens.file}）`);
         const value = parseBlock(block, screensSchema, errors);
@@ -397,7 +491,7 @@ export function collectLearnData(root: string): CollectResult {
           scenarios: journeys.map((j) => j.value),
         }
       : undefined;
-  return { data, journeys, services, screens, errors };
+  return { data, journeys, services, screens, extraRefs, errors };
 }
 
 /** data 中のすべての参照（refs と tests）を列挙する。 */
@@ -417,5 +511,6 @@ export function listLearnRefs(result: CollectResult): { file: string; ref: Learn
     for (const item of result.services.value.outages.items) push(result.services.file, item.refs);
   if (result.screens)
     for (const node of result.screens.value.nodes) push(result.screens.file, node.refs);
+  for (const { file, value } of result.extraRefs) push(file, value);
   return out;
 }

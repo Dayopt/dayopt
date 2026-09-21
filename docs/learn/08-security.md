@@ -32,10 +32,10 @@ last_verified: 2026-09-21
 
 **繰り返した穴のクラス**（再発したものだけ。網羅ではない）の中で、最も多いのは次の 2 つ。
 
-1. **認可の判断材料が、判断される当人の側にある**（6 回）— 例: 利用者が書き換えられる cookie や入力を、権限の判断に使ってしまう。MFA の cookie 改竄テスト（`mfa-aal-cookie-tampering.integration.test.ts`）はこのクラスの再発防止
+1. **認可の判断材料が、判断される当人の側にある**（6 回）— 例: 利用者が書き換えられる値を、権限の判断に使ってしまう
 2. **ガード自身の走査範囲に穴がある**（8 回）— 例: 検査スクリプトが一部のファイルや経路を見ていない
 
-ほかに、URL の正規化ずれによる allowlist の迂回、外部由来の文章を機械が読む場所へ枠なしで流す、など。
+ほかに、URL の正規化ずれによる allowlist の迂回、外部由来の文章を機械が読む場所へ枠なしで流す、認可の境界より長生きする保管先が利用者ごとに分かれていない（例: MFA の cookie 改竄、#2047。`mfa-aal-cookie-tampering.integration.test.ts` がその再発防止）、など。
 
 **まだ sweep していない境界**: 課金（Stripe webhook・利用権）、外部カレンダー（Google OAuth・token の回転・revoke outbox）、cron の 4 本、ガードレール自身、`apps/web`。**「見て問題なし」ではない**。
 
@@ -77,3 +77,28 @@ last_verified: 2026-09-21
 未検査。threat-model の「未検査の境界」に入っている。署名・identity・冪等 claim の仕組みはあるが、sweep は回していない。
 
 </details>
+
+## 参照（検査用）
+
+このページの本文が名指ししているコード。`pnpm docs:check` が、ファイルが在り `find` の文字列を含むことを検査する。本文を書き換えたらここも直す。
+
+```json learn:refs
+[
+  {
+    "path": "docs/engineering/threat-model.md",
+    "find": "## 未検査の境界"
+  },
+  {
+    "path": "docs/engineering/threat-model.md",
+    "find": "認可の判断材料が、判断される当人の側にある"
+  },
+  {
+    "path": "apps/product/src/lib/safe-redirect.ts",
+    "find": "getSafeRedirectPath"
+  },
+  {
+    "path": "apps/product/src/lib/test/integration/mfa-aal-cookie-tampering.integration.test.ts",
+    "find": "MFA AAL cookie tampering (#2047)"
+  }
+]
+```

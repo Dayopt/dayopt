@@ -17,10 +17,11 @@ Dayopt は **merge と本番公開を分けている**。main への merge は�
 
 ```mermaid
 flowchart LR
-  PR["PR<br/>Supabase Preview Branch + Vercel Preview"] --> M["main へ merge<br/>ruleset の required checks"]
+  PR["PR<br/>Vercel Preview（migration を含む PR は Supabase Preview Branch も）"] --> M["main へ merge<br/>ruleset の required checks"]
   M --> MIG["Supabase: migration を本番へ適用<br/>（merge の時点）"]
   M --> B["Vercel: 本番候補を build<br/>（domain 未割当）"]
-  B --> I["影響判定"] --> L3["E2E / Web / Storybook"]
+  M --> I["Production Release: 影響判定"] --> L3["E2E / Web / Storybook"]
+  B -.->|"release が build を待つ"| P
   L3 -->|"緑"| P["smoke → promote<br/>本番 domain を切り替え"]
   L3 -->|"赤"| X["公開しない<br/>area:deployment の issue"]
 ```
@@ -33,12 +34,12 @@ flowchart LR
 
 **Preview と Production の違い**:
 
-| 項目                          | Preview（PR ごと）                                        | Production                           |
-| ----------------------------- | --------------------------------------------------------- | ------------------------------------ |
-| DB                            | PR ごとの Supabase Preview Branch（本番 DB を参照しない） | 本番 Supabase                        |
-| Sentry                        | 動かない（`IS_SENTRY_PRODUCTION` が偽）                   | 動く                                 |
-| Resend・Stripe・Google の env | 揃っていなくてよい                                        | 組で揃っていることを `env.ts` が要求 |
-| 公開                          | Preview の URL                                            | promote が domain を切り替えた時だけ |
+| 項目                          | Preview（PR ごと）                                                                                                       | Production                                                         |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------ |
+| DB                            | migration を含む PR だけ Supabase Preview Branch が作られる（本番 DB を参照しない）。app-only の PR は branch を持たない | 本番 Supabase                                                      |
+| Sentry                        | 動かない（`IS_SENTRY_PRODUCTION` が偽）                                                                                  | 動く                                                               |
+| Resend・Stripe・Google の env | 揃っていなくてよい（MCP の OAuth を有効にした Preview の build では置くこと自体を禁じる）                                | Resend は必須、Stripe と Google は全部あるか全部無いか（`env.ts`） |
+| 公開                          | Preview の URL                                                                                                           | promote が domain を切り替えた時だけ                               |
 
 **開いているタブ**は、戻った時に `/api/health/version` で版を比べ、編集中でない瞬間に黙って再読み込みする。通知は出ない。API の入力を必須にする変更は、古いタブからの呼び出しを壊す。
 
@@ -71,3 +72,32 @@ migration は merge の時点で本番に入り、古いコードが E2E 完走�
 Preview と本番は別の Supabase・別の env。本番の Resend の設定（`RESEND_*`、送信元ドメイン）と Supabase の Auth hook を見る必要がある。Preview での成功は本番の証明にならない。
 
 </details>
+
+## 参照（検査用）
+
+このページの本文が名指ししているコード。`pnpm docs:check` が、ファイルが在り `find` の文字列を含むことを検査する。本文を書き換えたらここも直す。
+
+```json learn:refs
+[
+  {
+    "path": ".github/workflows/promote.yml",
+    "find": "Verify candidate migrations are applied in Production"
+  },
+  {
+    "path": "scripts/ci/production-migration-readiness.mjs",
+    "find": "**advisory**"
+  },
+  {
+    "path": "scripts/ci/production-release.mjs",
+    "find": "Force Promote: skipping smoke and Production Config Audit."
+  },
+  {
+    "path": "docs/engineering/infra.md",
+    "find": "app-only の PR には branch を要求しない"
+  },
+  {
+    "path": "apps/product/src/app/[locale]/(app)/_providers/useApplyUpdateWhenSafe.ts",
+    "find": "export function useApplyUpdateWhenSafe"
+  }
+]
+```

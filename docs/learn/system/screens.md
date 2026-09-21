@@ -139,7 +139,7 @@ flowchart LR
 
 セッションの確認そのものが失敗した時の逃げ場。もう一度試すか、サインアウトする。
 
-- **ここへ来る条件**: proxy.ts で AAL の確認に失敗した時。/calendar と /auth/login の無限往復を防ぐための画面。
+- **ここへ来る条件**: proxy.ts で AAL の確認に失敗した時、または proxy の処理そのものが例外で落ちた時（Supabase の障害など）。/calendar と /auth/login の無限往復を防ぐための画面。
 - **読み込むデータ**: なし
 - **触るサービス**: Vercel（Next.js）
 - **壊れた時**: ここに来ること自体が障害の兆候。
@@ -147,6 +147,7 @@ flowchart LR
 - **この画面を通る経路**: [ログイン（MFA 含む）](../journeys/login.md)
 - **コードと文書**:
   - [`apps/product/src/proxy.ts`](../../../apps/product/src/proxy.ts) で `MFA assurance lookup failed; redirecting to session error page` を探す
+  - [`apps/product/src/proxy.ts`](../../../apps/product/src/proxy.ts) で `Proxy request failed` を探す
 
 ### トップ（/ja）（`/ja`）
 
@@ -299,7 +300,7 @@ MCP クライアントに渡す権限（scope）を利用者が承認する。
         ],
         "extra": "Cloudflare Turnstile ✓",
         "button": "サインイン",
-        "alt": "Google で続ける"
+        "alt": "Google でサインイン"
       },
       "refs": [
         {
@@ -442,7 +443,7 @@ MCP クライアントに渡す権限（scope）を利用者が承認する。
         "t": "form",
         "title": "多要素認証",
         "url": "/ja/auth/mfa-verify",
-        "fields": [["認証アプリの6桁のコード", "– – – – – –"]],
+        "fields": [["認証コード", "– – – – – –"]],
         "button": "認証",
         "alt": "リカバリーコードを使用"
       },
@@ -462,7 +463,7 @@ MCP クライアントに渡す権限（scope）を利用者が承認する。
       "row": 7,
       "group": "auth",
       "what": "セッションの確認そのものが失敗した時の逃げ場。もう一度試すか、サインアウトする。",
-      "arrive": "proxy.ts で AAL の確認に失敗した時。/calendar と /auth/login の無限往復を防ぐための画面。",
+      "arrive": "proxy.ts で AAL の確認に失敗した時、または proxy の処理そのものが例外で落ちた時（Supabase の障害など）。/calendar と /auth/login の無限往復を防ぐための画面。",
       "loads": "なし",
       "svcs": ["vercel"],
       "fails": "ここに来ること自体が障害の兆候。",
@@ -478,6 +479,10 @@ MCP クライアントに渡す権限（scope）を利用者が承認する。
         {
           "path": "apps/product/src/proxy.ts",
           "find": "MFA assurance lookup failed; redirecting to session error page"
+        },
+        {
+          "path": "apps/product/src/proxy.ts",
+          "find": "Proxy request failed"
         }
       ],
       "flows": ["login"]
