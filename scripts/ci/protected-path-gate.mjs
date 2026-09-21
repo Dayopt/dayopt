@@ -89,6 +89,15 @@ export const PROTECTED_PATH_GLOBS = [
   'apps/product/src/app/api/oauth/**',
   'apps/product/src/app/.well-known/oauth-authorization-server/**',
   'apps/product/src/app/.well-known/oauth-protected-resource/**',
+  // 認証 callback / middleware と共有判定層。route だけを保護しても、token 発行・
+  // verified user・scope・redirect allowlist の実装変更が同じ境界を迂回する。
+  'apps/product/src/app/[locale]/(auth)/auth/**',
+  'apps/product/src/proxy.ts',
+  'apps/product/src/lib/supabase/middleware.ts',
+  'apps/product/src/lib/trpc/session-auth-context.ts',
+  'apps/product/src/lib/auth/**',
+  'apps/product/src/lib/safe-redirect.ts',
+  'apps/product/src/lib/oauth-server/**',
   'apps/product/src/app/api/integrations/**',
   'apps/product/src/app/mcp/**',
   'apps/product/src/app/api/mcp/**',

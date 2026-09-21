@@ -42,6 +42,13 @@ describe('trusted validation plan', () => {
     'scripts/lib/validation-plan.mjs',
     'scripts/lib/review-policy.mjs',
     'apps/product/src/app/api/mcp/a.ts',
+    'apps/product/src/app/[locale]/(auth)/auth/callback/route.ts',
+    'apps/product/src/proxy.ts',
+    'apps/product/src/lib/supabase/middleware.ts',
+    'apps/product/src/lib/trpc/session-auth-context.ts',
+    'apps/product/src/lib/auth/domain/access-policy.ts',
+    'apps/product/src/lib/safe-redirect.ts',
+    'apps/product/src/lib/oauth-server/scopes.ts',
     'supabase/migrations/20260916000000_rls.sql',
   ])('requires review for an external contract, irreversible change, or guardrail: %s', (file) => {
     expect(plan([file]).review.status).toBe('required');
