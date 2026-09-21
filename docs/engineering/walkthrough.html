@@ -38,6 +38,7 @@
         --svc-resend: #8a4bd6;
         --svc-github: #b8641b;
         --svc-external: #6b675f;
+        --svc-google: #0f8b8d;
         color-scheme: light;
       }
       @media (prefers-color-scheme: dark) {
@@ -64,6 +65,7 @@
           --svc-resend: #b98cf0;
           --svc-github: #e0a263;
           --svc-external: #a29e95;
+          --svc-google: #4fc3c5;
           color-scheme: dark;
         }
       }
@@ -90,6 +92,7 @@
         --svc-resend: #b98cf0;
         --svc-github: #e0a263;
         --svc-external: #a29e95;
+        --svc-google: #4fc3c5;
         color-scheme: dark;
       }
       * {
@@ -587,6 +590,445 @@
         font-size: 0.88em;
       }
 
+      /* ---- 利用者の画面の模型 ---- */
+      .hop-head {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 14px;
+        align-items: flex-start;
+        margin-top: 8px;
+      }
+      .hop-head > p {
+        flex: 1 1 200px;
+        margin: 0;
+      }
+      .mock-wrap {
+        flex: 0 0 232px;
+        max-width: 100%;
+      }
+      .mock-cap {
+        font-size: 0.75em;
+        color: var(--muted);
+        margin-bottom: 4px;
+      }
+      .mock-cap.bad {
+        color: var(--bad);
+        font-weight: 700;
+      }
+      .mock {
+        position: relative;
+        width: 232px;
+        max-width: 100%;
+        border: 1.5px solid var(--border);
+        border-radius: 12px;
+        overflow: hidden;
+        background: var(--bg);
+        font-size: 11px;
+        line-height: 1.4;
+        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
+      }
+      .mock.fail {
+        border-color: var(--bad);
+      }
+      .mock-bar {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 5px 8px;
+        background: var(--surface-2);
+        border-bottom: 1px solid var(--border);
+      }
+      .mock-bar i {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--wire);
+        flex: none;
+      }
+      .mock-url {
+        flex: 1;
+        min-width: 0;
+        padding: 1px 8px;
+        border-radius: 999px;
+        background: var(--surface);
+        color: var(--muted);
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 9.5px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .mock-body {
+        position: relative;
+        height: 200px;
+        padding: 8px 10px;
+        overflow: hidden;
+        background: var(--surface);
+      }
+      .mock-note {
+        margin-top: 4px;
+        font-size: 0.75em;
+        color: var(--muted);
+      }
+      .m-banner {
+        margin: -8px -10px 6px;
+        padding: 3px 10px;
+        font-weight: 700;
+        background: var(--warn-bg);
+        color: var(--warn);
+      }
+      .m-banner.bad {
+        background: var(--bad-bg);
+        color: var(--bad);
+      }
+      .m-banner.ok {
+        background: var(--ok-bg);
+        color: var(--ok);
+      }
+      .m-h {
+        font-weight: 700;
+        font-size: 12px;
+        margin-bottom: 6px;
+      }
+      /* calendar */
+      .m-cal {
+        position: absolute;
+        left: 10px;
+        right: 10px;
+        top: 30px;
+        bottom: 8px;
+      }
+      .m-hour {
+        position: absolute;
+        left: 0;
+        right: 0;
+        border-top: 1px solid var(--border);
+        color: var(--muted);
+        font-size: 9px;
+      }
+      .m-block {
+        position: absolute;
+        left: 32px;
+        right: 4px;
+        border-radius: 5px;
+        padding: 2px 6px;
+        font-weight: 700;
+        overflow: hidden;
+        transition: opacity 0.3s;
+      }
+      .m-block.select {
+        border: 1.5px dashed var(--accent);
+        background: color-mix(in srgb, var(--accent) 8%, transparent);
+        color: var(--accent);
+      }
+      .m-block.temp {
+        border: 1.5px dashed var(--accent);
+        background: color-mix(in srgb, var(--accent) 30%, transparent);
+        color: var(--accent);
+      }
+      .m-block.saved {
+        background: var(--accent);
+        color: #fff;
+      }
+      .m-block.record {
+        background: var(--ok);
+        color: #fff;
+      }
+      .m-block.ext {
+        background: color-mix(in srgb, var(--svc-external) 25%, var(--surface));
+        border-left: 4px solid var(--svc-external);
+        color: var(--text);
+      }
+      .m-block.gone {
+        border: 1.5px dotted var(--bad);
+        color: var(--bad);
+        background: transparent;
+        font-weight: 400;
+      }
+      .m-drawer {
+        position: absolute;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        width: 46%;
+        padding: 8px;
+        background: var(--surface-2);
+        border-left: 1px solid var(--border);
+        box-shadow: -4px 0 10px rgba(0, 0, 0, 0.06);
+        z-index: 2;
+      }
+      .m-chip {
+        display: block;
+        margin-top: 4px;
+        padding: 2px 6px;
+        border-radius: 5px;
+        border: 1px solid var(--border);
+        background: var(--surface);
+      }
+      .m-chip.on {
+        border-color: var(--accent);
+        color: var(--accent);
+        font-weight: 700;
+      }
+      .m-toast {
+        position: absolute;
+        left: 8px;
+        right: 8px;
+        bottom: 8px;
+        z-index: 3;
+        padding: 5px 8px;
+        border-radius: 7px;
+        background: var(--text);
+        color: var(--bg);
+        display: flex;
+        gap: 6px;
+        align-items: center;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+      }
+      .m-toast.bad {
+        background: var(--bad);
+        color: #fff;
+      }
+      .m-toast b {
+        margin-left: auto;
+        white-space: nowrap;
+        text-decoration: underline;
+      }
+      /* form */
+      .m-field {
+        margin-top: 5px;
+      }
+      .m-field span {
+        display: block;
+        color: var(--muted);
+        font-size: 9.5px;
+      }
+      .m-field div {
+        height: 18px;
+        border: 1px solid var(--border);
+        border-radius: 5px;
+        background: var(--bg);
+        padding: 0 6px;
+        color: var(--muted);
+        font-size: 9.5px;
+        line-height: 16px;
+        letter-spacing: 0.15em;
+      }
+      .m-btn {
+        margin-top: 8px;
+        padding: 4px;
+        border-radius: 6px;
+        background: var(--accent);
+        color: #fff;
+        text-align: center;
+        font-weight: 700;
+      }
+      .m-btn.busy {
+        opacity: 0.6;
+      }
+      .m-btn.ghost {
+        background: transparent;
+        color: var(--text);
+        border: 1px solid var(--border);
+      }
+      .m-err {
+        margin-top: 6px;
+        color: var(--bad);
+        font-weight: 700;
+      }
+      .m-extra {
+        margin-top: 6px;
+        padding: 3px 6px;
+        border: 1px solid var(--border);
+        border-radius: 5px;
+        color: var(--muted);
+        font-size: 9.5px;
+      }
+      /* inbox */
+      .m-mail {
+        display: flex;
+        gap: 6px;
+        align-items: flex-start;
+        padding: 5px 0;
+        border-bottom: 1px solid var(--border);
+      }
+      .m-mail i {
+        flex: none;
+        width: 7px;
+        height: 7px;
+        margin-top: 4px;
+        border-radius: 50%;
+        background: var(--accent);
+      }
+      .m-mail.read i {
+        background: transparent;
+      }
+      .m-mail.missing {
+        color: var(--bad);
+        border-bottom-style: dashed;
+      }
+      .m-mail.missing i {
+        background: transparent;
+        border: 1px dashed var(--bad);
+      }
+      .m-mail b {
+        display: block;
+      }
+      .m-mail small {
+        color: var(--muted);
+      }
+      .m-mail.missing small {
+        color: var(--bad);
+      }
+      /* page */
+      .m-page {
+        text-align: center;
+        padding-top: 22px;
+      }
+      .m-page .ic {
+        display: inline-grid;
+        place-items: center;
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        font-weight: 700;
+        font-size: 15px;
+        color: #fff;
+        background: var(--ok);
+      }
+      .m-page.warn .ic {
+        background: var(--warn);
+      }
+      .m-page.bad .ic {
+        background: var(--bad);
+      }
+      .m-page.neutral .ic {
+        background: var(--muted);
+      }
+      .m-page p {
+        margin: 6px 0 0;
+        color: var(--muted);
+      }
+      /* settings */
+      .m-row {
+        display: flex;
+        justify-content: space-between;
+        gap: 6px;
+        align-items: center;
+        padding: 5px 0;
+        border-bottom: 1px solid var(--border);
+      }
+      .m-pill {
+        padding: 0 6px;
+        border-radius: 999px;
+        font-size: 9.5px;
+        font-weight: 700;
+        white-space: nowrap;
+        background: var(--sev-bg);
+        color: var(--sev);
+      }
+      /* blank */
+      .m-blank {
+        height: 100%;
+        display: grid;
+        place-items: center;
+        text-align: center;
+        color: var(--muted);
+      }
+      /* ---- 画面マップ ---- */
+      .stage.wide {
+        grid-template-columns: minmax(0, 1fr);
+      }
+      .stage.wide .panel {
+        position: static;
+        max-height: none;
+      }
+      .smap {
+        position: relative;
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        column-gap: 120px;
+        row-gap: 14px;
+        padding: 16px 44px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+      }
+      @media (max-width: 560px) {
+        .smap {
+          column-gap: 30px;
+          padding: 12px 20px;
+        }
+      }
+      .smap-h {
+        position: relative;
+        z-index: 2;
+        font-size: 0.78em;
+        color: var(--muted);
+      }
+      .scr {
+        position: relative;
+        z-index: 2;
+        min-height: 44px;
+        padding: 6px 10px;
+        text-align: left;
+        border: 1.5px solid var(--border);
+        border-left: 5px solid var(--g);
+        border-radius: 8px;
+        background: var(--surface);
+        cursor: pointer;
+        line-height: 1.3;
+        transition: opacity 0.2s;
+      }
+      .scr.auth {
+        --g: var(--svc-supabase);
+      }
+      .scr.app {
+        --g: var(--svc-browser);
+      }
+      .scr.ext {
+        --g: var(--svc-google);
+      }
+      .scr b {
+        display: block;
+        font-size: 0.88em;
+      }
+      .scr small {
+        display: block;
+        color: var(--muted);
+        font-size: 0.68em;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        overflow-wrap: anywhere;
+      }
+      .scr.on {
+        box-shadow: 0 0 0 2px var(--accent);
+        background: color-mix(in srgb, var(--accent) 10%, var(--surface));
+      }
+      .has-pick .scr:not(.on):not(.linked) {
+        opacity: 0.45;
+      }
+      .scr-edge {
+        fill: none;
+        stroke: var(--wire);
+        stroke-width: 1.5;
+        opacity: 0.3;
+      }
+      .scr-edge.on {
+        stroke: var(--accent);
+        stroke-width: 2.5;
+        opacity: 1;
+      }
+      .tag.on {
+        color: var(--accent);
+        border-color: var(--accent);
+        font-weight: 600;
+      }
+      .chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+        margin-top: 4px;
+      }
       /* ---- 停止マップ ---- */
       .deps {
         position: relative;
@@ -739,7 +1181,7 @@
       <header>
         <h1>Dayopt 経路ウォークスルー</h1>
         <p>
-          操作を 1 つ選び、どのサービスのどの処理を通るかを図で辿る。▶ で依頼が流れ、段を押すと中身とコードが出る。「⚡ ここで失敗させる」を押すと、どこで途切れ、何が画面へ戻り、データ・再試行・痕跡がどうなり、どこから確認するかが出る。目的は暗記ではなく、変更の影響先と障害時の初手を自分で引けるようにすること。
+          まず画面マップで画面どうしの移り方を見て、操作を 1 つ選び、どのサービスのどの処理を通るかを図で辿る。各段の右には利用者の画面の模型が出る。▶ で依頼が流れ、段を押すと中身とコードが出る。「⚡ ここで失敗させる」を押すと、どこで途切れ、何が画面へ戻り、データ・再試行・痕跡がどうなり、どこから確認するかが出る。目的は暗記ではなく、変更の影響先と障害時の初手を自分で引けるようにすること。
         </p>
       </header>
 
@@ -787,6 +1229,11 @@
             "label": "その他の外部",
             "var": "--svc-external",
             "sub": ""
+          },
+          "google": {
+            "label": "Google",
+            "var": "--svc-google",
+            "sub": "OAuth / Calendar API"
           }
         },
         "scenarios": [
@@ -818,7 +1265,18 @@
                   }
                 ],
                 "fails": [],
-                "short": "Plan か Record か決める"
+                "short": "Plan か Record か決める",
+                "screen": {
+                  "t": "calendar",
+                  "url": "/ja/calendar",
+                  "blocks": [
+                    {
+                      "state": "select",
+                      "label": "10:00–11:00"
+                    }
+                  ],
+                  "note": "ドラッグで時間帯を選んだところ"
+                }
               },
               {
                 "id": "inline-create",
@@ -856,10 +1314,42 @@
                       "data": "unchanged",
                       "retry": "user",
                       "trace": "none"
+                    },
+                    "screenAfter": {
+                      "t": "calendar",
+                      "url": "/ja/calendar",
+                      "blocks": [
+                        {
+                          "state": "saved",
+                          "label": "既存の予定"
+                        }
+                      ],
+                      "toast": "この時間帯には既に予定があります",
+                      "toastTone": "bad"
                     }
                   }
                 ],
-                "short": "作成を依頼"
+                "short": "作成を依頼",
+                "screen": {
+                  "t": "calendar",
+                  "url": "/ja/calendar",
+                  "blocks": [
+                    {
+                      "state": "select",
+                      "label": ""
+                    }
+                  ],
+                  "drawer": {
+                    "title": "アクティビティ",
+                    "items": [
+                      "仕事",
+                      "読書",
+                      "運動"
+                    ],
+                    "on": 0
+                  },
+                  "note": "右のパネルでアクティビティを選ぶ"
+                }
               },
               {
                 "id": "optimistic",
@@ -906,10 +1396,32 @@
                       "data": "unchanged",
                       "retry": "auto",
                       "trace": "none"
+                    },
+                    "screenAfter": {
+                      "t": "calendar",
+                      "url": "/ja/calendar",
+                      "blocks": [
+                        {
+                          "state": "temp",
+                          "label": "仕事（保存中）"
+                        }
+                      ],
+                      "note": "回線が戻るまでこのまま。タブを閉じるとこの保存は消える"
                     }
                   }
                 ],
-                "short": "先に画面へ出す"
+                "short": "先に画面へ出す",
+                "screen": {
+                  "t": "calendar",
+                  "url": "/ja/calendar",
+                  "blocks": [
+                    {
+                      "state": "temp",
+                      "label": "仕事（保存中）"
+                    }
+                  ],
+                  "note": "サーバーの返事を待たずに出す。以降の段の間、利用者はこの表示のまま操作を続けられる"
+                }
               },
               {
                 "id": "trpc-client",
@@ -961,7 +1473,20 @@
                       "trace": "sentry"
                     },
                     "to": "optimistic",
-                    "back": "巻き戻し + トースト"
+                    "back": "巻き戻し + トースト",
+                    "screenAfter": {
+                      "t": "calendar",
+                      "url": "/ja/calendar",
+                      "blocks": [
+                        {
+                          "state": "gone",
+                          "label": "消えた"
+                        }
+                      ],
+                      "toast": "保存できませんでした。入力内容は保持されています。もう一度お試しください",
+                      "toastTone": "bad",
+                      "note": "一覧を取り直した時、DB で確定していたなら Plan が再び現れる"
+                    }
                   }
                 ],
                 "short": "tRPC で送る"
@@ -1008,7 +1533,19 @@
                       "trace": "none"
                     },
                     "to": "optimistic",
-                    "back": "巻き戻し + トースト"
+                    "back": "巻き戻し + トースト",
+                    "screenAfter": {
+                      "t": "calendar",
+                      "url": "/ja/calendar",
+                      "blocks": [
+                        {
+                          "state": "gone",
+                          "label": "消えた"
+                        }
+                      ],
+                      "toast": "保存できませんでした。入力内容は保持されています。もう一度お試しください",
+                      "toastTone": "bad"
+                    }
                   },
                   {
                     "id": "function-down",
@@ -1031,7 +1568,19 @@
                       "trace": "log"
                     },
                     "to": "optimistic",
-                    "back": "巻き戻し + トースト"
+                    "back": "巻き戻し + トースト",
+                    "screenAfter": {
+                      "t": "calendar",
+                      "url": "/ja/calendar",
+                      "blocks": [
+                        {
+                          "state": "gone",
+                          "label": "消えた"
+                        }
+                      ],
+                      "toast": "保存できませんでした。入力内容は保持されています。もう一度お試しください",
+                      "toastTone": "bad"
+                    }
                   }
                 ],
                 "short": "/api/trpc で受ける",
@@ -1079,7 +1628,25 @@
                       "trace": "none"
                     },
                     "to": "optimistic",
-                    "back": "ログイン画面へ"
+                    "back": "ログイン画面へ",
+                    "screenAfter": {
+                      "t": "form",
+                      "title": "サインイン",
+                      "url": "/ja/auth/login?redirect=/calendar",
+                      "fields": [
+                        [
+                          "メールアドレス",
+                          "m@example.com"
+                        ],
+                        [
+                          "パスワード",
+                          "••••••••"
+                        ]
+                      ],
+                      "extra": "Cloudflare Turnstile ✓",
+                      "button": "サインイン",
+                      "alt": "Google で続ける"
+                    }
                   },
                   {
                     "id": "write-fence",
@@ -1106,7 +1673,19 @@
                       "trace": "none"
                     },
                     "to": "optimistic",
-                    "back": "巻き戻し + トースト"
+                    "back": "巻き戻し + トースト",
+                    "screenAfter": {
+                      "t": "calendar",
+                      "url": "/ja/calendar",
+                      "blocks": [
+                        {
+                          "state": "gone",
+                          "label": "消えた"
+                        }
+                      ],
+                      "toast": "保存できませんでした。入力内容は保持されています。もう一度お試しください",
+                      "toastTone": "bad"
+                    }
                   },
                   {
                     "id": "upstash-down",
@@ -1128,7 +1707,19 @@
                       "retry": "na",
                       "trace": "sentry"
                     },
-                    "continues": true
+                    "continues": true,
+                    "screenAfter": {
+                      "t": "calendar",
+                      "url": "/ja/calendar",
+                      "blocks": [
+                        {
+                          "state": "saved",
+                          "label": "仕事"
+                        }
+                      ],
+                      "toast": "予定を追加しました ✓",
+                      "toastAction": "元に戻す"
+                    }
                   }
                 ],
                 "short": "関門チェック"
@@ -1197,7 +1788,19 @@
                       "retry": "auto",
                       "trace": "none"
                     },
-                    "continues": true
+                    "continues": true,
+                    "screenAfter": {
+                      "t": "calendar",
+                      "url": "/ja/calendar",
+                      "blocks": [
+                        {
+                          "state": "saved",
+                          "label": "仕事"
+                        }
+                      ],
+                      "toast": "予定を追加しました ✓",
+                      "toastAction": "元に戻す"
+                    }
                   },
                   {
                     "id": "db-unexpected",
@@ -1224,7 +1827,19 @@
                       "trace": "sentry"
                     },
                     "to": "optimistic",
-                    "back": "巻き戻し + トースト"
+                    "back": "巻き戻し + トースト",
+                    "screenAfter": {
+                      "t": "calendar",
+                      "url": "/ja/calendar",
+                      "blocks": [
+                        {
+                          "state": "gone",
+                          "label": "消えた"
+                        }
+                      ],
+                      "toast": "保存できませんでした。入力内容は保持されています。もう一度お試しください",
+                      "toastTone": "bad"
+                    }
                   },
                   {
                     "id": "supabase-down",
@@ -1247,7 +1862,20 @@
                       "trace": "monitor"
                     },
                     "to": "optimistic",
-                    "back": "保存も表示も失敗"
+                    "back": "保存も表示も失敗",
+                    "screenAfter": {
+                      "t": "calendar",
+                      "url": "/ja/calendar",
+                      "blocks": [
+                        {
+                          "state": "gone",
+                          "label": "消えた"
+                        }
+                      ],
+                      "toast": "保存できませんでした。入力内容は保持されています。もう一度お試しください",
+                      "toastTone": "bad",
+                      "note": "一覧の取り直しも失敗し、キャッシュの表示が残る"
+                    }
                   }
                 ],
                 "short": "RPC で書き込む",
@@ -1295,7 +1923,19 @@
                       "trace": "none"
                     },
                     "to": "optimistic",
-                    "back": "規則ごとの文言"
+                    "back": "規則ごとの文言",
+                    "screenAfter": {
+                      "t": "calendar",
+                      "url": "/ja/calendar",
+                      "blocks": [
+                        {
+                          "state": "gone",
+                          "label": "消えた"
+                        }
+                      ],
+                      "toast": "終了時刻は開始時刻より後にしてください",
+                      "toastTone": "bad"
+                    }
                   },
                   {
                     "id": "overlap",
@@ -1318,7 +1958,19 @@
                       "trace": "none"
                     },
                     "to": "optimistic",
-                    "back": "重なりの案内"
+                    "back": "重なりの案内",
+                    "screenAfter": {
+                      "t": "calendar",
+                      "url": "/ja/calendar",
+                      "blocks": [
+                        {
+                          "state": "gone",
+                          "label": "消えた"
+                        }
+                      ],
+                      "toast": "この時間帯には既に記録があります",
+                      "toastTone": "bad"
+                    }
                   }
                 ],
                 "short": "時刻の規則で検査"
@@ -1345,13 +1997,717 @@
                 ],
                 "fails": [],
                 "short": "確定して取り直す",
-                "via": "応答"
+                "via": "応答",
+                "screen": {
+                  "t": "calendar",
+                  "url": "/ja/calendar",
+                  "blocks": [
+                    {
+                      "state": "saved",
+                      "label": "仕事"
+                    }
+                  ],
+                  "toast": "予定を追加しました ✓",
+                  "toastAction": "元に戻す"
+                }
               }
             ],
             "lanes": [
               "browser",
               "vercel",
               "supabase"
+            ]
+          },
+          {
+            "id": "login",
+            "title": "ログイン（MFA 含む）",
+            "intro": "メールアドレスとパスワードでサインインする。多要素認証（MFA）を登録している人は、6 桁のコードを求められる。認証の通信はブラウザから Supabase Auth へ直接行き、tRPC を通らない。",
+            "play": "▶ サインインを押す",
+            "lanes": [
+              "browser",
+              "vercel",
+              "supabase"
+            ],
+            "hops": [
+              {
+                "id": "login-form",
+                "svc": "browser",
+                "short": "サインイン画面",
+                "title": "サインイン画面で入力する",
+                "what": "メールアドレスとパスワードを入れ、Cloudflare Turnstile の確認が済むとボタンが押せる。Google で続けるボタンは別経路（Supabase の OAuth → /auth/callback）。",
+                "change": "ボタンの活性は Turnstile の状態で決まる。Turnstile の設定を変える時はこの画面と登録画面の両方を見る。",
+                "screen": {
+                  "t": "form",
+                  "title": "サインイン",
+                  "url": "/ja/auth/login",
+                  "fields": [
+                    [
+                      "メールアドレス",
+                      "m@example.com"
+                    ],
+                    [
+                      "パスワード",
+                      "••••••••"
+                    ]
+                  ],
+                  "extra": "Cloudflare Turnstile ✓",
+                  "button": "サインイン",
+                  "alt": "Google で続ける"
+                },
+                "refs": [
+                  {
+                    "path": "apps/product/src/features/auth/components/LoginForm.tsx",
+                    "find": "turnstile.blocksSubmit"
+                  },
+                  {
+                    "path": "apps/product/src/app/[locale]/(auth)/auth/callback/route.ts",
+                    "find": "exchangeCodeForSession",
+                    "why": "Google で続けた場合の着地"
+                  }
+                ],
+                "fails": [
+                  {
+                    "id": "turnstile-block",
+                    "label": "Turnstile の確認が終わらない",
+                    "screen": "ボタンが押せないまま。",
+                    "data": "変化なし。",
+                    "retry": "利用者が待つか、再読み込みする。",
+                    "trace": "何も残らない（通信前）。",
+                    "look": "Cloudflare の status。全員に起きているなら site key の設定。",
+                    "refs": [
+                      {
+                        "path": "apps/product/src/features/auth/components/LoginForm.tsx",
+                        "find": "turnstile.blocksSubmit"
+                      }
+                    ],
+                    "tags": {
+                      "screen": "blocked",
+                      "data": "unchanged",
+                      "retry": "user",
+                      "trace": "none"
+                    },
+                    "screenAfter": {
+                      "t": "form",
+                      "title": "サインイン",
+                      "url": "/ja/auth/login",
+                      "fields": [
+                        [
+                          "メールアドレス",
+                          "m@example.com"
+                        ],
+                        [
+                          "パスワード",
+                          "••••••••"
+                        ]
+                      ],
+                      "extra": "Turnstile 確認中…",
+                      "button": "サインイン",
+                      "alt": "Google で続ける",
+                      "disabled": true
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "sign-in",
+                "svc": "supabase",
+                "short": "パスワードを確かめる",
+                "via": "signInWithPassword",
+                "title": "Supabase Auth がパスワードを確かめる",
+                "what": "ブラウザから supabase.auth.signInWithPassword を呼ぶ。エラーは生の文言を出さず、翻訳キーへ変換してフォームの下に出す。メールが無いのかパスワードが違うのかは区別しない。",
+                "change": "想定内の認証エラー（401 / 422 / 429 など）は Sentry に送らない。送る対象を変える時は isExpectedAuthError を見る。",
+                "screen": {
+                  "t": "form",
+                  "title": "サインイン",
+                  "url": "/ja/auth/login",
+                  "fields": [
+                    [
+                      "メールアドレス",
+                      "m@example.com"
+                    ],
+                    [
+                      "パスワード",
+                      "••••••••"
+                    ]
+                  ],
+                  "extra": "Cloudflare Turnstile ✓",
+                  "button": "サインイン",
+                  "alt": "Google で続ける",
+                  "busy": true
+                },
+                "refs": [
+                  {
+                    "path": "apps/product/src/features/auth/stores/useAuthStore.ts",
+                    "find": "supabase.auth.signInWithPassword"
+                  },
+                  {
+                    "path": "apps/product/src/lib/sentry/integration.ts",
+                    "find": "export function isExpectedAuthError"
+                  }
+                ],
+                "fails": [
+                  {
+                    "id": "wrong-password",
+                    "label": "パスワードが違う",
+                    "screen": "「メールアドレスまたはパスワードが正しくありません」。",
+                    "data": "変化なし。",
+                    "retry": "すぐにやり直せる。",
+                    "trace": "想定内なので Sentry には出ない。",
+                    "look": "利用者の入力ミス。多発するなら Supabase の Auth ログ。",
+                    "refs": [
+                      {
+                        "path": "apps/product/src/lib/auth-error.ts",
+                        "find": "invalidCredentials"
+                      }
+                    ],
+                    "tags": {
+                      "screen": "toast",
+                      "data": "unchanged",
+                      "retry": "user",
+                      "trace": "none"
+                    },
+                    "to": "login-form",
+                    "back": "フォームにエラー",
+                    "screenAfter": {
+                      "t": "form",
+                      "title": "サインイン",
+                      "url": "/ja/auth/login",
+                      "fields": [
+                        [
+                          "メールアドレス",
+                          "m@example.com"
+                        ],
+                        [
+                          "パスワード",
+                          "••••••••"
+                        ]
+                      ],
+                      "extra": "Cloudflare Turnstile ✓",
+                      "button": "サインイン",
+                      "alt": "Google で続ける",
+                      "error": "メールアドレスまたはパスワードが正しくありません"
+                    }
+                  },
+                  {
+                    "id": "auth-rate-limited",
+                    "label": "試行が多すぎる（Supabase の制限）",
+                    "screen": "「一時的にロックされています。…分後に再試行してください」。",
+                    "data": "変化なし。",
+                    "retry": "時間を置くしかない。回数はアプリ側では数えていない。",
+                    "trace": "Sentry には出ない。",
+                    "look": "Supabase の Auth ログ（アプリの DB には記録が無い）。",
+                    "refs": [
+                      {
+                        "path": "apps/product/src/lib/auth-error.ts",
+                        "find": "auth.errors.accountLocked"
+                      }
+                    ],
+                    "tags": {
+                      "screen": "toast",
+                      "data": "unchanged",
+                      "retry": "user",
+                      "trace": "none"
+                    },
+                    "to": "login-form",
+                    "back": "ロックの案内",
+                    "screenAfter": {
+                      "t": "form",
+                      "title": "サインイン",
+                      "url": "/ja/auth/login",
+                      "fields": [
+                        [
+                          "メールアドレス",
+                          "m@example.com"
+                        ],
+                        [
+                          "パスワード",
+                          "••••••••"
+                        ]
+                      ],
+                      "extra": "Cloudflare Turnstile ✓",
+                      "button": "サインイン",
+                      "alt": "Google で続ける",
+                      "error": "セキュリティのため、このアカウントは一時的にロックされています"
+                    }
+                  },
+                  {
+                    "id": "captcha-failed",
+                    "label": "Turnstile の token が拒否される",
+                    "screen": "「確認に失敗しました」。Turnstile が作り直され、もう一度押せる。",
+                    "data": "変化なし。",
+                    "retry": "利用者がやり直す。",
+                    "trace": "token 側の既知の問題なら Sentry に出ない。secret の設定ミスなど未知の理由なら Sentry に出る。",
+                    "look": "Sentry で captcha_failed を探す → Supabase の Bot Protection の secret。",
+                    "refs": [
+                      {
+                        "path": "apps/product/src/lib/sentry/integration.ts",
+                        "find": "EXPECTED_CAPTCHA_TOKEN_ISSUE_MESSAGES"
+                      }
+                    ],
+                    "tags": {
+                      "screen": "toast",
+                      "data": "unchanged",
+                      "retry": "user",
+                      "trace": "sentry"
+                    },
+                    "to": "login-form",
+                    "back": "確認に失敗",
+                    "screenAfter": {
+                      "t": "form",
+                      "title": "サインイン",
+                      "url": "/ja/auth/login",
+                      "fields": [
+                        [
+                          "メールアドレス",
+                          "m@example.com"
+                        ],
+                        [
+                          "パスワード",
+                          "••••••••"
+                        ]
+                      ],
+                      "extra": "Cloudflare Turnstile ✓",
+                      "button": "サインイン",
+                      "alt": "Google で続ける",
+                      "error": "確認に失敗しました。解決しない場合はサポートへ"
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "aal-check",
+                "svc": "supabase",
+                "short": "MFA が要るか確かめる",
+                "title": "多要素認証が要るかを確かめる",
+                "what": "パスワードが通ったら、認証の強さ（AAL）を問い合わせる。今が aal1 で次が aal2 なら MFA を登録している人なので、コード入力の画面へ進む。そうでなければそのままカレンダーへ。",
+                "change": "問い合わせに失敗した時は、安全側に倒して MFA 画面へ送る（fail-closed）。",
+                "refs": [
+                  {
+                    "path": "apps/product/src/features/auth/components/LoginForm.tsx",
+                    "find": "getAuthenticatorAssuranceLevel"
+                  },
+                  {
+                    "path": "apps/product/src/features/auth/components/LoginForm.tsx",
+                    "find": "router.push(buildMfaUrl())"
+                  }
+                ],
+                "fails": [
+                  {
+                    "id": "aal-lookup-fail",
+                    "label": "AAL の問い合わせが失敗",
+                    "screen": "MFA を登録していなくても MFA 画面へ進む。",
+                    "data": "変化なし。",
+                    "retry": "不要。MFA 画面が登録の有無を確かめ直し、未登録ならカレンダーへ送る。",
+                    "trace": "logger.warn だけ。",
+                    "look": "Supabase の Auth ログ。",
+                    "refs": [
+                      {
+                        "path": "apps/product/src/features/auth/components/LoginForm.tsx",
+                        "find": "MFA check failed, redirecting to MFA verify for safety"
+                      }
+                    ],
+                    "tags": {
+                      "screen": "redirect",
+                      "data": "unchanged",
+                      "retry": "na",
+                      "trace": "log"
+                    },
+                    "screenAfter": {
+                      "t": "form",
+                      "title": "多要素認証",
+                      "url": "/ja/auth/mfa-verify",
+                      "fields": [
+                        [
+                          "認証アプリの6桁のコード",
+                          "– – – – – –"
+                        ]
+                      ],
+                      "button": "認証",
+                      "alt": "リカバリーコードを使用"
+                    },
+                    "continues": true
+                  }
+                ]
+              },
+              {
+                "id": "mfa-page",
+                "svc": "browser",
+                "short": "6 桁のコード入力",
+                "via": "MFA が必要なら",
+                "title": "MFA 画面でコードを入れる",
+                "what": "画面を開くと登録済みの TOTP を探し、challenge を発行する。6 桁を入れ終えると自動で送る。端末を失くした人はリカバリーコードでも通れる（その場合は MFA が解除され、解除の通知メールが届く）。",
+                "change": "リカバリーコードの tRPC だけは、まだ aal1 のままでも protectedProcedure を通れるよう例外にしてある。MFA の関門を変える時はこの例外を壊さない。",
+                "screen": {
+                  "t": "form",
+                  "title": "多要素認証",
+                  "url": "/ja/auth/mfa-verify",
+                  "fields": [
+                    [
+                      "認証アプリの6桁のコード",
+                      "– – – – – –"
+                    ]
+                  ],
+                  "button": "認証",
+                  "alt": "リカバリーコードを使用"
+                },
+                "refs": [
+                  {
+                    "path": "apps/product/src/app/[locale]/(auth)/auth/mfa-verify/page.tsx",
+                    "find": "supabase.auth.mfa.challenge"
+                  },
+                  {
+                    "path": "apps/product/src/app/[locale]/(auth)/auth/mfa-verify/page.tsx",
+                    "find": "vanillaTrpc.user.verifyRecoveryCode.mutate"
+                  },
+                  {
+                    "path": "apps/product/src/lib/trpc/procedures.ts",
+                    "find": "MFA_CHALLENGE_TRPC_PATHS"
+                  },
+                  {
+                    "path": "apps/product/src/features/auth/server/recovery-service.ts",
+                    "find": "sendMfaDisabledEmail"
+                  }
+                ],
+                "fails": [
+                  {
+                    "id": "challenge-fail",
+                    "label": "challenge を発行できない",
+                    "screen": "エラーと「もう一度試す」ボタンが出る。",
+                    "data": "変化なし。",
+                    "retry": "利用者がボタンで発行し直す。",
+                    "trace": "画面に出るだけ。",
+                    "look": "Supabase の Auth ログ。",
+                    "refs": [
+                      {
+                        "path": "apps/product/src/app/[locale]/(auth)/auth/mfa-verify/page.tsx",
+                        "find": "checkMFARequired"
+                      }
+                    ],
+                    "tags": {
+                      "screen": "toast",
+                      "data": "unchanged",
+                      "retry": "user",
+                      "trace": "none"
+                    },
+                    "screenAfter": {
+                      "t": "form",
+                      "title": "多要素認証",
+                      "url": "/ja/auth/mfa-verify",
+                      "fields": [
+                        [
+                          "認証アプリの6桁のコード",
+                          "– – – – – –"
+                        ]
+                      ],
+                      "button": "もう一度試す",
+                      "alt": "リカバリーコードを使用",
+                      "error": "チャレンジエラー"
+                    }
+                  },
+                  {
+                    "id": "recovery-exhausted",
+                    "label": "リカバリーコードを使い切っている",
+                    "screen": "使い切った旨の表示。先へ進めない。",
+                    "data": "変化なし。",
+                    "retry": "できない。サポートへの連絡が要る。",
+                    "trace": "想定内。",
+                    "look": "サポート対応。",
+                    "refs": [
+                      {
+                        "path": "apps/product/src/features/auth/server/recovery-service.ts",
+                        "find": "RECOVERY_EXHAUSTED"
+                      }
+                    ],
+                    "tags": {
+                      "screen": "toast",
+                      "data": "unchanged",
+                      "retry": "none",
+                      "trace": "none"
+                    },
+                    "screenAfter": {
+                      "t": "form",
+                      "title": "多要素認証",
+                      "url": "/ja/auth/mfa-verify",
+                      "fields": [
+                        [
+                          "認証アプリの6桁のコード",
+                          "– – – – – –"
+                        ]
+                      ],
+                      "button": "認証",
+                      "alt": "リカバリーコードを使用",
+                      "error": "リカバリーコードを使い切っています"
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "mfa-verify",
+                "svc": "supabase",
+                "short": "コードを検証",
+                "via": "mfa.verify",
+                "title": "Supabase がコードを検証する",
+                "what": "mfa.verify で検証する。通ればセッションが aal2 に上がり、next パラメータ（安全な相対パスだけ）へ進む。",
+                "change": "遷移先は getSafeRedirectPath で必ず検査する。外部 URL を渡されるとオープンリダイレクトになる。",
+                "screen": {
+                  "t": "form",
+                  "title": "多要素認証",
+                  "url": "/ja/auth/mfa-verify",
+                  "fields": [
+                    [
+                      "認証アプリの6桁のコード",
+                      "1 2 3 4 5 6"
+                    ]
+                  ],
+                  "button": "認証",
+                  "alt": "リカバリーコードを使用",
+                  "busy": true
+                },
+                "refs": [
+                  {
+                    "path": "apps/product/src/app/[locale]/(auth)/auth/mfa-verify/page.tsx",
+                    "find": "isMfaChallengeExpired"
+                  },
+                  {
+                    "path": "apps/product/src/lib/safe-redirect.ts",
+                    "find": "getSafeRedirectPath"
+                  }
+                ],
+                "fails": [
+                  {
+                    "id": "wrong-code",
+                    "label": "コードが違う",
+                    "screen": "「コードが正しくありません。もう一度お試しください」。入力は消える。",
+                    "data": "変化なし。",
+                    "retry": "同じ challenge でやり直せる。",
+                    "trace": "想定内。",
+                    "look": "端末の時刻ずれを疑う。",
+                    "refs": [
+                      {
+                        "path": "apps/product/src/app/[locale]/(auth)/auth/mfa-verify/page.tsx",
+                        "find": "resolveMfaVerifyErrorKey"
+                      }
+                    ],
+                    "tags": {
+                      "screen": "toast",
+                      "data": "unchanged",
+                      "retry": "user",
+                      "trace": "none"
+                    },
+                    "to": "mfa-page",
+                    "back": "コードが違う",
+                    "screenAfter": {
+                      "t": "form",
+                      "title": "多要素認証",
+                      "url": "/ja/auth/mfa-verify",
+                      "fields": [
+                        [
+                          "認証アプリの6桁のコード",
+                          "– – – – – –"
+                        ]
+                      ],
+                      "button": "認証",
+                      "alt": "リカバリーコードを使用",
+                      "error": "コードが正しくありません。もう一度お試しください"
+                    }
+                  },
+                  {
+                    "id": "challenge-expired",
+                    "label": "challenge の期限切れ",
+                    "screen": "入力が消えるだけ。",
+                    "data": "変化なし。",
+                    "retry": "新しい challenge を自動で発行する。",
+                    "trace": "何も残らない。",
+                    "look": "不要。",
+                    "refs": [
+                      {
+                        "path": "apps/product/src/app/[locale]/(auth)/auth/mfa-verify/page.tsx",
+                        "find": "isMfaChallengeExpired"
+                      }
+                    ],
+                    "tags": {
+                      "screen": "none",
+                      "data": "unchanged",
+                      "retry": "auto",
+                      "trace": "none"
+                    },
+                    "screenAfter": {
+                      "t": "form",
+                      "title": "多要素認証",
+                      "url": "/ja/auth/mfa-verify",
+                      "fields": [
+                        [
+                          "認証アプリの6桁のコード",
+                          "– – – – – –"
+                        ]
+                      ],
+                      "button": "認証",
+                      "alt": "リカバリーコードを使用"
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "proxy",
+                "svc": "vercel",
+                "short": "proxy がセッションを確認",
+                "via": "/ja/calendar へ移動",
+                "title": "proxy.ts がセッションと AAL を確かめる",
+                "what": "保護された画面へのリクエストはすべて proxy.ts を通る。cookie のセッションを更新し、未ログインなら元のパスを redirect に入れてサインインへ、aal2 が要るのに aal1 なら MFA 画面へ送る。",
+                "change": "保護する画面を足す時は access-policy の protectedProductPaths に入れる。入れ忘れると未ログインでも開ける。",
+                "screen": {
+                  "t": "blank",
+                  "url": "/ja/calendar",
+                  "text": "読み込み中…"
+                },
+                "refs": [
+                  {
+                    "path": "apps/product/src/proxy.ts",
+                    "find": "resolveMfaAssurance"
+                  },
+                  {
+                    "path": "apps/product/src/proxy.ts",
+                    "find": "loginUrl.searchParams.set('redirect'"
+                  },
+                  {
+                    "path": "apps/product/src/lib/auth/domain/access-policy.ts",
+                    "find": "protectedProductPaths"
+                  }
+                ],
+                "fails": [
+                  {
+                    "id": "no-session",
+                    "label": "セッションが無い・切れた",
+                    "screen": "サインイン画面へ。元のパスは redirect パラメータに残る。",
+                    "data": "変化なし。",
+                    "retry": "サインインし直すと元の画面へ戻る。",
+                    "trace": "何も残らない。",
+                    "look": "頻発するなら cookie の更新（updateSession）と Supabase の Auth ログ。",
+                    "refs": [
+                      {
+                        "path": "apps/product/src/proxy.ts",
+                        "find": "loginUrl.searchParams.set('redirect'"
+                      }
+                    ],
+                    "tags": {
+                      "screen": "redirect",
+                      "data": "unchanged",
+                      "retry": "user",
+                      "trace": "none"
+                    },
+                    "to": "login-form",
+                    "back": "サインインへ",
+                    "screenAfter": {
+                      "t": "form",
+                      "title": "サインイン",
+                      "url": "/ja/auth/login?redirect=/calendar",
+                      "fields": [
+                        [
+                          "メールアドレス",
+                          "m@example.com"
+                        ],
+                        [
+                          "パスワード",
+                          "••••••••"
+                        ]
+                      ],
+                      "extra": "Cloudflare Turnstile ✓",
+                      "button": "サインイン",
+                      "alt": "Google で続ける"
+                    }
+                  },
+                  {
+                    "id": "proxy-aal-fail",
+                    "label": "AAL の確認に失敗",
+                    "screen": "「セッションを確認できませんでした」の画面。もう一度試すかサインアウトできる。",
+                    "data": "変化なし。",
+                    "retry": "利用者が「もう一度試す」を押す。/calendar と /auth/login の無限往復を避けるため専用画面にしている。",
+                    "trace": "logger.warn だけ。",
+                    "look": "Vercel のログで「MFA assurance lookup failed」を探す → Supabase の Auth。",
+                    "refs": [
+                      {
+                        "path": "apps/product/src/proxy.ts",
+                        "find": "MFA assurance lookup failed; redirecting to session error page"
+                      }
+                    ],
+                    "tags": {
+                      "screen": "redirect",
+                      "data": "unchanged",
+                      "retry": "user",
+                      "trace": "log"
+                    },
+                    "screenAfter": {
+                      "t": "page",
+                      "url": "/ja/auth/session-error",
+                      "tone": "warn",
+                      "title": "セッションを確認できませんでした",
+                      "body": "もう一度お試しください。解決しない場合はサインアウトしてください。",
+                      "button": "もう一度試す"
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "landing",
+                "svc": "browser",
+                "short": "カレンダーに着地",
+                "title": "カレンダーに着地する",
+                "what": "サインイン前に開こうとしていた画面（redirect）があればそこへ、無ければ /calendar へ。カレンダーは Plan・Record・Google の予定・統計を server で先に取ってから描く。",
+                "change": "しばらく操作しないと自動でサインアウトし、/auth/login?reason=timeout へ戻る。",
+                "screen": {
+                  "t": "calendar",
+                  "url": "/ja/calendar",
+                  "blocks": [
+                    {
+                      "state": "saved",
+                      "label": "仕事"
+                    },
+                    {
+                      "state": "ext",
+                      "label": "Google の予定",
+                      "from": 2.2,
+                      "len": 0.8
+                    }
+                  ]
+                },
+                "refs": [
+                  {
+                    "path": "apps/product/src/lib/safe-redirect.ts",
+                    "find": "getSafeRedirectPath"
+                  },
+                  {
+                    "path": "apps/product/src/lib/auth/session-config.ts",
+                    "find": "/auth/login?reason=timeout"
+                  },
+                  {
+                    "path": "apps/product/src/lib/hooks/useLogout.ts",
+                    "find": "supabase.auth.signOut()"
+                  }
+                ],
+                "fails": [
+                  {
+                    "id": "open-redirect",
+                    "label": "redirect に外部 URL が入っている",
+                    "screen": "何も起きない。/calendar へ着地する。",
+                    "data": "変化なし。",
+                    "retry": "不要。",
+                    "trace": "何も残らない。",
+                    "look": "不要（防御が効いている）。",
+                    "refs": [
+                      {
+                        "path": "apps/product/src/lib/safe-redirect.ts",
+                        "find": "getSafeRedirectPath"
+                      }
+                    ],
+                    "tags": {
+                      "screen": "none",
+                      "data": "unchanged",
+                      "retry": "na",
+                      "trace": "none"
+                    }
+                  }
+                ]
+              }
             ]
           },
           {
@@ -1401,7 +2757,14 @@
                       "retry": "na",
                       "trace": "log"
                     },
-                    "continues": true
+                    "continues": true,
+                    "screenAfter": {
+                      "t": "page",
+                      "url": "/ja/auth/signup",
+                      "tone": "neutral",
+                      "title": "メールを確認してください",
+                      "body": "m@example.com に確認リンクを送信しました。"
+                    }
                   },
                   {
                     "id": "turnstile-missing",
@@ -1422,10 +2785,45 @@
                       "data": "unknown",
                       "retry": "none",
                       "trace": "none"
+                    },
+                    "screenAfter": {
+                      "t": "form",
+                      "title": "アカウントを作成",
+                      "url": "/ja/auth/signup",
+                      "fields": [
+                        [
+                          "メールアドレス",
+                          "m@example.com"
+                        ],
+                        [
+                          "パスワード",
+                          "••••••••"
+                        ]
+                      ],
+                      "extra": "（Turnstile が出ない）",
+                      "button": "アカウント作成",
+                      "error": "確認に失敗しました（Bot Protection が有効な場合）"
                     }
                   }
                 ],
-                "short": "登録フォーム"
+                "short": "登録フォーム",
+                "screen": {
+                  "t": "form",
+                  "title": "アカウントを作成",
+                  "url": "/ja/auth/signup",
+                  "fields": [
+                    [
+                      "メールアドレス",
+                      "m@example.com"
+                    ],
+                    [
+                      "パスワード",
+                      "••••••••"
+                    ]
+                  ],
+                  "extra": "Cloudflare Turnstile ✓",
+                  "button": "アカウント作成"
+                }
               },
               {
                 "id": "supabase-signup",
@@ -1465,11 +2863,47 @@
                       "trace": "sentry"
                     },
                     "to": "signup-form",
-                    "back": "フォームにエラー"
+                    "back": "フォームにエラー",
+                    "screenAfter": {
+                      "t": "form",
+                      "title": "アカウントを作成",
+                      "url": "/ja/auth/signup",
+                      "fields": [
+                        [
+                          "メールアドレス",
+                          "m@example.com"
+                        ],
+                        [
+                          "パスワード",
+                          "••••••••"
+                        ]
+                      ],
+                      "extra": "Cloudflare Turnstile ✓",
+                      "button": "アカウント作成",
+                      "error": "（エラーの種類に応じた文言）"
+                    }
                   }
                 ],
                 "short": "Auth に登録",
-                "via": "signUp"
+                "via": "signUp",
+                "screen": {
+                  "t": "form",
+                  "title": "アカウントを作成",
+                  "url": "/ja/auth/signup",
+                  "fields": [
+                    [
+                      "メールアドレス",
+                      "m@example.com"
+                    ],
+                    [
+                      "パスワード",
+                      "••••••••"
+                    ]
+                  ],
+                  "extra": "Cloudflare Turnstile ✓",
+                  "button": "アカウント作成",
+                  "busy": true
+                }
               },
               {
                 "id": "auth-email-hook",
@@ -1509,11 +2943,36 @@
                       "trace": "sentry"
                     },
                     "to": "signup-form",
-                    "back": "登録エラー"
+                    "back": "登録エラー",
+                    "screenAfter": {
+                      "t": "form",
+                      "title": "アカウントを作成",
+                      "url": "/ja/auth/signup",
+                      "fields": [
+                        [
+                          "メールアドレス",
+                          "m@example.com"
+                        ],
+                        [
+                          "パスワード",
+                          "••••••••"
+                        ]
+                      ],
+                      "extra": "Cloudflare Turnstile ✓",
+                      "button": "アカウント作成",
+                      "error": "（登録エラーとして表示）"
+                    }
                   }
                 ],
                 "short": "確認メール送信",
-                "via": "send_email hook"
+                "via": "send_email hook",
+                "screen": {
+                  "t": "page",
+                  "url": "/ja/auth/signup",
+                  "tone": "neutral",
+                  "title": "メールを確認してください",
+                  "body": "m@example.com に確認リンクを送信しました。"
+                }
               },
               {
                 "id": "confirm-route",
@@ -1552,11 +3011,31 @@
                       "data": "unchanged",
                       "retry": "user",
                       "trace": "none"
+                    },
+                    "screenAfter": {
+                      "t": "page",
+                      "url": "/ja/auth/confirmed?status=…",
+                      "tone": "warn",
+                      "title": "メールアドレスの確認",
+                      "body": "状態に応じた案内とサインインへのボタン",
+                      "button": "サインインへ"
                     }
                   }
                 ],
                 "short": "確認リンクで着地",
-                "via": "メールのリンク"
+                "via": "メールのリンク",
+                "screen": {
+                  "t": "inbox",
+                  "host": "メール",
+                  "url": "",
+                  "mails": [
+                    {
+                      "subject": "メールアドレスの確認",
+                      "state": "new"
+                    }
+                  ],
+                  "note": "利用者がメールのリンクを押す → /auth/confirm"
+                }
               },
               {
                 "id": "welcome-claim",
@@ -1594,6 +3073,22 @@
                       "data": "unchanged",
                       "retry": "next",
                       "trace": "sentry"
+                    },
+                    "screenAfter": {
+                      "t": "inbox",
+                      "host": "メール",
+                      "url": "",
+                      "mails": [
+                        {
+                          "subject": "Dayopt へようこそ",
+                          "state": "missing"
+                        },
+                        {
+                          "subject": "メールアドレスの確認",
+                          "state": "read"
+                        }
+                      ],
+                      "note": "次に確認リンクを通った時、まだ空なら送る"
                     }
                   },
                   {
@@ -1610,11 +3105,23 @@
                       "data": "unchanged",
                       "retry": "na",
                       "trace": "none"
+                    },
+                    "screenAfter": {
+                      "t": "calendar",
+                      "url": "/ja/calendar",
+                      "blocks": [],
+                      "note": "2 回目は何も送らない"
                     }
                   }
                 ],
                 "short": "送る権利を取る",
-                "via": "UPDATE"
+                "via": "UPDATE",
+                "screen": {
+                  "t": "calendar",
+                  "url": "/ja/calendar",
+                  "blocks": [],
+                  "note": "サインインした状態でカレンダーに着地"
+                }
               },
               {
                 "id": "transactional-send",
@@ -1656,6 +3163,21 @@
                       "data": "lost",
                       "retry": "none",
                       "trace": "sentry"
+                    },
+                    "screenAfter": {
+                      "t": "inbox",
+                      "host": "メール",
+                      "url": "",
+                      "mails": [
+                        {
+                          "subject": "Dayopt へようこそ",
+                          "state": "missing"
+                        },
+                        {
+                          "subject": "メールアドレスの確認",
+                          "state": "read"
+                        }
+                      ]
                     }
                   },
                   {
@@ -1677,6 +3199,21 @@
                       "data": "lost",
                       "retry": "none",
                       "trace": "sentry"
+                    },
+                    "screenAfter": {
+                      "t": "inbox",
+                      "host": "メール",
+                      "url": "",
+                      "mails": [
+                        {
+                          "subject": "Dayopt へようこそ",
+                          "state": "missing"
+                        },
+                        {
+                          "subject": "メールアドレスの確認",
+                          "state": "read"
+                        }
+                      ]
                     }
                   },
                   {
@@ -1698,11 +3235,41 @@
                       "data": "unchanged",
                       "retry": "none",
                       "trace": "log"
+                    },
+                    "screenAfter": {
+                      "t": "inbox",
+                      "host": "メール",
+                      "url": "",
+                      "mails": [
+                        {
+                          "subject": "Dayopt へようこそ",
+                          "state": "missing"
+                        },
+                        {
+                          "subject": "メールアドレスの確認",
+                          "state": "read"
+                        }
+                      ]
                     }
                   }
                 ],
                 "short": "Resend で送る",
-                "via": "送信 API"
+                "via": "送信 API",
+                "screen": {
+                  "t": "inbox",
+                  "host": "メール",
+                  "url": "",
+                  "mails": [
+                    {
+                      "subject": "Dayopt へようこそ",
+                      "state": "new"
+                    },
+                    {
+                      "subject": "メールアドレスの確認",
+                      "state": "read"
+                    }
+                  ]
+                }
               },
               {
                 "id": "resend-webhook",
@@ -1776,6 +3343,687 @@
             ]
           },
           {
+            "id": "google-calendar",
+            "title": "Google Calendar 連携",
+            "intro": "設定の「連携」で Google アカウントを接続し、Google の予定を Dayopt のカレンダーに取り込む。接続（OAuth）と取り込み（15 分ごとの cron）は別の経路で、接続した瞬間には取り込まない。",
+            "play": "▶ 接続を押す",
+            "lanes": [
+              "browser",
+              "vercel",
+              "google",
+              "supabase"
+            ],
+            "hops": [
+              {
+                "id": "integrations-ui",
+                "svc": "browser",
+                "short": "連携設定で接続",
+                "title": "設定の「連携」で接続ボタンを押す",
+                "what": "「Google アカウントを接続」を押すと、/api/integrations/google-calendar/start へ画面ごと移動する（SPA の遷移ではない）。ボタンは「この環境で接続できるか」（設定と redirect URI）だけで活性を決める。",
+                "change": "ボタンは利用権（課金）を見ていない。利用権が切れた人が押すと /start が 403 の JSON を返し、ブラウザに JSON がそのまま出る。",
+                "screen": {
+                  "t": "settings",
+                  "url": "/ja/settings/integrations",
+                  "title": "連携 › Google カレンダー",
+                  "rows": [
+                    [
+                      "Google アカウント",
+                      "未接続",
+                      "neutral"
+                    ]
+                  ],
+                  "button": "Google アカウントを接続"
+                },
+                "refs": [
+                  {
+                    "path": "apps/product/src/features/external-calendar/components/GoogleCalendarSettings.tsx",
+                    "find": "window.location.assign(`/api/integrations/google-calendar/start"
+                  },
+                  {
+                    "path": "apps/product/src/features/external-calendar/server/router.ts",
+                    "find": "getConnectionAvailability"
+                  }
+                ],
+                "fails": [
+                  {
+                    "id": "not-configured",
+                    "label": "この環境で接続できない",
+                    "screen": "「この環境ではGoogle カレンダーに接続できません。」ボタンは押せない。",
+                    "data": "変化なし。",
+                    "retry": "しない。",
+                    "trace": "何も残らない。",
+                    "look": "GOOGLE_CALENDAR_* と CALENDAR_TOKEN_ENCRYPTION_KEY の env、redirect URI の allowlist。",
+                    "refs": [
+                      {
+                        "path": "apps/product/src/env.ts",
+                        "find": "CALENDAR_TOKEN_ENCRYPTION_KEY"
+                      }
+                    ],
+                    "tags": {
+                      "screen": "blocked",
+                      "data": "unchanged",
+                      "retry": "none",
+                      "trace": "none"
+                    },
+                    "screenAfter": {
+                      "t": "settings",
+                      "url": "/ja/settings/integrations",
+                      "title": "連携 › Google カレンダー",
+                      "rows": [
+                        [
+                          "Google アカウント",
+                          "未接続",
+                          "neutral"
+                        ]
+                      ],
+                      "banner": "この環境ではGoogle カレンダーに接続できません。",
+                      "bannerTone": "warn"
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "start",
+                "svc": "vercel",
+                "short": "/start で準備",
+                "via": "GET /api/…/start",
+                "title": "/start が関門を通して Google へ送る",
+                "what": "ログイン → MFA → 利用権 → rate limit の順に確かめ、state と PKCE を作って cookie に入れ、Google の同意画面へ 302 する。求める権限はカレンダー一覧と予定の読み取りだけ（書き込みはしない）。",
+                "change": "MFA を利用権や rate limit より先に見るのは、MFA 不足で断る時に DB 読み取りや枠を消費しないため。",
+                "screen": {
+                  "t": "blank",
+                  "url": "/api/integrations/google-calendar/start",
+                  "text": "Google へ移動中…"
+                },
+                "refs": [
+                  {
+                    "path": "apps/product/src/app/api/integrations/google-calendar/start/route.ts",
+                    "find": "checkEntitlementForUser"
+                  },
+                  {
+                    "path": "apps/product/src/app/api/integrations/google-calendar/start/route.ts",
+                    "find": "generatePkcePair"
+                  },
+                  {
+                    "path": "apps/product/src/app/api/integrations/google-calendar/start/route.ts",
+                    "find": "calendarConnectRateLimit"
+                  },
+                  {
+                    "path": "apps/product/src/features/external-calendar/server/../schemas/google.ts",
+                    "find": "GOOGLE_AUTHORIZATION_SCOPES"
+                  }
+                ],
+                "fails": [
+                  {
+                    "id": "start-pro",
+                    "label": "利用権が切れている",
+                    "screen": "ブラウザに {\"error\":\"Pro plan required\"} の JSON がそのまま出る。",
+                    "data": "変化なし。",
+                    "retry": "しない。",
+                    "trace": "想定内の拒否。",
+                    "look": "利用者の課金状態。画面側でボタンを止めていないのが原因。",
+                    "refs": [
+                      {
+                        "path": "apps/product/src/app/api/integrations/google-calendar/start/route.ts",
+                        "find": "{ error: 'Pro plan required' }"
+                      }
+                    ],
+                    "tags": {
+                      "screen": "down",
+                      "data": "unchanged",
+                      "retry": "none",
+                      "trace": "none"
+                    },
+                    "screenAfter": {
+                      "t": "page",
+                      "url": "/api/integrations/google-calendar/start",
+                      "tone": "bad",
+                      "title": "{\"error\":\"Pro plan required\"}",
+                      "body": "JSON がそのまま表示される"
+                    }
+                  },
+                  {
+                    "id": "start-mfa",
+                    "label": "MFA がまだ",
+                    "screen": "MFA 画面へ移動する。",
+                    "data": "変化なし。",
+                    "retry": "認証後にもう一度押す。",
+                    "trace": "何も残らない。",
+                    "look": "不要。",
+                    "refs": [
+                      {
+                        "path": "apps/product/src/app/api/integrations/google-calendar/start/route.ts",
+                        "find": "calendar_connect"
+                      }
+                    ],
+                    "tags": {
+                      "screen": "redirect",
+                      "data": "unchanged",
+                      "retry": "user",
+                      "trace": "none"
+                    },
+                    "screenAfter": {
+                      "t": "form",
+                      "title": "多要素認証",
+                      "url": "/ja/auth/mfa-verify",
+                      "fields": [
+                        [
+                          "認証アプリの6桁のコード",
+                          "– – – – – –"
+                        ]
+                      ],
+                      "button": "認証",
+                      "alt": "リカバリーコードを使用"
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "consent",
+                "svc": "google",
+                "short": "Google の同意画面",
+                "via": "302 → Google",
+                "title": "Google でアカウントを選び、許可する",
+                "what": "アカウントの選択と同意画面が出る。オフラインでも使える refresh token を得るため access_type=offline で求める。",
+                "change": "求める権限（scope）を増やすと、既存の接続は再同意が要る。Google の審査（OAuth verification）にも関わる。",
+                "screen": {
+                  "t": "consent",
+                  "host": "accounts.google.com",
+                  "url": "/o/oauth2/…",
+                  "title": "Dayopt が Google アカウントへのアクセスを求めています",
+                  "scopes": [
+                    "カレンダーの一覧を見る",
+                    "予定を見る（読み取りのみ）"
+                  ]
+                },
+                "refs": [
+                  {
+                    "path": "apps/product/src/features/external-calendar/server/google-oauth.ts",
+                    "find": "access_type"
+                  },
+                  {
+                    "path": "docs/operations/google-oauth-verification.md",
+                    "find": "Google"
+                  }
+                ],
+                "fails": [
+                  {
+                    "id": "access-denied",
+                    "label": "利用者が許可しない",
+                    "screen": "設定に戻り「Google カレンダーへのアクセスが許可されませんでした」。",
+                    "data": "変化なし。",
+                    "retry": "利用者がもう一度接続する。",
+                    "trace": "想定内。",
+                    "look": "不要。",
+                    "refs": [
+                      {
+                        "path": "apps/product/src/app/api/integrations/google-calendar/callback/route.ts",
+                        "find": "access_denied"
+                      }
+                    ],
+                    "tags": {
+                      "screen": "toast",
+                      "data": "unchanged",
+                      "retry": "user",
+                      "trace": "none"
+                    },
+                    "to": "back-settings",
+                    "back": "許可されなかった",
+                    "screenAfter": {
+                      "t": "settings",
+                      "url": "/ja/settings/integrations",
+                      "title": "連携 › Google カレンダー",
+                      "rows": [
+                        [
+                          "Google アカウント",
+                          "未接続",
+                          "neutral"
+                        ]
+                      ],
+                      "toast": "Google カレンダーへのアクセスが許可されませんでした",
+                      "toastTone": "bad"
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "callback",
+                "svc": "vercel",
+                "short": "callback で検証",
+                "via": "302 → /callback?code=",
+                "title": "callback が戻りを検証する",
+                "what": "ログイン・MFA・rate limit・write fence・利用権を確かめ直し、cookie の state と照合する。code を使う前に残り時間を確かめる（code は 1 回しか使えないので、交換後に時間切れになると取り返せない）。",
+                "change": "失敗の理由はすべて ?calendar=error&reason=… で設定画面へ返し、専用の文言を出す。理由を足したら文言も足す。",
+                "screen": {
+                  "t": "blank",
+                  "url": "/api/integrations/google-calendar/callback",
+                  "text": "接続を確認中…"
+                },
+                "refs": [
+                  {
+                    "path": "apps/product/src/app/api/integrations/google-calendar/callback/route.ts",
+                    "find": "isWriteFenceEnabled"
+                  },
+                  {
+                    "path": "apps/product/src/app/api/integrations/google-calendar/callback/route.ts",
+                    "find": "POST_EXCHANGE_BUDGET_MS"
+                  },
+                  {
+                    "path": "apps/product/src/features/external-calendar/lib/calendar-callback-result.ts",
+                    "find": "budget"
+                  }
+                ],
+                "fails": [
+                  {
+                    "id": "state-mismatch",
+                    "label": "state が合わない・cookie が切れた",
+                    "screen": "設定に戻り、もう一度試すよう案内される。",
+                    "data": "変化なし。",
+                    "retry": "利用者がもう一度接続する。",
+                    "trace": "想定内。",
+                    "look": "不要（別タブで接続し直した等）。",
+                    "refs": [
+                      {
+                        "path": "apps/product/src/app/api/integrations/google-calendar/callback/route.ts",
+                        "find": "state_mismatch"
+                      }
+                    ],
+                    "tags": {
+                      "screen": "toast",
+                      "data": "unchanged",
+                      "retry": "user",
+                      "trace": "none"
+                    },
+                    "to": "back-settings",
+                    "back": "やり直しの案内",
+                    "screenAfter": {
+                      "t": "settings",
+                      "url": "/ja/settings/integrations",
+                      "title": "連携 › Google カレンダー",
+                      "rows": [
+                        [
+                          "Google アカウント",
+                          "未接続",
+                          "neutral"
+                        ]
+                      ],
+                      "toast": "接続用のリンクの有効期限が切れました。もう一度お試しください。",
+                      "toastTone": "bad"
+                    }
+                  },
+                  {
+                    "id": "callback-fence",
+                    "label": "write fence が ON",
+                    "screen": "設定に戻り、接続できなかった旨。",
+                    "data": "変化なし。",
+                    "retry": "fence を解くまで同じ。",
+                    "trace": "運用が意図した停止。",
+                    "look": "runbook の Write Fence。",
+                    "refs": [
+                      {
+                        "path": "apps/product/src/app/api/integrations/google-calendar/callback/route.ts",
+                        "find": "write_fenced"
+                      }
+                    ],
+                    "tags": {
+                      "screen": "toast",
+                      "data": "unchanged",
+                      "retry": "none",
+                      "trace": "none"
+                    },
+                    "to": "back-settings",
+                    "back": "接続できない",
+                    "screenAfter": {
+                      "t": "settings",
+                      "url": "/ja/settings/integrations",
+                      "title": "連携 › Google カレンダー",
+                      "rows": [
+                        [
+                          "Google アカウント",
+                          "未接続",
+                          "neutral"
+                        ]
+                      ],
+                      "toast": "Google カレンダーに接続できませんでした",
+                      "toastTone": "bad"
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "exchange",
+                "svc": "google",
+                "short": "code を token に交換",
+                "via": "token 交換",
+                "title": "Google で code を token に交換する",
+                "what": "code を access token と refresh token に交換し、許可された権限が揃っているかを確かめる。揃っていない、または別アカウントだった時は、得た許可を Google 側で取り消してから断る（孤児の許可を残さない）。",
+                "change": "ここより後で失敗した時は必ず revokeOrphanedGrant を試す。新しい失敗理由を足す時もこの後始末を通す。",
+                "refs": [
+                  {
+                    "path": "apps/product/src/app/api/integrations/google-calendar/callback/route.ts",
+                    "find": "hasRequiredCalendarScopes"
+                  },
+                  {
+                    "path": "apps/product/src/app/api/integrations/google-calendar/callback/route.ts",
+                    "find": "revokeOrphanedGrant"
+                  }
+                ],
+                "fails": [
+                  {
+                    "id": "scope-not-granted",
+                    "label": "一部の権限だけ許可された",
+                    "screen": "設定に戻り「必要な権限の一部が許可されませんでした」。",
+                    "data": "得た許可は Google 側で取り消す。",
+                    "retry": "利用者がすべて許可してやり直す。",
+                    "trace": "想定内。",
+                    "look": "不要。",
+                    "refs": [
+                      {
+                        "path": "apps/product/src/app/api/integrations/google-calendar/callback/route.ts",
+                        "find": "scope_not_granted"
+                      }
+                    ],
+                    "tags": {
+                      "screen": "toast",
+                      "data": "unchanged",
+                      "retry": "user",
+                      "trace": "none"
+                    },
+                    "to": "back-settings",
+                    "back": "権限が足りない",
+                    "screenAfter": {
+                      "t": "settings",
+                      "url": "/ja/settings/integrations",
+                      "title": "連携 › Google カレンダー",
+                      "rows": [
+                        [
+                          "Google アカウント",
+                          "未接続",
+                          "neutral"
+                        ]
+                      ],
+                      "toast": "必要な権限の一部が許可されませんでした",
+                      "toastTone": "bad"
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "save-connection",
+                "svc": "supabase",
+                "short": "暗号化して保存",
+                "via": "calendar_connections",
+                "title": "refresh token を暗号化して保存する",
+                "what": "refresh token を AES-256-GCM で暗号化し、calendar_connections に保存する。利用者のセッションからは暗号化された列を読めない（列単位の GRANT）。",
+                "change": "CALENDAR_TOKEN_ENCRYPTION_KEY を変えると、保存済みの token をすべて読めなくなる（全員が再接続になる）。",
+                "refs": [
+                  {
+                    "path": "apps/product/src/features/external-calendar/server/token-crypto.ts",
+                    "find": "AES-256-GCM"
+                  },
+                  {
+                    "path": "apps/product/src/features/external-calendar/server/connection-service.ts",
+                    "find": "refresh_token_enc: encryptToken("
+                  }
+                ],
+                "fails": []
+              },
+              {
+                "id": "back-settings",
+                "svc": "browser",
+                "short": "設定に戻る（接続済み）",
+                "via": "302 → ?calendar=connected",
+                "title": "設定画面に戻り、接続済みになる",
+                "what": "/settings/integrations?calendar=connected へ戻り、トーストを出してから URL の印を消す。この時点では予定はまだ取り込んでいない。",
+                "change": "デスクトップでは設定はモーダルなので、戻ってきた後にカレンダーの上で開き直す。",
+                "screen": {
+                  "t": "settings",
+                  "url": "/ja/settings/integrations",
+                  "title": "連携 › Google カレンダー",
+                  "rows": [
+                    [
+                      "m@example.com",
+                      "接続済み",
+                      "ok"
+                    ],
+                    [
+                      "最終同期",
+                      "未同期",
+                      "neutral"
+                    ]
+                  ],
+                  "toast": "Google アカウントを接続しました"
+                },
+                "refs": [
+                  {
+                    "path": "apps/product/src/app/[locale]/(app)/settings/[category]/page.tsx",
+                    "find": "removeCalendarCallbackParams"
+                  }
+                ],
+                "fails": []
+              },
+              {
+                "id": "cron-sync",
+                "svc": "vercel",
+                "short": "15 分ごとの同期 cron",
+                "via": "最大 15 分後",
+                "title": "Vercel Cron が 15 分ごとに同期を回す",
+                "what": "CRON_SECRET で呼び出し元を確かめ、write fence を見て、開始と完了を heartbeat に記録する。同期が必要な接続を順に、50 秒の持ち時間の中で処理する。設定の「今すぐ同期」も同じ処理を呼ぶ。",
+                "change": "取りこぼした回を埋め直さない。止まったことは heartbeat の完了時刻が古くなることで気づく（production の監査が見る）。",
+                "screen": {
+                  "t": "settings",
+                  "url": "/ja/settings/integrations",
+                  "title": "連携 › Google カレンダー",
+                  "rows": [
+                    [
+                      "m@example.com",
+                      "接続済み",
+                      "ok"
+                    ],
+                    [
+                      "最終同期",
+                      "未同期",
+                      "neutral"
+                    ]
+                  ],
+                  "note": "利用者は待っているだけ。「今すぐ同期」で前倒しもできる"
+                },
+                "refs": [
+                  {
+                    "path": "apps/product/src/app/api/cron/calendar-sync/route.ts",
+                    "find": "writeCronHeartbeat"
+                  },
+                  {
+                    "path": "apps/product/vercel.json",
+                    "find": "*/15 * * * *"
+                  },
+                  {
+                    "path": "apps/product/src/features/external-calendar/server/sync-dispatcher.ts",
+                    "find": "dispatchCalendarSync"
+                  },
+                  {
+                    "path": "scripts/ci/production-cron-heartbeat-audit.mjs",
+                    "find": "heartbeat"
+                  }
+                ],
+                "fails": [
+                  {
+                    "id": "cron-stopped",
+                    "label": "cron が動いていない",
+                    "screen": "何も起きない。予定が増えないだけ。",
+                    "data": "取り込まれない。",
+                    "retry": "次に cron が動いた時に追いつく。「今すぐ同期」でも取れる。",
+                    "trace": "heartbeat の完了時刻が古くなり、本番の監査が拾う。",
+                    "look": "monitoring.md の Cron heartbeat → Vercel の Cron 履歴 → CRON_SECRET。",
+                    "refs": [
+                      {
+                        "path": "docs/operations/monitoring.md",
+                        "find": "## Cron heartbeat と本番 schema・権限監査"
+                      }
+                    ],
+                    "tags": {
+                      "screen": "none",
+                      "data": "unchanged",
+                      "retry": "next",
+                      "trace": "monitor"
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "fetch-events",
+                "svc": "google",
+                "short": "予定を差分で取得",
+                "via": "Calendar API",
+                "title": "Google から予定を差分で取る",
+                "what": "保存した refresh token で access token を取り直し、前回の sync token から差分だけ取る。1 日 1 回は全件、Google が sync token を無効にした時（410）も全件で取り直す。1 回の API は 15 秒で打ち切る。",
+                "change": "refresh token の回転（新しい token の保存）はこの同期の中で行う。別の cron ではない。",
+                "refs": [
+                  {
+                    "path": "apps/product/src/features/external-calendar/server/providers/google.ts",
+                    "find": "GOOGLE_API_TIMEOUT_MS"
+                  },
+                  {
+                    "path": "apps/product/src/features/external-calendar/server/providers/google.ts",
+                    "find": "requestWithRateLimitRetry"
+                  },
+                  {
+                    "path": "apps/product/src/features/external-calendar/server/token-rotation.ts",
+                    "find": "persistCalendarTokenRotation"
+                  }
+                ],
+                "fails": [
+                  {
+                    "id": "reauth",
+                    "label": "Google 側で許可が取り消された",
+                    "screen": "設定の行が「再接続が必要」になり、再接続ボタンが出る。",
+                    "data": "status が reauth_required になり、以後は同期を飛ばす。",
+                    "retry": "利用者が再接続する。",
+                    "trace": "利用者が直せる失敗なので Sentry には出さない（quota を焼かせないため）。接続の last_sync_error に残る。",
+                    "look": "calendar_connections の status と last_sync_error。",
+                    "refs": [
+                      {
+                        "path": "apps/product/src/features/external-calendar/server/sync-service.ts",
+                        "find": "markCalendarConnectionReauth"
+                      }
+                    ],
+                    "tags": {
+                      "screen": "toast",
+                      "data": "unchanged",
+                      "retry": "user",
+                      "trace": "log"
+                    },
+                    "to": "back-settings",
+                    "back": "再接続が必要",
+                    "screenAfter": {
+                      "t": "settings",
+                      "url": "/ja/settings/integrations",
+                      "title": "連携 › Google カレンダー",
+                      "rows": [
+                        [
+                          "m@example.com",
+                          "再接続が必要",
+                          "bad"
+                        ]
+                      ],
+                      "banner": "Googleへのアクセスが期限切れです。同じGoogle アカウントを再接続してください。",
+                      "bannerTone": "bad",
+                      "button": "再接続"
+                    }
+                  },
+                  {
+                    "id": "google-429",
+                    "label": "Google が 429 / 5xx / 時間切れ",
+                    "screen": "設定の行が「確認が必要」になりうる。カレンダーは前回までの予定のまま。",
+                    "data": "一部だけ取り込まれることがある。",
+                    "retry": "rate limit は 1 回だけ即座に再試行。それ以外は次の cron で。",
+                    "trace": "last_sync_error（rate_limited / provider_unavailable）。",
+                    "look": "Google Cloud の status と quota。",
+                    "refs": [
+                      {
+                        "path": "apps/product/src/features/external-calendar/server/providers/google.ts",
+                        "find": "requestWithRateLimitRetry"
+                      }
+                    ],
+                    "tags": {
+                      "screen": "none",
+                      "data": "unknown",
+                      "retry": "auto",
+                      "trace": "log"
+                    },
+                    "screenAfter": {
+                      "t": "settings",
+                      "url": "/ja/settings/integrations",
+                      "title": "連携 › Google カレンダー",
+                      "rows": [
+                        [
+                          "m@example.com",
+                          "確認が必要",
+                          "warn"
+                        ]
+                      ],
+                      "banner": "Google カレンダーを一時的に利用できません。",
+                      "bannerTone": "warn"
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "store-events",
+                "svc": "supabase",
+                "short": "予定を保存",
+                "via": "upsert",
+                "title": "external_calendar_events に保存する",
+                "what": "取った予定は plans ではなく external_calendar_events に upsert する。消えた予定は tombstone で消す。Google の予定はこの段階ではまだ Plan ではない。",
+                "change": "Plan / Record と別テーブルなので、時刻の規則（DT003 / DT005）はここには掛からない。",
+                "refs": [
+                  {
+                    "path": "apps/product/src/features/external-calendar/server/sync-service.ts",
+                    "find": "external_calendar_events"
+                  },
+                  {
+                    "path": "apps/product/src/features/external-calendar/server/fenced-sync-writer.ts",
+                    "find": "p_tombstone_event_ids"
+                  }
+                ],
+                "fails": []
+              },
+              {
+                "id": "show-ghost",
+                "svc": "browser",
+                "short": "カレンダーに薄く表示",
+                "via": "externalCalendar.listEvents",
+                "title": "カレンダーに Google の予定が薄く出る",
+                "what": "カレンダーは Plan・Record と一緒に Google の予定も取り、薄い見た目で重ねて出す（読み取り専用）。タップすると Plan（または Record）に変換され、ここから「Plan を保存」と同じ経路に入る。",
+                "change": "変換した Plan には source: external_calendar と元の予定の ID が付く。Google の予定を消しても、変換済みの Plan は残る。",
+                "screen": {
+                  "t": "calendar",
+                  "url": "/ja/calendar",
+                  "blocks": [
+                    {
+                      "state": "ext",
+                      "label": "Google の予定",
+                      "from": 1,
+                      "len": 1
+                    }
+                  ],
+                  "note": "薄い表示。タップで Plan に変換"
+                },
+                "refs": [
+                  {
+                    "path": "apps/product/src/app/[locale]/(app)/(workspace)/_server/calendar-prefetch.ts",
+                    "find": "helpers.externalCalendar.listEvents.prefetch"
+                  },
+                  {
+                    "path": "apps/product/src/features/calendar/hooks/operations/useConvertGhostEvent.ts",
+                    "find": "externalCalendarEventId"
+                  }
+                ],
+                "fails": []
+              }
+            ]
+          },
+          {
             "id": "deploy",
             "title": "merge → 本番公開",
             "intro": "PR を main へ merge する。merge と本番公開は分かれていて、公開するのは Production Release workflow だけ。DB の migration は merge の時点で先に本番へ入る。",
@@ -1798,7 +4046,19 @@
                   }
                 ],
                 "fails": [],
-                "short": "main へ merge"
+                "short": "main へ merge",
+                "screen": {
+                  "t": "calendar",
+                  "url": "/ja/calendar",
+                  "blocks": [
+                    {
+                      "state": "saved",
+                      "label": "仕事"
+                    }
+                  ],
+                  "title": "カレンダー（旧版）",
+                  "note": "利用者は旧版を使い続ける。通知は出ない"
+                }
               },
               {
                 "id": "migration",
@@ -1842,7 +4102,19 @@
                       "trace": "issue"
                     },
                     "to": "tab-update",
-                    "back": "旧版のまま配信"
+                    "back": "旧版のまま配信",
+                    "screenAfter": {
+                      "t": "calendar",
+                      "url": "/ja/calendar",
+                      "blocks": [
+                        {
+                          "state": "saved",
+                          "label": "仕事"
+                        }
+                      ],
+                      "title": "カレンダー（旧版）",
+                      "note": "利用者は旧版を使い続ける。通知は出ない"
+                    }
                   }
                 ],
                 "short": "migration 適用",
@@ -1882,7 +4154,19 @@
                       "trace": "issue"
                     },
                     "to": "tab-update",
-                    "back": "旧版のまま配信"
+                    "back": "旧版のまま配信",
+                    "screenAfter": {
+                      "t": "calendar",
+                      "url": "/ja/calendar",
+                      "blocks": [
+                        {
+                          "state": "saved",
+                          "label": "仕事"
+                        }
+                      ],
+                      "title": "カレンダー（旧版）",
+                      "note": "利用者は旧版を使い続ける。通知は出ない"
+                    }
                   }
                 ],
                 "short": "本番候補を build",
@@ -1946,7 +4230,19 @@
                       "trace": "issue"
                     },
                     "to": "tab-update",
-                    "back": "旧版のまま配信"
+                    "back": "旧版のまま配信",
+                    "screenAfter": {
+                      "t": "calendar",
+                      "url": "/ja/calendar",
+                      "blocks": [
+                        {
+                          "state": "saved",
+                          "label": "仕事"
+                        }
+                      ],
+                      "title": "カレンダー（旧版）",
+                      "note": "利用者は旧版を使い続ける。通知は出ない"
+                    }
                   }
                 ],
                 "short": "E2E などで検証"
@@ -1989,7 +4285,19 @@
                       "trace": "issue"
                     },
                     "to": "tab-update",
-                    "back": "旧版のまま配信"
+                    "back": "旧版のまま配信",
+                    "screenAfter": {
+                      "t": "calendar",
+                      "url": "/ja/calendar",
+                      "blocks": [
+                        {
+                          "state": "saved",
+                          "label": "仕事"
+                        }
+                      ],
+                      "title": "カレンダー（旧版）",
+                      "note": "利用者は旧版を使い続ける。通知は出ない"
+                    }
                   }
                 ],
                 "short": "smoke → 公開"
@@ -1998,7 +4306,7 @@
                 "id": "tab-update",
                 "svc": "browser",
                 "title": "開いているタブが新版に気づく",
-                "what": "タブへ戻った時に /api/health/version の SHA を比べ、古ければ「更新あり」を立てる。いつ再読み込みしてよいかは、編集中かどうかを知る側が決める（編集中は勝手に再読み込みしない）。",
+                "what": "タブへ戻った時に /api/health/version の SHA を比べ、古ければ新版があると判断する。通知は出さず、編集中（保存中の mutation、作成中の下書き、開いたダイアログ、入力欄のフォーカス）でない瞬間にだけ黙って再読み込みする。",
                 "change": "API の入出力を変えた直後は、旧版の画面が新版のサーバーを呼ぶ時間がある。tRPC の入力を必須化する変更は、旧画面からの呼び出しを壊す。",
                 "refs": [
                   {
@@ -2008,11 +4316,27 @@
                   {
                     "path": "docs/engineering/pwa.md",
                     "find": "/api/health/version"
+                  },
+                  {
+                    "path": "apps/product/src/app/[locale]/(app)/_providers/useApplyUpdateWhenSafe.ts",
+                    "find": "export function useApplyUpdateWhenSafe"
                   }
                 ],
                 "fails": [],
                 "short": "タブが新版に気づく",
-                "via": "新版を配信"
+                "via": "新版を配信",
+                "screen": {
+                  "t": "calendar",
+                  "url": "/ja/calendar",
+                  "blocks": [
+                    {
+                      "state": "saved",
+                      "label": "仕事"
+                    }
+                  ],
+                  "title": "カレンダー（新版）",
+                  "note": "タブへ戻った時、編集中でなければ黙って再読み込みして新版になる"
+                }
               }
             ],
             "lanes": [
@@ -2340,6 +4664,737 @@
               "label": "本番公開"
             }
           ]
+        },
+        "screens": {
+          "title": "画面マップ",
+          "intro": "Dayopt の画面と、画面どうしの移り方。画面を押すと、そこへ来る条件・読み込むデータ・触るサービス・壊れた時の見え方と、その画面を通る経路が出る。URL は日本語の場合（英語は /ja が付かない）。",
+          "columns": [
+            "サインインの前後",
+            "アプリ",
+            "外部・特殊"
+          ],
+          "nodes": [
+            {
+              "id": "login",
+              "label": "サインイン",
+              "url": "/ja/auth/login",
+              "col": 1,
+              "row": 2,
+              "group": "auth",
+              "what": "メールとパスワード、または Google でサインインする。",
+              "arrive": "サインインしていない人が保護された画面を開くと、proxy.ts がここへ送る（元のパスは redirect に残る）。サインイン済みの人が開くと /calendar へ戻される。",
+              "loads": "なし（Supabase Auth を直接呼ぶ）",
+              "svcs": [
+                "browser",
+                "supabase",
+                "external"
+              ],
+              "fails": "認証エラーはフォームの下に文言で出る。想定内のエラーは Sentry に出ない。",
+              "screen": {
+                "t": "form",
+                "title": "サインイン",
+                "url": "/ja/auth/login",
+                "fields": [
+                  [
+                    "メールアドレス",
+                    "m@example.com"
+                  ],
+                  [
+                    "パスワード",
+                    "••••••••"
+                  ]
+                ],
+                "extra": "Cloudflare Turnstile ✓",
+                "button": "サインイン",
+                "alt": "Google で続ける"
+              },
+              "refs": [
+                {
+                  "path": "apps/product/src/app/[locale]/(auth)/auth/login/page.tsx",
+                  "find": "LoginForm"
+                },
+                {
+                  "path": "apps/product/src/proxy.ts",
+                  "find": "loginUrl.searchParams.set('redirect'"
+                }
+              ],
+              "flows": [
+                "login"
+              ]
+            },
+            {
+              "id": "signup",
+              "label": "アカウント作成",
+              "url": "/ja/auth/signup",
+              "col": 1,
+              "row": 1,
+              "group": "auth",
+              "what": "メールとパスワードで登録する。登録後は確認メールを待つ画面になる。",
+              "arrive": "サインイン画面のリンクから。",
+              "loads": "なし",
+              "svcs": [
+                "browser",
+                "supabase",
+                "resend"
+              ],
+              "fails": "確認メールを送れないと登録エラーになる。",
+              "screen": {
+                "t": "form",
+                "title": "アカウントを作成",
+                "url": "/ja/auth/signup",
+                "fields": [
+                  [
+                    "メールアドレス",
+                    "m@example.com"
+                  ],
+                  [
+                    "パスワード",
+                    "••••••••"
+                  ]
+                ],
+                "extra": "Cloudflare Turnstile ✓",
+                "button": "アカウント作成"
+              },
+              "refs": [
+                {
+                  "path": "apps/product/src/features/auth/components/SignupForm.tsx",
+                  "find": "safeCheckPasswordPwned"
+                }
+              ],
+              "flows": [
+                "signup"
+              ]
+            },
+            {
+              "id": "confirmed",
+              "label": "メール確認の結果",
+              "url": "/ja/auth/confirmed",
+              "col": 1,
+              "row": 3,
+              "group": "auth",
+              "what": "確認リンクでセッションを作れなかった時の着地点。状態ごとの案内とサインインへのボタン。",
+              "arrive": "/auth/confirm が失敗・期限切れ・メール変更の途中の時。",
+              "loads": "なし",
+              "svcs": [
+                "vercel"
+              ],
+              "fails": "素のエラーではなく案内を出すための画面そのもの。",
+              "screen": {
+                "t": "page",
+                "url": "/ja/auth/confirmed?status=…",
+                "tone": "warn",
+                "title": "メールアドレスの確認",
+                "body": "状態に応じた案内とサインインへのボタン",
+                "button": "サインインへ"
+              },
+              "refs": [
+                {
+                  "path": "apps/product/src/app/[locale]/(auth)/auth/confirmed/page.tsx",
+                  "find": "toConfirmStatus"
+                }
+              ],
+              "flows": [
+                "signup"
+              ]
+            },
+            {
+              "id": "password",
+              "label": "パスワード再設定の依頼",
+              "url": "/ja/auth/password",
+              "col": 1,
+              "row": 4,
+              "group": "auth",
+              "what": "メールアドレスを入れ、リセット用のリンクを受け取る。",
+              "arrive": "サインイン画面の「パスワードを忘れた」から。",
+              "loads": "なし",
+              "svcs": [
+                "browser",
+                "supabase",
+                "resend"
+              ],
+              "fails": "リンクのメールは確認メールと同じく Edge Function から Resend で送る。",
+              "screen": {
+                "t": "form",
+                "title": "パスワードをリセット",
+                "url": "/ja/auth/password",
+                "fields": [
+                  [
+                    "メールアドレス",
+                    "m@example.com"
+                  ]
+                ],
+                "button": "リセット用リンクを送信"
+              },
+              "refs": [
+                {
+                  "path": "apps/product/src/app/[locale]/(auth)/auth/password/page.tsx",
+                  "find": "PasswordResetForm"
+                }
+              ],
+              "flows": []
+            },
+            {
+              "id": "reset-password",
+              "label": "新しいパスワード",
+              "url": "/ja/auth/reset-password",
+              "col": 1,
+              "row": 5,
+              "group": "auth",
+              "what": "リセットのリンクから来て、新しいパスワードを決める。",
+              "arrive": "リセット用リンク → /auth/confirm（recovery）。セッションが無いと /auth へ戻される。",
+              "loads": "なし",
+              "svcs": [
+                "browser",
+                "supabase"
+              ],
+              "fails": "セッションが無ければ /auth（→ /auth/login）へ。",
+              "screen": {
+                "t": "form",
+                "title": "新しいパスワード",
+                "url": "/ja/auth/reset-password",
+                "fields": [
+                  [
+                    "新しいパスワード",
+                    "••••••••"
+                  ]
+                ],
+                "button": "更新"
+              },
+              "refs": [
+                {
+                  "path": "apps/product/src/app/[locale]/(auth)/auth/reset-password/page.tsx",
+                  "find": "redirect(`/${locale}/auth`)"
+                }
+              ],
+              "flows": []
+            },
+            {
+              "id": "mfa-verify",
+              "label": "多要素認証",
+              "url": "/ja/auth/mfa-verify",
+              "col": 1,
+              "row": 6,
+              "group": "auth",
+              "what": "6 桁のコード、またはリカバリーコードで本人確認を終える。",
+              "arrive": "パスワードが通って aal2 が必要な時。保護された画面を aal1 のまま開いた時も proxy.ts がここへ送る。",
+              "loads": "Supabase Auth（listFactors / challenge / verify）。リカバリーコードだけ tRPC。",
+              "svcs": [
+                "browser",
+                "supabase",
+                "vercel"
+              ],
+              "fails": "challenge の失敗は「もう一度試す」ボタン付きで出る。",
+              "screen": {
+                "t": "form",
+                "title": "多要素認証",
+                "url": "/ja/auth/mfa-verify",
+                "fields": [
+                  [
+                    "認証アプリの6桁のコード",
+                    "– – – – – –"
+                  ]
+                ],
+                "button": "認証",
+                "alt": "リカバリーコードを使用"
+              },
+              "refs": [
+                {
+                  "path": "apps/product/src/app/[locale]/(auth)/auth/mfa-verify/page.tsx",
+                  "find": "supabase.auth.mfa.challenge"
+                }
+              ],
+              "flows": [
+                "login"
+              ]
+            },
+            {
+              "id": "session-error",
+              "label": "セッション確認エラー",
+              "url": "/ja/auth/session-error",
+              "col": 1,
+              "row": 7,
+              "group": "auth",
+              "what": "セッションの確認そのものが失敗した時の逃げ場。もう一度試すか、サインアウトする。",
+              "arrive": "proxy.ts で AAL の確認に失敗した時。/calendar と /auth/login の無限往復を防ぐための画面。",
+              "loads": "なし",
+              "svcs": [
+                "vercel"
+              ],
+              "fails": "ここに来ること自体が障害の兆候。",
+              "screen": {
+                "t": "page",
+                "url": "/ja/auth/session-error",
+                "tone": "warn",
+                "title": "セッションを確認できませんでした",
+                "body": "もう一度お試しください。解決しない場合はサインアウトしてください。",
+                "button": "もう一度試す"
+              },
+              "refs": [
+                {
+                  "path": "apps/product/src/proxy.ts",
+                  "find": "MFA assurance lookup failed; redirecting to session error page"
+                }
+              ],
+              "flows": [
+                "login"
+              ]
+            },
+            {
+              "id": "root",
+              "label": "トップ（/ja）",
+              "url": "/ja",
+              "col": 2,
+              "row": 1,
+              "group": "app",
+              "what": "入口。必ずカレンダーへ送る。",
+              "arrive": "URL を直接開いた時。",
+              "loads": "なし",
+              "svcs": [
+                "vercel"
+              ],
+              "fails": "なし。",
+              "screen": {
+                "t": "blank",
+                "url": "/ja",
+                "text": "→ /ja/calendar"
+              },
+              "refs": [
+                {
+                  "path": "apps/product/src/app/[locale]/page.tsx",
+                  "find": "redirect(`/${locale}/calendar`)"
+                }
+              ],
+              "flows": []
+            },
+            {
+              "id": "calendar",
+              "label": "カレンダー",
+              "url": "/ja/calendar",
+              "col": 2,
+              "row": 2,
+              "group": "app",
+              "what": "主画面。Plan・Record・Google の予定を時間軸に並べ、作成・編集は右の Inspector で行う。",
+              "arrive": "サインイン・MFA の後の既定の着地点。トップからも。",
+              "loads": "server で先に取る: plans.list / records.list / externalCalendar.listEvents / statistics.getActivityStats",
+              "svcs": [
+                "browser",
+                "vercel",
+                "supabase"
+              ],
+              "fails": "セグメント単位の error.tsx（CalendarError）が受ける。回線が無ければ Service Worker が /offline を出す。",
+              "screen": {
+                "t": "calendar",
+                "url": "/ja/calendar",
+                "blocks": [
+                  {
+                    "state": "saved",
+                    "label": "仕事"
+                  },
+                  {
+                    "state": "ext",
+                    "label": "Google の予定",
+                    "from": 2.2,
+                    "len": 0.8
+                  }
+                ]
+              },
+              "refs": [
+                {
+                  "path": "apps/product/src/app/[locale]/(app)/(workspace)/_server/calendar-prefetch.ts",
+                  "find": "helpers.plans.list.prefetch"
+                },
+                {
+                  "path": "apps/product/src/app/[locale]/(app)/(workspace)/calendar/error.tsx",
+                  "find": "CalendarError"
+                }
+              ],
+              "flows": [
+                "save-plan",
+                "login",
+                "google-calendar",
+                "deploy"
+              ]
+            },
+            {
+              "id": "report",
+              "label": "レポート",
+              "url": "/ja/report",
+              "col": 2,
+              "row": 3,
+              "group": "app",
+              "what": "計画と実績の差をふり返る。",
+              "arrive": "ワークスペースのタブで切り替える。",
+              "loads": "client で取る: review.getReportPeriod / review.getReportActivityDetail（server で先に取らない）",
+              "svcs": [
+                "browser",
+                "vercel",
+                "supabase"
+              ],
+              "fails": "カレンダーと同じ CalendarError。読み込み中は loading.tsx。",
+              "screen": {
+                "t": "page",
+                "url": "/ja/report",
+                "tone": "neutral",
+                "title": "レポート",
+                "body": "計画と実績の差"
+              },
+              "refs": [
+                {
+                  "path": "apps/product/src/features/review/hooks/useReportPeriod.ts",
+                  "find": "review.getReportPeriod.useQuery"
+                },
+                {
+                  "path": "apps/product/src/app/[locale]/(app)/_shell/WorkspaceTabs.tsx",
+                  "find": "/report"
+                }
+              ],
+              "flows": []
+            },
+            {
+              "id": "settings",
+              "label": "設定",
+              "url": "/ja/settings",
+              "col": 2,
+              "row": 4,
+              "group": "app",
+              "what": "アカウント・表示・データ・連携・課金の 5 分類。デスクトップではカレンダーの上にモーダルで開き、URL は /calendar に戻す。スマホでは画面として開く。",
+              "arrive": "サイドバーやメニューから。",
+              "loads": "分類ごとに異なる（連携なら externalCalendar.listConnections、課金なら billing.getOverview）",
+              "svcs": [
+                "browser",
+                "vercel",
+                "supabase"
+              ],
+              "fails": "専用の error.tsx は無く、(app) 全体の error.tsx が受ける。",
+              "screen": {
+                "t": "settings",
+                "url": "/ja/settings",
+                "rows": [
+                  [
+                    "アカウント",
+                    ""
+                  ],
+                  [
+                    "表示",
+                    ""
+                  ],
+                  [
+                    "データ",
+                    ""
+                  ],
+                  [
+                    "連携",
+                    ""
+                  ],
+                  [
+                    "課金",
+                    ""
+                  ]
+                ]
+              },
+              "refs": [
+                {
+                  "path": "apps/product/src/features/settings/constants.ts",
+                  "find": "SETTINGS_CATEGORIES"
+                },
+                {
+                  "path": "apps/product/src/app/[locale]/(app)/settings/_composition/settings-route.tsx",
+                  "find": "router.replace(DESKTOP_SETTINGS_EXIT_PATH)"
+                }
+              ],
+              "flows": []
+            },
+            {
+              "id": "integrations",
+              "label": "設定 › 連携",
+              "url": "/ja/settings/integrations",
+              "col": 2,
+              "row": 5,
+              "group": "app",
+              "what": "Google アカウントの接続・再接続・解除、取り込むカレンダーの選択、今すぐ同期。",
+              "arrive": "設定の「連携」。Google の OAuth から ?calendar=connected / error で戻ってくる。",
+              "loads": "externalCalendar.listConnections / getConnectionAvailability",
+              "svcs": [
+                "browser",
+                "vercel",
+                "supabase",
+                "google"
+              ],
+              "fails": "接続の失敗は理由ごとのトースト。同期の問題は行のバッジ（再接続が必要 / 確認が必要）。",
+              "screen": {
+                "t": "settings",
+                "url": "/ja/settings/integrations",
+                "title": "連携 › Google カレンダー",
+                "rows": [
+                  [
+                    "m@example.com",
+                    "接続済み",
+                    "ok"
+                  ],
+                  [
+                    "最終同期",
+                    "未同期",
+                    "neutral"
+                  ]
+                ]
+              },
+              "refs": [
+                {
+                  "path": "apps/product/src/app/[locale]/(app)/settings/[category]/page.tsx",
+                  "find": "removeCalendarCallbackParams"
+                }
+              ],
+              "flows": [
+                "google-calendar"
+              ]
+            },
+            {
+              "id": "google",
+              "label": "Google の同意画面",
+              "url": "accounts.google.com",
+              "col": 3,
+              "row": 5,
+              "group": "ext",
+              "what": "Google 側の画面。アカウントを選び、カレンダーの読み取りを許可する。",
+              "arrive": "連携の「接続」→ /api/integrations/google-calendar/start → 302。",
+              "loads": "なし（Google 側）",
+              "svcs": [
+                "google"
+              ],
+              "fails": "許可しなければ ?calendar=error&reason=access_denied で戻る。",
+              "screen": {
+                "t": "consent",
+                "host": "accounts.google.com",
+                "url": "/o/oauth2/…",
+                "title": "Dayopt が Google アカウントへのアクセスを求めています",
+                "scopes": [
+                  "カレンダーの一覧を見る",
+                  "予定を見る（読み取りのみ）"
+                ]
+              },
+              "refs": [
+                {
+                  "path": "apps/product/src/features/external-calendar/server/../schemas/google.ts",
+                  "find": "GOOGLE_AUTHORIZATION_SCOPES"
+                }
+              ],
+              "flows": [
+                "google-calendar"
+              ]
+            },
+            {
+              "id": "oauth-authorize",
+              "label": "MCP の認可（入口）",
+              "url": "/ja/oauth/authorize",
+              "col": 3,
+              "row": 1,
+              "group": "ext",
+              "what": "外部の AI クライアントが MCP で Dayopt を使う時の OAuth 認可。パラメータを検証して同意画面へ送る。",
+              "arrive": "MCP クライアントから。サインインしていなければ proxy.ts がサインインへ送る。",
+              "loads": "なし（検証のみ）",
+              "svcs": [
+                "vercel",
+                "supabase"
+              ],
+              "fails": "パラメータが不正ならエラーパネル。",
+              "screen": {
+                "t": "blank",
+                "url": "/ja/oauth/authorize",
+                "text": "→ 同意画面へ"
+              },
+              "refs": [
+                {
+                  "path": "apps/product/src/app/[locale]/oauth/authorize/page.tsx",
+                  "find": "OAuthErrorPanel"
+                }
+              ],
+              "flows": []
+            },
+            {
+              "id": "oauth-consent",
+              "label": "MCP の同意",
+              "url": "/ja/oauth/consent",
+              "col": 3,
+              "row": 2,
+              "group": "ext",
+              "what": "MCP クライアントに渡す権限（scope）を利用者が承認する。",
+              "arrive": "/oauth/authorize から。",
+              "loads": "OAuth 用 DB（許可できる scope）",
+              "svcs": [
+                "vercel",
+                "supabase"
+              ],
+              "fails": "外部契約（MCP / OAuth scope）なので、変更は既存クライアントを壊さないか確かめる。",
+              "screen": {
+                "t": "settings",
+                "url": "/ja/oauth/consent",
+                "title": "アクセスを許可しますか？",
+                "rows": [
+                  [
+                    "予定を読む",
+                    ""
+                  ],
+                  [
+                    "予定を作る",
+                    ""
+                  ]
+                ],
+                "button": "許可"
+              },
+              "refs": [
+                {
+                  "path": "apps/product/src/app/[locale]/oauth/consent/page.tsx",
+                  "find": "processConsent"
+                }
+              ],
+              "flows": []
+            },
+            {
+              "id": "offline",
+              "label": "オフライン",
+              "url": "/offline",
+              "col": 3,
+              "row": 3,
+              "group": "ext",
+              "what": "回線が無く、キャッシュにもページが無い時に Service Worker が出す画面。言語はブラウザの設定で決める。",
+              "arrive": "ページの移動で回線が無い時（Network First → cache → /offline）。",
+              "loads": "なし",
+              "svcs": [
+                "browser"
+              ],
+              "fails": "この画面が出る時点で、サーバーには何も届いていない。",
+              "screen": {
+                "t": "page",
+                "url": "/offline",
+                "tone": "neutral",
+                "title": "オフラインです",
+                "body": "接続が戻ったら再読み込み"
+              },
+              "refs": [
+                {
+                  "path": "apps/product/public/sw.js",
+                  "find": "caches.match('/offline')"
+                },
+                {
+                  "path": "docs/engineering/pwa.md",
+                  "find": "Network First"
+                }
+              ],
+              "flows": []
+            }
+          ],
+          "edges": [
+            [
+              "root",
+              "calendar",
+              "常に"
+            ],
+            [
+              "signup",
+              "login",
+              "サインインへ"
+            ],
+            [
+              "signup",
+              "calendar",
+              "確認リンク（成功）"
+            ],
+            [
+              "signup",
+              "confirmed",
+              "確認リンク（session なし）"
+            ],
+            [
+              "confirmed",
+              "login",
+              "サインインへ"
+            ],
+            [
+              "login",
+              "mfa-verify",
+              "MFA が必要"
+            ],
+            [
+              "login",
+              "calendar",
+              "サインイン成功"
+            ],
+            [
+              "login",
+              "password",
+              "パスワードを忘れた"
+            ],
+            [
+              "password",
+              "reset-password",
+              "リセットのリンク"
+            ],
+            [
+              "mfa-verify",
+              "calendar",
+              "認証成功"
+            ],
+            [
+              "calendar",
+              "login",
+              "未ログイン / サインアウト"
+            ],
+            [
+              "calendar",
+              "mfa-verify",
+              "aal2 が必要（proxy）"
+            ],
+            [
+              "calendar",
+              "session-error",
+              "AAL の確認に失敗"
+            ],
+            [
+              "session-error",
+              "calendar",
+              "もう一度試す"
+            ],
+            [
+              "calendar",
+              "report",
+              "タブ"
+            ],
+            [
+              "report",
+              "calendar",
+              "タブ"
+            ],
+            [
+              "calendar",
+              "settings",
+              "設定を開く"
+            ],
+            [
+              "settings",
+              "integrations",
+              "連携"
+            ],
+            [
+              "integrations",
+              "google",
+              "接続（/start）"
+            ],
+            [
+              "google",
+              "integrations",
+              "callback → 結果"
+            ],
+            [
+              "oauth-authorize",
+              "oauth-consent",
+              "パラメータが正しい"
+            ],
+            [
+              "calendar",
+              "offline",
+              "回線なし（SW）"
+            ]
+          ]
         }
       }
     </script>
@@ -2352,8 +5407,8 @@
         var viewEl = document.getElementById('view');
         var SVG = 'http://www.w3.org/2000/svg';
         var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-        var tabs = data.scenarios.concat([{ id: 'outages', title: data.outages.title }]);
-        var state = { tab: 0, hop: 0, fail: null, outage: null, token: 0 };
+        var tabs = [{ id: 'screens', title: data.screens.title }].concat(data.scenarios, [{ id: 'outages', title: data.outages.title }]);
+        var state = { tab: 0, hop: 0, fail: null, outage: null, screen: null, token: 0 };
         var resizeObserver = null;
 
         // 失敗時の 4 観点を、色と見出しで一目で読める形にする辞書
@@ -2363,6 +5418,7 @@
             toast: ['エラー表示', 'bad'],
             redirect: ['別の画面へ', 'warn'],
             wait: ['待ち状態', 'warn'],
+            blocked: ['押せない', 'warn'],
             down: ['使えない', 'bad'],
             old: ['旧版のまま', 'warn'],
             depends: ['設定次第', 'warn'],
@@ -2402,7 +5458,7 @@
           var t = f.tags;
           if (t.screen === 'toast' || t.screen === 'down' || t.data === 'lost') return 'bad';
           if (
-            ['redirect', 'wait', 'old', 'depends'].indexOf(t.screen) >= 0 ||
+            ['redirect', 'wait', 'old', 'depends', 'blocked'].indexOf(t.screen) >= 0 ||
             t.data === 'unknown' ||
             t.data === 'mixed' ||
             t.retry === 'next'
@@ -2499,7 +5555,8 @@
           if (resizeObserver) resizeObserver.disconnect();
           renderTabs();
           if (tabs[state.tab].id === 'outages') renderOutages();
-          else renderScenario(data.scenarios[state.tab]);
+          else if (tabs[state.tab].id === 'screens') renderScreens();
+          else renderScenario(tabs[state.tab]);
         }
 
         // ---------- 経路図 ----------
@@ -2745,7 +5802,17 @@
             el('div', {}, [el('span', { class: 'svc-chip', style: svcVar(h.svc), text: data.services[h.svc].label })]),
           );
           panel.appendChild(el('h2', { text: h.title }));
-          panel.appendChild(el('p', { text: h.what }));
+          var hopIndex = sc.hops.indexOf(h);
+          var info = failInfo(sc);
+          var shot;
+          if (info && info.index === hopIndex) {
+            shot = mockBlock(info.fail.screenAfter || screenFor(sc, hopIndex), '⚡ 失敗した後の利用者の画面', true);
+          } else if (info && info.to === hopIndex && info.fail.screenAfter) {
+            shot = mockBlock(info.fail.screenAfter, '⚡ 失敗が利用者に見える画面', true);
+          } else {
+            shot = mockBlock(screenFor(sc, hopIndex), '利用者の画面（この段の時点）', false);
+          }
+          panel.appendChild(el('div', { class: 'hop-head' }, [shot, el('p', { text: h.what })]));
           if (h.change) {
             panel.appendChild(el('div', { class: 'change' }, [el('strong', { text: 'ここを変えると' }), h.change]));
           }
@@ -2800,6 +5867,143 @@
 
           panel.appendChild(el('h3', { text: 'コードと文書' }));
           panel.appendChild(refList(h.refs));
+        }
+
+        // ---------- 利用者の画面の模型 ----------
+        // spec は JSON の hop.screen / fail.screenAfter / page.screen。t で型を選ぶ。
+        var HOST = 'app.dayopt.app';
+
+        function mockCalendar(spec, body) {
+          body.appendChild(el('div', { class: 'm-h', text: spec.title || 'カレンダー（今日）' }));
+          var cal = el('div', { class: 'm-cal' });
+          var hours = ['9:00', '10:00', '11:00', '12:00'];
+          hours.forEach(function (h, k) {
+            cal.appendChild(el('div', { class: 'm-hour', style: 'top:' + k * 25 + '%', text: h }));
+          });
+          (spec.blocks || []).forEach(function (b) {
+            var from = b.from === undefined ? 1 : b.from;
+            var len = b.len === undefined ? 1 : b.len;
+            cal.appendChild(
+              el('div', {
+                class: 'm-block ' + b.state,
+                style: 'top:' + (from * 25 + 1) + '%; height:' + (len * 25 - 2) + '%',
+                text: b.label,
+              }),
+            );
+          });
+          body.appendChild(cal);
+          if (spec.drawer) {
+            body.appendChild(
+              el(
+                'div',
+                { class: 'm-drawer' },
+                [el('div', { class: 'm-h', text: spec.drawer.title })].concat(
+                  spec.drawer.items.map(function (it, k) {
+                    return el('span', { class: 'm-chip' + (k === spec.drawer.on ? ' on' : ''), text: it });
+                  }),
+                ),
+              ),
+            );
+          }
+        }
+
+        function mockForm(spec, body) {
+          body.appendChild(el('div', { class: 'm-h', text: spec.title }));
+          (spec.fields || []).forEach(function (f) {
+            body.appendChild(el('div', { class: 'm-field' }, [el('span', { text: f[0] }), el('div', { text: f[1] || '' })]));
+          });
+          if (spec.extra) body.appendChild(el('div', { class: 'm-extra', text: spec.extra }));
+          if (spec.button) body.appendChild(el('div', { class: 'm-btn' + (spec.busy || spec.disabled ? ' busy' : ''), text: spec.busy ? '処理中…' : spec.button }));
+          if (spec.alt) body.appendChild(el('div', { class: 'm-btn ghost', text: spec.alt }));
+          if (spec.error) body.appendChild(el('div', { class: 'm-err', text: spec.error }));
+        }
+
+        function mockInbox(spec, body) {
+          body.appendChild(el('div', { class: 'm-h', text: '受信トレイ' }));
+          spec.mails.forEach(function (m) {
+            body.appendChild(
+              el('div', { class: 'm-mail ' + (m.state || 'new') }, [
+                el('i', {}),
+                el('span', {}, [el('b', { text: m.subject }), el('small', { text: m.state === 'missing' ? '届かない' : m.from || 'Dayopt' })]),
+              ]),
+            );
+          });
+        }
+
+        function mockPage(spec, body) {
+          var icon = { ok: '✓', warn: '!', bad: '✕', neutral: '…' }[spec.tone || 'ok'];
+          body.appendChild(
+            el('div', { class: 'm-page ' + (spec.tone || 'ok') }, [
+              el('span', { class: 'ic', text: icon }),
+              el('div', { class: 'm-h', style: 'margin-top:6px', text: spec.title }),
+              spec.body ? el('p', { text: spec.body }) : null,
+            ]),
+          );
+          if (spec.button) body.appendChild(el('div', { class: 'm-btn', text: spec.button }));
+        }
+
+        function mockConsent(spec, body) {
+          body.appendChild(el('div', { class: 'm-h', text: 'Google' }));
+          body.appendChild(el('div', { style: 'font-weight:700', text: spec.title }));
+          (spec.scopes || []).forEach(function (s) {
+            body.appendChild(el('div', { class: 'm-extra', text: '☑ ' + s }));
+          });
+          body.appendChild(
+            el('div', { style: 'display:flex; gap:6px' }, [
+              el('div', { class: 'm-btn ghost', style: 'flex:1', text: 'キャンセル' }),
+              el('div', { class: 'm-btn', style: 'flex:1', text: '続行' }),
+            ]),
+          );
+        }
+
+        function mockSettings(spec, body) {
+          body.appendChild(el('div', { class: 'm-h', text: spec.title || '設定' }));
+          spec.rows.forEach(function (r) {
+            body.appendChild(
+              el('div', { class: 'm-row' }, [el('span', { text: r[0] }), r[1] ? el('span', { class: 'm-pill s-' + (r[2] || 'neutral'), text: r[1] }) : null]),
+            );
+          });
+          if (spec.button) body.appendChild(el('div', { class: 'm-btn', text: spec.button }));
+        }
+
+        function mock(spec, failed) {
+          var frame = el('div', { class: 'mock' + (failed ? ' fail' : ''), 'aria-hidden': 'true' });
+          frame.appendChild(
+            el('div', { class: 'mock-bar' }, [el('i', {}), el('i', {}), el('i', {}), el('span', { class: 'mock-url', text: (spec.host || HOST) + (spec.url || '') })]),
+          );
+          var body = el('div', { class: 'mock-body' });
+          if (spec.banner) body.appendChild(el('div', { class: 'm-banner ' + (spec.bannerTone || ''), text: spec.banner }));
+          if (spec.t === 'calendar') mockCalendar(spec, body);
+          else if (spec.t === 'form') mockForm(spec, body);
+          else if (spec.t === 'inbox') mockInbox(spec, body);
+          else if (spec.t === 'page') mockPage(spec, body);
+          else if (spec.t === 'consent') mockConsent(spec, body);
+          else if (spec.t === 'settings') mockSettings(spec, body);
+          else body.appendChild(el('div', { class: 'm-blank', text: spec.text || '' }));
+          if (spec.toast) {
+            body.appendChild(
+              el('div', { class: 'm-toast ' + (spec.toastTone || '') }, [
+                el('span', { text: spec.toast }),
+                spec.toastAction ? el('b', { text: spec.toastAction }) : null,
+              ]),
+            );
+          }
+          frame.appendChild(body);
+          return frame;
+        }
+
+        function mockBlock(spec, caption, failed) {
+          if (!spec) return null;
+          return el('div', { class: 'mock-wrap' }, [
+            el('div', { class: 'mock-cap' + (failed ? ' bad' : ''), text: caption }),
+            mock(spec, failed),
+            spec.note ? el('div', { class: 'mock-note', text: spec.note }) : null,
+          ]);
+        }
+
+        function screenFor(sc, i) {
+          for (var k = i; k >= 0; k--) if (sc.hops[k].screen) return sc.hops[k].screen;
+          return null;
         }
 
         // ---------- アニメーション ----------
@@ -2869,6 +6073,218 @@
           await sleep(reduce ? 0 : 150);
           if (token !== state.token) return;
           await travel(document.getElementById('ret'), 'bad', 900, token);
+        }
+
+        // ---------- 画面マップ ----------
+        var GROUP_LABEL = { auth: 'サインインの前後', app: 'アプリ', ext: '外部・特殊' };
+
+        function scenarioTabIndex(id) {
+          for (var k = 0; k < tabs.length; k++) if (tabs[k].id === id) return k;
+          return -1;
+        }
+
+        function renderScreens() {
+          var S = data.screens;
+          viewEl.textContent = '';
+          viewEl.appendChild(el('div', { class: 'intro' }, [el('p', { text: S.intro })]));
+          if (!state.screen) state.screen = 'calendar';
+          var cur = S.nodes.filter(function (n) {
+            return n.id === state.screen;
+          })[0];
+          var byId = {};
+          S.nodes.forEach(function (n) {
+            byId[n.id] = n;
+          });
+
+          var rows = 0;
+          S.nodes.forEach(function (n) {
+            rows = Math.max(rows, n.row);
+          });
+          var map = el('div', { class: 'smap has-pick', id: 'smap', role: 'group', 'aria-label': '画面マップ' });
+          S.columns.forEach(function (c, k) {
+            map.appendChild(el('div', { class: 'smap-h', style: 'grid-column:' + (k + 1) + '; grid-row:1', text: c }));
+          });
+          S.nodes.forEach(function (n) {
+            var linked = S.edges.some(function (e) {
+              return (e[0] === cur.id && e[1] === n.id) || (e[1] === cur.id && e[0] === n.id);
+            });
+            var b = el(
+              'button',
+              {
+                class: 'scr ' + n.group + (n.id === cur.id ? ' on' : '') + (linked ? ' linked' : ''),
+                type: 'button',
+                'data-scr': n.id,
+                'aria-pressed': String(n.id === cur.id),
+                style: 'grid-column:' + n.col + '; grid-row:' + (n.row + 1),
+              },
+              [el('b', { text: n.label }), el('small', { text: n.url })],
+            );
+            b.addEventListener('click', function () {
+              state.screen = n.id;
+              renderScreens();
+              if (window.matchMedia('(max-width: 860px)').matches) {
+                document.getElementById('panel').scrollIntoView({ block: 'start', behavior: 'smooth' });
+              }
+            });
+            map.appendChild(b);
+          });
+          map.style.gridTemplateRows = 'auto repeat(' + rows + ', auto)';
+          map.appendChild(svgEl('svg', { class: 'wires', 'aria-hidden': 'true' }));
+
+          var panel = el('section', { class: 'panel', id: 'panel', 'aria-live': 'polite' });
+          var back = el('button', { class: 'ghost back', type: 'button', text: '↑ 図へ戻る' });
+          back.addEventListener('click', function () {
+            document.getElementById('smap').scrollIntoView({ block: 'start', behavior: 'smooth' });
+          });
+          panel.appendChild(back);
+          panel.appendChild(el('div', {}, [el('span', { class: 'svc-chip', style: '--svc: var(--accent)', text: GROUP_LABEL[cur.group] })]));
+          panel.appendChild(el('h2', { text: cur.label }));
+          panel.appendChild(el('div', { class: 'hop-head' }, [mockBlock(cur.screen, 'この画面', false), el('p', { text: cur.what })]));
+
+          var svcChips = el(
+            'div',
+            { class: 'chips' },
+            cur.svcs.map(function (s) {
+              return el('span', { class: 'svc-chip', style: svcVar(s), text: data.services[s].label });
+            }),
+          );
+          panel.appendChild(
+            el('div', { class: 'tiles' }, [
+              el('div', { class: 'tile s-neutral' }, [el('span', { class: 'h', text: 'ここへ来る条件' }), el('p', { text: cur.arrive })]),
+              el('div', { class: 'tile s-neutral' }, [el('span', { class: 'h', text: '読み込むデータ' }), el('p', { text: cur.loads })]),
+              el('div', { class: 'tile s-neutral' }, [el('span', { class: 'h', text: '触るサービス' }), svcChips]),
+              el('div', { class: 'tile s-warn' }, [el('span', { class: 'h', text: '壊れた時' }), el('p', { text: cur.fails })]),
+            ]),
+          );
+
+          var outs = S.edges.filter(function (e) {
+            return e[0] === cur.id;
+          });
+          var ins = S.edges.filter(function (e) {
+            return e[1] === cur.id;
+          });
+          function moveList(title, list, pick, arrow) {
+            if (!list.length) return;
+            panel.appendChild(el('h3', { text: title }));
+            var row = el('div', { class: 'fails' });
+            list.forEach(function (e) {
+              var target = byId[pick(e)];
+              var b = el('button', { class: 'ghost', type: 'button', text: arrow + ' ' + target.label + '（' + e[2] + '）' });
+              b.addEventListener('click', function () {
+                state.screen = target.id;
+                renderScreens();
+              });
+              row.appendChild(b);
+            });
+            panel.appendChild(row);
+          }
+          moveList('ここから移る先', outs, function (e) {
+            return e[1];
+          }, '→');
+          moveList('ここへ来る元', ins, function (e) {
+            return e[0];
+          }, '←');
+
+          if (cur.flows.length) {
+            panel.appendChild(el('h3', { text: 'この画面を通る経路' }));
+            var fl = el('div', { class: 'fails' });
+            cur.flows.forEach(function (id) {
+              var k = scenarioTabIndex(id);
+              if (k < 0) return;
+              var b = el('button', { class: 'play', type: 'button', text: '▶ ' + tabs[k].title });
+              b.addEventListener('click', function () {
+                selectTab(k);
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              });
+              fl.appendChild(b);
+            });
+            panel.appendChild(fl);
+          }
+
+          panel.appendChild(el('h3', { text: 'コードと文書' }));
+          panel.appendChild(refList(cur.refs));
+
+          viewEl.appendChild(el('div', { class: 'stage wide' }, [map, panel]));
+          drawScreenEdges(cur);
+          if (window.ResizeObserver) {
+            resizeObserver = new ResizeObserver(function () {
+              drawScreenEdges(cur);
+            });
+            resizeObserver.observe(map);
+          }
+        }
+
+        function drawScreenEdges(cur) {
+          var map = document.getElementById('smap');
+          if (!map) return;
+          var S = data.screens;
+          var svg = map.querySelector('svg.wires');
+          svg.textContent = '';
+          map.querySelectorAll('.tag').forEach(function (t) {
+            t.remove();
+          });
+          svg.setAttribute('width', map.clientWidth);
+          svg.setAttribute('height', map.clientHeight);
+          var defs = svgEl('defs');
+          [
+            ['s-off', 'var(--wire)'],
+            ['s-on', 'var(--accent)'],
+          ].forEach(function (m) {
+            var marker = svgEl('marker', {
+              id: m[0],
+              viewBox: '0 0 10 10',
+              refX: '8',
+              refY: '5',
+              markerWidth: '8',
+              markerHeight: '8',
+              markerUnits: 'userSpaceOnUse',
+              orient: 'auto-start-reverse',
+            });
+            var tri = svgEl('path', { d: 'M0,0 L10,5 L0,10 z' });
+            tri.setAttribute('style', 'fill: ' + m[1]);
+            marker.appendChild(tri);
+            defs.appendChild(marker);
+          });
+          svg.appendChild(defs);
+          var base = map.getBoundingClientRect();
+          function box(id) {
+            var r = map.querySelector('[data-scr="' + id + '"]').getBoundingClientRect();
+            return { l: r.left - base.left, r: r.right - base.left, cy: r.top - base.top + r.height / 2 };
+          }
+          var byId = {};
+          S.nodes.forEach(function (n) {
+            byId[n.id] = n;
+          });
+          var onPaths = [];
+          S.edges.forEach(function (e) {
+            var a = box(e[0]);
+            var b = box(e[1]);
+            var ca = byId[e[0]].col;
+            var cb = byId[e[1]].col;
+            var d;
+            if (cb > ca) {
+              var mx = (a.r + b.l) / 2;
+              d = 'M' + a.r + ',' + a.cy + ' C' + mx + ',' + a.cy + ' ' + mx + ',' + b.cy + ' ' + (b.l - 2) + ',' + b.cy;
+            } else if (cb < ca) {
+              var mx2 = (a.l + b.r) / 2;
+              d = 'M' + a.l + ',' + a.cy + ' C' + mx2 + ',' + a.cy + ' ' + mx2 + ',' + b.cy + ' ' + (b.r + 2) + ',' + b.cy;
+            } else if (byId[e[0]].row < byId[e[1]].row) {
+              d = 'M' + a.r + ',' + (a.cy + 6) + ' C' + (a.r + 30) + ',' + (a.cy + 6) + ' ' + (b.r + 30) + ',' + (b.cy - 6) + ' ' + (b.r + 2) + ',' + (b.cy - 6);
+            } else {
+              d = 'M' + a.l + ',' + (a.cy - 6) + ' C' + (a.l - 30) + ',' + (a.cy - 6) + ' ' + (b.l - 30) + ',' + (b.cy + 6) + ' ' + (b.l - 2) + ',' + (b.cy + 6);
+            }
+            var on = e[0] === cur.id || e[1] === cur.id;
+            var path = svgEl('path', { d: d, class: 'scr-edge' + (on ? ' on' : '') });
+            path.setAttribute('marker-end', on ? 'url(#s-on)' : 'url(#s-off)');
+            if (on) onPaths.push([path, e[2]]);
+            else svg.appendChild(path);
+          });
+          onPaths.forEach(function (p) {
+            svg.appendChild(p[0]);
+            var len = p[0].getTotalLength();
+            var pt = p[0].getPointAtLength(len / 2);
+            map.appendChild(el('span', { class: 'tag on', style: 'left:' + pt.x + 'px; top:' + pt.y + 'px', text: p[1] }));
+          });
         }
 
         // ---------- 停止マップ ----------
