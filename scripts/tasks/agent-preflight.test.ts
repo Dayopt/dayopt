@@ -25,13 +25,19 @@ describe('agent preflight', () => {
     const root = fixture();
     const state = collectPreflight(root);
     expect(state.dependencies).toBe(false);
-    expect(state.nodeMatches).toBe(false);
     expect(state.pnpmMatches).toBe(false);
     expect(state.expectedPnpm).toBe(null);
     expect(state.hooks['pre-push']).toBe(false);
     expect(state.readOnlyDelegation.wrapper).toBe(false);
     expect(state.readOnlyDelegation.native).toContain('unsupported');
     expect(renderPreflight(state)).toContain('commit / push 前に');
+  });
+  it('flags a Node.js mismatch independently of the test runner version', () => {
+    const root = fixture();
+    const currentMajor = Number(process.versions.node.split('.')[0]);
+    writeFileSync(join(root, '.nvmrc'), `${currentMajor + 1}\n`);
+    const state = collectPreflight(root);
+    expect(state.nodeMatches).toBe(false);
   });
   it('uses repository root from a subdirectory and verifies configured hook files', () => {
     const root = fixture();
