@@ -47,7 +47,7 @@ describe('ctx.mjs の mapSkills は roster の skill を path から返す', () 
     expect(mapSkills(['supabase/migrations/1.sql'], false)).toEqual(['supabase']);
     expect(mapSkills(['apps/product/messages/ja/auth.json'], false)).toEqual(['i18n']);
     expect(mapSkills(['scripts/lib/x.test.ts'], false)).toEqual(['test']);
-    expect(mapSkills(['scripts/ci/gate.mjs'], false)).toEqual(['pr-cross-review']);
+    expect(mapSkills(['scripts/ci/gate.mjs'], false)).toEqual([]);
   });
 });
 

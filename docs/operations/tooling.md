@@ -571,7 +571,7 @@ Node.js と package manager は実行場所ごとに暗黙で選ばせず、repo
 
 ## 6. Independent PR Review
 
-通常 PR の独立レビューは GitHub の `@codex review`。依頼・対象 SHA の照合・所見の裁定・再レビューは `.agents/skills/pr-cross-review/SKILL.md` を正本とする。実装 session の reviewer subagent や独自 pack を日常の必須工程にしない。未応答・古い結果・未実行は指摘0とは異なる。
+GitHub の `@codex review` は `protected-path-gate.mjs` が判定する外部契約・不可逆・ガードレール変更だけで使う。依頼時点、対象 SHA の照合、所見の裁定は `.agents/skills/pr-cross-review/SKILL.md` を正本とし、通常 PR や実装途中では起動しない。未応答・古い結果・未実行は指摘0とは異なる。
 
 高リスク変更の immutable pack / role / envelope / validation（`pnpm review:pack` / `review:sweep` / `review:validate` と固定差分レビュー手順）は 2026-09-20 に撤去した。追加 reviewer の停止から 3 日で一度も再開されず、pack を通した証跡も残っていなかったため、読むためだけの実装を維持しない。再開する時は git history から読む。既存の `[review-summary]` は読み取り互換だけを残す。不可逆操作の独立レビュー条件は通常レビューで置き換えない。
 

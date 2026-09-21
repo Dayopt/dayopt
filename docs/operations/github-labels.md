@@ -92,7 +92,7 @@ code: .github/dependabot.yml
 ### review
 
 - `review:full` — **Issue / PR 共通の「User 自身が重く見て目を通す」印**（2026-09-04、[#2596](https://github.com/Dayopt/dayopt/issues/2596) で機械 gate から情報ラベルへ格下げ。旧: Issue / PR 共通の高リスクシグナルとして必須レビューを機械判定していた [#2529](https://github.com/Dayopt/dayopt/issues/2529) / [#2530](https://github.com/Dayopt/dayopt/issues/2530) は撤回）。手で付ける明示的なエスカレーションで、AI が自動付与する仕組みは作らない
-  - **PR に付いている場合**: User が GitHub の `@codex review` を重点的に確認する目安になる（merge を止める機械 gate ではない）。判定材料として `scripts/ci/protected-path-gate.mjs` の保護対象 path 判定と併せて使う
+  - **PR に付いている場合**: User 自身が重点的に確認する印。Codex review の起動条件には使わず、独立レビューは `scripts/ci/protected-path-gate.mjs` だけで判定する
   - **Issue に付いている場合**: 実装着手前に User 自身が目を通すべき合図（機械 gate はない）
   - ラベルの有無は merge / 着手可否の機械判定に使わない
 

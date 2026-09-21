@@ -103,7 +103,6 @@ export function createValidationPlan(input, options = {}) {
   const proseOnly =
     files.length > 0 &&
     files.every((file) => classifyPlanPath(file).every((area) => area === 'prose'));
-  const policy = areas.includes('policy');
   const database = areas.includes('database');
   // integration job（fresh）は `supabase/migrations/**` 全体で走る。upgrade / old-consumer job は
   // production に適用される root の migration ファイルだけで起動する（check.mjs と同じ判定）
@@ -160,7 +159,11 @@ export function createValidationPlan(input, options = {}) {
       'Live consumer must remain compatible after migration',
     ),
   };
-  const reviewRequired = !proseOnly || protectedPaths.required || unknown;
+  // #2489 の正本: 独立レビューは「外部契約 or 不可逆」と機械ガードレール自身だけ。
+  // 通常ロジック・時間不変条件・agent 向け文書は、対象 test / CI とセルフレビューで閉じる。
+  // diff / revision の不完全性は suite() が indeterminate にするため、ここで reviewRequired を
+  // 広げて「未知の変更 = 外部契約」と読み替えない。
+  const reviewRequired = protectedPaths.required;
   return {
     schemaVersion: PLAN_VERSION,
     policyVersion: PLAN_VERSION,
@@ -185,10 +188,12 @@ export function createValidationPlan(input, options = {}) {
     review: {
       ...suite(
         reviewRequired,
-        proseOnly ? 'Allowlisted prose only' : 'Behavior, policy or external contract changed',
+        reviewRequired
+          ? `External contract, irreversible change, or guardrail: ${protectedPaths.reason}`
+          : 'No external contract, irreversible change, or review guardrail changed',
       ),
       focus: reviewRequired ? ['REVIEW-1', 'REVIEW-2', 'REVIEW-3', 'TEST-1'] : [],
-      protected: protectedPaths.required || policy,
+      protected: protectedPaths.required,
     },
     authority: {
       code: proseOnly ? 'AUTONOMOUS' : 'CHECKPOINT',

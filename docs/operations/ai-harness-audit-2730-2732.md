@@ -16,10 +16,10 @@ last_verified: 2026-09-14
 | 対象                    | 変更と根拠                                                                                                                                                                                  |
 | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | AGENTS / routing        | 同じ主担当の完遂、機械処理優先、read-only の大量調査だけを初期委譲候補とする。#2730 の承認済み運用方針を反映。L0〜L3 は既存 JSON 契約を維持し、L1 を別 agent の起動指示としない。           |
-| 通常 PR review          | `@codex review` を入口とし、head SHA・未応答・古い結果を区別する。独自 pack / role / envelope は高リスク変更の参照先へ移動し、security sweep のコード・契約は維持。                         |
+| 保護対象 PR review      | `@codex review` を入口とし、head SHA・未応答・古い結果を区別する。2026-09-22 に #2489 の境界を復元し、通常 PR は対象外へ戻した。独自 pack / role / envelope は撤去済み。                    |
 | 検証の重複              | 変更前の局所修正・Story 追加で全体 typecheck / lint / boundaries の実行を確認。作業中は対象の検証を優先し、ready 化前の `pnpm check` / pre-push は維持。README の重複指示を正本参照に変更。 |
 | Storybook               | Warning の args 追加に450行の skill を読む実行を確認。token 選択・新設テンプレート・mock を必要時だけ読む構成へ移動。AllPatterns、semantic token、操作がある時の play 等の規約は維持。      |
-| tooling / security docs | 通常 review の旧入口を正本参照へ変更。Opus 4.7 の移行記録は履歴と明示し、現行への自動適用を避ける。                                                                                         |
+| tooling / security docs | 保護対象 review の入口を正本参照へ変更。Opus 4.7 の移行記録は履歴と明示し、現行への自動適用を避ける。                                                                                       |
 
 不可逆操作の明示指示・独立レビュー・dry-run/backup、ユーザー分離、時間不変条件、CI、hook、ruleset は変更していない。早期終了や安全な操作での不要な承認停止は再現していないため、completion / permission 指示を追加・撤去しない。
 

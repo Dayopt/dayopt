@@ -2,11 +2,11 @@
 
 /**
  * Protected Path Gate - determines from a changed-files list whether a PR
- * touches a protected path, used as the signal for how heavily
- * GitHub `@codex review` should focus on the change (#2478,
+ * touches a protected path, used as the signal for whether
+ * GitHub `@codex review` is eligible for the change (#2478,
  * tempo-linked review signal; downgraded from a merge-blocking gate to an
- * advisory signal in #2596 - merge itself is blocked only by CI
- * status-check-rollup and the `gh pr merge` guard hook).
+ * advisory signal in #2596 - merge itself is blocked by the main branch
+ * repository ruleset).
  *
  * The old design required an extra cross-review on every PR uniformly. This
  * script narrows the "where should the standard review focus" signal to PRs that
@@ -26,8 +26,8 @@
  * behavior covered by unit tests and CI, and keeping them here put nearly every
  * product PR on the required side - which, combined with cloud sessions where
  * `Workflow` / `Agent` are disabled by default (#2472), stalled merges instead
- * of adding review. `review:full` remains the manual escalation for a PR that
- * deserves the heavier review without matching a glob.
+ * of adding review. `review:full` remains a human-only attention label and
+ * does not expand this machine-selected scope.
  *
  * Retreat condition for that call: see AGENTS.md §レビュー (the sentence
  * referencing #2489 / #2503) for when a PR must carry `review:full` by hand
@@ -77,9 +77,9 @@ export const PRODUCTION_CONFIG_AUDIT_CONTRACT_PATHS = [
 
 /**
  * Protected path globs (OR'd together). If any changed file matches one of
- * these, the standard GitHub `@codex review` should pay closer attention (#2596;
- * no longer a merge-blocking requirement). Add or remove entries only in this
- * array (finish-branch.sh does not keep a copy).
+ * these, the PR is eligible for GitHub `@codex review` at the stable
+ * merge-candidate stage (#2596; no longer a merge-blocking requirement).
+ * Add or remove entries only in this array (finish-branch.sh does not keep a copy).
  */
 export const PROTECTED_PATH_GLOBS = [
   // auth / OAuth / MCP integrations
@@ -136,6 +136,17 @@ export const PROTECTED_PATH_GLOBS = [
   // guardrail の重点確認対象として残す（#2483 の過去レビューで入った境界）。
   'scripts/ci/check.mjs',
   '.github/workflows/ci.yml',
+  // Review policy / validation controller。#2794 / #2796 で追加された後発の
+  // ガードレールで、判定側と producer を同じ PR で弱めると shadow が偽の green を出す。
+  // #2489 の「ガードレール自身」に含めるが、AGENTS.md や一般 skill のような
+  // 可逆な agent 向け文書までは保護対象へ広げない。
+  'scripts/lib/validation-plan.mjs',
+  'scripts/lib/validation-plan.test.ts',
+  'scripts/lib/review-policy.mjs',
+  'scripts/lib/review-policy.test.ts',
+  'scripts/ci/validation-gate.mjs',
+  'scripts/ci/validation-gate.test.ts',
+  '.github/workflows/validation-gate.yml',
   // promote.yml は production domain を切り替える唯一の経路で、2026-09-03 以降は
   // main merge がそれを自動で起動する（層 3 → smoke → promote → rollback）。
   // gate の `if:` 式を 1 つ緩めるだけで未検証の main が本番へ出るが、その変更は

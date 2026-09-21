@@ -4,7 +4,7 @@ Dayopt で作業する全エージェントの provider-neutral な正本ガイ�
 
 ## レビュー規則
 
-実装 agent 自身のセルフレビューと `pr-cross-review` に共通する観点。レビューの正本は PR の diff・Issue・検証結果で、provider 固有の model 名や tool 名を全 runtime の保証として扱わない。追加 reviewer は停止中で、User の明示指示がある時だけ別途判断する。
+全 PR のセルフレビューと、保護対象 PR だけで使う `pr-cross-review` に共通する観点。レビューの正本は PR の diff・Issue・検証結果で、provider 固有の model 名や tool 名を全 runtime の保証として扱わない。追加 reviewer は停止中で、User の明示指示がある時だけ別途判断する。
 
 - レビューコメントは日本語で書く
 - diff によって新たに生じる、または現実に悪化する不具合だけを指摘する。問題がなければ指摘ゼロでよい
@@ -130,7 +130,7 @@ review threadは全件resolveしてからmerge（fix積む/反論reply/issue化�
 
 レビューのシンプルルール: (1) 壊れる筋書きを語れないなら指摘しない、語れたなら黙殺しない (2) mergeの基準は完璧ではなくmainより安全 (3) 迷ったら点を塞ぐよりclassを閉じる。
 
-**merge の遮断は main の repository ruleset 1 本で行う**（required status checks = `🔍 Static Checks` / `📦 Unit Tests` / `🧪 Integration Tests` / `Vercel – product` / `Vercel – web`、strict up-to-date、review thread resolution、bypass actor 0。2026-09-07 の repo public 化で有効、2026-09-13 に #2640 で `Production Config Audit` を外し Integration Tests を足した）。ruleset は local / cloud / UI / API / MCP のどの経路にも同じ条件で効く。skipped な required check は success 扱いなので、DB を触らない PR は Integration Tests が skip でも止まらない。`pnpm branch:finish` は merge と worktree / branch 掃除をワンセットで行う入口であり gate ではない（rollup 検査は ruleset と重複する冗長検査として残す）。provider adapter の pre-tool guard にあった merge 直接実行の block（#2596）は撤去した。PR の独立レビューは GitHub の `@codex review` を標準にし、追加 reviewer は停止中。保護対象 path の判定（`scripts/ci/protected-path-gate.mjs`）は、そのレビューで重点的に読む範囲の目安に使う。保護対象の基準は**外部契約 or 不可逆**（auth/OAuth/MCP、billing/webhook、migration、外部calendar provider、system API、ガードレール自身）。`review:full` ラベルは「User 自身が重く見て目を通す」印であり、機械判定の入力にはしない。
+**merge の遮断は main の repository ruleset 1 本で行う**（required status checks = `🔍 Static Checks` / `📦 Unit Tests` / `🧪 Integration Tests` / `Vercel – product` / `Vercel – web`、strict up-to-date、review thread resolution、bypass actor 0。2026-09-07 の repo public 化で有効、2026-09-13 に #2640 で `Production Config Audit` を外し Integration Tests を足した）。ruleset は local / cloud / UI / API / MCP のどの経路にも同じ条件で効く。`pnpm branch:finish` は merge と worktree / branch 掃除の入口であり gate ではない。独立レビューは `scripts/ci/protected-path-gate.mjs` が判定する保護対象 PR だけを、required CI が通り head が安定した merge 候補時に GitHub の `@codex review` へ出す。基準は **外部契約 or 不可逆**（auth/OAuth/MCP、billing/webhook、migration、外部calendar provider、system API、ガードレール自身）で、通常ロジック・時間不変条件・agent 文書は対象 test / CI とセルフレビューで閉じる（#2489）。`Review policy (shadow)` は advisory のまま自動起動・required 化しない。`review:full` は User 自身が重く見る印で、Codex 起動や merge の機械入力にしない。
 
 retreat条件: `apps/product/src/features/timeblock` または `apps/product/src/lib/time` 配下のtestを削除・skipするPRは、`review:full` labelを手で付けてUser自身が目を通す（時間不変条件の安全網がそのtest自身であるため。#2489 / #2503）。
 
@@ -141,7 +141,7 @@ worktree で作業するセッション（レーン）は次を守る:
 - **止まる前に連絡**する。質問・ブロック・想定外・判断待ちが発生したら、待ち状態に入る前に (1) 何で止まっているか (2) 自分の推奨 (3) 待ち中に続行できる代替作業の有無、の3点で担当issue/PRへコメントする。黙って停止しない
 - **停止条件**: 同種のエラーに3回連続で失敗した／scope外のファイルを変更しないと解決できないと判明した／チケットが前提とする原因・機構が実測と食い違うと分かった、のいずれかに当たったら試行を続けず停止して報告する。エスカレーションは失敗ではなく正しい動作
 - **検証の証跡原則**: 検証主張には実行コマンドと出力の要点を添える。「passした」だけの報告は不可
-- **push前セルフレビューはriskに比例させる**: auth/RLS/billing/migration/公開契約/cross-feature 等の diff と既存パターン追従でない新規ロジックは、push前に敵対的セルフレビューを行い根拠を報告する。これは reviewer の自動委任条件ではない。独立 PR レビューは高リスク変更も GitHub の `@codex review` を使う。追加の reviewer subagent / 外部 provider レビューは停止中で、User が明示的に再開を指示するまで起動しない。手順は `pr-cross-review` skill を参照する
+- **push前セルフレビューはriskに比例させる**: auth/RLS/billing/migration/公開契約/cross-feature 等の diff と既存パターン追従でない新規ロジックは、push前に敵対的セルフレビューを行い根拠を報告する。これは reviewer の自動委任条件ではない。保護対象 path に一致する PR だけ、merge 候補時に `pr-cross-review` skill で GitHub の `@codex review` を依頼する。追加 reviewer は User が明示的に再開を指示するまで起動しない
 - issue/PRコメントが内容の正本。1 worktree = 1 branch = 1 PR、役目を終えたworktreeはその場で削除する
 
 ## 委任・報告の作法
@@ -181,7 +181,7 @@ worktree で作業するセッション（レーン）は次を守る:
 | `diagnosing-bugs`      | 原因不明・複数層に跨る不具合の再現と切り分け                                     |
 | `react-performance`    | データ取得の waterfall・bundle・RSC 境界の性能判断                               |
 | `ui-audit`             | 指定 UI の操作性・アクセシビリティのコード監査（明示依頼時のみ）                 |
-| `pr-cross-review`      | GitHub の独立 PR レビュー（追加 reviewer は停止中）                              |
+| `pr-cross-review`      | 保護対象 PR の GitHub 独立レビュー（通常 PR は対象外）                           |
 | `docs-writing`         | ユーザー向けdocs・リリースノート・技術ドキュメント                               |
 | `docs-audit`           | 公開docsの監査                                                                   |
 | `releasing`            | リリース作業end-to-end（明示依頼時のみ）                                         |
