@@ -27,6 +27,12 @@ description: 非 trivial な作業の成功条件・実行方法・モデル選�
 4. 独立した大量調査だけ、下記の委譲条件で採算を比較する。モデル名や agent 数を目的にしない。
 5. 失敗時は情報不足・環境不備・仕様の曖昧さ・能力不足を切り分ける。安いモデルで同じ失敗を重ねることを節約と扱わない。停止境界は `AGENTS.md` に従う。
 
+## 高影響変更の spec-first
+
+auth / RLS / service role、billing / webhook、migration、data model、公開 API / MCP / OAuth / 外部 provider 契約、複数 feature の architecture、不可逆操作に触れる場合は、実装前に [`AI開発標準ループ`](../../../docs/operations/ai-development-loop.md) §高影響変更の spec-first を適用する。Issue / PR の spec を実装・既存契約・test と照合してから凍結し、実装後に固定した条件へ照合する。これは production mutation や release の許可ではない。
+
+既知の狭い修正や既存パターンへの追従では、不要な spec 凍結を追加しない。
+
 ## モデル選択
 
 難しさ・影響・検証可能性で初期選択する。具体名は運用上の目安であり、可用性や能力の保証ではない。
