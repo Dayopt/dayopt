@@ -7,6 +7,9 @@
     <!--
       Dayopt の仕組みを触って学ぶ教材。操作 → 通る処理 → 失敗点 → 画面・データ・再試行への影響を辿る。
       内容は下の JSON（id="walkthrough-data"）が正本。
+      図の描画に使う項目: scenario.lanes（列の並び）、hop.short（図の見出し）/ hop.via（その段へ入る矢印のラベル）、
+      fail.tags（画面 / データ / 再試行 / 痕跡の分類。辞書は下の script の TAGS）/ fail.to・back（結果が現れる段と戻り矢印のラベル）/
+      fail.continues（失敗しても流れが続く）、outages.features と item.impacts（down / degraded）。
       refs の {path, find} は `pnpm docs:check`（walkthrough-refs）が「ファイルが在り、find の文字列を含む」ことを検査する。
       行番号は持たない（ずれるため）。コードを動かしたら find を追従させる。
       外部 script / CSS / font は使わない（file:// で開ける状態を保つ）。
@@ -19,12 +22,18 @@
         --text: #1d1c1a;
         --muted: #6b675f;
         --border: #e2ded6;
+        --wire: #b7b1a6;
         --accent: #2f5bd3;
-        --danger: #c0392b;
-        --danger-bg: #fdf0ee;
+        --bad: #c7362a;
+        --bad-bg: #fcefed;
+        --warn: #b26b00;
+        --warn-bg: #fdf4e4;
         --ok: #1e7b4f;
+        --ok-bg: #e9f5ee;
+        --neutral: #6b675f;
+        --neutral-bg: #f1efeb;
         --svc-browser: #2f5bd3;
-        --svc-vercel: #1d1c1a;
+        --svc-vercel: #3b3a36;
         --svc-supabase: #1e8a5a;
         --svc-resend: #8a4bd6;
         --svc-github: #b8641b;
@@ -39,12 +48,18 @@
           --text: #ecebe7;
           --muted: #a29e95;
           --border: #3a3834;
+          --wire: #5b5750;
           --accent: #7d9df0;
-          --danger: #f08274;
-          --danger-bg: #3a2320;
+          --bad: #f08274;
+          --bad-bg: #3a2320;
+          --warn: #e8b35a;
+          --warn-bg: #3a2e1a;
           --ok: #6fcf9c;
+          --ok-bg: #1d3328;
+          --neutral: #a29e95;
+          --neutral-bg: #2a2926;
           --svc-browser: #7d9df0;
-          --svc-vercel: #ecebe7;
+          --svc-vercel: #d8d6d0;
           --svc-supabase: #5ccf97;
           --svc-resend: #b98cf0;
           --svc-github: #e0a263;
@@ -59,12 +74,18 @@
         --text: #ecebe7;
         --muted: #a29e95;
         --border: #3a3834;
+        --wire: #5b5750;
         --accent: #7d9df0;
-        --danger: #f08274;
-        --danger-bg: #3a2320;
+        --bad: #f08274;
+        --bad-bg: #3a2320;
+        --warn: #e8b35a;
+        --warn-bg: #3a2e1a;
         --ok: #6fcf9c;
+        --ok-bg: #1d3328;
+        --neutral: #a29e95;
+        --neutral-bg: #2a2926;
         --svc-browser: #7d9df0;
-        --svc-vercel: #ecebe7;
+        --svc-vercel: #d8d6d0;
         --svc-supabase: #5ccf97;
         --svc-resend: #b98cf0;
         --svc-github: #e0a263;
@@ -106,14 +127,13 @@
         outline-offset: 2px;
       }
       .wrap {
-        max-width: 1180px;
+        max-width: 1240px;
         margin: 0 auto;
         padding: 24px 16px 64px;
       }
       header h1 {
         font-size: 1.5rem;
         margin: 0 0 4px;
-        letter-spacing: 0.01em;
       }
       header p {
         margin: 0;
@@ -151,6 +171,11 @@
         flex: 1 1 360px;
         color: var(--muted);
       }
+      .btns {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
       .play {
         min-height: 44px;
         padding: 8px 18px;
@@ -161,79 +186,251 @@
         font-weight: 600;
         cursor: pointer;
       }
-      .grid {
-        display: grid;
-        grid-template-columns: minmax(0, 380px) minmax(0, 1fr);
-        gap: 20px;
-        align-items: start;
+      .play.bad {
+        background: var(--bad);
       }
-      @media (max-width: 820px) {
-        .grid {
-          grid-template-columns: minmax(0, 1fr);
-        }
-      }
-      .lane {
-        list-style: none;
-        margin: 0;
-        padding: 0;
-        display: flex;
-        flex-direction: column;
-        gap: 6px;
-      }
-      .hop {
-        width: 100%;
+      .ghost {
         min-height: 44px;
-        display: grid;
-        grid-template-columns: 28px 1fr;
-        gap: 10px;
-        align-items: start;
-        text-align: left;
-        padding: 10px 12px;
+        padding: 8px 14px;
         border: 1px solid var(--border);
-        border-left: 5px solid var(--svc);
         border-radius: 8px;
         background: var(--surface);
         cursor: pointer;
+      }
+      .stage {
+        display: grid;
+        grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+        gap: 20px;
+        align-items: start;
+      }
+      @media (max-width: 860px) {
+        .stage {
+          grid-template-columns: minmax(0, 1fr);
+        }
+      }
+
+      /* ---- 経路図（swimlane） ---- */
+      .flow {
+        position: relative;
+        display: grid;
+        grid-template-columns: repeat(var(--lanes), minmax(0, 1fr));
+        column-gap: 28px;
+        padding: 0 4px 16px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+      }
+      .lane-bg {
+        grid-row: 1 / -1;
+        margin: 0 -10px;
+        background: color-mix(in srgb, var(--svc) 5%, transparent);
+        border-left: 1px dashed color-mix(in srgb, var(--svc) 35%, transparent);
+        border-right: 1px dashed color-mix(in srgb, var(--svc) 35%, transparent);
+      }
+      .lane-head {
+        grid-row: 1;
+        z-index: 1;
+        padding: 12px 2px 8px;
+        text-align: center;
+        line-height: 1.3;
+        border-bottom: 3px solid var(--svc);
+        margin-bottom: 8px;
+      }
+      .lane-head b {
+        display: block;
+        color: var(--svc);
+        font-size: 0.92em;
+      }
+      .lane-head small {
+        display: block;
+        color: var(--muted);
+        font-size: 0.72em;
+      }
+      .node {
+        position: relative;
+        z-index: 2;
+        margin-top: 14px;
+        min-height: 44px;
+        padding: 8px 10px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        text-align: left;
+        background: var(--surface);
+        border: 1.5px solid color-mix(in srgb, var(--svc) 55%, var(--border));
+        border-radius: 10px;
+        cursor: pointer;
+        line-height: 1.35;
+        font-size: 0.9em;
         transition:
-          opacity 0.2s,
-          background 0.2s;
+          opacity 0.25s,
+          box-shadow 0.2s,
+          transform 0.2s;
       }
-      .hop .n {
-        font-variant-numeric: tabular-nums;
-        color: var(--muted);
-        font-size: 0.85em;
-        padding-top: 2px;
+      .node.cross {
+        margin-top: 46px;
       }
-      .hop .t {
-        display: block;
+      .node:hover {
+        box-shadow: 0 2px 8px color-mix(in srgb, var(--svc) 25%, transparent);
+      }
+      .node[aria-current='step'] {
+        background: color-mix(in srgb, var(--svc) 12%, var(--surface));
+        box-shadow: 0 0 0 2px var(--svc);
+      }
+      .node .num {
+        flex: none;
+        width: 22px;
+        height: 22px;
+        border-radius: 50%;
+        display: grid;
+        place-items: center;
+        font-size: 0.72em;
+        font-weight: 700;
+        color: var(--surface);
+        background: var(--svc);
+      }
+      .node .lbl {
+        flex: 1;
+        min-width: 0;
         font-weight: 600;
-        line-height: 1.45;
       }
-      .hop .s {
-        display: block;
-        font-size: 0.8em;
+      .node .bolt {
+        flex: none;
+        font-size: 0.72em;
         color: var(--muted);
       }
-      .hop[aria-current='step'] {
-        background: var(--surface-2);
-        box-shadow: inset 0 0 0 1px var(--svc);
+      .node.dim {
+        opacity: 0.28;
       }
-      .hop.pulse {
-        background: var(--surface-2);
+      .node.f-bad,
+      .node.f-warn,
+      .node.f-ok {
+        box-shadow: 0 0 0 3px var(--sev);
+        background: var(--sev-bg);
       }
-      .hop.failed {
-        border-color: var(--danger);
-        background: var(--danger-bg);
+      .node.f-bad {
+        --sev: var(--bad);
+        --sev-bg: var(--bad-bg);
       }
-      .hop.skipped {
-        opacity: 0.35;
+      .node.f-warn {
+        --sev: var(--warn);
+        --sev-bg: var(--warn-bg);
       }
-      .hop .fx {
-        display: inline-block;
-        margin-left: 6px;
-        font-size: 0.75em;
-        color: var(--danger);
+      .node.f-ok {
+        --sev: var(--ok);
+        --sev-bg: var(--ok-bg);
       }
+      .node.f-bad .num,
+      .node.f-warn .num,
+      .node.f-ok .num {
+        background: var(--sev);
+      }
+      .node.surface {
+        box-shadow: 0 0 0 2px var(--bad);
+      }
+      .node.hit {
+        transform: scale(1.04);
+      }
+      /* 1 列が狭い時（4 列の図や狭い画面）は番号の下に見出しを全幅で置く */
+      .flow.narrow .node {
+        display: grid;
+        grid-template-columns: auto 1fr;
+        grid-template-areas: 'num bolt' 'lbl lbl';
+        gap: 4px;
+        padding: 6px 8px;
+        font-size: 0.8em;
+      }
+      .flow.narrow .node .num {
+        grid-area: num;
+      }
+      .flow.narrow .node .lbl {
+        grid-area: lbl;
+      }
+      .flow.narrow .node .bolt {
+        grid-area: bolt;
+        justify-self: end;
+      }
+      .wires {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        z-index: 1;
+        overflow: visible;
+      }
+      .wire {
+        fill: none;
+        stroke: var(--wire);
+        stroke-width: 2;
+      }
+      .wire.net {
+        stroke-width: 2.5;
+      }
+      .wire.dim {
+        opacity: 0.25;
+      }
+      .wire.cut {
+        stroke: var(--bad);
+        stroke-dasharray: 3 5;
+        opacity: 0.6;
+      }
+      .wire.ret {
+        stroke: var(--bad);
+        stroke-width: 2.5;
+        stroke-dasharray: 7 5;
+      }
+      .wire.lit {
+        stroke: var(--accent);
+      }
+      .packet {
+        fill: var(--accent);
+        filter: drop-shadow(0 0 4px var(--accent));
+      }
+      .packet.bad {
+        fill: var(--bad);
+        filter: drop-shadow(0 0 4px var(--bad));
+      }
+      .tag {
+        position: absolute;
+        z-index: 3;
+        transform: translate(-50%, -50%);
+        padding: 1px 8px;
+        border-radius: 999px;
+        font-size: 0.72em;
+        line-height: 1.6;
+        white-space: nowrap;
+        background: var(--surface);
+        border: 1px solid var(--wire);
+        color: var(--muted);
+        pointer-events: none;
+      }
+      .tag.x {
+        color: var(--bad);
+        border-color: var(--bad);
+        font-weight: 700;
+      }
+      .tag.ret {
+        color: #fff;
+        background: var(--bad);
+        border-color: var(--bad);
+        font-weight: 600;
+      }
+      @media (max-width: 560px) {
+        .flow {
+          column-gap: 14px;
+        }
+        .lane-bg {
+          margin: 0 -6px;
+        }
+        .lane-head small {
+          display: none;
+        }
+        .tag {
+          font-size: 0.64em;
+          padding: 0 5px;
+        }
+      }
+
+      /* ---- 詳細パネル ---- */
       .panel {
         background: var(--surface);
         border: 1px solid var(--border);
@@ -241,7 +438,7 @@
         padding: 20px;
         min-width: 0;
       }
-      @media (min-width: 821px) {
+      @media (min-width: 861px) {
         .panel {
           position: sticky;
           top: 16px;
@@ -250,12 +447,21 @@
         }
       }
       .panel h2 {
-        margin: 0 0 4px;
+        margin: 4px 0;
         font-size: 1.2rem;
       }
       .panel h3 {
         margin: 20px 0 8px;
         font-size: 0.95rem;
+      }
+      .back {
+        display: none;
+      }
+      @media (max-width: 860px) {
+        .back {
+          display: inline-block;
+          margin-bottom: 8px;
+        }
       }
       .svc-chip {
         display: inline-block;
@@ -264,7 +470,6 @@
         border-radius: 999px;
         border: 1px solid var(--svc);
         color: var(--svc);
-        margin-right: 4px;
       }
       .change {
         margin-top: 12px;
@@ -285,47 +490,86 @@
       .fail-btn {
         min-height: 44px;
         padding: 8px 12px;
-        border: 1px solid var(--danger);
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        border: 1px solid var(--border);
         border-radius: 8px;
-        background: transparent;
-        color: var(--danger);
+        background: var(--surface);
         cursor: pointer;
         text-align: left;
       }
       .fail-btn[aria-pressed='true'] {
-        background: var(--danger);
-        color: var(--surface);
+        border-color: var(--sev);
+        background: var(--sev-bg);
+        box-shadow: 0 0 0 1px var(--sev);
       }
-      .outcome {
-        margin: 12px 0 0;
-        border: 1px solid var(--danger);
-        border-radius: 10px;
-        overflow: hidden;
+      .dot {
+        flex: none;
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: var(--sev);
       }
-      .outcome div {
+      .s-bad {
+        --sev: var(--bad);
+        --sev-bg: var(--bad-bg);
+      }
+      .s-warn {
+        --sev: var(--warn);
+        --sev-bg: var(--warn-bg);
+      }
+      .s-ok {
+        --sev: var(--ok);
+        --sev-bg: var(--ok-bg);
+      }
+      .s-neutral {
+        --sev: var(--neutral);
+        --sev-bg: var(--neutral-bg);
+      }
+      .tiles {
         display: grid;
-        grid-template-columns: 7.5em 1fr;
-        gap: 12px;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+        margin-top: 14px;
+      }
+      @media (max-width: 420px) {
+        .tiles {
+          grid-template-columns: minmax(0, 1fr);
+        }
+      }
+      .tile {
         padding: 10px 12px;
-        border-top: 1px solid var(--border);
-      }
-      .outcome div:first-child {
-        border-top: 0;
-      }
-      .outcome dt {
-        font-weight: 600;
-        color: var(--muted);
-        font-size: 0.88em;
-      }
-      .outcome dd {
-        margin: 0;
+        border-radius: 10px;
+        background: var(--sev-bg);
+        border-top: 4px solid var(--sev);
         min-width: 0;
       }
-      @media (max-width: 480px) {
-        .outcome div {
-          grid-template-columns: 1fr;
-          gap: 2px;
-        }
+      .tile .k {
+        font-size: 0.75em;
+        color: var(--muted);
+        letter-spacing: 0.05em;
+      }
+      .tile .h {
+        display: block;
+        font-weight: 700;
+        color: var(--sev);
+        font-size: 1.05em;
+      }
+      .tile p {
+        margin: 4px 0 0;
+        font-size: 0.86em;
+      }
+      .look {
+        margin-top: 8px;
+        padding: 12px;
+        border-radius: 10px;
+        border: 2px solid var(--accent);
+      }
+      .look strong {
+        display: block;
+        color: var(--accent);
+        font-size: 0.85em;
       }
       .refs {
         list-style: none;
@@ -338,77 +582,153 @@
       .refs li {
         overflow-wrap: anywhere;
       }
-      .refs .why {
+      .why {
         color: var(--muted);
         font-size: 0.88em;
       }
-      .unknown {
-        margin-top: 12px;
-        font-size: 0.88em;
-        color: var(--muted);
-        border-left: 3px solid var(--border);
-        padding-left: 10px;
-      }
-      .cards {
+
+      /* ---- 停止マップ ---- */
+      .deps {
+        position: relative;
         display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        column-gap: 72px;
+        padding: 16px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+      }
+      @media (max-width: 560px) {
+        .deps {
+          column-gap: 36px;
+          padding: 12px 8px;
+        }
+      }
+      .deps .col {
+        position: relative;
+        z-index: 2;
+        display: flex;
+        flex-direction: column;
         gap: 8px;
       }
-      .card {
-        min-height: 64px;
+      .deps .col.feat {
+        justify-content: space-around;
+      }
+      .deps .col-h {
+        font-size: 0.78em;
+        color: var(--muted);
+        margin-bottom: 2px;
+      }
+      .svc-node {
+        min-height: 44px;
+        padding: 6px 10px;
         text-align: left;
-        padding: 10px 12px;
-        border: 1px solid var(--border);
-        border-top: 4px solid var(--svc);
+        border: 1.5px solid var(--border);
+        border-left: 5px solid var(--svc);
         border-radius: 8px;
         background: var(--surface);
         cursor: pointer;
+        line-height: 1.3;
+        transition: opacity 0.2s;
       }
-      .card[aria-pressed='true'] {
-        background: var(--surface-2);
-        box-shadow: inset 0 0 0 1px var(--svc);
-      }
-      .card .t {
+      .svc-node b {
         display: block;
-        font-weight: 600;
+        font-size: 0.92em;
       }
-      .card .s {
+      .svc-node small {
         display: block;
-        font-size: 0.8em;
         color: var(--muted);
+        font-size: 0.72em;
+      }
+      .svc-node[aria-pressed='true'] {
+        border-color: var(--svc);
+        box-shadow: 0 0 0 2px var(--svc);
+        background: color-mix(in srgb, var(--svc) 10%, var(--surface));
+      }
+      .has-pick .svc-node[aria-pressed='false'] {
+        opacity: 0.55;
+      }
+      .feat-node {
+        min-height: 44px;
+        padding: 6px 10px;
+        border-radius: 8px;
+        border: 1.5px solid var(--border);
+        background: var(--surface);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        line-height: 1.3;
+        font-size: 0.9em;
+        font-weight: 600;
+        transition:
+          background 0.2s,
+          opacity 0.2s;
+      }
+      .feat-node small {
+        font-weight: 700;
+        font-size: 0.75em;
+      }
+      .feat-node.down {
+        border-color: var(--bad);
+        background: var(--bad-bg);
+        color: var(--bad);
+      }
+      .feat-node.degraded {
+        border-color: var(--warn);
+        background: var(--warn-bg);
+        color: var(--warn);
+      }
+      .feat-node.safe {
+        opacity: 0.55;
+      }
+      .edge {
+        fill: none;
+        stroke: var(--wire);
+        stroke-width: 1.5;
+        opacity: 0.35;
+      }
+      .edge.down {
+        stroke: var(--bad);
+        stroke-width: 3;
+        opacity: 1;
+      }
+      .edge.degraded {
+        stroke: var(--warn);
+        stroke-width: 3;
+        stroke-dasharray: 6 4;
+        opacity: 1;
+      }
+      .edge.off {
+        opacity: 0.08;
       }
       .legend {
         display: flex;
         flex-wrap: wrap;
-        gap: 6px 14px;
-        margin: 0 0 12px;
+        gap: 6px 16px;
+        margin: 10px 2px 0;
         font-size: 0.82em;
         color: var(--muted);
       }
-      .legend span::before {
-        content: '';
+      .legend i {
         display: inline-block;
-        width: 10px;
-        height: 10px;
-        border-radius: 2px;
-        margin-right: 5px;
-        background: var(--svc);
-        vertical-align: -1px;
+        width: 22px;
+        height: 0;
+        margin-right: 6px;
+        vertical-align: middle;
+        border-top: 3px solid var(--sev);
+      }
+      .legend i.dash {
+        border-top-style: dashed;
       }
       footer {
         margin-top: 40px;
         color: var(--muted);
         font-size: 0.85em;
       }
-      .sr-only {
-        position: absolute;
-        width: 1px;
-        height: 1px;
-        overflow: hidden;
-        clip: rect(0 0 0 0);
-      }
       @media (prefers-reduced-motion: reduce) {
-        .hop {
+        .node,
+        .feat-node,
+        .svc-node {
           transition: none;
         }
       }
@@ -419,7 +739,7 @@
       <header>
         <h1>Dayopt 経路ウォークスルー</h1>
         <p>
-          操作を 1 つ選び、どの処理とサービスを通るかを辿る。各段で「ここで失敗させる」を押すと、画面・データ・再試行・痕跡がどうなり、どこから確認するかが出る。目的は暗記ではなく、変更の影響先と障害時の初手を自分で引けるようにすること。
+          操作を 1 つ選び、どのサービスのどの処理を通るかを図で辿る。▶ で依頼が流れ、段を押すと中身とコードが出る。「⚡ ここで失敗させる」を押すと、どこで途切れ、何が画面へ戻り、データ・再試行・痕跡がどうなり、どこから確認するかが出る。目的は暗記ではなく、変更の影響先と障害時の初手を自分で引けるようにすること。
         </p>
       </header>
 
@@ -438,12 +758,36 @@
       {
         "repo": "https://github.com/Dayopt/dayopt/blob/main/",
         "services": {
-          "browser": { "label": "ブラウザ", "var": "--svc-browser" },
-          "vercel": { "label": "Vercel（Next.js）", "var": "--svc-vercel" },
-          "supabase": { "label": "Supabase", "var": "--svc-supabase" },
-          "resend": { "label": "Resend", "var": "--svc-resend" },
-          "github": { "label": "GitHub Actions", "var": "--svc-github" },
-          "external": { "label": "その他の外部", "var": "--svc-external" }
+          "browser": {
+            "label": "ブラウザ",
+            "var": "--svc-browser",
+            "sub": "React / TanStack Query"
+          },
+          "vercel": {
+            "label": "Vercel（Next.js）",
+            "var": "--svc-vercel",
+            "sub": "Next.js の Function"
+          },
+          "supabase": {
+            "label": "Supabase",
+            "var": "--svc-supabase",
+            "sub": "Postgres / Auth / Edge Function"
+          },
+          "resend": {
+            "label": "Resend",
+            "var": "--svc-resend",
+            "sub": "メール送信"
+          },
+          "github": {
+            "label": "GitHub Actions",
+            "var": "--svc-github",
+            "sub": "Actions / ruleset"
+          },
+          "external": {
+            "label": "その他の外部",
+            "var": "--svc-external",
+            "sub": ""
+          }
         },
         "scenarios": [
           {
@@ -459,11 +803,22 @@
                 "what": "終了時刻が今より未来なら Plan、過去なら Record が既定になる。過去の時間帯でだけ Plan へ切り替えられる。通信のない純粋な関数。",
                 "change": "時刻の規則を強制しているのは DB trigger で、ここはその写し。ここだけ変えても保存できるかどうかは変わらない。規則を撤去・変更する時は invariants.md §時刻 の写し表を全部たどる。",
                 "refs": [
-                  { "path": "apps/product/src/features/timeblock/domain/timeblock-destination.ts", "find": "resolveTimeblockDestination" },
-                  { "path": "apps/product/src/features/timeblock/domain/timeblock-destination.ts", "find": "resolveTimeblockKindChoice" },
-                  { "path": "docs/engineering/invariants.md", "find": "### 規則の写しと、その分類", "why": "写しの一覧（契約変換 / UX 先回り）" }
+                  {
+                    "path": "apps/product/src/features/timeblock/domain/timeblock-destination.ts",
+                    "find": "resolveTimeblockDestination"
+                  },
+                  {
+                    "path": "apps/product/src/features/timeblock/domain/timeblock-destination.ts",
+                    "find": "resolveTimeblockKindChoice"
+                  },
+                  {
+                    "path": "docs/engineering/invariants.md",
+                    "find": "### 規則の写しと、その分類",
+                    "why": "写しの一覧（契約変換 / UX 先回り）"
+                  }
                 ],
-                "fails": []
+                "fails": [],
+                "short": "Plan か Record か決める"
               },
               {
                 "id": "inline-create",
@@ -472,8 +827,14 @@
                 "what": "作成パネルでアクティビティを選んだ瞬間に mutation を呼ぶ。送る前に、画面が持っているデータで重なりを先に確かめる（往復を減らすための写し）。成功すると「取り消し」付きのトーストを出し、取り消しは作ったものを削除する。",
                 "change": "作成の入口はここと、サイドバーのアクティビティタップの 2 つ。手数を変える時は両方を見る。",
                 "refs": [
-                  { "path": "apps/product/src/features/calendar/components/create/useInlineCreate.ts", "find": "mutation.mutate(" },
-                  { "path": "apps/product/src/features/calendar/components/create/InlineCreatePanel.tsx", "find": "InlineCreatePanel" }
+                  {
+                    "path": "apps/product/src/features/calendar/components/create/useInlineCreate.ts",
+                    "find": "mutation.mutate("
+                  },
+                  {
+                    "path": "apps/product/src/features/calendar/components/create/InlineCreatePanel.tsx",
+                    "find": "InlineCreatePanel"
+                  }
                 ],
                 "fails": [
                   {
@@ -484,9 +845,21 @@
                     "retry": "なし。時間帯を変えて選び直す。",
                     "trace": "何も残らない（通信前）。",
                     "look": "仕様どおりの挙動。サーバー側の判定（DB の排他制約）と食い違うなら、写しがずれている。",
-                    "refs": [{ "path": "apps/product/src/features/calendar/components/create/useInlineCreate.ts", "find": "errors.timeOverlap" }]
+                    "refs": [
+                      {
+                        "path": "apps/product/src/features/calendar/components/create/useInlineCreate.ts",
+                        "find": "errors.timeOverlap"
+                      }
+                    ],
+                    "tags": {
+                      "screen": "toast",
+                      "data": "unchanged",
+                      "retry": "user",
+                      "trace": "none"
+                    }
                   }
-                ]
+                ],
+                "short": "作成を依頼"
               },
               {
                 "id": "optimistic",
@@ -495,9 +868,18 @@
                 "what": "サーバーの返事を待たず、一時 ID（temp-…）の Plan を一覧のキャッシュへ差し込む。その直前に一覧の snapshot を取っておき、失敗したらそこへ戻す。",
                 "change": "キャッシュのキーや一覧の絞り込み条件を変えると、差し込み先と巻き戻し対象がずれる。書き込み mutation を足す時は optimistic-update skill の手順に従う。",
                 "refs": [
-                  { "path": "apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.ts", "find": "const createPlan = api.planCommands.create.useMutation" },
-                  { "path": "apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.ts", "find": "snapshotTimeblockLists" },
-                  { "path": "docs/engineering/architecture.md", "find": "### 楽観的更新のフロー" }
+                  {
+                    "path": "apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.ts",
+                    "find": "const createPlan = api.planCommands.create.useMutation"
+                  },
+                  {
+                    "path": "apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.ts",
+                    "find": "snapshotTimeblockLists"
+                  },
+                  {
+                    "path": "docs/engineering/architecture.md",
+                    "find": "### 楽観的更新のフロー"
+                  }
                 ],
                 "fails": [
                   {
@@ -509,11 +891,25 @@
                     "trace": "何も残らない。",
                     "look": "DevTools の Network タブと navigator.onLine。ブラウザがオフラインと判定した時だけこの挙動で、回線が不安定なだけなら下の「通信が途中で切れる」になる。",
                     "refs": [
-                      { "path": "apps/product/src/app/[locale]/(app)/_providers/_composition/ProvidersComposition.tsx", "find": "shouldDehydrateMutation: () => false" },
-                      { "path": "apps/product/src/lib/trpc/query-client.ts", "find": "networkMode: 'offlineFirst'", "why": "query 側だけの設定。mutation には効かない" }
-                    ]
+                      {
+                        "path": "apps/product/src/app/[locale]/(app)/_providers/_composition/ProvidersComposition.tsx",
+                        "find": "shouldDehydrateMutation: () => false"
+                      },
+                      {
+                        "path": "apps/product/src/lib/trpc/query-client.ts",
+                        "find": "networkMode: 'offlineFirst'",
+                        "why": "query 側だけの設定。mutation には効かない"
+                      }
+                    ],
+                    "tags": {
+                      "screen": "wait",
+                      "data": "unchanged",
+                      "retry": "auto",
+                      "trace": "none"
+                    }
                   }
-                ]
+                ],
+                "short": "先に画面へ出す"
               },
               {
                 "id": "trpc-client",
@@ -522,9 +918,18 @@
                 "what": "1 本の httpBatchLink で /api/trpc へ POST する（query も POST。入力を URL やログに残さないため）。送り直し用の link は無く、timeblock の mutation は retry: false。",
                 "change": "link を足す・変える影響は全 API に及ぶ。エラーを受ける共通処理（401 で画面ごとログインへ移動、Sentry 送信）は QueryClient 側にある。",
                 "refs": [
-                  { "path": "apps/product/src/lib/trpc/browser-client.ts", "find": "httpBatchLink" },
-                  { "path": "apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.ts", "find": "retry: false" },
-                  { "path": "apps/product/src/lib/trpc/query-client.ts", "find": "function handleAuthError" }
+                  {
+                    "path": "apps/product/src/lib/trpc/browser-client.ts",
+                    "find": "httpBatchLink"
+                  },
+                  {
+                    "path": "apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.ts",
+                    "find": "retry: false"
+                  },
+                  {
+                    "path": "apps/product/src/lib/trpc/query-client.ts",
+                    "find": "function handleAuthError"
+                  }
                 ],
                 "fails": [
                   {
@@ -536,22 +941,30 @@
                     "trace": "サーバーの形をしていない通信エラーとして、ブラウザから Sentry へ送る（source: trpc_client_transport）。ブラウザの Sentry は分析の同意がある時だけ動くので、無いこともある。",
                     "look": "Sentry で source:trpc_client_transport を探し、同じ時刻の Vercel の /api/trpc ログで、サーバーまで届いていたかを見る。",
                     "refs": [
-                      { "path": "apps/product/src/lib/trpc/client-errors.ts", "find": "trpc_client_transport" },
-                      { "path": "apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.ts", "find": "onSettled: invalidate" },
-                      { "path": "apps/product/instrumentation-client.ts", "find": "hasAnalyticsConsent" }
-                    ]
-                  },
-                  {
-                    "id": "session-expired",
-                    "label": "セッションが切れている（401）",
-                    "screen": "/auth/login へ画面ごと移動する（キャッシュも捨てるため、意図的にハードリロード）。",
-                    "data": "変化なし。",
-                    "retry": "しない。ログイン後に元のパスへ戻る。",
-                    "trace": "想定内の拒否なので Sentry には出ない。",
-                    "look": "頻発するなら Supabase Auth のログと、cookie を更新する middleware。",
-                    "refs": [{ "path": "apps/product/src/lib/trpc/query-client.ts", "find": "function isAuthError" }]
+                      {
+                        "path": "apps/product/src/lib/trpc/client-errors.ts",
+                        "find": "trpc_client_transport"
+                      },
+                      {
+                        "path": "apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.ts",
+                        "find": "onSettled: invalidate"
+                      },
+                      {
+                        "path": "apps/product/instrumentation-client.ts",
+                        "find": "hasAnalyticsConsent"
+                      }
+                    ],
+                    "tags": {
+                      "screen": "toast",
+                      "data": "unknown",
+                      "retry": "none",
+                      "trace": "sentry"
+                    },
+                    "to": "optimistic",
+                    "back": "巻き戻し + トースト"
                   }
-                ]
+                ],
+                "short": "tRPC で送る"
               },
               {
                 "id": "route",
@@ -560,8 +973,14 @@
                 "what": "Vercel の Function（Node.js、上限 60 秒）。context を作って認証方式（session / oauth / service role）を判定し、認証前に IP 単位の rate limit を見る。",
                 "change": "ここは全 tRPC 共通の入口。context に項目を足すと全 procedure の実行前コストが増える。",
                 "refs": [
-                  { "path": "apps/product/src/app/api/trpc/[trpc]/route.ts", "find": "createFetchTRPCContext" },
-                  { "path": "apps/product/src/lib/trpc/context.ts", "find": "isPreAuthRateLimited" }
+                  {
+                    "path": "apps/product/src/app/api/trpc/[trpc]/route.ts",
+                    "find": "createFetchTRPCContext"
+                  },
+                  {
+                    "path": "apps/product/src/lib/trpc/context.ts",
+                    "find": "isPreAuthRateLimited"
+                  }
                 ],
                 "fails": [
                   {
@@ -573,9 +992,23 @@
                     "trace": "想定内（TOO_MANY_REQUESTS）として Sentry には出さない。",
                     "look": "Upstash のダッシュボード。E2E が 429 に当たる時は手続きの数を数える。",
                     "refs": [
-                      { "path": "apps/product/src/lib/trpc/query-client.ts", "find": "function isRateLimitedError" },
-                      { "path": "apps/product/src/lib/trpc/errors.ts", "find": "'TOO_MANY_REQUESTS'" }
-                    ]
+                      {
+                        "path": "apps/product/src/lib/trpc/query-client.ts",
+                        "find": "function isRateLimitedError"
+                      },
+                      {
+                        "path": "apps/product/src/lib/trpc/errors.ts",
+                        "find": "'TOO_MANY_REQUESTS'"
+                      }
+                    ],
+                    "tags": {
+                      "screen": "toast",
+                      "data": "unchanged",
+                      "retry": "none",
+                      "trace": "none"
+                    },
+                    "to": "optimistic",
+                    "back": "巻き戻し + トースト"
                   },
                   {
                     "id": "function-down",
@@ -585,9 +1018,24 @@
                     "retry": "自動ではしない。一覧の取り直しで実際の状態に揃う。",
                     "trace": "Vercel の Function ログ。例外なら server 側 Sentry。",
                     "look": "Vercel の status、Function ログ、直近の deploy。直近に promote があったなら runbook の Playbook 2。",
-                    "refs": [{ "path": "docs/operations/monitoring.md", "find": "## Incident triage" }]
+                    "refs": [
+                      {
+                        "path": "docs/operations/monitoring.md",
+                        "find": "## Incident triage"
+                      }
+                    ],
+                    "tags": {
+                      "screen": "toast",
+                      "data": "unknown",
+                      "retry": "none",
+                      "trace": "log"
+                    },
+                    "to": "optimistic",
+                    "back": "巻き戻し + トースト"
                   }
-                ]
+                ],
+                "short": "/api/trpc で受ける",
+                "via": "POST /api/trpc"
               },
               {
                 "id": "procedure",
@@ -596,10 +1044,43 @@
                 "what": "順に、ログインしているか → MFA の要件 → 利用権（課金）→ write fence（運用で書き込みを止めるスイッチ）→ ユーザー単位の rate limit（1 分 300 回）を見る。",
                 "change": "順序に理由がある。write fence を rate limit より先に見るのは、止めている間の依頼で自分の枠を使い切り、復旧直後に締め出されるのを避けるため。",
                 "refs": [
-                  { "path": "apps/product/src/lib/trpc/procedures.ts", "find": "isWriteFenceEnabled" },
-                  { "path": "apps/product/src/lib/trpc/procedures.ts", "find": "async function isUserRateLimited" }
+                  {
+                    "path": "apps/product/src/lib/trpc/procedures.ts",
+                    "find": "isWriteFenceEnabled"
+                  },
+                  {
+                    "path": "apps/product/src/lib/trpc/procedures.ts",
+                    "find": "async function isUserRateLimited"
+                  }
                 ],
                 "fails": [
+                  {
+                    "id": "session-expired",
+                    "label": "セッションが切れている（401）",
+                    "screen": "/auth/login へ画面ごと移動する（キャッシュも捨てるため、意図的にハードリロード）。",
+                    "data": "変化なし。",
+                    "retry": "しない。ログイン後に元のパスへ戻る。",
+                    "trace": "想定内の拒否なので Sentry には出ない。",
+                    "look": "頻発するなら Supabase Auth のログと、cookie を更新する middleware。",
+                    "refs": [
+                      {
+                        "path": "apps/product/src/lib/trpc/procedures.ts",
+                        "find": "code: 'UNAUTHORIZED'"
+                      },
+                      {
+                        "path": "apps/product/src/lib/trpc/query-client.ts",
+                        "find": "function isAuthError"
+                      }
+                    ],
+                    "tags": {
+                      "screen": "redirect",
+                      "data": "unchanged",
+                      "retry": "none",
+                      "trace": "none"
+                    },
+                    "to": "optimistic",
+                    "back": "ログイン画面へ"
+                  },
                   {
                     "id": "write-fence",
                     "label": "write fence が ON",
@@ -609,9 +1090,23 @@
                     "trace": "運用が意図した停止なので Sentry には出さない（障害観測中に Sentry を埋めないため）。",
                     "look": "fence を ON にした経緯。解除手順は runbook。",
                     "refs": [
-                      { "path": "apps/product/src/lib/trpc/errors.ts", "find": "isWriteFencedError" },
-                      { "path": "docs/operations/runbook.md", "find": "### Write Fence 有効化（API層の書き込み停止）" }
-                    ]
+                      {
+                        "path": "apps/product/src/lib/trpc/errors.ts",
+                        "find": "isWriteFencedError"
+                      },
+                      {
+                        "path": "docs/operations/runbook.md",
+                        "find": "### Write Fence 有効化（API層の書き込み停止）"
+                      }
+                    ],
+                    "tags": {
+                      "screen": "toast",
+                      "data": "unchanged",
+                      "retry": "none",
+                      "trace": "none"
+                    },
+                    "to": "optimistic",
+                    "back": "巻き戻し + トースト"
                   },
                   {
                     "id": "upstash-down",
@@ -621,9 +1116,22 @@
                     "retry": "不要。rate limit は Function のメモリ上の判定へ退避する（インスタンスごとなので制限は緩くなる）。",
                     "trace": "Sentry（feature: rate_limit / operation: trpc_user_rate_limit_check）。加えて本番の /api/health は Redis の失敗を error として 503 を返すので、UptimeRobot が DOWN を通知する。",
                     "look": "Upstash の status。DOWN 通知が来ても、アプリ本体が動いているかを先に確かめる。可用性を優先して通す設計なので、保存は止まっていない。",
-                    "refs": [{ "path": "apps/product/src/lib/trpc/procedures.ts", "find": "trpc_user_rate_limit_check" }]
+                    "refs": [
+                      {
+                        "path": "apps/product/src/lib/trpc/procedures.ts",
+                        "find": "trpc_user_rate_limit_check"
+                      }
+                    ],
+                    "tags": {
+                      "screen": "none",
+                      "data": "saved",
+                      "retry": "na",
+                      "trace": "sentry"
+                    },
+                    "continues": true
                   }
-                ]
+                ],
+                "short": "関門チェック"
               },
               {
                 "id": "router-service",
@@ -632,11 +1140,21 @@
                 "what": "Router が zod で入力を検証して Service を呼ぶ。Service は command client で書き込み、成功後に利用記録（plan_created）を product_events へ送る。",
                 "change": "業務ロジックは Service に置き、Router に書かない（trpc-router-creating skill）。利用記録は best-effort で、失敗しても保存は取り消さない。",
                 "refs": [
-                  { "path": "apps/product/src/features/timeblock/server/plan-commands-router.ts", "find": "handleServiceError" },
-                  { "path": "apps/product/src/features/timeblock/server/timeblock-command-service.ts", "find": "plan_created" },
-                  { "path": "docs/operations/product-analytics.md", "find": "product_events" }
+                  {
+                    "path": "apps/product/src/features/timeblock/server/plan-commands-router.ts",
+                    "find": "handleServiceError"
+                  },
+                  {
+                    "path": "apps/product/src/features/timeblock/server/timeblock-command-service.ts",
+                    "find": "plan_created"
+                  },
+                  {
+                    "path": "docs/operations/product-analytics.md",
+                    "find": "product_events"
+                  }
                 ],
-                "fails": []
+                "fails": [],
+                "short": "Router → Service"
               },
               {
                 "id": "command-client",
@@ -645,9 +1163,18 @@
                 "what": "service role の client で create_plan_command_v1 を呼び、user_id を引数で渡す。利用者のセッションからは plans / records へ直接書き込めない（authenticated には SELECT だけ許可）。Postgres のエラーコードをアプリのコードへ訳す。",
                 "change": "service role は RLS を越える。テナント分離は「この adapter が必ず user_id を渡す」ことで守っている。ここへ command を足す時は REVIEW-1（ユーザー分離）の観点で読む。",
                 "refs": [
-                  { "path": "apps/product/src/features/timeblock/server/timeblock-command-client.ts", "find": "create_plan_command_v1" },
-                  { "path": "apps/product/src/features/timeblock/server/timeblock-command-client.ts", "find": "EXPECTED_COMMAND_ERRORS" },
-                  { "path": "supabase/migrations/20260730090300_revoke_authenticated_timeblock_dml.sql", "find": "GRANT SELECT" }
+                  {
+                    "path": "apps/product/src/features/timeblock/server/timeblock-command-client.ts",
+                    "find": "create_plan_command_v1"
+                  },
+                  {
+                    "path": "apps/product/src/features/timeblock/server/timeblock-command-client.ts",
+                    "find": "EXPECTED_COMMAND_ERRORS"
+                  },
+                  {
+                    "path": "supabase/migrations/20260730090300_revoke_authenticated_timeblock_dml.sql",
+                    "find": "GRANT SELECT"
+                  }
                 ],
                 "fails": [
                   {
@@ -658,7 +1185,19 @@
                     "retry": "server の adapter 内で 1 回だけ送り直す。PostgreSQL が失敗したトランザクションを中断済みなので安全、という理由でこのコードだけ。",
                     "trace": "何も残らない（2 回目も失敗すると「競合」として返る）。",
                     "look": "不要。頻発するなら Postgres のログで lock を見る。",
-                    "refs": [{ "path": "apps/product/src/features/timeblock/server/timeblock-command-client.ts", "find": "if (result.error?.code === '40P01') result = await request();" }]
+                    "refs": [
+                      {
+                        "path": "apps/product/src/features/timeblock/server/timeblock-command-client.ts",
+                        "find": "if (result.error?.code === '40P01') result = await request();"
+                      }
+                    ],
+                    "tags": {
+                      "screen": "none",
+                      "data": "saved",
+                      "retry": "auto",
+                      "trace": "none"
+                    },
+                    "continues": true
                   },
                   {
                     "id": "db-unexpected",
@@ -669,9 +1208,23 @@
                     "trace": "COMMAND_FAILED として Sentry へ（feature: timeblock、operation: create_plan）。",
                     "look": "Sentry の該当 issue → 同じ時刻の Supabase の Postgres ログ。",
                     "refs": [
-                      { "path": "apps/product/src/features/timeblock/server/timeblock-command-client.ts", "find": "captureUnexpectedDatabaseError" },
-                      { "path": "docs/operations/runbook.md", "find": "## Playbook 4: Sentryエラー急増（P2）" }
-                    ]
+                      {
+                        "path": "apps/product/src/features/timeblock/server/timeblock-command-client.ts",
+                        "find": "captureUnexpectedDatabaseError"
+                      },
+                      {
+                        "path": "docs/operations/runbook.md",
+                        "find": "## Playbook 4: Sentryエラー急増（P2）"
+                      }
+                    ],
+                    "tags": {
+                      "screen": "toast",
+                      "data": "unchanged",
+                      "retry": "none",
+                      "trace": "sentry"
+                    },
+                    "to": "optimistic",
+                    "back": "巻き戻し + トースト"
                   },
                   {
                     "id": "supabase-down",
@@ -681,9 +1234,24 @@
                     "retry": "書き込みはしない。読み取りは最大 3 回、間隔を広げて送り直す。",
                     "trace": "Sentry に大量に出る。UptimeRobot が /api/health の 503 で DOWN を通知する。",
                     "look": "Supabase の status page → runbook の Playbook 1。",
-                    "refs": [{ "path": "docs/operations/runbook.md", "find": "## Playbook 1: Supabase障害（P0）" }]
+                    "refs": [
+                      {
+                        "path": "docs/operations/runbook.md",
+                        "find": "## Playbook 1: Supabase障害（P0）"
+                      }
+                    ],
+                    "tags": {
+                      "screen": "down",
+                      "data": "unchanged",
+                      "retry": "none",
+                      "trace": "monitor"
+                    },
+                    "to": "optimistic",
+                    "back": "保存も表示も失敗"
                   }
-                ]
+                ],
+                "short": "RPC で書き込む",
+                "via": "RPC"
               },
               {
                 "id": "db-trigger",
@@ -692,8 +1260,14 @@
                 "what": "規則は 2 本だけ。end_at > start_at（DT003）と、Record は未来に終われない（DT005）。重なりは排他制約（23P01）で弾く。",
                 "change": "規則の正本はここ。変える時は DB → service → UI の写しを 1 変更で全部変える。DB だけ緩めて UI の写しが残ると「操作はできるのに保存されない」になる。",
                 "refs": [
-                  { "path": "supabase/migrations/20260904080216_simplify_timeblock_temporal_rules.sql", "find": "DT003" },
-                  { "path": "docs/engineering/invariants.md", "find": "## 時刻" }
+                  {
+                    "path": "supabase/migrations/20260904080216_simplify_timeblock_temporal_rules.sql",
+                    "find": "DT003"
+                  },
+                  {
+                    "path": "docs/engineering/invariants.md",
+                    "find": "## 時刻"
+                  }
                 ],
                 "fails": [
                   {
@@ -705,9 +1279,23 @@
                     "trace": "想定内（BAD_REQUEST）なので Sentry には出ない。",
                     "look": "UI の写しがこの規則を先回りできていない可能性。invariants.md §時刻。",
                     "refs": [
-                      { "path": "apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.ts", "find": "const temporalRuleMessage" },
-                      { "path": "apps/product/src/lib/trpc/client-safe-service-code.ts", "find": "RECORD_IN_FUTURE" }
-                    ]
+                      {
+                        "path": "apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.ts",
+                        "find": "const temporalRuleMessage"
+                      },
+                      {
+                        "path": "apps/product/src/lib/trpc/client-safe-service-code.ts",
+                        "find": "RECORD_IN_FUTURE"
+                      }
+                    ],
+                    "tags": {
+                      "screen": "toast",
+                      "data": "unchanged",
+                      "retry": "none",
+                      "trace": "none"
+                    },
+                    "to": "optimistic",
+                    "back": "規則ごとの文言"
                   },
                   {
                     "id": "overlap",
@@ -717,9 +1305,23 @@
                     "retry": "しない。",
                     "trace": "想定内なので Sentry には出ない。",
                     "look": "画面の一覧が古かった可能性。取り直しで揃う。",
-                    "refs": [{ "path": "apps/product/src/features/timeblock/server/timeblock-command-client.ts", "find": "'23P01': 'TIME_OVERLAP'" }]
+                    "refs": [
+                      {
+                        "path": "apps/product/src/features/timeblock/server/timeblock-command-client.ts",
+                        "find": "'23P01': 'TIME_OVERLAP'"
+                      }
+                    ],
+                    "tags": {
+                      "screen": "toast",
+                      "data": "unchanged",
+                      "retry": "none",
+                      "trace": "none"
+                    },
+                    "to": "optimistic",
+                    "back": "重なりの案内"
                   }
-                ]
+                ],
+                "short": "時刻の規則で検査"
               },
               {
                 "id": "settle",
@@ -728,12 +1330,28 @@
                 "what": "一時 ID の行をサーバーの行へ差し替える。成功・失敗どちらでも statistics / review / plans / records を取り直す。Realtime の購読は無いので、別のタブや端末には次の取り直し（フォーカス復帰など）で反映される。手動で作った Plan を Google Calendar へ書き出す処理はこの経路に無い。",
                 "change": "新しい集計画面を足したら、ここの取り直し対象に入れないと保存後も古い数字が残る。",
                 "refs": [
-                  { "path": "apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.ts", "find": "insertIntoMatchingLists('plans', created, context?.tempId)" },
-                  { "path": "apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.ts", "find": "void utils.plans.invalidate();" },
-                  { "path": "docs/engineering/infra.md", "find": "**Realtime は現状の浸透に含めない。**" }
+                  {
+                    "path": "apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.ts",
+                    "find": "insertIntoMatchingLists('plans', created, context?.tempId)"
+                  },
+                  {
+                    "path": "apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.ts",
+                    "find": "void utils.plans.invalidate();"
+                  },
+                  {
+                    "path": "docs/engineering/infra.md",
+                    "find": "**Realtime は現状の浸透に含めない。**"
+                  }
                 ],
-                "fails": []
+                "fails": [],
+                "short": "確定して取り直す",
+                "via": "応答"
               }
+            ],
+            "lanes": [
+              "browser",
+              "vercel",
+              "supabase"
             ]
           },
           {
@@ -749,9 +1367,18 @@
                 "what": "Cloudflare Turnstile の token を取り、パスワードが既知の漏洩に含まれないかを Have I Been Pwned で確かめる。",
                 "change": "Turnstile の secret は app の env ではなく Supabase Auth の Bot Protection にある。site key と secret は別の場所で管理している。",
                 "refs": [
-                  { "path": "apps/product/src/features/auth/components/SignupForm.tsx", "find": "safeCheckPasswordPwned" },
-                  { "path": "apps/product/src/lib/turnstile/config.ts", "find": "isTurnstileEnabled" },
-                  { "path": "docs/engineering/infra.md", "find": "## Bot 対策（Cloudflare Turnstile）" }
+                  {
+                    "path": "apps/product/src/features/auth/components/SignupForm.tsx",
+                    "find": "safeCheckPasswordPwned"
+                  },
+                  {
+                    "path": "apps/product/src/lib/turnstile/config.ts",
+                    "find": "isTurnstileEnabled"
+                  },
+                  {
+                    "path": "docs/engineering/infra.md",
+                    "find": "## Bot 対策（Cloudflare Turnstile）"
+                  }
                 ],
                 "fails": [
                   {
@@ -762,7 +1389,19 @@
                     "retry": "しない。確認を諦めて通す（fail-open）。",
                     "trace": "logger.warn だけ。Sentry には出ない。",
                     "look": "急ぎではない。",
-                    "refs": [{ "path": "apps/product/src/features/auth/components/SignupForm.tsx", "find": "safeCheckPasswordPwned" }]
+                    "refs": [
+                      {
+                        "path": "apps/product/src/features/auth/components/SignupForm.tsx",
+                        "find": "safeCheckPasswordPwned"
+                      }
+                    ],
+                    "tags": {
+                      "screen": "none",
+                      "data": "saved",
+                      "retry": "na",
+                      "trace": "log"
+                    },
+                    "continues": true
                   },
                   {
                     "id": "turnstile-missing",
@@ -772,9 +1411,21 @@
                     "retry": "しない。",
                     "trace": "画面側には何も残らない。",
                     "look": "NEXT_PUBLIC_TURNSTILE_SITE_KEY の有無と、Supabase の Bot Protection 設定。",
-                    "refs": [{ "path": "apps/product/src/env.ts", "find": "NEXT_PUBLIC_TURNSTILE_SITE_KEY" }]
+                    "refs": [
+                      {
+                        "path": "apps/product/src/env.ts",
+                        "find": "NEXT_PUBLIC_TURNSTILE_SITE_KEY"
+                      }
+                    ],
+                    "tags": {
+                      "screen": "depends",
+                      "data": "unknown",
+                      "retry": "none",
+                      "trace": "none"
+                    }
                   }
-                ]
+                ],
+                "short": "登録フォーム"
               },
               {
                 "id": "supabase-signup",
@@ -783,8 +1434,14 @@
                 "what": "ブラウザから supabase.auth.signUp を呼ぶ（Turnstile の token も渡す）。ここは tRPC を通らない。",
                 "change": "認証は Supabase に最も深く依存している部分。乗り換えの重さは出口コスト台帳。",
                 "refs": [
-                  { "path": "apps/product/src/features/auth/stores/useAuthStore.ts", "find": "supabase.auth.signUp" },
-                  { "path": "docs/engineering/infra.md", "find": "## 出口コスト台帳" }
+                  {
+                    "path": "apps/product/src/features/auth/stores/useAuthStore.ts",
+                    "find": "supabase.auth.signUp"
+                  },
+                  {
+                    "path": "docs/engineering/infra.md",
+                    "find": "## 出口コスト台帳"
+                  }
                 ],
                 "fails": [
                   {
@@ -795,9 +1452,24 @@
                     "retry": "しない。利用者が押し直す。",
                     "trace": "想定外のエラーなら Sentry（captureUnexpectedAuthError）。",
                     "look": "Supabase の Auth ログ。",
-                    "refs": [{ "path": "apps/product/src/features/auth/stores/useAuthStore.ts", "find": "captureUnexpectedAuthError" }]
+                    "refs": [
+                      {
+                        "path": "apps/product/src/features/auth/stores/useAuthStore.ts",
+                        "find": "captureUnexpectedAuthError"
+                      }
+                    ],
+                    "tags": {
+                      "screen": "toast",
+                      "data": "unchanged",
+                      "retry": "user",
+                      "trace": "sentry"
+                    },
+                    "to": "signup-form",
+                    "back": "フォームにエラー"
                   }
-                ]
+                ],
+                "short": "Auth に登録",
+                "via": "signUp"
               },
               {
                 "id": "auth-email-hook",
@@ -806,8 +1478,14 @@
                 "what": "Supabase Auth の send_email hook が Edge Function send-auth-email を呼び、React Email で組み立てて Resend で送る。hook の署名を検証し、idempotency key を付けて重複配送を防ぐ。",
                 "change": "この Function は Vercel ではなく Supabase にデプロイされる（supabase functions deploy --use-api）。アプリの deploy とは別に動く。",
                 "refs": [
-                  { "path": "supabase/functions/send-auth-email/index.ts", "find": "buildAuthEmailIdempotencyKey" },
-                  { "path": "supabase/functions/send-auth-email/index.ts", "find": "captureEdgeFunctionEvent" }
+                  {
+                    "path": "supabase/functions/send-auth-email/index.ts",
+                    "find": "buildAuthEmailIdempotencyKey"
+                  },
+                  {
+                    "path": "supabase/functions/send-auth-email/index.ts",
+                    "find": "captureEdgeFunctionEvent"
+                  }
                 ],
                 "fails": [
                   {
@@ -818,9 +1496,24 @@
                     "retry": "Function は再試行可能かどうかを status で Supabase に伝える。すでに一部送れていて idempotency key も無い時は、重複を避けて再試行不可として返す。",
                     "trace": "Edge Function から Sentry へ（send-auth-email failed: …）。宛先は記録しない。",
                     "look": "Resend のダッシュボード → Supabase の Edge Function ログ。",
-                    "refs": [{ "path": "supabase/functions/send-auth-email/index.ts", "find": "resolveSendAuthEmailStatus" }]
+                    "refs": [
+                      {
+                        "path": "supabase/functions/send-auth-email/index.ts",
+                        "find": "resolveSendAuthEmailStatus"
+                      }
+                    ],
+                    "tags": {
+                      "screen": "toast",
+                      "data": "unknown",
+                      "retry": "depends",
+                      "trace": "sentry"
+                    },
+                    "to": "signup-form",
+                    "back": "登録エラー"
                   }
-                ]
+                ],
+                "short": "確認メール送信",
+                "via": "send_email hook"
               },
               {
                 "id": "confirm-route",
@@ -829,8 +1522,15 @@
                 "what": "/auth/confirm が verifyOtp で確認する。成否は verify の結果ではなく session の有無で分け、失敗しても素のエラーではなく /auth/confirmed?status=… に着地させる。新規登録の確認の時だけウェルカムメールを依頼する。",
                 "change": "email_change / recovery も同じ route を通る。ウェルカムメールは type が signup の時だけ。",
                 "refs": [
-                  { "path": "apps/product/src/app/[locale]/(auth)/auth/confirm/route.ts", "find": "deliverWelcomeEmailOnce(signupUserId)" },
-                  { "path": "apps/product/src/app/[locale]/(auth)/auth/callback/route.ts", "find": "deliverWelcomeEmailOnce", "why": "Google ログインで登録した場合の入口" }
+                  {
+                    "path": "apps/product/src/app/[locale]/(auth)/auth/confirm/route.ts",
+                    "find": "deliverWelcomeEmailOnce(signupUserId)"
+                  },
+                  {
+                    "path": "apps/product/src/app/[locale]/(auth)/auth/callback/route.ts",
+                    "find": "deliverWelcomeEmailOnce",
+                    "why": "Google ログインで登録した場合の入口"
+                  }
                 ],
                 "fails": [
                   {
@@ -841,9 +1541,22 @@
                     "retry": "しない。確認メールを送り直してもらう。",
                     "trace": "想定内。",
                     "look": "Supabase の Auth ログ。Redirect URLs の allowlist がずれていないか。",
-                    "refs": [{ "path": "apps/product/src/app/[locale]/(auth)/auth/confirm/route.ts", "find": "confirmedUrl" }]
+                    "refs": [
+                      {
+                        "path": "apps/product/src/app/[locale]/(auth)/auth/confirm/route.ts",
+                        "find": "confirmedUrl"
+                      }
+                    ],
+                    "tags": {
+                      "screen": "redirect",
+                      "data": "unchanged",
+                      "retry": "user",
+                      "trace": "none"
+                    }
                   }
-                ]
+                ],
+                "short": "確認リンクで着地",
+                "via": "メールのリンク"
               },
               {
                 "id": "welcome-claim",
@@ -852,8 +1565,14 @@
                 "what": "profiles.welcome_email_sent_at が空の行だけを更新し、更新できた 1 回だけが送る。送ってから記録するのではなく、記録してから送る。途中で落ちたら重複ではなく欠落に倒す設計。",
                 "change": "1 回限りの通知を足す時の手本。列を足すだけだと既存ユーザー全員へ次のサインインで飛ぶので、migration 時点の既存行を送信済みで埋める。",
                 "refs": [
-                  { "path": "apps/product/src/features/auth/server/welcome-email.ts", "find": ".is('welcome_email_sent_at', null)" },
-                  { "path": "docs/engineering/invariants.md", "find": "## メール通知" }
+                  {
+                    "path": "apps/product/src/features/auth/server/welcome-email.ts",
+                    "find": ".is('welcome_email_sent_at', null)"
+                  },
+                  {
+                    "path": "docs/engineering/invariants.md",
+                    "find": "## メール通知"
+                  }
                 ],
                 "fails": [
                   {
@@ -864,7 +1583,18 @@
                     "retry": "しない。次に確認リンクを通った時に、まだ空なら送る。",
                     "trace": "Sentry（feature: auth / operation: claim_welcome_email）。",
                     "look": "Sentry → Supabase の Postgres ログ。",
-                    "refs": [{ "path": "apps/product/src/features/auth/server/welcome-email.ts", "find": "claim_welcome_email" }]
+                    "refs": [
+                      {
+                        "path": "apps/product/src/features/auth/server/welcome-email.ts",
+                        "find": "claim_welcome_email"
+                      }
+                    ],
+                    "tags": {
+                      "screen": "none",
+                      "data": "unchanged",
+                      "retry": "next",
+                      "trace": "sentry"
+                    }
                   },
                   {
                     "id": "double-click",
@@ -874,9 +1604,17 @@
                     "retry": "該当なし。",
                     "trace": "何も残らない（正常）。",
                     "look": "不要。",
-                    "refs": []
+                    "refs": [],
+                    "tags": {
+                      "screen": "none",
+                      "data": "unchanged",
+                      "retry": "na",
+                      "trace": "none"
+                    }
                   }
-                ]
+                ],
+                "short": "送る権利を取る",
+                "via": "UPDATE"
               },
               {
                 "id": "transactional-send",
@@ -885,8 +1623,14 @@
                 "what": "アプリが送るメールはすべて sendTransactionalEmail を通る。まず email_suppressions（bounce / 苦情で止めた宛先）を確かめ、止めていなければ Resend で送る。",
                 "change": "メール送信を足す時はここを通す。Resend を直接呼ぶと suppression を素通りする（問い合わせフォームは例外で、自前で idempotency key を付けて Resend の API を呼ぶ）。",
                 "refs": [
-                  { "path": "apps/product/src/lib/email/send.ts", "find": "export async function sendTransactionalEmail" },
-                  { "path": "apps/product/src/lib/email/send.ts", "find": "isEmailSuppressed" }
+                  {
+                    "path": "apps/product/src/lib/email/send.ts",
+                    "find": "export async function sendTransactionalEmail"
+                  },
+                  {
+                    "path": "apps/product/src/lib/email/send.ts",
+                    "find": "isEmailSuppressed"
+                  }
                 ],
                 "fails": [
                   {
@@ -898,9 +1642,21 @@
                     "trace": "Sentry（feature: auth / operation: send_welcome_email）。",
                     "look": "Resend のダッシュボードと status。env の RESEND_API_KEY / RESEND_FROM_EMAIL。",
                     "refs": [
-                      { "path": "apps/product/src/features/auth/server/welcome-email.ts", "find": "send_welcome_email" },
-                      { "path": "apps/product/src/env.ts", "find": "RESEND_API_KEY" }
-                    ]
+                      {
+                        "path": "apps/product/src/features/auth/server/welcome-email.ts",
+                        "find": "send_welcome_email"
+                      },
+                      {
+                        "path": "apps/product/src/env.ts",
+                        "find": "RESEND_API_KEY"
+                      }
+                    ],
+                    "tags": {
+                      "screen": "none",
+                      "data": "lost",
+                      "retry": "none",
+                      "trace": "sentry"
+                    }
                   },
                   {
                     "id": "suppression-lookup-fail",
@@ -910,7 +1666,18 @@
                     "retry": "しない。",
                     "trace": "Sentry（DB エラー）。",
                     "look": "Supabase の Postgres ログ。",
-                    "refs": [{ "path": "apps/product/src/lib/email/send.ts", "find": "suppression_lookup" }]
+                    "refs": [
+                      {
+                        "path": "apps/product/src/lib/email/send.ts",
+                        "find": "suppression_lookup"
+                      }
+                    ],
+                    "tags": {
+                      "screen": "none",
+                      "data": "lost",
+                      "retry": "none",
+                      "trace": "sentry"
+                    }
                   },
                   {
                     "id": "suppressed",
@@ -920,9 +1687,22 @@
                     "retry": "しない。",
                     "trace": "logger.warn だけ。MFA やパスワード変更などのセキュリティ通知の時だけ Sentry へ上げる。",
                     "look": "email_suppressions の該当行。",
-                    "refs": [{ "path": "apps/product/src/lib/email/send.ts", "find": "securityNotification" }]
+                    "refs": [
+                      {
+                        "path": "apps/product/src/lib/email/send.ts",
+                        "find": "securityNotification"
+                      }
+                    ],
+                    "tags": {
+                      "screen": "none",
+                      "data": "unchanged",
+                      "retry": "none",
+                      "trace": "log"
+                    }
                   }
-                ]
+                ],
+                "short": "Resend で送る",
+                "via": "送信 API"
               },
               {
                 "id": "resend-webhook",
@@ -931,8 +1711,14 @@
                 "what": "Resend が /api/webhooks/resend へ bounce / 苦情を送る。svix の署名を検証し、Upstash の lease で 1 回だけ処理して email_suppressions へ書く。一時的な bounce（受信トレイの容量超過など）は止めない。",
                 "change": "ここが止まると、新しい bounce が記録されず、届かない宛先へ送り続ける。",
                 "refs": [
-                  { "path": "apps/product/src/app/api/webhooks/resend/route.ts", "find": "claimResendWebhookEvent" },
-                  { "path": "apps/product/src/app/api/webhooks/resend/route.ts", "find": "isSuppressibleBounce" }
+                  {
+                    "path": "apps/product/src/app/api/webhooks/resend/route.ts",
+                    "find": "claimResendWebhookEvent"
+                  },
+                  {
+                    "path": "apps/product/src/app/api/webhooks/resend/route.ts",
+                    "find": "isSuppressibleBounce"
+                  }
                 ],
                 "fails": [
                   {
@@ -943,7 +1729,18 @@
                     "retry": "Resend 側の再送に任せる。",
                     "trace": "署名失敗の監視へ記録する。",
                     "look": "RESEND_WEBHOOK_SECRET が Resend 側の設定と一致しているか。",
-                    "refs": [{ "path": "apps/product/src/app/api/webhooks/resend/route.ts", "find": "captureWebhookSignatureFailure" }]
+                    "refs": [
+                      {
+                        "path": "apps/product/src/app/api/webhooks/resend/route.ts",
+                        "find": "captureWebhookSignatureFailure"
+                      }
+                    ],
+                    "tags": {
+                      "screen": "none",
+                      "data": "unchanged",
+                      "retry": "provider",
+                      "trace": "monitor"
+                    }
                   },
                   {
                     "id": "webhook-write-fail",
@@ -953,10 +1750,29 @@
                     "retry": "Resend が再送する（lease を返したので次は処理できる）。",
                     "trace": "Sentry（DB エラー）。",
                     "look": "Supabase の Postgres ログ。",
-                    "refs": [{ "path": "apps/product/src/app/api/webhooks/resend/route.ts", "find": "releaseResendWebhookEvent" }]
+                    "refs": [
+                      {
+                        "path": "apps/product/src/app/api/webhooks/resend/route.ts",
+                        "find": "releaseResendWebhookEvent"
+                      }
+                    ],
+                    "tags": {
+                      "screen": "none",
+                      "data": "unchanged",
+                      "retry": "provider",
+                      "trace": "sentry"
+                    }
                   }
-                ]
+                ],
+                "short": "配送結果を受ける",
+                "via": "webhook"
               }
+            ],
+            "lanes": [
+              "browser",
+              "vercel",
+              "supabase",
+              "resend"
             ]
           },
           {
@@ -972,10 +1788,17 @@
                 "what": "main の repository ruleset が required checks（Static / Unit / Integration / Vercel product / web）と review thread の解決を求める。merge commit だけ許可。",
                 "change": "required check に paths filter 付きの check を入れると、満たせない PR が merge できなくなる。",
                 "refs": [
-                  { "path": "AGENTS.md", "find": "merge の遮断は main の repository ruleset 1 本で行う" },
-                  { "path": "docs/engineering/infra.md", "find": "### merge gate の required checks" }
+                  {
+                    "path": "AGENTS.md",
+                    "find": "merge の遮断は main の repository ruleset 1 本で行う"
+                  },
+                  {
+                    "path": "docs/engineering/infra.md",
+                    "find": "### merge gate の required checks"
+                  }
                 ],
-                "fails": []
+                "fails": [],
+                "short": "main へ merge"
               },
               {
                 "id": "migration",
@@ -984,8 +1807,14 @@
                 "what": "Supabase の GitHub 連携が、merge の時点で production へ migration を適用する。この repo の workflow は適用しない（確認するだけ）。",
                 "change": "ここから promote が終わるまで、新しい schema の上で旧コードが動く時間がある（E2E が完走するまで）。migration は旧コードでも壊れない形で書く。",
                 "refs": [
-                  { "path": "docs/engineering/infra.md", "find": "main merge: Supabase integration が production に migration を適用する" },
-                  { "path": ".agents/skills/supabase/SKILL.md", "find": "migration" }
+                  {
+                    "path": "docs/engineering/infra.md",
+                    "find": "main merge: Supabase integration が production に migration を適用する"
+                  },
+                  {
+                    "path": ".agents/skills/supabase/SKILL.md",
+                    "find": "migration"
+                  }
                 ],
                 "fails": [
                   {
@@ -997,11 +1826,27 @@
                     "trace": "release job の「Verify candidate migrations are applied in Production」が未適用を検出し、promote しない。",
                     "look": "Supabase のダッシュボードの branch / migration 履歴 → runbook の Playbook 1。",
                     "refs": [
-                      { "path": ".github/workflows/promote.yml", "find": "Verify candidate migrations are applied in Production" },
-                      { "path": "scripts/ci/production-migration-readiness.mjs", "find": "schema_migrations" }
-                    ]
+                      {
+                        "path": ".github/workflows/promote.yml",
+                        "find": "Verify candidate migrations are applied in Production"
+                      },
+                      {
+                        "path": "scripts/ci/production-migration-readiness.mjs",
+                        "find": "schema_migrations"
+                      }
+                    ],
+                    "tags": {
+                      "screen": "old",
+                      "data": "unchanged",
+                      "retry": "none",
+                      "trace": "issue"
+                    },
+                    "to": "tab-update",
+                    "back": "旧版のまま配信"
                   }
-                ]
+                ],
+                "short": "migration 適用",
+                "via": "GitHub 連携"
               },
               {
                 "id": "vercel-build",
@@ -1009,7 +1854,12 @@
                 "title": "Vercel が本番候補を build する",
                 "what": "merge ごとに Production build を作るが、domain は割り当てない（Auto-assign を OFF にしてある）。まだ誰も見ていない候補。",
                 "change": "Ignored Build Step で production build を skip させてはいけない。候補が無いと release job が現れない build を待ち続ける。",
-                "refs": [{ "path": "docs/engineering/infra.md", "find": "### merge と Production 公開の分離" }],
+                "refs": [
+                  {
+                    "path": "docs/engineering/infra.md",
+                    "find": "### merge と Production 公開の分離"
+                  }
+                ],
                 "fails": [
                   {
                     "id": "build-fail",
@@ -1019,9 +1869,24 @@
                     "retry": "しない。同じ SHA を作り直すなら deployment を名指しして redeploy。",
                     "trace": "Vercel の build ログ。promote が失敗すると area:deployment の issue が立つ。",
                     "look": "runbook の Playbook 2。",
-                    "refs": [{ "path": "docs/operations/runbook.md", "find": "## Playbook 2: Vercelデプロイ失敗（P1）" }]
+                    "refs": [
+                      {
+                        "path": "docs/operations/runbook.md",
+                        "find": "## Playbook 2: Vercelデプロイ失敗（P1）"
+                      }
+                    ],
+                    "tags": {
+                      "screen": "old",
+                      "data": "mixed",
+                      "retry": "none",
+                      "trace": "issue"
+                    },
+                    "to": "tab-update",
+                    "back": "旧版のまま配信"
                   }
-                ]
+                ],
+                "short": "本番候補を build",
+                "via": "同時に開始"
               },
               {
                 "id": "impact",
@@ -1030,10 +1895,18 @@
                 "what": "Production Release workflow が起動し、product / web / storybook それぞれの現在公開中の SHA との差分から、どれに影響があるかを決める。",
                 "change": "影響なしと判定された project の検証は走らない。docs だけの merge でも build は作られ、判定を通る。",
                 "refs": [
-                  { "path": ".github/workflows/promote.yml", "find": "Resolve release impact" },
-                  { "path": "scripts/ci/release-impact.mjs", "find": "affected" }
+                  {
+                    "path": ".github/workflows/promote.yml",
+                    "find": "Resolve release impact"
+                  },
+                  {
+                    "path": "scripts/ci/release-impact.mjs",
+                    "find": "affected"
+                  }
                 ],
-                "fails": []
+                "fails": [],
+                "short": "影響判定",
+                "via": "workflow 起動"
               },
               {
                 "id": "layer3",
@@ -1042,8 +1915,14 @@
                 "what": "影響がある project だけ、同じ run の中で E2E（local Supabase を起動）、web の build と E2E、Storybook の検査を走らせる。",
                 "change": "ここが merge 後の本番を守る唯一の実行検証。遅くすると、migration と旧コードが共存する時間も伸びる。",
                 "refs": [
-                  { "path": ".github/workflows/promote.yml", "find": "Run E2E tests" },
-                  { "path": "docs/engineering/testing.md", "find": "E2E" }
+                  {
+                    "path": ".github/workflows/promote.yml",
+                    "find": "Run E2E tests"
+                  },
+                  {
+                    "path": "docs/engineering/testing.md",
+                    "find": "E2E"
+                  }
                 ],
                 "fails": [
                   {
@@ -1054,9 +1933,23 @@
                     "retry": "自動ではしない。直して次の merge で走り直すか、workflow を手で起動する。",
                     "trace": "area:deployment ラベルの issue が立つ（既にあれば更新）。E2E の report が artifact に残る。",
                     "look": "その issue → Actions の run → Upload report の artifact。",
-                    "refs": [{ "path": ".github/workflows/promote.yml", "find": "File or update promote failure issue" }]
+                    "refs": [
+                      {
+                        "path": ".github/workflows/promote.yml",
+                        "find": "File or update promote failure issue"
+                      }
+                    ],
+                    "tags": {
+                      "screen": "old",
+                      "data": "mixed",
+                      "retry": "none",
+                      "trace": "issue"
+                    },
+                    "to": "tab-update",
+                    "back": "旧版のまま配信"
                   }
-                ]
+                ],
+                "short": "E2E などで検証"
               },
               {
                 "id": "promote",
@@ -1065,8 +1958,14 @@
                 "what": "release job が、migration が本番に入っていることを確かめ、候補を smoke してから Production domain へ promote する。",
                 "change": "緊急時の Force Promote は理由の入力が必須。層 3 を飛ばすので、使ったら記録を残す。",
                 "refs": [
-                  { "path": ".github/workflows/promote.yml", "find": "Wait, smoke, and promote Production" },
-                  { "path": "scripts/ci/production-release.mjs", "find": "promote" }
+                  {
+                    "path": ".github/workflows/promote.yml",
+                    "find": "Wait, smoke, and promote Production"
+                  },
+                  {
+                    "path": "scripts/ci/production-release.mjs",
+                    "find": "promote"
+                  }
                 ],
                 "fails": [
                   {
@@ -1077,9 +1976,23 @@
                     "retry": "しない。",
                     "trace": "Production Release の commit status と area:deployment の issue。",
                     "look": "runbook の Playbook 2。",
-                    "refs": [{ "path": "docs/operations/runbook.md", "find": "### 前提: mergeとProduction公開は分離されている" }]
+                    "refs": [
+                      {
+                        "path": "docs/operations/runbook.md",
+                        "find": "### 前提: mergeとProduction公開は分離されている"
+                      }
+                    ],
+                    "tags": {
+                      "screen": "old",
+                      "data": "mixed",
+                      "retry": "none",
+                      "trace": "issue"
+                    },
+                    "to": "tab-update",
+                    "back": "旧版のまま配信"
                   }
-                ]
+                ],
+                "short": "smoke → 公開"
               },
               {
                 "id": "tab-update",
@@ -1088,11 +2001,25 @@
                 "what": "タブへ戻った時に /api/health/version の SHA を比べ、古ければ「更新あり」を立てる。いつ再読み込みしてよいかは、編集中かどうかを知る側が決める（編集中は勝手に再読み込みしない）。",
                 "change": "API の入出力を変えた直後は、旧版の画面が新版のサーバーを呼ぶ時間がある。tRPC の入力を必須化する変更は、旧画面からの呼び出しを壊す。",
                 "refs": [
-                  { "path": "apps/product/src/lib/hooks/useServiceWorker.ts", "find": "DEPLOYED_VERSION_ENDPOINT" },
-                  { "path": "docs/engineering/pwa.md", "find": "/api/health/version" }
+                  {
+                    "path": "apps/product/src/lib/hooks/useServiceWorker.ts",
+                    "find": "DEPLOYED_VERSION_ENDPOINT"
+                  },
+                  {
+                    "path": "docs/engineering/pwa.md",
+                    "find": "/api/health/version"
+                  }
                 ],
-                "fails": []
+                "fails": [],
+                "short": "タブが新版に気づく",
+                "via": "新版を配信"
               }
+            ],
+            "lanes": [
+              "github",
+              "supabase",
+              "vercel",
+              "browser"
             ]
           }
         ],
@@ -1108,12 +2035,30 @@
               "breaks": "ログイン、全データの読み書き、認証メール（Edge Function）、/api/health（503）。",
               "keeps": "キャッシュ済みの表示（query は offlineFirst、IndexedDB に最大 2 時間）。公開サイト（apps/web）。",
               "behavior": "必須の env が欠けると起動時に throw。実行時の失敗は各経路で Sentry。",
-              "env": ["NEXT_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", "SUPABASE_SECRET_KEY"],
+              "env": [
+                "NEXT_PUBLIC_SUPABASE_URL",
+                "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
+                "SUPABASE_SECRET_KEY"
+              ],
               "look": "Supabase の status page → runbook Playbook 1。",
               "refs": [
-                { "path": "apps/product/src/env.ts", "find": "SUPABASE_SECRET_KEY" },
-                { "path": "docs/operations/runbook.md", "find": "## Playbook 1: Supabase障害（P0）" }
-              ]
+                {
+                  "path": "apps/product/src/env.ts",
+                  "find": "SUPABASE_SECRET_KEY"
+                },
+                {
+                  "path": "docs/operations/runbook.md",
+                  "find": "## Playbook 1: Supabase障害（P0）"
+                }
+              ],
+              "impacts": {
+                "login": "down",
+                "save": "down",
+                "view": "degraded",
+                "email": "down",
+                "billing": "degraded",
+                "calendar": "down"
+              }
             },
             {
               "id": "vercel",
@@ -1121,14 +2066,60 @@
               "name": "Vercel",
               "role": "product / web の配信・Function・Cron",
               "breaks": "アプリ全体、tRPC、webhook の受信、Cron（calendar-sync など）。",
-              "keeps": "DB のデータ。Stripe / Resend は webhook を再送するので、復旧後に追いつく。",
+              "keeps": "DB のデータ。一度開いたページとデータはキャッシュから表示できる（書き込みはできない）。Stripe / Resend は webhook を再送するので、復旧後に追いつく。",
               "behavior": "Cron は次の予定時刻に走るだけで、取りこぼした回を埋め直さない。完了記録（heartbeat）が古くなることで気づく。",
-              "env": ["CRON_SECRET"],
+              "env": [
+                "CRON_SECRET"
+              ],
               "look": "Vercel の status → runbook Playbook 2 → monitoring.md の Cron heartbeat。",
               "refs": [
-                { "path": "apps/product/vercel.json", "find": "crons" },
-                { "path": "docs/operations/monitoring.md", "find": "## Cron heartbeat と本番 schema・権限監査" }
-              ]
+                {
+                  "path": "apps/product/vercel.json",
+                  "find": "crons"
+                },
+                {
+                  "path": "docs/operations/monitoring.md",
+                  "find": "## Cron heartbeat と本番 schema・権限監査"
+                },
+                {
+                  "path": "docs/engineering/pwa.md",
+                  "find": "Network First",
+                  "why": "ページは network → cache の順"
+                }
+              ],
+              "impacts": {
+                "login": "down",
+                "save": "down",
+                "view": "degraded",
+                "email": "degraded",
+                "billing": "degraded",
+                "calendar": "down",
+                "deploy": "down"
+              }
+            },
+            {
+              "id": "github",
+              "svc": "github",
+              "name": "GitHub",
+              "role": "merge・Actions・deploy の起点",
+              "breaks": "merge、CI、本番公開（Vercel の build も Supabase の migration 適用も GitHub 連携から始まる）。",
+              "keeps": "本番で動いているアプリとデータ。",
+              "behavior": "アプリの実行時には使わない。止まっている間は何も公開されない。",
+              "env": [],
+              "look": "GitHub の status。復旧後に Production Release が走ったかを Actions で確かめる。",
+              "refs": [
+                {
+                  "path": "docs/engineering/infra.md",
+                  "find": "Vercel の正規 deployment source は `Dayopt/dayopt` の GitHub 連携だけとする"
+                },
+                {
+                  "path": ".github/workflows/promote.yml",
+                  "find": "Resolve release impact"
+                }
+              ],
+              "impacts": {
+                "deploy": "down"
+              }
             },
             {
               "id": "upstash",
@@ -1138,12 +2129,25 @@
               "breaks": "rate limit が Function のメモリ上の判定へ退避し緩くなる。Resend webhook の処理。本番の /api/health が 503 を返し、UptimeRobot が DOWN を通知する（アプリ本体は動いているのに）。",
               "keeps": "保存・表示など通常の操作（可用性を優先して通す）。",
               "behavior": "fail-open。Sentry に記録。",
-              "env": ["UPSTASH_REDIS_REST_URL", "UPSTASH_REDIS_REST_TOKEN"],
+              "env": [
+                "UPSTASH_REDIS_REST_URL",
+                "UPSTASH_REDIS_REST_TOKEN"
+              ],
               "look": "Upstash の status。",
               "refs": [
-                { "path": "apps/product/src/lib/rate-limit/upstash.ts", "find": "isUpstashEnabled" },
-                { "path": "apps/product/src/app/api/health/route.ts", "find": "checkRedis" }
-              ]
+                {
+                  "path": "apps/product/src/lib/rate-limit/upstash.ts",
+                  "find": "isUpstashEnabled"
+                },
+                {
+                  "path": "apps/product/src/app/api/health/route.ts",
+                  "find": "checkRedis"
+                }
+              ],
+              "impacts": {
+                "email": "degraded",
+                "monitor": "degraded"
+              }
             },
             {
               "id": "resend",
@@ -1153,12 +2157,26 @@
               "breaks": "確認メール（登録が失敗する）、ウェルカム・通知メール（黙って欠落）、bounce の記録。",
               "keeps": "ログイン済みの利用、保存。",
               "behavior": "アプリ側の送信は throw せず失敗を返し、呼び出し側が扱う。ウェルカムメールは再送しない。",
-              "env": ["RESEND_API_KEY", "RESEND_FROM_EMAIL", "RESEND_WEBHOOK_SECRET"],
+              "env": [
+                "RESEND_API_KEY",
+                "RESEND_FROM_EMAIL",
+                "RESEND_WEBHOOK_SECRET"
+              ],
               "look": "Resend のダッシュボード → Supabase の Edge Function ログ（確認メール）→ Sentry。",
               "refs": [
-                { "path": "apps/product/src/lib/email/send.ts", "find": "sendTransactionalEmail" },
-                { "path": "supabase/functions/send-auth-email/index.ts", "find": "RESEND_API_KEY" }
-              ]
+                {
+                  "path": "apps/product/src/lib/email/send.ts",
+                  "find": "sendTransactionalEmail"
+                },
+                {
+                  "path": "supabase/functions/send-auth-email/index.ts",
+                  "find": "RESEND_API_KEY"
+                }
+              ],
+              "impacts": {
+                "login": "degraded",
+                "email": "down"
+              }
             },
             {
               "id": "sentry",
@@ -1168,12 +2186,24 @@
               "breaks": "障害の痕跡が見えなくなる。資格情報が欠けると production build が失敗する。",
               "keeps": "アプリの動作（送信は fire-and-forget）。",
               "behavior": "DSN が無ければ黙って初期化しない。/api/health の transaction は inbound filter で捨てるので、Sentry が無音でも health が無事とは限らない。",
-              "env": ["NEXT_PUBLIC_SENTRY_DSN", "SENTRY_DSN"],
+              "env": [
+                "NEXT_PUBLIC_SENTRY_DSN",
+                "SENTRY_DSN"
+              ],
               "look": "Sentry の status。痕跡が無い時は Vercel の Function ログへ。",
               "refs": [
-                { "path": "apps/product/sentry.server.config.ts", "find": "Sentry.init" },
-                { "path": "docs/operations/monitoring.md", "find": "## Sentry runtime contract" }
-              ]
+                {
+                  "path": "apps/product/sentry.server.config.ts",
+                  "find": "Sentry.init"
+                },
+                {
+                  "path": "docs/operations/monitoring.md",
+                  "find": "## Sentry runtime contract"
+                }
+              ],
+              "impacts": {
+                "monitor": "degraded"
+              }
             },
             {
               "id": "turnstile",
@@ -1183,12 +2213,23 @@
               "breaks": "Supabase の Bot Protection が有効なら、token が取れず登録・ログインが止まる。",
               "keeps": "ログイン済みの利用。",
               "behavior": "site key が空なら画面側の確認は黙って無効。",
-              "env": ["NEXT_PUBLIC_TURNSTILE_SITE_KEY"],
+              "env": [
+                "NEXT_PUBLIC_TURNSTILE_SITE_KEY"
+              ],
               "look": "Cloudflare の status → infra.md の Turnstile 節。",
               "refs": [
-                { "path": "apps/product/src/lib/turnstile/config.ts", "find": "isTurnstileEnabled" },
-                { "path": "docs/engineering/infra.md", "find": "## Bot 対策（Cloudflare Turnstile）" }
-              ]
+                {
+                  "path": "apps/product/src/lib/turnstile/config.ts",
+                  "find": "isTurnstileEnabled"
+                },
+                {
+                  "path": "docs/engineering/infra.md",
+                  "find": "## Bot 対策（Cloudflare Turnstile）"
+                }
+              ],
+              "impacts": {
+                "login": "down"
+              }
             },
             {
               "id": "stripe",
@@ -1198,12 +2239,24 @@
               "breaks": "checkout、webhook による課金状態の同期。",
               "keeps": "課金を強制していない間（BILLING_ENFORCED 未設定）は全員が無料で使えるので、通常の利用。",
               "behavior": "鍵が無ければ getStripe() が null。webhook は署名・冪等 claim を経て、失敗時は 500 で Stripe に再送させる。毎晩の突き合わせ Cron が差分を検出する（検出だけで直さない）。",
-              "env": ["STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET"],
+              "env": [
+                "STRIPE_SECRET_KEY",
+                "STRIPE_WEBHOOK_SECRET"
+              ],
               "look": "Stripe の status → runbook Playbook 3。",
               "refs": [
-                { "path": "apps/product/src/lib/stripe/client.ts", "find": "getStripe" },
-                { "path": "docs/operations/runbook.md", "find": "## Playbook 3: Stripe Webhook停止（P1）" }
-              ]
+                {
+                  "path": "apps/product/src/lib/stripe/client.ts",
+                  "find": "getStripe"
+                },
+                {
+                  "path": "docs/operations/runbook.md",
+                  "find": "## Playbook 3: Stripe Webhook停止（P1）"
+                }
+              ],
+              "impacts": {
+                "billing": "down"
+              }
             },
             {
               "id": "google",
@@ -1213,12 +2266,24 @@
               "breaks": "外部カレンダーの予定の取り込み・連携の開始。",
               "keeps": "Dayopt 内の Plan / Record。手動で作った Plan は Google へ書き出さないので影響しない。",
               "behavior": "15 分ごとの calendar-sync Cron が取り込む。API は 15 秒で打ち切る。失敗は Sentry。",
-              "env": ["GOOGLE_CALENDAR_CLIENT_ID", "CALENDAR_TOKEN_ENCRYPTION_KEY"],
+              "env": [
+                "GOOGLE_CALENDAR_CLIENT_ID",
+                "CALENDAR_TOKEN_ENCRYPTION_KEY"
+              ],
               "look": "Google Cloud の status → Sentry（feature: external-calendar 周辺）→ Cron heartbeat。",
               "refs": [
-                { "path": "apps/product/src/features/external-calendar/server/providers/google.ts", "find": "GOOGLE_API_TIMEOUT_MS" },
-                { "path": "apps/product/src/app/api/cron/calendar-sync/route.ts", "find": "writeCronHeartbeat" }
-              ]
+                {
+                  "path": "apps/product/src/features/external-calendar/server/providers/google.ts",
+                  "find": "GOOGLE_API_TIMEOUT_MS"
+                },
+                {
+                  "path": "apps/product/src/app/api/cron/calendar-sync/route.ts",
+                  "find": "writeCronHeartbeat"
+                }
+              ],
+              "impacts": {
+                "calendar": "down"
+              }
             },
             {
               "id": "uptimerobot",
@@ -1230,7 +2295,49 @@
               "behavior": "アプリのコードには登場しない。503 / 504 を DOWN としてメールで通知する。",
               "env": [],
               "look": "monitoring.md の Monitoring surfaces。",
-              "refs": [{ "path": "docs/operations/monitoring.md", "find": "## Monitoring surfaces" }]
+              "refs": [
+                {
+                  "path": "docs/operations/monitoring.md",
+                  "find": "## Monitoring surfaces"
+                }
+              ],
+              "impacts": {
+                "monitor": "degraded"
+              }
+            }
+          ],
+          "features": [
+            {
+              "id": "login",
+              "label": "ログイン・登録"
+            },
+            {
+              "id": "save",
+              "label": "Plan / Record の保存"
+            },
+            {
+              "id": "view",
+              "label": "カレンダーの表示"
+            },
+            {
+              "id": "email",
+              "label": "メール"
+            },
+            {
+              "id": "billing",
+              "label": "課金"
+            },
+            {
+              "id": "calendar",
+              "label": "外部カレンダー取り込み"
+            },
+            {
+              "id": "monitor",
+              "label": "障害の検知"
+            },
+            {
+              "id": "deploy",
+              "label": "本番公開"
             }
           ]
         }
@@ -1243,14 +2350,71 @@
         var data = JSON.parse(document.getElementById('walkthrough-data').textContent);
         var tabsEl = document.getElementById('tabs');
         var viewEl = document.getElementById('view');
-        var state = { tab: 0, hop: 0, fail: null, timer: null };
+        var SVG = 'http://www.w3.org/2000/svg';
+        var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
         var tabs = data.scenarios.concat([{ id: 'outages', title: data.outages.title }]);
+        var state = { tab: 0, hop: 0, fail: null, outage: null, token: 0 };
+        var resizeObserver = null;
+
+        // 失敗時の 4 観点を、色と見出しで一目で読める形にする辞書
+        var TAGS = {
+          screen: {
+            none: ['何も起きない', 'ok'],
+            toast: ['エラー表示', 'bad'],
+            redirect: ['別の画面へ', 'warn'],
+            wait: ['待ち状態', 'warn'],
+            down: ['使えない', 'bad'],
+            old: ['旧版のまま', 'warn'],
+            depends: ['設定次第', 'warn'],
+          },
+          data: {
+            unchanged: ['変化なし', 'neutral'],
+            saved: ['保存される', 'ok'],
+            unknown: ['どちらもありうる', 'warn'],
+            lost: ['欠落する', 'bad'],
+            mixed: ['DB だけ新しい', 'warn'],
+          },
+          retry: {
+            none: ['しない', 'neutral'],
+            auto: ['自動で再試行', 'ok'],
+            user: ['利用者がやり直す', 'neutral'],
+            provider: ['相手が再送', 'ok'],
+            next: ['次の機会に', 'warn'],
+            na: ['不要', 'ok'],
+            depends: ['条件次第', 'warn'],
+          },
+          trace: {
+            sentry: ['Sentry', 'ok'],
+            log: ['ログだけ', 'warn'],
+            none: ['残らない', 'neutral'],
+            issue: ['GitHub issue', 'ok'],
+            monitor: ['監視が拾う', 'ok'],
+          },
+        };
+        var TILE_ORDER = [
+          ['screen', '画面'],
+          ['data', 'データ'],
+          ['retry', '再試行'],
+          ['trace', '痕跡'],
+        ];
+
+        function severity(f) {
+          var t = f.tags;
+          if (t.screen === 'toast' || t.screen === 'down' || t.data === 'lost') return 'bad';
+          if (
+            ['redirect', 'wait', 'old', 'depends'].indexOf(t.screen) >= 0 ||
+            t.data === 'unknown' ||
+            t.data === 'mixed' ||
+            t.retry === 'next'
+          )
+            return 'warn';
+          return 'ok';
+        }
 
         function el(tag, attrs, children) {
           var node = document.createElement(tag);
           Object.keys(attrs || {}).forEach(function (k) {
             if (k === 'text') node.textContent = attrs[k];
-            else if (k === 'style') node.setAttribute('style', attrs[k]);
             else node.setAttribute(k, attrs[k]);
           });
           (children || []).forEach(function (c) {
@@ -1259,14 +2423,17 @@
           return node;
         }
 
-        function svcStyle(svc) {
-          var s = data.services[svc] || data.services.external;
-          return '--svc: var(' + s.var + ')';
+        function svgEl(tag, attrs) {
+          var node = document.createElementNS(SVG, tag);
+          Object.keys(attrs || {}).forEach(function (k) {
+            node.setAttribute(k, attrs[k]);
+          });
+          return node;
         }
 
-        function svcChip(svc) {
+        function svcVar(svc) {
           var s = data.services[svc] || data.services.external;
-          return el('span', { class: 'svc-chip', style: svcStyle(svc), text: s.label });
+          return '--svc: var(' + s.var + ')';
         }
 
         function refList(refs) {
@@ -1278,8 +2445,7 @@
               var href = data.repo + r.path.split('/').map(encodeURIComponent).join('/');
               return el('li', {}, [
                 el('a', { href: href, target: '_blank', rel: 'noopener' }, [el('code', { text: r.path })]),
-                ' ',
-                el('span', { class: 'why', text: 'で ' }),
+                el('span', { class: 'why', text: ' で ' }),
                 el('code', { text: r.find }),
                 el('span', { class: 'why', text: ' を探す' + (r.why ? '（' + r.why + '）' : '') }),
               ]);
@@ -1287,6 +2453,13 @@
           );
         }
 
+        function sleep(ms) {
+          return new Promise(function (r) {
+            setTimeout(r, ms);
+          });
+        }
+
+        // ---------- タブ ----------
         function renderTabs() {
           tabsEl.textContent = '';
           tabs.forEach(function (t, i) {
@@ -1315,115 +2488,282 @@
         }
 
         function selectTab(i) {
-          stopPlay();
           state.tab = i;
           state.hop = 0;
           state.fail = null;
           render();
         }
 
-        function stopPlay() {
-          if (state.timer) clearInterval(state.timer);
-          state.timer = null;
-        }
-
         function render() {
+          state.token++;
+          if (resizeObserver) resizeObserver.disconnect();
           renderTabs();
           if (tabs[state.tab].id === 'outages') renderOutages();
           else renderScenario(data.scenarios[state.tab]);
         }
 
-        function legend(svcs) {
-          return el(
-            'div',
-            { class: 'legend', 'aria-hidden': 'true' },
-            svcs.map(function (s) {
-              return el('span', { style: svcStyle(s), text: data.services[s].label });
-            }),
-          );
+        // ---------- 経路図 ----------
+        function failInfo(sc) {
+          if (!state.fail) return null;
+          for (var i = 0; i < sc.hops.length; i++) {
+            if (sc.hops[i].id !== state.fail.hop) continue;
+            for (var j = 0; j < sc.hops[i].fails.length; j++) {
+              var f = sc.hops[i].fails[j];
+              if (f.id === state.fail.id) {
+                var to = -1;
+                sc.hops.forEach(function (h, k) {
+                  if (f.to && h.id === f.to) to = k;
+                });
+                return { index: i, fail: f, to: to, sev: severity(f) };
+              }
+            }
+          }
+          return null;
         }
 
         function renderScenario(sc) {
           viewEl.textContent = '';
-          var failHop = -1;
-          if (state.fail) {
-            sc.hops.forEach(function (h, i) {
-              if (h.id === state.fail.hop) failHop = i;
-            });
-          }
+          var info = failInfo(sc);
 
-          var play = el('button', { class: 'play', type: 'button', text: sc.play });
+          var btns = el('div', { class: 'btns' });
+          var play = el('button', {
+            class: 'play' + (info ? ' bad' : ''),
+            type: 'button',
+            text: info ? '▶ 失敗「' + info.fail.label + '」を再生' : sc.play,
+          });
           play.addEventListener('click', function () {
-            startPlay(sc);
+            playScenario(sc);
           });
-          viewEl.appendChild(el('div', { class: 'intro' }, [el('p', { text: sc.intro }), play]));
-
-          var used = [];
-          sc.hops.forEach(function (h) {
-            if (used.indexOf(h.svc) < 0) used.push(h.svc);
-          });
-
-          var lane = el('ol', { class: 'lane', 'aria-label': '通る処理' });
-          sc.hops.forEach(function (h, i) {
-            var cls = 'hop';
-            if (failHop === i) cls += ' failed';
-            else if (failHop >= 0 && i > failHop) cls += ' skipped';
-            var btn = el(
-              'button',
-              { class: cls, type: 'button', style: svcStyle(h.svc), 'data-i': String(i) },
-              [
-                el('span', { class: 'n', text: String(i + 1).padStart(2, '0') }),
-                el('span', {}, [
-                  el('span', { class: 't' }, [
-                    h.title,
-                    h.fails.length ? el('span', { class: 'fx', text: '失敗 ' + h.fails.length }) : null,
-                  ]),
-                  el('span', { class: 's', text: data.services[h.svc].label }),
-                ]),
-              ],
-            );
-            if (i === state.hop) btn.setAttribute('aria-current', 'step');
-            btn.addEventListener('click', function () {
-              stopPlay();
-              state.hop = i;
-              if (state.fail && state.fail.hop !== h.id) state.fail = null;
+          btns.appendChild(play);
+          if (info) {
+            var reset = el('button', { class: 'ghost', type: 'button', text: '失敗を解除' });
+            reset.addEventListener('click', function () {
+              state.fail = null;
               renderScenario(sc);
             });
-            lane.appendChild(el('li', {}, [btn]));
+            btns.appendChild(reset);
+          }
+          viewEl.appendChild(el('div', { class: 'intro' }, [el('p', { text: sc.intro }), btns]));
+
+          var lanes = sc.lanes;
+          var flow = el('div', {
+            class: 'flow',
+            id: 'flow',
+            style: '--lanes: ' + lanes.length,
+            role: 'group',
+            'aria-label': sc.title + ' の経路図',
+          });
+          lanes.forEach(function (svc, k) {
+            var s = data.services[svc];
+            flow.appendChild(
+              el('div', { class: 'lane-bg', style: svcVar(svc) + '; grid-column: ' + (k + 1) }),
+            );
+            flow.appendChild(
+              el('div', { class: 'lane-head', style: svcVar(svc) + '; grid-column: ' + (k + 1) }, [
+                el('b', { text: s.label }),
+                el('small', { text: s.sub }),
+              ]),
+            );
           });
 
-          var left = el('div', {}, [legend(used), lane]);
-          var panel = el('section', { class: 'panel', 'aria-live': 'polite', id: 'panel' });
-          fillHopPanel(panel, sc, sc.hops[state.hop]);
-          viewEl.appendChild(el('div', { class: 'grid' }, [left, panel]));
+          sc.hops.forEach(function (h, i) {
+            var lane = lanes.indexOf(h.svc);
+            var prevLane = i > 0 ? lanes.indexOf(sc.hops[i - 1].svc) : lane;
+            var cls = 'node' + (i > 0 && lane !== prevLane ? ' cross' : '');
+            if (info) {
+              if (i === info.index) cls += ' f-' + info.sev;
+              else if (i === info.to) cls += ' surface';
+              else if (!info.fail.continues && i > info.index) cls += ' dim';
+            }
+            var node = el(
+              'button',
+              {
+                class: cls,
+                type: 'button',
+                'data-i': String(i),
+                style: svcVar(h.svc) + '; grid-column: ' + (lane + 1) + '; grid-row: ' + (i + 2),
+                'aria-label': i + 1 + '. ' + h.title + '（' + data.services[h.svc].label + '）',
+              },
+              [
+                el('span', { class: 'num', text: String(i + 1) }),
+                el('span', { class: 'lbl', text: h.short }),
+                h.fails.length ? el('span', { class: 'bolt', text: '⚡' + h.fails.length }) : null,
+              ],
+            );
+            node.addEventListener('click', function () {
+              state.token++;
+              selectHop(sc, i);
+              if (window.matchMedia('(max-width: 860px)').matches) {
+                document.getElementById('panel').scrollIntoView({ block: 'start', behavior: 'smooth' });
+              }
+            });
+            flow.appendChild(node);
+          });
+          flow.style.gridTemplateRows = 'auto repeat(' + sc.hops.length + ', auto)';
+          flow.appendChild(svgEl('svg', { class: 'wires', 'aria-hidden': 'true' }));
+
+          var panel = el('section', { class: 'panel', id: 'panel', 'aria-live': 'polite' });
+          viewEl.appendChild(el('div', { class: 'stage' }, [flow, panel]));
+
+          drawWires(sc, info);
+          selectHop(sc, info ? info.index : Math.min(state.hop, sc.hops.length - 1));
+
+          if (window.ResizeObserver) {
+            resizeObserver = new ResizeObserver(function () {
+              drawWires(sc, failInfo(sc));
+            });
+            resizeObserver.observe(flow);
+          }
         }
 
-        function fillHopPanel(panel, sc, h) {
-          panel.appendChild(el('div', {}, [svcChip(h.svc)]));
+        function boxOf(flow, i) {
+          var base = flow.getBoundingClientRect();
+          var r = flow.querySelector('.node[data-i="' + i + '"]').getBoundingClientRect();
+          return {
+            l: r.left - base.left,
+            r: r.right - base.left,
+            t: r.top - base.top,
+            b: r.bottom - base.top,
+            cx: r.left - base.left + r.width / 2,
+            cy: r.top - base.top + r.height / 2,
+          };
+        }
+
+        function addTag(flow, path, text, cls, at) {
+          var len = path.getTotalLength();
+          var p = path.getPointAtLength(len * (at || 0.5));
+          flow.appendChild(
+            el('span', { class: 'tag ' + (cls || ''), style: 'left:' + p.x + 'px; top:' + p.y + 'px', text: text }),
+          );
+        }
+
+        function drawWires(sc, info) {
+          var flow = document.getElementById('flow');
+          if (!flow) return;
+          flow.classList.toggle('narrow', flow.clientWidth / sc.lanes.length < 170);
+          var svg = flow.querySelector('svg.wires');
+          svg.textContent = '';
+          flow.querySelectorAll('.tag').forEach(function (t) {
+            t.remove();
+          });
+          svg.setAttribute('width', flow.clientWidth);
+          svg.setAttribute('height', flow.clientHeight);
+
+          var defs = svgEl('defs');
+          [
+            ['m-wire', 'var(--wire)'],
+            ['m-bad', 'var(--bad)'],
+          ].forEach(function (m) {
+            var marker = svgEl('marker', {
+              id: m[0],
+              viewBox: '0 0 10 10',
+              refX: '8',
+              refY: '5',
+              markerWidth: '9',
+              markerHeight: '9',
+              markerUnits: 'userSpaceOnUse',
+              orient: 'auto-start-reverse',
+            });
+            var tri = svgEl('path', { d: 'M0,0 L10,5 L0,10 z' });
+            tri.setAttribute('style', 'fill: ' + m[1]);
+            marker.appendChild(tri);
+            defs.appendChild(marker);
+          });
+          svg.appendChild(defs);
+
+          var lanes = sc.lanes;
+          for (var i = 1; i < sc.hops.length; i++) {
+            var a = boxOf(flow, i - 1);
+            var b = boxOf(flow, i);
+            var cross = lanes.indexOf(sc.hops[i].svc) !== lanes.indexOf(sc.hops[i - 1].svc);
+            var d;
+            if (!cross) {
+              d = 'M' + a.cx + ',' + a.b + ' L' + b.cx + ',' + (b.t - 2);
+            } else {
+              var my = (a.b + b.t) / 2;
+              d = 'M' + a.cx + ',' + a.b + ' C' + a.cx + ',' + my + ' ' + b.cx + ',' + my + ' ' + b.cx + ',' + (b.t - 2);
+            }
+            var cls = 'wire' + (cross ? ' net' : '');
+            var stopped = info && !info.fail.continues;
+            if (stopped && i === info.index + 1) cls += ' cut';
+            else if (stopped && i > info.index + 1) cls += ' dim';
+            var path = svgEl('path', { d: d, class: cls, 'data-w': String(i) });
+            path.setAttribute('marker-end', cls.indexOf('cut') >= 0 ? 'url(#m-bad)' : 'url(#m-wire)');
+            svg.appendChild(path);
+            if (stopped && i === info.index + 1) addTag(flow, path, '✕', 'x');
+            else if (sc.hops[i].via) addTag(flow, path, sc.hops[i].via, '');
+          }
+
+          if (info && info.to >= 0 && info.to !== info.index) {
+            var f = boxOf(flow, info.index);
+            var s = boxOf(flow, info.to);
+            var fl = lanes.indexOf(sc.hops[info.index].svc);
+            var sl = lanes.indexOf(sc.hops[info.to].svc);
+            var x1, x2, c1, c2;
+            if (sl < fl) {
+              x1 = f.l;
+              x2 = s.r;
+              c1 = x1 - 60;
+              c2 = x2 + 60;
+            } else if (sl > fl) {
+              x1 = f.r;
+              x2 = s.l;
+              c1 = x1 + 60;
+              c2 = x2 - 60;
+            } else {
+              x1 = f.r;
+              x2 = s.r;
+              c1 = Math.min(x1 + 50, flow.clientWidth - 4);
+              c2 = c1;
+            }
+            var rd = 'M' + x1 + ',' + f.cy + ' C' + c1 + ',' + f.cy + ' ' + c2 + ',' + s.cy + ' ' + x2 + ',' + s.cy;
+            var ret = svgEl('path', { d: rd, class: 'wire ret', id: 'ret' });
+            ret.setAttribute('marker-end', 'url(#m-bad)');
+            svg.appendChild(ret);
+            addTag(flow, ret, info.fail.back, 'ret', 0.25);
+          }
+        }
+
+        function selectHop(sc, i) {
+          state.hop = i;
+          document.querySelectorAll('#flow .node').forEach(function (n) {
+            if (Number(n.getAttribute('data-i')) === i) n.setAttribute('aria-current', 'step');
+            else n.removeAttribute('aria-current');
+          });
+          fillPanel(sc, sc.hops[i]);
+        }
+
+        function fillPanel(sc, h) {
+          var panel = document.getElementById('panel');
+          panel.textContent = '';
+          var back = el('button', { class: 'ghost back', type: 'button', text: '↑ 図へ戻る' });
+          back.addEventListener('click', function () {
+            document.getElementById('flow').scrollIntoView({ block: 'start', behavior: 'smooth' });
+          });
+          panel.appendChild(back);
+          panel.appendChild(
+            el('div', {}, [el('span', { class: 'svc-chip', style: svcVar(h.svc), text: data.services[h.svc].label })]),
+          );
           panel.appendChild(el('h2', { text: h.title }));
           panel.appendChild(el('p', { text: h.what }));
           if (h.change) {
-            panel.appendChild(
-              el('div', { class: 'change' }, [el('strong', { text: 'ここを変えると' }), h.change]),
-            );
+            panel.appendChild(el('div', { class: 'change' }, [el('strong', { text: 'ここを変えると' }), h.change]));
           }
 
           if (h.fails.length) {
-            panel.appendChild(el('h3', { text: 'ここで失敗させる' }));
+            panel.appendChild(el('h3', { text: '⚡ ここで失敗させる' }));
             var row = el('div', { class: 'fails' });
             h.fails.forEach(function (f) {
               var on = !!(state.fail && state.fail.hop === h.id && state.fail.id === f.id);
-              var b = el('button', {
-                class: 'fail-btn',
-                type: 'button',
-                'aria-pressed': String(on),
-                text: '⚡ ' + f.label,
-              });
+              var b = el(
+                'button',
+                { class: 'fail-btn s-' + severity(f), type: 'button', 'aria-pressed': String(on) },
+                [el('span', { class: 'dot', 'aria-hidden': 'true' }), f.label],
+              );
               b.addEventListener('click', function () {
                 state.fail = on ? null : { hop: h.id, id: f.id };
                 renderScenario(sc);
-                var p = document.getElementById('panel');
-                if (p && window.matchMedia('(max-width: 820px)').matches) p.scrollIntoView({ block: 'start' });
+                if (state.fail) playFailureReturn(sc);
               });
               row.appendChild(b);
             });
@@ -1436,22 +2776,21 @@
               });
             }
             if (active) {
-              var rows = [
-                ['画面', active.screen],
-                ['データ', active.data],
-                ['再試行', active.retry],
-                ['痕跡', active.trace],
-                ['最初に見る', active.look],
-              ];
               panel.appendChild(
                 el(
-                  'dl',
-                  { class: 'outcome' },
-                  rows.map(function (r) {
-                    return el('div', {}, [el('dt', { text: r[0] }), el('dd', { text: r[1] })]);
+                  'div',
+                  { class: 'tiles' },
+                  TILE_ORDER.map(function (t) {
+                    var tag = TAGS[t[0]][active.tags[t[0]]];
+                    return el('div', { class: 'tile s-' + tag[1] }, [
+                      el('span', { class: 'k', text: t[1] }),
+                      el('span', { class: 'h', text: tag[0] }),
+                      el('p', { text: active[t[0]] }),
+                    ]);
                   }),
                 ),
               );
+              panel.appendChild(el('div', { class: 'look' }, [el('strong', { text: '→ 最初に見る場所' }), active.look]));
               if (active.refs && active.refs.length) {
                 panel.appendChild(el('h3', { text: 'この失敗の根拠' }));
                 panel.appendChild(refList(active.refs));
@@ -1463,70 +2802,188 @@
           panel.appendChild(refList(h.refs));
         }
 
-        function startPlay(sc) {
-          stopPlay();
-          state.fail = null;
-          state.hop = 0;
-          renderScenario(sc);
-          var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-          if (reduce) return;
-          state.timer = setInterval(function () {
-            if (state.hop >= sc.hops.length - 1) {
-              stopPlay();
-              return;
+        // ---------- アニメーション ----------
+        function travel(path, cls, ms, token) {
+          return new Promise(function (resolve) {
+            if (!path || reduce) return resolve(true);
+            var svg = path.ownerSVGElement;
+            var dot = svgEl('circle', { r: '6', class: 'packet ' + (cls || '') });
+            svg.appendChild(dot);
+            var len = path.getTotalLength();
+            var start = null;
+            function step(ts) {
+              if (token !== state.token) {
+                dot.remove();
+                return resolve(false);
+              }
+              if (start === null) start = ts;
+              var t = Math.min((ts - start) / ms, 1);
+              var e = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+              var p = path.getPointAtLength(len * e);
+              dot.setAttribute('cx', p.x);
+              dot.setAttribute('cy', p.y);
+              if (t < 1) requestAnimationFrame(step);
+              else {
+                dot.remove();
+                resolve(true);
+              }
             }
-            state.hop += 1;
-            renderScenario(sc);
-          }, 900);
+            requestAnimationFrame(step);
+          });
         }
 
+        function hit(i) {
+          var n = document.querySelector('#flow .node[data-i="' + i + '"]');
+          if (!n || reduce) return;
+          n.classList.add('hit');
+          setTimeout(function () {
+            n.classList.remove('hit');
+          }, 220);
+        }
+
+        async function playScenario(sc) {
+          var token = ++state.token;
+          var info = failInfo(sc);
+          var last = info && !info.fail.continues ? info.index : sc.hops.length - 1;
+          selectHop(sc, 0);
+          hit(0);
+          for (var i = 1; i <= last; i++) {
+            var path = document.querySelector('#flow path[data-w="' + i + '"]');
+            if (path) path.classList.add('lit');
+            var ok = await travel(path, '', path && path.classList.contains('net') ? 650 : 380, token);
+            if (path) path.classList.remove('lit');
+            if (!ok) return;
+            selectHop(sc, i);
+            hit(i);
+          }
+          if (info) {
+            selectHop(sc, info.index);
+            await sleep(reduce ? 0 : 250);
+            if (token !== state.token) return;
+            await travel(document.getElementById('ret'), 'bad', 900, token);
+          }
+        }
+
+        async function playFailureReturn(sc) {
+          var token = ++state.token;
+          await sleep(reduce ? 0 : 150);
+          if (token !== state.token) return;
+          await travel(document.getElementById('ret'), 'bad', 900, token);
+        }
+
+        // ---------- 停止マップ ----------
         function renderOutages() {
           var o = data.outages;
           viewEl.textContent = '';
           viewEl.appendChild(el('div', { class: 'intro' }, [el('p', { text: o.intro })]));
           if (!state.outage) state.outage = o.items[0].id;
-          var cards = el('div', { class: 'cards', role: 'group', 'aria-label': '外部サービス' });
-          var current = o.items[0];
+          var current = o.items.filter(function (it) {
+            return it.id === state.outage;
+          })[0];
+
+          var deps = el('div', { class: 'deps has-pick', id: 'deps', role: 'group', 'aria-label': '外部サービスと機能の依存図' });
+          var left = el('div', { class: 'col' }, [el('div', { class: 'col-h', text: '外部サービス（押すと止まる）' })]);
           o.items.forEach(function (it) {
-            var on = it.id === state.outage;
-            if (on) current = it;
             var b = el(
               'button',
-              { class: 'card', type: 'button', style: svcStyle(it.svc), 'aria-pressed': String(on) },
-              [el('span', { class: 't', text: it.name }), el('span', { class: 's', text: it.role })],
+              {
+                class: 'svc-node',
+                type: 'button',
+                'data-svc': it.id,
+                style: svcVar(it.svc),
+                'aria-pressed': String(it.id === state.outage),
+              },
+              [el('b', { text: it.name }), el('small', { text: it.role })],
             );
             b.addEventListener('click', function () {
               state.outage = it.id;
               renderOutages();
             });
-            cards.appendChild(b);
+            left.appendChild(b);
           });
+          var right = el('div', { class: 'col feat' }, [el('div', { class: 'col-h', text: '機能' })]);
+          o.features.forEach(function (f) {
+            var impact = current.impacts[f.id];
+            right.appendChild(
+              el('div', { class: 'feat-node ' + (impact || 'safe'), 'data-feat': f.id }, [
+                f.label,
+                impact ? el('small', { text: impact === 'down' ? '✕ 止まる' : '△ 弱まる' }) : null,
+              ]),
+            );
+          });
+          deps.appendChild(left);
+          deps.appendChild(right);
+          deps.appendChild(svgEl('svg', { class: 'wires', 'aria-hidden': 'true' }));
+
+          var legend = el('div', { class: 'legend' }, [
+            el('span', { class: 's-bad' }, [el('i', {}), '止まる']),
+            el('span', { class: 's-warn' }, [el('i', { class: 'dash' }), '弱まる（一部・遅れて追いつく）']),
+          ]);
 
           var panel = el('section', { class: 'panel', 'aria-live': 'polite' });
-          panel.appendChild(el('h2', { text: current.name + ' が止まったら' }));
-          panel.appendChild(el('p', { class: 'why', text: current.role }));
-          var rows = [
-            ['壊れる', current.breaks],
-            ['動き続ける', current.keeps],
-            ['コードの挙動', current.behavior],
-            ['関係する env', current.env.length ? current.env.join(', ') : '（なし）'],
-            ['最初に見る', current.look],
-          ];
           panel.appendChild(
-            el(
-              'dl',
-              { class: 'outcome' },
-              rows.map(function (r) {
-                return el('div', {}, [el('dt', { text: r[0] }), el('dd', { text: r[1] })]);
-              }),
-            ),
+            el('div', {}, [el('span', { class: 'svc-chip', style: svcVar(current.svc), text: current.role })]),
           );
+          panel.appendChild(el('h2', { text: current.name + ' が止まったら' }));
+          var impactTiles = el(
+            'div',
+            { class: 'tiles' },
+            [
+              ['壊れる', current.breaks, 'bad'],
+              ['動き続ける', current.keeps, 'ok'],
+              ['コードの挙動', current.behavior, 'neutral'],
+              ['関係する env', current.env.length ? current.env.join(', ') : '（なし）', 'neutral'],
+            ].map(function (t) {
+              return el('div', { class: 'tile s-' + t[2] }, [el('span', { class: 'h', text: t[0] }), el('p', { text: t[1] })]);
+            }),
+          );
+          panel.appendChild(impactTiles);
+          panel.appendChild(el('div', { class: 'look' }, [el('strong', { text: '→ 最初に見る場所' }), current.look]));
           panel.appendChild(el('h3', { text: 'コードと文書' }));
           panel.appendChild(refList(current.refs));
           panel.appendChild(
-            el('p', { class: 'unknown', text: 'env は名前だけを載せる。値は 1Password が正本（docs/operations/secrets.md）。' }),
+            el('p', { class: 'why', text: 'env は名前だけを載せる。値は 1Password が正本（docs/operations/secrets.md）。' }),
           );
-          viewEl.appendChild(el('div', { class: 'grid' }, [cards, panel]));
+
+          viewEl.appendChild(el('div', { class: 'stage' }, [el('div', {}, [deps, legend]), panel]));
+          drawEdges(current);
+          if (window.ResizeObserver) {
+            resizeObserver = new ResizeObserver(function () {
+              drawEdges(current);
+            });
+            resizeObserver.observe(deps);
+          }
+        }
+
+        function drawEdges(current) {
+          var deps = document.getElementById('deps');
+          if (!deps) return;
+          var svg = deps.querySelector('svg.wires');
+          svg.textContent = '';
+          svg.setAttribute('width', deps.clientWidth);
+          svg.setAttribute('height', deps.clientHeight);
+          var base = deps.getBoundingClientRect();
+          var picked = [];
+          data.outages.items.forEach(function (it) {
+            var a = deps.querySelector('[data-svc="' + it.id + '"]').getBoundingClientRect();
+            Object.keys(it.impacts).forEach(function (fid) {
+              var b = deps.querySelector('[data-feat="' + fid + '"]').getBoundingClientRect();
+              var x1 = a.right - base.left;
+              var y1 = a.top - base.top + a.height / 2;
+              var x2 = b.left - base.left;
+              var y2 = b.top - base.top + b.height / 2;
+              var mx = (x1 + x2) / 2;
+              var d = 'M' + x1 + ',' + y1 + ' C' + mx + ',' + y1 + ' ' + mx + ',' + y2 + ' ' + x2 + ',' + y2;
+              var mine = it.id === current.id;
+              var path = svgEl('path', { d: d, class: 'edge ' + (mine ? it.impacts[fid] : 'off') });
+              if (mine) picked.push(path);
+              else svg.appendChild(path);
+            });
+          });
+          // 選んだサービスの線を最前面に
+          picked.forEach(function (p) {
+            svg.appendChild(p);
+          });
         }
 
         render();
