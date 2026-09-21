@@ -15,9 +15,14 @@ import { legalMdxComponents } from './_components/legal-mdx-components';
 import { LEGAL_MDX_OPTIONS } from './_components/legal-mdx-options';
 import { getLegalDocument, type LegalDocumentSlug } from './_lib/legal-content';
 
+const legalLinkState = vi.hoisted(() => ({ locale: 'en' as 'en' | 'ja' }));
+
 vi.mock('@dayopt/i18n/navigation', () => ({
   Link: ({ children, href, ...rest }: { children: ReactNode; href: string }) => (
-    <a href={href} {...rest}>
+    <a
+      href={legalLinkState.locale === 'ja' && href.startsWith('/') ? `/ja${href}` : href}
+      {...rest}
+    >
       {children}
     </a>
   ),
@@ -49,6 +54,7 @@ afterEach(() => {
 const DAYOPT_REPOSITORY_URL_PATTERN = /github\.com\/Dayopt\//i;
 
 async function renderLegalBody(testCase: LegalContractCase): Promise<HTMLElement> {
+  legalLinkState.locale = testCase.locale;
   const document = getLegalDocument(testCase.locale, testCase.slug);
   const compiled = await serialize(document.content, LEGAL_MDX_OPTIONS);
   const { container } = render(<MDXRemote {...compiled} components={legalMdxComponents} />);
@@ -69,6 +75,10 @@ describe('legal document contract', () => {
       );
       expect(hrefs.some((href) => DAYOPT_REPOSITORY_URL_PATTERN.test(href))).toBe(false);
       expect(container.textContent ?? '').not.toMatch(/GitHub Security Advisory/i);
+
+      if (testCase.locale === 'ja' && testCase.slug === 'cookies') {
+        expect(hrefs).toContain('/ja/legal/privacy');
+      }
     });
   }
 

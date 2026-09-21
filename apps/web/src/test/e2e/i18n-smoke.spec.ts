@@ -36,6 +36,19 @@ test('登録 CTA が product signup に統一されている', async ({ page }) 
   expect(signupHrefs.every((href) => href === dayoptProductUrls.signup)).toBe(true);
 });
 
+test('LP は 390px 幅でも en/ja の hero と料金セクションを表示する', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+
+  for (const [path, heroCopy] of [
+    ['/', 'Plan days you can actually keep.'],
+    ['/ja/', '守れる計画を、立てられるように。'],
+  ] as const) {
+    await page.goto(path);
+    await expect(page.getByRole('heading', { level: 1 })).toContainText(heroCopy);
+    await expect(page.locator('#pricing')).toBeVisible();
+  }
+});
+
 test('LP metadata と OG image が新コピーに整合する', async ({ page }) => {
   const title = 'Plan days you can actually keep.';
   const description =

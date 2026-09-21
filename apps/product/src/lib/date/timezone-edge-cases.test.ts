@@ -35,6 +35,14 @@ describe('localTimeToUTCISO', () => {
       'America/New_York',
       '2025-03-09T07:00:00.000Z',
     ],
+    [
+      'NY after fall back',
+      new Date(2025, 10, 2),
+      12,
+      0,
+      'America/New_York',
+      '2025-11-02T17:00:00.000Z',
+    ],
   ])('%s', (_label, date, hours, minutes, timezone, expected) => {
     expect(localTimeToUTCISO(date, hours, minutes, timezone)).toBe(expected);
   });
