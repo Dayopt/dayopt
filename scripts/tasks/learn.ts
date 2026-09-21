@@ -21,14 +21,18 @@ import { renderLearnDocs } from '../lib/learn/render-markdown.ts';
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const TEMPLATE = resolve(ROOT, 'scripts/lib/learn/ui/template.html');
 const OUTPUT = resolve(ROOT, '.learn/index.html');
-const PLACEHOLDER = 'id="learn-data">__LEARN_DATA__</script>';
+// prettier が placeholder を別の行へ折っても見つかるよう、前後の空白を許す
+const PLACEHOLDER =
+  /(<script type="application\/json" id="learn-data">)\s*__LEARN_DATA__\s*(<\/script>)/;
 
 /** data を template の JSON script へ埋め込む。`</script>` で閉じられないよう < を escape する。 */
 export function buildLearnHtml(template: string, data: LearnData): string {
-  if (!template.includes(PLACEHOLDER))
-    throw new Error('template に learn-data の placeholder が無い');
+  if (!PLACEHOLDER.test(template)) throw new Error('template に learn-data の placeholder が無い');
   const json = JSON.stringify(data).replace(/</g, '\\u003c');
-  return template.replace(PLACEHOLDER, `id="learn-data">${json}</script>`);
+  return template.replace(
+    PLACEHOLDER,
+    (_match, open: string, close: string) => open + json + close,
+  );
 }
 
 function fail(errors: readonly string[]): never {

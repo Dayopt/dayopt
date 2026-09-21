@@ -53,6 +53,17 @@ pnpm learn
 
 <!-- learn:generated:end -->
 
+## 手を動かして壊す（labs）
+
+local の Supabase と product で、実際に壊して観察する。各 lab は先に予想を書き、手順の後で「実測結果」と照らす。本番・Preview には触れない。
+
+- [1 つの依頼を端から端まで追う](labs/trace-request.md) — 壊さずに、依頼の数・DB の行・取り直しを見る
+- [通信を壊す](labs/break-network.md) — 届く前に切れた時と、返事だけ失われた時
+- [UI を迂回して規則を破る](labs/break-rules.md) — DB が最後の砦であること、superuser の psql は再現にならないこと
+- [別の利用者のデータへ手を伸ばす](labs/break-isolation.md) — RLS・GRANT・関数の照合がどこで止めるか
+
+Supabase そのものを止める lab と、メール送信を壊す lab はまだ無い。local の Supabase は他の作業と共有しているので、止める手順を安全に確かめられていないため。
+
 ## 学ぶ順序
 
 章は概念 → 図 → 利用者の操作 → 処理 → コード の順で書いてある。コードは最後。各章の終わりに、自分で確かめる問いがある。

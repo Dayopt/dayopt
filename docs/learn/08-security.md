@@ -39,6 +39,10 @@ last_verified: 2026-09-21
 
 **まだ sweep していない境界**: 課金（Stripe webhook・利用権）、外部カレンダー（Google OAuth・token の回転・revoke outbox）、cron の 4 本、ガードレール自身、`apps/web`。**「見て問題なし」ではない**。
 
+## 手を動かして確かめる
+
+- [Lab: 別の利用者のデータへ手を伸ばす](labs/break-isolation.md)
+
 ## 境界に触る変更の時
 
 - 認証・認可・RLS・OAuth・webhook・課金・migration に触る変更は、push 前に敵対的なセルフレビューを行う（AGENTS.md の lane 運用）

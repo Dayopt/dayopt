@@ -41,6 +41,10 @@ flowchart TD
 - [サインアップ → ウェルカムメール](journeys/signup.md) — 黙って欠落する失敗（利用者は気づかない）
 - [merge → 本番公開](journeys/deploy.md) — 本番に届かない失敗
 
+## 手を動かして確かめる
+
+- [Lab: 通信を壊す](labs/break-network.md) — 同じトーストでも、DB に入っている場合と入っていない場合がある
+
 ## 正本
 
 - [docs/operations/runbook.md](../operations/runbook.md) — 共通初動、write fence、Playbook 1〜5

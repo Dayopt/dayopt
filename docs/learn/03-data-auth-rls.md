@@ -55,6 +55,10 @@ flowchart TD
 - [AI クライアントから Plan を作る](journeys/mcp.md) — 同じ書き込みの別の入口
 - [アカウントを削除する](journeys/account-deletion.md) — 利用者のデータを消し切る側の境界
 
+## 手を動かして確かめる
+
+- [Lab: 別の利用者のデータへ手を伸ばす](labs/break-isolation.md)
+
 ## この境界を守るテスト
 
 - `apps/product/src/lib/test/integration/rls-access.integration.test.ts` — 「authenticatedはown Plan / Recordをreadできるが直接writeできない」ほか

@@ -209,6 +209,10 @@
         background: var(--bad);
       }
       .ghost {
+        display: inline-flex;
+        align-items: center;
+        color: var(--text);
+        text-decoration: none;
         min-height: 44px;
         padding: 8px 14px;
         border: 1px solid var(--border);
@@ -1197,7 +1201,13 @@
       <header>
         <h1>Dayopt Learning System</h1>
         <p>
-          まず画面マップで画面どうしの移り方を見て、操作を 1 つ選び、どのサービスのどの処理を通るかを図で辿る。各段の右には利用者の画面の模型が出る。▶ で依頼が流れ、段を押すと中身とコードが出る。「⚡ ここで失敗させる」を押すと、どこで途切れ、何が画面へ戻り、データ・再試行・痕跡がどうなり、どこから確認するかが出る。目的は暗記ではなく、変更の影響先と障害時の初手を自分で引けるようにすること。
+          <a href="../docs/learn/README.md" target="_blank" rel="noopener"
+            >章と卒業問題（docs/learn）</a
+          >
+          · まず画面マップで画面どうしの移り方を見て、操作を 1
+          つ選び、どのサービスのどの処理を通るかを図で辿る。各段の右には利用者の画面の模型が出る。▶
+          で依頼が流れ、段を押すと中身とコードが出る。「⚡
+          ここで失敗させる」を押すと、どこで途切れ、何が画面へ戻り、データ・再試行・痕跡がどうなり、どこから確認するかが出る。目的は暗記ではなく、変更の影響先と障害時の初手を自分で引けるようにすること。
         </p>
       </header>
 
@@ -1206,14 +1216,17 @@
 
       <footer>
         <p>
-          この画面は <code>docs/learn</code> の Markdown（各ファイルの JSON block）から <code>pnpm learn</code> が作った表示。
-          記述がコードとずれていたら、その .md の JSON を直して <code>pnpm learn:generate</code> を実行する。
-          コードへのリンクは GitHub の <code>main</code> を指す。参照先の実在は <code>pnpm docs:check</code> が検査する。
+          この画面は <code>docs/learn</code> の Markdown（各ファイルの JSON block）から
+          <code>pnpm learn</code> が作った表示。 記述がコードとずれていたら、その .md の JSON
+          を直して <code>pnpm learn:generate</code> を実行する。 コードへのリンクは GitHub の
+          <code>main</code> を指す。参照先の実在は <code>pnpm docs:check</code> が検査する。
         </p>
       </footer>
     </div>
 
-    <script type="application/json" id="learn-data">__LEARN_DATA__</script>
+    <script type="application/json" id="learn-data">
+      __LEARN_DATA__
+    </script>
 
     <script>
       (function () {
@@ -1290,7 +1303,9 @@
             refs.map(function (r) {
               var href = data.repo + r.path.split('/').map(encodeURIComponent).join('/');
               return el('li', {}, [
-                el('a', { href: href, target: '_blank', rel: 'noopener' }, [el('code', { text: r.path })]),
+                el('a', { href: href, target: '_blank', rel: 'noopener' }, [
+                  el('code', { text: r.path }),
+                ]),
                 el('span', { class: 'why', text: ' で ' }),
                 el('code', { text: r.find }),
                 el('span', { class: 'why', text: ' を探す' + (r.why ? '（' + r.why + '）' : '') }),
@@ -1391,6 +1406,17 @@
             playScenario(sc);
           });
           btns.appendChild(play);
+          if (sc.lab) {
+            btns.appendChild(
+              el('a', {
+                class: 'ghost',
+                href: '../docs/learn/labs/' + sc.lab + '.md',
+                target: '_blank',
+                rel: 'noopener',
+                text: '🧪 壊して確かめる（lab）',
+              }),
+            );
+          }
           if (sc.twin && scenarioTabIndex(sc.twin) >= 0) {
             var twinIndex = scenarioTabIndex(sc.twin);
             var twin = el('button', {
@@ -1462,7 +1488,9 @@
               state.token++;
               selectHop(sc, i);
               if (window.matchMedia('(max-width: 860px)').matches) {
-                document.getElementById('panel').scrollIntoView({ block: 'start', behavior: 'smooth' });
+                document
+                  .getElementById('panel')
+                  .scrollIntoView({ block: 'start', behavior: 'smooth' });
               }
             });
             flow.appendChild(node);
@@ -1501,7 +1529,11 @@
           var len = path.getTotalLength();
           var p = path.getPointAtLength(len * (at || 0.5));
           flow.appendChild(
-            el('span', { class: 'tag ' + (cls || ''), style: 'left:' + p.x + 'px; top:' + p.y + 'px', text: text }),
+            el('span', {
+              class: 'tag ' + (cls || ''),
+              style: 'left:' + p.x + 'px; top:' + p.y + 'px',
+              text: text,
+            }),
           );
         }
 
@@ -1549,14 +1581,33 @@
               d = 'M' + a.cx + ',' + a.b + ' L' + b.cx + ',' + (b.t - 2);
             } else {
               var my = (a.b + b.t) / 2;
-              d = 'M' + a.cx + ',' + a.b + ' C' + a.cx + ',' + my + ' ' + b.cx + ',' + my + ' ' + b.cx + ',' + (b.t - 2);
+              d =
+                'M' +
+                a.cx +
+                ',' +
+                a.b +
+                ' C' +
+                a.cx +
+                ',' +
+                my +
+                ' ' +
+                b.cx +
+                ',' +
+                my +
+                ' ' +
+                b.cx +
+                ',' +
+                (b.t - 2);
             }
             var cls = 'wire' + (cross ? ' net' : '');
             var stopped = info && !info.fail.continues;
             if (stopped && i === info.index + 1) cls += ' cut';
             else if (stopped && i > info.index + 1) cls += ' dim';
             var path = svgEl('path', { d: d, class: cls, 'data-w': String(i) });
-            path.setAttribute('marker-end', cls.indexOf('cut') >= 0 ? 'url(#m-bad)' : 'url(#m-wire)');
+            path.setAttribute(
+              'marker-end',
+              cls.indexOf('cut') >= 0 ? 'url(#m-bad)' : 'url(#m-wire)',
+            );
             svg.appendChild(path);
             if (stopped && i === info.index + 1) addTag(flow, path, '✕', 'x');
             else if (sc.hops[i].via) addTag(flow, path, sc.hops[i].via, '');
@@ -1584,7 +1635,23 @@
               c1 = Math.min(x1 + 50, flow.clientWidth - 4);
               c2 = c1;
             }
-            var rd = 'M' + x1 + ',' + f.cy + ' C' + c1 + ',' + f.cy + ' ' + c2 + ',' + s.cy + ' ' + x2 + ',' + s.cy;
+            var rd =
+              'M' +
+              x1 +
+              ',' +
+              f.cy +
+              ' C' +
+              c1 +
+              ',' +
+              f.cy +
+              ' ' +
+              c2 +
+              ',' +
+              s.cy +
+              ' ' +
+              x2 +
+              ',' +
+              s.cy;
             var ret = svgEl('path', { d: rd, class: 'wire ret', id: 'ret' });
             ret.setAttribute('marker-end', 'url(#m-bad)');
             svg.appendChild(ret);
@@ -1610,14 +1677,24 @@
           });
           panel.appendChild(back);
           panel.appendChild(
-            el('div', {}, [el('span', { class: 'svc-chip', style: svcVar(h.svc), text: data.services[h.svc].label })]),
+            el('div', {}, [
+              el('span', {
+                class: 'svc-chip',
+                style: svcVar(h.svc),
+                text: data.services[h.svc].label,
+              }),
+            ]),
           );
           panel.appendChild(el('h2', { text: h.title }));
           var hopIndex = sc.hops.indexOf(h);
           var info = failInfo(sc);
           var shot;
           if (info && info.index === hopIndex) {
-            shot = mockBlock(info.fail.screenAfter || screenFor(sc, hopIndex), '⚡ 失敗した後の利用者の画面', true);
+            shot = mockBlock(
+              info.fail.screenAfter || screenFor(sc, hopIndex),
+              '⚡ 失敗した後の利用者の画面',
+              true,
+            );
           } else if (info && info.to === hopIndex && info.fail.screenAfter) {
             shot = mockBlock(info.fail.screenAfter, '⚡ 失敗が利用者に見える画面', true);
           } else {
@@ -1625,15 +1702,22 @@
           }
           panel.appendChild(el('div', { class: 'hop-head' }, [shot, el('p', { text: h.what })]));
           if (h.why) {
-            panel.appendChild(el('div', { class: 'change' }, [el('strong', { text: 'なぜ必要か' }), h.why]));
+            panel.appendChild(
+              el('div', { class: 'change' }, [el('strong', { text: 'なぜ必要か' }), h.why]),
+            );
           }
           if (h.io) {
             panel.appendChild(
-              el('div', { class: 'change' }, [el('strong', { text: '入力 → 出力' }), h.io.in + ' → ' + h.io.out]),
+              el('div', { class: 'change' }, [
+                el('strong', { text: '入力 → 出力' }),
+                h.io.in + ' → ' + h.io.out,
+              ]),
             );
           }
           if (h.change) {
-            panel.appendChild(el('div', { class: 'change' }, [el('strong', { text: 'ここを変えると' }), h.change]));
+            panel.appendChild(
+              el('div', { class: 'change' }, [el('strong', { text: 'ここを変えると' }), h.change]),
+            );
           }
 
           if (h.fails.length) {
@@ -1676,7 +1760,12 @@
                   }),
                 ),
               );
-              panel.appendChild(el('div', { class: 'look' }, [el('strong', { text: '→ 最初に見る場所' }), active.look]));
+              panel.appendChild(
+                el('div', { class: 'look' }, [
+                  el('strong', { text: '→ 最初に見る場所' }),
+                  active.look,
+                ]),
+              );
               if (active.refs && active.refs.length) {
                 panel.appendChild(el('h3', { text: 'この失敗の根拠' }));
                 panel.appendChild(refList(active.refs));
@@ -1726,7 +1815,10 @@
                 { class: 'm-drawer' },
                 [el('div', { class: 'm-h', text: spec.drawer.title })].concat(
                   spec.drawer.items.map(function (it, k) {
-                    return el('span', { class: 'm-chip' + (k === spec.drawer.on ? ' on' : ''), text: it });
+                    return el('span', {
+                      class: 'm-chip' + (k === spec.drawer.on ? ' on' : ''),
+                      text: it,
+                    });
                   }),
                 ),
               ),
@@ -1737,10 +1829,21 @@
         function mockForm(spec, body) {
           body.appendChild(el('div', { class: 'm-h', text: spec.title }));
           (spec.fields || []).forEach(function (f) {
-            body.appendChild(el('div', { class: 'm-field' }, [el('span', { text: f[0] }), el('div', { text: f[1] || '' })]));
+            body.appendChild(
+              el('div', { class: 'm-field' }, [
+                el('span', { text: f[0] }),
+                el('div', { text: f[1] || '' }),
+              ]),
+            );
           });
           if (spec.extra) body.appendChild(el('div', { class: 'm-extra', text: spec.extra }));
-          if (spec.button) body.appendChild(el('div', { class: 'm-btn' + (spec.busy || spec.disabled ? ' busy' : ''), text: spec.busy ? '処理中…' : spec.button }));
+          if (spec.button)
+            body.appendChild(
+              el('div', {
+                class: 'm-btn' + (spec.busy || spec.disabled ? ' busy' : ''),
+                text: spec.busy ? '処理中…' : spec.button,
+              }),
+            );
           if (spec.alt) body.appendChild(el('div', { class: 'm-btn ghost', text: spec.alt }));
           if (spec.error) body.appendChild(el('div', { class: 'm-err', text: spec.error }));
         }
@@ -1751,7 +1854,10 @@
             body.appendChild(
               el('div', { class: 'm-mail ' + (m.state || 'new') }, [
                 el('i', {}),
-                el('span', {}, [el('b', { text: m.subject }), el('small', { text: m.state === 'missing' ? '届かない' : m.from || 'Dayopt' })]),
+                el('span', {}, [
+                  el('b', { text: m.subject }),
+                  el('small', { text: m.state === 'missing' ? '届かない' : m.from || 'Dayopt' }),
+                ]),
               ]),
             );
           });
@@ -1787,7 +1893,10 @@
           body.appendChild(el('div', { class: 'm-h', text: spec.title || '設定' }));
           spec.rows.forEach(function (r) {
             body.appendChild(
-              el('div', { class: 'm-row' }, [el('span', { text: r[0] }), r[1] ? el('span', { class: 'm-pill s-' + (r[2] || 'neutral'), text: r[1] }) : null]),
+              el('div', { class: 'm-row' }, [
+                el('span', { text: r[0] }),
+                r[1] ? el('span', { class: 'm-pill s-' + (r[2] || 'neutral'), text: r[1] }) : null,
+              ]),
             );
           });
           if (spec.button) body.appendChild(el('div', { class: 'm-btn', text: spec.button }));
@@ -1796,10 +1905,18 @@
         function mock(spec, failed) {
           var frame = el('div', { class: 'mock' + (failed ? ' fail' : ''), 'aria-hidden': 'true' });
           frame.appendChild(
-            el('div', { class: 'mock-bar' }, [el('i', {}), el('i', {}), el('i', {}), el('span', { class: 'mock-url', text: (spec.host || HOST) + (spec.url || '') })]),
+            el('div', { class: 'mock-bar' }, [
+              el('i', {}),
+              el('i', {}),
+              el('i', {}),
+              el('span', { class: 'mock-url', text: (spec.host || HOST) + (spec.url || '') }),
+            ]),
           );
           var body = el('div', { class: 'mock-body' });
-          if (spec.banner) body.appendChild(el('div', { class: 'm-banner ' + (spec.bannerTone || ''), text: spec.banner }));
+          if (spec.banner)
+            body.appendChild(
+              el('div', { class: 'm-banner ' + (spec.bannerTone || ''), text: spec.banner }),
+            );
           if (spec.t === 'calendar') mockCalendar(spec, body);
           else if (spec.t === 'form') mockForm(spec, body);
           else if (spec.t === 'inbox') mockInbox(spec, body);
@@ -1881,7 +1998,12 @@
           for (var i = 1; i <= last; i++) {
             var path = document.querySelector('#flow path[data-w="' + i + '"]');
             if (path) path.classList.add('lit');
-            var ok = await travel(path, '', path && path.classList.contains('net') ? 650 : 380, token);
+            var ok = await travel(
+              path,
+              '',
+              path && path.classList.contains('net') ? 650 : 380,
+              token,
+            );
             if (path) path.classList.remove('lit');
             if (!ok) return;
             selectHop(sc, i);
@@ -1927,9 +2049,20 @@
           S.nodes.forEach(function (n) {
             rows = Math.max(rows, n.row);
           });
-          var map = el('div', { class: 'smap has-pick', id: 'smap', role: 'group', 'aria-label': '画面マップ' });
+          var map = el('div', {
+            class: 'smap has-pick',
+            id: 'smap',
+            role: 'group',
+            'aria-label': '画面マップ',
+          });
           S.columns.forEach(function (c, k) {
-            map.appendChild(el('div', { class: 'smap-h', style: 'grid-column:' + (k + 1) + '; grid-row:1', text: c }));
+            map.appendChild(
+              el('div', {
+                class: 'smap-h',
+                style: 'grid-column:' + (k + 1) + '; grid-row:1',
+                text: c,
+              }),
+            );
           });
           S.nodes.forEach(function (n) {
             var linked = S.edges.some(function (e) {
@@ -1938,7 +2071,8 @@
             var b = el(
               'button',
               {
-                class: 'scr ' + n.group + (n.id === cur.id ? ' on' : '') + (linked ? ' linked' : ''),
+                class:
+                  'scr ' + n.group + (n.id === cur.id ? ' on' : '') + (linked ? ' linked' : ''),
                 type: 'button',
                 'data-scr': n.id,
                 'aria-pressed': String(n.id === cur.id),
@@ -1950,7 +2084,9 @@
               state.screen = n.id;
               renderScreens();
               if (window.matchMedia('(max-width: 860px)').matches) {
-                document.getElementById('panel').scrollIntoView({ block: 'start', behavior: 'smooth' });
+                document
+                  .getElementById('panel')
+                  .scrollIntoView({ block: 'start', behavior: 'smooth' });
               }
             });
             map.appendChild(b);
@@ -1964,23 +2100,52 @@
             document.getElementById('smap').scrollIntoView({ block: 'start', behavior: 'smooth' });
           });
           panel.appendChild(back);
-          panel.appendChild(el('div', {}, [el('span', { class: 'svc-chip', style: '--svc: var(--accent)', text: GROUP_LABEL[cur.group] })]));
+          panel.appendChild(
+            el('div', {}, [
+              el('span', {
+                class: 'svc-chip',
+                style: '--svc: var(--accent)',
+                text: GROUP_LABEL[cur.group],
+              }),
+            ]),
+          );
           panel.appendChild(el('h2', { text: cur.label }));
-          panel.appendChild(el('div', { class: 'hop-head' }, [mockBlock(cur.screen, 'この画面', false), el('p', { text: cur.what })]));
+          panel.appendChild(
+            el('div', { class: 'hop-head' }, [
+              mockBlock(cur.screen, 'この画面', false),
+              el('p', { text: cur.what }),
+            ]),
+          );
 
           var svcChips = el(
             'div',
             { class: 'chips' },
             cur.svcs.map(function (s) {
-              return el('span', { class: 'svc-chip', style: svcVar(s), text: data.services[s].label });
+              return el('span', {
+                class: 'svc-chip',
+                style: svcVar(s),
+                text: data.services[s].label,
+              });
             }),
           );
           panel.appendChild(
             el('div', { class: 'tiles' }, [
-              el('div', { class: 'tile s-neutral' }, [el('span', { class: 'h', text: 'ここへ来る条件' }), el('p', { text: cur.arrive })]),
-              el('div', { class: 'tile s-neutral' }, [el('span', { class: 'h', text: '読み込むデータ' }), el('p', { text: cur.loads })]),
-              el('div', { class: 'tile s-neutral' }, [el('span', { class: 'h', text: '触るサービス' }), svcChips]),
-              el('div', { class: 'tile s-warn' }, [el('span', { class: 'h', text: '壊れた時' }), el('p', { text: cur.fails })]),
+              el('div', { class: 'tile s-neutral' }, [
+                el('span', { class: 'h', text: 'ここへ来る条件' }),
+                el('p', { text: cur.arrive }),
+              ]),
+              el('div', { class: 'tile s-neutral' }, [
+                el('span', { class: 'h', text: '読み込むデータ' }),
+                el('p', { text: cur.loads }),
+              ]),
+              el('div', { class: 'tile s-neutral' }, [
+                el('span', { class: 'h', text: '触るサービス' }),
+                svcChips,
+              ]),
+              el('div', { class: 'tile s-warn' }, [
+                el('span', { class: 'h', text: '壊れた時' }),
+                el('p', { text: cur.fails }),
+              ]),
             ]),
           );
 
@@ -1996,7 +2161,11 @@
             var row = el('div', { class: 'fails' });
             list.forEach(function (e) {
               var target = byId[pick(e)];
-              var b = el('button', { class: 'ghost', type: 'button', text: arrow + ' ' + target.label + '（' + e[2] + '）' });
+              var b = el('button', {
+                class: 'ghost',
+                type: 'button',
+                text: arrow + ' ' + target.label + '（' + e[2] + '）',
+              });
               b.addEventListener('click', function () {
                 state.screen = target.id;
                 renderScreens();
@@ -2005,12 +2174,22 @@
             });
             panel.appendChild(row);
           }
-          moveList('ここから移る先', outs, function (e) {
-            return e[1];
-          }, '→');
-          moveList('ここへ来る元', ins, function (e) {
-            return e[0];
-          }, '←');
+          moveList(
+            'ここから移る先',
+            outs,
+            function (e) {
+              return e[1];
+            },
+            '→',
+          );
+          moveList(
+            'ここへ来る元',
+            ins,
+            function (e) {
+              return e[0];
+            },
+            '←',
+          );
 
           if (cur.flows.length) {
             panel.appendChild(el('h3', { text: 'この画面を通る経路' }));
@@ -2076,7 +2255,11 @@
           var base = map.getBoundingClientRect();
           function box(id) {
             var r = map.querySelector('[data-scr="' + id + '"]').getBoundingClientRect();
-            return { l: r.left - base.left, r: r.right - base.left, cy: r.top - base.top + r.height / 2 };
+            return {
+              l: r.left - base.left,
+              r: r.right - base.left,
+              cy: r.top - base.top + r.height / 2,
+            };
           }
           var byId = {};
           S.nodes.forEach(function (n) {
@@ -2091,14 +2274,78 @@
             var d;
             if (cb > ca) {
               var mx = (a.r + b.l) / 2;
-              d = 'M' + a.r + ',' + a.cy + ' C' + mx + ',' + a.cy + ' ' + mx + ',' + b.cy + ' ' + (b.l - 2) + ',' + b.cy;
+              d =
+                'M' +
+                a.r +
+                ',' +
+                a.cy +
+                ' C' +
+                mx +
+                ',' +
+                a.cy +
+                ' ' +
+                mx +
+                ',' +
+                b.cy +
+                ' ' +
+                (b.l - 2) +
+                ',' +
+                b.cy;
             } else if (cb < ca) {
               var mx2 = (a.l + b.r) / 2;
-              d = 'M' + a.l + ',' + a.cy + ' C' + mx2 + ',' + a.cy + ' ' + mx2 + ',' + b.cy + ' ' + (b.r + 2) + ',' + b.cy;
+              d =
+                'M' +
+                a.l +
+                ',' +
+                a.cy +
+                ' C' +
+                mx2 +
+                ',' +
+                a.cy +
+                ' ' +
+                mx2 +
+                ',' +
+                b.cy +
+                ' ' +
+                (b.r + 2) +
+                ',' +
+                b.cy;
             } else if (byId[e[0]].row < byId[e[1]].row) {
-              d = 'M' + a.r + ',' + (a.cy + 6) + ' C' + (a.r + 30) + ',' + (a.cy + 6) + ' ' + (b.r + 30) + ',' + (b.cy - 6) + ' ' + (b.r + 2) + ',' + (b.cy - 6);
+              d =
+                'M' +
+                a.r +
+                ',' +
+                (a.cy + 6) +
+                ' C' +
+                (a.r + 30) +
+                ',' +
+                (a.cy + 6) +
+                ' ' +
+                (b.r + 30) +
+                ',' +
+                (b.cy - 6) +
+                ' ' +
+                (b.r + 2) +
+                ',' +
+                (b.cy - 6);
             } else {
-              d = 'M' + a.l + ',' + (a.cy - 6) + ' C' + (a.l - 30) + ',' + (a.cy - 6) + ' ' + (b.l - 30) + ',' + (b.cy + 6) + ' ' + (b.l - 2) + ',' + (b.cy + 6);
+              d =
+                'M' +
+                a.l +
+                ',' +
+                (a.cy - 6) +
+                ' C' +
+                (a.l - 30) +
+                ',' +
+                (a.cy - 6) +
+                ' ' +
+                (b.l - 30) +
+                ',' +
+                (b.cy + 6) +
+                ' ' +
+                (b.l - 2) +
+                ',' +
+                (b.cy + 6);
             }
             var on = e[0] === cur.id || e[1] === cur.id;
             var path = svgEl('path', { d: d, class: 'scr-edge' + (on ? ' on' : '') });
@@ -2110,7 +2357,13 @@
             svg.appendChild(p[0]);
             var len = p[0].getTotalLength();
             var pt = p[0].getPointAtLength(len / 2);
-            map.appendChild(el('span', { class: 'tag on', style: 'left:' + pt.x + 'px; top:' + pt.y + 'px', text: p[1] }));
+            map.appendChild(
+              el('span', {
+                class: 'tag on',
+                style: 'left:' + pt.x + 'px; top:' + pt.y + 'px',
+                text: p[1],
+              }),
+            );
           });
         }
 
@@ -2124,8 +2377,15 @@
             return it.id === state.outage;
           })[0];
 
-          var deps = el('div', { class: 'deps has-pick', id: 'deps', role: 'group', 'aria-label': '外部サービスと機能の依存図' });
-          var left = el('div', { class: 'col' }, [el('div', { class: 'col-h', text: '外部サービス（押すと止まる）' })]);
+          var deps = el('div', {
+            class: 'deps has-pick',
+            id: 'deps',
+            role: 'group',
+            'aria-label': '外部サービスと機能の依存図',
+          });
+          var left = el('div', { class: 'col' }, [
+            el('div', { class: 'col-h', text: '外部サービス（押すと止まる）' }),
+          ]);
           o.items.forEach(function (it) {
             var b = el(
               'button',
@@ -2144,7 +2404,9 @@
             });
             left.appendChild(b);
           });
-          var right = el('div', { class: 'col feat' }, [el('div', { class: 'col-h', text: '機能' })]);
+          var right = el('div', { class: 'col feat' }, [
+            el('div', { class: 'col-h', text: '機能' }),
+          ]);
           o.features.forEach(function (f) {
             var impact = current.impacts[f.id];
             right.appendChild(
@@ -2160,12 +2422,17 @@
 
           var legend = el('div', { class: 'legend' }, [
             el('span', { class: 's-bad' }, [el('i', {}), '止まる']),
-            el('span', { class: 's-warn' }, [el('i', { class: 'dash' }), '弱まる（一部・遅れて追いつく）']),
+            el('span', { class: 's-warn' }, [
+              el('i', { class: 'dash' }),
+              '弱まる（一部・遅れて追いつく）',
+            ]),
           ]);
 
           var panel = el('section', { class: 'panel', 'aria-live': 'polite' });
           panel.appendChild(
-            el('div', {}, [el('span', { class: 'svc-chip', style: svcVar(current.svc), text: current.role })]),
+            el('div', {}, [
+              el('span', { class: 'svc-chip', style: svcVar(current.svc), text: current.role }),
+            ]),
           );
           panel.appendChild(el('h2', { text: current.name + ' が止まったら' }));
           var impactTiles = el(
@@ -2177,15 +2444,26 @@
               ['コードの挙動', current.behavior, 'neutral'],
               ['関係する env', current.env.length ? current.env.join(', ') : '（なし）', 'neutral'],
             ].map(function (t) {
-              return el('div', { class: 'tile s-' + t[2] }, [el('span', { class: 'h', text: t[0] }), el('p', { text: t[1] })]);
+              return el('div', { class: 'tile s-' + t[2] }, [
+                el('span', { class: 'h', text: t[0] }),
+                el('p', { text: t[1] }),
+              ]);
             }),
           );
           panel.appendChild(impactTiles);
-          panel.appendChild(el('div', { class: 'look' }, [el('strong', { text: '→ 最初に見る場所' }), current.look]));
+          panel.appendChild(
+            el('div', { class: 'look' }, [
+              el('strong', { text: '→ 最初に見る場所' }),
+              current.look,
+            ]),
+          );
           panel.appendChild(el('h3', { text: 'コードと文書' }));
           panel.appendChild(refList(current.refs));
           panel.appendChild(
-            el('p', { class: 'why', text: 'env は名前だけを載せる。値は 1Password が正本（docs/operations/secrets.md）。' }),
+            el('p', {
+              class: 'why',
+              text: 'env は名前だけを載せる。値は 1Password が正本（docs/operations/secrets.md）。',
+            }),
           );
 
           viewEl.appendChild(el('div', { class: 'stage' }, [el('div', {}, [deps, legend]), panel]));
@@ -2216,7 +2494,23 @@
               var x2 = b.left - base.left;
               var y2 = b.top - base.top + b.height / 2;
               var mx = (x1 + x2) / 2;
-              var d = 'M' + x1 + ',' + y1 + ' C' + mx + ',' + y1 + ' ' + mx + ',' + y2 + ' ' + x2 + ',' + y2;
+              var d =
+                'M' +
+                x1 +
+                ',' +
+                y1 +
+                ' C' +
+                mx +
+                ',' +
+                y1 +
+                ' ' +
+                mx +
+                ',' +
+                y2 +
+                ' ' +
+                x2 +
+                ',' +
+                y2;
               var mine = it.id === current.id;
               var path = svgEl('path', { d: d, class: 'edge ' + (mine ? it.impacts[fid] : 'off') });
               if (mine) picked.push(path);

@@ -42,6 +42,8 @@ flowchart TD
 
 同じ操作を別の入口から行う経路: [mcp](mcp.md)
 
+壊して確かめる: [break-network](../labs/break-network.md)
+
 #### この経路を守るテスト
 
 - [`apps/product/src/lib/test/e2e/critical-path.spec.ts`](../../../apps/product/src/lib/test/e2e/critical-path.spec.ts) で `test('ドラッグ選択とアクティビティ選択で明日の Plan を作成し、リロード後も残る'` を探す（E2E。保存して再読み込みしても残ることまで見る）
@@ -1216,6 +1218,7 @@ service role の client で create_plan_command_v1 を呼び、user_id を引数
     }
   ],
   "lanes": ["browser", "vercel", "supabase"],
+  "lab": "break-network",
   "twin": "mcp",
   "tests": [
     {

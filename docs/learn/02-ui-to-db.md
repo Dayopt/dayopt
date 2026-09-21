@@ -43,6 +43,12 @@ flowchart TD
 - [削除と取り消し](journeys/delete-undo.md) — 取り消しに使う version の罠
 - [レポートを開く](journeys/report.md) — 読み取りの経路。集計は SQL ではなく TypeScript
 
+## 手を動かして確かめる
+
+- [Lab: 1 つの依頼を端から端まで追う](labs/trace-request.md)
+- [Lab: 通信を壊す](labs/break-network.md) — 届く前に切れた時と、返事だけ失われた時で、結果が逆になる
+- [Lab: UI を迂回して規則を破る](labs/break-rules.md)
+
 ## 正本
 
 - [docs/engineering/architecture.md](../engineering/architecture.md) の「楽観的更新のフロー」

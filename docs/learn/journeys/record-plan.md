@@ -36,6 +36,8 @@ flowchart TD
 
 通るサービス: ブラウザ / Vercel（Next.js） / Supabase。段 8・失敗 7 種。
 
+壊して確かめる: [break-rules](../labs/break-rules.md)
+
 #### この経路を守るテスト
 
 - [`apps/product/src/lib/test/e2e/critical-path.spec.ts`](../../../apps/product/src/lib/test/e2e/critical-path.spec.ts) で `test('過去帯をドラッグして Record を記録し、リロード後も残る'` を探す（E2E。入口 (3) の過去の時間帯から作る経路。「そのまま記録」を通しで守る E2E は見つからなかった）
@@ -815,6 +817,7 @@ Plan を FOR UPDATE で押さえ、削除済みなら DT001、版が違えば DT
     }
   ],
   "lanes": ["browser", "vercel", "supabase"],
+  "lab": "break-rules",
   "tests": [
     {
       "path": "apps/product/src/lib/test/e2e/critical-path.spec.ts",
