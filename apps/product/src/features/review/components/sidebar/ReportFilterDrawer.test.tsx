@@ -42,6 +42,9 @@ describe('ReportFilterDrawer', () => {
 
     const dialog = await screen.findByRole('dialog');
     expect(dialog).toHaveTextContent('title');
+    expect(screen.getByText('実装').closest('[data-report-filter-row="activity"]')).toHaveClass(
+      'h-11',
+    );
     // アクティビティ単位の出し入れがモバイルにもある（チップ列の時は無かった）
     await user.click(screen.getByRole('button', { name: 'hide 実装' }));
     expect(useReportViewStore.getState().hiddenActivityIds).toEqual(['act-dev']);

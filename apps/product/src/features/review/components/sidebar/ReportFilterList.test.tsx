@@ -22,6 +22,7 @@ const TREE = {
 const treeState = vi.hoisted(() => ({
   current: { data: undefined as unknown, isPending: false },
 }));
+const mediaState = vi.hoisted(() => ({ isTouch: false }));
 
 /** `t(key, values)` は `key 値...` を返す。どの行の操作かを名前で引けるようにする。 */
 vi.mock('next-intl', () => ({
@@ -35,7 +36,7 @@ vi.mock('@/features/activities', () => ({
 }));
 
 vi.mock('@/lib/hooks/useMediaQuery', () => ({
-  useMediaQuery: () => false,
+  useMediaQuery: () => mediaState.isTouch,
 }));
 
 import { useReportViewStore } from '../../stores/useReportViewStore';
@@ -66,6 +67,7 @@ describe('ReportFilterList', () => {
     localStorage.clear();
     resetStore();
     treeState.current = { data: TREE, isPending: false };
+    mediaState.isTouch = false;
   });
 
   /** 骨格はカレンダーのサイドバーと同じ「カテゴリ」「未分類」の 2 見出し。 */
@@ -89,6 +91,19 @@ describe('ReportFilterList', () => {
 
     expect(screen.queryAllByRole('checkbox')).toHaveLength(0);
     expect(screen.queryByText(/segment|セグメント/i)).toBeNull();
+  });
+
+  it('タッチ面では行の 44px 高さと表示トグルを常時確保する', () => {
+    mediaState.isTouch = true;
+    render(<ReportFilterList />);
+
+    expect(screen.getByText('仕事').closest('[data-report-filter-row="category"]')).toHaveClass(
+      'h-11',
+    );
+    expect(screen.getByText('実装').closest('[data-report-filter-row="activity"]')).toHaveClass(
+      'h-11',
+    );
+    expect(screen.getByRole('button', { name: 'hide 実装' })).toBeInTheDocument();
   });
 
   describe('アクティビティの 👁', () => {

@@ -21,6 +21,15 @@ describe('isTodayInTimezone', () => {
     expect(isTodayInTimezone(new Date('2026-04-28T00:00:00Z'), 'Asia/Tokyo', now)).toBe(false);
   });
 
+  it('UTC 日付が前日の NY では前日側を今日と判定する', () => {
+    const now = new Date('2026-01-15T03:00:00Z');
+    const candidate14 = new Date('2026-01-14T18:00:00Z');
+    const candidate15 = new Date('2026-01-15T15:00:00Z');
+
+    expect(isTodayInTimezone(candidate14, 'America/New_York', now)).toBe(true);
+    expect(isTodayInTimezone(candidate15, 'America/New_York', now)).toBe(false);
+  });
+
   it('DST spring-forward 当日でも今日判定が壊れない (NY 2026-03-08)', () => {
     // 2026-03-08 はアメリカ DST 開始日。UTC 12:00 = EDT 08:00
     const now = new Date('2026-03-08T12:00:00Z');

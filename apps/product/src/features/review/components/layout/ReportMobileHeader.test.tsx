@@ -87,6 +87,7 @@ describe('ReportMobileHeader', () => {
     render(<ReportMobileHeader {...BASE_PROPS} onDateSelect={() => {}} />);
 
     const toggle = screen.getByRole('button', { name: 'report.mobile.openMiniCalendar' });
+    expect(toggle).toHaveClass('min-h-11');
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
     await user.click(toggle);
 
