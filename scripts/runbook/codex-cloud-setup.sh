@@ -19,17 +19,30 @@ if [[ -z "$EXPECTED_NODE_MAJOR" || "$ACTUAL_NODE_MAJOR" != "$EXPECTED_NODE_MAJOR
 fi
 
 EXPECTED_PNPM_VERSION="$(node -p "require('./package.json').packageManager.replace(/^pnpm@/, '')")"
+PNPM_RUNNER=()
 
-get_pnpm_version() {
+resolve_pnpm_runner() {
+  PNPM_RUNNER=()
   if command -v pnpm >/dev/null 2>&1; then
-    pnpm --version 2>/dev/null || true
-  elif command -v corepack >/dev/null 2>&1; then
-    corepack pnpm --version 2>/dev/null || true
+    local direct_version
+    direct_version="$(pnpm --version 2>/dev/null || true)"
+    if [[ "$direct_version" == "$EXPECTED_PNPM_VERSION" ]]; then
+      PNPM_RUNNER=(pnpm)
+      return 0
+    fi
   fi
+  if command -v corepack >/dev/null 2>&1; then
+    local corepack_version
+    corepack_version="$(corepack pnpm --version 2>/dev/null || true)"
+    if [[ "$corepack_version" == "$EXPECTED_PNPM_VERSION" ]]; then
+      PNPM_RUNNER=(corepack pnpm)
+      return 0
+    fi
+  fi
+  return 1
 }
 
-ACTUAL_PNPM_VERSION="$(get_pnpm_version)"
-if [[ "$ACTUAL_PNPM_VERSION" != "$EXPECTED_PNPM_VERSION" ]]; then
+if ! resolve_pnpm_runner; then
   if command -v npm >/dev/null 2>&1; then
     # Node 24 の Corepack shim は未取得の pnpm をレジストリから取得する。
     # Cloud の Corepack 経路が失敗しても、npm の global install で固定版を導入する。
@@ -40,19 +53,10 @@ if [[ "$ACTUAL_PNPM_VERSION" != "$EXPECTED_PNPM_VERSION" ]]; then
     echo "pnpm@${EXPECTED_PNPM_VERSION} is required, but Corepack and npm are unavailable." >&2
     exit 1
   fi
-  ACTUAL_PNPM_VERSION="$(get_pnpm_version)"
+  if ! resolve_pnpm_runner; then
+    echo "Expected pnpm@${EXPECTED_PNPM_VERSION}; no matching pnpm or Corepack entrypoint is available." >&2
+    exit 1
+  fi
 fi
 
-if [[ "$ACTUAL_PNPM_VERSION" != "$EXPECTED_PNPM_VERSION" ]]; then
-  echo "Expected pnpm@${EXPECTED_PNPM_VERSION}; found ${ACTUAL_PNPM_VERSION:-unavailable}." >&2
-  exit 1
-fi
-
-if command -v pnpm >/dev/null 2>&1; then
-  pnpm install --frozen-lockfile
-elif command -v corepack >/dev/null 2>&1; then
-  corepack pnpm install --frozen-lockfile
-else
-  echo "pnpm@${EXPECTED_PNPM_VERSION} is unavailable after setup." >&2
-  exit 1
-fi
+"${PNPM_RUNNER[@]}" install --frozen-lockfile

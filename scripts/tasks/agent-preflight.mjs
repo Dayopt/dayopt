@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { accessSync, constants, existsSync, readFileSync } from 'node:fs';
+import { delimiter, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 // SessionStart の外側 timeout は 10 秒（.codex/hooks.json）。外部 command は
@@ -106,12 +106,16 @@ function nodeMajor(version) {
 }
 
 function commandPresent(name) {
-  try {
-    execFileSync('which', [name], { stdio: 'ignore' });
-    return true;
-  } catch {
-    return false;
-  }
+  const pathValue = process.env.PATH ?? '';
+  return pathValue.split(delimiter).some((directory) => {
+    const candidate = join(directory || '.', name);
+    try {
+      accessSync(candidate, constants.X_OK);
+      return true;
+    } catch {
+      return false;
+    }
+  });
 }
 
 export function collectPreflight(cwd = process.cwd()) {

@@ -50,8 +50,14 @@ describe('agent preflight', () => {
       '#!/bin/sh\n[ "$1" = "pnpm" ] && [ "$2" = "--version" ] || exit 1\nprintf \'11.26.0\\n\'\n',
     );
     chmodSync(corepack, 0o755);
+    const git = join(bin, 'git');
+    writeFileSync(
+      git,
+      '#!/bin/sh\ncase "$1 $2" in\n  "rev-parse --show-toplevel") pwd ;;\n  "status --short") exit 0 ;;\n  *) exit 1 ;;\nesac\n',
+    );
+    chmodSync(git, 0o755);
     const previousPath = process.env.PATH;
-    process.env.PATH = `${bin}:/usr/bin:/bin`;
+    process.env.PATH = bin;
     try {
       const state = collectPreflight(root);
       expect(state.pnpm).toBe('11.26.0');
