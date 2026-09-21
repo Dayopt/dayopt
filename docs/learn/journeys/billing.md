@@ -171,7 +171,7 @@ Stripe がホストする Checkout ページ。カード情報は Dayopt を通�
   - [`apps/product/src/lib/test/e2e/billing.spec.ts`](../../../apps/product/src/lib/test/e2e/billing.spec.ts) で `Checkout 成功復帰（?success=true）で成功 toast が表示される` を探す
 
 <details>
-<summary>⚡ 30 秒待っても webhook が反映されない — 画面: エラー表示 / データ: 食い違いが残る / 再試行: 相手が再送 / 痕跡: ログだけ</summary>
+<summary>⚡ 30 秒待っても webhook が反映されない — 画面: エラー表示 / データ: 食い違いが残る / 再試行: 相手が再送 / 痕跡: Sentry</summary>
 
 - 画面: 「契約状態をまだ確認できません。しばらくしてから課金情報を再読み込みしてください。変わらない場合はサポートへご連絡ください。」の toast。
 - データ: Stripe では支払い済み、DB の profiles はまだ free。webhook が後で届けば直る。
@@ -772,7 +772,7 @@ Vercel cron が毎日 /api/cron/billing-reconciliation を叩く。Stripe の直
             "screen": "toast",
             "data": "mixed",
             "retry": "provider",
-            "trace": "log"
+            "trace": "sentry"
           },
           "screenAfter": {
             "t": "settings",

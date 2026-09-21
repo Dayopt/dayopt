@@ -2515,7 +2515,14 @@
               el('span', { text: S.edges.length + ' 本の移り方' }),
             ]),
           );
-          if (!state.screen) state.screen = 'calendar';
+          if (!state.screen) {
+            // calendar が既定。改名・削除された時は先頭の画面へ落とす（schema が 1 件以上を保証）
+            state.screen = S.nodes.some(function (n) {
+              return n.id === 'calendar';
+            })
+              ? 'calendar'
+              : S.nodes[0].id;
+          }
           var cur = S.nodes.filter(function (n) {
             return n.id === state.screen;
           })[0];

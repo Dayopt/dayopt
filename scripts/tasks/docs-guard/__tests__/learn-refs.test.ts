@@ -18,7 +18,23 @@ const services = {
   services: { browser: { label: 'ブラウザ', var: '--svc-browser', sub: '' } },
   outages: { title: '停止', intro: 'i', features: [], items: [] },
 };
-const screens = { title: '画面', intro: 'i', columns: ['a'], nodes: [], edges: [] };
+const screenNode = {
+  id: 'home',
+  label: 'ホーム',
+  url: '/',
+  col: 1,
+  row: 1,
+  group: 'app',
+  what: 'w',
+  arrive: 'a',
+  loads: 'l',
+  svcs: [],
+  fails: 'f',
+  screen: { t: 'blank' },
+  refs: [],
+  flows: [],
+};
+const screens = { title: '画面', intro: 'i', columns: ['a'], nodes: [screenNode], edges: [] };
 const journey = (find: string) => ({
   id: 'demo',
   title: 'デモ',

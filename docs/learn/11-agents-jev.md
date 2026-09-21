@@ -32,7 +32,7 @@ flowchart LR
 - `scripts/hooks/pre-tool-guard.sh` — AI のツール実行の前に危険なコマンドを止める
 - `.husky/pre-push` — push の前の確認（DO-CONFIRM）
 - main の repository ruleset — required checks と review thread の解決が揃わないと merge できない。bypass できる人はいない
-- `scripts/ci/protected-path-gate.mjs` — 外部契約・不可逆の path に触った変更を、レビューで重点的に読む範囲として示す。ruleset の merge は止めない。ただし監査の契約（`auditContract`）に触れた PR では、`pnpm branch:finish` が Production Config Audit の結果を待つ
+- `scripts/ci/protected-path-gate.mjs` — 外部契約・不可逆の path に触った変更を、レビューで重点的に読む範囲として示す。ruleset の merge は止めない。監査の契約（`auditContract`）に触れた PR でも、Production Config Audit の「この head に監査結果が無い」は `pnpm branch:finish` が参考扱いにして失敗数から外す。止めるのは Vercel の env が契約と実際に食い違った時（drift）と、結果を判定できない時だけ
 - `pnpm docs:check` — この教材の参照切れもここで止まる
 
 **Jev** は Vercel AI Gateway 経由の小さな評価モデル。**最終意思決定者ではない**。権限・必須レビュー・test の結果・path の policy は決定的なコードが持ち、Jev は非構造の文章から意味の特徴を足すだけ。予算と停止条件（残高が下限を下回ると送らない、`JEV_DISABLED=1` で止まる）が先に決めてある。
@@ -75,6 +75,10 @@ flowchart LR
 
 ```json learn:refs
 [
+  {
+    "path": "scripts/tasks/finish-branch.sh",
+    "find": "# ── audit contract guard も advisory として扱う"
+  },
   {
     "path": "docs/operations/jev.md",
     "find": "**Jev は最終意思決定者ではない。**"

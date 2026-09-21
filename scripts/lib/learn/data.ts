@@ -274,7 +274,7 @@ export const screensSchema = z.strictObject({
   title: z.string().min(1),
   intro: z.string().min(1),
   columns: z.array(z.string().min(1)),
-  nodes: z.array(screenNodeSchema),
+  nodes: z.array(screenNodeSchema).min(1),
   edges: z.array(z.tuple([z.string().min(1), z.string().min(1), z.string().min(1)])),
 });
 
