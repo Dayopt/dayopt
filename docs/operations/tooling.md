@@ -506,7 +506,7 @@ Codex でこの project を初めて開く時は、project trust を確認し、
 Node.js と package manager は実行場所ごとに暗黙で選ばせず、repository contract に揃える。
 
 - `.nvmrc` と `package.json#packageManager` が runtime の正本。`pnpm agent:preflight` は Node.js の major、pnpm の version、依存、hook を表示し、不一致なら exit 1 にする
-- Codex Cloud の Dayopt 環境は自動 package-manager detection を使わず、`nvm` で `.nvmrc` の Node.js を選び、`packageManager` の pnpm を `pnpm install --frozen-lockfile` で一度だけ install する。キャッシュ再開時も同じ処理を maintenance script で実行する
+- Codex Cloud の Dayopt 環境は自動 package-manager detection を使わず、setup / maintenance script で `nvm` から `.nvmrc` の Node.js を選び、標準の [`scripts/runbook/codex-cloud-setup.sh`](../../scripts/runbook/codex-cloud-setup.sh) で `packageManager` の pnpm を検証して `pnpm install --frozen-lockfile` を一度だけ実行する
 - Cloud の setup / maintenance はネットワークが有効な setup phase で実行し、agent phase のインターネットアクセスは無効のままにする。自動検出が各 workspace へ npm を実行して `catalog:` / `workspace:` を壊す経路を作らない
 - Cloud で Docker・local Supabase・実ブラウザ・vault が必要な検証は完了扱いにせず、対応する local または CI の証跡を別に残す
 
