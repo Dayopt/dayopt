@@ -82,6 +82,7 @@ code: apps/product/src/features/timeblock # 任意。repo 内の実在 path
 | UI / code用語                  | `product/glossary.md`                                                                |
 | 訴求・コピー                   | `business/messaging.md`（UI 文言は `product/copywriting.md`）                        |
 | 全体 architecture / state flow | `engineering/architecture.md`                                                        |
+| 操作の経路と失敗時の挙動を辿る | `engineering/walkthrough.html`（ブラウザで開く）                                     |
 | coding / API / frontend 規約   | `engineering/conventions*.md` と `AGENTS.md`                                         |
 | 不可解な失敗の切り分け手順     | `engineering/diagnostics.md`                                                         |
 | テスト方針・CI 予算            | `engineering/testing.md`, `operations/self-hosted-runner.md`                         |

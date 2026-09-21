@@ -1,0 +1,1536 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Dayopt 経路ウォークスルー</title>
+    <!--
+      Dayopt の仕組みを触って学ぶ教材。操作 → 通る処理 → 失敗点 → 画面・データ・再試行への影響を辿る。
+      内容は下の JSON（id="walkthrough-data"）が正本。
+      refs の {path, find} は `pnpm docs:check`（walkthrough-refs）が「ファイルが在り、find の文字列を含む」ことを検査する。
+      行番号は持たない（ずれるため）。コードを動かしたら find を追従させる。
+      外部 script / CSS / font は使わない（file:// で開ける状態を保つ）。
+    -->
+    <style>
+      :root {
+        --bg: #fbfaf8;
+        --surface: #ffffff;
+        --surface-2: #f3f1ed;
+        --text: #1d1c1a;
+        --muted: #6b675f;
+        --border: #e2ded6;
+        --accent: #2f5bd3;
+        --danger: #c0392b;
+        --danger-bg: #fdf0ee;
+        --ok: #1e7b4f;
+        --svc-browser: #2f5bd3;
+        --svc-vercel: #1d1c1a;
+        --svc-supabase: #1e8a5a;
+        --svc-resend: #8a4bd6;
+        --svc-github: #b8641b;
+        --svc-external: #6b675f;
+        color-scheme: light;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root:not([data-theme='light']) {
+          --bg: #161614;
+          --surface: #1f1e1c;
+          --surface-2: #2a2926;
+          --text: #ecebe7;
+          --muted: #a29e95;
+          --border: #3a3834;
+          --accent: #7d9df0;
+          --danger: #f08274;
+          --danger-bg: #3a2320;
+          --ok: #6fcf9c;
+          --svc-browser: #7d9df0;
+          --svc-vercel: #ecebe7;
+          --svc-supabase: #5ccf97;
+          --svc-resend: #b98cf0;
+          --svc-github: #e0a263;
+          --svc-external: #a29e95;
+          color-scheme: dark;
+        }
+      }
+      :root[data-theme='dark'] {
+        --bg: #161614;
+        --surface: #1f1e1c;
+        --surface-2: #2a2926;
+        --text: #ecebe7;
+        --muted: #a29e95;
+        --border: #3a3834;
+        --accent: #7d9df0;
+        --danger: #f08274;
+        --danger-bg: #3a2320;
+        --ok: #6fcf9c;
+        --svc-browser: #7d9df0;
+        --svc-vercel: #ecebe7;
+        --svc-supabase: #5ccf97;
+        --svc-resend: #b98cf0;
+        --svc-github: #e0a263;
+        --svc-external: #a29e95;
+        color-scheme: dark;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font:
+          15px/1.7 -apple-system,
+          BlinkMacSystemFont,
+          'Hiragino Sans',
+          'Noto Sans JP',
+          sans-serif;
+      }
+      code {
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 0.88em;
+        background: var(--surface-2);
+        padding: 0.05em 0.35em;
+        border-radius: 4px;
+        overflow-wrap: anywhere;
+      }
+      a {
+        color: var(--accent);
+      }
+      button {
+        font: inherit;
+        color: inherit;
+      }
+      button:focus-visible,
+      a:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+      }
+      .wrap {
+        max-width: 1180px;
+        margin: 0 auto;
+        padding: 24px 16px 64px;
+      }
+      header h1 {
+        font-size: 1.5rem;
+        margin: 0 0 4px;
+        letter-spacing: 0.01em;
+      }
+      header p {
+        margin: 0;
+        color: var(--muted);
+        max-width: 72ch;
+      }
+      .tabs {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin: 20px 0 16px;
+      }
+      .tab {
+        min-height: 44px;
+        padding: 8px 16px;
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        background: var(--surface);
+        cursor: pointer;
+      }
+      .tab[aria-selected='true'] {
+        background: var(--text);
+        color: var(--bg);
+        border-color: var(--text);
+      }
+      .intro {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 12px 16px;
+        margin-bottom: 16px;
+      }
+      .intro p {
+        margin: 0;
+        flex: 1 1 360px;
+        color: var(--muted);
+      }
+      .play {
+        min-height: 44px;
+        padding: 8px 18px;
+        border: 0;
+        border-radius: 8px;
+        background: var(--accent);
+        color: #fff;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: minmax(0, 380px) minmax(0, 1fr);
+        gap: 20px;
+        align-items: start;
+      }
+      @media (max-width: 820px) {
+        .grid {
+          grid-template-columns: minmax(0, 1fr);
+        }
+      }
+      .lane {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .hop {
+        width: 100%;
+        min-height: 44px;
+        display: grid;
+        grid-template-columns: 28px 1fr;
+        gap: 10px;
+        align-items: start;
+        text-align: left;
+        padding: 10px 12px;
+        border: 1px solid var(--border);
+        border-left: 5px solid var(--svc);
+        border-radius: 8px;
+        background: var(--surface);
+        cursor: pointer;
+        transition:
+          opacity 0.2s,
+          background 0.2s;
+      }
+      .hop .n {
+        font-variant-numeric: tabular-nums;
+        color: var(--muted);
+        font-size: 0.85em;
+        padding-top: 2px;
+      }
+      .hop .t {
+        display: block;
+        font-weight: 600;
+        line-height: 1.45;
+      }
+      .hop .s {
+        display: block;
+        font-size: 0.8em;
+        color: var(--muted);
+      }
+      .hop[aria-current='step'] {
+        background: var(--surface-2);
+        box-shadow: inset 0 0 0 1px var(--svc);
+      }
+      .hop.pulse {
+        background: var(--surface-2);
+      }
+      .hop.failed {
+        border-color: var(--danger);
+        background: var(--danger-bg);
+      }
+      .hop.skipped {
+        opacity: 0.35;
+      }
+      .hop .fx {
+        display: inline-block;
+        margin-left: 6px;
+        font-size: 0.75em;
+        color: var(--danger);
+      }
+      .panel {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 20px;
+        min-width: 0;
+      }
+      @media (min-width: 821px) {
+        .panel {
+          position: sticky;
+          top: 16px;
+          max-height: calc(100vh - 32px);
+          overflow: auto;
+        }
+      }
+      .panel h2 {
+        margin: 0 0 4px;
+        font-size: 1.2rem;
+      }
+      .panel h3 {
+        margin: 20px 0 8px;
+        font-size: 0.95rem;
+      }
+      .svc-chip {
+        display: inline-block;
+        font-size: 0.78em;
+        padding: 1px 8px;
+        border-radius: 999px;
+        border: 1px solid var(--svc);
+        color: var(--svc);
+        margin-right: 4px;
+      }
+      .change {
+        margin-top: 12px;
+        padding: 10px 12px;
+        border-radius: 8px;
+        background: var(--surface-2);
+      }
+      .change strong {
+        display: block;
+        font-size: 0.85em;
+        color: var(--muted);
+      }
+      .fails {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      .fail-btn {
+        min-height: 44px;
+        padding: 8px 12px;
+        border: 1px solid var(--danger);
+        border-radius: 8px;
+        background: transparent;
+        color: var(--danger);
+        cursor: pointer;
+        text-align: left;
+      }
+      .fail-btn[aria-pressed='true'] {
+        background: var(--danger);
+        color: var(--surface);
+      }
+      .outcome {
+        margin: 12px 0 0;
+        border: 1px solid var(--danger);
+        border-radius: 10px;
+        overflow: hidden;
+      }
+      .outcome div {
+        display: grid;
+        grid-template-columns: 7.5em 1fr;
+        gap: 12px;
+        padding: 10px 12px;
+        border-top: 1px solid var(--border);
+      }
+      .outcome div:first-child {
+        border-top: 0;
+      }
+      .outcome dt {
+        font-weight: 600;
+        color: var(--muted);
+        font-size: 0.88em;
+      }
+      .outcome dd {
+        margin: 0;
+        min-width: 0;
+      }
+      @media (max-width: 480px) {
+        .outcome div {
+          grid-template-columns: 1fr;
+          gap: 2px;
+        }
+      }
+      .refs {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .refs li {
+        overflow-wrap: anywhere;
+      }
+      .refs .why {
+        color: var(--muted);
+        font-size: 0.88em;
+      }
+      .unknown {
+        margin-top: 12px;
+        font-size: 0.88em;
+        color: var(--muted);
+        border-left: 3px solid var(--border);
+        padding-left: 10px;
+      }
+      .cards {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+        gap: 8px;
+      }
+      .card {
+        min-height: 64px;
+        text-align: left;
+        padding: 10px 12px;
+        border: 1px solid var(--border);
+        border-top: 4px solid var(--svc);
+        border-radius: 8px;
+        background: var(--surface);
+        cursor: pointer;
+      }
+      .card[aria-pressed='true'] {
+        background: var(--surface-2);
+        box-shadow: inset 0 0 0 1px var(--svc);
+      }
+      .card .t {
+        display: block;
+        font-weight: 600;
+      }
+      .card .s {
+        display: block;
+        font-size: 0.8em;
+        color: var(--muted);
+      }
+      .legend {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px 14px;
+        margin: 0 0 12px;
+        font-size: 0.82em;
+        color: var(--muted);
+      }
+      .legend span::before {
+        content: '';
+        display: inline-block;
+        width: 10px;
+        height: 10px;
+        border-radius: 2px;
+        margin-right: 5px;
+        background: var(--svc);
+        vertical-align: -1px;
+      }
+      footer {
+        margin-top: 40px;
+        color: var(--muted);
+        font-size: 0.85em;
+      }
+      .sr-only {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip: rect(0 0 0 0);
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .hop {
+          transition: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <header>
+        <h1>Dayopt 経路ウォークスルー</h1>
+        <p>
+          操作を 1 つ選び、どの処理とサービスを通るかを辿る。各段で「ここで失敗させる」を押すと、画面・データ・再試行・痕跡がどうなり、どこから確認するかが出る。目的は暗記ではなく、変更の影響先と障害時の初手を自分で引けるようにすること。
+        </p>
+      </header>
+
+      <div class="tabs" role="tablist" aria-label="操作例" id="tabs"></div>
+      <div id="view"></div>
+
+      <footer>
+        <p>
+          正本はコードと既存の運用文書。ここは入口にすぎない。リンクは GitHub の <code>main</code> を指す。記述がコードとずれていたら、この HTML の
+          <code>walkthrough-data</code> を直す（<code>pnpm docs:check</code> が参照先の存在だけは検査する）。
+        </p>
+      </footer>
+    </div>
+
+    <script type="application/json" id="walkthrough-data">
+      {
+        "repo": "https://github.com/Dayopt/dayopt/blob/main/",
+        "services": {
+          "browser": { "label": "ブラウザ", "var": "--svc-browser" },
+          "vercel": { "label": "Vercel（Next.js）", "var": "--svc-vercel" },
+          "supabase": { "label": "Supabase", "var": "--svc-supabase" },
+          "resend": { "label": "Resend", "var": "--svc-resend" },
+          "github": { "label": "GitHub Actions", "var": "--svc-github" },
+          "external": { "label": "その他の外部", "var": "--svc-external" }
+        },
+        "scenarios": [
+          {
+            "id": "save-plan",
+            "title": "Plan を保存",
+            "intro": "カレンダーで時間帯をドラッグし、作成パネルでアクティビティを選ぶ。選んだ瞬間に保存が走る。",
+            "play": "▶ 保存を押す",
+            "hops": [
+              {
+                "id": "destination",
+                "svc": "browser",
+                "title": "Plan か Record かを決める",
+                "what": "終了時刻が今より未来なら Plan、過去なら Record が既定になる。過去の時間帯でだけ Plan へ切り替えられる。通信のない純粋な関数。",
+                "change": "時刻の規則を強制しているのは DB trigger で、ここはその写し。ここだけ変えても保存できるかどうかは変わらない。規則を撤去・変更する時は invariants.md §時刻 の写し表を全部たどる。",
+                "refs": [
+                  { "path": "apps/product/src/features/timeblock/domain/timeblock-destination.ts", "find": "resolveTimeblockDestination" },
+                  { "path": "apps/product/src/features/timeblock/domain/timeblock-destination.ts", "find": "resolveTimeblockKindChoice" },
+                  { "path": "docs/engineering/invariants.md", "find": "### 規則の写しと、その分類", "why": "写しの一覧（契約変換 / UX 先回り）" }
+                ],
+                "fails": []
+              },
+              {
+                "id": "inline-create",
+                "svc": "browser",
+                "title": "アクティビティを選ぶと作成を依頼する",
+                "what": "作成パネルでアクティビティを選んだ瞬間に mutation を呼ぶ。送る前に、画面が持っているデータで重なりを先に確かめる（往復を減らすための写し）。成功すると「取り消し」付きのトーストを出し、取り消しは作ったものを削除する。",
+                "change": "作成の入口はここと、サイドバーのアクティビティタップの 2 つ。手数を変える時は両方を見る。",
+                "refs": [
+                  { "path": "apps/product/src/features/calendar/components/create/useInlineCreate.ts", "find": "mutation.mutate(" },
+                  { "path": "apps/product/src/features/calendar/components/create/InlineCreatePanel.tsx", "find": "InlineCreatePanel" }
+                ],
+                "fails": [
+                  {
+                    "id": "client-overlap",
+                    "label": "画面上で重なりが見つかる",
+                    "screen": "重なりのトーストが出て、作成しない。",
+                    "data": "変化なし。サーバーへは何も送っていない。",
+                    "retry": "なし。時間帯を変えて選び直す。",
+                    "trace": "何も残らない（通信前）。",
+                    "look": "仕様どおりの挙動。サーバー側の判定（DB の排他制約）と食い違うなら、写しがずれている。",
+                    "refs": [{ "path": "apps/product/src/features/calendar/components/create/useInlineCreate.ts", "find": "errors.timeOverlap" }]
+                  }
+                ]
+              },
+              {
+                "id": "optimistic",
+                "svc": "browser",
+                "title": "先に画面へ出す（楽観的更新）",
+                "what": "サーバーの返事を待たず、一時 ID（temp-…）の Plan を一覧のキャッシュへ差し込む。その直前に一覧の snapshot を取っておき、失敗したらそこへ戻す。",
+                "change": "キャッシュのキーや一覧の絞り込み条件を変えると、差し込み先と巻き戻し対象がずれる。書き込み mutation を足す時は optimistic-update skill の手順に従う。",
+                "refs": [
+                  { "path": "apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.ts", "find": "const createPlan = api.planCommands.create.useMutation" },
+                  { "path": "apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.ts", "find": "snapshotTimeblockLists" },
+                  { "path": "docs/engineering/architecture.md", "find": "### 楽観的更新のフロー" }
+                ],
+                "fails": [
+                  {
+                    "id": "offline",
+                    "label": "ブラウザがオフライン",
+                    "screen": "一時 ID の Plan が表示されたまま、応答待ちで止まる。",
+                    "data": "サーバーへは何も届いていない。",
+                    "retry": "失敗ではなく一時停止になる（TanStack Query の既定。mutation の networkMode は上書きしていない）。回線が戻ると自動で送り直す。ただし一時停止中の依頼は保存しない設定なので、その間にタブを閉じると消える。",
+                    "trace": "何も残らない。",
+                    "look": "DevTools の Network タブと navigator.onLine。ブラウザがオフラインと判定した時だけこの挙動で、回線が不安定なだけなら下の「通信が途中で切れる」になる。",
+                    "refs": [
+                      { "path": "apps/product/src/app/[locale]/(app)/_providers/_composition/ProvidersComposition.tsx", "find": "shouldDehydrateMutation: () => false" },
+                      { "path": "apps/product/src/lib/trpc/query-client.ts", "find": "networkMode: 'offlineFirst'", "why": "query 側だけの設定。mutation には効かない" }
+                    ]
+                  }
+                ]
+              },
+              {
+                "id": "trpc-client",
+                "svc": "browser",
+                "title": "tRPC で /api/trpc へ送る",
+                "what": "1 本の httpBatchLink で /api/trpc へ POST する（query も POST。入力を URL やログに残さないため）。送り直し用の link は無く、timeblock の mutation は retry: false。",
+                "change": "link を足す・変える影響は全 API に及ぶ。エラーを受ける共通処理（401 で画面ごとログインへ移動、Sentry 送信）は QueryClient 側にある。",
+                "refs": [
+                  { "path": "apps/product/src/lib/trpc/browser-client.ts", "find": "httpBatchLink" },
+                  { "path": "apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.ts", "find": "retry: false" },
+                  { "path": "apps/product/src/lib/trpc/query-client.ts", "find": "function handleAuthError" }
+                ],
+                "fails": [
+                  {
+                    "id": "network-lost",
+                    "label": "通信が途中で切れる",
+                    "screen": "一時 ID の Plan が消え（snapshot へ戻す）、「保存に失敗」のトーストが出る。",
+                    "data": "2 通りある。届く前に切れたなら DB は変わらない。DB で確定した後に返事だけ失われたなら、DB には Plan がある。",
+                    "retry": "自動では送り直さない（retry: false）。代わりに成功・失敗どちらでも一覧を取り直す（onSettled）。後者なら取り直しで Plan が再び現れる。利用者がもう一度作ると二重になりうるのはこのケース。",
+                    "trace": "サーバーの形をしていない通信エラーとして、ブラウザから Sentry へ送る（source: trpc_client_transport）。ブラウザの Sentry は分析の同意がある時だけ動くので、無いこともある。",
+                    "look": "Sentry で source:trpc_client_transport を探し、同じ時刻の Vercel の /api/trpc ログで、サーバーまで届いていたかを見る。",
+                    "refs": [
+                      { "path": "apps/product/src/lib/trpc/client-errors.ts", "find": "trpc_client_transport" },
+                      { "path": "apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.ts", "find": "onSettled: invalidate" },
+                      { "path": "apps/product/instrumentation-client.ts", "find": "hasAnalyticsConsent" }
+                    ]
+                  },
+                  {
+                    "id": "session-expired",
+                    "label": "セッションが切れている（401）",
+                    "screen": "/auth/login へ画面ごと移動する（キャッシュも捨てるため、意図的にハードリロード）。",
+                    "data": "変化なし。",
+                    "retry": "しない。ログイン後に元のパスへ戻る。",
+                    "trace": "想定内の拒否なので Sentry には出ない。",
+                    "look": "頻発するなら Supabase Auth のログと、cookie を更新する middleware。",
+                    "refs": [{ "path": "apps/product/src/lib/trpc/query-client.ts", "find": "function isAuthError" }]
+                  }
+                ]
+              },
+              {
+                "id": "route",
+                "svc": "vercel",
+                "title": "/api/trpc で受ける",
+                "what": "Vercel の Function（Node.js、上限 60 秒）。context を作って認証方式（session / oauth / service role）を判定し、認証前に IP 単位の rate limit を見る。",
+                "change": "ここは全 tRPC 共通の入口。context に項目を足すと全 procedure の実行前コストが増える。",
+                "refs": [
+                  { "path": "apps/product/src/app/api/trpc/[trpc]/route.ts", "find": "createFetchTRPCContext" },
+                  { "path": "apps/product/src/lib/trpc/context.ts", "find": "isPreAuthRateLimited" }
+                ],
+                "fails": [
+                  {
+                    "id": "ip-rate-limit",
+                    "label": "IP 単位の rate limit を超える（429）",
+                    "screen": "「保存に失敗」のトースト。一時 Plan は消える。",
+                    "data": "変化なし。",
+                    "retry": "しない。超過中に送り直すと同じ枠をさらに食い、復旧が遅れるだけなので。",
+                    "trace": "想定内（TOO_MANY_REQUESTS）として Sentry には出さない。",
+                    "look": "Upstash のダッシュボード。E2E が 429 に当たる時は手続きの数を数える。",
+                    "refs": [
+                      { "path": "apps/product/src/lib/trpc/query-client.ts", "find": "function isRateLimitedError" },
+                      { "path": "apps/product/src/lib/trpc/errors.ts", "find": "'TOO_MANY_REQUESTS'" }
+                    ]
+                  },
+                  {
+                    "id": "function-down",
+                    "label": "Function が落ちる・時間切れ",
+                    "screen": "「保存に失敗」のトースト。一時 Plan は消える。",
+                    "data": "どこまで進んだかは分からない（「通信が途中で切れる」と同じ 2 通り）。",
+                    "retry": "自動ではしない。一覧の取り直しで実際の状態に揃う。",
+                    "trace": "Vercel の Function ログ。例外なら server 側 Sentry。",
+                    "look": "Vercel の status、Function ログ、直近の deploy。直近に promote があったなら runbook の Playbook 2。",
+                    "refs": [{ "path": "docs/operations/monitoring.md", "find": "## Incident triage" }]
+                  }
+                ]
+              },
+              {
+                "id": "procedure",
+                "svc": "vercel",
+                "title": "protectedProcedure の関門を通る",
+                "what": "順に、ログインしているか → MFA の要件 → 利用権（課金）→ write fence（運用で書き込みを止めるスイッチ）→ ユーザー単位の rate limit（1 分 300 回）を見る。",
+                "change": "順序に理由がある。write fence を rate limit より先に見るのは、止めている間の依頼で自分の枠を使い切り、復旧直後に締め出されるのを避けるため。",
+                "refs": [
+                  { "path": "apps/product/src/lib/trpc/procedures.ts", "find": "isWriteFenceEnabled" },
+                  { "path": "apps/product/src/lib/trpc/procedures.ts", "find": "async function isUserRateLimited" }
+                ],
+                "fails": [
+                  {
+                    "id": "write-fence",
+                    "label": "write fence が ON",
+                    "screen": "「保存に失敗」のトースト。すべての書き込みが同じになる。",
+                    "data": "変化なし。読み取りは動く。",
+                    "retry": "しない。fence を解くまで同じ結果。",
+                    "trace": "運用が意図した停止なので Sentry には出さない（障害観測中に Sentry を埋めないため）。",
+                    "look": "fence を ON にした経緯。解除手順は runbook。",
+                    "refs": [
+                      { "path": "apps/product/src/lib/trpc/errors.ts", "find": "isWriteFencedError" },
+                      { "path": "docs/operations/runbook.md", "find": "### Write Fence 有効化（API層の書き込み停止）" }
+                    ]
+                  },
+                  {
+                    "id": "upstash-down",
+                    "label": "Upstash（Redis）が落ちている",
+                    "screen": "何も起きない。保存は通る。",
+                    "data": "正常に保存される。",
+                    "retry": "不要。rate limit は Function のメモリ上の判定へ退避する（インスタンスごとなので制限は緩くなる）。",
+                    "trace": "Sentry（feature: rate_limit / operation: trpc_user_rate_limit_check）。加えて本番の /api/health は Redis の失敗を error として 503 を返すので、UptimeRobot が DOWN を通知する。",
+                    "look": "Upstash の status。DOWN 通知が来ても、アプリ本体が動いているかを先に確かめる。可用性を優先して通す設計なので、保存は止まっていない。",
+                    "refs": [{ "path": "apps/product/src/lib/trpc/procedures.ts", "find": "trpc_user_rate_limit_check" }]
+                  }
+                ]
+              },
+              {
+                "id": "router-service",
+                "svc": "vercel",
+                "title": "Router → Service",
+                "what": "Router が zod で入力を検証して Service を呼ぶ。Service は command client で書き込み、成功後に利用記録（plan_created）を product_events へ送る。",
+                "change": "業務ロジックは Service に置き、Router に書かない（trpc-router-creating skill）。利用記録は best-effort で、失敗しても保存は取り消さない。",
+                "refs": [
+                  { "path": "apps/product/src/features/timeblock/server/plan-commands-router.ts", "find": "handleServiceError" },
+                  { "path": "apps/product/src/features/timeblock/server/timeblock-command-service.ts", "find": "plan_created" },
+                  { "path": "docs/operations/product-analytics.md", "find": "product_events" }
+                ],
+                "fails": []
+              },
+              {
+                "id": "command-client",
+                "svc": "supabase",
+                "title": "Supabase の RPC で書き込む",
+                "what": "service role の client で create_plan_command_v1 を呼び、user_id を引数で渡す。利用者のセッションからは plans / records へ直接書き込めない（authenticated には SELECT だけ許可）。Postgres のエラーコードをアプリのコードへ訳す。",
+                "change": "service role は RLS を越える。テナント分離は「この adapter が必ず user_id を渡す」ことで守っている。ここへ command を足す時は REVIEW-1（ユーザー分離）の観点で読む。",
+                "refs": [
+                  { "path": "apps/product/src/features/timeblock/server/timeblock-command-client.ts", "find": "create_plan_command_v1" },
+                  { "path": "apps/product/src/features/timeblock/server/timeblock-command-client.ts", "find": "EXPECTED_COMMAND_ERRORS" },
+                  { "path": "supabase/migrations/20260730090300_revoke_authenticated_timeblock_dml.sql", "find": "GRANT SELECT" }
+                ],
+                "fails": [
+                  {
+                    "id": "deadlock",
+                    "label": "deadlock（40P01）",
+                    "screen": "何も起きない。利用者は気づかない。",
+                    "data": "正常に保存される。",
+                    "retry": "server の adapter 内で 1 回だけ送り直す。PostgreSQL が失敗したトランザクションを中断済みなので安全、という理由でこのコードだけ。",
+                    "trace": "何も残らない（2 回目も失敗すると「競合」として返る）。",
+                    "look": "不要。頻発するなら Postgres のログで lock を見る。",
+                    "refs": [{ "path": "apps/product/src/features/timeblock/server/timeblock-command-client.ts", "find": "if (result.error?.code === '40P01') result = await request();" }]
+                  },
+                  {
+                    "id": "db-unexpected",
+                    "label": "想定外の DB エラー",
+                    "screen": "「保存に失敗」のトースト。一時 Plan は消える。",
+                    "data": "RPC のトランザクションごと取り消されるので、何も残らない。",
+                    "retry": "しない。",
+                    "trace": "COMMAND_FAILED として Sentry へ（feature: timeblock、operation: create_plan）。",
+                    "look": "Sentry の該当 issue → 同じ時刻の Supabase の Postgres ログ。",
+                    "refs": [
+                      { "path": "apps/product/src/features/timeblock/server/timeblock-command-client.ts", "find": "captureUnexpectedDatabaseError" },
+                      { "path": "docs/operations/runbook.md", "find": "## Playbook 4: Sentryエラー急増（P2）" }
+                    ]
+                  },
+                  {
+                    "id": "supabase-down",
+                    "label": "Supabase が落ちている",
+                    "screen": "保存も表示も失敗する。キャッシュにある表示は残る（query は offlineFirst）。",
+                    "data": "変化なし。",
+                    "retry": "書き込みはしない。読み取りは最大 3 回、間隔を広げて送り直す。",
+                    "trace": "Sentry に大量に出る。UptimeRobot が /api/health の 503 で DOWN を通知する。",
+                    "look": "Supabase の status page → runbook の Playbook 1。",
+                    "refs": [{ "path": "docs/operations/runbook.md", "find": "## Playbook 1: Supabase障害（P0）" }]
+                  }
+                ]
+              },
+              {
+                "id": "db-trigger",
+                "svc": "supabase",
+                "title": "DB が時刻の規則を強制する",
+                "what": "規則は 2 本だけ。end_at > start_at（DT003）と、Record は未来に終われない（DT005）。重なりは排他制約（23P01）で弾く。",
+                "change": "規則の正本はここ。変える時は DB → service → UI の写しを 1 変更で全部変える。DB だけ緩めて UI の写しが残ると「操作はできるのに保存されない」になる。",
+                "refs": [
+                  { "path": "supabase/migrations/20260904080216_simplify_timeblock_temporal_rules.sql", "find": "DT003" },
+                  { "path": "docs/engineering/invariants.md", "find": "## 時刻" }
+                ],
+                "fails": [
+                  {
+                    "id": "rule-violation",
+                    "label": "時刻の規則に反する（DT003 / DT005）",
+                    "screen": "規則ごとの専用文言でトーストを出す（汎用の「保存に失敗」にはしない）。",
+                    "data": "変化なし。",
+                    "retry": "しない。",
+                    "trace": "想定内（BAD_REQUEST）なので Sentry には出ない。",
+                    "look": "UI の写しがこの規則を先回りできていない可能性。invariants.md §時刻。",
+                    "refs": [
+                      { "path": "apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.ts", "find": "const temporalRuleMessage" },
+                      { "path": "apps/product/src/lib/trpc/client-safe-service-code.ts", "find": "RECORD_IN_FUTURE" }
+                    ]
+                  },
+                  {
+                    "id": "overlap",
+                    "label": "既存と重なる（23P01）",
+                    "screen": "重なりの案内を出す（画面側の重なり確認をすり抜けた時。別タブで作った直後など）。",
+                    "data": "変化なし。",
+                    "retry": "しない。",
+                    "trace": "想定内なので Sentry には出ない。",
+                    "look": "画面の一覧が古かった可能性。取り直しで揃う。",
+                    "refs": [{ "path": "apps/product/src/features/timeblock/server/timeblock-command-client.ts", "find": "'23P01': 'TIME_OVERLAP'" }]
+                  }
+                ]
+              },
+              {
+                "id": "settle",
+                "svc": "browser",
+                "title": "返事で画面を確定し、関連を取り直す",
+                "what": "一時 ID の行をサーバーの行へ差し替える。成功・失敗どちらでも statistics / review / plans / records を取り直す。Realtime の購読は無いので、別のタブや端末には次の取り直し（フォーカス復帰など）で反映される。手動で作った Plan を Google Calendar へ書き出す処理はこの経路に無い。",
+                "change": "新しい集計画面を足したら、ここの取り直し対象に入れないと保存後も古い数字が残る。",
+                "refs": [
+                  { "path": "apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.ts", "find": "insertIntoMatchingLists('plans', created, context?.tempId)" },
+                  { "path": "apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.ts", "find": "void utils.plans.invalidate();" },
+                  { "path": "docs/engineering/infra.md", "find": "**Realtime は現状の浸透に含めない。**" }
+                ],
+                "fails": []
+              }
+            ]
+          },
+          {
+            "id": "signup",
+            "title": "サインアップ → ウェルカムメール",
+            "intro": "メールアドレスで登録し、確認メールのリンクを押す。確認が済むと、1 回だけウェルカムメールが届く。メールは 2 つの別経路で送られる。",
+            "play": "▶ 登録する",
+            "hops": [
+              {
+                "id": "signup-form",
+                "svc": "browser",
+                "title": "登録フォーム（Turnstile と漏洩パスワード確認）",
+                "what": "Cloudflare Turnstile の token を取り、パスワードが既知の漏洩に含まれないかを Have I Been Pwned で確かめる。",
+                "change": "Turnstile の secret は app の env ではなく Supabase Auth の Bot Protection にある。site key と secret は別の場所で管理している。",
+                "refs": [
+                  { "path": "apps/product/src/features/auth/components/SignupForm.tsx", "find": "safeCheckPasswordPwned" },
+                  { "path": "apps/product/src/lib/turnstile/config.ts", "find": "isTurnstileEnabled" },
+                  { "path": "docs/engineering/infra.md", "find": "## Bot 対策（Cloudflare Turnstile）" }
+                ],
+                "fails": [
+                  {
+                    "id": "pwned-down",
+                    "label": "漏洩パスワード確認が失敗する",
+                    "screen": "何も起きない。登録は続く。",
+                    "data": "登録される。",
+                    "retry": "しない。確認を諦めて通す（fail-open）。",
+                    "trace": "logger.warn だけ。Sentry には出ない。",
+                    "look": "急ぎではない。",
+                    "refs": [{ "path": "apps/product/src/features/auth/components/SignupForm.tsx", "find": "safeCheckPasswordPwned" }]
+                  },
+                  {
+                    "id": "turnstile-missing",
+                    "label": "Turnstile の site key が未設定",
+                    "screen": "画面側の確認が黙って無効になる。Supabase Auth 側の Bot Protection が有効なら、token が無いので登録は拒否されエラーが出る。",
+                    "data": "Supabase 側の設定次第。",
+                    "retry": "しない。",
+                    "trace": "画面側には何も残らない。",
+                    "look": "NEXT_PUBLIC_TURNSTILE_SITE_KEY の有無と、Supabase の Bot Protection 設定。",
+                    "refs": [{ "path": "apps/product/src/env.ts", "find": "NEXT_PUBLIC_TURNSTILE_SITE_KEY" }]
+                  }
+                ]
+              },
+              {
+                "id": "supabase-signup",
+                "svc": "supabase",
+                "title": "Supabase Auth に登録を依頼する",
+                "what": "ブラウザから supabase.auth.signUp を呼ぶ（Turnstile の token も渡す）。ここは tRPC を通らない。",
+                "change": "認証は Supabase に最も深く依存している部分。乗り換えの重さは出口コスト台帳。",
+                "refs": [
+                  { "path": "apps/product/src/features/auth/stores/useAuthStore.ts", "find": "supabase.auth.signUp" },
+                  { "path": "docs/engineering/infra.md", "find": "## 出口コスト台帳" }
+                ],
+                "fails": [
+                  {
+                    "id": "auth-error",
+                    "label": "Supabase Auth がエラーを返す",
+                    "screen": "フォームにエラー文言が出る（生の文言ではなく、安全な翻訳キーへ変換したもの）。",
+                    "data": "登録されない。",
+                    "retry": "しない。利用者が押し直す。",
+                    "trace": "想定外のエラーなら Sentry（captureUnexpectedAuthError）。",
+                    "look": "Supabase の Auth ログ。",
+                    "refs": [{ "path": "apps/product/src/features/auth/stores/useAuthStore.ts", "find": "captureUnexpectedAuthError" }]
+                  }
+                ]
+              },
+              {
+                "id": "auth-email-hook",
+                "svc": "resend",
+                "title": "確認メールを送る（Edge Function → Resend）",
+                "what": "Supabase Auth の send_email hook が Edge Function send-auth-email を呼び、React Email で組み立てて Resend で送る。hook の署名を検証し、idempotency key を付けて重複配送を防ぐ。",
+                "change": "この Function は Vercel ではなく Supabase にデプロイされる（supabase functions deploy --use-api）。アプリの deploy とは別に動く。",
+                "refs": [
+                  { "path": "supabase/functions/send-auth-email/index.ts", "find": "buildAuthEmailIdempotencyKey" },
+                  { "path": "supabase/functions/send-auth-email/index.ts", "find": "captureEdgeFunctionEvent" }
+                ],
+                "fails": [
+                  {
+                    "id": "auth-email-fail",
+                    "label": "Resend が確認メールを送れない",
+                    "screen": "Supabase Auth は signUp にエラーを返すので、登録エラーとして見える。",
+                    "data": "ユーザー行が残るかどうかは Supabase Auth 側の挙動で、この repo では確かめていない。",
+                    "retry": "Function は再試行可能かどうかを status で Supabase に伝える。すでに一部送れていて idempotency key も無い時は、重複を避けて再試行不可として返す。",
+                    "trace": "Edge Function から Sentry へ（send-auth-email failed: …）。宛先は記録しない。",
+                    "look": "Resend のダッシュボード → Supabase の Edge Function ログ。",
+                    "refs": [{ "path": "supabase/functions/send-auth-email/index.ts", "find": "resolveSendAuthEmailStatus" }]
+                  }
+                ]
+              },
+              {
+                "id": "confirm-route",
+                "svc": "vercel",
+                "title": "確認リンクで着地する",
+                "what": "/auth/confirm が verifyOtp で確認する。成否は verify の結果ではなく session の有無で分け、失敗しても素のエラーではなく /auth/confirmed?status=… に着地させる。新規登録の確認の時だけウェルカムメールを依頼する。",
+                "change": "email_change / recovery も同じ route を通る。ウェルカムメールは type が signup の時だけ。",
+                "refs": [
+                  { "path": "apps/product/src/app/[locale]/(auth)/auth/confirm/route.ts", "find": "deliverWelcomeEmailOnce(signupUserId)" },
+                  { "path": "apps/product/src/app/[locale]/(auth)/auth/callback/route.ts", "find": "deliverWelcomeEmailOnce", "why": "Google ログインで登録した場合の入口" }
+                ],
+                "fails": [
+                  {
+                    "id": "otp-invalid",
+                    "label": "リンクが無効・期限切れ",
+                    "screen": "/auth/confirmed に状態付きで着地する。",
+                    "data": "確認されない。",
+                    "retry": "しない。確認メールを送り直してもらう。",
+                    "trace": "想定内。",
+                    "look": "Supabase の Auth ログ。Redirect URLs の allowlist がずれていないか。",
+                    "refs": [{ "path": "apps/product/src/app/[locale]/(auth)/auth/confirm/route.ts", "find": "confirmedUrl" }]
+                  }
+                ]
+              },
+              {
+                "id": "welcome-claim",
+                "svc": "supabase",
+                "title": "ウェルカムメールの「送る権利」を先に取る",
+                "what": "profiles.welcome_email_sent_at が空の行だけを更新し、更新できた 1 回だけが送る。送ってから記録するのではなく、記録してから送る。途中で落ちたら重複ではなく欠落に倒す設計。",
+                "change": "1 回限りの通知を足す時の手本。列を足すだけだと既存ユーザー全員へ次のサインインで飛ぶので、migration 時点の既存行を送信済みで埋める。",
+                "refs": [
+                  { "path": "apps/product/src/features/auth/server/welcome-email.ts", "find": ".is('welcome_email_sent_at', null)" },
+                  { "path": "docs/engineering/invariants.md", "find": "## メール通知" }
+                ],
+                "fails": [
+                  {
+                    "id": "claim-fail",
+                    "label": "送信記録の更新が失敗する",
+                    "screen": "何も起きない。ログインは完了する。",
+                    "data": "記録されず、メールも送らない。",
+                    "retry": "しない。次に確認リンクを通った時に、まだ空なら送る。",
+                    "trace": "Sentry（feature: auth / operation: claim_welcome_email）。",
+                    "look": "Sentry → Supabase の Postgres ログ。",
+                    "refs": [{ "path": "apps/product/src/features/auth/server/welcome-email.ts", "find": "claim_welcome_email" }]
+                  },
+                  {
+                    "id": "double-click",
+                    "label": "確認リンクを 2 回押す",
+                    "screen": "何も起きない。",
+                    "data": "2 回目は更新できる行が無いので送らない。",
+                    "retry": "該当なし。",
+                    "trace": "何も残らない（正常）。",
+                    "look": "不要。",
+                    "refs": []
+                  }
+                ]
+              },
+              {
+                "id": "transactional-send",
+                "svc": "resend",
+                "title": "送信の共通窓口から Resend へ",
+                "what": "アプリが送るメールはすべて sendTransactionalEmail を通る。まず email_suppressions（bounce / 苦情で止めた宛先）を確かめ、止めていなければ Resend で送る。",
+                "change": "メール送信を足す時はここを通す。Resend を直接呼ぶと suppression を素通りする（問い合わせフォームは例外で、自前で idempotency key を付けて Resend の API を呼ぶ）。",
+                "refs": [
+                  { "path": "apps/product/src/lib/email/send.ts", "find": "export async function sendTransactionalEmail" },
+                  { "path": "apps/product/src/lib/email/send.ts", "find": "isEmailSuppressed" }
+                ],
+                "fails": [
+                  {
+                    "id": "resend-fail",
+                    "label": "Resend が送れない",
+                    "screen": "何も起きない。ログインは完了する。",
+                    "data": "送信記録は付いたまま、メールは届かない。",
+                    "retry": "しない。記録済みなので二度と送らない（重複より欠落を選んだ結果）。",
+                    "trace": "Sentry（feature: auth / operation: send_welcome_email）。",
+                    "look": "Resend のダッシュボードと status。env の RESEND_API_KEY / RESEND_FROM_EMAIL。",
+                    "refs": [
+                      { "path": "apps/product/src/features/auth/server/welcome-email.ts", "find": "send_welcome_email" },
+                      { "path": "apps/product/src/env.ts", "find": "RESEND_API_KEY" }
+                    ]
+                  },
+                  {
+                    "id": "suppression-lookup-fail",
+                    "label": "suppression の確認が失敗する",
+                    "screen": "何も起きない。",
+                    "data": "送らない（確かめられない時は送らない側へ倒す fail-closed）。",
+                    "retry": "しない。",
+                    "trace": "Sentry（DB エラー）。",
+                    "look": "Supabase の Postgres ログ。",
+                    "refs": [{ "path": "apps/product/src/lib/email/send.ts", "find": "suppression_lookup" }]
+                  },
+                  {
+                    "id": "suppressed",
+                    "label": "宛先が suppression 済み",
+                    "screen": "何も起きない。",
+                    "data": "送らない。",
+                    "retry": "しない。",
+                    "trace": "logger.warn だけ。MFA やパスワード変更などのセキュリティ通知の時だけ Sentry へ上げる。",
+                    "look": "email_suppressions の該当行。",
+                    "refs": [{ "path": "apps/product/src/lib/email/send.ts", "find": "securityNotification" }]
+                  }
+                ]
+              },
+              {
+                "id": "resend-webhook",
+                "svc": "vercel",
+                "title": "配送結果が webhook で戻る",
+                "what": "Resend が /api/webhooks/resend へ bounce / 苦情を送る。svix の署名を検証し、Upstash の lease で 1 回だけ処理して email_suppressions へ書く。一時的な bounce（受信トレイの容量超過など）は止めない。",
+                "change": "ここが止まると、新しい bounce が記録されず、届かない宛先へ送り続ける。",
+                "refs": [
+                  { "path": "apps/product/src/app/api/webhooks/resend/route.ts", "find": "claimResendWebhookEvent" },
+                  { "path": "apps/product/src/app/api/webhooks/resend/route.ts", "find": "isSuppressibleBounce" }
+                ],
+                "fails": [
+                  {
+                    "id": "webhook-signature",
+                    "label": "署名が一致しない",
+                    "screen": "利用者には見えない。",
+                    "data": "書かない。401 を返す。",
+                    "retry": "Resend 側の再送に任せる。",
+                    "trace": "署名失敗の監視へ記録する。",
+                    "look": "RESEND_WEBHOOK_SECRET が Resend 側の設定と一致しているか。",
+                    "refs": [{ "path": "apps/product/src/app/api/webhooks/resend/route.ts", "find": "captureWebhookSignatureFailure" }]
+                  },
+                  {
+                    "id": "webhook-write-fail",
+                    "label": "suppression の書き込みが失敗",
+                    "screen": "利用者には見えない。",
+                    "data": "書かれない。lease を返して 500 を返す。",
+                    "retry": "Resend が再送する（lease を返したので次は処理できる）。",
+                    "trace": "Sentry（DB エラー）。",
+                    "look": "Supabase の Postgres ログ。",
+                    "refs": [{ "path": "apps/product/src/app/api/webhooks/resend/route.ts", "find": "releaseResendWebhookEvent" }]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "deploy",
+            "title": "merge → 本番公開",
+            "intro": "PR を main へ merge する。merge と本番公開は分かれていて、公開するのは Production Release workflow だけ。DB の migration は merge の時点で先に本番へ入る。",
+            "play": "▶ merge する",
+            "hops": [
+              {
+                "id": "merge",
+                "svc": "github",
+                "title": "main へ merge する",
+                "what": "main の repository ruleset が required checks（Static / Unit / Integration / Vercel product / web）と review thread の解決を求める。merge commit だけ許可。",
+                "change": "required check に paths filter 付きの check を入れると、満たせない PR が merge できなくなる。",
+                "refs": [
+                  { "path": "AGENTS.md", "find": "merge の遮断は main の repository ruleset 1 本で行う" },
+                  { "path": "docs/engineering/infra.md", "find": "### merge gate の required checks" }
+                ],
+                "fails": []
+              },
+              {
+                "id": "migration",
+                "svc": "supabase",
+                "title": "migration が本番 DB に入る",
+                "what": "Supabase の GitHub 連携が、merge の時点で production へ migration を適用する。この repo の workflow は適用しない（確認するだけ）。",
+                "change": "ここから promote が終わるまで、新しい schema の上で旧コードが動く時間がある（E2E が完走するまで）。migration は旧コードでも壊れない形で書く。",
+                "refs": [
+                  { "path": "docs/engineering/infra.md", "find": "main merge: Supabase integration が production に migration を適用する" },
+                  { "path": ".agents/skills/supabase/SKILL.md", "find": "migration" }
+                ],
+                "fails": [
+                  {
+                    "id": "migration-fail",
+                    "label": "migration の適用が失敗",
+                    "screen": "利用者は旧版を使い続ける。",
+                    "data": "本番 DB は適用前のまま（失敗した migration による）。",
+                    "retry": "自動ではしない。",
+                    "trace": "release job の「Verify candidate migrations are applied in Production」が未適用を検出し、promote しない。",
+                    "look": "Supabase のダッシュボードの branch / migration 履歴 → runbook の Playbook 1。",
+                    "refs": [
+                      { "path": ".github/workflows/promote.yml", "find": "Verify candidate migrations are applied in Production" },
+                      { "path": "scripts/ci/production-migration-readiness.mjs", "find": "schema_migrations" }
+                    ]
+                  }
+                ]
+              },
+              {
+                "id": "vercel-build",
+                "svc": "vercel",
+                "title": "Vercel が本番候補を build する",
+                "what": "merge ごとに Production build を作るが、domain は割り当てない（Auto-assign を OFF にしてある）。まだ誰も見ていない候補。",
+                "change": "Ignored Build Step で production build を skip させてはいけない。候補が無いと release job が現れない build を待ち続ける。",
+                "refs": [{ "path": "docs/engineering/infra.md", "find": "### merge と Production 公開の分離" }],
+                "fails": [
+                  {
+                    "id": "build-fail",
+                    "label": "build が失敗",
+                    "screen": "利用者は旧版を使い続ける。",
+                    "data": "変化なし（migration は先に入っている）。",
+                    "retry": "しない。同じ SHA を作り直すなら deployment を名指しして redeploy。",
+                    "trace": "Vercel の build ログ。promote が失敗すると area:deployment の issue が立つ。",
+                    "look": "runbook の Playbook 2。",
+                    "refs": [{ "path": "docs/operations/runbook.md", "find": "## Playbook 2: Vercelデプロイ失敗（P1）" }]
+                  }
+                ]
+              },
+              {
+                "id": "impact",
+                "svc": "github",
+                "title": "影響判定（impact）",
+                "what": "Production Release workflow が起動し、product / web / storybook それぞれの現在公開中の SHA との差分から、どれに影響があるかを決める。",
+                "change": "影響なしと判定された project の検証は走らない。docs だけの merge でも build は作られ、判定を通る。",
+                "refs": [
+                  { "path": ".github/workflows/promote.yml", "find": "Resolve release impact" },
+                  { "path": "scripts/ci/release-impact.mjs", "find": "affected" }
+                ],
+                "fails": []
+              },
+              {
+                "id": "layer3",
+                "svc": "github",
+                "title": "層 3 の検証（E2E / Web / Storybook）",
+                "what": "影響がある project だけ、同じ run の中で E2E（local Supabase を起動）、web の build と E2E、Storybook の検査を走らせる。",
+                "change": "ここが merge 後の本番を守る唯一の実行検証。遅くすると、migration と旧コードが共存する時間も伸びる。",
+                "refs": [
+                  { "path": ".github/workflows/promote.yml", "find": "Run E2E tests" },
+                  { "path": "docs/engineering/testing.md", "find": "E2E" }
+                ],
+                "fails": [
+                  {
+                    "id": "e2e-fail",
+                    "label": "E2E が失敗",
+                    "screen": "利用者は旧版を使い続ける。",
+                    "data": "コードは旧版のまま。migration だけ新しい。",
+                    "retry": "自動ではしない。直して次の merge で走り直すか、workflow を手で起動する。",
+                    "trace": "area:deployment ラベルの issue が立つ（既にあれば更新）。E2E の report が artifact に残る。",
+                    "look": "その issue → Actions の run → Upload report の artifact。",
+                    "refs": [{ "path": ".github/workflows/promote.yml", "find": "File or update promote failure issue" }]
+                  }
+                ]
+              },
+              {
+                "id": "promote",
+                "svc": "github",
+                "title": "smoke してから本番へ切り替える",
+                "what": "release job が、migration が本番に入っていることを確かめ、候補を smoke してから Production domain へ promote する。",
+                "change": "緊急時の Force Promote は理由の入力が必須。層 3 を飛ばすので、使ったら記録を残す。",
+                "refs": [
+                  { "path": ".github/workflows/promote.yml", "find": "Wait, smoke, and promote Production" },
+                  { "path": "scripts/ci/production-release.mjs", "find": "promote" }
+                ],
+                "fails": [
+                  {
+                    "id": "smoke-fail",
+                    "label": "smoke が失敗",
+                    "screen": "利用者は旧版を使い続ける。",
+                    "data": "変化なし。",
+                    "retry": "しない。",
+                    "trace": "Production Release の commit status と area:deployment の issue。",
+                    "look": "runbook の Playbook 2。",
+                    "refs": [{ "path": "docs/operations/runbook.md", "find": "### 前提: mergeとProduction公開は分離されている" }]
+                  }
+                ]
+              },
+              {
+                "id": "tab-update",
+                "svc": "browser",
+                "title": "開いているタブが新版に気づく",
+                "what": "タブへ戻った時に /api/health/version の SHA を比べ、古ければ「更新あり」を立てる。いつ再読み込みしてよいかは、編集中かどうかを知る側が決める（編集中は勝手に再読み込みしない）。",
+                "change": "API の入出力を変えた直後は、旧版の画面が新版のサーバーを呼ぶ時間がある。tRPC の入力を必須化する変更は、旧画面からの呼び出しを壊す。",
+                "refs": [
+                  { "path": "apps/product/src/lib/hooks/useServiceWorker.ts", "find": "DEPLOYED_VERSION_ENDPOINT" },
+                  { "path": "docs/engineering/pwa.md", "find": "/api/health/version" }
+                ],
+                "fails": []
+              }
+            ]
+          }
+        ],
+        "outages": {
+          "title": "サービス停止マップ",
+          "intro": "外部サービスが 1 つ止まったら、何が壊れ、何は動き続け、どこから見るか。乗り換えの重さ（出口コスト）は infra.md の台帳が正本。",
+          "items": [
+            {
+              "id": "supabase",
+              "svc": "supabase",
+              "name": "Supabase",
+              "role": "Auth・DB・Storage・Edge Functions",
+              "breaks": "ログイン、全データの読み書き、認証メール（Edge Function）、/api/health（503）。",
+              "keeps": "キャッシュ済みの表示（query は offlineFirst、IndexedDB に最大 2 時間）。公開サイト（apps/web）。",
+              "behavior": "必須の env が欠けると起動時に throw。実行時の失敗は各経路で Sentry。",
+              "env": ["NEXT_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", "SUPABASE_SECRET_KEY"],
+              "look": "Supabase の status page → runbook Playbook 1。",
+              "refs": [
+                { "path": "apps/product/src/env.ts", "find": "SUPABASE_SECRET_KEY" },
+                { "path": "docs/operations/runbook.md", "find": "## Playbook 1: Supabase障害（P0）" }
+              ]
+            },
+            {
+              "id": "vercel",
+              "svc": "vercel",
+              "name": "Vercel",
+              "role": "product / web の配信・Function・Cron",
+              "breaks": "アプリ全体、tRPC、webhook の受信、Cron（calendar-sync など）。",
+              "keeps": "DB のデータ。Stripe / Resend は webhook を再送するので、復旧後に追いつく。",
+              "behavior": "Cron は次の予定時刻に走るだけで、取りこぼした回を埋め直さない。完了記録（heartbeat）が古くなることで気づく。",
+              "env": ["CRON_SECRET"],
+              "look": "Vercel の status → runbook Playbook 2 → monitoring.md の Cron heartbeat。",
+              "refs": [
+                { "path": "apps/product/vercel.json", "find": "crons" },
+                { "path": "docs/operations/monitoring.md", "find": "## Cron heartbeat と本番 schema・権限監査" }
+              ]
+            },
+            {
+              "id": "upstash",
+              "svc": "external",
+              "name": "Upstash Redis",
+              "role": "rate limit・Resend webhook の 1 回処理",
+              "breaks": "rate limit が Function のメモリ上の判定へ退避し緩くなる。Resend webhook の処理。本番の /api/health が 503 を返し、UptimeRobot が DOWN を通知する（アプリ本体は動いているのに）。",
+              "keeps": "保存・表示など通常の操作（可用性を優先して通す）。",
+              "behavior": "fail-open。Sentry に記録。",
+              "env": ["UPSTASH_REDIS_REST_URL", "UPSTASH_REDIS_REST_TOKEN"],
+              "look": "Upstash の status。",
+              "refs": [
+                { "path": "apps/product/src/lib/rate-limit/upstash.ts", "find": "isUpstashEnabled" },
+                { "path": "apps/product/src/app/api/health/route.ts", "find": "checkRedis" }
+              ]
+            },
+            {
+              "id": "resend",
+              "svc": "resend",
+              "name": "Resend",
+              "role": "認証メール・通知メール・bounce webhook",
+              "breaks": "確認メール（登録が失敗する）、ウェルカム・通知メール（黙って欠落）、bounce の記録。",
+              "keeps": "ログイン済みの利用、保存。",
+              "behavior": "アプリ側の送信は throw せず失敗を返し、呼び出し側が扱う。ウェルカムメールは再送しない。",
+              "env": ["RESEND_API_KEY", "RESEND_FROM_EMAIL", "RESEND_WEBHOOK_SECRET"],
+              "look": "Resend のダッシュボード → Supabase の Edge Function ログ（確認メール）→ Sentry。",
+              "refs": [
+                { "path": "apps/product/src/lib/email/send.ts", "find": "sendTransactionalEmail" },
+                { "path": "supabase/functions/send-auth-email/index.ts", "find": "RESEND_API_KEY" }
+              ]
+            },
+            {
+              "id": "sentry",
+              "svc": "external",
+              "name": "Sentry",
+              "role": "エラー監視・production build の gate",
+              "breaks": "障害の痕跡が見えなくなる。資格情報が欠けると production build が失敗する。",
+              "keeps": "アプリの動作（送信は fire-and-forget）。",
+              "behavior": "DSN が無ければ黙って初期化しない。/api/health の transaction は inbound filter で捨てるので、Sentry が無音でも health が無事とは限らない。",
+              "env": ["NEXT_PUBLIC_SENTRY_DSN", "SENTRY_DSN"],
+              "look": "Sentry の status。痕跡が無い時は Vercel の Function ログへ。",
+              "refs": [
+                { "path": "apps/product/sentry.server.config.ts", "find": "Sentry.init" },
+                { "path": "docs/operations/monitoring.md", "find": "## Sentry runtime contract" }
+              ]
+            },
+            {
+              "id": "turnstile",
+              "svc": "external",
+              "name": "Cloudflare Turnstile",
+              "role": "登録・ログインのボット対策",
+              "breaks": "Supabase の Bot Protection が有効なら、token が取れず登録・ログインが止まる。",
+              "keeps": "ログイン済みの利用。",
+              "behavior": "site key が空なら画面側の確認は黙って無効。",
+              "env": ["NEXT_PUBLIC_TURNSTILE_SITE_KEY"],
+              "look": "Cloudflare の status → infra.md の Turnstile 節。",
+              "refs": [
+                { "path": "apps/product/src/lib/turnstile/config.ts", "find": "isTurnstileEnabled" },
+                { "path": "docs/engineering/infra.md", "find": "## Bot 対策（Cloudflare Turnstile）" }
+              ]
+            },
+            {
+              "id": "stripe",
+              "svc": "external",
+              "name": "Stripe",
+              "role": "Pro 課金・アカウント削除時の解約",
+              "breaks": "checkout、webhook による課金状態の同期。",
+              "keeps": "課金を強制していない間（BILLING_ENFORCED 未設定）は全員が無料で使えるので、通常の利用。",
+              "behavior": "鍵が無ければ getStripe() が null。webhook は署名・冪等 claim を経て、失敗時は 500 で Stripe に再送させる。毎晩の突き合わせ Cron が差分を検出する（検出だけで直さない）。",
+              "env": ["STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET"],
+              "look": "Stripe の status → runbook Playbook 3。",
+              "refs": [
+                { "path": "apps/product/src/lib/stripe/client.ts", "find": "getStripe" },
+                { "path": "docs/operations/runbook.md", "find": "## Playbook 3: Stripe Webhook停止（P1）" }
+              ]
+            },
+            {
+              "id": "google",
+              "svc": "external",
+              "name": "Google Calendar",
+              "role": "外部カレンダーの取り込み（Supabase の Google ログインとは別の OAuth）",
+              "breaks": "外部カレンダーの予定の取り込み・連携の開始。",
+              "keeps": "Dayopt 内の Plan / Record。手動で作った Plan は Google へ書き出さないので影響しない。",
+              "behavior": "15 分ごとの calendar-sync Cron が取り込む。API は 15 秒で打ち切る。失敗は Sentry。",
+              "env": ["GOOGLE_CALENDAR_CLIENT_ID", "CALENDAR_TOKEN_ENCRYPTION_KEY"],
+              "look": "Google Cloud の status → Sentry（feature: external-calendar 周辺）→ Cron heartbeat。",
+              "refs": [
+                { "path": "apps/product/src/features/external-calendar/server/providers/google.ts", "find": "GOOGLE_API_TIMEOUT_MS" },
+                { "path": "apps/product/src/app/api/cron/calendar-sync/route.ts", "find": "writeCronHeartbeat" }
+              ]
+            },
+            {
+              "id": "uptimerobot",
+              "svc": "external",
+              "name": "UptimeRobot",
+              "role": "外形監視（/api/health を 5 分ごと）",
+              "breaks": "全体停止の通知だけが届かなくなる。",
+              "keeps": "アプリの動作すべて。",
+              "behavior": "アプリのコードには登場しない。503 / 504 を DOWN としてメールで通知する。",
+              "env": [],
+              "look": "monitoring.md の Monitoring surfaces。",
+              "refs": [{ "path": "docs/operations/monitoring.md", "find": "## Monitoring surfaces" }]
+            }
+          ]
+        }
+      }
+    </script>
+
+    <script>
+      (function () {
+        'use strict';
+        var data = JSON.parse(document.getElementById('walkthrough-data').textContent);
+        var tabsEl = document.getElementById('tabs');
+        var viewEl = document.getElementById('view');
+        var state = { tab: 0, hop: 0, fail: null, timer: null };
+        var tabs = data.scenarios.concat([{ id: 'outages', title: data.outages.title }]);
+
+        function el(tag, attrs, children) {
+          var node = document.createElement(tag);
+          Object.keys(attrs || {}).forEach(function (k) {
+            if (k === 'text') node.textContent = attrs[k];
+            else if (k === 'style') node.setAttribute('style', attrs[k]);
+            else node.setAttribute(k, attrs[k]);
+          });
+          (children || []).forEach(function (c) {
+            if (c) node.appendChild(typeof c === 'string' ? document.createTextNode(c) : c);
+          });
+          return node;
+        }
+
+        function svcStyle(svc) {
+          var s = data.services[svc] || data.services.external;
+          return '--svc: var(' + s.var + ')';
+        }
+
+        function svcChip(svc) {
+          var s = data.services[svc] || data.services.external;
+          return el('span', { class: 'svc-chip', style: svcStyle(svc), text: s.label });
+        }
+
+        function refList(refs) {
+          if (!refs || refs.length === 0) return null;
+          return el(
+            'ul',
+            { class: 'refs' },
+            refs.map(function (r) {
+              var href = data.repo + r.path.split('/').map(encodeURIComponent).join('/');
+              return el('li', {}, [
+                el('a', { href: href, target: '_blank', rel: 'noopener' }, [el('code', { text: r.path })]),
+                ' ',
+                el('span', { class: 'why', text: 'で ' }),
+                el('code', { text: r.find }),
+                el('span', { class: 'why', text: ' を探す' + (r.why ? '（' + r.why + '）' : '') }),
+              ]);
+            }),
+          );
+        }
+
+        function renderTabs() {
+          tabsEl.textContent = '';
+          tabs.forEach(function (t, i) {
+            var b = el('button', {
+              class: 'tab',
+              role: 'tab',
+              id: 'tab-' + t.id,
+              'aria-selected': String(i === state.tab),
+              'aria-controls': 'view',
+              tabindex: i === state.tab ? '0' : '-1',
+              text: t.title,
+            });
+            b.addEventListener('click', function () {
+              selectTab(i);
+            });
+            b.addEventListener('keydown', function (e) {
+              if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
+              var next = (i + (e.key === 'ArrowRight' ? 1 : tabs.length - 1)) % tabs.length;
+              selectTab(next);
+              document.getElementById('tab-' + tabs[next].id).focus();
+            });
+            tabsEl.appendChild(b);
+          });
+          viewEl.setAttribute('role', 'tabpanel');
+          viewEl.setAttribute('aria-labelledby', 'tab-' + tabs[state.tab].id);
+        }
+
+        function selectTab(i) {
+          stopPlay();
+          state.tab = i;
+          state.hop = 0;
+          state.fail = null;
+          render();
+        }
+
+        function stopPlay() {
+          if (state.timer) clearInterval(state.timer);
+          state.timer = null;
+        }
+
+        function render() {
+          renderTabs();
+          if (tabs[state.tab].id === 'outages') renderOutages();
+          else renderScenario(data.scenarios[state.tab]);
+        }
+
+        function legend(svcs) {
+          return el(
+            'div',
+            { class: 'legend', 'aria-hidden': 'true' },
+            svcs.map(function (s) {
+              return el('span', { style: svcStyle(s), text: data.services[s].label });
+            }),
+          );
+        }
+
+        function renderScenario(sc) {
+          viewEl.textContent = '';
+          var failHop = -1;
+          if (state.fail) {
+            sc.hops.forEach(function (h, i) {
+              if (h.id === state.fail.hop) failHop = i;
+            });
+          }
+
+          var play = el('button', { class: 'play', type: 'button', text: sc.play });
+          play.addEventListener('click', function () {
+            startPlay(sc);
+          });
+          viewEl.appendChild(el('div', { class: 'intro' }, [el('p', { text: sc.intro }), play]));
+
+          var used = [];
+          sc.hops.forEach(function (h) {
+            if (used.indexOf(h.svc) < 0) used.push(h.svc);
+          });
+
+          var lane = el('ol', { class: 'lane', 'aria-label': '通る処理' });
+          sc.hops.forEach(function (h, i) {
+            var cls = 'hop';
+            if (failHop === i) cls += ' failed';
+            else if (failHop >= 0 && i > failHop) cls += ' skipped';
+            var btn = el(
+              'button',
+              { class: cls, type: 'button', style: svcStyle(h.svc), 'data-i': String(i) },
+              [
+                el('span', { class: 'n', text: String(i + 1).padStart(2, '0') }),
+                el('span', {}, [
+                  el('span', { class: 't' }, [
+                    h.title,
+                    h.fails.length ? el('span', { class: 'fx', text: '失敗 ' + h.fails.length }) : null,
+                  ]),
+                  el('span', { class: 's', text: data.services[h.svc].label }),
+                ]),
+              ],
+            );
+            if (i === state.hop) btn.setAttribute('aria-current', 'step');
+            btn.addEventListener('click', function () {
+              stopPlay();
+              state.hop = i;
+              if (state.fail && state.fail.hop !== h.id) state.fail = null;
+              renderScenario(sc);
+            });
+            lane.appendChild(el('li', {}, [btn]));
+          });
+
+          var left = el('div', {}, [legend(used), lane]);
+          var panel = el('section', { class: 'panel', 'aria-live': 'polite', id: 'panel' });
+          fillHopPanel(panel, sc, sc.hops[state.hop]);
+          viewEl.appendChild(el('div', { class: 'grid' }, [left, panel]));
+        }
+
+        function fillHopPanel(panel, sc, h) {
+          panel.appendChild(el('div', {}, [svcChip(h.svc)]));
+          panel.appendChild(el('h2', { text: h.title }));
+          panel.appendChild(el('p', { text: h.what }));
+          if (h.change) {
+            panel.appendChild(
+              el('div', { class: 'change' }, [el('strong', { text: 'ここを変えると' }), h.change]),
+            );
+          }
+
+          if (h.fails.length) {
+            panel.appendChild(el('h3', { text: 'ここで失敗させる' }));
+            var row = el('div', { class: 'fails' });
+            h.fails.forEach(function (f) {
+              var on = !!(state.fail && state.fail.hop === h.id && state.fail.id === f.id);
+              var b = el('button', {
+                class: 'fail-btn',
+                type: 'button',
+                'aria-pressed': String(on),
+                text: '⚡ ' + f.label,
+              });
+              b.addEventListener('click', function () {
+                state.fail = on ? null : { hop: h.id, id: f.id };
+                renderScenario(sc);
+                var p = document.getElementById('panel');
+                if (p && window.matchMedia('(max-width: 820px)').matches) p.scrollIntoView({ block: 'start' });
+              });
+              row.appendChild(b);
+            });
+            panel.appendChild(row);
+
+            var active = null;
+            if (state.fail && state.fail.hop === h.id) {
+              h.fails.forEach(function (f) {
+                if (f.id === state.fail.id) active = f;
+              });
+            }
+            if (active) {
+              var rows = [
+                ['画面', active.screen],
+                ['データ', active.data],
+                ['再試行', active.retry],
+                ['痕跡', active.trace],
+                ['最初に見る', active.look],
+              ];
+              panel.appendChild(
+                el(
+                  'dl',
+                  { class: 'outcome' },
+                  rows.map(function (r) {
+                    return el('div', {}, [el('dt', { text: r[0] }), el('dd', { text: r[1] })]);
+                  }),
+                ),
+              );
+              if (active.refs && active.refs.length) {
+                panel.appendChild(el('h3', { text: 'この失敗の根拠' }));
+                panel.appendChild(refList(active.refs));
+              }
+            }
+          }
+
+          panel.appendChild(el('h3', { text: 'コードと文書' }));
+          panel.appendChild(refList(h.refs));
+        }
+
+        function startPlay(sc) {
+          stopPlay();
+          state.fail = null;
+          state.hop = 0;
+          renderScenario(sc);
+          var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+          if (reduce) return;
+          state.timer = setInterval(function () {
+            if (state.hop >= sc.hops.length - 1) {
+              stopPlay();
+              return;
+            }
+            state.hop += 1;
+            renderScenario(sc);
+          }, 900);
+        }
+
+        function renderOutages() {
+          var o = data.outages;
+          viewEl.textContent = '';
+          viewEl.appendChild(el('div', { class: 'intro' }, [el('p', { text: o.intro })]));
+          if (!state.outage) state.outage = o.items[0].id;
+          var cards = el('div', { class: 'cards', role: 'group', 'aria-label': '外部サービス' });
+          var current = o.items[0];
+          o.items.forEach(function (it) {
+            var on = it.id === state.outage;
+            if (on) current = it;
+            var b = el(
+              'button',
+              { class: 'card', type: 'button', style: svcStyle(it.svc), 'aria-pressed': String(on) },
+              [el('span', { class: 't', text: it.name }), el('span', { class: 's', text: it.role })],
+            );
+            b.addEventListener('click', function () {
+              state.outage = it.id;
+              renderOutages();
+            });
+            cards.appendChild(b);
+          });
+
+          var panel = el('section', { class: 'panel', 'aria-live': 'polite' });
+          panel.appendChild(el('h2', { text: current.name + ' が止まったら' }));
+          panel.appendChild(el('p', { class: 'why', text: current.role }));
+          var rows = [
+            ['壊れる', current.breaks],
+            ['動き続ける', current.keeps],
+            ['コードの挙動', current.behavior],
+            ['関係する env', current.env.length ? current.env.join(', ') : '（なし）'],
+            ['最初に見る', current.look],
+          ];
+          panel.appendChild(
+            el(
+              'dl',
+              { class: 'outcome' },
+              rows.map(function (r) {
+                return el('div', {}, [el('dt', { text: r[0] }), el('dd', { text: r[1] })]);
+              }),
+            ),
+          );
+          panel.appendChild(el('h3', { text: 'コードと文書' }));
+          panel.appendChild(refList(current.refs));
+          panel.appendChild(
+            el('p', { class: 'unknown', text: 'env は名前だけを載せる。値は 1Password が正本（docs/operations/secrets.md）。' }),
+          );
+          viewEl.appendChild(el('div', { class: 'grid' }, [cards, panel]));
+        }
+
+        render();
+      })();
+    </script>
+  </body>
+</html>
