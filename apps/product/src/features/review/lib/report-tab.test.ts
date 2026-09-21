@@ -1,8 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildReportHref, parseReportTabParam } from './report-tab';
+import { buildReportHref, parseReportTabParam, reportTabs } from './report-tab';
 
 describe('parseReportTabParam', () => {
+  it.each(reportTabs)('%s is accepted as a report tab', (tab) => {
+    expect(parseReportTabParam(tab)).toBe(tab);
+  });
+
   it('省略と不正値は時間の使い方へ丸める', () => {
     expect(parseReportTabParam(undefined)).toBe('usage');
     expect(parseReportTabParam('tidy')).toBe('usage');

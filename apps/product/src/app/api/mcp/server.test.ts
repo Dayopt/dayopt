@@ -51,6 +51,31 @@ describe('MCP scope-filtered tool discovery', () => {
         'records.trash.list',
       ],
     ],
+    [
+      ['read:entries', 'write:records'],
+      [
+        'entries.list',
+        'plans.get',
+        'plans.list',
+        'records.create',
+        'records.get',
+        'records.list',
+        'records.update',
+      ],
+    ],
+    [
+      ['read:entries', 'delete:plans'],
+      [
+        'entries.list',
+        'plans.delete',
+        'plans.get',
+        'plans.list',
+        'plans.restore',
+        'plans.trash.list',
+        'records.get',
+        'records.list',
+      ],
+    ],
   ] as const)('scopes %j advertise only the public tool set', async (scopes, expected) => {
     expect(await listTools(scopes)).toEqual([...expected].sort());
   });

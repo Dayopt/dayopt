@@ -550,5 +550,6 @@ describe('LoginForm の再送先の紐付け', () => {
       name: 'auth.loginForm.resendConfirmation',
     });
     expect(button).toBeEnabled();
+    expect(button).toHaveClass('min-h-11');
   });
 });
