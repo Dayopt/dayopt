@@ -21,7 +21,7 @@ description: 非 trivial な作業の成功条件・実行方法・モデル選�
 
 ## 手順
 
-1. **成功条件を固定する**。ユーザーが確認できる結果、対象範囲、検証方法、外部変更の有無を短く書く。Issue / PR があればそこに残す。
+1. **成功条件を固定する**。ユーザーが確認できる結果、対象範囲、検証方法、外部変更の有無を短く書く。Issue / PR があればそこに、なければ作業報告に残す。
 2. 不要な作業をなくし、検索・集計・差分・検査は既存 script / CLI で閉じる。必要な一次情報だけ読む。
 3. 同じ主担当で調査・判断・実装・検証・修正を進める。工程の変化だけでは handoff しない。
 4. 独立した大量調査だけ、下記の委譲条件で採算を比較する。モデル名や agent 数を目的にしない。
@@ -29,9 +29,9 @@ description: 非 trivial な作業の成功条件・実行方法・モデル選�
 
 ## 高影響変更の spec-first
 
-auth / RLS / service role、billing / webhook、migration、data model、公開 API / MCP / OAuth / 外部 provider 契約、複数 feature の architecture、不可逆操作に触れる場合は、実装前に [`AI開発標準ループ`](../../../docs/operations/ai-development-loop.md) §高影響変更の spec-first を適用する。Issue / PR の spec を実装・既存契約・test と照合してから凍結し、実装後に固定した条件へ照合する。これは production mutation や release の許可ではない。
+auth / RLS / service role、billing / webhook、migration、data model、公開 API / MCP / OAuth / 外部 provider 契約、複数 feature の architecture、不可逆操作に触れる場合は、実装前に [`AI開発標準ループ`](../../../docs/operations/ai-development-loop.md) §高影響変更の spec-first を適用する。Issue / PR があればそこに、なければ作業報告に spec を残し、実装・既存契約・test と照合してから凍結する。Issue / PR を後から作った場合は転記して以後の正本にする。実装後は固定した条件へ照合する。これは production mutation や release の許可ではない。
 
-既知の狭い修正や既存パターンへの追従では、不要な spec 凍結を追加しない。
+既知の狭い修正や既存パターンへの追従でも、高影響条件に該当する場合は spec-first を適用する。高影響条件に該当しない場合は、不要な spec 凍結を追加しない。
 
 ## モデル選択
 
