@@ -39,7 +39,7 @@ describe('agent preflight', () => {
     const state = collectPreflight(root);
     expect(state.nodeMatches).toBe(false);
   });
-  it('uses Corepack when only the Corepack pnpm entrypoint is available', () => {
+  it('uses the Corepack entrypoint when it is the only matching pnpm contract', () => {
     const root = fixture();
     writeFileSync(join(root, 'package.json'), '{"packageManager":"pnpm@11.26.0"}\n');
     const bin = join(root, 'bin');
@@ -50,6 +50,9 @@ describe('agent preflight', () => {
       '#!/bin/sh\n[ "$1" = "pnpm" ] && [ "$2" = "--version" ] || exit 1\nprintf \'11.26.0\\n\'\n',
     );
     chmodSync(corepack, 0o755);
+    const pnpm = join(bin, 'pnpm');
+    writeFileSync(pnpm, "#!/bin/sh\nprintf '10.0.0\\n'\n");
+    chmodSync(pnpm, 0o755);
     const git = join(bin, 'git');
     writeFileSync(
       git,

@@ -73,22 +73,25 @@ export function collectGhIdentity({ env = process.env, ghPresent = true, statusT
   };
 }
 
-function collectPnpmVersion({ pnpmPresent, corepackPresent }) {
+function collectPnpmVersion({ pnpmPresent, corepackPresent, expectedVersion }) {
   const commands = [];
+  let firstVersion = null;
   if (pnpmPresent) commands.push(['pnpm']);
   if (corepackPresent) commands.push(['corepack', 'pnpm']);
   for (const [command, ...args] of commands) {
     try {
-      return execFileSync(command, [...args, '--version'], {
+      const version = execFileSync(command, [...args, '--version'], {
         encoding: 'utf8',
         stdio: ['ignore', 'pipe', 'ignore'],
         timeout: PREFLIGHT_COMMAND_TIMEOUT_MS,
       }).trim();
+      firstVersion ??= version;
+      if (expectedVersion !== null && version === expectedVersion) return version;
     } catch {
       // A broken pnpm shim can coexist with a working Corepack entrypoint.
     }
   }
-  return null;
+  return firstVersion;
 }
 
 function packageManagerVersion(root) {
@@ -144,7 +147,11 @@ export function collectPreflight(cwd = process.cwd()) {
   const expectedNode = readFileSync(join(root, '.nvmrc'), 'utf8').trim();
   const expectedNodeMajor = nodeMajor(expectedNode);
   const expectedPnpm = packageManagerVersion(root);
-  const actualPnpm = collectPnpmVersion({ pnpmPresent, corepackPresent });
+  const actualPnpm = collectPnpmVersion({
+    pnpmPresent,
+    corepackPresent,
+    expectedVersion: expectedPnpm,
+  });
   return {
     cwd,
     root,
