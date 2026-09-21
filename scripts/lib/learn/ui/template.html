@@ -11,63 +11,8 @@
       外部 script / CSS / font は使わない（file:// で開ける状態を保つ）。
     -->
     <style>
+      /* 学習画面はダーク表示だけにする */
       :root {
-        --bg: #fbfaf8;
-        --surface: #ffffff;
-        --surface-2: #f3f1ed;
-        --text: #1d1c1a;
-        --muted: #6b675f;
-        --border: #e2ded6;
-        --wire: #b7b1a6;
-        --accent: #2f5bd3;
-        --bad: #c7362a;
-        --bad-bg: #fcefed;
-        --warn: #b26b00;
-        --warn-bg: #fdf4e4;
-        --ok: #1e7b4f;
-        --ok-bg: #e9f5ee;
-        --neutral: #6b675f;
-        --neutral-bg: #f1efeb;
-        --svc-browser: #2f5bd3;
-        --svc-vercel: #3b3a36;
-        --svc-supabase: #1e8a5a;
-        --svc-resend: #8a4bd6;
-        --svc-github: #b8641b;
-        --svc-external: #6b675f;
-        --svc-google: #0f8b8d;
-        --svc-stripe: #635bff;
-        color-scheme: light;
-      }
-      @media (prefers-color-scheme: dark) {
-        :root:not([data-theme='light']) {
-          --bg: #161614;
-          --surface: #1f1e1c;
-          --surface-2: #2a2926;
-          --text: #ecebe7;
-          --muted: #a29e95;
-          --border: #3a3834;
-          --wire: #5b5750;
-          --accent: #7d9df0;
-          --bad: #f08274;
-          --bad-bg: #3a2320;
-          --warn: #e8b35a;
-          --warn-bg: #3a2e1a;
-          --ok: #6fcf9c;
-          --ok-bg: #1d3328;
-          --neutral: #a29e95;
-          --neutral-bg: #2a2926;
-          --svc-browser: #7d9df0;
-          --svc-vercel: #d8d6d0;
-          --svc-supabase: #5ccf97;
-          --svc-resend: #b98cf0;
-          --svc-github: #e0a263;
-          --svc-external: #a29e95;
-          --svc-google: #4fc3c5;
-          --svc-stripe: #9a94ff;
-          color-scheme: dark;
-        }
-      }
-      :root[data-theme='dark'] {
         --bg: #161614;
         --surface: #1f1e1c;
         --surface-2: #2a2926;
@@ -92,6 +37,8 @@
         --svc-external: #a29e95;
         --svc-google: #4fc3c5;
         --svc-stripe: #9a94ff;
+        /* 明るい色（accent・bad・ok など）の上に置く文字 */
+        --on-strong: #111214;
         color-scheme: dark;
       }
       * {
@@ -165,7 +112,7 @@
         border-radius: 9px;
         display: grid;
         place-items: center;
-        color: #fff;
+        color: var(--on-strong);
         font-weight: 800;
         font-size: 15px;
         background: linear-gradient(135deg, var(--accent), var(--svc-supabase));
@@ -243,26 +190,6 @@
         padding: 12px 6px 0;
         border-top: 1px solid var(--border);
         font-size: 12.5px;
-      }
-      .theme {
-        display: inline-flex;
-        border: 1px solid var(--border);
-        border-radius: 8px;
-        overflow: hidden;
-        align-self: flex-start;
-      }
-      .theme button {
-        border: 0;
-        background: transparent;
-        padding: 4px 10px;
-        font-size: 12px;
-        cursor: pointer;
-        color: var(--muted);
-      }
-      .theme button[aria-pressed='true'] {
-        background: var(--surface-2);
-        color: var(--text);
-        font-weight: 700;
       }
       .main {
         min-width: 0;
@@ -358,7 +285,7 @@
         border: 0;
         border-radius: 10px;
         background: var(--accent);
-        color: #fff;
+        color: var(--on-strong);
         font-weight: 700;
         cursor: pointer;
         box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
@@ -604,7 +531,7 @@
         font-weight: 700;
       }
       .tag.ret {
-        color: #fff;
+        color: var(--on-strong);
         background: var(--bad);
         border-color: var(--bad);
         font-weight: 600;
@@ -920,11 +847,11 @@
       }
       .m-block.saved {
         background: var(--accent);
-        color: #fff;
+        color: var(--on-strong);
       }
       .m-block.record {
         background: var(--ok);
-        color: #fff;
+        color: var(--on-strong);
       }
       .m-block.ext {
         background: color-mix(in srgb, var(--svc-external) 25%, var(--surface));
@@ -979,7 +906,7 @@
       }
       .m-toast.bad {
         background: var(--bad);
-        color: #fff;
+        color: var(--on-strong);
       }
       .m-toast b {
         margin-left: auto;
@@ -1011,7 +938,7 @@
         padding: 4px;
         border-radius: 6px;
         background: var(--accent);
-        color: #fff;
+        color: var(--on-strong);
         text-align: center;
         font-weight: 700;
       }
@@ -1085,7 +1012,7 @@
         border-radius: 50%;
         font-weight: 700;
         font-size: 15px;
-        color: #fff;
+        color: var(--on-strong);
         background: var(--ok);
       }
       .m-page.warn .ic {
@@ -1368,20 +1295,9 @@
       }
       /* ---- 見た目の仕上げ（部品ごとの上書き） ---- */
       :root {
-        --shadow-sm: 0 1px 2px rgba(28, 25, 20, 0.06);
-        --shadow: 0 1px 3px rgba(28, 25, 20, 0.06), 0 6px 20px rgba(28, 25, 20, 0.05);
-        --radius: 14px;
-      }
-      :root[data-theme='dark'],
-      :root:not([data-theme='light']) {
         --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.25);
         --shadow: 0 1px 3px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.25);
-      }
-      @media (prefers-color-scheme: light) {
-        :root:not([data-theme='dark']) {
-          --shadow-sm: 0 1px 2px rgba(28, 25, 20, 0.06);
-          --shadow: 0 1px 3px rgba(28, 25, 20, 0.06), 0 6px 20px rgba(28, 25, 20, 0.05);
-        }
+        --radius: 14px;
       }
       .flow,
       .smap,
@@ -1681,7 +1597,6 @@
           <a href="../docs/learn/README.md" target="_blank" rel="noopener"
             >章・lab・卒業問題（docs/learn）</a
           >
-          <div class="theme" role="group" aria-label="表示" id="theme"></div>
         </div>
       </aside>
       <main class="main">
@@ -1868,50 +1783,6 @@
             ]),
             actions || null,
           ]);
-        }
-
-        // 表示の切替（自動 / ライト / ダーク）。選択はこの端末の localStorage にだけ残す
-        function renderTheme() {
-          var box = document.getElementById('theme');
-          var current = null;
-          try {
-            current = window.localStorage.getItem('learn-theme');
-          } catch (e) {
-            current = null;
-          }
-          var apply = function (v) {
-            if (v) document.documentElement.setAttribute('data-theme', v);
-            else document.documentElement.removeAttribute('data-theme');
-          };
-          apply(current);
-          [
-            [null, '自動'],
-            ['light', 'ライト'],
-            ['dark', 'ダーク'],
-          ].forEach(function (opt) {
-            var b = el('button', {
-              type: 'button',
-              'aria-pressed': String(opt[0] === current),
-              text: opt[1],
-            });
-            b.addEventListener('click', function () {
-              current = opt[0];
-              apply(current);
-              try {
-                if (current) window.localStorage.setItem('learn-theme', current);
-                else window.localStorage.removeItem('learn-theme');
-              } catch (e) {
-                /* 保存できなくても表示は切り替わる */
-              }
-              box.querySelectorAll('button').forEach(function (x, k) {
-                x.setAttribute(
-                  'aria-pressed',
-                  String(k === [null, 'light', 'dark'].indexOf(current)),
-                );
-              });
-            });
-            box.appendChild(b);
-          });
         }
 
         function selectTab(i) {
@@ -3136,7 +3007,6 @@
           });
         }
 
-        renderTheme();
         render();
       })();
     </script>
