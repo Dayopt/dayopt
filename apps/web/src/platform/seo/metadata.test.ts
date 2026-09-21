@@ -99,6 +99,21 @@ describe('generateSEOMetadata', () => {
     });
   });
 
+  it('ページ見出しとソーシャルカードのタイトルを分けられる', () => {
+    const metadata = generateSEOMetadata({
+      title: 'One day at a time',
+      documentTitle: 'Dayopt',
+      ogTitle: 'Dayopt',
+      description: 'A description',
+    });
+    const imageUrl = (metadata.openGraph?.images as Array<{ url: string }>)[0]?.url;
+
+    expect(metadata.title).toBe('Dayopt');
+    expect(metadata.openGraph?.title).toBe('Dayopt');
+    expect(metadata.twitter?.title).toBe('Dayopt');
+    expect(new URL(imageUrl).searchParams.get('title')).toBe('Dayopt');
+  });
+
   it('en は prefixless canonical にし、入力済み locale prefix と末尾 slash を除く', () => {
     expect(generateSEOMetadata({ locale: 'en', url: '/ja/about/' })).toMatchObject({
       alternates: { canonical: 'https://dayopt.com/about' },
