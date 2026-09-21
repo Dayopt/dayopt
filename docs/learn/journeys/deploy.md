@@ -148,7 +148,7 @@ release job が migration の反映を確かめ（今は advisory で warning �
 
 ### 7. 開いているタブが新版に気づく（ブラウザ）
 
-タブへ戻った時（前回の確認から 1 分以上たっている時だけ）に /api/health/version の SHA を比べ、古ければ新版があると判断する。通知は出さない。その時点で編集中でなければ（保存中の mutation、作成中の下書き、開いたダイアログ、入力欄のフォーカスが無ければ）黙って再読み込みする。編集中だった時は、ダイアログを閉じても追いかけて再読み込みはせず、次にタブへ戻った時に判定し直す。
+新版の検知は 2 つの経路がある。(1) 別のタブが新しい版を開いて新しい Service Worker が制御を得た時（controllerchange）は、すぐに「新版あり」になる。(2) タブへ戻った時（前回の確認から 1 分以上たっている時だけ）に /api/health/version の SHA を比べる。どちらも通知は出さず、その時点で表示中で編集中でなければ（保存中の mutation・作成中の下書き・開いたダイアログ・入力欄のフォーカスが無ければ）黙って再読み込みする。編集中だった時は、ダイアログを閉じても追いかけて再読み込みはせず、次にタブが見えるようになった時に判定し直す。
 
 - **ここを変えると**: API の入出力を変えた直後は、旧版の画面が新版のサーバーを呼ぶ時間がある。tRPC の入力を必須化する変更は、旧画面からの呼び出しを壊す。
 - **コード**:
@@ -156,6 +156,7 @@ release job が migration の反映を確かめ（今は advisory で warning �
   - [`docs/engineering/pwa.md`](../../engineering/pwa.md) で `/api/health/version` を探す
   - [`apps/product/src/app/[locale]/(app)/_providers/useApplyUpdateWhenSafe.ts`](<../../../apps/product/src/app/[locale]/(app)/_providers/useApplyUpdateWhenSafe.ts>) で `export function useApplyUpdateWhenSafe` を探す
   - [`apps/product/src/lib/hooks/useServiceWorker.ts`](../../../apps/product/src/lib/hooks/useServiceWorker.ts) で `DEPLOYED_VERSION_PROBE_INTERVAL_MS = 60_000` を探す
+  - [`apps/product/src/lib/hooks/useServiceWorker.ts`](../../../apps/product/src/lib/hooks/useServiceWorker.ts) で `新 SW への切替検出（controllerchange）` を探す
 
 <!-- learn:generated:end -->
 
@@ -447,7 +448,7 @@ release job が migration の反映を確かめ（今は advisory で warning �
       "id": "tab-update",
       "svc": "browser",
       "title": "開いているタブが新版に気づく",
-      "what": "タブへ戻った時（前回の確認から 1 分以上たっている時だけ）に /api/health/version の SHA を比べ、古ければ新版があると判断する。通知は出さない。その時点で編集中でなければ（保存中の mutation、作成中の下書き、開いたダイアログ、入力欄のフォーカスが無ければ）黙って再読み込みする。編集中だった時は、ダイアログを閉じても追いかけて再読み込みはせず、次にタブへ戻った時に判定し直す。",
+      "what": "新版の検知は 2 つの経路がある。(1) 別のタブが新しい版を開いて新しい Service Worker が制御を得た時（controllerchange）は、すぐに「新版あり」になる。(2) タブへ戻った時（前回の確認から 1 分以上たっている時だけ）に /api/health/version の SHA を比べる。どちらも通知は出さず、その時点で表示中で編集中でなければ（保存中の mutation・作成中の下書き・開いたダイアログ・入力欄のフォーカスが無ければ）黙って再読み込みする。編集中だった時は、ダイアログを閉じても追いかけて再読み込みはせず、次にタブが見えるようになった時に判定し直す。",
       "change": "API の入出力を変えた直後は、旧版の画面が新版のサーバーを呼ぶ時間がある。tRPC の入力を必須化する変更は、旧画面からの呼び出しを壊す。",
       "refs": [
         {
@@ -465,6 +466,10 @@ release job が migration の反映を確かめ（今は advisory で warning �
         {
           "path": "apps/product/src/lib/hooks/useServiceWorker.ts",
           "find": "DEPLOYED_VERSION_PROBE_INTERVAL_MS = 60_000"
+        },
+        {
+          "path": "apps/product/src/lib/hooks/useServiceWorker.ts",
+          "find": "新 SW への切替検出（controllerchange）"
         }
       ],
       "fails": [],

@@ -377,7 +377,7 @@ last_verified: 2026-09-21
 
 - [Google Calendar 連携](journeys/google-calendar.md) の 4. callback で検証 — 失敗の理由はすべて ?calendar=error&reason=… で設定画面へ返し、専用の文言を出す。理由を足したら文言も足す。
 
-#### `apps/product/src/features/external-calendar/server/../schemas/google.ts`
+#### `apps/product/src/features/external-calendar/schemas/google.ts`
 
 - [Google Calendar 連携](journeys/google-calendar.md) の 2. /start で準備 — MFA を利用権や rate limit より先に見るのは、MFA 不足で断る時に DB 読み取りや枠を消費しないため。
 

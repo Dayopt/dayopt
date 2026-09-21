@@ -41,7 +41,7 @@ flowchart LR
 | Resend・Stripe・Google の env | 揃っていなくてよい（MCP の OAuth を有効にした Preview の build では置くこと自体を禁じる）                                | Resend は必須、Stripe と Google は全部あるか全部無いか（`env.ts`） |
 | 公開                          | Preview の URL                                                                                                           | promote が domain を切り替えた時だけ                               |
 
-**開いているタブ**は、戻った時に `/api/health/version` で版を比べ、編集中でない瞬間に黙って再読み込みする。通知は出ない。API の入力を必須にする変更は、古いタブからの呼び出しを壊す。
+**開いているタブ**は、別のタブが新しい版を開いた時（Service Worker の controllerchange）か、1 分以上たってからタブへ戻った時（`/api/health/version` で版を比べる）に新版に気づき、その時点で編集中でなければ黙って再読み込みする。通知は出ない。編集中だった時は、次にタブが見えるようになるまで古い版のまま。API の入力を必須にする変更は、古いタブからの呼び出しを壊す。
 
 ## 正本
 

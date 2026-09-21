@@ -142,11 +142,12 @@ flowchart LR
 - **壊れる**: 障害の痕跡が見えなくなる。資格情報が欠けると production build が失敗する。
 - **動き続ける**: アプリの動作（送信は fire-and-forget）。
 - **コードの挙動**: 本番の build は DSN などが無いと失敗する（build gate）。Preview と local では DSN が無ければ黙って初期化しない。/api/health の transaction は inbound filter で捨てるので、Sentry が無音でも health が無事とは限らない。
-- **関係する env**: `NEXT_PUBLIC_SENTRY_DSN`, `SENTRY_DSN`
+- **関係する env**: `NEXT_PUBLIC_SENTRY_DSN`, `SENTRY_DSN`, `SENTRY_ORG`, `SENTRY_PROJECT`, `SENTRY_AUTH_TOKEN`, `VERCEL_GIT_COMMIT_SHA`
 - **最初に見る場所**: Sentry の status。痕跡が無い時は Vercel の Function ログへ。
 - **コードと文書**:
   - [`apps/product/sentry.server.config.ts`](../../../apps/product/sentry.server.config.ts) で `Sentry.init` を探す
   - [`docs/operations/monitoring.md`](../../operations/monitoring.md) で `## Sentry runtime contract` を探す
+  - [`packages/observability/build-gate.mjs`](../../../packages/observability/build-gate.mjs) で `'SENTRY_AUTH_TOKEN',` を探す
 
 ### Cloudflare Turnstile が止まったら
 
@@ -417,7 +418,14 @@ flowchart LR
         "breaks": "障害の痕跡が見えなくなる。資格情報が欠けると production build が失敗する。",
         "keeps": "アプリの動作（送信は fire-and-forget）。",
         "behavior": "本番の build は DSN などが無いと失敗する（build gate）。Preview と local では DSN が無ければ黙って初期化しない。/api/health の transaction は inbound filter で捨てるので、Sentry が無音でも health が無事とは限らない。",
-        "env": ["NEXT_PUBLIC_SENTRY_DSN", "SENTRY_DSN"],
+        "env": [
+          "NEXT_PUBLIC_SENTRY_DSN",
+          "SENTRY_DSN",
+          "SENTRY_ORG",
+          "SENTRY_PROJECT",
+          "SENTRY_AUTH_TOKEN",
+          "VERCEL_GIT_COMMIT_SHA"
+        ],
         "look": "Sentry の status。痕跡が無い時は Vercel の Function ログへ。",
         "refs": [
           {
@@ -427,6 +435,10 @@ flowchart LR
           {
             "path": "docs/operations/monitoring.md",
             "find": "## Sentry runtime contract"
+          },
+          {
+            "path": "packages/observability/build-gate.mjs",
+            "find": "'SENTRY_AUTH_TOKEN',"
           }
         ],
         "impacts": {

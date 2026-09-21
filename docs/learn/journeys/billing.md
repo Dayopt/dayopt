@@ -171,16 +171,17 @@ Stripe がホストする Checkout ページ。カード情報は Dayopt を通�
   - [`apps/product/src/lib/test/e2e/billing.spec.ts`](../../../apps/product/src/lib/test/e2e/billing.spec.ts) で `Checkout 成功復帰（?success=true）で成功 toast が表示される` を探す
 
 <details>
-<summary>⚡ 30 秒待っても webhook が反映されない — 画面: エラー表示 / データ: 食い違いが残る / 再試行: 相手が再送 / 痕跡: Sentry</summary>
+<summary>⚡ 30 秒待っても webhook が反映されない — 画面: エラー表示 / データ: 食い違いが残る / 再試行: 相手が再送 / 痕跡: ログだけ</summary>
 
 - 画面: 「契約状態をまだ確認できません。しばらくしてから課金情報を再読み込みしてください。変わらない場合はサポートへご連絡ください。」の toast。
 - データ: Stripe では支払い済み、DB の profiles はまだ free。webhook が後で届けば直る。
 - 再試行: Stripe が webhook を再送する。画面は再読み込みか 60 秒ごとの利用権の取り直しで追いつく。
-- 痕跡: Sentry（operation: billing_return_poll_timeout）。
+- 痕跡: ブラウザから Sentry へ送る（operation: billing_return_poll_timeout）。ただしブラウザの Sentry は本番（VERCEL_ENV=production）で、かつ分析の同意がある時だけ動くので、Preview や同意の無い利用者では何も残らない。
 - **最初に見る場所**: Stripe Dashboard の webhook 配信履歴と runbook Playbook 3。原因は下の webhook の段にある。
 - 根拠:
   - [`apps/product/src/features/settings/lib/billing-poll-observability.ts`](../../../apps/product/src/features/settings/lib/billing-poll-observability.ts) で `operation: 'billing_return_poll_timeout',` を探す
   - [`docs/operations/runbook.md`](../../operations/runbook.md) で `## Playbook 3: Stripe Webhook停止（P1）` を探す
+  - [`apps/product/src/features/settings/lib/billing-poll-observability.ts`](../../../apps/product/src/features/settings/lib/billing-poll-observability.ts) で `operation: 'billing_return_poll_timeout',` を探す
 
 </details>
 
@@ -751,7 +752,7 @@ Vercel cron が毎日 /api/cron/billing-reconciliation を叩く。Stripe の直
           "screen": "「契約状態をまだ確認できません。しばらくしてから課金情報を再読み込みしてください。変わらない場合はサポートへご連絡ください。」の toast。",
           "data": "Stripe では支払い済み、DB の profiles はまだ free。webhook が後で届けば直る。",
           "retry": "Stripe が webhook を再送する。画面は再読み込みか 60 秒ごとの利用権の取り直しで追いつく。",
-          "trace": "Sentry（operation: billing_return_poll_timeout）。",
+          "trace": "ブラウザから Sentry へ送る（operation: billing_return_poll_timeout）。ただしブラウザの Sentry は本番（VERCEL_ENV=production）で、かつ分析の同意がある時だけ動くので、Preview や同意の無い利用者では何も残らない。",
           "look": "Stripe Dashboard の webhook 配信履歴と runbook Playbook 3。原因は下の webhook の段にある。",
           "refs": [
             {
@@ -761,13 +762,17 @@ Vercel cron が毎日 /api/cron/billing-reconciliation を叩く。Stripe の直
             {
               "path": "docs/operations/runbook.md",
               "find": "## Playbook 3: Stripe Webhook停止（P1）"
+            },
+            {
+              "path": "apps/product/src/features/settings/lib/billing-poll-observability.ts",
+              "find": "operation: 'billing_return_poll_timeout',"
             }
           ],
           "tags": {
             "screen": "toast",
             "data": "mixed",
             "retry": "provider",
-            "trace": "sentry"
+            "trace": "log"
           },
           "screenAfter": {
             "t": "settings",

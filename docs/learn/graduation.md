@@ -62,7 +62,7 @@ last_verified: 2026-09-21
 - main の ruleset（required checks・review thread の解決）を通って merge
 - merge の時点で migration が本番 DB に入る。Vercel は本番候補を作る（domain は未割当）
 - Production Release が影響を判定し、E2E などを回し、緑なら smoke して promote。赤なら公開せず issue が立つ。migration の反映確認は今は warning だけで、promote を止めない
-- 開いているタブは、編集中でない瞬間に黙って新しい版になる
+- 開いているタブは、別タブが新版を開いた時か 1 分以上たってからの復帰時に新版に気づき、その時点で編集中でなければ黙って再読み込みする（編集中なら次に見えるようになるまで古いまま）
 
 読み直す: [merge → 本番公開](journeys/deploy.md)、[9. デプロイ](09-deployment.md)
 

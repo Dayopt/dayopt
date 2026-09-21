@@ -71,7 +71,7 @@ flowchart TD
 <details>
 <summary>3. 本番の書き込みを一時的に止めたい。何を使い、何は止まらないか</summary>
 
-write fence（runbook の「Write Fence 有効化」）。tRPC の mutation と cron・callback の書き込みが止まる。読み取りと、MCP の書き込み gate（別スイッチ）は対象外。
+write fence（runbook の「Write Fence 有効化」）。止まるのは、tRPC の mutation、Stripe / Resend の webhook、3 本の cron（calendar-sync・external-connection-maintenance・calendar-account-deletion-settle）、Google Calendar の callback、AI クライアントの新規接続（token 発行の authorization_code）。**止まらない**のは、読み取り、refresh token の発行、ブラウザから直接呼ぶ Supabase Auth（登録・パスワード変更など）と Storage（アバター）、pg_cron、MCP の tool の書き込み（別スイッチ `mcp_mutation_control`）。一覧の正本は runbook の表。
 
 </details>
 

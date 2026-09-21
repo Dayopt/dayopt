@@ -172,6 +172,17 @@ describe('runLearnRefsCheck', () => {
     expect(violations.some((v) => v.reason.includes('マーカーが 2 個ある'))).toBe(true);
   });
 
+  it('.. を含む参照パスを拒否する（同じファイルが別表記になり逆引きから外れる）', async () => {
+    const root = fixture('createPlan');
+    const path = join(root, 'docs/learn/journeys/demo.md');
+    writeFileSync(
+      path,
+      readFileSync(path, 'utf8').replace('"path": "real.ts"', '"path": "sub/../real.ts"'),
+    );
+    const violations = await runLearnRefsCheck(root);
+    expect(violations.some((v) => v.reason.includes('正規化した repo 相対パスで書く'))).toBe(true);
+  });
+
   it('壊れた JSON を報告する', async () => {
     const root = fixture();
     const path = join(root, 'docs/learn/journeys/demo.md');

@@ -81,7 +81,7 @@ flowchart TD
   - [`apps/product/src/app/api/integrations/google-calendar/start/route.ts`](../../../apps/product/src/app/api/integrations/google-calendar/start/route.ts) で `checkEntitlementForUser` を探す
   - [`apps/product/src/app/api/integrations/google-calendar/start/route.ts`](../../../apps/product/src/app/api/integrations/google-calendar/start/route.ts) で `generatePkcePair` を探す
   - [`apps/product/src/app/api/integrations/google-calendar/start/route.ts`](../../../apps/product/src/app/api/integrations/google-calendar/start/route.ts) で `calendarConnectRateLimit` を探す
-  - [`apps/product/src/features/external-calendar/server/../schemas/google.ts`](../../../apps/product/src/features/external-calendar/schemas/google.ts) で `GOOGLE_AUTHORIZATION_SCOPES` を探す
+  - [`apps/product/src/features/external-calendar/schemas/google.ts`](../../../apps/product/src/features/external-calendar/schemas/google.ts) で `GOOGLE_AUTHORIZATION_SCOPES` を探す
 
 <details>
 <summary>⚡ 利用権が切れている — 画面: 使えない / データ: 変化なし / 再試行: しない / 痕跡: 残らない</summary>
@@ -411,7 +411,7 @@ CRON_SECRET で呼び出し元を確かめ、write fence を見て、開始と�
           "find": "calendarConnectRateLimit"
         },
         {
-          "path": "apps/product/src/features/external-calendar/server/../schemas/google.ts",
+          "path": "apps/product/src/features/external-calendar/schemas/google.ts",
           "find": "GOOGLE_AUTHORIZATION_SCOPES"
         }
       ],

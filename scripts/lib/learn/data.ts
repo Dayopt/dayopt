@@ -60,7 +60,17 @@ function tagEnum<K extends keyof typeof FAILURE_TAGS>(kind: K) {
 }
 
 const refSchema = z.strictObject({
-  path: z.string().min(1),
+  // 正規化した repo 相対パスだけを許す。`..` や `./` を含むと、同じファイルが別の表記になり
+  // 章 12 の逆引き（ファイルごとの一覧）から外れる
+  path: z
+    .string()
+    .min(1)
+    .refine(
+      (path) =>
+        !path.startsWith('/') &&
+        !path.split('/').some((seg) => seg === '..' || seg === '.' || seg === ''),
+      '正規化した repo 相対パスで書く（先頭の /、.、..、空の区切りは使わない）',
+    ),
   find: z.string().min(1),
   why: z.string().min(1).optional(),
 });

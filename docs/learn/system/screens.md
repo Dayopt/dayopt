@@ -227,7 +227,7 @@ Google 側の画面。アカウントを選び、カレンダーの読み取り�
 - **移る先**: 設定 › 連携（callback → 結果）
 - **この画面を通る経路**: [Google Calendar 連携](../journeys/google-calendar.md)
 - **コードと文書**:
-  - [`apps/product/src/features/external-calendar/server/../schemas/google.ts`](../../../apps/product/src/features/external-calendar/schemas/google.ts) で `GOOGLE_AUTHORIZATION_SCOPES` を探す
+  - [`apps/product/src/features/external-calendar/schemas/google.ts`](../../../apps/product/src/features/external-calendar/schemas/google.ts) で `GOOGLE_AUTHORIZATION_SCOPES` を探す
 
 ### MCP の認可（入口）（`/ja/oauth/authorize`）
 
@@ -677,7 +677,7 @@ MCP クライアントに渡す権限（scope）を利用者が承認する。
       },
       "refs": [
         {
-          "path": "apps/product/src/features/external-calendar/server/../schemas/google.ts",
+          "path": "apps/product/src/features/external-calendar/schemas/google.ts",
           "find": "GOOGLE_AUTHORIZATION_SCOPES"
         }
       ],
