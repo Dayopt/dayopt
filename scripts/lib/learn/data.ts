@@ -12,6 +12,8 @@ import { readFileSync } from 'node:fs';
 import { relative, resolve } from 'node:path';
 import { z } from 'zod';
 
+import { discoverEntrypoints, type Entrypoint } from './entrypoints.ts';
+
 export const REPO_BLOB_URL = 'https://github.com/Dayopt/dayopt/blob/main/';
 
 /** 失敗時の 4 観点。[見出し, 色の分類]。UI とテキスト生成の両方がこの辞書を使う。 */
@@ -278,7 +280,30 @@ export const screensSchema = z.strictObject({
   edges: z.array(z.tuple([z.string().min(1), z.string().min(1), z.string().min(1)])),
 });
 
+/**
+ * HTTP の入口（route.ts / cron）の説明。一覧は entrypoints.ts が実装から発見し、ここには
+ * 機械が読めない「誰が・なぜ・止まると」だけを書く。key は入口の id（URL の path）。
+ */
+export const entrypointNoteSchema = z.strictObject({
+  /** 誰が呼ぶか（ブラウザ / Vercel Cron / Stripe など） */
+  who: z.string().min(1),
+  /** 何のためにあるか */
+  why: z.string().min(1),
+  /** 止まる・落ちると何が起きるか、どこで気づくか */
+  outage: z.string().min(1),
+  /** 対応する経路と段（journey id と hop id）。無ければ省略 */
+  journey: z.strictObject({ id: z.string().min(1), hop: z.string().min(1) }).optional(),
+  refs: z.array(refSchema).optional(),
+});
+
+export const entrypointsSchema = z.strictObject({
+  title: z.string().min(1),
+  intro: z.string().min(1),
+  notes: z.record(z.string().min(1), entrypointNoteSchema),
+});
+
 export type LearnRef = z.infer<typeof refSchema>;
+export type LearnEntrypoints = z.infer<typeof entrypointsSchema>;
 export type LearnJourney = z.infer<typeof journeySchema>;
 export type LearnServices = z.infer<typeof servicesSchema>;
 export type LearnScreens = z.infer<typeof screensSchema>;
@@ -306,6 +331,9 @@ export interface CollectResult {
   screens: LearnSource<LearnScreens> | undefined;
   /** 章や lab の手書きの本文が名指しするコード（learn:refs）。本文と同じファイルに置く */
   extraRefs: LearnSource<LearnRef[]>[];
+  /** learn:entrypoints（入口の説明）と、実装から発見した入口の一覧 */
+  entrypoints: LearnSource<LearnEntrypoints> | undefined;
+  discoveredEntrypoints: Entrypoint[];
   errors: string[];
 }
 
@@ -449,6 +477,7 @@ export function collectLearnData(root: string): CollectResult {
   let services: LearnSource<LearnServices> | undefined;
   let screens: LearnSource<LearnScreens> | undefined;
   const extraRefs: LearnSource<LearnRef[]>[] = [];
+  let entrypoints: LearnSource<LearnEntrypoints> | undefined;
 
   for (const abs of files) {
     const file = relative(root, abs);
@@ -473,6 +502,11 @@ export function collectLearnData(root: string): CollectResult {
         if (screens) errors.push(`${file}: learn:screens が 2 つある（${screens.file}）`);
         const value = parseBlock(block, screensSchema, errors);
         if (value) screens = { file, value };
+      } else if (block.kind === 'entrypoints') {
+        if (entrypoints)
+          errors.push(`${file}: learn:entrypoints が 2 つある（${entrypoints.file}）`);
+        const value = parseBlock(block, entrypointsSchema, errors);
+        if (value) entrypoints = { file, value };
       } else {
         errors.push(`${file}: 未知の block learn:${block.kind}`);
       }
@@ -482,6 +516,13 @@ export function collectLearnData(root: string): CollectResult {
   if (!services) errors.push('learn:services の block が無い');
   if (!screens) errors.push('learn:screens の block が無い');
   if (services && screens) errors.push(...crossCheck(journeys, services, screens));
+
+  // 入口: 実装の一覧と説明の対応。一覧にあって説明が無い（足したのに書いていない）、
+  // 説明があって一覧に無い（消したのに残っている）のどちらも止める
+  const discovery = discoverEntrypoints(root);
+  errors.push(...discovery.errors);
+  if (!entrypoints) errors.push('learn:entrypoints の block が無い');
+  else errors.push(...checkEntrypointNotes(entrypoints, discovery.entrypoints, journeys));
 
   // 対話画面のタブと README の一覧は、まとまり（JOURNEY_GROUPS の並び）→ order の順
   const groupRank = Object.keys(JOURNEY_GROUPS);
@@ -502,7 +543,47 @@ export function collectLearnData(root: string): CollectResult {
           scenarios: journeys.map((j) => j.value),
         }
       : undefined;
-  return { data, journeys, services, screens, extraRefs, errors };
+  return {
+    data,
+    journeys,
+    services,
+    screens,
+    extraRefs,
+    entrypoints,
+    discoveredEntrypoints: discovery.entrypoints,
+    errors,
+  };
+}
+
+export function checkEntrypointNotes(
+  source: LearnSource<LearnEntrypoints>,
+  discovered: readonly Entrypoint[],
+  journeys: readonly LearnSource<LearnJourney>[],
+): string[] {
+  const errors: string[] = [];
+  const known = new Set(discovered.map((e) => e.id));
+  for (const entry of discovered) {
+    if (!(entry.id in source.value.notes))
+      errors.push(
+        `${source.file}: 入口 ${entry.id}（${entry.path}）の説明が無い。learn:entrypoints の notes に足す`,
+      );
+  }
+  for (const [id, note] of Object.entries(source.value.notes)) {
+    if (!known.has(id))
+      errors.push(
+        `${source.file}: 入口 ${id} の説明があるが、対応する route.ts が無い（消すか id を直す）`,
+      );
+    if (note.journey) {
+      const journey = journeys.find((j) => j.value.id === note.journey?.id);
+      if (!journey)
+        errors.push(`${source.file}: 入口 ${id} が存在しない journey を指す: ${note.journey.id}`);
+      else if (!journey.value.hops.some((hop) => hop.id === note.journey?.hop))
+        errors.push(
+          `${source.file}: 入口 ${id} が journey ${note.journey.id} に無い段を指す: ${note.journey.hop}`,
+        );
+    }
+  }
+  return errors;
 }
 
 /** data 中のすべての参照（refs と tests）を列挙する。 */
@@ -523,5 +604,8 @@ export function listLearnRefs(result: CollectResult): { file: string; ref: Learn
   if (result.screens)
     for (const node of result.screens.value.nodes) push(result.screens.file, node.refs);
   for (const { file, value } of result.extraRefs) push(file, value);
+  if (result.entrypoints)
+    for (const note of Object.values(result.entrypoints.value.notes))
+      push(result.entrypoints.file, note.refs);
   return out;
 }

@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import { collectLearnData } from '../../../lib/learn/data.ts';
-import { renderLearnDocs } from '../../../lib/learn/render-markdown.ts';
+import { learnMarkers, renderLearnDocs } from '../../../lib/learn/render-markdown.ts';
 import { checkLearnRefs, runLearnRefsCheck } from '../checks/learn-refs.ts';
 
 const FM = '---\nstatus: current\nlast_verified: 2026-09-21\n---\n\n';
@@ -57,10 +57,37 @@ const journey = (find: string) => ({
   ],
 });
 
+const API_DIR = 'apps/product/src/app/api';
+const entrypoints = {
+  title: '入口',
+  intro: 'i',
+  notes: {
+    '/api/health': { who: '監視', why: 'w', outage: 'o' },
+    '/api/cron/tick': { who: 'cron', why: 'w', outage: 'o', journey: { id: 'demo', hop: 'one' } },
+  },
+};
+
+function writeEntrypoints(root: string, value: unknown = entrypoints): void {
+  writeFileSync(
+    join(root, 'docs/learn/system/entrypoints.md'),
+    `${FM}# e\n\n${learnMarkers('entrypoints').start}\n\n${learnMarkers('entrypoints').end}\n${block('entrypoints', value)}`,
+  );
+}
+
 function fixture(find = 'createPlan'): string {
   const root = mkdtempSync(join(tmpdir(), 'learn-refs-'));
   mkdirSync(join(root, 'docs/learn/journeys'), { recursive: true });
   mkdirSync(join(root, 'docs/learn/system'), { recursive: true });
+  mkdirSync(join(root, API_DIR, 'health'), { recursive: true });
+  mkdirSync(join(root, API_DIR, 'cron/tick'), { recursive: true });
+  writeFileSync(join(root, API_DIR, 'health/route.ts'), 'export function GET() {}\n');
+  writeFileSync(join(root, API_DIR, 'cron/tick/route.ts'), 'export { h as GET };\n');
+  mkdirSync(join(root, 'apps/product'), { recursive: true });
+  writeFileSync(
+    join(root, 'apps/product/vercel.json'),
+    JSON.stringify({ crons: [{ path: '/api/cron/tick', schedule: '*/15 * * * *' }] }),
+  );
+  writeEntrypoints(root);
   writeFileSync(join(root, 'real.ts'), 'export function createPlan() {}\n');
   writeFileSync(join(root, 'real.test.ts'), "it('保存できる', () => {});\n");
   writeFileSync(
@@ -205,5 +232,60 @@ describe('runLearnRefsCheck', () => {
     writeFileSync(path, readFileSync(path, 'utf8').replace('"order": 10,', '"order": 10'));
     const violations = await runLearnRefsCheck(root);
     expect(violations.some((v) => v.reason.includes('JSON が壊れている'))).toBe(true);
+  });
+});
+
+describe('入口の一覧と説明の対応', () => {
+  const reasons = (root: string) => collectLearnData(root).errors;
+
+  it('一覧と説明が揃っていれば error 0 件', () => {
+    expect(reasons(fixture())).toEqual([]);
+  });
+
+  it('route.ts を足したのに説明が無ければ止める', () => {
+    const root = fixture();
+    mkdirSync(join(root, API_DIR, 'fresh'), { recursive: true });
+    writeFileSync(join(root, API_DIR, 'fresh/route.ts'), 'export const POST = () => {};\n');
+    expect(reasons(root)).toEqual([expect.stringContaining('入口 /api/fresh')]);
+  });
+
+  it('route.ts が消えたのに説明が残っていれば止める', () => {
+    const root = fixture();
+    writeEntrypoints(root, {
+      ...entrypoints,
+      notes: { ...entrypoints.notes, '/api/gone': { who: 'x', why: 'y', outage: 'z' } },
+    });
+    expect(reasons(root)).toEqual([expect.stringContaining('入口 /api/gone の説明があるが')]);
+  });
+
+  it('vercel.json の cron が無い route を指していれば止める', () => {
+    const root = fixture();
+    writeFileSync(
+      join(root, 'apps/product/vercel.json'),
+      JSON.stringify({ crons: [{ path: '/api/cron/ghost', schedule: '0 0 * * *' }] }),
+    );
+    expect(reasons(root)).toEqual([expect.stringContaining('cron /api/cron/ghost')]);
+  });
+
+  it('説明が存在しない段を指していれば止める', () => {
+    const root = fixture();
+    writeEntrypoints(root, {
+      ...entrypoints,
+      notes: {
+        ...entrypoints.notes,
+        '/api/cron/tick': { who: 'c', why: 'w', outage: 'o', journey: { id: 'demo', hop: 'nine' } },
+      },
+    });
+    expect(reasons(root)).toEqual([expect.stringContaining('無い段を指す: nine')]);
+  });
+
+  it('生成した表に cron の間隔と経路の段が載る', async () => {
+    const root = fixture();
+    const doc = (await renderLearnDocs(root, collectLearnData(root))).find((d) =>
+      d.file.endsWith('entrypoints.md'),
+    );
+    expect(doc?.expected).toContain('15 分ごと');
+    expect(doc?.expected).toContain('の 1 ');
+    expect(doc?.expected).toContain('| GET ');
   });
 });

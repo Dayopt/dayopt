@@ -14,12 +14,13 @@ pnpm learn
 
 ## 中身
 
-| 種類            | 場所                                     | 答える問い                                                       |
-| --------------- | ---------------------------------------- | ---------------------------------------------------------------- |
-| 画面マップ      | [system/screens.md](system/screens.md)   | どの画面から、どの条件で、どこへ移るか                           |
-| 外部サービス    | [system/services.md](system/services.md) | どのサービスが止まると、何が止まり、何が動き続けるか             |
-| AI まわり       | [system/agents.md](system/agents.md)     | AI 向けの指示書・skill・guard・memory が、どこに在り、いつ効くか |
-| 経路（journey） | [journeys/](journeys/)                   | 1 つの操作が、ブラウザから DB まで何を通るか                     |
+| 種類            | 場所                                           | 答える問い                                                                             |
+| --------------- | ---------------------------------------------- | -------------------------------------------------------------------------------------- |
+| 画面マップ      | [system/screens.md](system/screens.md)         | どの画面から、どの条件で、どこへ移るか                                                 |
+| 外部サービス    | [system/services.md](system/services.md)       | どのサービスが止まると、何が止まり、何が動き続けるか                                   |
+| AI まわり       | [system/agents.md](system/agents.md)           | AI 向けの指示書・skill・guard・memory が、どこに在り、いつ効くか                       |
+| 入口の一覧      | [system/entrypoints.md](system/entrypoints.md) | 外から入る HTTP と cron は何本あり、誰が呼び、止まるとどうなるか（一覧は実装から生成） |
+| 経路（journey） | [journeys/](journeys/)                         | 1 つの操作が、ブラウザから DB まで何を通るか                                           |
 
 経路（`pnpm learn` のタブと同じまとまり）:
 

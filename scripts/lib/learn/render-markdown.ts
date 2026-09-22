@@ -23,13 +23,20 @@ import {
   type LearnScreens,
   type LearnServices,
 } from './data.ts';
+import { describeSchedule } from './entrypoints.ts';
 
 const SOURCE_KINDS = new Set(['journey', 'services', 'screens']);
 
+const ENTRYPOINTS_SOURCE =
+  'apps/product/src/app/api の route.ts と vercel.json の crons（一覧）+ このファイルの learn:entrypoints の JSON（説明）';
+
 export function learnMarkers(kind: string): GeneratedBlockMarkers {
-  const source = SOURCE_KINDS.has(kind)
-    ? `このファイルの learn:${kind} の JSON`
-    : `docs/learn/journeys の JSON（${kind}）`;
+  const source =
+    kind === 'entrypoints'
+      ? ENTRYPOINTS_SOURCE
+      : SOURCE_KINDS.has(kind)
+        ? `このファイルの learn:${kind} の JSON`
+        : `docs/learn/journeys の JSON（${kind}）`;
   return {
     start: `<!-- learn:generated:start — 正本 ${source} / 再生成 pnpm learn:generate / 検証 pnpm docs:check。この範囲は手編集しない -->`,
     end: '<!-- learn:generated:end -->',
@@ -255,6 +262,42 @@ export function renderScreens(
 }
 
 /** 章 6: 経路の段ごとに、それを守るテストと、守るテストが無い段を並べる。 */
+/** 入口の一覧。行は実装の発見結果、説明は learn:entrypoints から。 */
+export function renderEntrypoints(docFile: string, result: CollectResult): string {
+  const source = result.entrypoints;
+  if (!source) return '';
+  const journeyFiles = new Map(result.journeys.map((j) => [j.value.id, j.file]));
+  const journeyTitles = new Map(result.journeys.map((j) => [j.value.id, j.value.title]));
+  const hopIndex = (journeyId: string, hopId: string): number =>
+    (result.journeys.find((j) => j.value.id === journeyId)?.value.hops ?? []).findIndex(
+      (hop) => hop.id === hopId,
+    ) + 1;
+  const cell = (text: string) => text.replace(/\|/g, '\\|').replace(/\n/g, ' ');
+  const out: string[] = [
+    source.value.intro,
+    '',
+    '| 入口 | method | 誰が呼ぶか | 間隔 | なぜあるか | 止まると | 経路 |',
+    '| --- | --- | --- | --- | --- | --- | --- |',
+  ];
+  const untold: string[] = [];
+  for (const entry of result.discoveredEntrypoints) {
+    const note = source.value.notes[entry.id];
+    if (!note) {
+      untold.push(entry.id);
+      continue;
+    }
+    const link = `[${inlineCode(entry.id)}](${relLink(docFile, entry.path)})`;
+    const journey = note.journey
+      ? `[${journeyTitles.get(note.journey.id) ?? note.journey.id}](${relLink(docFile, journeyFiles.get(note.journey.id) ?? '')}) の ${hopIndex(note.journey.id, note.journey.hop)}`
+      : '—';
+    out.push(
+      `| ${link} | ${entry.methods.join(' ')} | ${cell(note.who)} | ${entry.schedule ? describeSchedule(entry.schedule) : '—'} | ${cell(note.why)} | ${cell(note.outage)} | ${journey} |`,
+    );
+  }
+  if (untold.length) out.push('', `説明の無い入口（docs:check が止める）: ${untold.join(', ')}`);
+  return out.join('\n');
+}
+
 export function renderTestMap(docFile: string, result: CollectResult): string {
   const out: string[] = [
     '経路の各段に紐付いたテストの一覧。段の「この段を守るテスト」と、経路全体を通しで守るテストを集めた。',
@@ -334,6 +377,7 @@ export function renderJourneyIndex(docFile: string, result: CollectResult): stri
 const INDEX_DOCS = [
   { file: 'docs/learn/README.md', kind: 'journey-index', render: renderJourneyIndex },
   { file: 'docs/learn/06-testing.md', kind: 'test-map', render: renderTestMap },
+  { file: 'docs/learn/system/entrypoints.md', kind: 'entrypoints', render: renderEntrypoints },
   { file: 'docs/learn/12-change.md', kind: 'change-map', render: renderChangeMap },
 ] as const;
 
