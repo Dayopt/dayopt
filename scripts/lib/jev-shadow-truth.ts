@@ -18,6 +18,7 @@ import { createHash } from 'node:crypto';
 
 import { JEV_MAX_INPUT_BYTES, jevInputBytes, type JevJsonValue } from './jev-adapter.ts';
 import { SHADOW_QUESTION_SET_ID, SHADOW_QUESTIONS } from './jev-shadow-questions.ts';
+import { VALIDATION_PRODUCER_DEFINITIONS } from './validation-producer-contract.mjs';
 
 /** 保護対象 glob を観点へ写像する時の分類。 */
 export type ProtectedCategory =
@@ -40,6 +41,13 @@ export const PROTECTED_GLOB_CATEGORIES: Record<string, ProtectedCategory> = {
   'apps/product/src/app/api/oauth/**': 'auth-mcp',
   'apps/product/src/app/.well-known/oauth-authorization-server/**': 'auth-mcp',
   'apps/product/src/app/.well-known/oauth-protected-resource/**': 'auth-mcp',
+  'apps/product/src/app/[locale]/(auth)/auth/**': 'auth-mcp',
+  'apps/product/src/proxy.ts': 'auth-mcp',
+  'apps/product/src/lib/supabase/**': 'auth-mcp',
+  'apps/product/src/lib/trpc/*context*.ts': 'auth-mcp',
+  'apps/product/src/lib/auth/**': 'auth-mcp',
+  'apps/product/src/lib/safe-redirect.ts': 'auth-mcp',
+  'apps/product/src/lib/oauth-server/**': 'auth-mcp',
   'apps/product/src/app/api/integrations/**': 'auth-mcp',
   'apps/product/src/app/mcp/**': 'auth-mcp',
   'apps/product/src/app/api/mcp/**': 'auth-mcp',
@@ -50,15 +58,15 @@ export const PROTECTED_GLOB_CATEGORIES: Record<string, ProtectedCategory> = {
   'apps/product/src/lib/billing/**': 'billing',
   'apps/product/src/app/api/webhooks/**': 'billing',
   'apps/product/src/features/settings/server/billing-*.ts': 'billing',
-  'apps/product/src/features/external-calendar/server/providers/**': 'external-calendar',
-  'apps/product/src/app/api/cron/calendar-account-deletion-settle/**': 'external-calendar',
-  'apps/product/src/features/external-calendar/server/account-deletion.ts': 'external-calendar',
-  'apps/product/src/features/external-calendar/server/token-rotation.ts': 'external-calendar',
-  'apps/product/src/features/external-calendar/server/revoke-outbox.ts': 'external-calendar',
+  'apps/product/src/**/account-deletion*.ts': 'billing',
+  'apps/product/src/features/external-calendar/server/**': 'external-calendar',
+  'apps/product/src/features/external-calendar/schemas/google*.ts': 'external-calendar',
+  'apps/product/src/app/api/cron/**': 'auth-mcp',
+  'apps/product/src/app/api/v1/**': 'system-api',
+  'apps/product/src/features/timeblock/lib/plan-to-ical.ts': 'external-calendar',
   'apps/product/src/features/timeblock/server/mcp-*': 'timeblock-highrisk',
   'apps/product/src/features/timeblock/server/private-timeblock-search-query.ts':
     'timeblock-highrisk',
-  'apps/product/src/app/api/v1/system/**': 'system-api',
   '.husky/**': 'guardrails',
   '.codex/**': 'guardrails',
   '.claude/settings.json': 'guardrails',
@@ -66,8 +74,16 @@ export const PROTECTED_GLOB_CATEGORIES: Record<string, ProtectedCategory> = {
   'scripts/hooks/**': 'guardrails',
   'scripts/tasks/finish-branch.sh': 'guardrails',
   'scripts/ci/protected-path-gate.mjs': 'guardrails',
-  'scripts/ci/check.mjs': 'guardrails',
-  '.github/workflows/ci.yml': 'guardrails',
+  ...Object.fromEntries(
+    VALIDATION_PRODUCER_DEFINITIONS.map((path) => [path, 'guardrails'] as const),
+  ),
+  'scripts/lib/validation-*.mjs': 'guardrails',
+  'scripts/lib/validation-*.test.ts': 'guardrails',
+  'scripts/lib/review-policy.mjs': 'guardrails',
+  'scripts/lib/review-policy.test.ts': 'guardrails',
+  'scripts/ci/validation-*.mjs': 'guardrails',
+  'scripts/ci/validation-*.test.ts': 'guardrails',
+  '.github/workflows/validation-gate.yml': 'guardrails',
   '.github/workflows/promote.yml': 'guardrails',
   'scripts/ci/release-impact.mjs': 'guardrails',
   'scripts/ci/production-release.mjs': 'guardrails',

@@ -281,7 +281,7 @@ describe('mapSkills', () => {
     expect(mapSkills(['packages/components/Button.stories.tsx'], false)).toEqual(['storybook']);
     expect(mapSkills(['apps/product/messages/ja/common.json'], false)).toEqual(['i18n']);
     expect(mapSkills(['docs/foo.md'], false)).toEqual(['docs-writing']);
-    expect(mapSkills(['scripts/ci/check.mjs'], false)).toEqual(['pr-cross-review']);
+    expect(mapSkills(['scripts/ci/check.mjs'], false)).toEqual([]);
     expect(mapSkills(['foo.test.ts'], false)).toEqual(['test']);
   });
 

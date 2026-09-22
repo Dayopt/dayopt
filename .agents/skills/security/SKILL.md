@@ -163,7 +163,7 @@ pnpm security:check
    「あるべき検査の不在」を判定する時の照合先なので、更新を怠ると新機能の穴が構造的に
    見えなくなる。**判定は自動では走らない**（merge の hard gate ではない advisory
    レビュー。追加 reviewer は停止中。AGENTS.md §レビュー規則）。危険クラスの diff では
-   merge 前に `@codex review` を依頼する
+   `protected-path-gate.mjs` が保護対象と判定する時だけ、検証済みの merge 候補で `@codex review` を依頼する
 
 5. **実装前に `docs/engineering/threat-model.md` の既往クラスと却下記録を読む** - Dayopt で
    実際に起きた欠陥のクラスと、反証つきで却下済みの候補が並んでいる。同じ穴を掘り直さない
