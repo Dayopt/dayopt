@@ -93,8 +93,11 @@ export const PROTECTED_PATH_GLOBS = [
   // verified user・scope・redirect allowlist の実装変更が同じ境界を迂回する。
   'apps/product/src/app/[locale]/(auth)/auth/**',
   'apps/product/src/proxy.ts',
-  'apps/product/src/lib/supabase/middleware.ts',
-  'apps/product/src/lib/trpc/session-auth-context.ts',
+  // Supabase client の認証 mode と tRPC context は service-role（RLS bypass）を選ぶ
+  // 共有境界。個別 entrypoint の列挙では新しい client/context が無保護になるため、
+  // 実装とその contract test を class 単位で含める。
+  'apps/product/src/lib/supabase/**',
+  'apps/product/src/lib/trpc/*context*.ts',
   'apps/product/src/lib/auth/**',
   'apps/product/src/lib/safe-redirect.ts',
   'apps/product/src/lib/oauth-server/**',
@@ -123,18 +126,24 @@ export const PROTECTED_PATH_GLOBS = [
   'apps/product/src/app/api/cron/calendar-account-deletion-settle/**',
   // 不可逆な purge 本体 + provider 側 token の revoke（#2503 監査）。
   'apps/product/src/features/external-calendar/server/account-deletion.ts',
+  // account deletion は Stripe customer / subscription を含む不可逆な一括削除。
+  // coordinator の配置に依存せず、実装と contract test を同じ class として保護する。
+  // external-calendar 固有の path は直前のより狭い分類を優先する。
+  'apps/product/src/**/account-deletion*.ts',
   // rotation を誤ると唯一の refresh token が失効し、以後そのアカウントの sync が復旧できない（#2503 監査）。
   'apps/product/src/features/external-calendar/server/token-rotation.ts',
   // provider 側の revoke は一方向操作で、実行してしまえば取り消せない（#2503 監査）。
   'apps/product/src/features/external-calendar/server/revoke-outbox.ts',
+  // `/api/v1` は既存 consumer が依存する公開契約。iCalendar の serializer は route の
+  // 外にあるが、UID・日時・payload 互換性を同じ公開契約として扱う。
+  'apps/product/src/app/api/v1/**',
+  'apps/product/src/features/timeblock/lib/plan-to-ical.ts',
   // timeblock feature の server 側だけに同居する高リスク面（#2489 クロスレビュー P1）。
   // feature 全体は必須側から外したが、この 2 つは「外部契約 or 不可逆」に該当するため
   // 残す: mcp-* は MCP の公開契約 + service role（RLS を迂回する）クエリ、
   // private-timeblock-search-query.ts は検索語を Sentry から隔離する privacy 境界。
   'apps/product/src/features/timeblock/server/mcp-*',
   'apps/product/src/features/timeblock/server/private-timeblock-search-query.ts',
-  // system API
-  'apps/product/src/app/api/v1/system/**',
   // the guardrails themselves
   '.husky/**',
   '.codex/**',
@@ -155,12 +164,14 @@ export const PROTECTED_PATH_GLOBS = [
   // ガードレールで、判定側と producer を同じ PR で弱めると shadow が偽の green を出す。
   // #2489 の「ガードレール自身」に含めるが、AGENTS.md や一般 skill のような
   // 可逆な agent 向け文書までは保護対象へ広げない。
-  'scripts/lib/validation-plan.mjs',
-  'scripts/lib/validation-plan.test.ts',
+  // validation controller の producer / evidence / shadow entrypoint と contract tests。
+  // ファイル名の個別列挙では判定依存の追加時に自己保護が抜けるため class で固定する。
+  'scripts/lib/validation-*.mjs',
+  'scripts/lib/validation-*.test.ts',
   'scripts/lib/review-policy.mjs',
   'scripts/lib/review-policy.test.ts',
-  'scripts/ci/validation-gate.mjs',
-  'scripts/ci/validation-gate.test.ts',
+  'scripts/ci/validation-*.mjs',
+  'scripts/ci/validation-*.test.ts',
   '.github/workflows/validation-gate.yml',
   // promote.yml は production domain を切り替える唯一の経路で、2026-09-03 以降は
   // main merge がそれを自動で起動する（層 3 → smoke → promote → rollback）。

@@ -45,6 +45,9 @@ describe('trusted validation plan', () => {
     'apps/product/src/app/[locale]/(auth)/auth/callback/route.ts',
     'apps/product/src/proxy.ts',
     'apps/product/src/lib/supabase/middleware.ts',
+    'apps/product/src/lib/supabase/oauth.ts',
+    'apps/product/src/lib/supabase/server.ts',
+    'apps/product/src/lib/trpc/context.ts',
     'apps/product/src/lib/trpc/session-auth-context.ts',
     'apps/product/src/lib/auth/domain/access-policy.ts',
     'apps/product/src/lib/safe-redirect.ts',
@@ -53,6 +56,12 @@ describe('trusted validation plan', () => {
     'apps/product/src/features/external-calendar/server/authority-config.ts',
     'apps/product/src/features/external-calendar/server/connect-flow.ts',
     'apps/product/src/features/external-calendar/schemas/google.ts',
+    'apps/product/src/app/api/v1/calendar/[token]/route.ts',
+    'apps/product/src/features/timeblock/lib/plan-to-ical.ts',
+    'apps/product/src/features/settings/server/account-deletion.ts',
+    'apps/product/src/app/api/trpc/_server/_composition/account-deletion-coordinator.ts',
+    'scripts/lib/validation-evidence.mjs',
+    'scripts/ci/validation-plan-shadow.mjs',
     'supabase/migrations/20260916000000_rls.sql',
   ])('requires review for an external contract, irreversible change, or guardrail: %s', (file) => {
     expect(plan([file]).review.status).toBe('required');
