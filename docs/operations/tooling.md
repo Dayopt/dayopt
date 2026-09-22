@@ -537,7 +537,7 @@ Node.js と package manager は実行場所ごとに暗黙で選ばせず、repo
 - **root `package.json` の script を改名・統合する時は permission allowlist を両方向で見る**。消す側が wildcard に一致して許可され、残す側が漏れて prompt に落ちる向きが本当の failure（2026-08-18）。統合後の名前を実際に叩いて prompt が出ないか確認し、消した名前の pattern は同時に削る（許可範囲は広げない）
 - **`scripts/` に新規ファイルを足して docs から名指しすると taxonomy test が `runbook` 判定にする**（`classifyHits` は docs の言及を importedBy より先に見る）。`scripts/lib/` の純粋な lib でも落ちるので、`scripts/__tests__/scripts-taxonomy.test.ts` の `KNOWN_PLACEMENT_EXCEPTIONS` へ理由つきで追記する（2026-09-16 #2775 で 2 回）
 - **skill の効果は発動条件と揃えた依頼でしか測れない**。既存 migration の「レビュー」依頼では両条件とも `supabase` skill を読まず「効果なし」と誤判定しかけた（#2810）。どの skill が読まれたかは `codex exec --json` の `exec_command_begin` から `.agents/skills/<name>/` を grep して機械的に取る。自己申告は根拠にしない
-- **`codex exec` の隔離と model**: `--cd <pack-dir> --sandbox read-only --skip-git-repo-check` で作業根を pack に固定すると repo が物理的に見えない（指示ではなく構造の隔離）。`-m` を省くと config の既定 model が 400 で落ちることがある。応答が名乗る model 名は run ごとにぶれるので、証拠は起動コマンド側に残す（2026-09-10 実測）
+- **`codex exec` の隔離と model**: `--cd <pack-dir> --sandbox read-only --skip-git-repo-check` は cwd を pack へ固定し書き込みを禁じるだけで、agent は `..` や絶対パスから repo を読める。**読み取りの隔離にはならない**ので、比較実験で正解データや現在の修正が漏れてはいけない時は、container / chroot / 読み取り許可 root の制限のように repo を実際に不可視にする境界を使う。`-m` を省くと config の既定 model が 400 で落ちることがある。応答が名乗る model 名は run ごとにぶれるので、証拠は起動コマンド側に残す（2026-09-10 実測）
 - **usage limit は turn 途中で run を落とす**。`turn.failed` で `token_count` が出ず tokens が null になるのが機械的な見分け方。比較実験は条件ペアで交互に回さず 1 条件を全ケース終えてから次へ行き、欠損を片側に寄せる。中断を「効果なし」と書かない（2026-09-17 #2810）
 
 ## 4. Skill 設計

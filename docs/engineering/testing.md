@@ -139,8 +139,8 @@ agent が実際に踏んで、緑の報告が嘘になった事例。どれも�
   ```bash
   NEXT_PUBLIC_TURNSTILE_SITE_KEY= \
   NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321 \
-  NEXT_PUBLIC_SUPABASE_ANON_KEY="$ANON_KEY" \
-  SUPABASE_SERVICE_ROLE_KEY="$SERVICE_ROLE_KEY" \
+  NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY="$PUBLISHABLE_KEY" \
+  SUPABASE_SECRET_KEY="$SECRET_KEY" \
   pnpm exec playwright test <spec> --project=chromium --reporter=line
   ```
 
