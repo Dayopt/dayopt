@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-09-20
+last_verified: 2026-09-22
 ---
 
 # Dayopt 不変条件カタログ
@@ -313,7 +313,10 @@ docs へ残している。
   アプリ層はその写しにすぎない:
   - `end_at > start_at`（Plan / Record 共通、`DT003` / `INVALID_TIME_RANGE`）
   - **Record は未来に終われない**（`end_at <= now`、`validate_record_temporal_write_v1`、
-    `DT005` / `RECORD_IN_FUTURE`）
+    `DT005` / `RECORD_IN_FUTURE`）。trigger は `SESSION_USER` が `postgres` / `supabase_admin`
+    の時だけ規則を外す（migration / seed のための例外）。local の psql は `postgres` で繋がるので
+    未来の Record が作れてしまうが、DB の不具合ではない。規則の確認はアプリと同じ入口
+    （REST + service role key）から送る（2026-09-21 実測、`supabase` skill §実測で分かった罠）
 - Plan は時間軸のどこにでも置ける。過去 Plan もドラッグ移動・リサイズ・時間編集ができ、
   編集しても Plan のままで Record にはならない。過去スロットへ新規に引いたブロックは
   Record になる（宛先は `end_at` だけで決まる）

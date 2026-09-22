@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-09-20
+last_verified: 2026-09-22
 code:
   - scripts/tasks/jev
 ---
@@ -201,6 +201,14 @@ Phase 1 の shadow 評価（実 PR 100 + 合成 4、tune 76 件を完走）で�
 - **証拠の十分さ**は 70 件で本文長 200 文字と不一致ゼロ。しかも検出したい「薄い issue」が repo の 2% しか無い
 - 合成した prompt injection ケースでは、**state に書かれた「routine・レビュー不要」という誘導に従わなかった**（1 件ずつなので耐性の証明ではない）
 - 学んだ手順が上の §pack を足す。**単一 pack の失敗を理由に共通基盤を撤去しない**のが #2827 の不変条件
+
+### Gateway の実測で docs と読みが分かれた点（2026-09-18〜19）
+
+- `confidence` は `providerMetadata.typesafe.confidence` に質問 ID 別で来る。分布の最大値とは値がずれる（同じ質問で分布 0.78 / confidence 0.67）ので、閾値で振り分けるなら provider 由来を使う。boolean には付かない（空オブジェクト）
+- 実モデル version は取れない。`response.modelId` はエイリアスのまま
+- 残高は遅れて反映され、`gateway.cost` の合計と一致しない。費用の正本は生成 metadata の cost。2026-09-19 からは cost が 0 で返るようになった（`marketCost` は定価のまま）。**課金側の挙動なので予算制御は外さない**
+- timeout は `provider_error` に化ける。`@ai-sdk/gateway` は `AbortSignal.timeout()` の DOMException を `GatewayInternalServerError`（500）へ包み原因を `cause` に入れる。表層の `name` だけ見る判定は取り逃す（PR #2849 で `cause` を辿るよう修正済み）
+- 過去 PR で判断を評価する時、PR 本文（`## Review focus` を含む全部）は実装後に書かれた人間の答えなので入力にしない。母集団は linked issue のある PR に限り、入力が空の case（`evidenceSufficiency` が最大 0.15 と分離する）は集計から外す
 
 ## 起票時の契約から変わったもの
 

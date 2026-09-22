@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-09-07
+last_verified: 2026-09-22
 ---
 
 # 運用ツール（Eagle / ライセンスコンプライアンス / AI協働ハーネス / 管理者スクリプト）
@@ -525,6 +525,20 @@ Node.js と package manager は実行場所ごとに暗黙で選ばせず、repo
 **shell の任意編集は機械的に閉じていない**。`sed -i`、`perl -pi`、`cp`、`mv`、`tee`、出力redirect、任意scriptによる既存migration・他worktreeへの書き込みを、このadapterは一般には検出しない。Codexのファイル変更は原則 `apply_patch` を使い、shell編集へ切り替えてこの検査を迂回しない（指示による制御）。hookに到達しただけで全操作が保護されるわけではない。write_stdin、hosted/specialized tool、wrapper内部の処理も同じ保証を持たない。
 
 この境界はshell interpreterの自作で埋めず、runtimeの書き込み範囲・Git hooks/CI・最小権限の資格情報で補う。本番は既存の明示権限・独立レビュー・dry-run/backupを維持する。上記が不足する操作は未対応として扱い、通常開発の実動試行でも境界を確認する。
+
+### 実測で分かった罠（guard / hook / scripts）
+
+2026-09-22 に Claude Code の memory から昇格。判定ロジックは共有なので Codex の adapter でも同じ形で起きる。
+
+- **guard は「言及」でも止まる**。判定は tool call の command 文字列全体を見るので、禁止コマンド名を説明する commit message / issue コメント / review reply の heredoc も同じ文字列一致で止まる（2026-08-24 #2293 で 4 回）。これは意図した trade-off で guard 側を緩めない。本文はファイルへ書いてから `gh ... --body-file` / `git commit -F` で渡し、言い回しを変えて該当句の連続を崩す
+- **textual guard は shell 展開を捕まえられない**。quote 剥がしで allowlist を補強しても `$'\x2d\x2d...'` や `${IFS}` は素通りする（#2291 PR #2309）。動的引数のコマンドを許す時は「値をコマンドラインに載せない」方向へ寄せる（body は固定パスの `--body-file`、`--repo` は値ごと固定）。展開形を 1 つずつ追いかけない
+- **壊れると自分の編集まで止まるファイル（hook script / `.claude/settings.json` / `.codex/hooks.json`）は scratch 先行で触る**。構文エラーでも exit 2 が「止める」と解釈され、直す編集自体ができなくなる（2026-08-12）。scratch に候補を書き `bash -n` と実挙動を通してから `cp` で設置する。復旧は別 session か User に `git -C <worktree> checkout -- <path>` を 1 コマンド依頼する
+- **migration guard は `refs/remotes/origin/main` の tree に載っているファイルだけを止める**（#2185 PR #2714）。未 merge の PR にしか無い migration は push 済みでも編集できる。止まったのに未 merge のはずなら `git fetch origin main`。判定不能（ref 不在 / git 不動）は全部止める
+- **root `package.json` の script を改名・統合する時は permission allowlist を両方向で見る**。消す側が wildcard に一致して許可され、残す側が漏れて prompt に落ちる向きが本当の failure（2026-08-18）。統合後の名前を実際に叩いて prompt が出ないか確認し、消した名前の pattern は同時に削る（許可範囲は広げない）
+- **`scripts/` に新規ファイルを足して docs から名指しすると taxonomy test が `runbook` 判定にする**（`classifyHits` は docs の言及を importedBy より先に見る）。`scripts/lib/` の純粋な lib でも落ちるので、`scripts/__tests__/scripts-taxonomy.test.ts` の `KNOWN_PLACEMENT_EXCEPTIONS` へ理由つきで追記する（2026-09-16 #2775 で 2 回）
+- **skill の効果は発動条件と揃えた依頼でしか測れない**。既存 migration の「レビュー」依頼では両条件とも `supabase` skill を読まず「効果なし」と誤判定しかけた（#2810）。どの skill が読まれたかは `codex exec --json` の `exec_command_begin` から `.agents/skills/<name>/` を grep して機械的に取る。自己申告は根拠にしない
+- **`codex exec` の隔離と model**: `--cd <pack-dir> --sandbox read-only --skip-git-repo-check` は cwd を pack へ固定し書き込みを禁じるだけで、agent は `..` や絶対パスから repo を読める。**読み取りの隔離にはならない**ので、比較実験で正解データや現在の修正が漏れてはいけない時は、container / chroot / 読み取り許可 root の制限のように repo を実際に不可視にする境界を使う。`-m` を省くと config の既定 model が 400 で落ちることがある。応答が名乗る model 名は run ごとにぶれるので、証拠は起動コマンド側に残す（2026-09-10 実測）
+- **usage limit は turn 途中で run を落とす**。`turn.failed` で `token_count` が出ず tokens が null になるのが機械的な見分け方。比較実験は条件ペアで交互に回さず 1 条件を全ケース終えてから次へ行き、欠損を片側に寄せる。中断を「効果なし」と書かない（2026-09-17 #2810）
 
 ## 4. Skill 設計
 

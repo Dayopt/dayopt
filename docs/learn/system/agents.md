@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-09-21
+last_verified: 2026-09-22
 ---
 
 # AI まわりの仕組みの地図
@@ -119,10 +119,10 @@ flowchart LR
 
 ## memory（Claude Code の覚え書き）
 
-- **場所**: repo の外（`~/.claude/projects/<repo のパス>/memory/`）。`MEMORY.md` が索引で、1 件 1 ファイル。2026-09-21 時点で 108 件
+- **場所**: repo の外（`~/.claude/projects/<repo のパス>/memory/`）。`MEMORY.md` が索引で、1 件 1 ファイル。2026-09-22 時点で 109 件
 - **誰が読むか**: Claude Code だけ。毎セッションの最初に索引が読み込まれ、関係しそうなものだけ本文を読む。**Codex は読まない**。repo に入っていないので、`pnpm docs:check` も他の人も見ない
-- **中身**: 過去に踏んだ罠と、User から受けた作業のしかたの指摘。索引は 12 の見出しで分けてある（User と働き方 / 判断の前に測る / 検証と報告の罠 / レビューと PR 運用 / git・worktree / CI・gate・release / guard・hook・scripts / Supabase・DB / secrets・外部サービス / ローカル環境・Browser・E2E / プロダクト実装の罠 / AI 評価）
-- **使い分け**: どの AI にも効かせたい規則は、memory ではなく `AGENTS.md` か skill に書く。memory に置くのは、Claude が繰り返し踏む罠の回避と、repo に書くまでもない作業の癖だけ
+- **2026-09-22 に repo へ昇格した**。Codex を主担当にする引き継ぎで、今も有効で repo に無かった知見を「実測で分かった罠」節として次へ書いた: [testing.md](../../engineering/testing.md)（検証と報告、ローカル E2E）、[runbook.md](../../operations/runbook.md) 第5部（git / worktree / CI / release）、[tooling.md](../../operations/tooling.md) §3（guard / hook / scripts）、[ai-development-loop.md](../../operations/ai-development-loop.md)（現状確認の誤診）、[secrets.md](../../operations/secrets.md)、[conventions.md](../../engineering/conventions.md) §9、[jev.md](../../operations/jev.md)、`supabase` / `pr-cross-review` skill。Claude Code の tool や UI にしか効かないもの（Browser pane の座標、subagent の催促、plugin 選定など）と、既に `AGENTS.md` / skill にあるものは昇格しなかった。以後、memory は Claude の残骸であって正本ではない
+- **使い分け**: どの AI にも効かせたい規則は、memory ではなく `AGENTS.md` か skill か上記の doc に書く。memory に置くのは、Claude が繰り返し踏む罠の回避と、repo に書くまでもない作業の癖だけ
 
 ## AI にこうさせたい時、どこを触るか
 
@@ -279,7 +279,7 @@ flowchart LR
   },
   {
     "path": "supabase/migrations/CLAUDE.md",
-    "find": ".claude/skills/supabase/SKILL.md"
+    "find": ".agents/skills/supabase/SKILL.md"
   },
   {
     "path": ".claude/settings.json",

@@ -55,6 +55,20 @@ Validation controller（`validation-gate.yml`、[infra.md](../../../docs/enginee
 - 本番操作の `EXPLICIT AUTHORITY` は PR 本文の checkbox・label・レビュー結果から推定しない。常に別の明示承認が要る
 - shadow は Codex を自動起動せず required check にもしない。起動候補を log に出すのは非draft・Validation satisfied・保護対象・未依頼の merge 候補だけ。ruleset / Codex 設定の変更は本 skill の範囲外
 
+## 実測で分かった罠（Codex review の扱い）
+
+2026-09-22 に Claude Code の memory から昇格。指摘の的中率は高い（2026-07-28 に 53 件を検証して誤診 1 件、PR #2868 の P2 5 件も全部妥当）が、**重さは別に測る**。
+
+- **検出は review API で行う**。Codex は指摘を pull request review の line comment として投稿し、issue comment に出るのはサマリーだけ。指摘がある時ほど issue comment には現れない。`gh api repos/{o}/{r}/pulls/{n}/reviews` と GraphQL `reviewThreads` を見る（issue comment だけ見て「無応答」と誤記録した。PR #1885）
+- **resolve は thread ID を名指しする**。`isResolved == false` を全部取って一括 resolve すると、その間に届いた未読 thread を閉じる（PR #2549 で 9 thread）。一括操作の前に `author.login` と `path` を目視し、誤って閉じたら `unresolveReviewThread` + 訂正 reply
+- **回数を増やさない**。追従 merge を先に → fix を全部束ねて 1 push → CI 完走 → `@codex review` を 1 回。応答前に再投稿しない（PR #2554 は fix 6 push で起動 8 回・6 回「問題なし」）。`Something went wrong` / usage limit の応答は `Reviewed commit:` を含まず証跡にならないので、再投稿の是非は User に確認する
+- **User が「もう投げるな」と言ったら投げない**。gate の形式要件は停止指示を上書きしない（PR #2563）。通らないなら状況を出して裁可を仰ぐ
+- **反論は「機構」ではなく「結論」を反証する**。指摘された機構が誤りでも、結論が別経路で真のことがある（PR #1998、`ON DELETE RESTRICT`）
+- **P2 は 2 種に分ける**。この PR の主経路を壊す → PR 内で対応。運用エッジ・多者競合の強化 → 理由を reply に書いて issue へ切り出す
+- **同型指摘の打ち切りより強い終端がある**。TOCTOU のような class は再読み込みを足すたびに 1 段深い同型指摘が構成でき、PR #1820 は 30 ラウンド超で 545 行が 2,153 行に膨らんだ。境界の明文化（防御）より、proxy 指標をやめて対象そのものを直接計測する・列挙をやめて `rg` 全数検索を正にする、といった構造変更（解消）が可能ならそちらを選ぶ（PR #1878）。境界を docs に書く前に、その主張が実装と一致するか検証する
+- **client の module state が遷移を跨ぐ前提の P1 は、hard navigation かをブラウザで測ってから重さを確定する**（[testing.md](../../../docs/engineering/testing.md) §ローカル E2E とブラウザ実測）
+- **レビュー gate を足す方向の新規ルールを提案しない**。cross review の hard gate は 2026-09 に撤回済みで、依頼 77 件中 23 件が usage limit で非応答、gate 自身が 3 回 regression した
+
 ## 追加レビューの停止
 
 2026-09-17 の User 指示により、固定差分レビューと追加 reviewer の実行を停止する。保護対象 PR もセルフレビューと GitHub の `@codex review` だけを使い、モデルを下げた追加 reviewer を起動しない。

@@ -1,6 +1,6 @@
 {
   "name": "dayopt",
-  "version": "0.34.0",
+  "version": "0.35.0",
   "private": true,
   "engines": {
     "node": "24.x"
@@ -33,7 +33,6 @@
     "prepare": "husky",
     "branch:finish": "bash scripts/tasks/finish-branch.sh",
     "mcp:gate": "tsx scripts/tasks/mcp-gate.ts",
-    "green:watch": "node scripts/tasks/green-watch.mjs",
     "ai:usage": "node scripts/tasks/ai-usage.mjs",
     "ctx": "node scripts/tasks/ctx.mjs",
     "jev:check": "pnpm exec tsx scripts/tasks/jev/check.ts",

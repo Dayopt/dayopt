@@ -46,7 +46,7 @@ claude.ai の connector 設定画面から MCP を接続する経路は `~/.clau
 
 ### 常駐を増やさない
 
-外部能力の扱いは `AGENTS.md` §委任・報告の作法（原則③）に従う。ローカルアプリ依存（`eagle` / `storybook` / `supabase-local`）と、購入・停止・deploy など不可逆の能力を含む OAuth MCP（Vercel 等）は常駐させない。使う時だけ `claude mcp add`、終わったら `claude mcp remove`（登録内容は上の表が正本）。
+外部能力の扱いは `AGENTS.md` §委任・報告の作法（原則③）に従う。ローカルアプリ依存（`eagle` / `storybook` / `supabase-local`）と、購入・停止・deploy など不可逆の能力を含む OAuth MCP（Vercel 等）は常駐させない。使う時だけ `claude mcp add` / `codex mcp add`、終わったら `claude mcp remove` / `codex mcp remove`（登録内容は上の表が正本）。
 
 ### オンデマンド専用サーバーの登録・解除
 
@@ -62,6 +62,13 @@ claude mcp add supabase -s user -e SUPABASE_ACCESS_TOKEN=op://agent/supabase-age
 
 # 使い終わったら
 claude mcp remove supabase -s user
+```
+
+Codex は同じ登録内容を user-global の `~/.codex/config.toml` へ書く `codex mcp add` / `codex mcp remove` で行う（`--env KEY=VALUE` と `-- <COMMAND>` の形。stdio server だけ `--env` が使える）:
+
+```bash
+codex mcp add supabase --env SUPABASE_ACCESS_TOKEN=op://agent/supabase-agent/credential -- op run -- npx -y @supabase/mcp-server-supabase@latest --read-only --project-ref=yvglwblxrnrenfifsnje
+codex mcp remove supabase
 ```
 
 token は `agent/supabase-agent`（read 権限だけの scoped token）で、write を含む `human/supabase-cli` は使わない。`execute_sql` は `--read-only` と token の両方で読み取りに限られるが、`auth.users` などの個人情報も読める。個人情報を含む行は User の明示指示がある時だけ読む。登録後は再起動して `list_tables` で疎通確認する。`supabase-local`（http、`op` 不要）は常駐のままでよい。
