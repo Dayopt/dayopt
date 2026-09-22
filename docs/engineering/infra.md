@@ -322,7 +322,7 @@ GitHub Code QualityはOrganization / Repositoryの両方で無効にし、PR品�
 
 - Required checksはrepository rulesetと`.github/workflows/ci.yml`を正とし、Code Quality由来のcheckを追加しない
 - **GitHub CodeQL は 2026-08-11 に無効化すると決めた。UI 操作は本記述時点で未実施で、現在も CodeQL は動いている**（残作業は #1934。現在状態は `gh api repos/Dayopt/dayopt/code-scanning/default-setup --jq '.state'` が `configured` を返すか `not-configured` を返すかで判定する。`not-configured` を確認したらこの一文を完了形へ更新する）。無効化を決めた理由は次のとおり。 default setup が `languages: ["actions"]` で有効化されており、**workflow YAML しか解析していなかった**（`apps/` 配下の JS / TS は対象外）。#1425 の Done 条件「JavaScript / TypeScript が対象になっていることを確認する」が満たされないまま COMPLETED で close されたため、誤った前提が docs 側に残り続けていた。無効化後のセキュリティ静的解析の担当: secret は gitleaks と `pnpm secrets:check`（#2483 以前は `.github/workflows/docs-guard.yml`、現在は `ci.yml` の static job（`scripts/ci/check.mjs`））、依存は Dependabot、深掘り SAST は `/claude-security`。**`.github/workflows/**` に対する PR ごとの自動解析だけは代替が無く、無効化で失われる**（受容済み。根拠と再評価の条件は決定ログ）。再有効化する場合は `languages` に `javascript-typescript` が入っていることを `gh api repos/Dayopt/dayopt/code-scanning/default-setup` で確認する（設定画面を開いた事実では確認にならない）。判断は2026-08-11 の決定ログ（削除済み、git 履歴参照）
-- **自動レビューの履歴と現在の入口**: 2026-08-03 に Gemini の ai-review と Copilot を撤去し、Codex の GitHub review も適用範囲を変更してきた（当時の判断・実測は git 履歴を参照）。現在の PR 独立レビューは、リスクにかかわらず GitHub の `@codex review` を使う。追加 reviewer は 2026-09-17 の User 指示で停止中で、可用性や無応答を理由に自動起動しない。現在の規則は `AGENTS.md` §レビュー規則、手順は `.agents/skills/pr-cross-review/SKILL.md`
+- **自動レビューの履歴と現在の入口**: 2026-08-03 に Gemini の ai-review と Copilot を撤去し、Codex の GitHub review も適用範囲を変更してきた（当時の判断・実測は git 履歴を参照）。現在の PR 独立レビューは `protected-path-gate.mjs` が「外部契約 or 不可逆」またはガードレール自身の変更と判定した時だけ、安定した merge 候補で GitHub の `@codex review` を使う。通常 PR へは依頼しない。追加 reviewer は 2026-09-17 の User 指示で停止中で、可用性や無応答を理由に自動起動しない。現在の規則は `AGENTS.md` §レビュー規則、手順は `.agents/skills/pr-cross-review/SKILL.md`
 - **repo ruleset「Copilot automatic first review」は 2026-08-05 に削除した。** 上記の「外した」後も ruleset 自体は active で残っており、seat 付与後に復活したのか直近 PR（#1832）へ実際にレビューを投稿し、PR ごとに約 3 課金分の Actions 実行を発生させていた。private 化後の課金源かつ（当時の）Codex 一本化方針と二重のため ruleset ごと削除。再開する場合は org の Copilot seat 割り当て（Settings → Copilot → Access）と ruleset の再作成の両方が必要
 - カバレッジ閾値が必要になった場合はVitest / CIで直接管理する
 - Code Qualityを再評価する場合は、有効化前にbilling impactと既存品質ゲートとの差分を確認する
@@ -448,9 +448,10 @@ upgrade 成功の代用にしない。適用済み migration の編集・削除�
 comment / thread（GraphQL の resolve 状態）から `not-required` / `not-started` / `pending` /
 `stale` / `complete` / `pending-adjudication` / `unknown` を判定し、commit status
 `Review policy (shadow)` に出す。状態の定義と完了証拠は `pr-cross-review` skill §Review policy。
-追加 reviewer は停止中。保護対象 path でも現 head の GitHub レビューと指摘の裁定で満たし、
+追加 reviewer は停止中。`protected-path-gate.mjs` に一致する PR だけ現 head の GitHub レビューと指摘の裁定を読み、
 固定差分レビューの欠落・古さ・partial を別の停止条件にしない。既存証跡の読み取り互換は維持する。
-shadow 中は Codex を自動起動しない（workflow に `pull-requests: write` を渡していない）。
+通常ロジック・時間不変条件・agent 文書は `not-required`。shadow 中は Codex を自動起動せず、
+required check へ切り替えない（workflow に `pull-requests: write` を渡していない）。
 review evidence の保証境界: review の submit と thread の resolve は issue_comment を出さないため、
 その直後は再評価されない。通常は修正 push → CI 完了の `workflow_run` で再評価される。
 `pull_request_review` 系は PR 側の定義で走るため trigger にしない。reviewThreads は cursor で
@@ -479,15 +480,15 @@ would-add（Actions job と Vercel deployment の両方）を 1 表にする。�
 未取得、plan が indeterminate の行は比較を未判定とし、0 や削減可能に丸めない。判定は人が行い、
 件数の少ない分類の p95 は出さない。Preview / review の待ち時間は未取得）。
 
-**順序: shadow 観察 → 比較 → 承認付き切替 → 観察 → 整理。既存の必須条件を先に削らない。**
+**Validation の順序: shadow 観察 → 比較 → 承認付き切替 → 観察 → 整理。既存の必須条件を先に削らない。Review policy は shadow のまま維持する。**
 
-| 段階 | 変更                                                                                                                                                                              | 戻し方                                   | 承認                       |
-| ---- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- | -------------------------- |
-| 0    | shadow（現状）: `Validation (shadow)` / `Review policy (shadow)` / `🧱 DB Upgrade (shadow)` は非必須                                                                              | workflow を Disable                      | 不要（AUTONOMOUS）         |
-| 1    | 比較レポートで docs / ui / logic / api-db / ci-policy 別に正例・負例と保証の退行が無いことを確認                                                                                  | -                                        | -                          |
-| 2    | ruleset に `Validation (shadow)` と `Review policy (shadow)` を **既存 required と併走で追加**（旧条件は残す。片方だけだと Review policy が pending / blocked でも merge できる） | ruleset から context を外す              | User（CHECKPOINT）         |
-| 3    | 観察後、旧 required のうち新条件が包含するものだけを外す（trusted source を保つ native check は残す）                                                                             | その PUT 直前に保存した ruleset を再適用 | User（EXPLICIT AUTHORITY） |
-| 4    | `branch:finish` の rollup 検査と shadow の重複を整理                                                                                                                              | git revert                               | -                          |
+| 段階 | 変更                                                                                                           | 戻し方                                   | 承認                       |
+| ---- | -------------------------------------------------------------------------------------------------------------- | ---------------------------------------- | -------------------------- |
+| 0    | shadow（現状）: `Validation (shadow)` / `Review policy (shadow)` / `🧱 DB Upgrade (shadow)` は非必須           | workflow を Disable                      | 不要（AUTONOMOUS）         |
+| 1    | 比較レポートで docs / ui / logic / api-db / ci-policy 別に正例・負例と保証の退行が無いことを確認               | -                                        | -                          |
+| 2    | ruleset に `Validation (shadow)` を既存 required と併走で追加。`Review policy (shadow)` は advisory のまま残す | ruleset から context を外す              | User（CHECKPOINT）         |
+| 3    | 観察後、旧 required のうち新条件が包含するものだけを外す（trusted source を保つ native check は残す）          | その PUT 直前に保存した ruleset を再適用 | User（EXPLICIT AUTHORITY） |
+| 4    | `branch:finish` の rollup 検査と shadow の重複を整理                                                           | git revert                               | -                          |
 
 **段階 2 の前提（発行元の分離）**: `Validation (shadow)` / `Review policy (shadow)` は現状
 validation-gate.yml が `GITHUB_TOKEN`（github-actions App、integration_id 15368）で発行している。
@@ -499,7 +500,7 @@ User 裁可で決める: (a) controller の status を専用 GitHub App の inst
 ruleset の `required_status_checks[].integration_id` をその App に束縛する（推奨。PR workflow は
 その App の token を得られない）、(b) repo の Actions 既定権限を read に固定したうえで、PR
 workflow の `permissions` 宣言による昇格を組織 policy で禁止できることを実測してから進める。
-どちらも未実施の間は段階 2 へ進まない。
+どちらも未実施の間は `Validation (shadow)` の段階 2 へ進まない。Review policy の required 化には使わない。
 
 切替は `gh api -X PUT repos/Dayopt/dayopt/rulesets/6790553` で行い、**各 PUT の直前に
 `gh api repos/Dayopt/dayopt/rulesets/6790553` の完全な JSON をその操作固有の rollback 入力として
@@ -673,7 +674,7 @@ required status checks の実状は ruleset が正本で、context の一覧を�
   merge 不能になる。**2026-09-07 の public 化で ruleset が有効化され、この落とし穴が実際に発生した**
   （全 PR が `mergeStateStatus: BLOCKED`、5 日で 34 回の手動 dispatch で回避。2026-09-13 に [#2640](https://github.com/Dayopt/dayopt/issues/2640) で required から外して解消）
 - **外部モデルの自動 diff レビュー（ai-review / Gemini）は 2026-08-03 に撤去した。** 現在の
-  PR 独立レビューは GitHub の `@codex review` で、追加の内部 / 外部 reviewer は停止中。
+  PR 独立レビューは保護対象 path に限って GitHub の `@codex review` を使い、通常 PR では起動しない。追加の内部 / 外部 reviewer は停止中。
   旧レビューで蓄積した不変条件カタログは [invariants.md](./invariants.md) に残っている。
 - `ci.yml` は docs / rules のみの変更でも **workflow 自体は起動し**、`gate` job（Impact Resolver）の
   判定を各 job の `if:` に配って skip する。**skip された job は required status check として success

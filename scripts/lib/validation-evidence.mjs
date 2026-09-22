@@ -20,6 +20,14 @@
  *   pending にする。strict up-to-date の ruleset と同じ向き
  */
 
+import {
+  VALIDATION_PRODUCER_DEFINITIONS as PRODUCER_DEFINITIONS,
+  REVIEW_REQUIRED_ACTIONS_JOBS,
+  REVIEW_REQUIRED_STATUS_CONTEXTS,
+} from './validation-producer-contract.mjs';
+
+export { PRODUCER_DEFINITIONS };
+
 export const VALIDATION_VERSION = 1;
 export const VALIDATION_STATUS_CONTEXT = 'Validation (shadow)';
 
@@ -107,13 +115,6 @@ const SUCCESS = 'success';
  * PR #2804）。その run は producer として信用せず `self-produced` にする。保証境界は job の
  * 配線ファイルまで（vitest 設定や package.json scripts の改変は review 側の観点）。
  */
-export const PRODUCER_DEFINITIONS = Object.freeze([
-  '.github/workflows/ci.yml',
-  '.github/actions/setup/action.yml',
-  'scripts/ci/check.mjs',
-  'scripts/ci/impact.mjs',
-]);
-
 /**
  * producer 固有の定義ファイル（その suite の評価でだけ self-produced にする）。
  * 🧱 DB Upgrade (shadow) の実体を migration と同時に改変した PR の緑は信用しないが、
@@ -441,6 +442,63 @@ function latestCiFailures(evidence) {
 }
 
 /**
+ * Review の依頼時点だけを判定する。Validation の証拠としては self-produced を受理しないが、
+ * guardrail 自身を変える PR でも native required job が完了するまで待った後に独立レビューへ
+ * 出せなければ、最もレビューが必要な差分だけ候補にならない。ここで raw job を見るのは
+ * merge 安全性の証明ではなくタイミング制御だけで、Validation verdict は blocked のまま保つ。
+ */
+function isReviewCandidateReady(plan, evidence, suites) {
+  if (
+    plan?.status !== 'determinate' ||
+    evidence?.pr?.state !== 'open' ||
+    evidence?.pr?.draft ||
+    evidence?.pr?.fork ||
+    !['ahead', 'identical'].includes(evidence?.baseCompare)
+  )
+    return false;
+
+  const trustedRuns = new Map();
+  const trustedJobReady = (jobName) => {
+    let run = trustedRuns.get(CI_WORKFLOW);
+    if (run === undefined) {
+      run = selectTrustedRun(evidence.workflowRuns, {
+        repository: evidence.repository,
+        headSha: evidence.headSha,
+        workflow: CI_WORKFLOW,
+      });
+      trustedRuns.set(CI_WORKFLOW, run);
+    }
+    const job = (run?.jobs ?? []).find(
+      (candidate) => candidate.name === jobName && candidate.runAttempt === run.runAttempt,
+    );
+    return job?.status === 'completed' && ['success', 'skipped'].includes(job.conclusion ?? '');
+  };
+  const selfProducedReady = (name) => {
+    const producer = PRODUCERS[name];
+    if (producer?.stage !== 'merge' || producer.kind !== 'actions-job') return false;
+    return trustedJobReady(producer.job);
+  };
+
+  const ready = Object.entries(suites)
+    .filter(([, suite]) => suite.stage === 'merge')
+    .every(([name, suite]) =>
+      ['satisfied', 'not-applicable'].includes(suite.status)
+        ? true
+        : suite.status === 'self-produced' && selfProducedReady(name),
+    );
+  const requiredActionsReady = REVIEW_REQUIRED_ACTIONS_JOBS.every(trustedJobReady);
+  const requiredStatusesReady = REVIEW_REQUIRED_STATUS_CONTEXTS.every((context) =>
+    (evidence.statuses ?? []).some((entry) => entry.context === context && entry.state === SUCCESS),
+  );
+  return (
+    ready &&
+    requiredActionsReady &&
+    requiredStatusesReady &&
+    latestCiFailures(evidence).length === 0
+  );
+}
+
+/**
  * @param {{ plan: any, evidence: ValidationEvidence }} input
  */
 export function evaluateValidation({ plan, evidence }) {
@@ -504,6 +562,7 @@ export function evaluateValidation({ plan, evidence }) {
     identity: plan?.identity ?? null,
     fetchedAt: evidence?.fetchedAt ?? null,
     verdict,
+    reviewCandidateReady: isReviewCandidateReady(plan, evidence, suites),
     reasons,
     suites,
     review: plan?.review ?? null,

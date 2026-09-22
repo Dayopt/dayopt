@@ -457,10 +457,6 @@ const SKILL_RULES = [
   },
   { test: (f) => f.startsWith('apps/product/messages/'), skill: 'i18n' },
   { test: (f) => f.startsWith('apps/web/content/'), skill: 'docs-writing' },
-  {
-    test: (f) => f.startsWith('scripts/hooks/') || f.startsWith('scripts/ci/'),
-    skill: 'pr-cross-review',
-  },
   { test: (f) => f.endsWith('.test.ts'), skill: 'test' },
   { test: (f) => f.startsWith('docs/'), skill: 'docs-writing' },
 ];

@@ -721,7 +721,9 @@ export function runValidationGate({
       plan,
       evidence: reviewEvidence,
       now: now(),
-      validationVerdict: result.verdict,
+      // Validation の verdict は self-produced を安全に blocked のまま保つ。一方、review は
+      // native required job の完了を timing signal として、guardrail 自身も候補へ残す。
+      validationVerdict: result.reviewCandidateReady ? 'satisfied' : result.verdict,
     });
     const summary = formatValidationResult(result) + '\n' + formatReviewPolicy(review);
     output(summary);

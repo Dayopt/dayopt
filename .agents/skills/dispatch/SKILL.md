@@ -67,7 +67,7 @@ feature 開発と並行する非 feature 作業を issue ベースで回す定�
 `size:*` ラベルには依存しない（`size:*` は deprecated。操作 B 手順 3 参照）。編成のたびに issue 本文の内容から次の 3 区分のいずれかを判定する:
 
 - **直接実装**: 手順が既存パターンの追従で完結する。plan 不要
-- **plan 先行**: 複数ファイル・複数 Step にまたがる、または既存 contract に触れる。worker に `AGENTS.md` §実装 Plan の必須セクション に従った plan を先に出させてから実装。複数 issue を束ねた PR は merge 前に GitHub の `@codex review` で重点的に読む対象になりやすい（merge を止めるものではない）
+- **plan 先行**: 複数ファイル・複数 Step にまたがる、または既存 contract に触れる。worker に `AGENTS.md` §実装 Plan の必須セクション に従った plan を先に出させてから実装。Codex review の要否はPRの大きさやissue数ではなく `protected-path-gate.mjs` で決める
 - **裁定 session で実施**: spike / 設計判断を含む issue、または `risk:authority` が付いた issue。権限・比較・rollback を判断できる担当が実施し、provider の model tier 名では固定しない
 
 ## 操作 B: intake — 新しい作業を issue 化する
