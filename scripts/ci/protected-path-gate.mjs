@@ -116,26 +116,18 @@ export const PROTECTED_PATH_GLOBS = [
   'apps/product/src/lib/billing/**',
   'apps/product/src/app/api/webhooks/**',
   'apps/product/src/features/settings/server/billing-*.ts',
-  // external calendar integrations
-  'apps/product/src/features/external-calendar/server/providers/**',
-  // Google OAuth client 契約。provider adapter だけでなく、scope / token response、
-  // authority identity、PKCE state の変更も全利用者の接続互換性と認証境界へ波及する。
-  'apps/product/src/features/external-calendar/server/google-oauth.ts',
-  'apps/product/src/features/external-calendar/server/authority-config.ts',
-  'apps/product/src/features/external-calendar/server/connect-flow.ts',
+  // 外部 calendar の server 層は provider/OAuth 契約に加え、service-role client で
+  // user_id・connection_id の認可境界と token lifecycle を扱う。個別実装の列挙では
+  // 新しい service が同じ境界を迂回するため、server-side integration 全体を保護する。
+  'apps/product/src/features/external-calendar/server/**',
   'apps/product/src/features/external-calendar/schemas/google*.ts',
-  // アカウント削除に伴う外部 calendar データの不可逆な一括削除を駆動する cron（#2503 監査）。
-  'apps/product/src/app/api/cron/calendar-account-deletion-settle/**',
-  // 不可逆な purge 本体 + provider 側 token の revoke（#2503 監査）。
-  'apps/product/src/features/external-calendar/server/account-deletion.ts',
+  // cron route は CRON_SECRET を唯一の認証境界としてservice-role同期、外部token revoke、
+  // billing照合などを起動する。route名ではなく認証・不可逆処理の入口全体を保護する。
+  'apps/product/src/app/api/cron/**',
   // account deletion は Stripe customer / subscription を含む不可逆な一括削除。
   // coordinator の配置に依存せず、実装と contract test を同じ class として保護する。
-  // external-calendar 固有の path は直前のより狭い分類を優先する。
+  // external-calendar 固有の path はserver classを優先する。
   'apps/product/src/**/account-deletion*.ts',
-  // rotation を誤ると唯一の refresh token が失効し、以後そのアカウントの sync が復旧できない（#2503 監査）。
-  'apps/product/src/features/external-calendar/server/token-rotation.ts',
-  // provider 側の revoke は一方向操作で、実行してしまえば取り消せない（#2503 監査）。
-  'apps/product/src/features/external-calendar/server/revoke-outbox.ts',
   // `/api/v1` は既存 consumer が依存する公開契約。iCalendar の serializer は route の
   // 外にあるが、UID・日時・payload 互換性を同じ公開契約として扱う。
   'apps/product/src/app/api/v1/**',

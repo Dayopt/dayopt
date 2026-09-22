@@ -38,6 +38,7 @@ describe('trusted validation plan', () => {
   it.each([
     '.github/workflows/ci.yml',
     '.github/actions/setup/action.yml',
+    'package.json',
     'scripts/ci/impact.mjs',
     '.github/workflows/validation-gate.yml',
     'scripts/ci/validation-gate.mjs',
@@ -58,6 +59,10 @@ describe('trusted validation plan', () => {
     'apps/product/src/features/external-calendar/server/authority-config.ts',
     'apps/product/src/features/external-calendar/server/connect-flow.ts',
     'apps/product/src/features/external-calendar/schemas/google.ts',
+    'apps/product/src/features/external-calendar/server/connection-service.ts',
+    'apps/product/src/features/external-calendar/server/sync-service.ts',
+    'apps/product/src/app/api/cron/calendar-sync/route.ts',
+    'apps/product/src/app/api/cron/billing-reconciliation/route.ts',
     'apps/product/src/app/api/v1/calendar/[token]/route.ts',
     'apps/product/src/features/timeblock/lib/plan-to-ical.ts',
     'apps/product/src/features/settings/server/account-deletion.ts',

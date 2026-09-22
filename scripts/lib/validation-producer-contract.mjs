@@ -7,6 +7,7 @@
 export const VALIDATION_PRODUCER_DEFINITIONS = Object.freeze([
   '.github/workflows/ci.yml',
   '.github/actions/setup/action.yml',
+  'package.json',
   'scripts/ci/check.mjs',
   'scripts/ci/impact.mjs',
 ]);
