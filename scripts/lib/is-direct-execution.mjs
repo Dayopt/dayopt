@@ -5,7 +5,7 @@ import { pathToFileURL } from 'node:url';
  * 呼び出し元の `.mjs` ファイルが `node <file>` として直接実行されたか
  * （import されただけではないか）を判定する。
  *
- * ops 系の各 wrapper（`green-watch.mjs` 等）が
+ * ops 系の各 wrapper（`factory-handoff.mjs` 等）が
  * 同一実装をそれぞれ複製していた（#2432 plan-review
  * 指摘、plan-critic）。新規スクリプトでの複製を増やさないための共有先として
  * 抽出する。既存の複製は本ファイルの新設だけでは解消されない（呼び出し元の
