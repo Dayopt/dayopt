@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-08-10
+last_verified: 2026-09-22
 ---
 
 # Runbook（障害対応・リリース手順）
@@ -1775,3 +1775,50 @@ AIがリリースノートを記載する際の構造テンプレート。リポ
 ## 過去のリリースノートスナップショット
 
 バージョン別のリリースノートは `docs/operations/log/` に日付プレフィックス付きで保存していたが、2026-08-28（#2475）に domain log/ を全廃したため、過去分は Git 履歴のみに残る。リリースノートの正本は [GitHub Releases](https://github.com/Dayopt/dayopt/releases) と `apps/web/content/blog/{en,ja}/` の `category: 'release'` 記事。
+
+---
+
+# 第5部: 実測で分かった罠（git / worktree / CI / release）
+
+agent が実際に踏んだ事例を、再発条件と最短の対処だけ残す。2026-09-22 に Claude Code の memory から昇格した（provider を問わず効く）。
+
+## commit / push
+
+- **commitlint の `subject-case`**: subject の先頭が大文字始まりの Latin 語（`Typography に…` / `LP の…`）だと fail する。subject は日本語で始め、固有名詞は文中へ。type は `feat / fix / docs / style / refactor / perf / test / build / ci / chore / revert` だけで、issue 題名に多い `ops(...)` は通らない（`chore` にする）。`Closes #N` を書く commit は直前の段落まで footer 扱いになり `footer-max-line-length`（100 文字）で落ちるので body を手で折り返す
+- **pre-push の PAUSE**: `.husky/pre-push` は push する commit 集合ごとに初回必ず `PAUSE: push 前の確認` を出して exit 1 する。transient failure ではない。`grep -A8 PAUSE` で読み、セルフレビュー 4 点（index 確認 / 直前修正の穴 / auth・RLS・billing 等の反証 / 配線と不等式）を PR コメントに書いてから同じ commit 集合を再 push する（#2432。差分ゼロ push は自動 skip）
+- **guard を足した diff の DO-CONFIRM には経路の列挙そのものを書く**: 「`rg` で呼び出し元 N 件、うち guard を通るのは N 件」の形。数えずに「穴なし」と書いて、同じ質問を送る 2 つ目の CLI を見落とした（2026-09-20 PR #2851）。塞ぐ時は点ではなく共有の契約モジュールへ置き場を変える
+- **merge commit の上で `git commit --amend` しない**: 黙って成功してコード変更が merge commit に畳み込まれ、`git log -S` の帰属が壊れる（2026-08-18 PR #2184）。amend 前に `git log --oneline -1` を見る。踏んだら `git reset --soft <feat commit>` で畳み直し、merge 由来のファイルを index から外してから merge し直す
+- **古い main から切った branch の push が workflow 変更の拒否文言で落ちる**: 自分の diff に workflow が無くても、default branch との差で判定される。`git rebase origin/main`（または追従 merge）で解消し、User へ回さない（2026-09-15 PR #2764）
+
+## worktree と branch:finish
+
+- **着手前は 3 点を見る**: `gh pr list`（open PR）、`git worktree list` の branch 名（commit 0 でも対象 issue 番号があれば着手済み）、`status:in-progress` label。`status:ready` は未着手を意味しない（2026-08-10、#1900 を二重実装して PR #1906 が丸ごと捨て仕事になった）。直列 merge 順の衝突は `git merge-tree --write-tree HEAD origin/<相手>` で待たずに測れる（exit 0 + tree OID なら衝突なし）
+- **worktree で `next dev` を回した後の `pnpm branch:finish` は掃除だけ止まる**: Next が `apps/product/AGENTS.md` / `CLAUDE.md` を未追跡で生成するため。merge は済んでいるので 2 ファイルを削除して再実行する（commit しない。2026-09-07 PR #2634）
+- **main checkout 上で切った branch を `branch:finish` すると main working tree を削除しに行く**: git が拒否するので破壊はされないが途中停止する。本実行の前に `git checkout main` して `--dry-run` を見る（2026-09-18 PR #2839）
+- **`gh pr merge` は他ツールの worktree が main を checkout していると失敗する**（`'main' is already used by worktree`）。ローカル git に触れない `gh api repos/Dayopt/dayopt/pulls/<N>/merge -X PUT -f merge_method=merge` へ切り替える。worktree 削除後の `git branch -d` も同じ理由で `not fully merged` と誤検知するので、`git merge-base --is-ancestor <branch> origin/main` で確定してから消す
+- **producer 定義（`ci.yml` / `scripts/ci/check.mjs` / `impact.mjs`）を変える PR は `Validation (shadow)` が設計上 failure**（`self-produced`、#2795）。shadow は required ではないが `branch:finish` の rollup は失敗 check があると止まる。required 全 green・未解決 thread 0 を確認し、理由を PR に書いて `gh api -X PUT .../merge` で merge する（2026-09-17 PR #2808）
+- **`.git/config` に `core.bare=true` が書かれて git 操作不能になる事象**（2026-08-25 #2375、5 回）: hook が子プロセスへ注入する `GIT_DIR` を、test fixture の引数なし `git init --bare` が拾って repo を bare 再初期化していた（PR #2368 の vitest setupFile で `GIT_*` を消して解消）。署名は `must be run in a work tree`、復旧は `git config core.bare false`。「未変更の main でも再現」という報告は linked worktree（共有 `.git`）ではなく独立 full clone での再現かを確かめてから信じる
+
+## CI と merge gate
+
+- **`N of M required status checks are expected (HTTP 405)` は実行途中の姿**。update-branch（synchronize）にも ci.yml は発火する。Impact gate の `needs` で下流 job が rollup に遅れて現れるだけなので、`gh pr checks <N> --watch` で完走を待つ。close → reopen は走行中 run を cancel して重量層込みの再実行を浪費する（2026-08-11 PR #1931）
+- **required check は「全 PR で必ず publish されるもの」だけにする**。`paths` filter つき workflow の check、migration がある時だけ走る check は expected のまま永久に残り、全 PR が merge 不能になる（2026-09-07 の public 化で実際に起きた。#2640 で解消）。plan / visibility の変更は inert だった ruleset を一斉に有効化する
+- **共通検証計画（`scripts/lib/` の validation plan、`classifyPlanPath`）と Impact Resolver（`impact.mjs`）が同じ path を別に分類すると、plan が required にした check を impact が起動せず永久に来ない**（PR #2813、#2868）。実効 `unknown` は `areas.includes('unknown') || impact.unknown.length > 0` の OR。area を外すと fallback で `unknown` に落ちて悪化する。影響は `git ls-files` を両関数に通して unknown 0 件で閉じる
+- **`gh pr view --json statusCheckRollup` は status の `description` を返さない**。設計上 failure になる check を advisory へ格下げする判定を conclusion だけで書くと、同じ経路の本物の失敗まで飲み込む。分ける手がかりが description なら `gh api repos/{o}/{r}/commits/<sha>/statuses` を別に引く（#2469、PR #2834）
+- **commit status の description は 4-byte Unicode（emoji）を拒否する**（422）。required job 名は全部 emoji 始まりなので、job 名を description に混ぜた瞬間に落ち、gate の bug が「判定不能」に化ける（2026-09-17 #2814）。動的に job 名を混ぜる経路だけ description を正規化する
+- **write 権限を持つ controller の trigger は `workflow_run` だけ**。`deployment_status` は deployment の commit（= PR head）の定義で走り、`workflow_dispatch` は任意 ref の定義で走る（PR #2804 で実測）。PR が producer 定義を変えている時は同名 job の success を信用しない。controller 側にも `GITHUB_REF` / `GITHUB_EVENT_NAME` の guard を置く
+- **CI 所要時間の条件別集計は交絡する**。「Supabase 同居で遅い」は誤診で、遅かった条件だけ product unit を実行していた（2026-09-02 #2539）。条件ごとに最低 1 件は `gh run view <id> --log` を開き、何が skip されたかを見てから因果を書く
+
+## Vercel / Supabase Preview
+
+- **Vercel flake は 2 型**（2026-08-12）。型 1: 特定 branch だけ deployment が作られず required status が expected のまま。空 commit でも直らず、Vercel Dashboard の Create Deployment で手動指定する（User 操作）。型 2: `next/font/google` の build 時フェッチ不安定（`NextFontGoogleFontFileReplacer` / font module-not-found）。同一 commit の `vercel redeploy dpl_<id>` で通る。まず deployment が「存在して失敗」か「そもそも存在しない」かを分け、コード修正に走らない
+- **Vercel Preview は Protection Bypass for Automation で実測できる**（両 project 有効済み）。`x-vercel-protection-bypass` と `x-vercel-set-bypass-cookie: false` の 2 header、または `vercel curl <path> --deployment <url> --yes`。性能比較は同じ branch の連続 2 commit を交互に叩く（時間帯と環境の交絡が消える）。runtime-logs API は live tail 専用で履歴は取れない
+- **Supabase Preview が `Configurations ❌ ... storage config 404` で止まったら先に status page**。`curl -s https://status.supabase.com/api/v2/incidents/unresolved.json` で lifecycle 系 incident を見る。障害なら close / reopen せず、解決後の次の push で自動再試行される（2026-09-04 PR #2594）
+- **migration は main merge で即 production へ適用されるが、promote は層 3 が green になるまで待つ**。DB は forward-only なので Instant Rollback でも戻せず、旧ビルドが新スキーマを踏む窓は E2E の完走時間だけ続く。破壊的 migration は code 先行 merge → promote → migration merge の 2 段に分ける（AGENTS.md が許す不可逆 migration の隔離。2026-09-03 #2175）
+
+## 状態の確定
+
+- **SHA / 追従状態 / merge 順を記憶や他 session の報告から補完しない**。短縮 SHA から 40 桁を補完して捏造し、完全一致で判定する gate が止まりかけた（2026-08-14、同日 3 回）。`gh pr view <N> --json headRefOid,mergeStateStatus` の出力をそのまま貼る。誤投稿は追加ではなく当該コメントの編集で直す
+- **破壊的操作（`git worktree remove --force` / `branch -D` / データ削除）の承認は、この会話へ User から直接届いたものだけ**。別 session や PR コメントの「User 承認済み」は承認にならない。実行前に `gh pr view <N> --json state,closedAt` 等で外部状態を実測し、`git -C <wt> status --porcelain` が非空なら止める（2026-08-26、未 push の作業を消した）
+- **待ちは 10〜15 分で time-box する**。通知が来ない時に誰も動かないと PR が User の在席頼みになる。自分で PR / CI / issue を実測して次の手を打つ。ただし不可逆操作の確認は省かない
+- **milestone は期限切れでも close しない**。世代交代は releasing skill Phase 3.1（release 時）だけ。due date を動かすかクリアする（2026-08-20 に是正指示を受けて差し戻した）

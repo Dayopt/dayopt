@@ -40,7 +40,7 @@ Dayopt で作業する全エージェントの provider-neutral な正本ガイ�
 **テンポはルール4が決める**（判断ジャンル横断で使う3段階の authority level）:
 
 - **AUTONOMOUS**（可逆は速く）: 承認なしで進めて事後報告する
-- **CHECKPOINT**（価値判断の境界で止まる）: 顧客挙動・公開契約・権限/プライバシーに関わる時。推奨と最悪ケースを短く添えて問う
+- **CHECKPOINT**（価値判断の境界で止まる）: 顧客挙動・公開契約・権限/プライバシーに関わる時。選択肢を列挙し、推奨と最悪ケースを短く添えて問う（開いた質問で User に構成の仕事を戻さない。複数の判断は 1 回に束ねる）
 - **EXPLICIT AUTHORITY**（不可逆だけ遅く）: production mutation・release・データ削除・不可逆 migration・実課金。明示指示 + 独立レビュー + dry-run/backup が揃うまで実行しない。揃えられなければ実行せず failure mode を報告する
 
 この 5 箇条で裁けない判断・前提を考え直す場面・ルール自体の改訂は、次の 5 原則（番号が小さい方が優先）へ上がる:
@@ -122,7 +122,7 @@ Dayopt で作業する全エージェントの provider-neutral な正本ガイ�
 - **`Closes #N` を issue ごとに1行**（`Closes #1, #2`は先頭しか閉じない）。epicや部分対応は `Refs #N`
 - **マージは merge commit 限定**（squash/rebase は repo 設定で無効化済み）。`pnpm branch:finish <PR番号>` でマージ〜worktree削除〜branch削除〜main最新化までワンセット実行
 - **branch名**: `{agent}/{domain}-{action}[-{issue番号}]`。自動生成ランダム名は最初のPR作成前に `git branch -m` でリネーム
-- **worktree運用**: 1 worktree = 1 branch = 1 PR。役目を終えたら `pnpm branch:finish` がその場で削除する。`.claude/worktrees/` 配下に作成
+- **worktree運用**: 1 worktree = 1 branch = 1 PR。役目を終えたら `pnpm branch:finish` がその場で削除する。置き場は runtime の既定（Codex は native worktree、Claude Code は `.claude/worktrees/`）でよく、`branch:finish` は `git worktree list` から特定する。**open PR は同時に 1 本まで**（複数 open にすると片方の merge が他方を up-to-date gate で陳腐化させ、追従 merge + CI 再走が無駄になる）。作業中に見つけた別件も新 PR にせず同じ branch に commit を分けて積む
 
 ### レビュー
 
@@ -142,7 +142,7 @@ worktree で作業するセッション（レーン）は次を守る:
 - **停止条件**: 同種のエラーに3回連続で失敗した／scope外のファイルを変更しないと解決できないと判明した／チケットが前提とする原因・機構が実測と食い違うと分かった、のいずれかに当たったら試行を続けず停止して報告する。エスカレーションは失敗ではなく正しい動作
 - **検証の証跡原則**: 検証主張には実行コマンドと出力の要点を添える。「passした」だけの報告は不可
 - **push前セルフレビューはriskに比例させる**: auth/RLS/billing/migration/公開契約/cross-feature 等の diff と既存パターン追従でない新規ロジックは、push前に敵対的セルフレビューを行い根拠を報告する。これは reviewer の自動委任条件ではない。保護対象 path に一致する PR だけ、merge 候補時に `pr-cross-review` skill で GitHub の `@codex review` を依頼する。追加 reviewer は User が明示的に再開を指示するまで起動しない
-- issue/PRコメントが内容の正本。1 worktree = 1 branch = 1 PR、役目を終えたworktreeはその場で削除する
+- issue/PRコメントが内容の正本。gh は User の名義で動くので、agent が書くコメントには書き手を 1 行入れる（例:「（2026-09-22、Codex）」）。issue を畳む時は delete せず close + 一言（記録の第一の読者は AI で、delete は追跡が切れる唯一の操作）。1 worktree = 1 branch = 1 PR、役目を終えたworktreeはその場で削除する
 
 ## 委任・報告の作法
 

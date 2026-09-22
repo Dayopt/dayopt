@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-09-07
+last_verified: 2026-09-22
 code: scripts/tasks/env/schema.ts
 ---
 
@@ -645,6 +645,21 @@ reCAPTCHA 関連 env は旧方式。新規設定・docs・example には追加�
 - Production secret を通常の local dev から参照する
 - PR Preview Branch credentials を 1Password に保存する
 - `vercel env pull` を通常フローとして案内する
+
+---
+
+## 実測で分かった罠
+
+2026-09-22 に Claude Code の memory から昇格。
+
+- **`op item get`（`--reveal` なし）でも notes の複数行はそのまま出る**。recovery codes を 2 回会話ログへ露出させ、再発行を依頼した（2026-08-14、2026-09-14）。field 名を見る時は `awk '/^Fields:/{f=1;next} f && /^  [A-Za-z_]+:/' | sed -E 's/:.*$//'` で field 行だけを通す。値の有無だけなら `pnpm 1password:check`。`sentry auth status` のような CLI の status 系も token の一部を表示するので、疎通は `sentry org list` で確かめる
+- **`op item create` / `op item edit` の stdout は item 内容を出す**。必ず `>/dev/null`。書き込み直後の読み取りは数秒間不安定。CLI で編集できない item 種別（SSO login field 持ち、SSH Key）は GUI のみ
+- **日本語ロケールの「API Credential」item は標準 field が内部 id `credential` を持つ**。同名の field を足すと `more than one credential field` で参照が壊れる。User へは「標準の『認証情報』欄に値を入れる」と伝え、参照は内部 id で書く
+- **`op whoami` が未サインインでも `op run` は通る**。desktop 統合は別経路で、承認プロンプトが閉じられていると `authorization timeout` になるだけ。`op whoami` や `supabase projects list` の失敗を根拠に「経路なし」と誤診しない（2026-09-04 #2175、2026-09-18 再確認）。production への SELECT は `SUPABASE_ACCESS_TOKEN='op://agent/supabase-agent/credential' op run -- bash -c 'curl -X POST https://api.supabase.com/v1/projects/<ref>/database/query --data-binary @body.json'` で送れる。body は secret を含まない JSON をファイルへ先に書き、1 回の `op run` にまとめて承認を 1 回にする。PII は件数と sha256 だけ出す
+- **credential の発行は最初から User 手作業として計画に書く**。key の値が画面に出る操作へ到達する browser 操作は自動化の分類器に止められる（2026-09-18 #2827）。agent がやってよいのは読み取りでの現況確認（残高・既存 key 件数・プラン）と、秘密でない欄の入力まで
+- **agent の gh は fine-grained PAT（`GH_CONFIG_DIR=~/.config/gh-agent`）**。`.github/workflows/` を含む commit の push は拒否される（`refusing to allow a Personal Access Token to create or update workflow`）。agent は commit まで作り、push は User の terminal で行う。identity を切り替える形の push は自動化側でも止まるので、コマンドを渡すところまでが agent の仕事。`gh` が 403 / `Resource not accessible` を返したら scope 外なので User へ依頼する（2026-09-14 PR #2761）
+- **Sentry の読み取りは `SENTRY_AUTH_TOKEN="op://agent/sentry-cli-readonly/credential" op run -- sentry issue list dayopt/`**（CLI 名は `sentry`。`sentry-cli` は別物の build tool）。build 用 token の正本は `ci/sentry-release-token`。2026-09-07 の「agent から Sentry を読む経路が無い」は item 名の取り違えによる誤診だった
+- **MCP 定義は user-global にだけ置く**（Claude は `~/.claude.json`、Codex は `~/.codex/config.toml` の `[mcp_servers.*]`）。repo に同名定義を足すとキー単位でマージされ `invalid configuration: url is not supported for stdio` で MCP 全体が起動しなくなる（2026-07-23 に 2 回）。詳細は `mcp-usage` skill
 
 ---
 
