@@ -49,6 +49,10 @@ describe('trusted validation plan', () => {
     'apps/product/src/lib/auth/domain/access-policy.ts',
     'apps/product/src/lib/safe-redirect.ts',
     'apps/product/src/lib/oauth-server/scopes.ts',
+    'apps/product/src/features/external-calendar/server/google-oauth.ts',
+    'apps/product/src/features/external-calendar/server/authority-config.ts',
+    'apps/product/src/features/external-calendar/server/connect-flow.ts',
+    'apps/product/src/features/external-calendar/schemas/google.ts',
     'supabase/migrations/20260916000000_rls.sql',
   ])('requires review for an external contract, irreversible change, or guardrail: %s', (file) => {
     expect(plan([file]).review.status).toBe('required');

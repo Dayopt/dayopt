@@ -113,6 +113,12 @@ export const PROTECTED_PATH_GLOBS = [
   'apps/product/src/features/settings/server/billing-*.ts',
   // external calendar integrations
   'apps/product/src/features/external-calendar/server/providers/**',
+  // Google OAuth client 契約。provider adapter だけでなく、scope / token response、
+  // authority identity、PKCE state の変更も全利用者の接続互換性と認証境界へ波及する。
+  'apps/product/src/features/external-calendar/server/google-oauth.ts',
+  'apps/product/src/features/external-calendar/server/authority-config.ts',
+  'apps/product/src/features/external-calendar/server/connect-flow.ts',
+  'apps/product/src/features/external-calendar/schemas/google*.ts',
   // アカウント削除に伴う外部 calendar データの不可逆な一括削除を駆動する cron（#2503 監査）。
   'apps/product/src/app/api/cron/calendar-account-deletion-settle/**',
   // 不可逆な purge 本体 + provider 側 token の revoke（#2503 監査）。

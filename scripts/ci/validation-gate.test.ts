@@ -811,11 +811,11 @@ describe('validation gate controller', () => {
       postStatus: () => '',
       now: () => new Date('2026-09-16T10:55:00Z'),
     });
-    // 依頼 comment は head より前なので not-started。ただし Validation が未充足の間は
-    // merge 候補ではなく、shadow は再依頼候補にもせず投稿もしない
+    // 依頼 comment は head より前なので not-started。required merge checks は成功済みなので、
+    // Validation の成功語彙 `pass` を正規化して起動候補だけを通知する（投稿はしない）
     expect(outcome.review?.state).toBe('not-started');
-    expect(outcome.review?.trigger.shouldRequest).toBe(false);
-    expect(outputs.some((text) => text.startsWith('::notice::Review policy'))).toBe(false);
+    expect(outcome.review?.trigger.shouldRequest).toBe(true);
+    expect(outputs.some((text) => text.startsWith('::notice::Review policy'))).toBe(true);
   });
 
   it('reads every reviewThreads page and fails closed on an incomplete page', () => {

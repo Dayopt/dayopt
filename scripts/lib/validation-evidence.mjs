@@ -441,6 +441,51 @@ function latestCiFailures(evidence) {
 }
 
 /**
+ * Review の依頼時点だけを判定する。Validation の証拠としては self-produced を受理しないが、
+ * guardrail 自身を変える PR でも native required job が完了するまで待った後に独立レビューへ
+ * 出せなければ、最もレビューが必要な差分だけ候補にならない。ここで raw job を見るのは
+ * merge 安全性の証明ではなくタイミング制御だけで、Validation verdict は blocked のまま保つ。
+ */
+function isReviewCandidateReady(plan, evidence, suites) {
+  if (
+    plan?.status !== 'determinate' ||
+    evidence?.pr?.state !== 'open' ||
+    evidence?.pr?.draft ||
+    evidence?.pr?.fork ||
+    !['ahead', 'identical'].includes(evidence?.baseCompare)
+  )
+    return false;
+
+  const trustedRuns = new Map();
+  const selfProducedReady = (name) => {
+    const producer = PRODUCERS[name];
+    if (producer?.stage !== 'merge' || producer.kind !== 'actions-job') return false;
+    let run = trustedRuns.get(producer.workflow);
+    if (run === undefined) {
+      run = selectTrustedRun(evidence.workflowRuns, {
+        repository: evidence.repository,
+        headSha: evidence.headSha,
+        workflow: producer.workflow,
+      });
+      trustedRuns.set(producer.workflow, run);
+    }
+    const job = (run?.jobs ?? []).find(
+      (candidate) => candidate.name === producer.job && candidate.runAttempt === run.runAttempt,
+    );
+    return job?.status === 'completed' && ['success', 'skipped'].includes(job.conclusion ?? '');
+  };
+
+  const ready = Object.entries(suites)
+    .filter(([, suite]) => suite.stage === 'merge')
+    .every(([name, suite]) =>
+      ['satisfied', 'not-applicable'].includes(suite.status)
+        ? true
+        : suite.status === 'self-produced' && selfProducedReady(name),
+    );
+  return ready && latestCiFailures(evidence).length === 0;
+}
+
+/**
  * @param {{ plan: any, evidence: ValidationEvidence }} input
  */
 export function evaluateValidation({ plan, evidence }) {
@@ -504,6 +549,7 @@ export function evaluateValidation({ plan, evidence }) {
     identity: plan?.identity ?? null,
     fetchedAt: evidence?.fetchedAt ?? null,
     verdict,
+    reviewCandidateReady: isReviewCandidateReady(plan, evidence, suites),
     reasons,
     suites,
     review: plan?.review ?? null,

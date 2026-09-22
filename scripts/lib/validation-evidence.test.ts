@@ -405,8 +405,26 @@ describe('validation evidence: rejected evidence', () => {
       expect(result.suites.productUnit.status).toBe('self-produced');
       expect(result.suites.productPreview.status).toBe('satisfied');
       expect(result.verdict).toBe('blocked');
+      expect(result.reviewCandidateReady).toBe(true);
     },
   );
+
+  it('waits for the native job before reviewing a self-produced guardrail change', () => {
+    const result = evaluateValidation({
+      plan: plan(['.github/workflows/ci.yml', APP_FILE]),
+      evidence: evidence({
+        workflowRuns: [
+          ciRun([
+            job('🔍 Static Checks', null),
+            job('📦 Unit Tests', 'success'),
+            job('🧪 Integration Tests', 'skipped'),
+          ]),
+        ],
+      }),
+    });
+    expect(result.verdict).toBe('blocked');
+    expect(result.reviewCandidateReady).toBe(false);
+  });
 
   it('blocks on any failed trusted CI job even when the plan does not require it', () => {
     const result = evaluateValidation({
