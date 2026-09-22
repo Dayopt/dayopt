@@ -20,6 +20,14 @@
  *   pending にする。strict up-to-date の ruleset と同じ向き
  */
 
+import {
+  VALIDATION_PRODUCER_DEFINITIONS as PRODUCER_DEFINITIONS,
+  REVIEW_REQUIRED_ACTIONS_JOBS,
+  REVIEW_REQUIRED_STATUS_CONTEXTS,
+} from './validation-producer-contract.mjs';
+
+export { PRODUCER_DEFINITIONS };
+
 export const VALIDATION_VERSION = 1;
 export const VALIDATION_STATUS_CONTEXT = 'Validation (shadow)';
 
@@ -107,13 +115,6 @@ const SUCCESS = 'success';
  * PR #2804）。その run は producer として信用せず `self-produced` にする。保証境界は job の
  * 配線ファイルまで（vitest 設定や package.json scripts の改変は review 側の観点）。
  */
-export const PRODUCER_DEFINITIONS = Object.freeze([
-  '.github/workflows/ci.yml',
-  '.github/actions/setup/action.yml',
-  'scripts/ci/check.mjs',
-  'scripts/ci/impact.mjs',
-]);
-
 /**
  * producer 固有の定義ファイル（その suite の評価でだけ self-produced にする）。
  * 🧱 DB Upgrade (shadow) の実体を migration と同時に改変した PR の緑は信用しないが、
@@ -457,22 +458,25 @@ function isReviewCandidateReady(plan, evidence, suites) {
     return false;
 
   const trustedRuns = new Map();
-  const selfProducedReady = (name) => {
-    const producer = PRODUCERS[name];
-    if (producer?.stage !== 'merge' || producer.kind !== 'actions-job') return false;
-    let run = trustedRuns.get(producer.workflow);
+  const trustedJobReady = (jobName) => {
+    let run = trustedRuns.get(CI_WORKFLOW);
     if (run === undefined) {
       run = selectTrustedRun(evidence.workflowRuns, {
         repository: evidence.repository,
         headSha: evidence.headSha,
-        workflow: producer.workflow,
+        workflow: CI_WORKFLOW,
       });
-      trustedRuns.set(producer.workflow, run);
+      trustedRuns.set(CI_WORKFLOW, run);
     }
     const job = (run?.jobs ?? []).find(
-      (candidate) => candidate.name === producer.job && candidate.runAttempt === run.runAttempt,
+      (candidate) => candidate.name === jobName && candidate.runAttempt === run.runAttempt,
     );
     return job?.status === 'completed' && ['success', 'skipped'].includes(job.conclusion ?? '');
+  };
+  const selfProducedReady = (name) => {
+    const producer = PRODUCERS[name];
+    if (producer?.stage !== 'merge' || producer.kind !== 'actions-job') return false;
+    return trustedJobReady(producer.job);
   };
 
   const ready = Object.entries(suites)
@@ -482,7 +486,16 @@ function isReviewCandidateReady(plan, evidence, suites) {
         ? true
         : suite.status === 'self-produced' && selfProducedReady(name),
     );
-  return ready && latestCiFailures(evidence).length === 0;
+  const requiredActionsReady = REVIEW_REQUIRED_ACTIONS_JOBS.every(trustedJobReady);
+  const requiredStatusesReady = REVIEW_REQUIRED_STATUS_CONTEXTS.every((context) =>
+    (evidence.statuses ?? []).some((entry) => entry.context === context && entry.state === SUCCESS),
+  );
+  return (
+    ready &&
+    requiredActionsReady &&
+    requiredStatusesReady &&
+    latestCiFailures(evidence).length === 0
+  );
 }
 
 /**

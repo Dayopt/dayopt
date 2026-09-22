@@ -18,6 +18,7 @@ import { createHash } from 'node:crypto';
 
 import { JEV_MAX_INPUT_BYTES, jevInputBytes, type JevJsonValue } from './jev-adapter.ts';
 import { SHADOW_QUESTION_SET_ID, SHADOW_QUESTIONS } from './jev-shadow-questions.ts';
+import { VALIDATION_PRODUCER_DEFINITIONS } from './validation-producer-contract.mjs';
 
 /** 保護対象 glob を観点へ写像する時の分類。 */
 export type ProtectedCategory =
@@ -79,8 +80,9 @@ export const PROTECTED_GLOB_CATEGORIES: Record<string, ProtectedCategory> = {
   'scripts/hooks/**': 'guardrails',
   'scripts/tasks/finish-branch.sh': 'guardrails',
   'scripts/ci/protected-path-gate.mjs': 'guardrails',
-  'scripts/ci/check.mjs': 'guardrails',
-  '.github/workflows/ci.yml': 'guardrails',
+  ...Object.fromEntries(
+    VALIDATION_PRODUCER_DEFINITIONS.map((path) => [path, 'guardrails'] as const),
+  ),
   'scripts/lib/validation-*.mjs': 'guardrails',
   'scripts/lib/validation-*.test.ts': 'guardrails',
   'scripts/lib/review-policy.mjs': 'guardrails',

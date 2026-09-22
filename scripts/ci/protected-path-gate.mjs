@@ -59,6 +59,8 @@
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { VALIDATION_PRODUCER_DEFINITIONS } from '../lib/validation-producer-contract.mjs';
+
 /**
  * `.github/workflows/production-config-audit.yml` の self-change 検出
  * （`grep -Eq '^(...)$'`、`Detect audit contract changes` step）がリテラルで
@@ -158,8 +160,9 @@ export const PROTECTED_PATH_GLOBS = [
   // 処理とどの test を skip するかの判定を持ち、ci.yml はその job / permissions
   // を決める。どちらも「壊れても CI は green のまま」になりうるため、
   // guardrail の重点確認対象として残す（#2483 の過去レビューで入った境界）。
-  'scripts/ci/check.mjs',
-  '.github/workflows/ci.yml',
+  // Validation が self-produced と判定する producer 定義と同じ正本を使う。
+  // job の実行環境・検査対象を変えられる依存を個別allowlistから漏らさない。
+  ...VALIDATION_PRODUCER_DEFINITIONS,
   // Review policy / validation controller。#2794 / #2796 で追加された後発の
   // ガードレールで、判定側と producer を同じ PR で弱めると shadow が偽の green を出す。
   // #2489 の「ガードレール自身」に含めるが、AGENTS.md や一般 skill のような

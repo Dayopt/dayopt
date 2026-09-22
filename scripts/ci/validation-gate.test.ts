@@ -120,6 +120,12 @@ function fakeApi(overrides: Record<string, unknown> = {}) {
           target_url: 'https://vercel.com/dayopt/product/x',
           description: 'Deployment has completed',
         },
+        {
+          context: 'Vercel – web',
+          state: 'success',
+          target_url: 'https://vercel.com/dayopt/web/x',
+          description: 'Deployment has completed',
+        },
       ],
     },
     [`repos/${REPO}/deployments?sha=${headSha}&per_page=100`]: [

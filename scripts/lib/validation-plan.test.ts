@@ -37,6 +37,8 @@ describe('trusted validation plan', () => {
   });
   it.each([
     '.github/workflows/ci.yml',
+    '.github/actions/setup/action.yml',
+    'scripts/ci/impact.mjs',
     '.github/workflows/validation-gate.yml',
     'scripts/ci/validation-gate.mjs',
     'scripts/lib/validation-plan.mjs',

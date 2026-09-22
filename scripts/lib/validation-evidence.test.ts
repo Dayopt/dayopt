@@ -426,6 +426,38 @@ describe('validation evidence: rejected evidence', () => {
     expect(result.reviewCandidateReady).toBe(false);
   });
 
+  it('waits for every repository-ruleset context even when the plan marks it not applicable', () => {
+    const guardrailPlan = plan(['.github/workflows/validation-gate.yml']);
+    const pendingIntegration = evaluateValidation({
+      plan: guardrailPlan,
+      evidence: evidence({
+        workflowRuns: [
+          ciRun([
+            job('🔍 Static Checks', 'success'),
+            job('📦 Unit Tests', 'success'),
+            job('🧪 Integration Tests', null),
+          ]),
+        ],
+      }),
+    });
+    const pendingProduct = evaluateValidation({
+      plan: guardrailPlan,
+      evidence: evidence({
+        statuses: [status('Vercel – product', { state: 'pending' }), status('Vercel – web')],
+      }),
+    });
+    const pendingWeb = evaluateValidation({
+      plan: guardrailPlan,
+      evidence: evidence({
+        statuses: [status('Vercel – product'), status('Vercel – web', { state: 'pending' })],
+      }),
+    });
+
+    expect(pendingIntegration.reviewCandidateReady).toBe(false);
+    expect(pendingProduct.reviewCandidateReady).toBe(false);
+    expect(pendingWeb.reviewCandidateReady).toBe(false);
+  });
+
   it('blocks on any failed trusted CI job even when the plan does not require it', () => {
     const result = evaluateValidation({
       plan: plan(['README.md']),
