@@ -57,6 +57,8 @@
     "functions:check": "deno check --no-lock --config supabase/functions/deno.json supabase/functions",
     "lint:i18n": "pnpm --filter @dayopt/product lint:i18n",
     "docs:check": "tsx scripts/tasks/docs-guard/index.ts",
+    "learn": "tsx scripts/tasks/learn.ts",
+    "learn:generate": "tsx scripts/tasks/learn.ts --generate",
     "docs:coverage": "tsx scripts/tasks/docs-coverage/index.ts",
     "architecture:generate": "tsx scripts/tasks/generate-architecture-map.ts",
     "architecture:check": "tsx scripts/tasks/generate-architecture-map.ts --check",

@@ -21,6 +21,8 @@ apps/*/out/
 
 # misc
 .DS_Store
+# Dayopt Learning System の生成物（正本は docs/learn、pnpm learn で作る）
+/.learn/
 *.pem
 
 # debug
