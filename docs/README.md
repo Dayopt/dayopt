@@ -29,6 +29,7 @@
 | コードの作り方の話か                         | `engineering/` — architecture、規約、infra                                                   |
 | 本番を動かし続ける話か                       | `operations/` — runbook、monitoring、security、legal                                         |
 | 何を契約・所有しているかの話か               | `company/` — accounts、登記                                                                  |
+| 仕組みを追跡できるようになりたいか           | `learn/` — Dayopt Learning System（経路・失敗・画面・章。正本は各 .md の JSON block）        |
 | 進行中の複数領域を跨ぐ設計か                 | epic issue 本文（`docs/projects/` は作らない。2026-08-28、#2473）                            |
 | 意思決定の記録か                             | `decisions.md`（全決定の時系列索引、append-only。2026-08-28、#2475）                         |
 | 調査・feedback・incidentの記録か             | GitHub issue（`domain log/` は 2026-08-28、#2475 で全廃）                                    |
@@ -82,6 +83,7 @@ code: apps/product/src/features/timeblock # 任意。repo 内の実在 path
 | UI / code用語                  | `product/glossary.md`                                                                |
 | 訴求・コピー                   | `business/messaging.md`（UI 文言は `product/copywriting.md`）                        |
 | 全体 architecture / state flow | `engineering/architecture.md`                                                        |
+| 仕組みを追跡できるようになる   | `learn/README.md`（Dayopt Learning System。`pnpm learn` で対話画面）                 |
 | coding / API / frontend 規約   | `engineering/conventions*.md` と `AGENTS.md`                                         |
 | 不可解な失敗の切り分け手順     | `engineering/diagnostics.md`                                                         |
 | テスト方針・CI 予算            | `engineering/testing.md`, `operations/self-hosted-runner.md`                         |

@@ -120,6 +120,9 @@
       "Bash(pnpm build:*)",
       "Bash(pnpm check)",
       "Bash(pnpm docs:check)",
+      "Bash(pnpm learn)",
+      "Bash(pnpm learn --no-open)",
+      "Bash(pnpm learn:generate)",
       "Bash(pnpm vitest:*)",
       "Bash(pnpm exec tsc:*)"
     ],
