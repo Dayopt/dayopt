@@ -281,14 +281,14 @@
   },
   {
     "name": "@next/env",
-    "version": "16.3.5",
+    "version": "16.3.6",
     "license": "MIT",
     "repository": "https://github.com/vercel/next.js",
     "publisher": "Next.js Team <support@vercel.com>"
   },
   {
     "name": "@next/swc-darwin-arm64",
-    "version": "16.3.5",
+    "version": "16.3.6",
     "license": "MIT",
     "repository": "https://github.com/vercel/next.js"
   },
@@ -2462,7 +2462,7 @@
   },
   {
     "name": "next",
-    "version": "16.3.5",
+    "version": "16.3.6",
     "license": "MIT",
     "repository": "vercel/next.js"
   },

@@ -115,7 +115,7 @@
     "@lhci/cli": "catalog:tooling",
     "@modelcontextprotocol/conformance": "0.1.16",
     "@next/bundle-analyzer": "catalog:tooling",
-    "@next/env": "^16.3.5",
+    "@next/env": "^16.3.6",
     "@playwright/test": "catalog:tooling",
     "@storybook/addon-a11y": "catalog:tooling",
     "@storybook/addon-docs": "catalog:tooling",
