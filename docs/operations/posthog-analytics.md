@@ -5,7 +5,13 @@ last_verified: 2026-09-24
 code:
   - packages/observability/src/posthog-browser.ts
   - apps/product/src/lib/analytics/posthog-server.ts
+  - apps/product/src/lib/analytics/billing-events.ts
+  - apps/product/src/lib/analytics/signup-analytics-claim.ts
+  - apps/product/src/features/settings/server/signup-analytics-claim-service.ts
+  - apps/product/src/features/timeblock/server/mcp-mutation-client.ts
   - apps/product/src/features/settings/server/analytics-consent-service.ts
+  - apps/product/src/lib/billing/operation-access.ts
+  - supabase/migrations/20260924103844_posthog_analytics_claims.sql
 ---
 
 # PostHog 横断分析
@@ -25,8 +31,10 @@ Dayopt の Web 流入、登録、初回利用、初回支払いを、分析に�
 
 - Web と Product のブラウザ送信は、それぞれの origin の分析 Cookie 同意後だけ開始する。拒否・撤回するとそのブラウザからの送信を止め、SDK の識別子を reset する。Web の同意を Product に自動適用しない。
 - Product の「アカウントの利用分析」はログイン済みユーザー自身が許可・撤回する。初期値は拒否。サーバーイベントは送信直前に最新値を読み、取得失敗時も送らない。Stripe webhook で別端末の支払いが成功した場合にも、このアカウントの判断を適用する。ブラウザ同意とは独立する。
-- ブラウザで同意済みの Product ユーザーは Supabase user UUID で identify し、匿名 Web 訪問と同じ PostHog ブラウザ cookie を通じてつなぐ。Web と Product の両方で同意していない訪問を推定で結合しない。メール、氏名、計画タイトル、メモ、決済情報を送らない。
-- `signup_completed` は登録後の認証リダイレクトで Product のブラウザ同意を得た場合だけ送る。`/auth/*` では同意バナーを表示しないため、新規利用者の `signup_viewed` は欠測しうる。登録の全数は既存の `product_events.user_signed_up` を参照する。
+- ブラウザで同意済みの Product ユーザーは Supabase user UUID で identify し、匿名 Web 訪問と同じ PostHog ブラウザ cookie を通じてつなぐ。認証の初期化が終わるまでブラウザ送信を待ち、初期化後とアカウント切替時は以前の PostHog 識別子を reset してから現在の UUID を identify する。Web と Product の両方で同意していない訪問を推定で結合しない。メール、氏名、計画タイトル、メモ、決済情報を送らない。
+- `signup_completed` は認証 callback が実際の新規登録を確定した時だけ発行する。callback はアカウントに結び付いた署名済みの短時間 HttpOnly Cookie を設定し、ブラウザは固定の URL marker をきっかけに入力なしの tRPC mutation を呼ぶ。サーバーは署名、現在のアカウント、アカウント同意を確認し、DB の一回限り claim を消費してからイベントを送る。`registered=email` のような query parameter は登録の証拠に使わない。cookie は最大 10 分で失効する。
+- `signup_completed` を送るのは登録後の認証リダイレクトで Product のブラウザ同意とアカウント同意の両方が有効な場合だけ。`/auth/*` では同意バナーを表示しないため、新規利用者の `signup_viewed` は欠測しうる。登録の全数は既存の `product_events.user_signed_up` を参照する。
+- 期限切れアカウントでも分析同意の撤回は設定操作として許可する。支払い成功の初回判定は、`product_events` を service_role から読み取り可能にせず、prior event の有無だけを返す限定 RPC で行う。
 
 ## イベント契約
 
@@ -35,11 +43,11 @@ Dayopt の Web 流入、登録、初回利用、初回支払いを、分析に�
 | `$pageview`                                                        | 同意済み Web ページ表示               | 正規化 path、外部参照元ドメイン、許可された UTM |
 | `signup_cta_clicked`                                               | Web の登録 CTA                        | 固定 CTA ID、正規化 path                        |
 | `signup_viewed`, `signup_completed`                                | Product の登録表示、認証完了          | 固定画面名、登録方式                            |
-| `plan_created`, `record_created`, `plan_updated`, `record_updated` | DB 保存成功                           | 操作経路と件数                                  |
+| `plan_created`, `record_created`, `plan_updated`, `record_updated` | DB 保存成功（Product UI / MCP）       | 操作経路と件数                                  |
 | `review_opened`                                                    | Review 表示                           | 固定画面名                                      |
 | `app_trial_started`, `first_payment_succeeded`                     | トライアル確定、初回有料 invoice 成功 | 共通値のみ                                      |
 
-全イベントは `schema_version=1`、`environment`、`surface` を持つ。ブラウザ SDK のイベントと property は送信前の許可リストで制限する。URL の query と hash、自由入力、Stripe ID、日付・時間帯、価格は送らない。サーバーイベントの UUID はイベント名と成功した操作の内部 ID から決定し、再送時も同じになる。PostHog が利用できなくても業務操作は成功させるため、欠測を監査ログと扱わない。
+全イベントは `schema_version=1`、`environment`、`surface` を持つ。ブラウザ SDK のイベントと property は送信前の許可リストで制限する。URL の query と hash、自由入力、Stripe ID、日付・時間帯、価格は送らない。Plan / Record の `source` は `manual`、`external_calendar`、`confirm_day`、`plan_recording`、`mcp` のいずれか。サーバーイベントの UUID はイベント名と成功した操作の内部 ID から決定し、再送時も同じになる。MCP の作成と更新も成功 receipt の resource ID / version で重複排除する。PostHog が利用できなくても業務操作は成功させるため、欠測を監査ログと扱わない。
 
 `posthog-node` 5.52.4 のローカル HTTP stub で実送信形式を展開した結果、サーバー側には SDK 由来の `$geoip_disable`、`$is_server`、`$lib`、`$lib_version` も付く。メール・URL・コンテンツは付かなかった。SDK 更新時はこの境界を再確認する。
 

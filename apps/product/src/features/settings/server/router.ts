@@ -7,10 +7,16 @@ import { SUPPORTED_LOCALES } from '@dayopt/config';
 import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
 
+import { trackPostHogServerEvent } from '@/lib/analytics/posthog-server';
+import {
+  clearedSignupAnalyticsClaimCookie,
+  SIGNUP_ANALYTICS_CLAIM_COOKIE,
+} from '@/lib/analytics/signup-analytics-claim';
 import { handleServiceError } from '@/lib/trpc/errors';
 import { createTRPCRouter, protectedProcedure } from '@/lib/trpc/procedures';
 import { AnalyticsConsentService } from './analytics-consent-service';
 import { createSettingsService } from './settings-service';
+import { SignupAnalyticsClaimService } from './signup-analytics-claim-service';
 
 // バリデーションスキーマ
 const userSettingsSchema = z.object({
@@ -70,6 +76,23 @@ export const userSettingsRouter = createTRPCRouter({
         return handleServiceError(error);
       }
     }),
+
+  claimSignupCompletion: protectedProcedure.mutation(async ({ ctx }) => {
+    const claimToken = ctx.req.cookies[SIGNUP_ANALYTICS_CLAIM_COOKIE];
+    if (!claimToken) return { claimed: false };
+
+    const signupMethod = await new SignupAnalyticsClaimService().claim(ctx.userId!, claimToken);
+    ctx.res.headers?.append('set-cookie', clearedSignupAnalyticsClaimCookie());
+    if (!signupMethod) return { claimed: false };
+
+    await trackPostHogServerEvent({
+      eventName: 'signup_completed',
+      userId: ctx.userId!,
+      sourceId: ctx.userId!,
+      signupMethod,
+    });
+    return { claimed: true };
+  }),
 
   /**
    * 設定取得

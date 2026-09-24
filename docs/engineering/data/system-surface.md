@@ -104,7 +104,7 @@ job 名を変数で渡す schedule と、jobid で消す unschedule は追えな
 
 | builder              | 使っている procedure 数 | 定義                                      |
 | -------------------- | ----------------------- | ----------------------------------------- |
-| `protectedProcedure` | 66                      | `apps/product/src/lib/trpc/procedures.ts` |
+| `protectedProcedure` | 67                      | `apps/product/src/lib/trpc/procedures.ts` |
 | `entitledProcedure`  | 4                       | `apps/product/src/lib/trpc/procedures.ts` |
 
 ### rate limit（21）
@@ -271,7 +271,7 @@ TS の `PRODUCT_EVENT_NAMES` と DB の CHECK 制約の両方で定義される�
 | `plans.list`, `records.list`                                                                                                             | `plans.list`, `records.list`                           | `apps/product/src/app/api/mcp/_tools/timeblock-list.ts`      |
 | `plans.create`, `plans.delete`, `plans.restore`, `plans.update`, `records.create`, `records.delete`, `records.restore`, `records.update` | tRPC を経由しない                                      | `apps/product/src/app/api/mcp/_tools/timeblock-mutations.ts` |
 
-### tRPC procedure の呼び出し元（70）
+### tRPC procedure の呼び出し元（71）
 
 呼び出し元は file 数。`api.x.y.useQuery` / `utils.x.y.invalidate` / `helpers.x.y.prefetch` /
 `trpc.x.y(`（MCP bridge）を数える。test と Story は数えない。
@@ -341,6 +341,7 @@ TS の `PRODUCT_EVENT_NAMES` と DB の CHECK 制約の両方で定義される�
 | `user.exportData`                            | 1                   | 0                   |
 | `user.requestEmailChange`                    | 1                   | 0                   |
 | `user.verifyRecoveryCode`                    | 2                   | 0                   |
+| `userSettings.claimSignupCompletion`         | 1                   | 0                   |
 | `userSettings.get`                           | 10                  | 0                   |
 | `userSettings.getAnalyticsConsent`           | 1                   | 0                   |
 | `userSettings.getICalToken`                  | 1                   | 0                   |
@@ -387,7 +388,7 @@ docs の frontmatter `code:` が指す実装から引く。
 | ---------------------------------------------- | --------------------------------------- |
 | `docs/operations/contact-email.md`             | `contact`                               |
 | `docs/operations/google-oauth-verification.md` | `external-calendar`                     |
-| `docs/operations/posthog-analytics.md`         | `settings`                              |
+| `docs/operations/posthog-analytics.md`         | `settings`, `timeblock`                 |
 | `docs/product/specs/activities.md`             | `activities`                            |
 | `docs/product/specs/auth.md`                   | `auth`, `external-calendar`, `settings` |
 | `docs/product/specs/calendar.md`               | `calendar`                              |
@@ -424,12 +425,12 @@ docs の frontmatter `code:` が指す実装から引く。
 
 ### DB 関数の integration test 被覆
 
-app から呼ぶ DB 関数 76 件のうち、integration test（TS / SQL）から
+app から呼ぶ DB 関数 78 件のうち、integration test（TS / SQL）から
 呼ばれているのは 61 件。
 
-**test から呼ばれていない（15）**: `abandon_calendar_account_delete_revoke_v1`, `begin_calendar_account_deletion_v1`, `claim_stripe_webhook_event`, `clear_calendar_sync_cursor_command_v1`, `delete_all_user_data_command_v5`, `finalize_calendar_account_delete_revoke_v1`, `get_external_lifecycle_app_version_v3`, `get_timeblock_context_marker_v1`, `list_expired_calendar_account_deletion_intents_v1`, `normalize_calendar_account_deletion_intent_v1`, `prepare_calendar_account_delete_revoke_v1`, `prepare_user_data_purge_v1`, `replace_selected_calendars_command_v1`, `seal_calendar_account_deletion_v1`, `start_calendar_account_delete_provider_attempt_v1`
+**test から呼ばれていない（17）**: `abandon_calendar_account_delete_revoke_v1`, `begin_calendar_account_deletion_v1`, `claim_posthog_signup_v1`, `claim_stripe_webhook_event`, `clear_calendar_sync_cursor_command_v1`, `delete_all_user_data_command_v5`, `finalize_calendar_account_delete_revoke_v1`, `get_external_lifecycle_app_version_v3`, `get_timeblock_context_marker_v1`, `has_prior_paid_invoice_event_v1`, `list_expired_calendar_account_deletion_intents_v1`, `normalize_calendar_account_deletion_intent_v1`, `prepare_calendar_account_delete_revoke_v1`, `prepare_user_data_purge_v1`, `replace_selected_calendars_command_v1`, `seal_calendar_account_deletion_v1`, `start_calendar_account_delete_provider_attempt_v1`
 
-### tRPC procedure → DB（66）
+### tRPC procedure → DB（67）
 
 型チェッカーで `procedure → service → .from() / .rpc()` を辿った結果。DI（`this.x.method`）や
 条件分岐で決まるテーブル名も解決する。ここに出ない procedure は DB を触らない。
@@ -495,6 +496,7 @@ app から呼ぶ DB 関数 76 件のうち、integration test（TS / SQL）か�
 | `user.exportData`                          | `activities`, `categories`, `email_suppressions`, `plans`, `profiles`, `records`, `user_settings`                   | —                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | `user.requestEmailChange`                  | `activities`, `categories`, `email_suppressions`, `plans`, `profiles`, `records`, `user_settings`                   | —                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | `user.verifyRecoveryCode`                  | `email_suppressions`, `mfa_recovery_codes`, `user_settings`                                                         | `count_unused_recovery_codes`, `use_recovery_code`                                                                                                                                                                                                                                                                                                                                                                                     |
+| `userSettings.claimSignupCompletion`       | `profiles`                                                                                                          | `claim_posthog_signup_v1`                                                                                                                                                                                                                                                                                                                                                                                                              |
 | `userSettings.get`                         | `user_settings`                                                                                                     | —                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | `userSettings.getAnalyticsConsent`         | `profiles`                                                                                                          | —                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | `userSettings.getICalToken`                | `user_settings`                                                                                                     | —                                                                                                                                                                                                                                                                                                                                                                                                                                      |
@@ -512,20 +514,20 @@ tRPC を経由しない書き込み tool は、receipt を残す `apply_mcp_*` �
 | `activities.list`    | `activities`                     | —                                                                                                                                                                                                                                        |
 | `categories.list`    | `categories`                     | —                                                                                                                                                                                                                                        |
 | `entries.list`       | `activities`, `plans`, `records` | —                                                                                                                                                                                                                                        |
-| `plans.create`       | —                                | `apply_mcp_plan_create_v1`, `apply_mcp_plan_delete_v1`, `apply_mcp_plan_restore_v1`, `apply_mcp_plan_update_v1`, `apply_mcp_record_create_v1`, `apply_mcp_record_delete_v1`, `apply_mcp_record_restore_v1`, `apply_mcp_record_update_v1` |
-| `plans.delete`       | —                                | `apply_mcp_plan_create_v1`, `apply_mcp_plan_delete_v1`, `apply_mcp_plan_restore_v1`, `apply_mcp_plan_update_v1`, `apply_mcp_record_create_v1`, `apply_mcp_record_delete_v1`, `apply_mcp_record_restore_v1`, `apply_mcp_record_update_v1` |
+| `plans.create`       | `profiles`                       | `apply_mcp_plan_create_v1`, `apply_mcp_plan_delete_v1`, `apply_mcp_plan_restore_v1`, `apply_mcp_plan_update_v1`, `apply_mcp_record_create_v1`, `apply_mcp_record_delete_v1`, `apply_mcp_record_restore_v1`, `apply_mcp_record_update_v1` |
+| `plans.delete`       | `profiles`                       | `apply_mcp_plan_create_v1`, `apply_mcp_plan_delete_v1`, `apply_mcp_plan_restore_v1`, `apply_mcp_plan_update_v1`, `apply_mcp_record_create_v1`, `apply_mcp_record_delete_v1`, `apply_mcp_record_restore_v1`, `apply_mcp_record_update_v1` |
 | `plans.get`          | `plans`, `records`               | —                                                                                                                                                                                                                                        |
 | `plans.list`         | `activities`, `plans`, `records` | —                                                                                                                                                                                                                                        |
-| `plans.restore`      | —                                | `apply_mcp_plan_create_v1`, `apply_mcp_plan_delete_v1`, `apply_mcp_plan_restore_v1`, `apply_mcp_plan_update_v1`, `apply_mcp_record_create_v1`, `apply_mcp_record_delete_v1`, `apply_mcp_record_restore_v1`, `apply_mcp_record_update_v1` |
+| `plans.restore`      | `profiles`                       | `apply_mcp_plan_create_v1`, `apply_mcp_plan_delete_v1`, `apply_mcp_plan_restore_v1`, `apply_mcp_plan_update_v1`, `apply_mcp_record_create_v1`, `apply_mcp_record_delete_v1`, `apply_mcp_record_restore_v1`, `apply_mcp_record_update_v1` |
 | `plans.trash.list`   | `plans`, `records`               | —                                                                                                                                                                                                                                        |
-| `plans.update`       | —                                | `apply_mcp_plan_create_v1`, `apply_mcp_plan_delete_v1`, `apply_mcp_plan_restore_v1`, `apply_mcp_plan_update_v1`, `apply_mcp_record_create_v1`, `apply_mcp_record_delete_v1`, `apply_mcp_record_restore_v1`, `apply_mcp_record_update_v1` |
-| `records.create`     | —                                | `apply_mcp_plan_create_v1`, `apply_mcp_plan_delete_v1`, `apply_mcp_plan_restore_v1`, `apply_mcp_plan_update_v1`, `apply_mcp_record_create_v1`, `apply_mcp_record_delete_v1`, `apply_mcp_record_restore_v1`, `apply_mcp_record_update_v1` |
-| `records.delete`     | —                                | `apply_mcp_plan_create_v1`, `apply_mcp_plan_delete_v1`, `apply_mcp_plan_restore_v1`, `apply_mcp_plan_update_v1`, `apply_mcp_record_create_v1`, `apply_mcp_record_delete_v1`, `apply_mcp_record_restore_v1`, `apply_mcp_record_update_v1` |
+| `plans.update`       | `profiles`                       | `apply_mcp_plan_create_v1`, `apply_mcp_plan_delete_v1`, `apply_mcp_plan_restore_v1`, `apply_mcp_plan_update_v1`, `apply_mcp_record_create_v1`, `apply_mcp_record_delete_v1`, `apply_mcp_record_restore_v1`, `apply_mcp_record_update_v1` |
+| `records.create`     | `profiles`                       | `apply_mcp_plan_create_v1`, `apply_mcp_plan_delete_v1`, `apply_mcp_plan_restore_v1`, `apply_mcp_plan_update_v1`, `apply_mcp_record_create_v1`, `apply_mcp_record_delete_v1`, `apply_mcp_record_restore_v1`, `apply_mcp_record_update_v1` |
+| `records.delete`     | `profiles`                       | `apply_mcp_plan_create_v1`, `apply_mcp_plan_delete_v1`, `apply_mcp_plan_restore_v1`, `apply_mcp_plan_update_v1`, `apply_mcp_record_create_v1`, `apply_mcp_record_delete_v1`, `apply_mcp_record_restore_v1`, `apply_mcp_record_update_v1` |
 | `records.get`        | `plans`, `records`               | —                                                                                                                                                                                                                                        |
 | `records.list`       | `activities`, `plans`, `records` | —                                                                                                                                                                                                                                        |
-| `records.restore`    | —                                | `apply_mcp_plan_create_v1`, `apply_mcp_plan_delete_v1`, `apply_mcp_plan_restore_v1`, `apply_mcp_plan_update_v1`, `apply_mcp_record_create_v1`, `apply_mcp_record_delete_v1`, `apply_mcp_record_restore_v1`, `apply_mcp_record_update_v1` |
+| `records.restore`    | `profiles`                       | `apply_mcp_plan_create_v1`, `apply_mcp_plan_delete_v1`, `apply_mcp_plan_restore_v1`, `apply_mcp_plan_update_v1`, `apply_mcp_record_create_v1`, `apply_mcp_record_delete_v1`, `apply_mcp_record_restore_v1`, `apply_mcp_record_update_v1` |
 | `records.trash.list` | `plans`, `records`               | —                                                                                                                                                                                                                                        |
-| `records.update`     | —                                | `apply_mcp_plan_create_v1`, `apply_mcp_plan_delete_v1`, `apply_mcp_plan_restore_v1`, `apply_mcp_plan_update_v1`, `apply_mcp_record_create_v1`, `apply_mcp_record_delete_v1`, `apply_mcp_record_restore_v1`, `apply_mcp_record_update_v1` |
+| `records.update`     | `profiles`                       | `apply_mcp_plan_create_v1`, `apply_mcp_plan_delete_v1`, `apply_mcp_plan_restore_v1`, `apply_mcp_plan_update_v1`, `apply_mcp_record_create_v1`, `apply_mcp_record_delete_v1`, `apply_mcp_record_restore_v1`, `apply_mcp_record_update_v1` |
 | `review.get`         | `activities`                     | —                                                                                                                                                                                                                                        |
 
 ### 画面 → 使う procedure
@@ -552,5 +554,5 @@ page から import を宣言元まで解決して辿った結果（barrel の再
 | `contact`           | 8      | 6         | 2         | 1 / 2                  |
 | `external-calendar` | 26     | 19        | 2         | 1 / 2                  |
 | `review`            | 37     | 22        | 19        | 14 / 19                |
-| `settings`          | 48     | 37        | 22        | 17 / 22                |
+| `settings`          | 49     | 39        | 22        | 17 / 22                |
 | `timeblock`         | 98     | 54        | 18        | 12 / 18                |

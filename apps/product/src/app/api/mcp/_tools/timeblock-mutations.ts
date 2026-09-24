@@ -149,7 +149,7 @@ export function registerPlansCreateTool(server: McpServer, ctx: McpRequestContex
     async (input) => {
       if (!ctx.scopes.includes('write:plans')) return insufficientScopeResult();
       return handleMutation('plans_create', () =>
-        new McpMutationClient().createPlan({
+        new McpMutationClient(undefined, ctx.userId).createPlan({
           ...input,
           note: input.note ?? null,
           activityId: input.activityId ?? null,
@@ -174,7 +174,7 @@ export function registerPlansUpdateTool(server: McpServer, ctx: McpRequestContex
     async (input) => {
       if (!ctx.scopes.includes('write:plans')) return insufficientScopeResult();
       return handleMutation('plans_update', () =>
-        new McpMutationClient().updatePlan({
+        new McpMutationClient(undefined, ctx.userId).updatePlan({
           operationId: input.operationId,
           planId: input.planId,
           expectedUpdatedAt: input.expectedUpdatedAt,
@@ -204,7 +204,7 @@ export function registerPlansDeleteTool(server: McpServer, ctx: McpRequestContex
     async (input) => {
       if (!ctx.scopes.includes('delete:plans')) return insufficientScopeResult();
       return handleMutation('plans_delete', () =>
-        new McpMutationClient().deletePlan({
+        new McpMutationClient(undefined, ctx.userId).deletePlan({
           ...input,
           connectionId: ctx.connectionId,
           accessTokenId: ctx.tokenId,
@@ -227,7 +227,7 @@ export function registerPlansRestoreTool(server: McpServer, ctx: McpRequestConte
     async (input) => {
       if (!ctx.scopes.includes('delete:plans')) return insufficientScopeResult();
       return handleMutation('plans_restore', () =>
-        new McpMutationClient().restorePlan({
+        new McpMutationClient(undefined, ctx.userId).restorePlan({
           ...input,
           connectionId: ctx.connectionId,
           accessTokenId: ctx.tokenId,
@@ -250,7 +250,7 @@ export function registerRecordsCreateTool(server: McpServer, ctx: McpRequestCont
     async (input) => {
       if (!ctx.scopes.includes('write:records')) return insufficientScopeResult();
       return handleMutation('records_create', () =>
-        new McpMutationClient().createRecord({
+        new McpMutationClient(undefined, ctx.userId).createRecord({
           ...input,
           note: input.note ?? null,
           activityId: input.activityId ?? null,
@@ -277,7 +277,7 @@ export function registerRecordsUpdateTool(server: McpServer, ctx: McpRequestCont
     async (input) => {
       if (!ctx.scopes.includes('write:records')) return insufficientScopeResult();
       return handleMutation('records_update', () =>
-        new McpMutationClient().updateRecord({
+        new McpMutationClient(undefined, ctx.userId).updateRecord({
           operationId: input.operationId,
           recordId: input.recordId,
           expectedUpdatedAt: input.expectedUpdatedAt,
@@ -308,7 +308,7 @@ export function registerRecordsDeleteTool(server: McpServer, ctx: McpRequestCont
     async (input) => {
       if (!ctx.scopes.includes('delete:records')) return insufficientScopeResult();
       return handleMutation('records_delete', () =>
-        new McpMutationClient().deleteRecord({
+        new McpMutationClient(undefined, ctx.userId).deleteRecord({
           ...input,
           connectionId: ctx.connectionId,
           accessTokenId: ctx.tokenId,
@@ -331,7 +331,7 @@ export function registerRecordsRestoreTool(server: McpServer, ctx: McpRequestCon
     async (input) => {
       if (!ctx.scopes.includes('delete:records')) return insufficientScopeResult();
       return handleMutation('records_restore', () =>
-        new McpMutationClient().restoreRecord({
+        new McpMutationClient(undefined, ctx.userId).restoreRecord({
           ...input,
           connectionId: ctx.connectionId,
           accessTokenId: ctx.tokenId,

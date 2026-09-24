@@ -53,20 +53,17 @@ export async function hasPriorPaidInvoiceEvent(input: {
 }): Promise<boolean> {
   try {
     const currentEventId = billingEventId(input.currentEventName, input.invoiceId);
-    const { data, error } = await createServiceRoleClient()
-      .from('product_events')
-      .select('id')
-      .eq('user_id', input.userId)
-      .in('event_name', ['subscription_payment_succeeded', 'subscription_renewal_succeeded'])
-      .neq('id', currentEventId)
-      .limit(1)
-      .abortSignal(AbortSignal.timeout(1_000));
+    const query = createServiceRoleClient().rpc('has_prior_paid_invoice_event_v1', {
+      p_user_id: input.userId,
+      p_current_event_id: currentEventId,
+    });
+    const { data, error } = await query.abortSignal(AbortSignal.timeout(1_000));
 
     if (error) {
       logger.warn('Prior paid invoice lookup failed');
       return true;
     }
-    return (data?.length ?? 0) > 0;
+    return data === true;
   } catch {
     logger.warn('Prior paid invoice lookup failed');
     return true;

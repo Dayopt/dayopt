@@ -2,6 +2,7 @@ export {
   capturePostHogBrowserEvent,
   capturePostHogPageview,
   identifyPostHogBrowser,
+  resetPostHogBrowserIdentity,
   startPostHogBrowser,
   stopPostHogBrowser,
 } from './posthog-browser';

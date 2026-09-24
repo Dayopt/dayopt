@@ -4,7 +4,6 @@ const EVENT_NAMES = new Set([
   '$identify',
   'signup_cta_clicked',
   'signup_viewed',
-  'signup_completed',
   'review_opened',
 ]);
 
@@ -21,7 +20,6 @@ const PROPERTY_NAMES = new Set([
   'schema_version',
   'page_path',
   'cta_id',
-  'signup_method',
   'screen',
   'language',
   'device_category',
@@ -50,7 +48,6 @@ const FIXED_VALUES: Record<string, ReadonlySet<string>> = {
   environment: new Set(['production', 'preview', 'development']),
   surface: new Set(['web', 'product']),
   cta_id: new Set(['header_desktop', 'header_mobile', 'hero', 'pricing_free', 'pricing_pro']),
-  signup_method: new Set(['email', 'google']),
   screen: new Set(['signup', 'review']),
   language: new Set(['ja', 'en']),
   device_category: new Set(['mobile', 'desktop']),

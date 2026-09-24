@@ -65,12 +65,11 @@ describe('PostHog browser data boundary', () => {
     ).toBeNull();
   });
 
-  it('rejects arbitrary text in categorical event properties', () => {
+  it('rejects untrusted values in fixed browser event properties', () => {
     expect(
       filterPostHogBrowserProperties(
-        'signup_completed',
+        'signup_viewed',
         {
-          signup_method: 'person@example.com',
           screen: 'private note',
           cta_id: 'account-123',
           environment: 'production',

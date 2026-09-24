@@ -8,7 +8,7 @@ import {
 
 type Surface = 'web' | 'product';
 type Environment = 'production' | 'preview' | 'development';
-type BrowserEvent = 'signup_cta_clicked' | 'signup_viewed' | 'signup_completed' | 'review_opened';
+type BrowserEvent = 'signup_cta_clicked' | 'signup_viewed' | 'review_opened';
 
 interface BrowserAnalyticsOptions {
   projectKey: string;
@@ -115,6 +115,12 @@ export function identifyPostHogBrowser(userId: string): void {
   if (!enabled || !consentCheck?.() || !client) return;
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId)) return;
   client.identify(userId);
+}
+
+/** Drops any identity persisted by a previous auth session while retaining consent. */
+export function resetPostHogBrowserIdentity(): void {
+  if (!enabled || !consentCheck?.() || !client) return;
+  client.reset();
 }
 
 function attributionProperties(): Record<string, string> {

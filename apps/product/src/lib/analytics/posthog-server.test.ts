@@ -101,6 +101,24 @@ describe('PostHog server analytics', () => {
     );
   });
 
+  it('preserves only the verified signup method on the server event', async () => {
+    consentQuery(true);
+    await trackPostHogServerEvent({
+      eventName: 'signup_completed',
+      userId: 'user-1',
+      sourceId: 'user-1',
+      signupMethod: 'google',
+    });
+    await deferredCallbacks.callbacks[0]?.();
+
+    expect(captureImmediate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: 'signup_completed',
+        properties: expect.objectContaining({ signup_method: 'google' }),
+      }),
+    );
+  });
+
   it('never fails the Product write if delivery fails', async () => {
     consentQuery(true);
     captureImmediate.mockRejectedValue(new Error('network'));
@@ -112,5 +130,19 @@ describe('PostHog server analytics', () => {
       }),
     ).resolves.toBeUndefined();
     await deferredCallbacks.callbacks[0]?.();
+  });
+
+  it('never fails the Product write if Next cannot schedule background delivery', async () => {
+    scheduleAfter.mockImplementationOnce(() => {
+      throw new Error('request scope unavailable');
+    });
+
+    await expect(
+      trackPostHogServerEvent({
+        eventName: 'plan_created',
+        userId: 'user-1',
+        sourceId: 'plan-1',
+      }),
+    ).resolves.toBeUndefined();
   });
 });

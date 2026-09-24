@@ -1,9 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { billingEventId, trackBillingEvent } from './billing-events';
+import { billingEventId, hasPriorPaidInvoiceEvent, trackBillingEvent } from './billing-events';
 const abortSignal = vi.hoisted(() => vi.fn());
 const insert = vi.hoisted(() => vi.fn(() => ({ abortSignal })));
+const rpc = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/supabase/oauth', () => ({
-  createServiceRoleClient: () => ({ from: () => ({ insert }) }),
+  createServiceRoleClient: () => ({ from: () => ({ insert }), rpc }),
 }));
 vi.mock('@/lib/logger', () => ({ logger: { warn: vi.fn() } }));
 const input = {
@@ -40,5 +41,23 @@ describe('trusted billing analytics', () => {
       .mockRejectedValueOnce(new Error('timeout'));
     expect(await trackBillingEvent(input)).toBe(false);
     expect(await trackBillingEvent(input)).toBe(false);
+  });
+
+  it('uses the narrow server RPC to look up prior paid invoice events', async () => {
+    const abort = vi.fn().mockResolvedValue({ data: false, error: null });
+    rpc.mockReturnValueOnce({ abortSignal: abort });
+
+    await expect(
+      hasPriorPaidInvoiceEvent({
+        userId: input.userId,
+        invoiceId: input.sourceId,
+        currentEventName: 'subscription_payment_succeeded',
+      }),
+    ).resolves.toBe(false);
+    expect(rpc).toHaveBeenCalledWith('has_prior_paid_invoice_event_v1', {
+      p_user_id: input.userId,
+      p_current_event_id: billingEventId(input.eventName, input.sourceId),
+    });
+    expect(abort).toHaveBeenCalledWith(expect.any(AbortSignal));
   });
 });

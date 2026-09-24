@@ -19,6 +19,7 @@ vi.mock('posthog-js', () => ({ default: sdk }));
 import {
   capturePostHogBrowserEvent,
   identifyPostHogBrowser,
+  resetPostHogBrowserIdentity,
   startPostHogBrowser,
   stopPostHogBrowser,
 } from './posthog-browser';
@@ -83,12 +84,14 @@ describe('PostHog browser consent boundary', () => {
 
     capturePostHogBrowserEvent('signup_cta_clicked');
     identifyPostHogBrowser('00000000-0000-4000-8000-000000000001');
+    resetPostHogBrowserIdentity();
     expect(sdk.capture).toHaveBeenCalledTimes(2);
     expect(sdk.capture).toHaveBeenCalledWith('signup_cta_clicked', expect.any(Object), {
       send_instantly: true,
       transport: 'sendBeacon',
     });
     expect(sdk.identify).toHaveBeenCalledOnce();
+    expect(sdk.reset).toHaveBeenCalledOnce();
 
     stopPostHogBrowser();
     expect(sdk.opt_out_capturing).toHaveBeenCalledOnce();
@@ -102,5 +105,6 @@ describe('PostHog browser consent boundary', () => {
     identifyPostHogBrowser('00000000-0000-4000-8000-000000000001');
     expect(sdk.capture).toHaveBeenCalledTimes(2);
     expect(sdk.identify).toHaveBeenCalledOnce();
+    expect(sdk.reset).toHaveBeenCalledOnce();
   });
 });

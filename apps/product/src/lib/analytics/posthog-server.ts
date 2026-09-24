@@ -13,10 +13,11 @@ type PostHogServerEventName =
   | 'plan_updated'
   | 'record_updated'
   | 'review_opened'
+  | 'signup_completed'
   | 'app_trial_started'
   | 'first_payment_succeeded';
 
-type AnalyticsSource = 'manual' | 'external_calendar' | 'confirm_day' | 'plan_recording';
+type AnalyticsSource = 'manual' | 'external_calendar' | 'confirm_day' | 'plan_recording' | 'mcp';
 
 interface PostHogServerEvent {
   eventName: PostHogServerEventName;
@@ -25,6 +26,7 @@ interface PostHogServerEvent {
   occurredAt?: string;
   source?: AnalyticsSource;
   count?: number;
+  signupMethod?: 'email' | 'google';
 }
 
 /** The same successful operation always gets the same PostHog event UUID. */
@@ -46,9 +48,13 @@ export async function trackPostHogServerEvent(input: PostHogServerEvent): Promis
   const projectKey = process.env.NEXT_PUBLIC_POSTHOG_PROJECT_KEY;
   if (process.env.POSTHOG_SERVER_ENABLED !== 'true' || !projectKey) return;
 
-  after(async () => {
-    await deliverPostHogServerEvent(input, projectKey);
-  });
+  try {
+    after(async () => {
+      await deliverPostHogServerEvent(input, projectKey);
+    });
+  } catch {
+    logger.warn('PostHog event scheduling failed', { eventName: input.eventName });
+  }
 }
 
 async function deliverPostHogServerEvent(
@@ -86,6 +92,7 @@ async function deliverPostHogServerEvent(
         schema_version: 1,
         ...(input.source ? { source: input.source } : {}),
         ...(input.count !== undefined ? { count: input.count } : {}),
+        ...(input.signupMethod ? { signup_method: input.signupMethod } : {}),
       },
     });
   } catch {
