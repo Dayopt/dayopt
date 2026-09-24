@@ -9,11 +9,12 @@
  */
 
 import { NextRequest } from 'next/server';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   env: {
-    NODE_ENV: 'production',
+    NODE_ENV: 'production' as 'development' | 'production' | 'test',
+    VERCEL_ENV: 'production' as 'development' | 'preview' | 'production' | undefined,
     VERCEL_URL: 'web-k94imlgmq-dayopt.vercel.app',
     NEXT_PUBLIC_APP_URL: 'https://app.dayopt.app',
   },
@@ -22,6 +23,11 @@ const mocks = vi.hoisted(() => ({
 vi.mock('@web/platform/config/env', () => ({ env: mocks.env }));
 
 import { verifyCsrfToken } from './csrf-protection';
+
+beforeEach(() => {
+  mocks.env.NODE_ENV = 'production';
+  mocks.env.VERCEL_ENV = 'production';
+});
 
 function postFrom(origin: string): NextRequest {
   return new NextRequest('https://dayopt.app/api/contact', {
@@ -71,5 +77,16 @@ describe('verifyCsrfToken: Vercel deployment URL の許可範囲', () => {
     });
 
     expect(verifyCsrfToken(request)).toBe(true);
+  });
+
+  it('production では loopback origin を拒否する', () => {
+    expect(verifyCsrfToken(postFrom('http://localhost:3000'))).toBe(false);
+  });
+
+  it('development では loopback origin を許可する', () => {
+    mocks.env.NODE_ENV = 'development';
+    mocks.env.VERCEL_ENV = undefined;
+
+    expect(verifyCsrfToken(postFrom('http://localhost:3001'))).toBe(true);
   });
 });

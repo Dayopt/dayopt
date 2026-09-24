@@ -52,7 +52,7 @@ sweep が実際に得た既往クラス・却下記録を置く。
 
 ### 攻撃面（`7562ab0ba` 時点で実測）
 
-**入口となる route**（`app/**/route.ts` のうち、この境界に属するもの。全数と method の一覧は [`data/system-surface.md`](./data/system-surface.md) の生成表を見る）:
+**入口となる route**（`app/**/route.{ts,tsx,js,mjs}` のうち、この境界に属するもの。全数と method の一覧は [`data/system-surface.md`](./data/system-surface.md) の生成表を見る）:
 
 | path                                         | 認証                                |
 | -------------------------------------------- | ----------------------------------- |
@@ -72,7 +72,7 @@ sweep が実際に得た既往クラス・却下記録を置く。
 - `apps/product/src/proxy.ts` — 保護ルートの判定と MFA redirect
 - `apps/product/src/lib/supabase/middleware.ts` — セッション更新
 - `apps/product/src/lib/trpc/session-auth-context.ts` — verified user / session token / MFA assurance の共通解決
-- `apps/product/src/lib/auth/domain/access-policy.ts`、`permissions.ts`、`roles.ts`
+- `apps/product/src/lib/auth/domain/access-policy.ts`、`permissions.ts`
 - `apps/product/src/lib/auth/recovery-codes.ts`、`session-config.ts`、`pwned-password.ts`
 - `apps/product/src/lib/safe-redirect.ts` — redirect allowlist
 - `apps/product/src/lib/oauth-server/`（test を除く全モジュール）— `authorize-validation`、`code-exchange`、`redirect-uris`、`scopes`、`tokens`、`token-rate-limit`、`identity`、`clients`、`origin`、`request-host`
