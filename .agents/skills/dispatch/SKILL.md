@@ -40,6 +40,8 @@ feature 開発と並行する非 feature 作業を issue ベースで回す定�
 6. `status:ready` を `status:in-progress` へ差し替え、**その issue 自身**にコメントで dispatch 先（session / agent / provider）と scope を記録する。束ねた場合は代表 issue にコメントし、他は代表へリンクする。**この着手のタイミング（レーンへの割り当て、または PR の Closes に載せた時点）で、対象 issue に現行 milestone を付与する**（編成時(操作 B 手順 5)の判断とは独立に、着手＝付与を機械的に行う。#2006）。**レーンが draft PR を作成した時点で、PR 自身にも現行 milestone を付与する**（issue 側だけでなく PR 側にも付いていると release notes 作成時の集計が楽になる。#2065）。**差し替えたら `pnpm ctx <N> --post` を実行して brief（関連 PR / 触るファイル / 保護対象の要否 / 決定ログ / 次の一手）を issue コメントへ置く**（worker は issue URL しか受け取らないので、最初の turn より前に選別・圧縮済みの文脈を届ける。再実行すると同じコメントを更新する。`routing` skill）。**この dispatch コメントに DoD（完了の定義）を 1〜3 行で記載する**（「仕様には適合しているが意図とズレている」静かな失敗は着手時点の意図と突き合わせないと見つからない。束ねた場合は代表 issue のコメントへ一括で書く。突き合わせは PR レビュー時と、ズレを疑った時に行う。[#2273](https://github.com/Dayopt/dayopt/issues/2273)）
 7. worker への指示は issue URL + 「本文の受け入れ条件と検証コマンドに従う」だけで済む状態にする。着手手順・PR 規約・報告テンプレート・検証原則はチップ prompt へ個別に書き下さず `AGENTS.md` §レーン運用 への参照 1 行で足りる
 
+担当Codex sessionは着手時にIssue本文と信頼できる最新 `ctx-brief` コメントを明示取得する。Issue番号とsnapshotの一致を確認し、Issue本文を要求の正本として扱う。briefコメントの存在だけでは配達完了とみなさない。
+
 ### handoff-quality テンプレート（issue 本文に含める 4 要素 + 任意 1 要素）
 
 ```markdown
