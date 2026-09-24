@@ -95,6 +95,7 @@
     "lucide-react": "catalog:",
     "next": "catalog:",
     "next-intl": "catalog:",
+    "posthog-node": "5.52.4",
     "qrcode": "^1.5.4",
     "react": "catalog:",
     "react-dom": "catalog:",

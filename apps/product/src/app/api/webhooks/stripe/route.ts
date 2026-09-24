@@ -31,6 +31,7 @@ import {
   syncSubscriptionStatus,
 } from '@/features/settings/server/billing-service';
 import { trackBillingEvent } from '@/lib/analytics/billing-events';
+import { trackPostHogServerEvent } from '@/lib/analytics/posthog-server';
 import { trackProductEvent } from '@/lib/analytics/product-events';
 import { getAppUrl } from '@/lib/app-url';
 import { sendTransactionalEmail as deliverTransactionalEmail } from '@/lib/email/send';
@@ -527,11 +528,12 @@ export async function POST(request: NextRequest) {
             break;
           const user = await getBillingProfileByCustomerId(supabase, customerId);
           if (!user) throw new Error('Paid invoice has no application user');
-          const { error: consumptionError } = await supabase
+          const { data: firstPaidRows, error: consumptionError } = await supabase
             .from('profiles')
             .update({ app_trial_consumed_at: new Date(event.created * 1_000).toISOString() })
             .eq('id', user.id)
-            .is('app_trial_consumed_at', null);
+            .is('app_trial_consumed_at', null)
+            .select('id');
           if (consumptionError)
             throw captureUnexpectedDatabaseError(consumptionError, {
               feature: 'billing',
@@ -550,6 +552,14 @@ export async function POST(request: NextRequest) {
             }))
           )
             throw new Error('Billing analytics must be retried');
+          if (firstPaidRows?.length) {
+            await trackPostHogServerEvent({
+              eventName: 'first_payment_succeeded',
+              userId: user.id,
+              sourceId: invoice.id,
+              occurredAt: new Date(event.created * 1_000).toISOString(),
+            });
+          }
         }
         break;
       }

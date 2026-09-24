@@ -9,6 +9,7 @@ import { z } from 'zod';
 
 import { handleServiceError } from '@/lib/trpc/errors';
 import { createTRPCRouter, protectedProcedure } from '@/lib/trpc/procedures';
+import { AnalyticsConsentService } from './analytics-consent-service';
 import { createSettingsService } from './settings-service';
 
 // バリデーションスキーマ
@@ -52,6 +53,24 @@ const profileUpdateSchema = z
 
 /** ユーザー設定のtRPCルーター（取得・更新・iCalトークン管理） */
 export const userSettingsRouter = createTRPCRouter({
+  getAnalyticsConsent: protectedProcedure.query(async ({ ctx }) => {
+    try {
+      return await new AnalyticsConsentService(ctx.supabase).get(ctx.userId!);
+    } catch (error) {
+      return handleServiceError(error);
+    }
+  }),
+
+  setAnalyticsConsent: protectedProcedure
+    .input(z.object({ allowed: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      try {
+        return await new AnalyticsConsentService(ctx.supabase).set(ctx.userId!, input.allowed);
+      } catch (error) {
+        return handleServiceError(error);
+      }
+    }),
+
   /**
    * 設定取得
    */

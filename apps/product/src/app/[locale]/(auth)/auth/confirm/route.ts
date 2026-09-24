@@ -90,7 +90,9 @@ export async function GET(request: NextRequest) {
         // 落ちていたこと（allowlist は User が追加済み）。recovery の着地先は固定で問題
         // ないため、allowlist が再びドリフトしても壊れない形にしておく（防御層）。
         const target = type === 'recovery' ? '/auth/reset-password' : next;
-        return NextResponse.redirect(new URL(target, request.url));
+        const destination = new URL(target, request.url);
+        if (signupUserId) destination.searchParams.set('registered', 'email');
+        return NextResponse.redirect(destination);
       }
 
       return NextResponse.redirect(confirmedUrl(statusForType(type), request));

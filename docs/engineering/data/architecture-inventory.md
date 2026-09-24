@@ -16,7 +16,7 @@
 | DB テーブル    | 30   | 10         | 6                | 14               | 0              |
 | DB 関数        | 136  | 1          | 59               | 76               | 0              |
 | tRPC router    | 15   | 0          | 15               | 0                | 0              |
-| tRPC procedure | 68   | 0          | 68               | 0                | 0              |
+| tRPC procedure | 70   | 0          | 70               | 0                | 0              |
 | MCP tool       | 19   | 19         | 0                | 0                | 0              |
 | Zustand store  | 14   | 0          | 13               | 0                | 1              |
 | Story          | 113  | 0          | 89               | 24               | 0              |
@@ -2292,8 +2292,10 @@ graph LR
 | tRPC procedure | [mcpConnections.list](<../../../apps/product/src/features/settings/server/mcp-connections-router.ts>) | feature 経由 |
 | tRPC procedure | [mcpConnections.revoke](<../../../apps/product/src/features/settings/server/mcp-connections-router.ts>) | feature 経由 |
 | tRPC procedure | [userSettings.get](<../../../apps/product/src/features/settings/server/router.ts>) | feature 経由 |
+| tRPC procedure | [userSettings.getAnalyticsConsent](<../../../apps/product/src/features/settings/server/router.ts>) | feature 経由 |
 | tRPC procedure | [userSettings.getICalToken](<../../../apps/product/src/features/settings/server/router.ts>) | feature 経由 |
 | tRPC procedure | [userSettings.regenerateICalToken](<../../../apps/product/src/features/settings/server/router.ts>) | feature 経由 |
+| tRPC procedure | [userSettings.setAnalyticsConsent](<../../../apps/product/src/features/settings/server/router.ts>) | feature 経由 |
 | tRPC procedure | [userSettings.update](<../../../apps/product/src/features/settings/server/router.ts>) | feature 経由 |
 | tRPC procedure | [userSettings.updateProfile](<../../../apps/product/src/features/settings/server/router.ts>) | feature 経由 |
 | Zustand store | [useBillingPollStore](<../../../apps/product/src/features/settings/stores/useBillingPollStore.ts>) | feature 経由 |
@@ -2353,7 +2355,7 @@ graph LR
 </details>
 
 <details>
-<summary>test の候補（57）</summary>
+<summary>test の候補（58）</summary>
 
 <!-- prettier-ignore -->
 | ファイル | 対応の根拠 |
@@ -2384,6 +2386,7 @@ graph LR
 | [apps/product/src/features/settings/lib/timeblock-csv-export.test.ts](<../../../apps/product/src/features/settings/lib/timeblock-csv-export.test.ts>) | feature: settings |
 | [apps/product/src/features/settings/server/account-deletion-legacy.test.ts](<../../../apps/product/src/features/settings/server/account-deletion-legacy.test.ts>) | feature: settings |
 | [apps/product/src/features/settings/server/account-deletion.test.ts](<../../../apps/product/src/features/settings/server/account-deletion.test.ts>) | feature: settings |
+| [apps/product/src/features/settings/server/analytics-consent-service.test.ts](<../../../apps/product/src/features/settings/server/analytics-consent-service.test.ts>) | feature: settings |
 | [apps/product/src/features/settings/server/billing-lifecycle-mode.test.ts](<../../../apps/product/src/features/settings/server/billing-lifecycle-mode.test.ts>) | feature: settings |
 | [apps/product/src/features/settings/server/billing-mutation-cleanup.test.ts](<../../../apps/product/src/features/settings/server/billing-mutation-cleanup.test.ts>) | feature: settings |
 | [apps/product/src/features/settings/server/billing-mutation-service.test.ts](<../../../apps/product/src/features/settings/server/billing-mutation-service.test.ts>) | feature: settings |
@@ -2419,11 +2422,12 @@ graph LR
 </details>
 
 <details>
-<summary>docs の候補（2）</summary>
+<summary>docs の候補（3）</summary>
 
 <!-- prettier-ignore -->
 | ファイル | 対応の根拠 |
 | --- | --- |
+| [docs/operations/posthog-analytics.md](<../../operations/posthog-analytics.md>) | frontmatter code: settings |
 | [docs/product/specs/auth.md](<../../product/specs/auth.md>) | frontmatter code: settings |
 | [docs/product/specs/settings.md](<../../product/specs/settings.md>) | frontmatter code: settings |
 

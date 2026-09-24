@@ -132,6 +132,12 @@ const serverSchema = z
       .optional(),
     STRIPE_LIVEMODE: z.enum(['true', 'false']).optional(),
     STRIPE_WEBHOOK_SECRET: z.string().optional(),
+    NEXT_PUBLIC_POSTHOG_PROJECT_KEY: z
+      .string()
+      .regex(/^phc_[A-Za-z0-9_-]+$/)
+      .optional(),
+    NEXT_PUBLIC_POSTHOG_BROWSER_ENABLED: z.enum(['true', 'false']).optional(),
+    POSTHOG_SERVER_ENABLED: z.enum(['true', 'false']).optional(),
     NEXT_PUBLIC_STRIPE_PRO_PRICE_ID: z.string().optional(),
 
     // App

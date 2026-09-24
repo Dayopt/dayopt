@@ -847,6 +847,8 @@ export type Database = {
       };
       profiles: {
         Row: {
+          analytics_consent: boolean;
+          analytics_consent_updated_at: string | null;
           app_trial_consumed_at: string | null;
           app_trial_ends_at: string | null;
           app_trial_started_at: string | null;
@@ -862,6 +864,8 @@ export type Database = {
           welcome_email_sent_at: string | null;
         };
         Insert: {
+          analytics_consent?: boolean;
+          analytics_consent_updated_at?: string | null;
           app_trial_consumed_at?: string | null;
           app_trial_ends_at?: string | null;
           app_trial_started_at?: string | null;
@@ -877,6 +881,8 @@ export type Database = {
           welcome_email_sent_at?: string | null;
         };
         Update: {
+          analytics_consent?: boolean;
+          analytics_consent_updated_at?: string | null;
           app_trial_consumed_at?: string | null;
           app_trial_ends_at?: string | null;
           app_trial_started_at?: string | null;

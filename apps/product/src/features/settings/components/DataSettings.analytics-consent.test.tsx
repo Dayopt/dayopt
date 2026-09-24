@@ -7,6 +7,8 @@ import {
   BROWSER_TELEMETRY_CONSENT_STORAGE_KEY,
 } from '@dayopt/observability';
 
+const accountConsent = vi.hoisted(() => ({ mutateAsync: vi.fn(), setData: vi.fn() }));
+
 vi.mock('next-intl', () => ({
   useTranslations: (namespace: string) => (key: string) => `${namespace}.${key}`,
 }));
@@ -17,6 +19,17 @@ vi.mock('@/lib/toast', () => ({
 
 vi.mock('@/lib/trpc', () => ({
   api: {
+    useUtils: () => ({
+      userSettings: { getAnalyticsConsent: { setData: accountConsent.setData } },
+    }),
+    userSettings: {
+      getAnalyticsConsent: {
+        useQuery: () => ({ data: { allowed: false }, isLoading: false, isError: false }),
+      },
+      setAnalyticsConsent: {
+        useMutation: () => ({ mutateAsync: accountConsent.mutateAsync, isPending: false }),
+      },
+    },
     user: {
       exportData: {
         useQuery: () => ({ refetch: vi.fn(), isLoading: false, isFetching: false }),
@@ -191,5 +204,40 @@ describe('AnalyticsConsentSection', () => {
     } finally {
       spy.mockRestore();
     }
+  });
+});
+
+describe('AccountAnalyticsConsentSection', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('saves the account-wide permission only after an explicit click', async () => {
+    const user = userEvent.setup();
+    accountConsent.mutateAsync.mockResolvedValue({
+      allowed: true,
+      updatedAt: '2026-09-24T00:00:00Z',
+    });
+    render(<DataSettings />);
+
+    expect(accountConsent.mutateAsync).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('button', { name: 'settings.legal.cookies.account.allow' }));
+    expect(accountConsent.mutateAsync).toHaveBeenCalledWith({ allowed: true });
+    await waitFor(() =>
+      expect(accountConsent.setData).toHaveBeenCalledWith(undefined, {
+        allowed: true,
+        updatedAt: '2026-09-24T00:00:00Z',
+      }),
+    );
+  });
+
+  it('does not present a failed account permission as saved', async () => {
+    const user = userEvent.setup();
+    accountConsent.mutateAsync.mockRejectedValue(new Error('network'));
+    render(<DataSettings />);
+
+    await user.click(screen.getByRole('button', { name: 'settings.legal.cookies.account.allow' }));
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith('settings.legal.cookies.account.saveFailed'),
+    );
+    expect(accountConsent.setData).not.toHaveBeenCalled();
   });
 });

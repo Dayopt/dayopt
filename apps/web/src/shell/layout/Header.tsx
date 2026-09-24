@@ -7,6 +7,8 @@ import { Menu } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useEffect, useState } from 'react';
 
+import { trackSignupCta } from '@web/platform/analytics/signup-cta';
+
 export function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
@@ -85,7 +87,9 @@ export function Header() {
               <Link href="/login">{t('actions.login')}</Link>
             </Button>
             <Button variant="primary" size="default" asChild>
-              <a href={dayoptProductUrls.signup}>{t('actions.signup')}</a>
+              <a href={dayoptProductUrls.signup} onClick={() => trackSignupCta('header_desktop')}>
+                {t('actions.signup')}
+              </a>
             </Button>
           </div>
 
@@ -95,7 +99,9 @@ export function Header() {
               <Link href="/login">{t('actions.login')}</Link>
             </Button>
             <Button variant="primary" size="sm" asChild>
-              <a href={dayoptProductUrls.signup}>{t('actions.signup')}</a>
+              <a href={dayoptProductUrls.signup} onClick={() => trackSignupCta('header_mobile')}>
+                {t('actions.signup')}
+              </a>
             </Button>
             <Button
               variant="ghost"

@@ -446,7 +446,7 @@ RLS の正確な対象・policy・grant は自動生成の [`data/db/rls-snapsho
 | `plan_templates`                | 5    | —                                                               |
 | `plans`                         | 12   | `activities`, `external_calendar_events`                        |
 | `product_events`                | 5    | —                                                               |
-| `profiles`                      | 13   | —                                                               |
+| `profiles`                      | 15   | —                                                               |
 | `records`                       | 13   | `activities`, `external_calendar_events`                        |
 | `reports`                       | 8    | —                                                               |
 | `segment_activities`            | 3    | `activities`, `segments`                                        |
@@ -532,6 +532,8 @@ erDiagram
     string user_id FK
   }
   profiles {
+    boolean analytics_consent
+    string analytics_consent_updated_at "nullable"
     string app_trial_consumed_at "nullable"
     string app_trial_ends_at "nullable"
     string app_trial_started_at "nullable"
@@ -804,6 +806,8 @@ erDiagram
     string user_id
   }
   profiles {
+    boolean analytics_consent
+    string analytics_consent_updated_at "nullable"
     string app_trial_consumed_at "nullable"
     string app_trial_ends_at "nullable"
     string app_trial_started_at "nullable"

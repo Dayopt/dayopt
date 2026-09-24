@@ -46,9 +46,15 @@ const writeFenceMaybeSingle = vi.hoisted(() => vi.fn());
 const getUserById = vi.hoisted(() => vi.fn());
 const trackBillingEvent = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/analytics/billing-events', () => ({ trackBillingEvent }));
+const trackPostHogServerEvent = vi.hoisted(() => vi.fn());
+vi.mock('@/lib/analytics/posthog-server', () => ({ trackPostHogServerEvent }));
 const trackProductEvent = vi.hoisted(() => vi.fn());
 const profileConsume = vi.hoisted(() =>
-  vi.fn(() => ({ eq: () => ({ is: () => Promise.resolve({ error: null }) }) })),
+  vi.fn(() => ({
+    eq: () => ({
+      is: () => ({ select: () => Promise.resolve({ data: [{ id: 'user-1' }], error: null }) }),
+    }),
+  })),
 );
 const captureUnexpectedError = vi.hoisted(() => vi.fn());
 const deliverTransactionalEmail = vi.hoisted(() => vi.fn());
@@ -122,6 +128,7 @@ function request(overrides: { body?: string; headers?: Record<string, string> } 
 
 beforeEach(() => {
   trackBillingEvent.mockResolvedValue(true);
+  trackPostHogServerEvent.mockResolvedValue(undefined);
   vi.clearAllMocks();
   resetWriteFenceCacheForTestsOnly();
   resetWebhookSignatureFailureCaptureForTestsOnly();
@@ -322,9 +329,17 @@ describe('Stripe webhook route', () => {
               : 'subscription_renewal_succeeded',
         }),
       );
+      expect(trackPostHogServerEvent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          eventName: 'first_payment_succeeded',
+          userId: 'user-1',
+          sourceId: 'in_paid',
+        }),
+      );
       claimStripeWebhookEvent.mockResolvedValueOnce('already_processed');
       expect((await POST(request())).status).toBe(200);
       expect(trackBillingEvent).toHaveBeenCalledTimes(1);
+      expect(trackPostHogServerEvent).toHaveBeenCalledTimes(1);
     },
   );
 

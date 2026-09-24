@@ -41,10 +41,12 @@ export async function GET(request: Request) {
       // 初回だけ歓迎メールを送る。2 回目以降は profiles の conditional UPDATE が
       // 0 行になって即戻るので、サインインの体感には効かない。失敗しても throw しない。
       const userId = data.session?.user?.id;
-      if (userId) await deliverWelcomeEmailOnce(userId);
+      const newlyRegistered = userId ? await deliverWelcomeEmailOnce(userId) : false;
 
       // 成功した場合は元のページまたはデフォルトページへリダイレクト
-      return NextResponse.redirect(new URL(next, request.url));
+      const destination = new URL(next, request.url);
+      if (newlyRegistered) destination.searchParams.set('registered', 'google');
+      return NextResponse.redirect(destination);
     }
 
     logger.warn('Auth callback code exchange failed');

@@ -114,7 +114,7 @@ describe('deliverWelcomeEmailOnce', () => {
     claimResult.current = { data: [{ id: 'u1', full_name: null }], error: null };
     sendWelcomeEmail.mockRejectedValue(new Error('resend down'));
 
-    await expect(deliverWelcomeEmailOnce('u1')).resolves.toBeUndefined();
+    await expect(deliverWelcomeEmailOnce('u1')).resolves.toBe(true);
     expect(captureUnexpectedError).toHaveBeenCalled();
   });
 
