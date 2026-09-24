@@ -1135,6 +1135,10 @@ model {
     metadata { app 'web' methods 'POST, HEAD' }
     link ../../../../apps/web/src/app/api/csp-report/route.ts
   }
+  httproute h_web_api_og '/api/og' {
+    metadata { app 'web' methods 'GET' }
+    link ../../../../apps/web/src/app/api/og/route.tsx
+  }
   httproute h_web_api_search '/api/search' {
     metadata { app 'web' methods 'GET' }
     link ../../../../apps/web/src/app/api/search/route.ts
