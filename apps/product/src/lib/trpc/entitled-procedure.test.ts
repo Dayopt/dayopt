@@ -40,7 +40,7 @@ function context(status: string, endsAt: string | null = null) {
           : null,
       ),
   };
-  return { ...createMockContext({ userId: 'user-1' }), supabase: db, subscriptionStatus: 'active' };
+  return { ...createMockContext({ userId: 'user-1' }), supabase: db };
 }
 describe('single-plan procedure boundary', () => {
   beforeEach(() => {
@@ -53,7 +53,7 @@ describe('single-plan procedure boundary', () => {
     vi.useRealTimers();
   });
   it.each(['free', 'canceled'])(
-    'preserves saved reads and deletion for %s despite old claims',
+    'uses the database profile status for %s access checks',
     async (status) => {
       const api = caller(context(status) as never);
       await expect(api.review.getReportPeriod()).resolves.toBe('report');
