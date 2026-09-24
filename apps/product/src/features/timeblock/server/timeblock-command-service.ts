@@ -1,5 +1,6 @@
 import 'server-only';
 
+import { trackPostHogServerEvent } from '@/lib/analytics/posthog-server';
 import { trackProductEvent, trackProductEvents } from '@/lib/analytics/product-events';
 
 import type {
@@ -68,6 +69,13 @@ export class TimeblockCommandService {
       endAt: input.end_at,
     });
     await trackProductEvent({ eventName: 'plan_created', userId });
+    await trackPostHogServerEvent({
+      eventName: 'plan_created',
+      userId,
+      sourceId: plan.id,
+      source: input.externalCalendarEventId ? 'external_calendar' : 'manual',
+      count: 1,
+    });
     return plan;
   }
 
@@ -77,7 +85,7 @@ export class TimeblockCommandService {
     if (input.activityId !== undefined && input.activityId !== existing.activity_id) {
       await assertActivityAssignable(this.supabase, userId, input.activityId);
     }
-    return this.commands.updatePlan({
+    const plan = await this.commands.updatePlan({
       userId,
       planId: id,
       expectedUpdatedAt,
@@ -92,6 +100,14 @@ export class TimeblockCommandService {
       startAt: input.start_at ?? existing.start_at,
       endAt: input.end_at ?? existing.end_at,
     });
+    await trackPostHogServerEvent({
+      eventName: 'plan_updated',
+      userId,
+      sourceId: `${plan.id}:${plan.updated_at}`,
+      source: plan.source === 'external_calendar' ? 'external_calendar' : 'manual',
+      count: 1,
+    });
+    return plan;
   }
 
   deletePlan(options: VersionedTargetOptions): Promise<PlanRow> {
@@ -117,6 +133,13 @@ export class TimeblockCommandService {
       expectedUpdatedAt: options.expectedUpdatedAt,
     });
     await trackProductEvent({ eventName: 'record_created', userId: options.userId });
+    await trackPostHogServerEvent({
+      eventName: 'record_created',
+      userId: options.userId,
+      sourceId: record.id,
+      source: 'plan_recording',
+      count: 1,
+    });
     return record;
   }
 
@@ -129,6 +152,17 @@ export class TimeblockCommandService {
     await trackProductEvents(
       records.map(() => ({ eventName: 'record_created' as const, userId: options.userId })),
     );
+    if (records.length > 0)
+      await trackPostHogServerEvent({
+        eventName: 'record_created',
+        userId: options.userId,
+        sourceId: records
+          .map((record) => record.id)
+          .sort()
+          .join(':'),
+        source: 'confirm_day',
+        count: records.length,
+      });
     return records;
   }
 
@@ -146,6 +180,13 @@ export class TimeblockCommandService {
       fulfillment: input.fulfillment ?? null,
     });
     await trackProductEvent({ eventName: 'record_created', userId });
+    await trackPostHogServerEvent({
+      eventName: 'record_created',
+      userId,
+      sourceId: record.id,
+      source: input.externalCalendarEventId ? 'external_calendar' : 'manual',
+      count: 1,
+    });
     return record;
   }
 
@@ -155,7 +196,7 @@ export class TimeblockCommandService {
     if (input.activityId !== undefined && input.activityId !== existing.activity_id) {
       await assertActivityAssignable(this.supabase, userId, input.activityId);
     }
-    return this.commands.updateRecord({
+    const record = await this.commands.updateRecord({
       userId,
       recordId: id,
       expectedUpdatedAt,
@@ -174,6 +215,14 @@ export class TimeblockCommandService {
           ? parseFulfillment(existing.fulfillment)
           : input.fulfillment,
     });
+    await trackPostHogServerEvent({
+      eventName: 'record_updated',
+      userId,
+      sourceId: `${record.id}:${record.updated_at}`,
+      source: record.source === 'external_calendar' ? 'external_calendar' : 'manual',
+      count: 1,
+    });
+    return record;
   }
 
   deleteRecord(options: VersionedTargetOptions): Promise<RecordRow> {

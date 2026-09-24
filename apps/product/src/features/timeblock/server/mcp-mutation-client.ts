@@ -1,5 +1,6 @@
 import 'server-only';
 
+import { trackPostHogServerEvent } from '@/lib/analytics/posthog-server';
 import { captureUnexpectedDatabaseError } from '@/lib/sentry';
 
 import {
@@ -249,7 +250,23 @@ export class McpMutationClient {
    */
   constructor(
     private readonly db: ReturnType<typeof createMcpMutationDb> = createMcpMutationDb(),
+    private readonly analyticsUserId?: string,
   ) {}
+
+  private async trackMutationEvent(
+    eventName: 'plan_created' | 'record_created' | 'plan_updated' | 'record_updated',
+    resourceId: string,
+    version?: string,
+  ): Promise<void> {
+    if (!this.analyticsUserId) return;
+    await trackPostHogServerEvent({
+      eventName,
+      userId: this.analyticsUserId,
+      sourceId: version ? `${resourceId}:${version}` : resourceId,
+      source: 'mcp',
+      count: 1,
+    });
+  }
 
   async createPlan(input: McpPlanCreateInput): Promise<McpPlanCreateReceipt> {
     const operation = 'apply_mcp_plan_create';
@@ -266,9 +283,11 @@ export class McpMutationClient {
       });
 
     const rows = await requestMutationRows(request, operation);
-    return toMutationReceipt(
+    const receipt = toMutationReceipt(
       requireActiveMutationReceipt(rows, input.operationId, operation, 'plan'),
     );
+    await this.trackMutationEvent('plan_created', receipt.resourceId);
+    return receipt;
   }
 
   async updatePlan(input: McpPlanUpdateInput): Promise<McpPlanUpdateReceipt> {
@@ -293,9 +312,11 @@ export class McpMutationClient {
       });
 
     const rows = await requestMutationRows(request, operation);
-    return toMutationReceipt(
+    const receipt = toMutationReceipt(
       requireActiveMutationReceipt(rows, input.operationId, operation, 'plan', input.planId),
     );
+    await this.trackMutationEvent('plan_updated', receipt.resourceId, receipt.version);
+    return receipt;
   }
 
   async deletePlan(input: McpPlanDeleteInput): Promise<McpPlanDeleteReceipt> {
@@ -351,9 +372,11 @@ export class McpMutationClient {
     const rows = await requestMutationRows(request, operation, {
       DT012: 'Plan links have been removed; omit planId and refresh the tool schema.',
     });
-    return toMutationReceipt(
+    const receipt = toMutationReceipt(
       requireActiveMutationReceipt(rows, input.operationId, operation, 'record'),
     );
+    await this.trackMutationEvent('record_created', receipt.resourceId);
+    return receipt;
   }
 
   async updateRecord(input: McpRecordUpdateInput): Promise<McpRecordUpdateReceipt> {
@@ -380,9 +403,11 @@ export class McpMutationClient {
       });
 
     const rows = await requestMutationRows(request, operation);
-    return toMutationReceipt(
+    const receipt = toMutationReceipt(
       requireActiveMutationReceipt(rows, input.operationId, operation, 'record', input.recordId),
     );
+    await this.trackMutationEvent('record_updated', receipt.resourceId, receipt.version);
+    return receipt;
   }
 
   async deleteRecord(input: McpRecordDeleteInput): Promise<McpRecordDeleteReceipt> {

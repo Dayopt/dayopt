@@ -1,11 +1,13 @@
 'use client';
 
 import { Button, cn, Logo, Sheet, SheetContent } from '@dayopt/components';
-import { dayoptProductUrls } from '@dayopt/config';
 import { Link, usePathname } from '@dayopt/i18n/navigation';
 import { Menu } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useEffect, useState } from 'react';
+
+import { trackSignupCta } from '@web/platform/analytics/signup-cta';
+import { productSignupUrl } from '@web/platform/config/product-signup-url';
 
 export function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -85,7 +87,9 @@ export function Header() {
               <Link href="/login">{t('actions.login')}</Link>
             </Button>
             <Button variant="primary" size="default" asChild>
-              <a href={dayoptProductUrls.signup}>{t('actions.signup')}</a>
+              <a href={productSignupUrl()} onClick={() => trackSignupCta('header_desktop')}>
+                {t('actions.signup')}
+              </a>
             </Button>
           </div>
 
@@ -95,7 +99,9 @@ export function Header() {
               <Link href="/login">{t('actions.login')}</Link>
             </Button>
             <Button variant="primary" size="sm" asChild>
-              <a href={dayoptProductUrls.signup}>{t('actions.signup')}</a>
+              <a href={productSignupUrl()} onClick={() => trackSignupCta('header_mobile')}>
+                {t('actions.signup')}
+              </a>
             </Button>
             <Button
               variant="ghost"

@@ -1,9 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { billingEventId, trackBillingEvent } from './billing-events';
+import { billingEventId, claimFirstPaidInvoice, trackBillingEvent } from './billing-events';
 const abortSignal = vi.hoisted(() => vi.fn());
 const insert = vi.hoisted(() => vi.fn(() => ({ abortSignal })));
+const rpc = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/supabase/oauth', () => ({
-  createServiceRoleClient: () => ({ from: () => ({ insert }) }),
+  createServiceRoleClient: () => ({ from: () => ({ insert }), rpc }),
 }));
 vi.mock('@/lib/logger', () => ({ logger: { warn: vi.fn() } }));
 const input = {
@@ -40,5 +41,43 @@ describe('trusted billing analytics', () => {
       .mockRejectedValueOnce(new Error('timeout'));
     expect(await trackBillingEvent(input)).toBe(false);
     expect(await trackBillingEvent(input)).toBe(false);
+  });
+
+  it('persists first-paid identity beyond product event retention and deduplicates retries', async () => {
+    const abort = vi
+      .fn()
+      .mockResolvedValueOnce({ data: true, error: null })
+      .mockResolvedValueOnce({ data: true, error: null })
+      .mockResolvedValueOnce({ data: false, error: null });
+    rpc.mockReturnValue({ abortSignal: abort });
+
+    await expect(
+      claimFirstPaidInvoice({
+        userId: input.userId,
+        invoiceId: input.sourceId,
+        eventName: 'subscription_payment_succeeded',
+      }),
+    ).resolves.toBe(true);
+    await expect(
+      claimFirstPaidInvoice({
+        userId: input.userId,
+        invoiceId: input.sourceId,
+        eventName: 'subscription_payment_succeeded',
+      }),
+    ).resolves.toBe(true);
+    await expect(
+      claimFirstPaidInvoice({
+        userId: input.userId,
+        invoiceId: 'in_later',
+        eventName: 'subscription_renewal_succeeded',
+      }),
+    ).resolves.toBe(false);
+
+    expect(rpc).toHaveBeenCalledWith('claim_posthog_first_paid_invoice_v1', {
+      p_user_id: input.userId,
+      p_invoice_event_id: billingEventId(input.eventName, input.sourceId),
+    });
+    expect(abort).toHaveBeenCalledTimes(3);
+    expect(abort).toHaveBeenCalledWith(expect.any(AbortSignal));
   });
 });

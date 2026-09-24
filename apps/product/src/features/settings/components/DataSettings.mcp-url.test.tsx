@@ -11,6 +11,13 @@ vi.mock('@/lib/toast', () => ({
 
 vi.mock('@/lib/trpc', () => ({
   api: {
+    useUtils: () => ({ userSettings: { getAnalyticsConsent: { setData: vi.fn() } } }),
+    userSettings: {
+      getAnalyticsConsent: {
+        useQuery: () => ({ data: { allowed: false }, isLoading: false, isError: false }),
+      },
+      setAnalyticsConsent: { useMutation: () => ({ mutateAsync: vi.fn(), isPending: false }) },
+    },
     user: {
       exportData: {
         useQuery: () => ({ refetch: vi.fn(), isLoading: false, isFetching: false }),

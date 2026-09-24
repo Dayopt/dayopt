@@ -95,7 +95,9 @@ const MUTATIONS_ALLOWED_AFTER_END = [
   'user.deleteBlocks',
   'user.requestEmailChange',
   'user.verifyRecoveryCode',
+  'userSettings.claimSignupCompletion',
   'userSettings.regenerateICalToken',
+  'userSettings.setAnalyticsConsent',
   'userSettings.update',
   'userSettings.updateProfile',
 ];

@@ -15,6 +15,8 @@
         "GOOGLE_SITE_VERIFICATION",
         "MCP_*",
         "OAUTH_*",
+        "POSTHOG_*",
+        "NEXT_PUBLIC_POSTHOG_*",
         "PRIVACY_PROTECTION_MODE",
         "RECOVERY_CODE_PEPPER",
         "RESEND_*",

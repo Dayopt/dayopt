@@ -10,6 +10,8 @@ import {
 
 const dynamicState = vi.hoisted(() => ({ callCount: 0 }));
 
+vi.mock('./PostHogWebAnalytics', () => ({ PostHogWebAnalytics: () => null }));
+
 vi.mock('next/dynamic', () => ({
   default: () => {
     const testId = dynamicState.callCount++ === 0 ? 'analytics' : 'speed-insights';

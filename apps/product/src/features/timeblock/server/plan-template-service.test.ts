@@ -6,10 +6,13 @@ import type { PlanRow } from './timeblock-types';
 import type { ServiceSupabaseClient } from './types';
 
 const trackProductEvent = vi.hoisted(() => vi.fn());
+const trackProductEvents = vi.hoisted(() => vi.fn());
+const trackPostHogServerEvent = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/analytics/product-events', () => ({
   trackProductEvent,
-  trackProductEvents: vi.fn(),
+  trackProductEvents,
 }));
+vi.mock('@/lib/analytics/posthog-server', () => ({ trackPostHogServerEvent }));
 vi.mock('@/lib/sentry', () => ({
   captureUnexpectedDatabaseError: (error: unknown) => error,
 }));
@@ -312,9 +315,18 @@ describe('PlanTemplateService', () => {
           },
         ],
       });
-      expect(trackProductEvent).toHaveBeenCalledWith({
+      expect(trackProductEvent).not.toHaveBeenCalled();
+      expect(trackProductEvents).toHaveBeenCalledWith([
+        { eventName: 'plan_created', userId: USER_ID },
+        { eventName: 'plan_created', userId: USER_ID },
+        { eventName: 'plan_created', userId: USER_ID },
+      ]);
+      expect(trackPostHogServerEvent).toHaveBeenCalledWith({
         eventName: 'plan_created',
         userId: USER_ID,
+        sourceId: 'plan-1:plan-2:plan-3',
+        source: 'manual',
+        count: 3,
       });
     });
 

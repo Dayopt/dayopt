@@ -45,6 +45,7 @@ export function DataSettings() {
     <div className="space-y-6 sm:space-y-8">
       <ExportSection />
       <AnalyticsConsentSection />
+      <AccountAnalyticsConsentSection />
       <McpApiSection />
       <DeletionSection />
     </div>
@@ -296,6 +297,44 @@ function AnalyticsConsentSection() {
         confirmLabel={t('revokeConfirmLabel')}
         variant="warning"
       />
+    </SectionCard>
+  );
+}
+
+/** Server events use a separate, account-wide decision that can be changed on any device. */
+function AccountAnalyticsConsentSection() {
+  const t = useTranslations('settings.legal.cookies.account');
+  const utils = api.useUtils();
+  const consentQuery = api.userSettings.getAnalyticsConsent.useQuery();
+  const consentMutation = api.userSettings.setAnalyticsConsent.useMutation();
+  const allowed = consentQuery.data?.allowed ?? false;
+  const canChange = !consentQuery.isLoading && !consentQuery.isError && !consentMutation.isPending;
+
+  const handleChange = useCallback(async () => {
+    try {
+      const result = await consentMutation.mutateAsync({ allowed: !allowed });
+      utils.userSettings.getAnalyticsConsent.setData(undefined, result);
+    } catch {
+      toast.error(t('saveFailed'));
+    }
+  }, [allowed, consentMutation, t, utils.userSettings.getAnalyticsConsent]);
+
+  return (
+    <SectionCard title={t('title')}>
+      <p className="text-muted-foreground mb-4 text-base md:text-sm">{t('description')}</p>
+      <LabeledRow label={t('label')}>
+        <div className="flex items-center gap-3">
+          <span className="text-muted-foreground text-base md:text-sm">
+            {consentQuery.isError ? t('unavailable') : allowed ? t('enabled') : t('disabled')}
+          </span>
+          <Button variant="outline" size="sm" disabled={!canChange} onClick={handleChange}>
+            {allowed ? t('revoke') : t('allow')}
+          </Button>
+        </div>
+      </LabeledRow>
+      <InfoBox className="mt-4 p-4">
+        <p className="text-muted-foreground text-base md:text-sm">{t('deviceNote')}</p>
+      </InfoBox>
     </SectionCard>
   );
 }

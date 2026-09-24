@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import Stripe from 'stripe';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { resetWriteFenceCacheForTestsOnly } from '@/lib/ops/write-fence';
 import { resetWebhookSignatureFailureCaptureForTestsOnly } from '@/lib/webhooks/signature-failure-monitor';
@@ -45,10 +45,17 @@ const profileMaybeSingle = vi.hoisted(() => vi.fn());
 const writeFenceMaybeSingle = vi.hoisted(() => vi.fn());
 const getUserById = vi.hoisted(() => vi.fn());
 const trackBillingEvent = vi.hoisted(() => vi.fn());
-vi.mock('@/lib/analytics/billing-events', () => ({ trackBillingEvent }));
+const claimFirstPaidInvoice = vi.hoisted(() => vi.fn());
+vi.mock('@/lib/analytics/billing-events', () => ({ trackBillingEvent, claimFirstPaidInvoice }));
+const trackPostHogServerEvent = vi.hoisted(() => vi.fn());
+vi.mock('@/lib/analytics/posthog-server', () => ({ trackPostHogServerEvent }));
 const trackProductEvent = vi.hoisted(() => vi.fn());
 const profileConsume = vi.hoisted(() =>
-  vi.fn(() => ({ eq: () => ({ is: () => Promise.resolve({ error: null }) }) })),
+  vi.fn(() => ({
+    eq: () => ({
+      is: () => ({ select: () => Promise.resolve({ data: [{ id: 'user-1' }], error: null }) }),
+    }),
+  })),
 );
 const captureUnexpectedError = vi.hoisted(() => vi.fn());
 const deliverTransactionalEmail = vi.hoisted(() => vi.fn());
@@ -122,7 +129,11 @@ function request(overrides: { body?: string; headers?: Record<string, string> } 
 
 beforeEach(() => {
   trackBillingEvent.mockResolvedValue(true);
+  claimFirstPaidInvoice.mockResolvedValue(true);
+  trackPostHogServerEvent.mockResolvedValue(undefined);
   vi.clearAllMocks();
+  vi.stubEnv('POSTHOG_SERVER_ENABLED', 'true');
+  vi.stubEnv('NEXT_PUBLIC_POSTHOG_PROJECT_KEY', 'phc_test');
   resetWriteFenceCacheForTestsOnly();
   resetWebhookSignatureFailureCaptureForTestsOnly();
   envMock.STRIPE_WEBHOOK_SECRET = 'fixture';
@@ -152,6 +163,8 @@ beforeEach(() => {
     abortSignal: vi.fn(async () => ({ data: 1, error: null })),
   });
 });
+
+afterEach(() => vi.unstubAllEnvs());
 
 describe('Stripe webhook route', () => {
   it('idempotency claim失敗をSentryへ通知して500を返す', async () => {
@@ -322,11 +335,69 @@ describe('Stripe webhook route', () => {
               : 'subscription_renewal_succeeded',
         }),
       );
+      expect(claimFirstPaidInvoice).toHaveBeenCalledWith({
+        userId: 'user-1',
+        invoiceId: 'in_paid',
+        eventName:
+          reason === 'subscription_create'
+            ? 'subscription_payment_succeeded'
+            : 'subscription_renewal_succeeded',
+      });
+      expect(trackPostHogServerEvent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          eventName: 'first_payment_succeeded',
+          userId: 'user-1',
+          sourceId: 'user-1',
+        }),
+      );
       claimStripeWebhookEvent.mockResolvedValueOnce('already_processed');
       expect((await POST(request())).status).toBe(200);
       expect(trackBillingEvent).toHaveBeenCalledTimes(1);
+      expect(trackPostHogServerEvent).toHaveBeenCalledTimes(1);
     },
   );
+
+  it('does not report a later paid invoice as the first payment', async () => {
+    eventMock.type = 'invoice.paid';
+    eventMock.data.object = {
+      id: 'in_renewal',
+      customer: 'cus_test123',
+      status: 'paid',
+      amount_paid: 500,
+      billing_reason: 'subscription_cycle',
+    };
+    profileMaybeSingle.mockResolvedValue({ data: { id: 'user-1' }, error: null });
+    claimFirstPaidInvoice.mockResolvedValue(false);
+
+    expect((await POST(request())).status).toBe(200);
+
+    expect(trackPostHogServerEvent).not.toHaveBeenCalled();
+    expect(trackBillingEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ eventName: 'subscription_renewal_succeeded' }),
+    );
+  });
+
+  it('records first-paid identity while PostHog delivery is disabled', async () => {
+    eventMock.type = 'invoice.paid';
+    eventMock.data.object = {
+      id: 'in_paid',
+      customer: 'cus_test123',
+      status: 'paid',
+      amount_paid: 500,
+      billing_reason: 'subscription_create',
+    };
+    profileMaybeSingle.mockResolvedValue({ data: { id: 'user-1' }, error: null });
+    vi.stubEnv('POSTHOG_SERVER_ENABLED', 'false');
+
+    expect((await POST(request())).status).toBe(200);
+
+    expect(claimFirstPaidInvoice).toHaveBeenCalledWith({
+      userId: 'user-1',
+      invoiceId: 'in_paid',
+      eventName: 'subscription_payment_succeeded',
+    });
+    expect(trackPostHogServerEvent).not.toHaveBeenCalled();
+  });
 
   it('releases a paid invoice receipt when analytics persistence fails', async () => {
     eventMock.type = 'invoice.paid';

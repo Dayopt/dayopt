@@ -3,8 +3,16 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const verifyOtp = vi.hoisted(() => vi.fn());
 const createClient = vi.hoisted(() => vi.fn());
+const deliverWelcomeEmailOnce = vi.hoisted(() => vi.fn());
+const createSignupAnalyticsClaim = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/supabase/server', () => ({ createClient }));
+vi.mock('@/features/auth/server/welcome-email', () => ({ deliverWelcomeEmailOnce }));
+vi.mock('@/lib/analytics/signup-analytics-claim', () => ({
+  createSignupAnalyticsClaim,
+  SIGNUP_ANALYTICS_CLAIM_COOKIE: '__Host-dayopt_signup_claim',
+  SIGNUP_ANALYTICS_CLAIM_MAX_AGE_SECONDS: 600,
+}));
 vi.mock('@/lib/sentry', () => ({
   // 計測 wrapper は素通しさせる。ここで検証したいのは着地先の分岐であって観測ではない。
   observeAuthOperation: (_name: string, operation: () => unknown) => operation(),
@@ -26,6 +34,8 @@ describe('auth confirm route', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     createClient.mockResolvedValue({ auth: { verifyOtp } });
+    deliverWelcomeEmailOnce.mockResolvedValue(true);
+    createSignupAnalyticsClaim.mockReturnValue('signed-token');
   });
 
   // #1956: session がある時だけ保護ページへ送る。これが従来の正常系。
@@ -90,6 +100,20 @@ describe('auth confirm route', () => {
     const response = await GET(request('token_hash=hash&type=signup&next=%2Fcalendar'));
 
     expect(locationOf(response).pathname).toBe('/calendar');
+  });
+
+  it('確認済みの新規登録だけに署名付きの一時claimを設定する', async () => {
+    verifyOtp.mockResolvedValue({
+      data: { session: { ...SESSION, user: { id: 'new-user' } } },
+      error: null,
+    });
+
+    const response = await GET(request('token_hash=hash&type=signup&next=%2Fcalendar'));
+
+    expect(deliverWelcomeEmailOnce).toHaveBeenCalledWith('new-user');
+    expect(createSignupAnalyticsClaim).toHaveBeenCalledWith('new-user', 'email');
+    expect(locationOf(response).searchParams.get('signup_claim')).toBe('1');
+    expect(response.headers.get('set-cookie')).toContain('__Host-dayopt_signup_claim=signed-token');
   });
 
   // #1928: recovery は next を無視して固定で /auth/reset-password へ送る。メール送信経路

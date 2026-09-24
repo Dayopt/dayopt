@@ -42,6 +42,11 @@ import type { EmailOtpType } from '@supabase/auth-js';
 import { type NextRequest, NextResponse } from 'next/server';
 
 import { deliverWelcomeEmailOnce } from '@/features/auth/server/welcome-email';
+import {
+  createSignupAnalyticsClaim,
+  SIGNUP_ANALYTICS_CLAIM_COOKIE,
+  SIGNUP_ANALYTICS_CLAIM_MAX_AGE_SECONDS,
+} from '@/lib/analytics/signup-analytics-claim';
 import { getSafeRedirectPath } from '@/lib/safe-redirect';
 import { observeAuthOperation } from '@/lib/sentry';
 import { createClient } from '@/lib/supabase/server';
@@ -81,7 +86,10 @@ export async function GET(request: NextRequest) {
       // 新規登録の確認だけを歓迎の合図にする。email_change / recovery は既存ユーザーの操作。
       // user を optional に読むのは、歓迎メールの都合で確認の着地を壊さないため。
       const signupUserId = type === 'signup' ? data.session?.user?.id : undefined;
-      if (signupUserId) await deliverWelcomeEmailOnce(signupUserId);
+      const signupClaim =
+        signupUserId && (await deliverWelcomeEmailOnce(signupUserId))
+          ? createSignupAnalyticsClaim(signupUserId, 'email')
+          : null;
 
       if (data.session?.access_token) {
         // recovery だけ next を無視して固定 path へ送る（#1928）。実際の発生原因は
@@ -90,7 +98,19 @@ export async function GET(request: NextRequest) {
         // 落ちていたこと（allowlist は User が追加済み）。recovery の着地先は固定で問題
         // ないため、allowlist が再びドリフトしても壊れない形にしておく（防御層）。
         const target = type === 'recovery' ? '/auth/reset-password' : next;
-        return NextResponse.redirect(new URL(target, request.url));
+        const destination = new URL(target, request.url);
+        if (signupClaim) destination.searchParams.set('signup_claim', '1');
+        const response = NextResponse.redirect(destination);
+        if (signupClaim) {
+          response.cookies.set(SIGNUP_ANALYTICS_CLAIM_COOKIE, signupClaim, {
+            httpOnly: true,
+            secure: true,
+            sameSite: 'strict',
+            path: '/',
+            maxAge: SIGNUP_ANALYTICS_CLAIM_MAX_AGE_SECONDS,
+          });
+        }
+        return response;
       }
 
       return NextResponse.redirect(confirmedUrl(statusForType(type), request));

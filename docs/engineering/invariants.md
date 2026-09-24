@@ -33,6 +33,10 @@ docs へ残している。
   update が一度成功して見えた後に rollback され、汎用の失敗 toast だけが残って障害と区別できない
   （2026-09-20、Google Calendar 設定と activity / category の archive・restore で実発生。
   終了後も許す削除・切断・export は gate しない）
+- **PostHog の初回支払い判定は90日保持の `product_events` から都度推定しない。** user単位の
+  `private.posthog_first_paid_invoices` を限定 service-role claim RPC で更新し、account削除に追従して
+  cascade 削除する。migration 時点で残っている既存支払いeventはmarkerへ移すが、保持期間を過ぎて
+  消えた過去eventは復元できないため、導入以前の全支払い履歴を表す用途には使わない（2026-09-24、#2875）
 - 外部カレンダー連携は **Pro 限定**。OAuth の開始・callback・cron 同期の**すべての入口**で
   entitlement を検査する（2026-07 に callback の検査漏れが実際に起きたクラス）
 - Pro 限定機能の server 入口は `entitledProcedure(key)` を使うか、明示的に entitlement を検査する

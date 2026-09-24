@@ -426,6 +426,14 @@ model {
     metadata { inventoryKind 'db-function' detail 'app からの .rpc 呼び出しなし' }
     link ../../../../apps/product/src/lib/database/generated/database.types.ts
   }
+  dbfunction fn_claim_posthog_first_paid_invoice_v1 'claim_posthog_first_paid_invoice_v1' {
+    metadata { inventoryKind 'db-function' detail 'used by lib' }
+    link ../../../../apps/product/src/lib/database/generated/database.types.ts
+  }
+  dbfunction fn_claim_posthog_signup_v1 'claim_posthog_signup_v1' {
+    metadata { inventoryKind 'db-function' detail 'used by settings' }
+    link ../../../../apps/product/src/lib/database/generated/database.types.ts
+  }
   dbfunction fn_claim_stripe_webhook_event 'claim_stripe_webhook_event' {
     metadata { inventoryKind 'db-function' detail 'used by app' }
     link ../../../../apps/product/src/lib/database/generated/database.types.ts
@@ -1304,6 +1312,7 @@ model {
   f_settings -> fn_claim_billing_customer_provisioning_v2 'calls'
   f_settings -> fn_claim_billing_mutation_v3 'calls'
   f_external-calendar -> fn_claim_calendar_revoke_outbox_v1 'calls'
+  f_settings -> fn_claim_posthog_signup_v1 'calls'
   f_settings -> fn_classify_billing_customer_event_v1 'calls'
   f_settings -> fn_cleanup_billing_account_deletion_terminal_receipts_v2 'calls'
   f_settings -> fn_cleanup_billing_mutation_claims_v2 'calls'
@@ -1437,16 +1446,19 @@ model {
   r_planCommands -> t_activities 'reads'
   r_planCommands -> t_plans 'reads'
   r_planCommands -> t_product_events 'reads'
+  r_planCommands -> t_profiles 'reads'
   r_plans -> t_activities 'reads'
   r_plans -> t_plans 'reads'
   r_planTemplates -> t_activities 'reads'
   r_planTemplates -> t_plan_template_blocks 'reads'
   r_planTemplates -> t_plan_templates 'reads'
   r_planTemplates -> t_product_events 'reads'
+  r_planTemplates -> t_profiles 'reads'
   r_planTemplates -> t_records 'reads'
   r_planTemplates -> t_user_settings 'reads'
   r_recordCommands -> t_activities 'reads'
   r_recordCommands -> t_product_events 'reads'
+  r_recordCommands -> t_profiles 'reads'
   r_recordCommands -> t_records 'reads'
   r_records -> t_activities 'reads'
   r_records -> t_records 'reads'
@@ -1500,6 +1512,7 @@ model {
   r_recordCommands -> fn_update_record_command_v1 'calls'
   r_user -> fn_count_unused_recovery_codes 'calls'
   r_user -> fn_use_recovery_code 'calls'
+  r_userSettings -> fn_claim_posthog_signup_v1 'calls'
   r_userSettings -> fn_update_personalization 'calls'
   t_activities -> t_categories 'FK category_id, user_id'
   t_calendar_connection_calendars -> t_calendar_connections 'FK connection_id, user_id'

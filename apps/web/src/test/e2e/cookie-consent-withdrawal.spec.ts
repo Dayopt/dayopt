@@ -11,8 +11,8 @@ import commonEn from '../../../messages/en/common.json' with { type: 'json' };
  * 同意イベントを直接投げるので、**バナーと footer の導線が実際に同意値を書き換え、
  * それが reload と別タブへ伝わるか**はこの層でしか見えない。
  *
- * Vercel Production 以外では telemetry SDK 自体が読み込まれない（BrowserTelemetry.tsx:27）。
- * 「撤回後に通信が 0 件」の実測は production 相当 build に対して別途行う（PR 本文の証跡）。
+ * Vercel SDK は Production 限定。PostHog は別の送信スイッチと project key がある時だけ
+ * 読み込む。この E2E は同意の保存と伝播を検証し、実送信は別途確認する。
  */
 
 const banner = commonEn.common.cookies.banner;
