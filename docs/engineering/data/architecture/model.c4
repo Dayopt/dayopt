@@ -1444,6 +1444,7 @@ model {
   r_planTemplates -> t_plan_template_blocks 'reads'
   r_planTemplates -> t_plan_templates 'reads'
   r_planTemplates -> t_product_events 'reads'
+  r_planTemplates -> t_profiles 'reads'
   r_planTemplates -> t_records 'reads'
   r_planTemplates -> t_user_settings 'reads'
   r_recordCommands -> t_activities 'reads'

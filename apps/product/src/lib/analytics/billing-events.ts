@@ -1,8 +1,9 @@
 import 'server-only';
 
+import { createHash } from 'node:crypto';
+
 import { logger } from '@/lib/logger';
 import { createServiceRoleClient } from '@/lib/supabase/oauth';
-import { createHash } from 'node:crypto';
 
 type BillingEventName =
   | 'app_trial_started'
@@ -41,5 +42,33 @@ export async function trackBillingEvent(input: {
   } catch {
     logger.warn('Billing analytics unavailable', { eventName: input.eventName });
     return false;
+  }
+}
+
+/** Returns whether another paid invoice has already been recorded for the account. */
+export async function hasPriorPaidInvoiceEvent(input: {
+  userId: string;
+  invoiceId: string;
+  currentEventName: 'subscription_payment_succeeded' | 'subscription_renewal_succeeded';
+}): Promise<boolean> {
+  try {
+    const currentEventId = billingEventId(input.currentEventName, input.invoiceId);
+    const { data, error } = await createServiceRoleClient()
+      .from('product_events')
+      .select('id')
+      .eq('user_id', input.userId)
+      .in('event_name', ['subscription_payment_succeeded', 'subscription_renewal_succeeded'])
+      .neq('id', currentEventId)
+      .limit(1)
+      .abortSignal(AbortSignal.timeout(1_000));
+
+    if (error) {
+      logger.warn('Prior paid invoice lookup failed');
+      return true;
+    }
+    return (data?.length ?? 0) > 0;
+  } catch {
+    logger.warn('Prior paid invoice lookup failed');
+    return true;
   }
 }

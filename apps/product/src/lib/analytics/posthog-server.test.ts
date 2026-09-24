@@ -2,6 +2,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const captureImmediate = vi.hoisted(() => vi.fn());
 const createServiceRoleClient = vi.hoisted(() => vi.fn());
+const scheduleAfter = vi.hoisted(() => vi.fn());
+const deferredCallbacks = vi.hoisted(() => ({ callbacks: [] as Array<() => Promise<void>> }));
+
+vi.mock('next/server', () => ({ after: scheduleAfter }));
 
 vi.mock('posthog-node', () => ({
   PostHog: vi.fn().mockImplementation(function MockPostHog() {
@@ -28,6 +32,10 @@ function consentQuery(allowed: boolean | null, error: object | null = null) {
 describe('PostHog server analytics', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    deferredCallbacks.callbacks = [];
+    scheduleAfter.mockImplementation((callback: () => Promise<void>) => {
+      deferredCallbacks.callbacks.push(callback);
+    });
     vi.stubEnv('POSTHOG_SERVER_ENABLED', 'true');
     vi.stubEnv('NEXT_PUBLIC_POSTHOG_PROJECT_KEY', 'phc_test');
     captureImmediate.mockResolvedValue(undefined);
@@ -53,12 +61,14 @@ describe('PostHog server analytics', () => {
       userId: 'user-1',
       sourceId: 'plan-1',
     });
+    await deferredCallbacks.callbacks[0]?.();
     consentQuery(null, { code: 'PGRST000' });
     await trackPostHogServerEvent({
       eventName: 'plan_created',
       userId: 'user-1',
       sourceId: 'plan-1',
     });
+    await deferredCallbacks.callbacks[1]?.();
     expect(captureImmediate).not.toHaveBeenCalled();
   });
 
@@ -71,6 +81,8 @@ describe('PostHog server analytics', () => {
       source: 'manual',
       count: 1,
     });
+    expect(captureImmediate).not.toHaveBeenCalled();
+    await deferredCallbacks.callbacks[0]?.();
     expect(query.eq).toHaveBeenCalledWith('id', 'user-1');
     expect(captureImmediate).toHaveBeenCalledWith({
       distinctId: 'user-1',
@@ -99,5 +111,6 @@ describe('PostHog server analytics', () => {
         sourceId: 'plan-1:v2',
       }),
     ).resolves.toBeUndefined();
+    await deferredCallbacks.callbacks[0]?.();
   });
 });

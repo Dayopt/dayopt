@@ -138,6 +138,7 @@ const serverSchema = z
       .optional(),
     NEXT_PUBLIC_POSTHOG_BROWSER_ENABLED: z.enum(['true', 'false']).optional(),
     POSTHOG_SERVER_ENABLED: z.enum(['true', 'false']).optional(),
+    POSTHOG_PERSONAL_API_KEY: z.string().min(1).optional(),
     NEXT_PUBLIC_STRIPE_PRO_PRICE_ID: z.string().optional(),
 
     // App

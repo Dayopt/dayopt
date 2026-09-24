@@ -202,6 +202,14 @@ export const productionEnvSchema: EnvSchemaEntry[] = [
     '課金未有効化のため未設定（2026-08-11 実測、#1669）',
   ),
   pendingEnvEntry(
+    'POSTHOG_PERSONAL_API_KEY',
+    'secret',
+    'production',
+    human,
+    'posthog-delete',
+    'PostHog Production 送信は法務確認まで無効。計測を有効化する前に Project 625917 限定 person:write key を設定する',
+  ),
+  pendingEnvEntry(
     'NEXT_PUBLIC_STRIPE_PRO_PRICE_ID',
     'public',
     'production',

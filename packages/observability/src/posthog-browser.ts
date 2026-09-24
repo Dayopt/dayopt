@@ -22,9 +22,18 @@ type PostHogBrowser = (typeof import('posthog-js'))['default'];
 let client: PostHogBrowser | null = null;
 let loading: Promise<void> | null = null;
 let enabled = false;
+let persistenceDisabledAfterRevocation = false;
 let consentCheck: (() => boolean) | null = null;
+let pendingCaptures: Array<() => void> = [];
 let commonProperties: { environment: Environment; surface: Surface; schema_version: 1 } | null =
   null;
+
+function flushPendingCaptures(): void {
+  const queued = pendingCaptures;
+  pendingCaptures = [];
+  if (!enabled || !consentCheck?.()) return;
+  for (const capture of queued) capture();
+}
 
 /** Initialize only after this origin has explicitly allowed analytics. */
 export async function startPostHogBrowser(options: BrowserAnalyticsOptions): Promise<void> {
@@ -36,7 +45,16 @@ export async function startPostHogBrowser(options: BrowserAnalyticsOptions): Pro
     schema_version: 1,
   };
   enabled = true;
-  if (client) return;
+  if (client) {
+    if (persistenceDisabledAfterRevocation) {
+      client.persistence?.set_disabled(false);
+      client.sessionPersistence?.set_disabled(false);
+      client.opt_in_capturing({ captureEventName: false });
+      persistenceDisabledAfterRevocation = false;
+    }
+    flushPendingCaptures();
+    return;
+  }
   if (loading) return loading;
 
   loading = import('posthog-js')
@@ -72,6 +90,7 @@ export async function startPostHogBrowser(options: BrowserAnalyticsOptions): Pro
         },
       });
       client = posthog;
+      flushPendingCaptures();
     })
     .finally(() => {
       loading = null;
@@ -82,7 +101,14 @@ export async function startPostHogBrowser(options: BrowserAnalyticsOptions): Pro
 /** Clears the shared Dayopt cookie so another account never inherits this identity. */
 export function stopPostHogBrowser(): void {
   enabled = false;
-  client?.reset();
+  pendingCaptures = [];
+  client?.opt_out_capturing();
+  client?.persistence?.clear();
+  client?.sessionPersistence?.clear();
+  client?.clear_opt_in_out_capturing();
+  client?.persistence?.set_disabled(true);
+  client?.sessionPersistence?.set_disabled(true);
+  persistenceDisabledAfterRevocation = client !== null;
 }
 
 export function identifyPostHogBrowser(userId: string): void {
@@ -114,7 +140,11 @@ function attributionProperties(): Record<string, string> {
 }
 
 export function capturePostHogPageview(): void {
-  if (!enabled || !consentCheck?.() || !client || !commonProperties) return;
+  if (!enabled || !consentCheck?.() || !commonProperties) return;
+  if (!client) {
+    if (pendingCaptures.length < 20) pendingCaptures.push(capturePostHogPageview);
+    return;
+  }
   const pagePath = postHogPagePath(window.location.pathname);
   const attribution = attributionProperties();
   client.capture('$pageview', {
@@ -132,7 +162,13 @@ export function capturePostHogBrowserEvent(
   eventName: BrowserEvent,
   properties: Record<string, string> = {},
 ): void {
-  if (!enabled || !consentCheck?.() || !client || !commonProperties) return;
+  if (!enabled || !consentCheck?.() || !commonProperties) return;
+  if (!client) {
+    if (pendingCaptures.length < 20) {
+      pendingCaptures.push(() => capturePostHogBrowserEvent(eventName, properties));
+    }
+    return;
+  }
   client.capture(
     eventName,
     { ...commonProperties, ...properties },

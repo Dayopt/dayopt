@@ -1,5 +1,6 @@
 import 'server-only';
 
+import { after } from 'next/server';
 import { createHash } from 'node:crypto';
 import { PostHog } from 'posthog-node';
 
@@ -45,6 +46,15 @@ export async function trackPostHogServerEvent(input: PostHogServerEvent): Promis
   const projectKey = process.env.NEXT_PUBLIC_POSTHOG_PROJECT_KEY;
   if (process.env.POSTHOG_SERVER_ENABLED !== 'true' || !projectKey) return;
 
+  after(async () => {
+    await deliverPostHogServerEvent(input, projectKey);
+  });
+}
+
+async function deliverPostHogServerEvent(
+  input: PostHogServerEvent,
+  projectKey: string,
+): Promise<void> {
   try {
     const { data, error } = await createServiceRoleClient()
       .from('profiles')

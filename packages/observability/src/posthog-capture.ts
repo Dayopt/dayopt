@@ -15,6 +15,7 @@ const PROPERTY_NAMES = new Set([
   '$device_id',
   '$session_id',
   '$process_person_profile',
+  '$insert_id',
   'environment',
   'surface',
   'schema_version',
@@ -97,7 +98,9 @@ export function filterPostHogBrowserProperties(
   const filtered: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(properties)) {
     if (!PROPERTY_NAMES.has(key)) continue;
-    if (key === 'schema_version') {
+    if (key === '$insert_id') {
+      if (typeof value === 'string' && /^[a-z0-9_-]{16,64}$/i.test(value)) filtered[key] = value;
+    } else if (key === 'schema_version') {
       if (value === 1) filtered[key] = 1;
     } else if (key in FIXED_VALUES) {
       if (typeof value === 'string' && FIXED_VALUES[key]?.has(value)) filtered[key] = value;

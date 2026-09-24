@@ -36,6 +36,7 @@ describe('PostHog browser data boundary', () => {
           $current_url: 'https://dayopt.app/ja/blog/post?email=a%40example.com',
           $referrer: 'https://news.example.com/article?secret=123',
           $utm_source: ' Newsletter ',
+          $insert_id: '0123456789abcdef0123456789abcdef',
           email: 'a@example.com',
           $geoip_city_name: 'Tokyo',
           $session_recording_enabled: true,
@@ -48,6 +49,7 @@ describe('PostHog browser data boundary', () => {
       $current_url: 'https://dayopt.app/ja/blog/post',
       $referrer: 'https://news.example.com/',
       $utm_source: 'newsletter',
+      $insert_id: '0123456789abcdef0123456789abcdef',
       $geoip_disable: true,
     });
     expect(filterPostHogBrowserProperties('$autocapture', {}, 'https://dayopt.app')).toBeNull();

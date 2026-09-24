@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import Stripe from 'stripe';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { resetWriteFenceCacheForTestsOnly } from '@/lib/ops/write-fence';
 import { resetWebhookSignatureFailureCaptureForTestsOnly } from '@/lib/webhooks/signature-failure-monitor';
@@ -45,7 +45,8 @@ const profileMaybeSingle = vi.hoisted(() => vi.fn());
 const writeFenceMaybeSingle = vi.hoisted(() => vi.fn());
 const getUserById = vi.hoisted(() => vi.fn());
 const trackBillingEvent = vi.hoisted(() => vi.fn());
-vi.mock('@/lib/analytics/billing-events', () => ({ trackBillingEvent }));
+const hasPriorPaidInvoiceEvent = vi.hoisted(() => vi.fn());
+vi.mock('@/lib/analytics/billing-events', () => ({ trackBillingEvent, hasPriorPaidInvoiceEvent }));
 const trackPostHogServerEvent = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/analytics/posthog-server', () => ({ trackPostHogServerEvent }));
 const trackProductEvent = vi.hoisted(() => vi.fn());
@@ -128,8 +129,11 @@ function request(overrides: { body?: string; headers?: Record<string, string> } 
 
 beforeEach(() => {
   trackBillingEvent.mockResolvedValue(true);
+  hasPriorPaidInvoiceEvent.mockResolvedValue(false);
   trackPostHogServerEvent.mockResolvedValue(undefined);
   vi.clearAllMocks();
+  vi.stubEnv('POSTHOG_SERVER_ENABLED', 'true');
+  vi.stubEnv('NEXT_PUBLIC_POSTHOG_PROJECT_KEY', 'phc_test');
   resetWriteFenceCacheForTestsOnly();
   resetWebhookSignatureFailureCaptureForTestsOnly();
   envMock.STRIPE_WEBHOOK_SECRET = 'fixture';
@@ -159,6 +163,8 @@ beforeEach(() => {
     abortSignal: vi.fn(async () => ({ data: 1, error: null })),
   });
 });
+
+afterEach(() => vi.unstubAllEnvs());
 
 describe('Stripe webhook route', () => {
   it('idempotency claim失敗をSentryへ通知して500を返す', async () => {
@@ -329,11 +335,19 @@ describe('Stripe webhook route', () => {
               : 'subscription_renewal_succeeded',
         }),
       );
+      expect(hasPriorPaidInvoiceEvent).toHaveBeenCalledWith({
+        userId: 'user-1',
+        invoiceId: 'in_paid',
+        currentEventName:
+          reason === 'subscription_create'
+            ? 'subscription_payment_succeeded'
+            : 'subscription_renewal_succeeded',
+      });
       expect(trackPostHogServerEvent).toHaveBeenCalledWith(
         expect.objectContaining({
           eventName: 'first_payment_succeeded',
           userId: 'user-1',
-          sourceId: 'in_paid',
+          sourceId: 'user-1',
         }),
       );
       claimStripeWebhookEvent.mockResolvedValueOnce('already_processed');
@@ -342,6 +356,26 @@ describe('Stripe webhook route', () => {
       expect(trackPostHogServerEvent).toHaveBeenCalledTimes(1);
     },
   );
+
+  it('does not report a later paid invoice as the first payment', async () => {
+    eventMock.type = 'invoice.paid';
+    eventMock.data.object = {
+      id: 'in_renewal',
+      customer: 'cus_test123',
+      status: 'paid',
+      amount_paid: 500,
+      billing_reason: 'subscription_cycle',
+    };
+    profileMaybeSingle.mockResolvedValue({ data: { id: 'user-1' }, error: null });
+    hasPriorPaidInvoiceEvent.mockResolvedValue(true);
+
+    expect((await POST(request())).status).toBe(200);
+
+    expect(trackPostHogServerEvent).not.toHaveBeenCalled();
+    expect(trackBillingEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ eventName: 'subscription_renewal_succeeded' }),
+    );
+  });
 
   it('releases a paid invoice receipt when analytics persistence fails', async () => {
     eventMock.type = 'invoice.paid';

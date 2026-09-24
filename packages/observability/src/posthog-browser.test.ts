@@ -5,6 +5,11 @@ const sdk = vi.hoisted(() => ({
   capture: vi.fn(),
   identify: vi.fn(),
   reset: vi.fn(),
+  opt_in_capturing: vi.fn(),
+  opt_out_capturing: vi.fn(),
+  clear_opt_in_out_capturing: vi.fn(),
+  persistence: { clear: vi.fn(), set_disabled: vi.fn() },
+  sessionPersistence: { clear: vi.fn(), set_disabled: vi.fn() },
   register: vi.fn(),
   register_once: vi.fn(),
 }));
@@ -20,8 +25,9 @@ import {
 
 describe('PostHog browser consent boundary', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
     stopPostHogBrowser();
+    vi.clearAllMocks();
+    sdk.init.mockImplementation(() => undefined);
     vi.stubGlobal('window', { location: { origin: 'https://dayopt.app' } });
   });
 
@@ -37,7 +43,9 @@ describe('PostHog browser consent boundary', () => {
     await startPostHogBrowser(options);
     expect(sdk.init).not.toHaveBeenCalled();
     allowed = true;
-    await startPostHogBrowser(options);
+    const startup = startPostHogBrowser(options);
+    capturePostHogBrowserEvent('signup_viewed', { screen: 'signup' });
+    await startup;
     expect(sdk.init).toHaveBeenCalledWith(
       'phc_test',
       expect.objectContaining({
@@ -45,6 +53,11 @@ describe('PostHog browser consent boundary', () => {
         capture_pageview: false,
         disable_session_recording: true,
       }),
+    );
+    expect(sdk.capture).toHaveBeenCalledWith(
+      'signup_viewed',
+      expect.objectContaining({ screen: 'signup' }),
+      undefined,
     );
 
     const config = sdk.init.mock.calls[0]?.[1];
@@ -70,18 +83,24 @@ describe('PostHog browser consent boundary', () => {
 
     capturePostHogBrowserEvent('signup_cta_clicked');
     identifyPostHogBrowser('00000000-0000-4000-8000-000000000001');
-    expect(sdk.capture).toHaveBeenCalledOnce();
+    expect(sdk.capture).toHaveBeenCalledTimes(2);
     expect(sdk.capture).toHaveBeenCalledWith('signup_cta_clicked', expect.any(Object), {
       send_instantly: true,
       transport: 'sendBeacon',
     });
     expect(sdk.identify).toHaveBeenCalledOnce();
 
+    stopPostHogBrowser();
+    expect(sdk.opt_out_capturing).toHaveBeenCalledOnce();
+    expect(sdk.persistence.clear).toHaveBeenCalledOnce();
+    expect(sdk.sessionPersistence.clear).toHaveBeenCalledOnce();
+    expect(sdk.persistence.set_disabled).toHaveBeenLastCalledWith(true);
+
     allowed = false;
     expect(config.before_send({ event: '$pageview', properties: {} })).toBeNull();
     capturePostHogBrowserEvent('signup_cta_clicked');
     identifyPostHogBrowser('00000000-0000-4000-8000-000000000001');
-    expect(sdk.capture).toHaveBeenCalledOnce();
+    expect(sdk.capture).toHaveBeenCalledTimes(2);
     expect(sdk.identify).toHaveBeenCalledOnce();
   });
 });

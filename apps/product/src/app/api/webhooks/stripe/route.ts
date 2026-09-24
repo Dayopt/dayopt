@@ -30,7 +30,7 @@ import {
   syncDeletedSubscriptionStatus,
   syncSubscriptionStatus,
 } from '@/features/settings/server/billing-service';
-import { trackBillingEvent } from '@/lib/analytics/billing-events';
+import { hasPriorPaidInvoiceEvent, trackBillingEvent } from '@/lib/analytics/billing-events';
 import { trackPostHogServerEvent } from '@/lib/analytics/posthog-server';
 import { trackProductEvent } from '@/lib/analytics/product-events';
 import { getAppUrl } from '@/lib/app-url';
@@ -528,7 +528,20 @@ export async function POST(request: NextRequest) {
             break;
           const user = await getBillingProfileByCustomerId(supabase, customerId);
           if (!user) throw new Error('Paid invoice has no application user');
-          const { data: firstPaidRows, error: consumptionError } = await supabase
+          const invoiceEventName =
+            invoice.billing_reason === 'subscription_create'
+              ? 'subscription_payment_succeeded'
+              : 'subscription_renewal_succeeded';
+          const hasPriorPaidInvoice =
+            process.env.POSTHOG_SERVER_ENABLED === 'true' &&
+            Boolean(process.env.NEXT_PUBLIC_POSTHOG_PROJECT_KEY)
+              ? await hasPriorPaidInvoiceEvent({
+                  userId: user.id,
+                  invoiceId: invoice.id,
+                  currentEventName: invoiceEventName,
+                })
+              : true;
+          const { error: consumptionError } = await supabase
             .from('profiles')
             .update({ app_trial_consumed_at: new Date(event.created * 1_000).toISOString() })
             .eq('id', user.id)
@@ -542,21 +555,18 @@ export async function POST(request: NextRequest) {
 
           if (
             !(await trackBillingEvent({
-              eventName:
-                invoice.billing_reason === 'subscription_create'
-                  ? 'subscription_payment_succeeded'
-                  : 'subscription_renewal_succeeded',
+              eventName: invoiceEventName,
               sourceId: invoice.id,
               userId: user.id,
               occurredAt: new Date(event.created * 1_000).toISOString(),
             }))
           )
             throw new Error('Billing analytics must be retried');
-          if (firstPaidRows?.length) {
+          if (!hasPriorPaidInvoice) {
             await trackPostHogServerEvent({
               eventName: 'first_payment_succeeded',
               userId: user.id,
-              sourceId: invoice.id,
+              sourceId: user.id,
               occurredAt: new Date(event.created * 1_000).toISOString(),
             });
           }
