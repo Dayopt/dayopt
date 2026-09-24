@@ -50,8 +50,8 @@ PostHog の SQL editor または読み取り専用の MCP クエリで、**期�
 ```sql
 SELECT event, count() AS event_count, count(DISTINCT distinct_id) AS actors
 FROM events
-WHERE timestamp >= toDateTime('2026-09-01 00:00:00')
-  AND timestamp < toDateTime('2026-10-01 00:00:00')
+WHERE timestamp >= toDateTime('2026-09-01 00:00:00', 'UTC')
+  AND timestamp < toDateTime('2026-10-01 00:00:00', 'UTC')
   AND properties.environment = 'production'
   AND event IN ('$pageview', 'signup_cta_clicked', 'signup_completed',
                 'plan_created', 'record_created', 'first_payment_succeeded')
@@ -61,9 +61,67 @@ ORDER BY event
 
 Web から追跡可能な登録率の母数は同意済み Web 訪問者だけ。Product 全登録数とは同一の率に混ぜない。初回利用は登録後 24 時間以内の最初の Plan / Record 作成。翌週利用は初回利用から `[7日, 14日)` の作成または編集で、14 日観測済みの人だけを母数にする。Review の閲覧と継続の関係から因果関係は結論しない。初回支払いは `first_payment_succeeded` のみを数え、トライアルと checkout は含めない。
 
+同意済み Product 登録者に限るファネルのテンプレート。期間と `environment` は一緒に置き換える。`observed_14d` が翌週利用率の母数で、`returned_next_week` が分子となる。PostHog SQL editor で 2026-09-24 に構文を確認したが、データは 0 件のため実データでの結果照合は未完了。
+
+```sql
+WITH
+signups AS (
+  SELECT distinct_id, min(timestamp) AS signup_at
+  FROM events
+  WHERE event = 'signup_completed'
+    AND properties.environment = 'preview'
+    AND timestamp >= toDateTime('2026-09-01 00:00:00', 'UTC')
+    AND timestamp < toDateTime('2026-10-01 00:00:00', 'UTC')
+  GROUP BY distinct_id
+),
+first_use AS (
+  SELECT s.distinct_id, min(e.timestamp) AS first_use_at
+  FROM signups AS s
+  INNER JOIN events AS e ON e.distinct_id = s.distinct_id
+  WHERE e.properties.environment = 'preview'
+    AND e.event IN ('plan_created', 'record_created')
+    AND e.timestamp >= s.signup_at
+    AND e.timestamp < s.signup_at + INTERVAL 24 HOUR
+  GROUP BY s.distinct_id
+),
+next_week AS (
+  SELECT f.distinct_id
+  FROM first_use AS f
+  INNER JOIN events AS e ON e.distinct_id = f.distinct_id
+  WHERE e.properties.environment = 'preview'
+    AND e.event IN ('plan_created', 'record_created', 'plan_updated', 'record_updated')
+    AND e.timestamp >= f.first_use_at + INTERVAL 7 DAY
+    AND e.timestamp < f.first_use_at + INTERVAL 14 DAY
+  GROUP BY f.distinct_id
+),
+first_paid AS (
+  SELECT s.distinct_id
+  FROM signups AS s
+  INNER JOIN events AS e ON e.distinct_id = s.distinct_id
+  WHERE e.properties.environment = 'preview'
+    AND e.event = 'first_payment_succeeded'
+    AND e.timestamp >= s.signup_at
+  GROUP BY s.distinct_id
+)
+SELECT
+  count(DISTINCT s.distinct_id) AS consented_signups,
+  count(DISTINCT if(f.distinct_id != '', f.distinct_id, NULL)) AS first_use_within_24h,
+  count(DISTINCT if(f.distinct_id != '' AND f.first_use_at <= now() - INTERVAL 14 DAY,
+                    f.distinct_id, NULL)) AS observed_14d,
+  count(DISTINCT if(w.distinct_id != '' AND f.first_use_at <= now() - INTERVAL 14 DAY,
+                    w.distinct_id, NULL)) AS returned_next_week,
+  count(DISTINCT if(p.distinct_id != '', p.distinct_id, NULL)) AS first_paid
+FROM signups AS s
+LEFT JOIN first_use AS f ON f.distinct_id = s.distinct_id
+LEFT JOIN next_week AS w ON w.distinct_id = s.distinct_id
+LEFT JOIN first_paid AS p ON p.distinct_id = s.distinct_id
+```
+
 ## 保持・削除・エクスポート
 
-PostHog の保存期間と削除手順は本番送信前に管理画面で確認し、法務文面と一致させる。アカウント削除時は Dayopt の削除だけで完了とせず、Supabase user UUID に紐付く PostHog person / events の削除を別途実行・検証する。匿名 Web 履歴はアカウントに結合できた範囲だけ対象を特定できる。集計データが必要な時は PostHog SQL editor で環境と期間を限定してエクスポートし、保管先と削除期限を記録する。
+PostHog Cloud の Free plan は、公式の[イベント保持規則](https://posthog.com/docs/data/events-retention)で events table の保持期間が **1 年**とされる。保持期間は削除手段ではなく、短縮もできない。Data Warehouse に別途取り込んだ表にはこの規則を適用できないため、この導入では取り込みをしない。本番送信前に管理画面の plan と法務文面を再照合する。
+
+アカウント削除時は Dayopt の削除だけで完了とせず、Supabase user UUID を `distinct_id` とする PostHog person を特定し、person と events の削除を別途実行する。[PostHog の削除手順](https://posthog.com/docs/privacy/data-storage#data-deletion)では、Persons 画面から対象を検索して削除できる。API を使う場合は person UUID を取得し、`DELETE /api/projects/625917/persons/{person_uuid}?delete_events=true` を使う。削除には書き込み権限付き personal API key が必要なので、通常の AI 読み取り用 key と分離する。削除後の event 消去は非同期で、完了を deletion status と対象イベントの再検索で確認する。匿名 Web 履歴はアカウントに結合できた範囲だけ対象を特定できる。集計データが必要な時は PostHog SQL editor で環境と期間を限定したクエリを実行し、結果メニューの `.csv` または `.xlsx` からエクスポートする。保管先と削除期限を記録する。
 
 ## 検証と公開条件
 
@@ -71,6 +129,8 @@ PostHog の保存期間と削除手順は本番送信前に管理画面で確認
 2. Preview のテスト利用者で Web 同意 → 登録 → Product 同意 → Plan / Record → 模擬初回支払いを実行し、PostHog の raw event に自動 property や機密値がないか確認する。
 3. MCP の OAuth 権限と利用可能なツールを確認し、読み取りに必要な範囲だけで AI クエリを実行する。結果・SQL・母数を照合する。
 4. 本番送信は法務文面、人間のプライバシー確認、独立レビュー、送信 payload と削除手順の実測が終わってから別途承認する。
+
+法務レビューでは、Web の日英 Privacy / Cookies に **PostHog が新しい受領者であること**、ブラウザとアカウントの同意が独立すること、送信する識別子・イベント区分、US Cloud、Free plan の 1 年保持、本人からの削除依頼時の非同期削除を反映する。現行の法的原稿は [#2833](https://github.com/Dayopt/dayopt/pull/2833) で人間レビュー待ちのため、#2875 の計測を本番で有効化する前にその正本との整合と既存の新規サブプロセッサー通知条項を判断する。原稿への追記だけで法務承認や通知済みとは扱わない。
 
 2026-09-24 の Codex 公式 OAuth 接続試行では、`readonly=true` の URL でも認可要求に多数の write scope が含まれたため、認可を中断して設定を削除した。PostHog の `readonly=true` は公開 MCP ツールの制限で、credential 自体の権限を縮める証明ではない。AI 照合の直前に、project `625917` に限定し `Query: Read` 等だけを選んだ personal API key の権限・保存先・失効方法を確認する。現在 key は発行していない。
 
