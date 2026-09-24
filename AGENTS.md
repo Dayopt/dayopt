@@ -84,6 +84,7 @@ Dayopt で作業する全エージェントの provider-neutral な正本ガイ�
 ## Non-Negotiables
 
 - 既存コードを検索してから変更する（`rg` / `rg --files` 優先）。repo 全体を洗う時は `rg --hidden --glob '!.git/**'`（`.git/` 以外の dot ディレクトリも対象にするため）
+- 非自明な Issue / PR の着手は `pnpm ctx <number>` を入口にする。古い・不足・取得できない情報だけ一次資料で補い、同じ事実を別コマンドで再収集しない。環境状態が必要なら `pnpm agent:preflight`、architecture / API / MCP / DB の構造調査は生成済み docs / map を先に読み、不足分だけソースコードを探索する（詳細は `routing` skill）
 - issue の起票・worker への作業依頼は `dispatch` skill の規約に従う
 - 既存の未コミット差分はユーザー作業として扱い、勝手に revert / stage しない
 - env ファイルの読み書き境界は `docs/operations/secrets.md` に従う。`.op-env.agent`/`.op-env.human` は触ってよいが、実値が入りうる `.env`/`.env.local` は読みも書きもしない

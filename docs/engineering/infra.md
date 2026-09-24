@@ -391,10 +391,16 @@ Vercel Preview が CI より遅れる分は job 内で短く待ち（`VALIDATION
 （以前の success が偽の green として残らない）。合成 merge commit の日時は固定値で、同じ
 base / head / tree なら再評価でも同じ testSha・planId になる。
 controller 自身も `GITHUB_REF` が main でない・event が workflow_run / status でない場合は
-評価も発行もしない。**PR が producer 定義（ci.yml / setup action / check.mjs / impact.mjs）を変えている
-場合、その PR 自身の CI run は `self-produced` として信用しない**（job 名を保ったまま step を
-空にできるため）。この保証境界は job の配線ファイルまでで、vitest 設定や scripts の改変は
-review の観点に残る。PR 側のコード・依存・artifact は実行しない。
+評価も発行もしない。**PR が producer 定義（`ci.yml` / setup action / root `package.json` /
+`check.mjs` / `impact.mjs`）を変えている場合、その PR 自身の該当 CI run は
+`self-produced` として信用しない**（job 名を保ったまま step を空にできるため）。この保証境界は
+job の配線ファイルまでで、vitest 設定や scripts の改変は review の観点に残る。PR 側のコード・依存・artifact は実行しない。
+この block を解消するには、Validation plan の同一 head に必要な merge evidence が揃い、各 self-produced
+suite の producer job がその最新 run attempt で `success` し、さらに `Review policy (shadow)` が同一 head に
+対して `state: complete` / `verdict: satisfied` を返す必要がある。producer の skipped / cancelled / failed、
+古い attempt、missing evidence、stale review、未裁定 thread は解消条件を満たさない。解消時は suite を
+`review-verified` と表示し、既存の `Validation (shadow)` context の description に同一 head のレビュー完了で
+自己変更を確認したことを出す。通常の success と区別し、Review policy と ruleset は引き続き advisory のままにする。
 計画は毎回 base policy から再生成し、validation-shadow.yml の artifact は読まない。test merge は
 GitHub の `refs/pull/N/merge`（遅延更新で base が古いことがある）ではなく、main HEAD と
 `refs/pull/N/head` から `git merge-tree` で自前生成する。PR の tree は git object として diff に
@@ -481,6 +487,22 @@ would-add（Actions job と Vercel deployment の両方）を 1 表にする。�
 件数の少ない分類の p95 は出さない。Preview / review の待ち時間は未取得）。
 
 **Validation の順序: shadow 観察 → 比較 → 承認付き切替 → 観察 → 整理。既存の必須条件を先に削らない。Review policy は shadow のまま維持する。**
+
+#### #2887 の切替判断（2026-09-24）
+
+read-only で確認した live ruleset `6790553` は active、bypass actor は 0、required checks は `🔍 Static Checks`、
+`📦 Unit Tests`、`🧪 Integration Tests`、`Vercel – product`、`Vercel – web` の 5 件。Validation / Review policy は
+required ではなく、この Issue の作業では ruleset を変更しない。
+
+`pnpm validation:shadow-report --limit 10`（実装 policy SHA `94163399f9ed2707a6239ac6d1c92a299b47b074`）は Validation
+9 success / 1 failure。#2886 は `package.json` による self-produced failure で Review policy は pending。
+比較差分は合計 2 `would-skip` / 5 `would-add`、未判定 0。母数 10 は傾向確認に限り、切替根拠としては小さい。
+
+**判断: まだ切替不可。** #2886 の同一 head レビュー完了は未確認で、`would-add` の差も残る。変更後の判定を
+live で観測し、差分の意味を確認するまで既存 5 checks を維持する。後日切替を判断する場合は Validation を
+既存 5 checks と併走で追加し、Review policy は advisory のまま観察する。rollback は変更直前に保存した完全な
+ruleset JSON を再適用し、Validation を外したうえで元の 5 checks がすべて required であることを再取得して確認する。
+既存 checks を先に外さない。
 
 | 段階 | 変更                                                                                                           | 戻し方                                   | 承認                       |
 | ---- | -------------------------------------------------------------------------------------------------------------- | ---------------------------------------- | -------------------------- |

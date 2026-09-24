@@ -4,6 +4,7 @@ import {
   PRODUCERS,
   evaluateValidation,
   formatValidationResult,
+  resolveSelfProducedAfterReview,
   selectTrustedRun,
   toCommitStatus,
 } from './validation-evidence.mjs';
@@ -424,6 +425,178 @@ describe('validation evidence: rejected evidence', () => {
     });
     expect(result.verdict).toBe('blocked');
     expect(result.reviewCandidateReady).toBe(false);
+  });
+
+  it.each(['skipped', 'cancelled', 'failure'])(
+    'does not make a self-produced change review-ready when its latest producer job is %s',
+    (conclusion) => {
+      const result = evaluateValidation({
+        plan: plan(['.github/workflows/ci.yml', APP_FILE]),
+        evidence: evidence({
+          workflowRuns: [
+            ciRun([
+              job('🔍 Static Checks', conclusion),
+              job('📦 Unit Tests', 'success'),
+              job('🧪 Integration Tests', 'success'),
+            ]),
+          ],
+        }),
+      });
+
+      expect(result.verdict).toBe('blocked');
+      expect(result.reviewCandidateReady).toBe(false);
+      expect(
+        resolveSelfProducedAfterReview(result, {
+          context: 'Review policy (shadow)',
+          headSha: HEAD,
+          state: 'complete',
+          verdict: 'satisfied',
+        }).verdict,
+      ).toBe('blocked');
+    },
+  );
+
+  it('does not use an older run or attempt to make a self-produced change review-ready', () => {
+    const result = evaluateValidation({
+      plan: plan(['.github/workflows/ci.yml', APP_FILE]),
+      evidence: evidence({
+        workflowRuns: [
+          ciRun(
+            [
+              job('🔍 Static Checks', 'success'),
+              job('📦 Unit Tests', 'success'),
+              job('🧪 Integration Tests', 'success'),
+            ],
+            { id: 100 },
+          ),
+          ciRun(
+            [
+              job('🔍 Static Checks', 'success', 1),
+              job('📦 Unit Tests', 'success', 2),
+              job('🧪 Integration Tests', 'success', 2),
+            ],
+            { id: 101, runAttempt: 2 },
+          ),
+        ],
+      }),
+    });
+
+    expect(result.verdict).toBe('blocked');
+    expect(result.reviewCandidateReady).toBe(false);
+    expect(
+      resolveSelfProducedAfterReview(result, {
+        context: 'Review policy (shadow)',
+        headSha: HEAD,
+        state: 'complete',
+        verdict: 'satisfied',
+      }).verdict,
+    ).toBe('blocked');
+  });
+
+  it('resolves self-produced evidence only after Review policy completes on the same head', () => {
+    const blocked = evaluateValidation({
+      plan: plan(['.github/workflows/ci.yml', APP_FILE]),
+      evidence: evidence(),
+    });
+    const result = resolveSelfProducedAfterReview(blocked, {
+      context: 'Review policy (shadow)',
+      headSha: HEAD,
+      state: 'complete',
+      verdict: 'satisfied',
+    });
+
+    expect(blocked.verdict).toBe('blocked');
+    expect(result.verdict).toBe('pass');
+    expect(result.reasons.join('\n')).toContain('レビュー完了により自己変更を確認した');
+    expect(result.suites.static.status).toBe('review-verified');
+    expect(result.reviewResolution).toMatchObject({
+      context: 'Review policy (shadow)',
+      headSha: HEAD,
+    });
+    expect(result.reviewResolution.suiteNames).toContain('static');
+    expect(result.reviewResolution.suiteNames).toContain('productUnit');
+    expect(result.reviewResolution.suiteNames).not.toContain('productPreview');
+    expect(toCommitStatus(result).description).toContain('same-head review');
+    expect(formatValidationResult(result)).toContain('review-verified');
+  });
+
+  it.each([
+    ['missing review', null],
+    [
+      'pending review',
+      { context: 'Review policy (shadow)', headSha: HEAD, state: 'pending', verdict: 'pending' },
+    ],
+    [
+      'unresolved review thread',
+      {
+        context: 'Review policy (shadow)',
+        headSha: HEAD,
+        state: 'pending-adjudication',
+        verdict: 'blocked',
+      },
+    ],
+    [
+      'stale review',
+      {
+        context: 'Review policy (shadow)',
+        headSha: OTHER,
+        state: 'complete',
+        verdict: 'satisfied',
+      },
+    ],
+    [
+      'other context',
+      { context: 'Other status', headSha: HEAD, state: 'complete', verdict: 'satisfied' },
+    ],
+  ])('keeps self-produced evidence blocked with %s', (_name, review) => {
+    const blocked = evaluateValidation({
+      plan: plan(['.github/workflows/ci.yml', APP_FILE]),
+      evidence: evidence(),
+    });
+
+    expect(resolveSelfProducedAfterReview(blocked, review).verdict).toBe('blocked');
+  });
+
+  it('keeps unrelated blockers when a same-head review is complete', () => {
+    const blocked = evaluateValidation({
+      plan: plan(['.github/workflows/ci.yml', APP_FILE]),
+      evidence: evidence(),
+    });
+    const withOtherFailure = {
+      ...blocked,
+      reasons: [...blocked.reasons, 'failed check: unrelated producer (failure)'],
+    };
+    const result = resolveSelfProducedAfterReview(withOtherFailure, {
+      context: 'Review policy (shadow)',
+      headSha: HEAD,
+      state: 'complete',
+      verdict: 'satisfied',
+    });
+
+    expect(result.verdict).toBe('blocked');
+    expect(result.reasons).toContain('failed check: unrelated producer (failure)');
+  });
+
+  it('does not make self-produced evidence review-ready when the producer job is missing', () => {
+    const result = evaluateValidation({
+      plan: plan(['.github/workflows/ci.yml', APP_FILE]),
+      evidence: evidence({
+        workflowRuns: [
+          ciRun([job('📦 Unit Tests', 'success'), job('🧪 Integration Tests', 'success')]),
+        ],
+      }),
+    });
+
+    expect(result.verdict).toBe('blocked');
+    expect(result.reviewCandidateReady).toBe(false);
+    expect(
+      resolveSelfProducedAfterReview(result, {
+        context: 'Review policy (shadow)',
+        headSha: HEAD,
+        state: 'complete',
+        verdict: 'satisfied',
+      }).verdict,
+    ).toBe('blocked');
   });
 
   it('waits for every repository-ruleset context even when the plan marks it not applicable', () => {

@@ -20,6 +20,7 @@
  *   pending にする。strict up-to-date の ruleset と同じ向き
  */
 
+import { REVIEW_STATUS_CONTEXT } from './review-policy.mjs';
 import {
   VALIDATION_PRODUCER_DEFINITIONS as PRODUCER_DEFINITIONS,
   REVIEW_REQUIRED_ACTIONS_JOBS,
@@ -442,10 +443,10 @@ function latestCiFailures(evidence) {
 }
 
 /**
- * Review の依頼時点だけを判定する。Validation の証拠としては self-produced を受理しないが、
- * guardrail 自身を変える PR でも native required job が完了するまで待った後に独立レビューへ
- * 出せなければ、最もレビューが必要な差分だけ候補にならない。ここで raw job を見るのは
- * merge 安全性の証明ではなくタイミング制御だけで、Validation verdict は blocked のまま保つ。
+ * Review の依頼時点だけを判定する。repository ruleset の required job は従来どおり
+ * success / skipped の terminal を待つが、self-produced の該当 producer job は最新 attempt の
+ * 明示的な success だけを求める。ここで raw job を見るのはタイミング制御だけで、Validation
+ * verdict は Review policy が同一 head の完了を返すまで blocked のまま保つ。
  */
 function isReviewCandidateReady(plan, evidence, suites) {
   if (
@@ -458,7 +459,7 @@ function isReviewCandidateReady(plan, evidence, suites) {
     return false;
 
   const trustedRuns = new Map();
-  const trustedJobReady = (jobName) => {
+  const trustedJobConclusion = (jobName) => {
     let run = trustedRuns.get(CI_WORKFLOW);
     if (run === undefined) {
       run = selectTrustedRun(evidence.workflowRuns, {
@@ -471,12 +472,15 @@ function isReviewCandidateReady(plan, evidence, suites) {
     const job = (run?.jobs ?? []).find(
       (candidate) => candidate.name === jobName && candidate.runAttempt === run.runAttempt,
     );
-    return job?.status === 'completed' && ['success', 'skipped'].includes(job.conclusion ?? '');
+    return job?.status === 'completed' ? job.conclusion : null;
   };
+  const trustedJobReady = (jobName) =>
+    ['success', 'skipped'].includes(trustedJobConclusion(jobName) ?? '');
+  const trustedJobSucceeded = (jobName) => trustedJobConclusion(jobName) === 'success';
   const selfProducedReady = (name) => {
     const producer = PRODUCERS[name];
     if (producer?.stage !== 'merge' || producer.kind !== 'actions-job') return false;
-    return trustedJobReady(producer.job);
+    return trustedJobSucceeded(producer.job);
   };
 
   const ready = Object.entries(suites)
@@ -569,12 +573,75 @@ export function evaluateValidation({ plan, evidence }) {
   };
 }
 
+/** Apply a completed same-head Review policy result to self-produced validation evidence. */
+export function resolveSelfProducedAfterReview(result, review) {
+  const headSha = result?.identity?.headSha;
+  if (
+    result?.verdict !== 'blocked' ||
+    result.reviewCandidateReady !== true ||
+    !SHA.test(headSha ?? '') ||
+    review?.context !== REVIEW_STATUS_CONTEXT ||
+    review?.headSha !== headSha ||
+    review?.state !== 'complete' ||
+    review?.verdict !== 'satisfied'
+  )
+    return result;
+
+  const reviewedNames = Object.entries(result.suites ?? {})
+    .filter(([, suite]) => suite.stage === 'merge' && suite.status === 'self-produced')
+    .map(([name]) => name);
+  if (reviewedNames.length === 0) return result;
+
+  const selfProducedReasons = new Set(
+    reviewedNames.map((name) => `${name}: ${result.suites[name].reason}`),
+  );
+  const unresolvedReasons = (result.reasons ?? []).filter(
+    (reason) => !selfProducedReasons.has(reason),
+  );
+  if (unresolvedReasons.length > 0) return result;
+
+  const reason = `レビュー完了により自己変更を確認した (${headSha.slice(0, 9)})`;
+  const suites = { ...result.suites };
+  for (const name of reviewedNames) {
+    const suite = suites[name];
+    suites[name] = {
+      ...suite,
+      status: 'review-verified',
+      reason: `${suite.reason}; ${reason}`,
+      evidence: {
+        context: review.context,
+        headSha: review.headSha,
+        state: review.state,
+      },
+    };
+  }
+
+  return {
+    ...result,
+    verdict: 'pass',
+    reasons: [reason],
+    suites,
+    reviewResolution: {
+      context: review.context,
+      headSha: review.headSha,
+      suiteNames: reviewedNames,
+    },
+  };
+}
+
 /** commit status（context `Validation (shadow)`）の state / description。 */
 export function toCommitStatus(result) {
   const description = (text) => text.slice(0, 140);
   switch (result.verdict) {
     case 'pass':
-      return { state: 'success', description: description('All merge-stage evidence verified') };
+      return {
+        state: 'success',
+        description: description(
+          result.reviewResolution
+            ? `Self-produced change verified after same-head review (${result.reviewResolution.suiteNames.join(', ')})`
+            : 'All merge-stage evidence verified',
+        ),
+      };
     case 'pending':
       return {
         state: 'pending',
@@ -600,6 +667,7 @@ const ICON = {
   skipped: '❌',
   unwired: '🚧',
   'self-produced': '🚫',
+  'review-verified': '✅',
   indeterminate: '❓',
 };
 
