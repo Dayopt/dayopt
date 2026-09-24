@@ -8,6 +8,7 @@ last_verified: 2026-09-24
 - 対象: #2892、開始 SHA `faccb982355fa34fc02f8f54abeedf199d365954`
 - Issue body SHA-256: `3287adf24b657766dabc3f1070f542b5ca87fa6f461ca6e7147c29993eccbe2c`
 - Issue snapshot: `fdd2ce398b040c7b0888fd429f9d3f34eb177689dfb13f9467e2ec559f8c7276`
+- 今回の引継ぎ開始 HEAD: `06bfab3f9a01f7742e7dc7b9daf7d68ac079b17d`（上記は当初作業の開始 SHA）
 - 親担当によるIssue本文・snapshot照合: 済み（GitHubコメントなし）。Sol呼び出し前にも同一snapshotを確認
 - 実行面: Codex CLI `0.155.1`、L2 model `gpt-6-luna`、reasoning `medium`
 - 作業開始: 2026-09-24 08:25 UTC 頃。作業終了: 2026-09-24 08:29 UTC 頃（コマンド実行時刻から記録）
@@ -47,7 +48,18 @@ last_verified: 2026-09-24
 - CLI version確認: `/opt/homebrew/bin/codex --version` → `codex-cli 0.155.1`（PATH alias作成の警告あり）
 - `PATH=/opt/homebrew/opt/node@24/bin:$PATH pnpm docs:check` はLuna CLI sandbox内ではtsx IPC socketの `listen EPERM` で失敗した。別実行の直接 `node --import tsx scripts/tasks/docs-guard/index.ts` と、親による同じ `pnpm docs:check` の再実行は全check pass。
 - `pnpm exec prettier --check AGENTS.md .agents/skills/routing/SKILL.md .agents/skills/dispatch/SKILL.md docs/operations/ai-development-loop.md docs/operations/chat-handoff.md docs/operations/ai-agent-workflow-2892.md docs/operations/ai-harness-audit-2889.md` → pass。初回の整形指摘は修正済み。
-- Node 24で#2889 JSONをparseし、8試行とLuna / Solの記録を確認。TOMLはconfig.intent.tomlを読み、model `gpt-6-luna` / reasoning `max` を確認。利用可能なTOML parserがなく機械parseは未実施。
+- 親担当がNode 24で#2889 JSONをparseし、8試行とLuna / Solの記録を確認。config.intent.tomlは同環境のBundled Python `tomllib` で全体をparseし、model `gpt-6-luna` / reasoning `max` を確認した。
 - 親による最終 `git diff --check` → pass。
 - AstraによるUI確認: この文書作業にUI確認需要なし。未実施・未検証。Previewやアカウントの利用可能性は確認していない
 - PR / Issueへの記録・レビュー・merge・cleanupは未実施。確認時点でopen PRは4本（#2896、#2833、#2828、#2670）、同時open上限は1本。Issue状態とGitHubは変更していない。
+
+## 引継ぎ確認（2026-09-24）
+
+- 再開時の HEAD は `06bfab3f9a01f7742e7dc7b9daf7d68ac079b17d`。当初の実装開始 SHA `faccb982355fa34fc02f8f54abeedf199d365954` と区別する。#2889 の8試行は再実行していない。
+- 追加の GPT-6 Luna / medium / Codex CLI `0.155.1` 実行は thread `01a0d2b9-161f-7e40-8405-e03193ee86b7`。usage event は input 577,819（cached 530,176）、output 4,728（reasoning output 581）。これは CLI token 計測で、API相当額やCodex請求額ではない。
+- Luna CLI 内の `pnpm ctx 2892` は GitHub API 接続失敗となり、返却 snapshot が不一致だったため、その結果は採用していない。親担当は別途 `pnpm ctx 2892` と GitHub CLI で本文SHA-256 `3287adf24b657766dabc3f1070f542b5ca87fa6f461ca6e7147c29993eccbe2c`、snapshot `fdd2ce398b040c7b0888fd429f9d3f34eb177689dfb13f9467e2ec559f8c7276`、Issue状態を照合した。
+- Luna CLI が追加した変更はこの実務記録の引継ぎ追記のみ。Sol の応答は `partial` / `REPLAN`、Astraは未確認、#2891のpackは未採用のままで、いずれも完遂・採用の証拠に数えていない。Issue / PR の本文・コメント・状態変更も行っていない。
+- Luna CLI内の `pnpm docs:check` は Node 24 の tsx IPC socket `listen EPERM` で失敗したが、同じ環境の `node --import tsx scripts/tasks/docs-guard/index.ts` は全チェック pass。親担当でも `pnpm docs:check` と対象 Prettier を pass。8試行JSONは8件（Luna/Sol各4件）で acceptance・scope・親検証すべて pass と確認した。
+- Luna CLI内ではTOML parserが見つからなかった。親担当がPython `tomllib` でlocal intent TOML全体をparseし、model `gpt-6-luna` / reasoning `max` を確認した。live user configは読み書きしていない。
+- Luna CLIの `git add` は worktree 管理先 `/Users/tanakatomoya/Desktop/dayopt/.git/worktrees/dayopt4/index.lock` をsandboxが拒否して失敗し、commitは作成できなかった。親担当の `git diff --check` は pass。この実行でもL2がcommit・merge・cleanupまで完遂した証拠は得られていない。
+- 親担当が確認したopen PRは #2896、#2833、#2828、#2670 の4本で、repo上限1本を超過中。push / PR作成は行っていない。Issue原文と最新ctx-briefの親側照合は済みだが、L2 CLI sandboxからの取得は未確認。
