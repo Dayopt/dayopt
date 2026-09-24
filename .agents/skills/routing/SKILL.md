@@ -37,13 +37,15 @@ auth / RLS / service role、billing / webhook、migration、data model、公開 
 
 難しさ・影響・検証可能性で初期選択する。具体名は運用上の目安であり、可用性や能力の保証ではない。
 
-| 作業                                                                        | 初期候補                               |
-| --------------------------------------------------------------------------- | -------------------------------------- |
-| 検索・定型変換・集計・既存検査など結果が機械的に決まる                      | script / 通常 tool                     |
-| runtime で read-only と repository scope を機械強制できる大量の読み取り調査 | Luna（`gpt-5.6-luna`、現在は経路なし） |
-| 狭い範囲で正解が明確、機械的に検証できる                                    | 軽量 Codex（Terra 相当）               |
-| 既存設計の中で判断する通常実装・不具合修正                                  | Sol 相当                               |
-| 前提から考える設計、認可・時間不変条件、複合不具合、複数画面 UX             | Astra 相当                             |
+| 作業                                                                        | 初期候補                                              |
+| --------------------------------------------------------------------------- | ----------------------------------------------------- |
+| 検索・定型変換・集計・既存検査など結果が機械的に決まる                      | script / 通常 tool                                    |
+| runtime で read-only と repository scope を機械強制できる大量の読み取り調査 | Luna（`gpt-6-luna`、現在は経路なし）                  |
+| 狭い範囲で正解が明確、機械的に検証できる                                    | GPT-6 Luna（今回の docs / 狭い bug / Story 評価範囲） |
+| 既存設計の中で判断する通常実装・不具合修正                                  | Sol 相当                                              |
+| 前提から考える設計、認可・時間不変条件、複合不具合、複数画面 UX             | Astra 相当                                            |
+
+2026-09-24 の #2889 では、GPT-6 Luna / Sol を既存の docs・bug・story・risk 各ケースで medium、各1回評価した。両モデルとも4件の受け入れ条件と scope discipline を通過した。公式 API Standard の短文脈単価で計算した API 相当額は Luna が合計 $0.01555748、Sol が $0.38721960。これは Codex の実利用料ではなく、単一試行の観測である。CLI は旧比較と異なり、集計 token から API の個々の長文脈請求区分も復元できない。Luna は評価済みの狭い docs / 再現可能な bug / Story で低コスト候補とし、Sol がより広い実装で劣るとは推定しない。4試行の結果と限界は [#2889 の評価記録](../../../docs/operations/ai-harness-audit-2889.md) を参照する。
 
 毎回、軽量 → Sol → Astra と順番に試さない。理解済みの担当を切り替える再理解コストも含める。実測が不足する領域の表は暫定のままにする。
 
@@ -57,7 +59,7 @@ Issue briefを利用する担当Codex sessionは、Issue本文と信頼できる
 
 初期対象は repository-wide search、関連実装・テストの discovery、大量ログの分類など read-only の大量調査。主作業から独立し、短く検証可能な成果が返り、親の照合まで含めて利益がある場合に限る。architecture・debugging の判断、認可・migration・時間不変条件、重要な編集は主担当が持つ。
 
-read-only と repository scope を runtime で同時に機械強制できる adapter は現在ないため、大量の読み取り調査も委譲せず主担当が行う。将来、両方の境界を実測できる adapter が追加された場合だけ、Codex は Luna（`gpt-5.6-luna`）、Claude は Haiku 相当を候補にする。現行 native `spawn_agent` / `Agent` は実際の入力に read-only / write を区別する型がないため、read-only を含む判別不能な経路として使わない。runtime が別名の typed write / browser tool を提供した時だけ、User が明示した非重複 scope と既存の authority 契約に従って扱う。専用 security harness のモデル選択はこの読み取り調査の指定対象ではない。
+read-only と repository scope を runtime で同時に機械強制できる adapter は現在ないため、大量の読み取り調査も委譲せず主担当が行う。将来、両方の境界を実測できる adapter が追加された場合だけ、Codex は Luna（`gpt-6-luna`）、Claude は Haiku 相当を候補にする。現行 native `spawn_agent` / `Agent` は実際の入力に read-only / write を区別する型がないため、read-only を含む判別不能な経路として使わない。runtime が別名の typed write / browser tool を提供した時だけ、User が明示した非重複 scope と既存の authority 契約に従って扱う。専用 security harness のモデル選択はこの読み取り調査の指定対象ではない。
 
 渡すものは成功条件、読む範囲、既知の制約、検証方法、禁止操作。返却は「確認した範囲／事実／file・symbol・location／未確認範囲／不足情報」に絞る。prompt の read-only 指示は security boundary ではないため、runtime の権限も合わせる。専用 security harness のレビューはこの通常調査とは別契約で行う。
 
