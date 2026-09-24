@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-09-07
+last_verified: 2026-09-22
 ---
 
 # 運用ツール（Eagle / ライセンスコンプライアンス / AI協働ハーネス / 管理者スクリプト）
@@ -487,7 +487,7 @@ BSD-2-Clause: 12 packages (1.3%)
 
 ## 2. Routing の基準
 
-通常開発は ChatGPT Chat + Codex。短い協働原則は `AGENTS.md`、モデル選択と委譲の詳細は `.agents/skills/routing/SKILL.md` を正本とする。同じ主担当が調査・判断・実装・検証・修正まで完了し、初期の委譲対象は独立した read-only の大量調査に限る。
+通常開発は ChatGPT Chat + Codex。短い協働原則は `AGENTS.md`、モデル選択と委譲の詳細は `.agents/skills/routing/SKILL.md` を正本とする。同じ主担当が調査・判断・実装・検証・修正まで完了し、初期の委譲対象は実行時に read-only 境界を検証できる大量調査に限る。
 
 Chat は product / UX・research・仕様整理、Codex は repo に基づく判断と実装を担う。受け渡しが必要な時だけ [Chat 連携手順](./chat-handoff.md) を読む。承認済みの目的・仕様・リスク境界内の技術判断を毎回 Chat に戻さない。
 
@@ -499,7 +499,16 @@ Chat は product / UX・research・仕様整理、Codex は repo に基づく判
 
 adapter の script が存在するだけでは tool call は止まらない。runtime 側で adapter が実行前 hook として登録・起動され、block 結果を尊重する必要がある。repo は user-global 設定、直接 shell、User 自身の UI 操作、未知の tool surface を強制できない。具体的な secret 境界と残余リスクは [secrets.md](./secrets.md) を正本とする。
 
-Codex でこの project を初めて開く時は、project trust を確認し、`/hooks` で `.codex/hooks.json` の command と有効状態を User が 1 回レビューする。repo の `.codex/config.toml` に `hooks = true` があっても、runtime が project を trust して hook を読み込んだ証拠にはならない。`pnpm agent:preflight`（機械利用は `pnpm agent:preflight --json`）は依存、Git hooks、CLI、skills、Codex hook 設定ファイルの存在を確認するが、runtime の trust や実際の hook 発火は判定できない。user-global 設定はこの onboarding で変更しない。
+Codex でこの project を初めて開く時は、project trust を確認し、`/hooks` で `.codex/hooks.json` の command と有効状態を User が 1 回レビューする。repo の `.codex/config.toml` に `hooks = true` があっても、runtime が project を trust して hook を読み込んだ証拠にはならない。`pnpm agent:preflight`（機械利用は `pnpm agent:preflight --json`）は依存、Git hooks、CLI、skills、Codex hook 設定ファイル、read-only delegation の状態を確認するが、runtime の trust や実際の hook 発火は判定できない。read-only delegation は scope を runtime で強制できないため unsupported と表示され、bulk read の経路に使わない。user-global 設定はこの onboarding で変更しない。
+
+### Local / Codex Cloud の実行環境
+
+Node.js と package manager は実行場所ごとに暗黙で選ばせず、repository contract に揃える。
+
+- `.nvmrc` と `package.json#packageManager` が runtime の正本。`pnpm agent:preflight` は Node.js の major、pnpm の version、依存、hook を表示し、不一致なら exit 1 にする
+- Codex Cloud の Dayopt 環境は自動 package-manager detection を使わず、setup / maintenance script で `nvm` から `.nvmrc` の Node.js を選び、標準の [`scripts/runbook/codex-cloud-setup.sh`](../../scripts/runbook/codex-cloud-setup.sh) で `packageManager` の pnpm を検証して `pnpm install --frozen-lockfile` を一度だけ実行する
+- Cloud の setup / maintenance はネットワークが有効な setup phase で実行し、agent phase のインターネットアクセスは無効のままにする。自動検出が各 workspace へ npm を実行して `catalog:` / `workspace:` を壊す経路を作らない
+- Cloud で Docker・local Supabase・実ブラウザ・vault が必要な検証は完了扱いにせず、対応する local または CI の証跡を別に残す
 
 ### 実行経路ごとの保護範囲
 
@@ -510,11 +519,26 @@ Codex でこの project を初めて開く時は、project trust を確認し、
 | 秘密情報: envファイル、vault参照            | Read/Write/Edit と Bash の個別パターンを機械検査      | apply_patch の全対象・shell の個別パターンを機械検査。汎用read toolはsurface依存 | repo hook接続なし。指示で制御、実動未確認  |
 | 破壊的操作: 既存migration・他worktreeの編集 | Write/Editで機械検査。任意shell編集は保証外           | apply_patch の変更元/先・symlinkを機械検査。任意shell編集は保証外                | 指示で制御、機械保護は未対応               |
 | Git運用: force push、no-verify、直接merge等 | Bashの列挙パターンを機械検査                          | 共通Bash判定を再利用                                                             | 共通Git hookのみ。tool実行前の検査は未対応 |
+| 大量の読み取り調査                          | scope を runtime で強制できないため委譲しない         | scope を runtime で強制できないため委譲しない                                    | read-only 境界を確認できないため委譲しない |
 | コスト・利便性                              | モデル名に基づく委任制限は撤去。起動確認は共通command | 同左                                                                             | 共通commandを手動利用可能、実動未確認      |
 
 **shell の任意編集は機械的に閉じていない**。`sed -i`、`perl -pi`、`cp`、`mv`、`tee`、出力redirect、任意scriptによる既存migration・他worktreeへの書き込みを、このadapterは一般には検出しない。Codexのファイル変更は原則 `apply_patch` を使い、shell編集へ切り替えてこの検査を迂回しない（指示による制御）。hookに到達しただけで全操作が保護されるわけではない。write_stdin、hosted/specialized tool、wrapper内部の処理も同じ保証を持たない。
 
 この境界はshell interpreterの自作で埋めず、runtimeの書き込み範囲・Git hooks/CI・最小権限の資格情報で補う。本番は既存の明示権限・独立レビュー・dry-run/backupを維持する。上記が不足する操作は未対応として扱い、通常開発の実動試行でも境界を確認する。
+
+### 実測で分かった罠（guard / hook / scripts）
+
+2026-09-22 に Claude Code の memory から昇格。判定ロジックは共有なので Codex の adapter でも同じ形で起きる。
+
+- **guard は「言及」でも止まる**。判定は tool call の command 文字列全体を見るので、禁止コマンド名を説明する commit message / issue コメント / review reply の heredoc も同じ文字列一致で止まる（2026-08-24 #2293 で 4 回）。これは意図した trade-off で guard 側を緩めない。本文はファイルへ書いてから `gh ... --body-file` / `git commit -F` で渡し、言い回しを変えて該当句の連続を崩す
+- **textual guard は shell 展開を捕まえられない**。quote 剥がしで allowlist を補強しても `$'\x2d\x2d...'` や `${IFS}` は素通りする（#2291 PR #2309）。動的引数のコマンドを許す時は「値をコマンドラインに載せない」方向へ寄せる（body は固定パスの `--body-file`、`--repo` は値ごと固定）。展開形を 1 つずつ追いかけない
+- **壊れると自分の編集まで止まるファイル（hook script / `.claude/settings.json` / `.codex/hooks.json`）は scratch 先行で触る**。構文エラーでも exit 2 が「止める」と解釈され、直す編集自体ができなくなる（2026-08-12）。scratch に候補を書き `bash -n` と実挙動を通してから `cp` で設置する。復旧は別 session か User に `git -C <worktree> checkout -- <path>` を 1 コマンド依頼する
+- **migration guard は `refs/remotes/origin/main` の tree に載っているファイルだけを止める**（#2185 PR #2714）。未 merge の PR にしか無い migration は push 済みでも編集できる。止まったのに未 merge のはずなら `git fetch origin main`。判定不能（ref 不在 / git 不動）は全部止める
+- **root `package.json` の script を改名・統合する時は permission allowlist を両方向で見る**。消す側が wildcard に一致して許可され、残す側が漏れて prompt に落ちる向きが本当の failure（2026-08-18）。統合後の名前を実際に叩いて prompt が出ないか確認し、消した名前の pattern は同時に削る（許可範囲は広げない）
+- **`scripts/` に新規ファイルを足して docs から名指しすると taxonomy test が `runbook` 判定にする**（`classifyHits` は docs の言及を importedBy より先に見る）。`scripts/lib/` の純粋な lib でも落ちるので、`scripts/__tests__/scripts-taxonomy.test.ts` の `KNOWN_PLACEMENT_EXCEPTIONS` へ理由つきで追記する（2026-09-16 #2775 で 2 回）
+- **skill の効果は発動条件と揃えた依頼でしか測れない**。既存 migration の「レビュー」依頼では両条件とも `supabase` skill を読まず「効果なし」と誤判定しかけた（#2810）。どの skill が読まれたかは `codex exec --json` の `exec_command_begin` から `.agents/skills/<name>/` を grep して機械的に取る。自己申告は根拠にしない
+- **`codex exec` の隔離と model**: `--cd <pack-dir> --sandbox read-only --skip-git-repo-check` は cwd を pack へ固定し書き込みを禁じるだけで、agent は `..` や絶対パスから repo を読める。**読み取りの隔離にはならない**ので、比較実験で正解データや現在の修正が漏れてはいけない時は、container / chroot / 読み取り許可 root の制限のように repo を実際に不可視にする境界を使う。`-m` を省くと config の既定 model が 400 で落ちることがある。応答が名乗る model 名は run ごとにぶれるので、証拠は起動コマンド側に残す（2026-09-10 実測）
+- **usage limit は turn 途中で run を落とす**。`turn.failed` で `token_count` が出ず tokens が null になるのが機械的な見分け方。比較実験は条件ペアで交互に回さず 1 条件を全ケース終えてから次へ行き、欠損を片側に寄せる。中断を「効果なし」と書かない（2026-09-17 #2810）
 
 ## 4. Skill 設計
 
@@ -559,37 +583,13 @@ Codex でこの project を初めて開く時は、project trust を確認し、
 
 **自動更新、未監査スクリプトの実行、runtime のリモート取得は行わない。** UI guidelines の `command.md` は skill 本体（vercel-labs/agent-skills）とは別 repo の依存であり、上表で別行として固定する。
 
-## 6. Independent PR Review と追加契約
+## 6. Independent PR Review
 
-通常 PR の独立レビューは GitHub の `@codex review`。依頼・対象 SHA の照合・所見の裁定・再レビューは `.agents/skills/pr-cross-review/SKILL.md` を正本とする。実装 session の reviewer subagent や独自 pack を日常の必須工程にしない。未応答・古い結果・未実行は指摘0とは異なる。
+GitHub の `@codex review` は `protected-path-gate.mjs` が判定する外部契約・不可逆・ガードレール変更だけで使う。依頼時点、対象 SHA の照合、所見の裁定は `.agents/skills/pr-cross-review/SKILL.md` を正本とし、通常 PR や実装途中では起動しない。未応答・古い結果・未実行は指摘0とは異なる。
 
-高リスク変更の immutable pack / role / envelope / validation は同 skill の `references/high-risk-review.md` に保持する。OpenAI / Codex を primary とし、別 provider の追加反証は任意。専用 security sweep と不可逆操作の独立レビュー条件は通常レビューで置き換えない。
+高リスク変更の immutable pack / role / envelope / validation（`pnpm review:pack` / `review:sweep` / `review:validate` と固定差分レビュー手順）は 2026-09-20 に撤去した。追加 reviewer の停止から 3 日で一度も再開されず、pack を通した証跡も残っていなかったため、読むためだけの実装を維持しない。再開する時は git history から読む。既存の `[review-summary]` は読み取り互換だけを残す。不可逆操作の独立レビュー条件は通常レビューで置き換えない。
 
-### pack の種別と契約 version
-
-pack は `kind`（`pr` / `sweep`）と `contractVersion` を manifest に持ち、artifact 集合はその組から literal registry で決まる。**role 一覧から artifact 名を導出しない** — 導出していた頃は role を 1 つ足すだけで生成済み pack が一斉に `invalid` になった。`kind` を持たない manifest は `pr` / version 1 として読み、未知の kind / version は fail closed で `invalid` にする。契約変更前に生成した PR pack を `scripts/__tests__/fixtures/review-pack-pr-v1/` に凍結してあり、整形するとバイト列が変わって pack の破損になるため `.prettierignore` の対象にしている。
-
-`sweep` は PR の差分ではなく 1 つの SHA における scope を読む（`security-sweep` skill）。`baseSha` / `headSha` を持たず `targetSha` 1 本と `scopePaths` を持ち、`diff.patch` と `verification.md` は作らない。envelope に `baseSha` / `headSha` が入っていれば PR envelope の流用として `invalid` にする。
-
-```bash
-pnpm review:sweep --at <commit-ish> --scope <repo 相対 path（繰り返し可）> \
-  --context <context-markdown-path> --threat-model <threat-model-path> --out <new-directory>
-```
-
-sweep の後段（`security-critic` / `security-reproducer`）は候補集合と突き合わせる。`--result` は繰り返せ、上限や中断で分割した同一 role の結果を 1 回の検証で合流させる。
-
-```bash
-pnpm review:validate --pack <directory> --result <result.json> [--result <result2.json>] \
-  [--candidates <candidates.json>] [--verdicts <critic.json>] [--emit-candidates <new-path>]
-```
-
-- `candidateId` / `signature` / `candidateSetHash` は**生成側が導出**し、reviewer の申告を採らない
-- 判定が返っていない候補、候補集合に無い id への判定、食い違う判定、別 run の候補集合を**別々の理由で**検出する
-- `undetermined`（critic）と `not-run` / `environment-missing`（reproducer）は裁定が決まっていないものとして `partial` に留める。id が入っていることを「判定済み」と数えない
-- `--emit-candidates` は**内容の違う**候補集合で既存ファイルを置き換えない（同一内容の再検証は冪等に通る）。分割した envelope は `--result` を並べて 1 回で検証する
-- reproducer の母集合は `--verdicts` に渡した critic envelope から**その場で再計算**する。実行待ち集合をファイルに残すと、分割した critic の一部だけで書いた部分集合が古いまま残り、渡していない round の `needs-execution` が母集合にも `missing` にも現れなくなる。裁定が全候補に届いていない critic に対して reproducer を `reviewed` にはしない
-- `rejected` / `undetermined` には `counterevidence` を要求する。`confirmed` には要求しない（落とす判断にだけ反証を求める）
-- `reproduced` / `failed-to-reproduce` は実行した `command` と `testPath` の提示を要求する。到達証拠のない失敗は `not-run` / `environment-missing` へ落とす。`statically-confirmed` は件数を結果に出して、実行できた候補が逃げていないか見えるようにする
+read-only と repository scope を runtime で同時に強制できる delegate は現在ないため、大量の repository 読み取り調査は親担当が行う。現行 native delegation は実際の入力に read-only / write を区別する型がなく、判別不能な経路として read-only を含めて拒否する。runtime が別名の typed write / browser tool を提供した時だけ、User が明示した非重複 scope と既存の authority 契約に従って扱う。将来、両方を実測できる adapter が追加された場合だけ、Luna / Haiku の候補と env・timeout・fallback 契約を再評価する。
 
 ## 7. Migration acceptance と handoff
 
@@ -597,13 +597,13 @@ native worktree root の fresh Codex session による共通指示・skills の�
 
 2026-09-07、`scripts/tasks` から新規 Codex read-only セッション（gpt-5.6-sol、session `01a0796e-8943-7303-9bb3-6184e41a9b2f`）を起動し、base `393f432c6` → head `bbdb9510a` の移行差分を pack で手渡した。result envelope は `reviewed`、recommendation は `revise`、指摘 1 件だった。指摘は shell の任意編集に対する保証の過大解釈で、経路別の保護表へ保証外の操作を明記した。これは別 OpenAI セッションの反証であり、別モデル系列の反証や native hook 発火の証拠ではない。旧 SHA の所見を後続 SHA の指摘ゼロとして再利用しない。
 
-次の 3 trial は将来の実 PR で各 1 件行い、証跡はその issue / PR comment に残す。ここに別の常設 tracker は作らない。Antigravity は高リスク変更で独立した反証が有益な時の任意 adapter であり、trial の合格条件にはしない。
+次の 3 trial は過去の移行計画として記録したもので、2026-09-17 の User 指示により追加 reviewer の試行は行わない。ここに別の常設 tracker は作らない。
 
 | trial                    | 対象                                                 | status  |
 | ------------------------ | ---------------------------------------------------- | ------- |
-| **通常バグ修正**         | 1 feature 内の再現可能な bug fix 1 件                | pending |
-| **複数ファイル変更**     | 複数 file / connection point を含む変更 1 件         | pending |
-| **高リスク diff review** | auth / RLS / billing / migration / 公開契約など 1 件 | pending |
+| **通常バグ修正**         | 1 feature 内の再現可能な bug fix 1 件                | stopped |
+| **複数ファイル変更**     | 複数 file / connection point を含む変更 1 件         | stopped |
+| **高リスク diff review** | auth / RLS / billing / migration / 公開契約など 1 件 | stopped |
 
 各 trial は次の 4 軸で評価する。
 

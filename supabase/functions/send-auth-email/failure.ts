@@ -15,7 +15,12 @@
 export type SendAuthEmailFailurePhase = 'verify' | 'render' | 'send';
 
 export type SendAuthEmailFailureKind =
-  'signature' | 'resend_unavailable' | 'resend_rejected' | 'render' | 'unknown';
+  | 'signature'
+  | 'resend_unavailable'
+  | 'resend_rejected'
+  | 'resend_idempotency_conflict'
+  | 'render'
+  | 'unknown';
 
 export interface SendAuthEmailFailure {
   status: 401 | 500 | 503;
@@ -112,6 +117,21 @@ export function classifySendAuthEmailFailure(
   // phase === 'send'
   const resendErrorName = resendErrorNameOf(error);
   if (resendErrorName) {
+    // 同じ idempotency key のリクエストが並行中。先行が完走すれば再試行はキャッシュに
+    // 当たって成功応答を得るので、retryable のまま返す（#2803）。
+    if (resendErrorName === 'concurrent_idempotent_requests') {
+      return { status: 503, kind: 'resend_idempotency_conflict', resendErrorName, message };
+    }
+    // 同じ key で payload が違う（`invalid_idempotent_request`）／key 自体が不正
+    // （`invalid_idempotency_key`）はこちら側のバグ。再試行しても同じ結果なので
+    // non-retryable として扱う（下の `resend_rejected` と同じ 500 だが、Sentry の tag で
+    // 切り分けられるように kind を分ける）。
+    if (
+      resendErrorName === 'invalid_idempotent_request' ||
+      resendErrorName === 'invalid_idempotency_key'
+    ) {
+      return { status: 500, kind: 'resend_idempotency_conflict', resendErrorName, message };
+    }
     if (RESEND_UNAVAILABLE_NAMES.has(resendErrorName)) {
       return { status: 503, kind: 'resend_unavailable', resendErrorName, message };
     }
@@ -128,12 +148,17 @@ export function classifySendAuthEmailFailure(
  * 呼び直す（Supabase Auth Hooks の仕様、2026-09-10 実測）。`email_change` は現アドレス宛 →
  * 新アドレス宛の順に 2 通送るため、2 通目の失敗で 503 を返すと再試行のたびに 1 通目が
  * 重複配送される。冪等でない状態からの再試行は害の方が大きいので non-retryable へ落とす。
+ *
+ * **`idempotencyKeyInUse` が true ならこの降格をやめる**（#2803）。1 通目は同じ
+ * idempotency key で送られているので、再試行では Resend 側のキャッシュに当たって
+ * 重複配送されない。降格の理由だった害が消える以上、retryable を維持して 2 通目を
+ * 送り直せる方がよい。`webhook-id` が取れず key を付けられなかった経路は従来どおり降格する。
  */
 export function resolveSendAuthEmailStatus(
   failure: SendAuthEmailFailure,
-  options: { firstEmailAlreadySent: boolean },
+  options: { firstEmailAlreadySent: boolean; idempotencyKeyInUse: boolean },
 ): SendAuthEmailFailure['status'] {
-  if (failure.status === 503 && options.firstEmailAlreadySent) {
+  if (failure.status === 503 && options.firstEmailAlreadySent && !options.idempotencyKeyInUse) {
     return 500;
   }
   return failure.status;

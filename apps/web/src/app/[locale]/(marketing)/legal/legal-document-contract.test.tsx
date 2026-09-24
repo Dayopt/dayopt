@@ -100,13 +100,13 @@ function localizeHref(href: string, locale: 'en' | 'ja'): string {
   return `${prefix}${normalizedHref}`;
 }
 
-const GENERATE_METADATA: Record<LegalDocumentSlug, typeof generatePrivacyMetadata> = {
+const GENERATE_METADATA = {
   privacy: generatePrivacyMetadata,
   terms: generateTermsMetadata,
   cookies: generateCookiesMetadata,
   tokushoho: generateTokushohoMetadata,
   security: generateSecurityMetadata,
-};
+} satisfies Record<LegalDocumentSlug, typeof generatePrivacyMetadata>;
 
 interface LegalContractCase {
   locale: 'en' | 'ja';

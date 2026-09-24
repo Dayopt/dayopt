@@ -86,7 +86,7 @@ docs の最終更新と product 側の最終コミットを比較し、乖離が
 
 ### Step 4: ユーザー選択
 
-AskUserQuestion で対応するものを選択してもらう（**multiSelect: true**）。
+候補を番号付きで並べ、複数選択できる形で対応するものを選んでもらう（runtime に選択 UI があればそれを使う。Claude Code なら AskUserQuestion の **multiSelect: true**）。
 
 ### Step 5: GitHub Issue 起票
 

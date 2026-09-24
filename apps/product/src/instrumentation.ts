@@ -35,6 +35,11 @@ export async function register() {
   // Node.jsランタイム（サーバーサイド）
   if (process.env.NEXT_RUNTIME === 'nodejs') {
     await import('../sentry.server.config');
+    // #2728: Supabase の tracePropagation は、この副作用 import が OpenTelemetry の
+    // trace context extractor を globalThis へ登録して初めて効く。未登録だと
+    // supabase-js は warn を 1 度出すだけで header を付けない（silent no-op）。
+    // Edge / browser は Sentry 側が global propagator を登録しないので読み込まない。
+    await import('@supabase/supabase-js/tracing');
   }
 
   // Edgeランタイム（Middleware、Edge API Routes）

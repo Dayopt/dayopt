@@ -8,6 +8,7 @@ import { env } from '@/env';
 import type { Database } from '@/lib/database';
 import { captureUnexpectedError } from '@/lib/sentry';
 
+import { SUPABASE_TRACE_PROPAGATION } from '@/lib/supabase/trace-propagation';
 import {
   resolveGoogleCalendarAuthorityIdentity,
   type GoogleCalendarAuthorityIdentity,
@@ -139,6 +140,7 @@ function createCalendarAccountDeletionClient(): CalendarAccountDeletionClient {
     env.NEXT_PUBLIC_SUPABASE_URL,
     env.SUPABASE_SECRET_KEY,
     {
+      tracePropagation: SUPABASE_TRACE_PROPAGATION,
       auth: {
         autoRefreshToken: false,
         persistSession: false,

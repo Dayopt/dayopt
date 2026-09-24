@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-09-16
+last_verified: 2026-09-18
 code:
   - apps/product/src/features/settings/components/EmailChangeDialog.tsx
   - apps/product/src/features/settings/components/PasswordChangeDialog.tsx
@@ -16,6 +16,11 @@ code:
   - apps/product/src/features/auth/server/password-reauthentication.ts
   - apps/product/src/features/auth/server/recovery-service.ts
   - apps/product/src/features/auth/components/ResetPasswordForm.tsx
+  - apps/product/src/features/auth/components/PasswordResetForm.tsx
+  - apps/product/src/lib/turnstile/useTurnstileGate.ts
+  - apps/product/src/lib/auth/mfa-verify-error.ts
+  - apps/product/src/features/auth/components/LoginForm.tsx
+  - apps/product/src/features/auth/stores/useAuthStore.ts
   - apps/product/src/features/auth/components/MFAVerifyForm.tsx
   - apps/product/src/features/external-calendar/server/account-deletion.ts
   - apps/product/src/features/settings/server/account-deletion.ts
@@ -32,7 +37,7 @@ Supabase Auth ベースの認証機能。
 
 - Supabase Auth によるセッション管理（メール/パスワード、MFA検証フローを含む）
 - ソーシャルログインは Google のみ。Apple（有料 Developer Program が必須）と Meta（アプリ審査コスト）は不採用（2026-07 決定、ログ（削除済み、git 履歴参照））。本番の provider 設定は Supabase Dashboard が正本
-- 認証メール（signup 確認 / パスワードリセット / メールアドレス変更）は Auth send_email hook → Edge Function `send-auth-email` → Resend で送信する。メールアドレス変更は Secure Email Change により現・新両アドレスへ確認メールを 2 通送る
+- 認証メール（signup 確認 / パスワードリセット / メールアドレス変更 / パスワード変更通知）は Auth send_email hook → Edge Function `send-auth-email` → Resend で送信する。メールアドレス変更は Secure Email Change により現・新両アドレスへ確認メールを 2 通送る。パスワード変更通知は `password_changed_notification` だけを根拠にし、クライアントから任意送信できる endpoint を持たない。送信前に bounce / complaint の suppression を確認し、判定不能時も送らない
 - 歓迎メールは認証メールとは別経路で、session が張れた着地点（`/auth/callback` と `signup` の `/auth/confirm`）から送る。「1 ユーザー 1 通」は `profiles.welcome_email_sent_at` の conditional UPDATE を掴めた 1 リクエストだけが送ることで保証し、アプリ側で初回判定をしない。送信失敗でサインインは止めない
 - `protectedProcedure` で保護された tRPC procedure が `ctx.userId` でデータアクセスを制限する
 - MFA登録済みで session assurance level が `aal1` のブラウザセッションは、画面遷移だけでなく HTTP / RSC の両 tRPC context でも protected procedure を拒否する
@@ -45,6 +50,62 @@ Supabase Auth ベースの認証機能。
 ただしこれは**エラーメッセージ内の文言差**だけを防ぐ設計であり、**画面遷移そのものの差**は別の保証に依存する。`SignupForm.tsx` は `result.data.session` の有無で「そのままアプリへ」（session あり）と「確認メール待ち画面」（session なし）を分岐する。GoTrue は email confirmation が必須（`enable_confirmations = true` 相当）の場合、**新規登録でも既登録でも** confirmation 待ちの obfuscated レスポンス（session なし）を返す設計になっており、この対称性があって初めて「新規登録者と既登録者で画面遷移が区別できない」という列挙防止が成立する。
 
 **もし production の email confirmation 必須設定が drift して無効化されると**、新規登録は即座に session ありで成功する一方、既登録アドレスへの signup は `getAuthErrorKey` のエラー画面（`signupUnavailable`）に落ちるため、**エラー文言を丸めていても画面遷移の有無で存在が判別可能になる**。この設定（GoTrue の `mailer_autoconfirm`、`expected: false`）は `scripts/ci/production-auth-config-audit.mjs` が既に pin しており、`true`（確認省略）への drift は fail-open として検出される。
+
+## パスワードリセットのユーザー列挙防止
+
+`PasswordResetForm` は送信結果で画面を変えない。未登録アドレスは GoTrue が 200 を返して早期 return する一方、登録済みアドレスは再送間隔（`max_frequency`）の 429 などで失敗しうるため、エラーをそのまま出すと「エラー画面が出る = 登録済み」という存在確認になる。**成功画面はすべての結果に対して出す。**
+
+例外は captcha 失敗（`captcha_failed`）だけで、これは本人が解き直せば解決する。captcha 判定は Turnstile の到達可否に依存し、アカウントの存在とは無関係なので oracle にならない。
+
+失敗そのものの記録は `useAuthStore.resetPassword` の `captureUnexpectedAuthError`（Sentry）が持つ。画面を黙らせても観測は落ちない。
+
+## Turnstile へ到達できない利用者の扱い
+
+`useTurnstileGate`（`apps/product/src/lib/turnstile/useTurnstileGate.ts`）が login / signup / パスワードリセットの 3 フォームで captcha の状態を持つ。token が来るまで送信を止めるが、次の 3 つに当たったら送信を通す。
+
+1. 15 秒以内に widget が**載らなかった**（script ごと遮断された）
+2. widget が error を返した
+3. 環境が非対応だと widget 自身が言った
+
+**待たせている最中の widget は到達不能に含めない。** 時間切れは token ではなく `onWidgetLoad` を待つ。managed widget は対話操作を求めることがあり、スクリーンリーダー利用者や操作に時間のかかる利用者は数十秒かかる。そこを打ち切ると、解けるはずの人へ「このまま送信できます」と案内して `captcha_failed` を踏ませ、widget が作り直されて同じ失敗を繰り返す。
+
+`challenges.cloudflare.com` は広告ブロッカー・企業プロキシ・provider 障害で遮断されうる。token の有無だけで送信ボタンを無効にすると、その利用者は理由の表示も回復手段も無いままログインできなくなる（production では Bot Protection が有効なので 3 フォームすべてが同時に死ぬ）。送信を通せば GoTrue が `captcha_failed` を返し、`auth.errors.captchaFailed` として理由が出る。到達できないこと自体も `auth.errors.captchaUnavailable` で伝える。
+
+**これは captcha を弱める変更ではない。** 検証は GoTrue 側で行われ、token 無しの要求は production では必ず拒否される。変わるのは「押せないボタン」が「サーバーの判断」に置き換わる点だけ。
+
+### widget は普段見せない（`appearance: 'interaction-only'`）
+
+3 フォームの widget は通常 高さ 0 で表示されず、Cloudflare が対話を求めた時だけチェックボックスが出る（2026-09-18）。疑われていない利用者は「私は人間です」を押す手が要らず、疑われた利用者には従来と同じ challenge が出る。
+
+**表示を隠しただけで、判定は何も変わらない。** challenge の実行も token の検証も `appearance: 'always'` と同じで、Bot Protection は GoTrue 側で従来どおり効く。
+
+**`interactive` を表示の可否に使わない。** `onBeforeInteractive`（`useTurnstileGate.interactive`）は widget が場所を取り始めた合図で、フォームは余白の出し分けにだけ使う。false の側で widget を隠す実装にすると、対話を求められた利用者が challenge を見られないまま送信もできず、上の 3 つの到達不能判定にも当たらないので無言で詰む。
+
+**Cloudflare dashboard の widget type は Managed のままにする。** `invisible` / `non-interactive` へ変えると、疑われた利用者は対話で解き直す経路を失い `captcha_failed` から回復できない。site key は web の問い合わせフォームと共有なので、dashboard 側の変更は app だけに閉じない。
+
+## 確認メールの再送導線と列挙防止
+
+ログインの失敗は `getAuthErrorKey` が 1 つのキー（`auth.errors.invalidCredentials`）へ丸めるため、**「メールの確認がまだ」という状態を利用者は文言から知れない**。丸め自体は列挙防止として意図的だが、確認リンクを踏んでいない人は原因も出口も分からなくなる。
+
+そこでログイン失敗時に「確認メールを再送する」を出す（`LoginForm`）。宛先は直前に試したアドレス。
+
+**結果で表示を変えない。** 未登録でも、確認済みでも、未確認でも、押した後は同じ文言（`auth.loginForm.confirmationResent`）を出す。変えると「再送できた = 未確認の登録済み」という存在確認になり、丸めた意味が消える。例外は captcha 失敗だけで、これは本人が解き直せば解決するので伝える（パスワードリセットと同じ扱い）。
+
+導線はログイン失敗のたびに出る。**成功時にも未登録時にも出ない差が付かないよう、判定材料は「送信を試みたか」だけにする。**
+
+## MFA 検証の失敗と challenge の寿命
+
+`/auth/mfa-verify` は GoTrue の `message` を描画しない。`AuthError.code` を `resolveMfaVerifyErrorKey`（`lib/auth/mfa-verify-error.ts`）で i18n キーへ写し、未知の code は汎用キーへ落とす。生の message は英語で provider 都合で変わるため、日本語の利用者に英語が出るうえ、文言が変わっても気付けない。
+
+**challenge には寿命がある。** 切れた後は正しいコードを入れても通らないので、`mfa_challenge_expired` を受けたら challenge を発行し直す。引き直さないと手動リロード以外に出口が無い。コード誤りでは引き直さない（無駄に GoTrue の rate limit を削るため）。
+
+初期化（factor 一覧 → challenge 発行）は **mount につき 1 回**に固定する。`checkMFARequired` は `t` に依存し、その参照はレンダーごとに変わりうるので、素直に effect の依存にすると challenge を発行し続ける。
+
+## auth state listener は 1 本だけ
+
+`useAuthStore.initialize` は何度でも呼ばれうる（`AuthStoreInitializer` の guard は mount ごとで、`(app)` ↔ `(auth)` を行き来するたびに再実行される）。`onAuthStateChange` を張り直す前に**前の購読を必ず解除する**。
+
+`beforeunload` での解除は document が捨てられる直前にしか走らず、同じ document 内での再 initialize には効かない。解除しないと listener が積み上がり、1 イベントで同じ `set` が何度も走る。
 
 ## ログイン手段によるアカウント操作の分岐
 

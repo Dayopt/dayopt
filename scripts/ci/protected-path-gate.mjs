@@ -2,14 +2,14 @@
 
 /**
  * Protected Path Gate - determines from a changed-files list whether a PR
- * touches a protected path, used as the signal for how heavily
- * `pr-cross-review` skill's advisory review should be applied (#2478,
- * tempo-linked review gate; downgraded from a merge-blocking gate to an
- * advisory signal in #2596 - merge itself is blocked only by CI
- * status-check-rollup and the `gh pr merge` guard hook).
+ * touches a protected path, used as the signal for whether
+ * GitHub `@codex review` is eligible for the change (#2478,
+ * tempo-linked review signal; downgraded from a merge-blocking gate to an
+ * advisory signal in #2596 - merge itself is blocked by the main branch
+ * repository ruleset).
  *
- * The old design required internal cross-review on every PR uniformly. This
- * script narrows the "how heavily should this be reviewed" signal to PRs that
+ * The old design required an extra cross-review on every PR uniformly. This
+ * script narrows the "where should the standard review focus" signal to PRs that
  * touch protected paths. It is the single source of truth consumed by
  * `scripts/tasks/finish-branch.sh` (the glob list is not duplicated in bash to
  * avoid drift), which also reuses it to decide whether the `Production Config
@@ -26,8 +26,8 @@
  * behavior covered by unit tests and CI, and keeping them here put nearly every
  * product PR on the required side - which, combined with cloud sessions where
  * `Workflow` / `Agent` are disabled by default (#2472), stalled merges instead
- * of adding review. `review:full` remains the manual escalation for a PR that
- * deserves the heavier review without matching a glob.
+ * of adding review. `review:full` remains a human-only attention label and
+ * does not expand this machine-selected scope.
  *
  * Retreat condition for that call: see AGENTS.md §レビュー (the sentence
  * referencing #2489 / #2503) for when a PR must carry `review:full` by hand
@@ -59,6 +59,8 @@
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { VALIDATION_PRODUCER_DEFINITIONS } from '../lib/validation-producer-contract.mjs';
+
 /**
  * `.github/workflows/production-config-audit.yml` の self-change 検出
  * （`grep -Eq '^(...)$'`、`Detect audit contract changes` step）がリテラルで
@@ -77,9 +79,9 @@ export const PRODUCTION_CONFIG_AUDIT_CONTRACT_PATHS = [
 
 /**
  * Protected path globs (OR'd together). If any changed file matches one of
- * these, `pr-cross-review` skill's advisory review is recommended (#2596;
- * no longer a merge-blocking requirement). Add or remove entries only in this
- * array (finish-branch.sh does not keep a copy).
+ * these, the PR is eligible for GitHub `@codex review` at the stable
+ * merge-candidate stage (#2596; no longer a merge-blocking requirement).
+ * Add or remove entries only in this array (finish-branch.sh does not keep a copy).
  */
 export const PROTECTED_PATH_GLOBS = [
   // auth / OAuth / MCP integrations
@@ -89,6 +91,18 @@ export const PROTECTED_PATH_GLOBS = [
   'apps/product/src/app/api/oauth/**',
   'apps/product/src/app/.well-known/oauth-authorization-server/**',
   'apps/product/src/app/.well-known/oauth-protected-resource/**',
+  // 認証 callback / middleware と共有判定層。route だけを保護しても、token 発行・
+  // verified user・scope・redirect allowlist の実装変更が同じ境界を迂回する。
+  'apps/product/src/app/[locale]/(auth)/auth/**',
+  'apps/product/src/proxy.ts',
+  // Supabase client の認証 mode と tRPC context は service-role（RLS bypass）を選ぶ
+  // 共有境界。個別 entrypoint の列挙では新しい client/context が無保護になるため、
+  // 実装とその contract test を class 単位で含める。
+  'apps/product/src/lib/supabase/**',
+  'apps/product/src/lib/trpc/*context*.ts',
+  'apps/product/src/lib/auth/**',
+  'apps/product/src/lib/safe-redirect.ts',
+  'apps/product/src/lib/oauth-server/**',
   'apps/product/src/app/api/integrations/**',
   'apps/product/src/app/mcp/**',
   'apps/product/src/app/api/mcp/**',
@@ -102,37 +116,58 @@ export const PROTECTED_PATH_GLOBS = [
   'apps/product/src/lib/billing/**',
   'apps/product/src/app/api/webhooks/**',
   'apps/product/src/features/settings/server/billing-*.ts',
-  // external calendar integrations
-  'apps/product/src/features/external-calendar/server/providers/**',
-  // アカウント削除に伴う外部 calendar データの不可逆な一括削除を駆動する cron（#2503 監査）。
-  'apps/product/src/app/api/cron/calendar-account-deletion-settle/**',
-  // 不可逆な purge 本体 + provider 側 token の revoke（#2503 監査）。
-  'apps/product/src/features/external-calendar/server/account-deletion.ts',
-  // rotation を誤ると唯一の refresh token が失効し、以後そのアカウントの sync が復旧できない（#2503 監査）。
-  'apps/product/src/features/external-calendar/server/token-rotation.ts',
-  // provider 側の revoke は一方向操作で、実行してしまえば取り消せない（#2503 監査）。
-  'apps/product/src/features/external-calendar/server/revoke-outbox.ts',
+  // 外部 calendar の server 層は provider/OAuth 契約に加え、service-role client で
+  // user_id・connection_id の認可境界と token lifecycle を扱う。個別実装の列挙では
+  // 新しい service が同じ境界を迂回するため、server-side integration 全体を保護する。
+  'apps/product/src/features/external-calendar/server/**',
+  'apps/product/src/features/external-calendar/schemas/google*.ts',
+  // cron route は CRON_SECRET を唯一の認証境界としてservice-role同期、外部token revoke、
+  // billing照合などを起動する。route名ではなく認証・不可逆処理の入口全体を保護する。
+  'apps/product/src/app/api/cron/**',
+  // account deletion は Stripe customer / subscription を含む不可逆な一括削除。
+  // coordinator の配置に依存せず、実装と contract test を同じ class として保護する。
+  // external-calendar 固有の path はserver classを優先する。
+  'apps/product/src/**/account-deletion*.ts',
+  // `/api/v1` は既存 consumer が依存する公開契約。iCalendar の serializer は route の
+  // 外にあるが、UID・日時・payload 互換性を同じ公開契約として扱う。
+  'apps/product/src/app/api/v1/**',
+  'apps/product/src/features/timeblock/lib/plan-to-ical.ts',
   // timeblock feature の server 側だけに同居する高リスク面（#2489 クロスレビュー P1）。
   // feature 全体は必須側から外したが、この 2 つは「外部契約 or 不可逆」に該当するため
   // 残す: mcp-* は MCP の公開契約 + service role（RLS を迂回する）クエリ、
   // private-timeblock-search-query.ts は検索語を Sentry から隔離する privacy 境界。
   'apps/product/src/features/timeblock/server/mcp-*',
   'apps/product/src/features/timeblock/server/private-timeblock-search-query.ts',
-  // system API
-  'apps/product/src/app/api/v1/system/**',
   // the guardrails themselves
   '.husky/**',
   '.codex/**',
   '.claude/settings.json',
+  // agent adapter は child の権限・scope・credential 境界を固定するため、変更時は
+  // 標準 GitHub review の重点確認対象にする。
+  'scripts/agent/**',
   'scripts/hooks/**',
   'scripts/tasks/finish-branch.sh',
   'scripts/ci/protected-path-gate.mjs',
   // CI の中枢。check.mjs は write 権限つき GH_TOKEN を PR コードから隔離する
   // 処理とどの test を skip するかの判定を持ち、ci.yml はその job / permissions
   // を決める。どちらも「壊れても CI は green のまま」になりうるため、
-  // guardrail として必須側に置く（#2483 クロスレビュー、risk-reviewer 指摘）。
-  'scripts/ci/check.mjs',
-  '.github/workflows/ci.yml',
+  // guardrail の重点確認対象として残す（#2483 の過去レビューで入った境界）。
+  // Validation が self-produced と判定する producer 定義と同じ正本を使う。
+  // job の実行環境・検査対象を変えられる依存を個別allowlistから漏らさない。
+  ...VALIDATION_PRODUCER_DEFINITIONS,
+  // Review policy / validation controller。#2794 / #2796 で追加された後発の
+  // ガードレールで、判定側と producer を同じ PR で弱めると shadow が偽の green を出す。
+  // #2489 の「ガードレール自身」に含めるが、AGENTS.md や一般 skill のような
+  // 可逆な agent 向け文書までは保護対象へ広げない。
+  // validation controller の producer / evidence / shadow entrypoint と contract tests。
+  // ファイル名の個別列挙では判定依存の追加時に自己保護が抜けるため class で固定する。
+  'scripts/lib/validation-*.mjs',
+  'scripts/lib/validation-*.test.ts',
+  'scripts/lib/review-policy.mjs',
+  'scripts/lib/review-policy.test.ts',
+  'scripts/ci/validation-*.mjs',
+  'scripts/ci/validation-*.test.ts',
+  '.github/workflows/validation-gate.yml',
   // promote.yml は production domain を切り替える唯一の経路で、2026-09-03 以降は
   // main merge がそれを自動で起動する（層 3 → smoke → promote → rollback）。
   // gate の `if:` 式を 1 つ緩めるだけで未検証の main が本番へ出るが、その変更は

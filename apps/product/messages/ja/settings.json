@@ -555,8 +555,28 @@
           "enabled": "有効",
           "disabled": "無効"
         },
+        "unset": "未選択",
+        "allow": "分析を許可",
+        "revoke": "分析を撤回",
+        "revokeConfirmTitle": "分析への同意を撤回しますか？",
+        "revokeConfirmDescription": "ブラウザの計測とエラー監視を完全に停止するため、この画面を再読み込みします。入力途中で保存していない内容は失われます。",
+        "revokeConfirmLabel": "撤回する",
+        "saveFailed": "選択を保存できませんでした。ブラウザの保存領域が書き込みを拒否したため、分析の設定は変わっていません。",
+        "independentOrigins": "ウェブサイトとアプリの選択は、それぞれ別に保存されます。",
         "manage": "Cookie設定を管理",
-        "lastUpdated": "最終更新"
+        "lastUpdated": "最終更新",
+        "account": {
+          "title": "アカウントの利用分析",
+          "description": "許可すると、Plan・Record の作成や初回支払いなどの成功を、アカウント単位で分析します。内容や決済情報は送信しません。どの端末からでも撤回できます。",
+          "label": "サーバー側の分析",
+          "enabled": "許可中",
+          "disabled": "許可していません",
+          "unavailable": "状態を確認できません",
+          "allow": "許可する",
+          "revoke": "撤回する",
+          "saveFailed": "アカウントの分析設定を保存できませんでした。再度お試しください。",
+          "deviceNote": "この設定はアカウント全体のサーバー送信に適用されます。各端末のブラウザ計測は、その端末の Cookie 設定で管理します。"
+        }
       },
       "links": {
         "title": "法的文書",

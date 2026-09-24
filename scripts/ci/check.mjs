@@ -17,7 +17,8 @@
  * impact:      PR の変更ファイルから affected 判定を出すだけの軽量 job（全 job の上流）
  * static:      gitleaks CLI + allowlist canary + secrets:check + docs:check +
  *              validate:content（常時）+ typecheck/lint/knip/check:static の並列
- *              lane（docs-only でなければ）+ supabase/functions/** 変更時のみ deno check
+ *              lane（docs-only でなければ）+ test:scripts（docs-only の時だけ。#2822）
+ *              + supabase/functions/** 変更時のみ deno check
  * unit:        unit（product/web/i18n/observability + scripts、常時）+ 新規 migration の
  *              destructive scan（pull_request イベント時は常時）。**DB を一切使わない**
  * integration: affected な PR だけ integration/RLS（Supabase の起動自体は ci.yml 側の
@@ -232,6 +233,26 @@ function isFalseFlag(value) {
 /** docs-only の PR では静的解析の並列 lane（lint/knip/check:static/typecheck）を skip する。 */
 export function shouldRunStaticLanes(docsOnly) {
   return !isTrueFlag(docsOnly);
+}
+
+/**
+ * docs-only の PR でだけ static job が `pnpm test:scripts` を肩代わりする（#2822）。
+ *
+ * scripts のテストは **`docs/` を入力に読む**。`scripts/lib/scripts-taxonomy.ts` は
+ * `walkFiles(repoRoot, 'docs')` で docs 全体を読んで script の分類（agent / runbook /
+ * unreferenced）を決めるため、docs から `scripts/lib/**` を新しく参照しただけで
+ * `scripts/__tests__/scripts-taxonomy.test.ts` が落ちる。ところが `📦 Unit Tests` は
+ * ci.yml の `docs_only != 'true'` で job ごと skip されるので、**docs に 1 行足した PR が
+ * 緑で merge され、main で `pnpm check` が落ちる**（実際に 2 回踏んだ）。
+ *
+ * 塞ぎ方は「docs-only でも走る job（= `🔍 Static Checks`）で scripts suite を実行する」。
+ * `shouldRunStaticLanes` と**排他**で、非 docs-only の PR では `runUnit()` が同じ
+ * `pnpm test:scripts` を走らせるので二重実行にならない。docs を入力に持つテストだけを
+ * 別 suite へ切り出す案は採らない（対象一覧を人手で維持することになり、新しく docs を
+ * 読み始めたテストが静かに漏れる）。
+ */
+export function shouldRunScriptsTestsInStatic(docsOnly) {
+  return isTrueFlag(docsOnly);
 }
 
 /** CI toolchain の変更を含む PR では docs-only でも product unit test を走らせる。 */
@@ -568,6 +589,13 @@ async function runStatic() {
     ]);
   } else {
     console.log('docs-only の変更のため typecheck/lint/knip/check:static lane を skip します。');
+  }
+
+  // docs-only では `📦 Unit Tests` が job ごと skip されるため、docs を入力に読む
+  // scripts のテスト（taxonomy / glossary / docs-guard 等）をここで肩代わりする（#2822）。
+  if (shouldRunScriptsTestsInStatic(docsOnly)) {
+    console.log('docs-only のため scripts suite を static 側で実行します（#2822）。');
+    run('pnpm', ['test:scripts']);
   }
 
   // impact job が `!isPr`（workflow_dispatch）も込みで解決済み。ここでは

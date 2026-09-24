@@ -295,14 +295,14 @@
   },
   {
     "name": "@next/env",
-    "version": "16.3.5",
+    "version": "16.3.6",
     "license": "MIT",
     "repository": "https://github.com/vercel/next.js",
     "publisher": "Next.js Team <support@vercel.com>"
   },
   {
     "name": "@next/swc-darwin-arm64",
-    "version": "16.3.5",
+    "version": "16.3.6",
     "license": "MIT",
     "repository": "https://github.com/vercel/next.js"
   },
@@ -380,6 +380,24 @@
     "license": "Apache-2.0",
     "repository": "https://github.com/microsoft/playwright.git",
     "publisher": "Microsoft Corporation"
+  },
+  {
+    "name": "@posthog/browser-common",
+    "version": "0.8.3",
+    "license": "MIT",
+    "repository": "https://github.com/PostHog/posthog-js.git"
+  },
+  {
+    "name": "@posthog/core",
+    "version": "1.55.1",
+    "license": "MIT",
+    "repository": "https://github.com/PostHog/posthog-js.git"
+  },
+  {
+    "name": "@posthog/types",
+    "version": "1.412.4",
+    "license": "MIT",
+    "repository": "https://github.com/PostHog/posthog-js.git"
   },
   {
     "name": "@radix-ui/number",
@@ -1037,6 +1055,12 @@
     "repository": "https://github.com/DefinitelyTyped/DefinitelyTyped.git"
   },
   {
+    "name": "@types/trusted-types",
+    "version": "2.0.7",
+    "license": "MIT",
+    "repository": "https://github.com/DefinitelyTyped/DefinitelyTyped.git"
+  },
+  {
     "name": "@types/ws",
     "version": "8.18.1",
     "license": "MIT",
@@ -1542,6 +1566,13 @@
     "publisher": "Luca Ban - Mesqueeb (https://cycraft.co)"
   },
   {
+    "name": "core-js",
+    "version": "3.50.0",
+    "license": "MIT",
+    "repository": "https://github.com/zloirock/core-js.git",
+    "publisher": "Denis Pushkarev"
+  },
+  {
     "name": "cors",
     "version": "2.8.6",
     "license": "MIT",
@@ -1669,6 +1700,13 @@
     "license": "BSD-2-Clause",
     "repository": "git://github.com/fb55/domhandler.git",
     "publisher": "Felix Boehm <me@feedic.com>"
+  },
+  {
+    "name": "dompurify",
+    "version": "3.4.13",
+    "license": "(MPL-2.0 OR Apache-2.0)",
+    "repository": "git://github.com/cure53/DOMPurify.git",
+    "publisher": "Dr.-Ing. Mario Heiderich, Cure53 <mario@cure53.de> (https://cure53.de/)"
   },
   {
     "name": "domutils",
@@ -1904,6 +1942,13 @@
     "license": "MIT",
     "repository": "https://github.com/thecodrr/fdir.git",
     "publisher": "thecodrr <thecodrr@protonmail.com>"
+  },
+  {
+    "name": "fflate",
+    "version": "0.4.9",
+    "license": "MIT",
+    "repository": "https://github.com/101arrowz/fflate",
+    "publisher": "Arjun Barrett"
   },
   {
     "name": "file-selector",
@@ -2478,7 +2523,7 @@
   },
   {
     "name": "next",
-    "version": "16.3.5",
+    "version": "16.3.6",
     "license": "MIT",
     "repository": "vercel/next.js"
   },
@@ -2733,6 +2778,26 @@
     "repository": "postcss/postcss-selector-parser"
   },
   {
+    "name": "posthog-js",
+    "version": "1.433.5",
+    "license": "(Apache-2.0 AND MIT)",
+    "repository": "https://github.com/PostHog/posthog-js",
+    "publisher": "engineering@posthog.com"
+  },
+  {
+    "name": "posthog-node",
+    "version": "5.52.4",
+    "license": "MIT",
+    "repository": "https://github.com/PostHog/posthog-js.git",
+    "publisher": "PostHog"
+  },
+  {
+    "name": "preact",
+    "version": "10.29.8",
+    "license": "MIT",
+    "repository": "preactjs/preact"
+  },
+  {
     "name": "prettier",
     "version": "3.9.6",
     "license": "MIT",
@@ -2792,6 +2857,13 @@
     "version": "6.16.0",
     "license": "BSD-3-Clause",
     "repository": "https://github.com/ljharb/qs.git"
+  },
+  {
+    "name": "query-selector-shadow-dom",
+    "version": "1.0.1",
+    "license": "MIT",
+    "repository": "https://github.com/webdriverio/query-selector-shadow-dom",
+    "publisher": "George Griffiths <GeorgeGriff>"
   },
   {
     "name": "range-parser",
@@ -3367,6 +3439,20 @@
     "license": "MIT",
     "repository": "https://github.com/webpack/watchpack.git",
     "publisher": "Tobias Koppers @sokra"
+  },
+  {
+    "name": "web-vitals",
+    "version": "6.2.1",
+    "license": "Apache-2.0",
+    "repository": "https://github.com/GoogleChrome/web-vitals.git",
+    "publisher": "Philip Walton"
+  },
+  {
+    "name": "web-vitals",
+    "version": "6.2.2",
+    "license": "Apache-2.0",
+    "repository": "https://github.com/GoogleChrome/web-vitals.git",
+    "publisher": "Philip Walton"
   },
   {
     "name": "webidl-conversions",

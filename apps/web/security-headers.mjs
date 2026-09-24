@@ -2,7 +2,11 @@ const TURNSTILE_ORIGIN = 'https://challenges.cloudflare.com';
 const CSP_REPORT_URI = '/api/csp-report';
 
 /** Build the public Website CSP from fixed providers and the exact configured Sentry origin. */
-export function buildWebContentSecurityPolicy({ isDevelopment, sentryIngestOrigin }) {
+export function buildWebContentSecurityPolicy({
+  isDevelopment,
+  sentryIngestOrigin,
+  posthogEnabled = false,
+}) {
   const scriptSources = [
     "'self'",
     ...(isDevelopment ? ["'unsafe-eval'"] : []),
@@ -16,6 +20,7 @@ export function buildWebContentSecurityPolicy({ isDevelopment, sentryIngestOrigi
     'https://vercel.live',
     'https://vitals.vercel-insights.com',
     ...(sentryIngestOrigin ? [sentryIngestOrigin] : []),
+    ...(posthogEnabled ? ['https://us.i.posthog.com'] : []),
   ].join(' ');
 
   return [

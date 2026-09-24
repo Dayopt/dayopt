@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-09-16
+last_verified: 2026-09-22
 code:
   - .github/workflows/ci.yml
   - .github/workflows/promote.yml
@@ -107,3 +107,50 @@ repo を private に戻すと、Actions は分単位の課金になる。GitHub 
 | audit の Supabase 2 job を 1 job に統合               | 見送り                    | 月 100 分程度                                  | job 名を鍵にした security contract test 2 本の書き換えが要り、節約に見合わない。deploy-health は commit status 権限を持つので token 分離上そもそも統合しない |
 | Static と Unit の 1 job 化                            | 見送り                    | 月 200 分程度                                  | ruleset の required check 名が変わる                                                                                                                         |
 | org の Actions spending limit を $0 から上げる        | User 操作                 | —                                              | 上限 $0 のまま枠を使い切ると CI が起動しなくなり、merge gate ごと止まる                                                                                      |
+
+## 実測で分かった罠（検証と報告）
+
+agent が実際に踏んで、緑の報告が嘘になった事例。どれもエラーを出さずに間違った結論を返す。2026-09-22 に Claude Code の memory から昇格した（provider を問わず効く）。
+
+### 緑が証拠にならない形
+
+- **パイプの末尾が exit code を隠す。** `pnpm check 2>&1 | tail -40` の exit code は `tail` のもので、失敗しても 0 が返る。検証主張に使う実行は `> <scratch>/check.log 2>&1; echo "EXIT=$?"` の形にし、`grep -E 'Test Files|Tests  '` で件数を読む（2026-08-11 #1934、2026-09-18 #2827 で 2 回誤報告した）
+- **行数で切ると最重要部分が消える。** `| tail -N` / `| head -N` は行数が 1 行ずれた瞬間に必要な部分を落とし、残りが自己完結して見える。外部 CLI・レビュー出力は全量をファイルへ落としてから `sed -n '/^anchor/,$p'` のように内容で切る（2026-08-28、Codex の P1 2 件と marker の 1 行目を失った）
+- **`pnpm typecheck` の cached は実走ではない。** turbo が `FULL TURBO` を返すと型検査は走らない。`pnpm check` も内部で同じ経路を通るので偽グリーンになる（2026-08-11 PR #1927）。確実なのは対象 package で `pnpm exec tsc --noEmit` を直接叩くこと。`--force` は 2 回目に tsc へ渡って `TS5093` で落ちることがある
+- **skip 条件つき test の緑は実行の証拠ではない。** vitest の `it.skipIf` / `describe.skipIf` は収集時に評価されるので、`beforeAll` の probe で決まる条件は常に skip になる（2026-08-11 #1925 で 3 件全部 skip）。実行時条件は `it(name, (ctx) => { if (!ok) ctx.skip(); })` にし、`N passed` と `N skipped` を読み分け、有効・無効の両状態で 1 回ずつ走らせる
+- **`::warning::` を出す関数を test から呼ぶと本物の annotation が出る。** GitHub Actions は vitest の stdout も workflow command として解釈する。全 PR に嘘の警告が出続けた（2026-09-16 PR #2788）。`vi.spyOn(console, 'log').mockImplementation(() => {})` で握ってから呼び、`gh run view <id> --log | rg '##\[warning\]'` で無いことを確認する
+- **`.text-destructive` を含む複合 locator はエラー未発生でも即 pass する。** 必須項目の `＊` が送信前から可視なため。server error を待つ時は `[role="alert"][data-slot="field-error"]` まで絞り、文言を `toContainText` で確認する（2026-08-10 PR #1882、#1883）
+- **`tsx` は top-level await を持つ `.mjs` を静的 import できない。** CJS へ落ちるので `ERR_REQUIRE_ASYNC_MODULE` で即死するが、vitest は ESM なので unit test は緑のまま。判定関数を注入する形にして CLI 側で `await import()` し、`spawnSync('pnpm', ['exec', 'tsx', ...])` の実起動 test を 1 本置く（2026-09-18 #2827）
+
+### 環境と道具の癖
+
+- **Node は 24 を前置する。** system の node 26 では zustand persist / localStorage 系 test が `Cannot read properties of undefined (reading 'clear')` で落ちる。`PATH=/opt/homebrew/opt/node@24/bin:$PATH pnpm check`（nvm / fnm は入っていない）。`env PATH=...` 形は PATH 中の空白で exit 127 になるので `export` する
+- **`VAR=$(script)` の失敗は次のコマンドを止めない。** 空文字で `gh issue edit --body ""` が走り本文が消えた（2026-08-24）。上書き系は `|| exit` を付けるか、ファイルへ書いて非空を確認してから `--body-file` で渡す
+- **`jq '.flag // "default"'` は `false` も既定値へ倒す。** boolean は `if (.x | type) == "boolean" then (.x | tostring) else "unknown" end` で読む。#2586 では約 40 件の test 失敗を「方針が広すぎる」と誤読した。大量失敗を設計の signal にする前に原因を 1 件掘る
+- **自動整形が未使用 import を消す。** import を先に足して使用箇所を後で書くと、中間状態で lint-staged / 整形 hook が import を除去し、新機能が丸ごと無反応になる（2026-08-11 #1929）。使用箇所を先に書き、import は最後にまとめる。新しく足した処理が何も出力しない時はまず import の生存を見る
+- **書き出したファイルに NUL が混ざると git が binary 扱いにして diff が読めなくなる。** `git diff --cached --stat` に `Bin 0 -> N bytes` と出たら疑う。`file <path>` が `data` なら `perl -i -pe 's/\x00/ /g'` で直す
+- **`package.json` の依存を触ったら同じ commit に `pnpm-lock.yaml` を含める。** ローカルは既存 node_modules で素通りし、CI だけ全 job が setup で 15〜20 秒で落ちる（2026-09-07 PR #2623）。push 前に `pnpm install --frozen-lockfile` を通す。`catalog:` 化や依存 1 本の追加でも pnpm は無関係な version を再解決して動かすので、`git diff -U0 pnpm-lock.yaml | grep '^-' | grep -v '^---'` が空でなければ drift。旧 version へ手で戻してから `--frozen-lockfile` に検証させる（#2518、#2827）
+- **新規 package に test を足したら root `test:run` の `&&` 連結へも足す。** turbo 任せではないので、忘れると CI で永久に走らない
+
+### ローカル E2E とブラウザ実測
+
+- **login 系 E2E をローカルで走らせるには env 4 点を渡す。** `.env` は読まず `supabase status -o json` から鍵を取る。渡さないと `resolveServiceRoleTarget` が false になり suite ごと skip して「0 failed」の緑に見える（`4 skipped` を確認する）
+
+  ```bash
+  NEXT_PUBLIC_TURNSTILE_SITE_KEY= \
+  NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321 \
+  NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY="$PUBLISHABLE_KEY" \
+  SUPABASE_SECRET_KEY="$SECRET_KEY" \
+  pnpm exec playwright test <spec> --project=chromium --reporter=line
+  ```
+
+  Turnstile が出て `button[type="submit"]` が disabled のまま落ちるのは環境差。`@next/env` は定義済みの `process.env` を上書きしないので、shell 側の空文字が勝つ。空文字にしても落ちるなら Supabase の anon key が remote のまま（画面には理由が出ない）
+
+- **Turnstile の 2 経路は公式 test key で踏める。** `3x00000000000000000000FF` は強制対話（submit が disabled のまま）、無効文字列は error 400020（submit が有効化）。site key を差し替えて dev server を立て直すだけで 5 分で確認できる
+- **env ファイルの無い worktree でも dev は動く。** `env NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=<...> SUPABASE_SECRET_KEY=<...> NEXT_PUBLIC_APP_URL=http://localhost:3200 NEXT_PUBLIC_TURNSTILE_SITE_KEY= pnpm --filter @dayopt/product exec next dev -p 3200`。Resend / Upstash / Sentry / Turnstile は未設定の既知の状態。seed ユーザーへはパスワードを打たず magic link で入る（`POST /auth/v1/admin/generate_link` の `hashed_token` を `/ja/auth/confirm?token_hash=<hash>&type=magiclink&next=/calendar` へ）。translation key を足したら dev server を再起動しないと `MISSING_MESSAGE` が出続ける。Next は同一ディレクトリの 2 つ目の `next dev` を拒否するので、`lsof -nP -iTCP:3000 -sTCP:LISTEN` で既に立っていればそれを使う
+- **dev の HSTS が localhost にも効く。** `next.config.mjs` の `Strict-Transport-Security` は環境を問わず出るため、内蔵 Chrome で言語切替の RSC fetch が `ERR_SSL_PROTOCOL_ERROR` になる。full navigation にフォールバックして成立するので diff 由来と誤診しない
+- **module state が遷移を跨ぐ前提の P1 は hard navigation か測ってから重さを決める。** 遷移前に `window.__probe = 'x'` を置き、遷移後に消えていれば store ごと reset されている。2026-09-18 の auth レビューで「再ログインが弾き戻される」P1 が実測で潜在へ降格した。修正自体は残してよいが、報告では「潜在」と書く
+- **429 を trace で数える。** `--trace on` の `test-results/*/trace.zip` 内 `*.network` から `/api/trpc/<a,b,c>?batch=1` を分解すると test ごとの手続き数が出る。rate limit は手続き単位なので、直列 spec は 1 テスト 40〜70 手続きで 100/min に素で届く（#2669）。commit 違いの比較は `git worktree add --detach` で。削除済み worktree の next-server が port 3000 に残ると `reuseExistingServer` で別コードを叩くので先に `lsof` で cwd を見る
+- **`next start` は `RECOVERY_CODE_PEPPER` 必須。** build は通り、最初のリクエストで 500 になる。local 計測ならダミー値を起動 script 内で export する（repo には入れない）。web は `networkidle` に到達しないので load + 固定待ちにする。`~/Library/Caches/ms-playwright` が消えたら `pnpm exec playwright install chromium chromium-headless-shell`
+- **他 session が作った PR は既存 worktree で再検証できる。** `git worktree list` で対象 branch の worktree（node_modules 済み）を探し、`git status --short` が空で HEAD が `headRefOid` と一致すれば vitest をそこで叩くだけでよい。read-only 操作に限り、dev server や E2E は回さない（生成物で他 lane の worktree を汚す）
+- **Mermaid は headless で parse 検証する。** `apps/storybook/node_modules/mermaid/dist/mermaid.core.mjs` を happy-dom の `Window` 上で import し `mermaid.parse(code)` を呼ぶ。diagramType が返れば構文 OK（#2775）

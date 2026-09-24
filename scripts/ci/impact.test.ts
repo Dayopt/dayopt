@@ -197,6 +197,12 @@ describe('中立 path（app 成果物に影響しない）', () => {
     [['.husky/pre-push', '.vscode/settings.json']],
     [['apps/storybook/.storybook/main.ts']],
     [['eslint.config.mjs', '.prettierrc', 'vitest.scripts.config.ts']],
+    // static / scripts の検査が入力として読む設定。未分類のままだと unknown に載り、
+    // validation-plan 側で migration の無い PR が隔離 DB を待って恒久 blocked になる
+    // （#2811 / PR #2868）。app の bundle にも runtime 挙動にも入らない
+    [['.gitleaks.toml', '.boundary-budget.json']],
+    [['.op-env.agent.example', '.op-env.human.example']],
+    [['lint-staged.config.mjs', 'tsconfig.scripts.json']],
   ])('%j は app build を要求しない', (files) => {
     expectImpact(files, {});
   });
@@ -281,6 +287,19 @@ describe('Vercel の build が実行する root script', () => {
 
   it('build に関与しない scripts/ は従来どおり中立', () => {
     expectImpact(['scripts/tasks/finish-branch.sh'], {});
+  });
+
+  it('patches/ は両 app の build 入力（pnpm patchedDependencies）', () => {
+    // install 時に node_modules を書き換えるので中立ではない。未分類（unknown）でもない
+    // ——unknown は validation-plan 側で隔離 DB を要求し、migration の無い PR を
+    // 恒久 blocked にする（#2811 / PR #2868）
+    expectImpact(['patches/image-size@2.0.2.patch'], {
+      product: true,
+      web: true,
+      productJourney: true,
+      webPreviewSmoke: true,
+    });
+    expect(resolveImpact(['patches/image-size@2.0.2.patch']).unknown).toEqual([]);
   });
 
   it('PRODUCT_BUILD_SCRIPTS が product の build 定義と一致する（drift 検出）', () => {

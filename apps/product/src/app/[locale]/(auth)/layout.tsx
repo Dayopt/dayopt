@@ -8,7 +8,7 @@
  *
  * Provider階層:
  * 1. IntlProvider（common + auth + error + navigation）
- * 2. AuthClientLayout → PublicProviders（Theme, Tooltip のみ）
+ * 2. AuthClientLayout → PublicProviders（Theme, Tooltip のみ）と AuthStoreInitializer
  * 3. AuthLayout（認証UI用レイアウト）
  */
 import type { Metadata } from 'next';

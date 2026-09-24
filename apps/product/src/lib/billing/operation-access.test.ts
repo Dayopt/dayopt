@@ -7,6 +7,9 @@ describe('single-plan operation boundary', () => {
     'recordCommands.update',
     'activities.restoreActivity',
     'externalCalendar.syncNow',
+    'planTemplates.create',
+    'planTemplates.applyToDay',
+    'planTemplates.rename',
     'future.newMutation',
     'user.futureImport',
   ])('requires access for %s', (path) =>
@@ -20,10 +23,13 @@ describe('single-plan operation boundary', () => {
     'billing.createCheckoutSession',
     'mcpConnections.revoke',
     'externalCalendar.disconnect',
+    'userSettings.claimSignupCompletion',
     'userSettings.update',
+    'userSettings.setAnalyticsConsent',
     'user.deleteAccount',
     'user.exportData',
     'user.verifyRecoveryCode',
+    'planTemplates.delete',
   ])('preserves management/deletion for %s', (path) =>
     expect(requiresProductAccess(path, 'mutation', false)).toBe(false),
   );

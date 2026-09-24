@@ -225,6 +225,16 @@ function isNeutralPath(file) {
     'eslint.config.mjs',
     'vitest.scripts.config.ts',
     'LICENSE',
+    // 以下はいずれも **static / scripts の検査が入力として読む設定**で、app の bundle にも
+    // runtime 挙動にも入らない。未分類のままだと `impact.unknown` に載り、
+    // validation-plan 側で `databaseTests` が applicable になって migration の無い PR が
+    // 隔離 Supabase branch を待って恒久 blocked になる（#2811 / PR #2868）。
+    '.gitleaks.toml', // secret scan の設定。読むのは ci.yml の static job
+    '.boundary-budget.json', // lint:boundaries の予算。読むのは scripts/tasks/boundaries
+    '.op-env.agent.example', // secret 台帳の例示。ci-secret-ledger.test.ts が読む
+    '.op-env.human.example',
+    'lint-staged.config.mjs', // pre-commit の整形。CI の build には入らない
+    'tsconfig.scripts.json', // scripts/ の typecheck 専用（app は tsconfig.base.json）
   ]);
   return rootNeutral.has(file);
 }
@@ -412,7 +422,10 @@ export function resolveImpact(changedFiles, options = {}) {
       }
       continue;
     }
-    if (ROOT_BUILD_FILES.has(file)) {
+    // `patches/**` は pnpm の `patchedDependencies` が install 時に当てるので、両 app の
+    // node_modules ＝ build 対象を変える。中立ではなく **両 app 影響**（未分類のままだと
+    // `unknown` に載り、migration の無い PR が隔離 DB を待って恒久 blocked になる）。
+    if (ROOT_BUILD_FILES.has(file) || file.startsWith('patches/')) {
       product = true;
       web = true;
       mark('product', file);

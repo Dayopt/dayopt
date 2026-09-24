@@ -10,6 +10,8 @@ import {
 import dynamic from 'next/dynamic';
 import { useEffect, useState } from 'react';
 
+import { PostHogWebAnalytics } from './PostHogWebAnalytics';
+
 const Analytics = dynamic(
   () => import('@vercel/analytics/react').then((module) => module.Analytics),
   { ssr: false },
@@ -19,13 +21,11 @@ const SpeedInsights = dynamic(
   { ssr: false },
 );
 
-/** Load browser analytics only in Vercel Production and after explicit analytics consent. */
+/** Load consented browser analytics; Vercel SDKs additionally require Production. */
 export function BrowserTelemetry() {
   const [enabled, setEnabled] = useState(false);
 
   useEffect(() => {
-    if (process.env.NEXT_PUBLIC_VERCEL_ENV !== 'production') return;
-
     setEnabled(hasAnalyticsConsent(getBrowserTelemetryConsentStorage()));
 
     const handleConsent = (event: Event) => {
@@ -49,12 +49,15 @@ export function BrowserTelemetry() {
     };
   }, []);
 
-  if (!enabled) return null;
-
   return (
     <>
-      <Analytics />
-      <SpeedInsights />
+      {enabled && process.env.NEXT_PUBLIC_VERCEL_ENV === 'production' && (
+        <>
+          <Analytics />
+          <SpeedInsights />
+        </>
+      )}
+      {enabled && <PostHogWebAnalytics />}
     </>
   );
 }

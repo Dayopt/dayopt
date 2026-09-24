@@ -100,12 +100,14 @@ export function DeferredAnalytics() {
     };
   }, []);
 
-  if (!shouldLoad) return null;
-
   return (
     <>
-      <SpeedInsights />
-      <Analytics />
+      {shouldLoad && (
+        <>
+          <SpeedInsights />
+          <Analytics />
+        </>
+      )}
     </>
   );
 }

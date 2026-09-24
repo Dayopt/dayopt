@@ -52,6 +52,10 @@ interface AuthState {
     email: string,
     options?: { captchaToken?: string },
   ) => Promise<{ error: AuthError | null }>;
+  resendConfirmation: (
+    email: string,
+    options?: { captchaToken?: string },
+  ) => Promise<{ error: AuthError | null }>;
   // @supabase/auth-js 2.106.2 以降 updateUser は session を含まない UserResponse を返す
   updatePassword: (password: string) => Promise<UserResponse>;
   clearError: () => void;
@@ -61,6 +65,25 @@ interface AuthState {
   _setSession: (session: Session | null) => void;
   _setLoading: (loading: boolean) => void;
   _setError: (error: string | null) => void;
+}
+
+/**
+ * 現在張っている auth state listener。`initialize` は何度でも呼ばれうる
+ * （`AuthStoreInitializer` の guard は mount ごとで、`(app)` ↔ `(auth)` を
+ * 行き来するたびに再実行される）。張り直す前に前の購読を必ず解除する。
+ * 解除しないと listener が積み上がり、1 イベントで同じ `set` が何度も走る。
+ */
+let activeAuthSubscription: { unsubscribe: () => void } | null = null;
+
+function replaceAuthSubscription(subscription: { unsubscribe: () => void }): void {
+  activeAuthSubscription?.unsubscribe();
+  activeAuthSubscription = subscription;
+}
+
+/** テスト専用。module state を持ち越さないための後始末 */
+export function resetAuthSubscriptionForTest(): void {
+  activeAuthSubscription?.unsubscribe();
+  activeAuthSubscription = null;
 }
 
 /** 認証状態を管理するZustandストア */
@@ -111,6 +134,7 @@ export const useAuthStore = create<AuthState>()(
             user: data.session?.user ?? null,
             loading: false,
             error: null,
+            _sessionExpired: false,
           });
 
           // Auth state changeリスナーは非同期で設定（ブロックしない）
@@ -122,6 +146,10 @@ export const useAuthStore = create<AuthState>()(
               set({
                 session,
                 user: session?.user ?? null,
+                // 主体が戻ったら失効フラグを下ろす。logout → login は soft navigation
+                // なので module state が生き残り、下ろさないと再ログイン直後に
+                // SessionMonitorProvider が再発火して login へ弾き戻す。
+                ...(session?.user ? { _sessionExpired: false } : {}),
               });
 
               // C2: セッション失効の検出 — 以前ログイン済みだったのに session が消えた場合
@@ -134,12 +162,9 @@ export const useAuthStore = create<AuthState>()(
               }
             });
 
-            // Cleanup subscription on unmount
-            if (typeof window !== 'undefined') {
-              window.addEventListener('beforeunload', () => {
-                subscription.unsubscribe();
-              });
-            }
+            // 前の購読を解除してから差し替える。`beforeunload` での解除は document が
+            // 捨てられる直前にしか走らず、同じ document 内での再 initialize には効かない。
+            replaceAuthSubscription(subscription);
           } catch (listenerError) {
             logger.warn('[AuthStore] Failed to set up auth state listener:', listenerError);
             captureUnexpectedAuthError(listenerError, { operation: 'subscribe_auth_state' });
@@ -164,8 +189,10 @@ export const useAuthStore = create<AuthState>()(
             password,
             options: {
               // 確認メールのリンク検証後の着地先。send-auth-email hook が
-              // origin + path を confirm route の next に変換する
-              emailRedirectTo: `${window.location.origin}/week`,
+              // origin + path を confirm route の next に変換する。
+              // 旧 route（/week）を指すと proxy の legacy 写像に依存し、その削除で
+              // 確認リンクの着地が 404 になるため、現行の契約 URL を直接指す。
+              emailRedirectTo: `${window.location.origin}/calendar`,
               ...(options?.captchaToken && { captchaToken: options.captchaToken }),
               ...(options?.metadata && { data: options.metadata }),
             },
@@ -227,6 +254,9 @@ export const useAuthStore = create<AuthState>()(
               user: result.data.user,
               loading: false,
               error: null,
+              // listener が張られていない公開ページ（PublicProviders）からの
+              // サインインでも失効フラグを下ろす
+              ...(result.data.session ? { _sessionExpired: false } : {}),
             });
           }
 
@@ -333,6 +363,35 @@ export const useAuthStore = create<AuthState>()(
         } catch (err) {
           captureUnexpectedAuthError(err, { operation: 'reset_password' });
           set({ error: 'auth.errors.unexpectedError', loading: false });
+          return { error: { message: 'auth.errors.unexpectedError' } as AuthError };
+        }
+      },
+
+      // Resend the signup confirmation email
+      // OWASP: 呼び出し側は結果で表示を変えない（未登録 / 確認済み / 未確認のどれでも
+      // 同じ応答になる）。ここは送信を試みて結果をそのまま返すだけにする。
+      resendConfirmation: async (email, options) => {
+        try {
+          const supabase = createClient();
+          const result = await observeAuthOperation('resend_confirmation', () =>
+            supabase.auth.resend({
+              type: 'signup',
+              email,
+              options: {
+                // 確認リンクの着地先。signUp と同じ契約 URL を指す
+                emailRedirectTo: `${window.location.origin}/calendar`,
+                ...(options?.captchaToken && { captchaToken: options.captchaToken }),
+              },
+            }),
+          );
+
+          if (result.error) {
+            captureUnexpectedAuthError(result.error, { operation: 'resend_confirmation' });
+          }
+
+          return { error: result.error };
+        } catch (err) {
+          captureUnexpectedAuthError(err, { operation: 'resend_confirmation' });
           return { error: { message: 'auth.errors.unexpectedError' } as AuthError };
         }
       },

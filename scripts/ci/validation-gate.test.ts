@@ -11,8 +11,10 @@ import {
   collectInheritedPreviews,
   createGithubApi,
   fetchAllReviewPages,
+  isUnsafeStatusDescriptionChar,
   resolveTarget,
   runValidationGate,
+  STATUS_DESCRIPTION_FALLBACK,
   toStatusDescription,
 } from './validation-gate.mjs';
 
@@ -116,6 +118,12 @@ function fakeApi(overrides: Record<string, unknown> = {}) {
           context: 'Vercel – product',
           state: 'success',
           target_url: 'https://vercel.com/dayopt/product/x',
+          description: 'Deployment has completed',
+        },
+        {
+          context: 'Vercel – web',
+          state: 'success',
+          target_url: 'https://vercel.com/dayopt/web/x',
           description: 'Deployment has completed',
         },
       ],
@@ -809,7 +817,8 @@ describe('validation gate controller', () => {
       postStatus: () => '',
       now: () => new Date('2026-09-16T10:55:00Z'),
     });
-    // 依頼 comment は head より前 → 無視され、not-started で「起動する」判定になるが投稿はしない
+    // 依頼 comment は head より前なので not-started。required merge checks は成功済みなので、
+    // Validation の成功語彙 `pass` を正規化して起動候補だけを通知する（投稿はしない）
     expect(outcome.review?.state).toBe('not-started');
     expect(outcome.review?.trigger.shouldRequest).toBe(true);
     expect(outputs.some((text) => text.startsWith('::notice::Review policy'))).toBe(true);
@@ -1108,5 +1117,50 @@ describe('commit status description', () => {
     expect(toStatusDescription('indeterminate: Unresolved input: PR context unavailable')).toBe(
       'indeterminate: Unresolved input: PR context unavailable',
     );
+  });
+
+  // ── #2816: Codex の review summary 由来の 422 ──────────────────────────
+  // PR #2812（run 35184170878）/ PR #2817（run 35186212427）で実際に publish された
+  // description。`@codex review` を投げた PR ではほぼ必ず emoji を含み、state に依らず
+  // 422 で両 shadow status が indeterminate になった。
+  const codexSummary =
+    'Codex summary reports "🔄 **Running** since <relative-time datetime="2026-09-17T05:02:10.630367Z">2026-09-17T05:02:10.630367Z</relative-time';
+
+  it('normalizes the Codex summary that actually caused the 422', () => {
+    const description = toStatusDescription(codexSummary);
+    expect(astral(description)).toBe(false);
+    expect([...description].some(isUnsafeStatusDescriptionChar)).toBe(false);
+    expect(description).toContain('Codex summary reports');
+  });
+
+  // 通す側だけの test は「もともと通っていた」で緑になる。**正規化していない生の入力が
+  // 本当に不正文字を含むこと**を同じ述語で固定し、ガードが実際に何かを落としていることを示す。
+  it('detects the unsafe characters in the raw string before normalization', () => {
+    expect([...codexSummary].some(isUnsafeStatusDescriptionChar)).toBe(true);
+    expect(astral(codexSummary)).toBe(true);
+    expect(isUnsafeStatusDescriptionChar('🔄')).toBe(true);
+    expect(isUnsafeStatusDescriptionChar('\n')).toBe(true);
+    expect(isUnsafeStatusDescriptionChar('\u0000')).toBe(true);
+    expect(isUnsafeStatusDescriptionChar('\u007f')).toBe(true);
+    expect(isUnsafeStatusDescriptionChar('\ud800')).toBe(true);
+    expect(isUnsafeStatusDescriptionChar('a')).toBe(false);
+    expect(isUnsafeStatusDescriptionChar('–')).toBe(false); // Vercel の context は en dash を含む
+  });
+
+  it('drops control characters and lone surrogates without merging words', () => {
+    expect(toStatusDescription('blocked:\u0000 integration\u0007 missing')).toBe(
+      'blocked: integration missing',
+    );
+    expect(toStatusDescription('pass:\nall suites\r\nsatisfied')).toBe(
+      'pass: all suites satisfied',
+    );
+    expect(toStatusDescription('pass: \ud800all suites')).toBe('pass: all suites');
+  });
+
+  it('falls back to a readable string when normalization empties the description', () => {
+    expect(toStatusDescription('🔄🧪')).toBe(STATUS_DESCRIPTION_FALLBACK);
+    expect(toStatusDescription('')).toBe(STATUS_DESCRIPTION_FALLBACK);
+    expect(toStatusDescription(null)).toBe(STATUS_DESCRIPTION_FALLBACK);
+    expect(toStatusDescription(undefined)).toBe(STATUS_DESCRIPTION_FALLBACK);
   });
 });

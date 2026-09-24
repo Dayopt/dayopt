@@ -16,6 +16,13 @@ import { logger } from '@/lib/logger';
  */
 
 /**
+ * HIBP への 1 リクエストの上限。応答しない接続（キャプティブポータル、
+ * パケットを捨てる proxy）でサインアップのスピナーが止まらなくなるのを防ぐ。
+ * 超過時は catch が fail-open で false / 0 を返し、登録自体は続行できる。
+ */
+export const PWNED_PASSWORD_TIMEOUT_MS = 3_000;
+
+/**
  * SHA-1ハッシュを計算（Web Crypto API使用）
  */
 async function sha1(text: string): Promise<string> {
@@ -65,6 +72,7 @@ export async function checkPasswordPwned(password: string): Promise<boolean> {
       headers: {
         'User-Agent': 'Dayopt-App', // API推奨のUser-Agent
       },
+      signal: AbortSignal.timeout(PWNED_PASSWORD_TIMEOUT_MS),
     });
 
     if (!response.ok) {
@@ -115,6 +123,7 @@ export async function getPasswordPwnedCount(password: string): Promise<number> {
       headers: {
         'User-Agent': 'Dayopt-App',
       },
+      signal: AbortSignal.timeout(PWNED_PASSWORD_TIMEOUT_MS),
     });
 
     if (!response.ok) {

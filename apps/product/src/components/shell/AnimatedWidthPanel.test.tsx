@@ -43,14 +43,4 @@ describe('AnimatedWidthPanel', () => {
 
     expect(screen.queryByText('content')).not.toBeInTheDocument();
   });
-
-  it('anchors right-side content to the right edge', () => {
-    render(
-      <AnimatedWidthPanel open width={256} side="right" data-testid="panel">
-        <div>content</div>
-      </AnimatedWidthPanel>,
-    );
-
-    expect(screen.getByTestId('panel')).toHaveClass('justify-end');
-  });
 });

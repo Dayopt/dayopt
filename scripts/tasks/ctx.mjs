@@ -64,7 +64,9 @@ const OWN_MARKER_PREFIXES = [
 
 /** body が Main 自身の marker / brief コメントで始まるか。 */
 function isOwnMarkerComment(body) {
-  return typeof body === 'string' && OWN_MARKER_PREFIXES.some((prefix) => body.startsWith(prefix));
+  if (typeof body !== 'string') return false;
+  if (body.startsWith(CTX_MARKER)) return false;
+  return OWN_MARKER_PREFIXES.slice(1).some((prefix) => body.startsWith(prefix));
 }
 
 // F2: findMarkerComment / detectJudgmentRecords の brief 判定は、なりすまし防止のため
@@ -80,6 +82,145 @@ function isTrustedMarkerComment(comment) {
     comment.body.startsWith(CTX_MARKER) &&
     TRUSTED_MARKER_ASSOCIATIONS.has(comment.author_association)
   );
+}
+
+/**
+ * Stable JSON for a source snapshot. Trusted ctx-brief comments are removed at every level so
+ * posting the brief cannot change the input identity it records. Untrusted marker lookalikes stay.
+ */
+function canonicalSnapshotValue(value) {
+  if (Array.isArray(value)) {
+    return value
+      .filter((item) => !isTrustedMarkerComment(item))
+      .map((item) => canonicalSnapshotValue(item));
+  }
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value)
+        .filter(([, item]) => item !== undefined)
+        .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+        .map(([key, item]) => [key, canonicalSnapshotValue(item)]),
+    );
+  }
+  return value;
+}
+
+/** Hashes source material independently of its key order and trusted self-generated brief comments. */
+export function computeContextSnapshotId(sourceMaterial) {
+  return createHash('sha256')
+    .update(JSON.stringify(canonicalSnapshotValue(sourceMaterial)))
+    .digest('hex');
+}
+
+const BRIEF_L1_CATEGORIES = new Set([
+  'decision',
+  'constraint',
+  'open_question',
+  'verification_result',
+  'status_only',
+]);
+const BRIEF_L1_FAILURES = new Set([
+  'auth_failed',
+  'balance_below_floor',
+  'balance_unknown',
+  'budget_exceeded',
+  'customer_verification_required',
+  'deferred_after_failure',
+  'deferred_after_live',
+  'disabled',
+  'free_tier_restricted',
+  'insufficient_credits',
+  'input_too_large',
+  'invalid_response',
+  'invalid_request',
+  'missing_credentials',
+  'not_cached',
+  'provider_error',
+  'rate_limited',
+  'timeout',
+  'budget_unavailable',
+  'budget_below_floor',
+  'cooldown',
+  'rate_locked',
+  'rate_state_invalid',
+  'rate_state_unreadable',
+  'rate_state_unwritable',
+  'budget_exhausted',
+  'low_confidence',
+  'cache_invalid',
+  'incomplete',
+]);
+
+function isCanonicalBriefSourceUrl(value) {
+  try {
+    const url = new URL(value);
+    return (
+      url.origin === 'https://github.com' &&
+      !url.username &&
+      !url.password &&
+      url.pathname.startsWith('/Dayopt/dayopt/')
+    );
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Makes a bounded L1 annotation view from an already available report. An adoption record, complete
+ * evaluation, sufficient confidence, and an L0 source reference are all required. Model-authored
+ * prose, URLs, SHAs, and verification claims are intentionally discarded.
+ * @param {{packId: string, adoptedPackIds?: string[], complete?: boolean, failure?: string,
+ * rows?: Array<{id: string, relevance: number, category: string, evaluatedAt: string, confidence: number}>,
+ * sources?: Array<{id: string, url: string}>, minimumConfidence?: number}} input
+ */
+export function buildBriefAnnotations({
+  packId,
+  adoptedPackIds = [],
+  complete = false,
+  failure = 'incomplete',
+  rows = [],
+  sources = [],
+  minimumConfidence = 0.7,
+}) {
+  if (!adoptedPackIds.includes(packId)) return { status: 'not_adopted', rows: [] };
+  if (!complete || !Array.isArray(rows) || !Array.isArray(sources)) {
+    const reason = BRIEF_L1_FAILURES.has(failure) ? failure : 'incomplete';
+    return { status: 'unevaluated', reason, rows: [] };
+  }
+
+  const sourceById = new Map(sources.map((source) => [source.id, source]));
+  const normalized = [];
+  for (const row of rows) {
+    const confidence = row?.confidence;
+    if (
+      typeof confidence !== 'number' ||
+      !Number.isFinite(confidence) ||
+      confidence < minimumConfidence ||
+      confidence > 1
+    )
+      return { status: 'unevaluated', reason: 'low_confidence', rows: [] };
+    const source = sourceById.get(row?.id);
+    if (
+      !source ||
+      typeof source.url !== 'string' ||
+      !isCanonicalBriefSourceUrl(source.url) ||
+      !Number.isFinite(row?.relevance) ||
+      row.relevance < 0 ||
+      row.relevance > 1 ||
+      !BRIEF_L1_CATEGORIES.has(row?.category) ||
+      typeof row?.evaluatedAt !== 'string' ||
+      !Number.isFinite(Date.parse(row.evaluatedAt))
+    )
+      return { status: 'unevaluated', reason: 'incomplete', rows: [] };
+    normalized.push({
+      sourceId: row.id,
+      url: source.url,
+      category: row.category,
+      relevance: row.relevance,
+      evaluatedAt: row.evaluatedAt,
+    });
+  }
+  return { status: 'adopted', rows: normalized };
 }
 
 // --- 純関数群（test 対象） -------------------------------------------------
@@ -282,6 +423,35 @@ export function extractAcceptanceCriteriaText(body) {
   return acceptanceLines.join('\n').trim();
 }
 
+/** Keep the canonical request, scope, constraints, and verification text visible outside ranked L1. */
+function extractBriefRequiredSections(body) {
+  const wanted = new Map([
+    ['goal', '要求（Goal）'],
+    ['背景', '要求（背景）'],
+    ['やること', '実施範囲（やること）'],
+    ['minimum viable approach', '実施範囲（Minimum Viable Approach）'],
+    ['test and acceptance', '必要な検証（Test and Acceptance）'],
+    ['検証', '必要な検証（検証）'],
+    ['assumptions and not doing', '制約（Assumptions and Not Doing）'],
+    ['注意', '制約（注意）'],
+  ]);
+  const lines = String(body ?? '').split('\n');
+  const sections = [];
+  for (let index = 0; index < lines.length; index += 1) {
+    const heading = /^##\s+(.+?)\s*#*\s*$/.exec(lines[index].trim());
+    if (!heading) continue;
+    const normalized = heading[1].trim().toLowerCase();
+    const label = wanted.get(normalized);
+    if (!label) continue;
+    const content = [];
+    for (let next = index + 1; next < lines.length && !/^##(?!#)\s/.test(lines[next]); next += 1)
+      content.push(lines[next]);
+    const text = content.join('\n').trim();
+    if (text) sections.push({ heading: label, text });
+  }
+  return sections;
+}
+
 /**
  * issue body の「受け入れ条件 / 検証コマンド」を判定する（routing skill / dispatch §status:ready）。
  *
@@ -344,6 +514,8 @@ export function buildJudgmentHint(records) {
 export function selectComments(comments, k, allComments) {
   const list = Array.isArray(comments) ? comments : [];
   const filtered = list.filter((c) => {
+    if (typeof c.body === 'string' && c.body.startsWith(CTX_MARKER))
+      return !isTrustedMarkerComment(c);
     if (isOwnMarkerComment(c.body)) return false;
     if (allComments) return true;
     return !isBotLogin(c.user?.login) || isCodexBotLogin(c.user?.login);
@@ -457,10 +629,6 @@ const SKILL_RULES = [
   },
   { test: (f) => f.startsWith('apps/product/messages/'), skill: 'i18n' },
   { test: (f) => f.startsWith('apps/web/content/'), skill: 'docs-writing' },
-  {
-    test: (f) => f.startsWith('scripts/hooks/') || f.startsWith('scripts/ci/'),
-    skill: 'pr-cross-review',
-  },
   { test: (f) => f.endsWith('.test.ts'), skill: 'test' },
   { test: (f) => f.startsWith('docs/'), skill: 'docs-writing' },
 ];
@@ -559,6 +727,13 @@ function escapeCell(value) {
   return String(value ?? '').replace(/\|/g, '\\|');
 }
 
+function escapeHtmlText(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
 function formatFileList(files, max = 40) {
   if (!files || files.length === 0) return null;
   const shown = files.slice(0, max);
@@ -605,6 +780,9 @@ function buildMarkdownLines(
     `url: ${pack.header.url ?? '未取得'}`,
   ];
   lines.push(headerParts.join(' | '));
+  if (pack.snapshotId) {
+    lines.push(`生成: ${pack.generatedAt ?? '未取得'} | snapshot: ${pack.snapshotId}`);
+  }
 
   if (pack.kind === 'pr') {
     const ci = pack.header.ciRollup;
@@ -618,6 +796,7 @@ function buildMarkdownLines(
     lines.push(
       [
         `${pack.header.headRefName ?? '未取得'} → ${pack.header.baseRefName ?? '未取得'}`,
+        `head SHA: ${pack.header.headSha ?? '未取得'} | base SHA: ${pack.header.baseSha ?? '未取得'}`,
         `isDraft: ${pack.header.isDraft ?? '未取得'}`,
         `mergeStateStatus: ${pack.header.mergeStateStatus ?? '未取得'}`,
         `reviewDecision: ${pack.header.reviewDecision ?? 'なし'}`,
@@ -627,6 +806,47 @@ function buildMarkdownLines(
     );
   }
   lines.push('');
+
+  if (pack.kind === 'issue') {
+    lines.push(
+      `Issue本文が要求・制約の正本。以下は該当節の原文で、全文: ${pack.header.url ?? '未取得'} | 本文SHA-256: ${pack.bodySha256 ?? '未取得'}`,
+    );
+    if (pack.requiredSections?.length) {
+      lines.push('#### 要求・制約・必要な検証', '');
+      for (const section of pack.requiredSections) {
+        const escapedText = escapeHtmlText(section.text).replace(/\r?\n/g, '&#10;');
+        lines.push(
+          `<details><summary>${escapeHtmlText(section.heading)}（Issue本文の原文）</summary><pre>${escapedText}</pre></details>`,
+          '',
+        );
+      }
+    } else {
+      lines.push(
+        '#### 要求・制約・必要な検証',
+        '',
+        '該当する標準見出しはありません。Issue本文全文を正本として確認してください。',
+        '',
+      );
+    }
+
+    lines.push('#### 関連PRのrevision・検証', '');
+    if (pack.related?.prs === null || pack.related?.prs === undefined) {
+      lines.push('関連PR: 未取得');
+    } else if (pack.related.prs.length === 0) {
+      lines.push('関連PR: なし');
+    } else {
+      for (const pr of pack.related.prs) {
+        const ci = pr.ciRollup
+          ? `CI SUCCESS ${pr.ciRollup.success} / FAILURE ${pr.ciRollup.failure} / PENDING ${pr.ciRollup.pending}`
+          : 'CI 未取得';
+        const detail = pr.detailAvailable ? '' : ` | 詳細 ${pr.detailStatus ?? '未取得'}`;
+        lines.push(
+          `- #${pr.number} ${pr.state} ${pr.title} | ${pr.url ? `[PR](${pr.url})` : 'URL未取得'} | head SHA ${pr.headSha ?? '未取得'} | base SHA ${pr.baseSha ?? '未取得'} | ${ci}${detail}`,
+        );
+      }
+    }
+    lines.push('');
+  }
 
   // --- 本文（可変: bodyMaxLines） ---
   if (pack.body) {
@@ -657,7 +877,10 @@ function buildMarkdownLines(
     lines.push(`#### 直近コメント（最新 ${pack.comments.length} 件）`);
     lines.push('');
     for (const comment of shownComments) {
-      lines.push(`**${comment.author}** (${comment.date})`);
+      const source = comment.url ? ` [出典](${comment.url})` : '';
+      lines.push(
+        `**${comment.author}** (${comment.date})${source} | 実行結果・進捗は自己申告として扱う`,
+      );
       lines.push(comment.body);
       lines.push('');
     }
@@ -676,10 +899,13 @@ function buildMarkdownLines(
       `- 親 epic: #${related.parentEpic.number} ${related.parentEpic.state ?? '未取得'} ${related.parentEpic.title ?? ''}`,
     );
   }
-  if (related.prs) {
+  if (related.prs && pack.kind !== 'issue') {
     for (const pr of related.prs) {
+      const ci = pr.ciRollup
+        ? `CI SUCCESS ${pr.ciRollup.success} / FAILURE ${pr.ciRollup.failure} / PENDING ${pr.ciRollup.pending}`
+        : 'CI 未取得';
       allRelatedLines.push(
-        `- #${pr.number} ${pr.state} ${pr.title} (${pr.headRefName ?? '未取得'})`,
+        `- #${pr.number} ${pr.state} ${pr.title} (${pr.headRefName ?? '未取得'}) | ${pr.url ? `[PR](${pr.url})` : 'URL未取得'} | head SHA ${pr.headSha ?? '未取得'} | base SHA ${pr.baseSha ?? '未取得'} | ${ci}`,
       );
     }
   }
@@ -725,7 +951,8 @@ function buildMarkdownLines(
       // 見出しと省略行だけで予算を使い切る段（acceptanceMaxLines <= 3）では、
       // 「…（N 行省略）」しか残らないセクションを出しても行数を食うだけなので
       // セクションごと落とす。段階縮小の最終段が実際に 0 行まで縮むようにする。
-      const budget = Math.max(0, acceptanceMaxLines - heading.length);
+      // Count the heading, section body, trailing separator, and omission marker inside the limit.
+      const budget = Math.max(0, acceptanceMaxLines - heading.length - 2);
       if (budget > 1) {
         let cappedBody = sectionBody;
         if (sectionBody.length > budget) {
@@ -799,6 +1026,32 @@ function buildMarkdownLines(
     if (pack.nextStepSecondary) {
       lines.push(pack.nextStepSecondary);
     }
+  }
+
+  const l1 = pack.l1Annotations;
+  if (l1) {
+    lines.push('', '#### L1注釈（補助情報）', '');
+    if (l1.status === 'adopted') {
+      lines.push('採用済みpackの完全評価結果。Issue本文の要求、必須条件、検証を置き換えない。');
+      if (l1.rows.length === 0) lines.push('採用済み注釈に表示候補はありません。');
+      for (const row of l1.rows)
+        lines.push(
+          `- [${row.sourceId}](${row.url}) | ${row.category} | 関連度 ${row.relevance.toFixed(2)} | 評価 ${row.evaluatedAt}`,
+        );
+    } else if (l1.status === 'unevaluated') {
+      lines.push(`L1: 未評価（${l1.reason}）。候補順位を表示していません。`);
+    } else {
+      lines.push('L1: 未採用packのGo記録が無いため未接続。');
+    }
+  }
+
+  lines.push('', '#### 未確認事項', '');
+  if (pack.missingSources?.length) {
+    for (const missing of pack.missingSources) lines.push(`- ${missing}`);
+  } else {
+    lines.push(
+      '取得失敗・入力不足はありません。コメントの記述は自己申告、CI表示は各PRごとのGitHub状態です。',
+    );
   }
 
   // 末尾の空行を畳んで行数を安定させる。
@@ -890,14 +1143,17 @@ function tryOr(fn, fallback) {
 
 const DECISIONS_PATH = 'docs/decisions.md';
 
-function collectDecisionLines(readFileImpl, cwd, numbers) {
-  const raw = tryOr(() => readFileImpl(join(cwd, DECISIONS_PATH), 'utf8'), null);
-  if (raw === null) return [];
+function decisionLinesFromText(raw, numbers, truncate = true) {
   const needles = numbers.map((n) => `#${n}`);
   return raw
     .split('\n')
     .filter((line) => needles.some((needle) => line.includes(needle)))
-    .map((line) => line.trim().slice(0, 200));
+    .map((line) => (truncate ? line.trim().slice(0, 200) : line.trim()));
+}
+
+function collectDecisionLines(readFileImpl, cwd, numbers, truncate = true) {
+  const raw = tryOr(() => readFileImpl(join(cwd, DECISIONS_PATH), 'utf8'), null);
+  return raw === null ? [] : decisionLinesFromText(raw, numbers, truncate);
 }
 
 // GraphQL ページングの安全上限（無限ループ防止。100 件 × 30 頁 = 3000 thread は
@@ -948,6 +1204,9 @@ export function buildContextPack(options, deps = {}) {
     existsFn = existsSync,
     readFileImpl = readFileSync,
     cwd = process.cwd(),
+    now = () => new Date(),
+    adoptedPackIds = [],
+    l1Report = null,
   } = deps;
   const { number, comments: commentsK, bodyLines, allComments } = options;
 
@@ -987,6 +1246,7 @@ export function buildContextPack(options, deps = {}) {
       milestone: pr?.milestone?.title ?? base?.milestone?.title ?? null,
       assignee: (pr?.assignees ?? base?.assignees ?? [])[0]?.login ?? null,
       url: pr?.url ?? base?.html_url ?? null,
+      updatedAt: base?.updated_at ?? null,
       headRefName: pr?.headRefName ?? null,
       baseRefName: pr?.baseRefName ?? null,
       headSha: pr?.headRefOid ?? null,
@@ -1012,30 +1272,36 @@ export function buildContextPack(options, deps = {}) {
       milestone: base?.milestone?.title ?? null,
       assignee: (base?.assignees ?? [])[0]?.login ?? null,
       url: base?.html_url ?? null,
+      updatedAt: base?.updated_at ?? null,
     };
     rawBody = base?.body ?? '';
   }
 
   const bodyResult = truncateBody(rawBody, bodyLines);
 
-  const commentsRaw = tryOr(
-    () =>
-      runGhJson(['api', `repos/${REPO}/issues/${number}/comments?per_page=100`, '--paginate'], {
-        execFileImpl,
-      }),
-    null,
-  );
+  const commentsRaw = tryOr(() => {
+    const raw = runGhJson(
+      ['api', `repos/${REPO}/issues/${number}/comments?per_page=100`, '--paginate', '--slurp'],
+      { execFileImpl },
+    );
+    // `--slurp` returns one array per page. Flatten so every collected comment participates in
+    // snapshot freshness and paging does not depend on the caller mode.
+    return Array.isArray(raw) ? raw.flat() : null;
+  }, null);
   const comments =
     commentsRaw === null
       ? null
       : selectComments(commentsRaw, commentsK, allComments).map((c) => ({
+          id: c.id ?? null,
           author: c.user?.login ?? '不明',
           date: (c.created_at ?? '').slice(0, 10),
+          url: c.id ? `https://github.com/${REPO}/issues/${number}#issuecomment-${c.id}` : null,
           body: truncateCommentBody(c.body),
         }));
 
   // --- 関連 ---
   const related = { parentEpic: null, prs: null, linkedIssues: null };
+  const assistRelated = [];
   let linkedNumbers = [];
 
   if (kind === 'issue') {
@@ -1043,6 +1309,7 @@ export function buildContextPack(options, deps = {}) {
       const epicNumber = extractParentEpic(rawBody);
       if (!epicNumber) return null;
       const epic = runGhJson(['api', `repos/${REPO}/issues/${epicNumber}`], { execFileImpl });
+      assistRelated.push(epic);
       return { number: epicNumber, state: epic.state, title: epic.title };
     }, null);
 
@@ -1055,7 +1322,7 @@ export function buildContextPack(options, deps = {}) {
           REPO,
           `#${number}`,
           '--json',
-          'number,title,state,body',
+          'number,title,state,url,body,updatedAt',
           '--limit',
           '20',
         ],
@@ -1065,31 +1332,96 @@ export function buildContextPack(options, deps = {}) {
     }, null);
 
     if (matchedPrs !== null) {
+      assistRelated.push(...matchedPrs);
       // 触るファイル用に上位 3 件だけ headRefName + files を追加取得する。
       const enriched = matchedPrs.slice(0, 3).map((pr) =>
         tryOr(
           () => {
             const detail = runGhJson(
-              ['pr', 'view', String(pr.number), '--json', 'headRefName,files'],
+              [
+                'pr',
+                'view',
+                String(pr.number),
+                '--json',
+                'url,headRefName,baseRefName,headRefOid,baseRefOid,statusCheckRollup,updatedAt,files',
+              ],
               {
                 execFileImpl,
               },
             );
             return {
               ...pr,
+              url: detail.url ?? pr.url ?? null,
               headRefName: detail.headRefName,
+              baseRefName: detail.baseRefName ?? null,
+              headSha: detail.headRefOid ?? null,
+              baseSha: detail.baseRefOid ?? null,
+              updatedAt: detail.updatedAt ?? pr.updatedAt ?? null,
+              ciRollup: Array.isArray(detail.statusCheckRollup)
+                ? computeCiRollup(detail.statusCheckRollup)
+                : null,
+              detailAvailable: true,
+              detailStatus: 'available',
               files: detail.files?.map((f) => f.path) ?? [],
             };
           },
-          { ...pr, headRefName: null, files: [] },
+          {
+            ...pr,
+            url: pr.url ?? null,
+            headRefName: null,
+            baseRefName: null,
+            headSha: null,
+            baseSha: null,
+            updatedAt: pr.updatedAt ?? null,
+            ciRollup: null,
+            detailAvailable: false,
+            detailStatus: 'unavailable',
+            files: [],
+          },
         ),
       );
-      related.prs = enriched.map(({ number: n, state, title, headRefName }) => ({
-        number: n,
-        state,
-        title,
-        headRefName,
+      const unexpanded = matchedPrs.slice(3).map((pr) => ({
+        ...pr,
+        url: pr.url ?? null,
+        headRefName: null,
+        baseRefName: null,
+        headSha: null,
+        baseSha: null,
+        updatedAt: pr.updatedAt ?? null,
+        ciRollup: null,
+        detailAvailable: false,
+        detailStatus: 'not_expanded',
+        files: [],
       }));
+      related.prs = [...enriched, ...unexpanded].map(
+        ({
+          number: n,
+          state,
+          title,
+          url,
+          headRefName,
+          baseRefName,
+          headSha,
+          baseSha,
+          updatedAt,
+          ciRollup,
+          detailAvailable,
+          detailStatus,
+        }) => ({
+          number: n,
+          state,
+          title,
+          url,
+          headRefName,
+          baseRefName,
+          headSha,
+          baseSha,
+          updatedAt,
+          ciRollup,
+          detailAvailable,
+          detailStatus,
+        }),
+      );
       files = [...new Set(enriched.flatMap((pr) => pr.files))];
     }
   } else {
@@ -1099,6 +1431,7 @@ export function buildContextPack(options, deps = {}) {
         tryOr(
           () => {
             const issue = runGhJson(['api', `repos/${REPO}/issues/${n}`], { execFileImpl });
+            assistRelated.push(issue);
             return {
               number: n,
               state: issue.state,
@@ -1130,7 +1463,69 @@ export function buildContextPack(options, deps = {}) {
     ...(related.parentEpic ? [related.parentEpic.number] : []),
     ...linkedNumbers,
   ];
-  const decisionLines = collectDecisionLines(readFileImpl, cwd, decisionNumbers);
+  const decisionsRaw = tryOr(() => readFileImpl(join(cwd, DECISIONS_PATH), 'utf8'), null);
+  const decisionLinesFull =
+    decisionsRaw === null ? [] : decisionLinesFromText(decisionsRaw, decisionNumbers, false);
+  const decisionLines = decisionLinesFull.map((line) => line.slice(0, 200));
+  const missingSources = [
+    ...(base === null || !header.url ? ['primary_metadata_unavailable'] : []),
+    ...(commentsRaw === null ? ['comments_unavailable'] : []),
+    ...(kind === 'issue' && related.prs === null ? ['related_prs_unavailable'] : []),
+    ...(kind === 'issue' && extractParentEpic(rawBody) && !related.parentEpic
+      ? ['parent_issue_unavailable']
+      : []),
+    ...(related.prs ?? [])
+      .filter((pr) => !pr.detailAvailable)
+      .map((pr) => `related_pr_${pr.number}_details_${pr.detailStatus ?? 'unavailable'}`),
+    ...(kind === 'pr' && unresolvedThreads === null ? ['review_threads_unavailable'] : []),
+    ...(decisionsRaw === null ? ['decisions_unavailable'] : []),
+    ...(related.linkedIssues ?? [])
+      .filter((item) => item.state === '未取得')
+      .map((item) => `linked_issue_${item.number}_unavailable`),
+  ];
+  const snapshotMaterial = {
+    target: {
+      number,
+      kind,
+      title: header.title,
+      state: header.state,
+      labels: header.labels,
+      milestone: header.milestone,
+      assignee: header.assignee,
+      url: header.url,
+      bodySha256: createHash('sha256').update(rawBody).digest('hex'),
+    },
+    comments:
+      commentsRaw === null
+        ? null
+        : selectComments(commentsRaw, Number.MAX_SAFE_INTEGER, true).map((comment) => ({
+            id: comment.id ?? null,
+            url: comment.html_url ?? null,
+            author: comment.user?.login ?? null,
+            authorAssociation: comment.author_association ?? null,
+            createdAt: comment.created_at ?? null,
+            updatedAt: comment.updated_at ?? null,
+            body: comment.body ?? '',
+          })),
+    related: {
+      parentEpic: related.parentEpic,
+      prs: related.prs,
+      linkedIssues: related.linkedIssues,
+    },
+    decisions: decisionsRaw === null ? null : decisionLinesFull,
+    missingSources,
+  };
+  const snapshotId = computeContextSnapshotId(snapshotMaterial);
+  const l1Annotations = buildBriefAnnotations(
+    l1Report ?? {
+      packId: 'context-relevance',
+      adoptedPackIds,
+      complete: false,
+      failure: 'not_cached',
+      rows: [],
+      sources: [],
+    },
+  );
 
   // closed/merged PR は「関連」には出すが、次の一手を駆動しない ── 別の
   // linked PR がまだ open で進行中の可能性や、closed PR が issue を解決しなかった
@@ -1181,7 +1576,31 @@ export function buildContextPack(options, deps = {}) {
   return {
     number,
     kind,
+    ...(options.assist
+      ? {
+          assistSource: {
+            title: header.title,
+            body: rawBody,
+            url: header.url,
+            // GitHub may advance Issue updated_at when this brief comment is posted. Use created_at
+            // for this body candidate; body edits still change the candidate text/cache key.
+            updatedAt: base?.created_at ?? null,
+            comments:
+              commentsRaw === null
+                ? null
+                : selectComments(commentsRaw, Number.MAX_SAFE_INTEGER, allComments),
+            related: assistRelated,
+            decisions: decisionLinesFull,
+            missing: missingSources,
+          },
+        }
+      : {}),
     bodySha256: createHash('sha256').update(rawBody).digest('hex'),
+    snapshotId,
+    generatedAt: now().toISOString(),
+    requiredSections: kind === 'issue' ? extractBriefRequiredSections(rawBody) : [],
+    missingSources,
+    l1Annotations,
     header,
     body: bodyResult,
     comments,
@@ -1201,8 +1620,14 @@ export function buildContextPack(options, deps = {}) {
 // CTX_MARKER の定義はファイル先頭（selectComments / detectJudgmentRecords と共用）。
 
 /** コメント本文を組み立てる。1 行目は必ずマーカー（idempotent 判定の唯一の根拠）。 */
-export function buildCommentBody({ number, date, markdown }) {
-  return `${CTX_MARKER}\n**brief（\`pnpm ctx ${number}\`、${date}）**\n\n${markdown}\n`;
+export function buildCommentBody({ number, date, generatedAt, snapshotId, markdown }) {
+  const timestamp = generatedAt ?? `${date ?? '未取得'}T00:00:00.000Z`;
+  return `${CTX_MARKER}\n**Issue Context Brief（\`pnpm ctx ${number}\`）**\n生成: ${timestamp} | snapshot: ${snapshotId ?? '未取得'}\n\n${markdown}\n`;
+}
+
+function sameBriefContentIgnoringGeneratedTime(current, candidate) {
+  const normalize = (body) => body.replace(/^生成: .*?( \| snapshot: )/gm, '生成: <timestamp>$1');
+  return normalize(current ?? '') === normalize(candidate ?? '');
 }
 
 /**
@@ -1262,10 +1687,14 @@ export function postContextBrief(pack, markdown, deps = {}) {
     mkdtempImpl = mkdtempSync,
     tmpDirPath = tmpdir(),
     now = () => new Date(),
+    getCurrentSnapshotId,
   } = deps;
 
+  if (pack.snapshotId && !pack.header?.url)
+    throw new Error('対象Issue/PRのURLが未取得のためbriefを投稿できません');
+
   const existingComments = runGhJson(
-    ['api', `repos/${REPO}/issues/${pack.number}/comments?per_page=100`, '--paginate'],
+    ['api', `repos/${REPO}/issues/${pack.number}/comments?per_page=100`, '--paginate', '--slurp'],
     { execFileImpl },
   );
   // 認証ユーザーの login を 1 回だけ取得する。取得失敗（gh 未認証等）は fail-open で
@@ -1275,14 +1704,40 @@ export function postContextBrief(pack, markdown, deps = {}) {
     () => runGh(['api', 'user', '--jq', '.login'], { execFileImpl }).trim(),
     null,
   );
-  const existing = findMarkerComment(existingComments, authLogin);
+  const existing = findMarkerComment(
+    Array.isArray(existingComments) ? existingComments.flat() : [],
+    authLogin,
+  );
 
-  const date = now().toISOString().slice(0, 10);
-  const body = buildCommentBody({ number: pack.number, date, markdown });
+  const assertFreshSnapshot = () => {
+    if (!pack.snapshotId) return;
+    if (typeof getCurrentSnapshotId !== 'function')
+      throw new Error('投稿前のsnapshot再確認関数がありません');
+    const currentSnapshotId = getCurrentSnapshotId(pack);
+    if (currentSnapshotId !== pack.snapshotId)
+      throw new Error(
+        `投稿前に入力snapshotが変化しました（${pack.snapshotId} → ${currentSnapshotId ?? '未取得'}）。briefを再生成してください`,
+      );
+  };
+  const body = buildCommentBody({
+    number: pack.number,
+    generatedAt: pack.generatedAt ?? now().toISOString(),
+    snapshotId: pack.snapshotId,
+    markdown,
+  });
+
+  if (existing && sameBriefContentIgnoringGeneratedTime(existing.body, body)) {
+    assertFreshSnapshot();
+    return { mode: 'unchanged', url: existing.html_url ?? null };
+  }
 
   const dir = mkdtempImpl(join(tmpDirPath, 'ctx-brief-'));
   const tmpFile = join(dir, 'body.md');
   writeFileImpl(tmpFile, body, 'utf8');
+
+  // Collect again after the draft is ready and directly before the GitHub mutation. The generated
+  // marker itself is excluded from the snapshot, so creation/update remains idempotent.
+  assertFreshSnapshot();
 
   const { mode, argv } = buildPostArgs({
     number: pack.number,
@@ -1292,7 +1747,7 @@ export function postContextBrief(pack, markdown, deps = {}) {
 
   if (mode === 'update') {
     const updated = runGhJson(argv, { execFileImpl });
-    return { mode, url: updated?.html_url ?? null };
+    return { mode, url: updated?.html_url ?? existing?.html_url ?? null };
   }
   const out = runGh(argv, { execFileImpl });
   return { mode, url: out.trim() };
@@ -1305,9 +1760,11 @@ function main() {
   const pack = buildContextPack(options, {});
   if (options.post) {
     const markdown = renderMarkdown(pack);
-    const result = postContextBrief(pack, markdown, {});
+    const result = postContextBrief(pack, markdown, {
+      getCurrentSnapshotId: () => buildContextPack(options, {}).snapshotId,
+    });
     process.stdout.write(
-      `${result.mode === 'update' ? '更新' : '作成'}: ${result.url ?? '（URL 未取得）'}\n`,
+      `${result.mode === 'update' ? '更新' : result.mode === 'unchanged' ? '変更なし' : '作成'}: ${result.url ?? '（URL 未取得）'}\n`,
     );
     return;
   }

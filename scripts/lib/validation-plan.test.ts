@@ -26,27 +26,63 @@ describe('trusted validation plan', () => {
   it.each([
     'AGENTS.md',
     '.agents/skills/test/SKILL.md',
-    '.github/workflows/ci.yml',
-    'scripts/ci/validation-plan.mjs',
     'docs/security.md',
     'apps/web/content/docs/a.mdx',
     'apps/product/src/a.css',
     'apps/product/src/a.tsx',
     'apps/product/src/lib/time/a.ts',
-    'apps/product/src/app/api/mcp/a.ts',
     'pnpm-lock.yaml',
-  ])('requires review for %s', (file) => {
+  ])('does not require an independent review for reversible changes: %s', (file) => {
+    expect(plan([file]).review.status).toBe('not-applicable');
+  });
+  it.each([
+    '.github/workflows/ci.yml',
+    '.github/actions/setup/action.yml',
+    'package.json',
+    'scripts/ci/impact.mjs',
+    '.github/workflows/validation-gate.yml',
+    'scripts/ci/validation-gate.mjs',
+    'scripts/lib/validation-plan.mjs',
+    'scripts/lib/review-policy.mjs',
+    'apps/product/src/app/api/mcp/a.ts',
+    'apps/product/src/app/[locale]/(auth)/auth/callback/route.ts',
+    'apps/product/src/proxy.ts',
+    'apps/product/src/lib/supabase/middleware.ts',
+    'apps/product/src/lib/supabase/oauth.ts',
+    'apps/product/src/lib/supabase/server.ts',
+    'apps/product/src/lib/trpc/context.ts',
+    'apps/product/src/lib/trpc/session-auth-context.ts',
+    'apps/product/src/lib/auth/domain/access-policy.ts',
+    'apps/product/src/lib/safe-redirect.ts',
+    'apps/product/src/lib/oauth-server/scopes.ts',
+    'apps/product/src/features/external-calendar/server/google-oauth.ts',
+    'apps/product/src/features/external-calendar/server/authority-config.ts',
+    'apps/product/src/features/external-calendar/server/connect-flow.ts',
+    'apps/product/src/features/external-calendar/schemas/google.ts',
+    'apps/product/src/features/external-calendar/server/connection-service.ts',
+    'apps/product/src/features/external-calendar/server/sync-service.ts',
+    'apps/product/src/app/api/cron/calendar-sync/route.ts',
+    'apps/product/src/app/api/cron/billing-reconciliation/route.ts',
+    'apps/product/src/app/api/v1/calendar/[token]/route.ts',
+    'apps/product/src/features/timeblock/lib/plan-to-ical.ts',
+    'apps/product/src/features/settings/server/account-deletion.ts',
+    'apps/product/src/app/api/trpc/_server/_composition/account-deletion-coordinator.ts',
+    'scripts/lib/validation-evidence.mjs',
+    'scripts/ci/validation-plan-shadow.mjs',
+    'supabase/migrations/20260916000000_rls.sql',
+  ])('requires review for an external contract, irreversible change, or guardrail: %s', (file) => {
     expect(plan([file]).review.status).toBe('required');
   });
-  it('does not confuse policy review with app build', () => {
+  it('does not confuse agent guidance with an executable guardrail', () => {
     // 元の assertion は `scripts` も required に固定していたが、producer の `📦 Unit Tests` は
     // ci.yml が docs-only で skip するため満たされず、恒久 blocked になっていた（#2821）。
-    // policy 文書に求めるのは review と static の 2 つで、app build は要らない、が本来の意図。
+    // agent 向け文書は static だけでよい。Codex review の対象は外部契約・不可逆・
+    // 機械ガードレール自身に限る（#2489）。
     const result = plan(['AGENTS.md']);
     expect(result.required.productPreview.status).toBe('not-applicable');
     expect(result.required.static.status).toBe('required');
-    expect(result.review.status).toBe('required');
-    expect(result.review.protected).toBe(true);
+    expect(result.review.status).toBe('not-applicable');
+    expect(result.review.protected).toBe(false);
   });
   it('unions README and RLS requirements, including independent migration paths', () => {
     const result = plan(['README.md', 'supabase/migrations/20260916000000_rls.sql']);
@@ -82,7 +118,7 @@ describe('trusted validation plan', () => {
     expect(result.areas).not.toContain('database');
     expect(result.areas).not.toContain('unknown');
     expect(result.required.integration.status).toBe('not-applicable');
-    expect(result.review.status).toBe('required');
+    expect(result.review.status).toBe('not-applicable');
   });
   it('still requires integration when the same change carries SQL', () => {
     const result = plan([
@@ -113,7 +149,7 @@ describe('trusted validation plan', () => {
     const result = plan([file]);
     expect(result.required.scripts.status).toBe('not-applicable');
     expect(result.required.static.status).toBe('required');
-    expect(result.review.status).toBe('required');
+    expect(result.review.status).toBe('not-applicable');
   });
   it.each([
     'scripts/ci/impact.mjs',
@@ -127,6 +163,7 @@ describe('trusted validation plan', () => {
   it('requires broad validation for unknown paths', () => {
     const result = plan(['new-root/file']);
     expect(Object.values(result.required).every((rule) => rule.status === 'required')).toBe(true);
+    expect(result.review.status).toBe('not-applicable');
   });
   it.each([
     { diff: { complete: false, files: ['README.md'], hash: 'd'.repeat(64) } },
@@ -141,6 +178,56 @@ describe('trusted validation plan', () => {
       true,
     );
     expect(result.review.status).toBe('indeterminate');
+  });
+  // #2811 / PR #2868: repo 直下の設定と editor 設定が unknown へ落ちると databaseTests が
+  // applicable になり、migration が無い PR が隔離 Supabase branch を待って恒久 blocked になる。
+  it.each([
+    '.gitignore',
+    '.prettierignore',
+    '.prettierrc',
+    'turbo.json',
+    '.vscode/settings.json',
+    '.gitleaks.toml',
+    '.boundary-budget.json',
+    '.op-env.agent.example',
+  ])('treats repo config %s as policy, not an unsatisfiable database requirement', (file) => {
+    const result = plan([file]);
+    expect(result.areas).not.toContain('unknown');
+    expect(result.areas).toContain('policy');
+    // 実効 unknown は areas と impact の OR。片側だけ直しても恒久 blocked は消えない
+    expect(result.legacyImpact.unknown).toEqual([]);
+    // migration が無いので隔離 DB は要求しない（Supabase Preview は起動しようがない）
+    expect(result.environments.databaseTests).toBe('not-applicable');
+    expect(result.review.protected).toBe(false);
+  });
+  // plan 側では既に `dependencies` に分類されていたが impact 側が未分類だったもの。
+  // 実効 unknown は両者の OR なので、impact 側だけでも恒久 blocked を作る
+  it.each(['lint-staged.config.mjs', 'tsconfig.scripts.json'])(
+    'does not let impact-side unknown make %s wait for an isolated database',
+    (file) => {
+      const result = plan([file]);
+      expect(result.legacyImpact.unknown).toEqual([]);
+      expect(result.environments.databaseTests).toBe('not-applicable');
+    },
+  );
+  it('treats a dependency patch as a build input, not an unknown path', () => {
+    const result = plan(['patches/image-size@2.0.2.patch']);
+    expect(result.areas).not.toContain('unknown');
+    expect(result.areas).toContain('dependencies');
+    expect(result.legacyImpact.unknown).toEqual([]);
+    // pnpm の patchedDependencies は両 app の node_modules を変える
+    expect(result.legacyImpact.product).toBe(true);
+    expect(result.legacyImpact.web).toBe(true);
+    expect(result.environments.databaseTests).toBe('not-applicable');
+  });
+  it('still fails closed for an unrecognized nested directory', () => {
+    const result = plan(['terraform/main.tf']);
+    expect(result.areas).toContain('unknown');
+    expect(result.environments.databaseTests).toBe('disposable-local');
+  });
+  it('keeps requiring an isolated database when the PR really has a migration', () => {
+    const result = plan(['supabase/migrations/20260920000000_add_column.sql']);
+    expect(result.environments.databaseTests).toBe('disposable-local');
   });
   it('is deterministic and explains revisions and legacy differences', () => {
     const result = plan(['AGENTS.md']);

@@ -514,6 +514,35 @@ npx supabase secrets set --env-file .env.edge.<env> --project-ref=<REF>
 - production への変更は必ず preview branch での検証を経る
 - staging は「Stripe検証 / hotfix / closed beta」以外の目的では触らない
 
+## 実測で分かった罠（local DB / 生成物 / PostgREST）
+
+2026-09-22 に Claude Code の memory から昇格。
+
+### local DB の状態
+
+- **local DB は「最後に reset した branch」の状態を保持し、たいてい worktree より先行している**。`psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -c "SELECT count(*), max(version) FROM supabase_migrations.schema_migrations;"` と `ls supabase/migrations/*.sql | wc -l`（`CLAUDE.md` を数えないよう `*.sql` に限る）を突き合わせ、ずれていたら生成コマンドの前に `pnpm db:fresh`（他 branch のローカルデータが消えるので一言確認）。並列に他 session が動く時は、DB に依存する検証（`rls:snapshot` / `types:generate:local` / integration test）を全 writer の完了後にもう一度まとめてやり直す
+- **local の `postgres` は superuser ではない**（`rolsuper = f`、superuser は `supabase_admin` だけ）。権限で通るか落ちるかは local の grant で先に判定できる。確認は `SELECT rolname, rolsuper FROM pg_roles` → `SELECT relacl FROM pg_class` → `has_table_privilege(...)`。`vault.secrets` は `postgres` に SELECT / DELETE / TRUNCATE / REFERENCES はあるが INSERT / UPDATE は無い（#2733）
+- **psql（`postgres`）は DT005 を外す**。`validate_record_temporal_write_v1` は `SESSION_USER` が `postgres` / `supabase_admin` の時は「Record は未来に終われない」を強制しない（migration / seed のための例外）。command 関数は JWT の role を見るので psql からは `42501` になり、transaction 内の `set_config('request.jwt.claims', '{"role":"service_role"}', true)` で呼べる。DB の規則をアプリと同じ条件で確かめる時は REST（`curl http://127.0.0.1:54321/rest/v1/rpc/<fn>` に `supabase status -o json` の SERVICE_ROLE_KEY）から送り、psql の結果を本番の根拠にしない（手順は `docs/learn/labs/`）
+- **`ALTER TABLE ... OWNER TO` は既存 GRANT を不可逆に消す**。owner を戻しても ACL は復元しない。owner 変更を伴う検証の後は `pnpm db:fresh` で作り直す。生成物の件数減（`rls:snapshot` の ACL が 1 → 0）が唯一のサイン（PR #1901）
+
+### 生成物
+
+- **`pnpm types:generate`（production）は 3 つの罠がある**。token 無しだと redirect が先に走って `database.types.ts` が 1 行に切り詰められる（`git checkout --` で戻す）。Prettier を通さないと 2,200 行超の偽 diff になる。`stripe_webhook_events.status` がリテラルユニオンから `string` へ落ちるのは CLI の既知 quirk なので該当行だけ戻す。未 merge の RPC は production に無いので最初から `types:generate:local` → prettier → `git diff --stat` の順にする
+- **SQL 関数の最新定義を migration ファイルの grep で探すと改名チェーンで取りこぼす**。`public.X_command_v1` → `SET SCHEMA private` → `RENAME TO X_unserialized_v1` の経路で本体が `private.*_unserialized_v1` に移っている（#2598 で 7 関数中 2 つを見落とした）。適用済み local DB へ直接聞く: `SELECT n.nspname||'.'||p.proname, pg_get_functiondef(p.oid) FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname IN ('public','private') AND p.prosrc LIKE '%<ERRCODE>%';`。dump を起点に guard 部分だけを機械的に除いて migration を生成すれば `SECURITY DEFINER` / `search_path` / `lock_timeout` の取りこぼしも防げる
+
+### PostgREST（`@supabase/supabase-js` 2.110 / PostgREST 14.1 で一次確認）
+
+- **配列 `upsert` は全行のキーの和集合を送り、欠けた行は NULL で埋める**。一部の行だけに列を入れると他の行の既存値が NULL 上書きされる。全行のキー集合を厳密に揃える
+- **`.not('col','in','()')` は空リストで全行一致 → 全削除**。空配列を渡す DELETE を禁止する（`.in()` は空で 0 件なので安全）
+- **`max_rows=1000`（`supabase/config.toml`）を超える SELECT は静かに切り捨てる**。keyset ページングで回す。URL 長は約 8192B（`.in()` は UUID 約 210 件で 414）
+- **anti-join DELETE は PostgREST 単体で書けない**。候補 SELECT → 参照 SELECT → 差集合 → `.in('id', ...)` DELETE、または RPC。参照判定は soft-delete で絞らない（削除済み行も FK を掴む）
+- **column-scoped GRANT の table は列を明示列挙する**。`select('*')` も未 grant 列を含む WHERE / ORDER も `42501`（列名は出ない）
+
+### production の読み取り
+
+- **MCP 公開契約の破壊的変更を検討する前に接続数を実測する**。2026-08-18 時点で `oauth_connections` / `oauth_tokens` / `oauth_authorization_codes` は 3 table とも 0 行で、alias 維持の推奨は母数が空だった（#2174）。実測は時点ものなので、0 件を前提にする migration には適用時に数え直して 0 でなければ止まる preflight を付ける
+- **read-only の実測は `op run` 経由の Management API で自前実行できる**（`docs/operations/secrets.md` §実測で分かった罠）。config / branches endpoint は guard が言及ごと止めるので、診断は status page と PR の bot コメントで足りる
+
 ## 関連スキル
 
 - `/optimistic-update` - Realtime 競合対策

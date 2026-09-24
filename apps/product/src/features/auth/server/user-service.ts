@@ -24,7 +24,7 @@ import {
   publicRecordSelect,
   publicUserSettingsSelect,
 } from '@/lib/database';
-import { getUserLocale, sendAccountDeletionEmail } from '@/lib/email/router';
+import { getUserLocale, sendAccountDeletionEmail } from '@/lib/email/notifications';
 import { logger } from '@/lib/logger';
 import {
   captureUnexpectedDatabaseError,

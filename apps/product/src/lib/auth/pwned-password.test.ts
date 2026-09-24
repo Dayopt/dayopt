@@ -7,7 +7,11 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { checkPasswordPwned, getPasswordPwnedCount } from './pwned-password';
+import {
+  checkPasswordPwned,
+  getPasswordPwnedCount,
+  PWNED_PASSWORD_TIMEOUT_MS,
+} from './pwned-password';
 
 // fetchのモック
 const mockFetch = vi.fn();
@@ -65,6 +69,38 @@ describe('Pwned Password Check', () => {
       const result = await checkPasswordPwned('testpassword');
 
       expect(result).toBe(false);
+    });
+
+    // 応答しない接続（キャプティブポータル / パケットを捨てる proxy）では
+    // fetch が解決も reject もしない。timeout が無いとサインアップのスピナーが
+    // 永久に回り、理由も出ない。
+    it('should time out and fail safe when the request never settles', async () => {
+      mockFetch.mockImplementationOnce(
+        (_url: string, init: RequestInit) =>
+          new Promise((_resolve, reject) => {
+            init.signal?.addEventListener('abort', () =>
+              reject(new DOMException('The operation was aborted.', 'TimeoutError')),
+            );
+          }),
+      );
+
+      const result = await checkPasswordPwned('password');
+
+      expect(result).toBe(false);
+    });
+
+    it('should pass an abort signal with the documented budget', async () => {
+      mockFetch.mockResolvedValueOnce({ ok: true, text: async () => '' });
+      const timeoutSpy = vi.spyOn(AbortSignal, 'timeout');
+
+      await checkPasswordPwned('password');
+
+      expect(timeoutSpy).toHaveBeenCalledWith(PWNED_PASSWORD_TIMEOUT_MS);
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({ signal: expect.any(AbortSignal) }),
+      );
+      timeoutSpy.mockRestore();
     });
 
     it('should return false on network error (fail safe)', async () => {

@@ -31,7 +31,8 @@ Dayopt の AI 協働設定を provider-neutral に棚卸しし、不要・重複
 - project skill の正本は `.agents/skills/*/SKILL.md`。`.claude/skills` は Claude Code 互換の相対 symlink で、内容を二重管理しない
 - `.claude/rules/` と `.claude/agents/` は持たない。恒常ルールは AGENTS.md または該当 skill に置く
 - hook の共有ロジックは `scripts/hooks/pre-tool-guard-rules.mjs`。provider adapter はこの rules を呼ぶ薄い入口とし、runtime から登録・起動されて初めて強制力を持つ
-- 通常の独立 PR レビューは `@codex review`。`pr-cross-review` は通常手順と高リスク変更の追加契約への入口であり advisory。外部 provider の可用性を merge gate にしない
+- runtime で read-only と repository scope を同時に強制できる adapter がないため、大量の読み取り調査も主担当が行う。現行 native delegation は実際の入力に read-only / write を区別する型がないため使わず、runtime が別名の typed write / browser tool を提供した時だけ User の明示した非重複 scope・authority 契約で扱う。両方を実測できる adapter が追加された場合だけ、Luna / Haiku の候補を再評価する
+- 独立 PR レビューは `protected-path-gate.mjs` が判定する外部契約・不可逆・ガードレール変更だけで `@codex review` を使う。通常 PR は対象外で、`pr-cross-review` は依頼と裁定の入口。追加 reviewer は User が明示的に再開を指示するまで停止する
 
 ## Inventory
 

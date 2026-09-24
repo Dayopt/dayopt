@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-07-21
+last_verified: 2026-09-17
 code:
   - apps/product/src/features/contact
   - apps/product/src/app/api/webhooks/resend
@@ -40,6 +40,36 @@ Resend delivery failure → app別POST /api/webhooks/resend → PIIなしSentry 
 
 API keyやwebhook secretはchat、Issue、PR、docsへ貼らない。アプリ送信用keyとGmail返信用keyを共用しない。
 
+## 重複配送をどの層で止めるか
+
+Resendのidempotency keyは**24時間保持・256文字まで・同じkeyでpayloadが違うと409**。つまり「retryでは同じkey、別の論理通知では別key」を満たせない経路に機械的にkeyを付けると、正当な2回目の通知を黙って潰す。経路ごとに止める層を分ける（#2803）。
+
+| 経路                                                        | retryの発生源                                 | 止める層                                                                                                                                |
+| ----------------------------------------------------------- | --------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| Supabase Authメール（`supabase/functions/send-auth-email`） | GoTrueが503 / 429で最大3回・総予算5秒で再試行 | **Resend idempotency key**。`webhook-id`（Standard Webhooks仕様でretry間も不変）から`auth/<webhook-id>/<action>/<recipient role>`を作る |
+| Contact（Product / Web）                                    | ユーザーの再送信                              | Resend idempotency key。client生成の`submissionId`を使い、本文を編集したら新しいUUIDにする                                              |
+| Welcome                                                     | サインイン経路の再実行                        | DB claim。`profiles.welcome_email_sent_at`の条件付きUPDATEで掴んでから送る                                                              |
+| Stripe由来の課金メール                                      | Stripeのwebhook再送                           | DB claim。`stripe-webhook-idempotency.ts`                                                                                               |
+| MFA disabled / account deletion                             | なし（server-side service の1回呼び出し）     | 何もしない                                                                                                                              |
+
+**最後の行にkeyを足さない。** provider retryが走らないのでkeyが防ぐものが無い。パスワード変更通知は Auth Hook へ移し、`webhook-id` というイベント単位の安定IDで同一イベントの再試行だけを抑止する（#2848）。
+
+パスワード変更通知も送信前に`email_suppressions`を確認する。suppressedまたは判定不能なら
+Resendへ送らず、宛先を含まないSentry eventを残してAuth Hookへ200を返す。認証メールと同じ
+From domainの評価を、既知のbounce / complaint先への再送で落とさないためである。
+
+`webhook-id`が取れない時は**乱数へフォールバックしない**。毎回違うkeyはidempotencyとして無意味で、「冪等になったつもり」で`resolveSendAuthEmailStatus`の503→500降格を外すとかえって二重配送が増える。keyを作れない時はkey無しで送り、降格を従来どおり効かせる。
+
+## 一時API keyの扱い
+
+検証のために作った短命のResend API keyは、**検証が終わったら消すところまでが1つの作業**。
+
+- 作成時に目的・scope（sending-only / domain限定）・ownerをIssueへ書く
+- 値は1Passwordの正規itemへ入れない（長寿命keyと混ざるため）。検証中だけ手元に置く
+- 削除前に、GitHub / Vercel / 1Password / Supabase / repo検索のすべてで参照0を確認する
+- 削除は外部サービスの不可逆操作なので、確認結果を示してUserの承認を得てから実行する
+- cleanupの証跡にkey値そのものを残さない
+
 ## 1. DNSと受信の準備（ユーザー作業）
 
 1. Cloudflare Freeへ`dayopt.app`を追加する。nameserverはまだ変更しない
@@ -54,6 +84,27 @@ API keyやwebhook secretはchat、Issue、PR、docsへ貼らない。アプリ�
 6. 既存GmailをDestinationとして認証し、`support@dayopt.app`だけを転送する。catch-allは無効にする
 
 DNS移管で到達性を失った場合は、Vercel Registrarのnameserverを元のVercel nameserverへ戻す。変更前のrecord一覧は値を秘密にする必要はないが、Cloudflare importとVercel表示を照合できる形で手元に保存する。
+
+### DMARCはFrom domainの側に要る（2026-09-17 実測）
+
+DMARCは**From headerのdomain**で評価される。Dayoptの実Fromは`noreply@dayopt.app` / `support@dayopt.app`のapexなので、参照されるのは`_dmarc.dayopt.app`であって`_dmarc.send.dayopt.app`ではない。
+
+`dig +short TXT <name> @1.1.1.1` の実測:
+
+| name                           | 実測値                                                  | 意味                                               |
+| ------------------------------ | ------------------------------------------------------- | -------------------------------------------------- |
+| `_dmarc.dayopt.app`            | `cname.vercel-dns-017.com.`（wildcard `*` CNAMEが応答） | **DMARC TXTが無い。** 実Fromのdomainにpolicyが無い |
+| `_dmarc.send.dayopt.app`       | `v=DMARC1; p=none; rua=mailto:dmarc@dayopt.app`         | From に使わない側にだけpolicyがある                |
+| `send.dayopt.app` TXT          | `v=spf1 include:amazonses.com ~all`                     | Return-Path用SPF                                   |
+| `resend._domainkey.dayopt.app` | DKIM公開鍵                                              | `d=dayopt.app`で署名される                         |
+
+alignment自体は成立している（DKIMは`d=dayopt.app`でstrict alignment、SPFはReturn-Path `send.dayopt.app`とFrom `dayopt.app`が同じorganizational domainなのでrelaxed alignment）。欠けているのは**policyの公開だけ**で、apexへ1本足せば埋まる。
+
+```
+_dmarc.dayopt.app TXT "v=DMARC1; p=none; rua=mailto:dmarc@dayopt.app"
+```
+
+`p=none`は非強制なので既存配信を壊さない。apexにexplicit recordを置けばwildcard `*` CNAMEより優先される。強いpolicy（`p=quarantine` / `p=reject`）へ上げるのは、`rua`のレポートで全経路（Supabase Auth / Product・Web のResend / Gmail返信SMTP）のalignmentを確認してから。
 
 ## 2. 返信の準備（ユーザー作業）
 

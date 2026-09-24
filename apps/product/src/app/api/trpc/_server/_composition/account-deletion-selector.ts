@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { deleteLegacyBillingAccountData } from '@/features/settings/server/account-deletion';
+import { deletePostHogAccountData } from '@/lib/analytics/posthog-deletion';
 import { getExternalLifecycleAppVersion } from '@/lib/database/external-lifecycle-version';
 import { captureUnexpectedError } from '@/lib/sentry';
 import { createServiceRoleClient } from '@/lib/supabase/oauth';
@@ -26,6 +27,7 @@ async function prepareLegacyAccountDeletion(
     }
 
     await deleteLegacyBillingAccountData(userId);
+    await deletePostHogAccountData({ userId });
 
     return { status: 'completed' };
   } catch (error) {

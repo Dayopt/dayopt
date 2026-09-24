@@ -24,7 +24,14 @@ import {
   resolveSendAuthEmailStatus,
   type SendAuthEmailFailurePhase,
 } from './failure.ts';
+import {
+  type AuthEmailRecipientRole,
+  buildAuthEmailIdempotencyKey,
+  resolveWebhookEventId,
+} from './idempotency.ts';
 import { MagicLinkEmail } from './MagicLinkEmail.tsx';
+import { resolvePasswordChangedNotificationEmails } from './password-changed-notification.ts';
+import { PasswordChangedEmail } from './PasswordChangedEmail.tsx';
 import { PasswordResetEmail } from './PasswordResetEmail.tsx';
 import { authEmailSubjects } from './subjects.ts';
 import { resolveAuthEmailSecretKey } from './supabase-key.ts';
@@ -38,24 +45,30 @@ const APP_URL = Deno.env.get('NEXT_PUBLIC_APP_URL') || 'https://app.dayopt.app';
 
 type Locale = 'en' | 'ja';
 
-/**
- * user_settings から preferred_locale を取得する
- * 取得できない場合は 'en' にフォールバック
- */
-async function getUserLocale(userId: string): Promise<Locale> {
+function createAuthEmailServiceClient() {
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
-  if (!supabaseUrl) return 'en';
+  if (!supabaseUrl) return undefined;
+
   const secretKey = resolveAuthEmailSecretKey({
     supabaseUrl,
     secretKey: Deno.env.get('SUPABASE_SECRET_KEY'),
     secretKeys: Deno.env.get('SUPABASE_SECRET_KEYS'),
     localServiceRoleKey: Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'),
   });
+  if (!secretKey) return undefined;
 
-  if (!secretKey) return 'en';
+  return createClient(supabaseUrl, secretKey);
+}
+
+/**
+ * user_settings から preferred_locale を取得する
+ * 取得できない場合は 'en' にフォールバック
+ */
+async function getUserLocale(userId: string): Promise<Locale> {
+  const supabase = createAuthEmailServiceClient();
+  if (!supabase) return 'en';
 
   try {
-    const supabase = createClient(supabaseUrl, secretKey);
     const { data } = await supabase
       .from('user_settings')
       .select('preferred_locale')
@@ -71,6 +84,24 @@ async function getUserLocale(userId: string): Promise<Locale> {
 }
 
 /**
+ * bounce / complaint 済みの宛先かを service role で確認する。
+ * 判定不能時は caller が fail-closed で通知を落とし、PIIなしの運用痕跡を残す。
+ */
+async function isEmailSuppressed(email: string): Promise<boolean> {
+  const supabase = createAuthEmailServiceClient();
+  if (!supabase) throw new Error('Email suppression lookup is unavailable');
+
+  const { data, error } = await supabase
+    .from('email_suppressions')
+    .select('reason')
+    .eq('email', email)
+    .limit(1);
+
+  if (error) throw new Error('Email suppression lookup failed');
+  return data.length > 0;
+}
+
+/**
  * 確認 URL の組み立ては `./confirm-url.ts`（Deno API 非依存の純関数）へ寄せてある。
  * origin の allowlist 検証を含み、Node 側の vitest から直接テストできる（#2616）。
  */
@@ -82,6 +113,8 @@ interface OutgoingEmail {
   to: string;
   subject: string;
   element: React.ReactElement;
+  /** idempotency key の末尾。同じ webhook 配送に属する 2 通を区別する（#2803） */
+  recipientRole: AuthEmailRecipientRole;
 }
 
 Deno.serve(async (req) => {
@@ -108,123 +141,188 @@ Deno.serve(async (req) => {
 
   const { user, email_data } = verified;
 
+  // Standard Webhooks の `webhook-id`。retry では同じ値・別イベントでは別の値になるので、
+  // そのまま idempotency key の素材にできる（#2803）。欠落時は undefined のまま扱い、
+  // 乱数へフォールバックしない。
+  const eventId = resolveWebhookEventId(headers);
+
   // Sentry へ送る context 用。宛先 email・本文・token_hash は含めない。
   let phase: SendAuthEmailFailurePhase = 'render';
   let sentCount = 0;
   let currentSubject = '';
+  // 「既に送った分がすべて idempotency key 付きだったか」。`eventId` の有無ではなく実際に
+  // 適用できた key を見る（key は 256 文字上限でも作られないため、両者は一致しない）。
+  let sentWithoutIdempotencyKey = false;
 
   try {
     const userName = user.user_metadata.full_name || 'there';
-    const confirmUrl = buildConfirmUrl(email_data);
     const locale = await getUserLocale(user.id);
     const subjects = authEmailSubjects[locale];
 
     const emails: OutgoingEmail[] = [];
+    const passwordChangedResolution = await resolvePasswordChangedNotificationEmails({
+      emailActionType: email_data.email_action_type,
+      user,
+      locale,
+      isEmailSuppressed,
+    });
 
-    switch (email_data.email_action_type) {
-      case 'signup': {
-        emails.push({
-          to: user.email,
-          subject: subjects.signup,
-          element: React.createElement(ConfirmEmail, {
-            userName,
-            confirmUrl,
-            locale,
-            appUrl: APP_URL,
+    if (passwordChangedResolution?.status === 'send') {
+      emails.push(
+        ...passwordChangedResolution.emails.map(
+          ({ userName: passwordChangedUserName, ...email }) => ({
+            ...email,
+            element: React.createElement(PasswordChangedEmail, {
+              userName: passwordChangedUserName,
+              locale,
+              appUrl: APP_URL,
+            }),
           }),
-        });
-        break;
-      }
-      case 'recovery': {
-        emails.push({
-          to: user.email,
-          subject: subjects.recovery,
-          element: React.createElement(PasswordResetEmail, {
-            userName,
-            resetUrl: confirmUrl,
-            locale,
-            appUrl: APP_URL,
-          }),
-        });
-        break;
-      }
-      // hook payload の JSON Schema は 'magiclink'、公式サンプルは 'magic_link' 表記。
-      // アプリは magic link 未使用だが、どちらが来ても処理できるよう両対応する
-      case 'magic_link':
-      case 'magiclink': {
-        emails.push({
-          to: user.email,
-          subject: subjects.magic_link,
-          element: React.createElement(MagicLinkEmail, {
-            loginUrl: confirmUrl,
-            locale,
-            appUrl: APP_URL,
-          }),
-        });
-        break;
-      }
-      case 'email_change': {
-        const newEmail = user.new_email;
-        if (!newEmail) {
-          return new Response(
-            JSON.stringify({ error: { message: 'email_change payload missing new_email' } }),
-            { status: 400, headers: { 'Content-Type': 'application/json' } },
-          );
-        }
-        // Secure Email Change 有効時は 2 通送る。token hash のフィールド名は
-        // 後方互換のため逆転している（公式 docs 明記）:
-        //   現アドレス宛 → token_hash_new / 新アドレス宛 → token_hash
-        if (email_data.token_hash_new) {
+        ),
+      );
+    } else if (passwordChangedResolution) {
+      const reason = passwordChangedResolution.status;
+      console.warn('[send-auth-email] password changed notification skipped', { reason });
+      await captureEdgeFunctionEvent(Deno.env.get('SENTRY_DSN'), {
+        functionName: 'send-auth-email',
+        message: 'Password changed notification skipped',
+        level: 'warning',
+        tags: {
+          action: email_data.email_action_type,
+          phase: 'suppression',
+          kind: reason,
+        },
+      });
+      return new Response(JSON.stringify({}), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    } else {
+      switch (email_data.email_action_type) {
+        case 'signup': {
+          const confirmUrl = buildConfirmUrl(email_data);
           emails.push({
             to: user.email,
-            subject: subjects.email_change_current,
+            subject: subjects.signup,
+            recipientRole: 'single',
+            element: React.createElement(ConfirmEmail, {
+              userName,
+              confirmUrl,
+              locale,
+              appUrl: APP_URL,
+            }),
+          });
+          break;
+        }
+        case 'recovery': {
+          const confirmUrl = buildConfirmUrl(email_data);
+          emails.push({
+            to: user.email,
+            subject: subjects.recovery,
+            recipientRole: 'single',
+            element: React.createElement(PasswordResetEmail, {
+              userName,
+              resetUrl: confirmUrl,
+              locale,
+              appUrl: APP_URL,
+            }),
+          });
+          break;
+        }
+        // hook payload の JSON Schema は 'magiclink'、公式サンプルは 'magic_link' 表記。
+        // アプリは magic link 未使用だが、どちらが来ても処理できるよう両対応する
+        case 'magic_link':
+        case 'magiclink': {
+          const confirmUrl = buildConfirmUrl(email_data);
+          emails.push({
+            to: user.email,
+            subject: subjects.magic_link,
+            recipientRole: 'single',
+            element: React.createElement(MagicLinkEmail, {
+              loginUrl: confirmUrl,
+              locale,
+              appUrl: APP_URL,
+            }),
+          });
+          break;
+        }
+        case 'email_change': {
+          const newEmail = user.new_email;
+          if (!newEmail) {
+            return new Response(
+              JSON.stringify({ error: { message: 'email_change payload missing new_email' } }),
+              { status: 400, headers: { 'Content-Type': 'application/json' } },
+            );
+          }
+          // Secure Email Change 有効時は 2 通送る。token hash のフィールド名は
+          // 後方互換のため逆転している（公式 docs 明記）:
+          //   現アドレス宛 → token_hash_new / 新アドレス宛 → token_hash
+          if (email_data.token_hash_new) {
+            emails.push({
+              to: user.email,
+              subject: subjects.email_change_current,
+              recipientRole: 'current',
+              element: React.createElement(EmailChangeEmail, {
+                userName,
+                confirmUrl: buildConfirmUrl(email_data, email_data.token_hash_new),
+                newEmail,
+                variant: 'current',
+                locale,
+              }),
+            });
+          }
+          emails.push({
+            to: newEmail,
+            subject: subjects.email_change_new,
+            recipientRole: 'new',
             element: React.createElement(EmailChangeEmail, {
               userName,
-              confirmUrl: buildConfirmUrl(email_data, email_data.token_hash_new),
+              confirmUrl: buildConfirmUrl(email_data, email_data.token_hash),
               newEmail,
-              variant: 'current',
+              variant: 'new',
               locale,
             }),
           });
+          break;
         }
-        emails.push({
-          to: newEmail,
-          subject: subjects.email_change_new,
-          element: React.createElement(EmailChangeEmail, {
-            userName,
-            confirmUrl: buildConfirmUrl(email_data, email_data.token_hash),
-            newEmail,
-            variant: 'new',
-            locale,
-          }),
-        });
-        break;
-      }
-      default: {
-        return new Response(
-          JSON.stringify({
-            error: {
-              message: `Unknown email action type: ${email_data.email_action_type}`,
-            },
-          }),
-          { status: 400, headers: { 'Content-Type': 'application/json' } },
-        );
+        default: {
+          return new Response(
+            JSON.stringify({
+              error: {
+                message: `Unknown email action type: ${email_data.email_action_type}`,
+              },
+            }),
+            { status: 400, headers: { 'Content-Type': 'application/json' } },
+          );
+        }
       }
     }
 
-    for (const { to, subject, element } of emails) {
+    for (const { to, subject, element, recipientRole } of emails) {
       currentSubject = subject;
 
       phase = 'render';
       const html = await renderAsync(element);
 
       phase = 'send';
-      const { error } = await resend.emails.send({
-        from: `Dayopt <${FROM_EMAIL}>`,
-        to: [to],
-        subject,
-        html,
+      // 同じ webhook 配送の再試行では同じ key になり、Resend 側で 24 時間のあいだ
+      // 重複配送が抑止される。テンプレートは決定的なので再 render しても payload は
+      // 一致し、payload 不一致の 409 を踏まない（#2803）。
+      const idempotencyKey = buildAuthEmailIdempotencyKey({
+        eventId,
+        emailActionType: email_data.email_action_type,
+        recipientRole,
       });
+
+      const { error } = await resend.emails.send(
+        {
+          from: `Dayopt <${FROM_EMAIL}>`,
+          to: [to],
+          subject,
+          html,
+        },
+        idempotencyKey ? { idempotencyKey } : undefined,
+      );
 
       if (error) {
         // 部分失敗（email_change の 2 通目など）を切り分けられるよう、宛先を含めず記録する
@@ -236,14 +334,19 @@ Deno.serve(async (req) => {
       }
 
       sentCount += 1;
+      if (!idempotencyKey) sentWithoutIdempotencyKey = true;
     }
   } catch (error) {
     const classified = classifySendAuthEmailFailure(error, phase);
     const { kind, resendErrorName, message } = classified;
     const firstEmailAlreadySent = sentCount > 0;
 
-    // 部分送信済みなら retryable status を返さない（判定理由は resolveSendAuthEmailStatus）
-    const status = resolveSendAuthEmailStatus(classified, { firstEmailAlreadySent });
+    // 部分送信済みなら retryable status を返さない（判定理由は resolveSendAuthEmailStatus）。
+    // ただし idempotency key を付けられていれば重複配送が起きないので降格しない。
+    const status = resolveSendAuthEmailStatus(classified, {
+      firstEmailAlreadySent,
+      idempotencyKeyInUse: !sentWithoutIdempotencyKey,
+    });
 
     // 401（署名不一致）は基本的には verify 段階の try/catch が処理するためここには来ないが、
     // 万一 classify が 401 を返しても capture しない（攻撃者由来のノイズを Issues に入れない）
@@ -258,7 +361,11 @@ Deno.serve(async (req) => {
           status: String(status),
           resend_error: resendErrorName ?? 'none',
         },
-        extra: { subject: currentSubject, firstEmailAlreadySent },
+        extra: {
+          subject: currentSubject,
+          firstEmailAlreadySent,
+          idempotencyKeyInUse: !sentWithoutIdempotencyKey,
+        },
       });
     }
 

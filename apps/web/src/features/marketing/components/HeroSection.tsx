@@ -1,7 +1,8 @@
 import { Button, Container } from '@dayopt/components';
-import { dayoptProductUrls } from '@dayopt/config';
 import { getTranslations } from 'next-intl/server';
 import { Fragment } from 'react';
+
+import { SignupCtaLink } from '@web/shell/analytics/SignupCtaLink';
 
 import { HeroProductMocks } from './HeroProductMocks';
 
@@ -45,7 +46,7 @@ export async function HeroSection({ locale }: HeroSectionProps) {
           {/* CTA */}
           <div className="mt-12 flex items-center justify-center">
             <Button variant="primary" size="lg" asChild>
-              <a href={dayoptProductUrls.signup}>{t('hero.ctaPrimary')}</a>
+              <SignupCtaLink ctaId="hero">{t('hero.ctaPrimary')}</SignupCtaLink>
             </Button>
           </div>
 

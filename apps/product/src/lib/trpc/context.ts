@@ -19,6 +19,7 @@ import { trpcPreAuthIpRateLimit } from '@/lib/rate-limit/upstash';
 import { extractClientIp } from '@/lib/security/ip-validation';
 import { captureUnexpectedError } from '@/lib/sentry';
 import { AuthMode, createServiceRoleClient, detectAuthMode } from '@/lib/supabase/oauth';
+import { SUPABASE_TRACE_PROPAGATION } from '@/lib/supabase/trace-propagation';
 import { resolveSessionAuthContext, type MfaAssurance } from '@/lib/trpc/session-auth-context';
 
 /**
@@ -71,8 +72,6 @@ export interface Context {
   oauthExecution?: 'mcp_internal' | undefined;
   /** Supabase Auth MFA assurance level（session modeの場合のみ） */
   mfaAssurance?: MfaAssurance | undefined;
-  /** JWTカスタムクレームから取得したサブスクリプション状態（custom_access_token hook） */
-  subscriptionStatus?: string | undefined;
 }
 
 /**
@@ -178,6 +177,7 @@ async function createTRPCContext(opts: {
       env.NEXT_PUBLIC_SUPABASE_URL,
       env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
       {
+        tracePropagation: SUPABASE_TRACE_PROPAGATION,
         cookies: {
           getAll() {
             return Object.entries(req.cookies).map(([name, value]) => ({
@@ -198,27 +198,6 @@ async function createTRPCContext(opts: {
     mfaAssurance = sessionAuthContext.mfaAssurance;
   }
 
-  // JWTカスタムクレームからsubscription_statusを取得（custom_access_token hook）
-  let subscriptionStatus: string | undefined;
-  const tokenToDecode = accessToken ?? sessionId;
-  if (tokenToDecode) {
-    try {
-      const payload = tokenToDecode.split('.')[1];
-      if (payload) {
-        const claims = JSON.parse(Buffer.from(payload, 'base64url').toString()) as Record<
-          string,
-          unknown
-        >;
-        subscriptionStatus =
-          typeof claims['subscription_status'] === 'string'
-            ? claims['subscription_status']
-            : undefined;
-      }
-    } catch {
-      // JWTデコード失敗時はundefined（entitledProcedureでフォールバック）
-    }
-  }
-
   return {
     req,
     res,
@@ -231,7 +210,6 @@ async function createTRPCContext(opts: {
     mfaAssurance,
     supabase,
     authMode,
-    subscriptionStatus,
   };
 }
 

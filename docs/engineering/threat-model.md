@@ -1,12 +1,11 @@
 ---
 status: current
-last_verified: 2026-09-17
+last_verified: 2026-09-20
 ---
 
 # Threat Model
 
-`security-sweep` skill が scope を決める時と、`security` skill が実装前に既往を照合する時の参照先。
-`pr-cross-review` の `risk-reviewer` も `--source` でこのファイルを受け取る。
+`security` skill が実装前に既往を照合する時と、`/gardening` §5 の月次 sweep が scope を決める時の参照先。
 
 **このファイルは全体の脅威モデルではない。** 1 つの信頼境界ずつ、実際に sweep を回した範囲だけを書く。
 書かれていない境界は「安全」ではなく **未着手**。所見ゼロを clean と読む前に §未検査の境界 を見る。
@@ -53,7 +52,7 @@ sweep が実際に得た既往クラス・却下記録を置く。
 
 ### 攻撃面（`7562ab0ba` 時点で実測）
 
-**入口となる route**（`app/**/route.ts` のうち、この境界に属するもの。全数と method の一覧は [`data/system-surface.md`](./data/system-surface.md) の生成表を見る）:
+**入口となる route**（`app/**/route.{ts,tsx,js,mjs}` のうち、この境界に属するもの。全数と method の一覧は [`data/system-surface.md`](./data/system-surface.md) の生成表を見る）:
 
 | path                                         | 認証                                |
 | -------------------------------------------- | ----------------------------------- |
@@ -73,7 +72,7 @@ sweep が実際に得た既往クラス・却下記録を置く。
 - `apps/product/src/proxy.ts` — 保護ルートの判定と MFA redirect
 - `apps/product/src/lib/supabase/middleware.ts` — セッション更新
 - `apps/product/src/lib/trpc/session-auth-context.ts` — verified user / session token / MFA assurance の共通解決
-- `apps/product/src/lib/auth/domain/access-policy.ts`、`permissions.ts`、`roles.ts`
+- `apps/product/src/lib/auth/domain/access-policy.ts`、`permissions.ts`
 - `apps/product/src/lib/auth/recovery-codes.ts`、`session-config.ts`、`pwned-password.ts`
 - `apps/product/src/lib/safe-redirect.ts` — redirect allowlist
 - `apps/product/src/lib/oauth-server/`（test を除く全モジュール）— `authorize-validation`、`code-exchange`、`redirect-uris`、`scopes`、`tokens`、`token-rate-limit`、`identity`、`clients`、`origin`、`request-host`
@@ -158,6 +157,47 @@ hash 入力なので、同じ欠陥に別の語を当てると同一候補とし
 | 反証           | `apps/product/src/app/api/cron/calendar-sync/route.ts` は未設定なら 503 で返し、設定時は `safeEquals` で `Bearer <secret>` 全体を `timingSafeEqual` に掛ける。攻撃者は決め手になる入力を書けない                                |
 | 引き直しの差分 | パネルが報告しなかった事実として、**4 本の cron route のうち下限を持たないのはこの 1 本だけ**（他 3 本は `MIN_CRON_SECRET_LENGTH = 16` を持つ）。`env.ts` の側にも下限は無い。到達可能な failure ではなく規約の不揃いとして扱う |
 | 再評価条件     | (1) 完全一致が前方一致・部分比較へ変わる (2) 短い値を生成しうる `CRON_SECRET` の発行経路が増える（下限は 3 route 側にあり schema 側に無い）(3) この route に第 2 の認証経路が増える                                             |
+
+### 境界横断の検証で否定した疑い（2026-09-20、`048a8ce`）
+
+sweep ではなく、「境界をまたいだ時に成立しない条件」を探す単発の敵対的検証（PR で記録）。
+1 境界を通して読む sweep の手順は踏んでいないので、上の 3 件と同じ却下記録の扱いにはしない。
+ここに書くのは **将来のセッションが同じ疑いを掘り返さないため**の反証であり、免除ではない。
+同じ検証で確認できた問題のうち E-1（transient bounce の恒久 suppression）と O-9（終了後の UI gating）は
+同 PR で修正し、D-1（Privacy Policy の 30 日 export 窓 vs 即時削除）/ D-2（`email_suppressions` が
+削除後も残る、#2859）/ E-2（MFA 無効化通知の非対称、#2858）は issue にした。法務ページの stale 記述は
+D-1 と合わせて #2832 へ証拠を集約（重複起票の #2857 / #2860 は duplicate close）、repo から確定できなかった
+運用側の 3 点は #2861。
+
+**O-6（`billing-reconciliation` の heartbeat 欠落）は同 PR で直そうとして取り下げた。**
+`cron_heartbeats_job_name_check` が 8 job 名しか許さず、`billing-reconciliation` の書き込みは
+毎回 CHECK violation になる。`writeCronHeartbeat` はそれを握るので行は永遠に作られず、監査へ足すと
+恒久 missing になって直す前より悪い。制約を広げる migration とセットにする必要があるため #2864 へ送った
+（PR #2863 の `@codex review` P2 指摘。**「merged but not effective」を自分でやりかけた実例**として残す）。
+
+| 疑い                                                                                        | 成立前提                                                                 | 反証（`048a8ce`）                                                                                                                                                                                                                                                  | 再評価条件                                                                                 |
+| ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------ |
+| MCP read tool に tenant isolation の case が無いものがある                                  | `_tools/*.ts` が呼ぶ tRPC procedure が test の case より多い             | `_tools/*.ts` が呼ぶのは 8 procedure（activities.listActivities / listCategories、plans.list / getById、records.list / getById、statistics.getMcpReview、timeblockContext.getConstraints）で、`mcp-read-tenant-isolation.integration.test.ts` は全てに case を持つ | read tool を足す時（invariants.md §MCP の規約どおり case を足す）                          |
+| DT005 の `SESSION_USER NOT IN ('postgres','supabase_admin')` 免除を service-role 経路が通る | PostgREST の service-role 接続で SESSION_USER が免除対象になる           | PostgREST は `authenticator` で接続し `SET ROLE` するため SESSION_USER は `authenticator` のまま。免除は migration / seed 用                                                                                                                                       | pooler や Edge Function から `postgres` ロールで直接 DML する経路が増えた時                |
+| cron の calendar sync が利用権の切れた利用者にも走る                                        | dispatcher が entitlement を見ない                                       | `sync-dispatcher.ts:126-148` が enforced 時に `checkEntitlementForUser` で skip し、`sync-service.ts:214-216` 等で多重に再検査する                                                                                                                                 | dispatcher の entitlement 分岐を触る時                                                     |
+| Upstash 未設定で `password-reauthentication.ts:73` の rate limit が fail-open になる        | production で Upstash env が欠けたまま起動できる                         | `env.ts:186-203` の production refine、`production-build-gate.mjs:15-31`、`production-config-audit.mjs:7` の 3 層が build 前に落とす。null 素通り自体は事実                                                                                                        | この 3 層のどれかから Upstash が外れた時                                                   |
+| `email_change` の旧 address 通知が `token_hash_new` 依存で黙って落ちる                      | `mailer_secure_email_change_enabled` が production で false になっている | `production-auth-config-audit.mjs:127` が `true` を pin し drift を検出する（audit は「落ちても操作を止めない」意味で fail-open。無監視ではない）                                                                                                                  | audit の対象 key から外れた時、または Edge Function が `token_hash_new` 以外を条件にした時 |
+| `custom_access_token_hook` が production で無効なため claim 欠落で認可が壊れる              | JWT の `subscription_status` claim を読む認可経路がある                  | `trpc/context.ts:203-221` が `ctx.subscriptionStatus` を組み立てるが読み手が無く、認可は全て `getBillingAccess` が profiles を読む。無効は #1946 の意図的判断                                                                                                      | `ctx.subscriptionStatus` の読み手が増えた時                                                |
+| 公開 docs の Free / Pro・7 日体験の表記が実装（単一プラン・45 日）と食い違う                | 公開文言が誤って取り残されている                                         | `docs/operations/billing-single-plan-rollout.md:31` が「flag flip まで Web は旧表記を保つ」と明記した意図的保留                                                                                                                                                    | `BILLING_ENFORCED=true` を配備する時（同時に Web を更新する）                              |
+| `BILLING_ENFORCED` に production guard が無く、欠落 deploy で課金が黙って外れる             | 現在 production で `true` である                                         | 現在は rollout 前で意図的に `false`（`billing-single-plan-rollout.md:31`）。flip 時に `production-config-audit.mjs` の required へ足す手順が rollout doc に無いことは #2861 に残した                                                                               | rollout 実施時                                                                             |
+
+**否定できず、証拠が足りないまま残した疑い**:
+
+| 疑い                                                                                       | なぜ否定できないか                                                                                                                                                                                                                                                                                                                       | 再評価条件                                                                         |
+| ------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| Stripe `customer.deleted` / `customer.updated` が未処理で durable mode が 500 を返し続ける | `route.ts` の `default` 分岐が durable mode で throw することは実測。しかし **endpoint が実際に何を購読しているかは Stripe Dashboard 側**にあり、repo からは読めない。`docs/product/specs/billing.md:77-81` は 5 種を列挙するが、それは**仕様書であって購読設定の実測ではない**（仕様で反証を名乗らない、#2863 の `@codex review` 指摘） | Stripe Dashboard / API で endpoint の購読 event を実測した時。購読設定を変更した時 |
+
+この 1 件は #2861（repo から確定できない運用側の確認）に含めて追跡する。
+
+**この検証で見ていない範囲**: `supabase/functions/**` の send-auth-email 以外、Stripe / Resend の
+dashboard 側設定（endpoint の振り分け、購読 event の実値）、GoTrue の production 設定値そのもの、
+`apps/web` の LP / blog。integration test は実行環境（local Supabase 無し）の制約で **作成のみ**で、
+CI の integration job で初回実行される。
 
 ## 未検査の境界
 

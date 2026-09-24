@@ -83,6 +83,9 @@ export async function updateSession(request: NextRequest) {
   const sessionContinuity: SessionContinuity = createEmptySessionContinuity();
 
   // Supabaseクライアントを作成
+  // #2728: tracePropagation は渡さない。proxy.ts 経由の edge runtime では
+  // @sentry/vercel-edge が OpenTelemetry の global propagator を登録しないため、
+  // 有効にしても extractor は空の carrier しか返さず header は付かない。
   const supabase = createServerClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,

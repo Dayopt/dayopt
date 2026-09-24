@@ -4,7 +4,7 @@ Dayopt で作業する全エージェントの provider-neutral な正本ガイ�
 
 ## レビュー規則
 
-実装 agent 自身のセルフレビュー、`pr-cross-review`、User が任意で依頼する外部レビューに共通する観点。OpenAI / Codex は実装・調査・レビューを担える primary provider とし、他 provider は高リスク変更で独立した反証が有益な時だけ任意で追加する。外部 provider の可用性は merge gate にしない。
+全 PR のセルフレビューと、保護対象 PR だけで使う `pr-cross-review` に共通する観点。レビューの正本は PR の diff・Issue・検証結果で、provider 固有の model 名や tool 名を全 runtime の保証として扱わない。追加 reviewer は停止中で、User の明示指示がある時だけ別途判断する。
 
 - レビューコメントは日本語で書く
 - diff によって新たに生じる、または現実に悪化する不具合だけを指摘する。問題がなければ指摘ゼロでよい
@@ -40,7 +40,7 @@ Dayopt で作業する全エージェントの provider-neutral な正本ガイ�
 **テンポはルール4が決める**（判断ジャンル横断で使う3段階の authority level）:
 
 - **AUTONOMOUS**（可逆は速く）: 承認なしで進めて事後報告する
-- **CHECKPOINT**（価値判断の境界で止まる）: 顧客挙動・公開契約・権限/プライバシーに関わる時。推奨と最悪ケースを短く添えて問う
+- **CHECKPOINT**（価値判断の境界で止まる）: 顧客挙動・公開契約・権限/プライバシーに関わる時。選択肢を列挙し、推奨と最悪ケースを短く添えて問う（開いた質問で User に構成の仕事を戻さない。複数の判断は 1 回に束ねる）
 - **EXPLICIT AUTHORITY**（不可逆だけ遅く）: production mutation・release・データ削除・不可逆 migration・実課金。明示指示 + 独立レビュー + dry-run/backup が揃うまで実行しない。揃えられなければ実行せず failure mode を報告する
 
 この 5 箇条で裁けない判断・前提を考え直す場面・ルール自体の改訂は、次の 5 原則（番号が小さい方が優先）へ上がる:
@@ -84,11 +84,12 @@ Dayopt で作業する全エージェントの provider-neutral な正本ガイ�
 ## Non-Negotiables
 
 - 既存コードを検索してから変更する（`rg` / `rg --files` 優先）。repo 全体を洗う時は `rg --hidden --glob '!.git/**'`（`.git/` 以外の dot ディレクトリも対象にするため）
+- 非自明な Issue / PR の着手は `pnpm ctx <number>` を入口にする。古い・不足・取得できない情報だけ一次資料で補い、同じ事実を別コマンドで再収集しない。環境状態が必要なら `pnpm agent:preflight`、architecture / API / MCP / DB の構造調査は生成済み docs / map を先に読み、不足分だけソースコードを探索する（詳細は `routing` skill）
 - issue の起票・worker への作業依頼は `dispatch` skill の規約に従う
 - 既存の未コミット差分はユーザー作業として扱い、勝手に revert / stage しない
 - env ファイルの読み書き境界は `docs/operations/secrets.md` に従う。`.op-env.agent`/`.op-env.human` は触ってよいが、実値が入りうる `.env`/`.env.local` は読みも書きもしない
 - `git add .` は避ける。path-limited add で scope を固定する。コミット前に `git diff --cached` を確認する
-- 作業中は変更を証明する対象の検証を優先する。小さく可逆な変更で毎回全体検査を重ねない。挙動変更は対象 test / E2E / Storybook 等、高リスク変更は専用契約を満たす。ready 化前の `pnpm check` と pre-push は維持し、同じ差分・環境で通った検査は新しい根拠なく繰り返さない。どの層にテストを置くか・回帰テストの基準・CI 予算は [docs/engineering/testing.md](docs/engineering/testing.md)
+- 作業中は変更を証明する対象の検証を優先する。小さく可逆な変更で毎回全体検査を重ねない。挙動変更は対象 test / E2E / Storybook 等、高リスク変更は該当するレビュー・CI・authority 契約を満たす。ready 化前の `pnpm check` と pre-push は維持し、同じ差分・環境で通った検査は新しい根拠なく繰り返さない。どの層にテストを置くか・回帰テストの基準・CI 予算は [docs/engineering/testing.md](docs/engineering/testing.md)
 - コミットメッセージは日本語 Conventional Commits（Latin大文字語で始めると`subject-case`で弾かれる）
 - 型: 具体的な型を使う。union の variance には `as never`（`as any` 禁止）。`unknown` は型ガードと併用のみ
 - Export: named export。App Router 特殊ファイル（page/layout/loading等）のみ `export default`
@@ -117,12 +118,12 @@ Dayopt で作業する全エージェントの provider-neutral な正本ガイ�
 ## PR / git 運用
 
 - **束ねが標準**: 機能のまとまり単位で1 PRにする。サイズを理由に分割しない。分割してよいのは不可逆migrationの隔離、独立検証・revertしたい変更のみ
-- **PR判定3問**: (1) 同じレーンが書いたか (2) 壊れたら一緒に戻すか (3) クロスレビュー1巡で読み切れるか
+- **PR判定3問**: (1) 同じレーンが書いたか (2) 壊れたら一緒に戻すか (3) レビュー1巡で読み切れるか
 - **PR は draft で作成**、ローカル検証（`pnpm check` + pre-pushフック）後に自己判断で ready 化する。ready化で軽量CIが起動、fix roundは ready のまま1round=1pushで積む
 - **`Closes #N` を issue ごとに1行**（`Closes #1, #2`は先頭しか閉じない）。epicや部分対応は `Refs #N`
 - **マージは merge commit 限定**（squash/rebase は repo 設定で無効化済み）。`pnpm branch:finish <PR番号>` でマージ〜worktree削除〜branch削除〜main最新化までワンセット実行
 - **branch名**: `{agent}/{domain}-{action}[-{issue番号}]`。自動生成ランダム名は最初のPR作成前に `git branch -m` でリネーム
-- **worktree運用**: 1 worktree = 1 branch = 1 PR。役目を終えたら `pnpm branch:finish` がその場で削除する。`.claude/worktrees/` 配下に作成
+- **worktree運用**: 1 worktree = 1 branch = 1 PR。役目を終えたら `pnpm branch:finish` がその場で削除する。置き場は runtime の既定（Codex は native worktree、Claude Code は `.claude/worktrees/`）でよく、`branch:finish` は `git worktree list` から特定する。**open PR は同時に 1 本まで**（複数 open にすると片方の merge が他方を up-to-date gate で陳腐化させ、追従 merge + CI 再走が無駄になる）。作業中に見つけた別件も新 PR にせず同じ branch に commit を分けて積む
 
 ### レビュー
 
@@ -130,7 +131,7 @@ review threadは全件resolveしてからmerge（fix積む/反論reply/issue化�
 
 レビューのシンプルルール: (1) 壊れる筋書きを語れないなら指摘しない、語れたなら黙殺しない (2) mergeの基準は完璧ではなくmainより安全 (3) 迷ったら点を塞ぐよりclassを閉じる。
 
-**merge の遮断は main の repository ruleset 1 本で行う**（required status checks = `🔍 Static Checks` / `📦 Unit Tests` / `🧪 Integration Tests` / `Vercel – product` / `Vercel – web`、strict up-to-date、review thread resolution、bypass actor 0。2026-09-07 の repo public 化で有効、2026-09-13 に #2640 で `Production Config Audit` を外し Integration Tests を足した）。ruleset は local / cloud / UI / API / MCP のどの経路にも同じ条件で効く。skipped な required check は success 扱いなので、DB を触らない PR は Integration Tests が skip でも止まらない。`pnpm branch:finish` は merge と worktree / branch 掃除をワンセットで行う入口であり gate ではない（rollup 検査は ruleset と重複する冗長検査として残す）。provider adapter の pre-tool guard にあった merge 直接実行の block（#2596）は撤去した。`pr-cross-review` と外部 provider の反証レビューは advisory で、所見は PR コメントとして投稿するだけで merge を止めない。保護対象 path の判定（`scripts/ci/protected-path-gate.mjs`）は、レビューをどこまで重く行うかの目安に使う。保護対象の基準は**外部契約 or 不可逆**（auth/OAuth/MCP、billing/webhook、migration、外部calendar provider、system API、ガードレール自身）。`review:full` ラベルは「User 自身が重く見て目を通す」印であり、機械判定の入力にはしない。
+**merge の遮断は main の repository ruleset 1 本で行う**（required status checks = `🔍 Static Checks` / `📦 Unit Tests` / `🧪 Integration Tests` / `Vercel – product` / `Vercel – web`、strict up-to-date、review thread resolution、bypass actor 0。2026-09-07 の repo public 化で有効、2026-09-13 に #2640 で `Production Config Audit` を外し Integration Tests を足した）。ruleset は local / cloud / UI / API / MCP のどの経路にも同じ条件で効く。`pnpm branch:finish` は merge と worktree / branch 掃除の入口であり gate ではない。独立レビューは `scripts/ci/protected-path-gate.mjs` が判定する保護対象 PR だけを、required CI が通り head が安定した merge 候補時に GitHub の `@codex review` へ出す。基準は **外部契約 or 不可逆**（auth/OAuth/MCP、billing/webhook、migration、外部calendar provider、system API、ガードレール自身）で、通常ロジック・時間不変条件・agent 文書は対象 test / CI とセルフレビューで閉じる（#2489）。`Review policy (shadow)` は advisory のまま自動起動・required 化しない。`review:full` は User 自身が重く見る印で、Codex 起動や merge の機械入力にしない。
 
 retreat条件: `apps/product/src/features/timeblock` または `apps/product/src/lib/time` 配下のtestを削除・skipするPRは、`review:full` labelを手で付けてUser自身が目を通す（時間不変条件の安全網がそのtest自身であるため。#2489 / #2503）。
 
@@ -141,20 +142,22 @@ worktree で作業するセッション（レーン）は次を守る:
 - **止まる前に連絡**する。質問・ブロック・想定外・判断待ちが発生したら、待ち状態に入る前に (1) 何で止まっているか (2) 自分の推奨 (3) 待ち中に続行できる代替作業の有無、の3点で担当issue/PRへコメントする。黙って停止しない
 - **停止条件**: 同種のエラーに3回連続で失敗した／scope外のファイルを変更しないと解決できないと判明した／チケットが前提とする原因・機構が実測と食い違うと分かった、のいずれかに当たったら試行を続けず停止して報告する。エスカレーションは失敗ではなく正しい動作
 - **検証の証跡原則**: 検証主張には実行コマンドと出力の要点を添える。「passした」だけの報告は不可
-- **push前セルフレビューはriskに比例させる**: auth/RLS/billing/migration/公開契約/cross-feature 等の diff と既存パターン追従でない新規ロジックは、push前に敵対的セルフレビューを行い根拠を報告する。これは reviewer の自動委任条件ではない。通常 PR の独立レビューは GitHub の `@codex review`、高リスク変更の追加契約は `pr-cross-review` skill を参照する
-- issue/PRコメントが内容の正本。1 worktree = 1 branch = 1 PR、役目を終えたworktreeはその場で削除する
+- **push前セルフレビューはriskに比例させる**: auth/RLS/billing/migration/公開契約/cross-feature 等の diff と既存パターン追従でない新規ロジックは、push前に敵対的セルフレビューを行い根拠を報告する。これは reviewer の自動委任条件ではない。保護対象 path に一致する PR だけ、merge 候補時に `pr-cross-review` skill で GitHub の `@codex review` を依頼する。追加 reviewer は User が明示的に再開を指示するまで起動しない
+- issue/PRコメントが内容の正本。gh は User の名義で動くので、agent が書くコメントには書き手を 1 行入れる（例:「（2026-09-22、Codex）」）。issue を畳む時は delete せず close + 一言（記録の第一の読者は AI で、delete は追跡が切れる唯一の操作）。1 worktree = 1 branch = 1 PR、役目を終えたworktreeはその場で削除する
 
 ## 委任・報告の作法
 
 - **主担当は1つ**。原則として同じ Codex session が調査・判断・実装・検証・修正まで完了する。工程だけを理由に agent / model を切り替えない。目的は必要な品質を少ない総利用量・手戻り・人間介入で達成すること
-- **最初に成功条件を固定する**。ユーザーが確認できる結果、対象範囲、検証方法を先に書き、手段や model 選択を目的化しない
+- **L2/L3 の役割**: L2 は同一主担当による通常実装、L3 は不変条件・権限・設計判断の助言。モデル切替は助言であり、担当・承認・authority を移さない。Issue 束ねは下記 PR / git 運用規則に従う（詳細: `routing` / `dispatch` skill）
+- **Issue Context Brief**: 要求・制約の正本はIssue本文。担当Codex sessionは着手時にIssue本文と信頼できる最新 `ctx-brief` コメントを明示取得し、Issue番号とsnapshotが一致することを確かめる。コメントが存在するだけではsessionへの配達完了とみなさない
+- **最初に成功条件を固定する**。ユーザーが確認できる結果、対象範囲、検証方法を先に書き、手段や model 選択を目的化しない。標準ループは [docs/operations/ai-development-loop.md](docs/operations/ai-development-loop.md)
 - **事実と仮説を分ける**。repo / docs / issue / 実行結果で確認した事実には証拠を添え、未実測の原因や効果は仮説として明記する。安く確認できる仮説は作業前に検証する
 - **決定的な道具を先に使う**。検索・git history・diff・typecheck・lint・test・JSON 変換・CI 取得は、まず既存 script / CLI で閉じられないか探す。LLM や外部連携を使う時も、必要な瞬間だけ最小の context・権限・経路を渡す（`routing` / `mcp-usage` skill）
-- **委譲は採算が合う時だけ行う**。既定は単独完遂。初期の委譲対象は独立した read-only の大量調査に限り、引き渡し・待ち・親による照合を含めて便益を判断する。判断と重要な編集は主担当が持つ。専用 security harness の独立レビュー契約は別途維持する
+- **委譲は採算が合う時だけ行う**。既定は単独完遂。初期の委譲対象は、実行時に read-only 権限と scope を検証できる大量調査に限り、引き渡し・待ち・親による照合を含めて便益を判断する。検証できない native tool や runtime しかない場合は委譲せず、主担当が続ける。判断と重要な編集は主担当が持つ。専用 security harness の独立レビュー契約は別途維持する
 - **委譲契約**: 成功条件、触ってよい path、既知の制約、期待する証拠、検証コマンド、外部 state を変更してよいかを明記する。write 可能な委譲は同一 worktree・非重複 scope に限定し、commit / push / external mutation は明示的に委ねられた場合だけ行う
 - **判断では意味のある選択肢を比較する**。差が実際の挙動・リスク・可逆性に影響する選択肢だけを並べ、推奨と最悪の failure mode を添える。複数の判断は 1 回に束ねる
 - **出力ではなく outcome を検証する**。diff、コマンド出力、実際の UI / API / data flow を成功条件と突き合わせ、subagent や tool の「passed」という申告だけで完了にしない
-- **外部 provider の反証は任意**。auth / RLS / billing / migration / 公開契約などで独立視点の便益が実行コストを上回る時に追加する。OpenAI / Codex を primary としつつ、別 provider を使う場合も同じ scope・証拠・privacy 境界を適用する
+- **委譲の出力は親が再検証する**。read-only worker の報告は事実・location・未確認範囲の候補であり、判断・編集・テスト・レビュー完了の証明にはしない。現在の HEAD と diff に照合できない報告は採用しない
 - **永続 handoff**: issue / PR がある作業は、進捗・判断・ブロック・検証結果をその issue / PR へ残す。会話 transcript を唯一の状態にしない
 - **完了報告**では変更、検証コマンドと出力の要点、未確認事項、deferred scopeを示す
 - **曖昧な指示**: (1) repo/docs/issueから判明する事実を先に調べる (2) 承認済みscope内で安全かつ可逆なら合理的仮定を明示して進める (3) 未決事項だけ証拠付き推奨とともに確認する (4) 質問・懸念を承認へ読み替えない
@@ -181,15 +184,13 @@ worktree で作業するセッション（レーン）は次を守る:
 | `diagnosing-bugs`      | 原因不明・複数層に跨る不具合の再現と切り分け                                     |
 | `react-performance`    | データ取得の waterfall・bundle・RSC 境界の性能判断                               |
 | `ui-audit`             | 指定 UI の操作性・アクセシビリティのコード監査（明示依頼時のみ）                 |
-| `pr-cross-review`      | GitHub の独立 PR レビューと高リスク変更の追加契約                                |
-| `security-sweep`       | 1 SHA の scope を読む security 調査（候補・反証・実行証拠を機械検査）            |
+| `pr-cross-review`      | 保護対象 PR の GitHub 独立レビュー（通常 PR は対象外）                           |
 | `docs-writing`         | ユーザー向けdocs・リリースノート・技術ドキュメント                               |
 | `docs-audit`           | 公開docsの監査                                                                   |
 | `releasing`            | リリース作業end-to-end（明示依頼時のみ）                                         |
 | `gardening`            | 月次改善ループ: ai:usage の 4 問 → 月に 1 変数 → 結果(未) 回収（明示依頼時のみ） |
 | `audit-ai-config`      | AI設定の棚卸し・audit                                                            |
 | `blog-ideas`           | ブログネタ提案とissue起票                                                        |
-| `usability-probe`      | repo blind な browser-only ユーザビリティプローブ実行                            |
 | `decision`             | `docs/decisions.md` への意思決定1行追記                                          |
 
 ## Deploy / Release

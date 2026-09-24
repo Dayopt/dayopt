@@ -14,9 +14,9 @@
 | -------------- | ---- | ---------- | ---------------- | ---------------- | -------------- |
 | feature        | 8    | 8          | 0                | 0                | 0              |
 | DB テーブル    | 30   | 10         | 6                | 14               | 0              |
-| DB 関数        | 136  | 1          | 59               | 76               | 0              |
-| tRPC router    | 16   | 0          | 15               | 0                | 1              |
-| tRPC procedure | 69   | 0          | 68               | 0                | 1              |
+| DB 関数        | 138  | 1          | 60               | 77               | 0              |
+| tRPC router    | 15   | 0          | 15               | 0                | 0              |
+| tRPC procedure | 71   | 0          | 71               | 0                | 0              |
 | MCP tool       | 19   | 19         | 0                | 0                | 0              |
 | Zustand store  | 14   | 0          | 13               | 0                | 1              |
 | Story          | 113  | 0          | 89               | 24               | 0              |
@@ -269,11 +269,12 @@ graph LR
 </details>
 
 <details>
-<summary>docs の候補（1）</summary>
+<summary>docs の候補（2）</summary>
 
 <!-- prettier-ignore -->
 | ファイル | 対応の根拠 |
 | --- | --- |
+| [docs/operations/posthog-analytics.md](<../../operations/posthog-analytics.md>) | frontmatter code: timeblock |
 | [docs/product/specs/plan-record.md](<../../product/specs/plan-record.md>) | frontmatter code: timeblock |
 
 </details>
@@ -506,11 +507,12 @@ graph LR
 </details>
 
 <details>
-<summary>docs の候補（1）</summary>
+<summary>docs の候補（2）</summary>
 
 <!-- prettier-ignore -->
 | ファイル | 対応の根拠 |
 | --- | --- |
+| [docs/operations/posthog-analytics.md](<../../operations/posthog-analytics.md>) | frontmatter code: timeblock |
 | [docs/product/specs/plan-record.md](<../../product/specs/plan-record.md>) | frontmatter code: timeblock |
 
 </details>
@@ -743,11 +745,12 @@ graph LR
 </details>
 
 <details>
-<summary>docs の候補（1）</summary>
+<summary>docs の候補（2）</summary>
 
 <!-- prettier-ignore -->
 | ファイル | 対応の根拠 |
 | --- | --- |
+| [docs/operations/posthog-analytics.md](<../../operations/posthog-analytics.md>) | frontmatter code: timeblock |
 | [docs/product/specs/plan-record.md](<../../product/specs/plan-record.md>) | frontmatter code: timeblock |
 
 </details>
@@ -1228,11 +1231,12 @@ graph LR
 </details>
 
 <details>
-<summary>docs の候補（1）</summary>
+<summary>docs の候補（2）</summary>
 
 <!-- prettier-ignore -->
 | ファイル | 対応の根拠 |
 | --- | --- |
+| [docs/operations/posthog-analytics.md](<../../operations/posthog-analytics.md>) | frontmatter code: timeblock |
 | [docs/product/specs/plan-record.md](<../../product/specs/plan-record.md>) | frontmatter code: timeblock |
 
 </details>
@@ -1565,11 +1569,12 @@ graph LR
 </details>
 
 <details>
-<summary>docs の候補（1）</summary>
+<summary>docs の候補（2）</summary>
 
 <!-- prettier-ignore -->
 | ファイル | 対応の根拠 |
 | --- | --- |
+| [docs/operations/posthog-analytics.md](<../../operations/posthog-analytics.md>) | frontmatter code: timeblock |
 | [docs/product/specs/plan-record.md](<../../product/specs/plan-record.md>) | frontmatter code: timeblock |
 
 </details>
@@ -2124,7 +2129,7 @@ graph LR
 </details>
 
 <details>
-<summary>test の候補（96）</summary>
+<summary>test の候補（97）</summary>
 
 <!-- prettier-ignore -->
 | ファイル | 対応の根拠 |
@@ -2135,6 +2140,7 @@ graph LR
 | [apps/product/src/features/calendar/components/activity-filter/components/CategoryCreateDialog.test.tsx](<../../../apps/product/src/features/calendar/components/activity-filter/components/CategoryCreateDialog.test.tsx>) | feature: calendar |
 | [apps/product/src/features/calendar/components/activity-filter/hooks/useActivityQuickCreate.test.ts](<../../../apps/product/src/features/calendar/components/activity-filter/hooks/useActivityQuickCreate.test.ts>) | feature: calendar |
 | [apps/product/src/features/calendar/components/activity-filter/sort-activities.test.ts](<../../../apps/product/src/features/calendar/components/activity-filter/sort-activities.test.ts>) | feature: calendar |
+| [apps/product/src/features/calendar/components/CalendarController.test.tsx](<../../../apps/product/src/features/calendar/components/CalendarController.test.tsx>) | feature: calendar |
 | [apps/product/src/features/calendar/components/controller/components/CalendarViewRenderer.test.ts](<../../../apps/product/src/features/calendar/components/controller/components/CalendarViewRenderer.test.ts>) | feature: calendar |
 | [apps/product/src/features/calendar/components/controller/hooks/useCalendarHandlers.test.ts](<../../../apps/product/src/features/calendar/components/controller/hooks/useCalendarHandlers.test.ts>) | feature: calendar |
 | [apps/product/src/features/calendar/components/controller/hooks/useCalendarNavigationHandlers.test.tsx](<../../../apps/product/src/features/calendar/components/controller/hooks/useCalendarNavigationHandlers.test.tsx>) | feature: calendar |
@@ -2266,6 +2272,7 @@ graph LR
 | DB 関数 | [abandon_billing_customer_provisioning_v2](<../../../apps/product/src/lib/database/generated/database.types.ts>) | feature 経由 |
 | DB 関数 | [claim_billing_customer_provisioning_v2](<../../../apps/product/src/lib/database/generated/database.types.ts>) | feature 経由 |
 | DB 関数 | [claim_billing_mutation_v3](<../../../apps/product/src/lib/database/generated/database.types.ts>) | feature 経由 |
+| DB 関数 | [claim_posthog_signup_v1](<../../../apps/product/src/lib/database/generated/database.types.ts>) | feature 経由 |
 | DB 関数 | [classify_billing_customer_event_v1](<../../../apps/product/src/lib/database/generated/database.types.ts>) | feature 経由 |
 | DB 関数 | [cleanup_billing_account_deletion_terminal_receipts_v2](<../../../apps/product/src/lib/database/generated/database.types.ts>) | feature 経由 |
 | DB 関数 | [cleanup_billing_mutation_claims_v2](<../../../apps/product/src/lib/database/generated/database.types.ts>) | feature 経由 |
@@ -2290,9 +2297,12 @@ graph LR
 | tRPC procedure | [billing.startTrial](<../../../apps/product/src/features/settings/server/billing-router.ts>) | feature 経由 |
 | tRPC procedure | [mcpConnections.list](<../../../apps/product/src/features/settings/server/mcp-connections-router.ts>) | feature 経由 |
 | tRPC procedure | [mcpConnections.revoke](<../../../apps/product/src/features/settings/server/mcp-connections-router.ts>) | feature 経由 |
+| tRPC procedure | [userSettings.claimSignupCompletion](<../../../apps/product/src/features/settings/server/router.ts>) | feature 経由 |
 | tRPC procedure | [userSettings.get](<../../../apps/product/src/features/settings/server/router.ts>) | feature 経由 |
+| tRPC procedure | [userSettings.getAnalyticsConsent](<../../../apps/product/src/features/settings/server/router.ts>) | feature 経由 |
 | tRPC procedure | [userSettings.getICalToken](<../../../apps/product/src/features/settings/server/router.ts>) | feature 経由 |
 | tRPC procedure | [userSettings.regenerateICalToken](<../../../apps/product/src/features/settings/server/router.ts>) | feature 経由 |
+| tRPC procedure | [userSettings.setAnalyticsConsent](<../../../apps/product/src/features/settings/server/router.ts>) | feature 経由 |
 | tRPC procedure | [userSettings.update](<../../../apps/product/src/features/settings/server/router.ts>) | feature 経由 |
 | tRPC procedure | [userSettings.updateProfile](<../../../apps/product/src/features/settings/server/router.ts>) | feature 経由 |
 | Zustand store | [useBillingPollStore](<../../../apps/product/src/features/settings/stores/useBillingPollStore.ts>) | feature 経由 |
@@ -2352,13 +2362,14 @@ graph LR
 </details>
 
 <details>
-<summary>test の候補（56）</summary>
+<summary>test の候補（60）</summary>
 
 <!-- prettier-ignore -->
 | ファイル | 対応の根拠 |
 | --- | --- |
 | [apps/product/src/features/settings/components/AccountDeletionDialog.retry.test.tsx](<../../../apps/product/src/features/settings/components/AccountDeletionDialog.retry.test.tsx>) | feature: settings |
 | [apps/product/src/features/settings/components/BillingSettings.billing-operation.test.tsx](<../../../apps/product/src/features/settings/components/BillingSettings.billing-operation.test.tsx>) | feature: settings |
+| [apps/product/src/features/settings/components/DataSettings.analytics-consent.test.tsx](<../../../apps/product/src/features/settings/components/DataSettings.analytics-consent.test.tsx>) | feature: settings |
 | [apps/product/src/features/settings/components/DataSettings.csv-export.test.tsx](<../../../apps/product/src/features/settings/components/DataSettings.csv-export.test.tsx>) | feature: settings |
 | [apps/product/src/features/settings/components/DataSettings.mcp-url.test.tsx](<../../../apps/product/src/features/settings/components/DataSettings.mcp-url.test.tsx>) | feature: settings |
 | [apps/product/src/features/settings/components/DisplaySettings.test.tsx](<../../../apps/product/src/features/settings/components/DisplaySettings.test.tsx>) | feature: settings |
@@ -2382,6 +2393,8 @@ graph LR
 | [apps/product/src/features/settings/lib/timeblock-csv-export.test.ts](<../../../apps/product/src/features/settings/lib/timeblock-csv-export.test.ts>) | feature: settings |
 | [apps/product/src/features/settings/server/account-deletion-legacy.test.ts](<../../../apps/product/src/features/settings/server/account-deletion-legacy.test.ts>) | feature: settings |
 | [apps/product/src/features/settings/server/account-deletion.test.ts](<../../../apps/product/src/features/settings/server/account-deletion.test.ts>) | feature: settings |
+| [apps/product/src/features/settings/server/analytics-consent-service.test.ts](<../../../apps/product/src/features/settings/server/analytics-consent-service.test.ts>) | feature: settings |
+| [apps/product/src/features/settings/server/analytics-signup-router.test.ts](<../../../apps/product/src/features/settings/server/analytics-signup-router.test.ts>) | feature: settings |
 | [apps/product/src/features/settings/server/billing-lifecycle-mode.test.ts](<../../../apps/product/src/features/settings/server/billing-lifecycle-mode.test.ts>) | feature: settings |
 | [apps/product/src/features/settings/server/billing-mutation-cleanup.test.ts](<../../../apps/product/src/features/settings/server/billing-mutation-cleanup.test.ts>) | feature: settings |
 | [apps/product/src/features/settings/server/billing-mutation-service.test.ts](<../../../apps/product/src/features/settings/server/billing-mutation-service.test.ts>) | feature: settings |
@@ -2392,6 +2405,7 @@ graph LR
 | [apps/product/src/features/settings/server/mcp-connections-service.test.ts](<../../../apps/product/src/features/settings/server/mcp-connections-service.test.ts>) | feature: settings |
 | [apps/product/src/features/settings/server/recovery-code-actions.test.ts](<../../../apps/product/src/features/settings/server/recovery-code-actions.test.ts>) | feature: settings |
 | [apps/product/src/features/settings/server/settings-service.test.ts](<../../../apps/product/src/features/settings/server/settings-service.test.ts>) | feature: settings |
+| [apps/product/src/features/settings/server/signup-analytics-claim-service.test.ts](<../../../apps/product/src/features/settings/server/signup-analytics-claim-service.test.ts>) | feature: settings |
 | [apps/product/src/lib/test/e2e/a11y.spec.ts](<../../../apps/product/src/lib/test/e2e/a11y.spec.ts>) | 画面: /[locale]/report / 画面: /[locale]/settings/[category] |
 | [apps/product/src/lib/test/e2e/account-deletion.spec.ts](<../../../apps/product/src/lib/test/e2e/account-deletion.spec.ts>) | 画面: /[locale]/calendar / 画面: /[locale]/settings/[category] |
 | [apps/product/src/lib/test/e2e/billing.spec.ts](<../../../apps/product/src/lib/test/e2e/billing.spec.ts>) | 画面: /[locale]/settings/[category] |
@@ -2417,11 +2431,12 @@ graph LR
 </details>
 
 <details>
-<summary>docs の候補（2）</summary>
+<summary>docs の候補（3）</summary>
 
 <!-- prettier-ignore -->
 | ファイル | 対応の根拠 |
 | --- | --- |
+| [docs/operations/posthog-analytics.md](<../../operations/posthog-analytics.md>) | frontmatter code: settings |
 | [docs/product/specs/auth.md](<../../product/specs/auth.md>) | frontmatter code: settings |
 | [docs/product/specs/settings.md](<../../product/specs/settings.md>) | frontmatter code: settings |
 
@@ -2492,7 +2507,7 @@ graph LR
 </details>
 
 <details>
-<summary>test の候補（16）</summary>
+<summary>test の候補（17）</summary>
 
 <!-- prettier-ignore -->
 | ファイル | 対応の根拠 |
@@ -2510,6 +2525,7 @@ graph LR
 | [apps/product/src/features/auth/server/user-service.test.ts](<../../../apps/product/src/features/auth/server/user-service.test.ts>) | feature: auth |
 | [apps/product/src/features/auth/server/welcome-email.test.ts](<../../../apps/product/src/features/auth/server/welcome-email.test.ts>) | feature: auth |
 | [apps/product/src/features/auth/stores/resolve-user-id.test.ts](<../../../apps/product/src/features/auth/stores/resolve-user-id.test.ts>) | feature: auth |
+| [apps/product/src/features/auth/stores/useAuthStore.sessionExpired.test.ts](<../../../apps/product/src/features/auth/stores/useAuthStore.sessionExpired.test.ts>) | feature: auth |
 | [apps/product/src/features/auth/stores/useAuthStore.updatePassword.test.ts](<../../../apps/product/src/features/auth/stores/useAuthStore.updatePassword.test.ts>) | feature: auth |
 | [apps/product/src/lib/test/integration/mfa-recovery-codes-lockdown.integration.test.ts](<../../../apps/product/src/lib/test/integration/mfa-recovery-codes-lockdown.integration.test.ts>) | DB 関数: count_unused_recovery_codes |
 | [apps/product/src/lib/test/integration/rls-access.integration.test.ts](<../../../apps/product/src/lib/test/integration/rls-access.integration.test.ts>) | DB 関数: count_unused_recovery_codes / DB 関数: use_recovery_code |
@@ -2592,11 +2608,9 @@ graph LR
 どの概念からも辿れず、かつ「語彙を持たない層」にも当たらない項目。
 用語集へ 1 行足すか、実装を消すかを人間が判断する。
 
-| 種別           | 項目                        | 発見元                                         | 補足               |
-| -------------- | --------------------------- | ---------------------------------------------- | ------------------ |
-| tRPC router    | `email`                     | `apps/product/src/lib/email/router.ts`         | emailRouter        |
-| tRPC procedure | `email.sendPasswordChanged` | `apps/product/src/lib/email/router.ts`         | protectedProcedure |
-| Zustand store  | `useShellStore`             | `apps/product/src/lib/stores/useShellStore.ts` | —                  |
+| 種別          | 項目            | 発見元                                         | 補足 |
+| ------------- | --------------- | ---------------------------------------------- | ---- |
+| Zustand store | `useShellStore` | `apps/product/src/lib/stores/useShellStore.ts` | —    |
 
 ## 語彙を持たない層（意図的）
 
@@ -2606,7 +2620,7 @@ graph LR
 | 理由                                                                           | 種別           | 件数 | 項目                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | ------------------------------------------------------------------------------ | -------------- | ---- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | feature 横断の基盤（lib 層）。特定の概念には属さない                           | DB テーブル    | 5    | `cron_heartbeats`, `mcp_mutation_control`, `oauth_tokens`, `product_events`, `write_fence_control`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| feature 横断の基盤（lib 層）。特定の概念には属さない                           | DB 関数        | 3    | `exchange_oauth_authorization_code_v2`, `get_external_lifecycle_app_version_v3`, `rotate_oauth_refresh_token_v2`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| feature 横断の基盤（lib 層）。特定の概念には属さない                           | DB 関数        | 4    | `claim_posthog_first_paid_invoice_v1`, `exchange_oauth_authorization_code_v2`, `get_external_lifecycle_app_version_v3`, `rotate_oauth_refresh_token_v2`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | feature 横断の基盤（app / lib 層）。特定の概念には属さない                     | DB テーブル    | 1    | `email_suppressions`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | feature 横断の基盤（app / lib 層）。特定の概念には属さない                     | DB 関数        | 1    | `get_mcp_environment_identity_v1`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | app から直接読み書きしない（SQL 関数の内部と RLS のためだけに存在する）        | DB テーブル    | 8    | `mcp_environment_identity`, `mcp_mutation_receipts`, `oauth_audit_log`, `oauth_authorization_codes`, `reports`, `undo_receipt_effects`, `undo_receipt_field_changes`, `undo_receipts`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |

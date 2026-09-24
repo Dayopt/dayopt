@@ -159,11 +159,11 @@ pnpm security:check
 3. **`handleServiceError()` を使用** - 直接TRPCErrorをthrowしない
 4. **守るべき前提を作ったら `docs/engineering/invariants.md` を同じ PR で更新** - 新しい
    Pro 限定機能、新しい公開エンドポイント種別、新しい table パターンなど。カタログは
-   内製クロスレビュー（`.agents/skills/pr-cross-review/SKILL.md`）が
+   GitHub の `@codex review` が
    「あるべき検査の不在」を判定する時の照合先なので、更新を怠ると新機能の穴が構造的に
    見えなくなる。**判定は自動では走らない**（merge の hard gate ではない advisory
-   レビュー。別 provider の反証は User が必要時に使う任意経路。AGENTS.md §レビュー規則、
-   #2596）。危険クラスの diff では merge 前に `pr-cross-review` skill を明示的に実行する
+   レビュー。追加 reviewer は停止中。AGENTS.md §レビュー規則）。危険クラスの diff では
+   `protected-path-gate.mjs` が保護対象と判定する時だけ、検証済みの merge 候補で `@codex review` を依頼する
 
 5. **実装前に `docs/engineering/threat-model.md` の既往クラスと却下記録を読む** - Dayopt で
    実際に起きた欠陥のクラスと、反証つきで却下済みの候補が並んでいる。同じ穴を掘り直さない
@@ -172,11 +172,20 @@ pnpm security:check
 
 ## 関連する検査経路
 
-- **`pr-cross-review` skill** — auth / RLS / service role / OAuth / webhook / billing / redirect / migration を扱う PR の merge 前クロスレビュー
-- **`security-sweep` skill** — PR 差分ではなく 1 SHA の scope を読む provider 非依存の調査。候補・反証・実行証拠を候補集合として残し、その結果が `docs/engineering/threat-model.md` へ戻る
-- **`/claude-security`** — 既存コードの深掘りスキャン。`security-sweep` の researcher 段の任意の加速器で、必須ではない
+- **`pr-cross-review` skill** — auth / RLS / service role / OAuth / webhook / billing / redirect / migration を扱う PR の `@codex review` と裁定
+- **`gardening` skill §5** — 月次の sweep（Supabase の `get_advisors` + `pnpm security:check`）。所見は issue へ、既往は `docs/engineering/threat-model.md` へ戻る
+- **オンデマンド sweep** — 月次以外に「repository 全体 / この境界を sweep して」と明示依頼された時の手順（下記）。provider を問わず同じ順序で回す
+- **`/claude-security`** — 既存コードの深掘りスキャン。上の手順の **任意の加速器**で、無くても完走する（Claude 以外の runtime では使えない）
 
-> このスキルは「実装時のガイド」、上記は「既存コードの検査」。新規コード実装時はこのスキルを、既存コードのスキャンは `/claude-security` を使う。
+### オンデマンド sweep の手順（provider 非依存）
+
+1. **scope を決める**: 「repository 全体」の依頼は 1 回で読み切らず、`docs/engineering/threat-model.md` §未検査の境界 と既往クラスの表から**境界を列挙し、1 つずつ回す**。列挙した境界と、今回どこまでやるかを最初に宣言する
+2. **機械検査を先に通す**: Supabase の `get_advisors`（security、read-only）と `pnpm security:check`。ここで出るものは調査せずそのまま所見にする
+3. **既往を照合する**: `docs/engineering/threat-model.md` の既往クラスと却下記録。**既に反証済みの疑いを掘り返さない**
+4. **境界ごとに読む**: 対象境界の入口（route / procedure / policy）から、認可・テナント分離・入力検証・外部契約の順に確認する。`/claude-security` を使える runtime ならこの段の加速に使ってよい
+5. **記録する**: 所見は issue。新しい既往クラスと、反証して落とした疑いは `docs/engineering/threat-model.md` へ戻す。**所見ゼロを「安全」と書かない** — 読んだ境界と読んでいない境界を明記する
+
+> このスキルは「実装時のガイド」、上記は「既存コードの検査」。新規コード実装時はこのスキルを、既存コードのスキャンは上のオンデマンド手順を使う。
 
 ## 関連スキル
 

@@ -29,7 +29,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
  *     （session 開始を止めるより、agent に「手動で install してから commit」と伝える方が安全）
  *
  * pnpm は stub に差し替える（実 install は走らせない）。stub は受け取った引数を
- * STUB_RECORD へ書き、STUB_EXIT で終了コードを制御する。
+ * STUB_RECORD へ1呼び出し1行で書き、STUB_EXIT で終了コードを制御する。
  */
 const rootDir = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const hookPath = resolve(rootDir, 'scripts/hooks/session-start.sh');
@@ -77,7 +77,7 @@ beforeAll(() => {
   const pnpmStub = join(stubDir, 'pnpm');
   writeFileSync(
     pnpmStub,
-    '#!/bin/bash\nprintf \'%s\' "$*" >> "$STUB_RECORD"\nexit "${STUB_EXIT:-0}"\n',
+    '#!/bin/bash\nprintf \'%s\\n\' "$*" >> "$STUB_RECORD"\nexit "${STUB_EXIT:-0}"\n',
   );
   chmodSync(pnpmStub, 0o755);
 
@@ -147,11 +147,16 @@ function runHook(opts: { remote: boolean; stubExit?: number; withGh?: boolean })
   };
 }
 
+function recordedPnpmCalls(record: string | null): string[] {
+  return record?.split('\n').filter(Boolean) ?? [];
+}
+
 describe('session-start.sh: 依存 install（cloud session だけ）', () => {
-  it('remote でなければ pnpm を呼ばず、deps の欠落だけを報告する', () => {
+  it('remote でなければ install を呼ばず、deps の欠落だけを報告する', () => {
     const r = runHook({ remote: false });
     expect(r.status).toBe(0);
-    expect(r.record).toBeNull();
+    expect(recordedPnpmCalls(r.record)).toContain('--version');
+    expect(recordedPnpmCalls(r.record)).not.toContain('install --frozen-lockfile');
     expect(r.stdout).toContain('**remote**: no');
     expect(r.stdout).toContain('**deps**: missing (pnpm install --frozen-lockfile)');
   });
@@ -159,7 +164,10 @@ describe('session-start.sh: 依存 install（cloud session だけ）', () => {
   it('remote なら pnpm install --frozen-lockfile を 1 回だけ呼び、所要秒を報告する', () => {
     const r = runHook({ remote: true });
     expect(r.status).toBe(0);
-    expect(r.record).toBe('install --frozen-lockfile');
+    expect(recordedPnpmCalls(r.record)).toContain('--version');
+    expect(
+      recordedPnpmCalls(r.record).filter((call) => call === 'install --frozen-lockfile'),
+    ).toHaveLength(1);
     expect(r.stdout).toContain('**remote**: yes');
     expect(r.stdout).toMatch(/\*\*deps\*\*: installed \(\d+s\)/);
     expect(existsSync(join(r.tmp, 'dayopt-session-start-install.log'))).toBe(true);
@@ -168,7 +176,10 @@ describe('session-start.sh: 依存 install（cloud session だけ）', () => {
   it('install が失敗しても exit 0 のまま、失敗と手動手順を context に残す', () => {
     const r = runHook({ remote: true, stubExit: 1 });
     expect(r.status).toBe(0);
-    expect(r.record).toBe('install --frozen-lockfile');
+    expect(recordedPnpmCalls(r.record)).toContain('--version');
+    expect(
+      recordedPnpmCalls(r.record).filter((call) => call === 'install --frozen-lockfile'),
+    ).toHaveLength(1);
     expect(r.stdout).toMatch(/\*\*deps\*\*: install failed \(exit 1, \d+s, log: /);
     expect(r.stdout).toContain('依存 install に失敗');
     expect(r.stdout).toContain('pnpm install --frozen-lockfile');
@@ -186,7 +197,7 @@ describe('session-start.sh: 実行環境の報告', () => {
     expect(r.stdout).toMatch(/\*\*cli\*\*: gh:no codex:no op:no supabase:no gitleaks:no vercel:no/);
   });
 
-  it('gh が無ければ、gh 依存の L0 入口（ctx / trace / green:watch / branch:finish）が使えない旨と MCP への迂回を出す', () => {
+  it('gh が無ければ、gh 依存の L0 入口（ctx / trace / branch:finish）が使えない旨と MCP への迂回を出す', () => {
     const r = runHook({ remote: false });
     expect(r.stdout).toContain('gh なし');
     expect(r.stdout).toContain('ctx');

@@ -9,8 +9,10 @@ import type { ServiceSupabaseClient } from './types';
 
 const trackProductEvent = vi.hoisted(() => vi.fn());
 const trackProductEvents = vi.hoisted(() => vi.fn());
+const trackPostHogServerEvent = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/analytics/product-events', () => ({ trackProductEvent, trackProductEvents }));
+vi.mock('@/lib/analytics/posthog-server', () => ({ trackPostHogServerEvent }));
 
 const USER_ID = '00000000-0000-4000-8000-0000000000a1';
 const PLAN_ID = '00000000-0000-4000-8000-0000000000b1';
@@ -69,6 +71,7 @@ describe('TimeblockCommandService', () => {
     vi.clearAllMocks();
     trackProductEvent.mockResolvedValue(undefined);
     trackProductEvents.mockResolvedValue(undefined);
+    trackPostHogServerEvent.mockResolvedValue(undefined);
   });
 
   it('successful create/record commands emit payload-free events after the command', async () => {
@@ -125,6 +128,20 @@ describe('TimeblockCommandService', () => {
       { eventName: 'record_created', userId: USER_ID },
       { eventName: 'record_created', userId: USER_ID },
     ]);
+    expect(trackPostHogServerEvent).toHaveBeenNthCalledWith(1, {
+      eventName: 'plan_created',
+      userId: USER_ID,
+      sourceId: PLAN_ID,
+      source: 'manual',
+      count: 1,
+    });
+    expect(trackPostHogServerEvent).toHaveBeenNthCalledWith(4, {
+      eventName: 'record_created',
+      userId: USER_ID,
+      sourceId: [RECORD_ID, `${RECORD_ID}-2`].sort().join(':'),
+      source: 'confirm_day',
+      count: 2,
+    });
   });
 
   it('partial Plan updateをuser内の現在行で補い、raw CAS tokenを保持する', async () => {

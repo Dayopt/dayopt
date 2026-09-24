@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { getUserLocale, sendWelcomeEmail } from '@/lib/email/router';
+import { getUserLocale, sendWelcomeEmail } from '@/lib/email/notifications';
 import { logger } from '@/lib/logger';
 import { captureUnexpectedDatabaseError, captureUnexpectedError } from '@/lib/sentry';
 import { createServiceRoleClient } from '@/lib/supabase/oauth';
@@ -20,7 +20,8 @@ import { createServiceRoleClient } from '@/lib/supabase/oauth';
  * この列は migration 時点の既存ユーザーを「送信済み」で埋めてあるので、過去のユーザーへ
  * 遡って送ることはない（20260916010000_track_welcome_email_sent.sql）。
  */
-export async function deliverWelcomeEmailOnce(userId: string): Promise<void> {
+export async function deliverWelcomeEmailOnce(userId: string): Promise<boolean> {
+  let newlyRegistered = false;
   try {
     const supabase = createServiceRoleClient();
 
@@ -36,12 +37,13 @@ export async function deliverWelcomeEmailOnce(userId: string): Promise<void> {
         feature: 'auth',
         operation: 'claim_welcome_email',
       });
-      return;
+      return false;
     }
 
     const claimed = data?.[0];
     // 掴めなかった = 既に送信済み。何もしないのが正常系。
-    if (!claimed) return;
+    if (!claimed) return false;
+    newlyRegistered = true;
 
     const {
       data: { user },
@@ -50,7 +52,7 @@ export async function deliverWelcomeEmailOnce(userId: string): Promise<void> {
 
     if (authError || !user?.email) {
       logger.warn('Welcome email skipped: recipient address is unavailable');
-      return;
+      return true;
     }
 
     await sendWelcomeEmail({
@@ -58,11 +60,13 @@ export async function deliverWelcomeEmailOnce(userId: string): Promise<void> {
       userName: (claimed.full_name as string | null) || 'there',
       locale: await getUserLocale(supabase, userId),
     });
+    return true;
   } catch (error) {
     // サインインの完了をメール送信で妨げない。
     captureUnexpectedError(error instanceof Error ? error : new Error('Welcome email failed'), {
       feature: 'auth',
       operation: 'send_welcome_email',
     });
+    return newlyRegistered;
   }
 }

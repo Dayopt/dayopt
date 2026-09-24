@@ -555,8 +555,28 @@
           "enabled": "Enabled",
           "disabled": "Disabled"
         },
+        "unset": "Not selected",
+        "allow": "Allow analytics",
+        "revoke": "Withdraw analytics",
+        "revokeConfirmTitle": "Withdraw analytics consent?",
+        "revokeConfirmDescription": "The page reloads so that browser analytics and error monitoring stop completely. Anything you have typed but not saved is lost.",
+        "revokeConfirmLabel": "Withdraw",
+        "saveFailed": "Could not save your choice. Browser storage rejected the write, so analytics was not changed.",
+        "independentOrigins": "Choices made on the website and in the app are stored separately.",
         "manage": "Manage cookie settings",
-        "lastUpdated": "Last updated"
+        "lastUpdated": "Last updated",
+        "account": {
+          "title": "Account analytics",
+          "description": "If you allow this, successful actions such as creating Plans or Records and the first payment can be analyzed for your account. We do not send content or payment details. You can withdraw this from any device.",
+          "label": "Server-side analytics",
+          "enabled": "Allowed",
+          "disabled": "Not allowed",
+          "unavailable": "Status unavailable",
+          "allow": "Allow",
+          "revoke": "Withdraw",
+          "saveFailed": "Could not save the account analytics setting. Please try again.",
+          "deviceNote": "This choice applies to server-side usage data for your account. Browser analytics on each device is managed by that device's cookie settings."
+        }
       },
       "links": {
         "title": "Legal documents",

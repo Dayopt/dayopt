@@ -16,6 +16,7 @@ import { EXTERNAL_CALENDAR_WINDOW_RADIUS_MS } from '@/lib/external-calendar-ghos
 import { logger } from '@/lib/logger';
 import { captureUnexpectedDatabaseError, captureUnexpectedError } from '@/lib/sentry';
 
+import { SUPABASE_TRACE_PROPAGATION } from '@/lib/supabase/trace-propagation';
 import { deleteUnreferencedEvents } from './event-pruning';
 import { ExternalCalendarServiceError } from './external-calendar-service-error';
 import {
@@ -132,6 +133,7 @@ type SyncClient = SupabaseClient<SyncDatabase>;
 
 function createSyncDbClient(): SyncClient {
   return createClient<SyncDatabase>(env.NEXT_PUBLIC_SUPABASE_URL, env.SUPABASE_SECRET_KEY, {
+    tracePropagation: SUPABASE_TRACE_PROPAGATION,
     auth: { autoRefreshToken: false, persistSession: false },
     // narrow 版には `createServiceRoleClient` の timeout 注入が無いので、ここで足す。
     global: {

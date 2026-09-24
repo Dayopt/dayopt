@@ -63,7 +63,7 @@ user_invocable: true
 
 ### Step 3: ユーザー選択
 
-AskUserQuestion で採用するネタを選択してもらう（**multiSelect: true**）。
+候補を番号付きで並べ、複数選択できる形で採用するネタを選んでもらう（runtime に選択 UI があればそれを使う。Claude Code なら AskUserQuestion の **multiSelect: true**）。
 
 ### Step 4: GitHub Issue 起票
 

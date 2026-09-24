@@ -77,5 +77,7 @@ export function createClient() {
     );
   }
 
+  // #2728: tracePropagation は渡さない。@sentry/browser は @opentelemetry/api を
+  // 使わないため global propagator が居らず、有効にしても header は付かない。
   return createBrowserClient<Database>(url, anonKey);
 }

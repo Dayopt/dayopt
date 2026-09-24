@@ -54,7 +54,7 @@ Yes. We practice data minimization, obtain clear consent, and guarantee the righ
 
 We use reliable infrastructure that meets data safety and legal requirements. Please see our security page for details.
 
-## Is there two-factor authentication (2FA)?
+## Is there multi-factor authentication (MFA)?
 
 We prioritize security and employ secure authentication methods. Please check our security page for details.
 
@@ -80,7 +80,11 @@ Being indie means taking personal responsibility for every line of code. While w
 
 ## How are cookies used?
 
-Essential cookies support sessions and preferences. Browser Sentry, Vercel Analytics, and Speed Insights start only after you consent to analytics. Session Replay is disabled because the current SDK cannot guarantee removal of URL query strings from Replay payloads. In Production, sanitized server and edge error monitoring remains active regardless of that choice so we can diagnose service failures. Product and Website telemetry is kept in separate Sentry projects, and Sentry events exclude request bodies, email addresses, URL query strings, cookies, and authorization credentials. See our [Cookie Policy](/legal/cookies) and [Privacy Policy](/legal/privacy) for details.
+Essential cookies support sessions and preferences. Browser Sentry, Vercel Analytics, Speed Insights, and PostHog start only after you consent to analytics on each site. We use PostHog to understand visits, signups, Product use, and first payments. Automatic click capture and Session Replay are disabled.
+
+Browser consent is separate for the website and Product. The "Account usage analytics" choice in Product settings is also separate. It applies to successful Plan, Record, and first payment events, and you can withdraw it from Product settings on any device. We do not send your email address, Plan or Record titles or notes, or payment details to PostHog. PostHog processes analytics events in the United States and retains them for one year on the free plan. Contact us if you want analytics data linked to your account deleted.
+
+In Production, sanitized server and edge error monitoring continues regardless of your analytics choice so we can diagnose service failures. See our [Cookie Policy](/legal/cookies) and [Privacy Policy](/legal/privacy) for details.
 
 ## My company requires security approval. Can you provide documentation?
 

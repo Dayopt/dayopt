@@ -116,10 +116,16 @@ const evidence = (patch: Record<string, unknown> = {}) => ({
   ...patch,
 });
 
-const APP = 'apps/product/src/features/timeblock/domain/a.ts';
+const APP = 'apps/product/src/lib/billing/a.ts';
 const RLS = 'supabase/migrations/20260916_rls.sql';
 const evaluate = (files: string[], ev: ReturnType<typeof evidence>, extra = {}) =>
-  evaluateReviewPolicy({ plan: plan(files), evidence: ev, now: NOW, ...extra });
+  evaluateReviewPolicy({
+    plan: plan(files),
+    evidence: ev,
+    now: NOW,
+    validationVerdict: 'satisfied',
+    ...extra,
+  });
 
 describe('review policy: requirement from plan', () => {
   it('does not require or request a review for README typos', () => {
@@ -129,17 +135,32 @@ describe('review policy: requirement from plan', () => {
     expect(toReviewCommitStatus(result).state).toBe('success');
   });
 
-  it.each([
-    RLS,
-    'apps/product/src/app/api/mcp/a.ts',
-    'apps/product/src/lib/time/a.ts',
-    'AGENTS.md',
-  ])('requires review with the four focus points for %s', (file) => {
-    const result = evaluate([file], evidence());
+  it.each([RLS, 'apps/product/src/app/api/mcp/a.ts', 'scripts/lib/review-policy.mjs'])(
+    'requires review with the four focus points for %s',
+    (file) => {
+      const result = evaluate([file], evidence(), { validationVerdict: 'satisfied' });
+      expect(result.required).toBe('required');
+      expect(result.focus).toEqual(['REVIEW-1', 'REVIEW-2', 'REVIEW-3', 'TEST-1']);
+      expect(result.state).toBe('not-started');
+      expect(result.trigger.shouldRequest).toBe(true);
+      expect(result.verdict).toBe('pending');
+    },
+  );
+
+  it.each(['apps/product/src/lib/time/a.ts', 'AGENTS.md', 'apps/product/src/a.tsx'])(
+    'does not require review for a reversible change: %s',
+    (file) => {
+      const result = evaluate([file], evidence(), { validationVerdict: 'satisfied' });
+      expect(result.verdict).toBe('not-required');
+      expect(result.trigger.shouldRequest).toBe(false);
+    },
+  );
+
+  it('does not suggest a request until validation is satisfied', () => {
+    const result = evaluate([RLS], evidence(), { validationVerdict: 'pending' });
     expect(result.required).toBe('required');
-    expect(result.focus).toEqual(['REVIEW-1', 'REVIEW-2', 'REVIEW-3', 'TEST-1']);
     expect(result.state).toBe('not-started');
-    expect(result.trigger.shouldRequest).toBe(true);
+    expect(result.trigger.shouldRequest).toBe(false);
     expect(result.verdict).toBe('pending');
   });
 
@@ -191,14 +212,15 @@ describe('review policy: completion evidence', () => {
     expect(silent.reason).toMatch(/without a reply/);
   });
 
-  it('treats a review of an older commit as stale and would request again', () => {
+  it('treats a review of an older commit as stale without requesting again automatically', () => {
     const result = evaluate(
       [APP],
       evidence({ reviews: [codexReview(OLD)], threads: [thread('PRR_1')] }),
     );
     expect(result.state).toBe('stale');
     expect(result.verdict).toBe('pending');
-    expect(result.trigger.shouldRequest).toBe(true);
+    expect(result.trigger.shouldRequest).toBe(false);
+    expect(result.trigger.reason).toMatch(/scope/i);
   });
 
   it('does not accept a summary table row, a request comment or a reaction as completion', () => {
@@ -220,7 +242,7 @@ describe('review policy: completion evidence', () => {
     });
     expect(result.state).toBe('unknown');
     expect(result.verdict).toBe('blocked');
-    expect(result.reason).toMatch(/equivalent independent review/);
+    expect(result.reason).toMatch(/already-recorded review evidence/);
   });
 
   it('ignores requests made before the current head was pushed', () => {
@@ -370,7 +392,22 @@ describe('review policy: completion evidence', () => {
     );
     expect(result.state).toBe('complete');
     expect(result.verdict).toBe('satisfied');
-    expect(result.reason).toMatch(/Independent fixed-diff review/);
+    expect(result.reason).toMatch(/Existing fixed-diff review evidence/);
+  });
+
+  it('does not let a fixed-diff summary replace a missing or stale Codex request', () => {
+    const notStarted = evaluate([APP], evidence({ comments: [highRiskSummary(HEAD)] }));
+    expect(notStarted.state).toBe('not-started');
+    expect(notStarted.verdict).toBe('pending');
+    expect(notStarted.trigger.shouldRequest).toBe(true);
+
+    const stale = evaluate(
+      [APP],
+      evidence({ reviews: [codexReview(OLD)], comments: [highRiskSummary(HEAD)] }),
+    );
+    expect(stale.state).toBe('stale');
+    expect(stale.verdict).toBe('pending');
+    expect(stale.trigger.shouldRequest).toBe(false);
   });
 
   it('does not request a review of a blocked head or a draft', () => {
@@ -381,18 +418,18 @@ describe('review policy: completion evidence', () => {
   });
 });
 
-describe('review policy: high-risk contract', () => {
-  it('requires the fixed-diff summary for the current head on protected paths', () => {
+describe('review policy: optional fixed-diff evidence', () => {
+  it('accepts the current Codex review on protected paths without an additional review', () => {
     const missing = evaluate([RLS], evidence({ reviews: [codexReview(HEAD)] }));
     expect(missing.state).toBe('complete');
     expect(missing.highRisk?.status).toBe('missing');
-    expect(missing.verdict).toBe('pending');
+    expect(missing.verdict).toBe('satisfied');
     const stale = evaluate(
       [RLS],
       evidence({ reviews: [codexReview(HEAD)], comments: [highRiskSummary(OLD)] }),
     );
     expect(stale.highRisk?.status).toBe('stale');
-    expect(stale.verdict).toBe('pending');
+    expect(stale.verdict).toBe('satisfied');
     const partial = evaluate(
       [RLS],
       evidence({
@@ -401,13 +438,24 @@ describe('review policy: high-risk contract', () => {
       }),
     );
     expect(partial.highRisk?.status).toBe('partial');
-    expect(partial.verdict).toBe('blocked');
+    expect(partial.verdict).toBe('satisfied');
     const ok = evaluate(
       [RLS],
       evidence({ reviews: [codexReview(HEAD)], comments: [highRiskSummary(HEAD)] }),
     );
     expect(ok.highRisk?.status).toBe('satisfied');
     expect(ok.verdict).toBe('satisfied');
+  });
+
+  it('still requires a current Codex review and adjudication on protected paths', () => {
+    expect(evaluate([RLS], evidence()).verdict).toBe('pending');
+    expect(evaluate([RLS], evidence({ reviews: [codexReview(OLD)] })).verdict).toBe('pending');
+    const unresolved = evaluate(
+      [RLS],
+      evidence({ reviews: [codexReview(HEAD)], threads: [thread('PRR_1', { resolved: false })] }),
+    );
+    expect(unresolved.state).toBe('pending-adjudication');
+    expect(unresolved.verdict).toBe('blocked');
   });
 
   it('rejects a review-summary from a non-member and non-strict status forms', () => {

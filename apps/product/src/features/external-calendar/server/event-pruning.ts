@@ -6,6 +6,7 @@ import { env } from '@/env';
 import { databaseTables, type Database } from '@/lib/database';
 import { logger } from '@/lib/logger';
 import { captureUnexpectedDatabaseError, captureUnexpectedError } from '@/lib/sentry';
+import { SUPABASE_TRACE_PROPAGATION } from '@/lib/supabase/trace-propagation';
 
 /**
  * ミラー（`external_calendar_events`）から「plans / records に参照されていない行」だけを
@@ -74,6 +75,7 @@ type EventPruningClient = SupabaseClient<EventPruningDatabase>;
 
 function createEventPruningClient(): EventPruningClient {
   return createClient<EventPruningDatabase>(env.NEXT_PUBLIC_SUPABASE_URL, env.SUPABASE_SECRET_KEY, {
+    tracePropagation: SUPABASE_TRACE_PROPAGATION,
     auth: { autoRefreshToken: false, persistSession: false },
     global: {
       fetch: (url, options) =>

@@ -8,15 +8,9 @@ const mockUpdateUser = vi.fn();
 const mockSignInWithPassword = vi.fn();
 const mockSignOut = vi.fn();
 const mockCheckPasswordPwned = vi.fn();
-const mockSendPasswordChangedEmail = vi.fn();
 
 vi.mock('next-intl', () => ({
   useTranslations: () => (key: string) => key,
-}));
-
-vi.mock('@/features/auth', () => ({
-  useAuthStore: (selector: (state: { user: { email: string } }) => unknown) =>
-    selector({ user: { email: 'user@example.com' } }),
 }));
 
 vi.mock('@/lib/auth/pwned-password', () => ({
@@ -33,24 +27,10 @@ vi.mock('@/lib/supabase/client', () => ({
   }),
 }));
 
-vi.mock('@/lib/trpc', () => ({
-  api: {
-    email: {
-      sendPasswordChanged: {
-        useMutation: () => ({ mutate: mockSendPasswordChangedEmail }),
-      },
-    },
-  },
-}));
-
 vi.mock('@/lib/logger', () => ({
   logger: {
     error: vi.fn(),
   },
-}));
-
-vi.mock('@/lib/user', () => ({
-  getDisplayName: () => 'User',
 }));
 
 function renderDialog() {
@@ -90,10 +70,6 @@ describe('PasswordChangeDialog', () => {
     expect(mockSignInWithPassword).not.toHaveBeenCalled();
     expect(mockUpdateUser).toHaveBeenCalledTimes(1);
     expect(mockSignOut).toHaveBeenCalledWith({ scope: 'others' });
-    expect(mockSendPasswordChangedEmail).toHaveBeenCalledWith({
-      email: 'user@example.com',
-      userName: 'User',
-    });
   });
 
   it('shows the current password error when Supabase rejects current_password', async () => {
@@ -115,7 +91,6 @@ describe('PasswordChangeDialog', () => {
     });
 
     expect(mockSignOut).not.toHaveBeenCalled();
-    expect(mockSendPasswordChangedEmail).not.toHaveBeenCalled();
   });
 
   it('does not mistake a captcha failure for a wrong current password', async () => {
@@ -141,7 +116,6 @@ describe('PasswordChangeDialog', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('settings.account.passwordUpdateFailed');
     expect(screen.getByRole('alert')).not.toHaveTextContent('settings.account.passwordIncorrect');
     expect(mockSignOut).not.toHaveBeenCalled();
-    expect(mockSendPasswordChangedEmail).not.toHaveBeenCalled();
   });
 
   it('treats a structured invalid_credentials code as a wrong current password', async () => {
@@ -164,6 +138,5 @@ describe('PasswordChangeDialog', () => {
     });
 
     expect(mockSignOut).not.toHaveBeenCalled();
-    expect(mockSendPasswordChangedEmail).not.toHaveBeenCalled();
   });
 });

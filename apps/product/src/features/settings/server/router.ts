@@ -7,9 +7,38 @@ import { SUPPORTED_LOCALES } from '@dayopt/config';
 import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
 
+import { trackPostHogServerEvent } from '@/lib/analytics/posthog-server';
+import {
+  clearedSignupAnalyticsClaimCookie,
+  SIGNUP_ANALYTICS_CLAIM_COOKIE,
+} from '@/lib/analytics/signup-analytics-claim';
 import { handleServiceError } from '@/lib/trpc/errors';
 import { createTRPCRouter, protectedProcedure } from '@/lib/trpc/procedures';
+import { AnalyticsConsentService } from './analytics-consent-service';
 import { createSettingsService } from './settings-service';
+import { SignupAnalyticsClaimService } from './signup-analytics-claim-service';
+
+async function completeSignupAnalyticsClaim(input: {
+  userId: string;
+  claimToken: string | undefined;
+  responseHeaders: Headers | undefined;
+}): Promise<boolean> {
+  if (!input.claimToken) return false;
+
+  const result = await new SignupAnalyticsClaimService().claim(input.userId, input.claimToken);
+  if (result.status === 'pending' || result.status === 'retry') return false;
+
+  input.responseHeaders?.append('set-cookie', clearedSignupAnalyticsClaimCookie());
+  if (result.status === 'invalid') return false;
+
+  await trackPostHogServerEvent({
+    eventName: 'signup_completed',
+    userId: input.userId,
+    sourceId: input.userId,
+    signupMethod: result.method,
+  });
+  return true;
+}
 
 // バリデーションスキーマ
 const userSettingsSchema = z.object({
@@ -52,6 +81,44 @@ const profileUpdateSchema = z
 
 /** ユーザー設定のtRPCルーター（取得・更新・iCalトークン管理） */
 export const userSettingsRouter = createTRPCRouter({
+  getAnalyticsConsent: protectedProcedure.query(async ({ ctx }) => {
+    try {
+      return await new AnalyticsConsentService(ctx.supabase).get(ctx.userId!);
+    } catch (error) {
+      return handleServiceError(error);
+    }
+  }),
+
+  setAnalyticsConsent: protectedProcedure
+    .input(z.object({ allowed: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      try {
+        const consent = await new AnalyticsConsentService(ctx.supabase).set(
+          ctx.userId!,
+          input.allowed,
+        );
+        if (input.allowed) {
+          await completeSignupAnalyticsClaim({
+            userId: ctx.userId!,
+            claimToken: ctx.req.cookies[SIGNUP_ANALYTICS_CLAIM_COOKIE],
+            responseHeaders: ctx.res.headers,
+          });
+        }
+        return consent;
+      } catch (error) {
+        return handleServiceError(error);
+      }
+    }),
+
+  claimSignupCompletion: protectedProcedure.mutation(async ({ ctx }) => {
+    const claimed = await completeSignupAnalyticsClaim({
+      userId: ctx.userId!,
+      claimToken: ctx.req.cookies[SIGNUP_ANALYTICS_CLAIM_COOKIE],
+      responseHeaders: ctx.res.headers,
+    });
+    return { claimed };
+  }),
+
   /**
    * 設定取得
    */

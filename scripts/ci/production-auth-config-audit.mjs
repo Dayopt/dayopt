@@ -192,10 +192,8 @@ export const AUTH_CONFIG_CONTRACT = [
     expected: [
       'https://app.dayopt.app/**',
       'https://app.dayopt.app/auth/reset-password',
-      'https://product-*-dayopt.vercel.app/**',
       'https://product-dayopt.vercel.app/',
       'https://product-dayopt.vercel.app/**',
-      'https://product-*-dayopt.vercel.app',
     ],
     compare: 'set',
     // この audit が扱う中で最大の blast radius。緩められるとパスワードリセットの
@@ -217,10 +215,25 @@ export const AUTH_CONFIG_CONTRACT = [
     // recovery 遷移先固定化も同時に入っており、復旧の因果をこの追加だけに切り分けては
     // いない）。pin はいずれにせよ production の実値集合に追従させる（#2023）。
     //
-    // 残る 5 件のうち `https://product-dayopt.vercel.app/` 系と `/**` 無しの
-    // ワイルドカードは重複・冗長に見えるが、preview の実 URL 形への依存が未調査のため
-    // 現状維持とした（整理は別途）。production を変えたら同じ変更でこの期待値も更新する
-    // — それを強制するのがこの pin の目的で、忘れると push:main で main が赤くなる。
+    // `https://product-*-dayopt.vercel.app` 系 2 件は 2026-09-17 に除去した（#2616）。
+    // 除去の根拠は 2 つ:
+    //
+    // 1. **この wildcard は第三者が奪える形だった。** Vercel の commit URL は
+    //    `<project>-<9 文字の英数字>-<scope slug>.vercel.app` なので、`*` がハイフンを
+    //    跨げると `product-<hash>-evil-dayopt.vercel.app` が一致する。つまり
+    //    `evil-dayopt` という team slug を取った第三者へ `token_hash` が渡りうる。
+    // 2. **この 2 件は生きている preview フローを serve していなかった。** Vercel の
+    //    Preview は PR branch ごとに Supabase Preview Branch の認証情報を受け取る
+    //    （`NEXT_PUBLIC_SUPABASE_URL` が branch 単位で配られていることを 2026-09-17 に
+    //    Vercel dashboard で実測）。preview の auth は branch 側の GoTrue を通るので、
+    //    production の allowlist に preview host を置く理由が無い。branch 側の
+    //    allowlist は `supabase/config.toml` の `additional_redirect_urls` が持つ。
+    //
+    // 残した `https://product-dayopt.vercel.app/` 系 2 件は production alias（wildcard を
+    // 含まないので上の手口が効かない）。重複・冗長に見えるが実値に合わせてある。
+    //
+    // production を変えたら同じ変更でこの期待値も更新する — それを強制するのがこの pin の
+    // 目的で、忘れると push:main で main が赤くなる。
     failureMode: 'fail-open',
     why: 'redirect allowlist。緩めるとリセットリンクと OAuth code が第三者へ渡る',
   },
@@ -255,6 +268,14 @@ export const AUTH_CONFIG_CONTRACT = [
     // メールが届かなくなるが、UI 側はエラーにならない。
     failureMode: 'fail-closed',
     why: '認証メール送信 hook。off で確認・リセットメールが届かなくなる',
+  },
+  {
+    key: 'mailer_notifications_password_changed_enabled',
+    expected: true,
+    // パスワード変更通知は client mutation ではなく Auth event を根拠にする。off になると
+    // パスワード変更自体は成功する一方、本人が不正変更に気づく経路だけが消える（#2848）。
+    failureMode: 'fail-closed',
+    why: 'パスワード変更通知。off で変更成功後のセキュリティ通知だけが届かなくなる',
   },
   {
     key: 'hook_custom_access_token_enabled',

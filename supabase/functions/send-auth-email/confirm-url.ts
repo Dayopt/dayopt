@@ -18,18 +18,27 @@ import type { EmailData } from '../_shared/types.ts';
  * fail-open（監査が読めなければ通る）である以上、設定 drift だけで token の配送先が第三者へ
  * 広がる経路を残さない。
  *
- * **現状の幅は GoTrue 側と同じ**にしてある。`product-*-dayopt.vercel.app` を狭められるかは
- * 「第三者が `-dayopt` で終わる Vercel team slug を取得できるか」の実測待ちで、その結論は
- * #2616 手順 1 に残っている。ここを狭めるのは実測後（狭めすぎると Preview の認証メールが
- * 本番 origin へ落ちてリンクが機能しなくなる）。
+ * **preview の幅は hash の桁まで固定する**（#2616）。Vercel の commit URL は
+ * `<project>-<unique-hash>-<scope-slug>.vercel.app` で、`<unique-hash>` は 9 文字の英数字
+ * （ハイフンを含まない）と docs に明記されている。よって `[a-z0-9]{9}` に固定すると、
+ * 一致させるには scope slug が**ちょうど `dayopt`** である必要があり、実在チームが占有済みの
+ * その slug 以外では一致しなくなる。旧 `[a-z0-9-]+` はハイフンを許したため、第三者が
+ * `evil-dayopt` のような team slug を取ると `product-<hash>-evil-dayopt.vercel.app` が
+ * 一致し、`token_hash` がそこへ載りえた。
+ *
+ * **branch URL 形（`product-git-<branch>-dayopt`）は allowlist に入れない。** branch 名は
+ * ハイフンを含むので、攻撃者 slug `x-dayopt` + branch `foo` の
+ * `product-git-foo-x-dayopt.vercel.app` を `branch=foo-x` として受理してしまい、regex では
+ * 原理的に区別できない。branch URL 経由の preview は下の `appUrl` 一致で救われる
+ * （preview branch では `appUrl` 自身がその preview URL になる）。
  */
 const ALLOWED_ORIGIN_PATTERNS: readonly RegExp[] = [
   /^https:\/\/app\.dayopt\.app$/,
   /^https:\/\/product-dayopt\.vercel\.app$/,
-  // Vercel preview（`product-<hash>-dayopt.vercel.app` / `product-git-<branch>-dayopt.vercel.app`）。
-  // `[a-z0-9-]+` はドットを含まないので、`product-x.evil-dayopt.vercel.app` のような
-  // 別ホストへの拡張は一致しない。
-  /^https:\/\/product-[a-z0-9-]+-dayopt\.vercel\.app$/,
+  // Vercel commit URL（`product-<9 文字の英数字>-dayopt.vercel.app`）。
+  // ドットもハイフンも含まないので、`product-x.evil-dayopt.vercel.app` や
+  // `product-<hash>-evil-dayopt.vercel.app` は一致しない。
+  /^https:\/\/product-[a-z0-9]{9}-dayopt\.vercel\.app$/,
 ];
 
 /**
