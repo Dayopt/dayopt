@@ -2,11 +2,13 @@ import { describe, expect, it, vi } from 'vitest';
 
 import {
   bodyReferencesNumber,
+  buildBriefAnnotations,
   buildCommentBody,
   buildContextPack,
   buildJudgmentHint,
   buildPostArgs,
   computeCiRollup,
+  computeContextSnapshotId,
   countUnresolvedThreads,
   CTX_MARKER,
   detectAcceptanceCriteria,
@@ -137,6 +139,7 @@ describe('isBotLogin / selectComments', () => {
       { user: { login: 'a' }, created_at: '2026-08-01T00:00:00Z', body: '1' },
       {
         user: { login: 'claude' },
+        author_association: 'MEMBER',
         created_at: '2026-08-02T00:00:00Z',
         body: `${CTX_MARKER}\n**brief（...）**`,
       },
@@ -154,6 +157,15 @@ describe('isBotLogin / selectComments', () => {
     ];
     expect(selectComments(withMarkers, 10, false).map((c) => c.body)).toEqual(['1', '5']);
     expect(selectComments(withMarkers, 10, true).map((c) => c.body)).toEqual(['1', '5']);
+  });
+
+  it('偽markerは信頼できる配達コメントと確認できないため資料から除外しない', () => {
+    const spoofed = {
+      user: { login: 'randomuser' },
+      author_association: 'NONE',
+      body: `${CTX_MARKER}\n重要な制約`,
+    };
+    expect(selectComments([spoofed], 10, true)).toEqual([spoofed]);
   });
 
   it('Codex（chatgpt-codex-connector[bot]）は bot 除外の対象外にする（実装前レビューを見落とさない）', () => {
@@ -688,7 +700,13 @@ describe('nextStep', () => {
 
 describe('buildContextPack (execFileImpl 経由の gh 呼び出し形)', () => {
   it('assistだけ切り詰め前の資料を持ち、通常出力と自己生成コメント除外は維持する', () => {
-    const comments = Array.from({ length: 101 }, (_, index) => ({
+    const comments: Array<{
+      id: number;
+      user: { login: string };
+      created_at: string;
+      body: string;
+      author_association?: string;
+    }> = Array.from({ length: 101 }, (_, index) => ({
       id: index + 1,
       user: { login: 'tomoya' },
       created_at: `2026-09-${String(index + 1).padStart(2, '0')}T00:00:00Z`,
@@ -697,18 +715,24 @@ describe('buildContextPack (execFileImpl 経由の gh 呼び出し形)', () => {
     comments.push({
       id: 10,
       user: { login: 'tomoya' },
+      author_association: 'OWNER',
       created_at: '2026-09-10T00:00:00Z',
       body: `${CTX_MARKER}\n自己生成`,
     });
     const deps = {
+      now: () => new Date('2026-09-24T00:00:00Z'),
       execFileImpl: (_cmd: string, args: string[]) => {
         if (args[1]?.includes('/comments'))
-          return JSON.stringify(args.includes('--slurp') ? [comments] : comments);
+          return JSON.stringify(
+            args.includes('--slurp') ? [comments.slice(0, 100), comments.slice(100)] : comments,
+          );
         if (args[0] === 'search') return '[]';
         return JSON.stringify({
           title: 'issue',
           body: '要求',
           labels: [],
+          created_at: '2026-01-01T00:00:00Z',
+          updated_at: '2026-09-24T00:00:00Z',
           html_url: 'https://github.com/Dayopt/dayopt/issues/1',
         });
       },
@@ -721,6 +745,7 @@ describe('buildContextPack (execFileImpl 経由の gh 呼び出し形)', () => {
     expect(unchanged).toEqual(normal);
     expect(normal).not.toHaveProperty('assistSource');
     if (!assistSource?.comments) throw new Error('assist資料が無い');
+    expect(assistSource.updatedAt).toBe('2026-01-01T00:00:00Z');
     expect(assistSource.comments).toHaveLength(101);
     expect(assistSource.comments[0].body).toBe(comments[0].body);
     expect(assistSource.decisions[0].length).toBeGreaterThan(200);
@@ -753,6 +778,146 @@ describe('buildContextPack (execFileImpl 経由の gh 呼び出し形)', () => {
     expect(first.bodySha256).not.toBe(next.bodySha256);
     expect(renderMarkdown(first)).toContain('実装・判断: L3');
   });
+  it('入力資料から自己生成briefを除いて安定snapshotを作り、本文・comment・PR SHA変更を検知する', () => {
+    const base = {
+      issue: { number: 1, body: '要求', updatedAt: '2026-09-24T00:00:00Z' },
+      comments: [
+        { id: 10, body: '判断', updatedAt: '2026-09-24T01:00:00Z' },
+        {
+          id: 11,
+          body: `${CTX_MARKER}\n生成済みbrief`,
+          author_association: 'OWNER',
+          updatedAt: '2026-09-24T02:00:00Z',
+        },
+      ],
+      relatedPrs: [
+        { number: 2, url: 'https://github.com/Dayopt/dayopt/pull/2', headSha: 'a'.repeat(40) },
+      ],
+      decisions: ['#1 判断'],
+    };
+    const first = computeContextSnapshotId(base);
+    expect(computeContextSnapshotId(base)).toBe(first);
+    expect(computeContextSnapshotId({ ...base, comments: base.comments.slice(0, 1) })).toBe(first);
+    expect(
+      computeContextSnapshotId({
+        ...base,
+        comments: [
+          ...base.comments,
+          { id: 12, body: `${CTX_MARKER}\n偽marker`, author_association: 'NONE' },
+        ],
+      }),
+    ).not.toBe(first);
+    expect(
+      computeContextSnapshotId({ ...base, issue: { ...base.issue, body: '変更要求' } }),
+    ).not.toBe(first);
+    expect(
+      computeContextSnapshotId({ ...base, comments: [{ ...base.comments[0], body: '別判断' }] }),
+    ).not.toBe(first);
+    expect(
+      computeContextSnapshotId({
+        ...base,
+        relatedPrs: [{ ...base.relatedPrs[0], headSha: 'b'.repeat(40) }],
+      }),
+    ).not.toBe(first);
+  });
+  it('L1注釈は採用済み・完全評価・既知参照だけを表示し、部分評価は未評価に戻す', () => {
+    const sources = [
+      { id: 'comment-10', url: 'https://github.com/Dayopt/dayopt/issues/1#issuecomment-10' },
+    ];
+    const rows = [
+      {
+        id: 'comment-10',
+        relevance: 0.93,
+        category: 'constraint',
+        evaluatedAt: '2026-09-24T00:00:00Z',
+        confidence: 0.91,
+        url: 'https://evil.example/forged',
+        sha: 'f'.repeat(40),
+        text: '自由文で必要条件を作る',
+      },
+    ];
+    const adopted = buildBriefAnnotations({
+      packId: 'context-relevance',
+      adoptedPackIds: ['context-relevance'],
+      complete: true,
+      rows,
+      sources,
+    });
+    expect(adopted.status).toBe('adopted');
+    expect(adopted.rows[0]).toEqual({
+      sourceId: 'comment-10',
+      url: sources[0].url,
+      category: 'constraint',
+      relevance: 0.93,
+      evaluatedAt: '2026-09-24T00:00:00Z',
+    });
+    expect(JSON.stringify(adopted)).not.toContain('evil.example');
+    expect(JSON.stringify(adopted)).not.toContain('必要条件を作る');
+    expect(JSON.stringify(adopted)).not.toContain('f'.repeat(40));
+    expect(
+      buildBriefAnnotations({
+        packId: 'context-relevance',
+        adoptedPackIds: [],
+        complete: true,
+        rows,
+        sources,
+      }),
+    ).toMatchObject({ status: 'not_adopted', rows: [] });
+    expect(
+      buildBriefAnnotations({
+        packId: 'context-relevance',
+        adoptedPackIds: ['context-relevance'],
+        complete: false,
+        failure: 'rate_limited',
+        rows,
+        sources,
+      }),
+    ).toMatchObject({ status: 'unevaluated', reason: 'rate_limited', rows: [] });
+    for (const failure of [
+      'timeout',
+      'balance_below_floor',
+      'balance_unknown',
+      'missing_credentials',
+    ]) {
+      expect(
+        buildBriefAnnotations({
+          packId: 'context-relevance',
+          adoptedPackIds: ['context-relevance'],
+          complete: false,
+          failure,
+          rows,
+          sources,
+        }),
+      ).toMatchObject({ status: 'unevaluated', reason: failure, rows: [] });
+    }
+    expect(
+      buildBriefAnnotations({
+        packId: 'context-relevance',
+        adoptedPackIds: ['context-relevance'],
+        complete: true,
+        rows: [{ ...rows[0], confidence: 0.4 }],
+        sources,
+      }),
+    ).toMatchObject({ status: 'unevaluated', reason: 'low_confidence', rows: [] });
+    expect(
+      buildBriefAnnotations({
+        packId: 'context-relevance',
+        adoptedPackIds: ['context-relevance'],
+        complete: true,
+        rows,
+        sources: [{ id: 'comment-10', url: 'https://evil.example/source' }],
+      }),
+    ).toMatchObject({ status: 'unevaluated', reason: 'incomplete', rows: [] });
+    expect(
+      buildBriefAnnotations({
+        packId: 'context-relevance',
+        adoptedPackIds: ['context-relevance'],
+        complete: true,
+        rows: [{ ...rows[0], confidence: Number.NaN }],
+        sources,
+      }),
+    ).toMatchObject({ status: 'unevaluated', reason: 'low_confidence', rows: [] });
+  });
   it('issue: issues API → comments → search prs → pr view(headRefName,files) の順で argv を渡す', () => {
     const calls: string[][] = [];
     const execFileImpl = vi.fn((_cmd: string, args: string[]) => {
@@ -780,11 +945,25 @@ describe('buildContextPack (execFileImpl 経由の gh 呼び出し形)', () => {
         return JSON.stringify({ state: 'open', title: '親 issue', labels: [] });
       }
       if (args[0] === 'search') {
-        return JSON.stringify([{ number: 99, title: 'PR', state: 'OPEN', body: 'Closes #2550' }]);
+        return JSON.stringify([
+          {
+            number: 99,
+            title: 'PR',
+            state: 'OPEN',
+            url: 'https://github.com/Dayopt/dayopt/pull/99',
+            body: 'Closes #2550',
+          },
+        ]);
       }
       if (args[0] === 'pr' && args[1] === 'view') {
         return JSON.stringify({
+          url: 'https://github.com/Dayopt/dayopt/pull/99',
           headRefName: 'sonnet/foo-2550',
+          baseRefName: 'main',
+          headRefOid: 'a'.repeat(40),
+          baseRefOid: 'b'.repeat(40),
+          statusCheckRollup: [{ conclusion: 'FAILURE' }],
+          updatedAt: '2026-09-23T00:00:00Z',
           files: [{ path: 'apps/product/src/foo.ts' }],
         });
       }
@@ -800,8 +979,22 @@ describe('buildContextPack (execFileImpl 経由の gh 呼び出し形)', () => {
     expect(pack.header.title).toBe('issue タイトル');
     expect(pack.related.parentEpic).toEqual({ number: 1, state: 'open', title: '親 issue' });
     expect(pack.related.prs).toEqual([
-      { number: 99, state: 'OPEN', title: 'PR', headRefName: 'sonnet/foo-2550' },
+      {
+        number: 99,
+        state: 'OPEN',
+        title: 'PR',
+        url: 'https://github.com/Dayopt/dayopt/pull/99',
+        headRefName: 'sonnet/foo-2550',
+        baseRefName: 'main',
+        headSha: 'a'.repeat(40),
+        baseSha: 'b'.repeat(40),
+        updatedAt: '2026-09-23T00:00:00Z',
+        ciRollup: { success: 0, failure: 1, pending: 0 },
+        detailAvailable: true,
+        detailStatus: 'available',
+      },
     ]);
+    expect(pack.snapshotId).toMatch(/^[a-f0-9]{64}$/);
     expect(pack.files).toContain('apps/product/src/foo.ts');
     expect(pack.routing).toMatchObject({ level: 'unclassified', preparation: 'L1', ready: false });
     expect(calls[0]).toEqual(['api', 'repos/Dayopt/dayopt/issues/2550']);
@@ -855,8 +1048,34 @@ describe('buildContextPack (execFileImpl 経由の gh 呼び出し形)', () => {
 
     // 関連セクションには closed/merged PR も引き続き載る。
     expect(pack.related.prs).toEqual([
-      { number: 90, state: 'CLOSED', title: 'PR (closed)', headRefName: 'sonnet/foo-2550' },
-      { number: 91, state: 'MERGED', title: 'PR (merged)', headRefName: 'sonnet/foo-2550' },
+      {
+        number: 90,
+        state: 'CLOSED',
+        title: 'PR (closed)',
+        url: null,
+        headRefName: 'sonnet/foo-2550',
+        baseRefName: null,
+        headSha: null,
+        baseSha: null,
+        updatedAt: null,
+        ciRollup: null,
+        detailAvailable: true,
+        detailStatus: 'available',
+      },
+      {
+        number: 91,
+        state: 'MERGED',
+        title: 'PR (merged)',
+        url: null,
+        headRefName: 'sonnet/foo-2550',
+        baseRefName: null,
+        headSha: null,
+        baseSha: null,
+        updatedAt: null,
+        ciRollup: null,
+        detailAvailable: true,
+        detailStatus: 'available',
+      },
     ]);
     // だが次の一手は「紐付き済み」扱いにしない（linked PR #90/#91 を進める、には
     // ならない）。judgmentHint が上書きするため実際の文言は「分解表」を含む
@@ -1102,11 +1321,108 @@ describe('renderMarkdown', () => {
     };
     const markdown = renderMarkdown(pack);
     expect(markdown).not.toContain('直近コメント');
-    expect(markdown).not.toContain('関連');
+    expect(markdown).not.toContain('\n#### 関連\n');
     expect(markdown).not.toContain('触るファイル');
     expect(markdown).not.toContain('決定ログ');
     expect(markdown).not.toContain('skill');
     expect(markdown).not.toContain('次の一手');
+  });
+
+  it('Issue本文を正本として示し、必須条件・検証・PRごとのSHAと未確認状態を150行目安で残す', () => {
+    const markdown = renderMarkdown({
+      number: 2891,
+      kind: 'issue',
+      generatedAt: '2026-09-24T10:00:00.000Z',
+      snapshotId: 'a'.repeat(64),
+      header: {
+        title: 'Issue Context Brief',
+        state: 'open',
+        labels: [],
+        milestone: 'v0.36',
+        assignee: null,
+        url: 'https://github.com/Dayopt/dayopt/issues/2891',
+        updatedAt: '2026-09-24T09:00:00Z',
+      },
+      body: {
+        text: '## Goal\n要求の正本\n## Minimum Viable Approach\n制約を保持する\n## Test and Acceptance\n`pnpm test:scripts`',
+        truncated: false,
+        remaining: 0,
+      },
+      requiredSections: [
+        { heading: 'Goal', text: '要求の正本' },
+        { heading: 'Minimum Viable Approach', text: '制約を保持する' },
+        { heading: 'Test and Acceptance', text: '`pnpm test:scripts`' },
+      ],
+      comments: [
+        {
+          id: 3,
+          author: 'tomoya',
+          date: '2026-09-24',
+          url: 'https://github.com/Dayopt/dayopt/issues/2891#issuecomment-3',
+          body: 'pnpm test:scripts: pass (自己申告)',
+        },
+      ],
+      related: {
+        parentEpic: null,
+        prs: [
+          {
+            number: 90,
+            state: 'OPEN',
+            title: 'A',
+            url: 'https://github.com/Dayopt/dayopt/pull/90',
+            headRefName: 'a',
+            headSha: 'b'.repeat(40),
+            baseSha: 'c'.repeat(40),
+            ciRollup: { success: 1, failure: 0, pending: 0 },
+            detailAvailable: true,
+          },
+          {
+            number: 91,
+            state: 'OPEN',
+            title: 'B',
+            url: 'https://github.com/Dayopt/dayopt/pull/91',
+            headRefName: 'b',
+            headSha: 'd'.repeat(40),
+            baseSha: 'e'.repeat(40),
+            ciRollup: { success: 0, failure: 1, pending: 0 },
+            detailAvailable: true,
+          },
+        ],
+        linkedIssues: null,
+      },
+      missingSources: ['comments_unavailable'],
+      l1Annotations: { status: 'unevaluated', reason: 'timeout', rows: [] },
+      files: null,
+      protectedRequired: null,
+      decisionLines: [],
+      skills: [],
+      judgmentRecords: {
+        dod: true,
+        breakdown: true,
+        brief: true,
+        acceptance: true,
+        verification: true,
+      },
+      routing: null,
+      nextStep: '実装を進める',
+    });
+    expect(markdown).toContain('生成: 2026-09-24T10:00:00.000Z');
+    expect(markdown).toContain(`snapshot: ${'a'.repeat(64)}`);
+    expect(markdown).toContain('Issue本文が要求・制約の正本');
+    expect(markdown).toContain('#### 要求・制約・必要な検証');
+    expect(markdown).toContain('Minimum Viable Approach');
+    expect(markdown).toContain('Test and Acceptance');
+    expect(markdown).toContain('issuecomment-3');
+    expect(markdown).toContain('head SHA');
+    expect(markdown).toContain(
+      `head SHA ${'b'.repeat(40)} | base SHA ${'c'.repeat(40)} | CI SUCCESS 1 / FAILURE 0 / PENDING 0`,
+    );
+    expect(markdown).toContain(
+      `head SHA ${'d'.repeat(40)} | base SHA ${'e'.repeat(40)} | CI SUCCESS 0 / FAILURE 1 / PENDING 0`,
+    );
+    expect(markdown).toContain('comments_unavailable');
+    expect(markdown).toContain('L1: 未評価（timeout）');
+    expect(markdown.split('\n').length).toBeLessThanOrEqual(150);
   });
 
   it('可変セクションが巨大でも 150 行以内に収め、末尾セクションは残す（150 行保証）', () => {
@@ -1485,10 +1801,18 @@ describe('renderMarkdown', () => {
 
 describe('buildCommentBody', () => {
   it('1 行目がマーカー、2 行目が見出し行', () => {
-    const body = buildCommentBody({ number: 2550, date: '2026-09-02', markdown: '### 本文' });
+    const body = buildCommentBody({
+      number: 2550,
+      date: '2026-09-02',
+      generatedAt: '2026-09-02T00:00:00.000Z',
+      snapshotId: 'a'.repeat(64),
+      markdown: '### 本文',
+    });
     const lines = body.split('\n');
     expect(lines[0]).toBe(CTX_MARKER);
-    expect(lines[1]).toBe('**brief（`pnpm ctx 2550`、2026-09-02）**');
+    expect(lines[1]).toBe('**Issue Context Brief（`pnpm ctx 2550`）**');
+    expect(lines[2]).toContain('2026-09-02T00:00:00.000Z');
+    expect(lines[2]).toContain('snapshot:');
     expect(body).toContain('### 本文');
   });
 });
@@ -1595,8 +1919,20 @@ describe('buildPostArgs', () => {
 });
 
 describe('postContextBrief', () => {
-  const pack = { number: 2550 };
+  const pack = {
+    number: 2550,
+    snapshotId: 'a'.repeat(64),
+    header: { url: 'https://github.com/Dayopt/dayopt/issues/2550' },
+  };
   const markdown = '### #2550 タイトル';
+
+  it('対象Issue/PRのURLが取れなければ投稿しない', () => {
+    const execFileImpl = vi.fn();
+    expect(() =>
+      postContextBrief({ ...pack, header: { url: null } }, markdown, { execFileImpl }),
+    ).toThrow(/URLが未取得/);
+    expect(execFileImpl).not.toHaveBeenCalled();
+  });
 
   it('既存の ctx brief コメントが無ければ作成する', () => {
     const calls: string[][] = [];
@@ -1616,6 +1952,7 @@ describe('postContextBrief', () => {
 
     const result = postContextBrief(pack, markdown, {
       execFileImpl,
+      getCurrentSnapshotId: () => pack.snapshotId,
       writeFileImpl,
       mkdtempImpl,
       now: () => new Date('2026-09-02T00:00:00Z'),
@@ -1629,6 +1966,7 @@ describe('postContextBrief', () => {
       'api',
       'repos/Dayopt/dayopt/issues/2550/comments?per_page=100',
       '--paginate',
+      '--slurp',
     ]);
     expect(calls[1]).toEqual(['api', 'user', '--jq', '.login']);
     expect(calls[2]).toEqual([
@@ -1672,6 +2010,7 @@ describe('postContextBrief', () => {
 
     const result = postContextBrief(pack, markdown, {
       execFileImpl,
+      getCurrentSnapshotId: () => pack.snapshotId,
       writeFileImpl,
       mkdtempImpl,
       now: () => new Date('2026-09-02T00:00:00Z'),
@@ -1716,11 +2055,137 @@ describe('postContextBrief', () => {
 
     const result = postContextBrief(pack, markdown, {
       execFileImpl,
+      getCurrentSnapshotId: () => pack.snapshotId,
       writeFileImpl,
       mkdtempImpl,
       now: () => new Date('2026-09-02T00:00:00Z'),
     });
 
     expect(result.mode).toBe('create');
+  });
+
+  it('投稿直前にsnapshotが変わった場合はコメントを書かず停止する', () => {
+    const calls: string[][] = [];
+    const execFileImpl = vi.fn((_cmd: string, args: string[]) => {
+      calls.push(args);
+      if (args[0] === 'api' && args[1] === 'user') return 'tomoya\n';
+      if (args[0] === 'api') return JSON.stringify([]);
+      throw new Error('投稿してはいけない');
+    });
+    expect(() =>
+      postContextBrief(pack, markdown, {
+        execFileImpl,
+        getCurrentSnapshotId: () => 'b'.repeat(64),
+        writeFileImpl: vi.fn(),
+        mkdtempImpl: () => '/tmp/ctx-brief-stale',
+      }),
+    ).toThrow(/snapshot.*変化/);
+    expect(calls.some((args) => args[0] === 'issue')).toBe(false);
+    expect(calls.some((args) => args[0] === 'api' && args[1] === '-X')).toBe(false);
+  });
+
+  it('入力snapshotが変わった場合は表示内容が同じでも既存briefを更新する', () => {
+    const nextPack = { ...pack, snapshotId: 'b'.repeat(64) };
+    const oldBody = buildCommentBody({
+      number: 2550,
+      date: '2026-09-01',
+      generatedAt: '2026-09-01T10:00:00.000Z',
+      snapshotId: pack.snapshotId,
+      markdown,
+    });
+    const calls: string[][] = [];
+    const execFileImpl = vi.fn((_cmd: string, args: string[]) => {
+      calls.push(args);
+      if (args[0] === 'api' && args[1] === 'user') return 'tomoya\n';
+      if (args[0] === 'api' && args[1] === '-X')
+        return JSON.stringify({
+          html_url: 'https://github.com/Dayopt/dayopt/issues/2550#issuecomment-42',
+        });
+      if (args[0] === 'api')
+        return JSON.stringify([
+          {
+            id: 42,
+            html_url: 'https://github.com/Dayopt/dayopt/issues/2550#issuecomment-42',
+            body: oldBody,
+            author_association: 'OWNER',
+            user: { login: 'tomoya' },
+          },
+        ]);
+      throw new Error(`unexpected args: ${args.join(' ')}`);
+    });
+    const writeFileImpl = vi.fn();
+
+    const result = postContextBrief(nextPack, markdown, {
+      execFileImpl,
+      getCurrentSnapshotId: () => nextPack.snapshotId,
+      writeFileImpl,
+      mkdtempImpl: () => '/tmp/ctx-brief-snapshot-update',
+      now: () => new Date('2026-09-24T10:00:00Z'),
+    });
+
+    expect(result).toEqual({
+      mode: 'update',
+      url: 'https://github.com/Dayopt/dayopt/issues/2550#issuecomment-42',
+    });
+    expect(calls.some((args) => args[0] === 'api' && args[1] === '-X')).toBe(true);
+    expect(writeFileImpl).toHaveBeenCalledWith(
+      '/tmp/ctx-brief-snapshot-update/body.md',
+      expect.stringContaining(`snapshot: ${nextPack.snapshotId}`),
+      'utf8',
+    );
+  });
+
+  it('内容とsnapshotが同じなら既存コメントと生成時刻を維持し再PATCHしない', () => {
+    const oldBody = buildCommentBody({
+      number: 2550,
+      date: '2026-09-01',
+      generatedAt: '2026-09-01T10:00:00.000Z',
+      snapshotId: pack.snapshotId,
+      markdown,
+    });
+    const calls: string[][] = [];
+    const execFileImpl = vi.fn((_cmd: string, args: string[]) => {
+      calls.push(args);
+      if (args[0] === 'api' && args[1] === 'user') return 'tomoya\n';
+      if (args[0] === 'api')
+        return JSON.stringify([
+          {
+            id: 42,
+            html_url: 'https://github.com/Dayopt/dayopt/issues/2550#issuecomment-42',
+            body: oldBody,
+            author_association: 'OWNER',
+            user: { login: 'tomoya' },
+          },
+        ]);
+      throw new Error('unchanged brief must not be posted');
+    });
+    const result = postContextBrief(pack, markdown, {
+      execFileImpl,
+      getCurrentSnapshotId: () => pack.snapshotId,
+      now: () => new Date('2026-09-24T10:00:00Z'),
+      writeFileImpl: vi.fn(),
+    });
+    expect(result).toEqual({
+      mode: 'unchanged',
+      url: 'https://github.com/Dayopt/dayopt/issues/2550#issuecomment-42',
+    });
+    expect(calls).toHaveLength(2);
+  });
+
+  it('投稿エラーは成功扱いにせずそのまま失敗する', () => {
+    const execFileImpl = vi.fn((_cmd: string, args: string[]) => {
+      if (args[0] === 'api' && args[1] === 'user') return 'tomoya\n';
+      if (args[0] === 'api') return JSON.stringify([]);
+      if (args[0] === 'issue') throw new Error('GitHub write failed');
+      throw new Error(`unexpected args: ${args.join(' ')}`);
+    });
+    expect(() =>
+      postContextBrief(pack, markdown, {
+        execFileImpl,
+        getCurrentSnapshotId: () => pack.snapshotId,
+        writeFileImpl: vi.fn(),
+        mkdtempImpl: () => '/tmp/ctx-brief-post-failure',
+      }),
+    ).toThrow('GitHub write failed');
   });
 });

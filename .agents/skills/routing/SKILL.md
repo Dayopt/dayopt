@@ -49,6 +49,8 @@ auth / RLS / service role、billing / webhook、migration、data model、公開 
 
 `pnpm ctx <N>` の L0〜L3 は助言の既存インターフェースとして維持する。L0 は機械収集、L1 は事実整理、L2 は通常実装、L3 は不変条件・権限・設計判断を表す。`preparation: L1` は別 agent の起動指示ではなく、同じ主担当が担ってよい。L2 の中でも狭く検証容易なら Terra、判断が必要なら Sol を選ぶ。`ready` は入力項目の存在確認だけで、実装・ラベル・merge の許可ではない。
 
+Issue briefを利用する担当Codex sessionは、Issue本文と信頼できる最新 `ctx-brief` コメントを自分の入力として明示取得し、Issue番号・snapshotの一致を確認する。Issue本文が要求の正本であり、コメントが存在するだけではsessionが取得した証拠にならない。
+
 評価モデル Jev（`pnpm jev:*`）は、この選択を置き換えない。文章しか入力が無く答えが有限集合の判定へ意味的な特徴を足す層で、注釈は候補の提示までに留まり、権限・必須レビュー・merge には繋がない。**決定的に分かることは Jev へ聞かない**（実測で負けた 4 判定と、pack を足す手順は [jev.md](../../../docs/operations/jev.md)）。
 
 ## 委譲する場合だけ
