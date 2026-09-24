@@ -9,7 +9,7 @@
 
 ## 外部との接点
 
-### HTTP route（31）
+### HTTP route（32）
 
 tRPC の `/api/trpc` を含む、Next.js の route handler 全件。method は export から取る。
 
@@ -41,6 +41,7 @@ tRPC の `/api/trpc` を含む、Next.js の route handler 全件。method は e
 | web     | `/api/compass-docs`                          | GET                | —       | 30          | `apps/web/src/app/api/compass-docs/route.ts`                              |
 | web     | `/api/contact`                               | POST               | —       | 30          | `apps/web/src/app/api/contact/route.ts`                                   |
 | web     | `/api/csp-report`                            | POST, HEAD         | —       | 30          | `apps/web/src/app/api/csp-report/route.ts`                                |
+| web     | `/api/og`                                    | GET                | —       | 25          | `apps/web/src/app/api/og/route.tsx`                                       |
 | web     | `/api/search`                                | GET                | —       | 30          | `apps/web/src/app/api/search/route.ts`                                    |
 | web     | `/api/v1/system/[...retired]`                | GET, POST, OPTIONS | —       | 5           | `apps/web/src/app/api/v1/system/[...retired]/route.ts`                    |
 | web     | `/api/webhooks/resend`                       | POST               | nodejs  | 15          | `apps/web/src/app/api/webhooks/resend/route.ts`                           |

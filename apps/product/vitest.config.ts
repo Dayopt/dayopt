@@ -44,7 +44,6 @@ const DOM_ONLY_TESTS = [
   'src/features/timeblock/components/editor/TimeblockRecordActions.test.ts',
   'src/lib/cookie-consent.test.ts',
   'src/lib/keyboard/shortcut-registry.test.ts',
-  'src/lib/security/encryption.test.ts',
   // 別タブからの storage.clear() まで見る consent lifecycle の test（browser 前提）
   'instrumentation-client.test.ts',
 ];
