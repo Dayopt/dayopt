@@ -63,3 +63,10 @@ last_verified: 2026-09-24
 - Luna CLI内ではTOML parserが見つからなかった。親担当がPython `tomllib` でlocal intent TOML全体をparseし、model `gpt-6-luna` / reasoning `max` を確認した。live user configは読み書きしていない。
 - Luna CLIの `git add` は worktree 管理先 `/Users/tanakatomoya/Desktop/dayopt/.git/worktrees/dayopt4/index.lock` をsandboxが拒否して失敗し、commitは作成できなかった。親担当の `git diff --check` は pass。この実行でもL2がcommit・merge・cleanupまで完遂した証拠は得られていない。
 - 親担当が確認したopen PRは #2896、#2833、#2828、#2670 の4本で、repo上限1本を超過中。push / PR作成は行っていない。Issue原文と最新ctx-briefの親側照合は済みだが、L2 CLI sandboxからの取得は未確認。
+
+## 再実行の開始確認（2026-09-24）
+
+- 今回の開始 HEAD と `origin/main`: `7d722b34e938bdc91eb3cf1eb1d4efee29b584ad`。開始時worktreeは clean。Issue #2892 は OPEN、本文 SHA-256 は `3287adf24b657766dabc3f1070f542b5ca87fa6f461ca6e7147c29993eccbe2c`、`pnpm ctx 2892` snapshot は `eb2e116ab3e18963999b6c217a40de38859566be7e44376c28ef46ee7e419bec`。このsnapshotに Context Brief はない。
+- 実行依頼の実行者指定は GPT-6 Luna / Codex CLI / medium。`codex --version` は `codex-cli 0.155.1`。利用量の `turn.completed` はこの実行面から取得できないため、未計測として扱う。
+- 既存 handoff `2892-l3-20260924-01` は変更・再実行していない。記録済み対象 SHA は `faccb982355fa34fc02f8f54abeedf199d365954`、応答は `gpt-6-sol` / `medium`、thread `01a0d27f-d409-7030-95a9-2f40c37e855d`、状態 `partial`、推奨 `REPLAN`。Sol環境からのGitHub再取得失敗をpartial理由として維持し、L2側の採用も既存記録どおり狭い評価からの一般化を避ける範囲に留める。完了応答や現HEADを対象とした裁定には読み替えない。
+- これは再実行開始時の照合記録であり、単独ではL2のmerge/cleanup完了やIssueの全受け入れ条件を証明しない。最終結果は、この同じ変更のGitHub PR・required checks・merge履歴と照合する。
