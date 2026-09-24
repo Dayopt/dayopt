@@ -67,6 +67,13 @@ last_verified: 2026-09-24
 ## 再実行の開始確認（2026-09-24）
 
 - 今回の開始 HEAD と `origin/main`: `7d722b34e938bdc91eb3cf1eb1d4efee29b584ad`。開始時worktreeは clean。Issue #2892 は OPEN、本文 SHA-256 は `3287adf24b657766dabc3f1070f542b5ca87fa6f461ca6e7147c29993eccbe2c`、`pnpm ctx 2892` snapshot は `eb2e116ab3e18963999b6c217a40de38859566be7e44376c28ef46ee7e419bec`。このsnapshotに Context Brief はない。
-- 実行依頼の実行者指定は GPT-6 Luna / Codex CLI / medium。`codex --version` は `codex-cli 0.155.1`。利用量の `turn.completed` はこの実行面から取得できないため、未計測として扱う。
+- 実行依頼の実行者指定は GPT-6 Luna / Codex CLI / medium。`codex --version` は `codex-cli 0.155.1`。usage event は親が CLI の `turn.completed` から取得したため、後掲の確定結果へ追記する。
 - 既存 handoff `2892-l3-20260924-01` は変更・再実行していない。記録済み対象 SHA は `faccb982355fa34fc02f8f54abeedf199d365954`、応答は `gpt-6-sol` / `medium`、thread `01a0d27f-d409-7030-95a9-2f40c37e855d`、状態 `partial`、推奨 `REPLAN`。Sol環境からのGitHub再取得失敗をpartial理由として維持し、L2側の採用も既存記録どおり狭い評価からの一般化を避ける範囲に留める。完了応答や現HEADを対象とした裁定には読み替えない。
 - これは再実行開始時の照合記録であり、単独ではL2のmerge/cleanup完了やIssueの全受け入れ条件を証明しない。最終結果は、この同じ変更のGitHub PR・required checks・merge履歴と照合する。
+
+## 再実行の確定結果（2026-09-24）
+
+- 同じ Codex CLI thread `01a0d2ed-e3a4-7621-9b0d-8c59f7a8a383` の本実行は input 2,733,075（cached 2,620,160）、output 19,014（reasoning output 11,617）。cleanup 再開は同じ thread で input 3,080,430（cached 2,947,072）、output 20,923（reasoning output 13,087）。合計は input 5,813,505（cached 5,567,232）、output 39,937（reasoning output 24,704）。いずれも CLI token 計測であり、Codex 利用料や API 相当額ではない。
+- PR #2898 (`98e9bbd3442fc1e006b31660d39c0bb1bbe4a662`) は merge commit `d6068b4515aa28b84de0d82d088da8111c6f6343` で merge、#2892 は自動 close。Static Checks、Vercel product/web、Validation plan、Impact は pass。docs-only の Unit / Integration Tests は workflow の条件で skip。
+- Luna は `pnpm branch:finish 2898` を実行し、merge と remote branch 削除まで成功したが、自分の実行中 worktree の削除で `Operation not permitted` となった。親が clean 状態・merged tree・worktree 登録解除を照合し、main を `origin/main` へ fast-forward、local branch を安全削除、残存した worktree directory を Trash へ移動した。したがって同じ Luna による実装・検証・PR・merge は実測できたが、Luna 自身による local worktree 削除成功は未確認。
+- #2852 の自動評価では `op run ... evaluate --split tune --max 1` が2回とも1Password `authorization timeout` で API 呼び出し前に終了。`jev:check` は17/17 pass。現在の report は tune 86件中0件、holdout 19件中0件が評価済み、両方の実費表示は$0。人手ラベルを要する #2853 はユーザー指示で保留。
