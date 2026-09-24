@@ -46,7 +46,7 @@ Dayopt の Web 流入、登録、初回利用、初回支払いを、分析に�
 
 PostHog の SQL editor または読み取り専用の MCP クエリで、**期間を UTC の半開区間 `[start, end)`、`environment`、母数、イベント名、重複排除方法**を回答と一緒に示す。`environment` のないイベントは除外する。Production と Preview を合算しない。小さい母数では人数を伏せて共有し、個人の raw event を issue / PR / chat に貼らない。
 
-基本的なイベント数のテンプレート。実データへの実行と HogQL 方言の確認は、Preview でイベントを送った後に行う。
+基本的なイベント数のテンプレート。Preview で同意済みの Web イベントを送った後、2026-09-24 に PostHog SQL editor で実データへの実行と HogQL 方言を確認した。実行時は `environment` と UTC の期間を対象環境に合わせて指定する。
 
 ```sql
 SELECT event, count() AS event_count, count(DISTINCT distinct_id) AS actors
