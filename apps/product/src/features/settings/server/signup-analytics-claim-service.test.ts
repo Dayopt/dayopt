@@ -20,7 +20,9 @@ describe('SignupAnalyticsClaimService', () => {
   it('rejects a forged marker before calling the database', async () => {
     const service = new SignupAnalyticsClaimService();
 
-    await expect(service.claim(USER_ID, 'registered=email')).resolves.toBeNull();
+    await expect(service.claim(USER_ID, 'registered=email')).resolves.toEqual({
+      status: 'invalid',
+    });
     expect(rpc).not.toHaveBeenCalled();
   });
 
@@ -30,7 +32,10 @@ describe('SignupAnalyticsClaimService', () => {
     const token = createSignupAnalyticsClaim(USER_ID, 'email') ?? '';
     const service = new SignupAnalyticsClaimService();
 
-    await expect(service.claim(USER_ID, token)).resolves.toBe('email');
+    await expect(service.claim(USER_ID, token)).resolves.toEqual({
+      status: 'claimed',
+      method: 'email',
+    });
     expect(rpc).toHaveBeenCalledWith('claim_posthog_signup_v1', { p_user_id: USER_ID });
     expect(abortSignal).toHaveBeenCalledWith(expect.any(AbortSignal));
   });
@@ -41,6 +46,15 @@ describe('SignupAnalyticsClaimService', () => {
     const token = createSignupAnalyticsClaim(USER_ID, 'email') ?? '';
     const service = new SignupAnalyticsClaimService();
 
-    await expect(service.claim(USER_ID, token)).resolves.toBeNull();
+    await expect(service.claim(USER_ID, token)).resolves.toEqual({ status: 'pending' });
+  });
+
+  it('keeps a valid claim retryable after a temporary database error', async () => {
+    const abortSignal = vi.fn().mockResolvedValue({ data: null, error: new Error('temporary') });
+    rpc.mockReturnValueOnce({ abortSignal });
+    const token = createSignupAnalyticsClaim(USER_ID, 'email') ?? '';
+    const service = new SignupAnalyticsClaimService();
+
+    await expect(service.claim(USER_ID, token)).resolves.toEqual({ status: 'retry' });
   });
 });

@@ -426,6 +426,10 @@ model {
     metadata { inventoryKind 'db-function' detail 'app からの .rpc 呼び出しなし' }
     link ../../../../apps/product/src/lib/database/generated/database.types.ts
   }
+  dbfunction fn_claim_posthog_first_paid_invoice_v1 'claim_posthog_first_paid_invoice_v1' {
+    metadata { inventoryKind 'db-function' detail 'used by lib' }
+    link ../../../../apps/product/src/lib/database/generated/database.types.ts
+  }
   dbfunction fn_claim_posthog_signup_v1 'claim_posthog_signup_v1' {
     metadata { inventoryKind 'db-function' detail 'used by settings' }
     link ../../../../apps/product/src/lib/database/generated/database.types.ts
@@ -632,10 +636,6 @@ model {
   }
   dbfunction fn_get_user_timezone 'get_user_timezone' {
     metadata { inventoryKind 'db-function' detail 'app からの .rpc 呼び出しなし' }
-    link ../../../../apps/product/src/lib/database/generated/database.types.ts
-  }
-  dbfunction fn_has_prior_paid_invoice_event_v1 'has_prior_paid_invoice_event_v1' {
-    metadata { inventoryKind 'db-function' detail 'used by lib' }
     link ../../../../apps/product/src/lib/database/generated/database.types.ts
   }
   dbfunction fn_issue_oauth_token_pair 'issue_oauth_token_pair' {

@@ -4,6 +4,7 @@ const sdk = vi.hoisted(() => ({
   init: vi.fn(),
   capture: vi.fn(),
   identify: vi.fn(),
+  get_property: vi.fn(),
   reset: vi.fn(),
   opt_in_capturing: vi.fn(),
   opt_out_capturing: vi.fn(),
@@ -18,6 +19,7 @@ vi.mock('posthog-js', () => ({ default: sdk }));
 
 import {
   capturePostHogBrowserEvent,
+  getPostHogBrowserIdentifiedUserId,
   identifyPostHogBrowser,
   resetPostHogBrowserIdentity,
   startPostHogBrowser,
@@ -29,6 +31,7 @@ describe('PostHog browser consent boundary', () => {
     stopPostHogBrowser();
     vi.clearAllMocks();
     sdk.init.mockImplementation(() => undefined);
+    sdk.get_property.mockReset();
     vi.stubGlobal('window', { location: { origin: 'https://dayopt.app' } });
   });
 
@@ -92,6 +95,11 @@ describe('PostHog browser consent boundary', () => {
     });
     expect(sdk.identify).toHaveBeenCalledOnce();
     expect(sdk.reset).toHaveBeenCalledOnce();
+    expect(sdk.reset).toHaveBeenCalledWith(true);
+
+    sdk.get_property.mockReturnValue('00000000-0000-4000-8000-000000000002');
+    expect(getPostHogBrowserIdentifiedUserId()).toBe('00000000-0000-4000-8000-000000000002');
+    expect(sdk.get_property).toHaveBeenCalledWith('$user_id');
 
     stopPostHogBrowser();
     expect(sdk.opt_out_capturing).toHaveBeenCalledOnce();

@@ -45,8 +45,8 @@ const profileMaybeSingle = vi.hoisted(() => vi.fn());
 const writeFenceMaybeSingle = vi.hoisted(() => vi.fn());
 const getUserById = vi.hoisted(() => vi.fn());
 const trackBillingEvent = vi.hoisted(() => vi.fn());
-const hasPriorPaidInvoiceEvent = vi.hoisted(() => vi.fn());
-vi.mock('@/lib/analytics/billing-events', () => ({ trackBillingEvent, hasPriorPaidInvoiceEvent }));
+const claimFirstPaidInvoice = vi.hoisted(() => vi.fn());
+vi.mock('@/lib/analytics/billing-events', () => ({ trackBillingEvent, claimFirstPaidInvoice }));
 const trackPostHogServerEvent = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/analytics/posthog-server', () => ({ trackPostHogServerEvent }));
 const trackProductEvent = vi.hoisted(() => vi.fn());
@@ -129,7 +129,7 @@ function request(overrides: { body?: string; headers?: Record<string, string> } 
 
 beforeEach(() => {
   trackBillingEvent.mockResolvedValue(true);
-  hasPriorPaidInvoiceEvent.mockResolvedValue(false);
+  claimFirstPaidInvoice.mockResolvedValue(true);
   trackPostHogServerEvent.mockResolvedValue(undefined);
   vi.clearAllMocks();
   vi.stubEnv('POSTHOG_SERVER_ENABLED', 'true');
@@ -335,10 +335,10 @@ describe('Stripe webhook route', () => {
               : 'subscription_renewal_succeeded',
         }),
       );
-      expect(hasPriorPaidInvoiceEvent).toHaveBeenCalledWith({
+      expect(claimFirstPaidInvoice).toHaveBeenCalledWith({
         userId: 'user-1',
         invoiceId: 'in_paid',
-        currentEventName:
+        eventName:
           reason === 'subscription_create'
             ? 'subscription_payment_succeeded'
             : 'subscription_renewal_succeeded',
@@ -367,7 +367,7 @@ describe('Stripe webhook route', () => {
       billing_reason: 'subscription_cycle',
     };
     profileMaybeSingle.mockResolvedValue({ data: { id: 'user-1' }, error: null });
-    hasPriorPaidInvoiceEvent.mockResolvedValue(true);
+    claimFirstPaidInvoice.mockResolvedValue(false);
 
     expect((await POST(request())).status).toBe(200);
 
@@ -375,6 +375,28 @@ describe('Stripe webhook route', () => {
     expect(trackBillingEvent).toHaveBeenCalledWith(
       expect.objectContaining({ eventName: 'subscription_renewal_succeeded' }),
     );
+  });
+
+  it('records first-paid identity while PostHog delivery is disabled', async () => {
+    eventMock.type = 'invoice.paid';
+    eventMock.data.object = {
+      id: 'in_paid',
+      customer: 'cus_test123',
+      status: 'paid',
+      amount_paid: 500,
+      billing_reason: 'subscription_create',
+    };
+    profileMaybeSingle.mockResolvedValue({ data: { id: 'user-1' }, error: null });
+    vi.stubEnv('POSTHOG_SERVER_ENABLED', 'false');
+
+    expect((await POST(request())).status).toBe(200);
+
+    expect(claimFirstPaidInvoice).toHaveBeenCalledWith({
+      userId: 'user-1',
+      invoiceId: 'in_paid',
+      eventName: 'subscription_payment_succeeded',
+    });
+    expect(trackPostHogServerEvent).not.toHaveBeenCalled();
   });
 
   it('releases a paid invoice receipt when analytics persistence fails', async () => {

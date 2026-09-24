@@ -4,6 +4,7 @@ import {
   BROWSER_TELEMETRY_CONSENT_EVENT,
   capturePostHogBrowserEvent,
   getBrowserTelemetryConsentStorage,
+  getPostHogBrowserIdentifiedUserId,
   hasAnalyticsConsent,
   identifyPostHogBrowser,
   isBrowserTelemetryConsentStorageChange,
@@ -26,15 +27,14 @@ export function PostHogProductAnalytics() {
   const pathname = usePathname();
   const userId = useAuthStore((state) => state.user?.id ?? null);
   const authLoading = useAuthStore((state) => state.loading);
-  const previousUserId = useRef<string | null>(null);
-  const authIdentityInitialized = useRef(false);
   const lastSignupView = useRef<string | null>(null);
   const [consentVersion, setConsentVersion] = useState(0);
 
   useEffect(() => {
+    const projectKey = process.env.NEXT_PUBLIC_POSTHOG_PROJECT_KEY;
     const changed = () => {
       if (!hasConsent()) {
-        stopPostHogBrowser();
+        stopPostHogBrowser(projectKey);
         lastSignupView.current = null;
       }
       setConsentVersion((version) => version + 1);
@@ -51,13 +51,34 @@ export function PostHogProductAnalytics() {
   }, []);
 
   useEffect(() => {
-    if (authLoading) return;
+    if (authLoading || !userId) return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('signup_claim') !== '1') return;
 
-    const identityChanged = !authIdentityInitialized.current || previousUserId.current !== userId;
+    params.delete('signup_claim');
+    const remaining = params.toString();
+    window.history.replaceState(
+      window.history.state,
+      '',
+      `${window.location.pathname}${remaining ? `?${remaining}` : ''}${window.location.hash}`,
+    );
+    void vanillaTrpc.userSettings.claimSignupCompletion.mutate().catch(() => {
+      captureUnexpectedError(new Error('Signup analytics claim failed'), {
+        feature: 'analytics',
+        operation: 'claim_signup_completion',
+      });
+    });
+  }, [authLoading, pathname, userId]);
 
+  useEffect(() => {
     const projectKey = process.env.NEXT_PUBLIC_POSTHOG_PROJECT_KEY;
-    if (process.env.NEXT_PUBLIC_POSTHOG_BROWSER_ENABLED !== 'true' || !projectKey || !hasConsent())
+    if (!hasConsent()) {
+      stopPostHogBrowser(projectKey);
       return;
+    }
+    if (authLoading) return;
+    if (process.env.NEXT_PUBLIC_POSTHOG_BROWSER_ENABLED !== 'true' || !projectKey) return;
+
     let active = true;
     void startPostHogBrowser({
       projectKey,
@@ -71,31 +92,15 @@ export function PostHogProductAnalytics() {
       hasConsent,
     }).then(() => {
       if (!active || !hasConsent()) return;
-      if (identityChanged) resetPostHogBrowserIdentity();
-      authIdentityInitialized.current = true;
-      previousUserId.current = userId;
+      const previouslyIdentifiedUserId = getPostHogBrowserIdentifiedUserId();
+      if (previouslyIdentifiedUserId && previouslyIdentifiedUserId !== userId) {
+        resetPostHogBrowserIdentity();
+      }
       if (userId) identifyPostHogBrowser(userId);
 
       if (pathname.endsWith('/auth/signup') && lastSignupView.current !== pathname) {
         lastSignupView.current = pathname;
         capturePostHogBrowserEvent('signup_viewed', { screen: 'signup' });
-      }
-
-      const params = new URLSearchParams(window.location.search);
-      if (userId && params.get('signup_claim') === '1') {
-        params.delete('signup_claim');
-        const remaining = params.toString();
-        window.history.replaceState(
-          window.history.state,
-          '',
-          `${window.location.pathname}${remaining ? `?${remaining}` : ''}${window.location.hash}`,
-        );
-        void vanillaTrpc.userSettings.claimSignupCompletion.mutate().catch(() => {
-          captureUnexpectedError(new Error('Signup analytics claim failed'), {
-            feature: 'analytics',
-            operation: 'claim_signup_completion',
-          });
-        });
       }
     });
     return () => {
@@ -103,7 +108,10 @@ export function PostHogProductAnalytics() {
     };
   }, [authLoading, pathname, userId, consentVersion]);
 
-  useEffect(() => () => stopPostHogBrowser(), []);
+  useEffect(() => {
+    const projectKey = process.env.NEXT_PUBLIC_POSTHOG_PROJECT_KEY;
+    return () => stopPostHogBrowser(projectKey);
+  }, []);
 
   return null;
 }

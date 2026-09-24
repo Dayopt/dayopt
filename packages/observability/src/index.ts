@@ -1,6 +1,7 @@
 export {
   capturePostHogBrowserEvent,
   capturePostHogPageview,
+  getPostHogBrowserIdentifiedUserId,
   identifyPostHogBrowser,
   resetPostHogBrowserIdentity,
   startPostHogBrowser,

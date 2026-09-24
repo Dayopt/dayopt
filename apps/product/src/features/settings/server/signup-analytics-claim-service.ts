@@ -7,11 +7,17 @@ import {
 import { logger } from '@/lib/logger';
 import { createServiceRoleClient } from '@/lib/supabase/oauth';
 
+type SignupAnalyticsClaimResult =
+  | { status: 'claimed'; method: SignupAnalyticsMethod }
+  | { status: 'invalid' }
+  | { status: 'pending' }
+  | { status: 'retry' };
+
 /** Consumes an authenticated signup marker once, after checking its server signature. */
 export class SignupAnalyticsClaimService {
-  async claim(userId: string, token: string): Promise<SignupAnalyticsMethod | null> {
+  async claim(userId: string, token: string): Promise<SignupAnalyticsClaimResult> {
     const claim = verifySignupAnalyticsClaim(token, userId);
-    if (!claim) return null;
+    if (!claim) return { status: 'invalid' };
 
     try {
       const request = createServiceRoleClient().rpc('claim_posthog_signup_v1', {
@@ -20,12 +26,12 @@ export class SignupAnalyticsClaimService {
       const { data, error } = await request.abortSignal(AbortSignal.timeout(1_000));
       if (error) {
         logger.warn('PostHog signup claim failed');
-        return null;
+        return { status: 'retry' };
       }
-      return data === true ? claim.method : null;
+      return data === true ? { status: 'claimed', method: claim.method } : { status: 'pending' };
     } catch {
       logger.warn('PostHog signup claim unavailable');
-      return null;
+      return { status: 'retry' };
     }
   }
 }

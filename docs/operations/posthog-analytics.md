@@ -31,10 +31,9 @@ Dayopt の Web 流入、登録、初回利用、初回支払いを、分析に�
 
 - Web と Product のブラウザ送信は、それぞれの origin の分析 Cookie 同意後だけ開始する。拒否・撤回するとそのブラウザからの送信を止め、SDK の識別子を reset する。Web の同意を Product に自動適用しない。
 - Product の「アカウントの利用分析」はログイン済みユーザー自身が許可・撤回する。初期値は拒否。サーバーイベントは送信直前に最新値を読み、取得失敗時も送らない。Stripe webhook で別端末の支払いが成功した場合にも、このアカウントの判断を適用する。ブラウザ同意とは独立する。
-- ブラウザで同意済みの Product ユーザーは Supabase user UUID で identify し、匿名 Web 訪問と同じ PostHog ブラウザ cookie を通じてつなぐ。認証の初期化が終わるまでブラウザ送信を待ち、初期化後とアカウント切替時は以前の PostHog 識別子を reset してから現在の UUID を identify する。Web と Product の両方で同意していない訪問を推定で結合しない。メール、氏名、計画タイトル、メモ、決済情報を送らない。
-- `signup_completed` は認証 callback が実際の新規登録を確定した時だけ発行する。callback はアカウントに結び付いた署名済みの短時間 HttpOnly Cookie を設定し、ブラウザは固定の URL marker をきっかけに入力なしの tRPC mutation を呼ぶ。サーバーは署名、現在のアカウント、アカウント同意を確認し、DB の一回限り claim を消費してからイベントを送る。`registered=email` のような query parameter は登録の証拠に使わない。cookie は最大 10 分で失効する。
-- `signup_completed` を送るのは登録後の認証リダイレクトで Product のブラウザ同意とアカウント同意の両方が有効な場合だけ。`/auth/*` では同意バナーを表示しないため、新規利用者の `signup_viewed` は欠測しうる。登録の全数は既存の `product_events.user_signed_up` を参照する。
-- 期限切れアカウントでも分析同意の撤回は設定操作として許可する。支払い成功の初回判定は、`product_events` を service_role から読み取り可能にせず、prior event の有無だけを返す限定 RPC で行う。
+- ブラウザで同意済みの Product ユーザーは Supabase user UUID で identify し、匿名 Web 訪問と同じ PostHog ブラウザ cookie を通じてつなぐ。認証の初期化が終わるまでブラウザ送信を待ち、別の UUID がすでに識別済みの場合だけ reset してから現在の UUID を identify する。匿名 Web 訪問の distinct ID はそのまま引き継ぐ。Web または Product で同意を拒否・撤回すると、SDK が未初期化でも共有 PostHog cookie と session storage を消すため、両面の匿名識別がリセットされる。Web と Product の両方で同意していない訪問を推定で結合しない。メール、氏名、計画タイトル、メモ、決済情報を送らない。
+- `signup_completed` は認証 callback が実際の新規登録を確定した時だけ発行する。callback はアカウントに結び付いた署名済みの短時間 HttpOnly Cookie を設定し、ブラウザは固定の URL marker をきっかけに入力なしの tRPC mutation を呼ぶ。サーバーは署名、現在のアカウント、アカウント同意を確認し、DB の一回限り claim を消費してからイベントを送る。アカウント未同意または照合の一時失敗では署名済み claim を残し、アカウントで同意した時に再試行する。ブラウザ Cookie の同意はブラウザ SDK の送信を制御し、このサーバーイベントのアカウント同意とは独立する。`registered=email` のような query parameter は登録の証拠に使わない。cookie は最大 10 分で失効する。`/auth/*` では同意バナーを表示しないため、新規利用者の `signup_viewed` は欠測しうる。登録の全数は既存の `product_events.user_signed_up` を参照する。
+- 期限切れアカウントでも分析同意の撤回は設定操作として許可する。初回支払い判定には、90日で削除される `product_events` とは別に、userごとの invoice event UUID を `private.posthog_first_paid_invoices` へ保存する。migration 時点で残っている支払いイベントは marker に移し、後続の同一invoice再送だけを同じ初回として扱う。90日を超えて先に削除された過去eventは復元できないため、既存アカウントの過去全件に対する初回支払い集計には使わない。marker はアカウント削除時に cascade 削除され、service_role からもテーブルを直接読めず、限定 claim RPC だけを実行できる。
 
 ## イベント契約
 

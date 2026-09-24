@@ -30,7 +30,7 @@ import {
   syncDeletedSubscriptionStatus,
   syncSubscriptionStatus,
 } from '@/features/settings/server/billing-service';
-import { hasPriorPaidInvoiceEvent, trackBillingEvent } from '@/lib/analytics/billing-events';
+import { claimFirstPaidInvoice, trackBillingEvent } from '@/lib/analytics/billing-events';
 import { trackPostHogServerEvent } from '@/lib/analytics/posthog-server';
 import { trackProductEvent } from '@/lib/analytics/product-events';
 import { getAppUrl } from '@/lib/app-url';
@@ -532,15 +532,6 @@ export async function POST(request: NextRequest) {
             invoice.billing_reason === 'subscription_create'
               ? 'subscription_payment_succeeded'
               : 'subscription_renewal_succeeded';
-          const hasPriorPaidInvoice =
-            process.env.POSTHOG_SERVER_ENABLED === 'true' &&
-            Boolean(process.env.NEXT_PUBLIC_POSTHOG_PROJECT_KEY)
-              ? await hasPriorPaidInvoiceEvent({
-                  userId: user.id,
-                  invoiceId: invoice.id,
-                  currentEventName: invoiceEventName,
-                })
-              : true;
           const { error: consumptionError } = await supabase
             .from('profiles')
             .update({ app_trial_consumed_at: new Date(event.created * 1_000).toISOString() })
@@ -562,7 +553,16 @@ export async function POST(request: NextRequest) {
             }))
           )
             throw new Error('Billing analytics must be retried');
-          if (!hasPriorPaidInvoice) {
+          const isFirstPaidInvoice = await claimFirstPaidInvoice({
+            userId: user.id,
+            invoiceId: invoice.id,
+            eventName: invoiceEventName,
+          });
+          if (
+            isFirstPaidInvoice &&
+            process.env.POSTHOG_SERVER_ENABLED === 'true' &&
+            Boolean(process.env.NEXT_PUBLIC_POSTHOG_PROJECT_KEY)
+          ) {
             await trackPostHogServerEvent({
               eventName: 'first_payment_succeeded',
               userId: user.id,

@@ -98,8 +98,40 @@ export async function startPostHogBrowser(options: BrowserAnalyticsOptions): Pro
   return loading;
 }
 
-/** Clears the shared Dayopt cookie so another account never inherits this identity. */
-export function stopPostHogBrowser(): void {
+function postHogPersistenceName(projectKey: string): string {
+  const token = projectKey.replace(/\+/g, 'PL').replace(/\//g, 'SL').replace(/=/g, 'EQ');
+  return `ph_${token}_posthog`;
+}
+
+function clearPostHogBrowserPersistence(projectKey: string): void {
+  const persistenceName = postHogPersistenceName(projectKey);
+  const secure = typeof window !== 'undefined' && window.location.protocol === 'https:';
+  const secureAttribute = secure ? '; Secure' : '';
+  const cookie = `${persistenceName}=; Max-Age=0; Path=/; SameSite=Lax${secureAttribute}`;
+
+  if (typeof document !== 'undefined') {
+    for (const value of [`${cookie}; Domain=.dayopt.app`, cookie]) {
+      try {
+        document.cookie = value;
+      } catch {
+        // Cookie storage can be unavailable in restricted browser contexts.
+      }
+    }
+  }
+
+  if (typeof window !== 'undefined') {
+    for (const key of [persistenceName, `ph_${projectKey}_session_registered_properties`]) {
+      try {
+        window.sessionStorage.removeItem(key);
+      } catch {
+        // Session storage can be unavailable independently from cookie storage.
+      }
+    }
+  }
+}
+
+/** Clears shared browser identity even when the SDK has not been initialized. */
+export function stopPostHogBrowser(projectKey?: string): void {
   enabled = false;
   pendingCaptures = [];
   client?.opt_out_capturing();
@@ -109,6 +141,7 @@ export function stopPostHogBrowser(): void {
   client?.persistence?.set_disabled(true);
   client?.sessionPersistence?.set_disabled(true);
   persistenceDisabledAfterRevocation = client !== null;
+  if (projectKey) clearPostHogBrowserPersistence(projectKey);
 }
 
 export function identifyPostHogBrowser(userId: string): void {
@@ -117,10 +150,17 @@ export function identifyPostHogBrowser(userId: string): void {
   client.identify(userId);
 }
 
+/** Returns the previously identified account without discarding an anonymous device ID. */
+export function getPostHogBrowserIdentifiedUserId(): string | null {
+  if (!client) return null;
+  const identifiedUserId = client.get_property('$user_id');
+  return typeof identifiedUserId === 'string' ? identifiedUserId : null;
+}
+
 /** Drops any identity persisted by a previous auth session while retaining consent. */
 export function resetPostHogBrowserIdentity(): void {
   if (!enabled || !consentCheck?.() || !client) return;
-  client.reset();
+  client.reset(true);
 }
 
 function attributionProperties(): Record<string, string> {

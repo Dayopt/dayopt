@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { billingEventId, hasPriorPaidInvoiceEvent, trackBillingEvent } from './billing-events';
+import { billingEventId, claimFirstPaidInvoice, trackBillingEvent } from './billing-events';
 const abortSignal = vi.hoisted(() => vi.fn());
 const insert = vi.hoisted(() => vi.fn(() => ({ abortSignal })));
 const rpc = vi.hoisted(() => vi.fn());
@@ -43,21 +43,41 @@ describe('trusted billing analytics', () => {
     expect(await trackBillingEvent(input)).toBe(false);
   });
 
-  it('uses the narrow server RPC to look up prior paid invoice events', async () => {
-    const abort = vi.fn().mockResolvedValue({ data: false, error: null });
-    rpc.mockReturnValueOnce({ abortSignal: abort });
+  it('persists first-paid identity beyond product event retention and deduplicates retries', async () => {
+    const abort = vi
+      .fn()
+      .mockResolvedValueOnce({ data: true, error: null })
+      .mockResolvedValueOnce({ data: true, error: null })
+      .mockResolvedValueOnce({ data: false, error: null });
+    rpc.mockReturnValue({ abortSignal: abort });
 
     await expect(
-      hasPriorPaidInvoiceEvent({
+      claimFirstPaidInvoice({
         userId: input.userId,
         invoiceId: input.sourceId,
-        currentEventName: 'subscription_payment_succeeded',
+        eventName: 'subscription_payment_succeeded',
+      }),
+    ).resolves.toBe(true);
+    await expect(
+      claimFirstPaidInvoice({
+        userId: input.userId,
+        invoiceId: input.sourceId,
+        eventName: 'subscription_payment_succeeded',
+      }),
+    ).resolves.toBe(true);
+    await expect(
+      claimFirstPaidInvoice({
+        userId: input.userId,
+        invoiceId: 'in_later',
+        eventName: 'subscription_renewal_succeeded',
       }),
     ).resolves.toBe(false);
-    expect(rpc).toHaveBeenCalledWith('has_prior_paid_invoice_event_v1', {
+
+    expect(rpc).toHaveBeenCalledWith('claim_posthog_first_paid_invoice_v1', {
       p_user_id: input.userId,
-      p_current_event_id: billingEventId(input.eventName, input.sourceId),
+      p_invoice_event_id: billingEventId(input.eventName, input.sourceId),
     });
+    expect(abort).toHaveBeenCalledTimes(3);
     expect(abort).toHaveBeenCalledWith(expect.any(AbortSignal));
   });
 });

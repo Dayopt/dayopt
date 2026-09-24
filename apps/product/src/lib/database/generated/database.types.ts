@@ -1701,6 +1701,10 @@ export type Database = {
           refresh_token_enc: string;
         }[];
       };
+      claim_posthog_first_paid_invoice_v1: {
+        Args: { p_invoice_event_id: string; p_user_id: string };
+        Returns: boolean;
+      };
       claim_posthog_signup_v1: { Args: { p_user_id: string }; Returns: boolean };
       claim_stripe_webhook_event: {
         Args: {
@@ -2208,10 +2212,6 @@ export type Database = {
         Returns: number;
       };
       get_user_timezone: { Args: { p_user_id: string }; Returns: string };
-      has_prior_paid_invoice_event_v1: {
-        Args: { p_current_event_id: string; p_user_id: string };
-        Returns: boolean;
-      };
       issue_oauth_token_pair: {
         Args: {
           p_access_expires_at: string;

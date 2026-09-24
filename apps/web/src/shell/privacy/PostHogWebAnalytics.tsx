@@ -44,13 +44,13 @@ export function PostHogWebAnalytics() {
     };
   }, [pathname]);
 
-  useEffect(
-    () => () => {
+  useEffect(() => {
+    const projectKey = process.env.NEXT_PUBLIC_POSTHOG_PROJECT_KEY;
+    return () => {
       lastPage.current = null;
-      stopPostHogBrowser();
-    },
-    [],
-  );
+      stopPostHogBrowser(projectKey);
+    };
+  }, []);
 
   return null;
 }

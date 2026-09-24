@@ -18,6 +18,28 @@ import { AnalyticsConsentService } from './analytics-consent-service';
 import { createSettingsService } from './settings-service';
 import { SignupAnalyticsClaimService } from './signup-analytics-claim-service';
 
+async function completeSignupAnalyticsClaim(input: {
+  userId: string;
+  claimToken: string | undefined;
+  responseHeaders: Headers | undefined;
+}): Promise<boolean> {
+  if (!input.claimToken) return false;
+
+  const result = await new SignupAnalyticsClaimService().claim(input.userId, input.claimToken);
+  if (result.status === 'pending' || result.status === 'retry') return false;
+
+  input.responseHeaders?.append('set-cookie', clearedSignupAnalyticsClaimCookie());
+  if (result.status === 'invalid') return false;
+
+  await trackPostHogServerEvent({
+    eventName: 'signup_completed',
+    userId: input.userId,
+    sourceId: input.userId,
+    signupMethod: result.method,
+  });
+  return true;
+}
+
 // バリデーションスキーマ
 const userSettingsSchema = z.object({
   // タイムゾーン設定
@@ -71,27 +93,30 @@ export const userSettingsRouter = createTRPCRouter({
     .input(z.object({ allowed: z.boolean() }))
     .mutation(async ({ ctx, input }) => {
       try {
-        return await new AnalyticsConsentService(ctx.supabase).set(ctx.userId!, input.allowed);
+        const consent = await new AnalyticsConsentService(ctx.supabase).set(
+          ctx.userId!,
+          input.allowed,
+        );
+        if (input.allowed) {
+          await completeSignupAnalyticsClaim({
+            userId: ctx.userId!,
+            claimToken: ctx.req.cookies[SIGNUP_ANALYTICS_CLAIM_COOKIE],
+            responseHeaders: ctx.res.headers,
+          });
+        }
+        return consent;
       } catch (error) {
         return handleServiceError(error);
       }
     }),
 
   claimSignupCompletion: protectedProcedure.mutation(async ({ ctx }) => {
-    const claimToken = ctx.req.cookies[SIGNUP_ANALYTICS_CLAIM_COOKIE];
-    if (!claimToken) return { claimed: false };
-
-    const signupMethod = await new SignupAnalyticsClaimService().claim(ctx.userId!, claimToken);
-    ctx.res.headers?.append('set-cookie', clearedSignupAnalyticsClaimCookie());
-    if (!signupMethod) return { claimed: false };
-
-    await trackPostHogServerEvent({
-      eventName: 'signup_completed',
+    const claimed = await completeSignupAnalyticsClaim({
       userId: ctx.userId!,
-      sourceId: ctx.userId!,
-      signupMethod,
+      claimToken: ctx.req.cookies[SIGNUP_ANALYTICS_CLAIM_COOKIE],
+      responseHeaders: ctx.res.headers,
     });
-    return { claimed: true };
+    return { claimed };
   }),
 
   /**

@@ -5,10 +5,12 @@ const analytics = vi.hoisted(() => ({
   consent: true,
   loading: false,
   userId: '00000000-0000-4000-8000-000000000001',
+  identifiedUserId: null as string | null,
   start: vi.fn().mockResolvedValue(undefined),
   stop: vi.fn(),
   reset: vi.fn(),
   identify: vi.fn(),
+  getIdentifiedUserId: vi.fn(() => analytics.identifiedUserId),
   capture: vi.fn(),
   signupClaim: vi.fn().mockResolvedValue({ claimed: true }),
   captureUnexpectedError: vi.fn(),
@@ -32,6 +34,7 @@ vi.mock('@dayopt/observability', () => ({
   getBrowserTelemetryConsentStorage: () => null,
   hasAnalyticsConsent: () => analytics.consent,
   identifyPostHogBrowser: analytics.identify,
+  getPostHogBrowserIdentifiedUserId: analytics.getIdentifiedUserId,
   resetPostHogBrowserIdentity: analytics.reset,
   isBrowserTelemetryConsentStorageChange: () => false,
   startPostHogBrowser: analytics.start,
@@ -45,6 +48,7 @@ describe('PostHog Product registration boundary', () => {
     vi.clearAllMocks();
     analytics.consent = true;
     analytics.loading = false;
+    analytics.identifiedUserId = null;
     window.sessionStorage.clear();
     window.history.replaceState({}, '', '/calendar?signup_claim=1&view=week');
     vi.stubEnv('NEXT_PUBLIC_POSTHOG_PROJECT_KEY', 'phc_test');
@@ -72,10 +76,21 @@ describe('PostHog Product registration boundary', () => {
 
   it('does not initialize or capture without browser consent', () => {
     analytics.consent = false;
+    window.history.replaceState({}, '', '/calendar');
     render(<PostHogProductAnalytics />);
     expect(analytics.start).not.toHaveBeenCalled();
+    expect(analytics.stop).toHaveBeenCalledWith('phc_test');
     expect(analytics.capture).not.toHaveBeenCalled();
     expect(analytics.signupClaim).not.toHaveBeenCalled();
+  });
+
+  it('asks the server to verify a signed signup claim without browser cookie consent', async () => {
+    analytics.consent = false;
+    render(<PostHogProductAnalytics />);
+
+    await waitFor(() => expect(analytics.signupClaim).toHaveBeenCalledOnce());
+    expect(analytics.start).not.toHaveBeenCalled();
+    expect(analytics.capture).not.toHaveBeenCalled();
   });
 
   it('reports a failed background claim without surfacing an analytics error in the UI', async () => {
@@ -90,7 +105,7 @@ describe('PostHog Product registration boundary', () => {
     );
   });
 
-  it('waits for restored auth state and clears any prior browser identity before tracking', async () => {
+  it('preserves a shared anonymous Web identity on the first Product login', async () => {
     analytics.loading = true;
     const view = render(<PostHogProductAnalytics />);
 
@@ -99,6 +114,14 @@ describe('PostHog Product registration boundary', () => {
 
     analytics.loading = false;
     view.rerender(<PostHogProductAnalytics />);
+
+    await waitFor(() => expect(analytics.identify).toHaveBeenCalledWith(analytics.userId));
+    expect(analytics.reset).not.toHaveBeenCalled();
+  });
+
+  it('resets a persisted different account before identifying the current account', async () => {
+    analytics.identifiedUserId = '00000000-0000-4000-8000-000000000002';
+    render(<PostHogProductAnalytics />);
 
     await waitFor(() => expect(analytics.identify).toHaveBeenCalledWith(analytics.userId));
     expect(analytics.reset.mock.invocationCallOrder[0]).toBeLessThan(
