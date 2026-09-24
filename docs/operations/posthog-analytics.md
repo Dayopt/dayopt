@@ -18,6 +18,7 @@ Dayopt の Web 流入、登録、初回利用、初回支払いを、分析に�
 - 無料枠は Product Analytics 月 100 万イベント。支払い方法を登録せず、PostHog の Usage で当月のイベント数を確認する。増え方を確認してから送信範囲を広げる。Session Replay、ヒートマップ、自動クリック、Web Vitals、例外自動取得、feature flags は使わない。
 - `NEXT_PUBLIC_POSTHOG_PROJECT_KEY` は PostHog の公開 project key。`NEXT_PUBLIC_POSTHOG_BROWSER_ENABLED=true` と `POSTHOG_SERVER_ENABLED=true` は独立した送信スイッチ。未設定なら送信しない。Preview と Production の設定・承認を分ける。
 - PostHog の Web analytics domains には `dayopt.app`、`app.dayopt.app` と、PR #2896 の Web / Product Preview の具体的な Vercel ドメインを登録済み（2026-09-24）。ワイルドカードは使わない。SDK は米国の `https://us.i.posthog.com` を使う。別の Preview URL で検証する場合は、そのドメインを個別に登録する。
+- PR #2896 の Vercel Preview ブランチには両サイトの公開 project key とブラウザ送信スイッチ、Product にはサーバー送信スイッチを設定済み。Web の `NEXT_PUBLIC_PRODUCT_ORIGIN` は対応する Product Preview を指す。本番環境にはこれらの送信スイッチを設定していない。環境変数の変更は既存デプロイに反映されないため、Preview を再デプロイしてから検証する。
 
 ## 同意と識別
 
