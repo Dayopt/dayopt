@@ -60,13 +60,21 @@ describe('PostHog browser consent boundary', () => {
       }),
     ).toEqual({
       event: '$pageview',
-      properties: { $current_url: 'https://dayopt.app/ja', environment: 'preview' },
+      properties: {
+        $current_url: 'https://dayopt.app/ja',
+        environment: 'preview',
+        $geoip_disable: true,
+      },
     });
     expect(config.before_send({ event: '$autocapture', properties: {} })).toBeNull();
 
     capturePostHogBrowserEvent('signup_cta_clicked');
     identifyPostHogBrowser('00000000-0000-4000-8000-000000000001');
     expect(sdk.capture).toHaveBeenCalledOnce();
+    expect(sdk.capture).toHaveBeenCalledWith('signup_cta_clicked', expect.any(Object), {
+      send_instantly: true,
+      transport: 'sendBeacon',
+    });
     expect(sdk.identify).toHaveBeenCalledOnce();
 
     allowed = false;

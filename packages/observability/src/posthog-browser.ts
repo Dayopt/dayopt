@@ -1,6 +1,7 @@
 import {
   filterPostHogBrowserProperties,
   postHogExternalReferrer,
+  postHogPageLanguage,
   postHogPagePath,
   postHogUtm,
 } from './posthog-capture';
@@ -122,7 +123,7 @@ export function capturePostHogPageview(): void {
     page_path: pagePath,
     $pathname: pagePath,
     $current_url: `${window.location.origin}${pagePath}`,
-    language: document.documentElement.lang === 'ja' ? 'ja' : 'en',
+    language: postHogPageLanguage(pagePath),
     device_category: window.matchMedia('(max-width: 767px)').matches ? 'mobile' : 'desktop',
   });
 }
@@ -135,8 +136,8 @@ export function capturePostHogBrowserEvent(
   client.capture(
     eventName,
     { ...commonProperties, ...properties },
-    {
-      send_instantly: eventName === 'signup_cta_clicked',
-    },
+    eventName === 'signup_cta_clicked'
+      ? { send_instantly: true, transport: 'sendBeacon' }
+      : undefined,
   );
 }

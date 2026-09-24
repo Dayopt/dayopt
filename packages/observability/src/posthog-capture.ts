@@ -66,6 +66,10 @@ export function postHogPagePath(pathname: string): string {
   return safe.length ? `/${safe.join('/')}` : '/';
 }
 
+export function postHogPageLanguage(pagePath: string): 'ja' | 'en' {
+  return pagePath === '/ja' || pagePath.startsWith('/ja/') ? 'ja' : 'en';
+}
+
 export function postHogUtm(value: string | null): string | undefined {
   const trimmed = value?.trim().toLowerCase();
   return trimmed && /^[a-z0-9_-]{1,64}$/.test(trimmed) ? trimmed : undefined;
@@ -126,5 +130,8 @@ export function filterPostHogBrowserProperties(
       filtered[key] = value;
     }
   }
+  // PostHog enriches browser events with location from the request IP unless
+  // this processing flag is present. Discarding the stored IP alone is insufficient.
+  filtered.$geoip_disable = true;
   return filtered;
 }

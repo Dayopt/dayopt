@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   filterPostHogBrowserProperties,
   postHogExternalReferrer,
+  postHogPageLanguage,
   postHogPagePath,
   postHogUtm,
 } from './posthog-capture';
@@ -10,6 +11,8 @@ import {
 describe('PostHog browser data boundary', () => {
   it('keeps only a safe page path and permitted UTM', () => {
     expect(postHogPagePath('/ja/blog/hello-world')).toBe('/ja/blog/hello-world');
+    expect(postHogPageLanguage('/ja/blog/hello-world')).toBe('ja');
+    expect(postHogPageLanguage('/en/blog/hello-world')).toBe('en');
     expect(postHogPagePath('/ja/user/09f7106708384e9fa05dd729bc876281')).toBe('/ja/user/:page');
     expect(postHogUtm(' Newsletter_One ')).toBe('newsletter_one');
     expect(postHogUtm('person@example.com')).toBeUndefined();
@@ -45,6 +48,7 @@ describe('PostHog browser data boundary', () => {
       $current_url: 'https://dayopt.app/ja/blog/post',
       $referrer: 'https://news.example.com/',
       $utm_source: 'newsletter',
+      $geoip_disable: true,
     });
     expect(filterPostHogBrowserProperties('$autocapture', {}, 'https://dayopt.app')).toBeNull();
   });
@@ -73,6 +77,11 @@ describe('PostHog browser data boundary', () => {
         },
         'https://app.dayopt.app',
       ),
-    ).toEqual({ environment: 'production', surface: 'product', schema_version: 1 });
+    ).toEqual({
+      environment: 'production',
+      surface: 'product',
+      schema_version: 1,
+      $geoip_disable: true,
+    });
   });
 });
