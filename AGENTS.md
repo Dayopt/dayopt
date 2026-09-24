@@ -148,6 +148,7 @@ worktree で作業するセッション（レーン）は次を守る:
 ## 委任・報告の作法
 
 - **主担当は1つ**。原則として同じ Codex session が調査・判断・実装・検証・修正まで完了する。工程だけを理由に agent / model を切り替えない。目的は必要な品質を少ない総利用量・手戻り・人間介入で達成すること
+- **Issue Context Brief**: 要求・制約の正本はIssue本文。担当Codex sessionは着手時にIssue本文と信頼できる最新 `ctx-brief` コメントを明示取得し、Issue番号とsnapshotが一致することを確かめる。コメントが存在するだけではsessionへの配達完了とみなさない
 - **最初に成功条件を固定する**。ユーザーが確認できる結果、対象範囲、検証方法を先に書き、手段や model 選択を目的化しない。標準ループは [docs/operations/ai-development-loop.md](docs/operations/ai-development-loop.md)
 - **事実と仮説を分ける**。repo / docs / issue / 実行結果で確認した事実には証拠を添え、未実測の原因や効果は仮説として明記する。安く確認できる仮説は作業前に検証する
 - **決定的な道具を先に使う**。検索・git history・diff・typecheck・lint・test・JSON 変換・CI 取得は、まず既存 script / CLI で閉じられないか探す。LLM や外部連携を使う時も、必要な瞬間だけ最小の context・権限・経路を渡す（`routing` / `mcp-usage` skill）

@@ -45,7 +45,9 @@ pnpm jev:check         # ネットワーク不要の静的検査。ここが落�
 
 ### 判断材料を用意する assist（採用評価前）
 
-`context-relevance` と `claim-support` は独立した shadow 用途。明示呼び出しで使えるが、現時点で `ctx --post`、通常の `ctx`、`routing` の手順や150行briefへは接続していない。人手評価後の運用接続は別PRにする。既存の要求・権限・必須検証・独立レビューの原資料を置き換えない。
+`context-relevance` と `claim-support` は独立した shadow 用途。`pnpm ctx <N>` はL0だけを収集し、Jevを呼ばない。`pnpm ctx <N> --post` も評価を起動せず、既にある入力の再評価もしない。Issue briefのL1表示は、人がGoを確認してコード側で採用したpackの完全評価、十分な確信度、L0に存在する出典参照が揃った時だけ許可する。自由文、URL、SHA、検査結果をJevの出力から作らない。部分評価・停止・低確信度は未評価として扱う。現在はGoを記録したpackが無いため、L1は未接続である。`PACK_STATUS.active` や `GO_CANDIDATE` は採用記録ではない。
+
+Issue本文は要求・制約の正本で、briefは原文の該当節、出典、snapshot、個別PRのSHA/CI、未確認事項を短く配る補助資料。必須条件と失敗・欠測はL1の順位付けで削らない。Codex sessionはIssue本文と信頼できる最新 `ctx-brief` コメントを明示取得し、Issue番号とsnapshotを確認する。コメントが存在するだけでは取得済みとみなさない。
 
 ```bash
 pnpm jev:assist context --issue 2853
