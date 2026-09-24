@@ -27,6 +27,12 @@ description: 非 trivial な作業の成功条件・実行方法・モデル選�
 4. 独立した大量調査だけ、下記の委譲条件で採算を比較する。モデル名や agent 数を目的にしない。
 5. 失敗時は情報不足・環境不備・仕様の曖昧さ・能力不足を切り分ける。安いモデルで同じ失敗を重ねることを節約と扱わない。停止境界は `AGENTS.md` に従う。
 
+## Level 0 を入口にする
+
+非自明な Issue / PR は、実装・レビューの前に `pnpm ctx <number>` を実行し、Issue / PR の要求、関連ファイル、既存判断、検査状態、候補 Skill を確認する。出力が古い、欠けている、または取得できないと分かった情報だけ一次資料で補い、確認済みの事実を別コマンドで重ねて集めない。
+
+環境・hook・toolchain の状態確認が作業に必要な場合は `pnpm agent:preflight` を使う。architecture / API / MCP / DB の構造調査は、まず生成済みの [`docs/engineering/architecture.md`](../../../docs/engineering/architecture.md) と関連 map / contract docs を確認し、具体的な不足だけソースコードを探索する。
+
 ## 高影響変更の spec-first
 
 auth / RLS / service role、billing / webhook、migration、data model、公開 API / MCP / OAuth / 外部 provider 契約、複数 feature の architecture、不可逆操作に触れる場合は、実装前に [`AI開発標準ループ`](../../../docs/operations/ai-development-loop.md) §高影響変更の spec-first を適用する。Issue / PR があればそこに、なければ作業報告に spec を残し、実装・既存契約・test と照合してから凍結する。Issue / PR を後から作った場合は転記して以後の正本にする。実装後は固定した条件へ照合する。これは production mutation や release の許可ではない。
