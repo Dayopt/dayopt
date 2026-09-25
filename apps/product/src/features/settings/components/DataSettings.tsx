@@ -359,7 +359,6 @@ function McpApiSection() {
     mcpResourceUri === '' || mcpResourceUri === dayoptUrls.mcp
       ? mcpResourceUri
       : `${mcpResourceUri}/mcp`;
-
   const handleCopy = useCallback(
     (text: string, type: 'url') => {
       navigator.clipboard.writeText(text);
@@ -404,8 +403,6 @@ function McpApiSection() {
           />
         </div>
       </LabeledRow>
-      {/* Connection guide（`apps/web/content/docs/{en,ja}/data/api-mcp.mdx` は
-          draft:true で未公開のため、公開後にここへリンクを追加する） */}
       <InfoBox className="mt-4 p-4">
         <p className="text-muted-foreground text-base md:text-sm">{t('connectionGuide')}</p>
       </InfoBox>

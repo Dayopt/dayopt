@@ -2,7 +2,7 @@ import 'server-only';
 
 import { logger } from '@/lib/logger';
 import {
-  oauthTokenGlobalRateLimit,
+  oauthTokenClientRateLimit,
   oauthTokenIpRateLimit,
   oauthTokenPreBodyIpRateLimit,
   oauthTokenRefreshIpRateLimit,
@@ -11,13 +11,16 @@ import {
 import { extractClientIp } from '@/lib/security/ip-validation';
 import { captureUnexpectedError } from '@/lib/sentry';
 
+import type { OAuthClientId } from './redirect-uris';
 import { hashToken } from './tokens';
 
 const LOCAL_PRE_BODY_IP_LIMIT = 600;
 const LOCAL_IP_LIMIT = 10;
 const LOCAL_REFRESH_LIMIT = 30;
 const LOCAL_REFRESH_IP_LIMIT = 120;
-const LOCAL_GLOBAL_LIMIT = 120;
+// 既知のOAuth clientごとに120/分。現行allowlistは3つなので、全体の最大は360/分。
+// allowlistを増やす時はこの合計DB admission上限を見直す。
+const LOCAL_CLIENT_LIMIT = 120;
 const LOCAL_WINDOW_MS = 60_000;
 const localRequests = new Map<string, number[]>();
 
@@ -42,7 +45,8 @@ export async function checkOAuthTokenPreBodyRateLimit(
 }
 
 /**
- * grant 種別ごとの上限。どちらの経路も最後に全体の上限を通る。
+ * grant 種別ごとの上限。最後の budget はOAuth clientごとに分け、1 clientの
+ * unauthenticatedな失敗で他clientの token 発行・更新を止めない。
  *
  * - `authorization_code`: IP 単位。ユーザーが同意画面を踏んだ直後にしか来ないので、
  *   IP あたりの頻度はもともと低い
@@ -52,6 +56,7 @@ export async function checkOAuthTokenPreBodyRateLimit(
  */
 export async function checkOAuthTokenGrantRateLimit(
   request: Request,
+  clientId: OAuthClientId,
   grant: { type: 'refresh_token'; refreshToken: string } | { type: 'other' },
 ): Promise<OAuthTokenRateLimitState> {
   const grantState =
@@ -66,10 +71,10 @@ export async function checkOAuthTokenGrantRateLimit(
   if (grantState !== 'allowed') return grantState;
 
   return checkRateLimit(
-    oauthTokenGlobalRateLimit,
-    'all-clients',
-    LOCAL_GLOBAL_LIMIT,
-    'check_oauth_token_global_rate_limit',
+    oauthTokenClientRateLimit,
+    `client:${clientId}`,
+    LOCAL_CLIENT_LIMIT,
+    'check_oauth_token_client_rate_limit',
   );
 }
 
@@ -77,9 +82,9 @@ export async function checkOAuthTokenGrantRateLimit(
  * refresh grant は **IP と token の両方**を通す。
  *
  * bucket key の材料は検証前の body なので、token 単位だけだと攻撃者が毎回別の値を
- * 送って bucket を無限に作れてしまい、1 IP から全体上限を飽和させて正規ユーザーの
- * token 更新を巻き添えで止められる。IP 側は共有 egress IP を締め出さない値にして
- * ある（`authorization_code` の 10/分 より緩い）ので、D-01 の目的は保たれる。
+ * 送って per-token bucket を無限に作れる。IP上限はこの経路の単一送信元負荷を抑え、
+ * 別clientの共有budgetを消費しない。共有 egress IP を締め出さないよう、
+ * `authorization_code` の10/分より緩くする（#2721 D-01）。
  */
 async function checkRefreshGrantRateLimit(
   request: Request,

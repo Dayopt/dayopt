@@ -48,6 +48,8 @@ docs へ残している。
 - 公開エンドポイント（OAuth callback / webhook / contact）は rate limit を持つ
 - `withUpstashRateLimit` のIP rate limitはVercel由来の`X-Real-IP`だけを使い、`X-Forwarded-For`へfallbackしない。欠落・不正値は共有`ip:unknown`でfail closedにする
 - rate limitのRedis keyは`ip:` / `email:`のpurpose prefixを付けてHMAC化し、生のIP / emailを保存・記録しない。account bucketを併用する場合はIP-firstで短絡し、IP bucketが拒否したらaccount bucketを消費しない
+- OAuth token endpointはform bodyをstream中に実byte数で制限し、16 KiBを超えたら読込を止める。`Content-Length`だけを実測上限として扱わない
+- OAuth token endpointの最終rate-limit bucketは静的allowlistで解決したclientごとに分ける。clientごとの120件/分を守りつつ、一clientの無効grantで別clientの枠を消費させない。現行3 clientでは合計上限が360件/分になるため、allowlist拡張時はDB負荷上限を見直す
 - cron ルート（`app/api/cron/**`）は `CRON_SECRET` を検証する
 - **`writeCronHeartbeat` に渡せる job 名は `cron_heartbeats_job_name_check`（CHECK 制約）が
   決める。** 制約に無い名前で書くと毎回 CHECK violation になり、`writeCronHeartbeat` は例外を

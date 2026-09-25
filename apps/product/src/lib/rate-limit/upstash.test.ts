@@ -24,7 +24,7 @@ import {
   isUpstashEnabled,
   mcpPreAuthRateLimit,
   mcpUserRateLimit,
-  oauthTokenGlobalRateLimit,
+  oauthTokenClientRateLimit,
   oauthTokenIpRateLimit,
   RATE_LIMIT_PRESETS,
   RATE_LIMIT_TIMEOUT_MS,
@@ -66,7 +66,7 @@ describe('Upstash Rate Limit', () => {
     expect(mcpPreAuthRateLimit).toBeNull();
     expect(mcpUserRateLimit).toBeNull();
     expect(oauthTokenIpRateLimit).toBeNull();
-    expect(oauthTokenGlobalRateLimit).toBeNull();
+    expect(oauthTokenClientRateLimit).toBeNull();
     expect(timeblockCreateRateLimit).toBeNull();
     expect(cspReportRateLimit).toBeNull();
     expect(cspReportGlobalRateLimit).toBeNull();
