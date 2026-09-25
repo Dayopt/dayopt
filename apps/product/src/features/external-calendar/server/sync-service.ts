@@ -24,6 +24,7 @@ import {
   clearCalendarSyncCursor,
   finishCalendarSyncRun,
   persistCalendarSyncResult,
+  repairCalendarConnectionAuthorityFence,
   resolveProjectKey,
   type CasContext,
 } from './fenced-sync-writer';
@@ -557,7 +558,22 @@ async function syncConnectionFenced(args: {
     return { outcome: 'not_configured', calendarsSynced: 0, calendarsFailed: 0 };
   }
 
-  const begin = await beginCalendarSyncRun({ connectionId, userId, projectKey, deadlineAt });
+  let begin = await beginCalendarSyncRun({ connectionId, userId, projectKey, deadlineAt });
+  if (typeof begin !== 'string' && begin.result === 'missing') {
+    // Callback 由来の legacy connection は authority fence が NULL のまま残ることがある。
+    // begin の missing に限り DB の generation・authority 検証で修復し、同期開始を再試行する。
+    // 修復できない時は fail closed で provider へ進まない。
+    const repair = await repairCalendarConnectionAuthorityFence({
+      connectionId,
+      userId,
+      projectKey,
+      deadlineAt,
+    });
+    if (repair !== 'ready') {
+      return { outcome: 'not_configured', calendarsSynced: 0, calendarsFailed: 0 };
+    }
+    begin = await beginCalendarSyncRun({ connectionId, userId, projectKey, deadlineAt });
+  }
   if (typeof begin === 'string') {
     // callRpc 内で Sentry capture 済み（unresolved / rejected_input）か、想定内
     // （account_deleting / deadline_exceeded）。いずれも安全な no-op として畳む

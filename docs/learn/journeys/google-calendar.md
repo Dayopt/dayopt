@@ -138,7 +138,7 @@ flowchart TD
 - **ここを変えると**: 失敗の理由はすべて ?calendar=error&reason=… で設定画面へ返し、専用の文言を出す。理由を足したら文言も足す。
 - **コード**:
   - [`apps/product/src/app/api/integrations/google-calendar/callback/route.ts`](../../../apps/product/src/app/api/integrations/google-calendar/callback/route.ts) で `isWriteFenceEnabled` を探す
-  - [`apps/product/src/app/api/integrations/google-calendar/callback/route.ts`](../../../apps/product/src/app/api/integrations/google-calendar/callback/route.ts) で `POST_EXCHANGE_BUDGET_MS` を探す
+  - [`apps/product/src/app/api/integrations/google-calendar/callback/route.ts`](../../../apps/product/src/app/api/integrations/google-calendar/callback/route.ts) で `PRE_CLAIM_BUDGET_MS` を探す
   - [`apps/product/src/features/external-calendar/lib/calendar-callback-result.ts`](../../../apps/product/src/features/external-calendar/lib/calendar-callback-result.ts) で `budget` を探す
 
 <details>
@@ -554,7 +554,7 @@ CRON_SECRET で呼び出し元を確かめ、write fence を見て、開始と�
         },
         {
           "path": "apps/product/src/app/api/integrations/google-calendar/callback/route.ts",
-          "find": "POST_EXCHANGE_BUDGET_MS"
+          "find": "PRE_CLAIM_BUDGET_MS"
         },
         {
           "path": "apps/product/src/features/external-calendar/lib/calendar-callback-result.ts",

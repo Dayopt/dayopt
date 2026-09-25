@@ -160,6 +160,7 @@ type FencedSyncWriterDatabase = {
       | 'clear_calendar_sync_cursor_command_v1'
       | 'finish_calendar_sync_run_v1'
       | 'persist_calendar_sync_result_command_v1'
+      | 'repair_calendar_connection_authority_fence_v1'
       | 'replace_selected_calendars_command_v1'
     >;
     Enums: Record<string, never>;
@@ -203,21 +204,21 @@ export type CasContext = {
 };
 
 /** `TEXT` を1つ返す RPC 用の共通 retry ループ。応答喪失と rollback を区別せず同一引数で retry する。 */
-async function callTextRpc(
+async function callTextRpc<TResult extends string = string>(
   operation: string,
   deadlineAt: number | undefined,
   request: () => PromiseLike<{
     data: string | null;
     error: { code?: string; message?: string } | null;
   }>,
-): Promise<string | FencedWriterFailure> {
+): Promise<TResult | FencedWriterFailure> {
   let lastError: ObservedRpcError | undefined;
 
   for (let attempt = 0; attempt < RPC_ATTEMPTS; attempt += 1) {
     if (!hasBudgetForAttempt(deadlineAt)) return 'deadline_exceeded';
     try {
       const { data, error } = await request();
-      if (!error && data !== null) return data;
+      if (!error && data !== null) return data as TResult;
 
       if (error) lastError = { code: error.code, message: error.message };
 
@@ -230,6 +231,35 @@ async function callTextRpc(
     }
   }
   return reportUnresolved(operation, lastError);
+}
+
+/**
+ * 同期開始前に legacy connection の authority fence を DB 側で修復する。
+ * repair RPC は current generation / active status / ready project・subject fence を
+ * 検証し、条件が揃わなければ fail closed の結果を返す。応答喪失時の retry は同一引数で
+ * 行うため、1回目が反映済みなら2回目は ready を返す。
+ */
+export async function repairCalendarConnectionAuthorityFence(params: {
+  connectionId: string;
+  userId: string;
+  projectKey: string;
+  deadlineAt?: number | undefined;
+}): Promise<'ready' | 'missing' | 'blocked' | 'stale' | FencedWriterFailure> {
+  const operation = 'repair_calendar_connection_authority_fence';
+  return callTextRpc<'ready' | 'missing' | 'blocked' | 'stale'>(
+    operation,
+    params.deadlineAt,
+    async () => {
+      const db = createFencedSyncWriterClient();
+      return db
+        .rpc('repair_calendar_connection_authority_fence_v1', {
+          p_project_key: params.projectKey,
+          p_user_id: params.userId,
+          p_connection_id: params.connectionId,
+        })
+        .abortSignal(AbortSignal.timeout(RPC_TIMEOUT_MS));
+    },
+  );
 }
 
 // =============================================================================
