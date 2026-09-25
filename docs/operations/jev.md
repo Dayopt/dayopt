@@ -189,10 +189,10 @@ pack は「state の作り方・質問・決定的な baseline・policy・正解
 
 ## 今ある pack
 
-| pack               | 状態 | 中身                                                                         |
-| ------------------ | ---- | ---------------------------------------------------------------------------- |
-| `shadow-e1`        | 無効 | Phase 1 の 8 問。決定的な baseline を上回らなかった（下の §negative result） |
-| `skill-suggestion` | 有効 | 12 skill の boolean。issue 本文から、着手時に読むべき skill を候補として出す |
+| pack               | 状態 | 中身                                                                                                        |
+| ------------------ | ---- | ----------------------------------------------------------------------------------------------------------- |
+| `shadow-e1`        | 無効 | Phase 1 の 8 問。決定的な baseline を上回らなかった（下の §negative result）                                |
+| `skill-suggestion` | 無効 | #2852 の holdout が未完了。採用せず、追加送信の明示承認まで停止（[評価記録](jev-skill-suggestion-2852.md)） |
 
 ## negative result（[#2827](https://github.com/Dayopt/dayopt/issues/2827)）
 

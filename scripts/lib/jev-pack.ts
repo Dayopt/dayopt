@@ -57,7 +57,11 @@ export const PACK_STATUS: Record<PackId, { status: 'active' | 'disabled'; reason
     status: 'disabled',
     reason: 'Phase 1 で決定的な baseline を上回らなかった（#2827 の 2026-09-19 の判定）',
   },
-  'skill-suggestion': { status: 'active' },
+  'skill-suggestion': {
+    status: 'disabled',
+    reason:
+      '#2852 の採用評価は未完了（2026-09-25）。holdout は 1/19 成功後に 503 provider_error が 3 件連続し停止。追加送信の明示承認まで evaluate を止める',
+  },
 };
 
 /**
