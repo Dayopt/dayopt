@@ -164,6 +164,15 @@ workflow は次を満たした時だけ promote する。
 - live な Vercel metadata に対する Production Config Audit が成功
 - promote 後、`dayopt.app` と `app.dayopt.app` の両方への smoke が成功
 
+候補待ちはまず 5 分。時間内に全 project が READY にならない時は対象 SHA を再検索し、既存 candidate
+（QUEUED / BUILDING を含む）があれば deployment ID を固定して最大 25 分待つ。candidate が無い project
+だけ、Vercel project が `Dayopt/dayopt` に link 済みで Auto-assign が `false` と読めた場合に限り、Vercel
+Git source から exact SHA の staged Production build を作る。作成直前の project 設定が Auto-assign
+無効であることと、response の `aliasAssigned=false` / alias 空を確認し、project ID・target・GitHub source
+SHA・deployment ID を再読込して既存の smoke / audit / promote
+gate に通す。link / Auto-assign / API response を確認できない時は fail closed で promote しない。
+候補待ちの最悪時間はこの 5 分 + 25 分で、workflow timeout の算定にも含める。
+
 **どの project を進めるかは project ごとに判定する。** 基準は「その project が今配信している
 deployment の source SHA」で、そこから対象 SHA までの `git diff` を Impact Resolver
 （`scripts/ci/impact.mjs`）に通す。web が 3 commit 遅れていても、判定は web の live SHA から見た

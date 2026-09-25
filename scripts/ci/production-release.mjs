@@ -109,6 +109,7 @@ export function readImpactAffected(env = process.env, projects = RELEASE_PROJECT
 /** 200 のまま streaming 中に失敗した Next.js response の目印。 */
 const STREAMED_FAILURE_MARKERS = ['NEXT_HTTP_ERROR_FALLBACK', 'NEXT_REDIRECT'];
 
+const CANDIDATE_GRACE_TIMEOUT_MS = 5 * 60 * 1000;
 const READY_TIMEOUT_MS = 25 * 60 * 1000;
 const READY_POLL_MS = 15 * 1000;
 const ASSIGN_TIMEOUT_MS = 5 * 60 * 1000;
@@ -147,7 +148,7 @@ const STABILIZE_ATTEMPTS = 3;
  * この script が費やしうる最悪時間。workflow の `timeout-minutes` がこれを
  * 下回ると、rollback の途中で job が kill され、片方だけ promote された
  * production が手動 rollback の手掛かりごと失われる。
- * 内訳: candidate 待機 + 全 smoke の retry + promote 反映待ち + rollback 反映待ち。
+ * 内訳: Git candidate grace + staged candidate 待機 + 全 smoke の retry + promote 反映待ち + rollback 反映待ち。
  * smoke は candidate（promote 前）と production domain（promote 後）で 2 巡する。
  */
 const WORST_CASE_SMOKE_MS =
@@ -159,15 +160,17 @@ const WORST_CASE_SMOKE_MS =
 // 「promote の確認（timeout）+ rollback の確認 + 着地待ち」の 3 窓を連続で使う。
 // transport 失敗で抜けた場合は promote の確認を行わないので 2 窓に収まる。
 export const WORST_CASE_RELEASE_MS =
+  CANDIDATE_GRACE_TIMEOUT_MS +
   READY_TIMEOUT_MS +
   WORST_CASE_SMOKE_MS * 2 +
   RELEASE_PROJECTS.length * (ASSIGN_TIMEOUT_MS * 2 + AMBIGUOUS_SETTLE_MS);
 
 export class ReleaseError extends Error {
-  constructor(message, { manualRollback } = {}) {
+  constructor(message, { manualRollback, code } = {}) {
     super(message);
     this.name = 'ReleaseError';
     this.manualRollback = manualRollback ?? null;
+    this.code = code ?? null;
   }
 }
 
@@ -391,8 +394,8 @@ function normalizeDeployment(raw) {
     state: raw.readyState ?? raw.state ?? null,
     createdAt: raw.createdAt ?? raw.created ?? null,
     target: raw.target ?? null,
-    // GitHub 連携以外（CLI / API）の deployment はこの値を持たない。
-    // 正規経路の build だけを release 対象にするため、これを必須にする。
+    // GitHub source SHA metadata を持つ deployment だけを release 対象にする。
+    // staged fallback も Vercel の linked Git source から exact SHA を指定する。
     sha: raw.meta?.githubCommitSha ?? null,
     // 名指しの再配備（§getPinnedDeployment）が「別 project の deployment ではない」ことを
     // 確かめるために使う。一覧系の応答には無いことがある。
@@ -401,13 +404,13 @@ function normalizeDeployment(raw) {
 }
 
 /**
- * 名指しされた deployment を 1 件読み、再配備の candidate として受理できるか検証する。
+ * 名指しされた deployment を 1 件読み、この run の candidate として受理できるか検証する。
  *
  * 受理条件はすべて fail closed（値が読めない時も拒否）:
  *
  * - その project の deployment である（他 project の ID を production domain へ載せない）
- * - GitHub 連携の production build で、source SHA が release 対象と一致する
- * - **live より後に作られている。** 同じ commit の deployment は祖先関係で新旧を
+ * - GitHub source SHA を持つ production build で、source SHA が release 対象と一致する
+ * - 通常の redeploy は **live より後に作られている。** 同じ commit の deployment は祖先関係で新旧を
  *   決められないので、ここだけは作成時刻で比べる。env 更新より前の古い build を
  *   名指しして「再配備」すると、更新したはずの設定が production から消える
  */
@@ -417,6 +420,7 @@ export async function getPinnedDeployment({
   deploymentId,
   sha,
   liveCreatedAt,
+  requireNewerThanLive = true,
   token,
   teamId,
   fetchImpl,
@@ -427,7 +431,7 @@ export async function getPinnedDeployment({
   );
   const deployment = normalizeDeployment(raw);
   const refuse = (why) =>
-    new ReleaseError(`${projectName}: refusing to redeploy ${deploymentId}: ${why}`);
+    new ReleaseError(`${projectName}: refusing to use ${deploymentId} as a candidate: ${why}`);
 
   if (deployment === null || deployment.id !== deploymentId) {
     throw refuse('the deployment could not be read');
@@ -439,13 +443,92 @@ export async function getPinnedDeployment({
     throw refuse(`it is not a production build of ${sha}`);
   }
   if (
-    typeof deployment.createdAt !== 'number' ||
-    typeof liveCreatedAt !== 'number' ||
-    deployment.createdAt <= liveCreatedAt
+    requireNewerThanLive &&
+    (typeof deployment.createdAt !== 'number' ||
+      typeof liveCreatedAt !== 'number' ||
+      deployment.createdAt <= liveCreatedAt)
   ) {
     throw refuse('it is not newer than the deployment that production serves now');
   }
   return deployment;
+}
+
+/**
+ * Vercel の Git hook から候補が作られなかった時に、Production target の staged build を作る。
+ * domain を割り当てず、呼び出し側が受け取った ID を固定して既存の gate へ渡す。
+ */
+export async function createStagedProductionCandidate({
+  projectName,
+  projectId,
+  githubRepoLink,
+  sha,
+  autoAssignCustomDomains,
+  token,
+  teamId,
+  fetchImpl,
+  logger,
+}) {
+  if (!/^[0-9a-f]{40}$/.test(sha ?? '')) {
+    throw new ReleaseError(`${projectName}: refusing staged build for an invalid commit SHA`);
+  }
+  if (autoAssignCustomDomains !== false) {
+    throw new ReleaseError(
+      `${projectName}: refusing staged build because Auto-assign Custom Production Domains is not confirmed disabled`,
+    );
+  }
+
+  const repoId = githubRepoLink?.repoId;
+  const validRepoId =
+    (typeof repoId === 'number' && Number.isSafeInteger(repoId) && repoId > 0) ||
+    (typeof repoId === 'string' && /^[0-9]+$/.test(repoId));
+  if (
+    githubRepoLink?.type?.toLowerCase() !== 'github' ||
+    githubRepoLink?.org?.toLowerCase() !== 'dayopt' ||
+    githubRepoLink?.repo?.toLowerCase() !== 'dayopt' ||
+    githubRepoLink?.productionBranch !== 'main' ||
+    !validRepoId
+  ) {
+    throw new ReleaseError(
+      `${projectName}: expected Dayopt/dayopt GitHub repository on main before creating a staged build`,
+    );
+  }
+
+  const created = await callVercel(apiUrl('/v13/deployments', teamId), {
+    token,
+    fetchImpl,
+    method: 'POST',
+    label: `create-staged-candidate(${projectName})`,
+    body: {
+      name: projectName,
+      project: projectId,
+      target: 'production',
+      gitSource: { type: 'vercel', repoId: String(repoId), sha },
+      gitMetadata: {
+        remoteUrl: 'https://github.com/Dayopt/dayopt',
+        commitRef: 'main',
+        commitSha: sha,
+      },
+    },
+  });
+
+  const deploymentId = created?.uid ?? created?.id;
+  const aliasesAreEmpty =
+    created?.alias === undefined || (Array.isArray(created.alias) && created.alias.length === 0);
+  if (
+    typeof deploymentId !== 'string' ||
+    created?.target !== 'production' ||
+    created?.aliasAssigned !== false ||
+    !aliasesAreEmpty
+  ) {
+    throw new ReleaseError(
+      `${projectName}: Vercel did not confirm an unaliased Production candidate; refusing to continue`,
+    );
+  }
+
+  logger.log(
+    `${projectName}: created staged Production candidate ${deploymentId} for ${short(sha)}`,
+  );
+  return deploymentId;
 }
 
 /** target SHA の production deployment を 1 件返す。無ければ null。 */
@@ -496,6 +579,20 @@ export async function getProjectMeta({ projectName, token, teamId, fetchImpl }) 
     projectId: body.id,
     // promote endpoint がこの設定を書き換えるため、事前値を控えて後で戻す。
     autoAssignCustomDomains: body.autoAssignCustomDomains ?? null,
+    githubRepoLink:
+      body.link && typeof body.link === 'object'
+        ? {
+            type: typeof body.link.type === 'string' ? body.link.type : null,
+            org: typeof body.link.org === 'string' ? body.link.org : null,
+            repo: typeof body.link.repo === 'string' ? body.link.repo : null,
+            productionBranch:
+              typeof body.link.productionBranch === 'string' ? body.link.productionBranch : null,
+            repoId:
+              typeof body.link.repoId === 'string' || typeof body.link.repoId === 'number'
+                ? body.link.repoId
+                : null,
+          }
+        : null,
   };
 }
 
@@ -654,6 +751,7 @@ export async function waitForReadyCandidates({
         .join(', ');
       throw new ReleaseError(
         `Timed out waiting for READY production builds of ${sha} (pending: ${pending})`,
+        { code: 'candidate_wait_timeout' },
       );
     }
 
@@ -1034,7 +1132,7 @@ export function buildManifest({
             ? live.id
             : null),
         // この run が観測していない project の値は run 開始時点のもの。candidate 待機
-        // （最大 25 分）の間に人が Instant Rollback していれば実態とズレる。復旧時に
+        // （最大 30 分）の間に人が Instant Rollback していれば実態とズレる。復旧時に
         // 「いつ観測した値か」を取り違えないよう、出所を値と一緒に残す。
         observedAt: observed || entry ? 'this-run' : 'run-start',
       };
@@ -1653,28 +1751,97 @@ export async function runProductionRelease({
       };
     }
 
-    const candidates = await waitForReadyCandidates({
-      projects: targets,
-      sha,
-      token,
-      teamId,
-      fetchImpl,
-      sleepImpl,
-      nowImpl,
-      logger,
-      pinned: redeployPending
-        ? new Map([
-            [
-              redeploy.projectName,
-              {
-                deploymentId: redeploy.deploymentId,
-                projectId: projectIds.get(redeploy.projectName),
-                liveCreatedAt: redeployLive?.createdAt ?? null,
-              },
-            ],
-          ])
-        : new Map(),
-    }).catch(async (error) => {
+    const pinnedForRedeploy = redeployPending
+      ? new Map([
+          [
+            redeploy.projectName,
+            {
+              deploymentId: redeploy.deploymentId,
+              projectId: projectIds.get(redeploy.projectName),
+              liveCreatedAt: redeployLive?.createdAt ?? null,
+            },
+          ],
+        ])
+      : new Map();
+    const waitForCandidates = ({ timeoutMs, pinned = pinnedForRedeploy }) =>
+      waitForReadyCandidates({
+        projects: targets,
+        sha,
+        token,
+        teamId,
+        fetchImpl,
+        sleepImpl,
+        nowImpl,
+        logger,
+        timeoutMs,
+        pinned,
+      });
+    const candidates = await (async () => {
+      try {
+        return await waitForCandidates({
+          timeoutMs: redeployPending ? READY_TIMEOUT_MS : CANDIDATE_GRACE_TIMEOUT_MS,
+        });
+      } catch (error) {
+        if (error?.code !== 'candidate_wait_timeout' || redeployPending) throw error;
+
+        // Candidate が無い project だけ Vercel Git source から staged Production build を作る。
+        // まず再読込し、通常 hook の遅延到着や build 中 deployment との二重作成を避ける。
+        const pinned = new Map();
+        for (const project of targets) {
+          const existing = await findDeploymentForSha({
+            projectName: project.name,
+            sha,
+            token,
+            teamId,
+            fetchImpl,
+          });
+          const liveAtStart = before.get(project.name);
+          let deploymentId = existing?.id;
+          const projectId = projectIds.get(project.name);
+
+          if (!existing) {
+            // 5 分の待機中に project link / domain 設定が変わっていないか、作成直前に
+            // 再読込する。初回 snapshot のみを信じた staged build は許可しない。
+            const latestMeta = await getProjectMeta({
+              projectName: project.name,
+              token,
+              teamId,
+              fetchImpl,
+            });
+            if (latestMeta.projectId !== projectId) {
+              throw new ReleaseError(
+                `${project.name}: Vercel project id changed while waiting for a candidate`,
+              );
+            }
+            deploymentId = await createStagedProductionCandidate({
+              projectName: project.name,
+              projectId,
+              githubRepoLink: latestMeta.githubRepoLink,
+              sha,
+              autoAssignCustomDomains: latestMeta.autoAssignCustomDomains,
+              token,
+              teamId,
+              fetchImpl,
+              logger,
+            });
+          }
+
+          if (existing) {
+            logger.log(
+              `${project.name}: found Git candidate ${deploymentId} after grace; pinning it`,
+            );
+          }
+          pinned.set(project.name, {
+            deploymentId,
+            projectId,
+            liveCreatedAt: liveAtStart?.createdAt ?? null,
+            requireNewerThanLive: Boolean(liveAtStart),
+          });
+        }
+
+        return waitForCandidates({ timeoutMs: READY_TIMEOUT_MS, pinned });
+      }
+    })().catch(async (error) => {
       // 片方が READY で自動割当された一方、もう片方が timeout / ERROR というケース。
       // run 開始時点の snapshot だけで manifest を作ると、live になった候補が
       // `pending` として載り、runbook が「production は無傷」と案内する。
@@ -1682,7 +1849,7 @@ export async function runProductionRelease({
       throw Object.assign(error, { manifest: manifestFor('failed') });
     });
 
-    // 待機は最大 25 分ブロックする。その間に人が Instant Rollback や手動 promote を
+    // 候補待機は最大 30 分ブロックする。その間に人が Instant Rollback や手動 promote を
     // 行いうるため、判定は待機後の実状態で行う。unaffected な project は promote 対象で
     // ないので読み直さない（この run が動かさない先の状態は before で足りる）。
     const current = new Map();
@@ -1697,7 +1864,7 @@ export async function runProductionRelease({
       }
     };
     for (const project of targets) {
-      // 25 分待った後の失敗。ここで manifest を付けずに抜けると、artifact が
+      // 候補待ちの後の失敗。ここで manifest を付けずに抜けると、artifact が
       // 1 つも残らない（run 開始時点の状態すら読めなくなる）。
       const state = await getLiveProduction({
         projectName: project.name,
