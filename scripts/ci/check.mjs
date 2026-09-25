@@ -787,26 +787,31 @@ async function runIntegration() {
   }
 
   run('pnpm', ['test:integration']);
-  run(
-    'psql',
-    [
-      '-h',
-      '127.0.0.1',
-      '-p',
-      '54322',
-      '-U',
-      'postgres',
-      '-d',
-      'postgres',
-      '-v',
-      'ON_ERROR_STOP=1',
-      '-c',
-      'SET app.isolated_validation = on',
-      '-f',
-      'supabase/tests/cron-heartbeats.sql',
-    ],
-    { env: { ...process.env, PGPASSWORD: 'postgres' } },
-  );
+  for (const sqlFile of [
+    'supabase/tests/cron-heartbeats.sql',
+    'supabase/tests/fenced-calendar-reconnect.sql',
+  ]) {
+    run(
+      'psql',
+      [
+        '-h',
+        '127.0.0.1',
+        '-p',
+        '54322',
+        '-U',
+        'postgres',
+        '-d',
+        'postgres',
+        '-v',
+        'ON_ERROR_STOP=1',
+        '-c',
+        'SET app.isolated_validation = on',
+        '-f',
+        sqlFile,
+      ],
+      { env: { ...process.env, PGPASSWORD: 'postgres' } },
+    );
+  }
   run('pnpm', ['rls:snapshot:check']);
   run('pnpm', ['types:generate:local']);
   run('git', [

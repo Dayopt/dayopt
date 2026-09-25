@@ -1,11 +1,14 @@
 import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { CalendarConnectionSaveError } from '@/features/external-calendar/server/connection-service';
+
 const getUser = vi.hoisted(() => vi.fn());
 const createClient = vi.hoisted(() => vi.fn());
 const saveConnection = vi.hoisted(() => vi.fn());
+const reconnectConnection = vi.hoisted(() => vi.fn());
+const claimCalendarOAuthAttempt = vi.hoisted(() => vi.fn());
 const getReconnectTarget = vi.hoisted(() => vi.fn());
-const reconnectExistingConnection = vi.hoisted(() => vi.fn());
 const revokeOrphanedGrant = vi.hoisted(() => vi.fn());
 const captureUnexpectedError = vi.hoisted(() => vi.fn());
 const checkEntitlementForUser = vi.hoisted(() => vi.fn());
@@ -25,7 +28,7 @@ vi.mock('@/lib/sentry', () => ({ captureUnexpectedError }));
 vi.mock('@/lib/billing/enforcement', () => ({ checkEntitlementForUser }));
 vi.mock('@/lib/rate-limit/upstash', () => ({ calendarConnectRateLimit: { limit: rateLimit } }));
 vi.mock('@/features/external-calendar/server/connection-service', async (importOriginal) => {
-  // CALENDAR_CONNECTION_DB_TIMEOUT_MS は実値を使う（route.ts が POST_EXCHANGE_BUDGET_MS の
+  // CALENDAR_CONNECTION_DB_TIMEOUT_MS は実値を使う（route.ts が予算を導出する
   // 導出に使う、#1990）。手書きで複製すると本体側の値が変わった時にテストが追従しない
   // （risk-reviewer 指摘、PR #2075）。
   const actual =
@@ -33,8 +36,9 @@ vi.mock('@/features/external-calendar/server/connection-service', async (importO
   return {
     ...actual,
     saveConnection,
+    reconnectConnection,
+    claimCalendarOAuthAttempt,
     getReconnectTarget,
-    reconnectExistingConnection,
     revokeOrphanedGrant,
   };
 });
@@ -96,6 +100,7 @@ function withCookie(
     JSON.stringify({
       state: STATE,
       verifier: 'code-verifier',
+      attemptId: '00000000-0000-4000-8000-0000000000a2',
       locale: 'ja',
       userId: USER_ID,
       ...overrides,
@@ -113,12 +118,13 @@ describe('google calendar callback route', () => {
     vi.clearAllMocks();
     getUser.mockResolvedValue({ data: { user: { id: USER_ID } }, error: null });
     createClient.mockResolvedValue({ auth: { getUser } });
-    saveConnection.mockResolvedValue(undefined);
+    saveConnection.mockResolvedValue('saved');
+    reconnectConnection.mockResolvedValue('saved');
+    claimCalendarOAuthAttempt.mockResolvedValue(undefined);
     getReconnectTarget.mockResolvedValue({
       id: '00000000-0000-4000-8000-0000000000c1',
       providerAccountId: 'google-sub-123',
     });
-    reconnectExistingConnection.mockResolvedValue('updated');
     revokeOrphanedGrant.mockResolvedValue(undefined);
     checkEntitlementForUser.mockResolvedValue('allowed');
     resolveMfaAssurance.mockResolvedValue({ currentLevel: 'aal1', nextLevel: 'aal1' });
@@ -128,6 +134,41 @@ describe('google calendar callback route', () => {
       'fetch',
       vi.fn(() => Promise.resolve(new Response(JSON.stringify(tokenResponse()), { status: 200 }))),
     );
+  });
+
+  it('one-time OAuth attempt を code 交換より先に claim する', async () => {
+    const order: string[] = [];
+    claimCalendarOAuthAttempt.mockImplementation(async () => {
+      order.push('claim');
+    });
+    const fetchMock = vi.fn(async () => {
+      order.push('exchange');
+      return new Response(JSON.stringify(tokenResponse()), { status: 200 });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const response = await GET(withCookie(request()));
+
+    expect(reasonOf(response)).toBeNull();
+    expect(claimCalendarOAuthAttempt).toHaveBeenCalledWith({
+      attemptId: '00000000-0000-4000-8000-0000000000a2',
+      userId: USER_ID,
+      state: STATE,
+      verifier: 'code-verifier',
+    });
+    expect(order).toEqual(['claim', 'exchange']);
+  });
+
+  it('OAuth attempt を claim できなければ Google の code を消費しない', async () => {
+    claimCalendarOAuthAttempt.mockRejectedValueOnce(new Error('attempt unavailable'));
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+
+    const response = await GET(withCookie(request()));
+
+    expect(reasonOf(response)).toBe('connection_failed');
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(saveConnection).not.toHaveBeenCalled();
   });
 
   it('env が未設定なら 503', async () => {
@@ -544,25 +585,65 @@ describe('google calendar callback route', () => {
     const response = await GET(withCookie(request(), { reconnectConnectionId: connectionId }));
 
     expect(reasonOf(response)).toBe('scope_not_granted');
-    expect(getReconnectTarget).not.toHaveBeenCalled();
-    expect(reconnectExistingConnection).not.toHaveBeenCalled();
+    expect(getReconnectTarget).toHaveBeenCalledWith(USER_ID, connectionId);
     expect(saveConnection).not.toHaveBeenCalled();
   });
 
-  it('再接続は同じ Google sub の既存行だけを条件付き更新する', async () => {
+  it('再接続は選択済みの同じ Google sub だけを条件付き fenced save に通す', async () => {
     const connectionId = '00000000-0000-4000-8000-0000000000c1';
     const response = await GET(withCookie(request(), { reconnectConnectionId: connectionId }));
 
     expect(reasonOf(response)).toBeNull();
     expect(getReconnectTarget).toHaveBeenCalledWith(USER_ID, connectionId);
-    expect(reconnectExistingConnection).toHaveBeenCalledWith(
+    expect(reconnectConnection).toHaveBeenCalledWith(
       expect.objectContaining({
-        connectionId,
+        attemptId: '00000000-0000-4000-8000-0000000000a2',
         userId: USER_ID,
+        connectionId,
         providerAccountId: 'google-sub-123',
       }),
     );
     expect(saveConnection).not.toHaveBeenCalled();
+  });
+
+  it('OAuth 中に切断された再接続対象を復活させず、交換済み token を revoke する', async () => {
+    const connectionId = '00000000-0000-4000-8000-0000000000c1';
+    reconnectConnection.mockResolvedValueOnce('missing');
+
+    const response = await GET(withCookie(request(), { reconnectConnectionId: connectionId }));
+
+    expect(reasonOf(response)).toBe('reconnect_target_invalid');
+    expect(reconnectConnection).toHaveBeenCalledWith(
+      expect.objectContaining({ connectionId, providerAccountId: 'google-sub-123' }),
+    );
+    expect(revokeOrphanedGrant).toHaveBeenCalledWith(
+      expect.objectContaining({
+        providerAccountId: 'google-sub-123',
+        refreshToken: 'refresh-token',
+      }),
+    );
+    expect(saveConnection).not.toHaveBeenCalled();
+  });
+
+  it('fenced save が revoke outbox に移した接続を成功表示しない', async () => {
+    saveConnection.mockResolvedValueOnce('enqueued');
+
+    const response = await GET(withCookie(request()));
+
+    expect(reasonOf(response)).toBe('connection_failed');
+    expect(saveConnection).toHaveBeenCalledWith(
+      expect.objectContaining({ attemptId: '00000000-0000-4000-8000-0000000000a2' }),
+    );
+    expect(revokeOrphanedGrant).not.toHaveBeenCalled();
+  });
+
+  it('save RPC の結果が不明なら保存済み token の revoke を避ける', async () => {
+    saveConnection.mockRejectedValueOnce(new CalendarConnectionSaveError('unknown'));
+
+    const response = await GET(withCookie(request()));
+
+    expect(reasonOf(response)).toBe('connection_failed');
+    expect(revokeOrphanedGrant).not.toHaveBeenCalled();
   });
 
   it('別の Google sub を選んだ再接続は保存しない', async () => {
@@ -572,8 +653,8 @@ describe('google calendar callback route', () => {
     const response = await GET(withCookie(request(), { reconnectConnectionId: connectionId }));
 
     expect(reasonOf(response)).toBe('account_mismatch');
-    expect(reconnectExistingConnection).not.toHaveBeenCalled();
     expect(saveConnection).not.toHaveBeenCalled();
+    expect(reconnectConnection).not.toHaveBeenCalled();
     // #2072: token 交換は完了しているので、Dayopt 側に残らない孤立 grant を revoke する。
     expect(revokeOrphanedGrant).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -583,29 +664,18 @@ describe('google calendar callback route', () => {
     );
   });
 
-  it.each([
-    ['対象が削除済み', null, 'updated'],
-    [
-      '条件付き UPDATE が 0 行',
-      { id: '00000000-0000-4000-8000-0000000000c1', providerAccountId: 'google-sub-123' },
-      'missing',
-    ],
-  ])('%s なら接続を新規作成しない', async (_label, target, updateOutcome) => {
+  it('再接続先が見つからない場合は code を消費せずに止める', async () => {
     const connectionId = '00000000-0000-4000-8000-0000000000c1';
-    getReconnectTarget.mockResolvedValue(target);
-    reconnectExistingConnection.mockResolvedValue(updateOutcome);
+    getReconnectTarget.mockResolvedValue(null);
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
 
     const response = await GET(withCookie(request(), { reconnectConnectionId: connectionId }));
 
     expect(reasonOf(response)).toBe('reconnect_target_invalid');
+    expect(fetchMock).not.toHaveBeenCalled();
     expect(saveConnection).not.toHaveBeenCalled();
-    // #2072: 両ケースとも token 交換済みなので orphan grant の revoke を試みる。
-    expect(revokeOrphanedGrant).toHaveBeenCalledWith(
-      expect.objectContaining({
-        providerAccountId: 'google-sub-123',
-        refreshToken: 'refresh-token',
-      }),
-    );
+    expect(revokeOrphanedGrant).not.toHaveBeenCalled();
   });
 
   describe('orphan grant revoke（#2072）', () => {
@@ -708,7 +778,7 @@ describe('google calendar callback route', () => {
   }
 
   it('code 消費前に残り予算が不足していれば token 交換に到達しない', async () => {
-    // deadlineAt = 0 + TIME_BUDGET_MS(80_000)。消費直前の残り 1ms（POST_EXCHANGE_BUDGET_MS
+    // deadlineAt = 0 + TIME_BUDGET_MS(80_000)。claim 前の残り 1ms（PRE_CLAIM_BUDGET_MS
     // =45_000 未満）。
     const nowSpy = mockClockAfterEntry(0, 79_999);
 
@@ -722,7 +792,7 @@ describe('google calendar callback route', () => {
   });
 
   it('残り予算が十分なら通常どおり token 交換へ進む', async () => {
-    // 消費直前の残り 45_001ms（POST_EXCHANGE_BUDGET_MS を上回る）。
+    // claim 前の残り 45_001ms（PRE_CLAIM_BUDGET_MS を上回る）。
     const nowSpy = mockClockAfterEntry(0, 34_999);
 
     const response = await GET(withCookie(request()));

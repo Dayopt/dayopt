@@ -27,7 +27,7 @@ tRPC の `/api/trpc` を含む、Next.js の route handler 全件。method は e
 | product | `/api/health`                                | GET                | —       | 30          | `apps/product/src/app/api/health/route.ts`                                |
 | product | `/api/health/version`                        | GET                | —       | 15          | `apps/product/src/app/api/health/version/route.ts`                        |
 | product | `/api/integrations/google-calendar/callback` | GET                | nodejs  | 90          | `apps/product/src/app/api/integrations/google-calendar/callback/route.ts` |
-| product | `/api/integrations/google-calendar/start`    | GET                | nodejs  | 60          | `apps/product/src/app/api/integrations/google-calendar/start/route.ts`    |
+| product | `/api/integrations/google-calendar/start`    | GET                | nodejs  | 90          | `apps/product/src/app/api/integrations/google-calendar/start/route.ts`    |
 | product | `/api/mcp`                                   | GET, POST, DELETE  | —       | 120         | `apps/product/src/app/api/mcp/route.ts`                                   |
 | product | `/api/oauth/token`                           | POST               | —       | 60          | `apps/product/src/app/api/oauth/token/route.ts`                           |
 | product | `/api/trpc/[trpc]`                           | GET, POST          | nodejs  | 60          | `apps/product/src/app/api/trpc/[trpc]/route.ts`                           |
@@ -425,10 +425,10 @@ docs の frontmatter `code:` が指す実装から引く。
 
 ### DB 関数の integration test 被覆
 
-app から呼ぶ DB 関数 78 件のうち、integration test（TS / SQL）から
-呼ばれているのは 62 件。
+app から呼ぶ DB 関数 82 件のうち、integration test（TS / SQL）から
+呼ばれているのは 65 件。
 
-**test から呼ばれていない（16）**: `abandon_calendar_account_delete_revoke_v1`, `begin_calendar_account_deletion_v1`, `claim_posthog_signup_v1`, `claim_stripe_webhook_event`, `clear_calendar_sync_cursor_command_v1`, `delete_all_user_data_command_v5`, `finalize_calendar_account_delete_revoke_v1`, `get_external_lifecycle_app_version_v3`, `get_timeblock_context_marker_v1`, `list_expired_calendar_account_deletion_intents_v1`, `normalize_calendar_account_deletion_intent_v1`, `prepare_calendar_account_delete_revoke_v1`, `prepare_user_data_purge_v1`, `replace_selected_calendars_command_v1`, `seal_calendar_account_deletion_v1`, `start_calendar_account_delete_provider_attempt_v1`
+**test から呼ばれていない（17）**: `abandon_calendar_account_delete_revoke_v1`, `begin_calendar_account_deletion_v1`, `claim_posthog_signup_v1`, `claim_stripe_webhook_event`, `clear_calendar_sync_cursor_command_v1`, `delete_all_user_data_command_v5`, `finalize_calendar_account_delete_revoke_v1`, `get_external_lifecycle_app_version_v3`, `get_timeblock_context_marker_v1`, `list_expired_calendar_account_deletion_intents_v1`, `normalize_calendar_account_deletion_intent_v1`, `prepare_calendar_account_delete_revoke_v1`, `prepare_user_data_purge_v1`, `replace_selected_calendars_command_v1`, `save_calendar_connection_command_v2`, `seal_calendar_account_deletion_v1`, `start_calendar_account_delete_provider_attempt_v1`
 
 ### tRPC procedure → DB（67）
 
