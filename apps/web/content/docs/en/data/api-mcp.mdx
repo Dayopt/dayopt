@@ -52,7 +52,11 @@ An authorized client can read the Dayopt data included in its granted permission
 
 ChatGPT Pro custom MCP apps can use read and fetch permissions in Developer Mode. They cannot use write actions through MCP. See [OpenAI's ChatGPT MCP guide](https://help.openai.com/en/articles/12584461-developer-mode-and-mcp-apps-in-chatgpt) for current availability and setup instructions.
 
-Dayopt write access is a limited beta. It is available only when both the Dayopt account and the specific MCP client have been enabled, and the account meets Dayopt's current access requirements. A client that has not been enabled receives read-only access. The consent screen shows the permissions for that connection.
+Dayopt write access is a limited beta. It is available only when both the Dayopt account and the specific MCP client have been enabled, and the account meets Dayopt's current access requirements. A client that has not been enabled receives read-only access.
+
+The consent screen lists the permissions for your connection. `write:plans` lets the client create and update Plans. `write:records` lets it create and update Records. `delete:plans` and `delete:records` let it move the matching data to trash and restore it. Review each permission before you approve it.
+
+Write permissions let the client change the selected data directly when it runs a write action. The consent screen does not confirm each change for you. Check whether your client lets you review each write action before it runs. Keep the connection read-only if you cannot review those actions.
 
 ## Find your MCP server URL
 
@@ -82,9 +86,33 @@ Use ChatGPT on the web. ChatGPT Pro custom MCP apps currently support read and f
 
 If tool calls fail after Dayopt's tool list changes, review the custom app settings and scan the tools again, or recreate the app if needed. Follow [OpenAI's current setup guide](https://help.openai.com/en/articles/12584461-developer-mode-and-mcp-apps-in-chatgpt).
 
+## Try a read and write flow
+
+Select Dayopt in a chat. Use separate read tools to review Plans and Records:
+
+> List my Plans and Records separately for [date], from [start of date] to [start of next date] in [time zone]. Keep planned and completed time separate.
+
+If the consent screen grants `write:plans`, first ask for a draft without calling a Dayopt write tool:
+
+> Draft one future Plan called [title] for [activity] from [start time] to [end time]. Use full ISO 8601 date-times with the correct UTC offset. Do not call a Dayopt write tool yet. Show me the title, activity, start time, and end time so I can review them.
+
+After you review the draft, give a separate instruction to create it. The client applies the change when it calls `plans.create`. Check that the Plan appears in the Dayopt calendar.
+
+If the consent screen grants `write:records`, use the same two-step process after an activity has happened:
+
+> Draft one Record called [title] for [activity] from [past start time] to [past end time]. Use full ISO 8601 date-times with the correct UTC offset. Do not call a Dayopt write tool yet. Show me the title, activity, start time, and end time so I can review them.
+
+After you review the draft, give a separate instruction to create it. The client applies the change when it calls `records.create`. A Record must end at or before the current time. Dayopt rejects a Record that ends in the future. For a negative check, request a Record that ends in the future and confirm that Dayopt rejects it and no Record appears. Create a Plan for future time instead. For example, `2026-10-05T09:00:00+09:00` is an ISO 8601 date-time with a UTC offset.
+
+Use `plans.list` and `records.list` to read each type separately; both require `read:entries`. `activities.list` requires `read:activities` when you need to choose an activity. `review.get` compares Plans and Records for a date range of up to 31 days and requires `read:stats`. `entries.list` is also available when you want a combined list.
+
+ChatGPT Pro supports read and fetch only, so it cannot run the write steps above. If the client does not show write access, keep using read-only tools and check the permissions on the consent screen.
+
 ## Revoke or reconnect
 
-To revoke a connection, open Dayopt **Settings → Integrations → MCP connections** and revoke access for that client. You can also remove the connector in the client. After revoking access in Dayopt, reconnect from the client and approve the current permissions to use it again.
+To revoke Dayopt access, open **Settings → Integrations → MCP connections** in Dayopt and revoke access for that client. You can also remove the connector in the client. Removing it from the client does not replace revoking access in Dayopt.
+
+To reconnect, start the connection again from the client, sign in to Dayopt, and review the current permissions before you approve them.
 
 ## Troubleshooting
 
