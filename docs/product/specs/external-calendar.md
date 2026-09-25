@@ -28,7 +28,8 @@ Google カレンダーの予定を読み取り専用でミラーし、Calendar �
 - 再接続は start 時点で選んだ `reauth_required` 行、または authority fence が欠けた legacy `active` 行の ID・user・provider・Google `sub` を条件にした保存だけを許可する。OAuth 中にその行が切断・削除されていた場合、再作成せず `missing` を返す
 - fenced writer 導入前に作られた active 行で fence が NULL の場合、カレンダー一覧・選択更新の前に対象接続専用の service-role RPC が user data generation と project / quarantine / subject fence の ready 状態を確認し、1 行だけを原子的に fence へ結び付ける。CAS を迂回する未 fence 操作にはフォールバックしない。generation が古い接続や fence が処理中の接続は再認証へ誘導する
 - Google 側の grant 発行後に Dayopt の保存が確実に rollback した場合は orphan grant の revoke を試みる。DB 応答が失われ commit 結果が不明な場合は、保存済み token を失効させないため revoke を行わず、失敗を記録する（#2072, #2156）
-- 2026-09-25 の読み取り確認では Production の `get_external_lifecycle_app_version_v3` marker は存在し、active な Google 接続は 1 件、fence 欠損は 1 件、data-generation mismatch は 0 件だった。`authority_fence_id` / `authority_epoch` はどちらも NULL、最終同期は約 35.8 日前。cron heartbeat は 8 件すべて新しかったが、接続の同期成功は確認できていない。新しい repair RPC は未反映で、反映後に一覧・選択・同期が実際に回復するかの確認が残っている
+- 2026-09-25 の Production 読み取り確認では `get_external_lifecycle_app_version_v3` marker は存在し、Google 接続は 1 件、その接続は active だが fence 欠損、data-generation mismatch は 0 件だった。`authority_fence_id` / `authority_epoch` はどちらも NULL、最終同期は 2026-08-20 05:45 UTC。cron heartbeat は 8 件すべて新しかったが、接続の同期成功は確認できていない
+- 同日の追加確認では `repair_calendar_connection_authority_fence_v1` は未反映で、`private.calendar_authority_projects` の singleton 行も存在しなかった。したがって migration を適用するだけでは接続を回復できず、Production の Google authority identity を確認して provision・activate した後、一覧・選択・同期を実際に確認する必要がある。Production への変更は未実施
 
 ## Stateの正本
 
