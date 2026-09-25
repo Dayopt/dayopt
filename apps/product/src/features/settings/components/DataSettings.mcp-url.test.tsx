@@ -1,10 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const localeState = vi.hoisted(() => ({ value: 'en' }));
-
 vi.mock('next-intl', () => ({
-  useLocale: () => localeState.value,
   useTranslations: (namespace: string) => (key: string) => `${namespace}.${key}`,
 }));
 
@@ -50,32 +47,22 @@ const MCP_SECTION_TITLE = 'settings.dataControls.mcp.title';
 describe('McpApiSection deployment-bound MCP URL', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    localeState.value = 'en';
   });
 
   afterEach(() => {
     vi.unstubAllEnvs();
   });
 
-  it('productionではcanonical resource URIをそのまま表示する', () => {
+  it('productionではcanonical resource URIを表示し、未公開ガイドへリンクしない', () => {
     vi.stubEnv('NEXT_PUBLIC_MCP_RESOURCE_URI', 'https://mcp.dayopt.app');
     render(<DataSettings />);
 
     expect(screen.getByText(MCP_SECTION_TITLE)).toBeInTheDocument();
     expect(screen.getByText('https://mcp.dayopt.app')).toBeInTheDocument();
+    expect(screen.getByText('settings.dataControls.mcp.connectionGuide')).toBeInTheDocument();
     expect(
-      screen.getByRole('link', { name: 'settings.dataControls.mcp.guideLink' }),
-    ).toHaveAttribute('href', 'https://dayopt.app/docs/data/api-mcp');
-  });
-
-  it('日本語設定では日本語の接続ガイドへ案内する', () => {
-    localeState.value = 'ja';
-    vi.stubEnv('NEXT_PUBLIC_MCP_RESOURCE_URI', 'https://mcp.dayopt.app');
-    render(<DataSettings />);
-
-    expect(
-      screen.getByRole('link', { name: 'settings.dataControls.mcp.guideLink' }),
-    ).toHaveAttribute('href', 'https://dayopt.app/ja/docs/data/api-mcp');
+      screen.queryByRole('link', { name: 'settings.dataControls.mcp.guideLink' }),
+    ).not.toBeInTheDocument();
   });
 
   it('Preview identityではbranch originの/mcp transportを表示する', () => {
