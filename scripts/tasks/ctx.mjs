@@ -24,15 +24,15 @@ function isCodexBotLogin(login) {
 }
 
 /**
- * `pnpm ctx <N>` — L0 の機械収集に、同一入力snapshotを確認したJev L1のshadow助言を添える。
- * L1は既定で実行し、Markdown / JSONと`--post`のContext Briefへ含める。
- * `--reuse-brief-l1` はJev APIを呼ばず、同じIssue・snapshot・HEADのtrusted BriefからL1だけを再利用する。
- * `--l1-shadow` は旧コマンドとの互換用で、明示しなくてもL1は実行される。
+ * `pnpm ctx <N>` — L0 の機械収集に、同一入力snapshotを確認したBriefのJev L1助言を添える。
+ * 通常の読み取りはJev APIを呼ばず、信頼済みBriefから一致するL1だけを再利用する。
+ * `--post` はdispatch用にJev L1を生成してBriefへ配達する。
+ * `--l1-shadow` は明示的なローカルpreview用。`--reuse-brief-l1` は通常読取の意図を明示する。
  *
  * Uber 原則⑤「AI が考える前に機械的に集められる文脈はここで終える」の Dayopt 写像。
  * AI セッションが issue / PR に着手する前に行う `gh issue view` / `gh pr list` /
- * `rg` / `Read` の 5〜10 手番を、L0の機械収集とL1の出典付き候補にまとめる。
- * Jev assistは入力の鮮度照合のため公開資料を別途読み、未キャッシュならAPIを呼ぶ。
+ * `rg` / `Read` の 5〜10 手番を、L0の機械収集とBrief内L1の出典付き候補にまとめる。
+ * Jev assistはdispatch時の `--post` か明示的な `--l1-shadow` previewでだけ実行する。
  * 出力は 150 行以内の markdown、判断そのものはしない（判断材料の収集で止める）。
  *
  * 呼び出し予算: issue は最大 6 回、PR は最大 9 回の gh 呼び出しに収める
@@ -246,7 +246,7 @@ const L1_CATEGORY_WEIGHT = {
 
 /**
  * Creates non-authoritative L1 advice after confirming the Jev report used the exact context
- * input collected for this L0 run. The result is included in normal output and --post briefs.
+ * input collected for this L0 run. The result is included in explicit previews and --post briefs.
  */
 export function buildL1ShadowPreview(report, expectedInput) {
   if (
@@ -368,7 +368,7 @@ function renderL1ShadowPreview(preview) {
     );
   if (preview.status === 'complete') {
     lines.push(
-      `選択した ${preview.selectedCount} 件を評価済み。候補を最大5件表示（別枠の対象外 ${preview.omittedCount} 件は未評価）。`,
+      `Jevが選択した ${preview.selectedCount} 件を整理。候補を最大5件表示（別枠の対象外 ${preview.omittedCount} 件は未整理）。`,
     );
   } else if (preview.status === 'partial') {
     lines.push(
@@ -647,6 +647,14 @@ export function parseArgs(argv) {
   }
   options.number = number;
   return options;
+}
+
+/** Resolve the CLI default to API-free Brief reuse; generation is explicit at dispatch. */
+export function resolveContextL1Mode(options) {
+  if (options.post || options.l1Shadow) {
+    return { ...options, reuseBriefL1: false };
+  }
+  return { ...options, reuseBriefL1: true };
 }
 
 /** `gh api repos/.../issues/N` の応答が PR かどうか（`pull_request` キーの有無）。 */
@@ -1415,7 +1423,7 @@ function buildMarkdownLines(
     } else if (l1.status === 'unevaluated') {
       lines.push(`L1: 未評価（${l1.reason}）。候補順位を表示していません。`);
     } else {
-      lines.push('正式採用packの注釈は未接続。評価保留中のL1助言候補は次節に表示。');
+      lines.push('保存済み注釈はありません。Issue補助用のJev L1候補は次節に表示。');
     }
   }
 
@@ -2155,7 +2163,7 @@ export function postContextBrief(pack, markdown, deps = {}) {
 
 function main() {
   const options = parseArgs(process.argv.slice(2));
-  const pack = buildContextPackWithL1(options);
+  const pack = buildContextPackWithL1(resolveContextL1Mode(options));
   if (options.post) {
     const markdown = renderMarkdown(pack);
     const result = postContextBrief(pack, markdown, {
@@ -2174,8 +2182,9 @@ function main() {
 }
 
 /**
- * Adds Jev's advisory L1 output to the L0 pack by default. Reuse mode reads only a matching Brief;
- * Jev failure leaves the L0 result usable. Dependencies are injectable for offline delivery tests.
+ * Adds advisory L1 output to the L0 pack. Reuse mode reads only a matching Brief; generation is
+ * used by dispatch (`--post`) or an explicit preview (`--l1-shadow`). Jev failure leaves the L0
+ * result usable. Dependencies are injectable for offline delivery tests.
  */
 export function buildContextPackWithL1(
   options,

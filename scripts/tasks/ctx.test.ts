@@ -30,6 +30,7 @@ import {
   parseArgs,
   postContextBrief,
   renderMarkdown,
+  resolveContextL1Mode,
   runContextL1ShadowAssist,
   selectComments,
   truncateBody,
@@ -76,7 +77,7 @@ describe('parseArgs', () => {
     });
   });
 
-  it('--l1-shadow は後方互換で受け付け、通常出力と投稿のどちらでもL1を含める', () => {
+  it('--l1-shadow は明示previewとして通常出力でL1を含める', () => {
     expect(parseArgs(['2550', '--l1-shadow'])).toMatchObject({ l1Shadow: true, post: false });
     expect(parseArgs(['2550', '--post', '--l1-shadow'])).toMatchObject({
       l1Shadow: true,
@@ -92,6 +93,29 @@ describe('parseArgs', () => {
 
   it('未知の引数は例外', () => {
     expect(() => parseArgs(['1', '--foo'])).toThrow(/未知の引数/);
+  });
+});
+
+describe('resolveContextL1Mode', () => {
+  it('通常の読み取りはJevを呼ばずBriefのL1を再利用する', () => {
+    expect(resolveContextL1Mode(parseArgs(['2550']))).toMatchObject({ reuseBriefL1: true });
+  });
+
+  it('dispatch投稿と明示previewはJev生成を許可する', () => {
+    expect(resolveContextL1Mode(parseArgs(['2550', '--post']))).toMatchObject({
+      post: true,
+      reuseBriefL1: false,
+    });
+    expect(resolveContextL1Mode(parseArgs(['2550', '--l1-shadow']))).toMatchObject({
+      l1Shadow: true,
+      reuseBriefL1: false,
+    });
+  });
+
+  it('明示的なBrief再利用はそのまま維持する', () => {
+    expect(resolveContextL1Mode(parseArgs(['2550', '--reuse-brief-l1']))).toMatchObject({
+      reuseBriefL1: true,
+    });
   });
 });
 
@@ -1238,6 +1262,21 @@ describe('buildContextPack (execFileImpl 経由の gh 呼び出し形)', () => {
         status: 'complete',
         source: 'trusted_brief',
       },
+    });
+
+    const defaultReadAssist = vi.fn(() => {
+      throw new Error('default reads must not call Jev');
+    });
+    const defaultReadPack = buildContextPackWithL1(resolveContextL1Mode(parseArgs(['23'])), {
+      cwd: '/repo',
+      getHeadSha: () => sha,
+      getAuthLogin: () => 'tomoya',
+      buildPack,
+      runAssist: defaultReadAssist,
+    });
+    expect(defaultReadAssist).not.toHaveBeenCalled();
+    expect(defaultReadPack).toMatchObject({
+      l1ShadowPreview: { status: 'complete', source: 'trusted_brief' },
     });
   });
   it('issue: issues API → comments → search prs → pr view(headRefName,files) の順で argv を渡す', () => {
