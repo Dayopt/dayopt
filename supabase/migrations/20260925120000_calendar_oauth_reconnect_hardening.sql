@@ -5,6 +5,14 @@ BEGIN;
 SET LOCAL lock_timeout = '5s';
 SET LOCAL statement_timeout = '60s';
 
+ALTER TABLE private.calendar_oauth_attempts
+  DROP CONSTRAINT calendar_oauth_attempts_expiry_order;
+ALTER TABLE private.calendar_oauth_attempts
+  ADD CONSTRAINT calendar_oauth_attempts_expiry_order CHECK (
+    expires_at > created_at
+    AND expires_at <= created_at + INTERVAL '13 minutes'
+  );
+
 CREATE OR REPLACE FUNCTION public.begin_calendar_oauth_attempt_v1(
   p_project_key TEXT,
   p_user_id UUID,
