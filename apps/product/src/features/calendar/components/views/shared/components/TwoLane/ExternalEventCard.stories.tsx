@@ -374,14 +374,14 @@ export const ThreeSources: Story = {
             duration: 60,
             status: 'upcoming',
           }}
-          position={{ top: 0, height: 60, left: 0, width: 38 }}
+          position={{ top: 9 * HOUR_HEIGHT, height: 60, left: 0, width: 38 }}
           activityName="Deep Work"
           activityColor="blue"
           interactive={false}
         />
         <RecordLaneCard
           event={record}
-          position={{ top: 60, height: 60, left: 0, width: 38 }}
+          position={{ top: 10 * HOUR_HEIGHT, height: 60, left: 0, width: 38 }}
           activityName="Deep Work"
           activityColor="blue"
           interactive={false}
@@ -389,7 +389,7 @@ export const ThreeSources: Story = {
         <ExternalEventCard
           event={ghost({ id: 'external-source', startDate: externalStart, endDate: at(12) })}
           position={{
-            top: 120,
+            top: 11 * HOUR_HEIGHT,
             height: 60,
             left: 0,
             width: 38,
