@@ -121,7 +121,7 @@ job 名を変数で渡す schedule と、jobid で消す unschedule は追えな
 | `oauthTokenPreBodyIpRateLimit` | 600  | `1 m`  | `apps/product/src/lib/oauth-server/token-rate-limit.ts`                                                                                           |
 | `oauthTokenRefreshRateLimit`   | 30   | `1 m`  | `apps/product/src/lib/oauth-server/token-rate-limit.ts`                                                                                           |
 | `oauthTokenRefreshIpRateLimit` | 120  | `1 m`  | `apps/product/src/lib/oauth-server/token-rate-limit.ts`                                                                                           |
-| `oauthTokenGlobalRateLimit`    | 120  | `1 m`  | `apps/product/src/lib/oauth-server/token-rate-limit.ts`                                                                                           |
+| `oauthTokenClientRateLimit`    | 120  | `1 m`  | `apps/product/src/lib/oauth-server/token-rate-limit.ts`                                                                                           |
 | `timeblockCreateRateLimit`     | 500  | `24 h` | 利用箇所なし                                                                                                                                      |
 | `icalFeedRateLimit`            | 10   | `1 m`  | `apps/product/src/app/api/v1/calendar/[token]/route.ts`                                                                                           |
 | `icalFeedIpRateLimit`          | 60   | `1 m`  | `apps/product/src/app/api/v1/calendar/[token]/route.ts`                                                                                           |
