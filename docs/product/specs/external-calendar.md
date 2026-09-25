@@ -30,7 +30,7 @@ Google カレンダーの予定を読み取り専用でミラーし、Calendar �
 - fenced 同期は `begin_calendar_sync_run_v1` が `missing` を返した接続だけ同じ fence repair を試し、`ready` の場合に begin を再試行する。接続がない場合や generation / authority 条件を満たさない場合は Google API へ進まない
 - Google 側の grant 発行後に Dayopt の保存が確実に rollback した場合は orphan grant の revoke を試みる。DB 応答が失われ commit 結果が不明な場合は、保存済み token を失効させないため revoke を行わず、失敗を記録する（#2072, #2156）
 - 2026-09-25 の Production 読み取り確認では `get_external_lifecycle_app_version_v3` marker は存在し、Google 接続は 1 件、その接続は active だが fence 欠損、data-generation mismatch は 0 件だった。`authority_fence_id` / `authority_epoch` はどちらも NULL、最終同期は 2026-08-20 05:45 UTC。cron heartbeat は 8 件すべて新しかったが、接続の同期成功は確認できていない
-- 同日の追加確認では `repair_calendar_connection_authority_fence_v1` は未反映で、`private.calendar_authority_projects` の singleton 行も存在しなかった。したがって migration を適用するだけでは接続を回復できず、Production の Google authority identity を確認して provision・activate した後、一覧・選択・同期を実際に確認する必要がある。Production への変更は未実施
+- 2026-09-25 の Supabase Production migration 一覧は `20260924120643` が末尾で、branch の `20260925000000_fenced_calendar_reconnect_command` と `20260925100000_repair_legacy_calendar_connection_fence` は未反映。`repair_calendar_connection_authority_fence_v1` も未反映で、`private.calendar_authority_projects` の singleton 行も存在しなかった。したがって migration を適用するだけでは接続を回復できず、Production の Google authority identity を確認して provision・activate した後、一覧・選択・同期を実際に確認する必要がある。Production への変更は未実施
 - 接続の集計では選択カレンダー 1 件、ミラー予定 1 件、未 dismiss の ghost 1 件を確認した。接続は active・連続失敗 0・`last_sync_error` なしだが最終同期は約 35 日前で、この ghost は現在の同期成功を示さない。Vercel Product の Production target には OAuth client ID / project number / client secret / 暗号鍵 / redirect URI の 5 key が登録済みだが、値は今回の read-only 確認では取得せず、client ID と project number の一致は未確認
 
 ## Stateの正本
