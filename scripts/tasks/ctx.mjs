@@ -26,6 +26,7 @@ function isCodexBotLogin(login) {
 /**
  * `pnpm ctx <N>` — L0 の機械収集に、同一入力snapshotを確認したJev L1のshadow助言を添える。
  * L1は既定で実行し、Markdown / JSONと`--post`のContext Briefへ含める。
+ * `--reuse-brief-l1` はJev APIを呼ばず、同じIssue・snapshot・HEADのtrusted BriefからL1だけを再利用する。
  * `--l1-shadow` は旧コマンドとの互換用で、明示しなくてもL1は実行される。
  *
  * Uber 原則⑤「AI が考える前に機械的に集められる文脈はここで終える」の Dayopt 写像。
@@ -50,6 +51,7 @@ const [REPO_OWNER, REPO_NAME] = REPO.split('/');
  * ファイル先頭で定義する（元は --post セクションにあったが、独立性ガード（F2）で
  * 上流の selectComments からも参照するようになった）。 */
 export const CTX_MARKER = '<!-- ctx-brief -->';
+const CTX_L1_MARKER_PREFIX = '<!-- ctx-l1-v1:';
 
 // F2（独立性ガード）: Main 自身が書いた marker / brief コメントが reviewer への
 // ctx pack へ紛れ込むと、Main の判断が「独立レビュー」を経由せず reviewer の入力へ
@@ -360,6 +362,10 @@ function renderL1ShadowPreview(preview) {
     '',
     'Codexの作業入力へ渡す助言情報（shadow）。Issueの要求・必須条件・policy・検証条件を変更せず、最終判断もしません。候補から外れた資料を無関係とはみなしません。',
   ];
+  if (preview.source === 'trusted_brief')
+    lines.push(
+      '信頼済みctx-briefから再利用（Issue入力snapshotと公開HEADの一致を確認済み。Jev APIは呼び出していません）。',
+    );
   if (preview.status === 'complete') {
     lines.push(
       `選択した ${preview.selectedCount} 件を評価済み。候補を最大5件表示（別枠の対象外 ${preview.omittedCount} 件は未評価）。`,
@@ -386,6 +392,199 @@ function renderL1ShadowPreview(preview) {
   return lines;
 }
 
+function briefL1MetadataForPack(pack) {
+  const preview = pack?.l1ShadowPreview;
+  const target = preview?.target;
+  const candidates = preview?.candidates;
+  if (
+    !pack?.snapshotId ||
+    !Number.isSafeInteger(pack.number) ||
+    !/^[a-f0-9]{64}$/.test(pack.snapshotId) ||
+    !Number.isSafeInteger(target?.number) ||
+    target.number !== pack.number ||
+    !/^[a-f0-9]{40}$/.test(target?.sha ?? '') ||
+    !isCanonicalBriefSourceUrl(target?.url) ||
+    !['complete', 'partial', 'unevaluated'].includes(preview?.status) ||
+    !Number.isSafeInteger(preview.evaluatedCount) ||
+    preview.evaluatedCount < 0 ||
+    !Number.isSafeInteger(preview.selectedCount) ||
+    preview.selectedCount < preview.evaluatedCount ||
+    preview.selectedCount > 24 ||
+    !Number.isSafeInteger(preview.omittedCount) ||
+    preview.omittedCount < 0 ||
+    preview.omittedCount > 10_000 ||
+    !Array.isArray(candidates) ||
+    candidates.length > 5 ||
+    candidates.length > preview.evaluatedCount ||
+    (preview.status === 'complete' && preview.evaluatedCount !== preview.selectedCount) ||
+    (preview.status === 'partial' && preview.evaluatedCount >= preview.selectedCount) ||
+    (preview.status === 'unevaluated' && preview.evaluatedCount !== 0) ||
+    (preview.reason !== null &&
+      preview.reason !== undefined &&
+      !BRIEF_L1_FAILURES.has(preview.reason))
+  )
+    return null;
+
+  const safeCandidates = [];
+  for (const candidate of candidates) {
+    if (
+      !/^[a-zA-Z0-9_-]{1,80}$/.test(candidate?.id ?? '') ||
+      !isCanonicalBriefSourceUrl(candidate?.url) ||
+      !Object.hasOwn(L1_CATEGORY_LABELS, candidate?.category) ||
+      typeof candidate?.evaluatedAt !== 'string' ||
+      !isIsoTimestamp(candidate.evaluatedAt)
+    )
+      return null;
+    safeCandidates.push({
+      id: candidate.id,
+      url: candidate.url,
+      updatedAt: candidate.updatedAt,
+      category: candidate.category,
+      evaluatedAt: candidate.evaluatedAt,
+    });
+  }
+
+  return {
+    schemaVersion: 1,
+    issueNumber: pack.number,
+    snapshotId: pack.snapshotId,
+    target: { number: target.number, sha: target.sha, url: target.url },
+    preview: {
+      status: preview.status,
+      reason: preview.reason ?? null,
+      evaluatedCount: preview.evaluatedCount,
+      selectedCount: preview.selectedCount,
+      omittedCount: preview.omittedCount,
+      candidates: safeCandidates,
+    },
+  };
+}
+
+function isIsoTimestamp(value) {
+  return (
+    typeof value === 'string' &&
+    value.length <= 40 &&
+    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/.test(value) &&
+    Number.isFinite(Date.parse(value))
+  );
+}
+
+function encodeBriefL1Metadata(pack) {
+  const metadata = briefL1MetadataForPack(pack);
+  if (!metadata) return null;
+  return `${CTX_L1_MARKER_PREFIX}${Buffer.from(JSON.stringify(metadata)).toString('base64url')} -->`;
+}
+
+function decodeBriefL1Metadata(body) {
+  if (typeof body !== 'string') return null;
+  const match = body.match(/^<!-- ctx-l1-v1:([A-Za-z0-9_-]{8,12000}) -->$/m);
+  if (!match) return null;
+  try {
+    const json = Buffer.from(match[1], 'base64url').toString('utf8');
+    if (Buffer.from(json).toString('base64url') !== match[1]) return null;
+    const value = JSON.parse(json);
+    return value && typeof value === 'object' ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Reuses L1 stored in a trusted brief only when its issue, source snapshot, URL and HEAD match. */
+export function findReusableBriefL1Preview(comments, expected) {
+  if (
+    !Array.isArray(comments) ||
+    !Number.isSafeInteger(expected?.number) ||
+    !/^[a-f0-9]{64}$/.test(expected?.snapshotId ?? '') ||
+    !/^[a-f0-9]{40}$/.test(expected?.sha ?? '') ||
+    !isCanonicalBriefSourceUrl(expected?.url) ||
+    !Array.isArray(expected?.candidates)
+  )
+    return null;
+
+  const sourceById = new Map(expected.candidates.map((candidate) => [candidate.id, candidate]));
+  for (const comment of [...comments].reverse()) {
+    if (!isTrustedMarkerComment(comment)) continue;
+    const metadata = decodeBriefL1Metadata(comment.body);
+    if (
+      metadata?.schemaVersion !== 1 ||
+      metadata?.issueNumber !== expected.number ||
+      metadata?.snapshotId !== expected.snapshotId ||
+      metadata?.target?.number !== expected.number ||
+      metadata?.target?.sha !== expected.sha ||
+      metadata?.target?.url !== expected.url
+    )
+      continue;
+
+    const preview = metadata.preview;
+    if (
+      !['complete', 'partial', 'unevaluated'].includes(preview?.status) ||
+      !Number.isSafeInteger(preview.evaluatedCount) ||
+      preview.evaluatedCount < 0 ||
+      !Number.isSafeInteger(preview.selectedCount) ||
+      preview.selectedCount < preview.evaluatedCount ||
+      preview.selectedCount > 24 ||
+      !Number.isSafeInteger(preview.omittedCount) ||
+      preview.omittedCount < 0 ||
+      preview.omittedCount > 10_000 ||
+      !Array.isArray(preview.candidates) ||
+      preview.candidates.length > 5 ||
+      preview.candidates.length > preview.evaluatedCount ||
+      (preview.status === 'complete' && preview.evaluatedCount !== preview.selectedCount) ||
+      (preview.status === 'partial' && preview.evaluatedCount >= preview.selectedCount) ||
+      (preview.status === 'unevaluated' && preview.evaluatedCount !== 0) ||
+      (preview.reason !== null &&
+        preview.reason !== undefined &&
+        !BRIEF_L1_FAILURES.has(preview.reason))
+    )
+      continue;
+
+    const candidates = [];
+    const seenIds = new Set();
+    let invalid = false;
+    for (const candidate of preview.candidates) {
+      const source = sourceById.get(candidate?.id);
+      if (
+        !source ||
+        seenIds.has(candidate.id) ||
+        source.url !== candidate.url ||
+        !isCanonicalBriefSourceUrl(source.url) ||
+        !Object.hasOwn(L1_CATEGORY_LABELS, candidate.category) ||
+        !isIsoTimestamp(candidate.evaluatedAt)
+      ) {
+        invalid = true;
+        break;
+      }
+      seenIds.add(candidate.id);
+      candidates.push({
+        id: source.id,
+        url: source.url,
+        updatedAt: source.updatedAt,
+        category: candidate.category,
+        categoryLabel: L1_CATEGORY_LABELS[candidate.category],
+        evaluatedAt: candidate.evaluatedAt,
+      });
+    }
+    if (invalid) continue;
+
+    return {
+      status: preview.status,
+      reason: preview.reason ?? null,
+      evaluatedCount: preview.evaluatedCount,
+      selectedCount: preview.selectedCount,
+      omittedCount: preview.omittedCount,
+      candidates,
+      source: 'trusted_brief',
+      snapshotId: metadata.snapshotId,
+      target: {
+        number: metadata.target.number,
+        sha: metadata.target.sha,
+        url: metadata.target.url,
+      },
+    };
+  }
+  return null;
+}
+
 // --- 純関数群（test 対象） -------------------------------------------------
 
 /** CLI 引数を解釈する。位置引数は issue/PR 番号 1 つのみ。 */
@@ -398,6 +597,7 @@ export function parseArgs(argv) {
     allComments: false,
     post: false,
     l1Shadow: false,
+    reuseBriefL1: false,
   };
   const positionals = [];
   for (let i = 0; i < argv.length; i += 1) {
@@ -410,6 +610,8 @@ export function parseArgs(argv) {
       options.post = true;
     } else if (arg === '--l1-shadow') {
       options.l1Shadow = true;
+    } else if (arg === '--reuse-brief-l1') {
+      options.reuseBriefL1 = true;
     } else if (arg === '--comments') {
       options.comments = Number(argv[i + 1]);
       i += 1;
@@ -418,7 +620,7 @@ export function parseArgs(argv) {
       i += 1;
     } else if (arg.startsWith('--')) {
       throw new Error(
-        `未知の引数です: ${arg}（--json / --comments / --body-lines / --all-comments / --post / --l1-shadow のみ）`,
+        `未知の引数です: ${arg}（--json / --comments / --body-lines / --all-comments / --post / --l1-shadow / --reuse-brief-l1 のみ）`,
       );
     } else {
       positionals.push(arg);
@@ -1375,6 +1577,7 @@ export function buildContextPack(options, deps = {}) {
     now = () => new Date(),
     adoptedPackIds = [],
     l1Report = null,
+    includeTrustedBriefComments = false,
   } = deps;
   const { number, comments: commentsK, bodyLines, allComments } = options;
 
@@ -1763,6 +1966,17 @@ export function buildContextPack(options, deps = {}) {
           },
         }
       : {}),
+    ...(includeTrustedBriefComments
+      ? {
+          trustedBriefComments:
+            commentsRaw === null
+              ? null
+              : commentsRaw.filter(isTrustedMarkerComment).map((comment) => ({
+                  body: comment.body,
+                  author_association: comment.author_association,
+                })),
+        }
+      : {}),
     bodySha256: createHash('sha256').update(rawBody).digest('hex'),
     snapshotId,
     generatedAt: now().toISOString(),
@@ -1788,9 +2002,17 @@ export function buildContextPack(options, deps = {}) {
 // CTX_MARKER の定義はファイル先頭（selectComments / detectJudgmentRecords と共用）。
 
 /** コメント本文を組み立てる。1 行目は必ずマーカー（idempotent 判定の唯一の根拠）。 */
-export function buildCommentBody({ number, date, generatedAt, snapshotId, markdown }) {
+export function buildCommentBody({
+  number,
+  date,
+  generatedAt,
+  snapshotId,
+  markdown,
+  l1Metadata = null,
+}) {
   const timestamp = generatedAt ?? `${date ?? '未取得'}T00:00:00.000Z`;
-  return `${CTX_MARKER}\n**Issue Context Brief（\`pnpm ctx ${number}\`）**\n生成: ${timestamp} | snapshot: ${snapshotId ?? '未取得'}\n\n${markdown}\n`;
+  const metadataLine = typeof l1Metadata === 'string' ? `\n${l1Metadata}` : '';
+  return `${CTX_MARKER}\n**Issue Context Brief（\`pnpm ctx ${number}\`）**\n生成: ${timestamp} | snapshot: ${snapshotId ?? '未取得'}${metadataLine}\n\n${markdown}\n`;
 }
 
 function sameBriefContentIgnoringGeneratedTime(current, candidate) {
@@ -1892,6 +2114,7 @@ export function postContextBrief(pack, markdown, deps = {}) {
     generatedAt: pack.generatedAt ?? now().toISOString(),
     snapshotId: pack.snapshotId,
     markdown,
+    l1Metadata: encodeBriefL1Metadata(pack),
   });
 
   if (existing && sameBriefContentIgnoringGeneratedTime(existing.body, body)) {
@@ -1944,8 +2167,8 @@ function main() {
 }
 
 /**
- * Adds Jev's advisory L1 output to the L0 pack by default. Jev failure leaves the L0 result usable.
- * Dependencies are injectable so the delivery path can be tested without GitHub or model calls.
+ * Adds Jev's advisory L1 output to the L0 pack by default. Reuse mode reads only a matching Brief;
+ * Jev failure leaves the L0 result usable. Dependencies are injectable for offline delivery tests.
  */
 export function buildContextPackWithL1(
   options,
@@ -1977,24 +2200,54 @@ export function buildContextPackWithL1(
     { ...options, assist: true },
     {
       cwd,
+      includeTrustedBriefComments: true,
       readFileImpl: (path) => {
         if (!path.endsWith(DECISIONS_PATH)) throw new Error('対象外の資料');
         return readDecisionAtHead(headSha, path, cwd);
       },
     },
   );
+  let reusablePreview = null;
   try {
     const expectedInput = buildContextInput(
       options.number,
       headSha,
       l0WithAssistInput.assistSource,
     );
-    const report = runAssist(options.number, { cwd });
-    l0WithAssistInput.l1ShadowPreview = buildL1ShadowPreview(report, expectedInput);
+    const expectedBrief = {
+      ...expectedInput,
+      snapshotId: l0WithAssistInput.snapshotId,
+    };
+    reusablePreview = findReusableBriefL1Preview(
+      l0WithAssistInput.trustedBriefComments,
+      expectedBrief,
+    );
+    if (options.reuseBriefL1) {
+      l0WithAssistInput.l1ShadowPreview =
+        reusablePreview ?? l1ShadowUnavailable('trusted_brief_missing_or_stale');
+    } else {
+      const report = runAssist(options.number, { cwd });
+      const currentPreview = buildL1ShadowPreview(report, expectedInput);
+      if (currentPreview.status === 'complete' || !reusablePreview) {
+        l0WithAssistInput.l1ShadowPreview = currentPreview;
+        if (['complete', 'partial', 'unevaluated'].includes(currentPreview.status)) {
+          l0WithAssistInput.l1ShadowPreview.snapshotId = l0WithAssistInput.snapshotId;
+          l0WithAssistInput.l1ShadowPreview.target = {
+            number: expectedInput.number,
+            sha: expectedInput.sha,
+            url: expectedInput.url,
+          };
+        }
+      } else {
+        l0WithAssistInput.l1ShadowPreview = reusablePreview;
+      }
+    }
   } catch {
-    l0WithAssistInput.l1ShadowPreview = l1ShadowUnavailable();
+    l0WithAssistInput.l1ShadowPreview =
+      reusablePreview ?? l1ShadowUnavailable('assist_unavailable');
   }
   delete l0WithAssistInput.assistSource;
+  delete l0WithAssistInput.trustedBriefComments;
   return l0WithAssistInput;
 }
 

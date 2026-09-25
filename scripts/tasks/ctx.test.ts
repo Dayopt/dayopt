@@ -22,6 +22,7 @@ import {
   extractPathTokens,
   filterExistingPaths,
   findMarkerComment,
+  findReusableBriefL1Preview,
   isBotLogin,
   isPullRequest,
   mapSkills,
@@ -45,6 +46,7 @@ describe('parseArgs', () => {
       allComments: false,
       post: false,
       l1Shadow: false,
+      reuseBriefL1: false,
     });
   });
 
@@ -59,11 +61,19 @@ describe('parseArgs', () => {
       allComments: true,
       post: false,
       l1Shadow: false,
+      reuseBriefL1: false,
     });
   });
 
   it('--post を解釈する', () => {
     expect(parseArgs(['2550', '--post'])).toMatchObject({ number: 2550, post: true });
+  });
+
+  it('--reuse-brief-l1 は保存済みBriefのL1だけを読む指定として解釈する', () => {
+    expect(parseArgs(['2550', '--reuse-brief-l1'])).toMatchObject({
+      number: 2550,
+      reuseBriefL1: true,
+    });
   });
 
   it('--l1-shadow は後方互換で受け付け、通常出力と投稿のどちらでもL1を含める', () => {
@@ -995,6 +1005,67 @@ describe('buildContextPack (execFileImpl 経由の gh 呼び出し形)', () => {
     );
     expect(partial).toMatchObject({ status: 'partial', evaluatedCount: 1, selectedCount: 2 });
   });
+  it('信頼済みBriefのL1は同一Issue・snapshot・HEADの候補だけ再利用する', () => {
+    const sha = 'a'.repeat(40);
+    const source = {
+      title: 'Issue title',
+      body: 'Canonical request',
+      url: 'https://github.com/Dayopt/dayopt/issues/23',
+      updatedAt: '2026-09-24T00:00:00Z',
+      comments: [
+        {
+          id: 42,
+          body: 'Constraint source',
+          html_url: 'https://github.com/Dayopt/dayopt/issues/23#issuecomment-42',
+          created_at: '2026-09-24T01:00:00Z',
+        },
+      ],
+      related: [],
+      decisions: [],
+      missing: [],
+    };
+    const input = buildContextInput(23, sha, source);
+    const snapshotId = 'b'.repeat(64);
+    const candidate = input.candidates[0];
+    const metadata = {
+      schemaVersion: 1,
+      issueNumber: 23,
+      snapshotId,
+      target: { number: 23, sha, url: input.url },
+      preview: {
+        status: 'complete',
+        reason: null,
+        evaluatedCount: 1,
+        selectedCount: 1,
+        omittedCount: 0,
+        candidates: [
+          {
+            id: candidate.id,
+            url: candidate.url,
+            updatedAt: candidate.updatedAt,
+            category: 'constraint',
+            evaluatedAt: '2026-09-24T02:00:00Z',
+          },
+        ],
+      },
+    };
+    const body = `${CTX_MARKER}\n<!-- ctx-l1-v1:${Buffer.from(JSON.stringify(metadata)).toString('base64url')} -->`;
+    const comment = { body, author_association: 'OWNER' };
+    const expected = { ...input, snapshotId };
+
+    expect(findReusableBriefL1Preview([comment], expected)).toMatchObject({
+      status: 'complete',
+      source: 'trusted_brief',
+      candidates: [{ id: candidate.id, url: candidate.url, categoryLabel: '制約' }],
+    });
+    expect(findReusableBriefL1Preview([comment], { ...expected, sha: 'c'.repeat(40) })).toBeNull();
+    expect(
+      findReusableBriefL1Preview([comment], { ...expected, snapshotId: 'd'.repeat(64) }),
+    ).toBeNull();
+    expect(
+      findReusableBriefL1Preview([{ ...comment, author_association: 'NONE' }], expected),
+    ).toBeNull();
+  });
   it('Jev CLIは固定argvで呼び、JSON以外の出力やshell評価を使わない', () => {
     const execFileImpl = vi.fn(() => '{"packId":"context-relevance"}');
     expect(runContextL1ShadowAssist(23, { cwd: '/repo', execFileImpl })).toEqual({
@@ -1020,7 +1091,15 @@ describe('buildContextPack (execFileImpl 経由の gh 呼び出し形)', () => {
     };
     const expectedInput = buildContextInput(23, sha, source);
     const buildPack = vi.fn((options: { assist?: boolean }) =>
-      options.assist ? { number: 23, assistSource: source } : { number: 23 },
+      options.assist
+        ? {
+            number: 23,
+            snapshotId: 'b'.repeat(64),
+            header: { url: source.url },
+            assistSource: source,
+            trustedBriefComments: [],
+          }
+        : { number: 23 },
     ) as unknown as typeof buildContextPack;
     const report = {
       packId: 'context-relevance',
@@ -1060,6 +1139,96 @@ describe('buildContextPack (execFileImpl 経由の gh 呼び出し形)', () => {
     expect(fallback).toMatchObject({
       number: 23,
       l1ShadowPreview: { status: 'unavailable', candidates: [] },
+    });
+  });
+  it('reuse指定はJevを呼ばず、信頼済みBriefの一致するL1だけを返す', () => {
+    const sha = 'a'.repeat(40);
+    const snapshotId = 'b'.repeat(64);
+    const source = {
+      title: 'Issue title',
+      body: 'Canonical request',
+      url: 'https://github.com/Dayopt/dayopt/issues/23',
+      updatedAt: '2026-09-24T00:00:00Z',
+      comments: [
+        {
+          id: 42,
+          body: 'Constraint source',
+          html_url: 'https://github.com/Dayopt/dayopt/issues/23#issuecomment-42',
+          created_at: '2026-09-24T01:00:00Z',
+        },
+      ],
+      related: [],
+      decisions: [],
+      missing: [],
+    };
+    const input = buildContextInput(23, sha, source);
+    const candidate = input.candidates[0];
+    const metadata = {
+      schemaVersion: 1,
+      issueNumber: 23,
+      snapshotId,
+      target: { number: 23, sha, url: input.url },
+      preview: {
+        status: 'complete',
+        reason: null,
+        evaluatedCount: 1,
+        selectedCount: 1,
+        omittedCount: 0,
+        candidates: [
+          {
+            id: candidate.id,
+            url: candidate.url,
+            updatedAt: candidate.updatedAt,
+            category: 'constraint',
+            evaluatedAt: '2026-09-24T02:00:00Z',
+          },
+        ],
+      },
+    };
+    const brief = {
+      body: `${CTX_MARKER}\n<!-- ctx-l1-v1:${Buffer.from(JSON.stringify(metadata)).toString('base64url')} -->`,
+      author_association: 'OWNER',
+    };
+    const buildPack = vi.fn(() => ({
+      number: 23,
+      snapshotId,
+      header: { url: source.url },
+      assistSource: source,
+      trustedBriefComments: [brief],
+    })) as unknown as typeof buildContextPack;
+    const runAssist = vi.fn(() => {
+      throw new Error('reuse mode must not call Jev');
+    });
+    const pack = buildContextPackWithL1(parseArgs(['23', '--reuse-brief-l1']), {
+      cwd: '/repo',
+      getHeadSha: () => sha,
+      buildPack,
+      runAssist,
+    });
+
+    expect(runAssist).not.toHaveBeenCalled();
+    expect(pack).toMatchObject({
+      l1ShadowPreview: {
+        status: 'complete',
+        source: 'trusted_brief',
+        candidates: [{ id: candidate.id, url: candidate.url }],
+      },
+    });
+    expect(pack).not.toHaveProperty('trustedBriefComments');
+
+    const fallbackPack = buildContextPackWithL1(parseArgs(['23']), {
+      cwd: '/repo',
+      getHeadSha: () => sha,
+      buildPack,
+      runAssist: () => {
+        throw new Error('Jev unavailable');
+      },
+    });
+    expect(fallbackPack).toMatchObject({
+      l1ShadowPreview: {
+        status: 'complete',
+        source: 'trusted_brief',
+      },
     });
   });
   it('issue: issues API → comments → search prs → pr view(headRefName,files) の順で argv を渡す', () => {
@@ -2145,6 +2314,52 @@ describe('postContextBrief', () => {
       expect.stringContaining(CTX_MARKER),
       'utf8',
     );
+  });
+
+  it('L1を含むBriefへissue・snapshot・公開HEAD付きの再利用データを保存する', () => {
+    const l1Pack = {
+      ...pack,
+      l1ShadowPreview: {
+        status: 'complete',
+        reason: null,
+        evaluatedCount: 0,
+        selectedCount: 0,
+        omittedCount: 0,
+        candidates: [],
+        snapshotId: pack.snapshotId,
+        target: {
+          number: pack.number,
+          sha: 'c'.repeat(40),
+          url: pack.header.url,
+        },
+      },
+    };
+    const execFileImpl = vi.fn((_cmd: string, args: string[]) => {
+      if (args[0] === 'api' && args[1] === 'user') return 'tomoya\n';
+      if (args[0] === 'api') return JSON.stringify([]);
+      if (args[0] === 'issue' && args[1] === 'comment') return 'created\n';
+      throw new Error(`unexpected args: ${args.join(' ')}`);
+    });
+    const writeFileImpl = vi.fn();
+
+    postContextBrief(l1Pack, markdown, {
+      execFileImpl,
+      getCurrentSnapshotId: () => pack.snapshotId,
+      writeFileImpl,
+      mkdtempImpl: () => '/tmp/ctx-brief-l1',
+    });
+
+    const body = writeFileImpl.mock.calls[0]?.[1];
+    expect(body).toContain('<!-- ctx-l1-v1:');
+    expect(
+      findReusableBriefL1Preview([{ body, author_association: 'OWNER' }], {
+        number: pack.number,
+        snapshotId: pack.snapshotId,
+        sha: 'c'.repeat(40),
+        url: pack.header.url,
+        candidates: [],
+      }),
+    ).toMatchObject({ status: 'complete', source: 'trusted_brief', candidates: [] });
   });
 
   it('既存の ctx brief コメントが有れば PATCH で更新する', () => {

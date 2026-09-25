@@ -108,7 +108,42 @@ pnpm jev:assist-eval report --input /absolute/path/evaluation.json
 
 ひな型は未確認の空欄で、正解ではない。原資料、対象ID、baselineの規則と結果、質問version、split、採用基準を送信前に人が確認し、共有保存先に凍結して残す。`reviewedBy`・`rationale`・`sourceRefs` を埋める。`frozenAt` は固定記録の時刻。CLIは申告された記録を集計するだけで、人手確認の実施や後からの改変を保証しない。元の凍結資料との照合はレビューで行う。
 
-- contextは30 Issue（tune10 / holdout20）。`candidateIds` 全体に対する人手の `usefulIds` と `requiredIds`、Jev・最新順・既存キーワード規則の各上位5件を記録する。Recall@5が強いbaselineを平均0.10以上上回り、baselineが拾った必須制約を新たに落とさないこと。
+### 実評価を進める時
+
+`pnpm jev:check` は静的検査であり、品質評価ではない。実評価は「30 Issueの人手ラベル付き比較」で、完了済みの #2889 GPT-6 harness 8試行とも別の評価である。今は評価を保留しており、以下は再開時の手順。
+
+1. 公開 Issue を30件選び、Jevを実行する前にテンプレートを作る。各ケースの `candidateIds` は `--json` レポートの `input.candidates` から埋める。資料本文を読み `usefulIds`（役立つ資料）と `requiredIds`（見落とせない必須制約）を人がラベルし、`review` と `sourceRefs` を記録する。holdoutのラベルは出力評価を調整する担当者に見せず凍結する。
+2. 30件すべてで、Jev・最新順・キーワード baseline の上位5件を同じ候補集合から作る。`jevTop5` はレポートの `top`、`recencyTop5` は `updatedAt` 降順（同時刻は ID 順）から作る。キーワード baseline の対象語・一致規則・同点処理は既存CLIに固定実装がないため、データを凍結する前に明記して全件へ同じ規則を適用する。候補集合やルールを holdout 結果を見てから変えない。
+3. まず tune 10件で Jev 候補とラベル付け手順の問題を確認し、質問・データ・判定基準を固定する。その後に残る holdout 20件を一度だけ評価し、見た後の閾値調整や再試行はしない。実行例は1 Issueずつ明示する。24候補すべてなら最大4送信/Issueになり得るため、30件で最大120送信相当と60秒の共有間隔を見込む。
+
+```bash
+pnpm jev:assist-eval template context-relevance > /absolute/path/evaluation.json
+
+AI_GATEWAY_API_KEY="op://agent/vercel-ai-gateway/credential" op run -- \
+  pnpm jev:assist context --issue 2853 --json > /absolute/path/jev-2853.json
+```
+
+このコマンドは Gateway API を呼び、結果 JSON と全資料 artifact を保存する。1 Issueあたり最大24候補、6候補ずつの複数送信になり得る。30件を一括連続実行せず、既定の60秒間隔・停止理由・実費を確認する。API送信を始める前に、選んだ Issue と関連資料が公開データで、送信してよい内容かを確認する。`op run` の承認が通らなければ認証状態を確認して止め、繰り返し認証を試さない。
+
+4. tune/holdout とも全項目を埋め、原資料・質問version・候補集合・baseline規則・基準が凍結済みであることを人が確認してから、`pnpm jev:assist-eval report --input /absolute/path/evaluation.json` でオフライン集計する。`GO_CANDIDATE` は集計上の候補であり、正式採用やrouting変更には別途人の照合が必要。
+
+実評価を実施するにはAPI利用量が発生する。この手順の記載だけでは送信を許可したことにならない。評価を始める時は、30件の固定済みdatasetとAPI実行範囲を示して別途判断する。
+
+### Codex Cloud での Jev 結果の受け渡し
+
+Codex Cloud の Secret はsetup scriptにだけ提供され、agent phaseの開始前に取り除かれる。Gateway keyを通常のEnvironment Variableとして登録するとagentから読めるため登録しない（[Cloud environment documentation](https://learn.chatgpt.com/docs/environments/cloud-environment)）。Cloud task内でJevを新規実行するのでなく、認証済みのローカル担当が評価済みL1をIssue Briefへ保存し、CloudのL2担当が同じ結果を読み取る。
+
+```bash
+# ローカルの認証済み担当。GitHubコメントを作成・更新する。
+pnpm ctx 2853 --post
+
+# Cloud の L2 担当。Jev API は呼ばず、現在のL0と一致した保存済みL1だけを読む。
+pnpm ctx 2853 --reuse-brief-l1
+```
+
+BriefにはL1候補の再利用用メタデータが含まれる。Cloud側は信頼済み `ctx-brief` コメントから読んだpayloadのIssue番号・URL・snapshot・HEAD SHAを照合し、ひとつでも違えば候補を使わずL0のみを返す。旧形式や古いBriefを使う場合は、ローカル側で明示的に再生成する。Cloudでこのコマンドを使うには repository access と `gh` の GitHub API 読み取りが必要。認証または通信が使えない環境ではL1未取得と報告し、候補が届いたと扱わない。
+
+- contextは30 Issue（tune10 / holdout20）。`candidateIds` 全体に対する人手の `usefulIds` と `requiredIds`、Jev・最新順・事前に凍結したキーワード baseline の各上位5件を記録する。Recall@5が強いbaselineを平均0.10以上上回り、baselineが拾った必須制約を新たに落とさないこと。
 - claimsは60組、4分類各15組（各分類tune5 / holdout10）。単純baselineは常に判断不能。holdoutのmacro-F1が0.75以上かつbaseline +0.10以上で、反証・判断不能を支持と誤分類しないこと。
 - holdoutは一度だけ。見た後に閾値を調整しない。欠測・未確認・入力不足はGoにしない。集計の `GO_CANDIDATE` は運用接続の許可ではなく、原資料を人が照合するための候補結果。
 - `skill-suggestion` の採用評価は #2852 の条件で別途完了させる。他packの合格で代替しない。
