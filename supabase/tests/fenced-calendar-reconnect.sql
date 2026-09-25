@@ -17,6 +17,7 @@ DECLARE
   v_stale_connection_id UUID := gen_random_uuid();
   v_deleted_connection_id UUID := gen_random_uuid();
   v_attempt_id UUID;
+  v_attempt_expires_at TIMESTAMPTZ;
   v_state_digest BYTEA := decode(repeat('01', 32), 'hex');
   v_verifier_digest BYTEA := decode(repeat('02', 32), 'hex');
   v_fence_id UUID;
@@ -65,11 +66,14 @@ BEGIN
     3
   );
 
-  SELECT attempt.attempt_id
-  INTO v_attempt_id
+  SELECT attempt.attempt_id, attempt.expires_at
+  INTO v_attempt_id, v_attempt_expires_at
   FROM public.begin_calendar_oauth_attempt_v1(
     '123456789', v_user_id, v_state_digest, v_verifier_digest
   ) AS attempt;
+  IF v_attempt_expires_at <= pg_catalog.clock_timestamp() + INTERVAL '12 minutes 30 seconds' THEN
+    RAISE EXCEPTION 'OAuth attempt did not leave enough time for the ten-minute connect cookie';
+  END IF;
   PERFORM 1
   FROM public.claim_calendar_oauth_attempt_v1(
     '123456789', v_user_id, v_state_digest, v_verifier_digest
@@ -98,6 +102,45 @@ BEGIN
   WHERE id = v_legacy_connection_id AND user_id = v_user_id;
   IF v_fence_id IS NULL OR v_epoch IS NULL OR v_status <> 'active' OR v_failures <> 0 THEN
     RAISE EXCEPTION 'Legacy active reconnect did not restore its authority fence';
+  END IF;
+
+  UPDATE public.calendar_connections
+  SET consecutive_failures = 7
+  WHERE id = v_legacy_connection_id AND user_id = v_user_id;
+
+  v_state_digest := decode(repeat('05', 32), 'hex');
+  v_verifier_digest := decode(repeat('06', 32), 'hex');
+  SELECT attempt.attempt_id
+  INTO v_attempt_id
+  FROM public.begin_calendar_oauth_attempt_v1(
+    '123456789', v_user_id, v_state_digest, v_verifier_digest
+  ) AS attempt;
+  PERFORM 1
+  FROM public.claim_calendar_oauth_attempt_v1(
+    '123456789', v_user_id, v_state_digest, v_verifier_digest
+  ) AS claim
+  WHERE claim.attempt_id = v_attempt_id;
+  IF NOT FOUND THEN RAISE EXCEPTION 'Ordinary save OAuth attempt was not claimed'; END IF;
+
+  SELECT public.save_calendar_connection_command_v2(
+    v_attempt_id,
+    '123456789',
+    v_user_id,
+    'google',
+    'legacy-active-subject',
+    'owner@example.invalid',
+    ARRAY['https://www.googleapis.com/auth/calendar.events.readonly'],
+    'newer-ciphertext'
+  ) INTO v_result;
+  IF v_result IS DISTINCT FROM 'saved' THEN
+    RAISE EXCEPTION 'Ordinary save reconnect returned %', v_result;
+  END IF;
+  SELECT consecutive_failures
+  INTO v_failures
+  FROM public.calendar_connections
+  WHERE id = v_legacy_connection_id AND user_id = v_user_id;
+  IF v_failures <> 0 THEN
+    RAISE EXCEPTION 'Ordinary save reconnect did not reset consecutive failures';
   END IF;
 
   INSERT INTO public.calendar_connections (

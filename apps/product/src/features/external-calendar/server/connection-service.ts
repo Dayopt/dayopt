@@ -93,6 +93,19 @@ type CalendarConnectionClient = SupabaseClient<CalendarConnectionDatabase>;
  */
 export const CALENDAR_CONNECTION_DB_TIMEOUT_MS = 15_000;
 
+function assertCalendarDeadline(
+  deadlineAt: number | undefined,
+  requiredMs: number,
+  operation: string,
+): void {
+  if (deadlineAt !== undefined && deadlineAt - Date.now() < requiredMs) {
+    throw new ExternalCalendarServiceError(
+      'DEADLINE_EXCEEDED',
+      `${operation} exceeded the wall-clock budget`,
+    );
+  }
+}
+
 function createCalendarConnectionDbClient(): CalendarConnectionClient {
   return createClient<CalendarConnectionDatabase>(
     env.NEXT_PUBLIC_SUPABASE_URL,
@@ -474,6 +487,7 @@ type LoadConnectionSecretOptions = {
    * 使わず `id` + `user_id` で削除する。
    */
   allowMissingAuthorityFence?: boolean;
+  deadlineAt?: number | undefined;
 };
 
 /** service_role で connection の token 行を読む。無ければ null。 */
@@ -483,6 +497,11 @@ async function loadConnectionSecret(
   connectionId: string,
   options: LoadConnectionSecretOptions = {},
 ): Promise<ConnectionSecret | null> {
+  assertCalendarDeadline(
+    options.deadlineAt,
+    CALENDAR_CONNECTION_DB_TIMEOUT_MS,
+    'loading connection',
+  );
   // #2050: この判定は `getConfiguredExternalLifecycleAppVersion`（Candidate 3 marker、
   // settings/billing 等の無関係な既存呼び出し元と共有）とは別関数に分離してある —
   // widen すると既存呼び出し元の RPC 呼び出し契約が変わり、無関係な test が regression
@@ -491,6 +510,11 @@ async function loadConnectionSecret(
   if (fencedWriterReady) {
     // #2050 fenced writer 移行: replaceSelectedCalendars の CAS 入力に要る
     // authority_fence_id / authority_epoch も同時に読む。
+    assertCalendarDeadline(
+      options.deadlineAt,
+      CALENDAR_CONNECTION_DB_TIMEOUT_MS,
+      'loading connection',
+    );
     const { data, error } = await db
       .from(databaseTables.calendarConnections)
       .select('status, refresh_token_enc, data_generation, authority_fence_id, authority_epoch')
@@ -527,8 +551,18 @@ async function loadConnectionSecret(
     };
   }
 
+  assertCalendarDeadline(
+    options.deadlineAt,
+    CALENDAR_CONNECTION_DB_TIMEOUT_MS,
+    'checking calendar lifecycle readiness',
+  );
   const lifecycleVersion = await getConfiguredExternalLifecycleAppVersion();
   if (lifecycleVersion === 0) {
+    assertCalendarDeadline(
+      options.deadlineAt,
+      CALENDAR_CONNECTION_DB_TIMEOUT_MS,
+      'loading connection',
+    );
     const { data, error } = await db
       .from(databaseTables.calendarConnections)
       .select('status, refresh_token_enc')
@@ -549,6 +583,11 @@ async function loadConnectionSecret(
     };
   }
 
+  assertCalendarDeadline(
+    options.deadlineAt,
+    CALENDAR_CONNECTION_DB_TIMEOUT_MS,
+    'loading connection',
+  );
   const { data, error } = await db
     .from(databaseTables.calendarConnections)
     .select('status, refresh_token_enc, data_generation')
@@ -574,9 +613,11 @@ async function loadConnectionSecretWithFenceRepair(
   db: CalendarConnectionClient,
   userId: string,
   connectionId: string,
+  deadlineAt?: number | undefined,
 ): Promise<ConnectionSecret | null> {
   let secret = await loadConnectionSecret(db, userId, connectionId, {
     allowMissingAuthorityFence: true,
+    deadlineAt,
   });
   if (!secret) return null;
   if (secret.status === 'reauth_required') {
@@ -584,6 +625,11 @@ async function loadConnectionSecretWithFenceRepair(
   }
   if (!secret.authorityFenceMissing) return secret;
 
+  assertCalendarDeadline(
+    deadlineAt,
+    CALENDAR_CONNECTION_DB_TIMEOUT_MS,
+    'repairing calendar connection authority fence',
+  );
   const { data, error } = await db.rpc('repair_calendar_connection_authority_fence_v1', {
     p_project_key: requireProjectKey(),
     p_user_id: userId,
@@ -604,7 +650,7 @@ async function loadConnectionSecretWithFenceRepair(
     );
   }
 
-  secret = await loadConnectionSecret(db, userId, connectionId);
+  secret = await loadConnectionSecret(db, userId, connectionId, { deadlineAt });
   if (!secret) return null;
   if (secret.authorityFenceMissing || secret.authorityFenceId === undefined) {
     throw new ExternalCalendarServiceError(
@@ -663,7 +709,7 @@ export async function listProviderCalendars(
 ): Promise<ProviderCalendarOption[]> {
   const db = createCalendarConnectionDbClient();
 
-  const secret = await loadConnectionSecretWithFenceRepair(db, userId, connectionId);
+  const secret = await loadConnectionSecretWithFenceRepair(db, userId, connectionId, deadlineAt);
   if (!secret) {
     throw new ExternalCalendarServiceError('CONNECTION_NOT_FOUND', 'calendar connection not found');
   }
@@ -674,6 +720,14 @@ export async function listProviderCalendars(
   const refreshToken = decryptToken(
     secret.refreshTokenEnc,
     env.CALENDAR_TOKEN_ENCRYPTION_KEY ?? '',
+  );
+
+  // Fence repair and its confirmation share the route's budget. Do not rotate a provider token
+  // unless enough time remains both to refresh it and persist a rotated refresh token in Dayopt.
+  assertCalendarDeadline(
+    deadlineAt,
+    TOKEN_REQUEST_TIMEOUT_MS + CALENDAR_CONNECTION_DB_TIMEOUT_MS,
+    'refreshing and saving calendar credentials',
   );
 
   const rotationOperationId = randomUUID();

@@ -606,6 +606,49 @@ describe('listProviderCalendars', () => {
     expect(listCalendars).toHaveBeenCalledTimes(1);
   });
 
+  it('legacy fence repair 後に refresh と保存の予算が足りなければ Google session を開始しない', async () => {
+    isConfiguredFencedCalendarSyncWriterReady.mockResolvedValue(true);
+    const { rpcCalls } = setupServiceRoleDb({
+      connection: {
+        data_generation: 3,
+        status: 'active',
+        refresh_token_enc: 'enc',
+        authority_fence_id: null,
+        authority_epoch: null,
+      },
+    });
+    const deadlineAt = Date.now() + 20_000;
+
+    await expect(listProviderCalendars(USER_ID, CONNECTION_ID, deadlineAt)).rejects.toMatchObject({
+      code: 'DEADLINE_EXCEEDED',
+    });
+
+    expect(rpcCalls).toContainEqual(
+      expect.objectContaining({ functionName: 'repair_calendar_connection_authority_fence_v1' }),
+    );
+    expect(startSession).not.toHaveBeenCalled();
+  });
+
+  it('DB timeout より短い残り予算では fence repair を始めない', async () => {
+    isConfiguredFencedCalendarSyncWriterReady.mockResolvedValue(true);
+    const { rpcCalls } = setupServiceRoleDb({
+      connection: {
+        data_generation: 3,
+        status: 'active',
+        refresh_token_enc: 'enc',
+        authority_fence_id: null,
+        authority_epoch: null,
+      },
+    });
+
+    await expect(
+      listProviderCalendars(USER_ID, CONNECTION_ID, Date.now() + 1_000),
+    ).rejects.toMatchObject({ code: 'DEADLINE_EXCEEDED' });
+
+    expect(rpcCalls).toHaveLength(0);
+    expect(startSession).not.toHaveBeenCalled();
+  });
+
   it('startSession の invalid_grant で観測authorityを reauth_required にして弾く', async () => {
     setupServiceRoleDb({
       connection: { data_generation: 3, status: 'active', refresh_token_enc: 'enc' },
@@ -710,10 +753,11 @@ describe('listProviderCalendars', () => {
   // deadlineAt をそのまま adapter へ通す。
   it('deadlineAt を listCalendars へそのまま渡す', async () => {
     setupServiceRoleDb({ connection: { status: 'active', refresh_token_enc: 'enc' } });
+    const deadlineAt = Date.now() + 60_000;
 
-    await listProviderCalendars(USER_ID, CONNECTION_ID, 12_345);
+    await listProviderCalendars(USER_ID, CONNECTION_ID, deadlineAt);
 
-    expect(listCalendars).toHaveBeenCalledWith(expect.anything(), 12_345);
+    expect(listCalendars).toHaveBeenCalledWith(expect.anything(), deadlineAt);
   });
 
   // 一覧取得の予算超過は syncCalendar の「部分結果を安全に返す」とは扱いを変え、明示的な

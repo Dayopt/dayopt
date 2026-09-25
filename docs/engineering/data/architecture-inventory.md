@@ -1860,7 +1860,7 @@ graph LR
 | [apps/product/src/lib/test/integration/calendar-sync-writer.integration.test.ts](<../../../apps/product/src/lib/test/integration/calendar-sync-writer.integration.test.ts>) | DB 関数: begin_calendar_sync_run_v1 / DB 関数: finish_calendar_sync_run_v1 / DB 関数: persist_calendar_sync_result_command_v1 |
 | [apps/product/src/lib/test/integration/external-authority-maintenance.integration.test.ts](<../../../apps/product/src/lib/test/integration/external-authority-maintenance.integration.test.ts>) | DB 関数: claim_calendar_revoke_outbox_v1 / DB 関数: complete_calendar_revoke_outbox_v1 / DB 関数: expire_calendar_revoke_outbox_v1 / DB 関数: get_external_lifecycle_app_version_v2 / DB 関数: retry_calendar_revoke_outbox_v1 |
 | [apps/product/src/lib/test/integration/user-data-purge-generation.integration.test.ts](<../../../apps/product/src/lib/test/integration/user-data-purge-generation.integration.test.ts>) | DB 関数: mark_calendar_connection_reauth_command_v2 / DB 関数: prepare_calendar_token_rotation_recovery_command_v1 / DB 関数: rotate_or_enqueue_calendar_refresh_token_command_v2 |
-| [supabase/tests/fenced-calendar-reconnect.sql](<../../../supabase/tests/fenced-calendar-reconnect.sql>) | DB 関数: begin_calendar_oauth_attempt_v1 / DB 関数: claim_calendar_oauth_attempt_v1 / DB 関数: reconnect_calendar_connection_command_v1 / DB 関数: repair_calendar_connection_authority_fence_v1 |
+| [supabase/tests/fenced-calendar-reconnect.sql](<../../../supabase/tests/fenced-calendar-reconnect.sql>) | DB 関数: begin_calendar_oauth_attempt_v1 / DB 関数: claim_calendar_oauth_attempt_v1 / DB 関数: reconnect_calendar_connection_command_v1 / DB 関数: repair_calendar_connection_authority_fence_v1 / DB 関数: save_calendar_connection_command_v2 |
 
 </details>
 
