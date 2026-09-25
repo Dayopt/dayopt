@@ -89,7 +89,7 @@ describe('CLI として起動できる', () => {
     });
   });
 
-  it('evaluate は credential が無ければ課金前に止まる', () => {
+  it('evaluate は無効な skill-suggestion を credential 確認前に止める', () => {
     const result = spawnSync(
       'pnpm',
       ['exec', 'tsx', 'scripts/tasks/jev/pack.ts', 'skill-suggestion', 'evaluate'],
@@ -100,7 +100,9 @@ describe('CLI として起動できる', () => {
       },
     );
     expect(result.status).toBe(1);
-    expect(result.stderr).toContain('AI_GATEWAY_API_KEY');
+    expect(result.stderr).toContain('pack skill-suggestion は無効化されている');
+    expect(result.stderr).toContain(PACK_STATUS['skill-suggestion'].reason ?? '');
+    expect(result.stderr).not.toContain('AI_GATEWAY_API_KEY');
   });
 });
 
@@ -109,10 +111,11 @@ describe('CLI として起動できる', () => {
  * adapter 全体の kill switch なので、pack 単位で止める手段がこれとは別に要る。
  */
 describe('無効化した pack は evaluate だけが止まる', () => {
-  it('shadow-e1 は無効で理由を持ち、skill-suggestion は有効', () => {
+  it('無効な pack は理由を持つ', () => {
     expect(PACK_STATUS['shadow-e1']).toMatchObject({ status: 'disabled' });
     expect(PACK_STATUS['shadow-e1'].reason?.trim()).toBeTruthy();
-    expect(PACK_STATUS['skill-suggestion'].status).toBe('active');
+    expect(PACK_STATUS['skill-suggestion']).toMatchObject({ status: 'disabled' });
+    expect(PACK_STATUS['skill-suggestion'].reason?.trim()).toBeTruthy();
     // status の付け忘れた pack を残さない
     expect(Object.keys(PACK_STATUS).sort()).toEqual([...PACK_IDS].sort());
   });
