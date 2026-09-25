@@ -13,6 +13,8 @@ DO $test$
 DECLARE
   v_user_id UUID := gen_random_uuid();
   v_legacy_connection_id UUID := gen_random_uuid();
+  v_repair_connection_id UUID := gen_random_uuid();
+  v_stale_connection_id UUID := gen_random_uuid();
   v_deleted_connection_id UUID := gen_random_uuid();
   v_attempt_id UUID;
   v_state_digest BYTEA := decode(repeat('01', 32), 'hex');
@@ -86,6 +88,83 @@ BEGIN
   WHERE id = v_legacy_connection_id AND user_id = v_user_id;
   IF v_fence_id IS NULL OR v_epoch IS NULL OR v_status <> 'active' OR v_failures <> 0 THEN
     RAISE EXCEPTION 'Legacy active reconnect did not restore its authority fence';
+  END IF;
+
+  INSERT INTO public.calendar_connections (
+    id,
+    user_id,
+    provider,
+    provider_account_id,
+    provider_account_email,
+    granted_scopes,
+    refresh_token_enc,
+    status
+  ) VALUES (
+    v_repair_connection_id,
+    v_user_id,
+    'google',
+    'repair-active-subject',
+    'owner@example.invalid',
+    ARRAY['https://www.googleapis.com/auth/calendar.events.readonly'],
+    'legacy-ciphertext',
+    'active'
+  );
+
+  SELECT public.repair_calendar_connection_authority_fence_v1(
+    '123456789', v_user_id, v_repair_connection_id
+  ) INTO v_result;
+  IF v_result IS DISTINCT FROM 'ready' THEN
+    RAISE EXCEPTION 'Current-generation legacy fence repair returned %', v_result;
+  END IF;
+  SELECT authority_fence_id, authority_epoch
+  INTO v_fence_id, v_epoch
+  FROM public.calendar_connections
+  WHERE id = v_repair_connection_id AND user_id = v_user_id;
+  IF v_fence_id IS NULL OR v_epoch IS NULL THEN
+    RAISE EXCEPTION 'Current-generation legacy connection was not fenced';
+  END IF;
+  SELECT public.repair_calendar_connection_authority_fence_v1(
+    '123456789', v_user_id, v_repair_connection_id
+  ) INTO v_result;
+  IF v_result IS DISTINCT FROM 'ready' THEN
+    RAISE EXCEPTION 'Idempotent fence repair returned %', v_result;
+  END IF;
+
+  INSERT INTO public.calendar_connections (
+    id,
+    user_id,
+    provider,
+    provider_account_id,
+    provider_account_email,
+    granted_scopes,
+    refresh_token_enc,
+    status,
+    data_generation
+  ) VALUES (
+    v_stale_connection_id,
+    v_user_id,
+    'google',
+    'stale-repair-subject',
+    'owner@example.invalid',
+    ARRAY['https://www.googleapis.com/auth/calendar.events.readonly'],
+    'stale-ciphertext',
+    'active',
+    1
+  );
+
+  SELECT public.repair_calendar_connection_authority_fence_v1(
+    '123456789', v_user_id, v_stale_connection_id
+  ) INTO v_result;
+  IF v_result IS DISTINCT FROM 'stale' THEN
+    RAISE EXCEPTION 'Stale-generation fence repair returned %', v_result;
+  END IF;
+  IF EXISTS (
+    SELECT 1
+    FROM public.calendar_connections
+    WHERE id = v_stale_connection_id
+      AND (authority_fence_id IS NOT NULL OR authority_epoch IS NOT NULL)
+  ) THEN
+    RAISE EXCEPTION 'Stale-generation connection was promoted to a ready fence';
   END IF;
 
   INSERT INTO public.calendar_connections (

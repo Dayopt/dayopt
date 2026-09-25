@@ -49,6 +49,7 @@ type CalendarConnectionDatabase = {
         Database['public']['Functions'],
         | 'begin_calendar_oauth_attempt_v1'
         | 'claim_calendar_oauth_attempt_v1'
+        | 'repair_calendar_connection_authority_fence_v1'
         | 'reconnect_calendar_connection_command_v1'
         | 'save_calendar_connection_command_v2'
       >,
@@ -67,6 +68,10 @@ type CalendarConnectionDatabase = {
           'p_provider_account_email'
         > & { p_provider_account_email: string | null };
         Returns: Database['public']['Functions']['reconnect_calendar_connection_command_v1']['Returns'];
+      };
+      repair_calendar_connection_authority_fence_v1: {
+        Args: Database['public']['Functions']['repair_calendar_connection_authority_fence_v1']['Args'];
+        Returns: Database['public']['Functions']['repair_calendar_connection_authority_fence_v1']['Returns'];
       };
     };
     Enums: Record<string, never>;
@@ -464,9 +469,9 @@ type LoadConnectionSecretOptions = {
    * `authority_epoch`）が NULL の行を「存在しない」と扱わず、fence 値を undefined に
    * したまま secret を返す（#2620）。
    *
-   * これを使う caller は欠落 fence を明示的に処理する。disconnect は fence 値を使わず
-   * `id` + `user_id` で削除し、calendar 一覧は token を provider へ送らず再認証導線を返す。
-   * CAS を伴う書き込み経路（`updateSelectedCalendars`）は既定の false のままにする。
+   * これを使う caller は欠落 fence を明示的に処理する。calendar 一覧と選択更新は CAS を
+   * 迂回せず、専用 RPC で fence を修復してから fenced writer を呼ぶ。disconnect は fence 値を
+   * 使わず `id` + `user_id` で削除する。
    */
   allowMissingAuthorityFence?: boolean;
 };
@@ -564,6 +569,55 @@ async function loadConnectionSecret(
   };
 }
 
+/** fence欠落の接続は、現行世代であることをDBが確認してから操作前に修復する。 */
+async function loadConnectionSecretWithFenceRepair(
+  db: CalendarConnectionClient,
+  userId: string,
+  connectionId: string,
+): Promise<ConnectionSecret | null> {
+  let secret = await loadConnectionSecret(db, userId, connectionId, {
+    allowMissingAuthorityFence: true,
+  });
+  if (!secret) return null;
+  if (secret.status === 'reauth_required') {
+    throw new ExternalCalendarServiceError('REAUTH_REQUIRED', 'calendar connection needs reauth');
+  }
+  if (!secret.authorityFenceMissing) return secret;
+
+  const { data, error } = await db.rpc('repair_calendar_connection_authority_fence_v1', {
+    p_project_key: requireProjectKey(),
+    p_user_id: userId,
+    p_connection_id: connectionId,
+  });
+  if (error) {
+    throw new ExternalCalendarServiceError(
+      'UPDATE_FAILED',
+      'failed to repair calendar connection authority fence',
+      { cause: error },
+    );
+  }
+  if (data === 'missing') return null;
+  if (data !== 'ready') {
+    throw new ExternalCalendarServiceError(
+      'REAUTH_REQUIRED',
+      'calendar connection needs reauthorization before it can be used',
+    );
+  }
+
+  secret = await loadConnectionSecret(db, userId, connectionId);
+  if (!secret) return null;
+  if (secret.authorityFenceMissing || secret.authorityFenceId === undefined) {
+    throw new ExternalCalendarServiceError(
+      'UPDATE_FAILED',
+      'calendar connection authority fence repair was not observable',
+    );
+  }
+  if (secret.status === 'reauth_required') {
+    throw new ExternalCalendarServiceError('REAUTH_REQUIRED', 'calendar connection needs reauth');
+  }
+  return secret;
+}
+
 function throwForReauthOutcome(
   outcome: Awaited<ReturnType<typeof markCalendarConnectionReauth>>,
   cause?: unknown,
@@ -609,16 +663,9 @@ export async function listProviderCalendars(
 ): Promise<ProviderCalendarOption[]> {
   const db = createCalendarConnectionDbClient();
 
-  const secret = await loadConnectionSecret(db, userId, connectionId, {
-    allowMissingAuthorityFence: true,
-  });
+  const secret = await loadConnectionSecretWithFenceRepair(db, userId, connectionId);
   if (!secret) {
     throw new ExternalCalendarServiceError('CONNECTION_NOT_FOUND', 'calendar connection not found');
-  }
-  if (secret.authorityFenceMissing) {
-    // Legacy active rows cannot safely enter fenced calendar-list operations. Surface the existing
-    // reconnect UI and repair the fence only after the user completes Google OAuth again.
-    throw new ExternalCalendarServiceError('REAUTH_REQUIRED', 'calendar connection needs reauth');
   }
   if (secret.status === 'reauth_required') {
     throw new ExternalCalendarServiceError('REAUTH_REQUIRED', 'calendar connection needs reauth');
@@ -756,7 +803,7 @@ export async function updateSelectedCalendars(
 ): Promise<void> {
   const db = createCalendarConnectionDbClient();
 
-  const secret = await loadConnectionSecret(db, userId, connectionId);
+  const secret = await loadConnectionSecretWithFenceRepair(db, userId, connectionId);
   if (!secret) {
     throw new ExternalCalendarServiceError('CONNECTION_NOT_FOUND', 'calendar connection not found');
   }

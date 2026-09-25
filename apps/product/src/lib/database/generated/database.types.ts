@@ -2478,6 +2478,14 @@ export type Database = {
         };
         Returns: string;
       };
+      repair_calendar_connection_authority_fence_v1: {
+        Args: {
+          p_connection_id: string;
+          p_project_key: string;
+          p_user_id: string;
+        };
+        Returns: string;
+      };
       replace_mfa_recovery_codes_v1: {
         Args: { p_code_hashes: string[]; p_user_id: string };
         Returns: number;

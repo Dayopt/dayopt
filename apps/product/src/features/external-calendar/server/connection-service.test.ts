@@ -83,6 +83,7 @@ type Config = {
   saveTransportFailure?: boolean;
   saveDatabaseFailure?: boolean;
   saveGatewayFailure?: boolean;
+  repairResult?: string;
   connection?: {
     data_generation?: number;
     status: string;
@@ -157,6 +158,14 @@ function setupServiceRoleDb(config: Config) {
 
   const rpc = vi.fn((functionName: string, args: Record<string, unknown>) => {
     rpcCalls.push({ functionName, args });
+    if (functionName === 'repair_calendar_connection_authority_fence_v1') {
+      const result = config.repairResult ?? 'ready';
+      if (result === 'ready' && config.connection) {
+        config.connection.authority_fence_id = 'repaired-fence-id';
+        config.connection.authority_epoch = 9;
+      }
+      return Promise.resolve({ data: result, error: null });
+    }
     if (functionName === 'begin_calendar_oauth_attempt_v1') {
       return Promise.resolve({
         data: [
@@ -570,21 +579,31 @@ describe('listProviderCalendars', () => {
     expect(startSession).not.toHaveBeenCalled();
   });
 
-  it('fenced writer ready 後の legacy NULL fence は provider を叩かず再接続を案内する', async () => {
+  it('fenced writer ready 後の legacy NULL fence は修復 RPC の後で calendarList を取得する', async () => {
     isConfiguredFencedCalendarSyncWriterReady.mockResolvedValue(true);
-    setupServiceRoleDb({
+    const { rpcCalls } = setupServiceRoleDb({
       connection: {
+        data_generation: 3,
         status: 'active',
         refresh_token_enc: 'enc',
         authority_fence_id: null,
         authority_epoch: null,
       },
     });
+    listCalendars.mockResolvedValue([{ id: 'cal-a', name: 'A', primary: true }]);
 
-    await expect(listProviderCalendars(USER_ID, CONNECTION_ID)).rejects.toMatchObject({
-      code: 'REAUTH_REQUIRED',
+    await expect(listProviderCalendars(USER_ID, CONNECTION_ID)).resolves.toEqual([
+      { id: 'cal-a', name: 'A', primary: true, selected: false },
+    ]);
+    expect(rpcCalls).toContainEqual({
+      functionName: 'repair_calendar_connection_authority_fence_v1',
+      args: {
+        p_project_key: 'project-key',
+        p_user_id: USER_ID,
+        p_connection_id: CONNECTION_ID,
+      },
     });
-    expect(startSession).not.toHaveBeenCalled();
+    expect(listCalendars).toHaveBeenCalledTimes(1);
   });
 
   it('startSession の invalid_grant で観測authorityを reauth_required にして弾く', async () => {
@@ -865,9 +884,11 @@ describe('updateSelectedCalendars（fenced writer ready）', () => {
     ).rejects.toMatchObject({ code: 'UPDATE_FAILED' });
   });
 
-  it('authority fence が未確立の接続は missing 相当として CONNECTION_NOT_FOUND を throw する', async () => {
-    setupServiceRoleDb({
+  it('authority fence が未確立でも修復して fenced CAS で選択を更新する', async () => {
+    isConfiguredFencedCalendarSyncWriterReady.mockResolvedValue(true);
+    const { rpcCalls } = setupServiceRoleDb({
       connection: {
+        data_generation: 3,
         status: 'active',
         refresh_token_enc: 'enc',
         authority_fence_id: null,
@@ -879,7 +900,40 @@ describe('updateSelectedCalendars（fenced writer ready）', () => {
       updateSelectedCalendars(USER_ID, CONNECTION_ID, [
         { providerCalendarId: 'cal-a', calendarName: 'A' },
       ]),
-    ).rejects.toMatchObject({ code: 'CONNECTION_NOT_FOUND' });
+    ).resolves.toBeUndefined();
+    expect(rpcCalls).toContainEqual(
+      expect.objectContaining({
+        functionName: 'repair_calendar_connection_authority_fence_v1',
+      }),
+    );
+    expect(replaceSelectedCalendars).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: USER_ID,
+        connectionId: CONNECTION_ID,
+        expectedGeneration: 3,
+        expectedAuthorityFenceId: 'repaired-fence-id',
+        expectedAuthorityEpoch: 9,
+      }),
+    );
+  });
+
+  it('repair RPC が stale generation を返したら CAS を呼ばず再認証を要求する', async () => {
+    setupServiceRoleDb({
+      repairResult: 'stale',
+      connection: {
+        data_generation: 3,
+        status: 'active',
+        refresh_token_enc: 'enc',
+        authority_fence_id: null,
+        authority_epoch: null,
+      },
+    });
+
+    await expect(
+      updateSelectedCalendars(USER_ID, CONNECTION_ID, [
+        { providerCalendarId: 'cal-a', calendarName: 'A' },
+      ]),
+    ).rejects.toMatchObject({ code: 'REAUTH_REQUIRED' });
     expect(replaceSelectedCalendars).not.toHaveBeenCalled();
   });
 

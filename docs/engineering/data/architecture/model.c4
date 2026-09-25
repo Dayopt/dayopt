@@ -718,6 +718,10 @@ model {
     metadata { inventoryKind 'db-function' detail 'app からの .rpc 呼び出しなし' }
     link ../../../../apps/product/src/lib/database/generated/database.types.ts
   }
+  dbfunction fn_repair_calendar_connection_authority_fence_v1 'repair_calendar_connection_authority_fence_v1' {
+    metadata { inventoryKind 'db-function' detail 'used by external-calendar' }
+    link ../../../../apps/product/src/lib/database/generated/database.types.ts
+  }
   dbfunction fn_replace_mfa_recovery_codes_v1 'replace_mfa_recovery_codes_v1' {
     metadata { inventoryKind 'db-function' detail 'used by settings' }
     link ../../../../apps/product/src/lib/database/generated/database.types.ts
@@ -1350,6 +1354,7 @@ model {
   f_settings -> fn_reconcile_billing_mutation_v4 'calls'
   f_external-calendar -> fn_reconnect_calendar_connection_command_v1 'calls'
   f_timeblock -> fn_record_plan_command_v1 'calls'
+  f_external-calendar -> fn_repair_calendar_connection_authority_fence_v1 'calls'
   f_settings -> fn_replace_mfa_recovery_codes_v1 'calls'
   f_external-calendar -> fn_replace_selected_calendars_command_v1 'calls'
   f_timeblock -> fn_restore_plan_command_v1 'calls'
@@ -1504,6 +1509,7 @@ model {
   r_externalCalendar -> fn_mark_calendar_connection_reauth_command_v2 'calls'
   r_externalCalendar -> fn_persist_calendar_sync_result_command_v1 'calls'
   r_externalCalendar -> fn_prepare_calendar_token_rotation_recovery_command_v1 'calls'
+  r_externalCalendar -> fn_repair_calendar_connection_authority_fence_v1 'calls'
   r_externalCalendar -> fn_replace_selected_calendars_command_v1 'calls'
   r_externalCalendar -> fn_rotate_or_enqueue_calendar_refresh_token_command_v2 'calls'
   r_mcpConnections -> fn_revoke_oauth_connection 'calls'
