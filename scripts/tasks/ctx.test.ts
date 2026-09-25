@@ -6,6 +6,7 @@ import {
   buildBriefAnnotations,
   buildCommentBody,
   buildContextPack,
+  buildContextPackWithL1,
   buildJudgmentHint,
   buildL1ShadowPreview,
   buildPostArgs,
@@ -65,9 +66,12 @@ describe('parseArgs', () => {
     expect(parseArgs(['2550', '--post'])).toMatchObject({ number: 2550, post: true });
   });
 
-  it('--l1-shadow は明示実行だけを有効にし、投稿とは併用できない', () => {
+  it('--l1-shadow は後方互換で受け付け、通常出力と投稿のどちらでもL1を含める', () => {
     expect(parseArgs(['2550', '--l1-shadow'])).toMatchObject({ l1Shadow: true, post: false });
-    expect(() => parseArgs(['2550', '--l1-shadow', '--post'])).toThrow(/ローカルのshadow preview/);
+    expect(parseArgs(['2550', '--post', '--l1-shadow'])).toMatchObject({
+      l1Shadow: true,
+      post: true,
+    });
   });
 
   it('番号が無い・不正・複数は例外', () => {
@@ -1002,6 +1006,62 @@ describe('buildContextPack (execFileImpl 経由の gh 呼び出し形)', () => {
       { cwd: '/repo', encoding: 'utf8', maxBuffer: 2_000_000 },
     );
   });
+  it('通常のContext packへ同一snapshotのL1助言を載せ、失敗時はL0を残す', () => {
+    const sha = 'a'.repeat(40);
+    const source = {
+      title: 'Issue title',
+      body: 'Canonical request',
+      url: 'https://github.com/Dayopt/dayopt/issues/23',
+      updatedAt: '2026-09-24T00:00:00Z',
+      comments: [],
+      related: [],
+      decisions: [],
+      missing: [],
+    };
+    const expectedInput = buildContextInput(23, sha, source);
+    const buildPack = vi.fn((options: { assist?: boolean }) =>
+      options.assist ? { number: 23, assistSource: source } : { number: 23 },
+    ) as unknown as typeof buildContextPack;
+    const report = {
+      packId: 'context-relevance',
+      mode: 'shadow',
+      target: { number: 23, sha, url: expectedInput.url },
+      input: expectedInput,
+      complete: true,
+      missing: [],
+      omitted: [],
+      rows: [],
+    };
+    const runAssist = vi.fn(() => report);
+    const options = parseArgs(['23']);
+
+    const pack = buildContextPackWithL1(options, {
+      cwd: '/repo',
+      getHeadSha: () => sha,
+      buildPack,
+      runAssist,
+    });
+    expect(buildPack).toHaveBeenCalledWith({ ...options, assist: true }, expect.any(Object));
+    expect(runAssist).toHaveBeenCalledWith(23, { cwd: '/repo' });
+    expect(pack).toMatchObject({
+      number: 23,
+      l1ShadowPreview: { status: 'complete', candidates: [] },
+    });
+    expect(pack).not.toHaveProperty('assistSource');
+
+    const fallback = buildContextPackWithL1(options, {
+      cwd: '/repo',
+      getHeadSha: () => sha,
+      buildPack,
+      runAssist: () => {
+        throw new Error('Jev unavailable');
+      },
+    });
+    expect(fallback).toMatchObject({
+      number: 23,
+      l1ShadowPreview: { status: 'unavailable', candidates: [] },
+    });
+  });
   it('issue: issues API → comments → search prs → pr view(headRefName,files) の順で argv を渡す', () => {
     const calls: string[][] = [];
     const execFileImpl = vi.fn((_cmd: string, args: string[]) => {
@@ -1387,7 +1447,8 @@ describe('renderMarkdown', () => {
     expect(markdown).toContain('#### 決定ログ');
     expect(markdown).toContain('#### 関連 skill 候補');
     expect(markdown).toContain('#### 判断の記録');
-    expect(markdown).toContain('#### L1 Jev shadow preview（助言のみ）');
+    expect(markdown).toContain('#### L1 Jev 候補（shadow助言）');
+    expect(markdown).toContain('Codexの作業入力へ渡す助言情報（shadow）');
     expect(markdown).toContain('部分評価 1/2 件');
     expect(markdown).toContain(
       '[comment-99](https://github.com/Dayopt/dayopt/issues/2549#issuecomment-99)',

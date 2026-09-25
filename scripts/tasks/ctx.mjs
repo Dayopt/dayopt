@@ -24,13 +24,14 @@ function isCodexBotLogin(login) {
 }
 
 /**
- * `pnpm ctx <N>` — L0 の「context pack」（AGENTS.md 委任・報告の作法 §L0、
- * routing skill §Worker recipe / L0）。`--l1-shadow` は既存Jev assistを明示実行し、
- * 同一入力snapshotを確認したローカルpreviewだけを追加する。通常の読取・投稿ではJevを呼ばない。
+ * `pnpm ctx <N>` — L0 の機械収集に、同一入力snapshotを確認したJev L1のshadow助言を添える。
+ * L1は既定で実行し、Markdown / JSONと`--post`のContext Briefへ含める。
+ * `--l1-shadow` は旧コマンドとの互換用で、明示しなくてもL1は実行される。
  *
  * Uber 原則⑤「AI が考える前に機械的に集められる文脈はここで終える」の Dayopt 写像。
  * AI セッションが issue / PR に着手する前に行う `gh issue view` / `gh pr list` /
- * `rg` / `Read` の 5〜10 手番を、gh の追加呼び出しなしで完結する 1 コマンドへ畳む。
+ * `rg` / `Read` の 5〜10 手番を、L0の機械収集とL1の出典付き候補にまとめる。
+ * Jev assistは入力の鮮度照合のため公開資料を別途読み、未キャッシュならAPIを呼ぶ。
  * 出力は 150 行以内の markdown、判断そのものはしない（判断材料の収集で止める）。
  *
  * 呼び出し予算: issue は最大 6 回、PR は最大 9 回の gh 呼び出しに収める
@@ -242,8 +243,8 @@ const L1_CATEGORY_WEIGHT = {
 };
 
 /**
- * Creates a local-only, non-authoritative preview after confirming the Jev report used the exact
- * context input collected for this L0 run. The normal brief and --post path never consume it.
+ * Creates non-authoritative L1 advice after confirming the Jev report used the exact context
+ * input collected for this L0 run. The result is included in normal output and --post briefs.
  */
 export function buildL1ShadowPreview(report, expectedInput) {
   if (
@@ -355,9 +356,9 @@ function l1ShadowUnavailable(reason = 'assist_unavailable') {
 function renderL1ShadowPreview(preview) {
   const lines = [
     '',
-    '#### L1 Jev shadow preview（助言のみ）',
+    '#### L1 Jev 候補（shadow助言）',
     '',
-    '未採用packのローカル表示。Issueの要求・必須条件・policy・検証条件を変更せず、最終判断もしません。候補から外れた資料を無関係とはみなしません。',
+    'Codexの作業入力へ渡す助言情報（shadow）。Issueの要求・必須条件・policy・検証条件を変更せず、最終判断もしません。候補から外れた資料を無関係とはみなしません。',
   ];
   if (preview.status === 'complete') {
     lines.push(
@@ -426,8 +427,6 @@ export function parseArgs(argv) {
   if (positionals.length !== 1) {
     throw new Error('issue/PR 番号を 1 つ指定してください: pnpm ctx <N>');
   }
-  if (options.post && options.l1Shadow)
-    throw new Error('--l1-shadow はローカルのshadow preview専用で、--postとは併用できません');
   const number = Number(positionals[0]);
   if (!Number.isInteger(number) || number <= 0) {
     throw new Error(`不正な番号です: ${positionals[0]}`);
@@ -1208,7 +1207,7 @@ function buildMarkdownLines(
     } else if (l1.status === 'unevaluated') {
       lines.push(`L1: 未評価（${l1.reason}）。候補順位を表示していません。`);
     } else {
-      lines.push('L1: 未採用packのGo記録が無いため未接続。');
+      lines.push('正式採用packの注釈は未接続。評価保留中のL1助言候補は次節に表示。');
     }
   }
 
@@ -1926,47 +1925,7 @@ export function postContextBrief(pack, markdown, deps = {}) {
 
 function main() {
   const options = parseArgs(process.argv.slice(2));
-  let pack;
-  if (options.l1Shadow) {
-    const cwd = process.cwd();
-    let headSha = null;
-    try {
-      headSha = execFileSync('git', ['rev-parse', 'HEAD'], { cwd, encoding: 'utf8' }).trim();
-    } catch {
-      // L0 remains usable even when Git metadata is unavailable for the optional L1 preview.
-    }
-    if (!headSha) {
-      pack = buildContextPack(options, { cwd });
-      pack.l1ShadowPreview = l1ShadowUnavailable('public_commit_required');
-    } else {
-      const assistOptions = { ...options, assist: true };
-      const l0WithAssistInput = buildContextPack(assistOptions, {
-        cwd,
-        readFileImpl: (path) => {
-          if (!path.endsWith(DECISIONS_PATH)) throw new Error('対象外の資料');
-          return execFileSync('git', ['show', `${headSha}:${DECISIONS_PATH}`], {
-            cwd,
-            encoding: 'utf8',
-          });
-        },
-      });
-      try {
-        const expectedInput = buildContextInput(
-          options.number,
-          headSha,
-          l0WithAssistInput.assistSource,
-        );
-        const report = runContextL1ShadowAssist(options.number, { cwd });
-        l0WithAssistInput.l1ShadowPreview = buildL1ShadowPreview(report, expectedInput);
-      } catch {
-        l0WithAssistInput.l1ShadowPreview = l1ShadowUnavailable();
-      }
-      delete l0WithAssistInput.assistSource;
-      pack = l0WithAssistInput;
-    }
-  } else {
-    pack = buildContextPack(options, {});
-  }
+  const pack = buildContextPackWithL1(options);
   if (options.post) {
     const markdown = renderMarkdown(pack);
     const result = postContextBrief(pack, markdown, {
@@ -1982,6 +1941,61 @@ function main() {
   } else {
     process.stdout.write(`${renderMarkdown(pack)}\n`);
   }
+}
+
+/**
+ * Adds Jev's advisory L1 output to the L0 pack by default. Jev failure leaves the L0 result usable.
+ * Dependencies are injectable so the delivery path can be tested without GitHub or model calls.
+ */
+export function buildContextPackWithL1(
+  options,
+  {
+    cwd = process.cwd(),
+    getHeadSha = () => execFileSync('git', ['rev-parse', 'HEAD'], { cwd, encoding: 'utf8' }).trim(),
+    readDecisionAtHead = (headSha) =>
+      execFileSync('git', ['show', `${headSha}:${DECISIONS_PATH}`], {
+        cwd,
+        encoding: 'utf8',
+      }),
+    buildPack = buildContextPack,
+    runAssist = runContextL1ShadowAssist,
+  } = {},
+) {
+  let headSha = null;
+  try {
+    headSha = getHeadSha();
+  } catch {
+    // L0 remains usable even when Git metadata is unavailable for L1 advice.
+  }
+  if (!headSha) {
+    const pack = buildPack(options, { cwd });
+    pack.l1ShadowPreview = l1ShadowUnavailable('public_commit_required');
+    return pack;
+  }
+
+  const l0WithAssistInput = buildPack(
+    { ...options, assist: true },
+    {
+      cwd,
+      readFileImpl: (path) => {
+        if (!path.endsWith(DECISIONS_PATH)) throw new Error('対象外の資料');
+        return readDecisionAtHead(headSha, path, cwd);
+      },
+    },
+  );
+  try {
+    const expectedInput = buildContextInput(
+      options.number,
+      headSha,
+      l0WithAssistInput.assistSource,
+    );
+    const report = runAssist(options.number, { cwd });
+    l0WithAssistInput.l1ShadowPreview = buildL1ShadowPreview(report, expectedInput);
+  } catch {
+    l0WithAssistInput.l1ShadowPreview = l1ShadowUnavailable();
+  }
+  delete l0WithAssistInput.assistSource;
+  return l0WithAssistInput;
 }
 
 if (isDirectExecution(import.meta.url)) {

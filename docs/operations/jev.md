@@ -45,9 +45,11 @@ pnpm jev:check         # ネットワーク不要の静的検査。ここが落�
 
 ### 判断材料を用意する assist（採用評価前）
 
-`context-relevance` と `claim-support` は独立した shadow 用途。`pnpm ctx <N>` はL0だけを収集し、Jevを呼ばない。`pnpm ctx <N> --post` も評価を起動せず、既にある入力の再評価もしない。Issue briefの通常配達は、人がGoを確認してコード側で採用したpackの完全評価、十分な確信度、L0に存在する出典参照が揃った時だけ許可する。自由文、URL、SHA、検査結果をJevの出力から作らない。部分評価・停止・低確信度は未評価として扱う。現在はGoを記録したpackが無いため、通常のL1配達は未接続である。`PACK_STATUS.active` や `GO_CANDIDATE` は採用記録ではない。
+`context-relevance` と `claim-support` は別々の shadow pack。`pnpm ctx <N>` はL0で機械収集した情報に、`context-relevance` のL1助言を自動で加え、Markdown / JSON の出力へ含める。`pnpm ctx <N> --post` も同じ助言をIssue Context Briefへ含めるため、Briefを取得するL2 Codexに出典付き候補が届く。未キャッシュの場合はJev APIを呼ぶため、`ctx` 実行時に候補数に応じた複数request・送信間隔・費用が発生しうる。`--l1-shadow` は従来コマンドとの互換用で、L1の明示的な有効化には不要。
 
-**ローカルでL0とL1の接続を確認する場合だけ** `pnpm ctx <N> --l1-shadow` を使う。これは既存の `jev:assist context` を明示実行し、L0と同じ公開Issue・コメント・関連資料・決定記録から作った入力snapshotが一致した場合に限り、L1の助言候補を標準出力へ追加する。既存assistと同じく対象HEADが公開済みcommitであることを要求する。未キャッシュの評価はJev APIを呼び、候補数に応じて複数request・送信間隔が発生する。通常の `ctx` は引き続きL0だけで、`--l1-shadow` は `--post` と併用できない。結果は未採用packのshadow表示であり、必須条件・policy・権限・最終判断を変えず、GitHubへ投稿しない。入力不一致やL1障害では候補を隠し、L0をそのまま返す。
+L1の候補は作業対象の読み順を助ける shadow 情報であり、性能評価を終えた正式採用packではない。人による品質評価は保留中なので、候補の正しさを前提にせず、Issue本文・必須条件・信頼できる出典をCodexが確認する。自由文、URL、SHA、検査結果をJev出力から作らない。候補が欠けても無関係の証明にせず、部分評価・停止・低確信度・入力不一致は未評価として扱う。候補は必須条件・policy・権限・検証条件・最終判断を変更しない。`PACK_STATUS.active` や `GO_CANDIDATE` は採用記録ではない。
+
+この自動配達は、同一の公開Issue・コメント・関連資料・決定記録から作った入力snapshotがL0と一致した時だけ候補を表示する。既存assistと同じく対象HEADは公開済みcommitを要求する。入力不一致やL1障害時は候補を隠し、L0の収集結果をそのまま返す。`--post` の実行はGitHubコメントを書き込むため、状態変更はユーザーが指示した時だけ行う。
 
 Issue本文は要求・制約の正本で、briefは原文の該当節、出典、snapshot、個別PRのSHA/CI、未確認事項を短く配る補助資料。必須条件と失敗・欠測はL1の順位付けで削らない。Codex sessionはIssue本文と信頼できる最新 `ctx-brief` コメントを明示取得し、Issue番号とsnapshotを確認する。コメントが存在するだけでは取得済みとみなさない。
 
