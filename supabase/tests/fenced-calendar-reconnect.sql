@@ -32,6 +32,16 @@ BEGIN
     '123456789',
     '123456789-calendar-reconnect-test.apps.googleusercontent.com'
   );
+  UPDATE private.calendar_authority_projects
+  SET activation_version = 1,
+      activated_at = pg_catalog.clock_timestamp()
+  WHERE singleton
+    AND project_key = '123456789'
+    AND activation_version = 0
+    AND activated_at IS NULL;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Test Calendar authority project was not provisioned';
+  END IF;
 
   INSERT INTO public.calendar_connections (
     id,
