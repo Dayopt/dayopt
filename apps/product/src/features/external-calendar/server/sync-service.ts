@@ -28,6 +28,7 @@ import {
   resolveProjectKey,
   type CasContext,
 } from './fenced-sync-writer';
+import { TOKEN_REQUEST_TIMEOUT_MS } from './google-oauth';
 import { googleCalendarAdapter } from './providers/google';
 import {
   CalendarProviderError,
@@ -69,6 +70,9 @@ const TOMBSTONE_BATCH_SIZE = 150;
  * あって全依存同時ハング時の完走保証ではない）。
  */
 export const PERSIST_RESERVE_MS = 2 * DB_REQUEST_TIMEOUT_MS;
+
+/** Provider refresh と token rotation 保存（最大28秒）のために残す予算。 */
+const TOKEN_REFRESH_AND_PERSIST_RESERVE_MS = TOKEN_REQUEST_TIMEOUT_MS + PERSIST_RESERVE_MS;
 
 const PROVIDER = 'google';
 
@@ -608,6 +612,14 @@ async function syncConnectionFenced(args: {
     runStartedAtIso: begin.runStartedAt,
     refreshTokenEnc: begin.refreshTokenEnc,
   };
+
+  // Fence repair を含む DB 処理で残予算が減った場合、rotation されうる token を
+  // provider へ渡す前に次回同期へ延期する。provider refresh の上限に加えて、token
+  // rotation persistence / recovery を含む既存の DB 書き込み予算を確保する。
+  if (deadlineAt !== undefined && deadlineAt - Date.now() < TOKEN_REFRESH_AND_PERSIST_RESERVE_MS) {
+    await finishFencedSyncRunBestEffort(runState, 'partial_timeout', deadlineAt);
+    return { outcome: 'partial_timeout', calendarsSynced: 0, calendarsFailed: 0 };
+  }
 
   let refreshToken: string;
   try {

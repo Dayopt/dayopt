@@ -1012,6 +1012,35 @@ describe('syncConnection — fenced writer ready', () => {
     expect(startSession).not.toHaveBeenCalled();
   });
 
+  it('fence repair 後に provider と token 保存の残予算がなければ次回同期へ延期する', async () => {
+    beginCalendarSyncRun
+      .mockResolvedValueOnce({ result: 'missing' })
+      .mockImplementationOnce(async () => {
+        vi.advanceTimersByTime(3_000);
+        return beginStarted();
+      });
+    repairCalendarConnectionAuthorityFence.mockImplementation(async () => {
+      vi.advanceTimersByTime(2_001);
+      return 'ready';
+    });
+    setupDb({ connection: activeConnection(), calendars: oneCalendar() });
+    const deadlineAt = Date.now() + 50_000;
+
+    const result = await syncConnection({
+      connectionId: CONNECTION_ID,
+      userId: USER_ID,
+      deadlineAt,
+    });
+
+    expect(result).toEqual({ outcome: 'partial_timeout', calendarsSynced: 0, calendarsFailed: 0 });
+    expect(startSession).not.toHaveBeenCalled();
+    expect(repairCalendarConnectionAuthorityFence).toHaveBeenCalledTimes(1);
+    expect(beginCalendarSyncRun).toHaveBeenCalledTimes(2);
+    expect(finishCalendarSyncRun).toHaveBeenCalledWith(
+      expect.objectContaining({ lastSyncError: 'partial_timeout', deadlineAt }),
+    );
+  });
+
   it('fence 欠落時だけ修復して begin を再試行する', async () => {
     beginCalendarSyncRun
       .mockResolvedValueOnce({ result: 'missing' })
@@ -1209,7 +1238,7 @@ describe('syncConnection — fenced writer ready', () => {
   it('deadlineAt が渡されると begin/persist/finish の呼び出し引数に伝播する', async () => {
     setupDb({ calendars: oneCalendar() });
     syncCalendar.mockResolvedValue(syncResult({ events: [event()] }));
-    const deadlineAt = Date.now() + 30_000;
+    const deadlineAt = Date.now() + 60_000;
 
     await syncConnection({ connectionId: CONNECTION_ID, userId: USER_ID, deadlineAt });
 
