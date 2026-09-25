@@ -55,11 +55,27 @@ export async function POST(request: NextRequest) {
     const form = await readFormBody(request);
     const get = (key: string): string | undefined => form.get(key) ?? undefined;
     const grantType = get('grant_type');
+    if (grantType !== 'authorization_code' && grantType !== 'refresh_token') {
+      throw new OAuthServerError(
+        'unsupported_grant_type',
+        `grant_type "${grantType ?? '(missing)'}" is not supported`,
+      );
+    }
+
+    // client別の rate-limit bucket を使う前に、外部入力のclient_idを静的allowlistへ束縛する。
+    const clientId = required(get('client_id'), 'client_id');
+    const client = resolveClient(clientId);
+    if (!client) {
+      throw new OAuthServerError('invalid_client', 'Unknown client_id');
+    }
 
     const refreshToken = grantType === 'refresh_token' ? get('refresh_token') : undefined;
     const grantRateLimitState = await checkOAuthTokenGrantRateLimit(
       request,
-      refreshToken ? { type: 'refresh_token', refreshToken } : { type: 'other' },
+      client.id,
+      grantType === 'refresh_token'
+        ? { type: 'refresh_token', refreshToken: required(refreshToken, 'refresh_token') }
+        : { type: 'other' },
     );
     if (grantRateLimitState !== 'allowed') return rateLimitErrorResponse(grantRateLimitState);
 
@@ -86,15 +102,9 @@ export async function POST(request: NextRequest) {
 
     if (grantType === 'authorization_code') {
       const code = required(get('code'), 'code');
-      const clientId = required(get('client_id'), 'client_id');
       const redirectUri = required(get('redirect_uri'), 'redirect_uri');
       const codeVerifier = required(get('code_verifier'), 'code_verifier');
       const resource = requiredResource(get('resource'));
-
-      const client = resolveClient(clientId);
-      if (!client) {
-        throw new OAuthServerError('invalid_client', 'Unknown client_id');
-      }
 
       const tokens = await exchangeAuthorizationCode({
         code,
@@ -108,13 +118,7 @@ export async function POST(request: NextRequest) {
 
     if (grantType === 'refresh_token') {
       const presentedRefreshToken = required(refreshToken, 'refresh_token');
-      const clientId = required(get('client_id'), 'client_id');
       const resource = requiredResource(get('resource'));
-
-      const client = resolveClient(clientId);
-      if (!client) {
-        throw new OAuthServerError('invalid_client', 'Unknown client_id');
-      }
 
       const tokens = await refreshAccessToken({
         refresh_token: presentedRefreshToken,
@@ -124,10 +128,7 @@ export async function POST(request: NextRequest) {
       return tokenResponse(tokens);
     }
 
-    throw new OAuthServerError(
-      'unsupported_grant_type',
-      `grant_type "${grantType ?? '(missing)'}" is not supported`,
-    );
+    throw new OAuthServerError('server_error', 'Unexpected token grant state', 500);
   } catch (err) {
     if (err instanceof OAuthServerError) {
       if (err.httpStatus >= 500) {
@@ -158,11 +159,8 @@ export async function POST(request: NextRequest) {
 }
 
 /**
- * form body の上限。
- *
- * grant 種別の判定に body が要るため、body 読み取りは per-grant の上限より手前にある
- * （粗い IP 上限の内側）。無制限に読ませると、その頻度差がそのまま memory / CPU の
- * 増幅になる。`/api/mcp` と同じく宣言値と実測値の両方で切る。
+ * form body の上限。grant 種別の判定に body が要るため、本文読込前の粗いIP上限は維持し、
+ * byte streamを上限までしか確保しない。
  */
 const MAX_FORM_BODY_BYTES = 16 * 1024;
 
@@ -180,12 +178,34 @@ async function readFormBody(request: NextRequest): Promise<URLSearchParams> {
     throw new OAuthServerError('invalid_request', 'Request body is too large');
   }
 
-  const body = await request.text();
-  // 宣言値は信用しない（欠落・過少申告どちらもありうる）。
-  if (new TextEncoder().encode(body).length > MAX_FORM_BODY_BYTES) {
-    throw new OAuthServerError('invalid_request', 'Request body is too large');
+  if (!request.body) return new URLSearchParams();
+
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let totalBytes = 0;
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      totalBytes += value.byteLength;
+      if (totalBytes > MAX_FORM_BODY_BYTES) {
+        await reader.cancel().catch(() => undefined);
+        throw new OAuthServerError('invalid_request', 'Request body is too large');
+      }
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock();
   }
-  return new URLSearchParams(body);
+
+  const bodyBytes = new Uint8Array(totalBytes);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bodyBytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return new URLSearchParams(new TextDecoder().decode(bodyBytes));
 }
 
 function required(value: string | undefined, name: string): string {
