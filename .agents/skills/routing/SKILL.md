@@ -29,7 +29,7 @@ description: 非 trivial な作業の成功条件・実行方法・モデル選�
 
 ## Level 0 を入口にする
 
-非自明な Issue / PR は、実装・レビューの前に `pnpm ctx <number>` を実行し、Issue / PR の要求、関連ファイル、既存判断、検査状態、候補 Skill を確認する。出力が古い、欠けている、または取得できないと分かった情報だけ一次資料で補い、確認済みの事実を別コマンドで重ねて集めない。
+非自明な Issue / PR は、実装・レビューの前に `pnpm ctx <number> --reuse-brief-l1` を実行し、Issue / PR の要求、関連ファイル、既存判断、検査状態、候補 Skill と、snapshotが一致するBrief内のL1候補を確認する。この読取コマンドはJev APIを呼ばない。L1が無い・古い・取得できない場合はその状態を明記してL0と一次資料で続ける。出力が古い、欠けている、または取得できないと分かった情報だけ補い、確認済みの事実を別コマンドで重ねて集めない。
 
 環境・hook・toolchain の状態確認が作業に必要な場合は `pnpm agent:preflight` を使う。architecture / API / MCP / DB の構造調査は、まず生成済みの [`docs/engineering/architecture.md`](../../../docs/engineering/architecture.md) と関連 map / contract docs を確認し、具体的な不足だけソースコードを探索する。
 
@@ -58,11 +58,17 @@ auth / RLS / service role、billing / webhook、migration、data model、公開 
 
 `#2892` の L2/L3 は実装担当と裁定担当の運用上の役割で、能力や権限を定義しない。#2889 が測ったのは docs・bug・story・risk 各1回だけであり、Luna の広い実装適性を示す根拠ではない。測定済みの狭い範囲を越える L2 配分は未検証の運用試行として扱い、性能改善を主張しない。model / reasoning / tool の利用可否は実行面で確認する。
 
-`pnpm ctx <N>` の L0〜L3 は助言の既存インターフェースとして維持する。L0 は機械収集、L1 は事実整理、L2 は通常実装、L3 は不変条件・権限・設計判断を表す。これは #2892 のモデル名による役割とは別の分類で、表示名の一致だけで再定義しない。`preparation: L1` は別 agent の起動指示ではなく、同じ主担当が担ってよい。`ready` は入力項目の存在確認だけで、実装・ラベル・merge の許可ではない。
+JevのL1は、Issueの読み順を助ける関連度・分類・出典付き候補として日常の作業で使う。品質評価を利用開始の条件にせず、通常の修正や指摘から中長期で改善する。L1はshadow助言であり、Issue本文や必須条件の代わりにならず、候補外の資料を無関係とみなさない。dispatch担当は `pnpm ctx <N> --post` でL1入りBriefを作り、L2担当は `pnpm ctx <N> --reuse-brief-l1` で同じsnapshotのL1を読む。`routing.level` の L2 / L3 はそれぞれ通常実装 / 不変条件・権限・設計判断の分類で、#2892 のモデル名による役割とも別である。`preparation: L1` は追加の意味整理を同じ主担当が担うという助言であり、別agent起動やコード変更の自動許可ではない。`ready` は入力項目の存在確認だけで、実装・ラベル・merge の許可ではない。
 
 通常の test / 型検査失敗や不足資料・環境の復旧は L2 / L0 で切り分ける。Issue の前提と実測が矛盾する、未決の契約・設計・scope 判断がある場合は依存作業を止めて L3 に問いを渡し、返答の ID・対象 SHA・状態を確認して同じ L2 担当が再開する。production・削除・実課金・不可逆変更の明示承認は人間が行う。
 
 Issue briefを利用する担当Codex sessionは、Issue本文と信頼できる最新 `ctx-brief` コメントを自分の入力として明示取得し、Issue番号・snapshotの一致を確認する。Issue本文が要求の正本であり、コメントが存在するだけではsessionが取得した証拠にならない。
+
+### Codex Cloud へ L1 を渡す
+
+Cloud の L2 担当は Gateway key を持たず、Jev API を呼ばない。dispatch 前に、key を1Passwordから注入できる担当が `pnpm ctx <N> --post` で日常利用するL1候補入りBriefを作成・更新する。Cloud の担当は `pnpm ctx <N> --reuse-brief-l1` を実行し、Issue本文・関連資料・コメントを再収集した L0 とともに、Brief 内の候補を取得する。
+
+再利用は trusted `ctx-brief` の machine metadata が Issue 番号・URL・入力snapshot・公開 HEAD SHA のすべてと一致し、投稿者が現在の `gh` 認証ユーザーと一致した時だけ行う。別ユーザーのBrief、古い Brief、旧形式の Brief、GitHub API 未認証・取得失敗では L1 を未取得にし、L0とIssue本文から続行する。Cloud task に `--post` を付けない。Cloud 側は repository access と `gh` の GitHub API 読み取りが必要で、ネットワークが使えない時にL1が届いた扱いにしない。
 
 評価モデル Jev（`pnpm jev:*`）は、この選択を置き換えない。文章しか入力が無く答えが有限集合の判定へ意味的な特徴を足す層で、注釈は候補の提示までに留まり、権限・必須レビュー・merge には繋がない。**決定的に分かることは Jev へ聞かない**（実測で負けた 4 判定と、pack を足す手順は [jev.md](../../../docs/operations/jev.md)）。
 
