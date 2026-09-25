@@ -1050,8 +1050,8 @@ describe('buildContextPack (execFileImpl 経由の gh 呼び出し形)', () => {
       },
     };
     const body = `${CTX_MARKER}\n<!-- ctx-l1-v1:${Buffer.from(JSON.stringify(metadata)).toString('base64url')} -->`;
-    const comment = { body, author_association: 'OWNER' };
-    const expected = { ...input, snapshotId };
+    const comment = { body, author_association: 'OWNER', user: { login: 'tomoya' } };
+    const expected = { ...input, snapshotId, authLogin: 'tomoya' };
 
     expect(findReusableBriefL1Preview([comment], expected)).toMatchObject({
       status: 'complete',
@@ -1065,6 +1065,10 @@ describe('buildContextPack (execFileImpl 経由の gh 呼び出し形)', () => {
     expect(
       findReusableBriefL1Preview([{ ...comment, author_association: 'NONE' }], expected),
     ).toBeNull();
+    expect(
+      findReusableBriefL1Preview([{ ...comment, user: { login: 'another-member' } }], expected),
+    ).toBeNull();
+    expect(findReusableBriefL1Preview([comment], { ...expected, authLogin: null })).toBeNull();
   });
   it('Jev CLIは固定argvで呼び、JSON以外の出力やshell評価を使わない', () => {
     const execFileImpl = vi.fn(() => '{"packId":"context-relevance"}');
@@ -1117,6 +1121,7 @@ describe('buildContextPack (execFileImpl 経由の gh 呼び出し形)', () => {
     const pack = buildContextPackWithL1(options, {
       cwd: '/repo',
       getHeadSha: () => sha,
+      getAuthLogin: () => null,
       buildPack,
       runAssist,
     });
@@ -1131,6 +1136,7 @@ describe('buildContextPack (execFileImpl 経由の gh 呼び出し形)', () => {
     const fallback = buildContextPackWithL1(options, {
       cwd: '/repo',
       getHeadSha: () => sha,
+      getAuthLogin: () => null,
       buildPack,
       runAssist: () => {
         throw new Error('Jev unavailable');
@@ -1188,6 +1194,7 @@ describe('buildContextPack (execFileImpl 経由の gh 呼び出し形)', () => {
     const brief = {
       body: `${CTX_MARKER}\n<!-- ctx-l1-v1:${Buffer.from(JSON.stringify(metadata)).toString('base64url')} -->`,
       author_association: 'OWNER',
+      user: { login: 'tomoya' },
     };
     const buildPack = vi.fn(() => ({
       number: 23,
@@ -1202,6 +1209,7 @@ describe('buildContextPack (execFileImpl 経由の gh 呼び出し形)', () => {
     const pack = buildContextPackWithL1(parseArgs(['23', '--reuse-brief-l1']), {
       cwd: '/repo',
       getHeadSha: () => sha,
+      getAuthLogin: () => 'tomoya',
       buildPack,
       runAssist,
     });
@@ -1219,6 +1227,7 @@ describe('buildContextPack (execFileImpl 経由の gh 呼び出し形)', () => {
     const fallbackPack = buildContextPackWithL1(parseArgs(['23']), {
       cwd: '/repo',
       getHeadSha: () => sha,
+      getAuthLogin: () => 'tomoya',
       buildPack,
       runAssist: () => {
         throw new Error('Jev unavailable');
@@ -2352,13 +2361,17 @@ describe('postContextBrief', () => {
     const body = writeFileImpl.mock.calls[0]?.[1];
     expect(body).toContain('<!-- ctx-l1-v1:');
     expect(
-      findReusableBriefL1Preview([{ body, author_association: 'OWNER' }], {
-        number: pack.number,
-        snapshotId: pack.snapshotId,
-        sha: 'c'.repeat(40),
-        url: pack.header.url,
-        candidates: [],
-      }),
+      findReusableBriefL1Preview(
+        [{ body, author_association: 'OWNER', user: { login: 'tomoya' } }],
+        {
+          number: pack.number,
+          snapshotId: pack.snapshotId,
+          sha: 'c'.repeat(40),
+          url: pack.header.url,
+          candidates: [],
+          authLogin: 'tomoya',
+        },
+      ),
     ).toMatchObject({ status: 'complete', source: 'trusted_brief', candidates: [] });
   });
 

@@ -141,7 +141,7 @@ pnpm ctx 2853 --post
 pnpm ctx 2853 --reuse-brief-l1
 ```
 
-BriefにはL1候補の再利用用メタデータが含まれる。Cloud側は信頼済み `ctx-brief` コメントから読んだpayloadのIssue番号・URL・snapshot・HEAD SHAを照合し、ひとつでも違えば候補を使わずL0のみを返す。旧形式や古いBriefを使う場合は、ローカル側で明示的に再生成する。Cloudでこのコマンドを使うには repository access と `gh` の GitHub API 読み取りが必要。認証または通信が使えない環境ではL1未取得と報告し、候補が届いたと扱わない。
+BriefにはL1候補の再利用用メタデータが含まれる。Cloud側は信頼済み `ctx-brief` コメントから読んだpayloadのIssue番号・URL・snapshot・HEAD SHAを照合し、投稿者が現在の `gh` 認証ユーザーと一致するBriefだけを使う。条件がひとつでも違えば候補を使わずL0のみを返す。旧形式や古いBriefを使う場合は、ローカル側で明示的に再生成する。Cloudでこのコマンドを使うには repository access と `gh` の GitHub API 読み取りが必要。認証または通信が使えない環境ではL1未取得と報告し、候補が届いたと扱わない。
 
 - contextは30 Issue（tune10 / holdout20）。`candidateIds` 全体に対する人手の `usefulIds` と `requiredIds`、Jev・最新順・事前に凍結したキーワード baseline の各上位5件を記録する。Recall@5が強いbaselineを平均0.10以上上回り、baselineが拾った必須制約を新たに落とさないこと。
 - claimsは60組、4分類各15組（各分類tune5 / holdout10）。単純baselineは常に判断不能。holdoutのmacro-F1が0.75以上かつbaseline +0.10以上で、反証・判断不能を支持と誤分類しないこと。

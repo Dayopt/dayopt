@@ -508,7 +508,7 @@ Node.js と package manager は実行場所ごとに暗黙で選ばせず、repo
 - `.nvmrc` と `package.json#packageManager` が runtime の正本。`pnpm agent:preflight` は Node.js の major、pnpm の version、依存、hook を表示し、不一致なら exit 1 にする
 - Codex Cloud の Dayopt 環境は自動 package-manager detection を使わず、setup / maintenance script で `nvm` から `.nvmrc` の Node.js を選び、標準の [`scripts/runbook/codex-cloud-setup.sh`](../../scripts/runbook/codex-cloud-setup.sh) で `packageManager` の pnpm を検証して `pnpm install --frozen-lockfile` を一度だけ実行する
 - Cloud の setup / maintenance はネットワークが有効な setup phase で実行し、自動検出が各 workspace へ npm を実行して `catalog:` / `workspace:` を壊す経路を作らない。Issue の context を `gh` で読む Cloud task は、repository access に加えて agent phase の GitHub API への限定アクセスが要る。無効・未認証なら context 未取得として止めず、取得できた L0 だけで進める
-- Codex Cloud の Secret は setup script にだけ渡り、agent phase の前に取り除かれる。Jev key を Cloud の通常 Environment Variable に置くと agent phase から読めるため設定しない。L1 を Cloud L2 に渡す時は、ローカルの認証済み `pnpm ctx <N> --post` で Issue Brief に保存し、Cloud 側は [`pnpm ctx <N> --reuse-brief-l1`](./jev.md) で一致を検証して読む
+- Codex Cloud の Secret は setup script にだけ渡り、agent phase の前に取り除かれる。Jev key を Cloud の通常 Environment Variable に置くと agent phase から読めるため設定しない。L1 を Cloud L2 に渡す時は、ローカルの認証済み `pnpm ctx <N> --post` で Issue Brief に保存し、Cloud 側は [`pnpm ctx <N> --reuse-brief-l1`](./jev.md) で入力一致とBrief投稿者・現在の `gh` 認証ユーザーの一致を検証して読む
 - Cloud で Docker・local Supabase・実ブラウザ・vault が必要な検証は完了扱いにせず、対応する local または CI の証跡を別に残す
 
 ### 実行経路ごとの保護範囲

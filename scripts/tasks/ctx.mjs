@@ -489,11 +489,13 @@ function decodeBriefL1Metadata(body) {
   }
 }
 
-/** Reuses L1 stored in a trusted brief only when its issue, source snapshot, URL and HEAD match. */
+/** Reuses L1 only from the current GitHub user when its issue, snapshot, URL and HEAD match. */
 export function findReusableBriefL1Preview(comments, expected) {
   if (
     !Array.isArray(comments) ||
     !Number.isSafeInteger(expected?.number) ||
+    typeof expected?.authLogin !== 'string' ||
+    expected.authLogin.length === 0 ||
     !/^[a-f0-9]{64}$/.test(expected?.snapshotId ?? '') ||
     !/^[a-f0-9]{40}$/.test(expected?.sha ?? '') ||
     !isCanonicalBriefSourceUrl(expected?.url) ||
@@ -503,7 +505,11 @@ export function findReusableBriefL1Preview(comments, expected) {
 
   const sourceById = new Map(expected.candidates.map((candidate) => [candidate.id, candidate]));
   for (const comment of [...comments].reverse()) {
-    if (!isTrustedMarkerComment(comment)) continue;
+    if (
+      !isTrustedMarkerComment(comment) ||
+      comment.user?.login?.toLowerCase() !== expected.authLogin.toLowerCase()
+    )
+      continue;
     const metadata = decodeBriefL1Metadata(comment.body);
     if (
       metadata?.schemaVersion !== 1 ||
@@ -1974,6 +1980,7 @@ export function buildContextPack(options, deps = {}) {
               : commentsRaw.filter(isTrustedMarkerComment).map((comment) => ({
                   body: comment.body,
                   author_association: comment.author_association,
+                  user: { login: comment.user?.login },
                 })),
         }
       : {}),
@@ -2175,6 +2182,7 @@ export function buildContextPackWithL1(
   {
     cwd = process.cwd(),
     getHeadSha = () => execFileSync('git', ['rev-parse', 'HEAD'], { cwd, encoding: 'utf8' }).trim(),
+    getAuthLogin = () => tryOr(() => runGh(['api', 'user', '--jq', '.login']).trim(), null),
     readDecisionAtHead = (headSha) =>
       execFileSync('git', ['show', `${headSha}:${DECISIONS_PATH}`], {
         cwd,
@@ -2217,6 +2225,7 @@ export function buildContextPackWithL1(
     const expectedBrief = {
       ...expectedInput,
       snapshotId: l0WithAssistInput.snapshotId,
+      authLogin: tryOr(() => getAuthLogin(), null),
     };
     reusablePreview = findReusableBriefL1Preview(
       l0WithAssistInput.trustedBriefComments,

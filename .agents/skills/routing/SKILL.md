@@ -68,7 +68,7 @@ Issue briefを利用する担当Codex sessionは、Issue本文と信頼できる
 
 Cloud の L2 担当は Gateway key を持たず、Jev API を呼ばない。dispatch 前に、key を1Passwordから注入できるローカル担当が `pnpm ctx <N> --post` で L1 候補を含む Brief を作成・更新する。Cloud の担当は `pnpm ctx <N> --reuse-brief-l1` を実行し、Issue本文・関連資料・コメントを再収集した L0 とともに、Brief 内の候補を取得する。
 
-再利用は trusted `ctx-brief` の machine metadata が Issue 番号・URL・入力snapshot・公開 HEAD SHA のすべてと一致した時だけ行う。古い Brief、旧形式の Brief、GitHub API 未認証・取得失敗では L1 を未取得にし、L0とIssue本文から続行する。Cloud task に `--post` を付けない。Cloud 側は repository access と `gh` の GitHub API 読み取りが必要で、ネットワークが使えない時にL1が届いた扱いにしない。
+再利用は trusted `ctx-brief` の machine metadata が Issue 番号・URL・入力snapshot・公開 HEAD SHA のすべてと一致し、投稿者が現在の `gh` 認証ユーザーと一致した時だけ行う。別ユーザーのBrief、古い Brief、旧形式の Brief、GitHub API 未認証・取得失敗では L1 を未取得にし、L0とIssue本文から続行する。Cloud task に `--post` を付けない。Cloud 側は repository access と `gh` の GitHub API 読み取りが必要で、ネットワークが使えない時にL1が届いた扱いにしない。
 
 評価モデル Jev（`pnpm jev:*`）は、この選択を置き換えない。文章しか入力が無く答えが有限集合の判定へ意味的な特徴を足す層で、注釈は候補の提示までに留まり、権限・必須レビュー・merge には繋がない。**決定的に分かることは Jev へ聞かない**（実測で負けた 4 判定と、pack を足す手順は [jev.md](../../../docs/operations/jev.md)）。
 
