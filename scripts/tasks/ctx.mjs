@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -7,6 +8,7 @@ import { resolveProtectedPathGate } from '../ci/protected-path-gate.mjs';
 import { resolveFactoryRoute } from '../lib/factory-routing.mjs';
 import { REPO, runGh, runGhJson } from '../lib/gh.mjs';
 import { isDirectExecution } from '../lib/is-direct-execution.mjs';
+import { buildContextInput } from '../lib/jev-assist-context.mjs';
 
 /**
  * Codex GitHub 連携 bot の login。GraphQL の `author.login` は
@@ -23,7 +25,8 @@ function isCodexBotLogin(login) {
 
 /**
  * `pnpm ctx <N>` — L0 の「context pack」（AGENTS.md 委任・報告の作法 §L0、
- * routing skill §Worker recipe / L0）。
+ * routing skill §Worker recipe / L0）。`--l1-shadow` は既存Jev assistを明示実行し、
+ * 同一入力snapshotを確認したローカルpreviewだけを追加する。通常の読取・投稿ではJevを呼ばない。
  *
  * Uber 原則⑤「AI が考える前に機械的に集められる文脈はここで終える」の Dayopt 写像。
  * AI セッションが issue / PR に着手する前に行う `gh issue view` / `gh pr list` /
@@ -223,6 +226,165 @@ export function buildBriefAnnotations({
   return { status: 'adopted', rows: normalized };
 }
 
+const L1_CATEGORY_LABELS = {
+  constraint: '制約',
+  decision: '決定',
+  open_question: '未解決の問い',
+  verification_result: '検証結果',
+  status_only: '進捗',
+};
+const L1_CATEGORY_WEIGHT = {
+  constraint: 4,
+  decision: 3,
+  open_question: 2,
+  verification_result: 1,
+  status_only: 0,
+};
+
+/**
+ * Creates a local-only, non-authoritative preview after confirming the Jev report used the exact
+ * context input collected for this L0 run. The normal brief and --post path never consume it.
+ */
+export function buildL1ShadowPreview(report, expectedInput) {
+  if (
+    report?.packId !== 'context-relevance' ||
+    report?.mode !== 'shadow' ||
+    report?.target?.number !== expectedInput?.number ||
+    report?.target?.sha !== expectedInput?.sha ||
+    report?.target?.url !== expectedInput?.url ||
+    !report?.input ||
+    computeContextSnapshotId(report.input) !== computeContextSnapshotId(expectedInput) ||
+    !Array.isArray(report.rows) ||
+    !Array.isArray(report.omitted) ||
+    !Array.isArray(report.missing)
+  )
+    return {
+      status: 'snapshot_mismatch',
+      evaluatedCount: 0,
+      selectedCount: 0,
+      omittedCount: 0,
+      candidates: [],
+    };
+
+  const sourceById = new Map(
+    expectedInput.candidates.map((candidate) => [candidate.id, candidate]),
+  );
+  const rows = [];
+  let invalidCount = 0;
+  for (const row of report.rows) {
+    const source = sourceById.get(row?.id);
+    const valid =
+      source &&
+      typeof source.id === 'string' &&
+      /^[a-zA-Z0-9_-]{1,80}$/.test(source.id) &&
+      isCanonicalBriefSourceUrl(source.url) &&
+      typeof row?.relevance === 'number' &&
+      Number.isFinite(row.relevance) &&
+      row.relevance >= 0 &&
+      row.relevance <= 1 &&
+      typeof row?.category === 'string' &&
+      Object.hasOwn(L1_CATEGORY_LABELS, row.category) &&
+      typeof row?.evaluatedAt === 'string' &&
+      Number.isFinite(Date.parse(row.evaluatedAt));
+    if (!valid) {
+      invalidCount += 1;
+      continue;
+    }
+    rows.push({
+      id: source.id,
+      url: source.url,
+      updatedAt: source.updatedAt,
+      category: row.category,
+      categoryLabel: L1_CATEGORY_LABELS[row.category],
+      evaluatedAt: row.evaluatedAt,
+      relevance: row.relevance,
+    });
+  }
+  rows.sort(
+    (a, b) =>
+      b.relevance - a.relevance ||
+      (L1_CATEGORY_WEIGHT[b.category] ?? 0) - (L1_CATEGORY_WEIGHT[a.category] ?? 0) ||
+      b.updatedAt.localeCompare(a.updatedAt) ||
+      a.id.localeCompare(b.id),
+  );
+
+  const complete = report.complete === true && report.missing.length === 0 && invalidCount === 0;
+  const evaluatedCount = rows.length;
+  return {
+    status: complete ? 'complete' : evaluatedCount > 0 ? 'partial' : 'unevaluated',
+    reason: complete
+      ? null
+      : BRIEF_L1_FAILURES.has(report.rows.find((row) => row?.reason)?.reason)
+        ? report.rows.find((row) => row?.reason)?.reason
+        : 'incomplete',
+    evaluatedCount,
+    selectedCount: report.rows.length,
+    omittedCount: report.omitted.length,
+    candidates: rows.slice(0, 5).map(({ relevance: _relevance, ...candidate }) => candidate),
+  };
+}
+
+/**
+ * Calls the existing Jev shadow entrypoint with argv (never a shell) and parses its JSON report.
+ * @param {number} number
+ * @param {{cwd?: string, execFileImpl?: (file: string, args: string[], options: import('node:child_process').ExecFileSyncOptionsWithStringEncoding) => string}} [options]
+ */
+export function runContextL1ShadowAssist(
+  number,
+  { cwd = process.cwd(), execFileImpl = execFileSync } = {},
+) {
+  const stdout = execFileImpl(
+    join(cwd, 'node_modules', '.bin', 'tsx'),
+    ['scripts/tasks/jev/assist.ts', 'context', '--issue', String(number), '--json'],
+    { cwd, encoding: 'utf8', maxBuffer: 2_000_000 },
+  );
+  return JSON.parse(stdout);
+}
+
+function l1ShadowUnavailable(reason = 'assist_unavailable') {
+  return {
+    status: 'unavailable',
+    reason,
+    evaluatedCount: 0,
+    selectedCount: 0,
+    omittedCount: 0,
+    candidates: [],
+  };
+}
+
+function renderL1ShadowPreview(preview) {
+  const lines = [
+    '',
+    '#### L1 Jev shadow preview（助言のみ）',
+    '',
+    '未採用packのローカル表示。Issueの要求・必須条件・policy・検証条件を変更せず、最終判断もしません。候補から外れた資料を無関係とはみなしません。',
+  ];
+  if (preview.status === 'complete') {
+    lines.push(
+      `選択した ${preview.selectedCount} 件を評価済み。候補を最大5件表示（別枠の対象外 ${preview.omittedCount} 件は未評価）。`,
+    );
+  } else if (preview.status === 'partial') {
+    lines.push(
+      `部分評価 ${preview.evaluatedCount}/${preview.selectedCount} 件。以下は暫定候補で、全体順位ではありません（対象外 ${preview.omittedCount} 件）。`,
+    );
+  } else if (preview.status === 'unevaluated') {
+    lines.push(`未評価（${preview.reason ?? 'incomplete'}）。候補順位を表示していません。`);
+  } else if (preview.status === 'snapshot_mismatch') {
+    lines.push(
+      'L0とJevの入力snapshotが一致しないため、候補を表示していません。再実行してください。',
+    );
+  } else {
+    lines.push(
+      `Jevのshadow結果を取得できません（${preview.reason ?? 'assist_unavailable'}）。L0の結果はそのまま利用できます。`,
+    );
+  }
+  for (const row of preview.candidates ?? [])
+    lines.push(`- [${row.id}](${row.url}) | ${row.categoryLabel} | 読む候補（shadow）`);
+  if (preview.status === 'complete' && preview.evaluatedCount === 0)
+    lines.push('候補はありません。これは問題や関連資料が無いことの証明ではありません。');
+  return lines;
+}
+
 // --- 純関数群（test 対象） -------------------------------------------------
 
 /** CLI 引数を解釈する。位置引数は issue/PR 番号 1 つのみ。 */
@@ -234,6 +396,7 @@ export function parseArgs(argv) {
     bodyLines: 60,
     allComments: false,
     post: false,
+    l1Shadow: false,
   };
   const positionals = [];
   for (let i = 0; i < argv.length; i += 1) {
@@ -244,6 +407,8 @@ export function parseArgs(argv) {
       options.allComments = true;
     } else if (arg === '--post') {
       options.post = true;
+    } else if (arg === '--l1-shadow') {
+      options.l1Shadow = true;
     } else if (arg === '--comments') {
       options.comments = Number(argv[i + 1]);
       i += 1;
@@ -252,7 +417,7 @@ export function parseArgs(argv) {
       i += 1;
     } else if (arg.startsWith('--')) {
       throw new Error(
-        `未知の引数です: ${arg}（--json / --comments / --body-lines / --all-comments / --post のみ）`,
+        `未知の引数です: ${arg}（--json / --comments / --body-lines / --all-comments / --post / --l1-shadow のみ）`,
       );
     } else {
       positionals.push(arg);
@@ -261,6 +426,8 @@ export function parseArgs(argv) {
   if (positionals.length !== 1) {
     throw new Error('issue/PR 番号を 1 つ指定してください: pnpm ctx <N>');
   }
+  if (options.post && options.l1Shadow)
+    throw new Error('--l1-shadow はローカルのshadow preview専用で、--postとは併用できません');
   const number = Number(positionals[0]);
   if (!Number.isInteger(number) || number <= 0) {
     throw new Error(`不正な番号です: ${positionals[0]}`);
@@ -1045,6 +1212,8 @@ function buildMarkdownLines(
     }
   }
 
+  if (pack.l1ShadowPreview) lines.push(...renderL1ShadowPreview(pack.l1ShadowPreview));
+
   lines.push('', '#### 未確認事項', '');
   if (pack.missingSources?.length) {
     for (const missing of pack.missingSources) lines.push(`- ${missing}`);
@@ -1757,7 +1926,47 @@ export function postContextBrief(pack, markdown, deps = {}) {
 
 function main() {
   const options = parseArgs(process.argv.slice(2));
-  const pack = buildContextPack(options, {});
+  let pack;
+  if (options.l1Shadow) {
+    const cwd = process.cwd();
+    let headSha = null;
+    try {
+      headSha = execFileSync('git', ['rev-parse', 'HEAD'], { cwd, encoding: 'utf8' }).trim();
+    } catch {
+      // L0 remains usable even when Git metadata is unavailable for the optional L1 preview.
+    }
+    if (!headSha) {
+      pack = buildContextPack(options, { cwd });
+      pack.l1ShadowPreview = l1ShadowUnavailable('public_commit_required');
+    } else {
+      const assistOptions = { ...options, assist: true };
+      const l0WithAssistInput = buildContextPack(assistOptions, {
+        cwd,
+        readFileImpl: (path) => {
+          if (!path.endsWith(DECISIONS_PATH)) throw new Error('対象外の資料');
+          return execFileSync('git', ['show', `${headSha}:${DECISIONS_PATH}`], {
+            cwd,
+            encoding: 'utf8',
+          });
+        },
+      });
+      try {
+        const expectedInput = buildContextInput(
+          options.number,
+          headSha,
+          l0WithAssistInput.assistSource,
+        );
+        const report = runContextL1ShadowAssist(options.number, { cwd });
+        l0WithAssistInput.l1ShadowPreview = buildL1ShadowPreview(report, expectedInput);
+      } catch {
+        l0WithAssistInput.l1ShadowPreview = l1ShadowUnavailable();
+      }
+      delete l0WithAssistInput.assistSource;
+      pack = l0WithAssistInput;
+    }
+  } else {
+    pack = buildContextPack(options, {});
+  }
   if (options.post) {
     const markdown = renderMarkdown(pack);
     const result = postContextBrief(pack, markdown, {

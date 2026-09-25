@@ -1,11 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
 
+import { buildContextInput } from '../lib/jev-assist-context.mjs';
 import {
   bodyReferencesNumber,
   buildBriefAnnotations,
   buildCommentBody,
   buildContextPack,
   buildJudgmentHint,
+  buildL1ShadowPreview,
   buildPostArgs,
   computeCiRollup,
   computeContextSnapshotId,
@@ -26,6 +28,7 @@ import {
   parseArgs,
   postContextBrief,
   renderMarkdown,
+  runContextL1ShadowAssist,
   selectComments,
   truncateBody,
   truncateCommentBody,
@@ -40,6 +43,7 @@ describe('parseArgs', () => {
       bodyLines: 60,
       allComments: false,
       post: false,
+      l1Shadow: false,
     });
   });
 
@@ -53,11 +57,17 @@ describe('parseArgs', () => {
       bodyLines: 10,
       allComments: true,
       post: false,
+      l1Shadow: false,
     });
   });
 
   it('--post を解釈する', () => {
     expect(parseArgs(['2550', '--post'])).toMatchObject({ number: 2550, post: true });
+  });
+
+  it('--l1-shadow は明示実行だけを有効にし、投稿とは併用できない', () => {
+    expect(parseArgs(['2550', '--l1-shadow'])).toMatchObject({ l1Shadow: true, post: false });
+    expect(() => parseArgs(['2550', '--l1-shadow', '--post'])).toThrow(/ローカルのshadow preview/);
   });
 
   it('番号が無い・不正・複数は例外', () => {
@@ -918,6 +928,80 @@ describe('buildContextPack (execFileImpl 経由の gh 呼び出し形)', () => {
       }),
     ).toMatchObject({ status: 'unevaluated', reason: 'low_confidence', rows: [] });
   });
+  it('L1 shadowは同一入力だけから固定ラベルと一次資料リンクを作り、部分評価を完全順位にしない', () => {
+    const sha = 'a'.repeat(40);
+    const source = {
+      title: 'Issue title',
+      body: 'Canonical request',
+      url: 'https://github.com/Dayopt/dayopt/issues/1',
+      updatedAt: '2026-09-24T00:00:00Z',
+      comments: [{ id: 12, body: 'Constraint source', created_at: '2026-09-24T01:00:00Z' }],
+      related: [{ number: 2, title: 'Related', body: 'Related source' }],
+      decisions: ['2026-09-23 #1 decision'],
+      missing: [],
+    };
+    const input = buildContextInput(1, sha, source);
+    const report = {
+      packId: 'context-relevance',
+      mode: 'shadow',
+      target: { number: 1, sha, url: input.url },
+      input,
+      complete: true,
+      missing: [],
+      omitted: [],
+      rows: input.candidates.map((candidate, index) => ({
+        ...candidate,
+        relevance: index === 1 ? 0.98 : 0.65,
+        category: 'constraint',
+        evaluatedAt: '2026-09-24T02:00:00Z',
+        source: 'live',
+        reason: 'evaluated',
+        text: 'model must not author source text',
+        url: 'https://evil.example/forged',
+      })),
+    };
+
+    const preview = buildL1ShadowPreview(report, input);
+    expect(preview.status).toBe('complete');
+    expect(preview.candidates[0]).toMatchObject({
+      id: input.candidates[1].id,
+      url: input.candidates[1].url,
+      categoryLabel: '制約',
+    });
+    expect(JSON.stringify(preview)).not.toContain('evil.example');
+    expect(JSON.stringify(preview)).not.toContain('model must not author');
+    expect(JSON.stringify(preview)).not.toContain('0.98');
+
+    const stale = buildL1ShadowPreview(
+      { ...report, input: { ...input, body: 'Changed request' } },
+      input,
+    );
+    expect(stale).toMatchObject({ status: 'snapshot_mismatch', candidates: [] });
+
+    const partial = buildL1ShadowPreview(
+      {
+        ...report,
+        complete: false,
+        rows: [
+          { ...report.rows[0], relevance: null, category: null, reason: 'missing_credentials' },
+          report.rows[1],
+        ],
+      },
+      input,
+    );
+    expect(partial).toMatchObject({ status: 'partial', evaluatedCount: 1, selectedCount: 2 });
+  });
+  it('Jev CLIは固定argvで呼び、JSON以外の出力やshell評価を使わない', () => {
+    const execFileImpl = vi.fn(() => '{"packId":"context-relevance"}');
+    expect(runContextL1ShadowAssist(23, { cwd: '/repo', execFileImpl })).toEqual({
+      packId: 'context-relevance',
+    });
+    expect(execFileImpl).toHaveBeenCalledWith(
+      '/repo/node_modules/.bin/tsx',
+      ['scripts/tasks/jev/assist.ts', 'context', '--issue', '23', '--json'],
+      { cwd: '/repo', encoding: 'utf8', maxBuffer: 2_000_000 },
+    );
+  });
   it('issue: issues API → comments → search prs → pr view(headRefName,files) の順で argv を渡す', () => {
     const calls: string[][] = [];
     const execFileImpl = vi.fn((_cmd: string, args: string[]) => {
@@ -1272,6 +1356,19 @@ describe('renderMarkdown', () => {
       judgmentRecords: { dod: true, breakdown: false, brief: true },
       nextStep: 'pnpm branch:finish 2549',
       nextStepSecondary: '判断の記録が欠けている: 分解表（routing skill 手順 1 / dispatch 手順 7）',
+      l1ShadowPreview: {
+        status: 'partial',
+        evaluatedCount: 1,
+        selectedCount: 2,
+        omittedCount: 0,
+        candidates: [
+          {
+            id: 'comment-99',
+            url: 'https://github.com/Dayopt/dayopt/issues/2549#issuecomment-99',
+            categoryLabel: '制約',
+          },
+        ],
+      },
     };
 
     const markdown = renderMarkdown(pack);
@@ -1290,6 +1387,12 @@ describe('renderMarkdown', () => {
     expect(markdown).toContain('#### 決定ログ');
     expect(markdown).toContain('#### 関連 skill 候補');
     expect(markdown).toContain('#### 判断の記録');
+    expect(markdown).toContain('#### L1 Jev shadow preview（助言のみ）');
+    expect(markdown).toContain('部分評価 1/2 件');
+    expect(markdown).toContain(
+      '[comment-99](https://github.com/Dayopt/dayopt/issues/2549#issuecomment-99)',
+    );
+    expect(markdown).toContain('Issueの要求・必須条件・policy・検証条件を変更せず');
     expect(markdown).toContain('DoD: あり | 分解表: なし | brief: あり');
     expect(markdown).toContain('次の一手: pnpm branch:finish 2549');
     expect(markdown).toContain(
