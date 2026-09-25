@@ -6,14 +6,14 @@ import { useBillingAccess } from '@/lib/billing/BillingAccessProvider';
 import { acceptNecessaryOnly, getCookieConsent, setCookieConsent } from '@/lib/cookie-consent';
 import { useShellStore } from '@/lib/stores/useShellStore';
 import { toast } from '@/lib/toast';
-import { dayoptUrls } from '@dayopt/config';
+import { createDayoptUrl, dayoptUrls } from '@dayopt/config';
 import {
   BROWSER_TELEMETRY_CONSENT_EVENT,
   type BrowserTelemetryConsent,
   isBrowserTelemetryConsentStorageChange,
 } from '@dayopt/observability';
 import { Check, Copy, Crown, Download, Trash2 } from 'lucide-react';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 
 import { ConfirmDialog } from '@/components/ui/overlays/confirm-dialog';
 import { api } from '@/lib/trpc';
@@ -343,6 +343,7 @@ function AccountAnalyticsConsentSection() {
 
 function McpApiSection() {
   const t = useTranslations('settings.dataControls.mcp');
+  const locale = useLocale();
   const [copied, setCopied] = useState<'url' | null>(null);
 
   const { canUseProduct } = useBillingAccess();
@@ -359,6 +360,10 @@ function McpApiSection() {
     mcpResourceUri === '' || mcpResourceUri === dayoptUrls.mcp
       ? mcpResourceUri
       : `${mcpResourceUri}/mcp`;
+  const mcpGuideUrl =
+    locale === 'ja'
+      ? createDayoptUrl(dayoptUrls.marketing, '/ja/docs/data/api-mcp')
+      : createDayoptUrl(dayoptUrls.docs, '/data/api-mcp');
 
   const handleCopy = useCallback(
     (text: string, type: 'url') => {
@@ -404,10 +409,19 @@ function McpApiSection() {
           />
         </div>
       </LabeledRow>
-      {/* Connection guide（`apps/web/content/docs/{en,ja}/data/api-mcp.mdx` は
-          draft:true で未公開のため、公開後にここへリンクを追加する） */}
+      {/* Keep this link aligned with the public English and Japanese MCP guides. */}
       <InfoBox className="mt-4 p-4">
-        <p className="text-muted-foreground text-base md:text-sm">{t('connectionGuide')}</p>
+        <div className="space-y-2">
+          <p className="text-muted-foreground text-base md:text-sm">{t('connectionGuide')}</p>
+          <a
+            className="text-primary inline-flex min-h-11 items-center underline underline-offset-4"
+            href={mcpGuideUrl}
+            rel="noreferrer"
+            target="_blank"
+          >
+            {t('guideLink')}
+          </a>
+        </div>
       </InfoBox>
     </SectionCard>
   );
