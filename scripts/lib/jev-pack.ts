@@ -60,7 +60,7 @@ export const PACK_STATUS: Record<PackId, { status: 'active' | 'disabled'; reason
   'skill-suggestion': {
     status: 'disabled',
     reason:
-      '#2852 の採用評価は未完了（2026-09-25）。holdout は 1/19 成功後に 503 provider_error が 3 件連続し停止。追加送信の明示承認まで evaluate を止める',
+      '#2852 は No-Go（2026-09-25）。holdout は 16/19 評価、macro-F1 は Jev 0% / baseline 69%、503 provider_error が3件。新たな明示承認まで evaluate を止める',
   },
 };
 

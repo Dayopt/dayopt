@@ -1,0 +1,102 @@
+{
+  "issue": 2852,
+  "run": "holdout-retry-2026-09-25",
+  "decision": "no_go",
+  "conditions": {
+    "split": "holdout",
+    "threshold": 0.5,
+    "questionSetId": "skill-suggestion-v1",
+    "questionSetChanged": false,
+    "thresholdChanged": false,
+    "evaluationRevision": "93bb3544cc90541dc9e3c996378d017cf075463d",
+    "modelId": "typesafe-ai/jev",
+    "node": "24.19.0",
+    "pnpm": "11.26.0"
+  },
+  "execution": {
+    "command": "pnpm jev:pack skill-suggestion evaluate --split holdout --threshold 0.5",
+    "sent": 18,
+    "skippedEvaluatedSameInput": 1,
+    "skippedCaseIds": ["issue-1893"],
+    "successfulCaseIds": [
+      "issue-2460",
+      "issue-2556",
+      "issue-2583",
+      "issue-2612",
+      "issue-2619",
+      "issue-2628",
+      "issue-2631",
+      "issue-2640",
+      "issue-2662",
+      "issue-2752",
+      "issue-2758",
+      "issue-2777",
+      "issue-2785",
+      "issue-2815",
+      "issue-2816"
+    ],
+    "unavailableCaseIds": ["issue-2596", "issue-2627", "issue-2658"],
+    "recoveredPreviousProviderErrors": ["issue-2460", "issue-2556", "issue-2583"],
+    "firstEvaluationAt": "2026-09-25T00:52:55.689Z",
+    "lastEvaluationAt": "2026-09-25T01:10:17.778Z",
+    "evaluationTimestampSpanSeconds": 1042.089,
+    "processWallTimeRecorded": false
+  },
+  "finalHoldoutState": {
+    "cases": 19,
+    "evaluated": 16,
+    "unavailable": 3,
+    "unevaluated": 0,
+    "unavailableReason": "provider_error"
+  },
+  "metrics": {
+    "threshold": 0.5,
+    "macroF1": {
+      "jevUnionRule": 0,
+      "ruleUnionB1": 0.69,
+      "delta": -0.69
+    },
+    "microF1": {
+      "jevUnionRule": 0,
+      "ruleUnionB1": 0.48
+    },
+    "recallDeclinedByMoreThanPoint2": ["error-handling", "security", "test", "docs-writing"],
+    "goCriteria": {
+      "minimumMacroF1Improvement": 0.1,
+      "maximumRecallDeclinePerSkill": 0.2,
+      "passed": false
+    }
+  },
+  "usage": {
+    "retrySuccessfulResponses": {
+      "cases": 15,
+      "inputTokens": 112414,
+      "outputTokens": 3570,
+      "gatewayMarketCostEstimateUsd": 0.004721388,
+      "gatewayCostUsd": 0
+    },
+    "finalHoldoutSuccessfulResponses": {
+      "cases": 16,
+      "inputTokens": 119829,
+      "outputTokens": 3808,
+      "gatewayMarketCostEstimateUsd": 0.005032818,
+      "gatewayCostUsd": 0
+    },
+    "credits": {
+      "before": {
+        "balance": 4.99944644,
+        "totalUsed": 0.000567084
+      },
+      "after": {
+        "balance": 4.99944644,
+        "totalUsed": 0.000567084
+      }
+    },
+    "marketCostIsEstimateNotInvoice": true
+  },
+  "operationalOutcome": {
+    "packStatus": "disabled",
+    "contextBriefAdopted": false,
+    "additionalHoldoutAttemptsWithoutNewApproval": false
+  }
+}
