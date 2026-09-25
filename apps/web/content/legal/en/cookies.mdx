@@ -1,7 +1,7 @@
 ---
 title: 'Cookie Policy'
 description: 'How Dayopt uses cookies and similar technologies'
-lastUpdated: 'Review draft: 2026-09-17'
+lastUpdated: 'Review draft: 2026-09-25'
 ---
 
 <CookieDocument
@@ -28,8 +28,8 @@ lastUpdated: 'Review draft: 2026-09-17'
         analytics: {
           name: 'Analytics Cookies',
           description:
-            'These optional cookies and similar browser technologies help us diagnose browser errors and understand performance and usage. Browser Sentry, Vercel Analytics, and Speed Insights start only after analytics consent. Session Replay is disabled.',
-          examples: 'Browser errors, page views, and performance metrics',
+            'These optional cookies and similar browser technologies help us diagnose browser errors and understand performance and usage. Browser Sentry, PostHog, Vercel Analytics, and Speed Insights start only after analytics consent on that site. Product server-side analytics uses a separate account-level choice. Session Replay is disabled.',
+          examples: 'Browser errors, page views, signup interactions, and performance metrics',
         },
         preference: {
           name: 'Preference Cookies',
@@ -89,6 +89,14 @@ lastUpdated: 'Review draft: 2026-09-17'
           duration:
             'Provider-controlled telemetry; no va_* cookie is asserted. Verify network and storage before publication (HUMAN-09).',
         },
+        posthog: {
+          name: 'PostHog browser analytics storage',
+          provider: 'PostHog',
+          purpose: 'Keeps a pseudonymous browser identifier for consented browser analytics',
+          category: 'Analytics',
+          duration:
+            'SDK-controlled browser persistence. Verify the actual storage keys, duration, and removal after withdrawal before publication (HUMAN-09).',
+        },
         turnstile: {
           name: 'Cloudflare Turnstile browser technology',
           provider: 'Cloudflare',
@@ -106,6 +114,8 @@ lastUpdated: 'Review draft: 2026-09-17'
           'Vercel — Hosting and delivery remain available without analytics consent. Vercel Analytics and Speed Insights run in the browser only after analytics consent.',
         sentry:
           'Sentry — server and edge diagnostics continue independently of browser consent. Browser initialization and event sending require analytics consent; SDK code may be included before consent. We filter request bodies, email addresses, query strings, cookies and authorization credentials. Session Replay is disabled.',
+        posthog:
+          'PostHog — consented website and Product browser events use a pseudonymous browser identifier. Product server-side account events use the separate account analytics setting described in the Privacy Policy.',
         turnstile:
           "Cloudflare Turnstile — Essential bot protection on forms. A verification token and the requester's IP address are sent to Cloudflare. Cloudflare may use necessary browser storage and device signals under its Privacy Policy.",
         note: "Please refer to each provider's privacy policy for more information about its processing and use of browser technologies.",
@@ -122,7 +132,7 @@ lastUpdated: 'Review draft: 2026-09-17'
       impact: {
         title: 'Impact of Disabling Cookies',
         content:
-          'If you disable essential cookies, you will not be able to log in or use core features of the Service. Disabling preference cookies means your settings (such as language and theme) will not be remembered between sessions. Declining analytics does not affect core features; browser Sentry, Vercel Analytics, and Speed Insights do not start. Session Replay is disabled. Sanitized Production server and edge error monitoring remains active to diagnose service failures.',
+          'If you disable essential cookies, you will not be able to log in or use core features of the Service. Disabling preference cookies means your settings (such as language and theme) will not be remembered between sessions. Declining analytics does not affect core features; browser Sentry, PostHog, Vercel Analytics, and Speed Insights do not start on that site. Product’s separate account analytics setting controls Product server-side account events. Session Replay is disabled. Sanitized Production server and edge error monitoring remains active to diagnose service failures.',
       },
       doNotTrack: {
         title: 'Do Not Track Signals',

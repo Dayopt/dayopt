@@ -54,6 +54,7 @@ const PRIVACY_SECTIONS: readonly SectionLayout[] = [
           'supabase',
           'vercel',
           'sentry',
+          'posthog',
           'stripe',
           'resend',
           'upstash',
@@ -100,7 +101,7 @@ const PRIVACY_SECTIONS: readonly SectionLayout[] = [
       {
         type: 'table',
         columns: ['category', 'period'],
-        rows: ['primary', 'google', 'technical', 'backup', 'providers', 'billing'],
+        rows: ['primary', 'google', 'technical', 'posthog', 'backup', 'providers', 'billing'],
       },
       { type: 'paragraph', key: 'note', position: 'after' },
     ],

@@ -1,7 +1,7 @@
 ---
 title: 'Privacy Policy'
 description: 'How Dayopt handles your personal information'
-lastUpdated: 'Review draft: 2026-09-17'
+lastUpdated: 'Review draft: 2026-09-25'
 ---
 
 <PrivacyDocument
@@ -36,7 +36,7 @@ lastUpdated: 'Review draft: 2026-09-17'
         security:
           'Server and edge error monitoring, security and abuse prevention: legitimate interests in operating a reliable and secure service, subject to applicable law and your rights.',
         analytics:
-          'Optional browser error and performance monitoring: consent. Separately, server-side service usage events support product and billing analysis; these do not rely on the browser analytics switch. [HUMAN-02: confirm the legal basis and objection process for this analysis before publication.]',
+          'Optional browser error, performance, and usage analytics require consent on each site. Separately, Product server-side usage events are sent to PostHog only when account analytics consent is enabled. PostHog receives a pseudonymous browser identifier for consented browser events and the Supabase account UUID for consented Product events; it does not receive email, name, Plan or Record content, or payment IDs. [HUMAN-02: confirm the legal basis and objection process for this analysis before publication.]',
         legal:
           'Meeting applicable accounting, legal and regulatory requirements: legal obligation where applicable. We do not use automated decisions that produce legal or similarly significant effects on you.',
       },
@@ -50,6 +50,8 @@ lastUpdated: 'Review draft: 2026-09-17'
           'Vercel — website and application hosting, request logs and delivery; browser Analytics and Speed Insights only after analytics consent.',
         sentry:
           'Sentry — filtered error and performance diagnostics. Production server and edge monitoring runs independently of browser consent; browser monitoring requires consent. Session Replay is disabled.',
+        posthog:
+          'PostHog — website and Product usage analytics, including page views, signup funnel, successful Plan or Record operations, and first successful payment. Browser events require the separate analytics consent on each site; Product server events require account analytics consent. The configured project uses PostHog US Cloud. [HUMAN-03: verify the contracting entity, DPA, project region, and applicable transfer basis before publication.]',
         stripe: 'Stripe — payment processing, subscriptions, fraud prevention and billing records.',
         resend:
           'Resend — transactional email, support replies and delivery status; recipient addresses and message content.',
@@ -124,6 +126,11 @@ lastUpdated: 'Review draft: 2026-09-17'
             period:
               'Expiry-based cleanup applies to tokens and authorization codes. MCP mutation receipts and service usage events have 90-day retention rules. Some security and deletion evidence is retained independently of the account. HUMAN-05 covers the exact category limits and cleanup delays.',
           },
+          posthog: {
+            category: 'PostHog analytics events',
+            period:
+              'The current Free plan retention rule is one year for events. Account deletion submits an asynchronous request to delete events associated with the Product account UUID; completion is controlled by PostHog. Unlinked anonymous browser events may remain under the provider retention rule. [HUMAN-05: confirm the project-specific retention setting and verify account-linked and anonymous-event deletion handling before publication.]',
+          },
           backup: {
             category: 'Database and file backups',
             period:
@@ -149,7 +156,7 @@ lastUpdated: 'Review draft: 2026-09-17'
         export:
           'Settings provides JSON export of your profile, plans, records, categories, activities and settings. CSV contains plan and record rows. This self-service export is not a complete copy of provider logs, correspondence or billing records; request other personal information through support.',
         consent:
-          'You can refuse analytics in the consent banner. To reset a saved choice today, clear this site’s local storage in your browser and reload, then choose again. This can reset other preferences. Server-side diagnostics and service usage processing described above continue. [HUMAN-09: provide and verify an accessible in-service withdrawal control before publication.]',
+          'The website browser choice controls website browser analytics. Product has a separate account analytics setting that controls server-side account events and can be changed in Product Settings from any device. To change a saved website choice today, clear this site’s local storage in your browser and reload, then choose again; this may reset other preferences. [HUMAN-09: provide a persistent website withdrawal control and verify that browser events stop after withdrawal before publication.]',
         california:
           'We do not sell personal information or share it for cross-context behavioral advertising. California statutory rights apply where the relevant law covers the service. [HUMAN-02: confirm applicability and request-handling obligations.]',
         children:

@@ -1,7 +1,7 @@
 ---
 title: 'Cookieポリシー'
 description: 'Dayoptにおけるクッキーおよび類似技術の使用について'
-lastUpdated: 'レビュー原稿: 2026-09-17'
+lastUpdated: 'レビュー原稿: 2026-09-25'
 ---
 
 <CookieDocument
@@ -28,8 +28,8 @@ lastUpdated: 'レビュー原稿: 2026-09-17'
         analytics: {
           name: '分析Cookie',
           description:
-            'ブラウザエラーの診断とパフォーマンス・利用状況の把握に使う、任意のCookieおよび類似のブラウザ技術です。ブラウザ版Sentry、Vercel Analytics、Speed Insightsは分析への同意後のみ起動します。Session Replayは無効にしています。',
-          examples: 'ブラウザエラー、ページビュー、パフォーマンス指標',
+            'ブラウザエラーの診断とパフォーマンス・利用状況の把握に使う、任意のCookieおよび類似のブラウザ技術です。ブラウザ版Sentry、PostHog、Vercel Analytics、Speed Insightsは各サイトで分析に同意した後のみ起動します。Productのサーバー側分析は別のアカウント設定で制御します。Session Replayは無効にしています。',
+          examples: 'ブラウザエラー、ページ閲覧、登録導線、パフォーマンス指標',
         },
         preference: {
           name: '設定Cookie',
@@ -89,6 +89,14 @@ lastUpdated: 'レビュー原稿: 2026-09-17'
           duration:
             '提供者が管理する計測。va_*というCookieの存在は断定しません。公開前に通信と保存領域を確認（HUMAN-09）。',
         },
+        posthog: {
+          name: 'PostHogのブラウザ分析保存領域',
+          provider: 'PostHog',
+          purpose: '同意済みブラウザ分析に使う仮名化ブラウザ識別子を保持',
+          category: '分析',
+          duration:
+            'SDKが保存方法を管理します。公開前に実際の保存キー・期間・撤回後の削除を確認してください（HUMAN-09）。',
+        },
         turnstile: {
           name: 'Cloudflare Turnstileのブラウザ技術',
           provider: 'Cloudflare',
@@ -105,6 +113,8 @@ lastUpdated: 'レビュー原稿: 2026-09-17'
           'Vercel — ホスティングと配信は分析への同意がなくても提供します。Vercel AnalyticsとSpeed Insightsは分析への同意後に限りブラウザで動作します。',
         sentry:
           'Sentry — サーバー・エッジの診断はブラウザの同意とは独立して継続します。ブラウザでの初期化と情報送信には分析への同意が必要ですが、SDKのコード自体は同意前にも含まれる場合があります。リクエスト本文、メールアドレス、クエリ文字列、Cookie、認証情報を除去する処理を行います。Session Replayは無効です。',
+        posthog:
+          'PostHog — 同意後のウェブサイト・Productのブラウザイベントに仮名化ブラウザ識別子を使います。Productのサーバー側アカウントイベントは、プライバシーポリシーに記載する別のアカウント分析設定で制御します。',
         turnstile:
           'Cloudflare Turnstile — フォームに必要なbot対策です。検証tokenと送信元IPアドレスをCloudflareへ送ります。Cloudflareは同社のプライバシーポリシーに基づき、必要なブラウザ保存領域とdevice signalを使用する場合があります。',
         note: '各プロバイダーによるデータ処理とブラウザ技術の使用については、各社のプライバシーポリシーをご参照ください。',
@@ -121,7 +131,7 @@ lastUpdated: 'レビュー原稿: 2026-09-17'
       impact: {
         title: 'Cookie無効化の影響',
         content:
-          '必須Cookieを無効にすると、サインインや主要機能の使用ができなくなります。設定Cookieを無効にすると、言語やテーマなどの設定がセッション間で記憶されなくなります。分析を拒否しても主要機能には影響せず、ブラウザ版Sentry、Vercel Analytics、Speed Insightsは起動しません。Session Replayは無効にしています。サービス障害を診断するため、サニタイズ済みのProductionサーバー・Edgeエラー監視は継続します。',
+          '必須Cookieを無効にすると、サインインや主要機能の使用ができなくなります。設定Cookieを無効にすると、言語やテーマなどの設定がセッション間で記憶されなくなります。分析を拒否しても主要機能には影響せず、そのサイトではブラウザ版Sentry、PostHog、Vercel Analytics、Speed Insightsは起動しません。Productのサーバー側アカウントイベントは、別のアカウント分析設定で制御します。Session Replayは無効にしています。サービス障害を診断するため、サニタイズ済みのProductionサーバー・Edgeエラー監視は継続します。',
       },
       doNotTrack: {
         title: 'Do Not Trackシグナル',

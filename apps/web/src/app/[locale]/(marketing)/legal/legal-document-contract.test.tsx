@@ -130,8 +130,8 @@ const LEGAL_CONTRACT_CASES: readonly LegalContractCase[] = [
     slug: 'privacy',
     metadataTitle: 'Privacy Policy - Dayopt',
     metadataDescription: 'How Dayopt handles your personal information',
-    lastUpdated: 'Review draft: 2026-09-17',
-    bodyHash: 'e11ff1029108a645912ff7718f2633d28027f96e12fe9b8d8152957cb5dc7602',
+    lastUpdated: 'Review draft: 2026-09-25',
+    bodyHash: '669c587b6aa8979b4f9b5295feb8275ebab65724d78f8902d9c25abb3083b2c5',
     hrefs: [
       'https://developers.google.com/terms/api-services-user-data-policy',
       '/legal/cookies',
@@ -164,8 +164,8 @@ const LEGAL_CONTRACT_CASES: readonly LegalContractCase[] = [
     slug: 'cookies',
     metadataTitle: 'Cookie Policy - Dayopt',
     metadataDescription: 'How Dayopt uses cookies and similar technologies',
-    lastUpdated: 'Review draft: 2026-09-17',
-    bodyHash: '43b96db13c0fa583d04af2f890754df4f8dae957c6aa4203a8fbdcf99db40f2a',
+    lastUpdated: 'Review draft: 2026-09-25',
+    bodyHash: '20e009b46e4a23b48a1dcb3df8614921673da3f4c2cef206aff072a81b322b37',
     hrefs: ['/legal/privacy'],
     counts: {
       h2: 10,
@@ -215,8 +215,8 @@ const LEGAL_CONTRACT_CASES: readonly LegalContractCase[] = [
     slug: 'privacy',
     metadataTitle: 'プライバシーポリシー - Dayopt',
     metadataDescription: 'Dayoptにおける個人情報の取り扱いについて',
-    lastUpdated: 'レビュー原稿: 2026-09-17',
-    bodyHash: '531e9ac22ca1ad8e7222641a8d3ac50c324f69622bf5fe9af9c5c46e79269da9',
+    lastUpdated: 'レビュー原稿: 2026-09-25',
+    bodyHash: 'b4cc3018705fb30991a6def1bae6b5d7155624b9fbd30421283846046f164b39',
     hrefs: [
       'https://developers.google.com/terms/api-services-user-data-policy',
       '/ja/legal/cookies',
@@ -249,8 +249,8 @@ const LEGAL_CONTRACT_CASES: readonly LegalContractCase[] = [
     slug: 'cookies',
     metadataTitle: 'Cookieポリシー - Dayopt',
     metadataDescription: 'Dayoptにおけるクッキーおよび類似技術の使用について',
-    lastUpdated: 'レビュー原稿: 2026-09-17',
-    bodyHash: '073d48adb096acbcf314f3e58622a2a7665af5db7cd17de9e34937a23f00cd43',
+    lastUpdated: 'レビュー原稿: 2026-09-25',
+    bodyHash: '000b4f314d0609306a072711000766a796204def62043d2c6335070075fb5964',
     hrefs: ['/ja/legal/privacy'],
     counts: {
       h2: 10,
