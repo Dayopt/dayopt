@@ -7,7 +7,7 @@
 #
 # 完了定義（5点すべてを満たして初めて「作業終了」）:
 #   ① PR マージ済み
-#   ② worktree 削除
+#   ② linked worktree 削除（通常 checkout は保持）
 #   ③ ローカル branch 削除
 #   ④ リモート branch 消滅（fetch --prune で確認）
 #   ⑤ ローカル main ref が origin/main と一致
@@ -894,6 +894,11 @@ WORKTREE_PATH="$(git worktree list --porcelain | awk -v br="refs/heads/$BRANCH" 
   /^branch / && $2 == br { print path; exit }
 ')"
 
+RETAIN_CHECKOUT=false
+if [[ -n "$WORKTREE_PATH" && "$(cd "$WORKTREE_PATH" && pwd -P)" == "$(cd "$MAIN_ROOT" && pwd -P)" ]]; then
+  RETAIN_CHECKOUT=true
+fi
+
 if [[ -n "$WORKTREE_PATH" ]]; then
   info "worktree: $WORKTREE_PATH"
 else
@@ -904,7 +909,10 @@ fi
 if [[ -n "$WORKTREE_PATH" ]]; then
   step "worktree の未コミット差分を確認"
 
-  DIRTY="$(git -C "$WORKTREE_PATH" status --porcelain 2>/dev/null || true)"
+  if ! DIRTY="$(git -C "$WORKTREE_PATH" status --porcelain 2>/dev/null)"; then
+    error "worktree の状態を取得できません。掃除を中止します。"
+    exit 1
+  fi
 
   if [[ -n "$DIRTY" ]]; then
     # tracked ファイルの差分があるかを判定する。
@@ -921,10 +929,25 @@ fi
 
 # ── 5. worktree 削除 ────────────────────────────────────────────────
 if [[ -n "$WORKTREE_PATH" ]]; then
-  step "worktree を削除"
-  # gitignore された生成物（.next/ 等）だけが残って remove が拒否される場合に備え、
-  # dirty 確認（step 4）を通過している前提で --force を付ける。
-  run git worktree remove --force "$WORKTREE_PATH"
+  if [[ "$RETAIN_CHECKOUT" == true ]]; then
+    # Cloud の通常 clone は削除できない。対象 branch の未保存差分と main への
+    # 到達を確認した場合だけ detach し、checkout のファイルと実行場所を保つ。
+    # 他 session の branch は WORKTREE_PATH に一致しないので切り替えない。
+    if [[ "$DRY_RUN" != true ]]; then
+      git -C "$MAIN_ROOT" fetch origin main
+      if ! git -C "$MAIN_ROOT" merge-base --is-ancestor "refs/heads/$BRANCH" refs/remotes/origin/main; then
+        error "対象 branch は origin/main に到達していません。checkout を保持して停止します。"
+        exit 1
+      fi
+    fi
+    step "通常 checkout を保持して対象 branch を終了"
+    run git -C "$MAIN_ROOT" switch --detach
+  else
+    step "worktree を削除"
+    # gitignore された生成物（.next/ 等）だけが残って remove が拒否される場合に備え、
+    # dirty 確認（step 4）を通過している前提で --force を付ける。
+    run git worktree remove --force "$WORKTREE_PATH"
+  fi
 fi
 
 # 孤児化した worktree 管理情報をここで掃除する（step 6 より前に行う）。
@@ -1046,7 +1069,11 @@ else
 
   echo "✅ PR #$PR_NUMBER を片付けました:" >&2
   echo "   - branch: ${BRANCH}（ローカル / リモートとも削除）" >&2
-  [[ -n "$WORKTREE_PATH" ]] && echo "   - worktree: ${WORKTREE_PATH}（削除）" >&2
+  if [[ "$RETAIN_CHECKOUT" == true ]]; then
+    echo "   - checkout: ${WORKTREE_PATH}（保持・detached HEAD）" >&2
+  elif [[ -n "$WORKTREE_PATH" ]]; then
+    echo "   - worktree: ${WORKTREE_PATH}（削除）" >&2
+  fi
 
   # 完了定義⑤: ローカル main ref が origin/main と一致していること。
   # main checkout がどの branch にいるかは問わない（別セッションの作業を尊重する）。

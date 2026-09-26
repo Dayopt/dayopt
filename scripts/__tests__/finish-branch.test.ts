@@ -372,7 +372,8 @@ type RepoScenario = {
   /** origin/main に feature を merge --no-ff 済みにするか */
   mergeIntoMain: boolean;
   /** MAIN_ROOT の HEAD。'other' は別セッションが作業中の状態を表す */
-  mainRootHead: 'main' | 'other';
+  mainRootHead: 'main' | 'other' | 'feature';
+  dirtyFeature?: boolean;
   /** main を MAIN_ROOT 以外の worktree が checkout している状態にする */
   addMainWorktree?: boolean;
   /** feature branch の worktree を作る */
@@ -428,6 +429,10 @@ function runScriptOnRepo(scenario: RepoScenario) {
 
   if (scenario.mainRootHead === 'other') {
     git(mainRoot, 'checkout', '-b', 'other');
+  }
+  if (scenario.mainRootHead === 'feature') {
+    git(mainRoot, 'checkout', BRANCH);
+    if (scenario.dirtyFeature) writeFileSync(join(mainRoot, 'feature.txt'), 'uncommitted\n');
   }
   if (scenario.addMainWorktree) {
     git(mainRoot, 'worktree', 'add', mainWorktree, 'main');
@@ -1473,6 +1478,33 @@ describe('マージ経路（#1771 症状①）', () => {
 });
 
 describe('main checkout に触らない掃除（#1771）', () => {
+  it('Cloudの通常checkoutではディレクトリを保持し、対象branchだけ終了する', () => {
+    const repo = runScriptOnRepo({
+      prState: 'MERGED',
+      mergeIntoMain: true,
+      mainRootHead: 'feature',
+    });
+    expect(repo.status, repo.stderr).toBe(0);
+    expect(existsSync(repo.mainRoot)).toBe(true);
+    expect(repo.branchExists()).toBe(false);
+    expect(repo.currentBranch(repo.mainRoot)).toBe('');
+    expect(repo.localMainMatchesRemote()).toBe(true);
+    expect(repo.remoteBranchExists()).toBe(false);
+  });
+
+  it('Cloudの通常checkoutにも未保存差分の保護を適用する', () => {
+    const repo = runScriptOnRepo({
+      prState: 'MERGED',
+      mergeIntoMain: true,
+      mainRootHead: 'feature',
+      dirtyFeature: true,
+    });
+    expect(repo.status).toBe(1);
+    expect(repo.stderr).toContain('未コミット');
+    expect(repo.branchExists()).toBe(true);
+    expect(readFileSync(join(repo.mainRoot, 'feature.txt'), 'utf8')).toBe('uncommitted\n');
+  });
+
   it('通常系（MAIN_ROOT が main）は従来どおり branch -d で削除する', () => {
     const repo = runScriptOnRepo({
       prState: 'MERGED',
@@ -1542,6 +1574,18 @@ describe('main checkout に触らない掃除（#1771）', () => {
 });
 
 describe('掃除で緩めてはいけない判定（#1771）', () => {
+  it('Cloudでも未マージbranchをdetach・削除しない', () => {
+    const repo = runScriptOnRepo({
+      prState: 'CLOSED',
+      mergeIntoMain: false,
+      mainRootHead: 'feature',
+    });
+    expect(repo.status).toBe(1);
+    expect(repo.branchExists()).toBe(true);
+    expect(repo.currentBranch(repo.mainRoot)).toBe(BRANCH);
+    expect(repo.remoteBranchExists()).toBe(true);
+  });
+
   it('マージに失敗したら掃除へ進まない', () => {
     // REST 直叩きは失敗しても fallback しない。worktree も branch も残ること。
     const repo = runScriptOnRepo({
