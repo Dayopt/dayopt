@@ -1,4 +1,6 @@
-import { test as base, expect, type Request, type Response } from '@playwright/test';
+import { expect, type Request, type Response } from '@playwright/test';
+
+import { test as base } from './preview-access-fixture';
 
 /**
  * HTTP batch 数ではなく、ブラウザが送った procedure 数を操作前から数える。
