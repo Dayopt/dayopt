@@ -456,7 +456,9 @@ describe('detectAcceptanceCriteria', () => {
     expect(detectAcceptanceCriteria('## 受け入れ条件\n- できる')).toMatchObject({
       acceptance: true,
     });
-    expect(detectAcceptanceCriteria('完了条件: XXX')).toMatchObject({ acceptance: true });
+    expect(detectAcceptanceCriteria('完了条件: 保存した内容を再表示できる')).toMatchObject({
+      acceptance: true,
+    });
     expect(detectAcceptanceCriteria('## やること\n- [ ] 実装する\n- [ ] test\n')).toMatchObject({
       acceptance: true,
     });
@@ -465,6 +467,118 @@ describe('detectAcceptanceCriteria', () => {
     });
     expect(detectAcceptanceCriteria('本文だけ')).toMatchObject({ acceptance: false });
     expect(detectAcceptanceCriteria(undefined)).toMatchObject({ acceptance: false });
+  });
+
+  it.each([
+    [
+      'GitHub bug Form',
+      [
+        '### 背景 — 問題と期待する変化',
+        '保存結果が一覧に反映されない。',
+        '### やること — Goal / Scope / Non-goals / AC',
+        '- [ ] 受け入れ条件: 保存した内容が一覧に反映される。',
+        '### 注意（触らない範囲）',
+        '該当なし: ローカルの入力判定だけを変更し、外部状態には触れない。',
+        '### 検証 — 実行した結果を記録',
+        '```bash',
+        'pnpm test:scripts',
+        '```',
+      ].join('\n'),
+    ],
+    [
+      'Markdown chore',
+      [
+        '## 背景 — 問題と期待する変化',
+        '古い案内が着手時に迷いを生む。',
+        '## やること',
+        '- [ ] 受け入れ条件: 現行の案内へ辿れる。',
+        '## 注意',
+        '履歴と既存の運用境界を保つ。',
+        '## 検証',
+        '`pnpm docs:check` を実行する。',
+      ].join('\n'),
+    ],
+    [
+      'Markdown research',
+      [
+        '## 背景',
+        '研究の適用先が未確認。',
+        '## やること — 調査の完了条件',
+        '- [ ] 受け入れ条件: 一次資料と未確認事項を分けて記録する。',
+        '## 注意',
+        '未確認: 関連する Dayopt 実装を先に調べる。',
+        '## 検証',
+        'pnpm test:scripts',
+      ].join('\n'),
+    ],
+    [
+      'GitHub high-impact Form',
+      [
+        '### 背景',
+        'OAuth scope の境界を明確にする。',
+        '### やること',
+        '- [ ] 受け入れ条件: 未許可 scope を拒否し、既存 client を維持する。',
+        '### 注意',
+        '顧客挙動と外部契約を確認し、production を変更しない。',
+        '### 検証',
+        'pnpm test:scripts',
+      ].join('\n'),
+    ],
+  ])('%s の4節と受け入れ条件を読む', (_name, body) => {
+    expect(detectAcceptanceCriteria(body)).toMatchObject({
+      acceptance: true,
+      verification: true,
+      missingContractSections: [],
+    });
+  });
+
+  it('Forms の検証本文を次の同階層見出しで区切る', () => {
+    const formBody = [
+      '### 背景',
+      '問題',
+      '### やること',
+      '- [ ] 受け入れ条件: 完了する',
+      '### 注意',
+      '該当なし: 対象はローカル文書だけ。',
+      '### 検証',
+      '```bash',
+      'pnpm test:scripts',
+      '```',
+    ].join('\n');
+    expect(extractAcceptanceCriteriaText(formBody)).toContain('pnpm test:scripts');
+    expect(extractAcceptanceCriteriaText(formBody)).not.toContain('該当なし');
+  });
+
+  it('空欄・TBD・根拠のない該当なしを不足として扱い、根拠付き該当なしは受け入れる', () => {
+    const incomplete = [
+      '## 背景',
+      'TBD',
+      '## やること',
+      '- [ ] TBD',
+      '## 注意',
+      '該当なし',
+      '## 検証',
+      '```bash',
+      'TBD',
+      '```',
+    ].join('\n');
+
+    expect(detectAcceptanceCriteria(incomplete)).toMatchObject({
+      acceptance: false,
+      verification: false,
+      missingContractSections: ['背景', 'やること', '注意'],
+    });
+    expect(detectAcceptanceCriteria('## 受け入れ条件\n該当なし')).toMatchObject({
+      acceptance: false,
+    });
+    expect(detectAcceptanceCriteria('## 受け入れ条件\n受け入れ条件: TBD')).toMatchObject({
+      acceptance: false,
+    });
+    expect(
+      detectAcceptanceCriteria('## 受け入れ条件\n該当なし: 変更不要である理由を確認済み'),
+    ).toMatchObject({
+      acceptance: true,
+    });
   });
 
   it('検証コマンドは fenced code block、pnpm/gh/node/git/rg/npx のインラインコード、または expect( で あり', () => {
@@ -481,6 +595,9 @@ describe('detectAcceptanceCriteria', () => {
       verification: true,
     });
     expect(detectAcceptanceCriteria('## 検証\n`ls -la` を実行')).toMatchObject({
+      verification: false,
+    });
+    expect(detectAcceptanceCriteria('## 検証\n```bash\nTBD\n```')).toMatchObject({
       verification: false,
     });
     expect(detectAcceptanceCriteria('本文だけ')).toMatchObject({ verification: false });
@@ -812,7 +929,7 @@ describe('buildContextPack (execFileImpl 経由の gh 呼び出し形)', () => {
                 state: 'open',
                 labels: [],
                 html_url: 'https://github.com/Dayopt/dayopt/issues/123',
-                body: `## やること\n受け入れ条件: scripts/tasks/ctx.mjs の結果を確認\n## 検証\n\`pnpm test:scripts\`\n${'説明\n'.repeat(70)}${suffix}`,
+                body: `## 背景\nIssueの長文を要約しても制約を失わない。\n## やること\n受け入れ条件: scripts/tasks/ctx.mjs の結果を確認\n## 注意\n該当なし: ローカルの出力形式だけを確認する。\n## 検証\n\`pnpm test:scripts\`\n${'説明\n'.repeat(70)}${suffix}`,
               });
             return '[]';
           },
@@ -1365,6 +1482,7 @@ describe('buildContextPack (execFileImpl 経由の gh 呼び出し形)', () => {
       brief: false,
       acceptance: false,
       verification: false,
+      missingContractSections: ['背景', 'やること', '注意'],
     });
     expect(pack.nextStepSecondary).toBe(
       '判断の記録が欠けている: DoD・分解表・brief・受け入れ条件・検証コマンド（dispatch §status:ready の機械判定）（routing skill 手順 1 / dispatch 手順 7）',

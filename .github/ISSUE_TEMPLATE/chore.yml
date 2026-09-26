@@ -6,29 +6,33 @@ body:
   - type: markdown
     attributes:
       value: |
-        `priority:` / `area:` は [github-labels.md](https://github.com/Dayopt/dayopt/blob/main/docs/operations/github-labels.md) の一覧から選んで追加する。**milestone は付けない**（着手時に Main が付与する。`.claude/skills/dispatch/SKILL.md` 操作 A）。
+        `priority:` / `area:` は [github-labels.md](https://github.com/Dayopt/dayopt/blob/main/docs/operations/github-labels.md) の一覧から選んで追加する。**milestone は付けない**（着手時に Main が付与する。`.agents/skills/dispatch/SKILL.md` 操作 A）。
   - type: textarea
     id: background
     attributes:
       label: 背景
-      description: なぜやるか。関連 issue / docs / 過去 PR へのリンク
+      description: 解決する問題と期待する変化。確認済み事実と未確認の仮説を分け、関連 issue / docs / 過去 PR を参照
     validations:
       required: true
   - type: textarea
     id: todo
     attributes:
       label: やること
-      description: '番号付き手順。対象ファイル path を明記。受け入れ条件（何ができたら完了か）を 1 行以上。外部リサーチが要る時は「Deep Research 依頼: <問い>」を 1 行書く'
+      description: 'Goal、Scope / Non-goals、受け入れ条件、未解決事項を書く。必要な場合だけ手順・対象 path を示し、確認していない実装方法を確定事項にしない'
     validations:
       required: true
   - type: textarea
     id: caution
     attributes:
       label: 注意
-      description: 既知の罠、触ってはいけない領域、単独 PR にしない場合の相乗り先
+      description: 触らない範囲、権限境界、外部作用、必要な停止・復帰条件。該当なしの場合は理由を書く
+    validations:
+      required: true
   - type: textarea
     id: verification
     attributes:
       label: 検証
-      description: そのまま実行できる検証コマンドと確認観点（worker が受け入れ条件を機械で確かめられる形に）
+      description: 受け入れ条件を確かめる実行可能なコマンドまたは具体的な手順。必要な検証と実行済みの結果を分け、未実行・失敗も記録
       placeholder: pnpm check など
+    validations:
+      required: true
