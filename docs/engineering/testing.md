@@ -132,6 +132,29 @@ agent が実際に踏んで、緑の報告が嘘になった事例。どれも�
 - **`package.json` の依存を触ったら同じ commit に `pnpm-lock.yaml` を含める。** ローカルは既存 node_modules で素通りし、CI だけ全 job が setup で 15〜20 秒で落ちる（2026-09-07 PR #2623）。push 前に `pnpm install --frozen-lockfile` を通す。`catalog:` 化や依存 1 本の追加でも pnpm は無関係な version を再解決して動かすので、`git diff -U0 pnpm-lock.yaml | grep '^-' | grep -v '^---'` が空でなければ drift。旧 version へ手で戻してから `--frozen-lockfile` に検証させる（#2518、#2827）
 - **新規 package に test を足したら root `test:run` の `&&` 連結へも足す。** turbo 任せではないので、忘れると CI で永久に走らない
 
+### Cloud Preview の実行前照合（#2910、移行中）
+
+`node scripts/ci/preview-readiness.mjs` は、指定した Product Preview と非本番 DB の対応を読み取りで確認する。まだ E2E を起動するコマンドや required check ではない。常設 DB 登録・資格情報配布・実 Preview での検証は未完了であり、この処理の unit test 成功を環境稼働の証拠にしない。
+
+```bash
+node scripts/ci/preview-readiness.mjs \
+  --sha <完全な候補SHA> --deployment <dpl_ID> \
+  --branch <PRのbranch> --pr <PR番号> \
+  --db-ref <非本番project_ref> --db-branch <Supabase branch UUID> \
+  --db-mode <sharedまたはephemeral>
+```
+
+- 同じ SHA の clean checkout で実行する。期待 migration はその checkout から取得する。Supabase URL のみの指定や、可変 branch alias は対象選択に使わない。
+- `VERCEL_TOKEN`（対象 project の読取）、`SUPABASE_PREVIEW_READINESS_TOKEN`（branch metadata / 対象非本番 DB の読取）、`VERCEL_AUTOMATION_BYPASS_SECRET` を許可済み runner の環境から渡す。引数・証拠 JSON・ログへ値を出さず、個人の Vault unlock をコマンドの前提にしない。初期の登録・scope確認は別途必要。
+- Vercel API が返す具体 deployment の project、Git source、SHA、READY、非 production target を確認する。Supabase は指定 parent/branch/ref、非 default、本番データ複製なしを確認する。`shared` は persistent、`ephemeral` は同じ PR/branch に属する使い捨て環境に限る。
+- migration の version 集合は候補と完全一致を要求する。共有 DB に別候補の migration が入った場合も止まり、自動 reset・migration 適用・redeploy は行わない。version の一致は手動 DDL が無いことの証明ではない。
+- Preview の `/api/health/version` が返す完全 SHA / deployment ID / DB ref、および `/api/health` の DB 疎通も照合する。本番の version 応答は従来どおり。欠測や古いアプリは未確認として失敗する。
+- 成功 JSON は識別子・migration versions・観測開始/終了時刻のみ。各サービスを原子的に読んだ snapshot ではないため、将来の remote runner は E2E 前後に照合し、共有 DB の候補競合を別途防ぐ。
+
+非ローカルで service role を使う既存 E2E は `E2E_ALLOW_NONLOCAL_SUPABASE=1` に加え `E2E_SUPABASE_PROJECT_REF` を要求し、対応する HTTPS Supabase origin だけに接続する。これは上の readiness を代替しない。critical-path の synthetic user は実行ごとに password を生成し、作成成功を確認した同じ client/user だけを cleanup する。setup・cleanup の失敗は test を失敗させ、cleanup エラーには合成 user ID と失敗箇所だけを残す。プロセス強制終了や作成応答喪失時の残存回収は、remote runner の run 記録と合わせて実装・検証する必要がある。
+
+[Protection Bypass の公式仕様](https://vercel.com/docs/deployment-protection/methods-to-bypass-deployment-protection/protection-bypass-automation)に従い、readiness の bypass header は API で確認した具体 deployment の origin だけへ送る。redirect は拒否する。ブラウザ全体への header 設定や query parameter への secret 埋込は使わない。[Playwright trace はネットワークも記録する](https://playwright.dev/docs/api/class-tracing)ため、remote E2E の trace/添付公開は credential を含めない経路が整うまで未実装とする。
+
 ### ローカル E2E とブラウザ実測
 
 - **login 系 E2E をローカルで走らせるには env 4 点を渡す。** `.env` は読まず `supabase status -o json` から鍵を取る。渡さないと `resolveServiceRoleTarget` が false になり suite ごと skip して「0 failed」の緑に見える（`4 skipped` を確認する）
