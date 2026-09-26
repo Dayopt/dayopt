@@ -37,6 +37,15 @@ describe('factory routing', () => {
     });
   });
 
+  it('reports missing Issue Contract sections in its advisory checklist', () => {
+    expect(
+      resolveFactoryRoute({ ...normal, missingContractSections: ['背景', '注意'] }),
+    ).toMatchObject({
+      ready: false,
+      missing: ['背景（Issue Contract）', '注意（Issue Contract）'],
+    });
+  });
+
   it.each([
     'supabase/migrations/20260908000000_change.sql',
     'apps/product/src/features/auth/check.ts',
