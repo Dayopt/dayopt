@@ -11,6 +11,7 @@ const COOKIE_ITEMS = [
   'theme',
   'cookieConsent',
   'vercelAnalytics',
+  'posthog',
   'turnstile',
 ] as const;
 
