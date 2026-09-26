@@ -245,6 +245,8 @@ export function useInteraction(props: UseInteractionProps): UseInteractionReturn
       e: React.MouseEvent | React.TouchEvent,
       position: TimeblockRect,
     ) => {
+      // Touch はカード側の long-press move に限定し、resize の起点にしない。
+      if (e.type === 'touchstart') return;
       // マウスイベントの場合は左クリックのみ許可
       if ('button' in e && e.button !== 0) return;
       const r = latestRef.current;

@@ -288,6 +288,7 @@ describe('precision regression: 移動 / リサイズは相対 snap で元の分
       currentPoint: origin,
       originalPosition: off607,
       direction: 'bottom',
+      snappedTop: 607,
       snappedHeight: 60,
       previewTime: {
         start: new Date('2026-01-15T10:07:00'),

@@ -33,6 +33,7 @@ const resizing: Extract<InteractionState, { mode: 'resizing' }> = {
   currentPoint: { clientX: 0, clientY: 100 },
   originalPosition: { top: 0, height: 60, left: 0, width: 100 },
   direction: 'bottom',
+  snappedTop: 10,
   snappedHeight: 120,
   previewTime: resizingPreviewTime,
   isOverlapping: false,
@@ -72,6 +73,7 @@ describe('getAdjustedStyle', () => {
       const result = getAdjustedStyle(baseStyle, 'plan-1', resizing);
       expect(result).toMatchObject({
         ...baseStyle,
+        top: 10,
         height: '120px',
         zIndex: 1000,
       });

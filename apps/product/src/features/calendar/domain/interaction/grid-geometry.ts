@@ -84,12 +84,43 @@ export function buildMoveTimeRange(
 }
 
 // ========================================
-// 既存ブロックのリサイズ（開始固定 + 終端の相対 snap）
+// 既存ブロックのリサイズ（両端の相対 snap）
 // ========================================
 
 /** リサイズ中も動かさない開始時刻（分）。snap せず元の分を保持する。 */
 export function resolveResizeStartMinutes(originalTopPx: number, hourHeight: number): number {
   return pixelsToMinutesUnsnapped(originalTopPx, hourHeight, DAY_LAST_START_MINUTES);
+}
+
+/** リサイズ開始時に保持する元の終了時刻（分）。最小長へ正規化しない。 */
+export function resolveResizeOriginalEndMinutes(
+  originalBottomPx: number,
+  hourHeight: number,
+): number {
+  return pixelsToMinutesUnsnapped(originalBottomPx, hourHeight, DAY_END_MINUTES);
+}
+
+/**
+ * リサイズ後の開始時刻（分）を相対 snap で求め、終了時刻を固定する。
+ * 元のブロックが最小長より短い場合、短くする方向への操作は元の開始時刻で止める。
+ */
+export function resolveResizeTopMinutes(params: {
+  originalTopPx: number;
+  originalBottomPx: number;
+  deltaPx: number;
+  hourHeight: number;
+  intervalMin: number;
+}): number {
+  const { originalTopPx, originalBottomPx, deltaPx, hourHeight, intervalMin } = params;
+  const originalStart = pixelsToMinutesUnsnapped(originalTopPx, hourHeight, DAY_LAST_START_MINUTES);
+  const originalEnd = pixelsToMinutesUnsnapped(originalBottomPx, hourHeight, DAY_END_MINUTES);
+  const originalDuration = originalEnd - originalStart;
+  const latestStart =
+    originalDuration < MIN_TIMEBLOCK_DURATION_MINUTES
+      ? originalStart
+      : originalEnd - MIN_TIMEBLOCK_DURATION_MINUTES;
+  const moved = originalStart + snapDeltaMinutes(deltaPx, hourHeight, intervalMin);
+  return Math.max(0, Math.min(latestStart, moved));
 }
 
 /**
