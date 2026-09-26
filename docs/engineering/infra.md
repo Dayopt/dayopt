@@ -23,7 +23,34 @@ Dayopt の標準ルートは `local → PR Preview → production`。Vercel Prev
 
 web（`dayopt.app`）と product（`app.dayopt.app`）は別ドメインで配信する。web から product へは絶対 URL でリンクし、path ベースの Multi-Zones（web の rewrites で `/settings` や `/app-static` を product へ proxy する構成）は使わない。production で既に 404 になっていたため 2026-09-14 に設定を撤去した（#2747）。security headers の正本は各 app の `next.config.mjs` の `headers()` で、`vercel.json` には置かない。
 
-persistent staging は常設しない。固定 URL が必要な Stripe / OAuth callback / closed beta 検証が出た時だけ、Vercel staging と Supabase persistent branch を追加する。
+上表は稼働中の構成。Cloud-firstへの移行仕様は次節。常設環境の構築と通し検証が終わるまで、稼働済みの構成とは区別する。
+
+### Cloud-firstへの移行契約（#2910、構築中）
+
+通常の実装はCodex Cloud、手元のUI確認は任意のStorybookを入口とする。CI内のDocker・隔離DB・RLS・migration検証は維持する。個人の1Password unlockやMacのDBを通常workerの前提にしない。
+
+| 用途                               | アプリ                                         | DB                                  |
+| ---------------------------------- | ---------------------------------------------- | ----------------------------------- |
+| 通常PR                             | PRごとのVercel Preview                         | 常設の非本番Supabaseを共有          |
+| DB・共通認証設定の変更、破壊的検証 | PRごとのVercel Preview                         | そのPR専用の使い捨てSupabase branch |
+| 統合確認                           | 専用Vercel projectのProduction target、固定URL | 同じ常設Supabase 1環境              |
+| 任意の手元UI確認                   | Storybook / mock                               | 不要                                |
+
+常設には合成データとテスト専用アカウントを維持する。人間の確認用とAI・E2E用のユーザーを分離し、並列runは自分が作ったデータだけ掃除する。DB/RLS/migration以外でも、全ユーザー対象のjob、Auth、Storage、共通設定に影響する実験は共有DBで行わない。本番データを複製しない。
+
+同じDBへ接続するとアカウントを使い回せるが、異なるPreview domain間のログインsession共有は保証されない。アプリ認証とVercel Deployment Protectionは別々に確認する。共有DBに接続したPRを固定MCP OAuth issuerとして扱わない。
+
+本番と揃えるのはcode、migration、RLS、認証・利用権・Webhook・Cronの処理。変えてよいものは接続先、資格情報、データ、URL、外部サービスのテストaccount/mode、メール送信先、ログ環境、容量。`VERCEL_ENV=production`だけで本番と判定せず、専用project/ref/domainと外部accountを照合する。認証や課金判定を無効化して同等とみなさない。
+
+待機時の常設は実際に公開済みの本番revisionに対応させる。統合確認時だけ候補を固定し、別候補で上書きしない。必要な確認はmain merge前に行う（既存Supabase Git integrationはmerge時に本番migrationを適用するため）。本番へ渡すのは検証したcode/migrationであり、非本番Secret入りのbuildではない。
+
+証拠はIssue/PR、既存ctx/trace/Validation、各サービスへの参照を使う。head/base SHA、deployment、DB ref、migration集合、run/attempt、観測時刻を対応付け、古い成功・欠測・接続拒否を現在の成功にしない。専用dashboardや管理DBは作らない。
+
+**使い捨てbranchの費用と終了**: 作成前にPR・git branch・Supabase branch ID/ref・所有者を記録する。作成したら検証とマージまで進める。マージできなければ、そのPR専用で非default・非persistentと確認できたbranchだけを削除し、APIで消滅を確認する。単なる古いbranch名やPR checkの成功から削除対象を推測しない。理由、保持した証拠、再開時のGit integrationによる再作成・migration/seed・環境変数再同期・新deploymentの照合手順をPRへ残す。再開時には古いDBの成功を再利用しない。Vercel deploymentとCI artifactの保持はDB削除と別に扱う。
+
+**構築前の確認対象**: 常設Micro相当1本、専用Vercel project、固定URL、Stripe Sandbox、Resendの許可送信先、Google Calendarテストaccount、Sentry環境、MCP OAuth identity、Cron。新規有料プランは前提にしない。Microのcomputeは概ね月$10だがusageは別であり上限保証ではない。resource一覧・接続先・費用・復旧方法をまとめて確認してから作る。データの復旧はアプリrollbackと分け、DBだけresetしてStripe等を孤児化させない。
+
+2026-09-26の確認ではSupabaseはmainのみで、常設と上記接続は未構築。未接続のAC、統合gateの実強制、Preview E2Eの通し検証は#2910に残す。通し検証前に旧経路や手元の実物を削除しない。
 
 ### テスト自動化の現在地
 
@@ -1130,15 +1157,16 @@ Supabase CLIを使用して、データベーススキーマからTypeScript型�
 
 ### コマンド
 
-| コマンド                            | ソース          | 用途                                      |
-| ----------------------------------- | --------------- | ----------------------------------------- |
-| `npm run types:generate`            | production main | `types:generate:production` の互換 alias  |
-| `npm run types:generate:production` | production main | production main から生成                  |
-| `npm run types:generate:local`      | Local DB        | ローカルから生成（`supabase start` 必要） |
+| コマンド                                                       | ソース          | 用途                                      |
+| -------------------------------------------------------------- | --------------- | ----------------------------------------- |
+| `pnpm types:generate --target preview --project-ref <ref>`     | PR専用DB        | 対象refを明示して生成                     |
+| `pnpm types:generate --target integration --project-ref <ref>` | 常設非本番DB    | 対象refを明示して生成                     |
+| `npm run types:generate:production`                            | production main | production main から生成                  |
+| `npm run types:generate:local`                                 | Local DB        | ローカルから生成（`supabase start` 必要） |
 
-PR Preview Branch の schema は Supabase integration check で検証する。型生成は production main か local のどちらかを明示して行う。
+引数なしの `pnpm types:generate` は失敗する。本番取得は明示した `types:generate:production` のみ。preview/integrationに本番refは指定できない。環境名は利用者の指定であり、そのrefの所有者やmigration適用済みを証明するものではない。PRのbranch/ref・適用migrationと照合してから実行し、CIの `types:generate:local` による再構築比較も維持する。
 
-全コマンドとも `apps/product/src/lib/database/generated/database.types.ts` に出力。
+全コマンドとも `apps/product/src/lib/database/generated/database.types.ts` に出力。CLI成功・Database型取得・整形成功後だけ置き換える。認証や生成に失敗しても既存ファイルは保持し、CLIの生のエラー出力は秘密情報を含み得るため表示しない。
 
 ### 使用タイミング
 

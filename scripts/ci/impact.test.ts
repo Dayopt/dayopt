@@ -276,6 +276,10 @@ describe('CI toolchain（productUnit / webCi と product / web の分離）', ()
 });
 
 describe('Vercel の build が実行する root script', () => {
+  it('DB型生成ラッパー単独の変更でもintegrationを実行する', () => {
+    expectImpact(['scripts/tasks/generate-database-types.mjs'], { integration: true });
+  });
+
   it.each([
     ['scripts/tasks/check-client-bundle-secrets.mjs'],
     ['scripts/tasks/check-bundle-budget.ts'],

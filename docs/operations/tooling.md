@@ -510,6 +510,9 @@ Node.js と package manager は実行場所ごとに暗黙で選ばせず、repo
 - Cloud の setup / maintenance はネットワークが有効な setup phase で実行し、自動検出が各 workspace へ npm を実行して `catalog:` / `workspace:` を壊す経路を作らない。Issue の context を `gh` で読む Cloud task は、repository access に加えて agent phase の GitHub API への限定アクセスが要る。無効・未認証なら context 未取得として止めず、取得できた L0 だけで進める
 - Codex Cloud の Secret は setup script にだけ渡り、agent phase の前に取り除かれる。Jev key を Cloud の通常 Environment Variable に置くと agent phase から読めるため設定しない。L1 を Cloud L2 に渡す時は、ローカルの認証済み `pnpm ctx <N> --post` で Issue Brief に保存し、Cloud 側は [`pnpm ctx <N> --reuse-brief-l1`](./jev.md) で入力一致とBrief投稿者・現在の `gh` 認証ユーザーの一致を検証して読む
 - Cloud で Docker・local Supabase・実ブラウザ・vault が必要な検証は完了扱いにせず、対応する local または CI の証跡を別に残す
+- `pnpm branch:finish` はlinked worktreeなら従来どおり削除する。Cloud等の通常checkoutは未保存差分がなく、local/remoteの先端がPRのheadと一致しorigin/mainへ到達していることを確認してdetachし、ディレクトリを保持する。mainと別branchのcheckoutは切り替えない。残存remote branchはPRのheadに対するlease付き削除で後続pushを保護する。GitHubのmerge条件は実行場所で変えない
+- 手元のUI確認は `pnpm storybook`、静的buildは `pnpm build-storybook`。既存mockを使い、アプリSecret・1Password・Local Supabaseを要求しない。これは実際の認証や外部連携の確認とは区別する
+- DB型取得は `pnpm types:generate --target preview --project-ref <ref>` 等で対象を指定する。省略時に本番へ接続しない。環境構成・終了時のDB費用・未移行項目は [infra.md](../engineering/infra.md#cloud-firstへの移行契約2910構築中) を参照
 
 ### 実行経路ごとの保護範囲
 
