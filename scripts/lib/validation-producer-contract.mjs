@@ -9,6 +9,7 @@ export const VALIDATION_PRODUCER_DEFINITIONS = Object.freeze([
   '.github/actions/setup/action.yml',
   'package.json',
   'scripts/ci/check.mjs',
+  'scripts/tasks/generate-database-types.mjs',
   'scripts/ci/impact.mjs',
 ]);
 

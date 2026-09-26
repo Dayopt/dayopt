@@ -398,17 +398,19 @@ describe('validation evidence: rejected evidence', () => {
     });
   });
 
-  it.each(['.github/workflows/ci.yml', 'scripts/ci/check.mjs', '.github/actions/setup/action.yml'])(
-    'does not trust a run whose producer definition %s is changed by the PR',
-    (file) => {
-      const result = evaluateValidation({ plan: plan([file, APP_FILE]), evidence: evidence() });
-      expect(result.suites.static.status).toBe('self-produced');
-      expect(result.suites.productUnit.status).toBe('self-produced');
-      expect(result.suites.productPreview.status).toBe('satisfied');
-      expect(result.verdict).toBe('blocked');
-      expect(result.reviewCandidateReady).toBe(true);
-    },
-  );
+  it.each([
+    '.github/workflows/ci.yml',
+    'scripts/ci/check.mjs',
+    '.github/actions/setup/action.yml',
+    'scripts/tasks/generate-database-types.mjs',
+  ])('does not trust a run whose producer definition %s is changed by the PR', (file) => {
+    const result = evaluateValidation({ plan: plan([file, APP_FILE]), evidence: evidence() });
+    expect(result.suites.static.status).toBe('self-produced');
+    expect(result.suites.productUnit.status).toBe('self-produced');
+    expect(result.suites.productPreview.status).toBe('satisfied');
+    expect(result.verdict).toBe('blocked');
+    expect(result.reviewCandidateReady).toBe(true);
+  });
 
   it('waits for the native job before reviewing a self-produced guardrail change', () => {
     const result = evaluateValidation({

@@ -125,6 +125,13 @@ if [[ -z "$BRANCH" || "$BRANCH" == "null" ]]; then
   exit 1
 fi
 
+# fork の headRefName も main になり得る。通常 checkout の保持経路でも
+# repository の default branch 自体は detach / branch 削除の対象にしない。
+if [[ "$BRANCH" == "main" ]]; then
+  error "main は掃除対象にできません。fork の PR は手動で対象 repository を確認してください。"
+  exit 1
+fi
+
 info "branch: $BRANCH / state: $PR_STATE"
 
 if [[ "$PR_STATE" == "CLOSED" ]]; then
@@ -864,22 +871,18 @@ if [[ "$PR_STATE" == "OPEN" ]]; then
   # `sha=` が落ちても dry-run 側が残っている限り test が pass してしまう。
   MERGE_ARGS=(-X PUT "repos/{owner}/{repo}/pulls/$PR_NUMBER/merge"
     -f merge_method=merge -f "sha=$HEAD_SHA")
-  DELETE_REF_ARGS=(-X DELETE "repos/{owner}/{repo}/git/refs/heads/$BRANCH")
 
   if [[ "$DRY_RUN" == true ]]; then
     echo "   [dry-run] gh api ${MERGE_ARGS[*]}" >&2
-    echo "   [dry-run] gh api ${DELETE_REF_ARGS[*]}" >&2
   else
     if ! gh api "${MERGE_ARGS[@]}" >/dev/null; then
       error "PR #$PR_NUMBER のマージに失敗しました。"
       error "gh pr view $PR_NUMBER で状態を確認してください（head が更新された可能性があります）。"
       exit 1
     fi
-    info "マージしました。リモート branch を削除します。"
-    # repo 設定は deleteBranchOnMerge: true だが、設定変更で掃除が静かに止まらないよう
-    # 明示的にも削除する。既に消えていれば 422 になるので失敗は無視してよい
-    # （残存した場合は step 8 が fetch --prune 後に検証する）。
-    gh api "${DELETE_REF_ARGS[@]}" >/dev/null 2>&1 || true
+    info "マージしました。リモート branch の残存は後段で確認します。"
+    # REST delete-ref には期待OIDを指定できない。別sessionの後続pushを
+    # 消さないよう、残存refの削除はstep 8のlease付き操作だけで行う。
   fi
 else
   info "PR は既にクローズ済みのためマージ手順はスキップします。"
@@ -934,7 +937,19 @@ if [[ -n "$WORKTREE_PATH" ]]; then
     # 到達を確認した場合だけ detach し、checkout のファイルと実行場所を保つ。
     # 他 session の branch は WORKTREE_PATH に一致しないので切り替えない。
     if [[ "$DRY_RUN" != true ]]; then
+      if [[ "$(git -C "$MAIN_ROOT" rev-parse --verify "refs/heads/$BRANCH")" != "$HEAD_SHA" ]]; then
+        error "checkout の branch は PR の head SHA と一致しません。掃除を中止します。"
+        exit 1
+      fi
       git -C "$MAIN_ROOT" fetch origin main
+      if ! REMOTE_HEADS="$(git -C "$MAIN_ROOT" ls-remote --heads origin "refs/heads/$BRANCH")"; then
+        error "リモート branch の先端を確認できません。checkout を保持して停止します。"
+        exit 1
+      fi
+      if [[ -n "$REMOTE_HEADS" && "${REMOTE_HEADS%%[[:space:]]*}" != "$HEAD_SHA" ]]; then
+        error "リモート branch は PR の head SHA と一致しません。checkout を保持して停止します。"
+        exit 1
+      fi
       if ! git -C "$MAIN_ROOT" merge-base --is-ancestor "refs/heads/$BRANCH" refs/remotes/origin/main; then
         error "対象 branch は origin/main に到達していません。checkout を保持して停止します。"
         exit 1
@@ -1027,7 +1042,7 @@ fi
 
 # ── 8. リモート branch の消滅を確認 ─────────────────────────────────
 # step 6 の fetch --prune で origin/<branch> は消えているはず。
-# 万一 --delete-branch が効かず残っていれば明示的に削除する。
+# 自動削除されず残っていれば、PRのhead SHAが変わっていない場合だけ削除する。
 step "リモート branch を確認"
 
 REMOTE_BRANCH_REMAINS=false
@@ -1035,8 +1050,14 @@ REMOTE_BRANCH_REMAINS=false
 if [[ "$DRY_RUN" == false ]]; then
   if git -C "$MAIN_ROOT" show-ref --verify --quiet "refs/remotes/origin/$BRANCH"; then
     info "リモートに origin/$BRANCH が残っています。削除します。"
-    git -C "$MAIN_ROOT" push origin --delete "$BRANCH" ||
-      error "リモート branch の削除に失敗しました。"
+    if [[ "$HEAD_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+      # 履歴を上書きするforce pushではなく、期待OIDとの比較つきref削除。
+      # fetch後に別sessionがpushしても、そのcommitを削除しない。
+      git -C "$MAIN_ROOT" push origin "--force-with-lease=refs/heads/$BRANCH:$HEAD_SHA" --delete "$BRANCH" ||
+        error "リモート branch の削除に失敗しました（先端が更新された可能性があります）。"
+    else
+      error "PR の head SHA を確認できないためリモート branch は削除しません。"
+    fi
   fi
 
   # 削除コマンドの成否ではなく、実際に消えたかをリモートへ問い合わせて確認する
@@ -1063,7 +1084,7 @@ else
   # 「作業終了」の判定に使うため、未達を伏せると積み残しがそのまま流れる。
   if [[ "$REMOTE_BRANCH_REMAINS" == true ]]; then
     error "リモート branch origin/$BRANCH が残っています（完了定義④が未達）。"
-    error "手動で削除してください: git -C \"$MAIN_ROOT\" push origin --delete $BRANCH"
+    error "現在のリモート先端が別作業で更新されていないか確認してください。無条件には削除しないでください。"
     exit 1
   fi
 
