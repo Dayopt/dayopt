@@ -94,6 +94,7 @@ describe('POINTER_MOVE while resizing', () => {
     currentPoint: origin,
     originalPosition: rect, // top: 540, height: 60
     direction: 'bottom',
+    snappedTop: 540,
     snappedHeight: 60,
     previewTime: {
       start: new Date('2026-01-15T09:00:00'),
@@ -111,6 +112,47 @@ describe('POINTER_MOVE while resizing', () => {
       expect(state.snappedHeight).toBe(90); // 1.5 hours
       expect(state.previewTime.end.getHours()).toBe(10);
       expect(state.previewTime.end.getMinutes()).toBe(30);
+    }
+  });
+
+  it('top resize changes only the start and keeps the end fixed', () => {
+    const { state: started } = dispatch(IDLE, {
+      type: 'RESIZE_START',
+      timeblockId: 'a',
+      direction: 'top',
+      point: origin,
+      originalPosition: rect,
+    });
+    const movedPoint = { clientX: origin.clientX, clientY: origin.clientY + 15 };
+    const { state } = dispatch(started, { type: 'POINTER_MOVE', point: movedPoint });
+
+    expect(state.mode).toBe('resizing');
+    if (state.mode === 'resizing') {
+      expect(state.previewTime.start.getHours()).toBe(9);
+      expect(state.previewTime.start.getMinutes()).toBe(15);
+      expect(state.previewTime.end.getHours()).toBe(10);
+      expect(state.previewTime.end.getMinutes()).toBe(0);
+      expect(state.snappedHeight).toBe(45);
+    }
+  });
+
+  it('top resize keeps the original minute while applying a relative snap', () => {
+    const offGridPosition = { top: 607, left: 0, width: 200, height: 60 };
+    const { state: started } = dispatch(IDLE, {
+      type: 'RESIZE_START',
+      timeblockId: 'a',
+      direction: 'top',
+      point: origin,
+      originalPosition: offGridPosition,
+    });
+    const movedPoint = { clientX: origin.clientX, clientY: origin.clientY + 15 };
+    const { state } = dispatch(started, { type: 'POINTER_MOVE', point: movedPoint });
+
+    if (state.mode === 'resizing') {
+      expect(state.previewTime.start.getHours()).toBe(10);
+      expect(state.previewTime.start.getMinutes()).toBe(22);
+      expect(state.previewTime.end.getHours()).toBe(11);
+      expect(state.previewTime.end.getMinutes()).toBe(7);
     }
   });
 
@@ -162,6 +204,7 @@ describe('POINTER_MOVE while resizing', () => {
       currentPoint: origin,
       originalPosition: { top: 607, left: 0, width: 200, height: 60 }, // 10:07-11:07
       direction: 'bottom',
+      snappedTop: 607,
       snappedHeight: 60,
       previewTime: {
         start: new Date('2026-01-15T10:07:00'),
@@ -182,6 +225,22 @@ describe('POINTER_MOVE while resizing', () => {
   });
 });
 
+describe('short timeblock resize without movement', () => {
+  it('does not lengthen or save a timeblock shorter than the resize minimum', () => {
+    const { state: started } = dispatch(IDLE, {
+      type: 'RESIZE_START',
+      timeblockId: 'a',
+      direction: 'bottom',
+      point: origin,
+      originalPosition: { top: 600, left: 0, width: 200, height: 3 },
+    });
+    const { state, effects } = dispatch(started, { type: 'POINTER_UP' });
+
+    expect(state.mode).toBe('idle');
+    expect(effects).not.toContainEqual(expect.objectContaining({ type: 'RESIZE_COMPLETE' }));
+  });
+});
+
 // ========================================
 // resizing → idle (POINTER_UP)
 // ========================================
@@ -195,6 +254,7 @@ describe('POINTER_UP while resizing', () => {
       currentPoint: { clientX: origin.clientX, clientY: origin.clientY + 30 },
       originalPosition: rect,
       direction: 'bottom',
+      snappedTop: 540,
       snappedHeight: 90,
       previewTime: {
         start: new Date('2026-01-15T09:00:00'),
@@ -219,6 +279,7 @@ describe('POINTER_UP while resizing', () => {
       currentPoint: origin,
       originalPosition: rect,
       direction: 'bottom',
+      snappedTop: 540,
       snappedHeight: 120,
       previewTime: {
         start: new Date('2026-01-15T09:00:00'),

@@ -17,9 +17,8 @@ import {
   buildMoveTimeRange,
   buildSelectionRange,
   minutesToDate,
-  resizeHeightPx,
   resolveMoveStartMinutes,
-  resolveResizeEndMinutes,
+  resolveResizeOriginalEndMinutes,
   resolveResizeStartMinutes,
   resolveTargetDate,
 } from './grid-geometry';
@@ -142,20 +141,15 @@ export function interactionReducer(
     case 'RESIZE_START': {
       if (state.mode !== 'idle') return { state, effects };
 
-      // 掴んだ時点では時刻を変えない。開始は snap せず、終端も最小長の担保だけ行う。
+      // 掴んだ時点では時刻を変えない。短いブロックも最小長へ正規化しない。
       const startMinutes = resolveResizeStartMinutes(action.originalPosition.top, ctx.hourHeight);
-      const endMinutes = resolveResizeEndMinutes({
-        startMinutes,
-        originalEndPx: action.originalPosition.top + action.originalPosition.height,
-        deltaPx: 0,
-        hourHeight: ctx.hourHeight,
-        intervalMin: interval,
-        minEndMinutes: ctx.getResizeMinEndMinutes?.(action.timeblockId) ?? null,
-      });
+      const endMinutes = resolveResizeOriginalEndMinutes(
+        action.originalPosition.top + action.originalPosition.height,
+        ctx.hourHeight,
+      );
 
       const start = minutesToDate(ctx.date, startMinutes);
       const end = minutesToDate(ctx.date, endMinutes);
-      const snappedHeight = resizeHeightPx(startMinutes, endMinutes, ctx.hourHeight);
       const isOverlapping = ctx.checkOverlap(action.timeblockId, start, end, 'resize');
 
       return {
@@ -166,7 +160,8 @@ export function interactionReducer(
           currentPoint: action.point,
           originalPosition: action.originalPosition,
           direction: action.direction,
-          snappedHeight,
+          snappedTop: action.originalPosition.top,
+          snappedHeight: action.originalPosition.height,
           previewTime: { start, end },
           isOverlapping,
         },

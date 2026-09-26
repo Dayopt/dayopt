@@ -26,6 +26,7 @@ export function getAdjustedStyle(
   if (state.mode === 'resizing' && state.timeblockId === planId) {
     return {
       ...originalStyle,
+      top: state.snappedTop,
       height: `${state.snappedHeight}px`,
       zIndex: 1000,
     };

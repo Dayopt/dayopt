@@ -141,6 +141,23 @@ export const Compact: Story = {
   ),
 };
 
+/** Desktopで選択中に表示する上端・下端のresize affordance。 */
+export const DesktopResize: Story = {
+  render: () => (
+    <Slot>
+      <RecordLaneCard
+        event={makeEvent({})}
+        position={basePosition}
+        activityName="Deep Work"
+        activityColor="teal"
+        isActive
+        onPointerDown={() => {}}
+        onResizeStart={() => {}}
+      />
+    </Slot>
+  ),
+};
+
 /** Compare panel に表示中の予定外Record。 */
 export const CompareTarget: Story = {
   render: () => (
@@ -243,6 +260,17 @@ export const AllPatterns: Story = {
           activityColor="blue"
           interactive={false}
           className="shadow-card"
+        />
+      </Slot>
+      <Slot>
+        <RecordLaneCard
+          event={makeEvent({})}
+          position={basePosition}
+          activityName="Deep Work"
+          activityColor="teal"
+          isActive
+          onPointerDown={() => {}}
+          onResizeStart={() => {}}
         />
       </Slot>
       <div className="border-border relative h-24 w-16 overflow-hidden rounded-lg border">

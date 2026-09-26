@@ -40,6 +40,21 @@ describe('CANCEL', () => {
         },
         isOverlapping: false,
       },
+      {
+        mode: 'resizing',
+        timeblockId: 'a',
+        startPoint: origin,
+        currentPoint: origin,
+        originalPosition: rect,
+        direction: 'bottom',
+        snappedTop: rect.top,
+        snappedHeight: rect.height,
+        previewTime: {
+          start: new Date('2026-01-15T09:00:00'),
+          end: new Date('2026-01-15T10:00:00'),
+        },
+        isOverlapping: false,
+      },
     ];
 
     for (const s of states) {

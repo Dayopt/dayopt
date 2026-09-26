@@ -123,6 +123,37 @@
   will-change: opacity, filter;
 }
 
+/* Desktop の resize は hover / 選択時だけ見せ、モバイル touch に resize の意味を持たせない。 */
+.calendar-resize-handle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 120ms var(--motion-ease-standard);
+}
+
+[data-timeblock-card]:hover .calendar-resize-handle,
+[data-timeblock-card]:focus-visible .calendar-resize-handle,
+[data-timeblock-card][data-timeblock-selected='true'] .calendar-resize-handle {
+  pointer-events: auto;
+  opacity: 1;
+}
+
+.calendar-resize-handle-indicator {
+  width: 24px;
+  height: 2px;
+  border-radius: 9999px;
+  background-color: var(--color-foreground);
+  opacity: 0.55;
+}
+
+@media (hover: none), (pointer: coarse) {
+  .calendar-resize-handle {
+    display: none;
+  }
+}
+
 /* カレンダー用カスタムスクロールバー（16px幅、8pxグリッド準拠） */
 @layer utilities {
   .calendar-scrollbar::-webkit-scrollbar {
