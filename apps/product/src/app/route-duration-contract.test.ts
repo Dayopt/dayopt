@@ -16,12 +16,10 @@ import { describe, expect, it } from 'vitest';
  * 「Supabase 1 往復 + rate limit 1 回」を下回らないことしか見ない。依存が全部同時に
  * それぞれの timeout まで張り付く理論上の worst path は、一部の route で予算を超える:
  *
- * - `api/integrations/google-calendar/callback`（90）— getUser 15 + rate limit 2 +
- *   Pro 判定 15 + Google token 交換 15 + connection write 15 ≒ 62s。#1990 で token 交換
- *   （code 消費）の直前に残り予算を検査するようになったため、消費後に kill される経路
- *   自体は塞がれている（予算不足なら code を使わず安全に失敗する）。maxDuration=90 は
- *   その予算検査（`POST_EXCHANGE_BUDGET_MS=45s`）を維持したまま、消費前フェーズの
- *   スラックを確保するための値（指揮台決定、PR #2075 クロスレビュー）
+ * - `api/integrations/google-calendar/callback`（90）— `PRE_CLAIM_BUDGET_MS=45s` は
+ *   attempt claim 15 + Google token 交換 15 + fenced save 15 から導出。#1990 で code 消費前に
+ *   claim・交換・save の残予算を確保し、不足時は code を未消費のまま安全に失敗する。
+ *   maxDuration=90 は消費前フェーズのスラック35sとhard kill margin10sを残す
  * - `api/mcp`（120）— 認証フェーズが逐次 getUser 15 × 5 ≒ 75s で 60 を超えるため、
  *   段の値には戻せていない（#1990 の「検討する」項目、未着手）
  * - `api/trpc/[trpc]`（60）— #1965 で `externalCalendar.syncNow` / `updateSelectedCalendars`
@@ -80,14 +78,13 @@ const ROUTE_DURATION_CONTRACT = {
   'src/app/api/cron/billing-reconciliation/route.ts': 60,
   'src/app/api/cron/calendar-sync/route.ts': 60,
   'src/app/api/cron/external-connection-maintenance/route.ts': 60,
-  'src/app/api/integrations/google-calendar/start/route.ts': 60,
+  // OAuth start に fenced attempt の DB 往復が加わったため、逐次処理の余白を確保する。
+  'src/app/api/integrations/google-calendar/start/route.ts': 90,
   'src/app/api/oauth/token/route.ts': 60,
   'src/app/api/v1/calendar/[token]/route.ts': 60,
   'src/app/oauth/token/route.ts': 60,
-  // #1990: token 交換（code 消費）の直前で残り予算を検査するようになったため、逐次 worst
-  // path（77s）を 60 が下回っていても kill 時の失敗の質が変わり安全側になった。90 は
-  // その安全性を保ったまま、消費前フェーズの可用性の崖を除去するための値
-  // （指揮台決定、PR #2075 クロスレビュー。詳細は maxDuration 直上のコメント）。
+  // #1990: OAuth attempt claim と fenced save を含む予算検査で、code 消費後に kill される
+  // 経路を塞ぐ。詳細は route.ts の maxDuration 直上のコメント。
   'src/app/api/integrations/google-calendar/callback/route.ts': 90,
   // #1965: externalCalendar.syncConnection に wall-clock 予算を持たせたため、procedure の
   // dispatch 数に上限が無いという構造的な理由がなくなり、段の値へ戻せた。#2079 で

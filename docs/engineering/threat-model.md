@@ -110,7 +110,7 @@ hash 入力なので、同じ欠陥に別の語を当てると同一候補とし
 | URL / origin の正規化ずれで allowlist を迂回           | `6b89325f0` / #1441 / #1449 / #1460 / #2616（未解決）         | 入口（`proxy.ts`）、Supabase Auth の設定値                 | 4    | 判定関数を個別に直さない。入口 1 箇所で decode・正規化を終えてから判定へ渡す（`6b89325f0` の commit 本文が前例）                              |
 | 事前認証で到達できる経路に量的上限と失効が無い         | #2460 / #1978 / #1979 / #2081                                 | RLS（Storage）、service（rate limit）                      | 4    | 認証前に到達する経路を足す時は、上限と失効を同じ変更に含める                                                                                  |
 | 認可境界より長生きする保管先がユーザー非分離           | #2619 / #2047 / #1777                                         | UI（Provider + store）、service（SSR context）             | 3    | key と中身の両方を user id で束縛し、サインアウトと主体の切り替わりで破棄する                                                                 |
-| authority fence が NULL の行を writer 側だけが拒否する | #2620 → #2673（未解決）                                       | service（破壊的経路だけ例外化）                            | 2    | 読み取り側へ例外を足すのではなく、接続の作成経路で fence を必ず張る（#2673 手順 2）                                                           |
+| authority fence が NULL の行を writer 側だけが拒否する | #2620 / #2673                                                 | DB（接続保存・legacy fence 修復 RPC）、service             | 2    | 新規保存は ready な fence を必須にし、legacy 行は generation と fence 状態を DB で検証してから修復する。未 fence の CAS 書き込みへは進めない  |
 
 不変条件そのものは [invariants.md](./invariants.md) が正本。ここは「同じ穴を掘る前に止まる」ための索引で、
 規則の本文は重複させない。

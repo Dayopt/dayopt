@@ -47,6 +47,7 @@ vi.mock('./providers/google', () => ({
 }));
 
 const beginCalendarSyncRun = vi.hoisted(() => vi.fn());
+const repairCalendarConnectionAuthorityFence = vi.hoisted(() => vi.fn());
 const clearCalendarSyncCursor = vi.hoisted(() => vi.fn());
 const finishCalendarSyncRun = vi.hoisted(() => vi.fn());
 const persistCalendarSyncResult = vi.hoisted(() => vi.fn());
@@ -54,6 +55,7 @@ const resolveProjectKey = vi.hoisted(() => vi.fn());
 
 vi.mock('./fenced-sync-writer', () => ({
   beginCalendarSyncRun,
+  repairCalendarConnectionAuthorityFence,
   clearCalendarSyncCursor,
   finishCalendarSyncRun,
   persistCalendarSyncResult,
@@ -245,6 +247,7 @@ beforeEach(() => {
   isConfiguredFencedCalendarSyncWriterReady.mockResolvedValue(false);
   startSession.mockResolvedValue(session());
   resolveProjectKey.mockReturnValue('project-key');
+  repairCalendarConnectionAuthorityFence.mockResolvedValue('ready');
   beginCalendarSyncRun.mockResolvedValue(beginStarted());
   clearCalendarSyncCursor.mockResolvedValue('cleared');
   persistCalendarSyncResult.mockResolvedValue('persisted');
@@ -998,14 +1001,83 @@ describe('syncConnection — fenced writer ready', () => {
     isConfiguredFencedCalendarSyncWriterReady.mockResolvedValue(true);
   });
 
-  it('begin が missing なら not_configured を返す（RPC を一切呼ばない）', async () => {
+  it('begin と fence repair が missing なら provider に接続せず not_configured を返す', async () => {
     beginCalendarSyncRun.mockResolvedValue({ result: 'missing' });
+    repairCalendarConnectionAuthorityFence.mockResolvedValue('missing');
 
     const result = await syncConnection({ connectionId: CONNECTION_ID, userId: USER_ID });
 
     expect(result).toEqual({ outcome: 'not_configured', calendarsSynced: 0, calendarsFailed: 0 });
+    expect(repairCalendarConnectionAuthorityFence).toHaveBeenCalledTimes(1);
     expect(startSession).not.toHaveBeenCalled();
   });
+
+  it('fence repair 後に provider と token 保存の残予算がなければ次回同期へ延期する', async () => {
+    beginCalendarSyncRun
+      .mockResolvedValueOnce({ result: 'missing' })
+      .mockImplementationOnce(async () => {
+        vi.advanceTimersByTime(3_000);
+        return beginStarted();
+      });
+    repairCalendarConnectionAuthorityFence.mockImplementation(async () => {
+      vi.advanceTimersByTime(2_001);
+      return 'ready';
+    });
+    setupDb({ connection: activeConnection(), calendars: oneCalendar() });
+    const deadlineAt = Date.now() + 50_000;
+
+    const result = await syncConnection({
+      connectionId: CONNECTION_ID,
+      userId: USER_ID,
+      deadlineAt,
+    });
+
+    expect(result).toEqual({ outcome: 'partial_timeout', calendarsSynced: 0, calendarsFailed: 0 });
+    expect(startSession).not.toHaveBeenCalled();
+    expect(repairCalendarConnectionAuthorityFence).toHaveBeenCalledTimes(1);
+    expect(beginCalendarSyncRun).toHaveBeenCalledTimes(2);
+    expect(finishCalendarSyncRun).toHaveBeenCalledWith(
+      expect.objectContaining({ lastSyncError: 'partial_timeout', deadlineAt }),
+    );
+  });
+
+  it('fence 欠落時だけ修復して begin を再試行する', async () => {
+    beginCalendarSyncRun
+      .mockResolvedValueOnce({ result: 'missing' })
+      .mockResolvedValue(beginStarted());
+    setupDb({ calendars: oneCalendar() });
+    syncCalendar.mockResolvedValue(syncResult());
+
+    await syncConnection({ connectionId: CONNECTION_ID, userId: USER_ID });
+
+    expect(repairCalendarConnectionAuthorityFence).toHaveBeenCalledWith({
+      connectionId: CONNECTION_ID,
+      userId: USER_ID,
+      projectKey: 'project-key',
+      deadlineAt: undefined,
+    });
+    expect(beginCalendarSyncRun).toHaveBeenCalledTimes(2);
+    expect(beginCalendarSyncRun.mock.invocationCallOrder[0]!).toBeLessThan(
+      repairCalendarConnectionAuthorityFence.mock.invocationCallOrder[0]!,
+    );
+    expect(repairCalendarConnectionAuthorityFence.mock.invocationCallOrder[0]!).toBeLessThan(
+      beginCalendarSyncRun.mock.invocationCallOrder[1]!,
+    );
+  });
+
+  it.each(['missing', 'blocked', 'stale', 'unresolved'] as const)(
+    'fence repair が %s なら fail closed で同期を開始しない',
+    async (repairResult) => {
+      beginCalendarSyncRun.mockResolvedValue({ result: 'missing' });
+      repairCalendarConnectionAuthorityFence.mockResolvedValue(repairResult);
+
+      const result = await syncConnection({ connectionId: CONNECTION_ID, userId: USER_ID });
+
+      expect(result).toEqual({ outcome: 'not_configured', calendarsSynced: 0, calendarsFailed: 0 });
+      expect(beginCalendarSyncRun).toHaveBeenCalledTimes(1);
+      expect(startSession).not.toHaveBeenCalled();
+    },
+  );
 
   it('begin が reauth_required なら skipped_reauth_required を返す', async () => {
     beginCalendarSyncRun.mockResolvedValue({ result: 'reauth_required' });
@@ -1045,6 +1117,7 @@ describe('syncConnection — fenced writer ready', () => {
     const result = await syncConnection({ connectionId: CONNECTION_ID, userId: USER_ID });
 
     expect(result).toEqual({ outcome: 'synced', calendarsSynced: 1, calendarsFailed: 0 });
+    expect(repairCalendarConnectionAuthorityFence).not.toHaveBeenCalled();
     expect(persistCalendarSyncResult).toHaveBeenCalledWith(
       expect.objectContaining({
         connectionId: CONNECTION_ID,
@@ -1165,7 +1238,7 @@ describe('syncConnection — fenced writer ready', () => {
   it('deadlineAt が渡されると begin/persist/finish の呼び出し引数に伝播する', async () => {
     setupDb({ calendars: oneCalendar() });
     syncCalendar.mockResolvedValue(syncResult({ events: [event()] }));
-    const deadlineAt = Date.now() + 30_000;
+    const deadlineAt = Date.now() + 60_000;
 
     await syncConnection({ connectionId: CONNECTION_ID, userId: USER_ID, deadlineAt });
 

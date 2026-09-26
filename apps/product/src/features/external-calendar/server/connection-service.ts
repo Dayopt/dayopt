@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
@@ -44,7 +44,36 @@ type CalendarConnectionDatabase = {
       'calendar_connections' | 'calendar_connection_calendars'
     >;
     Views: Record<string, never>;
-    Functions: Record<string, never>;
+    Functions: Omit<
+      Pick<
+        Database['public']['Functions'],
+        | 'begin_calendar_oauth_attempt_v1'
+        | 'claim_calendar_oauth_attempt_v1'
+        | 'repair_calendar_connection_authority_fence_v1'
+        | 'reconnect_calendar_connection_command_v1'
+        | 'save_calendar_connection_command_v2'
+      >,
+      'reconnect_calendar_connection_command_v1' | 'save_calendar_connection_command_v2'
+    > & {
+      save_calendar_connection_command_v2: {
+        Args: Omit<
+          Database['public']['Functions']['save_calendar_connection_command_v2']['Args'],
+          'p_provider_account_email'
+        > & { p_provider_account_email: string | null };
+        Returns: Database['public']['Functions']['save_calendar_connection_command_v2']['Returns'];
+      };
+      reconnect_calendar_connection_command_v1: {
+        Args: Omit<
+          Database['public']['Functions']['reconnect_calendar_connection_command_v1']['Args'],
+          'p_provider_account_email'
+        > & { p_provider_account_email: string | null };
+        Returns: Database['public']['Functions']['reconnect_calendar_connection_command_v1']['Returns'];
+      };
+      repair_calendar_connection_authority_fence_v1: {
+        Args: Database['public']['Functions']['repair_calendar_connection_authority_fence_v1']['Args'];
+        Returns: Database['public']['Functions']['repair_calendar_connection_authority_fence_v1']['Returns'];
+      };
+    };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;
   };
@@ -63,6 +92,19 @@ type CalendarConnectionClient = SupabaseClient<CalendarConnectionDatabase>;
  * worst case」を導出するのに使うため。手書きの数値を二重管理しない。
  */
 export const CALENDAR_CONNECTION_DB_TIMEOUT_MS = 15_000;
+
+function assertCalendarDeadline(
+  deadlineAt: number | undefined,
+  requiredMs: number,
+  operation: string,
+): void {
+  if (deadlineAt !== undefined && deadlineAt - Date.now() < requiredMs) {
+    throw new ExternalCalendarServiceError(
+      'DEADLINE_EXCEEDED',
+      `${operation} exceeded the wall-clock budget`,
+    );
+  }
+}
 
 function createCalendarConnectionDbClient(): CalendarConnectionClient {
   return createClient<CalendarConnectionDatabase>(
@@ -89,6 +131,7 @@ function createCalendarConnectionDbClient(): CalendarConnectionClient {
 const GOOGLE_PROVIDER = 'google';
 
 type SaveConnectionInput = {
+  attemptId: string;
   userId: string;
   /** Google の `sub`。email は可変・再利用可なので同定には使わない。 */
   providerAccountId: string;
@@ -98,6 +141,18 @@ type SaveConnectionInput = {
   encryptionKey: string;
 };
 
+type CalendarConnectionSaveCommitOutcome = 'not_committed' | 'unknown';
+
+export class CalendarConnectionSaveError extends ExternalCalendarServiceError {
+  constructor(
+    readonly commitOutcome: CalendarConnectionSaveCommitOutcome,
+    options?: ErrorOptions,
+  ) {
+    super('UPDATE_FAILED', 'failed to save calendar connection', options);
+    this.name = 'CalendarConnectionSaveError';
+  }
+}
+
 type ReconnectTarget = {
   id: string;
   providerAccountId: string;
@@ -105,9 +160,81 @@ type ReconnectTarget = {
   providerAccountEmail: string | null;
 };
 
-type ReconnectExistingConnectionInput = SaveConnectionInput & {
-  connectionId: string;
+type CalendarOAuthAttemptInput = {
+  userId: string;
+  state: string;
+  verifier: string;
 };
+
+type ClaimCalendarOAuthAttemptInput = CalendarOAuthAttemptInput & {
+  attemptId: string;
+};
+
+/** PostgreSQL bytea の text input。生の state / verifier はDBへ送らない。 */
+function digestOAuthSecret(value: string): string {
+  return `\\x${createHash('sha256').update(value, 'utf8').digest('hex')}`;
+}
+
+function requireProjectKey(): string {
+  const projectKey = resolveProjectKey();
+  if (!projectKey) {
+    throw new ExternalCalendarServiceError(
+      'UPDATE_FAILED',
+      'Google Calendar authority identity is not configured',
+    );
+  }
+  return projectKey;
+}
+
+/** OAuth state / PKCE digest を fence command の server-side attempt に記録する。 */
+export async function beginCalendarOAuthAttempt(input: CalendarOAuthAttemptInput): Promise<string> {
+  const db = createCalendarConnectionDbClient();
+  const { data, error } = await db.rpc('begin_calendar_oauth_attempt_v1', {
+    p_project_key: requireProjectKey(),
+    p_user_id: input.userId,
+    p_state_digest: digestOAuthSecret(input.state),
+    p_verifier_digest: digestOAuthSecret(input.verifier),
+  });
+
+  if (error) {
+    throw new ExternalCalendarServiceError('UPDATE_FAILED', 'failed to begin calendar OAuth', {
+      cause: error,
+    });
+  }
+  const attempt = data?.length === 1 ? data[0] : undefined;
+  if (!attempt?.attempt_id) {
+    throw new ExternalCalendarServiceError(
+      'UPDATE_FAILED',
+      'calendar OAuth attempt was not created',
+    );
+  }
+  return attempt.attempt_id;
+}
+
+/** Google の一回限りの authorization code を消費する前に attempt を claim する。 */
+export async function claimCalendarOAuthAttempt(
+  input: ClaimCalendarOAuthAttemptInput,
+): Promise<void> {
+  const db = createCalendarConnectionDbClient();
+  const { data, error } = await db.rpc('claim_calendar_oauth_attempt_v1', {
+    p_project_key: requireProjectKey(),
+    p_user_id: input.userId,
+    p_state_digest: digestOAuthSecret(input.state),
+    p_verifier_digest: digestOAuthSecret(input.verifier),
+  });
+
+  if (error) {
+    throw new ExternalCalendarServiceError('UPDATE_FAILED', 'failed to claim calendar OAuth', {
+      cause: error,
+    });
+  }
+  if (data?.length !== 1 || data[0]?.attempt_id !== input.attemptId) {
+    throw new ExternalCalendarServiceError(
+      'UPDATE_FAILED',
+      'calendar OAuth attempt does not match the connect flow',
+    );
+  }
+}
 
 /**
  * 接続を保存する。
@@ -116,33 +243,85 @@ type ReconnectExistingConnectionInput = SaveConnectionInput & {
  * `status='active'` に戻すと、失効済みの token を抱えた接続が UI 上「接続済み」に見え、
  * 再認証導線が二度と出なくなる（overview.md §5-4 の reauth_required 遷移が死ぬ）。
  */
-export async function saveConnection(input: SaveConnectionInput): Promise<void> {
-  const db = createCalendarConnectionDbClient();
-
-  const { error } = await db.from(databaseTables.calendarConnections).upsert(
-    {
-      user_id: input.userId,
-      provider: GOOGLE_PROVIDER,
-      provider_account_id: input.providerAccountId,
-      provider_account_email: input.providerAccountEmail,
-      granted_scopes: input.grantedScopes,
-      refresh_token_enc: encryptToken(input.refreshToken, input.encryptionKey),
-      status: 'active',
-      last_sync_error: null,
-      // 接続し直したら連続失敗の履歴も捨てる（#2687。due から外れていた接続が cron に戻る）
-      consecutive_failures: 0,
-    },
-    { onConflict: 'user_id,provider,provider_account_id' },
-  );
+async function runConnectionSaveCommand(
+  request: PromiseLike<{ data: string | null; error: unknown | null }>,
+): Promise<'saved' | 'enqueued' | 'missing'> {
+  const result = await Promise.resolve(request).catch((cause: unknown) => {
+    // A transport timeout/reset is ambiguous: PostgreSQL may have committed before the response was
+    // lost. The callback must not revoke this token, which could now belong to the saved row.
+    throw new CalendarConnectionSaveError('unknown', { cause });
+  });
+  const { data, error } = result;
 
   if (error) {
-    // error にトークンは含まれないが、message をそのまま外へ出さない。
-    throw new Error(`failed to save calendar connection: ${error.code ?? 'unknown'}`);
+    // Only a PostgreSQL SQLSTATE proves the RPC statement failed transactionally. HTTP gateway
+    // errors can arrive after the database committed, so those outcomes must keep the token alive.
+    const code =
+      typeof error === 'object' && error !== null && 'code' in error ? error.code : undefined;
+    const isRolledBackSqlError =
+      typeof code === 'string' && /^[0-9A-Z]{5}$/.test(code) && !code.startsWith('08');
+    throw new CalendarConnectionSaveError(isRolledBackSqlError ? 'not_committed' : 'unknown', {
+      cause: error,
+    });
   }
+  if (data !== 'saved' && data !== 'enqueued' && data !== 'missing') {
+    throw new CalendarConnectionSaveError('unknown');
+  }
+  return data;
 }
 
+function connectionSaveArgs(
+  input: SaveConnectionInput,
+  projectKey: string,
+): {
+  p_attempt_id: string;
+  p_project_key: string;
+  p_user_id: string;
+  p_provider: string;
+  p_provider_account_id: string;
+  p_provider_account_email: string | null;
+  p_granted_scopes: string[];
+  p_refresh_token_enc: string;
+} {
+  return {
+    p_attempt_id: input.attemptId,
+    p_project_key: projectKey,
+    p_user_id: input.userId,
+    p_provider: GOOGLE_PROVIDER,
+    p_provider_account_id: input.providerAccountId,
+    p_provider_account_email: input.providerAccountEmail,
+    p_granted_scopes: input.grantedScopes,
+    p_refresh_token_enc: encryptToken(input.refreshToken, input.encryptionKey),
+  };
+}
+
+export async function saveConnection(input: SaveConnectionInput): Promise<'saved' | 'enqueued'> {
+  const db = createCalendarConnectionDbClient();
+  const projectKey = requireProjectKey();
+  return await runConnectionSaveCommand(
+    db.rpc('save_calendar_connection_command_v2', connectionSaveArgs(input, projectKey)),
+  ).then((outcome) => {
+    if (outcome === 'missing') throw new CalendarConnectionSaveError('unknown');
+    return outcome;
+  });
+}
+
+/** Refresh only a reauth or legacy fence-missing row selected before OAuth; deleted rows are never recreated. */
+export async function reconnectConnection(
+  input: SaveConnectionInput & { connectionId: string },
+): Promise<'saved' | 'enqueued' | 'missing'> {
+  const db = createCalendarConnectionDbClient();
+  const projectKey = requireProjectKey();
+  return await runConnectionSaveCommand(
+    db.rpc('reconnect_calendar_connection_command_v1', {
+      ...connectionSaveArgs(input, projectKey),
+      p_expected_connection_id: input.connectionId,
+    }),
+  );
+}
 /**
- * 再接続対象を本人・provider・状態まで限定して読む。
+ * 再接続対象を本人・provider・状態まで限定して読む。対象は `reauth_required`、または
+ * fenced writer 導入前に作られた authority fence 不足の active 行だけ。
  *
  * `provider_account_id` は Google の安定識別子であり、callback で検証済み `sub` と比較する
  * ためだけに server 内で扱う。UI や cookie には載せない。
@@ -154,11 +333,12 @@ export async function getReconnectTarget(
   const db = createCalendarConnectionDbClient();
   const { data, error } = await db
     .from(databaseTables.calendarConnections)
-    .select('id, provider_account_id, provider_account_email')
+    .select(
+      'id, provider_account_id, provider_account_email, status, authority_fence_id, authority_epoch',
+    )
     .eq('id', connectionId)
     .eq('user_id', userId)
     .eq('provider', GOOGLE_PROVIDER)
-    .eq('status', 'reauth_required')
     .maybeSingle();
 
   if (error) {
@@ -167,49 +347,16 @@ export async function getReconnectTarget(
     });
   }
   if (!data) return null;
+  const reauthRequired = data.status === 'reauth_required';
+  const legacyFenceMissing =
+    data.status === 'active' && (data.authority_fence_id === null || data.authority_epoch === null);
+  if (!reauthRequired && !legacyFenceMissing) return null;
+
   return {
     id: data.id,
     providerAccountId: data.provider_account_id,
     providerAccountEmail: data.provider_account_email,
   };
-}
-
-/**
- * 既存の再接続対象だけを更新する。
- *
- * generic upsert を使うと、callback と切断が競合した際に削除済み接続を再作成できてしまう。
- * そのため id / owner / provider / Google sub / reauth 状態を一つの UPDATE で guard し、
- * 更新行が無ければ再接続失敗として扱う。これにより切断が常に最終的に勝つ。
- */
-export async function reconnectExistingConnection(
-  input: ReconnectExistingConnectionInput,
-): Promise<'updated' | 'missing'> {
-  const db = createCalendarConnectionDbClient();
-  const { data, error } = await db
-    .from(databaseTables.calendarConnections)
-    .update({
-      provider_account_email: input.providerAccountEmail,
-      granted_scopes: input.grantedScopes,
-      refresh_token_enc: encryptToken(input.refreshToken, input.encryptionKey),
-      status: 'active',
-      last_sync_error: null,
-      // 接続し直したら連続失敗の履歴も捨てる（#2687。due から外れていた接続が cron に戻る）
-      consecutive_failures: 0,
-    })
-    .eq('id', input.connectionId)
-    .eq('user_id', input.userId)
-    .eq('provider', GOOGLE_PROVIDER)
-    .eq('provider_account_id', input.providerAccountId)
-    .eq('status', 'reauth_required')
-    .select('id')
-    .maybeSingle();
-
-  if (error) {
-    throw new ExternalCalendarServiceError('UPDATE_FAILED', 'failed to reconnect calendar', {
-      cause: error,
-    });
-  }
-  return data ? 'updated' : 'missing';
 }
 
 // =============================================================================
@@ -325,6 +472,8 @@ type ConnectionSecret = {
   /** fenced sync writer（#2050）が ready な時だけ非 undefined。 */
   authorityFenceId?: string;
   authorityEpoch?: number;
+  /** fenced writer ready なのに旧 direct-write が残した NULL fence を検知した状態。 */
+  authorityFenceMissing?: boolean;
 };
 
 type LoadConnectionSecretOptions = {
@@ -333,14 +482,12 @@ type LoadConnectionSecretOptions = {
    * `authority_epoch`）が NULL の行を「存在しない」と扱わず、fence 値を undefined に
    * したまま secret を返す（#2620）。
    *
-   * **破壊的経路（disconnect）専用。** fence は fenced sync writer の CAS 入力なので、
-   * CAS を伴う書き込み経路（`updateSelectedCalendars`）では既定の false のままにする。
-   * disconnect は fence 値を一切使わず、DELETE も CAS ではなく
-   * `id` + `user_id` の一致だけで行うため、ここで fence を要求しても守れる不変条件が無い。
-   * 一方で要求すると、ユーザーが実行した取り消しが revoke も削除もせず成功を返す
-   * （＝ provider 側の grant が生き続ける）。
+   * これを使う caller は欠落 fence を明示的に処理する。calendar 一覧と選択更新は CAS を
+   * 迂回せず、専用 RPC で fence を修復してから fenced writer を呼ぶ。disconnect は fence 値を
+   * 使わず `id` + `user_id` で削除する。
    */
   allowMissingAuthorityFence?: boolean;
+  deadlineAt?: number | undefined;
 };
 
 /** service_role で connection の token 行を読む。無ければ null。 */
@@ -350,6 +497,11 @@ async function loadConnectionSecret(
   connectionId: string,
   options: LoadConnectionSecretOptions = {},
 ): Promise<ConnectionSecret | null> {
+  assertCalendarDeadline(
+    options.deadlineAt,
+    CALENDAR_CONNECTION_DB_TIMEOUT_MS,
+    'loading connection',
+  );
   // #2050: この判定は `getConfiguredExternalLifecycleAppVersion`（Candidate 3 marker、
   // settings/billing 等の無関係な既存呼び出し元と共有）とは別関数に分離してある —
   // widen すると既存呼び出し元の RPC 呼び出し契約が変わり、無関係な test が regression
@@ -358,6 +510,11 @@ async function loadConnectionSecret(
   if (fencedWriterReady) {
     // #2050 fenced writer 移行: replaceSelectedCalendars の CAS 入力に要る
     // authority_fence_id / authority_epoch も同時に読む。
+    assertCalendarDeadline(
+      options.deadlineAt,
+      CALENDAR_CONNECTION_DB_TIMEOUT_MS,
+      'loading connection',
+    );
     const { data, error } = await db
       .from(databaseTables.calendarConnections)
       .select('status, refresh_token_enc, data_generation, authority_fence_id, authority_epoch')
@@ -372,18 +529,17 @@ async function loadConnectionSecret(
     }
     if (!data) return null;
     if (data.authority_fence_id === null || data.authority_epoch === null) {
-      // authority fence 未確立の接続（理論上は #2050 の CAS 対象外）。fenced writer
-      // 呼び出しに必要な CAS 値が揃わないため missing 相当として扱う。
+      // authority fence が未確立の既存接続（fenced save の導入前に作成された行など）は、
+      // fenced writer 呼び出しに必要な CAS 値が揃わないため missing 相当として扱う。
       //
-      // ただし fence を使わない破壊的経路（disconnect）だけは例外にする（#2620）。
-      // 接続作成経路（`saveConnection` / `reconnectExistingConnection`）は fence 列を
-      // 書かないため、OAuth callback が作った行は必ずここに落ちる。missing 扱いのままだと
-      // 切断が revoke も DELETE も飛ばして成功を返し、Google 側の grant が無期限に残る。
+      // ただし欠落を明示的に回復・案内する caller と、fence を使わず確実に切断する
+      // 経路（#2620）は例外にする。通常の sync / 選択変更で通すと CAS を迂回するため不可。
       if (!options.allowMissingAuthorityFence) return null;
       return {
         dataGeneration: data.data_generation,
         status: data.status,
         refreshTokenEnc: data.refresh_token_enc,
+        authorityFenceMissing: true,
       };
     }
     return {
@@ -395,8 +551,18 @@ async function loadConnectionSecret(
     };
   }
 
+  assertCalendarDeadline(
+    options.deadlineAt,
+    CALENDAR_CONNECTION_DB_TIMEOUT_MS,
+    'checking calendar lifecycle readiness',
+  );
   const lifecycleVersion = await getConfiguredExternalLifecycleAppVersion();
   if (lifecycleVersion === 0) {
+    assertCalendarDeadline(
+      options.deadlineAt,
+      CALENDAR_CONNECTION_DB_TIMEOUT_MS,
+      'loading connection',
+    );
     const { data, error } = await db
       .from(databaseTables.calendarConnections)
       .select('status, refresh_token_enc')
@@ -417,6 +583,11 @@ async function loadConnectionSecret(
     };
   }
 
+  assertCalendarDeadline(
+    options.deadlineAt,
+    CALENDAR_CONNECTION_DB_TIMEOUT_MS,
+    'loading connection',
+  );
   const { data, error } = await db
     .from(databaseTables.calendarConnections)
     .select('status, refresh_token_enc, data_generation')
@@ -435,6 +606,62 @@ async function loadConnectionSecret(
     status: data.status,
     refreshTokenEnc: data.refresh_token_enc,
   };
+}
+
+/** fence欠落の接続は、現行世代であることをDBが確認してから操作前に修復する。 */
+async function loadConnectionSecretWithFenceRepair(
+  db: CalendarConnectionClient,
+  userId: string,
+  connectionId: string,
+  deadlineAt?: number | undefined,
+): Promise<ConnectionSecret | null> {
+  let secret = await loadConnectionSecret(db, userId, connectionId, {
+    allowMissingAuthorityFence: true,
+    deadlineAt,
+  });
+  if (!secret) return null;
+  if (secret.status === 'reauth_required') {
+    throw new ExternalCalendarServiceError('REAUTH_REQUIRED', 'calendar connection needs reauth');
+  }
+  if (!secret.authorityFenceMissing) return secret;
+
+  assertCalendarDeadline(
+    deadlineAt,
+    CALENDAR_CONNECTION_DB_TIMEOUT_MS,
+    'repairing calendar connection authority fence',
+  );
+  const { data, error } = await db.rpc('repair_calendar_connection_authority_fence_v1', {
+    p_project_key: requireProjectKey(),
+    p_user_id: userId,
+    p_connection_id: connectionId,
+  });
+  if (error) {
+    throw new ExternalCalendarServiceError(
+      'UPDATE_FAILED',
+      'failed to repair calendar connection authority fence',
+      { cause: error },
+    );
+  }
+  if (data === 'missing') return null;
+  if (data !== 'ready') {
+    throw new ExternalCalendarServiceError(
+      'REAUTH_REQUIRED',
+      'calendar connection needs reauthorization before it can be used',
+    );
+  }
+
+  secret = await loadConnectionSecret(db, userId, connectionId, { deadlineAt });
+  if (!secret) return null;
+  if (secret.authorityFenceMissing || secret.authorityFenceId === undefined) {
+    throw new ExternalCalendarServiceError(
+      'UPDATE_FAILED',
+      'calendar connection authority fence repair was not observable',
+    );
+  }
+  if (secret.status === 'reauth_required') {
+    throw new ExternalCalendarServiceError('REAUTH_REQUIRED', 'calendar connection needs reauth');
+  }
+  return secret;
 }
 
 function throwForReauthOutcome(
@@ -482,7 +709,7 @@ export async function listProviderCalendars(
 ): Promise<ProviderCalendarOption[]> {
   const db = createCalendarConnectionDbClient();
 
-  const secret = await loadConnectionSecret(db, userId, connectionId);
+  const secret = await loadConnectionSecretWithFenceRepair(db, userId, connectionId, deadlineAt);
   if (!secret) {
     throw new ExternalCalendarServiceError('CONNECTION_NOT_FOUND', 'calendar connection not found');
   }
@@ -493,6 +720,14 @@ export async function listProviderCalendars(
   const refreshToken = decryptToken(
     secret.refreshTokenEnc,
     env.CALENDAR_TOKEN_ENCRYPTION_KEY ?? '',
+  );
+
+  // Fence repair and its confirmation share the route's budget. Do not rotate a provider token
+  // unless enough time remains both to refresh it and persist a rotated refresh token in Dayopt.
+  assertCalendarDeadline(
+    deadlineAt,
+    TOKEN_REQUEST_TIMEOUT_MS + CALENDAR_CONNECTION_DB_TIMEOUT_MS,
+    'refreshing and saving calendar credentials',
   );
 
   const rotationOperationId = randomUUID();
@@ -622,7 +857,7 @@ export async function updateSelectedCalendars(
 ): Promise<void> {
   const db = createCalendarConnectionDbClient();
 
-  const secret = await loadConnectionSecret(db, userId, connectionId);
+  const secret = await loadConnectionSecretWithFenceRepair(db, userId, connectionId);
   if (!secret) {
     throw new ExternalCalendarServiceError('CONNECTION_NOT_FOUND', 'calendar connection not found');
   }
@@ -805,10 +1040,10 @@ function reportUnrevokedGrant(reason: string): void {
  *
  * 解約済みユーザーも切断できるよう protectedProcedure から呼ぶ。接続が既に無ければ冪等に成功。
  *
- * **authority fence の欠落で止まらない**（#2620）。`loadConnectionSecret` は fenced writer が
- * ready な時、`authority_fence_id` / `authority_epoch` が NULL の行を missing 相当として
- * null を返すが、disconnect は `allowMissingAuthorityFence` でその扱いを外す。fence を書く
- * 接続作成経路が存在しない以上、要求すると全ての新規接続で切断が空振りする。
+ * **authority fence の欠落で止まらない**（#2620）。新しい OAuth 保存は fence を設定するが、
+ * 過去の direct-write で作られた行は NULL のまま残りうる。`loadConnectionSecret` は fenced
+ * writer が ready な時、こうした行を通常の CAS 経路では missing 相当にする。disconnect は
+ * `allowMissingAuthorityFence` を明示し、fence を使わない `id` + `user_id` の削除まで進む。
  *
  * **revoke の失敗は削除を止めない**（上記 2 が best-effort である帰結を明示する）。provider が
  * revoke を拒否しても行は削除し、Sentry に `disconnect_revoke` を残す。ユーザーが実行した

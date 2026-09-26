@@ -8,6 +8,7 @@ const rateLimit = vi.hoisted(() => vi.fn());
 const checkEntitlementForUser = vi.hoisted(() => vi.fn());
 const captureUnexpectedError = vi.hoisted(() => vi.fn());
 const getReconnectTarget = vi.hoisted(() => vi.fn());
+const beginCalendarOAuthAttempt = vi.hoisted(() => vi.fn());
 const resolveMfaAssurance = vi.hoisted(() => vi.fn());
 const envMock = vi.hoisted(() => ({
   GOOGLE_CALENDAR_CLIENT_ID: 'client-id.apps.googleusercontent.com',
@@ -24,7 +25,10 @@ vi.mock('@/lib/rate-limit/upstash', () => ({
 }));
 vi.mock('@/lib/billing/enforcement', () => ({ checkEntitlementForUser }));
 vi.mock('@/lib/sentry', () => ({ captureUnexpectedError }));
-vi.mock('@/features/external-calendar/server/connection-service', () => ({ getReconnectTarget }));
+vi.mock('@/features/external-calendar/server/connection-service', () => ({
+  beginCalendarOAuthAttempt,
+  getReconnectTarget,
+}));
 vi.mock('@/lib/trpc/session-auth-context', () => ({ resolveMfaAssurance }));
 
 import { GET } from './start/route';
@@ -50,6 +54,7 @@ describe('google calendar start route', () => {
     resolveMfaAssurance.mockResolvedValue({ currentLevel: 'aal1', nextLevel: 'aal1' });
     rateLimit.mockResolvedValue({ success: true });
     checkEntitlementForUser.mockResolvedValue('allowed');
+    beginCalendarOAuthAttempt.mockResolvedValue('00000000-0000-4000-8000-0000000000a2');
     getReconnectTarget.mockResolvedValue({
       id: '00000000-0000-4000-8000-0000000000c1',
       providerAccountId: 'google-sub-123',
@@ -186,10 +191,24 @@ describe('google calendar start route', () => {
 
     const flowState = JSON.parse(decodeURIComponent(cookie?.value ?? '{}'));
     expect(flowState.userId).toBe(USER_ID);
+    expect(flowState.attemptId).toBe('00000000-0000-4000-8000-0000000000a2');
+    expect(beginCalendarOAuthAttempt).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: USER_ID }),
+    );
     expect(flowState.state).toBe(location.searchParams.get('state'));
     // verifier は cookie にだけ入り、URL には出ない
     expect(flowState.verifier).toBeTruthy();
     expect(location.searchParams.get('code_verifier')).toBeNull();
+  });
+
+  it('server-side OAuth attempt を保存できなければ Google へ redirect しない', async () => {
+    beginCalendarOAuthAttempt.mockRejectedValueOnce(new Error('attempt unavailable'));
+
+    const response = await GET(request());
+
+    expect(response.status).toBe(500);
+    expect(response.headers.get('location')).toBeNull();
+    expect(response.cookies.get('__Host-dayopt-calendar-connect')).toBeUndefined();
   });
 
   it('本人の reauth_required 接続だけを再接続 cookie に保存する', async () => {
