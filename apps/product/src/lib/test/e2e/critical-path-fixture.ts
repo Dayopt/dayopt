@@ -2,6 +2,7 @@ import { expect, type Locator, type Page } from '@playwright/test';
 import { createClient } from '@supabase/supabase-js';
 
 import type { Database } from '@/lib/database';
+import { recordPreviewUser } from '../preview-user-lifecycle';
 import { REPORT_ALLOCATION } from './report-selectors';
 import { suppressConsentBanner } from './suppress-consent-banner';
 
@@ -74,19 +75,25 @@ export async function seedCriticalPathUser(
   identity: CriticalPathIdentity,
   fullName: string,
 ) {
+  recordPreviewUser(identity.userId, 'creating');
   const { data: authData, error: authError } = await admin.auth.admin.createUser({
     id: identity.userId,
     email: identity.email,
     password: identity.password,
     email_confirm: true,
+    ...(process.env.E2E_PREVIEW_RUN_ID
+      ? { app_metadata: { e2e_run_id: process.env.E2E_PREVIEW_RUN_ID } }
+      : {}),
     user_metadata: { full_name: fullName },
   });
   if (authError || authData.user?.id !== identity.userId) {
+    recordPreviewUser(identity.userId, 'creation-unconfirmed');
     throw new Error('E2E synthetic user creation failed');
   }
   const owned = createdUsers.get(admin) ?? new Set<string>();
   owned.add(identity.userId);
   createdUsers.set(admin, owned);
+  recordPreviewUser(identity.userId, 'created');
 
   const { error: profileError } = await admin.from('profiles').upsert({
     id: identity.userId,
@@ -154,8 +161,10 @@ export async function cleanupCriticalPathUser(admin: AdminSupabase, userId: stri
     }
   }
   if (failures.length) {
+    recordPreviewUser(userId, 'cleanup-failed');
     throw new Error(`E2E synthetic cleanup failed for ${userId}: ${failures.join(', ')}`);
   }
+  recordPreviewUser(userId, 'deleted');
   owned.delete(userId);
 }
 

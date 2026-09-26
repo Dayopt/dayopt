@@ -2,9 +2,9 @@ import { execFileSync } from 'node:child_process';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { SUPABASE_PRODUCTION_PROJECT_REF } from '../ci/production-auth-config-audit.mjs';
+import { expectedMigrationVersions } from '../ci/production-migration-readiness.mjs';
 import { isDirectExecution } from '../lib/is-direct-execution.mjs';
-import { SUPABASE_PRODUCTION_PROJECT_REF } from './production-auth-config-audit.mjs';
-import { expectedMigrationVersions } from './production-migration-readiness.mjs';
 
 class PreviewReadinessError extends Error {}
 
