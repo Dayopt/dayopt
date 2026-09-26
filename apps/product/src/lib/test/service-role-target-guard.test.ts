@@ -7,7 +7,7 @@ import {
 
 const LOCAL_URL = 'http://127.0.0.1:54321';
 const PRODUCTION_URL = 'https://yvglwblxrnrenfifsnje.supabase.co';
-const PREVIEW_URL = 'https://abcdefghijklmnop.supabase.co';
+const PREVIEW_URL = 'https://abcdefghijklmnopqrst.supabase.co';
 const KEY = 'service-role-key';
 
 /** repo の ProcessEnv 型は NODE_ENV を必須にしているため、最小の env をここで組む。 */
@@ -32,8 +32,82 @@ describe('resolveServiceRoleTarget', () => {
   it('非ローカルは opt-in があれば安全', () => {
     expect(resolveServiceRoleTarget(PREVIEW_URL, KEY, testEnv())).toMatchObject({ safe: false });
     expect(
-      resolveServiceRoleTarget(PREVIEW_URL, KEY, testEnv({ E2E_ALLOW_NONLOCAL_SUPABASE: '1' })),
+      resolveServiceRoleTarget(
+        PREVIEW_URL,
+        KEY,
+        testEnv({
+          E2E_ALLOW_NONLOCAL_SUPABASE: '1',
+          E2E_SUPABASE_PROJECT_REF: 'abcdefghijklmnopqrst',
+        }),
+      ),
     ).toEqual({ safe: true });
+  });
+
+  it('非ローカルopt-inだけでは任意hostへsecretを送らない', () => {
+    expect(
+      resolveServiceRoleTarget(
+        'https://example.com',
+        KEY,
+        testEnv({ E2E_ALLOW_NONLOCAL_SUPABASE: '1' }),
+      ),
+    ).toMatchObject({ safe: false });
+  });
+
+  it('非ローカルはref省略を許可しない', () => {
+    expect(
+      resolveServiceRoleTarget(PREVIEW_URL, KEY, testEnv({ E2E_ALLOW_NONLOCAL_SUPABASE: '1' })),
+    ).toMatchObject({ safe: false });
+  });
+
+  it.each(['http://localhost:54321', 'http://[::1]:54321'])('CI/local originを維持: %s', (url) => {
+    expect(resolveServiceRoleTarget(url, KEY, testEnv())).toEqual({ safe: true });
+  });
+
+  it.each([
+    'ftp://localhost:54321',
+    'http://user:secret@localhost:54321',
+    'http://localhost:54321?token=secret',
+  ])('localでも不正originは拒否: %s', (url) => {
+    expect(resolveServiceRoleTarget(url, KEY, testEnv())).toMatchObject({ safe: false });
+  });
+
+  it('指定refと異なるDBを拒否する', () => {
+    expect(
+      resolveServiceRoleTarget(
+        PREVIEW_URL,
+        KEY,
+        testEnv({
+          E2E_ALLOW_NONLOCAL_SUPABASE: '1',
+          E2E_SUPABASE_PROJECT_REF: 'zzzzzzzzzzzzzzzzzzzz',
+        }),
+      ),
+    ).toMatchObject({ safe: false });
+  });
+
+  it.each([
+    'http://abcdefghijklmnopqrst.supabase.co',
+    'https://user:secret@abcdefghijklmnopqrst.supabase.co',
+    'https://abcdefghijklmnopqrst.supabase.co/path',
+    'https://abcdefghijklmnopqrst.supabase.co?token=secret',
+    'https://abcdefghijklmnopqrst.supabase.co#secret',
+    'https://abcdefghijklmnopqrst.supabase.co:444',
+  ])('不正なremote originを拒否: %s', (url) => {
+    expect(
+      resolveServiceRoleTarget(
+        url,
+        KEY,
+        testEnv({
+          E2E_ALLOW_NONLOCAL_SUPABASE: '1',
+          E2E_SUPABASE_PROJECT_REF: 'abcdefghijklmnopqrst',
+        }),
+      ),
+    ).toMatchObject({ safe: false });
+  });
+
+  it('不正URLの生値を診断へ漏らさない', () => {
+    expect(
+      JSON.stringify(resolveServiceRoleTarget('invalid-secret-value', KEY, testEnv())),
+    ).not.toContain('invalid-secret-value');
   });
 
   it('Production project は opt-in があっても安全でない', () => {

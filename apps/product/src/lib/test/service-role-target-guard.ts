@@ -9,7 +9,7 @@
  * 実行先が安全であることを確認できた場合だけ suite を有効にする。
  *
  * 既定はローカル stack のみ。PR Preview など非ローカルで走らせる場合は
- * `E2E_ALLOW_NONLOCAL_SUPABASE=1` の明示的な opt-in を要求する。
+ * `E2E_ALLOW_NONLOCAL_SUPABASE=1` と `E2E_SUPABASE_PROJECT_REF` の明示を要求する。
  * Production project ref は opt-in があっても許可しない。
  *
  * `e2e/` 配下ではなくここに置く。vitest の unit project は `**\/e2e/**` を exclude
@@ -33,15 +33,17 @@ export function resolveServiceRoleTarget(
     return { safe: false, reason: 'NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SECRET_KEY が未設定' };
   }
 
-  let hostname: string;
+  let url: URL;
   try {
-    hostname = new URL(supabaseUrl).hostname;
+    url = new URL(supabaseUrl);
   } catch {
     return {
       safe: false,
-      reason: `NEXT_PUBLIC_SUPABASE_URL を URL として解釈できない: ${supabaseUrl}`,
+      reason: 'NEXT_PUBLIC_SUPABASE_URL を URL として解釈できない',
     };
   }
+
+  const hostname = url.hostname;
 
   // opt-in があっても Production だけは通さない
   if (hostname.includes(PRODUCTION_PROJECT_REF)) {
@@ -51,13 +53,43 @@ export function resolveServiceRoleTarget(
     };
   }
 
+  if (
+    !['http:', 'https:'].includes(url.protocol) ||
+    url.username ||
+    url.password ||
+    url.pathname !== '/' ||
+    url.search ||
+    url.hash
+  ) {
+    return {
+      safe: false,
+      reason: 'Supabase URL は認証情報・path・query・fragment を含まない HTTP(S) origin が必要',
+    };
+  }
+
   if (LOCAL_HOSTNAMES.has(hostname)) return { safe: true };
 
-  if (env.E2E_ALLOW_NONLOCAL_SUPABASE === '1') return { safe: true };
+  if (env.E2E_ALLOW_NONLOCAL_SUPABASE === '1') {
+    const expectedRef = env.E2E_SUPABASE_PROJECT_REF;
+    if (
+      !expectedRef ||
+      !/^[a-z]{20}$/.test(expectedRef) ||
+      expectedRef === PRODUCTION_PROJECT_REF ||
+      url.protocol !== 'https:' ||
+      url.port ||
+      hostname !== `${expectedRef}.supabase.co`
+    ) {
+      return {
+        safe: false,
+        reason: '非本番 E2E_SUPABASE_PROJECT_REF と HTTPS Supabase origin の一致が必要',
+      };
+    }
+    return { safe: true };
+  }
 
   return {
     safe: false,
-    reason: `非ローカルの Supabase (${hostname}) には E2E_ALLOW_NONLOCAL_SUPABASE=1 の明示 opt-in が必要`,
+    reason: '非ローカルの Supabase には E2E_ALLOW_NONLOCAL_SUPABASE=1 の明示 opt-in が必要',
   };
 }
 
