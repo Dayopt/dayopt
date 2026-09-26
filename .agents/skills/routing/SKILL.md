@@ -64,6 +64,8 @@ JevのL1は、Issueの読み順を助ける関連度・分類・出典付き候�
 
 Issue briefを利用する担当Codex sessionは、Issue本文と信頼できる最新 `ctx-brief` コメントを自分の入力として明示取得し、Issue番号・snapshotの一致を確認する。Issue本文が要求の正本であり、コメントが存在するだけではsessionが取得した証拠にならない。
 
+Issue Contract の4節は [`dispatch` の handoff-quality テンプレート](../dispatch/SKILL.md)を正本とし、Markdown・Forms・API 起票で同じ意味を使う。L0 は節の有無、placeholder、根拠付きの「該当なし」、実行可能な検証コマンドを形式面から示すだけで、内容の真実性・安全性・作業許可は判断しない。
+
 ### Codex Cloud へ L1 を渡す
 
 Cloud の L2 担当は Gateway key を持たず、Jev API を呼ばない。dispatch 前に、key を1Passwordから注入できる担当が `pnpm ctx <N> --post` で日常利用するL1候補入りBriefを作成・更新する。Cloud の担当は `pnpm ctx <N> --reuse-brief-l1` を実行し、Issue本文・関連資料・コメントを再収集した L0 とともに、Brief 内の候補を取得する。
