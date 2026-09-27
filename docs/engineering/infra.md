@@ -1558,7 +1558,7 @@ pnpm dev
 
 #### 4. Persistent Integration 確認
 
-`integration` への merge 後、Supabase branch が active / migration current であること、`product-integration.vercel.app/api/health` の DB / Redis checks、固定 synthetic account の password login、合成データ CRUD、MCP read-only、必要な Stripe test / Calendar test を確認する。Vercel `product-integration` が Git `integration` と Supabase `tilwaprottpyhlfoggbb` を使うことも確認する。
+`integration` への merge 後、Supabase branch が active / migration current であること、`product-integration-dayopt.vercel.app/api/health` の DB / Redis checks、固定 synthetic account の password login、合成データ CRUD、MCP read-only、必要な Stripe test / Calendar test を確認する。Vercel `product-integration` が Git `integration` と Supabase `tilwaprottpyhlfoggbb` を使うことも確認する。
 
 #### 5. Production promotion
 
