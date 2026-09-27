@@ -19,7 +19,7 @@
 | tRPC procedure | 71   | 0          | 71               | 0                | 0              |
 | MCP tool       | 19   | 19         | 0                | 0                | 0              |
 | Zustand store  | 14   | 0          | 13               | 0                | 1              |
-| Story          | 113  | 0          | 89               | 24               | 0              |
+| Story          | 114  | 0          | 90               | 24               | 0              |
 | route          | 16   | 0          | 6                | 10               | 0              |
 | i18n namespace | 15   | 7          | 0                | 8                | 0              |
 
@@ -2321,6 +2321,7 @@ graph LR
 | Story | [Product/Features/Settings/InfoBox](<../../../apps/product/src/features/settings/components/InfoBox.stories.tsx>) | feature 経由 |
 | Story | [Product/Features/Settings/McpConnectionsSettings](<../../../apps/product/src/features/settings/components/McpConnectionsSettingsView.stories.tsx>) | feature 経由 |
 | Story | [Product/Features/Settings/MFASection](<../../../apps/product/src/features/settings/components/sections/MFASection.stories.tsx>) | feature 経由 |
+| Story | [Product/Features/Settings/MobileAccountOverview](<../../../apps/product/src/features/settings/components/MobileAccountOverview.stories.tsx>) | feature 経由 |
 | Story | [Product/Features/Settings/PasswordChangeDialog](<../../../apps/product/src/features/settings/components/PasswordChangeDialog.stories.tsx>) | feature 経由 |
 | Story | [Product/Features/Settings/SettingsDialog](<../../../apps/product/src/features/settings/components/SettingsDialog.stories.tsx>) | feature 経由 |
 | Story | [Product/Features/Settings/SettingsSidebar](<../../../apps/product/src/features/settings/components/SettingsSidebar.stories.tsx>) | feature 経由 |

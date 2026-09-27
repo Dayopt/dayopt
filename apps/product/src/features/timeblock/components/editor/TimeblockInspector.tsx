@@ -11,13 +11,15 @@
  * 旧 TimeblockInspector（entries 用）の置き換え。旧実装は Step 9 で削除する。
  */
 
-import { Suspense, useCallback, useEffect, useRef } from 'react';
+import { useQueryClient, type QueryClient } from '@tanstack/react-query';
+import { Suspense, useCallback, useEffect, useMemo, useRef } from 'react';
 
 import { useTranslations } from 'next-intl';
 
 import { ErrorState } from '@/components/ui/feedback/ErrorState';
 import { useActivitiesMap } from '@/features/activities';
 import { MEDIA_QUERIES } from '@/lib/breakpoints';
+import type { PublicPlanRow, PublicRecordRow } from '@/lib/database';
 import { useDomSlot } from '@/lib/dom-slots/useDomSlot';
 import { useMediaQuery } from '@/lib/hooks/useMediaQuery';
 import { overlappingRecords, type DerivedBlock } from '@/lib/time';
@@ -53,6 +55,29 @@ interface TimeModelInspectorProps {
 
 const INSPECTOR_FOCUSABLE_SELECTOR =
   'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+function findCachedTimeblockListRow<Row extends { id: string }>(
+  queryClient: QueryClient,
+  lane: 'plans' | 'records',
+  id: string | null,
+): Row | undefined {
+  if (!id) return undefined;
+
+  const cachedLists = queryClient.getQueriesData<Row[]>({
+    predicate: ({ queryKey }) =>
+      Array.isArray(queryKey) &&
+      Array.isArray(queryKey[0]) &&
+      queryKey[0][0] === lane &&
+      queryKey[0][1] === 'list',
+  });
+
+  for (const [, rows] of cachedLists) {
+    const match = rows?.find((row) => row.id === id);
+    if (match) return match;
+  }
+
+  return undefined;
+}
 
 function toInspectorDerivedBlock(
   row: {
@@ -91,6 +116,7 @@ export function TimeblockInspector({
 }: TimeModelInspectorProps) {
   const t = useTranslations();
   const isMobile = useMediaQuery(MEDIA_QUERIES.mobile);
+  const queryClient = useQueryClient();
   const { getActivityById } = useActivitiesMap();
 
   const isOpen = useTimeblockInspectorStore((state) => state.isOpen);
@@ -105,14 +131,28 @@ export function TimeblockInspector({
   const closeInspector = useTimeblockInspectorStore((state) => state.closeInspector);
   const contentRef = useRef<HTMLDivElement>(null);
   const shouldFocusRelationshipRef = useRef(false);
+  const cachedPlan = useMemo(
+    () => findCachedTimeblockListRow<PublicPlanRow>(queryClient, 'plans', timeblockId),
+    [queryClient, timeblockId],
+  );
+  const cachedRecord = useMemo(
+    () => findCachedTimeblockListRow<PublicRecordRow>(queryClient, 'records', timeblockId),
+    [queryClient, timeblockId],
+  );
 
   const planQuery = api.plans.getById.useQuery(
     { id: timeblockId ?? '' },
-    { enabled: isOpen && !duplicateDraft && !!timeblockId && timeblockKind === 'plan' },
+    {
+      enabled: isOpen && !duplicateDraft && !!timeblockId && timeblockKind === 'plan',
+      ...(isMobile && cachedPlan ? { placeholderData: cachedPlan } : {}),
+    },
   );
   const recordQuery = api.records.getById.useQuery(
     { id: timeblockId ?? '' },
-    { enabled: isOpen && !duplicateDraft && !!timeblockId && timeblockKind === 'record' },
+    {
+      enabled: isOpen && !duplicateDraft && !!timeblockId && timeblockKind === 'record',
+      ...(isMobile && cachedRecord ? { placeholderData: cachedRecord } : {}),
+    },
   );
   const relatedRecordsQuery = api.records.list.useQuery(
     {
@@ -240,7 +280,7 @@ export function TimeblockInspector({
   } else {
     content = (
       <TimeblockInspectorForm
-        key={`${timeblockKind}:${target.id}`}
+        key={`${timeblockKind}:${target.id}:${activeQuery.isPlaceholderData ? 'placeholder' : 'loaded'}`}
         kind={timeblockKind}
         plan={plan}
         record={record}
@@ -256,7 +296,12 @@ export function TimeblockInspector({
   }
 
   const contentElement = (
-    <div ref={contentRef} tabIndex={-1} className="focus:outline-none">
+    <div
+      ref={contentRef}
+      tabIndex={-1}
+      inert={activeQuery.isPlaceholderData}
+      className="focus:outline-none"
+    >
       {content}
     </div>
   );

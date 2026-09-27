@@ -15,6 +15,9 @@
       "deleteFailed": "Failed to delete account",
       "profile": "Profile",
       "profileDesc": "Basic information and profile image settings",
+      "sections": {
+        "security": "Security"
+      },
       "displayName": "Display name",
       "displayNameDesc": "Name shown to other users",
       "displayNamePlaceholder": "Enter display name",
@@ -590,6 +593,13 @@
       }
     },
     "accountPage": {
+      "sections": {
+        "settings": "Settings",
+        "data": "Data",
+        "plan": "Plan",
+        "support": "Support",
+        "other": "Other"
+      },
       "helpAndSupport": "Help & support",
       "releaseNotes": "Release notes",
       "documentation": "Documentation",

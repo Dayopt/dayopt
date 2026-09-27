@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 let mockHasMounted = false;
 let mockIsMobile = false;
-let mockCategory = 'profile';
+let mockCategory = 'account';
 let mockSearchParams = new URLSearchParams();
 
 const mockReplace = vi.fn();
@@ -48,19 +48,38 @@ vi.mock('@dayopt/i18n/navigation', async () => {
 // SETTINGS_CATEGORIES はここで mock し、barrel 側は re-export を通じて同じ値を受け取る。
 vi.mock('@/features/settings/constants', () => ({
   SETTINGS_CATEGORIES: [
-    { id: 'profile', labelKey: 'settings.category.profile', icon: () => <span>icon</span> },
+    {
+      id: 'account',
+      labelKey: 'settings.dialog.categories.account',
+      icon: () => <span aria-hidden="true" />,
+    },
+    {
+      id: 'display',
+      labelKey: 'settings.dialog.categories.display',
+      icon: () => <span aria-hidden="true" />,
+    },
+    {
+      id: 'data',
+      labelKey: 'settings.dialog.categories.data',
+      icon: () => <span aria-hidden="true" />,
+    },
     {
       id: 'integrations',
-      labelKey: 'settings.category.integrations',
-      icon: () => <span>icon</span>,
+      labelKey: 'settings.dialog.categories.integrations',
+      icon: () => <span aria-hidden="true" />,
     },
-    { id: 'billing', labelKey: 'settings.category.billing', icon: () => <span>icon</span> },
+    {
+      id: 'billing',
+      labelKey: 'settings.dialog.categories.billing',
+      icon: () => <span aria-hidden="true" />,
+    },
   ],
 }));
 
 vi.mock('@/features/settings', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/features/settings')>()),
-  isValidCategory: (category: string) => ['profile', 'integrations', 'billing'].includes(category),
+  isValidCategory: (category: string) =>
+    ['account', 'display', 'data', 'integrations', 'billing'].includes(category),
   SettingsContent: ({ category }: { category: string }) => <div>{category}</div>,
 }));
 
@@ -153,7 +172,7 @@ describe('settings route hydration guards', () => {
     vi.clearAllMocks();
     mockHasMounted = false;
     mockIsMobile = false;
-    mockCategory = 'profile';
+    mockCategory = 'account';
     mockSearchParams = new URLSearchParams();
   });
 
@@ -182,13 +201,31 @@ describe('settings route hydration guards', () => {
 
     expect(mockOpenSettings).not.toHaveBeenCalled();
     expect(screen.getByText('Tester')).toBeInTheDocument();
+    expect(screen.getByText('Tester').closest('a')).toBeNull();
     expect(screen.getByRole('link', { name: 'common.back' })).toHaveAttribute(
       'href',
       '/week?date=2026-06-22&panel=review',
     );
-    expect(screen.getByRole('link', { name: /settings\.category\.profile/ })).toHaveAttribute(
+    expect(
+      screen.getByRole('heading', { level: 2, name: 'settings.accountPage.sections.settings' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { level: 2, name: 'settings.accountPage.sections.data' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { level: 2, name: 'settings.accountPage.sections.plan' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { level: 2, name: 'settings.accountPage.sections.support' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { level: 2, name: 'settings.accountPage.sections.other' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: 'settings.dialog.categories.account' }),
+    ).toHaveAttribute(
       'href',
-      '/settings/profile?returnTo=%2Fweek%3Fdate%3D2026-06-22%26panel%3Dreview',
+      '/settings/account?returnTo=%2Fweek%3Fdate%3D2026-06-22%26panel%3Dreview',
     );
     expect(
       screen.getByRole('link', { name: 'settings.accountPage.documentation' }),
@@ -270,13 +307,13 @@ describe('settings route hydration guards', () => {
   it('ignores checkout params outside the billing category', () => {
     mockHasMounted = true;
     mockIsMobile = false;
-    mockCategory = 'profile';
+    mockCategory = 'account';
     mockSearchParams = new URLSearchParams('success=true');
 
     render(<SettingsCategoryPage />);
 
     expect(mockToastSuccess).not.toHaveBeenCalled();
-    expect(mockOpenSettings).toHaveBeenCalledWith('profile');
+    expect(mockOpenSettings).toHaveBeenCalledWith('account');
   });
 
   it('cleans only calendar callback params on mobile', () => {

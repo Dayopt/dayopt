@@ -25,6 +25,8 @@ import { InfoBox } from '../InfoBox';
 
 /** MFASection のプロップス定義 */
 export interface MFASectionProps {
+  /** Render inside the grouped AccountSettings card. */
+  embedded?: boolean;
   /**
    * テスト・Storybook用フック差し替え。
    * 省略時は本物の useMFA を使用。
@@ -38,7 +40,7 @@ export interface MFASectionProps {
  *
  * TOTP認証の登録・管理UIを提供
  */
-export function MFASection({ _useMFAHook }: MFASectionProps = {}) {
+export function MFASection({ _useMFAHook, embedded = false }: MFASectionProps = {}) {
   const t = useTranslations();
   // テスト用に差し替え可能。本番では常に useMFA を使う。
   const hookToUse = _useMFAHook ?? useMFA;
@@ -82,7 +84,10 @@ export function MFASection({ _useMFAHook }: MFASectionProps = {}) {
   };
 
   return (
-    <SectionCard title={t('settings.account.twoFactor')}>
+    <SectionCard
+      title={t('settings.account.twoFactor')}
+      className={embedded ? 'border-b-0 pb-0' : ''}
+    >
       <div className="space-y-4">
         {/* エラー・成功メッセージ */}
         {error && (
