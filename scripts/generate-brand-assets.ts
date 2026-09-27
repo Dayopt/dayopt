@@ -56,6 +56,10 @@ async function main() {
       90,
     );
   }
+  // Short, descriptive names are the default primary assets for light backgrounds.
+  assets['mark.svg'] = assets['dayopt-symbol-primary.svg'];
+  assets['wordmark.svg'] = assets['dayopt-wordmark-primary.svg'];
+  assets['lockup.svg'] = assets['dayopt-lockup-primary.svg'];
   assets['dayopt-app-icon.svg'] = appIcon();
   assets['dayopt-app-icon-maskable.svg'] = appIcon({ maskable: true });
   assets['dayopt-app-icon-rounded-preview.svg'] = appIcon({ rounded: true });
@@ -71,8 +75,10 @@ async function main() {
   for (const app of ['product', 'web']) {
     const pub = path.join(root, `apps/${app}/public`);
     const dest = path.join(pub, 'brand');
+    const appMetadataDir = app === 'web' ? path.join(root, 'apps/web/src/app') : undefined;
     await mkdir(dest, { recursive: true });
     await mkdir(path.join(pub, 'icons'), { recursive: true });
+    if (appMetadataDir) await mkdir(appMetadataDir, { recursive: true });
     for (const [name, data] of Object.entries(assets)) await writeFile(path.join(dest, name), data);
     await copyFile(path.join(source, 'Inter-LICENSE.txt'), path.join(dest, 'Inter-LICENSE.txt'));
     for (const name of ['lockup', 'wordmark', 'symbol'])
@@ -95,7 +101,7 @@ async function main() {
     // Keep the existing URL working; its established appearance is the dark variant.
     await writeFile(path.join(pub, 'og-image.png'), ogPngs.dark);
     await writeFile(path.join(dest, 'og-image.png'), ogPngs.dark);
-    await writeFile(path.join(pub, 'favicon.svg'), assets['favicon.svg']);
+    const faviconFiles: Record<string, Buffer> = {};
     const pngs: Buffer[] = [];
     for (const n of [16, 32, 48]) {
       const b = await sharp(Buffer.from(appIcon({ rounded: true })))
@@ -103,7 +109,9 @@ async function main() {
         .png()
         .toBuffer();
       pngs.push(b);
-      await writeFile(path.join(pub, `favicon-${n}x${n}.png`), b);
+      const name = `favicon-${n}x${n}.png`;
+      faviconFiles[name] = b;
+      if (!appMetadataDir) await writeFile(path.join(pub, name), b);
     }
     const header = Buffer.alloc(6 + pngs.length * 16);
     header.writeUInt16LE(1, 2);
@@ -119,7 +127,15 @@ async function main() {
       header.writeUInt32LE(offset, p + 12);
       offset += b.length;
     });
-    await writeFile(path.join(pub, 'favicon.ico'), Buffer.concat([header, ...pngs]));
+    const faviconIco = Buffer.concat([header, ...pngs]);
+    faviconFiles['favicon.ico'] = faviconIco;
+    if (appMetadataDir) {
+      await writeFile(path.join(appMetadataDir, 'favicon.ico'), faviconIco);
+      await writeFile(path.join(appMetadataDir, 'icon.svg'), assets['favicon.svg']);
+    } else {
+      await writeFile(path.join(pub, 'favicon.svg'), assets['favicon.svg']);
+      await writeFile(path.join(pub, 'favicon.ico'), faviconIco);
+    }
     for (const n of [192, 512]) {
       const square = await sharp(Buffer.from(appIcon({ maskable: true })))
         .resize(n, n)
@@ -136,9 +152,27 @@ async function main() {
       }
     }
     const apple = await sharp(Buffer.from(appIcon())).resize(180, 180).png().toBuffer();
-    await writeFile(path.join(pub, 'apple-touch-icon.png'), apple);
+    faviconFiles['apple-touch-icon.png'] = apple;
+    if (appMetadataDir) {
+      await writeFile(path.join(appMetadataDir, 'apple-icon.png'), apple);
+      for (const name of [
+        'favicon.svg',
+        'favicon.ico',
+        'favicon-16x16.png',
+        'favicon-32x32.png',
+        'favicon-48x48.png',
+        'apple-touch-icon.png',
+      ]) {
+        await rm(path.join(pub, name), { force: true });
+      }
+    } else {
+      await writeFile(path.join(pub, 'apple-touch-icon.png'), apple);
+    }
     await writeFile(path.join(pub, 'icons/apple-touch-icon.png'), apple);
     await sharp(Buffer.from(appIcon())).resize(512, 512).png().toFile(path.join(pub, 'logo.png'));
+    for (const [name, data] of Object.entries(faviconFiles)) {
+      await writeFile(path.join(dest, name), data);
+    }
     const og = svg(
       '0 0 1200 630',
       `<rect width="1200" height="630" fill="${brand.primary}"/><g transform="translate(288.8 249.4) scale(1.6) translate(0 -22)">${paths(brand.lockup, brand.reverse)}</g>`,
@@ -161,16 +195,7 @@ async function main() {
   for (const app of ['product', 'web']) {
     const dest = path.join(root, `apps/${app}/public/brand`);
     await copyFile(path.join(root, 'docs/business/brand.md'), path.join(dest, 'README.md'));
-    for (const name of [
-      'favicon.ico',
-      'favicon-16x16.png',
-      'favicon-32x32.png',
-      'favicon-48x48.png',
-      'apple-touch-icon.png',
-      'og-image.png',
-      'og-image-light.png',
-      'og-image-dark.png',
-    ]) {
+    for (const name of ['og-image.png', 'og-image-light.png', 'og-image-dark.png']) {
       await copyFile(path.join(root, `apps/${app}/public`, name), path.join(dest, name));
     }
     const files = (await readdir(dest)).filter((name) => !name.endsWith('.zip')).sort();

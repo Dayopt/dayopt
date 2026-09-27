@@ -80,7 +80,7 @@ export function Footer() {
           {/* Logo */}
           <div>
             <Link href="/" className="inline-block">
-              <Logo variant="lockup" size="lg" />
+              <Logo variant="wordmark" size="lg" />
             </Link>
           </div>
 
