@@ -20,7 +20,6 @@ import { recordCommandsRouter } from '@/features/timeblock/server/record-command
 import { recordsRouter } from '@/features/timeblock/server/records-router';
 import { statisticsRouter } from '@/features/timeblock/server/router-index';
 import { timeblockContextRouter } from '@/features/timeblock/server/timeblock-context-router';
-import { emailRouter } from '@/lib/email/router';
 import { createTRPCRouter } from '@/lib/trpc/router';
 
 import { prepareAccountDeletionWithCompatibility } from './_composition/account-deletion-selector';
@@ -33,7 +32,6 @@ export const appRouter = createTRPCRouter({
   activities: activitiesRouter,
   billing: billingRouter,
   contact: contactRouter,
-  email: emailRouter,
   externalCalendar: externalCalendarRouter,
   mcpConnections: mcpConnectionsRouter,
   planCommands: planCommandsRouter,

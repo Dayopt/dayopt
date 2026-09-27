@@ -172,18 +172,24 @@ export function useInteractionListeners({
       dispatch({ type: 'POINTER_UP' });
     }
 
+    function handleGlobalCancel() {
+      dispatch({ type: 'CANCEL' });
+    }
+
     document.addEventListener('mousemove', handleGlobalMove, { passive: false });
     document.addEventListener('mouseup', handleGlobalUp);
     document.addEventListener('touchmove', handleGlobalMove, { passive: false });
     document.addEventListener('touchend', handleGlobalUp);
-    document.addEventListener('touchcancel', handleGlobalUp);
+    document.addEventListener('touchcancel', handleGlobalCancel);
+    document.addEventListener('pointercancel', handleGlobalCancel);
 
     return () => {
       document.removeEventListener('mousemove', handleGlobalMove);
       document.removeEventListener('mouseup', handleGlobalUp);
       document.removeEventListener('touchmove', handleGlobalMove);
       document.removeEventListener('touchend', handleGlobalUp);
-      document.removeEventListener('touchcancel', handleGlobalUp);
+      document.removeEventListener('touchcancel', handleGlobalCancel);
+      document.removeEventListener('pointercancel', handleGlobalCancel);
     };
   }, [mode, dispatch, latestRef, stateRef, dayColumnsRef, pendingTargetLaneRef, dragLaneRef]);
 }

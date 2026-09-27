@@ -1,8 +1,9 @@
 import 'server-only';
 
+import { createHash } from 'node:crypto';
+
 import { logger } from '@/lib/logger';
 import { createServiceRoleClient } from '@/lib/supabase/oauth';
-import { createHash } from 'node:crypto';
 
 type BillingEventName =
   | 'app_trial_started'
@@ -40,6 +41,31 @@ export async function trackBillingEvent(input: {
     return true;
   } catch {
     logger.warn('Billing analytics unavailable', { eventName: input.eventName });
+    return false;
+  }
+}
+
+/** Persists the lifetime first-paid invoice marker outside product_events retention. */
+export async function claimFirstPaidInvoice(input: {
+  userId: string;
+  invoiceId: string;
+  eventName: 'subscription_payment_succeeded' | 'subscription_renewal_succeeded';
+}): Promise<boolean> {
+  try {
+    const invoiceEventId = billingEventId(input.eventName, input.invoiceId);
+    const query = createServiceRoleClient().rpc('claim_posthog_first_paid_invoice_v1', {
+      p_user_id: input.userId,
+      p_invoice_event_id: invoiceEventId,
+    });
+    const { data, error } = await query.abortSignal(AbortSignal.timeout(1_000));
+
+    if (error) {
+      logger.warn('First paid invoice marker failed');
+      return false;
+    }
+    return data === true;
+  } catch {
+    logger.warn('First paid invoice marker unavailable');
     return false;
   }
 }

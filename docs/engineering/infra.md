@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-09-16
+last_verified: 2026-09-22
 ---
 
 # インフラ・環境・API/Routing 総覧
@@ -23,7 +23,34 @@ Dayopt の標準ルートは `local → PR Preview → production`。Vercel Prev
 
 web（`dayopt.app`）と product（`app.dayopt.app`）は別ドメインで配信する。web から product へは絶対 URL でリンクし、path ベースの Multi-Zones（web の rewrites で `/settings` や `/app-static` を product へ proxy する構成）は使わない。production で既に 404 になっていたため 2026-09-14 に設定を撤去した（#2747）。security headers の正本は各 app の `next.config.mjs` の `headers()` で、`vercel.json` には置かない。
 
-persistent staging は常設しない。固定 URL が必要な Stripe / OAuth callback / closed beta 検証が出た時だけ、Vercel staging と Supabase persistent branch を追加する。
+上表は稼働中の構成。Cloud-firstへの移行仕様は次節。常設環境の構築と通し検証が終わるまで、稼働済みの構成とは区別する。
+
+### Cloud-firstへの移行契約（#2910、構築中）
+
+通常の実装はCodex Cloud、手元のUI確認は任意のStorybookを入口とする。CI内のDocker・隔離DB・RLS・migration検証は維持する。個人の1Password unlockやMacのDBを通常workerの前提にしない。
+
+| 用途                               | アプリ                                         | DB                                  |
+| ---------------------------------- | ---------------------------------------------- | ----------------------------------- |
+| 通常PR                             | PRごとのVercel Preview                         | 常設の非本番Supabaseを共有          |
+| DB・共通認証設定の変更、破壊的検証 | PRごとのVercel Preview                         | そのPR専用の使い捨てSupabase branch |
+| 統合確認                           | 専用Vercel projectのProduction target、固定URL | 同じ常設Supabase 1環境              |
+| 任意の手元UI確認                   | Storybook / mock                               | 不要                                |
+
+常設には合成データとテスト専用アカウントを維持する。人間の確認用とAI・E2E用のユーザーを分離し、並列runは自分が作ったデータだけ掃除する。DB/RLS/migration以外でも、全ユーザー対象のjob、Auth、Storage、共通設定に影響する実験は共有DBで行わない。本番データを複製しない。
+
+同じDBへ接続するとアカウントを使い回せるが、異なるPreview domain間のログインsession共有は保証されない。アプリ認証とVercel Deployment Protectionは別々に確認する。共有DBに接続したPRを固定MCP OAuth issuerとして扱わない。
+
+本番と揃えるのはcode、migration、RLS、認証・利用権・Webhook・Cronの処理。変えてよいものは接続先、資格情報、データ、URL、外部サービスのテストaccount/mode、メール送信先、ログ環境、容量。`VERCEL_ENV=production`だけで本番と判定せず、専用project/ref/domainと外部accountを照合する。認証や課金判定を無効化して同等とみなさない。
+
+待機時の常設は実際に公開済みの本番revisionに対応させる。統合確認時だけ候補を固定し、別候補で上書きしない。必要な確認はmain merge前に行う（既存Supabase Git integrationはmerge時に本番migrationを適用するため）。本番へ渡すのは検証したcode/migrationであり、非本番Secret入りのbuildではない。
+
+証拠はIssue/PR、既存ctx/trace/Validation、各サービスへの参照を使う。head/base SHA、deployment、DB ref、migration集合、run/attempt、観測時刻を対応付け、古い成功・欠測・接続拒否を現在の成功にしない。専用dashboardや管理DBは作らない。
+
+**使い捨てbranchの費用と終了**: 作成前にPR・git branch・Supabase branch ID/ref・所有者を記録する。作成したら検証とマージまで進める。マージできなければ、そのPR専用で非default・非persistentと確認できたbranchだけを削除し、APIで消滅を確認する。単なる古いbranch名やPR checkの成功から削除対象を推測しない。理由、保持した証拠、再開時のGit integrationによる再作成・migration/seed・環境変数再同期・新deploymentの照合手順をPRへ残す。再開時には古いDBの成功を再利用しない。Vercel deploymentとCI artifactの保持はDB削除と別に扱う。
+
+**構築前の確認対象**: 常設Micro相当1本、専用Vercel project、固定URL、Stripe Sandbox、Resendの許可送信先、Google Calendarテストaccount、Sentry環境、MCP OAuth identity、Cron。新規有料プランは前提にしない。Microのcomputeは概ね月$10だがusageは別であり上限保証ではない。resource一覧・接続先・費用・復旧方法をまとめて確認してから作る。データの復旧はアプリrollbackと分け、DBだけresetしてStripe等を孤児化させない。
+
+2026-09-26の確認ではSupabaseはmainのみで、常設と上記接続は未構築。未接続のAC、統合gateの実強制、Preview E2Eの通し検証は#2910に残す。通し検証前に旧経路や手元の実物を削除しない。
 
 ### テスト自動化の現在地
 
@@ -164,6 +191,15 @@ workflow は次を満たした時だけ promote する。
 - live な Vercel metadata に対する Production Config Audit が成功
 - promote 後、`dayopt.app` と `app.dayopt.app` の両方への smoke が成功
 
+候補待ちはまず 5 分。時間内に全 project が READY にならない時は対象 SHA を再検索し、既存 candidate
+（QUEUED / BUILDING を含む）があれば deployment ID を固定して最大 25 分待つ。candidate が無い project
+だけ、Vercel project が `Dayopt/dayopt` に link 済みで Auto-assign が `false` と読めた場合に限り、Vercel
+Git source から exact SHA の staged Production build を作る。作成直前の project 設定が Auto-assign
+無効であることと、response の `aliasAssigned=false` / alias 空を確認し、project ID・target・GitHub source
+SHA・deployment ID を再読込して既存の smoke / audit / promote
+gate に通す。link / Auto-assign / API response を確認できない時は fail closed で promote しない。
+候補待ちの最悪時間はこの 5 分 + 25 分で、workflow timeout の算定にも含める。
+
 **どの project を進めるかは project ごとに判定する。** 基準は「その project が今配信している
 deployment の source SHA」で、そこから対象 SHA までの `git diff` を Impact Resolver
 （`scripts/ci/impact.mjs`）に通す。web が 3 commit 遅れていても、判定は web の live SHA から見た
@@ -214,6 +250,16 @@ run の結果は `release-manifest-<attempt>` artifact（保持 90 日、`github
 
 対象 SHA より新しい Production deployment が既に live の場合は promote せず、`Production Release` status
 を failure にする。live でない commit に tag を打てないようにするためで、run 自体も失敗として扱う。
+
+**同一 commit の再配備**（#2735）: env だけを更新して build し直した deployment は source SHA が live と
+同じなので、影響判定は `already serving` になり candidate 選択へ届かない。`workflow_dispatch` の
+`redeploy` input（`<project>:<deployment id>`）を渡した run だけ、名指しの project を affected として扱い、
+「SHA の最新 deployment」ではなく **その ID の deployment だけ**を candidate にする。層 3・candidate smoke・
+Production Config Audit・production domain smoke・live 検証・自動 rollback は通常の release と同じ。
+受理するのは「同じ project の、release 対象と同じ commit の GitHub 連携 production build で、live より
+後に作られたもの」だけで、どれかが読めない時も拒否する（fail closed）。Force Promote とは併用できない。
+release 対象が `github.sha` である点は変わらず、任意の SHA を指定する口にはならない。手順は
+[runbook](../operations/runbook.md) §同一 commit の再配備。
 
 **Vercel 側の既知バグへの対処**: promote endpoint は project 設定の `autoAssignCustomDomains` を
 `true` へ戻す（[vercel/vercel#15095](https://github.com/vercel/vercel/issues/15095)、未修正）。放置すると
@@ -312,7 +358,7 @@ GitHub Code QualityはOrganization / Repositoryの両方で無効にし、PR品�
 
 - Required checksはrepository rulesetと`.github/workflows/ci.yml`を正とし、Code Quality由来のcheckを追加しない
 - **GitHub CodeQL は 2026-08-11 に無効化すると決めた。UI 操作は本記述時点で未実施で、現在も CodeQL は動いている**（残作業は #1934。現在状態は `gh api repos/Dayopt/dayopt/code-scanning/default-setup --jq '.state'` が `configured` を返すか `not-configured` を返すかで判定する。`not-configured` を確認したらこの一文を完了形へ更新する）。無効化を決めた理由は次のとおり。 default setup が `languages: ["actions"]` で有効化されており、**workflow YAML しか解析していなかった**（`apps/` 配下の JS / TS は対象外）。#1425 の Done 条件「JavaScript / TypeScript が対象になっていることを確認する」が満たされないまま COMPLETED で close されたため、誤った前提が docs 側に残り続けていた。無効化後のセキュリティ静的解析の担当: secret は gitleaks と `pnpm secrets:check`（#2483 以前は `.github/workflows/docs-guard.yml`、現在は `ci.yml` の static job（`scripts/ci/check.mjs`））、依存は Dependabot、深掘り SAST は `/claude-security`。**`.github/workflows/**` に対する PR ごとの自動解析だけは代替が無く、無効化で失われる**（受容済み。根拠と再評価の条件は決定ログ）。再有効化する場合は `languages` に `javascript-typescript` が入っていることを `gh api repos/Dayopt/dayopt/code-scanning/default-setup` で確認する（設定画面を開いた事実では確認にならない）。判断は2026-08-11 の決定ログ（削除済み、git 履歴参照）
-- **自動レビューの履歴と現在の入口**: 2026-08-03 に Gemini の ai-review と Copilot を撤去し、Codex の GitHub review も適用範囲を変更してきた（当時の判断・実測は git 履歴を参照）。現在の PR 独立レビューは、リスクにかかわらず GitHub の `@codex review` を使う。追加 reviewer は 2026-09-17 の User 指示で停止中で、可用性や無応答を理由に自動起動しない。現在の規則は `AGENTS.md` §レビュー規則、手順は `.agents/skills/pr-cross-review/SKILL.md`
+- **自動レビューの履歴と現在の入口**: 2026-08-03 に Gemini の ai-review と Copilot を撤去し、Codex の GitHub review も適用範囲を変更してきた（当時の判断・実測は git 履歴を参照）。現在の PR 独立レビューは `protected-path-gate.mjs` が「外部契約 or 不可逆」またはガードレール自身の変更と判定した時だけ、安定した merge 候補で GitHub の `@codex review` を使う。通常 PR へは依頼しない。追加 reviewer は 2026-09-17 の User 指示で停止中で、可用性や無応答を理由に自動起動しない。現在の規則は `AGENTS.md` §レビュー規則、手順は `.agents/skills/pr-cross-review/SKILL.md`
 - **repo ruleset「Copilot automatic first review」は 2026-08-05 に削除した。** 上記の「外した」後も ruleset 自体は active で残っており、seat 付与後に復活したのか直近 PR（#1832）へ実際にレビューを投稿し、PR ごとに約 3 課金分の Actions 実行を発生させていた。private 化後の課金源かつ（当時の）Codex 一本化方針と二重のため ruleset ごと削除。再開する場合は org の Copilot seat 割り当て（Settings → Copilot → Access）と ruleset の再作成の両方が必要
 - カバレッジ閾値が必要になった場合はVitest / CIで直接管理する
 - Code Qualityを再評価する場合は、有効化前にbilling impactと既存品質ゲートとの差分を確認する
@@ -381,10 +427,16 @@ Vercel Preview が CI より遅れる分は job 内で短く待ち（`VALIDATION
 （以前の success が偽の green として残らない）。合成 merge commit の日時は固定値で、同じ
 base / head / tree なら再評価でも同じ testSha・planId になる。
 controller 自身も `GITHUB_REF` が main でない・event が workflow_run / status でない場合は
-評価も発行もしない。**PR が producer 定義（ci.yml / setup action / check.mjs / impact.mjs）を変えている
-場合、その PR 自身の CI run は `self-produced` として信用しない**（job 名を保ったまま step を
-空にできるため）。この保証境界は job の配線ファイルまでで、vitest 設定や scripts の改変は
-review の観点に残る。PR 側のコード・依存・artifact は実行しない。
+評価も発行もしない。**PR が producer 定義（`ci.yml` / setup action / root `package.json` /
+`check.mjs` / `impact.mjs`）を変えている場合、その PR 自身の該当 CI run は
+`self-produced` として信用しない**（job 名を保ったまま step を空にできるため）。この保証境界は
+job の配線ファイルまでで、vitest 設定や scripts の改変は review の観点に残る。PR 側のコード・依存・artifact は実行しない。
+この block を解消するには、Validation plan の同一 head に必要な merge evidence が揃い、各 self-produced
+suite の producer job がその最新 run attempt で `success` し、さらに `Review policy (shadow)` が同一 head に
+対して `state: complete` / `verdict: satisfied` を返す必要がある。producer の skipped / cancelled / failed、
+古い attempt、missing evidence、stale review、未裁定 thread は解消条件を満たさない。解消時は suite を
+`review-verified` と表示し、既存の `Validation (shadow)` context の description に同一 head のレビュー完了で
+自己変更を確認したことを出す。通常の success と区別し、Review policy と ruleset は引き続き advisory のままにする。
 計画は毎回 base policy から再生成し、validation-shadow.yml の artifact は読まない。test merge は
 GitHub の `refs/pull/N/merge`（遅延更新で base が古いことがある）ではなく、main HEAD と
 `refs/pull/N/head` から `git merge-tree` で自前生成する。PR の tree は git object として diff に
@@ -438,9 +490,10 @@ upgrade 成功の代用にしない。適用済み migration の編集・削除�
 comment / thread（GraphQL の resolve 状態）から `not-required` / `not-started` / `pending` /
 `stale` / `complete` / `pending-adjudication` / `unknown` を判定し、commit status
 `Review policy (shadow)` に出す。状態の定義と完了証拠は `pr-cross-review` skill §Review policy。
-追加 reviewer は停止中。保護対象 path でも現 head の GitHub レビューと指摘の裁定で満たし、
+追加 reviewer は停止中。`protected-path-gate.mjs` に一致する PR だけ現 head の GitHub レビューと指摘の裁定を読み、
 固定差分レビューの欠落・古さ・partial を別の停止条件にしない。既存証跡の読み取り互換は維持する。
-shadow 中は Codex を自動起動しない（workflow に `pull-requests: write` を渡していない）。
+通常ロジック・時間不変条件・agent 文書は `not-required`。shadow 中は Codex を自動起動せず、
+required check へ切り替えない（workflow に `pull-requests: write` を渡していない）。
 review evidence の保証境界: review の submit と thread の resolve は issue_comment を出さないため、
 その直後は再評価されない。通常は修正 push → CI 完了の `workflow_run` で再評価される。
 `pull_request_review` 系は PR 側の定義で走るため trigger にしない。reviewThreads は cursor で
@@ -469,15 +522,31 @@ would-add（Actions job と Vercel deployment の両方）を 1 表にする。�
 未取得、plan が indeterminate の行は比較を未判定とし、0 や削減可能に丸めない。判定は人が行い、
 件数の少ない分類の p95 は出さない。Preview / review の待ち時間は未取得）。
 
-**順序: shadow 観察 → 比較 → 承認付き切替 → 観察 → 整理。既存の必須条件を先に削らない。**
+**Validation の順序: shadow 観察 → 比較 → 承認付き切替 → 観察 → 整理。既存の必須条件を先に削らない。Review policy は shadow のまま維持する。**
 
-| 段階 | 変更                                                                                                                                                                              | 戻し方                                   | 承認                       |
-| ---- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- | -------------------------- |
-| 0    | shadow（現状）: `Validation (shadow)` / `Review policy (shadow)` / `🧱 DB Upgrade (shadow)` は非必須                                                                              | workflow を Disable                      | 不要（AUTONOMOUS）         |
-| 1    | 比較レポートで docs / ui / logic / api-db / ci-policy 別に正例・負例と保証の退行が無いことを確認                                                                                  | -                                        | -                          |
-| 2    | ruleset に `Validation (shadow)` と `Review policy (shadow)` を **既存 required と併走で追加**（旧条件は残す。片方だけだと Review policy が pending / blocked でも merge できる） | ruleset から context を外す              | User（CHECKPOINT）         |
-| 3    | 観察後、旧 required のうち新条件が包含するものだけを外す（trusted source を保つ native check は残す）                                                                             | その PUT 直前に保存した ruleset を再適用 | User（EXPLICIT AUTHORITY） |
-| 4    | `branch:finish` の rollup 検査と shadow の重複を整理                                                                                                                              | git revert                               | -                          |
+#### #2887 の切替判断（2026-09-24）
+
+read-only で確認した live ruleset `6790553` は active、bypass actor は 0、required checks は `🔍 Static Checks`、
+`📦 Unit Tests`、`🧪 Integration Tests`、`Vercel – product`、`Vercel – web` の 5 件。Validation / Review policy は
+required ではなく、この Issue の作業では ruleset を変更しない。
+
+`pnpm validation:shadow-report --limit 10`（実装 policy SHA `94163399f9ed2707a6239ac6d1c92a299b47b074`）は Validation
+9 success / 1 failure。#2886 は `package.json` による self-produced failure で Review policy は pending。
+比較差分は合計 2 `would-skip` / 5 `would-add`、未判定 0。母数 10 は傾向確認に限り、切替根拠としては小さい。
+
+**判断: まだ切替不可。** #2886 の同一 head レビュー完了は未確認で、`would-add` の差も残る。変更後の判定を
+live で観測し、差分の意味を確認するまで既存 5 checks を維持する。後日切替を判断する場合は Validation を
+既存 5 checks と併走で追加し、Review policy は advisory のまま観察する。rollback は変更直前に保存した完全な
+ruleset JSON を再適用し、Validation を外したうえで元の 5 checks がすべて required であることを再取得して確認する。
+既存 checks を先に外さない。
+
+| 段階 | 変更                                                                                                           | 戻し方                                   | 承認                       |
+| ---- | -------------------------------------------------------------------------------------------------------------- | ---------------------------------------- | -------------------------- |
+| 0    | shadow（現状）: `Validation (shadow)` / `Review policy (shadow)` / `🧱 DB Upgrade (shadow)` は非必須           | workflow を Disable                      | 不要（AUTONOMOUS）         |
+| 1    | 比較レポートで docs / ui / logic / api-db / ci-policy 別に正例・負例と保証の退行が無いことを確認               | -                                        | -                          |
+| 2    | ruleset に `Validation (shadow)` を既存 required と併走で追加。`Review policy (shadow)` は advisory のまま残す | ruleset から context を外す              | User（CHECKPOINT）         |
+| 3    | 観察後、旧 required のうち新条件が包含するものだけを外す（trusted source を保つ native check は残す）          | その PUT 直前に保存した ruleset を再適用 | User（EXPLICIT AUTHORITY） |
+| 4    | `branch:finish` の rollup 検査と shadow の重複を整理                                                           | git revert                               | -                          |
 
 **段階 2 の前提（発行元の分離）**: `Validation (shadow)` / `Review policy (shadow)` は現状
 validation-gate.yml が `GITHUB_TOKEN`（github-actions App、integration_id 15368）で発行している。
@@ -489,7 +558,7 @@ User 裁可で決める: (a) controller の status を専用 GitHub App の inst
 ruleset の `required_status_checks[].integration_id` をその App に束縛する（推奨。PR workflow は
 その App の token を得られない）、(b) repo の Actions 既定権限を read に固定したうえで、PR
 workflow の `permissions` 宣言による昇格を組織 policy で禁止できることを実測してから進める。
-どちらも未実施の間は段階 2 へ進まない。
+どちらも未実施の間は `Validation (shadow)` の段階 2 へ進まない。Review policy の required 化には使わない。
 
 切替は `gh api -X PUT repos/Dayopt/dayopt/rulesets/6790553` で行い、**各 PUT の直前に
 `gh api repos/Dayopt/dayopt/rulesets/6790553` の完全な JSON をその操作固有の rollback 入力として
@@ -663,7 +732,7 @@ required status checks の実状は ruleset が正本で、context の一覧を�
   merge 不能になる。**2026-09-07 の public 化で ruleset が有効化され、この落とし穴が実際に発生した**
   （全 PR が `mergeStateStatus: BLOCKED`、5 日で 34 回の手動 dispatch で回避。2026-09-13 に [#2640](https://github.com/Dayopt/dayopt/issues/2640) で required から外して解消）
 - **外部モデルの自動 diff レビュー（ai-review / Gemini）は 2026-08-03 に撤去した。** 現在の
-  PR 独立レビューは GitHub の `@codex review` で、追加の内部 / 外部 reviewer は停止中。
+  PR 独立レビューは保護対象 path に限って GitHub の `@codex review` を使い、通常 PR では起動しない。追加の内部 / 外部 reviewer は停止中。
   旧レビューで蓄積した不変条件カタログは [invariants.md](./invariants.md) に残っている。
 - `ci.yml` は docs / rules のみの変更でも **workflow 自体は起動し**、`gate` job（Impact Resolver）の
   判定を各 job の `if:` に配って skip する。**skip された job は required status check として success
@@ -1088,15 +1157,16 @@ Supabase CLIを使用して、データベーススキーマからTypeScript型�
 
 ### コマンド
 
-| コマンド                            | ソース          | 用途                                      |
-| ----------------------------------- | --------------- | ----------------------------------------- |
-| `npm run types:generate`            | production main | `types:generate:production` の互換 alias  |
-| `npm run types:generate:production` | production main | production main から生成                  |
-| `npm run types:generate:local`      | Local DB        | ローカルから生成（`supabase start` 必要） |
+| コマンド                                                       | ソース          | 用途                                      |
+| -------------------------------------------------------------- | --------------- | ----------------------------------------- |
+| `pnpm types:generate --target preview --project-ref <ref>`     | PR専用DB        | 対象refを明示して生成                     |
+| `pnpm types:generate --target integration --project-ref <ref>` | 常設非本番DB    | 対象refを明示して生成                     |
+| `npm run types:generate:production`                            | production main | production main から生成                  |
+| `npm run types:generate:local`                                 | Local DB        | ローカルから生成（`supabase start` 必要） |
 
-PR Preview Branch の schema は Supabase integration check で検証する。型生成は production main か local のどちらかを明示して行う。
+引数なしの `pnpm types:generate` は失敗する。本番取得は明示した `types:generate:production` のみ。preview/integrationに本番refは指定できない。環境名は利用者の指定であり、そのrefの所有者やmigration適用済みを証明するものではない。PRのbranch/ref・適用migrationと照合してから実行し、CIの `types:generate:local` による再構築比較も維持する。
 
-全コマンドとも `apps/product/src/lib/database/generated/database.types.ts` に出力。
+全コマンドとも `apps/product/src/lib/database/generated/database.types.ts` に出力。CLI成功・Database型取得・整形成功後だけ置き換える。認証や生成に失敗しても既存ファイルは保持し、CLIの生のエラー出力は秘密情報を含み得るため表示しない。
 
 ### 使用タイミング
 
@@ -2111,18 +2181,18 @@ WHERE version = '20260319090000';  -- 該当バージョンに置き換え
 
 ### 中（乗り換えは日単位）
 
-| 依存                                   | 浸透                                                                                                                                                                                                                                                                                                                                                                                                                      | 今日捨てたら何が壊れるか                                                                                                                                               | 逃げ道                                                                                                                                                                                                                                                                                              | 出口検討トリガー                    |
-| -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- |
-| **Vercel**                             | product / web のホスティング、build 内 bundle 検査、merge gate の commit status、**Cron**（`calendar-sync` / `external-connection-maintenance` を 15 分毎、`calendar-account-deletion-settle` を毎時、`billing-reconciliation` を日次）、**host 別 rewrite**（`mcp.dayopt.app` → `/api/mcp`）、**`dayopt.app` の registrar**（DNS zone 自体は Cloudflare へ委任済み。次項の Cloudflare 行、§DNS 管理（Cloudflare） 参照） | deploy 経路、PR 検証の一部、**カレンダー同期と接続メンテナンスの定期実行**、**MCP の入口 routing**、**ドメインの更新・移管権限**（DNS レコードそのものへの影響は無い） | Next.js は他ホスト（Cloudflare / Netlify / self-host）で動く。CI 配線に加え **scheduler と host routing の移植**（`apps/product/vercel.json`）と **registrar 移管**が要る。ホスティングだけ移して account を閉じるとドメインを失う                                                                  | 価格改定、他ホストでの Next.js 冷遇 |
-| **Stripe**                             | Pro 課金（billing）+ **アカウント削除フロー**（subscription cancel → customer 削除）                                                                                                                                                                                                                                                                                                                                      | 課金・サブスク管理に加え、`stripe_customer_id` を持つユーザーの**アカウント削除が完了しなくなる**                                                                      | 代替決済へ切替可能だが、既存サブスクの移行（解約 → 再契約）と**削除フローの customer cleanup 差し替え**が要る                                                                                                                                                                                       | 手数料改定、アカウント凍結リスク    |
-| **GitHub**                             | issue / PR 運用、Actions CI、`branch:finish` の REST 依存、**deployment の所有権**（Supabase integration が migration / Edge Function / Storage bucket の deploy owner、Vercel の唯一の deployment source、`promote.yml` が production domain promote の唯一経路）                                                                                                                                                        | 開発運用の全経路に加え、**アプリと DB の production deploy が両方止まる**                                                                                              | git 自体は分散。CI workflow と運用 script の書き直しに加え、**Supabase / Vercel integration と release 経路の再配線**が主コスト                                                                                                                                                                     | 価格改定、Actions 課金の構造変化    |
-| **Upstash Redis**                      | rate limit（tRPC / OAuth token endpoint / MCP request）+ Resend webhook の exactly-once 処理リース                                                                                                                                                                                                                                                                                                                        | **operational 環境ではアプリが起動しない**（env 検証が失敗）。起動しても webhook 処理が fail-closed になる                                                             | `@upstash/redis` は REST API 前提のため素の Redis へ drop-in で移れない。rate limit は degrade で凌げるが、webhook の冪等性は代替ストア（Postgres 等）の実装が要る                                                                                                                                  | 価格改定、REST API の互換性変更     |
-| **Google**                             | OAuth ログイン + external-calendar 連携 + **`support@dayopt.app` の最終受信箱**（Gmail destination と Send mail as）                                                                                                                                                                                                                                                                                                      | Google ログインユーザーのアクセス、カレンダー同期、**問い合わせの受信と返信**                                                                                          | ログインは email 併存、連携は opt-in。ただし**受信箱は代替が要る**（destination 変更・履歴移行・返信経路の再設定。`docs/operations/contact-email.md`）                                                                                                                                              | OAuth / Calendar API の政策変更     |
-| **Cloudflare**                         | `dayopt.app` の **authoritative DNS**（`app` / `mcp` / `www` を含む）、**Email Routing**（`support@` → Gmail）、Turnstile（Bot 対策）                                                                                                                                                                                                                                                                                     | **全ドメインの名前解決**と**問い合わせの受信**、Bot 対策                                                                                                               | nameserver を別 DNS へ委譲し直し、MX / SPF / DKIM と転送先を再設定、CAPTCHA を差し替える。DNS の切替は伝播待ちを伴う                                                                                                                                                                                | 価格改定、無料枠の縮小              |
-| **Sentry**                             | エラー監視（runtime capture / sanitizer / CSP report）+ **production build gate**（`assertProductionSentryBuildEnv` が資格情報欠落で build を失敗させる。product / web 両方）                                                                                                                                                                                                                                             | 監視に加え、**次の production build が止まる**                                                                                                                         | 代替 APM への移植は build 配線・sanitizer・CSP・運用 runbook を含むため日単位。履歴は持ち出さない割り切り                                                                                                                                                                                           | 価格改定、無料枠の縮小              |
-| **Resend**                             | メール送信 + **bounce / complaint webhook**（svix 署名検証 → `email_suppressions` 更新）                                                                                                                                                                                                                                                                                                                                  | 送信に加え、**新規 bounce / complaint が記録されなくなり、抑止対象へ送り続ける**                                                                                       | 代替 SMTP / API へ切替。suppression list の持ち出しに加え、**webhook 署名検証・イベント変換・冪等性の再実装**が要る                                                                                                                                                                                 | 価格改定、到達率の劣化              |
-| **1Password**                          | 長寿命 secret の **master**（Vercel / GitHub / Supabase は replica）、`op run` 注入、GitHub SSH 鍵、各サービスの password / TOTP / recovery code、ドメイン管理情報                                                                                                                                                                                                                                                        | secret の rotation 元と**アカウント復旧手段**（TOTP / recovery code / SSH 鍵）                                                                                         | `.op-env` スキーマだけでなく、**master secret・外部 replica の同期元・SSH agent・login / recovery item** をまとめて別 manager へ移す必要がある（`docs/operations/secrets.md`）                                                                                                                      | 価格改定、desktop 統合の劣化        |
-| **Anthropic / Claude**（開発プロセス） | CLAUDE.md / rules / skills / agents が Claude Code 前提                                                                                                                                                                                                                                                                                                                                                                   | 開発テンポ（プロダクトは無傷）。**実装・運用を引き継ぐ agent が現行ポリシー上いない**ため、修正と release が止まる                                                     | 規約はすべて plain markdown で repo 内。ただし AGENTS.md は Codex を**レビュー専任**と定めていた（2026-08-13 時点で運用停止、規則は凍結保存）ため、稼働時点でも二系統は代替経路にならなかった。出口作業は「規約と workflow を別の実装系へ移植する」こと。tier 読み替え原則で model 名には固定しない | 価格・品質・提供条件の変化          |
+| 依存                               | 浸透                                                                                                                                                                                                                                                                                                                                                                                                                      | 今日捨てたら何が壊れるか                                                                                                                                               | 逃げ道                                                                                                                                                                                                                                                                                                                                       | 出口検討トリガー                    |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- |
+| **Vercel**                         | product / web のホスティング、build 内 bundle 検査、merge gate の commit status、**Cron**（`calendar-sync` / `external-connection-maintenance` を 15 分毎、`calendar-account-deletion-settle` を毎時、`billing-reconciliation` を日次）、**host 別 rewrite**（`mcp.dayopt.app` → `/api/mcp`）、**`dayopt.app` の registrar**（DNS zone 自体は Cloudflare へ委任済み。次項の Cloudflare 行、§DNS 管理（Cloudflare） 参照） | deploy 経路、PR 検証の一部、**カレンダー同期と接続メンテナンスの定期実行**、**MCP の入口 routing**、**ドメインの更新・移管権限**（DNS レコードそのものへの影響は無い） | Next.js は他ホスト（Cloudflare / Netlify / self-host）で動く。CI 配線に加え **scheduler と host routing の移植**（`apps/product/vercel.json`）と **registrar 移管**が要る。ホスティングだけ移して account を閉じるとドメインを失う                                                                                                           | 価格改定、他ホストでの Next.js 冷遇 |
+| **Stripe**                         | Pro 課金（billing）+ **アカウント削除フロー**（subscription cancel → customer 削除）                                                                                                                                                                                                                                                                                                                                      | 課金・サブスク管理に加え、`stripe_customer_id` を持つユーザーの**アカウント削除が完了しなくなる**                                                                      | 代替決済へ切替可能だが、既存サブスクの移行（解約 → 再契約）と**削除フローの customer cleanup 差し替え**が要る                                                                                                                                                                                                                                | 手数料改定、アカウント凍結リスク    |
+| **GitHub**                         | issue / PR 運用、Actions CI、`branch:finish` の REST 依存、**deployment の所有権**（Supabase integration が migration / Edge Function / Storage bucket の deploy owner、Vercel の唯一の deployment source、`promote.yml` が production domain promote の唯一経路）                                                                                                                                                        | 開発運用の全経路に加え、**アプリと DB の production deploy が両方止まる**                                                                                              | git 自体は分散。CI workflow と運用 script の書き直しに加え、**Supabase / Vercel integration と release 経路の再配線**が主コスト                                                                                                                                                                                                              | 価格改定、Actions 課金の構造変化    |
+| **Upstash Redis**                  | rate limit（tRPC / OAuth token endpoint / MCP request）+ Resend webhook の exactly-once 処理リース                                                                                                                                                                                                                                                                                                                        | **operational 環境ではアプリが起動しない**（env 検証が失敗）。起動しても webhook 処理が fail-closed になる                                                             | `@upstash/redis` は REST API 前提のため素の Redis へ drop-in で移れない。rate limit は degrade で凌げるが、webhook の冪等性は代替ストア（Postgres 等）の実装が要る                                                                                                                                                                           | 価格改定、REST API の互換性変更     |
+| **Google**                         | OAuth ログイン + external-calendar 連携 + **`support@dayopt.app` の最終受信箱**（Gmail destination と Send mail as）                                                                                                                                                                                                                                                                                                      | Google ログインユーザーのアクセス、カレンダー同期、**問い合わせの受信と返信**                                                                                          | ログインは email 併存、連携は opt-in。ただし**受信箱は代替が要る**（destination 変更・履歴移行・返信経路の再設定。`docs/operations/contact-email.md`）                                                                                                                                                                                       | OAuth / Calendar API の政策変更     |
+| **Cloudflare**                     | `dayopt.app` の **authoritative DNS**（`app` / `mcp` / `www` を含む）、**Email Routing**（`support@` → Gmail）、Turnstile（Bot 対策）                                                                                                                                                                                                                                                                                     | **全ドメインの名前解決**と**問い合わせの受信**、Bot 対策                                                                                                               | nameserver を別 DNS へ委譲し直し、MX / SPF / DKIM と転送先を再設定、CAPTCHA を差し替える。DNS の切替は伝播待ちを伴う                                                                                                                                                                                                                         | 価格改定、無料枠の縮小              |
+| **Sentry**                         | エラー監視（runtime capture / sanitizer / CSP report）+ **production build gate**（`assertProductionSentryBuildEnv` が資格情報欠落で build を失敗させる。product / web 両方）                                                                                                                                                                                                                                             | 監視に加え、**次の production build が止まる**                                                                                                                         | 代替 APM への移植は build 配線・sanitizer・CSP・運用 runbook を含むため日単位。履歴は持ち出さない割り切り                                                                                                                                                                                                                                    | 価格改定、無料枠の縮小              |
+| **Resend**                         | メール送信 + **bounce / complaint webhook**（svix 署名検証 → `email_suppressions` 更新）                                                                                                                                                                                                                                                                                                                                  | 送信に加え、**新規 bounce / complaint が記録されなくなり、抑止対象へ送り続ける**                                                                                       | 代替 SMTP / API へ切替。suppression list の持ち出しに加え、**webhook 署名検証・イベント変換・冪等性の再実装**が要る                                                                                                                                                                                                                          | 価格改定、到達率の劣化              |
+| **1Password**                      | 長寿命 secret の **master**（Vercel / GitHub / Supabase は replica）、`op run` 注入、GitHub SSH 鍵、各サービスの password / TOTP / recovery code、ドメイン管理情報                                                                                                                                                                                                                                                        | secret の rotation 元と**アカウント復旧手段**（TOTP / recovery code / SSH 鍵）                                                                                         | `.op-env` スキーマだけでなく、**master secret・外部 replica の同期元・SSH agent・login / recovery item** をまとめて別 manager へ移す必要がある（`docs/operations/secrets.md`）                                                                                                                                                               | 価格改定、desktop 統合の劣化        |
+| **OpenAI / Codex**（開発プロセス） | 通常開発の主担当（ChatGPT Chat + Codex、2026-09-07 決定）。GitHub の `@codex review` が保護対象 PR の独立レビュー                                                                                                                                                                                                                                                                                                         | 開発テンポ（プロダクトは無傷）。独立レビューは required ではないので merge は止まらない                                                                                | 規約は provider 非依存の `AGENTS.md` と `.agents/skills/` に plain markdown で置き、Claude Code は `CLAUDE.md` / `.claude/skills` symlink / 共有 guard rules の互換 adapter で同じ正本を読む（2026-09-22 に Claude memory の知見も docs へ昇格済み）。出口は adapter を別 runtime へ足すだけで、規約の移植は要らない。model 名には固定しない | 価格・品質・提供条件の変化          |
 
 ### 浅い（乗り換えは時間単位、単機能で代替容易）
 

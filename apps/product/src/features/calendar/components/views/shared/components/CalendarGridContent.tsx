@@ -27,6 +27,7 @@ import {
   calculateExternalEventLayout,
   toZonedExternalEvents,
 } from '../../../../lib/external-event-layout';
+import { buildDragPreviewTimeblock } from '../../../../lib/interaction-preview';
 import { buildPlanRecordDropInput } from '../../../../lib/plan-record-drop';
 import {
   calculateTwoLaneStylesForCalendarEvents,
@@ -45,28 +46,11 @@ import { PlanLaneCard } from './TwoLane/PlanLaneCard';
 import { RecordLaneCard } from './TwoLane/RecordLaneCard';
 import { TwoLaneTimeblockRenderer } from './TwoLaneTimeblockRenderer';
 
+export { buildDragPreviewTimeblock } from '../../../../lib/interaction-preview';
+
 // ========================================
 // Types
 // ========================================
-
-export function buildDragPreviewTimeblock(
-  timeblock: CalendarDisplayEvent,
-  previewTime: { start: Date; end: Date },
-): CalendarDisplayEvent {
-  const duration = Math.max(
-    1,
-    Math.round((previewTime.end.getTime() - previewTime.start.getTime()) / 60000),
-  );
-
-  return {
-    ...timeblock,
-    startDate: previewTime.start,
-    endDate: previewTime.end,
-    displayStartDate: previewTime.start,
-    displayEndDate: previewTime.end,
-    duration,
-  };
-}
 
 /** CalendarGridContent コンポーネントのプロパティ */
 interface CalendarGridContentProps {
@@ -444,9 +428,13 @@ export const CalendarGridContent = React.memo(function CalendarGridContent({
               onTouchStart={(...args) => {
                 if (canUseProduct) handlers.handleTouchStart(...args);
               }}
-              onResizeStart={(...args) => {
-                if (canUseProduct) handlers.handleResizeStart(...args);
-              }}
+              onResizeStart={
+                isMobile
+                  ? undefined
+                  : (...args) => {
+                      if (canUseProduct) handlers.handleResizeStart(...args);
+                    }
+              }
             />
           );
         })}

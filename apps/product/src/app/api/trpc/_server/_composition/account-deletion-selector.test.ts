@@ -4,6 +4,7 @@ const rpc = vi.hoisted(() => vi.fn());
 const storageList = vi.hoisted(() => vi.fn());
 const storageRemove = vi.hoisted(() => vi.fn());
 const deleteLegacyBillingAccountData = vi.hoisted(() => vi.fn());
+const deletePostHogAccountData = vi.hoisted(() => vi.fn());
 const prepareDurable = vi.hoisted(() => vi.fn());
 const captureUnexpectedError = vi.hoisted(() => vi.fn());
 
@@ -18,6 +19,7 @@ vi.mock('@/lib/supabase/oauth', () => ({
 vi.mock('@/features/settings/server/account-deletion', () => ({
   deleteLegacyBillingAccountData,
 }));
+vi.mock('@/lib/analytics/posthog-deletion', () => ({ deletePostHogAccountData }));
 vi.mock('@/lib/sentry', () => ({ captureUnexpectedError }));
 vi.mock('./account-deletion-coordinator', () => ({
   prepareAccountDeletionBeforeIdentityDeletion: prepareDurable,
@@ -32,6 +34,7 @@ beforeEach(() => {
   storageList.mockResolvedValue({ data: [], error: null });
   storageRemove.mockResolvedValue({ data: [], error: null });
   deleteLegacyBillingAccountData.mockResolvedValue(undefined);
+  deletePostHogAccountData.mockResolvedValue(undefined);
   prepareDurable.mockResolvedValue({ status: 'completed' });
 });
 
@@ -49,6 +52,7 @@ describe('prepareAccountDeletionWithCompatibility', () => {
 
     expect(storageList).toHaveBeenCalledWith(USER_ID);
     expect(deleteLegacyBillingAccountData).toHaveBeenCalledWith(USER_ID);
+    expect(deletePostHogAccountData).toHaveBeenCalledWith({ userId: USER_ID });
     expect(prepareDurable).not.toHaveBeenCalled();
   });
 
@@ -60,8 +64,21 @@ describe('prepareAccountDeletionWithCompatibility', () => {
     await expect(prepareAccountDeletionWithCompatibility({ userId: USER_ID })).resolves.toEqual({
       status: 'completed',
     });
+    expect(deletePostHogAccountData).toHaveBeenCalledWith({ userId: USER_ID });
     expect(deleteLegacyBillingAccountData).toHaveBeenCalledWith(USER_ID);
     expect(prepareDurable).not.toHaveBeenCalled();
+  });
+
+  it('PostHog削除が失敗したら互換退会準備をfail closedにする', async () => {
+    rpc.mockReturnValue({
+      abortSignal: vi.fn(async () => ({ data: null, error: { code: 'PGRST202' } })),
+    });
+    deletePostHogAccountData.mockRejectedValue(new Error('PostHog deletion rejected'));
+
+    await expect(prepareAccountDeletionWithCompatibility({ userId: USER_ID })).rejects.toThrow(
+      'PostHog deletion rejected',
+    );
+    expect(deletePostHogAccountData).toHaveBeenCalledWith({ userId: USER_ID });
   });
 
   it('gateがactiveならdurable coordinatorだけを使う', async () => {

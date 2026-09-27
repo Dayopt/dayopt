@@ -21,7 +21,7 @@ const chain = vi.hoisted(
     },
 );
 
-vi.mock('@/lib/email/router', () => ({ sendWelcomeEmail, getUserLocale }));
+vi.mock('@/lib/email/notifications', () => ({ sendWelcomeEmail, getUserLocale }));
 vi.mock('@/lib/logger', () => ({ logger: { warn: loggerWarn, info: vi.fn(), error: vi.fn() } }));
 vi.mock('@/lib/sentry', () => ({ captureUnexpectedError, captureUnexpectedDatabaseError }));
 vi.mock('@/lib/supabase/oauth', () => ({
@@ -114,7 +114,7 @@ describe('deliverWelcomeEmailOnce', () => {
     claimResult.current = { data: [{ id: 'u1', full_name: null }], error: null };
     sendWelcomeEmail.mockRejectedValue(new Error('resend down'));
 
-    await expect(deliverWelcomeEmailOnce('u1')).resolves.toBeUndefined();
+    await expect(deliverWelcomeEmailOnce('u1')).resolves.toBe(true);
     expect(captureUnexpectedError).toHaveBeenCalled();
   });
 

@@ -229,6 +229,15 @@ export function collectPrRow({ pr, api }) {
   };
 }
 
+/** Keep self-produced Validation outcomes readable beside ordinary failures in the table. */
+export function validationShadowCell({ validation, validationDetail = '', review }) {
+  if (/self-produced change verified after same-head review/i.test(validationDetail))
+    return `${validation} (review-confirmed self-change)`;
+  if (/changes the producer definition/i.test(validationDetail))
+    return `${validation} (self-produced; Review ${review})`;
+  return validation;
+}
+
 const cell = (value) => (value === null || value === undefined ? UNAVAILABLE : String(value));
 const listCell = (list) => (list.length ? list.join(', ') : '-');
 
@@ -243,7 +252,7 @@ export function formatReport(rows, { limit, fetchedAt, policyCheckout }) {
   ];
   for (const row of rows)
     lines.push(
-      `| #${row.number} | ${row.classification} | ${row.planStatus}; review ${row.review} | ${row.legacyJobs.join(', ') || 'なし'} | ${row.vercel.product} / ${row.vercel.web} | ${cell(row.runnerMinutes)} | ${cell(row.ciSeconds)} | ${row.comparison ? listCell(row.comparison.wouldSkip) : UNDECIDED} | ${row.comparison ? listCell(row.comparison.wouldAdd) : UNDECIDED} | ${row.shadow.validation} | ${row.shadow.review} |`,
+      `| #${row.number} | ${row.classification} | ${row.planStatus}; review ${row.review} | ${row.legacyJobs.join(', ') || 'なし'} | ${row.vercel.product} / ${row.vercel.web} | ${cell(row.runnerMinutes)} | ${cell(row.ciSeconds)} | ${row.comparison ? listCell(row.comparison.wouldSkip) : UNDECIDED} | ${row.comparison ? listCell(row.comparison.wouldAdd) : UNDECIDED} | ${validationShadowCell(row.shadow)} | ${row.shadow.review} |`,
     );
   const byClass = new Map();
   for (const row of rows) {

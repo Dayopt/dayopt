@@ -86,6 +86,9 @@ function buildContentSecurityPolicy(nonce: string): string {
     'https://api.pwnedpasswords.com',
     'https://challenges.cloudflare.com',
     ...(SENTRY_INGEST_ORIGIN ? [SENTRY_INGEST_ORIGIN] : []),
+    ...(process.env.NEXT_PUBLIC_POSTHOG_BROWSER_ENABLED === 'true'
+      ? ['https://us.i.posthog.com']
+      : []),
     ...(LOCAL_SUPABASE_ORIGIN ? [LOCAL_SUPABASE_ORIGIN] : []),
   ].join(' ');
 

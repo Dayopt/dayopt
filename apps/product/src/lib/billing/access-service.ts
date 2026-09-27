@@ -4,6 +4,7 @@ import { appTrialDurationMs, resolveBillingAccess, type BillingAccess } from '@d
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 import { trackBillingEvent } from '@/lib/analytics/billing-events';
+import { trackPostHogServerEvent } from '@/lib/analytics/posthog-server';
 import type { Database } from '@/lib/database';
 import { captureUnexpectedDatabaseError } from '@/lib/sentry';
 import { ServiceError } from '@/lib/trpc/errors';
@@ -61,12 +62,19 @@ export async function startAppTrial(
     });
     throw new ServiceError('INTERNAL_ERROR', 'Unable to start trial', { cause });
   }
-  if (data?.length)
+  if (data?.length) {
     await trackBillingEvent({
       eventName: 'app_trial_started',
       sourceId: userId,
       userId,
       occurredAt: new Date(startedAt).toISOString(),
     });
+    await trackPostHogServerEvent({
+      eventName: 'app_trial_started',
+      userId,
+      sourceId: userId,
+      occurredAt: new Date(startedAt).toISOString(),
+    });
+  }
   return getBillingAccess(db, userId);
 }

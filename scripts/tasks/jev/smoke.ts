@@ -77,7 +77,7 @@ export function parseSmokeArgs(
   return { ok: true, args: { caseId, delayMs, asJson } };
 }
 
-const DEFAULT_DELAY_MS = 6_000;
+const DEFAULT_DELAY_MS = 60_000;
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));

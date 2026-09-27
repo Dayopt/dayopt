@@ -32,6 +32,49 @@ import {
 } from './jev-adapter.ts';
 import type { PrEvidence } from './jev-gh-prs.ts';
 
+export const PACK_IDS = ['shadow-e1', 'skill-suggestion'] as const;
+export type PackId = (typeof PACK_IDS)[number];
+
+/**
+ * pack ごとの有効・無効（#2827 の不変条件「各 pack は独立して無効化・撤去できる」）。
+ *
+ * `JEV_DISABLED=1` は adapter 全体の kill switch で、粒度が粗すぎる。事前登録した
+ * Go 条件を満たさなかった pack を止めるには、**その pack だけ**送信を止められる必要がある。
+ *
+ * **CLI ではなくここに置く。** 同じ pack を送れる入口が複数ある（`pnpm jev:pack` と、
+ * 保存先の互換のために残している `pnpm jev:shadow`）ので、表を片方の CLI が持つと
+ * もう片方が無効化を迂回する。入口が増えても `assertPackEvaluationAllowed` を通す限り
+ * 同じ表を見る。
+ *
+ * 止めるのは `evaluate`（課金と外部送信が起きる経路）だけにする。`collect` と `report` は
+ * 通す — negative result を読み返せなくなると、止めた判断の根拠ごと失われるため。
+ */
+export const PACK_STATUS: Record<PackId, { status: 'active' | 'disabled'; reason?: string }> = {
+  // Phase 1 の 8 問は、決定的な代替（protected-path-gate / 本文長）を上回らなかった。
+  // 質問文の問題ではなく「コードが確定できることを推測させていた」設計の問題なので、
+  // 質問セットを作り直すまで送信しない。集計済みの結果は report で読める。
+  'shadow-e1': {
+    status: 'disabled',
+    reason: 'Phase 1 で決定的な baseline を上回らなかった（#2827 の 2026-09-19 の判定）',
+  },
+  'skill-suggestion': { status: 'active' },
+};
+
+/**
+ * 送信前に呼ぶ。無効なら stderr へ出す文面を返し、有効なら null を返す。
+ *
+ * **credential の確認より先に呼ぶ。** 「key が無い」と「止めてある」を取り違えると、
+ * 1Password の承認を取りに行ってから初めて止まっていたと分かる。
+ */
+export function assertPackEvaluationAllowed(packId: PackId): string | null {
+  const entry = PACK_STATUS[packId];
+  if (!entry || entry.status !== 'disabled') return null;
+  return (
+    `pack ${packId} は無効化されている: ${entry.reason ?? '(理由の記載なし)'}\n` +
+    `collect / report は使える。再開するには jev-pack.ts の PACK_STATUS を戻す\n`
+  );
+}
+
 export type PackSplit = 'tune' | 'holdout';
 
 /** policy が合成した結果。Annotation とは別に保存する。 */

@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 
+const trackPostHogServerEvent = vi.hoisted(() => vi.fn());
+vi.mock('@/lib/analytics/posthog-server', () => ({ trackPostHogServerEvent }));
+
 import { McpMutationClient } from './mcp-mutation-client';
 import type { createMcpMutationDb } from './mcp-mutation-db';
 
@@ -41,8 +44,8 @@ function createFakeDb() {
   };
 }
 
-function buildClient(db: ReturnType<typeof createFakeDb>): McpMutationClient {
-  return new McpMutationClient(db as unknown as FakeMutationDb);
+function buildClient(db: ReturnType<typeof createFakeDb>, userId?: string): McpMutationClient {
+  return new McpMutationClient(db as unknown as FakeMutationDb, userId);
 }
 
 /** command 境界がアーカイブ済みアクティビティを拒否したときに PostgREST が返す形。 */
@@ -75,6 +78,34 @@ function recordReceiptRow(overrides: Record<string, unknown> = {}) {
 }
 
 describe('McpMutationClient archived activity boundary', () => {
+  it('tracks a successful MCP plan creation for the authenticated account', async () => {
+    const db = createFakeDb();
+    db.applyPlanCreate.mockResolvedValue({
+      data: [planReceiptRow({ operation_id: 'op-analytics' })],
+      error: null,
+    });
+    const client = buildClient(db, 'user-1');
+
+    await client.createPlan({
+      operationId: 'op-analytics',
+      title: 'Plan',
+      note: null,
+      activityId: null,
+      startAt: '2026-08-01T00:00:00.000Z',
+      endAt: '2026-08-01T01:00:00.000Z',
+      connectionId: CONNECTION_ID,
+      accessTokenId: ACCESS_TOKEN_ID,
+    });
+
+    expect(trackPostHogServerEvent).toHaveBeenCalledWith({
+      eventName: 'plan_created',
+      userId: 'user-1',
+      sourceId: 'plan-1',
+      source: 'mcp',
+      count: 1,
+    });
+  });
+
   it('plans.createはDBのDT014をACTIVITY_ARCHIVEDへマップし、preflightせずapply RPCまで到達する', async () => {
     const db = createFakeDb();
     db.applyPlanCreate.mockResolvedValue(ARCHIVED_ACTIVITY_DB_ERROR);
@@ -157,10 +188,15 @@ describe('McpMutationClient archived activity boundary', () => {
   it('plans.updateはactivityIdを省略した編集ならアクティビティ検証なしで通る', async () => {
     const db = createFakeDb();
     db.applyPlanUpdate.mockResolvedValue({
-      data: [planReceiptRow({ operation_id: 'op-4' })],
+      data: [
+        planReceiptRow({
+          operation_id: 'op-4',
+          version: '2026-08-01T00:00:00.000123Z',
+        }),
+      ],
       error: null,
     });
-    const client = buildClient(db);
+    const client = buildClient(db, 'user-1');
 
     await client.updatePlan({
       operationId: 'op-4',
@@ -172,6 +208,13 @@ describe('McpMutationClient archived activity boundary', () => {
     });
 
     expect(db.applyPlanUpdate).toHaveBeenCalledOnce();
+    expect(trackPostHogServerEvent).toHaveBeenCalledWith({
+      eventName: 'plan_updated',
+      userId: 'user-1',
+      sourceId: 'plan-1:2026-08-01T00:00:00.000123Z',
+      source: 'mcp',
+      count: 1,
+    });
   });
 
   it('plans.updateはarchivedアクティビティへの付け替えをDT014経由で拒否する', async () => {

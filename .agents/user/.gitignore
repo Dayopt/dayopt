@@ -1,0 +1,7 @@
+# 認証・マシン固有・退避物は入れない
+*.local.*
+settings.local.json
+hosts.yml
+.env*
+*.bak-*
+.DS_Store

@@ -26,12 +26,16 @@ afterEach(() => {
   vi.unstubAllEnvs();
 });
 
-function request(refreshToken: string, ip = '203.0.113.10') {
+function request(refreshToken: string, ip = '203.0.113.10', clientId = 'claude-ai') {
   return new NextRequest('http://localhost:3000/oauth/token', {
     method: 'POST',
     headers: { 'content-type': 'application/x-www-form-urlencoded', 'x-real-ip': ip },
-    // client_idを省略することで、bucket通過後はDBを呼ばずinvalid_requestになる。
-    body: new URLSearchParams({ grant_type: 'refresh_token', refresh_token: refreshToken }),
+    // client はallowlistで通し、resource欠落でDBを呼ばずinvalid_requestにする。
+    body: new URLSearchParams({
+      client_id: clientId,
+      grant_type: 'refresh_token',
+      refresh_token: refreshToken,
+    }),
   });
 }
 
@@ -45,23 +49,27 @@ describe('refresh HTTP budget boundaries without Redis', () => {
     expect(createServiceRoleClient).not.toHaveBeenCalled();
   });
 
-  it('token-denied traffic consumes IP budget without consuming the global budget', async () => {
+  it('token-denied traffic consumes IP budget without consuming the client budget', async () => {
     const { POST } = await import('./route');
     for (let i = 0; i < 120; i++) {
       expect((await POST(request('same-token'))).status).toBe(i < 30 ? 400 : 429);
     }
-    // tokenを変えても同一IPは拒否。他IPは通るのでglobal超過による偽陽性ではない。
+    // tokenを変えても同一IPは拒否。他IPは通るのでclient上限による偽陽性ではない。
     expect((await POST(request('fresh-token'))).status).toBe(429);
     expect((await POST(request('fresh-token', '203.0.113.11'))).status).toBe(400);
     expect(createServiceRoleClient).not.toHaveBeenCalled();
   });
 
-  it('changing IP and token still reaches the shared 120/global budget', async () => {
+  it('changing IP and token reaches the per-client budget without blocking another client', async () => {
     const { POST } = await import('./route');
     for (let i = 0; i < 120; i++) {
       expect((await POST(request('token-' + i, '203.0.113.' + (i + 1)))).status).toBe(400);
     }
     expect((await POST(request('token-120', '203.0.113.121'))).status).toBe(429);
+    const otherClientResponse = await POST(
+      request('other-client-token', '203.0.113.122', 'chatgpt'),
+    );
+    expect(otherClientResponse.status).toBe(400);
     expect(createServiceRoleClient).not.toHaveBeenCalled();
   });
 });

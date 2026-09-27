@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
@@ -13,7 +13,7 @@ describe('Supabase API key migration contract', () => {
     })
       .trim()
       .split('\n')
-      .filter((file) => /\.[cm]?[jt]sx?$/.test(file));
+      .filter((file) => /\.[cm]?[jt]sx?$/.test(file) && existsSync(resolve(root, file)));
     expect(files.length).toBeGreaterThan(100);
     const violations = files.filter((file) =>
       /(?:NEXT_PUBLIC_SUPABASE_ANON_KEY|SUPABASE_SERVICE_ROLE_KEY)/.test(

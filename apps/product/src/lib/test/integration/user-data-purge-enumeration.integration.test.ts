@@ -88,6 +88,58 @@ const INTENTIONALLY_RETAINED: Record<string, string> = {
   oauth_tokens: '削除ではなく revoked_at を打って失効させる',
 };
 
+/**
+ * email を持ちながら、**アカウント削除でも purge でも消えない** table と、その理由。
+ *
+ * 上の列挙 test は「`user_id` を持つ public table」だけを母集合にするため、email を key に
+ * 持つ table はそもそも検査対象に入らない。2026-09-20 の境界検証で `email_suppressions` が
+ * この死角にあった（account deletion 後も raw email が残り、Privacy Policy の「削除後 30 日
+ * 以内に完全削除」と食い違う）。ここに載せるのは「決めた」ことの記録であって、正当化ではない。
+ * 消す方針にした時はこの allowlist から外し、削除経路（account deletion coordinator）へ足す。
+ *
+ * **`auth.users` から `ON DELETE CASCADE` で到達できる table は対象外**（`profiles` など）。
+ * それらは `user_id` 列を持たなくてもアカウント削除で確実に消えるので、ここで決める話が無い。
+ */
+const EMAIL_KEYED_WITHOUT_USER_ID: Record<string, string> = {
+  email_suppressions:
+    '未裁定。bounce / complaint 済み address の配信評価保護が目的で、account deletion でも消さない。' +
+    '削除後も raw email が残るため Privacy Policy と不整合（#2859 で裁定する）',
+};
+
+/**
+ * 入口 RPC から `PERFORM` / `SELECT` で辿れる関数を再帰的に集める CTE（`purge_chain` /
+ * `purge_body`）。列挙 test と email 列 test の両方が使うので、**1 箇所で定義する**
+ * （2 つに書き分けると「片方だけ purge の到達判定が古い」状態が静かに生まれる）。
+ */
+function purgeChainCte(entryPoint: string): string {
+  return `
+    purge_chain(schema_name, proname) AS (
+      SELECT 'public'::name, '${entryPoint}'::name
+      UNION
+      SELECT callee.schema_name, callee.proname
+      FROM purge_chain
+      JOIN pg_proc AS caller ON caller.proname = purge_chain.proname
+      JOIN pg_namespace AS caller_ns
+        ON caller_ns.oid = caller.pronamespace AND caller_ns.nspname = purge_chain.schema_name
+      CROSS JOIN LATERAL regexp_matches(
+        caller.prosrc, '\\m(?:PERFORM|SELECT)\\s+(public|private)\\.(\\w+)\\s*\\(', 'g'
+      ) AS m
+      CROSS JOIN LATERAL (SELECT m[1]::name AS schema_name, m[2]::name AS proname) AS callee
+      WHERE EXISTS (
+        SELECT 1 FROM pg_proc AS p2
+        JOIN pg_namespace AS n2 ON n2.oid = p2.pronamespace
+        WHERE n2.nspname = callee.schema_name AND p2.proname = callee.proname
+      )
+    ),
+    purge_body AS (
+      SELECT string_agg(routine.prosrc, E'\\n') AS src
+      FROM purge_chain
+      JOIN pg_proc AS routine ON routine.proname = purge_chain.proname
+      JOIN pg_namespace AS ns
+        ON ns.oid = routine.pronamespace AND ns.nspname = purge_chain.schema_name
+    )`;
+}
+
 function runOwnerSql(sql: string): string {
   const result = spawnSync(
     'psql',
@@ -132,31 +184,7 @@ describe.skipIf(!RUN_LOCAL)('account-preserving purge の列挙 (#2444)', () => 
    * 何が消えるかは分からない。**チェーン全体の DELETE の和**が実際の削除対象になる。
    */
   const purgeCoverageSql = `
-    WITH RECURSIVE purge_chain(schema_name, proname) AS (
-      SELECT 'public'::name, '${entryPoint}'::name
-      UNION
-      SELECT callee.schema_name, callee.proname
-      FROM purge_chain
-      JOIN pg_proc AS caller ON caller.proname = purge_chain.proname
-      JOIN pg_namespace AS caller_ns
-        ON caller_ns.oid = caller.pronamespace AND caller_ns.nspname = purge_chain.schema_name
-      CROSS JOIN LATERAL regexp_matches(
-        caller.prosrc, '\\m(?:PERFORM|SELECT)\\s+(public|private)\\.(\\w+)\\s*\\(', 'g'
-      ) AS m
-      CROSS JOIN LATERAL (SELECT m[1]::name AS schema_name, m[2]::name AS proname) AS callee
-      WHERE EXISTS (
-        SELECT 1 FROM pg_proc AS p2
-        JOIN pg_namespace AS n2 ON n2.oid = p2.pronamespace
-        WHERE n2.nspname = callee.schema_name AND p2.proname = callee.proname
-      )
-    ),
-    purge_body AS (
-      SELECT string_agg(routine.prosrc, E'\\n') AS src
-      FROM purge_chain
-      JOIN pg_proc AS routine ON routine.proname = purge_chain.proname
-      JOIN pg_namespace AS ns
-        ON ns.oid = routine.pronamespace AND ns.nspname = purge_chain.schema_name
-    ),
+    WITH RECURSIVE ${purgeChainCte(entryPoint)},
     user_tables AS (
       SELECT relation.oid, relation.relname
       FROM pg_class AS relation
@@ -235,6 +263,86 @@ describe.skipIf(!RUN_LOCAL)('account-preserving purge の列挙 (#2444)', () => 
             '',
             'どちらでもない状態＝「決め忘れ」であり、#2162 / #2444 で 2 回起きた漏れの正体。',
           ].join('\n'),
+    ).toEqual([]);
+  });
+
+  it('email を持ちアカウント削除でも消えない public table は、扱いが理由付きで決まっている', () => {
+    // 列挙 test の母集合（user_id を持つ table）から漏れる PII 保持 table を機械で拾う。
+    //
+    // `user_id` が無いだけでは「消えない」根拠にならない。`profiles` は `id` が
+    // `auth.users(id)` を `ON DELETE CASCADE` で参照するのでアカウント削除で消える。
+    // 同様に、purge chain が直接 DELETE する table とその CASCADE 到達分も消える。
+    // 残すべき問いは「email を持つのに、そのどれからも到達されない table」だけなので、
+    // 両方の到達集合（deletion_closure）を DB 側で引いてから比べる。
+    // 片方だけで引くと、purge 経路へ table を足した時に「消えるのに未決」で落ちる。
+    const rows = runOwnerSql(`
+      WITH RECURSIVE ${purgeChainCte(entryPoint)},
+      -- アカウント削除で消える起点: auth.users 本体と、purge chain が直接 DELETE する table。
+      -- 製品の削除経路は coordinator の step → purge RPC → auth.users 削除の順に進むので、
+      -- どちらか片方だけを見ると「消えるのに未決として検出される」table が出る。
+      deletion_seed AS (
+        SELECT users.oid
+        FROM pg_class AS users
+        JOIN pg_namespace AS auth_ns ON auth_ns.oid = users.relnamespace
+        WHERE auth_ns.nspname = 'auth' AND users.relname = 'users'
+        UNION
+        SELECT relation.oid
+        FROM pg_class AS relation
+        JOIN pg_namespace AS ns ON ns.oid = relation.relnamespace
+        CROSS JOIN purge_body
+        WHERE ns.nspname = 'public'
+          AND relation.relkind = 'r'
+          AND purge_body.src ~ ('DELETE FROM public\\.' || relation.relname || '\\M')
+      ),
+      -- 起点から ON DELETE CASCADE の辺だけを辿って到達できる table を足した閉包
+      deletion_closure(oid) AS (
+        SELECT oid FROM deletion_seed
+        UNION
+        SELECT child.conrelid
+        FROM pg_constraint AS child
+        JOIN deletion_closure ON deletion_closure.oid = child.confrelid
+        WHERE child.contype = 'f' AND child.confdeltype = 'c'
+      )
+      SELECT relation.relname
+      FROM pg_class AS relation
+      JOIN pg_namespace AS ns ON ns.oid = relation.relnamespace
+      WHERE ns.nspname = 'public'
+        AND relation.relkind = 'r'
+        AND relation.oid NOT IN (SELECT oid FROM deletion_closure)
+        AND EXISTS (
+          SELECT 1 FROM pg_attribute AS email_column
+          WHERE email_column.attrelid = relation.oid
+            AND email_column.attname = 'email'
+            AND email_column.attnum > 0
+            AND NOT email_column.attisdropped
+        )
+        AND NOT EXISTS (
+          SELECT 1 FROM pg_attribute AS owner_column
+          WHERE owner_column.attrelid = relation.oid
+            AND owner_column.attname = 'user_id'
+            AND owner_column.attnum > 0
+            AND NOT owner_column.attisdropped
+        )
+      ORDER BY relation.relname;
+    `)
+      .split('\n')
+      .filter(Boolean);
+
+    const undecided = rows.filter((name) => !(name in EMAIL_KEYED_WITHOUT_USER_ID));
+    expect(
+      undecided,
+      undecided.length === 0
+        ? ''
+        : `email を持ちアカウント削除でも消えない table の扱いが未決: ${undecided.join(', ')}。` +
+            '消すなら削除経路へ足し、消さないなら EMAIL_KEYED_WITHOUT_USER_ID へ理由を書く',
+    ).toEqual([]);
+
+    const stale = Object.keys(EMAIL_KEYED_WITHOUT_USER_ID).filter((name) => !rows.includes(name));
+    expect(
+      stale,
+      stale.length === 0
+        ? ''
+        : `allowlist に死んだエントリ: ${stale.join(', ')}。削除経路へ入ったなら allowlist から外す`,
     ).toEqual([]);
   });
 

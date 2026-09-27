@@ -7,6 +7,7 @@ const createObjectURL = vi.hoisted(() => vi.fn());
 const revokeObjectURL = vi.hoisted(() => vi.fn());
 
 vi.mock('next-intl', () => ({
+  useLocale: () => 'en',
   useTranslations: () => (key: string) => key,
 }));
 
@@ -16,6 +17,13 @@ vi.mock('@/lib/toast', () => ({
 
 vi.mock('@/lib/trpc', () => ({
   api: {
+    useUtils: () => ({ userSettings: { getAnalyticsConsent: { setData: vi.fn() } } }),
+    userSettings: {
+      getAnalyticsConsent: {
+        useQuery: () => ({ data: { allowed: false }, isLoading: false, isError: false }),
+      },
+      setAnalyticsConsent: { useMutation: () => ({ mutateAsync: vi.fn(), isPending: false }) },
+    },
     user: {
       exportData: {
         useQuery: () => ({ refetch: refetchExport, isLoading: false, isFetching: false }),

@@ -2,7 +2,9 @@ import { createChainableMock } from '@/lib/test/trpc-test-helpers';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getBillingAccess, startAppTrial } from './access-service';
 const trackBillingEvent = vi.hoisted(() => vi.fn());
+const trackPostHogServerEvent = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/analytics/billing-events', () => ({ trackBillingEvent }));
+vi.mock('@/lib/analytics/posthog-server', () => ({ trackPostHogServerEvent }));
 const profile = {
   subscription_status: 'free',
   app_trial_started_at: '2026-09-08T00:00:00Z',
@@ -39,6 +41,9 @@ describe('server-owned app trial', () => {
     expect(write.eq).toHaveBeenCalledWith('id', 'u');
     expect(write.is).toHaveBeenCalledWith('app_trial_started_at', null);
     expect(write.is).toHaveBeenCalledWith('app_trial_consumed_at', null);
+    expect(trackPostHogServerEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ eventName: 'app_trial_started', userId: 'u', sourceId: 'u' }),
+    );
   });
   it('fails closed when current profile cannot be verified', async () => {
     const db = { from: () => createChainableMock(null) };

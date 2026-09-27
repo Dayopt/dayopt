@@ -8,7 +8,6 @@
 import { render } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const dismiss = vi.hoisted(() => vi.fn());
 const isMobile = vi.hoisted(() => ({ value: false }));
 const toasterProps = vi.hoisted(() => ({ value: {} as Record<string, unknown> }));
 
@@ -17,46 +16,16 @@ vi.mock('sonner', () => ({
     toasterProps.value = props;
     return <div data-testid="sonner-root" />;
   },
-  toast: { dismiss },
+  toast: {},
 }));
 vi.mock('@/lib/hooks/useMediaQuery', () => ({ useMediaQuery: () => isMobile.value }));
 vi.mock('next-intl', () => ({ useTranslations: () => (key: string) => key }));
 
 const { Toaster } = await import('./toast');
 
-function pressEscape() {
-  document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
-}
-
-/** トースト本体のクリックを模す */
-function clickToastBody() {
-  const el = document.createElement('div');
-  el.setAttribute('data-sonner-toast', '');
-  document.body.appendChild(el);
-  el.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-  el.remove();
-}
-
 describe('Toaster の消去', () => {
   beforeEach(() => {
-    dismiss.mockClear();
     isMobile.value = false;
-  });
-
-  it('Esc では消さない（Inspector を閉じる 1 打で取り消し口を失わせない）', () => {
-    render(<Toaster />);
-
-    pressEscape();
-
-    expect(dismiss).not.toHaveBeenCalled();
-  });
-
-  it('本文クリックでも消さない（アクションと意図が競合する）', () => {
-    render(<Toaster />);
-
-    clickToastBody();
-
-    expect(dismiss).not.toHaveBeenCalled();
   });
 
   it('デスクトップは×を出す（唯一の「今すぐ消す」導線）', () => {

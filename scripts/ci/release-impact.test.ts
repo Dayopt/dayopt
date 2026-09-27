@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -71,6 +74,38 @@ describe('release impact（層 3 の起動判定）', () => {
 
     // push の parent ではなく、alias が指している deployment の SHA が base になる。
     expect(seenBase).toBe(OTHER_SHA);
+  });
+
+  it('再配備で名指しされた project は、live が target SHA でも層 3 を走らせる（#2735）', async () => {
+    const results = await resolveReleaseImpact({
+      sha: SHA,
+      token: 'token',
+      teamId: 'team',
+      projects: PROJECTS as never,
+      headShaImpl: () => SHA,
+      projectStateImpl: (async () => ({ production: { sha: SHA } })) as never,
+      storybookImpactImpl: () => false,
+      redeploy: { projectName: 'product', deploymentId: 'dpl_redeploy' } as never,
+    });
+
+    // 判定は実物の resolveProjectImpact に任せる（stub すると配線の欠落を見逃す）。
+    expect(formatOutputs(results)).toBe(
+      'web_affected=false\nproduct_affected=true\nstorybook_affected=false',
+    );
+  });
+
+  it('promote.yml は再配備要求を impact と release の両 job へ同じ式で渡す', () => {
+    const workflow = readFileSync(join(process.cwd(), '.github/workflows/promote.yml'), 'utf8');
+    const wiring = workflow
+      .split('\n')
+      .map((line) => line.trim())
+      .filter((line) => line.startsWith('RELEASE_REDEPLOY:'));
+
+    // 片方の job だけに渡ると、release が affected・impact が unaffected で必ず食い違う。
+    expect(wiring).toHaveLength(2);
+    expect(new Set(wiring).size).toBe(1);
+    // push 起動の run に入力は無い。dispatch の時だけ読む。
+    expect(wiring[0]).toContain("github.event_name == 'workflow_dispatch' && inputs.redeploy");
   });
 
   it('Vercel API が失敗した project は affected へ倒す（fail closed）', async () => {

@@ -5,7 +5,7 @@
  * 運用面の事実を集める。どれも正本はコードで、この module は読み手にすぎない。
  *
  * 発見元:
- *   - HTTP route      apps/{product,web}/src/app/**\/route.ts の method export
+ *   - HTTP route      apps/{product,web}/src/app/**\/route.{ts,tsx,js,mjs} の method export
  *   - 定期実行        apps/product/vercel.json / .github/workflows/*.yml / migrations の cron.schedule
  *   - Supabase        supabase/config.toml の [functions.*] / [auth.hook.*] / [storage.buckets.*]
  *   - DB エラーコード  migrations の `USING ERRCODE = 'DTnnn'` と app 側の参照
@@ -156,16 +156,17 @@ export function parseRouteMethods(text: string): string[] {
 export function routeUrlOf(relativePath: string): string {
   const segments = relativePath
     .replace(/^apps\/(product|web)\/src\/app\/?/, '')
-    .replace(/\/(route|page)\.tsx?$/, '')
+    .replace(/\/(route|page)\.(?:ts|tsx|js|mjs)$/, '')
     .split('/')
     .filter((segment) => segment.length > 0 && !/^\(.+\)$/.test(segment));
   return `/${segments.join('/')}`;
 }
 
-function walkFiles(root: string, relativeDir: string, fileName: string): string[] {
+function walkFiles(root: string, relativeDir: string, fileNames: readonly string[]): string[] {
   const dir = join(root, relativeDir);
   if (!existsSync(dir)) return [];
   const found: string[] = [];
+  const supportedNames = new Set(fileNames);
   // `.well-known/` のように dot で始まる route ディレクトリが実在するため、
   // 除外は build 生成物と node_modules だけに絞る（#2775 で .well-known 2 route を落としていた）
   const skipped = new Set(['node_modules', '.next', '.turbo', '.git', '.vercel']);
@@ -174,7 +175,7 @@ function walkFiles(root: string, relativeDir: string, fileName: string): string[
       if (skipped.has(entry)) continue;
       const full = join(current, entry);
       if (statSync(full).isDirectory()) walk(full);
-      else if (entry === fileName) found.push(full.slice(root.length + 1));
+      else if (supportedNames.has(entry)) found.push(full.slice(root.length + 1));
     }
   };
   walk(dir);
@@ -184,7 +185,12 @@ function walkFiles(root: string, relativeDir: string, fileName: string): string[
 export function discoverHttpRoutes(root: string): HttpRoute[] {
   const routes: HttpRoute[] = [];
   for (const app of ['product', 'web'] as const) {
-    for (const path of walkFiles(root, `apps/${app}/src/app`, 'route.ts')) {
+    for (const path of walkFiles(root, `apps/${app}/src/app`, [
+      'route.ts',
+      'route.tsx',
+      'route.js',
+      'route.mjs',
+    ])) {
       const text = readFileSync(join(root, path), 'utf8');
       routes.push({
         id: routeUrlOf(path),

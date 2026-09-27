@@ -16,12 +16,6 @@
     "valueProp": "Dayopt は予定・時間記録・カレンダーをひとつにまとめたアプリです。あなたの時間の使い方を可視化します。",
     "ctaButton": "はじめる"
   },
-  "passwordChanged": {
-    "subject": "パスワードが変更されました",
-    "heading": "パスワードが変更されました",
-    "body": "Dayopt のパスワードが正常に変更されました。",
-    "securityWarning": "この変更に覚えがない場合は、すぐに {resetLink} からパスワードをリセットし、{supportEmail} までご連絡ください。"
-  },
   "mfaDisabled": {
     "subject": "多要素認証が無効になりました",
     "heading": "多要素認証が無効になりました",

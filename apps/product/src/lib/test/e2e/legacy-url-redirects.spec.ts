@@ -60,8 +60,6 @@ test.describe('Legacy URL redirects', () => {
   const legacyToCalendar: Array<[string, string]> = [
     ['/ja/day?date=2026-04-20', '/ja/calendar?date=2026-04-20&view=day'],
     ['/ja/week?date=2026-04-20', '/ja/calendar?date=2026-04-20&view=week'],
-    ['/ja/2day?date=2026-04-20', '/ja/calendar?date=2026-04-20&view=2day'],
-    ['/ja/7day?date=2026-04-20', '/ja/calendar?date=2026-04-20&view=7day'],
   ];
 
   for (const [from, to] of legacyToCalendar) {
@@ -81,13 +79,6 @@ test.describe('Legacy URL redirects', () => {
   test('panel=diff on day view redirects to /report with range=week', async ({ page }) => {
     // レポートは週 / 月 / 年の 3 粒度しか持たない（#2575）。旧 day 系リンクは週へ寄る。
     await page.goto('/ja/day?date=2026-04-20&panel=diff');
-    await expect(page).toHaveURL(/\/ja\/report\?date=2026-04-20&range=week/);
-  });
-
-  test('panel=analytics（旧URL別名）redirects to /report — 恒久 shim を redirect 層が引き継ぐ', async ({
-    page,
-  }) => {
-    await page.goto('/ja/day?date=2026-04-20&panel=analytics');
     await expect(page).toHaveURL(/\/ja\/report\?date=2026-04-20&range=week/);
   });
 

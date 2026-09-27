@@ -14,6 +14,7 @@ describe('DiffBadge', () => {
     const { container } = render(<DiffBadge diffMinutes={20} />);
 
     const badge = screen.getByText('+20min');
+    expect(badge).toBeInTheDocument();
     expect(badge).toHaveClass('text-muted-foreground');
     expect(badge).not.toHaveClass('text-success', 'text-destructive');
     expect(container.querySelector('svg.lucide-arrow-up')).toBeInTheDocument();
@@ -23,6 +24,7 @@ describe('DiffBadge', () => {
     const { container } = render(<DiffBadge diffMinutes={-15} />);
 
     const badge = screen.getByText('-15min');
+    expect(badge).toBeInTheDocument();
     expect(badge).toHaveClass('text-muted-foreground');
     expect(badge).not.toHaveClass('text-success', 'text-destructive');
     expect(container.querySelector('svg.lucide-arrow-down')).toBeInTheDocument();

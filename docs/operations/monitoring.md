@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-09-14
+last_verified: 2026-09-22
 code:
   - packages/observability
   - apps/product/src/instrumentation.ts
@@ -71,6 +71,7 @@ GitHub の schedule は実行時刻を保証しない。15分は起動予定の�
 - `event_id`、`trace_id`、`span_id`、release、environment など Sentry protocol 値は変更しない
 - **`/api/health` は Sentry 上に存在しない**。inbound filter `filtered-transaction`（health check transactions）が両 project で有効で、`GET /api/health` は ingest 時に 100% 破棄される（`GET /api/health/version` は名前が `*/health` に一致しないため通る。90 日で前者 0 件 / 後者 1 件、2026-09-18 実測）。UptimeRobot の 5 分間隔 ping で quota を焼かないための正しい挙動なので filter は外さない。**`/api/health` へ request を送って span が出るかで ingest の生死を測ってはいけない** — 送出側（sampler / propagator）が正常でも必ずゼロになる。ingest の生死は [Organization Stats](https://dayopt.sentry.io/stats/) の accepted / filtered / rate_limited の内訳で見る
 - **discover / events API は `dataset=spans` を使う**。当 organization は span (EAP) dataset へ移行済みで、`dataset=transactions` は全 project・全期間で 0 件を返す。存在確認に `transactions` を使うと「記録されていない」と誤診する（2026-09-18 実測）
+- **agent の読み取り経路は `SENTRY_AUTH_TOKEN="op://agent/sentry-cli-readonly/credential" op run -- sentry ...`**（read scope だけ。build 用 token は `ci/sentry-release-token`）。`sentry auth status` は token の一部を表示するので使わず、疎通は `sentry org list` で確かめる（[secrets.md](./secrets.md) §実測で分かった罠）
 - **span ゼロの窓それ自体は異常ではない**。production のトラフィックが少ないため、30〜60 分にわたり accepted span が 0 件の時間帯は平常時にも現れる（2026-09-17 の 12:00Z / 14:00Z など）。沈黙を障害と読む前に、同じ期間の outcome 内訳で `rate_limited` と `filtered` を確認する
 
 主なcapture経路:

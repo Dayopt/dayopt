@@ -157,6 +157,20 @@ describe('React Email templates', () => {
       expect(countHtmlOccurrences(html, resetUrl)).toBe(3);
     });
 
+    it('password changed notification links to a new reset request and support', async () => {
+      const html = await render(
+        PasswordChangedEmail({
+          userName: 'Tomoya',
+          locale: 'en',
+          appUrl: 'https://app.dayopt.test',
+        }),
+      );
+
+      expect(html).toContain('The password for your Dayopt account was changed.');
+      expect(html).toContain('href="https://app.dayopt.test/auth/password"');
+      expect(html).toContain('href="mailto:support@dayopt.app"');
+    });
+
     it('現アドレス宛は変更先アドレスを本文に出し、変更されない旨を伝える', async () => {
       const confirmUrl = 'https://app.dayopt.app/auth/confirm?token_hash=current&type=email_change';
       const html = await render(

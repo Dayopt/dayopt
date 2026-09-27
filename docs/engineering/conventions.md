@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-08-04
+last_verified: 2026-09-22
 code: apps/product/src
 ---
 
@@ -671,6 +671,13 @@ git commit -m "fix: button color"
 # ✅ 日本語 + Conventional Commits
 git commit -m "fix(ui): ボタンのカラーをセマンティックトークンに修正"
 ```
+
+### 9. 実装で踏んだ罠（実測、2026-09-22 に memory から昇格）
+
+- **`apps/product/src/env.ts` の production refine（all-or-nothing）に変数を足す前に、その変数が既に別用途で存在していないか `rg '<VAR>' scripts/tasks/env/schema.ts .op-env.agent.example .op-env.human.example docs/operations/secrets.md` で確認する（見つからなければ repo 全体を `rg --hidden --glob '!.git/**'` で洗う）**。`CRON_SECRET` を calendar 4 変数の組に入れ、「cron secret だけ設定済み」という現実的な状態で env Proxy が throw してアプリ全体が起動不能になりかけた（PR #1731）。失敗は build ではなく production runtime の cold start で出る（Proxy は build / CI / test で validation を skip する）。未設定を検知したいだけなら、その feature の entry point で 503 を返す graceful degradation にする。build 前の fail-closed は `production-build-gate.mjs` 側
+- **OAuth client の unit test では落ちない穴が 3 つある**（#1704 で 3 件とも Codex が拾った）。(1) 外部 API が本当にその形で返すか: `openid` scope を要求せず `id_token` を期待していた。外部レスポンスを mock する時は公式 docs のどの記述に対応するかをコメントに残す (2) 未署名 cookie は「一部改竄」ではなく「全体自作」で考える: state / verifier / userId を自作して start を踏まずに callback へ直行できた (3) 既定 off の flag 配下の gate は、flag を立てる時に誰も再監査しないので実装時点で正しくしておく
+- **上限付き payload（明細 200 件など）を client で数え直さない**。同じ配列から中央値や n を再計算すると、上限を超える期間で同じパネル内に違う数字が並ぶ（PR #2715）。代表値・件数・分布は server が全件から出して別 field で返し、client が導けるのは点の位置のような表示専用の値だけにする。fixture も同じ規則で導出する
+- **「1 ユーザー 1 回だけ送る」列を足す migration には既存行の backfill を同じファイルに入れる**。列を足しただけだと既存ユーザー全員が NULL = 未送信になり、次のサインインで一斉に飛ぶ（PR #2790）。掴んでから送る順序にし、列を `authenticated` / `anon` から REVOKE し、実 DB で「1 回目 1 行・2 回目 0 行」を実測する
 
 ### 関連ドキュメント
 

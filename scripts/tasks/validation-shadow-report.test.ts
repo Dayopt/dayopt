@@ -313,6 +313,55 @@ describe('shadow report: collection and rendering', () => {
     expect(row.vercel).toEqual({ product: 'success', web: '未取得' });
   });
 
+  it('distinguishes ordinary failures, self-produced blockers, and review-confirmed self-changes', () => {
+    const withStatuses = (validationState: string, validationDetail: string, reviewState: string) =>
+      collectPrRow({
+        pr,
+        api: (path: string) =>
+          path.endsWith(`/commits/${HEAD}/statuses?per_page=100`)
+            ? [
+                {
+                  id: 4,
+                  context: 'Validation (shadow)',
+                  state: validationState,
+                  description: validationDetail,
+                },
+                {
+                  id: 5,
+                  context: 'Review policy (shadow)',
+                  state: reviewState,
+                  description: 'review fixture',
+                },
+              ]
+            : api(path),
+      });
+    const ordinaryFailure = withStatuses(
+      'failure',
+      'blocked: static: required job failed',
+      'pending',
+    );
+    const selfProduced = withStatuses(
+      'failure',
+      'blocked: static: This PR changes the producer definition (package.json)',
+      'pending',
+    );
+    const reviewed = withStatuses(
+      'success',
+      'Self-produced change verified after same-head review (static)',
+      'success',
+    );
+
+    const report = formatReport([ordinaryFailure, selfProduced, reviewed], {
+      limit: 3,
+      fetchedAt: 'x',
+      policyCheckout: 'p',
+    });
+
+    expect(report).toContain('| failure | pending |');
+    expect(report).toContain('| failure (self-produced; Review pending) | pending |');
+    expect(report).toContain('| success (review-confirmed self-change) | success |');
+  });
+
   it('reports runner minutes as 未取得 while a job is still running or when no CI run exists', () => {
     const running = collectPrRow({
       pr,

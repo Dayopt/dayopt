@@ -1,4 +1,21 @@
 export {
+  capturePostHogBrowserEvent,
+  capturePostHogPageview,
+  getPostHogBrowserIdentifiedUserId,
+  identifyPostHogBrowser,
+  resetPostHogBrowserIdentity,
+  startPostHogBrowser,
+  stopPostHogBrowser,
+} from './posthog-browser';
+
+export {
+  filterPostHogBrowserProperties,
+  postHogExternalReferrer,
+  postHogPagePath,
+  postHogUtm,
+} from './posthog-capture';
+
+export {
   BROWSER_TELEMETRY_CONSENT_EVENT,
   BROWSER_TELEMETRY_CONSENT_STORAGE_KEY,
   getBrowserTelemetryConsentStorage,

@@ -78,6 +78,28 @@ describe('buildAuthEmailIdempotencyKey', () => {
     expect(signup).not.toBe(recovery);
   });
 
+  it('password changed event は同じ event だけを重複抑止する', () => {
+    const first = key({
+      eventId: EVENT_ID,
+      emailActionType: 'password_changed_notification',
+      recipientRole: 'single',
+    });
+    const retry = key({
+      eventId: EVENT_ID,
+      emailActionType: 'password_changed_notification',
+      recipientRole: 'single',
+    });
+    const laterChange = key({
+      eventId: 'msg_later_password_change',
+      emailActionType: 'password_changed_notification',
+      recipientRole: 'single',
+    });
+
+    expect(first).toBeDefined();
+    expect(retry).toBe(first);
+    expect(laterChange).not.toBe(first);
+  });
+
   // email_change は現アドレス宛と新アドレス宛の 2 通を同じ webhook 配送で送る。
   // 同じ key だと 2 通目が 1 通目のキャッシュに当たり、新アドレスへ届かない。
   it('email_change の 2 通は相互に抑止しない', () => {

@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -25,10 +25,50 @@ describe('agent preflight', () => {
     const root = fixture();
     const state = collectPreflight(root);
     expect(state.dependencies).toBe(false);
+    expect(state.pnpmMatches).toBe(false);
+    expect(state.expectedPnpm).toBe(null);
     expect(state.hooks['pre-push']).toBe(false);
     expect(state.readOnlyDelegation.wrapper).toBe(false);
     expect(state.readOnlyDelegation.native).toContain('unsupported');
     expect(renderPreflight(state)).toContain('commit / push 前に');
+  });
+  it('flags a Node.js mismatch independently of the test runner version', () => {
+    const root = fixture();
+    const currentMajor = Number(process.versions.node.split('.')[0]);
+    writeFileSync(join(root, '.nvmrc'), `${currentMajor + 1}\n`);
+    const state = collectPreflight(root);
+    expect(state.nodeMatches).toBe(false);
+  });
+  it('uses the Corepack entrypoint when it is the only matching pnpm contract', () => {
+    const root = fixture();
+    writeFileSync(join(root, 'package.json'), '{"packageManager":"pnpm@11.26.0"}\n');
+    const bin = join(root, 'bin');
+    mkdirSync(bin);
+    const corepack = join(bin, 'corepack');
+    writeFileSync(
+      corepack,
+      '#!/bin/sh\n[ "$1" = "pnpm" ] && [ "$2" = "--version" ] || exit 1\nprintf \'11.26.0\\n\'\n',
+    );
+    chmodSync(corepack, 0o755);
+    const pnpm = join(bin, 'pnpm');
+    writeFileSync(pnpm, "#!/bin/sh\nprintf '10.0.0\\n'\n");
+    chmodSync(pnpm, 0o755);
+    const git = join(bin, 'git');
+    writeFileSync(
+      git,
+      '#!/bin/sh\ncase "$1 $2" in\n  "rev-parse --show-toplevel") pwd ;;\n  "status --short") exit 0 ;;\n  *) exit 1 ;;\nesac\n',
+    );
+    chmodSync(git, 0o755);
+    const previousPath = process.env.PATH;
+    process.env.PATH = bin;
+    try {
+      const state = collectPreflight(root);
+      expect(state.pnpm).toBe('11.26.0');
+      expect(state.pnpmMatches).toBe(true);
+    } finally {
+      if (previousPath === undefined) delete process.env.PATH;
+      else process.env.PATH = previousPath;
+    }
   });
   it('uses repository root from a subdirectory and verifies configured hook files', () => {
     const root = fixture();

@@ -24,7 +24,7 @@ const observeAuthOperation = vi.hoisted(() =>
   vi.fn(async (_operation: string, call: () => PromiseLike<unknown>) => call()),
 );
 
-vi.mock('@/lib/email/router', () => ({ sendAccountDeletionEmail, getUserLocale }));
+vi.mock('@/lib/email/notifications', () => ({ sendAccountDeletionEmail, getUserLocale }));
 
 vi.mock('@/lib/supabase/oauth', () => ({
   createServiceRoleClient: () => ({ auth: { admin: { deleteUser } }, from: adminFrom }),

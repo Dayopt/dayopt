@@ -16,6 +16,11 @@
 import { NextResponse } from 'next/server';
 
 import { deliverWelcomeEmailOnce } from '@/features/auth/server/welcome-email';
+import {
+  createSignupAnalyticsClaim,
+  SIGNUP_ANALYTICS_CLAIM_COOKIE,
+  SIGNUP_ANALYTICS_CLAIM_MAX_AGE_SECONDS,
+} from '@/lib/analytics/signup-analytics-claim';
 import { logger } from '@/lib/logger';
 import { getSafeRedirectPath } from '@/lib/safe-redirect';
 import { observeAuthOperation } from '@/lib/sentry';
@@ -41,10 +46,24 @@ export async function GET(request: Request) {
       // 初回だけ歓迎メールを送る。2 回目以降は profiles の conditional UPDATE が
       // 0 行になって即戻るので、サインインの体感には効かない。失敗しても throw しない。
       const userId = data.session?.user?.id;
-      if (userId) await deliverWelcomeEmailOnce(userId);
+      const newlyRegistered = userId ? await deliverWelcomeEmailOnce(userId) : false;
+      const signupClaim =
+        userId && newlyRegistered ? createSignupAnalyticsClaim(userId, 'google') : null;
 
       // 成功した場合は元のページまたはデフォルトページへリダイレクト
-      return NextResponse.redirect(new URL(next, request.url));
+      const destination = new URL(next, request.url);
+      if (signupClaim) destination.searchParams.set('signup_claim', '1');
+      const response = NextResponse.redirect(destination);
+      if (signupClaim) {
+        response.cookies.set(SIGNUP_ANALYTICS_CLAIM_COOKIE, signupClaim, {
+          httpOnly: true,
+          secure: true,
+          sameSite: 'strict',
+          path: '/',
+          maxAge: SIGNUP_ANALYTICS_CLAIM_MAX_AGE_SECONDS,
+        });
+      }
+      return response;
     }
 
     logger.warn('Auth callback code exchange failed');

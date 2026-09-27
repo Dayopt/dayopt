@@ -1,11 +1,11 @@
 # 必要な場合だけ行う永続 handoff
 
-- `routing.level` は通常実装を L2、危険な手掛かりがあれば L3、情報不足なら `unclassified` とする。L1 は事前整理の候補で、コード変更の自動許可ではない
+- `routing.level` は通常実装を L2、危険な手掛かりがあれば L3、情報不足なら `unclassified` とする。別フィールド `preparation: L1` は追加の事前整理候補で、コード変更の自動許可ではない
 - `routing.ready` は入力項目の存在確認だけ。受け入れ条件・検証コマンドの検出は既存の文字列判定なので、内容が十分かは担当が確認する。`status:ready` の付与・merge・production 操作を許可しない
 - path / 本文の一致は保守的な手掛かり。calendar 内の小修正も L3 候補になる場合がある。差分の実際の意味を確認して層を下げる時は理由を残す。一致なしを安全の証明にしない
 - 想定原因と実測が食い違う、対象が広がる、同種の失敗が続く時は AGENTS.md の停止条件に従い、証拠を残して再判定する
 
-### L1 の資料を再利用する
+### `preparation: L1` の資料を再利用する
 
 引き渡しが必要な作業にだけ使う。同じ担当が小修正を完了できる時は資料を増やさない。
 
@@ -27,7 +27,7 @@ pnpm handoff:validate --context /tmp/dayopt-context.json --file /tmp/dayopt-hand
 
 対象 HEAD・選択した source の作業中の内容・ctx のハッシュが変われば再利用できない。引き渡す前に ctx を再取得して検査する。資料の生成時点から対象が変わったら新しい出力先へ作り直し、変化した事実だけ再確認する。PR は現在の HEAD が PR head SHA と一致する checkout で作る。snapshot と snapshotId は編集しない。
 
-検査結果は `ready` / `partial` / `stale` / `invalid`。`ready` 以外は非 0 exit で、未実行や未確認を完了扱いしない。これは鮮度・形式・根拠参照の検査であり、記述の真偽・コマンドの実行・安全性は証明しない。選択していないファイルの変化も保証外。L2・L3 は論点に必要な一次資料と結果を確認する。独立レビューへ L1 の安全性の結論を引き継がない。高リスク変更も GitHub の `@codex review` を使う。追加 reviewer は User が明示的に再開を指示するまで停止する（`pr-cross-review` skill）。
+検査結果は `ready` / `partial` / `stale` / `invalid`。`ready` 以外は非 0 exit で、未実行や未確認を完了扱いしない。これは鮮度・形式・根拠参照の検査であり、記述の真偽・コマンドの実行・安全性は証明しない。選択していないファイルの変化も保証外。L2・L3 は論点に必要な一次資料と結果を確認する。独立レビューへ L1 の安全性の結論を引き継がない。保護対象 PR だけ GitHub の `@codex review` を使い、追加 reviewer は User が明示的に再開を指示するまで停止する（`pr-cross-review` skill）。
 
 ### 効果の回収
 

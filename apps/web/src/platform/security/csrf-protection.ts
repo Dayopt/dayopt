@@ -15,15 +15,19 @@ import { NextRequest } from 'next/server';
  * 許可されたオリジンのリスト
  *
  * 本番環境: vercel.app ドメインと本番ドメイン
- * 開発環境: localhost
+ * 非本番環境: localhost も許可
  */
 function getAllowedOrigins(): string[] {
-  const allowedOrigins = [
-    'http://localhost:3000',
-    'http://localhost:3001',
-    'http://127.0.0.1:3000',
-    'http://127.0.0.1:3001',
-  ];
+  const allowedOrigins: string[] = [];
+  const isProduction = env.NODE_ENV === 'production' || env.VERCEL_ENV === 'production';
+  if (!isProduction) {
+    allowedOrigins.push(
+      'http://localhost:3000',
+      'http://localhost:3001',
+      'http://127.0.0.1:3000',
+      'http://127.0.0.1:3001',
+    );
+  }
 
   // Vercel のプレビュー/本番環境
   if (env.VERCEL_URL) {

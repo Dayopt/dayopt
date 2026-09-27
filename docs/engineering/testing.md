@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-09-16
+last_verified: 2026-09-22
 code:
   - .github/workflows/ci.yml
   - .github/workflows/promote.yml
@@ -107,3 +107,84 @@ repo を private に戻すと、Actions は分単位の課金になる。GitHub 
 | audit の Supabase 2 job を 1 job に統合               | 見送り                    | 月 100 分程度                                  | job 名を鍵にした security contract test 2 本の書き換えが要り、節約に見合わない。deploy-health は commit status 権限を持つので token 分離上そもそも統合しない |
 | Static と Unit の 1 job 化                            | 見送り                    | 月 200 分程度                                  | ruleset の required check 名が変わる                                                                                                                         |
 | org の Actions spending limit を $0 から上げる        | User 操作                 | —                                              | 上限 $0 のまま枠を使い切ると CI が起動しなくなり、merge gate ごと止まる                                                                                      |
+
+## 実測で分かった罠（検証と報告）
+
+agent が実際に踏んで、緑の報告が嘘になった事例。どれもエラーを出さずに間違った結論を返す。2026-09-22 に Claude Code の memory から昇格した（provider を問わず効く）。
+
+### 緑が証拠にならない形
+
+- **パイプの末尾が exit code を隠す。** `pnpm check 2>&1 | tail -40` の exit code は `tail` のもので、失敗しても 0 が返る。検証主張に使う実行は `> <scratch>/check.log 2>&1; echo "EXIT=$?"` の形にし、`grep -E 'Test Files|Tests  '` で件数を読む（2026-08-11 #1934、2026-09-18 #2827 で 2 回誤報告した）
+- **行数で切ると最重要部分が消える。** `| tail -N` / `| head -N` は行数が 1 行ずれた瞬間に必要な部分を落とし、残りが自己完結して見える。外部 CLI・レビュー出力は全量をファイルへ落としてから `sed -n '/^anchor/,$p'` のように内容で切る（2026-08-28、Codex の P1 2 件と marker の 1 行目を失った）
+- **`pnpm typecheck` の cached は実走ではない。** turbo が `FULL TURBO` を返すと型検査は走らない。`pnpm check` も内部で同じ経路を通るので偽グリーンになる（2026-08-11 PR #1927）。確実なのは対象 package で `pnpm exec tsc --noEmit` を直接叩くこと。`--force` は 2 回目に tsc へ渡って `TS5093` で落ちることがある
+- **skip 条件つき test の緑は実行の証拠ではない。** vitest の `it.skipIf` / `describe.skipIf` は収集時に評価されるので、`beforeAll` の probe で決まる条件は常に skip になる（2026-08-11 #1925 で 3 件全部 skip）。実行時条件は `it(name, (ctx) => { if (!ok) ctx.skip(); })` にし、`N passed` と `N skipped` を読み分け、有効・無効の両状態で 1 回ずつ走らせる
+- **`::warning::` を出す関数を test から呼ぶと本物の annotation が出る。** GitHub Actions は vitest の stdout も workflow command として解釈する。全 PR に嘘の警告が出続けた（2026-09-16 PR #2788）。`vi.spyOn(console, 'log').mockImplementation(() => {})` で握ってから呼び、`gh run view <id> --log | rg '##\[warning\]'` で無いことを確認する
+- **`.text-destructive` を含む複合 locator はエラー未発生でも即 pass する。** 必須項目の `＊` が送信前から可視なため。server error を待つ時は `[role="alert"][data-slot="field-error"]` まで絞り、文言を `toContainText` で確認する（2026-08-10 PR #1882、#1883）
+- **`tsx` は top-level await を持つ `.mjs` を静的 import できない。** CJS へ落ちるので `ERR_REQUIRE_ASYNC_MODULE` で即死するが、vitest は ESM なので unit test は緑のまま。判定関数を注入する形にして CLI 側で `await import()` し、`spawnSync('pnpm', ['exec', 'tsx', ...])` の実起動 test を 1 本置く（2026-09-18 #2827）
+
+### 環境と道具の癖
+
+- **Node は 24 を前置する。** system の node 26 では zustand persist / localStorage 系 test が `Cannot read properties of undefined (reading 'clear')` で落ちる。`PATH=/opt/homebrew/opt/node@24/bin:$PATH pnpm check`（nvm / fnm は入っていない）。`env PATH=...` 形は PATH 中の空白で exit 127 になるので `export` する
+- **`VAR=$(script)` の失敗は次のコマンドを止めない。** 空文字で `gh issue edit --body ""` が走り本文が消えた（2026-08-24）。上書き系は `|| exit` を付けるか、ファイルへ書いて非空を確認してから `--body-file` で渡す
+- **`jq '.flag // "default"'` は `false` も既定値へ倒す。** boolean は `if (.x | type) == "boolean" then (.x | tostring) else "unknown" end` で読む。#2586 では約 40 件の test 失敗を「方針が広すぎる」と誤読した。大量失敗を設計の signal にする前に原因を 1 件掘る
+- **自動整形が未使用 import を消す。** import を先に足して使用箇所を後で書くと、中間状態で lint-staged / 整形 hook が import を除去し、新機能が丸ごと無反応になる（2026-08-11 #1929）。使用箇所を先に書き、import は最後にまとめる。新しく足した処理が何も出力しない時はまず import の生存を見る
+- **書き出したファイルに NUL が混ざると git が binary 扱いにして diff が読めなくなる。** `git diff --cached --stat` に `Bin 0 -> N bytes` と出たら疑う。`file <path>` が `data` なら `perl -i -pe 's/\x00/ /g'` で直す
+- **`package.json` の依存を触ったら同じ commit に `pnpm-lock.yaml` を含める。** ローカルは既存 node_modules で素通りし、CI だけ全 job が setup で 15〜20 秒で落ちる（2026-09-07 PR #2623）。push 前に `pnpm install --frozen-lockfile` を通す。`catalog:` 化や依存 1 本の追加でも pnpm は無関係な version を再解決して動かすので、`git diff -U0 pnpm-lock.yaml | grep '^-' | grep -v '^---'` が空でなければ drift。旧 version へ手で戻してから `--frozen-lockfile` に検証させる（#2518、#2827）
+- **新規 package に test を足したら root `test:run` の `&&` 連結へも足す。** turbo 任せではないので、忘れると CI で永久に走らない
+
+### Cloud Preview の実行前照合（#2910、移行中）
+
+`node scripts/runbook/preview-readiness.mjs` は、指定した Product Preview と非本番 DB の対応を読み取りで確認する。readiness 単独では E2E を起動せず、required check でもない。常設 DB 登録・資格情報配布・実 Preview での検証は未完了であり、この処理の unit test 成功を環境稼働の証拠にしない。
+
+```bash
+node scripts/runbook/preview-readiness.mjs \
+  --sha <完全な候補SHA> --deployment <dpl_ID> \
+  --branch <PRのbranch> --pr <PR番号> \
+  --db-ref <非本番project_ref> --db-branch <Supabase branch UUID> \
+  --db-mode <sharedまたはephemeral>
+```
+
+- 同じ SHA の clean checkout で実行する。期待 migration はその checkout から取得する。Supabase URL のみの指定や、可変 branch alias は対象選択に使わない。
+- `VERCEL_TOKEN`（対象 project の読取）、`SUPABASE_PREVIEW_READINESS_TOKEN`（branch metadata / 対象非本番 DB の読取）、`VERCEL_AUTOMATION_BYPASS_SECRET` を許可済み runner の環境から渡す。引数・証拠 JSON・ログへ値を出さず、個人の Vault unlock をコマンドの前提にしない。初期の登録・scope確認は別途必要。
+- Vercel API が返す具体 deployment の project、Git source、SHA、READY、非 production target を確認する。Supabase は指定 parent/branch/ref、非 default、本番データ複製なしを確認する。`shared` は persistent、`ephemeral` は同じ PR/branch に属する使い捨て環境に限る。
+- migration の version 集合は候補と完全一致を要求する。共有 DB に別候補の migration が入った場合も止まり、自動 reset・migration 適用・redeploy は行わない。version の一致は手動 DDL が無いことの証明ではない。
+- Preview の `/api/health/version` が返す完全 SHA / deployment ID / DB ref、および `/api/health` の DB 疎通も照合する。本番の version 応答は従来どおり。欠測や古いアプリは未確認として失敗する。
+- 成功 JSON は識別子・migration versions・観測開始/終了時刻のみ。各サービスを原子的に読んだ snapshot ではないため、`preview-e2e.mjs` は E2E 前後に照合する。共有 DB の候補競合を防ぐ排他は別途必要。
+
+非ローカルで service role を使う既存 E2E は `E2E_ALLOW_NONLOCAL_SUPABASE=1` に加え `E2E_SUPABASE_PROJECT_REF` を要求し、対応する HTTPS Supabase origin だけに接続する。これは上の readiness を代替しない。critical-path の synthetic user は実行ごとに password を生成し、作成成功を確認した同じ client/user だけを cleanup する。setup・cleanup の失敗は test を失敗させ、cleanup エラーには合成 user ID と失敗箇所だけを残す。remote run は `users/<UUID>.json` に作成前から状態を記録し、Auth の app_metadata に `e2e_run_id` を付ける。中断・応答喪失・cleanup失敗後は、この記録と対象非本番DBのユーザーID・app_metadataの一致を確認して回収する。未知の既存ユーザーを推測で削除しない。中断後の自動回収は未実装。
+
+[Protection Bypass の公式仕様](https://vercel.com/docs/deployment-protection/methods-to-bypass-deployment-protection/protection-bypass-automation)に従い、readiness の bypass header は API で確認した具体 deployment の origin だけへ送る。redirect は拒否する。ブラウザ全体への header 設定や query parameter への secret 埋込は使わない。[Playwright trace はネットワークも記録する](https://playwright.dev/docs/api/class-tracing)ため、remote E2E では生の Playwright trace/video/標準reportを保存先から除外する。代わりに下記の限定した操作記録を残す。通常CI/ローカルの既存traceは変更しない。
+
+#### Remote E2E の実行
+
+`node scripts/runbook/preview-e2e.mjs` に上記 readiness と同じ引数を渡す。さらに承認済み非本番の `SUPABASE_SECRET_KEY` が必要。readiness に成功した具体 deployment に対し、既存の desktop / mobile critical-path（作成・reload・Report確認）を実行し、終了後に再照合する。localhost の build / 起動はしない。個人の1Password認証も呼び出さない。実クラウドでの通し確認とCIへの配線はまだ未完了。
+
+- 子プロセスへは非本番DB keyと当該Previewのbypassだけを渡し、Vercel/Supabase管理tokenや他のアプリSecretは引き継がない。信頼できるコード・runnerでのみ実行する。未審査のforkへSecretを渡す仕組みではない。
+- ブラウザ通信は具体Preview、選択したSupabase、CAPTCHA providerに限定する。本番domainを含むその他originは拒否する。bypassはPreviewだけへ1 hopずつ付け、redirect先で再判定する。
+- 再試行は0、workerは1、Playwright全体5分。runnerの7分上限後は自分が起動したprocess groupを終了させる。これでDB上の合成データも自動的に消えるとはみなさず、下の残存記録を確認する。
+- 成果物は表示された `evidenceDirectory` だけを収集する。`run.json` はrun IDと前後のreadiness、`e2e.json` は操作のコード位置・時間・成否、通信先種別・HTTP status、失敗時PNGへの参照、`users/*.json` は合成ユーザーの状態。raw stdout/stderr、失敗メッセージ、入力値、URL query、header、cookie、通信bodyは出力しない。内部Playwright出力は終了後削除する。
+- これはヘッダーやDOMを再現する通常のPlaywright traceではなく、資格情報を除外した限定的な操作記録。失敗の詳細は同じSHAのソース位置と失敗画面から追う。必要な情報が足りなければ、許可された非本番環境で範囲を絞って再現する。
+- 終了コード0だけでは成功にしない。desktop/mobile両方の全対象testが初回成功し、skip/欠測/異常終了がなく、後段のreadinessも一致した時だけ `passed`。この結果を既存Validationが信頼済み証拠として受理する配線は別途必要。
+
+### ローカル E2E とブラウザ実測
+
+- **login 系 E2E をローカルで走らせるには env 4 点を渡す。** `.env` は読まず `supabase status -o json` から鍵を取る。渡さないと `resolveServiceRoleTarget` が false になり suite ごと skip して「0 failed」の緑に見える（`4 skipped` を確認する）
+
+  ```bash
+  NEXT_PUBLIC_TURNSTILE_SITE_KEY= \
+  NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321 \
+  NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY="$PUBLISHABLE_KEY" \
+  SUPABASE_SECRET_KEY="$SECRET_KEY" \
+  pnpm exec playwright test <spec> --project=chromium --reporter=line
+  ```
+
+  Turnstile が出て `button[type="submit"]` が disabled のまま落ちるのは環境差。`@next/env` は定義済みの `process.env` を上書きしないので、shell 側の空文字が勝つ。空文字にしても落ちるなら Supabase の anon key が remote のまま（画面には理由が出ない）
+
+- **Turnstile の 2 経路は公式 test key で踏める。** `3x00000000000000000000FF` は強制対話（submit が disabled のまま）、無効文字列は error 400020（submit が有効化）。site key を差し替えて dev server を立て直すだけで 5 分で確認できる
+- **env ファイルの無い worktree でも dev は動く。** `env NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=<...> SUPABASE_SECRET_KEY=<...> NEXT_PUBLIC_APP_URL=http://localhost:3200 NEXT_PUBLIC_TURNSTILE_SITE_KEY= pnpm --filter @dayopt/product exec next dev -p 3200`。Resend / Upstash / Sentry / Turnstile は未設定の既知の状態。seed ユーザーへはパスワードを打たず magic link で入る（`POST /auth/v1/admin/generate_link` の `hashed_token` を `/ja/auth/confirm?token_hash=<hash>&type=magiclink&next=/calendar` へ）。translation key を足したら dev server を再起動しないと `MISSING_MESSAGE` が出続ける。Next は同一ディレクトリの 2 つ目の `next dev` を拒否するので、`lsof -nP -iTCP:3000 -sTCP:LISTEN` で既に立っていればそれを使う
+- **dev の HSTS が localhost にも効く。** `next.config.mjs` の `Strict-Transport-Security` は環境を問わず出るため、内蔵 Chrome で言語切替の RSC fetch が `ERR_SSL_PROTOCOL_ERROR` になる。full navigation にフォールバックして成立するので diff 由来と誤診しない
+- **module state が遷移を跨ぐ前提の P1 は hard navigation か測ってから重さを決める。** 遷移前に `window.__probe = 'x'` を置き、遷移後に消えていれば store ごと reset されている。2026-09-18 の auth レビューで「再ログインが弾き戻される」P1 が実測で潜在へ降格した。修正自体は残してよいが、報告では「潜在」と書く
+- **429 を trace で数える。** `--trace on` の `test-results/*/trace.zip` 内 `*.network` から `/api/trpc/<a,b,c>?batch=1` を分解すると test ごとの手続き数が出る。rate limit は手続き単位なので、直列 spec は 1 テスト 40〜70 手続きで 100/min に素で届く（#2669）。commit 違いの比較は `git worktree add --detach` で。削除済み worktree の next-server が port 3000 に残ると `reuseExistingServer` で別コードを叩くので先に `lsof` で cwd を見る
+- **`next start` は `RECOVERY_CODE_PEPPER` 必須。** build は通り、最初のリクエストで 500 になる。local 計測ならダミー値を起動 script 内で export する（repo には入れない）。web は `networkidle` に到達しないので load + 固定待ちにする。`~/Library/Caches/ms-playwright` が消えたら `pnpm exec playwright install chromium chromium-headless-shell`
+- **他 session が作った PR は既存 worktree で再検証できる。** `git worktree list` で対象 branch の worktree（node_modules 済み）を探し、`git status --short` が空で HEAD が `headRefOid` と一致すれば vitest をそこで叩くだけでよい。read-only 操作に限り、dev server や E2E は回さない（生成物で他 lane の worktree を汚す）
+- **Mermaid は headless で parse 検証する。** `apps/storybook/node_modules/mermaid/dist/mermaid.core.mjs` を happy-dom の `Window` 上で import し `mermaid.parse(code)` を呼ぶ。diagramType が返れば構文 OK（#2775）

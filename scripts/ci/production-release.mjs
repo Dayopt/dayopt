@@ -109,6 +109,7 @@ export function readImpactAffected(env = process.env, projects = RELEASE_PROJECT
 /** 200 のまま streaming 中に失敗した Next.js response の目印。 */
 const STREAMED_FAILURE_MARKERS = ['NEXT_HTTP_ERROR_FALLBACK', 'NEXT_REDIRECT'];
 
+const CANDIDATE_GRACE_TIMEOUT_MS = 5 * 60 * 1000;
 const READY_TIMEOUT_MS = 25 * 60 * 1000;
 const READY_POLL_MS = 15 * 1000;
 const ASSIGN_TIMEOUT_MS = 5 * 60 * 1000;
@@ -147,7 +148,7 @@ const STABILIZE_ATTEMPTS = 3;
  * この script が費やしうる最悪時間。workflow の `timeout-minutes` がこれを
  * 下回ると、rollback の途中で job が kill され、片方だけ promote された
  * production が手動 rollback の手掛かりごと失われる。
- * 内訳: candidate 待機 + 全 smoke の retry + promote 反映待ち + rollback 反映待ち。
+ * 内訳: Git candidate grace + staged candidate 待機 + 全 smoke の retry + promote 反映待ち + rollback 反映待ち。
  * smoke は candidate（promote 前）と production domain（promote 後）で 2 巡する。
  */
 const WORST_CASE_SMOKE_MS =
@@ -159,15 +160,17 @@ const WORST_CASE_SMOKE_MS =
 // 「promote の確認（timeout）+ rollback の確認 + 着地待ち」の 3 窓を連続で使う。
 // transport 失敗で抜けた場合は promote の確認を行わないので 2 窓に収まる。
 export const WORST_CASE_RELEASE_MS =
+  CANDIDATE_GRACE_TIMEOUT_MS +
   READY_TIMEOUT_MS +
   WORST_CASE_SMOKE_MS * 2 +
   RELEASE_PROJECTS.length * (ASSIGN_TIMEOUT_MS * 2 + AMBIGUOUS_SETTLE_MS);
 
 export class ReleaseError extends Error {
-  constructor(message, { manualRollback } = {}) {
+  constructor(message, { manualRollback, code } = {}) {
     super(message);
     this.name = 'ReleaseError';
     this.manualRollback = manualRollback ?? null;
+    this.code = code ?? null;
   }
 }
 
@@ -176,6 +179,37 @@ export class ReleaseError extends Error {
 const SHA_PATTERN = /^[0-9a-f]{40}$/;
 
 const short = (sha) => (typeof sha === 'string' ? sha.slice(0, 7) : 'unknown');
+
+const DEPLOYMENT_ID_PATTERN = /^dpl_[A-Za-z0-9]+$/;
+
+/**
+ * 同一 commit の再配備要求（`RELEASE_REDEPLOY` = `<project>:<deployment id>`）を読む。
+ *
+ * env だけを更新して同じ commit を build し直した deployment は、source SHA が live と
+ * 同じなので通常の影響判定では `already serving` になり、candidate 選択まで届かない
+ * （#2735）。「SHA が同じなら最新を選ぶ」にしない理由は、同じ commit の deployment が
+ * 複数ある時に **どの build を gate へ通すかを run の外で固定する**ため。ID を名指しに
+ * すれば、dispatch 後に作られた別の build や env 更新前の古い build が紛れ込まない。
+ *
+ * 未指定（空文字）は null。形式不正は throw する —— 黙って通常 dispatch へ落とすと
+ * `already-released` の success が返り、再配備が済んだように見える。
+ */
+export function parseRedeployRequest(raw, projects = RELEASE_PROJECTS) {
+  const value = (raw ?? '').trim();
+  if (value === '') return null;
+
+  const separator = value.indexOf(':');
+  const projectName = separator === -1 ? '' : value.slice(0, separator);
+  const deploymentId = separator === -1 ? '' : value.slice(separator + 1);
+  const names = projects.map((project) => project.name);
+  if (!names.includes(projectName) || !DEPLOYMENT_ID_PATTERN.test(deploymentId)) {
+    throw new ReleaseError(
+      `RELEASE_REDEPLOY must be <project>:<deployment id> ` +
+        `(project = ${names.join(' | ')}, deployment id = dpl_...)`,
+    );
+  }
+  return { projectName, deploymentId };
+}
 
 /**
  * 2 commit 間の変更ファイル一覧を返す。
@@ -261,11 +295,23 @@ export function resolveProjectImpact({
   targetSha,
   checkoutAtTarget = true,
   diffFilesImpl = gitDiffFiles,
+  /**
+   * 同一 commit の再配備（§parseRedeployRequest）で名指しされた deployment ID。
+   * 指定された project だけ、live が既に target SHA でも affected へ倒す。impact job
+   * （層 3 の起動判定）と release の両方がこの同じ規則を使うので、再配備でも層 3 が走る。
+   */
+  redeployDeploymentId = null,
 }) {
   if (!SHA_PATTERN.test(baseSha ?? '')) {
     return { affected: true, reason: 'current production SHA is unknown (fail closed)' };
   }
   if (baseSha === targetSha) {
+    if (redeployDeploymentId) {
+      return {
+        affected: true,
+        reason: `redeploy of ${redeployDeploymentId} requested for ${short(targetSha)}`,
+      };
+    }
     return { affected: false, reason: `already serving ${short(targetSha)}` };
   }
   if (!checkoutAtTarget) {
@@ -348,10 +394,141 @@ function normalizeDeployment(raw) {
     state: raw.readyState ?? raw.state ?? null,
     createdAt: raw.createdAt ?? raw.created ?? null,
     target: raw.target ?? null,
-    // GitHub 連携以外（CLI / API）の deployment はこの値を持たない。
-    // 正規経路の build だけを release 対象にするため、これを必須にする。
+    // GitHub source SHA metadata を持つ deployment だけを release 対象にする。
+    // staged fallback も Vercel の linked Git source から exact SHA を指定する。
     sha: raw.meta?.githubCommitSha ?? null,
+    // 名指しの再配備（§getPinnedDeployment）が「別 project の deployment ではない」ことを
+    // 確かめるために使う。一覧系の応答には無いことがある。
+    projectId: typeof raw.projectId === 'string' ? raw.projectId : null,
   };
+}
+
+/**
+ * 名指しされた deployment を 1 件読み、この run の candidate として受理できるか検証する。
+ *
+ * 受理条件はすべて fail closed（値が読めない時も拒否）:
+ *
+ * - その project の deployment である（他 project の ID を production domain へ載せない）
+ * - GitHub source SHA を持つ production build で、source SHA が release 対象と一致する
+ * - 通常の redeploy は **live より後に作られている。** 同じ commit の deployment は祖先関係で新旧を
+ *   決められないので、ここだけは作成時刻で比べる。env 更新より前の古い build を
+ *   名指しして「再配備」すると、更新したはずの設定が production から消える
+ */
+export async function getPinnedDeployment({
+  projectName,
+  projectId,
+  deploymentId,
+  sha,
+  liveCreatedAt,
+  requireNewerThanLive = true,
+  token,
+  teamId,
+  fetchImpl,
+}) {
+  const raw = await callVercel(
+    apiUrl(`/v13/deployments/${encodeURIComponent(deploymentId)}`, teamId),
+    { token, fetchImpl, label: `deployment(${projectName})` },
+  );
+  const deployment = normalizeDeployment(raw);
+  const refuse = (why) =>
+    new ReleaseError(`${projectName}: refusing to use ${deploymentId} as a candidate: ${why}`);
+
+  if (deployment === null || deployment.id !== deploymentId) {
+    throw refuse('the deployment could not be read');
+  }
+  if (deployment.projectId !== projectId) {
+    throw refuse(`it does not belong to ${projectName}`);
+  }
+  if (deployment.target !== 'production' || deployment.sha !== sha) {
+    throw refuse(`it is not a production build of ${sha}`);
+  }
+  if (
+    requireNewerThanLive &&
+    (typeof deployment.createdAt !== 'number' ||
+      typeof liveCreatedAt !== 'number' ||
+      deployment.createdAt <= liveCreatedAt)
+  ) {
+    throw refuse('it is not newer than the deployment that production serves now');
+  }
+  return deployment;
+}
+
+/**
+ * Vercel の Git hook から候補が作られなかった時に、Production target の staged build を作る。
+ * domain を割り当てず、呼び出し側が受け取った ID を固定して既存の gate へ渡す。
+ */
+export async function createStagedProductionCandidate({
+  projectName,
+  projectId,
+  githubRepoLink,
+  sha,
+  autoAssignCustomDomains,
+  token,
+  teamId,
+  fetchImpl,
+  logger,
+}) {
+  if (!/^[0-9a-f]{40}$/.test(sha ?? '')) {
+    throw new ReleaseError(`${projectName}: refusing staged build for an invalid commit SHA`);
+  }
+  if (autoAssignCustomDomains !== false) {
+    throw new ReleaseError(
+      `${projectName}: refusing staged build because Auto-assign Custom Production Domains is not confirmed disabled`,
+    );
+  }
+
+  const repoId = githubRepoLink?.repoId;
+  const validRepoId =
+    (typeof repoId === 'number' && Number.isSafeInteger(repoId) && repoId > 0) ||
+    (typeof repoId === 'string' && /^[0-9]+$/.test(repoId));
+  if (
+    githubRepoLink?.type?.toLowerCase() !== 'github' ||
+    githubRepoLink?.org?.toLowerCase() !== 'dayopt' ||
+    githubRepoLink?.repo?.toLowerCase() !== 'dayopt' ||
+    githubRepoLink?.productionBranch !== 'main' ||
+    !validRepoId
+  ) {
+    throw new ReleaseError(
+      `${projectName}: expected Dayopt/dayopt GitHub repository on main before creating a staged build`,
+    );
+  }
+
+  const created = await callVercel(apiUrl('/v13/deployments', teamId), {
+    token,
+    fetchImpl,
+    method: 'POST',
+    label: `create-staged-candidate(${projectName})`,
+    body: {
+      name: projectName,
+      project: projectId,
+      target: 'production',
+      gitSource: { type: 'vercel', repoId: String(repoId), sha },
+      gitMetadata: {
+        remoteUrl: 'https://github.com/Dayopt/dayopt',
+        commitRef: 'main',
+        commitSha: sha,
+      },
+    },
+  });
+
+  const deploymentId = created?.uid ?? created?.id;
+  const aliasesAreEmpty =
+    created?.alias === undefined || (Array.isArray(created.alias) && created.alias.length === 0);
+  if (
+    typeof deploymentId !== 'string' ||
+    created?.target !== 'production' ||
+    created?.aliasAssigned !== false ||
+    !aliasesAreEmpty
+  ) {
+    throw new ReleaseError(
+      `${projectName}: Vercel did not confirm an unaliased Production candidate; refusing to continue`,
+    );
+  }
+
+  logger.log(
+    `${projectName}: created staged Production candidate ${deploymentId} for ${short(sha)}`,
+  );
+  return deploymentId;
 }
 
 /** target SHA の production deployment を 1 件返す。無ければ null。 */
@@ -402,6 +579,20 @@ export async function getProjectMeta({ projectName, token, teamId, fetchImpl }) 
     projectId: body.id,
     // promote endpoint がこの設定を書き換えるため、事前値を控えて後で戻す。
     autoAssignCustomDomains: body.autoAssignCustomDomains ?? null,
+    githubRepoLink:
+      body.link && typeof body.link === 'object'
+        ? {
+            type: typeof body.link.type === 'string' ? body.link.type : null,
+            org: typeof body.link.org === 'string' ? body.link.org : null,
+            repo: typeof body.link.repo === 'string' ? body.link.repo : null,
+            productionBranch:
+              typeof body.link.productionBranch === 'string' ? body.link.productionBranch : null,
+            repoId:
+              typeof body.link.repoId === 'string' || typeof body.link.repoId === 'number'
+                ? body.link.repoId
+                : null,
+          }
+        : null,
   };
 }
 
@@ -506,6 +697,11 @@ export async function waitForReadyCandidates({
   logger,
   timeoutMs = READY_TIMEOUT_MS,
   pollMs = READY_POLL_MS,
+  /**
+   * project 名 → `{ deploymentId, projectId, liveCreatedAt }`。載っている project は
+   * 「SHA の最新 deployment」を探さず、名指しの deployment だけを candidate にする。
+   */
+  pinned = new Map(),
 }) {
   const deadline = nowImpl() + timeoutMs;
   const ready = new Map();
@@ -514,13 +710,23 @@ export async function waitForReadyCandidates({
     for (const project of projects) {
       if (ready.has(project.name)) continue;
 
-      const deployment = await findDeploymentForSha({
-        projectName: project.name,
-        sha,
-        token,
-        teamId,
-        fetchImpl,
-      });
+      const pin = pinned.get(project.name);
+      const deployment = pin
+        ? await getPinnedDeployment({
+            projectName: project.name,
+            ...pin,
+            sha,
+            token,
+            teamId,
+            fetchImpl,
+          })
+        : await findDeploymentForSha({
+            projectName: project.name,
+            sha,
+            token,
+            teamId,
+            fetchImpl,
+          });
       if (!deployment) continue;
 
       if (TERMINAL_FAILURE_STATES.has(deployment.state)) {
@@ -545,6 +751,7 @@ export async function waitForReadyCandidates({
         .join(', ');
       throw new ReleaseError(
         `Timed out waiting for READY production builds of ${sha} (pending: ${pending})`,
+        { code: 'candidate_wait_timeout' },
       );
     }
 
@@ -879,6 +1086,17 @@ export function buildManifest({
         if (entry && isOurPrevious && rolled) return 'rolled-back';
 
         // ここから先は「我々の操作の結果ではないものが live」。
+        // 再配備が promote へ届かなかった run。live は run 開始時点のままで、同じ commit
+        // なので下の SHA 比較へ進むと `uncertified`（= 戻せ）と案内してしまう。
+        // `affected` かつ live が target SHA になるのは再配備だけ（通常は unaffected）。
+        if (
+          decision?.affected &&
+          !entry &&
+          effective.id === (live?.id ?? null) &&
+          live?.sha === sha
+        ) {
+          return 'pending';
+        }
         if (effective.sha === sha) return certified ? 'already-serving' : 'uncertified';
         if (effective.id === (live?.id ?? null) && !entry) {
           return decision?.affected ? 'pending' : 'skipped';
@@ -914,7 +1132,7 @@ export function buildManifest({
             ? live.id
             : null),
         // この run が観測していない project の値は run 開始時点のもの。candidate 待機
-        // （最大 25 分）の間に人が Instant Rollback していれば実態とズレる。復旧時に
+        // （最大 30 分）の間に人が Instant Rollback していれば実態とズレる。復旧時に
         // 「いつ観測した値か」を取り違えないよう、出所を値と一緒に残す。
         observedAt: observed || entry ? 'this-run' : 'run-start',
       };
@@ -965,6 +1183,12 @@ export async function runProductionRelease({
    * `force`（break-glass）の時だけこの検査ごと免除する。
    */
   impactAffected = {},
+  /**
+   * 同一 commit の再配備要求 `{ projectName, deploymentId }`（§parseRedeployRequest）。
+   * 名指しの project だけ、live が既に target SHA でも candidate を ID 固定で取り、
+   * 通常と同じ gate（層 3 の検査・smoke・config audit・live 検証）を通して promote する。
+   */
+  redeploy = null,
   // gate が有効な運用（Auto-assign 無効化済み）では false を宣言する。
   // null の間は「run 開始時点の値へ戻す」だけになり、前回 run から持ち越した
   // ドリフトは検出できない。段階適用が終わったら宣言する。
@@ -984,6 +1208,14 @@ export async function runProductionRelease({
   if (!teamId) throw new ReleaseError('VERCEL_TEAM_ID is required for Production Release');
   if (!/^[0-9a-f]{40}$/.test(sha ?? '')) {
     throw new ReleaseError('RELEASE_SHA must be a 40 character commit SHA');
+  }
+  if (redeploy && force) {
+    // 再配備は「通常の検証を維持したまま同じ commit を出し直す」経路。force は検証を
+    // 省くので、組み合わせると env 更新後の build が一度も検証されずに live になる。
+    throw new ReleaseError('A redeploy cannot be combined with Force Promote');
+  }
+  if (redeploy && !projects.some((project) => project.name === redeploy.projectName)) {
+    throw new ReleaseError(`Unknown redeploy project: ${redeploy.projectName}`);
   }
 
   const projectIds = new Map();
@@ -1027,6 +1259,14 @@ export async function runProductionRelease({
     logger.log(`Checkout is not ${sha}; classifying every project as affected (fail closed).`);
   }
 
+  // 名指しの deployment が既に live なら、再配備としてやることは残っていない。通常の
+  // `already serving` 経路へ落とし、そこで smoke と audit を通して認証する。
+  const redeployLive = redeploy ? before.get(redeploy.projectName) : null;
+  const redeployPending = redeploy && redeployLive?.id !== redeploy.deploymentId;
+  if (redeploy && !redeployPending) {
+    logger.log(`${redeploy.projectName}: production already serves ${redeploy.deploymentId}.`);
+  }
+
   const decisions = new Map();
   const decisionLines = [];
   for (const project of projects) {
@@ -1036,6 +1276,8 @@ export async function runProductionRelease({
       targetSha: sha,
       checkoutAtTarget,
       diffFilesImpl,
+      redeployDeploymentId:
+        redeployPending && redeploy.projectName === project.name ? redeploy.deploymentId : null,
     });
     decisions.set(project.name, decision);
     const line = `- ${project.name}: ${decision.affected ? 'affected' : 'skip'} — ${decision.reason}`;
@@ -1044,8 +1286,12 @@ export async function runProductionRelease({
   }
   writeStepSummary(['', '### Impact', '', ...decisionLines]);
 
-  const alreadyServing = projects.filter((project) => before.get(project.name)?.sha === sha);
   const targets = projects.filter((project) => decisions.get(project.name).affected);
+  // 再配備の対象は target SHA を配信していても targets 側に入る。両方へ入れると
+  // 「この run の rollback scope の外」と誤って案内してしまう（§preexistingSplit）。
+  const alreadyServing = projects.filter(
+    (project) => before.get(project.name)?.sha === sha && !targets.includes(project),
+  );
 
   // この run が promote していないのに target SHA が live になった project。
   // 待機中や gate 実行中に外部 actor が同じ candidate を promote した場合に入る。
@@ -1325,6 +1571,28 @@ export async function runProductionRelease({
   let driftRecovery = null;
 
   const result = await (async () => {
+    // 再配備は「live と同じ commit を、別の deployment で出し直す」操作に限る。live が
+    // 別の commit なら通常の dispatch で足りる（影響判定が candidate 選択まで届く）ので、
+    // ID 固定の口を広げない。ここまでは読み取りだけで、production は未変更。
+    //
+    // **判定は `redeployPending` ではなく `redeploy` の有無で行う。** 名指しの ID が既に
+    // live でも、その live が別 commit なら「同じ commit の出し直し」ではない。ID 一致だけで
+    // 素通りさせると `redeployPending` が false になって下の candidate 選択へ落ち、
+    // **運用者が名指ししていない最新 target deployment を promote する**（控えた ID を
+    // dispatch するまでの間に main が進んだ時に起きる）。承認は「この deployment を
+    // 出し直す」であって「別 commit を公開する」ではないので、ここで止める。
+    if (redeploy && redeployLive?.sha !== sha) {
+      throw Object.assign(
+        new ReleaseError(
+          `Refusing to redeploy ${redeploy.deploymentId}: ${redeploy.projectName} serves ` +
+            `${short(redeployLive?.sha)}, not ${short(sha)}. A redeploy only replaces a ` +
+            `deployment of the same commit. Production was left untouched; dispatch without ` +
+            `the redeploy input to release ${short(sha)}.`,
+        ),
+        { manifest: manifestFor('failed') },
+      );
+    }
+
     // ── 層 3 未実行の promote を拒む（#2574）─────────────────────────────
     //
     // impact job（T0）と この script（T1）は **別時刻の live production SHA** を基準に
@@ -1483,16 +1751,97 @@ export async function runProductionRelease({
       };
     }
 
-    const candidates = await waitForReadyCandidates({
-      projects: targets,
-      sha,
-      token,
-      teamId,
-      fetchImpl,
-      sleepImpl,
-      nowImpl,
-      logger,
-    }).catch(async (error) => {
+    const pinnedForRedeploy = redeployPending
+      ? new Map([
+          [
+            redeploy.projectName,
+            {
+              deploymentId: redeploy.deploymentId,
+              projectId: projectIds.get(redeploy.projectName),
+              liveCreatedAt: redeployLive?.createdAt ?? null,
+            },
+          ],
+        ])
+      : new Map();
+    const waitForCandidates = ({ timeoutMs, pinned = pinnedForRedeploy }) =>
+      waitForReadyCandidates({
+        projects: targets,
+        sha,
+        token,
+        teamId,
+        fetchImpl,
+        sleepImpl,
+        nowImpl,
+        logger,
+        timeoutMs,
+        pinned,
+      });
+    const candidates = await (async () => {
+      try {
+        return await waitForCandidates({
+          timeoutMs: redeployPending ? READY_TIMEOUT_MS : CANDIDATE_GRACE_TIMEOUT_MS,
+        });
+      } catch (error) {
+        if (error?.code !== 'candidate_wait_timeout' || redeployPending) throw error;
+
+        // Candidate が無い project だけ Vercel Git source から staged Production build を作る。
+        // まず再読込し、通常 hook の遅延到着や build 中 deployment との二重作成を避ける。
+        const pinned = new Map();
+        for (const project of targets) {
+          const existing = await findDeploymentForSha({
+            projectName: project.name,
+            sha,
+            token,
+            teamId,
+            fetchImpl,
+          });
+          const liveAtStart = before.get(project.name);
+          let deploymentId = existing?.id;
+          const projectId = projectIds.get(project.name);
+
+          if (!existing) {
+            // 5 分の待機中に project link / domain 設定が変わっていないか、作成直前に
+            // 再読込する。初回 snapshot のみを信じた staged build は許可しない。
+            const latestMeta = await getProjectMeta({
+              projectName: project.name,
+              token,
+              teamId,
+              fetchImpl,
+            });
+            if (latestMeta.projectId !== projectId) {
+              throw new ReleaseError(
+                `${project.name}: Vercel project id changed while waiting for a candidate`,
+              );
+            }
+            deploymentId = await createStagedProductionCandidate({
+              projectName: project.name,
+              projectId,
+              githubRepoLink: latestMeta.githubRepoLink,
+              sha,
+              autoAssignCustomDomains: latestMeta.autoAssignCustomDomains,
+              token,
+              teamId,
+              fetchImpl,
+              logger,
+            });
+          }
+
+          if (existing) {
+            logger.log(
+              `${project.name}: found Git candidate ${deploymentId} after grace; pinning it`,
+            );
+          }
+          pinned.set(project.name, {
+            deploymentId,
+            projectId,
+            liveCreatedAt: liveAtStart?.createdAt ?? null,
+            requireNewerThanLive: Boolean(liveAtStart),
+          });
+        }
+
+        return waitForCandidates({ timeoutMs: READY_TIMEOUT_MS, pinned });
+      }
+    })().catch(async (error) => {
       // 片方が READY で自動割当された一方、もう片方が timeout / ERROR というケース。
       // run 開始時点の snapshot だけで manifest を作ると、live になった候補が
       // `pending` として載り、runbook が「production は無傷」と案内する。
@@ -1500,7 +1849,7 @@ export async function runProductionRelease({
       throw Object.assign(error, { manifest: manifestFor('failed') });
     });
 
-    // 待機は最大 25 分ブロックする。その間に人が Instant Rollback や手動 promote を
+    // 候補待機は最大 30 分ブロックする。その間に人が Instant Rollback や手動 promote を
     // 行いうるため、判定は待機後の実状態で行う。unaffected な project は promote 対象で
     // ないので読み直さない（この run が動かさない先の状態は before で足りる）。
     const current = new Map();
@@ -1515,7 +1864,7 @@ export async function runProductionRelease({
       }
     };
     for (const project of targets) {
-      // 25 分待った後の失敗。ここで manifest を付けずに抜けると、artifact が
+      // 候補待ちの後の失敗。ここで manifest を付けずに抜けると、artifact が
       // 1 つも残らない（run 開始時点の状態すら読めなくなる）。
       const state = await getLiveProduction({
         projectName: project.name,
@@ -2337,21 +2686,26 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     RELEASE_PROJECTS.map((project) => [project.name, process.env[project.bypassEnv]]),
   );
 
-  runProductionRelease({
-    sha: process.env.RELEASE_SHA,
-    token: process.env.VERCEL_TOKEN,
-    teamId: process.env.VERCEL_TEAM_ID,
-    force: process.env.RELEASE_FORCE === 'true',
-    impactAffected: readImpactAffected(),
-    expectedAutoAssign:
-      process.env.RELEASE_EXPECT_AUTO_ASSIGN === 'false'
-        ? false
-        : process.env.RELEASE_EXPECT_AUTO_ASSIGN === 'true'
-          ? true
-          : null,
-    simulateFailure: process.env.RELEASE_SIMULATE_FAILURE ?? '',
-    bypassSecrets,
-  })
+  // 入力の解釈（parseRedeployRequest）が throw しても下の catch で失敗 status を残す。
+  Promise.resolve()
+    .then(() =>
+      runProductionRelease({
+        sha: process.env.RELEASE_SHA,
+        token: process.env.VERCEL_TOKEN,
+        teamId: process.env.VERCEL_TEAM_ID,
+        force: process.env.RELEASE_FORCE === 'true',
+        impactAffected: readImpactAffected(),
+        redeploy: parseRedeployRequest(process.env.RELEASE_REDEPLOY),
+        expectedAutoAssign:
+          process.env.RELEASE_EXPECT_AUTO_ASSIGN === 'false'
+            ? false
+            : process.env.RELEASE_EXPECT_AUTO_ASSIGN === 'true'
+              ? true
+              : null,
+        simulateFailure: process.env.RELEASE_SIMULATE_FAILURE ?? '',
+        bypassSecrets,
+      }),
+    )
     .then((result) => {
       writeStepSummary(summarize(result));
       writeReleaseManifest(result.manifest);

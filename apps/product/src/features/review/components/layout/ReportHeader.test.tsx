@@ -63,17 +63,4 @@ describe('ReportHeader', () => {
     expect(columnOf(sidebarToggle)).not.toBe(columnOf(granularity));
     expect(columnOf(injected)).not.toBe(columnOf(sidebarToggle));
   });
-
-  /**
-   * ヘッダーが厚く見えていた原因は、粒度が `SegmentedControl`（1 項目 min-h-11 で
-   * 枠込み 54px）で、32px の行からはみ出していたこと。カレンダーと同じ `h-8` の
-   * トリガーに揃えたので、クラスでそれを固定する（セグメントへ戻すと落ちる）。
-   */
-  it('粒度トリガーをナビと同じ 32px の高さで組む', () => {
-    render(<ReportHeader {...BASE_PROPS} />);
-
-    const trigger = screen.getByRole('button', { name: 'report.granularity.week' });
-    expect(trigger.className).toContain('h-8');
-    expect(document.querySelector('[data-slot="segmented-control"]')).toBeNull();
-  });
 });

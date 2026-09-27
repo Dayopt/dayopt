@@ -31,6 +31,7 @@ import {
   VALIDATION_STATUS_CONTEXT,
   evaluateValidation,
   formatValidationResult,
+  resolveSelfProducedAfterReview,
   toCommitStatus,
 } from '../lib/validation-evidence.mjs';
 import { createValidationPlan } from '../lib/validation-plan.mjs';
@@ -721,8 +722,11 @@ export function runValidationGate({
       plan,
       evidence: reviewEvidence,
       now: now(),
-      validationVerdict: result.verdict,
+      // Validation の verdict は self-produced を安全に blocked のまま保つ。一方、review は
+      // native required job の完了を timing signal として、guardrail 自身も候補へ残す。
+      validationVerdict: result.reviewCandidateReady ? 'satisfied' : result.verdict,
     });
+    result = resolveSelfProducedAfterReview(result, review);
     const summary = formatValidationResult(result) + '\n' + formatReviewPolicy(review);
     output(summary);
     if (env.GITHUB_STEP_SUMMARY) appendFileSync(env.GITHUB_STEP_SUMMARY, summary);

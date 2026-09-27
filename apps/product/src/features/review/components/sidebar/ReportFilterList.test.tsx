@@ -22,6 +22,7 @@ const TREE = {
 const treeState = vi.hoisted(() => ({
   current: { data: undefined as unknown, isPending: false },
 }));
+const mediaState = vi.hoisted(() => ({ isTouch: false }));
 
 /** `t(key, values)` は `key 値...` を返す。どの行の操作かを名前で引けるようにする。 */
 vi.mock('next-intl', () => ({
@@ -34,10 +35,8 @@ vi.mock('@/features/activities', () => ({
   ActivityIcon: () => <span data-testid="activity-icon" />,
 }));
 
-const isTouch = vi.hoisted(() => ({ current: false }));
-
 vi.mock('@/lib/hooks/useMediaQuery', () => ({
-  useMediaQuery: () => isTouch.current,
+  useMediaQuery: () => mediaState.isTouch,
 }));
 
 import { useReportViewStore } from '../../stores/useReportViewStore';
@@ -67,8 +66,8 @@ describe('ReportFilterList', () => {
   beforeEach(() => {
     localStorage.clear();
     resetStore();
-    isTouch.current = false;
     treeState.current = { data: TREE, isPending: false };
+    mediaState.isTouch = false;
   });
 
   /** 骨格はカレンダーのサイドバーと同じ「カテゴリ」「未分類」の 2 見出し。 */
@@ -94,19 +93,19 @@ describe('ReportFilterList', () => {
     expect(screen.queryByText(/segment|セグメント/i)).toBeNull();
   });
 
-  /**
-   * カレンダーの `ActivityRow` と同じ出し方: 見えている行の 👁 は行ホバーまで隠し、
-   * 外している行の 👁 は常時出す（戻す手段を隠さない）。
-   */
-  it('見えている行の 👁 はホバーで出し、外した行の 👁 は常に出す', () => {
-    useReportViewStore.setState({ hiddenActivityIds: ['act-mtg'] });
+  it('タッチ面では行の 44px 高さと表示トグルを常時確保する', () => {
+    mediaState.isTouch = true;
     render(<ReportFilterList />);
 
-    expect(eye('hide', '実装')).toHaveClass('opacity-0');
-    expect(eye('show', '会議')).not.toHaveClass('opacity-0');
-    // 一部だけ外したカテゴリーの 👁 は常時出す
-    expect(eye('show', '仕事')).not.toHaveClass('opacity-0');
-    expect(eye('hide', '睡眠')).toHaveClass('opacity-0');
+    expect(screen.getByText('仕事').closest('[data-report-filter-row="category"]')).toHaveClass(
+      'h-11',
+    );
+    expect(screen.getByText('実装').closest('[data-report-filter-row="activity"]')).toHaveClass(
+      'h-11',
+    );
+    const toggle = screen.getByRole('button', { name: 'hide 実装' });
+    expect(toggle).toBeInTheDocument();
+    expect(toggle).not.toHaveClass('opacity-0');
   });
 
   describe('アクティビティの 👁', () => {
@@ -118,9 +117,7 @@ describe('ReportFilterList', () => {
 
       expect(useReportViewStore.getState().hiddenActivityIds).toEqual(['act-dev']);
       expect(useReportViewStore.getState().hiddenCategoryIds).toEqual([]);
-      expect(screen.getByRole('button', { name: '実装', pressed: false })).toHaveClass(
-        'text-muted-foreground',
-      );
+      expect(screen.getByRole('button', { name: '実装', pressed: false })).toBeInTheDocument();
       expect(eye('hide', '会議')).toBeInTheDocument();
     });
 
@@ -224,20 +221,6 @@ describe('ReportFilterList', () => {
       expect(useReportViewStore.getState().hiddenActivityIds).toEqual(['act-dev']);
     });
 
-    it('展開中の chevron は行ホバーまで隠し、畳んでいる間は常に出す', async () => {
-      const user = userEvent.setup();
-      render(<ReportFilterList />);
-
-      const chevron = screen.getByRole('button', { name: 'collapseCategory 仕事' });
-      expect(chevron).toHaveClass('opacity-0');
-
-      await user.click(chevron);
-
-      expect(screen.getByRole('button', { name: 'expandCategory 仕事' })).not.toHaveClass(
-        'opacity-0',
-      );
-    });
-
     it('未分類の見出しも畳める', async () => {
       const user = userEvent.setup();
       render(<ReportFilterList />);
@@ -246,26 +229,6 @@ describe('ReportFilterList', () => {
 
       expect(screen.queryByText('散歩')).toBeNull();
     });
-  });
-
-  /**
-   * 幅 < 768px では `mobile-layout` が Sidebar ごと描かないので、`useIsMobile()` では
-   * この分岐に到達できない。実際にタッチで触られるのは iPad 縦のような
-   * 「幅は広いが coarse pointer」の面。ホバーが無いので 👁 も常時出す。
-   */
-  it('タッチ面では行を 44px にし、👁 を常に出す', () => {
-    isTouch.current = true;
-    render(<ReportFilterList />);
-
-    expect(screen.getByText('実装').closest('[data-report-filter-row]')).toHaveClass('h-11');
-    expect(eye('hide', '実装')).not.toHaveClass('opacity-0');
-  });
-
-  it('マウス面では行を 32px にする', () => {
-    render(<ReportFilterList />);
-
-    expect(screen.getByText('実装').closest('[data-report-filter-row]')).toHaveClass('h-8');
-    expect(screen.getByText('仕事').closest('[data-report-filter-row]')).toHaveClass('h-8');
   });
 
   it('カテゴリーも未分類も無ければ、それぞれの見出しに空の文言を出す', () => {

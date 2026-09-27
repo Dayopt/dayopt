@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -7,6 +8,7 @@ import { resolveProtectedPathGate } from '../ci/protected-path-gate.mjs';
 import { resolveFactoryRoute } from '../lib/factory-routing.mjs';
 import { REPO, runGh, runGhJson } from '../lib/gh.mjs';
 import { isDirectExecution } from '../lib/is-direct-execution.mjs';
+import { buildContextInput } from '../lib/jev-assist-context.mjs';
 
 /**
  * Codex GitHub 連携 bot の login。GraphQL の `author.login` は
@@ -22,12 +24,15 @@ function isCodexBotLogin(login) {
 }
 
 /**
- * `pnpm ctx <N>` — L0 の「context pack」（AGENTS.md 委任・報告の作法 §L0、
- * routing skill §Worker recipe / L0）。
+ * `pnpm ctx <N>` — L0 の機械収集に、同一入力snapshotを確認したBriefのJev L1助言を添える。
+ * 通常の読み取りはJev APIを呼ばず、信頼済みBriefから一致するL1だけを再利用する。
+ * `--post` はdispatch用にJev L1を生成してBriefへ配達する。
+ * `--l1-shadow` は明示的なローカルpreview用。`--reuse-brief-l1` は通常読取の意図を明示する。
  *
  * Uber 原則⑤「AI が考える前に機械的に集められる文脈はここで終える」の Dayopt 写像。
  * AI セッションが issue / PR に着手する前に行う `gh issue view` / `gh pr list` /
- * `rg` / `Read` の 5〜10 手番を、gh の追加呼び出しなしで完結する 1 コマンドへ畳む。
+ * `rg` / `Read` の 5〜10 手番を、L0の機械収集とBrief内L1の出典付き候補にまとめる。
+ * Jev assistはdispatch時の `--post` か明示的な `--l1-shadow` previewでだけ実行する。
  * 出力は 150 行以内の markdown、判断そのものはしない（判断材料の収集で止める）。
  *
  * 呼び出し予算: issue は最大 6 回、PR は最大 9 回の gh 呼び出しに収める
@@ -46,6 +51,7 @@ const [REPO_OWNER, REPO_NAME] = REPO.split('/');
  * ファイル先頭で定義する（元は --post セクションにあったが、独立性ガード（F2）で
  * 上流の selectComments からも参照するようになった）。 */
 export const CTX_MARKER = '<!-- ctx-brief -->';
+const CTX_L1_MARKER_PREFIX = '<!-- ctx-l1-v1:';
 
 // F2（独立性ガード）: Main 自身が書いた marker / brief コメントが reviewer への
 // ctx pack へ紛れ込むと、Main の判断が「独立レビュー」を経由せず reviewer の入力へ
@@ -64,7 +70,9 @@ const OWN_MARKER_PREFIXES = [
 
 /** body が Main 自身の marker / brief コメントで始まるか。 */
 function isOwnMarkerComment(body) {
-  return typeof body === 'string' && OWN_MARKER_PREFIXES.some((prefix) => body.startsWith(prefix));
+  if (typeof body !== 'string') return false;
+  if (body.startsWith(CTX_MARKER)) return false;
+  return OWN_MARKER_PREFIXES.slice(1).some((prefix) => body.startsWith(prefix));
 }
 
 // F2: findMarkerComment / detectJudgmentRecords の brief 判定は、なりすまし防止のため
@@ -82,6 +90,507 @@ function isTrustedMarkerComment(comment) {
   );
 }
 
+/**
+ * Stable JSON for a source snapshot. Trusted ctx-brief comments are removed at every level so
+ * posting the brief cannot change the input identity it records. Untrusted marker lookalikes stay.
+ */
+function canonicalSnapshotValue(value) {
+  if (Array.isArray(value)) {
+    return value
+      .filter((item) => !isTrustedMarkerComment(item))
+      .map((item) => canonicalSnapshotValue(item));
+  }
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value)
+        .filter(([, item]) => item !== undefined)
+        .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+        .map(([key, item]) => [key, canonicalSnapshotValue(item)]),
+    );
+  }
+  return value;
+}
+
+/** Hashes source material independently of its key order and trusted self-generated brief comments. */
+export function computeContextSnapshotId(sourceMaterial) {
+  return createHash('sha256')
+    .update(JSON.stringify(canonicalSnapshotValue(sourceMaterial)))
+    .digest('hex');
+}
+
+const BRIEF_L1_CATEGORIES = new Set([
+  'decision',
+  'constraint',
+  'open_question',
+  'verification_result',
+  'status_only',
+]);
+const BRIEF_L1_FAILURES = new Set([
+  'auth_failed',
+  'balance_below_floor',
+  'balance_unknown',
+  'budget_exceeded',
+  'customer_verification_required',
+  'deferred_after_failure',
+  'deferred_after_live',
+  'disabled',
+  'free_tier_restricted',
+  'insufficient_credits',
+  'input_too_large',
+  'invalid_response',
+  'invalid_request',
+  'missing_credentials',
+  'not_cached',
+  'provider_error',
+  'rate_limited',
+  'timeout',
+  'budget_unavailable',
+  'budget_below_floor',
+  'cooldown',
+  'rate_locked',
+  'rate_state_invalid',
+  'rate_state_unreadable',
+  'rate_state_unwritable',
+  'budget_exhausted',
+  'low_confidence',
+  'cache_invalid',
+  'incomplete',
+]);
+
+function isCanonicalBriefSourceUrl(value) {
+  try {
+    const url = new URL(value);
+    return (
+      url.origin === 'https://github.com' &&
+      !url.username &&
+      !url.password &&
+      url.pathname.startsWith('/Dayopt/dayopt/')
+    );
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Makes a bounded L1 annotation view from an already available report. An adoption record, complete
+ * evaluation, sufficient confidence, and an L0 source reference are all required. Model-authored
+ * prose, URLs, SHAs, and verification claims are intentionally discarded.
+ * @param {{packId: string, adoptedPackIds?: string[], complete?: boolean, failure?: string,
+ * rows?: Array<{id: string, relevance: number, category: string, evaluatedAt: string, confidence: number}>,
+ * sources?: Array<{id: string, url: string}>, minimumConfidence?: number}} input
+ */
+export function buildBriefAnnotations({
+  packId,
+  adoptedPackIds = [],
+  complete = false,
+  failure = 'incomplete',
+  rows = [],
+  sources = [],
+  minimumConfidence = 0.7,
+}) {
+  if (!adoptedPackIds.includes(packId)) return { status: 'not_adopted', rows: [] };
+  if (!complete || !Array.isArray(rows) || !Array.isArray(sources)) {
+    const reason = BRIEF_L1_FAILURES.has(failure) ? failure : 'incomplete';
+    return { status: 'unevaluated', reason, rows: [] };
+  }
+
+  const sourceById = new Map(sources.map((source) => [source.id, source]));
+  const normalized = [];
+  for (const row of rows) {
+    const confidence = row?.confidence;
+    if (
+      typeof confidence !== 'number' ||
+      !Number.isFinite(confidence) ||
+      confidence < minimumConfidence ||
+      confidence > 1
+    )
+      return { status: 'unevaluated', reason: 'low_confidence', rows: [] };
+    const source = sourceById.get(row?.id);
+    if (
+      !source ||
+      typeof source.url !== 'string' ||
+      !isCanonicalBriefSourceUrl(source.url) ||
+      !Number.isFinite(row?.relevance) ||
+      row.relevance < 0 ||
+      row.relevance > 1 ||
+      !BRIEF_L1_CATEGORIES.has(row?.category) ||
+      typeof row?.evaluatedAt !== 'string' ||
+      !Number.isFinite(Date.parse(row.evaluatedAt))
+    )
+      return { status: 'unevaluated', reason: 'incomplete', rows: [] };
+    normalized.push({
+      sourceId: row.id,
+      url: source.url,
+      category: row.category,
+      relevance: row.relevance,
+      evaluatedAt: row.evaluatedAt,
+    });
+  }
+  return { status: 'adopted', rows: normalized };
+}
+
+const L1_CATEGORY_LABELS = {
+  constraint: '制約',
+  decision: '決定',
+  open_question: '未解決の問い',
+  verification_result: '検証結果',
+  status_only: '進捗',
+};
+const L1_CATEGORY_WEIGHT = {
+  constraint: 4,
+  decision: 3,
+  open_question: 2,
+  verification_result: 1,
+  status_only: 0,
+};
+
+/**
+ * Creates non-authoritative L1 advice after confirming the Jev report used the exact context
+ * input collected for this L0 run. The result is included in explicit previews and --post briefs.
+ */
+export function buildL1ShadowPreview(report, expectedInput) {
+  if (
+    report?.packId !== 'context-relevance' ||
+    report?.mode !== 'shadow' ||
+    report?.target?.number !== expectedInput?.number ||
+    report?.target?.sha !== expectedInput?.sha ||
+    report?.target?.url !== expectedInput?.url ||
+    !report?.input ||
+    computeContextSnapshotId(report.input) !== computeContextSnapshotId(expectedInput) ||
+    !Array.isArray(report.rows) ||
+    !Array.isArray(report.omitted) ||
+    !Array.isArray(report.missing)
+  )
+    return {
+      status: 'snapshot_mismatch',
+      evaluatedCount: 0,
+      selectedCount: 0,
+      omittedCount: 0,
+      candidates: [],
+    };
+
+  const sourceById = new Map(
+    expectedInput.candidates.map((candidate) => [candidate.id, candidate]),
+  );
+  const rows = [];
+  let invalidCount = 0;
+  for (const row of report.rows) {
+    const source = sourceById.get(row?.id);
+    const valid =
+      source &&
+      typeof source.id === 'string' &&
+      /^[a-zA-Z0-9_-]{1,80}$/.test(source.id) &&
+      isCanonicalBriefSourceUrl(source.url) &&
+      typeof row?.relevance === 'number' &&
+      Number.isFinite(row.relevance) &&
+      row.relevance >= 0 &&
+      row.relevance <= 1 &&
+      typeof row?.category === 'string' &&
+      Object.hasOwn(L1_CATEGORY_LABELS, row.category) &&
+      typeof row?.evaluatedAt === 'string' &&
+      Number.isFinite(Date.parse(row.evaluatedAt));
+    if (!valid) {
+      invalidCount += 1;
+      continue;
+    }
+    rows.push({
+      id: source.id,
+      url: source.url,
+      updatedAt: source.updatedAt,
+      category: row.category,
+      categoryLabel: L1_CATEGORY_LABELS[row.category],
+      evaluatedAt: row.evaluatedAt,
+      relevance: row.relevance,
+    });
+  }
+  rows.sort(
+    (a, b) =>
+      b.relevance - a.relevance ||
+      (L1_CATEGORY_WEIGHT[b.category] ?? 0) - (L1_CATEGORY_WEIGHT[a.category] ?? 0) ||
+      b.updatedAt.localeCompare(a.updatedAt) ||
+      a.id.localeCompare(b.id),
+  );
+
+  const complete = report.complete === true && report.missing.length === 0 && invalidCount === 0;
+  const evaluatedCount = rows.length;
+  return {
+    status: complete ? 'complete' : evaluatedCount > 0 ? 'partial' : 'unevaluated',
+    reason: complete
+      ? null
+      : BRIEF_L1_FAILURES.has(report.rows.find((row) => row?.reason)?.reason)
+        ? report.rows.find((row) => row?.reason)?.reason
+        : 'incomplete',
+    evaluatedCount,
+    selectedCount: report.rows.length,
+    omittedCount: report.omitted.length,
+    candidates: rows.slice(0, 5).map(({ relevance: _relevance, ...candidate }) => candidate),
+  };
+}
+
+/**
+ * Calls the existing Jev shadow entrypoint with argv (never a shell) and parses its JSON report.
+ * @param {number} number
+ * @param {{cwd?: string, execFileImpl?: (file: string, args: string[], options: import('node:child_process').ExecFileSyncOptionsWithStringEncoding) => string}} [options]
+ */
+export function runContextL1ShadowAssist(
+  number,
+  { cwd = process.cwd(), execFileImpl = execFileSync } = {},
+) {
+  const stdout = execFileImpl(
+    join(cwd, 'node_modules', '.bin', 'tsx'),
+    ['scripts/tasks/jev/assist.ts', 'context', '--issue', String(number), '--json'],
+    { cwd, encoding: 'utf8', maxBuffer: 2_000_000 },
+  );
+  return JSON.parse(stdout);
+}
+
+function l1ShadowUnavailable(reason = 'assist_unavailable') {
+  return {
+    status: 'unavailable',
+    reason,
+    evaluatedCount: 0,
+    selectedCount: 0,
+    omittedCount: 0,
+    candidates: [],
+  };
+}
+
+function renderL1ShadowPreview(preview) {
+  const lines = [
+    '',
+    '#### L1 Jev 候補（shadow助言）',
+    '',
+    'Codexの作業入力へ渡す助言情報（shadow）。Issueの要求・必須条件・policy・検証条件を変更せず、最終判断もしません。候補から外れた資料を無関係とはみなしません。',
+  ];
+  if (preview.source === 'trusted_brief')
+    lines.push(
+      '信頼済みctx-briefから再利用（Issue入力snapshotと公開HEADの一致を確認済み。Jev APIは呼び出していません）。',
+    );
+  if (preview.status === 'complete') {
+    lines.push(
+      `Jevが選択した ${preview.selectedCount} 件を整理。候補を最大5件表示（別枠の対象外 ${preview.omittedCount} 件は未整理）。`,
+    );
+  } else if (preview.status === 'partial') {
+    lines.push(
+      `部分評価 ${preview.evaluatedCount}/${preview.selectedCount} 件。以下は暫定候補で、全体順位ではありません（対象外 ${preview.omittedCount} 件）。`,
+    );
+  } else if (preview.status === 'unevaluated') {
+    lines.push(`未評価（${preview.reason ?? 'incomplete'}）。候補順位を表示していません。`);
+  } else if (preview.status === 'snapshot_mismatch') {
+    lines.push(
+      'L0とJevの入力snapshotが一致しないため、候補を表示していません。再実行してください。',
+    );
+  } else {
+    lines.push(
+      `Jevのshadow結果を取得できません（${preview.reason ?? 'assist_unavailable'}）。L0の結果はそのまま利用できます。`,
+    );
+  }
+  for (const row of preview.candidates ?? [])
+    lines.push(`- [${row.id}](${row.url}) | ${row.categoryLabel} | 読む候補（shadow）`);
+  if (preview.status === 'complete' && preview.evaluatedCount === 0)
+    lines.push('候補はありません。これは問題や関連資料が無いことの証明ではありません。');
+  return lines;
+}
+
+function briefL1MetadataForPack(pack) {
+  const preview = pack?.l1ShadowPreview;
+  const target = preview?.target;
+  const candidates = preview?.candidates;
+  if (
+    !pack?.snapshotId ||
+    !Number.isSafeInteger(pack.number) ||
+    !/^[a-f0-9]{64}$/.test(pack.snapshotId) ||
+    !Number.isSafeInteger(target?.number) ||
+    target.number !== pack.number ||
+    !/^[a-f0-9]{40}$/.test(target?.sha ?? '') ||
+    !isCanonicalBriefSourceUrl(target?.url) ||
+    !['complete', 'partial', 'unevaluated'].includes(preview?.status) ||
+    !Number.isSafeInteger(preview.evaluatedCount) ||
+    preview.evaluatedCount < 0 ||
+    !Number.isSafeInteger(preview.selectedCount) ||
+    preview.selectedCount < preview.evaluatedCount ||
+    preview.selectedCount > 24 ||
+    !Number.isSafeInteger(preview.omittedCount) ||
+    preview.omittedCount < 0 ||
+    preview.omittedCount > 10_000 ||
+    !Array.isArray(candidates) ||
+    candidates.length > 5 ||
+    candidates.length > preview.evaluatedCount ||
+    (preview.status === 'complete' && preview.evaluatedCount !== preview.selectedCount) ||
+    (preview.status === 'partial' && preview.evaluatedCount >= preview.selectedCount) ||
+    (preview.status === 'unevaluated' && preview.evaluatedCount !== 0) ||
+    (preview.reason !== null &&
+      preview.reason !== undefined &&
+      !BRIEF_L1_FAILURES.has(preview.reason))
+  )
+    return null;
+
+  const safeCandidates = [];
+  for (const candidate of candidates) {
+    if (
+      !/^[a-zA-Z0-9_-]{1,80}$/.test(candidate?.id ?? '') ||
+      !isCanonicalBriefSourceUrl(candidate?.url) ||
+      !Object.hasOwn(L1_CATEGORY_LABELS, candidate?.category) ||
+      typeof candidate?.evaluatedAt !== 'string' ||
+      !isIsoTimestamp(candidate.evaluatedAt)
+    )
+      return null;
+    safeCandidates.push({
+      id: candidate.id,
+      url: candidate.url,
+      updatedAt: candidate.updatedAt,
+      category: candidate.category,
+      evaluatedAt: candidate.evaluatedAt,
+    });
+  }
+
+  return {
+    schemaVersion: 1,
+    issueNumber: pack.number,
+    snapshotId: pack.snapshotId,
+    target: { number: target.number, sha: target.sha, url: target.url },
+    preview: {
+      status: preview.status,
+      reason: preview.reason ?? null,
+      evaluatedCount: preview.evaluatedCount,
+      selectedCount: preview.selectedCount,
+      omittedCount: preview.omittedCount,
+      candidates: safeCandidates,
+    },
+  };
+}
+
+function isIsoTimestamp(value) {
+  return (
+    typeof value === 'string' &&
+    value.length <= 40 &&
+    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/.test(value) &&
+    Number.isFinite(Date.parse(value))
+  );
+}
+
+function encodeBriefL1Metadata(pack) {
+  const metadata = briefL1MetadataForPack(pack);
+  if (!metadata) return null;
+  return `${CTX_L1_MARKER_PREFIX}${Buffer.from(JSON.stringify(metadata)).toString('base64url')} -->`;
+}
+
+function decodeBriefL1Metadata(body) {
+  if (typeof body !== 'string') return null;
+  const match = body.match(/^<!-- ctx-l1-v1:([A-Za-z0-9_-]{8,12000}) -->$/m);
+  if (!match) return null;
+  try {
+    const json = Buffer.from(match[1], 'base64url').toString('utf8');
+    if (Buffer.from(json).toString('base64url') !== match[1]) return null;
+    const value = JSON.parse(json);
+    return value && typeof value === 'object' ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Reuses L1 only from the current GitHub user when its issue, snapshot, URL and HEAD match. */
+export function findReusableBriefL1Preview(comments, expected) {
+  if (
+    !Array.isArray(comments) ||
+    !Number.isSafeInteger(expected?.number) ||
+    typeof expected?.authLogin !== 'string' ||
+    expected.authLogin.length === 0 ||
+    !/^[a-f0-9]{64}$/.test(expected?.snapshotId ?? '') ||
+    !/^[a-f0-9]{40}$/.test(expected?.sha ?? '') ||
+    !isCanonicalBriefSourceUrl(expected?.url) ||
+    !Array.isArray(expected?.candidates)
+  )
+    return null;
+
+  const sourceById = new Map(expected.candidates.map((candidate) => [candidate.id, candidate]));
+  for (const comment of [...comments].reverse()) {
+    if (
+      !isTrustedMarkerComment(comment) ||
+      comment.user?.login?.toLowerCase() !== expected.authLogin.toLowerCase()
+    )
+      continue;
+    const metadata = decodeBriefL1Metadata(comment.body);
+    if (
+      metadata?.schemaVersion !== 1 ||
+      metadata?.issueNumber !== expected.number ||
+      metadata?.snapshotId !== expected.snapshotId ||
+      metadata?.target?.number !== expected.number ||
+      metadata?.target?.sha !== expected.sha ||
+      metadata?.target?.url !== expected.url
+    )
+      continue;
+
+    const preview = metadata.preview;
+    if (
+      !['complete', 'partial', 'unevaluated'].includes(preview?.status) ||
+      !Number.isSafeInteger(preview.evaluatedCount) ||
+      preview.evaluatedCount < 0 ||
+      !Number.isSafeInteger(preview.selectedCount) ||
+      preview.selectedCount < preview.evaluatedCount ||
+      preview.selectedCount > 24 ||
+      !Number.isSafeInteger(preview.omittedCount) ||
+      preview.omittedCount < 0 ||
+      preview.omittedCount > 10_000 ||
+      !Array.isArray(preview.candidates) ||
+      preview.candidates.length > 5 ||
+      preview.candidates.length > preview.evaluatedCount ||
+      (preview.status === 'complete' && preview.evaluatedCount !== preview.selectedCount) ||
+      (preview.status === 'partial' && preview.evaluatedCount >= preview.selectedCount) ||
+      (preview.status === 'unevaluated' && preview.evaluatedCount !== 0) ||
+      (preview.reason !== null &&
+        preview.reason !== undefined &&
+        !BRIEF_L1_FAILURES.has(preview.reason))
+    )
+      continue;
+
+    const candidates = [];
+    const seenIds = new Set();
+    let invalid = false;
+    for (const candidate of preview.candidates) {
+      const source = sourceById.get(candidate?.id);
+      if (
+        !source ||
+        seenIds.has(candidate.id) ||
+        source.url !== candidate.url ||
+        !isCanonicalBriefSourceUrl(source.url) ||
+        !Object.hasOwn(L1_CATEGORY_LABELS, candidate.category) ||
+        !isIsoTimestamp(candidate.evaluatedAt)
+      ) {
+        invalid = true;
+        break;
+      }
+      seenIds.add(candidate.id);
+      candidates.push({
+        id: source.id,
+        url: source.url,
+        updatedAt: source.updatedAt,
+        category: candidate.category,
+        categoryLabel: L1_CATEGORY_LABELS[candidate.category],
+        evaluatedAt: candidate.evaluatedAt,
+      });
+    }
+    if (invalid) continue;
+
+    return {
+      status: preview.status,
+      reason: preview.reason ?? null,
+      evaluatedCount: preview.evaluatedCount,
+      selectedCount: preview.selectedCount,
+      omittedCount: preview.omittedCount,
+      candidates,
+      source: 'trusted_brief',
+      snapshotId: metadata.snapshotId,
+      target: {
+        number: metadata.target.number,
+        sha: metadata.target.sha,
+        url: metadata.target.url,
+      },
+    };
+  }
+  return null;
+}
+
 // --- 純関数群（test 対象） -------------------------------------------------
 
 /** CLI 引数を解釈する。位置引数は issue/PR 番号 1 つのみ。 */
@@ -93,6 +602,8 @@ export function parseArgs(argv) {
     bodyLines: 60,
     allComments: false,
     post: false,
+    l1Shadow: false,
+    reuseBriefL1: false,
   };
   const positionals = [];
   for (let i = 0; i < argv.length; i += 1) {
@@ -103,6 +614,10 @@ export function parseArgs(argv) {
       options.allComments = true;
     } else if (arg === '--post') {
       options.post = true;
+    } else if (arg === '--l1-shadow') {
+      options.l1Shadow = true;
+    } else if (arg === '--reuse-brief-l1') {
+      options.reuseBriefL1 = true;
     } else if (arg === '--comments') {
       options.comments = Number(argv[i + 1]);
       i += 1;
@@ -111,7 +626,7 @@ export function parseArgs(argv) {
       i += 1;
     } else if (arg.startsWith('--')) {
       throw new Error(
-        `未知の引数です: ${arg}（--json / --comments / --body-lines / --all-comments / --post のみ）`,
+        `未知の引数です: ${arg}（--json / --comments / --body-lines / --all-comments / --post / --l1-shadow / --reuse-brief-l1 のみ）`,
       );
     } else {
       positionals.push(arg);
@@ -132,6 +647,14 @@ export function parseArgs(argv) {
   }
   options.number = number;
   return options;
+}
+
+/** Resolve the CLI default to API-free Brief reuse; generation is explicit at dispatch. */
+export function resolveContextL1Mode(options) {
+  if (options.post || options.l1Shadow) {
+    return { ...options, reuseBriefL1: false };
+  }
+  return { ...options, reuseBriefL1: true };
 }
 
 /** `gh api repos/.../issues/N` の応答が PR かどうか（`pull_request` キーの有無）。 */
@@ -218,45 +741,109 @@ export function detectJudgmentRecords(comments, body) {
   return { dod, breakdown, brief };
 }
 
-/** text 中の `## やること` セクションに、チェックリスト/箇条書き行が1つ以上あるか。 */
-function hasYaruKotoChecklist(text) {
-  if (!text) return false;
-  const lines = text.split('\n');
-  const startIdx = lines.findIndex((line) => /^#{1,6}\s*やること\s*$/.test(line.trim()));
-  if (startIdx === -1) return false;
+/** Parse a Markdown heading and normalize a short explanatory suffix. */
+function parseIssueHeading(line) {
+  const match = /^(#{1,6})\s+(.+?)\s*#*\s*$/.exec(String(line ?? '').trim());
+  if (!match) return null;
+  const rawTitle = match[2].replaceAll('`', '').replaceAll('**', '').trim();
+  const suffix = rawTitle.search(/\s+[—–-]\s*|[:：]|[（(]/u);
+  const title = (suffix === -1 ? rawTitle : rawTitle.slice(0, suffix)).trim().toLocaleLowerCase();
+  return { level: match[1].length, title };
+}
+
+function isIssueSectionHeading(line, name) {
+  return parseIssueHeading(line)?.title === name.toLocaleLowerCase();
+}
+
+/** A single `該当なし` is a placeholder; a short reason makes it an explicit answer. */
+function hasReasonedNotApplicable(text) {
+  return String(text ?? '')
+    .split('\n')
+    .some((line) => {
+      const match =
+        /^\s*(?:[-*+]\s*)?(?:\[[ xX]\]\s*)?該当なし\s*(?::|：|—|–|[-]|[（(])\s*(.+?)\s*[）)]?\s*$/.exec(
+          line,
+        );
+      const reason = match ? normalizeIssueContentLine(match[1]) : '';
+      return reason.length > 0 && !isIssuePlaceholder(reason);
+    });
+}
+
+function normalizeIssueContentLine(line) {
+  return String(line ?? '')
+    .trim()
+    .replace(/^[-*+]\s*(?:\[[ xX]\]\s*)?/, '')
+    .replace(/^>\s?/, '')
+    .replace(/[`*_~]/g, '')
+    .trim();
+}
+
+function isIssuePlaceholder(line) {
+  const normalized = normalizeIssueContentLine(line);
+  const barePlaceholder =
+    /^(?:tbd|todo|tbc|placeholder|n\/?a|na|none|なし|未記入|未入力|未確認|未定|記入待ち|入力待ち|該当なし|\.{3,}|…+|<[^>]+>)(?:\s*[:：-]\s*)?[.!。]*$/i;
+  if (barePlaceholder.test(normalized)) return true;
+  const notApplicableWithPlaceholder =
+    /^(?:該当なし|n\/?a|na|none|なし)\s*(?::|：|—|–|-|[（(])\s*(.+?)\s*[）)]?$/i.exec(normalized);
+  return (
+    notApplicableWithPlaceholder !== null && barePlaceholder.test(notApplicableWithPlaceholder[1])
+  );
+}
+
+/** Treat blank / placeholder-only content as missing; do not infer meaning from a label. */
+function hasMeaningfulIssueText(text) {
+  if (hasReasonedNotApplicable(text)) return true;
+  return String(text ?? '')
+    .split('\n')
+    .map(normalizeIssueContentLine)
+    .some((line) => line.length > 0 && !isIssuePlaceholder(line));
+}
+
+/** Extract one contract section, stopping at the next heading of equal or higher level. */
+function extractSectionText(text, headingName) {
+  const lines = String(text ?? '').split('\n');
+  const startIdx = lines.findIndex((line) => isIssueSectionHeading(line, headingName));
+  if (startIdx === -1) return null;
+  const startHeading = parseIssueHeading(lines[startIdx]);
+  if (!startHeading) return null;
+  const sectionLines = [];
   for (let i = startIdx + 1; i < lines.length; i += 1) {
-    const line = lines[i];
-    if (/^#{1,6}\s/.test(line)) break; // 次のセクションに入ったら終了
-    if (/^\s*[-*]\s*(\[[ xX]\])?\s*\S/.test(line)) return true;
+    const nextHeading = parseIssueHeading(lines[i]);
+    if (nextHeading && nextHeading.level <= startHeading.level) break;
+    sectionLines.push(lines[i]);
+  }
+  return sectionLines.join('\n').trim();
+}
+
+/** `やること` may contain nested headings, but only meaningful checklist items count. */
+function hasYaruKotoChecklist(text) {
+  const lines = String(text ?? '').split('\n');
+  const startIdx = lines.findIndex((line) => isIssueSectionHeading(line, 'やること'));
+  if (startIdx === -1) return false;
+  const startHeading = parseIssueHeading(lines[startIdx]);
+  if (!startHeading) return false;
+  for (let i = startIdx + 1; i < lines.length; i += 1) {
+    const heading = parseIssueHeading(lines[i]);
+    if (heading && heading.level <= startHeading.level) break;
+    if (!/^\s*[-*+]\s*(?:\[[ xX]\]\s*)?\S/.test(lines[i])) continue;
+    const item = normalizeIssueContentLine(lines[i]).replace(/^\[[ xX]\]\s*/, '');
+    const acceptanceValue = /^(?:受け入れ条件|完了条件)\s*[:：]\s*(.*)$/u.exec(item)?.[1];
+    if (hasMeaningfulIssueText(acceptanceValue ?? item)) return true;
   }
   return false;
 }
 
-/**
- * text 中の `## 検証` セクション本文だけを抜き出す（次の `## ` 見出しの直前まで、
- * `###` 以下のサブ見出しは区切りにしない）。見出しが無ければ空文字。
- */
+/** Extract a Markdown or GitHub Forms `検証` section. */
 function extractVerificationSection(text) {
-  return extractSectionText(text, /^##\s*検証\s*$/) ?? '';
+  return extractSectionText(text, '検証') ?? '';
 }
 
-/**
- * text 中の `headingRegex` に一致する見出し行の直後から、次の `##` 見出し
- * （`###` 以下のサブ見出しは区切りにしない）の直前までの本文を抜き出す。
- * 見出しが見つからなければ null。
- * @param {string} text
- * @param {RegExp} headingRegex 見出し行（trim 済み）に対する正規表現
- */
-function extractSectionText(text, headingRegex) {
-  const lines = String(text ?? '').split('\n');
-  const startIdx = lines.findIndex((line) => headingRegex.test(line.trim()));
-  if (startIdx === -1) return null;
-  const sectionLines = [];
-  for (let i = startIdx + 1; i < lines.length; i += 1) {
-    if (/^##(?!#)\s/.test(lines[i])) break; // 次の `##` 見出しに入ったら終了
-    sectionLines.push(lines[i]);
-  }
-  return sectionLines.join('\n').trim();
+function hasVerificationCommand(text) {
+  return (
+    /`(?:pnpm|gh|node|git|rg|npx)\s+[^`]+`/i.test(text) ||
+    /(?:^|\n)\s*(?:pnpm|gh|node|git|rg|npx)\s+\S+/im.test(text) ||
+    String(text ?? '').includes('expect(')
+  );
 }
 
 /**
@@ -268,11 +855,11 @@ function extractSectionText(text, headingRegex) {
  * @param {string | undefined | null} body
  */
 export function extractAcceptanceCriteriaText(body) {
-  const text = body ?? '';
+  const text = String(body ?? '');
   const parts = [];
-  const yaruKoto = extractSectionText(text, /^#{1,6}\s*やること\s*$/);
+  const yaruKoto = extractSectionText(text, 'やること');
   if (yaruKoto) parts.push(`## やること\n${yaruKoto}`);
-  const kensho = extractSectionText(text, /^##\s*検証\s*$/);
+  const kensho = extractSectionText(text, '検証');
   if (kensho) parts.push(`## 検証\n${kensho}`);
   if (parts.length > 0) return parts.join('\n\n').trim();
 
@@ -280,6 +867,35 @@ export function extractAcceptanceCriteriaText(body) {
     .split('\n')
     .filter((line) => line.includes('受け入れ条件') || line.includes('完了条件'));
   return acceptanceLines.join('\n').trim();
+}
+
+/** Keep the canonical request, scope, constraints, and verification text visible outside ranked L1. */
+function extractBriefRequiredSections(body) {
+  const wanted = new Map([
+    ['goal', '要求（Goal）'],
+    ['背景', '要求（背景）'],
+    ['やること', '実施範囲（やること）'],
+    ['minimum viable approach', '実施範囲（Minimum Viable Approach）'],
+    ['test and acceptance', '必要な検証（Test and Acceptance）'],
+    ['検証', '必要な検証（検証）'],
+    ['assumptions and not doing', '制約（Assumptions and Not Doing）'],
+    ['注意', '制約（注意）'],
+  ]);
+  const lines = String(body ?? '').split('\n');
+  const sections = [];
+  for (let index = 0; index < lines.length; index += 1) {
+    const heading = /^##\s+(.+?)\s*#*\s*$/.exec(lines[index].trim());
+    if (!heading) continue;
+    const normalized = heading[1].trim().toLowerCase();
+    const label = wanted.get(normalized);
+    if (!label) continue;
+    const content = [];
+    for (let next = index + 1; next < lines.length && !/^##(?!#)\s/.test(lines[next]); next += 1)
+      content.push(lines[next]);
+    const text = content.join('\n').trim();
+    if (text) sections.push({ heading: label, text });
+  }
+  return sections;
 }
 
 /**
@@ -294,19 +910,34 @@ export function extractAcceptanceCriteriaText(body) {
  *   コマンドと誤認するのを防ぐ）
  */
 export function detectAcceptanceCriteria(body) {
-  const text = body ?? '';
-
+  const text = String(body ?? '');
+  const background = extractSectionText(text, '背景');
+  const scope = extractSectionText(text, 'やること');
+  const caution = extractSectionText(text, '注意');
+  const acceptanceSection =
+    extractSectionText(text, '受け入れ条件') ?? extractSectionText(text, '完了条件');
+  const acceptanceSectionContent = String(acceptanceSection ?? '')
+    .split('\n')
+    .map((line) => line.replace(/^\s*(?:受け入れ条件|完了条件)\s*[:：]\s*/u, ''))
+    .join('\n');
+  const hasAcceptanceLabel = text.split('\n').some((line) => {
+    const match = /(?:受け入れ条件|完了条件)\s*[:：]\s*(.*)$/u.exec(line);
+    return match !== null && hasMeaningfulIssueText(match[1]);
+  });
   const acceptance =
-    text.includes('受け入れ条件') || text.includes('完了条件') || hasYaruKotoChecklist(text);
-
+    hasMeaningfulIssueText(acceptanceSectionContent) ||
+    hasAcceptanceLabel ||
+    hasYaruKotoChecklist(text);
   const verificationSection = extractVerificationSection(text);
-  const hasFencedCodeBlock = /```/.test(verificationSection);
-  const hasVerificationCommand =
-    /`(pnpm|gh|node|git|rg|npx) [^`]*`/.test(verificationSection) ||
-    verificationSection.includes('expect(');
-  const verification = hasFencedCodeBlock || hasVerificationCommand;
+  const verification =
+    hasMeaningfulIssueText(verificationSection) && hasVerificationCommand(verificationSection);
+  const missingContractSections = [
+    !hasMeaningfulIssueText(background) ? '背景' : null,
+    !hasMeaningfulIssueText(scope) ? 'やること' : null,
+    !hasMeaningfulIssueText(caution) ? '注意' : null,
+  ].filter(Boolean);
 
-  return { acceptance, verification };
+  return { acceptance, verification, missingContractSections };
 }
 
 /**
@@ -344,6 +975,8 @@ export function buildJudgmentHint(records) {
 export function selectComments(comments, k, allComments) {
   const list = Array.isArray(comments) ? comments : [];
   const filtered = list.filter((c) => {
+    if (typeof c.body === 'string' && c.body.startsWith(CTX_MARKER))
+      return !isTrustedMarkerComment(c);
     if (isOwnMarkerComment(c.body)) return false;
     if (allComments) return true;
     return !isBotLogin(c.user?.login) || isCodexBotLogin(c.user?.login);
@@ -457,10 +1090,6 @@ const SKILL_RULES = [
   },
   { test: (f) => f.startsWith('apps/product/messages/'), skill: 'i18n' },
   { test: (f) => f.startsWith('apps/web/content/'), skill: 'docs-writing' },
-  {
-    test: (f) => f.startsWith('scripts/hooks/') || f.startsWith('scripts/ci/'),
-    skill: 'pr-cross-review',
-  },
   { test: (f) => f.endsWith('.test.ts'), skill: 'test' },
   { test: (f) => f.startsWith('docs/'), skill: 'docs-writing' },
 ];
@@ -559,6 +1188,13 @@ function escapeCell(value) {
   return String(value ?? '').replace(/\|/g, '\\|');
 }
 
+function escapeHtmlText(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
 function formatFileList(files, max = 40) {
   if (!files || files.length === 0) return null;
   const shown = files.slice(0, max);
@@ -605,6 +1241,9 @@ function buildMarkdownLines(
     `url: ${pack.header.url ?? '未取得'}`,
   ];
   lines.push(headerParts.join(' | '));
+  if (pack.snapshotId) {
+    lines.push(`生成: ${pack.generatedAt ?? '未取得'} | snapshot: ${pack.snapshotId}`);
+  }
 
   if (pack.kind === 'pr') {
     const ci = pack.header.ciRollup;
@@ -618,6 +1257,7 @@ function buildMarkdownLines(
     lines.push(
       [
         `${pack.header.headRefName ?? '未取得'} → ${pack.header.baseRefName ?? '未取得'}`,
+        `head SHA: ${pack.header.headSha ?? '未取得'} | base SHA: ${pack.header.baseSha ?? '未取得'}`,
         `isDraft: ${pack.header.isDraft ?? '未取得'}`,
         `mergeStateStatus: ${pack.header.mergeStateStatus ?? '未取得'}`,
         `reviewDecision: ${pack.header.reviewDecision ?? 'なし'}`,
@@ -627,6 +1267,47 @@ function buildMarkdownLines(
     );
   }
   lines.push('');
+
+  if (pack.kind === 'issue') {
+    lines.push(
+      `Issue本文が要求・制約の正本。以下は該当節の原文で、全文: ${pack.header.url ?? '未取得'} | 本文SHA-256: ${pack.bodySha256 ?? '未取得'}`,
+    );
+    if (pack.requiredSections?.length) {
+      lines.push('#### 要求・制約・必要な検証', '');
+      for (const section of pack.requiredSections) {
+        const escapedText = escapeHtmlText(section.text).replace(/\r?\n/g, '&#10;');
+        lines.push(
+          `<details><summary>${escapeHtmlText(section.heading)}（Issue本文の原文）</summary><pre>${escapedText}</pre></details>`,
+          '',
+        );
+      }
+    } else {
+      lines.push(
+        '#### 要求・制約・必要な検証',
+        '',
+        '該当する標準見出しはありません。Issue本文全文を正本として確認してください。',
+        '',
+      );
+    }
+
+    lines.push('#### 関連PRのrevision・検証', '');
+    if (pack.related?.prs === null || pack.related?.prs === undefined) {
+      lines.push('関連PR: 未取得');
+    } else if (pack.related.prs.length === 0) {
+      lines.push('関連PR: なし');
+    } else {
+      for (const pr of pack.related.prs) {
+        const ci = pr.ciRollup
+          ? `CI SUCCESS ${pr.ciRollup.success} / FAILURE ${pr.ciRollup.failure} / PENDING ${pr.ciRollup.pending}`
+          : 'CI 未取得';
+        const detail = pr.detailAvailable ? '' : ` | 詳細 ${pr.detailStatus ?? '未取得'}`;
+        lines.push(
+          `- #${pr.number} ${pr.state} ${pr.title} | ${pr.url ? `[PR](${pr.url})` : 'URL未取得'} | head SHA ${pr.headSha ?? '未取得'} | base SHA ${pr.baseSha ?? '未取得'} | ${ci}${detail}`,
+        );
+      }
+    }
+    lines.push('');
+  }
 
   // --- 本文（可変: bodyMaxLines） ---
   if (pack.body) {
@@ -657,7 +1338,10 @@ function buildMarkdownLines(
     lines.push(`#### 直近コメント（最新 ${pack.comments.length} 件）`);
     lines.push('');
     for (const comment of shownComments) {
-      lines.push(`**${comment.author}** (${comment.date})`);
+      const source = comment.url ? ` [出典](${comment.url})` : '';
+      lines.push(
+        `**${comment.author}** (${comment.date})${source} | 実行結果・進捗は自己申告として扱う`,
+      );
       lines.push(comment.body);
       lines.push('');
     }
@@ -676,10 +1360,13 @@ function buildMarkdownLines(
       `- 親 epic: #${related.parentEpic.number} ${related.parentEpic.state ?? '未取得'} ${related.parentEpic.title ?? ''}`,
     );
   }
-  if (related.prs) {
+  if (related.prs && pack.kind !== 'issue') {
     for (const pr of related.prs) {
+      const ci = pr.ciRollup
+        ? `CI SUCCESS ${pr.ciRollup.success} / FAILURE ${pr.ciRollup.failure} / PENDING ${pr.ciRollup.pending}`
+        : 'CI 未取得';
       allRelatedLines.push(
-        `- #${pr.number} ${pr.state} ${pr.title} (${pr.headRefName ?? '未取得'})`,
+        `- #${pr.number} ${pr.state} ${pr.title} (${pr.headRefName ?? '未取得'}) | ${pr.url ? `[PR](${pr.url})` : 'URL未取得'} | head SHA ${pr.headSha ?? '未取得'} | base SHA ${pr.baseSha ?? '未取得'} | ${ci}`,
       );
     }
   }
@@ -725,7 +1412,8 @@ function buildMarkdownLines(
       // 見出しと省略行だけで予算を使い切る段（acceptanceMaxLines <= 3）では、
       // 「…（N 行省略）」しか残らないセクションを出しても行数を食うだけなので
       // セクションごと落とす。段階縮小の最終段が実際に 0 行まで縮むようにする。
-      const budget = Math.max(0, acceptanceMaxLines - heading.length);
+      // Count the heading, section body, trailing separator, and omission marker inside the limit.
+      const budget = Math.max(0, acceptanceMaxLines - heading.length - 2);
       if (budget > 1) {
         let cappedBody = sectionBody;
         if (sectionBody.length > budget) {
@@ -799,6 +1487,34 @@ function buildMarkdownLines(
     if (pack.nextStepSecondary) {
       lines.push(pack.nextStepSecondary);
     }
+  }
+
+  const l1 = pack.l1Annotations;
+  if (l1) {
+    lines.push('', '#### L1注釈（補助情報）', '');
+    if (l1.status === 'adopted') {
+      lines.push('採用済みpackの完全評価結果。Issue本文の要求、必須条件、検証を置き換えない。');
+      if (l1.rows.length === 0) lines.push('採用済み注釈に表示候補はありません。');
+      for (const row of l1.rows)
+        lines.push(
+          `- [${row.sourceId}](${row.url}) | ${row.category} | 関連度 ${row.relevance.toFixed(2)} | 評価 ${row.evaluatedAt}`,
+        );
+    } else if (l1.status === 'unevaluated') {
+      lines.push(`L1: 未評価（${l1.reason}）。候補順位を表示していません。`);
+    } else {
+      lines.push('保存済み注釈はありません。Issue補助用のJev L1候補は次節に表示。');
+    }
+  }
+
+  if (pack.l1ShadowPreview) lines.push(...renderL1ShadowPreview(pack.l1ShadowPreview));
+
+  lines.push('', '#### 未確認事項', '');
+  if (pack.missingSources?.length) {
+    for (const missing of pack.missingSources) lines.push(`- ${missing}`);
+  } else {
+    lines.push(
+      '取得失敗・入力不足はありません。コメントの記述は自己申告、CI表示は各PRごとのGitHub状態です。',
+    );
   }
 
   // 末尾の空行を畳んで行数を安定させる。
@@ -890,14 +1606,17 @@ function tryOr(fn, fallback) {
 
 const DECISIONS_PATH = 'docs/decisions.md';
 
-function collectDecisionLines(readFileImpl, cwd, numbers) {
-  const raw = tryOr(() => readFileImpl(join(cwd, DECISIONS_PATH), 'utf8'), null);
-  if (raw === null) return [];
+function decisionLinesFromText(raw, numbers, truncate = true) {
   const needles = numbers.map((n) => `#${n}`);
   return raw
     .split('\n')
     .filter((line) => needles.some((needle) => line.includes(needle)))
-    .map((line) => line.trim().slice(0, 200));
+    .map((line) => (truncate ? line.trim().slice(0, 200) : line.trim()));
+}
+
+function collectDecisionLines(readFileImpl, cwd, numbers, truncate = true) {
+  const raw = tryOr(() => readFileImpl(join(cwd, DECISIONS_PATH), 'utf8'), null);
+  return raw === null ? [] : decisionLinesFromText(raw, numbers, truncate);
 }
 
 // GraphQL ページングの安全上限（無限ループ防止。100 件 × 30 頁 = 3000 thread は
@@ -948,6 +1667,10 @@ export function buildContextPack(options, deps = {}) {
     existsFn = existsSync,
     readFileImpl = readFileSync,
     cwd = process.cwd(),
+    now = () => new Date(),
+    adoptedPackIds = [],
+    l1Report = null,
+    includeTrustedBriefComments = false,
   } = deps;
   const { number, comments: commentsK, bodyLines, allComments } = options;
 
@@ -987,6 +1710,7 @@ export function buildContextPack(options, deps = {}) {
       milestone: pr?.milestone?.title ?? base?.milestone?.title ?? null,
       assignee: (pr?.assignees ?? base?.assignees ?? [])[0]?.login ?? null,
       url: pr?.url ?? base?.html_url ?? null,
+      updatedAt: base?.updated_at ?? null,
       headRefName: pr?.headRefName ?? null,
       baseRefName: pr?.baseRefName ?? null,
       headSha: pr?.headRefOid ?? null,
@@ -1012,30 +1736,36 @@ export function buildContextPack(options, deps = {}) {
       milestone: base?.milestone?.title ?? null,
       assignee: (base?.assignees ?? [])[0]?.login ?? null,
       url: base?.html_url ?? null,
+      updatedAt: base?.updated_at ?? null,
     };
     rawBody = base?.body ?? '';
   }
 
   const bodyResult = truncateBody(rawBody, bodyLines);
 
-  const commentsRaw = tryOr(
-    () =>
-      runGhJson(['api', `repos/${REPO}/issues/${number}/comments?per_page=100`, '--paginate'], {
-        execFileImpl,
-      }),
-    null,
-  );
+  const commentsRaw = tryOr(() => {
+    const raw = runGhJson(
+      ['api', `repos/${REPO}/issues/${number}/comments?per_page=100`, '--paginate', '--slurp'],
+      { execFileImpl },
+    );
+    // `--slurp` returns one array per page. Flatten so every collected comment participates in
+    // snapshot freshness and paging does not depend on the caller mode.
+    return Array.isArray(raw) ? raw.flat() : null;
+  }, null);
   const comments =
     commentsRaw === null
       ? null
       : selectComments(commentsRaw, commentsK, allComments).map((c) => ({
+          id: c.id ?? null,
           author: c.user?.login ?? '不明',
           date: (c.created_at ?? '').slice(0, 10),
+          url: c.id ? `https://github.com/${REPO}/issues/${number}#issuecomment-${c.id}` : null,
           body: truncateCommentBody(c.body),
         }));
 
   // --- 関連 ---
   const related = { parentEpic: null, prs: null, linkedIssues: null };
+  const assistRelated = [];
   let linkedNumbers = [];
 
   if (kind === 'issue') {
@@ -1043,6 +1773,7 @@ export function buildContextPack(options, deps = {}) {
       const epicNumber = extractParentEpic(rawBody);
       if (!epicNumber) return null;
       const epic = runGhJson(['api', `repos/${REPO}/issues/${epicNumber}`], { execFileImpl });
+      assistRelated.push(epic);
       return { number: epicNumber, state: epic.state, title: epic.title };
     }, null);
 
@@ -1055,7 +1786,7 @@ export function buildContextPack(options, deps = {}) {
           REPO,
           `#${number}`,
           '--json',
-          'number,title,state,body',
+          'number,title,state,url,body,updatedAt',
           '--limit',
           '20',
         ],
@@ -1065,31 +1796,96 @@ export function buildContextPack(options, deps = {}) {
     }, null);
 
     if (matchedPrs !== null) {
+      assistRelated.push(...matchedPrs);
       // 触るファイル用に上位 3 件だけ headRefName + files を追加取得する。
       const enriched = matchedPrs.slice(0, 3).map((pr) =>
         tryOr(
           () => {
             const detail = runGhJson(
-              ['pr', 'view', String(pr.number), '--json', 'headRefName,files'],
+              [
+                'pr',
+                'view',
+                String(pr.number),
+                '--json',
+                'url,headRefName,baseRefName,headRefOid,baseRefOid,statusCheckRollup,updatedAt,files',
+              ],
               {
                 execFileImpl,
               },
             );
             return {
               ...pr,
+              url: detail.url ?? pr.url ?? null,
               headRefName: detail.headRefName,
+              baseRefName: detail.baseRefName ?? null,
+              headSha: detail.headRefOid ?? null,
+              baseSha: detail.baseRefOid ?? null,
+              updatedAt: detail.updatedAt ?? pr.updatedAt ?? null,
+              ciRollup: Array.isArray(detail.statusCheckRollup)
+                ? computeCiRollup(detail.statusCheckRollup)
+                : null,
+              detailAvailable: true,
+              detailStatus: 'available',
               files: detail.files?.map((f) => f.path) ?? [],
             };
           },
-          { ...pr, headRefName: null, files: [] },
+          {
+            ...pr,
+            url: pr.url ?? null,
+            headRefName: null,
+            baseRefName: null,
+            headSha: null,
+            baseSha: null,
+            updatedAt: pr.updatedAt ?? null,
+            ciRollup: null,
+            detailAvailable: false,
+            detailStatus: 'unavailable',
+            files: [],
+          },
         ),
       );
-      related.prs = enriched.map(({ number: n, state, title, headRefName }) => ({
-        number: n,
-        state,
-        title,
-        headRefName,
+      const unexpanded = matchedPrs.slice(3).map((pr) => ({
+        ...pr,
+        url: pr.url ?? null,
+        headRefName: null,
+        baseRefName: null,
+        headSha: null,
+        baseSha: null,
+        updatedAt: pr.updatedAt ?? null,
+        ciRollup: null,
+        detailAvailable: false,
+        detailStatus: 'not_expanded',
+        files: [],
       }));
+      related.prs = [...enriched, ...unexpanded].map(
+        ({
+          number: n,
+          state,
+          title,
+          url,
+          headRefName,
+          baseRefName,
+          headSha,
+          baseSha,
+          updatedAt,
+          ciRollup,
+          detailAvailable,
+          detailStatus,
+        }) => ({
+          number: n,
+          state,
+          title,
+          url,
+          headRefName,
+          baseRefName,
+          headSha,
+          baseSha,
+          updatedAt,
+          ciRollup,
+          detailAvailable,
+          detailStatus,
+        }),
+      );
       files = [...new Set(enriched.flatMap((pr) => pr.files))];
     }
   } else {
@@ -1099,6 +1895,7 @@ export function buildContextPack(options, deps = {}) {
         tryOr(
           () => {
             const issue = runGhJson(['api', `repos/${REPO}/issues/${n}`], { execFileImpl });
+            assistRelated.push(issue);
             return {
               number: n,
               state: issue.state,
@@ -1130,7 +1927,69 @@ export function buildContextPack(options, deps = {}) {
     ...(related.parentEpic ? [related.parentEpic.number] : []),
     ...linkedNumbers,
   ];
-  const decisionLines = collectDecisionLines(readFileImpl, cwd, decisionNumbers);
+  const decisionsRaw = tryOr(() => readFileImpl(join(cwd, DECISIONS_PATH), 'utf8'), null);
+  const decisionLinesFull =
+    decisionsRaw === null ? [] : decisionLinesFromText(decisionsRaw, decisionNumbers, false);
+  const decisionLines = decisionLinesFull.map((line) => line.slice(0, 200));
+  const missingSources = [
+    ...(base === null || !header.url ? ['primary_metadata_unavailable'] : []),
+    ...(commentsRaw === null ? ['comments_unavailable'] : []),
+    ...(kind === 'issue' && related.prs === null ? ['related_prs_unavailable'] : []),
+    ...(kind === 'issue' && extractParentEpic(rawBody) && !related.parentEpic
+      ? ['parent_issue_unavailable']
+      : []),
+    ...(related.prs ?? [])
+      .filter((pr) => !pr.detailAvailable)
+      .map((pr) => `related_pr_${pr.number}_details_${pr.detailStatus ?? 'unavailable'}`),
+    ...(kind === 'pr' && unresolvedThreads === null ? ['review_threads_unavailable'] : []),
+    ...(decisionsRaw === null ? ['decisions_unavailable'] : []),
+    ...(related.linkedIssues ?? [])
+      .filter((item) => item.state === '未取得')
+      .map((item) => `linked_issue_${item.number}_unavailable`),
+  ];
+  const snapshotMaterial = {
+    target: {
+      number,
+      kind,
+      title: header.title,
+      state: header.state,
+      labels: header.labels,
+      milestone: header.milestone,
+      assignee: header.assignee,
+      url: header.url,
+      bodySha256: createHash('sha256').update(rawBody).digest('hex'),
+    },
+    comments:
+      commentsRaw === null
+        ? null
+        : selectComments(commentsRaw, Number.MAX_SAFE_INTEGER, true).map((comment) => ({
+            id: comment.id ?? null,
+            url: comment.html_url ?? null,
+            author: comment.user?.login ?? null,
+            authorAssociation: comment.author_association ?? null,
+            createdAt: comment.created_at ?? null,
+            updatedAt: comment.updated_at ?? null,
+            body: comment.body ?? '',
+          })),
+    related: {
+      parentEpic: related.parentEpic,
+      prs: related.prs,
+      linkedIssues: related.linkedIssues,
+    },
+    decisions: decisionsRaw === null ? null : decisionLinesFull,
+    missingSources,
+  };
+  const snapshotId = computeContextSnapshotId(snapshotMaterial);
+  const l1Annotations = buildBriefAnnotations(
+    l1Report ?? {
+      packId: 'context-relevance',
+      adoptedPackIds,
+      complete: false,
+      failure: 'not_cached',
+      rows: [],
+      sources: [],
+    },
+  );
 
   // closed/merged PR は「関連」には出すが、次の一手を駆動しない ── 別の
   // linked PR がまだ open で進行中の可能性や、closed PR が issue を解決しなかった
@@ -1181,7 +2040,43 @@ export function buildContextPack(options, deps = {}) {
   return {
     number,
     kind,
+    ...(options.assist
+      ? {
+          assistSource: {
+            title: header.title,
+            body: rawBody,
+            url: header.url,
+            // GitHub may advance Issue updated_at when this brief comment is posted. Use created_at
+            // for this body candidate; body edits still change the candidate text/cache key.
+            updatedAt: base?.created_at ?? null,
+            comments:
+              commentsRaw === null
+                ? null
+                : selectComments(commentsRaw, Number.MAX_SAFE_INTEGER, allComments),
+            related: assistRelated,
+            decisions: decisionLinesFull,
+            missing: missingSources,
+          },
+        }
+      : {}),
+    ...(includeTrustedBriefComments
+      ? {
+          trustedBriefComments:
+            commentsRaw === null
+              ? null
+              : commentsRaw.filter(isTrustedMarkerComment).map((comment) => ({
+                  body: comment.body,
+                  author_association: comment.author_association,
+                  user: { login: comment.user?.login },
+                })),
+        }
+      : {}),
     bodySha256: createHash('sha256').update(rawBody).digest('hex'),
+    snapshotId,
+    generatedAt: now().toISOString(),
+    requiredSections: kind === 'issue' ? extractBriefRequiredSections(rawBody) : [],
+    missingSources,
+    l1Annotations,
     header,
     body: bodyResult,
     comments,
@@ -1201,8 +2096,22 @@ export function buildContextPack(options, deps = {}) {
 // CTX_MARKER の定義はファイル先頭（selectComments / detectJudgmentRecords と共用）。
 
 /** コメント本文を組み立てる。1 行目は必ずマーカー（idempotent 判定の唯一の根拠）。 */
-export function buildCommentBody({ number, date, markdown }) {
-  return `${CTX_MARKER}\n**brief（\`pnpm ctx ${number}\`、${date}）**\n\n${markdown}\n`;
+export function buildCommentBody({
+  number,
+  date,
+  generatedAt,
+  snapshotId,
+  markdown,
+  l1Metadata = null,
+}) {
+  const timestamp = generatedAt ?? `${date ?? '未取得'}T00:00:00.000Z`;
+  const metadataLine = typeof l1Metadata === 'string' ? `\n${l1Metadata}` : '';
+  return `${CTX_MARKER}\n**Issue Context Brief（\`pnpm ctx ${number}\`）**\n生成: ${timestamp} | snapshot: ${snapshotId ?? '未取得'}${metadataLine}\n\n${markdown}\n`;
+}
+
+function sameBriefContentIgnoringGeneratedTime(current, candidate) {
+  const normalize = (body) => body.replace(/^生成: .*?( \| snapshot: )/gm, '生成: <timestamp>$1');
+  return normalize(current ?? '') === normalize(candidate ?? '');
 }
 
 /**
@@ -1262,10 +2171,14 @@ export function postContextBrief(pack, markdown, deps = {}) {
     mkdtempImpl = mkdtempSync,
     tmpDirPath = tmpdir(),
     now = () => new Date(),
+    getCurrentSnapshotId,
   } = deps;
 
+  if (pack.snapshotId && !pack.header?.url)
+    throw new Error('対象Issue/PRのURLが未取得のためbriefを投稿できません');
+
   const existingComments = runGhJson(
-    ['api', `repos/${REPO}/issues/${pack.number}/comments?per_page=100`, '--paginate'],
+    ['api', `repos/${REPO}/issues/${pack.number}/comments?per_page=100`, '--paginate', '--slurp'],
     { execFileImpl },
   );
   // 認証ユーザーの login を 1 回だけ取得する。取得失敗（gh 未認証等）は fail-open で
@@ -1275,14 +2188,41 @@ export function postContextBrief(pack, markdown, deps = {}) {
     () => runGh(['api', 'user', '--jq', '.login'], { execFileImpl }).trim(),
     null,
   );
-  const existing = findMarkerComment(existingComments, authLogin);
+  const existing = findMarkerComment(
+    Array.isArray(existingComments) ? existingComments.flat() : [],
+    authLogin,
+  );
 
-  const date = now().toISOString().slice(0, 10);
-  const body = buildCommentBody({ number: pack.number, date, markdown });
+  const assertFreshSnapshot = () => {
+    if (!pack.snapshotId) return;
+    if (typeof getCurrentSnapshotId !== 'function')
+      throw new Error('投稿前のsnapshot再確認関数がありません');
+    const currentSnapshotId = getCurrentSnapshotId(pack);
+    if (currentSnapshotId !== pack.snapshotId)
+      throw new Error(
+        `投稿前に入力snapshotが変化しました（${pack.snapshotId} → ${currentSnapshotId ?? '未取得'}）。briefを再生成してください`,
+      );
+  };
+  const body = buildCommentBody({
+    number: pack.number,
+    generatedAt: pack.generatedAt ?? now().toISOString(),
+    snapshotId: pack.snapshotId,
+    markdown,
+    l1Metadata: encodeBriefL1Metadata(pack),
+  });
+
+  if (existing && sameBriefContentIgnoringGeneratedTime(existing.body, body)) {
+    assertFreshSnapshot();
+    return { mode: 'unchanged', url: existing.html_url ?? null };
+  }
 
   const dir = mkdtempImpl(join(tmpDirPath, 'ctx-brief-'));
   const tmpFile = join(dir, 'body.md');
   writeFileImpl(tmpFile, body, 'utf8');
+
+  // Collect again after the draft is ready and directly before the GitHub mutation. The generated
+  // marker itself is excluded from the snapshot, so creation/update remains idempotent.
+  assertFreshSnapshot();
 
   const { mode, argv } = buildPostArgs({
     number: pack.number,
@@ -1292,7 +2232,7 @@ export function postContextBrief(pack, markdown, deps = {}) {
 
   if (mode === 'update') {
     const updated = runGhJson(argv, { execFileImpl });
-    return { mode, url: updated?.html_url ?? null };
+    return { mode, url: updated?.html_url ?? existing?.html_url ?? null };
   }
   const out = runGh(argv, { execFileImpl });
   return { mode, url: out.trim() };
@@ -1302,12 +2242,14 @@ export function postContextBrief(pack, markdown, deps = {}) {
 
 function main() {
   const options = parseArgs(process.argv.slice(2));
-  const pack = buildContextPack(options, {});
+  const pack = buildContextPackWithL1(resolveContextL1Mode(options));
   if (options.post) {
     const markdown = renderMarkdown(pack);
-    const result = postContextBrief(pack, markdown, {});
+    const result = postContextBrief(pack, markdown, {
+      getCurrentSnapshotId: () => buildContextPack(options, {}).snapshotId,
+    });
     process.stdout.write(
-      `${result.mode === 'update' ? '更新' : '作成'}: ${result.url ?? '（URL 未取得）'}\n`,
+      `${result.mode === 'update' ? '更新' : result.mode === 'unchanged' ? '変更なし' : '作成'}: ${result.url ?? '（URL 未取得）'}\n`,
     );
     return;
   }
@@ -1316,6 +2258,94 @@ function main() {
   } else {
     process.stdout.write(`${renderMarkdown(pack)}\n`);
   }
+}
+
+/**
+ * Adds advisory L1 output to the L0 pack. Reuse mode reads only a matching Brief; generation is
+ * used by dispatch (`--post`) or an explicit preview (`--l1-shadow`). Jev failure leaves the L0
+ * result usable. Dependencies are injectable for offline delivery tests.
+ */
+export function buildContextPackWithL1(
+  options,
+  {
+    cwd = process.cwd(),
+    getHeadSha = () => execFileSync('git', ['rev-parse', 'HEAD'], { cwd, encoding: 'utf8' }).trim(),
+    getAuthLogin = () => tryOr(() => runGh(['api', 'user', '--jq', '.login']).trim(), null),
+    readDecisionAtHead = (headSha) =>
+      execFileSync('git', ['show', `${headSha}:${DECISIONS_PATH}`], {
+        cwd,
+        encoding: 'utf8',
+      }),
+    buildPack = buildContextPack,
+    runAssist = runContextL1ShadowAssist,
+  } = {},
+) {
+  let headSha = null;
+  try {
+    headSha = getHeadSha();
+  } catch {
+    // L0 remains usable even when Git metadata is unavailable for L1 advice.
+  }
+  if (!headSha) {
+    const pack = buildPack(options, { cwd });
+    pack.l1ShadowPreview = l1ShadowUnavailable('public_commit_required');
+    return pack;
+  }
+
+  const l0WithAssistInput = buildPack(
+    { ...options, assist: true },
+    {
+      cwd,
+      includeTrustedBriefComments: true,
+      readFileImpl: (path) => {
+        if (!path.endsWith(DECISIONS_PATH)) throw new Error('対象外の資料');
+        return readDecisionAtHead(headSha, path, cwd);
+      },
+    },
+  );
+  let reusablePreview = null;
+  try {
+    const expectedInput = buildContextInput(
+      options.number,
+      headSha,
+      l0WithAssistInput.assistSource,
+    );
+    const expectedBrief = {
+      ...expectedInput,
+      snapshotId: l0WithAssistInput.snapshotId,
+      authLogin: tryOr(() => getAuthLogin(), null),
+    };
+    reusablePreview = findReusableBriefL1Preview(
+      l0WithAssistInput.trustedBriefComments,
+      expectedBrief,
+    );
+    if (options.reuseBriefL1) {
+      l0WithAssistInput.l1ShadowPreview =
+        reusablePreview ?? l1ShadowUnavailable('trusted_brief_missing_or_stale');
+    } else {
+      const report = runAssist(options.number, { cwd });
+      const currentPreview = buildL1ShadowPreview(report, expectedInput);
+      if (currentPreview.status === 'complete' || !reusablePreview) {
+        l0WithAssistInput.l1ShadowPreview = currentPreview;
+        if (['complete', 'partial', 'unevaluated'].includes(currentPreview.status)) {
+          l0WithAssistInput.l1ShadowPreview.snapshotId = l0WithAssistInput.snapshotId;
+          l0WithAssistInput.l1ShadowPreview.target = {
+            number: expectedInput.number,
+            sha: expectedInput.sha,
+            url: expectedInput.url,
+          };
+        }
+      } else {
+        l0WithAssistInput.l1ShadowPreview = reusablePreview;
+      }
+    }
+  } catch {
+    l0WithAssistInput.l1ShadowPreview =
+      reusablePreview ?? l1ShadowUnavailable('assist_unavailable');
+  }
+  delete l0WithAssistInput.assistSource;
+  delete l0WithAssistInput.trustedBriefComments;
+  return l0WithAssistInput;
 }
 
 if (isDirectExecution(import.meta.url)) {

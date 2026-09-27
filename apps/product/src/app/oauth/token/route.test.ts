@@ -49,6 +49,43 @@ describe('canonical /oauth/token filesystem route', () => {
     await expect(response.json()).resolves.toMatchObject({ error: 'invalid_request' });
   });
 
+  it('cancels a body stream as soon as an understated Content-Length crosses the byte limit', async () => {
+    let pullCount = 0;
+    let cancelled = false;
+    const body = new ReadableStream<Uint8Array>({
+      type: 'bytes',
+      pull(controller) {
+        pullCount += 1;
+        if (pullCount <= 3) {
+          controller.enqueue(new Uint8Array(10 * 1024));
+        } else {
+          controller.close();
+        }
+      },
+      cancel() {
+        cancelled = true;
+      },
+    });
+    type NextRequestInit = NonNullable<ConstructorParameters<typeof NextRequest>[1]>;
+    const requestInit = {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/x-www-form-urlencoded',
+        'content-length': '1',
+      },
+      body,
+      duplex: 'half',
+    } satisfies NextRequestInit & { duplex: 'half' };
+    const request = new NextRequest('https://app.dayopt.app/oauth/token', requestInit);
+
+    const response = await POST(request);
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({ error: 'invalid_request' });
+    expect(pullCount).toBe(2);
+    expect(cancelled).toBe(true);
+  });
+
   it('write fence 中でも refresh は fence 判定へ入らない', async () => {
     // access token の寿命は 5 分。refresh を止めると fence が 5 分を超えた時点で
     // read-only 接続も失効し、「読み取りは通したまま」が MCP で成り立たなくなる。
@@ -79,7 +116,7 @@ describe('canonical /oauth/token filesystem route', () => {
     const authorizationCode = new NextRequest('https://app.dayopt.app/oauth/token', {
       method: 'POST',
       headers: { 'content-type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({ grant_type: 'authorization_code' }),
+      body: new URLSearchParams({ grant_type: 'authorization_code', client_id: 'claude-ai' }),
     });
 
     const response = await POST(authorizationCode);

@@ -1,3 +1,4 @@
+import { DAYOPT_BRAND } from '@dayopt/components/brand';
 import { dayoptBrand, dayoptDomains } from '@dayopt/config';
 import { OG_COLORS } from '@dayopt/foundations/og-colors';
 import { ImageResponse } from 'next/og';
@@ -242,47 +243,18 @@ export async function GET(request: NextRequest) {
           }}
         />
 
-        {/* ヘッダー: ロゴタイル + ブランド名 + 種別 */}
-        <div style={{ display: 'flex', alignItems: 'center' }}>
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              width: 64,
-              height: 64,
-              borderRadius: 16,
-              background: `linear-gradient(135deg, ${OG_COLORS.primary} 0%, ${OG_COLORS.primaryLight} 100%)`,
-              boxShadow: `0 8px 32px ${OG_COLORS.primaryGlow30}`,
-              marginRight: 20,
-            }}
-          >
-            <svg
-              width={38}
-              height={38}
-              viewBox="0 0 24 24"
-              fill={OG_COLORS.foreground}
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path d="M12 3.5c4.69 0 8.5 3.81 8.5 8.5s-3.81 8.5-8.5 8.5S3.5 16.69 3.5 12 7.31 3.5 12 3.5Zm0 3.2A5.31 5.31 0 0 0 6.7 12c0 2.92 2.38 5.3 5.3 5.3s5.3-2.38 5.3-5.3h-3.1a2.2 2.2 0 1 1-2.2-2.2V6.7Z" />
-            </svg>
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
-            <div
-              style={{
-                fontSize: 26,
-                fontWeight: 500,
-                color: OG_COLORS.foreground,
-                letterSpacing: '-0.01em',
-                lineHeight: 1.2,
-              }}
-            >
-              {dayoptBrand.name}
-            </div>
-            <div style={{ fontSize: 16, color: OG_COLORS.mutedSubtle, letterSpacing: '0.05em' }}>
-              {typeLabel}
-            </div>
-          </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
+          <svg width={237} height={50} viewBox="0 22 389 82" xmlns="http://www.w3.org/2000/svg">
+            {DAYOPT_BRAND.lockup.map((d) => (
+              <path
+                key={d}
+                d={d}
+                fill={DAYOPT_BRAND.reverse}
+                fillRule={d === DAYOPT_BRAND.lockup[0] ? 'evenodd' : 'nonzero'}
+              />
+            ))}
+          </svg>
+          <div style={{ fontSize: 16, color: OG_COLORS.mutedSubtle }}>{typeLabel}</div>
         </div>
 
         {/* 本文 */}

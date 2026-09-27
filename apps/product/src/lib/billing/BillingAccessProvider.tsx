@@ -4,17 +4,16 @@ import { api } from '@/lib/trpc';
 import type { BillingAccess } from '@dayopt/billing';
 import { Button } from '@dayopt/components';
 import { useTranslations } from 'next-intl';
-import { createContext, useContext, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
-const BillingAccessContext = createContext<BillingAccess>({
-  state: 'not_started',
-  canUseProduct: true,
-  trialEndsAt: null,
-  enforced: false,
-});
+import {
+  BillingAccessContext,
+  useBillingAccess as useBillingAccessContext,
+} from './billing-access-context';
 
+/** Keep the existing provider import path while the context stays independent of tRPC. */
 export function useBillingAccess(): BillingAccess {
-  return useContext(BillingAccessContext);
+  return useBillingAccessContext();
 }
 
 /** The authenticated application mounts this once; public pages never mount it. */

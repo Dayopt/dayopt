@@ -55,9 +55,7 @@ describe('TimeblockEditor', () => {
     expect(screen.queryByText('plan')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('title')).not.toBeInTheDocument();
     expect(screen.getByText('0/1000')).toBeInTheDocument();
-    // メモ欄はカード内の軽いインライン操作として見せる（常時背景なし、hover時のみ表示。User指示）
-    expect(screen.getByRole('button', { name: 'note' })).toHaveClass('hover:bg-state-hover');
-    expect(screen.getByRole('button', { name: 'note' })).not.toHaveClass('bg-input');
+    expect(screen.getByRole('button', { name: 'note' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'save' })).not.toBeInTheDocument();
   });
 

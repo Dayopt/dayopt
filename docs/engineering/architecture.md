@@ -62,6 +62,8 @@ Zustand と TanStack Query の使い分け:
 
 Dayopt におけるデータの流れ。ユーザー操作から DB までの全レイヤーを図解する。
 
+操作を 1 つ選んで経路を辿り、各段で失敗させた時の画面・データ・再試行・確認先を見るには [Dayopt Learning System](../learn/README.md) を使う（`pnpm learn` で対話画面が開く）。
+
 ### 全体像
 
 ```mermaid
@@ -444,7 +446,7 @@ RLS の正確な対象・policy・grant は自動生成の [`data/db/rls-snapsho
 | `plan_templates`                | 5    | —                                                               |
 | `plans`                         | 12   | `activities`, `external_calendar_events`                        |
 | `product_events`                | 5    | —                                                               |
-| `profiles`                      | 13   | —                                                               |
+| `profiles`                      | 15   | —                                                               |
 | `records`                       | 13   | `activities`, `external_calendar_events`                        |
 | `reports`                       | 8    | —                                                               |
 | `segment_activities`            | 3    | `activities`, `segments`                                        |
@@ -530,6 +532,8 @@ erDiagram
     string user_id FK
   }
   profiles {
+    boolean analytics_consent
+    string analytics_consent_updated_at "nullable"
     string app_trial_consumed_at "nullable"
     string app_trial_ends_at "nullable"
     string app_trial_started_at "nullable"
@@ -802,6 +806,8 @@ erDiagram
     string user_id
   }
   profiles {
+    boolean analytics_consent
+    string analytics_consent_updated_at "nullable"
     string app_trial_consumed_at "nullable"
     string app_trial_ends_at "nullable"
     string app_trial_started_at "nullable"

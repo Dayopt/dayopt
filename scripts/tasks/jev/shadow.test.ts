@@ -445,13 +445,16 @@ describe('CLI として起動できる', () => {
     expect(JSON.parse(result.stdout)).toHaveProperty('coverage');
   });
 
-  it('evaluate は credential が無ければ課金前に止まる', () => {
+  it('evaluate は pack shadow-e1 の無効化で課金前に止まる', () => {
+    // この CLI が送るのは pack `shadow-e1` と同じ質問セットなので、pack の status に従う。
+    // status の判定は credential の確認より**先**に来るため、key の有無に関わらず
+    // ここで止まる（credential が無い時の停止は、有効な pack 側を pack.test.ts が見る）
     const result = spawnSync('pnpm', ['exec', 'tsx', 'scripts/tasks/jev/shadow.ts', 'evaluate'], {
       cwd: repoRoot,
       encoding: 'utf8',
       env: { ...process.env, AI_GATEWAY_API_KEY: '' },
     });
     expect(result.status).toBe(1);
-    expect(result.stderr).toContain('AI_GATEWAY_API_KEY');
+    expect(result.stderr).toContain('無効化');
   });
 });

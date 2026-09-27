@@ -6,6 +6,7 @@ The deployed Supabase Auth email templates are the source of truth:
 - `supabase/functions/send-auth-email/EmailChangeEmail.tsx`
 - `supabase/functions/send-auth-email/MagicLinkEmail.tsx`
 - `supabase/functions/send-auth-email/PasswordResetEmail.tsx`
+- `supabase/functions/send-auth-email/PasswordChangedEmail.tsx`
 - `supabase/functions/send-auth-email/styles.tsx`
 - `supabase/functions/send-auth-email/subjects.ts`
 

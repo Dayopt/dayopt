@@ -15,6 +15,7 @@ import { readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
 import {
+  JEV_MAX_DISTRIBUTION_KEYS,
   JEV_MAX_INPUT_BYTES,
   JEV_MAX_QUESTIONS,
   JEV_MAX_RETRIES,
@@ -25,9 +26,10 @@ import {
   jevCacheKey,
   validateJevRequest,
 } from '../../lib/jev-adapter.ts';
+import { ASSIST_PACKS, claimRequests, contextRequests } from '../../lib/jev-assist-packs.ts';
 import { createShadowPack } from '../../lib/jev-pack-shadow.ts';
 import { createSkillSuggestionPack } from '../../lib/jev-pack-skill-suggestion.ts';
-import { buildPackRequest, packQuestionSetId } from '../../lib/jev-pack.ts';
+import { PACK_IDS, PACK_STATUS, buildPackRequest, packQuestionSetId } from '../../lib/jev-pack.ts';
 import { SHADOW_QUESTION_IDS, SHADOW_QUESTION_SET_ID } from '../../lib/jev-shadow-questions.ts';
 import { SHADOW_SYNTHETIC_CASES } from '../../lib/jev-shadow-synthetic.ts';
 import { buildShadowRequest } from '../../lib/jev-shadow-truth.ts';
@@ -121,6 +123,54 @@ async function run(): Promise<number> {
     });
   }
 
+  const sha = 'a'.repeat(40);
+  const context = contextRequests({
+    number: 1,
+    sha,
+    title: '要求',
+    body: '原文',
+    url: 'https://github.com/Dayopt/dayopt/issues/1',
+    missing: [],
+    candidates: Array.from({ length: 6 }, (_, index) => ({
+      id: `c${index}`,
+      text: '制約',
+      url: 'https://github.com/Dayopt/dayopt/issues/1',
+      updatedAt: '2026-09-20',
+      kind: 'comment' as const,
+    })),
+  });
+  const claims = claimRequests(
+    {
+      schemaVersion: 1,
+      target: { number: 1, sha },
+      claims: [{ id: 'c', text: '主張', evidenceIds: ['e'] }],
+      evidence: [{ id: 'e', kind: 'blob', path: 'AGENTS.md', sha }],
+    },
+    [
+      {
+        id: 'e',
+        text: '原文',
+        url: 'https://github.com/Dayopt/dayopt',
+        sha,
+        missing: null,
+        facts: { existsAtSha: true },
+      },
+    ],
+  );
+  for (const request of [...context, ...claims].map((batch) => batch.request)) {
+    const errors = validateJevRequest(request);
+    checks.push({
+      name: `assist ${request.questionSetId} の質問契約`,
+      ok: errors.length === 0,
+      detail: errors.join(' / ') || `${Object.keys(request.questions).length} 問`,
+    });
+  }
+  checks.push({
+    name: 'assistは採用評価前のshadowで、権限・レビューを変更しない',
+    ok: Object.values(ASSIST_PACKS).every((pack) => pack.mode === 'shadow'),
+    detail: 'ctxはshadow候補をL2へ渡すが、Issue条件・権限・reviewの判定はコード側に残す',
+  });
+
   // Phase 1 の質問セットも同じ静的検査に通す。質問文を足した時に上限や空欄で落ちるのを
   // 課金前に捕まえる（合成 state は代表として shadow の合成ケースを 1 件使う）。
   const shadowErrors = validateJevRequest(buildShadowRequest(SHADOW_SYNTHETIC_CASES[0].state));
@@ -173,6 +223,21 @@ async function run(): Promise<number> {
 
   // 無効化した経路。runner も apiKey も渡さないので、外部へは出ない。
   const disabled = await evaluateWithJev(JEV_SMOKE_CASES[0].request, { disabled: true });
+  // 無効化した pack を「理由なく止まっているもの」にしない。理由が消えると、
+  // 再開してよいのか作り直しが要るのかが後から判断できなくなる。
+  const statusGaps = PACK_IDS.filter((id) => {
+    const entry = PACK_STATUS[id];
+    return !entry || (entry.status === 'disabled' && !entry.reason?.trim());
+  });
+  checks.push({
+    name: '全 pack に status があり、無効な pack には理由が書かれている',
+    ok: statusGaps.length === 0,
+    detail:
+      statusGaps.length === 0
+        ? PACK_IDS.map((id) => `${id}=${PACK_STATUS[id]?.status ?? '(無し)'}`).join(' ')
+        : `理由や status が欠けている: ${statusGaps.join(', ')}`,
+  });
+
   checks.push({
     name: '無効化した経路は外部呼び出しなしで unavailable を返す',
     ok: disabled.status === 'unavailable' && disabled.reasonCode === 'disabled',
@@ -191,6 +256,7 @@ async function run(): Promise<number> {
             maxRetries: JEV_MAX_RETRIES,
             maxInputBytes: JEV_MAX_INPUT_BYTES,
             maxQuestions: JEV_MAX_QUESTIONS,
+            maxDistributionKeys: JEV_MAX_DISTRIBUTION_KEYS,
             minBalanceUsd: JEV_MIN_BALANCE_USD,
           },
           checks,
@@ -202,7 +268,7 @@ async function run(): Promise<number> {
   } else {
     console.log(`Jev 設定検査（schema v${JEV_SCHEMA_VERSION} / model ${JEV_MODEL_ID}）`);
     console.log(
-      `上限: 入力 ${JEV_MAX_INPUT_BYTES} バイト（state + 最長 question）/ 質問 ${JEV_MAX_QUESTIONS} 件 / 残高の床 $${JEV_MIN_BALANCE_USD}`,
+      `上限: 入力 ${JEV_MAX_INPUT_BYTES} バイト（state + 最長 question）/ 質問 ${JEV_MAX_QUESTIONS} 件 / 選択肢・段 ${JEV_MAX_DISTRIBUTION_KEYS} / 残高の床 $${JEV_MIN_BALANCE_USD}`,
     );
     console.log('');
     for (const check of checks)

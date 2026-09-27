@@ -13,7 +13,8 @@ import 'server-only';
  *   `resolveTemplateBlockMinutes` を通す。見えている長さと置かれる長さを一致させるため
  */
 
-import { trackProductEvent } from '@/lib/analytics/product-events';
+import { trackPostHogServerEvent } from '@/lib/analytics/posthog-server';
+import { trackProductEvents } from '@/lib/analytics/product-events';
 import { MS_PER_DAY } from '@/lib/date/constants';
 import { captureUnexpectedDatabaseError } from '@/lib/sentry';
 
@@ -294,7 +295,19 @@ export class PlanTemplateService {
         endAt: plan.endAt,
       })),
     });
-    await trackProductEvent({ eventName: 'plan_created', userId });
+    await trackProductEvents(rows.map(() => ({ eventName: 'plan_created' as const, userId })));
+    if (rows.length > 0) {
+      await trackPostHogServerEvent({
+        eventName: 'plan_created',
+        userId,
+        sourceId: rows
+          .map((row) => row.id)
+          .sort()
+          .join(':'),
+        source: 'manual',
+        count: rows.length,
+      });
+    }
     return rows;
   }
 

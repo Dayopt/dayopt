@@ -11,6 +11,13 @@ vi.mock('@/lib/toast', () => ({
 
 vi.mock('@/lib/trpc', () => ({
   api: {
+    useUtils: () => ({ userSettings: { getAnalyticsConsent: { setData: vi.fn() } } }),
+    userSettings: {
+      getAnalyticsConsent: {
+        useQuery: () => ({ data: { allowed: false }, isLoading: false, isError: false }),
+      },
+      setAnalyticsConsent: { useMutation: () => ({ mutateAsync: vi.fn(), isPending: false }) },
+    },
     user: {
       exportData: {
         useQuery: () => ({ refetch: vi.fn(), isLoading: false, isFetching: false }),
@@ -46,12 +53,16 @@ describe('McpApiSection deployment-bound MCP URL', () => {
     vi.unstubAllEnvs();
   });
 
-  it('productionではcanonical resource URIをそのまま表示する', () => {
+  it('productionではcanonical resource URIを表示し、未公開ガイドへリンクしない', () => {
     vi.stubEnv('NEXT_PUBLIC_MCP_RESOURCE_URI', 'https://mcp.dayopt.app');
     render(<DataSettings />);
 
     expect(screen.getByText(MCP_SECTION_TITLE)).toBeInTheDocument();
     expect(screen.getByText('https://mcp.dayopt.app')).toBeInTheDocument();
+    expect(screen.getByText('settings.dataControls.mcp.connectionGuide')).toBeInTheDocument();
+    expect(
+      screen.queryByRole('link', { name: 'settings.dataControls.mcp.guideLink' }),
+    ).not.toBeInTheDocument();
   });
 
   it('Preview identityではbranch originの/mcp transportを表示する', () => {

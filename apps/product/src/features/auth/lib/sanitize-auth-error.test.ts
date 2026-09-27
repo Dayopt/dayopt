@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import { getAuthErrorKey, RESOLVED_KEYS } from './sanitize-auth-error';
+import { getAuthErrorKey } from '@/lib/auth-error';
+import { RESOLVED_KEYS } from './sanitize-auth-error';
 
 function err(message: string, code?: string) {
   return { message, code };

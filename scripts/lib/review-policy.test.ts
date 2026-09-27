@@ -116,10 +116,16 @@ const evidence = (patch: Record<string, unknown> = {}) => ({
   ...patch,
 });
 
-const APP = 'apps/product/src/features/timeblock/domain/a.ts';
+const APP = 'apps/product/src/lib/billing/a.ts';
 const RLS = 'supabase/migrations/20260916_rls.sql';
 const evaluate = (files: string[], ev: ReturnType<typeof evidence>, extra = {}) =>
-  evaluateReviewPolicy({ plan: plan(files), evidence: ev, now: NOW, ...extra });
+  evaluateReviewPolicy({
+    plan: plan(files),
+    evidence: ev,
+    now: NOW,
+    validationVerdict: 'satisfied',
+    ...extra,
+  });
 
 describe('review policy: requirement from plan', () => {
   it('does not require or request a review for README typos', () => {
@@ -129,17 +135,32 @@ describe('review policy: requirement from plan', () => {
     expect(toReviewCommitStatus(result).state).toBe('success');
   });
 
-  it.each([
-    RLS,
-    'apps/product/src/app/api/mcp/a.ts',
-    'apps/product/src/lib/time/a.ts',
-    'AGENTS.md',
-  ])('requires review with the four focus points for %s', (file) => {
-    const result = evaluate([file], evidence());
+  it.each([RLS, 'apps/product/src/app/api/mcp/a.ts', 'scripts/lib/review-policy.mjs'])(
+    'requires review with the four focus points for %s',
+    (file) => {
+      const result = evaluate([file], evidence(), { validationVerdict: 'satisfied' });
+      expect(result.required).toBe('required');
+      expect(result.focus).toEqual(['REVIEW-1', 'REVIEW-2', 'REVIEW-3', 'TEST-1']);
+      expect(result.state).toBe('not-started');
+      expect(result.trigger.shouldRequest).toBe(true);
+      expect(result.verdict).toBe('pending');
+    },
+  );
+
+  it.each(['apps/product/src/lib/time/a.ts', 'AGENTS.md', 'apps/product/src/a.tsx'])(
+    'does not require review for a reversible change: %s',
+    (file) => {
+      const result = evaluate([file], evidence(), { validationVerdict: 'satisfied' });
+      expect(result.verdict).toBe('not-required');
+      expect(result.trigger.shouldRequest).toBe(false);
+    },
+  );
+
+  it('does not suggest a request until validation is satisfied', () => {
+    const result = evaluate([RLS], evidence(), { validationVerdict: 'pending' });
     expect(result.required).toBe('required');
-    expect(result.focus).toEqual(['REVIEW-1', 'REVIEW-2', 'REVIEW-3', 'TEST-1']);
     expect(result.state).toBe('not-started');
-    expect(result.trigger.shouldRequest).toBe(true);
+    expect(result.trigger.shouldRequest).toBe(false);
     expect(result.verdict).toBe('pending');
   });
 
@@ -191,14 +212,15 @@ describe('review policy: completion evidence', () => {
     expect(silent.reason).toMatch(/without a reply/);
   });
 
-  it('treats a review of an older commit as stale and would request again', () => {
+  it('treats a review of an older commit as stale without requesting again automatically', () => {
     const result = evaluate(
       [APP],
       evidence({ reviews: [codexReview(OLD)], threads: [thread('PRR_1')] }),
     );
     expect(result.state).toBe('stale');
     expect(result.verdict).toBe('pending');
-    expect(result.trigger.shouldRequest).toBe(true);
+    expect(result.trigger.shouldRequest).toBe(false);
+    expect(result.trigger.reason).toMatch(/scope/i);
   });
 
   it('does not accept a summary table row, a request comment or a reaction as completion', () => {
@@ -385,7 +407,7 @@ describe('review policy: completion evidence', () => {
     );
     expect(stale.state).toBe('stale');
     expect(stale.verdict).toBe('pending');
-    expect(stale.trigger.shouldRequest).toBe(true);
+    expect(stale.trigger.shouldRequest).toBe(false);
   });
 
   it('does not request a review of a blocked head or a draft', () => {

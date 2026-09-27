@@ -22,8 +22,6 @@ test('footer の言語切替で locale prefix と hero copy が切り替わる',
 });
 
 test('登録 CTA が product signup に統一されている', async ({ page }) => {
-  expect(dayoptProductUrls.signup).toBe('https://app.dayopt.app/auth/signup');
-
   await page.goto('/');
 
   const signupHrefs = await page
@@ -36,6 +34,19 @@ test('登録 CTA が product signup に統一されている', async ({ page }) 
 
   expect(signupHrefs.length).toBeGreaterThan(0);
   expect(signupHrefs.every((href) => href === dayoptProductUrls.signup)).toBe(true);
+});
+
+test('LP は 390px 幅でも en/ja の hero と料金セクションを表示する', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+
+  for (const [path, heroCopy] of [
+    ['/', 'Plan days you can actually keep.'],
+    ['/ja/', '守れる計画を、立てられるように。'],
+  ] as const) {
+    await page.goto(path);
+    await expect(page.getByRole('heading', { level: 1 })).toContainText(heroCopy);
+    await expect(page.locator('#pricing')).toBeVisible();
+  }
 });
 
 test('LP metadata と OG image が新コピーに整合する', async ({ page }) => {
@@ -61,7 +72,6 @@ test('LP metadata と OG image が新コピーに整合する', async ({ page })
   expect(response.ok()).toBe(true);
   expect(response.headers()['content-type']).toContain('image/png');
 });
-
 test('LP の en/ja × desktop/mobile を表示できる', async ({ page }, testInfo) => {
   const patterns = [
     {

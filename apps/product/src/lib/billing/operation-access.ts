@@ -12,6 +12,8 @@ const managementMutations = new Set([
   'billing.createPortalSession',
   'userSettings.update',
   'userSettings.updateProfile',
+  'userSettings.setAnalyticsConsent',
+  'userSettings.claimSignupCompletion',
   'userSettings.regenerateICalToken',
   'mcpConnections.revoke',
   'externalCalendar.disconnect',

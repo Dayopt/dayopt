@@ -3,8 +3,8 @@ import { resolveProtectedPathGate } from '../ci/protected-path-gate.mjs';
 /**
  * Advisory routing only: never a permission, readiness label, or model launcher.
  * @param {{files: string[] | null, labels?: string[], body?: string,
- * acceptance?: boolean, verification?: boolean, metadataAvailable?: boolean,
- * state?: string | null}} input
+ * acceptance?: boolean, verification?: boolean, missingContractSections?: string[],
+ * metadataAvailable?: boolean, state?: string | null}} input
  */
 export function resolveFactoryRoute({
   files,
@@ -12,6 +12,7 @@ export function resolveFactoryRoute({
   body = '',
   acceptance = false,
   verification = false,
+  missingContractSections = [],
   metadataAvailable = false,
   state = null,
 }) {
@@ -21,6 +22,7 @@ export function resolveFactoryRoute({
   const missing = [];
   if (!metadataAvailable) missing.push('元の issue / PR 情報');
   if (paths.length === 0) missing.push('対象パス');
+  for (const section of missingContractSections) missing.push(`${section}（Issue Contract）`);
   if (!acceptance) missing.push('受け入れ条件');
   if (!verification) missing.push('検証コマンド');
   const reasons = [];

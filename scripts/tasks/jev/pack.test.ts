@@ -4,8 +4,10 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
+import { jevStoreRoot } from '../../lib/jev-assist-store.ts';
+import { PACK_IDS, PACK_STATUS } from '../../lib/jev-pack.ts';
 import { mapSkills } from '../ctx.mjs';
-import { PACK_IDS, parsePackArgs } from './pack.ts';
+import { parsePackArgs } from './pack.ts';
 
 const repoRoot = join(import.meta.dirname, '../../..');
 
@@ -27,11 +29,11 @@ describe('引数は完全に解釈する', () => {
     const evaluate = parsePackArgs(['skill-suggestion', 'evaluate']);
     const report = parsePackArgs(['shadow-e1', 'report', '--threshold', '0.6']);
     expect(evaluate.ok && evaluate.args).toMatchObject({
-      out: join('tmp', 'jev', 'skill-suggestion'),
+      out: join(jevStoreRoot(repoRoot), 'packs', 'skill-suggestion'),
       split: 'tune',
     });
     expect(report.ok && report.args).toMatchObject({
-      out: join('tmp', 'jev', 'shadow-e1'),
+      out: join(jevStoreRoot(repoRoot), 'packs', 'shadow-e1'),
       split: 'all',
       threshold: 0.6,
     });
@@ -45,7 +47,7 @@ describe('ctx.mjs の mapSkills は roster の skill を path から返す', () 
     expect(mapSkills(['supabase/migrations/1.sql'], false)).toEqual(['supabase']);
     expect(mapSkills(['apps/product/messages/ja/auth.json'], false)).toEqual(['i18n']);
     expect(mapSkills(['scripts/lib/x.test.ts'], false)).toEqual(['test']);
-    expect(mapSkills(['scripts/ci/gate.mjs'], false)).toEqual(['pr-cross-review']);
+    expect(mapSkills(['scripts/ci/gate.mjs'], false)).toEqual([]);
   });
 });
 
@@ -99,5 +101,59 @@ describe('CLI として起動できる', () => {
     );
     expect(result.status).toBe(1);
     expect(result.stderr).toContain('AI_GATEWAY_API_KEY');
+  });
+});
+
+/**
+ * #2827 の不変条件「各 pack は独立して無効化・撤去できる」。`JEV_DISABLED=1` は
+ * adapter 全体の kill switch なので、pack 単位で止める手段がこれとは別に要る。
+ */
+describe('無効化した pack は evaluate だけが止まる', () => {
+  it('shadow-e1 は無効で理由を持ち、skill-suggestion は有効', () => {
+    expect(PACK_STATUS['shadow-e1']).toMatchObject({ status: 'disabled' });
+    expect(PACK_STATUS['shadow-e1'].reason?.trim()).toBeTruthy();
+    expect(PACK_STATUS['skill-suggestion'].status).toBe('active');
+    // status の付け忘れた pack を残さない
+    expect(Object.keys(PACK_STATUS).sort()).toEqual([...PACK_IDS].sort());
+  });
+
+  it('evaluate は credential を持っていても送信前に止まる', () => {
+    const result = spawnSync(
+      'pnpm',
+      ['exec', 'tsx', 'scripts/tasks/jev/pack.ts', 'shadow-e1', 'evaluate'],
+      {
+        cwd: repoRoot,
+        encoding: 'utf8',
+        // key がある状態でも止まることを見る（止まる理由が「key が無い」ではない）
+        env: { ...process.env, AI_GATEWAY_API_KEY: 'test-key-not-used' },
+      },
+    );
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('無効化');
+    expect(result.stderr).toContain(PACK_STATUS['shadow-e1'].reason ?? '');
+  });
+
+  it('旧 CLI（pnpm jev:shadow）からも迂回できない', () => {
+    // `jev:shadow evaluate` は pack shadow-e1 と同じ質問セットを送る。入口が 2 つある
+    // ことを理由に無効化が片方だけに効くと、docs が案内している旧コマンドで課金できる
+    const result = spawnSync('pnpm', ['exec', 'tsx', 'scripts/tasks/jev/shadow.ts', 'evaluate'], {
+      cwd: repoRoot,
+      encoding: 'utf8',
+      env: { ...process.env, AI_GATEWAY_API_KEY: 'test-key-not-used' },
+    });
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('無効化');
+    expect(result.stderr).toContain(PACK_STATUS['shadow-e1'].reason ?? '');
+  });
+
+  it('report は無効な pack でも読める（negative result を失わない）', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'jev-pack-disabled-'));
+    const result = spawnSync(
+      'pnpm',
+      ['exec', 'tsx', 'scripts/tasks/jev/pack.ts', 'shadow-e1', 'report', '--out', dir, '--json'],
+      { cwd: repoRoot, encoding: 'utf8' },
+    );
+    expect(result.status).toBe(0);
+    expect(JSON.parse(result.stdout)).toMatchObject({ packId: 'shadow-e1' });
   });
 });

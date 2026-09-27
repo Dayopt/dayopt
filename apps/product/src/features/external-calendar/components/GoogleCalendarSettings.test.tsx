@@ -1,4 +1,4 @@
-import { act, render } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 type SelectionInput = {
@@ -60,11 +60,22 @@ const mocks = vi.hoisted(() => ({
   statusSetData: vi.fn(),
   statusInvalidate: vi.fn(),
   listEventsInvalidate: vi.fn(),
+  providerQueryOptions: null as { enabled?: boolean } | null,
+  canUseProduct: true,
 }));
 
 vi.mock('next-intl', () => ({
   useLocale: () => 'ja',
   useTranslations: () => (key: string) => key,
+}));
+
+vi.mock('@/lib/billing/BillingAccessProvider', () => ({
+  useBillingAccess: () => ({
+    state: mocks.canUseProduct ? 'trial' : 'expired',
+    canUseProduct: mocks.canUseProduct,
+    trialEndsAt: null,
+    enforced: true,
+  }),
 }));
 
 vi.mock('@/lib/hooks/useHasMounted', () => ({
@@ -117,7 +128,8 @@ vi.mock('@/lib/trpc', () => ({
         useQuery: () => ({ data: PREVIOUS_STATUS, isError: false, refetch: vi.fn() }),
       },
       listProviderCalendars: {
-        useQuery: () => ({
+        useQuery: (_input: unknown, options: { enabled?: boolean }) => ({
+          ...((mocks.providerQueryOptions = options), {}),
           data: PREVIOUS_PROVIDER,
           error: null,
           isLoading: false,
@@ -159,6 +171,8 @@ describe('GoogleCalendarSettings mutation contracts', () => {
     mocks.updateOptions = null;
     mocks.syncOptions = null;
     mocks.disconnectOptions = null;
+    mocks.providerQueryOptions = null;
+    mocks.canUseProduct = true;
     mocks.providerGetData.mockReturnValue(PREVIOUS_PROVIDER);
     mocks.statusGetData.mockReturnValue(PREVIOUS_STATUS);
     for (const invalidate of [
@@ -226,6 +240,21 @@ describe('GoogleCalendarSettings mutation contracts', () => {
     expect(mocks.listInvalidate).toHaveBeenCalledOnce();
     expect(mocks.statusInvalidate).toHaveBeenCalledWith(QUERY_INPUT);
     expect(mocks.listEventsInvalidate).toHaveBeenCalledOnce();
+  });
+
+  it('利用権が無い時は server が拒否する呼び出し（一覧取得・選択更新・手動同期）を送らない', () => {
+    // server は listProviderCalendars / updateSelectedCalendars / syncNow を
+    // BILLING_ACCESS_ENDED で拒否する（lib/billing/operation-access.ts）。UI 側で止めないと
+    // 「同期に失敗しました」の汎用 toast だけが残り、障害と区別できない。切断は server も
+    // 許すので残す。
+    mocks.canUseProduct = false;
+    render(<GoogleCalendarSettings />);
+
+    expect(mocks.providerQueryOptions?.enabled).toBe(false);
+    expect(screen.getByRole('button', { name: 'syncNow' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'apply' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'disconnect' })).toBeEnabled();
+    expect(screen.getByText('dataControls.mcp.proRequired')).toBeInTheDocument();
   });
 
   it('切断は一覧を楽観削除せず、settled 後に全関連 query を再取得する', async () => {

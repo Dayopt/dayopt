@@ -1,0 +1,30 @@
+# 参照用スナップショット（~/.codex/config.toml の意図部分だけ）。symlink しない。
+# 新デバイスでは手で ~/.codex/config.toml へ貼る。[projects.*] / [plugins.*] / [hooks.state] / [desktop] は Codex が自動生成する機械状態なので含めない。
+# MCP 定義は mcp-usage skill に従い repo に置かない（user scope の ~/.codex/config.toml だけに持つ）。
+
+model = "gpt-6-luna"
+model_reasoning_effort = "max"
+model_reasoning_summary = "none"
+model_supports_reasoning_summaries = false
+approval_policy = "on-request"
+approvals_reviewer = "user"
+default_permissions = ":workspace"
+service_tier = "default"
+
+[features]
+memories = true
+js_repl = false
+chronicle = true
+
+[memories]
+generate_memories = true
+use_memories = true
+disable_on_external_context = false
+
+[shell_environment_policy.set]
+GH_CONFIG_DIR = "/Users/tanakatomoya/.config/gh-agent"
+NODE_REPL_TRUSTED_BROWSER_CLIENT_SHA256S = "9230e2bd8b24b7ac7a0ba6774c64bf0d78ecdabbdd91d0ed627b02a587bae2df"
+CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS = "1"
+
+[shell_environment_policy]
+inherit = "core"

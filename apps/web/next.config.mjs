@@ -58,6 +58,7 @@ const nextConfig = {
     const contentSecurityPolicy = buildWebContentSecurityPolicy({
       isDevelopment: isDev,
       sentryIngestOrigin,
+      posthogEnabled: process.env.NEXT_PUBLIC_POSTHOG_BROWSER_ENABLED === 'true',
     });
 
     // security headers の正本はここ 1 箇所。vercel.json には置かない（両方に書くと片側だけ

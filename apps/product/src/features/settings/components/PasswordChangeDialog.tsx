@@ -5,13 +5,10 @@ import { useCallback, useState } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 
-import { useAuthStore } from '@/features/auth';
 import { checkPasswordPwned } from '@/lib/auth/pwned-password';
 import { logger } from '@/lib/logger';
 import { observeAuthOperation } from '@/lib/sentry';
 import { createClient } from '@/lib/supabase/client';
-import { api } from '@/lib/trpc';
-import { getDisplayName } from '@/lib/user';
 import {
   Button,
   Dialog,
@@ -59,10 +56,8 @@ function isCurrentPasswordError(error: unknown): boolean {
  * OWASP/NIST推奨のセキュリティチェックを含む
  */
 export function PasswordChangeDialog({ open, onOpenChange }: PasswordChangeDialogProps) {
-  const user = useAuthStore((state) => state.user);
   const t = useTranslations();
   const supabase = createClient();
-  const { mutate: sendPasswordChangedEmail } = api.email.sendPasswordChanged.useMutation();
 
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -110,10 +105,6 @@ export function PasswordChangeDialog({ open, onOpenChange }: PasswordChangeDialo
       setIsLoading(true);
 
       try {
-        if (!user?.email) {
-          throw new Error(t('common.errors.auth.emailNotFound'));
-        }
-
         // Step 1: Pwned password check (NIST)
         const isPwned = await checkPasswordPwned(newPassword);
         if (isPwned) {
@@ -164,12 +155,8 @@ export function PasswordChangeDialog({ open, onOpenChange }: PasswordChangeDialo
         }
         setSignOutOthersFailed(!signOutSucceeded);
 
-        // Step 4: Send password changed notification email (fire-and-forget)
-        sendPasswordChangedEmail({
-          email: user.email,
-          userName: getDisplayName(user, 'there'),
-        });
-
+        // 通知は、この updateUser が発火する Supabase Auth の
+        // password_changed_notification を send-email hook が配送する（#2848）。
         setSuccess(true);
       } catch (err) {
         logger.error('Password update error:', err);
@@ -180,7 +167,7 @@ export function PasswordChangeDialog({ open, onOpenChange }: PasswordChangeDialo
         setIsLoading(false);
       }
     },
-    [currentPassword, newPassword, confirmPassword, user, t, supabase, sendPasswordChangedEmail],
+    [currentPassword, newPassword, confirmPassword, t, supabase],
   );
 
   return (

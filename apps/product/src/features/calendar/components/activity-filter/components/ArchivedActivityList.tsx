@@ -13,6 +13,7 @@ import {
   useRestoreActivity,
   useRestoreCategory,
 } from '@/features/activities';
+import { useProductAccessGate } from '@/lib/billing/useProductAccessGate';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -70,6 +71,8 @@ export function ArchivedActivityList({
 
   const restoreActivity = useRestoreActivity();
   const restoreCategory = useRestoreCategory();
+  // restore は利用権無しで server が拒否する（delete は許す）。送る前に止める
+  const gateProductAccess = useProductAccessGate();
 
   // カテゴリーを先に出す。アクティビティの所属先なので、復元の順序としても自然
   const entries = useMemo<ArchivedEntry[]>(
@@ -137,9 +140,11 @@ export function ArchivedActivityList({
               <DropdownMenuContent align="start" side="right">
                 <DropdownMenuItem
                   onClick={() =>
-                    entry.kind === 'category'
-                      ? restoreCategory.mutate({ id: entry.id })
-                      : restoreActivity.mutate({ id: entry.id })
+                    gateProductAccess(() =>
+                      entry.kind === 'category'
+                        ? restoreCategory.mutate({ id: entry.id })
+                        : restoreActivity.mutate({ id: entry.id }),
+                    )
                   }
                 >
                   <ArchiveRestore className="size-4" />

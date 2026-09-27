@@ -43,7 +43,23 @@ export function classifyPlanPath(file) {
     )
   )
     areas.push('dependencies');
-  if (areas.length === 0) areas.push(/^(apps|packages)\//.test(file) ? 'behavior' : 'unknown');
+  // repo 直下の設定ファイルと editor 設定は **repo の規約**であって未分類ではない。
+  // `impact.mjs` は同じ集合を `rootNeutral` / 中立 prefix（`.vscode/`）として既に知っており、
+  // plan 側だけが `unknown` へ落としていた（#2811 のコメント、#2815 と同じ class）。
+  //
+  // `unknown` は全 suite を required にするだけでなく `databaseTests` まで applicable にし、
+  // `evaluateDatabaseIsolation` が隔離 Supabase branch を要求する。しかし Supabase Preview は
+  // migration が無ければ起動しないので **PR 側に満たす手段が無く恒久 blocked** になる。
+  // `.gitignore` の 3 行削除で実発生（PR #2868 の `Validation (shadow)`）。
+  //
+  // fail closed は残す: `apps/` `packages/` 配下でも repo 直下でもない**未知のディレクトリ**
+  // （`terraform/` 等が増えた場合）は従来どおり `unknown` にする。
+  // `patches/**` は pnpm の `patchedDependencies`。impact.mjs 側は両 app の build 影響として
+  // 扱うので、plan 側も未分類にしない（area は依存設定と同じ `dependencies`）。
+  if (file.startsWith('patches/')) areas.push('dependencies');
+  const repoConfig = !file.includes('/') || file.startsWith('.vscode/');
+  if (areas.length === 0)
+    areas.push(/^(apps|packages)\//.test(file) ? 'behavior' : repoConfig ? 'policy' : 'unknown');
   return areas;
 }
 
@@ -87,7 +103,6 @@ export function createValidationPlan(input, options = {}) {
   const proseOnly =
     files.length > 0 &&
     files.every((file) => classifyPlanPath(file).every((area) => area === 'prose'));
-  const policy = areas.includes('policy');
   const database = areas.includes('database');
   // integration job（fresh）は `supabase/migrations/**` 全体で走る。upgrade / old-consumer job は
   // production に適用される root の migration ファイルだけで起動する（check.mjs と同じ判定）
@@ -144,7 +159,11 @@ export function createValidationPlan(input, options = {}) {
       'Live consumer must remain compatible after migration',
     ),
   };
-  const reviewRequired = !proseOnly || protectedPaths.required || unknown;
+  // #2489 の正本: 独立レビューは「外部契約 or 不可逆」と機械ガードレール自身だけ。
+  // 通常ロジック・時間不変条件・agent 向け文書は、対象 test / CI とセルフレビューで閉じる。
+  // diff / revision の不完全性は suite() が indeterminate にするため、ここで reviewRequired を
+  // 広げて「未知の変更 = 外部契約」と読み替えない。
+  const reviewRequired = protectedPaths.required;
   return {
     schemaVersion: PLAN_VERSION,
     policyVersion: PLAN_VERSION,
@@ -169,10 +188,12 @@ export function createValidationPlan(input, options = {}) {
     review: {
       ...suite(
         reviewRequired,
-        proseOnly ? 'Allowlisted prose only' : 'Behavior, policy or external contract changed',
+        reviewRequired
+          ? `External contract, irreversible change, or guardrail: ${protectedPaths.reason}`
+          : 'No external contract, irreversible change, or review guardrail changed',
       ),
       focus: reviewRequired ? ['REVIEW-1', 'REVIEW-2', 'REVIEW-3', 'TEST-1'] : [],
-      protected: protectedPaths.required || policy,
+      protected: protectedPaths.required,
     },
     authority: {
       code: proseOnly ? 'AUTONOMOUS' : 'CHECKPOINT',

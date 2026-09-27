@@ -49,6 +49,7 @@ import {
 } from '../lib/architecture-map/relations.ts';
 import { parseSchemaModel } from '../lib/architecture-map/schema-model.ts';
 import {
+  discoverHttpRoutes,
   foldPgCronJobs,
   parseAnalyticsEventCheck,
   parseAnalyticsEventNames,
@@ -980,6 +981,14 @@ describe('surface: 運用面の発見', () => {
     expect(routeUrlOf('apps/product/src/app/.well-known/oauth-protected-resource/route.ts')).toBe(
       '/.well-known/oauth-protected-resource',
     );
+  });
+
+  it('route.tsx も HTTP route として発見する', () => {
+    expect(
+      discoverHttpRoutes(REPO_ROOT).find(
+        (route) => route.path === 'apps/web/src/app/api/og/route.tsx',
+      ),
+    ).toMatchObject({ app: 'web', id: '/api/og' });
   });
 
   it('pg_cron は schedule / unschedule を migration 順に畳む', () => {

@@ -5,6 +5,7 @@ import {
   describeFailure,
   evaluateWithJev,
   isExpectedJevModelId,
+  JEV_MAX_DISTRIBUTION_KEYS,
   jevCacheKey,
   jevInputBytes,
   normalizeJevAnswer,
@@ -185,6 +186,96 @@ describe('Jev adapter が送信しない条件', () => {
   });
 });
 
+/**
+ * #2842。許容誤差を段数・選択肢数に合わせる代わりに、固定の許容誤差で証明できる
+ * 範囲へ入力を閉じた。**偽陰性（正常な丸め結果を捨てる）と偽陽性（食い違いを見逃す）の
+ * 両方向**を上限の境界で固定する。片方だけ見て緩めたり締めたりしないため。
+ */
+describe('分布のキー数は固定の許容誤差で証明できる範囲に閉じる', () => {
+  function choiceWith(count: number): JevQuestion {
+    return {
+      type: 'choice',
+      instructions: '選ぶ',
+      criteria: Object.fromEntries(
+        Array.from({ length: count }, (_, index) => [`o${index}`, `選択肢 ${index}`]),
+      ),
+    };
+  }
+
+  function scoreWith(levels: number): JevQuestion {
+    return {
+      type: 'score',
+      instructions: '測る',
+      criteria: Array.from({ length: levels }, (_, index) => `段 ${index}`),
+    };
+  }
+
+  it('上限ちょうどは通り、超えたら静的検査で落ちる', () => {
+    expect(JEV_MAX_DISTRIBUTION_KEYS).toBe(5);
+    const atLimit = { ...request, questions: { c: choiceWith(5), s: scoreWith(5) } };
+    expect(validateJevRequest(atLimit)).toEqual([]);
+
+    const overChoice = { ...request, questions: { c: choiceWith(6) } };
+    expect(validateJevRequest(overChoice)).toContain('c.criteria: 6 択は上限 5 超');
+
+    const overScore = { ...request, questions: { s: scoreWith(6) } };
+    expect(validateJevRequest(overScore)).toContain('s.criteria: 6 段は上限 5 超');
+  });
+
+  it('上限内なら、正常な丸め結果を捨てない（偽陰性の側）', () => {
+    // 5 択を小数 2 桁へ丸めた最悪ケース。合計は 1.025 で許容誤差 0.03 の内側に残る。
+    // 6 択にすると合計 1.03 が倍精度で 0.030000000000000027 になり、各値が正常な
+    // 丸め結果なのに invalid_response として捨てられる（上限を 5 にした理由）
+    expect(
+      normalizeJevAnswer(choiceWith(5), {
+        type: 'choice',
+        choice: 'o4',
+        probabilities: { o0: 0.17, o1: 0.17, o2: 0.17, o3: 0.17, o4: 0.325 },
+      }),
+    ).toMatchObject({ choice: 'o4' });
+
+    // 5 段の加重平均 2.2 に対し、丸めで score だけ 2.24 へずれた形（許容誤差 0.06 の内側）
+    expect(
+      normalizeJevAnswer(scoreWith(5), {
+        type: 'score',
+        score: 2.24,
+        probabilities: { '0': 0.1, '1': 0.2, '2': 0.3, '3': 0.2, '4': 0.2 },
+      }),
+    ).toMatchObject({ type: 'score', score: 2.24 });
+  });
+
+  it('上限内なら、段数が増えても食い違いを見逃さない（偽陽性の側）', () => {
+    // 21 段では許容誤差が 1.06 まで膨らみ、この形が素通りしていた（#2842 の 1）。
+    // 5 段では 0.06 なので落ちる
+    expect(
+      normalizeJevAnswer(scoreWith(5), {
+        type: 'score',
+        score: 0,
+        probabilities: { '0': 0, '1': 1, '2': 0, '3': 0, '4': 0 },
+      }),
+    ).toBeNull();
+  });
+
+  it('2026-09-18 の実測値は引き続き通る', () => {
+    // 上限の導入で既存の 3 択・3 段の挙動が変わっていないことの固定
+    expect(
+      normalizeJevAnswer(questions.lane, {
+        type: 'choice',
+        choice: 'standard',
+        probabilities: { routine: 0.23, frontier: 0, standard: 0.77 },
+      }),
+    ).toMatchObject({ choice: 'standard', topProbability: 0.77 });
+
+    expect(
+      normalizeJevAnswer(questions.evidence, {
+        type: 'score',
+        score: 2,
+        probabilities: { '0': 0, '1': 0, '2': 1 },
+      }),
+    ).toMatchObject({ type: 'score', score: 2 });
+  });
+});
+
 describe('入力上限はバイトで測る（多言語でも token 上限を超えない）', () => {
   it('同じ文字数でも日本語の state は先に上限へ当たる', async () => {
     const ascii: JevRequest = { ...request, state: { body: 'a'.repeat(400) } };
@@ -317,8 +408,13 @@ describe('Jev の応答かどうかの判定', () => {
   it.each([
     ['実測どおりの alias', 'typesafe-ai/jev', true],
     ['version 付き（将来 Gateway が返す可能性）', 'typesafe-ai/jev-1.13.0', true],
+    ['version が 1 段', 'typesafe-ai/jev-2', true],
     ['別モデル', 'openai/gpt-5.6-sol', false],
     ['前方一致だが別モデル', 'typesafe-ai/jevx', false],
+    // #2842 の 3。前方一致では素通りしていた形
+    ['version でない接尾辞', 'typesafe-ai/jev-preview', false],
+    ['ハイフンだけ', 'typesafe-ai/jev-', false],
+    ['version の後ろに余分', 'typesafe-ai/jev-1.13.0-preview', false],
     ['欠落', null, false],
   ])('%s → %s', (_label, modelId, expected) => {
     expect(isExpectedJevModelId(modelId as string | null)).toBe(expected);

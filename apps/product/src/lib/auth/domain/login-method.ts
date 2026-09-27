@@ -6,9 +6,6 @@
  *
  * 判定には `app_metadata.providers` を使う。`user.identities` は session 由来の
  * user オブジェクトに含まれないことがあり、判定が不安定になるため使わない。
- *
- * NOTE: ここでいう identity は Supabase Auth の認証 identity。アプリ内部の
- * `ProductIdentity`（userId / role / subscriptionStatus）とは別概念。
  */
 
 /** 判定に必要な最小の user 形。Supabase の `User` をそのまま渡せる */

@@ -218,6 +218,11 @@ pass = ""
 admin_email = ""
 sender_name = ""
 
+[auth.email.notification.password_changed]
+# Security notification は Auth event でだけ発火する。任意の client endpoint からは送らない。
+enabled = true
+subject = "Your Dayopt password was changed"
+
 # Uncomment to customize email template
 # [auth.email.template.invite]
 # subject = "You have been invited"

@@ -308,20 +308,22 @@ export function evaluateReviewPolicy({
 
   const shouldRequest =
     prOpen &&
-    ['not-started', 'stale'].includes(state) &&
+    state === 'not-started' &&
     openRequests.length === 0 &&
-    validationVerdict !== 'blocked';
+    validationVerdict === 'satisfied';
   const trigger = {
     shouldRequest,
     reason: shouldRequest
       ? `Request @codex review for ${headSha.slice(0, 9)} (${state})`
       : !prOpen
         ? 'PR is not ready for review'
-        : validationVerdict === 'blocked'
-          ? 'Validation is blocked; do not request a review of a failing head'
-          : openRequests.length > 0
-            ? 'A request for this head already exists'
-            : `No request needed (${state})`,
+        : state === 'stale'
+          ? 'Previous review is stale; check whether the protected scope changed before requesting again'
+          : validationVerdict !== 'satisfied'
+            ? `Validation is ${validationVerdict}; request only after the head is a merge candidate`
+            : openRequests.length > 0
+              ? 'A request for this head already exists'
+              : `No request needed (${state})`,
   };
 
   // blocked = 自動では前へ進まない状態（無応答 / 失敗 / 未裁定 / 対象不明）。

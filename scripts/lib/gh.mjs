@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process';
 
 /**
  * gh CLI を shell を経由せず呼ぶ共通 wrapper（旧 scripts/ci/night-watch/lib.mjs から
- * 移設。夜勤撤去後も `scripts/tasks/green-watch.mjs` が使う）。
+ * 移設。ctx / trace / ai-usage / validation 系 script が使う）。
  *
  * 設計原則: **動的な値は shell へ二度渡さない**。issue 本文・検索クエリなどの
  * 危険な部分は `execFileSync` の argv 配列で渡す。argv 配列は shell を経由しない

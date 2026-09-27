@@ -25,6 +25,7 @@ import { Suspense } from 'react';
 import { DeferredAnalytics } from '@/lib/analytics/DeferredAnalytics';
 import { THEME_BOOTSTRAP_SCRIPT } from '@/lib/theme/theme-bootstrap-script';
 import { cn } from '@dayopt/components';
+import { PostHogProductAnalytics } from './_components/PostHogProductAnalytics';
 
 // next/font による最適化されたフォント読み込み（Variable Font: wght軸のみ）
 // preload: true でLCP改善（デフォルトでtrueだが明示的に指定）
@@ -98,6 +99,7 @@ export const metadata: Metadata = {
   // アイコン設定（iOS/Android/デスクトップ対応）
   icons: {
     icon: [
+      { url: '/favicon.svg', type: 'image/svg+xml' },
       { url: '/favicon.ico', sizes: 'any' },
       { url: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' },
       { url: '/icons/icon-512.png', sizes: '512x512', type: 'image/png' },
@@ -206,6 +208,7 @@ const RootLayout = async ({ children, params }: RootLayoutProps) => {
           {children}
           {/* LCP/TBT改善: Analyticsを遅延読み込み（-300ms/-150ms） */}
           <DeferredAnalytics />
+          <PostHogProductAnalytics />
         </Suspense>
       </body>
     </html>

@@ -1,9 +1,10 @@
 import { mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import {
+  evaluateWithJev,
   jevCacheKey,
   type JevAnnotation,
   type JevRawResult,
@@ -284,6 +285,26 @@ describe('runEvaluateLoop', () => {
     expect(runner.calls()).toBe(2);
     expect(result.stopped).toBe(true);
     expect(logs.join('\n')).toContain('2 回連続');
+  });
+
+  it('永続的な送信状態では後続caseを評価せず停止する', async () => {
+    const base = await evaluateWithJev(request, { disabled: true });
+    const evaluate = vi.fn(async () => ({
+      ...base,
+      reasonCode: 'rate_locked' as const,
+    }));
+    const result = await runEvaluateLoop({
+      targets: [target(), { id: 'issue-2', annotation: null }],
+      requestOf: () => request,
+      persist: () => {},
+      max: null,
+      delayMs: 0,
+      rateLimitWaitMs: 0,
+      evaluate,
+      sleepImpl: noSleep,
+    });
+    expect(evaluate).toHaveBeenCalledTimes(1);
+    expect(result).toEqual({ sent: 1, stopped: true });
   });
 
   it('残高が下限を割ったら送らずに止まる（credits は購入しない）', async () => {

@@ -61,11 +61,13 @@ function createRuntime(responses: Record<string, MockRpcResponse[]>) {
   const calendar = vi.fn().mockResolvedValue({ status: 'completed' });
   const recoverBilling = vi.fn().mockResolvedValue({ status: 'completed' });
   const storage = vi.fn().mockResolvedValue(undefined);
+  const posthogDeletion = vi.fn().mockResolvedValue(undefined);
   const coordinator = createAccountDeletionCoordinator({
     billing,
     billingQuiesce,
     calendar,
     db,
+    posthogDeletion,
     recoverBilling,
     storage,
   });
@@ -78,6 +80,7 @@ function createRuntime(responses: Record<string, MockRpcResponse[]>) {
     recoverBilling,
     rpc,
     storage,
+    posthogDeletion,
   };
 }
 
@@ -132,7 +135,7 @@ describe('Account deletion coordinator', () => {
   });
 
   it('active gateではCalendar、Storage、Billingを順に完了してgeneric receiptをsealする', async () => {
-    const { billing, billingQuiesce, calendar, coordinator, rpc, storage } =
+    const { billing, billingQuiesce, calendar, coordinator, rpc, storage, posthogDeletion } =
       createRuntime(activeResponses());
 
     await expect(coordinator.beforeIdentityDeletion({ userId: USER_ID })).resolves.toEqual({
@@ -144,6 +147,7 @@ describe('Account deletion coordinator', () => {
       userId: USER_ID,
     });
     expect(storage).toHaveBeenCalledWith({ userId: USER_ID });
+    expect(posthogDeletion).toHaveBeenCalledWith({ userId: USER_ID });
     expect(billingQuiesce).toHaveBeenCalledWith({
       stripeCustomerId: 'cus_bound',
       userId: USER_ID,

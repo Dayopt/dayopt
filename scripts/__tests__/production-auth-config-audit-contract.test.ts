@@ -66,6 +66,7 @@ describe('production auth config audit contract', () => {
       ['security_refresh_token_reuse_interval', 10, null, null],
       ['security_sb_forwarded_for_enabled', false, null, null],
       ['hook_send_email_enabled', true, null, null],
+      ['mailer_notifications_password_changed_enabled', true, null, null],
       ['hook_custom_access_token_enabled', false, null, null],
       ['mfa_totp_verify_enabled', true, null, null],
       ['mfa_allow_low_aal', false, null, null],

@@ -37,7 +37,7 @@ const MULTI_KEY_EXCEPTIONS: Record<string, string[]> = {
   email: [
     'emailCommon',
     'welcome',
-    'passwordChanged',
+    // passwordChanged は Supabase Auth Hook の inline en/ja 辞書へ移した（#2848）。
     'mfaDisabled',
     'accountDeletion',
     'trialStart',

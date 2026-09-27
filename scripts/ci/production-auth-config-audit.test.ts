@@ -79,6 +79,19 @@ describe('auditSupabaseAuthConfig', () => {
     expect(errors[0]).toContain('[fail-closed]');
   });
 
+  it('パスワード変更通知が無効なら failure にする', () => {
+    const config = {
+      ...compliantAuthConfig(),
+      mailer_notifications_password_changed_enabled: false,
+    };
+
+    const errors = auditSupabaseAuthConfig(config);
+
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toContain('mailer_notifications_password_changed_enabled must be true');
+    expect(errors[0]).toContain('[fail-closed]');
+  });
+
   it('契約にも除外リストにも無い security_* キーは failure にする', () => {
     // 契約は「知っているキー」しか守れない。未知の設定が現れたら 1 度止めて、
     // pin するか除外リストへ入れるかの判断を強制する（2026-08-11 に

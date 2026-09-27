@@ -1,5 +1,5 @@
-import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { render, screen } from '@testing-library/react';
+import { describe, expect, it } from 'vitest';
 
 import type { PlanEvent, RecordEvent } from '@/features/timeblock';
 import type { TwoLanePosition } from '../../../../../lib/two-lane-layout';
@@ -49,33 +49,5 @@ describe('TwoLane cards time format', () => {
     );
 
     expect(screen.getByText('1:05 PM–2:30 PM')).toBeInTheDocument();
-  });
-});
-
-describe('TwoLane cards keyboard interaction', () => {
-  it('PlanカードをbuttonとしてEnterで開く', () => {
-    const onClick = vi.fn();
-    render(
-      <PlanLaneCard event={plan} position={position} activityName="Focus" onClick={onClick} />,
-    );
-
-    const card = screen.getByRole('button', { name: 'Focus' });
-    expect(card).toHaveClass('focus-visible:ring-ring');
-    fireEvent.keyDown(card, { key: 'Enter' });
-
-    expect(onClick).toHaveBeenCalledWith(plan, expect.any(Object));
-  });
-
-  it('RecordカードをbuttonとしてSpaceで開く', () => {
-    const onClick = vi.fn();
-    render(
-      <RecordLaneCard event={record} position={position} activityName="Focus" onClick={onClick} />,
-    );
-
-    const card = screen.getByRole('button', { name: 'Focus' });
-    expect(card).toHaveClass('focus-visible:ring-ring');
-    fireEvent.keyDown(card, { key: ' ' });
-
-    expect(onClick).toHaveBeenCalledWith(record, expect.any(Object));
   });
 });

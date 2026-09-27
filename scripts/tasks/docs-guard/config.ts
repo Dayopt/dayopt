@@ -11,7 +11,7 @@ export const DOCS_DIR = resolve(ROOT, 'docs');
 // status / last_verified が必須の stock domain。
 // 2026-08-10: marketing ドメインは廃止し business へ統合したため削除
 // （docs/marketing/* は git mv 済みで docs/business/* 配下に存在しない）。
-export const STOCK_DIRS = ['business', 'product', 'engineering', 'operations', 'company'];
+export const STOCK_DIRS = ['business', 'product', 'engineering', 'operations', 'company', 'learn'];
 
 // STOCK_DIRS はドメインサブディレクトリ単位で stock 契約を適用するための allowlist。
 // docs ルート直下へ昇格した個別ファイルはドメインを持たないため、ここに明示する。

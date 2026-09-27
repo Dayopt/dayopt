@@ -67,6 +67,12 @@ export const AUTH_EMAIL_TEMPLATES: readonly AuthEmailTemplate[] = [
     ],
   },
   {
+    source: 'supabase/functions/send-auth-email/PasswordChangedEmail.tsx',
+    destination: 'apps/product/src/emails/PasswordChangedEmail.tsx',
+    componentName: 'PasswordChangedEmail',
+    kind: 'template',
+  },
+  {
     source: 'supabase/functions/send-auth-email/styles.tsx',
     destination: 'apps/product/src/emails/auth-email-styles.generated.ts',
     kind: 'styles',

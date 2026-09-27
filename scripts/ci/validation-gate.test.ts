@@ -120,6 +120,12 @@ function fakeApi(overrides: Record<string, unknown> = {}) {
           target_url: 'https://vercel.com/dayopt/product/x',
           description: 'Deployment has completed',
         },
+        {
+          context: 'Vercel – web',
+          state: 'success',
+          target_url: 'https://vercel.com/dayopt/web/x',
+          description: 'Deployment has completed',
+        },
       ],
     },
     [`repos/${REPO}/deployments?sha=${headSha}&per_page=100`]: [
@@ -811,7 +817,8 @@ describe('validation gate controller', () => {
       postStatus: () => '',
       now: () => new Date('2026-09-16T10:55:00Z'),
     });
-    // 依頼 comment は head より前 → 無視され、not-started で「起動する」判定になるが投稿はしない
+    // 依頼 comment は head より前なので not-started。required merge checks は成功済みなので、
+    // Validation の成功語彙 `pass` を正規化して起動候補だけを通知する（投稿はしない）
     expect(outcome.review?.state).toBe('not-started');
     expect(outcome.review?.trigger.shouldRequest).toBe(true);
     expect(outputs.some((text) => text.startsWith('::notice::Review policy'))).toBe(true);

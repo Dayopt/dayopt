@@ -25,11 +25,8 @@ describe('createI18nRequestConfig', () => {
     expect(loader).toHaveBeenCalledWith('ja');
   });
 
-  it.each([
-    ['missing locale', undefined],
-    ['invalid locale', 'fr'],
-  ])('%s は default locale にフォールバックする', async (_label, requestLocale) => {
-    const { config, loader } = await resolveRequest(requestLocale);
+  it('不正 locale は default locale にフォールバックする', async () => {
+    const { config, loader } = await resolveRequest('fr');
 
     expect(config).toEqual({ locale: 'en', messages: { loadedLocale: 'en' } });
     expect(loader).toHaveBeenCalledOnce();

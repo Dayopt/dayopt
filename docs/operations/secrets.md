@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-09-07
+last_verified: 2026-09-22
 code: scripts/tasks/env/schema.ts
 ---
 
@@ -250,6 +250,7 @@ vault は 2026-08-14 の信頼境界軸再編（[#2086](https://github.com/Dayop
 | `github-agent`        | `credential`（fine-grained PAT、Dayopt/dayopt 限定）, `expires`                                                                                                                                                                                                                                                                                      | Agent セッションの `gh` / git push 用 identity。op run では消費せず `GH_CONFIG_DIR` の replica で使う（下記 §Agent の gh identity）                                                                             |
 | `supabase-agent`      | `credential`（Supabase scoped access token、read 権限だけ、90 日期限）, `expires`                                                                                                                                                                                                                                                                    | Agent の production Supabase 読み取り（supabase MCP `--read-only`、`supabase-mgmt-safe-get.mjs`）。下記 §Agent の Supabase 読み取り token                                                                       |
 | `sentry-cli-readonly` | `credential`（Sentry user auth token、read scope だけ）                                                                                                                                                                                                                                                                                              | Agent の Sentry 読み取り（`sentry` CLI を inline `op://` で起動）。org `dayopt` での access は `alerts:read` / `member:read` / `project:read` / `team:read` / `org:read` / `event:read` だけ（2026-09-14 実測） |
+| `vercel-ai-gateway`   | `credential`（AI Gateway API key、budget $4 / 月、90 日期限）, `expires`                                                                                                                                                                                                                                                                             | 評価モデル Jev の呼び出し（`pnpm jev:*` を inline `op://` で起動）。下記 §評価モデル Jev の Gateway key                                                                                                         |
 
 **`agent/app` の `RECOVERY_CODE_PEPPER` は production と別値**（2026-09-14、User が値を表示しない比較で `different` を確認）。local dev の recovery code が production で通ることはない。
 
@@ -277,6 +278,7 @@ vault は 2026-08-14 の信頼境界軸再編（[#2086](https://github.com/Dayop
 | `upstash`                | `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`                                                                                                                                                                                                                                   |
 | `upstash-login`          | Upstash Console の GUI ログイン（LOGIN item）。op:// では参照されない、ブラウザでの手動サインイン専用（#2127）                                                                                                                                                                         |
 | `stripe-live`            | `STRIPE_SECRET_KEY`, `STRIPE_ACCOUNT_ID`, `STRIPE_LIVEMODE`, `STRIPE_WEBHOOK_SECRET`, `NEXT_PUBLIC_STRIPE_PRO_PRICE_ID`                                                                                                                                                                |
+| `posthog-delete`         | `credential`（Project 625917 限定の `person:write` key。Product の account deletion が PostHog person / events の削除を要求する時だけ使用。MCP / agent に渡さない）                                                                                                                    |
 | `resend`                 | `RESEND_WEBHOOK_SECRET`（Product）                                                                                                                                                                                                                                                     |
 | `resend-send`            | `RESEND_API_KEY`, `RESEND_FROM_EMAIL`（Product / Web の Production が共用する送信 credential。2026-09-14 に agent から移動）                                                                                                                                                           |
 | `resend-web`             | `RESEND_WEBHOOK_SECRET`（Web、Productと別値）                                                                                                                                                                                                                                          |
@@ -375,6 +377,20 @@ vault は 2026-08-14 の信頼境界軸再編（[#2086](https://github.com/Dayop
 **`human/supabase-cli` の位置づけ**: Auth config の write を要する `scripts/runbook/enable-auth-hook.sh` など、User が明示操作で使う operational credential として残す。次回 rotation 時に read 系 permission を外し、write が要る作業の時だけ発行する形へ寄せる。
 
 **rotation**: §短命トークンのローテーション に従う。期限切れは MCP / safe-get の 401 で表面化する。
+
+## 評価モデル Jev の Gateway key
+
+策定日: 2026-09-17（[#2827](https://github.com/Dayopt/dayopt/issues/2827)）。評価モデル Jev は Vercel AI Gateway 経由で呼ぶ。key は `agent/vercel-ai-gateway` の `credential` に置き、**inline `op://` でそのプロセスだけへ注入する**。
+
+```bash
+AI_GATEWAY_API_KEY="op://agent/vercel-ai-gateway/credential" op run -- pnpm jev:smoke
+```
+
+**`.op-env.agent` には入れない。** 入れると `pnpm dev` が Jev の key に依存し、評価を回さない日でも 1Password の承認が要るようになる。Jev を呼ぶコマンドだけが承認を求める形を保つ。
+
+**agent vault に置いてよい理由**: key 側に budget（$4 / 月）と有効期限（90 日）が設定してあり、漏れても損害が上限で止まる。Gateway の credits は購入せず、無料枠（$5）の内側だけで使う（[#2827](https://github.com/Dayopt/dayopt/issues/2827) の制約）。
+
+**rotation**: §短命トークンのローテーション に従う。期限切れは `pnpm jev:*` の `auth_failed` で表面化する。運用手順と停止方法は [jev.md](./jev.md)。
 
 ## Service Account（無人実行用、設計のみ・未導入）
 
@@ -630,6 +646,21 @@ reCAPTCHA 関連 env は旧方式。新規設定・docs・example には追加�
 - Production secret を通常の local dev から参照する
 - PR Preview Branch credentials を 1Password に保存する
 - `vercel env pull` を通常フローとして案内する
+
+---
+
+## 実測で分かった罠
+
+2026-09-22 に Claude Code の memory から昇格。
+
+- **`op item get`（`--reveal` なし）でも notes の複数行はそのまま出る**。recovery codes を 2 回会話ログへ露出させ、再発行を依頼した（2026-08-14、2026-09-14）。field 名を見る時は `awk '/^Fields:/{f=1;next} f && /^  [A-Za-z_]+:/' | sed -E 's/:.*$//'` で field 行だけを通す。値の有無だけなら `pnpm 1password:check`。`sentry auth status` のような CLI の status 系も token の一部を表示するので、疎通は `sentry org list` で確かめる
+- **`op item create` / `op item edit` の stdout は item 内容を出す**。必ず `>/dev/null`。書き込み直後の読み取りは数秒間不安定。CLI で編集できない item 種別（SSO login field 持ち、SSH Key）は GUI のみ
+- **日本語ロケールの「API Credential」item は標準 field が内部 id `credential` を持つ**。同名の field を足すと `more than one credential field` で参照が壊れる。User へは「標準の『認証情報』欄に値を入れる」と伝え、参照は内部 id で書く
+- **`op whoami` が未サインインでも `op run` は通る**。desktop 統合は別経路で、承認プロンプトが閉じられていると `authorization timeout` になるだけ。`op whoami` や `supabase projects list` の失敗を根拠に「経路なし」と誤診しない（2026-09-04 #2175、2026-09-18 再確認）。production への SELECT は `op run` で token を env に解決し、既存の read-only helper `scripts/lib/production-db-readonly.mjs`（`runReadOnlyQuery`。`Authorization: Bearer`・JSON content type・`read_only: true` を必ず付け、credential を引数やエラーに出さない）を経由して送る。手書き `curl` を使う時も同じ request 契約（Bearer header + `{"query": ..., "read_only": true}`）を満たす。query は secret を含まない JSON をファイルへ先に書き、1 回の `op run` にまとめて承認を 1 回にする。PII は件数と sha256 だけ出す
+- **credential の発行は最初から User 手作業として計画に書く**。key の値が画面に出る操作へ到達する browser 操作は自動化の分類器に止められる（2026-09-18 #2827）。agent がやってよいのは読み取りでの現況確認（残高・既存 key 件数・プラン）と、秘密でない欄の入力まで
+- **agent の gh は fine-grained PAT（`GH_CONFIG_DIR=~/.config/gh-agent`）**。`.github/workflows/` を含む commit の push は拒否される（`refusing to allow a Personal Access Token to create or update workflow`）。agent は commit まで作り、push は User の terminal で行う。identity を切り替える形の push は自動化側でも止まるので、コマンドを渡すところまでが agent の仕事。`gh` が 403 / `Resource not accessible` を返したら scope 外なので User へ依頼する（2026-09-14 PR #2761）
+- **Sentry の読み取りは `SENTRY_AUTH_TOKEN="op://agent/sentry-cli-readonly/credential" op run -- sentry issue list dayopt/`**（CLI 名は `sentry`。`sentry-cli` は別物の build tool）。build 用 token の正本は `ci/sentry-release-token`。2026-09-07 の「agent から Sentry を読む経路が無い」は item 名の取り違えによる誤診だった
+- **MCP 定義は user-global にだけ置く**（Claude は `~/.claude.json`、Codex は `~/.codex/config.toml` の `[mcp_servers.*]`）。repo に同名定義を足すとキー単位でマージされ `invalid configuration: url is not supported for stdio` で MCP 全体が起動しなくなる（2026-07-23 に 2 回）。詳細は `mcp-usage` skill
 
 ---
 

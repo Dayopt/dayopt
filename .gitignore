@@ -21,6 +21,8 @@ apps/*/out/
 
 # misc
 .DS_Store
+# Dayopt Learning System の生成物（正本は docs/learn、pnpm learn で作る）
+/.learn/
 *.pem
 
 # debug
@@ -165,9 +167,6 @@ temp/
 /playwright-report/
 /playwright/.auth/
 /.playwright-mcp/
-# usability-probe-setup.ts の出力（認証済み storageState）。多重防御として
-# 深さを問わず無視する（apps/product/.gitignore の `.probe/` が主、こちらは保険）
-.probe/
 # Lighthouse CI
 .lighthouseci/
 .env*.local

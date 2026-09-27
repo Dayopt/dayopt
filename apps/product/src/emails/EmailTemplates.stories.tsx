@@ -142,6 +142,9 @@ export const Guidelines: Story = {
           <p className="pl-4">ConfirmEmail.tsx — メール確認（Auth signup）</p>
           <p className="pl-4">PasswordResetEmail.tsx — PW リセット（Auth recovery）</p>
           <p className="pl-4">
+            PasswordChangedEmail.tsx — PW変更通知（Auth password_changed_notification）
+          </p>
+          <p className="pl-4">
             EmailChangeEmail.tsx — メール変更（Auth email_change / 現・新の2通）
           </p>
           <p className="pl-4">MagicLinkEmail.tsx — マジックリンク（Auth magic_link）</p>
@@ -155,12 +158,11 @@ export const Guidelines: Story = {
           <p className="pl-4">ProStartEmail.tsx — Pro開始</p>
           <p className="pl-4">PaymentFailedEmail.tsx — 支払い失敗</p>
           <p className="pl-4">PaymentRecoveredEmail.tsx — 支払い復旧</p>
-          <p className="pl-4">PasswordChangedEmail.tsx — PW変更通知</p>
           <p className="pl-4">MfaDisabledEmail.tsx — 多要素認証無効化通知</p>
           <p className="pl-4">CancellationConfirmEmail.tsx — Pro解約確認</p>
           <p className="pl-4">AccountDeletionEmail.tsx — アカウント削除（GDPR）</p>
           <p className="text-muted-foreground mt-4 text-xs">
-            ※ Auth テンプレート4つと専用styles・件名辞書は pnpm auth-email:sync で Edge Function
+            ※ Auth テンプレート5つと専用styles・件名辞書は pnpm auth-email:sync で Edge Function
             正本から生成。pnpm check がドリフトを検知する。アプリメールの件名は
             messages/[en|ja]/email.json の *.subject キーが正本。
           </p>
@@ -219,7 +221,7 @@ export const Guidelines: Story = {
                 ['ProStartEmail', 'Pro開始', 'Stripe webhook'],
                 ['PaymentFailedEmail', '支払い失敗', 'Stripe webhook'],
                 ['PaymentRecoveredEmail', '支払い復旧', 'Stripe webhook'],
-                ['PasswordChangedEmail', 'PW変更通知', 'email.sendPasswordChanged'],
+                ['PasswordChangedEmail', 'PW変更通知', 'Auth Hook (password_changed_notification)'],
                 ['MfaDisabledEmail', '多要素認証無効化通知', 'RecoveryService.verify()'],
                 ['CancellationConfirmEmail', 'Pro解約確認', 'Stripe webhook'],
                 ['AccountDeletionEmail', 'アカウント削除', 'sendAccountDeletionEmail()'],
@@ -244,7 +246,7 @@ export const Guidelines: Story = {
         <div className="text-muted-foreground space-y-4 text-sm">
           <div>
             <h3 className="text-foreground mb-2 text-sm font-medium">
-              Auth メール（signup / reset / magic_link）
+              Auth メール（signup / reset / magic_link / security notification）
             </h3>
             <div className="bg-muted rounded-lg p-4 font-mono text-xs">
               <p>Supabase Auth → send_email hook → Edge Function</p>
@@ -254,11 +256,11 @@ export const Guidelines: Story = {
           </div>
           <div>
             <h3 className="text-foreground mb-2 text-sm font-medium">
-              アプリメール（welcome / trial / pro / billing / deletion）
+              アプリメール（welcome / trial / pro / billing / MFA / deletion）
             </h3>
             <div className="bg-muted rounded-lg p-4 font-mono text-xs">
-              <p>App → tRPC email.sendXxx → React Email render</p>
-              <p className="pl-4">→ src/lib/email/router.ts</p>
+              <p>Server service / Stripe webhook → React Email render</p>
+              <p className="pl-4">→ src/lib/email/notifications.ts / billing mailer</p>
               <p className="pl-4">→ Resend API → ユーザー</p>
             </div>
           </div>
@@ -461,7 +463,7 @@ export const PasswordChanged: Story = {
     <BilingualEmailPreview
       enElement={PasswordChangedEmail({ userName: 'Tomoya', locale: 'en' })}
       jaElement={PasswordChangedEmail({ userName: 'Tomoya', locale: 'ja' })}
-      subjects={appSubjects('passwordChanged.subject')}
+      subjects={authSubjects('password_changed_notification')}
       title="Password Changed"
     />
   ),

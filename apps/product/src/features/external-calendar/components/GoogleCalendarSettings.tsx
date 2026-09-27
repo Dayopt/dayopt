@@ -5,6 +5,7 @@ import { useMemo, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 
 import { ConfirmDialog } from '@/components/ui/overlays/confirm-dialog';
+import { useBillingAccess } from '@/lib/billing/BillingAccessProvider';
 import { useHasMounted } from '@/lib/hooks/useHasMounted';
 import { toast } from '@/lib/toast';
 import { api } from '@/lib/trpc';
@@ -88,6 +89,10 @@ function GoogleCalendarConnection({
   const locale = useLocale();
   const t = useTranslations('settings.integrations.googleCalendar');
   const utils = api.useUtils();
+  // server は listProviderCalendars / updateSelectedCalendars / syncNow を利用権無しで
+  // 拒否する（`lib/billing/operation-access.ts`）。ここで止めないと汎用の失敗 toast だけが
+  // 残る。切断・一覧・同期状態の閲覧は終了後も許されるので gate しない。
+  const { canUseProduct } = useBillingAccess();
   const storedNeedsReauth = connection.status === 'reauth_required';
   const [draftSelection, setDraftSelection] = useState<{
     connectionId: string;
@@ -102,7 +107,7 @@ function GoogleCalendarConnection({
   );
   const providerCalendars = api.externalCalendar.listProviderCalendars.useQuery(
     { connectionId: connection.id },
-    { enabled: !storedNeedsReauth, retry: false },
+    { enabled: !storedNeedsReauth && canUseProduct, retry: false },
   );
 
   // calendarList の取得中に token 失効を検知すると service が行を reauth_required に更新して
@@ -229,6 +234,7 @@ function GoogleCalendarConnection({
   };
 
   const apply = () => {
+    if (!canUseProduct) return;
     updateSelection.mutate({
       connectionId: connection.id,
       calendars: calendars
@@ -246,6 +252,7 @@ function GoogleCalendarConnection({
         statusVariant={currentStatus === 'active' ? 'success' : 'warning'}
         persistedError={persistedErrorMessage(t, currentConnection.last_sync_error)}
         needsReauth={needsReauth}
+        readOnly={!canUseProduct}
         reconnectAvailable={reconnectAvailable}
         calendars={calendars}
         selectedCalendarIds={selectedSet}
@@ -269,7 +276,10 @@ function GoogleCalendarConnection({
           void Promise.all([providerCalendars.refetch(), syncStatus.refetch()]);
         }}
         onApply={apply}
-        onSync={() => syncNow.mutate({ connectionId: connection.id })}
+        onSync={() => {
+          if (!canUseProduct) return;
+          syncNow.mutate({ connectionId: connection.id });
+        }}
         onReconnect={reconnect}
         onDisconnect={() => setDisconnectOpen(true)}
       />

@@ -39,6 +39,7 @@ const KNOWN_PLACEMENT_EXCEPTIONS = new Set<string>([
   'scripts/tasks/docs-guard/checks/decisions-append-only.ts',
   'scripts/tasks/docs-guard/checks/frontmatter-check.ts',
   'scripts/tasks/docs-guard/checks/glossary-sync.ts',
+  'scripts/tasks/docs-guard/checks/learn-refs.ts',
   'scripts/tasks/docs-guard/checks/likec4-validate.ts',
   'scripts/tasks/docs-guard/checks/link-check.ts',
   'scripts/tasks/docs-guard/checks/naming-check.ts',
@@ -50,8 +51,7 @@ const KNOWN_PLACEMENT_EXCEPTIONS = new Set<string>([
   'scripts/tasks/env/schema.ts',
   // admin-*.sh family: admin-common.sh を `dirname "${BASH_SOURCE[0]}"` 相対で
   // source するため、同一ディレクトリに揃える必要がある。admin-delete-user.sh は
-  // lane-protocol.md / usability-probe SKILL.md からの言及で agent 判定になるが、
-  // family を割らない。
+  // lane-protocol.md からの言及で agent 判定になるが、family を割らない。
   'scripts/runbook/admin-delete-user.sh',
   // supabase-mgmt-safe-get.mjs: pre-tool-guard-rules.mjs 内の言及は「このscriptを使え」
   // という利用者(agent)向け誘導メッセージであり、フック自身がこのscriptを実行・

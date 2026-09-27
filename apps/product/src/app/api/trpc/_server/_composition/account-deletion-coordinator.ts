@@ -8,6 +8,7 @@ import {
   quiesceBoundBillingAccountData,
   recoverBillingCustomerBeforeAccountDeletion,
 } from '@/features/settings/server/account-deletion';
+import { deletePostHogAccountData } from '@/lib/analytics/posthog-deletion';
 import type { Database } from '@/lib/database';
 import { createServiceRoleClient } from '@/lib/supabase/oauth';
 
@@ -45,6 +46,7 @@ type AccountDeletionCoordinatorRuntime = Readonly<{
   billingQuiesce: (input: { stripeCustomerId: string | null; userId: string }) => Promise<void>;
   calendar: (input: { deletionId: string; userId: string }) => Promise<SourceAdapterResult>;
   db: AccountDeletionDatabase;
+  posthogDeletion: (input: { userId: string }) => Promise<void>;
   recoverBilling: (input: { userId: string }) => Promise<SourceAdapterResult>;
   storage: (input: { userId: string }) => Promise<void>;
 }>;
@@ -427,7 +429,10 @@ export function createAccountDeletionCoordinator(runtime: AccountDeletionCoordin
           deletionId,
           step: 'storage',
           userId: input.userId,
-          work: () => runtime.storage(input),
+          work: async () => {
+            await runtime.storage(input);
+            await runtime.posthogDeletion(input);
+          },
         });
 
         await runStep(runtime, {
@@ -487,6 +492,7 @@ export async function prepareAccountDeletionBeforeIdentityDeletion(input: {
     billingQuiesce: quiesceBoundBillingAccountData,
     calendar: prepareBoundCalendarBeforeIdentityDeletion,
     db,
+    posthogDeletion: deletePostHogAccountData,
     recoverBilling: (billingInput) => recoverBillingCustomerBeforeAccountDeletion(db, billingInput),
     storage: (storageInput) => deleteAccountStorage(db, storageInput),
   }).beforeIdentityDeletion(input);
