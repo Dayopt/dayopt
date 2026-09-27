@@ -1,7 +1,7 @@
 import { dayoptPlans, dayoptPricing } from '@dayopt/billing';
 import { Button } from '@dayopt/components';
-import { dayoptProductUrls } from '@dayopt/config';
 import { Link } from '@dayopt/i18n/navigation';
+import { SignupCtaLink } from '@web/shell/analytics/SignupCtaLink';
 import { getTranslations } from 'next-intl/server';
 
 import { CalendarDemo, ClosingMark, HeroJourney, TemplateDemo } from './LandingInteractions';
@@ -43,7 +43,6 @@ export async function LandingPage({ locale }: LandingPageProps) {
   const t = await getTranslations({ locale, namespace: 'marketing' });
   const freeFeatures = t.raw('pricing.plans.free.features') as string[];
   const proHighlights = t.raw('pricing.plans.pro.highlights') as string[];
-  const signup = dayoptProductUrls.signup;
 
   return (
     <div className={styles.landing} data-locale={locale}>
@@ -60,9 +59,9 @@ export async function LandingPage({ locale }: LandingPageProps) {
           </p>
           <div className={styles.heroActions}>
             <Button variant="primary" size="lg" asChild>
-              <a href={signup}>
+              <SignupCtaLink ctaId="hero">
                 {t('landing.hero.cta')} <span aria-hidden="true">↗</span>
-              </a>
+              </SignupCtaLink>
             </Button>
             <a className={styles.textLink} href="#calendar-preview">
               {t('landing.hero.demo')} <span aria-hidden="true">↓</span>
@@ -480,9 +479,9 @@ export async function LandingPage({ locale }: LandingPageProps) {
                 ))}
               </ul>
               <Button variant="outline" size="lg" asChild>
-                <a href={signup}>
+                <SignupCtaLink ctaId="pricing_free">
                   {t('pricing.plans.free.cta')} <span aria-hidden="true">↗</span>
-                </a>
+                </SignupCtaLink>
               </Button>
             </div>
             <div className={styles.priceCard}>
@@ -501,9 +500,9 @@ export async function LandingPage({ locale }: LandingPageProps) {
                 ))}
               </ul>
               <Button variant="primary" size="lg" asChild>
-                <a href={signup}>
+                <SignupCtaLink ctaId="pricing_pro">
                   {t('pricing.plans.pro.cta')} <span aria-hidden="true">↗</span>
-                </a>
+                </SignupCtaLink>
               </Button>
             </div>
           </div>
@@ -559,9 +558,9 @@ export async function LandingPage({ locale }: LandingPageProps) {
         </h2>
         <p>{t('landing.closing.body')}</p>
         <Button variant="primary" size="lg" asChild>
-          <a href={signup}>
+          <SignupCtaLink ctaId="closing">
             {t('landing.hero.cta')} <span aria-hidden="true">↗</span>
-          </a>
+          </SignupCtaLink>
         </Button>
         <small>{t('landing.closing.note')}</small>
       </section>

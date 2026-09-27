@@ -219,6 +219,7 @@ test('連携セクションはライト・ダークそれぞれの明度階層�
       sectionForeground: getComputedStyle(section).color,
     }));
 
+    expect(colors.sectionBackground).not.toBe(colors.pageBackground);
     expect(colors.sectionBackground).not.toBe(colors.pageForeground);
     expect(colors.sectionForeground).not.toBe(colors.pageBackground);
   }

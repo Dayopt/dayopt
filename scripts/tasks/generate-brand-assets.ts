@@ -1,9 +1,9 @@
 /** Figma approved F -> public assets. Run: pnpm brand:generate */
-import { execFileSync } from 'node:child_process';
 import { copyFile, mkdir, readdir, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import sharp from 'sharp';
 import { DAYOPT_BRAND as brand } from '../../packages/components/src/identity/logo-data';
+import { createDeterministicZip } from './create-deterministic-zip';
 
 async function main() {
   const root = process.cwd();
@@ -199,8 +199,7 @@ async function main() {
       await copyFile(path.join(root, `apps/${app}/public`, name), path.join(dest, name));
     }
     const files = (await readdir(dest)).filter((name) => !name.endsWith('.zip')).sort();
-    await rm(path.join(dest, 'dayopt-brand-F.zip'), { force: true });
-    execFileSync('zip', ['-X', '-q', 'dayopt-brand-F.zip', ...files], { cwd: dest });
+    await createDeterministicZip(dest, 'dayopt-brand-F.zip', files);
   }
   console.log(
     'Generated approved F SVG, PNG, ICO, PWA and light/dark OG assets for product and web.',

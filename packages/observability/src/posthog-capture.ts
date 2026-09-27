@@ -47,7 +47,14 @@ const PROPERTY_NAMES = new Set([
 const FIXED_VALUES: Record<string, ReadonlySet<string>> = {
   environment: new Set(['production', 'preview', 'development']),
   surface: new Set(['web', 'product']),
-  cta_id: new Set(['header_desktop', 'header_mobile', 'hero', 'pricing_free', 'pricing_pro']),
+  cta_id: new Set([
+    'header_desktop',
+    'header_mobile',
+    'hero',
+    'pricing_free',
+    'pricing_pro',
+    'closing',
+  ]),
   screen: new Set(['signup', 'review']),
   language: new Set(['ja', 'en']),
   device_category: new Set(['mobile', 'desktop']),

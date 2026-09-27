@@ -85,4 +85,14 @@ describe('PostHog browser data boundary', () => {
       $geoip_disable: true,
     });
   });
+
+  it('retains the closing CTA placement in signup analytics', () => {
+    expect(
+      filterPostHogBrowserProperties(
+        'signup_cta_clicked',
+        { cta_id: 'closing' },
+        'https://dayopt.app',
+      ),
+    ).toEqual({ cta_id: 'closing', $geoip_disable: true });
+  });
 });
