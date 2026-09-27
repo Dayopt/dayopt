@@ -14,7 +14,7 @@ code:
 ## 正本と配布
 
 - 視覚上の正本: [Figma / Approved F](https://www.figma.com/design/eAthKm7adblXS1TzeSkScx/Dayopt-Brand---Logo?node-id=7-288)
-- アプリアイコン: [Figma / App Icon](https://www.figma.com/design/eAthKm7adblXS1TzeSkScx/Dayopt-Brand---Logo?node-id=7-514)
+- アプリアイコン: [Figma / App Icon Light](https://www.figma.com/design/eAthKm7adblXS1TzeSkScx/Dayopt-Brand---Logo?node-id=11-2)（[1024pxマスター](https://www.figma.com/design/eAthKm7adblXS1TzeSkScx/Dayopt-Brand---Logo?node-id=11-54)）
 - 書き出しボード: [Figma / Download](https://www.figma.com/design/eAthKm7adblXS1TzeSkScx/Dayopt-Brand---Logo?node-id=10-2)
 - コード共通データ: `packages/components/src/identity/logo-data.ts`
 - Figmaから直接書き出した採用ロックアップ: `assets/brand/figma-approved-lockup.svg`
@@ -50,6 +50,7 @@ Planは輪郭、Logは塗り。間隔5、右上端は6下がり、下端差16。
 
 - Primary: `#26251F`。ライト背景で使用する。
 - Reverse: `#FFFFFF`。ダーク背景で使用する。形状は同じ。
+- アプリアイコンはライト版のみを使用する。背景 `#FFFFFF`、マーク `#26251F`。端末の表示モードによって切り替えない。favicon、Apple/PWAアイコンも同じ配色にする。
 - Reactの `Logo` は専用 `brand-ink` トークンでテーマに追従する。
 - シンボル周囲は原則14単位以上（輪郭厚7の2倍）を確保する。これは外部コンテンツとの余白であり、マークと文字の間隔には加えない。
 - シンボルは16px以上、横組みは高さ20px以上を目安とする。faviconでは専用の背景付きラスターデータを使う。

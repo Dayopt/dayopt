@@ -20,7 +20,7 @@ async function main() {
   const appIcon = (rounded = false) =>
     svg(
       '0 0 1024 1024',
-      `<rect width="1024" height="1024" rx="${rounded ? 256 : 0}" fill="${brand.primary}"/><g transform="translate(191.456969697 201.696969697) scale(6.206060606)">${paths(brand.symbol, brand.reverse)}</g>`,
+      `<rect width="1024" height="1024" rx="${rounded ? 256 : 0}" fill="${brand.reverse}"/><g transform="translate(191.456969697 201.696969697) scale(6.206060606)">${paths(brand.symbol, brand.primary)}</g>`,
       1024,
       1024,
     );
@@ -46,12 +46,7 @@ async function main() {
   }
   assets['dayopt-app-icon.svg'] = appIcon();
   assets['dayopt-app-icon-rounded-preview.svg'] = appIcon(true);
-  assets['favicon.svg'] = svg(
-    '0 0 100 100',
-    `<style>path{fill:${brand.primary}}@media(prefers-color-scheme:dark){path{fill:${brand.reverse}}}</style>${paths(brand.symbol, brand.primary)}`,
-    100,
-    100,
-  );
+  assets['favicon.svg'] = appIcon(true);
   await mkdir(source, { recursive: true });
   for (const [name, data] of Object.entries(assets)) await writeFile(path.join(source, name), data);
   for (const app of ['product', 'web']) {
