@@ -102,6 +102,35 @@ describe('Product browser Sentry consent lifecycle', () => {
     expect(reloadSpy).toHaveBeenCalledTimes(1);
   });
 
+  it('keeps the Vercel Preview bundle free of initialized Sentry', async () => {
+    vi.stubEnv('NEXT_PUBLIC_VERCEL_ENV', 'preview');
+    localStorage.setItem(
+      BROWSER_TELEMETRY_CONSENT_STORAGE_KEY,
+      JSON.stringify(consentDetail(true)),
+    );
+
+    await import('./instrumentation-client');
+
+    expect(sentry.init).not.toHaveBeenCalled();
+  });
+
+  it('labels the explicitly bound persistent Integration project', async () => {
+    vi.stubEnv('NEXT_PUBLIC_DAYOPT_ENVIRONMENT', 'integration');
+    vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://tilwaprottpyhlfoggbb.supabase.co');
+    vi.stubEnv('NEXT_PUBLIC_VERCEL_TARGET_ENV', 'production');
+    vi.stubEnv('NEXT_PUBLIC_VERCEL_GIT_COMMIT_REF', 'integration');
+    localStorage.setItem(
+      BROWSER_TELEMETRY_CONSENT_STORAGE_KEY,
+      JSON.stringify(consentDetail(true)),
+    );
+
+    await import('./instrumentation-client');
+
+    expect(sentry.init).toHaveBeenCalledTimes(1);
+    expect(sentry.init.mock.calls[0]?.[0].environment).toBe('integration');
+    expect(sentry.init.mock.calls[0]?.[0].enabled).toBe(true);
+  });
+
   it('does not use NODE_ENV as a fallback for local production-mode starts', async () => {
     vi.stubEnv('NEXT_PUBLIC_VERCEL_ENV', '');
     vi.stubEnv('NODE_ENV', 'production');

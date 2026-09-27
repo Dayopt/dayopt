@@ -28,9 +28,11 @@ import {
 export const onRouterTransitionStart = Sentry.captureRouterTransitionStart;
 
 const SENTRY_DSN = process.env.NEXT_PUBLIC_SENTRY_DSN;
+const VERCEL_ENV = process.env.NEXT_PUBLIC_VERCEL_ENV;
+const IS_SENTRY_PRODUCTION = VERCEL_ENV === 'production';
 const DAYOPT_ENVIRONMENT = resolveDayoptEnvironment({
   publicDayoptEnvironment: process.env.NEXT_PUBLIC_DAYOPT_ENVIRONMENT,
-  vercelEnvironment: process.env.NEXT_PUBLIC_VERCEL_ENV,
+  vercelEnvironment: VERCEL_ENV,
   vercelTargetEnvironment: process.env.NEXT_PUBLIC_VERCEL_TARGET_ENV,
   vercelGitCommitRef: process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_REF,
   supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -73,7 +75,7 @@ function initSentry(dsn: string) {
 
     // Production and the explicitly bound Integration project only. Integration
     // also uses Vercel's Production target, so check the Dayopt identity above.
-    enabled: SENTRY_ENVIRONMENT !== null,
+    enabled: IS_SENTRY_PRODUCTION && SENTRY_ENVIRONMENT !== null,
 
     // 固定protocol allowlistとpath-aware規則で、相関IDを保持しつつPIIを除去する。
     beforeSend: withPIIScrub(),
@@ -123,7 +125,7 @@ function applyBrowserTelemetryConsent(dsn: string, allowed: boolean): void {
 }
 
 // DSNが設定されている場合のみ処理
-if (SENTRY_DSN && SENTRY_ENVIRONMENT !== null) {
+if (SENTRY_DSN && IS_SENTRY_PRODUCTION) {
   isBrowserTelemetryAllowed = typeof window !== 'undefined' && hasStoredAnalyticsConsent();
 
   if (isBrowserTelemetryAllowed) {

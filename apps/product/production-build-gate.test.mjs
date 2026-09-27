@@ -357,6 +357,18 @@ describe('Product Integration build gate', () => {
     expect(assertProductOperationalProductionBuildEnv(completeIntegrationEnv())).toBe(false);
   });
 
+  it('treats this project’s PR deployments as Preview, not as the Integration Production target', () => {
+    const previewEnv = {
+      ...completePreviewEnv(),
+      VERCEL_PROJECT_PRODUCTION_URL: PRODUCT_INTEGRATION_HOST,
+    };
+
+    expect(assertProductIntegrationBuildEnv(previewEnv)).toBe(false);
+    expect(resolveProductPublicMcpResourceUri(previewEnv)).toBe(
+      `https://${previewEnv.VERCEL_BRANCH_URL}`,
+    );
+  });
+
   it.each(REQUIRED_PRODUCT_INTEGRATION_BUILD_ENV)(
     'rejects an Integration build missing only %s',
     (name) => {

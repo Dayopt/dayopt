@@ -144,7 +144,7 @@ function isProductIntegrationConfigured(env) {
     env.DAYOPT_ENVIRONMENT === 'integration' ||
     env.NEXT_PUBLIC_DAYOPT_ENVIRONMENT === 'integration' ||
     getSupabaseHost(env.NEXT_PUBLIC_SUPABASE_URL) === PRODUCT_INTEGRATION_SUPABASE_HOST ||
-    env.VERCEL_PROJECT_PRODUCTION_URL === PRODUCT_INTEGRATION_HOST
+    (env.VERCEL_ENV !== 'preview' && env.VERCEL_PROJECT_PRODUCTION_URL === PRODUCT_INTEGRATION_HOST)
   );
 }
 
