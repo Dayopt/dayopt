@@ -108,8 +108,8 @@ function assertServerSupabaseKey(env) {
 
 export const PRODUCT_PRODUCTION_ORIGIN = 'https://app.dayopt.app';
 export const MCP_PRODUCTION_ORIGIN = 'https://mcp.dayopt.app';
-export const PRODUCT_INTEGRATION_ORIGIN = 'https://product-integration.vercel.app';
-export const PRODUCT_INTEGRATION_HOST = 'product-integration.vercel.app';
+export const PRODUCT_INTEGRATION_ORIGIN = 'https://product-integration-dayopt.vercel.app';
+export const PRODUCT_INTEGRATION_HOST = 'product-integration-dayopt.vercel.app';
 export const PRODUCT_INTEGRATION_SUPABASE_HOST = 'tilwaprottpyhlfoggbb.supabase.co';
 const PRODUCTION_SUPABASE_HOST = 'yvglwblxrnrenfifsnje.supabase.co';
 const PRODUCT_PREVIEW_BRANCH_HOST_PATTERN = /^product-git-[a-z0-9-]+-dayopt\.vercel\.app$/u;
