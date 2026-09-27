@@ -152,8 +152,24 @@ test('小さい画面でもLP本文に横スクロールがない', async ({ pag
     for (const width of [320, 375, 430]) {
       await page.setViewportSize({ width, height: 844 });
       await page.goto(locale);
-      const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
-      expect(scrollWidth).toBeLessThanOrEqual(width);
+      const overflow = await page.locator('[data-locale]').evaluate((landing) => {
+        const viewportWidth = document.documentElement.clientWidth;
+        return Array.from(
+          landing.querySelectorAll('section, h1, h2, h3, p, a, button, summary, li, [role="img"]'),
+        )
+          .filter((element) => {
+            const rect = element.getBoundingClientRect();
+            return (
+              rect.left < -1 ||
+              rect.right > viewportWidth + 1 ||
+              element.scrollWidth > element.clientWidth + 1
+            );
+          })
+          .map(
+            (element) => `${element.tagName.toLowerCase()}${element.id ? `#${element.id}` : ''}`,
+          );
+      });
+      expect(overflow, `${locale} at ${width}px`).toEqual([]);
     }
   }
 });
@@ -166,10 +182,29 @@ test('ダークモードと動きを減らす設定でもHeroの物語を読め�
   await expect(page.getByText('思ったより、夢中に。')).toBeVisible();
   await expect(page.getByText('読み終えた。')).toBeVisible();
 
-  const background = await page
+  await expect(page.locator('html')).toHaveClass(/dark/);
+  const darkBackground = await page
     .locator('body')
     .evaluate((element) => getComputedStyle(element).backgroundColor);
-  expect(background).not.toBe('rgb(255, 255, 255)');
+
+  await page.emulateMedia({ colorScheme: 'light' });
+  await page.reload();
+  await expect(page.locator('html')).not.toHaveClass(/dark/);
+  const lightBackground = await page
+    .locator('body')
+    .evaluate((element) => getComputedStyle(element).backgroundColor);
+  expect(lightBackground).not.toBe(darkBackground);
+});
+
+test('Googleカレンダー連携へのページ内リンクで見出しが固定ヘッダーに隠れない', async ({ page }) => {
+  await page.goto('/ja');
+  await page.locator('a[href="#google-calendar"]').click();
+
+  await expect
+    .poll(() =>
+      page.locator('#google-calendar').evaluate((element) => element.getBoundingClientRect().top),
+    )
+    .toBeGreaterThanOrEqual(71);
 });
 
 test('連携セクションはライト・ダークそれぞれの明度階層に沿う', async ({ page }) => {

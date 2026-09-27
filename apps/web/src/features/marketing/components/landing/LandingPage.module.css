@@ -1048,6 +1048,7 @@
   grid-template-columns: 0.9fr 1.1fr;
   gap: 50px;
   padding-block: 40px;
+  scroll-margin-top: 72px;
 }
 
 .googleBridge h3,
