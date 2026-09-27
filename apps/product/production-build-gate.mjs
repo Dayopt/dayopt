@@ -39,9 +39,29 @@ export const REQUIRED_PRODUCT_PREVIEW_BUILD_ENV = [
   'VERCEL_GIT_COMMIT_REF',
 ];
 
+export const REQUIRED_PRODUCT_INTEGRATION_BUILD_ENV = [
+  'DAYOPT_ENVIRONMENT',
+  'NEXT_PUBLIC_DAYOPT_ENVIRONMENT',
+  'VERCEL_ENV',
+  'VERCEL_TARGET_ENV',
+  'VERCEL_GIT_COMMIT_REF',
+  'VERCEL_PROJECT_PRODUCTION_URL',
+  'NEXT_PUBLIC_SUPABASE_URL',
+  'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY',
+  'SUPABASE_SECRET_KEY',
+  'NEXT_PUBLIC_APP_URL',
+  'MCP_OAUTH_ENVIRONMENT',
+  'OAUTH_AUTHORIZATION_SERVER_URI',
+  'MCP_CANONICAL_RESOURCE_URI',
+  'NEXT_PUBLIC_TURNSTILE_SITE_KEY',
+  'UPSTASH_REDIS_REST_URL',
+  'UPSTASH_REDIS_REST_TOKEN',
+  'RECOVERY_CODE_PEPPER',
+];
+
 /**
- * Persistent Staging は作らない決定に合わせ、Production 専用の delivery / billing /
- * telemetry / Calendar secret を OAuth 有効 Preview へ持ち込ませない。
+ * Persistent Integration remains non-production: only explicitly validated
+ * test-only delivery, billing, telemetry, and Calendar settings may be present.
  */
 export const FORBIDDEN_PRODUCT_PREVIEW_BUILD_ENV = [
   'RESEND_API_KEY',
@@ -88,6 +108,9 @@ function assertServerSupabaseKey(env) {
 
 export const PRODUCT_PRODUCTION_ORIGIN = 'https://app.dayopt.app';
 export const MCP_PRODUCTION_ORIGIN = 'https://mcp.dayopt.app';
+export const PRODUCT_INTEGRATION_ORIGIN = 'https://product-integration.vercel.app';
+export const PRODUCT_INTEGRATION_HOST = 'product-integration.vercel.app';
+export const PRODUCT_INTEGRATION_SUPABASE_HOST = 'tilwaprottpyhlfoggbb.supabase.co';
 const PRODUCTION_SUPABASE_HOST = 'yvglwblxrnrenfifsnje.supabase.co';
 const PRODUCT_PREVIEW_BRANCH_HOST_PATTERN = /^product-git-[a-z0-9-]+-dayopt\.vercel\.app$/u;
 
@@ -101,6 +124,9 @@ const PRODUCT_PREVIEW_BRANCH_HOST_PATTERN = /^product-git-[a-z0-9-]+-dayopt\.ver
  * The build assertions run before this resolver in next.config.mjs.
  */
 export function resolveProductPublicMcpResourceUri(env) {
+  if (isProductIntegrationConfigured(env)) {
+    return isBoundProductIntegration(env) ? PRODUCT_INTEGRATION_ORIGIN : '';
+  }
   if (env.VERCEL_ENV === 'production') return MCP_PRODUCTION_ORIGIN;
   if (
     env.VERCEL_ENV === 'preview' &&
@@ -111,6 +137,137 @@ export function resolveProductPublicMcpResourceUri(env) {
     return `https://${env.VERCEL_BRANCH_URL}`;
   }
   return '';
+}
+
+function isProductIntegrationConfigured(env) {
+  return (
+    env.DAYOPT_ENVIRONMENT === 'integration' ||
+    env.NEXT_PUBLIC_DAYOPT_ENVIRONMENT === 'integration' ||
+    getSupabaseHost(env.NEXT_PUBLIC_SUPABASE_URL) === PRODUCT_INTEGRATION_SUPABASE_HOST ||
+    env.VERCEL_PROJECT_PRODUCTION_URL === PRODUCT_INTEGRATION_HOST
+  );
+}
+
+function isBoundProductIntegration(env) {
+  return (
+    env.DAYOPT_ENVIRONMENT === 'integration' &&
+    env.NEXT_PUBLIC_DAYOPT_ENVIRONMENT === 'integration' &&
+    env.VERCEL_ENV === 'production' &&
+    env.VERCEL_TARGET_ENV === 'production' &&
+    env.VERCEL_GIT_COMMIT_REF === 'integration' &&
+    env.VERCEL_PROJECT_PRODUCTION_URL === PRODUCT_INTEGRATION_HOST &&
+    env.NEXT_PUBLIC_APP_URL === PRODUCT_INTEGRATION_ORIGIN &&
+    env.NEXT_PUBLIC_SUPABASE_URL === `https://${PRODUCT_INTEGRATION_SUPABASE_HOST}` &&
+    env.MCP_OAUTH_ENVIRONMENT === 'integration' &&
+    env.OAUTH_AUTHORIZATION_SERVER_URI === PRODUCT_INTEGRATION_ORIGIN &&
+    env.MCP_CANONICAL_RESOURCE_URI === PRODUCT_INTEGRATION_ORIGIN
+  );
+}
+
+function getSupabaseHost(value) {
+  if (typeof value !== 'string') return null;
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:' && url.pathname === '/' && !url.search && !url.hash
+      ? url.hostname
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Validate the fixed always-on Integration project before accepting a Vercel Production build. */
+export function assertProductIntegrationBuildEnv(env) {
+  if (!isProductIntegrationConfigured(env)) return false;
+
+  const missingNames = REQUIRED_PRODUCT_INTEGRATION_BUILD_ENV.filter(
+    (name) => !hasNonEmptyValue(env, name),
+  );
+  if (missingNames.length > 0) {
+    throw new Error(`Product Integration build requires: ${missingNames.join(', ')}`);
+  }
+
+  if (!isBoundProductIntegration(env)) {
+    throw new Error(
+      'Product Integration build requires its fixed domain, integration Git branch, Production target, OAuth identity, and Supabase project',
+    );
+  }
+
+  assertServerSupabaseKey(env);
+  assertHttpsUrl(env.UPSTASH_REDIS_REST_URL, 'UPSTASH_REDIS_REST_URL', 'Integration');
+
+  const upstashHost = new URL(env.UPSTASH_REDIS_REST_URL).hostname;
+  if (upstashHost === 'localhost' || upstashHost === '127.0.0.1') {
+    throw new Error('Product Integration requires a hosted, environment-specific Upstash instance');
+  }
+
+  if (env.MCP_WRITE_ENABLED_CLIENTS?.trim()) {
+    throw new Error('Product Integration build requires MCP_WRITE_ENABLED_CLIENTS to be empty');
+  }
+  if (env.BILLING_ENFORCED === 'true') {
+    throw new Error('Product Integration build forbids BILLING_ENFORCED=true');
+  }
+  if (env.POSTHOG_SERVER_ENABLED === 'true' || env.NEXT_PUBLIC_POSTHOG_BROWSER_ENABLED === 'true') {
+    throw new Error('Product Integration build forbids PostHog event delivery');
+  }
+
+  const stripeKey = typeof env.STRIPE_SECRET_KEY === 'string' ? env.STRIPE_SECRET_KEY.trim() : '';
+  if (
+    (stripeKey && !stripeKey.startsWith('sk_test_') && !stripeKey.startsWith('rk_test_')) ||
+    (stripeKey && env.STRIPE_LIVEMODE !== 'false') ||
+    (!stripeKey && env.STRIPE_LIVEMODE === 'true')
+  ) {
+    throw new Error('Product Integration build allows only Stripe test-mode credentials');
+  }
+
+  const contactRecipient =
+    typeof env.CONTACT_INTEGRATION_RECIPIENT === 'string'
+      ? env.CONTACT_INTEGRATION_RECIPIENT.trim().toLowerCase()
+      : '';
+  if (
+    hasNonEmptyValue(env, 'RESEND_API_KEY') &&
+    (!isValidEmailAddress(contactRecipient) || contactRecipient === 'support@dayopt.app')
+  ) {
+    throw new Error(
+      'Product Integration with Resend requires a dedicated CONTACT_INTEGRATION_RECIPIENT',
+    );
+  }
+  assertOptionalEnvironmentGroup(env, 'Product Integration Resend configuration', [
+    'RESEND_API_KEY',
+    'RESEND_FROM_EMAIL',
+    'RESEND_WEBHOOK_SECRET',
+    'CONTACT_INTEGRATION_RECIPIENT',
+  ]);
+  assertOptionalEnvironmentGroup(env, 'Product Integration Calendar configuration', [
+    'GOOGLE_CALENDAR_CLIENT_ID',
+    'GOOGLE_CALENDAR_PROJECT_NUMBER',
+    'GOOGLE_CALENDAR_CLIENT_SECRET',
+    'CALENDAR_TOKEN_ENCRYPTION_KEY',
+    'GOOGLE_CALENDAR_REDIRECT_URIS',
+  ]);
+
+  if (
+    hasNonEmptyValue(env, 'GOOGLE_CALENDAR_CLIENT_ID') &&
+    env.GOOGLE_CALENDAR_REDIRECT_URIS !==
+      `${PRODUCT_INTEGRATION_ORIGIN}/api/integrations/google-calendar/callback`
+  ) {
+    throw new Error('Product Integration Calendar redirect URI must match its fixed callback');
+  }
+
+  return true;
+}
+
+function assertOptionalEnvironmentGroup(env, label, names) {
+  const configured = names.filter((name) => hasNonEmptyValue(env, name)).length;
+  if (configured > 0 && configured !== names.length) {
+    throw new Error(`${label} requires all or none of: ${names.join(', ')}`);
+  }
+}
+
+function isValidEmailAddress(value) {
+  return (
+    value.length <= 254 && !/[\r\n,]/u.test(value) && /^[^\s@]+@[^\s@]+\.[^\s@]+$/u.test(value)
+  );
 }
 
 function hasNonEmptyValue(env, name) {
@@ -142,12 +299,10 @@ function isVerifiedDayoptSender(value) {
 
 /** Prevent a Production deploy with unavailable delivery, monitoring, or abuse controls. */
 export function assertProductOperationalProductionBuildEnv(env) {
-  if (env.VERCEL_ENV !== 'production') return false;
+  if (env.VERCEL_ENV !== 'production' || isProductIntegrationConfigured(env)) return false;
 
-  // Dayopt には staging 環境が無い（Persistent Staging を作らない決定）。存在しない
-  // 以上ここへは到達しないが、あとから staging 名の Vercel custom environment が
-  // 生えた場合に Production の OAuth identity をそのまま配ってしまう。sink ではなく
-  // 明示的な拒否にして、その時は build を止めて設計判断へ戻す。
+  // Integration was validated above and skipped here. Reject an unknown Vercel
+  // target or non-Production identity instead of silently treating it as Production.
   if (
     env.VERCEL_TARGET_ENV === 'staging' ||
     hasNonEmptyValue(env, 'MCP_OAUTH_PREVIEW_BRANCH') ||

@@ -6,6 +6,7 @@ import createNextIntlPlugin from 'next-intl/plugin';
 import { fileURLToPath } from 'url';
 
 import {
+  assertProductIntegrationBuildEnv,
   assertProductOperationalProductionBuildEnv,
   assertProductPreviewBuildEnv,
   resolveProductPublicMcpResourceUri,
@@ -23,6 +24,7 @@ const withBundleAnalyzer = bundleAnalyzer({
 });
 
 assertProductPreviewBuildEnv(process.env);
+assertProductIntegrationBuildEnv(process.env);
 const isSentryProductionBuild = assertProductionSentryBuildEnv(process.env, 'Product');
 assertProductOperationalProductionBuildEnv(process.env);
 
@@ -59,6 +61,9 @@ const nextConfig = {
     // client 側で Vercel 環境を判別するため露出。preview は NODE_ENV=production だが
     // VERCEL_ENV=preview なので、Sentry を production のみ有効化する gate に必要。
     NEXT_PUBLIC_VERCEL_ENV: process.env.VERCEL_ENV || '',
+    NEXT_PUBLIC_VERCEL_TARGET_ENV: process.env.VERCEL_TARGET_ENV || '',
+    NEXT_PUBLIC_VERCEL_GIT_COMMIT_REF: process.env.VERCEL_GIT_COMMIT_REF || '',
+    NEXT_PUBLIC_DAYOPT_ENVIRONMENT: process.env.NEXT_PUBLIC_DAYOPT_ENVIRONMENT || '',
     // sw.js のキャッシュバージョニング（useServiceWorker.ts が `/sw.js?v=<sha>` で登録する）
     // に使う。turbo.json の build env allowlist には VERCEL_GIT_COMMIT_SHA はあるが
     // NEXT_PUBLIC_ 版が無いため、ここで client 向けに再露出する。

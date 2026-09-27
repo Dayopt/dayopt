@@ -2199,6 +2199,16 @@ export type Database = {
           supabase_project_ref: string;
         }[];
       };
+      ensure_mcp_integration_environment_identity_v1: {
+        Args: never;
+        Returns: {
+          authorization_server_uri: string;
+          environment: string;
+          provisioned_at: string;
+          resource_uri: string;
+          supabase_project_ref: string;
+        }[];
+      };
       get_timeblock_context_marker_v1: {
         Args: { p_user_id: string };
         Returns: {

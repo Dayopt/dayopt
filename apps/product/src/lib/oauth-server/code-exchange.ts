@@ -150,6 +150,9 @@ export async function assertTokenIssuanceDatabaseIdentity(
       expectedIdentity,
       () => db.rpc('get_mcp_environment_identity_v1'),
       expectedSupabaseProjectRef,
+      expectedIdentity.environment === 'integration'
+        ? () => db.rpc('ensure_mcp_integration_environment_identity_v1')
+        : undefined,
     );
   } catch (error) {
     const original = captureUnexpectedDatabaseError(error, {

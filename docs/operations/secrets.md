@@ -235,13 +235,13 @@ vault は 2026-08-14 の信頼境界軸再編（[#2086](https://github.com/Dayop
 
 **AI が `op run` で解決してよい credentials を全部ここに置く**（「入れた瞬間 AI に漏れたとみなしても困らないもの」だけを入れる）。pre-tool-guard の vault allowlist はこの 1 vault のみを通す。
 
-**test mode credential と、local dev が使う app 設定が主な中身。** 通常の PR Preview では使わず、persistent staging を追加した時、または local dev 用の長寿命参照が必要な時だけ使う。
+**test mode credential と、local dev が使う app 設定が主な中身。** 通常の PR Preview と常設 Integration の Supabase connection info はここに保存しない。Integration 用値は専用 Vercel project の environment variables と Supabase branch-specific settings に user が保存する。
 
-**常設 staging 環境は存在しない**（Supabase の branch は `main` のみ）。そのため Supabase の接続情報（`NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` / `SUPABASE_SERVICE_ROLE_KEY` / `SUPABASE_DB_PASSWORD`）はこの vault に置かない。置けば production の複製にしかならず、実際 2026-08-11 まで 4 field とも `human/supabase` と同一値だった（[#1929](https://github.com/Dayopt/dayopt/issues/1929)）。local dev の Supabase 接続は `scripts/tasks/dev-with-op.sh` が `supabase status -o env` から注入し、1Password を経由しない。この境界は `scripts/__tests__/staging-supabase-boundary.test.ts` が固定する。
+**常設 Integration は Supabase project の Production data を複製しない**。Supabase branch `integration` は data-less branch とし、GitHub `integration` の migration と `supabase/seed.sql` だけを使う。`NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` / `SUPABASE_SECRET_KEY` / `SUPABASE_DB_PASSWORD` は `agent` vault に置かず、Production Supabase credentials も流用しない。local dev の Supabase 接続は `scripts/tasks/dev-with-op.sh` が `supabase status -o env` から注入し、1Password を経由しない。この境界は `scripts/__tests__/staging-supabase-boundary.test.ts` が固定する。
 
 | Item                  | Fields                                                                                                                                                                                                                                                                                                                                               | 用途                                                                                                                                                                                                            |
 | --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `supabase`            | `CRON_SECRET`, `SEND_EMAIL_HOOK_SECRET`, `SENTRY_DSN`（Edge Function send-auth-email 用、任意）                                                                                                                                                                                                                                                      | staging 用 optional secret（cron / send-email hook の local dev 検証）                                                                                                                                          |
+| `supabase`            | `CRON_SECRET`, `SEND_EMAIL_HOOK_SECRET`, `SENTRY_DSN`（Edge Function send-auth-email 用、任意）                                                                                                                                                                                                                                                      | Local 用 optional secret（cron / send-email hook の検証）                                                                                                                                                       |
 | `upstash`             | `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`                                                                                                                                                                                                                                                                                                 | Redis rate limit / cache                                                                                                                                                                                        |
 | `stripe-test`         | `STRIPE_SECRET_KEY`, `STRIPE_ACCOUNT_ID`, `STRIPE_LIVEMODE`, `STRIPE_WEBHOOK_SECRET`, `NEXT_PUBLIC_STRIPE_PRO_PRICE_ID`                                                                                                                                                                                                                              | Stripe test mode                                                                                                                                                                                                |
 | `app`                 | `NEXT_PUBLIC_APP_URL`, `NEXT_PUBLIC_SITE_URL`, `RECOVERY_CODE_PEPPER`, `OAUTH_CLAUDE_REDIRECT_URIS`, `OAUTH_CHATGPT_REDIRECT_URIS`, `OAUTH_CURSOR_REDIRECT_URIS`, `MCP_OAUTH_ENVIRONMENT`, `OAUTH_AUTHORIZATION_SERVER_URI`, `MCP_CANONICAL_RESOURCE_URI`, `MCP_OAUTH_PREVIEW_BRANCH`, `MCP_OAUTH_PREVIEW_UPSTASH_HOST`, `MCP_WRITE_ENABLED_CLIENTS` | App URL / recovery code HMAC pepper / MCP OAuth beta                                                                                                                                                            |
@@ -253,6 +253,32 @@ vault は 2026-08-14 の信頼境界軸再編（[#2086](https://github.com/Dayop
 | `vercel-ai-gateway`   | `credential`（AI Gateway API key、budget $4 / 月、90 日期限）, `expires`                                                                                                                                                                                                                                                                             | 評価モデル Jev の呼び出し（`pnpm jev:*` を inline `op://` で起動）。下記 §評価モデル Jev の Gateway key                                                                                                         |
 
 **`agent/app` の `RECOVERY_CODE_PEPPER` は production と別値**（2026-09-14、User が値を表示しない比較で `different` を確認）。local dev の recovery code が production で通ることはない。
+
+### Cloud-first Product Integration (#2910)
+
+Integration credentials は 1Password の `agent` item に追加せず、専用 Vercel project `product-integration` の Production environment に保存する。Supabase Production branch の自動設定は `main` のままにし、Integration の Supabase URL / keys は branch `tilwaprottpyhlfoggbb` から個別に取得する。Vercel system variables は Vercel が供給する値を使い、手入力しない。
+
+必須のアプリ設定:
+
+| Variable                                                        | 値 / ルール                                                                |
+| --------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| `DAYOPT_ENVIRONMENT` / `NEXT_PUBLIC_DAYOPT_ENVIRONMENT`         | どちらも `integration`                                                     |
+| `NEXT_PUBLIC_APP_URL`                                           | `https://product-integration.vercel.app`                                   |
+| `NEXT_PUBLIC_SUPABASE_URL`                                      | `https://tilwaprottpyhlfoggbb.supabase.co`                                 |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` / `SUPABASE_SECRET_KEY`  | Integration branch 専用の鍵。Production の鍵を使わない                     |
+| `MCP_OAUTH_ENVIRONMENT`                                         | `integration`                                                              |
+| `OAUTH_AUTHORIZATION_SERVER_URI` / `MCP_CANONICAL_RESOURCE_URI` | どちらも `https://product-integration.vercel.app`                          |
+| `NEXT_PUBLIC_TURNSTILE_SITE_KEY`                                | Integration 用 site key。Supabase branch の Auth captcha secret と対にする |
+| `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN`           | Integration 専用 instance                                                  |
+| `RECOVERY_CODE_PEPPER`                                          | Integration 専用のランダム値                                               |
+
+Vercel の `VERCEL_ENV=production` / `VERCEL_TARGET_ENV=production` / `VERCEL_GIT_COMMIT_REF=integration` / `VERCEL_PROJECT_PRODUCTION_URL=product-integration.vercel.app` は system values。アプリはこれらと上記の環境印・Supabase ref を build/runtime の両方で照合する。
+
+初期状態は `BILLING_ENFORCED=false`、`MCP_WRITE_ENABLED_CLIENTS` 空、`POSTHOG_SERVER_ENABLED=false`、`NEXT_PUBLIC_POSTHOG_BROWSER_ENABLED=false`。Stripe を有効化する場合は `STRIPE_SECRET_KEY` と `STRIPE_WEBHOOK_SECRET` を test credentials にし、`STRIPE_LIVEMODE=false` にする。live key / live mode は build で拒否される。
+
+Resend は任意。設定する場合は `RESEND_API_KEY` / `RESEND_FROM_EMAIL` / `RESEND_WEBHOOK_SECRET` / `CONTACT_INTEGRATION_RECIPIENT` を全て揃え、recipient は `support@dayopt.app` 以外の固定 test mailbox にする。Calendar も任意で、`GOOGLE_CALENDAR_CLIENT_ID` / `GOOGLE_CALENDAR_PROJECT_NUMBER` / `GOOGLE_CALENDAR_CLIENT_SECRET` / `CALENDAR_TOKEN_ENCRYPTION_KEY` / `GOOGLE_CALENDAR_REDIRECT_URIS` を揃える。Redirect URI は `https://product-integration.vercel.app/api/integrations/google-calendar/callback` に固定し、専用 test account だけを使う。
+
+Product は Sentry build で source-map release credentials を要求する。`SENTRY_ORG` / `SENTRY_PROJECT` / `SENTRY_AUTH_TOKEN` と `SENTRY_DSN` / `NEXT_PUBLIC_SENTRY_DSN` を設定し、Sentry event の `environment` は `integration` とする。実際の値は人間が Vercel に保存し、会話・Issue・repo に貼らない。
 
 **2026-09-14 に agent から外したもの**（Secret / Credential 監査）: `resend`（production ドメインから送れる送信 key。`human/resend-send` へ移動）、`anthropic`（consumer 無し、値も空）、`google`（webmaster verification。値が空で Vercel にも replica 無し）、`vercel`（未使用の team 全権 token。revoke 済み）。agent には「漏れても rotate すれば 1 日で戻せるもの」だけを置く。local dev は Resend 無しで動く（Supabase local の認証メールは Inbucket、問い合わせ送信は Production 限定、welcome / trial 系メールは送信失敗を handle する）。
 
@@ -298,7 +324,7 @@ vault は 2026-08-14 の信頼境界軸再編（[#2086](https://github.com/Dayop
 `google-calendar` は外部カレンダー取り込み（[#1702](https://github.com/Dayopt/dayopt/issues/1702)）専用の OAuth client で、Supabase Auth の Google provider とは別 client として作る。Supabase 側の client secret を流用しない。`GOOGLE_CALENDAR_PROJECT_NUMBER` は client ID の先頭にある project number と一致させる。
 
 - `OAUTH_CLAUDE_REDIRECT_URIS` / `OAUTH_CHATGPT_REDIRECT_URIS` / `OAUTH_CURSOR_REDIRECT_URIS` はclientが発行する追加callback URIのcomma区切りexact allowlist。wildcardやoriginだけの緩い一致は使わない。既定callbackで足りるclientではfieldを空のままにする
-- `MCP_OAUTH_ENVIRONMENT`はOAuth identityの環境marker。所有する環境はProductionと一時Previewの2つだけで、常設Stagingは作らない。一時Previewでは`preview`を必須とし、`VERCEL_ENV=preview`、`VERCEL_TARGET_ENV=preview`、branch、issuer、resourceのどれかが一致しなければbuildとruntimeを停止する。Productionは未設定時だけ既存originを既定値にする
+- `MCP_OAUTH_ENVIRONMENT`はOAuth identityの環境marker。Production / 一時Preview / persistent Integration を許可する。一時Previewでは`preview`と`VERCEL_ENV=preview`、`VERCEL_TARGET_ENV=preview`、branch、issuer、resourceを完全照合する。Integrationでは`integration`、Vercel Production target、Git branch `integration`、Supabase ref `tilwaprottpyhlfoggbb`、固定 origin `https://product-integration.vercel.app` を完全照合する。Productionは未設定時だけ既存originを既定値にする
 - `OAUTH_AUTHORIZATION_SERVER_URI`と`MCP_CANONICAL_RESOURCE_URI`は環境ごとに固定するorigin。一時Previewでは同じstable branch URLを使い、transport path、query、fragment、Production originを含めない
 - `MCP_OAUTH_PREVIEW_BRANCH`は検証対象PRのexact branch名。`VERCEL_GIT_COMMIT_REF`と一致しないPreviewを停止する。Productionには登録しない
 - `MCP_OAUTH_PREVIEW_UPSTASH_HOST`は一時Preview専用Upstashのhost marker。接続先URLのhostと一致しないbuildを停止する。Productionには登録せず、ProductionのUpstashをPreviewへ複製しない

@@ -37,6 +37,7 @@
 import { createBrowserClient } from '@supabase/ssr';
 
 import type { Database } from '@/lib/database';
+import { PRODUCT_INTEGRATION_APP_ORIGIN, resolveDayoptEnvironment } from '@/lib/dayopt-environment';
 
 // next.config.mjs の env フォールバック値（env var 未設定時の build 用プレースホルダー）。
 // ここと同じ値を保つ必要がある。
@@ -74,6 +75,28 @@ export function createClient() {
       '❌ NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY が未設定です:\n\n' +
         'これらは pnpm dev が Supabase local（supabase status -o env）から注入します。' +
         'pnpm dev で起動してください。詳細は docs/operations/secrets.md を参照してください。',
+    );
+  }
+
+  const dayoptEnvironment = resolveDayoptEnvironment({
+    publicDayoptEnvironment: process.env.NEXT_PUBLIC_DAYOPT_ENVIRONMENT,
+    vercelEnvironment: process.env.NEXT_PUBLIC_VERCEL_ENV,
+    vercelTargetEnvironment: process.env.NEXT_PUBLIC_VERCEL_TARGET_ENV,
+    vercelGitCommitRef: process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_REF,
+    supabaseUrl: url,
+  });
+  if (dayoptEnvironment === 'unknown') {
+    throw new SupabaseConfigError(
+      'Supabase project does not match the configured Dayopt environment.',
+    );
+  }
+  if (
+    dayoptEnvironment === 'integration' &&
+    typeof window !== 'undefined' &&
+    window.location.origin !== PRODUCT_INTEGRATION_APP_ORIGIN
+  ) {
+    throw new SupabaseConfigError(
+      'Integration Supabase access is restricted to its fixed app origin.',
     );
   }
 

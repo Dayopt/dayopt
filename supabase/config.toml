@@ -4,13 +4,16 @@
 # 各設定値には「なぜそうしたか」を記載。
 # 公式リファレンス: https://supabase.com/docs/guides/local-development/cli/config
 #
-# 運用モデル: local → PR Preview → production
+# 運用モデル: local → PR Preview → persistent Integration → production
 #   - Local:      supabase start（この config.toml を使用）
 #   - PR Preview: Supabase GitHub integration が PR ごとに Preview Branch を作成
+#   - Integration: product-integration Vercel project と integration Supabase branch
+#                  (ref: tilwaprottpyhlfoggbb) を固定接続
 #   - Production: dayopt main (ref: yvglwblxrnrenfifsnje)
 #
-# persistent staging は常設しない。固定URLが必要な検証時だけ追加する。
-# 詳細: apps/storybook/docs/dev/guides/MigrationChecklist.mdx / .claude/skills/supabase/SKILL.md
+# Production の GitHub branch は引き続き main。Integration は合成データ専用で
+# Production credentials / user data を複製しない。
+# 詳細: docs/engineering/infra.md の Cloud-first Integration 節
 # ============================================================
 
 project_id = "dayopt"
@@ -237,6 +240,27 @@ enable_confirmations = false
 template = "Your code is {{ .Code }}"
 # Controls the minimum amount of time that must pass before sending another sms otp.
 max_frequency = "5s"
+
+# Persistent Integration is an existing non-production Supabase branch. Remote
+# configuration applies only when the `integration` Git branch is merged; the
+# production remote remains Supabase `main` above.
+[remotes.integration]
+project_id = "tilwaprottpyhlfoggbb"
+
+[remotes.integration.db.seed]
+enabled = true
+sql_paths = ["./seed.sql"]
+
+[remotes.integration.auth]
+site_url = "https://product-integration.vercel.app"
+additional_redirect_urls = [
+  "https://product-integration.vercel.app",
+  "https://product-integration.vercel.app/**"
+]
+# The fixed synthetic test account from seed.sql is used for sign-in. Prevent
+# arbitrary account creation from turning this shared test database into a
+# place for real personal data.
+enable_signup = false
 
 # Use pre-defined map of phone number to OTP for testing.
 # [auth.sms.test_otp]

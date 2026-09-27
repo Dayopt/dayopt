@@ -1,4 +1,9 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+
+import {
+  PRODUCT_INTEGRATION_APP_ORIGIN,
+  PRODUCT_INTEGRATION_SUPABASE_REF,
+} from '@/lib/dayopt-environment';
 
 import {
   assertDatabaseOAuthIdentity,
@@ -35,6 +40,23 @@ const databasePreviewIdentity = {
   resource_uri: previewOrigin,
   supabase_project_ref: previewProjectRef,
   provisioned_at: '2026-07-29T00:00:00.000Z',
+};
+const integrationIdentity = resolveOAuthEnvironmentConfig({
+  mcpOAuthEnvironment: 'integration',
+  dayoptEnvironment: 'integration',
+  authorizationServerUri: PRODUCT_INTEGRATION_APP_ORIGIN,
+  resourceUri: PRODUCT_INTEGRATION_APP_ORIGIN,
+  vercelEnvironment: 'production',
+  vercelTargetEnvironment: 'production',
+  vercelGitCommitRef: 'integration',
+  supabaseProjectRef: PRODUCT_INTEGRATION_SUPABASE_REF,
+});
+const databaseIntegrationIdentity = {
+  environment: 'integration',
+  authorization_server_uri: PRODUCT_INTEGRATION_APP_ORIGIN,
+  resource_uri: PRODUCT_INTEGRATION_APP_ORIGIN,
+  supabase_project_ref: PRODUCT_INTEGRATION_SUPABASE_REF,
+  provisioned_at: '2026-09-27T00:00:00.000Z',
 };
 
 describe('database OAuth identity', () => {
@@ -144,6 +166,53 @@ describe('database OAuth identity', () => {
         supabaseUrl: `https://${previewProjectRef}.supabase.co`,
       }),
     ).toBe(previewProjectRef);
+  });
+
+  it('binds Integration to its one persistent Supabase project ref', () => {
+    expect(
+      resolveDatabaseOAuthProjectRef({
+        environment: 'integration',
+        supabaseUrl: `https://${PRODUCT_INTEGRATION_SUPABASE_REF}.supabase.co`,
+      }),
+    ).toBe(PRODUCT_INTEGRATION_SUPABASE_REF);
+
+    expect(() =>
+      resolveDatabaseOAuthProjectRef({
+        environment: 'integration',
+        supabaseUrl: 'https://yvglwblxrnrenfifsnje.supabase.co',
+      }),
+    ).toThrow(DatabaseOAuthIdentityError);
+  });
+
+  it('provisions the exact Integration identity once before checking it', async () => {
+    const provision = vi.fn(async () => ({
+      data: [databaseIntegrationIdentity],
+      error: null,
+    }));
+    const query = vi.fn(async () => ({
+      data: [databaseIntegrationIdentity],
+      error: null,
+    }));
+
+    await expect(
+      assertDatabaseOAuthIdentity(
+        integrationIdentity,
+        query,
+        PRODUCT_INTEGRATION_SUPABASE_REF,
+        provision,
+      ),
+    ).resolves.toBeUndefined();
+    await expect(
+      assertDatabaseOAuthIdentity(
+        integrationIdentity,
+        query,
+        PRODUCT_INTEGRATION_SUPABASE_REF,
+        provision,
+      ),
+    ).resolves.toBeUndefined();
+
+    expect(provision).toHaveBeenCalledTimes(1);
+    expect(query).toHaveBeenCalledTimes(2);
   });
 
   it.each([

@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
+import {
+  PRODUCT_INTEGRATION_APP_ORIGIN,
+  PRODUCT_INTEGRATION_SUPABASE_REF,
+} from '@/lib/dayopt-environment';
+
 import { isOAuthRequestHostAllowed, resolveOAuthEnvironmentConfig } from './identity';
 
 describe('MCP OAuth environment identity', () => {
@@ -120,6 +125,67 @@ describe('MCP OAuth environment identity', () => {
       protectedResourceMetadataUri:
         'https://product-git-codex-mcp-preview-dayopt.vercel.app/.well-known/oauth-protected-resource',
     });
+  });
+
+  it('accepts one exact Integration identity on the integration Git branch and Supabase ref', () => {
+    expect(
+      resolveOAuthEnvironmentConfig({
+        mcpOAuthEnvironment: 'integration',
+        dayoptEnvironment: 'integration',
+        authorizationServerUri: PRODUCT_INTEGRATION_APP_ORIGIN,
+        resourceUri: PRODUCT_INTEGRATION_APP_ORIGIN,
+        vercelEnvironment: 'production',
+        vercelTargetEnvironment: 'production',
+        vercelGitCommitRef: 'integration',
+        supabaseProjectRef: PRODUCT_INTEGRATION_SUPABASE_REF,
+      }),
+    ).toMatchObject({
+      environment: 'integration',
+      surfacesEnabled: true,
+      authorizationServerUri: PRODUCT_INTEGRATION_APP_ORIGIN,
+      resourceUri: PRODUCT_INTEGRATION_APP_ORIGIN,
+    });
+  });
+
+  it.each([
+    {
+      name: 'missing application marker',
+      override: { dayoptEnvironment: undefined },
+    },
+    {
+      name: 'Vercel Preview target',
+      override: { vercelEnvironment: 'preview' },
+    },
+    {
+      name: 'non-Production Vercel target',
+      override: { vercelTargetEnvironment: 'preview' },
+    },
+    {
+      name: 'main Git branch',
+      override: { vercelGitCommitRef: 'main' },
+    },
+    {
+      name: 'Production database ref',
+      override: { supabaseProjectRef: 'yvglwblxrnrenfifsnje' },
+    },
+    {
+      name: 'Production issuer',
+      override: { authorizationServerUri: 'https://app.dayopt.app' },
+    },
+  ])('rejects Integration identity drift: $name', ({ override }) => {
+    expect(() =>
+      resolveOAuthEnvironmentConfig({
+        mcpOAuthEnvironment: 'integration',
+        dayoptEnvironment: 'integration',
+        authorizationServerUri: PRODUCT_INTEGRATION_APP_ORIGIN,
+        resourceUri: PRODUCT_INTEGRATION_APP_ORIGIN,
+        vercelEnvironment: 'production',
+        vercelTargetEnvironment: 'production',
+        vercelGitCommitRef: 'integration',
+        supabaseProjectRef: PRODUCT_INTEGRATION_SUPABASE_REF,
+        ...override,
+      }),
+    ).toThrow();
   });
 
   it.each([

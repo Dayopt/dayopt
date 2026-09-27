@@ -9,6 +9,7 @@
 
 import * as Sentry from '@sentry/nextjs';
 
+import { resolveDayoptEnvironment } from '@/lib/dayopt-environment';
 import {
   scrubSentryBreadcrumb,
   scrubSentrySpan,
@@ -18,15 +19,24 @@ import {
 
 // Edge環境ではSENTRY_DSNを優先（ランタイム環境変数）
 const SENTRY_DSN = process.env.SENTRY_DSN;
-// VERCEL_ENVはVercelが自動設定（production, preview, development）
-const VERCEL_ENV = process.env.VERCEL_ENV;
-const IS_SENTRY_PRODUCTION = VERCEL_ENV === 'production';
+const DAYOPT_ENVIRONMENT = resolveDayoptEnvironment({
+  dayoptEnvironment: process.env.DAYOPT_ENVIRONMENT,
+  publicDayoptEnvironment: process.env.NEXT_PUBLIC_DAYOPT_ENVIRONMENT,
+  vercelEnvironment: process.env.VERCEL_ENV,
+  vercelTargetEnvironment: process.env.VERCEL_TARGET_ENV,
+  vercelGitCommitRef: process.env.VERCEL_GIT_COMMIT_REF,
+  supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL,
+});
+const SENTRY_ENVIRONMENT =
+  DAYOPT_ENVIRONMENT === 'production' || DAYOPT_ENVIRONMENT === 'integration'
+    ? DAYOPT_ENVIRONMENT
+    : null;
 
 // DSNが設定されている場合のみ初期化
-if (SENTRY_DSN && IS_SENTRY_PRODUCTION) {
+if (SENTRY_DSN && SENTRY_ENVIRONMENT !== null) {
   Sentry.init({
     dsn: SENTRY_DSN,
-    environment: 'production',
+    environment: SENTRY_ENVIRONMENT,
     sendDefaultPii: false,
     // release は withSentryConfig が build 時に注入する（next.config の release.name = VERCEL_GIT_COMMIT_SHA）。
     // ここで明示すると source map upload 時の release と runtime がズレるため上書きしない。
@@ -38,9 +48,9 @@ if (SENTRY_DSN && IS_SENTRY_PRODUCTION) {
     // デバッグモード無効（Edgeは軽量に）
     debug: false,
 
-    // 本番環境のみ有効。preview は NODE_ENV=production だが VERCEL_ENV=preview なので除外
-    // （IS_PRODUCTION では preview を除外できない）。
-    enabled: IS_SENTRY_PRODUCTION,
+    // Production and the explicitly bound Integration project only. Integration
+    // also uses Vercel's Production target, so check the Dayopt identity above.
+    enabled: SENTRY_ENVIRONMENT !== null,
 
     // Edge のフィルタリング + PII スクラビング
     beforeSend: withPIIScrub(),

@@ -16,6 +16,7 @@ import {
 } from '@dayopt/observability';
 import * as Sentry from '@sentry/nextjs';
 
+import { resolveDayoptEnvironment } from '@/lib/dayopt-environment';
 import {
   scrubSentryBreadcrumb,
   scrubSentrySpan,
@@ -27,8 +28,17 @@ import {
 export const onRouterTransitionStart = Sentry.captureRouterTransitionStart;
 
 const SENTRY_DSN = process.env.NEXT_PUBLIC_SENTRY_DSN;
-const VERCEL_ENV = process.env.NEXT_PUBLIC_VERCEL_ENV;
-const IS_SENTRY_PRODUCTION = VERCEL_ENV === 'production';
+const DAYOPT_ENVIRONMENT = resolveDayoptEnvironment({
+  publicDayoptEnvironment: process.env.NEXT_PUBLIC_DAYOPT_ENVIRONMENT,
+  vercelEnvironment: process.env.NEXT_PUBLIC_VERCEL_ENV,
+  vercelTargetEnvironment: process.env.NEXT_PUBLIC_VERCEL_TARGET_ENV,
+  vercelGitCommitRef: process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_REF,
+  supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL,
+});
+const SENTRY_ENVIRONMENT =
+  DAYOPT_ENVIRONMENT === 'production' || DAYOPT_ENVIRONMENT === 'integration'
+    ? DAYOPT_ENVIRONMENT
+    : null;
 let isSentryInitialized = false;
 let isBrowserTelemetryAllowed = false;
 let revocationReloadRequested = false;
@@ -51,7 +61,7 @@ function initSentry(dsn: string) {
 
   Sentry.init({
     dsn,
-    environment: VERCEL_ENV,
+    environment: SENTRY_ENVIRONMENT ?? 'unknown',
     sendDefaultPii: false,
     // release は withSentryConfig が build 時に注入する（next.config の release.name = VERCEL_GIT_COMMIT_SHA）。
     // ここで明示すると source map upload 時の release と runtime がズレるため上書きしない。
@@ -61,9 +71,9 @@ function initSentry(dsn: string) {
     // デバッグモード（開発環境のみ）
     debug: false,
 
-    // 本番環境のみ有効。preview は NODE_ENV=production だが VERCEL_ENV=preview なので除外
-    // （IS_PRODUCTION では preview を除外できない）。
-    enabled: IS_SENTRY_PRODUCTION,
+    // Production and the explicitly bound Integration project only. Integration
+    // also uses Vercel's Production target, so check the Dayopt identity above.
+    enabled: SENTRY_ENVIRONMENT !== null,
 
     // 固定protocol allowlistとpath-aware規則で、相関IDを保持しつつPIIを除去する。
     beforeSend: withPIIScrub(),
@@ -113,7 +123,7 @@ function applyBrowserTelemetryConsent(dsn: string, allowed: boolean): void {
 }
 
 // DSNが設定されている場合のみ処理
-if (SENTRY_DSN && IS_SENTRY_PRODUCTION) {
+if (SENTRY_DSN && SENTRY_ENVIRONMENT !== null) {
   isBrowserTelemetryAllowed = typeof window !== 'undefined' && hasStoredAnalyticsConsent();
 
   if (isBrowserTelemetryAllowed) {

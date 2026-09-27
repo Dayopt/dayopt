@@ -3,11 +3,16 @@ import { describe, expect, it } from 'vitest';
 import { dayoptUrls } from '@dayopt/config';
 
 import {
+  assertProductIntegrationBuildEnv,
   assertProductOperationalProductionBuildEnv,
   assertProductPreviewBuildEnv,
   FORBIDDEN_PRODUCT_PREVIEW_BUILD_ENV,
   MCP_PRODUCTION_ORIGIN,
+  PRODUCT_INTEGRATION_HOST,
+  PRODUCT_INTEGRATION_ORIGIN,
+  PRODUCT_INTEGRATION_SUPABASE_HOST,
   PRODUCT_PRODUCTION_ORIGIN,
+  REQUIRED_PRODUCT_INTEGRATION_BUILD_ENV,
   REQUIRED_PRODUCT_OPERATIONAL_BUILD_ENV,
   REQUIRED_PRODUCT_PREVIEW_BUILD_ENV,
   resolveProductPublicMcpResourceUri,
@@ -49,6 +54,29 @@ function completePreviewEnv() {
     OAUTH_AUTHORIZATION_SERVER_URI: `https://${branchUrl}`,
     MCP_CANONICAL_RESOURCE_URI: `https://${branchUrl}`,
     NEXT_PUBLIC_APP_URL: `https://${branchUrl}`,
+    MCP_WRITE_ENABLED_CLIENTS: '',
+  };
+}
+
+function completeIntegrationEnv() {
+  return {
+    DAYOPT_ENVIRONMENT: 'integration',
+    NEXT_PUBLIC_DAYOPT_ENVIRONMENT: 'integration',
+    VERCEL_ENV: 'production',
+    VERCEL_TARGET_ENV: 'production',
+    VERCEL_GIT_COMMIT_REF: 'integration',
+    VERCEL_PROJECT_PRODUCTION_URL: PRODUCT_INTEGRATION_HOST,
+    NEXT_PUBLIC_SUPABASE_URL: `https://${PRODUCT_INTEGRATION_SUPABASE_HOST}`,
+    NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_safe-dummy-key',
+    SUPABASE_SECRET_KEY: 'eyJ-safe-dummy-service-role-key',
+    NEXT_PUBLIC_APP_URL: PRODUCT_INTEGRATION_ORIGIN,
+    MCP_OAUTH_ENVIRONMENT: 'integration',
+    OAUTH_AUTHORIZATION_SERVER_URI: PRODUCT_INTEGRATION_ORIGIN,
+    MCP_CANONICAL_RESOURCE_URI: PRODUCT_INTEGRATION_ORIGIN,
+    NEXT_PUBLIC_TURNSTILE_SITE_KEY: 'safe-dummy-site-key',
+    UPSTASH_REDIS_REST_URL: 'https://integration-example.upstash.io',
+    UPSTASH_REDIS_REST_TOKEN: 'safe-dummy-upstash-token',
+    RECOVERY_CODE_PEPPER: 'safe-dummy-recovery-pepper',
     MCP_WRITE_ENABLED_CLIENTS: '',
   };
 }
@@ -318,6 +346,95 @@ describe('Product MCP Preview build gate', () => {
   });
 });
 
+describe('Product Integration build gate', () => {
+  it('skips builds that are not bound to the Integration project', () => {
+    expect(assertProductIntegrationBuildEnv({ VERCEL_ENV: 'preview' })).toBe(false);
+    expect(assertProductIntegrationBuildEnv(completeProductionEnv())).toBe(false);
+  });
+
+  it('accepts the fixed Integration deployment and its non-production project', () => {
+    expect(assertProductIntegrationBuildEnv(completeIntegrationEnv())).toBe(true);
+    expect(assertProductOperationalProductionBuildEnv(completeIntegrationEnv())).toBe(false);
+  });
+
+  it.each(REQUIRED_PRODUCT_INTEGRATION_BUILD_ENV)(
+    'rejects an Integration build missing only %s',
+    (name) => {
+      const env = completeIntegrationEnv();
+      delete env[name];
+      expect(() => assertProductIntegrationBuildEnv(env)).toThrow(name);
+    },
+  );
+
+  it.each([
+    ['DAYOPT_ENVIRONMENT', 'production'],
+    ['NEXT_PUBLIC_DAYOPT_ENVIRONMENT', 'preview'],
+    ['VERCEL_TARGET_ENV', 'preview'],
+    ['VERCEL_GIT_COMMIT_REF', 'main'],
+    ['VERCEL_PROJECT_PRODUCTION_URL', 'app.dayopt.app'],
+    ['NEXT_PUBLIC_SUPABASE_URL', 'https://yvglwblxrnrenfifsnje.supabase.co'],
+    ['NEXT_PUBLIC_APP_URL', 'https://app.dayopt.app'],
+    ['MCP_OAUTH_ENVIRONMENT', 'production'],
+    ['OAUTH_AUTHORIZATION_SERVER_URI', 'https://app.dayopt.app'],
+  ])('rejects Integration identity drift in %s', (name, value) => {
+    expect(() =>
+      assertProductIntegrationBuildEnv({ ...completeIntegrationEnv(), [name]: value }),
+    ).toThrow('Product Integration build requires its fixed domain');
+  });
+
+  it('fails closed for production-capable writes, billing, and analytics', () => {
+    for (const [name, value, message] of [
+      ['MCP_WRITE_ENABLED_CLIENTS', 'chatgpt', 'MCP_WRITE_ENABLED_CLIENTS to be empty'],
+      ['BILLING_ENFORCED', 'true', 'BILLING_ENFORCED=true'],
+      ['POSTHOG_SERVER_ENABLED', 'true', 'forbids PostHog event delivery'],
+      ['NEXT_PUBLIC_POSTHOG_BROWSER_ENABLED', 'true', 'forbids PostHog event delivery'],
+    ]) {
+      expect(() =>
+        assertProductIntegrationBuildEnv({ ...completeIntegrationEnv(), [name]: value }),
+      ).toThrow(message);
+    }
+  });
+
+  it.each([
+    ['sk_live_live-secret', 'true'],
+    ['rk_live_live-secret', 'false'],
+    ['sk_test_safe-test-key', 'true'],
+  ])('rejects a non-test Stripe configuration', (key, liveMode) => {
+    expect(() =>
+      assertProductIntegrationBuildEnv({
+        ...completeIntegrationEnv(),
+        STRIPE_SECRET_KEY: key,
+        STRIPE_LIVEMODE: liveMode,
+      }),
+    ).toThrow('allows only Stripe test-mode credentials');
+  });
+
+  it('requires a dedicated non-support recipient before enabling Resend', () => {
+    expect(() =>
+      assertProductIntegrationBuildEnv({
+        ...completeIntegrationEnv(),
+        RESEND_API_KEY: 'test-key',
+      }),
+    ).toThrow('dedicated CONTACT_INTEGRATION_RECIPIENT');
+    expect(() =>
+      assertProductIntegrationBuildEnv({
+        ...completeIntegrationEnv(),
+        RESEND_API_KEY: 'test-key',
+        CONTACT_INTEGRATION_RECIPIENT: 'support@dayopt.app',
+      }),
+    ).toThrow('dedicated CONTACT_INTEGRATION_RECIPIENT');
+    expect(
+      assertProductIntegrationBuildEnv({
+        ...completeIntegrationEnv(),
+        RESEND_API_KEY: 'test-key',
+        RESEND_FROM_EMAIL: 'noreply@dayopt.app',
+        RESEND_WEBHOOK_SECRET: 'test-webhook-secret',
+        CONTACT_INTEGRATION_RECIPIENT: 'qa+integration@example.com',
+      }),
+    ).toBe(true);
+  });
+});
+
 describe('Product public MCP resource', () => {
   it('advertises only the resource owned by Production or the bound Preview', () => {
     expect(resolveProductPublicMcpResourceUri(completeProductionEnv())).toBe(MCP_PRODUCTION_ORIGIN);
@@ -340,5 +457,17 @@ describe('Product public MCP resource', () => {
     // Settings を Production MCP への接続導線にしてしまう。ローカル build は
     // どの MCP resource も所有しないため、Preview と同じく何も advertise しない。
     expect(resolveProductPublicMcpResourceUri({})).toBe('');
+  });
+
+  it('advertises the Integration resource only for the exact Integration deployment', () => {
+    expect(resolveProductPublicMcpResourceUri(completeIntegrationEnv())).toBe(
+      PRODUCT_INTEGRATION_ORIGIN,
+    );
+    expect(
+      resolveProductPublicMcpResourceUri({
+        ...completeIntegrationEnv(),
+        NEXT_PUBLIC_SUPABASE_URL: 'https://yvglwblxrnrenfifsnje.supabase.co',
+      }),
+    ).toBe('');
   });
 });
