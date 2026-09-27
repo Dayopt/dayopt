@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
 
+import { resolveDayoptEnvironment } from '@/lib/dayopt-environment';
 import { logger } from '@/lib/logger';
 import {
   assertDatabaseOAuthIdentity,
@@ -99,6 +100,9 @@ async function checkDatabase(): Promise<'ok' | 'error' | 'warning'> {
         expectedIdentity,
         () => supabase.rpc('get_mcp_environment_identity_v1'),
         expectedSupabaseProjectRef,
+        expectedIdentity.environment === 'integration'
+          ? () => supabase.rpc('ensure_mcp_integration_environment_identity_v1')
+          : undefined,
       );
     }
 
@@ -158,15 +162,14 @@ function getVersion(): string {
  * 環境名を取得
  */
 function getEnvironment(): string {
-  if (process.env.VERCEL_TARGET_ENV) {
-    return process.env.VERCEL_TARGET_ENV;
-  }
-
-  if (process.env.VERCEL_ENV) {
-    return process.env.VERCEL_ENV;
-  }
-
-  return process.env.NODE_ENV || 'development';
+  return resolveDayoptEnvironment({
+    dayoptEnvironment: process.env.DAYOPT_ENVIRONMENT,
+    publicDayoptEnvironment: process.env.NEXT_PUBLIC_DAYOPT_ENVIRONMENT,
+    vercelEnvironment: process.env.VERCEL_ENV,
+    vercelTargetEnvironment: process.env.VERCEL_TARGET_ENV,
+    vercelGitCommitRef: process.env.VERCEL_GIT_COMMIT_REF,
+    supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL,
+  });
 }
 
 /**

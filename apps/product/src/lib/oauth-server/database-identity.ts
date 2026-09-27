@@ -1,5 +1,10 @@
 import 'server-only';
 
+import {
+  PRODUCT_INTEGRATION_SUPABASE_REF,
+  resolveSupabaseProjectRef,
+} from '@/lib/dayopt-environment';
+
 import type { OAuthEnvironmentConfig } from './identity';
 
 interface DatabaseOAuthIdentity {
@@ -16,6 +21,10 @@ interface DatabaseIdentityQueryResult {
 }
 
 type DatabaseIdentityQuery = () => PromiseLike<DatabaseIdentityQueryResult>;
+type DatabaseIdentityProvisionQuery = () => PromiseLike<DatabaseIdentityQueryResult>;
+
+let integrationIdentityProvisioned = false;
+let integrationIdentityProvisioning: Promise<void> | null = null;
 
 export class DatabaseOAuthIdentityError extends Error {
   constructor(cause?: unknown) {
@@ -46,7 +55,19 @@ export async function assertDatabaseOAuthIdentity(
   expected: OAuthEnvironmentConfig,
   query: DatabaseIdentityQuery,
   expectedSupabaseProjectRef: string | null = null,
+  provisionIntegrationIdentity?: DatabaseIdentityProvisionQuery,
 ): Promise<void> {
+  if (expected.environment === 'integration') {
+    if (
+      expectedSupabaseProjectRef !== PRODUCT_INTEGRATION_SUPABASE_REF ||
+      !provisionIntegrationIdentity
+    ) {
+      throw new DatabaseOAuthIdentityError();
+    }
+
+    await ensureIntegrationIdentity(expected, provisionIntegrationIdentity);
+  }
+
   let result: DatabaseIdentityQueryResult;
 
   try {
@@ -64,35 +85,56 @@ export async function assertDatabaseOAuthIdentity(
   }
 }
 
+async function ensureIntegrationIdentity(
+  expected: OAuthEnvironmentConfig,
+  provision: DatabaseIdentityProvisionQuery,
+): Promise<void> {
+  if (integrationIdentityProvisioned) return;
+
+  if (!integrationIdentityProvisioning) {
+    integrationIdentityProvisioning = (async () => {
+      let result: DatabaseIdentityQueryResult;
+      try {
+        result = await provision();
+      } catch (error) {
+        throw new DatabaseOAuthIdentityError(error);
+      }
+
+      if (
+        result.error ||
+        result.data?.length !== 1 ||
+        !matchesDatabaseOAuthIdentity(result.data[0]!, expected, PRODUCT_INTEGRATION_SUPABASE_REF)
+      ) {
+        throw new DatabaseOAuthIdentityError(result.error ?? undefined);
+      }
+      integrationIdentityProvisioned = true;
+    })();
+  }
+
+  try {
+    await integrationIdentityProvisioning;
+  } catch (error) {
+    integrationIdentityProvisioning = null;
+    throw error;
+  }
+}
+
 export function resolveDatabaseOAuthProjectRef(input: {
   environment: OAuthEnvironmentConfig['environment'];
   supabaseUrl: string | undefined;
 }): string | null {
-  if (input.environment !== 'preview') return null;
+  if (input.environment === 'production') return null;
 
-  try {
-    if (!input.supabaseUrl) throw new Error();
-    const url = new URL(input.supabaseUrl);
-    if (
-      url.protocol !== 'https:' ||
-      url.username ||
-      url.password ||
-      url.port ||
-      url.pathname !== '/' ||
-      url.search ||
-      url.hash
-    ) {
-      throw new Error();
-    }
-
-    const hostMatch = /^([a-z]{20})[.]supabase[.]co$/u.exec(url.hostname);
-    if (!hostMatch?.[1]) throw new Error();
-
-    // Opaque API keys carry no project claims. The URL identifies the expected
-    // project; the authenticated identity RPC above must independently return
-    // the same project ref. A mismatched key fails authentication at that URL.
-    return hostMatch[1];
-  } catch {
+  const projectRef = resolveSupabaseProjectRef(input.supabaseUrl);
+  if (
+    !projectRef ||
+    (input.environment === 'integration' && projectRef !== PRODUCT_INTEGRATION_SUPABASE_REF)
+  ) {
     throw new DatabaseOAuthIdentityError();
   }
+
+  // Opaque API keys carry no project claims. The URL identifies the expected
+  // project; the authenticated identity RPC above must independently return
+  // the same project ref. A mismatched key fails authentication at that URL.
+  return projectRef;
 }

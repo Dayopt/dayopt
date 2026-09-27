@@ -5,7 +5,7 @@ last_verified: 2026-09-22
 
 # インフラ・環境・API/Routing 総覧
 
-環境構成（Local / PR Preview / Production）、CI品質ゲートのロードマップ、DNS 管理（Cloudflare）、Bot 対策（Turnstile）、API endpoints 総覧、Supabase 型自動生成、App Router routing 総覧、パフォーマンス監視の原則、開発コマンド一覧、マイグレーション/リリースチェックリスト、災害復旧手順、DB Migration Rollback 手順書、出口コスト台帳。「環境・デプロイ・シークレットは?」の正。
+環境構成（Local / PR Preview / Integration / Production）、CI品質ゲートのロードマップ、DNS 管理（Cloudflare）、Bot 対策（Turnstile）、API endpoints 総覧、Supabase 型自動生成、App Router routing 総覧、パフォーマンス監視の原則、開発コマンド一覧、マイグレーション/リリースチェックリスト、災害復旧手順、DB Migration Rollback 手順書、出口コスト台帳。「環境・デプロイ・シークレットは?」の正。
 
 ---
 
@@ -1460,19 +1460,23 @@ Dayopt の標準ルートは `local → PR Preview → production`。
 - **Project ref**: `yvglwblxrnrenfifsnje`
 - **Local**: `supabase start` と `pnpm dev` (`op run`) を使う
 - **PR Preview**: PR ごとの Supabase Preview Branch と Vercel Preview を使う
+- **Integration**: persistent Supabase branch `integration` と専用 Vercel project `product-integration` を使う。Production data / credentials は使わない
 - **Production**: `main` merge 後だけ Supabase main と Vercel Production に反映する
 
-| 環境           | Supabase                          | Vercel                         | 用途                         |
-| -------------- | --------------------------------- | ------------------------------ | ---------------------------- |
-| **Local**      | `supabase start`                  | `pnpm dev`                     | 手元の開発                   |
-| **PR Preview** | PR ごとの Supabase Preview Branch | Vercel Preview URL (`product`) | migration / 機能の本番前検証 |
-| **Production** | `dayopt` main                     | Production deployment          | 実ユーザー                   |
+| 環境            | Supabase                                 | Vercel                           | 用途                                    |
+| --------------- | ---------------------------------------- | -------------------------------- | --------------------------------------- |
+| **Local**       | `supabase start`                         | `pnpm dev`                       | 手元の開発                              |
+| **PR Preview**  | PR ごとの Supabase Preview Branch        | Vercel Preview URL (`product`)   | migration / 機能の本番前検証            |
+| **Integration** | `tilwaprottpyhlfoggbb` persistent branch | `product-integration.vercel.app` | 固定 URL の合成データ検証（接続準備中） |
+| **Production**  | `dayopt` main                            | Production deployment            | 実ユーザー                              |
 
-persistent staging は標準ルートでは使わない。固定 URL が必要な Stripe / OAuth / closed beta 検証が発生した時だけ、Vercel staging と Supabase persistent branch を追加する。
+Cloud-first 開発で使う persistent Integration は常設する。通常の PR Preview は引き続き Vercel の一時 URL を使い、Supabase Preview branch は migration / Supabase 設定変更を検証する PR だけに作る。固定 URL の OAuth / sandbox / ブラウザ検証は Integration が受け持つ。
+
+2026-09-27 時点で GitHub `integration` branch は `main` から作成し、Supabase persistent branch `tilwaprottpyhlfoggbb` に同名の Git branch を割り当てた。Supabase はまだ `MIGRATIONS_FAILED`（public schema に tables がなく、migration は 2 件のみ）。Vercel `product-integration` の branch / env 設定はユーザー保存待ちで、ログイン可能な環境としては未検証。
 
 ### Integration Setup
 
-Supabase Dashboard で `dayopt` project に GitHub integration を接続する。
+Supabase Dashboard の `dayopt` project は既存の GitHub integration を使い続ける。
 
 - Repository: `Dayopt/dayopt`
 - Working directory: `.`
@@ -1480,24 +1484,48 @@ Supabase Dashboard で `dayopt` project に GitHub integration を接続する�
 - Automatic branching: enabled
 - Deploy to production: enabled
 - Preview Branch seed: `supabase/seed.sql`
+- Persistent Integration branch: GitHub `integration` と Supabase branch `tilwaprottpyhlfoggbb` を一対一で接続
+- Persistent branch settings: `supabase/config.toml` の `[remotes.integration]`
 
-Supabase Vercel integration は `product` Vercel project のみに接続する。`web` は今回の Supabase Preview Branch 切替対象外。
+Supabase Vercel integration は既存どおり `product` project の PR Preview 向けに使う。`web` と専用 Vercel project `product-integration` は自動 Supabase env の注入先にしない。`product-integration` は Integration branch 固有の URL/key を明示的に設定し、Production Supabase key を入れない。
 
-GitHub branch protection では Supabase integration の required check を有効化する。これにより、Preview Branch への migration 適用が失敗した PR は merge できない。
+専用 Vercel project は `product-integration`、固定 URL は `https://product-integration.vercel.app`、Production branch は GitHub `integration`。Vercel の target 名が `Production` でも Dayopt では非本番として扱う。build と Supabase access は、環境印、target、Git branch、Supabase project ref が全て一致する場合だけ許可する。既存 `product` project の Production branch `main` は変更しない。
+
+#### LLM のデータ境界
+
+| LLM が扱える                                                                                                    | LLM に渡さない                                                                                                                                      |
+| --------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| repository code、合成 seed の test account / records、Integration で新たに作った架空データ、Stripe test objects | Production / real-user records、実名・実メール・実際の問い合わせ内容、実際の Google Calendar / OAuth token、Production Stripe customer/payment data |
+| Integration の設定名、成功・失敗などの技術的証拠                                                                | Production credentials、service-role key、cookie/session、recovery code、signing/encryption key、one-time code、実ユーザー credentials              |
+
+Integration は Production DB の clone を作らず、`supabase/seed.sql` の固定 test account だけを使う。branch-specific Supabase Auth では任意 signup を無効にし、固定 account は email confirmation なしの password login を使う。実名・実メール・本物のカレンダー・Production OAuth token を入力しない。外部送信は必要時だけ専用 credentials と固定 test recipient を設定する。PostHog delivery と MCP write は初期状態で無効にする。Stripe を設定する場合は `sk_test_` / `rk_test_` と `STRIPE_LIVEMODE=false` の組だけを許可する。
+
+専用 Vercel env の Supabase key、Upstash、Stripe、Calendar OAuth、Resend、Recovery pepper、Cron secret は全て Integration 用に分離する。Sentry event は `environment=integration` と PII scrub を使う。secret の実値は repo / Issue / LLM の会話へ貼らない。
 
 ### リリースフロー全体像
 
 ```txt
-feature branch → PR open
-                  ├── Supabase: Preview Branch 作成 + migration 適用 + seed
-                  └── Vercel: product Preview が Preview Branch env を参照
+feature branch → PR to integration
+                  ├── Supabase: temporary Preview Branch + migration + synthetic seed
+                  ├── Vercel product: PR Preview + temporary Supabase credentials
+                  └── CI / Supabase Preview checks
 
-PR review → checks pass → main merge
-                  ├── Supabase: main/production に migration 適用
-                  └── Vercel: product Production deploy
+PR checks pass → merge into integration
+                  ├── Supabase: persistent Integration branch receives migrations/config
+                  └── Vercel product-integration: fixed URL deploys integration branch
+
+Integration browser / auth / sandbox checks pass → PR integration to main
+                  ├── Supabase: temporary Preview Branch for the promotion PR
+                  └── Vercel product: PR Preview
+
+promotion checks pass → merge into main
+                  ├── Supabase: main/production receives migrations
+                  └── Vercel product: Production deploy
 ```
 
-Vercel Preview は production Supabase DB を参照しない。PR close / merge 後の Preview Branch は Supabase 側で削除または停止される。
+通常の Vercel Preview は Production Supabase DB を参照しない。一時 Preview Branch は migration を使う PR でだけ作り、merge 後は Supabase が削除する。該当 PR は merge まで進める。merge できず Preview が残った場合は、その temporary branch だけ削除し、persistent Integration は消さない。
+
+`integration` と `main` の PR は同じ変更 tree を通す。Integration の動作確認が済むまで main に進めない。各段階で Git SHA / deployment URL / Supabase ref を別々に記録する。
 
 ### マイグレーション手順
 
@@ -1519,7 +1547,7 @@ pnpm dev
 
 #### 3. PR Preview 検証
 
-PR を作成すると Supabase GitHub integration が Preview Branch を作成し、`supabase/migrations/**` を適用する。Vercel integration が `product` の Preview deployment に対応する Supabase env vars を注入する。
+`integration` 向け PR に新しい SQL migration が含まれると Supabase GitHub integration が temporary Preview Branch を作成し、`supabase/migrations/**` と `supabase/seed.sql` を適用する。Vercel integration が `product` の Preview deployment に対応する Supabase env vars を注入する。Supabase と無関係な PR では Supabase branch を作らない。
 
 確認すること:
 
@@ -1528,9 +1556,15 @@ PR を作成すると Supabase GitHub integration が Preview Branch を作成�
 - migration に依存する機能が Preview URL で動く
 - seed data だけで動作確認でき、本番データを必要としない
 
-#### 4. Production 適用
+#### 4. Persistent Integration 確認
 
-`main` merge 後、Supabase GitHub integration が production に migration を適用する。GitHub Actions から `supabase db push` は実行しない。
+`integration` への merge 後、Supabase branch が active / migration current であること、`product-integration.vercel.app/api/health` の DB / Redis checks、固定 synthetic account の password login、合成データ CRUD、MCP read-only、必要な Stripe test / Calendar test を確認する。Vercel `product-integration` が Git `integration` と Supabase `tilwaprottpyhlfoggbb` を使うことも確認する。
+
+#### 5. Production promotion
+
+Integration checks が通った変更 tree から `integration` → `main` PR を作る。promotion PR の Supabase Preview と CI checks を確認する。一時 Preview branch は merge または削除して閉じる。
+
+`main` merge 後、Supabase GitHub integration が production に migration を適用し、`product` が Production deploy する。GitHub Actions から `supabase db push` は実行しない。
 
 ### Emergency Runbook
 

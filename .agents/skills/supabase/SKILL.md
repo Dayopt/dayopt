@@ -1,6 +1,6 @@
 ---
 name: supabase
-description: 新規 Supabase migration ファイル(`supabase/migrations/*.sql`)を追加する時、既存 schema に RLS ポリシーを設計・変更する時、Storage バケットポリシーを編集する時、Realtime 購読(`postgres_changes`)を新規実装する時、Edge Functions(`supabase/functions/`)を追加・デプロイする時、production main への DB 変更を適用する時に発動。Supabase Branching による local → PR Preview → production 運用パターンを適用する。アプリケーション層のみの変更では発動しない。
+description: 新規 Supabase migration ファイル(`supabase/migrations/*.sql`)を追加する時、既存 schema に RLS ポリシーを設計・変更する時、Storage バケットポリシーを編集する時、Realtime 購読(`postgres_changes`)を新規実装する時、Edge Functions(`supabase/functions/`)を追加・デプロイする時、Integration または Production へ DB 変更を適用する時に発動。Supabase Branching による local → PR Preview → persistent Integration → production 運用パターンを適用する。アプリケーション層のみの変更では発動しない。
 effort: high
 maxTurns: 25
 ---
@@ -11,12 +11,13 @@ Dayoptでの Supabase 運用パターンを支援するスキル。
 
 > ## 現状: Supabase Branching 運用
 >
-> Dayopt は **1 Supabase project (`dayopt`, ref `yvglwblxrnrenfifsnje`) + PR ごとの Preview Branch** で運用する。標準ルートは `local → PR Preview → production`。
+> Dayopt は **Production project (`dayopt`, ref `yvglwblxrnrenfifsnje`)、PR ごとの ephemeral Preview Branch、および persistent `integration` branch (`tilwaprottpyhlfoggbb`)** で運用する。標準ルートは `local → PR Preview → persistent Integration → production`。専用 Vercel project は `product-integration`、その Git の Production branch は `integration` にする。Supabase Production branch は `main` のまま維持する。
 >
 > **現状で守ること**:
 >
 > - migration owner は Supabase GitHub integration
 > - Vercel Preview は PR 用 Supabase Preview Branch を参照
+> - Persistent Integration への変更は GitHub `integration` branch と Supabase `[remotes.integration]` の固定 ref で対応させる
 > - GitHub Actions から `supabase db push` しない
 > - 手動 `db push` は emergency only
 > - PR Preview credentials は 1Password に保存しない
@@ -42,35 +43,37 @@ Dayoptでの Supabase 運用パターンを支援するスキル。
 
 ### 原則
 
-**1 Supabase project + ephemeral PR Preview branches**
+**1 Supabase project + ephemeral PR Preview branches + one persistent Integration branch**
 
 git の世界観と揃える:
 
 - `main` = production
-- persistent staging = 固定URLが必要な時だけ追加
+- `integration` = persistent Integration branch (`tilwaprottpyhlfoggbb`)、専用 Vercel project `product-integration` と固定接続
 - `feat/*` = preview branch(PR単位、自動生成・自動破棄)
 
 ### 環境マップ
 
-| 環境           | 実体                    | ライフサイクル            | 用途                                            |
-| -------------- | ----------------------- | ------------------------- | ----------------------------------------------- |
-| **Preview**    | Supabase preview branch | PR open〜close(ephemeral) | 日常の開発・PR検証                              |
-| **Staging**    | persistent branch       | 必要時のみ                | Stripe webhook検証、OAuth callback、closed beta |
-| **Production** | main project            | 永続                      | 実ユーザー                                      |
-| **Local**      | `supabase start`        | 任意                      | 手元の開発                                      |
+| 環境            | 実体                            | ライフサイクル                        | 用途                                                              |
+| --------------- | ------------------------------- | ------------------------------------- | ----------------------------------------------------------------- |
+| **Preview**     | Supabase preview branch         | migration/config PR open〜merge/close | branch単位の migration / RLS 検証                                 |
+| **Integration** | persistent branch `integration` | 常設                                  | 固定 URL の Auth / OAuth / browser / sandbox 検証、合成 seed のみ |
+| **Production**  | main project `main`             | 永続                                  | 実ユーザー                                                        |
+| **Local**       | `supabase start`                | 任意                                  | 手元の開発                                                        |
 
 ### 守るもの・捨てるもの
 
 **守る:**
 
 - 本番データ・認証ユーザー・APIキーは Supabase branch 機構で完全隔離
-- 開発作業は staging/production の DB を直接汚さない
+- Integration は data-less persistent branch を作り、`supabase/seed.sql` の固定 synthetic user だけを使う。任意 signup は無効
+- Integration 用 Vercel / Supabase / Redis / Stripe / OAuth secrets は専用設定とし、Production values をコピーしない
+- 開発作業は Integration/Production の DB を直接変更せず、GitHub integration が適用する migration を使う
 - migration は git history に残り、CI で検証されたものだけが production に到達
 
 **捨てる(=意図的に採用しない):**
 
 - Supabase プロジェクトの物理分離(1 organization で完結)
-- ローカル開発からの staging / production 直結
+- ローカル開発からの Integration / production 直結
 - Dashboard SQL Editor での手動 production migration
 
 ## Migration 運用
@@ -82,14 +85,14 @@ git の世界観と揃える:
 git checkout -b feat/add-xxx
 
 # 2. migration ファイル作成
-npx supabase migration new add_xxx
+pnpm migration:create add_xxx
 
 # 3. SQL編集
 # supabase/migrations/YYYYMMDDHHMMSS_add_xxx.sql
 
-# 4. push → PR
+# 4. push → PR to integration
 git push -u origin feat/add-xxx
-gh pr create
+gh pr create --base integration
 
 # 5. 自動実行
 # - Supabase preview branch 自動生成
@@ -97,29 +100,29 @@ gh pr create
 # - CI で status check 実行
 # - Vercel Preview が preview branch に接続
 
-# 6. PR レビュー・動作確認
+# 6. Preview checks + review → merge into integration
+# - persistent Supabase Integration branch に migrations/config を反映
+# - product-integration が固定 URL で Integration branch を deploy
+# - Auth / CRUD / read-only MCP / 必要な sandbox flow を確認
 
-# 7. main merge
+# 7. Integration 済みの同じ変更 tree で PR integration → main
+# - promotion PR の temporary Preview / checks も完了させる
+# 8. main merge
 # - production に migration 自動適用
 # - Vercel production 自動デプロイ
 ```
 
-### Staging branch への適用
+### Integration branch への適用
 
-通常の PR フローは preview → production 直行。staging を経由するのは**以下の場合のみ**:
+Cloud-first Product changes は Integration で確認してから main へ進める。通常 branch protections / CI は維持し、Supabase Preview を生成した PR は merge 後に temporary branch が削除されたことを確認する。merge 不能ならその temporary branch だけ削除し、persistent Integration は残す。
 
-- Stripe 本番 webhook との結合検証が必要な migration
-- launch 後の hotfix で、本番相当の検証が必要な時
-- closed beta 用のデータモデル変更
+`supabase/config.toml` の `[remotes.integration]` が persistent branch の config / seed を管理する。Supabase Production integration の branch は `main` のまま維持する。
 
-その場合の手順:
+PR Preview branch は migration / Supabase config 変更を独立して確かめる用途で、一時的に使う:
 
 ```bash
-# staging branch に cherry-pick or merge
-git checkout staging
-git merge feat/add-xxx
-git push
-# → staging Supabase branch に自動適用
+# PR branch を integration に merge
+# → temporary Preview は自動破棄され、persistent Integration に migration/config が反映される
 ```
 
 ### Preview branch の作られ方
@@ -149,7 +152,7 @@ supabase --experimental branches create <name> \
 
 省略すると action run の `git_config.ref` が空になり、`migrate` step が `DEAD` で停止する。git `main` への紐付けは **409 で拒否される**（default branch が占有済み）。実在する feature branch に紐付ければ全 migration が適用される。
 
-**2. 手動 branch の credential は Vercel へ同期されない**（integration が自分で branch を作る経路でしか同期が走らないため）。Preview を実際に動かす目的では使えない。
+**2. 手動 Preview branch の credential は Vercel へ同期されない**（Supabase GitHub integration が作る PR Preview branch の同期経路とは異なる）。Preview を実際に動かす目的では使えない。Persistent Integration は別経路で、`[remotes.integration]` の固定 ref と `product-integration` 専用 env を使う。
 
 **削除は 2 段階**（persistent の場合）:
 
@@ -433,13 +436,13 @@ npx supabase functions deploy send-auth-email --use-api --project-ref=<PROD_REF>
 
 #### マトリクス
 
-| Secret                   | Preview           | Staging               | Production               | 備考                            |
-| ------------------------ | ----------------- | --------------------- | ------------------------ | ------------------------------- |
-| `RESEND_API_KEY`         | test key          | test key              | **live key**             | Resend は test/live の2分割     |
-| `RESEND_FROM_EMAIL`      | `noreply-dev@...` | `noreply-staging@...` | `noreply@dayopt.app`     | 環境別                          |
-| `NEXT_PUBLIC_APP_URL`    | preview URL       | staging URL           | `https://app.dayopt.app` | 環境別                          |
-| `CRON_SECRET`            | (不要)            | UUID-staging          | UUID-production          | `openssl rand -hex 32`          |
-| `SEND_EMAIL_HOOK_SECRET` | test値            | staging値             | production値             | Supabase Auth hook 設定時に発行 |
+| Secret                   | Preview             | Integration                              | Production               | 備考                                   |
+| ------------------------ | ------------------- | ---------------------------------------- | ------------------------ | -------------------------------------- |
+| `RESEND_API_KEY`         | 設定しない          | 任意。専用 recipient にだけ送る          | **Production key**       | Integration と Production を共有しない |
+| `RESEND_FROM_EMAIL`      | 設定しない          | verified sender + fixed test recipient   | `noreply@dayopt.app`     | 環境別                                 |
+| `NEXT_PUBLIC_APP_URL`    | preview URL         | `https://product-integration.vercel.app` | `https://app.dayopt.app` | 環境別                                 |
+| `CRON_SECRET`            | 不要                | 任意の専用 secret                        | Production secret        | secret を環境間で共有しない            |
+| `SEND_EMAIL_HOOK_SECRET` | Preview branch 固有 | Integration branch 固有                  | Production secret        | Supabase Auth hook 設定時に発行        |
 
 **Supabase platform 自動注入(触らない):**
 
@@ -460,8 +463,9 @@ npx supabase secrets set --env-file .env.edge.<env> --project-ref=<REF>
 
 #### Resend key の切り分け
 
-- **test key**: preview / staging で共用。Resend test mode なので実メール送信されない
-- **live key**: production 専用。実ユーザーにメール送信する
+- Preview では Resend を設定しない。
+- Integration は別 key と fixed test mailbox を使い、実ユーザー宛てへ送らない。
+- Production key と Integration key を共有しない。送信先 allowlist と外部サービス側設定も併用する。
 
 ## 絶対ルール
 
@@ -498,7 +502,7 @@ npx supabase secrets set --env-file .env.edge.<env> --project-ref=<REF>
 ### Edge Functions
 
 - デプロイは必ず `--use-api` フラグ付きで実行
-- production の secrets を preview / staging にコピーしない
+- production の secrets を preview / integration にコピーしない
 - `RESEND_API_KEY` の live key は production のみ
 - cron function は preview にデプロイしない（現状そのような function は無い）
 
@@ -510,9 +514,9 @@ npx supabase secrets set --env-file .env.edge.<env> --project-ref=<REF>
 
 ### 環境操作
 
-- Staging と Production は同時に触らない（`AGENTS.md` §Deploy / Release）
+- Integration と Production の DB に手動で直接変更を加えない。migration を Git に記録し、Integration で確認してから Production に進める
 - production への変更は必ず preview branch での検証を経る
-- staging は「Stripe検証 / hotfix / closed beta」以外の目的では触らない
+- Integration は合成データのみで、固定 URL の認証・OAuth・CRUD・Stripe Sandbox・許可済みテスト接続を確認する用途に限る
 
 ## 実測で分かった罠（local DB / 生成物 / PostgREST）
 

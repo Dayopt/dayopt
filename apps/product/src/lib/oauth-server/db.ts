@@ -29,6 +29,7 @@ type OAuthOnlyDatabase = {
       Database['public']['Functions'],
       | 'create_oauth_authorization_grant_v2'
       | 'exchange_oauth_authorization_code_v2'
+      | 'ensure_mcp_integration_environment_identity_v1'
       | 'get_mcp_environment_identity_v1'
       | 'rotate_oauth_refresh_token_v2'
     >;

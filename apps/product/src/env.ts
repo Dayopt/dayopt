@@ -9,6 +9,12 @@ import 'server-only';
 
 import { z } from 'zod';
 
+import {
+  PRODUCT_INTEGRATION_APP_ORIGIN,
+  PRODUCT_INTEGRATION_SUPABASE_REF,
+  resolveSupabaseProjectRef,
+} from '@/lib/dayopt-environment';
+
 import { isValidOAuthRedirectUriList } from '@/lib/oauth-server/redirect-uris';
 
 function isDayoptEmailAddress(value: string): boolean {
@@ -55,6 +61,10 @@ const serverSchema = z
     RESEND_API_KEY: z.string().optional(),
     RESEND_WEBHOOK_SECRET: z.string().optional(),
     RESEND_FROM_EMAIL: z.string().email().optional(),
+    CONTACT_INTEGRATION_RECIPIENT: z.preprocess(
+      (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
+      z.string().email().optional(),
+    ),
 
     // Cloudflare Turnstile (client-side site key only; secret is stored in Supabase Auth Bot Protection)
     NEXT_PUBLIC_TURNSTILE_SITE_KEY: z.string().optional(),
@@ -84,7 +94,7 @@ const serverSchema = z
     // `lib/oauth-server/identity-env.ts` が呼ばれた時点で検証する。ここで
     // superRefine すると build phase / CI で skip される Proxy を通り抜け、
     // production cold start で MCP と無関係な全ページが 500 になる。
-    MCP_OAUTH_ENVIRONMENT: z.enum(['production', 'preview']).optional(),
+    MCP_OAUTH_ENVIRONMENT: z.enum(['production', 'preview', 'integration']).optional(),
     MCP_OAUTH_PREVIEW_BRANCH: z.string().min(1).optional(),
     MCP_OAUTH_PREVIEW_UPSTASH_HOST: z.string().min(1).optional(),
     OAUTH_AUTHORIZATION_SERVER_URI: z.string().url().optional(),
@@ -143,6 +153,12 @@ const serverSchema = z
 
     // App
     NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
+    // Dayopt's application environment is separate from Vercel's target. In particular,
+    // product-integration is a Vercel Production deployment connected to non-production data.
+    DAYOPT_ENVIRONMENT: z.enum(['production', 'preview', 'integration', 'development']).optional(),
+    NEXT_PUBLIC_DAYOPT_ENVIRONMENT: z
+      .enum(['production', 'preview', 'integration', 'development'])
+      .optional(),
     NEXT_PUBLIC_APP_URL: z.string().url().optional(),
     NEXT_PUBLIC_MAINTENANCE_MODE: z.enum(['true', 'false']).optional(),
     // 課金 enforcement。未設定（既定）= 無効＝全機能無料。
@@ -178,6 +194,56 @@ const serverSchema = z
     },
   )
   .refine(
+    (data) => {
+      if (data.DAYOPT_ENVIRONMENT !== 'integration') return true;
+      const key = data.STRIPE_SECRET_KEY?.trim();
+      if (!key && data.STRIPE_LIVEMODE !== 'true') return true;
+      return Boolean(
+        (!key || key.startsWith('sk_test_') || key.startsWith('rk_test_')) &&
+        data.STRIPE_LIVEMODE === 'false',
+      );
+    },
+    {
+      message: 'IntegrationではStripe test keyとSTRIPE_LIVEMODE=falseだけを使用してください',
+      path: ['STRIPE_SECRET_KEY'],
+    },
+  )
+  .refine(
+    (data) =>
+      data.DAYOPT_ENVIRONMENT !== 'integration' ||
+      Boolean(data.STRIPE_SECRET_KEY?.trim()) === Boolean(data.STRIPE_WEBHOOK_SECRET?.trim()),
+    {
+      message: 'IntegrationではStripe test keyとwebhook secretを一緒に設定してください',
+      path: ['STRIPE_WEBHOOK_SECRET'],
+    },
+  )
+  .refine(
+    (data) => {
+      const supabaseProjectRef = resolveSupabaseProjectRef(data.NEXT_PUBLIC_SUPABASE_URL);
+      const integrationConfigured =
+        data.DAYOPT_ENVIRONMENT === 'integration' ||
+        data.NEXT_PUBLIC_DAYOPT_ENVIRONMENT === 'integration' ||
+        supabaseProjectRef === PRODUCT_INTEGRATION_SUPABASE_REF;
+      if (!integrationConfigured) return true;
+
+      const appOrigin = data.NEXT_PUBLIC_APP_URL ? new URL(data.NEXT_PUBLIC_APP_URL).origin : null;
+      return (
+        data.DAYOPT_ENVIRONMENT === 'integration' &&
+        data.NEXT_PUBLIC_DAYOPT_ENVIRONMENT === 'integration' &&
+        data.VERCEL_ENV === 'production' &&
+        data.VERCEL_TARGET_ENV === 'production' &&
+        data.VERCEL_GIT_COMMIT_REF === 'integration' &&
+        supabaseProjectRef === PRODUCT_INTEGRATION_SUPABASE_REF &&
+        (!appOrigin || appOrigin === PRODUCT_INTEGRATION_APP_ORIGIN)
+      );
+    },
+    {
+      message:
+        'Integration requires matching Dayopt markers, the Production target, integration Git branch, exact Supabase ref, and fixed app origin',
+      path: ['DAYOPT_ENVIRONMENT'],
+    },
+  )
+  .refine(
     (data) =>
       // Vercel preview deployment は NODE_ENV=production だが VERCEL_ENV=preview。
       // generic Preview は手動アクセスのみだが、MCP OAuth を明示的に有効にする Preview は
@@ -198,6 +264,23 @@ const serverSchema = z
       if (!(data.NODE_ENV === 'production' && data.VERCEL_ENV === 'production')) return true;
 
       const sender = data.RESEND_FROM_EMAIL?.trim().toLowerCase();
+      if (data.DAYOPT_ENVIRONMENT === 'integration') {
+        const mailValues = [
+          data.RESEND_API_KEY,
+          data.RESEND_FROM_EMAIL,
+          data.RESEND_WEBHOOK_SECRET,
+          data.CONTACT_INTEGRATION_RECIPIENT,
+        ].map((value) => Boolean(value?.trim()));
+        if (!mailValues.every(Boolean) && mailValues.some(Boolean)) return false;
+        if (!mailValues.some(Boolean)) return true;
+        return Boolean(
+          sender &&
+          sender !== 'onboarding@resend.dev' &&
+          isDayoptEmailAddress(sender) &&
+          data.CONTACT_INTEGRATION_RECIPIENT?.trim().toLowerCase() !== 'support@dayopt.app',
+        );
+      }
+
       return Boolean(
         data.RESEND_API_KEY?.trim() &&
         data.RESEND_WEBHOOK_SECRET?.trim() &&

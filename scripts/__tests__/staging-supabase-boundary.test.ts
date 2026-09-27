@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 
 import { envSchema, forbiddenFields, productionEnvSchema } from '../tasks/env/schema';
 
-// agent には常設 staging が無く、置けば production の複製になる 4 field。
+// Cloud Integration credentials remain in the dedicated Vercel project, never in the AI-readable agent vault.
 const SUPABASE_CONNECTION_FIELDS = [
   'NEXT_PUBLIC_SUPABASE_URL',
   'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY',
@@ -35,7 +35,7 @@ const adminEnvExample = readFileSync(
 
 const gitignore = readFileSync(fileURLToPath(new URL('../../.gitignore', import.meta.url)), 'utf8');
 
-/** setup-1password.sh から Staging の supabase item を作る 1 コマンドだけを切り出す。 */
+/** setup-1password.sh から agent vault の supabase item を作る 1 コマンドだけを切り出す。 */
 function stagingSupabaseItemBlock(): string {
   const start = setup1PasswordScript.indexOf('--vault=agent --title=supabase');
   expect(start).toBeGreaterThan(-1);
@@ -45,7 +45,7 @@ function stagingSupabaseItemBlock(): string {
 }
 
 describe('agent/supabase の接続情報境界', () => {
-  it('staging schema に Supabase の接続 field を置かない', () => {
+  it('agent schema に Supabase の接続 field を置かない', () => {
     for (const field of SUPABASE_CONNECTION_FIELDS) {
       const matches = envSchema.filter(
         (entry) => entry.item === 'supabase' && entry.field === field,
@@ -54,7 +54,7 @@ describe('agent/supabase の接続情報境界', () => {
     }
   });
 
-  it('production schema には同じ接続 field を残す', () => {
+  it('human production schema には同じ接続 field を残す', () => {
     for (const field of SUPABASE_CONNECTION_FIELDS) {
       const matches = productionEnvSchema.filter(
         (entry) => entry.vault === 'human' && entry.item === 'supabase',
@@ -66,13 +66,13 @@ describe('agent/supabase の接続情報境界', () => {
     }
   });
 
-  it('local injection 参照から Staging の Supabase 接続情報を外す', () => {
+  it('local injection 参照から agent vault の Supabase 接続情報を外す', () => {
     for (const field of SUPABASE_CONNECTION_FIELDS) {
       expect(opEnvExample, field).not.toContain(`op://agent/supabase/${field}`);
     }
   });
 
-  it('1Password bootstrap が Staging の supabase item に接続 field を作らない', () => {
+  it('1Password bootstrap が agent supabase item に接続 field を作らない', () => {
     const block = stagingSupabaseItemBlock();
     // 切り出しが空振りすると not.toContain が素通りするため、残す field で掴めていることを先に示す
     expect(block).toContain("'CRON_SECRET[concealed]='");
@@ -82,7 +82,7 @@ describe('agent/supabase の接続情報境界', () => {
     }
   });
 
-  it('SUPABASE_ACCESS_TOKEN は production へ一本化し、staging には置かない（#1933）', () => {
+  it('SUPABASE_ACCESS_TOKEN は production へ一本化し、agent vault には置かない（#1933）', () => {
     const matches = envSchema.filter(
       (entry) => entry.item === 'supabase' && entry.field === 'SUPABASE_ACCESS_TOKEN',
     );

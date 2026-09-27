@@ -1,17 +1,22 @@
 import { createDayoptUrl, dayoptUrls } from '@dayopt/config';
 
 import {
+  PRODUCT_INTEGRATION_APP_ORIGIN,
+  PRODUCT_INTEGRATION_SUPABASE_REF,
+} from '@/lib/dayopt-environment';
+
+import {
   normalizeHttpsOrigin,
   type CanonicalAuthorizationServerUri,
   type CanonicalResourceUri,
 } from './origin';
 
 /**
- * Dayopt が所有する OAuth identity は production と ephemeral preview の 2 つだけ。
- * Persistent Staging は作らない決定に合わせ、DB 側の
- * `mcp_environment_identity_tuple_check` も production / preview のみを許す。
+ * Dayopt owns Production, ephemeral Preview, and one persistent Integration OAuth identity.
+ * Integration uses Vercel's Production target but must remain bound to its own app origin,
+ * Git branch, and Supabase project ref.
  */
-export type McpOAuthEnvironment = 'production' | 'preview';
+export type McpOAuthEnvironment = 'production' | 'preview' | 'integration';
 
 export interface OAuthEnvironmentConfig {
   environment: McpOAuthEnvironment;
@@ -34,6 +39,8 @@ interface OAuthEnvironmentInput {
   vercelBranchUrl?: string | undefined;
   vercelGitCommitRef?: string | undefined;
   mcpOAuthPreviewBranch?: string | undefined;
+  dayoptEnvironment?: string | undefined;
+  supabaseProjectRef?: string | undefined;
 }
 
 const AUTHORIZATION_SERVER_PATHS = new Set([
@@ -52,12 +59,22 @@ const PROTECTED_RESOURCE_PATHS = new Set([
 
 const KNOWN_RESOURCE_HOSTS = new Set([new URL(dayoptUrls.mcp).hostname]);
 
-const KNOWN_AUTHORIZATION_SERVER_HOSTS = new Set([new URL(dayoptUrls.product).hostname]);
+const INTEGRATION_HOST = new URL(PRODUCT_INTEGRATION_APP_ORIGIN).hostname;
+KNOWN_RESOURCE_HOSTS.add(INTEGRATION_HOST);
+
+const KNOWN_AUTHORIZATION_SERVER_HOSTS = new Set([
+  new URL(dayoptUrls.product).hostname,
+  INTEGRATION_HOST,
+]);
 
 const EXPECTED_IDENTITIES = {
   production: {
     authorizationServerUri: dayoptUrls.product,
     resourceUri: dayoptUrls.mcp,
+  },
+  integration: {
+    authorizationServerUri: PRODUCT_INTEGRATION_APP_ORIGIN,
+    resourceUri: PRODUCT_INTEGRATION_APP_ORIGIN,
   },
 } as const;
 
@@ -77,10 +94,10 @@ export function resolveOAuthEnvironmentConfig(
       : EXPECTED_IDENTITIES[environment];
   const authorizationServerUri = normalizeAuthorizationServerUri(
     input.authorizationServerUri ??
-      (environment === 'production' ? expected.authorizationServerUri : ''),
+      (environment === 'preview' ? '' : expected.authorizationServerUri),
   );
   const resourceUri = normalizeResourceUri(
-    input.resourceUri ?? (environment === 'production' ? expected.resourceUri : ''),
+    input.resourceUri ?? (environment === 'preview' ? '' : expected.resourceUri),
   );
 
   if (authorizationServerUri !== expected.authorizationServerUri) {
@@ -162,7 +179,8 @@ export function isOAuthRequestHostAllowed(input: {
 function resolveEnvironment(value: string | undefined): McpOAuthEnvironment {
   if (value === undefined || value === '' || value === 'production') return 'production';
   if (value === 'preview') return 'preview';
-  throw new Error('MCP_OAUTH_ENVIRONMENT must be production or preview');
+  if (value === 'integration') return 'integration';
+  throw new Error('MCP_OAUTH_ENVIRONMENT must be production, preview, or integration');
 }
 
 function isLocalHostname(hostname: string): boolean {
@@ -186,16 +204,30 @@ function assertVercelEnvironmentBinding(
   input: OAuthEnvironmentInput,
   environment: McpOAuthEnvironment,
 ): void {
-  const targetsPreview = input.vercelTargetEnvironment === 'preview';
-
-  if (input.vercelEnvironment === 'production' && environment !== 'production') {
+  if (input.dayoptEnvironment === 'integration' && environment !== 'integration') {
+    throw new Error('DAYOPT_ENVIRONMENT=integration requires MCP_OAUTH_ENVIRONMENT=integration');
+  }
+  if (environment === 'integration') {
+    if (
+      input.dayoptEnvironment !== 'integration' ||
+      input.vercelEnvironment !== 'production' ||
+      input.vercelTargetEnvironment !== 'production' ||
+      input.vercelGitCommitRef !== 'integration' ||
+      input.supabaseProjectRef !== PRODUCT_INTEGRATION_SUPABASE_REF
+    ) {
+      throw new Error(
+        'MCP Integration identity requires its Production target, integration Git branch, and exact Supabase ref',
+      );
+    }
+  }
+  if (input.vercelEnvironment === 'production' && environment === 'preview') {
     throw new Error('A Vercel Production deployment must use the production OAuth identity');
   }
   if (input.mcpOAuthPreviewBranch && environment !== 'preview') {
     throw new Error('MCP_OAUTH_PREVIEW_BRANCH requires MCP_OAUTH_ENVIRONMENT=preview');
   }
   if (environment === 'preview') {
-    if (input.vercelEnvironment !== 'preview' || !targetsPreview) {
+    if (input.vercelEnvironment !== 'preview' || input.vercelTargetEnvironment !== 'preview') {
       throw new Error(
         'MCP preview identity requires VERCEL_ENV=preview and VERCEL_TARGET_ENV=preview',
       );
@@ -220,6 +252,15 @@ function isOAuthSurfaceEnabled(
       input.vercelEnvironment === 'preview' &&
       input.vercelTargetEnvironment === 'preview' &&
       input.vercelGitCommitRef === input.mcpOAuthPreviewBranch
+    );
+  }
+  if (environment === 'integration') {
+    return (
+      input.dayoptEnvironment === 'integration' &&
+      input.vercelEnvironment === 'production' &&
+      input.vercelTargetEnvironment === 'production' &&
+      input.vercelGitCommitRef === 'integration' &&
+      input.supabaseProjectRef === PRODUCT_INTEGRATION_SUPABASE_REF
     );
   }
   return input.vercelEnvironment === 'production';
