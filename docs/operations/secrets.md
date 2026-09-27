@@ -260,8 +260,6 @@ Integration credentials は 1Password の `agent` item に追加せず、専用 
 
 Integration の正規 origin は `https://product-integration-dayopt.vercel.app` の1つだけとする。`product-integration-git-integration-dayopt.vercel.app` など Git branch alias や個別 deployment URL は OAuth issuer / MCP resource / Supabase Auth Site URL / callback に使わない。
 
-Integration の正規 origin は `https://product-integration-dayopt.vercel.app` の1つだけとする。`product-integration-git-integration-dayopt.vercel.app` など Git branch alias や個別 deployment URL は OAuth issuer / MCP resource / Supabase Auth Site URL / callback に使わない。
-
 必須のアプリ設定:
 
 | Variable                                                        | 値 / ルール                                                                |
@@ -282,7 +280,7 @@ Vercel の `VERCEL_ENV=production` / `VERCEL_TARGET_ENV=production` / `VERCEL_GI
 
 Resend は任意。設定する場合は `RESEND_API_KEY` / `RESEND_FROM_EMAIL` / `RESEND_WEBHOOK_SECRET` / `CONTACT_INTEGRATION_RECIPIENT` を全て揃え、recipient は `support@dayopt.app` 以外の固定 test mailbox にする。Calendar も任意で、`GOOGLE_CALENDAR_CLIENT_ID` / `GOOGLE_CALENDAR_PROJECT_NUMBER` / `GOOGLE_CALENDAR_CLIENT_SECRET` / `CALENDAR_TOKEN_ENCRYPTION_KEY` / `GOOGLE_CALENDAR_REDIRECT_URIS` を揃える。Redirect URI は `https://product-integration-dayopt.vercel.app/api/integrations/google-calendar/callback` に固定し、専用 test account だけを使う。
 
-Product は Sentry build で source-map release credentials を要求する。`SENTRY_ORG` / `SENTRY_PROJECT` / `SENTRY_AUTH_TOKEN` と `SENTRY_DSN` / `NEXT_PUBLIC_SENTRY_DSN` を設定し、Sentry event の `environment` は `integration` とする。実際の値は人間が Vercel に保存し、会話・Issue・repo に貼らない。
+Sentry は初期の必須13変数には含めず、Integration 起動時は未設定でよい。有効化する場合だけ Integration 専用 project / DSN / upload token を用意し、Production の Sentry credentials はコピーしない。event の `environment` は `integration` とし、実値は会話・Issue・repo に貼らない。
 
 **2026-09-14 に agent から外したもの**（Secret / Credential 監査）: `resend`（production ドメインから送れる送信 key。`human/resend-send` へ移動）、`anthropic`（consumer 無し、値も空）、`google`（webmaster verification。値が空で Vercel にも replica 無し）、`vercel`（未使用の team 全権 token。revoke 済み）。agent には「漏れても rotate すれば 1 日で戻せるもの」だけを置く。local dev は Resend 無しで動く（Supabase local の認証メールは Inbucket、問い合わせ送信は Production 限定、welcome / trial 系メールは送信失敗を handle する）。
 
