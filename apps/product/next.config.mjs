@@ -6,6 +6,7 @@ import createNextIntlPlugin from 'next-intl/plugin';
 import { fileURLToPath } from 'url';
 
 import {
+  assertProductDeploymentEnvironmentBuildEnv,
   assertProductOperationalProductionBuildEnv,
   assertProductPreviewBuildEnv,
   resolveProductPublicMcpResourceUri,
@@ -22,6 +23,7 @@ const withBundleAnalyzer = bundleAnalyzer({
   enabled: process.env.ANALYZE === 'true',
 });
 
+assertProductDeploymentEnvironmentBuildEnv(process.env);
 assertProductPreviewBuildEnv(process.env);
 const isSentryProductionBuild = assertProductionSentryBuildEnv(process.env, 'Product');
 assertProductOperationalProductionBuildEnv(process.env);

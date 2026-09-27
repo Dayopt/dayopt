@@ -9,6 +9,7 @@ import 'server-only';
 
 import { z } from 'zod';
 
+import { resolveDayoptEnvironment } from '@/lib/dayopt-environment';
 import { isValidOAuthRedirectUriList } from '@/lib/oauth-server/redirect-uris';
 
 function isDayoptEmailAddress(value: string): boolean {
@@ -143,6 +144,12 @@ const serverSchema = z
 
     // App
     NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
+    // App identity is independent from the Supabase database. In particular,
+    // Product Preview may share the Integration Supabase project while remaining Preview.
+    DAYOPT_ENVIRONMENT: z.enum(['production', 'preview', 'integration', 'development']).optional(),
+    NEXT_PUBLIC_DAYOPT_ENVIRONMENT: z
+      .enum(['production', 'preview', 'integration', 'development'])
+      .optional(),
     NEXT_PUBLIC_APP_URL: z.string().url().optional(),
     NEXT_PUBLIC_MAINTENANCE_MODE: z.enum(['true', 'false']).optional(),
     // 課金 enforcement。未設定（既定）= 無効＝全機能無料。
@@ -155,6 +162,25 @@ const serverSchema = z
     VERCEL_GIT_COMMIT_REF: z.string().optional(),
     SKIP_AUTH_IN_DEV: z.string().optional(),
   })
+  .refine(
+    (data) =>
+      resolveDayoptEnvironment({
+        dayoptEnvironment: data.DAYOPT_ENVIRONMENT,
+        publicDayoptEnvironment: data.NEXT_PUBLIC_DAYOPT_ENVIRONMENT,
+        vercelEnvironment: data.VERCEL_ENV,
+        vercelTargetEnvironment: data.VERCEL_TARGET_ENV,
+        vercelGitCommitRef: data.VERCEL_GIT_COMMIT_REF,
+        vercelUrl: data.VERCEL_URL,
+        vercelBranchUrl: data.VERCEL_BRANCH_URL,
+        appUrl: data.NEXT_PUBLIC_APP_URL,
+        supabaseUrl: data.NEXT_PUBLIC_SUPABASE_URL,
+      }) !== 'unknown',
+    {
+      message:
+        'Dayopt app environment, Vercel deployment, and Supabase project identity do not match',
+      path: ['DAYOPT_ENVIRONMENT'],
+    },
+  )
   .refine((data) => !(data.NODE_ENV === 'production' && data.SKIP_AUTH_IN_DEV === 'true'), {
     message: 'SKIP_AUTH_IN_DEV は本番環境では使用できない',
     path: ['SKIP_AUTH_IN_DEV'],

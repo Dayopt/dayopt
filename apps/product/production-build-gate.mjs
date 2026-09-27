@@ -71,17 +71,20 @@ export const FORBIDDEN_PRODUCT_PREVIEW_BUILD_ENV = [
  * 不明な形式の取り違えを止めるだけで、接続先・有効性・captcha 免除を証明しない。
  * Production 切替前の captcha 有効環境での再認証検証は docs/product/specs/auth.md を参照。
  */
-function assertServerSupabaseKey(env) {
+function assertServerSupabaseKey(env, environmentLabel = 'production') {
   const value = env.SUPABASE_SECRET_KEY;
   if (typeof value !== 'string') return;
   const normalized = value.replace(/\\n/gu, '').trim();
   if (normalized === '') return;
 
   if (!/^sb_secret_[A-Za-z0-9_-]+$/u.test(normalized) && !normalized.startsWith('eyJ')) {
+    const productionGuidance =
+      environmentLabel === 'production'
+        ? ' Verify password reauthentication with captcha enabled before Production key rotation.'
+        : '';
     throw new Error(
-      'Product production build requires a server-only SUPABASE_SECRET_KEY ' +
-        '(opaque secret key or legacy service-role JWT). Verify password reauthentication ' +
-        'with captcha enabled before Production key rotation.',
+      `Product ${environmentLabel} build requires a server-only SUPABASE_SECRET_KEY ` +
+        `(opaque secret key or legacy service-role JWT).${productionGuidance}`,
     );
   }
 }
@@ -89,7 +92,10 @@ function assertServerSupabaseKey(env) {
 export const PRODUCT_PRODUCTION_ORIGIN = 'https://app.dayopt.app';
 export const MCP_PRODUCTION_ORIGIN = 'https://mcp.dayopt.app';
 const PRODUCTION_SUPABASE_HOST = 'yvglwblxrnrenfifsnje.supabase.co';
+export const PRODUCT_INTEGRATION_SUPABASE_REF = 'tilwaprottpyhlfoggbb';
+export const PRODUCT_INTEGRATION_APP_ORIGIN = 'https://product-integration-dayopt.vercel.app';
 const PRODUCT_PREVIEW_BRANCH_HOST_PATTERN = /^product-git-[a-z0-9-]+-dayopt\.vercel\.app$/u;
+const PRODUCT_PREVIEW_DEPLOYMENT_HOST_PATTERN = /^product-[a-z0-9-]+-dayopt\.vercel\.app$/u;
 
 /**
  * Expose only the MCP resource owned by this deploy to client components.
@@ -115,6 +121,174 @@ export function resolveProductPublicMcpResourceUri(env) {
 
 function hasNonEmptyValue(env, name) {
   return typeof env[name] === 'string' && env[name].trim() !== '';
+}
+
+function resolveProductSupabaseProjectRef(value) {
+  if (typeof value !== 'string') return undefined;
+  try {
+    const url = new URL(value);
+    if (
+      url.protocol !== 'https:' ||
+      url.username ||
+      url.password ||
+      url.port ||
+      url.pathname !== '/' ||
+      url.search ||
+      url.hash
+    ) {
+      return undefined;
+    }
+    return /^([a-z]{20})\.supabase\.co$/u.exec(url.hostname)?.[1];
+  } catch {
+    return undefined;
+  }
+}
+
+function assertMatchingDayoptEnvironmentMarkers(env) {
+  const allowed = new Set(['production', 'preview', 'integration', 'development']);
+  for (const name of ['DAYOPT_ENVIRONMENT', 'NEXT_PUBLIC_DAYOPT_ENVIRONMENT']) {
+    if (hasNonEmptyValue(env, name) && !allowed.has(env[name])) {
+      throw new Error(`Product deployment requires a supported ${name}`);
+    }
+  }
+  if (
+    hasNonEmptyValue(env, 'DAYOPT_ENVIRONMENT') &&
+    hasNonEmptyValue(env, 'NEXT_PUBLIC_DAYOPT_ENVIRONMENT') &&
+    env.DAYOPT_ENVIRONMENT !== env.NEXT_PUBLIC_DAYOPT_ENVIRONMENT
+  ) {
+    throw new Error('Product deployment requires matching Dayopt environment markers');
+  }
+}
+
+function assertPreviewAppUrlMatchesVercel(env) {
+  if (!hasNonEmptyValue(env, 'NEXT_PUBLIC_APP_URL')) return;
+  const expectedHosts = [env.VERCEL_BRANCH_URL, env.VERCEL_URL].filter(
+    (host) =>
+      typeof host === 'string' &&
+      (PRODUCT_PREVIEW_BRANCH_HOST_PATTERN.test(host) ||
+        PRODUCT_PREVIEW_DEPLOYMENT_HOST_PATTERN.test(host)),
+  );
+  let url;
+  try {
+    url = new URL(env.NEXT_PUBLIC_APP_URL);
+  } catch {
+    throw new Error('Product Preview requires NEXT_PUBLIC_APP_URL to match its Vercel URL');
+  }
+  if (
+    url.protocol !== 'https:' ||
+    url.username ||
+    url.password ||
+    url.port ||
+    url.pathname !== '/' ||
+    url.search ||
+    url.hash ||
+    !expectedHosts.some((host) => url.origin === `https://${host}`)
+  ) {
+    throw new Error('Product Preview requires NEXT_PUBLIC_APP_URL to match its Vercel URL');
+  }
+}
+
+/**
+ * Bind the application environment to its database without treating a shared
+ * nonproduction Supabase ref as proof that the app itself is Integration.
+ * This catches missing Preview wiring and accidental Production DB reuse at build time.
+ */
+export function assertProductDeploymentEnvironmentBuildEnv(env) {
+  const vercelEnvironment = env.VERCEL_ENV;
+  if (vercelEnvironment !== 'preview' && vercelEnvironment !== 'production') return false;
+
+  assertMatchingDayoptEnvironmentMarkers(env);
+
+  const missingNames = [
+    'NEXT_PUBLIC_SUPABASE_URL',
+    'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY',
+    'SUPABASE_SECRET_KEY',
+  ].filter((name) => !hasNonEmptyValue(env, name));
+  if (missingNames.length > 0) {
+    throw new Error(`Product ${vercelEnvironment} build requires: ${missingNames.join(', ')}`);
+  }
+
+  const projectRef = resolveProductSupabaseProjectRef(env.NEXT_PUBLIC_SUPABASE_URL);
+  if (!projectRef) {
+    throw new Error('Product deployment requires a canonical HTTPS Supabase project URL');
+  }
+  assertServerSupabaseKey(env, vercelEnvironment);
+
+  const appMarker = env.DAYOPT_ENVIRONMENT || env.NEXT_PUBLIC_DAYOPT_ENVIRONMENT;
+  if (vercelEnvironment === 'preview') {
+    if (env.VERCEL_TARGET_ENV && env.VERCEL_TARGET_ENV !== 'preview') {
+      throw new Error('Product Preview build requires the Vercel Preview target');
+    }
+    if (appMarker && appMarker !== 'preview') {
+      throw new Error('Product Preview build requires the Preview application identity');
+    }
+    if (projectRef === 'yvglwblxrnrenfifsnje') {
+      throw new Error('Product Preview build forbids the Production Supabase project');
+    }
+    assertPreviewAppUrlMatchesVercel(env);
+
+    const forbiddenNames = FORBIDDEN_PRODUCT_PREVIEW_BUILD_ENV.filter(
+      (name) => name !== 'RESEND_FROM_EMAIL' && hasNonEmptyValue(env, name),
+    );
+    if (forbiddenNames.length > 0) {
+      throw new Error(`Product Preview build forbids: ${forbiddenNames.join(', ')}`);
+    }
+    if (env.MCP_OAUTH_ENVIRONMENT === 'production') {
+      throw new Error('Product Preview build forbids the Production MCP OAuth identity');
+    }
+    if (
+      projectRef === PRODUCT_INTEGRATION_SUPABASE_REF &&
+      (env.MCP_OAUTH_ENVIRONMENT === 'preview' ||
+        hasNonEmptyValue(env, 'OAUTH_AUTHORIZATION_SERVER_URI') ||
+        hasNonEmptyValue(env, 'MCP_CANONICAL_RESOURCE_URI') ||
+        hasNonEmptyValue(env, 'MCP_OAUTH_PREVIEW_BRANCH') ||
+        hasNonEmptyValue(env, 'MCP_OAUTH_PREVIEW_UPSTASH_HOST'))
+    ) {
+      throw new Error(
+        'Product Preview sharing Integration Supabase cannot own an MCP OAuth identity',
+      );
+    }
+    if (env.BILLING_ENFORCED === 'true') {
+      throw new Error('Product Preview build forbids BILLING_ENFORCED=true');
+    }
+    if (hasNonEmptyValue(env, 'MCP_WRITE_ENABLED_CLIENTS')) {
+      throw new Error('Product Preview build requires MCP_WRITE_ENABLED_CLIENTS to be empty');
+    }
+    return true;
+  }
+
+  if (env.VERCEL_TARGET_ENV && env.VERCEL_TARGET_ENV !== 'production') {
+    throw new Error('Product Production build requires the Vercel Production target');
+  }
+
+  if (projectRef === 'yvglwblxrnrenfifsnje') {
+    if (appMarker && appMarker !== 'production') {
+      throw new Error('Product Production build requires the Production application identity');
+    }
+    if (env.VERCEL_GIT_COMMIT_REF !== 'main') {
+      throw new Error('Product Production Supabase is reserved for the main Git branch');
+    }
+    return true;
+  }
+
+  if (projectRef === PRODUCT_INTEGRATION_SUPABASE_REF) {
+    if (
+      env.DAYOPT_ENVIRONMENT !== 'integration' ||
+      env.NEXT_PUBLIC_DAYOPT_ENVIRONMENT !== 'integration' ||
+      env.VERCEL_TARGET_ENV !== 'production' ||
+      env.VERCEL_GIT_COMMIT_REF !== 'integration' ||
+      env.NEXT_PUBLIC_APP_URL !== PRODUCT_INTEGRATION_APP_ORIGIN
+    ) {
+      throw new Error(
+        'Product Integration build requires matching app markers, Git branch, Supabase ref, and Vercel stable alias',
+      );
+    }
+    return true;
+  }
+
+  throw new Error(
+    'Product Production build requires its bound Production or Integration Supabase project',
+  );
 }
 
 function isVerifiedDayoptSender(value) {
