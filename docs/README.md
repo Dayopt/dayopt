@@ -81,6 +81,7 @@ code: apps/product/src/features/timeblock # 任意。repo 内の実在 path
 | プロダクト原則・不採用方針     | `product/principles.md`                                                              |
 | 現在の機能仕様                 | `product/specs/*.md`                                                                 |
 | UI / code用語                  | `product/glossary.md`                                                                |
+| ロゴ・ブランド素材             | `business/brand.md`                                                                  |
 | 訴求・コピー                   | `business/messaging.md`（UI 文言は `product/copywriting.md`）                        |
 | 全体 architecture / state flow | `engineering/architecture.md`                                                        |
 | 仕組みを追跡できるようになる   | `learn/README.md`（Dayopt Learning System。`pnpm learn` で対話画面）                 |

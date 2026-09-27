@@ -69,6 +69,7 @@
     "license:audit": "pnpm --filter @dayopt/product license:audit",
     "license:credits:check": "pnpm --filter @dayopt/product license:credits:check && pnpm --filter @dayopt/web license:credits:check",
     "generate-licenses": "pnpm --filter @dayopt/product generate-licenses && pnpm --filter @dayopt/web generate-licenses",
+    "brand:generate": "tsx scripts/tasks/generate-brand-assets.ts",
     "perf:lighthouse": "pnpm --filter @dayopt/product perf:lighthouse",
     "quality:deadcode": "pnpm --filter @dayopt/product quality:deadcode",
     "quality:deadcode:ci": "pnpm --filter @dayopt/product quality:deadcode:ci",
