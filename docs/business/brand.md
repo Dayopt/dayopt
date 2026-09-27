@@ -33,6 +33,13 @@ code:
 
 SVGは透明背景、穴は実際に抜いたベクター。ロックアップとワードマークは文字をアウトライン化済み。フォントのインストールやWebフォント読み込みは不要。PNGは透過に対応する。アプリアイコンは例外として不透明な背景を持つ。
 
+### OG画像
+
+- `og-image-light.png` / `og-image-dark.png` は 1200×630px。OGP向けの背景とロックアップを組み合わせた画像で、SVG原稿も `public/brand/` に同梱する。
+- Light は白地に Primary ロゴ、Dark は Primary 地に白ロゴ。
+- 既存の `/og-image.png` は Dark 版を指し、URL互換を維持する。Web / Product の静的ブランド配布先には Light / Dark の両方を置く。
+- SNSのOGP取得側は閲覧者のOSやサイト表示テーマを知らないため、自動切替できない。ページの `og:image` に採用したいテーマの画像URLを明示する。
+
 ## 構造
 
 100×100座標系で実形状99×90を中央配置する。
@@ -73,6 +80,6 @@ import { Logo } from '@dayopt/components';
 pnpm exec tsx scripts/generate-brand-assets.ts
 ```
 
-生成スクリプトはSVG、PNG、favicon ICO、Apple/PWAアイコン、OGの静的フォールバックを両アプリへ出力する。配布ZIPは `public/brand` 内の素材・本書・ライセンスをまとめる。形状変更時はFigmaの承認を先に更新し、共通データと配布物を同時に更新する。生成済みPNGやコピー先のSVGを個別に修正しない。
+生成スクリプトはSVG、PNG、favicon ICO、Apple/PWAアイコン、Light / Dark のOG画像を両アプリへ出力する。配布ZIPは `public/brand` 内の素材・本書・ライセンスをまとめる。形状変更時はFigmaの承認を先に更新し、共通データと配布物を同時に更新する。生成済みPNGやコピー先のSVGを個別に修正しない。
 
 本変更はロゴと配置の更新。UIの本文書体、操作色、認証処理は既存仕様を維持する。

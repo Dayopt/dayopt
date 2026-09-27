@@ -29,6 +29,13 @@ async function main() {
       1024,
     );
   };
+  const ogImage = (background: string, foreground: string) =>
+    svg(
+      '0 0 1200 630',
+      `<rect width="1200" height="630" fill="${background}"/><g transform="translate(288.8 249.4) scale(1.6) translate(0 -22)">${paths(brand.lockup, foreground)}</g>`,
+      1200,
+      630,
+    );
   const assets: Record<string, string> = {};
   for (const [name, color] of [
     ['primary', brand.primary],
@@ -53,6 +60,12 @@ async function main() {
   assets['dayopt-app-icon-maskable.svg'] = appIcon({ maskable: true });
   assets['dayopt-app-icon-rounded-preview.svg'] = appIcon({ rounded: true });
   assets['favicon.svg'] = appIcon({ rounded: true });
+  assets['og-image-light.svg'] = ogImage(brand.reverse, brand.primary);
+  assets['og-image-dark.svg'] = ogImage(brand.primary, brand.reverse);
+  const ogPngs = {
+    light: await sharp(Buffer.from(assets['og-image-light.svg'])).png().toBuffer(),
+    dark: await sharp(Buffer.from(assets['og-image-dark.svg'])).png().toBuffer(),
+  };
   await mkdir(source, { recursive: true });
   for (const [name, data] of Object.entries(assets)) await writeFile(path.join(source, name), data);
   for (const app of ['product', 'web']) {
@@ -74,6 +87,14 @@ async function main() {
         .resize(n, n)
         .png()
         .toFile(path.join(dest, `dayopt-app-icon-${n}.png`));
+    for (const [theme, png] of Object.entries(ogPngs)) {
+      const name = `og-image-${theme}.png`;
+      await writeFile(path.join(pub, name), png);
+      await writeFile(path.join(dest, name), png);
+    }
+    // Keep the existing URL working; its established appearance is the dark variant.
+    await writeFile(path.join(pub, 'og-image.png'), ogPngs.dark);
+    await writeFile(path.join(dest, 'og-image.png'), ogPngs.dark);
     await writeFile(path.join(pub, 'favicon.svg'), assets['favicon.svg']);
     const pngs: Buffer[] = [];
     for (const n of [16, 32, 48]) {
@@ -147,6 +168,8 @@ async function main() {
       'favicon-48x48.png',
       'apple-touch-icon.png',
       'og-image.png',
+      'og-image-light.png',
+      'og-image-dark.png',
     ]) {
       await copyFile(path.join(root, `apps/${app}/public`, name), path.join(dest, name));
     }
@@ -154,6 +177,8 @@ async function main() {
     await rm(path.join(dest, 'dayopt-brand-F.zip'), { force: true });
     execFileSync('zip', ['-X', '-q', 'dayopt-brand-F.zip', ...files], { cwd: dest });
   }
-  console.log('Generated approved F SVG, PNG, ICO, PWA and OG assets for product and web.');
+  console.log(
+    'Generated approved F SVG, PNG, ICO, PWA and light/dark OG assets for product and web.',
+  );
 }
 void main();
