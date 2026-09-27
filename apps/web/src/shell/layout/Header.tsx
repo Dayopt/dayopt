@@ -56,7 +56,7 @@ export function Header() {
         {/* Logo */}
         <div className="flex lg:flex-1">
           <Link href="/" className="flex items-center gap-2">
-            <Logo variant="wordmark" size="md" className="text-foreground" />
+            <Logo variant="lockup" size="md" />
           </Link>
         </div>
 
@@ -129,7 +129,7 @@ export function Header() {
             className="flex items-center gap-2"
             onClick={() => setMobileMenuOpen(false)}
           >
-            <Logo variant="wordmark" size="md" className="text-foreground" />
+            <Logo variant="lockup" size="md" />
           </Link>
 
           <div className="mt-6 flow-root">
