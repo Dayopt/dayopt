@@ -209,6 +209,15 @@ const serverSchema = z
     },
   )
   .refine(
+    (data) =>
+      data.DAYOPT_ENVIRONMENT !== 'integration' ||
+      Boolean(data.STRIPE_SECRET_KEY?.trim()) === Boolean(data.STRIPE_WEBHOOK_SECRET?.trim()),
+    {
+      message: 'IntegrationではStripe test keyとwebhook secretを一緒に設定してください',
+      path: ['STRIPE_WEBHOOK_SECRET'],
+    },
+  )
+  .refine(
     (data) => {
       const supabaseProjectRef = resolveSupabaseProjectRef(data.NEXT_PUBLIC_SUPABASE_URL);
       const integrationConfigured =

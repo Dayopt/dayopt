@@ -219,6 +219,10 @@ export function assertProductIntegrationBuildEnv(env) {
   ) {
     throw new Error('Product Integration build allows only Stripe test-mode credentials');
   }
+  assertOptionalEnvironmentGroup(env, 'Product Integration Stripe configuration', [
+    'STRIPE_SECRET_KEY',
+    'STRIPE_WEBHOOK_SECRET',
+  ]);
 
   const contactRecipient =
     typeof env.CONTACT_INTEGRATION_RECIPIENT === 'string'

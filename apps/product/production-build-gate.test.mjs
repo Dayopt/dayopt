@@ -409,6 +409,24 @@ describe('Product Integration build gate', () => {
     ).toThrow('allows only Stripe test-mode credentials');
   });
 
+  it('requires Integration Stripe API and webhook secrets as a pair', () => {
+    expect(() =>
+      assertProductIntegrationBuildEnv({
+        ...completeIntegrationEnv(),
+        STRIPE_WEBHOOK_SECRET: 'safe-dummy-webhook-secret',
+      }),
+    ).toThrow('Product Integration Stripe configuration requires all or none');
+
+    expect(
+      assertProductIntegrationBuildEnv({
+        ...completeIntegrationEnv(),
+        STRIPE_SECRET_KEY: 'sk_test_safe-test-key',
+        STRIPE_WEBHOOK_SECRET: 'safe-dummy-webhook-secret',
+        STRIPE_LIVEMODE: 'false',
+      }),
+    ).toBe(true);
+  });
+
   it('requires a dedicated non-support recipient before enabling Resend', () => {
     expect(() =>
       assertProductIntegrationBuildEnv({

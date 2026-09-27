@@ -27,6 +27,7 @@ ALTER TABLE public.mcp_environment_identity
       AND authorization_server_uri = resource_uri
       AND authorization_server_uri
         ~ '^https://product-git-[a-z0-9-]+-dayopt[.]vercel[.]app$'
+      AND supabase_project_ref IS NOT NULL
       AND supabase_project_ref ~ '^[a-z]{20}$'
     )
     OR

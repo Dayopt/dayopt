@@ -97,4 +97,13 @@ describe('Integration server environment', () => {
       'IntegrationではStripe test keyとSTRIPE_LIVEMODE=falseだけを使用してください',
     );
   });
+
+  it('rejects a partial Stripe test configuration', async () => {
+    const { env } = await loadIntegrationEnv({
+      STRIPE_WEBHOOK_SECRET: 'safe-dummy-webhook-secret',
+    });
+    expect(() => env.NEXT_PUBLIC_SUPABASE_URL).toThrow(
+      'IntegrationではStripe test keyとwebhook secretを一緒に設定してください',
+    );
+  });
 });
