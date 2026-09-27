@@ -11,6 +11,7 @@
         "CALENDAR_TOKEN_ENCRYPTION_KEY",
         "CI",
         "CRON_SECRET",
+        "DAYOPT_ENVIRONMENT",
         "GOOGLE_CALENDAR_*",
         "GOOGLE_SITE_VERIFICATION",
         "MCP_*",
