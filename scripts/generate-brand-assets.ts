@@ -17,13 +17,18 @@ async function main() {
       .join('');
   const svg = (box: string, content: string, width: number, height: number) =>
     `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="${box}">${content}</svg>\n`;
-  const appIcon = (rounded = false) =>
-    svg(
+  const appIcon = ({ rounded = false, maskable = false } = {}) => {
+    // The symbol occupies 75% of a regular icon; the maskable version stays inside the safe area.
+    const scale = (1024 * (maskable ? 0.6 : 0.75)) / 99;
+    const x = 512 - 10.24 - 50 * scale;
+    const y = 512 - 50 * scale;
+    return svg(
       '0 0 1024 1024',
-      `<rect width="1024" height="1024" rx="${rounded ? 256 : 0}" fill="${brand.reverse}"/><g transform="translate(191.456969697 201.696969697) scale(6.206060606)">${paths(brand.symbol, brand.primary)}</g>`,
+      `<rect width="1024" height="1024" rx="${rounded ? 256 : 0}" fill="${brand.reverse}"/><g transform="translate(${x} ${y}) scale(${scale})">${paths(brand.symbol, brand.primary)}</g>`,
       1024,
       1024,
     );
+  };
   const assets: Record<string, string> = {};
   for (const [name, color] of [
     ['primary', brand.primary],
@@ -45,8 +50,9 @@ async function main() {
     );
   }
   assets['dayopt-app-icon.svg'] = appIcon();
-  assets['dayopt-app-icon-rounded-preview.svg'] = appIcon(true);
-  assets['favicon.svg'] = appIcon(true);
+  assets['dayopt-app-icon-maskable.svg'] = appIcon({ maskable: true });
+  assets['dayopt-app-icon-rounded-preview.svg'] = appIcon({ rounded: true });
+  assets['favicon.svg'] = appIcon({ rounded: true });
   await mkdir(source, { recursive: true });
   for (const [name, data] of Object.entries(assets)) await writeFile(path.join(source, name), data);
   for (const app of ['product', 'web']) {
@@ -71,7 +77,7 @@ async function main() {
     await writeFile(path.join(pub, 'favicon.svg'), assets['favicon.svg']);
     const pngs: Buffer[] = [];
     for (const n of [16, 32, 48]) {
-      const b = await sharp(Buffer.from(appIcon(true)))
+      const b = await sharp(Buffer.from(appIcon({ rounded: true })))
         .resize(n, n)
         .png()
         .toBuffer();
@@ -94,14 +100,18 @@ async function main() {
     });
     await writeFile(path.join(pub, 'favicon.ico'), Buffer.concat([header, ...pngs]));
     for (const n of [192, 512]) {
-      const square = await sharp(Buffer.from(appIcon())).resize(n, n).png().toBuffer();
-      const rounded = await sharp(Buffer.from(appIcon(true)))
+      const square = await sharp(Buffer.from(appIcon({ maskable: true })))
+        .resize(n, n)
+        .png()
+        .toBuffer();
+      const rounded = await sharp(Buffer.from(appIcon({ rounded: true })))
         .resize(n, n)
         .png()
         .toBuffer();
       if (n === 192 || n === 512) {
         await writeFile(path.join(pub, `icons/icon-${n}.png`), rounded);
         await writeFile(path.join(pub, `icons/icon-${n}-maskable.png`), square);
+        await writeFile(path.join(dest, `dayopt-app-icon-maskable-${n}.png`), square);
       }
     }
     const apple = await sharp(Buffer.from(appIcon())).resize(180, 180).png().toBuffer();

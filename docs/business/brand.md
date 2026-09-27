@@ -14,7 +14,7 @@ code:
 ## 正本と配布
 
 - 視覚上の正本: [Figma / Approved F](https://www.figma.com/design/eAthKm7adblXS1TzeSkScx/Dayopt-Brand---Logo?node-id=7-288)
-- アプリアイコン: [Figma / App Icon Light](https://www.figma.com/design/eAthKm7adblXS1TzeSkScx/Dayopt-Brand---Logo?node-id=11-2)（[1024pxマスター](https://www.figma.com/design/eAthKm7adblXS1TzeSkScx/Dayopt-Brand---Logo?node-id=11-54)）
+- アプリアイコン: [Figma / App Icon Light 75%](https://www.figma.com/design/eAthKm7adblXS1TzeSkScx/Dayopt-Brand---Logo?node-id=13-2)（[通常版1024pxマスター](https://www.figma.com/design/eAthKm7adblXS1TzeSkScx/Dayopt-Brand---Logo?node-id=13-60)・[マスク用60%マスター](https://www.figma.com/design/eAthKm7adblXS1TzeSkScx/Dayopt-Brand---Logo?node-id=13-66)）
 - 書き出しボード: [Figma / Download](https://www.figma.com/design/eAthKm7adblXS1TzeSkScx/Dayopt-Brand---Logo?node-id=10-2)
 - コード共通データ: `packages/components/src/identity/logo-data.ts`
 - Figmaから直接書き出した採用ロックアップ: `assets/brand/figma-approved-lockup.svg`
@@ -28,6 +28,7 @@ code:
 | 正方形のシンボル枠             | `dayopt-symbol-primary.svg` / `dayopt-symbol-reverse.svg`             |
 | 見た目の外接矩形に合わせる配置 | `dayopt-symbol-tight-primary.svg` / `dayopt-symbol-tight-reverse.svg` |
 | インストール用アイコン         | `dayopt-app-icon.svg`、192 / 512 / 1024 PNG                           |
+| マスク用アイコン               | `dayopt-app-icon-maskable.svg`、192 / 512 PNG                         |
 | 角丸の見た目確認               | `dayopt-app-icon-rounded-preview.svg`                                 |
 
 SVGは透明背景、穴は実際に抜いたベクター。ロックアップとワードマークは文字をアウトライン化済み。フォントのインストールやWebフォント読み込みは不要。PNGは透過に対応する。アプリアイコンは例外として不透明な背景を持つ。
@@ -54,7 +55,7 @@ Planは輪郭、Logは塗り。間隔5、右上端は6下がり、下端差16。
 - Reactの `Logo` は専用 `brand-ink` トークンでテーマに追従する。
 - シンボル周囲は原則14単位以上（輪郭厚7の2倍）を確保する。これは外部コンテンツとの余白であり、マークと文字の間隔には加えない。
 - シンボルは16px以上、横組みは高さ20px以上を目安とする。faviconでは専用の背景付きラスターデータを使う。
-- アプリアイコンは正方形の60%幅をマークに使用し、見た目の中央から1%左へ補正する。OSへ渡すマスク用原稿は背景を四隅まで敷く。角丸を二重に付けない。
+- 通常のアプリアイコン、Apple用、faviconは正方形の75%幅をマークに使用する。PWAのマスク用原稿は60%幅を維持し、背景を四隅まで敷く。いずれも見た目の中央から1%左へ補正する。OS用原稿には角丸を二重に付けない。
 - 引き伸ばし、回転、左右の独立拡縮、穴の白塗り化、影、グラデーション、追加記号、文字の打ち直しをしない。
 
 ## 実装と再生成
