@@ -3,7 +3,7 @@ import { copyFile, mkdir, readdir, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import sharp from 'sharp';
 import { DAYOPT_BRAND as brand } from '../../packages/components/src/identity/logo-data';
-import { createDeterministicZip } from './create-deterministic-zip';
+import { createDeterministicZip } from '../lib/create-deterministic-zip';
 
 async function main() {
   const root = process.cwd();
