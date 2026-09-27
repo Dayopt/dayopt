@@ -260,6 +260,8 @@ Integration credentials は 1Password の `agent` item に追加せず、専用 
 
 Integration の正規 origin は `https://product-integration-dayopt.vercel.app` の1つだけとする。`product-integration-git-integration-dayopt.vercel.app` など Git branch alias や個別 deployment URL は OAuth issuer / MCP resource / Supabase Auth Site URL / callback に使わない。
 
+Integration の正規 origin は `https://product-integration-dayopt.vercel.app` の1つだけとする。`product-integration-git-integration-dayopt.vercel.app` など Git branch alias や個別 deployment URL は OAuth issuer / MCP resource / Supabase Auth Site URL / callback に使わない。
+
 必須のアプリ設定:
 
 | Variable                                                        | 値 / ルール                                                                |
