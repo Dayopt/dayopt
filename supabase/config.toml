@@ -252,10 +252,10 @@ enabled = true
 sql_paths = ["./seed.sql"]
 
 [remotes.integration.auth]
-site_url = "https://product-integration.vercel.app"
+site_url = "https://product-integration-dayopt.vercel.app"
 additional_redirect_urls = [
-  "https://product-integration.vercel.app",
-  "https://product-integration.vercel.app/**"
+  "https://product-integration-dayopt.vercel.app",
+  "https://product-integration-dayopt.vercel.app/**"
 ]
 # The fixed synthetic test account from seed.sql is used for sign-in. Prevent
 # arbitrary account creation from turning this shared test database into a

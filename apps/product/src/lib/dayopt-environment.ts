@@ -7,7 +7,7 @@
 export type DayoptEnvironment =
   'production' | 'preview' | 'integration' | 'development' | 'unknown';
 
-export const PRODUCT_INTEGRATION_APP_ORIGIN = 'https://product-integration.vercel.app';
+export const PRODUCT_INTEGRATION_APP_ORIGIN = 'https://product-integration-dayopt.vercel.app';
 export const PRODUCT_INTEGRATION_SUPABASE_REF = 'tilwaprottpyhlfoggbb';
 
 interface DayoptEnvironmentInput {

@@ -440,7 +440,7 @@ npx supabase functions deploy send-auth-email --use-api --project-ref=<PROD_REF>
 | ------------------------ | ------------------- | ---------------------------------------- | ------------------------ | -------------------------------------- |
 | `RESEND_API_KEY`         | 設定しない          | 任意。専用 recipient にだけ送る          | **Production key**       | Integration と Production を共有しない |
 | `RESEND_FROM_EMAIL`      | 設定しない          | verified sender + fixed test recipient   | `noreply@dayopt.app`     | 環境別                                 |
-| `NEXT_PUBLIC_APP_URL`    | preview URL         | `https://product-integration.vercel.app` | `https://app.dayopt.app` | 環境別                                 |
+| `NEXT_PUBLIC_APP_URL`    | preview URL         | `https://product-integration-dayopt.vercel.app` | `https://app.dayopt.app` | 環境別                                 |
 | `CRON_SECRET`            | 不要                | 任意の専用 secret                        | Production secret        | secret を環境間で共有しない            |
 | `SEND_EMAIL_HOOK_SECRET` | Preview branch 固有 | Integration branch 固有                  | Production secret        | Supabase Auth hook 設定時に発行        |
 

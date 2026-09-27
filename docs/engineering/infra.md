@@ -1467,12 +1467,12 @@ Dayopt の標準ルートは `local → PR Preview → production`。
 | --------------- | ---------------------------------------- | -------------------------------- | --------------------------------------- |
 | **Local**       | `supabase start`                         | `pnpm dev`                       | 手元の開発                              |
 | **PR Preview**  | PR ごとの Supabase Preview Branch        | Vercel Preview URL (`product`)   | migration / 機能の本番前検証            |
-| **Integration** | `tilwaprottpyhlfoggbb` persistent branch | `product-integration.vercel.app` | 固定 URL の合成データ検証（接続準備中） |
+| **Integration** | `tilwaprottpyhlfoggbb` persistent branch | `product-integration-dayopt.vercel.app` | 固定 URL の合成データ検証（Supabase healthy / Vercel env 未設定） |
 | **Production**  | `dayopt` main                            | Production deployment            | 実ユーザー                              |
 
 Cloud-first 開発で使う persistent Integration は常設する。通常の PR Preview は引き続き Vercel の一時 URL を使い、Supabase Preview branch は migration / Supabase 設定変更を検証する PR だけに作る。固定 URL の OAuth / sandbox / ブラウザ検証は Integration が受け持つ。
 
-2026-09-27 時点で GitHub `integration` branch は `main` から作成し、Supabase persistent branch `tilwaprottpyhlfoggbb` に同名の Git branch を割り当てた。Supabase はまだ `MIGRATIONS_FAILED`（public schema に tables がなく、migration は 2 件のみ）。Vercel `product-integration` の branch / env 設定はユーザー保存待ちで、ログイン可能な環境としては未検証。
+2026-09-27 時点で GitHub `integration` branch は `99f07ff36226ba7fedb86a716c2a18f631440382` まで進み、Supabase persistent branch `tilwaprottpyhlfoggbb` は `FUNCTIONS_DEPLOYED / ACTIVE_HEALTHY`。migration は 294 件、synthetic seed は再実行しても件数が増えない状態まで確認済み。Vercel `product-integration` の Production branch は `integration` だが、同 commit の Production target deploy は Integration 用 env 未設定で build gate が停止しているため、Auth / OAuth / CRUD の live 検証は未完了。
 
 ### Integration Setup
 
@@ -1489,7 +1489,7 @@ Supabase Dashboard の `dayopt` project は既存の GitHub integration を使�
 
 Supabase Vercel integration は既存どおり `product` project の PR Preview 向けに使う。`web` と専用 Vercel project `product-integration` は自動 Supabase env の注入先にしない。`product-integration` は Integration branch 固有の URL/key を明示的に設定し、Production Supabase key を入れない。
 
-専用 Vercel project は `product-integration`、固定 URL は `https://product-integration.vercel.app`、Production branch は GitHub `integration`。Vercel の target 名が `Production` でも Dayopt では非本番として扱う。build と Supabase access は、環境印、target、Git branch、Supabase project ref が全て一致する場合だけ許可する。既存 `product` project の Production branch `main` は変更しない。
+専用 Vercel project は `product-integration`、固定 URL は `https://product-integration-dayopt.vercel.app`、Production branch は GitHub `integration`。Vercel の target 名が `Production` でも Dayopt では非本番として扱う。build と Supabase access は、環境印、target、Git branch、Supabase project ref が全て一致する場合だけ許可する。既存 `product` project の Production branch `main` は変更しない。
 
 #### LLM のデータ境界
 
@@ -1558,7 +1558,7 @@ pnpm dev
 
 #### 4. Persistent Integration 確認
 
-`integration` への merge 後、Supabase branch が active / migration current であること、`product-integration.vercel.app/api/health` の DB / Redis checks、固定 synthetic account の password login、合成データ CRUD、MCP read-only、必要な Stripe test / Calendar test を確認する。Vercel `product-integration` が Git `integration` と Supabase `tilwaprottpyhlfoggbb` を使うことも確認する。
+`integration` への merge 後、Supabase branch が active / migration current であること、`product-integration-dayopt.vercel.app/api/health` の DB / Redis checks、固定 synthetic account の password login、合成データ CRUD、MCP read-only、必要な Stripe test / Calendar test を確認する。Vercel `product-integration` が Git `integration` と Supabase `tilwaprottpyhlfoggbb` を使うことも確認する。
 
 #### 5. Production promotion
 
