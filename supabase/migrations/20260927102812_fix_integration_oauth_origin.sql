@@ -28,8 +28,9 @@ BEGIN
     AND p.proname = 'ensure_mcp_integration_environment_identity_v1'
     AND p.pronargs = 0;
 
-  IF pg_catalog.position(
-    'https://product-integration.vercel.app' IN v_definition
+  IF pg_catalog.strpos(
+    v_definition,
+    'https://product-integration.vercel.app'
   ) = 0 THEN
     RAISE EXCEPTION 'Existing Integration provisioning function does not contain the expected old origin'
       USING ERRCODE = 'DI009';
