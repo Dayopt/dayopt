@@ -1,9 +1,9 @@
-/** Figma approved F -> public assets. Run: pnpm exec tsx scripts/generate-brand-assets.ts */
+/** Figma approved F -> public assets. Run: pnpm brand:generate */
 import { execFileSync } from 'node:child_process';
 import { copyFile, mkdir, readdir, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import sharp from 'sharp';
-import { DAYOPT_BRAND as brand } from '../packages/components/src/identity/logo-data';
+import { DAYOPT_BRAND as brand } from '../../packages/components/src/identity/logo-data';
 
 async function main() {
   const root = process.cwd();

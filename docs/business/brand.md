@@ -4,7 +4,7 @@ last_verified: 2026-09-27
 code:
   - packages/components/src/identity/logo.tsx
   - packages/components/src/identity/logo-data.ts
-  - scripts/generate-brand-assets.ts
+  - scripts/tasks/generate-brand-assets.ts
 ---
 
 # Dayopt ブランド / Approved F
@@ -79,9 +79,9 @@ import { Logo } from '@dayopt/components';
 `label` はアクセシブル名。ロゴの表示文字を変更するAPIではない。OG画像は `@dayopt/components/brand` の同じパスを使う。
 
 ```sh
-pnpm exec tsx scripts/generate-brand-assets.ts
+pnpm brand:generate
 ```
 
-生成スクリプトはSVG、PNG、favicon ICO、Apple/PWAアイコン、Light / Dark のOG画像を両アプリへ出力し、Web用のfavicon・SVG icon・Apple iconをNext.jsのファイル規約へ配置する。配布ZIPは `public/brand` 内の素材・本書・ライセンスをまとめる。形状変更時はFigmaの承認を先に更新し、共通データと配布物を同時に更新する。生成済みPNGやコピー先のSVGを個別に修正しない。
+生成タスクはSVG、PNG、favicon ICO、Apple/PWAアイコン、Light / Dark のOG画像を両アプリへ出力し、Web用のfavicon・SVG icon・Apple iconをNext.jsのファイル規約へ配置する。配布ZIPは `public/brand` 内の素材・本書・ライセンスをまとめる。形状変更時はFigmaの承認を先に更新し、共通データと配布物を同時に更新する。生成済みPNGやコピー先のSVGを個別に修正しない。
 
 本変更はロゴと配置の更新。UIの本文書体、操作色、認証処理は既存仕様を維持する。
