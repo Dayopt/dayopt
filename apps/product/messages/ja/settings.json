@@ -15,6 +15,9 @@
       "deleteFailed": "アカウントを削除できませんでした。もう一度お試しください",
       "profile": "プロフィール",
       "profileDesc": "基本情報とプロフィール画像の設定",
+      "sections": {
+        "security": "セキュリティ"
+      },
       "displayName": "表示名",
       "displayNameDesc": "他のユーザーに表示される名前",
       "displayNamePlaceholder": "例: Taro",
@@ -590,6 +593,13 @@
       }
     },
     "accountPage": {
+      "sections": {
+        "settings": "設定",
+        "data": "データ",
+        "plan": "プラン",
+        "support": "サポート",
+        "other": "その他"
+      },
       "helpAndSupport": "ヘルプ & サポート",
       "releaseNotes": "リリースノート",
       "documentation": "ドキュメント",

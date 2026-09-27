@@ -188,8 +188,6 @@ describeWithEnv('Timeblock conflict', () => {
     await updateAsOtherWriter();
 
     // 古い版を前提にしたメモ編集を送る（debounce 600ms、blur で flush）。
-    const noteTrigger = page.getByRole('button', { name: 'メモ' });
-    await noteTrigger.click();
     const noteInput = page.getByRole('textbox', { name: 'メモ' });
     await noteInput.fill(STALE_UI_NOTE);
     await noteInput.blur();
@@ -201,7 +199,7 @@ describeWithEnv('Timeblock conflict', () => {
 
     // 2. 再取得した server 値でフォームを描き直す（UI の古い入力は残さない）
     await expect(startTime).toHaveValue('09:30', { timeout: 10_000 });
-    await expect(page.getByRole('button', { name: 'メモ' })).toContainText(OTHER_WRITER_NOTE, {
+    await expect(page.getByRole('textbox', { name: 'メモ' })).toHaveValue(OTHER_WRITER_NOTE, {
       timeout: 10_000,
     });
 
