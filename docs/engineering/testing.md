@@ -132,6 +132,40 @@ agent が実際に踏んで、緑の報告が嘘になった事例。どれも�
 - **`package.json` の依存を触ったら同じ commit に `pnpm-lock.yaml` を含める。** ローカルは既存 node_modules で素通りし、CI だけ全 job が setup で 15〜20 秒で落ちる（2026-09-07 PR #2623）。push 前に `pnpm install --frozen-lockfile` を通す。`catalog:` 化や依存 1 本の追加でも pnpm は無関係な version を再解決して動かすので、`git diff -U0 pnpm-lock.yaml | grep '^-' | grep -v '^---'` が空でなければ drift。旧 version へ手で戻してから `--frozen-lockfile` に検証させる（#2518、#2827）
 - **新規 package に test を足したら root `test:run` の `&&` 連結へも足す。** turbo 任せではないので、忘れると CI で永久に走らない
 
+### Cloud Preview の実行前照合（#2910、移行中）
+
+`node scripts/runbook/preview-readiness.mjs` は、指定した Product Preview と非本番 DB の対応を読み取りで確認する。readiness 単独では E2E を起動せず、required check でもない。常設 DB 登録・資格情報配布・実 Preview での検証は未完了であり、この処理の unit test 成功を環境稼働の証拠にしない。
+
+```bash
+node scripts/runbook/preview-readiness.mjs \
+  --sha <完全な候補SHA> --deployment <dpl_ID> \
+  --branch <PRのbranch> --pr <PR番号> \
+  --db-ref <非本番project_ref> --db-branch <Supabase branch UUID> \
+  --db-mode <sharedまたはephemeral>
+```
+
+- 同じ SHA の clean checkout で実行する。期待 migration はその checkout から取得する。Supabase URL のみの指定や、可変 branch alias は対象選択に使わない。
+- `VERCEL_TOKEN`（対象 project の読取）、`SUPABASE_PREVIEW_READINESS_TOKEN`（branch metadata / 対象非本番 DB の読取）、`VERCEL_AUTOMATION_BYPASS_SECRET` を許可済み runner の環境から渡す。引数・証拠 JSON・ログへ値を出さず、個人の Vault unlock をコマンドの前提にしない。初期の登録・scope確認は別途必要。
+- Vercel API が返す具体 deployment の project、Git source、SHA、READY、非 production target を確認する。Supabase は指定 parent/branch/ref、非 default、本番データ複製なしを確認する。`shared` は persistent、`ephemeral` は同じ PR/branch に属する使い捨て環境に限る。
+- migration の version 集合は候補と完全一致を要求する。共有 DB に別候補の migration が入った場合も止まり、自動 reset・migration 適用・redeploy は行わない。version の一致は手動 DDL が無いことの証明ではない。
+- Preview の `/api/health/version` が返す完全 SHA / deployment ID / DB ref、および `/api/health` の DB 疎通も照合する。本番の version 応答は従来どおり。欠測や古いアプリは未確認として失敗する。
+- 成功 JSON は識別子・migration versions・観測開始/終了時刻のみ。各サービスを原子的に読んだ snapshot ではないため、`preview-e2e.mjs` は E2E 前後に照合する。共有 DB の候補競合を防ぐ排他は別途必要。
+
+非ローカルで service role を使う既存 E2E は `E2E_ALLOW_NONLOCAL_SUPABASE=1` に加え `E2E_SUPABASE_PROJECT_REF` を要求し、対応する HTTPS Supabase origin だけに接続する。これは上の readiness を代替しない。critical-path の synthetic user は実行ごとに password を生成し、作成成功を確認した同じ client/user だけを cleanup する。setup・cleanup の失敗は test を失敗させ、cleanup エラーには合成 user ID と失敗箇所だけを残す。remote run は `users/<UUID>.json` に作成前から状態を記録し、Auth の app_metadata に `e2e_run_id` を付ける。中断・応答喪失・cleanup失敗後は、この記録と対象非本番DBのユーザーID・app_metadataの一致を確認して回収する。未知の既存ユーザーを推測で削除しない。中断後の自動回収は未実装。
+
+[Protection Bypass の公式仕様](https://vercel.com/docs/deployment-protection/methods-to-bypass-deployment-protection/protection-bypass-automation)に従い、readiness の bypass header は API で確認した具体 deployment の origin だけへ送る。redirect は拒否する。ブラウザ全体への header 設定や query parameter への secret 埋込は使わない。[Playwright trace はネットワークも記録する](https://playwright.dev/docs/api/class-tracing)ため、remote E2E では生の Playwright trace/video/標準reportを保存先から除外する。代わりに下記の限定した操作記録を残す。通常CI/ローカルの既存traceは変更しない。
+
+#### Remote E2E の実行
+
+`node scripts/runbook/preview-e2e.mjs` に上記 readiness と同じ引数を渡す。さらに承認済み非本番の `SUPABASE_SECRET_KEY` が必要。readiness に成功した具体 deployment に対し、既存の desktop / mobile critical-path（作成・reload・Report確認）を実行し、終了後に再照合する。localhost の build / 起動はしない。個人の1Password認証も呼び出さない。実クラウドでの通し確認とCIへの配線はまだ未完了。
+
+- 子プロセスへは非本番DB keyと当該Previewのbypassだけを渡し、Vercel/Supabase管理tokenや他のアプリSecretは引き継がない。信頼できるコード・runnerでのみ実行する。未審査のforkへSecretを渡す仕組みではない。
+- ブラウザ通信は具体Preview、選択したSupabase、CAPTCHA providerに限定する。本番domainを含むその他originは拒否する。bypassはPreviewだけへ1 hopずつ付け、redirect先で再判定する。
+- 再試行は0、workerは1、Playwright全体5分。runnerの7分上限後は自分が起動したprocess groupを終了させる。これでDB上の合成データも自動的に消えるとはみなさず、下の残存記録を確認する。
+- 成果物は表示された `evidenceDirectory` だけを収集する。`run.json` はrun IDと前後のreadiness、`e2e.json` は操作のコード位置・時間・成否、通信先種別・HTTP status、失敗時PNGへの参照、`users/*.json` は合成ユーザーの状態。raw stdout/stderr、失敗メッセージ、入力値、URL query、header、cookie、通信bodyは出力しない。内部Playwright出力は終了後削除する。
+- これはヘッダーやDOMを再現する通常のPlaywright traceではなく、資格情報を除外した限定的な操作記録。失敗の詳細は同じSHAのソース位置と失敗画面から追う。必要な情報が足りなければ、許可された非本番環境で範囲を絞って再現する。
+- 終了コード0だけでは成功にしない。desktop/mobile両方の全対象testが初回成功し、skip/欠測/異常終了がなく、後段のreadinessも一致した時だけ `passed`。この結果を既存Validationが信頼済み証拠として受理する配線は別途必要。
+
 ### ローカル E2E とブラウザ実測
 
 - **login 系 E2E をローカルで走らせるには env 4 点を渡す。** `.env` は読まず `supabase status -o json` から鍵を取る。渡さないと `resolveServiceRoleTarget` が false になり suite ごと skip して「0 failed」の緑に見える（`4 skipped` を確認する）

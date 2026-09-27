@@ -527,7 +527,7 @@ npx supabase secrets set --env-file .env.edge.<env> --project-ref=<REF>
 
 ### 生成物
 
-- **`pnpm types:generate`（production）は 3 つの罠がある**。token 無しだと redirect が先に走って `database.types.ts` が 1 行に切り詰められる（`git checkout --` で戻す）。Prettier を通さないと 2,200 行超の偽 diff になる。`stripe_webhook_events.status` がリテラルユニオンから `string` へ落ちるのは CLI の既知 quirk なので該当行だけ戻す。未 merge の RPC は production に無いので最初から `types:generate:local` → prettier → `git diff --stat` の順にする
+- **型生成の対象を明示する**。`pnpm types:generate --target preview --project-ref <ref>` または `--target integration --project-ref <ref>` を使い、対象branch/refと適用migrationを確認する。引数なしでは本番へ接続しない。本番は明示的な `types:generate:production`、CI内の再構築DBは `types:generate:local`。生成・整形が成功してから置き換えるため、認証失敗時も既存型は保持する。`stripe_webhook_events.status` がリテラルユニオンから `string` へ落ちるCLIの既知quirkは差分で確認する。未mergeのRPCを本番型で検証したことにしない
 - **SQL 関数の最新定義を migration ファイルの grep で探すと改名チェーンで取りこぼす**。`public.X_command_v1` → `SET SCHEMA private` → `RENAME TO X_unserialized_v1` の経路で本体が `private.*_unserialized_v1` に移っている（#2598 で 7 関数中 2 つを見落とした）。適用済み local DB へ直接聞く: `SELECT n.nspname||'.'||p.proname, pg_get_functiondef(p.oid) FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname IN ('public','private') AND p.prosrc LIKE '%<ERRCODE>%';`。dump を起点に guard 部分だけを機械的に除いて migration を生成すれば `SECURITY DEFINER` / `search_path` / `lock_timeout` の取りこぼしも防げる
 
 ### PostgREST（`@supabase/supabase-js` 2.110 / PostgREST 14.1 で一次確認）

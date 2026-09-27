@@ -372,7 +372,11 @@ type RepoScenario = {
   /** origin/main に feature を merge --no-ff 済みにするか */
   mergeIntoMain: boolean;
   /** MAIN_ROOT の HEAD。'other' は別セッションが作業中の状態を表す */
-  mainRootHead: 'main' | 'other';
+  mainRootHead: 'main' | 'other' | 'feature';
+  dirtyFeature?: boolean;
+  prHeadBranch?: string;
+  prHeadSha?: string;
+  remoteAdvance?: 'before-cleanup' | 'before-delete';
   /** main を MAIN_ROOT 以外の worktree が checkout している状態にする */
   addMainWorktree?: boolean;
   /** feature branch の worktree を作る */
@@ -429,6 +433,10 @@ function runScriptOnRepo(scenario: RepoScenario) {
   if (scenario.mainRootHead === 'other') {
     git(mainRoot, 'checkout', '-b', 'other');
   }
+  if (scenario.mainRootHead === 'feature') {
+    git(mainRoot, 'checkout', BRANCH);
+    if (scenario.dirtyFeature) writeFileSync(join(mainRoot, 'feature.txt'), 'uncommitted\n');
+  }
   if (scenario.addMainWorktree) {
     git(mainRoot, 'worktree', 'add', mainWorktree, 'main');
   }
@@ -444,14 +452,39 @@ function runScriptOnRepo(scenario: RepoScenario) {
   const binDirectory = join(root, 'bin');
   mkdirSync(binDirectory);
   const headSha = git(seeder, 'rev-parse', BRANCH);
+  if (scenario.remoteAdvance === 'before-cleanup') {
+    git(seeder, 'checkout', BRANCH);
+    git(seeder, 'commit', '--allow-empty', '-m', 'later-unmerged');
+    git(seeder, 'push', 'origin', BRANCH);
+  }
+  if (scenario.remoteAdvance === 'before-delete') {
+    const realGit = spawnSync('which', ['git'], { encoding: 'utf8' }).stdout.trim();
+    const gitStub = join(binDirectory, 'git');
+    writeFileSync(
+      gitStub,
+      `#!/bin/bash
+set -euo pipefail
+if [[ "$*" == *"--delete"* && ! -f "$FINISH_BRANCH_RACE_MARKER" ]]; then
+  touch "$FINISH_BRANCH_RACE_MARKER"
+  "$FINISH_BRANCH_REAL_GIT" -C "$FINISH_BRANCH_SEEDER" checkout "$FINISH_BRANCH_NAME"
+  "$FINISH_BRANCH_REAL_GIT" -C "$FINISH_BRANCH_SEEDER" commit --allow-empty -m later-unmerged
+  "$FINISH_BRANCH_REAL_GIT" -C "$FINISH_BRANCH_SEEDER" push origin "$FINISH_BRANCH_NAME"
+fi
+exec "$FINISH_BRANCH_REAL_GIT" "$@"
+`,
+    );
+    chmodSync(gitStub, 0o755);
+    // wrapperは削除コマンドが始まる瞬間だけ別sessionのpushを再現する。
+    writeFileSync(join(root, 'real-git-path'), realGit);
+  }
   const payloadPath = join(root, 'pr.json');
   writeFileSync(
     payloadPath,
     JSON.stringify({
       state: scenario.prState,
       isDraft: false,
-      headRefName: BRANCH,
-      headRefOid: headSha,
+      headRefName: scenario.prHeadBranch ?? BRANCH,
+      headRefOid: scenario.prHeadSha ?? headSha,
       mergeable: 'MERGEABLE',
       mergeStateStatus: 'CLEAN',
       statusCheckRollup:
@@ -499,6 +532,13 @@ esac
       FINISH_BRANCH_PR_JSON: payloadPath,
       FINISH_BRANCH_EXPECT_MERGE: scenario.prState === 'OPEN' ? '1' : '0',
       FINISH_BRANCH_MERGE_EXIT: scenario.mergeFails ? '1' : '0',
+      FINISH_BRANCH_REAL_GIT:
+        scenario.remoteAdvance === 'before-delete'
+          ? readFileSync(join(root, 'real-git-path'), 'utf8')
+          : '',
+      FINISH_BRANCH_SEEDER: seeder,
+      FINISH_BRANCH_NAME: BRANCH,
+      FINISH_BRANCH_RACE_MARKER: join(root, 'race-started'),
     },
   });
 
@@ -514,6 +554,7 @@ esac
     localMainMatchesRemote: () =>
       git(mainRoot, 'rev-parse', 'main') === git(mainRoot, 'rev-parse', 'origin/main'),
     remoteBranchExists: () => git(mainRoot, 'ls-remote', '--heads', 'origin', BRANCH) !== '',
+    remoteBranchSubject: () => git(originPath, 'log', '-1', '--format=%s', BRANCH),
   };
 }
 
@@ -1473,6 +1514,33 @@ describe('マージ経路（#1771 症状①）', () => {
 });
 
 describe('main checkout に触らない掃除（#1771）', () => {
+  it('Cloudの通常checkoutではディレクトリを保持し、対象branchだけ終了する', () => {
+    const repo = runScriptOnRepo({
+      prState: 'MERGED',
+      mergeIntoMain: true,
+      mainRootHead: 'feature',
+    });
+    expect(repo.status, repo.stderr).toBe(0);
+    expect(existsSync(repo.mainRoot)).toBe(true);
+    expect(repo.branchExists()).toBe(false);
+    expect(repo.currentBranch(repo.mainRoot)).toBe('');
+    expect(repo.localMainMatchesRemote()).toBe(true);
+    expect(repo.remoteBranchExists()).toBe(false);
+  });
+
+  it('Cloudの通常checkoutにも未保存差分の保護を適用する', () => {
+    const repo = runScriptOnRepo({
+      prState: 'MERGED',
+      mergeIntoMain: true,
+      mainRootHead: 'feature',
+      dirtyFeature: true,
+    });
+    expect(repo.status).toBe(1);
+    expect(repo.stderr).toContain('未コミット');
+    expect(repo.branchExists()).toBe(true);
+    expect(readFileSync(join(repo.mainRoot, 'feature.txt'), 'utf8')).toBe('uncommitted\n');
+  });
+
   it('通常系（MAIN_ROOT が main）は従来どおり branch -d で削除する', () => {
     const repo = runScriptOnRepo({
       prState: 'MERGED',
@@ -1542,6 +1610,63 @@ describe('main checkout に触らない掃除（#1771）', () => {
 });
 
 describe('掃除で緩めてはいけない判定（#1771）', () => {
+  it.each(['before-cleanup', 'before-delete'] as const)(
+    '別sessionの未マージpushを保持する: %s',
+    (remoteAdvance) => {
+      const repo = runScriptOnRepo({
+        prState: 'MERGED',
+        mergeIntoMain: true,
+        mainRootHead: 'feature',
+        remoteAdvance,
+      });
+      expect(repo.remoteBranchExists()).toBe(true);
+      expect(repo.remoteBranchSubject()).toBe('later-unmerged');
+      expect(repo.status).toBe(1);
+      if (remoteAdvance === 'before-cleanup') {
+        expect(repo.currentBranch(repo.mainRoot)).toBe(BRANCH);
+        expect(repo.branchExists()).toBe(true);
+      }
+    },
+  );
+
+  it('同名branchでもPRとheadが違う通常checkoutを変更しない', () => {
+    const repo = runScriptOnRepo({
+      prState: 'MERGED',
+      mergeIntoMain: true,
+      mainRootHead: 'feature',
+      prHeadSha: 'f'.repeat(40),
+    });
+    expect(repo.status).toBe(1);
+    expect(repo.currentBranch(repo.mainRoot)).toBe(BRANCH);
+    expect(repo.branchExists()).toBe(true);
+    expect(repo.remoteBranchExists()).toBe(true);
+    expect(repo.stderr).toContain('head SHA と一致しません');
+  });
+
+  it('fork側のhead名がmainでも手元のmainをdetach・削除しない', () => {
+    const repo = runScriptOnRepo({
+      prState: 'MERGED',
+      mergeIntoMain: true,
+      mainRootHead: 'main',
+      prHeadBranch: 'main',
+    });
+    expect(repo.currentBranch(repo.mainRoot)).toBe('main');
+    expect(repo.status).toBe(1);
+    expect(repo.stderr).toContain('main は掃除対象にできません');
+  });
+
+  it('Cloudでも未マージbranchをdetach・削除しない', () => {
+    const repo = runScriptOnRepo({
+      prState: 'CLOSED',
+      mergeIntoMain: false,
+      mainRootHead: 'feature',
+    });
+    expect(repo.status).toBe(1);
+    expect(repo.branchExists()).toBe(true);
+    expect(repo.currentBranch(repo.mainRoot)).toBe(BRANCH);
+    expect(repo.remoteBranchExists()).toBe(true);
+  });
+
   it('マージに失敗したら掃除へ進まない', () => {
     // REST 直叩きは失敗しても fallback しない。worktree も branch も残ること。
     const repo = runScriptOnRepo({

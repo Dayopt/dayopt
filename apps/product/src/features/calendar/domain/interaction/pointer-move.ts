@@ -15,11 +15,13 @@ import {
   resizeHeightPx,
   resolveMoveStartMinutes,
   resolveResizeEndMinutes,
+  resolveResizeOriginalEndMinutes,
   resolveResizeStartMinutes,
+  resolveResizeTopMinutes,
   resolveTargetDate,
 } from './grid-geometry';
 import { DRAG_THRESHOLD_PX, IDLE, TOUCH_SCROLL_THRESHOLD_PX } from './machine-constants';
-import { minutesToPixels } from './time-math';
+import { minutesToPixels, snapDeltaMinutes } from './time-math';
 import type {
   InteractionContext,
   InteractionEffect,
@@ -153,20 +155,47 @@ export function handlePointerMove(
 
     case 'resizing': {
       const deltaY = action.point.clientY - state.startPoint.clientY;
-      // 開始時刻は動かさない。終端だけを相対 snap する。
-      const startMinutes = resolveResizeStartMinutes(state.originalPosition.top, ctx.hourHeight);
-      const endMinutes = resolveResizeEndMinutes({
-        startMinutes,
-        originalEndPx: state.originalPosition.top + state.originalPosition.height,
-        deltaPx: deltaY,
-        hourHeight: ctx.hourHeight,
-        intervalMin: interval,
-        minEndMinutes: ctx.getResizeMinEndMinutes?.(state.timeblockId) ?? null,
-      });
+      // snap 粒度に達していない動きでは短いブロックや既存値を正規化しない。
+      if (snapDeltaMinutes(deltaY, ctx.hourHeight, interval) === 0) return { state, effects };
+
+      const originalStartMinutes = resolveResizeStartMinutes(
+        state.originalPosition.top,
+        ctx.hourHeight,
+      );
+      const originalEndMinutes = resolveResizeOriginalEndMinutes(
+        state.originalPosition.top + state.originalPosition.height,
+        ctx.hourHeight,
+      );
+      const startMinutes =
+        state.direction === 'top'
+          ? resolveResizeTopMinutes({
+              originalTopPx: state.originalPosition.top,
+              originalBottomPx: state.originalPosition.top + state.originalPosition.height,
+              deltaPx: deltaY,
+              hourHeight: ctx.hourHeight,
+              intervalMin: interval,
+            })
+          : originalStartMinutes;
+      const endMinutes =
+        state.direction === 'top'
+          ? originalEndMinutes
+          : resolveResizeEndMinutes({
+              startMinutes,
+              originalEndPx: state.originalPosition.top + state.originalPosition.height,
+              deltaPx: deltaY,
+              hourHeight: ctx.hourHeight,
+              intervalMin: interval,
+              minEndMinutes: ctx.getResizeMinEndMinutes?.(state.timeblockId) ?? null,
+            });
+      const snappedTop = minutesToPixels(startMinutes, ctx.hourHeight);
       const newHeight = resizeHeightPx(startMinutes, endMinutes, ctx.hourHeight);
 
-      const prevEndMinutes = startMinutes + Math.round((state.snappedHeight / ctx.hourHeight) * 60);
-      if (crossedHapticBoundary(prevEndMinutes, endMinutes)) {
+      const previousEdgeMinutes =
+        state.direction === 'top'
+          ? Math.round((state.snappedTop / ctx.hourHeight) * 60)
+          : originalStartMinutes + Math.round((state.snappedHeight / ctx.hourHeight) * 60);
+      const nextEdgeMinutes = state.direction === 'top' ? startMinutes : endMinutes;
+      if (crossedHapticBoundary(previousEdgeMinutes, nextEdgeMinutes)) {
         effects.push({ type: 'HAPTIC', pattern: 'tap' });
       }
 
@@ -180,6 +209,7 @@ export function handlePointerMove(
         state: {
           ...state,
           currentPoint: action.point,
+          snappedTop,
           snappedHeight: newHeight,
           previewTime,
           isOverlapping,

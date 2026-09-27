@@ -153,7 +153,7 @@ op run --env-file=.op-env.human -- pnpm mcp:gate -- --expect-url='<approved-supa
    ```
 
 3. run は通常の release と同じ検証を通す: 名指しした project の層 3 → candidate の smoke → Production Config Audit → promote → 全 project の production domain smoke → live 検証。失敗時は promote 済みの分を元の deployment へ自動で戻し、戻し先は release manifest の `previousDeploymentId` に残る。
-4. 次のいずれかに当たる deployment は candidate にせず、production を触らずに失敗する: 別 project の deployment / release 対象と違う commit の build / GitHub 連携以外で作った build（source SHA を持たない）/ **live より前に作られた build**（env 更新前の古い build の取り違えを防ぐ）/ build 失敗。live が別の commit を配信している時も拒否するので、その場合は `redeploy` を付けずに dispatch する。
+4. 次のいずれかに当たる deployment は candidate にせず、production を触らずに失敗する: 別 project の deployment / release 対象と違う commit の build / GitHub source SHA を持たない build / **live より前に作られた build**（env 更新前の古い build の取り違えを防ぐ）/ build 失敗。live が別の commit を配信している時も拒否するので、その場合は `redeploy` を付けずに dispatch する。
 5. 名指しした deployment が既に live の場合は promote せず、`already-released` として smoke と audit だけを通す。
 
 戻し方: run が成功した後で元へ戻す場合は、manifest の `previousDeploymentId` を Vercel の Instant Rollback で指定する（Playbook 2 の手動 rollback と同じ）。
@@ -282,7 +282,7 @@ SELECT cron.unschedule(jobname) FROM cron.job WHERE active;
 
 ### 前提: mergeとProduction公開は分離されている
 
-main へ merge しても Production domain は**直接**切り替わらない。Product / Web は Auto-assign Custom Production Domains を無効化してあり、merge が作るのは **domain 未割当の Production build（candidate）** だけである。merge は `Production Release` workflow を自動で起動し（2026-09-03 以降。それ以前は人が dispatch していた）、workflow は影響のある層 3（E2E / Web Build & E2E）を走らせ、**その merge の影響を受ける project**の candidate を READY まで待ち、smoke と Production Config Audit を通してから promote する。影響を受けない project は待たずに skip し、どの app にも影響しない merge は promote 0 件の success（`unaffected`）で終わる。判定仕様は [infra.md](../engineering/infra.md)。
+main へ merge しても Production domain は**直接**切り替わらない。Product / Web は Auto-assign Custom Production Domains を無効化してあり、merge が作るのは **domain 未割当の Production build（candidate）** だけである。merge は `Production Release` workflow を自動で起動し、workflow は影響のある層 3（E2E / Web Build & E2E）を走らせてから、**その merge の影響を受ける project**の candidate を使う。通常の Git 連携で 5 分以内に READY にならない場合、同じ SHA の候補を再確認し、まだ無い project だけ linked Git source から staged Production build を作る。すでに QUEUED / BUILDING の候補があれば ID を固定して待つ。staged build は `Dayopt/dayopt` への Git link と Auto-assign 無効を確認し、domain を割り当てずに作る。その後も候補の smoke と Production Config Audit を通るまで promote しない。影響を受けない project は待たずに skip し、どの app にも影響しない merge は promote 0 件の success（`unaffected`）で終わる。判定仕様は [infra.md](../engineering/infra.md)。
 
 このため「本番が新しくならない」ことは、それ自体では障害ではない。**現行 Production は既知の正常 deployment のまま応答し続けている**。復旧の緊急度は「本番が壊れたか」ではなく「本番が古いままか」で判断する。層 3 が赤い merge では promote が走らないので、その意味でも本番は無傷で残る。
 
@@ -329,6 +329,7 @@ curl -s -o /dev/null -w "%{http_code}\n" https://app.dayopt.app/api/health
 promote は行われていないので、**Production domain は現行 SHA のまま無傷**。緊急操作は不要。
 
 - [ ] run summary のエラーを確認し、原因に応じてケースA / B を実施
+- [ ] candidate timeout / staged build の拒否なら、Vercel project の `Dayopt/dayopt` Git link、production branch、Auto-assign が無効であることを read-only で確認する。原因を直した後は workflow 全体を再実行し、`Re-run failed jobs` は使わない
 - [ ] **修正を main へ merge すれば release gate は自動で再実行される**（`promote.yml` は `push: main` で起動、2026-09-03）。workflow を Disable している場合は先に Enable へ戻す
 - [ ] main HEAD をそのまま再試行するだけなら `gh workflow run promote.yml --ref main`。**`sha` input は廃止した**（2026-09-03）ので `-f sha=` は 422 で拒否される。対象は常にその run の commit で、古い SHA を本番へ戻すのは promote ではなく rollback（ケースC）
 - [ ] smoke が Deployment Protection で止まった場合は、対象 project の Protection Bypass for Automation と repository secret（`VERCEL_AUTOMATION_BYPASS_PRODUCT` / `VERCEL_AUTOMATION_BYPASS_WEB`）を確認する

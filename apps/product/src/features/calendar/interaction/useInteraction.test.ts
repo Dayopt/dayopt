@@ -43,6 +43,18 @@ function createMouseEvent(clientX: number = 100, clientY: number = 540): React.M
   } as unknown as React.MouseEvent;
 }
 
+function createTouchEvent(clientX: number = 100, clientY: number = 540): React.TouchEvent {
+  return {
+    type: 'touchstart',
+    preventDefault: () => {},
+    stopPropagation: () => {},
+    nativeEvent: {
+      type: 'touchstart',
+      touches: [{ clientX, clientY }],
+    },
+  } as unknown as React.TouchEvent;
+}
+
 function makeProps(overrides: Partial<UseInteractionProps> = {}): UseInteractionProps {
   return {
     date: new Date('2026-01-15T00:00:00'),
@@ -424,7 +436,7 @@ describe('useInteraction handleResizeStart guard', () => {
     expect(result.current.state.mode).toBe('idle');
   });
 
-  it('Mobile + Inspector open: resizeDisabledPlanId が null のとき RESIZE_START が dispatch される', () => {
+  it('Touch入力は resizeDisabledPlanId が null でも RESIZE_START を開始しない', () => {
     const { result } = renderHook(() =>
       useInteraction(
         makeProps({
@@ -435,10 +447,10 @@ describe('useInteraction handleResizeStart guard', () => {
     );
 
     act(() => {
-      result.current.handlers.handleResizeStart('timeblock-1', 'bottom', createMouseEvent(), rect);
+      result.current.handlers.handleResizeStart('timeblock-1', 'bottom', createTouchEvent(), rect);
     });
 
-    expect(result.current.state.mode).toBe('resizing');
+    expect(result.current.state.mode).toBe('idle');
   });
 
   it('Inspector closed: 両 prop が null/undefined のとき RESIZE_START が dispatch される', () => {
@@ -533,6 +545,38 @@ describe('useInteraction resize completion', () => {
       expect.not.objectContaining({ keepActualTime: true }),
     );
   });
+});
+
+describe('useInteraction gesture cancellation', () => {
+  it.each(['touchcancel', 'pointercancel'])(
+    '%s cancels a resize without saving its preview',
+    (type) => {
+      const onEventUpdate = vi.fn();
+      const { result } = renderHook(() => useInteraction(makeProps({ onEventUpdate })));
+
+      act(() => {
+        result.current.dispatch({
+          type: 'RESIZE_START',
+          timeblockId: 'timeblock-1',
+          direction: 'bottom',
+          point: { clientX: 100, clientY: 540 },
+          originalPosition: rect,
+        });
+        result.current.dispatch({
+          type: 'POINTER_MOVE',
+          point: { clientX: 100, clientY: 570 },
+        });
+      });
+      expect(result.current.state.mode).toBe('resizing');
+
+      act(() => {
+        document.dispatchEvent(new Event(type));
+      });
+
+      expect(result.current.state.mode).toBe('idle');
+      expect(onEventUpdate).not.toHaveBeenCalled();
+    },
+  );
 });
 
 describe('useInteraction optimistic version', () => {

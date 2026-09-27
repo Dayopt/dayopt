@@ -121,7 +121,7 @@ job 名を変数で渡す schedule と、jobid で消す unschedule は追えな
 | `oauthTokenPreBodyIpRateLimit` | 600  | `1 m`  | `apps/product/src/lib/oauth-server/token-rate-limit.ts`                                                                                           |
 | `oauthTokenRefreshRateLimit`   | 30   | `1 m`  | `apps/product/src/lib/oauth-server/token-rate-limit.ts`                                                                                           |
 | `oauthTokenRefreshIpRateLimit` | 120  | `1 m`  | `apps/product/src/lib/oauth-server/token-rate-limit.ts`                                                                                           |
-| `oauthTokenGlobalRateLimit`    | 120  | `1 m`  | `apps/product/src/lib/oauth-server/token-rate-limit.ts`                                                                                           |
+| `oauthTokenClientRateLimit`    | 120  | `1 m`  | `apps/product/src/lib/oauth-server/token-rate-limit.ts`                                                                                           |
 | `timeblockCreateRateLimit`     | 500  | `24 h` | 利用箇所なし                                                                                                                                      |
 | `icalFeedRateLimit`            | 10   | `1 m`  | `apps/product/src/app/api/v1/calendar/[token]/route.ts`                                                                                           |
 | `icalFeedIpRateLimit`          | 60   | `1 m`  | `apps/product/src/app/api/v1/calendar/[token]/route.ts`                                                                                           |
@@ -550,7 +550,7 @@ page から import を宣言元まで解決して辿った結果（barrel の再
 | ------------------- | ------ | --------- | --------- | ---------------------- |
 | `activities`        | 30     | 3         | 11        | 3 / 11                 |
 | `auth`              | 22     | 15        | 8         | 7 / 8                  |
-| `calendar`          | 192    | 97        | 59        | 31 / 59                |
+| `calendar`          | 193    | 97        | 59        | 31 / 59                |
 | `contact`           | 8      | 6         | 2         | 1 / 2                  |
 | `external-calendar` | 26     | 19        | 2         | 1 / 2                  |
 | `review`            | 37     | 22        | 19        | 14 / 19                |

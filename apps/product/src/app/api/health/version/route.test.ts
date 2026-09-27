@@ -26,4 +26,30 @@ describe('GET /api/health/version', () => {
 
     expect(body.commitSha).toBe('');
   });
+  it('Previewだけにdeployment / 完全SHA / DB refを返す', async () => {
+    vi.stubEnv('VERCEL_ENV', 'preview');
+    vi.stubEnv('VERCEL_DEPLOYMENT_ID', 'dpl_preview123');
+    vi.stubEnv('VERCEL_GIT_COMMIT_SHA', 'a'.repeat(40));
+    vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://abcdefghijklmnopqrst.supabase.co');
+    expect(await GET().json()).toMatchObject({
+      preview: {
+        deploymentId: 'dpl_preview123',
+        sha: 'a'.repeat(40),
+        supabaseProjectRef: 'abcdefghijklmnopqrst',
+      },
+    });
+  });
+
+  it('本番ではPreview metadataを返さない', async () => {
+    vi.stubEnv('VERCEL_ENV', 'production');
+    expect(await GET().json()).not.toHaveProperty('preview');
+  });
+
+  it('Preview設定が不正でもsecret入りの生URLを返さない', async () => {
+    vi.stubEnv('VERCEL_ENV', 'preview');
+    vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://user:secret@example.com');
+    const body = await GET().json();
+    expect(body).toHaveProperty('preview', null);
+    expect(JSON.stringify(body)).not.toContain('secret');
+  });
 });

@@ -282,20 +282,19 @@ export const oauthTokenRefreshRateLimit = createRateLimiter(
  * refresh grant の IP 単位上限。**token 単位の上限と AND で使う。**
  *
  * bucket key の材料（refresh token）は検証前の body なので、攻撃者は毎回別の値を
- * 送って per-token bucket を無限に作れる。token 単位だけだと 1 IP から全体上限
- * （`oauthTokenGlobalRateLimit`）を飽和させられ、正規ユーザーの token 更新が
- * 巻き添えで止まる。共有 egress IP を締め出さないよう、`authorization_code` 用の
- * 10/分 より緩くする。
+ * 送って per-token bucket を無限に作れる。token 単位だけでは送信元単位の負荷を
+ * 制限できないため、client別 budget とは独立したIP上限を維持する。共有 egress IP
+ * を締め出さないよう、`authorization_code` 用の10/分より緩くする。
  */
 export const oauthTokenRefreshIpRateLimit = createRateLimiter(
   Ratelimit.slidingWindow(120, '1 m'),
   'ratelimit:product:oauth-token:refresh-ip',
 );
 
-/** OAuth token endpoint全体のDB負荷上限。 */
-export const oauthTokenGlobalRateLimit = createRateLimiter(
+/** OAuth token endpoint の client ごとのDB負荷上限。client ID は静的allowlistで検証後に使う。 */
+export const oauthTokenClientRateLimit = createRateLimiter(
   Ratelimit.slidingWindow(120, '1 m'),
-  'ratelimit:product:oauth-token:global',
+  'ratelimit:product:oauth-token:client',
 );
 
 /**

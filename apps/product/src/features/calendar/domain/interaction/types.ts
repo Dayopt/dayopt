@@ -86,7 +86,7 @@ export interface DraggingState {
   isOverlapping: boolean;
 }
 
-/** Actively resizing an event (bottom edge) */
+/** Actively resizing an event from either edge */
 export interface ResizingState {
   mode: 'resizing';
   timeblockId: string;
@@ -94,6 +94,8 @@ export interface ResizingState {
   currentPoint: Point;
   originalPosition: TimeblockRect;
   direction: 'top' | 'bottom';
+  /** Grid-relative top of the resize preview (px). */
+  snappedTop: number;
   /** Snapped height (px) */
   snappedHeight: number;
   /** Preview time range at current size */
@@ -172,7 +174,7 @@ export interface InteractionContext {
   displayDates?: Date[];
   /** Current view mode */
   viewMode: 'day' | '3day' | '5day' | 'week';
-  /** Snap interval in minutes (default: DEFAULT_DRAG_SNAP_MINUTES = 1) */
+  /** Snap interval in minutes (default: DEFAULT_DRAG_SNAP_MINUTES = 15) */
   snapIntervalMinutes?: number;
   /** Get timeblock duration in milliseconds by ID */
   getTimeblockDurationMs: (timeblockId: string) => number;

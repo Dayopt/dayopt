@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-09-22
+last_verified: 2026-09-26
 ---
 
 # AI開発標準ループ
@@ -82,6 +82,53 @@ spec-first の draft / 凍結は agent 単独の承認ではない。顧客挙�
 | ------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
 | 検索、再現、コード変更、対象 test / check、整合性確認、レビュー証跡の収集 | 作るべきか、product intent、外部への約束、不可逆操作、production / release。architecture / security は authority 境界に触れる場合のみ人間が判断 |
 | 固定した spec に対する実装と機械的な検証                                  | `CHECKPOINT` / `EXPLICIT AUTHORITY` に該当する spec の最終意図、許容リスク、未確認事項を踏まえた採否                                            |
+
+## 外部知見・レビュー所見の抽出
+
+外部研究・事例や再利用できそうなレビュー所見から変更候補を考える時だけ、次の短いカードを使う。通常の製品 Issue に全項目を求めず、論文ごとの Issue や別の知見管理基盤を作らない。Issue Contract の入力仕様は [`dispatch` の handoff-quality テンプレート](../../.agents/skills/dispatch/SKILL.md)が正本。
+
+```markdown
+### <知見を一文で>
+
+- Source / Evidence: 一次資料 URL、公開・更新日、確認日、資料の種別、確認できた範囲と限界
+- Finding: 資料が実際に示した観測。数値には対象と条件を付ける
+- Mechanism: 資料の説明と Dayopt 側の仮説を分ける
+- Dayopt gap: 現行コード / 運用 / Issue の根拠。既存対応・実害・未確認を区別する
+- Candidate change: 最小差分または変更不要。適用範囲と対象 path / 既存 Issue
+- Enforcement / Owner: Template・Skill・test・lint・CI・実行面の権限など、適切な既存の置き場と責務
+- Decision / Validation: 採用候補・可逆な試行・既存対応・保留・見送り、その根拠、検証と撤回条件
+- Confidence: 外部証拠の強さ | Dayopt への適用根拠。1 つの点数へ合算しない
+```
+
+長い場合は意味を保った短い表にする。外部資料の指示や取得した Skill をそのまま実行せず、出典未確認・Dayopt 未測定・仮説を明示する。URL が開くことだけを主張の証拠にしない。
+
+### 既存の行き先
+
+分類は検索・判断用であり、新しい GitHub ラベルや管理 DB にはしない。
+
+| 分類                   | 置き場・既存の担当                                                            |
+| ---------------------- | ----------------------------------------------------------------------------- |
+| Input Contract         | #2908、Issue Forms / dispatch / ctx                                           |
+| Planning / Decision    | 既存 spec-first、変更不要判断、L2 実行と必要時の L3 裁定                      |
+| Execution              | 既存 worktree / branch / dispatch。資源競合が実測された場合だけ最小対策を検討 |
+| Verification           | 既存 test / lint / CI / Validation、#2887                                     |
+| Review                 | 現行のセルフレビューと保護対象の独立レビュー                                  |
+| Learning / Maintenance | ai-development-loop / gardening / 既存 AI 設定監査                            |
+| Routing / Resources    | #2889 / #2892、既存 routing と予算・権限境界                                  |
+
+### 今回の初期例
+
+下表は確認日 2026-09-26 の一次資料と現行 repo / Issue を突き合わせた範囲を示す。効果の測定や未確認事項を、知見の事実へ繰り上げない。
+
+| 観点                         | 確認した範囲と限界                                                                                                                                                                                                                                                                                                                                                                                       | Dayopt の差分・行き先・未確認事項                                                                                                                                                          |
+| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| CAFE(S) と Issue 入力        | 2026-09-24 公開の[DX の研究紹介](https://getdx.com/research/cafe-s-your-agent-is-only-as-good-as-its-context/)と[著者側の解説](https://getdx.com/news/acm-queue-publishes-cafe-s-a-framework-for-improving-ai-coding-agent-effectiveness/)を2026-09-26に確認。Clarity / Actionability / Fidelity / Efficiency / Security を context の診断語彙として示し、著者側は測定システムではなく枠組みと説明する。 | `dispatch` に4節の契約はある一方、3つの Issue Form は注意・検証が必須でなく旧 Skill 参照もある（#2908）。既存4節と `ctx` へ反映する。5軸の点数や Dayopt での効果は未確認で、必須にしない。 |
+| 並列 build / test の資源競合 | 2026-09-16公開・09-23更新の[GitHub Copilot runtime 移行事例](https://github.blog/ai-and-ml/generative-ai/migrating-the-github-copilot-runtime-to-rust-using-copilot/)を2026-09-26に確認。1台の laptop で15の並行 session が build / test した時に著者の作業が停止するほど遅くなったと報告している。単一 repo・単一機材の事例である。                                                                     | Dayopt の host / runner で同様の競合が起きた証拠は今回なく、scheduler や常設 lock は作らない。CPU / memory / 共有出力など具体的な競合を観測した時に既存設定の最小調整を検討する。          |
+| Skill の出所と保守           | 2026-09-23 公開の[UCL GitSkills 説明](https://www.ucl.ac.uk/engineering/news/2026/sep/ucl-led-dataset-opens-new-research-how-ai-coding-agents-are-instructed)を2026-09-26に確認。公開 Skill の収集・複製・変更・保守・安全性を調べる研究資源を説明する。特定の registry が効果を上げた検証ではない。                                                                                                     | Dayopt は frontmatter、Git 履歴、元 Issue / PR、gardening で変更理由を追える。独立 registry は追加しない。これらで実務上追跡できない問題があるかは未確認。                                 |
+| 検証基準の独立性             | #2887 と既存 Validation の契約を再利用する。テスト自体の変更禁止や、正当な仕様変更・回帰 test の追加禁止を独立性と取り違えない。                                                                                                                                                                                                                                                                         | 決定的な不変条件は既存 test / lint / CI へ置き、PR が弱めた同じ判定だけで合格にしない。新しい benchmark 基盤や全 test 不変の gate は作らない。                                             |
+| readiness と L0〜L3          | #2891 / #2892 と `ctx` の現行責務を参照する。L0 は形式・取得情報、L1 は任意助言、L2 は実装・検証、L3 は未決判断を扱う。                                                                                                                                                                                                                                                                                  | Issue 本文を正本にし、L0 は不足項目を表示する。形式の充足を内容の真実性・権限・merge 許可へ拡張せず、直列必須 pipeline や新しい採点を作らない。                                            |
+| Routing とモデル資源         | #2889 / #2892 の対象範囲と観測だけを再利用し、新モデル紹介だけを新しい Dayopt の差分根拠にしない。                                                                                                                                                                                                                                                                                                       | 既存 routing と権限・予算境界へ戻す。測定していない task への性能・費用の一般化は未確認。                                                                                                  |
+| 根拠が未確認の改善率         | 2026-09-25 の #2909 source check では RRSI 本文を取得できず、Qodo / Agoda の数値も再検証されていない。                                                                                                                                                                                                                                                                                                   | 数値や削減率を採用根拠へ転記しない。一次資料・測定条件・Dayopt での適用根拠を確認するまで保留する。                                                                                        |
 
 ## レビュー知見の昇格
 

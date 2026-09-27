@@ -123,6 +123,7 @@ Dayopt で作業する全エージェントの provider-neutral な正本ガイ�
 - **`Closes #N` を issue ごとに1行**（`Closes #1, #2`は先頭しか閉じない）。epicや部分対応は `Refs #N`
 - **マージは merge commit 限定**（squash/rebase は repo 設定で無効化済み）。`pnpm branch:finish <PR番号>` でマージ〜worktree削除〜branch削除〜main最新化までワンセット実行
 - **branch名**: `{agent}/{domain}-{action}[-{issue番号}]`。自動生成ランダム名は最初のPR作成前に `git branch -m` でリネーム
+- **Cloud の通常 checkout**: worktree の追加作成は必須にしない。1 checkout = 1 branch = 1 PR とし、同じ検証・merge 条件を使う。`branch:finish` は対象branchの未保存差分がなくmainへ到達していることを確認後、通常checkoutをdetachして保持する。別branchで作業中のcheckoutは切り替えない
 - **worktree運用**: 1 worktree = 1 branch = 1 PR。役目を終えたら `pnpm branch:finish` がその場で削除する。置き場は runtime の既定（Codex は native worktree、Claude Code は `.claude/worktrees/`）でよく、`branch:finish` は `git worktree list` から特定する。**open PR は同時に 1 本まで**（複数 open にすると片方の merge が他方を up-to-date gate で陳腐化させ、追従 merge + CI 再走が無駄になる）。作業中に見つけた別件も新 PR にせず同じ branch に commit を分けて積む
 
 ### レビュー

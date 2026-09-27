@@ -23,6 +23,7 @@ import {
   calendarEventToPlanEvent,
   calendarEventToRecordEvent,
 } from '../../../../lib/calendar-event-to-lane-event';
+import { buildDragPreviewTimeblock } from '../../../../lib/interaction-preview';
 import type { TwoLanePosition } from '../../../../lib/two-lane-layout';
 import type { CalendarDisplayEvent } from '../../../../types/calendar.types';
 import { PlanLaneCard } from './TwoLane/PlanLaneCard';
@@ -55,12 +56,14 @@ interface TwoLaneTimeblockRendererProps {
     rect: { top: number; left: number; width: number; height: number },
     dayIndex?: number,
   ) => void;
-  onResizeStart: (
-    timeblockId: string,
-    direction: 'top' | 'bottom',
-    e: React.MouseEvent | React.TouchEvent,
-    rect: { top: number; left: number; width: number; height: number },
-  ) => void;
+  onResizeStart?:
+    | ((
+        timeblockId: string,
+        direction: 'top' | 'bottom',
+        e: React.MouseEvent | React.TouchEvent,
+        rect: { top: number; left: number; width: number; height: number },
+      ) => void)
+    | undefined;
 }
 
 /** auto_migrated record はドラッグ/リサイズを禁止する。 */
@@ -105,10 +108,19 @@ export function TwoLaneTimeblockRenderer({
     interactionState.mode === 'resizing' &&
     interactionState.timeblockId === timeblock.id;
 
-  // リサイズ中はプレビュー高さを反映する（TimeblockRenderer の buildResizePreviewTimeblock 相当）
+  const resizePreviewTimeblock =
+    timeblockResizing && interactionState.mode === 'resizing'
+      ? buildDragPreviewTimeblock(timeblock, interactionState.previewTime)
+      : timeblock;
+
+  // resize preview は開始端・終了端の両方をカードへ反映する。
   const previewPosition: TwoLanePosition =
-    interactionState.mode === 'resizing' && interactionState.timeblockId === timeblock.id
-      ? { ...position, height: interactionState.snappedHeight }
+    timeblockResizing && interactionState.mode === 'resizing'
+      ? {
+          ...position,
+          top: interactionState.snappedTop,
+          height: interactionState.snappedHeight,
+        }
       : position;
 
   const styleOverride: React.CSSProperties = timeblockDragging
@@ -154,8 +166,13 @@ export function TwoLaneTimeblockRenderer({
     onTouchStart(timeblock.id, e, rect, enableCrossDayDrag ? dayIndex : undefined);
   };
 
-  const handleResizeStart = (_target: unknown, e: React.MouseEvent | React.TouchEvent) => {
-    onResizeStart(timeblock.id, 'bottom', e, rect);
+  const handleResizeStart = (
+    _target: unknown,
+    direction: 'top' | 'bottom',
+    e: React.MouseEvent,
+  ) => {
+    if (!onResizeStart) return;
+    onResizeStart(timeblock.id, direction, e, rect);
   };
 
   const kind =
@@ -164,7 +181,7 @@ export function TwoLaneTimeblockRenderer({
   if (kind === 'plan') {
     return (
       <PlanLaneCard
-        event={calendarEventToPlanEvent(timeblock, allEvents)}
+        event={calendarEventToPlanEvent(resizePreviewTimeblock, allEvents)}
         position={previewPosition}
         activityName={activityName}
         activityColor={activityColor}
@@ -181,14 +198,14 @@ export function TwoLaneTimeblockRenderer({
         onContextMenu={handleContextMenu}
         onPointerDown={handlePointerDown}
         onTouchStart={handleTouchStart}
-        onResizeStart={handleResizeStart}
+        onResizeStart={onResizeStart ? handleResizeStart : undefined}
       />
     );
   }
 
   return (
     <RecordLaneCard
-      event={calendarEventToRecordEvent(timeblock)}
+      event={calendarEventToRecordEvent(resizePreviewTimeblock)}
       position={previewPosition}
       activityName={activityName}
       activityColor={activityColor}
@@ -204,7 +221,7 @@ export function TwoLaneTimeblockRenderer({
       onContextMenu={handleContextMenu}
       onPointerDown={handlePointerDown}
       onTouchStart={handleTouchStart}
-      onResizeStart={handleResizeStart}
+      onResizeStart={onResizeStart ? handleResizeStart : undefined}
     />
   );
 }

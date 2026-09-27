@@ -10,6 +10,7 @@ import {
 const accountConsent = vi.hoisted(() => ({ mutateAsync: vi.fn(), setData: vi.fn() }));
 
 vi.mock('next-intl', () => ({
+  useLocale: () => 'en',
   useTranslations: (namespace: string) => (key: string) => `${namespace}.${key}`,
 }));
 

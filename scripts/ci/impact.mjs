@@ -114,6 +114,7 @@ export const INTEGRATION_GLOBS = [
   '.github/workflows/nightly.yml',
   '.github/workflows/ci.yml',
   'scripts/ci/check.mjs',
+  'scripts/tasks/generate-database-types.mjs',
   'apps/product/src/features/*/domain/**',
   'apps/product/src/features/*/server/**',
   'apps/product/src/lib/time/**',
