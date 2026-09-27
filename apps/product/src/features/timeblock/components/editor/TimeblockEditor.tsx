@@ -65,7 +65,7 @@ export function TimeblockEditor({
     <div className="space-y-3">
       <div className="space-y-1">
         {beforeDateTimeSlot ? <div className="pb-2">{beforeDateTimeSlot}</div> : null}
-        <div className="bg-muted rounded-2xl px-4 py-2">
+        <div className="bg-card rounded-2xl px-4 py-2 shadow-sm">
           <DateTimeSection
             dateLabel={t('date')}
             timeLabel={t('time')}
@@ -89,6 +89,18 @@ export function TimeblockEditor({
             hasError={hasDateTimeError}
           />
           {fulfillmentSlot}
+          <div className="mt-2">
+            <div onBlurCapture={onNoteBlur}>
+              <NoteSection
+                label={t('note')}
+                icon={StickyNote}
+                note={value.note}
+                onNoteChange={onNoteChange}
+                placeholder={t('notePlaceholder')}
+                disabled={disabled}
+              />
+            </div>
+          </div>
         </div>
         <div
           // eslint-disable-next-line tailwindcss/no-arbitrary-value -- sidebar create と同じ expand/collapse animation
@@ -99,17 +111,6 @@ export function TimeblockEditor({
             <TimeConflictAlert message={dateTimeError ?? ''} />
           </div>
         </div>
-      </div>
-      {/* メモは一番下（v1.0 設計書 §6.1、#2412） */}
-      <div onBlurCapture={onNoteBlur}>
-        <NoteSection
-          label={t('note')}
-          icon={StickyNote}
-          note={value.note}
-          onNoteChange={onNoteChange}
-          placeholder={t('notePlaceholder')}
-          disabled={disabled}
-        />
       </div>
     </div>
   );

@@ -12,6 +12,13 @@ const meta = {
   component: TimeblockEditor,
   tags: ['autodocs'],
   parameters: { layout: 'padded' },
+  decorators: [
+    (Story) => (
+      <div className="mx-auto w-full max-w-sm">
+        <Story />
+      </div>
+    ),
+  ],
   argTypes: {
     dateTimeError: { control: 'text' },
   },
@@ -34,6 +41,12 @@ const pastPlanValue: TimeModelEditorValue = {
   endAt: new Date('2020-07-09T10:00:00'),
 };
 
+const recordStoryValue: TimeModelEditorValue = {
+  ...pastPlanValue,
+  note: '運動に集中できて、気分よく過ごせた。',
+  source: undefined,
+};
+
 /** 未来の Plan の日時・メモ編集。 */
 export const Plan: Story = {
   args: {
@@ -53,21 +66,15 @@ export const Plan: Story = {
   },
 };
 
-/**
- * Record（記録）の編集。フィールド順はタイトル（アクティビティ）→ 日付・時間 → 充実度
- * （時間の下）→ メモ の順（v1.0 設計書 §6.1、#2412）。
- */
+/** 記録の詳細。日付・時間・充実度・入力済みメモを同じグループに表示。 */
 export const Record: Story = {
   args: {
-    value: pastPlanValue,
+    value: recordStoryValue,
     onDateTimeChange: () => undefined,
     onNoteChange: () => undefined,
   },
   render: function RecordStory() {
-    const [value, setValue] = useState<TimeModelEditorValue>({
-      ...pastPlanValue,
-      source: undefined,
-    });
+    const [value, setValue] = useState(recordStoryValue);
     const [fulfillment, setFulfillment] = useState<Fulfillment | null>('high');
     return (
       <TimeblockEditor
@@ -80,7 +87,7 @@ export const Record: Story = {
   },
 };
 
-/** 過去の Plan の日時・メモ編集。フィールド順は Record と同じだが充実度は無い。 */
+/** 過去の Plan の日時・メモ編集。Record と同じグループで、充実度は無い。 */
 export const PastPlan: Story = {
   args: {
     value: futureValue,
@@ -145,7 +152,7 @@ export const WithEstimationFeedforward: Story = {
   },
 };
 
-/** 全パターン一覧。 */
+/** 予定・記録のメモ欄と各入力状態。 */
 export const AllPatterns: Story = {
   args: {
     value: futureValue,
@@ -155,10 +162,7 @@ export const AllPatterns: Story = {
   render: function AllPatternsStory() {
     const [value, setValue] = useState(futureValue);
     const [pastValue, setPastValue] = useState(pastPlanValue);
-    const [recordValue, setRecordValue] = useState<TimeModelEditorValue>({
-      ...pastPlanValue,
-      source: undefined,
-    });
+    const [recordValue, setRecordValue] = useState(recordStoryValue);
     const [fulfillment, setFulfillment] = useState<Fulfillment | null>('high');
     return (
       <div className="space-y-6">

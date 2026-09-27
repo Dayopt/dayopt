@@ -24,7 +24,7 @@ function NoteSectionDemo({
 }) {
   const [note, setNote] = useState(initialNote);
   return (
-    <div className="w-80">
+    <div className="bg-card mx-auto w-80 rounded-2xl px-4 py-2 shadow-sm">
       <NoteSection
         label="メモ"
         icon={StickyNote}
@@ -37,13 +37,13 @@ function NoteSectionDemo({
   );
 }
 
-/** 空のメモ入力欄。 */
+/** 空の1行メモ入力欄。 */
 export const Default: Story = {
   args: { label: 'メモ', note: '', onNoteChange: () => undefined },
   render: () => <NoteSectionDemo />,
 };
 
-/** 入力済みのメモ。 */
+/** 入力済みの1行メモ。 */
 export const WithNote: Story = {
   args: { label: 'メモ', note: '', onNoteChange: () => undefined },
   render: () => <NoteSectionDemo initialNote="設計レビューで確認した内容を整理する。" />,
