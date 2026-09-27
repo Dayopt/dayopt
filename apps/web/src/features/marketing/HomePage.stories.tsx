@@ -19,10 +19,5 @@ export const En: Story = {
 };
 
 export const AllPatterns: Story = {
-  render: () => (
-    <div className="flex flex-col gap-12">
-      <LandingPage locale="ja" />
-      <LandingPage locale="en" />
-    </div>
-  ),
+  render: () => <LandingPage locale="ja" />,
 };

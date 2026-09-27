@@ -242,11 +242,11 @@ export function MFASection({ _useMFAHook, embedded = false }: MFASectionProps = 
             {recoveryCodeCount === 0 && (
               <InfoBox variant="destructive">
                 <div className="mb-2 flex items-center gap-2">
-                  <span className="text-destructive text-base font-medium md:text-sm">
+                  <span className="text-destructive dark:text-foreground text-base font-medium md:text-sm">
                     {t('settings.account.mfa.recoveryCodes.noCodesLeft')}
                   </span>
                 </div>
-                <p className="text-destructive text-xs">
+                <p className="text-destructive dark:text-foreground text-xs">
                   {t('settings.account.mfa.recoveryCodes.exhaustedWarning')}
                 </p>
                 <div className="mt-4">
