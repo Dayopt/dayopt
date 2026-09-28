@@ -280,6 +280,10 @@ Vercel の `VERCEL_ENV=preview` / `VERCEL_TARGET_ENV=preview` / `VERCEL_GIT_COMM
 
 初期状態は `BILLING_ENFORCED=false`、`MCP_WRITE_ENABLED_CLIENTS` 空、`POSTHOG_SERVER_ENABLED=false`、`NEXT_PUBLIC_POSTHOG_BROWSER_ENABLED=false`。Stripe を有効化する場合は `STRIPE_SECRET_KEY` と `STRIPE_WEBHOOK_SECRET` を test credentials にし、`STRIPE_LIVEMODE=false` にする。live key / live mode は build で拒否される。
 
+Stripe 実フロー検証 #2867 は Git branch `integration` に限定して `INTEGRATION_BILLING_REHEARSAL=true` を設定する。固定 origin / Product project / Preview target / Git branch / Supabase ref / OAuth identity の完全一致、`BILLING_ENFORCED=true`、test key / endpoint signing secret / `STRIPE_ACCOUNT_ID` / `STRIPE_LIVEMODE=false` / `NEXT_PUBLIC_STRIPE_PRO_PRICE_ID` の全項目が build の条件となる。通常 Preview や Production への opt-in は拒否される。account / Price の実在・金額・mode は build とは別に Stripe API で確認する。Stripe の5変数と rehearsal flag、billing flag、MCP client allowlist は共有 Preview に追加せず `integration` 限定にする。
+
+この検証の `MCP_WRITE_ENABLED_CLIENTS` は空または `chatgpt` のみ。DB の write / billing gate は自動変更されず、現在 revision を照合した専用手順で別途操作する。停止時は `INTEGRATION_BILLING_REHEARSAL=false`、`BILLING_ENFORCED=false`、MCP client 空を同時に配備し、DB control を保存済み状態へ戻す。test Customer / Subscription / Invoice と試験利用者の対応記録を残し、共有データを reset しない。詳細は [単一有料プランの公開手順](billing-single-plan-rollout.md#cloud-integration-でのテスト検証-2867)。
+
 Resend は任意。設定する場合は `RESEND_API_KEY` / `RESEND_FROM_EMAIL` / `RESEND_WEBHOOK_SECRET` / `CONTACT_INTEGRATION_RECIPIENT` を全て揃え、recipient は `support@dayopt.app` 以外の固定 test mailbox にする。Calendar も任意で、`GOOGLE_CALENDAR_CLIENT_ID` / `GOOGLE_CALENDAR_PROJECT_NUMBER` / `GOOGLE_CALENDAR_CLIENT_SECRET` / `CALENDAR_TOKEN_ENCRYPTION_KEY` / `GOOGLE_CALENDAR_REDIRECT_URIS` を揃える。Redirect URI は `https://product-git-integration-dayopt.vercel.app/api/integrations/google-calendar/callback` に固定し、専用 test account だけを使う。
 
 Sentry は初期の必須13変数には含めず、Integration 起動時は未設定でよい。有効化する場合だけ Integration 専用 project / DSN / upload token を用意し、Production の Sentry credentials はコピーしない。event の `environment` は `integration` とし、実値は会話・Issue・repo に貼らない。

@@ -8,6 +8,7 @@
       "env": [
         "ANALYZE",
         "BILLING_ENFORCED",
+        "INTEGRATION_BILLING_REHEARSAL",
         "CALENDAR_TOKEN_ENCRYPTION_KEY",
         "CI",
         "CONTACT_INTEGRATION_RECIPIENT",

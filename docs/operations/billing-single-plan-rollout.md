@@ -26,6 +26,38 @@ code: apps/product/src/lib/billing/access-service.ts
 - `pnpm check`、`pnpm docs:check`、`supabase/tests/single-plan-trial.sql`、課金E2E、MCP conformanceを実行する。E2Eの既存Stripe interceptionは実決済を証明しないため、Stripe test modeの実際のCheckout/Webhook/復帰も別途記録する。
 - 期限直前・一致・直後、複数タブ、再ログイン、timezone変更、古いJWT、未保存入力の保持と本人による再保存、同期途中、Data API/RPCへの直接アクセスを確認する。
 
+## Cloud Integration でのテスト検証 (#2867)
+
+Docker を使わず、常設 Supabase branch `integration`（ref `tilwaprottpyhlfoggbb`）と既存 Product の固定 origin `https://product-git-integration-dayopt.vercel.app` を使う。以下は本番開通 #2869 の判断前の検証であり、本番の公開順序とは別に実施する。
+
+1. Product deployment の SHA / branch / project、DB identity / migrations / control revision を読み取り確認する。seed と既存データの集計を保存する。新しい試験利用者に run ID を付け、対象 user ID と新規 Stripe オブジェクトの対応を非公開の証跡に記録する。既存試験契約や Customer を合格証拠に流用しない。
+2. `agent/stripe-test` の明示 credential を使った GET で account が `STRIPE_ACCOUNT_ID` と一致し、設定済み Price が active・test mode・USD 500 cents・毎月であることを確認する。新しい Price は作らない。secret や Customer の個人情報を出力しない。
+3. [secrets.md](secrets.md#cloud-first-product-integration-2910) の `integration` 限定 env を user が Vercel Dashboard / user terminal で保存する。`INTEGRATION_BILLING_REHEARSAL=true`、`BILLING_ENFORCED=true`、Stripe 5変数が必要。最初は MCP client 空で配備し、最終 SHA の runtime 確認後に MCP 検証用の `chatgpt` を設定する。shared Preview の env を変更しない。
+4. Deployment Protection を維持したまま署名付き Stripe test webhook が固定 origin の `/api/webhooks/stripe` へ届く経路を用意する。Automation bypass を使う場合は secret を記録・公開しない。endpoint signing secret を branch の `STRIPE_WEBHOOK_SECRET` に保存して再配備し、署名検証と DB 確定を確認する。Protection のログイン画面や成功画面だけでは合格にしない。
+5. 試験利用者の Checkout 成功・中断・初回失敗、更新成功・再試行・回収不能、解約予約・再契約、同一 event 再送を実行する。Checkout Session / Customer / Subscription / Invoice / webhook event / profiles の対応と各ケースの前後状態を同じ最終 SHA で記録する。状態を SQL で直接変更して決済成功の代わりにしない。
+6. 期限境界の fixture は決済とは区別し、trial の開始・期限一致・直前直後、複数タブ・再ログイン・古い JWT、本人による未保存入力の再保存、API/RPC 直接アクセスを検証する。MCP は保存した control 状態と revision を確認後、Integration に限り billing gate / chatgpt write gate を CAS で開いて実クライアントから試す。共有利用者への影響が判明したら停止する。
+7. 検証が終わったら run 所有の test Subscription のみ解約し、既存データの集計を再照合する。DB control を現在 revision で開始前の状態に戻し、rehearsal / billing を false、MCP client を空へ同時に戻して再配備する。Stripe の test 履歴と試験証跡は保持する。結果・残項目・復帰結果を #2867 に記録し、#2869 は User の結果確認と判断を待つ。
+
+account / mode / ref / SHA の不一致、署名付き webhook の不達、既存データへの想定外の変更、run の所有範囲を確定できない場合は停止する。初期 Ready / migration 適用 / mock E2E は実フロー完了の証明に含めない。
+
+### 接続設定
+
+Vercel project `product` の Preview / Git branch `integration` に以下を保存する。secret の実値は会話・Issue・repo へ貼らない。
+
+| 変数                                                 | 設定元 / 値                                                                        |
+| ---------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| `STRIPE_SECRET_KEY`                                  | 1Password `agent/stripe-test` の test key                                          |
+| `STRIPE_ACCOUNT_ID`                                  | 同 item の照合済み account                                                         |
+| `STRIPE_LIVEMODE`                                    | `false`                                                                            |
+| `NEXT_PUBLIC_STRIPE_PRO_PRICE_ID`                    | 同 item の照合済み既存 Price                                                       |
+| `STRIPE_WEBHOOK_SECRET`                              | 今回の Integration endpoint の signing secret。CLI listener の secret は流用しない |
+| `INTEGRATION_BILLING_REHEARSAL` / `BILLING_ENFORCED` | 両方 `true`                                                                        |
+| `MCP_WRITE_ENABLED_CLIENTS`                          | 最初は空。MCP 検証時のみ `chatgpt`                                                 |
+
+Stripe の上記 account の test mode で endpoint を作り、イベントは `checkout.session.completed`、`customer.subscription.updated`、`customer.subscription.deleted`、`invoice.paid`、`invoice.payment_failed` を購読する。payload API version は Product の `apps/product/src/lib/stripe/client.ts` と同じ `2026-02-25.clover` を選ぶ。
+
+Webhook URL は固定 origin の `/api/webhooks/stripe` を使う。Vercel Protection が有効な場合は、user が project の Automation Bypass secret を取得し、Stripe Dashboard 内だけで `?x-vercel-protection-bypass=<secret>` を付ける。[Vercel 公式手順](https://vercel.com/docs/deployment-protection/methods-to-bypass-deployment-protection/protection-bypass-automation) が Stripe 等の URL 設定による配送を案内している。完全な URL は secret を含むため証跡へ転記しない。Protection を無効化せず、既存 bypass secret をローテーションして他の Preview 検証を止めない。再配備後、署名不正の拒否と Stripe の実配送 2xx を確認してから Checkout を開始する。
+
 ## 公開順序
 
 ProductとWebのProductionデプロイはこの順序を揃えるまで保留する。課金制限のフラグは引き続き `BILLING_ENFORCED=false` とし、未公開の45日表記を先にWebへ出さない。

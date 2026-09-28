@@ -86,6 +86,111 @@ function completeIntegrationEnv() {
   };
 }
 
+describe('Integration billing rehearsal', () => {
+  function rehearsalEnv() {
+    return {
+      ...completeIntegrationEnv(),
+      INTEGRATION_BILLING_REHEARSAL: 'true',
+      BILLING_ENFORCED: 'true',
+      // 形式検査だけの1文字 fixture。実 credential ではない。
+      STRIPE_SECRET_KEY: 'sk_test_x',
+      STRIPE_WEBHOOK_SECRET: 'whsec_x',
+      STRIPE_ACCOUNT_ID: 'acct_safe_dummy',
+      STRIPE_LIVEMODE: 'false',
+      NEXT_PUBLIC_STRIPE_PRO_PRICE_ID: 'price_safe_dummy',
+      MCP_WRITE_ENABLED_CLIENTS: 'chatgpt',
+    };
+  }
+
+  it('accepts explicitly opted-in test billing only on the bound Integration environment', () => {
+    expect(assertProductIntegrationBuildEnv(rehearsalEnv())).toBe(true);
+    expect(assertProductDeploymentEnvironmentBuildEnv(rehearsalEnv())).toBe(true);
+  });
+
+  it('allows billing validation while keeping all MCP writes disabled', () => {
+    const env = { ...rehearsalEnv(), MCP_WRITE_ENABLED_CLIENTS: '' };
+    expect(assertProductIntegrationBuildEnv(env)).toBe(true);
+    expect(assertProductDeploymentEnvironmentBuildEnv(env)).toBe(true);
+  });
+
+  it.each([
+    ['VERCEL_ENV', 'production'],
+    ['VERCEL_TARGET_ENV', 'production'],
+    ['VERCEL_PROJECT_ID', 'prj_other'],
+    ['VERCEL_GIT_COMMIT_REF', 'codex/other'],
+    ['VERCEL_BRANCH_URL', 'product-other.vercel.app'],
+    ['NEXT_PUBLIC_APP_URL', 'https://product-other.vercel.app'],
+    ['NEXT_PUBLIC_SUPABASE_URL', 'https://yvglwblxrnrenfifsnje.supabase.co'],
+    ['DAYOPT_ENVIRONMENT', 'preview'],
+    ['NEXT_PUBLIC_DAYOPT_ENVIRONMENT', 'preview'],
+    ['MCP_OAUTH_ENVIRONMENT', 'production'],
+    ['OAUTH_AUTHORIZATION_SERVER_URI', 'https://product.dayopt.app'],
+    ['MCP_CANONICAL_RESOURCE_URI', 'https://mcp.dayopt.app'],
+    ['INTEGRATION_BILLING_REHEARSAL', 'yes'],
+  ])('rejects rehearsal identity drift in %s through either gate', (name, value) => {
+    const env = { ...rehearsalEnv(), [name]: value };
+    expect(() => assertProductIntegrationBuildEnv(env)).toThrow(
+      'fixed Product Integration identity',
+    );
+    expect(() => assertProductDeploymentEnvironmentBuildEnv(env)).toThrow(
+      'fixed Product Integration identity',
+    );
+  });
+
+  it.each([
+    'STRIPE_SECRET_KEY',
+    'STRIPE_WEBHOOK_SECRET',
+    'STRIPE_ACCOUNT_ID',
+    'NEXT_PUBLIC_STRIPE_PRO_PRICE_ID',
+  ])('requires every Stripe field including %s', (name) => {
+    const env = rehearsalEnv();
+    delete env[name];
+    expect(() => assertProductIntegrationBuildEnv(env)).toThrow(name);
+    expect(() => assertProductDeploymentEnvironmentBuildEnv(env)).toThrow(name);
+  });
+
+  it.each([
+    ['STRIPE_SECRET_KEY', 'sk_live_x'],
+    ['STRIPE_SECRET_KEY', 'rk_live_x'],
+    ['STRIPE_LIVEMODE', 'true'],
+    ['STRIPE_LIVEMODE', undefined],
+    ['STRIPE_WEBHOOK_SECRET', 'invalid'],
+    ['STRIPE_ACCOUNT_ID', 'invalid'],
+    ['NEXT_PUBLIC_STRIPE_PRO_PRICE_ID', 'invalid'],
+  ])('rejects unsafe Stripe configuration in %s', (name, value) => {
+    const env = { ...rehearsalEnv(), [name]: value };
+    expect(() => assertProductIntegrationBuildEnv(env)).toThrow('Stripe test-mode configuration');
+    expect(() => assertProductDeploymentEnvironmentBuildEnv(env)).toThrow(
+      'Stripe test-mode configuration',
+    );
+  });
+
+  it.each(['claude-ai', 'chatgpt,claude-ai', '*', ' chatgpt ', 'chatgpt,chatgpt'])(
+    'rejects an unbounded MCP allowlist %s',
+    (clients) => {
+      const env = { ...rehearsalEnv(), MCP_WRITE_ENABLED_CLIENTS: clients };
+      expect(() => assertProductIntegrationBuildEnv(env)).toThrow('only the chatgpt MCP client');
+      expect(() => assertProductDeploymentEnvironmentBuildEnv(env)).toThrow(
+        'only the chatgpt MCP client',
+      );
+    },
+  );
+
+  it('requires application billing enforcement when opted in', () => {
+    const env = { ...rehearsalEnv(), BILLING_ENFORCED: 'false' };
+    expect(() => assertProductIntegrationBuildEnv(env)).toThrow('requires BILLING_ENFORCED=true');
+    expect(() => assertProductDeploymentEnvironmentBuildEnv(env)).toThrow(
+      'requires BILLING_ENFORCED=true',
+    );
+  });
+
+  it.each([undefined, 'false'])('does not open enforcement without opt-in %s', (flag) => {
+    const env = { ...rehearsalEnv(), INTEGRATION_BILLING_REHEARSAL: flag };
+    expect(() => assertProductIntegrationBuildEnv(env)).toThrow('MCP_WRITE_ENABLED_CLIENTS');
+    expect(() => assertProductDeploymentEnvironmentBuildEnv(env)).toThrow('BILLING_ENFORCED=true');
+  });
+});
+
 describe('Product operational production build gate', () => {
   it('uses the shared canonical Product and MCP origins', () => {
     expect({
