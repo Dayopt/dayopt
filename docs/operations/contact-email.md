@@ -13,30 +13,36 @@ code:
 
 `support@dayopt.app`の受信、返信、フォーム配送、Production切替、障害時の戻し方の正本。secret値、nameserver値、個人Gmail addressは記録しない。
 
+Productの固定Integrationでは、別の非本番Resend設定と`CONTACT_INTEGRATION_RECIPIENT`を使って送信を検証できる。宛先に`support@dayopt.app`は使えず、件名には`[Integration]`、idempotency keyには`-integration`が付く。通常のPR Preview / DevelopmentとWebの非本番配送は拒否される。Integration用設定と実配送の証拠がない段階では、メール検証を完了扱いしない。
+
 ## 構成
 
 ```text
 通常メール → support@dayopt.app → Cloudflare Email Routing → 既存Gmail
                                                                └→ Resend SMTPでsupport@dayopt.appとして返信
 
-Product contact.submit ─┐
+Product Production contact.submit ─┐
                         ├→ Resend API → support@dayopt.app → 同じ運用受信箱
-Web POST /api/contact ──┘
+Web Production POST /api/contact ───┘
 
-Resend delivery failure → app別POST /api/webhooks/resend → PIIなしSentry event
+Product Integration contact.submit → 非本番Resend設定 → 専用テスト受信先
+
+Productionの問い合わせdelivery failure → app別POST /api/webhooks/resend → PIIなしSentry event
+Integration専用宛先の非同期配送結果 → Resend側で確認
 ```
 
 問い合わせ原文はResendの配送処理とアクセス制限付きGmailにだけ置く。logger、Sentry、HTTP response、GitHub Issueへ原文・氏名・email・Turnstile token・authorization・webhook raw bodyを記録しない。
 
 ## 役割とsecret分離
 
-| 用途                | 1Password                                  | Replica / scope                                               |
-| ------------------- | ------------------------------------------ | ------------------------------------------------------------- |
-| Product / Web送信   | `human/resend-send`                        | 各Vercel projectのProductionだけ。Preview / Developmentは禁止 |
-| Product webhook署名 | `human/resend`                             | Product Productionだけ                                        |
-| Web webhook署名     | `human/resend-web`                         | Web Productionだけ。Productと異なる値                         |
-| Gmail返信SMTP       | `human/resend-support-replies`             | Gmail Send mail asだけ。Sending access・`dayopt.app`限定      |
-| 受信先Gmail         | Google accountのLogin / MFA / recovery管理 | address自体をrepoへ書かない                                   |
+| 用途                    | 1Password                                  | Replica / scope                                                            |
+| ----------------------- | ------------------------------------------ | -------------------------------------------------------------------------- |
+| Product / Web本番送信   | `human/resend-send`                        | 各Vercel projectのProductionだけ。本番keyのPreview / Development配布は禁止 |
+| Product Integration送信 | 非本番専用key（保存先は設定時に記録）      | Productのintegration branch scopeだけ。専用テスト受信先を必須にする        |
+| Product webhook署名     | `human/resend`                             | Product Productionだけ                                                     |
+| Web webhook署名         | `human/resend-web`                         | Web Productionだけ。Productと異なる値                                      |
+| Gmail返信SMTP           | `human/resend-support-replies`             | Gmail Send mail asだけ。Sending access・`dayopt.app`限定                   |
+| 受信先Gmail             | Google accountのLogin / MFA / recovery管理 | address自体をrepoへ書かない                                                |
 
 API keyやwebhook secretはchat、Issue、PR、docsへ貼らない。アプリ送信用keyとGmail返信用keyを共用しない。
 
