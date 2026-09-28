@@ -58,6 +58,11 @@ last_verified: 2026-09-21
 - **経路全体**:
   - [`apps/product/src/lib/test/e2e/timeblock-drag-move.spec.ts`](../../apps/product/src/lib/test/e2e/timeblock-drag-move.spec.ts) で `test('過去 Plan をドラッグ移動すると新しい時刻が保存される'` を探す（E2E。過去 Plan を動かして DB に残ることまで見る）
   - [`apps/product/src/lib/test/e2e/timeblock-conflict.spec.ts`](../../apps/product/src/lib/test/e2e/timeblock-conflict.spec.ts) で `test('別 writer が同じ Plan を更新すると、UI は conflict として最新値を読み直す'` を探す（E2E。Inspector の古い入力が別の場所の値を潰さないこと）
+- **1. ドラッグを離す**:
+  - [`apps/product/src/features/calendar/interaction/useInteraction.test.ts`](../../apps/product/src/features/calendar/interaction/useInteraction.test.ts) で `it('Recordと同じ領域へdropしてもPlanの時刻を更新する'` を探す
+  - [`apps/product/src/features/calendar/interaction/useInteraction.test.ts`](../../apps/product/src/features/calendar/interaction/useInteraction.test.ts) で `it('Recordと重なる場所へ移動してもRecord重複として拒否しない'` を探す
+  - [`apps/product/src/features/calendar/interaction/useInteraction.test.ts`](../../apps/product/src/features/calendar/interaction/useInteraction.test.ts) で `it('別のPlanと重なる移動は拒否する'` を探す
+  - [`apps/product/src/features/calendar/interaction/useInteraction.test.ts`](../../apps/product/src/features/calendar/interaction/useInteraction.test.ts) で `it('別のRecordと重なる移動は拒否する'` を探す
 - **2. 更新を依頼**:
   - [`apps/product/src/features/calendar/hooks/operations/useTimeblockOperations.test.tsx`](../../apps/product/src/features/calendar/hooks/operations/useTimeblockOperations.test.tsx) で `it('過去の plan を過去の範囲内へ動かしても新しい時刻で mutate を呼ぶ'` を探す
   - [`apps/product/src/features/calendar/hooks/operations/useTimeblockOperations.test.tsx`](../../apps/product/src/features/calendar/hooks/operations/useTimeblockOperations.test.tsx) で `it('record を未来へ動かす更新は timeLocked トーストを出し mutate を呼ばない'` を探す
@@ -79,26 +84,24 @@ last_verified: 2026-09-21
 ### Record を作る・Plan を記録する
 
 - **経路全体**:
-  - [`apps/product/src/lib/test/e2e/critical-path.spec.ts`](../../apps/product/src/lib/test/e2e/critical-path.spec.ts) で `test('過去帯をドラッグして Record を記録し、リロード後も残る'` を探す（E2E。入口 (3) の過去の時間帯から作る経路。「そのまま記録」を通しで守る E2E は見つからなかった）
+  - [`apps/product/src/lib/test/e2e/critical-path.spec.ts`](../../apps/product/src/lib/test/e2e/critical-path.spec.ts) で `test('過去帯をドラッグして Record を記録し、リロード後も残る'` を探す（E2E。入口 (2) の過去の時間帯から明示的に作る経路。「そのまま記録」を通しで守る E2E は見つからなかった）
 - **1. 入口を選ぶ**:
   - [`apps/product/src/features/timeblock/components/editor/TimeblockInspectorForm.test.tsx`](../../apps/product/src/features/timeblock/components/editor/TimeblockInspectorForm.test.tsx) で `it('時間帯の記録の有無で予定の記録操作を消さない'` を探す
-  - [`apps/product/src/features/calendar/interaction/useInteraction.test.ts`](../../apps/product/src/features/calendar/interaction/useInteraction.test.ts) で `it('drop previewの終了が未来なら過去Planでも記録callbackを呼ばない'` を探す
-- **2. 列へ落とす**:
-  - [`apps/product/src/features/calendar/lib/plan-record-drop.test.ts`](../../apps/product/src/features/calendar/lib/plan-record-drop.test.ts) で `it('Planの内容とdrop先のpreview rangeから独立Record入力を作る'` を探す
-  - [`apps/product/src/features/calendar/interaction/useInteraction.test.ts`](../../apps/product/src/features/calendar/interaction/useInteraction.test.ts) で `it('Recordレーンへのdropはplan更新ではなく記録mutationへ委譲する'` を探す
-- **3. 編集を保存しきる**:
+  - [`apps/product/src/features/calendar/components/create/InlineCreatePanel.test.tsx`](../../apps/product/src/features/calendar/components/create/InlineCreatePanel.test.tsx) で `it('未来スロットでは記録タブが選べず、選択すると Plan を作る'` を探す
+  - [`apps/product/src/features/calendar/components/create/InlineCreatePanel.test.tsx`](../../apps/product/src/features/calendar/components/create/InlineCreatePanel.test.tsx) で `it('明示的なRecord作成は既存Recordと重なる時に作成しない'` を探す
+- **2. 編集を保存しきる**:
   - [`apps/product/src/features/timeblock/components/editor/TimeblockRecordActions.test.ts`](../../apps/product/src/features/timeblock/components/editor/TimeblockRecordActions.test.ts) で `it('最新編集の保存完了後にだけPlanを記録する'` を探す
   - [`apps/product/src/features/timeblock/components/editor/TimeblockInspectorForm.test.tsx`](../../apps/product/src/features/timeblock/components/editor/TimeblockInspectorForm.test.tsx) で `it('記録前にdebounceを止め、最新のアクティビティとメモをsnapshot保存する'` を探す
-- **4. 記録を依頼**:
+- **3. 記録を依頼**:
   - [`apps/product/src/features/timeblock/hooks/useTimeblockRecordMutations.test.tsx`](../../apps/product/src/features/timeblock/hooks/useTimeblockRecordMutations.test.tsx) で `it('記録commandも自動再送を無効にする'` を探す
   - [`apps/product/src/features/timeblock/components/editor/TimeblockRecordActions.test.ts`](../../apps/product/src/features/timeblock/components/editor/TimeblockRecordActions.test.ts) で `it('Record作成中は二重実行を無効化する'` を探す
-- **6. RPC で記録**:
+- **5. RPC で記録**:
   - [`apps/product/src/features/timeblock/server/timeblock-command-client.test.ts`](../../apps/product/src/features/timeblock/server/timeblock-command-client.test.ts) で `it('stale versionと消えたversioned targetを別のstable codeへ変換する'` を探す
-- **7. Plan を写して作る**:
+- **6. Plan を写して作る**:
   - [`apps/product/src/lib/test/integration/timeblock-atomic-commands.integration.test.ts`](../../apps/product/src/lib/test/integration/timeblock-atomic-commands.integration.test.ts) で `it('rejects future Records and ignores the drained legacy link argument'` を探す（local Supabase が要る integration）
   - [`apps/product/src/lib/test/integration/timeblock-atomic-commands.integration.test.ts`](../../apps/product/src/lib/test/integration/timeblock-atomic-commands.integration.test.ts) で `it('allows a Plan and Record to occupy the same time across separate lanes'` を探す
   - [`apps/product/src/lib/test/integration/timeblock-atomic-commands.integration.test.ts`](../../apps/product/src/lib/test/integration/timeblock-atomic-commands.integration.test.ts) で `it('serializes confirm-day against one-tap Plan recording'` を探す
-- **8. 出して取り消しを出す**:
+- **7. 出して取り消しを出す**:
   - [`apps/product/src/features/timeblock/hooks/useTimeblockRecordMutations.test.tsx`](../../apps/product/src/features/timeblock/hooks/useTimeblockRecordMutations.test.tsx) で `it('ワンタップ記録のトーストから作った Record を取り消せる'` を探す
   - [`apps/product/src/features/timeblock/components/editor/TimeblockInspectorForm.test.tsx`](../../apps/product/src/features/timeblock/components/editor/TimeblockInspectorForm.test.tsx) で `it('記録成功後のRecord IDをInspector切替へ渡す'` を探す
 
@@ -351,9 +354,8 @@ last_verified: 2026-09-21
 - [Plan を保存](journeys/save-plan.md) の 5. /api/trpc で受ける
 - [Plan を保存](journeys/save-plan.md) の 7. Router → Service
 - [Plan を保存](journeys/save-plan.md) の 10. 確定して取り直す
-- [Plan / Record を動かす・直す](journeys/edit-timeblock.md) の 1. ドラッグを離す
 - [Plan / Record を動かす・直す](journeys/edit-timeblock.md) の 5. Router → Service
-- [Record を作る・Plan を記録する](journeys/record-plan.md) の 5. Router → Service
+- [Record を作る・Plan を記録する](journeys/record-plan.md) の 4. Router → Service
 - [削除と取り消し](journeys/delete-undo.md) の 4. Router → Service
 - [レポートを開く（集計）](journeys/report.md) の 3. /api/trpc と関門
 - [ログイン（MFA 含む）](journeys/login.md) の 1. サインイン画面

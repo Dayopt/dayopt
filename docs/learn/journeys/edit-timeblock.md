@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-09-21
+last_verified: 2026-09-28
 ---
 
 # Plan / Record を動かす・直す
@@ -43,15 +43,20 @@ flowchart TD
 
 ### 1. ドラッグ・リサイズを離す（ブラウザ）
 
-つかんだ瞬間に、その Plan / Record の版（updated_at）を控える。動かしている間は画面が持つデータで同じ種類同士の重なりを確かめ、重なる位置で離すと元の位置へ戻す（送らない）。重ならなければ新しい時刻と控えた版を更新処理へ渡す。Plan の過去・未来は区別しない。
+つかんだ瞬間に、その Plan / Record の版（updated_at）を控える。動かしている間は同じ種類同士の重なりだけを確かめ、Plan と Record の重なりは許す。レーンをまたいでPlanを離してもPlanのまま時刻を更新する。重なる同種ブロックの位置で離すと元の位置へ戻す（送らない）。Plan の過去・未来は区別しない。
 
 - **なぜ必要か**: つかんだ時点の版を送ることで、動かしている間に別の場所で変わっていたら上書きせずに止められる。重なりを先に見るのは往復を減らすための写し。
 - **入力 → 出力**: 離した位置の開始・終了時刻、つかんだ時の版 → id + 新しい時刻 + expectedUpdatedAt
-- **ここを変えると**: Plan を Record の列へ落とした時だけは更新ではなく記録になる（「Record を作る・Plan を記録する」）。重なりの判定を変える時は、DB の排他制約（Plan 同士・Record 同士、半開区間 [start, end)）と揃っているかを見る。
+- **ここを変えると**: Plan のドラッグはレーンにかかわらずPlanの時刻更新になる。Plan同士・Record同士の重複は拒否し、PlanとRecordの重複は許可する。重なりの判定を変える時は、DB の排他制約（同種同士、半開区間 [start, end)）と揃っているかを見る。
 - **コード**:
   - [`apps/product/src/features/calendar/interaction/interaction-effects.ts`](../../../apps/product/src/features/calendar/interaction/interaction-effects.ts) で `case 'RESIZE_COMPLETE': {` を探す
   - [`apps/product/src/features/calendar/interaction/useInteraction.ts`](../../../apps/product/src/features/calendar/interaction/useInteraction.ts) で `return checkClientSideOverlapByKind(` を探す
   - [`apps/product/src/features/calendar/interaction/GhostRenderer.tsx`](../../../apps/product/src/features/calendar/interaction/GhostRenderer.tsx) で `message={t('errors.timeOverlap')}` を探す
+- **この段を守るテスト**:
+  - [`apps/product/src/features/calendar/interaction/useInteraction.test.ts`](../../../apps/product/src/features/calendar/interaction/useInteraction.test.ts) で `it('Recordと同じ領域へdropしてもPlanの時刻を更新する'` を探す
+  - [`apps/product/src/features/calendar/interaction/useInteraction.test.ts`](../../../apps/product/src/features/calendar/interaction/useInteraction.test.ts) で `it('Recordと重なる場所へ移動してもRecord重複として拒否しない'` を探す
+  - [`apps/product/src/features/calendar/interaction/useInteraction.test.ts`](../../../apps/product/src/features/calendar/interaction/useInteraction.test.ts) で `it('別のPlanと重なる移動は拒否する'` を探す
+  - [`apps/product/src/features/calendar/interaction/useInteraction.test.ts`](../../../apps/product/src/features/calendar/interaction/useInteraction.test.ts) で `it('別のRecordと重なる移動は拒否する'` を探す
 
 <details>
 <summary>⚡ 離した位置が既存と重なる — 画面: 押せない / データ: 変化なし / 再試行: 利用者がやり直す / 痕跡: 残らない</summary>
@@ -293,13 +298,13 @@ service role の client で update_plan_command_v1 / update_record_command_v1 �
       "id": "drag",
       "svc": "browser",
       "title": "ドラッグ・リサイズを離す",
-      "what": "つかんだ瞬間に、その Plan / Record の版（updated_at）を控える。動かしている間は画面が持つデータで同じ種類同士の重なりを確かめ、重なる位置で離すと元の位置へ戻す（送らない）。重ならなければ新しい時刻と控えた版を更新処理へ渡す。Plan の過去・未来は区別しない。",
+      "what": "つかんだ瞬間に、その Plan / Record の版（updated_at）を控える。動かしている間は同じ種類同士の重なりだけを確かめ、Plan と Record の重なりは許す。レーンをまたいでPlanを離してもPlanのまま時刻を更新する。重なる同種ブロックの位置で離すと元の位置へ戻す（送らない）。Plan の過去・未来は区別しない。",
       "why": "つかんだ時点の版を送ることで、動かしている間に別の場所で変わっていたら上書きせずに止められる。重なりを先に見るのは往復を減らすための写し。",
       "io": {
         "in": "離した位置の開始・終了時刻、つかんだ時の版",
         "out": "id + 新しい時刻 + expectedUpdatedAt"
       },
-      "change": "Plan を Record の列へ落とした時だけは更新ではなく記録になる（「Record を作る・Plan を記録する」）。重なりの判定を変える時は、DB の排他制約（Plan 同士・Record 同士、半開区間 [start, end)）と揃っているかを見る。",
+      "change": "Plan のドラッグはレーンにかかわらずPlanの時刻更新になる。Plan同士・Record同士の重複は拒否し、PlanとRecordの重複は許可する。重なりの判定を変える時は、DB の排他制約（同種同士、半開区間 [start, end)）と揃っているかを見る。",
       "refs": [
         {
           "path": "apps/product/src/features/calendar/interaction/interaction-effects.ts",
@@ -312,6 +317,24 @@ service role の client で update_plan_command_v1 / update_record_command_v1 �
         {
           "path": "apps/product/src/features/calendar/interaction/GhostRenderer.tsx",
           "find": "message={t('errors.timeOverlap')}"
+        }
+      ],
+      "tests": [
+        {
+          "path": "apps/product/src/features/calendar/interaction/useInteraction.test.ts",
+          "find": "it('Recordと同じ領域へdropしてもPlanの時刻を更新する'"
+        },
+        {
+          "path": "apps/product/src/features/calendar/interaction/useInteraction.test.ts",
+          "find": "it('Recordと重なる場所へ移動してもRecord重複として拒否しない'"
+        },
+        {
+          "path": "apps/product/src/features/calendar/interaction/useInteraction.test.ts",
+          "find": "it('別のPlanと重なる移動は拒否する'"
+        },
+        {
+          "path": "apps/product/src/features/calendar/interaction/useInteraction.test.ts",
+          "find": "it('別のRecordと重なる移動は拒否する'"
         }
       ],
       "fails": [

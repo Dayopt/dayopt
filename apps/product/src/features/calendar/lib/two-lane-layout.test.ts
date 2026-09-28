@@ -2,12 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { CalendarDisplayEvent } from '../types/calendar.types';
 
-import {
-  calculateTwoLaneStylesForCalendarEvents,
-  DEFAULT_PLAN_LANE_WIDTH_PERCENT,
-  hasLaneCounterpart,
-  resolveTwoLaneFromPointer,
-} from './two-lane-layout';
+import { calculateTwoLaneStylesForCalendarEvents, hasLaneCounterpart } from './two-lane-layout';
 
 const HOUR_HEIGHT = 60;
 
@@ -269,48 +264,5 @@ describe('hasLaneCounterpart', () => {
 
   it('target 区間が縮退（end<=start）なら安全側の true', () => {
     expect(hasLaneCounterpart([], localDate(9, 0), localDate(9, 0))).toBe(true);
-  });
-});
-
-describe('resolveTwoLaneFromPointer', () => {
-  it('全ビュー共通の既定38%境界より左をPlan、右をRecordにする', () => {
-    expect(DEFAULT_PLAN_LANE_WIDTH_PERCENT).toBe(38);
-    expect(resolveTwoLaneFromPointer(137, 100, 100)).toBe('plan');
-    expect(resolveTwoLaneFromPointer(138, 100, 100)).toBe('record');
-  });
-
-  it('既定値に戻した38%幅を反映する', () => {
-    expect(resolveTwoLaneFromPointer(137, 100, 100, 38)).toBe('plan');
-    expect(resolveTwoLaneFromPointer(138, 100, 100, 38)).toBe('record');
-  });
-
-  it('明示した境界幅を反映する', () => {
-    expect(resolveTwoLaneFromPointer(149, 100, 100, 50)).toBe('plan');
-    expect(resolveTwoLaneFromPointer(150, 100, 100, 50)).toBe('record');
-  });
-
-  // #2250 plan-review で検出した P1 故障モード（本 issue のcoreとなるregression test）:
-  // 相手レーンの timeblock が無い時刻（= 画面上フル幅で境界が見えない）では、
-  // pointer の x 座標に関わらず sourceLane のまま維持し、意図しない
-  // Plan→Record 変換 mutation を発火させない。
-  it('相手レーンに counterpart が無い時、x座標に関わらず sourceLane を維持する（不可視 mutation の防止）', () => {
-    // x=138（既定38%境界より右、通常なら'record'と判定される位置）でも、
-    // hasCounterpart=false なら sourceLane='plan' を返す。
-    expect(
-      resolveTwoLaneFromPointer(138, 100, 100, 38, { sourceLane: 'plan', hasCounterpart: false }),
-    ).toBe('plan');
-    // 境界の左端（x=137）でも同様に sourceLane を維持する。
-    expect(
-      resolveTwoLaneFromPointer(137, 100, 100, 38, { sourceLane: 'plan', hasCounterpart: false }),
-    ).toBe('plan');
-  });
-
-  it('相手レーンに counterpart がある時は、laneAvailability を渡しても従来どおり x座標で判定する', () => {
-    expect(
-      resolveTwoLaneFromPointer(138, 100, 100, 38, { sourceLane: 'plan', hasCounterpart: true }),
-    ).toBe('record');
-    expect(
-      resolveTwoLaneFromPointer(137, 100, 100, 38, { sourceLane: 'plan', hasCounterpart: true }),
-    ).toBe('plan');
   });
 });
