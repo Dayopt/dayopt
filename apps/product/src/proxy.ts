@@ -12,6 +12,7 @@ import {
   isPublicRewritePath,
 } from '@/lib/auth/domain';
 import { isValidCalendarViewToken } from '@/lib/calendar-view-tokens';
+import { resolveSupabaseProjectRef } from '@/lib/dayopt-environment';
 import { logger } from '@/lib/logger';
 import {
   isOAuthRequestHostAllowed,
@@ -541,6 +542,10 @@ function enforceOAuthHostBoundary(hostname: string, pathname: string): NextRespo
       vercelBranchUrl: process.env.VERCEL_BRANCH_URL,
       vercelGitCommitRef: process.env.VERCEL_GIT_COMMIT_REF,
       mcpOAuthPreviewBranch: process.env.MCP_OAUTH_PREVIEW_BRANCH,
+      dayoptEnvironment: process.env.DAYOPT_ENVIRONMENT,
+      publicDayoptEnvironment: process.env.NEXT_PUBLIC_DAYOPT_ENVIRONMENT,
+      vercelProjectId: process.env.VERCEL_PROJECT_ID,
+      supabaseProjectRef: resolveSupabaseProjectRef(process.env.NEXT_PUBLIC_SUPABASE_URL),
     });
   } catch {
     if (!isOAuthSurfacePath(pathname) && !KNOWN_OAUTH_HOSTS.has(hostname)) return null;
