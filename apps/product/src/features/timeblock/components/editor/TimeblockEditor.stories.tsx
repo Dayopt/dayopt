@@ -43,8 +43,24 @@ const pastPlanValue: TimeModelEditorValue = {
 
 const recordStoryValue: TimeModelEditorValue = {
   ...pastPlanValue,
-  note: '運動に集中できて、気分よく過ごせた。',
+  note: '運動に集中できて、気分よく過ごせた。\n水分を取ってから始めた。',
   source: undefined,
+};
+
+const longMemoValue: TimeModelEditorValue = {
+  ...recordStoryValue,
+  note: [
+    '午前の定例で確認する項目を整理する。',
+    '前回のレビューで出た質問への回答を用意する。',
+    '仕様の変更点を関係者に共有する。',
+    '見積もりと実装の順序を確認する。',
+    '関連するテストケースを更新する。',
+    'レビュー依頼の前に変更差分を読み直す。',
+    '未決の点はIssueに記録して担当を決める。',
+    '次回の確認時間をカレンダーに追加する。',
+    '午後に実装を進め、終わったら結果を共有する。',
+    '最後に残作業と次の予定を整理する。',
+  ].join('\n'),
 };
 
 /** 未来の Plan の日時・メモ編集。 */
@@ -106,6 +122,29 @@ export const PastPlan: Story = {
   },
 };
 
+/** 長い記録メモは入力に合わせて伸び、Inspector全体がスクロールする。 */
+export const LongMemoScroll: Story = {
+  args: {
+    value: longMemoValue,
+    onDateTimeChange: () => undefined,
+    onNoteChange: () => undefined,
+  },
+  render: function LongMemoScrollStory() {
+    const [value, setValue] = useState(longMemoValue);
+    const [fulfillment, setFulfillment] = useState<Fulfillment | null>('high');
+    return (
+      <div className="border-border h-[70vh] min-h-0 overflow-y-auto rounded-2xl border p-4">
+        <TimeblockEditor
+          value={value}
+          onDateTimeChange={setValue}
+          onNoteChange={(note) => setValue((current) => ({ ...current, note }))}
+          fulfillmentSlot={<RecordFulfillmentRow value={fulfillment} onChange={setFulfillment} />}
+        />
+      </div>
+    );
+  },
+};
+
 /** サイドバー作成と共通の時間重複状態。 */
 export const TimeConflict: Story = {
   args: {
@@ -162,10 +201,10 @@ export const AllPatterns: Story = {
   render: function AllPatternsStory() {
     const [value, setValue] = useState(futureValue);
     const [pastValue, setPastValue] = useState(pastPlanValue);
-    const [recordValue, setRecordValue] = useState(recordStoryValue);
+    const [recordValue, setRecordValue] = useState(longMemoValue);
     const [fulfillment, setFulfillment] = useState<Fulfillment | null>('high');
     return (
-      <div className="space-y-6">
+      <div className="max-h-[70vh] space-y-6 overflow-y-auto">
         <TimeblockEditor
           value={recordValue}
           onDateTimeChange={setRecordValue}

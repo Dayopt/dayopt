@@ -40,14 +40,9 @@
         "toggleWeekends": "週末の表示を切り替え",
         "createBlock": "タイムブロックを作成",
         "createBlockNow": "現在時刻にタイムブロックを作成",
-        "copyBlock": "選択中のタイムブロックをコピー",
-        "pasteBlock": "コピーしたタイムブロックを貼り付け",
         "deleteBlock": "選択中のタイムブロックを削除",
         "closeInspector": "タイムブロックの詳細を閉じる"
       }
-    },
-    "clipboard": {
-      "recordRequiresPast": "記録は過去の時間に貼り付けてください"
     },
     "panel": {
       "resizeLabel": "右パネルの幅を変更"

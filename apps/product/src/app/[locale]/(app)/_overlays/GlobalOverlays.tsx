@@ -1,6 +1,6 @@
 'use client';
 
-import { useLocale, useTranslations } from 'next-intl';
+import { useLocale } from 'next-intl';
 import dynamic from 'next/dynamic';
 import { usePathname, useRouter } from 'next/navigation';
 import { useCallback, useEffect } from 'react';
@@ -13,13 +13,11 @@ import {
   isCalendarViewPath,
   useCalendarNavigation,
   useShortcutRegistry,
-  useTimeblockClipboardStore,
   useTimeblockSearchShortcut,
 } from '@/features/calendar';
-import { useTimeblockInspectorStore, type ClipboardTimeblock } from '@/features/timeblock';
+import { useTimeblockInspectorStore } from '@/features/timeblock';
 import { useUserPreferences } from '@/lib/hooks/useUserPreferences';
 import { useShellStore } from '@/lib/stores/useShellStore';
-import { toast } from '@/lib/toast';
 import { APP_SHORTCUT_CATALOG } from './app-shortcut-catalog';
 import { useTimeblockSearchResultNavigation } from './useTimeblockSearchResultNavigation';
 
@@ -66,7 +64,6 @@ export function GlobalOverlays() {
   useTimeblockSearchShortcut();
 
   const locale = useLocale();
-  const t = useTranslations();
   const router = useRouter();
   const pathname = usePathname();
   const calendarNavigation = useCalendarNavigation();
@@ -87,7 +84,6 @@ export function GlobalOverlays() {
     : 'global';
   const isInspectorOpen = useTimeblockInspectorStore((s) => s.isOpen);
   const closeInspector = useTimeblockInspectorStore((s) => s.closeInspector);
-  const copyTimeblock = useTimeblockClipboardStore((state) => state.copyTimeblock);
 
   // shell overlayが開いたら Inspector を閉じる（排他制御）
   useEffect(() => {
@@ -118,14 +114,6 @@ export function GlobalOverlays() {
       router.push(buildReportPath(locale, calendarNavigation?.currentDate ?? new Date()));
     },
     [router, locale, calendarNavigation?.currentDate],
-  );
-
-  const handleCopy = useCallback(
-    (timeblock: ClipboardTimeblock) => {
-      copyTimeblock(timeblock);
-      toast.success(t('common.toast.copied'));
-    },
-    [copyTimeblock, t],
   );
 
   const handleSearchOpenChange = useCallback(
@@ -171,7 +159,6 @@ export function GlobalOverlays() {
       />
       <TimeblockInspector
         onViewStats={handleViewStats}
-        onCopy={handleCopy}
         createContent={<InlineCreatePanel onClose={closeInspector} />}
       />
       <Toaster />

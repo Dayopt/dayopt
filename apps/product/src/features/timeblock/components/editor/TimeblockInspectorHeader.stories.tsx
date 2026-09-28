@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { Copy } from 'lucide-react';
+import { CopyPlus } from 'lucide-react';
 import { fn } from 'storybook/test';
 
 import type { TimeblockMenuItem } from '../../lib/timeblock-menu-items';
@@ -7,9 +7,9 @@ import { TimeblockInspectorHeader } from './TimeblockInspectorHeader';
 
 const menuItems = [
   {
-    key: 'copy',
-    labelKey: 'common.actions.copy',
-    icon: Copy,
+    key: 'duplicate',
+    labelKey: 'common.actions.duplicate',
+    icon: CopyPlus,
     dangerous: false,
     onSelect: fn(),
   },

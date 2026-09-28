@@ -1031,10 +1031,6 @@ model {
     metadata { inventoryKind 'store' feature 'calendar' }
     link ../../../../apps/product/src/features/calendar/stores/useTemplateSaveStore.ts
   }
-  store s_useTimeblockClipboardStore 'useTimeblockClipboardStore' {
-    metadata { inventoryKind 'store' feature 'calendar' }
-    link ../../../../apps/product/src/features/calendar/stores/useTimeblockClipboardStore.ts
-  }
   store s_useTimeblockInspectorStore 'useTimeblockInspectorStore' {
     metadata { inventoryKind 'store' feature 'timeblock' }
     link ../../../../apps/product/src/features/timeblock/stores/useTimeblockInspectorStore.ts
@@ -1385,7 +1381,6 @@ model {
   f_review -> s_useReportDetailStore 'owns'
   f_review -> s_useReportViewStore 'owns'
   f_calendar -> s_useTemplateSaveStore 'owns'
-  f_calendar -> s_useTimeblockClipboardStore 'owns'
   f_timeblock -> s_useTimeblockInspectorStore 'owns'
   f_activities -> t_activities 'reads'
   f_auth -> t_activities 'reads'

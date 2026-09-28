@@ -18,7 +18,7 @@
 | tRPC router    | 15   | 0          | 15               | 0                | 0              |
 | tRPC procedure | 71   | 0          | 71               | 0                | 0              |
 | MCP tool       | 19   | 19         | 0                | 0                | 0              |
-| Zustand store  | 14   | 0          | 13               | 0                | 1              |
+| Zustand store  | 13   | 0          | 12               | 0                | 1              |
 | Story          | 116  | 0          | 92               | 24               | 0              |
 | route          | 16   | 0          | 6                | 10               | 0              |
 | i18n namespace | 15   | 7          | 0                | 8                | 0              |
@@ -201,6 +201,7 @@ graph LR
 | [apps/product/src/features/timeblock/components/inspector/DockedInspectorPanel.test.tsx](<../../../apps/product/src/features/timeblock/components/inspector/DockedInspectorPanel.test.tsx>) | feature: timeblock |
 | [apps/product/src/features/timeblock/components/inspector/fields/ClockTimePicker.test.tsx](<../../../apps/product/src/features/timeblock/components/inspector/fields/ClockTimePicker.test.tsx>) | feature: timeblock |
 | [apps/product/src/features/timeblock/components/inspector/fields/note-html-to-text.test.ts](<../../../apps/product/src/features/timeblock/components/inspector/fields/note-html-to-text.test.ts>) | feature: timeblock |
+| [apps/product/src/features/timeblock/components/inspector/fields/NoteSection.test.tsx](<../../../apps/product/src/features/timeblock/components/inspector/fields/NoteSection.test.tsx>) | feature: timeblock |
 | [apps/product/src/features/timeblock/components/inspector/fields/TimeInput.test.tsx](<../../../apps/product/src/features/timeblock/components/inspector/fields/TimeInput.test.tsx>) | feature: timeblock |
 | [apps/product/src/features/timeblock/domain/activity-axis-aggregation.test.ts](<../../../apps/product/src/features/timeblock/domain/activity-axis-aggregation.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/domain/activity-estimation-factor.test.ts](<../../../apps/product/src/features/timeblock/domain/activity-estimation-factor.test.ts>) | feature: timeblock |
@@ -224,7 +225,6 @@ graph LR
 | [apps/product/src/features/timeblock/lib/inspector-url.test.ts](<../../../apps/product/src/features/timeblock/lib/inspector-url.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/lib/plan-to-ical.test.ts](<../../../apps/product/src/features/timeblock/lib/plan-to-ical.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/lib/time-diff.test.ts](<../../../apps/product/src/features/timeblock/lib/time-diff.test.ts>) | feature: timeblock |
-| [apps/product/src/features/timeblock/lib/timeblock-clipboard.test.ts](<../../../apps/product/src/features/timeblock/lib/timeblock-clipboard.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/lib/timeblock-duplicate.test.ts](<../../../apps/product/src/features/timeblock/lib/timeblock-duplicate.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/lib/timeblock-lane-conflict.test.ts](<../../../apps/product/src/features/timeblock/lib/timeblock-lane-conflict.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/lib/timeblock-menu-items.test.ts](<../../../apps/product/src/features/timeblock/lib/timeblock-menu-items.test.ts>) | feature: timeblock |
@@ -443,6 +443,7 @@ graph LR
 | [apps/product/src/features/timeblock/components/inspector/DockedInspectorPanel.test.tsx](<../../../apps/product/src/features/timeblock/components/inspector/DockedInspectorPanel.test.tsx>) | feature: timeblock |
 | [apps/product/src/features/timeblock/components/inspector/fields/ClockTimePicker.test.tsx](<../../../apps/product/src/features/timeblock/components/inspector/fields/ClockTimePicker.test.tsx>) | feature: timeblock |
 | [apps/product/src/features/timeblock/components/inspector/fields/note-html-to-text.test.ts](<../../../apps/product/src/features/timeblock/components/inspector/fields/note-html-to-text.test.ts>) | feature: timeblock |
+| [apps/product/src/features/timeblock/components/inspector/fields/NoteSection.test.tsx](<../../../apps/product/src/features/timeblock/components/inspector/fields/NoteSection.test.tsx>) | feature: timeblock |
 | [apps/product/src/features/timeblock/components/inspector/fields/TimeInput.test.tsx](<../../../apps/product/src/features/timeblock/components/inspector/fields/TimeInput.test.tsx>) | feature: timeblock |
 | [apps/product/src/features/timeblock/domain/activity-axis-aggregation.test.ts](<../../../apps/product/src/features/timeblock/domain/activity-axis-aggregation.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/domain/activity-estimation-factor.test.ts](<../../../apps/product/src/features/timeblock/domain/activity-estimation-factor.test.ts>) | feature: timeblock |
@@ -466,7 +467,6 @@ graph LR
 | [apps/product/src/features/timeblock/lib/inspector-url.test.ts](<../../../apps/product/src/features/timeblock/lib/inspector-url.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/lib/plan-to-ical.test.ts](<../../../apps/product/src/features/timeblock/lib/plan-to-ical.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/lib/time-diff.test.ts](<../../../apps/product/src/features/timeblock/lib/time-diff.test.ts>) | feature: timeblock |
-| [apps/product/src/features/timeblock/lib/timeblock-clipboard.test.ts](<../../../apps/product/src/features/timeblock/lib/timeblock-clipboard.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/lib/timeblock-duplicate.test.ts](<../../../apps/product/src/features/timeblock/lib/timeblock-duplicate.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/lib/timeblock-lane-conflict.test.ts](<../../../apps/product/src/features/timeblock/lib/timeblock-lane-conflict.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/lib/timeblock-menu-items.test.ts](<../../../apps/product/src/features/timeblock/lib/timeblock-menu-items.test.ts>) | feature: timeblock |
@@ -685,6 +685,7 @@ graph LR
 | [apps/product/src/features/timeblock/components/inspector/DockedInspectorPanel.test.tsx](<../../../apps/product/src/features/timeblock/components/inspector/DockedInspectorPanel.test.tsx>) | feature: timeblock |
 | [apps/product/src/features/timeblock/components/inspector/fields/ClockTimePicker.test.tsx](<../../../apps/product/src/features/timeblock/components/inspector/fields/ClockTimePicker.test.tsx>) | feature: timeblock |
 | [apps/product/src/features/timeblock/components/inspector/fields/note-html-to-text.test.ts](<../../../apps/product/src/features/timeblock/components/inspector/fields/note-html-to-text.test.ts>) | feature: timeblock |
+| [apps/product/src/features/timeblock/components/inspector/fields/NoteSection.test.tsx](<../../../apps/product/src/features/timeblock/components/inspector/fields/NoteSection.test.tsx>) | feature: timeblock |
 | [apps/product/src/features/timeblock/components/inspector/fields/TimeInput.test.tsx](<../../../apps/product/src/features/timeblock/components/inspector/fields/TimeInput.test.tsx>) | feature: timeblock |
 | [apps/product/src/features/timeblock/domain/activity-axis-aggregation.test.ts](<../../../apps/product/src/features/timeblock/domain/activity-axis-aggregation.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/domain/activity-estimation-factor.test.ts](<../../../apps/product/src/features/timeblock/domain/activity-estimation-factor.test.ts>) | feature: timeblock |
@@ -708,7 +709,6 @@ graph LR
 | [apps/product/src/features/timeblock/lib/inspector-url.test.ts](<../../../apps/product/src/features/timeblock/lib/inspector-url.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/lib/plan-to-ical.test.ts](<../../../apps/product/src/features/timeblock/lib/plan-to-ical.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/lib/time-diff.test.ts](<../../../apps/product/src/features/timeblock/lib/time-diff.test.ts>) | feature: timeblock |
-| [apps/product/src/features/timeblock/lib/timeblock-clipboard.test.ts](<../../../apps/product/src/features/timeblock/lib/timeblock-clipboard.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/lib/timeblock-duplicate.test.ts](<../../../apps/product/src/features/timeblock/lib/timeblock-duplicate.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/lib/timeblock-lane-conflict.test.ts](<../../../apps/product/src/features/timeblock/lib/timeblock-lane-conflict.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/lib/timeblock-menu-items.test.ts](<../../../apps/product/src/features/timeblock/lib/timeblock-menu-items.test.ts>) | feature: timeblock |
@@ -1175,6 +1175,7 @@ graph LR
 | [apps/product/src/features/timeblock/components/inspector/DockedInspectorPanel.test.tsx](<../../../apps/product/src/features/timeblock/components/inspector/DockedInspectorPanel.test.tsx>) | feature: timeblock |
 | [apps/product/src/features/timeblock/components/inspector/fields/ClockTimePicker.test.tsx](<../../../apps/product/src/features/timeblock/components/inspector/fields/ClockTimePicker.test.tsx>) | feature: timeblock |
 | [apps/product/src/features/timeblock/components/inspector/fields/note-html-to-text.test.ts](<../../../apps/product/src/features/timeblock/components/inspector/fields/note-html-to-text.test.ts>) | feature: timeblock |
+| [apps/product/src/features/timeblock/components/inspector/fields/NoteSection.test.tsx](<../../../apps/product/src/features/timeblock/components/inspector/fields/NoteSection.test.tsx>) | feature: timeblock |
 | [apps/product/src/features/timeblock/components/inspector/fields/TimeInput.test.tsx](<../../../apps/product/src/features/timeblock/components/inspector/fields/TimeInput.test.tsx>) | feature: timeblock |
 | [apps/product/src/features/timeblock/domain/activity-axis-aggregation.test.ts](<../../../apps/product/src/features/timeblock/domain/activity-axis-aggregation.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/domain/activity-estimation-factor.test.ts](<../../../apps/product/src/features/timeblock/domain/activity-estimation-factor.test.ts>) | feature: timeblock |
@@ -1198,7 +1199,6 @@ graph LR
 | [apps/product/src/features/timeblock/lib/inspector-url.test.ts](<../../../apps/product/src/features/timeblock/lib/inspector-url.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/lib/plan-to-ical.test.ts](<../../../apps/product/src/features/timeblock/lib/plan-to-ical.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/lib/time-diff.test.ts](<../../../apps/product/src/features/timeblock/lib/time-diff.test.ts>) | feature: timeblock |
-| [apps/product/src/features/timeblock/lib/timeblock-clipboard.test.ts](<../../../apps/product/src/features/timeblock/lib/timeblock-clipboard.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/lib/timeblock-duplicate.test.ts](<../../../apps/product/src/features/timeblock/lib/timeblock-duplicate.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/lib/timeblock-lane-conflict.test.ts](<../../../apps/product/src/features/timeblock/lib/timeblock-lane-conflict.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/lib/timeblock-menu-items.test.ts](<../../../apps/product/src/features/timeblock/lib/timeblock-menu-items.test.ts>) | feature: timeblock |
@@ -1517,6 +1517,7 @@ graph LR
 | [apps/product/src/features/timeblock/components/inspector/DockedInspectorPanel.test.tsx](<../../../apps/product/src/features/timeblock/components/inspector/DockedInspectorPanel.test.tsx>) | feature: timeblock |
 | [apps/product/src/features/timeblock/components/inspector/fields/ClockTimePicker.test.tsx](<../../../apps/product/src/features/timeblock/components/inspector/fields/ClockTimePicker.test.tsx>) | feature: timeblock |
 | [apps/product/src/features/timeblock/components/inspector/fields/note-html-to-text.test.ts](<../../../apps/product/src/features/timeblock/components/inspector/fields/note-html-to-text.test.ts>) | feature: timeblock |
+| [apps/product/src/features/timeblock/components/inspector/fields/NoteSection.test.tsx](<../../../apps/product/src/features/timeblock/components/inspector/fields/NoteSection.test.tsx>) | feature: timeblock |
 | [apps/product/src/features/timeblock/components/inspector/fields/TimeInput.test.tsx](<../../../apps/product/src/features/timeblock/components/inspector/fields/TimeInput.test.tsx>) | feature: timeblock |
 | [apps/product/src/features/timeblock/domain/activity-axis-aggregation.test.ts](<../../../apps/product/src/features/timeblock/domain/activity-axis-aggregation.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/domain/activity-estimation-factor.test.ts](<../../../apps/product/src/features/timeblock/domain/activity-estimation-factor.test.ts>) | feature: timeblock |
@@ -1540,7 +1541,6 @@ graph LR
 | [apps/product/src/features/timeblock/lib/inspector-url.test.ts](<../../../apps/product/src/features/timeblock/lib/inspector-url.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/lib/plan-to-ical.test.ts](<../../../apps/product/src/features/timeblock/lib/plan-to-ical.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/lib/time-diff.test.ts](<../../../apps/product/src/features/timeblock/lib/time-diff.test.ts>) | feature: timeblock |
-| [apps/product/src/features/timeblock/lib/timeblock-clipboard.test.ts](<../../../apps/product/src/features/timeblock/lib/timeblock-clipboard.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/lib/timeblock-duplicate.test.ts](<../../../apps/product/src/features/timeblock/lib/timeblock-duplicate.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/lib/timeblock-lane-conflict.test.ts](<../../../apps/product/src/features/timeblock/lib/timeblock-lane-conflict.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/lib/timeblock-menu-items.test.ts](<../../../apps/product/src/features/timeblock/lib/timeblock-menu-items.test.ts>) | feature: timeblock |
@@ -2044,7 +2044,6 @@ graph LR
 | Zustand store | [useCalendarNavigationStore](<../../../apps/product/src/features/calendar/stores/useCalendarNavigationStore.ts>) | feature 経由 |
 | Zustand store | [useInlineCreateStore](<../../../apps/product/src/features/calendar/stores/useInlineCreateStore.ts>) | feature 経由 |
 | Zustand store | [useTemplateSaveStore](<../../../apps/product/src/features/calendar/stores/useTemplateSaveStore.ts>) | feature 経由 |
-| Zustand store | [useTimeblockClipboardStore](<../../../apps/product/src/features/calendar/stores/useTimeblockClipboardStore.ts>) | feature 経由 |
 | Story | [Product/Features/Activities/ActivityFilterList](<../../../apps/product/src/features/calendar/components/activity-filter/ActivityFilterList.stories.tsx>) | feature 経由 |
 | Story | [Product/Features/Activities/ActivityRowMenu](<../../../apps/product/src/features/calendar/components/activity-filter/components/ActivityRowMenu.stories.tsx>) | feature 経由 |
 | Story | [Product/Features/Activities/CategoryCreateDialog](<../../../apps/product/src/features/calendar/components/activity-filter/components/CategoryCreateDialog.stories.tsx>) | feature 経由 |
@@ -2149,7 +2148,7 @@ graph LR
 </details>
 
 <details>
-<summary>test の候補（96）</summary>
+<summary>test の候補（94）</summary>
 
 <!-- prettier-ignore -->
 | ファイル | 対応の根拠 |
@@ -2238,7 +2237,6 @@ graph LR
 | [apps/product/src/features/calendar/lib/record-event-adapter.test.ts](<../../../apps/product/src/features/calendar/lib/record-event-adapter.test.ts>) | feature: calendar |
 | [apps/product/src/features/calendar/lib/remaining-day-minutes.test.ts](<../../../apps/product/src/features/calendar/lib/remaining-day-minutes.test.ts>) | feature: calendar |
 | [apps/product/src/features/calendar/lib/route-utils.test.ts](<../../../apps/product/src/features/calendar/lib/route-utils.test.ts>) | feature: calendar |
-| [apps/product/src/features/calendar/lib/timeblock-clipboard-paste.test.ts](<../../../apps/product/src/features/calendar/lib/timeblock-clipboard-paste.test.ts>) | feature: calendar |
 | [apps/product/src/features/calendar/lib/timeblock-search-path.test.ts](<../../../apps/product/src/features/calendar/lib/timeblock-search-path.test.ts>) | feature: calendar |
 | [apps/product/src/features/calendar/lib/timeblock-search-results.test.ts](<../../../apps/product/src/features/calendar/lib/timeblock-search-results.test.ts>) | feature: calendar |
 | [apps/product/src/features/calendar/lib/timezone-edge-cases.test.ts](<../../../apps/product/src/features/calendar/lib/timezone-edge-cases.test.ts>) | feature: calendar |
@@ -2249,7 +2247,6 @@ graph LR
 | [apps/product/src/features/calendar/stores/useCalendarFilterStore.test.ts](<../../../apps/product/src/features/calendar/stores/useCalendarFilterStore.test.ts>) | feature: calendar |
 | [apps/product/src/features/calendar/stores/useInlineCreateStore.test.ts](<../../../apps/product/src/features/calendar/stores/useInlineCreateStore.test.ts>) | feature: calendar |
 | [apps/product/src/features/calendar/stores/useTemplateSaveStore.test.ts](<../../../apps/product/src/features/calendar/stores/useTemplateSaveStore.test.ts>) | feature: calendar |
-| [apps/product/src/features/calendar/stores/useTimeblockClipboardStore.test.ts](<../../../apps/product/src/features/calendar/stores/useTimeblockClipboardStore.test.ts>) | feature: calendar |
 
 </details>
 
