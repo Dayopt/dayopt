@@ -29,6 +29,10 @@ export const onRouterTransitionStart = Sentry.captureRouterTransitionStart;
 
 const SENTRY_DSN = process.env.NEXT_PUBLIC_SENTRY_DSN;
 const VERCEL_ENV = process.env.NEXT_PUBLIC_VERCEL_ENV;
+// Keep a build-time condition so ordinary Preview bundles omit Sentry initialization.
+// The resolved binding below still decides whether this deployment owns telemetry.
+const IS_SENTRY_DEPLOYMENT =
+  VERCEL_ENV === 'production' || process.env.NEXT_PUBLIC_DAYOPT_ENVIRONMENT === 'integration';
 const DAYOPT_ENVIRONMENT = resolveDayoptEnvironment({
   dayoptEnvironment: process.env.NEXT_PUBLIC_DAYOPT_ENVIRONMENT,
   publicDayoptEnvironment: process.env.NEXT_PUBLIC_DAYOPT_ENVIRONMENT,
@@ -78,7 +82,7 @@ function initSentry(dsn: string) {
     debug: false,
 
     // Only Production or the fully bound fixed Integration can send telemetry.
-    enabled: SENTRY_ENVIRONMENT !== null,
+    enabled: IS_SENTRY_DEPLOYMENT && SENTRY_ENVIRONMENT !== null,
 
     // 固定protocol allowlistとpath-aware規則で、相関IDを保持しつつPIIを除去する。
     beforeSend: withPIIScrub(),
@@ -128,7 +132,7 @@ function applyBrowserTelemetryConsent(dsn: string, allowed: boolean): void {
 }
 
 // DSNが設定されている場合のみ処理
-if (SENTRY_DSN && SENTRY_ENVIRONMENT !== null) {
+if (SENTRY_DSN && IS_SENTRY_DEPLOYMENT && SENTRY_ENVIRONMENT !== null) {
   isBrowserTelemetryAllowed = typeof window !== 'undefined' && hasStoredAnalyticsConsent();
 
   if (isBrowserTelemetryAllowed) {
