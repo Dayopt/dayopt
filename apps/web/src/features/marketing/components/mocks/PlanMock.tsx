@@ -1,3 +1,5 @@
+import { Logo } from '@dayopt/components';
+
 import { MockWindow } from './MockWindow';
 
 /**
@@ -55,9 +57,8 @@ export function PlanMock() {
         {/* Sidebar — lg 以上で表示 */}
         <div className="bg-container border-border hidden w-44 shrink-0 flex-col border-r p-3 lg:flex">
           {/* Logo */}
-          <div className="mb-4 flex items-center gap-2">
-            <div className="bg-primary size-3 rounded-full" />
-            <span className="text-foreground text-xs font-medium">Dayopt</span>
+          <div className="mb-4 flex items-center px-1">
+            <Logo variant="wordmark" size="sm" />
           </div>
 
           {/* Nav */}
