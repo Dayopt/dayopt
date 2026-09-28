@@ -653,14 +653,24 @@ describe('resolveVercelIgnore（純粋ロジック）', () => {
     expect(result.reason).toContain('fail open');
   });
 
-  it('差分 0 件は skip に倒す（変更が無いという確定的な答え）', () => {
+  it('差分 0 件でも再デプロイの設定変更を反映するため build に倒す', () => {
     const result = resolveVercelIgnore({
       projectKey: 'product',
       prevSha: 'deadbeef',
       diffFilesImpl: () => [],
     });
-    expect(result.shouldBuild).toBe(false);
-    expect(result.reason).toContain('no file changes');
+    expect(result.shouldBuild).toBe(true);
+    expect(result.reason).toContain('rebuild to apply deployment configuration');
+  });
+
+  it.each(['product', 'web'])('ビルド省略の判定自身の変更で %s を build する', (projectKey) => {
+    const result = resolveVercelIgnore({
+      projectKey,
+      prevSha: 'deadbeef',
+      diffFilesImpl: () => ['scripts/ci/impact.mjs'],
+    });
+    expect(result.shouldBuild).toBe(true);
+    expect(result.reason).toContain('build decision script changed');
   });
 
   it('product のみ変更 → product は build、web は skip', () => {
@@ -704,6 +714,7 @@ describe('Vercel Ignored Build Step CLI（実 git fixture）', () => {
   let initSha: string;
   let productOnlySha: string;
   let sharedPackageSha: string;
+  let decisionScriptSha: string;
 
   function git(args: string[], cwd: string) {
     return execFileSync('git', args, { cwd, encoding: 'utf8' }).trim();
@@ -768,6 +779,8 @@ describe('Vercel Ignored Build Step CLI（実 git fixture）', () => {
 
     writeFileSync(join(fixtureDir, 'packages/config/index.ts'), 'export const config = 2;');
     sharedPackageSha = commit(fixtureDir, 'shared package change');
+    writeFileSync(scriptPath, readFileSync(scriptPath, 'utf8') + '\n// Changed build decision\n');
+    decisionScriptSha = commit(fixtureDir, 'build decision change');
   });
 
   afterAll(() => {
@@ -802,6 +815,27 @@ describe('Vercel Ignored Build Step CLI（実 git fixture）', () => {
       VERCEL_GIT_PREVIOUS_SHA: productOnlySha,
     });
     expect(webResult.status).toBe(1);
+  });
+
+  it.each(['product', 'web'])('同じ SHA の %s 再デプロイは build（exit 1）', (project) => {
+    git(['checkout', '-q', productOnlySha], fixtureDir);
+
+    const result = runCli(project, join(fixtureDir, 'apps', project), {
+      VERCEL_GIT_PREVIOUS_SHA: productOnlySha,
+      VERCEL_ENV: 'preview',
+    });
+    expect(result.status).toBe(1);
+    expect(result.stdout).toContain('rebuild to apply deployment configuration');
+  });
+
+  it.each(['product', 'web'])('判定スクリプトだけの変更でも %s は build（exit 1）', (project) => {
+    git(['checkout', '-q', decisionScriptSha], fixtureDir);
+    const result = runCli(project, join(fixtureDir, 'apps', project), {
+      VERCEL_GIT_PREVIOUS_SHA: sharedPackageSha,
+      VERCEL_ENV: 'preview',
+    });
+    expect(result.status).toBe(1);
+    expect(result.stdout).toContain('build decision script changed');
   });
 
   it('VERCEL_GIT_PREVIOUS_SHA が未設定 → build（exit 1、fail open）', () => {

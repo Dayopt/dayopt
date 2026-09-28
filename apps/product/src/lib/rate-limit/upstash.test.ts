@@ -1,5 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import {
+  PRODUCT_INTEGRATION_APP_ORIGIN,
+  PRODUCT_INTEGRATION_SUPABASE_REF,
+  PRODUCT_VERCEL_PROJECT_ID,
+} from '@/lib/dayopt-environment';
+
 const mocks = vi.hoisted(() => ({
   captureUnexpectedError: vi.fn(),
   loggerError: vi.fn(),
@@ -94,7 +100,7 @@ describe('Upstash Rate Limit', () => {
     expect(requireAvailableRateLimitResult(allowedResult as never)).toBe(allowedResult);
   });
 
-  it('uses local webhook leases outside Production and fails closed without Redis in Production', async () => {
+  it('uses local webhook leases outside operational environments and fails closed without Redis in Production or Integration', async () => {
     const claim = await claimResendWebhookEvent('event-1');
     expect(claim).toMatchObject({ status: 'claimed' });
     if (claim.status !== 'claimed') throw new Error('Expected a local claim');
@@ -104,6 +110,18 @@ describe('Upstash Rate Limit', () => {
     vi.stubEnv('VERCEL_ENV', 'production');
     await expect(claimResendWebhookEvent('event-2')).rejects.toBeInstanceOf(
       RateLimitUnavailableError,
+    );
+
+    vi.stubEnv('VERCEL_ENV', 'preview');
+    vi.stubEnv('DAYOPT_ENVIRONMENT', 'integration');
+    vi.stubEnv('NEXT_PUBLIC_DAYOPT_ENVIRONMENT', 'integration');
+    vi.stubEnv('MCP_OAUTH_ENVIRONMENT', 'integration');
+    vi.stubEnv('UPSTASH_REDIS_REST_URL', '');
+    vi.stubEnv('UPSTASH_REDIS_REST_TOKEN', '');
+    vi.resetModules();
+    const integrationModule = await import('./upstash');
+    await expect(integrationModule.claimResendWebhookEvent('event-3')).rejects.toThrow(
+      'Rate-limit backend is unavailable',
     );
   });
 
@@ -220,6 +238,68 @@ describe('Upstash Rate Limit', () => {
     expect(persistedEmailIdentifier).toMatch(/^[a-f0-9]{64}$/u);
     expect(persistedEmailIdentifier).not.toContain('person@example.com');
     expect(persistedEmailIdentifier).not.toBe(persistedIpIdentifier);
+  });
+
+  it.each([
+    {
+      name: 'fixed Integration with all app, Vercel, and database bindings',
+      environment: {
+        DAYOPT_ENVIRONMENT: 'integration',
+        NEXT_PUBLIC_DAYOPT_ENVIRONMENT: 'integration',
+        VERCEL_ENV: 'preview',
+        VERCEL_TARGET_ENV: 'preview',
+        VERCEL_PROJECT_ID: PRODUCT_VERCEL_PROJECT_ID,
+        VERCEL_GIT_COMMIT_REF: 'integration',
+        VERCEL_BRANCH_URL: 'product-git-integration-dayopt.vercel.app',
+        NEXT_PUBLIC_APP_URL: PRODUCT_INTEGRATION_APP_ORIGIN,
+        NEXT_PUBLIC_SUPABASE_URL: `https://${PRODUCT_INTEGRATION_SUPABASE_REF}.supabase.co`,
+      },
+      expectedPrefix: 'ratelimit:product:integration:contact',
+      otherPrefix: 'ratelimit:product:contact',
+    },
+    {
+      name: 'ordinary Product Preview sharing the persistent Integration database',
+      environment: {
+        DAYOPT_ENVIRONMENT: 'preview',
+        NEXT_PUBLIC_DAYOPT_ENVIRONMENT: 'preview',
+        VERCEL_ENV: 'preview',
+        VERCEL_TARGET_ENV: 'preview',
+        VERCEL_PROJECT_ID: PRODUCT_VERCEL_PROJECT_ID,
+        VERCEL_GIT_COMMIT_REF: 'codex/cloud-preview',
+        VERCEL_URL: 'product-git-codex-cloud-preview-dayopt.vercel.app',
+        VERCEL_BRANCH_URL: 'product-git-codex-cloud-preview-dayopt.vercel.app',
+        NEXT_PUBLIC_APP_URL: 'https://product-git-codex-cloud-preview-dayopt.vercel.app',
+        NEXT_PUBLIC_SUPABASE_URL: `https://${PRODUCT_INTEGRATION_SUPABASE_REF}.supabase.co`,
+      },
+      expectedPrefix: 'ratelimit:product:contact',
+      otherPrefix: 'ratelimit:product:integration:contact',
+    },
+  ])('uses $expectedPrefix for $name', async ({ environment, expectedPrefix, otherPrefix }) => {
+    vi.resetModules();
+    const constructorOptions: Array<Record<string, unknown>> = [];
+    class MockRatelimit {
+      static slidingWindow(requests: number, window: string) {
+        return { requests, window };
+      }
+
+      constructor(options: Record<string, unknown>) {
+        constructorOptions.push(options);
+      }
+
+      limit = vi.fn().mockResolvedValue(allowedResult);
+    }
+
+    vi.doMock('@upstash/ratelimit', () => ({ Ratelimit: MockRatelimit }));
+    vi.doMock('@upstash/redis', () => ({ Redis: class MockRedis {} }));
+    vi.stubEnv('UPSTASH_REDIS_REST_URL', 'https://example.upstash.io');
+    vi.stubEnv('UPSTASH_REDIS_REST_TOKEN', 'configured');
+    for (const [name, value] of Object.entries(environment)) vi.stubEnv(name, value);
+
+    await import('./upstash');
+
+    const prefixes = constructorOptions.map((options) => options.prefix);
+    expect(prefixes).toContain(expectedPrefix);
+    expect(prefixes).not.toContain(otherPrefix);
   });
 
   it('#2011: loads without touching @/env even when its schema validation would throw', async () => {

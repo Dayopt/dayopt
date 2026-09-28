@@ -39,9 +39,30 @@ export const REQUIRED_PRODUCT_PREVIEW_BUILD_ENV = [
   'VERCEL_GIT_COMMIT_REF',
 ];
 
+export const REQUIRED_PRODUCT_INTEGRATION_BUILD_ENV = [
+  'DAYOPT_ENVIRONMENT',
+  'NEXT_PUBLIC_DAYOPT_ENVIRONMENT',
+  'VERCEL_ENV',
+  'VERCEL_TARGET_ENV',
+  'VERCEL_GIT_COMMIT_REF',
+  'VERCEL_PROJECT_ID',
+  'VERCEL_BRANCH_URL',
+  'NEXT_PUBLIC_SUPABASE_URL',
+  'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY',
+  'SUPABASE_SECRET_KEY',
+  'NEXT_PUBLIC_APP_URL',
+  'MCP_OAUTH_ENVIRONMENT',
+  'OAUTH_AUTHORIZATION_SERVER_URI',
+  'MCP_CANONICAL_RESOURCE_URI',
+  'NEXT_PUBLIC_TURNSTILE_SITE_KEY',
+  'UPSTASH_REDIS_REST_URL',
+  'UPSTASH_REDIS_REST_TOKEN',
+  'RECOVERY_CODE_PEPPER',
+];
+
 /**
- * Persistent Staging は作らない決定に合わせ、Production 専用の delivery / billing /
- * telemetry / Calendar secret を OAuth 有効 Preview へ持ち込ませない。
+ * Persistent Integration remains non-production: only explicitly validated
+ * test-only delivery, billing, telemetry, and Calendar settings may be present.
  */
 export const FORBIDDEN_PRODUCT_PREVIEW_BUILD_ENV = [
   'RESEND_API_KEY',
@@ -71,34 +92,34 @@ export const FORBIDDEN_PRODUCT_PREVIEW_BUILD_ENV = [
  * 不明な形式の取り違えを止めるだけで、接続先・有効性・captcha 免除を証明しない。
  * Production 切替前の captcha 有効環境での再認証検証は docs/product/specs/auth.md を参照。
  */
-function assertServerSupabaseKey(env, environmentLabel = 'production') {
+function assertServerSupabaseKey(env) {
   const value = env.SUPABASE_SECRET_KEY;
   if (typeof value !== 'string') return;
   const normalized = value.replace(/\\n/gu, '').trim();
   if (normalized === '') return;
 
   if (!/^sb_secret_[A-Za-z0-9_-]+$/u.test(normalized) && !normalized.startsWith('eyJ')) {
-    const productionGuidance =
-      environmentLabel === 'production'
-        ? ' Verify password reauthentication with captcha enabled before Production key rotation.'
-        : '';
     throw new Error(
-      `Product ${environmentLabel} build requires a server-only SUPABASE_SECRET_KEY ` +
-        `(opaque secret key or legacy service-role JWT).${productionGuidance}`,
+      'Product production build requires a server-only SUPABASE_SECRET_KEY ' +
+        '(opaque secret key or legacy service-role JWT). Verify password reauthentication ' +
+        'with captcha enabled before Production key rotation.',
     );
   }
 }
 
 export const PRODUCT_PRODUCTION_ORIGIN = 'https://app.dayopt.app';
 export const MCP_PRODUCTION_ORIGIN = 'https://mcp.dayopt.app';
-const PRODUCTION_SUPABASE_HOST = 'yvglwblxrnrenfifsnje.supabase.co';
+export const PRODUCT_INTEGRATION_ORIGIN = 'https://product-git-integration-dayopt.vercel.app';
+export const PRODUCT_INTEGRATION_HOST = 'product-git-integration-dayopt.vercel.app';
+export const PRODUCT_INTEGRATION_SUPABASE_HOST = 'tilwaprottpyhlfoggbb.supabase.co';
 export const PRODUCT_VERCEL_PROJECT_ID = 'prj_hByu1DGZWiuLk0yfV4Gz1T4aIjpa';
 export const PRODUCT_INTEGRATION_SUPABASE_REF = 'tilwaprottpyhlfoggbb';
-export const PRODUCT_INTEGRATION_APP_ORIGIN = 'https://product-git-integration-dayopt.vercel.app';
+export const PRODUCT_INTEGRATION_APP_ORIGIN = PRODUCT_INTEGRATION_ORIGIN;
 const PRODUCT_INTEGRATION_BRANCH = 'integration';
-const PRODUCT_INTEGRATION_BRANCH_HOST = PRODUCT_INTEGRATION_APP_ORIGIN.slice('https://'.length);
-const PRODUCT_PREVIEW_BRANCH_HOST_PATTERN = /^product-git-[a-z0-9-]+-dayopt\.vercel\.app$/u;
+const PRODUCT_INTEGRATION_BRANCH_HOST = PRODUCT_INTEGRATION_HOST;
 const PRODUCT_PREVIEW_DEPLOYMENT_HOST_PATTERN = /^product-[a-z0-9-]+-dayopt\.vercel\.app$/u;
+const PRODUCTION_SUPABASE_HOST = 'yvglwblxrnrenfifsnje.supabase.co';
+const PRODUCT_PREVIEW_BRANCH_HOST_PATTERN = /^product-git-[a-z0-9-]+-dayopt\.vercel\.app$/u;
 
 /**
  * Expose only the MCP resource owned by this deploy to client components.
@@ -110,6 +131,9 @@ const PRODUCT_PREVIEW_DEPLOYMENT_HOST_PATTERN = /^product-[a-z0-9-]+-dayopt\.ver
  * The build assertions run before this resolver in next.config.mjs.
  */
 export function resolveProductPublicMcpResourceUri(env) {
+  if (isProductIntegrationConfigured(env)) {
+    return isBoundProductIntegration(env) ? PRODUCT_INTEGRATION_ORIGIN : '';
+  }
   if (env.VERCEL_ENV === 'production') return MCP_PRODUCTION_ORIGIN;
   if (
     env.VERCEL_ENV === 'preview' &&
@@ -120,6 +144,130 @@ export function resolveProductPublicMcpResourceUri(env) {
     return `https://${env.VERCEL_BRANCH_URL}`;
   }
   return '';
+}
+
+function isProductIntegrationConfigured(env) {
+  return (
+    env.DAYOPT_ENVIRONMENT === 'integration' ||
+    env.NEXT_PUBLIC_DAYOPT_ENVIRONMENT === 'integration' ||
+    env.MCP_OAUTH_ENVIRONMENT === 'integration' ||
+    env.VERCEL_GIT_COMMIT_REF === 'integration'
+  );
+}
+
+function isBoundProductIntegration(env) {
+  return (
+    env.DAYOPT_ENVIRONMENT === 'integration' &&
+    env.NEXT_PUBLIC_DAYOPT_ENVIRONMENT === 'integration' &&
+    env.VERCEL_ENV === 'preview' &&
+    env.VERCEL_TARGET_ENV === 'preview' &&
+    env.VERCEL_PROJECT_ID === PRODUCT_VERCEL_PROJECT_ID &&
+    env.VERCEL_GIT_COMMIT_REF === 'integration' &&
+    env.VERCEL_BRANCH_URL === PRODUCT_INTEGRATION_HOST &&
+    env.NEXT_PUBLIC_APP_URL === PRODUCT_INTEGRATION_ORIGIN &&
+    env.NEXT_PUBLIC_SUPABASE_URL === `https://${PRODUCT_INTEGRATION_SUPABASE_HOST}` &&
+    env.MCP_OAUTH_ENVIRONMENT === 'integration' &&
+    env.OAUTH_AUTHORIZATION_SERVER_URI === PRODUCT_INTEGRATION_ORIGIN &&
+    env.MCP_CANONICAL_RESOURCE_URI === PRODUCT_INTEGRATION_ORIGIN
+  );
+}
+
+/** Validate the fixed always-on Integration project before accepting its Vercel Preview build. */
+export function assertProductIntegrationBuildEnv(env) {
+  if (!isProductIntegrationConfigured(env)) return false;
+
+  const missingNames = REQUIRED_PRODUCT_INTEGRATION_BUILD_ENV.filter(
+    (name) => !hasNonEmptyValue(env, name),
+  );
+  if (missingNames.length > 0) {
+    throw new Error(`Product Integration build requires: ${missingNames.join(', ')}`);
+  }
+
+  if (!isBoundProductIntegration(env)) {
+    throw new Error(
+      'Product Integration build requires its fixed domain, Product project, integration Git branch, Preview target, OAuth identity, and Supabase project',
+    );
+  }
+
+  assertServerSupabaseKey(env);
+  assertHttpsUrl(env.UPSTASH_REDIS_REST_URL, 'UPSTASH_REDIS_REST_URL', 'Integration');
+
+  const upstashHost = new URL(env.UPSTASH_REDIS_REST_URL).hostname;
+  if (upstashHost === 'localhost' || upstashHost === '127.0.0.1') {
+    throw new Error('Product Integration requires a hosted, environment-specific Upstash instance');
+  }
+
+  if (env.MCP_WRITE_ENABLED_CLIENTS?.trim()) {
+    throw new Error('Product Integration build requires MCP_WRITE_ENABLED_CLIENTS to be empty');
+  }
+  if (env.BILLING_ENFORCED === 'true') {
+    throw new Error('Product Integration build forbids BILLING_ENFORCED=true');
+  }
+  if (env.POSTHOG_SERVER_ENABLED === 'true' || env.NEXT_PUBLIC_POSTHOG_BROWSER_ENABLED === 'true') {
+    throw new Error('Product Integration build forbids PostHog event delivery');
+  }
+
+  const stripeKey = typeof env.STRIPE_SECRET_KEY === 'string' ? env.STRIPE_SECRET_KEY.trim() : '';
+  if (
+    (stripeKey && !stripeKey.startsWith('sk_test_') && !stripeKey.startsWith('rk_test_')) ||
+    (stripeKey && env.STRIPE_LIVEMODE !== 'false') ||
+    (!stripeKey && env.STRIPE_LIVEMODE === 'true')
+  ) {
+    throw new Error('Product Integration build allows only Stripe test-mode credentials');
+  }
+  assertOptionalEnvironmentGroup(env, 'Product Integration Stripe configuration', [
+    'STRIPE_SECRET_KEY',
+    'STRIPE_WEBHOOK_SECRET',
+  ]);
+
+  const contactRecipient =
+    typeof env.CONTACT_INTEGRATION_RECIPIENT === 'string'
+      ? env.CONTACT_INTEGRATION_RECIPIENT.trim().toLowerCase()
+      : '';
+  if (
+    hasNonEmptyValue(env, 'RESEND_API_KEY') &&
+    (!isValidEmailAddress(contactRecipient) || contactRecipient === 'support@dayopt.app')
+  ) {
+    throw new Error(
+      'Product Integration with Resend requires a dedicated CONTACT_INTEGRATION_RECIPIENT',
+    );
+  }
+  assertOptionalEnvironmentGroup(env, 'Product Integration Resend configuration', [
+    'RESEND_API_KEY',
+    'RESEND_FROM_EMAIL',
+    'RESEND_WEBHOOK_SECRET',
+    'CONTACT_INTEGRATION_RECIPIENT',
+  ]);
+  assertOptionalEnvironmentGroup(env, 'Product Integration Calendar configuration', [
+    'GOOGLE_CALENDAR_CLIENT_ID',
+    'GOOGLE_CALENDAR_PROJECT_NUMBER',
+    'GOOGLE_CALENDAR_CLIENT_SECRET',
+    'CALENDAR_TOKEN_ENCRYPTION_KEY',
+    'GOOGLE_CALENDAR_REDIRECT_URIS',
+  ]);
+
+  if (
+    hasNonEmptyValue(env, 'GOOGLE_CALENDAR_CLIENT_ID') &&
+    env.GOOGLE_CALENDAR_REDIRECT_URIS !==
+      `${PRODUCT_INTEGRATION_ORIGIN}/api/integrations/google-calendar/callback`
+  ) {
+    throw new Error('Product Integration Calendar redirect URI must match its fixed callback');
+  }
+
+  return true;
+}
+
+function assertOptionalEnvironmentGroup(env, label, names) {
+  const configured = names.filter((name) => hasNonEmptyValue(env, name)).length;
+  if (configured > 0 && configured !== names.length) {
+    throw new Error(`${label} requires all or none of: ${names.join(', ')}`);
+  }
+}
+
+function isValidEmailAddress(value) {
+  return (
+    value.length <= 254 && !/[\r\n,]/u.test(value) && /^[^\s@]+@[^\s@]+\.[^\s@]+$/u.test(value)
+  );
 }
 
 function hasNonEmptyValue(env, name) {
@@ -256,7 +404,7 @@ export function assertProductDeploymentEnvironmentBuildEnv(env) {
     assertPreviewAppUrlMatchesVercel(env);
 
     const forbiddenNames = FORBIDDEN_PRODUCT_PREVIEW_BUILD_ENV.filter(
-      (name) => name !== 'RESEND_FROM_EMAIL' && hasNonEmptyValue(env, name),
+      (name) => !integrationMarker && name !== 'RESEND_FROM_EMAIL' && hasNonEmptyValue(env, name),
     );
     if (forbiddenNames.length > 0) {
       throw new Error(`Product Preview build forbids: ${forbiddenNames.join(', ')}`);
@@ -328,12 +476,10 @@ function isVerifiedDayoptSender(value) {
 
 /** Prevent a Production deploy with unavailable delivery, monitoring, or abuse controls. */
 export function assertProductOperationalProductionBuildEnv(env) {
-  if (env.VERCEL_ENV !== 'production') return false;
+  if (env.VERCEL_ENV !== 'production' || isProductIntegrationConfigured(env)) return false;
 
-  // Dayopt には staging 環境が無い（Persistent Staging を作らない決定）。存在しない
-  // 以上ここへは到達しないが、あとから staging 名の Vercel custom environment が
-  // 生えた場合に Production の OAuth identity をそのまま配ってしまう。sink ではなく
-  // 明示的な拒否にして、その時は build を止めて設計判断へ戻す。
+  // Integration was validated above and skipped here. Reject an unknown Vercel
+  // target or non-Production identity instead of silently treating it as Production.
   if (
     env.VERCEL_TARGET_ENV === 'staging' ||
     hasNonEmptyValue(env, 'MCP_OAUTH_PREVIEW_BRANCH') ||

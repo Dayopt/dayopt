@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { env } from '@/env';
+import { resolveSupabaseProjectRef } from '@/lib/dayopt-environment';
 
 import { resolveOAuthEnvironmentConfig, type OAuthEnvironmentConfig } from './identity';
 
@@ -22,6 +23,10 @@ export function getOAuthEnvironmentConfig(): OAuthEnvironmentConfig {
     vercelBranchUrl: readTrimmedEnvValue(env.VERCEL_BRANCH_URL),
     vercelGitCommitRef: readTrimmedEnvValue(env.VERCEL_GIT_COMMIT_REF),
     mcpOAuthPreviewBranch: readTrimmedEnvValue(env.MCP_OAUTH_PREVIEW_BRANCH),
+    dayoptEnvironment: readTrimmedEnvValue(env.DAYOPT_ENVIRONMENT),
+    publicDayoptEnvironment: readTrimmedEnvValue(env.NEXT_PUBLIC_DAYOPT_ENVIRONMENT),
+    vercelProjectId: readTrimmedEnvValue(env.VERCEL_PROJECT_ID),
+    supabaseProjectRef: resolveSupabaseProjectRef(env.NEXT_PUBLIC_SUPABASE_URL),
   });
 }
 

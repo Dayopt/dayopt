@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
+import {
+  PRODUCT_INTEGRATION_APP_ORIGIN,
+  PRODUCT_INTEGRATION_SUPABASE_REF,
+  PRODUCT_VERCEL_PROJECT_ID,
+} from '@/lib/dayopt-environment';
+
 import { isOAuthRequestHostAllowed, resolveOAuthEnvironmentConfig } from './identity';
 
 describe('MCP OAuth environment identity', () => {
@@ -120,6 +126,73 @@ describe('MCP OAuth environment identity', () => {
       protectedResourceMetadataUri:
         'https://product-git-codex-mcp-preview-dayopt.vercel.app/.well-known/oauth-protected-resource',
     });
+  });
+
+  it('accepts one exact Integration identity on the integration Git branch and Supabase ref', () => {
+    expect(
+      resolveOAuthEnvironmentConfig({
+        mcpOAuthEnvironment: 'integration',
+        dayoptEnvironment: 'integration',
+        publicDayoptEnvironment: 'integration',
+        vercelProjectId: PRODUCT_VERCEL_PROJECT_ID,
+        vercelBranchUrl: PRODUCT_INTEGRATION_APP_ORIGIN.slice('https://'.length),
+        authorizationServerUri: PRODUCT_INTEGRATION_APP_ORIGIN,
+        resourceUri: PRODUCT_INTEGRATION_APP_ORIGIN,
+        vercelEnvironment: 'preview',
+        vercelTargetEnvironment: 'preview',
+        vercelGitCommitRef: 'integration',
+        supabaseProjectRef: PRODUCT_INTEGRATION_SUPABASE_REF,
+      }),
+    ).toMatchObject({
+      environment: 'integration',
+      surfacesEnabled: true,
+      authorizationServerUri: PRODUCT_INTEGRATION_APP_ORIGIN,
+      resourceUri: PRODUCT_INTEGRATION_APP_ORIGIN,
+    });
+  });
+
+  it.each([
+    {
+      name: 'missing application marker',
+      override: { dayoptEnvironment: undefined },
+    },
+    {
+      name: 'Vercel Production environment',
+      override: { vercelEnvironment: 'production' },
+    },
+    {
+      name: 'Production Vercel target',
+      override: { vercelTargetEnvironment: 'production' },
+    },
+    {
+      name: 'main Git branch',
+      override: { vercelGitCommitRef: 'main' },
+    },
+    {
+      name: 'Production database ref',
+      override: { supabaseProjectRef: 'yvglwblxrnrenfifsnje' },
+    },
+    {
+      name: 'Production issuer',
+      override: { authorizationServerUri: 'https://app.dayopt.app' },
+    },
+  ])('rejects Integration identity drift: $name', ({ override }) => {
+    expect(() =>
+      resolveOAuthEnvironmentConfig({
+        mcpOAuthEnvironment: 'integration',
+        dayoptEnvironment: 'integration',
+        publicDayoptEnvironment: 'integration',
+        vercelProjectId: PRODUCT_VERCEL_PROJECT_ID,
+        vercelBranchUrl: PRODUCT_INTEGRATION_APP_ORIGIN.slice('https://'.length),
+        authorizationServerUri: PRODUCT_INTEGRATION_APP_ORIGIN,
+        resourceUri: PRODUCT_INTEGRATION_APP_ORIGIN,
+        vercelEnvironment: 'preview',
+        vercelTargetEnvironment: 'preview',
+        vercelGitCommitRef: 'integration',
+        supabaseProjectRef: PRODUCT_INTEGRATION_SUPABASE_REF,
+        ...override,
+      }),
+    ).toThrow();
   });
 
   it.each([

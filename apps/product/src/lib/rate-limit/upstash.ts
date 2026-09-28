@@ -11,6 +11,7 @@
 import { Ratelimit } from '@upstash/ratelimit';
 import { Redis } from '@upstash/redis';
 
+import { resolveDayoptEnvironment } from '@/lib/dayopt-environment';
 import { logger } from '@/lib/logger';
 import { extractClientIp } from '@/lib/security/ip-validation';
 import { captureUnexpectedError } from '@/lib/sentry';
@@ -37,6 +38,33 @@ function readTrimmedEnv(name: string): string | undefined {
 
 const UPSTASH_REDIS_REST_URL = readTrimmedEnv('UPSTASH_REDIS_REST_URL');
 const UPSTASH_REDIS_REST_TOKEN = readTrimmedEnv('UPSTASH_REDIS_REST_TOKEN');
+const IS_INTEGRATION_BOUND =
+  resolveDayoptEnvironment({
+    dayoptEnvironment: process.env.DAYOPT_ENVIRONMENT,
+    publicDayoptEnvironment: process.env.NEXT_PUBLIC_DAYOPT_ENVIRONMENT,
+    vercelEnvironment: process.env.VERCEL_ENV,
+    vercelTargetEnvironment: process.env.VERCEL_TARGET_ENV,
+    vercelProjectId: process.env.VERCEL_PROJECT_ID,
+    vercelGitCommitRef: process.env.VERCEL_GIT_COMMIT_REF,
+    vercelUrl: process.env.VERCEL_URL,
+    vercelBranchUrl: process.env.VERCEL_BRANCH_URL,
+    appUrl: process.env.NEXT_PUBLIC_APP_URL,
+    supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL,
+  }) === 'integration';
+const CLAIMS_INTEGRATION_ENVIRONMENT =
+  process.env.DAYOPT_ENVIRONMENT === 'integration' ||
+  process.env.NEXT_PUBLIC_DAYOPT_ENVIRONMENT === 'integration' ||
+  process.env.MCP_OAUTH_ENVIRONMENT === 'integration';
+const RATE_LIMIT_PREFIX = IS_INTEGRATION_BOUND
+  ? 'ratelimit:product:integration'
+  : 'ratelimit:product';
+const WEBHOOK_KEY_PREFIX = IS_INTEGRATION_BOUND
+  ? 'webhook:product:integration:resend'
+  : 'webhook:product:resend';
+
+function rateLimitPrefix(suffix: string): string {
+  return `${RATE_LIMIT_PREFIX}:${suffix}`;
+}
 
 /** Upstash Redisが有効かどうか（環境変数が設定されている場合のみtrue） */
 export const isUpstashEnabled = Boolean(UPSTASH_REDIS_REST_URL && UPSTASH_REDIS_REST_TOKEN);
@@ -130,13 +158,13 @@ function createRateLimiter(
  */
 export const contactRateLimit = createRateLimiter(
   Ratelimit.slidingWindow(5, '1 h'),
-  'ratelimit:product:contact',
+  rateLimitPrefix('contact'),
 );
 
 /** お問い合わせ配送全体の予算上限: 60リクエスト / 1時間。 */
 export const contactGlobalRateLimit = createRateLimiter(
   Ratelimit.slidingWindow(60, '1 h'),
-  'ratelimit:product:contact-global',
+  rateLimitPrefix('contact-global'),
 );
 
 const RESEND_WEBHOOK_PROCESSING_SECONDS = 5 * 60;
@@ -149,11 +177,16 @@ type ResendWebhookClaim =
   | { status: 'in_progress' };
 
 async function getResendWebhookKey(eventId: string): Promise<string> {
-  return `webhook:product:resend:${await hashRateLimitIdentifier(`resend-event:${eventId}`)}`;
+  return `${WEBHOOK_KEY_PREFIX}:${await hashRateLimitIdentifier(`resend-event:${eventId}`)}`;
 }
 
 function assertWebhookRedisAvailable(): void {
-  if (!redis && process.env.VERCEL_ENV === 'production') {
+  if (
+    !redis &&
+    (process.env.VERCEL_ENV === 'production' ||
+      IS_INTEGRATION_BOUND ||
+      CLAIMS_INTEGRATION_ENVIRONMENT)
+  ) {
     throw new RateLimitUnavailableError();
   }
 }
@@ -218,7 +251,7 @@ return 0`,
  */
 export const trpcUserRateLimit = createRateLimiter(
   Ratelimit.slidingWindow(300, '1 m'),
-  'ratelimit:product:trpc:user',
+  rateLimitPrefix('trpc:user'),
 );
 
 /**
@@ -233,25 +266,25 @@ export const trpcUserRateLimit = createRateLimiter(
  */
 export const reauthRateLimit = createRateLimiter(
   Ratelimit.slidingWindow(5, '10 m'),
-  'ratelimit:product:reauth',
+  rateLimitPrefix('reauth'),
 );
 
 /** MCP token検証前のcoarse IP ceiling。認証後は別のuser limitで絞る。 */
 export const mcpPreAuthRateLimit = createRateLimiter(
   Ratelimit.slidingWindow(1_200, '1 m'),
-  'ratelimit:product:mcp:pre-auth',
+  rateLimitPrefix('mcp:pre-auth'),
 );
 
 /** MCP protected resource用: tool discovery/read/writeをuser単位でまとめて制限する。 */
 export const mcpUserRateLimit = createRateLimiter(
   Ratelimit.slidingWindow(120, '1 m'),
-  'ratelimit:product:mcp:user',
+  rateLimitPrefix('mcp:user'),
 );
 
 /** OAuth token endpoint用: 未認証IP単位のDB負荷上限。 */
 export const oauthTokenIpRateLimit = createRateLimiter(
   Ratelimit.slidingWindow(10, '1 m'),
-  'ratelimit:product:oauth-token:ip',
+  rateLimitPrefix('oauth-token:ip'),
 );
 
 /**
@@ -262,7 +295,7 @@ export const oauthTokenIpRateLimit = createRateLimiter(
  */
 export const oauthTokenPreBodyIpRateLimit = createRateLimiter(
   Ratelimit.slidingWindow(600, '1 m'),
-  'ratelimit:product:oauth-token:pre-body-ip',
+  rateLimitPrefix('oauth-token:pre-body-ip'),
 );
 
 /**
@@ -275,7 +308,7 @@ export const oauthTokenPreBodyIpRateLimit = createRateLimiter(
  */
 export const oauthTokenRefreshRateLimit = createRateLimiter(
   Ratelimit.slidingWindow(30, '1 m'),
-  'ratelimit:product:oauth-token:refresh',
+  rateLimitPrefix('oauth-token:refresh'),
 );
 
 /**
@@ -288,13 +321,13 @@ export const oauthTokenRefreshRateLimit = createRateLimiter(
  */
 export const oauthTokenRefreshIpRateLimit = createRateLimiter(
   Ratelimit.slidingWindow(120, '1 m'),
-  'ratelimit:product:oauth-token:refresh-ip',
+  rateLimitPrefix('oauth-token:refresh-ip'),
 );
 
 /** OAuth token endpoint の client ごとのDB負荷上限。client ID は静的allowlistで検証後に使う。 */
 export const oauthTokenClientRateLimit = createRateLimiter(
   Ratelimit.slidingWindow(120, '1 m'),
-  'ratelimit:product:oauth-token:client',
+  rateLimitPrefix('oauth-token:client'),
 );
 
 /**
@@ -303,7 +336,7 @@ export const oauthTokenClientRateLimit = createRateLimiter(
  */
 export const timeblockCreateRateLimit = createRateLimiter(
   Ratelimit.slidingWindow(500, '24 h'),
-  'ratelimit:product:timeblock:create',
+  rateLimitPrefix('timeblock:create'),
 );
 
 /**
@@ -312,7 +345,7 @@ export const timeblockCreateRateLimit = createRateLimiter(
  */
 export const icalFeedRateLimit = createRateLimiter(
   Ratelimit.slidingWindow(10, '1 m'),
-  'ratelimit:product:ical-feed',
+  rateLimitPrefix('ical-feed'),
 );
 
 /**
@@ -324,7 +357,7 @@ export const icalFeedRateLimit = createRateLimiter(
  */
 export const icalFeedIpRateLimit = createRateLimiter(
   Ratelimit.slidingWindow(60, '1 m'),
-  'ratelimit:product:ical-feed-ip',
+  rateLimitPrefix('ical-feed-ip'),
 );
 
 /**
@@ -339,7 +372,7 @@ export const icalFeedIpRateLimit = createRateLimiter(
  */
 export const trpcPreAuthIpRateLimit = createRateLimiter(
   Ratelimit.slidingWindow(600, '1 m'),
-  'ratelimit:product:trpc:pre-auth-ip',
+  rateLimitPrefix('trpc:pre-auth-ip'),
 );
 
 /**
@@ -350,19 +383,19 @@ export const trpcPreAuthIpRateLimit = createRateLimiter(
  */
 export const healthCheckGlobalRateLimit = createRateLimiter(
   Ratelimit.slidingWindow(120, '1 m'),
-  'ratelimit:product:health:global',
+  rateLimitPrefix('health:global'),
 );
 
 /** Anonymous cron-heartbeat monitor: cap public service-role SELECT traffic independently. */
 export const cronHeartbeatHealthRateLimit = createRateLimiter(
   Ratelimit.slidingWindow(30, '1 m'),
-  'ratelimit:product:cron-heartbeat-health:global',
+  rateLimitPrefix('cron-heartbeat-health:global'),
 );
 
 /** iCalフィード全体の集約上限（暫定値）。service-role DB lookupを保護する。 */
 export const icalFeedGlobalRateLimit = createRateLimiter(
   Ratelimit.slidingWindow(600, '1 m'),
-  'ratelimit:product:ical-feed-global',
+  rateLimitPrefix('ical-feed-global'),
 );
 
 /**
@@ -379,7 +412,7 @@ export const icalFeedGlobalRateLimit = createRateLimiter(
  */
 export const calendarConnectRateLimit = createRateLimiter(
   Ratelimit.slidingWindow(10, '1 h'),
-  'ratelimit:product:calendar-connect',
+  rateLimitPrefix('calendar-connect'),
 );
 
 /**
@@ -390,18 +423,18 @@ export const calendarConnectRateLimit = createRateLimiter(
  */
 export const calendarSyncNowRateLimit = createRateLimiter(
   Ratelimit.slidingWindow(6, '1 h'),
-  'ratelimit:product:calendar-sync-now',
+  rateLimitPrefix('calendar-sync-now'),
 );
 
 /** CSP reportは公開入力なのでIP単位と全体上限を別々に持つ。 */
 export const cspReportRateLimit = createRateLimiter(
   Ratelimit.slidingWindow(20, '1 m'),
-  'ratelimit:product:csp-report',
+  rateLimitPrefix('csp-report'),
 );
 
 export const cspReportGlobalRateLimit = createRateLimiter(
   Ratelimit.slidingWindow(120, '1 m'),
-  'ratelimit:product:csp-report-global',
+  rateLimitPrefix('csp-report-global'),
 );
 
 /**

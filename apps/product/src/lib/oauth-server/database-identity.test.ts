@@ -1,4 +1,10 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+
+import {
+  PRODUCT_INTEGRATION_APP_ORIGIN,
+  PRODUCT_INTEGRATION_SUPABASE_REF,
+  PRODUCT_VERCEL_PROJECT_ID,
+} from '@/lib/dayopt-environment';
 
 import {
   assertDatabaseOAuthIdentity,
@@ -35,6 +41,26 @@ const databasePreviewIdentity = {
   resource_uri: previewOrigin,
   supabase_project_ref: previewProjectRef,
   provisioned_at: '2026-07-29T00:00:00.000Z',
+};
+const integrationIdentity = resolveOAuthEnvironmentConfig({
+  mcpOAuthEnvironment: 'integration',
+  dayoptEnvironment: 'integration',
+  publicDayoptEnvironment: 'integration',
+  vercelProjectId: PRODUCT_VERCEL_PROJECT_ID,
+  vercelBranchUrl: PRODUCT_INTEGRATION_APP_ORIGIN.slice('https://'.length),
+  authorizationServerUri: PRODUCT_INTEGRATION_APP_ORIGIN,
+  resourceUri: PRODUCT_INTEGRATION_APP_ORIGIN,
+  vercelEnvironment: 'preview',
+  vercelTargetEnvironment: 'preview',
+  vercelGitCommitRef: 'integration',
+  supabaseProjectRef: PRODUCT_INTEGRATION_SUPABASE_REF,
+});
+const databaseIntegrationIdentity = {
+  environment: 'integration',
+  authorization_server_uri: PRODUCT_INTEGRATION_APP_ORIGIN,
+  resource_uri: PRODUCT_INTEGRATION_APP_ORIGIN,
+  supabase_project_ref: PRODUCT_INTEGRATION_SUPABASE_REF,
+  provisioned_at: '2026-09-27T00:00:00.000Z',
 };
 
 describe('database OAuth identity', () => {
@@ -144,6 +170,52 @@ describe('database OAuth identity', () => {
         supabaseUrl: `https://${previewProjectRef}.supabase.co`,
       }),
     ).toBe(previewProjectRef);
+  });
+
+  it('binds Integration to its one persistent Supabase project ref', () => {
+    expect(
+      resolveDatabaseOAuthProjectRef({
+        environment: 'integration',
+        supabaseUrl: `https://${PRODUCT_INTEGRATION_SUPABASE_REF}.supabase.co`,
+      }),
+    ).toBe(PRODUCT_INTEGRATION_SUPABASE_REF);
+
+    expect(() =>
+      resolveDatabaseOAuthProjectRef({
+        environment: 'integration',
+        supabaseUrl: 'https://yvglwblxrnrenfifsnje.supabase.co',
+      }),
+    ).toThrow(DatabaseOAuthIdentityError);
+  });
+
+  it('requires an explicitly provisioned Integration identity and rechecks every request', async () => {
+    const query = vi
+      .fn()
+      .mockResolvedValueOnce({ data: [], error: null })
+      .mockResolvedValueOnce({ data: [databaseIntegrationIdentity], error: null })
+      .mockResolvedValueOnce({
+        data: [{ ...databaseIntegrationIdentity, resource_uri: 'https://other.example' }],
+        error: null,
+      });
+
+    await expect(
+      assertDatabaseOAuthIdentity(integrationIdentity, query, PRODUCT_INTEGRATION_SUPABASE_REF),
+    ).rejects.toBeInstanceOf(DatabaseOAuthIdentityError);
+    await expect(
+      assertDatabaseOAuthIdentity(integrationIdentity, query, PRODUCT_INTEGRATION_SUPABASE_REF),
+    ).resolves.toBeUndefined();
+    await expect(
+      assertDatabaseOAuthIdentity(integrationIdentity, query, PRODUCT_INTEGRATION_SUPABASE_REF),
+    ).rejects.toBeInstanceOf(DatabaseOAuthIdentityError);
+    expect(query).toHaveBeenCalledTimes(3);
+  });
+
+  it('refuses an Integration check against another project before querying', async () => {
+    const query = vi.fn();
+    await expect(
+      assertDatabaseOAuthIdentity(integrationIdentity, query, previewProjectRef),
+    ).rejects.toBeInstanceOf(DatabaseOAuthIdentityError);
+    expect(query).not.toHaveBeenCalled();
   });
 
   it.each([
