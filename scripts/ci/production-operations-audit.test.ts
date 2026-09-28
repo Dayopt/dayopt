@@ -92,6 +92,7 @@ describe('production schema and query boundary', () => {
     const workflow = readFileSync('.github/workflows/production-config-audit.yml', 'utf8');
     for (const source of [
       'scripts/ci/production-cron-heartbeat-audit.mjs',
+      'apps/product/src/lib/ops/cron-heartbeat-policy.mjs',
       'scripts/ci/production-schema-drift-audit.mjs',
       'scripts/lib/production-db-readonly.mjs',
       'scripts/tasks/generate-rls-snapshot.ts',

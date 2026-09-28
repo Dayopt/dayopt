@@ -28,6 +28,8 @@ describe('factory routing', () => {
     { acceptance: false },
     { verification: false },
     { metadataAvailable: false },
+    { workflowStatus: 'Blocked', workflowStatusAvailable: true },
+    { workflowStatusAvailable: false },
     { state: 'CLOSED' },
     { labels: ['status:blocked'] },
   ])('情報不足・凍結を軽作業に格下げしない: %j', (change) => {

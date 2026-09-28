@@ -21,6 +21,7 @@ import {
   readWorkspaceGraph,
   resolveImpact,
   resolveVercelIgnore,
+  resolveWorkspaceTestScope,
 } from './impact.mjs';
 
 /**
@@ -84,6 +85,60 @@ describe('workspace 依存グラフ', () => {
     expect(graph.get('packages/config')).toEqual(new Set(['product', 'web']));
     expect(graph.get('packages/i18n')).toEqual(new Set(['product', 'web']));
     expect(graph.get('packages/components')).toEqual(new Set(['product', 'web']));
+  });
+});
+
+describe('workspace test scope', () => {
+  it('Product の変更は Product 側の related 判定へ任せる', () => {
+    expect(
+      resolveWorkspaceTestScope(['apps/product/src/features/plans/ui/Plan.tsx']).workspaces,
+    ).toEqual([]);
+  });
+
+  it('Web の変更は Web の test を実行する', () => {
+    expect(resolveWorkspaceTestScope(['apps/web/src/app/page.tsx']).workspaces).toEqual([
+      { name: '@dayopt/web', script: 'test:run' },
+    ]);
+  });
+
+  it('共有 components package は利用する Web の test を実行する', () => {
+    expect(resolveWorkspaceTestScope(['packages/components/src/button.tsx']).workspaces).toEqual([
+      { name: '@dayopt/web', script: 'test:run' },
+    ]);
+  });
+
+  it('workspace manifest・lockfile・未知 path は test 対象を全件に倒す', () => {
+    const all = [
+      { name: '@dayopt/billing', script: 'test:run' },
+      { name: '@dayopt/i18n', script: 'test:run' },
+      { name: '@dayopt/observability', script: 'test:run' },
+      { name: '@dayopt/web', script: 'test:run' },
+    ];
+    expect(resolveWorkspaceTestScope(['packages/i18n/package.json']).workspaces).toEqual(all);
+    expect(resolveWorkspaceTestScope(['pnpm-lock.yaml']).workspaces).toEqual(all);
+    expect(resolveWorkspaceTestScope(['new-root-policy.json']).workspaces).toEqual(all);
+  });
+
+  it('共有setup action の変更は全 workspace test を実行する', () => {
+    expect(resolveWorkspaceTestScope(['.github/actions/setup/action.yml'])).toMatchObject({
+      scope: 'all',
+      workspaces: [
+        { name: '@dayopt/billing', script: 'test:run' },
+        { name: '@dayopt/i18n', script: 'test:run' },
+        { name: '@dayopt/observability', script: 'test:run' },
+        { name: '@dayopt/web', script: 'test:run' },
+      ],
+    });
+  });
+
+  it('docs・workflow・scripts のみなら別workspace testを要求しない', () => {
+    expect(
+      resolveWorkspaceTestScope([
+        'docs/engineering/testing.md',
+        '.github/workflows/ci.yml',
+        'scripts/ci/check.mjs',
+      ]).workspaces,
+    ).toEqual([]);
   });
 });
 

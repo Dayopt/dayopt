@@ -1,3 +1,4 @@
+import type { OgCategory, OgLayout } from '@dayopt/assets/og';
 import { env } from '@web/platform/config/env';
 import type { Metadata } from 'next';
 
@@ -11,7 +12,9 @@ export interface SEOData {
   ogTitle?: string;
   description?: string;
   keywords?: string[];
-  image?: string;
+  category?: OgCategory;
+  layout?: OgLayout;
+  screenshot?: string;
   url?: string;
   type?: 'website' | 'article';
   publishedTime?: string;
@@ -53,7 +56,9 @@ export function generateSEOMetadata(data: SEOData = {}): Metadata {
     ogTitle,
     description = siteConfig.description,
     keywords = [],
-    image,
+    category = 'product',
+    layout,
+    screenshot,
     url,
     type = 'website',
     publishedTime,
@@ -77,10 +82,11 @@ export function generateSEOMetadata(data: SEOData = {}): Metadata {
   const ogSearchParams = new URLSearchParams({
     title: ogTitle || title || siteConfig.title,
     description,
+    category,
   });
-  const pageImage = image
-    ? `${siteConfig.url}${image}`
-    : `${siteConfig.url}/api/og?${ogSearchParams.toString()}`;
+  if (layout) ogSearchParams.set('layout', layout);
+  if (screenshot) ogSearchParams.set('screenshot', screenshot);
+  const pageImage = `${siteConfig.url}/api/og?${ogSearchParams.toString()}`;
 
   const allKeywords = [...siteConfig.keywords, ...keywords, ...tags].filter(Boolean);
 
@@ -171,10 +177,14 @@ export function generateArticleMetadata(data: {
   type: 'blog' | 'docs';
 }): Metadata {
   const { type, slug, publishedAt, updatedAt, authors, tags, category } = data;
+  const ogCategory: OgCategory =
+    type === 'docs' ? 'docs' : category?.toLowerCase() === 'release' ? 'release' : 'journal';
 
   return generateSEOMetadata({
-    ...data,
+    title: data.title,
+    description: data.description,
     url: `/${type}/${slug}`,
+    category: ogCategory,
     type: 'article',
     publishedTime: publishedAt,
     modifiedTime: updatedAt || publishedAt,

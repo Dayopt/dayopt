@@ -2,8 +2,10 @@
 status: current
 last_verified: 2026-09-27
 code:
+  - packages/assets/src/brand.ts
+  - packages/assets/src/logo-artwork.tsx
+  - packages/assets/src/og-card-image.tsx
   - packages/components/src/identity/logo.tsx
-  - packages/components/src/identity/logo-data.ts
   - scripts/tasks/generate-brand-assets.ts
 ---
 
@@ -17,8 +19,8 @@ code:
 - アプリアイコン: [Figma / App Icon Light 75%](https://www.figma.com/design/eAthKm7adblXS1TzeSkScx/Dayopt-Brand---Logo?node-id=13-2)（[通常版1024pxマスター](https://www.figma.com/design/eAthKm7adblXS1TzeSkScx/Dayopt-Brand---Logo?node-id=13-60)・[マスク用60%マスター](https://www.figma.com/design/eAthKm7adblXS1TzeSkScx/Dayopt-Brand---Logo?node-id=13-66)）
 - 書き出しボード: [Figma / Download](https://www.figma.com/design/eAthKm7adblXS1TzeSkScx/Dayopt-Brand---Logo?node-id=10-2)
 - Webのfavicon・SVG icon・Apple icon: `apps/web/src/app/favicon.ico`、`icon.svg`、`apple-icon.png`。Next.jsのファイル規約からhead要素を生成する。
-- コード共通データ: `packages/components/src/identity/logo-data.ts`
-- Figmaから直接書き出した採用ロックアップ: `assets/brand/figma-approved-lockup.svg`
+- 共通アセットとコードデータ: `packages/assets/`
+- Figmaから直接書き出した採用ロックアップ: `packages/assets/brand/figma-approved-lockup.svg`
 - 配布先: Web / Product 両方の `public/brand/`。公開後は `/brand/dayopt-brand-F.zip` で一括取得できる。
 - `public/brand/` と配布ZIPの `mark.svg`、`wordmark.svg`、`lockup.svg` は、ライト背景向けPrimary色の短縮名。ダーク背景では `*-reverse.svg` を使う。
 - Eagle: Dayopt → Brand → Logo → F — Approved 2026-09-27。
@@ -37,7 +39,10 @@ SVGは透明背景、穴は実際に抜いたベクター。ロックアップ�
 
 ### OG画像
 
-- `og-image-light.png` / `og-image-dark.png` は 1200×630px。OGP向けの背景とロックアップを組み合わせた画像で、SVG原稿も `public/brand/` に同梱する。
+- 新規 metadata が参照する OGP は `@dayopt/assets` の共通 renderer で 1200×630px の Light 画像を生成する。共通要素は Approved F のロゴ、category tag、title。
+- category の既定 layout は `Docs → center`、`Journal / Release → left`、`Product → screenshot`。スクリーンショットが無い・読めない場合は `left` に戻り、必要なページでは `layout` を上書きできる。
+- スクリーンショットはアプリ固有素材として `apps/web/public/og-screenshots/` または `apps/product/public/og-screenshots/` に置く。OGP から参照するのは raster ファイルだけで、外部 URL は取得しない。Product の既定ファイル名は `product.png`。
+- `og-image-light.png` / `og-image-dark.png` は 1200×630px の既存配布素材として維持し、SVG原稿も `public/brand/` に同梱する。
 - Light は白地に Primary ロゴ、Dark は Primary 地に白ロゴ。
 - 既存の `/og-image.png` は Dark 版を指し、URL互換を維持する。Web / Product の静的ブランド配布先には Light / Dark の両方を置く。
 - SNSのOGP取得側は閲覧者のOSやサイト表示テーマを知らないため、自動切替できない。ページの `og:image` に採用したいテーマの画像URLを明示する。
@@ -54,7 +59,7 @@ SVGは透明背景、穴は実際に抜いたベクター。ロックアップ�
 
 Planは輪郭、Logは塗り。間隔5、右上端は6下がり、下端差16。左右の外形幅は等しく、塗りによって記録側に重みを置く。初期検討時の破線・重なり・15%オフセットは採用版Fには適用しない。
 
-文字はInter Semi Bold、字間−3.5%。Figmaで確定したパスをそのまま利用する。本文フォントをInterへ変更する仕様ではない。付属の `Inter-LICENSE.txt` は字体のライセンス情報。
+文字はInter Semi Bold、字間−3.5%。Figmaで確定したパスをそのまま利用する。本文フォントをInterへ変更する仕様ではない。`packages/assets/brand/Inter-LICENSE.txt` は字体のライセンス情報。
 
 ## 色・余白・サイズ
 
@@ -76,12 +81,12 @@ import { Logo } from '@dayopt/components';
 <Logo variant="mark" size="sm" />
 ```
 
-`label` はアクセシブル名。ロゴの表示文字を変更するAPIではない。OG画像は `@dayopt/components/brand` の同じパスを使う。
+`label` はアクセシブル名。ロゴの表示文字を変更するAPIではない。UI の `Logo` と OGP は `@dayopt/assets/logo-artwork` の共通ベクター描画と `@dayopt/assets/brand` の同じパスデータを使う。
 
 ```sh
 pnpm brand:generate
 ```
 
-生成タスクはSVG、PNG、favicon ICO、Apple/PWAアイコン、Light / Dark のOG画像を両アプリへ出力し、Web用のfavicon・SVG icon・Apple iconをNext.jsのファイル規約へ配置する。配布ZIPは `public/brand` 内の素材・本書・ライセンスをまとめる。形状変更時はFigmaの承認を先に更新し、共通データと配布物を同時に更新する。生成済みPNGやコピー先のSVGを個別に修正しない。
+`pnpm brand:generate` は `packages/assets/` の共通データ・Figma SVG・ライセンスを起点に、SVG、PNG、favicon ICO、Apple/PWAアイコン、既存 Light / Dark のOG画像を Web / Product それぞれの公開領域へ生成する。Web用favicon・SVG icon・Apple iconはNext.jsのファイル規約へ配置する。配布ZIPは `public/brand` 内の素材・本書・ライセンスをまとめる。形状変更時はFigmaの承認を先に更新し、共通データと配布物を同時に更新する。生成済みPNGやコピー先のSVGを個別に修正しない。アプリ固有の画像は各 `apps/{web,product}` 内に置く。
 
 本変更はロゴと配置の更新。UIの本文書体、操作色、認証処理は既存仕様を維持する。

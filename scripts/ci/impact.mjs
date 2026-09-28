@@ -302,6 +302,180 @@ export function readWorkspaceGraph(root = ROOT) {
   return graph;
 }
 
+const WORKSPACE_TEST_FULL_SCOPE_FILES = new Set([
+  'package.json',
+  'pnpm-lock.yaml',
+  'pnpm-workspace.yaml',
+  'turbo.json',
+  'tsconfig.base.json',
+  '.nvmrc',
+  '.npmrc',
+  '.github/actions/setup/action.yml',
+]);
+
+const WORKSPACE_TEST_NEUTRAL_PREFIXES = [
+  'docs/',
+  'scripts/',
+  '.github/',
+  '.agents/',
+  '.claude/',
+  '.codex/',
+  '.husky/',
+  '.vscode/',
+  'supabase/',
+];
+
+/**
+ * Web と package の全件 test を変更影響のある workspace に絞る。
+ * Product は別の related/full 判定を持つため、この scope には含めない。
+ *
+ * manifest・toolchain・未知 path・一覧取得失敗は全 test workspace を返す。
+ * package の dependencies / devDependencies を逆向きに辿り、変更 package の
+ * downstream consumer も affected にする。
+ *
+ * @param {string[] | null | undefined} changedFiles
+ * @param {{ root?: string }} [options]
+ * @returns {{ scope: 'all' | 'affected', workspaces: { name: string, script: string }[], reason: string }}
+ */
+export function resolveWorkspaceTestScope(changedFiles, { root = ROOT } = {}) {
+  const readManifest = (dir) => {
+    try {
+      return JSON.parse(readFileSync(join(root, dir, 'package.json'), 'utf8'));
+    } catch {
+      return null;
+    }
+  };
+
+  /** @type {Map<string, { dir: string, dependencies: string[], scripts: Record<string, string> }>} */
+  const workspaces = new Map();
+  for (const area of ['apps', 'packages']) {
+    let entries;
+    try {
+      entries = readdirSync(join(root, area), { withFileTypes: true });
+    } catch {
+      return {
+        scope: 'all',
+        workspaces: [{ name: '*', script: '*' }],
+        reason: `workspace directory is unreadable: ${area}`,
+      };
+    }
+    for (const entry of entries) {
+      if (!entry.isDirectory() || entry.name.startsWith('.')) continue;
+      const dir = `${area}/${entry.name}`;
+      const manifest = readManifest(dir);
+      if (!manifest?.name || !manifest.scripts) {
+        return {
+          scope: 'all',
+          workspaces: [{ name: '*', script: '*' }],
+          reason: `workspace manifest is unreadable: ${dir}`,
+        };
+      }
+      const dependencies = Object.keys({
+        ...manifest.dependencies,
+        ...manifest.devDependencies,
+      }).filter((name) => name.startsWith('@dayopt/'));
+      workspaces.set(manifest.name, {
+        dir,
+        dependencies,
+        scripts: manifest.scripts,
+      });
+    }
+  }
+
+  const allTests = [...workspaces]
+    .filter(
+      ([name, workspace]) =>
+        name !== '@dayopt/product' &&
+        (typeof workspace.scripts['test:run'] === 'string' ||
+          typeof workspace.scripts.test === 'string'),
+    )
+    .map(([name, workspace]) => ({
+      name,
+      script: typeof workspace.scripts['test:run'] === 'string' ? 'test:run' : 'test',
+    }))
+    .sort((left, right) => left.name.localeCompare(right.name));
+  const all = (reason) => ({ scope: 'all', workspaces: allTests, reason });
+
+  if (!Array.isArray(changedFiles) || changedFiles.length === 0) {
+    return all('PR file list is unavailable');
+  }
+  if (changedFiles.length >= 3000) return all('PR file list reached the API limit');
+
+  const workspacesByDir = new Map(
+    [...workspaces].map(([name, workspace]) => [workspace.dir, name]),
+  );
+  const changed = new Set();
+
+  for (const rawFile of changedFiles) {
+    const file = String(rawFile).trim().replaceAll('\\', '/');
+    if (!file) return all('PR file list contains an empty path');
+    if (WORKSPACE_TEST_FULL_SCOPE_FILES.has(file) || file === 'eslint.config.packages.mjs') {
+      return all(`workspace/toolchain configuration changed: ${file}`);
+    }
+
+    const dir = file.split('/').slice(0, 2).join('/');
+    const workspaceName = workspacesByDir.get(dir);
+    if (workspaceName) {
+      if (file === `${dir}/package.json`) {
+        return all(`workspace manifest changed: ${file}`);
+      }
+      changed.add(workspaceName);
+      continue;
+    }
+
+    if (
+      WORKSPACE_TEST_NEUTRAL_PREFIXES.some((prefix) => file.startsWith(prefix)) ||
+      ['AGENTS.md', 'CLAUDE.md', 'README.md', '.gitignore', '.gitattributes'].includes(file)
+    ) {
+      continue;
+    }
+    return all(`unclassified path: ${file}`);
+  }
+
+  /** @type {Map<string, string[]>} */
+  const consumers = new Map([...workspaces.keys()].map((name) => [name, []]));
+  for (const [consumer, workspace] of workspaces) {
+    for (const dependency of workspace.dependencies) {
+      if (!workspaces.has(dependency)) {
+        return {
+          scope: 'all',
+          workspaces: [{ name: '*', script: '*' }],
+          reason: `unresolved workspace dependency: ${dependency}`,
+        };
+      }
+      consumers.get(dependency)?.push(consumer);
+    }
+  }
+
+  const affected = new Set(changed);
+  const queue = [...changed];
+  while (queue.length > 0) {
+    const current = queue.pop();
+    for (const consumer of consumers.get(current) ?? []) {
+      if (affected.has(consumer)) continue;
+      affected.add(consumer);
+      queue.push(consumer);
+    }
+  }
+
+  return {
+    scope: 'affected',
+    workspaces: [...affected]
+      .filter(
+        (name) =>
+          name !== '@dayopt/product' &&
+          (typeof workspaces.get(name)?.scripts['test:run'] === 'string' ||
+            typeof workspaces.get(name)?.scripts.test === 'string'),
+      )
+      .map((name) => ({
+        name,
+        script: typeof workspaces.get(name)?.scripts['test:run'] === 'string' ? 'test:run' : 'test',
+      }))
+      .sort((left, right) => left.name.localeCompare(right.name)),
+    reason: `affected workspaces resolved from ${changed.size} changed workspace(s)`,
+  };
+}
+
 // ─── 判定本体 ───────────────────────────────────────────────────────
 
 const ALL_AFFECTED = {

@@ -9,7 +9,7 @@
 
 ## 外部との接点
 
-### HTTP route（32）
+### HTTP route（33）
 
 tRPC の `/api/trpc` を含む、Next.js の route handler 全件。method は export から取る。
 
@@ -25,6 +25,7 @@ tRPC の `/api/trpc` を含む、Next.js の route handler 全件。method は e
 | product | `/api/cron/external-connection-maintenance`  | GET                | nodejs  | 60          | `apps/product/src/app/api/cron/external-connection-maintenance/route.ts`  |
 | product | `/api/csp-report`                            | POST, HEAD         | —       | 30          | `apps/product/src/app/api/csp-report/route.ts`                            |
 | product | `/api/health`                                | GET                | —       | 30          | `apps/product/src/app/api/health/route.ts`                                |
+| product | `/api/health/cron`                           | GET                | —       | 20          | `apps/product/src/app/api/health/cron/route.ts`                           |
 | product | `/api/health/version`                        | GET                | —       | 15          | `apps/product/src/app/api/health/version/route.ts`                        |
 | product | `/api/integrations/google-calendar/callback` | GET                | nodejs  | 90          | `apps/product/src/app/api/integrations/google-calendar/callback/route.ts` |
 | product | `/api/integrations/google-calendar/start`    | GET                | nodejs  | 60          | `apps/product/src/app/api/integrations/google-calendar/start/route.ts`    |
@@ -41,14 +42,14 @@ tRPC の `/api/trpc` を含む、Next.js の route handler 全件。method は e
 | web     | `/api/compass-docs`                          | GET                | —       | 30          | `apps/web/src/app/api/compass-docs/route.ts`                              |
 | web     | `/api/contact`                               | POST               | —       | 30          | `apps/web/src/app/api/contact/route.ts`                                   |
 | web     | `/api/csp-report`                            | POST, HEAD         | —       | 30          | `apps/web/src/app/api/csp-report/route.ts`                                |
-| web     | `/api/og`                                    | GET                | —       | 25          | `apps/web/src/app/api/og/route.tsx`                                       |
+| web     | `/api/og`                                    | GET                | nodejs  | 25          | `apps/web/src/app/api/og/route.tsx`                                       |
 | web     | `/api/search`                                | GET                | —       | 30          | `apps/web/src/app/api/search/route.ts`                                    |
 | web     | `/api/v1/system/[...retired]`                | GET, POST, OPTIONS | —       | 5           | `apps/web/src/app/api/v1/system/[...retired]/route.ts`                    |
 | web     | `/api/webhooks/resend`                       | POST               | nodejs  | 15          | `apps/web/src/app/api/webhooks/resend/route.ts`                           |
 | web     | `/blog/feed.xml`                             | GET                | —       | 30          | `apps/web/src/app/blog/feed.xml/route.ts`                                 |
 | web     | `/ja/blog/feed.xml`                          | GET                | —       | 30          | `apps/web/src/app/ja/blog/feed.xml/route.ts`                              |
 
-### 定期実行（16）
+### 定期実行（15）
 
 | source         | 対象                                         | schedule       | 発見元                                          |
 | -------------- | -------------------------------------------- | -------------- | ----------------------------------------------- |
@@ -60,7 +61,6 @@ tRPC の `/api/trpc` を含む、Next.js の route handler 全件。method は e
 | github-actions | `nightly.yml`                                | `30 21 * * *`  | `.github/workflows/nightly.yml`                 |
 | github-actions | `nightly.yml`                                | `0 22 * * *`   | `.github/workflows/nightly.yml`                 |
 | github-actions | `production-config-audit.yml`                | `0 21 * * *`   | `.github/workflows/production-config-audit.yml` |
-| github-actions | `production-config-audit.yml`                | `*/15 * * * *` | `.github/workflows/production-config-audit.yml` |
 
 **pg_cron（7）**: 下表は migration 上の定義を schedule / unschedule の順に畳んだもの。
 production の pg_cron は Supabase Dashboard 側が正本なので、ここは参考値として読む。
@@ -107,7 +107,7 @@ job 名を変数で渡す schedule と、jobid で消す unschedule は追えな
 | `protectedProcedure` | 67                      | `apps/product/src/lib/trpc/procedures.ts` |
 | `entitledProcedure`  | 4                       | `apps/product/src/lib/trpc/procedures.ts` |
 
-### rate limit（21）
+### rate limit（22）
 
 | limiter                        | 上限 | 窓     | 利用箇所                                                                                                                                          |
 | ------------------------------ | ---- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -127,6 +127,7 @@ job 名を変数で渡す schedule と、jobid で消す unschedule は追えな
 | `icalFeedIpRateLimit`          | 60   | `1 m`  | `apps/product/src/app/api/v1/calendar/[token]/route.ts`                                                                                           |
 | `trpcPreAuthIpRateLimit`       | 600  | `1 m`  | `apps/product/src/lib/trpc/context.ts`                                                                                                            |
 | `healthCheckGlobalRateLimit`   | 120  | `1 m`  | `apps/product/src/app/api/health/route.ts`                                                                                                        |
+| `cronHeartbeatHealthRateLimit` | 30   | `1 m`  | `apps/product/src/app/api/health/cron/route.ts`                                                                                                   |
 | `icalFeedGlobalRateLimit`      | 600  | `1 m`  | `apps/product/src/app/api/v1/calendar/[token]/route.ts`                                                                                           |
 | `calendarConnectRateLimit`     | 10   | `1 h`  | `apps/product/src/app/api/integrations/google-calendar/callback/route.ts`, `apps/product/src/app/api/integrations/google-calendar/start/route.ts` |
 | `calendarSyncNowRateLimit`     | 6    | `1 h`  | `apps/product/src/features/external-calendar/server/router.ts`                                                                                    |
@@ -242,16 +243,17 @@ TS の `PRODUCT_EVENT_NAMES` と DB の CHECK 制約の両方で定義される�
 | `VERCEL_TEAM_ID`                         | yes  | public     | production          | vercel-production               | —                          |
 | `VERCEL_TOKEN`                           | yes  | secret     | production          | vercel-production               | —                          |
 
-### workspace package（6）
+### workspace package（7）
 
-| package                 | exports                                          | 依存している workspace                                |
-| ----------------------- | ------------------------------------------------ | ----------------------------------------------------- |
-| `@dayopt/billing`       | `.`                                              | `@dayopt/product`, `@dayopt/web`                      |
-| `@dayopt/components`    | `.`, `./brand`, `./testing/modal-menu`           | `@dayopt/product`, `@dayopt/storybook`, `@dayopt/web` |
-| `@dayopt/config`        | `.`                                              | `@dayopt/i18n`, `@dayopt/product`, `@dayopt/web`      |
-| `@dayopt/foundations`   | `./og-colors`, `./scrollbar.css`, `./tokens.css` | `@dayopt/product`, `@dayopt/storybook`, `@dayopt/web` |
-| `@dayopt/i18n`          | `./navigation`, `./request`, `./routing`         | `@dayopt/product`, `@dayopt/web`                      |
-| `@dayopt/observability` | `.`, `./build-gate`                              | `@dayopt/product`, `@dayopt/web`                      |
+| package                 | exports                                                                        | 依存している workspace                                 |
+| ----------------------- | ------------------------------------------------------------------------------ | ------------------------------------------------------ |
+| `@dayopt/assets`        | `.`, `./brand`, `./logo-artwork`, `./og`, `./og-card-image`, `./og-screenshot` | `@dayopt/components`, `@dayopt/product`, `@dayopt/web` |
+| `@dayopt/billing`       | `.`                                                                            | `@dayopt/product`, `@dayopt/web`                       |
+| `@dayopt/components`    | `.`, `./brand`, `./testing/modal-menu`                                         | `@dayopt/product`, `@dayopt/storybook`, `@dayopt/web`  |
+| `@dayopt/config`        | `.`                                                                            | `@dayopt/i18n`, `@dayopt/product`, `@dayopt/web`       |
+| `@dayopt/foundations`   | `./og-colors`, `./scrollbar.css`, `./tokens.css`                               | `@dayopt/product`, `@dayopt/storybook`, `@dayopt/web`  |
+| `@dayopt/i18n`          | `./navigation`, `./request`, `./routing`                                       | `@dayopt/product`, `@dayopt/web`                       |
+| `@dayopt/observability` | `.`, `./build-gate`                                                            | `@dayopt/product`, `@dayopt/web`                       |
 
 ## 関係
 

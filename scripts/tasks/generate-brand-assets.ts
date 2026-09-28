@@ -2,12 +2,12 @@
 import { copyFile, mkdir, readdir, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import sharp from 'sharp';
-import { DAYOPT_BRAND as brand } from '../../packages/components/src/identity/logo-data';
+import { DAYOPT_BRAND as brand } from '../../packages/assets/src/brand';
 import { createDeterministicZip } from '../lib/create-deterministic-zip';
 
 async function main() {
   const root = process.cwd();
-  const source = path.join(root, 'assets/brand');
+  const source = path.join(root, 'packages/assets/brand');
   const paths = (items: readonly string[], color: string) =>
     items
       .map(
@@ -70,8 +70,7 @@ async function main() {
     light: await sharp(Buffer.from(assets['og-image-light.svg'])).png().toBuffer(),
     dark: await sharp(Buffer.from(assets['og-image-dark.svg'])).png().toBuffer(),
   };
-  await mkdir(source, { recursive: true });
-  for (const [name, data] of Object.entries(assets)) await writeFile(path.join(source, name), data);
+  const sourceFiles = await readdir(source);
   for (const app of ['product', 'web']) {
     const pub = path.join(root, `apps/${app}/public`);
     const dest = path.join(pub, 'brand');
@@ -79,8 +78,10 @@ async function main() {
     await mkdir(dest, { recursive: true });
     await mkdir(path.join(pub, 'icons'), { recursive: true });
     if (appMetadataDir) await mkdir(appMetadataDir, { recursive: true });
+    for (const name of sourceFiles) {
+      await copyFile(path.join(source, name), path.join(dest, name));
+    }
     for (const [name, data] of Object.entries(assets)) await writeFile(path.join(dest, name), data);
-    await copyFile(path.join(source, 'Inter-LICENSE.txt'), path.join(dest, 'Inter-LICENSE.txt'));
     for (const name of ['lockup', 'wordmark', 'symbol'])
       for (const tone of ['primary', 'reverse']) {
         await sharp(Buffer.from(assets[`dayopt-${name}-${tone}.svg`]))
@@ -202,7 +203,7 @@ async function main() {
     await createDeterministicZip(dest, 'dayopt-brand-F.zip', files);
   }
   console.log(
-    'Generated approved F SVG, PNG, ICO, PWA and light/dark OG assets for product and web.',
+    'Generated approved F SVG, PNG, ICO, PWA and legacy light/dark OG assets for product and web.',
   );
 }
 void main();

@@ -42,6 +42,11 @@ const withBundleAnalyzer = bundleAnalyzer({
 const nextConfig = {
   reactStrictMode: true,
 
+  // `/api/og` resolves screenshot names only inside this app-local folder at request time.
+  outputFileTracingIncludes: {
+    '/api/og': ['./public/og-screenshots/**/*'],
+  },
+
   // Next.js の agent-rules 自動生成を止める（#2693）。理由は
   // apps/product/next.config.mjs の同じ設定に書いてある。web も同じ next を
   // catalog から引くため、`next dev` を agent セッションで起動すれば同様に生成される。
