@@ -833,6 +833,25 @@ async function runIntegration() {
     return;
   }
 
+  run(
+    'psql',
+    [
+      '-h',
+      '127.0.0.1',
+      '-p',
+      '54322',
+      '-U',
+      'postgres',
+      '-d',
+      'postgres',
+      '-v',
+      'ON_ERROR_STOP=1',
+      '-f',
+      'supabase/tests/seed-idempotency.sql',
+    ],
+    { env: { ...process.env, PGPASSWORD: 'postgres' } },
+  );
+
   run('pnpm', ['test:integration']);
   run(
     'psql',

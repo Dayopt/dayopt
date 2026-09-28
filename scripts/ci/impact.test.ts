@@ -198,6 +198,14 @@ describe('app とその依存', () => {
     });
   });
 
+  it('supabase seed and database regression tests → product + integration', () => {
+    expectImpact(['supabase/seed.sql', 'supabase/tests/seed-idempotency.sql'], {
+      product: true,
+      productJourney: true,
+      integration: true,
+    });
+  });
+
   it('root の build 入力（pnpm-lock.yaml）→ 両方 + integration', () => {
     expectImpact(['pnpm-lock.yaml'], {
       product: true,
