@@ -168,7 +168,7 @@ node scripts/runbook/preview-readiness.mjs \
 
 ### Cloudの明示実行（既存CI）
 
-GitHub Actionsの既存 `CI` → `Run workflow` でworkflow branchを **integration** にし、`preview_e2e=true` を指定する。PR番号・レビュー済み候補SHA・READY deployment ID・DB mode/ref/branch UUIDを全て明示する。通常のPR CIとmainのrelease経路は維持し、Cloud E2Eは独立したrunとして起動する。default branchには既に `ci.yml` のdispatch入口がある。Integrationの新しい入力定義がUI/APIで実際に起動できるかは配線後に確認する。
+GitHub Actionsの既存 `CI` → `Run workflow` でworkflow branchを **integration** にし、`preview_e2e=true` を指定する。PR番号・レビュー済み候補SHA・READY deployment ID・DB mode/ref/branch UUIDを全て明示する。通常のPR CIとmainのrelease経路は維持し、Cloud E2Eは独立したrunとして起動する。通常実行では `preview_recover_run` / `preview_recover_attempt` を空のままにする。default branchには既に `ci.yml` のdispatch入口がある。Integrationの新しい入力定義がUI/APIで実際に起動できるかは配線後に確認する。
 
 Secret取得前のread-only gateはOPEN・非Draft・同一repo PR・exact head SHA・許可したbase/head branchを確認する。共有モードは既存Persistentのref/UUIDに限定し、`supabase/**` が変わるPRを拒否する。隔離モードは本番・Persistentを拒否し、既存readinessがPR専用branchとの対応を照合する。gateはコードの無害性を証明しない。権限ある担当が対象コードと依存をレビューしてSHAを選び、明示dispatchする。同一workerでのinstall-before-secretsは完全なsandboxではない。未信頼のcandidateは実行しない。
 
@@ -181,9 +181,19 @@ Secret取得前のread-only gateはOPEN・非Draft・同一repo PR・exact head 
 - `PREVIEW_E2E_BYPASS_SECRET`（workerでは `VERCEL_AUTOMATION_BYPASS_SECRET`）: Product PreviewのProtection用。アプリへの正規ログインは省略しない。
 - `PREVIEW_E2E_SUPABASE_KEY`（workerでは `SUPABASE_SECRET_KEY`）: 選択した非本番DBの合成user作成・所有runの回収用。隔離DBを選ぶ場合は対象DBのkeyが必要で、共有DBのkeyへfallbackしない。
 
-候補checkoutと依存・Chromiumのinstallを終えてからlive PRを再照合し、選択した非本番Authの基準合成ユーザーへのadmin GETでkeyを認証する。legacy keyのrole/refが違う場合、opaque keyの認証失敗、基準fixture欠落はいずれもuser作成前に停止する。providerの応答やメールアドレスは公開しない。続いて、信頼済みIntegrationのsupervisorで既存desktop/mobile critical pathを実行する。runごとに別concurrency groupとfixtureを持ち、他のrunを自動cancelしない。終了・失敗・cancelでは、生きているworker上の `always()` stepが所有journalだけを再回収する。Playwrightは5分、supervisorは7分、回収は120秒以内、jobは20分。VM破棄・job強制終了でこのstepが実行できない場合の別workerへのjournal replayは未実装。共有schema更新の排他leaseも未実装で、前後readinessはdriftの検出まで。
+候補checkout前に、run UUID・desktop/mobileの予定user ID・GitHub run/attempt・trusted workflow SHA・候補/DB bindingだけの `preview-intent-<run>-<attempt>` artifactを保存する。password/keyは含まない。候補のfixture生成2ファイルはtrusted workflowの契約と一致することを要求し、古い候補が予定IDを無視する場合はAuth作成前に停止する。候補checkoutと依存・Chromiumのinstallを終えてからlive PRを再照合し、選択した非本番Authの基準合成ユーザーへのadmin GETでkeyを認証する。legacy keyのrole/refが違う場合、opaque keyの認証失敗、基準fixture欠落はいずれもuser作成前に停止する。providerの応答やメールアドレスは公開しない。続いて、信頼済みIntegrationのsupervisorで既存desktop/mobile critical pathを実行する。runごとに別concurrency groupとfixtureを持ち、他のrunを自動cancelしない。終了・失敗・cancelでは、生きているworker上の `always()` stepが所有journalだけを再回収する。Playwrightは5分、supervisorは7分、回収は120秒以内、jobは20分。VM破棄・job強制終了でこのstepが実行できない場合は、以下の別worker回収入口を使う。共有schema更新の排他leaseも未実装で、前後readinessはdriftの検出まで。
 
-Actions artifactは信頼済みコードで再構成した **preview.jsonだけ**。候補SHA/deployment/DB、run ID、testのファイル・行・成否、所有user ID/statusと確認フラグを含む。画像、private出力、生のJSON、error本文、title、入力値、header/cookie/bodyをuploadしない。Cloud実走・2run並列・中断回収・次のPRでの再利用は実測後に証拠を記録し、配線やunit testだけでは完了扱いにしない。
+通常E2Eの結果artifactは信頼済みコードで再構成した **preview.jsonだけ**。候補SHA/deployment/DB、run ID、testのファイル・行・成否、所有user ID/statusと確認フラグを含む。画像、private出力、生のJSON、error本文、title、入力値、header/cookie/bodyをuploadしない。Cloud実走・2run並列・中断回収・次のPRでの再利用は実測後に証拠を記録し、配線やunit testだけでは完了扱いにしない。
+
+### Worker消失後の限定回収
+
+同じ `CI` → `Run workflow` でworkflow branchを **integration**、`preview_e2e=true` とし、`preview_recover_run` / `preview_recover_attempt` に元の失敗run IDとattemptを指定する。PR/SHA/deployment/DB入力を再入力して回収対象を推測しない。信頼済みコードが、元run/対象attemptの完了・失敗、開始済みE2E step、元repo/workflow/ref/SHA、候補コード前に保存した一意なintent artifactをAPIで照合する。最新attemptが稼働中、元の成功、証拠不足、artifact期限切れ・置換・欠測では停止する。
+
+回収intent artifactはread-only GitHub tokenで、元run/attemptに結び付いたartifact IDを指定して取得する。`gh api` の応答ZIPは128KiB以内でメモリに保持し、展開前にREST metadataのSHA-256 digestと一致することを確認する。ZIPから読むのはroot直下の `intent.json` 1件だけで、16KiBを超える内容、追加entry、path、symlink、暗号化、破損した圧縮データを拒否し、ファイルシステムへ展開しない。取得前後のartifact ID/digestを再照合する。candidate codeは回収workerでcheckout/実行しない。資格情報を使う直前にも元run/APIを再確認し、選択した非本番Authでkeyを認証する。
+
+回収workerはintentの予定2IDだけの一時journalを再構成し、既存の回収関数で各IDをGETする。404は未作成/削除済みとして確認し、存在する場合はserver側run所有権と合成メール形式を確認してからDELETE→404確認を行う。他のAuthユーザーを一覧検索しない。同じ元run/attemptの回収は直列化し、別attemptには新しいIDを割り当てる。公開する `recovery.json` は元binding・予定ID・結果だけで、provider本文・メール・credentialsを含まない。
+
+これは明示dispatchによる別worker回収の入口で、VM消失の自動検知/起動まで接続したものではない。7日のartifact保持を過ぎた回収は証拠不足で止まる。ephemeralを回収する場合にも**元DBのkey**が必要で、Environmentに現在保存されている共有DBのkeyへfallbackしない。keyが変わった場合の再保存は所有者が行う。Cloudでのhard-loss・別attempt・並列2runの実証は未完で、unit testや配線だけを成功証拠にしない。
 
 ### ローカル E2E とブラウザ実測
 

@@ -8,6 +8,7 @@ import {
   cleanupCloudRun,
   publishCloudEvidence,
   validateCloudRequest,
+  verifyCloudFixtureContract,
 } from './preview-cloud-run.mjs';
 
 const request = {
@@ -54,6 +55,27 @@ afterEach(() => {
 });
 
 describe('Cloud Preview evidence and cleanup', () => {
+  it('rejects candidates that would ignore the precommitted fixture IDs', () => {
+    const root = mkdtempSync(join(tmpdir(), 'cloud-fixture-contract-'));
+    roots.push(root);
+    const paths = [
+      'apps/product/src/lib/test/preview-cloud-identity.ts',
+      'apps/product/src/lib/test/e2e/critical-path-fixture.ts',
+    ];
+    for (const path of paths) {
+      const file = join(root, path);
+      mkdirSync(join(file, '..'), { recursive: true });
+      writeFileSync(file, readFileSync(path));
+    }
+    expect(() => verifyCloudFixtureContract(root)).not.toThrow();
+    writeFileSync(
+      join(root, paths[1]),
+      'export function createCriticalPathIdentity(){return {userId:crypto.randomUUID()}}',
+    );
+    expect(() => verifyCloudFixtureContract(root)).toThrow('fixture contract differs');
+    rmSync(join(root, paths[0]));
+    expect(() => verifyCloudFixtureContract(root)).toThrow();
+  });
   it('rejects Production and malformed identifiers before any recovery', () => {
     expect(() =>
       validateCloudRequest({ ...request, supabaseProjectRef: 'yvglwblxrnrenfifsnje' }),

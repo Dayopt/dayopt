@@ -1,16 +1,40 @@
 import { execFileSync } from 'node:child_process';
 import { lstatSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { expectedMigrationVersions } from '../ci/production-migration-readiness.mjs';
 import { isDirectExecution } from '../lib/is-direct-execution.mjs';
+import { validateCloudRequest } from '../lib/preview-cloud-binding.mjs';
 import { isPassingPreviewReport } from '../lib/preview-e2e-reporter.mjs';
 import { recoverPreviewUsers } from '../runbook/preview-cleanup.mjs';
 import { runPreviewE2E } from '../runbook/preview-e2e.mjs';
+import { validateCloudIntent } from './preview-cloud-intent.mjs';
+
+export { validateCloudRequest } from '../lib/preview-cloud-binding.mjs';
+
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
+export function verifyCloudFixtureContract(candidateRoot, trustedRoot = ROOT) {
+  // Older candidates would silently allocate random IDs absent from the durable
+  // intent. Require the trusted allocation contract before any fixture mutation.
+  for (const path of [
+    'apps/product/src/lib/test/preview-cloud-identity.ts',
+    'apps/product/src/lib/test/e2e/critical-path-fixture.ts',
+  ]) {
+    const source = readFileSync(join(trustedRoot, path));
+    const target = join(candidateRoot, path);
+    const stat = lstatSync(target);
+    if (
+      !stat.isFile() ||
+      stat.isSymbolicLink() ||
+      stat.size > 512 * 1024 ||
+      !source.equals(readFileSync(target))
+    )
+      throw new Error('Cloud Preview candidate fixture contract differs');
+  }
+}
 
 const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
-const REF = /^[a-z]{20}$/;
-const SHA = /^[a-f0-9]{40}$/;
 const STATES = new Set([
   'creating',
   'creation-unconfirmed',
@@ -30,44 +54,6 @@ function readJson(path) {
   const stat = lstatSync(path);
   if (!stat.isFile() || stat.isSymbolicLink() || stat.size > 2 * 1024 * 1024) throw new Error();
   return JSON.parse(readFileSync(path, 'utf8'));
-}
-
-export function validateCloudRequest(request) {
-  if (
-    !request ||
-    !SHA.test(request.sha ?? '') ||
-    !/^dpl_[a-zA-Z0-9]+$/.test(request.deploymentId ?? '') ||
-    !Number.isSafeInteger(request.prNumber) ||
-    request.prNumber < 1 ||
-    typeof request.branchName !== 'string' ||
-    !/^[a-zA-Z0-9][a-zA-Z0-9/_.-]{0,199}$/.test(request.branchName) ||
-    ['main', 'integration'].includes(request.branchName) ||
-    !REF.test(request.supabaseProjectRef ?? '') ||
-    request.supabaseProjectRef === 'yvglwblxrnrenfifsnje' ||
-    !UUID.test(request.supabaseBranchId ?? '') ||
-    !['shared', 'ephemeral'].includes(request.databaseMode)
-  )
-    throw new Error('Invalid Cloud Preview binding');
-  const sharedRef = 'tilwaprottpyhlfoggbb';
-  const sharedBranch = '4c2ed092-cba3-4f37-98e1-78f61cdf52ed';
-  if (
-    request.databaseMode === 'shared'
-      ? request.supabaseProjectRef !== sharedRef || request.supabaseBranchId !== sharedBranch
-      : request.supabaseProjectRef === sharedRef || request.supabaseBranchId === sharedBranch
-  ) {
-    throw new Error('Cloud Preview database mode does not match its binding');
-  }
-  return Object.fromEntries(
-    [
-      'sha',
-      'deploymentId',
-      'prNumber',
-      'branchName',
-      'supabaseProjectRef',
-      'supabaseBranchId',
-      'databaseMode',
-    ].map((key) => [key, request[key]]),
-  );
 }
 
 /** Authenticate the selected key against the selected nonproduction Auth API before creating fixtures. */
@@ -125,9 +111,24 @@ export async function cleanupCloudRun({
   request,
   serviceKey,
   recover = recoverPreviewUsers,
+  intent = undefined,
 }) {
   const bound = validateCloudRequest(request);
   const run = readRun(directory, bound);
+  if (intent) {
+    const plan = validateCloudIntent(intent);
+    if (
+      run.runId !== plan.runId ||
+      Object.entries(bound).some(([key, value]) => plan.request[key] !== value)
+    )
+      throw new Error();
+    for (const name of readdirSync(join(directory, 'evidence', 'users')).filter((name) =>
+      name.endsWith('.json'),
+    )) {
+      const row = readJson(join(directory, 'evidence', 'users', name));
+      if (!Object.values(plan.userIds).includes(row.userId)) throw new Error();
+    }
+  }
   const cleanup = await recover({
     evidenceDirectory: join(directory, 'evidence'),
     runId: run.runId,
@@ -143,11 +144,15 @@ export async function cleanupCloudRun({
 }
 
 /** Reconstruct a JSON-only public artifact. Never copy browser output, screenshots, or raw JSON. */
-export function publishCloudEvidence({ directory, destination, request }) {
+export function publishCloudEvidence({ directory, destination, request, intent = undefined }) {
   const bound = validateCloudRequest(request);
+  const plan = intent ? validateCloudIntent(intent) : null;
+  if (plan && Object.entries(bound).some(([key, value]) => plan.request[key] !== value))
+    throw new Error('Cloud Preview intent binding differs');
   let run;
   try {
     run = readRun(directory, bound);
+    if (plan && run.runId !== plan.runId) throw new Error();
   } catch {
     const output = {
       request: bound,
@@ -156,6 +161,7 @@ export function publishCloudEvidence({ directory, destination, request }) {
       cleanupConfirmed: false,
       tests: [],
       users: [],
+      ...(plan ? { intent: plan } : {}),
     };
     mkdirSync(destination, { recursive: false, mode: 0o700 });
     writeFileSync(join(destination, 'preview.json'), JSON.stringify(output, null, 2), {
@@ -180,6 +186,7 @@ export function publishCloudEvidence({ directory, destination, request }) {
     testsPassed: false,
     journalComplete: false,
     cleanupConfirmed: false,
+    ...(plan ? { intent: plan } : {}),
   };
   try {
     const report = readJson(join(directory, 'evidence', 'e2e.json'));
@@ -222,7 +229,8 @@ export function publishCloudEvidence({ directory, destination, request }) {
         row.userId === '00000000-0000-0000-0000-000000000001' ||
         name !== `${row.userId}.json` ||
         row.runId !== run.runId ||
-        !STATES.has(row.status)
+        !STATES.has(row.status) ||
+        (plan && !Object.values(plan.userIds).includes(row.userId))
       )
         throw new Error();
       return { userId: row.userId, runId: row.runId, status: row.status };
@@ -261,11 +269,24 @@ export function publishCloudEvidence({ directory, destination, request }) {
 
 if (isDirectExecution(import.meta.url)) {
   try {
-    const [operation, requestFile, candidatePath, runPath, artifactPath, ...rest] =
+    const [operation, requestFile, candidatePath, runPath, artifactPath, intentPath, ...rest] =
       process.argv.slice(2);
-    if (rest.length || !['execute', 'cleanup', 'publish'].includes(operation) || !artifactPath)
+    if (
+      rest.length ||
+      !['execute', 'cleanup', 'publish'].includes(operation) ||
+      !artifactPath ||
+      !intentPath
+    )
       throw new Error();
     const request = validateCloudRequest(readJson(requestFile));
+    const intent = validateCloudIntent(readJson(intentPath));
+    if (
+      Object.entries(request).some(([key, value]) => intent.request[key] !== value) ||
+      intent.sourceRunId !== Number(process.env.GITHUB_RUN_ID) ||
+      intent.sourceAttempt !== Number(process.env.GITHUB_RUN_ATTEMPT) ||
+      intent.workflowSha !== process.env.GITHUB_SHA
+    )
+      throw new Error();
     const candidateRoot = resolve(candidatePath);
     const directory = resolve(runPath);
     if (operation === 'execute') {
@@ -278,11 +299,14 @@ if (isDirectExecution(import.meta.url)) {
         }).trim();
       if (git(['rev-parse', 'HEAD']) !== request.sha || git(['status', '--porcelain']) !== '')
         throw new Error();
+      verifyCloudFixtureContract(candidateRoot);
       await assertCloudFixtureKey({ request, serviceKey: process.env.SUPABASE_SECRET_KEY });
       const result = await runPreviewE2E({
         candidateRoot,
         runDirectory: directory,
         request: { ...request, expectedMigrations: expectedMigrationVersions(candidateRoot) },
+        runId: intent.runId,
+        cloudUserIds: intent.userIds,
       });
       console.log(
         JSON.stringify({ runId: result.runId, status: result.status, cleanup: result.cleanup }),
@@ -293,11 +317,12 @@ if (isDirectExecution(import.meta.url)) {
         directory,
         request,
         serviceKey: process.env.SUPABASE_SECRET_KEY,
+        intent,
       });
       console.log(JSON.stringify(result));
       if (result.status !== 'clean') process.exitCode = 1;
     } else {
-      publishCloudEvidence({ directory, destination: resolve(artifactPath), request });
+      publishCloudEvidence({ directory, destination: resolve(artifactPath), request, intent });
       console.log('Public Cloud Preview evidence prepared');
     }
   } catch {

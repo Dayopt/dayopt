@@ -14,7 +14,14 @@ import { observePreviewReadiness, parsePreviewReadinessArgs } from './preview-re
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
-export function previewWorkerEnvironment(env, ready, privateDir, evidenceDir, runId) {
+export function previewWorkerEnvironment(
+  env,
+  ready,
+  privateDir,
+  evidenceDir,
+  runId,
+  cloudUserIds = /** @type {{desktop: string, mobile: string} | undefined} */ (undefined),
+) {
   const result = { NODE_ENV: 'test', CI: '1' };
   for (const key of ['PATH', 'HOME', 'TMPDIR', 'LANG', 'PNPM_HOME', 'PLAYWRIGHT_BROWSERS_PATH']) {
     if (env[key]) result[key] = env[key];
@@ -31,6 +38,13 @@ export function previewWorkerEnvironment(env, ready, privateDir, evidenceDir, ru
     E2E_PREVIEW_RUN_ID: runId,
     E2E_PREVIEW_PRIVATE_DIR: privateDir,
     E2E_PREVIEW_EVIDENCE_DIR: evidenceDir,
+    ...(cloudUserIds
+      ? {
+          E2E_PREVIEW_CLOUD_INTENT: '1',
+          E2E_PREVIEW_DESKTOP_USER_ID: cloudUserIds.desktop,
+          E2E_PREVIEW_MOBILE_USER_ID: cloudUserIds.mobile,
+        }
+      : {}),
   };
 }
 
@@ -99,6 +113,8 @@ export async function runPreviewE2E({
   recover = recoverPreviewUsers,
   tempRoot = tmpdir(),
   runDirectory = /** @type {string | undefined} */ (undefined),
+  runId = randomUUID(),
+  cloudUserIds = /** @type {{desktop: string, mobile: string} | undefined} */ (undefined),
 }) {
   if (!env.SUPABASE_SECRET_KEY?.trim())
     throw new Error('Nonproduction test credentials are required');
@@ -107,7 +123,8 @@ export async function runPreviewE2E({
     supabaseToken: env.SUPABASE_PREVIEW_READINESS_TOKEN,
     bypassSecret: env.VERCEL_AUTOMATION_BYPASS_SECRET,
   };
-  const runId = randomUUID();
+  if (!/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(runId))
+    throw new Error('Preview run identity is invalid');
   const before = await observe({ ...request, ...credentials });
   const directory = runDirectory ?? mkdtempSync(join(tempRoot, 'dayopt-preview-e2e-'));
   if (runDirectory) mkdirSync(directory, { recursive: false, mode: 0o700 });
@@ -131,7 +148,9 @@ export async function runPreviewE2E({
   let after = null;
   let failure = 'execution-failed';
   try {
-    exitCode = await execute(previewWorkerEnvironment(env, before, privateDir, evidenceDir, runId));
+    exitCode = await execute(
+      previewWorkerEnvironment(env, before, privateDir, evidenceDir, runId, cloudUserIds),
+    );
   } catch {
     // A raw process error can contain env, command output, or request details.
   }
