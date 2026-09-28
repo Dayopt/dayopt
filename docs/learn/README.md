@@ -30,7 +30,7 @@ pnpm learn
 
 - [Plan を保存](journeys/save-plan.md) — カレンダーで時間帯をドラッグし、作成パネルでアクティビティを選ぶ。
 - [Plan / Record を動かす・直す](journeys/edit-timeblock.md) — カレンダー上でドラッグ・リサイズするか、Inspector で時刻・メモ・アクティビティを直す。
-- [Record を作る・Plan を記録する](journeys/record-plan.md) — 終わった Plan を Inspector の「そのまま記録」で Record にする経路を中心に辿る。
+- [Record を作る・Plan を記録する](journeys/record-plan.md) — 終わった Plan を Inspector の「そのまま記録」で Record にする経路と、過去の時間帯から Record を明示的に作る経路を辿る。
 - [削除と取り消し](journeys/delete-undo.md) — Plan / Record を消すと、確認ダイアログを挟まずに画面から消え、「元に戻す」付きのトーストが出る。
 - [レポートを開く（集計）](journeys/report.md) — サイドバーからレポートを開くと、週 / 月 / 年の期間で Plan と Record をアクティビティ別に集計して見せる。
 

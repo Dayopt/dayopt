@@ -1,91 +1,75 @@
 ---
 status: current
-last_verified: 2026-09-21
+last_verified: 2026-09-28
 ---
 
 # Record を作る・Plan を記録する
 
 <!-- learn:generated:start — 正本 このファイルの learn:journey の JSON / 再生成 pnpm learn:generate / 検証 pnpm docs:check。この範囲は手編集しない -->
 
-終わった Plan を Inspector の「そのまま記録」で Record にする経路を中心に辿る。Plan は消えずに残り、同じ内容の Record が別に 1 件できる。Plan を Record の列へドラッグする入口と、過去の時間帯から直接 Record を作る入口（「Plan を保存」と同じ経路）もある。
+終わった Plan を Inspector の「そのまま記録」で Record にする経路と、過去の時間帯から Record を明示的に作る経路を辿る。Plan は消えず、Record は別の行として作られる。Plan のドラッグ移動はレーンにかかわらず Plan の時刻更新になる。
 
 ```mermaid
 flowchart TD
   subgraph s_browser["ブラウザ"]
     n1["1. 入口を選ぶ"]
-    n2["2. 列へ落とす"]
-    n3["3. 編集を保存しきる"]
-    n4["4. 記録を依頼"]
-    n8["8. 出して取り消しを出す"]
+    n2["2. 編集を保存しきる"]
+    n3["3. 記録を依頼"]
+    n7["7. 出して取り消しを出す"]
   end
   subgraph s_vercel["Vercel（Next.js）"]
-    n5["5. Router → Service"]
+    n4["4. Router → Service"]
   end
   subgraph s_supabase["Supabase"]
-    n6["6. RPC で記録"]
-    n7["7. Plan を写して作る"]
+    n5["5. RPC で記録"]
+    n6["6. Plan を写して作る"]
   end
   n1 --> n2
   n2 --> n3
   n3 --> n4
-  n4 --> n5
-  n5 -->|"RPC"| n6
-  n6 --> n7
-  n7 -->|"応答"| n8
+  n4 -->|"RPC"| n5
+  n5 --> n6
+  n6 -->|"応答"| n7
 ```
 
-通るサービス: ブラウザ / Vercel（Next.js） / Supabase。段 8・失敗 7 種。
+通るサービス: ブラウザ / Vercel（Next.js） / Supabase。段 7・失敗 7 種。
 
 壊して確かめる: [break-rules](../labs/break-rules.md)
 
 #### この経路を守るテスト
 
-- [`apps/product/src/lib/test/e2e/critical-path.spec.ts`](../../../apps/product/src/lib/test/e2e/critical-path.spec.ts) で `test('過去帯をドラッグして Record を記録し、リロード後も残る'` を探す（E2E。入口 (3) の過去の時間帯から作る経路。「そのまま記録」を通しで守る E2E は見つからなかった）
+- [`apps/product/src/lib/test/e2e/critical-path.spec.ts`](../../../apps/product/src/lib/test/e2e/critical-path.spec.ts) で `test('過去帯をドラッグして Record を記録し、リロード後も残る'` を探す（E2E。入口 (2) の過去の時間帯から明示的に作る経路。「そのまま記録」を通しで守る E2E は見つからなかった）
 
-### 1. 記録の入口は 3 つ（ブラウザ）
+### 1. 記録の入口は 2 つ（ブラウザ）
 
-(1) Inspector の「そのまま記録」: Plan で、終了が今以前の時だけ出る。(2) カレンダーで Plan を Record の列へドラッグ: 落とした位置の終了が今以前の時だけ記録になる。(3) 過去の時間帯をドラッグして作る: 既定が Record になる（「Plan を保存」の作成経路）。
+(1) Inspector の「そのまま記録」: 終了が今以前の Plan でだけ使える。(2) 過去の時間帯から作る: 作成 UI で Record を作る（既定も Record）。既存 Plan を別レーンへドラッグしても Record は作らず、Plan の時刻を更新する。
 
-- **なぜ必要か**: 計画と実績の距離を縮める手数を最小にするため。どの入口も、Record は未来に終われない（DT005）という DB 規則を先回りして、終わった時間帯でだけ記録を出す。
-- **入力 → 出力**: Plan の終了時刻（または落とした位置）と現在時刻 → 記録の導線を出すか・呼ぶか
-- **ここを変えると**: 出す条件は DB 規則の写し。規則を変える時は invariants.md §時刻 の写し表に沿って 3 つとも見る。日の単位でまとめて記録する ConfirmDayButton も部品としてはあるが、画面に置いている箇所は見つからなかった（未確認）。
+- **なぜ必要か**: Record はユーザーが明示的に作り、未来に終われない（DT005）という DB 規則に従う。レーンをまたぐ Plan 移動は予定の時刻編集として扱う。
+- **入力 → 出力**: Plan の終了時刻または過去の作成時間帯 → Inspector の記録操作または明示的な Record 作成
+- **ここを変えると**: Record の未来終了制約は Inspector の記録操作と作成 UI の選択可否に反映する。Plan のドラッグ移動では Record を作らず、種別を保ったまま時刻を更新する。ConfirmDayButton は画面に置いている箇所を確認できていない。
 - **コード**:
   - [`apps/product/src/features/timeblock/components/editor/TimeblockInspectorForm.tsx`](../../../apps/product/src/features/timeblock/components/editor/TimeblockInspectorForm.tsx) で `{!isDuplicateMode && kind === 'plan' && isPast && targetId ? (` を探す
-  - [`apps/product/src/features/calendar/interaction/interaction-effects.ts`](../../../apps/product/src/features/calendar/interaction/interaction-effects.ts) で `const canCreateRecord = effect.time.end.getTime() <= Date.now();` を探す
+  - [`apps/product/src/features/calendar/components/create/InlineCreatePanel.tsx`](../../../apps/product/src/features/calendar/components/create/InlineCreatePanel.tsx) で `resolveTimeblockKindChoice(` を探す
   - [`apps/product/src/features/timeblock/domain/timeblock-destination.ts`](../../../apps/product/src/features/timeblock/domain/timeblock-destination.ts) で `export function resolveTimeblockKindChoice(` を探す
 - **この段を守るテスト**:
   - [`apps/product/src/features/timeblock/components/editor/TimeblockInspectorForm.test.tsx`](../../../apps/product/src/features/timeblock/components/editor/TimeblockInspectorForm.test.tsx) で `it('時間帯の記録の有無で予定の記録操作を消さない'` を探す
-  - [`apps/product/src/features/calendar/interaction/useInteraction.test.ts`](../../../apps/product/src/features/calendar/interaction/useInteraction.test.ts) で `it('drop previewの終了が未来なら過去Planでも記録callbackを呼ばない'` を探す
+  - [`apps/product/src/features/calendar/components/create/InlineCreatePanel.test.tsx`](../../../apps/product/src/features/calendar/components/create/InlineCreatePanel.test.tsx) で `it('未来スロットでは記録タブが選べず、選択すると Plan を作る'` を探す
+  - [`apps/product/src/features/calendar/components/create/InlineCreatePanel.test.tsx`](../../../apps/product/src/features/calendar/components/create/InlineCreatePanel.test.tsx) で `it('明示的なRecord作成は既存Recordと重なる時に作成しない'` を探す
 
 <details>
-<summary>⚡ Record の列へ落とした位置の終了が未来 — 画面: 何も起きない / データ: 変化なし / 再試行: 利用者がやり直す / 痕跡: 残らない</summary>
+<summary>⚡ 既存 Record と重なる時間に Record を作る — 画面: 押せない / データ: 変化なし / 再試行: 利用者がやり直す / 痕跡: 残らない</summary>
 
-- 画面: 何も起きない。案内も出ず、Plan は元の位置に残る。
-- データ: 変化なし。送っていない。
-- 再試行: なし。終わった時間帯へ落とし直す。
-- 痕跡: 何も残らない。
-- **最初に見る場所**: 仕様どおり（DT005 の写し）。利用者から見ると理由が出ない点に注意。
+- 画面: Record は作成されず、既存の Record が残る。
+- データ: 変化なし。createRecord は呼ばれない。
+- 再試行: Record と重ならない時間を選ぶ。
+- 痕跡: 何も残らない（mutation 前）。
+- **最初に見る場所**: 仕様どおり。同種の Record 重複は作成 UI でも拒否する。
 - 根拠:
-  - [`apps/product/src/features/calendar/interaction/interaction-effects.ts`](../../../apps/product/src/features/calendar/interaction/interaction-effects.ts) で `if (canCreateRecord) {` を探す
+  - [`apps/product/src/features/calendar/components/create/InlineCreatePanel.test.tsx`](../../../apps/product/src/features/calendar/components/create/InlineCreatePanel.test.tsx) で `it('明示的なRecord作成は既存Recordと重なる時に作成しない'` を探す
 
 </details>
 
-### 2. Record の列へ落とすと、独立した Record を作る（ブラウザ）
-
-Plan のタイトル・メモ・アクティビティと、落とした位置の時刻で createRecord を呼ぶ。更新ではなく新規作成なので Plan はそのまま残る。一時 ID の Record を先に描き、失敗したら消してトーストを出す。成功時のトーストは出さない（取り消しトーストも無い）。動かしている間の重なり確認は、落とす先の Record 同士で行う。
-
-- **なぜ必要か**: 計画どおりでなかった時間帯へ、手で打ち直さずに実績を置くため。Plan を消さないのは、Plan と Record を別々の事実として比べられるようにするため。
-- **入力 → 出力**: Plan の内容 + 落とした位置の時刻 → createRecord の呼び出し
-- **ここを変えると**: 「そのまま記録」と違い、成功時に取り消しトーストが出ない。揃える時は useTimeblockRecordMutations の取り消しを流用する。
-- **コード**:
-  - [`apps/product/src/features/calendar/components/views/shared/components/CalendarGridContent.tsx`](../../../apps/product/src/features/calendar/components/views/shared/components/CalendarGridContent.tsx) で `createRecord.mutate(buildPlanRecordDropInput(plan, range));` を探す
-  - [`apps/product/src/features/calendar/lib/plan-record-drop.ts`](../../../apps/product/src/features/calendar/lib/plan-record-drop.ts) で `export function buildPlanRecordDropInput(` を探す
-  - [`apps/product/src/features/calendar/interaction/useInteraction.ts`](../../../apps/product/src/features/calendar/interaction/useInteraction.ts) で `// レーン間dropでkindが変わるのは Plan → Record だけ。` を探す
-- **この段を守るテスト**:
-  - [`apps/product/src/features/calendar/lib/plan-record-drop.test.ts`](../../../apps/product/src/features/calendar/lib/plan-record-drop.test.ts) で `it('Planの内容とdrop先のpreview rangeから独立Record入力を作る'` を探す
-  - [`apps/product/src/features/calendar/interaction/useInteraction.test.ts`](../../../apps/product/src/features/calendar/interaction/useInteraction.test.ts) で `it('Recordレーンへのdropはplan更新ではなく記録mutationへ委譲する'` を探す
-
-### 3. 記録の前に、待っている編集を保存しきる（ブラウザ）
+### 2. 記録の前に、待っている編集を保存しきる（ブラウザ）
 
 「そのまま記録」を押すと、メモの保存待ち（600ms）を止め、最新のメモとアクティビティを保存の列に積んで、その保存が終わるのを待つ。返ってきた Plan の版（updated_at）を記録の依頼に使う。待っている間はボタンを押せない。
 
@@ -112,7 +96,7 @@ Plan のタイトル・メモ・アクティビティと、落とした位置の
 
 </details>
 
-### 4. 記録を依頼する（先に描かない）（ブラウザ）
+### 3. 記録を依頼する（先に描かない）（ブラウザ）
 
 planCommands.record を呼ぶ。作成や更新と違い、一時 ID の Record は描かない（一覧の読み込みを止めて snapshot を取るだけ）。送っている間はボタンが押せない。retry: false で自動では送り直さない。
 
@@ -139,7 +123,7 @@ planCommands.record を呼ぶ。作成や更新と違い、一時 ID の Record 
 
 </details>
 
-### 5. Router → Service（Vercel（Next.js））
+### 4. Router → Service（Vercel（Next.js））
 
 入口と関門は「Plan を保存」と同じ。planCommands.record は id と expectedUpdatedAt だけを受け付ける（.strict()）。Service は command を呼び、成功後に利用記録（record_created）を送る。
 
@@ -150,7 +134,7 @@ planCommands.record を呼ぶ。作成や更新と違い、一時 ID の Record 
   - [`apps/product/src/features/timeblock/server/plan-commands-router.ts`](../../../apps/product/src/features/timeblock/server/plan-commands-router.ts) で `record: protectedProcedure` を探す
   - [`apps/product/src/features/timeblock/server/timeblock-command-service.ts`](../../../apps/product/src/features/timeblock/server/timeblock-command-service.ts) で `async recordPlan(options: VersionedTargetOptions): Promise<RecordRow> {` を探す
 
-### 6. Supabase の RPC で記録する（Supabase）
+### 5. Supabase の RPC で記録する（Supabase）
 
 service role の client で record_plan_command_v1 を呼ぶ。record_plan は「版付きで既存の行を指す操作」に入っているので、Plan が見つからない（DT001）時は STALE_TARGET に訳す。
 
@@ -176,7 +160,7 @@ service role の client で record_plan_command_v1 を呼ぶ。record_plan は�
 
 </details>
 
-### 7. DB が Plan を写して Record を作る（Supabase）
+### 6. DB が Plan を写して Record を作る（Supabase）
 
 Plan を FOR UPDATE で押さえ、削除済みなら DT001、版が違えば DT002。通れば Plan のタイトル・メモ・アクティビティ・開始・終了を写した Record を source = 'from_plan' で INSERT する。Plan は変えず、Plan への紐付けも保存しない。Record の trigger が「未来に終われない」（DT005）を、排他制約が Record 同士の重なり（23P01）を弾く。
 
@@ -218,7 +202,7 @@ Plan を FOR UPDATE で押さえ、削除済みなら DT001、版が違えば DT
 
 </details>
 
-### 8. Record を出し、取り消しを出す（ブラウザ）
+### 7. Record を出し、取り消しを出す（ブラウザ）
 
 返ってきた Record を一覧と詳細へ入れ、「記録しました ✓」のトースト（5 秒、「元に戻す」付き）を出す。Inspector は作った Record の詳細へ切り替わる。取り消しは作った Record を削除するだけで Plan は残る（開いている詳細がその Record なら閉じる）。成功・失敗どちらでも plans / records / statistics / review を取り直す。
 
@@ -257,28 +241,28 @@ Plan を FOR UPDATE で押さえ、削除済みなら DT001、版が違えば DT
   "title": "Record を作る・Plan を記録する",
   "order": 30,
   "group": "calendar",
-  "intro": "終わった Plan を Inspector の「そのまま記録」で Record にする経路を中心に辿る。Plan は消えずに残り、同じ内容の Record が別に 1 件できる。Plan を Record の列へドラッグする入口と、過去の時間帯から直接 Record を作る入口（「Plan を保存」と同じ経路）もある。",
+  "intro": "終わった Plan を Inspector の「そのまま記録」で Record にする経路と、過去の時間帯から Record を明示的に作る経路を辿る。Plan は消えず、Record は別の行として作られる。Plan のドラッグ移動はレーンにかかわらず Plan の時刻更新になる。",
   "play": "▶ そのまま記録を押す",
   "hops": [
     {
       "id": "entrances",
       "svc": "browser",
-      "title": "記録の入口は 3 つ",
-      "what": "(1) Inspector の「そのまま記録」: Plan で、終了が今以前の時だけ出る。(2) カレンダーで Plan を Record の列へドラッグ: 落とした位置の終了が今以前の時だけ記録になる。(3) 過去の時間帯をドラッグして作る: 既定が Record になる（「Plan を保存」の作成経路）。",
-      "why": "計画と実績の距離を縮める手数を最小にするため。どの入口も、Record は未来に終われない（DT005）という DB 規則を先回りして、終わった時間帯でだけ記録を出す。",
+      "title": "記録の入口は 2 つ",
+      "what": "(1) Inspector の「そのまま記録」: 終了が今以前の Plan でだけ使える。(2) 過去の時間帯から作る: 作成 UI で Record を作る（既定も Record）。既存 Plan を別レーンへドラッグしても Record は作らず、Plan の時刻を更新する。",
+      "why": "Record はユーザーが明示的に作り、未来に終われない（DT005）という DB 規則に従う。レーンをまたぐ Plan 移動は予定の時刻編集として扱う。",
       "io": {
-        "in": "Plan の終了時刻（または落とした位置）と現在時刻",
-        "out": "記録の導線を出すか・呼ぶか"
+        "in": "Plan の終了時刻または過去の作成時間帯",
+        "out": "Inspector の記録操作または明示的な Record 作成"
       },
-      "change": "出す条件は DB 規則の写し。規則を変える時は invariants.md §時刻 の写し表に沿って 3 つとも見る。日の単位でまとめて記録する ConfirmDayButton も部品としてはあるが、画面に置いている箇所は見つからなかった（未確認）。",
+      "change": "Record の未来終了制約は Inspector の記録操作と作成 UI の選択可否に反映する。Plan のドラッグ移動では Record を作らず、種別を保ったまま時刻を更新する。ConfirmDayButton は画面に置いている箇所を確認できていない。",
       "refs": [
         {
           "path": "apps/product/src/features/timeblock/components/editor/TimeblockInspectorForm.tsx",
           "find": "{!isDuplicateMode && kind === 'plan' && isPast && targetId ? ("
         },
         {
-          "path": "apps/product/src/features/calendar/interaction/interaction-effects.ts",
-          "find": "const canCreateRecord = effect.time.end.getTime() <= Date.now();"
+          "path": "apps/product/src/features/calendar/components/create/InlineCreatePanel.tsx",
+          "find": "resolveTimeblockKindChoice("
         },
         {
           "path": "apps/product/src/features/timeblock/domain/timeblock-destination.ts",
@@ -291,27 +275,31 @@ Plan を FOR UPDATE で押さえ、削除済みなら DT001、版が違えば DT
           "find": "it('時間帯の記録の有無で予定の記録操作を消さない'"
         },
         {
-          "path": "apps/product/src/features/calendar/interaction/useInteraction.test.ts",
-          "find": "it('drop previewの終了が未来なら過去Planでも記録callbackを呼ばない'"
+          "path": "apps/product/src/features/calendar/components/create/InlineCreatePanel.test.tsx",
+          "find": "it('未来スロットでは記録タブが選べず、選択すると Plan を作る'"
+        },
+        {
+          "path": "apps/product/src/features/calendar/components/create/InlineCreatePanel.test.tsx",
+          "find": "it('明示的なRecord作成は既存Recordと重なる時に作成しない'"
         }
       ],
       "fails": [
         {
-          "id": "drop-future",
-          "label": "Record の列へ落とした位置の終了が未来",
-          "screen": "何も起きない。案内も出ず、Plan は元の位置に残る。",
-          "data": "変化なし。送っていない。",
-          "retry": "なし。終わった時間帯へ落とし直す。",
-          "trace": "何も残らない。",
-          "look": "仕様どおり（DT005 の写し）。利用者から見ると理由が出ない点に注意。",
+          "id": "record-overlap",
+          "label": "既存 Record と重なる時間に Record を作る",
+          "screen": "Record は作成されず、既存の Record が残る。",
+          "data": "変化なし。createRecord は呼ばれない。",
+          "retry": "Record と重ならない時間を選ぶ。",
+          "trace": "何も残らない（mutation 前）。",
+          "look": "仕様どおり。同種の Record 重複は作成 UI でも拒否する。",
           "refs": [
             {
-              "path": "apps/product/src/features/calendar/interaction/interaction-effects.ts",
-              "find": "if (canCreateRecord) {"
+              "path": "apps/product/src/features/calendar/components/create/InlineCreatePanel.test.tsx",
+              "find": "it('明示的なRecord作成は既存Recordと重なる時に作成しない'"
             }
           ],
           "tags": {
-            "screen": "none",
+            "screen": "blocked",
             "data": "unchanged",
             "retry": "user",
             "trace": "none"
@@ -323,10 +311,10 @@ Plan を FOR UPDATE で押さえ、削除済みなら DT001、版が違えば DT
               {
                 "state": "saved",
                 "label": "仕事",
-                "from": 2
+                "from": 1
               }
             ],
-            "note": "（何も起きず、Plan はそのまま）"
+            "note": "（Record は作成されず、既存の Record が残る）"
           }
         }
       ],
@@ -342,44 +330,6 @@ Plan を FOR UPDATE で押さえ、削除済みなら DT001、版が違えば DT
         ],
         "button": "そのまま記録"
       }
-    },
-    {
-      "id": "lane-drop",
-      "svc": "browser",
-      "title": "Record の列へ落とすと、独立した Record を作る",
-      "what": "Plan のタイトル・メモ・アクティビティと、落とした位置の時刻で createRecord を呼ぶ。更新ではなく新規作成なので Plan はそのまま残る。一時 ID の Record を先に描き、失敗したら消してトーストを出す。成功時のトーストは出さない（取り消しトーストも無い）。動かしている間の重なり確認は、落とす先の Record 同士で行う。",
-      "why": "計画どおりでなかった時間帯へ、手で打ち直さずに実績を置くため。Plan を消さないのは、Plan と Record を別々の事実として比べられるようにするため。",
-      "io": {
-        "in": "Plan の内容 + 落とした位置の時刻",
-        "out": "createRecord の呼び出し"
-      },
-      "change": "「そのまま記録」と違い、成功時に取り消しトーストが出ない。揃える時は useTimeblockRecordMutations の取り消しを流用する。",
-      "refs": [
-        {
-          "path": "apps/product/src/features/calendar/components/views/shared/components/CalendarGridContent.tsx",
-          "find": "createRecord.mutate(buildPlanRecordDropInput(plan, range));"
-        },
-        {
-          "path": "apps/product/src/features/calendar/lib/plan-record-drop.ts",
-          "find": "export function buildPlanRecordDropInput("
-        },
-        {
-          "path": "apps/product/src/features/calendar/interaction/useInteraction.ts",
-          "find": "// レーン間dropでkindが変わるのは Plan → Record だけ。"
-        }
-      ],
-      "tests": [
-        {
-          "path": "apps/product/src/features/calendar/lib/plan-record-drop.test.ts",
-          "find": "it('Planの内容とdrop先のpreview rangeから独立Record入力を作る'"
-        },
-        {
-          "path": "apps/product/src/features/calendar/interaction/useInteraction.test.ts",
-          "find": "it('Recordレーンへのdropはplan更新ではなく記録mutationへ委譲する'"
-        }
-      ],
-      "fails": [],
-      "short": "列へ落とす"
     },
     {
       "id": "flush",
@@ -822,7 +772,7 @@ Plan を FOR UPDATE で押さえ、削除済みなら DT001、版が違えば DT
     {
       "path": "apps/product/src/lib/test/e2e/critical-path.spec.ts",
       "find": "test('過去帯をドラッグして Record を記録し、リロード後も残る'",
-      "why": "E2E。入口 (3) の過去の時間帯から作る経路。「そのまま記録」を通しで守る E2E は見つからなかった"
+      "why": "E2E。入口 (2) の過去の時間帯から明示的に作る経路。「そのまま記録」を通しで守る E2E は見つからなかった"
     }
   ]
 }
