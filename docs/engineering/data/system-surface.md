@@ -245,15 +245,15 @@ TS の `PRODUCT_EVENT_NAMES` と DB の CHECK 制約の両方で定義される�
 
 ### workspace package（7）
 
-| package                 | exports                                                                        | 依存している workspace                                 |
-| ----------------------- | ------------------------------------------------------------------------------ | ------------------------------------------------------ |
-| `@dayopt/assets`        | `.`, `./brand`, `./logo-artwork`, `./og`, `./og-card-image`, `./og-screenshot` | `@dayopt/components`, `@dayopt/product`, `@dayopt/web` |
-| `@dayopt/billing`       | `.`                                                                            | `@dayopt/product`, `@dayopt/web`                       |
-| `@dayopt/components`    | `.`, `./brand`, `./testing/modal-menu`                                         | `@dayopt/product`, `@dayopt/storybook`, `@dayopt/web`  |
-| `@dayopt/config`        | `.`                                                                            | `@dayopt/i18n`, `@dayopt/product`, `@dayopt/web`       |
-| `@dayopt/foundations`   | `./og-colors`, `./scrollbar.css`, `./tokens.css`                               | `@dayopt/product`, `@dayopt/storybook`, `@dayopt/web`  |
-| `@dayopt/i18n`          | `./navigation`, `./request`, `./routing`                                       | `@dayopt/product`, `@dayopt/web`                       |
-| `@dayopt/observability` | `.`, `./build-gate`                                                            | `@dayopt/product`, `@dayopt/web`                       |
+| package                 | exports                                                                                      | 依存している workspace                                 |
+| ----------------------- | -------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
+| `@dayopt/assets`        | `.`, `./brand`, `./logo-artwork`, `./og`, `./og-card-image`, `./og-fonts`, `./og-screenshot` | `@dayopt/components`, `@dayopt/product`, `@dayopt/web` |
+| `@dayopt/billing`       | `.`                                                                                          | `@dayopt/product`, `@dayopt/web`                       |
+| `@dayopt/components`    | `.`, `./brand`, `./testing/modal-menu`                                                       | `@dayopt/product`, `@dayopt/storybook`, `@dayopt/web`  |
+| `@dayopt/config`        | `.`                                                                                          | `@dayopt/i18n`, `@dayopt/product`, `@dayopt/web`       |
+| `@dayopt/foundations`   | `./og-colors`, `./scrollbar.css`, `./tokens.css`                                             | `@dayopt/product`, `@dayopt/storybook`, `@dayopt/web`  |
+| `@dayopt/i18n`          | `./navigation`, `./request`, `./routing`                                                     | `@dayopt/product`, `@dayopt/web`                       |
+| `@dayopt/observability` | `.`, `./build-gate`                                                                          | `@dayopt/product`, `@dayopt/web`                       |
 
 ## 関係
 
