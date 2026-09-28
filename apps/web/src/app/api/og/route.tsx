@@ -1,5 +1,6 @@
 import { OG_CARD_SIZE, resolveOgCardOptions } from '@dayopt/assets/og';
 import { OgCardImage } from '@dayopt/assets/og-card-image';
+import { loadOgFonts } from '@dayopt/assets/og-fonts';
 import { loadOgScreenshotDataUri } from '@dayopt/assets/og-screenshot';
 import { ImageResponse } from 'next/og';
 import { NextRequest } from 'next/server';
@@ -12,6 +13,7 @@ import {
   ogImageGlobalRateLimit,
   ogImageRateLimit,
 } from '@web/platform/security/rate-limit';
+import { getOgCategoryLabel, normalizeOgLocale } from '@web/platform/seo/og-category-label';
 
 import { OG_FALLBACK_IMAGE_BASE64 } from './og-fallback-image.generated';
 
@@ -97,6 +99,7 @@ export async function GET(request: NextRequest) {
 
   try {
     const { searchParams } = new URL(request.url);
+    const locale = normalizeOgLocale(searchParams.get('locale'));
     const title =
       truncate(searchParams.get('title'), MAX_TITLE_LENGTH) || '守れる計画を、立てられるように。';
     const screenshotSrc = await loadOgScreenshotDataUri(
@@ -114,11 +117,13 @@ export async function GET(request: NextRequest) {
       <OgCardImage
         title={title}
         category={options.category}
+        categoryLabel={getOgCategoryLabel(locale, options.category)}
         layout={options.layout}
         screenshotSrc={screenshotSrc}
       />,
       {
         ...OG_CARD_SIZE,
+        fonts: await loadOgFonts(),
         headers: { 'Cache-Control': OG_IMAGE_CACHE_CONTROL },
       },
     );

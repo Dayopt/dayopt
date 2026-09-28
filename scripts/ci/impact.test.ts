@@ -119,6 +119,18 @@ describe('workspace test scope', () => {
     expect(resolveWorkspaceTestScope(['new-root-policy.json']).workspaces).toEqual(all);
   });
 
+  it('共有setup action の変更は全 workspace test を実行する', () => {
+    expect(resolveWorkspaceTestScope(['.github/actions/setup/action.yml'])).toMatchObject({
+      scope: 'all',
+      workspaces: [
+        { name: '@dayopt/billing', script: 'test:run' },
+        { name: '@dayopt/i18n', script: 'test:run' },
+        { name: '@dayopt/observability', script: 'test:run' },
+        { name: '@dayopt/web', script: 'test:run' },
+      ],
+    });
+  });
+
   it('docs・workflow・scripts のみなら別workspace testを要求しない', () => {
     expect(
       resolveWorkspaceTestScope([

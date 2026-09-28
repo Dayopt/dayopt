@@ -176,7 +176,7 @@ TS の `PRODUCT_EVENT_NAMES` と DB の CHECK 制約の両方で定義される�
 
 ## 設定
 
-### env 変数（60）
+### env 変数（62）
 
 名前と所在だけを載せる（値は 1Password にあり、この生成物は触らない）。
 
@@ -233,27 +233,29 @@ TS の `PRODUCT_EVENT_NAMES` と DB の CHECK 制約の両方で定義される�
 | `SUPABASE_ACCESS_TOKEN`                  | no   | secret     | production          | supabase-cli                    | —                          |
 | `SUPABASE_AUTH_AUDIT_TOKEN`              | yes  | secret     | production          | supabase-auth-audit             | —                          |
 | `SUPABASE_DB_PASSWORD`                   | yes  | secret     | production          | supabase                        | —                          |
-| `SUPABASE_SECRET_KEY`                    | yes  | secret     | production          | supabase                        | —                          |
+| `SUPABASE_PREVIEW_READINESS_TOKEN`       | no   | secret     | staging             | preview-e2e                     | —                          |
+| `SUPABASE_SECRET_KEY`                    | yes  | secret     | production, staging | supabase, preview-e2e           | —                          |
 | `SUPABASE_STORAGE_RLS_AUDIT_TOKEN`       | yes  | secret     | production          | supabase-storage-rls-audit      | —                          |
 | `TURNSTILE_SECRET_KEY`                   | no   | secret     | shared              | turnstile                       | —                          |
 | `UPSTASH_REDIS_REST_TOKEN`               | no   | secret     | staging, production | upstash                         | —                          |
 | `UPSTASH_REDIS_REST_URL`                 | no   | secret     | staging, production | upstash                         | —                          |
+| `VERCEL_AUTOMATION_BYPASS_SECRET`        | no   | secret     | staging             | preview-e2e                     | —                          |
 | `VERCEL_BYPASS_PRODUCT`                  | yes  | secret     | production          | vercel-production               | —                          |
 | `VERCEL_BYPASS_WEB`                      | yes  | secret     | production          | vercel-production               | —                          |
 | `VERCEL_TEAM_ID`                         | yes  | public     | production          | vercel-production               | —                          |
-| `VERCEL_TOKEN`                           | yes  | secret     | production          | vercel-production               | —                          |
+| `VERCEL_TOKEN`                           | yes  | secret     | production, staging | vercel-production, preview-e2e  | —                          |
 
 ### workspace package（7）
 
-| package                 | exports                                                                        | 依存している workspace                                 |
-| ----------------------- | ------------------------------------------------------------------------------ | ------------------------------------------------------ |
-| `@dayopt/assets`        | `.`, `./brand`, `./logo-artwork`, `./og`, `./og-card-image`, `./og-screenshot` | `@dayopt/components`, `@dayopt/product`, `@dayopt/web` |
-| `@dayopt/billing`       | `.`                                                                            | `@dayopt/product`, `@dayopt/web`                       |
-| `@dayopt/components`    | `.`, `./brand`, `./testing/modal-menu`                                         | `@dayopt/product`, `@dayopt/storybook`, `@dayopt/web`  |
-| `@dayopt/config`        | `.`                                                                            | `@dayopt/i18n`, `@dayopt/product`, `@dayopt/web`       |
-| `@dayopt/foundations`   | `./og-colors`, `./scrollbar.css`, `./tokens.css`                               | `@dayopt/product`, `@dayopt/storybook`, `@dayopt/web`  |
-| `@dayopt/i18n`          | `./navigation`, `./request`, `./routing`                                       | `@dayopt/product`, `@dayopt/web`                       |
-| `@dayopt/observability` | `.`, `./build-gate`                                                            | `@dayopt/product`, `@dayopt/web`                       |
+| package                 | exports                                                                                      | 依存している workspace                                 |
+| ----------------------- | -------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
+| `@dayopt/assets`        | `.`, `./brand`, `./logo-artwork`, `./og`, `./og-card-image`, `./og-fonts`, `./og-screenshot` | `@dayopt/components`, `@dayopt/product`, `@dayopt/web` |
+| `@dayopt/billing`       | `.`                                                                                          | `@dayopt/product`, `@dayopt/web`                       |
+| `@dayopt/components`    | `.`, `./brand`, `./testing/modal-menu`                                                       | `@dayopt/product`, `@dayopt/storybook`, `@dayopt/web`  |
+| `@dayopt/config`        | `.`                                                                                          | `@dayopt/i18n`, `@dayopt/product`, `@dayopt/web`       |
+| `@dayopt/foundations`   | `./og-colors`, `./scrollbar.css`, `./tokens.css`                                             | `@dayopt/product`, `@dayopt/storybook`, `@dayopt/web`  |
+| `@dayopt/i18n`          | `./navigation`, `./request`, `./routing`                                                     | `@dayopt/product`, `@dayopt/web`                       |
+| `@dayopt/observability` | `.`, `./build-gate`                                                                          | `@dayopt/product`, `@dayopt/web`                       |
 
 ## 関係
 
@@ -557,4 +559,4 @@ page から import を宣言元まで解決して辿った結果（barrel の再
 | `external-calendar` | 26     | 19        | 2         | 1 / 2                  |
 | `review`            | 37     | 22        | 19        | 14 / 19                |
 | `settings`          | 49     | 39        | 22        | 18 / 22                |
-| `timeblock`         | 98     | 54        | 18        | 12 / 18                |
+| `timeblock`         | 100    | 54        | 20        | 14 / 20                |

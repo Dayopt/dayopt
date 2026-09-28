@@ -9,20 +9,38 @@ const FULL_UNIT_STEP_NAME = 'Run unit tests (full)';
 const SHA_PATTERN = /^[0-9a-f]{40}$/;
 const REPOSITORY_PATTERN = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
 
+/** Return the explicit full-test result, or null when this attempt did not run that step. */
+export function fullUnitStepResult(jobs) {
+  if (!Array.isArray(jobs)) return null;
+  const job = jobs.find((candidate) => candidate?.name === FULL_UNIT_JOB_NAME);
+  if (!Array.isArray(job?.steps)) return null;
+  const step = job.steps.find((candidate) => candidate?.name === FULL_UNIT_STEP_NAME);
+  if (!step || step.conclusion === 'skipped') return null;
+  return job.conclusion === 'success' && step.conclusion === 'success' ? 'success' : 'failure';
+}
+
+/** Return an executed full-test result with its actual step start time. */
+export function fullUnitStepEvidence(jobs) {
+  const result = fullUnitStepResult(jobs);
+  if (result === null) return null;
+
+  const job = jobs.find((candidate) => candidate?.name === FULL_UNIT_JOB_NAME);
+  const step = job.steps.find((candidate) => candidate?.name === FULL_UNIT_STEP_NAME);
+  const startedAt = Date.parse(step.started_at ?? '');
+  const completedAt = step.completed_at == null ? null : Date.parse(step.completed_at);
+  if (!Number.isFinite(startedAt) || (completedAt !== null && !Number.isFinite(completedAt))) {
+    throw new Error('full-unit step is missing a valid started_at or completed_at timestamp');
+  }
+  if (step.conclusion !== null && completedAt === null) {
+    throw new Error('completed full-unit step is missing a valid completed_at timestamp');
+  }
+
+  return { result, startedAt, completedAt };
+}
+
 /** A successful check requires both the job and the explicit full-test step to succeed. */
 export function hasSuccessfulFullUnitStep(jobs) {
-  return (
-    Array.isArray(jobs) &&
-    jobs.some(
-      (job) =>
-        job?.name === FULL_UNIT_JOB_NAME &&
-        job?.conclusion === 'success' &&
-        Array.isArray(job.steps) &&
-        job.steps.some(
-          (step) => step?.name === FULL_UNIT_STEP_NAME && step?.conclusion === 'success',
-        ),
-    )
-  );
+  return fullUnitStepResult(jobs) === 'success';
 }
 
 /** Manual runs always repeat the full suite; scheduled runs may reuse explicit evidence. */
@@ -42,7 +60,11 @@ function readJsonLines(args, execImpl = execFileSync) {
     .map((line) => JSON.parse(line));
 }
 
-/** Search only earlier runs of the same workflow and SHA. API failure is handled by caller. */
+/**
+ * Find the most recently started full-unit step across all runs of the same workflow and SHA.
+ * A newer skipped attempt does not replace evidence; an executed failure does. API failure is
+ * handled by caller.
+ */
 export function hasPreviousSuccessfulFullUnitRun({
   repository,
   headSha,
@@ -54,6 +76,7 @@ export function hasPreviousSuccessfulFullUnitRun({
   }
   const runs = readJsonLines(
     [
+      '--paginate',
       `repos/${repository}/actions/workflows/nightly.yml/runs?head_sha=${headSha}&branch=main&per_page=100`,
       '--jq',
       '.workflow_runs[] | @json',
@@ -61,15 +84,19 @@ export function hasPreviousSuccessfulFullUnitRun({
     execImpl,
   );
 
+  const evidence = [];
   for (const run of runs) {
-    if (
-      run?.head_sha !== headSha ||
-      String(run?.id ?? '') === String(currentRunId ?? '') ||
-      !Number.isSafeInteger(run?.run_attempt) ||
-      !Number.isSafeInteger(run?.id)
-    ) {
+    if (run?.head_sha !== headSha || String(run?.id ?? '') === String(currentRunId ?? '')) {
       continue;
     }
+    if (
+      !Number.isSafeInteger(run?.id) ||
+      !Number.isSafeInteger(run?.run_attempt) ||
+      run.run_attempt < 1
+    ) {
+      throw new Error('matching workflow run is missing valid id or run_attempt');
+    }
+
     for (let attempt = run.run_attempt; attempt >= 1; attempt -= 1) {
       const jobs = readJsonLines(
         [
@@ -79,10 +106,23 @@ export function hasPreviousSuccessfulFullUnitRun({
         ],
         execImpl,
       );
-      if (hasSuccessfulFullUnitStep(jobs)) return true;
+      const result = fullUnitStepEvidence(jobs);
+      if (result) {
+        evidence.push(result);
+        break;
+      }
     }
   }
-  return false;
+  if (evidence.length === 0) return false;
+
+  const latestStart = Math.max(...evidence.map((item) => item.startedAt));
+  const latestByStart = evidence.filter((item) => item.startedAt === latestStart);
+  if (latestByStart.some((item) => item.completedAt === null)) return false;
+
+  const latestCompletion = Math.max(...latestByStart.map((item) => item.completedAt));
+  return latestByStart
+    .filter((item) => item.completedAt === latestCompletion)
+    .every((item) => item.result === 'success');
 }
 
 function appendOutput(path, name, value) {
@@ -106,8 +146,8 @@ async function main() {
         currentRunId: process.env.GITHUB_RUN_ID,
       });
       reason = previousSuccessfulRun
-        ? 'same SHA has a successful full-unit run'
-        : 'no successful full-unit run exists for this SHA';
+        ? 'latest executed full-unit check succeeded for this SHA'
+        : 'rerun because no reusable full-unit result exists for this SHA';
     } catch {
       // API/auth/network errors may never be interpreted as successful evidence.
       previousSuccessfulRun = false;

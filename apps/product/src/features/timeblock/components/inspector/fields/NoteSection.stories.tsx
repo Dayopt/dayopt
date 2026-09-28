@@ -15,24 +15,11 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-function NoteSectionDemo({
-  initialNote = '',
-  disabled = false,
-}: {
-  initialNote?: string | undefined;
-  disabled?: boolean | undefined;
-}) {
+function NoteSectionDemo({ initialNote = '' }: { initialNote?: string | undefined }) {
   const [note, setNote] = useState(initialNote);
   return (
     <div className="bg-card mx-auto w-80 rounded-2xl px-4 py-2 shadow-sm">
-      <NoteSection
-        label="メモ"
-        icon={StickyNote}
-        note={note}
-        onNoteChange={setNote}
-        placeholder="メモを入力..."
-        disabled={disabled}
-      />
+      <NoteSection label="メモ" icon={StickyNote} note={note} onNoteChange={setNote} />
     </div>
   );
 }
@@ -49,12 +36,6 @@ export const WithNote: Story = {
   render: () => <NoteSectionDemo initialNote="設計レビューで確認した内容を整理する。" />,
 };
 
-/** 編集できないメモ。 */
-export const Disabled: Story = {
-  args: { label: 'メモ', note: '', onNoteChange: () => undefined },
-  render: () => <NoteSectionDemo initialNote="変更できないメモ" disabled />,
-};
-
 /** 主要状態の一覧。 */
 export const AllPatterns: Story = {
   args: { label: 'メモ', note: '', onNoteChange: () => undefined },
@@ -62,7 +43,6 @@ export const AllPatterns: Story = {
     <div className="flex flex-col gap-8">
       <NoteSectionDemo />
       <NoteSectionDemo initialNote="設計レビューで確認した内容を整理する。" />
-      <NoteSectionDemo initialNote="変更できないメモ" disabled />
     </div>
   ),
 };

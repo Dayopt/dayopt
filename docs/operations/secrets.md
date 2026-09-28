@@ -681,3 +681,9 @@ reCAPTCHA 関連 env は旧方式。新規設定・docs・example には追加�
 - `docs/engineering/infra.md` — Supabase / deployment 環境構成
 - `docs/operations/security/environment-secrets.md` — GitHub / Vercel / Supabase replica
 - `docs/operations/contact-email.md` — 問い合わせのDNS / mailbox / release運用
+
+### Cloud Preview の未初期化台帳（#2910）
+
+`ci/preview-e2e` の4参照は **planned master** としてoptional/pendingで登録した。item・値の実在、GitHubへの保存、権限の十分性を確認した証拠ではない。対象は `PREVIEW_E2E_VERCEL_TOKEN`、`PREVIEW_E2E_SUPABASE_READINESS_TOKEN`、`PREVIEW_E2E_BYPASS_SECRET`、`PREVIEW_E2E_SUPABASE_KEY`。Productionのmasterを複製せず、所有者が非本番用masterと `Preview – product` Environment replicaを保存する。Environmentのbranch policyは `integration` だけ。Cloud workerは個人Vaultを開かない。
+
+既存 `sync-ci-environment-secrets.sh` のProduction同期は実行しない。新しい参照は同scriptにpendingコメントとして対応だけ記録し、実行対象に加えていない。設定保存はユーザーが行う。実在・同期を検証して初期化済みにする判断は別途行う。

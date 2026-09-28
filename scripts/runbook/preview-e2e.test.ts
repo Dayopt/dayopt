@@ -1,4 +1,14 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -57,7 +67,8 @@ function scenario() {
     );
     return 0;
   });
-  return { root, observe, execute };
+  const recover = vi.fn(async () => ({ status: 'clean', checked: 2, recovered: 0 }));
+  return { root, observe, execute, recover };
 }
 
 describe('Preview E2E runner', () => {
@@ -69,6 +80,7 @@ describe('Preview E2E runner', () => {
       env,
       observe: s.observe,
       execute: s.execute,
+      recover: s.recover,
       tempRoot: s.root,
       onStarted: ({ evidenceDirectory }) => {
         startedManifest = JSON.parse(
@@ -95,11 +107,64 @@ describe('Preview E2E runner', () => {
       'private',
     );
   });
+  it('trusted supervisor starts the candidate worker in its own checkout without management tokens', async () => {
+    const s = scenario();
+    const candidateRoot = join(s.root, 'candidate');
+    const bin = join(s.root, 'bin');
+    mkdirSync(candidateRoot);
+    mkdirSync(bin);
+    const executable = join(bin, 'pnpm');
+    writeFileSync(
+      executable,
+      `#!/usr/bin/env node
+const fs = require('node:fs');
+const path = require('node:path');
+fs.writeFileSync(path.join(process.cwd(), 'worker-observation.json'), JSON.stringify({cwd:process.cwd(), hasManagement: Boolean(process.env.VERCEL_TOKEN || process.env.SUPABASE_PREVIEW_READINESS_TOKEN || process.env.STRIPE_SECRET_KEY), runId:process.env.E2E_PREVIEW_RUN_ID, cloudIntent:process.env.E2E_PREVIEW_CLOUD_INTENT, desktop:process.env.E2E_PREVIEW_DESKTOP_USER_ID, mobile:process.env.E2E_PREVIEW_MOBILE_USER_ID}));
+fs.writeFileSync(path.join(process.env.E2E_PREVIEW_EVIDENCE_DIR, 'e2e.json'), JSON.stringify({status:'passed',expected:2,tests:['chromium','Mobile Chrome'].map(project=>({file:'critical-path.spec.ts',project,status:'passed',expectedPassed:true,retry:0}))}));
+`,
+    );
+    chmodSync(executable, 0o700);
+    const runDirectory = join(s.root, 'cloud-run');
+    const runId = '11111111-1111-4111-8111-111111111111';
+    const cloudUserIds = {
+      desktop: '22222222-2222-4222-8222-222222222222',
+      mobile: '33333333-3333-4333-8333-333333333333',
+    };
+    const result = await runPreviewE2E({
+      request: {},
+      env: { ...env, PATH: `${bin}:${process.env.PATH}` },
+      candidateRoot,
+      runDirectory,
+      runId,
+      cloudUserIds,
+      observe: s.observe,
+      recover: s.recover,
+    });
+    expect(result.status).toBe('passed');
+    expect(result.evidenceDirectory).toBe(join(runDirectory, 'evidence'));
+    expect(
+      JSON.parse(readFileSync(join(candidateRoot, 'worker-observation.json'), 'utf8')),
+    ).toEqual({
+      cwd: realpathSync(candidateRoot),
+      hasManagement: false,
+      runId,
+      cloudIntent: '1',
+      ...cloudUserIds,
+    });
+    expect(existsSync(join(runDirectory, 'private'))).toBe(false);
+  });
   it('readiness失敗時はE2Eを起動しない', async () => {
     const s = scenario();
     s.observe.mockRejectedValueOnce(new Error('private'));
     await expect(
-      runPreviewE2E({ request: {}, env, observe: s.observe, execute: s.execute, tempRoot: s.root }),
+      runPreviewE2E({
+        request: {},
+        env,
+        observe: s.observe,
+        execute: s.execute,
+        recover: s.recover,
+        tempRoot: s.root,
+      }),
     ).rejects.toThrow();
     expect(s.execute).not.toHaveBeenCalled();
   });
@@ -111,6 +176,7 @@ describe('Preview E2E runner', () => {
       env,
       observe: s.observe,
       execute: s.execute,
+      recover: s.recover,
       tempRoot: s.root,
     });
     expect(result).toMatchObject({ status: 'failed', failure: 'post-readiness-failed' });
@@ -123,9 +189,52 @@ describe('Preview E2E runner', () => {
       env,
       observe: s.observe,
       execute: s.execute,
+      recover: s.recover,
       tempRoot: s.root,
     });
     expect(result).toMatchObject({ status: 'failed', failure: 'e2e-evidence-missing' });
+  });
+  it('E2E成功でもcleanup未確認は失敗し、開始時の回復用bindingを保存する', async () => {
+    const s = scenario();
+    s.execute.mockImplementationOnce(async (workerEnv: Record<string, string>) => {
+      const started = JSON.parse(
+        readFileSync(join(workerEnv.E2E_PREVIEW_EVIDENCE_DIR!, 'run.json'), 'utf8'),
+      );
+      expect(started.status).toBe('running');
+      expect(started.before).toEqual(ready);
+      expect(started.runId).toBe(workerEnv.E2E_PREVIEW_RUN_ID);
+      writeFileSync(
+        join(workerEnv.E2E_PREVIEW_EVIDENCE_DIR!, 'e2e.json'),
+        JSON.stringify({
+          status: 'passed',
+          expected: 2,
+          tests: ['chromium', 'Mobile Chrome'].map((project) => ({
+            file: 'critical-path.spec.ts',
+            project,
+            status: 'passed',
+            expectedPassed: true,
+            retry: 0,
+          })),
+        }),
+      );
+      return 0;
+    });
+    s.recover.mockResolvedValueOnce({ status: 'failed', checked: 2, recovered: 0 });
+    const result = await runPreviewE2E({
+      request: {},
+      env,
+      observe: s.observe,
+      execute: s.execute,
+      recover: s.recover,
+      tempRoot: s.root,
+    });
+    expect(result).toMatchObject({ status: 'failed', failure: 'cleanup-unconfirmed' });
+    expect(s.recover).toHaveBeenCalledWith(
+      expect.objectContaining({
+        runId: result.runId,
+        supabaseProjectRef: ready.supabaseProjectRef,
+      }),
+    );
   });
   it('子プロセスには管理tokenと本番secretを渡さない', () => {
     const worker = previewWorkerEnvironment(

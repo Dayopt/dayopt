@@ -146,7 +146,15 @@ describe('ci.yml の token 分離（credential audit P2-6）', () => {
     const tokenJobs = ciJobs.filter((job) => /github\.token|secrets\.GITHUB_TOKEN/.test(job.text));
 
     // impact / unit（read-only で PR files を読む）と migration-notice（コードを実行しない）
-    expect(tokenJobs.map((job) => job.id)).toEqual(['impact', 'unit', 'migration-notice']);
+    expect(tokenJobs.map((job) => job.id)).toEqual([
+      'impact',
+      'unit',
+      'migration-notice',
+      'preview-trust',
+      'preview-e2e',
+      'preview-recovery-trust',
+      'preview-recovery',
+    ]);
     for (const job of tokenJobs) {
       const effective = readPermissions(job.lines, 4) ?? workflowPermissions;
       if (repositoryCodeMarkers(job).length > 0) {
@@ -259,7 +267,7 @@ describe('ci.yml の token 分離（credential audit P2-6）', () => {
       expect(writeTokenOffenders(fine)).toEqual([]);
     });
 
-    it('実ファイルから 6 job を読めている（切り出しの空振りで全 assert が素通りしない）', () => {
+    it('実ファイルから 10 job を読めている（切り出しの空振りで全 assert が素通りしない）', () => {
       expect(ciJobs.map((job) => job.id)).toEqual([
         'impact',
         'static',
@@ -267,6 +275,10 @@ describe('ci.yml の token 分離（credential audit P2-6）', () => {
         'migration-notice',
         'integration',
         'db-upgrade',
+        'preview-trust',
+        'preview-e2e',
+        'preview-recovery-trust',
+        'preview-recovery',
       ]);
     });
   });

@@ -44,7 +44,7 @@ const nextConfig = {
 
   // `/api/og` resolves screenshot names only inside this app-local folder at request time.
   outputFileTracingIncludes: {
-    '/api/og': ['./public/og-screenshots/**/*'],
+    '/api/og': ['./public/og-screenshots/**/*', '../../packages/assets/fonts/*.ttf'],
   },
 
   // Next.js の agent-rules 自動生成を止める（#2693）。理由は

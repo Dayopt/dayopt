@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { expectedMigrationVersions } from '../ci/production-migration-readiness.mjs';
 import { isDirectExecution } from '../lib/is-direct-execution.mjs';
 import { isPassingPreviewReport } from '../lib/preview-e2e-reporter.mjs';
+import { recoverPreviewUsers } from './preview-cleanup.mjs';
 import {
   createPreviewRunManifest,
   ensurePreviewE2EStateRoot,
@@ -22,7 +23,14 @@ import { observePreviewReadiness, parsePreviewReadinessArgs } from './preview-re
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
-export function previewWorkerEnvironment(env, ready, privateDir, evidenceDir, runId) {
+export function previewWorkerEnvironment(
+  env,
+  ready,
+  privateDir,
+  evidenceDir,
+  runId,
+  cloudUserIds = /** @type {{desktop: string, mobile: string} | undefined} */ (undefined),
+) {
   const result = { NODE_ENV: 'test', CI: '1' };
   for (const key of ['PATH', 'HOME', 'TMPDIR', 'LANG', 'PNPM_HOME', 'PLAYWRIGHT_BROWSERS_PATH']) {
     if (env[key]) result[key] = env[key];
@@ -39,11 +47,18 @@ export function previewWorkerEnvironment(env, ready, privateDir, evidenceDir, ru
     E2E_PREVIEW_RUN_ID: runId,
     E2E_PREVIEW_PRIVATE_DIR: privateDir,
     E2E_PREVIEW_EVIDENCE_DIR: evidenceDir,
+    ...(cloudUserIds
+      ? {
+          E2E_PREVIEW_CLOUD_INTENT: '1',
+          E2E_PREVIEW_DESKTOP_USER_ID: cloudUserIds.desktop,
+          E2E_PREVIEW_MOBILE_USER_ID: cloudUserIds.mobile,
+        }
+      : {}),
   };
 }
 
 /** @returns {Promise<number>} */
-function executePlaywright(env) {
+function executePlaywright(env, candidateRoot = ROOT) {
   // Cloud runners and the optional Mac path are POSIX. Own the process group so
   // a deadline cannot leave browsers running after private output is removed.
   return new Promise((resolveExit) => {
@@ -59,7 +74,7 @@ function executePlaywright(env) {
         'playwright.preview.config.ts',
       ],
       {
-        cwd: ROOT,
+        cwd: candidateRoot,
         env,
         stdio: 'ignore',
         detached: true,
@@ -124,18 +139,28 @@ function executePlaywright(env) {
  *   request: any,
  *   env?: NodeJS.ProcessEnv,
  *   observe?: typeof observePreviewReadiness,
+ *   candidateRoot?: string,
  *   execute?: (env: any) => Promise<number>,
+ *   recover?: typeof recoverPreviewUsers,
  *   tempRoot?: string,
  *   onStarted?: (started: { runId: string; evidenceDirectory: string }) => void,
+ *   runDirectory?: string,
+ *   runId?: string,
+ *   cloudUserIds?: { desktop: string, mobile: string },
  * }} options
  */
 export async function runPreviewE2E({
   request,
   env = process.env,
   observe = observePreviewReadiness,
-  execute = executePlaywright,
+  candidateRoot = ROOT,
+  execute = (workerEnv) => executePlaywright(workerEnv, candidateRoot),
+  recover = recoverPreviewUsers,
   tempRoot = previewE2EStateRoot(env),
   onStarted = () => {},
+  runDirectory = undefined,
+  runId = randomUUID(),
+  cloudUserIds = /** @type {{desktop: string, mobile: string} | undefined} */ (undefined),
 }) {
   if (!env.SUPABASE_SECRET_KEY?.trim())
     throw new Error('Nonproduction test credentials are required');
@@ -144,10 +169,12 @@ export async function runPreviewE2E({
     supabaseToken: env.SUPABASE_PREVIEW_READINESS_TOKEN,
     bypassSecret: env.VERCEL_AUTOMATION_BYPASS_SECRET,
   };
-  const runId = randomUUID();
+  if (!/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(runId))
+    throw new Error('Preview run identity is invalid');
   const before = await observe({ ...request, ...credentials });
-  const stateRoot = ensurePreviewE2EStateRoot(tempRoot);
-  const directory = join(stateRoot, runId);
+  const directory = runDirectory
+    ? resolve(runDirectory)
+    : join(ensurePreviewE2EStateRoot(tempRoot), runId);
   mkdirSync(directory, { mode: 0o700 });
   const privateDir = join(directory, 'private');
   const evidenceDir = join(directory, 'evidence');
@@ -155,6 +182,11 @@ export async function runPreviewE2E({
   mkdirSync(evidenceDir, { mode: 0o700 });
   let manifest = createPreviewRunManifest({ runId, ready: before, evidenceDirectory: evidenceDir });
   writePreviewRunManifest(directory, manifest);
+  writeFileSync(
+    join(evidenceDir, 'run.json'),
+    JSON.stringify({ runId, status: 'running', before, evidenceDirectory: evidenceDir }),
+    { mode: 0o600 },
+  );
   try {
     onStarted?.({ runId, evidenceDirectory: evidenceDir });
   } catch {
@@ -169,12 +201,25 @@ export async function runPreviewE2E({
   let after = null;
   let failure = 'execution-failed';
   try {
-    exitCode = await execute(previewWorkerEnvironment(env, before, privateDir, evidenceDir, runId));
+    exitCode = await execute(
+      previewWorkerEnvironment(env, before, privateDir, evidenceDir, runId, cloudUserIds),
+    );
   } catch {
     // A raw process error can contain env, command output, or request details.
   } finally {
     clearInterval(heartbeat);
     rmSync(privateDir, { recursive: true, force: true });
+  }
+  let cleanup = { status: 'failed', checked: 0, recovered: 0 };
+  try {
+    cleanup = await recover({
+      evidenceDirectory: evidenceDir,
+      runId,
+      supabaseProjectRef: before.supabaseProjectRef,
+      serviceKey: env.SUPABASE_SECRET_KEY,
+    });
+  } catch {
+    // Invalid journal or raw provider errors cannot be disclosed.
   }
   try {
     after = await observe({ ...request, ...credentials });
@@ -187,13 +232,20 @@ export async function runPreviewE2E({
   } catch {
     failure = 'e2e-evidence-missing';
   }
-  const passed = exitCode === 0 && after !== null && isPassingPreviewReport(report);
+  if (cleanup.status !== 'clean' || cleanup.checked < 2) failure = 'cleanup-unconfirmed';
+  const passed =
+    exitCode === 0 &&
+    after !== null &&
+    isPassingPreviewReport(report) &&
+    cleanup.status === 'clean' &&
+    cleanup.checked >= 2;
   const result = {
     runId,
     status: passed ? 'passed' : 'failed',
     failure: passed ? null : failure,
     before,
     after,
+    cleanup,
     evidenceDirectory: evidenceDir,
   };
   // Raw Playwright output, including error-context files, is never an upload target.
@@ -259,11 +311,17 @@ if (isDirectExecution(import.meta.url)) {
       console.log(JSON.stringify(result, null, 2));
     } else {
       const request = parsePreviewReadinessArgs(args);
+      const gitEnvironment = Object.fromEntries(
+        ['PATH', 'HOME', 'LANG', 'GIT_TERMINAL_PROMPT'].flatMap((key) =>
+          process.env[key] ? [[key, process.env[key]]] : [],
+        ),
+      );
       const git = (gitArgs) =>
         execFileSync('git', gitArgs, {
           cwd: ROOT,
           encoding: 'utf8',
           stdio: ['ignore', 'pipe', 'pipe'],
+          env: gitEnvironment,
         }).trim();
       if (git(['rev-parse', 'HEAD']) !== request.sha || git(['status', '--porcelain']) !== '') {
         throw new Error('Candidate checkout is not clean or does not match SHA');

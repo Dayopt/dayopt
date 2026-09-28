@@ -117,15 +117,15 @@ GitHub は private repo の billable job duration を次の 1 分へ切り上げ
 
 ### 予算レバー台帳
 
-| レバー                                                     | 状態                               | 効果 / 次の確認                                                                                                         |
-| ---------------------------------------------------------- | ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| Web / package Unit を変更 workspace に絞る                 | 実装済み（#2930）、使用量は未計測  | Product の related/full 判定と fail-closed を維持する                                                                   |
-| Nightly full Unit を同一 SHA の成功証拠がある日は省略      | 実装済み（#2930）、使用量は未計測  | 週 40 分が変更前の上限目安。手動実行・証拠取得失敗時は full suite を実行する                                            |
-| Validation shadow / gate の自動実行を停止                  | GitHub UI で停止済み（2026-09-28） | 週 997 分の自動実行を停止。required checks ではない。#2811 の gate 展開は別件として維持し、required checks に追加しない |
-| 15 分 heartbeat Actions schedule を停止                    | 停止（push・日次監査は維持）       | 変更前は週 51 分。`/api/health/cron` の外形監視設定は未確認のため、push時・日次監査が残る                               |
-| Storybook browser suite を story / dependency 影響時に限定 | 未実施                             | 週 117 分。安全な依存判定がないため full suite を維持し、誤 skip のリスクを取らない                                     |
-| E2E を self-hosted runner へ切り替え                       | 選択肢のみ                         | runner 登録と変数設定は User 操作。[self-hosted-runner.md](../operations/self-hosted-runner.md)                         |
-| Actions の追加課金予算                                     | `$0` / 上限時停止のまま            | 変更しない。枠を超える場合も超過課金は起こさず workflow が停止する                                                      |
+| レバー                                                     | 状態                                | 効果 / 次の確認                                                                                                         |
+| ---------------------------------------------------------- | ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| Web / package Unit を変更 workspace に絞る                 | 実装済み（#2930）、使用量は未計測   | Product の related/full 判定と fail-closed を維持する                                                                   |
+| Nightly full Unit は直近に実走した同一 SHA が成功なら省略  | 実装済み（#2930）、未計測・判定修正 | 新しい同一 SHA の全件テスト失敗時・手動実行・証拠取得失敗時は full suite を実行する                                     |
+| Validation shadow / gate の自動実行を停止                  | GitHub UI で停止済み（2026-09-28）  | 週 997 分の自動実行を停止。required checks ではない。#2811 の gate 展開は別件として維持し、required checks に追加しない |
+| 15 分 heartbeat Actions schedule を停止                    | 停止（push・日次監査は維持）        | 変更前は週 51 分。`/api/health/cron` の外形監視設定は未確認のため、push時・日次監査が残る                               |
+| Storybook browser suite を story / dependency 影響時に限定 | 未実施                              | 週 117 分。安全な依存判定がないため full suite を維持し、誤 skip のリスクを取らない                                     |
+| E2E を self-hosted runner へ切り替え                       | 選択肢のみ                          | runner 登録と変数設定は User 操作。[self-hosted-runner.md](../operations/self-hosted-runner.md)                         |
+| Actions の追加課金予算                                     | `$0` / 上限時停止のまま             | 変更しない。枠を超える場合も超過課金は起こさず workflow が停止する                                                      |
 
 **#2930 の CI 最適化は default branch に merge 済みだが、削減効果は未計測。Actions 使用量の再計測は保留する。** 後日計測する場合は、必須 checks を残した状態で 30 日換算 2,400 分以内を目標にし、`partial: true` の集計は判断に使わない。30 日分は API 上限と時間上限を守るため、週ごとに分割して集計する。
 
@@ -174,21 +174,50 @@ node scripts/runbook/preview-readiness.mjs \
 - Preview の `/api/health/version` が返す完全 SHA / deployment ID / DB ref、および `/api/health` の DB 疎通も照合する。本番の version 応答は従来どおり。欠測や古いアプリは未確認として失敗する。
 - 成功 JSON は識別子・migration versions・観測開始/終了時刻のみ。各サービスを原子的に読んだ snapshot ではないため、`preview-e2e.mjs` は E2E 前後に照合する。共有 DB の候補競合を防ぐ排他は別途必要。
 
-非ローカルで service role を使う既存 E2E は `E2E_ALLOW_NONLOCAL_SUPABASE=1` に加え `E2E_SUPABASE_PROJECT_REF` を要求し、対応する HTTPS Supabase origin だけに接続する。これは上の readiness を代替しない。critical-path の synthetic user は実行ごとに password を生成し、作成成功を確認した同じ client/user だけを cleanup する。setup・cleanup の失敗は test を失敗させ、cleanup エラーには合成 user ID と失敗箇所だけを残す。remote run はrun開始前に `manifest.json` を保存し、`users/<UUID>.json` に作成前から状態を記録し、Auth の app_metadata に `e2e_run_id` を付ける。manifest/state/evidence は既定で `~/.local/state/dayopt/preview-e2e/<run UUID>/` に mode `0700/0600` で保存する。別の保存先を使うときだけ `E2E_PREVIEW_STATE_DIR` を明示する。manifestとuser記録にpassword、email、token、raw responseは保存しない。
+非ローカルで service role を使う既存 E2E は `E2E_ALLOW_NONLOCAL_SUPABASE=1` に加え `E2E_SUPABASE_PROJECT_REF` を要求し、対応する HTTPS Supabase origin だけに接続する。これは上の readiness を代替しない。critical-path の synthetic user は実行ごとに password を生成し、作成成功を確認した同じ client/user だけを cleanup する。setup・cleanup の失敗は test を失敗させ、cleanup エラーには合成 user ID と失敗箇所だけを残す。remote run は実行開始前に `manifest.json` と `evidence/run.json` を保存し、`users/<UUID>.json` に作成前から状態を記録し、Auth の app_metadata に `e2e_run_id` を付ける。manifest/state/evidence は既定で `~/.local/state/dayopt/preview-e2e/<run UUID>/` に mode `0700/0600` で保存する。別の保存先を使うときだけ `E2E_PREVIEW_STATE_DIR` を明示する。manifestとuser記録にpassword、email、token、raw responseは保存しない。子プロセス終了後は `preview-cleanup.mjs` がjournal全件を先に検証し、Auth adminで同じrun ID・user ID・合成メールnamespaceが一致するユーザーだけを回収して削除後の不在を確認する。基準fixture・別run・Productionは対象外。
 
 [Protection Bypass の公式仕様](https://vercel.com/docs/deployment-protection/methods-to-bypass-deployment-protection/protection-bypass-automation)に従い、readiness の bypass header は API で確認した具体 deployment の origin だけへ送る。redirect は拒否する。ブラウザ全体への header 設定や query parameter への secret 埋込は使わない。[Playwright trace はネットワークも記録する](https://playwright.dev/docs/api/class-tracing)ため、remote E2E では生の Playwright trace/video/標準reportを保存先から除外する。代わりに下記の限定した操作記録を残す。通常CI/ローカルの既存traceは変更しない。
 
 #### Remote E2E の実行
 
-`node scripts/runbook/preview-e2e.mjs` に上記 readiness と同じ引数を渡す。さらに承認済み非本番の `SUPABASE_SECRET_KEY` が必要。readiness に成功した具体 deployment に対し、既存の desktop / mobile critical-path（作成・reload・Report確認）を実行し、終了後に再照合する。localhost の build / 起動はしない。個人の1Password認証も呼び出さない。run IDとstate directoryは実行開始時に出力される。実クラウドでの通し確認とCIへの配線はまだ未完了。
+`node scripts/runbook/preview-e2e.mjs` に上記 readiness と同じ引数を渡す。さらに承認済み非本番の `SUPABASE_SECRET_KEY` が必要。readiness に成功した具体 deployment に対し、既存の desktop / mobile critical-path（作成・reload・Report確認）を実行し、終了後に再照合する。localhost の build / 起動はしない。個人の1Password認証も呼び出さない。run IDとstate directoryは実行開始時に出力される。既存CIからの明示opt-in経路は下記。実クラウドでの通し確認はまだ未完了。
 
 - 子プロセスへは非本番DB keyと当該Previewのbypassだけを渡し、Vercel/Supabase管理tokenや他のアプリSecretは引き継がない。信頼できるコード・runnerでのみ実行する。未審査のforkへSecretを渡す仕組みではない。
 - ブラウザ通信は具体Preview、選択したSupabase、CAPTCHA providerに限定する。本番domainを含むその他originは拒否する。bypassはPreviewだけへ1 hopずつ付け、redirect先で再判定する。
-- 再試行は0、workerは1、Playwright全体5分。runnerの7分上限とSIGINT/SIGTERM時は、自分が起動したprocess groupを停止してraw Playwright出力を消す。SIGKILLやhost終了では `private/` が残る可能性があるため、通常の合成ユーザーcleanupとは別に復旧コマンドを使う。
+- 再試行は0、workerは1、Playwright全体5分。runnerの7分上限とSIGINT/SIGTERM時は自分が起動したprocess groupを停止し、private Playwright出力を削除する。子プロセス終了後にjournal cleanupを行い、その確認結果をpass条件に含める。SIGKILLやhost終了でcleanup前に停止した場合、process停止だけではDB上の合成user削除を保証しないため、下の回復経路を使う。
 - 中断後の一覧は `node scripts/runbook/preview-e2e.mjs --list-recovery-runs`、明示したrunだけの回収は `node scripts/runbook/preview-e2e.mjs --recover-run <run UUID>`。**回収コマンドは現在の `origin/main` と完全一致するclean checkoutからのみ実行する。** コマンドが先に `origin/main` をfetchし、SHAとworking treeを照合する。回収処理は保存済み候補のdeployment/SHA/branch/DB ref/branch UUID/migration集合を再照合し、`running` / `recovering` の最後のheartbeatが10分以内なら停止する。`users/<UUID>.json` に列挙されたIDだけを対象にし、Auth user ID・`app_metadata.e2e_run_id`・critical-path用の合成emailが一致する場合に限って、そのuser IDの records/plans/activities/categories/user_settings/profiles とAuth userを消し、各テーブルとAuthの不在を確認する。Auth userが見つからない場合は各所有テーブルが既に0件かだけを確認し、残存行があれば所有を推測して削除せず手動確認で止める。失敗時はmanifestを保持して再試行可能にし、他run・基準fixture・未知ユーザー・DB全体には触れない。
-- 成果物は表示された `evidenceDirectory` だけを収集する。`run.json` はrun IDと前後のreadiness、`e2e.json` は操作のコード位置・時間・成否、通信先種別・HTTP status、失敗時PNGへの参照、`users/*.json` は合成ユーザーの状態、`recovery.json` は回収したユーザーIDだけ。raw stdout/stderr、失敗メッセージ、入力値、URL query、header、cookie、通信bodyは出力しない。通常終了したrunの内部Playwright出力は削除する。
+- 成果物は表示された `evidenceDirectory` だけを収集する。`run.json` はrun IDと前後のreadiness・cleanupの確認件数/回収件数、`e2e.json` は操作のコード位置・時間・成否、通信先種別・HTTP status、失敗時PNGへの参照、`users/*.json` は合成ユーザーの状態、`recovery.json` はローカル回収したユーザーIDだけ。raw stdout/stderr、失敗メッセージ、入力値、URL query、header、cookie、通信bodyは出力しない。内部Playwright出力は終了後削除する。
 - これはヘッダーやDOMを再現する通常のPlaywright traceではなく、資格情報を除外した限定的な操作記録。失敗の詳細は同じSHAのソース位置と失敗画面から追う。必要な情報が足りなければ、許可された非本番環境で範囲を絞って再現する。
-- 終了コード0だけでは成功にしない。desktop/mobile両方の全対象testが初回成功し、skip/欠測/異常終了がなく、後段のreadinessも一致した時だけ `passed`。この結果を既存Validationが信頼済み証拠として受理する配線は別途必要。
+- 終了コード0だけでは成功にしない。desktop/mobile両方の全対象testが初回成功し、skip/欠測/異常終了がなく、後段のreadinessも一致し、2ユーザー以上のjournal全件で削除後の不在を確認した時だけ `passed`。この結果を既存Validationが信頼済み証拠として受理する配線は別途必要。
+
+### Cloudの明示実行（既存CI）
+
+GitHub Actionsの既存 `CI` → `Run workflow` でworkflow branchを **integration** にし、`preview_e2e=true` を指定する。PR番号・レビュー済み候補SHA・READY deployment ID・DB mode/ref/branch UUIDを全て明示する。通常のPR CIとmainのrelease経路は維持し、Cloud E2Eは独立したrunとして起動する。通常実行では `preview_recover_run` / `preview_recover_attempt` を空のままにする。default branchには既に `ci.yml` のdispatch入口がある。Integrationの新しい入力定義がUI/APIで実際に起動できるかは配線後に確認する。
+
+Secret取得前のread-only gateはOPEN・非Draft・同一repo PR・exact head SHA・許可したbase/head branchを確認する。共有モードは既存Persistentのref/UUIDに限定し、`supabase/**` が変わるPRを拒否する。隔離モードは本番・Persistentを拒否し、既存readinessがPR専用branchとの対応を照合する。gateはコードの無害性を証明しない。権限ある担当が対象コードと依存をレビューしてSHAを選び、明示dispatchする。同一workerでのinstall-before-secretsは完全なsandboxではない。未信頼のcandidateは実行しない。
+
+既存GitHub Environment **Preview – product** は、初回の管理資格情報保存前にDeployment branches/tagsを **Selected branches and tags**、許可を **branch integrationのみ** に限定する。trust gateはこの制限をAPIで照合し、unrestricted・追加branch/tag・観測失敗を拒否する。現在の環境は無制限と観測したため、ユーザーによる設定保存まで実行は停止する。Secret初期保存もユーザーが行い、値を会話へ貼らない。
+
+このEnvironmentの4値をexecute/cleanup stepにだけ注入する。repository-wide secretやProductionの同名値で代用しない。
+
+- `PREVIEW_E2E_VERCEL_TOKEN`（workerでは `VERCEL_TOKEN`）: 既存Product Preview deploymentを確認する資格情報。
+- `PREVIEW_E2E_SUPABASE_READINESS_TOKEN`（workerでは `SUPABASE_PREVIEW_READINESS_TOKEN`）: 非本番branch/migrationの確認用。runnerのSQLはread-onlyだが、tokenそのものの権限範囲は発行元で別途確認する。
+- `PREVIEW_E2E_BYPASS_SECRET`（workerでは `VERCEL_AUTOMATION_BYPASS_SECRET`）: Product PreviewのProtection用。アプリへの正規ログインは省略しない。
+- `PREVIEW_E2E_SUPABASE_KEY`（workerでは `SUPABASE_SECRET_KEY`）: 選択した非本番DBの合成user作成・所有runの回収用。隔離DBを選ぶ場合は対象DBのkeyが必要で、共有DBのkeyへfallbackしない。
+
+候補checkout前に、run UUID・desktop/mobileの予定user ID・GitHub run/attempt・trusted workflow SHA・候補/DB bindingだけの `preview-intent-<run>-<attempt>` artifactを保存する。password/keyは含まない。候補のfixture生成2ファイルはtrusted workflowの契約と一致することを要求し、古い候補が予定IDを無視する場合はAuth作成前に停止する。候補checkoutと依存・Chromiumのinstallを終えてからlive PRを再照合し、選択した非本番Authの基準合成ユーザーへのadmin GETでkeyを認証する。legacy keyのrole/refが違う場合、opaque keyの認証失敗、基準fixture欠落はいずれもuser作成前に停止する。providerの応答やメールアドレスは公開しない。続いて、信頼済みIntegrationのsupervisorで既存desktop/mobile critical pathを実行する。runごとに別concurrency groupとfixtureを持ち、他のrunを自動cancelしない。終了・失敗・cancelでは、生きているworker上の `always()` stepが所有journalだけを再回収する。Playwrightは5分、supervisorは7分、回収は120秒以内、jobは20分。VM破棄・job強制終了でこのstepが実行できない場合は、以下の別worker回収入口を使う。共有schema更新の排他leaseも未実装で、前後readinessはdriftの検出まで。
+
+通常E2Eの結果artifactは信頼済みコードで再構成した **preview.jsonだけ**。候補SHA/deployment/DB、run ID、testのファイル・行・成否、所有user ID/statusと確認フラグを含む。画像、private出力、生のJSON、error本文、title、入力値、header/cookie/bodyをuploadしない。Cloud実走・2run並列・中断回収・次のPRでの再利用は実測後に証拠を記録し、配線やunit testだけでは完了扱いにしない。
+
+### Worker消失後の限定回収
+
+同じ `CI` → `Run workflow` でworkflow branchを **integration**、`preview_e2e=true` とし、`preview_recover_run` / `preview_recover_attempt` に元の失敗run IDとattemptを指定する。PR/SHA/deployment/DB入力を再入力して回収対象を推測しない。信頼済みコードが、元run/対象attemptの完了・失敗、開始済みE2E step、元repo/workflow/ref/SHA、候補コード前に保存した一意なintent artifactをAPIで照合する。最新attemptが稼働中、元の成功、証拠不足、artifact期限切れ・置換・欠測では停止する。
+
+回収intent artifactはread-only GitHub tokenで、元run/attemptに結び付いたartifact IDを指定して取得する。`gh api` の応答ZIPは128KiB以内でメモリに保持し、展開前にREST metadataのSHA-256 digestと一致することを確認する。ZIPから読むのはroot直下の `intent.json` 1件だけで、16KiBを超える内容、追加entry、path、symlink、暗号化、破損した圧縮データを拒否し、ファイルシステムへ展開しない。取得前後のartifact ID/digestを再照合する。candidate codeは回収workerでcheckout/実行しない。資格情報を使う直前にも元run/APIを再確認し、選択した非本番Authでkeyを認証する。
+
+回収workerはintentの予定2IDだけの一時journalを再構成し、既存の回収関数で各IDをGETする。404は未作成/削除済みとして確認し、存在する場合はserver側run所有権と合成メール形式を確認してからDELETE→404確認を行う。他のAuthユーザーを一覧検索しない。同じ元run/attemptの回収は直列化し、別attemptには新しいIDを割り当てる。公開する `recovery.json` は元binding・予定ID・結果だけで、provider本文・メール・credentialsを含まない。
+
+これは明示dispatchによる別worker回収の入口で、VM消失の自動検知/起動まで接続したものではない。7日のartifact保持を過ぎた回収は証拠不足で止まる。ephemeralを回収する場合にも**元DBのkey**が必要で、Environmentに現在保存されている共有DBのkeyへfallbackしない。keyが変わった場合の再保存は所有者が行う。Cloudでのhard-loss・別attempt・並列2runの実証は未完で、unit testや配線だけを成功証拠にしない。
 
 ### ローカル E2E とブラウザ実測
 
