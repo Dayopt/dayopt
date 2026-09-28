@@ -2,13 +2,16 @@ import { resolveProtectedPathGate } from '../ci/protected-path-gate.mjs';
 
 /**
  * Advisory routing only: never a permission, readiness label, or model launcher.
- * @param {{files: string[] | null, labels?: string[], body?: string,
+ * @param {{files: string[] | null, labels?: string[], workflowStatus?: string | null,
+ * workflowStatusAvailable?: boolean, body?: string,
  * acceptance?: boolean, verification?: boolean, missingContractSections?: string[],
  * metadataAvailable?: boolean, state?: string | null}} input
  */
 export function resolveFactoryRoute({
   files,
   labels = [],
+  workflowStatus = null,
+  workflowStatusAvailable,
   body = '',
   acceptance = false,
   verification = false,
@@ -46,7 +49,11 @@ export function resolveFactoryRoute({
   if (/認可|権限境界|課金|不可逆|\b(?:RLS|OAuth|SECURITY DEFINER)\b/i.test(body)) {
     reasons.push('本文に権限・外部契約・不可逆性の手掛かり');
   }
-  const unavailable = labels.includes('status:blocked') || state?.toLowerCase() !== 'open';
+  const unavailable =
+    labels.includes('status:blocked') ||
+    workflowStatus === 'Blocked' ||
+    workflowStatusAvailable === false ||
+    state?.toLowerCase() !== 'open';
   if (unavailable) missing.push('OPEN かつ凍結されていない状態');
   const level = reasons.length > 0 ? 'L3' : missing.length > 0 ? 'unclassified' : 'L2';
   return {

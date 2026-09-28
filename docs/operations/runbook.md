@@ -1793,7 +1793,7 @@ agent が実際に踏んだ事例を、再発条件と最短の対処だけ残�
 
 ## worktree と branch:finish
 
-- **着手前は 3 点を見る**: `gh pr list`（open PR）、`git worktree list` の branch 名（commit 0 でも対象 issue 番号があれば着手済み）、`status:in-progress` label。`status:ready` は未着手を意味しない（2026-08-10、#1900 を二重実装して PR #1906 が丸ごと捨て仕事になった）。直列 merge 順の衝突は `git merge-tree --write-tree HEAD origin/<相手>` で待たずに測れる（exit 0 + tree OID なら衝突なし）
+- **着手前は 3 点を見る**: `gh pr list`（open PR）、`git worktree list` の branch 名（commit 0 でも対象 issue 番号があれば着手済み）、`Workflow status=In Progress` field。`Workflow status=Ready` は未着手を意味しない（2026-08-10、#1900 を二重実装して PR #1906 が丸ごと捨て仕事になった）。直列 merge 順の衝突は `git merge-tree --write-tree HEAD origin/<相手>` で待たずに測れる（exit 0 + tree OID なら衝突なし）
 - **worktree で `next dev` を回した後の `pnpm branch:finish` は掃除だけ止まる**: Next が `apps/product/AGENTS.md` / `CLAUDE.md` を未追跡で生成するため。merge は済んでいるので 2 ファイルを削除して再実行する（commit しない。2026-09-07 PR #2634）
 - **main checkout 上で切った branch を `branch:finish` すると main working tree を削除しに行く**: git が拒否するので破壊はされないが途中停止する。本実行の前に `git checkout main` して `--dry-run` を見る（2026-09-18 PR #2839）
 - **`gh pr merge` は他ツールの worktree が main を checkout していると失敗する**（`'main' is already used by worktree`）。ローカル git に触れない `gh api repos/Dayopt/dayopt/pulls/<N>/merge -X PUT -f merge_method=merge` へ切り替える。worktree 削除後の `git branch -d` も同じ理由で `not fully merged` と誤検知するので、`git merge-base --is-ancestor <branch> origin/main` で確定してから消す
