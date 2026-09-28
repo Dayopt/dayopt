@@ -42,6 +42,8 @@ function InspectorURLSyncHandler() {
 }
 
 interface TimeModelInspectorProps {
+  /** 予定 / 記録の内容末尾に表示する操作。PC / モバイルで共通。 */
+  actionsSlot?: React.ReactNode;
   /** 振り返り panel を開くコールバック（Composition Layer から注入） */
   onViewStats?: ((tagId: string) => void) | undefined;
   /** Timeblockを独立複製用のクリップボードへ保存する。 */
@@ -110,6 +112,7 @@ function toInspectorDerivedBlock(
 
 /** plans / records 対応 Inspector のトップレベル（モバイル=Drawer / PC=DockedInspectorPanel） */
 export function TimeblockInspector({
+  actionsSlot,
   onViewStats,
   onCopy,
   createContent,
@@ -282,6 +285,7 @@ export function TimeblockInspector({
       <TimeblockInspectorForm
         key={`${timeblockKind}:${target.id}:${activeQuery.isPlaceholderData ? 'placeholder' : 'loaded'}`}
         kind={timeblockKind}
+        actionsSlot={actionsSlot}
         plan={plan}
         record={record}
         relationships={relationships}

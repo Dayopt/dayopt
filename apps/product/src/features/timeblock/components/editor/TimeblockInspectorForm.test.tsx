@@ -1,3 +1,5 @@
+import type { ReactNode } from 'react';
+
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -163,6 +165,7 @@ vi.mock('../inspector/fields', () => ({
 }));
 
 vi.mock('./TimeblockRecordActions', () => ({
+  TimeblockRecordActions: ({ children }: { children: ReactNode }) => <>{children}</>,
   RecordPlanButton: ({
     beforeRecord,
     onRecorded,

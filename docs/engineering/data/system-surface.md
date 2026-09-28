@@ -557,4 +557,4 @@ page から import を宣言元まで解決して辿った結果（barrel の再
 | `external-calendar` | 26     | 19        | 2         | 1 / 2                  |
 | `review`            | 37     | 22        | 19        | 14 / 19                |
 | `settings`          | 49     | 39        | 22        | 18 / 22                |
-| `timeblock`         | 98     | 54        | 18        | 12 / 18                |
+| `timeblock`         | 100    | 54        | 20        | 14 / 20                |

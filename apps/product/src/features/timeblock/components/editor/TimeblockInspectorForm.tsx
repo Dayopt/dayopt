@@ -3,15 +3,13 @@
 /**
  * TimeblockInspector のフォーム（Level 2）
  *
- * plan / record の 1 行を受け取り、パネル最上部のヘッダー行（タイトル＝アクティビティ選択 +
- * InspectorHeaderActions の「…」メニュー + 閉じる）を配線する。ヘッダーの高さ・余白は
- * AppHeader / Sidebar のヘッダー行に揃える（User指示、#2430）。
- * タグと確定済み日時は即時保存、note はデバウンスして自動保存する。
+ * plan / record の 1 行を受け取り、予定 / 記録の種別ヘッダーと独立したアクティビティカードを
+ * 配線する。タグと確定済み日時は即時保存、note はデバウンスして自動保存する。
  * auto_migrated の record は RLS で不変のため読み取り専用として扱う。
  */
 
 import { useBillingAccess } from '@/lib/billing/BillingAccessProvider';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
@@ -54,18 +52,16 @@ import {
 } from '../../lib/timeblock-lane-conflict';
 import { getTimeblockMenuItems } from '../../lib/timeblock-menu-items';
 import { parseFulfillment, type Fulfillment } from '../../schemas/timeblock';
-import {
-  ActivityFieldRow,
-  InspectorHeaderActions,
-  RecordFulfillmentRow,
-} from '../inspector/fields';
+import { RecordFulfillmentRow } from '../inspector/fields';
 import { EstimationFeedforward } from './EstimationFeedforward';
+import { TimeblockActivityCard } from './TimeblockActivityCard';
 import {
   isValidTimeModelRange,
   TimeblockEditor,
   type TimeModelEditorValue,
 } from './TimeblockEditor';
-import { RecordPlanButton } from './TimeblockRecordActions';
+import { TimeblockInspectorHeader } from './TimeblockInspectorHeader';
+import { RecordPlanButton, TimeblockRecordActions } from './TimeblockRecordActions';
 import {
   TimeblockRelationshipSection,
   type TimeblockRelationshipItem,
@@ -83,6 +79,8 @@ export type TimeblockRelationships = {
 
 interface TimeModelInspectorFormProps {
   kind: TimeblockDestination;
+  /** 予定 / 記録共通の末尾の操作。未指定なら既存の記録操作を表示する。 */
+  actionsSlot?: ReactNode;
   plan?: PlanRow | undefined;
   record?: RecordRow | undefined;
   /** Plan / Record の関係取得状態と表示対象。 */
@@ -135,6 +133,7 @@ function getTimeOverlapMessageKey(
 /** plan / record 共通の Inspector フォーム。タグ・日時・メモをフィールド別に自動保存する。 */
 export function TimeblockInspectorForm({
   kind,
+  actionsSlot,
   plan,
   record,
   relationships,
@@ -633,33 +632,24 @@ export function TimeblockInspectorForm({
 
   return (
     <div className="flex flex-col">
-      {/*
-        パネル最上部のヘッダー行（タイトル＝アクティビティ選択 + 「…」メニュー + 閉じる）。
-        高さ・余白は AppHeader / Sidebar のヘッダー行（h-14、実質16pxインセット）に揃える
-        （User指示、#2430）。以前はアクティビティ行が本文側（p-4）に独立して置かれ、
-        閉じるボタンの行とは高さ・余白が揃っていなかった。
-      */}
-      <div className="flex h-14 shrink-0 items-center justify-between px-2">
-        <div className="flex min-w-0 items-center pl-2">
-          <ActivityFieldRow
-            variant="compact"
-            activityId={value.activityId}
-            activityName={selectedActivity?.name ?? t('calendar.filter.noActivity')}
-            activityIcon={selectedActivity?.icon}
-            activityColor={selectedActivity?.color}
-            uncategorized={selectedActivity?.categoryId === null}
-            onActivityChange={handleActivityChange}
-            onCreateAndSelect={handleCreateAndSelectActivity}
-            disabled={isWriteFrozen || !canUseProduct}
-            durationByActivityId={medianByActivityId}
-          />
-        </div>
-        <InspectorHeaderActions
-          menuItems={menuItems}
-          onCloseInspector={onCloseInspector}
-          disabled={isWriteFrozen}
-        />
-      </div>
+      <TimeblockInspectorHeader
+        kind={kind}
+        menuItems={menuItems}
+        onCloseInspector={onCloseInspector}
+        disabled={isWriteFrozen}
+      />
+      <TimeblockActivityCard
+        activityId={value.activityId}
+        activityName={selectedActivity?.name ?? t('calendar.filter.noActivity')}
+        categoryName={selectedActivity?.categoryName}
+        activityIcon={selectedActivity?.icon}
+        activityColor={selectedActivity?.color}
+        uncategorized={selectedActivity?.categoryId === null}
+        onActivityChange={handleActivityChange}
+        onCreateAndSelect={handleCreateAndSelectActivity}
+        disabled={isWriteFrozen || !canUseProduct}
+        durationByActivityId={medianByActivityId}
+      />
 
       <div className="space-y-3 p-4 pt-0">
         {isMigrated ? (
@@ -758,8 +748,12 @@ export function TimeblockInspectorForm({
           />
         ) : null}
 
-        {!isDuplicateMode && kind === 'plan' && isPast && targetId ? (
-          <div className="flex justify-start">
+        {!isDuplicateMode && actionsSlot !== undefined ? (
+          actionsSlot != null ? (
+            <TimeblockRecordActions>{actionsSlot}</TimeblockRecordActions>
+          ) : null
+        ) : !isDuplicateMode && kind === 'plan' && isPast && targetId ? (
+          <TimeblockRecordActions>
             <RecordPlanButton
               planId={targetId}
               beforeRecord={flushPendingEdits}
@@ -773,7 +767,7 @@ export function TimeblockInspectorForm({
                   : undefined
               }
             />
-          </div>
+          </TimeblockRecordActions>
         ) : null}
       </div>
     </div>
