@@ -1,201 +1,110 @@
 # AGENTS.md
 
-Dayopt で作業する全エージェントの provider-neutral な正本ガイダンス。通常開発は ChatGPT Chat + Codex を使い、他 provider の互換 adapter でも同じ判断層と不変条件を読む。毎セッションの入口はこのファイルとし、特定作業だけの手順は `.agents/skills/*/SKILL.md` を参照する（末尾の Skills 索引）。~200 行は予算であり、行数だけを理由に不変条件を削らない。
+Dayopt の共通指示。Project 設定を正本とし、個人設定・ホームへのリンクに依存しない。作業別の手順は必要な skill だけ読む。
 
-## レビュー規則
+## Non-Negotiables
 
-全 PR のセルフレビューと、保護対象 PR だけで使う `pr-cross-review` に共通する観点。レビューの正本は PR の diff・Issue・検証結果で、provider 固有の model 名や tool 名を全 runtime の保証として扱わない。追加 reviewer は停止中で、User の明示指示がある時だけ別途判断する。
-
-- レビューコメントは日本語で書く
-- diff によって新たに生じる、または現実に悪化する不具合だけを指摘する。問題がなければ指摘ゼロでよい
-- 指摘には優先度と、発生条件を含む現実的な failure scenario を添える
-  - **P1**: 本番でユーザー影響、データ破壊、認可漏れ、または誤課金が起きる
-  - **P2**: 現実的なエッジケースで誤動作し、修正せずに出荷すべきでない
-- 指摘には原因と最小限の安全な修正方針を含める。到達可能な failure scenario を説明できない推測は指摘しない
-- provider 固有の優先度表記は、上記の failure scenario に基づいて P1 / P2 へ正規化する
-
-重点不変条件（機械では検出できない観点）:
-
-- **REVIEW-1（ユーザー・テナント分離）**: 別ユーザーのデータへ読み書きできる経路を新規に開いていないか。RLS / authorization / service role の境界を越境していないか
-- **REVIEW-2（Dayopt の時間不変条件）**: timezone / DST / 日境界、半開区間 `[start, end)`、overlap 判定、Plan / Log の対応関係を壊していないか
-- **REVIEW-3（外部契約の後方互換性）**: MCP / public API / OAuth scope、Stripe / billing / webhook、外部 calendar sync の event / payload / field name を、既存 consumer が壊れる形で変更していないか
-- **TEST-1（挙動を証明しないテスト）**: 変更後の挙動を担保する test が、操作前から存在する要素・generic な assert・発火していない mock だけで通っていないか
-
-指摘しないもの: スタイル / 可読性 / 命名の好み、PR の大きさ、「ついで refactor」、lint・型検査で確定的に検出される違反、diff と無関係な既存問題。
+- **Cloud-first、Local-optional**。開発・画面確認はクラウドを基本とし、必要ならローカルも使う。作業中の別 worktree・branch・未コミット差分を勝手に変更しない。
+- 変更前に既存実装と関連判断を調べる。検索は `rg` を優先し、repo 全体は `rg --hidden --glob '!.git/**'`。構造は [architecture.md](docs/engineering/architecture.md)、技術規約は [conventions.md](docs/engineering/conventions.md)、用語は [glossary.md](docs/product/glossary.md) を参照する。
+- Issue / PR がある非自明な作業は `pnpm ctx <N> --reuse-brief-l1` から始める。Issue 本文が要求の正本。Brief は助言であり、古い・取得できない場合は報告して一次資料で進める。詳細は `routing`。
+- 秘密情報は [secrets.md](docs/operations/secrets.md) の境界に従う。`.env` / `.env.local` は読み書きしない。`.op-env.agent` / `.op-env.human` を使う。
+- 変更した挙動を対象 test / E2E / Storybook 等で確かめる。同じ差分・環境の成功済み検査を根拠なく繰り返さない。ready 化前の `pnpm check` と pre-push は必須。詳細は [testing.md](docs/engineering/testing.md)。
+- commit は対象 path だけ stage して差分を確認する。日本語 Conventional Commits を使い、hook を迂回しない。
 
 ## シンプルルール（判断層）
 
-迷った瞬間に戻る 5 箇条。**機能の追加・優先順位・出荷・削除を判断する時にだけ**使う。typo 修正や既存パターンへの追従で持ち出さない。
+製品判断は [strategy.md](docs/strategy.md) に従い、個人の 1 日を良くし、計画と実績の距離・操作数を減らす最小の変更を選ぶ。
 
-| #   | ルール                                             | 種別       |
-| --- | -------------------------------------------------- | ---------- |
-| 1   | **個人の 1 日が良くならないなら、作らない**        | 境界       |
-| 2   | **迷ったら、計画と実績の距離を縮める方を選ぶ**     | 優先順位   |
-| 3   | **Google Calendar / Toggl より一手少なく**         | 方法       |
-| 4   | **不可逆だけ遅く、可逆は速く**                     | タイミング |
-| 5   | **2 週間、自分が触らなかった機能は削除候補にする** | 停止       |
-
-6 個目を足す時はどれかを削る。詳細な設計原則は [docs/strategy.md](docs/strategy.md) §4。
-
-**テンポはルール4が決める**（判断ジャンル横断で使う3段階の authority level）:
-
-- **AUTONOMOUS**（可逆は速く）: 承認なしで進めて事後報告する
-- **CHECKPOINT**（価値判断の境界で止まる）: 顧客挙動・公開契約・権限/プライバシーに関わる時。選択肢を列挙し、推奨と最悪ケースを短く添えて問う（開いた質問で User に構成の仕事を戻さない。複数の判断は 1 回に束ねる）
-- **EXPLICIT AUTHORITY**（不可逆だけ遅く）: production mutation・release・データ削除・不可逆 migration・実課金。明示指示 + 独立レビュー + dry-run/backup が揃うまで実行しない。揃えられなければ実行せず failure mode を報告する
-
-この 5 箇条で裁けない判断・前提を考え直す場面・ルール自体の改訂は、次の 5 原則（番号が小さい方が優先）へ上がる:
-
-1. **破滅に賭けるな** — 失敗しても会社・信頼・安全は残るか。残らないなら期待値が高くてもやらない
-2. **思惟に反するなら、速くてもやらない** — 誰の、どんな変化のためか即答できるか
-3. **迷ったら学びが最大の方を選べ。撤退条件を決めてから始めよ**
-4. **同点なら、扉が多く残る方を選べ**
-5. **非対称なら賭けろ** — 損失に天井があり利得に天井がないなら、Rule 1 に反しない限りコミットする
+- **AUTONOMOUS**: 承認済み範囲の可逆な作業は進めて報告する。
+- **CHECKPOINT**: 顧客挙動・公開契約・権限/プライバシーの未決判断は、選択肢・推奨・最悪ケースをまとめて確認する。
+- **EXPLICIT AUTHORITY**: production mutation・release・データ削除・不可逆 migration・実課金は、明示指示 + 独立レビュー + dry-run/backup が揃うまで実行しない。
 
 ## Dayopt のコア不変条件
 
 ### 時間（Plan / Record 分離モデル）
 
-記録（Record）はユーザーが明示的に作る。**時刻の規則は 2 本だけ**で、これ以外に過去・未来で操作を出し分けない（2026-09-04 に「未来 Plan」の特別扱い 4 種を撤去した）。
-
-| 規則                                             | 対象          | 強制点                                                    |
-| ------------------------------------------------ | ------------- | --------------------------------------------------------- |
-| `end_at > start_at`                              | Plan / Record | DB trigger（`DT003`）                                     |
-| **Record は未来に終われない**（`end_at <= now`） | Record        | DB trigger `validate_record_temporal_write_v1`（`DT005`） |
-
-- **Plan**: 時間軸のどこにでも置ける。過去の Plan もドラッグ移動・リサイズ・時間編集ができ、未来の Plan も skip できる。編集しても Plan のままで Record へは変わらない
-- **Record**: 過去の事実。終了を未来へ動かす編集だけ不可。紐付け先 Plan がどこにあるかは制約しない
-- 新規作成の**既定**は end_at だけで決まる（`resolveTimeblockDestination`。過去スロット → Record、未来スロット → Plan）。作成 UI は `resolveTimeblockKindChoice` で既定と選択可否を出し、**過去スロットでだけ** Plan へ切り替えるタブを出す。未来スロットは記録タブを disabled にする（DT005）。既定経路の手数は増やさない（2026-09-07）
-- **作成 UI は編集と同じ Inspector**（右パネル / モバイル Drawer）。ドラッグ確定で作成モード（`InlineCreatePanel`）が開き、アクティビティを選んだ瞬間に作成して詳細へ切り替わる。閉じれば保存しない（明示の保存 / キャンセルは置かない）。サイドバーのアクティビティタップは既定の長さで即作成し、同じパネルで直す（取り消しはトースト）
-- **強制点は DB trigger / SQL 関数**。アプリ層（service / MCP client / UI）はその写しで、UI だけを直しても規則は変わらない
-- **規則を撤去する時は写しを全部消すまでが 1 変更**。DB / service だけ緩めて UI 側の写しが残ると「操作はできるのに保存されない」症状になり、旧規則を assert しているテストが緑のまま隠す。撤去 PR では [docs/engineering/invariants.md](docs/engineering/invariants.md) §時刻 の写し表（契約変換 / UX 先回りの 2 分類）を grep 対象にする（2026-09-07、過去 Plan のドラッグ移動が 40348e2bd の後も効かなかった件）
-- 表示用の upcoming / active / past 分類は `useCalendarData` が持つ
+- Record はユーザーが明示的に作る。時刻の規則は `end_at > start_at`（Plan / Record、DT003）と `Record.end_at <= now`（DT005）の 2 本だけ。
+- Plan は過去・未来とも編集でき、未来も skip できる。編集しても Record には変わらない。Record の紐付け先 Plan の時刻は制約しない。
+- 新規作成の既定は end_at のみで決める（`resolveTimeblockDestination`）。過去は Record / Plan を選べ、未来は Plan のみ（`resolveTimeblockKindChoice`）。これ以外に過去・未来で操作を出し分けない。
+- 作成・編集は同じ Inspector。アクティビティ選択で作成し、選択前に閉じれば保存しない。明示の保存 / キャンセルは置かない。サイドバーのアクティビティは既定長で即作成し、取り消しはトースト。
+- 強制点は DB。規則の変更は [invariants.md](docs/engineering/invariants.md) の写し表を確認し、DB / service / MCP / UI / test を一緒に更新する。timezone / DST / 日境界と半開区間 `[start, end)` を守る。
 
 ### アーキテクチャ
 
-- **依存方向は一方向**: `features/ -> lib/`。lib/ は feature 非依存。feature 間は barrel 経由のみ、deep import 禁止（`pnpm lint:boundaries` 機械強制）。規則上の DAG: Layer0(activities) → Layer1(timeblock, external-calendar) → Layer2(calendar, review)。settings は composition、auth / contact は independent。**実際の import から描いた図**は [docs/engineering/architecture.md](docs/engineering/architecture.md) の生成ブロックが持つ（規則と実態がずれたら `pnpm architecture:check` が止める）。詳細判断（domain 配置、RPC transformer 配置、Calendar Hub）は [docs/engineering/conventions.md](docs/engineering/conventions.md)
-- **新規 API は必ず tRPC**（Router → Service → Supabase の3層、feature-colocated）。REST は既存 allowlist（`/api/health/*`, `/api/v1/*`, `/api/integrations/*`, `/api/mcp`, `/api/oauth/token`, `/api/cron/*`, `/api/webhooks/*`, `/api/csp-report`）のみ
-- **状態管理**: Zustand でグローバル、useState でローカル
-- **UI**: `@dayopt/components` 第一選択、semantic token 経由のみ（`pnpm lint:tokens` 機械強制）、Storybook に無いパターンは先に Story 追加（`storybook` skill）
-- **ロジックの置き場**: 新規の集計・ビジネスロジックは TS service 層。既存 PL/pgSQL 関数は凍結資産（bug fix のみ）
-- **楽観的更新**: ユーザー操作 mutation は不可逆操作を除き全て実装（`optimistic-update` skill）
-- **エラー境界**: 機能単位で設置、アプリ全体を1つでラップしない
-- **zod**: apps/product は v3 系、apps/web は v4 系に固定（`@hookform/resolvers`の協調アップグレードが要るため統一は見送り済み）。app間でスキーマ共有しない
+- 依存は `features/ → lib/` の一方向。feature 間は barrel 経由。新規 API は feature-colocated な tRPC（Router → Service → Supabase）、REST は既存 allowlist のみ。
+- 新規ビジネスロジックは TS service 層。既存 PL/pgSQL は bug fix のみ。UI は `@dayopt/components` と semantic token を使い、未登録パターンは先に Story を追加する。
+- ユーザー操作 mutation は不可逆操作以外、楽観的更新を実装する。zod は product が v3、web が v4。詳細は技術規約と該当 skill に従う。
 
-## Non-Negotiables
+## 実装 Plan
 
-- 既存コードを検索してから変更する（`rg` / `rg --files` 優先）。repo 全体を洗う時は `rg --hidden --glob '!.git/**'`（`.git/` 以外の dot ディレクトリも対象にするため）
-- 非自明な Issue / PR の着手は `pnpm ctx <number>` を入口にする。古い・不足・取得できない情報だけ一次資料で補い、同じ事実を別コマンドで再収集しない。環境状態が必要なら `pnpm agent:preflight`、architecture / API / MCP / DB の構造調査は生成済み docs / map を先に読み、不足分だけソースコードを探索する（詳細は `routing` skill）
-- issue の起票・worker への作業依頼は `dispatch` skill の規約に従う
-- 既存の未コミット差分はユーザー作業として扱い、勝手に revert / stage しない
-- env ファイルの読み書き境界は `docs/operations/secrets.md` に従う。`.op-env.agent`/`.op-env.human` は触ってよいが、実値が入りうる `.env`/`.env.local` は読みも書きもしない
-- `git add .` は避ける。path-limited add で scope を固定する。コミット前に `git diff --cached` を確認する
-- 作業中は変更を証明する対象の検証を優先する。小さく可逆な変更で毎回全体検査を重ねない。挙動変更は対象 test / E2E / Storybook 等、高リスク変更は該当するレビュー・CI・authority 契約を満たす。ready 化前の `pnpm check` と pre-push は維持し、同じ差分・環境で通った検査は新しい根拠なく繰り返さない。どの層にテストを置くか・回帰テストの基準・CI 予算は [docs/engineering/testing.md](docs/engineering/testing.md)
-- コミットメッセージは日本語 Conventional Commits（Latin大文字語で始めると`subject-case`で弾かれる）
-- 型: 具体的な型を使う。union の variance には `as never`（`as any` 禁止）。`unknown` は型ガードと併用のみ
-- Export: named export。App Router 特殊ファイル（page/layout/loading等）のみ `export default`
-- Component: 関数宣言 + props 型の直接注釈（アロー関数 const は避ける）
-- ログ: `@/lib/logger` を使う。`console.log` は本番コード禁止
-- 命名: `utils.ts`/`helpers.ts` を避け責務を表す具体名にする
-- 語彙: 用語は `docs/product/glossary.md`（正本 `scripts/lib/glossary/terms.ts`）に従う。messages は `pnpm copy:check:strict` が値とキー名を機械検査するが、docs / skill / issue 本文は検査対象外なので旧語彙（エントリ / タグ / タスク / ブロック / 箱 / 型 / レンズ）を書かない
-- eslint-disable は最終手段。使う時は同じ行に `-- 理由` を書く。ファイル全体無効化より1行無効化を優先
-- 依存追加前に確認: ブラウザ標準/既存依存で代替できないか、Star 1000+/直近6ヶ月更新か、出口コスト（捨てる時に何が壊れるか）を1文で言えるか
-- 依存はまず利用する workspace の `package.json` へ足す。root は repo 横断の tooling だけに置く。2 workspace 以上で version を揃える価値があるものは `pnpm-workspace.yaml` の catalog へ
-- root の `package.json` scripts は人間 / agent / CI / hooks / docs から参照される安定インターフェース。改名・削除は permission allowlist と docs 参照の同時更新まで含めて 1 変更にする
-- `--no-verify` によるフックスキップは禁止（hook が機械ブロックする）
-- アクセシビリティ: アイコンボタンに `aria-label`、フォームに `label` 紐付け、タッチターゲット最小 44x44px、画像に `alt`
+必要な作業では目的・最小の方針・検証方法を短く示す。UI フローを変える時は操作数への影響、不可逆変更では復旧方法も示す。固定の書式は要求しない。高影響変更は [AI開発標準ループ](docs/operations/ai-development-loop.md) の spec-first を適用する。
 
-## 実装 Plan の必須セクション
+## レビュー規則
 
-非trivialな実装 plan を提示する時、次を順に書く（trivial な1ファイル1行修正はGoal+1行Approachのみでよいが、不可逆要素があれば規模に関わらずReversibility Table必須）:
-
-1. **Goal**（1文）
-2. **Minimum Viable Approach** — 「ついで」「将来」「綺麗に」を排除した最小骨格。追加するなら理由を併記
-3. **Step Count**（UIフロー新設・変更時のみ必須）— Google Calendar/Toggl等との操作数比較表。同数/多い場合は理由必須
-4. **Reversibility Table** — 各stepに `[minutes]`/`[hours]`/`[days]`/`[irreversible]` タグ。irreversibleは強い正当化が必要
-5. **Existing Code to Reuse** — 流用する既存関数/component の path
-6. **What I'm Not Doing** — やらないことと理由（scope creepの自己検出）
+- 日本語で、diff が生む・悪化させる不具合だけを指摘する。発生条件・原因・安全な修正方針を添える。好み・既存問題・機械検査で確定する違反は指摘しない。指摘ゼロでよい。
+- **P1**: 本番のユーザー影響・データ破壊・認可漏れ・誤課金。**P2**: 現実的な条件で誤動作し、出荷前に修正すべきもの。
+- **REVIEW-1**: ユーザー分離と RLS / authorization / service role の境界を守る。
+- **REVIEW-2**: 時間不変条件、overlap、Plan / Record の対応を守る。
+- **REVIEW-3**: MCP / API / OAuth / billing / webhook / 外部 calendar の既存契約を壊さない。
+- **TEST-1**: 操作前からある要素・generic assert・未発火 mock だけで成功する test を証明にしない。
 
 ## PR / git 運用
 
-- **束ねが標準**: 機能のまとまり単位で1 PRにする。サイズを理由に分割しない。分割してよいのは不可逆migrationの隔離、独立検証・revertしたい変更のみ
-- **PR判定3問**: (1) 同じレーンが書いたか (2) 壊れたら一緒に戻すか (3) レビュー1巡で読み切れるか
-- **PR は draft で作成**、ローカル検証（`pnpm check` + pre-pushフック）後に自己判断で ready 化する。ready化で軽量CIが起動、fix roundは ready のまま1round=1pushで積む
-- **`Closes #N` を issue ごとに1行**（`Closes #1, #2`は先頭しか閉じない）。epicや部分対応は `Refs #N`
-- **マージは merge commit 限定**（squash/rebase は repo 設定で無効化済み）。`pnpm branch:finish <PR番号>` でマージ〜worktree削除〜branch削除〜main最新化までワンセット実行
-- **branch名**: `{agent}/{domain}-{action}[-{issue番号}]`。自動生成ランダム名は最初のPR作成前に `git branch -m` でリネーム
-- **Cloud の通常 checkout**: worktree の追加作成は必須にしない。1 checkout = 1 branch = 1 PR とし、同じ検証・merge 条件を使う。`branch:finish` は対象branchの未保存差分がなくmainへ到達していることを確認後、通常checkoutをdetachして保持する。別branchで作業中のcheckoutは切り替えない
-- **worktree運用**: 1 worktree = 1 branch = 1 PR。役目を終えたら `pnpm branch:finish` がその場で削除する。置き場は runtime の既定（Codex は native worktree、Claude Code は `.claude/worktrees/`）でよく、`branch:finish` は `git worktree list` から特定する。**open PR は同時に 1 本まで**（複数 open にすると片方の merge が他方を up-to-date gate で陳腐化させ、追従 merge + CI 再走が無駄になる）。作業中に見つけた別件も新 PR にせず同じ branch に commit を分けて積む
+- 機能のまとまりで 1 PR、1 checkout = 1 branch = 1 PR。分割は不可逆 migration の隔離か独立検証・revert が必要な時だけ。
+- commit までは自律。push・PR 作成・レビュー起動は明示指示か承認済み plan の範囲で行う。branch は `codex/<domain>-<action>[-<issue>]` を基本に、他 provider はその prefix を使う。
+- PR は draft で作成し、必要な検証後に ready 化する。`Closes #N` は Issue ごとに 1 行、部分対応は `Refs #N`。
+- merge commit のみ。merge・後処理は `pnpm branch:finish <PR番号>`。他の作業が使う checkout は切り替え・削除しない。
 
 ### レビュー
 
-review threadは全件resolveしてからmerge（fix積む/反論reply/issue化のいずれかで閉じる。黙って閉じない）。同じ構造の指摘が2ラウンド連続で出たら、fixを積むのをやめ保証境界を明文化して以後は反論replyへ切り替える（ただし「点の追加」ではなく「classごと閉じる設計」に転換できないか先に検討する）。判断基準は「mergeした時点でmainより安全か」。
-
-レビューのシンプルルール: (1) 壊れる筋書きを語れないなら指摘しない、語れたなら黙殺しない (2) mergeの基準は完璧ではなくmainより安全 (3) 迷ったら点を塞ぐよりclassを閉じる。
-
-**merge の遮断は main の repository ruleset 1 本で行う**（required status checks = `🔍 Static Checks` / `📦 Unit Tests` / `🧪 Integration Tests` / `Vercel – product` / `Vercel – web`、strict up-to-date、review thread resolution、bypass actor 0。2026-09-07 の repo public 化で有効、2026-09-13 に #2640 で `Production Config Audit` を外し Integration Tests を足した）。ruleset は local / cloud / UI / API / MCP のどの経路にも同じ条件で効く。`pnpm branch:finish` は merge と worktree / branch 掃除の入口であり gate ではない。独立レビューは `scripts/ci/protected-path-gate.mjs` が判定する保護対象 PR だけを、required CI が通り head が安定した merge 候補時に GitHub の `@codex review` へ出す。基準は **外部契約 or 不可逆**（auth/OAuth/MCP、billing/webhook、migration、外部calendar provider、system API、ガードレール自身）で、通常ロジック・時間不変条件・agent 文書は対象 test / CI とセルフレビューで閉じる（#2489）。`Review policy (shadow)` は advisory のまま自動起動・required 化しない。`review:full` は User 自身が重く見る印で、Codex 起動や merge の機械入力にしない。
-
-retreat条件: `apps/product/src/features/timeblock` または `apps/product/src/lib/time` 配下のtestを削除・skipするPRは、`review:full` labelを手で付けてUser自身が目を通す（時間不変条件の安全網がそのtest自身であるため。#2489 / #2503）。
+- 全 PR をリスクに比例してセルフレビューする。main の ruleset（required checks、最新 main への追従、review thread 解決）を満たし、bypass しない。
+- `scripts/ci/protected-path-gate.mjs` が外部契約・不可逆・ガードレール変更と判定した PR だけ、CI 成功・head 安定後に `pr-cross-review` で独立レビューを依頼する。追加 reviewer は明示指示なしに起動しない。
+- 指摘は修正・根拠付き反論・Issue 化で解決する。根拠のある不具合は直し、保証境界の外への点追加を繰り返さない。merge の基準は main より安全か。
+- timeblock / lib/time 配下の test を削除・skip する PR は `review:full` を付け User の確認を受ける。この label は reviewer の自動起動条件にしない。
 
 ### レーン運用
 
-worktree で作業するセッション（レーン）は次を守る:
-
-- **止まる前に連絡**する。質問・ブロック・想定外・判断待ちが発生したら、待ち状態に入る前に (1) 何で止まっているか (2) 自分の推奨 (3) 待ち中に続行できる代替作業の有無、の3点で担当issue/PRへコメントする。黙って停止しない
-- **停止条件**: 同種のエラーに3回連続で失敗した／scope外のファイルを変更しないと解決できないと判明した／チケットが前提とする原因・機構が実測と食い違うと分かった、のいずれかに当たったら試行を続けず停止して報告する。エスカレーションは失敗ではなく正しい動作
-- **検証の証跡原則**: 検証主張には実行コマンドと出力の要点を添える。「passした」だけの報告は不可
-- **push前セルフレビューはriskに比例させる**: auth/RLS/billing/migration/公開契約/cross-feature 等の diff と既存パターン追従でない新規ロジックは、push前に敵対的セルフレビューを行い根拠を報告する。これは reviewer の自動委任条件ではない。保護対象 path に一致する PR だけ、merge 候補時に `pr-cross-review` skill で GitHub の `@codex review` を依頼する。追加 reviewer は User が明示的に再開を指示するまで起動しない
-- issue/PRコメントが内容の正本。gh は User の名義で動くので、agent が書くコメントには書き手を 1 行入れる（例:「（2026-09-22、Codex）」）。issue を畳む時は delete せず close + 一言（記録の第一の読者は AI で、delete は追跡が切れる唯一の操作）。1 worktree = 1 branch = 1 PR、役目を終えたworktreeはその場で削除する
+- 証拠が増えない試行を繰り返さない。scope・権限・要求と実測の矛盾が解消できなければ、依存作業を止めて理由・推奨・続けられる作業を報告する。
+- Issue / PR がある作業では判断・停止理由・検証結果をそこに残し、コメントに書き手を記す。Issue は理由を添えて close し、delete しない。
+- 完了報告は変更・検証コマンドと出力の要点・未確認事項を示す。実行できなかった検証を成功と扱わない。
 
 ## 委任・報告の作法
 
-- **主担当は1つ**。原則として同じ Codex session が調査・判断・実装・検証・修正まで完了する。工程だけを理由に agent / model を切り替えない。目的は必要な品質を少ない総利用量・手戻り・人間介入で達成すること
-- **L2/L3 の役割**: L2 は同一主担当による通常実装、L3 は不変条件・権限・設計判断の助言。モデル切替は助言であり、担当・承認・authority を移さない。Issue 束ねは下記 PR / git 運用規則に従う（詳細: `routing` / `dispatch` skill）
-- **Issue Context Brief**: 要求・制約の正本はIssue本文。担当Codex sessionは着手時に `pnpm ctx <N> --reuse-brief-l1` を実行し、Issue本文と信頼できる最新 `ctx-brief` コメントを明示取得してIssue番号・snapshotの一致を確かめる。通常読取はJev APIを呼ばず、dispatch担当が `pnpm ctx <N> --post` で作成したL1候補を再利用する。品質評価を利用開始の条件にしない。Brief内のJev L1候補は実装時に読む資料への助言で、正しさ・無関係さ・許可の判定には使わない。Briefが無い/古い/取得できない時はその状態を報告してL0と一次資料から続ける。コメントが存在するだけではsessionへの配達完了とみなさない
-- **最初に成功条件を固定する**。ユーザーが確認できる結果、対象範囲、検証方法を先に書き、手段や model 選択を目的化しない。標準ループは [docs/operations/ai-development-loop.md](docs/operations/ai-development-loop.md)
-- **事実と仮説を分ける**。repo / docs / issue / 実行結果で確認した事実には証拠を添え、未実測の原因や効果は仮説として明記する。安く確認できる仮説は作業前に検証する
-- **決定的な道具を先に使う**。検索・git history・diff・typecheck・lint・test・JSON 変換・CI 取得は、まず既存 script / CLI で閉じられないか探す。LLM や外部連携を使う時も、必要な瞬間だけ最小の context・権限・経路を渡す（`routing` / `mcp-usage` skill）
-- **委譲は採算が合う時だけ行う**。既定は単独完遂。初期の委譲対象は、実行時に read-only 権限と scope を検証できる大量調査に限り、引き渡し・待ち・親による照合を含めて便益を判断する。検証できない native tool や runtime しかない場合は委譲せず、主担当が続ける。判断と重要な編集は主担当が持つ。専用 security harness の独立レビュー契約は別途維持する
-- **委譲契約**: 成功条件、触ってよい path、既知の制約、期待する証拠、検証コマンド、外部 state を変更してよいかを明記する。write 可能な委譲は同一 worktree・非重複 scope に限定し、commit / push / external mutation は明示的に委ねられた場合だけ行う
-- **判断では意味のある選択肢を比較する**。差が実際の挙動・リスク・可逆性に影響する選択肢だけを並べ、推奨と最悪の failure mode を添える。複数の判断は 1 回に束ねる
-- **出力ではなく outcome を検証する**。diff、コマンド出力、実際の UI / API / data flow を成功条件と突き合わせ、subagent や tool の「passed」という申告だけで完了にしない
-- **委譲の出力は親が再検証する**。read-only worker の報告は事実・location・未確認範囲の候補であり、判断・編集・テスト・レビュー完了の証明にはしない。現在の HEAD と diff に照合できない報告は採用しない
-- **永続 handoff**: issue / PR がある作業は、進捗・判断・ブロック・検証結果をその issue / PR へ残す。会話 transcript を唯一の状態にしない
-- **完了報告**では変更、検証コマンドと出力の要点、未確認事項、deferred scopeを示す
-- **曖昧な指示**: (1) repo/docs/issueから判明する事実を先に調べる (2) 承認済みscope内で安全かつ可逆なら合理的仮定を明示して進める (3) 未決事項だけ証拠付き推奨とともに確認する (4) 質問・懸念を承認へ読み替えない
+- 同じ主担当が調査から検証まで持つ。検索・集計・検査は既存 script / CLI を優先する。
+- 委譲が必要な場合だけ `routing` の scope・権限契約を使う。助言や worker の成功申告だけで完了にせず、主担当が現在の diff・実行結果を確認する。
+- 不明点は先に repo / docs / Issue を調べる。承認済み範囲の可逆な作業は仮定を示して進め、未決判断だけ確認する。質問・懸念を承認へ読み替えない。
 
 ## Skills 索引
 
-`.agents/skills/*/SKILL.md` を参照。`.claude/skills` は Claude Code 互換の相対 symlink であり、正本ではない。該当する作業では先に読む。
+`.agents/skills/*/SKILL.md` が正本。`.claude/skills` は相対 symlink、CLAUDE.md は共通指示の互換入口。該当する作業の skill だけ読む。
 
-| skill                  | 使う場面                                                                         |
-| ---------------------- | -------------------------------------------------------------------------------- |
-| `dispatch`             | issueをworkerへ渡す準備、issue起票、束ね、状態ラベル運用                         |
-| `routing`              | 非 trivial タスクの分解、実行方法・委譲の採算判断、出力契約                      |
-| `mcp-usage`            | Sentry/Supabase/Vercel/Context7/Eagle/UptimeRobot 等の MCP 呼び出し              |
-| `skill-design`         | 新規 skill 作成・既存 skill の description/When to Use 改修                      |
-| `supabase`             | migration/RLS/Storage policy/Realtime/Edge Functions                             |
-| `trpc-router-creating` | tRPC router/service の新規作成                                                   |
-| `store-creating`       | 新規 Zustand store                                                               |
-| `storybook`            | Story作成・design token 選択                                                     |
-| `i18n`                 | UI文言・翻訳ファイル・用語集/禁止表記                                            |
-| `error-handling`       | try/catch・tRPC onError・ErrorBoundary・Sentry連携                               |
-| `optimistic-update`    | tRPC mutation の楽観的更新                                                       |
-| `security`             | 認証/認可・RLS・外部入力を受けるフォーム                                         |
-| `test`                 | バグ修正前の失敗テスト・新機能後のテスト                                         |
-| `diagnosing-bugs`      | 原因不明・複数層に跨る不具合の再現と切り分け                                     |
-| `react-performance`    | データ取得の waterfall・bundle・RSC 境界の性能判断                               |
-| `ui-audit`             | 指定 UI の操作性・アクセシビリティのコード監査（明示依頼時のみ）                 |
-| `pr-cross-review`      | 保護対象 PR の GitHub 独立レビュー（通常 PR は対象外）                           |
-| `docs-writing`         | ユーザー向けdocs・リリースノート・技術ドキュメント                               |
-| `docs-audit`           | 公開docsの監査                                                                   |
-| `releasing`            | リリース作業end-to-end（明示依頼時のみ）                                         |
-| `gardening`            | 月次改善ループ: ai:usage の 4 問 → 月に 1 変数 → 結果(未) 回収（明示依頼時のみ） |
-| `audit-ai-config`      | AI設定の棚卸し・audit                                                            |
-| `blog-ideas`           | ブログネタ提案とissue起票                                                        |
-| `decision`             | `docs/decisions.md` への意思決定1行追記                                          |
+| skill                  | 使う場面                   |
+| ---------------------- | -------------------------- |
+| `routing`              | 作業方針・委譲の判断       |
+| `dispatch`             | Issue 起票・割り当て       |
+| `mcp-usage`            | 外部ツールの利用           |
+| `skill-design`         | skill の作成・整理         |
+| `supabase`             | migration・RLS・DB         |
+| `trpc-router-creating` | router / service 新設      |
+| `store-creating`       | Zustand 新設               |
+| `storybook`            | Story・token 選択          |
+| `i18n`                 | UI 文言・翻訳              |
+| `error-handling`       | エラー処理                 |
+| `optimistic-update`    | 楽観的更新                 |
+| `security`             | 認証・認可・外部入力       |
+| `test`                 | 挙動変更の検証             |
+| `diagnosing-bugs`      | 原因未特定の不具合         |
+| `react-performance`    | 性能調査                   |
+| `ui-audit`             | UI 監査の明示依頼          |
+| `pr-cross-review`      | 保護対象 PR の独立レビュー |
+| `docs-writing`         | docs 執筆                  |
+| `docs-audit`           | 公開 docs の監査           |
+| `releasing`            | release の明示依頼         |
+| `gardening`            | 月次改善の明示依頼         |
+| `audit-ai-config`      | AI 設定整理の明示依頼      |
+| `blog-ideas`           | ブログ提案・起票の明示依頼 |
+| `decision`             | 決定ログの明示依頼         |
 
 ## Deploy / Release
 
-- Staging branch と Production を同時に触らない。Staging → 開発者確認 → 指示後にProduction
-- Supabase Edge Functions は `supabase functions deploy --use-api`
-- release意図が明示された時だけ `releasing` skillを使う
+Staging → 開発者確認 → 明示指示後に Production。両環境を同時に触らない。release 手順は `releasing`、Supabase Edge Functions は `supabase functions deploy --use-api`。
