@@ -54,6 +54,8 @@ web（`dayopt.app`）と product（`app.dayopt.app`）は別ドメインで配�
 
 Product Vercel projectのPreview scopeには、現時点で `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` / `SUPABASE_SECRET_KEY` の共通値が無い。過去PR向けのSupabase接続値はbranch別scopeに残るため、値の継承だけで次の通常PRがPersistentへ接続するとは扱わない。通常PRを共有DBへ向ける前に、trusted Previewだけが使う共通3変数を非本番Persistent ref/keyで保存し、Preview URLやservice-role keyを外部fork・未承認コードへ渡さないVercel側のtrust設定を確かめる。通常PreviewのSupabase URL/keyの実値はsecret保管先で管理し、repoやIssueへ記録しない。
 
+固定Integration用Vercel project `product-integration` はProduction branchが `integration`。2026-09-28に `commandForIgnoringBuildStep` をPreviewではskip、Productionではcontinueする条件に設定したため、通常feature PRでは `product` projectだけが実Previewを作り、固定Integrationは `integration` branchの更新時に配備される。Ignore Build StepによるskipでもVercel deployment記録とquotaは消えないため、Supabase branch費用とは別に扱う。Vercel Git Fork Protectionは `product` / `product-integration` の両方で有効で、fork PRのdeployはteam memberの認可が必要。
+
 Supabase readiness runnerは `shared` / `ephemeral` を明示してpersistent branch ID、project ref、migration集合、対象deployment/healthを照合する。branch別overrideが残っていても、要求されたDB mode/refと一致しなければE2Eを開始しない。Product Vercel Previewの `NEXT_PUBLIC_APP_URL` は未設定にし、アプリはVercelのdeployment URLへ戻す。別Preview URL間でAuth sessionが共有されるとは仮定しない。
 
 固定URL `https://product-integration-dayopt.vercel.app` はVercelの生成aliasとして指定しているが、2026-09-28の到達確認では `DEPLOYMENT_NOT_FOUND` で、割当済み・利用可能とは確認できていない。Product Integration deploymentがREADYになってから割当と到達性を確認する。独自domainは追加しない。
