@@ -38,7 +38,7 @@
 
 ルート直下の `strategy.md` は stock として扱い、同じ frontmatter 契約（status / last_verified）に従う（docs-guard の `ROOT_STOCK_FILES`）。
 
-`strategy.md` と issue・PR は**変化速度で分かれる**。変わらない前提は `strategy.md`、現在地・賭け・当週キュー・進行中の作業は **issue と PR 自身**（`status:*` ラベルと各 issue のコメント列）。**現在地を docs へ転記しない** — 転記した瞬間に古くなる（2026-08-20 に廃止した STATE.md、2026-09-01 に廃止した日次盤面 issue、2026-09-02 に廃止した `state.md` と同じ失敗）。
+`strategy.md` と issue・PR は**変化速度で分かれる**。変わらない前提は `strategy.md`、現在地・賭け・当週キュー・進行中の作業は **issue と PR 自身**（`Workflow status` field と各 issue のコメント列）。**現在地を docs へ転記しない** — 転記した瞬間に古くなる（2026-08-20 に廃止した STATE.md、2026-09-01 に廃止した日次盤面 issue、2026-09-02 に廃止した `state.md` と同じ失敗）。
 
 ## 現在・履歴
 

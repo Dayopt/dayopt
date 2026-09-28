@@ -876,7 +876,7 @@ async function runIntegration() {
  * コメント投稿 → ラベル付与を行う（順序と「付与済みなら再通知しない」規約はそちらが持つ）。
  *
  * 実行に使う関数はすべて注入可能にしてある（test では gh / fs へ実際に触れずに
- * 分岐を検証する。strip-status-labels.mjs と同じ DI の型）。
+ * 分岐を検証する。clear-closed-workflow-status.mjs と同じ DI の型）。
  * @param {{
  *   repo?: string,
  *   prNumber?: string | number,

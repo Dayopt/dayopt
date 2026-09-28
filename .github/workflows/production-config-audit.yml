@@ -331,12 +331,21 @@ jobs:
             --jq --arg prefix "$title_prefix" '[.[] | select(.title | startswith($prefix))][0].number // empty')
 
           if [ -n "$existing" ]; then
+            issue_number="$existing"
             gh issue comment "$existing" --repo "$GITHUB_REPOSITORY" --body "$body"
           else
-            gh issue create --repo "$GITHUB_REPOSITORY" \
+            issue_url=$(gh issue create --repo "$GITHUB_REPOSITORY" \
               --title "$title_prefix" \
-              --label "area:deployment,area:operations,priority:p1" \
-              --body "$body"
+              --label "area:deployment,area:operations" \
+              --body "$body")
+            issue_number="${issue_url##*/}"
+          fi
+
+          current_priority=$(gh api "repos/$GITHUB_REPOSITORY/issues/$issue_number/issue-field-values" \
+            --jq '.[] | select(.issue_field_id == 38713666) | .single_select_option.name // empty')
+          if [ -z "$current_priority" ]; then
+            printf '%s\n' '{"issue_field_values":[{"field_id":38713666,"value":"High"}]}' |
+              gh api --method POST "repos/$GITHUB_REPOSITORY/issues/$issue_number/issue-field-values" --input -
           fi
 
       - name: Enforce deploy health result
@@ -575,10 +584,19 @@ jobs:
             --jq '[.[] | select(.title | startswith(env.TITLE_PREFIX))][0].number // empty')
 
           if [ -n "$existing" ]; then
+            issue_number="$existing"
             gh issue comment "$existing" --repo "$GITHUB_REPOSITORY" --body "$body"
           else
-            gh issue create --repo "$GITHUB_REPOSITORY" \
+            issue_url=$(gh issue create --repo "$GITHUB_REPOSITORY" \
               --title "$title_prefix" \
-              --label "area:operations,quality:security,priority:p1" \
-              --body "$body"
+              --label "area:operations,quality:security" \
+              --body "$body")
+            issue_number="${issue_url##*/}"
+          fi
+
+          current_priority=$(gh api "repos/$GITHUB_REPOSITORY/issues/$issue_number/issue-field-values" \
+            --jq '.[] | select(.issue_field_id == 38713666) | .single_select_option.name // empty')
+          if [ -z "$current_priority" ]; then
+            printf '%s\n' '{"issue_field_values":[{"field_id":38713666,"value":"High"}]}' |
+              gh api --method POST "repos/$GITHUB_REPOSITORY/issues/$issue_number/issue-field-values" --input -
           fi
