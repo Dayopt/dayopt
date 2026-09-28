@@ -69,7 +69,10 @@ export function requiresDistributedMcpRateLimit(
   return (
     environment.VERCEL_ENV === 'production' ||
     environment.VERCEL_TARGET_ENV === 'staging' ||
-    environment.MCP_OAUTH_ENVIRONMENT === 'preview'
+    environment.MCP_OAUTH_ENVIRONMENT === 'preview' ||
+    environment.DAYOPT_ENVIRONMENT === 'integration' ||
+    environment.NEXT_PUBLIC_DAYOPT_ENVIRONMENT === 'integration' ||
+    environment.MCP_OAUTH_ENVIRONMENT === 'integration'
   );
 }
 

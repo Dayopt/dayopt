@@ -256,7 +256,7 @@ vault は 2026-08-14 の信頼境界軸再編（[#2086](https://github.com/Dayop
 
 ### Cloud-first Product Integration (#2910)
 
-Integration credentials は 1Password の `agent` item に追加せず、既存 Vercel project `product` の Preview environment に保存する。固定Integrationの環境印・issuer・resource・app URLは Git branch `integration` に限定し、通常Previewへ継承させない。Supabase credentialsは非本番の通常Previewにも共有する。Supabase Production branch の自動設定は `main` のままにし、Integration の Supabase URL / keys は branch `tilwaprottpyhlfoggbb` から個別に取得する。Vercel system variables は Vercel が供給する値を使い、手入力しない。
+Integration credentials は 1Password の `agent` item に追加せず、既存 Vercel project `product` の Preview environment に保存する。固定Integrationの環境印・issuer・resource・app URLは Git branch `integration` に限定し、通常Previewへ継承させない。Supabase credentialsは非本番の通常Previewにも共有する。Supabase Production branch の自動設定は `main` のままにし、Integration の Supabase URL / keys は branch `tilwaprottpyhlfoggbb` から個別に取得する。Vercel system variables は Vercel が供給する値を使い、手入力しない。通常Previewへ非本番のserver keyを渡す前提は信頼済みPRだけである。VercelのGit Fork ProtectionとDeployment Protectionを維持し、未信頼forkへenvを渡す承認をしない。
 
 Integration の正規 origin は `https://product-git-integration-dayopt.vercel.app` の1つだけとする。旧専用ProjectのURLや個別 deployment URL は OAuth issuer / MCP resource / Supabase Auth Site URL / callback に使わない。
 
