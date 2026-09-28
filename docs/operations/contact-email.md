@@ -13,6 +13,8 @@ code:
 
 `support@dayopt.app`の受信、返信、フォーム配送、Production切替、障害時の戻し方の正本。secret値、nameserver値、個人Gmail addressは記録しない。
 
+Productの固定Integrationでは、別の非本番Resend設定と`CONTACT_INTEGRATION_RECIPIENT`を使って送信を検証できる。宛先に`support@dayopt.app`は使えず、件名には`[Integration]`、idempotency keyには`-integration`が付く。通常のPR Preview / DevelopmentとWebの非本番配送は拒否される。Integration用設定と実配送の証拠がない段階では、メール検証を完了扱いしない。
+
 ## 構成
 
 ```text

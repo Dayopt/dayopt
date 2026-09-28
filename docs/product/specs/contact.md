@@ -17,13 +17,13 @@ ProductとWebから受け付けた問い合わせを、Production限定で`suppo
 
 - Productは認証済みユーザー向け`contact.submit`、Webは公開`POST /api/contact`で問い合わせを受け付ける
 - 両interfaceは`submissionId: uuid`を必須とし、成功時は`{ success: true }`を返す
-- 配送先は固定の`support@dayopt.app`。From、件名、source tagはserverが固定し、検証済みの送信者emailだけをReply-Toに使う
+- Productionの配送先は固定の`support@dayopt.app`。Productの固定Integrationは専用の`CONTACT_INTEGRATION_RECIPIENT`を使い、support宛てを拒否する。From、件名、source tagはserverが固定し、検証済みの送信者emailだけをReply-Toに使う
 - 配送はResend APIを使い、10秒でtimeoutする。同じclient contact intentの再送は同じ`submissionId`とidempotency keyを使い、フォーム内容を編集した後は新しいIDを使う。Productの氏名・emailは配送時に認証済みprofileから取得するmetadataであり、intent IDには含めない
 - 配送に失敗した場合は成功表示にせず入力を保持する。WebはTurnstile tokenだけを破棄し、再検証する
-- credentialが存在してもProduction以外では配送しない。Preview / Developmentは実受信箱へ書き込まない
+- Webはcredentialが存在してもProduction以外では配送しない。ProductはProductionと固定Integrationだけで配送でき、Integrationは設定されたテスト受信先へ送る。通常のPR Preview / Developmentは配送しない
 - Productはuser単位と全体、WebはIP単位と全体のrate limitをUpstashで適用する。Productionでbackendを利用できない時は配送せずfail-closedにする
 - WebはCSRF、JSON content type、16 KiB body上限、strict schema、honeypot、Turnstile action / Production hostnameを検証する
-- Product / Webは別々の`POST /api/webhooks/resend`と署名secretを使う。source tagと固定Toで所有eventを判定し、processing leaseとprocessed markerでretryを重複排除する
+- Product / Webは別々の`POST /api/webhooks/resend`と署名secretを使う。source tagと固定Toで問い合わせeventを判定し、processing leaseとprocessed markerでretryを重複排除する。Integrationのテスト受信先はsupport宛ての問い合わせ判定に含まれない
 - 配送failureは問い合わせ本文・氏名・email・raw webhook bodyを含めずにSentryへ記録する。HTTP responseとloggerにも問い合わせPIIを含めない
 - 問い合わせ原文はResendの配送処理とアクセス制限付きGmailで扱う。開発対応が必要な内容だけPIIを除いて通常Issueへ転記し、ユーザーの声はCLAUDE.mdに従って日付付きfeedback logへ記録する
 
