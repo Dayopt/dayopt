@@ -192,6 +192,24 @@ describe('Preview E2E interrupted-run recovery', () => {
     expect(remoteAdmin.calls).toEqual([]);
   });
 
+  it('removes leftover private output when cleanup already completed', async () => {
+    const root = workspace();
+    const { directory } = addRun(root, runA);
+    const privateDirectory = join(directory, 'private');
+    mkdirSync(privateDirectory, { mode: 0o700 });
+    writeFileSync(join(privateDirectory, 'trace.zip'), 'private output');
+    const manifest = JSON.parse(readFileSync(join(directory, 'manifest.json'), 'utf8'));
+    manifest.status = 'recovered';
+    writePreviewRunManifest(directory, manifest);
+    const remoteAdmin = fakeAdmin(new Map());
+
+    await expect(recovery(root, runA, remoteAdmin.admin)).resolves.toMatchObject({
+      status: 'recovered',
+    });
+    expect(existsSync(privateDirectory)).toBe(false);
+    expect(remoteAdmin.calls).toEqual([]);
+  });
+
   it('recovers only manifest users whose Auth ID, app_metadata run and synthetic email match', async () => {
     const root = workspace();
     const { directory, evidenceDirectory } = addRun(root, runA, [{ userId: userA }]);
@@ -262,7 +280,15 @@ describe('Preview E2E interrupted-run recovery', () => {
       status: 'recovered',
       recoveredUserIds: [userA],
     });
-    expect(remoteAdmin.calls).toEqual([`auth:get:${userA}`]);
+    expect(remoteAdmin.calls).toEqual([
+      `auth:get:${userA}`,
+      `verify:records:user_id:${userA}`,
+      `verify:plans:user_id:${userA}`,
+      `verify:activities:user_id:${userA}`,
+      `verify:categories:user_id:${userA}`,
+      `verify:user_settings:user_id:${userA}`,
+      `verify:profiles:id:${userA}`,
+    ]);
     expect(
       JSON.parse(readFileSync(join(evidenceDirectory, 'users', `${userA}.json`), 'utf8')).status,
     ).toBe('deleted');
@@ -271,13 +297,37 @@ describe('Preview E2E interrupted-run recovery', () => {
   it('refuses app-row cleanup when Auth ownership cannot be reconfirmed', async () => {
     const root = workspace();
     addRun(root, runA, [{ userId: userA, status: 'created' }]);
-    const remoteAdmin = fakeAdmin(new Map());
+    const remoteAdmin = fakeAdmin(new Map(), '', 'profiles');
 
     await expect(recovery(root, runA, remoteAdmin.admin)).rejects.toThrow(
       'Auth ownership marker is missing',
     );
-    expect(remoteAdmin.calls).toEqual([`auth:get:${userA}`]);
+    expect(remoteAdmin.calls[0]).toBe(`auth:get:${userA}`);
+    expect(remoteAdmin.calls).toContain(`verify:profiles:id:${userA}`);
+    expect(remoteAdmin.calls.filter((call) => !call.startsWith('verify:'))).toEqual([
+      `auth:get:${userA}`,
+    ]);
     expect(remoteAdmin.calls).not.toContain(`auth:delete:${userA}`);
+  });
+
+  it('retries safely after Auth deletion when all owned table rows are already empty', async () => {
+    const root = workspace();
+    const { evidenceDirectory } = addRun(root, runA, [{ userId: userA, status: 'created' }]);
+    const remoteAdmin = fakeAdmin(new Map());
+
+    await expect(recovery(root, runA, remoteAdmin.admin)).resolves.toMatchObject({
+      status: 'recovered',
+      recoveredUserIds: [userA],
+    });
+    expect(remoteAdmin.calls[0]).toBe(`auth:get:${userA}`);
+    expect(remoteAdmin.calls).toContain(`verify:records:user_id:${userA}`);
+    expect(remoteAdmin.calls).toContain(`verify:profiles:id:${userA}`);
+    expect(remoteAdmin.calls.filter((call) => !call.startsWith('verify:'))).toEqual([
+      `auth:get:${userA}`,
+    ]);
+    expect(
+      JSON.parse(readFileSync(join(evidenceDirectory, 'users', `${userA}.json`), 'utf8')).status,
+    ).toBe('deleted');
   });
 
   it('keeps partial failures retryable and makes cleanup idempotent', async () => {

@@ -257,13 +257,32 @@ async function getVerifiedRunUser(admin, evidence, runId) {
   return user;
 }
 
+async function ownedTablesAreEmpty(admin, userId) {
+  let hasRows = false;
+  for (const [table, column] of TABLES) {
+    let verification;
+    try {
+      verification = await admin
+        .from(table)
+        .select(column, { count: 'exact', head: true })
+        .eq(column, userId);
+    } catch {
+      throw new Error(`Preview E2E recovery could not verify ${table}`);
+    }
+    if (verification.error) {
+      throw new Error(`Preview E2E recovery could not verify ${table}`);
+    }
+    if (verification.count !== 0) hasRows = true;
+  }
+  return !hasRows;
+}
+
 async function cleanupOwnedUser(admin, evidence, runId) {
   const user = await getVerifiedRunUser(admin, evidence, runId);
   if (!user) {
-    if (['creating', 'creation-unconfirmed'].includes(evidence.status)) {
-      // No confirmed Auth user means fixture setup did not proceed to app tables.
-      return;
-    }
+    // Never delete app rows without reconfirming Auth ownership. Checking that every
+    // owned table is empty makes the final Auth-delete/evidence-write window retryable.
+    if (await ownedTablesAreEmpty(admin, evidence.userId)) return;
     throw new Error(
       'Preview E2E Auth ownership marker is missing; manual verification is required',
     );
@@ -304,6 +323,20 @@ async function cleanupOwnedUser(admin, evidence, runId) {
   }
 }
 
+function removePrivateOutput(runDirectory) {
+  const privateDirectory = join(runDirectory, 'private');
+  if (!existsSync(privateDirectory)) return;
+  const privateMetadata = lstatSync(privateDirectory);
+  if (
+    !privateMetadata.isDirectory() ||
+    privateMetadata.isSymbolicLink() ||
+    (privateMetadata.mode & 0o077) !== 0
+  ) {
+    throw new Error('Preview E2E private output permissions are invalid');
+  }
+  rmSync(privateDirectory, { recursive: true, force: true });
+}
+
 export async function recoverPreviewE2ERun({
   runId,
   stateRoot,
@@ -321,6 +354,7 @@ export async function recoverPreviewE2ERun({
   ensurePreviewE2EStateRoot(root);
   const manifest = readManifest(runDirectory, runId);
   if (manifest.status === 'recovered') {
+    removePrivateOutput(runDirectory);
     return {
       runId,
       status: 'recovered',
@@ -393,7 +427,6 @@ export async function recoverPreviewE2ERun({
       heartbeatAt: now().toISOString(),
       completedAt: now().toISOString(),
     };
-    writePreviewRunManifest(runDirectory, completed);
     writeFileSync(
       join(current.evidenceDirectory, 'recovery.json'),
       JSON.stringify(
@@ -403,18 +436,8 @@ export async function recoverPreviewE2ERun({
       ),
       { mode: 0o600 },
     );
-    const privateDirectory = join(runDirectory, 'private');
-    if (existsSync(privateDirectory)) {
-      const privateMetadata = lstatSync(privateDirectory);
-      if (
-        !privateMetadata.isDirectory() ||
-        privateMetadata.isSymbolicLink() ||
-        (privateMetadata.mode & 0o077) !== 0
-      ) {
-        throw new Error('Preview E2E private output permissions are invalid');
-      }
-      rmSync(privateDirectory, { recursive: true, force: true });
-    }
+    writePreviewRunManifest(runDirectory, completed);
+    removePrivateOutput(runDirectory);
     return {
       runId,
       status: 'recovered',
