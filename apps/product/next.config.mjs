@@ -58,6 +58,9 @@ const nextConfig = {
     NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY:
       process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || 'placeholder',
     NEXT_PUBLIC_TURNSTILE_SITE_KEY: process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || '',
+    // Inline an absent public DSN as empty so Sentry initialization is pruned
+    // consistently with the bundle-budget compensation for unconfigured builds.
+    NEXT_PUBLIC_SENTRY_DSN: process.env.NEXT_PUBLIC_SENTRY_DSN || '',
     NEXT_PUBLIC_APP_VERSION: releaseVersion,
     NEXT_PUBLIC_MCP_RESOURCE_URI: resolveProductPublicMcpResourceUri(process.env),
     // client 側で Vercel 環境を判別するため露出。preview は NODE_ENV=production だが
