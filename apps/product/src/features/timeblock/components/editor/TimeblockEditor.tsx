@@ -65,7 +65,7 @@ export function TimeblockEditor({
     <div className="space-y-3">
       <div className="space-y-1">
         {beforeDateTimeSlot ? <div className="pb-2">{beforeDateTimeSlot}</div> : null}
-        <div className="bg-card rounded-2xl px-4 py-2 shadow-sm">
+        <div className="bg-card rounded-2xl px-4 pt-2 pb-4 shadow-sm">
           <DateTimeSection
             dateLabel={t('date')}
             timeLabel={t('time')}
@@ -96,7 +96,6 @@ export function TimeblockEditor({
                 icon={StickyNote}
                 note={value.note}
                 onNoteChange={onNoteChange}
-                placeholder={t('notePlaceholder')}
                 disabled={disabled}
               />
             </div>
