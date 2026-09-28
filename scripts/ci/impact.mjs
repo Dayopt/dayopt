@@ -662,6 +662,11 @@ export function resolveVercelIgnore({
     };
   }
 
+  // ビルド省略の判定自身が変わった場合は新しい判定で deployment を作り直す。
+  if (files.includes('scripts/ci/impact.mjs')) {
+    return { shouldBuild: true, reason: 'Vercel build decision script changed' };
+  }
+
   let impact;
   try {
     impact = resolveImpactImpl(files);

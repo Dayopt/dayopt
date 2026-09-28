@@ -39,6 +39,7 @@ async function loadIntegrationEnv(overrides: Record<string, string | undefined> 
 }
 
 afterEach(() => {
+  vi.restoreAllMocks();
   vi.unstubAllEnvs();
   vi.resetModules();
 });
@@ -72,6 +73,18 @@ describe('Integration server environment', () => {
       expect(errorMessage).not.toContain(value);
     },
   );
+
+  it('logs only issue paths and codes when configuration validation fails', async () => {
+    const errorLog = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const { env } = await loadIntegrationEnv({
+      UPSTASH_REDIS_REST_URL: 'sensitive-invalid-url',
+    });
+    expect(() => env.NEXT_PUBLIC_SUPABASE_URL).toThrow('環境変数のバリデーション');
+    expect(errorLog).toHaveBeenCalledWith('[env] validation failed', {
+      issues: [{ path: 'UPSTASH_REDIS_REST_URL', code: 'invalid_string' }],
+    });
+    expect(JSON.stringify(errorLog.mock.calls)).not.toContain('sensitive-invalid-url');
+  });
 
   it('accepts a complete Integration-only Resend sink and rejects partial configuration', async () => {
     const complete = await loadIntegrationEnv({
