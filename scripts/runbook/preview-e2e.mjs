@@ -165,7 +165,7 @@ export async function runPreviewE2E({
   if (!env.SUPABASE_SECRET_KEY?.trim())
     throw new Error('Nonproduction test credentials are required');
   const credentials = {
-    vercelToken: env.VERCEL_TOKEN,
+    githubToken: env.GITHUB_TOKEN,
     supabaseToken: env.SUPABASE_PREVIEW_READINESS_TOKEN,
     bypassSecret: env.VERCEL_AUTOMATION_BYPASS_SECRET,
   };

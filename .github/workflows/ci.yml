@@ -497,6 +497,8 @@ jobs:
       contents: read
       pull-requests: read
       actions: read
+      deployments: read
+      statuses: read
     steps:
       # Execute the supervisor from the dispatched trusted Integration revision.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -536,7 +538,7 @@ jobs:
       - id: execute
         name: Pinned remote login, desktop and mobile CRUD, and cleanup
         env:
-          VERCEL_TOKEN: ${{ secrets.PREVIEW_E2E_VERCEL_TOKEN }}
+          GITHUB_TOKEN: ${{ github.token }}
           SUPABASE_PREVIEW_READINESS_TOKEN: ${{ secrets.PREVIEW_E2E_SUPABASE_READINESS_TOKEN }}
           VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.PREVIEW_E2E_BYPASS_SECRET }}
           SUPABASE_SECRET_KEY: ${{ secrets.PREVIEW_E2E_SUPABASE_KEY }}

@@ -43,7 +43,7 @@ const ready = {
 };
 const env = {
   SUPABASE_SECRET_KEY: 'nonproduction-secret',
-  VERCEL_TOKEN: 'vercel-read-token',
+  GITHUB_TOKEN: 'github-read-token',
   SUPABASE_PREVIEW_READINESS_TOKEN: 'supabase-read-token',
   VERCEL_AUTOMATION_BYPASS_SECRET: 'preview-bypass',
 };
@@ -256,6 +256,32 @@ describe('Preview E2E interrupted-run recovery', () => {
       recovery(root, runA, remoteAdmin.admin, { ...ready, supabaseBranchId: runB }),
     ).rejects.toThrow('target does not match');
     expect(remoteAdmin.calls).toEqual([]);
+  });
+
+  it('所有runの回収は現在PRの実行可能条件だけを外し固定候補を再照合する', async () => {
+    const root = workspace();
+    addRun(root, runA, [{ userId: userA }]);
+    const remoteAdmin = fakeAdmin(new Map([[userA, ownedUser(userA, runA)]]));
+    const observe = vi.fn(async () => ready);
+    await expect(
+      recoverPreviewE2ERun({
+        runId: runA,
+        stateRoot: root,
+        env,
+        observe,
+        createAdmin: () => remoteAdmin.admin,
+        now: () => fixedNow,
+      }),
+    ).resolves.toMatchObject({ status: 'recovered', recoveredUserIds: [userA] });
+    expect(observe).toHaveBeenCalledWith(
+      expect.objectContaining({
+        requireRunnablePullRequest: false,
+        githubToken: 'github-read-token',
+        sha: ready.sha,
+        deploymentId: ready.deploymentId,
+        supabaseProjectRef: ready.supabaseProjectRef,
+      }),
+    );
   });
 
   it('refuses a user whose run marker differs and leaves all tables untouched', async () => {

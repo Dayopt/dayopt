@@ -243,7 +243,7 @@ TS の `PRODUCT_EVENT_NAMES` と DB の CHECK 制約の両方で定義される�
 | `VERCEL_BYPASS_PRODUCT`                  | yes  | secret     | production          | vercel-production               | —                          |
 | `VERCEL_BYPASS_WEB`                      | yes  | secret     | production          | vercel-production               | —                          |
 | `VERCEL_TEAM_ID`                         | yes  | public     | production          | vercel-production               | —                          |
-| `VERCEL_TOKEN`                           | yes  | secret     | production, staging | vercel-production, preview-e2e  | —                          |
+| `VERCEL_TOKEN`                           | yes  | secret     | production          | vercel-production               | —                          |
 
 ### workspace package（7）
 

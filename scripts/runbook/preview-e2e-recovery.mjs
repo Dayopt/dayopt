@@ -371,7 +371,7 @@ export async function recoverPreviewE2ERun({
   }
   if (
     !env.SUPABASE_SECRET_KEY?.trim() ||
-    !env.VERCEL_TOKEN?.trim() ||
+    !env.GITHUB_TOKEN?.trim() ||
     !env.SUPABASE_PREVIEW_READINESS_TOKEN?.trim() ||
     !env.VERCEL_AUTOMATION_BYPASS_SECRET?.trim()
   ) {
@@ -399,9 +399,11 @@ export async function recoverPreviewE2ERun({
       supabaseBranchId: current.candidate.supabaseBranchId,
       databaseMode: current.candidate.databaseMode,
       expectedMigrations: current.candidate.migrationVersions,
-      vercelToken: env.VERCEL_TOKEN,
+      githubToken: env.GITHUB_TOKEN,
       supabaseToken: env.SUPABASE_PREVIEW_READINESS_TOKEN,
       bypassSecret: env.VERCEL_AUTOMATION_BYPASS_SECRET,
+      // Recover the already-owned pinned run even after its PR closes or advances.
+      requireRunnablePullRequest: false,
     });
     if (!sameCandidate(current.candidate, observed)) {
       throw new Error('Preview E2E recovery target does not match the recorded candidate');

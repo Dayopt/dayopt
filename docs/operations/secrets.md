@@ -362,7 +362,7 @@ IntegrationのOAuth identity確認はread-only RPCだけを使い、healthやOAu
 
 ## Agent の vercel CLI（読み取り系だけ）
 
-策定日: 2026-09-14（Secret / Credential 監査 P1-2、User 裁可）。agent の `vercel` CLI は User 本人の対話 login で動き、team `Dayopt` の全権を持つ。Vercel の token は scope を絞れないため、GitHub のような identity 分離はできない。そこで **agent から実行してよい vercel サブコマンドを読み取り系に固定する**。
+策定日: 2026-09-14（Secret / Credential 監査 P1-2、User 裁可）。agent の `vercel` CLI は User 本人の対話 login で動き、team `Dayopt` の全権を持つ。現在はproject-scoped tokenも発行できるが、同じProduct project内のProduction/Previewを分離できずread/write権限を持つ。このため **agent から実行してよい vercel サブコマンドを読み取り系に固定する**。
 
 **agent 用 Vercel token は置かない。** 以前は `agent/vercel` を「agent 用の別発行 token（発行待ち）」として schema に持っていたが、実際には未使用の team 全権 token が入っていた。agent vault の定義（漏れても 1 日で戻せるもの）に合わないため、2026-09-14 に Vercel 側で revoke し、1Password の item を archive した。
 
@@ -523,7 +523,7 @@ master へ値を戻す時は GUI か対象を限定した `op item create` / `op
 
 策定日: 2026-08-17（[#2086](https://github.com/Dayopt/dayopt/issues/2086) 残 scope）。上記の Replica 台帳が「master は 1Password、replica は外部」の対応を列挙するのに対し、こちらは **1Password の外に構造的に実値が存在する場所**（1Password へ登録すること自体ができない値）を列挙する。基本方針 7「値がどこに存在していようと、必ず 1Password にもある」の唯一の意図的な例外群。
 
-**現在 0 件。** 調査の結果、既存の GitHub Secrets 6 件（`SUPABASE_AUTH_AUDIT_TOKEN` / `SUPABASE_STORAGE_RLS_AUDIT_TOKEN`（[#2345](https://github.com/Dayopt/dayopt/issues/2345) で発行・GitHub Secret 登録済み）/ `VERCEL_TOKEN` / `VERCEL_ORG_ID` / `VERCEL_AUTOMATION_BYPASS_PRODUCT` / `VERCEL_AUTOMATION_BYPASS_WEB`）はいずれも 1Password `ci` vault を master に持つ replica であり、真の bootstrap 例外には該当しない（[Environment Secrets](./security/environment-secrets.md) §GitHub の表と 1:1）。
+**Production経路は0件。** Cloud Previewはユーザー指示で2件をEnvironmentへ直接保存した例外があり、master未初期化の扱いは下記「Cloud Preview の未初期化台帳」を参照する。調査の結果、既存の GitHub Secrets 6 件（`SUPABASE_AUTH_AUDIT_TOKEN` / `SUPABASE_STORAGE_RLS_AUDIT_TOKEN`（[#2345](https://github.com/Dayopt/dayopt/issues/2345) で発行・GitHub Secret 登録済み）/ `VERCEL_TOKEN` / `VERCEL_ORG_ID` / `VERCEL_AUTOMATION_BYPASS_PRODUCT` / `VERCEL_AUTOMATION_BYPASS_WEB`）はいずれも 1Password `ci` vault を master に持つ replica であり、真の bootstrap 例外には該当しない（[Environment Secrets](./security/environment-secrets.md) §GitHub の表と 1:1）。
 
 上記「Service Account（無人実行用、設計のみ・未導入）」の SA token が導入されれば、それが最初の例外になる（SA token は「1Password を読むための鍵」であるため、循環問題により 1Password 自身には保管できない）。保管場所は導入時に決定し、その時点でこの台帳に追記する。
 
@@ -684,6 +684,10 @@ reCAPTCHA 関連 env は旧方式。新規設定・docs・example には追加�
 
 ### Cloud Preview の未初期化台帳（#2910）
 
-`ci/preview-e2e` の4参照は **planned master** としてoptional/pendingで登録した。item・値の実在、GitHubへの保存、権限の十分性を確認した証拠ではない。対象は `PREVIEW_E2E_VERCEL_TOKEN`、`PREVIEW_E2E_SUPABASE_READINESS_TOKEN`、`PREVIEW_E2E_BYPASS_SECRET`、`PREVIEW_E2E_SUPABASE_KEY`。Productionのmasterを複製せず、所有者が非本番用masterと `Preview – product` Environment replicaを保存する。Environmentのbranch policyは `integration` だけ。Cloud workerは個人Vaultを開かない。
+`ci/preview-e2e` の3参照（`PREVIEW_E2E_SUPABASE_READINESS_TOKEN`、`PREVIEW_E2E_BYPASS_SECRET`、`PREVIEW_E2E_SUPABASE_KEY`）は **planned master** としてoptional/pendingを維持する。1Password item・master値の実在や同期を確認した証拠ではない。2026-09-29の作業で、ユーザーの明示指示により個人Vault・1Passwordを開かず、readiness tokenと選択したIntegration DB keyを `Preview – product` Environmentへ直接保存し、登録名をUIで確認した。Environmentのbranch policyは `integration` だけに保存・確認済み。値は会話へ出さない。
 
-既存 `sync-ci-environment-secrets.sh` のProduction同期は実行しない。新しい参照は同scriptにpendingコメントとして対応だけ記録し、実行対象に加えていない。設定保存はユーザーが行う。実在・同期を検証して初期化済みにする判断は別途行う。
+`PREVIEW_E2E_VERCEL_TOKEN` のplanned参照は廃止する。短寿命 `GITHUB_TOKEN` のdeployments/statuses read権限で、GitHubが認証したVercel botのProduct Preview記録を確認する。Production用 `VERCEL_TOKEN` のmaster・replica・release経路は変更しない。project-scoped Vercel tokenもProductのProductionを含むread/write権限を持つため、Preview用tokenとして新規発行しない。
+
+Protection bypassは未保存・権限境界の判断待ち。project単位keyはProduct projectのProductionにも到達し得るため、非本番だけの資格情報とは呼ばない。専用project keyと対象Previewだけのshare方式のどちらを採用するか、所有者の判断後に対応する。既存Production bypassを複製しない。既存 `sync-ci-environment-secrets.sh` のProduction同期は実行しない。残る3参照は同scriptでplanned masterとの対応をpendingコメントに残し、実行対象に加えていない。masterを初期化済みにする判断は別途行う。
+
+`PREVIEW_E2E_SUPABASE_READINESS_TOKEN` は **Development Branches Read**（`branching_development_read`）と **Migrations Read**（`database_migrations_read`）だけを持つfine-grained tokenとする。branch一覧と `GET /v1/projects/{ref}/database/migrations` のversion metadataを確認し、Database Data Read・SQL実行・write権限を与えない。project選択が親projectしか提供しない場合は親を選ぶため、親のbranch/migration metadataも読める境界になる。Productionのユーザーデータを読めるtokenではなく、非本番projectだけに限定したtokenとも呼ばない。親projectで選んだtokenが対象子projectのmigration一覧を読めることは別途実測し、401/403ではProduction credentialやSQLへのfallbackをせず停止する。[migration一覧の公式契約](https://supabase.com/docs/reference/api/v1-list-migration-history)に従い、versionの欠落・追加・重複・不正応答はreadiness失敗とする。

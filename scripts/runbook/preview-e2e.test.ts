@@ -34,10 +34,28 @@ const ready = {
   observedAt: '2026-09-27T00:00:01Z',
   supabaseProjectRef: 'abcdefghijklmnopqrst',
   origin: 'https://product-abc123-dayopt.vercel.app',
+  providerEvidence: {
+    provider: 'vercel',
+    repository: 'Dayopt/dayopt',
+    environment: 'Preview – product',
+    sha: 'a'.repeat(40),
+    branchName: 'codex/test',
+    prNumber: 2910,
+    vercelDeploymentId: 'dpl_test',
+    githubDeploymentId: 6708659866,
+    githubDeploymentStatusId: 18941762944,
+    githubCommitStatusId: 55073316235,
+    creatorId: 35613825,
+    deploymentCreatedAt: '2026-09-27T00:00:00Z',
+    deploymentStatusCreatedAt: '2026-09-27T00:00:00Z',
+    commitStatusCreatedAt: '2026-09-27T00:00:00Z',
+    observedAt: '2026-09-27T00:00:01Z',
+  },
 };
 const env = {
   SUPABASE_SECRET_KEY: 'synthetic-admin',
-  VERCEL_TOKEN: 'management-private',
+  GITHUB_TOKEN: 'github-private',
+  VERCEL_TOKEN: 'production-vercel-private',
   SUPABASE_PREVIEW_READINESS_TOKEN: 'management-private',
   VERCEL_AUTOMATION_BYPASS_SECRET: 'bypass-private',
   STRIPE_SECRET_KEY: 'production-private',
@@ -90,6 +108,9 @@ describe('Preview E2E runner', () => {
     });
     expect(result.status).toBe('passed');
     expect(s.observe).toHaveBeenCalledTimes(2);
+    expect(s.observe).toHaveBeenCalledWith(
+      expect.objectContaining({ githubToken: 'github-private' }),
+    );
     expect(s.execute).toHaveBeenCalledTimes(1);
     expect(startedManifest).toMatchObject({ runId: result.runId, status: 'running' });
     const runDirectory = join(result.evidenceDirectory, '..');
@@ -119,7 +140,7 @@ describe('Preview E2E runner', () => {
       `#!/usr/bin/env node
 const fs = require('node:fs');
 const path = require('node:path');
-fs.writeFileSync(path.join(process.cwd(), 'worker-observation.json'), JSON.stringify({cwd:process.cwd(), hasManagement: Boolean(process.env.VERCEL_TOKEN || process.env.SUPABASE_PREVIEW_READINESS_TOKEN || process.env.STRIPE_SECRET_KEY), runId:process.env.E2E_PREVIEW_RUN_ID, cloudIntent:process.env.E2E_PREVIEW_CLOUD_INTENT, desktop:process.env.E2E_PREVIEW_DESKTOP_USER_ID, mobile:process.env.E2E_PREVIEW_MOBILE_USER_ID}));
+fs.writeFileSync(path.join(process.cwd(), 'worker-observation.json'), JSON.stringify({cwd:process.cwd(), hasManagement: Boolean(process.env.GITHUB_TOKEN || process.env.VERCEL_TOKEN || process.env.SUPABASE_PREVIEW_READINESS_TOKEN || process.env.STRIPE_SECRET_KEY), runId:process.env.E2E_PREVIEW_RUN_ID, cloudIntent:process.env.E2E_PREVIEW_CLOUD_INTENT, desktop:process.env.E2E_PREVIEW_DESKTOP_USER_ID, mobile:process.env.E2E_PREVIEW_MOBILE_USER_ID}));
 fs.writeFileSync(path.join(process.env.E2E_PREVIEW_EVIDENCE_DIR, 'e2e.json'), JSON.stringify({status:'passed',expected:2,tests:['chromium','Mobile Chrome'].map(project=>({file:'critical-path.spec.ts',project,status:'passed',expectedPassed:true,retry:0}))}));
 `,
     );
@@ -245,6 +266,7 @@ fs.writeFileSync(path.join(process.env.E2E_PREVIEW_EVIDENCE_DIR, 'e2e.json'), JS
       '11111111-1111-1111-1111-111111111111',
     );
     expect(worker).not.toHaveProperty('VERCEL_TOKEN');
+    expect(worker).not.toHaveProperty('GITHUB_TOKEN');
     expect(worker).not.toHaveProperty('SUPABASE_PREVIEW_READINESS_TOKEN');
     expect(worker).not.toHaveProperty('STRIPE_SECRET_KEY');
     expect(worker.NEXT_PUBLIC_SUPABASE_URL).toBe('https://abcdefghijklmnopqrst.supabase.co');

@@ -427,7 +427,7 @@ function rcloneEntries(side: 'SOURCE' | 'DEST', item: string): EnvSchemaEntry[] 
 export const ciSecretSchema: EnvSchemaEntry[] = [
   // item 名は 2026-09-14 に vercel から vercel-production へ変更（用途を名前で分かるように）。
   // token は team 全権で、promote / rollback（promote.yml）と読み取り監査で共用する。
-  // Vercel の token は scope を絞れないため、分けても被害範囲は変わらない。
+  // Production master は既存team token。project tokenも同じProduct内のProduction/Previewを分離しない。
   ciEntry('VERCEL_TOKEN', 'secret', 'vercel-production', RELEASE_AND_OPS),
   ciEntry('VERCEL_TEAM_ID', 'public', 'vercel-production', RELEASE_AND_OPS, {
     githubSecret: 'VERCEL_ORG_ID',
@@ -447,9 +447,9 @@ export const ciSecretSchema: EnvSchemaEntry[] = [
   ciEntry('SUPABASE_STORAGE_RLS_AUDIT_TOKEN', 'secret', 'supabase-storage-rls-audit', OPS, {
     field: 'credential',
   }),
-  // Planned nonproduction-only masters. Actual creation and Environment Save remain with the owner.
+  // Planned masters remain pending independently of replicas saved directly in the Environment.
+  // GitHub's short-lived read token observes Vercel; never add a Production-capable Vercel PAT here.
   ...[
-    ['VERCEL_TOKEN', 'PREVIEW_E2E_VERCEL_TOKEN'],
     ['SUPABASE_PREVIEW_READINESS_TOKEN', 'PREVIEW_E2E_SUPABASE_READINESS_TOKEN'],
     ['VERCEL_AUTOMATION_BYPASS_SECRET', 'PREVIEW_E2E_BYPASS_SECRET'],
     ['SUPABASE_SECRET_KEY', 'PREVIEW_E2E_SUPABASE_KEY'],
@@ -460,7 +460,7 @@ export const ciSecretSchema: EnvSchemaEntry[] = [
       'staging',
       ci,
       'preview-e2e',
-      'Cloud Preview opt-in is not provisioned; owner must create the nonproduction master and save the Integration-only Environment replica',
+      'Cloud Preview master is not initialized; direct Environment replicas do not prove a master exists or resolve the remaining bypass boundary',
       githubSecret,
     ),
     githubSecret,
