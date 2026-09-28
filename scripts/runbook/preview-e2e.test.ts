@@ -1,4 +1,13 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -79,6 +88,39 @@ describe('Preview E2E runner', () => {
     expect(readFileSync(join(result.evidenceDirectory, 'run.json'), 'utf8')).not.toContain(
       'private',
     );
+  });
+  it('trusted supervisor starts the candidate worker in its own checkout without management tokens', async () => {
+    const s = scenario();
+    const candidateRoot = join(s.root, 'candidate');
+    const bin = join(s.root, 'bin');
+    mkdirSync(candidateRoot);
+    mkdirSync(bin);
+    const executable = join(bin, 'pnpm');
+    writeFileSync(
+      executable,
+      `#!/usr/bin/env node
+const fs = require('node:fs');
+const path = require('node:path');
+fs.writeFileSync(path.join(process.cwd(), 'worker-observation.json'), JSON.stringify({cwd:process.cwd(), hasManagement: Boolean(process.env.VERCEL_TOKEN || process.env.SUPABASE_PREVIEW_READINESS_TOKEN || process.env.STRIPE_SECRET_KEY)}));
+fs.writeFileSync(path.join(process.env.E2E_PREVIEW_EVIDENCE_DIR, 'e2e.json'), JSON.stringify({status:'passed',expected:2,tests:['chromium','Mobile Chrome'].map(project=>({file:'critical-path.spec.ts',project,status:'passed',expectedPassed:true,retry:0}))}));
+`,
+    );
+    chmodSync(executable, 0o700);
+    const runDirectory = join(s.root, 'cloud-run');
+    const result = await runPreviewE2E({
+      request: {},
+      env: { ...env, PATH: `${bin}:${process.env.PATH}` },
+      candidateRoot,
+      runDirectory,
+      observe: s.observe,
+      recover: s.recover,
+    });
+    expect(result.status).toBe('passed');
+    expect(result.evidenceDirectory).toBe(join(runDirectory, 'evidence'));
+    expect(
+      JSON.parse(readFileSync(join(candidateRoot, 'worker-observation.json'), 'utf8')),
+    ).toEqual({ cwd: realpathSync(candidateRoot), hasManagement: false });
+    expect(existsSync(join(runDirectory, 'private'))).toBe(false);
   });
   it('readiness失敗時はE2Eを起動しない', async () => {
     const s = scenario();
