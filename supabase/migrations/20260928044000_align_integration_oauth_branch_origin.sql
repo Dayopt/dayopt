@@ -14,6 +14,8 @@ DO $migration$
 DECLARE
   v_definition TEXT;
   v_constraint TEXT;
+  v_function_matches BOOLEAN;
+  v_constraint_validated BOOLEAN;
   v_old_origin CONSTANT TEXT := 'https://product-integration-dayopt.vercel.app';
   v_new_origin CONSTANT TEXT := 'https://product-git-integration-dayopt.vercel.app';
 BEGIN
@@ -24,32 +26,41 @@ BEGIN
       USING ERRCODE = 'DI008';
   END IF;
 
-  SELECT pg_catalog.pg_get_functiondef(p.oid)
-  INTO STRICT v_definition
+  -- The body fingerprint is derived from the immutable first migration after
+  -- applying the second migration's exact origin replacement. Also retain its
+  -- SECURITY DEFINER and search_path/lock_timeout metadata.
+  SELECT pg_catalog.pg_get_functiondef(p.oid),
+    p.prosecdef
+    AND p.proconfig = ARRAY['search_path=""', 'lock_timeout=5s']::TEXT[]
+    AND pg_catalog.encode(extensions.digest(p.prosrc, 'sha256'), 'hex')
+      = 'e1455878619b101f2fd9cd1b73689527fd954859df90c3f2140bfbb1122a4bc3'
+  INTO STRICT v_definition, v_function_matches
   FROM pg_catalog.pg_proc AS p
   JOIN pg_catalog.pg_namespace AS n ON n.oid = p.pronamespace
   WHERE n.nspname = 'public'
     AND p.proname = 'ensure_mcp_integration_environment_identity_v1'
     AND p.pronargs = 0;
 
-  IF (pg_catalog.length(v_definition)
-      - pg_catalog.length(pg_catalog.replace(v_definition, v_old_origin, '')))
-      / pg_catalog.length(v_old_origin) <> 4 THEN
-    RAISE EXCEPTION 'Integration provisioning function does not match the expected predecessor origin'
+  IF v_function_matches IS DISTINCT FROM true THEN
+    RAISE EXCEPTION 'Integration provisioning function does not match the expected predecessor definition'
       USING ERRCODE = 'DI009';
   END IF;
 
-  SELECT pg_catalog.pg_get_constraintdef(c.oid)
-  INTO STRICT v_constraint
+  SELECT pg_catalog.pg_get_constraintdef(c.oid), c.convalidated
+  INTO STRICT v_constraint, v_constraint_validated
   FROM pg_catalog.pg_constraint AS c
   WHERE c.conrelid = 'public.mcp_environment_identity'::regclass
     AND c.conname = 'mcp_environment_identity_tuple_check'
     AND c.contype = 'c';
 
-  IF (pg_catalog.length(v_constraint)
-      - pg_catalog.length(pg_catalog.replace(v_constraint, v_old_origin, '')))
-      / pg_catalog.length(v_old_origin) <> 2 THEN
-    RAISE EXCEPTION 'Integration tuple constraint does not match the expected predecessor origin'
+  -- Fingerprint the whole validated PostgreSQL 17 predecessor, including its
+  -- Production/Preview clauses. Ignore formatting whitespace only; a different
+  -- expression or catalog representation must stop for explicit review.
+  IF v_constraint_validated IS DISTINCT FROM true
+    OR pg_catalog.encode(extensions.digest(
+      pg_catalog.regexp_replace(v_constraint, '[[:space:]]', '', 'g'), 'sha256'
+    ), 'hex') <> '00d67bca10165d3b5b9eba10c0244ff1134d18b93eb4e7e4d39f99009f418846' THEN
+    RAISE EXCEPTION 'Integration tuple constraint does not match the expected predecessor definition'
       USING ERRCODE = 'DI009';
   END IF;
 
