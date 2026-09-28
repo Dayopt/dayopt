@@ -653,11 +653,13 @@ export function resolveVercelIgnore({
     };
   }
 
-  // 差分 0 件は「変更が無い」という確定的な答え（production-release.mjs の
-  // resolveProjectImpact と同じ扱い）。resolveImpact へ空配列を渡すと「判定不能」として
-  // fail closed（全 affected）になってしまうため、ここで先に確定させる。
+  // 同じコードの再デプロイでも環境変数は変わりうる。Git の差分だけでは設定変更を
+  // 判定できないため build へ倒し、保存した設定を古い deployment に閉じ込めない。
   if (files.length === 0) {
-    return { shouldBuild: false, reason: `no file changes since ${shortSha(prevSha)}` };
+    return {
+      shouldBuild: true,
+      reason: `no file changes since ${shortSha(prevSha)}; rebuild to apply deployment configuration`,
+    };
   }
 
   let impact;
