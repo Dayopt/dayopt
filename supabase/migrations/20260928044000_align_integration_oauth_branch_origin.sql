@@ -54,12 +54,12 @@ BEGIN
     AND c.contype = 'c';
 
   -- Fingerprint the whole validated PostgreSQL 17 predecessor, including its
-  -- Production/Preview clauses. Ignore formatting whitespace only; a different
+  -- Production/Preview clauses and whitespace inside quoted literals. A different
   -- expression or catalog representation must stop for explicit review.
   IF v_constraint_validated IS DISTINCT FROM true
     OR pg_catalog.encode(extensions.digest(
-      pg_catalog.regexp_replace(v_constraint, '[[:space:]]', '', 'g'), 'sha256'
-    ), 'hex') <> '00d67bca10165d3b5b9eba10c0244ff1134d18b93eb4e7e4d39f99009f418846' THEN
+      v_constraint, 'sha256'
+    ), 'hex') <> '959f1b2ec2cf6349dee9abc09871c4c97130be269fba9544d746d14a9004c273' THEN
     RAISE EXCEPTION 'Integration tuple constraint does not match the expected predecessor definition'
       USING ERRCODE = 'DI009';
   END IF;
