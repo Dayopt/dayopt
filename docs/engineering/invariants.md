@@ -46,6 +46,11 @@ docs へ残している。
 ## 公開 HTTP エンドポイント
 
 - 公開エンドポイント（OAuth callback / webhook / contact）は rate limit を持つ
+- `app/api/health/cron/route.ts` は UptimeRobot 用の無認証・production-only monitor。
+  service-role で読むのは `cron_heartbeats` の allowlist 8件の job 名と完了時刻だけで、
+  OAuth identity を照合してから評価する。全体 30回/分、DB query は5秒で打ち切り、
+  応答は `healthy` / `unhealthy` のみ・`no-store`・失敗時503。上限超過時は60秒以内の
+  成功/失敗結果だけ再生し、新しい結果が無ければ503を返す。
 - `withUpstashRateLimit` のIP rate limitはVercel由来の`X-Real-IP`だけを使い、`X-Forwarded-For`へfallbackしない。欠落・不正値は共有`ip:unknown`でfail closedにする
 - rate limitのRedis keyは`ip:` / `email:`のpurpose prefixを付けてHMAC化し、生のIP / emailを保存・記録しない。account bucketを併用する場合はIP-firstで短絡し、IP bucketが拒否したらaccount bucketを消費しない
 - OAuth token endpointはform bodyをstream中に実byte数で制限し、16 KiBを超えたら読込を止める。`Content-Length`だけを実測上限として扱わない
