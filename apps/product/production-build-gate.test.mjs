@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 import { dayoptUrls } from '@dayopt/config';
@@ -11,10 +14,17 @@ import {
   PRODUCT_INTEGRATION_APP_ORIGIN,
   PRODUCT_INTEGRATION_SUPABASE_REF,
   PRODUCT_PRODUCTION_ORIGIN,
+  PRODUCT_VERCEL_PROJECT_ID,
   REQUIRED_PRODUCT_OPERATIONAL_BUILD_ENV,
   REQUIRED_PRODUCT_PREVIEW_BUILD_ENV,
   resolveProductPublicMcpResourceUri,
 } from './production-build-gate.mjs';
+import {
+  PRODUCT_INTEGRATION_APP_ORIGIN as RUNTIME_INTEGRATION_APP_ORIGIN,
+  PRODUCT_VERCEL_PROJECT_ID as RUNTIME_PRODUCT_VERCEL_PROJECT_ID,
+} from './src/lib/dayopt-environment';
+
+const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
 function completeProductionEnv() {
   return {
@@ -60,6 +70,7 @@ function completeSharedPreviewEnv() {
   return {
     VERCEL_ENV: 'preview',
     VERCEL_TARGET_ENV: 'preview',
+    VERCEL_PROJECT_ID: PRODUCT_VERCEL_PROJECT_ID,
     VERCEL_GIT_COMMIT_REF: 'codex/cloud-preview',
     VERCEL_BRANCH_URL: 'product-git-codex-cloud-preview-dayopt.vercel.app',
     VERCEL_URL: 'product-a1b2c3-dayopt.vercel.app',
@@ -335,8 +346,39 @@ describe('Product MCP Preview build gate', () => {
 });
 
 describe('Product deployment and Supabase identity build gate', () => {
+  it('uses the same fixed Integration Project and origin at build time and runtime', () => {
+    expect(PRODUCT_INTEGRATION_APP_ORIGIN).toBe(RUNTIME_INTEGRATION_APP_ORIGIN);
+    expect(PRODUCT_VERCEL_PROJECT_ID).toBe(RUNTIME_PRODUCT_VERCEL_PROJECT_ID);
+  });
+
+  it('passes runtime identity and Supabase connection variables through Turbo strict mode', () => {
+    const turbo = JSON.parse(readFileSync(resolve(repositoryRoot, 'turbo.json'), 'utf8'));
+    const buildEnv = turbo.tasks.build.env;
+
+    expect(buildEnv).toEqual(
+      expect.arrayContaining([
+        'DAYOPT_ENVIRONMENT',
+        'NEXT_PUBLIC_APP_URL',
+        'NEXT_PUBLIC_DAYOPT_ENVIRONMENT',
+        'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY',
+        'NEXT_PUBLIC_SUPABASE_URL',
+        'SUPABASE_*',
+        'VERCEL_PROJECT_ID',
+      ]),
+    );
+  });
+
   it('accepts a Product Preview app connected to the persistent nonproduction Supabase project', () => {
     expect(assertProductDeploymentEnvironmentBuildEnv(completeSharedPreviewEnv())).toBe(true);
+  });
+
+  it('rejects Product Preview when it is built by a different Vercel project', () => {
+    expect(() =>
+      assertProductDeploymentEnvironmentBuildEnv({
+        ...completeSharedPreviewEnv(),
+        VERCEL_PROJECT_ID: 'prj_not_product',
+      }),
+    ).toThrow('Product Preview build requires the Product Vercel project');
   });
 
   it('requires the complete Supabase pair and server key for Product Preview', () => {
@@ -369,7 +411,7 @@ describe('Product deployment and Supabase identity build gate', () => {
         NEXT_PUBLIC_DAYOPT_ENVIRONMENT: 'integration',
         NEXT_PUBLIC_APP_URL: PRODUCT_INTEGRATION_APP_ORIGIN,
       }),
-    ).toThrow('Preview application identity');
+    ).toThrow('Product Integration build requires matching markers');
   });
 
   it('rejects an App URL that points outside the Preview deployment aliases', () => {
@@ -433,13 +475,15 @@ describe('Product deployment and Supabase identity build gate', () => {
     );
   });
 
-  it('recognizes the fixed Integration app separately from the Vercel Production label', () => {
+  it('recognizes fixed Integration on the Product project integration branch Preview URL', () => {
     expect(
       assertProductDeploymentEnvironmentBuildEnv({
         ...completeSharedPreviewEnv(),
-        VERCEL_ENV: 'production',
-        VERCEL_TARGET_ENV: 'production',
+        VERCEL_ENV: 'preview',
+        VERCEL_TARGET_ENV: 'preview',
+        VERCEL_PROJECT_ID: PRODUCT_VERCEL_PROJECT_ID,
         VERCEL_GIT_COMMIT_REF: 'integration',
+        VERCEL_BRANCH_URL: 'product-git-integration-dayopt.vercel.app',
         DAYOPT_ENVIRONMENT: 'integration',
         NEXT_PUBLIC_DAYOPT_ENVIRONMENT: 'integration',
         NEXT_PUBLIC_APP_URL: PRODUCT_INTEGRATION_APP_ORIGIN,
@@ -447,15 +491,74 @@ describe('Product deployment and Supabase identity build gate', () => {
     ).toBe(true);
   });
 
-  it('rejects the Integration Supabase project on a Production branch without Integration identity', () => {
+  it('rejects a fixed Integration identity when its generated branch URL drifts', () => {
+    expect(() =>
+      assertProductDeploymentEnvironmentBuildEnv({
+        ...completeSharedPreviewEnv(),
+        VERCEL_GIT_COMMIT_REF: 'integration',
+        VERCEL_BRANCH_URL: 'product-git-other-dayopt.vercel.app',
+        DAYOPT_ENVIRONMENT: 'integration',
+        NEXT_PUBLIC_DAYOPT_ENVIRONMENT: 'integration',
+        NEXT_PUBLIC_APP_URL: PRODUCT_INTEGRATION_APP_ORIGIN,
+      }),
+    ).toThrow(
+      'matching markers, Product project, integration branch, persistent Supabase ref, and fixed Vercel branch URL',
+    );
+  });
+
+  it.each([
+    {
+      name: 'Vercel Project ID',
+      overrides: { VERCEL_PROJECT_ID: 'prj_not_product' },
+      expectedError: 'Product Preview build requires the Product Vercel project',
+    },
+    {
+      name: 'Supabase project ref',
+      overrides: { NEXT_PUBLIC_SUPABASE_URL: 'https://yvglwblxrnrenfifsnje.supabase.co' },
+      expectedError:
+        'matching markers, Product project, integration branch, persistent Supabase ref, and fixed Vercel branch URL',
+    },
+  ])('rejects fixed Integration when the $name drifts', ({ overrides, expectedError }) => {
+    expect(() =>
+      assertProductDeploymentEnvironmentBuildEnv({
+        ...completeSharedPreviewEnv(),
+        VERCEL_PROJECT_ID: PRODUCT_VERCEL_PROJECT_ID,
+        VERCEL_GIT_COMMIT_REF: 'integration',
+        VERCEL_BRANCH_URL: 'product-git-integration-dayopt.vercel.app',
+        DAYOPT_ENVIRONMENT: 'integration',
+        NEXT_PUBLIC_DAYOPT_ENVIRONMENT: 'integration',
+        NEXT_PUBLIC_APP_URL: PRODUCT_INTEGRATION_APP_ORIGIN,
+        ...overrides,
+      }),
+    ).toThrow(expectedError);
+  });
+
+  it('rejects the fixed Integration branch when Vercel marks it as Production', () => {
     expect(() =>
       assertProductDeploymentEnvironmentBuildEnv({
         ...completeSharedPreviewEnv(),
         VERCEL_ENV: 'production',
         VERCEL_TARGET_ENV: 'production',
-        VERCEL_GIT_COMMIT_REF: 'main',
+        VERCEL_GIT_COMMIT_REF: 'integration',
+        VERCEL_BRANCH_URL: 'product-git-integration-dayopt.vercel.app',
+        DAYOPT_ENVIRONMENT: 'integration',
+        NEXT_PUBLIC_DAYOPT_ENVIRONMENT: 'integration',
+        NEXT_PUBLIC_APP_URL: PRODUCT_INTEGRATION_APP_ORIGIN,
       }),
-    ).toThrow('matching app markers');
+    ).toThrow('Product Production build requires its bound Production Supabase project');
+  });
+
+  it('rejects the Integration Git branch without both explicit Integration markers', () => {
+    expect(() =>
+      assertProductDeploymentEnvironmentBuildEnv({
+        ...completeSharedPreviewEnv(),
+        VERCEL_GIT_COMMIT_REF: 'integration',
+        VERCEL_BRANCH_URL: 'product-git-integration-dayopt.vercel.app',
+        NEXT_PUBLIC_APP_URL: PRODUCT_INTEGRATION_APP_ORIGIN,
+      }),
+    ).toThrow(
+      'matching markers, Product project, integration branch, persistent Supabase ref, and fixed Vercel branch URL',
+    );
   });
 
   it('does not require Vercel settings for local builds and CI', () => {

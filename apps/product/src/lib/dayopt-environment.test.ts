@@ -4,6 +4,7 @@ import {
   PRODUCT_INTEGRATION_APP_ORIGIN,
   PRODUCT_INTEGRATION_SUPABASE_REF,
   PRODUCT_PRODUCTION_SUPABASE_REF,
+  PRODUCT_VERCEL_PROJECT_ID,
   resolveDayoptEnvironment,
   resolveSupabaseProjectRef,
 } from './dayopt-environment';
@@ -14,6 +15,7 @@ describe('Dayopt app and database identity', () => {
       resolveDayoptEnvironment({
         vercelEnvironment: 'preview',
         vercelTargetEnvironment: 'preview',
+        vercelProjectId: PRODUCT_VERCEL_PROJECT_ID,
         vercelGitCommitRef: 'codex/cloud-preview',
         supabaseUrl: `https://${PRODUCT_INTEGRATION_SUPABASE_REF}.supabase.co`,
       }),
@@ -25,9 +27,11 @@ describe('Dayopt app and database identity', () => {
       resolveDayoptEnvironment({
         dayoptEnvironment: 'integration',
         publicDayoptEnvironment: 'integration',
-        vercelEnvironment: 'production',
-        vercelTargetEnvironment: 'production',
+        vercelEnvironment: 'preview',
+        vercelTargetEnvironment: 'preview',
+        vercelProjectId: PRODUCT_VERCEL_PROJECT_ID,
         vercelGitCommitRef: 'integration',
+        vercelBranchUrl: 'product-git-integration-dayopt.vercel.app',
         appUrl: PRODUCT_INTEGRATION_APP_ORIGIN,
         supabaseUrl: `https://${PRODUCT_INTEGRATION_SUPABASE_REF}.supabase.co`,
       }),
@@ -47,9 +51,20 @@ describe('Dayopt app and database identity', () => {
 
   it.each([
     {
+      name: 'Preview is assigned to a different Vercel project',
+      input: {
+        vercelEnvironment: 'preview',
+        vercelTargetEnvironment: 'preview',
+        vercelProjectId: 'prj_not_product',
+        vercelGitCommitRef: 'codex/cloud-preview',
+        supabaseUrl: `https://${PRODUCT_INTEGRATION_SUPABASE_REF}.supabase.co`,
+      },
+    },
+    {
       name: 'Preview points to Production Supabase',
       input: {
         vercelEnvironment: 'preview',
+        vercelProjectId: PRODUCT_VERCEL_PROJECT_ID,
         supabaseUrl: `https://${PRODUCT_PRODUCTION_SUPABASE_REF}.supabase.co`,
       },
     },
@@ -70,6 +85,31 @@ describe('Dayopt app and database identity', () => {
         vercelTargetEnvironment: 'preview',
         appUrl: PRODUCT_INTEGRATION_APP_ORIGIN,
         vercelBranchUrl: 'product-git-codex-cloud-preview-dayopt.vercel.app',
+        supabaseUrl: `https://${PRODUCT_INTEGRATION_SUPABASE_REF}.supabase.co`,
+      },
+    },
+    {
+      name: 'Integration branch is missing its explicit app marker',
+      input: {
+        vercelEnvironment: 'preview',
+        vercelTargetEnvironment: 'preview',
+        vercelProjectId: PRODUCT_VERCEL_PROJECT_ID,
+        vercelGitCommitRef: 'integration',
+        vercelBranchUrl: 'product-git-integration-dayopt.vercel.app',
+        appUrl: PRODUCT_INTEGRATION_APP_ORIGIN,
+        supabaseUrl: `https://${PRODUCT_INTEGRATION_SUPABASE_REF}.supabase.co`,
+      },
+    },
+    {
+      name: 'Integration branch is assigned to a different Vercel project',
+      input: {
+        dayoptEnvironment: 'integration',
+        publicDayoptEnvironment: 'integration',
+        vercelEnvironment: 'preview',
+        vercelProjectId: 'prj_not_product',
+        vercelGitCommitRef: 'integration',
+        vercelBranchUrl: 'product-git-integration-dayopt.vercel.app',
+        appUrl: PRODUCT_INTEGRATION_APP_ORIGIN,
         supabaseUrl: `https://${PRODUCT_INTEGRATION_SUPABASE_REF}.supabase.co`,
       },
     },

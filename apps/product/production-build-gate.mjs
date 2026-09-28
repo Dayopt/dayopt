@@ -92,8 +92,11 @@ function assertServerSupabaseKey(env, environmentLabel = 'production') {
 export const PRODUCT_PRODUCTION_ORIGIN = 'https://app.dayopt.app';
 export const MCP_PRODUCTION_ORIGIN = 'https://mcp.dayopt.app';
 const PRODUCTION_SUPABASE_HOST = 'yvglwblxrnrenfifsnje.supabase.co';
+export const PRODUCT_VERCEL_PROJECT_ID = 'prj_hByu1DGZWiuLk0yfV4Gz1T4aIjpa';
 export const PRODUCT_INTEGRATION_SUPABASE_REF = 'tilwaprottpyhlfoggbb';
-export const PRODUCT_INTEGRATION_APP_ORIGIN = 'https://product-integration-dayopt.vercel.app';
+export const PRODUCT_INTEGRATION_APP_ORIGIN = 'https://product-git-integration-dayopt.vercel.app';
+const PRODUCT_INTEGRATION_BRANCH = 'integration';
+const PRODUCT_INTEGRATION_BRANCH_HOST = PRODUCT_INTEGRATION_APP_ORIGIN.slice('https://'.length);
 const PRODUCT_PREVIEW_BRANCH_HOST_PATTERN = /^product-git-[a-z0-9-]+-dayopt\.vercel\.app$/u;
 const PRODUCT_PREVIEW_DEPLOYMENT_HOST_PATTERN = /^product-[a-z0-9-]+-dayopt\.vercel\.app$/u;
 
@@ -216,11 +219,36 @@ export function assertProductDeploymentEnvironmentBuildEnv(env) {
 
   const appMarker = env.DAYOPT_ENVIRONMENT || env.NEXT_PUBLIC_DAYOPT_ENVIRONMENT;
   if (vercelEnvironment === 'preview') {
+    if (env.VERCEL_PROJECT_ID !== PRODUCT_VERCEL_PROJECT_ID) {
+      throw new Error('Product Preview build requires the Product Vercel project');
+    }
     if (env.VERCEL_TARGET_ENV && env.VERCEL_TARGET_ENV !== 'preview') {
       throw new Error('Product Preview build requires the Vercel Preview target');
     }
+
+    const integrationMarker =
+      env.DAYOPT_ENVIRONMENT === 'integration' &&
+      env.NEXT_PUBLIC_DAYOPT_ENVIRONMENT === 'integration';
+    const integrationBranch = env.VERCEL_GIT_COMMIT_REF === PRODUCT_INTEGRATION_BRANCH;
+    if (integrationMarker || integrationBranch) {
+      if (
+        !integrationMarker ||
+        !integrationBranch ||
+        env.VERCEL_PROJECT_ID !== PRODUCT_VERCEL_PROJECT_ID ||
+        projectRef !== PRODUCT_INTEGRATION_SUPABASE_REF ||
+        env.VERCEL_BRANCH_URL !== PRODUCT_INTEGRATION_BRANCH_HOST ||
+        env.NEXT_PUBLIC_APP_URL !== PRODUCT_INTEGRATION_APP_ORIGIN
+      ) {
+        throw new Error(
+          'Product Integration build requires matching markers, Product project, integration branch, persistent Supabase ref, and fixed Vercel branch URL',
+        );
+      }
+    }
+
     if (appMarker && appMarker !== 'preview') {
-      throw new Error('Product Preview build requires the Preview application identity');
+      if (!integrationMarker) {
+        throw new Error('Product Preview build requires the Preview application identity');
+      }
     }
     if (projectRef === 'yvglwblxrnrenfifsnje') {
       throw new Error('Product Preview build forbids the Production Supabase project');
@@ -238,6 +266,7 @@ export function assertProductDeploymentEnvironmentBuildEnv(env) {
     }
     if (
       projectRef === PRODUCT_INTEGRATION_SUPABASE_REF &&
+      !integrationMarker &&
       (env.MCP_OAUTH_ENVIRONMENT === 'preview' ||
         hasNonEmptyValue(env, 'OAUTH_AUTHORIZATION_SERVER_URI') ||
         hasNonEmptyValue(env, 'MCP_CANONICAL_RESOURCE_URI') ||
@@ -271,24 +300,7 @@ export function assertProductDeploymentEnvironmentBuildEnv(env) {
     return true;
   }
 
-  if (projectRef === PRODUCT_INTEGRATION_SUPABASE_REF) {
-    if (
-      env.DAYOPT_ENVIRONMENT !== 'integration' ||
-      env.NEXT_PUBLIC_DAYOPT_ENVIRONMENT !== 'integration' ||
-      env.VERCEL_TARGET_ENV !== 'production' ||
-      env.VERCEL_GIT_COMMIT_REF !== 'integration' ||
-      env.NEXT_PUBLIC_APP_URL !== PRODUCT_INTEGRATION_APP_ORIGIN
-    ) {
-      throw new Error(
-        'Product Integration build requires matching app markers, Git branch, Supabase ref, and Vercel stable alias',
-      );
-    }
-    return true;
-  }
-
-  throw new Error(
-    'Product Production build requires its bound Production or Integration Supabase project',
-  );
+  throw new Error('Product Production build requires its bound Production Supabase project');
 }
 
 function isVerifiedDayoptSender(value) {

@@ -3,10 +3,10 @@
  * A Vercel Preview may intentionally share the persistent nonproduction
  * Supabase project with the fixed Integration app.
  */
-export type DayoptEnvironment =
-  'production' | 'preview' | 'integration' | 'development' | 'unknown';
+type DayoptEnvironment = 'production' | 'preview' | 'integration' | 'development' | 'unknown';
 
-export const PRODUCT_INTEGRATION_APP_ORIGIN = 'https://product-integration-dayopt.vercel.app';
+export const PRODUCT_VERCEL_PROJECT_ID = 'prj_hByu1DGZWiuLk0yfV4Gz1T4aIjpa';
+export const PRODUCT_INTEGRATION_APP_ORIGIN = 'https://product-git-integration-dayopt.vercel.app';
 export const PRODUCT_INTEGRATION_SUPABASE_REF = 'tilwaprottpyhlfoggbb';
 export const PRODUCT_PRODUCTION_SUPABASE_REF = 'yvglwblxrnrenfifsnje';
 
@@ -15,6 +15,7 @@ interface DayoptEnvironmentInput {
   publicDayoptEnvironment?: string | undefined;
   vercelEnvironment?: string | undefined;
   vercelTargetEnvironment?: string | undefined;
+  vercelProjectId?: string | undefined;
   vercelGitCommitRef?: string | undefined;
   vercelUrl?: string | undefined;
   vercelBranchUrl?: string | undefined;
@@ -30,10 +31,14 @@ export function resolveDayoptEnvironment(input: DayoptEnvironmentInput): DayoptE
   const marker = dayoptMarker ?? publicMarker;
   const vercelEnvironment = normalize(input.vercelEnvironment);
   const vercelTargetEnvironment = normalize(input.vercelTargetEnvironment);
+  const vercelProjectId = normalize(input.vercelProjectId);
   const vercelGitCommitRef = normalize(input.vercelGitCommitRef);
   const projectRef = resolveSupabaseProjectRef(input.supabaseUrl);
 
   if (marker && !isDayoptEnvironment(marker)) return 'unknown';
+  if (vercelEnvironment === 'preview' && vercelProjectId !== PRODUCT_VERCEL_PROJECT_ID) {
+    return 'unknown';
+  }
 
   if (projectRef === PRODUCT_PRODUCTION_SUPABASE_REF) {
     if (
@@ -49,6 +54,20 @@ export function resolveDayoptEnvironment(input: DayoptEnvironmentInput): DayoptE
 
   if (projectRef === PRODUCT_INTEGRATION_SUPABASE_REF) {
     if (vercelEnvironment === 'preview') {
+      if (vercelGitCommitRef === 'integration') {
+        if (
+          dayoptMarker !== 'integration' ||
+          publicMarker !== 'integration' ||
+          vercelProjectId !== PRODUCT_VERCEL_PROJECT_ID ||
+          (vercelTargetEnvironment && vercelTargetEnvironment !== 'preview') ||
+          !isExactOrigin(input.appUrl, PRODUCT_INTEGRATION_APP_ORIGIN) ||
+          input.vercelBranchUrl !== PRODUCT_INTEGRATION_APP_ORIGIN.slice('https://'.length)
+        ) {
+          return 'unknown';
+        }
+        return 'integration';
+      }
+
       if (
         (vercelTargetEnvironment && vercelTargetEnvironment !== 'preview') ||
         (marker && marker !== 'preview') ||
@@ -57,18 +76,6 @@ export function resolveDayoptEnvironment(input: DayoptEnvironmentInput): DayoptE
         return 'unknown';
       }
       return 'preview';
-    }
-
-    if (vercelEnvironment === 'production') {
-      if (
-        marker !== 'integration' ||
-        vercelTargetEnvironment !== 'production' ||
-        vercelGitCommitRef !== 'integration' ||
-        !isExactOrigin(input.appUrl, PRODUCT_INTEGRATION_APP_ORIGIN)
-      ) {
-        return 'unknown';
-      }
-      return 'integration';
     }
 
     // Local full-app use of the shared project must be explicit.
@@ -85,6 +92,8 @@ export function resolveDayoptEnvironment(input: DayoptEnvironmentInput): DayoptE
 
   if (vercelEnvironment === 'preview') {
     if (
+      vercelGitCommitRef === 'integration' ||
+      marker === 'integration' ||
       (vercelTargetEnvironment && vercelTargetEnvironment !== 'preview') ||
       (marker && marker !== 'preview') ||
       !isPreviewAppUrlConsistent(input)
