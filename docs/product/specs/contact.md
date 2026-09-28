@@ -11,7 +11,7 @@ lp: []
 
 # Contact（問い合わせ・フィードバック）
 
-ProductとWebから受け付けた問い合わせを、Production限定で`support@dayopt.app`の運用受信箱へ配送する。
+ProductとWebから受け付けた問い合わせを、Productionでは`support@dayopt.app`の運用受信箱へ配送する。Productの固定Integrationでは専用のテスト受信先で配送を検証できる。
 
 ## 現在の振る舞い
 
@@ -40,7 +40,7 @@ ProductとWebから受け付けた問い合わせを、Production限定で`suppo
 
 ## 運用前提
 
-- Product / WebのVercel ProductionだけにResend、Upstash、必要なTurnstile envを置く
+- Production用Resend credentialsはProduct / WebのVercel Productionだけに置く。Productの固定Integrationには非本番専用の設定をbranch scopeで置き、通常のPR Preview / DevelopmentとWebへ送信用credentialsを配らない
 - Product / WebのResend webhook secretは別値にする
 - `support@dayopt.app`の受信はCloudflare Email Routingから既存Gmailへ転送し、返信は専用Resend SMTP keyを使う
 - 保存、削除、rotation、Production smokeは[問い合わせメール運用](../../operations/contact-email.md)に従う
