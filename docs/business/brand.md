@@ -27,7 +27,7 @@ code:
 
 | 用途                           | ファイル                                                              |
 | ------------------------------ | --------------------------------------------------------------------- |
-| Webヘッダー、フッター          | `dayopt-wordmark-primary.svg` / `dayopt-wordmark-reverse.svg`         |
+| Webヘッダー、フッター          | `dayopt-lockup-primary.svg` / `dayopt-lockup-reverse.svg`             |
 | 認証画面                       | `dayopt-lockup-primary.svg` / `dayopt-lockup-reverse.svg`             |
 | 正方形のシンボル枠             | `dayopt-symbol-primary.svg` / `dayopt-symbol-reverse.svg`             |
 | 見た目の外接矩形に合わせる配置 | `dayopt-symbol-tight-primary.svg` / `dayopt-symbol-tight-reverse.svg` |
@@ -39,7 +39,8 @@ SVGは透明背景、穴は実際に抜いたベクター。ロックアップ�
 
 ### OG画像
 
-- 新規 metadata が参照する OGP は `@dayopt/assets` の共通 renderer で 1200×630px の Light 画像を生成する。共通要素は Approved F のロゴ、category tag、title。
+- 新規 metadata が参照する OGP は `@dayopt/assets` の共通 renderer で 1200×630px の Light 画像を生成する。Approved F のロックアップを左上、category tag を右上に固定し、title と必要なスクリーンショットだけを layout ごとに変える。
+- OGP の下部には「一日の観察ノート」を表す装飾図版を置く。共通の時間軸に、輪郭の予定と塗りの記録を対で配置し、未配置の余白を残す。Docs は整列、Journal は長さの変化、Release は最後の記録を強調する。図版は実データではなく装飾として扱い、スクリーンショット併設時は実画面を図版として使う。
 - category の既定 layout は `Docs → center`、`Journal / Release → left`、`Product → screenshot`。スクリーンショットが無い・読めない場合は `left` に戻り、必要なページでは `layout` を上書きできる。
 - スクリーンショットはアプリ固有素材として `apps/web/public/og-screenshots/` または `apps/product/public/og-screenshots/` に置く。OGP から参照するのは raster ファイルだけで、外部 URL は取得しない。Product の既定ファイル名は `product.png`。
 - `og-image-light.png` / `og-image-dark.png` は 1200×630px の既存配布素材として維持し、SVG原稿も `public/brand/` に同梱する。

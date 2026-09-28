@@ -194,6 +194,7 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
       title: post.frontMatter.title,
       type: 'blog',
       date: post.frontMatter.publishedAt,
+      locale,
     }).toString()}`;
 
   // JSON-LD は platform/seo/structured-data.ts を正本にする（記事系で定義を重複させない）

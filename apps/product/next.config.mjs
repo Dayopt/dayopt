@@ -28,6 +28,10 @@ assertProductOperationalProductionBuildEnv(process.env);
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  outputFileTracingIncludes: {
+    '/opengraph-image': ['../../packages/assets/fonts/*.ttf'],
+  },
+
   reactStrictMode: true,
 
   // Next.js の agent-rules 自動生成を止める（#2693）。

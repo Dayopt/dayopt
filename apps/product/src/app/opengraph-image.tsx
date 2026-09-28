@@ -1,5 +1,6 @@
 import { OG_CARD_SIZE, resolveOgCardOptions } from '@dayopt/assets/og';
 import { OgCardImage } from '@dayopt/assets/og-card-image';
+import { loadOgFonts } from '@dayopt/assets/og-fonts';
 import { loadOgScreenshotDataUri } from '@dayopt/assets/og-screenshot';
 import { dayoptBrand } from '@dayopt/config';
 import { ImageResponse } from 'next/og';
@@ -26,9 +27,10 @@ export default async function OgImage() {
     <OgCardImage
       title="Plan your day. Track your time. Optimize your life."
       category={options.category}
+      categoryLabel="Product"
       layout={options.layout}
       screenshotSrc={screenshotSrc}
     />,
-    { ...size },
+    { ...size, fonts: await loadOgFonts() },
   );
 }
