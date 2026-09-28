@@ -639,6 +639,7 @@ export function TimeblockInspectorForm({
         disabled={isWriteFrozen}
       />
       <TimeblockActivityCard
+        kind={kind}
         activityId={value.activityId}
         activityName={selectedActivity?.name ?? t('calendar.filter.noActivity')}
         categoryName={selectedActivity?.categoryName}

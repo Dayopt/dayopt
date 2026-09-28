@@ -7,6 +7,7 @@ import type { ActivityTree } from '@/features/activities';
 
 import { PRESET_USER_SETTINGS } from '../../../../../../storybook/.storybook/mocks/presets';
 import { TimeblockActivityCard } from './TimeblockActivityCard';
+import { TimeblockInspectorHeader } from './TimeblockInspectorHeader';
 
 const timestamps = {
   created_at: '2026-09-28T00:00:00.000Z',
@@ -102,10 +103,16 @@ function ActivityCardPreview(args: CardProps) {
     args.onActivityChange(activityId);
   };
 
-  return <TimeblockActivityCard {...args} {...selection} onActivityChange={handleActivityChange} />;
+  return (
+    <div className="bg-surface-container w-full max-w-sm rounded-2xl pb-1">
+      <TimeblockInspectorHeader kind={args.kind} />
+      <TimeblockActivityCard {...args} {...selection} onActivityChange={handleActivityChange} />
+    </div>
+  );
 }
 
 const sharedArgs = {
+  kind: 'plan',
   activityId: 'activity-development',
   activityName: '開発',
   categoryName: '仕事',
@@ -133,12 +140,13 @@ const meta = {
   },
   args: sharedArgs,
   argTypes: {
+    kind: { control: 'inline-radio', options: ['plan', 'record'] },
     categoryName: { control: 'text' },
   },
   render: (args) => <ActivityCardPreview {...args} />,
   decorators: [
     (Story) => (
-      <div className="mx-auto w-full max-w-sm">
+      <div className="mx-auto w-full max-w-3xl">
         <Story />
       </div>
     ),
@@ -150,6 +158,22 @@ type Story = StoryObj<typeof meta>;
 
 /** アクティビティ選択カード。 */
 export const Default: Story = {};
+
+/** 予定はカテゴリー色の枠線で表示する。 */
+export const Plan: Story = { args: { kind: 'plan' } };
+
+/** 記録はカテゴリー色の淡い塗りで表示する。 */
+export const Record: Story = { args: { kind: 'record' } };
+
+/** 同じアクティビティの予定と記録を比較する。 */
+export const PlanAndRecord: Story = {
+  render: (args) => (
+    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+      <ActivityCardPreview {...args} kind="plan" />
+      <ActivityCardPreview {...args} kind="record" />
+    </div>
+  ),
+};
 
 /** カテゴリーに所属していないアクティビティ。 */
 export const Uncategorized: Story = {
@@ -190,12 +214,15 @@ export const LongNames: Story = {
 /** 全パターン一覧。 */
 export const AllPatterns: Story = {
   render: () => (
-    <div className="space-y-3">
-      <TimeblockActivityCard {...sharedArgs} />
-      <TimeblockActivityCard {...sharedArgs} {...Uncategorized.args} />
-      <TimeblockActivityCard {...sharedArgs} {...NoActivity.args} />
-      <TimeblockActivityCard {...sharedArgs} disabled />
-      <TimeblockActivityCard {...sharedArgs} {...LongNames.args} />
+    <div className="space-y-4">
+      {[{}, Uncategorized.args, NoActivity.args, Disabled.args, LongNames.args].map(
+        (args, index) => (
+          <div key={index} className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <ActivityCardPreview {...sharedArgs} {...args} kind="plan" />
+            <ActivityCardPreview {...sharedArgs} {...args} kind="record" />
+          </div>
+        ),
+      )}
     </div>
   ),
 };

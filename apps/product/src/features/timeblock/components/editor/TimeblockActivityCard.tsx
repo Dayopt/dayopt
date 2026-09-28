@@ -1,8 +1,10 @@
 'use client';
 
+import type { TimeblockDestination } from '../../domain/timeblock-destination';
 import { ActivityFieldRow } from '../inspector/fields';
 
 interface TimeblockActivityCardProps {
+  kind: TimeblockDestination;
   activityId: string | null;
   activityName: string;
   categoryName?: string | null | undefined;
@@ -22,6 +24,7 @@ interface TimeblockActivityCardProps {
 
 /** アクティビティ選択を独立したカードとして表示する。 */
 export function TimeblockActivityCard({
+  kind,
   activityId,
   activityName,
   categoryName,
@@ -37,6 +40,7 @@ export function TimeblockActivityCard({
     <div className="mx-4 mb-3">
       <ActivityFieldRow
         variant="card"
+        cardAppearance={kind === 'plan' ? 'outline' : 'filled'}
         activityId={activityId}
         activityName={activityName}
         categoryName={categoryName}
