@@ -119,15 +119,15 @@ GitHub は private repo の billable job duration を次の 1 分へ切り上げ
 
 | レバー                                                     | 状態                               | 効果 / 次の確認                                                                                                         |
 | ---------------------------------------------------------- | ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| Web / package Unit を変更 workspace に絞る                 | 実装中の branch、未 merge          | post-merge 2 週間の CI Unit usage で比較。Product の related/full 判定と fail-closed を維持する                         |
-| Nightly full Unit を同一 SHA の成功証拠がある日は省略      | 実装中の branch、未 merge          | 週 40 分が現在の上限目安。手動実行・証拠取得失敗時は full suite を実行する                                              |
+| Web / package Unit を変更 workspace に絞る                 | 実装済み（#2930）、使用量は未計測  | Product の related/full 判定と fail-closed を維持する                                                                   |
+| Nightly full Unit を同一 SHA の成功証拠がある日は省略      | 実装済み（#2930）、使用量は未計測  | 週 40 分が変更前の上限目安。手動実行・証拠取得失敗時は full suite を実行する                                            |
 | Validation shadow / gate の自動実行を停止                  | GitHub UI で停止済み（2026-09-28） | 週 997 分の自動実行を停止。required checks ではない。#2811 の gate 展開は別件として維持し、required checks に追加しない |
-| 15 分 heartbeat Actions を既存外形監視へ移す               | 代替 API を実装中、未 deploy       | 週の実測 51 分、設定上限は 30 日で 2,880 分。外形監視が新 API を正常に監視してから Actions schedule を止める            |
+| 15 分 heartbeat Actions schedule を停止                    | 停止（push・日次監査は維持）       | 変更前は週 51 分。`/api/health/cron` の外形監視設定は未確認のため、push時・日次監査が残る                               |
 | Storybook browser suite を story / dependency 影響時に限定 | 未実施                             | 週 117 分。安全な依存判定がないため full suite を維持し、誤 skip のリスクを取らない                                     |
 | E2E を self-hosted runner へ切り替え                       | 選択肢のみ                         | runner 登録と変数設定は User 操作。[self-hosted-runner.md](../operations/self-hosted-runner.md)                         |
 | Actions の追加課金予算                                     | `$0` / 上限時停止のまま            | 変更しない。枠を超える場合も超過課金は起こさず workflow が停止する                                                      |
 
-**実装 branch はまだ default branch に入っていないため、削減効果は未計測。** 変更 merge 後に 7〜14 日分を再計測し、必須 checks を残した状態で 30 日換算 2,400 分以内になることを確認する。`partial: true` の集計は判断に使わない。30 日分は API 上限と時間上限を守るため、週ごとに分割して集計する。
+**#2930 の CI 最適化は default branch に merge 済みだが、削減効果は未計測。Actions 使用量の再計測は保留する。** 後日計測する場合は、必須 checks を残した状態で 30 日換算 2,400 分以内を目標にし、`partial: true` の集計は判断に使わない。30 日分は API 上限と時間上限を守るため、週ごとに分割して集計する。
 
 読み取り専用 collector: `node scripts/runbook/actions-usage-collector.mjs [--since YYYY-MM-DD --until YYYY-MM-DD] [--out FILE]`。既定で直近 7 完了 UTC 日を収集し、job の経過時間を個別に分単位へ切り上げ、Windows / macOS runner の quota multiplier を適用する。`--out` は既存ファイルを上書きしない。GitHub の billable usage report ではなく、私有化前の比較用推計である。
 
