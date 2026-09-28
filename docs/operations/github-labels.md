@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-09-11
+last_verified: 2026-09-28
 code: .github/dependabot.yml
 ---
 
@@ -12,13 +12,26 @@ code: .github/dependabot.yml
 - ラベル自体の「名前」と「説明（Description）」を運用ルールの正本とし、色は参照用にのみ使う。
 - ここは現行運用の参照先（SSOT）で、運用手順は `.github/` 配下の設定/ワークフローと整合させる。
 - 未知のラベルを AI が推測して作成しない。
-- `priority:` は 0/1 個、`status:` は 0/1 個を付与する（通常 1 個）。
+- `status:` は 0/1 個を付与する（通常 1 個）。優先度は GitHub Issue field `Priority` を使い、`priority:*` ラベルは使わない。
 - `size:` は **deprecated**（2026-08-10、#1912。編成時に issue 本文から毎回判定する方式へ移行）。新規 issue に付けない。既存 issue からは剥がさない。
 - `risk:` は 0/1 個。
 - `type:`、`area:`、`quality:` は複数可。
 - 技術名、担当者名、Workflow名、Phase、実装ファイル種別をラベル化しない。
 - namespace の無い裸のラベルを作らない。`ops` は 2026-08-11（#1915）に `area:operations` へ付け替えたうえで削除した。
-- 新しいラベルが必要な場合は、既存 namespace（`type` / `priority` / `status` / `area` / `scope` / `quality` / `risk` / `db` / `review`）では表現できないことを確認したうえで判断する。
+- 新しいラベルが必要な場合は、既存 namespace（`type` / `status` / `area` / `scope` / `quality` / `risk` / `db` / `review`）では表現できないことを確認したうえで判断する。
+
+## Issue field: Priority
+
+GitHub organization-level Issue field `Priority`（API ID `38713666`）を優先度の正本とする。選択肢は `Urgent` / `High` / `Medium` / `Low`。Issue field は Issue にだけ設定でき、Pull Request には設定できない。Issue template から値を事前入力できないため、起票後にサイドバーまたは Issue Fields API で設定する。
+
+| 旧ラベル値    | Priority field |
+| ------------- | -------------- |
+| `priority:p0` | Urgent         |
+| `priority:p1` | High           |
+| `priority:p2` | Medium         |
+| `priority:p3` | Low            |
+
+旧 `priority:*` ラベルは移行後に削除する。今後の Issue / workflow 起票では Priority field を設定する。
 
 ## 正規ラベル一覧
 
@@ -33,13 +46,6 @@ code: .github/dependabot.yml
 - `type:discussion`
 - `type:chore`
 - ~~`type:board`~~（**廃止済み。2026-09-01、[#2525](https://github.com/Dayopt/dayopt/issues/2525)**。日次盤面 issue の運用ごと廃止した。ラベル自体は過去 issue の履歴として残すが、新規 issue には付けない）
-
-### priority
-
-- `priority:p0`
-- `priority:p1`
-- `priority:p2`
-- `priority:p3`
 
 ### status
 

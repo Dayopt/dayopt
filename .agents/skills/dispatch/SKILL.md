@@ -87,7 +87,7 @@ Chat 等への外部依頼で生じた調査結果も、まず既存の対象 is
 
    **これは起票時の攻撃シナリオ生成であり、実装の着手可否を決める gate ではない。** 本文を厚くするための best-effort な補助で、外部 provider の可用性を前提にしない
 
-3. ラベルは既存体系のみ使う: `type:*` / `priority:*` / `area:*` / `quality:*` など、掲載一覧（[github-labels.md](../../../docs/operations/github-labels.md)）にあるものだけ。`size:*` は **deprecated**（新規 issue には付けない。既存 issue から剥がしはしない）。新ラベルを作らない
+3. ラベルは既存体系のみ使う: `type:*` / `area:*` / `quality:*` など、掲載一覧（[github-labels.md](../../../docs/operations/github-labels.md)）にあるものだけ。優先度は GitHub Issue field `Priority`（Urgent / High / Medium / Low）に設定し、`priority:*` ラベルは使わない。API で設定する場合は organization issue field ID `38713666` に `POST /repos/Dayopt/dayopt/issues/{number}/issue-field-values` を使う。`size:*` は **deprecated**（新規 issue には付けない。既存 issue から剥がしはしない）。新ラベルを作らない
 4. `status:*` で着手可否を表す（着手可なら `status:ready`。`status:ready` を付けられる条件は §`status:ready` の定義（機械判定）に従う。前提待ちなら `status:blocked`）。既存テーマに属するなら該当 `scope:epic` issue の sub-issue にする。最上位ティア専用 / 🔒 prod 操作である旨は issue 本文の §注意 に書く。issue の実行自体に `EXPLICIT AUTHORITY` の不可逆操作（production mutation / release / データ削除 / 不可逆 migration / 実課金。`AGENTS.md` の authority level 定義）が含まれる場合に限り `risk:authority` を付け、実行前に User の明示指示を得る。可逆な auth / RLS / billing のコード変更には付けない（`pr-cross-review` skill での確認と、必要に応じた `CHECKPOINT` で扱う）
 5. **milestone を判断する**: 現行 milestone（次の minor version。open は常に 1 個、世代交代は releasing skill Phase 3.1）に入れて押し込む作業なら milestone を付ける。付けなければバックログ。「next」milestone は作らない
 

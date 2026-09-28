@@ -292,7 +292,7 @@ main へ merge しても Production domain は**直接**切り替わらない。
 
 さらに 2026-09-07（[#2643](https://github.com/Dayopt/dayopt/issues/2643)）から、promote.yml の
 `File promote failure` job が **`[auto] Production Release が失敗しました` という 1 本の issue**
-へ起票する（`area:deployment` / `priority:p1`）。同じ title prefix の open issue が既にあれば
+へ起票する（`area:deployment`、Priority field は `High`）。同じ title prefix の open issue が既にあれば
 新規作成せずコメントで追記するので、失敗が続く間も issue は 1 本のまま増えない。本文には
 どの job が落ちたか、対象 SHA、run URL が入る。**`superseded` は起票しない** —— burst merge で
 後発 run が先に promote した時、先発は superseded で exit 1 するが、その commit の内容は既に
