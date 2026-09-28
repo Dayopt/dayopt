@@ -61,6 +61,8 @@ interface ActivityFieldRowProps {
   disabled?: boolean | undefined;
   /** 見た目の重さ。既定は `heading`（見出し相当）。 */
   variant?: 'heading' | 'compact' | 'card' | undefined;
+  /** card の表現。予定は枠線、記録は淡い塗りで表示する。 */
+  cardAppearance?: 'outline' | 'filled' | undefined;
   /**
    * activityId → 普段の長さ（分）。選択一覧の各行へ目安として添える。
    * 集計を引くのは呼び出し側（この component は pure props を保つ）。
@@ -80,6 +82,7 @@ export function ActivityFieldRow({
   onCreateAndSelect,
   disabled = false,
   variant = 'heading',
+  cardAppearance = 'outline',
   durationByActivityId,
 }: ActivityFieldRowProps) {
   const t = useTranslations();
@@ -122,30 +125,31 @@ export function ActivityFieldRow({
       onClick={() => setSelectorOpen(true)}
       disabled={disabled}
       className={cn(
-        'border-border-subtle bg-card hover:bg-state-hover group ease-standard h-auto w-full cursor-pointer justify-start gap-3 rounded-2xl p-4 text-left shadow-sm duration-150',
-        selectorOpen && 'bg-state-selected ring-border ring-1',
+        'ease-standard relative isolate h-auto min-h-20 w-full cursor-pointer items-center justify-start overflow-hidden rounded-2xl px-4 py-3 text-left duration-150',
+        cardAppearance === 'outline'
+          ? cn('bg-transparent', iconColorClasses?.border ?? 'border-border')
+          : cn(
+              'border-transparent',
+              iconColorClasses
+                ? cn(iconColorClasses.tint, iconColorClasses.tintInteraction)
+                : 'bg-state-selected hover:bg-state-selected active:bg-state-selected',
+            ),
+        selectorOpen && 'ring-border ring-1',
       )}
       aria-label={`${t('calendar.filter.changeActivity')}: ${activityName}`}
       aria-haspopup="dialog"
       aria-expanded={selectorOpen}
     >
-      <span
-        className={cn(
-          'flex size-14 shrink-0 items-center justify-center rounded-lg',
-          iconColorClasses?.tint,
-        )}
-      >
-        <ActivityIcon
-          icon={activityIcon ?? null}
-          color={activityColor ?? null}
-          size="lg"
-          neutral={activityId === null || uncategorized}
-        />
-      </span>
-      <span className="flex min-w-0 flex-1 flex-col gap-1">
-        <span className="text-foreground truncate text-lg font-medium" title={activityName}>
-          {activityName}
+      {iconColorClasses && (
+        <span className="pointer-events-none absolute -right-2 -bottom-2 opacity-10" aria-hidden>
+          <ActivityIcon
+            icon={activityIcon ?? null}
+            color={activityColor ?? null}
+            className="size-20"
+          />
         </span>
+      )}
+      <span className="relative flex min-w-0 flex-1 flex-col gap-1">
         <span
           className="text-muted-foreground truncate text-sm font-normal"
           title={categoryName ?? undefined}
@@ -157,11 +161,10 @@ export function ActivityFieldRow({
                 : 'calendar.filter.noCategory',
             )}
         </span>
+        <span className="text-foreground truncate text-lg font-medium" title={activityName}>
+          {activityName}
+        </span>
       </span>
-      <ChevronDown
-        className="text-muted-foreground group-hover:text-foreground size-4 shrink-0"
-        aria-hidden
-      />
     </Button>
   ) : (
     <button
