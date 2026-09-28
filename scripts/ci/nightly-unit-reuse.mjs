@@ -19,6 +19,25 @@ export function fullUnitStepResult(jobs) {
   return job.conclusion === 'success' && step.conclusion === 'success' ? 'success' : 'failure';
 }
 
+/** Return an executed full-test result with its actual step start time. */
+export function fullUnitStepEvidence(jobs) {
+  const result = fullUnitStepResult(jobs);
+  if (result === null) return null;
+
+  const job = jobs.find((candidate) => candidate?.name === FULL_UNIT_JOB_NAME);
+  const step = job.steps.find((candidate) => candidate?.name === FULL_UNIT_STEP_NAME);
+  const startedAt = Date.parse(step.started_at ?? '');
+  const completedAt = step.completed_at == null ? null : Date.parse(step.completed_at);
+  if (!Number.isFinite(startedAt) || (completedAt !== null && !Number.isFinite(completedAt))) {
+    throw new Error('full-unit step is missing a valid started_at or completed_at timestamp');
+  }
+  if (step.conclusion !== null && completedAt === null) {
+    throw new Error('completed full-unit step is missing a valid completed_at timestamp');
+  }
+
+  return { result, startedAt, completedAt };
+}
+
 /** A successful check requires both the job and the explicit full-test step to succeed. */
 export function hasSuccessfulFullUnitStep(jobs) {
   return fullUnitStepResult(jobs) === 'success';
@@ -42,8 +61,9 @@ function readJsonLines(args, execImpl = execFileSync) {
 }
 
 /**
- * Search earlier runs of the same workflow and SHA, newest first. A newer skipped attempt does
- * not replace evidence; an explicitly executed failure does. API failure is handled by caller.
+ * Find the most recently started full-unit step across all runs of the same workflow and SHA.
+ * A newer skipped attempt does not replace evidence; an executed failure does. API failure is
+ * handled by caller.
  */
 export function hasPreviousSuccessfulFullUnitRun({
   repository,
@@ -56,22 +76,27 @@ export function hasPreviousSuccessfulFullUnitRun({
   }
   const runs = readJsonLines(
     [
-      `repos/${repository}/actions/workflows/nightly.yml/runs?head_sha=${headSha}&branch=main&sort=created&direction=desc&per_page=100`,
+      '--paginate',
+      `repos/${repository}/actions/workflows/nightly.yml/runs?head_sha=${headSha}&branch=main&per_page=100`,
       '--jq',
       '.workflow_runs[] | @json',
     ],
     execImpl,
   );
 
+  const evidence = [];
   for (const run of runs) {
-    if (
-      run?.head_sha !== headSha ||
-      String(run?.id ?? '') === String(currentRunId ?? '') ||
-      !Number.isSafeInteger(run?.run_attempt) ||
-      !Number.isSafeInteger(run?.id)
-    ) {
+    if (run?.head_sha !== headSha || String(run?.id ?? '') === String(currentRunId ?? '')) {
       continue;
     }
+    if (
+      !Number.isSafeInteger(run?.id) ||
+      !Number.isSafeInteger(run?.run_attempt) ||
+      run.run_attempt < 1
+    ) {
+      throw new Error('matching workflow run is missing valid id or run_attempt');
+    }
+
     for (let attempt = run.run_attempt; attempt >= 1; attempt -= 1) {
       const jobs = readJsonLines(
         [
@@ -81,12 +106,23 @@ export function hasPreviousSuccessfulFullUnitRun({
         ],
         execImpl,
       );
-      const result = fullUnitStepResult(jobs);
-      if (result === 'success') return true;
-      if (result === 'failure') return false;
+      const result = fullUnitStepEvidence(jobs);
+      if (result) {
+        evidence.push(result);
+        break;
+      }
     }
   }
-  return false;
+  if (evidence.length === 0) return false;
+
+  const latestStart = Math.max(...evidence.map((item) => item.startedAt));
+  const latestByStart = evidence.filter((item) => item.startedAt === latestStart);
+  if (latestByStart.some((item) => item.completedAt === null)) return false;
+
+  const latestCompletion = Math.max(...latestByStart.map((item) => item.completedAt));
+  return latestByStart
+    .filter((item) => item.completedAt === latestCompletion)
+    .every((item) => item.result === 'success');
 }
 
 function appendOutput(path, name, value) {
