@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   PRODUCT_INTEGRATION_APP_ORIGIN,
   PRODUCT_INTEGRATION_SUPABASE_REF,
+  PRODUCT_VERCEL_PROJECT_ID,
 } from '@/lib/dayopt-environment';
 
 import { isOAuthRequestHostAllowed, resolveOAuthEnvironmentConfig } from './identity';
@@ -132,10 +133,13 @@ describe('MCP OAuth environment identity', () => {
       resolveOAuthEnvironmentConfig({
         mcpOAuthEnvironment: 'integration',
         dayoptEnvironment: 'integration',
+        publicDayoptEnvironment: 'integration',
+        vercelProjectId: PRODUCT_VERCEL_PROJECT_ID,
+        vercelBranchUrl: PRODUCT_INTEGRATION_APP_ORIGIN.slice('https://'.length),
         authorizationServerUri: PRODUCT_INTEGRATION_APP_ORIGIN,
         resourceUri: PRODUCT_INTEGRATION_APP_ORIGIN,
-        vercelEnvironment: 'production',
-        vercelTargetEnvironment: 'production',
+        vercelEnvironment: 'preview',
+        vercelTargetEnvironment: 'preview',
         vercelGitCommitRef: 'integration',
         supabaseProjectRef: PRODUCT_INTEGRATION_SUPABASE_REF,
       }),
@@ -153,12 +157,12 @@ describe('MCP OAuth environment identity', () => {
       override: { dayoptEnvironment: undefined },
     },
     {
-      name: 'Vercel Preview target',
-      override: { vercelEnvironment: 'preview' },
+      name: 'Vercel Production environment',
+      override: { vercelEnvironment: 'production' },
     },
     {
-      name: 'non-Production Vercel target',
-      override: { vercelTargetEnvironment: 'preview' },
+      name: 'Production Vercel target',
+      override: { vercelTargetEnvironment: 'production' },
     },
     {
       name: 'main Git branch',
@@ -177,10 +181,13 @@ describe('MCP OAuth environment identity', () => {
       resolveOAuthEnvironmentConfig({
         mcpOAuthEnvironment: 'integration',
         dayoptEnvironment: 'integration',
+        publicDayoptEnvironment: 'integration',
+        vercelProjectId: PRODUCT_VERCEL_PROJECT_ID,
+        vercelBranchUrl: PRODUCT_INTEGRATION_APP_ORIGIN.slice('https://'.length),
         authorizationServerUri: PRODUCT_INTEGRATION_APP_ORIGIN,
         resourceUri: PRODUCT_INTEGRATION_APP_ORIGIN,
-        vercelEnvironment: 'production',
-        vercelTargetEnvironment: 'production',
+        vercelEnvironment: 'preview',
+        vercelTargetEnvironment: 'preview',
         vercelGitCommitRef: 'integration',
         supabaseProjectRef: PRODUCT_INTEGRATION_SUPABASE_REF,
         ...override,

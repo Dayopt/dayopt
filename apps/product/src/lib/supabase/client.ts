@@ -79,10 +79,15 @@ export function createClient() {
   }
 
   const dayoptEnvironment = resolveDayoptEnvironment({
+    dayoptEnvironment: process.env.NEXT_PUBLIC_DAYOPT_ENVIRONMENT,
     publicDayoptEnvironment: process.env.NEXT_PUBLIC_DAYOPT_ENVIRONMENT,
     vercelEnvironment: process.env.NEXT_PUBLIC_VERCEL_ENV,
     vercelTargetEnvironment: process.env.NEXT_PUBLIC_VERCEL_TARGET_ENV,
     vercelGitCommitRef: process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_REF,
+    vercelProjectId: process.env.NEXT_PUBLIC_VERCEL_PROJECT_ID,
+    vercelBranchUrl: process.env.NEXT_PUBLIC_VERCEL_BRANCH_URL,
+    vercelUrl: process.env.NEXT_PUBLIC_VERCEL_URL,
+    appUrl: process.env.NEXT_PUBLIC_APP_URL,
     supabaseUrl: url,
   });
   if (dayoptEnvironment === 'unknown') {

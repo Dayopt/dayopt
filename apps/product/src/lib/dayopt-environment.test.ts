@@ -1,43 +1,75 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  PRODUCT_INTEGRATION_APP_ORIGIN,
   PRODUCT_INTEGRATION_SUPABASE_REF,
+  PRODUCT_PRODUCTION_SUPABASE_REF,
+  PRODUCT_VERCEL_PROJECT_ID,
   resolveDayoptEnvironment,
   resolveSupabaseProjectRef,
 } from './dayopt-environment';
 
-describe('Dayopt environment identity', () => {
-  it('keeps Vercel target semantics as the fallback for existing environments', () => {
-    expect(resolveDayoptEnvironment({ vercelEnvironment: 'production' })).toBe('production');
-    expect(resolveDayoptEnvironment({ vercelEnvironment: 'preview' })).toBe('preview');
-    expect(resolveDayoptEnvironment({})).toBe('development');
+describe('Dayopt app and database identity', () => {
+  it('keeps an app Preview identity when it shares persistent Integration Supabase', () => {
+    expect(
+      resolveDayoptEnvironment({
+        vercelEnvironment: 'preview',
+        vercelTargetEnvironment: 'preview',
+        vercelProjectId: PRODUCT_VERCEL_PROJECT_ID,
+        vercelGitCommitRef: 'codex/cloud-preview',
+        supabaseUrl: `https://${PRODUCT_INTEGRATION_SUPABASE_REF}.supabase.co`,
+      }),
+    ).toBe('preview');
   });
 
-  it('recognizes the persistent Integration project only with its explicit marker and DB ref', () => {
+  it('recognizes the fixed Integration app only with its bound marker, branch, ref, and alias', () => {
     expect(
       resolveDayoptEnvironment({
         dayoptEnvironment: 'integration',
         publicDayoptEnvironment: 'integration',
-        vercelEnvironment: 'production',
-        vercelTargetEnvironment: 'production',
+        vercelEnvironment: 'preview',
+        vercelTargetEnvironment: 'preview',
+        vercelProjectId: PRODUCT_VERCEL_PROJECT_ID,
         vercelGitCommitRef: 'integration',
+        vercelBranchUrl: 'product-git-integration-dayopt.vercel.app',
+        appUrl: PRODUCT_INTEGRATION_APP_ORIGIN,
         supabaseUrl: `https://${PRODUCT_INTEGRATION_SUPABASE_REF}.supabase.co`,
       }),
     ).toBe('integration');
   });
 
-  it.each([
-    {
-      name: 'missing marker',
-      input: {
+  it('recognizes Production only on the Production Vercel environment and Supabase project', () => {
+    expect(
+      resolveDayoptEnvironment({
         vercelEnvironment: 'production',
         vercelTargetEnvironment: 'production',
-        vercelGitCommitRef: 'integration',
+        vercelGitCommitRef: 'main',
+        supabaseUrl: `https://${PRODUCT_PRODUCTION_SUPABASE_REF}.supabase.co`,
+      }),
+    ).toBe('production');
+  });
+
+  it.each([
+    {
+      name: 'Preview is assigned to a different Vercel project',
+      input: {
+        vercelEnvironment: 'preview',
+        vercelTargetEnvironment: 'preview',
+        vercelProjectId: 'prj_not_product',
+        vercelGitCommitRef: 'codex/cloud-preview',
         supabaseUrl: `https://${PRODUCT_INTEGRATION_SUPABASE_REF}.supabase.co`,
       },
     },
     {
-      name: 'production marker',
+      name: 'Preview points to Production Supabase',
+      input: {
+        vercelEnvironment: 'preview',
+        vercelProjectId: PRODUCT_VERCEL_PROJECT_ID,
+        supabaseUrl: `https://${PRODUCT_PRODUCTION_SUPABASE_REF}.supabase.co`,
+      },
+    },
+    {
+      name: 'Integration ref is labelled as Production',
       input: {
         dayoptEnvironment: 'production',
         vercelEnvironment: 'production',
@@ -47,69 +79,83 @@ describe('Dayopt environment identity', () => {
       },
     },
     {
-      name: 'wrong platform target',
+      name: 'Integration ref is used by Preview with a fixed Integration URL',
       input: {
-        dayoptEnvironment: 'integration',
         vercelEnvironment: 'preview',
         vercelTargetEnvironment: 'preview',
-        vercelGitCommitRef: 'integration',
+        appUrl: PRODUCT_INTEGRATION_APP_ORIGIN,
+        vercelBranchUrl: 'product-git-codex-cloud-preview-dayopt.vercel.app',
         supabaseUrl: `https://${PRODUCT_INTEGRATION_SUPABASE_REF}.supabase.co`,
       },
     },
     {
-      name: 'different git branch',
+      name: 'Integration branch is missing its explicit app marker',
       input: {
-        dayoptEnvironment: 'integration',
-        vercelEnvironment: 'production',
-        vercelTargetEnvironment: 'production',
-        vercelGitCommitRef: 'main',
+        vercelEnvironment: 'preview',
+        vercelTargetEnvironment: 'preview',
+        vercelProjectId: PRODUCT_VERCEL_PROJECT_ID,
+        vercelGitCommitRef: 'integration',
+        vercelBranchUrl: 'product-git-integration-dayopt.vercel.app',
+        appUrl: PRODUCT_INTEGRATION_APP_ORIGIN,
         supabaseUrl: `https://${PRODUCT_INTEGRATION_SUPABASE_REF}.supabase.co`,
       },
     },
     {
-      name: 'different database',
+      name: 'Integration branch is assigned to a different Vercel project',
       input: {
         dayoptEnvironment: 'integration',
-        vercelEnvironment: 'production',
-        vercelTargetEnvironment: 'production',
+        publicDayoptEnvironment: 'integration',
+        vercelEnvironment: 'preview',
+        vercelProjectId: 'prj_not_product',
         vercelGitCommitRef: 'integration',
-        supabaseUrl: 'https://yvglwblxrnrenfifsnje.supabase.co',
+        vercelBranchUrl: 'product-git-integration-dayopt.vercel.app',
+        appUrl: PRODUCT_INTEGRATION_APP_ORIGIN,
+        supabaseUrl: `https://${PRODUCT_INTEGRATION_SUPABASE_REF}.supabase.co`,
       },
+    },
+    {
+      name: 'shared local connection is not explicit',
+      input: { supabaseUrl: `https://${PRODUCT_INTEGRATION_SUPABASE_REF}.supabase.co` },
     },
     {
       name: 'server and browser markers disagree',
       input: {
-        dayoptEnvironment: 'production',
+        dayoptEnvironment: 'preview',
         publicDayoptEnvironment: 'integration',
-        vercelEnvironment: 'production',
-        vercelTargetEnvironment: 'production',
-        vercelGitCommitRef: 'integration',
+        vercelEnvironment: 'preview',
         supabaseUrl: `https://${PRODUCT_INTEGRATION_SUPABASE_REF}.supabase.co`,
       },
     },
-  ])('fails closed for Integration drift: $name', ({ input }) => {
+  ])('fails closed when $name', ({ input }) => {
     expect(resolveDayoptEnvironment(input)).toBe('unknown');
   });
 
-  it('does not accept an Integration marker on another Supabase project', () => {
+  it('keeps local Supabase as the Local development fallback', () => {
+    expect(resolveDayoptEnvironment({ supabaseUrl: 'http://127.0.0.1:54321' })).toBe('development');
+  });
+
+  it('allows an explicit local full-app connection to persistent Integration Supabase', () => {
     expect(
       resolveDayoptEnvironment({
-        dayoptEnvironment: 'integration',
-        vercelEnvironment: 'production',
-        vercelTargetEnvironment: 'production',
-        vercelGitCommitRef: 'integration',
-        supabaseUrl: 'https://yvglwblxrnrenfifsnje.supabase.co',
+        dayoptEnvironment: 'development',
+        vercelEnvironment: 'development',
+        vercelTargetEnvironment: 'development',
+        supabaseUrl: `https://${PRODUCT_INTEGRATION_SUPABASE_REF}.supabase.co`,
       }),
-    ).toBe('unknown');
+    ).toBe('development');
   });
 
   it('extracts only canonical Supabase project refs', () => {
-    expect(resolveSupabaseProjectRef('https://yvglwblxrnrenfifsnje.supabase.co')).toBe(
-      'yvglwblxrnrenfifsnje',
-    );
-    expect(resolveSupabaseProjectRef('http://yvglwblxrnrenfifsnje.supabase.co')).toBeUndefined();
     expect(
-      resolveSupabaseProjectRef('https://yvglwblxrnrenfifsnje.supabase.co.evil.example'),
+      resolveSupabaseProjectRef(`https://${PRODUCT_INTEGRATION_SUPABASE_REF}.supabase.co`),
+    ).toBe(PRODUCT_INTEGRATION_SUPABASE_REF);
+    expect(
+      resolveSupabaseProjectRef(
+        `https://${PRODUCT_INTEGRATION_SUPABASE_REF}.supabase.co.evil.example`,
+      ),
+    ).toBeUndefined();
+    expect(
+      resolveSupabaseProjectRef(`http://${PRODUCT_INTEGRATION_SUPABASE_REF}.supabase.co`),
     ).toBeUndefined();
   });
 });

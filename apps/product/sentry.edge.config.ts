@@ -25,6 +25,10 @@ const DAYOPT_ENVIRONMENT = resolveDayoptEnvironment({
   vercelEnvironment: process.env.VERCEL_ENV,
   vercelTargetEnvironment: process.env.VERCEL_TARGET_ENV,
   vercelGitCommitRef: process.env.VERCEL_GIT_COMMIT_REF,
+  vercelProjectId: process.env.VERCEL_PROJECT_ID,
+  vercelBranchUrl: process.env.VERCEL_BRANCH_URL,
+  vercelUrl: process.env.VERCEL_URL,
+  appUrl: process.env.NEXT_PUBLIC_APP_URL,
   supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL,
 });
 const SENTRY_ENVIRONMENT =
@@ -49,7 +53,7 @@ if (SENTRY_DSN && SENTRY_ENVIRONMENT !== null) {
     debug: false,
 
     // Production and the explicitly bound Integration project only. Integration
-    // also uses Vercel's Production target, so check the Dayopt identity above.
+    // uses Vercel's Preview target, so check the full Dayopt binding above.
     enabled: SENTRY_ENVIRONMENT !== null,
 
     // Edge のフィルタリング + PII スクラビング

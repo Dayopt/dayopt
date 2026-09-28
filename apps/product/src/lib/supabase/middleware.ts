@@ -79,6 +79,10 @@ export async function updateSession(request: NextRequest) {
     vercelEnvironment: process.env.VERCEL_ENV,
     vercelTargetEnvironment: process.env.VERCEL_TARGET_ENV,
     vercelGitCommitRef: process.env.VERCEL_GIT_COMMIT_REF,
+    vercelProjectId: process.env.VERCEL_PROJECT_ID,
+    vercelBranchUrl: process.env.VERCEL_BRANCH_URL,
+    vercelUrl: process.env.VERCEL_URL,
+    appUrl: process.env.NEXT_PUBLIC_APP_URL,
     supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL,
   });
   if (environment === 'unknown') {

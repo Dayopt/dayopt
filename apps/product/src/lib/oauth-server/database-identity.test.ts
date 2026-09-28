@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   PRODUCT_INTEGRATION_APP_ORIGIN,
   PRODUCT_INTEGRATION_SUPABASE_REF,
+  PRODUCT_VERCEL_PROJECT_ID,
 } from '@/lib/dayopt-environment';
 
 import {
@@ -44,10 +45,13 @@ const databasePreviewIdentity = {
 const integrationIdentity = resolveOAuthEnvironmentConfig({
   mcpOAuthEnvironment: 'integration',
   dayoptEnvironment: 'integration',
+  publicDayoptEnvironment: 'integration',
+  vercelProjectId: PRODUCT_VERCEL_PROJECT_ID,
+  vercelBranchUrl: PRODUCT_INTEGRATION_APP_ORIGIN.slice('https://'.length),
   authorizationServerUri: PRODUCT_INTEGRATION_APP_ORIGIN,
   resourceUri: PRODUCT_INTEGRATION_APP_ORIGIN,
-  vercelEnvironment: 'production',
-  vercelTargetEnvironment: 'production',
+  vercelEnvironment: 'preview',
+  vercelTargetEnvironment: 'preview',
   vercelGitCommitRef: 'integration',
   supabaseProjectRef: PRODUCT_INTEGRATION_SUPABASE_REF,
 });

@@ -57,6 +57,7 @@ vi.mock('@/env', () => ({
 import {
   PRODUCT_INTEGRATION_APP_ORIGIN,
   PRODUCT_INTEGRATION_SUPABASE_REF,
+  PRODUCT_VERCEL_PROJECT_ID,
 } from '@/lib/dayopt-environment';
 import { GET } from './route';
 
@@ -113,9 +114,12 @@ describe('GET /api/health', () => {
   });
 
   it('unprovisioned Integration health stays read-only across repeated checks', async () => {
-    vi.stubEnv('VERCEL_ENV', 'production');
-    vi.stubEnv('VERCEL_TARGET_ENV', 'production');
+    vi.stubEnv('VERCEL_ENV', 'preview');
+    vi.stubEnv('VERCEL_TARGET_ENV', 'preview');
     vi.stubEnv('VERCEL_GIT_COMMIT_REF', 'integration');
+    vi.stubEnv('VERCEL_PROJECT_ID', PRODUCT_VERCEL_PROJECT_ID);
+    vi.stubEnv('VERCEL_BRANCH_URL', PRODUCT_INTEGRATION_APP_ORIGIN.slice('https://'.length));
+    vi.stubEnv('NEXT_PUBLIC_APP_URL', PRODUCT_INTEGRATION_APP_ORIGIN);
     vi.stubEnv('DAYOPT_ENVIRONMENT', 'integration');
     vi.stubEnv('NEXT_PUBLIC_DAYOPT_ENVIRONMENT', 'integration');
     vi.stubEnv('MCP_OAUTH_ENVIRONMENT', 'integration');
