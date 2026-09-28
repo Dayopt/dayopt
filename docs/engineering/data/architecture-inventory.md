@@ -2129,7 +2129,7 @@ graph LR
 </details>
 
 <details>
-<summary>test の候補（97）</summary>
+<summary>test の候補（96）</summary>
 
 <!-- prettier-ignore -->
 | ファイル | 対応の根拠 |
@@ -2215,7 +2215,6 @@ graph LR
 | [apps/product/src/features/calendar/lib/overlap.test.ts](<../../../apps/product/src/features/calendar/lib/overlap.test.ts>) | feature: calendar |
 | [apps/product/src/features/calendar/lib/panel-url.test.ts](<../../../apps/product/src/features/calendar/lib/panel-url.test.ts>) | feature: calendar |
 | [apps/product/src/features/calendar/lib/plan-data-adapter.test.ts](<../../../apps/product/src/features/calendar/lib/plan-data-adapter.test.ts>) | feature: calendar |
-| [apps/product/src/features/calendar/lib/plan-record-drop.test.ts](<../../../apps/product/src/features/calendar/lib/plan-record-drop.test.ts>) | feature: calendar |
 | [apps/product/src/features/calendar/lib/record-event-adapter.test.ts](<../../../apps/product/src/features/calendar/lib/record-event-adapter.test.ts>) | feature: calendar |
 | [apps/product/src/features/calendar/lib/remaining-day-minutes.test.ts](<../../../apps/product/src/features/calendar/lib/remaining-day-minutes.test.ts>) | feature: calendar |
 | [apps/product/src/features/calendar/lib/route-utils.test.ts](<../../../apps/product/src/features/calendar/lib/route-utils.test.ts>) | feature: calendar |

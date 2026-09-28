@@ -1,10 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import {
-  isPlanRecordDrop,
-  resolveTimeblockDestination,
-  resolveTimeblockKindChoice,
-} from './timeblock-destination';
+import { resolveTimeblockDestination, resolveTimeblockKindChoice } from './timeblock-destination';
 
 const now = new Date('2026-07-10T12:00:00.000Z');
 
@@ -15,14 +11,6 @@ describe('resolveTimeblockDestination', () => {
 
   it('終了が現在以前なら Record を返す', () => {
     expect(resolveTimeblockDestination('2026-07-10T12:00:00.000Z', now)).toBe('record');
-  });
-});
-
-describe('isPlanRecordDrop', () => {
-  it('Plan から Record レーンへのドロップだけを記録化とみなす', () => {
-    expect(isPlanRecordDrop('plan', 'record')).toBe(true);
-    expect(isPlanRecordDrop('record', 'plan')).toBe(false);
-    expect(isPlanRecordDrop('plan', 'plan')).toBe(false);
   });
 });
 

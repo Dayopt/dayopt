@@ -41,7 +41,6 @@ export { TIMEBLOCK_PARAM, serializeTimeblockParam } from './lib/inspector-url';
 // Domain (時間モデル — 純粋関数、DB/tRPC/React 非依存)
 // =============================================================================
 export {
-  isPlanRecordDrop,
   resolveTimeblockDestination,
   resolveTimeblockKindChoice,
 } from './domain/timeblock-destination';
