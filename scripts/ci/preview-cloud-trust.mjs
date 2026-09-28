@@ -23,6 +23,8 @@ const SUPPORTED_INPUT_KEYS = [
   'preview_db_ref',
   'preview_db_branch',
   'preview_db_mode',
+  'preview_recover_run',
+  'preview_recover_attempt',
 ];
 const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
 const PROJECT_REF = /^[a-z]{20}$/;
@@ -55,6 +57,10 @@ function parseInputs(requestJson) {
     inputKeys.length === SUPPORTED_INPUT_KEYS.length &&
       inputKeys.every((key, index) => key === [...SUPPORTED_INPUT_KEYS].sort()[index]),
     'unexpected workflow input fields',
+  );
+  requireCondition(
+    inputs.preview_recover_run === '' && inputs.preview_recover_attempt === '',
+    'recovery inputs cannot be used for Preview E2E',
   );
   requireCondition(inputs.preview_e2e === true, 'Preview E2E was not explicitly enabled');
   requireCondition(
@@ -164,7 +170,7 @@ function apiUrl(path, query = {}) {
   return url;
 }
 
-async function verifyPreviewEnvironment({ token, fetchImpl }) {
+export async function verifyPreviewEnvironmentBoundary({ token, fetchImpl }) {
   const environmentPath = `/repos/${GITHUB_REPOSITORY}/environments/${encodeURIComponent(PREVIEW_ENVIRONMENT)}`;
   const { body: environment } = await readGitHubJson({
     url: apiUrl(environmentPath),
@@ -316,7 +322,7 @@ export async function verifyPreviewCloudTrust({
   );
   const request = parseInputs(requestJson);
 
-  await verifyPreviewEnvironment({ token: token.trim(), fetchImpl });
+  await verifyPreviewEnvironmentBoundary({ token: token.trim(), fetchImpl });
   const pullRequest = await readPullRequest({
     prNumber: request.prNumber,
     token: token.trim(),

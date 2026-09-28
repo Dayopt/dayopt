@@ -28,6 +28,8 @@ const context = {
     preview_db_ref: persistentRef,
     preview_db_branch: persistentBranchId,
     preview_db_mode: 'shared',
+    preview_recover_run: '',
+    preview_recover_attempt: '',
   }),
 };
 
@@ -134,6 +136,8 @@ describe('Preview Cloud trust gate', () => {
 
   it.each([
     ['disabled runner input', { preview_e2e: false }],
+    ['non-empty recovery run input', { preview_recover_run: '123' }],
+    ['non-empty recovery attempt input', { preview_recover_attempt: '1' }],
     ['invalid PR number', { preview_pr: '0' }],
     ['invalid commit SHA', { preview_sha: 'short' }],
     ['invalid deployment id', { preview_deployment: 'https://example.com' }],

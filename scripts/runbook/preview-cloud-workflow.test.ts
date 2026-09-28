@@ -6,11 +6,11 @@ describe('Cloud Preview credential wiring', () => {
   it('requires an explicit dispatch on the trusted Integration workflow ref', () => {
     expect(
       cloud.match(
-        /if: github.event_name == 'workflow_dispatch' && inputs.preview_e2e && github.ref == 'refs\/heads\/integration'/g,
+        /if: github.event_name == 'workflow_dispatch' && inputs.preview_e2e && inputs.preview_recover_run == '' && github.ref == 'refs\/heads\/integration'/g,
       ),
     ).toHaveLength(1);
     expect(cloud).toContain(
-      "always() && needs.preview-trust.result == 'success' && github.event_name == 'workflow_dispatch' && inputs.preview_e2e && github.ref == 'refs/heads/integration'",
+      "always() && needs.preview-trust.result == 'success' && github.event_name == 'workflow_dispatch' && inputs.preview_e2e && inputs.preview_recover_run == '' && github.ref == 'refs/heads/integration'",
     );
     expect(workflow).toContain('default: false');
     expect(workflow).toContain('cancel-in-progress: ${{ !inputs.preview_e2e }}');
@@ -40,5 +40,24 @@ describe('Cloud Preview credential wiring', () => {
     for (const line of cloud.split('\n').filter((line) => line.includes('run:'))) {
       expect(line).not.toContain('${{ inputs.');
     }
+  });
+  it('saves the exact run intent before any candidate checkout or dependency execution', () => {
+    const persist = cloud.indexOf('name: Persist the public recovery intent');
+    const candidate = cloud.indexOf('name: Checkout the exact reviewed candidate');
+    expect(persist).toBeGreaterThan(0);
+    expect(persist).toBeLessThan(candidate);
+    expect(cloud).toContain('name: preview-intent-${{ github.run_id }}-${{ github.run_attempt }}');
+    expect(cloud.slice(0, persist)).not.toMatch(/secrets\.PREVIEW_E2E_/);
+    expect(cloud.match(/preview-cloud-run\.mjs.*preview-intent\/intent\.json/g)).toHaveLength(3);
+  });
+  it('recovers on a trusted worker with no candidate code and one selected nonproduction key', () => {
+    const recovery = cloud.slice(cloud.indexOf('\n  preview-recovery-trust:'));
+    expect(recovery).toContain('needs: preview-recovery-trust');
+    expect(recovery).toContain("inputs.preview_recover_run != ''");
+    expect(recovery).toContain('cancel-in-progress: false');
+    expect(recovery).not.toContain('path: candidate');
+    expect(recovery).not.toContain('pnpm');
+    expect(recovery.match(/secrets\.[A-Z0-9_]+/g)).toEqual(['secrets.PREVIEW_E2E_SUPABASE_KEY']);
+    expect(recovery).toContain('path: ${{ runner.temp }}/preview-recovery/recovery.json');
   });
 });
