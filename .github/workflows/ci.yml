@@ -23,7 +23,9 @@ name: CI
 
 on:
   pull_request:
-    branches: [main]
+    # Integration の候補も merge 前に同じ品質検査を通す。通常PRを
+    # Integration 経由にする規則ではなく、既存の非本番変更経路の検査。
+    branches: [main, integration]
     # **`ready_for_review` を明示的に含める。** 既定の types は
     # `opened / synchronize / reopened` だけで ready_for_review を含まないため、
     # これが無いと draft → ready の変換で CI が再発火しない

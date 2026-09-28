@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { expectedMigrationVersions } from '../ci/production-migration-readiness.mjs';
 import { isDirectExecution } from '../lib/is-direct-execution.mjs';
 import { isPassingPreviewReport } from '../lib/preview-e2e-reporter.mjs';
+import { recoverPreviewUsers } from './preview-cleanup.mjs';
 import { observePreviewReadiness, parsePreviewReadinessArgs } from './preview-readiness.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
@@ -94,6 +95,7 @@ export async function runPreviewE2E({
   env = process.env,
   observe = observePreviewReadiness,
   execute = executePlaywright,
+  recover = recoverPreviewUsers,
   tempRoot = tmpdir(),
 }) {
   if (!env.SUPABASE_SECRET_KEY?.trim())
@@ -110,6 +112,18 @@ export async function runPreviewE2E({
   const evidenceDir = join(directory, 'evidence');
   mkdirSync(privateDir, { mode: 0o700 });
   mkdirSync(evidenceDir, { mode: 0o700 });
+  // Persist the public binding before spawning browsers, so a later supervisor
+  // can recover journaled users even when this process is interrupted.
+  writeFileSync(
+    join(evidenceDir, 'run.json'),
+    JSON.stringify({
+      runId,
+      status: 'running',
+      before,
+      evidenceDirectory: evidenceDir,
+    }),
+    { mode: 0o600 },
+  );
   let exitCode = 1;
   let after = null;
   let failure = 'execution-failed';
@@ -117,6 +131,17 @@ export async function runPreviewE2E({
     exitCode = await execute(previewWorkerEnvironment(env, before, privateDir, evidenceDir, runId));
   } catch {
     // A raw process error can contain env, command output, or request details.
+  }
+  let cleanup = { status: 'failed', checked: 0, recovered: 0 };
+  try {
+    cleanup = await recover({
+      evidenceDirectory: evidenceDir,
+      runId,
+      supabaseProjectRef: before.supabaseProjectRef,
+      serviceKey: env.SUPABASE_SECRET_KEY,
+    });
+  } catch {
+    // Invalid journal or raw provider errors cannot be disclosed.
   }
   try {
     after = await observe({ ...request, ...credentials });
@@ -129,13 +154,20 @@ export async function runPreviewE2E({
   } catch {
     failure = 'e2e-evidence-missing';
   }
-  const passed = exitCode === 0 && after !== null && isPassingPreviewReport(report);
+  if (cleanup.status !== 'clean' || cleanup.checked < 2) failure = 'cleanup-unconfirmed';
+  const passed =
+    exitCode === 0 &&
+    after !== null &&
+    isPassingPreviewReport(report) &&
+    cleanup.status === 'clean' &&
+    cleanup.checked >= 2;
   const result = {
     runId,
     status: passed ? 'passed' : 'failed',
     failure: passed ? null : failure,
     before,
     after,
+    cleanup,
     evidenceDirectory: evidenceDir,
   };
   // Raw Playwright output, including error-context files, is never an upload target.
@@ -152,6 +184,11 @@ if (isDirectExecution(import.meta.url)) {
         cwd: ROOT,
         encoding: 'utf8',
         stdio: ['ignore', 'pipe', 'pipe'],
+        env: Object.fromEntries(
+          ['PATH', 'HOME', 'LANG'].flatMap((key) =>
+            process.env[key] ? [[key, process.env[key]]] : [],
+          ),
+        ),
       }).trim();
     if (git(['rev-parse', 'HEAD']) !== request.sha || git(['status', '--porcelain']) !== '') {
       throw new Error('Candidate checkout is not clean or does not match SHA');
