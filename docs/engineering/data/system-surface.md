@@ -49,7 +49,7 @@ tRPC の `/api/trpc` を含む、Next.js の route handler 全件。method は e
 | web     | `/blog/feed.xml`                             | GET                | —       | 30          | `apps/web/src/app/blog/feed.xml/route.ts`                                 |
 | web     | `/ja/blog/feed.xml`                          | GET                | —       | 30          | `apps/web/src/app/ja/blog/feed.xml/route.ts`                              |
 
-### 定期実行（16）
+### 定期実行（15）
 
 | source         | 対象                                         | schedule       | 発見元                                          |
 | -------------- | -------------------------------------------- | -------------- | ----------------------------------------------- |
@@ -61,7 +61,6 @@ tRPC の `/api/trpc` を含む、Next.js の route handler 全件。method は e
 | github-actions | `nightly.yml`                                | `30 21 * * *`  | `.github/workflows/nightly.yml`                 |
 | github-actions | `nightly.yml`                                | `0 22 * * *`   | `.github/workflows/nightly.yml`                 |
 | github-actions | `production-config-audit.yml`                | `0 21 * * *`   | `.github/workflows/production-config-audit.yml` |
-| github-actions | `production-config-audit.yml`                | `*/15 * * * *` | `.github/workflows/production-config-audit.yml` |
 
 **pg_cron（7）**: 下表は migration 上の定義を schedule / unschedule の順に畳んだもの。
 production の pg_cron は Supabase Dashboard 側が正本なので、ここは参考値として読む。

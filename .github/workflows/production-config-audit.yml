@@ -102,7 +102,6 @@ on:
   schedule:
     # 06:00 JST。merge が無い日でも dashboard 手動変更の drift を 1 日以内に検出する
     - cron: '0 21 * * *'
-    - cron: '*/15 * * * *'
   workflow_dispatch:
 
 permissions:
@@ -111,7 +110,7 @@ permissions:
   statuses: write
 
 concurrency:
-  group: production-config-audit-${{ github.event.pull_request.number || github.ref }}-${{ github.event.schedule == '*/15 * * * *' && 'heartbeat' || 'full' }}
+  group: production-config-audit-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -119,7 +118,7 @@ jobs:
     name: Audit Vercel metadata (trusted)
     # draft の間は走らせない。skip は conclusion: skipped の check run になり、
     # finish-branch.sh の畳み込みが「判定を持つ entry を優先」で処理する（ci.yml の重量 job と同型）。
-    if: github.event.schedule != '*/15 * * * *' && (github.event_name != 'pull_request_target' || github.event.pull_request.draft == false)
+    if: github.event_name != 'pull_request_target' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     # Secret は main からだけ使える environment に置く（2026-09-14、ci vault 整理）。
     # 他 branch の workflow から secrets を読めないようにするためで、deployment 記録は作らない
@@ -245,7 +244,7 @@ jobs:
   # 巻き込まれ、無関係な contract test が壊れる（2026-08-17、PR #2130 で実際に発生）。
   deploy-health:
     name: Check production deploy health (trusted)
-    if: github.event_name == 'push' || (github.event_name == 'schedule' && github.event.schedule != '*/15 * * * *')
+    if: github.event_name == 'push' || github.event_name == 'schedule'
     runs-on: ubuntu-latest
     # Secret は main からだけ使える environment に置く（2026-09-14、ci vault 整理）。
     # 他 branch の workflow から secrets を読めないようにするためで、deployment 記録は作らない
@@ -380,7 +379,7 @@ jobs:
   # 続くが、commit status は発行しないため上記 contract test は変わらず green のまま。
   auth-config:
     name: Audit Supabase Auth config (trusted)
-    if: github.event_name == 'push' || (github.event_name == 'schedule' && github.event.schedule != '*/15 * * * *')
+    if: github.event_name == 'push' || github.event_name == 'schedule'
     runs-on: ubuntu-latest
     # Secret は main からだけ使える environment に置く（2026-09-14、ci vault 整理）。
     # 他 branch の workflow から secrets を読めないようにするためで、deployment 記録は作らない
@@ -430,7 +429,7 @@ jobs:
   # 曖昧な中間状態を持たない。
   storage-rls:
     name: Audit production storage.objects RLS (trusted)
-    if: github.event_name == 'push' || (github.event_name == 'schedule' && github.event.schedule != '*/15 * * * *')
+    if: github.event_name == 'push' || github.event_name == 'schedule'
     runs-on: ubuntu-latest
     # Secret は main からだけ使える environment に置く（2026-09-14、ci vault 整理）。
     # 他 branch の workflow から secrets を読めないようにするためで、deployment 記録は作らない
@@ -497,7 +496,7 @@ jobs:
 
   schema-drift:
     name: Audit production schema and ACL (trusted)
-    if: github.event_name == 'push' || (github.event_name == 'schedule' && github.event.schedule != '*/15 * * * *')
+    if: github.event_name == 'push' || github.event_name == 'schedule'
     runs-on: ubuntu-latest
     # Secret は main からだけ使える environment に置く（2026-09-14、ci vault 整理）。
     # 他 branch の workflow から secrets を読めないようにするためで、deployment 記録は作らない
