@@ -55,7 +55,7 @@ describe('TimeblockEditor', () => {
     expect(screen.queryByText('plan')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('title')).not.toBeInTheDocument();
     expect(screen.getByText('0/1000')).toBeInTheDocument();
-    expect(screen.getByRole('textbox', { name: 'note' })).toHaveAttribute('type', 'text');
+    expect(screen.getByRole('textbox', { name: 'note' }).tagName).toBe('TEXTAREA');
     expect(screen.queryByRole('button', { name: 'save' })).not.toBeInTheDocument();
   });
 
