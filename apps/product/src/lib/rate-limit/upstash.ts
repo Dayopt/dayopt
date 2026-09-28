@@ -353,6 +353,12 @@ export const healthCheckGlobalRateLimit = createRateLimiter(
   'ratelimit:product:health:global',
 );
 
+/** Anonymous cron-heartbeat monitor: cap public service-role SELECT traffic independently. */
+export const cronHeartbeatHealthRateLimit = createRateLimiter(
+  Ratelimit.slidingWindow(30, '1 m'),
+  'ratelimit:product:cron-heartbeat-health:global',
+);
+
 /** iCalフィード全体の集約上限（暫定値）。service-role DB lookupを保護する。 */
 export const icalFeedGlobalRateLimit = createRateLimiter(
   Ratelimit.slidingWindow(600, '1 m'),

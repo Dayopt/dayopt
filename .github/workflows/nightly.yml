@@ -101,14 +101,29 @@ jobs:
       cancel-in-progress: true
     permissions:
       contents: read
+      actions: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
+      # 毎日同じ main SHA を全件再検査しない。同じ SHA で全件テストの成功を
+      # API から確認できない場合は実行する。手動実行は常に全件。
+      - id: previous-full-unit
+        name: Check same-SHA full-unit evidence
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_SHA: ${{ github.sha }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+        run: node scripts/ci/nightly-unit-reuse.mjs
+
       - uses: ./.github/actions/setup
+        if: steps.previous-full-unit.outputs.run_full_tests == 'true'
 
       - name: Run unit tests (full)
+        if: steps.previous-full-unit.outputs.run_full_tests == 'true'
         env:
           GITHUB_EVENT_NAME: ${{ github.event_name }}
           CI_UNIT_MODE: full

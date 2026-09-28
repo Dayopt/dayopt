@@ -9,7 +9,7 @@
 
 ## 外部との接点
 
-### HTTP route（32）
+### HTTP route（33）
 
 tRPC の `/api/trpc` を含む、Next.js の route handler 全件。method は export から取る。
 
@@ -25,6 +25,7 @@ tRPC の `/api/trpc` を含む、Next.js の route handler 全件。method は e
 | product | `/api/cron/external-connection-maintenance`  | GET                | nodejs  | 60          | `apps/product/src/app/api/cron/external-connection-maintenance/route.ts`  |
 | product | `/api/csp-report`                            | POST, HEAD         | —       | 30          | `apps/product/src/app/api/csp-report/route.ts`                            |
 | product | `/api/health`                                | GET                | —       | 30          | `apps/product/src/app/api/health/route.ts`                                |
+| product | `/api/health/cron`                           | GET                | —       | 20          | `apps/product/src/app/api/health/cron/route.ts`                           |
 | product | `/api/health/version`                        | GET                | —       | 15          | `apps/product/src/app/api/health/version/route.ts`                        |
 | product | `/api/integrations/google-calendar/callback` | GET                | nodejs  | 90          | `apps/product/src/app/api/integrations/google-calendar/callback/route.ts` |
 | product | `/api/integrations/google-calendar/start`    | GET                | nodejs  | 60          | `apps/product/src/app/api/integrations/google-calendar/start/route.ts`    |
@@ -107,7 +108,7 @@ job 名を変数で渡す schedule と、jobid で消す unschedule は追えな
 | `protectedProcedure` | 67                      | `apps/product/src/lib/trpc/procedures.ts` |
 | `entitledProcedure`  | 4                       | `apps/product/src/lib/trpc/procedures.ts` |
 
-### rate limit（21）
+### rate limit（22）
 
 | limiter                        | 上限 | 窓     | 利用箇所                                                                                                                                          |
 | ------------------------------ | ---- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -127,6 +128,7 @@ job 名を変数で渡す schedule と、jobid で消す unschedule は追えな
 | `icalFeedIpRateLimit`          | 60   | `1 m`  | `apps/product/src/app/api/v1/calendar/[token]/route.ts`                                                                                           |
 | `trpcPreAuthIpRateLimit`       | 600  | `1 m`  | `apps/product/src/lib/trpc/context.ts`                                                                                                            |
 | `healthCheckGlobalRateLimit`   | 120  | `1 m`  | `apps/product/src/app/api/health/route.ts`                                                                                                        |
+| `cronHeartbeatHealthRateLimit` | 30   | `1 m`  | `apps/product/src/app/api/health/cron/route.ts`                                                                                                   |
 | `icalFeedGlobalRateLimit`      | 600  | `1 m`  | `apps/product/src/app/api/v1/calendar/[token]/route.ts`                                                                                           |
 | `calendarConnectRateLimit`     | 10   | `1 h`  | `apps/product/src/app/api/integrations/google-calendar/callback/route.ts`, `apps/product/src/app/api/integrations/google-calendar/start/route.ts` |
 | `calendarSyncNowRateLimit`     | 6    | `1 h`  | `apps/product/src/features/external-calendar/server/router.ts`                                                                                    |
