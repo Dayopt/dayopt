@@ -117,15 +117,15 @@ GitHub は private repo の billable job duration を次の 1 分へ切り上げ
 
 ### 予算レバー台帳
 
-| レバー                                                     | 状態                               | 効果 / 次の確認                                                                                                         |
-| ---------------------------------------------------------- | ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| Web / package Unit を変更 workspace に絞る                 | 実装済み（#2930）、使用量は未計測  | Product の related/full 判定と fail-closed を維持する                                                                   |
-| Nightly full Unit を同一 SHA の成功証拠がある日は省略      | 実装済み（#2930）、使用量は未計測  | 週 40 分が変更前の上限目安。手動実行・証拠取得失敗時は full suite を実行する                                            |
-| Validation shadow / gate の自動実行を停止                  | GitHub UI で停止済み（2026-09-28） | 週 997 分の自動実行を停止。required checks ではない。#2811 の gate 展開は別件として維持し、required checks に追加しない |
-| 15 分 heartbeat Actions schedule を停止                    | 停止（push・日次監査は維持）       | 変更前は週 51 分。`/api/health/cron` の外形監視設定は未確認のため、push時・日次監査が残る                               |
-| Storybook browser suite を story / dependency 影響時に限定 | 未実施                             | 週 117 分。安全な依存判定がないため full suite を維持し、誤 skip のリスクを取らない                                     |
-| E2E を self-hosted runner へ切り替え                       | 選択肢のみ                         | runner 登録と変数設定は User 操作。[self-hosted-runner.md](../operations/self-hosted-runner.md)                         |
-| Actions の追加課金予算                                     | `$0` / 上限時停止のまま            | 変更しない。枠を超える場合も超過課金は起こさず workflow が停止する                                                      |
+| レバー                                                     | 状態                                | 効果 / 次の確認                                                                                                         |
+| ---------------------------------------------------------- | ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| Web / package Unit を変更 workspace に絞る                 | 実装済み（#2930）、使用量は未計測   | Product の related/full 判定と fail-closed を維持する                                                                   |
+| Nightly full Unit は直近に実走した同一 SHA が成功なら省略  | 実装済み（#2930）、未計測・判定修正 | 新しい同一 SHA の全件テスト失敗時・手動実行・証拠取得失敗時は full suite を実行する                                     |
+| Validation shadow / gate の自動実行を停止                  | GitHub UI で停止済み（2026-09-28）  | 週 997 分の自動実行を停止。required checks ではない。#2811 の gate 展開は別件として維持し、required checks に追加しない |
+| 15 分 heartbeat Actions schedule を停止                    | 停止（push・日次監査は維持）        | 変更前は週 51 分。`/api/health/cron` の外形監視設定は未確認のため、push時・日次監査が残る                               |
+| Storybook browser suite を story / dependency 影響時に限定 | 未実施                              | 週 117 分。安全な依存判定がないため full suite を維持し、誤 skip のリスクを取らない                                     |
+| E2E を self-hosted runner へ切り替え                       | 選択肢のみ                          | runner 登録と変数設定は User 操作。[self-hosted-runner.md](../operations/self-hosted-runner.md)                         |
+| Actions の追加課金予算                                     | `$0` / 上限時停止のまま             | 変更しない。枠を超える場合も超過課金は起こさず workflow が停止する                                                      |
 
 **#2930 の CI 最適化は default branch に merge 済みだが、削減効果は未計測。Actions 使用量の再計測は保留する。** 後日計測する場合は、必須 checks を残した状態で 30 日換算 2,400 分以内を目標にし、`partial: true` の集計は判断に使わない。30 日分は API 上限と時間上限を守るため、週ごとに分割して集計する。
 
