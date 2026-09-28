@@ -136,11 +136,13 @@ export function hasRealSupabaseCredentials(supabaseUrl: string | undefined): boo
 export function resolvePreviewCompensationKB(
   supabaseUrl: string | undefined,
   publicDayoptEnvironment?: string,
+  publicSentryDsn?: string,
 ): number {
   // Match instrumentation-client.ts's compile-time initialization gate. Fixed
   // Integration includes Sentry even on Vercel Preview, so adding its measured
   // component again would double-count it. The build gate validates the binding.
-  const sentryCompensationKB = publicDayoptEnvironment === 'integration' ? 0 : SENTRY_COMPONENT_KB;
+  const sentryCompensationKB =
+    publicDayoptEnvironment === 'integration' && Boolean(publicSentryDsn) ? 0 : SENTRY_COMPONENT_KB;
   const credentialCompensationKB = hasRealSupabaseCredentials(supabaseUrl)
     ? 0
     : SUPABASE_CREDENTIAL_COMPONENT_KB;
@@ -322,10 +324,12 @@ function main(): void {
     : resolvePreviewCompensationKB(
         process.env.NEXT_PUBLIC_SUPABASE_URL,
         process.env.NEXT_PUBLIC_DAYOPT_ENVIRONMENT,
+        process.env.NEXT_PUBLIC_SENTRY_DSN,
       );
   if (!IS_PRODUCTION_BUILD) {
     const suffix =
-      process.env.NEXT_PUBLIC_DAYOPT_ENVIRONMENT === 'integration'
+      process.env.NEXT_PUBLIC_DAYOPT_ENVIRONMENT === 'integration' &&
+      Boolean(process.env.NEXT_PUBLIC_SENTRY_DSN)
         ? '（Integration の Sentry 成分は計測済み、#2910）'
         : hasRealSupabaseCredentials(process.env.NEXT_PUBLIC_SUPABASE_URL)
           ? '（実 Supabase credential 検出、Sentry 成分のみ加算、#2163）'
