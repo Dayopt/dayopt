@@ -32,6 +32,7 @@
         "VERCEL_ENV",
         "VERCEL_GIT_COMMIT_REF",
         "VERCEL_GIT_COMMIT_SHA",
+        "VERCEL_PROJECT_ID",
         "VERCEL_PROJECT_PRODUCTION_URL",
         "VERCEL_TARGET_ENV",
         "VERCEL_URL",

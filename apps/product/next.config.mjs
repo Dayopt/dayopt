@@ -6,6 +6,7 @@ import createNextIntlPlugin from 'next-intl/plugin';
 import { fileURLToPath } from 'url';
 
 import {
+  assertProductDeploymentEnvironmentBuildEnv,
   assertProductIntegrationBuildEnv,
   assertProductOperationalProductionBuildEnv,
   assertProductPreviewBuildEnv,
@@ -23,6 +24,7 @@ const withBundleAnalyzer = bundleAnalyzer({
   enabled: process.env.ANALYZE === 'true',
 });
 
+assertProductDeploymentEnvironmentBuildEnv(process.env);
 assertProductPreviewBuildEnv(process.env);
 assertProductIntegrationBuildEnv(process.env);
 const isSentryProductionBuild = assertProductionSentryBuildEnv(process.env, 'Product');
@@ -61,6 +63,9 @@ const nextConfig = {
     // client 側で Vercel 環境を判別するため露出。preview は NODE_ENV=production だが
     // VERCEL_ENV=preview なので、Sentry を production のみ有効化する gate に必要。
     NEXT_PUBLIC_VERCEL_ENV: process.env.VERCEL_ENV || '',
+    NEXT_PUBLIC_VERCEL_PROJECT_ID: process.env.VERCEL_PROJECT_ID || '',
+    NEXT_PUBLIC_VERCEL_BRANCH_URL: process.env.VERCEL_BRANCH_URL || '',
+    NEXT_PUBLIC_VERCEL_URL: process.env.VERCEL_URL || '',
     NEXT_PUBLIC_VERCEL_TARGET_ENV: process.env.VERCEL_TARGET_ENV || '',
     NEXT_PUBLIC_VERCEL_GIT_COMMIT_REF: process.env.VERCEL_GIT_COMMIT_REF || '',
     NEXT_PUBLIC_DAYOPT_ENVIRONMENT: process.env.NEXT_PUBLIC_DAYOPT_ENVIRONMENT || '',

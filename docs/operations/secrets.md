@@ -256,31 +256,31 @@ vault は 2026-08-14 の信頼境界軸再編（[#2086](https://github.com/Dayop
 
 ### Cloud-first Product Integration (#2910)
 
-Integration credentials は 1Password の `agent` item に追加せず、専用 Vercel project `product-integration` の Production environment に保存する。Supabase Production branch の自動設定は `main` のままにし、Integration の Supabase URL / keys は branch `tilwaprottpyhlfoggbb` から個別に取得する。Vercel system variables は Vercel が供給する値を使い、手入力しない。
+Integration credentials は 1Password の `agent` item に追加せず、既存 Vercel project `product` の Preview environment に保存する。固定Integrationの環境印・issuer・resource・app URLは Git branch `integration` に限定し、通常Previewへ継承させない。Supabase credentialsは非本番の通常Previewにも共有する。Supabase Production branch の自動設定は `main` のままにし、Integration の Supabase URL / keys は branch `tilwaprottpyhlfoggbb` から個別に取得する。Vercel system variables は Vercel が供給する値を使い、手入力しない。通常Previewへ非本番のserver keyを渡す前提は信頼済みPRだけである。VercelのGit Fork ProtectionとDeployment Protectionを維持し、未信頼forkへenvを渡す承認をしない。
 
-Integration の正規 origin は `https://product-integration-dayopt.vercel.app` の1つだけとする。`product-integration-git-integration-dayopt.vercel.app` など Git branch alias や個別 deployment URL は OAuth issuer / MCP resource / Supabase Auth Site URL / callback に使わない。
+Integration の正規 origin は `https://product-git-integration-dayopt.vercel.app` の1つだけとする。旧専用ProjectのURLや個別 deployment URL は OAuth issuer / MCP resource / Supabase Auth Site URL / callback に使わない。
 
-OAuth identity の確認は読み取りだけとし、health / MCP access / token issuance からの自動provisionは行わない。未provision・不一致なら利用を停止する。DB・runtime・Auth originを揃えた後の環境準備工程で明示的にprovisionする。常設originの切替中は、この読み取り専用runtimeが反映されたSHAを確認してからmigrationへ進む。以下は旧構成の設定であり、#2910で決めた既存`product` projectのPreview / 固定branch aliasへの同期完了を示すものではない。
+OAuth identity の確認は読み取りだけとし、health / MCP access / token issuance からの自動provisionは行わない。未provision・不一致なら利用を停止する。DB・runtime・Auth originを揃えた後の環境準備工程で明示的にprovisionする。常設originの切替中は、この読み取り専用runtimeが反映されたSHAを確認してからmigrationへ進む。以下は移行先の設定契約であり、設定保存・デプロイ・Auth origin・DB migrationの同期完了を示すものではない。
 
 必須のアプリ設定:
 
 | Variable                                                        | 値 / ルール                                                                |
 | --------------------------------------------------------------- | -------------------------------------------------------------------------- |
 | `DAYOPT_ENVIRONMENT` / `NEXT_PUBLIC_DAYOPT_ENVIRONMENT`         | どちらも `integration`                                                     |
-| `NEXT_PUBLIC_APP_URL`                                           | `https://product-integration-dayopt.vercel.app`                            |
+| `NEXT_PUBLIC_APP_URL`                                           | `https://product-git-integration-dayopt.vercel.app`                        |
 | `NEXT_PUBLIC_SUPABASE_URL`                                      | `https://tilwaprottpyhlfoggbb.supabase.co`                                 |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` / `SUPABASE_SECRET_KEY`  | Integration branch 専用の鍵。Production の鍵を使わない                     |
 | `MCP_OAUTH_ENVIRONMENT`                                         | `integration`                                                              |
-| `OAUTH_AUTHORIZATION_SERVER_URI` / `MCP_CANONICAL_RESOURCE_URI` | どちらも `https://product-integration-dayopt.vercel.app`                   |
+| `OAUTH_AUTHORIZATION_SERVER_URI` / `MCP_CANONICAL_RESOURCE_URI` | どちらも `https://product-git-integration-dayopt.vercel.app`               |
 | `NEXT_PUBLIC_TURNSTILE_SITE_KEY`                                | Integration 用 site key。Supabase branch の Auth captcha secret と対にする |
 | `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN`           | Integration 専用 instance                                                  |
 | `RECOVERY_CODE_PEPPER`                                          | Integration 専用のランダム値                                               |
 
-Vercel の `VERCEL_ENV=production` / `VERCEL_TARGET_ENV=production` / `VERCEL_GIT_COMMIT_REF=integration` / `VERCEL_PROJECT_PRODUCTION_URL=product-integration-dayopt.vercel.app` は system values。アプリはこれらと上記の環境印・Supabase ref を build/runtime の両方で照合する。
+Vercel の `VERCEL_ENV=preview` / `VERCEL_TARGET_ENV=preview` / `VERCEL_GIT_COMMIT_REF=integration` / `VERCEL_PROJECT_ID=prj_hByu1DGZWiuLk0yfV4Gz1T4aIjpa` / `VERCEL_BRANCH_URL=product-git-integration-dayopt.vercel.app` は system values。アプリはこれらと上記の環境印・Supabase ref を build/runtime の両方で照合する。
 
 初期状態は `BILLING_ENFORCED=false`、`MCP_WRITE_ENABLED_CLIENTS` 空、`POSTHOG_SERVER_ENABLED=false`、`NEXT_PUBLIC_POSTHOG_BROWSER_ENABLED=false`。Stripe を有効化する場合は `STRIPE_SECRET_KEY` と `STRIPE_WEBHOOK_SECRET` を test credentials にし、`STRIPE_LIVEMODE=false` にする。live key / live mode は build で拒否される。
 
-Resend は任意。設定する場合は `RESEND_API_KEY` / `RESEND_FROM_EMAIL` / `RESEND_WEBHOOK_SECRET` / `CONTACT_INTEGRATION_RECIPIENT` を全て揃え、recipient は `support@dayopt.app` 以外の固定 test mailbox にする。Calendar も任意で、`GOOGLE_CALENDAR_CLIENT_ID` / `GOOGLE_CALENDAR_PROJECT_NUMBER` / `GOOGLE_CALENDAR_CLIENT_SECRET` / `CALENDAR_TOKEN_ENCRYPTION_KEY` / `GOOGLE_CALENDAR_REDIRECT_URIS` を揃える。Redirect URI は `https://product-integration-dayopt.vercel.app/api/integrations/google-calendar/callback` に固定し、専用 test account だけを使う。
+Resend は任意。設定する場合は `RESEND_API_KEY` / `RESEND_FROM_EMAIL` / `RESEND_WEBHOOK_SECRET` / `CONTACT_INTEGRATION_RECIPIENT` を全て揃え、recipient は `support@dayopt.app` 以外の固定 test mailbox にする。Calendar も任意で、`GOOGLE_CALENDAR_CLIENT_ID` / `GOOGLE_CALENDAR_PROJECT_NUMBER` / `GOOGLE_CALENDAR_CLIENT_SECRET` / `CALENDAR_TOKEN_ENCRYPTION_KEY` / `GOOGLE_CALENDAR_REDIRECT_URIS` を揃える。Redirect URI は `https://product-git-integration-dayopt.vercel.app/api/integrations/google-calendar/callback` に固定し、専用 test account だけを使う。
 
 Sentry は初期の必須13変数には含めず、Integration 起動時は未設定でよい。有効化する場合だけ Integration 専用 project / DSN / upload token を用意し、Production の Sentry credentials はコピーしない。event の `environment` は `integration` とし、実値は会話・Issue・repo に貼らない。
 
@@ -328,7 +328,7 @@ Sentry は初期の必須13変数には含めず、Integration 起動時は未�
 `google-calendar` は外部カレンダー取り込み（[#1702](https://github.com/Dayopt/dayopt/issues/1702)）専用の OAuth client で、Supabase Auth の Google provider とは別 client として作る。Supabase 側の client secret を流用しない。`GOOGLE_CALENDAR_PROJECT_NUMBER` は client ID の先頭にある project number と一致させる。
 
 - `OAUTH_CLAUDE_REDIRECT_URIS` / `OAUTH_CHATGPT_REDIRECT_URIS` / `OAUTH_CURSOR_REDIRECT_URIS` はclientが発行する追加callback URIのcomma区切りexact allowlist。wildcardやoriginだけの緩い一致は使わない。既定callbackで足りるclientではfieldを空のままにする
-- `MCP_OAUTH_ENVIRONMENT`はOAuth identityの環境marker。Production / 一時Preview / persistent Integration を許可する。一時Previewでは`preview`と`VERCEL_ENV=preview`、`VERCEL_TARGET_ENV=preview`、branch、issuer、resourceを完全照合する。Integrationでは`integration`、Vercel Production target、Git branch `integration`、Supabase ref `tilwaprottpyhlfoggbb`、固定 origin `https://product-integration-dayopt.vercel.app` を完全照合する。Productionは未設定時だけ既存originを既定値にする
+- `MCP_OAUTH_ENVIRONMENT`はOAuth identityの環境marker。Production / 一時Preview / persistent Integration を許可する。一時Previewでは`preview`と`VERCEL_ENV=preview`、`VERCEL_TARGET_ENV=preview`、branch、issuer、resourceを完全照合する。Integrationではserver/public markerが共に`integration`、既存Product project、Vercel Preview target、固定branch alias、Git branch `integration`、Supabase ref `tilwaprottpyhlfoggbb`、固定 origin `https://product-git-integration-dayopt.vercel.app` を完全照合する。Productionは未設定時だけ既存originを既定値にする
 - `OAUTH_AUTHORIZATION_SERVER_URI`と`MCP_CANONICAL_RESOURCE_URI`は環境ごとに固定するorigin。一時Previewでは同じstable branch URLを使い、transport path、query、fragment、Production originを含めない
 - `MCP_OAUTH_PREVIEW_BRANCH`は検証対象PRのexact branch名。`VERCEL_GIT_COMMIT_REF`と一致しないPreviewを停止する。Productionには登録しない
 - `MCP_OAUTH_PREVIEW_UPSTASH_HOST`は一時Preview専用Upstashのhost marker。接続先URLのhostと一致しないbuildを停止する。Productionには登録せず、ProductionのUpstashをPreviewへ複製しない

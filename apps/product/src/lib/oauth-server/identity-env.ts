@@ -24,6 +24,8 @@ export function getOAuthEnvironmentConfig(): OAuthEnvironmentConfig {
     vercelGitCommitRef: readTrimmedEnvValue(env.VERCEL_GIT_COMMIT_REF),
     mcpOAuthPreviewBranch: readTrimmedEnvValue(env.MCP_OAUTH_PREVIEW_BRANCH),
     dayoptEnvironment: readTrimmedEnvValue(env.DAYOPT_ENVIRONMENT),
+    publicDayoptEnvironment: readTrimmedEnvValue(env.NEXT_PUBLIC_DAYOPT_ENVIRONMENT),
+    vercelProjectId: readTrimmedEnvValue(env.VERCEL_PROJECT_ID),
     supabaseProjectRef: resolveSupabaseProjectRef(env.NEXT_PUBLIC_SUPABASE_URL),
   });
 }

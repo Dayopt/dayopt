@@ -26,6 +26,10 @@ const DAYOPT_ENVIRONMENT = resolveDayoptEnvironment({
   vercelEnvironment: env.VERCEL_ENV,
   vercelTargetEnvironment: env.VERCEL_TARGET_ENV,
   vercelGitCommitRef: env.VERCEL_GIT_COMMIT_REF,
+  vercelProjectId: env.VERCEL_PROJECT_ID,
+  vercelBranchUrl: env.VERCEL_BRANCH_URL,
+  vercelUrl: env.VERCEL_URL,
+  appUrl: env.NEXT_PUBLIC_APP_URL,
   supabaseUrl: env.NEXT_PUBLIC_SUPABASE_URL,
 });
 const CONTACT_EMAIL_TIMEOUT_MS = 10_000;

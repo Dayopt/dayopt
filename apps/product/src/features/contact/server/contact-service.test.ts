@@ -19,6 +19,7 @@ async function importService(envOverrides: Record<string, string> = {}) {
   vi.resetModules();
   const testEnv = {
     VERCEL_ENV: 'production',
+    VERCEL_GIT_COMMIT_REF: 'main',
     NEXT_PUBLIC_SUPABASE_URL: 'https://yvglwblxrnrenfifsnje.supabase.co',
     RESEND_API_KEY: 'resend-test-key',
     RESEND_FROM_EMAIL: 'noreply@dayopt.app',
@@ -31,11 +32,13 @@ async function importService(envOverrides: Record<string, string> = {}) {
 const integrationEnv = {
   DAYOPT_ENVIRONMENT: 'integration',
   NEXT_PUBLIC_DAYOPT_ENVIRONMENT: 'integration',
-  VERCEL_ENV: 'production',
-  VERCEL_TARGET_ENV: 'production',
+  VERCEL_ENV: 'preview',
+  VERCEL_TARGET_ENV: 'preview',
+  VERCEL_PROJECT_ID: 'prj_hByu1DGZWiuLk0yfV4Gz1T4aIjpa',
+  VERCEL_BRANCH_URL: 'product-git-integration-dayopt.vercel.app',
   VERCEL_GIT_COMMIT_REF: 'integration',
   NEXT_PUBLIC_SUPABASE_URL: 'https://tilwaprottpyhlfoggbb.supabase.co',
-  NEXT_PUBLIC_APP_URL: 'https://product-integration.vercel.app',
+  NEXT_PUBLIC_APP_URL: 'https://product-git-integration-dayopt.vercel.app',
   CONTACT_INTEGRATION_RECIPIENT: 'qa+integration@example.com',
 };
 

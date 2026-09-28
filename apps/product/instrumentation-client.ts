@@ -29,12 +29,20 @@ export const onRouterTransitionStart = Sentry.captureRouterTransitionStart;
 
 const SENTRY_DSN = process.env.NEXT_PUBLIC_SENTRY_DSN;
 const VERCEL_ENV = process.env.NEXT_PUBLIC_VERCEL_ENV;
-const IS_SENTRY_PRODUCTION = VERCEL_ENV === 'production';
+// Keep a build-time condition so ordinary Preview bundles omit Sentry initialization.
+// The resolved binding below still decides whether this deployment owns telemetry.
+const IS_SENTRY_DEPLOYMENT =
+  VERCEL_ENV === 'production' || process.env.NEXT_PUBLIC_DAYOPT_ENVIRONMENT === 'integration';
 const DAYOPT_ENVIRONMENT = resolveDayoptEnvironment({
+  dayoptEnvironment: process.env.NEXT_PUBLIC_DAYOPT_ENVIRONMENT,
   publicDayoptEnvironment: process.env.NEXT_PUBLIC_DAYOPT_ENVIRONMENT,
   vercelEnvironment: VERCEL_ENV,
   vercelTargetEnvironment: process.env.NEXT_PUBLIC_VERCEL_TARGET_ENV,
   vercelGitCommitRef: process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_REF,
+  vercelProjectId: process.env.NEXT_PUBLIC_VERCEL_PROJECT_ID,
+  vercelBranchUrl: process.env.NEXT_PUBLIC_VERCEL_BRANCH_URL,
+  vercelUrl: process.env.NEXT_PUBLIC_VERCEL_URL,
+  appUrl: process.env.NEXT_PUBLIC_APP_URL,
   supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL,
 });
 const SENTRY_ENVIRONMENT =
@@ -73,9 +81,8 @@ function initSentry(dsn: string) {
     // デバッグモード（開発環境のみ）
     debug: false,
 
-    // Production and the explicitly bound Integration project only. Integration
-    // also uses Vercel's Production target, so check the Dayopt identity above.
-    enabled: IS_SENTRY_PRODUCTION && SENTRY_ENVIRONMENT !== null,
+    // Only Production or the fully bound fixed Integration can send telemetry.
+    enabled: IS_SENTRY_DEPLOYMENT && SENTRY_ENVIRONMENT !== null,
 
     // 固定protocol allowlistとpath-aware規則で、相関IDを保持しつつPIIを除去する。
     beforeSend: withPIIScrub(),
@@ -125,7 +132,7 @@ function applyBrowserTelemetryConsent(dsn: string, allowed: boolean): void {
 }
 
 // DSNが設定されている場合のみ処理
-if (SENTRY_DSN && IS_SENTRY_PRODUCTION) {
+if (SENTRY_DSN && IS_SENTRY_DEPLOYMENT && SENTRY_ENVIRONMENT !== null) {
   isBrowserTelemetryAllowed = typeof window !== 'undefined' && hasStoredAnalyticsConsent();
 
   if (isBrowserTelemetryAllowed) {

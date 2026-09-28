@@ -36,6 +36,8 @@ describe('Product browser Sentry consent lifecycle', () => {
     localStorage.clear();
     vi.stubEnv('NEXT_PUBLIC_SENTRY_DSN', 'https://public@example.ingest.sentry.io/1');
     vi.stubEnv('NEXT_PUBLIC_VERCEL_ENV', 'production');
+    vi.stubEnv('NEXT_PUBLIC_VERCEL_GIT_COMMIT_REF', 'main');
+    vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://yvglwblxrnrenfifsnje.supabase.co');
     reloadSpy = vi.spyOn(window.location, 'reload').mockImplementation(() => undefined);
   });
 
@@ -117,7 +119,11 @@ describe('Product browser Sentry consent lifecycle', () => {
   it('labels the explicitly bound persistent Integration project', async () => {
     vi.stubEnv('NEXT_PUBLIC_DAYOPT_ENVIRONMENT', 'integration');
     vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://tilwaprottpyhlfoggbb.supabase.co');
-    vi.stubEnv('NEXT_PUBLIC_VERCEL_TARGET_ENV', 'production');
+    vi.stubEnv('NEXT_PUBLIC_VERCEL_ENV', 'preview');
+    vi.stubEnv('NEXT_PUBLIC_VERCEL_TARGET_ENV', 'preview');
+    vi.stubEnv('NEXT_PUBLIC_VERCEL_PROJECT_ID', 'prj_hByu1DGZWiuLk0yfV4Gz1T4aIjpa');
+    vi.stubEnv('NEXT_PUBLIC_VERCEL_BRANCH_URL', 'product-git-integration-dayopt.vercel.app');
+    vi.stubEnv('NEXT_PUBLIC_APP_URL', 'https://product-git-integration-dayopt.vercel.app');
     vi.stubEnv('NEXT_PUBLIC_VERCEL_GIT_COMMIT_REF', 'integration');
     localStorage.setItem(
       BROWSER_TELEMETRY_CONSENT_STORAGE_KEY,

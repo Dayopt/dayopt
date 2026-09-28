@@ -44,6 +44,8 @@ const context = {
 describe('Product onRequestError', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.stubEnv('VERCEL_GIT_COMMIT_REF', 'main');
+    vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://yvglwblxrnrenfifsnje.supabase.co');
     vi.stubEnv('VERCEL_ENV', 'production');
     vi.stubEnv('SENTRY_DSN', 'https://public@example.ingest.sentry.io/1');
   });

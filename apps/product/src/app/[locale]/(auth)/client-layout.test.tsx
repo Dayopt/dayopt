@@ -99,6 +99,10 @@ describe('AuthClientLayout auth state initialization', () => {
     vi.stubEnv('NEXT_PUBLIC_POSTHOG_PROJECT_KEY', 'phc_test');
     vi.stubEnv('NEXT_PUBLIC_POSTHOG_BROWSER_ENABLED', 'true');
     vi.stubEnv('NEXT_PUBLIC_VERCEL_ENV', 'preview');
+    vi.stubEnv('NEXT_PUBLIC_VERCEL_TARGET_ENV', 'preview');
+    vi.stubEnv('NEXT_PUBLIC_VERCEL_PROJECT_ID', 'prj_hByu1DGZWiuLk0yfV4Gz1T4aIjpa');
+    vi.stubEnv('NEXT_PUBLIC_VERCEL_GIT_COMMIT_REF', 'codex/test');
+    vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://abcdefghijklmnopqrst.supabase.co');
   });
 
   it('signup view waits for auth resolution in the public auth layout', async () => {

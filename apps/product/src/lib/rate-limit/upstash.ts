@@ -11,10 +11,7 @@
 import { Ratelimit } from '@upstash/ratelimit';
 import { Redis } from '@upstash/redis';
 
-import {
-  PRODUCT_INTEGRATION_SUPABASE_REF,
-  resolveSupabaseProjectRef,
-} from '@/lib/dayopt-environment';
+import { resolveDayoptEnvironment } from '@/lib/dayopt-environment';
 import { logger } from '@/lib/logger';
 import { extractClientIp } from '@/lib/security/ip-validation';
 import { captureUnexpectedError } from '@/lib/sentry';
@@ -42,10 +39,22 @@ function readTrimmedEnv(name: string): string | undefined {
 const UPSTASH_REDIS_REST_URL = readTrimmedEnv('UPSTASH_REDIS_REST_URL');
 const UPSTASH_REDIS_REST_TOKEN = readTrimmedEnv('UPSTASH_REDIS_REST_TOKEN');
 const IS_INTEGRATION_BOUND =
+  resolveDayoptEnvironment({
+    dayoptEnvironment: process.env.DAYOPT_ENVIRONMENT,
+    publicDayoptEnvironment: process.env.NEXT_PUBLIC_DAYOPT_ENVIRONMENT,
+    vercelEnvironment: process.env.VERCEL_ENV,
+    vercelTargetEnvironment: process.env.VERCEL_TARGET_ENV,
+    vercelProjectId: process.env.VERCEL_PROJECT_ID,
+    vercelGitCommitRef: process.env.VERCEL_GIT_COMMIT_REF,
+    vercelUrl: process.env.VERCEL_URL,
+    vercelBranchUrl: process.env.VERCEL_BRANCH_URL,
+    appUrl: process.env.NEXT_PUBLIC_APP_URL,
+    supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL,
+  }) === 'integration';
+const CLAIMS_INTEGRATION_ENVIRONMENT =
   process.env.DAYOPT_ENVIRONMENT === 'integration' ||
   process.env.NEXT_PUBLIC_DAYOPT_ENVIRONMENT === 'integration' ||
-  resolveSupabaseProjectRef(process.env.NEXT_PUBLIC_SUPABASE_URL) ===
-    PRODUCT_INTEGRATION_SUPABASE_REF;
+  process.env.MCP_OAUTH_ENVIRONMENT === 'integration';
 const RATE_LIMIT_PREFIX = IS_INTEGRATION_BOUND
   ? 'ratelimit:product:integration'
   : 'ratelimit:product';
@@ -172,7 +181,12 @@ async function getResendWebhookKey(eventId: string): Promise<string> {
 }
 
 function assertWebhookRedisAvailable(): void {
-  if (!redis && process.env.VERCEL_ENV === 'production') {
+  if (
+    !redis &&
+    (process.env.VERCEL_ENV === 'production' ||
+      IS_INTEGRATION_BOUND ||
+      CLAIMS_INTEGRATION_ENVIRONMENT)
+  ) {
     throw new RateLimitUnavailableError();
   }
 }

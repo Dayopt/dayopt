@@ -9,11 +9,7 @@ import 'server-only';
 
 import { z } from 'zod';
 
-import {
-  PRODUCT_INTEGRATION_APP_ORIGIN,
-  PRODUCT_INTEGRATION_SUPABASE_REF,
-  resolveSupabaseProjectRef,
-} from '@/lib/dayopt-environment';
+import { resolveDayoptEnvironment } from '@/lib/dayopt-environment';
 
 import { isValidOAuthRedirectUriList } from '@/lib/oauth-server/redirect-uris';
 
@@ -154,7 +150,7 @@ const serverSchema = z
     // App
     NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
     // Dayopt's application environment is separate from Vercel's target. In particular,
-    // product-integration is a Vercel Production deployment connected to non-production data.
+    // Integration is the fixed Product Preview branch connected to non-production data.
     DAYOPT_ENVIRONMENT: z.enum(['production', 'preview', 'integration', 'development']).optional(),
     NEXT_PUBLIC_DAYOPT_ENVIRONMENT: z
       .enum(['production', 'preview', 'integration', 'development'])
@@ -168,6 +164,7 @@ const serverSchema = z
     VERCEL_ENV: z.string().optional(),
     VERCEL_TARGET_ENV: z.string().optional(),
     VERCEL_BRANCH_URL: z.string().optional(),
+    VERCEL_PROJECT_ID: z.string().optional(),
     VERCEL_GIT_COMMIT_REF: z.string().optional(),
     SKIP_AUTH_IN_DEV: z.string().optional(),
   })
@@ -219,27 +216,24 @@ const serverSchema = z
   )
   .refine(
     (data) => {
-      const supabaseProjectRef = resolveSupabaseProjectRef(data.NEXT_PUBLIC_SUPABASE_URL);
-      const integrationConfigured =
-        data.DAYOPT_ENVIRONMENT === 'integration' ||
-        data.NEXT_PUBLIC_DAYOPT_ENVIRONMENT === 'integration' ||
-        supabaseProjectRef === PRODUCT_INTEGRATION_SUPABASE_REF;
-      if (!integrationConfigured) return true;
-
-      const appOrigin = data.NEXT_PUBLIC_APP_URL ? new URL(data.NEXT_PUBLIC_APP_URL).origin : null;
       return (
-        data.DAYOPT_ENVIRONMENT === 'integration' &&
-        data.NEXT_PUBLIC_DAYOPT_ENVIRONMENT === 'integration' &&
-        data.VERCEL_ENV === 'production' &&
-        data.VERCEL_TARGET_ENV === 'production' &&
-        data.VERCEL_GIT_COMMIT_REF === 'integration' &&
-        supabaseProjectRef === PRODUCT_INTEGRATION_SUPABASE_REF &&
-        (!appOrigin || appOrigin === PRODUCT_INTEGRATION_APP_ORIGIN)
+        resolveDayoptEnvironment({
+          dayoptEnvironment: data.DAYOPT_ENVIRONMENT,
+          publicDayoptEnvironment: data.NEXT_PUBLIC_DAYOPT_ENVIRONMENT,
+          vercelEnvironment: data.VERCEL_ENV,
+          vercelTargetEnvironment: data.VERCEL_TARGET_ENV,
+          vercelProjectId: data.VERCEL_PROJECT_ID,
+          vercelGitCommitRef: data.VERCEL_GIT_COMMIT_REF,
+          vercelBranchUrl: data.VERCEL_BRANCH_URL,
+          vercelUrl: data.VERCEL_URL,
+          appUrl: data.NEXT_PUBLIC_APP_URL,
+          supabaseUrl: data.NEXT_PUBLIC_SUPABASE_URL,
+        }) !== 'unknown'
       );
     },
     {
       message:
-        'Integration requires matching Dayopt markers, the Production target, integration Git branch, exact Supabase ref, and fixed app origin',
+        'Product app environment must match its Vercel project, target, branch, origin, and Supabase binding',
       path: ['DAYOPT_ENVIRONMENT'],
     },
   )
@@ -250,7 +244,9 @@ const serverSchema = z
       // 外部 client から到達するため distributed rate limit を必須にする。
       !(
         data.NODE_ENV === 'production' &&
-        (process.env.VERCEL_ENV === 'production' || data.MCP_OAUTH_ENVIRONMENT === 'preview') &&
+        (process.env.VERCEL_ENV === 'production' ||
+          data.MCP_OAUTH_ENVIRONMENT === 'preview' ||
+          data.DAYOPT_ENVIRONMENT === 'integration') &&
         (!data.UPSTASH_REDIS_REST_URL || !data.UPSTASH_REDIS_REST_TOKEN)
       ),
     {
@@ -261,7 +257,11 @@ const serverSchema = z
   )
   .refine(
     (data) => {
-      if (!(data.NODE_ENV === 'production' && data.VERCEL_ENV === 'production')) return true;
+      if (!(
+        data.NODE_ENV === 'production' &&
+        (data.VERCEL_ENV === 'production' || data.DAYOPT_ENVIRONMENT === 'integration')
+      ))
+        return true;
 
       const sender = data.RESEND_FROM_EMAIL?.trim().toLowerCase();
       if (data.DAYOPT_ENVIRONMENT === 'integration') {
@@ -297,7 +297,11 @@ const serverSchema = z
   )
   .refine(
     (data) => {
-      if (!(data.NODE_ENV === 'production' && data.VERCEL_ENV === 'production')) return true;
+      if (!(
+        data.NODE_ENV === 'production' &&
+        (data.VERCEL_ENV === 'production' || data.DAYOPT_ENVIRONMENT === 'integration')
+      ))
+        return true;
 
       // 「全部揃うか全部無いか」。4 変数のうち一部だけ入っている状態は、connect フローが
       // 途中まで動いて失敗する最悪の中間状態になるので許さない。

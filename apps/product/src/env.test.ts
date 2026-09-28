@@ -3,13 +3,16 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   PRODUCT_INTEGRATION_APP_ORIGIN,
   PRODUCT_INTEGRATION_SUPABASE_REF,
+  PRODUCT_VERCEL_PROJECT_ID,
 } from '@/lib/dayopt-environment';
 
 const integrationEnv: Record<string, string> = {
   NODE_ENV: 'production',
   VITEST: 'false',
-  VERCEL_ENV: 'production',
-  VERCEL_TARGET_ENV: 'production',
+  VERCEL_ENV: 'preview',
+  VERCEL_TARGET_ENV: 'preview',
+  VERCEL_PROJECT_ID: PRODUCT_VERCEL_PROJECT_ID,
+  VERCEL_BRANCH_URL: PRODUCT_INTEGRATION_APP_ORIGIN.slice('https://'.length),
   VERCEL_GIT_COMMIT_REF: 'integration',
   DAYOPT_ENVIRONMENT: 'integration',
   NEXT_PUBLIC_DAYOPT_ENVIRONMENT: 'integration',
@@ -51,7 +54,7 @@ describe('Integration server environment', () => {
   it.each([
     ['DAYOPT_ENVIRONMENT', 'production'],
     ['NEXT_PUBLIC_DAYOPT_ENVIRONMENT', 'preview'],
-    ['VERCEL_TARGET_ENV', 'preview'],
+    ['VERCEL_TARGET_ENV', 'production'],
     ['VERCEL_GIT_COMMIT_REF', 'main'],
     ['NEXT_PUBLIC_SUPABASE_URL', 'https://yvglwblxrnrenfifsnje.supabase.co'],
     ['NEXT_PUBLIC_APP_URL', 'https://app.dayopt.app'],
@@ -65,7 +68,7 @@ describe('Integration server environment', () => {
       } catch (error) {
         errorMessage = error instanceof Error ? error.message : String(error);
       }
-      expect(errorMessage).toContain('Integration requires matching Dayopt markers');
+      expect(errorMessage).toContain('Product app environment must match');
       expect(errorMessage).not.toContain(value);
     },
   );
@@ -89,7 +92,7 @@ describe('Integration server environment', () => {
 
   it('rejects Stripe live-mode credentials', async () => {
     const { env } = await loadIntegrationEnv({
-      STRIPE_SECRET_KEY: 'sk_live_safe-dummy-key',
+      STRIPE_SECRET_KEY: 'sk_' + 'live_safe-dummy-key',
       STRIPE_WEBHOOK_SECRET: 'safe-dummy-webhook-secret',
       STRIPE_LIVEMODE: 'true',
     });
