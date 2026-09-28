@@ -302,7 +302,7 @@ export function readWorkspaceGraph(root = ROOT) {
   return graph;
 }
 
-const WORKSPACE_MANIFEST_FILES = new Set([
+const WORKSPACE_TEST_FULL_SCOPE_FILES = new Set([
   'package.json',
   'pnpm-lock.yaml',
   'pnpm-workspace.yaml',
@@ -310,6 +310,7 @@ const WORKSPACE_MANIFEST_FILES = new Set([
   'tsconfig.base.json',
   '.nvmrc',
   '.npmrc',
+  '.github/actions/setup/action.yml',
 ]);
 
 const WORKSPACE_TEST_NEUTRAL_PREFIXES = [
@@ -408,7 +409,7 @@ export function resolveWorkspaceTestScope(changedFiles, { root = ROOT } = {}) {
   for (const rawFile of changedFiles) {
     const file = String(rawFile).trim().replaceAll('\\', '/');
     if (!file) return all('PR file list contains an empty path');
-    if (WORKSPACE_MANIFEST_FILES.has(file) || file === 'eslint.config.packages.mjs') {
+    if (WORKSPACE_TEST_FULL_SCOPE_FILES.has(file) || file === 'eslint.config.packages.mjs') {
       return all(`workspace/toolchain configuration changed: ${file}`);
     }
 

@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  fullUnitStepResult,
   hasPreviousSuccessfulFullUnitRun,
   hasSuccessfulFullUnitStep,
   shouldRunFullUnitNow,
@@ -65,6 +66,39 @@ describe('hasSuccessfulFullUnitStep', () => {
   ])('rejects incomplete or differently named evidence: $jobs', ({ jobs }) => {
     expect(hasSuccessfulFullUnitStep(jobs)).toBe(false);
   });
+
+  it('treats a skipped full-test step as no new evidence and an executed failure as failure', () => {
+    expect(
+      fullUnitStepResult([
+        {
+          name: 'Product unit tests (full)',
+          conclusion: 'success',
+          steps: [{ name: 'Run unit tests (full)', conclusion: 'skipped' }],
+        },
+      ]),
+    ).toBeNull();
+    expect(
+      fullUnitStepResult([
+        {
+          name: 'Product unit tests (full)',
+          conclusion: 'failure',
+          steps: [{ name: 'Run unit tests (full)', conclusion: 'failure' }],
+        },
+      ]),
+    ).toBe('failure');
+  });
+
+  it('does not reuse older success while a newer full-test step is still in progress', () => {
+    expect(
+      fullUnitStepResult([
+        {
+          name: 'Product unit tests (full)',
+          conclusion: null,
+          steps: [{ name: 'Run unit tests (full)', status: 'in_progress', conclusion: null }],
+        },
+      ]),
+    ).toBe('failure');
+  });
 });
 
 describe('shouldRunFullUnitNow', () => {
@@ -114,6 +148,86 @@ describe('hasPreviousSuccessfulFullUnitRun', () => {
       }),
     ).toBe(true);
     expect(execImpl).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not reuse an older success after a newer full-unit attempt failed', () => {
+    const sha = 'a'.repeat(40);
+    const execImpl = vi.fn((_: string, args: string[]) => {
+      const apiPath = args[1];
+      if (apiPath.includes('/workflows/nightly.yml/runs?')) {
+        return [
+          { id: 102, head_sha: sha, run_attempt: 2 },
+          { id: 101, head_sha: sha, run_attempt: 1 },
+        ]
+          .map((run) => JSON.stringify(run))
+          .join('\n');
+      }
+      if (apiPath.includes('/runs/102/attempts/2/jobs?')) {
+        return JSON.stringify({
+          name: 'Product unit tests (full)',
+          conclusion: 'failure',
+          steps: [{ name: 'Run unit tests (full)', conclusion: 'failure' }],
+        });
+      }
+      if (apiPath.includes('/runs/102/attempts/1/jobs?')) {
+        return JSON.stringify({
+          name: 'Product unit tests (full)',
+          conclusion: 'success',
+          steps: [{ name: 'Run unit tests (full)', conclusion: 'success' }],
+        });
+      }
+      throw new Error(`unexpected API path: ${apiPath}`);
+    });
+
+    expect(
+      hasPreviousSuccessfulFullUnitRun({
+        repository: 'Dayopt/dayopt',
+        headSha: sha,
+        currentRunId: '103',
+        execImpl: execImpl as unknown as typeof execFileSync,
+      }),
+    ).toBe(false);
+    expect(execImpl).toHaveBeenCalledTimes(2);
+  });
+
+  it('continues past a skipped newer run to reuse an older successful full-unit run', () => {
+    const sha = 'a'.repeat(40);
+    const execImpl = vi.fn((_: string, args: string[]) => {
+      const apiPath = args[1];
+      if (apiPath.includes('/workflows/nightly.yml/runs?')) {
+        return [
+          { id: 102, head_sha: sha, run_attempt: 1 },
+          { id: 101, head_sha: sha, run_attempt: 1 },
+        ]
+          .map((run) => JSON.stringify(run))
+          .join('\n');
+      }
+      if (apiPath.includes('/runs/102/attempts/1/jobs?')) {
+        return JSON.stringify({
+          name: 'Product unit tests (full)',
+          conclusion: 'success',
+          steps: [{ name: 'Run unit tests (full)', conclusion: 'skipped' }],
+        });
+      }
+      if (apiPath.includes('/runs/101/attempts/1/jobs?')) {
+        return JSON.stringify({
+          name: 'Product unit tests (full)',
+          conclusion: 'success',
+          steps: [{ name: 'Run unit tests (full)', conclusion: 'success' }],
+        });
+      }
+      throw new Error(`unexpected API path: ${apiPath}`);
+    });
+
+    expect(
+      hasPreviousSuccessfulFullUnitRun({
+        repository: 'Dayopt/dayopt',
+        headSha: sha,
+        currentRunId: '103',
+        execImpl: execImpl as unknown as typeof execFileSync,
+      }),
+    ).toBe(true);
+    expect(execImpl).toHaveBeenCalledTimes(3);
   });
 
   it('rejects a different SHA and propagates API errors so the caller must run full', () => {

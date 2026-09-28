@@ -9,20 +9,19 @@ const FULL_UNIT_STEP_NAME = 'Run unit tests (full)';
 const SHA_PATTERN = /^[0-9a-f]{40}$/;
 const REPOSITORY_PATTERN = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
 
+/** Return the explicit full-test result, or null when this attempt did not run that step. */
+export function fullUnitStepResult(jobs) {
+  if (!Array.isArray(jobs)) return null;
+  const job = jobs.find((candidate) => candidate?.name === FULL_UNIT_JOB_NAME);
+  if (!Array.isArray(job?.steps)) return null;
+  const step = job.steps.find((candidate) => candidate?.name === FULL_UNIT_STEP_NAME);
+  if (!step || step.conclusion === 'skipped') return null;
+  return job.conclusion === 'success' && step.conclusion === 'success' ? 'success' : 'failure';
+}
+
 /** A successful check requires both the job and the explicit full-test step to succeed. */
 export function hasSuccessfulFullUnitStep(jobs) {
-  return (
-    Array.isArray(jobs) &&
-    jobs.some(
-      (job) =>
-        job?.name === FULL_UNIT_JOB_NAME &&
-        job?.conclusion === 'success' &&
-        Array.isArray(job.steps) &&
-        job.steps.some(
-          (step) => step?.name === FULL_UNIT_STEP_NAME && step?.conclusion === 'success',
-        ),
-    )
-  );
+  return fullUnitStepResult(jobs) === 'success';
 }
 
 /** Manual runs always repeat the full suite; scheduled runs may reuse explicit evidence. */
@@ -42,7 +41,10 @@ function readJsonLines(args, execImpl = execFileSync) {
     .map((line) => JSON.parse(line));
 }
 
-/** Search only earlier runs of the same workflow and SHA. API failure is handled by caller. */
+/**
+ * Search earlier runs of the same workflow and SHA, newest first. A newer skipped attempt does
+ * not replace evidence; an explicitly executed failure does. API failure is handled by caller.
+ */
 export function hasPreviousSuccessfulFullUnitRun({
   repository,
   headSha,
@@ -54,7 +56,7 @@ export function hasPreviousSuccessfulFullUnitRun({
   }
   const runs = readJsonLines(
     [
-      `repos/${repository}/actions/workflows/nightly.yml/runs?head_sha=${headSha}&branch=main&per_page=100`,
+      `repos/${repository}/actions/workflows/nightly.yml/runs?head_sha=${headSha}&branch=main&sort=created&direction=desc&per_page=100`,
       '--jq',
       '.workflow_runs[] | @json',
     ],
@@ -79,7 +81,9 @@ export function hasPreviousSuccessfulFullUnitRun({
         ],
         execImpl,
       );
-      if (hasSuccessfulFullUnitStep(jobs)) return true;
+      const result = fullUnitStepResult(jobs);
+      if (result === 'success') return true;
+      if (result === 'failure') return false;
     }
   }
   return false;
@@ -106,8 +110,8 @@ async function main() {
         currentRunId: process.env.GITHUB_RUN_ID,
       });
       reason = previousSuccessfulRun
-        ? 'same SHA has a successful full-unit run'
-        : 'no successful full-unit run exists for this SHA';
+        ? 'latest executed full-unit check succeeded for this SHA'
+        : 'rerun because no reusable full-unit result exists for this SHA';
     } catch {
       // API/auth/network errors may never be interpreted as successful evidence.
       previousSuccessfulRun = false;
