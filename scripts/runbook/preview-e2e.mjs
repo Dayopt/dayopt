@@ -35,7 +35,7 @@ export function previewWorkerEnvironment(env, ready, privateDir, evidenceDir, ru
 }
 
 /** @returns {Promise<number>} */
-function executePlaywright(env) {
+function executePlaywright(env, candidateRoot = ROOT) {
   // Cloud runners and the optional Mac path are POSIX. Own the process group so
   // a deadline cannot leave browsers running after private output is removed.
   return new Promise((resolveExit) => {
@@ -51,7 +51,7 @@ function executePlaywright(env) {
         'playwright.preview.config.ts',
       ],
       {
-        cwd: ROOT,
+        cwd: candidateRoot,
         env,
         stdio: 'ignore',
         detached: true,
@@ -94,9 +94,11 @@ export async function runPreviewE2E({
   request,
   env = process.env,
   observe = observePreviewReadiness,
-  execute = executePlaywright,
+  candidateRoot = ROOT,
+  execute = (workerEnv) => executePlaywright(workerEnv, candidateRoot),
   recover = recoverPreviewUsers,
   tempRoot = tmpdir(),
+  runDirectory = /** @type {string | undefined} */ (undefined),
 }) {
   if (!env.SUPABASE_SECRET_KEY?.trim())
     throw new Error('Nonproduction test credentials are required');
@@ -107,7 +109,8 @@ export async function runPreviewE2E({
   };
   const runId = randomUUID();
   const before = await observe({ ...request, ...credentials });
-  const directory = mkdtempSync(join(tempRoot, 'dayopt-preview-e2e-'));
+  const directory = runDirectory ?? mkdtempSync(join(tempRoot, 'dayopt-preview-e2e-'));
+  if (runDirectory) mkdirSync(directory, { recursive: false, mode: 0o700 });
   const privateDir = join(directory, 'private');
   const evidenceDir = join(directory, 'evidence');
   mkdirSync(privateDir, { mode: 0o700 });

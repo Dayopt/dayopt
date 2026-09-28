@@ -384,7 +384,7 @@ export const operationalItems: OperationalItem[] = [
 // GitHub Actions Secrets（repo 単位）。envName は workflow の step env 名で、Secret 名が違う時だけ
 // githubSecret を持つ。workflow の secrets.* 参照とこの表の対応は
 // scripts/__tests__/ci-secret-ledger.test.ts が名前で双方向に検査する（2026-09-14 監査）。
-// どれが欠けても本番 promote・監査・backup のいずれかが止まるため、すべて required。
+// どれが欠けても本番 promote・監査・backup のいずれかが止まるため、Production entry は required。Cloud Preview は未初期化を明示する pending entry。
 // 本番 release（promote.yml）と、監査・backup・replica check（production-config-audit.yml /
 // nightly.yml）で environment を分ける。どちらも deployment branch policy は main だけ。
 const RELEASE_AND_OPS = ['production-release', 'production-ops'];
@@ -447,6 +447,25 @@ export const ciSecretSchema: EnvSchemaEntry[] = [
   ciEntry('SUPABASE_STORAGE_RLS_AUDIT_TOKEN', 'secret', 'supabase-storage-rls-audit', OPS, {
     field: 'credential',
   }),
+  // Planned nonproduction-only masters. Actual creation and Environment Save remain with the owner.
+  ...[
+    ['VERCEL_TOKEN', 'PREVIEW_E2E_VERCEL_TOKEN'],
+    ['SUPABASE_PREVIEW_READINESS_TOKEN', 'PREVIEW_E2E_SUPABASE_READINESS_TOKEN'],
+    ['VERCEL_AUTOMATION_BYPASS_SECRET', 'PREVIEW_E2E_BYPASS_SECRET'],
+    ['SUPABASE_SECRET_KEY', 'PREVIEW_E2E_SUPABASE_KEY'],
+  ].map(([envName, githubSecret]) => ({
+    ...pendingEnvEntry(
+      envName,
+      'secret',
+      'staging',
+      ci,
+      'preview-e2e',
+      'Cloud Preview opt-in is not provisioned; owner must create the nonproduction master and save the Integration-only Environment replica',
+      githubSecret,
+    ),
+    githubSecret,
+    githubEnvironments: ['Preview – product'],
+  })),
   // nightly の Storage backup（rclone）。SOURCE は Supabase Storage の S3 接続、DEST は Cloudflare R2。
   ...rcloneEntries('SOURCE', 'Supabase-StorageS3-backupsource'),
   ...rcloneEntries('DEST', 'Cloudflare-R2-storagebackup'),
