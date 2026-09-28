@@ -41,4 +41,20 @@ describe('resolvePreviewCompensationKB', () => {
   it('実 URL では credential 分が既にビルドへ inline 済みのため Sentry 成分（41 KB）のみを適用する', () => {
     expect(resolvePreviewCompensationKB('https://abcdefghijklmnop.supabase.co')).toBe(41);
   });
+
+  it('固定Integrationでは計測済みSentryと実credentialを重複加算しない', () => {
+    expect(
+      resolvePreviewCompensationKB('https://tilwaprottpyhlfoggbb.supabase.co', 'integration'),
+    ).toBe(0);
+  });
+
+  it('Sentryを含むIntegrationでもplaceholderのcredential補正は維持する', () => {
+    expect(resolvePreviewCompensationKB('https://placeholder.supabase.co', 'integration')).toBe(27);
+  });
+
+  it('同じDBを共有する通常PreviewにはSentry補正を維持する', () => {
+    expect(
+      resolvePreviewCompensationKB('https://tilwaprottpyhlfoggbb.supabase.co', 'preview'),
+    ).toBe(41);
+  });
 });

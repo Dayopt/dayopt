@@ -131,11 +131,20 @@ export function hasRealSupabaseCredentials(supabaseUrl: string | undefined): boo
  *
  * 実 credential preview は credential 成分が既にビルドへ inline 済みのため Sentry 成分
  * のみを加算する。placeholder preview は両成分とも欠けているため両方を加算する。
+ * 固定Integrationはinstrumentationの初期化コードを含むのでSentry成分を加算しない。
  */
-export function resolvePreviewCompensationKB(supabaseUrl: string | undefined): number {
-  return hasRealSupabaseCredentials(supabaseUrl)
-    ? SENTRY_COMPONENT_KB
-    : SENTRY_COMPONENT_KB + SUPABASE_CREDENTIAL_COMPONENT_KB;
+export function resolvePreviewCompensationKB(
+  supabaseUrl: string | undefined,
+  publicDayoptEnvironment?: string,
+): number {
+  // Match instrumentation-client.ts's compile-time initialization gate. Fixed
+  // Integration includes Sentry even on Vercel Preview, so adding its measured
+  // component again would double-count it. The build gate validates the binding.
+  const sentryCompensationKB = publicDayoptEnvironment === 'integration' ? 0 : SENTRY_COMPONENT_KB;
+  const credentialCompensationKB = hasRealSupabaseCredentials(supabaseUrl)
+    ? 0
+    : SUPABASE_CREDENTIAL_COMPONENT_KB;
+  return sentryCompensationKB + credentialCompensationKB;
 }
 
 /** デザインシステム目標値（段階的に達成） */
@@ -310,11 +319,17 @@ function main(): void {
   console.log(`Checking bundle budgets for ${stats.length} routes...\n`);
   const previewCompensationKB = IS_PRODUCTION_BUILD
     ? 0
-    : resolvePreviewCompensationKB(process.env.NEXT_PUBLIC_SUPABASE_URL);
+    : resolvePreviewCompensationKB(
+        process.env.NEXT_PUBLIC_SUPABASE_URL,
+        process.env.NEXT_PUBLIC_DAYOPT_ENVIRONMENT,
+      );
   if (!IS_PRODUCTION_BUILD) {
-    const suffix = hasRealSupabaseCredentials(process.env.NEXT_PUBLIC_SUPABASE_URL)
-      ? '（実 Supabase credential 検出、Sentry 成分のみ加算、#2163）'
-      : '（Sentry 成分 + Supabase credential 成分を加算、#2163）';
+    const suffix =
+      process.env.NEXT_PUBLIC_DAYOPT_ENVIRONMENT === 'integration'
+        ? '（Integration の Sentry 成分は計測済み、#2910）'
+        : hasRealSupabaseCredentials(process.env.NEXT_PUBLIC_SUPABASE_URL)
+          ? '（実 Supabase credential 検出、Sentry 成分のみ加算、#2163）'
+          : '（Sentry 成分 + Supabase credential 成分を加算、#2163）';
     console.log(
       `  (preview/local build: +${previewCompensationKB} KB compensation applied per route, #2123${suffix})\n`,
     );
