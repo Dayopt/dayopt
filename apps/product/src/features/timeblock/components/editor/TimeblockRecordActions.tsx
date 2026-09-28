@@ -1,11 +1,21 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 
-import { Button } from '@dayopt/components';
+import { Button, FloatingActionBar, FloatingActionBarItem } from '@dayopt/components';
+import { Check } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 
 import { useTimeblockRecordMutations } from '../../hooks/useTimeblockRecordMutations';
+
+/** ブロック下の操作を、余白を持たせたカプセル状のバーにまとめる。 */
+export function TimeblockRecordActions({ children }: { children: ReactNode }) {
+  return (
+    <div className="px-4 pt-3 pb-1">
+      <FloatingActionBar className="mx-auto">{children}</FloatingActionBar>
+    </div>
+  );
+}
 
 interface RecordPlanButtonProps {
   planId: string;
@@ -57,15 +67,16 @@ export function RecordPlanButton({
   };
 
   return (
-    <Button
+    <FloatingActionBarItem
       type="button"
-      size="sm"
+      className="flex-row gap-2 text-sm"
       onClick={handleRecord}
       disabled={disabled || isPending}
       aria-busy={isPending}
     >
+      <Check className="size-4" aria-hidden="true" />
       {t('recordAsIs')}
-    </Button>
+    </FloatingActionBarItem>
   );
 }
 

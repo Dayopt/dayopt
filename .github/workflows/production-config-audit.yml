@@ -92,6 +92,7 @@ on:
       - 'scripts/ci/production-auth-config-audit.mjs'
       - 'scripts/ci/production-storage-rls-audit.mjs'
       - 'scripts/ci/production-cron-heartbeat-audit.mjs'
+      - 'apps/product/src/lib/ops/cron-heartbeat-policy.mjs'
       - 'scripts/ci/production-schema-drift-audit.mjs'
       - 'scripts/lib/production-db-readonly.mjs'
       - 'scripts/tasks/generate-rls-snapshot.ts'

@@ -33,6 +33,12 @@ export {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from './actions/dropdown-menu';
+export {
+  FloatingActionBar,
+  FloatingActionBarItem,
+  type FloatingActionBarItemProps,
+  type FloatingActionBarProps,
+} from './actions/floating-action-bar';
 
 // inputs
 export { Checkbox } from './inputs/checkbox';

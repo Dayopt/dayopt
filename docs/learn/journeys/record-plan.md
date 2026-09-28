@@ -48,7 +48,7 @@ flowchart TD
 - **入力 → 出力**: Plan の終了時刻または過去の作成時間帯 → Inspector の記録操作または明示的な Record 作成
 - **ここを変えると**: Record の未来終了制約は Inspector の記録操作と作成 UI の選択可否に反映する。Plan のドラッグ移動では Record を作らず、種別を保ったまま時刻を更新する。ConfirmDayButton は画面に置いている箇所を確認できていない。
 - **コード**:
-  - [`apps/product/src/features/timeblock/components/editor/TimeblockInspectorForm.tsx`](../../../apps/product/src/features/timeblock/components/editor/TimeblockInspectorForm.tsx) で `{!isDuplicateMode && kind === 'plan' && isPast && targetId ? (` を探す
+  - [`apps/product/src/features/timeblock/components/editor/TimeblockInspectorForm.tsx`](../../../apps/product/src/features/timeblock/components/editor/TimeblockInspectorForm.tsx) で `kind === 'plan' && isPast && targetId ? (` を探す
   - [`apps/product/src/features/calendar/components/create/InlineCreatePanel.tsx`](../../../apps/product/src/features/calendar/components/create/InlineCreatePanel.tsx) で `resolveTimeblockKindChoice(` を探す
   - [`apps/product/src/features/timeblock/domain/timeblock-destination.ts`](../../../apps/product/src/features/timeblock/domain/timeblock-destination.ts) で `export function resolveTimeblockKindChoice(` を探す
 - **この段を守るテスト**:
@@ -258,7 +258,7 @@ Plan を FOR UPDATE で押さえ、削除済みなら DT001、版が違えば DT
       "refs": [
         {
           "path": "apps/product/src/features/timeblock/components/editor/TimeblockInspectorForm.tsx",
-          "find": "{!isDuplicateMode && kind === 'plan' && isPast && targetId ? ("
+          "find": "kind === 'plan' && isPast && targetId ? ("
         },
         {
           "path": "apps/product/src/features/calendar/components/create/InlineCreatePanel.tsx",

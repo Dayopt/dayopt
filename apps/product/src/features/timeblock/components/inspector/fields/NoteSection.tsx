@@ -12,7 +12,6 @@ interface NoteSectionProps {
   icon?: LucideIcon | undefined;
   note: string;
   onNoteChange: (text: string) => void;
-  placeholder?: string | undefined;
   disabled?: boolean | undefined;
   maxLength?: number | undefined;
 }
@@ -27,7 +26,6 @@ export function NoteSection({
   icon: Icon,
   note,
   onNoteChange,
-  placeholder,
   disabled = false,
   maxLength = 1000,
 }: NoteSectionProps) {
@@ -69,7 +67,6 @@ export function NoteSection({
           setIsFocused(false);
           setLocalNote(displayNote);
         }}
-        placeholder={placeholder}
         disabled={disabled}
         maxLength={maxLength}
         aria-describedby={`${inputId}-counter`}

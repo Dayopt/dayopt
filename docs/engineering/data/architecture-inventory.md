@@ -19,7 +19,7 @@
 | tRPC procedure | 71   | 0          | 71               | 0                | 0              |
 | MCP tool       | 19   | 19         | 0                | 0                | 0              |
 | Zustand store  | 14   | 0          | 13               | 0                | 1              |
-| Story          | 114  | 0          | 90               | 24               | 0              |
+| Story          | 116  | 0          | 92               | 24               | 0              |
 | route          | 16   | 0          | 6                | 10               | 0              |
 | i18n namespace | 15   | 7          | 0                | 8                | 0              |
 
@@ -142,8 +142,10 @@ graph LR
 | Zustand store | [useTimeblockInspectorStore](<../../../apps/product/src/features/timeblock/stores/useTimeblockInspectorStore.ts>) | feature 経由 |
 | Story | [Product/Features/Timeblock/ClockTimePicker](<../../../apps/product/src/features/timeblock/components/inspector/fields/ClockTimePicker.stories.tsx>) | feature 経由 |
 | Story | [Product/Features/Timeblock/EstimationFeedforward](<../../../apps/product/src/features/timeblock/components/editor/EstimationFeedforward.stories.tsx>) | feature 経由 |
-| Story | [Product/Features/Timeblock/Inspector/ActivityFieldRow](<../../../apps/product/src/features/timeblock/components/inspector/fields/ActivityFieldRow.stories.tsx>) | feature 経由 |
+| Story | [Product/Features/Timeblock/Inspector/ActivityCard](<../../../apps/product/src/features/timeblock/components/editor/TimeblockActivityCard.stories.tsx>) | feature 経由 |
 | Story | [Product/Features/Timeblock/Inspector/DateRow](<../../../apps/product/src/features/timeblock/components/inspector/fields/DateRow.stories.tsx>) | feature 経由 |
+| Story | [Product/Features/Timeblock/Inspector/Form](<../../../apps/product/src/features/timeblock/components/editor/TimeblockInspectorForm.stories.tsx>) | feature 経由 |
+| Story | [Product/Features/Timeblock/Inspector/Header](<../../../apps/product/src/features/timeblock/components/editor/TimeblockInspectorHeader.stories.tsx>) | feature 経由 |
 | Story | [Product/Features/Timeblock/Inspector/InspectorHeaderActions](<../../../apps/product/src/features/timeblock/components/inspector/fields/InspectorHeaderActions.stories.tsx>) | feature 経由 |
 | Story | [Product/Features/Timeblock/Inspector/NoteSection](<../../../apps/product/src/features/timeblock/components/inspector/fields/NoteSection.stories.tsx>) | feature 経由 |
 | Story | [Product/Features/Timeblock/Inspector/RecordFulfillmentRow](<../../../apps/product/src/features/timeblock/components/inspector/fields/RecordFulfillmentRow.stories.tsx>) | feature 経由 |
@@ -156,15 +158,17 @@ graph LR
 | i18n namespace | [timeblock](<../../../apps/product/messages/en/timeblock.json>) | 直接 |
 
 <details>
-<summary>UI の候補（18）</summary>
+<summary>UI の候補（20）</summary>
 
 <!-- prettier-ignore -->
 | ファイル | 対応の根拠 |
 | --- | --- |
 | [apps/product/src/features/timeblock/components/editor/EstimationFeedforward.tsx](<../../../apps/product/src/features/timeblock/components/editor/EstimationFeedforward.tsx>) | feature: timeblock |
+| [apps/product/src/features/timeblock/components/editor/TimeblockActivityCard.tsx](<../../../apps/product/src/features/timeblock/components/editor/TimeblockActivityCard.tsx>) | feature: timeblock |
 | [apps/product/src/features/timeblock/components/editor/TimeblockEditor.tsx](<../../../apps/product/src/features/timeblock/components/editor/TimeblockEditor.tsx>) | feature: timeblock |
 | [apps/product/src/features/timeblock/components/editor/TimeblockInspector.tsx](<../../../apps/product/src/features/timeblock/components/editor/TimeblockInspector.tsx>) | feature: timeblock |
 | [apps/product/src/features/timeblock/components/editor/TimeblockInspectorForm.tsx](<../../../apps/product/src/features/timeblock/components/editor/TimeblockInspectorForm.tsx>) | feature: timeblock |
+| [apps/product/src/features/timeblock/components/editor/TimeblockInspectorHeader.tsx](<../../../apps/product/src/features/timeblock/components/editor/TimeblockInspectorHeader.tsx>) | feature: timeblock |
 | [apps/product/src/features/timeblock/components/editor/TimeblockRecordActions.tsx](<../../../apps/product/src/features/timeblock/components/editor/TimeblockRecordActions.tsx>) | feature: timeblock |
 | [apps/product/src/features/timeblock/components/editor/TimeblockRelationshipSection.tsx](<../../../apps/product/src/features/timeblock/components/editor/TimeblockRelationshipSection.tsx>) | feature: timeblock |
 | [apps/product/src/features/timeblock/components/inspector/DockedInspectorPanel.tsx](<../../../apps/product/src/features/timeblock/components/inspector/DockedInspectorPanel.tsx>) | feature: timeblock |
@@ -381,8 +385,10 @@ graph LR
 | Zustand store | [useTimeblockInspectorStore](<../../../apps/product/src/features/timeblock/stores/useTimeblockInspectorStore.ts>) | feature 経由 |
 | Story | [Product/Features/Timeblock/ClockTimePicker](<../../../apps/product/src/features/timeblock/components/inspector/fields/ClockTimePicker.stories.tsx>) | feature 経由 |
 | Story | [Product/Features/Timeblock/EstimationFeedforward](<../../../apps/product/src/features/timeblock/components/editor/EstimationFeedforward.stories.tsx>) | feature 経由 |
-| Story | [Product/Features/Timeblock/Inspector/ActivityFieldRow](<../../../apps/product/src/features/timeblock/components/inspector/fields/ActivityFieldRow.stories.tsx>) | feature 経由 |
+| Story | [Product/Features/Timeblock/Inspector/ActivityCard](<../../../apps/product/src/features/timeblock/components/editor/TimeblockActivityCard.stories.tsx>) | feature 経由 |
 | Story | [Product/Features/Timeblock/Inspector/DateRow](<../../../apps/product/src/features/timeblock/components/inspector/fields/DateRow.stories.tsx>) | feature 経由 |
+| Story | [Product/Features/Timeblock/Inspector/Form](<../../../apps/product/src/features/timeblock/components/editor/TimeblockInspectorForm.stories.tsx>) | feature 経由 |
+| Story | [Product/Features/Timeblock/Inspector/Header](<../../../apps/product/src/features/timeblock/components/editor/TimeblockInspectorHeader.stories.tsx>) | feature 経由 |
 | Story | [Product/Features/Timeblock/Inspector/InspectorHeaderActions](<../../../apps/product/src/features/timeblock/components/inspector/fields/InspectorHeaderActions.stories.tsx>) | feature 経由 |
 | Story | [Product/Features/Timeblock/Inspector/NoteSection](<../../../apps/product/src/features/timeblock/components/inspector/fields/NoteSection.stories.tsx>) | feature 経由 |
 | Story | [Product/Features/Timeblock/Inspector/RecordFulfillmentRow](<../../../apps/product/src/features/timeblock/components/inspector/fields/RecordFulfillmentRow.stories.tsx>) | feature 経由 |
@@ -394,15 +400,17 @@ graph LR
 | route | [/\[locale\]/calendar](<../../../apps/product/src/app/[locale]/(app)/(workspace)/calendar/page.tsx>) | feature 経由 |
 
 <details>
-<summary>UI の候補（18）</summary>
+<summary>UI の候補（20）</summary>
 
 <!-- prettier-ignore -->
 | ファイル | 対応の根拠 |
 | --- | --- |
 | [apps/product/src/features/timeblock/components/editor/EstimationFeedforward.tsx](<../../../apps/product/src/features/timeblock/components/editor/EstimationFeedforward.tsx>) | feature: timeblock |
+| [apps/product/src/features/timeblock/components/editor/TimeblockActivityCard.tsx](<../../../apps/product/src/features/timeblock/components/editor/TimeblockActivityCard.tsx>) | feature: timeblock |
 | [apps/product/src/features/timeblock/components/editor/TimeblockEditor.tsx](<../../../apps/product/src/features/timeblock/components/editor/TimeblockEditor.tsx>) | feature: timeblock |
 | [apps/product/src/features/timeblock/components/editor/TimeblockInspector.tsx](<../../../apps/product/src/features/timeblock/components/editor/TimeblockInspector.tsx>) | feature: timeblock |
 | [apps/product/src/features/timeblock/components/editor/TimeblockInspectorForm.tsx](<../../../apps/product/src/features/timeblock/components/editor/TimeblockInspectorForm.tsx>) | feature: timeblock |
+| [apps/product/src/features/timeblock/components/editor/TimeblockInspectorHeader.tsx](<../../../apps/product/src/features/timeblock/components/editor/TimeblockInspectorHeader.tsx>) | feature: timeblock |
 | [apps/product/src/features/timeblock/components/editor/TimeblockRecordActions.tsx](<../../../apps/product/src/features/timeblock/components/editor/TimeblockRecordActions.tsx>) | feature: timeblock |
 | [apps/product/src/features/timeblock/components/editor/TimeblockRelationshipSection.tsx](<../../../apps/product/src/features/timeblock/components/editor/TimeblockRelationshipSection.tsx>) | feature: timeblock |
 | [apps/product/src/features/timeblock/components/inspector/DockedInspectorPanel.tsx](<../../../apps/product/src/features/timeblock/components/inspector/DockedInspectorPanel.tsx>) | feature: timeblock |
@@ -619,8 +627,10 @@ graph LR
 | Zustand store | [useTimeblockInspectorStore](<../../../apps/product/src/features/timeblock/stores/useTimeblockInspectorStore.ts>) | feature 経由 |
 | Story | [Product/Features/Timeblock/ClockTimePicker](<../../../apps/product/src/features/timeblock/components/inspector/fields/ClockTimePicker.stories.tsx>) | feature 経由 |
 | Story | [Product/Features/Timeblock/EstimationFeedforward](<../../../apps/product/src/features/timeblock/components/editor/EstimationFeedforward.stories.tsx>) | feature 経由 |
-| Story | [Product/Features/Timeblock/Inspector/ActivityFieldRow](<../../../apps/product/src/features/timeblock/components/inspector/fields/ActivityFieldRow.stories.tsx>) | feature 経由 |
+| Story | [Product/Features/Timeblock/Inspector/ActivityCard](<../../../apps/product/src/features/timeblock/components/editor/TimeblockActivityCard.stories.tsx>) | feature 経由 |
 | Story | [Product/Features/Timeblock/Inspector/DateRow](<../../../apps/product/src/features/timeblock/components/inspector/fields/DateRow.stories.tsx>) | feature 経由 |
+| Story | [Product/Features/Timeblock/Inspector/Form](<../../../apps/product/src/features/timeblock/components/editor/TimeblockInspectorForm.stories.tsx>) | feature 経由 |
+| Story | [Product/Features/Timeblock/Inspector/Header](<../../../apps/product/src/features/timeblock/components/editor/TimeblockInspectorHeader.stories.tsx>) | feature 経由 |
 | Story | [Product/Features/Timeblock/Inspector/InspectorHeaderActions](<../../../apps/product/src/features/timeblock/components/inspector/fields/InspectorHeaderActions.stories.tsx>) | feature 経由 |
 | Story | [Product/Features/Timeblock/Inspector/NoteSection](<../../../apps/product/src/features/timeblock/components/inspector/fields/NoteSection.stories.tsx>) | feature 経由 |
 | Story | [Product/Features/Timeblock/Inspector/RecordFulfillmentRow](<../../../apps/product/src/features/timeblock/components/inspector/fields/RecordFulfillmentRow.stories.tsx>) | feature 経由 |
@@ -632,15 +642,17 @@ graph LR
 | route | [/\[locale\]/calendar](<../../../apps/product/src/app/[locale]/(app)/(workspace)/calendar/page.tsx>) | feature 経由 |
 
 <details>
-<summary>UI の候補（18）</summary>
+<summary>UI の候補（20）</summary>
 
 <!-- prettier-ignore -->
 | ファイル | 対応の根拠 |
 | --- | --- |
 | [apps/product/src/features/timeblock/components/editor/EstimationFeedforward.tsx](<../../../apps/product/src/features/timeblock/components/editor/EstimationFeedforward.tsx>) | feature: timeblock |
+| [apps/product/src/features/timeblock/components/editor/TimeblockActivityCard.tsx](<../../../apps/product/src/features/timeblock/components/editor/TimeblockActivityCard.tsx>) | feature: timeblock |
 | [apps/product/src/features/timeblock/components/editor/TimeblockEditor.tsx](<../../../apps/product/src/features/timeblock/components/editor/TimeblockEditor.tsx>) | feature: timeblock |
 | [apps/product/src/features/timeblock/components/editor/TimeblockInspector.tsx](<../../../apps/product/src/features/timeblock/components/editor/TimeblockInspector.tsx>) | feature: timeblock |
 | [apps/product/src/features/timeblock/components/editor/TimeblockInspectorForm.tsx](<../../../apps/product/src/features/timeblock/components/editor/TimeblockInspectorForm.tsx>) | feature: timeblock |
+| [apps/product/src/features/timeblock/components/editor/TimeblockInspectorHeader.tsx](<../../../apps/product/src/features/timeblock/components/editor/TimeblockInspectorHeader.tsx>) | feature: timeblock |
 | [apps/product/src/features/timeblock/components/editor/TimeblockRecordActions.tsx](<../../../apps/product/src/features/timeblock/components/editor/TimeblockRecordActions.tsx>) | feature: timeblock |
 | [apps/product/src/features/timeblock/components/editor/TimeblockRelationshipSection.tsx](<../../../apps/product/src/features/timeblock/components/editor/TimeblockRelationshipSection.tsx>) | feature: timeblock |
 | [apps/product/src/features/timeblock/components/inspector/DockedInspectorPanel.tsx](<../../../apps/product/src/features/timeblock/components/inspector/DockedInspectorPanel.tsx>) | feature: timeblock |
@@ -1105,8 +1117,10 @@ graph LR
 | Zustand store | [useTimeblockInspectorStore](<../../../apps/product/src/features/timeblock/stores/useTimeblockInspectorStore.ts>) | feature 経由 |
 | Story | [Product/Features/Timeblock/ClockTimePicker](<../../../apps/product/src/features/timeblock/components/inspector/fields/ClockTimePicker.stories.tsx>) | feature 経由 |
 | Story | [Product/Features/Timeblock/EstimationFeedforward](<../../../apps/product/src/features/timeblock/components/editor/EstimationFeedforward.stories.tsx>) | feature 経由 |
-| Story | [Product/Features/Timeblock/Inspector/ActivityFieldRow](<../../../apps/product/src/features/timeblock/components/inspector/fields/ActivityFieldRow.stories.tsx>) | feature 経由 |
+| Story | [Product/Features/Timeblock/Inspector/ActivityCard](<../../../apps/product/src/features/timeblock/components/editor/TimeblockActivityCard.stories.tsx>) | feature 経由 |
 | Story | [Product/Features/Timeblock/Inspector/DateRow](<../../../apps/product/src/features/timeblock/components/inspector/fields/DateRow.stories.tsx>) | feature 経由 |
+| Story | [Product/Features/Timeblock/Inspector/Form](<../../../apps/product/src/features/timeblock/components/editor/TimeblockInspectorForm.stories.tsx>) | feature 経由 |
+| Story | [Product/Features/Timeblock/Inspector/Header](<../../../apps/product/src/features/timeblock/components/editor/TimeblockInspectorHeader.stories.tsx>) | feature 経由 |
 | Story | [Product/Features/Timeblock/Inspector/InspectorHeaderActions](<../../../apps/product/src/features/timeblock/components/inspector/fields/InspectorHeaderActions.stories.tsx>) | feature 経由 |
 | Story | [Product/Features/Timeblock/Inspector/NoteSection](<../../../apps/product/src/features/timeblock/components/inspector/fields/NoteSection.stories.tsx>) | feature 経由 |
 | Story | [Product/Features/Timeblock/Inspector/RecordFulfillmentRow](<../../../apps/product/src/features/timeblock/components/inspector/fields/RecordFulfillmentRow.stories.tsx>) | feature 経由 |
@@ -1118,15 +1132,17 @@ graph LR
 | route | [/\[locale\]/calendar](<../../../apps/product/src/app/[locale]/(app)/(workspace)/calendar/page.tsx>) | feature 経由 |
 
 <details>
-<summary>UI の候補（18）</summary>
+<summary>UI の候補（20）</summary>
 
 <!-- prettier-ignore -->
 | ファイル | 対応の根拠 |
 | --- | --- |
 | [apps/product/src/features/timeblock/components/editor/EstimationFeedforward.tsx](<../../../apps/product/src/features/timeblock/components/editor/EstimationFeedforward.tsx>) | feature: timeblock |
+| [apps/product/src/features/timeblock/components/editor/TimeblockActivityCard.tsx](<../../../apps/product/src/features/timeblock/components/editor/TimeblockActivityCard.tsx>) | feature: timeblock |
 | [apps/product/src/features/timeblock/components/editor/TimeblockEditor.tsx](<../../../apps/product/src/features/timeblock/components/editor/TimeblockEditor.tsx>) | feature: timeblock |
 | [apps/product/src/features/timeblock/components/editor/TimeblockInspector.tsx](<../../../apps/product/src/features/timeblock/components/editor/TimeblockInspector.tsx>) | feature: timeblock |
 | [apps/product/src/features/timeblock/components/editor/TimeblockInspectorForm.tsx](<../../../apps/product/src/features/timeblock/components/editor/TimeblockInspectorForm.tsx>) | feature: timeblock |
+| [apps/product/src/features/timeblock/components/editor/TimeblockInspectorHeader.tsx](<../../../apps/product/src/features/timeblock/components/editor/TimeblockInspectorHeader.tsx>) | feature: timeblock |
 | [apps/product/src/features/timeblock/components/editor/TimeblockRecordActions.tsx](<../../../apps/product/src/features/timeblock/components/editor/TimeblockRecordActions.tsx>) | feature: timeblock |
 | [apps/product/src/features/timeblock/components/editor/TimeblockRelationshipSection.tsx](<../../../apps/product/src/features/timeblock/components/editor/TimeblockRelationshipSection.tsx>) | feature: timeblock |
 | [apps/product/src/features/timeblock/components/inspector/DockedInspectorPanel.tsx](<../../../apps/product/src/features/timeblock/components/inspector/DockedInspectorPanel.tsx>) | feature: timeblock |
@@ -1443,8 +1459,10 @@ graph LR
 | Zustand store | [useTimeblockInspectorStore](<../../../apps/product/src/features/timeblock/stores/useTimeblockInspectorStore.ts>) | feature 経由 |
 | Story | [Product/Features/Timeblock/ClockTimePicker](<../../../apps/product/src/features/timeblock/components/inspector/fields/ClockTimePicker.stories.tsx>) | feature 経由 |
 | Story | [Product/Features/Timeblock/EstimationFeedforward](<../../../apps/product/src/features/timeblock/components/editor/EstimationFeedforward.stories.tsx>) | feature 経由 |
-| Story | [Product/Features/Timeblock/Inspector/ActivityFieldRow](<../../../apps/product/src/features/timeblock/components/inspector/fields/ActivityFieldRow.stories.tsx>) | feature 経由 |
+| Story | [Product/Features/Timeblock/Inspector/ActivityCard](<../../../apps/product/src/features/timeblock/components/editor/TimeblockActivityCard.stories.tsx>) | feature 経由 |
 | Story | [Product/Features/Timeblock/Inspector/DateRow](<../../../apps/product/src/features/timeblock/components/inspector/fields/DateRow.stories.tsx>) | feature 経由 |
+| Story | [Product/Features/Timeblock/Inspector/Form](<../../../apps/product/src/features/timeblock/components/editor/TimeblockInspectorForm.stories.tsx>) | feature 経由 |
+| Story | [Product/Features/Timeblock/Inspector/Header](<../../../apps/product/src/features/timeblock/components/editor/TimeblockInspectorHeader.stories.tsx>) | feature 経由 |
 | Story | [Product/Features/Timeblock/Inspector/InspectorHeaderActions](<../../../apps/product/src/features/timeblock/components/inspector/fields/InspectorHeaderActions.stories.tsx>) | feature 経由 |
 | Story | [Product/Features/Timeblock/Inspector/NoteSection](<../../../apps/product/src/features/timeblock/components/inspector/fields/NoteSection.stories.tsx>) | feature 経由 |
 | Story | [Product/Features/Timeblock/Inspector/RecordFulfillmentRow](<../../../apps/product/src/features/timeblock/components/inspector/fields/RecordFulfillmentRow.stories.tsx>) | feature 経由 |
@@ -1456,15 +1474,17 @@ graph LR
 | route | [/\[locale\]/calendar](<../../../apps/product/src/app/[locale]/(app)/(workspace)/calendar/page.tsx>) | feature 経由 |
 
 <details>
-<summary>UI の候補（18）</summary>
+<summary>UI の候補（20）</summary>
 
 <!-- prettier-ignore -->
 | ファイル | 対応の根拠 |
 | --- | --- |
 | [apps/product/src/features/timeblock/components/editor/EstimationFeedforward.tsx](<../../../apps/product/src/features/timeblock/components/editor/EstimationFeedforward.tsx>) | feature: timeblock |
+| [apps/product/src/features/timeblock/components/editor/TimeblockActivityCard.tsx](<../../../apps/product/src/features/timeblock/components/editor/TimeblockActivityCard.tsx>) | feature: timeblock |
 | [apps/product/src/features/timeblock/components/editor/TimeblockEditor.tsx](<../../../apps/product/src/features/timeblock/components/editor/TimeblockEditor.tsx>) | feature: timeblock |
 | [apps/product/src/features/timeblock/components/editor/TimeblockInspector.tsx](<../../../apps/product/src/features/timeblock/components/editor/TimeblockInspector.tsx>) | feature: timeblock |
 | [apps/product/src/features/timeblock/components/editor/TimeblockInspectorForm.tsx](<../../../apps/product/src/features/timeblock/components/editor/TimeblockInspectorForm.tsx>) | feature: timeblock |
+| [apps/product/src/features/timeblock/components/editor/TimeblockInspectorHeader.tsx](<../../../apps/product/src/features/timeblock/components/editor/TimeblockInspectorHeader.tsx>) | feature: timeblock |
 | [apps/product/src/features/timeblock/components/editor/TimeblockRecordActions.tsx](<../../../apps/product/src/features/timeblock/components/editor/TimeblockRecordActions.tsx>) | feature: timeblock |
 | [apps/product/src/features/timeblock/components/editor/TimeblockRelationshipSection.tsx](<../../../apps/product/src/features/timeblock/components/editor/TimeblockRelationshipSection.tsx>) | feature: timeblock |
 | [apps/product/src/features/timeblock/components/inspector/DockedInspectorPanel.tsx](<../../../apps/product/src/features/timeblock/components/inspector/DockedInspectorPanel.tsx>) | feature: timeblock |
