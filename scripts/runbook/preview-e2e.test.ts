@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -63,16 +63,33 @@ function scenario() {
 describe('Preview E2E runner', () => {
   it('前後の照合とE2Eを実行し、private成果物を残さない', async () => {
     const s = scenario();
+    let startedManifest: Record<string, unknown> | undefined;
     const result = await runPreviewE2E({
       request: {},
       env,
       observe: s.observe,
       execute: s.execute,
       tempRoot: s.root,
+      onStarted: ({ evidenceDirectory }) => {
+        startedManifest = JSON.parse(
+          readFileSync(join(evidenceDirectory, '..', 'manifest.json'), 'utf8'),
+        );
+      },
     });
     expect(result.status).toBe('passed');
     expect(s.observe).toHaveBeenCalledTimes(2);
     expect(s.execute).toHaveBeenCalledTimes(1);
+    expect(startedManifest).toMatchObject({ runId: result.runId, status: 'running' });
+    const runDirectory = join(result.evidenceDirectory, '..');
+    const manifest = JSON.parse(readFileSync(join(runDirectory, 'manifest.json'), 'utf8'));
+    expect(manifest).toMatchObject({
+      runId: result.runId,
+      status: 'passed',
+      evidenceDirectory: result.evidenceDirectory,
+    });
+    expect(JSON.stringify(manifest)).not.toMatch(/synthetic-admin|private|bypass-private/i);
+    expect(statSync(runDirectory).mode & 0o777).toBe(0o700);
+    expect(statSync(join(runDirectory, 'manifest.json')).mode & 0o777).toBe(0o600);
     expect(existsSync(join(result.evidenceDirectory, '..', 'private'))).toBe(false);
     expect(readFileSync(join(result.evidenceDirectory, 'run.json'), 'utf8')).not.toContain(
       'private',

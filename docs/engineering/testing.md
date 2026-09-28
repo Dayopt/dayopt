@@ -174,18 +174,19 @@ node scripts/runbook/preview-readiness.mjs \
 - Preview の `/api/health/version` が返す完全 SHA / deployment ID / DB ref、および `/api/health` の DB 疎通も照合する。本番の version 応答は従来どおり。欠測や古いアプリは未確認として失敗する。
 - 成功 JSON は識別子・migration versions・観測開始/終了時刻のみ。各サービスを原子的に読んだ snapshot ではないため、`preview-e2e.mjs` は E2E 前後に照合する。共有 DB の候補競合を防ぐ排他は別途必要。
 
-非ローカルで service role を使う既存 E2E は `E2E_ALLOW_NONLOCAL_SUPABASE=1` に加え `E2E_SUPABASE_PROJECT_REF` を要求し、対応する HTTPS Supabase origin だけに接続する。これは上の readiness を代替しない。critical-path の synthetic user は実行ごとに password を生成し、作成成功を確認した同じ client/user だけを cleanup する。setup・cleanup の失敗は test を失敗させ、cleanup エラーには合成 user ID と失敗箇所だけを残す。remote run は `users/<UUID>.json` に作成前から状態を記録し、Auth の app_metadata に `e2e_run_id` を付ける。中断・応答喪失・cleanup失敗後は、この記録と対象非本番DBのユーザーID・app_metadataの一致を確認して回収する。未知の既存ユーザーを推測で削除しない。中断後の自動回収は未実装。
+非ローカルで service role を使う既存 E2E は `E2E_ALLOW_NONLOCAL_SUPABASE=1` に加え `E2E_SUPABASE_PROJECT_REF` を要求し、対応する HTTPS Supabase origin だけに接続する。これは上の readiness を代替しない。critical-path の synthetic user は実行ごとに password を生成し、作成成功を確認した同じ client/user だけを cleanup する。setup・cleanup の失敗は test を失敗させ、cleanup エラーには合成 user ID と失敗箇所だけを残す。remote run はrun開始前に `manifest.json` を保存し、`users/<UUID>.json` に作成前から状態を記録し、Auth の app_metadata に `e2e_run_id` を付ける。manifest/state/evidence は既定で `~/.local/state/dayopt/preview-e2e/<run UUID>/` に mode `0700/0600` で保存する。別の保存先を使うときだけ `E2E_PREVIEW_STATE_DIR` を明示する。manifestとuser記録にpassword、email、token、raw responseは保存しない。
 
 [Protection Bypass の公式仕様](https://vercel.com/docs/deployment-protection/methods-to-bypass-deployment-protection/protection-bypass-automation)に従い、readiness の bypass header は API で確認した具体 deployment の origin だけへ送る。redirect は拒否する。ブラウザ全体への header 設定や query parameter への secret 埋込は使わない。[Playwright trace はネットワークも記録する](https://playwright.dev/docs/api/class-tracing)ため、remote E2E では生の Playwright trace/video/標準reportを保存先から除外する。代わりに下記の限定した操作記録を残す。通常CI/ローカルの既存traceは変更しない。
 
 #### Remote E2E の実行
 
-`node scripts/runbook/preview-e2e.mjs` に上記 readiness と同じ引数を渡す。さらに承認済み非本番の `SUPABASE_SECRET_KEY` が必要。readiness に成功した具体 deployment に対し、既存の desktop / mobile critical-path（作成・reload・Report確認）を実行し、終了後に再照合する。localhost の build / 起動はしない。個人の1Password認証も呼び出さない。実クラウドでの通し確認とCIへの配線はまだ未完了。
+`node scripts/runbook/preview-e2e.mjs` に上記 readiness と同じ引数を渡す。さらに承認済み非本番の `SUPABASE_SECRET_KEY` が必要。readiness に成功した具体 deployment に対し、既存の desktop / mobile critical-path（作成・reload・Report確認）を実行し、終了後に再照合する。localhost の build / 起動はしない。個人の1Password認証も呼び出さない。run IDとstate directoryは実行開始時に出力される。実クラウドでの通し確認とCIへの配線はまだ未完了。
 
 - 子プロセスへは非本番DB keyと当該Previewのbypassだけを渡し、Vercel/Supabase管理tokenや他のアプリSecretは引き継がない。信頼できるコード・runnerでのみ実行する。未審査のforkへSecretを渡す仕組みではない。
 - ブラウザ通信は具体Preview、選択したSupabase、CAPTCHA providerに限定する。本番domainを含むその他originは拒否する。bypassはPreviewだけへ1 hopずつ付け、redirect先で再判定する。
-- 再試行は0、workerは1、Playwright全体5分。runnerの7分上限後は自分が起動したprocess groupを終了させる。これでDB上の合成データも自動的に消えるとはみなさず、下の残存記録を確認する。
-- 成果物は表示された `evidenceDirectory` だけを収集する。`run.json` はrun IDと前後のreadiness、`e2e.json` は操作のコード位置・時間・成否、通信先種別・HTTP status、失敗時PNGへの参照、`users/*.json` は合成ユーザーの状態。raw stdout/stderr、失敗メッセージ、入力値、URL query、header、cookie、通信bodyは出力しない。内部Playwright出力は終了後削除する。
+- 再試行は0、workerは1、Playwright全体5分。runnerの7分上限とSIGINT/SIGTERM時は、自分が起動したprocess groupを停止してraw Playwright出力を消す。SIGKILLやhost終了では `private/` が残る可能性があるため、通常の合成ユーザーcleanupとは別に復旧コマンドを使う。
+- 中断後の一覧は `node scripts/runbook/preview-e2e.mjs --list-recovery-runs`、明示したrunだけの回収は `node scripts/runbook/preview-e2e.mjs --recover-run <run UUID>`。**回収コマンドは現在の `origin/main` と完全一致するclean checkoutからのみ実行する。** コマンドが先に `origin/main` をfetchし、SHAとworking treeを照合する。回収処理は保存済み候補のdeployment/SHA/branch/DB ref/branch UUID/migration集合を再照合し、`running` / `recovering` の最後のheartbeatが10分以内なら停止する。`users/<UUID>.json` に列挙されたIDだけを対象にし、Auth user ID・`app_metadata.e2e_run_id`・critical-path用の合成emailが一致する場合に限って、そのuser IDの records/plans/activities/categories/user_settings/profiles とAuth userを消し、各テーブルとAuthの不在を確認する。Auth側の所有印が確認できないIDからDB行を推測して消さない。失敗時はmanifestを保持して再試行可能にし、他run・基準fixture・未知ユーザー・DB全体には触れない。
+- 成果物は表示された `evidenceDirectory` だけを収集する。`run.json` はrun IDと前後のreadiness、`e2e.json` は操作のコード位置・時間・成否、通信先種別・HTTP status、失敗時PNGへの参照、`users/*.json` は合成ユーザーの状態、`recovery.json` は回収したユーザーIDだけ。raw stdout/stderr、失敗メッセージ、入力値、URL query、header、cookie、通信bodyは出力しない。通常終了したrunの内部Playwright出力は削除する。
 - これはヘッダーやDOMを再現する通常のPlaywright traceではなく、資格情報を除外した限定的な操作記録。失敗の詳細は同じSHAのソース位置と失敗画面から追う。必要な情報が足りなければ、許可された非本番環境で範囲を絞って再現する。
 - 終了コード0だけでは成功にしない。desktop/mobile両方の全対象testが初回成功し、skip/欠測/異常終了がなく、後段のreadinessも一致した時だけ `passed`。この結果を既存Validationが信頼済み証拠として受理する配線は別途必要。
 
