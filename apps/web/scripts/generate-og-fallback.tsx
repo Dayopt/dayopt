@@ -17,6 +17,7 @@
 
 import { OG_CARD_SIZE } from '@dayopt/assets/og';
 import { OgCardImage } from '@dayopt/assets/og-card-image';
+import { loadOgFonts } from '@dayopt/assets/og-fonts';
 import { ImageResponse } from 'next/og';
 import { execFileSync } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
@@ -33,9 +34,10 @@ async function main() {
     <OgCardImage
       title="Plan your day. Track your time. Optimize your life."
       category="product"
+      categoryLabel="Product"
       layout="left"
     />,
-    { ...OG_CARD_SIZE },
+    { ...OG_CARD_SIZE, fonts: await loadOgFonts() },
   );
 
   const buffer = Buffer.from(await response.arrayBuffer());

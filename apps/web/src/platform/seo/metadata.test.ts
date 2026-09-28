@@ -23,6 +23,7 @@ describe('generateSEOMetadata', () => {
       title: siteConfig.title,
       description: siteConfig.description,
       category: 'product',
+      locale: 'ja',
     }).toString()}`;
 
     expect(generateSEOMetadata()).toEqual({
@@ -132,10 +133,13 @@ describe('generateSEOMetadata', () => {
   });
 
   it('en は prefixless canonical にし、入力済み locale prefix と末尾 slash を除く', () => {
-    expect(generateSEOMetadata({ locale: 'en', url: '/ja/about/' })).toMatchObject({
+    const metadata = generateSEOMetadata({ locale: 'en', url: '/ja/about/' });
+    expect(metadata).toMatchObject({
       alternates: { canonical: 'https://dayopt.com/about' },
       openGraph: { locale: 'en_US', url: 'https://dayopt.com/about' },
     });
+    const imageUrl = (metadata.openGraph?.images as Array<{ url: string }>)[0]?.url;
+    expect(new URL(imageUrl).searchParams.get('locale')).toBe('en');
   });
 
   it('keywords と tags は重複を保持し、OGP は共通生成 route を使う', () => {

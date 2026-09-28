@@ -16,13 +16,6 @@ const DEFAULT_LAYOUTS: Record<OgCategory, OgLayout> = {
   product: 'screenshot',
 };
 
-const CATEGORY_LABELS: Record<OgCategory, string> = {
-  product: 'Product',
-  docs: 'Docs',
-  journal: 'Journal',
-  release: 'Release',
-};
-
 const LEGACY_TYPE_CATEGORIES: Record<string, OgCategory> = {
   blog: 'journal',
   docs: 'docs',
@@ -31,12 +24,7 @@ const LEGACY_TYPE_CATEGORIES: Record<string, OgCategory> = {
 
 export interface ResolvedOgCardOptions {
   category: OgCategory;
-  categoryLabel: string;
   layout: OgLayout;
-}
-
-export function getOgCategoryLabel(category: OgCategory): string {
-  return CATEGORY_LABELS[category];
 }
 
 function parseCategory(value: string | null | undefined): OgCategory | undefined {
@@ -70,7 +58,6 @@ export function resolveOgCardOptions(
 
   return {
     category,
-    categoryLabel: getOgCategoryLabel(category),
     layout,
   };
 }
