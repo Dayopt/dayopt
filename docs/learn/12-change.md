@@ -62,7 +62,7 @@ last_verified: 2026-09-21
 
 #### `apps/product/sentry.server.config.ts`
 
-- [問い合わせを送る](journeys/contact.md) の 5. Resend へ送る — 件名は [Dayopt Contact][Product][カテゴリ] の固定形、tags の source は contact-product。後段の Resend webhook はこの source と宛先で問い合わせの配送だと判定するので、変えると配送失敗が Sentry に出なくなる。LP（apps/web）のフォームは別実装で、Idempotency-Key の名前空間を contact-web- に分けてある。
+- [問い合わせを送る](journeys/contact.md) の 5. Resend へ送る — 件名は Production では [Dayopt Contact][Product][カテゴリ]、Integration では [Integration] を加える。両方で tags の source は contact-product、environment tag は環境を示す。Product webhook の問い合わせ配送判定は source と support@dayopt.app 宛ての両方を条件にするため、専用受信先を使う Integration のイベントはその Sentry 判定に入らない。LP（apps/web）は別実装で、Idempotency-Key の名前空間を contact-web- に分けてある。
 
 #### `apps/product/src/app/[locale]/(app)/(workspace)/_composition/ReportViewClient.tsx`
 
@@ -206,7 +206,7 @@ last_verified: 2026-09-21
 #### `apps/product/src/app/api/webhooks/resend/route.ts`
 
 - [サインアップ → ウェルカムメール](journeys/signup.md) の 7. 配送結果を受ける — ここが止まると、新しい bounce が記録されず、届かない宛先へ送り続ける。
-- [問い合わせを送る](journeys/contact.md) の 8. 配送結果の通知 — tags の source や宛先を変えると、ここで問い合わせと判定できず、support 宛てのアドレスが送信停止リストに入りうる。
+- [問い合わせを送る](journeys/contact.md) の 8. 配送結果の通知 — Production の問い合わせ判定は source と support 宛先の両方に依存する。Integration のイベントは別宛先のため同じ判定を通らず、通常の event 処理に進む。
 
 #### `apps/product/src/app/api/webhooks/stripe/route.ts`
 
@@ -348,7 +348,7 @@ last_verified: 2026-09-21
 #### `apps/product/src/features/contact/components/ContactDialog.tsx`
 
 - [問い合わせを送る](journeys/contact.md) の 2. 送信 ID を決める — ID を使い回す条件を広げると、別の問い合わせが前の送信と同じ扱いになって Resend に捨てられる。狭めると、再送で同じメールが 2 通届く。
-- [問い合わせを送る](journeys/contact.md) の 3. 関門と回数制限 — Production のビルドは Upstash の env を必須にしているので、Production で回数制限が素通りになることはない。Preview では Upstash が無いと回数制限を飛ばすが、そもそも配送しない。
+- [問い合わせを送る](journeys/contact.md) の 3. 関門と回数制限 — 固定 Product Integration は専用の hosted Upstash を build 時に必須にしている。通常の PR Preview / 開発環境では Upstash が無い場合に回数制限が省略されることがあるが、問い合わせの配送は環境 identity check で拒否される。
 - [問い合わせを送る](journeys/contact.md) の 7. 結果を出す — エラーの種類ごとに文言を増やす時は、error.data.code の分岐をここに足す。
 
 #### `apps/product/src/features/contact/components/ContactDialogContent.tsx`
@@ -361,12 +361,12 @@ last_verified: 2026-09-21
 
 #### `apps/product/src/features/contact/server/contact-service.ts`
 
-- [問い合わせを送る](journeys/contact.md) の 5. Resend へ送る — 件名は [Dayopt Contact][Product][カテゴリ] の固定形、tags の source は contact-product。後段の Resend webhook はこの source と宛先で問い合わせの配送だと判定するので、変えると配送失敗が Sentry に出なくなる。LP（apps/web）のフォームは別実装で、Idempotency-Key の名前空間を contact-web- に分けてある。
-- [問い合わせを送る](journeys/contact.md) の 6. Resend が受け付ける — 宛先は packages/config の supportEmail が正本。変えると Resend webhook の判定（宛先一致）も同時に変わる。
+- [問い合わせを送る](journeys/contact.md) の 5. Resend へ送る — 件名は Production では [Dayopt Contact][Product][カテゴリ]、Integration では [Integration] を加える。両方で tags の source は contact-product、environment tag は環境を示す。Product webhook の問い合わせ配送判定は source と support@dayopt.app 宛ての両方を条件にするため、専用受信先を使う Integration のイベントはその Sentry 判定に入らない。LP（apps/web）は別実装で、Idempotency-Key の名前空間を contact-web- に分けてある。
+- [問い合わせを送る](journeys/contact.md) の 6. Resend が受け付ける — Production 宛先は packages/config の supportEmail が正本。Integration は別受信先を使うため、Product webhook の問い合わせ Sentry 判定（support 宛て一致）には入らない。
 
 #### `apps/product/src/features/contact/server/router.ts`
 
-- [問い合わせを送る](journeys/contact.md) の 3. 関門と回数制限 — Production のビルドは Upstash の env を必須にしているので、Production で回数制限が素通りになることはない。Preview では Upstash が無いと回数制限を飛ばすが、そもそも配送しない。
+- [問い合わせを送る](journeys/contact.md) の 3. 関門と回数制限 — 固定 Product Integration は専用の hosted Upstash を build 時に必須にしている。通常の PR Preview / 開発環境では Upstash が無い場合に回数制限が省略されることがあるが、問い合わせの配送は環境 identity check で拒否される。
 - [問い合わせを送る](journeys/contact.md) の 4. 送り主を確かめる — 返信先のアドレスは service 側でも検査する（改行やカンマで宛先を増やせないように）。
 
 #### `apps/product/src/features/external-calendar/components/GoogleCalendarSettings.tsx`
@@ -654,7 +654,7 @@ last_verified: 2026-09-21
 
 - [レポートを開く（集計）](journeys/report.md) の 3. /api/trpc と関門 — requiresProductAccess を変えると、レポートを含む全 query の見え方が課金状態で変わる。ここは全 tRPC 共通なので、変更の影響は保存経路（Plan を保存）と同じ範囲に及ぶ。
 - [データを書き出す](journeys/data-export.md) の 3. /api/trpc と関門 — requiresProductAccess を query にも掛けると、課金が切れた利用者がエクスポートできなくなる。operation-access.ts の一覧に user.exportData があるのは mutation 向けの例外表で、query のこの経路には効いていない。
-- [問い合わせを送る](journeys/contact.md) の 3. 関門と回数制限 — Production のビルドは Upstash の env を必須にしているので、Production で回数制限が素通りになることはない。Preview では Upstash が無いと回数制限を飛ばすが、そもそも配送しない。
+- [問い合わせを送る](journeys/contact.md) の 3. 関門と回数制限 — 固定 Product Integration は専用の hosted Upstash を build 時に必須にしている。通常の PR Preview / 開発環境では Upstash が無い場合に回数制限が省略されることがあるが、問い合わせの配送は環境 identity check で拒否される。
 
 #### `apps/product/src/lib/database/collect-query-pages.ts`
 
@@ -724,7 +724,7 @@ last_verified: 2026-09-21
 
 #### `apps/product/src/lib/rate-limit/upstash.ts`
 
-- [問い合わせを送る](journeys/contact.md) の 3. 関門と回数制限 — Production のビルドは Upstash の env を必須にしているので、Production で回数制限が素通りになることはない。Preview では Upstash が無いと回数制限を飛ばすが、そもそも配送しない。
+- [問い合わせを送る](journeys/contact.md) の 3. 関門と回数制限 — 固定 Product Integration は専用の hosted Upstash を build 時に必須にしている。通常の PR Preview / 開発環境では Upstash が無い場合に回数制限が省略されることがあるが、問い合わせの配送は環境 identity check で拒否される。
 
 #### `apps/product/src/lib/safe-redirect.ts`
 
@@ -833,7 +833,7 @@ last_verified: 2026-09-21
 
 #### `apps/web/src/app/api/contact/contact-email.ts`
 
-- [問い合わせを送る](journeys/contact.md) の 5. Resend へ送る — 件名は [Dayopt Contact][Product][カテゴリ] の固定形、tags の source は contact-product。後段の Resend webhook はこの source と宛先で問い合わせの配送だと判定するので、変えると配送失敗が Sentry に出なくなる。LP（apps/web）のフォームは別実装で、Idempotency-Key の名前空間を contact-web- に分けてある。
+- [問い合わせを送る](journeys/contact.md) の 5. Resend へ送る — 件名は Production では [Dayopt Contact][Product][カテゴリ]、Integration では [Integration] を加える。両方で tags の source は contact-product、environment tag は環境を示す。Product webhook の問い合わせ配送判定は source と support@dayopt.app 宛ての両方を条件にするため、専用受信先を使う Integration のイベントはその Sentry 判定に入らない。LP（apps/web）は別実装で、Idempotency-Key の名前空間を contact-web- に分けてある。
 
 #### `packages/billing/src/subscription.ts`
 
@@ -841,7 +841,7 @@ last_verified: 2026-09-21
 
 #### `packages/config/src/constants.ts`
 
-- [問い合わせを送る](journeys/contact.md) の 6. Resend が受け付ける — 宛先は packages/config の supportEmail が正本。変えると Resend webhook の判定（宛先一致）も同時に変わる。
+- [問い合わせを送る](journeys/contact.md) の 6. Resend が受け付ける — Production 宛先は packages/config の supportEmail が正本。Integration は別受信先を使うため、Product webhook の問い合わせ Sentry 判定（support 宛て一致）には入らない。
 
 #### `scripts/ci/production-auth-config-audit.mjs`
 

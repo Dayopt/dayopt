@@ -7,7 +7,7 @@ last_verified: 2026-09-21
 
 <!-- learn:generated:start — 正本 このファイルの learn:journey の JSON / 再生成 pnpm learn:generate / 検証 pnpm docs:check。この範囲は手編集しない -->
 
-ログイン中にメニューの「お問い合わせ」から送る。内容は DB に保存せず、Resend 経由で support@dayopt.app へメールとして届けるだけ。配送するのは Production だけで、Preview / 開発環境では必ず失敗する。LP（apps/web）のフォームは別の経路。
+ログイン中にメニューの「お問い合わせ」から送る。内容は DB に保存せず、Resend 経由でメールとして届ける。Production は support@dayopt.app、固定 Integration は専用のテスト受信先に送る。通常の PR Preview / 開発環境では送らない。LP（apps/web）のフォームは別の経路。
 
 ```mermaid
 flowchart TD
@@ -97,7 +97,7 @@ protectedProcedure でログインを確かめる。contact.submit は利用権�
 
 - **なぜ必要か**: 問い合わせは課金が切れた人にも必要な出口なので利用権では止めない。一方でメール送信は外部の費用とメールボックスを消費するので、本人単位と全体の両方で上限を置く。
 - **入力 → 出力**: 送信内容と本人のセッション → 通過 / 429 / 503
-- **ここを変えると**: Production のビルドは Upstash の env を必須にしているので、Production で回数制限が素通りになることはない。Preview では Upstash が無いと回数制限を飛ばすが、そもそも配送しない。
+- **ここを変えると**: 固定 Product Integration は専用の hosted Upstash を build 時に必須にしている。通常の PR Preview / 開発環境では Upstash が無い場合に回数制限が省略されることがあるが、問い合わせの配送は環境 identity check で拒否される。
 - **コード**:
   - [`apps/product/src/lib/billing/operation-access.ts`](../../../apps/product/src/lib/billing/operation-access.ts) で `'contact.submit',` を探す
   - [`apps/product/src/features/contact/server/router.ts`](../../../apps/product/src/features/contact/server/router.ts) で `await enforceContactRateLimit(contactGlobalRateLimit, 'global');` を探す
@@ -144,31 +144,31 @@ Supabase Auth から本人を取り直し、メールアドレスを返信先に
 
 ### 5. Resend の REST API へ 1 通送る（Vercel（Next.js））
 
-VERCEL_ENV が production でなければ送らずに失敗する。RESEND_API_KEY と、dayopt.app ドメインの RESEND_FROM_EMAIL（Resend の見本アドレス onboarding@resend.dev は拒否）を確かめる。本文は環境情報とメッセージを並べた plain text。Idempotency-Key に contact-product-<submissionId> を付け、10 秒で打ち切る。応答に email の id が無ければ失敗とみなす。
+解決された DAYOPT_ENVIRONMENT が production または固定 integration の場合だけ送る。Production は support@dayopt.app、Integration は CONTACT_INTEGRATION_RECIPIENT に送る。両方で RESEND_API_KEY と dayopt.app ドメインの RESEND_FROM_EMAIL（onboarding@resend.dev は拒否）を確かめる。本文は環境情報とメッセージの plain text。Idempotency-Key は contact-product-<submissionId>、Integration では末尾に -integration を付け、10 秒で打ち切る。応答の email id は受付を示し、実配送は非同期。
 
 - **なぜ必要か**: 問い合わせの個人情報は Resend の payload と運用のメールボックスにだけ置き、ログと Sentry には技術的な文脈だけを残す。打ち切りは、Resend が遅い時に利用者を待たせ続けず、同じ Idempotency-Key で送り直せるようにするため。
 - **入力 → 出力**: userEmail、userName、送信内容 → Resend の email id（受け取るだけで保存しない）
-- **ここを変えると**: 件名は [Dayopt Contact][Product][カテゴリ] の固定形、tags の source は contact-product。後段の Resend webhook はこの source と宛先で問い合わせの配送だと判定するので、変えると配送失敗が Sentry に出なくなる。LP（apps/web）のフォームは別実装で、Idempotency-Key の名前空間を contact-web- に分けてある。
+- **ここを変えると**: 件名は Production では [Dayopt Contact][Product][カテゴリ]、Integration では [Integration] を加える。両方で tags の source は contact-product、environment tag は環境を示す。Product webhook の問い合わせ配送判定は source と support@dayopt.app 宛ての両方を条件にするため、専用受信先を使う Integration のイベントはその Sentry 判定に入らない。LP（apps/web）は別実装で、Idempotency-Key の名前空間を contact-web- に分けてある。
 - **コード**:
-  - [`apps/product/src/features/contact/server/contact-service.ts`](../../../apps/product/src/features/contact/server/contact-service.ts) で ``'Idempotency-Key': `contact-product-${input.submissionId}`,`` を探す
+  - [`apps/product/src/features/contact/server/contact-service.ts`](../../../apps/product/src/features/contact/server/contact-service.ts) で ``'Idempotency-Key': `contact-product-${input.submissionId}${dayoptEnvironment === 'integration' ? '-integration' : ''}`,`` を探す
   - [`apps/product/src/features/contact/server/contact-service.ts`](../../../apps/product/src/features/contact/server/contact-service.ts) で `const CONTACT_EMAIL_TIMEOUT_MS = 10_000;` を探す
-  - [`apps/product/src/features/contact/server/contact-service.ts`](../../../apps/product/src/features/contact/server/contact-service.ts) で `'Contact email delivery is available only in Production',` を探す
+  - [`apps/product/src/features/contact/server/contact-service.ts`](../../../apps/product/src/features/contact/server/contact-service.ts) で `Contact email delivery is not available in this environment` を探す
   - [`apps/web/src/app/api/contact/contact-email.ts`](../../../apps/web/src/app/api/contact/contact-email.ts) で ``'Idempotency-Key': `contact-web-${input.submissionId}`,`` を探す（LP のフォーム（IP 単位の回数制限・Turnstile 付きの別経路））
 - **この段を守るテスト**:
   - [`apps/product/src/features/contact/server/contact-service.test.ts`](../../../apps/product/src/features/contact/server/contact-service.test.ts) で `it('sends a fixed-header plain-text Product contact email'` を探す
   - [`apps/product/src/features/contact/server/contact-service.test.ts`](../../../apps/product/src/features/contact/server/contact-service.test.ts) で `it('stops waiting after ten seconds while retaining the idempotency key for retry'` を探す
 
 <details>
-<summary>⚡ Preview / 開発環境で送る — 画面: エラー表示 / データ: 変化なし / 再試行: しない / 痕跡: ログだけ</summary>
+<summary>⚡ 通常の PR Preview / 開発環境で送る — 画面: エラー表示 / データ: 変化なし / 再試行: しない / 痕跡: ログだけ</summary>
 
 - 画面: 送信失敗の toast。
 - データ: 送らない（仕様）。
-- 再試行: しない。何度送っても同じ。
-- 痕跡: 残らない（Function のログだけ）。サーバーの Sentry は VERCEL_ENV=production の時しか初期化されないので、CONTACT_DELIVERY_FAILED が「想定外」に分類されても Preview・開発環境では送られない。
-- **最初に見る場所**: 仕様どおり。Preview で配送を試す手段は無い。env が揃っているかは運用手順の preflight で見る。
+- 再試行: この環境では送れない。送信確認には固定 Integration を使う。
+- 痕跡: Function log には category と errorType のみを記録する。通常の PR Preview / 開発環境では Sentry を初期化しない。Production / 固定 Integration は SENTRY_DSN がある場合に限り、想定外エラーを Sentry に送る。
+- **最初に見る場所**: 通常の PR Preview か固定 Integration か、Dayopt environment binding を確認する。Integration は専用受信先へ配送できる。
 - 根拠:
-  - [`docs/product/specs/contact.md`](../../product/specs/contact.md) で `credentialが存在してもProduction以外では配送しない` を探す
-  - [`apps/product/sentry.server.config.ts`](../../../apps/product/sentry.server.config.ts) で `const IS_SENTRY_PRODUCTION = VERCEL_ENV === 'production';` を探す
+  - [`apps/product/src/features/contact/server/contact-service.ts`](../../../apps/product/src/features/contact/server/contact-service.ts) で `Contact email delivery is not available in this environment` を探す
+  - [`apps/product/sentry.server.config.ts`](../../../apps/product/sentry.server.config.ts) で `if (SENTRY_DSN && SENTRY_ENVIRONMENT !== null) {` を探す
 
 </details>
 
@@ -192,20 +192,20 @@ VERCEL_ENV が production でなければ送らずに失敗する。RESEND_API_K
 - データ: 送らない。
 - 再試行: env を直すまで何度送っても同じ。
 - 痕跡: Sentry。
-- **最初に見る場所**: Vercel Production の RESEND_API_KEY / RESEND_FROM_EMAIL。運用手順は contact-email.md。
+- **最初に見る場所**: Production / Integration の RESEND_API_KEY と RESEND_FROM_EMAIL。Integration では CONTACT_INTEGRATION_RECIPIENT も確認する。運用手順は contact-email.md。
 - 根拠:
   - [`apps/product/src/features/contact/server/contact-service.ts`](../../../apps/product/src/features/contact/server/contact-service.ts) で `fromResult.data === 'onboarding@resend.dev'` を探す
   - [`docs/operations/contact-email.md`](../../operations/contact-email.md) で `## 3. Merge前のProduction preflight` を探す
 
 </details>
 
-### 6. Resend が受け付けて support@dayopt.app へ配送する（Resend）
+### 6. Resend が受け付けて環境ごとの宛先へ送る（Resend）
 
-宛先は support@dayopt.app、返信先は送り主のメール。メールボックスで返信すると本人へ届く。受け付けた時点で id を返し、実際の配送は非同期。
+Production の宛先は support@dayopt.app、固定 Integration の宛先は CONTACT_INTEGRATION_RECIPIENT。返信先は送り主のメール。Resend が受け付けた時点で id を返し、実際の配送は非同期。
 
-- **なぜ必要か**: 問い合わせを DB やチケット管理に持たず、運用のメールボックス 1 つに集めるため。
+- **なぜ必要か**: Production の問い合わせはサポート用メールボックスへ集め、Integration の送信確認は専用のテスト受信先へ分けるため。
 - **入力 → 出力**: email の payload と Idempotency-Key → { id }（受付）
-- **ここを変えると**: 宛先は packages/config の supportEmail が正本。変えると Resend webhook の判定（宛先一致）も同時に変わる。
+- **ここを変えると**: Production 宛先は packages/config の supportEmail が正本。Integration は別受信先を使うため、Product webhook の問い合わせ Sentry 判定（support 宛て一致）には入らない。
 - **コード**:
   - [`packages/config/src/constants.ts`](../../../packages/config/src/constants.ts) で `supportEmail: 'support@dayopt.app',` を探す
   - [`apps/product/src/features/contact/server/contact-service.ts`](../../../apps/product/src/features/contact/server/contact-service.ts) で `reply_to: replyToResult.data,` を探す
@@ -236,11 +236,11 @@ VERCEL_ENV が production でなければ送らずに失敗する。RESEND_API_K
 
 ### 8. （後で）配送できなかったら Resend webhook で知る（Vercel（Next.js））
 
-Resend は配送の結果を webhook で送ってくる。宛先が support@dayopt.app で source が contact-product の bounced / complained / failed / suppressed は、問い合わせの配送失敗として Sentry へ送る（通常のメールのように送信停止リストには入れない）。LP 発（contact-web）の event は Web 側の webhook に任せる。
+Resend は配送の結果を webhook で送ってくる。この webhook は宛先が support@dayopt.app かつ source が contact-product の bounced / complained / failed / suppressed を問い合わせの配送失敗として Sentry へ送る（通常のメールのように送信停止リストには入れない）。固定 Integration は専用宛先なので、この問い合わせ Sentry 判定には入らない。LP 発（contact-web）の event は Web 側の webhook に任せる。
 
 - **なぜ必要か**: 利用者には成功と出た後で届かなかったことを、運用側が気づけるようにするため。
 - **入力 → 出力**: Resend の配送 event（署名付き） → Sentry の issue（operation: email_delivery_status）
-- **ここを変えると**: tags の source や宛先を変えると、ここで問い合わせと判定できず、support 宛てのアドレスが送信停止リストに入りうる。
+- **ここを変えると**: Production の問い合わせ判定は source と support 宛先の両方に依存する。Integration のイベントは別宛先のため同じ判定を通らず、通常の event 処理に進む。
 - **コード**:
   - [`apps/product/src/app/api/webhooks/resend/route.ts`](../../../apps/product/src/app/api/webhooks/resend/route.ts) で `function isContactDelivery(data: EmailEventData, source: string): boolean {` を探す
   - [`apps/product/src/app/api/webhooks/resend/route.ts`](../../../apps/product/src/app/api/webhooks/resend/route.ts) で `operation: 'email_delivery_status',` を探す
@@ -272,7 +272,7 @@ Resend は配送の結果を webhook で送ってくる。宛先が support@dayo
   "title": "問い合わせを送る",
   "order": 120,
   "group": "integration",
-  "intro": "ログイン中にメニューの「お問い合わせ」から送る。内容は DB に保存せず、Resend 経由で support@dayopt.app へメールとして届けるだけ。配送するのは Production だけで、Preview / 開発環境では必ず失敗する。LP（apps/web）のフォームは別の経路。",
+  "intro": "ログイン中にメニューの「お問い合わせ」から送る。内容は DB に保存せず、Resend 経由でメールとして届ける。Production は support@dayopt.app、固定 Integration は専用のテスト受信先に送る。通常の PR Preview / 開発環境では送らない。LP（apps/web）のフォームは別の経路。",
   "play": "▶ 送信を押す",
   "lanes": ["browser", "vercel", "resend"],
   "hops": [
@@ -413,7 +413,7 @@ Resend は配送の結果を webhook で送ってくる。宛先が support@dayo
         "in": "送信内容と本人のセッション",
         "out": "通過 / 429 / 503"
       },
-      "change": "Production のビルドは Upstash の env を必須にしているので、Production で回数制限が素通りになることはない。Preview では Upstash が無いと回数制限を飛ばすが、そもそも配送しない。",
+      "change": "固定 Product Integration は専用の hosted Upstash を build 時に必須にしている。通常の PR Preview / 開発環境では Upstash が無い場合に回数制限が省略されることがあるが、問い合わせの配送は環境 identity check で拒否される。",
       "refs": [
         {
           "path": "apps/product/src/lib/billing/operation-access.ts",
@@ -524,17 +524,17 @@ Resend は配送の結果を webhook で送ってくる。宛先が support@dayo
       "svc": "vercel",
       "short": "Resend へ送る",
       "title": "Resend の REST API へ 1 通送る",
-      "what": "VERCEL_ENV が production でなければ送らずに失敗する。RESEND_API_KEY と、dayopt.app ドメインの RESEND_FROM_EMAIL（Resend の見本アドレス onboarding@resend.dev は拒否）を確かめる。本文は環境情報とメッセージを並べた plain text。Idempotency-Key に contact-product-<submissionId> を付け、10 秒で打ち切る。応答に email の id が無ければ失敗とみなす。",
+      "what": "解決された DAYOPT_ENVIRONMENT が production または固定 integration の場合だけ送る。Production は support@dayopt.app、Integration は CONTACT_INTEGRATION_RECIPIENT に送る。両方で RESEND_API_KEY と dayopt.app ドメインの RESEND_FROM_EMAIL（onboarding@resend.dev は拒否）を確かめる。本文は環境情報とメッセージの plain text。Idempotency-Key は contact-product-<submissionId>、Integration では末尾に -integration を付け、10 秒で打ち切る。応答の email id は受付を示し、実配送は非同期。",
       "why": "問い合わせの個人情報は Resend の payload と運用のメールボックスにだけ置き、ログと Sentry には技術的な文脈だけを残す。打ち切りは、Resend が遅い時に利用者を待たせ続けず、同じ Idempotency-Key で送り直せるようにするため。",
       "io": {
         "in": "userEmail、userName、送信内容",
         "out": "Resend の email id（受け取るだけで保存しない）"
       },
-      "change": "件名は [Dayopt Contact][Product][カテゴリ] の固定形、tags の source は contact-product。後段の Resend webhook はこの source と宛先で問い合わせの配送だと判定するので、変えると配送失敗が Sentry に出なくなる。LP（apps/web）のフォームは別実装で、Idempotency-Key の名前空間を contact-web- に分けてある。",
+      "change": "件名は Production では [Dayopt Contact][Product][カテゴリ]、Integration では [Integration] を加える。両方で tags の source は contact-product、environment tag は環境を示す。Product webhook の問い合わせ配送判定は source と support@dayopt.app 宛ての両方を条件にするため、専用受信先を使う Integration のイベントはその Sentry 判定に入らない。LP（apps/web）は別実装で、Idempotency-Key の名前空間を contact-web- に分けてある。",
       "refs": [
         {
           "path": "apps/product/src/features/contact/server/contact-service.ts",
-          "find": "'Idempotency-Key': `contact-product-${input.submissionId}`,"
+          "find": "'Idempotency-Key': `contact-product-${input.submissionId}${dayoptEnvironment === 'integration' ? '-integration' : ''}`,"
         },
         {
           "path": "apps/product/src/features/contact/server/contact-service.ts",
@@ -542,7 +542,7 @@ Resend は配送の結果を webhook で送ってくる。宛先が support@dayo
         },
         {
           "path": "apps/product/src/features/contact/server/contact-service.ts",
-          "find": "'Contact email delivery is available only in Production',"
+          "find": "Contact email delivery is not available in this environment"
         },
         {
           "path": "apps/web/src/app/api/contact/contact-email.ts",
@@ -563,20 +563,20 @@ Resend は配送の結果を webhook で送ってくる。宛先が support@dayo
       "fails": [
         {
           "id": "not-production",
-          "label": "Preview / 開発環境で送る",
+          "label": "通常の PR Preview / 開発環境で送る",
           "screen": "送信失敗の toast。",
           "data": "送らない（仕様）。",
-          "retry": "しない。何度送っても同じ。",
-          "trace": "残らない（Function のログだけ）。サーバーの Sentry は VERCEL_ENV=production の時しか初期化されないので、CONTACT_DELIVERY_FAILED が「想定外」に分類されても Preview・開発環境では送られない。",
-          "look": "仕様どおり。Preview で配送を試す手段は無い。env が揃っているかは運用手順の preflight で見る。",
+          "retry": "この環境では送れない。送信確認には固定 Integration を使う。",
+          "trace": "Function log には category と errorType のみを記録する。通常の PR Preview / 開発環境では Sentry を初期化しない。Production / 固定 Integration は SENTRY_DSN がある場合に限り、想定外エラーを Sentry に送る。",
+          "look": "通常の PR Preview か固定 Integration か、Dayopt environment binding を確認する。Integration は専用受信先へ配送できる。",
           "refs": [
             {
-              "path": "docs/product/specs/contact.md",
-              "find": "credentialが存在してもProduction以外では配送しない"
+              "path": "apps/product/src/features/contact/server/contact-service.ts",
+              "find": "Contact email delivery is not available in this environment"
             },
             {
               "path": "apps/product/sentry.server.config.ts",
-              "find": "const IS_SENTRY_PRODUCTION = VERCEL_ENV === 'production';"
+              "find": "if (SENTRY_DSN && SENTRY_ENVIRONMENT !== null) {"
             }
           ],
           "tags": {
@@ -618,7 +618,7 @@ Resend は配送の結果を webhook で送ってくる。宛先が support@dayo
           "data": "送らない。",
           "retry": "env を直すまで何度送っても同じ。",
           "trace": "Sentry。",
-          "look": "Vercel Production の RESEND_API_KEY / RESEND_FROM_EMAIL。運用手順は contact-email.md。",
+          "look": "Production / Integration の RESEND_API_KEY と RESEND_FROM_EMAIL。Integration では CONTACT_INTEGRATION_RECIPIENT も確認する。運用手順は contact-email.md。",
           "refs": [
             {
               "path": "apps/product/src/features/contact/server/contact-service.ts",
@@ -645,14 +645,14 @@ Resend は配送の結果を webhook で送ってくる。宛先が support@dayo
       "svc": "resend",
       "short": "Resend が受け付ける",
       "via": "POST api.resend.com/emails",
-      "title": "Resend が受け付けて support@dayopt.app へ配送する",
-      "what": "宛先は support@dayopt.app、返信先は送り主のメール。メールボックスで返信すると本人へ届く。受け付けた時点で id を返し、実際の配送は非同期。",
-      "why": "問い合わせを DB やチケット管理に持たず、運用のメールボックス 1 つに集めるため。",
+      "title": "Resend が受け付けて環境ごとの宛先へ送る",
+      "what": "Production の宛先は support@dayopt.app、固定 Integration の宛先は CONTACT_INTEGRATION_RECIPIENT。返信先は送り主のメール。Resend が受け付けた時点で id を返し、実際の配送は非同期。",
+      "why": "Production の問い合わせはサポート用メールボックスへ集め、Integration の送信確認は専用のテスト受信先へ分けるため。",
       "io": {
         "in": "email の payload と Idempotency-Key",
         "out": "{ id }（受付）"
       },
-      "change": "宛先は packages/config の supportEmail が正本。変えると Resend webhook の判定（宛先一致）も同時に変わる。",
+      "change": "Production 宛先は packages/config の supportEmail が正本。Integration は別受信先を使うため、Product webhook の問い合わせ Sentry 判定（support 宛て一致）には入らない。",
       "refs": [
         {
           "path": "packages/config/src/constants.ts",
@@ -726,13 +726,13 @@ Resend は配送の結果を webhook で送ってくる。宛先が support@dayo
       "short": "配送結果の通知",
       "via": "後で Resend → POST /api/webhooks/resend",
       "title": "（後で）配送できなかったら Resend webhook で知る",
-      "what": "Resend は配送の結果を webhook で送ってくる。宛先が support@dayopt.app で source が contact-product の bounced / complained / failed / suppressed は、問い合わせの配送失敗として Sentry へ送る（通常のメールのように送信停止リストには入れない）。LP 発（contact-web）の event は Web 側の webhook に任せる。",
+      "what": "Resend は配送の結果を webhook で送ってくる。この webhook は宛先が support@dayopt.app かつ source が contact-product の bounced / complained / failed / suppressed を問い合わせの配送失敗として Sentry へ送る（通常のメールのように送信停止リストには入れない）。固定 Integration は専用宛先なので、この問い合わせ Sentry 判定には入らない。LP 発（contact-web）の event は Web 側の webhook に任せる。",
       "why": "利用者には成功と出た後で届かなかったことを、運用側が気づけるようにするため。",
       "io": {
         "in": "Resend の配送 event（署名付き）",
         "out": "Sentry の issue（operation: email_delivery_status）"
       },
-      "change": "tags の source や宛先を変えると、ここで問い合わせと判定できず、support 宛てのアドレスが送信停止リストに入りうる。",
+      "change": "Production の問い合わせ判定は source と support 宛先の両方に依存する。Integration のイベントは別宛先のため同じ判定を通らず、通常の event 処理に進む。",
       "refs": [
         {
           "path": "apps/product/src/app/api/webhooks/resend/route.ts",
