@@ -4,11 +4,11 @@
 # 各設定値には「なぜそうしたか」を記載。
 # 公式リファレンス: https://supabase.com/docs/guides/local-development/cli/config
 #
-# 運用モデル: local → PR Preview → persistent Integration → production
-#   - Local:      supabase start（この config.toml を使用）
-#   - PR Preview: Supabase GitHub integration が PR ごとに Preview Branch を作成
-#   - Integration: product-integration Vercel project と integration Supabase branch
-#                  (ref: tilwaprottpyhlfoggbb) を固定接続
+# 運用モデル: 通常Previewは共有非本番DB、DB/共有設定変更だけPR専用Branchで隔離
+#   - Local:      optional。supabase start または明示した非本番DBを使用
+#   - PR Preview: 既存Product projectのPreview。通常はpersistent integrationを使用
+#   - Integration: 同じProduct projectのintegration branchの固定Preview入口
+#                  共有非本番Supabase (ref: tilwaprottpyhlfoggbb) を使用
 #   - Production: dayopt main (ref: yvglwblxrnrenfifsnje)
 #
 # Production の GitHub branch は引き続き main。Integration は合成データ専用で
@@ -252,15 +252,26 @@ enabled = true
 sql_paths = ["./seed.sql"]
 
 [remotes.integration.auth]
-site_url = "https://product-integration-dayopt.vercel.app"
+site_url = "https://product-git-integration-dayopt.vercel.app"
 additional_redirect_urls = [
-  "https://product-integration-dayopt.vercel.app",
-  "https://product-integration-dayopt.vercel.app/**"
+  "https://product-git-integration-dayopt.vercel.app",
+  "https://product-git-integration-dayopt.vercel.app/**",
+  # Supabase Auth sign-in redirects only; these do not grant MCP OAuth authority.
+  # Restrict generated Preview hosts to the existing Product project/team naming.
+  "https://product-*-dayopt.vercel.app/**",
+  "http://localhost:3000/**"
 ]
 # The fixed synthetic test account from seed.sql is used for sign-in. Prevent
 # arbitrary account creation from turning this shared test database into a
 # place for real personal data.
 enable_signup = false
+
+# Cloudflare's public always-pass test pair, matching the Preview site key.
+# Declare it only for Integration so GitHub Configure preserves CAPTCHA.
+[remotes.integration.auth.captcha]
+enabled = true
+provider = "turnstile"
+secret = "1x0000000000000000000000000000000AA"
 
 # Use pre-defined map of phone number to OTP for testing.
 # [auth.sms.test_otp]
