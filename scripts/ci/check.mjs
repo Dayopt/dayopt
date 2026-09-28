@@ -62,6 +62,7 @@ import {
   formatGithubOutput,
   formatSummary as formatImpactSummary,
   resolveImpact,
+  resolveWorkspaceTestScope,
   ROOT_MIGRATION_PATH,
 } from './impact.mjs';
 
@@ -258,6 +259,34 @@ export function shouldRunScriptsTestsInStatic(docsOnly) {
 /** CI toolchain の変更を含む PR では docs-only でも product unit test を走らせる。 */
 export function shouldRunProductUnitTests(productUnit) {
   return !isFalseFlag(productUnit);
+}
+
+/** Unknown or malformed scope data requests the full suite. */
+export function parseWorkspaceTestSelection(raw) {
+  if (typeof raw !== 'string' || raw.length === 0) return [{ name: '*', script: '*' }];
+  let value;
+  try {
+    value = JSON.parse(raw);
+  } catch {
+    return [{ name: '*', script: '*' }];
+  }
+  if (!Array.isArray(value)) return [{ name: '*', script: '*' }];
+  if (value.some((entry) => entry?.name === '*')) return [{ name: '*', script: '*' }];
+  if (
+    value.some(
+      (entry) =>
+        typeof entry?.name !== 'string' ||
+        !/^@dayopt\/[a-z0-9-]+$/.test(entry.name) ||
+        !['test:run', 'test'].includes(entry.script),
+    )
+  ) {
+    return [{ name: '*', script: '*' }];
+  }
+  return value;
+}
+
+export function shouldRunFullWorkspaceTest(selection) {
+  return !Array.isArray(selection) || selection.some((entry) => entry?.name === '*');
 }
 
 /** Protocol failures must fail the existing required unit job, not a detached advisory job. */
@@ -501,7 +530,17 @@ async function runImpact() {
 
   const filenames = isPr ? fetchPrFilenames({ repo, prNumber }) : [];
   const impact = resolveImpact(filenames);
-  await writeStepSummary(formatImpactSummary(impact));
+  const workspaceTestScope = resolveWorkspaceTestScope(filenames);
+  const runAllWorkspaceTests = workspaceTestScope.workspaces.some(({ name }) => name === '*');
+  if (runAllWorkspaceTests) {
+    impact.productUnit = true;
+    impact.docsOnly = false;
+  }
+  await writeStepSummary(
+    `${formatImpactSummary(impact)}\n\n## Workspace test scope\n\n` +
+      `- ${workspaceTestScope.scope}: ${workspaceTestScope.reason}\n` +
+      `- ${workspaceTestScope.workspaces.map(({ name }) => name).join(', ') || 'none'}`,
+  );
 
   // `functions_changed` は impact.mjs（app build への影響判定）の関心ではないため
   // ここで併せて出す。static job の deno check がこれを見る。`!isPr` を true 側へ
@@ -515,6 +554,7 @@ async function runImpact() {
 
   await writeGithubOutput([
     ...formatGithubOutput(impact).trim().split('\n'),
+    `workspace_tests=${JSON.stringify(workspaceTestScope.workspaces)}`,
     `functions_changed=${functionsChanged}`,
     `migrations_added=${migrationsAdded}`,
   ]);
@@ -638,6 +678,8 @@ async function runUnit() {
   const isPr = eventName === 'pull_request' && !!prNumber;
 
   const productUnit = shouldRunProductUnitTests(process.env.PRODUCT_UNIT);
+  const workspaceTestSelection = parseWorkspaceTestSelection(process.env.WORKSPACE_TESTS);
+  const runAllWorkspaceTests = shouldRunFullWorkspaceTest(workspaceTestSelection);
 
   // ── migration safety（破壊的変更の静的スキャン、常時・DB 不要）────
   // 他の unit test より先に実行する。DB 起動も build:packages も不要な軽い
@@ -669,7 +711,6 @@ async function runUnit() {
   }
 
   run('pnpm', ['build:packages']);
-  run('pnpm', ['test:scripts']);
   run('pnpm', [
     '--dir',
     'apps/product',
@@ -682,16 +723,22 @@ async function runUnit() {
   ]);
   run('pnpm', ['--dir', 'apps/web', 'exec', 'vitest', 'run', 'production-build-gate.test.mjs']);
 
-  if (productUnit) {
-    runProductUnit({ isPr, repo, prNumber, ghToken });
+  if (runAllWorkspaceTests) {
+    console.log('workspace test scope が判定不能のため root の full test suite を実行します。');
+    run('pnpm', ['test:run']);
   } else {
-    console.log('product 影響なしのため product unit test を skip します。');
+    run('pnpm', ['test:scripts']);
+    if (productUnit) {
+      runProductUnit({ isPr, repo, prNumber, ghToken });
+    } else {
+      console.log('product 影響なしのため product unit test を skip します。');
+    }
+    for (const workspace of workspaceTestSelection) {
+      console.log(`${workspace.name} の ${workspace.script} を実行します。`);
+      run('pnpm', ['--filter', workspace.name, workspace.script]);
+    }
   }
   runMcpConformance(process.env.MCP_CONFORMANCE);
-  run('pnpm', ['test:web']);
-  run('pnpm', ['--filter', '@dayopt/billing', 'test:run']);
-  run('pnpm', ['--filter', '@dayopt/i18n', 'test:run']);
-  run('pnpm', ['--filter', '@dayopt/observability', 'test:run']);
 
   if (migrationSafetyUndeterminable) {
     throw new Error(
