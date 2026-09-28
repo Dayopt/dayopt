@@ -265,11 +265,11 @@ Integration の正規 origin は `https://product-integration-dayopt.vercel.app`
 | Variable                                                        | 値 / ルール                                                                |
 | --------------------------------------------------------------- | -------------------------------------------------------------------------- |
 | `DAYOPT_ENVIRONMENT` / `NEXT_PUBLIC_DAYOPT_ENVIRONMENT`         | どちらも `integration`                                                     |
-| `NEXT_PUBLIC_APP_URL`                                           | `https://product-integration-dayopt.vercel.app`                                   |
+| `NEXT_PUBLIC_APP_URL`                                           | `https://product-integration-dayopt.vercel.app`                            |
 | `NEXT_PUBLIC_SUPABASE_URL`                                      | `https://tilwaprottpyhlfoggbb.supabase.co`                                 |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` / `SUPABASE_SECRET_KEY`  | Integration branch 専用の鍵。Production の鍵を使わない                     |
 | `MCP_OAUTH_ENVIRONMENT`                                         | `integration`                                                              |
-| `OAUTH_AUTHORIZATION_SERVER_URI` / `MCP_CANONICAL_RESOURCE_URI` | どちらも `https://product-integration-dayopt.vercel.app`                          |
+| `OAUTH_AUTHORIZATION_SERVER_URI` / `MCP_CANONICAL_RESOURCE_URI` | どちらも `https://product-integration-dayopt.vercel.app`                   |
 | `NEXT_PUBLIC_TURNSTILE_SITE_KEY`                                | Integration 用 site key。Supabase branch の Auth captcha secret と対にする |
 | `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN`           | Integration 専用 instance                                                  |
 | `RECOVERY_CODE_PEPPER`                                          | Integration 専用のランダム値                                               |
