@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-09-22
+last_verified: 2026-09-28
 ---
 
 # 入口の一覧（HTTP と cron）
@@ -21,7 +21,7 @@ last_verified: 2026-09-22
 | [`/api/cron/external-connection-maintenance`](../../../apps/product/src/app/api/cron/external-connection-maintenance/route.ts)   | GET              | Vercel Cron                                                    | 15 分ごと     | 切断した接続の token を Google 側で失効させる（revoke outbox）のと、security event の保持期限の掃除                                        | 失効が遅れる（token は保存の時点で消えているので、漏れはしない）。heartbeat で気づく                             | —                                                                       |
 | [`/api/csp-report`](../../../apps/product/src/app/api/csp-report/route.ts)                                                       | HEAD POST        | ブラウザ（CSP 違反を検出した時に自動で）                       | —             | CSP 違反の報告を受けて Sentry に送る。ブラウザ拡張由来は捨て、rate limit で量を抑える                                                      | CSP 違反に気づけなくなるだけ。画面の動作には影響しない                                                           | —                                                                       |
 | [`/api/health`](../../../apps/product/src/app/api/health/route.ts)                                                               | GET              | 外形監視（UptimeRobot）と、デプロイ後の確認                    | —             | DB（identity RPC → profiles）・Redis・env を短い timeout で確かめる。障害の切り分けの最初の 1 手                                           | 監視が鳴る。ただし Sentry はこの route の event を捨てるので、Sentry に無いのは正常                              | —                                                                       |
-| [`/api/health/cron`](../../../apps/product/src/app/api/health/cron/route.ts)                                                     | GET              | 外形監視（UptimeRobot に設定予定）                             | —             | 本番で各 cron の完了記録を上限時間と照合する。正常なら 200、heartbeat の遅延や確認失敗は 503 を返す                                        | cron の停止を外部監視で検出できなくなる。移行確認までは既存の Actions heartbeat を継続する                       | —                                                                       |
+| [`/api/health/cron`](../../../apps/product/src/app/api/health/cron/route.ts)                                                     | GET              | 外形監視（UptimeRobot 用。設定状況は未確認）                   | —             | 本番で各 cron の完了記録を上限時間と照合する。正常なら 200、heartbeat の遅延や確認失敗は 503 を返す                                        | この route を監視対象にしていない場合は、heartbeat の確認が main push 時と日次の production audit に限られる     | —                                                                       |
 | [`/api/health/version`](../../../apps/product/src/app/api/health/version/route.ts)                                               | GET              | 開きっぱなしのタブ（フォーカスが戻った時）                     | —             | 配信中のビルドの版を返すだけ。自分より新しい deploy があればタブを自動で再読み込みする                                                     | 古いタブが自動で更新されなくなるだけ                                                                             | [merge → 本番公開](../journeys/deploy.md) の 7                          |
 | [`/api/integrations/google-calendar/callback`](../../../apps/product/src/app/api/integrations/google-calendar/callback/route.ts) | GET              | ブラウザ（Google からの戻り）                                  | —             | code を token に交換して接続を保存する。state の不一致・scope 不足・write fence はここで弾く                                               | 同意しても接続が保存されず、設定画面へエラーで戻る                                                               | [Google Calendar 連携](../journeys/google-calendar.md) の 4             |
 | [`/api/integrations/google-calendar/start`](../../../apps/product/src/app/api/integrations/google-calendar/start/route.ts)       | GET              | ブラウザ（設定画面の「接続」）                                 | —             | Google の同意画面へ送る。state と PKCE を cookie に封じ、Pro の利用権と rate limit を先に見る                                              | 新しい接続ができない。既存の接続の同期には影響しない                                                             | [Google Calendar 連携](../journeys/google-calendar.md) の 2             |
@@ -155,9 +155,9 @@ last_verified: 2026-09-22
       ]
     },
     "/api/health/cron": {
-      "who": "外形監視（UptimeRobot に設定予定）",
+      "who": "外形監視（UptimeRobot 用。設定状況は未確認）",
       "why": "本番で各 cron の完了記録を上限時間と照合する。正常なら 200、heartbeat の遅延や確認失敗は 503 を返す",
-      "outage": "cron の停止を外部監視で検出できなくなる。移行確認までは既存の Actions heartbeat を継続する",
+      "outage": "この route を監視対象にしていない場合は、heartbeat の確認が main push 時と日次の production audit に限られる",
       "refs": [
         {
           "path": "apps/product/src/app/api/health/cron/route.ts",
