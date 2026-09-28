@@ -122,7 +122,7 @@ describe('MCP OAuth env inventory', () => {
   });
 
   it('persistent Integrationの接続先をSecrets文書で宣言する', () => {
-    expect(secretsDocumentation).toContain('https://product-integration.vercel.app');
+    expect(secretsDocumentation).toContain('https://product-integration-dayopt.vercel.app');
     expect(secretsDocumentation).toContain('tilwaprottpyhlfoggbb');
   });
 });

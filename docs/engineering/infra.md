@@ -1463,12 +1463,12 @@ Dayopt の標準ルートは `local → PR Preview → production`。
 - **Integration**: persistent Supabase branch `integration` と専用 Vercel project `product-integration` を使う。Production data / credentials は使わない
 - **Production**: `main` merge 後だけ Supabase main と Vercel Production に反映する
 
-| 環境            | Supabase                                 | Vercel                           | 用途                                    |
-| --------------- | ---------------------------------------- | -------------------------------- | --------------------------------------- |
-| **Local**       | `supabase start`                         | `pnpm dev`                       | 手元の開発                              |
-| **PR Preview**  | PR ごとの Supabase Preview Branch        | Vercel Preview URL (`product`)   | migration / 機能の本番前検証            |
+| 環境            | Supabase                                 | Vercel                                  | 用途                                                              |
+| --------------- | ---------------------------------------- | --------------------------------------- | ----------------------------------------------------------------- |
+| **Local**       | `supabase start`                         | `pnpm dev`                              | 手元の開発                                                        |
+| **PR Preview**  | PR ごとの Supabase Preview Branch        | Vercel Preview URL (`product`)          | migration / 機能の本番前検証                                      |
 | **Integration** | `tilwaprottpyhlfoggbb` persistent branch | `product-integration-dayopt.vercel.app` | 固定 URL の合成データ検証（Supabase healthy / Vercel env 未設定） |
-| **Production**  | `dayopt` main                            | Production deployment            | 実ユーザー                              |
+| **Production**  | `dayopt` main                            | Production deployment                   | 実ユーザー                                                        |
 
 Cloud-first 開発で使う persistent Integration は常設する。通常の PR Preview は引き続き Vercel の一時 URL を使い、Supabase Preview branch は migration / Supabase 設定変更を検証する PR だけに作る。固定 URL の OAuth / sandbox / ブラウザ検証は Integration が受け持つ。
 

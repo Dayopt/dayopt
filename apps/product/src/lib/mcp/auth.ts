@@ -64,9 +64,6 @@ export async function verifyAccessToken(token: string): Promise<VerifiedAccessTo
       expectedIdentity,
       () => db.rpc('get_mcp_environment_identity_v1'),
       expectedSupabaseProjectRef,
-      expectedIdentity.environment === 'integration'
-        ? () => db.rpc('ensure_mcp_integration_environment_identity_v1')
-        : undefined,
     );
   } catch (error) {
     throwDatabaseVerificationError(error, 'verify_mcp_environment_identity');
