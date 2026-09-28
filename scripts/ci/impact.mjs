@@ -125,6 +125,7 @@ export const INTEGRATION_GLOBS = [
   'apps/product/src/lib/trpc/**',
   'apps/product/src/app/api/mcp/**',
   'supabase/migrations/**',
+  'supabase/tests/**',
   'apps/product/src/lib/test/integration/**',
   'apps/product/src/lib/test/integration-setup.ts',
   'apps/product/src/lib/test/trpc-test-helpers.ts',

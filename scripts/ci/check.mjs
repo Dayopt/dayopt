@@ -833,7 +833,6 @@ async function runIntegration() {
     return;
   }
 
-  run('pnpm', ['test:integration']);
   run(
     'psql',
     [
@@ -851,9 +850,12 @@ async function runIntegration() {
       'SET app.isolated_validation = on',
       '-f',
       'supabase/tests/cron-heartbeats.sql',
+      '-f',
+      'supabase/tests/integration-oauth-identity.sql',
     ],
     { env: { ...process.env, PGPASSWORD: 'postgres' } },
   );
+  run('pnpm', ['test:integration']);
   run('pnpm', ['rls:snapshot:check']);
   run('pnpm', ['types:generate:local']);
   run('git', [
