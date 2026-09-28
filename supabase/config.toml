@@ -266,6 +266,13 @@ additional_redirect_urls = [
 # place for real personal data.
 enable_signup = false
 
+# Cloudflare's public always-pass test pair, matching the Preview site key.
+# Declare it only for Integration so GitHub Configure preserves CAPTCHA.
+[remotes.integration.auth.captcha]
+enabled = true
+provider = "turnstile"
+secret = "1x0000000000000000000000000000000AA"
+
 # Use pre-defined map of phone number to OTP for testing.
 # [auth.sms.test_otp]
 # 4152127777 = "123456"
