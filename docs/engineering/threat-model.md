@@ -54,18 +54,23 @@ sweep が実際に得た既往クラス・却下記録を置く。
 
 **入口となる route**（`app/**/route.{ts,tsx,js,mjs}` のうち、この境界に属するもの。全数と method の一覧は [`data/system-surface.md`](./data/system-surface.md) の生成表を見る）:
 
-| path                                         | 認証                                |
-| -------------------------------------------- | ----------------------------------- |
-| `app/api/oauth/token/route.ts`               | 未認証（client credential と code） |
-| `app/oauth/token/route.ts`                   | 同上（別 mount）                    |
-| `app/api/mcp/route.ts` / `app/mcp/route.ts`  | OAuth bearer                        |
-| `app/[locale]/(auth)/auth/callback/route.ts` | 未認証（code 交換）                 |
-| `app/[locale]/(auth)/auth/confirm/route.ts`  | 未認証（token_hash）                |
-| `app/api/trpc/[trpc]/route.ts`               | セッション（procedure ごと）        |
-| `app/api/v1/calendar/[token]/route.ts`       | token のみ（公開 ICS）              |
+| path                                         | 認証                                   |
+| -------------------------------------------- | -------------------------------------- |
+| `app/api/oauth/token/route.ts`               | 未認証（client credential と code）    |
+| `app/oauth/token/route.ts`                   | 同上（別 mount）                       |
+| `app/api/mcp/route.ts` / `app/mcp/route.ts`  | OAuth bearer                           |
+| `app/[locale]/(auth)/auth/callback/route.ts` | 未認証（code 交換）                    |
+| `app/[locale]/(auth)/auth/confirm/route.ts`  | 未認証（token_hash）                   |
+| `app/api/trpc/[trpc]/route.ts`               | セッション（procedure ごと）           |
+| `app/api/v1/calendar/[token]/route.ts`       | token のみ（公開 ICS）                 |
+| `app/api/health/cron/route.ts`               | 未認証（status のみ、production のみ） |
 
 `.well-known/oauth-authorization-server` と `.well-known/oauth-protected-resource` は metadata を返す
 未認証エンドポイント。
+
+`app/api/health/cron/route.ts` は外形監視専用で、service-role の SELECT 対象を
+`cron_heartbeats` の固定8 job名へ限定し、production の database OAuth identity を照合する。
+public response に job 名・時刻・DB error を含めず、rate limit と timeout を設ける。
 
 **判定を持つモジュール**:
 

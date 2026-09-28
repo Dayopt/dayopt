@@ -10,10 +10,12 @@ import {
   fetchPrFilesWithStatus,
   findFsReadingProductTests,
   formatMigrationSafetyOutput,
+  parseWorkspaceTestSelection,
   resolveDiffBase,
   resolveProductUnitScope,
   runMcpConformance,
   runMigrationSafety,
+  shouldRunFullWorkspaceTest,
   shouldRunIntegrationTests,
   shouldRunProductUnitTests,
   shouldRunScriptsTestsInStatic,
@@ -74,6 +76,23 @@ describe('shouldRunProductUnitTests', () => {
     expect(shouldRunProductUnitTests(true)).toBe(true);
     expect(shouldRunProductUnitTests(undefined)).toBe(true);
   });
+});
+
+describe('workspace test selection output', () => {
+  it('valid impact output keeps only the selected workspace suites', () => {
+    const selection = parseWorkspaceTestSelection('[{"name":"@dayopt/web","script":"test:run"}]');
+    expect(selection).toEqual([{ name: '@dayopt/web', script: 'test:run' }]);
+    expect(shouldRunFullWorkspaceTest(selection)).toBe(false);
+  });
+
+  it.each([undefined, '', 'not-json', '{}', '[{"name":"@dayopt/web; echo pwn","script":"test"}]'])(
+    'invalid impact output %p runs the full suite',
+    (value) => {
+      const selection = parseWorkspaceTestSelection(value);
+      expect(selection).toEqual([{ name: '*', script: '*' }]);
+      expect(shouldRunFullWorkspaceTest(selection)).toBe(true);
+    },
+  );
 });
 
 describe('shouldRunIntegrationTests', () => {
