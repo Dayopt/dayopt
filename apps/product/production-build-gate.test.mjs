@@ -150,6 +150,7 @@ describe('Integration billing rehearsal', () => {
   });
 
   it.each([
+    ['STRIPE_SECRET_KEY', 'rk_test_x'],
     ['STRIPE_SECRET_KEY', 'sk_live_x'],
     ['STRIPE_SECRET_KEY', 'rk_live_x'],
     ['STRIPE_LIVEMODE', 'true'],

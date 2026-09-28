@@ -46,7 +46,7 @@ Vercel project `product` の Preview / Git branch `integration` に以下を保�
 
 | 変数                                                 | 設定元 / 値                                                                        |
 | ---------------------------------------------------- | ---------------------------------------------------------------------------------- |
-| `STRIPE_SECRET_KEY`                                  | 1Password `agent/stripe-test` の test key                                          |
+| `STRIPE_SECRET_KEY`                                  | 1Password `agent/stripe-test` の `sk_test_` key。restricted key は使わない         |
 | `STRIPE_ACCOUNT_ID`                                  | 同 item の照合済み account                                                         |
 | `STRIPE_LIVEMODE`                                    | `false`                                                                            |
 | `NEXT_PUBLIC_STRIPE_PRO_PRICE_ID`                    | 同 item の照合済み既存 Price                                                       |

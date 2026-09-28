@@ -192,7 +192,7 @@ function assertIntegrationBillingRehearsalEnv(env) {
     throw new Error(`Integration billing rehearsal requires: ${missing.join(', ')}`);
   }
   if (
-    !/^(sk|rk)_test_\S+$/.test(env.STRIPE_SECRET_KEY) ||
+    !/^sk_test_\S+$/.test(env.STRIPE_SECRET_KEY) ||
     env.STRIPE_LIVEMODE !== 'false' ||
     !/^whsec_\S+$/.test(env.STRIPE_WEBHOOK_SECRET) ||
     !/^acct_[A-Za-z0-9_]+$/.test(env.STRIPE_ACCOUNT_ID) ||
