@@ -10,6 +10,7 @@ import 'server-only';
 import { z } from 'zod';
 
 import { resolveDayoptEnvironment } from '@/lib/dayopt-environment';
+import { logger } from '@/lib/logger';
 
 import { isValidOAuthRedirectUriList } from '@/lib/oauth-server/redirect-uris';
 
@@ -355,6 +356,13 @@ export const env = new Proxy({} as ServerEnv, {
       }
       const result = serverSchema.safeParse(cleaned);
       if (!result.success) {
+        // 内部ログには設定名と検証コードだけを残す。値・message・ZodError本体は出さない。
+        logger.error('[env] validation failed', {
+          issues: result.error.issues.map((issue) => ({
+            path: issue.path.join('.'),
+            code: issue.code,
+          })),
+        });
         const formatted = result.error.issues
           .map((issue) => `  ${issue.path.join('.')}: ${issue.message}`)
           .join('\n');
