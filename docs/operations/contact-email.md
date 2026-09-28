@@ -27,7 +27,8 @@ Web Production POST /api/contact ───┘
 
 Product Integration contact.submit → 非本番Resend設定 → 専用テスト受信先
 
-Resend delivery failure → app別POST /api/webhooks/resend → PIIなしSentry event
+Productionの問い合わせdelivery failure → app別POST /api/webhooks/resend → PIIなしSentry event
+Integration専用宛先の非同期配送結果 → Resend側で確認
 ```
 
 問い合わせ原文はResendの配送処理とアクセス制限付きGmailにだけ置く。logger、Sentry、HTTP response、GitHub Issueへ原文・氏名・email・Turnstile token・authorization・webhook raw bodyを記録しない。
