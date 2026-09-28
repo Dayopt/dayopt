@@ -22,6 +22,7 @@ describe('generateSEOMetadata', () => {
     const defaultImage = `https://dayopt.com/api/og?${new URLSearchParams({
       title: siteConfig.title,
       description: siteConfig.description,
+      category: 'product',
     }).toString()}`;
 
     expect(generateSEOMetadata()).toEqual({
@@ -114,6 +115,22 @@ describe('generateSEOMetadata', () => {
     expect(new URL(imageUrl).searchParams.get('title')).toBe('Dayopt');
   });
 
+  it('新しい OGP の category/layout/screenshot を Open Graph と Twitter で共有する', () => {
+    const metadata = generateSEOMetadata({
+      title: 'Docs title',
+      category: 'docs',
+      layout: 'left',
+      screenshot: '/og-screenshots/docs.png',
+    });
+    const openGraphImage = (metadata.openGraph?.images as Array<{ url: string }>)[0]?.url;
+    const twitterImage = metadata.twitter?.images?.[0] as string;
+
+    expect(openGraphImage).toBe(twitterImage);
+    expect(new URL(openGraphImage).searchParams.get('category')).toBe('docs');
+    expect(new URL(openGraphImage).searchParams.get('layout')).toBe('left');
+    expect(new URL(openGraphImage).searchParams.get('screenshot')).toBe('/og-screenshots/docs.png');
+  });
+
   it('en は prefixless canonical にし、入力済み locale prefix と末尾 slash を除く', () => {
     expect(generateSEOMetadata({ locale: 'en', url: '/ja/about/' })).toMatchObject({
       alternates: { canonical: 'https://dayopt.com/about' },
@@ -121,34 +138,34 @@ describe('generateSEOMetadata', () => {
     });
   });
 
-  it('keywords と tags は重複を保持し、custom image は site URL を付ける', () => {
+  it('keywords と tags は重複を保持し、OGP は共通生成 route を使う', () => {
     expect(
       generateSEOMetadata({
         keywords: ['計画'],
         tags: ['計画'],
-        image: '/custom.png',
+        category: 'journal',
       }),
     ).toMatchObject({
       keywords: 'タイムボクシング, 時間管理, 計画, 実績, 振り返り, カレンダー, 計画, 計画',
-      openGraph: { images: [{ url: 'https://dayopt.com/custom.png' }] },
-      twitter: { images: ['https://dayopt.com/custom.png'] },
+      openGraph: { images: [{ url: expect.stringContaining('https://dayopt.com/api/og?') }] },
+      twitter: { images: [expect.stringContaining('https://dayopt.com/api/og?')] },
     });
   });
 
   it('article metadata に日時、authors、section、tags を引き渡す', () => {
-    expect(
-      generateArticleMetadata({
-        title: 'Article',
-        description: 'Description',
-        slug: 'article',
-        publishedAt: '2026-01-01',
-        updatedAt: '2026-01-02',
-        authors: ['Author'],
-        tags: ['tag'],
-        category: 'Guide',
-        type: 'blog',
-      }),
-    ).toMatchObject({
+    const metadata = generateArticleMetadata({
+      title: 'Article',
+      description: 'Description',
+      slug: 'article',
+      publishedAt: '2026-01-01',
+      updatedAt: '2026-01-02',
+      authors: ['Author'],
+      tags: ['tag'],
+      category: 'Guide',
+      type: 'blog',
+    });
+
+    expect(metadata).toMatchObject({
       alternates: { canonical: 'https://dayopt.com/ja/blog/article' },
       openGraph: {
         type: 'article',
@@ -159,6 +176,8 @@ describe('generateSEOMetadata', () => {
         tags: ['tag'],
       },
     });
+    const imageUrl = (metadata.openGraph?.images as Array<{ url: string }>)[0]?.url;
+    expect(new URL(imageUrl).searchParams.get('category')).toBe('journal');
   });
 });
 

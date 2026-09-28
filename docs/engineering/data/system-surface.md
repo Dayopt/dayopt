@@ -41,7 +41,7 @@ tRPC の `/api/trpc` を含む、Next.js の route handler 全件。method は e
 | web     | `/api/compass-docs`                          | GET                | —       | 30          | `apps/web/src/app/api/compass-docs/route.ts`                              |
 | web     | `/api/contact`                               | POST               | —       | 30          | `apps/web/src/app/api/contact/route.ts`                                   |
 | web     | `/api/csp-report`                            | POST, HEAD         | —       | 30          | `apps/web/src/app/api/csp-report/route.ts`                                |
-| web     | `/api/og`                                    | GET                | —       | 25          | `apps/web/src/app/api/og/route.tsx`                                       |
+| web     | `/api/og`                                    | GET                | nodejs  | 25          | `apps/web/src/app/api/og/route.tsx`                                       |
 | web     | `/api/search`                                | GET                | —       | 30          | `apps/web/src/app/api/search/route.ts`                                    |
 | web     | `/api/v1/system/[...retired]`                | GET, POST, OPTIONS | —       | 5           | `apps/web/src/app/api/v1/system/[...retired]/route.ts`                    |
 | web     | `/api/webhooks/resend`                       | POST               | nodejs  | 15          | `apps/web/src/app/api/webhooks/resend/route.ts`                           |
@@ -242,16 +242,17 @@ TS の `PRODUCT_EVENT_NAMES` と DB の CHECK 制約の両方で定義される�
 | `VERCEL_TEAM_ID`                         | yes  | public     | production          | vercel-production               | —                          |
 | `VERCEL_TOKEN`                           | yes  | secret     | production          | vercel-production               | —                          |
 
-### workspace package（6）
+### workspace package（7）
 
-| package                 | exports                                          | 依存している workspace                                |
-| ----------------------- | ------------------------------------------------ | ----------------------------------------------------- |
-| `@dayopt/billing`       | `.`                                              | `@dayopt/product`, `@dayopt/web`                      |
-| `@dayopt/components`    | `.`, `./brand`, `./testing/modal-menu`           | `@dayopt/product`, `@dayopt/storybook`, `@dayopt/web` |
-| `@dayopt/config`        | `.`                                              | `@dayopt/i18n`, `@dayopt/product`, `@dayopt/web`      |
-| `@dayopt/foundations`   | `./og-colors`, `./scrollbar.css`, `./tokens.css` | `@dayopt/product`, `@dayopt/storybook`, `@dayopt/web` |
-| `@dayopt/i18n`          | `./navigation`, `./request`, `./routing`         | `@dayopt/product`, `@dayopt/web`                      |
-| `@dayopt/observability` | `.`, `./build-gate`                              | `@dayopt/product`, `@dayopt/web`                      |
+| package                 | exports                                                                        | 依存している workspace                                 |
+| ----------------------- | ------------------------------------------------------------------------------ | ------------------------------------------------------ |
+| `@dayopt/assets`        | `.`, `./brand`, `./logo-artwork`, `./og`, `./og-card-image`, `./og-screenshot` | `@dayopt/components`, `@dayopt/product`, `@dayopt/web` |
+| `@dayopt/billing`       | `.`                                                                            | `@dayopt/product`, `@dayopt/web`                       |
+| `@dayopt/components`    | `.`, `./brand`, `./testing/modal-menu`                                         | `@dayopt/product`, `@dayopt/storybook`, `@dayopt/web`  |
+| `@dayopt/config`        | `.`                                                                            | `@dayopt/i18n`, `@dayopt/product`, `@dayopt/web`       |
+| `@dayopt/foundations`   | `./og-colors`, `./scrollbar.css`, `./tokens.css`                               | `@dayopt/product`, `@dayopt/storybook`, `@dayopt/web`  |
+| `@dayopt/i18n`          | `./navigation`, `./request`, `./routing`                                       | `@dayopt/product`, `@dayopt/web`                       |
+| `@dayopt/observability` | `.`, `./build-gate`                                                            | `@dayopt/product`, `@dayopt/web`                       |
 
 ## 関係
 

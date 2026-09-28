@@ -66,6 +66,7 @@
     "test:mcp:conformance": "NEXT_PUBLIC_SUPABASE_URL=https://dummy.supabase.co NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=dummy SUPABASE_SECRET_KEY=dummy MCP_CANONICAL_RESOURCE_URI=https://mcp.dayopt.app NODE_OPTIONS='--conditions=react-server' tsx scripts/mcp-conformance.ts"
   },
   "dependencies": {
+    "@dayopt/assets": "workspace:*",
     "@dayopt/billing": "workspace:*",
     "@dayopt/components": "workspace:*",
     "@dayopt/config": "workspace:*",
