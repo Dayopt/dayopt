@@ -100,9 +100,6 @@ async function checkDatabase(): Promise<'ok' | 'error' | 'warning'> {
         expectedIdentity,
         () => supabase.rpc('get_mcp_environment_identity_v1'),
         expectedSupabaseProjectRef,
-        expectedIdentity.environment === 'integration'
-          ? () => supabase.rpc('ensure_mcp_integration_environment_identity_v1')
-          : undefined,
       );
     }
 

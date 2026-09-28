@@ -21,10 +21,6 @@ interface DatabaseIdentityQueryResult {
 }
 
 type DatabaseIdentityQuery = () => PromiseLike<DatabaseIdentityQueryResult>;
-type DatabaseIdentityProvisionQuery = () => PromiseLike<DatabaseIdentityQueryResult>;
-
-let integrationIdentityProvisioned = false;
-let integrationIdentityProvisioning: Promise<void> | null = null;
 
 export class DatabaseOAuthIdentityError extends Error {
   constructor(cause?: unknown) {
@@ -49,23 +45,19 @@ export function matchesDatabaseOAuthIdentity(
 /**
  * Require the deployment identity and database identity to be the same exact
  * tuple. Errors deliberately omit either tuple so readiness logs cannot expose
- * configuration or credentials.
+ * configuration or credentials. This check never provisions an identity;
+ * provisioning belongs to the explicit environment setup after runtime/DB sync.
  */
 export async function assertDatabaseOAuthIdentity(
   expected: OAuthEnvironmentConfig,
   query: DatabaseIdentityQuery,
   expectedSupabaseProjectRef: string | null = null,
-  provisionIntegrationIdentity?: DatabaseIdentityProvisionQuery,
 ): Promise<void> {
-  if (expected.environment === 'integration') {
-    if (
-      expectedSupabaseProjectRef !== PRODUCT_INTEGRATION_SUPABASE_REF ||
-      !provisionIntegrationIdentity
-    ) {
-      throw new DatabaseOAuthIdentityError();
-    }
-
-    await ensureIntegrationIdentity(expected, provisionIntegrationIdentity);
+  if (
+    expected.environment === 'integration' &&
+    expectedSupabaseProjectRef !== PRODUCT_INTEGRATION_SUPABASE_REF
+  ) {
+    throw new DatabaseOAuthIdentityError();
   }
 
   let result: DatabaseIdentityQueryResult;
@@ -82,40 +74,6 @@ export async function assertDatabaseOAuthIdentity(
     !matchesDatabaseOAuthIdentity(result.data[0]!, expected, expectedSupabaseProjectRef)
   ) {
     throw new DatabaseOAuthIdentityError(result.error ?? undefined);
-  }
-}
-
-async function ensureIntegrationIdentity(
-  expected: OAuthEnvironmentConfig,
-  provision: DatabaseIdentityProvisionQuery,
-): Promise<void> {
-  if (integrationIdentityProvisioned) return;
-
-  if (!integrationIdentityProvisioning) {
-    integrationIdentityProvisioning = (async () => {
-      let result: DatabaseIdentityQueryResult;
-      try {
-        result = await provision();
-      } catch (error) {
-        throw new DatabaseOAuthIdentityError(error);
-      }
-
-      if (
-        result.error ||
-        result.data?.length !== 1 ||
-        !matchesDatabaseOAuthIdentity(result.data[0]!, expected, PRODUCT_INTEGRATION_SUPABASE_REF)
-      ) {
-        throw new DatabaseOAuthIdentityError(result.error ?? undefined);
-      }
-      integrationIdentityProvisioned = true;
-    })();
-  }
-
-  try {
-    await integrationIdentityProvisioning;
-  } catch (error) {
-    integrationIdentityProvisioning = null;
-    throw error;
   }
 }
 

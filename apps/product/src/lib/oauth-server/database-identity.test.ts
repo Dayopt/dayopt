@@ -184,35 +184,34 @@ describe('database OAuth identity', () => {
     ).toThrow(DatabaseOAuthIdentityError);
   });
 
-  it('provisions the exact Integration identity once before checking it', async () => {
-    const provision = vi.fn(async () => ({
-      data: [databaseIntegrationIdentity],
-      error: null,
-    }));
-    const query = vi.fn(async () => ({
-      data: [databaseIntegrationIdentity],
-      error: null,
-    }));
+  it('requires an explicitly provisioned Integration identity and rechecks every request', async () => {
+    const query = vi
+      .fn()
+      .mockResolvedValueOnce({ data: [], error: null })
+      .mockResolvedValueOnce({ data: [databaseIntegrationIdentity], error: null })
+      .mockResolvedValueOnce({
+        data: [{ ...databaseIntegrationIdentity, resource_uri: 'https://other.example' }],
+        error: null,
+      });
 
     await expect(
-      assertDatabaseOAuthIdentity(
-        integrationIdentity,
-        query,
-        PRODUCT_INTEGRATION_SUPABASE_REF,
-        provision,
-      ),
+      assertDatabaseOAuthIdentity(integrationIdentity, query, PRODUCT_INTEGRATION_SUPABASE_REF),
+    ).rejects.toBeInstanceOf(DatabaseOAuthIdentityError);
+    await expect(
+      assertDatabaseOAuthIdentity(integrationIdentity, query, PRODUCT_INTEGRATION_SUPABASE_REF),
     ).resolves.toBeUndefined();
     await expect(
-      assertDatabaseOAuthIdentity(
-        integrationIdentity,
-        query,
-        PRODUCT_INTEGRATION_SUPABASE_REF,
-        provision,
-      ),
-    ).resolves.toBeUndefined();
+      assertDatabaseOAuthIdentity(integrationIdentity, query, PRODUCT_INTEGRATION_SUPABASE_REF),
+    ).rejects.toBeInstanceOf(DatabaseOAuthIdentityError);
+    expect(query).toHaveBeenCalledTimes(3);
+  });
 
-    expect(provision).toHaveBeenCalledTimes(1);
-    expect(query).toHaveBeenCalledTimes(2);
+  it('refuses an Integration check against another project before querying', async () => {
+    const query = vi.fn();
+    await expect(
+      assertDatabaseOAuthIdentity(integrationIdentity, query, previewProjectRef),
+    ).rejects.toBeInstanceOf(DatabaseOAuthIdentityError);
+    expect(query).not.toHaveBeenCalled();
   });
 
   it.each([

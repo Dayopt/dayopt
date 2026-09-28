@@ -14,10 +14,7 @@ type McpAccessDatabase = {
       'mcp_mutation_control' | 'oauth_connections' | 'oauth_tokens' | 'profiles'
     >;
     Views: Record<string, never>;
-    Functions: Pick<
-      Database['public']['Functions'],
-      'ensure_mcp_integration_environment_identity_v1' | 'get_mcp_environment_identity_v1'
-    >;
+    Functions: Pick<Database['public']['Functions'], 'get_mcp_environment_identity_v1'>;
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;
   };
