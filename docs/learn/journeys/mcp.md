@@ -345,13 +345,15 @@ McpMutationClient が、apply RPC 8 本だけに絞った service role client �
 
 認可が通ると、apply RPC は画面からの保存と同じ create_plan_command_v1 を source 'api' で呼ぶ。時刻の規則（DT003: end_at > start_at）と重なりの排他制約（23P01）はここで同じように効く。成功すると同じトランザクションで受領証（mcp_mutation_receipts）を書く。deadlock（40P01）は adapter が 1 回だけ送り直す。
 
-- **なぜ必要か**: 入口が違っても規則の正本は DB に 1 つだけ、というのがこの経路の要点。画面の保存と違うのは source（画面は manual、MCP は api）と、利用記録 plan_created を送らない点（Service 層を通らないため。意図かは未確認）。
+- **なぜ必要か**: 入口が違っても規則の正本は DB に 1 つだけ、というのがこの経路の要点。保存時の source は画面が manual、MCP が api。利用記録 plan_created は、受領証を検証した後に McpMutationClient から source: mcp で送信を予約する。実送信には POSTHOG_SERVER_ENABLED と送信時点の analytics_consent が必要で、失敗しても Plan の保存は失敗にしない。同じ Plan の再送には同じイベント UUID を使う。
 - **入力 → 出力**: user_id（段 8 で決定）・title・start_at・end_at・activity_id → plans の行 + 受領証（resourceId・version・replayed: false）
 - **ここを変えると**: create_plan_command_v1 の規則を変えると、画面と MCP の両方が同時に変わる。MCP のエラーコード対応表（EXPECTED_ERROR_CODES）は画面側の表とは別にあるので、新しい SQLSTATE を足したら両方に足さないと MCP だけ MUTATION_FAILED になる。
 - **コード**:
   - [`supabase/migrations/20260914000000_version_mcp_create_digest.sql`](../../../supabase/migrations/20260914000000_version_mcp_create_digest.sql) で `FROM public.create_plan_command_v1(` を探す
   - [`supabase/migrations/20260904080216_simplify_timeblock_temporal_rules.sql`](../../../supabase/migrations/20260904080216_simplify_timeblock_temporal_rules.sql) で `DT003` を探す
   - [`apps/product/src/features/timeblock/server/mcp-mutation-client.ts`](../../../apps/product/src/features/timeblock/server/mcp-mutation-client.ts) で `const EXPECTED_ERROR_CODES: Readonly<Record<string, McpMutationErrorCode>> = {` を探す
+  - [`apps/product/src/features/timeblock/server/mcp-mutation-client.ts`](../../../apps/product/src/features/timeblock/server/mcp-mutation-client.ts) で `await this.trackMutationEvent('plan_created', receipt.resourceId);` を探す
+  - [`apps/product/src/lib/analytics/posthog-server.ts`](../../../apps/product/src/lib/analytics/posthog-server.ts) で `export async function trackPostHogServerEvent(input: PostHogServerEvent): Promise<void> {` を探す
 
 <details>
 <summary>⚡ 時刻の規則に反する（DT003） — 画面: エラー表示 / データ: 変化なし / 再試行: しない / 痕跡: 残らない</summary>
@@ -1200,7 +1202,7 @@ Realtime の購読は無いので、MCP で作った Plan はすぐには画面�
       "short": "画面と同じ関数で書く",
       "title": "画面と同じ create_plan_command_v1 で書き込む",
       "what": "認可が通ると、apply RPC は画面からの保存と同じ create_plan_command_v1 を source 'api' で呼ぶ。時刻の規則（DT003: end_at > start_at）と重なりの排他制約（23P01）はここで同じように効く。成功すると同じトランザクションで受領証（mcp_mutation_receipts）を書く。deadlock（40P01）は adapter が 1 回だけ送り直す。",
-      "why": "入口が違っても規則の正本は DB に 1 つだけ、というのがこの経路の要点。画面の保存と違うのは source（画面は manual、MCP は api）と、利用記録 plan_created を送らない点（Service 層を通らないため。意図かは未確認）。",
+      "why": "入口が違っても規則の正本は DB に 1 つだけ、というのがこの経路の要点。保存時の source は画面が manual、MCP が api。利用記録 plan_created は、受領証を検証した後に McpMutationClient から source: mcp で送信を予約する。実送信には POSTHOG_SERVER_ENABLED と送信時点の analytics_consent が必要で、失敗しても Plan の保存は失敗にしない。同じ Plan の再送には同じイベント UUID を使う。",
       "io": {
         "in": "user_id（段 8 で決定）・title・start_at・end_at・activity_id",
         "out": "plans の行 + 受領証（resourceId・version・replayed: false）"
@@ -1218,6 +1220,14 @@ Realtime の購読は無いので、MCP で作った Plan はすぐには画面�
         {
           "path": "apps/product/src/features/timeblock/server/mcp-mutation-client.ts",
           "find": "const EXPECTED_ERROR_CODES: Readonly<Record<string, McpMutationErrorCode>> = {"
+        },
+        {
+          "path": "apps/product/src/features/timeblock/server/mcp-mutation-client.ts",
+          "find": "await this.trackMutationEvent('plan_created', receipt.resourceId);"
+        },
+        {
+          "path": "apps/product/src/lib/analytics/posthog-server.ts",
+          "find": "export async function trackPostHogServerEvent(input: PostHogServerEvent): Promise<void> {"
         }
       ],
       "fails": [

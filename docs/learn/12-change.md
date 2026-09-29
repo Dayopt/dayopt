@@ -611,6 +611,10 @@ last_verified: 2026-09-21
 - [Record を作る・Plan を記録する](journeys/record-plan.md) の 4. Router → Service — 入力に項目を足す時も userId は ctx から渡す（REVIEW-1）。
 - [削除と取り消し](journeys/delete-undo.md) の 4. Router → Service — 入力に項目を足す時も userId は ctx から渡す（REVIEW-1）。
 
+#### `apps/product/src/lib/analytics/posthog-server.ts`
+
+- [AI クライアントから Plan を作る（MCP）](journeys/mcp.md) の 9. 画面と同じ関数で書く — create_plan_command_v1 の規則を変えると、画面と MCP の両方が同時に変わる。MCP のエラーコード対応表（EXPECTED_ERROR_CODES）は画面側の表とは別にあるので、新しい SQLSTATE を足したら両方に足さないと MCP だけ MUTATION_FAILED になる。
+
 #### `apps/product/src/lib/auth-error.ts`
 
 - [ログイン（MFA 含む）](journeys/login.md) の 2. パスワードを確かめる — 想定内の認証エラー（401 / 422 / 429 など）は Sentry に送らない。送る対象を変える時は isExpectedAuthError を見る。
