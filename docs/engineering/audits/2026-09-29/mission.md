@@ -158,3 +158,5 @@ F027を`b82badf0eef2fd02459697b36e2be19c834e2af7`で修正。API上限を実SDK+
 F027を含む固定製品SHA `b82badf0eef2fd02459697b36e2be19c834e2af7`で全体`pnpm check` exit 0、billing37/i18n2/observability64/product4358/web366/scripts2642、合計7469 passed。ログ `/tmp/dayopt-audit-check-export-pages.log`。検査中は製品固定、文書だけ更新。別途docs:checkはlearnの旧1行query参照2件を検出し、journey825行を全文確認してJSON正本をページ走査の実装へ同期、learn:generateで本文/逆引きを再生成した。全文読解は基準295件、機械確認1、未確認2845。新規mainファイルは別枠。
 
 F028は2026-09-08の決定原文と現行仕様・query境界を照合し、settingsの古いPro限定説明だけを訂正。H029としてUIのrefetch失敗・query結果直接変更・timezoneの再現を次の着手点に保存。ConfirmDialog/clipboardの未処理Promise候補、公開JSON復元説明も追加調査する。今回の安全な修正をIssue化で終了扱いせず、次の継続で再現・修正へ進む。全体監査・実クラウド・E2Eは未完了。
+
+今回の修正は公開head `43f70d617d6608ea2b3ffbfe77708f071d106277`としてDraft #2965へpush、APIでhead/isDraft=true/state=OPENを確認。通常pre-push成功（affected型/lint/scripts2642/format）、`/tmp/dayopt-audit-push-export-verified.log`。docs:checkも正本/生成資料同期後exit 0（`/tmp/dayopt-audit-export-docs-check.log`）。公開後のtimezoneガイドとpreferences hook/test読解を追加し、ローカル台帳は298件。H029へはuser_settings queryを唯一のTZ参照元とする既存契約を適用する。次の実装修正前にこの3件の読解を繰り返す必要はない。

@@ -18519,10 +18519,12 @@
       "mode": "100644",
       "bytes": 1441,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 50]],
+      "evidence": [
+        "Full text reviewed at 43f70d617; baseline bytes unchanged. Timezone guide read in 1-155/156-EOF; preferences are sourced from settings query with browser fallback. Supports H029 export boundary investigation; guide examples still need semantic cross-check, not assumed correct."
+      ],
       "questions": []
     },
     {
@@ -18532,10 +18534,12 @@
       "mode": "100644",
       "bytes": 2655,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 84]],
+      "evidence": [
+        "Full text reviewed at 43f70d617; baseline bytes unchanged. Timezone guide read in 1-155/156-EOF; preferences are sourced from settings query with browser fallback. Supports H029 export boundary investigation; guide examples still need semantic cross-check, not assumed correct."
+      ],
       "questions": []
     },
     {
@@ -28557,10 +28561,12 @@
       "mode": "100644",
       "bytes": 12786,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 278]],
+      "evidence": [
+        "Full text reviewed at 43f70d617; baseline bytes unchanged. Timezone guide read in 1-155/156-EOF; preferences are sourced from settings query with browser fallback. Supports H029 export boundary investigation; guide examples still need semantic cross-check, not assumed correct."
+      ],
       "questions": []
     },
     {
