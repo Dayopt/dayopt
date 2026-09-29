@@ -2,6 +2,7 @@ import { createHash, createHmac } from 'node:crypto';
 
 import { assertFixtureBrokerTarget, verifyFixtureJobToken } from './preview-fixture-authority.mjs';
 import { assertCloudFixtureKey } from './preview-fixture-key.mjs';
+import { createSupabaseFixtureLifecycle } from './preview-fixture-lifecycle.mjs';
 
 const TABLES = ['records', 'plans', 'activities', 'categories', 'user_settings', 'profiles'];
 const SLOT_PREFIX = { desktop: 'critical-path', mobile: 'mobile-critical-path' };
@@ -290,4 +291,72 @@ export async function executeFixtureBroker({
   } catch {
     throw new Error('Preview fixture operation failed');
   }
+}
+
+/** Trusted server composition only; no HTTP route or request-supplied client. */
+export async function executeDurableFixtureBroker({
+  input,
+  token,
+  createClient,
+  env = process.env,
+  fetchImpl = fetch,
+  now = () => Math.floor(Date.now() / 1000),
+  elapsed = () => performance.now(),
+}) {
+  return executeFixtureBroker({
+    input,
+    token,
+    createClient,
+    env,
+    fetchImpl,
+    now,
+    elapsed,
+    withLifecycle: async (binding, execute) => {
+      // This callback is reached only after the executor's target/OIDC checks.
+      const target = assertFixtureBrokerTarget(input, env);
+      const bound = {
+        operation: target.operation,
+        origin: target.origin,
+        intent: target.intent,
+        execution: target.execution,
+      };
+      if (
+        binding.key !== `${bound.intent.request.supabaseProjectRef}:${bound.intent.runId}` ||
+        binding.intentDigest !== digest(bound.intent) ||
+        binding.operation !== bound.operation
+      )
+        throw new Error();
+      await verifyFixtureJobToken({ input: bound, token, fetchImpl, now });
+      const key = env.SUPABASE_SECRET_KEY;
+      await assertCloudFixtureKey({ request: bound.intent.request, serviceKey: key, fetchImpl });
+      const origin = `https://${bound.intent.request.supabaseProjectRef}.supabase.co`;
+      const client = createClient(origin, key, {
+        auth: { autoRefreshToken: false, persistSession: false },
+        global: {
+          fetch: async (url, init = {}) => {
+            const destination = new URL(
+              typeof url === 'string' ? url : url instanceof URL ? url.href : url.url,
+            );
+            if (
+              destination.href !== `${origin}/rest/v1/rpc/preview_fixture_lifecycle_v1` ||
+              String(init.method ?? 'GET').toUpperCase() !== 'POST'
+            )
+              throw new Error();
+            assertFixtureBrokerTarget(bound, env);
+            await verifyFixtureJobToken({ input: bound, token, fetchImpl, now });
+            init.signal?.throwIfAborted();
+            return fetchImpl(url, {
+              ...init,
+              redirect: 'error',
+              signal: AbortSignal.any([
+                AbortSignal.timeout(15_000),
+                ...(init.signal ? [init.signal] : []),
+              ]),
+            });
+          },
+        },
+      });
+      return createSupabaseFixtureLifecycle({ client })(binding, execute);
+    },
+  });
 }
