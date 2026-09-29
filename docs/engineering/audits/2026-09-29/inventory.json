@@ -190,10 +190,12 @@
       "mode": "100644",
       "bytes": 21940,
       "method": "full-text",
-      "status": "unverified",
-      "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "status": "full-text-reviewed",
+      "reason": "First-party source and contracts read in full; query limits and ownership/archive filters traced",
+      "read_ranges": [[1, 212]],
+      "evidence": [
+        "2026-09-29: full-text tool output, chunked where needed; activities spec lines 88-107 and mcp-usage 1-90/91-185/186-end recovered without truncation."
+      ],
       "questions": []
     },
     {
@@ -203,10 +205,12 @@
       "mode": "100644",
       "bytes": 6909,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 215]],
+      "evidence": [
+        "Complete primary-agent read; activity/category input, archive, lookup, cache and report paths cross-checked. F012/F013 and remaining hypotheses in findings.md. Cloud read helper inspected before attempted metadata-only query; authorization timed out before result."
+      ],
       "questions": []
     },
     {
@@ -4451,10 +4455,12 @@
       "mode": "100644",
       "bytes": 3931,
       "method": "full-text",
-      "status": "unverified",
-      "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "status": "full-text-reviewed",
+      "reason": "First-party source and contracts read in full; query limits and ownership/archive filters traced",
+      "read_ranges": [[1, 88]],
+      "evidence": [
+        "2026-09-29: full-text tool output, chunked where needed; activities spec lines 88-107 and mcp-usage 1-90/91-185/186-end recovered without truncation."
+      ],
       "questions": []
     },
     {
@@ -4464,10 +4470,12 @@
       "mode": "100644",
       "bytes": 3503,
       "method": "full-text",
-      "status": "unverified",
-      "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "status": "full-text-reviewed",
+      "reason": "First-party source and contracts read in full; query limits and ownership/archive filters traced",
+      "read_ranges": [[1, 87]],
+      "evidence": [
+        "2026-09-29: full-text tool output, chunked where needed; activities spec lines 88-107 and mcp-usage 1-90/91-185/186-end recovered without truncation."
+      ],
       "questions": []
     },
     {
@@ -6219,10 +6227,12 @@
       "mode": "100644",
       "bytes": 2322,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 70]],
+      "evidence": [
+        "Complete primary-agent read; activity/category input, archive, lookup, cache and report paths cross-checked. F012/F013 and remaining hypotheses in findings.md. Cloud read helper inspected before attempted metadata-only query; authorization timed out before result."
+      ],
       "questions": []
     },
     {
@@ -6232,10 +6242,12 @@
       "mode": "100644",
       "bytes": 2471,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 76]],
+      "evidence": [
+        "Complete primary-agent read; activity/category input, archive, lookup, cache and report paths cross-checked. F012/F013 and remaining hypotheses in findings.md. Cloud read helper inspected before attempted metadata-only query; authorization timed out before result."
+      ],
       "questions": []
     },
     {
@@ -6245,10 +6257,12 @@
       "mode": "100644",
       "bytes": 3720,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 119]],
+      "evidence": [
+        "Complete primary-agent read; activity/category input, archive, lookup, cache and report paths cross-checked. F012/F013 and remaining hypotheses in findings.md. Cloud read helper inspected before attempted metadata-only query; authorization timed out before result."
+      ],
       "questions": []
     },
     {
@@ -6258,10 +6272,12 @@
       "mode": "100644",
       "bytes": 2236,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 62]],
+      "evidence": [
+        "Complete primary-agent read; activity/category input, archive, lookup, cache and report paths cross-checked. F012/F013 and remaining hypotheses in findings.md. Cloud read helper inspected before attempted metadata-only query; authorization timed out before result."
+      ],
       "questions": []
     },
     {
@@ -6271,10 +6287,12 @@
       "mode": "100644",
       "bytes": 5103,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 141]],
+      "evidence": [
+        "Complete primary-agent read; activity/category input, archive, lookup, cache and report paths cross-checked. F012/F013 and remaining hypotheses in findings.md. Cloud read helper inspected before attempted metadata-only query; authorization timed out before result."
+      ],
       "questions": []
     },
     {
@@ -6284,10 +6302,12 @@
       "mode": "100644",
       "bytes": 7156,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 218]],
+      "evidence": [
+        "Complete primary-agent read; activity/category input, archive, lookup, cache and report paths cross-checked. F012/F013 and remaining hypotheses in findings.md. Cloud read helper inspected before attempted metadata-only query; authorization timed out before result."
+      ],
       "questions": []
     },
     {
@@ -6297,10 +6317,12 @@
       "mode": "100644",
       "bytes": 2370,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 68]],
+      "evidence": [
+        "Complete primary-agent read; activity/category input, archive, lookup, cache and report paths cross-checked. F012/F013 and remaining hypotheses in findings.md. Cloud read helper inspected before attempted metadata-only query; authorization timed out before result."
+      ],
       "questions": []
     },
     {
@@ -6310,10 +6332,12 @@
       "mode": "100644",
       "bytes": 25320,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 630]],
+      "evidence": [
+        "Complete primary-agent read; activity/category input, archive, lookup, cache and report paths cross-checked. F012/F013 and remaining hypotheses in findings.md. Cloud read helper inspected before attempted metadata-only query; authorization timed out before result."
+      ],
       "questions": []
     },
     {
@@ -6323,10 +6347,12 @@
       "mode": "100644",
       "bytes": 5264,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 159]],
+      "evidence": [
+        "Complete primary-agent read; activity/category input, archive, lookup, cache and report paths cross-checked. F012/F013 and remaining hypotheses in findings.md. Cloud read helper inspected before attempted metadata-only query; authorization timed out before result."
+      ],
       "questions": []
     },
     {
@@ -6336,10 +6362,12 @@
       "mode": "100644",
       "bytes": 3869,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 116]],
+      "evidence": [
+        "Complete primary-agent read; activity/category input, archive, lookup, cache and report paths cross-checked. F012/F013 and remaining hypotheses in findings.md. Cloud read helper inspected before attempted metadata-only query; authorization timed out before result."
+      ],
       "questions": []
     },
     {
@@ -6349,10 +6377,12 @@
       "mode": "100644",
       "bytes": 6663,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 191]],
+      "evidence": [
+        "Complete primary-agent read; activity/category input, archive, lookup, cache and report paths cross-checked. F012/F013 and remaining hypotheses in findings.md. Cloud read helper inspected before attempted metadata-only query; authorization timed out before result."
+      ],
       "questions": []
     },
     {
@@ -6362,10 +6392,12 @@
       "mode": "100644",
       "bytes": 4814,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 149]],
+      "evidence": [
+        "Complete primary-agent read; activity/category input, archive, lookup, cache and report paths cross-checked. F012/F013 and remaining hypotheses in findings.md. Cloud read helper inspected before attempted metadata-only query; authorization timed out before result."
+      ],
       "questions": []
     },
     {
@@ -6375,10 +6407,12 @@
       "mode": "100644",
       "bytes": 848,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 27]],
+      "evidence": [
+        "Complete primary-agent read; activity/category input, archive, lookup, cache and report paths cross-checked. F012/F013 and remaining hypotheses in findings.md. Cloud read helper inspected before attempted metadata-only query; authorization timed out before result."
+      ],
       "questions": []
     },
     {
@@ -6388,10 +6422,12 @@
       "mode": "100644",
       "bytes": 713,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 22]],
+      "evidence": [
+        "Complete primary-agent read; activity/category input, archive, lookup, cache and report paths cross-checked. F012/F013 and remaining hypotheses in findings.md. Cloud read helper inspected before attempted metadata-only query; authorization timed out before result."
+      ],
       "questions": []
     },
     {
@@ -6401,10 +6437,12 @@
       "mode": "100644",
       "bytes": 707,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 22]],
+      "evidence": [
+        "Complete primary-agent read; activity/category input, archive, lookup, cache and report paths cross-checked. F012/F013 and remaining hypotheses in findings.md. Cloud read helper inspected before attempted metadata-only query; authorization timed out before result."
+      ],
       "questions": []
     },
     {
@@ -6414,10 +6452,12 @@
       "mode": "100644",
       "bytes": 7229,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 197]],
+      "evidence": [
+        "Complete primary-agent read; activity/category input, archive, lookup, cache and report paths cross-checked. F012/F013 and remaining hypotheses in findings.md. Cloud read helper inspected before attempted metadata-only query; authorization timed out before result."
+      ],
       "questions": []
     },
     {
@@ -6427,10 +6467,12 @@
       "mode": "100644",
       "bytes": 6492,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 170]],
+      "evidence": [
+        "Complete primary-agent read; activity/category input, archive, lookup, cache and report paths cross-checked. F012/F013 and remaining hypotheses in findings.md. Cloud read helper inspected before attempted metadata-only query; authorization timed out before result."
+      ],
       "questions": []
     },
     {
@@ -6440,10 +6482,12 @@
       "mode": "100644",
       "bytes": 6411,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 169]],
+      "evidence": [
+        "Complete primary-agent read; activity/category input, archive, lookup, cache and report paths cross-checked. F012/F013 and remaining hypotheses in findings.md. Cloud read helper inspected before attempted metadata-only query; authorization timed out before result."
+      ],
       "questions": []
     },
     {
@@ -6453,10 +6497,12 @@
       "mode": "100644",
       "bytes": 3432,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 86]],
+      "evidence": [
+        "Complete primary-agent read; activity/category input, archive, lookup, cache and report paths cross-checked. F012/F013 and remaining hypotheses in findings.md. Cloud read helper inspected before attempted metadata-only query; authorization timed out before result."
+      ],
       "questions": []
     },
     {
@@ -6466,10 +6512,12 @@
       "mode": "100644",
       "bytes": 3154,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 82]],
+      "evidence": [
+        "Complete primary-agent read; activity/category input, archive, lookup, cache and report paths cross-checked. F012/F013 and remaining hypotheses in findings.md. Cloud read helper inspected before attempted metadata-only query; authorization timed out before result."
+      ],
       "questions": []
     },
     {
@@ -6479,10 +6527,12 @@
       "mode": "100644",
       "bytes": 4477,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 155]],
+      "evidence": [
+        "Complete primary-agent read; activity/category input, archive, lookup, cache and report paths cross-checked. F012/F013 and remaining hypotheses in findings.md. Cloud read helper inspected before attempted metadata-only query; authorization timed out before result."
+      ],
       "questions": []
     },
     {
@@ -6492,10 +6542,12 @@
       "mode": "100644",
       "bytes": 7204,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 221]],
+      "evidence": [
+        "Complete primary-agent read; activity/category input, archive, lookup, cache and report paths cross-checked. F012/F013 and remaining hypotheses in findings.md. Cloud read helper inspected before attempted metadata-only query; authorization timed out before result."
+      ],
       "questions": []
     },
     {
@@ -6505,10 +6557,12 @@
       "mode": "100644",
       "bytes": 6800,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 213]],
+      "evidence": [
+        "Complete primary-agent read; activity/category input, archive, lookup, cache and report paths cross-checked. F012/F013 and remaining hypotheses in findings.md. Cloud read helper inspected before attempted metadata-only query; authorization timed out before result."
+      ],
       "questions": []
     },
     {
@@ -6518,10 +6572,12 @@
       "mode": "100644",
       "bytes": 2453,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 68]],
+      "evidence": [
+        "Complete primary-agent read; activity/category input, archive, lookup, cache and report paths cross-checked. F012/F013 and remaining hypotheses in findings.md. Cloud read helper inspected before attempted metadata-only query; authorization timed out before result."
+      ],
       "questions": []
     },
     {
@@ -6531,10 +6587,12 @@
       "mode": "100644",
       "bytes": 6298,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 154]],
+      "evidence": [
+        "Complete primary-agent read; activity/category input, archive, lookup, cache and report paths cross-checked. F012/F013 and remaining hypotheses in findings.md. Cloud read helper inspected before attempted metadata-only query; authorization timed out before result."
+      ],
       "questions": []
     },
     {
@@ -6544,10 +6602,12 @@
       "mode": "100644",
       "bytes": 1627,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 84]],
+      "evidence": [
+        "Complete primary-agent read; activity/category input, archive, lookup, cache and report paths cross-checked. F012/F013 and remaining hypotheses in findings.md. Cloud read helper inspected before attempted metadata-only query; authorization timed out before result."
+      ],
       "questions": []
     },
     {
@@ -6557,10 +6617,12 @@
       "mode": "100644",
       "bytes": 4564,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 153]],
+      "evidence": [
+        "Complete primary-agent read; activity/category input, archive, lookup, cache and report paths cross-checked. F012/F013 and remaining hypotheses in findings.md. Cloud read helper inspected before attempted metadata-only query; authorization timed out before result."
+      ],
       "questions": []
     },
     {
@@ -6570,10 +6632,12 @@
       "mode": "100644",
       "bytes": 2120,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 74]],
+      "evidence": [
+        "Complete primary-agent read; activity/category input, archive, lookup, cache and report paths cross-checked. F012/F013 and remaining hypotheses in findings.md. Cloud read helper inspected before attempted metadata-only query; authorization timed out before result."
+      ],
       "questions": []
     },
     {
@@ -6583,10 +6647,12 @@
       "mode": "100644",
       "bytes": 7557,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 261]],
+      "evidence": [
+        "Complete primary-agent read; activity/category input, archive, lookup, cache and report paths cross-checked. F012/F013 and remaining hypotheses in findings.md. Cloud read helper inspected before attempted metadata-only query; authorization timed out before result."
+      ],
       "questions": []
     },
     {
@@ -6596,10 +6662,12 @@
       "mode": "100644",
       "bytes": 3417,
       "method": "full-text",
-      "status": "unverified",
-      "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "status": "full-text-reviewed",
+      "reason": "First-party source and contracts read in full; query limits and ownership/archive filters traced",
+      "read_ranges": [[1, 95]],
+      "evidence": [
+        "2026-09-29: full-text tool output, chunked where needed; activities spec lines 88-107 and mcp-usage 1-90/91-185/186-end recovered without truncation."
+      ],
       "questions": []
     },
     {
@@ -6609,10 +6677,12 @@
       "mode": "100644",
       "bytes": 6416,
       "method": "full-text",
-      "status": "unverified",
-      "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "status": "full-text-reviewed",
+      "reason": "First-party source and contracts read in full; query limits and ownership/archive filters traced",
+      "read_ranges": [[1, 198]],
+      "evidence": [
+        "2026-09-29: full-text tool output, chunked where needed; activities spec lines 88-107 and mcp-usage 1-90/91-185/186-end recovered without truncation."
+      ],
       "questions": []
     },
     {
@@ -6622,10 +6692,12 @@
       "mode": "100644",
       "bytes": 4304,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 120]],
+      "evidence": [
+        "Complete primary-agent read; activity/category input, archive, lookup, cache and report paths cross-checked. F012/F013 and remaining hypotheses in findings.md. Cloud read helper inspected before attempted metadata-only query; authorization timed out before result."
+      ],
       "questions": []
     },
     {
@@ -6635,10 +6707,12 @@
       "mode": "100644",
       "bytes": 1062,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 34]],
+      "evidence": [
+        "Complete primary-agent read; activity/category input, archive, lookup, cache and report paths cross-checked. F012/F013 and remaining hypotheses in findings.md. Cloud read helper inspected before attempted metadata-only query; authorization timed out before result."
+      ],
       "questions": []
     },
     {
@@ -6648,10 +6722,12 @@
       "mode": "100644",
       "bytes": 1979,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 62]],
+      "evidence": [
+        "Complete primary-agent read; activity/category input, archive, lookup, cache and report paths cross-checked. F012/F013 and remaining hypotheses in findings.md. Cloud read helper inspected before attempted metadata-only query; authorization timed out before result."
+      ],
       "questions": []
     },
     {
@@ -6661,10 +6737,12 @@
       "mode": "100644",
       "bytes": 8481,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 253]],
+      "evidence": [
+        "Complete primary-agent read; activity/category input, archive, lookup, cache and report paths cross-checked. F012/F013 and remaining hypotheses in findings.md. Cloud read helper inspected before attempted metadata-only query; authorization timed out before result."
+      ],
       "questions": []
     },
     {
@@ -6674,10 +6752,12 @@
       "mode": "100644",
       "bytes": 1455,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 43]],
+      "evidence": [
+        "Complete primary-agent read; activity/category input, archive, lookup, cache and report paths cross-checked. F012/F013 and remaining hypotheses in findings.md. Cloud read helper inspected before attempted metadata-only query; authorization timed out before result."
+      ],
       "questions": []
     },
     {
@@ -12779,10 +12859,12 @@
       "mode": "100644",
       "bytes": 14986,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 371]],
+      "evidence": [
+        "Complete primary-agent read; activity/category input, archive, lookup, cache and report paths cross-checked. F012/F013 and remaining hypotheses in findings.md. Cloud read helper inspected before attempted metadata-only query; authorization timed out before result."
+      ],
       "questions": []
     },
     {
@@ -13085,10 +13167,12 @@
       "mode": "100644",
       "bytes": 15254,
       "method": "full-text",
-      "status": "unverified",
-      "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "status": "full-text-reviewed",
+      "reason": "First-party source and contracts read in full; query limits and ownership/archive filters traced",
+      "read_ranges": [[1, 464]],
+      "evidence": [
+        "2026-09-29: full-text tool output, chunked where needed; activities spec lines 88-107 and mcp-usage 1-90/91-185/186-end recovered without truncation."
+      ],
       "questions": []
     },
     {
@@ -15716,10 +15800,12 @@
       "mode": "100644",
       "bytes": 5373,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 142]],
+      "evidence": [
+        "Complete primary-agent read; activity/category input, archive, lookup, cache and report paths cross-checked. F012/F013 and remaining hypotheses in findings.md. Cloud read helper inspected before attempted metadata-only query; authorization timed out before result."
+      ],
       "questions": []
     },
     {
@@ -17507,10 +17593,12 @@
       "mode": "100644",
       "bytes": 1122,
       "method": "full-text",
-      "status": "unverified",
-      "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "status": "full-text-reviewed",
+      "reason": "First-party source and contracts read in full; query limits and ownership/archive filters traced",
+      "read_ranges": [[1, 33]],
+      "evidence": [
+        "2026-09-29: full-text tool output, chunked where needed; activities spec lines 88-107 and mcp-usage 1-90/91-185/186-end recovered without truncation."
+      ],
       "questions": []
     },
     {
@@ -17520,10 +17608,12 @@
       "mode": "100644",
       "bytes": 714,
       "method": "full-text",
-      "status": "unverified",
-      "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "status": "full-text-reviewed",
+      "reason": "First-party source and contracts read in full; query limits and ownership/archive filters traced",
+      "read_ranges": [[1, 19]],
+      "evidence": [
+        "2026-09-29: full-text tool output, chunked where needed; activities spec lines 88-107 and mcp-usage 1-90/91-185/186-end recovered without truncation."
+      ],
       "questions": []
     },
     {
@@ -20904,10 +20994,12 @@
       "mode": "100644",
       "bytes": 1542,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 41]],
+      "evidence": [
+        "Complete primary-agent read; activity/category input, archive, lookup, cache and report paths cross-checked. F012/F013 and remaining hypotheses in findings.md. Cloud read helper inspected before attempted metadata-only query; authorization timed out before result."
+      ],
       "questions": []
     },
     {
@@ -21222,10 +21314,12 @@
       "mode": "100644",
       "bytes": 1207,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 42]],
+      "evidence": [
+        "Complete primary-agent read; activity/category input, archive, lookup, cache and report paths cross-checked. F012/F013 and remaining hypotheses in findings.md. Cloud read helper inspected before attempted metadata-only query; authorization timed out before result."
+      ],
       "questions": []
     },
     {
@@ -21417,10 +21511,12 @@
       "mode": "100644",
       "bytes": 4786,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 115]],
+      "evidence": [
+        "Complete primary-agent read; activity/category input, archive, lookup, cache and report paths cross-checked. F012/F013 and remaining hypotheses in findings.md. Cloud read helper inspected before attempted metadata-only query; authorization timed out before result."
+      ],
       "questions": []
     },
     {
@@ -29038,10 +29134,12 @@
       "mode": "100644",
       "bytes": 10025,
       "method": "full-text",
-      "status": "unverified",
-      "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "status": "full-text-reviewed",
+      "reason": "First-party source and contracts read in full; query limits and ownership/archive filters traced",
+      "read_ranges": [[1, 114]],
+      "evidence": [
+        "2026-09-29: full-text tool output, chunked where needed; activities spec lines 88-107 and mcp-usage 1-90/91-185/186-end recovered without truncation."
+      ],
       "questions": []
     },
     {
@@ -32105,10 +32203,12 @@
       "mode": "100644",
       "bytes": 4880,
       "method": "full-text",
-      "status": "unverified",
-      "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "status": "full-text-reviewed",
+      "reason": "First-party source and contracts read in full; query limits and ownership/archive filters traced",
+      "read_ranges": [[1, 120]],
+      "evidence": [
+        "2026-09-29: full-text tool output, chunked where needed; activities spec lines 88-107 and mcp-usage 1-90/91-185/186-end recovered without truncation."
+      ],
       "questions": []
     },
     {
@@ -32339,10 +32439,12 @@
       "mode": "100644",
       "bytes": 34760,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 659]],
+      "evidence": [
+        "Complete primary-agent read; activity/category input, archive, lookup, cache and report paths cross-checked. F012/F013 and remaining hypotheses in findings.md. Cloud read helper inspected before attempted metadata-only query; authorization timed out before result."
+      ],
       "questions": []
     },
     {
@@ -33701,10 +33803,12 @@
       "mode": "100644",
       "bytes": 1909,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 50]],
+      "evidence": [
+        "Complete primary-agent read; activity/category input, archive, lookup, cache and report paths cross-checked. F012/F013 and remaining hypotheses in findings.md. Cloud read helper inspected before attempted metadata-only query; authorization timed out before result."
+      ],
       "questions": []
     },
     {
@@ -38634,10 +38738,12 @@
       "mode": "100644",
       "bytes": 12824,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 277]],
+      "evidence": [
+        "Complete primary-agent read; activity/category input, archive, lookup, cache and report paths cross-checked. F012/F013 and remaining hypotheses in findings.md. Cloud read helper inspected before attempted metadata-only query; authorization timed out before result."
+      ],
       "questions": []
     },
     {

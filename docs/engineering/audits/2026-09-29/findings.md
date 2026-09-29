@@ -32,6 +32,7 @@ last_verified: 2026-09-29
 - 状態: 未検証仮説、未修正。#2910関連の進行中PRがある。
 - 根拠: secretsは常設Staging無し/local-only接続、architectureも永続Stagingなし。testingにはshared persistent nonproduction DBとCloud Preview runnerの移行中契約がある。
 - 次の反証: #2910本文/コメントと進行中PR、現行infra、許可済みmetadata readで環境存在とready状態を別々に確認。過去memoryや未merge差分だけで現行docsを上書きしない。
+- 追加確認: #2910の現行本文を分割して全文確認。通常Previewと任意localはpersistent非本番DB、schema/shared backend変更だけephemeral、OAuth等は固定Integrationが持つ契約。進行中PR #2926等の実装・配信は別証拠が必要。既存 `production-db-readonly.mjs` と依存helperを全文確認し、read_only=trueでserver version/transaction_read_only/API上限設定/RLS有効フラグだけを照会する既存op run経路を試した。2026-09-29 18:02 JSTに認証初期化がauthorization timeoutで終了し、DB結果は取得できなかった。再試行を繰り返さず、クラウド実態は未確認。個人データ・秘密実値の出力、DB書込なし。
 
 ## F004 — 規約がunknownの代わりにas neverを勧める
 
@@ -62,6 +63,9 @@ last_verified: 2026-09-29
 - 状態: 未検証仮説、未修正。
 - 根拠: report-fetchersはrecords/plansをcollectQueryPagesで取得するが、activities/categoriesは単発select。件数がAPIの上限を超えると、カテゴリー名/フィルタの所属が欠ける可能性。
 - 次の反証: Supabase側max_rows、既存の分類一覧とページング方針、所有者・上限契約、大量データでのfakeと実環境の違いを確認する。現時点で本番発生を主張しない。
+- 追加確認: activities仕様は件数無制限、repo configのmax_rowsは1,000。ActivitiesQueryServiceのlistActivities/listCategories/listTreeも単発selectで、MCP2ツールはそのserviceを利用。公式range資料も順序の指定が必要とする（https://supabase.com/docs/reference/javascript/using-modifiers-range）。実productionのmax_rows値は未確認。
+- 反証/設計上の境界: 閉じた#1825本文を取得し、単一クエリ/単一スナップショットとmax_rows切り捨てへの注意が明示されていることを確認。単なるoffsetページングは途中のarchive/改名/削除で欠落・重複しうるため、そのまま採用しない。まず既存の単一snapshot取得経路と#1825の実装・後継判断を調べる。全件を返すSQL read wrapperが必要ならschema検証と非本番環境の使用条件を別途照合する。無言の切り捨てを仕様へ読み替えない。
+- PR #1841の本文・対象一覧も確認。旧tagsではcount:exactと受信件数を比べwarnする契約であり、上限を除去した実装ではなかった。現行activities取得にはその検知もない。旧実装のdiffと#2162の移行判断は次に照合する。
 
 ## F008 — テンプレート中央値testが実行日に依存して失敗する
 
@@ -92,3 +96,25 @@ last_verified: 2026-09-29
 - 期待契約: 分類5はdocsの手順書からの参照。機械データにpathが載ることは実行を意味しない。
 - 条件/原因: 今回のinventory.json追加により、多数のlibがrunbookへ誤分類された。既存JSONの試行記録や構造データも同じ誤検知を起こしうる。既存の参照優先順位を変えず、手順書の走査対象をMarkdown/MDXへ限定。
 - 反証/検証: 合成repoでJSON一覧にだけ載る未使用scriptはunreferenced、実importされるscriptはlib、Markdown手順を追加するとrunbookになることを検査。修正前はfixtureと実repoの2件が失敗、後は関連16 tests passed、scripts全体110 files / 2625 tests passed。個別例外の追加や検査のskipでは解消していない。既存のworkflowコメント等を実行と誤認する一般的な制約は未解決のまま明記されている。
+
+## F012 — アーカイブ済みカテゴリーの古い非表示設定がレポートに残る
+
+- 状態: ローカル再現・修正済み（`9a3574988`）。Mission #2963。本番未観測。
+- 契約/条件: activities仕様は所属categoryがarchivedならサイドバー・分析とも未分類へ寄せる。categoryを非表示にしてからarchiveすると、現役activityはサイドバーで未分類・表示中になるが、集計は古いcategoryIdでhiddenCategoryIdsを適用して記録を隠す。
+- 根拠/反証: ActivitiesQueryServiceのtreeとReportFilterListはactive categoryだけで配置する。一方report-fetchersは全categoryのmetadataを返す。前期間比にも同じフィルタが使われる。復元時には元のcategoryで再びフィルタする必要があり、保存済みcategory_idをNULLにする修正は不適切。カレンダーブロック用のuseActivitiesMapは過去参照のlookupという別経路で、今回変更しない。
+- 修正: レポートのcategory metadata取得をarchived_at IS NULLに限定。既存の未分類処理へ渡す。DB保存値・MCP生データの契約・UI操作数は不変。
+- 検証: active/restoredとarchivedを分け、現在60分/前期間120分、カテゴリー非表示とactivity個別非表示を検査。修正前1 failed / 23 passed → 修正後aggregate・activities query・report view modelの3 files / 86 tests passed。ログ `/tmp/dayopt-audit-category-{red,green}.log`。クラウドDB実行ではない。
+
+## F013 — 分類の変更後にレポートのキャッシュが更新されない
+
+- 状態: ローカル再現・修正済み（`93d0774da`）。Mission #2963。本番未観測。
+- 契約/条件: 同一sessionでactivityの改名/移動やcategoryのarchive/restore等を完了すると、一覧は新しい状態なのに、既に取得したレポートが古い名前・所属・フィルタで表示される。staleTimeの経過自体は再取得のトリガーではないので、表示中のレポートは次のmount/focus等まで残りうる。
+- 原因/反証: activity/categoryの全mutationとundoはactivities-cacheを通すが、そこは分類一覧/予定/記録/statisticsだけをinvalidateする。reviewのperiod/detailは別キャッシュ。createAppQueryClientにも成功時の一括invalidateはない。timeblock書込にはreview更新があり、分類変更には無いことを照合。
+- 修正: 全分類mutationとundoが通るinvalidateActivityCachesでreview routerもinvalidate。集計ロジックや楽観更新の意味は変更しない。型は利用するquery utilityのみに限定し、実clientを使うテストへ不正なcastを要求しない。
+- 検証: 実TanStack QueryのQueryObserver + tRPC query key/utilityでfreshな旧reportを表示し、更新経路の後だけ新データを受け取ること、閉じたdetailはstaleになり無関係なbillingは維持されることを検査。修正前1 failed → 同コマンド1 passed。関連3 files / 39 tests passed、typecheck:product成功。ログ `/tmp/dayopt-audit-cache-{red,green,regression,types}.log`。API結果は合成データで、E2Eではない。
+
+## H014 — 分類フォームと楽観更新の失敗・復元境界
+
+- 状態: 読解からの候補。実行未再現、未修正。採用済み所見には数えない。
+- 追跡する点: ActivityRenameModal / CategoryRenameModalはmutateAsyncをtry/finallyだけで囲み、イベント側はvoidで呼ぶ。hookのtoast後もrejectが未処理にならないか確認する。activity-tree-cacheのcategory復元は未分類にある旧所属activityを戻さず、refetchまで空に見える。全snapshotのrestoreは別mutationの成功と競合しうる。
+- 次の反証: 実際の同時操作が可能なUI、tRPC/TanStack側の直列化、失敗時の回復・再取得を追う。コメントの意図や一時表示だけで直ちに不具合採用せず、操作後のユーザー可視結果で再現する。

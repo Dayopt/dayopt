@@ -49,10 +49,18 @@ repo調査、対象内の可逆修正、テスト、commit、必要なpush/Draft
 
 監査Issue: [#2963](https://github.com/Dayopt/dayopt/issues/2963)。`pnpm ctx 2963 --reuse-brief-l1` はexit 0、L1は `trusted_brief_missing_or_stale`。L1は未取得として本文と一次資料で続行。API課金を伴うJev呼び出しは行っていない。ctx初回起動時に既存lockfileから依存のinstallが行われた。tracked manifest/lockfileの差分は無い。
 
-全文確認62ファイル、symlink機械確認1件、未確認3,078件。`inventory.json`が各pathの確認範囲の正本。secrets/architecture/conventions/testing/glossary/strategy/decisionsとReviewの主経路の全文確認を完了。partial readは別に範囲を記録した。全体監査は初期段階であり、多数の未読が残る。
+全文確認115ファイル、symlink機械確認1件、未確認3,025件。`inventory.json`が各pathの確認範囲の正本。secrets/architecture/conventions/testing/glossary/strategy/decisions、Reviewの主経路、activities featureの基準ファイル全件の全文確認を完了。partial readは別に範囲を記録した。全文確認は全境界の実行検証を意味しない。全体監査は初期段階であり、多数の未読が残る。
 
 修正commit: F001 `f0151baaf`（作成既定と選択）、F004 `f2a43d559`（unknown/型アサーション）、F002 `e88a1890f`・`84f4d9019`（旧レポート説明と用語test）、F006 `c799b402b`（前期間だけの活動が比較から消える不具合）、F008 `8a5bc2c9f`（test時計固定）、F011 `9851013ae`（機械データによるtaxonomy誤検知）、F010 `befb03e5f`（DSTの時間帯集計）。`findings.md`に根拠・反証・検査結果を記録。
 
-全体`pnpm check`を2回実施。初回は基準から未変更のtemplate testの実時計依存2件で失敗。時計固定後はproduct 4,320 / web 366件成功、scriptsで廃止語と機械一覧の誤検知2件が失敗。両方を修正しscripts全体2,625件成功、typecheck:scripts成功。その後F010の変更を追加し、期間・時間帯・両serviceの88件成功。最新diffでの統合checkとpre-pushはこれから実施。クラウド実態照合・配信は未実施。
+追加修正: F012 `9a3574988`（archived categoryの古い非表示設定がレポートに残る）、F013 `93d0774da`（分類変更・undo後にreview cacheが更新されない）。それぞれred→green、関連86件/39件成功、F013のtypecheck:product成功。公開済みSHAと最新検証SHAは区別する。追加差分の統合checkとpushは次に実施する。
 
-次は統合した修正を検査し、Draft PRへ保存する。その後はReview詳細/時間境界とH007（分類メタデータのページング）、H003（環境レーン）、H005（MCPの確定契約）の照合を進める。現在の修正を全体監査完了とは扱わない。安全な修正は順次検証する。終了/コンテキスト更新のたびにここ・inventory・findings・Issueの証拠を同期し、未読をゼロから読み直さない。
+全体`pnpm check`を3回実施。初回は基準から未変更のtemplate testの実時計依存2件で失敗。時計固定後はproduct 4,320 / web 366件成功、scriptsで廃止語と機械一覧の誤検知2件が失敗。両方を修正しscripts全体2,625件成功、typecheck:scripts成功。その後F010を追加し、期間・時間帯・両serviceの88件成功。最新検証SHA `79a1a6c2392312fc2552b5e909ebdf784e7b31fd`の`pnpm check`はexit 0（型/lint/static/deadcode、billing15・i18n2・observability64・product4330・web366・scripts2625件、計7402 passed）。同HEADのpre-pushも通常フックで成功。ログ `/tmp/dayopt-audit-check-final.log` と `/tmp/dayopt-audit-push-verified.log`。1年にclipした合成記録のDST集計は525600分、ローカル計測152ms。クラウド実態照合・配信は未実施。
+
+Draft PR [#2965](https://github.com/Dayopt/dayopt/pull/2965)へ保存済み、milestone v0.36、チャットにattach済み。Issue進捗コメント: https://github.com/Dayopt/dayopt/issues/2963#issuecomment-5886921886 。DraftのためGitHubのStatic/Unit/Integration等はSKIPPEDでありCI成功とは扱わない。mainは基準SHAのまま（PR作成時read-only確認）。merge/releaseなし。
+
+次はH007（分類の件数上限と単一snapshot契約）、H014（分類の失敗・復元境界）、H003（環境レーン）、H005（MCPの確定契約）を照合する。#1825の本文とPR #1841本文・対象一覧を確認済み。旧tagsはcount:exactによる切り捨てwarnがあり、現行activitiesには無い。#2910はctx実施（L1未取得）、原文を`tmp/dayopt-issue-2910.md`に保存し、truncation箇所を回収して全文確認した。最新コメントでは共有DB検証が他レーン都合で保留されたとの自己申告がある。これは本監査のcloud実測証拠ではない。
+
+Supabase pluginとmcp-usageに従い、既存production-db-readonly/helperを全文確認してから、許可済みop run経路で非個人system metadataだけのread_only照会を試行。認証初期化が2026-09-29 18:02 JSTにauthorization timeoutで終了し、DB結果は未取得。transaction_read_only / server_version / max_rows設定 / activities・categoriesのRLSフラグは未確認のまま。秘密実値・個人データの取得/出力やDB書込なし。新規MCP登録・権限変更・同じ失敗の反復をせず、独立したrepo読解を続ける。
+
+現在の修正を全体監査完了とは扱わない。安全な修正は順次検証する。終了/コンテキスト更新のたびにここ・inventory・findings・Issueの証拠を同期し、未読をゼロから読み直さない。
