@@ -49,7 +49,7 @@ repo調査、対象内の可逆修正、テスト、commit、必要なpush/Draft
 
 監査Issue: [#2963](https://github.com/Dayopt/dayopt/issues/2963)。`pnpm ctx 2963 --reuse-brief-l1` はexit 0、L1は `trusted_brief_missing_or_stale`。L1は未取得として本文と一次資料で続行。API課金を伴うJev呼び出しは行っていない。ctx初回起動時に既存lockfileから依存のinstallが行われた。tracked manifest/lockfileの差分は無い。
 
-全文確認164ファイル、symlink機械確認1件、未確認2,976件。`inventory.json`が各pathの確認範囲の正本。secrets/architecture/conventions/testing/glossary/strategy/decisions、Reviewの主経路、activities featureの基準ファイル全件の全文確認を完了。partial readは別に範囲を記録した。全文確認は全境界の実行検証を意味しない。全体監査は初期段階であり、多数の未読が残る。
+全文確認170ファイル、symlink機械確認1件、未確認2,970件。`inventory.json`が各pathの確認範囲の正本。secrets/architecture/conventions/testing/glossary/strategy/decisions、Reviewの主経路、activities featureの基準ファイル全件の全文確認を完了。partial readは別に範囲を記録した。全文確認は全境界の実行検証を意味しない。全体監査は初期段階であり、多数の未読が残る。
 
 修正commit: F001 `f0151baaf`（作成既定と選択）、F004 `f2a43d559`（unknown/型アサーション）、F002 `e88a1890f`・`84f4d9019`（旧レポート説明と用語test）、F006 `c799b402b`（前期間だけの活動が比較から消える不具合）、F008 `8a5bc2c9f`（test時計固定）、F011 `9851013ae`（機械データによるtaxonomy誤検知）、F010 `befb03e5f`（DSTの時間帯集計）。`findings.md`に根拠・反証・検査結果を記録。
 
@@ -84,3 +84,11 @@ F016 `eb07b33eb`はReview/Calendarのresize中断後のlistener/body style残留
 競合5ファイルは、同じ9月7日の作成契約・同じ9月5日の固定時計を維持するmain側へ解消。Timeblock説明の古いskip/逆リンク要約を復活させず、glossaryの廃止済み3章とledger-barをmainと同じく撤去。監査側のテーブル行単位のglossary test、集計・cache・resize・改名の修正は保持。型・runtimeの差分はなく、変更されたtemplate testは10 passed（`/tmp/dayopt-audit-main-template.log`）。統合後のscripts/docs/pre-pushは別に記録し、統合前checkの7413件を統合後の実行結果とは混同しない。
 
 基準inventoryは開始SHAを維持し、各17pathへdelta確認の証拠を追記。差分だけ読んだ未読ファイルを全文確認へ昇格していない。PR #2964のrouting変更は判断索引の参照補強で、native委譲のruntime制約は緩和されていない。
+
+## MCPの直接書き込み契約の裁定
+
+H005は#1754の2026-08-26 User裁定原文を取得してF005へ採用。直接書込みの現scope出荷は明示選択、proposal-onlyは将来phaseの検討であり、DBとtoolの現行実装をghost化する修正は不要。strategy/principlesの古い全入口ghost説明だけを`1715af0d8`で修正、docs:check exit 0。新しい決定をagentが作ったのではなく、既存判断の適用範囲を復元した。
+
+6 migrationを追加で全文読解し、authorize→operation lock→digest replay→canonical command→期限再確認→receipt保存を照合。旧digestの互換保持は既存#2736が配備・90日保持・最終撤去の証拠を持つため削除しない。クラウド反映・実DB実行は未確認。次はH019（DM008がtoolで再試行可になる候補）を実adapter→toolで反証し、MCP createの古いfuture限定説明も照合する。H007/H009/H014/H015と全体の未読は引き続き残る。
+
+今回の文書修正と追加読解はlocal commitで保存。直前に公開済みのDraft #2965のheadは`4d7ff84068c843d5b9117d211beec5fea0b679f1`。次の修正を束ねた時に通常pre-pushを通して更新する。前回の統合後pre-push（scripts2625件・affected型/lint・format）成功は `/tmp/dayopt-audit-push-main-verified.log`、統合後docs成功は `/tmp/dayopt-audit-docs-main.log`。

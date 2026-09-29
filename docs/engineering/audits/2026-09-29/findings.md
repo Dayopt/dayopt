@@ -41,13 +41,22 @@ last_verified: 2026-09-29
 - 反証: product/web/packages ESLintを全文確認し、anyは禁止するがunknown禁止はない。同規約のserver入力表とOAuthの例外処理もunknownを許容する。型システム都合のassertionまで禁止する変更ではない。
 - 修正/影響: 禁止表をany/Functionと具体型・関数シグネチャへ修正。未知の入力・例外はunknownからschema/guardで絞り込み、as neverを入力検証の代替にしないと明記。unsafe castを誘発する説明を除去する。既存assertionの一律撤去はしない。Mission #2963で追跡。
 
-## H005 — strategyのAI書き込みghost原則とMCP公開契約
+## F005 — strategyのAI書き込みghost原則とMCP公開契約
 
-- 状態: 未検証仮説、未修正。
+- 状態: H005から採用。明示判断を確認し文書修正済み（`1715af0d8`）。runtime・公開tool・DBの変更なし。
 - 根拠: strategy原則3はMCP/API由来も未確定ghostと記す。現在のMCP書込契約をまだ読んでいないため矛盾は未確定。
 - 次の反証: MCP仕様、同意/操作確定契約、関連決定/Issue、DB command経路を追う。契約の未決判断をコードだけで裁定しない。
 - 追加読解: `docs/learn/10-api-mcp.md`はMCPからcanonical Planを同じDB commandで作る経路を説明し、OAuth scope同意とMCP gateを契約にしている。external-calendar仕様は外部ミラーを明示タップで変換する別経路。journeys/mcp.mdは取得がtruncatedだったため未読を残す。次はtool原文・DB command・明示判断を照合し、ghost原則の適用対象を裁定する。
 - 追加回収: journeys/mcp.mdの基準1–1399行を分割して全文回収。tool registry/8 mutation登録/input/output schema、McpMutationClient/DB adapter/contractも全文確認。実際のtool説明もcanonicalと明記し、8 apply RPCへ渡す。strategyとの裁定はDB定義と明示判断の読解が残る。`plans.create`の「future」説明もPlanの過去作成契約との差があり、別途契約/関連testを照合する。分析イベントの古い説明だけはF018へ分離。
+- 裁定根拠: #1754現行本文170行、[2026-08-26のUser裁定記録](https://github.com/Dayopt/dayopt/issues/1754#issuecomment-5418236863)、移設された責任境界の[原文](https://github.com/Dayopt/dayopt/issues/1754#issuecomment-5449310972)、commit `765fb8731`の明示裁定メッセージを確認。proposal-onlyへ変更するagent提案に対し、Userは完了間近のscopeを維持して直接書込で出荷すると選んだ。proposal化は将来phaseの検討であり、現在の実装違反ではなかった。移設原文にある古いbilling/planId/scope表は後継判断があるので復活させない。
+- DB照合: 20260908022927は接続からuserを導出し、gate/connection/token/profile/operationのlock後にscope・期限・利用権を判定。20260914000000のapplyは同じcanonical commandへsource apiで保存し、期限を再確認してreceiptを同一transactionに書く。20260729073126のresolverは90日保持と削除世代を確認。これはコード読解でありlive DB実測ではない。
+- 修正/検証: strategyの全入口ghostという要約とprinciplesの直接確定未決を、MCPの直接書込・clientの操作確認・外部calendarの明示変換へ分けた。理由と原典、将来見直しの観点を残す。`pnpm docs:check` exit 0（`/tmp/dayopt-audit-mcp-contract-docs.log`）。コードが存在するだけを採用根拠にせず、明示判断を根拠にした文書訂正のため新規挙動testなし。
+
+## H019 — 削除済みreceiptの終端エラーとMCPの再試行案内
+
+- 状態: コード読解からの候補、未修正・実行未再現。
+- 根拠: `private.resolve_mcp_mutation_replay_v1`はpurged receipt/旧data generationをDM008で拒否し、既存DB integration testもそのコードを期待する。McpMutationClientのEXPECTED_ERROR_CODESにはDM008がなく、想定外DBエラー→MUTATION_FAILEDへ入り、tool側がretryable=trueを返す。削除済み結果を同じoperationIdで再送しても90日保持中は回復しない可能性。
+- 次の反証: 公開error契約、削除後の新規操作との区別、既存client/test、#1754の運用契約を照合し、実adapter→toolで再現する。DB拒否を弱めず、安易にreceiptを削除/再実行しない。未知のDBエラーを一律に非再試行へ変える修正は採らない。
 
 ## F006 — 前期間にしか記録がない活動が前期間比から消える
 

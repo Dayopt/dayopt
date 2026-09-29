@@ -35720,10 +35720,12 @@
       "mode": "100644",
       "bytes": 824,
       "method": "full-text",
-      "status": "unverified",
-      "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "status": "full-text-reviewed",
+      "reason": "Full baseline SQL read in bounded chunks; superseding definitions distinguished from historical ones.",
+      "read_ranges": [[1, 19]],
+      "evidence": [
+        "Cross-checked MCP authorization locks, expiry rechecks, canonical Plan/Record command calls, atomic receipt, digest v1/v2 and 90-day replay/purge generation boundary. Existing #2736 owns compatibility retirement; no DB execution or migration changes. #1754 explicit 2026-08-26 decision resolves H005."
+      ],
       "questions": []
     },
     {
@@ -37657,10 +37659,12 @@
       "mode": "100644",
       "bytes": 14396,
       "method": "full-text",
-      "status": "unverified",
-      "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "status": "full-text-reviewed",
+      "reason": "Full baseline SQL read in bounded chunks; superseding definitions distinguished from historical ones.",
+      "read_ranges": [[1, 511]],
+      "evidence": [
+        "Cross-checked MCP authorization locks, expiry rechecks, canonical Plan/Record command calls, atomic receipt, digest v1/v2 and 90-day replay/purge generation boundary. Existing #2736 owns compatibility retirement; no DB execution or migration changes. #1754 explicit 2026-08-26 decision resolves H005."
+      ],
       "questions": []
     },
     {
@@ -37800,10 +37804,12 @@
       "mode": "100644",
       "bytes": 7605,
       "method": "full-text",
-      "status": "unverified",
-      "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "status": "full-text-reviewed",
+      "reason": "Full baseline SQL read in bounded chunks; superseding definitions distinguished from historical ones.",
+      "read_ranges": [[1, 263]],
+      "evidence": [
+        "Cross-checked MCP authorization locks, expiry rechecks, canonical Plan/Record command calls, atomic receipt, digest v1/v2 and 90-day replay/purge generation boundary. Existing #2736 owns compatibility retirement; no DB execution or migration changes. #1754 explicit 2026-08-26 decision resolves H005."
+      ],
       "questions": []
     },
     {
@@ -39180,10 +39186,12 @@
       "mode": "100644",
       "bytes": 12610,
       "method": "full-text",
-      "status": "unverified",
-      "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "status": "full-text-reviewed",
+      "reason": "Full baseline SQL read in bounded chunks; superseding definitions distinguished from historical ones.",
+      "read_ranges": [[1, 437]],
+      "evidence": [
+        "Cross-checked MCP authorization locks, expiry rechecks, canonical Plan/Record command calls, atomic receipt, digest v1/v2 and 90-day replay/purge generation boundary. Existing #2736 owns compatibility retirement; no DB execution or migration changes. #1754 explicit 2026-08-26 decision resolves H005."
+      ],
       "questions": []
     },
     {
@@ -39284,10 +39292,12 @@
       "mode": "100644",
       "bytes": 7854,
       "method": "full-text",
-      "status": "unverified",
-      "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "status": "full-text-reviewed",
+      "reason": "Full baseline SQL read in bounded chunks; superseding definitions distinguished from historical ones.",
+      "read_ranges": [[1, 267]],
+      "evidence": [
+        "Cross-checked MCP authorization locks, expiry rechecks, canonical Plan/Record command calls, atomic receipt, digest v1/v2 and 90-day replay/purge generation boundary. Existing #2736 owns compatibility retirement; no DB execution or migration changes. #1754 explicit 2026-08-26 decision resolves H005."
+      ],
       "questions": []
     },
     {
@@ -39336,10 +39346,12 @@
       "mode": "100644",
       "bytes": 14781,
       "method": "full-text",
-      "status": "unverified",
-      "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "status": "full-text-reviewed",
+      "reason": "Full baseline SQL read in bounded chunks; superseding definitions distinguished from historical ones.",
+      "read_ranges": [[1, 499]],
+      "evidence": [
+        "Cross-checked MCP authorization locks, expiry rechecks, canonical Plan/Record command calls, atomic receipt, digest v1/v2 and 90-day replay/purge generation boundary. Existing #2736 owns compatibility retirement; no DB execution or migration changes. #1754 explicit 2026-08-26 decision resolves H005."
+      ],
       "questions": []
     },
     {
