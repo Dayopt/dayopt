@@ -409,8 +409,8 @@ jobs:
   # validation-evidence の PRODUCERS と ci-job-name-contract.test.ts も直す。
   #
   # migration を追加していない PR では impact の `migrations_added` が空で skip される
-  # （plan 側も not-applicable）。`fetch-depth: 2` は merge commit の第 1 親（base）を
-  # `git ls-tree` / `git show` で読むため。接続先はローカル Docker だけ。
+  # （plan 側も not-applicable）。PR では merge commit の第 1 親、手動実行では
+  # origin/main を比較元に使う。両方の ref と履歴を取得する。接続先は CI の Docker だけ。
   db-upgrade:
     name: "\U0001F9F1 DB Upgrade (shadow)"
     needs: impact
@@ -422,7 +422,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          fetch-depth: 2
+          fetch-depth: 0
           persist-credentials: false
 
       - uses: ./.github/actions/setup
