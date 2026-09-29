@@ -20741,13 +20741,16 @@
       "mode": "100644",
       "bytes": 59447,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [[315, 394]],
+      "read_ranges": [[1, 1747]],
       "evidence": [
-        "Partial read 315-394 at c3f031ea6: expiry set before complete RPC, then reclaim and stale lease rejection. This does not exercise expiry during lock wait; full text remains pending."
+        "Partial read 315-394 at c3f031ea6: expiry set before complete RPC, then reclaim and stale lease rejection. This does not exercise expiry during lock wait; full text remains pending.",
+        "Full untruncated read at f11715af7: 1-175 in preceding turn, 176-314 and 395-1747 in bounded chunks, combined with saved 315-394. Baseline bytes match. Local-only fixture changes activation singleton, auth users, Storage and private tables; not executed. Covers lease expired before RPC/reclaim, transactional receipt rollback, 30-day cleanup, provider-response TTL and provisioning recovery. Does not exercise lease expiry while waiting on a lock."
       ],
-      "questions": []
+      "questions": [
+        "H034: expiry during lock wait remains unverified; approved isolated DB execution required, do not reuse shared cloud activation."
+      ]
     },
     {
       "path": "apps/product/src/lib/test/integration/activity-assignment-guards.integration.test.ts",

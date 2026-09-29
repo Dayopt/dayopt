@@ -323,11 +323,11 @@ H024の反証追記: installed `@supabase/auth-js@2.116.0` のGoTrueClient.ts 40
 - 修正: checkout/updatedで現在Subscriptionを5秒・再試行なしで取得し、ID/Customer/modeを照合。現在canceledならexact subscriptionの終了経路を使い、旧snapshotを保存しない。provider取得前のprofile ID/status/updated_atを保存条件へ加え、競合時は既存500/claim解放から再送する。legacyは既存profiles列の条件付きUPDATE、durableは既存terminal RPCを使い、新規migrationやActivation変更はない。
 - 反証: ID/statusだけの条件付き更新では、途中の遷移から同じ状態へ戻るケースを見逃す。別redで200となる失敗を確認（1 failed/5 passed、`/tmp/dayopt-audit-webhook-ordering-aba-red.log`）、既存profile updated_atを条件に追加。baseline SQL 22–32/112–127はNOT NULL timestampと全UPDATE triggerを定義。これは部分読解で、巨大baseline全文確認に昇格していない。旧経路もexact IDを確認し、遅いdeletedで別契約を終了しない。
 - 検証: 関連3 files/58 passed（ordering 8件含む）、型検査成功。ログ `/tmp/dayopt-audit-webhook-ordering-regression.log` / `/tmp/dayopt-audit-webhook-ordering-types.log`。後者は最初の修正時点の結果で、最終組合せの型検査は全体checkに含める。保存条件は合成query builderで検査し、実PostgREST/DBの行ロックを実測したものではない。legacy/durable双方の遅延更新、再契約、並行削除、同状態復帰、Customer不一致、遅延checkoutを検査。
-- 残り: profileが消滅した後のupdated/checkoutは現在snapshot取得で500となる。削除receiptへの分類で正しく終端すべき範囲を元契約と照合し、保護を落とさず続ける。複数の同時active契約という既存データ異常の裁定は別途未確認。通知の過去previous_attributesの意味、実Stripe mode・実DB・配信は未確認。F035を全体監査完了やこの残りの修正完了と扱わない。
+- 残り（記録時点）: profile消滅後のupdated/checkoutの終端分類は後続F036で再現・修正済み。複数の同時active契約という既存データ異常の裁定は別途未確認。通知の過去previous_attributesの意味、実Stripe mode・実DB・配信は未確認。F035を全体監査完了やこの残りの修正完了と扱わない。
 
 ## F036 — 削除済み顧客への遅延Checkout/更新を短期receiptへ分類しない
 
-- 状態: F035の残りのterminal account経路を再現・修正。Mission #2963。統合検査前。
+- 状態: F035の残りのterminal account経路を再現・修正。Mission #2963。main #2968統合内容でpnpm check exit 0、7631 passed（f11715af7）。
 - 契約/根拠: billing仕様のCustomer-bearing eventはlive profileまたは30日削除receiptへ分類し、未知Customerは成功扱いにしない。migration052の既存service-role専用RPCはliveを優先し、profileがなければ有効なhashed receiptだけをaccount_deletedへする。routeはinvoice/deletedには適用するが、checkout/updatedはprofile snapshotへ直接進んでいた。
 - 再現: 実route/service/identity +合成DB応答で、削除receipt有効のcheckout/updatedが500を返し、再送でも終端しないことを確認。分類とprofile取得の間に削除が入るfixtureも、最初の失敗後に再送が500のまま。red4 failed/10 passed（`/tmp/dayopt-audit-webhook-deleted-red.log`）。初回fixtureは分類hook未発火で競合自体が発生していなかったため棄却し、実際のprofile取得境界で削除状態へ変わるfixtureに直した結果だけを採用。
 - 修正/反証: durableのcheckout/updatedもprovider Event identity確認・event claim後、既存Customer分類を通す。有効receiptなら追加Subscription API/DB更新/通知へ進まずprocessedへ。未知/期限切れreceiptは既存serviceのFETCH_FAILED→500/claim解放を維持。分類live後のAuth削除は当該取得失敗を勝手に成功扱いにせず、次の再送のreceipt分類で終端する。legacyへ未導入RPCを追加しない。DB migration・receipt保持期間・課金権限は不変。

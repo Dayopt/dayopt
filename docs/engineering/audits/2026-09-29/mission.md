@@ -218,3 +218,9 @@ provider identity/client/diagnosing skillとreconciliation routeを追加全文�
 前回はF035の再現・修正・7491全体検査成功・local commit `c75475b94`とIssue comment-5900939197を保存したprogress。今回同clean HEADから継続し、F036で有効削除receiptのcheckout/updatedと、profile取得中の削除→再送をred4/green14で確認。関連85 tests成功。今回の製品コードの全体検査はまだ行っておらず、前回結果を流用しない。
 
 read-only fetchでmainがPR #2968の`650f62dc733831765aa8c110e29533b532e023f2`へ進んだことを確認。10pathの非JSON差分と新規209行runnerを全文確認。910行API実験JSONは生成された実行証拠として全parse/106 test identities・13 resultsの件数/失敗名参照/ソースhash/4filehashを機械検査。保存結果は12/13検出・1生存で、router上限50→500はservice上限50が残り同じ入力を拒否するため、機械的な冗長削除やtest文字列assertは不要。保存JSONのfailure messageは短縮されstack marker/log本文は残らず、今回classifierの実行成功とは扱わない。過去7575成功も再利用しない。4新規pathはdelta_filesに別管理し、6変更pathはdelta確認のみ。基準全文370/機械1/未確認2770を維持。次にcleanへcommitして監査branchへmainを統合、統合候補で全体検査を実行し通常pre-push後にDraftへ反映する。mainへのmerge・releaseなし。
+
+main #2968を監査branchへmerge `f11715af7d324fdb9c1234b7333813c2bf8c96c6`で統合。生成architecture資料2件の競合をgeneratorで解消し、両方のtest一覧を維持。mainへのmergeではない。初回commitのmerge typeはcommit-msgで拒否され、通常のchore日本語subjectで再実行。hook迂回なし。
+
+統合内容のNode24 `pnpm check` exit 0、型10/lint9/static/deadcode、billing37/i18n2/observability64/product4517/web366/scripts2645、合計7631 passed。ログ `/tmp/dayopt-audit-check-webhook-terminal-integrated.log`。開始時HEADは0a6621dc6でmerge index/working treeは最終内容、検査中に同じ内容をf11715af7へcommitした。製品コード変更なし。docs:checkもexit 0（`/tmp/dayopt-audit-webhook-terminal-docs.log`）。実DB/Stripe/配信証拠とは扱わない。
+
+generic account deletion gate integration1747行の残りを省略なく読解しbaseline bytes一致を確認。基準全文371件、機械1、未確認2769。lease期限を過去に変更してからcomplete/reclaimする検査と、lock待ち途中の期限超過を区別。receiptのAuth削除transaction内生成/rollback/30日掃除、Customer recoveryを確認したがローカル専用fixtureは未実行。次はH034の現行lock helper/時間評価、通知のイベント鮮度、残りの全文読解を進める。全体監査・実環境・E2E・配信は未完了。
