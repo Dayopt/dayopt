@@ -1,9 +1,7 @@
 import { expect, type Page } from '@playwright/test';
 
-import {
-  assertServiceRoleSuiteRunnable,
-  resolveServiceRoleTarget,
-} from '../service-role-target-guard';
+import { loadPreviewFixtureRegistry, resolveCriticalPathTarget } from '../preview-fixture-registry';
+import { assertServiceRoleSuiteRunnable } from '../service-role-target-guard';
 import {
   type AdminSupabase,
   cleanupCriticalPathUser,
@@ -15,10 +13,8 @@ import {
 } from './critical-path-fixture';
 import { test } from './preview-access-fixture';
 
-const target = resolveServiceRoleTarget(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SECRET_KEY,
-);
+const REGISTRY = loadPreviewFixtureRegistry();
+const target = resolveCriticalPathTarget();
 assertServiceRoleSuiteRunnable(target, 'Preview: user authorization');
 const describeWithEnv = target.safe ? test.describe : test.describe.skip;
 
@@ -115,6 +111,7 @@ describeWithEnv('Preview: user authorization', () => {
   let admin: AdminSupabase;
 
   test.beforeAll(async () => {
+    if (REGISTRY) return;
     admin = createAdminSupabase(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SECRET_KEY!,
@@ -123,6 +120,7 @@ describeWithEnv('Preview: user authorization', () => {
     await seedCriticalPathUser(admin, b, 'authorization B');
   });
   test.afterAll(async () => {
+    if (REGISTRY) return;
     if (!admin) return;
     const cleanup = await Promise.allSettled(
       [a, b].map((identity) => cleanupCriticalPathUser(admin, identity.userId)),

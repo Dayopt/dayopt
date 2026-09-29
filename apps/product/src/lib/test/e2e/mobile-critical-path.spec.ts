@@ -1,9 +1,7 @@
 import { expect, type Page } from '@playwright/test';
 
-import {
-  assertServiceRoleSuiteRunnable,
-  resolveServiceRoleTarget,
-} from '../service-role-target-guard';
+import { loadPreviewFixtureRegistry, resolveCriticalPathTarget } from '../preview-fixture-registry';
+import { assertServiceRoleSuiteRunnable } from '../service-role-target-guard';
 import {
   type AdminSupabase,
   cleanupCriticalPathUser,
@@ -40,7 +38,8 @@ test.use({ trpcProcedureBudget: 26 });
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SECRET_KEY;
-const SERVICE_ROLE_TARGET = resolveServiceRoleTarget(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+const REGISTRY = loadPreviewFixtureRegistry();
+const SERVICE_ROLE_TARGET = resolveCriticalPathTarget();
 assertServiceRoleSuiteRunnable(SERVICE_ROLE_TARGET, 'Mobile Critical Path: 計画 → 実績 → 振り返り');
 const describeWithEnv = SERVICE_ROLE_TARGET.safe ? test.describe : test.describe.skip;
 
@@ -175,11 +174,13 @@ describeWithEnv('Mobile Critical Path: 計画 → 実績 → 振り返り', () =
   let adminSupabase: AdminSupabase;
 
   test.beforeAll(async () => {
+    if (REGISTRY) return;
     adminSupabase = createAdminSupabase(SUPABASE_URL!, SUPABASE_SERVICE_KEY!);
     await seedCriticalPathUser(adminSupabase, IDENTITY, 'mobile critical path e2e');
   });
 
   test.afterAll(async () => {
+    if (REGISTRY) return;
     if (!adminSupabase) return;
     await cleanupCriticalPathUser(adminSupabase, IDENTITY.userId);
   });

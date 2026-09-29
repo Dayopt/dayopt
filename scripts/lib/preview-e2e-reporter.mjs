@@ -6,7 +6,8 @@ const FILES = new Set([
   'mobile-critical-path.spec.ts',
   'preview-authorization.spec.ts',
 ]);
-const PROJECTS = new Set(['chromium', 'Mobile Chrome']);
+const REQUIRED_PROJECTS = ['chromium', 'Mobile Chrome'];
+const PROJECTS = new Set([...REQUIRED_PROJECTS, 'preview-authorization']);
 const CATEGORIES = new Set(['expect', 'pw:api', 'test.step', 'fixture', 'hook']);
 
 /** Do not serialize titles, parameters, error messages, stdout, headers, cookies, or bodies. */
@@ -58,7 +59,7 @@ export function isPassingPreviewReport(report) {
         PROJECTS.has(test.project) &&
         FILES.has(test.file),
     ) &&
-    [...PROJECTS].every((project) => report.tests.some((test) => test.project === project))
+    REQUIRED_PROJECTS.every((project) => report.tests.some((test) => test.project === project))
   );
 }
 

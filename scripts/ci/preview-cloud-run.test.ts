@@ -82,6 +82,7 @@ describe('Cloud Preview evidence and cleanup', () => {
     roots.push(root);
     const paths = [
       'apps/product/src/lib/test/preview-cloud-identity.ts',
+      'apps/product/src/lib/test/preview-fixture-registry.ts',
       'apps/product/src/lib/test/e2e/critical-path-fixture.ts',
     ];
     for (const path of paths) {

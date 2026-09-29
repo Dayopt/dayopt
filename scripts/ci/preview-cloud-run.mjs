@@ -21,6 +21,7 @@ export function verifyCloudFixtureContract(candidateRoot, trustedRoot = ROOT) {
   // intent. Require the trusted allocation contract before any fixture mutation.
   for (const path of [
     'apps/product/src/lib/test/preview-cloud-identity.ts',
+    'apps/product/src/lib/test/preview-fixture-registry.ts',
     'apps/product/src/lib/test/e2e/critical-path-fixture.ts',
   ]) {
     const source = readFileSync(join(trustedRoot, path));
@@ -49,7 +50,7 @@ const FILES = new Set([
   'mobile-critical-path.spec.ts',
   'preview-authorization.spec.ts',
 ]);
-const PROJECTS = new Set(['chromium', 'Mobile Chrome']);
+const PROJECTS = new Set(['chromium', 'Mobile Chrome', 'preview-authorization']);
 const TEST_STATES = new Set(['passed', 'failed', 'timedOut', 'skipped', 'interrupted', 'unknown']);
 const safeGitEnv = () =>
   Object.fromEntries(

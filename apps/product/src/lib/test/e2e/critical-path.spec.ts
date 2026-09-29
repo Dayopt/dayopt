@@ -1,9 +1,7 @@
 import { expect, type Page } from '@playwright/test';
 
-import {
-  assertServiceRoleSuiteRunnable,
-  resolveServiceRoleTarget,
-} from '../service-role-target-guard';
+import { loadPreviewFixtureRegistry, resolveCriticalPathTarget } from '../preview-fixture-registry';
+import { assertServiceRoleSuiteRunnable } from '../service-role-target-guard';
 import {
   type AdminSupabase,
   cleanupCriticalPathUser,
@@ -34,14 +32,14 @@ test.use({ trpcProcedureBudget: 26 });
  * Record になる（docs/product/specs/plan-record.md §新規作成時の保存先ルール）ため、
  * Record lane 側（`box.width * 0.6`）へ変更して解消した。
  *
- * seed は service role で自前ユーザーを作る（block-search.spec.ts と同型）。
- * 実行先は resolveServiceRoleTarget が安全と判定した時だけ有効になる。
+ * legacy は service role で自前ユーザーを作る。registry は既に用意された通常ユーザーを使う。
+ * どちらも resolveCriticalPathTarget が安全と判定した時だけ有効になる。
  */
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SECRET_KEY;
-// service role で auth user / plan / record を作って消すため、実行先が安全な時だけ有効にする
-const SERVICE_ROLE_TARGET = resolveServiceRoleTarget(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+const REGISTRY = loadPreviewFixtureRegistry();
+const SERVICE_ROLE_TARGET = resolveCriticalPathTarget();
 // CI（E2E_REQUIRE_SERVICE_ROLE_SUITES=1）では skip を許さない。env が壊れて suite が
 // 丸ごと消えても「0 failed」で緑になるのを防ぐ。
 assertServiceRoleSuiteRunnable(SERVICE_ROLE_TARGET, 'Critical Path: 計画 → 実績 → 振り返り');
@@ -153,11 +151,13 @@ describeWithEnv('Critical Path: 計画 → 実績 → 振り返り', () => {
   const tomorrow = offsetDateParam(1);
 
   test.beforeAll(async () => {
+    if (REGISTRY) return;
     adminSupabase = createAdminSupabase(SUPABASE_URL!, SUPABASE_SERVICE_KEY!);
     await seedCriticalPathUser(adminSupabase, IDENTITY, 'critical path e2e');
   });
 
   test.afterAll(async () => {
+    if (REGISTRY) return;
     if (!adminSupabase) return;
     await cleanupCriticalPathUser(adminSupabase, IDENTITY.userId);
   });

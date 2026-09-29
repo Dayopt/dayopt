@@ -1,14 +1,15 @@
-import { defineConfig } from '@playwright/test';
+import { defineConfig, devices } from '@playwright/test';
 
 import localConfig from './playwright.config';
 import { validatePreviewOrigin } from './src/lib/test/preview-access';
-import { resolveServiceRoleTarget } from './src/lib/test/service-role-target-guard';
+import {
+  loadPreviewFixtureRegistry,
+  resolveCriticalPathTarget,
+} from './src/lib/test/preview-fixture-registry';
 
 const origin = validatePreviewOrigin(process.env.E2E_PREVIEW_ORIGIN);
-const target = resolveServiceRoleTarget(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SECRET_KEY,
-);
+const registry = loadPreviewFixtureRegistry();
+const target = resolveCriticalPathTarget();
 if (
   !target.safe ||
   process.env.E2E_REQUIRE_SERVICE_ROLE_SUITES !== '1' ||
@@ -19,6 +20,35 @@ if (
 }
 
 const config = defineConfig(localConfig, {
+  ...(registry
+    ? {
+        projects: [
+          {
+            name: 'chromium',
+            testMatch: 'critical-path.spec.ts',
+            use: {
+              ...devices['Desktop Chrome'],
+              viewport: { width: 1920, height: 1080 },
+            },
+          },
+          {
+            name: 'Mobile Chrome',
+            testMatch: 'mobile-critical-path.spec.ts',
+            dependencies: ['chromium'],
+            use: { ...devices['Pixel 5'] },
+          },
+          {
+            name: 'preview-authorization',
+            testMatch: 'preview-authorization.spec.ts',
+            dependencies: ['Mobile Chrome'],
+            use: {
+              ...devices['Desktop Chrome'],
+              viewport: { width: 1920, height: 1080 },
+            },
+          },
+        ],
+      }
+    : {}),
   testMatch: [
     'critical-path.spec.ts',
     'mobile-critical-path.spec.ts',

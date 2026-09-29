@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 
 import type { Database } from '@/lib/database';
 import { resolvePreviewCloudUserId } from '../preview-cloud-identity';
+import { loadPreviewFixtureRegistry } from '../preview-fixture-registry';
 import { recordPreviewUser } from '../preview-user-lifecycle';
 import { REPORT_ALLOCATION } from './report-selectors';
 import { suppressConsentBanner } from './suppress-consent-banner';
@@ -32,6 +33,13 @@ interface CriticalPathIdentity {
 }
 
 export function createCriticalPathIdentity(prefix: string): CriticalPathIdentity {
+  const registry = loadPreviewFixtureRegistry();
+  if (registry) {
+    const slot =
+      prefix === 'critical-path' ? 'desktop' : prefix === 'mobile-critical-path' ? 'mobile' : null;
+    if (!slot) throw new Error('Preview fixture identity slot is invalid');
+    return { prefix, ...registry.users[slot] };
+  }
   const runId = crypto.randomUUID();
   const userId = resolvePreviewCloudUserId(prefix) ?? crypto.randomUUID();
   return {
@@ -66,6 +74,8 @@ export function offsetDateParam(offsetDays: number): string {
 }
 
 export function createAdminSupabase(url: string, serviceKey: string): AdminSupabase {
+  if (loadPreviewFixtureRegistry())
+    throw new Error('Preview fixture consumers cannot construct an admin client');
   return createClient<Database>(url, serviceKey, {
     auth: { autoRefreshToken: false, persistSession: false },
   });
