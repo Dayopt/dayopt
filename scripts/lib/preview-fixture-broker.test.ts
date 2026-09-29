@@ -3,7 +3,7 @@ import { createRequire } from 'node:module';
 import { describe, expect, it, vi } from 'vitest';
 
 import { prepareFixtureAuthority } from './preview-fixture-authority.mjs';
-import { executeFixtureBroker } from './preview-fixture-broker.mjs';
+import { executeDurableFixtureBroker, executeFixtureBroker } from './preview-fixture-broker.mjs';
 
 // Exercise the installed SDK's real Auth and PostgREST request/response contract.
 const { createClient } = createRequire(new URL('../../apps/product/package.json', import.meta.url))(
@@ -140,6 +140,7 @@ function provider() {
   );
   const writes: { path: string; method: string; body: Row }[] = [];
   const failures = {
+    lifecycleAction: '',
     createResponseLost: false,
     createErrorResponse: false,
     table: '',
@@ -163,6 +164,19 @@ function provider() {
     expect(init.redirect).toBe('error');
     const body = init.body ? JSON.parse(String(init.body)) : {};
     if (!['GET', 'HEAD'].includes(method)) writes.push({ path: url.pathname, method, body });
+    if (url.pathname === '/rest/v1/rpc/preview_fixture_lifecycle_v1') {
+      if (body.p_action === failures.lifecycleAction) return json({ status: 'unknown' });
+      return json({
+        status:
+          body.p_action === 'claim'
+            ? 'acquired'
+            : body.p_action === 'guard'
+              ? 'owned'
+              : body.p_success
+                ? 'finished'
+                : 'unknown',
+      });
+    }
     if (url.pathname.startsWith('/auth/v1/admin/users')) {
       const id = url.pathname.split('/')[5];
       if (method === 'POST') {
@@ -237,8 +251,72 @@ function provider() {
       ...overrides,
     });
   }
-  return { users, tables, writes, failures, fetchImpl, run };
+  async function runDurable(selected = input, overrides: Record<string, unknown> = {}) {
+    return executeDurableFixtureBroker({
+      input: selected,
+      token: token(selected),
+      env,
+      createClient,
+      fetchImpl,
+      now: () => now,
+      ...overrides,
+    });
+  }
+  return { users, tables, writes, failures, fetchImpl, run, runDurable };
 }
+
+describe('trusted durable broker composition with installed SDK and mocked providers', () => {
+  it('claims, guards every fixture write and finishes through the SDK RPC bridge', async () => {
+    const p = provider();
+    expect(await p.runDurable()).toMatchObject({
+      operation: 'provision',
+      runId: input.intent.runId,
+    });
+    const rpcPath = '/rest/v1/rpc/preview_fixture_lifecycle_v1';
+    expect(p.writes[0]).toMatchObject({ path: rpcPath, body: { p_action: 'claim' } });
+    expect(p.writes.at(-1)).toMatchObject({
+      path: rpcPath,
+      body: { p_action: 'finish', p_success: true },
+    });
+    for (let i = 0; i < p.writes.length; i++) {
+      if (p.writes[i].path !== rpcPath)
+        expect(p.writes[i - 1]).toMatchObject({ path: rpcPath, body: { p_action: 'guard' } });
+    }
+    expect(await p.runDurable({ ...input, operation: 'cleanup' })).toMatchObject({
+      status: 'passed',
+    });
+    expect(p.users.size).toBe(1);
+  });
+  it('rejects an invalid job token before reading the secret or claiming', async () => {
+    const p = provider();
+    const secret = vi.fn(() => env.SUPABASE_SECRET_KEY);
+    const selectedEnv = { ...env };
+    Object.defineProperty(selectedEnv, 'SUPABASE_SECRET_KEY', { get: secret });
+    await expect(p.runDurable(input, { env: selectedEnv, token: 'invalid' })).rejects.toThrow(
+      /^Preview fixture operation failed$/,
+    );
+    expect(secret).not.toHaveBeenCalled();
+    expect(p.writes).toEqual([]);
+  });
+  it('does not create users when the durable claim returns UNKNOWN', async () => {
+    const p = provider();
+    p.failures.lifecycleAction = 'claim';
+    await expect(p.runDurable()).rejects.toThrow(/^Preview fixture operation failed$/);
+    expect(p.users.size).toBe(1);
+    expect(p.writes.map((w) => w.path)).toEqual(['/rest/v1/rpc/preview_fixture_lifecycle_v1']);
+  });
+  it('finishes with failure after guard loss and sends no fixture writes', async () => {
+    const p = provider();
+    p.failures.lifecycleAction = 'guard';
+    await expect(p.runDurable()).rejects.toThrow(/^Preview fixture operation failed$/);
+    expect(p.users.size).toBe(1);
+    expect(p.writes.map((w) => [w.body.p_action, w.body.p_success])).toEqual([
+      ['claim', null],
+      ['guard', null],
+      ['finish', false],
+    ]);
+  });
+});
 
 describe('authenticated Preview fixture executor with installed Supabase SDK', () => {
   it('rechecks expiry after waiting for lifecycle ownership, before reading the key', async () => {
