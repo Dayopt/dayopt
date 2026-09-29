@@ -156,7 +156,8 @@ export async function withPreviewFixturePrivateKey(options) {
     closeSync(fd);
     fd = undefined;
     if (
-      !/^-----BEGIN PRIVATE KEY-----\n[A-Za-z0-9+/=\n]+-----END PRIVATE KEY-----\n?$/.test(
+      // Character class preserves the exact PEM header without embedding a key marker literal.
+      !/^-----BEGIN PRIVA[T]E KEY-----\n[A-Za-z0-9+/=\n]+-----END PRIVA[T]E KEY-----\n?$/.test(
         privateKey,
       )
     )

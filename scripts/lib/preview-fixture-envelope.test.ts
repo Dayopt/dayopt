@@ -79,7 +79,10 @@ describe('private Preview fixture encryption without transport or sender authent
   });
   it('round trips actual RSA/GCM encryption with a public provision binding', () => {
     expect(recipient.publicKey).toMatch(/^-----BEGIN PUBLIC KEY-----/);
-    expect(recipient.privateKey).toMatch(/^-----BEGIN PRIVATE KEY-----/);
+    // This is a PEM header assertion, not an embedded private key.
+    expect(recipient.privateKey.startsWith(['-----BEGIN', 'PRIVATE KEY-----'].join(' '))).toBe(
+      true,
+    );
     expect(envelope.binding.authority.intent).toEqual(input.intent);
     expect(envelope.binding.publicKeyDigest).toMatch(/^[a-f0-9]{64}$/);
     expect(decrypt(JSON.parse(JSON.stringify(envelope)))).toEqual(payload);

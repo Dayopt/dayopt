@@ -690,6 +690,10 @@ model {
     metadata { inventoryKind 'db-function' detail 'used by external-calendar' }
     link ../../../../apps/product/src/lib/database/generated/database.types.ts
   }
+  dbfunction fn_preview_fixture_lifecycle_v1 'preview_fixture_lifecycle_v1' {
+    metadata { inventoryKind 'db-function' detail 'app からの .rpc 呼び出しなし' }
+    link ../../../../apps/product/src/lib/database/generated/database.types.ts
+  }
   dbfunction fn_provision_calendar_authority_project_v1 'provision_calendar_authority_project_v1' {
     metadata { inventoryKind 'db-function' detail 'app からの .rpc 呼び出しなし' }
     link ../../../../apps/product/src/lib/database/generated/database.types.ts

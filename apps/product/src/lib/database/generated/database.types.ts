@@ -2384,6 +2384,18 @@ export type Database = {
           operation_id: string;
         }[];
       };
+      preview_fixture_lifecycle_v1: {
+        Args: {
+          p_action: string;
+          p_database_ref: string;
+          p_intent_digest: string;
+          p_operation: string;
+          p_owner_id: string;
+          p_run_id: string;
+          p_success: boolean;
+        };
+        Returns: Json;
+      };
       provision_calendar_authority_project_v1: {
         Args: { p_oauth_client_id: string; p_project_key: string };
         Returns: string;
