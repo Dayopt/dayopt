@@ -75,6 +75,10 @@ ZIPはdigest照合後に固定されたroot-levelの1fileだけをメモリ内�
 
 公開鍵側も同じmetadata・digest・再検証を通してからRSA公開鍵だけを返す。公開artifactはschemaVersion・正規化したauthority・公開鍵digest・公開鍵の固定fieldに限り、別attempt/targetや余分なfield、秘密鍵・弱い鍵を拒否する。発行bodyの生成と受信はライブラリとして用意しているが、鍵の保存・upload・job間待機と終了時削除はworkflow側の未実装条件である。
 
+[一時鍵の保管処理](../../scripts/lib/preview-fixture-key-custody.mjs) は、RUNNER_TEMP内の別々の新規directoryにprivate.pemとpublic-key.jsonを作る。公開uploadはpublic-key.jsonだけに限定し、秘密鍵のdirectoryを含めない。秘密鍵は700directory / 600fileとし、読取時にrun binding・path・owner・mode・inode・hardlinkを検査する。trusted callerの受信処理を待ち、成功・失敗のどちらでも所有秘密鍵と空directoryを削除する。削除に失敗した場合も処理全体を失敗にする。未知fileの再帰削除や、同じOS userの任意コードに対する隔離保証は行わない。
+
+この保管処理はworkflowに未接続である。公開鍵upload前など、秘密鍵を消費するstepへ到達しない失敗の後始末と、worker喪失時のrunner破棄は別途必要。callback終了後の削除だけを、全中断経路の鍵削除やDB fixture回収の証拠にしてはならない。公開directoryの削除もcallerが担当する。
+
 consumer時はspecごとのadmin生成・seed・削除を行わず、同じ2ユーザーを通常loginで使う。Preview configで **desktop6件 → mobile5件 → A/B認可1件** のproject依存を明示し、認可テストのRecordが先にReport集計へ混ざらないようにする。先行失敗時の後続skipは成功にしない。全project後の回収は別のtrusted jobが担当し、worker喪失時も予定intentから回収できる必要がある。legacyモードのspec別作成/削除は維持する。
 
 `previewWorkerEnvironment` は信頼済み caller が registry path を明示した場合だけ、検証済み readiness の ephemeral binding・immutable origin・run・予定2UUIDを確認し、管理キーを含まないenvを組み立てる。親envのregistry指定は無視する。GitHub token、provider PAT、OIDC発行変数、NODE_OPTIONSは引き継がず、Preview到達用bypassと通常loginのprivate file pathだけを既存allowlistへ加える。file内容の検証はconsumer readerが行う。現在のrunner呼び出しは追加引数を渡さず、従来動作を維持する。同一jobでenvを絞るだけでは、悪意あるcandidateから親プロセス・filesystemへのアクセスを隔離できないため、trusted/candidateのjob分離を省略してはならない。
