@@ -235,3 +235,25 @@ H024の反証追記: installed `@supabase/auth-js@2.116.0` のGoTrueClient.ts 40
 - 状態: コード上の候補、再現・採否は未確定。
 - 根拠: user-service.exportDataはplans/records/categories/activitiesを1回ずつ取得し、ページ走査がない。repo supabase/config.tomlのmax_rowsは1000。画面は取得後に期間フィルタし全期間を選択できるため、上限を越す場合の欠落を調べる。実クラウド上限は未取得で、本番欠落とは断定しない。
 - 次: 公開仕様・既存Issue・DB列と既存page取得方式を照合し、API上限を再現する合成境界testを先に作る。独立して画面の期間境界/共有query結果への直接代入も確認する。H007の分類単一snapshot契約とは同一の修正と決めない。
+
+## F027 — 全件エクスポートがData APIの1回取得上限で途切れる
+
+- 状態: H027の件数上限部分を採用、`b82badf0eef2fd02459697b36e2be19c834e2af7`で修正。Mission #2963。既存Issue検索で同じ現行exportの欠落を直接扱うIssueは見つからず、Missionで追跡。
+- 期待契約/根拠: 公開data-export docsは全期間を含む出力を案内し、UIにもallがある。serviceの4 collectionはpage指定も走査もなく、repo設定max_rows=1000では超過分を取得しない。単一profile/settingsとは別。実クラウド上限・本番欠落は未観測。
+- 再現: 実Supabase SDK→合成HTTP（1000行cap）→実serviceを通す。4種類各1201件の完全一致と4種類の後続page失敗拒否で、修正前5 failed/47 passed。ユーザーfilterはHTTP側で全リクエストにassertし、SDK/query builder/collectQueryPagesはmockしない。
+- 修正/反証: 既存collectQueryPagesを各collectionへ適用、毎pageの認証済みuserId制約・安定したid順を維持。既存の列選択、service-role/user-scoped clientの境界、戻り値形式とEXPORT_FAILED変換は不変。後続page失敗時は部分データを返さない。新しい共通化・DB機能は追加しない。従来も6照会に分かれたexportで、今回も同時編集に対する単一DB snapshotは保証しない。500未満にAPI上限を下げた環境もこの合成検査の証明範囲外。
+- 検証: 関連2 files/54 passed、typecheck:product成功。初回型検査はtest fixtureの必須dependencies不足を検出し修正、再検査成功。ログ `/tmp/dayopt-audit-export-pages-{red,green,types}.log`。実DB integrationは未実行。統合checkは別記録。
+- 残るUI候補: refetch error時の既存data再利用、期間フィルタによるquery結果への直接代入、日付境界。settings仕様のPro限定文言は現行billing仕様・公開docsと不一致。元判断へ戻って裁定する。
+
+## F028 — settings仕様に残ったexportのPro限定説明
+
+- 状態: 文書修正。Mission #2963。製品・課金判定は変更しない。
+- 裁定根拠: docs/decisions.md 2026-09-07はexport Free、2026-09-08の更新判断は単一有料プラン移行後も終了後の閲覧/export/削除を残す。現行billing仕様・operation-access・protected query・公開data-export docsは後者と一致。settings仕様だけがPro限定の古い説明を維持している。
+- 修正/反証: settingsの1文を終了後も利用できる本人管理操作へ訂正し、現行Billing仕様を参照。古いFree/Pro境界をruntimeへ復活させない。公開docsのJSON復元・含まれる設定の説明は別の未照合部分であり、この訂正で承認したとは扱わない。
+
+## H029 — エクスポートUIの失敗・期間・共有データ境界
+
+- 状態: 読解候補、再現前。H027のUI側を分離。既存journeyにも同じ弱点の記載があるが、記載だけで実測としない。
+- 根拠: handleExportはresult.dataのみを判定。installed TanStack query-core 5.102.8のqueryObserver.ts（279–285、340–370、582–619）はrefetch既定でrejectをcatchし、dataとerror/isRefetchErrorを同時に返す。過去dataがある失敗を成功に見せる可能性。期間フィルタはcacheから受けた配列を直接置換し、開始はUTC日付/終了はbrowser日付で異なる境界。利用者timezoneを参照しない。
+- 次: 実QueryObserverの成功→失敗をcomponentのrefetch境界へつなぐ再現と、期間選択→全期間のcache不変、設定TZの日境界を検査する。期間跨ぎをstart_at基準からoverlapへ変える判断は今回混ぜない。日付未入力/逆転の扱い、exportのIndexedDB保持や復元可能性の公開説明も別に契約確認する。
+- 関連候補: ConfirmDialogはonConfirmをawaitするがfinallyのみ。DataSettingsのdelete mutationはonError通知後もmutateAsyncがrejectする。同じ未処理rejectionの可能性を呼出元全体で照合する。MCP URLコピーもclipboardのPromise未処理で成功通知する。まだ製品不具合の再現済み件数に含めない。

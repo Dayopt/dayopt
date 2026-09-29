@@ -21,7 +21,7 @@ flowchart TD
   end
   subgraph s_vercel["Vercel（Next.js）"]
     n3["3. /api/trpc と関門"]
-    n4["4. Service が 6 本読む"]
+    n4["4. Service が6種類を読む"]
   end
   subgraph s_supabase["Supabase"]
     n5["5. 行を読む"]
@@ -36,7 +36,7 @@ flowchart TD
   n8 --> n9
 ```
 
-通るサービス: ブラウザ / Vercel（Next.js） / Supabase。段 9・失敗 6 種。
+通るサービス: ブラウザ / Vercel（Next.js） / Supabase。段 9・失敗 5 種。
 
 #### この経路を守るテスト
 
@@ -109,7 +109,7 @@ context がセッションの cookie から利用者を決め、protectedProcedu
 
 ### 4. UserService.exportData が 6 種類を並行で読む（Vercel（Next.js））
 
-profile・カテゴリ・アクティビティ・user_settings は利用者の権限の client（RLS が効く）で、Plan と Record は service role の client で読み、どれも ctx の userId で絞る。6 本を並行で投げ、どれか 1 本でも失敗すれば全体を失敗にする（profile と user_settings が未作成なのは失敗にしない）。
+profile・カテゴリ・アクティビティ・user_settings は利用者の権限の client（RLS が効く）で、Plan と Record は service role の client で読み、どれも ctx の userId で絞る。6種類を並行で読み、どれかの取得（後続ページを含む）が失敗すれば全体を失敗にする（profile と user_settings が未作成なのは失敗にしない）。
 
 - **なぜ必要か**: Plan / Record の RLS は削除済み（deleted_at あり）の行を利用者から隠す。service role で読むので、削除済みの行も deleted_at 付きで書き出される。これが意図かどうかはコード上に説明が無く、未確認。
 - **入力 → 出力**: ctx の userId → exportedAt・userId・data（profile / plans / records / categories / activities / userSettings）
@@ -125,29 +125,17 @@ profile・カテゴリ・アクティビティ・user_settings は利用者の�
 
 ### 5. Supabase から各表を読む（Supabase）
 
-各表を 1 回の select で読む。レポートの取得と違い、ページ分けして読み切る処理（collectQueryPages）を通していない。
+Plan・Record・カテゴリ・アクティビティはcollectQueryPagesで500件ずつid順に読み切る。profileとuser_settingsは単一行を読む。各ページは同じctxのuserIdで絞る。
 
-- **なぜ必要か**: 件数が少ない前提の書き方になっている（理由の記録は見当たらない）。
+- **なぜ必要か**: 全期間のエクスポートがData APIの1回取得上限で欠けないようにするため。
 - **入力 → 出力**: user_id で絞った select → 各表の行
-- **ここを変えると**: PostgREST は 1 回の応答の行数に上限（max_rows）があり、超えた分は黙って切られる。local の設定は 1000。Plan / Record が多い利用者に効くので、直すなら collectQueryPages で読み切る。
+- **ここを変えると**: ページ途中の失敗は部分結果を返さずEXPORT_FAILEDにする。単一DB snapshotではないため取得中の同時編集に対する整合性保証は別。repoのmax_rowsは1000で、ページサイズ500以上の上限を前提とする。クラウドの現在値は未確認。
 - **コード**:
-  - [`apps/product/src/features/auth/server/user-service.ts`](../../../apps/product/src/features/auth/server/user-service.ts) で `adminClient.from(databaseTables.records).select(publicRecordSelect).eq('user_id', userId),` を探す
+  - [`apps/product/src/features/auth/server/user-service.ts`](../../../apps/product/src/features/auth/server/user-service.ts) で `collectQueryPages((from, to) =>` を探す
   - [`supabase/config.toml`](../../../supabase/config.toml) で `max_rows = 1000` を探す
-  - [`apps/product/src/lib/database/collect-query-pages.ts`](../../../apps/product/src/lib/database/collect-query-pages.ts) で `Exhaust a stably ordered query rather than silently accepting the Data API row cap.` を探す（レポート側はこれで読み切っている）
-
-<details>
-<summary>⚡ Plan か Record が行数の上限を超える — 画面: 何も起きない / データ: 欠落する / 再試行: しない / 痕跡: 残らない</summary>
-
-- 画面: 成功のトーストが出る。欠けていることは画面に出ない。
-- データ: DB は変化なし。ファイルには上限までの行しか入らない（並び順を指定していないので、どの行が落ちるかも決まらない）。
-- 再試行: しない。何度押しても同じだけ欠ける。
-- 痕跡: 残らない（エラーではない）。
-- **最初に見る場所**: local は config.toml の max_rows = 1000。本番の値は未確認（Supabase の API 設定で見る）。書き出したファイルの行数と、DB の件数を比べる。
-- 根拠:
-  - [`supabase/config.toml`](../../../supabase/config.toml) で `max_rows = 1000` を探す
-  - [`apps/product/src/features/auth/server/user-service.ts`](../../../apps/product/src/features/auth/server/user-service.ts) で `adminClient.from('plans').select(publicPlanSelect).eq('user_id', userId),` を探す
-
-</details>
+  - [`apps/product/src/lib/database/collect-query-pages.ts`](../../../apps/product/src/lib/database/collect-query-pages.ts) で `Exhaust a stably ordered query rather than silently accepting the Data API row cap.` を探す（レポートとエクスポートで共有する既存のページ走査）
+- **この段を守るテスト**:
+  - [`apps/product/src/features/auth/server/user-service.test.ts`](../../../apps/product/src/features/auth/server/user-service.test.ts) で `it('Data API上限を越す1201件を4種類とも欠落なくexportする'` を探す（実SDKと合成HTTP上限で全件を照合。後続ページ失敗も別caseで拒否を検査する。実DB検証ではない。）
 
 <details>
 <summary>⚡ どれかの表の読み取りが失敗する — 画面: エラー表示 / データ: 変化なし / 再試行: 自動で再試行 / 痕跡: Sentry</summary>
@@ -456,9 +444,9 @@ Blob から一時 URL を作り、見えないリンクの download 属性に da
     {
       "id": "service",
       "svc": "vercel",
-      "short": "Service が 6 本読む",
+      "short": "Service が6種類を読む",
       "title": "UserService.exportData が 6 種類を並行で読む",
-      "what": "profile・カテゴリ・アクティビティ・user_settings は利用者の権限の client（RLS が効く）で、Plan と Record は service role の client で読み、どれも ctx の userId で絞る。6 本を並行で投げ、どれか 1 本でも失敗すれば全体を失敗にする（profile と user_settings が未作成なのは失敗にしない）。",
+      "what": "profile・カテゴリ・アクティビティ・user_settings は利用者の権限の client（RLS が効く）で、Plan と Record は service role の client で読み、どれも ctx の userId で絞る。6種類を並行で読み、どれかの取得（後続ページを含む）が失敗すれば全体を失敗にする（profile と user_settings が未作成なのは失敗にしない）。",
       "why": "Plan / Record の RLS は削除済み（deleted_at あり）の行を利用者から隠す。service role で読むので、削除済みの行も deleted_at 付きで書き出される。これが意図かどうかはコード上に説明が無く、未確認。",
       "io": {
         "in": "ctx の userId",
@@ -502,17 +490,17 @@ Blob から一時 URL を作り、見えないリンクの download 属性に da
       "short": "行を読む",
       "title": "Supabase から各表を読む",
       "via": "PostgREST",
-      "what": "各表を 1 回の select で読む。レポートの取得と違い、ページ分けして読み切る処理（collectQueryPages）を通していない。",
-      "why": "件数が少ない前提の書き方になっている（理由の記録は見当たらない）。",
+      "what": "Plan・Record・カテゴリ・アクティビティはcollectQueryPagesで500件ずつid順に読み切る。profileとuser_settingsは単一行を読む。各ページは同じctxのuserIdで絞る。",
+      "why": "全期間のエクスポートがData APIの1回取得上限で欠けないようにするため。",
       "io": {
         "in": "user_id で絞った select",
         "out": "各表の行"
       },
-      "change": "PostgREST は 1 回の応答の行数に上限（max_rows）があり、超えた分は黙って切られる。local の設定は 1000。Plan / Record が多い利用者に効くので、直すなら collectQueryPages で読み切る。",
+      "change": "ページ途中の失敗は部分結果を返さずEXPORT_FAILEDにする。単一DB snapshotではないため取得中の同時編集に対する整合性保証は別。repoのmax_rowsは1000で、ページサイズ500以上の上限を前提とする。クラウドの現在値は未確認。",
       "refs": [
         {
           "path": "apps/product/src/features/auth/server/user-service.ts",
-          "find": "adminClient.from(databaseTables.records).select(publicRecordSelect).eq('user_id', userId),"
+          "find": "collectQueryPages((from, to) =>"
         },
         {
           "path": "supabase/config.toml",
@@ -521,50 +509,10 @@ Blob から一時 URL を作り、見えないリンクの download 属性に da
         {
           "path": "apps/product/src/lib/database/collect-query-pages.ts",
           "find": "Exhaust a stably ordered query rather than silently accepting the Data API row cap.",
-          "why": "レポート側はこれで読み切っている"
+          "why": "レポートとエクスポートで共有する既存のページ走査"
         }
       ],
       "fails": [
-        {
-          "id": "row-cap",
-          "label": "Plan か Record が行数の上限を超える",
-          "screen": "成功のトーストが出る。欠けていることは画面に出ない。",
-          "data": "DB は変化なし。ファイルには上限までの行しか入らない（並び順を指定していないので、どの行が落ちるかも決まらない）。",
-          "retry": "しない。何度押しても同じだけ欠ける。",
-          "trace": "残らない（エラーではない）。",
-          "look": "local は config.toml の max_rows = 1000。本番の値は未確認（Supabase の API 設定で見る）。書き出したファイルの行数と、DB の件数を比べる。",
-          "refs": [
-            {
-              "path": "supabase/config.toml",
-              "find": "max_rows = 1000"
-            },
-            {
-              "path": "apps/product/src/features/auth/server/user-service.ts",
-              "find": "adminClient.from('plans').select(publicPlanSelect).eq('user_id', userId),"
-            }
-          ],
-          "tags": {
-            "screen": "none",
-            "data": "lost",
-            "retry": "none",
-            "trace": "none"
-          },
-          "continues": true,
-          "to": "download",
-          "back": "欠けたまま保存",
-          "screenAfter": {
-            "t": "settings",
-            "url": "/ja/settings/data",
-            "title": "エクスポート",
-            "rows": [
-              ["形式", "JSON（バックアップ・復元用）", "neutral"],
-              ["範囲", "全期間", "neutral"]
-            ],
-            "button": "エクスポート",
-            "toast": "データをエクスポートしました",
-            "note": "ブラウザが dayopt-export-<数字>.json を保存する"
-          }
-        },
         {
           "id": "db-error",
           "label": "どれかの表の読み取りが失敗する",
@@ -603,6 +551,13 @@ Blob から一時 URL を作り、見えないリンクの download 属性に da
             "toast": "エクスポートできませんでした。もう一度お試しください。",
             "toastTone": "bad"
           }
+        }
+      ],
+      "tests": [
+        {
+          "path": "apps/product/src/features/auth/server/user-service.test.ts",
+          "find": "it('Data API上限を越す1201件を4種類とも欠落なくexportする'",
+          "why": "実SDKと合成HTTP上限で全件を照合。後続ページ失敗も別caseで拒否を検査する。実DB検証ではない。"
         }
       ]
     },

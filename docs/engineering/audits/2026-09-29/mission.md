@@ -150,3 +150,11 @@ F026を`9b10660eb`、F023を`40d9be4b3`で修正。回復コードはnative比�
 製品SHA `40d9be4b301735026f376ffc37f6f53cf19a502c`でNode24の`pnpm check` exit 0。型/lint/static、billing37/i18n2/observability64/product4353/web366/scripts2642、合計7464 passed。ログ `/tmp/dayopt-audit-check-auth-validation.log`。製品を固定して検査した。件数減は上記未使用helper専用testの撤去によるもので、検証済み範囲の拡大率とは扱わない。クラウド・E2E・配信は未確認。
 
 再認証test、user-serviceとtest、settings仕様、DataSettings、knipを全文読解し基準279件。次はH027の全件エクスポートとAPI上限、期間境界、共有query結果の扱いを追う。H024/H025の残る認証/cache境界とH026のHIBP検証候補も継続する。公開済みheadは引き続き`5d7f96eb1`で、今回の修正は次の通常pre-push後にDraftへ保存する。
+
+認証修正は公開head `c5a6511a0c85389e7ee788266d055176b193854a` としてDraft #2965へ保存し、isDraft=true/state=OPEN/headを確認済み。通常pre-push成功（型/lint/scripts2642/format）、ログ `/tmp/dayopt-audit-push-auth-verified.log`。Issue進捗 https://github.com/Dayopt/dayopt/issues/2963#issuecomment-5888472665 。mainへのmergeなし。
+
+F027を`b82badf0eef2fd02459697b36e2be19c834e2af7`で修正。API上限を実SDK+合成HTTPで再現し、全件エクスポートの4 collectionを既存ページ走査へ接続。red5/green54・型検査成功。単一snapshotや本番欠落を確認したとは扱わない。同製品SHAで全体checkを開始し製品コードを固定。基準全文確認285件。次はexport UIのrefetch失敗/日付/共有dataと、Pro限定の古い設定仕様を元判断と照合する。GDPR integration testは実際にはUSE_LOCAL_DB gateが必要で、未実行のまま。ドキュメントのPreview既定説明を実行証拠としない。
+
+F027を含む固定製品SHA `b82badf0eef2fd02459697b36e2be19c834e2af7`で全体`pnpm check` exit 0、billing37/i18n2/observability64/product4358/web366/scripts2642、合計7469 passed。ログ `/tmp/dayopt-audit-check-export-pages.log`。検査中は製品固定、文書だけ更新。別途docs:checkはlearnの旧1行query参照2件を検出し、journey825行を全文確認してJSON正本をページ走査の実装へ同期、learn:generateで本文/逆引きを再生成した。全文読解は基準295件、機械確認1、未確認2845。新規mainファイルは別枠。
+
+F028は2026-09-08の決定原文と現行仕様・query境界を照合し、settingsの古いPro限定説明だけを訂正。H029としてUIのrefetch失敗・query結果直接変更・timezoneの再現を次の着手点に保存。ConfirmDialog/clipboardの未処理Promise候補、公開JSON復元説明も追加調査する。今回の安全な修正をIssue化で終了扱いせず、次の継続で再現・修正へ進む。全体監査・実クラウド・E2Eは未完了。

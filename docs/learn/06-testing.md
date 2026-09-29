@@ -260,9 +260,11 @@ last_verified: 2026-09-21
 
 - **経路全体**:
   - [`apps/product/src/features/settings/components/DataSettings.csv-export.test.tsx`](../../apps/product/src/features/settings/components/DataSettings.csv-export.test.tsx) で `it('exportData の plan / record を安全な CSV Blob としてダウンロードする'` を探す（component test。問い合わせの結果が CSV の Blob になって保存されるまで（期間指定は通っていない））
-- **4. Service が 6 本読む**:
+- **4. Service が6種類を読む**:
   - [`apps/product/src/features/auth/server/user-service.test.ts`](../../apps/product/src/features/auth/server/user-service.test.ts) で `it('plans / records / categories / activities / settings をexportする'` を探す
   - [`apps/product/src/features/auth/server/user-service.test.ts`](../../apps/product/src/features/auth/server/user-service.test.ts) で `it('profileが未作成ならnullとしてexportする'` を探す
+- **5. 行を読む**:
+  - [`apps/product/src/features/auth/server/user-service.test.ts`](../../apps/product/src/features/auth/server/user-service.test.ts) で `it('Data API上限を越す1201件を4種類とも欠落なくexportする'` を探す（実SDKと合成HTTP上限で全件を照合。後続ページ失敗も別caseで拒否を検査する。実DB検証ではない。）
 - **8. CSV か JSON にする**:
   - [`apps/product/src/features/settings/lib/timeblock-csv-export.test.ts`](../../apps/product/src/features/settings/lib/timeblock-csv-export.test.ts) で `it('defined columns以外の内部値はexportしない'` を探す
   - [`apps/product/src/features/settings/lib/timeblock-csv-export.test.ts`](../../apps/product/src/features/settings/lib/timeblock-csv-export.test.ts) で `describe('escapeTimeblockCsvField'` を探す
@@ -370,7 +372,6 @@ last_verified: 2026-09-21
 - [データを書き出す](journeys/data-export.md) の 1. 形式と範囲を選ぶ
 - [データを書き出す](journeys/data-export.md) の 2. 押した時に問い合わせる
 - [データを書き出す](journeys/data-export.md) の 3. /api/trpc と関門
-- [データを書き出す](journeys/data-export.md) の 5. 行を読む
 - [データを書き出す](journeys/data-export.md) の 6. 応答を受け取る
 - [データを書き出す](journeys/data-export.md) の 7. 期間で絞る
 - [Google Calendar 連携](journeys/google-calendar.md) の 1. 連携設定で接続

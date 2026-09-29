@@ -5928,10 +5928,12 @@
       "mode": "100644",
       "bytes": 5503,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 164]],
+      "evidence": [
+        "Full text reviewed at b82badf0e, baseline bytes unchanged. Consent test output initially bundled with truncated decision search; reread independently in 1-130 and 131-EOF. CSV escaping, MCP URL, consent save confirmation and dialog rejection boundaries inspected. ConfirmDialog awaits onConfirm with finally only; rejection propagation remains candidate."
+      ],
       "questions": []
     },
     {
@@ -13612,10 +13614,12 @@
       "mode": "100644",
       "bytes": 8769,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 244]],
+      "evidence": [
+        "Full text reviewed at b82badf0e, baseline bytes unchanged. Consent test output initially bundled with truncated decision search; reread independently in 1-130 and 131-EOF. CSV escaping, MCP URL, consent save confirmation and dialog rejection boundaries inspected. ConfirmDialog awaits onConfirm with finally only; rejection propagation remains candidate."
+      ],
       "questions": []
     },
     {
@@ -13625,10 +13629,12 @@
       "mode": "100644",
       "bytes": 3422,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 104]],
+      "evidence": [
+        "Full text read at c5a6511a0 / b82badf0e; baseline bytes unchanged. Export all-history contract, expiry access exception and tests inspected. GDPR integration suite is gated on USE_LOCAL_DB=true and was not executed. Settings spec Pro statement differs from current billing spec and public export docs; pending decision-source check."
+      ],
       "questions": []
     },
     {
@@ -13638,10 +13644,12 @@
       "mode": "100644",
       "bytes": 3134,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 91]],
+      "evidence": [
+        "Full text reviewed at b82badf0e, baseline bytes unchanged. Consent test output initially bundled with truncated decision search; reread independently in 1-130 and 131-EOF. CSV escaping, MCP URL, consent save confirmation and dialog rejection boundaries inspected. ConfirmDialog awaits onConfirm with finally only; rejection propagation remains candidate."
+      ],
       "questions": []
     },
     {
@@ -13651,10 +13659,12 @@
       "mode": "100644",
       "bytes": 2236,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 64]],
+      "evidence": [
+        "Full text reviewed at b82badf0e, baseline bytes unchanged. Consent test output initially bundled with truncated decision search; reread independently in 1-130 and 131-EOF. CSV escaping, MCP URL, consent save confirmation and dialog rejection boundaries inspected. ConfirmDialog awaits onConfirm with finally only; rejection propagation remains candidate."
+      ],
       "questions": []
     },
     {
@@ -14459,10 +14469,12 @@
       "mode": "100644",
       "bytes": 2446,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 70]],
+      "evidence": [
+        "Full text reviewed at b82badf0e, baseline bytes unchanged. Consent test output initially bundled with truncated decision search; reread independently in 1-130 and 131-EOF. CSV escaping, MCP URL, consent save confirmation and dialog rejection boundaries inspected. ConfirmDialog awaits onConfirm with finally only; rejection propagation remains candidate."
+      ],
       "questions": []
     },
     {
@@ -14472,10 +14484,12 @@
       "mode": "100644",
       "bytes": 1275,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 41]],
+      "evidence": [
+        "Full text reviewed at b82badf0e, baseline bytes unchanged. Consent test output initially bundled with truncated decision search; reread independently in 1-130 and 131-EOF. CSV escaping, MCP URL, consent save confirmation and dialog rejection boundaries inspected. ConfirmDialog awaits onConfirm with finally only; rejection propagation remains candidate."
+      ],
       "questions": []
     },
     {
@@ -17698,10 +17712,12 @@
       "mode": "100644",
       "bytes": 1056,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 33]],
+      "evidence": [
+        "Full text read at c5a6511a0 / b82badf0e; baseline bytes unchanged. Export all-history contract, expiry access exception and tests inspected. GDPR integration suite is gated on USE_LOCAL_DB=true and was not executed. Settings spec Pro statement differs from current billing spec and public export docs; pending decision-source check."
+      ],
       "questions": []
     },
     {
@@ -17897,10 +17913,12 @@
       "mode": "100644",
       "bytes": 346,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 14]],
+      "evidence": [
+        "Full baseline text reviewed at b82badf0e (unchanged from baseline); data-export journey read in 1-205/206-410/411-615/616-EOF before editing its canonical JSON. F027 updates page fetch explanation and references via learn:generate. Remaining stale-success/date/restore observations are hypotheses until verified, not adopted solely from journey prose."
+      ],
       "questions": []
     },
     {
@@ -18092,10 +18110,12 @@
       "mode": "100644",
       "bytes": 9447,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 259]],
+      "evidence": [
+        "Full baseline text reviewed at b82badf0e (unchanged from baseline); data-export journey read in 1-205/206-410/411-615/616-EOF before editing its canonical JSON. F027 updates page fetch explanation and references via learn:generate. Remaining stale-success/date/restore observations are hypotheses until verified, not adopted solely from journey prose."
+      ],
       "questions": []
     },
     {
@@ -20811,10 +20831,12 @@
       "mode": "100644",
       "bytes": 14898,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 417]],
+      "evidence": [
+        "Full text read at c5a6511a0 / b82badf0e; baseline bytes unchanged. Export all-history contract, expiry access exception and tests inspected. GDPR integration suite is gated on USE_LOCAL_DB=true and was not executed. Settings spec Pro statement differs from current billing spec and public export docs; pending decision-source check."
+      ],
       "questions": []
     },
     {
@@ -21508,10 +21530,12 @@
       "mode": "100644",
       "bytes": 2203,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 47]],
+      "evidence": [
+        "Full baseline text reviewed at b82badf0e (unchanged from baseline); data-export journey read in 1-205/206-410/411-615/616-EOF before editing its canonical JSON. F027 updates page fetch explanation and references via learn:generate. Remaining stale-success/date/restore observations are hypotheses until verified, not adopted solely from journey prose."
+      ],
       "questions": []
     },
     {
@@ -23258,10 +23282,12 @@
       "mode": "100644",
       "bytes": 1493,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 58]],
+      "evidence": [
+        "Full text read at c5a6511a0 / b82badf0e; baseline bytes unchanged. Export all-history contract, expiry access exception and tests inspected. GDPR integration suite is gated on USE_LOCAL_DB=true and was not executed. Settings spec Pro statement differs from current billing spec and public export docs; pending decision-source check."
+      ],
       "questions": []
     },
     {
@@ -23518,10 +23544,12 @@
       "mode": "100644",
       "bytes": 1843,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 58]],
+      "evidence": [
+        "Full text read at c5a6511a0 / b82badf0e; baseline bytes unchanged. Export all-history contract, expiry access exception and tests inspected. GDPR integration suite is gated on USE_LOCAL_DB=true and was not executed. Settings spec Pro statement differs from current billing spec and public export docs; pending decision-source check."
+      ],
       "questions": []
     },
     {
@@ -28779,10 +28807,12 @@
       "mode": "100644",
       "bytes": 53350,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 825]],
+      "evidence": [
+        "Full baseline text reviewed at b82badf0e (unchanged from baseline); data-export journey read in 1-205/206-410/411-615/616-EOF before editing its canonical JSON. F027 updates page fetch explanation and references via learn:generate. Remaining stale-success/date/restore observations are hypotheses until verified, not adopted solely from journey prose."
+      ],
       "questions": []
     },
     {
@@ -29491,10 +29521,12 @@
       "mode": "100644",
       "bytes": 11225,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 110]],
+      "evidence": [
+        "Full text read at c5a6511a0 / b82badf0e; baseline bytes unchanged. Export all-history contract, expiry access exception and tests inspected. GDPR integration suite is gated on USE_LOCAL_DB=true and was not executed. Settings spec Pro statement differs from current billing spec and public export docs; pending decision-source check."
+      ],
       "questions": []
     },
     {

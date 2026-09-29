@@ -267,7 +267,7 @@ last_verified: 2026-09-21
 #### `apps/product/src/features/auth/server/router.ts`
 
 - [アカウントを削除する（不可逆）](journeys/account-deletion.md) の 2. 本人を確かめ直す — captcha を免除している経路なので、呼び出し元を増やす前に password-reauthentication.ts の契約と docs/product/specs/auth.md の保証境界を読む。検証用の session は scope: 'local' で消す（既定の global だと全端末がログアウトする）。
-- [データを書き出す](journeys/data-export.md) の 4. Service が 6 本読む — service role は RLS を越えるので、Plan / Record では .eq('user_id', userId) だけが他人のデータとの境界になる（REVIEW-1）。userId は必ず ctx から取り、入力で受けない。列は public-projections の select に限っているので、列を足す時はそこを変える。
+- [データを書き出す](journeys/data-export.md) の 4. Service が6種類を読む — service role は RLS を越えるので、Plan / Record では .eq('user_id', userId) だけが他人のデータとの境界になる（REVIEW-1）。userId は必ず ctx から取り、入力で受けない。列は public-projections の select に限っているので、列を足す時はそこを変える。
 
 #### `apps/product/src/features/auth/server/user-service.ts`
 
@@ -276,8 +276,8 @@ last_verified: 2026-09-21
 - [アカウントを削除する（不可逆）](journeys/account-deletion.md) の 4. 削除を開始（閉鎖へ） — DB の RPC は失敗 code が 40P01 / 55P03 / 57014（deadlock・lock 待ち・timeout）なら 3 回まで呼び直す。それでも取れなければ contention として利用者に押し直してもらう。
 - [アカウントを削除する（不可逆）](journeys/account-deletion.md) の 8. 封をして本体を消す — auth.users から ON DELETE CASCADE で届かないテーブルは、ここでは消えない。email_suppressions は削除後も残す扱いで未裁定（invariants.md）。この trigger は gate が有効な時だけ働く。
 - [アカウントを削除する（不可逆）](journeys/account-deletion.md) の 9. 削除完了メール — 削除のあとは user_settings も profiles も無い。メールに要る値はすべて削除の前に控えておく。
-- [データを書き出す](journeys/data-export.md) の 4. Service が 6 本読む — service role は RLS を越えるので、Plan / Record では .eq('user_id', userId) だけが他人のデータとの境界になる（REVIEW-1）。userId は必ず ctx から取り、入力で受けない。列は public-projections の select に限っているので、列を足す時はそこを変える。
-- [データを書き出す](journeys/data-export.md) の 5. 行を読む — PostgREST は 1 回の応答の行数に上限（max_rows）があり、超えた分は黙って切られる。local の設定は 1000。Plan / Record が多い利用者に効くので、直すなら collectQueryPages で読み切る。
+- [データを書き出す](journeys/data-export.md) の 4. Service が6種類を読む — service role は RLS を越えるので、Plan / Record では .eq('user_id', userId) だけが他人のデータとの境界になる（REVIEW-1）。userId は必ず ctx から取り、入力で受けない。列は public-projections の select に限っているので、列を足す時はそこを変える。
+- [データを書き出す](journeys/data-export.md) の 5. 行を読む — ページ途中の失敗は部分結果を返さずEXPORT_FAILEDにする。単一DB snapshotではないため取得中の同時編集に対する整合性保証は別。repoのmax_rowsは1000で、ページサイズ500以上の上限を前提とする。クラウドの現在値は未確認。
 
 #### `apps/product/src/features/auth/server/welcome-email.ts`
 
@@ -655,11 +655,11 @@ last_verified: 2026-09-21
 
 - [レポートを開く（集計）](journeys/report.md) の 6. 行を取る — RLS（利用者の権限の client）に加えて user_id でも絞っている。PostgREST の 1 回あたりの行数上限に黙って切られないよう collectQueryPages で読み切るので、ここを単発の select に戻すと多い期間で数字が欠ける。
 - [レポートを開く（集計）](journeys/report.md) の 7. TS で集計 — 集計の数え方は lib/time の aggregate を詳細パネルと共有している。中央値の母集団（期間へ切り取った長さ、auto_migrated を除く）を片方だけ変えると、一覧と詳細パネルで同じアクティビティの中央値が食い違う。現在時刻（nowAt）はサーバーの値を返して、ブラウザの時計とのずれで数字が揺れないようにしている。
-- [データを書き出す](journeys/data-export.md) の 5. 行を読む — PostgREST は 1 回の応答の行数に上限（max_rows）があり、超えた分は黙って切られる。local の設定は 1000。Plan / Record が多い利用者に効くので、直すなら collectQueryPages で読み切る。
+- [データを書き出す](journeys/data-export.md) の 5. 行を読む — ページ途中の失敗は部分結果を返さずEXPORT_FAILEDにする。単一DB snapshotではないため取得中の同時編集に対する整合性保証は別。repoのmax_rowsは1000で、ページサイズ500以上の上限を前提とする。クラウドの現在値は未確認。
 
 #### `apps/product/src/lib/database/public-projections.ts`
 
-- [データを書き出す](journeys/data-export.md) の 4. Service が 6 本読む — service role は RLS を越えるので、Plan / Record では .eq('user_id', userId) だけが他人のデータとの境界になる（REVIEW-1）。userId は必ず ctx から取り、入力で受けない。列は public-projections の select に限っているので、列を足す時はそこを変える。
+- [データを書き出す](journeys/data-export.md) の 4. Service が6種類を読む — service role は RLS を越えるので、Plan / Record では .eq('user_id', userId) だけが他人のデータとの境界になる（REVIEW-1）。userId は必ず ctx から取り、入力で受けない。列は public-projections の select に限っているので、列を足す時はそこを変える。
 
 #### `apps/product/src/lib/email/notifications.ts`
 
@@ -775,7 +775,7 @@ last_verified: 2026-09-21
 #### `apps/product/src/lib/trpc/error-code-map.ts`
 
 - [Plan / Record を動かす・直す](journeys/edit-timeblock.md) の 6. RPC で更新 — 訳したコードは client-safe-service-code.ts の許可一覧に載っているものだけがブラウザへ届く。載っていないコードは「結果不明」として扱われ、Inspector が止まる側に倒れる。
-- [データを書き出す](journeys/data-export.md) の 5. 行を読む — PostgREST は 1 回の応答の行数に上限（max_rows）があり、超えた分は黙って切られる。local の設定は 1000。Plan / Record が多い利用者に効くので、直すなら collectQueryPages で読み切る。
+- [データを書き出す](journeys/data-export.md) の 5. 行を読む — ページ途中の失敗は部分結果を返さずEXPORT_FAILEDにする。単一DB snapshotではないため取得中の同時編集に対する整合性保証は別。repoのmax_rowsは1000で、ページサイズ500以上の上限を前提とする。クラウドの現在値は未確認。
 
 #### `apps/product/src/lib/trpc/errors.ts`
 
@@ -864,7 +864,7 @@ last_verified: 2026-09-21
 
 - [パスワードを再設定する](journeys/password-reset.md) の 2. Auth が token を発行 — リンクの有効時間（mailer_otp_exp）や再送間隔は repo ではなく Supabase の Auth 設定が正本。production の値は Auth config audit が監視している（mailer_otp_exp は 3600 秒で固定）。
 - [パスワードを再設定する](journeys/password-reset.md) の 9. 変更通知メール — production で通知が有効かどうか（mailer_notifications_password_changed_enabled）は Auth config audit が監視する。リセットでも設定画面からの変更でも同じ通知が出る。
-- [データを書き出す](journeys/data-export.md) の 5. 行を読む — PostgREST は 1 回の応答の行数に上限（max_rows）があり、超えた分は黙って切られる。local の設定は 1000。Plan / Record が多い利用者に効くので、直すなら collectQueryPages で読み切る。
+- [データを書き出す](journeys/data-export.md) の 5. 行を読む — ページ途中の失敗は部分結果を返さずEXPORT_FAILEDにする。単一DB snapshotではないため取得中の同時編集に対する整合性保証は別。repoのmax_rowsは1000で、ページサイズ500以上の上限を前提とする。クラウドの現在値は未確認。
 
 #### `supabase/functions/send-auth-email/PasswordResetEmail.tsx`
 
@@ -934,7 +934,7 @@ last_verified: 2026-09-21
 
 #### `supabase/migrations/20260809015344_optimize_soft_delete_rls_initplan.sql`
 
-- [データを書き出す](journeys/data-export.md) の 4. Service が 6 本読む — service role は RLS を越えるので、Plan / Record では .eq('user_id', userId) だけが他人のデータとの境界になる（REVIEW-1）。userId は必ず ctx から取り、入力で受けない。列は public-projections の select に限っているので、列を足す時はそこを変える。
+- [データを書き出す](journeys/data-export.md) の 4. Service が6種類を読む — service role は RLS を越えるので、Plan / Record では .eq('user_id', userId) だけが他人のデータとの境界になる（REVIEW-1）。userId は必ず ctx から取り、入力で受けない。列は public-projections の select に限っているので、列を足す時はそこを変える。
 
 #### `supabase/migrations/20260824090000_detach_tag_id_from_timeblock_write_path.sql`
 
