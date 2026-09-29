@@ -59,6 +59,8 @@ registry は provision 応答の `schemaVersion / operation / runId / users` に
 
 file は600、親directoryは700、16KiB以内とし、file symlinkを拒否する。公開evidenceだけでなくPlaywrightのoutputDirの外に保存する。Playwrightは起動時にoutputDirを消去するため、credentialsとbrowser出力を同じ場所へ置かない。生のlogin fileをartifactやログへ載せない。
 
+[private writer](../../scripts/lib/preview-fixture-registry.mjs) は認証済み応答の受信・復号後に使う保存処理。provisionの公開intentと応答のrun/予定2UUID/固定fieldを照合し、既存fileを上書きせず、新しい700directoryへ600fileを作る。browser outputと公開evidenceの配下は、symlinkの実体を含めて拒否する。実際のconsumer readerで読めることをローカルの実fileで検証している。この処理自体は応答の送信者認証やjob間転送を行わず、現在のrunnerにも未接続。保存先をartifactへ渡さず、worker終了時の削除をcallerが担当する。
+
 consumer時はspecごとのadmin生成・seed・削除を行わず、同じ2ユーザーを通常loginで使う。Preview configで **desktop6件 → mobile5件 → A/B認可1件** のproject依存を明示し、認可テストのRecordが先にReport集計へ混ざらないようにする。先行失敗時の後続skipは成功にしない。全project後の回収は別のtrusted jobが担当し、worker喪失時も予定intentから回収できる必要がある。legacyモードのspec別作成/削除は維持する。
 
 `previewWorkerEnvironment` は信頼済み caller が registry path を明示した場合だけ、検証済み readiness の ephemeral binding・immutable origin・run・予定2UUIDを確認し、管理キーを含まないenvを組み立てる。親envのregistry指定は無視する。GitHub token、provider PAT、OIDC発行変数、NODE_OPTIONSは引き継がず、Preview到達用bypassと通常loginのprivate file pathだけを既存allowlistへ加える。file内容の検証はconsumer readerが行う。現在のrunner呼び出しは追加引数を渡さず、従来動作を維持する。同一jobでenvを絞るだけでは、悪意あるcandidateから親プロセス・filesystemへのアクセスを隔離できないため、trusted/candidateのjob分離を省略してはならない。
