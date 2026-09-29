@@ -181,10 +181,12 @@
       "mode": "100644",
       "bytes": 12565,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 285]],
+      "evidence": [
+        "Full text read at ef0f9e572; baseline bytes unchanged. Account deletion uses mutate/retry:false; provider durable and legacy paths require continued DB/callsite reconciliation. i18n confirms reuse of existing common.toast.copyFailed."
+      ],
       "questions": []
     },
     {
@@ -4851,10 +4853,12 @@
       "mode": "100644",
       "bytes": 14538,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 404]],
+      "evidence": [
+        "Full text read at ef0f9e572. Synthetic coordinator sequencing, lease re-claim, provider identity stop and recursive storage tests; not live DB/provider evidence."
+      ],
       "questions": []
     },
     {
@@ -4864,10 +4868,12 @@
       "mode": "100644",
       "bytes": 17039,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 499]],
+      "evidence": [
+        "Full text read at ef0f9e572, baseline unchanged. Traced activation versus schema and recover/bind/quiesce/calendar/storage+PostHog/billing/seal sequencing. Legacy retention intentional until drain/activation; migration supersession and live activation remain unverified."
+      ],
       "questions": []
     },
     {
@@ -4890,10 +4896,12 @@
       "mode": "100644",
       "bytes": 3155,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 86]],
+      "evidence": [
+        "Full text read at ef0f9e572, baseline unchanged. Traced activation versus schema and recover/bind/quiesce/calendar/storage+PostHog/billing/seal sequencing. Legacy retention intentional until drain/activation; migration supersession and live activation remain unverified."
+      ],
       "questions": []
     },
     {
@@ -13499,10 +13507,12 @@
       "mode": "100644",
       "bytes": 2609,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 60]],
+      "evidence": [
+        "Full text read at ef0f9e572; baseline bytes unchanged. Account deletion uses mutate/retry:false; provider durable and legacy paths require continued DB/callsite reconciliation. i18n confirms reuse of existing common.toast.copyFailed."
+      ],
       "questions": []
     },
     {
@@ -13525,10 +13535,12 @@
       "mode": "100644",
       "bytes": 9114,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 229]],
+      "evidence": [
+        "Full text read at ef0f9e572; baseline bytes unchanged. Account deletion uses mutate/retry:false; provider durable and legacy paths require continued DB/callsite reconciliation. i18n confirms reuse of existing common.toast.copyFailed."
+      ],
       "questions": []
     },
     {
@@ -14528,10 +14540,12 @@
       "mode": "100644",
       "bytes": 2133,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 66]],
+      "evidence": [
+        "Full text read at ef0f9e572, baseline unchanged. Traced activation versus schema and recover/bind/quiesce/calendar/storage+PostHog/billing/seal sequencing. Legacy retention intentional until drain/activation; migration supersession and live activation remain unverified."
+      ],
       "questions": []
     },
     {
@@ -14541,10 +14555,12 @@
       "mode": "100644",
       "bytes": 11589,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 350]],
+      "evidence": [
+        "Full text read at ef0f9e572, baseline unchanged. Traced activation versus schema and recover/bind/quiesce/calendar/storage+PostHog/billing/seal sequencing. Legacy retention intentional until drain/activation; migration supersession and live activation remain unverified."
+      ],
       "questions": []
     },
     {
@@ -14554,10 +14570,12 @@
       "mode": "100644",
       "bytes": 18181,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 536]],
+      "evidence": [
+        "Full text read at ef0f9e572; baseline bytes unchanged. Account deletion uses mutate/retry:false; provider durable and legacy paths require continued DB/callsite reconciliation. i18n confirms reuse of existing common.toast.copyFailed."
+      ],
       "questions": []
     },
     {
@@ -14606,10 +14624,12 @@
       "mode": "100644",
       "bytes": 1893,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 60]],
+      "evidence": [
+        "Full text read at ef0f9e572, baseline unchanged. Traced activation versus schema and recover/bind/quiesce/calendar/storage+PostHog/billing/seal sequencing. Legacy retention intentional until drain/activation; migration supersession and live activation remain unverified."
+      ],
       "questions": []
     },
     {
@@ -14619,10 +14639,12 @@
       "mode": "100644",
       "bytes": 1453,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 39]],
+      "evidence": [
+        "Full text read at ef0f9e572, baseline unchanged. Traced activation versus schema and recover/bind/quiesce/calendar/storage+PostHog/billing/seal sequencing. Legacy retention intentional until drain/activation; migration supersession and live activation remain unverified."
+      ],
       "questions": []
     },
     {
@@ -38793,10 +38815,12 @@
       "mode": "100644",
       "bytes": 5211,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 162]],
+      "evidence": [
+        "Full text read at ef0f9e572, baseline unchanged. Traced activation versus schema and recover/bind/quiesce/calendar/storage+PostHog/billing/seal sequencing. Legacy retention intentional until drain/activation; migration supersession and live activation remain unverified."
+      ],
       "questions": []
     },
     {

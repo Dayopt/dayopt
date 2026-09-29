@@ -170,3 +170,11 @@ F028は2026-09-08の決定原文と現行仕様・query境界を照合し、sett
 ConfirmDialogの全runtime callsiteを追い、Google/MCP/iCal/ghost/templateの反証を記録。未処理の候補はDataSettingsとActivityFilterListへ絞れた（H031）。追加の全文読解で基準313件、機械確認1、未確認2827。次はH031の再現・修正と、MCPコピーの失敗・exportの公開説明/保持境界を継続する。公開は通常pre-push後、Draftを維持する。
 
 F029/F030は公開head `83bb0cf832be62d1309038feedc28f2eeed1d93f`としてDraft #2965へ保存、APIでhead/isDraft=true/state=OPENを確認。通常pre-push（affected型/lint/scripts2642/format）成功、ログ `/tmp/dayopt-audit-push-export-ui-verified.log`。公開後にiCal/MCP settings testを追加全文確認し、ローカル台帳315件まで保存。MCPのonError callbackテストは実reject経路を通さない旨が明記されており、callback表示と実Promiseの保証を区別する。次の着手点はH031の2画面削除失敗。共通ConfirmDialog全体へ一律catchを追加するのではなく、既存通知を持つ未処理callsiteを再現して閉じる。
+
+## 削除・コピー操作の非同期結果
+
+H031を4種類の削除で再現しF031へ採用。通知callbackだけの合格と未処理rejectによる実行失敗を区別し、2 callsiteを修正。MCPコピーも完了前/拒否時の成功表示を再現してF032へ採用。製品SHA `ef0f9e572`に固定しNode24の全体checkを実行中。削除関連43 tests・型検査、コピーを含む関連9 tests成功。外部削除、実clipboard、配信は未実施。アカウント削除はmutate/retry:falseを使い、今回のmutateAsync未処理とは異なるため機械的に変更しない。以降はその再認証・provider cleanup・durable/legacy境界を追う。
+
+アカウント削除のUI/test、billing adapter/test、activation selector/coordinator、customer recovery migrationを追加全文確認。基準全文確認326件、機械確認1、未確認2814。schema presenceとactivationは意図的に別で、旧instance drain前はlegacyを維持する契約。旧経路の削除は未採用。durableではbegin→billing bind/quiesce→calendar→storage+PostHog→billing→seal、provider-started customerの期限内は待機し期限後のrecoveryへ進む。provider mockのtestは実Stripe観測ではない。migrationの後続上書き、provider検索の整合性/期限、DB gate・leaseと実環境のactivationは未照合として残す。次はcoordinator testsと現在のDB function定義・関連Issueでこれらを確認する。
+
+固定製品SHA `ef0f9e57258ecd8eb7e03d2545aee9d4f3fcd3d5`のNode24 `pnpm check` exit 0。型10 tasks・lint9 tasks・static、billing37/i18n2/observability64/product4372/web366/scripts2642、計7483 passed。ログ `/tmp/dayopt-audit-check-actions.log`。docs:checkもexit 0（`/tmp/dayopt-audit-actions-docs-check.log`）。検査中の変更は監査記録のみ。coordinator.test.tsも全文確認し基準327件、機械確認1、未確認2813。新規main pathはdelta管理を維持。実DB・E2E・配信の成功とは扱わない。

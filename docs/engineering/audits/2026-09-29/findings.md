@@ -278,3 +278,17 @@ H024の反証追記: installed `@supabase/auth-js@2.116.0` のGoTrueClient.ts 40
 - 状態: 呼び出し境界を照合、再現前。DataSettingsのdeleteBlocks/deleteAllDataとActivityFilterListのhandleConfirmDeleteが、既存のonError通知後もmutateAsyncのrejectをConfirmDialogへ返す。ConfirmDialogはfinallyでloadingを戻すだけで、React clickの返すPromiseは未処理になりうる。
 - 反証: Google切断・MCP revoke・iCal再生成はcallsiteでcatch済み。ExternalEventCardのdismissはuseConvertGhostEvent内部でcatch。TemplateListはCalendarSidebarのmutateを呼ぶため同じreject経路ではない。共通ダイアログで全例外を無条件に握りつぶす修正は未採用。
 - 次: 2つの未処理候補を実UIと失敗→再試行で再現し、通知の所有者を既存mutationに保ったまま最小のイベント境界で閉じる。Activityのfinallyによる閉じ方を無関係に変えない。既存testを使えるか確認する。外部API/DBの削除は実行しない。
+
+## F031 — 削除失敗の通知後に未処理rejectionが残る
+
+- 状態: H031を採用、`ef0f9e572`で修正。Mission #2963。実DBの削除は実行しない。
+- 再現: DataSettingsのblocks/allとActivityFilterListのactivity/categoryを実TanStack useMutationと実ConfirmDialogへ接続。各画面の修正前は2 tests passedでも2 unhandled errorsで実行全体がexit 1。通知callbackのassertだけではこの欠陥を見逃す。ログ `/tmp/dayopt-audit-data-delete-red.log` / `/tmp/dayopt-audit-activity-delete-red.log`。
+- 修正/反証: 未処理の2 callsiteでrejectを処理し、通知・rollbackは既存mutationの責務に保つ。DataSettingsは確認入力を保って再試行、ActivityFilterListは既存finallyによるcloseを維持。Google/MCP/iCal/ghost/templateは処理済みで変更せず、共通ConfirmDialogへ無条件catchを追加しない。
+- 検証: 失敗→再試行、通知回数、送信ID/確認値、ダイアログ状態を検査。関連6 files/43 passed・unhandled errorsなし、typecheck:product exit 0。ログ `/tmp/dayopt-audit-delete-{green,types}.log`。Activityのhookは実mutationを使う合成fixtureで、既存rollbackそのものや実DBの保証を新たに実測したものではない。
+
+## F032 — MCP URLコピーが書き込み前・拒否時にも成功を表示する
+
+- 状態: H029のclipboard候補を採用、`ef0f9e572`で修正。Mission #2963。
+- 根拠/再現: navigator.clipboard.writeTextのPromiseを待たずにcopied状態・成功通知を更新。遅延Promiseの完了前通知とNotAllowedError時の失敗通知欠落を操作で再現、修正前2 failed/3 passed。拒否理由や実際のclipboard内容は記録しない。
+- 修正: 書き込み成功後だけ成功状態を設定し、拒否/同期例外は既存common.toast.copyFailedで通知。再試行可能。接続URLの組み立て、利用権判定、コピー操作数は不変。汎用clipboard抽象化は追加しない。
+- 検証: 遅延完了・拒否→再試行を含む関連3 files/9 passed。ログ `/tmp/dayopt-audit-copy-{red,green}.log`。Clipboard APIは合成であり、実ブラウザ権限/OS clipboardの観測ではない。統合checkはMissionへ別記録。
