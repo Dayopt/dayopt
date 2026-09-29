@@ -238,6 +238,71 @@ describe('Cloud recovery plan intake', () => {
   });
 });
 describe('Cloud recovery after worker loss', () => {
+  it('repeats recovery from the durable intent without touching another run', async () => {
+    const foreignId = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+    const foreignUser = {
+      id: foreignId,
+      email: `critical-path-${foreignId}@example.com`,
+      app_metadata: { e2e_run_id: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd' },
+    };
+    const users = new Map([
+      [
+        intent.userIds.desktop,
+        {
+          id: intent.userIds.desktop,
+          email: `critical-path-${intent.userIds.desktop}@example.com`,
+          app_metadata: { e2e_run_id: intent.runId },
+        },
+      ],
+      [foreignId, foreignUser],
+    ]);
+    const fetchImpl = vi.fn<typeof fetch>(async (input, options) => {
+      const url = new URL(
+        typeof input === 'string' ? input : input instanceof URL ? input : input.url,
+      );
+      const userId = url.pathname.split('/').at(-1)!;
+      if (!Object.values(intent.userIds).includes(userId)) throw new Error('unexpected user');
+      if (options?.method === 'DELETE') {
+        users.delete(userId);
+        return new Response('{}', { status: 200 });
+      }
+      const user = users.get(userId);
+      return new Response(JSON.stringify(user ?? {}), { status: user ? 200 : 404 });
+    });
+    const authenticate = vi.fn(async () => undefined);
+    const recover = (options: {
+      evidenceDirectory: string;
+      runId: string;
+      supabaseProjectRef: string;
+      serviceKey: string;
+    }) => recoverPreviewUsers({ ...options, fetchImpl });
+    const first = await recoverCloudIntent({
+      intent,
+      directory: temp(),
+      serviceKey: 'sb_secret_dummy',
+      authenticate,
+      recover,
+    });
+    expect(first).toMatchObject({ status: 'clean', checked: 2, recovered: 1 });
+    expect(first.users.every((user) => user.status === 'deleted')).toBe(true);
+    expect(fetchImpl.mock.calls.filter((call) => call[1]?.method === 'DELETE')).toHaveLength(1);
+    expect(users.get(foreignId)).toEqual(foreignUser);
+
+    fetchImpl.mockClear();
+    const second = await recoverCloudIntent({
+      intent,
+      directory: temp(),
+      serviceKey: 'sb_secret_dummy',
+      authenticate,
+      recover,
+    });
+    expect(second).toMatchObject({ status: 'clean', checked: 2, recovered: 0 });
+    expect(second.users.every((user) => user.status === 'deleted')).toBe(true);
+    expect(fetchImpl.mock.calls).toHaveLength(2);
+    expect(fetchImpl.mock.calls.every((call) => call[1]?.method === 'GET')).toBe(true);
+    expect(authenticate).toHaveBeenCalledTimes(2);
+    expect([...users.entries()]).toEqual([[foreignId, foreignUser]]);
+  });
   it('recovers partial creation without the lost journal, using only two precommitted IDs', async () => {
     const directory = temp();
     const authenticate = vi.fn(async () => undefined);
