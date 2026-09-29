@@ -75,16 +75,9 @@ async function dragSelect(page: Page, hourFrom: number, hourTo: number) {
 /** 自前ユーザーの作成済みカードだけを編集・削除し、各書き込み後の永続状態を確認する。 */
 async function updateAndDeleteOwnedCard(page: Page, kind: 'plan' | 'record') {
   const date = offsetDateParam(kind === 'plan' ? 1 : -1);
-  await openDay(page, date);
   const cards = page.locator(`[data-${kind}-lane-card][data-timeblock-id]`, {
     hasText: IDENTITY.activityName,
   });
-  // serial suite が作成した同じ日・同じ種別の 1 件だけを対象にする。
-  await expect(cards).toHaveCount(1);
-  const id = await cards.getAttribute('data-timeblock-id');
-  expect(id).toMatch(/^[0-9a-f-]{36}$/i);
-  const card = page.locator(`[data-${kind}-lane-card][data-timeblock-id="${id}"]`);
-  const inspector = page.getByRole('region', { name: IDENTITY.activityName, exact: true });
   const note = `${kind} updated ${IDENTITY.activityName}`;
 
   async function awaitCommand(action: 'update' | 'delete', interact: () => Promise<void>) {
@@ -104,35 +97,52 @@ async function updateAndDeleteOwnedCard(page: Page, kind: 'plan' | 'record') {
     expect(response.status(), `${procedure} の保存応答`).toBe(200);
   }
 
-  await card.click();
-  await expect(inspector).toBeVisible();
-  await inspector.getByRole('button', { name: 'メモ', exact: true }).click();
-  const noteInput = inspector.getByRole('textbox', { name: 'メモ', exact: true });
-  await awaitCommand('update', async () => {
-    await noteInput.fill(note);
-    await noteInput.blur();
+  const { card, inspector } = await test.step('owned card open', async () => {
+    await openDay(page, date);
+    // serial suite が作成した同じ日・同じ種別の 1 件だけを対象にする。
+    await expect(cards).toHaveCount(1);
+    const id = await cards.getAttribute('data-timeblock-id');
+    expect(id).toMatch(/^[0-9a-f-]{36}$/i);
+    const card = page.locator(`[data-${kind}-lane-card][data-timeblock-id="${id}"]`);
+    const inspector = page.getByRole('region', { name: IDENTITY.activityName, exact: true });
+    await card.click();
+    await expect(inspector).toBeVisible();
+    return { card, inspector };
   });
 
-  await page.reload();
-  await expect(page.locator('[data-calendar-grid]').first()).toBeVisible({ timeout: 10_000 });
-  await expect(card).toBeVisible();
-  // reload 後に Inspector が復元された場合も、一度閉じて同じ ID のカードを開く。
-  if (await inspector.isVisible()) {
-    await inspector.getByRole('button', { name: '閉じる', exact: true }).click();
-  }
-  await card.click();
-  await expect(inspector).toBeVisible();
-  await expect(inspector.getByRole('button', { name: 'メモ', exact: true })).toHaveText(note);
+  await test.step('note update', async () => {
+    await inspector.getByRole('button', { name: 'メモ', exact: true }).click();
+    const noteInput = inspector.getByRole('textbox', { name: 'メモ', exact: true });
+    await awaitCommand('update', async () => {
+      await noteInput.fill(note);
+      await noteInput.blur();
+    });
+  });
 
-  await inspector.getByRole('button', { name: 'その他の操作', exact: true }).click();
-  await awaitCommand('delete', () =>
-    page.getByRole('menuitem', { name: '削除', exact: true }).click(),
-  );
-  await expect(card).toHaveCount(0);
-  await page.reload();
-  await expect(page.locator('[data-calendar-grid]').first()).toBeVisible({ timeout: 10_000 });
-  await expect(card).toHaveCount(0);
-  await expect(cards).toHaveCount(0);
+  await test.step('persisted note check', async () => {
+    await page.reload();
+    await expect(page.locator('[data-calendar-grid]').first()).toBeVisible({ timeout: 10_000 });
+    await expect(card).toBeVisible();
+    // reload 後に Inspector が復元された場合も、一度閉じて同じ ID のカードを開く。
+    if (await inspector.isVisible()) {
+      await inspector.getByRole('button', { name: '閉じる', exact: true }).click();
+    }
+    await card.click();
+    await expect(inspector).toBeVisible();
+    await expect(inspector.getByRole('button', { name: 'メモ', exact: true })).toHaveText(note);
+  });
+
+  await test.step('deletion check', async () => {
+    await inspector.getByRole('button', { name: 'その他の操作', exact: true }).click();
+    await awaitCommand('delete', () =>
+      page.getByRole('menuitem', { name: '削除', exact: true }).click(),
+    );
+    await expect(card).toHaveCount(0);
+    await page.reload();
+    await expect(page.locator('[data-calendar-grid]').first()).toBeVisible({ timeout: 10_000 });
+    await expect(card).toHaveCount(0);
+    await expect(cards).toHaveCount(0);
+  });
 }
 
 describeWithEnv('Critical Path: 計画 → 実績 → 振り返り', () => {

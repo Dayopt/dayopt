@@ -143,6 +143,26 @@ export async function cleanupCloudRun({
   return cleanup;
 }
 
+const STEP_CATEGORIES = new Set(['expect', 'pw:api', 'test.step', 'fixture', 'hook', 'other']);
+
+/** Candidate reporter metadata is untrusted: rebuild only bounded diagnostic coordinates. */
+function publicSteps(steps) {
+  if (!Array.isArray(steps)) return [];
+  return steps.slice(0, 2000).map((step) => ({
+    category: STEP_CATEGORIES.has(step?.category) ? step.category : 'other',
+    file: FILES.has(step?.file) ? step.file : null,
+    line:
+      Number.isSafeInteger(step?.line) && step.line > 0 && step.line <= 1_000_000
+        ? step.line
+        : null,
+    duration:
+      Number.isFinite(step?.duration) && step.duration >= 0 && step.duration <= 20 * 60 * 1000
+        ? step.duration
+        : 0,
+    failed: step?.failed === true,
+  }));
+}
+
 /** Reconstruct a JSON-only public artifact. Never copy browser output, screenshots, or raw JSON. */
 export function publishCloudEvidence({ directory, destination, request, intent = undefined }) {
   const bound = validateCloudRequest(request);
@@ -209,6 +229,7 @@ export function publishCloudEvidence({ directory, destination, request, intent =
         status: test.status,
         retry: test.retry,
         expectedPassed: test.expectedPassed === true,
+        steps: publicSteps(test.steps),
       };
     });
   } catch {
