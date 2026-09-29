@@ -46,6 +46,7 @@ last_verified: 2026-09-29
 - 状態: 未検証仮説、未修正。
 - 根拠: strategy原則3はMCP/API由来も未確定ghostと記す。現在のMCP書込契約をまだ読んでいないため矛盾は未確定。
 - 次の反証: MCP仕様、同意/操作確定契約、関連決定/Issue、DB command経路を追う。契約の未決判断をコードだけで裁定しない。
+- 追加読解: `docs/learn/10-api-mcp.md`はMCPからcanonical Planを同じDB commandで作る経路を説明し、OAuth scope同意とMCP gateを契約にしている。external-calendar仕様は外部ミラーを明示タップで変換する別経路。journeys/mcp.mdは取得がtruncatedだったため未読を残す。次はtool原文・DB command・明示判断を照合し、ghost原則の適用対象を裁定する。
 
 ## F006 — 前期間にしか記録がない活動が前期間比から消える
 
@@ -118,3 +119,9 @@ last_verified: 2026-09-29
 - 状態: 読解からの候補。実行未再現、未修正。採用済み所見には数えない。
 - 追跡する点: ActivityRenameModal / CategoryRenameModalはmutateAsyncをtry/finallyだけで囲み、イベント側はvoidで呼ぶ。hookのtoast後もrejectが未処理にならないか確認する。activity-tree-cacheのcategory復元は未分類にある旧所属activityを戻さず、refetchまで空に見える。全snapshotのrestoreは別mutationの成功と競合しうる。
 - 次の反証: 実際の同時操作が可能なUI、tRPC/TanStack側の直列化、失敗時の回復・再取得を追う。コメントの意図や一時表示だけで直ちに不具合採用せず、操作後のユーザー可視結果で再現する。
+
+## H015 — 開いた詳細パネルの再取得・中断境界
+
+- 状態: 読解からの候補。実行未再現、未修正。
+- 根拠: ReportDetailTargetは名前・category名・色の選択時snapshotを保存し、ConnectedReportDetailPanelはquery再取得後もその値で見出しを描く。F013はperiod/detail queryの再取得を保証するが、選択済みtargetの同期までは保証していない。実際にパネルを開いたままmetadataを変えられる操作経路を確認する。
+- 別の中断候補: ReportDetailResizeHandleはpointerupでwindow listener/body style/isResizingを解放するが、pointercancelやunmountのcleanupがない。ブラウザの実際の中断条件と共有resize実装を照合し、再現してから修正を採否する。

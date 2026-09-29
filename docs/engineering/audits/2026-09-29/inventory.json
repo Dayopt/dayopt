@@ -12320,10 +12320,12 @@
       "mode": "100644",
       "bytes": 3235,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 89]],
+      "evidence": [
+        "Complete untruncated primary-agent read; report state, display, test and canonical input contracts compared. No UI behavior changed in this reading batch; outstanding hypotheses in findings.md."
+      ],
       "questions": []
     },
     {
@@ -12333,10 +12335,12 @@
       "mode": "100644",
       "bytes": 4145,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 105]],
+      "evidence": [
+        "Complete untruncated primary-agent read; report state, display, test and canonical input contracts compared. No UI behavior changed in this reading batch; outstanding hypotheses in findings.md."
+      ],
       "questions": []
     },
     {
@@ -12346,10 +12350,12 @@
       "mode": "100644",
       "bytes": 6533,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 169]],
+      "evidence": [
+        "Complete untruncated primary-agent read; report state, display, test and canonical input contracts compared. No UI behavior changed in this reading batch; outstanding hypotheses in findings.md."
+      ],
       "questions": []
     },
     {
@@ -12398,10 +12404,12 @@
       "mode": "100644",
       "bytes": 1807,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 46]],
+      "evidence": [
+        "Complete untruncated primary-agent read; report state, display, test and canonical input contracts compared. No UI behavior changed in this reading batch; outstanding hypotheses in findings.md."
+      ],
       "questions": []
     },
     {
@@ -12411,10 +12419,12 @@
       "mode": "100644",
       "bytes": 4187,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 105]],
+      "evidence": [
+        "Complete untruncated primary-agent read; report state, display, test and canonical input contracts compared. No UI behavior changed in this reading batch; outstanding hypotheses in findings.md."
+      ],
       "questions": []
     },
     {
@@ -12437,10 +12447,12 @@
       "mode": "100644",
       "bytes": 1630,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 41]],
+      "evidence": [
+        "Complete untruncated primary-agent read; report state, display, test and canonical input contracts compared. No UI behavior changed in this reading batch; outstanding hypotheses in findings.md."
+      ],
       "questions": []
     },
     {
@@ -12463,10 +12475,12 @@
       "mode": "100644",
       "bytes": 2706,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 81]],
+      "evidence": [
+        "Complete untruncated primary-agent read; report state, display, test and canonical input contracts compared. No UI behavior changed in this reading batch; outstanding hypotheses in findings.md."
+      ],
       "questions": []
     },
     {
@@ -12489,10 +12503,12 @@
       "mode": "100644",
       "bytes": 2502,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 66]],
+      "evidence": [
+        "Complete untruncated primary-agent read; report state, display, test and canonical input contracts compared. No UI behavior changed in this reading batch; outstanding hypotheses in findings.md."
+      ],
       "questions": []
     },
     {
@@ -12502,10 +12518,12 @@
       "mode": "100644",
       "bytes": 3861,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 91]],
+      "evidence": [
+        "Complete untruncated primary-agent read; report state, display, test and canonical input contracts compared. No UI behavior changed in this reading batch; outstanding hypotheses in findings.md."
+      ],
       "questions": []
     },
     {
@@ -12567,10 +12585,12 @@
       "mode": "100644",
       "bytes": 1177,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 36]],
+      "evidence": [
+        "Complete untruncated primary-agent read; report state, display, test and canonical input contracts compared. No UI behavior changed in this reading batch; outstanding hypotheses in findings.md."
+      ],
       "questions": []
     },
     {
@@ -12649,10 +12669,12 @@
       "mode": "100644",
       "bytes": 4571,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 137]],
+      "evidence": [
+        "Complete untruncated primary-agent read; report state, display, test and canonical input contracts compared. No UI behavior changed in this reading batch; outstanding hypotheses in findings.md."
+      ],
       "questions": []
     },
     {
@@ -12675,10 +12697,12 @@
       "mode": "100644",
       "bytes": 3514,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 105]],
+      "evidence": [
+        "Complete untruncated primary-agent read; report state, display, test and canonical input contracts compared. No UI behavior changed in this reading batch; outstanding hypotheses in findings.md."
+      ],
       "questions": []
     },
     {
@@ -12688,10 +12712,12 @@
       "mode": "100644",
       "bytes": 5638,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 156]],
+      "evidence": [
+        "Complete untruncated primary-agent read; report state, display, test and canonical input contracts compared. No UI behavior changed in this reading batch; outstanding hypotheses in findings.md."
+      ],
       "questions": []
     },
     {
@@ -12714,10 +12740,12 @@
       "mode": "100644",
       "bytes": 2515,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 69]],
+      "evidence": [
+        "Complete untruncated primary-agent read; report state, display, test and canonical input contracts compared. No UI behavior changed in this reading batch; outstanding hypotheses in findings.md."
+      ],
       "questions": []
     },
     {
@@ -12740,10 +12768,12 @@
       "mode": "100644",
       "bytes": 3522,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 98]],
+      "evidence": [
+        "Complete untruncated primary-agent read; report state, display, test and canonical input contracts compared. No UI behavior changed in this reading batch; outstanding hypotheses in findings.md."
+      ],
       "questions": []
     },
     {
@@ -12753,10 +12783,12 @@
       "mode": "100644",
       "bytes": 1893,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 55]],
+      "evidence": [
+        "Complete untruncated primary-agent read; report state, display, test and canonical input contracts compared. No UI behavior changed in this reading batch; outstanding hypotheses in findings.md."
+      ],
       "questions": []
     },
     {
@@ -12779,10 +12811,12 @@
       "mode": "100644",
       "bytes": 1024,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 32]],
+      "evidence": [
+        "Complete untruncated primary-agent read; report state, display, test and canonical input contracts compared. No UI behavior changed in this reading batch; outstanding hypotheses in findings.md."
+      ],
       "questions": []
     },
     {
@@ -12805,10 +12839,12 @@
       "mode": "100644",
       "bytes": 2719,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 69]],
+      "evidence": [
+        "Complete untruncated primary-agent read; report state, display, test and canonical input contracts compared. No UI behavior changed in this reading batch; outstanding hypotheses in findings.md."
+      ],
       "questions": []
     },
     {
@@ -12818,10 +12854,12 @@
       "mode": "100644",
       "bytes": 2952,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 77]],
+      "evidence": [
+        "Complete untruncated primary-agent read; report state, display, test and canonical input contracts compared. No UI behavior changed in this reading batch; outstanding hypotheses in findings.md."
+      ],
       "questions": []
     },
     {
@@ -12874,10 +12912,12 @@
       "mode": "100644",
       "bytes": 3307,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 103]],
+      "evidence": [
+        "Complete untruncated primary-agent read; report state, display, test and canonical input contracts compared. No UI behavior changed in this reading batch; outstanding hypotheses in findings.md."
+      ],
       "questions": []
     },
     {
@@ -12902,10 +12942,12 @@
       "mode": "100644",
       "bytes": 1413,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 53]],
+      "evidence": [
+        "Complete untruncated primary-agent read; report state, display, test and canonical input contracts compared. No UI behavior changed in this reading batch; outstanding hypotheses in findings.md."
+      ],
       "questions": []
     },
     {
@@ -12915,10 +12957,12 @@
       "mode": "100644",
       "bytes": 2256,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 50]],
+      "evidence": [
+        "Complete untruncated primary-agent read; report state, display, test and canonical input contracts compared. No UI behavior changed in this reading batch; outstanding hypotheses in findings.md."
+      ],
       "questions": []
     },
     {
@@ -12988,10 +13032,12 @@
       "mode": "100644",
       "bytes": 1199,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 46]],
+      "evidence": [
+        "Complete untruncated primary-agent read; report state, display, test and canonical input contracts compared. No UI behavior changed in this reading batch; outstanding hypotheses in findings.md."
+      ],
       "questions": []
     },
     {
@@ -13001,10 +13047,12 @@
       "mode": "100644",
       "bytes": 764,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 25]],
+      "evidence": [
+        "Complete untruncated primary-agent read; report state, display, test and canonical input contracts compared. No UI behavior changed in this reading batch; outstanding hypotheses in findings.md."
+      ],
       "questions": []
     },
     {
@@ -13014,10 +13062,12 @@
       "mode": "100644",
       "bytes": 2587,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 51]],
+      "evidence": [
+        "Complete untruncated primary-agent read; report state, display, test and canonical input contracts compared. No UI behavior changed in this reading batch; outstanding hypotheses in findings.md."
+      ],
       "questions": []
     },
     {
@@ -13027,10 +13077,12 @@
       "mode": "100644",
       "bytes": 1786,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 35]],
+      "evidence": [
+        "Complete untruncated primary-agent read; report state, display, test and canonical input contracts compared. No UI behavior changed in this reading batch; outstanding hypotheses in findings.md."
+      ],
       "questions": []
     },
     {
@@ -13040,10 +13092,12 @@
       "mode": "100644",
       "bytes": 3152,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 114]],
+      "evidence": [
+        "Complete untruncated primary-agent read; report state, display, test and canonical input contracts compared. No UI behavior changed in this reading batch; outstanding hypotheses in findings.md."
+      ],
       "questions": []
     },
     {
@@ -13053,10 +13107,12 @@
       "mode": "100644",
       "bytes": 2458,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 54]],
+      "evidence": [
+        "Complete untruncated primary-agent read; report state, display, test and canonical input contracts compared. No UI behavior changed in this reading batch; outstanding hypotheses in findings.md."
+      ],
       "questions": []
     },
     {
@@ -13111,10 +13167,12 @@
       "mode": "100644",
       "bytes": 1019,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 29]],
+      "evidence": [
+        "Complete untruncated primary-agent read; report state, display, test and canonical input contracts compared. No UI behavior changed in this reading batch; outstanding hypotheses in findings.md."
+      ],
       "questions": []
     },
     {
@@ -13124,10 +13182,12 @@
       "mode": "100644",
       "bytes": 1791,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 41]],
+      "evidence": [
+        "Complete untruncated primary-agent read; report state, display, test and canonical input contracts compared. No UI behavior changed in this reading batch; outstanding hypotheses in findings.md."
+      ],
       "questions": []
     },
     {
@@ -13212,10 +13272,12 @@
       "mode": "100644",
       "bytes": 234,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 7]],
+      "evidence": [
+        "Complete untruncated primary-agent read; report state, display, test and canonical input contracts compared. No UI behavior changed in this reading batch; outstanding hypotheses in findings.md."
+      ],
       "questions": []
     },
     {
@@ -13225,10 +13287,12 @@
       "mode": "100644",
       "bytes": 3318,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 101]],
+      "evidence": [
+        "Complete untruncated primary-agent read; report state, display, test and canonical input contracts compared. No UI behavior changed in this reading batch; outstanding hypotheses in findings.md."
+      ],
       "questions": []
     },
     {
@@ -13253,10 +13317,12 @@
       "mode": "100644",
       "bytes": 4880,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 121]],
+      "evidence": [
+        "Complete untruncated primary-agent read; report state, display, test and canonical input contracts compared. No UI behavior changed in this reading batch; outstanding hypotheses in findings.md."
+      ],
       "questions": []
     },
     {
@@ -13266,10 +13332,12 @@
       "mode": "100644",
       "bytes": 4898,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 125]],
+      "evidence": [
+        "Complete untruncated primary-agent read; report state, display, test and canonical input contracts compared. No UI behavior changed in this reading batch; outstanding hypotheses in findings.md."
+      ],
       "questions": []
     },
     {
@@ -28363,10 +28431,12 @@
       "mode": "100644",
       "bytes": 8227,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 115]],
+      "evidence": [
+        "Complete untruncated primary-agent read; report state, display, test and canonical input contracts compared. No UI behavior changed in this reading batch; outstanding hypotheses in findings.md."
+      ],
       "questions": []
     },
     {
@@ -28548,7 +28618,9 @@
       "status": "unverified",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
       "read_ranges": [],
-      "evidence": [],
+      "evidence": [
+        "Attempted whole-file output was truncated; not counted as full read. Recover in bounded chunks before marking reviewed."
+      ],
       "questions": []
     },
     {
@@ -29201,10 +29273,12 @@
       "mode": "100644",
       "bytes": 4180,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 37]],
+      "evidence": [
+        "Complete untruncated primary-agent read; report state, display, test and canonical input contracts compared. No UI behavior changed in this reading batch; outstanding hypotheses in findings.md."
+      ],
       "questions": []
     },
     {
@@ -32614,7 +32688,8 @@
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
       "read_ranges": [[1, 283]],
       "evidence": [
-        "All baseline text read in complete bounded ranges; template clock failure, report dataflow, DST distribution and guard boundaries cross-checked."
+        "All baseline text read in complete bounded ranges; template clock failure, report dataflow, DST distribution and guard boundaries cross-checked.",
+        "Read all lines in two chunks; unchanged gate executed against current complete mission diff: required=false, auditContract=false."
       ],
       "questions": []
     },
