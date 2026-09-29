@@ -1,6 +1,8 @@
 import { execFileSync } from 'node:child_process';
+import { createHash, createPublicKey } from 'node:crypto';
 
 import { decodeVerifiedPreviewArtifactZip } from './preview-artifact-zip.mjs';
+import { prepareFixtureAuthority } from './preview-fixture-authority.mjs';
 import { decryptPreviewFixtureEnvelope } from './preview-fixture-envelope.mjs';
 import {
   previewFixtureHandoffArtifactName,
@@ -10,14 +12,14 @@ import { writeFixtureRegistry } from './preview-fixture-registry.mjs';
 
 const ERROR = 'Preview fixture handoff failed';
 
-function assertProof(proof, input) {
+function assertProof(proof, input, role) {
   if (
     !proof ||
     !Number.isSafeInteger(proof.artifactId) ||
     proof.artifactId < 1 ||
     typeof proof.digest !== 'string' ||
     !/^sha256:[a-f0-9]{64}$/.test(proof.digest) ||
-    proof.name !== previewFixtureHandoffArtifactName(input, 'envelope')
+    proof.name !== previewFixtureHandoffArtifactName(input, role)
   )
     throw new Error();
 }
@@ -71,7 +73,7 @@ export async function receivePreviewFixtureRegistry(options) {
     if (typeof token !== 'string' || !token.trim() || token.length > 16_384) throw new Error();
     const args = { input, role: 'envelope', token: token.trim(), fetchImpl };
     const proof = await verify(args);
-    assertProof(proof, input);
+    assertProof(proof, input, 'envelope');
     const archive = await download({ artifactId: proof.artifactId, token: token.trim() });
     const serialized = decodeVerifiedPreviewArtifactZip({
       archive,
@@ -79,7 +81,7 @@ export async function receivePreviewFixtureRegistry(options) {
       kind: 'envelope',
     });
     const current = await verify(args);
-    assertProof(current, input);
+    assertProof(current, input, 'envelope');
     if (
       current.artifactId !== proof.artifactId ||
       current.digest !== proof.digest ||
@@ -92,6 +94,99 @@ export async function receivePreviewFixtureRegistry(options) {
       envelope: JSON.parse(serialized),
     });
     return writeFixtureRegistry({ input, response, runnerTemp, privateOutput, evidenceDirectory });
+  } catch {
+    throw new Error(ERROR);
+  }
+}
+
+function exact(value, keys) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error();
+  const actual = Object.keys(value);
+  if (actual.length !== keys.length || actual.some((key) => !keys.includes(key))) throw new Error();
+}
+
+/** Public artifact body only; publication and private-key custody belong to trusted workflow code. */
+export function createPreviewFixturePublicKeyArtifact(options) {
+  try {
+    exact(options, ['input', 'publicKey']);
+    const { input, publicKey } = options;
+    const authority = prepareFixtureAuthority(input);
+    if (
+      authority.operation !== 'provision' ||
+      typeof publicKey !== 'string' ||
+      Buffer.byteLength(publicKey) > 2_048 ||
+      !/^-----BEGIN PUBLIC KEY-----\n[A-Za-z0-9+/=\n]+-----END PUBLIC KEY-----\n?$/.test(publicKey)
+    )
+      throw new Error();
+    const recipient = createPublicKey(publicKey);
+    const details = recipient.asymmetricKeyDetails;
+    if (
+      recipient.asymmetricKeyType !== 'rsa' ||
+      !details ||
+      ![3072, 4096].includes(details.modulusLength ?? 0) ||
+      details.publicExponent !== 65537n
+    )
+      throw new Error();
+    const publicKeyDigest = createHash('sha256')
+      .update(recipient.export({ type: 'spki', format: 'der' }))
+      .digest('hex');
+    return { schemaVersion: 1, binding: { authority, publicKeyDigest }, publicKey };
+  } catch {
+    throw new Error(ERROR);
+  }
+}
+
+/**
+ * Trusted provisioner only, before any fixture mutation. The artifact is public;
+ * its sender authority comes from the trusted job ordering and metadata verifier.
+ * Returns only an RSA public PEM after digest, binding and metadata revalidation.
+ * Injection hooks are for trusted code/tests, never candidate-controlled input.
+ */
+export async function receivePreviewFixturePublicKey(options) {
+  try {
+    const {
+      input,
+      token,
+      fetchImpl = fetch,
+      verify = verifyPreviewFixtureHandoffTrust,
+      download = downloadArtifact,
+    } = options;
+    if (typeof token !== 'string' || !token.trim() || token.length > 16_384) throw new Error();
+    const args = { input, role: 'public-key', token: token.trim(), fetchImpl };
+    const proof = await verify(args);
+    assertProof(proof, input, 'public-key');
+    const archive = await download({ artifactId: proof.artifactId, token: token.trim() });
+    const serialized = decodeVerifiedPreviewArtifactZip({
+      archive,
+      digest: proof.digest,
+      kind: 'public-key',
+    });
+    const current = await verify(args);
+    assertProof(current, input, 'public-key');
+    if (
+      current.artifactId !== proof.artifactId ||
+      current.digest !== proof.digest ||
+      current.name !== proof.name
+    )
+      throw new Error();
+    const artifact = JSON.parse(serialized);
+    exact(artifact, ['schemaVersion', 'binding', 'publicKey']);
+    exact(artifact.binding, ['authority', 'publicKeyDigest']);
+    exact(artifact.binding.authority, ['operation', 'origin', 'intent', 'execution', 'audience']);
+    const { operation, origin, intent, execution, audience } = artifact.binding.authority;
+    const normalized = prepareFixtureAuthority({ operation, origin, intent, execution });
+    const expected = createPreviewFixturePublicKeyArtifact({
+      input,
+      publicKey: artifact.publicKey,
+    });
+    if (
+      artifact.schemaVersion !== 1 ||
+      audience !== normalized.audience ||
+      JSON.stringify(normalized) !== JSON.stringify(expected.binding.authority) ||
+      artifact.binding.publicKeyDigest !== expected.binding.publicKeyDigest
+    )
+      throw new Error();
+    return expected.publicKey;
   } catch {
     throw new Error(ERROR);
   }

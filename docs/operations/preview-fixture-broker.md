@@ -65,11 +65,15 @@ file は600、親directoryは700、16KiB以内とし、file symlinkを拒否す�
 
 job分離時はconsumerとprovisionをtrusted preflight後に並列起動し、consumerがcandidate checkout前に公開鍵を発行して暗号化応答を待つ。cleanupは両jobの終了後に実行する。現在のrecovery verifierは旧E2E execute stepの開始を要求するため、新構成を接続する際はprovision開始後の失敗・cancel・timeoutも公開intentに結び付けて認証する必要がある。E2Eが未開始でもfixtureが存在する可能性があり、旧判定のまま接続してはならない。
 
+同じrunで旧Preview E2E jobと新consumerを同時に動かしてはならない。handoff検証はconsumerのcheckout前を確認するが、別jobで先にcandidateが動けば、同じrunのartifactへ干渉できる可能性がある。新経路を有効にする際は旧経路を排他的にし、同じrun内のすべてのcandidate checkout・install・実行がhandoff完了後になるworkflow条件も検証する。
+
 [handoff metadata検証器](../../scripts/lib/preview-fixture-handoff-trust.mjs) は進行中の同じtrusted workflow・attempt・SHAとjob/stepの状態を照合する。artifact名は公開bindingとroleから導出し、重複・旧attempt・別repository・不足metadataを拒否する。candidate実行前という順序条件を確認し、最後にrun/jobを再読する。GitHub artifact metadataにはproducer job IDがないため、この検証は固定されたtrusted workflowの実行順序との契約であり、artifact単体の送信者署名ではない。実APIの進行中step状態を含め、Cloud上では未検証。
 
 ZIPはdigest照合後に固定されたroot-levelの1fileだけをメモリ内で読む。intentは16KiB、公開鍵は32KiB、暗号化envelopeは48KiB、ZIP全体は128KiBに制限し、symlink・余分なfile・別pathを拒否する。既存recoveryのintent上限と失敗条件は維持する。
 
 [受信処理](../../scripts/lib/preview-fixture-handoff.mjs) はmetadata検証→暗号化ZIP取得→digest検査→metadata再検証→復号→private writerをつなぐ。取得には同じread-only GitHub tokenを使い、tokenはargvやterminal出力へ渡さず、gh子processのenvを限定する。取得前後でartifact ID/digest/nameが変わった場合やjob状態が変わった場合は、復号・保存前に停止する。返すのはprivate fileのpathだけ。テストは検証済みmetadataとdownloadを差し替え、実ZIP・暗号化・復号・file保存と各段階の失敗を確認している。実GitHub download、公開鍵発行側、workflowのjob分離、private key/fileの終了時削除、DB fixture回収への配線は未検証・未接続。
+
+公開鍵側も同じmetadata・digest・再検証を通してからRSA公開鍵だけを返す。公開artifactはschemaVersion・正規化したauthority・公開鍵digest・公開鍵の固定fieldに限り、別attempt/targetや余分なfield、秘密鍵・弱い鍵を拒否する。発行bodyの生成と受信はライブラリとして用意しているが、鍵の保存・upload・job間待機と終了時削除はworkflow側の未実装条件である。
 
 consumer時はspecごとのadmin生成・seed・削除を行わず、同じ2ユーザーを通常loginで使う。Preview configで **desktop6件 → mobile5件 → A/B認可1件** のproject依存を明示し、認可テストのRecordが先にReport集計へ混ざらないようにする。先行失敗時の後続skipは成功にしない。全project後の回収は別のtrusted jobが担当し、worker喪失時も予定intentから回収できる必要がある。legacyモードのspec別作成/削除は維持する。
 
