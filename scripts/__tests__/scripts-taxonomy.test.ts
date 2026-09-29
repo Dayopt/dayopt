@@ -93,6 +93,7 @@ const KNOWN_PLACEMENT_EXCEPTIONS = new Set<string>([
   'scripts/lib/preview-fixture-handoff-trust.mjs',
   'scripts/lib/preview-fixture-handoff.mjs',
   'scripts/lib/preview-fixture-key-custody.mjs',
+  'scripts/lib/preview-fixture-lifecycle.mjs',
   // protected-path-gate.mjs: impact.mjs（scripts/ci/、同じ --stdin 呼び出し規約）と
   // 同型で、finish-branch.sh から node 経由で呼ばれる ci unit。skill docs（audit-ai-
   // config / pr-cross-review）からの言及は利用者向けの説明文であり、実行呼び出しでは

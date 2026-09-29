@@ -34,7 +34,7 @@ OIDC の `id-token: write` は信頼済み job だけに付ける。candidate jo
 
 repository ID / owner ID / 既定 subject は 2026-09-29 の repository metadata と OIDC customization 設定を照合した値。repository 移転や subject 設定変更では自動的に緩めず、契約を再確認する。
 
-## 作成・回収処理と未実装の永続制御
+## 作成・回収処理と永続制御の接続条件
 
 実行処理は両 UUID の Auth ownership を最初の変更前に照合する。作成は run と UUID に結び付けた合成 login を用意し、Auth の作成応答が失われた場合やSDKがerrorを返した場合は失敗をadapterへ伝える。読み戻しだけで成功へ戻さず、後続seedや資格情報の返却を止める。正常な作成応答の後にも所有を読み戻して確認する。途中までの seed は同じ category / activity ID で再開し、既存の別ユーザーの行を上書きしない。ready 済みの再試行では password や seed を書き換えない。管理キーをローテーションした場合は既存 fixture の generation 不一致で停止し、元 intent による回収は許可する。
 
@@ -47,7 +47,9 @@ repository ID / owner ID / 既定 subject は 2026-09-29 の repository metadata
 - cleanup / recover の開始時に終了状態を永続化し、回収失敗でも保持する。以後の provision は拒否し、cleanup / recover の再試行だけを許可する。
 - worker / server 喪失後も、未確定の外部 Auth request が残る間に回収成功を返さない。単なる期限付き lease やプロセス内 mutex だけではこの条件を満たさない。
 
-実 adapter の最小案は、既存の対象 DB に操作状態を永続化し、応答不明や実行サーバー喪失を `UNKNOWN` として閉じること。SDK の外側で fencing token を確認しても、送信済みの Auth 作成要求の commit は止められない。時間経過だけで `UNKNOWN` を回収成功へ戻さず、この場合は所有する ephemeral branch の削除と DB 自体の終端確認を必須にする。branch metadata の 404 だけを DB 不在の証拠にしない。この案の provider 終端条件・実装・実測は未完了であり、既存 executor の回収成功をこの保証の代わりに使わない。
+永続制御は、既存の対象 DB に操作状態を永続化し、応答不明や実行サーバー喪失を `UNKNOWN` として閉じること。SDK の外側で fencing token を確認しても、送信済みの Auth 作成要求の commit は止められない。時間経過だけで `UNKNOWN` を回収成功へ戻さず、この場合は所有する ephemeral branch の削除と DB 自体の終端確認を必須にする。branch metadata の 404 だけを DB 不在の証拠にしない。provider 終端条件・実環境への接続・実測は未完了であり、既存 executor の回収成功をこの保証の代わりに使わない。
+
+[lifecycle adapter](../../scripts/lib/preview-fixture-lifecycle.mjs) とmigrationを用意した。非公開tableはrun・intent digest・owner・状態・期限だけを保持し、認証情報を保存しない。service-role専用RPCがrow lock取得後のDB時計で180秒の期限を判定する。cleanupのclaimは待機中でも新しいprovisionを閉じ、現在のownerは完了できる。期限切れや失敗はUNKNOWNとして閉じ、通常の再claimでは解除しない。adapterはclaimの待機を制限し、guard失敗がcallback内で捕捉されてもfinishを成功にしない。SDK接続はtrusted callerがerrorの検査とabortSignalへの接続を担当する。隔離CI用の別接続競合・期限切れ・権限testを追加したが、実DB結果が出るまでは永続性の証明にしない。
 
 executor は adapter の取得待ち後にも JWT の期限を再検証する。adapterがcallbackへ渡す `beforeMutation()` を必須とし、SDKの各書込み直前に永続ownerの検査を待つ。一度拒否された呼出しでは以後の書込みを送らず、検査待ちで実行予算を超えた場合も送信を止める。これは送信済み要求の取消しではなく、永続adapterの実装を代替しない。[SDKを用いるローカルテスト](../../scripts/lib/preview-fixture-broker.test.ts) は provider mock と test-only の coordination harness を使い、この呼び出し契約と競合を検証する。**実 adapter の永続性・インスタンス間の排他・worker 喪失からの回収を証明するテストではない。** その実装・実測前に公開 route へ接続してはならない。
 
