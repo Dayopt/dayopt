@@ -41,6 +41,8 @@ repository ID / owner ID / 既定 subject は 2026-09-29 の repository metadata
 - cleanup / recover の開始時に終了状態を永続化し、回収失敗でも保持する。以後の provision は拒否し、cleanup / recover の再試行だけを許可する。
 - worker / server 喪失後も、未確定の外部 Auth request が残る間に回収成功を返さない。単なる期限付き lease やプロセス内 mutex だけではこの条件を満たさない。
 
+実 adapter の最小案は、既存の対象 DB に操作状態を永続化し、応答不明や実行サーバー喪失を `UNKNOWN` として閉じること。SDK の外側で fencing token を確認しても、送信済みの Auth 作成要求の commit は止められない。時間経過だけで `UNKNOWN` を回収成功へ戻さず、この場合は所有する ephemeral branch の削除と DB 自体の終端確認を必須にする。branch metadata の 404 だけを DB 不在の証拠にしない。この案の provider 終端条件・実装・実測は未完了であり、既存 executor の回収成功をこの保証の代わりに使わない。
+
 executor は adapter の取得待ち後にも JWT の期限を再検証する。[SDKを用いるローカルテスト](../../scripts/lib/preview-fixture-broker.test.ts) は provider mock と test-only の coordination harness を使い、この呼び出し契約と競合を検証する。**実 adapter の永続性・インスタンス間の排他・worker 喪失からの回収を証明するテストではない。** その実装・実測前に公開 route へ接続してはならない。
 
 ## 既存処理と組み合わせる順序
