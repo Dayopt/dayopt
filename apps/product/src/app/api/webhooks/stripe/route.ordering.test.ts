@@ -5,6 +5,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 // side effects are synthetic. This mutable profile carries state across events.
 const fixture = vi.hoisted(() => ({
   mode: 'durable' as 'durable' | 'legacy',
+  profilePresent: true,
+  deletionReceipt: false,
+  deleteBeforeProfileLookup: false,
   event: {
     account: null,
     created: 1_800_000_000,
@@ -87,6 +90,7 @@ vi.mock('@/lib/supabase/oauth', () => ({
         select: () => {
           if (update) {
             if (
+              !fixture.profilePresent ||
               customer !== fixture.profile.stripe_customer_id ||
               Object.entries(filters).some(
                 ([key, value]) => fixture.profile[key as keyof typeof fixture.profile] !== value,
@@ -102,12 +106,32 @@ vi.mock('@/lib/supabase/oauth', () => ({
           filters[key] = value;
           return builder;
         },
-        single: async () => ({ data: { ...fixture.profile }, error: null }),
-        maybeSingle: async () => ({ data: { ...fixture.profile }, error: null }),
+        single: async () => {
+          if (fixture.deleteBeforeProfileLookup) {
+            fixture.profilePresent = false;
+            fixture.deletionReceipt = true;
+            fixture.deleteBeforeProfileLookup = false;
+          }
+          return fixture.profilePresent
+            ? { data: { ...fixture.profile }, error: null }
+            : { data: null, error: { code: 'PGRST116', message: 'No matching profile' } };
+        },
+        maybeSingle: async () => ({
+          data: fixture.profilePresent ? { ...fixture.profile } : null,
+          error: null,
+        }),
       };
       return builder;
     },
     rpc: async (name: string, input: { p_subscription_id: string }) => {
+      if (name === 'classify_billing_customer_event_v1') {
+        const classification = fixture.profilePresent
+          ? 'live'
+          : fixture.deletionReceipt
+            ? 'account_deleted'
+            : 'unknown_customer';
+        return { data: classification, error: null };
+      }
       if (name !== 'sync_billing_subscription_deleted_v1') throw new Error('Unexpected RPC');
       if (fixture.profile.subscription_id === input.p_subscription_id) {
         fixture.profile.subscription_id = null;
@@ -137,6 +161,9 @@ function deliver() {
 beforeEach(() => {
   vi.clearAllMocks();
   fixture.mode = 'durable';
+  fixture.profilePresent = true;
+  fixture.deletionReceipt = false;
+  fixture.deleteBeforeProfileLookup = false;
   fixture.profile.updated_at = '2026-09-30T00:00:00.000Z';
   fixture.profile.subscription_id = 'sub_old';
   fixture.profile.subscription_status = 'active';
@@ -262,4 +289,43 @@ describe('Stripe webhook delivery order', () => {
     expect(fixture.profile.subscription_status).toBe('active');
     expect(fixture.profile.subscription_id).toBe('sub_old');
   });
+  it.each(['checkout.session.completed', 'customer.subscription.updated'])(
+    '%s: acknowledges an account covered by a deletion receipt without restoring its state',
+    async (type) => {
+      fixture.event.type = type;
+      fixture.profilePresent = false;
+      fixture.deletionReceipt = true;
+      expect((await deliver()).status).toBe(200);
+      expect(processed).toHaveBeenCalledWith(expect.anything(), fixture.event.id);
+      expect(released).not.toHaveBeenCalled();
+      expect(retrieveSubscription).not.toHaveBeenCalled();
+      expect(fixture.profilePresent).toBe(false);
+    },
+  );
+
+  it.each(['checkout.session.completed', 'customer.subscription.updated'])(
+    '%s: does not acknowledge an unknown Customer without a deletion receipt',
+    async (type) => {
+      fixture.event.type = type;
+      fixture.profilePresent = false;
+      expect((await deliver()).status).toBe(500);
+      expect(processed).not.toHaveBeenCalled();
+      expect(released).toHaveBeenCalledWith(expect.anything(), fixture.event.id);
+      expect(retrieveSubscription).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(['checkout.session.completed', 'customer.subscription.updated'])(
+    '%s: retries if deletion commits between classification and profile lookup',
+    async (type) => {
+      fixture.event.type = type;
+      fixture.deleteBeforeProfileLookup = true;
+      expect((await deliver()).status).toBe(500);
+      expect(processed).not.toHaveBeenCalled();
+      expect(released).toHaveBeenCalledWith(expect.anything(), fixture.event.id);
+      expect((await deliver()).status).toBe(200);
+      expect(processed).toHaveBeenCalledTimes(1);
+      expect(fixture.profilePresent).toBe(false);
+    },
+  );
 });

@@ -369,6 +369,12 @@ export async function POST(request: NextRequest) {
               ? session.subscription
               : session.subscription.id;
 
+          if (
+            lifecycleMode === 'durable' &&
+            (await classifyBillingCustomerEvent(supabase, customerId)) === 'account_deleted'
+          )
+            break;
+
           // 実際の subscription ステータスを取得（trialing vs active）
           const expected = await getBillingSubscriptionSnapshot(supabase, customerId);
           const sub = await getCurrentSubscription(
@@ -432,6 +438,11 @@ export async function POST(request: NextRequest) {
         const snapshot = event.data.object as Stripe.Subscription;
         const customerId =
           typeof snapshot.customer === 'string' ? snapshot.customer : snapshot.customer.id;
+        if (
+          lifecycleMode === 'durable' &&
+          (await classifyBillingCustomerEvent(supabase, customerId)) === 'account_deleted'
+        )
+          break;
         const expected = await getBillingSubscriptionSnapshot(supabase, customerId);
         const subscription = await getCurrentSubscription(
           stripe,

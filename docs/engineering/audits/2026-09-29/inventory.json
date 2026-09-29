@@ -41849,6 +41849,136 @@
         "PR #2966 non-JSON diff 1088 lines read fully in bounded chunks. JSON contracts/validation also read fully. Delta is reviewed at 21770b13da1ff26c8982cdf041aa2a4d55025a3f."
       ],
       "questions": []
+    },
+    {
+      "path": "apps/product/src/features/activities/server/router.test.ts",
+      "sha": "650f62dc733831765aa8c110e29533b532e023f2",
+      "change": "A",
+      "blob": "8e0953fa63b95bba467d9fc7889971eda8562d32",
+      "method": "full-text",
+      "status": "full-text-reviewed",
+      "read_ranges": [[1, 446]],
+      "evidence": [
+        "PR #2968 non-JSON delta and new runner read fully without truncation. Artifact is generated experimental evidence: parsed completely; 13 unique results, 106 unique test identities, totals/failure membership/source and four file hashes match main. Reports 12 killed/1 survived. Saved messages omit full stacks/log bodies; metadata is not proof of current runtime or reproducible classification. Historical check/log checksum not used as current validation. Baseline denominator and unread statuses unchanged."
+      ],
+      "questions": []
+    },
+    {
+      "path": "apps/product/src/features/timeblock/schemas/plan-template.test.ts",
+      "sha": "650f62dc733831765aa8c110e29533b532e023f2",
+      "change": "A",
+      "blob": "5774cf98f9b1042e84385f3eb092a3f42573571c",
+      "method": "full-text",
+      "status": "full-text-reviewed",
+      "read_ranges": [[1, 102]],
+      "evidence": [
+        "PR #2968 non-JSON delta and new runner read fully without truncation. Artifact is generated experimental evidence: parsed completely; 13 unique results, 106 unique test identities, totals/failure membership/source and four file hashes match main. Reports 12 killed/1 survived. Saved messages omit full stacks/log bodies; metadata is not proof of current runtime or reproducible classification. Historical check/log checksum not used as current validation. Baseline denominator and unread statuses unchanged."
+      ],
+      "questions": []
+    },
+    {
+      "path": "docs/engineering/data/architecture-inventory.md",
+      "sha": "650f62dc733831765aa8c110e29533b532e023f2",
+      "change": "M",
+      "blob": "f89c48155c5f2b45db3b488fdb0989f971796edb",
+      "method": "full-text",
+      "status": "delta-reviewed",
+      "read_ranges": [],
+      "evidence": [
+        "PR #2968 non-JSON delta and new runner read fully without truncation. Artifact is generated experimental evidence: parsed completely; 13 unique results, 106 unique test identities, totals/failure membership/source and four file hashes match main. Reports 12 killed/1 survived. Saved messages omit full stacks/log bodies; metadata is not proof of current runtime or reproducible classification. Historical check/log checksum not used as current validation. Baseline denominator and unread statuses unchanged."
+      ],
+      "questions": []
+    },
+    {
+      "path": "docs/engineering/data/system-surface.md",
+      "sha": "650f62dc733831765aa8c110e29533b532e023f2",
+      "change": "M",
+      "blob": "49bf18fd83ba0d9668ebe344eaf5c041651fae5d",
+      "method": "full-text",
+      "status": "delta-reviewed",
+      "read_ranges": [],
+      "evidence": [
+        "PR #2968 non-JSON delta and new runner read fully without truncation. Artifact is generated experimental evidence: parsed completely; 13 unique results, 106 unique test identities, totals/failure membership/source and four file hashes match main. Reports 12 killed/1 survived. Saved messages omit full stacks/log bodies; metadata is not proof of current runtime or reproducible classification. Historical check/log checksum not used as current validation. Baseline denominator and unread statuses unchanged."
+      ],
+      "questions": []
+    },
+    {
+      "path": "docs/engineering/mission-testing.md",
+      "sha": "650f62dc733831765aa8c110e29533b532e023f2",
+      "change": "M",
+      "blob": "c7169912d11980a85884cd7684581376fb489fd5",
+      "method": "full-text",
+      "status": "delta-reviewed",
+      "read_ranges": [],
+      "evidence": [
+        "PR #2968 non-JSON delta and new runner read fully without truncation. Artifact is generated experimental evidence: parsed completely; 13 unique results, 106 unique test identities, totals/failure membership/source and four file hashes match main. Reports 12 killed/1 survived. Saved messages omit full stacks/log bodies; metadata is not proof of current runtime or reproducible classification. Historical check/log checksum not used as current validation. Baseline denominator and unread statuses unchanged."
+      ],
+      "questions": []
+    },
+    {
+      "path": "mission-evidence/api-boundaries.json",
+      "sha": "650f62dc733831765aa8c110e29533b532e023f2",
+      "change": "A",
+      "blob": "dcdc5e1874b244001997354a12902337a6b73756",
+      "method": "mechanical",
+      "status": "mechanically-checked",
+      "read_ranges": [],
+      "evidence": [
+        "PR #2968 non-JSON delta and new runner read fully without truncation. Artifact is generated experimental evidence: parsed completely; 13 unique results, 106 unique test identities, totals/failure membership/source and four file hashes match main. Reports 12 killed/1 survived. Saved messages omit full stacks/log bodies; metadata is not proof of current runtime or reproducible classification. Historical check/log checksum not used as current validation. Baseline denominator and unread statuses unchanged."
+      ],
+      "questions": []
+    },
+    {
+      "path": "missionissue",
+      "sha": "650f62dc733831765aa8c110e29533b532e023f2",
+      "change": "M",
+      "blob": "f7acfc1e681856e0d836d99289bf5e3f1810fafa",
+      "method": "full-text",
+      "status": "delta-reviewed",
+      "read_ranges": [],
+      "evidence": [
+        "PR #2968 non-JSON delta and new runner read fully without truncation. Artifact is generated experimental evidence: parsed completely; 13 unique results, 106 unique test identities, totals/failure membership/source and four file hashes match main. Reports 12 killed/1 survived. Saved messages omit full stacks/log bodies; metadata is not proof of current runtime or reproducible classification. Historical check/log checksum not used as current validation. Baseline denominator and unread statuses unchanged."
+      ],
+      "questions": []
+    },
+    {
+      "path": "scripts/lib/mutation-evidence.mjs",
+      "sha": "650f62dc733831765aa8c110e29533b532e023f2",
+      "change": "M",
+      "blob": "90b4d0e60511d0fdd73e4bc582e3c9c63c5002f2",
+      "method": "full-text",
+      "status": "delta-reviewed",
+      "read_ranges": [],
+      "evidence": [
+        "PR #2968 non-JSON delta and new runner read fully without truncation. Artifact is generated experimental evidence: parsed completely; 13 unique results, 106 unique test identities, totals/failure membership/source and four file hashes match main. Reports 12 killed/1 survived. Saved messages omit full stacks/log bodies; metadata is not proof of current runtime or reproducible classification. Historical check/log checksum not used as current validation. Baseline denominator and unread statuses unchanged."
+      ],
+      "questions": []
+    },
+    {
+      "path": "scripts/lib/mutation-evidence.test.ts",
+      "sha": "650f62dc733831765aa8c110e29533b532e023f2",
+      "change": "M",
+      "blob": "df0793523d501947f22b089a5d79f7f67b762c0e",
+      "method": "full-text",
+      "status": "delta-reviewed",
+      "read_ranges": [],
+      "evidence": [
+        "PR #2968 non-JSON delta and new runner read fully without truncation. Artifact is generated experimental evidence: parsed completely; 13 unique results, 106 unique test identities, totals/failure membership/source and four file hashes match main. Reports 12 killed/1 survived. Saved messages omit full stacks/log bodies; metadata is not proof of current runtime or reproducible classification. Historical check/log checksum not used as current validation. Baseline denominator and unread statuses unchanged."
+      ],
+      "questions": []
+    },
+    {
+      "path": "scripts/runbook/mission-api-mutations.mjs",
+      "sha": "650f62dc733831765aa8c110e29533b532e023f2",
+      "change": "A",
+      "blob": "380ad53710208e1a7ac1136004ab452888ad8ecb",
+      "method": "full-text",
+      "status": "full-text-reviewed",
+      "read_ranges": [[1, 209]],
+      "evidence": [
+        "PR #2968 non-JSON delta and new runner read fully without truncation. Artifact is generated experimental evidence: parsed completely; 13 unique results, 106 unique test identities, totals/failure membership/source and four file hashes match main. Reports 12 killed/1 survived. Saved messages omit full stacks/log bodies; metadata is not proof of current runtime or reproducible classification. Historical check/log checksum not used as current validation. Baseline denominator and unread statuses unchanged."
+      ],
+      "questions": []
     }
   ]
 }
