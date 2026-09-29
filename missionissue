@@ -124,3 +124,51 @@ pnpm --filter @dayopt/product exec vitest run --project unit src/features/timebl
 - pre-pushも成功し、対象ブランチをpush済み。gitleaks、整形、対象ESLintを含むcommit hookも通過。
 - 強化後runner: **20/20検出**。baseline/復元後328ケース、全test identity一致。証拠は `mission-evidence/mutations.json` の `verifiedRunner`。
 - この追記は検証済みコードに対する証拠更新。GitHub必須チェック・mergeの最終状態はPR側の当該headのcheckとmerge commitを正本とする。未達条件を達成へ変更しない。
+
+## Issueを前提にしない継続作業（2026-09-29）
+
+ユーザーの「Issueになくてもいい。ベストを尽くして」を受領。
+以降は `issues/` の欠落を作業停止理由にせず、実装の契約と実測から補強する。
+存在しないconflictの一覧を捏造せず、新たに発見した問題のred/greenを記録する。
+
+### 追加した保護
+
+- `activities` の全13 procedureについて、正常系・未認証・MFA未完了・公開OAuth拒否を網羅。書込10件にはwrite fence、更新/削除8件には他ユーザーID、作成/編集8件には利用権切れを追加。入力型、UUID、名前、enum、アーカイブ先への割当、DB一意制約のエラー変換も検査。**106ケース**。
+- 実Router・middleware・Service・Supabase clientを通し、DBのHTTP通信だけを代替する。アプリの所有者filterが抜けたときにfixture側のRLSが隠さない設計。これは実DBのRLS/FKやcookie/token検証の証明ではない。
+- テンプレートの4公開schemaに**25ケース**。0/1439分、端数/非有限値、名前100文字・タイトル200文字、1〜50ブロック、UUID、日付形式を検査。
+- 追加testのcallback先頭にはすべて「守ること」を明記。新規E2E **0件**、内部業務ロジックのmock **0件**。共通setupの既存server-only marker等は既存設定のまま。
+
+### 新たに発見・修正した検証ツールの問題
+
+`classifyMutationRun` が、Vitestの `.rejects` / `.resolves` による
+「Promiseが期待と逆に成功/失敗した」assertionを `inconclusive` にしていた。
+拒否の必要な認可を壊した場合、test自体は落ちるのに判定器が検出と分類できなかった。
+
+- 対象: `scripts/lib/mutation-evidence.test.ts`、正常/否定を3ケース追加。
+- 修正前: resolvedパターン **1 failed / 19 passed**。続いてrejectedパターンも **1 failed / 19 passed** を確認。
+- 修正後: 同じ `pnpm exec vitest run --config vitest.scripts.config.ts scripts/lib/mutation-evidence.test.ts` で **20 passed**。
+- メッセージだけで認定せず、Vitestの `_Assertion.__VITEST_REJECTS__` / `__VITEST_RESOLVES__` markerも要求。収集失敗・中断・skip・test identity不一致の拒否は保持。
+- DB重複名の期待値は既存 `error-code-map.ts` の契約を確認して `BAD_REQUEST / DUPLICATE_NAME` とした。初回のCONFLICTという期待値誤りを本番不具合やred/green証拠へ数えていない。
+
+### API破壊試行の結果
+
+[証拠](mission-evidence/api-boundaries.json)。無作為20件とは別の、事前定義した13種類の契約破壊。
+**12/13検出、1件生存**。baseline/復元後とも106成功・skipなし。検出ごとの失敗test名を保存。
+認証・MFA・OAuth・billing・write fence・所有者filter・アーカイブ・入力上限の異常を検出した。
+
+壊しても落ちなかったのは `router.ts` の名前上限を50→500へ緩める変更。
+実Serviceの上限50が残るので、不正入力は引き続き拒否され、APIの成功/失敗は変わらない。
+50→49へ狭める別試行は、最大長50文字を正常入力とする追加testが検出する。
+意味の変わらないmutationを検出するためだけに内部実装の文字列をassertせず、生存をそのまま記録する。
+runnerは生存があるため **exit 1** を返し、成功へ偽装しない。
+
+全公開関数/endpointと既存test全件の目的コメントは引き続き未完了。
+今回のAPI一覧はrouterの登録一覧とも照合し、この13件内にendpointを足してtest一覧を更新しなければ落ちる。
+全repoの候補数に対する単純な割合を意味的カバレッジとして報告しない。
+
+### 継続作業の全体検証
+
+- Node24で `pnpm check`: **exit 0、612 files / 7,575 tests passed**。Product4,462 / Web366 / scripts2,644 / billing37 / i18n2 / observability64。skipなし。
+- 初回は追加testを列挙するArchitecture Mapが未更新でscriptsの1件が失敗。`pnpm architecture:generate` で生成一覧2ファイルを更新し、同じ `pnpm check` を完走した。
+- protected-path判定: `required:false / auditContract:false`。製品の認証・権限・課金契約への変更はなく、追加reviewerを起動せずセルフレビューと必須CIで検証する。
+- ローカルログ: `/tmp/dayopt-api-check-final.log`。CI・mergeの最終状態はこの変更のPR側のhead/check/merge commitを正本とする。
