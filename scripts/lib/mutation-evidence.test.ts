@@ -75,6 +75,23 @@ describe('mutation evidence', () => {
     expect(classifyMutationRun(outcome(), baseline)).toBe('survived');
   });
 
+  it.each([
+    'Error: promise resolved "data" instead of rejecting\n    at _Assertion.__VITEST_REJECTS__ (vitest)',
+    'Error: promise rejected "error" instead of resolving\n    at _Assertion.__VITEST_RESOLVES__ (vitest)',
+  ])('recognizes a Vitest promise assertion: %s', (message) => {
+    // 守ること: 認可拒否が成功へ化けたPromise assertionの失敗も検出として数える。
+    const failure = outcome('failed');
+    failure.failures[0]!.messages = [message];
+    expect(classifyMutationRun(failure, outcome())).toBe('killed');
+  });
+
+  it('does not trust a domain error that merely mentions a resolved promise', () => {
+    // 守ること: Vitestのassertionでない業務エラー文言を検出証拠にしない。
+    const failure = outcome('failed');
+    failure.failures[0]!.messages = ['Error: promise resolved data instead of rejecting'];
+    expect(classifyMutationRun(failure, outcome())).toBe('inconclusive');
+  });
+
   it('rejects a replacement test even when total counts match', () => {
     // 守ること: 元のテストが消えて別テストが失敗しても検出成功にしない。
     expect(classifyMutationRun(outcome('failed', 'unrelated assertion'), outcome())).toBe(

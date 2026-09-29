@@ -92,8 +92,13 @@ export function classifyMutationRun(result, baseline) {
     result.exitCode !== 0 &&
     result.failed > 0 &&
     result.failures.some((failure) =>
-      failure.messages.some((message) =>
-        /AssertionError|expected .*|to (?:be|equal|throw)/s.test(message),
+      failure.messages.some(
+        (message) =>
+          /AssertionError|expected .*|to (?:be|equal|throw)/s.test(message) ||
+          (/^Error: promise resolved .* instead of rejecting/s.test(message) &&
+            message.includes('_Assertion.__VITEST_REJECTS__')) ||
+          (/^Error: promise rejected .* instead of resolving/s.test(message) &&
+            message.includes('_Assertion.__VITEST_RESOLVES__')),
       ),
     )
   ) {

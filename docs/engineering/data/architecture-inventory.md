@@ -187,7 +187,7 @@ graph LR
 </details>
 
 <details>
-<summary>test の候補（77）</summary>
+<summary>test の候補（78）</summary>
 
 <!-- prettier-ignore -->
 | ファイル | 対応の根拠 |
@@ -228,6 +228,7 @@ graph LR
 | [apps/product/src/features/timeblock/lib/timeblock-duplicate.test.ts](<../../../apps/product/src/features/timeblock/lib/timeblock-duplicate.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/lib/timeblock-lane-conflict.test.ts](<../../../apps/product/src/features/timeblock/lib/timeblock-lane-conflict.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/lib/timeblock-menu-items.test.ts](<../../../apps/product/src/features/timeblock/lib/timeblock-menu-items.test.ts>) | feature: timeblock |
+| [apps/product/src/features/timeblock/schemas/plan-template.test.ts](<../../../apps/product/src/features/timeblock/schemas/plan-template.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/schemas/timeblock.test.ts](<../../../apps/product/src/features/timeblock/schemas/timeblock.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/server/mcp-mutation-client.test.ts](<../../../apps/product/src/features/timeblock/server/mcp-mutation-client.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/server/plan-record-service.test.ts](<../../../apps/product/src/features/timeblock/server/plan-record-service.test.ts>) | feature: timeblock |
@@ -429,7 +430,7 @@ graph LR
 </details>
 
 <details>
-<summary>test の候補（77）</summary>
+<summary>test の候補（78）</summary>
 
 <!-- prettier-ignore -->
 | ファイル | 対応の根拠 |
@@ -470,6 +471,7 @@ graph LR
 | [apps/product/src/features/timeblock/lib/timeblock-duplicate.test.ts](<../../../apps/product/src/features/timeblock/lib/timeblock-duplicate.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/lib/timeblock-lane-conflict.test.ts](<../../../apps/product/src/features/timeblock/lib/timeblock-lane-conflict.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/lib/timeblock-menu-items.test.ts](<../../../apps/product/src/features/timeblock/lib/timeblock-menu-items.test.ts>) | feature: timeblock |
+| [apps/product/src/features/timeblock/schemas/plan-template.test.ts](<../../../apps/product/src/features/timeblock/schemas/plan-template.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/schemas/timeblock.test.ts](<../../../apps/product/src/features/timeblock/schemas/timeblock.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/server/mcp-mutation-client.test.ts](<../../../apps/product/src/features/timeblock/server/mcp-mutation-client.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/server/plan-record-service.test.ts](<../../../apps/product/src/features/timeblock/server/plan-record-service.test.ts>) | feature: timeblock |
@@ -671,7 +673,7 @@ graph LR
 </details>
 
 <details>
-<summary>test の候補（77）</summary>
+<summary>test の候補（78）</summary>
 
 <!-- prettier-ignore -->
 | ファイル | 対応の根拠 |
@@ -712,6 +714,7 @@ graph LR
 | [apps/product/src/features/timeblock/lib/timeblock-duplicate.test.ts](<../../../apps/product/src/features/timeblock/lib/timeblock-duplicate.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/lib/timeblock-lane-conflict.test.ts](<../../../apps/product/src/features/timeblock/lib/timeblock-lane-conflict.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/lib/timeblock-menu-items.test.ts](<../../../apps/product/src/features/timeblock/lib/timeblock-menu-items.test.ts>) | feature: timeblock |
+| [apps/product/src/features/timeblock/schemas/plan-template.test.ts](<../../../apps/product/src/features/timeblock/schemas/plan-template.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/schemas/timeblock.test.ts](<../../../apps/product/src/features/timeblock/schemas/timeblock.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/server/mcp-mutation-client.test.ts](<../../../apps/product/src/features/timeblock/server/mcp-mutation-client.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/server/plan-record-service.test.ts](<../../../apps/product/src/features/timeblock/server/plan-record-service.test.ts>) | feature: timeblock |
@@ -835,7 +838,7 @@ graph LR
 </details>
 
 <details>
-<summary>test の候補（16）</summary>
+<summary>test の候補（17）</summary>
 
 <!-- prettier-ignore -->
 | ファイル | 対応の根拠 |
@@ -843,6 +846,7 @@ graph LR
 | [apps/product/src/features/activities/components/ActivityQuickSelector.test.tsx](<../../../apps/product/src/features/activities/components/ActivityQuickSelector.test.tsx>) | feature: activities |
 | [apps/product/src/features/activities/domain/activity-tree-cache.test.ts](<../../../apps/product/src/features/activities/domain/activity-tree-cache.test.ts>) | feature: activities |
 | [apps/product/src/features/activities/server/activities-query-service.test.ts](<../../../apps/product/src/features/activities/server/activities-query-service.test.ts>) | feature: activities |
+| [apps/product/src/features/activities/server/router.test.ts](<../../../apps/product/src/features/activities/server/router.test.ts>) | feature: activities |
 | [apps/product/src/lib/test/e2e/a11y.spec.ts](<../../../apps/product/src/lib/test/e2e/a11y.spec.ts>) | 画面: /[locale]/report |
 | [apps/product/src/lib/test/e2e/account-deletion.spec.ts](<../../../apps/product/src/lib/test/e2e/account-deletion.spec.ts>) | 画面: /[locale]/calendar |
 | [apps/product/src/lib/test/e2e/calendar-initial-load.spec.ts](<../../../apps/product/src/lib/test/e2e/calendar-initial-load.spec.ts>) | 画面: /[locale]/calendar |
@@ -1161,7 +1165,7 @@ graph LR
 </details>
 
 <details>
-<summary>test の候補（77）</summary>
+<summary>test の候補（78）</summary>
 
 <!-- prettier-ignore -->
 | ファイル | 対応の根拠 |
@@ -1202,6 +1206,7 @@ graph LR
 | [apps/product/src/features/timeblock/lib/timeblock-duplicate.test.ts](<../../../apps/product/src/features/timeblock/lib/timeblock-duplicate.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/lib/timeblock-lane-conflict.test.ts](<../../../apps/product/src/features/timeblock/lib/timeblock-lane-conflict.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/lib/timeblock-menu-items.test.ts](<../../../apps/product/src/features/timeblock/lib/timeblock-menu-items.test.ts>) | feature: timeblock |
+| [apps/product/src/features/timeblock/schemas/plan-template.test.ts](<../../../apps/product/src/features/timeblock/schemas/plan-template.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/schemas/timeblock.test.ts](<../../../apps/product/src/features/timeblock/schemas/timeblock.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/server/mcp-mutation-client.test.ts](<../../../apps/product/src/features/timeblock/server/mcp-mutation-client.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/server/plan-record-service.test.ts](<../../../apps/product/src/features/timeblock/server/plan-record-service.test.ts>) | feature: timeblock |
@@ -1503,7 +1508,7 @@ graph LR
 </details>
 
 <details>
-<summary>test の候補（77）</summary>
+<summary>test の候補（78）</summary>
 
 <!-- prettier-ignore -->
 | ファイル | 対応の根拠 |
@@ -1544,6 +1549,7 @@ graph LR
 | [apps/product/src/features/timeblock/lib/timeblock-duplicate.test.ts](<../../../apps/product/src/features/timeblock/lib/timeblock-duplicate.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/lib/timeblock-lane-conflict.test.ts](<../../../apps/product/src/features/timeblock/lib/timeblock-lane-conflict.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/lib/timeblock-menu-items.test.ts](<../../../apps/product/src/features/timeblock/lib/timeblock-menu-items.test.ts>) | feature: timeblock |
+| [apps/product/src/features/timeblock/schemas/plan-template.test.ts](<../../../apps/product/src/features/timeblock/schemas/plan-template.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/schemas/timeblock.test.ts](<../../../apps/product/src/features/timeblock/schemas/timeblock.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/server/mcp-mutation-client.test.ts](<../../../apps/product/src/features/timeblock/server/mcp-mutation-client.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/server/plan-record-service.test.ts](<../../../apps/product/src/features/timeblock/server/plan-record-service.test.ts>) | feature: timeblock |
