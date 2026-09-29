@@ -160,3 +160,11 @@ F027を含む固定製品SHA `b82badf0eef2fd02459697b36e2be19c834e2af7`で全体
 F028は2026-09-08の決定原文と現行仕様・query境界を照合し、settingsの古いPro限定説明だけを訂正。H029としてUIのrefetch失敗・query結果直接変更・timezoneの再現を次の着手点に保存。ConfirmDialog/clipboardの未処理Promise候補、公開JSON復元説明も追加調査する。今回の安全な修正をIssue化で終了扱いせず、次の継続で再現・修正へ進む。全体監査・実クラウド・E2Eは未完了。
 
 今回の修正は公開head `43f70d617d6608ea2b3ffbfe77708f071d106277`としてDraft #2965へpush、APIでhead/isDraft=true/state=OPENを確認。通常pre-push成功（affected型/lint/scripts2642/format）、`/tmp/dayopt-audit-push-export-verified.log`。docs:checkも正本/生成資料同期後exit 0（`/tmp/dayopt-audit-export-docs-check.log`）。公開後のtimezoneガイドとpreferences hook/test読解を追加し、ローカル台帳は298件。H029へはuser_settings queryを唯一のTZ参照元とする既存契約を適用する。次の実装修正前にこの3件の読解を繰り返す必要はない。
+
+## エクスポートUIの失敗と期間の整合
+
+前回は取得上限の修正・統合検査・Draft保存まで進めたprogress turn。現在のclean HEADからH029を再現し、F029（`1ea132c53`）とF030（`4ec2fd6bf8f3e9cccc1130a145e43940e8c02e7e`）で修正。実QueryObserverの成功→失敗、期間filterの共有cache変更、JSTとNYの夏時間日の境界、不完全/逆転入力を検査した。関連25 tests・型検査成功。製品SHAを固定して全体check実行中。docs:checkは正本/生成資料同期後exit 0。現在の読解は基準305件。次はConfirmDialog/clipboardの非同期失敗、export保持/restore説明、設定の更新・失敗/競合経路を照合し、残る全文読解を進める。
+
+固定製品SHA `4ec2fd6bf8f3e9cccc1130a145e43940e8c02e7e` のNode24 `pnpm check` exit 0。型/lint/static、billing37/i18n2/observability64/product4366/web366/scripts2642、合計7477 passed。ログ `/tmp/dayopt-audit-check-export-ui.log`。同時に実施したdocs:checkもexit 0（`/tmp/dayopt-audit-export-ui-docs-check.log`）。検査中は製品を固定し、監査記録だけを更新。実DB・E2E・配信は未確認。
+
+ConfirmDialogの全runtime callsiteを追い、Google/MCP/iCal/ghost/templateの反証を記録。未処理の候補はDataSettingsとActivityFilterListへ絞れた（H031）。追加の全文読解で基準313件、機械確認1、未確認2827。次はH031の再現・修正と、MCPコピーの失敗・exportの公開説明/保持境界を継続する。公開は通常pre-push後、Draftを維持する。

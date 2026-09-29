@@ -3125,10 +3125,12 @@
       "mode": "100644",
       "bytes": 3781,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 97]],
+      "evidence": [
+        "Full text reviewed at 4ec2fd6bf, baseline bytes unchanged. Google settings split 1-190/191-EOF; MCP settings 1-125/126-EOF; ghost hook test 1-115/116-EOF. ConfirmDialog callers traced: MCP/iCal/Google catch mutation rejection, ghost hook catches dismissal, template uses mutate; DataSettings and ActivityFilterList remain rejection candidates."
+      ],
       "questions": []
     },
     {
@@ -6333,7 +6335,8 @@
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
       "read_ranges": [[1, 62]],
       "evidence": [
-        "Complete primary-agent read; activity/category input, archive, lookup, cache and report paths cross-checked. F012/F013 and remaining hypotheses in findings.md. Cloud read helper inspected before attempted metadata-only query; authorization timed out before result."
+        "Complete primary-agent read; activity/category input, archive, lookup, cache and report paths cross-checked. F012/F013 and remaining hypotheses in findings.md. Cloud read helper inspected before attempted metadata-only query; authorization timed out before result.",
+        "Full text reviewed at 4ec2fd6bf, baseline bytes unchanged. Google settings split 1-190/191-EOF; MCP settings 1-125/126-EOF; ghost hook test 1-115/116-EOF. ConfirmDialog callers traced: MCP/iCal/Google catch mutation rejection, ghost hook catches dismissal, template uses mutate; DataSettings and ActivityFilterList remain rejection candidates."
       ],
       "questions": []
     },
@@ -8508,10 +8511,12 @@
       "mode": "100644",
       "bytes": 6389,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 155]],
+      "evidence": [
+        "Full text reviewed at 4ec2fd6bf, baseline bytes unchanged. Google settings split 1-190/191-EOF; MCP settings 1-125/126-EOF; ghost hook test 1-115/116-EOF. ConfirmDialog callers traced: MCP/iCal/Google catch mutation rejection, ghost hook catches dismissal, template uses mutate; DataSettings and ActivityFilterList remain rejection candidates."
+      ],
       "questions": []
     },
     {
@@ -9405,10 +9410,12 @@
       "mode": "100644",
       "bytes": 7027,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 154]],
+      "evidence": [
+        "Full text reviewed at 4ec2fd6bf, baseline bytes unchanged. Google settings split 1-190/191-EOF; MCP settings 1-125/126-EOF; ghost hook test 1-115/116-EOF. ConfirmDialog callers traced: MCP/iCal/Google catch mutation rejection, ghost hook catches dismissal, template uses mutate; DataSettings and ActivityFilterList remain rejection candidates."
+      ],
       "questions": []
     },
     {
@@ -10601,10 +10608,12 @@
       "mode": "100644",
       "bytes": 6784,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 203]],
+      "evidence": [
+        "Full text reviewed at 4ec2fd6bf, baseline bytes unchanged. Google settings split 1-190/191-EOF; MCP settings 1-125/126-EOF; ghost hook test 1-115/116-EOF. ConfirmDialog callers traced: MCP/iCal/Google catch mutation rejection, ghost hook catches dismissal, template uses mutate; DataSettings and ActivityFilterList remain rejection candidates."
+      ],
       "questions": []
     },
     {
@@ -10614,10 +10623,12 @@
       "mode": "100644",
       "bytes": 6027,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 151]],
+      "evidence": [
+        "Full text reviewed at 4ec2fd6bf, baseline bytes unchanged. Google settings split 1-190/191-EOF; MCP settings 1-125/126-EOF; ghost hook test 1-115/116-EOF. ConfirmDialog callers traced: MCP/iCal/Google catch mutation rejection, ghost hook catches dismissal, template uses mutate; DataSettings and ActivityFilterList remain rejection candidates."
+      ],
       "questions": []
     },
     {
@@ -10718,10 +10729,12 @@
       "mode": "100644",
       "bytes": 1598,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 49]],
+      "evidence": [
+        "Full text read at 4ec2fd6bf; baseline bytes unchanged. core.ts split 1-160/161-330/331-EOF, settings test 1-165/166-EOF. Settings query projection, optimistic rollback, TZ cookie/invalidation and day-key comparison cross-checked. Calendar-day difference/parse helpers and concurrent settings rollback remain candidates, not verified defects."
+      ],
       "questions": []
     },
     {
@@ -11485,10 +11498,12 @@
       "mode": "100644",
       "bytes": 377,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 9]],
+      "evidence": [
+        "Full text read at 4ec2fd6bf; baseline bytes unchanged. core.ts split 1-160/161-330/331-EOF, settings test 1-165/166-EOF. Settings query projection, optimistic rollback, TZ cookie/invalidation and day-key comparison cross-checked. Calendar-day difference/parse helpers and concurrent settings rollback remain candidates, not verified defects."
+      ],
       "questions": []
     },
     {
@@ -11823,10 +11838,12 @@
       "mode": "100644",
       "bytes": 14476,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 373]],
+      "evidence": [
+        "Full text reviewed at 4ec2fd6bf, baseline bytes unchanged. Google settings split 1-190/191-EOF; MCP settings 1-125/126-EOF; ghost hook test 1-115/116-EOF. ConfirmDialog callers traced: MCP/iCal/Google catch mutation rejection, ghost hook catches dismissal, template uses mutate; DataSettings and ActivityFilterList remain rejection candidates."
+      ],
       "questions": []
     },
     {
@@ -13845,10 +13862,12 @@
       "mode": "100644",
       "bytes": 5121,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 169]],
+      "evidence": [
+        "Full text reviewed at 4ec2fd6bf, baseline bytes unchanged. Google settings split 1-190/191-EOF; MCP settings 1-125/126-EOF; ghost hook test 1-115/116-EOF. ConfirmDialog callers traced: MCP/iCal/Google catch mutation rejection, ghost hook catches dismissal, template uses mutate; DataSettings and ActivityFilterList remain rejection candidates."
+      ],
       "questions": []
     },
     {
@@ -13936,10 +13955,12 @@
       "mode": "100644",
       "bytes": 10062,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 222]],
+      "evidence": [
+        "Full text reviewed at 4ec2fd6bf, baseline bytes unchanged. Google settings split 1-190/191-EOF; MCP settings 1-125/126-EOF; ghost hook test 1-115/116-EOF. ConfirmDialog callers traced: MCP/iCal/Google catch mutation rejection, ghost hook catches dismissal, template uses mutate; DataSettings and ActivityFilterList remain rejection candidates."
+      ],
       "questions": []
     },
     {
@@ -14352,10 +14373,12 @@
       "mode": "100644",
       "bytes": 5966,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 189]],
+      "evidence": [
+        "Full text read at 4ec2fd6bf; baseline bytes unchanged. core.ts split 1-160/161-330/331-EOF, settings test 1-165/166-EOF. Settings query projection, optimistic rollback, TZ cookie/invalidation and day-key comparison cross-checked. Calendar-day difference/parse helpers and concurrent settings rollback remain candidates, not verified defects."
+      ],
       "questions": []
     },
     {
@@ -14365,10 +14388,12 @@
       "mode": "100644",
       "bytes": 2696,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 79]],
+      "evidence": [
+        "Full text read at 4ec2fd6bf; baseline bytes unchanged. core.ts split 1-160/161-330/331-EOF, settings test 1-165/166-EOF. Settings query projection, optimistic rollback, TZ cookie/invalidation and day-key comparison cross-checked. Calendar-day difference/parse helpers and concurrent settings rollback remain candidates, not verified defects."
+      ],
       "questions": []
     },
     {
@@ -17993,10 +18018,12 @@
       "mode": "100644",
       "bytes": 9177,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 353]],
+      "evidence": [
+        "Full text read at 4ec2fd6bf; baseline bytes unchanged. core.ts split 1-160/161-330/331-EOF, settings test 1-165/166-EOF. Settings query projection, optimistic rollback, TZ cookie/invalidation and day-key comparison cross-checked. Calendar-day difference/parse helpers and concurrent settings rollback remain candidates, not verified defects."
+      ],
       "questions": []
     },
     {
@@ -18493,10 +18520,12 @@
       "mode": "100644",
       "bytes": 2697,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 78]],
+      "evidence": [
+        "Full text read at 4ec2fd6bf; baseline bytes unchanged. core.ts split 1-160/161-330/331-EOF, settings test 1-165/166-EOF. Settings query projection, optimistic rollback, TZ cookie/invalidation and day-key comparison cross-checked. Calendar-day difference/parse helpers and concurrent settings rollback remain candidates, not verified defects."
+      ],
       "questions": []
     },
     {
@@ -18506,10 +18535,12 @@
       "mode": "100644",
       "bytes": 3094,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 94]],
+      "evidence": [
+        "Full text read at 4ec2fd6bf; baseline bytes unchanged. core.ts split 1-160/161-330/331-EOF, settings test 1-165/166-EOF. Settings query projection, optimistic rollback, TZ cookie/invalidation and day-key comparison cross-checked. Calendar-day difference/parse helpers and concurrent settings rollback remain candidates, not verified defects."
+      ],
       "questions": []
     },
     {

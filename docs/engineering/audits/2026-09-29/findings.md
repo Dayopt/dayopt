@@ -257,3 +257,24 @@ H024の反証追記: installed `@supabase/auth-js@2.116.0` のGoTrueClient.ts 40
 - 根拠: handleExportはresult.dataのみを判定。installed TanStack query-core 5.102.8のqueryObserver.ts（279–285、340–370、582–619）はrefetch既定でrejectをcatchし、dataとerror/isRefetchErrorを同時に返す。過去dataがある失敗を成功に見せる可能性。期間フィルタはcacheから受けた配列を直接置換し、開始はUTC日付/終了はbrowser日付で異なる境界。利用者timezoneを参照しない。
 - 次: 実QueryObserverの成功→失敗をcomponentのrefetch境界へつなぐ再現と、期間選択→全期間のcache不変、設定TZの日境界を検査する。期間跨ぎをstart_at基準からoverlapへ変える判断は今回混ぜない。日付未入力/逆転の扱い、exportのIndexedDB保持や復元可能性の公開説明も別に契約確認する。
 - 関連候補: ConfirmDialogはonConfirmをawaitするがfinallyのみ。DataSettingsのdelete mutationはonError通知後もmutateAsyncがrejectする。同じ未処理rejectionの可能性を呼出元全体で照合する。MCP URLコピーもclipboardのPromise未処理で成功通知する。まだ製品不具合の再現済み件数に含めない。
+
+## F029 — 再取得失敗を古いexport結果で成功扱いし、期間指定がcacheを変更する
+
+- 状態: H029の失敗/共有data部分を再現・修正（`1ea132c53`）。Mission #2963。製品API/保存形式は不変。
+- 再現/根拠: 実QueryObserver（retry:false、成功後にqueryFnを失敗）をUIのrefetchへ接続。2回目はisRefetchError=true/dataありで返り、旧UIは成功通知・2つ目のBlobを作る。別caseで期間内/外を含むquery結果を渡すと、ダウンロードは絞れるが元のplans/records配列まで置換される。修正前2 failed/1 passed。
+- 修正/反証: refetchのisErrorとdataを両方確認し、export用envelope/dataを浅いcopyにしてfilter結果をそこへ格納。行自体は書き換えないため深いcopyは不要。ネットワークrejectだけのmockでTanStackの結果契約を代用していない。単なる通知変更ではなくBlobが増えないことを確認。
+- 検証: 関連3 files/16 passed、typecheck:product成功。ログ `/tmp/dayopt-audit-export-ui-{red,green,types}.log`。取得前の入力/期間境界はF030。IndexedDB保持と公開restore説明は継続調査。
+
+## F030 — export期間の開始/終了が異なるtimezoneで解釈される
+
+- 状態: H029の期間境界を再現・修正（`4ec2fd6bf8f3e9cccc1130a145e43940e8c02e7e`）。Mission #2963。
+- 期待契約/根拠: timezone.mdの利用者設定を正本にする規則と既存useUserPreferences/getDateKeyへ照合。旧startはnew Date(YYYY-MM-DD)でUTC、endだけbrowser setHours、設定TZを使わない。JST/NYのDST開始・終了の日で境界の内外を用意すると3 failed/3 passed。期待値は各日のUTC instantを固定し実装と同じ変換式をコピーしない。
+- 修正/反証: 既存preferences queryからtimezoneを取得、start_atをそのTZの暦日キーに変換して選択日と比較。固定24h演算や新しい時間helperを導入しない。期間を跨ぐ行をstart_atで選ぶ既存契約、CSV列、export操作数は維持。実preferences hookのselectを通すfixtureで設定の接続も検査。
+- 入力境界: customで片方未入力または逆転している場合、全期間/空結果を成功出力することも3 failed/6 passedで再現。問い合わせ前に拒否し既存のexportFailed通知へ接続。新しい文言・確認ダイアログは追加しない。
+- 検証: 関連4 files/25 passed、型検査成功。ログ `/tmp/dayopt-audit-export-tz-{red,green}.log` / `/tmp/dayopt-audit-export-range-{red,green,types}.log`。実ブラウザの保存完了/実DB検証ではない。journeyの正本JSON/生成資料を同期しdocs:check成功。
+
+## H031 — ConfirmDialogへ渡す削除処理のreject処理が不統一
+
+- 状態: 呼び出し境界を照合、再現前。DataSettingsのdeleteBlocks/deleteAllDataとActivityFilterListのhandleConfirmDeleteが、既存のonError通知後もmutateAsyncのrejectをConfirmDialogへ返す。ConfirmDialogはfinallyでloadingを戻すだけで、React clickの返すPromiseは未処理になりうる。
+- 反証: Google切断・MCP revoke・iCal再生成はcallsiteでcatch済み。ExternalEventCardのdismissはuseConvertGhostEvent内部でcatch。TemplateListはCalendarSidebarのmutateを呼ぶため同じreject経路ではない。共通ダイアログで全例外を無条件に握りつぶす修正は未採用。
+- 次: 2つの未処理候補を実UIと失敗→再試行で再現し、通知の所有者を既存mutationに保ったまま最小のイベント境界で閉じる。Activityのfinallyによる閉じ方を無関係に変えない。既存testを使えるか確認する。外部API/DBの削除は実行しない。
