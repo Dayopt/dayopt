@@ -88,6 +88,7 @@ const KNOWN_PLACEMENT_EXCEPTIONS = new Set<string>([
   // API未接続。doc参照がimportより優先される分類器の既知の例外。
   'scripts/lib/preview-fixture-authority.mjs',
   'scripts/lib/preview-fixture-broker.mjs',
+  'scripts/lib/preview-fixture-registry.mjs',
   // protected-path-gate.mjs: impact.mjs（scripts/ci/、同じ --stdin 呼び出し規約）と
   // 同型で、finish-branch.sh から node 経由で呼ばれる ci unit。skill docs（audit-ai-
   // config / pr-cross-review）からの言及は利用者向けの説明文であり、実行呼び出しでは
