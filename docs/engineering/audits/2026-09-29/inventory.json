@@ -38126,10 +38126,12 @@
       "mode": "100644",
       "bytes": 21931,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 674]],
+      "evidence": [
+        "Full untruncated read in bounded chunks 1-110/111-300/301-495/496-674 at bd2e99fe9. Historical stage1 wrappers serialize supported writes; exclusive helper is superseded in revision-fence migration. Legacy skip/plan references require later removal migrations; do not treat these old definitions as current contract."
+      ],
       "questions": []
     },
     {
@@ -38152,10 +38154,12 @@
       "mode": "100644",
       "bytes": 26823,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 874]],
+      "evidence": [
+        "Full untruncated read 1-180/181-249/250-306/307-480/481-670/671-734/735-810/811-874 at bd2e99fe9. Last helper binds transaction user/lock mode before auth parent KEY SHARE and advisory lock; rejects shared-to-exclusive upgrade. Marker changes deferred/coalesced; pooled cleanup uses visible committed state with SKIP LOCKED. Search found no later exclusive-helper redefinition. No DB execution."
+      ],
       "questions": []
     },
     {

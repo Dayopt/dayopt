@@ -224,3 +224,7 @@ main #2968を監査branchへmerge `f11715af7d324fdb9c1234b7333813c2bf8c96c6`で�
 統合内容のNode24 `pnpm check` exit 0、型10/lint9/static/deadcode、billing37/i18n2/observability64/product4517/web366/scripts2645、合計7631 passed。ログ `/tmp/dayopt-audit-check-webhook-terminal-integrated.log`。開始時HEADは0a6621dc6でmerge index/working treeは最終内容、検査中に同じ内容をf11715af7へcommitした。製品コード変更なし。docs:checkもexit 0（`/tmp/dayopt-audit-webhook-terminal-docs.log`）。実DB/Stripe/配信証拠とは扱わない。
 
 generic account deletion gate integration1747行の残りを省略なく読解しbaseline bytes一致を確認。基準全文371件、機械1、未確認2769。lease期限を過去に変更してからcomplete/reclaimする検査と、lock待ち途中の期限超過を区別。receiptのAuth削除transaction内生成/rollback/30日掃除、Customer recoveryを確認したがローカル専用fixtureは未実行。次はH034の現行lock helper/時間評価、通知のイベント鮮度、残りの全文読解を進める。全体監査・実環境・E2E・配信は未完了。
+
+公開head `bd2e99fe97707ffad897b517e1839dee12e324a6`を通常pre-push（型/lint/scripts2645/format）経由でDraft #2965へpushし、APIでOPEN/isDraft=true/headを確認。ログ `/tmp/dayopt-audit-webhook-push-verified.log`。PR本文もF035/F036と7631全体成功へ更新。mainへのmergeなし。
+
+公開後にwriter serialization674行とrevision fence874行を全文確認し、baseline bytes一致を確認。基準全文373件、機械1、未確認2767。後続revision fenceの最後のexclusive helperはtransaction user/lock mode bind→auth parent KEY SHARE→同user advisory lockで、旧helperだけから結論を出さない。後続migration検索では更なるexclusive helper再定義なし。shared→exclusive upgradeは先に拒否され、H034の単純なlock待ち候補と別の境界として保持。DB実行なし。通知previous_attributesと最新Stripe状態の組合せは未採用候補で続ける。次の読解は後続のcommand/gateとrevision marker利用側の整合。
