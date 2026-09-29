@@ -3,11 +3,12 @@ import { execFileSync, spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { expectedMigrationVersions } from '../ci/production-migration-readiness.mjs';
 import { isDirectExecution } from '../lib/is-direct-execution.mjs';
+import { validateCloudRequest } from '../lib/preview-cloud-binding.mjs';
 import { isPassingPreviewReport } from '../lib/preview-e2e-reporter.mjs';
 import { recoverPreviewUsers } from './preview-cleanup.mjs';
 import {
@@ -30,7 +31,35 @@ export function previewWorkerEnvironment(
   evidenceDir,
   runId,
   cloudUserIds = /** @type {{desktop: string, mobile: string} | undefined} */ (undefined),
+  registryPath = /** @type {string | undefined} */ (undefined),
 ) {
+  if (registryPath !== undefined) {
+    try {
+      const bound = validateCloudRequest(ready);
+      const uuid = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
+      if (
+        ready.status !== 'ready' ||
+        bound.databaseMode !== 'ephemeral' ||
+        typeof registryPath !== 'string' ||
+        !isAbsolute(registryPath) ||
+        !/^https:\/\/product-[a-z0-9]+-dayopt\.vercel\.app$/.test(ready.origin ?? '') ||
+        !uuid.test(runId ?? '') ||
+        !cloudUserIds ||
+        Object.keys(cloudUserIds).length !== 2 ||
+        !uuid.test(cloudUserIds.desktop ?? '') ||
+        !uuid.test(cloudUserIds.mobile ?? '') ||
+        cloudUserIds.desktop === cloudUserIds.mobile ||
+        Object.values(cloudUserIds).some((id) =>
+          ['00000000-0000-0000-0000-000000000000', '00000000-0000-0000-0000-000000000001'].includes(
+            id,
+          ),
+        )
+      )
+        throw new Error();
+    } catch {
+      throw new Error('Preview fixture worker binding is invalid');
+    }
+  }
   const result = { NODE_ENV: 'test', CI: '1' };
   for (const key of ['PATH', 'HOME', 'TMPDIR', 'LANG', 'PNPM_HOME', 'PLAYWRIGHT_BROWSERS_PATH']) {
     if (env[key]) result[key] = env[key];
@@ -38,7 +67,9 @@ export function previewWorkerEnvironment(
   return {
     ...result,
     NEXT_PUBLIC_SUPABASE_URL: `https://${ready.supabaseProjectRef}.supabase.co`,
-    SUPABASE_SECRET_KEY: env.SUPABASE_SECRET_KEY,
+    ...(registryPath !== undefined
+      ? { E2E_PREVIEW_FIXTURE_REGISTRY: registryPath, E2E_PREVIEW_DB_MODE: 'ephemeral' }
+      : { SUPABASE_SECRET_KEY: env.SUPABASE_SECRET_KEY }),
     VERCEL_AUTOMATION_BYPASS_SECRET: env.VERCEL_AUTOMATION_BYPASS_SECRET,
     E2E_ALLOW_NONLOCAL_SUPABASE: '1',
     E2E_REQUIRE_SERVICE_ROLE_SUITES: '1',

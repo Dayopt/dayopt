@@ -257,6 +257,100 @@ fs.writeFileSync(path.join(process.env.E2E_PREVIEW_EVIDENCE_DIR, 'e2e.json'), JS
       }),
     );
   });
+  it('preprovisioned worker gets only scoped logins and no admin or OIDC authority', () => {
+    const ids = {
+      desktop: '22222222-2222-4222-8222-222222222222',
+      mobile: '33333333-3333-4333-8333-333333333333',
+    };
+    const parent = {
+      ...env,
+      GH_TOKEN: 'must-not-leak',
+      ACTIONS_ID_TOKEN_REQUEST_URL: 'must-not-leak',
+      ACTIONS_ID_TOKEN_REQUEST_TOKEN: 'must-not-leak',
+      NODE_OPTIONS: 'must-not-leak',
+      E2E_PREVIEW_FIXTURE_REGISTRY: 'untrusted-parent-path',
+    };
+    const worker = previewWorkerEnvironment(
+      parent,
+      ready,
+      '/private',
+      '/evidence',
+      '11111111-1111-4111-8111-111111111111',
+      ids,
+      '/credentials/login.json',
+    );
+    expect(worker).toMatchObject({
+      E2E_PREVIEW_FIXTURE_REGISTRY: '/credentials/login.json',
+      E2E_PREVIEW_DB_MODE: 'ephemeral',
+      E2E_PREVIEW_CLOUD_INTENT: '1',
+      E2E_PREVIEW_DESKTOP_USER_ID: ids.desktop,
+      E2E_PREVIEW_MOBILE_USER_ID: ids.mobile,
+      VERCEL_AUTOMATION_BYPASS_SECRET: env.VERCEL_AUTOMATION_BYPASS_SECRET,
+    });
+    for (const key of [
+      'SUPABASE_SECRET_KEY',
+      'GH_TOKEN',
+      'GITHUB_TOKEN',
+      'VERCEL_TOKEN',
+      'SUPABASE_PREVIEW_READINESS_TOKEN',
+      'STRIPE_SECRET_KEY',
+      'ACTIONS_ID_TOKEN_REQUEST_URL',
+      'ACTIONS_ID_TOKEN_REQUEST_TOKEN',
+      'NODE_OPTIONS',
+    ])
+      expect(worker).not.toHaveProperty(key);
+    expect(JSON.stringify(worker)).not.toContain('must-not-leak');
+    expect(parent.SUPABASE_SECRET_KEY).toBe(env.SUPABASE_SECRET_KEY);
+    // Inherited mode hints cannot silently switch legacy execution to the new mode.
+    const legacy = previewWorkerEnvironment(
+      parent,
+      ready,
+      '/private',
+      '/evidence',
+      '11111111-1111-4111-8111-111111111111',
+      ids,
+    );
+    expect(legacy).not.toHaveProperty('E2E_PREVIEW_FIXTURE_REGISTRY');
+    expect(legacy).toHaveProperty('SUPABASE_SECRET_KEY', env.SUPABASE_SECRET_KEY);
+  });
+  it.each([
+    'shared',
+    'production',
+    'not-ready',
+    'missing-users',
+    'same-users',
+    'baseline-user',
+    'relative-path',
+    'empty-path',
+    'bad-run',
+    'bad-origin',
+  ])('preprovisioned environment fails closed for %s', (scenario) => {
+    const binding = { ...ready };
+    let ids: { desktop: string; mobile: string } | undefined = {
+      desktop: '22222222-2222-4222-8222-222222222222',
+      mobile: '33333333-3333-4333-8333-333333333333',
+    };
+    let path = '/credentials/login.json';
+    let runId = '11111111-1111-4111-8111-111111111111';
+    if (scenario === 'shared')
+      Object.assign(binding, {
+        databaseMode: 'shared',
+        supabaseProjectRef: 'tilwaprottpyhlfoggbb',
+        supabaseBranchId: '4c2ed092-cba3-4f37-98e1-78f61cdf52ed',
+      });
+    if (scenario === 'production') binding.supabaseProjectRef = 'yvglwblxrnrenfifsnje';
+    if (scenario === 'not-ready') binding.status = 'failed';
+    if (scenario === 'missing-users') ids = undefined;
+    if (scenario === 'same-users') ids!.mobile = ids!.desktop;
+    if (scenario === 'baseline-user') ids!.desktop = '00000000-0000-0000-0000-000000000001';
+    if (scenario === 'relative-path') path = 'login.json';
+    if (scenario === 'empty-path') path = '';
+    if (scenario === 'bad-run') runId = 'must-not-leak';
+    if (scenario === 'bad-origin') binding.origin = 'https://example.com';
+    expect(() =>
+      previewWorkerEnvironment(env, binding, '/private', '/evidence', runId, ids, path),
+    ).toThrow(/^Preview fixture worker binding is invalid$/);
+  });
   it('子プロセスには管理tokenと本番secretを渡さない', () => {
     const worker = previewWorkerEnvironment(
       env,
