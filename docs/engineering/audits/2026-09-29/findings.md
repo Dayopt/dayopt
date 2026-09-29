@@ -52,11 +52,18 @@ last_verified: 2026-09-29
 - DB照合: 20260908022927は接続からuserを導出し、gate/connection/token/profile/operationのlock後にscope・期限・利用権を判定。20260914000000のapplyは同じcanonical commandへsource apiで保存し、期限を再確認してreceiptを同一transactionに書く。20260729073126のresolverは90日保持と削除世代を確認。これはコード読解でありlive DB実測ではない。
 - 修正/検証: strategyの全入口ghostという要約とprinciplesの直接確定未決を、MCPの直接書込・clientの操作確認・外部calendarの明示変換へ分けた。理由と原典、将来見直しの観点を残す。`pnpm docs:check` exit 0（`/tmp/dayopt-audit-mcp-contract-docs.log`）。コードが存在するだけを採用根拠にせず、明示判断を根拠にした文書訂正のため新規挙動testなし。
 
-## H019 — 削除済みreceiptの終端エラーとMCPの再試行案内
+## F019 — 削除済みreceiptの終端エラーを再試行可能として返す
 
-- 状態: コード読解からの候補、未修正・実行未再現。
-- 根拠: `private.resolve_mcp_mutation_replay_v1`はpurged receipt/旧data generationをDM008で拒否し、既存DB integration testもそのコードを期待する。McpMutationClientのEXPECTED_ERROR_CODESにはDM008がなく、想定外DBエラー→MUTATION_FAILEDへ入り、tool側がretryable=trueを返す。削除済み結果を同じoperationIdで再送しても90日保持中は回復しない可能性。
-- 次の反証: 公開error契約、削除後の新規操作との区別、既存client/test、#1754の運用契約を照合し、実adapter→toolで再現する。DB拒否を弱めず、安易にreceiptを削除/再実行しない。未知のDBエラーを一律に非再試行へ変える修正は採らない。
+- 状態: ローカル再現・修正済み（`bbc0dfe8e`）。Mission #2963。本番・実DB実行は未確認。
+- 条件/根拠: private.resolve_mcp_mutation_replay_v1はpurged receipt/旧data generationをDM008で拒否する。adapterのEXPECTED_ERROR_CODESにDM008が無く、想定外DBエラーとしてMUTATION_FAILEDへ入り、toolはretryable=trueを返していた。削除済みの保存結果は同じ操作の再送では復旧しない。
+- 反証/修正: 既存NOT_FOUND/非再試行へ対応付け、削除済み結果の再実行やreceipt消去はしない。全mutationが通る同じmapを変更。未知のDB障害は従来どおりMUTATION_FAILED/再試行可能、想定外エラーの報告も維持。新しい公開error enumやDB権限は追加しない。
+- 検証: real MCP SDK client/server → tool → real McpMutationClientの境界でPlan/Record作成を実行。DB adapterの戻りだけを合成しDM008/XX000を区別、applyの実呼出しも検査。修正前2 failed / 2 passed → 関連3 files / 42 passed、typecheck:product exit 0。ログ `/tmp/dayopt-audit-replay-error-{red,green,types}.log`。DB自身がDM008を生成することのクラウド実測を代用しない。
+
+## F020 — Plan作成toolの未来限定という古い説明
+
+- 状態: 説明修正。Mission #2963。入力schema/DB/認可/作成挙動は変更しない。
+- 期待契約/根拠: 9月4日の時間特例撤去と9月7日の作成UI判断、plan-record仕様のPlanは過去・未来とも作成可。現行apply_mcp_plan_create_v1にも未来限定判定はないが、tools/listでAIへ渡す説明にfutureのみが残り、既に可能な操作を誤って制限して説明する。
+- 修正/反証: 過去・未来とも作成可と明記し、learnの参照・journey正本と生成説明を同期。実装を根拠に新しい仕様へ変更したのではなく、明示判断に説明を合わせた。時刻のend>startやRecordのend<=nowは変更しない。文言一致だけの新規testは追加しない。commit `057697dfe`で生成説明と参照を同期、同製品コードでpnpm check exit 0・7417 tests passed。実DB/クラウド検証ではない。
 
 ## F006 — 前期間にしか記録がない活動が前期間比から消える
 

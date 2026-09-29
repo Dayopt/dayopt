@@ -49,7 +49,7 @@ repo調査、対象内の可逆修正、テスト、commit、必要なpush/Draft
 
 監査Issue: [#2963](https://github.com/Dayopt/dayopt/issues/2963)。`pnpm ctx 2963 --reuse-brief-l1` はexit 0、L1は `trusted_brief_missing_or_stale`。L1は未取得として本文と一次資料で続行。API課金を伴うJev呼び出しは行っていない。ctx初回起動時に既存lockfileから依存のinstallが行われた。tracked manifest/lockfileの差分は無い。
 
-全文確認170ファイル、symlink機械確認1件、未確認2,970件。`inventory.json`が各pathの確認範囲の正本。secrets/architecture/conventions/testing/glossary/strategy/decisions、Reviewの主経路、activities featureの基準ファイル全件の全文確認を完了。partial readは別に範囲を記録した。全文確認は全境界の実行検証を意味しない。全体監査は初期段階であり、多数の未読が残る。
+全文確認202ファイル、symlink機械確認1件、未確認2,938件。`inventory.json`が各pathの確認範囲の正本。secrets/architecture/conventions/testing/glossary/strategy/decisions、Reviewの主経路、activities featureの基準ファイル全件の全文確認を完了。partial readは別に範囲を記録した。全文確認は全境界の実行検証を意味しない。全体監査は初期段階であり、多数の未読が残る。
 
 修正commit: F001 `f0151baaf`（作成既定と選択）、F004 `f2a43d559`（unknown/型アサーション）、F002 `e88a1890f`・`84f4d9019`（旧レポート説明と用語test）、F006 `c799b402b`（前期間だけの活動が比較から消える不具合）、F008 `8a5bc2c9f`（test時計固定）、F011 `9851013ae`（機械データによるtaxonomy誤検知）、F010 `befb03e5f`（DSTの時間帯集計）。`findings.md`に根拠・反証・検査結果を記録。
 
@@ -92,3 +92,17 @@ H005は#1754の2026-08-26 User裁定原文を取得してF005へ採用。直接�
 6 migrationを追加で全文読解し、authorize→operation lock→digest replay→canonical command→期限再確認→receipt保存を照合。旧digestの互換保持は既存#2736が配備・90日保持・最終撤去の証拠を持つため削除しない。クラウド反映・実DB実行は未確認。次はH019（DM008がtoolで再試行可になる候補）を実adapter→toolで反証し、MCP createの古いfuture限定説明も照合する。H007/H009/H014/H015と全体の未読は引き続き残る。
 
 今回の文書修正と追加読解はlocal commitで保存。直前に公開済みのDraft #2965のheadは`4d7ff84068c843d5b9117d211beec5fea0b679f1`。次の修正を束ねた時に通常pre-pushを通して更新する。前回の統合後pre-push（scripts2625件・affected型/lint・format）成功は `/tmp/dayopt-audit-push-main-verified.log`、統合後docs成功は `/tmp/dayopt-audit-docs-main.log`。
+
+## 削除後の再送と公開ツール説明
+
+H019をSDK→tool→実adapterの境界で再現し、F019として`bbc0dfe8e`で修正。削除済みreceiptのDM008は既存NOT_FOUND/非再試行、未知DB障害は引き続き再試行可能。red 2 failed / 2 passed、green関連42 testsと型検査成功。DB結果は合成で、本番/クラウド検証ではない。
+
+F020は既存判断とDB applyに合わせ、plans.createの未来限定説明だけを訂正。learn正本/生成先も同期する。MCP adapterとtoolの変更を含むため、以前のprotected-path-gate required=falseを今回の差分へ流用しない。Draftのまま通常の検査・公開を行い、merge/releaseしない。次は統合検査と公開済みSHAを記録して、残る全文読解を継続する。
+
+OAuth/MCP入口・host/identity・token検証・scope・gate・service-role bridge・code exchangeの全文読解を追加。MCPの読み取りtoolでもverifyAccessTokenがlast_used_atを書き込むため、cloud read-only照合として呼ばない。token用とconnection用の検査、runtimeとDBのwrite gateは別責務で、同一ルールの不要重複としては削除しない。共有barrelがtrpc-bridgeを再exportしないのは循環回避の意図が明記されており維持する。DB内のexchange/rotation、UI consent、認証関連testの未読は引き続き追跡する。
+
+F020説明修正commit `057697dfe`。protected-path-gateの実行結果はrequired=true（apps/product/src/app/api/mcp/**）/auditContract=false。MCP修正を含む安定したmerge候補の独立レビューは通常経路で必要だが、現段階は監査中のDraftであり、早期にreviewerを起動していない。
+
+## MCP修正後の統合検査
+
+製品コードSHA `057697dfe`（MCP説明を含む）でNode24の`pnpm check`がexit 0。型10 tasks・lint9 tasks・静的検査、billing15・i18n2・observability64・product4345・web366・scripts2625、計7417 tests passed。ログ `/tmp/dayopt-audit-check-mcp-replay.log`。検査中は製品コードを固定し、読解記録のみ追記。Architecture generatorは先に実行、今回は差分なし。前回成功の流用ではなく、main統合と今回MCP修正を含む結果。実DB・E2E・CI・配信の証拠ではない。

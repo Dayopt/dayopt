@@ -4411,10 +4411,12 @@
       "mode": "100644",
       "bytes": 288,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 10]],
+      "evidence": [
+        "Complete bounded full read in OAuth/MCP boundary pass. Traced request host/resource identity, per-request token+connection+scope+entitlement checks, adapter and service-role boundary, transport error/result handling; referenced DB/live behavior requires separate verification. Audit code SHA 057697dfe. No cloud calls or auth policy changes in this pass."
+      ],
       "questions": []
     },
     {
@@ -4424,10 +4426,12 @@
       "mode": "100644",
       "bytes": 3598,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 112]],
+      "evidence": [
+        "Complete bounded full read in OAuth/MCP boundary pass. Traced request host/resource identity, per-request token+connection+scope+entitlement checks, adapter and service-role boundary, transport error/result handling; referenced DB/live behavior requires separate verification. Audit code SHA 057697dfe. No cloud calls or auth policy changes in this pass."
+      ],
       "questions": []
     },
     {
@@ -4437,10 +4441,12 @@
       "mode": "100644",
       "bytes": 1084,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 40]],
+      "evidence": [
+        "Complete bounded full read in OAuth/MCP boundary pass. Traced request host/resource identity, per-request token+connection+scope+entitlement checks, adapter and service-role boundary, transport error/result handling; referenced DB/live behavior requires separate verification. Audit code SHA 057697dfe. No cloud calls or auth policy changes in this pass."
+      ],
       "questions": []
     },
     {
@@ -4558,10 +4564,12 @@
       "mode": "100644",
       "bytes": 4026,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 91]],
+      "evidence": [
+        "Complete bounded full read in OAuth/MCP boundary pass. Traced request host/resource identity, per-request token+connection+scope+entitlement checks, adapter and service-role boundary, transport error/result handling; referenced DB/live behavior requires separate verification. Audit code SHA 057697dfe. No cloud calls or auth policy changes in this pass."
+      ],
       "questions": []
     },
     {
@@ -4584,10 +4592,12 @@
       "mode": "100644",
       "bytes": 51595,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 1291]],
+      "evidence": [
+        "Complete bounded reading of SDK advertisement/call contracts, real schema validation, legacy service mocks, filters and untrusted text; F019 adds a real adapter-to-tool boundary beyond these mocks."
+      ],
       "questions": []
     },
     {
@@ -4705,10 +4715,12 @@
       "mode": "100644",
       "bytes": 1649,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 44]],
+      "evidence": [
+        "Complete reading; success structuredContent and legacy JSON text errors intentionally differ due to SDK output validation."
+      ],
       "questions": []
     },
     {
@@ -4757,10 +4769,12 @@
       "mode": "100644",
       "bytes": 12037,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 347]],
+      "evidence": [
+        "Complete bounded full read in OAuth/MCP boundary pass. Traced request host/resource identity, per-request token+connection+scope+entitlement checks, adapter and service-role boundary, transport error/result handling; referenced DB/live behavior requires separate verification. Audit code SHA 057697dfe. No cloud calls or auth policy changes in this pass."
+      ],
       "questions": []
     },
     {
@@ -18607,10 +18621,12 @@
       "mode": "100644",
       "bytes": 1695,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 50]],
+      "evidence": [
+        "Complete bounded full read in OAuth/MCP boundary pass. Traced request host/resource identity, per-request token+connection+scope+entitlement checks, adapter and service-role boundary, transport error/result handling; referenced DB/live behavior requires separate verification. Audit code SHA 057697dfe. No cloud calls or auth policy changes in this pass."
+      ],
       "questions": []
     },
     {
@@ -18633,10 +18649,12 @@
       "mode": "100644",
       "bytes": 9146,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 281]],
+      "evidence": [
+        "Complete bounded full read in OAuth/MCP boundary pass. Traced request host/resource identity, per-request token+connection+scope+entitlement checks, adapter and service-role boundary, transport error/result handling; referenced DB/live behavior requires separate verification. Audit code SHA 057697dfe. No cloud calls or auth policy changes in this pass."
+      ],
       "questions": []
     },
     {
@@ -18646,10 +18664,12 @@
       "mode": "100644",
       "bytes": 807,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 15]],
+      "evidence": [
+        "Complete bounded full read in OAuth/MCP boundary pass. Traced request host/resource identity, per-request token+connection+scope+entitlement checks, adapter and service-role boundary, transport error/result handling; referenced DB/live behavior requires separate verification. Audit code SHA 057697dfe. No cloud calls or auth policy changes in this pass."
+      ],
       "questions": []
     },
     {
@@ -18672,10 +18692,12 @@
       "mode": "100644",
       "bytes": 2740,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 93]],
+      "evidence": [
+        "Complete bounded full read in OAuth/MCP boundary pass. Traced request host/resource identity, per-request token+connection+scope+entitlement checks, adapter and service-role boundary, transport error/result handling; referenced DB/live behavior requires separate verification. Audit code SHA 057697dfe. No cloud calls or auth policy changes in this pass."
+      ],
       "questions": []
     },
     {
@@ -18685,10 +18707,12 @@
       "mode": "100644",
       "bytes": 1280,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 40]],
+      "evidence": [
+        "Complete bounded full read in OAuth/MCP boundary pass. Traced request host/resource identity, per-request token+connection+scope+entitlement checks, adapter and service-role boundary, transport error/result handling; referenced DB/live behavior requires separate verification. Audit code SHA 057697dfe. No cloud calls or auth policy changes in this pass."
+      ],
       "questions": []
     },
     {
@@ -18698,10 +18722,12 @@
       "mode": "100644",
       "bytes": 829,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 25]],
+      "evidence": [
+        "Complete bounded full read in OAuth/MCP boundary pass. Traced request host/resource identity, per-request token+connection+scope+entitlement checks, adapter and service-role boundary, transport error/result handling; referenced DB/live behavior requires separate verification. Audit code SHA 057697dfe. No cloud calls or auth policy changes in this pass."
+      ],
       "questions": []
     },
     {
@@ -18711,10 +18737,12 @@
       "mode": "100644",
       "bytes": 1530,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 58]],
+      "evidence": [
+        "Complete bounded full read in OAuth/MCP boundary pass. Traced request host/resource identity, per-request token+connection+scope+entitlement checks, adapter and service-role boundary, transport error/result handling; referenced DB/live behavior requires separate verification. Audit code SHA 057697dfe. No cloud calls or auth policy changes in this pass."
+      ],
       "questions": []
     },
     {
@@ -18724,10 +18752,12 @@
       "mode": "100644",
       "bytes": 1162,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 39]],
+      "evidence": [
+        "Complete bounded full read in OAuth/MCP boundary pass. Traced request host/resource identity, per-request token+connection+scope+entitlement checks, adapter and service-role boundary, transport error/result handling; referenced DB/live behavior requires separate verification. Audit code SHA 057697dfe. No cloud calls or auth policy changes in this pass."
+      ],
       "questions": []
     },
     {
@@ -18750,10 +18780,12 @@
       "mode": "100644",
       "bytes": 1405,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 61]],
+      "evidence": [
+        "Complete bounded full read in OAuth/MCP boundary pass. Traced request host/resource identity, per-request token+connection+scope+entitlement checks, adapter and service-role boundary, transport error/result handling; referenced DB/live behavior requires separate verification. Audit code SHA 057697dfe. No cloud calls or auth policy changes in this pass."
+      ],
       "questions": []
     },
     {
@@ -18780,7 +18812,8 @@
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
       "read_ranges": [[1, 85]],
       "evidence": [
-        "Complete untruncated source read; conventions and boundary cross-check. statistics-fetchers output was fully visible after separately truncated history."
+        "Complete untruncated source read; conventions and boundary cross-check. statistics-fetchers output was fully visible after separately truncated history.",
+        "Complete bounded full read in OAuth/MCP boundary pass. Traced request host/resource identity, per-request token+connection+scope+entitlement checks, adapter and service-role boundary, transport error/result handling; referenced DB/live behavior requires separate verification. Audit code SHA 057697dfe. No cloud calls or auth policy changes in this pass."
       ],
       "questions": []
     },
@@ -18804,10 +18837,12 @@
       "mode": "100644",
       "bytes": 2969,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 87]],
+      "evidence": [
+        "Complete bounded full read in OAuth/MCP boundary pass. Traced request host/resource identity, per-request token+connection+scope+entitlement checks, adapter and service-role boundary, transport error/result handling; referenced DB/live behavior requires separate verification. Audit code SHA 057697dfe. No cloud calls or auth policy changes in this pass."
+      ],
       "questions": []
     },
     {
@@ -18830,10 +18865,12 @@
       "mode": "100644",
       "bytes": 6225,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 185]],
+      "evidence": [
+        "Complete bounded full read in OAuth/MCP boundary pass. Traced request host/resource identity, per-request token+connection+scope+entitlement checks, adapter and service-role boundary, transport error/result handling; referenced DB/live behavior requires separate verification. Audit code SHA 057697dfe. No cloud calls or auth policy changes in this pass."
+      ],
       "questions": []
     },
     {
@@ -18860,7 +18897,8 @@
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
       "read_ranges": [[1, 98]],
       "evidence": [
-        "Complete untruncated source read; conventions and boundary cross-check. statistics-fetchers output was fully visible after separately truncated history."
+        "Complete untruncated source read; conventions and boundary cross-check. statistics-fetchers output was fully visible after separately truncated history.",
+        "Complete bounded full read in OAuth/MCP boundary pass. Traced request host/resource identity, per-request token+connection+scope+entitlement checks, adapter and service-role boundary, transport error/result handling; referenced DB/live behavior requires separate verification. Audit code SHA 057697dfe. No cloud calls or auth policy changes in this pass."
       ],
       "questions": []
     },
@@ -18871,10 +18909,12 @@
       "mode": "100644",
       "bytes": 2584,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 69]],
+      "evidence": [
+        "Complete bounded full read in OAuth/MCP boundary pass. Traced request host/resource identity, per-request token+connection+scope+entitlement checks, adapter and service-role boundary, transport error/result handling; referenced DB/live behavior requires separate verification. Audit code SHA 057697dfe. No cloud calls or auth policy changes in this pass."
+      ],
       "questions": []
     },
     {
@@ -18884,10 +18924,12 @@
       "mode": "100644",
       "bytes": 693,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 30]],
+      "evidence": [
+        "Complete bounded full read in OAuth/MCP boundary pass. Traced request host/resource identity, per-request token+connection+scope+entitlement checks, adapter and service-role boundary, transport error/result handling; referenced DB/live behavior requires separate verification. Audit code SHA 057697dfe. No cloud calls or auth policy changes in this pass."
+      ],
       "questions": []
     },
     {
@@ -18897,10 +18939,12 @@
       "mode": "100644",
       "bytes": 1520,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 32]],
+      "evidence": [
+        "Complete bounded full read in OAuth/MCP boundary pass. Traced request host/resource identity, per-request token+connection+scope+entitlement checks, adapter and service-role boundary, transport error/result handling; referenced DB/live behavior requires separate verification. Audit code SHA 057697dfe. No cloud calls or auth policy changes in this pass."
+      ],
       "questions": []
     },
     {
@@ -18923,10 +18967,12 @@
       "mode": "100644",
       "bytes": 8409,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 251]],
+      "evidence": [
+        "Complete bounded full read in OAuth/MCP boundary pass. Traced request host/resource identity, per-request token+connection+scope+entitlement checks, adapter and service-role boundary, transport error/result handling; referenced DB/live behavior requires separate verification. Audit code SHA 057697dfe. No cloud calls or auth policy changes in this pass."
+      ],
       "questions": []
     },
     {
@@ -18936,10 +18982,12 @@
       "mode": "100644",
       "bytes": 1117,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 29]],
+      "evidence": [
+        "Complete bounded full read in OAuth/MCP boundary pass. Traced request host/resource identity, per-request token+connection+scope+entitlement checks, adapter and service-role boundary, transport error/result handling; referenced DB/live behavior requires separate verification. Audit code SHA 057697dfe. No cloud calls or auth policy changes in this pass."
+      ],
       "questions": []
     },
     {
@@ -18962,10 +19010,12 @@
       "mode": "100644",
       "bytes": 1320,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 38]],
+      "evidence": [
+        "Complete bounded full read in OAuth/MCP boundary pass. Traced request host/resource identity, per-request token+connection+scope+entitlement checks, adapter and service-role boundary, transport error/result handling; referenced DB/live behavior requires separate verification. Audit code SHA 057697dfe. No cloud calls or auth policy changes in this pass."
+      ],
       "questions": []
     },
     {
@@ -18975,10 +19025,12 @@
       "mode": "100644",
       "bytes": 1282,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 46]],
+      "evidence": [
+        "Complete bounded full read in OAuth/MCP boundary pass. Traced request host/resource identity, per-request token+connection+scope+entitlement checks, adapter and service-role boundary, transport error/result handling; referenced DB/live behavior requires separate verification. Audit code SHA 057697dfe. No cloud calls or auth policy changes in this pass."
+      ],
       "questions": []
     },
     {
@@ -19001,10 +19053,12 @@
       "mode": "100644",
       "bytes": 2090,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 72]],
+      "evidence": [
+        "Complete bounded full read in OAuth/MCP boundary pass. Traced request host/resource identity, per-request token+connection+scope+entitlement checks, adapter and service-role boundary, transport error/result handling; referenced DB/live behavior requires separate verification. Audit code SHA 057697dfe. No cloud calls or auth policy changes in this pass."
+      ],
       "questions": []
     },
     {
@@ -19014,10 +19068,12 @@
       "mode": "100644",
       "bytes": 1103,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 40]],
+      "evidence": [
+        "Complete bounded full read in OAuth/MCP boundary pass. Traced request host/resource identity, per-request token+connection+scope+entitlement checks, adapter and service-role boundary, transport error/result handling; referenced DB/live behavior requires separate verification. Audit code SHA 057697dfe. No cloud calls or auth policy changes in this pass."
+      ],
       "questions": []
     },
     {
@@ -19040,10 +19096,12 @@
       "mode": "100644",
       "bytes": 1200,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 33]],
+      "evidence": [
+        "Complete bounded full read in OAuth/MCP boundary pass. Traced request host/resource identity, per-request token+connection+scope+entitlement checks, adapter and service-role boundary, transport error/result handling; referenced DB/live behavior requires separate verification. Audit code SHA 057697dfe. No cloud calls or auth policy changes in this pass."
+      ],
       "questions": []
     },
     {
@@ -19066,10 +19124,12 @@
       "mode": "100644",
       "bytes": 3207,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 81]],
+      "evidence": [
+        "Complete bounded full read in OAuth/MCP boundary pass. Traced request host/resource identity, per-request token+connection+scope+entitlement checks, adapter and service-role boundary, transport error/result handling; referenced DB/live behavior requires separate verification. Audit code SHA 057697dfe. No cloud calls or auth policy changes in this pass."
+      ],
       "questions": []
     },
     {
@@ -19105,10 +19165,12 @@
       "mode": "100644",
       "bytes": 1563,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 50]],
+      "evidence": [
+        "Complete bounded full read in OAuth/MCP boundary pass. Traced request host/resource identity, per-request token+connection+scope+entitlement checks, adapter and service-role boundary, transport error/result handling; referenced DB/live behavior requires separate verification. Audit code SHA 057697dfe. No cloud calls or auth policy changes in this pass."
+      ],
       "questions": []
     },
     {
@@ -19131,10 +19193,12 @@
       "mode": "100644",
       "bytes": 2105,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 52]],
+      "evidence": [
+        "Complete bounded full read in OAuth/MCP boundary pass. Traced request host/resource identity, per-request token+connection+scope+entitlement checks, adapter and service-role boundary, transport error/result handling; referenced DB/live behavior requires separate verification. Audit code SHA 057697dfe. No cloud calls or auth policy changes in this pass."
+      ],
       "questions": []
     },
     {
@@ -28470,7 +28534,8 @@
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
       "read_ranges": [[1, 115]],
       "evidence": [
-        "Complete untruncated primary-agent read; report state, display, test and canonical input contracts compared. No UI behavior changed in this reading batch; outstanding hypotheses in findings.md."
+        "Complete untruncated primary-agent read; report state, display, test and canonical input contracts compared. No UI behavior changed in this reading batch; outstanding hypotheses in findings.md.",
+        "Complete 120-line reading; MCP/UI boundary table and current references reviewed. Future-only Plan wording corrected against existing temporal decision; cloud assertions not independently verified."
       ],
       "questions": []
     },
@@ -32741,7 +32806,8 @@
       "read_ranges": [[1, 283]],
       "evidence": [
         "All baseline text read in complete bounded ranges; template clock failure, report dataflow, DST distribution and guard boundaries cross-checked.",
-        "Read all lines in two chunks; unchanged gate executed against current complete mission diff: required=false, auditContract=false."
+        "Read all lines in two chunks; unchanged gate executed against current complete mission diff: required=false, auditContract=false.",
+        "Complete bounded full read in OAuth/MCP boundary pass. Traced request host/resource identity, per-request token+connection+scope+entitlement checks, adapter and service-role boundary, transport error/result handling; referenced DB/live behavior requires separate verification. Audit code SHA 057697dfe. No cloud calls or auth policy changes in this pass."
       ],
       "questions": []
     },
@@ -35265,10 +35331,12 @@
       "mode": "100644",
       "bytes": 3356,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 79]],
+      "evidence": [
+        "Complete reading of generation and local HTML build entrypoint; generator only invoked with --generate; no browser/build publishing."
+      ],
       "questions": []
     },
     {
