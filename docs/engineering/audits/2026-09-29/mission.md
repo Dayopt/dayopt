@@ -132,3 +132,11 @@ main `21770b13da1ff26c8982cdf041aa2a4d55025a3f` の18pathを確認。非JSON差�
 auth spec・env宣言・session store/hook/UI・周辺domain/schema/testを追加で全文読解。基準の全文確認は245件。F022は検査の誤合格を修正、H023の古いhelperと現行session監視の責務差は引き続き確認する。cache所有者のfallbackとlogout時の破棄を次の横断経路として追跡中。mainへのmerge・配信・実DB検証はない。
 
 cache所有者・persister・Provider構成・logout hook/設定画面とtestの10ファイルを追加全文確認し、基準全文確認255件まで進んだ。H024はSDK 2.116.0の現在のソースへ戻り、通常network失敗でもlocal sessionを削除してからerrorを返す反証を確認。古いSDKの前提で「ログインが残る」と断定せず、通知とglobal revokeを分けて次に検証する。H025は認証主体変更がcacheの非同期復元中に入る場合を未再現候補として記録。
+
+## cache破棄と非同期処理の順序
+
+H025のclear後再投入をF025として採用。実TanStack復元で旧userのqueryが戻ること、遅い保存と所有者解決が旧blobを復活させることを3件再現し、`605d4e613`で修正。関連30 tests・型検査成功、同SHAで全体checkを開始。製品コードを固定して検査中。保存形式/オフラインfallback/保持期間は変更せず、既存の分離契約を進行中処理にも適用する。実ブラウザ・本番の観測ではない。auth eventからeffectまで等の残る非同期境界は引き続き照合する。
+
+前回公開headは`b0e8afa5cbd104d5383e16b361fbec3cd0454eb5`、通常pre-push成功ログ `/tmp/dayopt-audit-push-main-21770-verified.log`。Issue記録 https://github.com/Dayopt/dayopt/issues/2963#issuecomment-5888170506 。その後の読解とF025はlocal commitで、次の通常検査後にDraftへ反映する。
+
+F025を含む製品SHA `605d4e6130bcb3989e043484ebc89c7e4c2e5921` の`pnpm check`はNode24でexit 0。型/lint/static、billing37/i18n2/observability64/product4369/web366/scripts2642、合計7480 passed。ログ `/tmp/dayopt-audit-check-cache-races.log`。製品コードを固定し、検査中は監査記録だけを追記。読解は基準269ファイルまで進んだ。H026は回復コードのtiming testの無効な閾値を記録し、次に実装根拠と測れる契約を分けて修正する。実DB/クラウドE2E/配信は未実施。

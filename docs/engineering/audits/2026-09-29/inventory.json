@@ -2983,10 +2983,12 @@
       "mode": "100644",
       "bytes": 855,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 24]],
+      "evidence": [
+        "Full text read at 605d4e613; baseline bytes verified unchanged. Optimistic mutation initial truncation recovered with 1-160 and 161-EOF; theme provider independently reread to EOF. Auth/cache domain boundaries cross-checked with current consumers."
+      ],
       "questions": []
     },
     {
@@ -3024,10 +3026,12 @@
       "mode": "100644",
       "bytes": 3556,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 113]],
+      "evidence": [
+        "Full text read at 605d4e613; baseline bytes verified unchanged. Optimistic mutation initial truncation recovered with 1-160 and 161-EOF; theme provider independently reread to EOF. Auth/cache domain boundaries cross-checked with current consumers."
+      ],
       "questions": []
     },
     {
@@ -3052,10 +3056,12 @@
       "mode": "100644",
       "bytes": 5190,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 166]],
+      "evidence": [
+        "Full text read at 605d4e613; baseline bytes verified unchanged. Optimistic mutation initial truncation recovered with 1-160 and 161-EOF; theme provider independently reread to EOF. Auth/cache domain boundaries cross-checked with current consumers."
+      ],
       "questions": []
     },
     {
@@ -7235,10 +7241,12 @@
       "mode": "100644",
       "bytes": 13307,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 344]],
+      "evidence": [
+        "Full text read in bounded chunks at 605d4e613. Recovery tests checked against factor-delete-before-consume contract; HIBP tests checked against prefix-only and timeout behavior. Timing test threshold mathematically vacuous; candidate recorded, not native constant-time proof."
+      ],
       "questions": []
     },
     {
@@ -7248,10 +7256,12 @@
       "mode": "100644",
       "bytes": 9800,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 224]],
+      "evidence": [
+        "Full text read at 605d4e613; baseline bytes verified unchanged. Optimistic mutation initial truncation recovered with 1-160 and 161-EOF; theme provider independently reread to EOF. Auth/cache domain boundaries cross-checked with current consumers."
+      ],
       "questions": []
     },
     {
@@ -17450,10 +17460,12 @@
       "mode": "100644",
       "bytes": 8929,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 283]],
+      "evidence": [
+        "Full text read in bounded chunks at 605d4e613. Recovery tests checked against factor-delete-before-consume contract; HIBP tests checked against prefix-only and timeout behavior. Timing test threshold mathematically vacuous; candidate recorded, not native constant-time proof."
+      ],
       "questions": []
     },
     {
@@ -17463,10 +17475,12 @@
       "mode": "100644",
       "bytes": 4580,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 148]],
+      "evidence": [
+        "Full text read at 605d4e613; baseline bytes verified unchanged. Optimistic mutation initial truncation recovered with 1-160 and 161-EOF; theme provider independently reread to EOF. Auth/cache domain boundaries cross-checked with current consumers."
+      ],
       "questions": []
     },
     {
@@ -17476,10 +17490,12 @@
       "mode": "100644",
       "bytes": 9890,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 315]],
+      "evidence": [
+        "Full text read in bounded chunks at 605d4e613. Recovery tests checked against factor-delete-before-consume contract; HIBP tests checked against prefix-only and timeout behavior. Timing test threshold mathematically vacuous; candidate recorded, not native constant-time proof."
+      ],
       "questions": []
     },
     {
@@ -17489,10 +17505,12 @@
       "mode": "100644",
       "bytes": 4166,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 136]],
+      "evidence": [
+        "Full text read at 605d4e613; baseline bytes verified unchanged. Optimistic mutation initial truncation recovered with 1-160 and 161-EOF; theme provider independently reread to EOF. Auth/cache domain boundaries cross-checked with current consumers."
+      ],
       "questions": []
     },
     {
@@ -20033,10 +20051,12 @@
       "mode": "100644",
       "bytes": 2093,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 68]],
+      "evidence": [
+        "Full text read at 605d4e613; baseline bytes verified unchanged. Optimistic mutation initial truncation recovered with 1-160 and 161-EOF; theme provider independently reread to EOF. Auth/cache domain boundaries cross-checked with current consumers."
+      ],
       "questions": []
     },
     {
@@ -20061,10 +20081,12 @@
       "mode": "100644",
       "bytes": 9534,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 312]],
+      "evidence": [
+        "Full text read at 605d4e613; baseline bytes verified unchanged. Optimistic mutation initial truncation recovered with 1-160 and 161-EOF; theme provider independently reread to EOF. Auth/cache domain boundaries cross-checked with current consumers."
+      ],
       "questions": []
     },
     {
@@ -20074,10 +20096,12 @@
       "mode": "100644",
       "bytes": 8712,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 353]],
+      "evidence": [
+        "Full text read at 605d4e613; baseline bytes verified unchanged. Optimistic mutation initial truncation recovered with 1-160 and 161-EOF; theme provider independently reread to EOF. Auth/cache domain boundaries cross-checked with current consumers."
+      ],
       "questions": []
     },
     {
@@ -20117,10 +20141,12 @@
       "mode": "100644",
       "bytes": 812,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 23]],
+      "evidence": [
+        "Full text read at 605d4e613; baseline bytes verified unchanged. Optimistic mutation initial truncation recovered with 1-160 and 161-EOF; theme provider independently reread to EOF. Auth/cache domain boundaries cross-checked with current consumers."
+      ],
       "questions": []
     },
     {
@@ -20130,10 +20156,12 @@
       "mode": "100644",
       "bytes": 450,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 16]],
+      "evidence": [
+        "Full text read at 605d4e613; baseline bytes verified unchanged. Optimistic mutation initial truncation recovered with 1-160 and 161-EOF; theme provider independently reread to EOF. Auth/cache domain boundaries cross-checked with current consumers."
+      ],
       "questions": []
     },
     {

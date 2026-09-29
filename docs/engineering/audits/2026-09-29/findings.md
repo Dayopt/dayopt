@@ -201,3 +201,17 @@ last_verified: 2026-09-29
 - 次: Providerのmount境界、TanStack復元中のhydration・subscribe開始、SDKのauth event順序を確認し、実際に前userのcacheが復元/保存される操作列を再現する。可能性だけで情報漏えいと断定しない。
 
 H024の反証追記: installed `@supabase/auth-js@2.116.0` のGoTrueClient.ts 4045–4138を確認。通常signOutのadmin失敗はerrorを返す前に_current sessionを削除する実装へ変わっている（scope=others以外）。したがって「戻り値errorを無視すると必ずローカルログインが残る」は成立しない。早いsessionError分岐は別であり、実際の通知/遷移とglobal revokeの保証を分けて検証する。戻り値errorで一律に遷移を止める修正も、既にローカルlogout済みの利用者を画面に残すため未採用。
+
+## F025 — cache破棄後に遅い復元・保存が旧データを戻す
+
+- 状態: H025のうち破棄済みcacheへの再投入をローカル再現・修正（`605d4e613`）。Mission #2963、既存の分離契約#2619。実ブラウザ/本番未観測。
+- 条件/根拠: persisterの所有者確定後のstorage.getItemが遅れ、その間に主体変更でQueryCacheAuthBoundaryがmemory/storageをclear。遅い結果が返ると実TanStack persistQueryClientRestoreが旧blobを再hydrateする。同様に遅い保存/所有者解決がclear後に完了すると旧blobが復活する。
+- 反証: 順次A→Bの既存testは通るため、clearを実行済みでも後続の旧処理に勝てない順序を制御して検査。SDKの復元・hydrateをmockせず実QueryClientのデータを確認。SDK @tanstack/query-persist-client-core/react-query-persist-client 5.102.8のrestore/subscribe実装も全文確認。ユーザー識別や現行envelope自体は正しいが、処理の寿命が分離されていなかった。
+- 修正: module世代でclear前の所有者解決・読み取りを無効化。storageの変更処理を直列化し、開始済みwrite完了後にclear、未開始の旧世代write/evictionは実行しない。失敗したwriteが後続clearを止めない。auth clearとpersister removeの両方を対応。オフラインfallback、保存形式、2時間保持、公開APIは維持。
+- 検証: 修正前3 failed/9 passed。修正後は両clear入口、新主体の保存/復元、保存失敗からの回復を加えて関連4 files/30 passed、typecheck:product exit 0。ログ `/tmp/dayopt-audit-cache-races-{red,green,regression,types}.log`（初回単独restore再現は`cache-race-red.log`）。storageは遅延を制御する合成実装であり、実IndexedDBや別タブE2Eの証拠ではない。
+- 残る照合: auth eventからReact effectのclearが発火するまでの区間、別documentの寿命、Provider unmountと復元の関係はH025の残作業。今回確認したclear前開始→clear後完了の経路を越えて「全cache境界を検証済み」とはしない。
+
+## H026 — 回復コードのtiming testが非負の計測値なら必ず合格する
+
+- 状態: 数式上の検証欠陥候補、未修正。recovery-codes.test.tsの平均時間差は`abs(a-b)/max(a,b)`（a,b非負）で0〜1なのに、閾値は2.0。早期returnの有無を検出できない。計測の揺れを弱めたという説明は保証にならない。
+- 次: 既存の手書き比較とNode native timingSafeEqualの境界を照合し、実測タイミングを安全性の証明にせず、先頭/末尾差分・異長/不正値の機能検証と実装根拠を分ける。HIBP testにもboolean型だけで大文字小文字契約を検証したように見せるassertがあり、外部API契約と照合して整理する。暗号機能の破綻/本番漏洩とは未判定。
