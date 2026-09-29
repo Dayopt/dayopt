@@ -472,7 +472,7 @@ last_verified: 2026-09-21
 
 - [データを書き出す](journeys/data-export.md) の 1. 形式と範囲を選ぶ — 同じ画面の下に、全件削除（deleteBlocks / deleteAllData）がある。こちらは不可逆なので、エクスポートとは別の経路として扱い、ここを変える時に巻き込まない。
 - [データを書き出す](journeys/data-export.md) の 2. 押した時に問い合わせる — refetchは失敗しても前回のdataを返すため、isErrorも確認して失敗時はファイルを作らない。dataの有無だけに戻すと古い結果を成功扱いする。
-- [データを書き出す](journeys/data-export.md) の 7. 期間で絞る — 日付の境界をブラウザで組んでいて、利用者の timezone 設定を使っていない（timezone.md の禁止パターンに近い書き方）。開始日は UTC の 0 時として読まれ、終了日はブラウザの timezone で閉じるので、両端の扱いが揃っていない。直すなら toTZStartISO / toTZEndISO を利用者の timezone で使う。絞り込みは開始時刻だけで、期間を跨ぐ Plan / Record は開始側の期間にしか入らない。
+- [データを書き出す](journeys/data-export.md) の 7. 期間で絞る — timezoneは既存のuseUserPreferencesから取得し、getDateKeyで各開始時刻の暦日を比較する。日を固定24時間として扱わないため、夏時間の23/25時間の日も同じ条件で選べる。期間を跨ぐ行は従来どおり開始側の期間に入る。
 - [データを書き出す](journeys/data-export.md) の 8. CSV か JSON にする — CSV の列を足すと、既存のスプレッドシートの取り込み手順が壊れうる（外部に渡る形式）。列は TIMEBLOCK_CSV_COLUMNS 1 か所で決まる。CSV にはカテゴリとアクティビティの名前が入らず、activity_id だけになる。
 - [データを書き出す](journeys/data-export.md) の 9. ファイルを保存する — 成功のトーストは click を呼んだ時点で出していて、ブラウザが実際に保存したかは確かめていない。
 
@@ -660,6 +660,10 @@ last_verified: 2026-09-21
 #### `apps/product/src/lib/database/public-projections.ts`
 
 - [データを書き出す](journeys/data-export.md) の 4. Service が6種類を読む — service role は RLS を越えるので、Plan / Record では .eq('user_id', userId) だけが他人のデータとの境界になる（REVIEW-1）。userId は必ず ctx から取り、入力で受けない。列は public-projections の select に限っているので、列を足す時はそこを変える。
+
+#### `apps/product/src/lib/date/core.ts`
+
+- [データを書き出す](journeys/data-export.md) の 7. 期間で絞る — timezoneは既存のuseUserPreferencesから取得し、getDateKeyで各開始時刻の暦日を比較する。日を固定24時間として扱わないため、夏時間の23/25時間の日も同じ条件で選べる。期間を跨ぐ行は従来どおり開始側の期間に入る。
 
 #### `apps/product/src/lib/email/notifications.ts`
 

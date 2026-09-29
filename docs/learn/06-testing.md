@@ -269,6 +269,8 @@ last_verified: 2026-09-21
   - [`apps/product/src/features/auth/server/user-service.test.ts`](../../apps/product/src/features/auth/server/user-service.test.ts) で `it('Data API上限を越す1201件を4種類とも欠落なくexportする'` を探す（実SDKと合成HTTP上限で全件を照合。後続ページ失敗も別caseで拒否を検査する。実DB検証ではない。）
 - **7. 期間で絞る**:
   - [`apps/product/src/features/settings/components/DataSettings.csv-export.test.tsx`](../../apps/product/src/features/settings/components/DataSettings.csv-export.test.tsx) で `it('期間で絞ってもqueryの全件データを変更しない'` を探す
+  - [`apps/product/src/features/settings/components/DataSettings.csv-export.test.tsx`](../../apps/product/src/features/settings/components/DataSettings.csv-export.test.tsx) で `'%sの%sの全日を設定TZで選び、隣接日を含めない'` を探す
+  - [`apps/product/src/features/settings/components/DataSettings.csv-export.test.tsx`](../../apps/product/src/features/settings/components/DataSettings.csv-export.test.tsx) で `'不完全・逆転した期間 %s〜%s を全期間として出力しない'` を探す
 - **8. CSV か JSON にする**:
   - [`apps/product/src/features/settings/lib/timeblock-csv-export.test.ts`](../../apps/product/src/features/settings/lib/timeblock-csv-export.test.ts) で `it('defined columns以外の内部値はexportしない'` を探す
   - [`apps/product/src/features/settings/lib/timeblock-csv-export.test.ts`](../../apps/product/src/features/settings/lib/timeblock-csv-export.test.ts) で `describe('escapeTimeblockCsvField'` を探す

@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('next-intl', () => ({
+  useLocale: () => 'en',
   useTranslations: (namespace: string) => (key: string) => `${namespace}.${key}`,
 }));
 
@@ -13,6 +14,7 @@ vi.mock('@/lib/trpc', () => ({
   api: {
     useUtils: () => ({ userSettings: { getAnalyticsConsent: { setData: vi.fn() } } }),
     userSettings: {
+      get: { useQuery: () => ({ data: undefined }) },
       getAnalyticsConsent: {
         useQuery: () => ({ data: { allowed: false }, isLoading: false, isError: false }),
       },

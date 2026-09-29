@@ -36,7 +36,7 @@ flowchart TD
   n8 --> n9
 ```
 
-通るサービス: ブラウザ / Vercel（Next.js） / Supabase。段 9・失敗 5 種。
+通るサービス: ブラウザ / Vercel（Next.js） / Supabase。段 9・失敗 4 種。
 
 #### この経路を守るテスト
 
@@ -166,43 +166,31 @@ Plan・Record・カテゴリ・アクティビティはcollectQueryPagesで500�
 
 ### 7. 期間指定ならブラウザで絞る（ブラウザ）
 
-範囲が「期間指定」で開始日と終了日の両方が入っている時だけ、Plan と Record を start_at で絞る。開始日は new Date('YYYY-MM-DD')、終了日はブラウザの timezone の 23:59:59.999。どちらかが空なら絞らず全期間になる。カテゴリ・アクティビティ・設定は絞らない。
+期間指定では開始日・終了日が両方あり開始日以下でない終了日を必要とする。不完全・逆転した入力は取得前に拒否する。PlanとRecordのstart_atを利用者の設定timezoneの暦日へ変換し、開始日から終了日までを含める。カテゴリ・アクティビティ・設定は絞らない。
 
 - **なぜ必要か**: サーバーは範囲を受け取らないので、絞り込みはここだけで行う。
 - **入力 → 出力**: キャッシュ上の全データと開始日・終了日 → エクスポート用コピーのPlan / Recordだけを絞る（query cacheは変更しない）
-- **ここを変えると**: 日付の境界をブラウザで組んでいて、利用者の timezone 設定を使っていない（timezone.md の禁止パターンに近い書き方）。開始日は UTC の 0 時として読まれ、終了日はブラウザの timezone で閉じるので、両端の扱いが揃っていない。直すなら toTZStartISO / toTZEndISO を利用者の timezone で使う。絞り込みは開始時刻だけで、期間を跨ぐ Plan / Record は開始側の期間にしか入らない。
+- **ここを変えると**: timezoneは既存のuseUserPreferencesから取得し、getDateKeyで各開始時刻の暦日を比較する。日を固定24時間として扱わないため、夏時間の23/25時間の日も同じ条件で選べる。期間を跨ぐ行は従来どおり開始側の期間に入る。
 - **コード**:
-  - [`apps/product/src/features/settings/components/DataSettings.tsx`](../../../apps/product/src/features/settings/components/DataSettings.tsx) で `const start = new Date(startDate);` を探す
-  - [`apps/product/src/features/settings/components/DataSettings.tsx`](../../../apps/product/src/features/settings/components/DataSettings.tsx) で `end.setHours(23, 59, 59, 999);` を探す
-  - [`apps/product/src/features/settings/components/DataSettings.tsx`](../../../apps/product/src/features/settings/components/DataSettings.tsx) で `if (range === 'custom' && startDate && endDate) {` を探す
-  - [`docs/engineering/timezone.md`](../../engineering/timezone.md) で `## 禁止パターン一覧` を探す
+  - [`apps/product/src/features/settings/components/DataSettings.tsx`](../../../apps/product/src/features/settings/components/DataSettings.tsx) で `const timezone = useUserPreferences((preferences) => preferences.timezone);` を探す
+  - [`apps/product/src/features/settings/components/DataSettings.tsx`](../../../apps/product/src/features/settings/components/DataSettings.tsx) で `const date = getDateKey(new Date(plan.start_at), timezone);` を探す
+  - [`apps/product/src/lib/date/core.ts`](../../../apps/product/src/lib/date/core.ts) で `export function getDateKey(` を探す
+  - [`docs/engineering/timezone.md`](../../engineering/timezone.md) で `## Layer 1: TZ Source of Truth` を探す
 - **この段を守るテスト**:
   - [`apps/product/src/features/settings/components/DataSettings.csv-export.test.tsx`](../../../apps/product/src/features/settings/components/DataSettings.csv-export.test.tsx) で `it('期間で絞ってもqueryの全件データを変更しない'` を探す
+  - [`apps/product/src/features/settings/components/DataSettings.csv-export.test.tsx`](../../../apps/product/src/features/settings/components/DataSettings.csv-export.test.tsx) で `'%sの%sの全日を設定TZで選び、隣接日を含めない'` を探す
+  - [`apps/product/src/features/settings/components/DataSettings.csv-export.test.tsx`](../../../apps/product/src/features/settings/components/DataSettings.csv-export.test.tsx) で `'不完全・逆転した期間 %s〜%s を全期間として出力しない'` を探す
 
 <details>
-<summary>⚡ UTC より東の timezone で期間指定する — 画面: 何も起きない / データ: 欠落する / 再試行: 利用者がやり直す / 痕跡: 残らない</summary>
+<summary>⚡ 期間指定の日付が不完全または逆転している — 画面: エラー表示 / データ: 変化なし / 再試行: 利用者がやり直す / 痕跡: 残らない</summary>
 
-- 画面: 成功のトーストが出る。
-- データ: DB は変化なし。JST なら開始日の 0:00〜8:59 に始まった Plan / Record がファイルから抜ける（開始日が UTC の 0 時 = JST 9 時として比べられるため）。
-- 再試行: しない。利用者が開始日を 1 日前にすれば入る。
+- 画面: 既存のエクスポート失敗トーストを表示する。
+- データ: 問い合わせず、ファイルも作らない。入力とquery cacheは維持する。
+- 再試行: 利用者が日付を直して押し直す。
 - 痕跡: 残らない。
-- **最初に見る場所**: handleExport の new Date(startDate)。この絞り込みを通すテストは無い。
+- **最初に見る場所**: handleExportの取得前のrange検証。
 - 根拠:
-  - [`apps/product/src/features/settings/components/DataSettings.tsx`](../../../apps/product/src/features/settings/components/DataSettings.tsx) で `const start = new Date(startDate);` を探す
-  - [`apps/product/src/features/settings/components/DataSettings.tsx`](../../../apps/product/src/features/settings/components/DataSettings.tsx) で `return recordDate >= start && recordDate <= end;` を探す
-
-</details>
-
-<details>
-<summary>⚡ 期間指定で日付を片方しか入れない — 画面: 何も起きない / データ: 変化なし / 再試行: 不要 / 痕跡: 残らない</summary>
-
-- 画面: 成功のトーストが出る。
-- データ: DB は変化なし。絞り込みが掛からず、全期間が書き出される。
-- 再試行: 不要（多く出るだけ）。
-- 痕跡: 残らない。
-- **最初に見る場所**: 開始日と終了日の両方が入っている時だけ絞る条件。入力の検証は無い。
-- 根拠:
-  - [`apps/product/src/features/settings/components/DataSettings.tsx`](../../../apps/product/src/features/settings/components/DataSettings.tsx) で `if (range === 'custom' && startDate && endDate) {` を探す
+  - [`apps/product/src/features/settings/components/DataSettings.tsx`](../../../apps/product/src/features/settings/components/DataSettings.tsx) で `throw new Error('Invalid export range');` を探す
 
 </details>
 
@@ -601,91 +589,52 @@ Blob から一時 URL を作り、見えないリンクの download 属性に da
       "svc": "browser",
       "short": "期間で絞る",
       "title": "期間指定ならブラウザで絞る",
-      "what": "範囲が「期間指定」で開始日と終了日の両方が入っている時だけ、Plan と Record を start_at で絞る。開始日は new Date('YYYY-MM-DD')、終了日はブラウザの timezone の 23:59:59.999。どちらかが空なら絞らず全期間になる。カテゴリ・アクティビティ・設定は絞らない。",
+      "what": "期間指定では開始日・終了日が両方あり開始日以下でない終了日を必要とする。不完全・逆転した入力は取得前に拒否する。PlanとRecordのstart_atを利用者の設定timezoneの暦日へ変換し、開始日から終了日までを含める。カテゴリ・アクティビティ・設定は絞らない。",
       "why": "サーバーは範囲を受け取らないので、絞り込みはここだけで行う。",
       "io": {
         "in": "キャッシュ上の全データと開始日・終了日",
         "out": "エクスポート用コピーのPlan / Recordだけを絞る（query cacheは変更しない）"
       },
-      "change": "日付の境界をブラウザで組んでいて、利用者の timezone 設定を使っていない（timezone.md の禁止パターンに近い書き方）。開始日は UTC の 0 時として読まれ、終了日はブラウザの timezone で閉じるので、両端の扱いが揃っていない。直すなら toTZStartISO / toTZEndISO を利用者の timezone で使う。絞り込みは開始時刻だけで、期間を跨ぐ Plan / Record は開始側の期間にしか入らない。",
+      "change": "timezoneは既存のuseUserPreferencesから取得し、getDateKeyで各開始時刻の暦日を比較する。日を固定24時間として扱わないため、夏時間の23/25時間の日も同じ条件で選べる。期間を跨ぐ行は従来どおり開始側の期間に入る。",
       "refs": [
         {
           "path": "apps/product/src/features/settings/components/DataSettings.tsx",
-          "find": "const start = new Date(startDate);"
+          "find": "const timezone = useUserPreferences((preferences) => preferences.timezone);"
         },
         {
           "path": "apps/product/src/features/settings/components/DataSettings.tsx",
-          "find": "end.setHours(23, 59, 59, 999);"
+          "find": "const date = getDateKey(new Date(plan.start_at), timezone);"
         },
         {
-          "path": "apps/product/src/features/settings/components/DataSettings.tsx",
-          "find": "if (range === 'custom' && startDate && endDate) {"
+          "path": "apps/product/src/lib/date/core.ts",
+          "find": "export function getDateKey("
         },
         {
           "path": "docs/engineering/timezone.md",
-          "find": "## 禁止パターン一覧"
+          "find": "## Layer 1: TZ Source of Truth"
         }
       ],
       "fails": [
         {
-          "id": "utc-start-day",
-          "label": "UTC より東の timezone で期間指定する",
-          "screen": "成功のトーストが出る。",
-          "data": "DB は変化なし。JST なら開始日の 0:00〜8:59 に始まった Plan / Record がファイルから抜ける（開始日が UTC の 0 時 = JST 9 時として比べられるため）。",
-          "retry": "しない。利用者が開始日を 1 日前にすれば入る。",
+          "id": "empty-date",
+          "label": "期間指定の日付が不完全または逆転している",
+          "screen": "既存のエクスポート失敗トーストを表示する。",
+          "data": "問い合わせず、ファイルも作らない。入力とquery cacheは維持する。",
+          "retry": "利用者が日付を直して押し直す。",
           "trace": "残らない。",
-          "look": "handleExport の new Date(startDate)。この絞り込みを通すテストは無い。",
+          "look": "handleExportの取得前のrange検証。",
           "refs": [
             {
               "path": "apps/product/src/features/settings/components/DataSettings.tsx",
-              "find": "const start = new Date(startDate);"
-            },
-            {
-              "path": "apps/product/src/features/settings/components/DataSettings.tsx",
-              "find": "return recordDate >= start && recordDate <= end;"
+              "find": "throw new Error('Invalid export range');"
             }
           ],
           "tags": {
-            "screen": "none",
-            "data": "lost",
+            "screen": "toast",
+            "data": "unchanged",
             "retry": "user",
             "trace": "none"
-          },
-          "continues": true,
-          "screenAfter": {
-            "t": "settings",
-            "url": "/ja/settings/data",
-            "title": "エクスポート",
-            "rows": [
-              ["形式", "JSON（バックアップ・復元用）", "neutral"],
-              ["範囲", "全期間", "neutral"]
-            ],
-            "button": "エクスポート",
-            "toast": "データをエクスポートしました",
-            "note": "ブラウザが dayopt-export-<数字>.json を保存する"
           }
-        },
-        {
-          "id": "empty-date",
-          "label": "期間指定で日付を片方しか入れない",
-          "screen": "成功のトーストが出る。",
-          "data": "DB は変化なし。絞り込みが掛からず、全期間が書き出される。",
-          "retry": "不要（多く出るだけ）。",
-          "trace": "残らない。",
-          "look": "開始日と終了日の両方が入っている時だけ絞る条件。入力の検証は無い。",
-          "refs": [
-            {
-              "path": "apps/product/src/features/settings/components/DataSettings.tsx",
-              "find": "if (range === 'custom' && startDate && endDate) {"
-            }
-          ],
-          "tags": {
-            "screen": "none",
-            "data": "unchanged",
-            "retry": "na",
-            "trace": "none"
-          },
-          "continues": true
         }
       ],
       "screen": {
@@ -704,6 +653,14 @@ Blob から一時 URL を作り、見えないリンクの download 属性に da
         {
           "path": "apps/product/src/features/settings/components/DataSettings.csv-export.test.tsx",
           "find": "it('期間で絞ってもqueryの全件データを変更しない'"
+        },
+        {
+          "path": "apps/product/src/features/settings/components/DataSettings.csv-export.test.tsx",
+          "find": "'%sの%sの全日を設定TZで選び、隣接日を含めない'"
+        },
+        {
+          "path": "apps/product/src/features/settings/components/DataSettings.csv-export.test.tsx",
+          "find": "'不完全・逆転した期間 %s〜%s を全期間として出力しない'"
         }
       ]
     },
