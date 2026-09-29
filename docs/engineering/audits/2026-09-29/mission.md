@@ -76,3 +76,11 @@ F016 `eb07b33eb`はReview/Calendarのresize中断後のlistener/body style残留
 `docs/learn/journeys/mcp.md`の基準1399行は分割で全文回収済み。MCP tool登録/input/output、mutation client/DB adapter/contract、analytics送信と既存testも全文確認。次はDB apply定義とユーザーの明示判断へ戻り、ghost原則とcanonical書込契約を裁定する。H014の改名失敗とH015のresize中断以外の仮説は未解決。
 
 引き続きDraft #2965を維持し、merge/releaseは行わない。未読2976件を完了扱いせず、H003/H005/H007/H009とH014/H015の未解決部分を継続する。
+
+## main更新の取り込み
+
+2026-09-29 18:31 JST、mainが `0bcdb864127feea425934baa179797bd53ecf375`（PR #2964）へ進んだことをread-onlyで確認。基準からの17ファイル/1071行のdiffを分割して省略なく確認し、監査ブランチへmerge commit `f85b255a2b4b85301c805b99c4d5f2dac31705b4`で取り込んだ。mainへのmergeではなく、外部状態の変更もない。
+
+競合5ファイルは、同じ9月7日の作成契約・同じ9月5日の固定時計を維持するmain側へ解消。Timeblock説明の古いskip/逆リンク要約を復活させず、glossaryの廃止済み3章とledger-barをmainと同じく撤去。監査側のテーブル行単位のglossary test、集計・cache・resize・改名の修正は保持。型・runtimeの差分はなく、変更されたtemplate testは10 passed（`/tmp/dayopt-audit-main-template.log`）。統合後のscripts/docs/pre-pushは別に記録し、統合前checkの7413件を統合後の実行結果とは混同しない。
+
+基準inventoryは開始SHAを維持し、各17pathへdelta確認の証拠を追記。差分だけ読んだ未読ファイルを全文確認へ昇格していない。PR #2964のrouting変更は判断索引の参照補強で、native委譲のruntime制約は緩和されていない。

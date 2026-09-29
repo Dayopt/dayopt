@@ -37,7 +37,9 @@
       "status": "unverified",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
       "read_ranges": [],
-      "evidence": [],
+      "evidence": [
+        "Main advanced to 0bcdb864127feea425934baa179797bd53ecf375 (PR #2964). Full 17-file delta (1071 diff lines) read in bounded chunks after initial truncated attempt. Changes reconciled on audit branch; baseline read status unchanged, delta reading does not imply unread full file is reviewed. Five conflicts resolved to main: equivalent creation contract/test clock, current source references and retired glossary terms."
+      ],
       "questions": []
     },
     {
@@ -316,7 +318,10 @@
       "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
       "read_ranges": [[1, 45]],
-      "evidence": ["Standalone complete read; native delegation restriction confirmed"],
+      "evidence": [
+        "Standalone complete read; native delegation restriction confirmed",
+        "Main advanced to 0bcdb864127feea425934baa179797bd53ecf375 (PR #2964). Full 17-file delta (1071 diff lines) read in bounded chunks after initial truncated attempt. Changes reconciled on audit branch; baseline read status unchanged, delta reading does not imply unread full file is reviewed. Five conflicts resolved to main: equivalent creation contract/test clock, current source references and retired glossary terms."
+      ],
       "questions": []
     },
     {
@@ -921,7 +926,8 @@
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
       "read_ranges": [[1, 110]],
       "evidence": [
-        "User supplied full instructions plus baseline file output; authority and rules checked"
+        "User supplied full instructions plus baseline file output; authority and rules checked",
+        "Main advanced to 0bcdb864127feea425934baa179797bd53ecf375 (PR #2964). Full 17-file delta (1071 diff lines) read in bounded chunks after initial truncated attempt. Changes reconciled on audit branch; baseline read status unchanged, delta reading does not imply unread full file is reviewed. Five conflicts resolved to main: equivalent creation contract/test clock, current source references and retired glossary terms."
       ],
       "questions": []
     },
@@ -14797,7 +14803,8 @@
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
       "read_ranges": [[1, 80]],
       "evidence": [
-        "Primary agent full untruncated read; F001 default versus choice corrected; other claims still being cross-checked"
+        "Primary agent full untruncated read; F001 default versus choice corrected; other claims still being cross-checked",
+        "Main advanced to 0bcdb864127feea425934baa179797bd53ecf375 (PR #2964). Full 17-file delta (1071 diff lines) read in bounded chunks after initial truncated attempt. Changes reconciled on audit branch; baseline read status unchanged, delta reading does not imply unread full file is reviewed. Five conflicts resolved to main: equivalent creation contract/test clock, current source references and retired glossary terms."
       ],
       "questions": []
     },
@@ -16336,7 +16343,8 @@
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
       "read_ranges": [[1, 391]],
       "evidence": [
-        "All baseline text read in complete bounded ranges; template clock failure, report dataflow, DST distribution and guard boundaries cross-checked."
+        "All baseline text read in complete bounded ranges; template clock failure, report dataflow, DST distribution and guard boundaries cross-checked.",
+        "Main advanced to 0bcdb864127feea425934baa179797bd53ecf375 (PR #2964). Full 17-file delta (1071 diff lines) read in bounded chunks after initial truncated attempt. Changes reconciled on audit branch; baseline read status unchanged, delta reading does not imply unread full file is reviewed. Five conflicts resolved to main: equivalent creation contract/test clock, current source references and retired glossary terms."
       ],
       "questions": []
     },
@@ -27772,7 +27780,9 @@
       "status": "unverified",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
       "read_ranges": [],
-      "evidence": [],
+      "evidence": [
+        "Main advanced to 0bcdb864127feea425934baa179797bd53ecf375 (PR #2964). Full 17-file delta (1071 diff lines) read in bounded chunks after initial truncated attempt. Changes reconciled on audit branch; baseline read status unchanged, delta reading does not imply unread full file is reviewed. Five conflicts resolved to main: equivalent creation contract/test clock, current source references and retired glossary terms."
+      ],
       "questions": []
     },
     {
@@ -28007,7 +28017,8 @@
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
       "read_ranges": [[1, 94]],
       "evidence": [
-        "Complete read in ranges 1-38,39-63,64-94; overrides interpreted chronologically"
+        "Complete read in ranges 1-38,39-63,64-94; overrides interpreted chronologically",
+        "Main advanced to 0bcdb864127feea425934baa179797bd53ecf375 (PR #2964). Full 17-file delta (1071 diff lines) read in bounded chunks after initial truncated attempt. Changes reconciled on audit branch; baseline read status unchanged, delta reading does not imply unread full file is reviewed. Five conflicts resolved to main: equivalent creation contract/test clock, current source references and retired glossary terms."
       ],
       "questions": []
     },
@@ -28840,7 +28851,9 @@
       "status": "unverified",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
       "read_ranges": [],
-      "evidence": [],
+      "evidence": [
+        "Main advanced to 0bcdb864127feea425934baa179797bd53ecf375 (PR #2964). Full 17-file delta (1071 diff lines) read in bounded chunks after initial truncated attempt. Changes reconciled on audit branch; baseline read status unchanged, delta reading does not imply unread full file is reviewed. Five conflicts resolved to main: equivalent creation contract/test clock, current source references and retired glossary terms."
+      ],
       "questions": []
     },
     {
@@ -28931,7 +28944,9 @@
       "status": "unverified",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
       "read_ranges": [],
-      "evidence": [],
+      "evidence": [
+        "Main advanced to 0bcdb864127feea425934baa179797bd53ecf375 (PR #2964). Full 17-file delta (1071 diff lines) read in bounded chunks after initial truncated attempt. Changes reconciled on audit branch; baseline read status unchanged, delta reading does not imply unread full file is reviewed. Five conflicts resolved to main: equivalent creation contract/test clock, current source references and retired glossary terms."
+      ],
       "questions": []
     },
     {
@@ -29022,7 +29037,9 @@
       "status": "unverified",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
       "read_ranges": [],
-      "evidence": [],
+      "evidence": [
+        "Main advanced to 0bcdb864127feea425934baa179797bd53ecf375 (PR #2964). Full 17-file delta (1071 diff lines) read in bounded chunks after initial truncated attempt. Changes reconciled on audit branch; baseline read status unchanged, delta reading does not imply unread full file is reviewed. Five conflicts resolved to main: equivalent creation contract/test clock, current source references and retired glossary terms."
+      ],
       "questions": []
     },
     {
@@ -29193,7 +29210,9 @@
       "status": "unverified",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
       "read_ranges": [],
-      "evidence": [],
+      "evidence": [
+        "Main advanced to 0bcdb864127feea425934baa179797bd53ecf375 (PR #2964). Full 17-file delta (1071 diff lines) read in bounded chunks after initial truncated attempt. Changes reconciled on audit branch; baseline read status unchanged, delta reading does not imply unread full file is reviewed. Five conflicts resolved to main: equivalent creation contract/test clock, current source references and retired glossary terms."
+      ],
       "questions": []
     },
     {
@@ -29207,7 +29226,8 @@
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
       "read_ranges": [[1, 248]],
       "evidence": [
-        "Complete read in ranges 1-95,96-165,166-248; stale destination/report explanations identified"
+        "Complete read in ranges 1-95,96-165,166-248; stale destination/report explanations identified",
+        "Main advanced to 0bcdb864127feea425934baa179797bd53ecf375 (PR #2964). Full 17-file delta (1071 diff lines) read in bounded chunks after initial truncated attempt. Changes reconciled on audit branch; baseline read status unchanged, delta reading does not imply unread full file is reviewed. Five conflicts resolved to main: equivalent creation contract/test clock, current source references and retired glossary terms."
       ],
       "questions": []
     },
@@ -29221,7 +29241,9 @@
       "status": "unverified",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
       "read_ranges": [],
-      "evidence": [],
+      "evidence": [
+        "Main advanced to 0bcdb864127feea425934baa179797bd53ecf375 (PR #2964). Full 17-file delta (1071 diff lines) read in bounded chunks after initial truncated attempt. Changes reconciled on audit branch; baseline read status unchanged, delta reading does not imply unread full file is reviewed. Five conflicts resolved to main: equivalent creation contract/test clock, current source references and retired glossary terms."
+      ],
       "questions": []
     },
     {
@@ -29235,7 +29257,8 @@
       "reason": "First-party source and contracts read in full; query limits and ownership/archive filters traced",
       "read_ranges": [[1, 114]],
       "evidence": [
-        "2026-09-29: full-text tool output, chunked where needed; activities spec lines 88-107 and mcp-usage 1-90/91-185/186-end recovered without truncation."
+        "2026-09-29: full-text tool output, chunked where needed; activities spec lines 88-107 and mcp-usage 1-90/91-185/186-end recovered without truncation.",
+        "Main advanced to 0bcdb864127feea425934baa179797bd53ecf375 (PR #2964). Full 17-file delta (1071 diff lines) read in bounded chunks after initial truncated attempt. Changes reconciled on audit branch; baseline read status unchanged, delta reading does not imply unread full file is reviewed. Five conflicts resolved to main: equivalent creation contract/test clock, current source references and retired glossary terms."
       ],
       "questions": []
     },
@@ -29330,7 +29353,8 @@
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
       "read_ranges": [[1, 153]],
       "evidence": [
-        "Primary agent full untruncated read; F001 default versus choice corrected; other claims still being cross-checked"
+        "Primary agent full untruncated read; F001 default versus choice corrected; other claims still being cross-checked",
+        "Main advanced to 0bcdb864127feea425934baa179797bd53ecf375 (PR #2964). Full 17-file delta (1071 diff lines) read in bounded chunks after initial truncated attempt. Changes reconciled on audit branch; baseline read status unchanged, delta reading does not imply unread full file is reviewed. Five conflicts resolved to main: equivalent creation contract/test clock, current source references and retired glossary terms."
       ],
       "questions": []
     },
@@ -29372,7 +29396,10 @@
       "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
       "read_ranges": [[1, 84]],
-      "evidence": ["All 84 lines visible before following file in output; concept authority read"],
+      "evidence": [
+        "All 84 lines visible before following file in output; concept authority read",
+        "Main advanced to 0bcdb864127feea425934baa179797bd53ecf375 (PR #2964). Full 17-file delta (1071 diff lines) read in bounded chunks after initial truncated attempt. Changes reconciled on audit branch; baseline read status unchanged, delta reading does not imply unread full file is reviewed. Five conflicts resolved to main: equivalent creation contract/test clock, current source references and retired glossary terms."
+      ],
       "questions": []
     },
     {
@@ -33411,7 +33438,8 @@
       "read_ranges": [[1, 811]],
       "evidence": [
         "Partial ranges reviewed; remainder unverified",
-        "Full text read in bounded ranges. Review definition -> query -> aggregation -> filter -> UI -> tests cross-check. Truncated sections were separately recovered."
+        "Full text read in bounded ranges. Review definition -> query -> aggregation -> filter -> UI -> tests cross-check. Truncated sections were separately recovered.",
+        "Main advanced to 0bcdb864127feea425934baa179797bd53ecf375 (PR #2964). Full 17-file delta (1071 diff lines) read in bounded chunks after initial truncated attempt. Changes reconciled on audit branch; baseline read status unchanged, delta reading does not imply unread full file is reviewed. Five conflicts resolved to main: equivalent creation contract/test clock, current source references and retired glossary terms."
       ],
       "questions": []
     },
