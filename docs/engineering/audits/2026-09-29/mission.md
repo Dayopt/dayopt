@@ -236,3 +236,5 @@ generic account deletion gate integration1747行の残りを省略なく読解�
 認証ownerの明示・raw microsecond CAS・部分更新の現在行補完・DB source shape・Planから独立Record作成・confirm-dayの26時間上限を照合。旧soft-delete/restore wrapperは後続migrationでserialized/private経路へ再接続され、service_role revokeの古い行だけを根拠に現行testが壊れていると判断しない。skip列の撤去後stubと旧insert Undo receipt互換も全文確認。revision/timezone一致・exact count・共有20秒deadlineと再読1回の範囲を確認。ローカルDB専用testは未実行で、今回新たな全体checkは不要な文書差分のみ。前回7631成功を新しいDB実測へ拡張しない。
 
 F037としてSupabase skillの不完全SQL雛形を現行安全例への参照へ修正しdocs:check成功。H038としてinsert Undoのfull maskが現在のactivity/fulfillmentを含まない候補を保存。#2434本文/9コメント/ctxを取得、検索範囲でruntime callsiteが未検出のDB substrateと稼働機能を区別して続ける。次はUndo substrate/record RPC/統合testの全文、receipt互換とconsumer計画を確認して採否を決める。H034とクラウド認証不能の独立境界は未確認のまま。今回DB・本番変更なし、全体監査未完了。
+
+F037修正と読解証拠を`23ecf8965`へcommit。追記後のdocs:checkもexit 0（`/tmp/dayopt-audit-command-reading-docs.log`）。追加でUndo substrate300行/record RPC gap395行を全文確認し、基準全文395件、機械1、未確認2745。public RPCはservice_roleのみ、tenant参照は複合FK、insert full-maskをrecord時に完全一致検査する一方、mask自体の現在mutable列との関係はH038として残る。ctx2434のL1はmissing/staleのため本文/9コメントを一次資料として利用した。次は948行の初期RPC定義と931行の統合test、後続field-change guardとconsumer計画を読み、旧receiptへの対応も含め採否を確定する。DB未実行。

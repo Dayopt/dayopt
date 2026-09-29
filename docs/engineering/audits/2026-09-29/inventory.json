@@ -39539,10 +39539,12 @@
       "mode": "100644",
       "bytes": 16525,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 300]],
+      "evidence": [
+        "Full untruncated bounded reading at 23ecf8965. Baseline bytes match. Substrate owner-composite FKs/RLS/no browser grants and record-RPC insert full-mask exact match confirmed. No runtime or isolated DB execution; H038 still pending current consumer/receipt compatibility/test review."
+      ],
       "questions": []
     },
     {
@@ -39591,10 +39593,12 @@
       "mode": "100644",
       "bytes": 16792,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 395]],
+      "evidence": [
+        "Full untruncated bounded reading at 23ecf8965. Baseline bytes match. Substrate owner-composite FKs/RLS/no browser grants and record-RPC insert full-mask exact match confirmed. No runtime or isolated DB execution; H038 still pending current consumer/receipt compatibility/test review."
+      ],
       "questions": []
     },
     {
