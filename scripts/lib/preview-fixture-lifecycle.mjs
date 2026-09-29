@@ -125,3 +125,27 @@ export function createFixtureLifecycle(options) {
     throw new Error(ERROR);
   }
 }
+
+/** Trusted server client only. No credential lookup or request-controlled hooks. */
+export function createSupabaseFixtureLifecycle({ client, wait = undefined, elapsed = undefined }) {
+  try {
+    if (!client || typeof client.rpc !== 'function') throw new Error();
+    return createFixtureLifecycle({
+      ...(wait === undefined ? {} : { wait }),
+      ...(elapsed === undefined ? {} : { elapsed }),
+      rpc: async (name, args, { signal }) => {
+        try {
+          // The installed SDK carries this signal through PostgREST fetch.
+          const result = await client.rpc(name, args).abortSignal(signal);
+          if (!result || result.error || result.data === null || result.data === undefined)
+            throw new Error();
+          return result.data;
+        } catch {
+          throw new Error(ERROR);
+        }
+      },
+    });
+  } catch {
+    throw new Error(ERROR);
+  }
+}

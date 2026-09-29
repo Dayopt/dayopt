@@ -10,7 +10,7 @@ DB 変更 PR の Supabase branch でも、毎 PR の secret 保存や手動 sign
 
 ## 現在の状態
 
-実装済みなのは [短命認証コア](../../scripts/lib/preview-fixture-authority.mjs) と [予定ユーザーの実行処理](../../scripts/lib/preview-fixture-broker.mjs)。実行処理は、永続的に操作順と終了状態を管理する adapter が渡されなければ、管理キーを読む前に拒否する。実 adapter、broker API、fixture の寿命、workflow の job 分離にはまだ接続していない。既存の共有 Preview runner の認証や権限は変更していない。
+実装済みなのは [短命認証コア](../../scripts/lib/preview-fixture-authority.mjs) と [予定ユーザーの実行処理](../../scripts/lib/preview-fixture-broker.mjs)。実行処理は、永続的に操作順と終了状態を管理する adapter が渡されなければ、管理キーを読む前に拒否する。永続adapterとSDK bridgeを用意したが、broker API、fixture の寿命、workflow の job 分離にはまだ接続していない。既存の共有 Preview runner の認証や権限は変更していない。
 
 ローカルの署名・拒否テストが成功しても、GitHub の実 OIDC 発行、Preview サーバーの system env、実際のログインや回収が動いた証拠にはならない。共有 Integration が別の検証で凍結中なら、source 作業だけを進める。
 
@@ -49,7 +49,7 @@ repository ID / owner ID / 既定 subject は 2026-09-29 の repository metadata
 
 永続制御は、既存の対象 DB に操作状態を永続化し、応答不明や実行サーバー喪失を `UNKNOWN` として閉じること。SDK の外側で fencing token を確認しても、送信済みの Auth 作成要求の commit は止められない。時間経過だけで `UNKNOWN` を回収成功へ戻さず、この場合は所有する ephemeral branch の削除と DB 自体の終端確認を必須にする。branch metadata の 404 だけを DB 不在の証拠にしない。provider 終端条件・実環境への接続・実測は未完了であり、既存 executor の回収成功をこの保証の代わりに使わない。
 
-[lifecycle adapter](../../scripts/lib/preview-fixture-lifecycle.mjs) とmigrationを用意した。非公開tableはrun・intent digest・owner・状態・期限だけを保持し、認証情報を保存しない。service-role専用RPCがrow lock取得後のDB時計で180秒の期限を判定する。cleanupのclaimは待機中でも新しいprovisionを閉じ、現在のownerは完了できる。期限切れや失敗はUNKNOWNとして閉じ、通常の再claimでは解除しない。adapterはclaimの待機を制限し、guard失敗がcallback内で捕捉されてもfinishを成功にしない。SDK接続はtrusted callerがerrorの検査とabortSignalへの接続を担当する。隔離CI用の別接続競合・期限切れ・権限testを追加したが、実DB結果が出るまでは永続性の証明にしない。
+[lifecycle adapter](../../scripts/lib/preview-fixture-lifecycle.mjs) とmigrationを用意した。非公開tableはrun・intent digest・owner・状態・期限だけを保持し、認証情報を保存しない。service-role専用RPCがrow lock取得後のDB時計で180秒の期限を判定する。cleanupのclaimは待機中でも新しいprovisionを閉じ、現在のownerは完了できる。期限切れや失敗はUNKNOWNとして閉じ、通常の再claimでは解除しない。adapterはclaimの待機を制限し、guard失敗がcallback内で捕捉されてもfinishを成功にしない。隔離CI run36643756082では、別接続競合・期限切れ・権限を含む実Postgres7ケースが成功した。`createSupabaseFixtureLifecycle`はtrusted callerが作ったSDK clientだけを受け取り、RPC結果のerror/data検査とabortSignalへの接続を担当する。installed SDKのmock transport38ケースに加え、隔離PostgRESTから永続SQL状態までのtestを追加した。この追加接続testの実CI結果とAPIへの配線は未確認。
 
 executor は adapter の取得待ち後にも JWT の期限を再検証する。adapterがcallbackへ渡す `beforeMutation()` を必須とし、SDKの各書込み直前に永続ownerの検査を待つ。一度拒否された呼出しでは以後の書込みを送らず、検査待ちで実行予算を超えた場合も送信を止める。これは送信済み要求の取消しではなく、永続adapterの実装を代替しない。[SDKを用いるローカルテスト](../../scripts/lib/preview-fixture-broker.test.ts) は provider mock と test-only の coordination harness を使い、この呼び出し契約と競合を検証する。**実 adapter の永続性・インスタンス間の排他・worker 喪失からの回収を証明するテストではない。** その実装・実測前に公開 route へ接続してはならない。
 

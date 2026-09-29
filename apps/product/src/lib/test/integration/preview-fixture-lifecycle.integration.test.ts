@@ -1,3 +1,4 @@
+import { createClient } from '@supabase/supabase-js';
 import { execFile, execFileSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { promisify } from 'node:util';
@@ -125,6 +126,61 @@ describe.skipIf(!RUN_LOCAL)('durable Preview fixture lifecycle in isolated CI Po
       }),
     );
     expect(results.sort()).toEqual(['acquired', 'busy']);
+  });
+  it('runs the trusted SDK bridge against isolated PostgREST and durable SQL state', async () => {
+    localOnly();
+    const apiUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const serviceKey = process.env.SUPABASE_SECRET_KEY;
+    if (
+      !apiUrl ||
+      !serviceKey ||
+      !['127.0.0.1', 'localhost', '[::1]'].includes(new URL(apiUrl).hostname)
+    )
+      throw new Error('Preview lifecycle SDK test requires isolated CI API');
+    const moduleUrl = new URL(
+      '../../../../../../scripts/lib/preview-fixture-lifecycle.mjs',
+      import.meta.url,
+    );
+    const { createSupabaseFixtureLifecycle } = await import(moduleUrl.href);
+    const client = createClient(apiUrl, serviceKey, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+    const id = runId();
+    const execute = createSupabaseFixtureLifecycle({ client });
+    const binding = { key: ref + ':' + id, intentDigest: digest, operation: 'provision' };
+    expect(
+      await execute(
+        binding,
+        async ({ beforeMutation }: { beforeMutation: () => Promise<void> }) => {
+          await beforeMutation();
+          expect(
+            sql(
+              `SELECT state FROM private.preview_fixture_lifecycle WHERE database_ref = '${ref}' AND run_id = '${id}';`,
+            ),
+          ).toBe('ACTIVE');
+          return 'prepared';
+        },
+      ),
+    ).toBe('prepared');
+    expect(
+      sql(
+        `SELECT state FROM private.preview_fixture_lifecycle WHERE database_ref = '${ref}' AND run_id = '${id}';`,
+      ),
+    ).toBe('IDLE');
+    await execute(
+      { ...binding, operation: 'cleanup' },
+      async ({ beforeMutation }: { beforeMutation: () => Promise<void> }) => {
+        await beforeMutation();
+      },
+    );
+    expect(
+      sql(
+        `SELECT state || ':' || closed::text FROM private.preview_fixture_lifecycle WHERE database_ref = '${ref}' AND run_id = '${id}';`,
+      ),
+    ).toBe('CLEANED:true');
+    await expect(execute(binding, async () => undefined)).rejects.toThrow(
+      /^Preview fixture lifecycle failed$/,
+    );
   });
   it('exposes only the service RPC and rejects user roles and protected database refs', () => {
     expect(
