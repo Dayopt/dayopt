@@ -2,9 +2,9 @@ import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { lstatSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { inflateRawSync } from 'node:zlib';
 
 import { isDirectExecution } from '../lib/is-direct-execution.mjs';
+import { decodePreviewArtifactZip } from '../lib/preview-artifact-zip.mjs';
 import { verifyPreviewRecoveryTrust } from '../lib/preview-cloud-recovery-trust.mjs';
 import { recoverPreviewUsers } from '../runbook/preview-cleanup.mjs';
 import { validateCloudIntent } from './preview-cloud-intent.mjs';
@@ -12,7 +12,6 @@ import { assertCloudFixtureKey } from './preview-cloud-run.mjs';
 
 const REPO = 'Dayopt/dayopt';
 const MAX_ARCHIVE_BYTES = 128 * 1024;
-const MAX_INTENT_BYTES = 16 * 1024;
 function number(value) {
   if (!/^[1-9]\d*$/.test(String(value))) throw new Error();
   const result = Number(value);
@@ -58,194 +57,9 @@ async function downloadIntent({ artifactId, token }) {
   }
 }
 
-function crc32(data) {
-  let crc = 0xffffffff;
-  for (const byte of data) {
-    crc ^= byte;
-    for (let bit = 0; bit < 8; bit++) crc = (crc >>> 1) ^ (crc & 1 ? 0xedb88320 : 0);
-  }
-  return (crc ^ 0xffffffff) >>> 0;
-}
-
-function assertRange(buffer, offset, length, boundary = buffer.length) {
-  if (
-    !Number.isSafeInteger(offset) ||
-    !Number.isSafeInteger(length) ||
-    offset < 0 ||
-    length < 0 ||
-    offset + length > boundary ||
-    boundary > buffer.length
-  )
-    throw new Error('Invalid Preview recovery ZIP');
-}
-
-function assertExtraFields(buffer, offset, length) {
-  const end = offset + length;
-  assertRange(buffer, offset, length);
-  while (offset < end) {
-    assertRange(buffer, offset, 4, end);
-    const id = buffer.readUInt16LE(offset);
-    const fieldLength = buffer.readUInt16LE(offset + 2);
-    if (id === 0x0001 || id === 0x7075 || id === 0x6375)
-      throw new Error('Unsupported Preview recovery ZIP extra field');
-    offset += 4;
-    assertRange(buffer, offset, fieldLength, end);
-    offset += fieldLength;
-  }
-}
-
-function findEndOfCentralDirectory(buffer) {
-  const minOffset = Math.max(0, buffer.length - 22 - 0xffff);
-  for (let offset = buffer.length - 22; offset >= minOffset; offset--) {
-    if (buffer.readUInt32LE(offset) !== 0x06054b50) continue;
-    if (offset + 22 > buffer.length) break;
-    const commentLength = buffer.readUInt16LE(offset + 20);
-    if (commentLength !== 0 || offset + 22 !== buffer.length) continue;
-    return offset;
-  }
-  throw new Error('Invalid Preview recovery ZIP');
-}
-
-/** Parse one small root-level intent.json from an already digest-verified ZIP. */
+/** Preserve the recovery-only intent contract; larger handoff envelopes are never accepted here. */
 export function decodePreviewIntentArtifactZip(archive) {
-  if (!Buffer.isBuffer(archive) || archive.length < 22 || archive.length > MAX_ARCHIVE_BYTES)
-    throw new Error('Invalid Preview recovery ZIP');
-  const eocdOffset = findEndOfCentralDirectory(archive);
-  const diskNumber = archive.readUInt16LE(eocdOffset + 4);
-  const centralDiskNumber = archive.readUInt16LE(eocdOffset + 6);
-  const diskEntries = archive.readUInt16LE(eocdOffset + 8);
-  const totalEntries = archive.readUInt16LE(eocdOffset + 10);
-  const centralSize = archive.readUInt32LE(eocdOffset + 12);
-  const centralOffset = archive.readUInt32LE(eocdOffset + 16);
-  if (
-    diskNumber !== 0 ||
-    centralDiskNumber !== 0 ||
-    diskEntries !== 1 ||
-    totalEntries !== 1 ||
-    centralOffset + centralSize !== eocdOffset
-  )
-    throw new Error('Invalid Preview recovery ZIP');
-
-  assertRange(archive, centralOffset, 46, eocdOffset);
-  if (archive.readUInt32LE(centralOffset) !== 0x02014b50)
-    throw new Error('Invalid Preview recovery ZIP');
-  const madeBy = archive.readUInt16LE(centralOffset + 4);
-  const neededVersion = archive.readUInt16LE(centralOffset + 6);
-  const flags = archive.readUInt16LE(centralOffset + 8);
-  const method = archive.readUInt16LE(centralOffset + 10);
-  const expectedCrc = archive.readUInt32LE(centralOffset + 16);
-  const compressedSize = archive.readUInt32LE(centralOffset + 20);
-  const uncompressedSize = archive.readUInt32LE(centralOffset + 24);
-  const nameLength = archive.readUInt16LE(centralOffset + 28);
-  const extraLength = archive.readUInt16LE(centralOffset + 30);
-  const commentLength = archive.readUInt16LE(centralOffset + 32);
-  const diskStart = archive.readUInt16LE(centralOffset + 34);
-  const externalAttributes = archive.readUInt32LE(centralOffset + 38);
-  const localOffset = archive.readUInt32LE(centralOffset + 42);
-  const centralHeaderLength = 46 + nameLength + extraLength + commentLength;
-  assertRange(archive, centralOffset, centralHeaderLength, eocdOffset);
-  const nameOffset = centralOffset + 46;
-  const centralName = archive.subarray(nameOffset, nameOffset + nameLength);
-  const allowedFlags = 0x080e;
-  const creatorHost = madeBy >>> 8;
-  const unixMode = externalAttributes >>> 16;
-  const fileType = unixMode & 0o170000;
-  if (
-    centralHeaderLength !== centralSize ||
-    commentLength !== 0 ||
-    diskStart !== 0 ||
-    localOffset !== 0 ||
-    neededVersion >= 45 ||
-    (flags & ~allowedFlags) !== 0 ||
-    ![0, 8].includes(method) ||
-    (method === 0 && (flags & 0x0006) !== 0) ||
-    !centralName.equals(Buffer.from('intent.json')) ||
-    (creatorHost === 0 && (externalAttributes & 0x10) !== 0) ||
-    (fileType !== 0 && fileType !== 0o100000) ||
-    uncompressedSize < 1 ||
-    uncompressedSize > MAX_INTENT_BYTES ||
-    compressedSize < 1 ||
-    compressedSize > MAX_ARCHIVE_BYTES
-  )
-    throw new Error('Unsupported Preview recovery ZIP entry');
-  assertExtraFields(archive, nameOffset + nameLength, extraLength);
-
-  assertRange(archive, localOffset, 30, centralOffset);
-  if (archive.readUInt32LE(localOffset) !== 0x04034b50)
-    throw new Error('Invalid Preview recovery ZIP');
-  const localFlags = archive.readUInt16LE(localOffset + 6);
-  const localMethod = archive.readUInt16LE(localOffset + 8);
-  const localCrc = archive.readUInt32LE(localOffset + 14);
-  const localCompressedSize = archive.readUInt32LE(localOffset + 18);
-  const localUncompressedSize = archive.readUInt32LE(localOffset + 22);
-  const localNameLength = archive.readUInt16LE(localOffset + 26);
-  const localExtraLength = archive.readUInt16LE(localOffset + 28);
-  const localNameOffset = localOffset + 30;
-  assertRange(archive, localNameOffset, localNameLength + localExtraLength, centralOffset);
-  const localName = archive.subarray(localNameOffset, localNameOffset + localNameLength);
-  if (localFlags !== flags || localMethod !== method || !localName.equals(centralName))
-    throw new Error('Preview recovery ZIP headers differ');
-  assertExtraFields(archive, localNameOffset + localNameLength, localExtraLength);
-  const dataOffset = localNameOffset + localNameLength + localExtraLength;
-  const dataEnd = dataOffset + compressedSize;
-  assertRange(archive, dataOffset, compressedSize, centralOffset);
-  const hasDataDescriptor = (flags & 0x0008) !== 0;
-  if (!hasDataDescriptor) {
-    if (
-      localCrc !== expectedCrc ||
-      localCompressedSize !== compressedSize ||
-      localUncompressedSize !== uncompressedSize ||
-      dataEnd !== centralOffset
-    )
-      throw new Error('Preview recovery ZIP headers differ');
-  } else {
-    if (
-      ![0, expectedCrc].includes(localCrc) ||
-      ![0, compressedSize].includes(localCompressedSize) ||
-      ![0, uncompressedSize].includes(localUncompressedSize)
-    )
-      throw new Error('Preview recovery ZIP headers differ');
-    const descriptorOffset = dataEnd;
-    assertRange(archive, descriptorOffset, 12, centralOffset);
-    const descriptorLength = centralOffset - descriptorOffset;
-    const descriptorHasSignature =
-      descriptorLength === 16 && archive.readUInt32LE(descriptorOffset) === 0x08074b50;
-    if (descriptorLength !== (descriptorHasSignature ? 16 : 12))
-      throw new Error('Invalid Preview recovery ZIP descriptor');
-    const descriptorStart = descriptorOffset + (descriptorHasSignature ? 4 : 0);
-    assertRange(archive, descriptorStart, 12, centralOffset);
-    if (
-      archive.readUInt32LE(descriptorStart) !== expectedCrc ||
-      archive.readUInt32LE(descriptorStart + 4) !== compressedSize ||
-      archive.readUInt32LE(descriptorStart + 8) !== uncompressedSize ||
-      descriptorStart + 12 !== centralOffset
-    )
-      throw new Error('Invalid Preview recovery ZIP descriptor');
-  }
-
-  const compressed = archive.subarray(dataOffset, dataEnd);
-  let content;
-  try {
-    content =
-      method === 0
-        ? Buffer.from(compressed)
-        : inflateRawSync(compressed, {
-            maxOutputLength: MAX_INTENT_BYTES,
-          });
-  } catch {
-    throw new Error('Invalid Preview recovery ZIP data');
-  }
-  if (
-    content.length !== uncompressedSize ||
-    content.length > MAX_INTENT_BYTES ||
-    crc32(content) !== expectedCrc
-  )
-    throw new Error('Invalid Preview recovery ZIP checksum');
-  try {
-    return new TextDecoder('utf-8', { fatal: true }).decode(content);
-  } catch {
-    throw new Error('Invalid Preview recovery intent encoding');
-  }
+  return decodePreviewArtifactZip(archive, 'intent');
 }
 
 /** Download only the small, uniquely named public plan; no platform key is needed. */

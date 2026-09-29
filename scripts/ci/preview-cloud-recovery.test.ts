@@ -4,6 +4,10 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { deflateRawSync } from 'node:zlib';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import {
+  decodePreviewArtifactZip,
+  decodeVerifiedPreviewArtifactZip,
+} from '../lib/preview-artifact-zip.mjs';
 import { recoverPreviewUsers } from '../runbook/preview-cleanup.mjs';
 import { createCloudIntent } from './preview-cloud-intent.mjs';
 import {
@@ -140,6 +144,60 @@ function prepare() {
   };
 }
 describe('Cloud recovery plan intake', () => {
+  it('checks the raw archive digest before interpreting handoff ZIP bytes', () => {
+    const archive = createZip([{ name: 'envelope.json', data: '{"encrypted":true}' }]);
+    const digest = `sha256:${createHash('sha256').update(archive).digest('hex')}`;
+    expect(decodeVerifiedPreviewArtifactZip({ archive, digest, kind: 'envelope' })).toBe(
+      '{"encrypted":true}',
+    );
+    const corrupt = Buffer.from(archive);
+    corrupt[0] ^= 0xff;
+    expect(() =>
+      decodeVerifiedPreviewArtifactZip({ archive: corrupt, digest, kind: 'envelope' }),
+    ).toThrow('Preview artifact archive digest differs');
+    expect(() =>
+      decodeVerifiedPreviewArtifactZip({ archive, digest: 'SECRET', kind: 'envelope' }),
+    ).toThrow('Preview artifact archive digest differs');
+  });
+  it.each([
+    ['public-key', 'public-key.json', 32_768],
+    ['envelope', 'envelope.json', 49_152],
+  ] as const)(
+    'decodes bounded %s handoff JSON without widening the intent decoder',
+    (kind, name, limit) => {
+      const data = JSON.stringify('a'.repeat(limit - 2));
+      const archive = createZip([{ name, data }]);
+      expect(decodePreviewArtifactZip(archive, kind)).toBe(data);
+      expect(() => decodePreviewIntentArtifactZip(archive)).toThrow();
+      expect(() =>
+        decodePreviewArtifactZip(createZip([{ name, data: data + ' ' }]), kind),
+      ).toThrow();
+      expect(() =>
+        decodePreviewArtifactZip(createZip([{ name: `../${name}`, data }]), kind),
+      ).toThrow();
+      expect(() =>
+        decodePreviewArtifactZip(createZip([{ name, data, mode: 0o120777 }]), kind),
+      ).toThrow();
+      expect(() =>
+        decodePreviewArtifactZip(
+          createZip([
+            { name, data },
+            { name: 'extra.json', data: '{}' },
+          ]),
+          kind,
+        ),
+      ).toThrow();
+    },
+  );
+  it('does not accept arbitrary archive kinds or larger recovery intents', () => {
+    expect(() => decodePreviewArtifactZip(intentArchive, 'constructor')).toThrow();
+    expect(() => decodePreviewArtifactZip(intentArchive, '../intent')).toThrow();
+    expect(() =>
+      decodePreviewIntentArtifactZip(
+        createZip([{ name: 'intent.json', data: 'a'.repeat(16_385) }]),
+      ),
+    ).toThrow();
+  });
   it('retrieves only the uniquely named public intent and rechecks its immutable metadata', async () => {
     const s = prepare();
     expect(await prepareCloudRecovery(s)).toEqual(proof);

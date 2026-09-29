@@ -65,6 +65,10 @@ file は600、親directoryは700、16KiB以内とし、file symlinkを拒否す�
 
 job分離時はconsumerとprovisionをtrusted preflight後に並列起動し、consumerがcandidate checkout前に公開鍵を発行して暗号化応答を待つ。cleanupは両jobの終了後に実行する。現在のrecovery verifierは旧E2E execute stepの開始を要求するため、新構成を接続する際はprovision開始後の失敗・cancel・timeoutも公開intentに結び付けて認証する必要がある。E2Eが未開始でもfixtureが存在する可能性があり、旧判定のまま接続してはならない。
 
+[handoff metadata検証器](../../scripts/lib/preview-fixture-handoff-trust.mjs) は進行中の同じtrusted workflow・attempt・SHAとjob/stepの状態を照合する。artifact名は公開bindingとroleから導出し、重複・旧attempt・別repository・不足metadataを拒否する。candidate実行前という順序条件を確認し、最後にrun/jobを再読する。GitHub artifact metadataにはproducer job IDがないため、この検証は固定されたtrusted workflowの実行順序との契約であり、artifact単体の送信者署名ではない。実APIの進行中step状態を含め、Cloud上では未検証。
+
+ZIPはdigest照合後に固定されたroot-levelの1fileだけをメモリ内で読む。intentは16KiB、公開鍵は32KiB、暗号化envelopeは48KiB、ZIP全体は128KiBに制限し、symlink・余分なfile・別pathを拒否する。既存recoveryのintent上限と失敗条件は維持する。metadata検証・download・digest検査・復号・private writerを一連のjobとして接続する処理はまだない。
+
 consumer時はspecごとのadmin生成・seed・削除を行わず、同じ2ユーザーを通常loginで使う。Preview configで **desktop6件 → mobile5件 → A/B認可1件** のproject依存を明示し、認可テストのRecordが先にReport集計へ混ざらないようにする。先行失敗時の後続skipは成功にしない。全project後の回収は別のtrusted jobが担当し、worker喪失時も予定intentから回収できる必要がある。legacyモードのspec別作成/削除は維持する。
 
 `previewWorkerEnvironment` は信頼済み caller が registry path を明示した場合だけ、検証済み readiness の ephemeral binding・immutable origin・run・予定2UUIDを確認し、管理キーを含まないenvを組み立てる。親envのregistry指定は無視する。GitHub token、provider PAT、OIDC発行変数、NODE_OPTIONSは引き継がず、Preview到達用bypassと通常loginのprivate file pathだけを既存allowlistへ加える。file内容の検証はconsumer readerが行う。現在のrunner呼び出しは追加引数を渡さず、従来動作を維持する。同一jobでenvを絞るだけでは、悪意あるcandidateから親プロセス・filesystemへのアクセスを隔離できないため、trusted/candidateのjob分離を省略してはならない。
