@@ -315,3 +315,12 @@ H024の反証追記: installed `@supabase/auth-js@2.116.0` のGoTrueClient.ts 40
 - 想定条件/影響: deletedが先に保存された後、未処理の古いactive updatedが届く場合、終了済み利用権を復活させる可能性。再契約後の旧Subscription更新でも新しいIDを上書きする可能性。Stripe/DBの実観測や本番発生は未確認。
 - 反証/制限: 同一event_idの再送はprocessedなら除外される。durable provider照合はAccount/Mode/Event identityを保護するが、Subscription最新状態の確認ではない。checkoutはSubscriptionを再取得するためupdatedと入力の鮮度が異なる。ただし再取得だけでも別契約・並行DB更新との競合は閉じない。既存route testのupdatedは解約予約activeの1例、serviceの状態遷移testは別mockで例外なしを確かめるだけで保存状態の連続性を検査しない。
 - 次: 元課金Issueの要求・provider identityとSubscriptionの対応・初回bind/再契約・削除中のロック契約を照合し、実route+serviceと状態を保持する合成DB応答で遅延配送を再現する。現在状態の再取得、条件付き保存、必要な直列化を比較し、一つの原因をcheckout/updated/deletedを横断して閉じる。event.created比較だけの修正は採らない。新規機構や本番書込みは不要。独立して進める全文読解は継続する。
+
+## F035 — 遅延Webhookと並行更新が現在の課金状態を上書きする
+
+- 状態: H035のlive profileでの上書き原因を再現・修正。統合検査中。Auth削除後の遅延checkout/updatedとterminal receiptの全イベント分類は未完了として残す。
+- 再現: 実route・実billing service・実provider identity関数を通し、イベント間でprofileを保持する合成DB/Stripe応答を使用。解約deleted成功後の古いactive updatedでcanceled→active、再契約後でsub_new→sub_oldを再現。red 2 failed（`/tmp/dayopt-audit-webhook-ordering-red.log`）。実providerや実DB観測ではない。
+- 修正: checkout/updatedで現在Subscriptionを5秒・再試行なしで取得し、ID/Customer/modeを照合。現在canceledならexact subscriptionの終了経路を使い、旧snapshotを保存しない。provider取得前のprofile ID/status/updated_atを保存条件へ加え、競合時は既存500/claim解放から再送する。legacyは既存profiles列の条件付きUPDATE、durableは既存terminal RPCを使い、新規migrationやActivation変更はない。
+- 反証: ID/statusだけの条件付き更新では、途中の遷移から同じ状態へ戻るケースを見逃す。別redで200となる失敗を確認（1 failed/5 passed、`/tmp/dayopt-audit-webhook-ordering-aba-red.log`）、既存profile updated_atを条件に追加。baseline SQL 22–32/112–127はNOT NULL timestampと全UPDATE triggerを定義。これは部分読解で、巨大baseline全文確認に昇格していない。旧経路もexact IDを確認し、遅いdeletedで別契約を終了しない。
+- 検証: 関連3 files/58 passed（ordering 8件含む）、型検査成功。ログ `/tmp/dayopt-audit-webhook-ordering-regression.log` / `/tmp/dayopt-audit-webhook-ordering-types.log`。後者は最初の修正時点の結果で、最終組合せの型検査は全体checkに含める。保存条件は合成query builderで検査し、実PostgREST/DBの行ロックを実測したものではない。legacy/durable双方の遅延更新、再契約、並行削除、同状態復帰、Customer不一致、遅延checkoutを検査。
+- 残り: profileが消滅した後のupdated/checkoutは現在snapshot取得で500となる。削除receiptへの分類で正しく終端すべき範囲を元契約と照合し、保護を落とさず続ける。複数の同時active契約という既存データ異常の裁定は別途未確認。通知の過去previous_attributesの意味、実Stripe mode・実DB・配信は未確認。F035を全体監査完了やこの残りの修正完了と扱わない。

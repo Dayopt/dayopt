@@ -202,3 +202,9 @@ clean HEAD `6fea3a7720d083f29748cdb4188cadd80710a1a0`から継続。更新され
 H035として遅延updatedが解約後/再契約後を上書きする候補を保存。Stripe公式の配送順・immutable Event説明に照合したが、まだ操作再現前。正常順を模した例外なしtestを状態遷移の証明として扱わない。次は初回bind/再契約/削除中の契約を照合して再現・最小修正を進める。H034のlock待ち中期限超過と隔離DB前提も未解決。今回製品コードは変更せず、同一の成功済み全体checkを繰り返していない。前回の7483成功は`ef0f9e572`の製品コードに束縛されたまま、現在の文書変更や未実行DB検証へ拡張しない。公開Draftの最後の確認headは`39a717490`、以後の読解/文書はlocal。全体監査・実環境・E2E・配信は未完了。
 
 今回の台帳/候補追記後にNode24 `pnpm docs:check` exit 0（`/tmp/dayopt-audit-webhook-reading-docs-check.log`）、diff whitespace検査成功。これは文書整合の検査で、H035の挙動検証ではない。
+
+## Webhook状態の逆戻りを再現・修正
+
+前回turnは20ファイルの全文読解、H035候補、証拠commit `3dc0e39b7`とIssue comment-5900681960を保存したprogress。今回同clean HEADから続け、diagnosing-bugsを適用。ctx2686はL1 missing/staleで、本文と2コメントを取得。reconciliationは検出のみ、修復はresendという境界を維持し、監視cronに自動修復を追加しない。
+
+F035でlive profileの遅延配送2件と同状態復帰1件をredで再現し、checkout/updated/deletedのTS呼出しを横断して現在状態・exact ID・条件付き保存へ修正。既存DB列とtriggerを利用しmigration追加なし。関連58 tests成功。最終製品コードを固定してNode24 `pnpm check`実行中、ログ `/tmp/dayopt-audit-check-webhook-ordering.log`、session42094。成功はまだ未確認で前回7483結果を流用しない。Architecture generatorは実行成功・tracked差分なし。今回追加testは基準3141母数の外で、基準全文366件/機械1/未確認2774を維持。snapshot行の終端記録、通知、実DB/Stripeの未確認境界はfindingsへ保存。次は全体検査の同sessionを確認して結果を記録し、Auth削除後の遅延updated/checkoutの分類を閉じる。
