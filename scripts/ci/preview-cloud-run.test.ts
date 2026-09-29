@@ -50,6 +50,28 @@ function fixture(overrides = {}) {
   );
   return { directory, destination: join(root, 'public'), request };
 }
+function writeStepReport(directory: string, steps: unknown) {
+  writeFileSync(
+    join(directory, 'evidence', 'e2e.json'),
+    JSON.stringify({
+      tests: [
+        {
+          file: 'critical-path.spec.ts',
+          project: 'chromium',
+          line: 1,
+          retry: 0,
+          status: 'failed',
+          expectedPassed: true,
+          steps,
+        },
+      ],
+    }),
+  );
+}
+function publishedSteps(result: ReturnType<typeof publishCloudEvidence>) {
+  const tests = result.tests as Array<{ steps: Array<Record<string, unknown>> }>;
+  return tests[0]!.steps;
+}
 afterEach(() => {
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
 });
@@ -116,6 +138,139 @@ describe('Cloud Preview evidence and cleanup', () => {
     const serialized = readFileSync(join(options.destination, 'preview.json'), 'utf8');
     expect(serialized).not.toContain('PRIVATE_');
     expect(result.tests).toHaveLength(1);
+  });
+  it('publishes diagnostic coordinates without candidate titles, errors or payloads', () => {
+    const options = fixture();
+    const categories = ['expect', 'pw:api', 'test.step', 'fixture', 'hook', 'other'];
+    writeStepReport(
+      options.directory,
+      categories.map((category, index) => ({
+        category,
+        file: 'mobile-critical-path.spec.ts',
+        line: 91 + index,
+        duration: 42.5,
+        failed: index === 0,
+        title: 'PRIVATE_TITLE',
+        errors: ['PRIVATE_ERROR'],
+        network: 'PRIVATE_NETWORK',
+        stdout: 'PRIVATE_STDOUT',
+        body: 'PRIVATE_BODY',
+        params: 'PRIVATE_PARAMS',
+        screenshot: 'PRIVATE_SCREENSHOT',
+        secret: 'PRIVATE_EXTRA',
+      })),
+    );
+    const result = publishCloudEvidence(options);
+    expect(publishedSteps(result)).toEqual(
+      categories.map((category, index) => ({
+        category,
+        file: 'mobile-critical-path.spec.ts',
+        line: 91 + index,
+        duration: 42.5,
+        failed: index === 0,
+      })),
+    );
+    expect(readFileSync(join(options.destination, 'preview.json'), 'utf8')).not.toContain(
+      'PRIVATE_',
+    );
+  });
+  it.each([undefined, null, {}, 'PRIVATE_STEPS'])(
+    'keeps older or malformed step lists private: %j',
+    (steps) => {
+      const options = fixture();
+      writeStepReport(options.directory, steps);
+      expect(publishedSteps(publishCloudEvidence(options))).toEqual([]);
+      expect(readFileSync(join(options.destination, 'preview.json'), 'utf8')).not.toContain(
+        'PRIVATE_',
+      );
+    },
+  );
+  it('normalizes malformed diagnostic fields and requires a strict failure boolean', () => {
+    const options = fixture();
+    writeStepReport(options.directory, [
+      null,
+      'PRIVATE_STEP',
+      {
+        category: 'PRIVATE_CATEGORY',
+        file: '/PRIVATE_PATH/critical-path.spec.ts',
+        line: -1,
+        duration: -1,
+        failed: 'PRIVATE_TRUE',
+      },
+      {
+        category: 'expect',
+        file: 'critical-path.spec.ts',
+        line: 0,
+        duration: 1_200_001,
+        failed: 1,
+      },
+      {
+        category: 'expect',
+        file: 'critical-path.spec.ts',
+        line: 1.5,
+        duration: null,
+        failed: false,
+      },
+      {
+        category: 'expect',
+        file: 'critical-path.spec.ts',
+        line: 1_000_001,
+        duration: 'PRIVATE_DURATION',
+        failed: {},
+      },
+      {
+        category: 'expect',
+        file: 'critical-path.spec.ts',
+        line: 1_000_000,
+        duration: 1_200_000,
+        failed: true,
+      },
+    ]);
+    expect(publishedSteps(publishCloudEvidence(options))).toEqual([
+      ...Array.from({ length: 3 }, () => ({
+        category: 'other',
+        file: null,
+        line: null,
+        duration: 0,
+        failed: false,
+      })),
+      ...Array.from({ length: 3 }, () => ({
+        category: 'expect',
+        file: 'critical-path.spec.ts',
+        line: null,
+        duration: 0,
+        failed: false,
+      })),
+      {
+        category: 'expect',
+        file: 'critical-path.spec.ts',
+        line: 1_000_000,
+        duration: 1_200_000,
+        failed: true,
+      },
+    ]);
+    expect(readFileSync(join(options.destination, 'preview.json'), 'utf8')).not.toContain(
+      'PRIVATE_',
+    );
+  });
+  it('bounds candidate diagnostic steps at 2000 reconstructed rows', () => {
+    const options = fixture();
+    writeStepReport(options.directory, [
+      ...Array.from({ length: 2000 }, () => ({
+        category: 'expect',
+        file: 'critical-path.spec.ts',
+        line: 91,
+        duration: 1,
+        failed: false,
+      })),
+      { title: 'PRIVATE_OVERFLOW', failed: true },
+    ]);
+    const result = publishCloudEvidence(options);
+    expect(publishedSteps(result)).toHaveLength(2000);
+    expect(publishedSteps(result).every((step) => step.failed === false)).toBe(true);
+    expect(readFileSync(join(options.destination, 'preview.json'), 'utf8')).not.toContain(
+      'PRIVATE_',
+    );
   });
   it('refuses a changed candidate binding before recovery and before artifact creation', async () => {
     const options = fixture({ before: { ...request, sha: 'b'.repeat(40) } });
