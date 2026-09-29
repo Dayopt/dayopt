@@ -3009,10 +3009,12 @@
       "mode": "100644",
       "bytes": 6779,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 161]],
+      "evidence": [
+        "Full text read at b0e8afa5c; baseline bytes verified unchanged. Cache owner resolution, persistence, auth boundary, logout call sites and tests cross-checked; async principal change and returned Auth error hypotheses require reproduction. No cloud calls."
+      ],
       "questions": []
     },
     {
@@ -3035,10 +3037,12 @@
       "mode": "100644",
       "bytes": 2273,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 49]],
+      "evidence": [
+        "Full text read at b0e8afa5c; baseline bytes verified unchanged. Cache owner resolution, persistence, auth boundary, logout call sites and tests cross-checked; async principal change and returned Auth error hypotheses require reproduction. No cloud calls."
+      ],
       "questions": []
     },
     {
@@ -7350,10 +7354,12 @@
       "mode": "100644",
       "bytes": 3665,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 102]],
+      "evidence": [
+        "Full text read at b0e8afa5c; baseline bytes verified unchanged. Cache owner resolution, persistence, auth boundary, logout call sites and tests cross-checked; async principal change and returned Auth error hypotheses require reproduction. No cloud calls."
+      ],
       "questions": []
     },
     {
@@ -7363,10 +7369,12 @@
       "mode": "100644",
       "bytes": 4096,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 90]],
+      "evidence": [
+        "Full text read at b0e8afa5c; baseline bytes verified unchanged. Cache owner resolution, persistence, auth boundary, logout call sites and tests cross-checked; async principal change and returned Auth error hypotheses require reproduction. No cloud calls."
+      ],
       "questions": []
     },
     {
@@ -13500,10 +13508,12 @@
       "mode": "100644",
       "bytes": 8626,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 226]],
+      "evidence": [
+        "Full text read at b0e8afa5c; baseline bytes verified unchanged. Cache owner resolution, persistence, auth boundary, logout call sites and tests cross-checked; async principal change and returned Auth error hypotheses require reproduction. No cloud calls."
+      ],
       "questions": []
     },
     {
@@ -18295,10 +18305,12 @@
       "mode": "100644",
       "bytes": 3127,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 118]],
+      "evidence": [
+        "Full text read at b0e8afa5c; baseline bytes verified unchanged. Cache owner resolution, persistence, auth boundary, logout call sites and tests cross-checked; async principal change and returned Auth error hypotheses require reproduction. No cloud calls."
+      ],
       "questions": []
     },
     {
@@ -18308,10 +18320,12 @@
       "mode": "100644",
       "bytes": 1897,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 52]],
+      "evidence": [
+        "Full text read at b0e8afa5c; baseline bytes verified unchanged. Cache owner resolution, persistence, auth boundary, logout call sites and tests cross-checked; async principal change and returned Auth error hypotheses require reproduction. No cloud calls."
+      ],
       "questions": []
     },
     {
@@ -20032,10 +20046,12 @@
       "mode": "100644",
       "bytes": 1781,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 47]],
+      "evidence": [
+        "Full text read at b0e8afa5c; baseline bytes verified unchanged. Cache owner resolution, persistence, auth boundary, logout call sites and tests cross-checked; async principal change and returned Auth error hypotheses require reproduction. No cloud calls."
+      ],
       "questions": []
     },
     {
@@ -20071,10 +20087,12 @@
       "mode": "100644",
       "bytes": 7502,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 208]],
+      "evidence": [
+        "Full text read at b0e8afa5c; baseline bytes verified unchanged. Cache owner resolution, persistence, auth boundary, logout call sites and tests cross-checked; async principal change and returned Auth error hypotheses require reproduction. No cloud calls."
+      ],
       "questions": []
     },
     {
@@ -20084,10 +20102,12 @@
       "mode": "100644",
       "bytes": 11642,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 293]],
+      "evidence": [
+        "Full text read at b0e8afa5c; baseline bytes verified unchanged. Cache owner resolution, persistence, auth boundary, logout call sites and tests cross-checked; async principal change and returned Auth error hypotheses require reproduction. No cloud calls."
+      ],
       "questions": []
     },
     {

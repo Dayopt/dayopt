@@ -130,3 +130,5 @@ main `21770b13da1ff26c8982cdf041aa2a4d55025a3f` の18pathを確認。非JSON差�
 統合製品SHA `fd815fa1d1a0baca98673267c163eebf428915aa` でNode24の`pnpm check` exit 0。billing37/i18n2/observability64/product4364/web366/scripts2642、合計7475 passed。ログ `/tmp/dayopt-audit-check-main-21770.log`。product検査終了後、scripts実行中にF022のtest assertionだけを編集したため、この全体成功は編集前testの証拠として扱う。F022は別途red2/green関連24を取得し`83c6d3c99`へcommit。以降のpre-pushはこの修正を含む。
 
 auth spec・env宣言・session store/hook/UI・周辺domain/schema/testを追加で全文読解。基準の全文確認は245件。F022は検査の誤合格を修正、H023の古いhelperと現行session監視の責務差は引き続き確認する。cache所有者のfallbackとlogout時の破棄を次の横断経路として追跡中。mainへのmerge・配信・実DB検証はない。
+
+cache所有者・persister・Provider構成・logout hook/設定画面とtestの10ファイルを追加全文確認し、基準全文確認255件まで進んだ。H024はSDK 2.116.0の現在のソースへ戻り、通常network失敗でもlocal sessionを削除してからerrorを返す反証を確認。古いSDKの前提で「ログインが残る」と断定せず、通知とglobal revokeを分けて次に検証する。H025は認証主体変更がcacheの非同期復元中に入る場合を未再現候補として記録。

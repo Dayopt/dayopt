@@ -187,3 +187,17 @@ last_verified: 2026-09-29
 - 状態: 読解候補。採否未確定。
 - 根拠: session-config.tsのvalidateSessionはremainingTimeでexpiresAt-nowのmsとidle/absoluteの秒を混在させ、token-expiry.test.tsもmsを期待する。一方、repo横断参照検索ではhelper呼び出しはtestのみ。実際のuseSessionMonitorはSESSION_CONFIGとSESSION_SECURITYだけを使う。
 - 次: dynamic import・公開参照・残すべき契約を確認し、未使用責務の撤去か単位訂正を決める。現時点では本番のセッション期限検証漏れとは扱わず、実経路とtest用の古いhelperを区別する。
+
+## H024 — ログアウトの返り値errorと例外の非対称
+
+- 状態: コード上の候補、再現前。
+- 根拠: useLogoutとAccountSettingsはobserveAuthOperationをawaitするが、戻り値のerrorを読まず成功toast/遷移へ進む。observeAuthOperationは返り値errorを記録して返す契約で、throwへ変換しない。既存useLogout.test.tsの失敗はrejectだけ。session-monitorもstoreの返り値errorを未検査だが、その既存契約はエラー時も遷移なので同じ修正を機械的に適用しない。
+- 次: SDKのsignOut失敗時のローカルsession保持をソースと合成実行で確認し、通常logoutの返り値errorを再現。AccountDeletionDialogはAuth削除完了後のbest-effort cleanupであり同じ原因に数えない。設定画面と共通hookは両方を閉じる。まだ修正/本番観測とは報告しない。
+
+## H025 — 非同期cache復元と認証主体変更
+
+- 状態: 読解候補、未再現。
+- 根拠: persisterはresolveUserId後に複数awaitを跨いでrestore/persistし、QueryCacheAuthBoundaryのclearは別effect。開始時と完了時の主体が一致するか、logout/別user loginが途中に入る場合を確認する。既存testは順次完了したA→Bのみ。
+- 次: Providerのmount境界、TanStack復元中のhydration・subscribe開始、SDKのauth event順序を確認し、実際に前userのcacheが復元/保存される操作列を再現する。可能性だけで情報漏えいと断定しない。
+
+H024の反証追記: installed `@supabase/auth-js@2.116.0` のGoTrueClient.ts 4045–4138を確認。通常signOutのadmin失敗はerrorを返す前に_current sessionを削除する実装へ変わっている（scope=others以外）。したがって「戻り値errorを無視すると必ずローカルログインが残る」は成立しない。早いsessionError分岐は別であり、実際の通知/遷移とglobal revokeの保証を分けて検証する。戻り値errorで一律に遷移を止める修正も、既にローカルlogout済みの利用者を画面に残すため未採用。
