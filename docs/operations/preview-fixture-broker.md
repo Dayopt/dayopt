@@ -61,6 +61,10 @@ file は600、親directoryは700、16KiB以内とし、file symlinkを拒否す�
 
 [private writer](../../scripts/lib/preview-fixture-registry.mjs) は認証済み応答の受信・復号後に使う保存処理。provisionの公開intentと応答のrun/予定2UUID/固定fieldを照合し、既存fileを上書きせず、新しい700directoryへ600fileを作る。browser outputと公開evidenceの配下は、symlinkの実体を含めて拒否する。実際のconsumer readerで読めることをローカルの実fileで検証している。この処理自体は応答の送信者認証やjob間転送を行わず、現在のrunnerにも未接続。保存先をartifactへ渡さず、worker終了時の削除をcallerが担当する。
 
+[暗号化コア](../../scripts/lib/preview-fixture-envelope.mjs) は一時RSA公開鍵でAES鍵を包み、login payloadをAES-GCMで暗号化する。公開intent・実行attempt・対象Preview/DB・受信者公開鍵へのbindingを検査する。暗号化は送信者認証ではないため、GitHub artifactの元run・trusted job・digestを確認する経路は別途必要。秘密鍵と復号済みloginはworker内だけに置き、artifactへ渡さない。現時点ではcryptoとprivate writerのローカル検証に限り、GitHub job間転送は未接続。
+
+job分離時はconsumerとprovisionをtrusted preflight後に並列起動し、consumerがcandidate checkout前に公開鍵を発行して暗号化応答を待つ。cleanupは両jobの終了後に実行する。現在のrecovery verifierは旧E2E execute stepの開始を要求するため、新構成を接続する際はprovision開始後の失敗・cancel・timeoutも公開intentに結び付けて認証する必要がある。E2Eが未開始でもfixtureが存在する可能性があり、旧判定のまま接続してはならない。
+
 consumer時はspecごとのadmin生成・seed・削除を行わず、同じ2ユーザーを通常loginで使う。Preview configで **desktop6件 → mobile5件 → A/B認可1件** のproject依存を明示し、認可テストのRecordが先にReport集計へ混ざらないようにする。先行失敗時の後続skipは成功にしない。全project後の回収は別のtrusted jobが担当し、worker喪失時も予定intentから回収できる必要がある。legacyモードのspec別作成/削除は維持する。
 
 `previewWorkerEnvironment` は信頼済み caller が registry path を明示した場合だけ、検証済み readiness の ephemeral binding・immutable origin・run・予定2UUIDを確認し、管理キーを含まないenvを組み立てる。親envのregistry指定は無視する。GitHub token、provider PAT、OIDC発行変数、NODE_OPTIONSは引き継がず、Preview到達用bypassと通常loginのprivate file pathだけを既存allowlistへ加える。file内容の検証はconsumer readerが行う。現在のrunner呼び出しは追加引数を渡さず、従来動作を維持する。同一jobでenvを絞るだけでは、悪意あるcandidateから親プロセス・filesystemへのアクセスを隔離できないため、trusted/candidateのjob分離を省略してはならない。
@@ -88,4 +92,4 @@ source と workflow は Git で復元できる。実証時の mutation は選択
 - 元 worker / journal が失われても別 job が予定 2 UUID だけを回収し、foreign user と baseline が保持されること。
 - 次の PR / branch 再作成でも手動の secret 保存が不要であること。
 
-根拠: [GitHub OIDC](https://docs.github.com/en/actions/reference/security/oidc)、[Supabase branching integrations](https://supabase.com/docs/guides/deployment/branching/integrations)、既存の intent / trust / owned cleanup source。
+根拠: [GitHub OIDC](https://docs.github.com/en/actions/reference/security/oidc)、[Supabase branching integrations](https://supabase.com/docs/guides/deployment/branching/integrations)、[Node 24 crypto](https://nodejs.org/docs/latest-v24.x/api/crypto.html)、既存の intent / trust / owned cleanup source。

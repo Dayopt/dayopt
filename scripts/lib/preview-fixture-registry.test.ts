@@ -12,6 +12,11 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { loadPreviewFixtureRegistry } from '../../apps/product/src/lib/test/preview-fixture-registry';
+import {
+  decryptPreviewFixtureEnvelope,
+  encryptPreviewFixtureEnvelope,
+  generatePreviewFixtureKeyPair,
+} from './preview-fixture-envelope.mjs';
 import { writeFixtureRegistry } from './preview-fixture-registry.mjs';
 
 const input = {
@@ -73,6 +78,26 @@ function fixture() {
 }
 
 describe('private fixture registry materialization', () => {
+  it('materializes the decrypted broker payload without exposing login in the transferable envelope', () => {
+    const args = fixture();
+    const { publicKey, privateKey } = generatePreviewFixtureKeyPair();
+    const envelope = encryptPreviewFixtureEnvelope({
+      input: args.input,
+      publicKey,
+      payload: args.response,
+    });
+    const serialized = JSON.stringify(envelope);
+    expect(serialized).not.toContain(args.response.users.desktop.password);
+    expect(serialized).not.toContain(args.response.users.mobile.email);
+    expect(serialized).not.toContain(privateKey);
+    const response = decryptPreviewFixtureEnvelope({
+      input: args.input,
+      privateKey,
+      envelope: JSON.parse(serialized),
+    });
+    const result = writeFixtureRegistry({ ...args, response });
+    expect(JSON.parse(readFileSync(result.path, 'utf8')).users).toEqual(args.response.users);
+  });
   it('writes a private file accepted by the actual candidate reader outside browser outputs', () => {
     const args = fixture();
     const result = writeFixtureRegistry(args);
