@@ -4082,10 +4082,12 @@
       "mode": "100644",
       "bytes": 10820,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 235]],
+      "evidence": [
+        "Full text read at 7f4859326; baseline unchanged before F033. Calendar deletion fence read in contiguous chunks 1-2257. Compared service dispatch/finalization with DB source-consumption, terminal receipt and cron normalization; #2055 final plan confirms cron does not call provider. DB execution/live activation remain unverified."
+      ],
       "questions": []
     },
     {
@@ -4095,10 +4097,12 @@
       "mode": "100644",
       "bytes": 10785,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 259]],
+      "evidence": [
+        "Full text read at 7f4859326. Route uses mock dispatcher; dispatcher uses synthetic RPC results. These establish local wiring/classification, not actual SQL transactions or provider results. Deadline formula test is not measured cloud duration."
+      ],
       "questions": []
     },
     {
@@ -4108,10 +4112,12 @@
       "mode": "100644",
       "bytes": 4961,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 112]],
+      "evidence": [
+        "Full text read at 7f4859326; baseline unchanged before F033. Calendar deletion fence read in contiguous chunks 1-2257. Compared service dispatch/finalization with DB source-consumption, terminal receipt and cron normalization; #2055 final plan confirms cron does not call provider. DB execution/live activation remain unverified."
+      ],
       "questions": []
     },
     {
@@ -4121,10 +4127,12 @@
       "mode": "100644",
       "bytes": 14184,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 313]],
+      "evidence": [
+        "Full text read at 7f4859326. Route uses mock dispatcher; dispatcher uses synthetic RPC results. These establish local wiring/classification, not actual SQL transactions or provider results. Deadline formula test is not measured cloud duration."
+      ],
       "questions": []
     },
     {
@@ -29639,7 +29647,8 @@
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
       "read_ranges": [[1, 37]],
       "evidence": [
-        "Complete untruncated primary-agent read; report state, display, test and canonical input contracts compared. No UI behavior changed in this reading batch; outstanding hypotheses in findings.md."
+        "Complete untruncated primary-agent read; report state, display, test and canonical input contracts compared. No UI behavior changed in this reading batch; outstanding hypotheses in findings.md.",
+        "Full text read at 7f4859326; baseline unchanged before F033. Calendar deletion fence read in contiguous chunks 1-2257. Compared service dispatch/finalization with DB source-consumption, terminal receipt and cron normalization; #2055 final plan confirms cron does not call provider. DB execution/live activation remain unverified."
       ],
       "questions": []
     },
@@ -38409,10 +38418,12 @@
       "mode": "100644",
       "bytes": 69162,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 2257]],
+      "evidence": [
+        "Full text read at 7f4859326; baseline unchanged before F033. Calendar deletion fence read in contiguous chunks 1-2257. Compared service dispatch/finalization with DB source-consumption, terminal receipt and cron normalization; #2055 final plan confirms cron does not call provider. DB execution/live activation remain unverified."
+      ],
       "questions": []
     },
     {

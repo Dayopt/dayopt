@@ -292,3 +292,10 @@ H024の反証追記: installed `@supabase/auth-js@2.116.0` のGoTrueClient.ts 40
 - 根拠/再現: navigator.clipboard.writeTextのPromiseを待たずにcopied状態・成功通知を更新。遅延Promiseの完了前通知とNotAllowedError時の失敗通知欠落を操作で再現、修正前2 failed/3 passed。拒否理由や実際のclipboard内容は記録しない。
 - 修正: 書き込み成功後だけ成功状態を設定し、拒否/同期例外は既存common.toast.copyFailedで通知。再試行可能。接続URLの組み立て、利用権判定、コピー操作数は不変。汎用clipboard抽象化は追加しない。
 - 検証: 遅延完了・拒否→再試行を含む関連3 files/9 passed。ログ `/tmp/dayopt-audit-copy-{red,green}.log`。Clipboard APIは合成であり、実ブラウザ権限/OS clipboardの観測ではない。統合checkはMissionへ別記録。
+
+## F033 — Calendar削除のsettle cronをprovider revoke担当と説明している
+
+- 状態: 仕様文書を訂正。Mission #2963、元実装判断#2055。runtime変更なし。
+- 根拠: external-calendar specは接続削除・revokeを独立cronが担うと記載。全文確認したroute/dispatcherはlist_expired→normalize RPCだけを呼ぶ。2257行のcalendar_account_deletion_fence migrationとサービスを照合し、実provider呼出しはアカウント削除リクエスト内のdispatch、cronは期限切れintentと未確定receiptの整理であることを確認。
+- 裁定/反証: #2055本文と確定plan・変更記録（issuecomment-5321803048）は1 RPC=1 transactionで期限切れintentをnormalizeする方針。途中のmaintenance同居案は撤回されており最終方針へ照合。現行コードを理由に契約を変更したのではない。confirmed/unconfirmed/not_attemptedを一律の「Google失効成功」へ変えず、再送しない既存設計を保つ。
+- 検証: docs:check exit 0（`/tmp/dayopt-audit-calendar-docs-check.log`）。DB実行・Google失効・実クラウドcron成功の証拠ではない。migrationは直接編集しない。ctx2055はL1 missing/staleのため本文・コメントと一次コードを使用。

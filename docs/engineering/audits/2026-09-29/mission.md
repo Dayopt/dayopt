@@ -180,3 +180,9 @@ H031を4種類の削除で再現しF031へ採用。通知callbackだけの合格
 固定製品SHA `ef0f9e57258ecd8eb7e03d2545aee9d4f3fcd3d5`のNode24 `pnpm check` exit 0。型10 tasks・lint9 tasks・static、billing37/i18n2/observability64/product4372/web366/scripts2642、計7483 passed。ログ `/tmp/dayopt-audit-check-actions.log`。docs:checkもexit 0（`/tmp/dayopt-audit-actions-docs-check.log`）。検査中の変更は監査記録のみ。coordinator.test.tsも全文確認し基準327件、機械確認1、未確認2813。新規main pathはdelta管理を維持。実DB・E2E・配信の成功とは扱わない。
 
 公開head `39a717490368c89e67c5b2bc415a9e8bcb3cdbce`をDraft #2965へpushし、APIでOPEN/isDraft=true/headを確認。通常pre-push成功、ログ `/tmp/dayopt-audit-actions-push-verified.log`。Issue記録 https://github.com/Dayopt/dayopt/issues/2963#issuecomment-5888985846 。公開後にlifecycle marker、PostHog削除とtest、selector test、Calendar削除adapterを全文確認し、ローカル台帳332件へ更新。PostHogは削除要求の受理を検査する実装で、完了観測の証拠ではない。Calendarのterminal結果にはrevoked以外のguard/expiryがあり、単純な成功/失敗へ統合しない。次はDBの後続定義とその設計判断へ戻って、これらを削除前提として扱う意味を照合する。今回の全文読解前の記録を再読からやり直す必要はない。クラウド取得不能は未確認として維持し、独立したrepo読解を続ける。
+
+## Calendar削除のDB receiptとcron責務
+
+前回turnはF031/F032の修正・検証・公開と332件までの全文読解を完了したprogress。今回clean HEAD `7f48593260287aa63475447d031956b0d8cd980b`から継続。Calendar deletion fence migration2257行を省略せず分割読解し、service→dispatch記録→source ciphertext消費→finalize→seal→期限切れnormalizeを照合。後続migrationのCREATE FUNCTION名も機械検索した範囲では、このファイルのfunction名の再定義はない（依存helper変更・動的DDLまでは未確認）。cron route/dispatcher/specも全文確認。#2055はctxと本文・5コメントを取得、初回出力の切詰め箇所を再取得し最終planへ照合。F033でcronのprovider revoke担当という説明を訂正。実provider失効を全件保証するような挙動変更はしない。ロック待ちと期限評価、NULLを含むterminal条件、DB helperの現行定義は未再現候補として次に追う。確認前の不具合断定はしない。
+
+F033はdocs:check exit 0（`/tmp/dayopt-audit-calendar-docs-check.log`）。製品コードは前回検証済み`ef0f9e572`から変更なしで、同一全体テストを繰り返していない。routeとdispatcherのtestも全文読解。RPC分割のmockは実DB transactionの証明ではなく、時間予算の定数比較も実クラウド所要時間の測定ではない。基準全文337件、機械確認1、未確認2803。次はCalendar削除のdeadline開始後のprovider dispatchとDB terminal条件の到達性、既存integration testの範囲を照合する。F033は文書変更のみでcommitし、次のDraft更新時に公開する。

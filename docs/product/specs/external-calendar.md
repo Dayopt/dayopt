@@ -22,7 +22,7 @@ Google カレンダーの予定を読み取り専用でミラーし、Calendar �
 - 接続の再認証が必要な状態（`reauth_required`）になった接続は、同期を止め、ghost の表示対象からも除外する（stale なミラーを見せ続けない）
 - カレンダーの選択を解除すると、そのカレンダー由来で未変換の ghost は即時に取り込み対象から外れる。既に Plan / Record に変換済みの予定は影響を受けない
 - 接続を切断すると、未参照のミラー行を削除してから provider 側の許可を取り消し、最後に接続情報を削除する。解約済みユーザーでも接続状態の閲覧と切断は常に行える（読み取り 4 procedure と切断は `protectedProcedure`、ghost 表示・書き込み・オンデマンド操作は `entitledProcedure(entitlementKeys.externalCalendarSync)`）
-- アカウント削除が進行中の間は、Calendar 接続の削除・revoke を独立 cron（`/api/cron/calendar-account-deletion-settle`）が担う。アカウント削除全体のフローの一段として "pending" 状態から確定（settle）させ、通常の接続操作（sync / 切断）とは別経路で処理する
+- アカウント削除では、削除リクエスト内の専用経路が Calendar の接続・保持中トークンを処理し、Google への失効要求とその結果を記録する。独立 cron（`/api/cron/calendar-account-deletion-settle`）は、期限切れでも準備中のまま残った削除 intent を整理する。Google への失効要求を再送せず、送信開始済みで結果不明の処理を `unconfirmed` として確定する。通常の sync / 切断とは別経路で、cron の完了は Google 側での失効確認を意味しない（#2055）
 - OAuth 認可コード交換が完了した後（Google 側の grant は既に発行済み）に Dayopt 側の接続保存が失敗すると、孤立した Google grant が残る。scope 不足・reconnect 対象不一致・アカウント不一致・保存失敗（DB 障害含む）のいずれでも、best-effort で revoke を試みて孤立 grant を残さない（#2072, #2156）
 
 ## Stateの正本
