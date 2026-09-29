@@ -24,8 +24,21 @@ describe('Cloud Preview credential wiring', () => {
     const execute = cloud.indexOf('- id: execute');
     expect(gate).toBeLessThan(execute);
     expect(cloud.slice(0, execute)).not.toMatch(
-      /secrets\.(PREVIEW_E2E_VERCEL_TOKEN|PREVIEW_E2E_SUPABASE_KEY|PREVIEW_E2E_BYPASS_SECRET|PREVIEW_E2E_SUPABASE_READINESS_TOKEN)/,
+      /secrets\.(PREVIEW_E2E_SUPABASE_KEY|PREVIEW_E2E_BYPASS_SECRET|PREVIEW_E2E_SUPABASE_READINESS_TOKEN)/,
     );
+  });
+  it('uses a short-lived GitHub read token for provider provenance without a Vercel PAT', () => {
+    const worker = cloud.slice(
+      cloud.indexOf('\n  preview-e2e:'),
+      cloud.indexOf('\n  preview-recovery-trust:'),
+    );
+    expect(worker).toContain('deployments: read');
+    expect(worker).toContain('statuses: read');
+    expect(worker.slice(worker.indexOf('- id: execute'))).toContain(
+      'GITHUB_TOKEN: ${{ github.token }}',
+    );
+    expect(cloud).not.toContain('PREVIEW_E2E_VERCEL_TOKEN');
+    expect(cloud).not.toMatch(/\bVERCEL_TOKEN:/);
   });
   it('runs trusted supervisor scripts rather than candidate runner code and publishes one sanitized JSON', () => {
     expect(cloud).toContain('ref: ${{ needs.preview-trust.outputs.sha }}');
