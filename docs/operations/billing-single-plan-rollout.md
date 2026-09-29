@@ -8,17 +8,25 @@ code: apps/product/src/lib/billing/access-service.ts
 
 45日体験と月 $5 の提供を開始するための手順。実装のマージは本番有効化の許可ではない。本番移行・通知送信・実課金は明示指示、独立レビュー、復元証跡が揃ってから実施する。#2610 / #2605 / #2629 / #2615。
 
+## 実行環境と前後の依存
+
+Stripe test mode の実走と証拠は [#2867](https://github.com/Dayopt/dayopt/issues/2867)、その完了を受けた本番有効化は [#2869](https://github.com/Dayopt/dayopt/issues/2869) が要求の正本。テスト完了を本番有効化・実課金の許可に読み替えない。
+
+環境は [Cloud-first 方針](../engineering/infra.md#環境構成)と [#2910](https://github.com/Dayopt/dayopt/issues/2910) を参照し、#2867 の本文・後続の合意から今回使う project / DB branch / SHA を特定する。古い local Supabase 前提や次の localhost 例だけで環境を選ばない。必要環境が未準備なら依存する実走を保留し、別環境の mock / SQL / 過去の Stripe object を今回の Checkout / Webhook の証拠として代用しない。環境の準備状況と停止・再開判断は各 Issue に置く。
+
 ## 事前検証
 
 - Stripe test mode の月額 USD 500 cents の Price を確認する。既存の Price ID 設定を使い、新しい Price は自動作成しない。初期提供はカード決済のみ。非同期決済を追加する場合は入金前のactive状態を利用権と分離する設計を先に行う。
 - Stripe CLI の保存済みアカウントを暗黙に使わない。`.op-env.agent` のtest keyを `STRIPE_API_KEY` としてCLIへ渡し、`STRIPE_ACCOUNT_ID` と同じsandboxへlistenerを固定する。listenerが表示する署名secretは1Passwordの`stripe-test/STRIPE_WEBHOOK_SECRET`へ保存してからProductを再起動し、値をshell履歴・ログ・issueへ残さない。
+
+  次はローカル検証を選んだ場合の listener 例。クラウドでは対象環境の endpoint と署名設定を照合する。
 
   ```bash
   op run --env-file=.op-env.agent -- bash -c \
     'export STRIPE_API_KEY="$STRIPE_SECRET_KEY"; stripe listen --forward-to http://localhost:3000/api/webhooks/stripe'
   ```
 
-  `stripe trigger`のfixtureはアプリ利用者と結び付かない。状態遷移の合否は実際のtest Customer / Subscription / Invoiceとlocal profileを対応させて判定する。
+  `stripe trigger`のfixtureはアプリ利用者と結び付かない。状態遷移の合否は実際のtest Customer / Subscription / Invoiceと検証環境の profile を対応させて判定する。
 
 - Preview と隔離DBに追加migrationを適用する。既存Stripe trialはそのまま維持する。体験開始は認証済みアプリ表示のみで確認し、LP・登録・MCP・同期から開始しないことを確認する。
 - Checkoutの成功・中断・初回失敗、更新の再試行・回収不能・解約予約・再契約をテストする。成功画面ではなく署名検証済みWebhookとprofilesの確定を確認する。
