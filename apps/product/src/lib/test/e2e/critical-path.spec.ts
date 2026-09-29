@@ -72,6 +72,69 @@ async function dragSelect(page: Page, hourFrom: number, hourTo: number) {
   await page.mouse.up();
 }
 
+/** 自前ユーザーの作成済みカードだけを編集・削除し、各書き込み後の永続状態を確認する。 */
+async function updateAndDeleteOwnedCard(page: Page, kind: 'plan' | 'record') {
+  const date = offsetDateParam(kind === 'plan' ? 1 : -1);
+  await openDay(page, date);
+  const cards = page.locator(`[data-${kind}-lane-card][data-timeblock-id]`, {
+    hasText: IDENTITY.activityName,
+  });
+  // serial suite が作成した同じ日・同じ種別の 1 件だけを対象にする。
+  await expect(cards).toHaveCount(1);
+  const id = await cards.getAttribute('data-timeblock-id');
+  expect(id).toMatch(/^[0-9a-f-]{36}$/i);
+  const card = page.locator(`[data-${kind}-lane-card][data-timeblock-id="${id}"]`);
+  const inspector = page.getByRole('region', { name: IDENTITY.activityName, exact: true });
+  const note = `${kind} updated ${IDENTITY.activityName}`;
+
+  async function awaitCommand(action: 'update' | 'delete', interact: () => Promise<void>) {
+    const procedure = `${kind}Commands.${action}`;
+    const saved = page.waitForResponse(
+      (response) => {
+        const path = new URL(response.url()).pathname;
+        return (
+          response.request().method() === 'POST' &&
+          path.startsWith('/api/trpc/') &&
+          decodeURIComponent(path.slice('/api/trpc/'.length)).split(',').includes(procedure)
+        );
+      },
+      { timeout: 15_000 },
+    );
+    const [response] = await Promise.all([saved, Promise.resolve().then(interact)]);
+    expect(response.status(), `${procedure} の保存応答`).toBe(200);
+  }
+
+  await card.click();
+  await expect(inspector).toBeVisible();
+  await inspector.getByRole('button', { name: 'メモ', exact: true }).click();
+  const noteInput = inspector.getByRole('textbox', { name: 'メモ', exact: true });
+  await awaitCommand('update', async () => {
+    await noteInput.fill(note);
+    await noteInput.blur();
+  });
+
+  await page.reload();
+  await expect(page.locator('[data-calendar-grid]').first()).toBeVisible({ timeout: 10_000 });
+  await expect(card).toBeVisible();
+  // reload 後に Inspector が復元された場合も、一度閉じて同じ ID のカードを開く。
+  if (await inspector.isVisible()) {
+    await inspector.getByRole('button', { name: '閉じる', exact: true }).click();
+  }
+  await card.click();
+  await expect(inspector).toBeVisible();
+  await expect(inspector.getByRole('button', { name: 'メモ', exact: true })).toHaveText(note);
+
+  await inspector.getByRole('button', { name: 'その他の操作', exact: true }).click();
+  await awaitCommand('delete', () =>
+    page.getByRole('menuitem', { name: '削除', exact: true }).click(),
+  );
+  await expect(card).toHaveCount(0);
+  await page.reload();
+  await expect(page.locator('[data-calendar-grid]').first()).toBeVisible({ timeout: 10_000 });
+  await expect(card).toHaveCount(0);
+  await expect(cards).toHaveCount(0);
+}
+
 describeWithEnv('Critical Path: 計画 → 実績 → 振り返り', () => {
   test.describe.configure({ mode: 'serial' });
   test.use({ timezoneId: TIMEZONE });
@@ -184,5 +247,16 @@ describeWithEnv('Critical Path: 計画 → 実績 → 振り返り', () => {
     await page.goto(`/ja/report?date=${offsetDateParam(-1)}&range=week`);
 
     await expectReportAllocationShowsOneHour(page, IDENTITY.activityName);
+  });
+  // 更新・削除は Report の検証後。作成済みの自前データだけを消す。
+  test.describe('UI で更新・削除', () => {
+    // login + 編集前/保存後/削除後の読み直しを含む往復の予算。
+    test.use({ trpcProcedureBudget: 40 });
+    for (const kind of ['plan', 'record'] as const) {
+      test(`作成済み ${kind} のメモを更新して保存を確認し、UI で削除する`, async ({ page }) => {
+        test.setTimeout(60_000);
+        await updateAndDeleteOwnedCard(page, kind);
+      });
+    }
   });
 });
