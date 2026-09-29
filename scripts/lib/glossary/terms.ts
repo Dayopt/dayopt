@@ -506,38 +506,6 @@ export const GLOSSARY: readonly GlossaryEntry[] = [
     usage: 'タブ。それが良い使い方だったかを見る面。中身は質の面。ja はページ名（Review）と同じ語',
     code: { identifiers: ['ReportTabs'] },
   },
-  {
-    id: 'report-chapter-allocation',
-    layer: 'ui',
-    status: 'deprecated',
-    concept: 'Allocation (chapter 1)',
-    ja: '配分',
-    en: 'Allocation',
-    usage:
-      '旧1章。2026-09-15 に目的別3タブへ再編。現在の配分は記録時間を分母とする。正本: docs/product/specs/review.md',
-    code: { identifiers: ['AllocationChapter'] },
-  },
-  {
-    id: 'report-chapter-execution',
-    layer: 'ui',
-    status: 'deprecated',
-    concept: 'Execution (chapter 2)',
-    ja: '執行',
-    en: 'Execution',
-    usage: '旧2章。現在は「差分」タブで予定と記録を見る。正本: docs/product/specs/review.md',
-    code: { identifiers: ['ExecutionChapter'] },
-  },
-  {
-    id: 'report-chapter-quality',
-    layer: 'ui',
-    status: 'deprecated',
-    concept: 'Quality (chapter 3)',
-    ja: '質',
-    en: 'Quality',
-    usage:
-      '旧3章。現在は「振り返り」タブで投下時間と充実を見る。正本: docs/product/specs/review.md',
-    code: { identifiers: ['QualityChapter'] },
-  },
 
   // ─── 設計語（UI 文言には出さない） ───
   {
@@ -576,16 +544,6 @@ export const GLOSSARY: readonly GlossaryEntry[] = [
         reason: '余白に良し悪しの評価を持ち込まない',
       },
     ],
-  },
-  {
-    id: 'ledger-bar',
-    layer: 'design',
-    status: 'deprecated',
-    concept: 'Ledger bar',
-    ja: '決算バー',
-    en: 'Ledger bar',
-    usage:
-      '旧: 週168hの決算バー。2026-09-15 に撤去し、記録時間を分母とする配分の横棒へ。余白は塗らない。正本: docs/product/specs/review.md',
   },
   {
     id: 'mirror',
