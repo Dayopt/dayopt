@@ -4883,10 +4883,12 @@
       "mode": "100644",
       "bytes": 5266,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 124]],
+      "evidence": [
+        "Full text read at 39a717490; baseline unchanged. Lifecycle markers and activation separate; PostHog queues deletion rather than observing completion; calendar terminal revoke guards/deadlines need current DB and provider-contract reconciliation. No external requests executed."
+      ],
       "questions": []
     },
     {
@@ -12017,10 +12019,12 @@
       "mode": "100644",
       "bytes": 20073,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 637]],
+      "evidence": [
+        "Full text read at 39a717490; baseline unchanged. Lifecycle markers and activation separate; PostHog queues deletion rather than observing completion; calendar terminal revoke guards/deadlines need current DB and provider-contract reconciliation. No external requests executed."
+      ],
       "questions": []
     },
     {
@@ -17248,10 +17252,12 @@
       "mode": "100644",
       "bytes": 2861,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 76]],
+      "evidence": [
+        "Full text read at 39a717490; baseline unchanged. Lifecycle markers and activation separate; PostHog queues deletion rather than observing completion; calendar terminal revoke guards/deadlines need current DB and provider-contract reconciliation. No external requests executed."
+      ],
       "questions": []
     },
     {
@@ -17261,10 +17267,12 @@
       "mode": "100644",
       "bytes": 1685,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 46]],
+      "evidence": [
+        "Full text read at 39a717490; baseline unchanged. Lifecycle markers and activation separate; PostHog queues deletion rather than observing completion; calendar terminal revoke guards/deadlines need current DB and provider-contract reconciliation. No external requests executed."
+      ],
       "questions": []
     },
     {
@@ -17938,10 +17946,12 @@
       "mode": "100644",
       "bytes": 3600,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 89]],
+      "evidence": [
+        "Full text read at 39a717490; baseline unchanged. Lifecycle markers and activation separate; PostHog queues deletion rather than observing completion; calendar terminal revoke guards/deadlines need current DB and provider-contract reconciliation. No external requests executed."
+      ],
       "questions": []
     },
     {
