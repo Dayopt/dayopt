@@ -2362,7 +2362,7 @@ graph LR
 </details>
 
 <details>
-<summary>test の候補（60）</summary>
+<summary>test の候補（61）</summary>
 
 <!-- prettier-ignore -->
 | ファイル | 対応の根拠 |
@@ -2386,6 +2386,7 @@ graph LR
 | [apps/product/src/features/settings/hooks/useDateFormat.test.ts](<../../../apps/product/src/features/settings/hooks/useDateFormat.test.ts>) | feature: settings |
 | [apps/product/src/features/settings/hooks/useMFA.test.ts](<../../../apps/product/src/features/settings/hooks/useMFA.test.ts>) | feature: settings |
 | [apps/product/src/features/settings/hooks/useStableBillingOperation.test.ts](<../../../apps/product/src/features/settings/hooks/useStableBillingOperation.test.ts>) | feature: settings |
+| [apps/product/src/features/settings/hooks/useTrialEndedDialog.test.ts](<../../../apps/product/src/features/settings/hooks/useTrialEndedDialog.test.ts>) | feature: settings |
 | [apps/product/src/features/settings/hooks/useUserSettings.test.ts](<../../../apps/product/src/features/settings/hooks/useUserSettings.test.ts>) | feature: settings |
 | [apps/product/src/features/settings/lib/billing-operation.test.ts](<../../../apps/product/src/features/settings/lib/billing-operation.test.ts>) | feature: settings |
 | [apps/product/src/features/settings/lib/billing-poll-observability.test.ts](<../../../apps/product/src/features/settings/lib/billing-poll-observability.test.ts>) | feature: settings |
