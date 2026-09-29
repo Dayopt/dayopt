@@ -4,7 +4,7 @@ DB 変更 PR の Supabase branch でも、毎 PR の secret 保存や手動 sign
 
 ## 現在の状態
 
-実装済みなのは [短命認証コア](../../scripts/lib/preview-fixture-authority.mjs) とその [テスト](../../scripts/lib/preview-fixture-authority.test.ts)。broker API、管理キーを使う処理、fixture の寿命、workflow の job 分離にはまだ接続していない。既存の共有 Preview runner の認証や権限は変更していない。
+実装済みなのは [短命認証コア](../../scripts/lib/preview-fixture-authority.mjs) と [予定ユーザーの実行処理](../../scripts/lib/preview-fixture-broker.mjs)。実行処理は、永続的に操作順と終了状態を管理する adapter が渡されなければ、管理キーを読む前に拒否する。実 adapter、broker API、fixture の寿命、workflow の job 分離にはまだ接続していない。既存の共有 Preview runner の認証や権限は変更していない。
 
 ローカルの署名・拒否テストが成功しても、GitHub の実 OIDC 発行、Preview サーバーの system env、実際のログインや回収が動いた証拠にはならない。共有 Integration が別の検証で凍結中なら、source 作業だけを進める。
 
@@ -27,6 +27,21 @@ OIDC の `id-token: write` は信頼済み job だけに付ける。candidate jo
 `assertFixtureBrokerTarget` は Product project、Preview、immutable URL / deployment、Git SHA / branch、選択した非本番 DB URL の一致を要求する。shared / Production への fallback はない。**この検査と JWT 検証の両方が成功してから管理キーを読み、操作する。**
 
 repository ID / owner ID / 既定 subject は 2026-09-29 の repository metadata と OIDC customization 設定を照合した値。repository 移転や subject 設定変更では自動的に緩めず、契約を再確認する。
+
+## 作成・回収処理と未実装の永続制御
+
+実行処理は両 UUID の Auth ownership を最初の変更前に照合する。作成は run と UUID に結び付けた合成 login を用意し、Auth の作成応答が失われても読み戻して所有を確認する。途中までの seed は同じ category / activity ID で再開し、既存の別ユーザーの行を上書きしない。ready 済みの再試行では password や seed を書き換えない。管理キーをローテーションした場合は既存 fixture の generation 不一致で停止し、元 intent による回収は許可する。
+
+回収は所有 Auth user の削除と不存在確認に加えて、profiles / user_settings / categories / activities / plans / records の残留 count が全て 0 であることを要求する。片方の削除失敗で他方の回収を打ち切らず、失敗は固定エラーとして残す。
+
+独立レビューでは、遅延中の provision が cleanup 成功後に user を再作成する競合を確認した。実行処理が必須とする `withLifecycle` adapter は次の全条件を満たす必要がある。
+
+- database ref と run UUID をキーに、全 operation をサーバーインスタンス間で直列化する。operation ごとに異なる audience を lock key にしない。
+- intent digest を固定し、同じ key への異なる intent を拒否する。
+- cleanup / recover の開始時に終了状態を永続化し、回収失敗でも保持する。以後の provision は拒否し、cleanup / recover の再試行だけを許可する。
+- worker / server 喪失後も、未確定の外部 Auth request が残る間に回収成功を返さない。単なる期限付き lease やプロセス内 mutex だけではこの条件を満たさない。
+
+executor は adapter の取得待ち後にも JWT の期限を再検証する。[SDKを用いるローカルテスト](../../scripts/lib/preview-fixture-broker.test.ts) は provider mock と test-only の coordination harness を使い、この呼び出し契約と競合を検証する。**実 adapter の永続性・インスタンス間の排他・worker 喪失からの回収を証明するテストではない。** その実装・実測前に公開 route へ接続してはならない。
 
 ## 既存処理と組み合わせる順序
 
