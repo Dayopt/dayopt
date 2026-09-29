@@ -25,6 +25,7 @@ last_verified: 2026-09-29
 - 反証: terms、Review仕様、ReportBody、AllocationChapter、report-view-model、aggregation service、filter storeを全文確認。現在の実装も記録時間の分母・3タブである。同日ログの「余白を分母に残す」は後の明示裁可で変更されているため、過去の決定ログは編集していない。segmentのDB dropも行っていない。
 - 修正: 用語集の生成元と詳細説明、旧決算バーのdeprecated分類、コメントの旧フィルタ/分母、仕様冒頭の「ダッシュボードではない」を後の明示判断へ同期。
 - 検証: glossary再生成、`docs:check`成功（その後の仕様冒頭1文はコミットhookでformat検証）。report-view-model / useReportViewStore / report-aggregation-serviceの3ファイル93 tests passed、skipなし。挙動は変えていないので新規redは不要。
+- 追加照合: Guide/詳細hook/service/Storyの旧説明も同期（`84f4d9019`）。全体検査で、廃止済み語も必ず掲載を要求するglossary testが失敗。旧testは別の表への語の偶然の出現でも通っていた。現行UI/設計語がそれぞれの表の行に存在し、非現行語は存在しない契約へ修正。生成処理は変更せず、関連16 tests passed。
 
 ## H003 — 常設非本番環境と既存secrets/architectureの記述
 
@@ -61,3 +62,33 @@ last_verified: 2026-09-29
 - 状態: 未検証仮説、未修正。
 - 根拠: report-fetchersはrecords/plansをcollectQueryPagesで取得するが、activities/categoriesは単発select。件数がAPIの上限を超えると、カテゴリー名/フィルタの所属が欠ける可能性。
 - 次の反証: Supabase側max_rows、既存の分類一覧とページング方針、所有者・上限契約、大量データでのfakeと実環境の違いを確認する。現時点で本番発生を主張しない。
+
+## F008 — テンプレート中央値testが実行日に依存して失敗する
+
+- 状態: 修正・検証済み（`8a5bc2c9f`）。runtimeの変更なし。Mission #2963。
+- 条件/原因: 2026-09-01の固定fixtureに対して実時計で過去28日を取得するため、9月29日には対象外になり2件が失敗する。対象service/domain/fetcher/testが基準SHAから未変更なことをdiffで確認し、監査の製品修正が原因でないことを反証。
+- 修正: testのDateだけを9月5日へ固定、afterEachで実時計へ復帰。test削除/skipなし。
+- 検証: 全体checkで2 failed / 4318 passed → 対象10 passed → 全体checkのproduct 434 files / 4320 passed。ログ `/tmp/dayopt-audit-check.log`、`/tmp/dayopt-audit-template-clock.log`、`/tmp/dayopt-audit-check-after-clock.log`。本番観測ではない。
+
+## H009 — テンプレート中央値と統計中央値の期間境界
+
+- 状態: 未検証仮説、未修正。
+- 根拠: StatisticsGeneralServiceは期間に重なる実記録の全長、PlanTemplateServiceはfetchRecordsの期間clip後の長さを中央値に使う。前者には全長を使う意図のコメントがある。
+- 次の反証: 提案用と統計用で期間境界の意味を意図的に分けた契約か、仕様/決定/Issueから確認する。共通domain関数を使っているという理由だけで統合しない。
+
+## F010 — 夏時間の時間帯集計が記録時間を失う/誤配置する
+
+- 状態: ローカル再現・修正・対象回帰検証済み。Mission #2963。本番発生は未観測。
+- 期待契約: report-periodの公称lengthMinutesはDSTを無視する一方、記録・予定集計値は影響を受けないという契約、AGENTSのtimezone/DST/半開区間契約。配分先はユーザーの壁時計の時間帯。
+- 条件/影響: America/New_York、2026-11-01 23:00–23:30（UTC翌04:00–04:30）の記録が0分となる。開始日には3時の記録を2時へ誤配置する。期間全体と詳細パネル両方の時間帯分布が影響を受ける。
+- 原因: 日の開始からの実経過分を0〜1440の壁時計の位置として比較。25時間の日の末尾は1440を超えて落ち、23時間の日は時刻が1時間ずれる。
+- 反証: 公称週168hという意図的な仕様と区別。集計service/詳細serviceの両呼出しが表示期間（最大1年）へclipすることを確認。DB保存値や期間定義を変える必要はない。
+- 修正: 実時間を単調に進め、時計の時間境界とoffset変更点で分けて対応する時間帯へ按分。繰り返す時刻は両方の実時間を計上、存在しない時刻は0。日数上限による途中打ち切りはなくし、clip済み終端で終了する。公開schema/UI操作数/DBは不変。
+- 検証: 24時間の具体的な期待配列、6時間帯との整合、合計の保存を検査。修正前7 failed / 7 passed、修正後に日全体ケースを追加し、期間・時間帯・集計・詳細serviceの4 files / 88 tests passed。1時間/30分の時計変更、日境界、秒の端数、23/25時間の日を含む。ログ `/tmp/dayopt-audit-dst-{red,green}.log`。ネイティブ委譲不可のため主担当が期待時刻/呼出し元/反対のDST方向で反証。
+
+## F011 — 機械的なpath一覧を実行手順と誤認するtaxonomy検査
+
+- 状態: 修正・検証済み（`9851013ae`）。Mission #2963。
+- 期待契約: 分類5はdocsの手順書からの参照。機械データにpathが載ることは実行を意味しない。
+- 条件/原因: 今回のinventory.json追加により、多数のlibがrunbookへ誤分類された。既存JSONの試行記録や構造データも同じ誤検知を起こしうる。既存の参照優先順位を変えず、手順書の走査対象をMarkdown/MDXへ限定。
+- 反証/検証: 合成repoでJSON一覧にだけ載る未使用scriptはunreferenced、実importされるscriptはlib、Markdown手順を追加するとrunbookになることを検査。修正前はfixtureと実repoの2件が失敗、後は関連16 tests passed、scripts全体110 files / 2625 tests passed。個別例外の追加や検査のskipでは解消していない。既存のworkflowコメント等を実行と誤認する一般的な制約は未解決のまま明記されている。

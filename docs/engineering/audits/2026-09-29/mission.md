@@ -49,8 +49,10 @@ repo調査、対象内の可逆修正、テスト、commit、必要なpush/Draft
 
 監査Issue: [#2963](https://github.com/Dayopt/dayopt/issues/2963)。`pnpm ctx 2963 --reuse-brief-l1` はexit 0、L1は `trusted_brief_missing_or_stale`。L1は未取得として本文と一次資料で続行。API課金を伴うJev呼び出しは行っていない。ctx初回起動時に既存lockfileから依存のinstallが行われた。tracked manifest/lockfileの差分は無い。
 
-全文確認43ファイル。`inventory.json`が各pathの確認範囲の正本。secrets/architecture/conventions/testing/glossary/strategy/decisionsとReviewの主経路の全文確認を完了。partial readは別に範囲を記録した。全体監査は初期段階であり、多数の未読が残る。
+全文確認62ファイル、symlink機械確認1件、未確認3,078件。`inventory.json`が各pathの確認範囲の正本。secrets/architecture/conventions/testing/glossary/strategy/decisionsとReviewの主経路の全文確認を完了。partial readは別に範囲を記録した。全体監査は初期段階であり、多数の未読が残る。
 
-修正commit: F001 `f0151baaf`（作成既定と選択）、F004 `f2a43d559`（unknown/型アサーション）、F002 `e88a1890f`（旧レポート説明）、F006 `c799b402b`（前期間だけの活動が比較から消える不具合）。F006以外は説明のみ。`findings.md`に根拠・反証・検査結果を記録。最新の`docs:check`と`typecheck:product`は成功。F006は修正前1 failed/19 passed→同条件20 passed、追加ケース後の関連3ファイル107 tests passed。全体`pnpm check`/pre-pushはまだ未実施。クラウド実態照合・配信は未実施。
+修正commit: F001 `f0151baaf`（作成既定と選択）、F004 `f2a43d559`（unknown/型アサーション）、F002 `e88a1890f`・`84f4d9019`（旧レポート説明と用語test）、F006 `c799b402b`（前期間だけの活動が比較から消える不具合）、F008 `8a5bc2c9f`（test時計固定）、F011 `9851013ae`（機械データによるtaxonomy誤検知）、F010 `befb03e5f`（DSTの時間帯集計）。`findings.md`に根拠・反証・検査結果を記録。
+
+全体`pnpm check`を2回実施。初回は基準から未変更のtemplate testの実時計依存2件で失敗。時計固定後はproduct 4,320 / web 366件成功、scriptsで廃止語と機械一覧の誤検知2件が失敗。両方を修正しscripts全体2,625件成功、typecheck:scripts成功。その後F010の変更を追加し、期間・時間帯・両serviceの88件成功。最新diffでの統合checkとpre-pushはこれから実施。クラウド実態照合・配信は未実施。
 
 次は統合した修正を検査し、Draft PRへ保存する。その後はReview詳細/時間境界とH007（分類メタデータのページング）、H003（環境レーン）、H005（MCPの確定契約）の照合を進める。現在の修正を全体監査完了とは扱わない。安全な修正は順次検証する。終了/コンテキスト更新のたびにここ・inventory・findings・Issueの証拠を同期し、未読をゼロから読み直さない。

@@ -543,10 +543,12 @@
       "mode": "120000",
       "bytes": 17,
       "method": "mechanical",
-      "status": "unverified",
+      "status": "mechanically-checked",
       "reason": "Symlink: verify target and ownership; read canonical source separately",
       "read_ranges": [],
-      "evidence": [],
+      "evidence": [
+        "Baseline symlink blob and current readlink both ../.agents/skills; canonical directory exists within repository. Individual skills retain independent read status."
+      ],
       "questions": []
     },
     {
@@ -12223,10 +12225,12 @@
       "mode": "100644",
       "bytes": 3168,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 43]],
+      "evidence": [
+        "All baseline text read in complete bounded ranges; template clock failure, report dataflow, DST distribution and guard boundaries cross-checked."
+      ],
       "questions": []
     },
     {
@@ -12747,10 +12751,12 @@
       "mode": "100644",
       "bytes": 3856,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 128]],
+      "evidence": [
+        "All baseline text read in complete bounded ranges; template clock failure, report dataflow, DST distribution and guard boundaries cross-checked."
+      ],
       "questions": []
     },
     {
@@ -12799,10 +12805,12 @@
       "mode": "100644",
       "bytes": 4320,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 112]],
+      "evidence": [
+        "All baseline text read in complete bounded ranges; template clock failure, report dataflow, DST distribution and guard boundaries cross-checked."
+      ],
       "questions": []
     },
     {
@@ -12838,10 +12846,12 @@
       "mode": "100644",
       "bytes": 26931,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 799]],
+      "evidence": [
+        "All baseline text read in complete bounded ranges; template clock failure, report dataflow, DST distribution and guard boundaries cross-checked."
+      ],
       "questions": []
     },
     {
@@ -12866,10 +12876,12 @@
       "mode": "100644",
       "bytes": 1336,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 36]],
+      "evidence": [
+        "All baseline text read in complete bounded ranges; template clock failure, report dataflow, DST distribution and guard boundaries cross-checked."
+      ],
       "questions": []
     },
     {
@@ -12972,10 +12984,12 @@
       "mode": "100644",
       "bytes": 3337,
       "method": "full-text",
-      "status": "unverified",
-      "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "status": "full-text-reviewed",
+      "reason": "First-party source and contract tests fully read; relevant baseline and working diff compared",
+      "read_ranges": [[1, 98]],
+      "evidence": [
+        "2026-09-29: full text read in segmented tool outputs; truncated period-test lines 100-141 recovered separately."
+      ],
       "questions": []
     },
     {
@@ -12985,10 +12999,12 @@
       "mode": "100644",
       "bytes": 13668,
       "method": "full-text",
-      "status": "unverified",
-      "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "status": "full-text-reviewed",
+      "reason": "First-party source and contract tests fully read; relevant baseline and working diff compared",
+      "read_ranges": [[1, 345]],
+      "evidence": [
+        "2026-09-29: full text read in segmented tool outputs; truncated period-test lines 100-141 recovered separately."
+      ],
       "questions": []
     },
     {
@@ -12998,10 +13014,12 @@
       "mode": "100644",
       "bytes": 17746,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 441]],
+      "evidence": [
+        "All baseline text read in complete bounded ranges; template clock failure, report dataflow, DST distribution and guard boundaries cross-checked."
+      ],
       "questions": []
     },
     {
@@ -13080,10 +13098,12 @@
       "mode": "100644",
       "bytes": 12270,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 317]],
+      "evidence": [
+        "All baseline text read in complete bounded ranges; template clock failure, report dataflow, DST distribution and guard boundaries cross-checked."
+      ],
       "questions": []
     },
     {
@@ -13175,10 +13195,12 @@
       "mode": "100644",
       "bytes": 9459,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 280]],
+      "evidence": [
+        "All baseline text read in complete bounded ranges; template clock failure, report dataflow, DST distribution and guard boundaries cross-checked."
+      ],
       "questions": []
     },
     {
@@ -15415,10 +15437,12 @@
       "mode": "100644",
       "bytes": 3871,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 85]],
+      "evidence": [
+        "All baseline text read in complete bounded ranges; template clock failure, report dataflow, DST distribution and guard boundaries cross-checked."
+      ],
       "questions": []
     },
     {
@@ -16134,10 +16158,12 @@
       "mode": "100644",
       "bytes": 14301,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 391]],
+      "evidence": [
+        "All baseline text read in complete bounded ranges; template clock failure, report dataflow, DST distribution and guard boundaries cross-checked."
+      ],
       "questions": []
     },
     {
@@ -16147,10 +16173,12 @@
       "mode": "100644",
       "bytes": 14481,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 420]],
+      "evidence": [
+        "All baseline text read in complete bounded ranges; template clock failure, report dataflow, DST distribution and guard boundaries cross-checked."
+      ],
       "questions": []
     },
     {
@@ -31722,10 +31750,12 @@
       "mode": "100644",
       "bytes": 4466,
       "method": "full-text",
-      "status": "unverified",
-      "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "status": "full-text-reviewed",
+      "reason": "First-party source and contract tests fully read; relevant baseline and working diff compared",
+      "read_ranges": [[1, 108]],
+      "evidence": [
+        "2026-09-29: full text read in segmented tool outputs; truncated period-test lines 100-141 recovered separately."
+      ],
       "questions": []
     },
     {
@@ -31878,10 +31908,12 @@
       "mode": "100644",
       "bytes": 8916,
       "method": "full-text",
-      "status": "unverified",
-      "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "status": "full-text-reviewed",
+      "reason": "First-party source and contract tests fully read; relevant baseline and working diff compared",
+      "read_ranges": [[1, 148]],
+      "evidence": [
+        "2026-09-29: full text read in segmented tool outputs; truncated period-test lines 100-141 recovered separately."
+      ],
       "questions": []
     },
     {
@@ -32476,10 +32508,12 @@
       "mode": "100644",
       "bytes": 15891,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 283]],
+      "evidence": [
+        "All baseline text read in complete bounded ranges; template clock failure, report dataflow, DST distribution and guard boundaries cross-checked."
+      ],
       "questions": []
     },
     {
@@ -32606,10 +32640,12 @@
       "mode": "100644",
       "bytes": 7411,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 171]],
+      "evidence": [
+        "All baseline text read in complete bounded ranges; template clock failure, report dataflow, DST distribution and guard boundaries cross-checked."
+      ],
       "questions": []
     },
     {
@@ -33152,10 +33188,13 @@
       "mode": "100644",
       "bytes": 23296,
       "method": "full-text",
-      "status": "unverified",
-      "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [[1, 110]],
-      "evidence": ["Partial ranges reviewed; remainder unverified"],
+      "status": "full-text-reviewed",
+      "reason": "First-party source and contract tests fully read; relevant baseline and working diff compared",
+      "read_ranges": [[1, 664]],
+      "evidence": [
+        "Partial ranges reviewed; remainder unverified",
+        "2026-09-29: full text read in segmented tool outputs; truncated period-test lines 100-141 recovered separately."
+      ],
       "questions": []
     },
     {
@@ -33701,10 +33740,12 @@
       "mode": "100644",
       "bytes": 13624,
       "method": "full-text",
-      "status": "unverified",
-      "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "status": "full-text-reviewed",
+      "reason": "First-party source and contract tests fully read; relevant baseline and working diff compared",
+      "read_ranges": [[1, 319]],
+      "evidence": [
+        "2026-09-29: full text read in segmented tool outputs; truncated period-test lines 100-141 recovered separately."
+      ],
       "questions": []
     },
     {
