@@ -344,10 +344,12 @@
       "mode": "100644",
       "bytes": 8269,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 193]],
+      "evidence": [
+        "Full read and applied implementation guide for OAuth configuration boundary fix. No new general security sweep or cloud advisor claim."
+      ],
       "questions": []
     },
     {
@@ -3904,10 +3906,12 @@
       "mode": "100644",
       "bytes": 4882,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 134]],
+      "evidence": [
+        "Full action read: revalidation, getUser, write fence, DB identity, scope downgrade, grant RPC, redirect. MFA enforcement lives in proxy; direct-action framework dispatch remains a question."
+      ],
       "questions": []
     },
     {
@@ -3917,10 +3921,12 @@
       "mode": "100644",
       "bytes": 5281,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 140]],
+      "evidence": [
+        "Full page read: displayed grantable scopes become hidden form fields, action recalculates; no automatic grant."
+      ],
       "questions": []
     },
     {
@@ -4743,10 +4749,12 @@
       "mode": "100644",
       "bytes": 5314,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 176]],
+      "evidence": [
+        "Real transport version framing and context rejection tests read; test server probe replaces production registration."
+      ],
       "questions": []
     },
     {
@@ -4756,10 +4764,12 @@
       "mode": "100644",
       "bytes": 20374,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 552]],
+      "evidence": [
+        "Full route test read; scope challenge, rate/body bounds, host, entitlement and dependency failures. Token verification/dispatch mocked, not end-to-end DB proof."
+      ],
       "questions": []
     },
     {
@@ -4784,10 +4794,12 @@
       "mode": "100644",
       "bytes": 2424,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 82]],
+      "evidence": [
+        "Real SDK scope-filtered advertisement tests read; no actual DB/tool execution claim."
+      ],
       "questions": []
     },
     {
@@ -4797,10 +4809,12 @@
       "mode": "100644",
       "bytes": 10208,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 286]],
+      "evidence": [
+        "Full read: host, bounded body, two limiter stages, new-grant-only write fence, exchange/refresh, generic error and no-store responses."
+      ],
       "questions": []
     },
     {
@@ -5213,10 +5227,10 @@
       "mode": "100644",
       "bytes": 698,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 13]],
+      "evidence": ["Canonical route reexports implementation with 60-second duration."],
       "questions": []
     },
     {
@@ -6242,8 +6256,10 @@
       "method": "full-text",
       "status": "unverified",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[245, 284]],
+      "evidence": [
+        "Partial runtime Proxy read: cleaned values are validated once but original process.env values returned; supports F021 boundary reproduction. Remaining source not read by this excerpt."
+      ],
       "questions": []
     },
     {
@@ -17291,10 +17307,12 @@
       "mode": "100644",
       "bytes": 2684,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 66]],
+      "evidence": [
+        "Full read: protected OAuth consent/authorize and auth/public path lists; prefixes vs exact paths."
+      ],
       "questions": []
     },
     {
@@ -18958,10 +18976,12 @@
       "mode": "100644",
       "bytes": 11243,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 332]],
+      "evidence": [
+        "Full read: exact production/preview identity, explicit branch, host/path separation and local exception tests."
+      ],
       "questions": []
     },
     {
@@ -21928,10 +21948,12 @@
       "mode": "100644",
       "bytes": 27213,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 677]],
+      "evidence": [
+        "Full 677 baseline lines plus new F021 regression tests: MFA/redirect/cookie/canonical paths, 2 red then boundary regression green."
+      ],
       "questions": []
     },
     {
@@ -21941,10 +21963,12 @@
       "mode": "100644",
       "bytes": 25511,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 589]],
+      "evidence": [
+        "Full 589 baseline lines: CSP, canonicalization, OAuth host, locale rewrites, session continuity and MFA. F021 fixes env normalization split; raw routing vs canonical auth distinction intentionally retained."
+      ],
       "questions": []
     },
     {
@@ -28378,10 +28402,12 @@
       "mode": "100644",
       "bytes": 31030,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 216]],
+      "evidence": [
+        "Full 216 lines; initial second output truncated, ranges 151-174 and 175-216 recovered independently. Existing normalization class and rejected candidates consulted."
+      ],
       "questions": []
     },
     {
@@ -37601,10 +37627,12 @@
       "mode": "100644",
       "bytes": 27489,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 953]],
+      "evidence": [
+        "Full 953 lines: schema/ACL/composite FK, legacy binding, original grant/exchange/rotation/revoke. Later overrides traced separately; old function body is not current implementation proof."
+      ],
       "questions": []
     },
     {
@@ -37614,10 +37642,12 @@
       "mode": "100644",
       "bytes": 11476,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 362]],
+      "evidence": [
+        "Full read: DB-owned expiry, removal of old overloads, rotation grace and deliberate reconnect after lost successful response; later cutover fixes alias ambiguity."
+      ],
       "questions": []
     },
     {
@@ -37627,10 +37657,12 @@
       "mode": "100644",
       "bytes": 14773,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 458]],
+      "evidence": [
+        "Full 458 lines: legacy parent/root binding and ambiguous-orphan rejection, rotation locks/scopes/30-second grace/family revoke. No DB execution."
+      ],
       "questions": []
     },
     {
@@ -37863,10 +37895,13 @@
       "mode": "100644",
       "bytes": 30308,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 1013]],
+      "evidence": [
+        "Partial read 720-855: public exchange/rotation wrappers check role/resource then invoke private implementation; rest of migration remains unread where not separately recorded.",
+        "Remaining 1-719 and 856-1013 fully read in bounded chunks; entire 1013-line baseline migration now reviewed. Identity tuple, insert-once data-less provisioning, public resource FK, credential column grants, client gate CAS, role/resource wrappers and mutation authorization read. Later overrides remain separately tracked; no provisioning/execution performed."
+      ],
       "questions": []
     },
     {
@@ -39011,10 +39046,12 @@
       "mode": "100644",
       "bytes": 6940,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 211]],
+      "evidence": [
+        "Full read: shared SQL scope allowlist, three checks and grant function; client gate and role/resource/user lock. Historical migration read, not current deployed-state assertion."
+      ],
       "questions": []
     },
     {

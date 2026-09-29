@@ -167,3 +167,10 @@ last_verified: 2026-09-29
 - 根拠: journeys/mcp.mdは「plan_createdを送らない」とするが、toolはctx.userIdをMcpMutationClientへ渡し、createPlanは受領証検証後にtrackMutationEventを呼ぶ。posthog-serverは明示runtime switchと送信時点のanalytics_consentを確認し、afterで送信、失敗はcatchする。同じresource/eventは同じUUID、更新はresourceId:versionを使う。
 - 反証/範囲: 送信予約は実取り込みの証明ではなく、switch未有効/同意なしでは送らない。コードと既存の成功・拒否・失敗testを全文照合。MCP/analyticsの挙動を変更する理由はこの所見からはない。実際の配信SHA/設定/取り込みは未確認。
 - 修正/検証: journeyのJSON正本を直し、`pnpm learn:generate`で説明と逆引き資料を再生成。変更diffは該当説明と参照だけ。全体checkのproduct検査に既存MCP/analytics testsを含み成功、生成後にdocs:checkを別途実施。文書のみの訂正のため新規挙動testは追加しない。
+
+## F021 — OAuth設定の正規化がproxyとhandlerで異なり正常接続を拒否する
+
+- 状態: ローカル再現・修正済み（`73d656f70`）。Mission #2963。クラウド実測なし。
+- 条件/根拠: OAuth originに末尾改行/前後空白、または任意originに空文字を設定。getOAuthEnvironmentConfigはtrim/空値未設定化で正しいidentityを返すが、proxyはraw process.envを同じresolverへ渡し503にする。env.ts自身もcleaned値だけを検証しraw値を返すので、この不一致を吸収しない。
+- 修正/反証: envからの読み出しと既存正規化を純粋なresolveOAuthEnvironmentFromEnvへ移し両入口で共有。raw URI policyを緩和せず、foreign origin・Preview別branchは拒否、runtime marker・host・DB identity・gateは維持する。環境変数や実デプロイの変更なし。
+- 検証: 実proxyと実handler用identity関数を同じ合成envで呼び、修正前2 failed/55 passed（handler成功・proxy503）。修正後はPreview一致/不一致を追加し、関連6 files/165 passed、typecheck:product成功。ログ `/tmp/dayopt-audit-oauth-env-{red,green,regression,types}.log`。normalization helperの戻りだけをmockしたテストではない。全体checkは別記録。

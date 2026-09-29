@@ -49,7 +49,7 @@ repo調査、対象内の可逆修正、テスト、commit、必要なpush/Draft
 
 監査Issue: [#2963](https://github.com/Dayopt/dayopt/issues/2963)。`pnpm ctx 2963 --reuse-brief-l1` はexit 0、L1は `trusted_brief_missing_or_stale`。L1は未取得として本文と一次資料で続行。API課金を伴うJev呼び出しは行っていない。ctx初回起動時に既存lockfileから依存のinstallが行われた。tracked manifest/lockfileの差分は無い。
 
-全文確認204ファイル、symlink機械確認1件、未確認2,936件。`inventory.json`が各pathの確認範囲の正本。secrets/architecture/conventions/testing/glossary/strategy/decisions、Reviewの主経路、activities featureの基準ファイル全件の全文確認を完了。partial readは別に範囲を記録した。全文確認は全境界の実行検証を意味しない。全体監査は初期段階であり、多数の未読が残る。
+全文確認222ファイル、symlink機械確認1件、未確認2,918件。`inventory.json`が各pathの確認範囲の正本。secrets/architecture/conventions/testing/glossary/strategy/decisions、Reviewの主経路、activities featureの基準ファイル全件の全文確認を完了。partial readは別に範囲を記録した。全文確認は全境界の実行検証を意味しない。全体監査は初期段階であり、多数の未読が残る。
 
 修正commit: F001 `f0151baaf`（作成既定と選択）、F004 `f2a43d559`（unknown/型アサーション）、F002 `e88a1890f`・`84f4d9019`（旧レポート説明と用語test）、F006 `c799b402b`（前期間だけの活動が比較から消える不具合）、F008 `8a5bc2c9f`（test時計固定）、F011 `9851013ae`（機械データによるtaxonomy誤検知）、F010 `befb03e5f`（DSTの時間帯集計）。`findings.md`に根拠・反証・検査結果を記録。
 
@@ -110,3 +110,13 @@ F020説明修正commit `057697dfe`。protected-path-gateの実行結果はrequir
 `01092d7fe997bcbcf9c907920dabb9904486f87f`を通常pre-push（affected型/lint、scripts2625、format）成功後にDraft #2965へpush済み。remote head/isDraft=true/state=OPENをAPIで確認。ログ `/tmp/dayopt-audit-push-mcp-replay-verified.log`。PR説明をMCPを含む最終差分・今回7417検査・protected-path=trueへ更新。mainへのmerge/releaseなし。
 
 公開後にauth/limiterの既存test2件を全文確認し台帳へ追加。次は残るMCP route/protocol tests、OAuthのDB exchange/rotationとconsent経路を照合し、H007/H009/H014/H015など未解決仮説へ戻る。依存警告はpush時にdefault branchのmoderate 1件と通知されたのみで、詳細未確認・所見未採用。依存graph監査の際に現在のadvisoryを確認する。読解202件までの台帳は上記公開head、204件目までの記録はこの追記commitで保存する。
+
+## OAuth設定の同一入力・異なる判定
+
+F021を`73d656f70`で修正。handlerではtrim/空値未設定化をするがproxyでは生の値を渡すため、同じProduction設定でもproxyが503になることを実関数で再現（2 failed / 55 passed）。既存のenv→identity正規化だけを純粋な共通入口へ移し、両方から呼ぶ。raw URIのpolicy、DB identity、host/branch allowlistは維持。追加Preview正負例を含む関連6 files / 165 passed、typecheck:product exit 0。ログ `/tmp/dayopt-audit-oauth-env-{red,green,regression,types}.log`。実環境設定値は未取得で本番発生とは主張しない。
+
+OAuthのconnection schema、legacy bridge、grant/exchange/rotationと公開wrapperを追跡。失われた成功refresh responseを平文token保存で再現しないのは明示設計で、並行再送30秒graceは接続全体の失効を避ける。書込fenceをrefreshへ広げると既存read接続も失効するため変更不要。MFAはproxyのprotected consent/authorizeで検査されるがaction本体に同じ検査はなく、framework直接dispatch時の境界はまだ未検証。期限直前のDB lock待ちとtransaction timestampの意味も実DB並行検証前には断定しない。
+
+F021を含む製品SHA `73d656f70`で`pnpm check` exit 0。型10 tasks・lint9 tasks・静的検査、billing15/i18n2/observability64/product4350/web366/scripts2625、合計7422 passed。ログ `/tmp/dayopt-audit-check-oauth-env.log`。今回の製品コードを固定して実施し、検査中の変更は監査記録だけ。配信/実DBの証拠ではない。
+
+2026-09-29 19:01頃のread-only確認でmainは`21770b13da1ff26c8982cdf041aa2a4d55025a3f`（#2966）へ進んだ。fetchとdiffstatでは18ファイル、主にテスト・mutation evidence script・新規証拠JSON。まだ全文delta照合/取り込み前であり、今回の7422成功は前回main `0bcdb8641`を含む監査branchの結果。次の最優先はこの18pathのdeltaと生成元を読み、追加証拠の分類を含めて整合を確認する。巨大JSONを未読のまま読了扱いしない。既存worktreeを切り替えず監査branchで統合する。
