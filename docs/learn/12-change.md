@@ -167,11 +167,11 @@ last_verified: 2026-09-21
 #### `apps/product/src/app/api/mcp/_tools/registry.ts`
 
 - [削除と取り消し](journeys/delete-undo.md) の 6. 取り消しを出す — 取り消しの出し方はカレンダーと Inspector で 1 つにする意図（useTimeblockDeleteUndo）だが、Inspector は自前で同じトーストを組んでいる。変える時は両方を見る。「元に戻す」付きのトーストが出ている間、action の無い成功トーストは出さない（lib/toast）ので、「復元しました」が出ないこともある。
-- [AI クライアントから Plan を作る（MCP）](journeys/mcp.md) の 5. plans.create を呼ぶ — tool 名（plans.create）・入力 schema・必要 scope（write:plans）は外部契約。改名・削除・必須項目の追加は、既存クライアントと、それを前提に書かれた利用者の指示を壊す。tool の説明文は「Create one future Plan」のままで、過去にも Plan を置ける現行の規則と食い違っている。
+- [AI クライアントから Plan を作る（MCP）](journeys/mcp.md) の 5. plans.create を呼ぶ — tool 名（plans.create）・入力 schema・必要 scope（write:plans）は外部契約。改名・削除・必須項目の追加は、既存クライアントと、それを前提に書かれた利用者の指示を壊す。Plan は過去・未来とも作成できる。説明文も現行の時間規則と一致させる。
 
 #### `apps/product/src/app/api/mcp/_tools/timeblock-mutations.ts`
 
-- [AI クライアントから Plan を作る（MCP）](journeys/mcp.md) の 5. plans.create を呼ぶ — tool 名（plans.create）・入力 schema・必要 scope（write:plans）は外部契約。改名・削除・必須項目の追加は、既存クライアントと、それを前提に書かれた利用者の指示を壊す。tool の説明文は「Create one future Plan」のままで、過去にも Plan を置ける現行の規則と食い違っている。
+- [AI クライアントから Plan を作る（MCP）](journeys/mcp.md) の 5. plans.create を呼ぶ — tool 名（plans.create）・入力 schema・必要 scope（write:plans）は外部契約。改名・削除・必須項目の追加は、既存クライアントと、それを前提に書かれた利用者の指示を壊す。Plan は過去・未来とも作成できる。説明文も現行の時間規則と一致させる。
 - [AI クライアントから Plan を作る（MCP）](journeys/mcp.md) の 10. 受領証を受け取る — 受領証の field と schemaVersion は外部契約。変えると、保存済みの受領証を再送で返す時に outputSchema の検証が失敗し、全 mutation tool が壊れる（timeblock-mutations.ts のコメント）。
 
 #### `apps/product/src/app/api/mcp/_tools/tool-result.ts`
@@ -689,7 +689,7 @@ last_verified: 2026-09-21
 
 #### `apps/product/src/lib/mcp/trpc-bridge.ts`
 
-- [AI クライアントから Plan を作る（MCP）](journeys/mcp.md) の 5. plans.create を呼ぶ — tool 名（plans.create）・入力 schema・必要 scope（write:plans）は外部契約。改名・削除・必須項目の追加は、既存クライアントと、それを前提に書かれた利用者の指示を壊す。tool の説明文は「Create one future Plan」のままで、過去にも Plan を置ける現行の規則と食い違っている。
+- [AI クライアントから Plan を作る（MCP）](journeys/mcp.md) の 5. plans.create を呼ぶ — tool 名（plans.create）・入力 schema・必要 scope（write:plans）は外部契約。改名・削除・必須項目の追加は、既存クライアントと、それを前提に書かれた利用者の指示を壊す。Plan は過去・未来とも作成できる。説明文も現行の時間規則と一致させる。
 
 #### `apps/product/src/lib/oauth-server/clients.ts`
 

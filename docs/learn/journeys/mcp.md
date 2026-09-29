@@ -166,7 +166,7 @@ AI は必要なら先に activities.list でアクティビティの ID を調�
 
 - **なぜ必要か**: 画面からの保存には楽観的更新があり、サーバーの返事を待たずに一時 Plan を出す。MCP にはそれが無く、AI は返事（受領証）を待つ。代わりに operationId があるので、通信が切れても安全に送り直せる（画面の保存には冪等キーが無く、利用者が作り直すと二重になりうる）。読み取り tool（activities.list など）は tRPC を service role + oauthExecution 'mcp_internal' で内部呼び出しするので RLS が効かず、テナント分離は各 service の user filter だけが持つ。
 - **入力 → 出力**: 利用者の自然文の依頼 → POST /api/mcp（tools/call plans.create、Authorization: Bearer）
-- **ここを変えると**: tool 名（plans.create）・入力 schema・必要 scope（write:plans）は外部契約。改名・削除・必須項目の追加は、既存クライアントと、それを前提に書かれた利用者の指示を壊す。tool の説明文は「Create one future Plan」のままで、過去にも Plan を置ける現行の規則と食い違っている。
+- **ここを変えると**: tool 名（plans.create）・入力 schema・必要 scope（write:plans）は外部契約。改名・削除・必須項目の追加は、既存クライアントと、それを前提に書かれた利用者の指示を壊す。Plan は過去・未来とも作成できる。説明文も現行の時間規則と一致させる。
 - **コード**:
   - [`apps/product/src/app/api/mcp/_tools/timeblock-mutations.ts`](../../../apps/product/src/app/api/mcp/_tools/timeblock-mutations.ts) で `export const MCP_PLAN_CREATE_INPUT_SCHEMA = z` を探す
   - [`apps/product/src/app/api/mcp/_tools/registry.ts`](../../../apps/product/src/app/api/mcp/_tools/registry.ts) で `name: 'plans.create',` を探す
@@ -763,7 +763,7 @@ Realtime の購読は無いので、MCP で作った Plan はすぐには画面�
         "in": "利用者の自然文の依頼",
         "out": "POST /api/mcp（tools/call plans.create、Authorization: Bearer）"
       },
-      "change": "tool 名（plans.create）・入力 schema・必要 scope（write:plans）は外部契約。改名・削除・必須項目の追加は、既存クライアントと、それを前提に書かれた利用者の指示を壊す。tool の説明文は「Create one future Plan」のままで、過去にも Plan を置ける現行の規則と食い違っている。",
+      "change": "tool 名（plans.create）・入力 schema・必要 scope（write:plans）は外部契約。改名・削除・必須項目の追加は、既存クライアントと、それを前提に書かれた利用者の指示を壊す。Plan は過去・未来とも作成できる。説明文も現行の時間規則と一致させる。",
       "refs": [
         {
           "path": "apps/product/src/app/api/mcp/_tools/timeblock-mutations.ts",
