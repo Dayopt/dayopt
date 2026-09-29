@@ -142,3 +142,11 @@ H025のclear後再投入をF025として採用。実TanStack復元で旧userのq
 F025を含む製品SHA `605d4e6130bcb3989e043484ebc89c7e4c2e5921` の`pnpm check`はNode24でexit 0。型/lint/static、billing37/i18n2/observability64/product4369/web366/scripts2642、合計7480 passed。ログ `/tmp/dayopt-audit-check-cache-races.log`。製品コードを固定し、検査中は監査記録だけを追記。読解は基準269ファイルまで進んだ。H026は回復コードのtiming testの無効な閾値を記録し、次に実装根拠と測れる契約を分けて修正する。実DB/クラウドE2E/配信は未実施。
 
 #2619本文と唯一のclosure commentを全文取得し、sign-out後storage空・別userへ復元しない・オフライン同一userを壊さないという受入条件を確認。router・再認証helper・service-role静的guard・PWA仕様も全文読解し、基準273件。static guardは明記された検出範囲に限る。#2619本文の非機微query allowlist案は別段階へ分けられる扱いで、今回勝手にオフライン対象を縮小しない。次は回復コード/古いsession helperの検証品質と、cache主体変更の残るlifecycleを続ける。
+
+## 認証の検証根拠と未使用責務
+
+F026を`9b10660eb`、F023を`40d9be4b3`で修正。回復コードはnative比較の実装根拠と入力/不一致の機能検査を分け、必ず通る時間比testを撤去。実経路から未使用のsession helperと専用testを撤去し、現行監視・MFA/OAuth検査は維持。新しい挙動バグのred/greenとは扱わない。
+
+製品SHA `40d9be4b301735026f376ffc37f6f53cf19a502c`でNode24の`pnpm check` exit 0。型/lint/static、billing37/i18n2/observability64/product4353/web366/scripts2642、合計7464 passed。ログ `/tmp/dayopt-audit-check-auth-validation.log`。製品を固定して検査した。件数減は上記未使用helper専用testの撤去によるもので、検証済み範囲の拡大率とは扱わない。クラウド・E2E・配信は未確認。
+
+再認証test、user-serviceとtest、settings仕様、DataSettings、knipを全文読解し基準279件。次はH027の全件エクスポートとAPI上限、期間境界、共有query結果の扱いを追う。H024/H025の残る認証/cache境界とH026のHIBP検証候補も継続する。公開済みheadは引き続き`5d7f96eb1`で、今回の修正は次の通常pre-push後にDraftへ保存する。

@@ -1085,10 +1085,12 @@
       "mode": "100644",
       "bytes": 899,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 34]],
+      "evidence": [
+        "Full text read in bounded chunks at 40d9be4b301735026f376ffc37f6f53cf19a502c; baseline bytes verified unchanged. Session call graph, reauthentication, deletion and export boundaries inspected. Export collection cap remains H027, not live observation."
+      ],
       "questions": []
     },
     {
@@ -7215,10 +7217,12 @@
       "mode": "100644",
       "bytes": 12382,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 299]],
+      "evidence": [
+        "Full text read in bounded chunks at 40d9be4b301735026f376ffc37f6f53cf19a502c; baseline bytes verified unchanged. Session call graph, reauthentication, deletion and export boundaries inspected. Export collection cap remains H027, not live observation."
+      ],
       "questions": []
     },
     {
@@ -7303,10 +7307,12 @@
       "mode": "100644",
       "bytes": 30426,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 744]],
+      "evidence": [
+        "Full text read in bounded chunks at 40d9be4b301735026f376ffc37f6f53cf19a502c; baseline bytes verified unchanged. Session call graph, reauthentication, deletion and export boundaries inspected. Export collection cap remains H027, not live observation."
+      ],
       "questions": []
     },
     {
@@ -7316,10 +7322,12 @@
       "mode": "100644",
       "bytes": 25438,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 596]],
+      "evidence": [
+        "Full text read in bounded chunks at 40d9be4b301735026f376ffc37f6f53cf19a502c; baseline bytes verified unchanged. Session call graph, reauthentication, deletion and export boundaries inspected. Export collection cap remains H027, not live observation."
+      ],
       "questions": []
     },
     {
@@ -13656,10 +13664,12 @@
       "mode": "100644",
       "bytes": 19044,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 517]],
+      "evidence": [
+        "Full text read in bounded chunks at 40d9be4b301735026f376ffc37f6f53cf19a502c; baseline bytes verified unchanged. Session call graph, reauthentication, deletion and export boundaries inspected. Export collection cap remains H027, not live observation."
+      ],
       "questions": []
     },
     {
@@ -29579,10 +29589,12 @@
       "mode": "100644",
       "bytes": 1670,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 28]],
+      "evidence": [
+        "Full text read in bounded chunks at 40d9be4b301735026f376ffc37f6f53cf19a502c; baseline bytes verified unchanged. Session call graph, reauthentication, deletion and export boundaries inspected. Export collection cap remains H027, not live observation."
+      ],
       "questions": []
     },
     {

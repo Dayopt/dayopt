@@ -215,3 +215,23 @@ H024の反証追記: installed `@supabase/auth-js@2.116.0` のGoTrueClient.ts 40
 
 - 状態: 数式上の検証欠陥候補、未修正。recovery-codes.test.tsの平均時間差は`abs(a-b)/max(a,b)`（a,b非負）で0〜1なのに、閾値は2.0。早期returnの有無を検出できない。計測の揺れを弱めたという説明は保証にならない。
 - 次: 既存の手書き比較とNode native timingSafeEqualの境界を照合し、実測タイミングを安全性の証明にせず、先頭/末尾差分・異長/不正値の機能検証と実装根拠を分ける。HIBP testにもboolean型だけで大文字小文字契約を検証したように見せるassertがあり、外部API契約と照合して整理する。暗号機能の破綻/本番漏洩とは未判定。
+
+## F023 — 実認証経路から呼ばれない別のセッション判定を撤去
+
+- 状態: H023を採用、`40d9be4b301735026f376ffc37f6f53cf19a502c`で修正。Mission #2963。
+- 根拠/反証: repo全体の参照・dynamic entry・knip設定・private packageの公開境界を確認。validateSession / shouldShowTimeoutWarningと専用型は2 testのみが使い、現行useSessionMonitorはSESSION_CONFIG / SESSION_SECURITYだけを参照。単位を修理して別モデルを残す理由はない。現行の監視・tRPC認証/MFA/OAuth制約は別実装であり変更しない。
+- 修正: 未使用helperとその専用fixture/assertを撤去。定数と6件の定数test、token-expiry.testの11件の実protectedProcedureテストは維持。
+- 検証: 関連4 files/35 passed、typecheck:product exit 0。ログ `/tmp/dayopt-audit-session-obsolete.log` / `dayopt-audit-session-obsolete-types.log`。未使用コード撤去のため挙動のred/greenとは扱わない。timeblock/lib/time testの削除ではない。
+
+## F026 — 回復コード比較の標準実装と検証根拠を分離
+
+- 状態: H026の回復コード部分を採用、`9b10660eb`で修正。Mission #2963。HIBPの弱いassertは継続調査。
+- 根拠: 非負の平均時間a,bに対してabs(a-b)/max(a,b)は最大1で、閾値2.0の旧testは百万倍の差でも通る。手書きXOR比較をNode crypto.timingSafeEqualへ置換し、byte長guardとUTF-8比較で従来の文字列一致を維持。hex decodeの不正値切詰めや大文字小文字同一視を導入しない。HMAC・pepper・入力正規化・保存形式は不変。
+- 反証/検証: 先頭/中間/末尾の不一致と異長/不正stored hashの機能検証は修正前39 passedで、挙動バグのred/greenではない。変更後関連2 files/51 passed、typecheck:product exit 0。ログ `/tmp/dayopt-audit-recovery-functional-before.log` / `dayopt-audit-recovery-native.log` / `dayopt-audit-recovery-native-types.log`。実タイミング攻撃や本番漏洩を再現したとは主張しない。
+- 実装根拠: [Node24公式crypto仕様](https://nodejs.org/docs/latest-v24.x/api/crypto.html#cryptotimingsafeequala-b)は同byte長のnative比較を定義し、周辺コード全体のtiming safetyまでは保証しない。時間計測testを暗号保証の証明として残さない。
+
+## H027 — エクスポートの全件取得とAPI上限
+
+- 状態: コード上の候補、再現・採否は未確定。
+- 根拠: user-service.exportDataはplans/records/categories/activitiesを1回ずつ取得し、ページ走査がない。repo supabase/config.tomlのmax_rowsは1000。画面は取得後に期間フィルタし全期間を選択できるため、上限を越す場合の欠落を調べる。実クラウド上限は未取得で、本番欠落とは断定しない。
+- 次: 公開仕様・既存Issue・DB列と既存page取得方式を照合し、API上限を再現する合成境界testを先に作る。独立して画面の期間境界/共有query結果への直接代入も確認する。H007の分類単一snapshot契約とは同一の修正と決めない。
