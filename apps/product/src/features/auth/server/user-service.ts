@@ -24,6 +24,7 @@ import {
   publicRecordSelect,
   publicUserSettingsSelect,
 } from '@/lib/database';
+import { collectQueryPages } from '@/lib/database/collect-query-pages';
 import { getUserLocale, sendAccountDeletionEmail } from '@/lib/email/notifications';
 import { logger } from '@/lib/logger';
 import {
@@ -524,10 +525,38 @@ export function createUserService(
         userSettingsResult,
       ] = await Promise.all([
         supabase.from('profiles').select('*').eq('id', userId).single(),
-        adminClient.from('plans').select(publicPlanSelect).eq('user_id', userId),
-        adminClient.from(databaseTables.records).select(publicRecordSelect).eq('user_id', userId),
-        supabase.from(databaseTables.categories).select('*').eq('user_id', userId),
-        supabase.from(databaseTables.activities).select('*').eq('user_id', userId),
+        collectQueryPages((from, to) =>
+          adminClient
+            .from('plans')
+            .select(publicPlanSelect)
+            .eq('user_id', userId)
+            .order('id')
+            .range(from, to),
+        ),
+        collectQueryPages((from, to) =>
+          adminClient
+            .from(databaseTables.records)
+            .select(publicRecordSelect)
+            .eq('user_id', userId)
+            .order('id')
+            .range(from, to),
+        ),
+        collectQueryPages((from, to) =>
+          supabase
+            .from(databaseTables.categories)
+            .select('*')
+            .eq('user_id', userId)
+            .order('id')
+            .range(from, to),
+        ),
+        collectQueryPages((from, to) =>
+          supabase
+            .from(databaseTables.activities)
+            .select('*')
+            .eq('user_id', userId)
+            .order('id')
+            .range(from, to),
+        ),
         supabase
           .from('user_settings')
           .select(publicUserSettingsSelect)
