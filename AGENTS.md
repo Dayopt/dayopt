@@ -5,7 +5,7 @@ Dayopt の共通指示。Project 設定を正本とし、個人設定・ホー�
 ## Non-Negotiables
 
 - **Cloud-first、Local-optional**。開発・画面確認はクラウドを基本とし、必要ならローカルも使う。作業中の別 worktree・branch・未コミット差分を勝手に変更しない。
-- 変更前に既存実装と関連判断を調べる。検索は `rg` を優先し、repo 全体は `rg --hidden --glob '!.git/**'`。構造は [architecture.md](docs/engineering/architecture.md)、技術規約は [conventions.md](docs/engineering/conventions.md)、用語は [glossary.md](docs/product/glossary.md) を参照する。
+- 提案・変更前に既存実装と関連判断を調べる。Issue の有無を問わず [判断の入口](docs/decisions.md#判断する前に読む)から現行の正本・理由・却下案を確認し、履歴の撤回済み判断を復活させない。検索は `rg` を優先し、repo 全体は `rg --hidden --glob '!.git/**'`。構造は [architecture.md](docs/engineering/architecture.md)、技術規約は [conventions.md](docs/engineering/conventions.md)、用語は [glossary.md](docs/product/glossary.md) を参照する。
 - Issue / PR がある非自明な作業は `pnpm ctx <N> --reuse-brief-l1` から始める。Issue 本文が要求の正本。Brief は助言であり、古い・取得できない場合は報告して一次資料で進める。詳細は `routing`。
 - 秘密情報は [secrets.md](docs/operations/secrets.md) の境界に従う。`.env` / `.env.local` は読み書きしない。`.op-env.agent` / `.op-env.human` を使う。
 - 変更した挙動を対象 test / E2E / Storybook 等で確かめる。同じ差分・環境の成功済み検査を根拠なく繰り返さない。ready 化前の `pnpm check` と pre-push は必須。詳細は [testing.md](docs/engineering/testing.md)。
@@ -24,7 +24,7 @@ Dayopt の共通指示。Project 設定を正本とし、個人設定・ホー�
 ### 時間（Plan / Record 分離モデル）
 
 - Record はユーザーが明示的に作る。時刻の規則は `end_at > start_at`（Plan / Record、DT003）と `Record.end_at <= now`（DT005）の 2 本だけ。
-- Plan は過去・未来とも編集でき、未来も skip できる。編集しても Record には変わらない。Record の紐付け先 Plan の時刻は制約しない。
+- Plan は過去・未来とも編集でき、編集しても Record には変わらない。Plan / Record は独立して保存する。手動 skip と保存上の相互参照は廃止済み（[現行仕様](docs/product/specs/plan-record.md)、[移行の経緯](docs/engineering/migrations/independent-plan-record.md)）。
 - 新規作成の既定は end_at のみで決める（`resolveTimeblockDestination`）。過去は Record / Plan を選べ、未来は Plan のみ（`resolveTimeblockKindChoice`）。これ以外に過去・未来で操作を出し分けない。
 - 作成・編集は同じ Inspector。アクティビティ選択で作成し、選択前に閉じれば保存しない。明示の保存 / キャンセルは置かない。サイドバーのアクティビティは既定長で即作成し、取り消しはトースト。
 - 強制点は DB。規則の変更は [invariants.md](docs/engineering/invariants.md) の写し表を確認し、DB / service / MCP / UI / test を一緒に更新する。timezone / DST / 日境界と半開区間 `[start, end)` を守る。

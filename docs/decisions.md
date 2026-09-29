@@ -1,5 +1,24 @@
 # decisions.md — 全決定の時系列索引（追記のみ）
 
+## 判断する前に読む
+
+この索引は履歴であり、全行が現在も有効な規則ではない。まず下表から関係する正本を読み、理由や却下案が足りない時に索引を機能名・旧称・Issue 番号で検索する。同じ対象の撤回・後継まで追い、日付が新しいだけで適用範囲の違う判断を上書きしない。記載がない理由・見直し条件は未記載、資料を取得できない場合は未取得とする。
+
+| 判断したいこと・検索語                                                 | 現行の意味を持つ正本                                                                                      |
+| ---------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| 何を作るか / タスク管理 / Todo / AI チャット / 通知 / 点数・ストリーク | [戦略 §原体験・プロダクト原則](strategy.md)                                                               |
+| カレンダー / 2レーン / 操作数 / ルーティン / 目標と未決事項            | [体験設計](product/principles.md)                                                                         |
+| Plan / Record / 過去の編集 / 未来 / 記録の確定                         | [Plan / Record の仕様](product/specs/plan-record.md)、[時間不変条件と写し表](engineering/invariants.md)   |
+| ghost / 外部予定 / 自動取り込み / 変換                                 | [外部カレンダーの仕様](product/specs/external-calendar.md)。ルーティンや API の目標・未決事項は体験設計へ |
+| report / 4章 / 3タブ / セグメント / 配分 / 余白                        | [振り返りの仕様](product/specs/review.md)                                                                 |
+| 価格 / Free・Pro / 課金の境界                                          | [価格戦略](business/pricing.md)、[課金仕様](product/specs/billing.md)                                     |
+| 判断を残す / 二重管理 / state.md / 日次ブリーフ / 蒸留                 | [意図の継承と運用判断の理由](operations/ai-development-loop.md#意図の継承)                                |
+| モデルの役割 / 委譲 / Context Brief / Jev                              | [作業方針](../.agents/skills/routing/SKILL.md)、[Jev の運用](operations/jev.md)                           |
+| 独立レビュー / 全PR / shadow / 人間の許可                              | [AGENTS.md](../AGENTS.md)、[AI開発標準ループ](operations/ai-development-loop.md)                          |
+| test / E2E / 実走 / CI 成功と本番状態                                  | [検証の責務](engineering/testing.md)                                                                      |
+
+索引は入口、リンク先は現在の判断、Issue / PR はその判断を下した時点の要求と証拠を持つ。相互に矛盾する場合は黙って選ばず、明示された撤回・後継と適用範囲を調べる。解消できない意図の衝突だけを人間に戻す。チャット全文の再読や個人メモリを通常の開始条件にしない。
+
 ## 書式
 
 - YYYY-MM-DD: [タグ] 決定を1文（理由: 1フレーズ）（参照: [#N](https://github.com/Dayopt/dayopt/issues/N)）
@@ -7,7 +26,7 @@
 
 ## ルール
 
-- 行の削除・書き換え禁止。覆すときは新しい行で「〜を撤回、Xへ」
+- 下の区切り以降の履歴は削除・書き換え禁止。覆すときは新しい行で「〜を撤回、Xへ」。上の参照入口は現行の正本へ更新する
 - 参照の issue / PR 番号はリンク付きで書く（`[#N](https://github.com/Dayopt/dayopt/issues/N)`）。GitHub 外（エディタ・AI の直読み）では素の `#N` から辿れないため
 - 決定したら索引に1行 ＋ 該当ストック（AGENTS.md / 該当 docs）を編集（ワンセット）
 - 300行を超えたら decisions/2026.md へ年別分割
@@ -92,3 +111,4 @@
 - 2026-09-25: [auth] OAuth token endpoint のDB admission上限を共有120/分からallowlist clientごとの120/分へ分ける。client IDは静的allowlist確認後だけbucket keyに使う。現行3 clientのaggregate上限は360/分となるため、client追加時に再評価する（理由: 認証前の有効client IDを使う1 clientの負荷で、独立した他clientのtoken発行・更新まで止めない。authorization_codeのIP 10/分、refresh token 30/分、refresh IP 120/分、body読込前IP 600/分は維持する）（参照: [#2721](https://github.com/Dayopt/dayopt/issues/2721)、[#2553](https://github.com/Dayopt/dayopt/issues/2553)）
 - 2026-09-26: [process] 外部研究・再利用可能なレビュー所見を変更候補にする時は、出典の証拠と Dayopt への適用根拠を分けた短い知見カードを使い、最小差分・既存の置き場・採用/保留/見送り・検証/撤回条件を既存 Issue / docs / skill / test / CI へ戻す（理由: 既存対応の再実装と根拠の弱い一般ルール化を避けつつ、単発の明確な修正を止めない）（参照: [#2909](https://github.com/Dayopt/dayopt/issues/2909)）
   結果(未): 2026-10-26 までに、知見整理で観測・仮説・適用根拠が分かれ、既存対応・変更不要・保留を選べたか。新しい必須 gate / registry / scheduler を増やさず運用できたか
+- 2026-09-29: [process] 判断の意図を既存の正本へ蒸留し、索引から理由・却下案・撤回と後継を辿れる入口を作る。提案前の参照と変更時の更新を routing / decision に接続する（理由: User が求める、意図の未共有による再議論・再提案・逸脱を防ぎ、過去チャットなしで判断できる状態にするため。提案を採用済みにせず、新しい台帳や定例蒸留は増やさない）（参照: [意図の継承](operations/ai-development-loop.md#意図の継承)、2026-09-29 の判断継承・蒸留依頼）
