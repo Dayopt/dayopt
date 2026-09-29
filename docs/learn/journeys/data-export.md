@@ -60,22 +60,24 @@ exportData の query は enabled: false で作ってあり、ボタンを押し�
 
 - **なぜ必要か**: 設定を開いただけで全データを運ばないため。範囲を送らないので、サーバーは常に全件を返す。
 - **入力 → 出力**: ボタンの押下 → POST /api/trpc（user.exportData、入力なし）
-- **ここを変えると**: refetch の結果は例外にならず、失敗しても前回成功した data を持ったまま返る。成否を data の有無だけで判定しているので、ここを触る時は result.isError も見る形にする。
+- **ここを変えると**: refetchは失敗しても前回のdataを返すため、isErrorも確認して失敗時はファイルを作らない。dataの有無だけに戻すと古い結果を成功扱いする。
 - **コード**:
   - [`apps/product/src/features/settings/components/DataSettings.tsx`](../../../apps/product/src/features/settings/components/DataSettings.tsx) で `const exportDataQuery = api.user.exportData.useQuery(undefined, {` を探す
   - [`apps/product/src/features/settings/components/DataSettings.tsx`](../../../apps/product/src/features/settings/components/DataSettings.tsx) で `const result = await exportDataQuery.refetch();` を探す
-  - [`apps/product/src/features/settings/components/DataSettings.tsx`](../../../apps/product/src/features/settings/components/DataSettings.tsx) で `if (!result.data) throw new Error('Export failed');` を探す
+  - [`apps/product/src/features/settings/components/DataSettings.tsx`](../../../apps/product/src/features/settings/components/DataSettings.tsx) で `if (result.isError || !result.data) throw new Error('Export failed');` を探す
+- **この段を守るテスト**:
+  - [`apps/product/src/features/settings/components/DataSettings.csv-export.test.tsx`](../../../apps/product/src/features/settings/components/DataSettings.csv-export.test.tsx) で `it('成功後の再取得失敗を古いdataで成功扱いしない'` を探す
 
 <details>
-<summary>⚡ 前回成功した後で、今回の取得が失敗する — 画面: 何も起きない / データ: 欠落する / 再試行: 自動で再試行 / 痕跡: Sentry</summary>
+<summary>⚡ 前回成功した後で、今回の取得が失敗する — 画面: エラー表示 / データ: 変化なし / 再試行: 利用者がやり直す / 痕跡: Sentry</summary>
 
-- 画面: 「データをエクスポートしました」と出る。失敗は利用者に見えない。
-- データ: DB は変化なし。保存されるファイルは前回取得した時点の内容で、その後の変更が入っていない。
-- 再試行: query の既定で最大 3 回まで再試行したあと、前回の data のまま進む。
-- 痕跡: サーバー側の失敗なら Sentry（feature: account_export）に残るが、画面の成功表示とは結び付かない。
-- **最初に見る場所**: コードから読んだ挙動で、実機では未確認。同じ画面で 2 回目以降、またはブラウザに保存された前回の結果が復元された後に起きうる。handleExport の成否判定（result.data の有無）を見る。
+- 画面: エクスポート失敗のトーストを出し、ファイルを作らない。
+- データ: DBと前回取得したquery dataは変化なし。古いデータを今回の成功結果として保存しない。
+- 再試行: queryの既定の再試行後も失敗なら、利用者が押し直す。
+- 痕跡: サーバー側の失敗はaccount_exportの既存観測経路に残る。
+- **最初に見る場所**: 実QueryObserverの成功→失敗をcomponent testで再現。実機・本番の観測ではない。
 - 根拠:
-  - [`apps/product/src/features/settings/components/DataSettings.tsx`](../../../apps/product/src/features/settings/components/DataSettings.tsx) で `if (!result.data) throw new Error('Export failed');` を探す
+  - [`apps/product/src/features/settings/components/DataSettings.tsx`](../../../apps/product/src/features/settings/components/DataSettings.tsx) で `if (result.isError || !result.data) throw new Error('Export failed');` を探す
   - [`apps/product/src/lib/trpc/query-client.ts`](../../../apps/product/src/lib/trpc/query-client.ts) で `return failureCount < 3;` を探す
   - [`apps/product/src/lib/tanstack-query/should-persist-query.ts`](../../../apps/product/src/lib/tanstack-query/should-persist-query.ts) で `query.state.status === 'success' &&` を探す
 
@@ -144,7 +146,7 @@ Plan・Record・カテゴリ・アクティビティはcollectQueryPagesで500�
 - データ: 変化なし。ファイルは作られない。
 - 再試行: query の既定で最大 3 回まで自動で再試行する。それでも駄目なら利用者が押し直す。
 - 痕跡: サーバーが Sentry へ送る（feature: account_export、operation: fetch_records 等）。応答は INTERNAL_SERVER_ERROR。
-- **最初に見る場所**: Sentry で feature:account_export を探す。前回の成功がこの画面に残っていると、失敗でも成功表示になる（段 2 の失敗）。
+- **最初に見る場所**: Sentryでfeature:account_exportを探す。前回成功したdataが残っていても、画面はrefetch失敗として扱う。
 - 根拠:
   - [`apps/product/src/features/auth/server/user-service.ts`](../../../apps/product/src/features/auth/server/user-service.ts) で `feature: 'account_export',` を探す
   - [`apps/product/src/lib/trpc/error-code-map.ts`](../../../apps/product/src/lib/trpc/error-code-map.ts) で `EXPORT_FAILED: 'INTERNAL_SERVER_ERROR',` を探す
@@ -167,13 +169,15 @@ Plan・Record・カテゴリ・アクティビティはcollectQueryPagesで500�
 範囲が「期間指定」で開始日と終了日の両方が入っている時だけ、Plan と Record を start_at で絞る。開始日は new Date('YYYY-MM-DD')、終了日はブラウザの timezone の 23:59:59.999。どちらかが空なら絞らず全期間になる。カテゴリ・アクティビティ・設定は絞らない。
 
 - **なぜ必要か**: サーバーは範囲を受け取らないので、絞り込みはここだけで行う。
-- **入力 → 出力**: キャッシュ上の全データと開始日・終了日 → 絞った Plan / Record（キャッシュの配列を置き換える）
+- **入力 → 出力**: キャッシュ上の全データと開始日・終了日 → エクスポート用コピーのPlan / Recordだけを絞る（query cacheは変更しない）
 - **ここを変えると**: 日付の境界をブラウザで組んでいて、利用者の timezone 設定を使っていない（timezone.md の禁止パターンに近い書き方）。開始日は UTC の 0 時として読まれ、終了日はブラウザの timezone で閉じるので、両端の扱いが揃っていない。直すなら toTZStartISO / toTZEndISO を利用者の timezone で使う。絞り込みは開始時刻だけで、期間を跨ぐ Plan / Record は開始側の期間にしか入らない。
 - **コード**:
   - [`apps/product/src/features/settings/components/DataSettings.tsx`](../../../apps/product/src/features/settings/components/DataSettings.tsx) で `const start = new Date(startDate);` を探す
   - [`apps/product/src/features/settings/components/DataSettings.tsx`](../../../apps/product/src/features/settings/components/DataSettings.tsx) で `end.setHours(23, 59, 59, 999);` を探す
   - [`apps/product/src/features/settings/components/DataSettings.tsx`](../../../apps/product/src/features/settings/components/DataSettings.tsx) で `if (range === 'custom' && startDate && endDate) {` を探す
   - [`docs/engineering/timezone.md`](../../engineering/timezone.md) で `## 禁止パターン一覧` を探す
+- **この段を守るテスト**:
+  - [`apps/product/src/features/settings/components/DataSettings.csv-export.test.tsx`](../../../apps/product/src/features/settings/components/DataSettings.csv-export.test.tsx) で `it('期間で絞ってもqueryの全件データを変更しない'` を探す
 
 <details>
 <summary>⚡ UTC より東の timezone で期間指定する — 画面: 何も起きない / データ: 欠落する / 再試行: 利用者がやり直す / 痕跡: 残らない</summary>
@@ -305,7 +309,7 @@ Blob から一時 URL を作り、見えないリンクの download 属性に da
         "in": "ボタンの押下",
         "out": "POST /api/trpc（user.exportData、入力なし）"
       },
-      "change": "refetch の結果は例外にならず、失敗しても前回成功した data を持ったまま返る。成否を data の有無だけで判定しているので、ここを触る時は result.isError も見る形にする。",
+      "change": "refetchは失敗しても前回のdataを返すため、isErrorも確認して失敗時はファイルを作らない。dataの有無だけに戻すと古い結果を成功扱いする。",
       "refs": [
         {
           "path": "apps/product/src/features/settings/components/DataSettings.tsx",
@@ -317,22 +321,22 @@ Blob から一時 URL を作り、見えないリンクの download 属性に da
         },
         {
           "path": "apps/product/src/features/settings/components/DataSettings.tsx",
-          "find": "if (!result.data) throw new Error('Export failed');"
+          "find": "if (result.isError || !result.data) throw new Error('Export failed');"
         }
       ],
       "fails": [
         {
           "id": "stale-success",
           "label": "前回成功した後で、今回の取得が失敗する",
-          "screen": "「データをエクスポートしました」と出る。失敗は利用者に見えない。",
-          "data": "DB は変化なし。保存されるファイルは前回取得した時点の内容で、その後の変更が入っていない。",
-          "retry": "query の既定で最大 3 回まで再試行したあと、前回の data のまま進む。",
-          "trace": "サーバー側の失敗なら Sentry（feature: account_export）に残るが、画面の成功表示とは結び付かない。",
-          "look": "コードから読んだ挙動で、実機では未確認。同じ画面で 2 回目以降、またはブラウザに保存された前回の結果が復元された後に起きうる。handleExport の成否判定（result.data の有無）を見る。",
+          "screen": "エクスポート失敗のトーストを出し、ファイルを作らない。",
+          "data": "DBと前回取得したquery dataは変化なし。古いデータを今回の成功結果として保存しない。",
+          "retry": "queryの既定の再試行後も失敗なら、利用者が押し直す。",
+          "trace": "サーバー側の失敗はaccount_exportの既存観測経路に残る。",
+          "look": "実QueryObserverの成功→失敗をcomponent testで再現。実機・本番の観測ではない。",
           "refs": [
             {
               "path": "apps/product/src/features/settings/components/DataSettings.tsx",
-              "find": "if (!result.data) throw new Error('Export failed');"
+              "find": "if (result.isError || !result.data) throw new Error('Export failed');"
             },
             {
               "path": "apps/product/src/lib/trpc/query-client.ts",
@@ -344,12 +348,11 @@ Blob から一時 URL を作り、見えないリンクの download 属性に da
             }
           ],
           "tags": {
-            "screen": "none",
-            "data": "lost",
-            "retry": "auto",
+            "screen": "toast",
+            "data": "unchanged",
+            "retry": "user",
             "trace": "sentry"
           },
-          "continues": true,
           "screenAfter": {
             "t": "settings",
             "url": "/ja/settings/data",
@@ -359,8 +362,9 @@ Blob から一時 URL を作り、見えないリンクの download 属性に da
               ["範囲", "全期間", "neutral"]
             ],
             "button": "エクスポート",
-            "toast": "データをエクスポートしました",
-            "note": "ブラウザが dayopt-export-<数字>.json を保存する"
+            "toast": "エクスポートできませんでした。もう一度お試しください。",
+            "note": "古いdataがあっても今回のファイルは作らない",
+            "toastTone": "bad"
           }
         }
       ],
@@ -374,7 +378,13 @@ Blob から一時 URL を作り、見えないリンクの download 属性に da
         ],
         "button": "エクスポート中...",
         "note": "応答が返るまでボタンは押せない"
-      }
+      },
+      "tests": [
+        {
+          "path": "apps/product/src/features/settings/components/DataSettings.csv-export.test.tsx",
+          "find": "it('成功後の再取得失敗を古いdataで成功扱いしない'"
+        }
+      ]
     },
     {
       "id": "gate",
@@ -520,7 +530,7 @@ Blob から一時 URL を作り、見えないリンクの download 属性に da
           "data": "変化なし。ファイルは作られない。",
           "retry": "query の既定で最大 3 回まで自動で再試行する。それでも駄目なら利用者が押し直す。",
           "trace": "サーバーが Sentry へ送る（feature: account_export、operation: fetch_records 等）。応答は INTERNAL_SERVER_ERROR。",
-          "look": "Sentry で feature:account_export を探す。前回の成功がこの画面に残っていると、失敗でも成功表示になる（段 2 の失敗）。",
+          "look": "Sentryでfeature:account_exportを探す。前回成功したdataが残っていても、画面はrefetch失敗として扱う。",
           "refs": [
             {
               "path": "apps/product/src/features/auth/server/user-service.ts",
@@ -595,7 +605,7 @@ Blob から一時 URL を作り、見えないリンクの download 属性に da
       "why": "サーバーは範囲を受け取らないので、絞り込みはここだけで行う。",
       "io": {
         "in": "キャッシュ上の全データと開始日・終了日",
-        "out": "絞った Plan / Record（キャッシュの配列を置き換える）"
+        "out": "エクスポート用コピーのPlan / Recordだけを絞る（query cacheは変更しない）"
       },
       "change": "日付の境界をブラウザで組んでいて、利用者の timezone 設定を使っていない（timezone.md の禁止パターンに近い書き方）。開始日は UTC の 0 時として読まれ、終了日はブラウザの timezone で閉じるので、両端の扱いが揃っていない。直すなら toTZStartISO / toTZEndISO を利用者の timezone で使う。絞り込みは開始時刻だけで、期間を跨ぐ Plan / Record は開始側の期間にしか入らない。",
       "refs": [
@@ -689,7 +699,13 @@ Blob から一時 URL を作り、見えないリンクの download 属性に da
           ["終了日", "2026/09/20", "neutral"]
         ],
         "button": "エクスポート"
-      }
+      },
+      "tests": [
+        {
+          "path": "apps/product/src/features/settings/components/DataSettings.csv-export.test.tsx",
+          "find": "it('期間で絞ってもqueryの全件データを変更しない'"
+        }
+      ]
     },
     {
       "id": "format",

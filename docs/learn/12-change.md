@@ -471,7 +471,7 @@ last_verified: 2026-09-21
 #### `apps/product/src/features/settings/components/DataSettings.tsx`
 
 - [データを書き出す](journeys/data-export.md) の 1. 形式と範囲を選ぶ — 同じ画面の下に、全件削除（deleteBlocks / deleteAllData）がある。こちらは不可逆なので、エクスポートとは別の経路として扱い、ここを変える時に巻き込まない。
-- [データを書き出す](journeys/data-export.md) の 2. 押した時に問い合わせる — refetch の結果は例外にならず、失敗しても前回成功した data を持ったまま返る。成否を data の有無だけで判定しているので、ここを触る時は result.isError も見る形にする。
+- [データを書き出す](journeys/data-export.md) の 2. 押した時に問い合わせる — refetchは失敗しても前回のdataを返すため、isErrorも確認して失敗時はファイルを作らない。dataの有無だけに戻すと古い結果を成功扱いする。
 - [データを書き出す](journeys/data-export.md) の 7. 期間で絞る — 日付の境界をブラウザで組んでいて、利用者の timezone 設定を使っていない（timezone.md の禁止パターンに近い書き方）。開始日は UTC の 0 時として読まれ、終了日はブラウザの timezone で閉じるので、両端の扱いが揃っていない。直すなら toTZStartISO / toTZEndISO を利用者の timezone で使う。絞り込みは開始時刻だけで、期間を跨ぐ Plan / Record は開始側の期間にしか入らない。
 - [データを書き出す](journeys/data-export.md) の 8. CSV か JSON にする — CSV の列を足すと、既存のスプレッドシートの取り込み手順が壊れうる（外部に渡る形式）。列は TIMEBLOCK_CSV_COLUMNS 1 か所で決まる。CSV にはカテゴリとアクティビティの名前が入らず、activity_id だけになる。
 - [データを書き出す](journeys/data-export.md) の 9. ファイルを保存する — 成功のトーストは click を呼んだ時点で出していて、ブラウザが実際に保存したかは確かめていない。
@@ -742,7 +742,7 @@ last_verified: 2026-09-21
 
 #### `apps/product/src/lib/tanstack-query/should-persist-query.ts`
 
-- [データを書き出す](journeys/data-export.md) の 2. 押した時に問い合わせる — refetch の結果は例外にならず、失敗しても前回成功した data を持ったまま返る。成否を data の有無だけで判定しているので、ここを触る時は result.isError も見る形にする。
+- [データを書き出す](journeys/data-export.md) の 2. 押した時に問い合わせる — refetchは失敗しても前回のdataを返すため、isErrorも確認して失敗時はファイルを作らない。dataの有無だけに戻すと古い結果を成功扱いする。
 - [データを書き出す](journeys/data-export.md) の 6. 応答を受け取る — 全データを端末に残したくないなら、useQuery に meta: { persist: false } を付ける。応答の大きさは件数に比例する。Vercel の応答サイズの上限に当たるかは未確認。
 
 #### `apps/product/src/lib/time/derived-model.ts`
@@ -798,7 +798,7 @@ last_verified: 2026-09-21
 - [Plan を保存](journeys/save-plan.md) の 6. 関門チェック — 順序に理由がある。write fence を rate limit より先に見るのは、止めている間の依頼で自分の枠を使い切り、復旧直後に締め出されるのを避けるため。
 - [レポートを開く（集計）](journeys/report.md) の 3. /api/trpc と関門 — requiresProductAccess を変えると、レポートを含む全 query の見え方が課金状態で変わる。ここは全 tRPC 共通なので、変更の影響は保存経路（Plan を保存）と同じ範囲に及ぶ。
 - [レポートを開く（集計）](journeys/report.md) の 6. 行を取る — RLS（利用者の権限の client）に加えて user_id でも絞っている。PostgREST の 1 回あたりの行数上限に黙って切られないよう collectQueryPages で読み切るので、ここを単発の select に戻すと多い期間で数字が欠ける。
-- [データを書き出す](journeys/data-export.md) の 2. 押した時に問い合わせる — refetch の結果は例外にならず、失敗しても前回成功した data を持ったまま返る。成否を data の有無だけで判定しているので、ここを触る時は result.isError も見る形にする。
+- [データを書き出す](journeys/data-export.md) の 2. 押した時に問い合わせる — refetchは失敗しても前回のdataを返すため、isErrorも確認して失敗時はファイルを作らない。dataの有無だけに戻すと古い結果を成功扱いする。
 - [データを書き出す](journeys/data-export.md) の 3. /api/trpc と関門 — requiresProductAccess を query にも掛けると、課金が切れた利用者がエクスポートできなくなる。operation-access.ts の一覧に user.exportData があるのは mutation 向けの例外表で、query のこの経路には効いていない。
 - [データを書き出す](journeys/data-export.md) の 6. 応答を受け取る — 全データを端末に残したくないなら、useQuery に meta: { persist: false } を付ける。応答の大きさは件数に比例する。Vercel の応答サイズの上限に当たるかは未確認。
 - [AI クライアントから Plan を作る（MCP）](journeys/mcp.md) の 11. Dayopt の画面に現れる — すぐ反映したくなったら Realtime を足す判断になるが、infra.md は Realtime を現状の構成に含めていない。staleTime を短くすると全 query の取得回数が増える。

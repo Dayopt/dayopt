@@ -68,9 +68,9 @@ function ExportSection() {
   const handleExport = useCallback(async () => {
     try {
       const result = await exportDataQuery.refetch();
-      if (!result.data) throw new Error('Export failed');
+      if (result.isError || !result.data) throw new Error('Export failed');
 
-      const exportData = result.data;
+      const exportData = { ...result.data, data: { ...result.data.data } };
 
       // 日付範囲フィルタリング
       if (range === 'custom' && startDate && endDate) {
