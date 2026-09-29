@@ -140,3 +140,5 @@ H025のclear後再投入をF025として採用。実TanStack復元で旧userのq
 前回公開headは`b0e8afa5cbd104d5383e16b361fbec3cd0454eb5`、通常pre-push成功ログ `/tmp/dayopt-audit-push-main-21770-verified.log`。Issue記録 https://github.com/Dayopt/dayopt/issues/2963#issuecomment-5888170506 。その後の読解とF025はlocal commitで、次の通常検査後にDraftへ反映する。
 
 F025を含む製品SHA `605d4e6130bcb3989e043484ebc89c7e4c2e5921` の`pnpm check`はNode24でexit 0。型/lint/static、billing37/i18n2/observability64/product4369/web366/scripts2642、合計7480 passed。ログ `/tmp/dayopt-audit-check-cache-races.log`。製品コードを固定し、検査中は監査記録だけを追記。読解は基準269ファイルまで進んだ。H026は回復コードのtiming testの無効な閾値を記録し、次に実装根拠と測れる契約を分けて修正する。実DB/クラウドE2E/配信は未実施。
+
+#2619本文と唯一のclosure commentを全文取得し、sign-out後storage空・別userへ復元しない・オフライン同一userを壊さないという受入条件を確認。router・再認証helper・service-role静的guard・PWA仕様も全文読解し、基準273件。static guardは明記された検出範囲に限る。#2619本文の非機微query allowlist案は別段階へ分けられる扱いで、今回勝手にオフライン対象を縮小しない。次は回復コード/古いsession helperの検証品質と、cache主体変更の残るlifecycleを続ける。

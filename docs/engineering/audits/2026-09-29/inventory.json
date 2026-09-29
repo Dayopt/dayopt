@@ -7228,10 +7228,12 @@
       "mode": "100644",
       "bytes": 9153,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 189]],
+      "evidence": [
+        "Full text read at 5d7f96eb1. Auth router/recovery/reauth, limited static service-role guard and PWA fallback cross-checked. Issue #2619 body and only closure comment read in full; acceptance includes empty storage after sign-out and no cross-principal restore. Guard limitations are not treated as complete data-flow proof."
+      ],
       "questions": []
     },
     {
@@ -7271,10 +7273,12 @@
       "mode": "100644",
       "bytes": 7972,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 204]],
+      "evidence": [
+        "Full text read at 5d7f96eb1. Auth router/recovery/reauth, limited static service-role guard and PWA fallback cross-checked. Issue #2619 body and only closure comment read in full; acceptance includes empty storage after sign-out and no cross-principal restore. Guard limitations are not treated as complete data-flow proof."
+      ],
       "questions": []
     },
     {
@@ -7284,10 +7288,12 @@
       "mode": "100644",
       "bytes": 4852,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 94]],
+      "evidence": [
+        "Full text read at 5d7f96eb1. Auth router/recovery/reauth, limited static service-role guard and PWA fallback cross-checked. Issue #2619 body and only closure comment read in full; acceptance includes empty storage after sign-out and no cross-principal restore. Guard limitations are not treated as complete data-flow proof."
+      ],
       "questions": []
     },
     {
@@ -28455,10 +28461,12 @@
       "mode": "100644",
       "bytes": 8983,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 173]],
+      "evidence": [
+        "Full text read at 5d7f96eb1. Auth router/recovery/reauth, limited static service-role guard and PWA fallback cross-checked. Issue #2619 body and only closure comment read in full; acceptance includes empty storage after sign-out and no cross-principal restore. Guard limitations are not treated as complete data-flow proof."
+      ],
       "questions": []
     },
     {
