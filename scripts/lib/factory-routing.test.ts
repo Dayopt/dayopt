@@ -28,14 +28,20 @@ describe('factory routing', () => {
     { acceptance: false },
     { verification: false },
     { metadataAvailable: false },
-    { workflowStatus: 'Blocked', workflowStatusAvailable: true },
-    { workflowStatusAvailable: false },
     { state: 'CLOSED' },
     { labels: ['status:blocked'] },
   ])('情報不足・凍結を軽作業に格下げしない: %j', (change) => {
     expect(resolveFactoryRoute({ ...normal, ...change })).toMatchObject({
       level: 'unclassified',
       ready: false,
+    });
+  });
+
+  it('status:blocked の無い open issue は利用可能として判定する', () => {
+    expect(resolveFactoryRoute(normal)).toMatchObject({ ready: true, level: 'L2' });
+    expect(resolveFactoryRoute({ ...normal, labels: ['status:blocked'] })).toMatchObject({
+      ready: false,
+      missing: ['OPEN かつ凍結されていない状態'],
     });
   });
 
@@ -70,6 +76,18 @@ describe('factory routing', () => {
 
   it('review:full は人間向けの印で機械判定に使わない', () => {
     expect(resolveFactoryRoute({ ...normal, labels: ['review:full'] }).level).toBe('L2');
-    expect(resolveFactoryRoute({ ...normal, labels: ['type:spike'] }).level).toBe('L3');
+    expect(resolveFactoryRoute({ ...normal, labels: ['type:question'] }).level).toBe('L3');
+  });
+
+  it.each([
+    ['type:mission', '子 Issue へ分解する。Mission 自体は実装しない'],
+    ['type:task', '合意済みの範囲を実装し、受け入れ条件を検証する'],
+    ['type:bug', 'まず再現し、回帰検証を加えて修正する'],
+    ['type:question', '証拠と調査結果を Issue コメントに残し、人の判断を待つ。PR は作らない'],
+  ])('%s は合意した進め方を表示する', (label, workGuidance) => {
+    expect(resolveFactoryRoute({ ...normal, labels: [label] })).toMatchObject({
+      workType: label,
+      workGuidance,
+    });
   });
 });

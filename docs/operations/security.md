@@ -21,7 +21,7 @@ GitHub Actionsのセキュリティ設定、OWASP準拠のセキュリティ監�
   workflows/
     ci.yml                    # impact（affected 判定）→ static（gitleaks + secrets:check + docs:check + lint/typecheck/knip）∥ unit（+ migration safety の検知）∥ integration（affected 時の RLS/integration）の並列 4 job + unit 後の migration-notice（検知時だけラベル + コメント）
     production-config-audit.yml  # Vercel environment metadata 監査
-    nightly.yml               # workflow-status-sweep + replica-check + storage-backup-export の 3 job（#2483 で旧ファイルから統合。night-watch job は 2026-09-02、層 3 と integration は 2026-09-03 に撤去）
+    nightly.yml               # product-unit-full + replica-check + storage-backup-export + notify-failure（#2483 で旧ファイルから統合。night-watch は 2026-09-02、層 3 と integration は 2026-09-03、Workflow status cleanup は 2026-09-29 に撤去）
     create-release.yml        # GitHub Release 作成
     promote.yml               # main merge 連動の promote。impact → 層 3（E2E / Web Build & E2E）→ release の 3 job
 ```
@@ -49,7 +49,6 @@ credential audit P2-6）。`ci.yml` の job が checkout / setup（`pnpm install
 | `ci.yml`（migration-notice job）                                                   | `contents: read` / `pull-requests: write` / `issues: write`  | migration safety の通知。checkout・依存 install をせず、unit の output は allowlist 検証する  |
 | `ci.yml`（integration job）                                                        | `contents: read`                                             | gh を呼ばないため job 単位で最小へ絞る（PR コードを実行する job に書き込み token を置かない） |
 | `nightly.yml`（replica-check / storage-backup job）                                | `contents: read`                                             | コード読み取りのみ                                                                            |
-| `nightly.yml`（workflow-status-sweep job）                                         | `issues: write` / `contents: read`                           | closed issue の Workflow status field cleanup                                                 |
 | `nightly.yml`（notify-failure job）                                                | `issues: write` / `contents: read`                           | 失敗時の issue 通知                                                                           |
 | `production-config-audit.yml`（deploy-health / notify-supabase-audit-failure job） | `issues: write` ほか                                         | 失敗時の issue 通知                                                                           |
 | `promote.yml`（notify_failure job）                                                | `issues: write` / `contents: read`                           | 失敗時の issue 通知                                                                           |

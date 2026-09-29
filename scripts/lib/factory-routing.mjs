@@ -2,16 +2,13 @@ import { resolveProtectedPathGate } from '../ci/protected-path-gate.mjs';
 
 /**
  * Advisory routing only: never a permission, readiness label, or model launcher.
- * @param {{files: string[] | null, labels?: string[], workflowStatus?: string | null,
- * workflowStatusAvailable?: boolean, body?: string,
+ * @param {{files: string[] | null, labels?: string[], body?: string,
  * acceptance?: boolean, verification?: boolean, missingContractSections?: string[],
  * metadataAvailable?: boolean, state?: string | null}} input
  */
 export function resolveFactoryRoute({
   files,
   labels = [],
-  workflowStatus = null,
-  workflowStatusAvailable,
   body = '',
   acceptance = false,
   verification = false,
@@ -43,17 +40,28 @@ export function resolveFactoryRoute({
   ) {
     reasons.push('時間・操作の不変条件に関係する可能性');
   }
-  if (labels.some((label) => ['risk:authority', 'type:spike'].includes(label))) {
+  if (labels.includes('risk:authority') || labels.includes('type:question')) {
     reasons.push('設計・権限・詳細レビューの明示指定');
+  }
+  const workType = labels.find((label) => /^type:(mission|task|bug|question)$/.test(label)) ?? null;
+  const workGuidance =
+    {
+      'type:mission': '子 Issue へ分解する。Mission 自体は実装しない',
+      'type:task': '合意済みの範囲を実装し、受け入れ条件を検証する',
+      'type:bug': 'まず再現し、回帰検証を加えて修正する',
+      'type:question': '証拠と調査結果を Issue コメントに残し、人の判断を待つ。PR は作らない',
+    }[workType] ?? null;
+  if (workType === 'type:mission' || workType === 'type:question') {
+    reasons.push(
+      workType === 'type:mission'
+        ? 'Mission issue: 子 Issue への分解を優先'
+        : 'Question issue: 人の判断を要する',
+    );
   }
   if (/認可|権限境界|課金|不可逆|\b(?:RLS|OAuth|SECURITY DEFINER)\b/i.test(body)) {
     reasons.push('本文に権限・外部契約・不可逆性の手掛かり');
   }
-  const unavailable =
-    labels.includes('status:blocked') ||
-    workflowStatus === 'Blocked' ||
-    workflowStatusAvailable === false ||
-    state?.toLowerCase() !== 'open';
+  const unavailable = labels.includes('status:blocked') || state?.toLowerCase() !== 'open';
   if (unavailable) missing.push('OPEN かつ凍結されていない状態');
   const level = reasons.length > 0 ? 'L3' : missing.length > 0 ? 'unclassified' : 'L2';
   return {
@@ -61,6 +69,8 @@ export function resolveFactoryRoute({
     advisory: true,
     level,
     ready: missing.length === 0,
+    workType,
+    workGuidance,
     reasons:
       reasons.length > 0
         ? reasons

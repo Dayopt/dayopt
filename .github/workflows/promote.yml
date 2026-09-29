@@ -392,16 +392,15 @@ jobs:
           else
             issue_url=$(gh issue create --repo "$GITHUB_REPOSITORY" \
               --title "$title_prefix" \
-              --label "area:deployment" \
+              --label "type:bug,area:deployment" \
               --body "$body")
             issue_number="${issue_url##*/}"
           fi
 
-          current_priority=$(gh api "repos/$GITHUB_REPOSITORY/issues/$issue_number/issue-field-values" \
-            --jq '.[] | select(.issue_field_id == 38713666) | .single_select_option.name // empty')
+          current_priority=$(gh issue view "$issue_number" --repo "$GITHUB_REPOSITORY" \
+            --json labels --jq '[.labels[].name | select(test("^priority:p[0-3]$"))][0] // empty')
           if [ -z "$current_priority" ]; then
-            printf '%s\n' '{"issue_field_values":[{"field_id":38713666,"value":"High"}]}' |
-              gh api --method POST "repos/$GITHUB_REPOSITORY/issues/$issue_number/issue-field-values" --input -
+            gh issue edit "$issue_number" --repo "$GITHUB_REPOSITORY" --add-label priority:p1
           fi
 
   # ─── promote 本体（層 4）────────────────────────────────────────────────

@@ -3,8 +3,8 @@ name: Nightly
 # CI ファイル統合（#2483 Phase 1）: 旧 heavy-post-merge.yml / integration.yml
 # （integration job のみ。migration-safety は ci.yml の unit job へ移設済み）/
 # replica-check.yml / storage-backup-export.yml の cron を 1 ファイルへ統合し、
-# close 済み issue の Workflow status field を消す batch sweep を新設 job として
-# 追加した（統合時に同居していた night-watch job は 2026-09-02 に撤去済み）。
+# product unit の full 実行を追加した（統合時に同居していた night-watch job は
+# 2026-09-02 に撤去済み）。
 #
 # **同じ schedule 配列に複数 cron を書くと、どの cron でもこの workflow 全体が
 # 起動する。job 単位の `if: github.event.schedule == '<cron>'` 振り分けが
@@ -26,7 +26,7 @@ name: Nightly
 
 on:
   schedule:
-    # 04:30 JST — close 済み issue の Workflow status field cleanup。
+    # 04:30 JST — product unit tests (full)。
     - cron: '30 19 * * *'
     # 06:30 JST — replica-check（production-config-audit の 06:00 JST cron と
     # 同日、時間をずらして外部 API 呼び出し衝突を避ける）。
@@ -36,11 +36,10 @@ on:
   workflow_dispatch:
     inputs:
       jobs:
-        description: '実行する job を選ぶ。replica-check / workflow-status-sweep / storage-backup は各 job を単独で手動代行したい時に選ぶ（既定は replica-check）。all は一括検証専用——storage-backup-export の実転送・Workflow status field cleanup も同時に走るため、単独の job だけ再実行したい時に選ばないこと（内製クロスレビュー risk-reviewer 指摘、P2、PR #2484: jobs=all しか無いと、単独 job の手動代行のつもりで実データ転送を誤爆させうる）'
+        description: '実行する job を選ぶ。replica-check / unit-full / storage-backup は各 job を単独で手動代行したい時に選ぶ（既定は replica-check）。all は一括検証専用で storage-backup-export の実転送も走るため、単独の job だけ再実行したい時に選ばないこと（PR #2484）'
         type: choice
         options:
           - replica-check
-          - workflow-status-sweep
           - storage-backup
           - unit-full
           - all
@@ -51,37 +50,11 @@ on:
         default: false
 
 jobs:
-  # ─── closed issue の Workflow status cleanup ─────────────────────────
-  # 旧 status:* label は移行後に削除する。closed issue の field 値は状態の記録として
-  # 維持せず、日次 backstop で Workflow status field だけを clear する。
-  # Issue Fields API の field-specific DELETE を使い、Priority やラベルには触れない。
-  workflow-status-sweep:
-    name: Closed issue Workflow status cleanup
-    if: github.event.schedule == '30 19 * * *' || (github.event_name == 'workflow_dispatch' && (github.event.inputs.jobs == 'workflow-status-sweep' || github.event.inputs.jobs == 'all'))
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    concurrency:
-      group: nightly-workflow-status-sweep
-      cancel-in-progress: false
-    permissions:
-      contents: read
-      issues: write
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      # timeout-minutes を変える時は script 側の 480 秒予算も見直す。
-      - name: Clear Workflow status from closed issues
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: node scripts/ci/clear-closed-workflow-status.mjs bulk --execute --budget-seconds 480
-
   # ─── product unit の full 実行（#2743）──────────────────────────────
   # PR の Unit job は product unit を `vitest related`（変更が import graph で届く test）に
   # 絞っている（scripts/ci/check.mjs resolveProductUnitScope）。graph で追えない漏れ
   # （削除した module を vi.mock の文字列で参照する等）を最大 1 日で拾う backstop。
-  # 04:30 JST の cron（workflow-status-sweep と同じ枠）に同居させ、cron を増やさない。
+  # 04:30 JST の cron に同居させ、cron を増やさない。
   product-unit-full:
     name: Product unit tests (full)
     if: github.event.schedule == '30 19 * * *' || (github.event_name == 'workflow_dispatch' && (github.event.inputs.jobs == 'unit-full' || github.event.inputs.jobs == 'all'))
@@ -246,11 +219,10 @@ jobs:
   # skipped（cron 振り分けで走らない job）は失敗ではない。
   notify-failure:
     name: File nightly failure
-    needs: [workflow-status-sweep, product-unit-full, replica-check, storage-backup-export]
+    needs: [product-unit-full, replica-check, storage-backup-export]
     if: >-
       ${{ !cancelled()
-          && ( needs.workflow-status-sweep.result == 'failure'
-               || needs.product-unit-full.result == 'failure'
+          && ( needs.product-unit-full.result == 'failure'
                || needs.replica-check.result == 'failure'
                || needs.storage-backup-export.result == 'failure' ) }}
     runs-on: ubuntu-latest
@@ -263,7 +235,6 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          SWEEP_RESULT: ${{ needs.workflow-status-sweep.result }}
           UNIT_RESULT: ${{ needs.product-unit-full.result }}
           REPLICA_RESULT: ${{ needs.replica-check.result }}
           BACKUP_RESULT: ${{ needs.storage-backup-export.result }}
@@ -284,15 +255,10 @@ jobs:
             hints="$hints
           - **product-unit-full**: PR では related に絞った product unit が main の full 実行で落ちた。PR の判定（\`scripts/ci/check.mjs\` の \`resolveProductUnitScope\`）が拾えなかった依存があるので、落ちた test を直すのに加え、その依存の種類を full 側へ倒す規則に足す（docs/engineering/testing.md §いつ回すか）"
           fi
-          if [ "$SWEEP_RESULT" = "failure" ]; then
-            hints="$hints
-          - **workflow-status-sweep**: \`scripts/ci/clear-closed-workflow-status.mjs bulk\` の失敗。実害は closed issue に Workflow status field が残るだけ。次回の nightly sweep で再試行される"
-          fi
           body="nightly の job が失敗した（起動: \`$EVENT_NAME\`）。
 
           | job | result |
           | --- | --- |
-          | Workflow status field cleanup | \`$SWEEP_RESULT\` |
           | Product unit tests (full) | \`$UNIT_RESULT\` |
           | Check Vercel replica against 1Password ledger | \`$REPLICA_RESULT\` |
           | Export Supabase Storage to R2 | \`$BACKUP_RESULT\` |
@@ -314,14 +280,13 @@ jobs:
           else
             issue_url=$(gh issue create --repo "$GITHUB_REPOSITORY" \
               --title "$title_prefix" \
-              --label "area:operations" \
+              --label "type:bug,area:operations,priority:p2" \
               --body "$body")
             issue_number="${issue_url##*/}"
           fi
 
-          current_priority=$(gh api "repos/$GITHUB_REPOSITORY/issues/$issue_number/issue-field-values" \
-            --jq '.[] | select(.issue_field_id == 38713666) | .single_select_option.name // empty')
+          current_priority=$(gh issue view "$issue_number" --repo "$GITHUB_REPOSITORY" \
+            --json labels --jq '[.labels[].name | select(test("^priority:p[0-3]$"))][0] // empty')
           if [ -z "$current_priority" ]; then
-            printf '%s\n' '{"issue_field_values":[{"field_id":38713666,"value":"Medium"}]}' |
-              gh api --method POST "repos/$GITHUB_REPOSITORY/issues/$issue_number/issue-field-values" --input -
+            gh issue edit "$issue_number" --repo "$GITHUB_REPOSITORY" --add-label priority:p2
           fi
