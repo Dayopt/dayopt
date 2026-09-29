@@ -134,7 +134,7 @@ agent が実際に踏んで、緑の報告が嘘になった事例。どれも�
 
 ### Cloud Preview の実行前照合（#2910、移行中）
 
-`node scripts/runbook/preview-readiness.mjs` は、指定した Product Preview と非本番 DB の対応を読み取りで確認する。readiness 単独では E2E を起動せず、required check でもない。常設 DB 登録・資格情報配布・実 Preview での検証は未完了であり、この処理の unit test 成功を環境稼働の証拠にしない。
+`node scripts/runbook/preview-readiness.mjs` は、指定した Product Preview と非本番 DB の対応を読み取りで確認する。readiness 単独では E2E を起動せず、required check でもない。常設Integration DBとreadiness/DB keyのEnvironment登録は確認済みだが、Protection bypassの選択・実 Previewでの検証は未完了。この処理のunit test成功をログイン/CRUD実走の証拠にしない。
 
 ```bash
 node scripts/runbook/preview-readiness.mjs \
@@ -145,24 +145,25 @@ node scripts/runbook/preview-readiness.mjs \
 ```
 
 - 同じ SHA の clean checkout で実行する。期待 migration はその checkout から取得する。Supabase URL のみの指定や、可変 branch alias は対象選択に使わない。
-- `VERCEL_TOKEN`（対象 project の読取）、`SUPABASE_PREVIEW_READINESS_TOKEN`（branch metadata / 対象非本番 DB の読取）、`VERCEL_AUTOMATION_BYPASS_SECRET` を許可済み runner の環境から渡す。引数・証拠 JSON・ログへ値を出さず、個人の Vault unlock をコマンドの前提にしない。初期の登録・scope確認は別途必要。
-- Vercel API が返す具体 deployment の project、Git source、SHA、READY、非 production target を確認する。Supabase は指定 parent/branch/ref、非 default、本番データ複製なしを確認する。`shared` は persistent、`ephemeral` は同じ PR/branch に属する使い捨て環境に限る。
+- `GITHUB_TOKEN`（repositoryのdeployments/statuses read）、`SUPABASE_PREVIEW_READINESS_TOKEN`（branch/migration metadataだけの読取）、`VERCEL_AUTOMATION_BYPASS_SECRET` を許可済みrunnerの環境から渡す。引数・証拠 JSON・ログへ値を出さず、個人の Vault unlock をコマンドの前提にしない。初期の登録・scope確認は別途必要。
+- GitHubが認証したVercel botの最新Product commit status/deployment statusで、Product path、Preview環境、exact SHA、requested deployment ID、成功状態、非Production flagを確認する。数値project IDは直接観測しない。Supabase は指定 parent/branch/ref、非 default、本番データ複製なしを確認する。`shared` は persistent、`ephemeral` は同じ PR/branch に属する使い捨て環境に限る。
 - migration の version 集合は候補と完全一致を要求する。共有 DB に別候補の migration が入った場合も止まり、自動 reset・migration 適用・redeploy は行わない。version の一致は手動 DDL が無いことの証明ではない。
 - Preview の `/api/health/version` が返す完全 SHA / deployment ID / DB ref、および `/api/health` の DB 疎通も照合する。本番の version 応答は従来どおり。欠測や古いアプリは未確認として失敗する。
-- 成功 JSON は識別子・migration versions・観測開始/終了時刻のみ。各サービスを原子的に読んだ snapshot ではないため、`preview-e2e.mjs` は E2E 前後に照合する。共有 DB の候補競合を防ぐ排他は別途必要。
+- 成功JSONは識別子・migration versions・GitHub provider記録のID/発行者ID/時刻・観測開始/終了時刻だけを含む。全provider/DB/app観測が60秒を超える場合、時計が逆行・不正な場合は合格にしない。各サービスを原子的に読んだsnapshotではないため、`preview-e2e.mjs` はE2E前後に照合する。共有 DB の候補競合を防ぐ排他は別途必要。
 
-非ローカルで service role を使う既存 E2E は `E2E_ALLOW_NONLOCAL_SUPABASE=1` に加え `E2E_SUPABASE_PROJECT_REF` を要求し、対応する HTTPS Supabase origin だけに接続する。これは上の readiness を代替しない。critical-path の synthetic user は実行ごとに password を生成し、作成成功を確認した同じ client/user だけを cleanup する。setup・cleanup の失敗は test を失敗させ、cleanup エラーには合成 user ID と失敗箇所だけを残す。remote run は `users/<UUID>.json` に作成前から状態を記録し、Auth の app_metadata に `e2e_run_id` を付ける。中断・応答喪失・cleanup失敗後は、この記録と対象非本番DBのユーザーID・app_metadataの一致を確認して回収する。未知の既存ユーザーを推測で削除しない。子プロセス終了後は `preview-cleanup.mjs` がjournalの全件検査とAuth admin読取を行い、同じrun ID・user ID・合成メールnamespaceが一致するユーザーだけを回収し、削除後の不在を確認する。基準fixture・別run・Productionは対象外。runner自体が強制終了した場合の再開/CI配線は未実装だが、子起動前の `run.json` とjournalを回復用に保持する。
+非ローカルで service role を使う既存 E2E は `E2E_ALLOW_NONLOCAL_SUPABASE=1` に加え `E2E_SUPABASE_PROJECT_REF` を要求し、対応する HTTPS Supabase origin だけに接続する。これは上の readiness を代替しない。critical-path の synthetic user は実行ごとに password を生成し、作成成功を確認した同じ client/user だけを cleanup する。setup・cleanup の失敗は test を失敗させ、cleanup エラーには合成 user ID と失敗箇所だけを残す。remote run は実行開始前に `manifest.json` と `evidence/run.json` を保存し、`users/<UUID>.json` に作成前から状態を記録し、Auth の app_metadata に `e2e_run_id` を付ける。manifest/state/evidence は既定で `~/.local/state/dayopt/preview-e2e/<run UUID>/` に mode `0700/0600` で保存する。別の保存先を使うときだけ `E2E_PREVIEW_STATE_DIR` を明示する。manifestとuser記録にpassword、email、token、raw responseは保存しない。子プロセス終了後は `preview-cleanup.mjs` がjournal全件を先に検証し、Auth adminで同じrun ID・user ID・合成メールnamespaceが一致するユーザーだけを回収して削除後の不在を確認する。基準fixture・別run・Productionは対象外。
 
-[Protection Bypass の公式仕様](https://vercel.com/docs/deployment-protection/methods-to-bypass-deployment-protection/protection-bypass-automation)に従い、readiness の bypass header は API で確認した具体 deployment の origin だけへ送る。redirect は拒否する。ブラウザ全体への header 設定や query parameter への secret 埋込は使わない。[Playwright trace はネットワークも記録する](https://playwright.dev/docs/api/class-tracing)ため、remote E2E では生の Playwright trace/video/標準reportを保存先から除外する。代わりに下記の限定した操作記録を残す。通常CI/ローカルの既存traceは変更しない。
+[Protection Bypass の公式仕様](https://vercel.com/docs/deployment-protection/methods-to-bypass-deployment-protection/protection-bypass-automation)に従い、readinessのbypass headerはGitHubの認証済みprovider記録で確認した具体deploymentのoriginだけへ送る。redirect は拒否する。ブラウザ全体への header 設定や query parameter への secret 埋込は使わない。[Playwright trace はネットワークも記録する](https://playwright.dev/docs/api/class-tracing)ため、remote E2E では生の Playwright trace/video/標準reportを保存先から除外する。代わりに下記の限定した操作記録を残す。通常CI/ローカルの既存traceは変更しない。
 
 #### Remote E2E の実行
 
-`node scripts/runbook/preview-e2e.mjs` に上記 readiness と同じ引数を渡す。さらに承認済み非本番の `SUPABASE_SECRET_KEY` が必要。readiness に成功した具体 deployment に対し、既存の desktop / mobile critical-path（作成・reload・Report確認）を実行し、終了後に再照合する。localhost の build / 起動はしない。個人の1Password認証も呼び出さない。既存CIへのopt-in配線は下記。実クラウドでの通し確認はまだ未完了。
+`node scripts/runbook/preview-e2e.mjs` に上記 readiness と同じ引数を渡す。さらに承認済み非本番の `SUPABASE_SECRET_KEY` が必要。readiness に成功した具体 deployment に対し、既存の desktop / mobile critical-path（作成・reload・Report確認）を実行し、終了後に再照合する。localhost の build / 起動はしない。個人の1Password認証も呼び出さない。run IDとstate directoryは実行開始時に出力される。既存CIからの明示opt-in経路は下記。実クラウドでの通し確認はまだ未完了。
 
 - 子プロセスへは非本番DB keyと当該Previewのbypassだけを渡し、Vercel/Supabase管理tokenや他のアプリSecretは引き継がない。信頼できるコード・runnerでのみ実行する。未審査のforkへSecretを渡す仕組みではない。
 - ブラウザ通信は具体Preview、選択したSupabase、CAPTCHA providerに限定する。本番domainを含むその他originは拒否する。bypassはPreviewだけへ1 hopずつ付け、redirect先で再判定する。
-- 再試行は0、workerは1、Playwright全体5分。runnerの7分上限後は自分が起動したprocess groupを終了させる。これでDB上の合成データも自動的に消えるとはみなさず、下の残存記録を確認する。
-- 成果物は表示された `evidenceDirectory` だけを収集する。`run.json` はrun IDと前後のreadiness・cleanupの確認件数/回収件数、`e2e.json` は操作のコード位置・時間・成否、通信先種別・HTTP status、失敗時PNGへの参照、`users/*.json` は合成ユーザーの状態。raw stdout/stderr、失敗メッセージ、入力値、URL query、header、cookie、通信bodyは出力しない。内部Playwright出力は終了後削除する。
+- 再試行は0、workerは1、Playwright全体5分。runnerの7分上限とSIGINT/SIGTERM時は自分が起動したprocess groupを停止し、private Playwright出力を削除する。子プロセス終了後にjournal cleanupを行い、その確認結果をpass条件に含める。SIGKILLやhost終了でcleanup前に停止した場合、process停止だけではDB上の合成user削除を保証しないため、下の回復経路を使う。
+- 中断後の一覧は `node scripts/runbook/preview-e2e.mjs --list-recovery-runs`、明示したrunだけの回収は `node scripts/runbook/preview-e2e.mjs --recover-run <run UUID>`。**回収コマンドは現在の `origin/main` と完全一致するclean checkoutからのみ実行する。** コマンドが先に `origin/main` をfetchし、SHAとworking treeを照合する。回収時だけPRのOPEN・非Draft・現在head一致という新規実行条件を外すため、PRがclose/merge/head更新されても所有runを回収できる。内部repo・branch/baseと認証済みproviderの固定候補照合は維持する。回収処理は保存済み候補のdeployment/SHA/branch/DB ref/branch UUID/migration集合を再照合し、`running` / `recovering` の最後のheartbeatが10分以内なら停止する。`users/<UUID>.json` に列挙されたIDだけを対象にし、Auth user ID・`app_metadata.e2e_run_id`・critical-path用の合成emailが一致する場合に限って、そのuser IDの records/plans/activities/categories/user_settings/profiles とAuth userを消し、各テーブルとAuthの不在を確認する。Auth userが見つからない場合は各所有テーブルが既に0件かだけを確認し、残存行があれば所有を推測して削除せず手動確認で止める。失敗時はmanifestを保持して再試行可能にし、他run・基準fixture・未知ユーザー・DB全体には触れない。
+- 成果物は表示された `evidenceDirectory` だけを収集する。`run.json` はrun IDと前後のreadiness・cleanupの確認件数/回収件数、`e2e.json` は操作のコード位置・時間・成否、通信先種別・HTTP status、失敗時PNGへの参照、`users/*.json` は合成ユーザーの状態、`recovery.json` はローカル回収したユーザーIDだけ。raw stdout/stderr、失敗メッセージ、入力値、URL query、header、cookie、通信bodyは出力しない。内部Playwright出力は終了後削除する。
 - これはヘッダーやDOMを再現する通常のPlaywright traceではなく、資格情報を除外した限定的な操作記録。失敗の詳細は同じSHAのソース位置と失敗画面から追う。必要な情報が足りなければ、許可された非本番環境で範囲を絞って再現する。
 - 終了コード0だけでは成功にしない。desktop/mobile両方の全対象testが初回成功し、skip/欠測/異常終了がなく、後段のreadinessも一致し、2ユーザー以上のjournal全件で削除後の不在を確認した時だけ `passed`。この結果を既存Validationが信頼済み証拠として受理する配線は別途必要。
 
@@ -172,14 +173,16 @@ GitHub Actionsの既存 `CI` → `Run workflow` でworkflow branchを **integrat
 
 Secret取得前のread-only gateはOPEN・非Draft・同一repo PR・exact head SHA・許可したbase/head branchを確認する。共有モードは既存Persistentのref/UUIDに限定し、`supabase/**` が変わるPRを拒否する。隔離モードは本番・Persistentを拒否し、既存readinessがPR専用branchとの対応を照合する。gateはコードの無害性を証明しない。権限ある担当が対象コードと依存をレビューしてSHAを選び、明示dispatchする。同一workerでのinstall-before-secretsは完全なsandboxではない。未信頼のcandidateは実行しない。
 
-既存GitHub Environment **Preview – product** は、初回の管理資格情報保存前にDeployment branches/tagsを **Selected branches and tags**、許可を **branch integrationのみ** に限定する。trust gateはこの制限をAPIで照合し、unrestricted・追加branch/tag・観測失敗を拒否する。現在の環境は無制限と観測したため、ユーザーによる設定保存まで実行は停止する。Secret初期保存もユーザーが行い、値を会話へ貼らない。
+既存GitHub Environment **Preview – product** は、初回の管理資格情報保存前にDeployment branches/tagsを **Selected branches and tags**、許可を **branch integrationのみ** に限定する。trust gateはこの制限をAPIで照合し、unrestricted・追加branch/tag・観測失敗を拒否する。現在は `integration` のみ許可する設定を保存・確認済み。ユーザーの明示指示によりagentが設定保存を行えるが、個人Vault・1Passwordを開かず、値を会話へ出さない。
 
-このEnvironmentの4値をexecute/cleanup stepにだけ注入する。repository-wide secretやProductionの同名値で代用しない。
+このEnvironmentの長寿命Secretは必要なexecute/cleanup stepにだけ注入する。repository-wide secretやProductionの同名値で代用しない。`PREVIEW_E2E_SUPABASE_READINESS_TOKEN` と `PREVIEW_E2E_SUPABASE_KEY` はEnvironmentへの直接保存をUIで確認済みで、1Password masterの初期化・同期を証明するものではない。Protection bypassの権限境界は未決のため、保存・実走完了とは扱わない。
 
-- `PREVIEW_E2E_VERCEL_TOKEN`（workerでは `VERCEL_TOKEN`）: 既存Product Preview deploymentを確認する資格情報。
-- `PREVIEW_E2E_SUPABASE_READINESS_TOKEN`（workerでは `SUPABASE_PREVIEW_READINESS_TOKEN`）: 非本番branch/migrationの確認用。runnerのSQLはread-onlyだが、tokenそのものの権限範囲は発行元で別途確認する。
-- `PREVIEW_E2E_BYPASS_SECRET`（workerでは `VERCEL_AUTOMATION_BYPASS_SECRET`）: Product PreviewのProtection用。アプリへの正規ログインは省略しない。
+- `GITHUB_TOKEN`（`${{ github.token }}`）: trusted workerの短寿命token。`deployments: read` と `statuses: read` でGitHubにVercelが発行したProduct Previewのdeployment/statusを読む。長寿命Vercel PATはPreviewへ保存・注入しない。候補Playwrightの環境へGitHub tokenを渡さない。
+- `PREVIEW_E2E_SUPABASE_READINESS_TOKEN`（workerでは `SUPABASE_PREVIEW_READINESS_TOKEN`）: branch一覧と選択した非本番DBのmigration metadata確認用。fine-grained tokenは **Development Branches Read**（`branching_development_read`）と **Migrations Read**（`database_migrations_read`）だけを付け、Database Data Readやwrite権限は付けない。migration確認は `GET /v1/projects/{ref}/database/migrations` を使い、SQLへfallbackしない。branch選択UIが子projectを提供しない場合は親projectを選ぶため、親のbranch/migration metadataへ到達できる権限であり非本番projectだけの権限とは呼ばない。選択した子projectへ同tokenでGETできることは初回実走で確認し、403では権限を広げず停止する。
+- `PREVIEW_E2E_BYPASS_SECRET`（workerでは `VERCEL_AUTOMATION_BYPASS_SECRET`）: Product PreviewのProtection用。現在は方式・保存が未決。project単位bypassは同じProduct projectのProductionにも到達し得るため、非本番だけの資格情報とは扱わない。対象Previewだけのshare方式との選択は所有者判断を待つ。アプリへの正規ログインは省略しない。
 - `PREVIEW_E2E_SUPABASE_KEY`（workerでは `SUPABASE_SECRET_KEY`）: 選択した非本番DBの合成user作成・所有runの回収用。隔離DBを選ぶ場合は対象DBのkeyが必要で、共有DBのkeyへfallbackしない。
+
+Vercel側のreadinessは数値project IDのAPI照合から、GitHubが認証した `vercel[bot]`（ID `35613825`）・Product path `/dayopt/product/`・`Preview – product` 環境・本番flag false・exact SHA・requested deployment ID・immutable originの契約へ置き換える。最新Product commit statusと最新deployment statusの成功を要求し、古い成功へのfallbackや曖昧な再デプロイ対応を拒否する。アプリの自己申告だけで合格にせず、同originのlive SHA/deployment ID/DB refとhealthを前後確認する。これは数値Vercel project IDの直接観測ではない。APIの観測失敗・発行者違い・別Product/環境・候補の変更はuser作成前に停止する。
 
 候補checkout前に、run UUID・desktop/mobileの予定user ID・GitHub run/attempt・trusted workflow SHA・候補/DB bindingだけの `preview-intent-<run>-<attempt>` artifactを保存する。password/keyは含まない。候補のfixture生成2ファイルはtrusted workflowの契約と一致することを要求し、古い候補が予定IDを無視する場合はAuth作成前に停止する。候補checkoutと依存・Chromiumのinstallを終えてからlive PRを再照合し、選択した非本番Authの基準合成ユーザーへのadmin GETでkeyを認証する。legacy keyのrole/refが違う場合、opaque keyの認証失敗、基準fixture欠落はいずれもuser作成前に停止する。providerの応答やメールアドレスは公開しない。続いて、信頼済みIntegrationのsupervisorで既存desktop/mobile critical pathを実行する。runごとに別concurrency groupとfixtureを持ち、他のrunを自動cancelしない。終了・失敗・cancelでは、生きているworker上の `always()` stepが所有journalだけを再回収する。Playwrightは5分、supervisorは7分、回収は120秒以内、jobは20分。VM破棄・job強制終了でこのstepが実行できない場合は、以下の別worker回収入口を使う。共有schema更新の排他leaseも未実装で、前後readinessはdriftの検出まで。
 
