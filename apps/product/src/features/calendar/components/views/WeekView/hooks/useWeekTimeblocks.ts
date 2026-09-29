@@ -31,9 +31,9 @@ export function useWeekTimeblocks({
   const timeblocksByDate = useMemo(() => {
     const grouped: Record<string, CalendarDisplayEvent[]> = {};
 
-    // 各日付のキーを初期化
+    // 表示日付は暦日の値。予定・記録の実時刻だけtimezoneへ変換する。
     weekDates.forEach((date) => {
-      const dateKey = getDateKey(date, timezone);
+      const dateKey = getDateKey(date);
       if (!(dateKey in grouped)) {
         grouped[dateKey] = [];
       }
@@ -56,7 +56,7 @@ export function useWeekTimeblocks({
 
       // 週の範囲内の日付を確認
       weekDates.forEach((date) => {
-        const dateKey = getDateKey(date, timezone);
+        const dateKey = getDateKey(date);
         if (timeblockDateKey === dateKey) {
           if (Object.prototype.hasOwnProperty.call(grouped, dateKey) && grouped[dateKey]) {
             grouped[dateKey].push(timeblock);
@@ -76,7 +76,7 @@ export function useWeekTimeblocks({
     const dayColumnWidth = weekDates.length > 0 ? 100 / weekDates.length : 100;
 
     weekDates.forEach((date, dayIndex) => {
-      const dateKey = getDateKey(date, timezone);
+      const dateKey = getDateKey(date);
       const dayTimeblocks =
         (Object.prototype.hasOwnProperty.call(timeblocksByDate, dateKey)
           ? timeblocksByDate[dateKey]
@@ -125,7 +125,7 @@ export function useWeekTimeblocks({
     });
 
     return positions;
-  }, [weekDates, timeblocksByDate, hourHeight, timezone]);
+  }, [weekDates, timeblocksByDate, hourHeight]);
 
   // 最大同時タイムブロック数を計算（layoutエンジンの結果から導出）
   const maxConcurrentTimeblocks = useMemo(() => {
