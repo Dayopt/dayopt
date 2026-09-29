@@ -1,11 +1,11 @@
 {
   "summary": {
-    "sourceFiles": 2130,
-    "publicFunctions": 2010,
+    "sourceFiles": 2132,
+    "publicFunctions": 2015,
     "withoutAdjacentTest": 900,
     "endpoints": 101,
-    "testDeclarations": 6426,
-    "withoutOpeningComment": 5935,
+    "testDeclarations": 6437,
+    "withoutOpeningComment": 5934,
     "mockCalls": 927,
     "conflictsDirectoryExists": false
   },
@@ -15,6 +15,36 @@
     "Mocks are candidates for manual classification; external boundary mocks are allowed."
   ],
   "publicFunctionCandidates": [
+    {
+      "file": "scripts/lib/mutation-evidence.mjs",
+      "line": 4,
+      "name": "selectMutationCandidates",
+      "adjacentTest": true
+    },
+    {
+      "file": "scripts/lib/mutation-evidence.mjs",
+      "line": 24,
+      "name": "summarizeMutationRun",
+      "adjacentTest": true
+    },
+    {
+      "file": "scripts/lib/mutation-evidence.mjs",
+      "line": 65,
+      "name": "isSuccessfulMutationRun",
+      "adjacentTest": true
+    },
+    {
+      "file": "scripts/lib/mutation-evidence.mjs",
+      "line": 78,
+      "name": "classifyMutationRun",
+      "adjacentTest": true
+    },
+    {
+      "file": "scripts/lib/mutation-evidence.mjs",
+      "line": 106,
+      "name": "applyMutation",
+      "adjacentTest": true
+    },
     {
       "file": "apps/product/production-build-gate.mjs",
       "line": 103,

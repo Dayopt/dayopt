@@ -12,9 +12,9 @@
 | 達成条件 | 判定 | 証拠・最も近づいた状態 |
 | --- | --- | --- |
 | issues/ の conflict 各件に修正前 red / 修正後 green | 未達・入力欠落 | checkout に `issues/` がない。`git ls-files` と filesystem の両方を調査し、対応する conflict 本文・修正前版を特定できなかった。空集合として達成扱いにせず、GitHub Issue やコード中の conflict を勝手に代用しなかった。 |
-| 全公開関数・全 endpoint に正常系 / 異常系各1本 | 未達 | 構文上の公開関数候補 2,010、endpoint候補 101 を列挙。関数単位の正常・異常 assertion の完全な対応表は未作成。隣接 test のない候補は 912 → 900（別ファイル・integration での網羅を否定する値ではない）。新たに時刻範囲・重複入力・billing の status / price / plan にテストを追加。 |
+| 全公開関数・全 endpoint に正常系 / 異常系各1本 | 未達 | 構文上の公開関数候補 2,015、endpoint候補 101 を列挙。関数単位の正常・異常 assertion の完全な対応表は未作成。隣接 test のない候補は 912 → 900（別ファイル・integration での網羅を否定する値ではない）。新たに時刻範囲・重複入力・billing の status / price / plan にテストを追加。 |
 | 主要モジュール20箇所を無作為に壊し20回落ちる | 達成（指定した母集団） | **20/20検出**、baseline / 復元後328ケース成功・skip 0。seed `20260929`、事前列挙した演算子323箇所から重複なしで20箇所。最初の選択を変えず不足テストを追加。 |
-| 各 test の冒頭に守る対象を1行記載 | 新規分のみ達成、全件は未達 | 追加16宣言・展開後36ケースには `// 守ること:` を配置。既存を含む6,426宣言候補のうち5,935は callback 冒頭のコメント未検出。外側コメントや test 名だけを達成とは数えていない。 |
+| 各 test の冒頭に守る対象を1行記載 | 新規分のみ達成、全件は未達 | 追加27宣言・展開後53ケースには `// 守ること:` を配置。既存を含む6,437宣言候補のうち5,934は callback 冒頭のコメント未検出。外側コメントや test 名だけを達成とは数えていない。 |
 
 未達理由: conflict の要求・修正前資料が欠落している。API 全件の正常系/異常系を意味に沿って対応付ける作業、既存内部 mock の境界への置換、既存 test の目的確認は完了していない。単純な隣接ファイル検査やコメント自動挿入を代用せず、未確認のまま残す。全件の達成を宣言できないため、ユーザー指定の未達終了形式で証拠と残件を残す。
 
@@ -96,3 +96,22 @@ pnpm --filter @dayopt/product exec vitest run --project unit src/features/timebl
 
 `git diff --check` 成功。CI・実DB integration・E2E・pre-push は未実行。push / PR / ready化は行っていない。
 全公開APIの意味的網羅はこの全体成功から推定せず、判定表の未達を維持する。
+
+
+## PR・マージに向けた追加検証（2026-09-29）
+
+ユーザーから継続作業とPR・マージの許可を受領。main `0bcdb8641` を取り込んだ。
+先の終了時点の結果は履歴として保持し、今回の差分・実測と区別する。
+
+- 破壊試行の判定関数にも17ケースを追加。候補不足、seed不正、同一位置の重複、収集エラー、skip、中断、起動失敗、終了コードだけの偽成功、baseline不成立、test名の入れ替わり、ソースSHA/位置のずれ、無変更mutationを拒否する。
+- 件数だけでなくsuite名とtest名を照合。復元後にも同一の全testが成功したことを要求する。
+- 強化後のrunnerでも同じ20箇所で20/20検出、baseline/復元後とも328成功・skipなし。
+- [17公開関数の正常系・異常系対応表](mission-evidence/contracts.json)を追加。全公開APIや全endpointの網羅へ一般化しない。
+- 全体の意味的なAPI網羅と既存test全件の目的追記は引き続き未完了。`issues/` の欠落は最新mainでも確認した。他担当のMission #2963をこの依頼のconflict一覧へ読み替えず、変更・closeもしない。
+- 適用範囲のprotected-path判定は `required:false` / `auditContract:false`。追加reviewerは起動せず、self reviewとmain rulesetを満たして進める。
+
+
+追加の全体検証では、既存の `production-operations-audit.test.ts` のGitHub CLI代役が
+`--input -` の標準入力を消費せず、パイプ側がSIGPIPE（exit 141）になる非決定的失敗を検出した。
+境界の代役が入力を読み切るように修正し、作成時のIssue URLも返し、対象Issue番号と優先度JSONをassertした。
+本番workflowの変更・外部API呼び出しはない。対象3 files / 37 tests（通知18、判定器17、配置規則2）が成功。

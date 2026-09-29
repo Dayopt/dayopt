@@ -6,6 +6,14 @@ import os from 'node:os';
 import path from 'node:path';
 import ts from 'typescript';
 
+import {
+  applyMutation,
+  classifyMutationRun,
+  isSuccessfulMutationRun,
+  selectMutationCandidates,
+  summarizeMutationRun,
+} from '../lib/mutation-evidence.mjs';
+
 const root = process.cwd();
 const output = path.resolve(process.argv[2] ?? 'artifacts/test-mission/mutations');
 const seed = Number(process.argv[3] ?? 20260929);
@@ -60,17 +68,8 @@ for (const file of files.filter(
   }
   visit(ast);
 }
-// Fisher-Yates with a recorded PRNG seed; selection is frozen before any tests run.
-let state = seed >>> 0;
-function random() {
-  state = (Math.imul(1664525, state) + 1013904223) >>> 0;
-  return state / 4294967296;
-}
-for (let i = candidates.length - 1; i > 0; i--) {
-  const j = Math.floor(random() * (i + 1));
-  [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
-}
-const selected = candidates.slice(0, 20);
+// Freeze the complete sample before running tests; refuse fewer than twenty sites.
+const selected = selectMutationCandidates(candidates, seed);
 fs.mkdirSync(output, { recursive: true });
 fs.writeFileSync(
   path.join(output, 'selection.json'),
@@ -144,56 +143,20 @@ try {
       (result.stdout ?? '') + (result.stderr ?? ''),
     );
     const parsed = fs.existsSync(json) ? JSON.parse(fs.readFileSync(json, 'utf8')) : null;
-    const failures =
-      parsed?.testResults?.flatMap((suite) =>
-        suite.assertionResults
-          .filter((test) => test.status === 'failed')
-          .map((test) => ({ name: test.fullName, messages: test.failureMessages })),
-      ) ?? [];
-    return {
-      exitCode: result.status,
-      signal: result.signal,
-      error: result.error?.message,
-      passed: parsed?.numPassedTests ?? 0,
-      failed: parsed?.numFailedTests ?? 0,
-      pending: parsed?.numPendingTests ?? 0,
-      runtimeErrors: parsed?.numRuntimeErrorTestSuites ?? 0,
-      failures,
-    };
+    return summarizeMutationRun(parsed, result);
   }
   report.baseline = run('baseline');
-  if (
-    report.baseline.exitCode !== 0 ||
-    report.baseline.passed === 0 ||
-    report.baseline.pending !== 0
-  )
+  if (!isSuccessfulMutationRun(report.baseline)) {
     throw new Error('Baseline is not clean; no mutant can count as killed.');
+  }
+
   for (const [index, mutant] of selected.entries()) {
     const target = path.join(scratch, mutant.file);
     const original = fs.readFileSync(target, 'utf8');
     try {
-      fs.writeFileSync(
-        target,
-        original.slice(0, mutant.start) + mutant.after + original.slice(mutant.end),
-      );
+      fs.writeFileSync(target, applyMutation(original, mutant));
       const result = run(`mutant-${String(index + 1).padStart(2, '0')}`);
-      // A collection/import/timeout error alone is never a kill.
-      const complete =
-        !result.signal &&
-        !result.error &&
-        result.pending === 0 &&
-        result.runtimeErrors === 0 &&
-        result.passed + result.failed === report.baseline.passed;
-      const status = !complete
-        ? 'inconclusive'
-        : result.exitCode === 0
-          ? 'survived'
-          : result.failed > 0 &&
-              result.failures.some((f) =>
-                f.messages.some((m) => /AssertionError|expected .*|to (?:be|equal|throw)/s.test(m)),
-              )
-            ? 'killed'
-            : 'inconclusive';
+      const status = classifyMutationRun(result, report.baseline);
       report.results.push({ ...mutant, ...result, status });
       console.log(
         `${index + 1}/20 ${status}: ${mutant.file}:${mutant.line} ${mutant.before} -> ${mutant.after}`,
@@ -205,9 +168,16 @@ try {
   }
   report.restoration = run('restored');
   report.restored =
-    report.restoration.exitCode === 0 && report.restoration.passed === report.baseline.passed;
+    isSuccessfulMutationRun(report.restoration) &&
+    classifyMutationRun(report.restoration, report.baseline) === 'survived';
 } finally {
   fs.writeFileSync(path.join(output, 'report.json'), JSON.stringify(report, null, 2) + '\n');
   fs.rmSync(scratch, { recursive: true, force: true });
 }
-if (!report.restored || report.results.some((r) => r.status !== 'killed')) process.exitCode = 1;
+if (
+  !report.restored ||
+  report.results.length !== 20 ||
+  report.results.some((r) => r.status !== 'killed')
+) {
+  process.exitCode = 1;
+}
