@@ -50,13 +50,13 @@ function fixture(overrides = {}) {
   );
   return { directory, destination: join(root, 'public'), request };
 }
-function writeStepReport(directory: string, steps: unknown) {
+function writeStepReport(directory: string, steps: unknown, file = 'critical-path.spec.ts') {
   writeFileSync(
     join(directory, 'evidence', 'e2e.json'),
     JSON.stringify({
       tests: [
         {
-          file: 'critical-path.spec.ts',
+          file,
           project: 'chromium',
           line: 1,
           retry: 0,
@@ -138,6 +138,36 @@ describe('Cloud Preview evidence and cleanup', () => {
     const serialized = readFileSync(join(options.destination, 'preview.json'), 'utf8');
     expect(serialized).not.toContain('PRIVATE_');
     expect(result.tests).toHaveLength(1);
+  });
+  it('retains authorization probe coordinates without its private response fields', () => {
+    const options = fixture();
+    writeStepReport(
+      options.directory,
+      [
+        {
+          category: 'test.step',
+          file: 'preview-authorization.spec.ts',
+          line: 80,
+          duration: 42,
+          failed: true,
+          response: 'PRIVATE_RESPONSE',
+          token: 'PRIVATE_TOKEN',
+        },
+      ],
+      'preview-authorization.spec.ts',
+    );
+    const result = publishCloudEvidence(options);
+    expect(result.tests).toHaveLength(1);
+    expect(publishedSteps(result)).toEqual([
+      {
+        category: 'test.step',
+        file: 'preview-authorization.spec.ts',
+        line: 80,
+        duration: 42,
+        failed: true,
+      },
+    ]);
+    expect(JSON.stringify(result)).not.toContain('PRIVATE_');
   });
   it('publishes diagnostic coordinates without candidate titles, errors or payloads', () => {
     const options = fixture();

@@ -42,7 +42,11 @@ const STATES = new Set([
   'cleanup-failed',
   'deleted',
 ]);
-const FILES = new Set(['critical-path.spec.ts', 'mobile-critical-path.spec.ts']);
+const FILES = new Set([
+  'critical-path.spec.ts',
+  'mobile-critical-path.spec.ts',
+  'preview-authorization.spec.ts',
+]);
 const PROJECTS = new Set(['chromium', 'Mobile Chrome']);
 const TEST_STATES = new Set(['passed', 'failed', 'timedOut', 'skipped', 'interrupted', 'unknown']);
 const safeGitEnv = () =>

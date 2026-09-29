@@ -274,6 +274,23 @@ fs.writeFileSync(path.join(process.env.E2E_PREVIEW_EVIDENCE_DIR, 'e2e.json'), JS
 });
 
 describe('Safe failure evidence', () => {
+  it('authorization失敗も入力や応答を含めず位置だけ残す', () => {
+    expect(
+      safePreviewStep({
+        category: 'test.step',
+        duration: 5,
+        location: { file: '/repo/preview-authorization.spec.ts', line: 80 },
+        title: 'PRIVATE_USER',
+        error: { message: 'PRIVATE_RESPONSE' },
+      }),
+    ).toEqual({
+      category: 'test.step',
+      file: 'preview-authorization.spec.ts',
+      line: 80,
+      duration: 5,
+      failed: true,
+    });
+  });
   it('stepのtitle/引数/error本文を捨てて位置と結果だけ残す', () => {
     const result = safePreviewStep({
       category: 'pw:api',

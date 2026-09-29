@@ -19,7 +19,11 @@ if (
 }
 
 const config = defineConfig(localConfig, {
-  testMatch: ['critical-path.spec.ts', 'mobile-critical-path.spec.ts'],
+  testMatch: [
+    'critical-path.spec.ts',
+    'mobile-critical-path.spec.ts',
+    'preview-authorization.spec.ts',
+  ],
   retries: 0,
   globalTimeout: 5 * 60 * 1000,
   workers: 1,
