@@ -48,6 +48,7 @@ interface CategorySeed {
   name: string;
   color?: string | null;
   icon?: string | null;
+  archived_at?: string | null;
   user_id?: string;
 }
 
@@ -88,6 +89,7 @@ function createFakeClient(seed: Seed): ReportFetchClient {
       user_id: USER_ID,
       color: null,
       icon: null,
+      archived_at: null,
       ...row,
     })),
   };
@@ -144,6 +146,60 @@ describe('ReportAggregationService.getReportPeriod', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
+
+  it.each([null, '2026-09-03T00:00:00Z'])(
+    'カテゴリーのアーカイブ状態に合わせて所属とフィルタを解決する: %s',
+    async (archivedAt) => {
+      const result = await createReportAggregationService(
+        createFakeClient({
+          categories: [
+            { id: 'c1', name: '仕事', color: 'blue', icon: 'briefcase', archived_at: archivedAt },
+          ],
+          activities: [{ id: 'a1', name: '現役の活動', category_id: 'c1' }],
+          records: [
+            {
+              id: 'current',
+              activity_id: 'a1',
+              start_at: '2026-09-02T00:00:00Z',
+              end_at: '2026-09-02T01:00:00Z',
+            },
+            {
+              id: 'previous',
+              activity_id: 'a1',
+              start_at: '2026-08-26T00:00:00Z',
+              end_at: '2026-08-26T02:00:00Z',
+            },
+          ],
+        }),
+      ).getReportPeriod(USER_ID, baseInput(), NOW);
+      const activity = aggregateFor(result, 'a1');
+      expect(activity).toMatchObject({
+        activityName: '現役の活動',
+        archived: false,
+        recordedMinutes: 60,
+        categoryId: archivedAt ? null : 'c1',
+        categoryName: archivedAt ? null : '仕事',
+        categoryColor: archivedAt ? null : 'blue',
+        categoryIcon: archivedAt ? null : 'briefcase',
+      });
+
+      // アーカイブ後のサイドバーは未分類へ移す。表示中なのに古いカテゴリーのhiddenで
+      // 集計から消え続けない。復元した場合はカテゴリーのフィルタが再び効く。
+      const visible = resolveVisibleActivities(result.activities, {
+        hiddenCategoryIds: ['c1'],
+        hiddenActivityIds: [],
+      });
+      const summary = buildUsageSummary(visible, result.previousActivities);
+      expect(summary.current.recordedMinutes).toBe(archivedAt ? 60 : 0);
+      expect(summary.previous?.recordedMinutes).toBe(archivedAt ? 120 : 0);
+      expect(
+        resolveVisibleActivities(result.activities, {
+          hiddenCategoryIds: [],
+          hiddenActivityIds: ['a1'],
+        }),
+      ).toEqual([]);
+    },
+  );
 
   it('期間と前期間・列キーを返す', async () => {
     const service = createReportAggregationService(createFakeClient({}));
