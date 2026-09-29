@@ -15,7 +15,7 @@ const SHARED_PREVIEW_BRANCH_ID = '4c2ed092-cba3-4f37-98e1-78f61cdf52ed';
 const PR_FILES_PER_PAGE = 100;
 const PR_FILES_MAX = 3000;
 const PR_FILES_MAX_PAGES = PR_FILES_MAX / PR_FILES_PER_PAGE;
-const SUPPORTED_INPUT_KEYS = [
+const REQUIRED_INPUT_KEYS = [
   'preview_e2e',
   'preview_pr',
   'preview_sha',
@@ -23,9 +23,9 @@ const SUPPORTED_INPUT_KEYS = [
   'preview_db_ref',
   'preview_db_branch',
   'preview_db_mode',
-  'preview_recover_run',
-  'preview_recover_attempt',
 ];
+const OPTIONAL_RECOVERY_INPUT_KEYS = ['preview_recover_run', 'preview_recover_attempt'];
+const SUPPORTED_INPUT_KEYS = [...REQUIRED_INPUT_KEYS, ...OPTIONAL_RECOVERY_INPUT_KEYS];
 const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
 const PROJECT_REF = /^[a-z]{20}$/;
 const SAFE_BRANCH = /^[A-Za-z0-9][A-Za-z0-9._-]*(?:\/[A-Za-z0-9][A-Za-z0-9._-]*)*$/;
@@ -52,14 +52,15 @@ function parseInputs(requestJson) {
     throw new PreviewCloudTrustError('Preview Cloud trust: invalid workflow input');
   }
   requireCondition(isRecord(inputs), 'invalid workflow input');
-  const inputKeys = Object.keys(inputs).sort();
+  const inputKeys = Object.keys(inputs);
   requireCondition(
-    inputKeys.length === SUPPORTED_INPUT_KEYS.length &&
-      inputKeys.every((key, index) => key === [...SUPPORTED_INPUT_KEYS].sort()[index]),
+    REQUIRED_INPUT_KEYS.every((key) => Object.hasOwn(inputs, key)) &&
+      inputKeys.every((key) => SUPPORTED_INPUT_KEYS.includes(key)),
     'unexpected workflow input fields',
   );
   requireCondition(
-    inputs.preview_recover_run === '' && inputs.preview_recover_attempt === '',
+    // GitHub's manual dispatch UI omits optional inputs left empty.
+    OPTIONAL_RECOVERY_INPUT_KEYS.every((key) => !Object.hasOwn(inputs, key) || inputs[key] === ''),
     'recovery inputs cannot be used for Preview E2E',
   );
   requireCondition(inputs.preview_e2e === true, 'Preview E2E was not explicitly enabled');

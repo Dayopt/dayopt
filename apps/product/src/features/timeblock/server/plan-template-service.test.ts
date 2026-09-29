@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { PlanTemplateService } from './plan-template-service';
 import type { TimeblockCommandClient } from './timeblock-command-client';
@@ -111,7 +111,14 @@ function createCommands() {
 
 describe('PlanTemplateService', () => {
   beforeEach(() => {
+    // 固定した記録を直近28日の集計窓に保ち、実行日によるdurationの変化を防ぐ。
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-09-05T00:00:00.000Z'));
     vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   describe('list', () => {
