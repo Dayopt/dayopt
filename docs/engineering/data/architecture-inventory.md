@@ -835,12 +835,13 @@ graph LR
 </details>
 
 <details>
-<summary>test の候補（17）</summary>
+<summary>test の候補（18）</summary>
 
 <!-- prettier-ignore -->
 | ファイル | 対応の根拠 |
 | --- | --- |
 | [apps/product/src/features/activities/components/ActivityQuickSelector.test.tsx](<../../../apps/product/src/features/activities/components/ActivityQuickSelector.test.tsx>) | feature: activities |
+| [apps/product/src/features/activities/components/ActivityRenameModal.test.tsx](<../../../apps/product/src/features/activities/components/ActivityRenameModal.test.tsx>) | feature: activities |
 | [apps/product/src/features/activities/domain/activity-tree-cache.test.ts](<../../../apps/product/src/features/activities/domain/activity-tree-cache.test.ts>) | feature: activities |
 | [apps/product/src/features/activities/hooks/activities-cache.test.ts](<../../../apps/product/src/features/activities/hooks/activities-cache.test.ts>) | feature: activities |
 | [apps/product/src/features/activities/server/activities-query-service.test.ts](<../../../apps/product/src/features/activities/server/activities-query-service.test.ts>) | feature: activities |

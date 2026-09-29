@@ -47,6 +47,7 @@ last_verified: 2026-09-29
 - 根拠: strategy原則3はMCP/API由来も未確定ghostと記す。現在のMCP書込契約をまだ読んでいないため矛盾は未確定。
 - 次の反証: MCP仕様、同意/操作確定契約、関連決定/Issue、DB command経路を追う。契約の未決判断をコードだけで裁定しない。
 - 追加読解: `docs/learn/10-api-mcp.md`はMCPからcanonical Planを同じDB commandで作る経路を説明し、OAuth scope同意とMCP gateを契約にしている。external-calendar仕様は外部ミラーを明示タップで変換する別経路。journeys/mcp.mdは取得がtruncatedだったため未読を残す。次はtool原文・DB command・明示判断を照合し、ghost原則の適用対象を裁定する。
+- 追加回収: journeys/mcp.mdの基準1–1399行を分割して全文回収。tool registry/8 mutation登録/input/output schema、McpMutationClient/DB adapter/contractも全文確認。実際のtool説明もcanonicalと明記し、8 apply RPCへ渡す。strategyとの裁定はDB定義と明示判断の読解が残る。`plans.create`の「future」説明もPlanの過去作成契約との差があり、別途契約/関連testを照合する。分析イベントの古い説明だけはF018へ分離。
 
 ## F006 — 前期間にしか記録がない活動が前期間比から消える
 
@@ -119,9 +120,34 @@ last_verified: 2026-09-29
 - 状態: 読解からの候補。実行未再現、未修正。採用済み所見には数えない。
 - 追跡する点: ActivityRenameModal / CategoryRenameModalはmutateAsyncをtry/finallyだけで囲み、イベント側はvoidで呼ぶ。hookのtoast後もrejectが未処理にならないか確認する。activity-tree-cacheのcategory復元は未分類にある旧所属activityを戻さず、refetchまで空に見える。全snapshotのrestoreは別mutationの成功と競合しうる。
 - 次の反証: 実際の同時操作が可能なUI、tRPC/TanStack側の直列化、失敗時の回復・再取得を追う。コメントの意図や一時表示だけで直ちに不具合採用せず、操作後のユーザー可視結果で再現する。
+- 改名フォームのrejectだけは再現してF017へ採用。他の復元/競合仮説は未検証のまま。
 
 ## H015 — 開いた詳細パネルの再取得・中断境界
 
 - 状態: 読解からの候補。実行未再現、未修正。
 - 根拠: ReportDetailTargetは名前・category名・色の選択時snapshotを保存し、ConnectedReportDetailPanelはquery再取得後もその値で見出しを描く。F013はperiod/detail queryの再取得を保証するが、選択済みtargetの同期までは保証していない。実際にパネルを開いたままmetadataを変えられる操作経路を確認する。
 - 別の中断候補: ReportDetailResizeHandleはpointerupでwindow listener/body style/isResizingを解放するが、pointercancelやunmountのcleanupがない。ブラウザの実際の中断条件と共有resize実装を照合し、再現してから修正を採否する。
+- 中断候補はcalendarの同種実装も再現してF016へ採用。選択済みmetadataの同期は未検証のまま。
+
+## F016 — パネル幅変更の中断後に選択禁止とリスナーが残る
+
+- 状態: ローカル再現・修正済み（`eb07b33eb`）。Mission #2963。本番未観測。
+- 条件/影響: Review詳細またはCalendar側パネルでドラッグ開始後、pointercancel・unmountが起きると、bodyのcursor/userSelectとwindowのpointermoveが残る。Calendarではドラッグ中にrailを閉じても同じ。操作終了後も文字選択できず、後のポインター移動で幅が変わり続ける。
+- 原因/反証: 両実装ともpointerupだけがcleanupを持つ。通常のpointerupやキーボード幅変更は既存契約を維持する必要がある。元のbody styleを復元し、単に既定値へ上書きしない。共有化で別のUI状態を結合せず、各所有者にlifecycle cleanupを追加。
+- 修正: 共通終了callbackをrefに保存し、pointercancel・unmount・次のdrag開始、Calendarのrail closeからも呼ぶ。move/up/cancel listenerとresizing状態を解除。UI操作数/外部API/DBは不変。
+- 検証: Review修正前2 failed / 23 passed、Calendar修正前3 failed / 13 passed。中断後のstyleとresizing状態、追加pointermoveで幅が変わらないことを検査。最終関連2 files / 42 tests passed、typecheck:product成功。ログ `/tmp/dayopt-audit-resize-report-red.log`、`/tmp/dayopt-audit-resize-calendar-red.log`、`/tmp/dayopt-audit-resize-regression.log`、`/tmp/dayopt-audit-resize-types.log`。DOM合成イベントでありクラウドE2Eではない。
+
+## F017 — 改名失敗を通知した後も未処理のPromise rejectionが出る
+
+- 状態: ローカル再現・修正済み（`0c299a246`）。Mission #2963。本番未観測。
+- 条件/原因: ActivityRenameModal/CategoryRenameModalのsubmitはmutateAsyncをtry/finallyでawaitし、click/Enterはvoidで呼ぶ。mutation hookがtoast/rollbackしてもrejectは継続し、UIのイベント境界では未処理になる。
+- 反証: 通知の所有者は既存hook/QueryClient。submitで通知やSentryを追加すると重複する。失敗時は閉じずに入力を保持し、isSubmittingを戻して再試行できるのが既存の挙動。
+- 修正: 両submitでrejectをcatchし、通知・rollbackをhookへ委ねる旨を明記。finallyによる再操作可能化は維持。
+- 検証: 実ModalとDialogで入力変更→保存失敗→draft維持/閉じない→再試行成功→closeを確認。修正前はassertion 2 passedだがVitestが未処理rejectionを2件検出してexit 1、修正後は2 passed・未処理rejection 0・exit 0。同じcommand/fixtureで比較。ログ `/tmp/dayopt-audit-rename-{red,green}.log`。API mutation結果は合成、実API/E2Eではない。
+
+## F018 — MCP作成の分析イベントを送信しないという古い説明
+
+- 状態: 文書修正。Mission #2963。runtime/同意/送信設定は変更しない。
+- 根拠: journeys/mcp.mdは「plan_createdを送らない」とするが、toolはctx.userIdをMcpMutationClientへ渡し、createPlanは受領証検証後にtrackMutationEventを呼ぶ。posthog-serverは明示runtime switchと送信時点のanalytics_consentを確認し、afterで送信、失敗はcatchする。同じresource/eventは同じUUID、更新はresourceId:versionを使う。
+- 反証/範囲: 送信予約は実取り込みの証明ではなく、switch未有効/同意なしでは送らない。コードと既存の成功・拒否・失敗testを全文照合。MCP/analyticsの挙動を変更する理由はこの所見からはない。実際の配信SHA/設定/取り込みは未確認。
+- 修正/検証: journeyのJSON正本を直し、`pnpm learn:generate`で説明と逆引き資料を再生成。変更diffは該当説明と参照だけ。全体checkのproduct検査に既存MCP/analytics testsを含み成功、生成後にdocs:checkを別途実施。文書のみの訂正のため新規挙動testは追加しない。

@@ -151,10 +151,12 @@
       "mode": "100644",
       "bytes": 12129,
       "method": "full-text",
-      "status": "unverified",
-      "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "status": "full-text-reviewed",
+      "reason": "Full baseline text reviewed without omitted ranges; changed portions reviewed separately.",
+      "read_ranges": [[1, 339]],
+      "evidence": [
+        "Read full error ownership rules; existing mutation hook handles toast/rollback, submit boundary catches async rejection. F017."
+      ],
       "questions": []
     },
     {
@@ -4589,10 +4591,12 @@
       "mode": "100644",
       "bytes": 4107,
       "method": "full-text",
-      "status": "unverified",
-      "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "status": "full-text-reviewed",
+      "reason": "Full baseline text read in bounded outputs; MCP write/receipt/analytics path cross-checked.",
+      "read_ranges": [[1, 150]],
+      "evidence": [
+        "MCP schema optional/null, RPC present flags, raw version, receipt shape, error mapping and retry; analytics scheduling/consent/failure and stable event ID read. DB authority and live ingestion remain unverified. F018 corrects obsolete journey prose only."
+      ],
       "questions": []
     },
     {
@@ -4667,10 +4671,12 @@
       "mode": "100644",
       "bytes": 13835,
       "method": "full-text",
-      "status": "unverified",
-      "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "status": "full-text-reviewed",
+      "reason": "Full baseline text read in bounded outputs; MCP write/receipt/analytics path cross-checked.",
+      "read_ranges": [[1, 382]],
+      "evidence": [
+        "MCP schema optional/null, RPC present flags, raw version, receipt shape, error mapping and retry; analytics scheduling/consent/failure and stable event ID read. DB authority and live ingestion remain unverified. F018 corrects obsolete journey prose only."
+      ],
       "questions": []
     },
     {
@@ -8054,10 +8060,12 @@
       "mode": "100644",
       "bytes": 9537,
       "method": "full-text",
-      "status": "unverified",
-      "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "status": "full-text-reviewed",
+      "reason": "Full baseline text reviewed without omitted ranges; changed portions reviewed separately.",
+      "read_ranges": [[1, 339]],
+      "evidence": [
+        "Full baseline read in bounded chunks; real resize interaction regression, later pointermove must not mutate after cleanup."
+      ],
       "questions": []
     },
     {
@@ -8067,10 +8075,12 @@
       "mode": "100644",
       "bytes": 20505,
       "method": "full-text",
-      "status": "unverified",
-      "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "status": "full-text-reviewed",
+      "reason": "Full baseline text reviewed without omitted ranges; changed portions reviewed separately.",
+      "read_ranges": [[1, 567]],
+      "evidence": [
+        "Full baseline read in bounded chunks; F016 covers pointerup, pointercancel, unmount and rail-close lifecycle."
+      ],
       "questions": []
     },
     {
@@ -12391,10 +12401,12 @@
       "mode": "100644",
       "bytes": 17394,
       "method": "full-text",
-      "status": "unverified",
-      "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "status": "full-text-reviewed",
+      "reason": "Full baseline text reviewed without omitted ranges; changed portions reviewed separately.",
+      "read_ranges": [[1, 445]],
+      "evidence": [
+        "Full baseline read in bounded chunks; F016 delta adds pointercancel and unmount assertions."
+      ],
       "questions": []
     },
     {
@@ -16208,10 +16220,12 @@
       "mode": "100644",
       "bytes": 14054,
       "method": "full-text",
-      "status": "unverified",
-      "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "status": "full-text-reviewed",
+      "reason": "Full baseline text read in bounded outputs; MCP write/receipt/analytics path cross-checked.",
+      "read_ranges": [[1, 414]],
+      "evidence": [
+        "MCP schema optional/null, RPC present flags, raw version, receipt shape, error mapping and retry; analytics scheduling/consent/failure and stable event ID read. DB authority and live ingestion remain unverified. F018 corrects obsolete journey prose only."
+      ],
       "questions": []
     },
     {
@@ -16221,10 +16235,12 @@
       "mode": "100644",
       "bytes": 16088,
       "method": "full-text",
-      "status": "unverified",
-      "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "status": "full-text-reviewed",
+      "reason": "Full baseline text read in bounded outputs; MCP write/receipt/analytics path cross-checked.",
+      "read_ranges": [[1, 446]],
+      "evidence": [
+        "MCP schema optional/null, RPC present flags, raw version, receipt shape, error mapping and retry; analytics scheduling/consent/failure and stable event ID read. DB authority and live ingestion remain unverified. F018 corrects obsolete journey prose only."
+      ],
       "questions": []
     },
     {
@@ -16234,10 +16250,12 @@
       "mode": "100644",
       "bytes": 3715,
       "method": "full-text",
-      "status": "unverified",
-      "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "status": "full-text-reviewed",
+      "reason": "Full baseline text read in bounded outputs; MCP write/receipt/analytics path cross-checked.",
+      "read_ranges": [[1, 123]],
+      "evidence": [
+        "MCP schema optional/null, RPC present flags, raw version, receipt shape, error mapping and retry; analytics scheduling/consent/failure and stable event ID read. DB authority and live ingestion remain unverified. F018 corrects obsolete journey prose only."
+      ],
       "questions": []
     },
     {
@@ -16247,10 +16265,12 @@
       "mode": "100644",
       "bytes": 6259,
       "method": "full-text",
-      "status": "unverified",
-      "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "status": "full-text-reviewed",
+      "reason": "Full baseline text read in bounded outputs; MCP write/receipt/analytics path cross-checked.",
+      "read_ranges": [[1, 173]],
+      "evidence": [
+        "MCP schema optional/null, RPC present flags, raw version, receipt shape, error mapping and retry; analytics scheduling/consent/failure and stable event ID read. DB authority and live ingestion remain unverified. F018 corrects obsolete journey prose only."
+      ],
       "questions": []
     },
     {
@@ -17089,10 +17109,12 @@
       "mode": "100644",
       "bytes": 4785,
       "method": "full-text",
-      "status": "unverified",
-      "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "status": "full-text-reviewed",
+      "reason": "Full baseline text read in bounded outputs; MCP write/receipt/analytics path cross-checked.",
+      "read_ranges": [[1, 148]],
+      "evidence": [
+        "MCP schema optional/null, RPC present flags, raw version, receipt shape, error mapping and retry; analytics scheduling/consent/failure and stable event ID read. DB authority and live ingestion remain unverified. F018 corrects obsolete journey prose only."
+      ],
       "questions": []
     },
     {
@@ -17102,10 +17124,12 @@
       "mode": "100644",
       "bytes": 3333,
       "method": "full-text",
-      "status": "unverified",
-      "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "status": "full-text-reviewed",
+      "reason": "Full baseline text read in bounded outputs; MCP write/receipt/analytics path cross-checked.",
+      "read_ranges": [[1, 101]],
+      "evidence": [
+        "MCP schema optional/null, RPC present flags, raw version, receipt shape, error mapping and retry; analytics scheduling/consent/failure and stable event ID read. DB authority and live ingestion remain unverified. F018 corrects obsolete journey prose only."
+      ],
       "questions": []
     },
     {
@@ -28615,11 +28639,12 @@
       "mode": "100644",
       "bytes": 92192,
       "method": "full-text",
-      "status": "unverified",
-      "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
+      "status": "full-text-reviewed",
+      "reason": "Full baseline text reviewed without omitted ranges; changed portions reviewed separately.",
+      "read_ranges": [[1, 1399]],
       "evidence": [
-        "Attempted whole-file output was truncated; not counted as full read. Recover in bounded chunks before marking reviewed."
+        "Attempted whole-file output was truncated; not counted as full read. Recover in bounded chunks before marking reviewed.",
+        "Recovered all 1399 lines through bounded reads; documentation claims on OAuth gates, canonical writes, receipt replay and cache refresh require source verification (H005). No cloud proof."
       ],
       "questions": []
     },

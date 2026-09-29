@@ -549,7 +549,7 @@ page から import を宣言元まで解決して辿った結果（barrel の再
 
 | feature             | source | test file | component | Story のある component |
 | ------------------- | ------ | --------- | --------- | ---------------------- |
-| `activities`        | 30     | 4         | 11        | 3 / 11                 |
+| `activities`        | 30     | 5         | 11        | 3 / 11                 |
 | `auth`              | 22     | 15        | 8         | 7 / 8                  |
 | `calendar`          | 190    | 94        | 59        | 31 / 59                |
 | `contact`           | 8      | 6         | 2         | 1 / 2                  |

@@ -49,7 +49,7 @@ repo調査、対象内の可逆修正、テスト、commit、必要なpush/Draft
 
 監査Issue: [#2963](https://github.com/Dayopt/dayopt/issues/2963)。`pnpm ctx 2963 --reuse-brief-l1` はexit 0、L1は `trusted_brief_missing_or_stale`。L1は未取得として本文と一次資料で続行。API課金を伴うJev呼び出しは行っていない。ctx初回起動時に既存lockfileから依存のinstallが行われた。tracked manifest/lockfileの差分は無い。
 
-全文確認152ファイル、symlink機械確認1件、未確認2,988件。`inventory.json`が各pathの確認範囲の正本。secrets/architecture/conventions/testing/glossary/strategy/decisions、Reviewの主経路、activities featureの基準ファイル全件の全文確認を完了。partial readは別に範囲を記録した。全文確認は全境界の実行検証を意味しない。全体監査は初期段階であり、多数の未読が残る。
+全文確認164ファイル、symlink機械確認1件、未確認2,976件。`inventory.json`が各pathの確認範囲の正本。secrets/architecture/conventions/testing/glossary/strategy/decisions、Reviewの主経路、activities featureの基準ファイル全件の全文確認を完了。partial readは別に範囲を記録した。全文確認は全境界の実行検証を意味しない。全体監査は初期段階であり、多数の未読が残る。
 
 修正commit: F001 `f0151baaf`（作成既定と選択）、F004 `f2a43d559`（unknown/型アサーション）、F002 `e88a1890f`・`84f4d9019`（旧レポート説明と用語test）、F006 `c799b402b`（前期間だけの活動が比較から消える不具合）、F008 `8a5bc2c9f`（test時計固定）、F011 `9851013ae`（機械データによるtaxonomy誤検知）、F010 `befb03e5f`（DSTの時間帯集計）。`findings.md`に根拠・反証・検査結果を記録。
 
@@ -66,3 +66,13 @@ Draft PR [#2965](https://github.com/Dayopt/dayopt/pull/2965)へ保存済み、mi
 Supabase pluginとmcp-usageに従い、既存production-db-readonly/helperを全文確認してから、許可済みop run経路で非個人system metadataだけのread_only照会を試行。認証初期化が2026-09-29 18:02 JSTにauthorization timeoutで終了し、DB結果は未取得。transaction_read_only / server_version / max_rows設定 / activities・categoriesのRLSフラグは未確認のまま。秘密実値・個人データの取得/出力やDB書込なし。新規MCP登録・権限変更・同じ失敗の反復をせず、独立したrepo読解を続ける。
 
 現在の修正を全体監査完了とは扱わない。安全な修正は順次検証する。終了/コンテキスト更新のたびにここ・inventory・findings・Issueの証拠を同期し、未読をゼロから読み直さない。
+
+## 追加検証 — UI中断とMCP説明
+
+F016 `eb07b33eb`はReview/Calendarのresize中断後のlistener/body style残留、F017 `0c299a246`は改名失敗後の未処理Promise rejectionを再現して修正。関連42 tests・型検査、改名2 tests成功。F018はMCPのplan_created送信に関する古い説明のみ訂正し、既存generatorで正本JSONから本文/逆引き資料を同期。
+
+製品コードSHA `0c299a246efee881f551ff13375c523b30c97904` + Architecture Map生成資料更新で `pnpm check` がexit 0。typecheck10 tasks・lint9 tasks・静的検査、billing15・i18n2・observability64・product4341・web366・scripts2625、計7413 passed。ログ `/tmp/dayopt-audit-check-interruptions.log`。検査中の変更は監査記録とMCP説明だけで、製品コードは固定。新しいtestファイルのpath/件数は検査前にgeneratorで同期済み。生成後 `pnpm docs:check` もexit 0、ログ `/tmp/dayopt-audit-docs-interruptions.log`。追加差分もprotected-path-gateはrequired=false/auditContract=false。
+
+`docs/learn/journeys/mcp.md`の基準1399行は分割で全文回収済み。MCP tool登録/input/output、mutation client/DB adapter/contract、analytics送信と既存testも全文確認。次はDB apply定義とユーザーの明示判断へ戻り、ghost原則とcanonical書込契約を裁定する。H014の改名失敗とH015のresize中断以外の仮説は未解決。
+
+引き続きDraft #2965を維持し、merge/releaseは行わない。未読2976件を完了扱いせず、H003/H005/H007/H009とH014/H015の未解決部分を継続する。
