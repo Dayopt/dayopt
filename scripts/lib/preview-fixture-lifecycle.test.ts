@@ -1,6 +1,10 @@
+import { createRequire } from 'node:module';
 import { describe, expect, it, vi } from 'vitest';
 import { SUPABASE_PRODUCTION_PROJECT_REF } from '../ci/production-auth-config-audit.mjs';
-import { createFixtureLifecycle } from './preview-fixture-lifecycle.mjs';
+import {
+  createFixtureLifecycle,
+  createSupabaseFixtureLifecycle,
+} from './preview-fixture-lifecycle.mjs';
 
 const binding = {
   key: 'abcdefghijklmnopqrst:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
@@ -190,5 +194,105 @@ describe('durable fixture lifecycle RPC adapter with mocked provider and clock',
     const s = setup();
     await expect(s.run(value, vi.fn())).rejects.toThrow(invalid);
     expect(s.rpc).not.toHaveBeenCalled();
+  });
+});
+
+const { createClient } = createRequire(new URL('../../apps/product/package.json', import.meta.url))(
+  '@supabase/supabase-js',
+);
+describe('installed Supabase SDK lifecycle bridge with mocked transport', () => {
+  function sdk(responses: { status: number; body: unknown }[]) {
+    const requests: { url: string; init: RequestInit; body: Record<string, unknown> }[] = [];
+    const transport = vi.fn(async (url: string, init: RequestInit) => {
+      requests.push({ url: String(url), init, body: JSON.parse(String(init.body)) });
+      const response = responses.shift();
+      if (!response) throw new Error('PRIVATE_PROVIDER');
+      return new Response(JSON.stringify(response.body), {
+        status: response.status,
+        headers: { 'content-type': 'application/json' },
+      });
+    });
+    const client = createClient(
+      'https://abcdefghijklmnopqrst.supabase.co',
+      'synthetic-sdk-key-not-real',
+      { auth: { persistSession: false, autoRefreshToken: false }, global: { fetch: transport } },
+    );
+    return { requests, transport, run: createSupabaseFixtureLifecycle({ client }) };
+  }
+  it('sends claim, guard and finish through the exact RPC with an abort signal', async () => {
+    const s = sdk([
+      { status: 200, body: { status: 'acquired' } },
+      { status: 200, body: { status: 'owned' } },
+      { status: 200, body: { status: 'finished' } },
+    ]);
+    expect(
+      await s.run(binding, async ({ beforeMutation }: { beforeMutation: () => Promise<void> }) => {
+        await beforeMutation();
+        return 'ready';
+      }),
+    ).toBe('ready');
+    expect(s.requests.map((r) => r.body.p_action)).toEqual(['claim', 'guard', 'finish']);
+    expect(s.requests.map((r) => r.body.p_success)).toEqual([null, null, true]);
+    for (const r of s.requests) {
+      expect(r.url).toBe(
+        'https://abcdefghijklmnopqrst.supabase.co/rest/v1/rpc/preview_fixture_lifecycle_v1',
+      );
+      expect(r.init.method).toBe('POST');
+      expect(r.init.signal).toBeInstanceOf(AbortSignal);
+    }
+  });
+  it('rejects provider HTTP errors before entering the callback', async () => {
+    const s = sdk([{ status: 403, body: { message: 'PRIVATE_PROVIDER', code: '42501' } }]);
+    const execute = vi.fn();
+    await expect(s.run(binding, execute)).rejects.toThrow(invalid);
+    expect(execute).not.toHaveBeenCalled();
+  });
+  it('marks guard HTTP failure as failed finish without returning callback data', async () => {
+    const s = sdk([
+      { status: 200, body: { status: 'acquired' } },
+      { status: 500, body: { message: 'PRIVATE_PROVIDER' } },
+      { status: 200, body: { status: 'unknown' } },
+    ]);
+    await expect(
+      s.run(binding, async ({ beforeMutation }: { beforeMutation: () => Promise<void> }) => {
+        await beforeMutation();
+        return 'PRIVATE_RESULT';
+      }),
+    ).rejects.toThrow(invalid);
+    expect(s.requests.map((r) => [r.body.p_action, r.body.p_success])).toEqual([
+      ['claim', null],
+      ['guard', null],
+      ['finish', false],
+    ]);
+  });
+  it('rejects null successful responses and transport exceptions', async () => {
+    for (const responses of [[{ status: 200, body: null }], []]) {
+      const s = sdk(responses);
+      const execute = vi.fn();
+      await expect(s.run(binding, execute)).rejects.toThrow(invalid);
+      expect(execute).not.toHaveBeenCalled();
+    }
+  });
+  it('never returns fixture data after an unconfirmed finish response', async () => {
+    const s = sdk([{ status: 200, body: { status: 'acquired' } }]);
+    await expect(s.run(binding, async () => 'PRIVATE_RESULT')).rejects.toThrow(invalid);
+  });
+  it('forwards an aborted signal to installed SDK fetch', async () => {
+    const aborted = new AbortController();
+    aborted.abort();
+    const transport = vi.fn(async (_url: string, init: RequestInit) => {
+      expect(init.signal).toBe(aborted.signal);
+      throw new Error('PRIVATE_PROVIDER');
+    });
+    const client = createClient(
+      'https://abcdefghijklmnopqrst.supabase.co',
+      'synthetic-sdk-key-not-real',
+      { global: { fetch: transport } },
+    );
+    const result = await client
+      .rpc('preview_fixture_lifecycle_v1', { p_action: 'guard' })
+      .abortSignal(aborted.signal);
+    expect(result.error).toBeTruthy();
+    expect(transport).toHaveBeenCalled();
   });
 });
