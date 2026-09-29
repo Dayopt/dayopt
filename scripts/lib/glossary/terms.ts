@@ -622,7 +622,7 @@ export const GLOSSARY: readonly GlossaryEntry[] = [
     ja: '保存先ルール',
     en: 'Destination rule',
     usage:
-      '新規作成は end_at だけで宛先が決まる（未来なら予定、過去なら記録）。種別選択の UI は置かない',
+      '新規作成の既定は end_at で決まる（未来なら予定、現在以前なら記録）。現在以前なら予定 / 記録を選べ、未来は予定のみ',
     code: { identifiers: ['resolveTimeblockDestination'] },
   },
 
