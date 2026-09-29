@@ -12014,10 +12014,12 @@
       "mode": "100644",
       "bytes": 20271,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 577]],
+      "evidence": [
+        "Full text read at c3f031ea6. Tests distinguish marker replay, provider outcomes and SQL source-writer races. Local-only integrations mutate singleton gates/fixtures and were not run. Completion captures clock before locks; wait-crossing-expiry remains an unverified candidate."
+      ],
       "questions": []
     },
     {
@@ -20702,10 +20704,12 @@
       "mode": "100644",
       "bytes": 35693,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 1198]],
+      "evidence": [
+        "Full text read at c3f031ea6. Tests distinguish marker replay, provider outcomes and SQL source-writer races. Local-only integrations mutate singleton gates/fixtures and were not run. Completion captures clock before locks; wait-crossing-expiry remains an unverified candidate."
+      ],
       "questions": []
     },
     {
@@ -20717,8 +20721,10 @@
       "method": "full-text",
       "status": "unverified",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[315, 394]],
+      "evidence": [
+        "Partial read 315-394 at c3f031ea6: expiry set before complete RPC, then reclaim and stale lease rejection. This does not exercise expiry during lock wait; full text remains pending."
+      ],
       "questions": []
     },
     {
@@ -20780,10 +20786,12 @@
       "mode": "100644",
       "bytes": 12484,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 466]],
+      "evidence": [
+        "Full text read at c3f031ea6. Tests distinguish marker replay, provider outcomes and SQL source-writer races. Local-only integrations mutate singleton gates/fixtures and were not run. Completion captures clock before locks; wait-crossing-expiry remains an unverified candidate."
+      ],
       "questions": []
     },
     {
@@ -38693,10 +38701,12 @@
       "mode": "100644",
       "bytes": 2622,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 97]],
+      "evidence": [
+        "Full text read at c3f031ea6. Tests distinguish marker replay, provider outcomes and SQL source-writer races. Local-only integrations mutate singleton gates/fixtures and were not run. Completion captures clock before locks; wait-crossing-expiry remains an unverified candidate."
+      ],
       "questions": []
     },
     {

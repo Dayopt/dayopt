@@ -299,3 +299,10 @@ H024の反証追記: installed `@supabase/auth-js@2.116.0` のGoTrueClient.ts 40
 - 根拠: external-calendar specは接続削除・revokeを独立cronが担うと記載。全文確認したroute/dispatcherはlist_expired→normalize RPCだけを呼ぶ。2257行のcalendar_account_deletion_fence migrationとサービスを照合し、実provider呼出しはアカウント削除リクエスト内のdispatch、cronは期限切れintentと未確定receiptの整理であることを確認。
 - 裁定/反証: #2055本文と確定plan・変更記録（issuecomment-5321803048）は1 RPC=1 transactionで期限切れintentをnormalizeする方針。途中のmaintenance同居案は撤回されており最終方針へ照合。現行コードを理由に契約を変更したのではない。confirmed/unconfirmed/not_attemptedを一律の「Google失効成功」へ変えず、再送しない既存設計を保つ。
 - 検証: docs:check exit 0（`/tmp/dayopt-audit-calendar-docs-check.log`）。DB実行・Google失効・実クラウドcron成功の証拠ではない。migrationは直接編集しない。ctx2055はL1 missing/staleのため本文・コメントと一次コードを使用。
+
+## H034 — 削除step完了の期限評価がロック待ち前の時刻を使う
+
+- 状態: コードと既存検証範囲を照合した候補、実DB再現前。未採用・未修正。
+- 期待契約/根拠: `20260730090037_reject_expired_account_deletion_step_lease.sql`は「別workerによる再claim前でも期限切れだけで無効」と明記。ただしcomplete_account_deletion_step_v1はDECLAREのclock_timestampをCONSTANT v_nowへ保存し、その後auth parent/user advisory/step rowのロックを待ってから同じ時刻でlease_expires_atを比較する。期限直前に入ってロック待ち中に越す場合、検査時点の期限とは異なる可能性がある。
+- 反証/範囲: 完了済みreplayはtrue、他workerによりlease IDが変更された場合は別条件で拒否されるため、任意の古いworkerが通るとは主張しない。既存account-deletion-gate.integration.test.ts 347-388は呼出前の期限変更→AD019→reclaim→旧ID拒否。concurrency test1198行はStorage/Billing/Customer/Plan/Record/webhook/cleanup競合を扱うが、completeのロック待ち中期限超過は含まない。Calendarのstart/finalize等にも入口時刻の保持があり、同じ修正を機械的に適用せず各契約を調べる。
+- 次: 現行DB helperのlock順と後続migration、元契約Issueを照合し、承認済み隔離DBで期限前に待機開始・期限後解放を制御して最終stateを確認する。既存integrationはlocalhost固定・USE_LOCAL_DB gate・共有activation更新を含むため、未検証のクラウド接続先へ付け替えて実行しない。コード上の時間差だけを本番不具合/認可漏れと断定しない。
