@@ -335,8 +335,12 @@ describe('Preview reporter completeness', () => {
       const root = mkdtempSync(join(tmpdir(), 'preview-reporter-'));
       roots.push(root);
       const reporter = new PreviewE2EReporter({ directory: root });
-      reporter.onBegin({}, { allTests: () => [1, 2] });
-      for (const [index, project] of ['chromium', 'Mobile Chrome'].entries()) {
+      reporter.onBegin({}, { allTests: () => [1, 2, 3] });
+      for (const [index, project] of [
+        'chromium',
+        'Mobile Chrome',
+        'preview-authorization',
+      ].entries()) {
         const test = {
           id: String(index),
           expectedStatus: 'passed',

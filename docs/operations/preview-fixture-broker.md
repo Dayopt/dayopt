@@ -45,6 +45,18 @@ repository ID / owner ID / 既定 subject は 2026-09-29 の repository metadata
 
 executor は adapter の取得待ち後にも JWT の期限を再検証する。[SDKを用いるローカルテスト](../../scripts/lib/preview-fixture-broker.test.ts) は provider mock と test-only の coordination harness を使い、この呼び出し契約と競合を検証する。**実 adapter の永続性・インスタンス間の排他・worker 喪失からの回収を証明するテストではない。** その実装・実測前に公開 route へ接続してはならない。
 
+## 準備済み login を使う candidate 側
+
+[registry reader](../../apps/product/src/lib/test/preview-fixture-registry.ts) と既存3specに、`E2E_PREVIEW_FIXTURE_REGISTRY` が指定された場合だけ有効な consumer 経路を用意した。現在の runner はこの変数を渡さないため、broker / workflow への接続は未完了のまま。
+
+registry は provision 応答の `schemaVersion / operation / runId / users` に、信頼済み caller が `origin / supabaseProjectRef` を付けた JSON。予定2ユーザーの通常 login だけを含む。reader は immutable origin、ephemeral DB、run、予定UUID、メールとseed名を照合し、不正・不足・追加fieldは固定エラーで拒否する。admin key / provider PAT / OIDC発行変数を持つconsumerも拒否する。job全体のenv allowlistは引き続き必須で、このreaderを任意の環境変数の無害化器と扱わない。
+
+file は600、親directoryは700、16KiB以内とし、file symlinkを拒否する。公開evidenceだけでなくPlaywrightのoutputDirの外に保存する。Playwrightは起動時にoutputDirを消去するため、credentialsとbrowser出力を同じ場所へ置かない。生のlogin fileをartifactやログへ載せない。
+
+consumer時はspecごとのadmin生成・seed・削除を行わず、同じ2ユーザーを通常loginで使う。Preview configで **desktop6件 → mobile5件 → A/B認可1件** のproject依存を明示し、認可テストのRecordが先にReport集計へ混ざらないようにする。先行失敗時の後続skipは成功にしない。全project後の回収は別のtrusted jobが担当し、worker喪失時も予定intentから回収できる必要がある。legacyモードのspec別作成/削除は維持する。
+
+このreader・spec経路・`--list` の検証は、private fileの作成/安全な受け渡し・broker実行・通常login実走・最終回収を証明しない。それらはworkflow接続と実測の未完了条件として残る。
+
 ## 既存処理と組み合わせる順序
 
 1. [preview-cloud-trust.mjs](../../scripts/ci/preview-cloud-trust.mjs) と readiness で exact candidate / deployment / branch / schema を確認し、公開 intent を candidate checkout 前に保存する。
