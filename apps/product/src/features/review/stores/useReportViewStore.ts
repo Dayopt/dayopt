@@ -104,7 +104,7 @@ function sanitizeReportViewState(persistedState: unknown): ReportViewState {
  * 空で足す。サニタイズは知らないキーを拾わず、無いキーを既定で埋めるので、形の変換そのものは
  * サニタイズと同義。未分類はカレンダーと同じくアクティビティ単位でだけ出し入れするので、
  * v1 で未分類をまとめて隠していた端末は「全部見える」へ戻る（可逆で、1 手で隠し直せる）。
- * 余白の切替は概念ごと撤去した（余白は常に分母に入る）。
+ * 余白の切替は概念ごと撤去した（余白は配分の分母に含めず、見出しの数字にだけ出す）。
  */
 export function migrateReportViewState(persistedState: unknown, _version: number): ReportViewState {
   return sanitizeReportViewState(persistedState);

@@ -513,7 +513,7 @@ export const GLOSSARY: readonly GlossaryEntry[] = [
     concept: 'Allocation (chapter 1)',
     ja: '配分',
     en: 'Allocation',
-    usage: '1 章。時間そのものを分母（週 = 168h）に置いて、どこへ流れたかを見る',
+    usage: '時間の使い方タブの面。配分は見えている記録時間の合計を分母にし、余白を混ぜない',
     code: { identifiers: ['AllocationChapter'] },
   },
   {
@@ -545,7 +545,7 @@ export const GLOSSARY: readonly GlossaryEntry[] = [
     concept: 'Ink',
     ja: 'インク',
     en: 'Ink',
-    usage: '記録として書かれた時間。決算バーの塗り',
+    usage: '記録として書かれた時間。日別の棒や配分の集計対象',
     code: { identifiers: ['buildInkColumns'] },
   },
   {
@@ -578,11 +578,12 @@ export const GLOSSARY: readonly GlossaryEntry[] = [
   {
     id: 'ledger-bar',
     layer: 'design',
-    status: 'current',
+    status: 'deprecated',
     concept: 'Ledger bar',
     ja: '決算バー',
     en: 'Ledger bar',
-    usage: '1 章の横 1 本のバー。塗りがインク、塗り残しが余白。UI にラベルとしては出さない',
+    usage:
+      '旧: 期間全体を分母にした横1本のバー。2026-09-15に廃止し、記録時間を分母にした配分の横棒へ置換',
   },
   {
     id: 'mirror',
