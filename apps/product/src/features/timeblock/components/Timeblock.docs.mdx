@@ -13,12 +13,12 @@ Plan / Recordのeditor、inspector、record action component群。Storybookで�
 | Inspector      | desktop popover / mobile drawer、time locked、複製下書き、validation error |
 | Editor         | 未来Plan、過去Plan、Record、全体disabled                                   |
 | Record actions | そのまま記録、日単位の一括確定、pending                                    |
-| Relationships  | Planの関連Record一覧、Recordの元Plan、loading / error / unavailable        |
+| Relationships  | Planの関連Record一覧、loading / error                                      |
 
 - Inspectorで開いたPlan / Recordは時間編集で暗黙変換しない
 - past Planも時間fieldを編集できる（編集してもPlanのままでRecordへは変わらない）。内容訂正とrecord actionも残す
-- 「そのまま記録」のpendingは、最新のタグ・メモ保存からRecord作成まで継続する
-- Plan / Recordの関係はraw IDではなくタグと日時で示し、行選択で同じInspectorの対象を切り替える
+- 「そのまま記録」のpendingは、最新のアクティビティ・メモ保存からRecord作成まで継続する
+- Planの関連Recordはraw IDではなくアクティビティと日時で示し、行選択で同じInspectorの対象を切り替える
 - product rule、DB、RPCはStorybookに複製しない
 
 ---
@@ -28,11 +28,11 @@ Plan / Recordのeditor、inspector、record action component群。Storybookで�
 ```
 TimeblockInspector                    Inspector シェル（PC: DockedInspectorPanel / Mobile: Drawer）
 └── TimeblockInspectorForm            Plan / Record 共有の編集フォーム
-    ├── TagRow                        タグ選択 + 共通メニュー（振り返り / コピー / 複製 / 削除等）
+    ├── TimeblockActivityCard         アクティビティ選択
     ├── DateTimeSection / メモ        自動保存される共有編集フィールド
-    └── TimeblockRelationshipSection  関連Record / 元Planの人間向け表示と詳細切替
+    └── TimeblockRelationshipSection  関連Recordの表示と詳細切替（保存された元Planへの逆リンクは持たない）
 
-TimeblockEditor                       インライン作成エディタ（タグパレット等から）
+TimeblockEditor                       インライン作成エディタ（アクティビティ選択から）
 TimeblockRecordActions                記録導線（ワンタップ「そのまま記録」/ ConfirmDayButton）
 ```
 
@@ -72,9 +72,4 @@ TimeblockRecordActions                記録導線（ワンタップ「そのま
 
 ## 過去 Plan の扱い
 
-- 予定時間の変更（移動・リサイズ）: 可（編集しても Plan のままで、Record へは変わらない）
-- アクティビティ・メモの訂正: 可
-- 過去日付への新規 Plan 追加: 可（既定は Record。作成 Inspector の種別タブで Plan を選べる）
-- ワンタップ記録 / skip / 削除: 可
-
-正本は `docs/product/specs/plan-record.md` を参照する。
+作成時の種別選択・時間編集・記録操作の正本は `docs/product/specs/plan-record.md` を参照する。操作の可否をここへ複製しない。旧「過去 Plan を新規作成できない」「skip 可」という要約は現行契約ではない。

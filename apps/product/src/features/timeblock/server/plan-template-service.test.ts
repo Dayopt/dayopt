@@ -112,7 +112,7 @@ function createCommands() {
 describe('PlanTemplateService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    // recordRowsの固定データを直近28日の窓で評価する。実行日で中央値が失われないようにする。
+    // 固定 fixture が実行日に依存して直近28日の窓から外れないようにする。
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date('2026-09-05T00:00:00.000Z'));
   });
