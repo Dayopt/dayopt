@@ -1,0 +1,124 @@
+{
+  "scope": "Explicit assertion mapping for the 17 functions strengthened in this change, not all public APIs. Boundary cases count as negative cases under the request. No endpoint coverage inferred.",
+  "contracts": [
+    {
+      "source": "apps/product/src/lib/time/time-range.ts",
+      "function": "createTimeRange",
+      "test": "apps/product/src/lib/time/time-range.test.ts",
+      "normalCase": "creates an independent copy of both endpoints",
+      "negativeOrBoundaryCase": "rejects zero, reversed, or invalid endpoints (%s, %s)"
+    },
+    {
+      "source": "apps/product/src/lib/time/time-range.ts",
+      "function": "getTimeRangeDurationMs",
+      "test": "apps/product/src/lib/time/time-range.test.ts",
+      "normalCase": "creates an independent copy of both endpoints",
+      "negativeOrBoundaryCase": "rejects zero, reversed, or invalid endpoints (%s, %s)"
+    },
+    {
+      "source": "apps/product/src/lib/time/time-range.ts",
+      "function": "isValidTimeRange",
+      "test": "apps/product/src/lib/time/time-range.test.ts",
+      "normalCase": "creates an independent copy of both endpoints",
+      "negativeOrBoundaryCase": "rejects zero, reversed, or invalid endpoints (%s, %s)"
+    },
+    {
+      "source": "apps/product/src/lib/time/time-conflict.ts",
+      "function": "rangesOverlap",
+      "test": "apps/product/src/lib/time/time-conflict.test.ts",
+      "normalCase": "detects intersection but allows touching half-open endpoints",
+      "negativeOrBoundaryCase": "rejects each missing or invalid endpoint independently: %s"
+    },
+    {
+      "source": "apps/product/src/lib/time/time-conflict.ts",
+      "function": "hasTwoLayerTimeConflict",
+      "test": "apps/product/src/lib/time/time-conflict.test.ts",
+      "normalCase": "rejects incomplete ranges even when there are no existing timeblocks (valid range assertion)",
+      "negativeOrBoundaryCase": "rejects incomplete ranges even when there are no existing timeblocks (missing endpoints assertions)"
+    },
+    {
+      "source": "packages/billing/src/subscription.ts",
+      "function": "isSubscriptionStatus",
+      "test": "packages/billing/src/subscription.test.ts",
+      "normalCase": "recognizes paid status %s",
+      "negativeOrBoundaryCase": "does not grant paid access for an unrecognized status %s"
+    },
+    {
+      "source": "packages/billing/src/subscription.ts",
+      "function": "isProSubscriptionStatus",
+      "test": "packages/billing/src/subscription.test.ts",
+      "normalCase": "recognizes paid status %s",
+      "negativeOrBoundaryCase": "does not grant paid access for an unrecognized status %s"
+    },
+    {
+      "source": "packages/billing/src/subscription.ts",
+      "function": "getPlanIdForSubscriptionStatus",
+      "test": "packages/billing/src/subscription.test.ts",
+      "normalCase": "recognizes paid status %s",
+      "negativeOrBoundaryCase": "does not grant paid access for an unrecognized status %s"
+    },
+    {
+      "source": "packages/billing/src/subscription.ts",
+      "function": "mapStripeSubscriptionStatus",
+      "test": "packages/billing/src/subscription.test.ts",
+      "normalCase": "recognizes paid status %s",
+      "negativeOrBoundaryCase": "fails closed for unsupported Stripe status %s"
+    },
+    {
+      "source": "packages/billing/src/pricing.ts",
+      "function": "getMonthlyUsdCents",
+      "test": "packages/billing/src/pricing.test.ts",
+      "normalCase": "converts the paid monthly price from cents to dollars once",
+      "negativeOrBoundaryCase": "preserves the zero-price boundary"
+    },
+    {
+      "source": "packages/billing/src/pricing.ts",
+      "function": "getMonthlyUsd",
+      "test": "packages/billing/src/pricing.test.ts",
+      "normalCase": "converts the paid monthly price from cents to dollars once",
+      "negativeOrBoundaryCase": "preserves the zero-price boundary"
+    },
+    {
+      "source": "packages/billing/src/plans.ts",
+      "function": "isPaidPlan",
+      "test": "packages/billing/src/plans.test.ts",
+      "normalCase": "recognizes pro as paid",
+      "negativeOrBoundaryCase": "does not treat free as paid"
+    },
+    {
+      "source": "scripts/lib/mutation-evidence.mjs",
+      "function": "selectMutationCandidates",
+      "test": "scripts/lib/mutation-evidence.test.ts",
+      "normalCase": "freezes twenty distinct sites with a reproducible seed without changing the pool",
+      "negativeOrBoundaryCase": "rejects an undersized or duplicate pool instead of claiming twenty trials"
+    },
+    {
+      "source": "scripts/lib/mutation-evidence.mjs",
+      "function": "summarizeMutationRun",
+      "test": "scripts/lib/mutation-evidence.test.ts",
+      "normalCase": "accepts a clean baseline, detects an assertion failure, and preserves a survivor",
+      "negativeOrBoundaryCase": "rejects a missing JSON report even with a successful process exit"
+    },
+    {
+      "source": "scripts/lib/mutation-evidence.mjs",
+      "function": "isSuccessfulMutationRun",
+      "test": "scripts/lib/mutation-evidence.test.ts",
+      "normalCase": "accepts a clean baseline, detects an assertion failure, and preserves a survivor",
+      "negativeOrBoundaryCase": "rejects a missing JSON report even with a successful process exit"
+    },
+    {
+      "source": "scripts/lib/mutation-evidence.mjs",
+      "function": "classifyMutationRun",
+      "test": "scripts/lib/mutation-evidence.test.ts",
+      "normalCase": "accepts a clean baseline, detects an assertion failure, and preserves a survivor",
+      "negativeOrBoundaryCase": "rejects a replacement test even when total counts match"
+    },
+    {
+      "source": "scripts/lib/mutation-evidence.mjs",
+      "function": "applyMutation",
+      "test": "scripts/lib/mutation-evidence.test.ts",
+      "normalCase": "changes only the selected operator in the captured source",
+      "negativeOrBoundaryCase": "rejects stale source, stale offsets, and a no-op mutation"
+    }
+  ]
+}
