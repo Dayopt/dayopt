@@ -2150,7 +2150,7 @@ graph LR
 </details>
 
 <details>
-<summary>test の候補（94）</summary>
+<summary>test の候補（95）</summary>
 
 <!-- prettier-ignore -->
 | ファイル | 対応の根拠 |
@@ -2158,6 +2158,7 @@ graph LR
 | [apps/product/src/features/calendar/components/activity-filter/activity-delete-counts.test.ts](<../../../apps/product/src/features/calendar/components/activity-filter/activity-delete-counts.test.ts>) | feature: calendar |
 | [apps/product/src/features/calendar/components/activity-filter/activity-drag.test.tsx](<../../../apps/product/src/features/calendar/components/activity-filter/activity-drag.test.tsx>) | feature: calendar |
 | [apps/product/src/features/calendar/components/activity-filter/activity-drop-target.test.ts](<../../../apps/product/src/features/calendar/components/activity-filter/activity-drop-target.test.ts>) | feature: calendar |
+| [apps/product/src/features/calendar/components/activity-filter/ActivityFilterList.deletion.test.tsx](<../../../apps/product/src/features/calendar/components/activity-filter/ActivityFilterList.deletion.test.tsx>) | feature: calendar |
 | [apps/product/src/features/calendar/components/activity-filter/components/CategoryCreateDialog.test.tsx](<../../../apps/product/src/features/calendar/components/activity-filter/components/CategoryCreateDialog.test.tsx>) | feature: calendar |
 | [apps/product/src/features/calendar/components/activity-filter/hooks/useActivityQuickCreate.test.ts](<../../../apps/product/src/features/calendar/components/activity-filter/hooks/useActivityQuickCreate.test.ts>) | feature: calendar |
 | [apps/product/src/features/calendar/components/activity-filter/sort-activities.test.ts](<../../../apps/product/src/features/calendar/components/activity-filter/sort-activities.test.ts>) | feature: calendar |
@@ -2381,7 +2382,7 @@ graph LR
 </details>
 
 <details>
-<summary>test の候補（60）</summary>
+<summary>test の候補（61）</summary>
 
 <!-- prettier-ignore -->
 | ファイル | 対応の根拠 |
@@ -2390,6 +2391,7 @@ graph LR
 | [apps/product/src/features/settings/components/BillingSettings.billing-operation.test.tsx](<../../../apps/product/src/features/settings/components/BillingSettings.billing-operation.test.tsx>) | feature: settings |
 | [apps/product/src/features/settings/components/DataSettings.analytics-consent.test.tsx](<../../../apps/product/src/features/settings/components/DataSettings.analytics-consent.test.tsx>) | feature: settings |
 | [apps/product/src/features/settings/components/DataSettings.csv-export.test.tsx](<../../../apps/product/src/features/settings/components/DataSettings.csv-export.test.tsx>) | feature: settings |
+| [apps/product/src/features/settings/components/DataSettings.deletion.test.tsx](<../../../apps/product/src/features/settings/components/DataSettings.deletion.test.tsx>) | feature: settings |
 | [apps/product/src/features/settings/components/DataSettings.mcp-url.test.tsx](<../../../apps/product/src/features/settings/components/DataSettings.mcp-url.test.tsx>) | feature: settings |
 | [apps/product/src/features/settings/components/DisplaySettings.test.tsx](<../../../apps/product/src/features/settings/components/DisplaySettings.test.tsx>) | feature: settings |
 | [apps/product/src/features/settings/components/EmailChangeDialog.retry.test.tsx](<../../../apps/product/src/features/settings/components/EmailChangeDialog.retry.test.tsx>) | feature: settings |

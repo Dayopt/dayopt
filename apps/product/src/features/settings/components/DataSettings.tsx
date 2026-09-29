@@ -345,6 +345,7 @@ function AccountAnalyticsConsentSection() {
 
 function McpApiSection() {
   const t = useTranslations('settings.dataControls.mcp');
+  const tToast = useTranslations('common.toast');
   const [copied, setCopied] = useState<'url' | null>(null);
 
   const { canUseProduct } = useBillingAccess();
@@ -362,13 +363,18 @@ function McpApiSection() {
       ? mcpResourceUri
       : `${mcpResourceUri}/mcp`;
   const handleCopy = useCallback(
-    (text: string, type: 'url') => {
-      navigator.clipboard.writeText(text);
-      setCopied(type);
-      toast.success(t('copied'));
-      setTimeout(() => setCopied(null), 2000);
+    async (text: string, type: 'url') => {
+      try {
+        await navigator.clipboard.writeText(text);
+        setCopied(type);
+        toast.success(t('copied'));
+        setTimeout(() => setCopied(null), 2000);
+      } catch {
+        setCopied(null);
+        toast.error(tToast('copyFailed'));
+      }
     },
-    [t],
+    [t, tToast],
   );
 
   // MCP 資格のない deploy では接続導線を出さない（Production へ誤接続させない）。
@@ -464,10 +470,14 @@ function DeletionSection() {
 
   const handleConfirm = useCallback(async () => {
     if (!isConfirmed) return;
-    if (target === 'blocks') {
-      await deleteBlocksMutation.mutateAsync({ confirmText: 'DELETE' });
-    } else if (target === 'all') {
-      await deleteAllDataMutation.mutateAsync({ confirmText: 'DELETE' });
+    try {
+      if (target === 'blocks') {
+        await deleteBlocksMutation.mutateAsync({ confirmText: 'DELETE' });
+      } else if (target === 'all') {
+        await deleteAllDataMutation.mutateAsync({ confirmText: 'DELETE' });
+      }
+    } catch {
+      // 通知はmutationのonErrorが行う。入力を保ち、確認画面で再試行できるようにする。
     }
   }, [target, isConfirmed, deleteBlocksMutation, deleteAllDataMutation]);
 

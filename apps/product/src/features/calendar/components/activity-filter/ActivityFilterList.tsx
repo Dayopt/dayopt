@@ -274,6 +274,8 @@ export function ActivityFilterList({ betweenCategoriesAndUncategorized }: Activi
       } else {
         await deleteActivityMutation.mutateAsync({ id: deleteTarget.id });
       }
+    } catch {
+      // 通知とrollbackは既存mutation hookが担当する。イベント境界にrejectを残さない。
     } finally {
       setDeleteTarget(null);
     }
