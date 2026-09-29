@@ -306,3 +306,12 @@ H024の反証追記: installed `@supabase/auth-js@2.116.0` のGoTrueClient.ts 40
 - 期待契約/根拠: `20260730090037_reject_expired_account_deletion_step_lease.sql`は「別workerによる再claim前でも期限切れだけで無効」と明記。ただしcomplete_account_deletion_step_v1はDECLAREのclock_timestampをCONSTANT v_nowへ保存し、その後auth parent/user advisory/step rowのロックを待ってから同じ時刻でlease_expires_atを比較する。期限直前に入ってロック待ち中に越す場合、検査時点の期限とは異なる可能性がある。
 - 反証/範囲: 完了済みreplayはtrue、他workerによりlease IDが変更された場合は別条件で拒否されるため、任意の古いworkerが通るとは主張しない。既存account-deletion-gate.integration.test.ts 347-388は呼出前の期限変更→AD019→reclaim→旧ID拒否。concurrency test1198行はStorage/Billing/Customer/Plan/Record/webhook/cleanup競合を扱うが、completeのロック待ち中期限超過は含まない。Calendarのstart/finalize等にも入口時刻の保持があり、同じ修正を機械的に適用せず各契約を調べる。
 - 次: 現行DB helperのlock順と後続migration、元契約Issueを照合し、承認済み隔離DBで期限前に待機開始・期限後解放を制御して最終stateを確認する。既存integrationはlocalhost固定・USE_LOCAL_DB gate・共有activation更新を含むため、未検証のクラウド接続先へ付け替えて実行しない。コード上の時間差だけを本番不具合/認可漏れと断定しない。
+
+## H035 — Subscription更新の遅延配送が終了状態や別契約を上書きする候補
+
+- 状態: 原文・route/service/claimの全文確認によるコード上の候補。操作による再現・修正前。Mission #2963で継続し、Issue化を修正完了へ数えない。
+- 期待契約: billing仕様は現在のStripe statusを同期し、canceled/unpaidでは終了後へ移る。Stripe公式の[Event ordering](https://docs.stripe.com/webhooks#event-ordering)は配送順を保証せず、同秒timestampで順序を決めないこと、APIでEventを再取得しても元のsnapshotが変わらないことを明記（2026-09-30取得）。
+- 根拠: routeのupdatedは照合済みEvent.data.object.statusをsyncSubscriptionStatusへ渡す。serviceの更新条件はCustomerだけで、現在Subscription IDやイベント前後関係を判定しない。claimはevent_id単位の重複防止で、異なるEvent間を順序付けない。deleted専用RPCは現在Subscriptionとの一致を判定し、終了時はsubscription_idをNULLへするが、後続updatedは同じCustomerへID/statusを再設定できる。
+- 想定条件/影響: deletedが先に保存された後、未処理の古いactive updatedが届く場合、終了済み利用権を復活させる可能性。再契約後の旧Subscription更新でも新しいIDを上書きする可能性。Stripe/DBの実観測や本番発生は未確認。
+- 反証/制限: 同一event_idの再送はprocessedなら除外される。durable provider照合はAccount/Mode/Event identityを保護するが、Subscription最新状態の確認ではない。checkoutはSubscriptionを再取得するためupdatedと入力の鮮度が異なる。ただし再取得だけでも別契約・並行DB更新との競合は閉じない。既存route testのupdatedは解約予約activeの1例、serviceの状態遷移testは別mockで例外なしを確かめるだけで保存状態の連続性を検査しない。
+- 次: 元課金Issueの要求・provider identityとSubscriptionの対応・初回bind/再契約・削除中のロック契約を照合し、実route+serviceと状態を保持する合成DB応答で遅延配送を再現する。現在状態の再取得、条件付き保存、必要な直列化を比較し、一つの原因をcheckout/updated/deletedを横断して閉じる。event.created比較だけの修正は採らない。新規機構や本番書込みは不要。独立して進める全文読解は継続する。

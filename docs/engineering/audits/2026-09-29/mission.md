@@ -192,3 +192,13 @@ F033はdocs:check exit 0（`/tmp/dayopt-audit-calendar-docs-check.log`）。製�
 前回はF033の文書訂正と337件までの全文読解を保存したprogress。今回clean HEAD `c3f031ea6379dc5c68938a89c21d3ecee96c32e8`で継続。Calendar account-deletion unit577行・app integration466行、generic gate concurrency1198行、期限切れstep lease migrationを全文確認。unitはprovider再送防止・canonical ID・結果不明・復号失敗・近い期限の再prepareを扱う。DB integrationはlocalhost/USE_LOCAL_DB専用でactivation singletonを更新するため未実行。generic integrationの315–394だけは部分読解として記録し、全文確認に昇格していない。H034としてロック待ち中の期限超過の未検証区間を保存。製品コード変更なし、前回成功した同一全体checkを繰り返していない。次はこの時間評価の契約・現行helper定義へ戻りつつ、generic gate integration残りとDB gate commandsの全文読解を続ける。実DB再現前にmigration変更や本番観測を主張しない。
 
 同turnでgeneric gate foundation/commands/provider-neutral再定義/singleton保護/begin lock順の5 migrationも全文確認。古いsealはCalendar/Stripe snapshotを直接持つが、後続028で3 step countとcompletedを必須にするprovider-neutral判定へ置換される。033はsingleton欠落をinactiveへ読み替えずAD018、038はbeginのglobal→auth parent→user順を修正。grepの旧定義だけを現行不具合と誤認しない。基準全文346件、機械確認1、未確認2794。H034はcompleteの後続037を対象とする。次は残るgate integration全文、source固有binding/enforcementと共通lock helperの現行定義を追い、実行環境が未確認のDB検査を成功に数えない。今回の変更は読解証拠と候補記録のみ。
+
+## 2026-09-30 — 削除証明とWebhookの入力鮮度
+
+clean HEAD `6fea3a7720d083f29748cdb4188cadd80710a1a0`から継続。更新されたAGENTSの判断入口と現行Plan/Record仕様を確認。独立保存・手動skip廃止を現行契約として適用し、旧判断を復活させない。decisionsの初回大出力は切り詰められたため入口1–28行を再取得。今回その索引全体を新たに全文読了とは数えない。
+
+前回の未保存13ファイルと、billing service/test、Webhook route/test、claim helper、state machine/旧table定義を合わせ20ファイルの全文確認を台帳へ保存。基準blobとのbyte一致を確認。基準全文366件、機械確認1、未確認2774。Calendarのexact intent binding、Billingの固定Customer/provider outcome/未完了claim、Storageの零残存確認は共通3step完了とは異なる証明であり削除しない。短期terminal receiptは30日で、無期限の削除証明ではない。invalid claimed_at仮説はDBのNOT NULL TIMESTAMPTZで反証され、正常DB経路の不具合として採用しない。
+
+H035として遅延updatedが解約後/再契約後を上書きする候補を保存。Stripe公式の配送順・immutable Event説明に照合したが、まだ操作再現前。正常順を模した例外なしtestを状態遷移の証明として扱わない。次は初回bind/再契約/削除中の契約を照合して再現・最小修正を進める。H034のlock待ち中期限超過と隔離DB前提も未解決。今回製品コードは変更せず、同一の成功済み全体checkを繰り返していない。前回の7483成功は`ef0f9e572`の製品コードに束縛されたまま、現在の文書変更や未実行DB検証へ拡張しない。公開Draftの最後の確認headは`39a717490`、以後の読解/文書はlocal。全体監査・実環境・E2E・配信は未完了。
+
+今回の台帳/候補追記後にNode24 `pnpm docs:check` exit 0（`/tmp/dayopt-audit-webhook-reading-docs-check.log`）、diff whitespace検査成功。これは文書整合の検査で、H035の挙動検証ではない。

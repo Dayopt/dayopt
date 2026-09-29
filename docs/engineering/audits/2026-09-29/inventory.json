@@ -5064,10 +5064,12 @@
       "mode": "100644",
       "bytes": 27519,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 719]],
+      "evidence": [
+        "Full untruncated text read at 6fea3a772 across account-deletion source bindings, Storage ownership, terminal receipts and Stripe webhook callers/tests. Baseline bytes match. Generic completion and provider-specific proofs are intentional separate boundaries. Unit dependencies are synthetic; local DB/cloud/provider execution not performed. Event-ID deduplication does not establish cross-event ordering; H035 remains under investigation."
+      ],
       "questions": []
     },
     {
@@ -5077,10 +5079,12 @@
       "mode": "100644",
       "bytes": 25114,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 645]],
+      "evidence": [
+        "Full untruncated text read at 6fea3a772 across account-deletion source bindings, Storage ownership, terminal receipts and Stripe webhook callers/tests. Baseline bytes match. Generic completion and provider-specific proofs are intentional separate boundaries. Unit dependencies are synthetic; local DB/cloud/provider execution not performed. Event-ID deduplication does not establish cross-event ordering; H035 remains under investigation."
+      ],
       "questions": []
     },
     {
@@ -5103,10 +5107,12 @@
       "mode": "100644",
       "bytes": 3044,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 100]],
+      "evidence": [
+        "Full untruncated text read at 6fea3a772 across account-deletion source bindings, Storage ownership, terminal receipts and Stripe webhook callers/tests. Baseline bytes match. Generic completion and provider-specific proofs are intentional separate boundaries. Unit dependencies are synthetic; local DB/cloud/provider execution not performed. Event-ID deduplication does not establish cross-event ordering; H035 remains under investigation."
+      ],
       "questions": []
     },
     {
@@ -14746,10 +14752,12 @@
       "mode": "100644",
       "bytes": 12042,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 369]],
+      "evidence": [
+        "Full untruncated text read at 6fea3a772 across account-deletion source bindings, Storage ownership, terminal receipts and Stripe webhook callers/tests. Baseline bytes match. Generic completion and provider-specific proofs are intentional separate boundaries. Unit dependencies are synthetic; local DB/cloud/provider execution not performed. Event-ID deduplication does not establish cross-event ordering; H035 remains under investigation."
+      ],
       "questions": []
     },
     {
@@ -14759,10 +14767,12 @@
       "mode": "100644",
       "bytes": 17992,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 559]],
+      "evidence": [
+        "Full untruncated text read at 6fea3a772 across account-deletion source bindings, Storage ownership, terminal receipts and Stripe webhook callers/tests. Baseline bytes match. Generic completion and provider-specific proofs are intentional separate boundaries. Unit dependencies are synthetic; local DB/cloud/provider execution not performed. Event-ID deduplication does not establish cross-event ordering; H035 remains under investigation."
+      ],
       "questions": []
     },
     {
@@ -14772,10 +14782,12 @@
       "mode": "100644",
       "bytes": 4303,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 125]],
+      "evidence": [
+        "Full untruncated text read at 6fea3a772 across account-deletion source bindings, Storage ownership, terminal receipts and Stripe webhook callers/tests. Baseline bytes match. Generic completion and provider-specific proofs are intentional separate boundaries. Unit dependencies are synthetic; local DB/cloud/provider execution not performed. Event-ID deduplication does not establish cross-event ordering; H035 remains under investigation."
+      ],
       "questions": []
     },
     {
@@ -14785,10 +14797,12 @@
       "mode": "100644",
       "bytes": 5736,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 185]],
+      "evidence": [
+        "Full untruncated text read at 6fea3a772 across account-deletion source bindings, Storage ownership, terminal receipts and Stripe webhook callers/tests. Baseline bytes match. Generic completion and provider-specific proofs are intentional separate boundaries. Unit dependencies are synthetic; local DB/cloud/provider execution not performed. Event-ID deduplication does not establish cross-event ordering; H035 remains under investigation."
+      ],
       "questions": []
     },
     {
@@ -36242,10 +36256,12 @@
       "mode": "100644",
       "bytes": 968,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 20]],
+      "evidence": [
+        "Full untruncated text read at 6fea3a772 across account-deletion source bindings, Storage ownership, terminal receipts and Stripe webhook callers/tests. Baseline bytes match. Generic completion and provider-specific proofs are intentional separate boundaries. Unit dependencies are synthetic; local DB/cloud/provider execution not performed. Event-ID deduplication does not establish cross-event ordering; H035 remains under investigation."
+      ],
       "questions": []
     },
     {
@@ -37815,10 +37831,12 @@
       "mode": "100644",
       "bytes": 2362,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 77]],
+      "evidence": [
+        "Full untruncated text read at 6fea3a772 across account-deletion source bindings, Storage ownership, terminal receipts and Stripe webhook callers/tests. Baseline bytes match. Generic completion and provider-specific proofs are intentional separate boundaries. Unit dependencies are synthetic; local DB/cloud/provider execution not performed. Event-ID deduplication does not establish cross-event ordering; H035 remains under investigation."
+      ],
       "questions": []
     },
     {
@@ -38575,10 +38593,12 @@
       "mode": "100644",
       "bytes": 7050,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 260]],
+      "evidence": [
+        "Full untruncated text read at 6fea3a772 across account-deletion source bindings, Storage ownership, terminal receipts and Stripe webhook callers/tests. Baseline bytes match. Generic completion and provider-specific proofs are intentional separate boundaries. Unit dependencies are synthetic; local DB/cloud/provider execution not performed. Event-ID deduplication does not establish cross-event ordering; H035 remains under investigation."
+      ],
       "questions": []
     },
     {
@@ -38603,10 +38623,12 @@
       "mode": "100644",
       "bytes": 8951,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 311]],
+      "evidence": [
+        "Full untruncated text read at 6fea3a772 across account-deletion source bindings, Storage ownership, terminal receipts and Stripe webhook callers/tests. Baseline bytes match. Generic completion and provider-specific proofs are intentional separate boundaries. Unit dependencies are synthetic; local DB/cloud/provider execution not performed. Event-ID deduplication does not establish cross-event ordering; H035 remains under investigation."
+      ],
       "questions": []
     },
     {
@@ -38629,10 +38651,12 @@
       "mode": "100644",
       "bytes": 10786,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 382]],
+      "evidence": [
+        "Full untruncated text read at 6fea3a772 across account-deletion source bindings, Storage ownership, terminal receipts and Stripe webhook callers/tests. Baseline bytes match. Generic completion and provider-specific proofs are intentional separate boundaries. Unit dependencies are synthetic; local DB/cloud/provider execution not performed. Event-ID deduplication does not establish cross-event ordering; H035 remains under investigation."
+      ],
       "questions": []
     },
     {
@@ -38642,10 +38666,12 @@
       "mode": "100644",
       "bytes": 3534,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 131]],
+      "evidence": [
+        "Full untruncated text read at 6fea3a772 across account-deletion source bindings, Storage ownership, terminal receipts and Stripe webhook callers/tests. Baseline bytes match. Generic completion and provider-specific proofs are intentional separate boundaries. Unit dependencies are synthetic; local DB/cloud/provider execution not performed. Event-ID deduplication does not establish cross-event ordering; H035 remains under investigation."
+      ],
       "questions": []
     },
     {
@@ -38683,10 +38709,12 @@
       "mode": "100644",
       "bytes": 1829,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 68]],
+      "evidence": [
+        "Full untruncated text read at 6fea3a772 across account-deletion source bindings, Storage ownership, terminal receipts and Stripe webhook callers/tests. Baseline bytes match. Generic completion and provider-specific proofs are intentional separate boundaries. Unit dependencies are synthetic; local DB/cloud/provider execution not performed. Event-ID deduplication does not establish cross-event ordering; H035 remains under investigation."
+      ],
       "questions": []
     },
     {
@@ -38696,10 +38724,12 @@
       "mode": "100644",
       "bytes": 2415,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 86]],
+      "evidence": [
+        "Full untruncated text read at 6fea3a772 across account-deletion source bindings, Storage ownership, terminal receipts and Stripe webhook callers/tests. Baseline bytes match. Generic completion and provider-specific proofs are intentional separate boundaries. Unit dependencies are synthetic; local DB/cloud/provider execution not performed. Event-ID deduplication does not establish cross-event ordering; H035 remains under investigation."
+      ],
       "questions": []
     },
     {
@@ -38871,10 +38901,12 @@
       "mode": "100644",
       "bytes": 6612,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 213]],
+      "evidence": [
+        "Full untruncated text read at 6fea3a772 across account-deletion source bindings, Storage ownership, terminal receipts and Stripe webhook callers/tests. Baseline bytes match. Generic completion and provider-specific proofs are intentional separate boundaries. Unit dependencies are synthetic; local DB/cloud/provider execution not performed. Event-ID deduplication does not establish cross-event ordering; H035 remains under investigation."
+      ],
       "questions": []
     },
     {
@@ -38884,10 +38916,12 @@
       "mode": "100644",
       "bytes": 4655,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 161]],
+      "evidence": [
+        "Full untruncated text read at 6fea3a772 across account-deletion source bindings, Storage ownership, terminal receipts and Stripe webhook callers/tests. Baseline bytes match. Generic completion and provider-specific proofs are intentional separate boundaries. Unit dependencies are synthetic; local DB/cloud/provider execution not performed. Event-ID deduplication does not establish cross-event ordering; H035 remains under investigation."
+      ],
       "questions": []
     },
     {
@@ -38897,10 +38931,12 @@
       "mode": "100644",
       "bytes": 323,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 11]],
+      "evidence": [
+        "Full untruncated text read at 6fea3a772 across account-deletion source bindings, Storage ownership, terminal receipts and Stripe webhook callers/tests. Baseline bytes match. Generic completion and provider-specific proofs are intentional separate boundaries. Unit dependencies are synthetic; local DB/cloud/provider execution not performed. Event-ID deduplication does not establish cross-event ordering; H035 remains under investigation."
+      ],
       "questions": []
     },
     {
@@ -38910,10 +38946,12 @@
       "mode": "100644",
       "bytes": 1647,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 58]],
+      "evidence": [
+        "Full untruncated text read at 6fea3a772 across account-deletion source bindings, Storage ownership, terminal receipts and Stripe webhook callers/tests. Baseline bytes match. Generic completion and provider-specific proofs are intentional separate boundaries. Unit dependencies are synthetic; local DB/cloud/provider execution not performed. Event-ID deduplication does not establish cross-event ordering; H035 remains under investigation."
+      ],
       "questions": []
     },
     {
@@ -39356,10 +39394,12 @@
       "mode": "100644",
       "bytes": 3925,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 97]],
+      "evidence": [
+        "Full untruncated text read at 6fea3a772 across account-deletion source bindings, Storage ownership, terminal receipts and Stripe webhook callers/tests. Baseline bytes match. Generic completion and provider-specific proofs are intentional separate boundaries. Unit dependencies are synthetic; local DB/cloud/provider execution not performed. Event-ID deduplication does not establish cross-event ordering; H035 remains under investigation."
+      ],
       "questions": []
     },
     {
