@@ -1,5 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import {
+  buildActivityUsageRows,
+  buildExecutionRows,
+  buildUsageSummary,
+  resolveVisibleActivities,
+} from '../domain/report/report-view-model';
 import { createReportAggregationService } from './report-aggregation-service';
 
 import type { ReportFetchClient } from './report-fetchers';
@@ -535,8 +541,87 @@ describe('ReportAggregationService.getReportPeriod', () => {
     expect(result.previousActivities).toEqual([
       { activityId: 'a1', recordedMinutes: 120, recordBoxes: 1, durationCounts: [[120, 1]] },
     ]);
-    expect(result.activities).toEqual([]);
+    expect(result.activities).toMatchObject([
+      { activityId: 'a1', recordedMinutes: 0, recordBoxes: 0, durationCounts: [] },
+    ]);
   });
+
+  it('前期間だけ記録のある活動も前期間比に含め、同じカテゴリーフィルタで除外できる', async () => {
+    const service = createReportAggregationService(
+      createFakeClient({
+        activities: [
+          { id: 'a1', name: '今週の活動', category_id: 'c1' },
+          { id: 'a2', name: '前週の活動', category_id: 'c2' },
+        ],
+        categories: [
+          { id: 'c1', name: '仕事' },
+          { id: 'c2', name: '生活' },
+        ],
+        records: [
+          mkRecord('current', 'a1', '2026-09-02T00:00:00Z', '2026-09-02T01:00:00Z'),
+          mkRecord('previous', 'a2', '2026-08-26T00:00:00Z', '2026-08-26T02:00:00Z'),
+        ],
+      }),
+    );
+    const result = await service.getReportPeriod(USER_ID, baseInput(), NOW);
+    const visible = resolveVisibleActivities(result.activities, {
+      hiddenCategoryIds: [],
+      hiddenActivityIds: [],
+    });
+    const summary = buildUsageSummary(visible, result.previousActivities);
+
+    // 今週60分・前週120分。活動が入れ替わっても前週を0分にはしない。
+    expect(summary.current.recordedMinutes).toBe(60);
+    expect(summary.previous).toEqual({ recordedMinutes: 120, recordCount: 1, medianMinutes: 120 });
+
+    const filtered = resolveVisibleActivities(result.activities, {
+      hiddenCategoryIds: ['c2'],
+      hiddenActivityIds: [],
+    });
+    expect(buildUsageSummary(filtered, result.previousActivities).previous?.recordedMinutes).toBe(
+      0,
+    );
+  });
+
+  it.each(['archived-activity', null])(
+    '今期間が空でも前期間比を保ち、空の一覧行は出さない: %s',
+    async (activityId) => {
+      const result = await createReportAggregationService(
+        createFakeClient({
+          activities: [
+            {
+              id: 'archived-activity',
+              name: '旧習慣',
+              category_id: null,
+              archived_at: '2026-08-29T00:00:00Z',
+            },
+          ],
+          records: [
+            mkRecord('previous', activityId, '2026-08-26T00:00:00Z', '2026-08-26T02:00:00Z'),
+          ],
+        }),
+      ).getReportPeriod(USER_ID, baseInput(), NOW);
+      const visible = resolveVisibleActivities(result.activities, {
+        hiddenCategoryIds: [],
+        hiddenActivityIds: [],
+      });
+      const summary = buildUsageSummary(visible, result.previousActivities);
+      expect(summary.current).toEqual({ recordedMinutes: 0, recordCount: 0, medianMinutes: null });
+      expect(summary.previous?.recordedMinutes).toBe(120);
+      expect(buildActivityUsageRows(visible, result.previousActivities)).toEqual([]);
+      expect(buildExecutionRows(visible)).toEqual([]);
+
+      if (activityId !== null) {
+        const filtered = resolveVisibleActivities(result.activities, {
+          hiddenCategoryIds: [],
+          hiddenActivityIds: [activityId],
+        });
+        expect(
+          buildUsageSummary(filtered, result.previousActivities).previous?.recordedMinutes,
+        ).toBe(0);
+      }
+    },
+  );
 
   it('月粒度では週の列を返す', async () => {
     const service = createReportAggregationService(createFakeClient({}));
