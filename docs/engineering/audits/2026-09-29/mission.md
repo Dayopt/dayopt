@@ -190,3 +190,5 @@ F033はdocs:check exit 0（`/tmp/dayopt-audit-calendar-docs-check.log`）。製�
 ## 削除の検証範囲と期限境界
 
 前回はF033の文書訂正と337件までの全文読解を保存したprogress。今回clean HEAD `c3f031ea6379dc5c68938a89c21d3ecee96c32e8`で継続。Calendar account-deletion unit577行・app integration466行、generic gate concurrency1198行、期限切れstep lease migrationを全文確認。unitはprovider再送防止・canonical ID・結果不明・復号失敗・近い期限の再prepareを扱う。DB integrationはlocalhost/USE_LOCAL_DB専用でactivation singletonを更新するため未実行。generic integrationの315–394だけは部分読解として記録し、全文確認に昇格していない。H034としてロック待ち中の期限超過の未検証区間を保存。製品コード変更なし、前回成功した同一全体checkを繰り返していない。次はこの時間評価の契約・現行helper定義へ戻りつつ、generic gate integration残りとDB gate commandsの全文読解を続ける。実DB再現前にmigration変更や本番観測を主張しない。
+
+同turnでgeneric gate foundation/commands/provider-neutral再定義/singleton保護/begin lock順の5 migrationも全文確認。古いsealはCalendar/Stripe snapshotを直接持つが、後続028で3 step countとcompletedを必須にするprovider-neutral判定へ置換される。033はsingleton欠落をinactiveへ読み替えずAD018、038はbeginのglobal→auth parent→user順を修正。grepの旧定義だけを現行不具合と誤認しない。基準全文346件、機械確認1、未確認2794。H034はcompleteの後続037を対象とする。次は残るgate integration全文、source固有binding/enforcementと共通lock helperの現行定義を追い、実行環境が未確認のDB検査を成功に数えない。今回の変更は読解証拠と候補記録のみ。

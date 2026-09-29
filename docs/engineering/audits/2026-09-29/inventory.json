@@ -38519,10 +38519,12 @@
       "mode": "100644",
       "bytes": 7126,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 245]],
+      "evidence": [
+        "Full text read on audit branch, baseline unchanged. Traced foundation -> commands -> provider-neutral step count -> fail-closed singleton -> begin lock ordering. Earlier source-specific seal is superseded; helper/runtime DB execution not inferred."
+      ],
       "questions": []
     },
     {
@@ -38532,10 +38534,12 @@
       "mode": "100644",
       "bytes": 14913,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 540]],
+      "evidence": [
+        "Full text read on audit branch, baseline unchanged. Traced foundation -> commands -> provider-neutral step count -> fail-closed singleton -> begin lock ordering. Earlier source-specific seal is superseded; helper/runtime DB execution not inferred."
+      ],
       "questions": []
     },
     {
@@ -38584,10 +38588,12 @@
       "mode": "100644",
       "bytes": 10179,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 370]],
+      "evidence": [
+        "Full text read on audit branch, baseline unchanged. Traced foundation -> commands -> provider-neutral step count -> fail-closed singleton -> begin lock ordering. Earlier source-specific seal is superseded; helper/runtime DB execution not inferred."
+      ],
       "questions": []
     },
     {
@@ -38649,10 +38655,12 @@
       "mode": "100644",
       "bytes": 2410,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 83]],
+      "evidence": [
+        "Full text read on audit branch, baseline unchanged. Traced foundation -> commands -> provider-neutral step count -> fail-closed singleton -> begin lock ordering. Earlier source-specific seal is superseded; helper/runtime DB execution not inferred."
+      ],
       "questions": []
     },
     {
@@ -38716,10 +38724,12 @@
       "mode": "100644",
       "bytes": 3391,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 125]],
+      "evidence": [
+        "Full text read on audit branch, baseline unchanged. Traced foundation -> commands -> provider-neutral step count -> fail-closed singleton -> begin lock ordering. Earlier source-specific seal is superseded; helper/runtime DB execution not inferred."
+      ],
       "questions": []
     },
     {
