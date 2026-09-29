@@ -93,13 +93,15 @@ const blocks = [
 const settings = { timezone: 'Asia/Tokyo', default_duration: 45 };
 
 function recordRows(activityId: string, minutes: number, count: number) {
+  // 直近4週の集計を守る fixture。固定日が実時計の窓から外れて中央値が消えるのを防ぐ。
+  const start = Date.now() - 7 * 24 * 60 * 60 * 1_000;
   return Array.from({ length: count }, (_, index) => ({
     id: `rec-${index}`,
     activity_id: activityId,
 
     source: 'manual',
-    start_at: '2026-09-01T00:00:00.000Z',
-    end_at: new Date(Date.parse('2026-09-01T00:00:00.000Z') + minutes * 60_000).toISOString(),
+    start_at: new Date(start).toISOString(),
+    end_at: new Date(start + minutes * 60_000).toISOString(),
   }));
 }
 
@@ -116,6 +118,7 @@ describe('PlanTemplateService', () => {
 
   describe('list', () => {
     it('中央値（n>=3）を着せ、無い activity と未分類は user_settings の既定長を着せる', async () => {
+      // 守ること: 集計可能な実績は中央値を使い、実績がないブロックだけ既定長にする。
       const { supabase } = createSupabaseStub({
         plan_templates: [{ data: [template], error: null }],
         plan_template_blocks: [{ data: blocks, error: null }],
@@ -265,6 +268,7 @@ describe('PlanTemplateService', () => {
 
   describe('apply', () => {
     it('中央値 / 既定長 / archived を反映した行を 1 回の bulk command へ渡し、Plan 行を返す', async () => {
+      // 守ること: 実績の中央値とアーカイブ状態を反映した予定を一括作成へ渡す。
       const created = [{ id: 'plan-1' }, { id: 'plan-2' }, { id: 'plan-3' }] as PlanRow[];
       const commands = createCommands();
       commands.createPlansBulk.mockResolvedValue(created);

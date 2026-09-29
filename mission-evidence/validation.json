@@ -1,0 +1,15 @@
+{
+  "command": "pnpm check",
+  "exitCode": 0,
+  "node": "v24.19.0",
+  "log": "artifacts/test-mission/check-complete.log",
+  "logSha256": "1680192c156980e47abc4d760313b4b34df2a6246d5419c20e32f03a4354e254",
+  "filesPassed": 609,
+  "testsPassed": 7424,
+  "newTests": 36,
+  "newE2E": 0,
+  "newMocks": 0,
+  "gitDiffCheck": "passed",
+  "ci": "not-run",
+  "prePush": "not-run"
+}
