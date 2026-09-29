@@ -168,3 +168,5 @@ F028は2026-09-08の決定原文と現行仕様・query境界を照合し、sett
 固定製品SHA `4ec2fd6bf8f3e9cccc1130a145e43940e8c02e7e` のNode24 `pnpm check` exit 0。型/lint/static、billing37/i18n2/observability64/product4366/web366/scripts2642、合計7477 passed。ログ `/tmp/dayopt-audit-check-export-ui.log`。同時に実施したdocs:checkもexit 0（`/tmp/dayopt-audit-export-ui-docs-check.log`）。検査中は製品を固定し、監査記録だけを更新。実DB・E2E・配信は未確認。
 
 ConfirmDialogの全runtime callsiteを追い、Google/MCP/iCal/ghost/templateの反証を記録。未処理の候補はDataSettingsとActivityFilterListへ絞れた（H031）。追加の全文読解で基準313件、機械確認1、未確認2827。次はH031の再現・修正と、MCPコピーの失敗・exportの公開説明/保持境界を継続する。公開は通常pre-push後、Draftを維持する。
+
+F029/F030は公開head `83bb0cf832be62d1309038feedc28f2eeed1d93f`としてDraft #2965へ保存、APIでhead/isDraft=true/state=OPENを確認。通常pre-push（affected型/lint/scripts2642/format）成功、ログ `/tmp/dayopt-audit-push-export-ui-verified.log`。公開後にiCal/MCP settings testを追加全文確認し、ローカル台帳315件まで保存。MCPのonError callbackテストは実reject経路を通さない旨が明記されており、callback表示と実Promiseの保証を区別する。次の着手点はH031の2画面削除失敗。共通ConfirmDialog全体へ一律catchを追加するのではなく、既存通知を持つ未処理callsiteを再現して閉じる。

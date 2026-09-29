@@ -13849,10 +13849,12 @@
       "mode": "100644",
       "bytes": 5449,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 156]],
+      "evidence": [
+        "Full text read at 83bb0cf83; baseline unchanged. MCP settings test split 1-130/131-260/261-390/391-EOF. Existing tests separate hook callbacks from mutation internals; callback assertions are not proof of real network/rejection/DB behavior. iCal token persistence and refresh UI boundaries inspected."
+      ],
       "questions": []
     },
     {
@@ -13942,10 +13944,12 @@
       "mode": "100644",
       "bytes": 22651,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 501]],
+      "evidence": [
+        "Full text read at 83bb0cf83; baseline unchanged. MCP settings test split 1-130/131-260/261-390/391-EOF. Existing tests separate hook callbacks from mutation internals; callback assertions are not proof of real network/rejection/DB behavior. iCal token persistence and refresh UI boundaries inspected."
+      ],
       "questions": []
     },
     {
