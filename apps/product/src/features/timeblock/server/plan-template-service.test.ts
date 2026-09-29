@@ -141,6 +141,32 @@ describe('PlanTemplateService', () => {
       ]);
     });
 
+    it('28日前の境界をまたぐ記録は集計窓内の時間だけを中央値に使う', async () => {
+      vi.setSystemTime(new Date('2026-09-29T00:45:00.000Z'));
+      const { supabase, calls } = createSupabaseStub({
+        plan_templates: [{ data: [template], error: null }],
+        plan_template_blocks: [{ data: [blocks[0]], error: null }],
+        user_settings: [{ data: settings, error: null }],
+        records: [{ data: recordRows(ACTIVITY_A, 90, 3), error: null }],
+      });
+      const service = new PlanTemplateService(supabase, createCommands(), () => supabase);
+
+      const result = await service.list(USER_ID);
+
+      // 9月1日00:00〜01:30のうち、00:45以降の45分だけが28日の窓に残る。
+      expect(result[0]?.blocks[0]?.previewDurationMinutes).toBe(45);
+      expect(calls).toContainEqual({
+        table: 'records',
+        method: 'gt',
+        args: ['end_at', '2026-09-01T00:45:00.000Z'],
+      });
+      expect(calls).toContainEqual({
+        table: 'records',
+        method: 'lt',
+        args: ['start_at', '2026-09-29T00:45:00.000Z'],
+      });
+    });
+
     it('template が無ければ blocks も records も読まない', async () => {
       const { supabase, calls } = createSupabaseStub({
         plan_templates: [{ data: [], error: null }],
