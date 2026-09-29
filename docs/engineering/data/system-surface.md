@@ -296,7 +296,7 @@ TS の `PRODUCT_EVENT_NAMES` と DB の CHECK 制約の両方で定義される�
 | `billing.createCheckoutSession`              | 1                   | 0                   |
 | `billing.createPortalSession`                | 3                   | 0                   |
 | `billing.getAccess`                          | 3                   | 0                   |
-| `billing.getOverview`                        | 7                   | 0                   |
+| `billing.getOverview`                        | 6                   | 0                   |
 | `billing.startTrial`                         | 1                   | 0                   |
 | `contact.submit`                             | 1                   | 0                   |
 | `externalCalendar.disconnect`                | 1                   | 0                   |
@@ -556,5 +556,5 @@ page から import を宣言元まで解決して辿った結果（barrel の再
 | `contact`           | 8      | 6         | 2         | 1 / 2                  |
 | `external-calendar` | 26     | 19        | 2         | 1 / 2                  |
 | `review`            | 37     | 22        | 19        | 14 / 19                |
-| `settings`          | 49     | 39        | 22        | 17 / 22                |
+| `settings`          | 49     | 40        | 22        | 17 / 22                |
 | `timeblock`         | 98     | 54        | 18        | 12 / 18                |
