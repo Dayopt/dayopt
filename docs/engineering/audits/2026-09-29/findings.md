@@ -174,3 +174,16 @@ last_verified: 2026-09-29
 - 条件/根拠: OAuth originに末尾改行/前後空白、または任意originに空文字を設定。getOAuthEnvironmentConfigはtrim/空値未設定化で正しいidentityを返すが、proxyはraw process.envを同じresolverへ渡し503にする。env.ts自身もcleaned値だけを検証しraw値を返すので、この不一致を吸収しない。
 - 修正/反証: envからの読み出しと既存正規化を純粋なresolveOAuthEnvironmentFromEnvへ移し両入口で共有。raw URI policyを緩和せず、foreign origin・Preview別branchは拒否、runtime marker・host・DB identity・gateは維持する。環境変数や実デプロイの変更なし。
 - 検証: 実proxyと実handler用identity関数を同じ合成envで呼び、修正前2 failed/55 passed（handler成功・proxy503）。修正後はPreview一致/不一致を追加し、関連6 files/165 passed、typecheck:product成功。ログ `/tmp/dayopt-audit-oauth-env-{red,green,regression,types}.log`。normalization helperの戻りだけをmockしたテストではない。全体checkは別記録。
+
+## F022 — セッション監視testのstore mockが実装へ届かず合格する
+
+- 状態: 再現・修正済み（`83c6d3c994376da7154dbc8279a2534d926f79fe`）。Mission #2963。製品挙動の変更なし。
+- 条件/原因: useSessionMonitorは`../stores/useAuthStore`をimportするがtestは`./stores/useAuthStore`をmock。意図したsession/signOutが注入されず、logoutのassertは共通の遷移だけを見るため、別の失敗経路でも成功する。初期状態trueだけのassertも初回microtask前に通る。
+- 反証/修正: signOut呼び出し回数と注入したrejectを受けたloggerの引数を追加すると2 failed/7 passed。正しいmoduleへmockを合わせ、初期状態testはmicrotask判定後まで待つ。hook自体をmockしていない。runtimeの認証契約を変える根拠はない。
+- 検証: 関連hook/storeの3 files/24 passed。`/tmp/dayopt-audit-session-mock-{red,green}.log`。実GoTrue・ブラウザE2Eの証拠ではない。
+
+## H023 — 現行監視とは別のセッション検証helper
+
+- 状態: 読解候補。採否未確定。
+- 根拠: session-config.tsのvalidateSessionはremainingTimeでexpiresAt-nowのmsとidle/absoluteの秒を混在させ、token-expiry.test.tsもmsを期待する。一方、repo横断参照検索ではhelper呼び出しはtestのみ。実際のuseSessionMonitorはSESSION_CONFIGとSESSION_SECURITYだけを使う。
+- 次: dynamic import・公開参照・残すべき契約を確認し、未使用責務の撤去か単位訂正を決める。現時点では本番のセッション期限検証漏れとは扱わず、実経路とtest用の古いhelperを区別する。

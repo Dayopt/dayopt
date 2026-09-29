@@ -120,3 +120,13 @@ OAuthのconnection schema、legacy bridge、grant/exchange/rotationと公開wrap
 F021を含む製品SHA `73d656f70`で`pnpm check` exit 0。型10 tasks・lint9 tasks・静的検査、billing15/i18n2/observability64/product4350/web366/scripts2625、合計7422 passed。ログ `/tmp/dayopt-audit-check-oauth-env.log`。今回の製品コードを固定して実施し、検査中の変更は監査記録だけ。配信/実DBの証拠ではない。
 
 2026-09-29 19:01頃のread-only確認でmainは`21770b13da1ff26c8982cdf041aa2a4d55025a3f`（#2966）へ進んだ。fetchとdiffstatでは18ファイル、主にテスト・mutation evidence script・新規証拠JSON。まだ全文delta照合/取り込み前であり、今回の7422成功は前回main `0bcdb8641`を含む監査branchの結果。次の最優先はこの18pathのdeltaと生成元を読み、追加証拠の分類を含めて整合を確認する。巨大JSONを未読のまま読了扱いしない。既存worktreeを切り替えず監査branchで統合する。
+
+## 検証用main差分の照合と統合
+
+main `21770b13da1ff26c8982cdf041aa2a4d55025a3f` の18pathを確認。非JSON差分1088行を分割して全文読解し、contracts/validation JSONも全文確認。大きなinventory/mutations JSONは生成元・runnerの全文読解と全体parse/参照整合の機械検査へ分類した。inventoryの2015関数・101endpoint・各20例の参照pathは存在。mutation20件は重複なし、全source hashとUTF-16位置のoperatorがmainと一致し、各結果の合計328件も整合。一方、保存JSONには実際の全test identityと検査log本文がないため、過去の「20/20」「check成功」を今回の実行証拠に代用しない。
+
+監査branchへmerge `fd815fa1d1a0baca98673267c163eebf428915aa` で競合なく統合。mainへのmergeではない。追加15ファイルはinventoryのdelta_filesへ別管理し、開始時3141ファイルの母数・未読状態は維持。変更3ファイルは差分確認だけを記録し、未読全文を読了に昇格していない。次に統合候補でpnpm checkを実行し、残る横断読解を続ける。
+
+統合製品SHA `fd815fa1d1a0baca98673267c163eebf428915aa` でNode24の`pnpm check` exit 0。billing37/i18n2/observability64/product4364/web366/scripts2642、合計7475 passed。ログ `/tmp/dayopt-audit-check-main-21770.log`。product検査終了後、scripts実行中にF022のtest assertionだけを編集したため、この全体成功は編集前testの証拠として扱う。F022は別途red2/green関連24を取得し`83c6d3c99`へcommit。以降のpre-pushはこの修正を含む。
+
+auth spec・env宣言・session store/hook/UI・周辺domain/schema/testを追加で全文読解。基準の全文確認は245件。F022は検査の誤合格を修正、H023の古いhelperと現行session監視の責務差は引き続き確認する。cache所有者のfallbackとlogout時の破棄を次の横断経路として追跡中。mainへのmerge・配信・実DB検証はない。

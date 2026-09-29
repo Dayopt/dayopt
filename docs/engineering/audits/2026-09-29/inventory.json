@@ -6254,11 +6254,12 @@
       "mode": "100644",
       "bytes": 13032,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [[245, 284]],
+      "read_ranges": [[1, 284]],
       "evidence": [
-        "Partial runtime Proxy read: cleaned values are validated once but original process.env values returned; supports F021 boundary reproduction. Remaining source not read by this excerpt."
+        "Partial runtime Proxy read: cleaned values are validated once but original process.env values returned; supports F021 boundary reproduction. Remaining source not read by this excerpt.",
+        "Full text read at fd815fa1d1a0baca98673267c163eebf428915aa; unchanged from baseline. Auth spec initial truncated 1-145 recovered as 1-75 and 76-145; rest 146-215 and 216-279. Session config/store/hook/UI/test and auth spec cross-checked. Wrong store mock path is a reproduction candidate; pure validateSession millisecond/second mismatch has only test callers and is not treated as live session enforcement."
       ],
       "questions": []
     },
@@ -7004,10 +7005,12 @@
       "mode": "100644",
       "bytes": 1722,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 56]],
+      "evidence": [
+        "Full text read at fd815fa1d1a0baca98673267c163eebf428915aa; unchanged from baseline. Auth spec initial truncated 1-145 recovered as 1-75 and 76-145; rest 146-215 and 216-279. Session config/store/hook/UI/test and auth spec cross-checked. Wrong store mock path is a reproduction candidate; pure validateSession millisecond/second mismatch has only test callers and is not treated as live session enforcement."
+      ],
       "questions": []
     },
     {
@@ -7030,10 +7033,12 @@
       "mode": "100644",
       "bytes": 2307,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 76]],
+      "evidence": [
+        "Full text read at fd815fa1d1a0baca98673267c163eebf428915aa; unchanged from baseline. Auth spec initial truncated 1-145 recovered as 1-75 and 76-145; rest 146-215 and 216-279. Session config/store/hook/UI/test and auth spec cross-checked. Wrong store mock path is a reproduction candidate; pure validateSession millisecond/second mismatch has only test callers and is not treated as live session enforcement."
+      ],
       "questions": []
     },
     {
@@ -7082,10 +7087,12 @@
       "mode": "100644",
       "bytes": 35,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 1]],
+      "evidence": [
+        "Full text read at fd815fa1d1a0baca98673267c163eebf428915aa; unchanged from baseline. Auth spec initial truncated 1-145 recovered as 1-75 and 76-145; rest 146-215 and 216-279. Session config/store/hook/UI/test and auth spec cross-checked. Wrong store mock path is a reproduction candidate; pure validateSession millisecond/second mismatch has only test callers and is not treated as live session enforcement."
+      ],
       "questions": []
     },
     {
@@ -7095,10 +7102,12 @@
       "mode": "100644",
       "bytes": 4632,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 147]],
+      "evidence": [
+        "Full text read at fd815fa1d1a0baca98673267c163eebf428915aa; unchanged from baseline. Auth spec initial truncated 1-145 recovered as 1-75 and 76-145; rest 146-215 and 216-279. Session config/store/hook/UI/test and auth spec cross-checked. Wrong store mock path is a reproduction candidate; pure validateSession millisecond/second mismatch has only test callers and is not treated as live session enforcement."
+      ],
       "questions": []
     },
     {
@@ -7108,10 +7117,12 @@
       "mode": "100644",
       "bytes": 6228,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 226]],
+      "evidence": [
+        "Full text read at fd815fa1d1a0baca98673267c163eebf428915aa; unchanged from baseline. Auth spec initial truncated 1-145 recovered as 1-75 and 76-145; rest 146-215 and 216-279. Session config/store/hook/UI/test and auth spec cross-checked. Wrong store mock path is a reproduction candidate; pure validateSession millisecond/second mismatch has only test callers and is not treated as live session enforcement."
+      ],
       "questions": []
     },
     {
@@ -7121,10 +7132,12 @@
       "mode": "100644",
       "bytes": 1374,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 28]],
+      "evidence": [
+        "Full text read at fd815fa1d1a0baca98673267c163eebf428915aa; unchanged from baseline. Auth spec initial truncated 1-145 recovered as 1-75 and 76-145; rest 146-215 and 216-279. Session config/store/hook/UI/test and auth spec cross-checked. Wrong store mock path is a reproduction candidate; pure validateSession millisecond/second mismatch has only test callers and is not treated as live session enforcement."
+      ],
       "questions": []
     },
     {
@@ -7134,10 +7147,12 @@
       "mode": "100644",
       "bytes": 875,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 19]],
+      "evidence": [
+        "Full text read at fd815fa1d1a0baca98673267c163eebf428915aa; unchanged from baseline. Auth spec initial truncated 1-145 recovered as 1-75 and 76-145; rest 146-215 and 216-279. Session config/store/hook/UI/test and auth spec cross-checked. Wrong store mock path is a reproduction candidate; pure validateSession millisecond/second mismatch has only test callers and is not treated as live session enforcement."
+      ],
       "questions": []
     },
     {
@@ -7160,10 +7175,12 @@
       "mode": "100644",
       "bytes": 365,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 9]],
+      "evidence": [
+        "Full text read at fd815fa1d1a0baca98673267c163eebf428915aa; unchanged from baseline. Auth spec initial truncated 1-145 recovered as 1-75 and 76-145; rest 146-215 and 216-279. Session config/store/hook/UI/test and auth spec cross-checked. Wrong store mock path is a reproduction candidate; pure validateSession millisecond/second mismatch has only test callers and is not treated as live session enforcement."
+      ],
       "questions": []
     },
     {
@@ -7173,10 +7190,12 @@
       "mode": "100644",
       "bytes": 2231,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 53]],
+      "evidence": [
+        "Full text read at fd815fa1d1a0baca98673267c163eebf428915aa; unchanged from baseline. Auth spec initial truncated 1-145 recovered as 1-75 and 76-145; rest 146-215 and 216-279. Session config/store/hook/UI/test and auth spec cross-checked. Wrong store mock path is a reproduction candidate; pure validateSession millisecond/second mismatch has only test callers and is not treated as live session enforcement."
+      ],
       "questions": []
     },
     {
@@ -7316,10 +7335,12 @@
       "mode": "100644",
       "bytes": 510,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 22]],
+      "evidence": [
+        "Full text read at fd815fa1d1a0baca98673267c163eebf428915aa; unchanged from baseline. Auth spec initial truncated 1-145 recovered as 1-75 and 76-145; rest 146-215 and 216-279. Session config/store/hook/UI/test and auth spec cross-checked. Wrong store mock path is a reproduction candidate; pure validateSession millisecond/second mismatch has only test callers and is not treated as live session enforcement."
+      ],
       "questions": []
     },
     {
@@ -7368,10 +7389,12 @@
       "mode": "100644",
       "bytes": 18744,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 472]],
+      "evidence": [
+        "Full text read at fd815fa1d1a0baca98673267c163eebf428915aa; unchanged from baseline. Auth spec initial truncated 1-145 recovered as 1-75 and 76-145; rest 146-215 and 216-279. Session config/store/hook/UI/test and auth spec cross-checked. Wrong store mock path is a reproduction candidate; pure validateSession millisecond/second mismatch has only test callers and is not treated as live session enforcement."
+      ],
       "questions": []
     },
     {
@@ -15576,7 +15599,9 @@
       "status": "unverified",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
       "read_ranges": [],
-      "evidence": [],
+      "evidence": [
+        "PR #2966 non-JSON diff 1088 lines read fully in bounded chunks. JSON contracts/validation also read fully. Delta is reviewed at 21770b13da1ff26c8982cdf041aa2a4d55025a3f. Existing full-file status unchanged."
+      ],
       "questions": []
     },
     {
@@ -16374,7 +16399,8 @@
       "read_ranges": [[1, 391]],
       "evidence": [
         "All baseline text read in complete bounded ranges; template clock failure, report dataflow, DST distribution and guard boundaries cross-checked.",
-        "Main advanced to 0bcdb864127feea425934baa179797bd53ecf375 (PR #2964). Full 17-file delta (1071 diff lines) read in bounded chunks after initial truncated attempt. Changes reconciled on audit branch; baseline read status unchanged, delta reading does not imply unread full file is reviewed. Five conflicts resolved to main: equivalent creation contract/test clock, current source references and retired glossary terms."
+        "Main advanced to 0bcdb864127feea425934baa179797bd53ecf375 (PR #2964). Full 17-file delta (1071 diff lines) read in bounded chunks after initial truncated attempt. Changes reconciled on audit branch; baseline read status unchanged, delta reading does not imply unread full file is reviewed. Five conflicts resolved to main: equivalent creation contract/test clock, current source references and retired glossary terms.",
+        "PR #2966 non-JSON diff 1088 lines read fully in bounded chunks. JSON contracts/validation also read fully. Delta is reviewed at 21770b13da1ff26c8982cdf041aa2a4d55025a3f. Existing full-file status unchanged."
       ],
       "questions": []
     },
@@ -17294,10 +17320,12 @@
       "mode": "100644",
       "bytes": 4682,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 91]],
+      "evidence": [
+        "Full text read at fd815fa1d1a0baca98673267c163eebf428915aa; unchanged from baseline. Auth spec initial truncated 1-145 recovered as 1-75 and 76-145; rest 146-215 and 216-279. Session config/store/hook/UI/test and auth spec cross-checked. Wrong store mock path is a reproduction candidate; pure validateSession millisecond/second mismatch has only test callers and is not treated as live session enforcement."
+      ],
       "questions": []
     },
     {
@@ -17322,10 +17350,12 @@
       "mode": "100644",
       "bytes": 96,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 3]],
+      "evidence": [
+        "Full text read at fd815fa1d1a0baca98673267c163eebf428915aa; unchanged from baseline. Auth spec initial truncated 1-145 recovered as 1-75 and 76-145; rest 146-215 and 216-279. Session config/store/hook/UI/test and auth spec cross-checked. Wrong store mock path is a reproduction candidate; pure validateSession millisecond/second mismatch has only test callers and is not treated as live session enforcement."
+      ],
       "questions": []
     },
     {
@@ -17335,10 +17365,12 @@
       "mode": "100644",
       "bytes": 2112,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 55]],
+      "evidence": [
+        "Full text read at fd815fa1d1a0baca98673267c163eebf428915aa; unchanged from baseline. Auth spec initial truncated 1-145 recovered as 1-75 and 76-145; rest 146-215 and 216-279. Session config/store/hook/UI/test and auth spec cross-checked. Wrong store mock path is a reproduction candidate; pure validateSession millisecond/second mismatch has only test callers and is not treated as live session enforcement."
+      ],
       "questions": []
     },
     {
@@ -17348,10 +17380,12 @@
       "mode": "100644",
       "bytes": 1598,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 39]],
+      "evidence": [
+        "Full text read at fd815fa1d1a0baca98673267c163eebf428915aa; unchanged from baseline. Auth spec initial truncated 1-145 recovered as 1-75 and 76-145; rest 146-215 and 216-279. Session config/store/hook/UI/test and auth spec cross-checked. Wrong store mock path is a reproduction candidate; pure validateSession millisecond/second mismatch has only test callers and is not treated as live session enforcement."
+      ],
       "questions": []
     },
     {
@@ -17361,10 +17395,12 @@
       "mode": "100644",
       "bytes": 157,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 3]],
+      "evidence": [
+        "Full text read at fd815fa1d1a0baca98673267c163eebf428915aa; unchanged from baseline. Auth spec initial truncated 1-145 recovered as 1-75 and 76-145; rest 146-215 and 216-279. Session config/store/hook/UI/test and auth spec cross-checked. Wrong store mock path is a reproduction candidate; pure validateSession millisecond/second mismatch has only test callers and is not treated as live session enforcement."
+      ],
       "questions": []
     },
     {
@@ -17374,10 +17410,12 @@
       "mode": "100644",
       "bytes": 2146,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 50]],
+      "evidence": [
+        "Full text read at fd815fa1d1a0baca98673267c163eebf428915aa; unchanged from baseline. Auth spec initial truncated 1-145 recovered as 1-75 and 76-145; rest 146-215 and 216-279. Session config/store/hook/UI/test and auth spec cross-checked. Wrong store mock path is a reproduction candidate; pure validateSession millisecond/second mismatch has only test callers and is not treated as live session enforcement."
+      ],
       "questions": []
     },
     {
@@ -17387,10 +17425,12 @@
       "mode": "100644",
       "bytes": 1503,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 35]],
+      "evidence": [
+        "Full text read at fd815fa1d1a0baca98673267c163eebf428915aa; unchanged from baseline. Auth spec initial truncated 1-145 recovered as 1-75 and 76-145; rest 146-215 and 216-279. Session config/store/hook/UI/test and auth spec cross-checked. Wrong store mock path is a reproduction candidate; pure validateSession millisecond/second mismatch has only test callers and is not treated as live session enforcement."
+      ],
       "questions": []
     },
     {
@@ -17452,10 +17492,12 @@
       "mode": "100644",
       "bytes": 3883,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 122]],
+      "evidence": [
+        "Full text read at fd815fa1d1a0baca98673267c163eebf428915aa; unchanged from baseline. Auth spec initial truncated 1-145 recovered as 1-75 and 76-145; rest 146-215 and 216-279. Session config/store/hook/UI/test and auth spec cross-checked. Wrong store mock path is a reproduction candidate; pure validateSession millisecond/second mismatch has only test callers and is not treated as live session enforcement."
+      ],
       "questions": []
     },
     {
@@ -17465,10 +17507,12 @@
       "mode": "100644",
       "bytes": 5361,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 204]],
+      "evidence": [
+        "Full text read at fd815fa1d1a0baca98673267c163eebf428915aa; unchanged from baseline. Auth spec initial truncated 1-145 recovered as 1-75 and 76-145; rest 146-215 and 216-279. Session config/store/hook/UI/test and auth spec cross-checked. Wrong store mock path is a reproduction candidate; pure validateSession millisecond/second mismatch has only test callers and is not treated as live session enforcement."
+      ],
       "questions": []
     },
     {
@@ -17478,10 +17522,12 @@
       "mode": "100644",
       "bytes": 11813,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 336]],
+      "evidence": [
+        "Full text read at fd815fa1d1a0baca98673267c163eebf428915aa; unchanged from baseline. Auth spec initial truncated 1-145 recovered as 1-75 and 76-145; rest 146-215 and 216-279. Session config/store/hook/UI/test and auth spec cross-checked. Wrong store mock path is a reproduction candidate; pure validateSession millisecond/second mismatch has only test callers and is not treated as live session enforcement."
+      ],
       "questions": []
     },
     {
@@ -29364,10 +29410,12 @@
       "mode": "100644",
       "bytes": 36776,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 279]],
+      "evidence": [
+        "Full text read at fd815fa1d1a0baca98673267c163eebf428915aa; unchanged from baseline. Auth spec initial truncated 1-145 recovered as 1-75 and 76-145; rest 146-215 and 216-279. Session config/store/hook/UI/test and auth spec cross-checked. Wrong store mock path is a reproduction candidate; pure validateSession millisecond/second mismatch has only test callers and is not treated as live session enforcement."
+      ],
       "questions": []
     },
     {
@@ -32756,7 +32804,9 @@
       "status": "unverified",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
       "read_ranges": [],
-      "evidence": [],
+      "evidence": [
+        "PR #2966 non-JSON diff 1088 lines read fully in bounded chunks. JSON contracts/validation also read fully. Delta is reviewed at 21770b13da1ff26c8982cdf041aa2a4d55025a3f. Existing full-file status unchanged."
+      ],
       "questions": []
     },
     {
@@ -41307,6 +41357,242 @@
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
       "read_ranges": [],
       "evidence": [],
+      "questions": []
+    }
+  ],
+  "delta_files": [
+    {
+      "path": "apps/product/src/features/timeblock/domain/plan-template-anchor.test.ts",
+      "sha": "21770b13da1ff26c8982cdf041aa2a4d55025a3f",
+      "change": "M",
+      "blob": "581df7450c5ee6545fa5ccb7d1b209b67edb18c3",
+      "method": "full-text",
+      "status": "delta-reviewed",
+      "read_ranges": [],
+      "evidence": [
+        "PR #2966 non-JSON diff 1088 lines read fully in bounded chunks. JSON contracts/validation also read fully. Delta is reviewed at 21770b13da1ff26c8982cdf041aa2a4d55025a3f."
+      ],
+      "questions": []
+    },
+    {
+      "path": "apps/product/src/features/timeblock/server/plan-template-service.test.ts",
+      "sha": "21770b13da1ff26c8982cdf041aa2a4d55025a3f",
+      "change": "M",
+      "blob": "e368b044400789e64d605807fe9b0c7599107bf2",
+      "method": "full-text",
+      "status": "delta-reviewed",
+      "read_ranges": [],
+      "evidence": [
+        "PR #2966 non-JSON diff 1088 lines read fully in bounded chunks. JSON contracts/validation also read fully. Delta is reviewed at 21770b13da1ff26c8982cdf041aa2a4d55025a3f."
+      ],
+      "questions": []
+    },
+    {
+      "path": "apps/product/src/lib/time/time-conflict.test.ts",
+      "sha": "21770b13da1ff26c8982cdf041aa2a4d55025a3f",
+      "change": "A",
+      "blob": "76c89d28502f8ed00adf592cdf64d9e416587b84",
+      "method": "full-text",
+      "status": "full-text-reviewed",
+      "read_ranges": [[1, 32]],
+      "evidence": [
+        "PR #2966 non-JSON diff 1088 lines read fully in bounded chunks. JSON contracts/validation also read fully. Delta is reviewed at 21770b13da1ff26c8982cdf041aa2a4d55025a3f."
+      ],
+      "questions": []
+    },
+    {
+      "path": "apps/product/src/lib/time/time-range.test.ts",
+      "sha": "21770b13da1ff26c8982cdf041aa2a4d55025a3f",
+      "change": "A",
+      "blob": "f42464d63ace68101eca903ce0a768ffbf6c62ee",
+      "method": "full-text",
+      "status": "full-text-reviewed",
+      "read_ranges": [[1, 37]],
+      "evidence": [
+        "PR #2966 non-JSON diff 1088 lines read fully in bounded chunks. JSON contracts/validation also read fully. Delta is reviewed at 21770b13da1ff26c8982cdf041aa2a4d55025a3f."
+      ],
+      "questions": []
+    },
+    {
+      "path": "docs/engineering/mission-testing.md",
+      "sha": "21770b13da1ff26c8982cdf041aa2a4d55025a3f",
+      "change": "A",
+      "blob": "f0e00046ec8cb45d210aaf7ceb15a35d16d701f6",
+      "method": "full-text",
+      "status": "full-text-reviewed",
+      "read_ranges": [[1, 33]],
+      "evidence": [
+        "PR #2966 non-JSON diff 1088 lines read fully in bounded chunks. JSON contracts/validation also read fully. Delta is reviewed at 21770b13da1ff26c8982cdf041aa2a4d55025a3f."
+      ],
+      "questions": []
+    },
+    {
+      "path": "mission-evidence/contracts.json",
+      "sha": "21770b13da1ff26c8982cdf041aa2a4d55025a3f",
+      "change": "A",
+      "blob": "ecc8fcddc87e99321fc684693d2e46df399f3506",
+      "method": "full-text",
+      "status": "full-text-reviewed",
+      "read_ranges": [[1, 124]],
+      "evidence": [
+        "PR #2966 non-JSON diff 1088 lines read fully in bounded chunks. JSON contracts/validation also read fully. Delta is reviewed at 21770b13da1ff26c8982cdf041aa2a4d55025a3f."
+      ],
+      "questions": []
+    },
+    {
+      "path": "mission-evidence/inventory.json",
+      "sha": "21770b13da1ff26c8982cdf041aa2a4d55025a3f",
+      "change": "A",
+      "blob": "1e4aa1fc103a098e1169d90de44e7434186832a8",
+      "method": "mechanical",
+      "status": "mechanically-checked",
+      "read_ranges": [],
+      "evidence": [
+        "Generated/selected historical evidence; generator and runner fully read. Parsed all JSON. Inventory 2015 function/101 endpoint/20 purpose/20 mock rows: all referenced paths exist. Mutation 20 unique entries: all source SHA256 and UTF-16 operator offsets match main, all pass/fail/pending totals match 328. Historical full test identities/log contents unavailable: source assertions of identity matching and prior check success are not current independent execution evidence."
+      ],
+      "questions": []
+    },
+    {
+      "path": "mission-evidence/mutations.json",
+      "sha": "21770b13da1ff26c8982cdf041aa2a4d55025a3f",
+      "change": "A",
+      "blob": "7f2ce3ef13e0e4354c6dc664094675a3ab0f6e50",
+      "method": "mechanical",
+      "status": "mechanically-checked",
+      "read_ranges": [],
+      "evidence": [
+        "Generated/selected historical evidence; generator and runner fully read. Parsed all JSON. Inventory 2015 function/101 endpoint/20 purpose/20 mock rows: all referenced paths exist. Mutation 20 unique entries: all source SHA256 and UTF-16 operator offsets match main, all pass/fail/pending totals match 328. Historical full test identities/log contents unavailable: source assertions of identity matching and prior check success are not current independent execution evidence."
+      ],
+      "questions": []
+    },
+    {
+      "path": "mission-evidence/validation.json",
+      "sha": "21770b13da1ff26c8982cdf041aa2a4d55025a3f",
+      "change": "A",
+      "blob": "5569f2d91dbaec31839791223791ac17a2f1e2bf",
+      "method": "full-text",
+      "status": "full-text-reviewed",
+      "read_ranges": [[1, 32]],
+      "evidence": [
+        "PR #2966 non-JSON diff 1088 lines read fully in bounded chunks. JSON contracts/validation also read fully. Delta is reviewed at 21770b13da1ff26c8982cdf041aa2a4d55025a3f."
+      ],
+      "questions": []
+    },
+    {
+      "path": "missionissue",
+      "sha": "21770b13da1ff26c8982cdf041aa2a4d55025a3f",
+      "change": "A",
+      "blob": "489855300c9d31dfe846edf67cd2c5856b0343c7",
+      "method": "full-text",
+      "status": "full-text-reviewed",
+      "read_ranges": [[1, 126]],
+      "evidence": [
+        "PR #2966 non-JSON diff 1088 lines read fully in bounded chunks. JSON contracts/validation also read fully. Delta is reviewed at 21770b13da1ff26c8982cdf041aa2a4d55025a3f."
+      ],
+      "questions": []
+    },
+    {
+      "path": "packages/billing/src/plans.test.ts",
+      "sha": "21770b13da1ff26c8982cdf041aa2a4d55025a3f",
+      "change": "A",
+      "blob": "7c32541ce405e39f4dce99da3fca186b15757c5c",
+      "method": "full-text",
+      "status": "full-text-reviewed",
+      "read_ranges": [[1, 15]],
+      "evidence": [
+        "PR #2966 non-JSON diff 1088 lines read fully in bounded chunks. JSON contracts/validation also read fully. Delta is reviewed at 21770b13da1ff26c8982cdf041aa2a4d55025a3f."
+      ],
+      "questions": []
+    },
+    {
+      "path": "packages/billing/src/pricing.test.ts",
+      "sha": "21770b13da1ff26c8982cdf041aa2a4d55025a3f",
+      "change": "A",
+      "blob": "b9982daa6b4b98f151d935d4dd85d8319e80ca1e",
+      "method": "full-text",
+      "status": "full-text-reviewed",
+      "read_ranges": [[1, 17]],
+      "evidence": [
+        "PR #2966 non-JSON diff 1088 lines read fully in bounded chunks. JSON contracts/validation also read fully. Delta is reviewed at 21770b13da1ff26c8982cdf041aa2a4d55025a3f."
+      ],
+      "questions": []
+    },
+    {
+      "path": "packages/billing/src/subscription.test.ts",
+      "sha": "21770b13da1ff26c8982cdf041aa2a4d55025a3f",
+      "change": "A",
+      "blob": "fec1a2e22e3d6be99d9800eafd19199023573e87",
+      "method": "full-text",
+      "status": "full-text-reviewed",
+      "read_ranges": [[1, 51]],
+      "evidence": [
+        "PR #2966 non-JSON diff 1088 lines read fully in bounded chunks. JSON contracts/validation also read fully. Delta is reviewed at 21770b13da1ff26c8982cdf041aa2a4d55025a3f."
+      ],
+      "questions": []
+    },
+    {
+      "path": "scripts/ci/production-operations-audit.test.ts",
+      "sha": "21770b13da1ff26c8982cdf041aa2a4d55025a3f",
+      "change": "M",
+      "blob": "f7407de5cc525a54564f5e1b1564075fa1a77396",
+      "method": "full-text",
+      "status": "delta-reviewed",
+      "read_ranges": [],
+      "evidence": [
+        "PR #2966 non-JSON diff 1088 lines read fully in bounded chunks. JSON contracts/validation also read fully. Delta is reviewed at 21770b13da1ff26c8982cdf041aa2a4d55025a3f."
+      ],
+      "questions": []
+    },
+    {
+      "path": "scripts/lib/mutation-evidence.mjs",
+      "sha": "21770b13da1ff26c8982cdf041aa2a4d55025a3f",
+      "change": "A",
+      "blob": "a4befc2c1b6e297d7593ff6b73fde72f9c58b69f",
+      "method": "full-text",
+      "status": "full-text-reviewed",
+      "read_ranges": [[1, 115]],
+      "evidence": [
+        "PR #2966 non-JSON diff 1088 lines read fully in bounded chunks. JSON contracts/validation also read fully. Delta is reviewed at 21770b13da1ff26c8982cdf041aa2a4d55025a3f."
+      ],
+      "questions": []
+    },
+    {
+      "path": "scripts/lib/mutation-evidence.test.ts",
+      "sha": "21770b13da1ff26c8982cdf041aa2a4d55025a3f",
+      "change": "A",
+      "blob": "1ab0c7bb232bb2cc747431cda1f0b2aadf42a7a8",
+      "method": "full-text",
+      "status": "full-text-reviewed",
+      "read_ranges": [[1, 139]],
+      "evidence": [
+        "PR #2966 non-JSON diff 1088 lines read fully in bounded chunks. JSON contracts/validation also read fully. Delta is reviewed at 21770b13da1ff26c8982cdf041aa2a4d55025a3f."
+      ],
+      "questions": []
+    },
+    {
+      "path": "scripts/runbook/mission-inventory.mjs",
+      "sha": "21770b13da1ff26c8982cdf041aa2a4d55025a3f",
+      "change": "A",
+      "blob": "849efd5de8efd53894c6e6a8304edddd47bf5162",
+      "method": "full-text",
+      "status": "full-text-reviewed",
+      "read_ranges": [[1, 149]],
+      "evidence": [
+        "PR #2966 non-JSON diff 1088 lines read fully in bounded chunks. JSON contracts/validation also read fully. Delta is reviewed at 21770b13da1ff26c8982cdf041aa2a4d55025a3f."
+      ],
+      "questions": []
+    },
+    {
+      "path": "scripts/runbook/mission-mutations.mjs",
+      "sha": "21770b13da1ff26c8982cdf041aa2a4d55025a3f",
+      "change": "A",
+      "blob": "fa52f93e43128aff1ca34394e56313b1b994297f",
+      "method": "full-text",
+      "status": "full-text-reviewed",
+      "read_ranges": [[1, 183]],
+      "evidence": [
+        "PR #2966 non-JSON diff 1088 lines read fully in bounded chunks. JSON contracts/validation also read fully. Delta is reviewed at 21770b13da1ff26c8982cdf041aa2a4d55025a3f."
+      ],
       "questions": []
     }
   ]
