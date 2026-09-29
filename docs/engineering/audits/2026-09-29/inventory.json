@@ -21315,10 +21315,12 @@
       "mode": "100644",
       "bytes": 34327,
       "method": "full-text",
-      "status": "unverified",
-      "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "status": "full-text-reviewed",
+      "reason": "Current first-party SQL/test fully read in bounded untruncated chunks",
+      "read_ranges": [[1, 931]],
+      "evidence": [
+        "Full text at 96c212e4e; baseline bytes match. Undo masks, grants, canonical locking, purge tombstones and integration cases reviewed. Local-only DB test not executed. H038 lacks activity/fulfillment insert-CAS case; no runtime consumer found in searched source."
+      ],
       "questions": []
     },
     {
@@ -39580,10 +39582,12 @@
       "mode": "100644",
       "bytes": 37730,
       "method": "full-text",
-      "status": "unverified",
-      "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "status": "full-text-reviewed",
+      "reason": "Current first-party SQL/test fully read in bounded untruncated chunks",
+      "read_ranges": [[1, 948]],
+      "evidence": [
+        "Full text at 96c212e4e; baseline bytes match. Undo masks, grants, canonical locking, purge tombstones and integration cases reviewed. Local-only DB test not executed. H038 lacks activity/fulfillment insert-CAS case; no runtime consumer found in searched source."
+      ],
       "questions": []
     },
     {
@@ -39608,10 +39612,12 @@
       "mode": "100644",
       "bytes": 1538,
       "method": "full-text",
-      "status": "unverified",
-      "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "status": "full-text-reviewed",
+      "reason": "Current first-party SQL/test fully read in bounded untruncated chunks",
+      "read_ranges": [[1, 27]],
+      "evidence": [
+        "Full text at 96c212e4e; baseline bytes match. Undo masks, grants, canonical locking, purge tombstones and integration cases reviewed. Local-only DB test not executed. H038 lacks activity/fulfillment insert-CAS case; no runtime consumer found in searched source."
+      ],
       "questions": []
     },
     {

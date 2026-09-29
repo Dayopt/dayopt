@@ -348,3 +348,5 @@ H024の反証追記: installed `@supabase/auth-js@2.116.0` のGoTrueClient.ts 40
 - 根拠: current contraction migrationのundo_full_maskはdeleted_at/end_at/note/start_at/titleのみ。record commandはactivity_id/fulfillmentを更新できる。一方record_undo_receiptのfull-mask一致検査とapplyのDELETEは保存field changesだけをCASにするため、事後のactivity/fulfillment更新がmask外に残る可能性。create_segments例の安全性とは別原因。
 - 反証/範囲: repoのruntime TSで当該record/apply RPCのliteral callsiteは検索範囲で見つからず、現在はDB substrate/統合testに限る。動的呼出し・実環境・実DB再現は未確認。既存のmask内note編集は保護され、update effectへfull-row CASを追加する修正は不適切。
 - 次: substrate/record RPCと統合testの残り全文を読み、insert receipt後のactivity/fulfillment更新を隔離DBで再現する。既存receiptの短期TTL/保持/互換条件とconsumer計画を照合し、新しい列をblindに必須化しない。実DB対象の確認が必要であり、共有activationや本番へ検査を向けない。
+
+H038追記: 初期RPC948行・後続guard27行・統合test931行を全文確認。#2394の移設Step3原文§4はinsert作成時全フィールドを要求する。現行testは5列だけをfull maskとして複製し、activity/fulfillment事後変更の負例は無い。現在検索したapps/packages/scriptsにはgenerated types・testを除くRPC callsiteは無い。#2435のclosed/activation OFF計画を実装・配信証拠にはしない。ローカルDB専用test未実行。更新Undoのmask外変更を許す契約を行全体CASへ変更する提案は却下し、insert側だけの保護と旧receipt互換を次に調べる。
