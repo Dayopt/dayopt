@@ -36,7 +36,7 @@ repository ID / owner ID / 既定 subject は 2026-09-29 の repository metadata
 
 ## 作成・回収処理と未実装の永続制御
 
-実行処理は両 UUID の Auth ownership を最初の変更前に照合する。作成は run と UUID に結び付けた合成 login を用意し、Auth の作成応答が失われても読み戻して所有を確認する。途中までの seed は同じ category / activity ID で再開し、既存の別ユーザーの行を上書きしない。ready 済みの再試行では password や seed を書き換えない。管理キーをローテーションした場合は既存 fixture の generation 不一致で停止し、元 intent による回収は許可する。
+実行処理は両 UUID の Auth ownership を最初の変更前に照合する。作成は run と UUID に結び付けた合成 login を用意し、Auth の作成応答が失われた場合やSDKがerrorを返した場合は失敗をadapterへ伝える。読み戻しだけで成功へ戻さず、後続seedや資格情報の返却を止める。正常な作成応答の後にも所有を読み戻して確認する。途中までの seed は同じ category / activity ID で再開し、既存の別ユーザーの行を上書きしない。ready 済みの再試行では password や seed を書き換えない。管理キーをローテーションした場合は既存 fixture の generation 不一致で停止し、元 intent による回収は許可する。
 
 回収は所有 Auth user の削除と不存在確認に加えて、profiles / user_settings / categories / activities / plans / records の残留 count が全て 0 であることを要求する。片方の削除失敗で他方の回収を打ち切らず、失敗は固定エラーとして残す。
 
@@ -49,7 +49,7 @@ repository ID / owner ID / 既定 subject は 2026-09-29 の repository metadata
 
 実 adapter の最小案は、既存の対象 DB に操作状態を永続化し、応答不明や実行サーバー喪失を `UNKNOWN` として閉じること。SDK の外側で fencing token を確認しても、送信済みの Auth 作成要求の commit は止められない。時間経過だけで `UNKNOWN` を回収成功へ戻さず、この場合は所有する ephemeral branch の削除と DB 自体の終端確認を必須にする。branch metadata の 404 だけを DB 不在の証拠にしない。この案の provider 終端条件・実装・実測は未完了であり、既存 executor の回収成功をこの保証の代わりに使わない。
 
-executor は adapter の取得待ち後にも JWT の期限を再検証する。[SDKを用いるローカルテスト](../../scripts/lib/preview-fixture-broker.test.ts) は provider mock と test-only の coordination harness を使い、この呼び出し契約と競合を検証する。**実 adapter の永続性・インスタンス間の排他・worker 喪失からの回収を証明するテストではない。** その実装・実測前に公開 route へ接続してはならない。
+executor は adapter の取得待ち後にも JWT の期限を再検証する。adapterがcallbackへ渡す `beforeMutation()` を必須とし、SDKの各書込み直前に永続ownerの検査を待つ。一度拒否された呼出しでは以後の書込みを送らず、検査待ちで実行予算を超えた場合も送信を止める。これは送信済み要求の取消しではなく、永続adapterの実装を代替しない。[SDKを用いるローカルテスト](../../scripts/lib/preview-fixture-broker.test.ts) は provider mock と test-only の coordination harness を使い、この呼び出し契約と競合を検証する。**実 adapter の永続性・インスタンス間の排他・worker 喪失からの回収を証明するテストではない。** その実装・実測前に公開 route へ接続してはならない。
 
 ## 準備済み login を使う candidate 側
 

@@ -104,7 +104,7 @@ function lifecycleHarness() {
   const runs = new Map<string, { tail: Promise<void>; digest: string; closed: boolean }>();
   return async (
     binding: { key: string; intentDigest: string; operation: string },
-    execute: () => Promise<unknown>,
+    execute: (scope: { beforeMutation: () => Promise<void> }) => Promise<unknown>,
   ) => {
     let state = runs.get(binding.key);
     if (!state) {
@@ -120,7 +120,7 @@ function lifecycleHarness() {
       if (binding.operation === 'provision') {
         if (state.closed) throw new Error('Run is closed');
       } else state.closed = true;
-      return await execute();
+      return await execute({ beforeMutation: async () => {} });
     } finally {
       done.resolve();
     }
@@ -141,6 +141,7 @@ function provider() {
   const writes: { path: string; method: string; body: Row }[] = [];
   const failures = {
     createResponseLost: false,
+    createErrorResponse: false,
     table: '',
     deleteId: '',
     skipCascade: '',
@@ -173,6 +174,7 @@ function provider() {
         }
         if (users.has(body.id)) return json({ msg: 'duplicate' }, 422);
         users.set(body.id, { ...body, password: undefined });
+        if (failures.createErrorResponse) return json({ msg: 'PRIVATE uncertain create' }, 500);
         if (failures.createResponseLost) {
           failures.createResponseLost = false;
           throw new Error('Lost response');
@@ -249,9 +251,12 @@ describe('authenticated Preview fixture executor with installed Supabase SDK', (
       p.run(input, {
         env: selectedEnv,
         now: () => clock,
-        withLifecycle: async (_binding: unknown, execute: () => Promise<unknown>) => {
+        withLifecycle: async (
+          _binding: unknown,
+          execute: (scope: { beforeMutation: () => Promise<void> }) => Promise<unknown>,
+        ) => {
           clock += 301;
-          return execute();
+          return execute({ beforeMutation: async () => {} });
         },
       }),
     ).rejects.toThrow(/^Preview fixture operation failed$/);
@@ -269,6 +274,94 @@ describe('authenticated Preview fixture executor with installed Supabase SDK', (
     );
     expect(secret).not.toHaveBeenCalled();
     expect(p.writes).toEqual([]);
+  });
+  it('requires the per-mutation ownership guard before reading an admin key', async () => {
+    const p = provider();
+    const secret = vi.fn(() => env.SUPABASE_SECRET_KEY);
+    const selectedEnv = { ...env };
+    Object.defineProperty(selectedEnv, 'SUPABASE_SECRET_KEY', { get: secret });
+    await expect(
+      p.run(input, {
+        env: selectedEnv,
+        withLifecycle: async (_binding: unknown, execute: () => Promise<unknown>) => execute(),
+      }),
+    ).rejects.toThrow(/^Preview fixture operation failed$/);
+    expect(secret).not.toHaveBeenCalled();
+  });
+  it('awaits ownership checks before every provider mutation and stops after ownership loss', async () => {
+    const p = provider();
+    let checks = 0;
+    await expect(
+      p.run(input, {
+        withLifecycle: async (
+          _binding: unknown,
+          execute: (scope: { beforeMutation: () => Promise<void> }) => Promise<unknown>,
+        ) =>
+          execute({
+            beforeMutation: async () => {
+              expect(p.writes).toHaveLength(checks);
+              checks++;
+              if (checks === 2) throw new Error('PRIVATE expired ownership');
+            },
+          }),
+      }),
+    ).rejects.toThrow(/^Preview fixture operation failed$/);
+    expect(checks).toBe(2);
+    expect(p.writes).toHaveLength(1);
+    expect(p.writes[0].path).toBe('/auth/v1/admin/users');
+    expect(p.tables.get('profiles')?.size).toBe(0);
+  });
+  it('does not send a mutation if the time budget expired while checking ownership', async () => {
+    const p = provider();
+    let elapsed = 0;
+    await expect(
+      p.run(input, {
+        elapsed: () => elapsed,
+        withLifecycle: async (
+          _binding: unknown,
+          execute: (scope: { beforeMutation: () => Promise<void> }) => Promise<unknown>,
+        ) =>
+          execute({
+            beforeMutation: async () => {
+              elapsed = 120_001;
+            },
+          }),
+      }),
+    ).rejects.toThrow(/^Preview fixture operation failed$/);
+    expect(p.writes).toEqual([]);
+  });
+  it('does not send an awaiting cleanup write after a parallel ownership check failed', async () => {
+    const p = provider();
+    await p.run();
+    const count = p.writes.length;
+    const first = deferred();
+    const failed = deferred();
+    let checks = 0;
+    const cleaning = p.run(
+      { ...input, operation: 'cleanup' },
+      {
+        withLifecycle: async (
+          _binding: unknown,
+          execute: (scope: { beforeMutation: () => Promise<void> }) => Promise<unknown>,
+        ) =>
+          execute({
+            beforeMutation: async () => {
+              checks++;
+              if (checks === 1) return first.promise;
+              failed.resolve();
+              throw new Error('Ownership lost');
+            },
+          }),
+      },
+    );
+    const rejected = expect(cleaning).rejects.toThrow(/^Preview fixture operation failed$/);
+    await failed.promise;
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    first.resolve();
+    await rejected;
+    expect(p.writes).toHaveLength(count);
+    expect(p.users.has(input.intent.userIds.desktop)).toBe(true);
+    expect(p.users.has(input.intent.userIds.mobile)).toBe(true);
   });
   it('keeps a terminal run closed even when cleanup precedes the first provision', async () => {
     const p = provider();
@@ -314,16 +407,22 @@ describe('authenticated Preview fixture executor with installed Supabase SDK', (
     expect(p.writes).toHaveLength(count);
     expect(p.users.get(seed)).toEqual(baseline);
   });
-  it('recovers a committed creation whose response was lost without duplicating fixture rows', async () => {
-    const p = provider();
-    p.failures.createResponseLost = true;
-    await p.run();
-    expect(p.users.size).toBe(3);
-    expect(
-      p.writes.filter((write) => write.method === 'POST' && write.path === '/auth/v1/admin/users'),
-    ).toHaveLength(2);
-    expect(p.tables.get('activities')?.size).toBe(2);
-  });
+  it.each(['createResponseLost', 'createErrorResponse'] as const)(
+    'propagates %s instead of treating readback as a confirmed provision',
+    async (failure) => {
+      const p = provider();
+      p.failures[failure] = true;
+      await expect(p.run()).rejects.toThrow(/^Preview fixture operation failed$/);
+      // Provider state may have changed even though no credentials may be returned.
+      expect(p.users.has(input.intent.userIds.desktop)).toBe(true);
+      expect(p.users.has(input.intent.userIds.mobile)).toBe(false);
+      expect(p.writes).toHaveLength(1);
+      expect(p.tables.get('activities')?.size).toBe(0);
+      expect(p.users.get(input.intent.userIds.desktop)?.app_metadata?.e2e_fixture_ready).toBe(
+        false,
+      );
+    },
+  );
   it('resumes interrupted seeding and marks ready only after all required rows exist', async () => {
     const p = provider();
     p.failures.table = 'activities';
