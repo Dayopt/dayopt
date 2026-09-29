@@ -75,25 +75,23 @@ async function ensureRow(admin, table, row) {
 async function provisionUser(admin, selected, intent, observed) {
   let user = observed;
   if (!user) {
-    // An unconfirmed response may have committed. Read back ownership before
-    // deciding whether to continue; never adopt a colliding foreign identity.
-    try {
-      await admin.auth.admin.createUser({
-        id: selected.userId,
-        email: selected.email,
-        password: selected.password,
-        email_confirm: true,
-        app_metadata: {
-          e2e_run_id: intent.runId,
-          e2e_fixture_intent: digest(intent),
-          e2e_fixture_generation: selected.generation,
-          e2e_fixture_ready: false,
-        },
-        user_metadata: { full_name: 'Cloud Preview synthetic user' },
-      });
-    } catch {
-      // The following ownership read is required even when transport throws.
-    }
+    // A lost/error response may have committed, but readback cannot resolve all
+    // outstanding provider work. Propagate failure to the durable lifecycle gate;
+    // do not return credentials or let a successful read clear an UNKNOWN state.
+    const created = await admin.auth.admin.createUser({
+      id: selected.userId,
+      email: selected.email,
+      password: selected.password,
+      email_confirm: true,
+      app_metadata: {
+        e2e_run_id: intent.runId,
+        e2e_fixture_intent: digest(intent),
+        e2e_fixture_generation: selected.generation,
+        e2e_fixture_ready: false,
+      },
+      user_metadata: { full_name: 'Cloud Preview synthetic user' },
+    });
+    if (created.error || created.data?.user?.id !== selected.userId) throw new Error();
     user = await readUser(admin, selected.userId);
   }
   if (!user) throw new Error();
@@ -163,6 +161,9 @@ async function cleanupUser(admin, selected, intent) {
  * withLifecycle is mandatory: its trusted adapter must durably serialize by
  * database + run ID across instances, bind the intent digest, and retain a
  * terminal tombstone from cleanup/recover START (including failed cleanup).
+ * The callback scope must provide beforeMutation(), which verifies its current
+ * unexpired durable owner before every SDK write. A rejected check poisons this
+ * invocation; it cannot revoke a request already sent to the provider.
  * No in-process default is safe for a server request surviving a worker crash.
  * Until that adapter exists, callers must not expose this executor as an API.
  * Returned provisioning credentials are private and must never be logged.
@@ -193,7 +194,8 @@ export async function executeFixtureBroker({
         intentDigest: digest(bound.intent),
         operation: bound.operation,
       },
-      async () => {
+      async (scope) => {
+        if (typeof scope?.beforeMutation !== 'function') throw new Error();
         // A request may wait for an earlier operation. Do not acquire admin
         // authority using a token that expired while waiting for the lifecycle gate.
         await verifyFixtureJobToken({ input: bound, token, fetchImpl, now });
@@ -202,15 +204,31 @@ export async function executeFixtureBroker({
         await assertCloudFixtureKey({ request: bound.intent.request, serviceKey: key, fetchImpl });
         const origin = `https://${bound.intent.request.supabaseProjectRef}.supabase.co`;
         const deadline = elapsed() + 120_000;
+        let ownershipLost = false;
         const admin = createClient(origin, key, {
           auth: { autoRefreshToken: false, persistSession: false },
           global: {
-            fetch: (url, init = {}) => {
+            fetch: async (url, init = {}) => {
               const destination = new URL(
                 typeof url === 'string' ? url : url instanceof URL ? url.href : url.url,
               );
+              if (destination.origin !== origin || elapsed() >= deadline) throw new Error();
+              const method = String(
+                init.method ?? (url instanceof Request ? url.method : 'GET'),
+              ).toUpperCase();
+              if (!['GET', 'HEAD'].includes(method)) {
+                if (ownershipLost) throw new Error();
+                try {
+                  await scope.beforeMutation();
+                } catch {
+                  ownershipLost = true;
+                  throw new Error();
+                }
+                // A parallel cleanup check may fail while this check is pending.
+                if (ownershipLost) throw new Error();
+              }
               const remaining = Math.ceil(deadline - elapsed());
-              if (destination.origin !== origin || remaining <= 0) throw new Error();
+              if (remaining <= 0) throw new Error();
               return fetchImpl(url, {
                 ...init,
                 redirect: 'error',

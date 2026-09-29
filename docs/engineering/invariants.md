@@ -91,6 +91,8 @@ docs へ残している。
 
 ## データ分離（RLS）
 
+- Preview fixtureの実行状態は `private.preview_fixture_lifecycle` にpayloadなしで保持する。Auth user削除に追従して消さず、service-role専用RPC以外から操作しない。回収開始後の新規provision、期限切れownerの再利用、`UNKNOWN`から通常成功への復帰を禁止する。Cloud接続の前提であり、未接続のローカルtestだけを実分散回収の証拠にしない。
+
 - user データを持つ table は RLS 有効。標準形は
   「`Users can view own X`（`auth.uid() = user_id`）」+「service_role full access」。
   この形から外れる policy は、外れる理由が migration に書かれているべき
