@@ -14,14 +14,14 @@ import { resolvePreviewCloudUserId } from './preview-cloud-identity';
 import { resolveServiceRoleTarget } from './service-role-target-guard';
 
 type Environment = Readonly<Record<string, string | undefined>>;
-export interface PreviewFixtureIdentity {
+interface PreviewFixtureIdentity {
   userId: string;
   email: string;
   password: string;
   activityName: string;
   categoryName: string;
 }
-export interface PreviewFixtureRegistry {
+interface PreviewFixtureRegistry {
   schemaVersion: 1;
   operation: 'provision';
   runId: string;
