@@ -1,3 +1,9 @@
+---
+status: current
+last_verified: 2026-09-29
+code: scripts/lib/preview-fixture-broker.mjs
+---
+
 # 隔離 Preview の fixture 認証経路（#2910）
 
 DB 変更 PR の Supabase branch でも、毎 PR の secret 保存や手動 signup をせず、合成ユーザーの通常ログインと所有データ回収を実行するための実装計画。
