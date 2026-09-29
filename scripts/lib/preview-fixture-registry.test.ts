@@ -9,14 +9,18 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import { createHash } from 'node:crypto';
 import { loadPreviewFixtureRegistry } from '../../apps/product/src/lib/test/preview-fixture-registry';
+import { createPreviewArtifactZip } from '../__tests__/helpers/preview-artifact-zip';
 import {
   decryptPreviewFixtureEnvelope,
   encryptPreviewFixtureEnvelope,
   generatePreviewFixtureKeyPair,
 } from './preview-fixture-envelope.mjs';
+import { previewFixtureHandoffArtifactName } from './preview-fixture-handoff-trust.mjs';
+import { receivePreviewFixtureRegistry } from './preview-fixture-handoff.mjs';
 import { writeFixtureRegistry } from './preview-fixture-registry.mjs';
 
 const input = {
@@ -78,6 +82,85 @@ function fixture() {
 }
 
 describe('private fixture registry materialization', () => {
+  function transfer() {
+    const args = fixture();
+    const { publicKey, privateKey } = generatePreviewFixtureKeyPair();
+    const envelope = encryptPreviewFixtureEnvelope({
+      input: args.input,
+      publicKey,
+      payload: args.response,
+    });
+    const archive = createPreviewArtifactZip([
+      { name: 'envelope.json', data: JSON.stringify(envelope) },
+    ]);
+    const proof = {
+      artifactId: 123,
+      name: previewFixtureHandoffArtifactName(args.input, 'envelope'),
+      digest: `sha256:${createHash('sha256').update(archive).digest('hex')}`,
+    };
+    const events: string[] = [];
+    const verify = vi.fn(async () => {
+      events.push('verify');
+      return { ...proof };
+    });
+    const download = vi.fn(async () => {
+      events.push('download');
+      return archive;
+    });
+    return { args, privateKey, proof, archive, verify, download, events };
+  }
+  function receive(s: ReturnType<typeof transfer>) {
+    return receivePreviewFixtureRegistry({
+      ...s.args,
+      token: 'PRIVATE_READ_TOKEN',
+      privateKey: s.privateKey,
+      verify: s.verify,
+      download: s.download,
+    });
+  }
+  it('verifies, downloads encrypted ZIP, rechecks metadata, then writes private login', async () => {
+    const s = transfer();
+    const result = await receive(s);
+    expect(s.events).toEqual(['verify', 'download', 'verify']);
+    expect(JSON.parse(readFileSync(result.path, 'utf8')).users).toEqual(s.args.response.users);
+    expect(Object.keys(result).sort()).toEqual(['directory', 'path']);
+    expect(s.download).toHaveBeenCalledWith({ artifactId: 123, token: 'PRIVATE_READ_TOKEN' });
+  });
+  it.each(['before', 'download', 'digest', 'after', 'replaced', 'wrong-key', 'payload'])(
+    'leaves no login file after %s failure',
+    async (mode) => {
+      const s = transfer();
+      if (mode === 'before') s.verify.mockRejectedValueOnce(new Error('PRIVATE_PROVIDER_BODY'));
+      if (mode === 'download') s.download.mockRejectedValueOnce(new Error('PRIVATE_READ_TOKEN'));
+      if (mode === 'digest')
+        s.download.mockResolvedValueOnce(Buffer.from('untrusted corrupt archive'));
+      if (mode === 'after')
+        s.verify.mockResolvedValueOnce(s.proof).mockRejectedValueOnce(new Error('PRIVATE'));
+      if (mode === 'replaced')
+        s.verify
+          .mockResolvedValueOnce(s.proof)
+          .mockResolvedValueOnce({ ...s.proof, artifactId: 124 });
+      if (mode === 'wrong-key') s.privateKey = generatePreviewFixtureKeyPair().privateKey;
+      if (mode === 'payload') {
+        const { publicKey, privateKey } = generatePreviewFixtureKeyPair();
+        s.privateKey = privateKey;
+        const envelope = encryptPreviewFixtureEnvelope({
+          input: s.args.input,
+          publicKey,
+          payload: { ...s.args.response, adminKey: 'PRIVATE' },
+        });
+        const archive = createPreviewArtifactZip([
+          { name: 'envelope.json', data: JSON.stringify(envelope) },
+        ]);
+        s.proof.digest = `sha256:${createHash('sha256').update(archive).digest('hex')}`;
+        s.download.mockResolvedValue(archive);
+      }
+      await expect(receive(s)).rejects.toThrow(new Error('Preview fixture handoff failed'));
+      expect(readdirSync(s.args.runnerTemp).sort()).toEqual(['browser', 'evidence']);
+      if (mode === 'before') expect(s.download).not.toHaveBeenCalled();
+      if (mode === 'digest') expect(s.verify).toHaveBeenCalledTimes(1);
+    },
+  );
   it('materializes the decrypted broker payload without exposing login in the transferable envelope', () => {
     const args = fixture();
     const { publicKey, privateKey } = generatePreviewFixtureKeyPair();
