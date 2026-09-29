@@ -208,3 +208,7 @@ H035として遅延updatedが解約後/再契約後を上書きする候補を�
 前回turnは20ファイルの全文読解、H035候補、証拠commit `3dc0e39b7`とIssue comment-5900681960を保存したprogress。今回同clean HEADから続け、diagnosing-bugsを適用。ctx2686はL1 missing/staleで、本文と2コメントを取得。reconciliationは検出のみ、修復はresendという境界を維持し、監視cronに自動修復を追加しない。
 
 F035でlive profileの遅延配送2件と同状態復帰1件をredで再現し、checkout/updated/deletedのTS呼出しを横断して現在状態・exact ID・条件付き保存へ修正。既存DB列とtriggerを利用しmigration追加なし。関連58 tests成功。最終製品コードを固定してNode24 `pnpm check`実行中、ログ `/tmp/dayopt-audit-check-webhook-ordering.log`、session42094。成功はまだ未確認で前回7483結果を流用しない。Architecture generatorは実行成功・tracked差分なし。今回追加testは基準3141母数の外で、基準全文366件/機械1/未確認2774を維持。snapshot行の終端記録、通知、実DB/Stripeの未確認境界はfindingsへ保存。次は全体検査の同sessionを確認して結果を記録し、Auth削除後の遅延updated/checkoutの分類を閉じる。
+
+F035実装修正commit `8fd1b58c7`。初回全体checkは未使用型exportのknip検出でexit 1、検証成功と扱わない（`/tmp/dayopt-audit-check-webhook-ordering.log`）。型を内部へ戻した最終製品コードを固定し、session23911のNode24 `pnpm check` exit 0。型10 tasks/lint9 tasks/static、billing37/i18n2/observability64/product4380/web366/scripts2642、合計7491 passed（`/tmp/dayopt-audit-check-webhook-ordering-final.log`）。検査中は製品コードを変更せず、docs/learnのJSON正本の古い呼出しanchor/説明を同期しlearn:generate。docs:checkもexit 0（`/tmp/dayopt-audit-webhook-ordering-docs-final.log`）。最初のdocs失敗は元anchorが消えた1件で、初回成功とは扱わない。
+
+provider identity/client/diagnosing skillとreconciliation routeを追加全文確認し基準370件、機械1、未確認2770。billing journey1284行は今回1–200/920–955のみ部分読解で、正本の1箇所編集/再生成を全文読了へ昇格しない。現在製品修正はlocal、公開Draftは以前のheadのまま。次はAuth削除後のcheckout/updatedと短期receiptを照合し、再現/修正した候補を同通常pre-pushでDraftへ反映する。全体監査・実DB・実Stripe・配信は未完了。

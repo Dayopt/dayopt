@@ -441,7 +441,7 @@ async function getInvoicesByCustomerId(stripe: Stripe, customerId: string): Prom
   }));
 }
 
-export interface BillingSubscriptionSnapshot {
+interface BillingSubscriptionSnapshot {
   subscriptionId: string | null;
   status: string;
   updatedAt: string;

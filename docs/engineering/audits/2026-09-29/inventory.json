@@ -49,10 +49,12 @@
       "mode": "100644",
       "bytes": 6437,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 100]],
+      "evidence": [
+        "Full untruncated read while reproducing H035 at 3dc0e39b7. Billing columns have uniqueness/status constraints; provider identity verifies the immutable Event separately from current Subscription. No cloud or provider mutation."
+      ],
       "questions": []
     },
     {
@@ -4069,10 +4071,12 @@
       "mode": "100644",
       "bytes": 3483,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 88]],
+      "evidence": [
+        "Full text read at 8fd1b58c7: authenticated read-only discrepancy detection, no automatic repair, no-store responses. Runtime not invoked. Billing journey read ranges 1-200 and 920-955 are partial; source-anchor/generation edits do not imply full review."
+      ],
       "questions": []
     },
     {
@@ -19857,10 +19861,12 @@
       "mode": "100644",
       "bytes": 1185,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 51]],
+      "evidence": [
+        "Full untruncated read while reproducing H035 at 3dc0e39b7. Billing columns have uniqueness/status constraints; provider identity verifies the immutable Event separately from current Subscription. No cloud or provider mutation."
+      ],
       "questions": []
     },
     {
@@ -19870,10 +19876,12 @@
       "mode": "100644",
       "bytes": 2204,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 74]],
+      "evidence": [
+        "Full untruncated read while reproducing H035 at 3dc0e39b7. Billing columns have uniqueness/status constraints; provider identity verifies the immutable Event separately from current Subscription. No cloud or provider mutation."
+      ],
       "questions": []
     },
     {
@@ -36076,7 +36084,8 @@
       "reason": "Full baseline SQL read in bounded chunks; superseding definitions distinguished from historical ones.",
       "read_ranges": [[1, 19]],
       "evidence": [
-        "Cross-checked MCP authorization locks, expiry rechecks, canonical Plan/Record command calls, atomic receipt, digest v1/v2 and 90-day replay/purge generation boundary. Existing #2736 owns compatibility retirement; no DB execution or migration changes. #1754 explicit 2026-08-26 decision resolves H005."
+        "Cross-checked MCP authorization locks, expiry rechecks, canonical Plan/Record command calls, atomic receipt, digest v1/v2 and 90-day replay/purge generation boundary. Existing #2736 owns compatibility retirement; no DB execution or migration changes. #1754 explicit 2026-08-26 decision resolves H005.",
+        "Full untruncated read while reproducing H035 at 3dc0e39b7. Billing columns have uniqueness/status constraints; provider identity verifies the immutable Event separately from current Subscription. No cloud or provider mutation."
       ],
       "questions": []
     },
