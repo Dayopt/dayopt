@@ -78,32 +78,32 @@ Dayopt の共通指示。Project 設定を正本とし、個人設定・ホー�
 
 `.agents/skills/*/SKILL.md` が正本。`.claude/skills` は相対 symlink、CLAUDE.md は共通指示の互換入口。該当する作業の skill だけ読む。
 
-| skill                  | 使う場面                   |
-| ---------------------- | -------------------------- |
-| `routing`              | 作業方針・委譲の判断       |
-| `dispatch`             | Issue 起票・割り当て       |
-| `mcp-usage`            | 外部ツールの利用           |
-| `skill-design`         | skill の作成・整理         |
-| `supabase`             | migration・RLS・DB         |
-| `trpc-router-creating` | router / service 新設      |
-| `store-creating`       | Zustand 新設               |
-| `storybook`            | Story・token 選択          |
-| `i18n`                 | UI 文言・翻訳              |
-| `error-handling`       | エラー処理                 |
-| `optimistic-update`    | 楽観的更新                 |
-| `security`             | 認証・認可・外部入力       |
-| `test`                 | 挙動変更の検証             |
-| `diagnosing-bugs`      | 原因未特定の不具合         |
-| `react-performance`    | 性能調査                   |
-| `ui-audit`             | UI 監査の明示依頼          |
-| `pr-cross-review`      | 保護対象 PR の独立レビュー |
-| `docs-writing`         | docs 執筆                  |
-| `docs-audit`           | 公開 docs の監査           |
-| `releasing`            | release の明示依頼         |
-| `gardening`            | 月次改善の明示依頼         |
-| `audit-ai-config`      | AI 設定整理の明示依頼      |
-| `blog-ideas`           | ブログ提案・起票の明示依頼 |
-| `decision`             | 決定ログの明示依頼         |
+| skill                  | 使う場面                       |
+| ---------------------- | ------------------------------ |
+| `routing`              | 作業方針・委譲の判断           |
+| `dispatch`             | Issue 起票・割り当て           |
+| `mcp-usage`            | 外部ツールの利用               |
+| `skill-design`         | skill の作成・整理             |
+| `supabase`             | migration・RLS・DB             |
+| `trpc-router-creating` | router / service 新設          |
+| `store-creating`       | Zustand 新設                   |
+| `storybook`            | Story・token 選択              |
+| `i18n`                 | UI 文言・翻訳                  |
+| `error-handling`       | エラー処理                     |
+| `optimistic-update`    | 楽観的更新                     |
+| `security`             | 認証・認可・外部入力           |
+| `test`                 | 挙動変更の検証                 |
+| `diagnosing-bugs`      | 原因未特定の不具合             |
+| `react-performance`    | 性能調査                       |
+| `ui-audit`             | UI 監査の明示依頼              |
+| `pr-cross-review`      | 保護対象 PR の独立レビュー     |
+| `docs-writing`         | docs 執筆                      |
+| `docs-audit`           | 公開 docs の監査               |
+| `releasing`            | release の明示依頼             |
+| `gardening`            | 月次改善の明示依頼             |
+| `audit-ai-config`      | AI 設定整理の明示依頼          |
+| `blog-ideas`           | ブログ提案・起票の明示依頼     |
+| `decision`             | 判断の明示確定・変更・記録依頼 |
 
 ## Deploy / Release
 

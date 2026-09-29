@@ -509,31 +509,33 @@ export const GLOSSARY: readonly GlossaryEntry[] = [
   {
     id: 'report-chapter-allocation',
     layer: 'ui',
-    status: 'current',
+    status: 'deprecated',
     concept: 'Allocation (chapter 1)',
     ja: '配分',
     en: 'Allocation',
-    usage: '1 章。時間そのものを分母（週 = 168h）に置いて、どこへ流れたかを見る',
+    usage:
+      '旧1章。2026-09-15 に目的別3タブへ再編。現在の配分は記録時間を分母とする。正本: docs/product/specs/review.md',
     code: { identifiers: ['AllocationChapter'] },
   },
   {
     id: 'report-chapter-execution',
     layer: 'ui',
-    status: 'current',
+    status: 'deprecated',
     concept: 'Execution (chapter 2)',
     ja: '執行',
     en: 'Execution',
-    usage: '2 章。予定に対して記録がどう動いたか。全体遵守率のような合成値は作らない',
+    usage: '旧2章。現在は「差分」タブで予定と記録を見る。正本: docs/product/specs/review.md',
     code: { identifiers: ['ExecutionChapter'] },
   },
   {
     id: 'report-chapter-quality',
     layer: 'ui',
-    status: 'current',
+    status: 'deprecated',
     concept: 'Quality (chapter 3)',
     ja: '質',
     en: 'Quality',
-    usage: '3 章。投下時間と充実 / 消耗の関係を見る。中の散布図が「羅針盤」',
+    usage:
+      '旧3章。現在は「振り返り」タブで投下時間と充実を見る。正本: docs/product/specs/review.md',
     code: { identifiers: ['QualityChapter'] },
   },
 
@@ -545,7 +547,7 @@ export const GLOSSARY: readonly GlossaryEntry[] = [
     concept: 'Ink',
     ja: 'インク',
     en: 'Ink',
-    usage: '記録として書かれた時間。決算バーの塗り',
+    usage: '記録として書かれた時間。レポートの現行表示は docs/product/specs/review.md を参照',
     code: { identifiers: ['buildInkColumns'] },
   },
   {
@@ -578,11 +580,12 @@ export const GLOSSARY: readonly GlossaryEntry[] = [
   {
     id: 'ledger-bar',
     layer: 'design',
-    status: 'current',
+    status: 'deprecated',
     concept: 'Ledger bar',
     ja: '決算バー',
     en: 'Ledger bar',
-    usage: '1 章の横 1 本のバー。塗りがインク、塗り残しが余白。UI にラベルとしては出さない',
+    usage:
+      '旧: 週168hの決算バー。2026-09-15 に撤去し、記録時間を分母とする配分の横棒へ。余白は塗らない。正本: docs/product/specs/review.md',
   },
   {
     id: 'mirror',
@@ -591,7 +594,7 @@ export const GLOSSARY: readonly GlossaryEntry[] = [
     concept: 'Mirror',
     ja: '見積もりの鏡',
     en: 'Mirror',
-    usage: '2 章の節。記録 / 過去予定の係数を癖の強い順に最大 3 件出す',
+    usage: '「差分」タブの節。記録 / 過去予定の係数を癖の強い順に最大 3 件出す',
     code: { identifiers: ['buildMirrorRows'] },
   },
   {
@@ -601,7 +604,7 @@ export const GLOSSARY: readonly GlossaryEntry[] = [
     concept: 'Compass',
     ja: '羅針盤',
     en: 'Compass',
-    usage: '3 章の散布図。横軸が投下時間、縦軸が充実と消耗の差。平均・回帰線・象限は作らない',
+    usage: '「振り返り」タブの散布図。軸と集計の正本は docs/product/specs/review.md を参照',
     code: { identifiers: ['CompassScatter', 'buildCompassPoints'] },
   },
   {
@@ -622,8 +625,8 @@ export const GLOSSARY: readonly GlossaryEntry[] = [
     ja: '保存先ルール',
     en: 'Destination rule',
     usage:
-      '新規作成は end_at だけで宛先が決まる（未来なら予定、過去なら記録）。種別選択の UI は置かない',
-    code: { identifiers: ['resolveTimeblockDestination'] },
+      '新規作成の既定は end_at で決まる。過去枠は予定 / 記録を選べる。正本: docs/product/specs/plan-record.md',
+    code: { identifiers: ['resolveTimeblockDestination', 'resolveTimeblockKindChoice'] },
   },
 
   // ─── コード内部語 ───

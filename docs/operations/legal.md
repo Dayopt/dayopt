@@ -25,7 +25,13 @@ Legal（利用規約・プライバシーポリシー等）の実体パスと改
 
 利用規約・プライバシーポリシー等を改定したら、**なぜ改定したか**を `/decision` で記録する（本文の diff は git history が正本、decision には理由だけ書く）。
 
-例: ADR-008 cookie consent banner（削除済み、git 履歴参照）、ADR-009 cookie consent required（削除済み、git 履歴参照） は過去の cookie 同意まわりの意思決定記録（このディレクトリ新設以前のもの）。2026-08-12 privacy Google Calendar 節追加（削除済み、git 履歴参照） は GCP sensitive scope 審査（#1963）に向けた最新例。2026-08-17 Axiom サブプロセッサー追記（削除済み、git 履歴参照） は Vercel Log Drains 導入（#1701 Phase 3）の legal 前提（30 日前通知）に向けた例。
+過去の改定理由は [決定索引](../decisions.md)と関連 Issue / PR を辿る。過去の例にある通知日数や契約前提を、現行の承認済み義務として再利用しない。
+
+## レビュー準備・承認・公開の境界
+
+[#2010](https://github.com/Dayopt/dayopt/issues/2010) は「人間が最終レビューできるドラフト・証拠・未決事項の準備」を完了範囲に変更した。Issue の close は法務承認や本番公開を意味しない。6ページの日英ドラフトとレビュー資料は [PR #2833](https://github.com/Dayopt/dayopt/pull/2833) にあり、この checkout に資料がなくても準備未実施とは断定しない。
+
+最終承認と公開の要求の正本は [#2832](https://github.com/Dayopt/dayopt/issues/2832)。HUMAN-01〜10 と元の8項目の証拠、承認者による確認、明示的な公開指示、公開後の SHA・12 URL の確認をそこで扱う。未決の法務判断を agent が推測で埋めない。同意撤回 UI は [#2831](https://github.com/Dayopt/dayopt/issues/2831)、課金表記の公開順序は [課金の公開手順](billing-single-plan-rollout.md)へ。現在の承認・公開状況は各 Issue / PR で確認し、ここに状態の写しを作らない。
 
 ## このファイルに書かないこと
 
