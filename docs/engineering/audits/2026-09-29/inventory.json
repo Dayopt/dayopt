@@ -18636,10 +18636,12 @@
       "mode": "100644",
       "bytes": 10785,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 337]],
+      "evidence": [
+        "Complete bounded read; auth failures, stored write base scope, billing switch and denied-use timestamp, limiter dependency failure and deployed-environment selection tests. Query builders are fakes and do not prove actual DB filtering or writes."
+      ],
       "questions": []
     },
     {
@@ -18679,10 +18681,12 @@
       "mode": "100644",
       "bytes": 2985,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 72]],
+      "evidence": [
+        "Complete bounded read; auth failures, stored write base scope, billing switch and denied-use timestamp, limiter dependency failure and deployed-environment selection tests. Query builders are fakes and do not prove actual DB filtering or writes."
+      ],
       "questions": []
     },
     {

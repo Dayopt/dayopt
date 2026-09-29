@@ -49,7 +49,7 @@ repo調査、対象内の可逆修正、テスト、commit、必要なpush/Draft
 
 監査Issue: [#2963](https://github.com/Dayopt/dayopt/issues/2963)。`pnpm ctx 2963 --reuse-brief-l1` はexit 0、L1は `trusted_brief_missing_or_stale`。L1は未取得として本文と一次資料で続行。API課金を伴うJev呼び出しは行っていない。ctx初回起動時に既存lockfileから依存のinstallが行われた。tracked manifest/lockfileの差分は無い。
 
-全文確認202ファイル、symlink機械確認1件、未確認2,938件。`inventory.json`が各pathの確認範囲の正本。secrets/architecture/conventions/testing/glossary/strategy/decisions、Reviewの主経路、activities featureの基準ファイル全件の全文確認を完了。partial readは別に範囲を記録した。全文確認は全境界の実行検証を意味しない。全体監査は初期段階であり、多数の未読が残る。
+全文確認204ファイル、symlink機械確認1件、未確認2,936件。`inventory.json`が各pathの確認範囲の正本。secrets/architecture/conventions/testing/glossary/strategy/decisions、Reviewの主経路、activities featureの基準ファイル全件の全文確認を完了。partial readは別に範囲を記録した。全文確認は全境界の実行検証を意味しない。全体監査は初期段階であり、多数の未読が残る。
 
 修正commit: F001 `f0151baaf`（作成既定と選択）、F004 `f2a43d559`（unknown/型アサーション）、F002 `e88a1890f`・`84f4d9019`（旧レポート説明と用語test）、F006 `c799b402b`（前期間だけの活動が比較から消える不具合）、F008 `8a5bc2c9f`（test時計固定）、F011 `9851013ae`（機械データによるtaxonomy誤検知）、F010 `befb03e5f`（DSTの時間帯集計）。`findings.md`に根拠・反証・検査結果を記録。
 
@@ -106,3 +106,7 @@ F020説明修正commit `057697dfe`。protected-path-gateの実行結果はrequir
 ## MCP修正後の統合検査
 
 製品コードSHA `057697dfe`（MCP説明を含む）でNode24の`pnpm check`がexit 0。型10 tasks・lint9 tasks・静的検査、billing15・i18n2・observability64・product4345・web366・scripts2625、計7417 tests passed。ログ `/tmp/dayopt-audit-check-mcp-replay.log`。検査中は製品コードを固定し、読解記録のみ追記。Architecture generatorは先に実行、今回は差分なし。前回成功の流用ではなく、main統合と今回MCP修正を含む結果。実DB・E2E・CI・配信の証拠ではない。
+
+`01092d7fe997bcbcf9c907920dabb9904486f87f`を通常pre-push（affected型/lint、scripts2625、format）成功後にDraft #2965へpush済み。remote head/isDraft=true/state=OPENをAPIで確認。ログ `/tmp/dayopt-audit-push-mcp-replay-verified.log`。PR説明をMCPを含む最終差分・今回7417検査・protected-path=trueへ更新。mainへのmerge/releaseなし。
+
+公開後にauth/limiterの既存test2件を全文確認し台帳へ追加。次は残るMCP route/protocol tests、OAuthのDB exchange/rotationとconsent経路を照合し、H007/H009/H014/H015など未解決仮説へ戻る。依存警告はpush時にdefault branchのmoderate 1件と通知されたのみで、詳細未確認・所見未採用。依存graph監査の際に現在のadvisoryを確認する。読解202件までの台帳は上記公開head、204件目までの記録はこの追記commitで保存する。
