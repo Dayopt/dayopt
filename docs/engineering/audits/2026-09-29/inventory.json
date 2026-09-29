@@ -21330,10 +21330,12 @@
       "mode": "100644",
       "bytes": 19542,
       "method": "full-text",
-      "status": "unverified",
-      "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "status": "full-text-reviewed",
+      "reason": "Current first-party integration test fully read without truncation",
+      "read_ranges": [[1, 508]],
+      "evidence": [
+        "Full text at e8358c98a; baseline bytes match. GRANT and transaction-local RLS checks, composite owner FK, uniqueness and cascade cases read. Local-only test not run. Future-only Plan fixture comment is stale; origin test covers nonexistent connection but not an existing other-owner connection; TRUNCATE every assertion lacks explicit result cardinality/status check. These are candidates, not measured failure."
+      ],
       "questions": []
     },
     {
