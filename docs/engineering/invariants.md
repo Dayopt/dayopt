@@ -42,6 +42,11 @@ docs へ残している。
 - Pro 限定機能の server 入口は `entitledProcedure(key)` を使うか、明示的に entitlement を検査する
 - Stripe webhook は署名を検証し、event id で冪等化する
   （`app/api/webhooks/stripe/stripe-webhook-idempotency.ts`）
+- Integration の課金検証は `INTEGRATION_BILLING_REHEARSAL=true` の明示 opt-in と固定 Product
+  project / Preview target / integration Git branch / origin / Supabase ref / OAuth identity の
+  完全一致が必要。test Stripe 設定全項目と `BILLING_ENFORCED=true` を要求し、MCP client は
+  空または `chatgpt` に限る。通常 Preview / Production / live key には適用できない。
+  build gate は DB control を開かず、Stripe account / Price の実在は API で別に照合する
 
 ## 公開 HTTP エンドポイント
 

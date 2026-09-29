@@ -172,8 +172,50 @@ function isBoundProductIntegration(env) {
   );
 }
 
+function assertIntegrationBillingRehearsalEnv(env) {
+  const flag = env.INTEGRATION_BILLING_REHEARSAL;
+  if (flag === undefined || flag === 'false') return false;
+  if (flag !== 'true' || !isBoundProductIntegration(env)) {
+    throw new Error(
+      'INTEGRATION_BILLING_REHEARSAL requires the fixed Product Integration identity',
+    );
+  }
+
+  const required = [
+    'STRIPE_SECRET_KEY',
+    'STRIPE_WEBHOOK_SECRET',
+    'STRIPE_ACCOUNT_ID',
+    'NEXT_PUBLIC_STRIPE_PRO_PRICE_ID',
+  ];
+  const missing = required.filter((name) => !hasNonEmptyValue(env, name));
+  if (missing.length > 0) {
+    throw new Error(`Integration billing rehearsal requires: ${missing.join(', ')}`);
+  }
+  if (
+    !/^sk_test_\S+$/.test(env.STRIPE_SECRET_KEY) ||
+    env.STRIPE_LIVEMODE !== 'false' ||
+    !/^whsec_\S+$/.test(env.STRIPE_WEBHOOK_SECRET) ||
+    !/^acct_[A-Za-z0-9_]+$/.test(env.STRIPE_ACCOUNT_ID) ||
+    !/^price_[A-Za-z0-9_]+$/.test(env.NEXT_PUBLIC_STRIPE_PRO_PRICE_ID)
+  ) {
+    throw new Error(
+      'Integration billing rehearsal requires complete Stripe test-mode configuration',
+    );
+  }
+  if (env.BILLING_ENFORCED !== 'true') {
+    throw new Error('Integration billing rehearsal requires BILLING_ENFORCED=true');
+  }
+  if (env.MCP_WRITE_ENABLED_CLIENTS && env.MCP_WRITE_ENABLED_CLIENTS !== 'chatgpt') {
+    throw new Error(
+      'Integration billing rehearsal allows only the chatgpt MCP client or no clients',
+    );
+  }
+  return true;
+}
+
 /** Validate the fixed always-on Integration project before accepting its Vercel Preview build. */
 export function assertProductIntegrationBuildEnv(env) {
+  const billingRehearsal = assertIntegrationBillingRehearsalEnv(env);
   if (!isProductIntegrationConfigured(env)) return false;
 
   const missingNames = REQUIRED_PRODUCT_INTEGRATION_BUILD_ENV.filter(
@@ -197,10 +239,10 @@ export function assertProductIntegrationBuildEnv(env) {
     throw new Error('Product Integration requires a hosted, environment-specific Upstash instance');
   }
 
-  if (env.MCP_WRITE_ENABLED_CLIENTS?.trim()) {
+  if (!billingRehearsal && env.MCP_WRITE_ENABLED_CLIENTS?.trim()) {
     throw new Error('Product Integration build requires MCP_WRITE_ENABLED_CLIENTS to be empty');
   }
-  if (env.BILLING_ENFORCED === 'true') {
+  if (!billingRehearsal && env.BILLING_ENFORCED === 'true') {
     throw new Error('Product Integration build forbids BILLING_ENFORCED=true');
   }
   if (env.POSTHOG_SERVER_ENABLED === 'true' || env.NEXT_PUBLIC_POSTHOG_BROWSER_ENABLED === 'true') {
@@ -345,6 +387,7 @@ function assertPreviewAppUrlMatchesVercel(env) {
  * This catches missing Preview wiring and accidental Production DB reuse at build time.
  */
 export function assertProductDeploymentEnvironmentBuildEnv(env) {
+  const billingRehearsal = assertIntegrationBillingRehearsalEnv(env);
   const vercelEnvironment = env.VERCEL_ENV;
   if (vercelEnvironment !== 'preview' && vercelEnvironment !== 'production') return false;
 
@@ -425,10 +468,10 @@ export function assertProductDeploymentEnvironmentBuildEnv(env) {
         'Product Preview sharing Integration Supabase cannot own an MCP OAuth identity',
       );
     }
-    if (env.BILLING_ENFORCED === 'true') {
+    if (!billingRehearsal && env.BILLING_ENFORCED === 'true') {
       throw new Error('Product Preview build forbids BILLING_ENFORCED=true');
     }
-    if (hasNonEmptyValue(env, 'MCP_WRITE_ENABLED_CLIENTS')) {
+    if (!billingRehearsal && hasNonEmptyValue(env, 'MCP_WRITE_ENABLED_CLIENTS')) {
       throw new Error('Product Preview build requires MCP_WRITE_ENABLED_CLIENTS to be empty');
     }
     return true;
