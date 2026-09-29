@@ -332,3 +332,19 @@ H024の反証追記: installed `@supabase/auth-js@2.116.0` のGoTrueClient.ts 40
 - 再現: 実route/service/identity +合成DB応答で、削除receipt有効のcheckout/updatedが500を返し、再送でも終端しないことを確認。分類とprofile取得の間に削除が入るfixtureも、最初の失敗後に再送が500のまま。red4 failed/10 passed（`/tmp/dayopt-audit-webhook-deleted-red.log`）。初回fixtureは分類hook未発火で競合自体が発生していなかったため棄却し、実際のprofile取得境界で削除状態へ変わるfixtureに直した結果だけを採用。
 - 修正/反証: durableのcheckout/updatedもprovider Event identity確認・event claim後、既存Customer分類を通す。有効receiptなら追加Subscription API/DB更新/通知へ進まずprocessedへ。未知/期限切れreceiptは既存serviceのFETCH_FAILED→500/claim解放を維持。分類live後のAuth削除は当該取得失敗を勝手に成功扱いにせず、次の再送のreceipt分類で終端する。legacyへ未導入RPCを追加しない。DB migration・receipt保持期間・課金権限は不変。
 - 検証: 同コマンドgreen14 passed。関連Webhook5 files/85 passed（`/tmp/dayopt-audit-webhook-deleted-regression.log`）。fixtureはreceiptの有効性判定結果を代替し、実DB expiry/lock・実Stripe・本番発生は未確認。expiry判定は既存SQL契約へ照合し、削除済みなら無条件に成功する実装はしない。
+
+## F037 — Supabaseの短縮SQL雛形が権限規則と現行helperに反する
+
+- 状態: 文書修正・docs:check成功。Mission #2963。DB/runtime変更なし。
+- 契約/根拠: 同skillの新規public object規則はREVOKE先行・GRANT・権限検査を同一migrationに要求する。全文確認したSQL雛形はREVOKE/権限検査を欠き、実際の現行migration集合にないhandle_updated_atを呼ぶ。archiveにだけ旧定義と廃止があり、現行baselineはupdate_updated_at。
+- 影響/反証: コピー時のmigration失敗・環境default ACL由来の過剰権限の候補。既存の稼働DBにこの雛形が適用された事実や本番漏洩を確認したものではない。RLSはTRUNCATEを防がず、既存規則を短縮雛形が打ち消す状態は残さない。
+- 修正: 重複した不完全SQLを撤去し、同skillが既に指定するcreate_segments migrationへ参照を一本化。参照先193行を全文確認、REVOKE先行/role別GRANT/DO権限検査/現行updated_at helperを照合。policyとgrantは対象の操作境界へ合わせる旨を明記。新しいルールやDB migrationは足さない。
+- 検証: Node24 pnpm docs:check exit 0（`/tmp/dayopt-audit-supabase-template-docs.log`）、相対参照先の存在/現行内容とdiffを確認。文書変更であり実SQL red/greenや本番実測とは報告しない。
+
+## H038 — insert Undoのfull maskと現在のmutable列が一致しない候補
+
+- 状態: 原契約/現行SQLによる候補、実DB再現前・未採用。Mission #2963で継続。
+- 契約: #2434本文と9コメントを全文取得。updateはmask内の値比較・ABA許容、insertの逆操作は行全体削除なので失われる全mutable fieldとlifecycleをguardする。行単位CASへ引き戻さない。ctx2434も取得し、古い設計レビューを現在の運用指示へ読み替えない。
+- 根拠: current contraction migrationのundo_full_maskはdeleted_at/end_at/note/start_at/titleのみ。record commandはactivity_id/fulfillmentを更新できる。一方record_undo_receiptのfull-mask一致検査とapplyのDELETEは保存field changesだけをCASにするため、事後のactivity/fulfillment更新がmask外に残る可能性。create_segments例の安全性とは別原因。
+- 反証/範囲: repoのruntime TSで当該record/apply RPCのliteral callsiteは検索範囲で見つからず、現在はDB substrate/統合testに限る。動的呼出し・実環境・実DB再現は未確認。既存のmask内note編集は保護され、update effectへfull-row CASを追加する修正は不適切。
+- 次: substrate/record RPCと統合testの残り全文を読み、insert receipt後のactivity/fulfillment更新を隔離DBで再現する。既存receiptの短期TTL/保持/互換条件とconsumer計画を照合し、新しい列をblindに必須化しない。実DB対象の確認が必要であり、共有activationや本番へ検査を向けない。

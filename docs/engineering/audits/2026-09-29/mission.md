@@ -228,3 +228,11 @@ generic account deletion gate integration1747行の残りを省略なく読解�
 公開head `bd2e99fe97707ffad897b517e1839dee12e324a6`を通常pre-push（型/lint/scripts2645/format）経由でDraft #2965へpushし、APIでOPEN/isDraft=true/headを確認。ログ `/tmp/dayopt-audit-webhook-push-verified.log`。PR本文もF035/F036と7631全体成功へ更新。mainへのmergeなし。
 
 公開後にwriter serialization674行とrevision fence874行を全文確認し、baseline bytes一致を確認。基準全文373件、機械1、未確認2767。後続revision fenceの最後のexclusive helperはtransaction user/lock mode bind→auth parent KEY SHARE→同user advisory lockで、旧helperだけから結論を出さない。後続migration検索では更なるexclusive helper再定義なし。shared→exclusive upgradeは先に拒否され、H034の単純なlock待ち候補と別の境界として保持。DB実行なし。通知previous_attributesと最新Stripe状態の組合せは未採用候補で続ける。次の読解は後続のcommand/gateとrevision marker利用側の整合。
+
+## command・revision・互換処理と作業指示の照合
+
+前回turnはF036を含むDraft公開head bd2e99fe9と371件の読解、公開後のlock helper2件をe83a19598へ保存したprogress。今回同clean HEADからcommand/service/router/context/既存integration/独立Plan-Record migration/旧wrapper/skillの20件を追加全文確認。baseline bytes一致、基準全文393件、機械1、未確認2747。大きなSQL・integration・skillは分割し、skillの初回切詰めは再取得した。検索結果だけを全文確認へ昇格しない。
+
+認証ownerの明示・raw microsecond CAS・部分更新の現在行補完・DB source shape・Planから独立Record作成・confirm-dayの26時間上限を照合。旧soft-delete/restore wrapperは後続migrationでserialized/private経路へ再接続され、service_role revokeの古い行だけを根拠に現行testが壊れていると判断しない。skip列の撤去後stubと旧insert Undo receipt互換も全文確認。revision/timezone一致・exact count・共有20秒deadlineと再読1回の範囲を確認。ローカルDB専用testは未実行で、今回新たな全体checkは不要な文書差分のみ。前回7631成功を新しいDB実測へ拡張しない。
+
+F037としてSupabase skillの不完全SQL雛形を現行安全例への参照へ修正しdocs:check成功。H038としてinsert Undoのfull maskが現在のactivity/fulfillmentを含まない候補を保存。#2434本文/9コメント/ctxを取得、検索範囲でruntime callsiteが未検出のDB substrateと稼働機能を区別して続ける。次はUndo substrate/record RPC/統合testの全文、receipt互換とconsumer計画を確認して採否を決める。H034とクラウド認証不能の独立境界は未確認のまま。今回DB・本番変更なし、全体監査未完了。

@@ -441,10 +441,12 @@
       "mode": "100644",
       "bytes": 30696,
       "method": "full-text",
-      "status": "unverified",
-      "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "status": "full-text-reviewed",
+      "reason": "Full first-party text read and baseline bytes confirmed; runtime/environment evidence is tracked separately.",
+      "read_ranges": [[1, 550]],
+      "evidence": [
+        "Full untruncated reading at e83a19598 in this continuation, baseline bytes match. Larger SQL/integration files read in bounded consecutive chunks; initial Supabase skill output was truncated and recovered as 1-170/171-340/341-520/521-550. Current command owner/CAS/source and revision/timezone page boundaries cross-checked; local-only integration fixtures not executed. F037 corrects only skill SQL example after reading."
+      ],
       "questions": []
     },
     {
@@ -12119,10 +12121,12 @@
       "mode": "100644",
       "bytes": 1956,
       "method": "full-text",
-      "status": "unverified",
-      "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "status": "full-text-reviewed",
+      "reason": "Full first-party text read and baseline bytes confirmed; runtime/environment evidence is tracked separately.",
+      "read_ranges": [[1, 48]],
+      "evidence": [
+        "Full untruncated reading at e83a19598 in this continuation, baseline bytes match. Larger SQL/integration files read in bounded consecutive chunks; initial Supabase skill output was truncated and recovered as 1-170/171-340/341-520/521-550. Current command owner/CAS/source and revision/timezone page boundaries cross-checked; local-only integration fixtures not executed. F037 corrects only skill SQL example after reading."
+      ],
       "questions": []
     },
     {
@@ -16488,10 +16492,12 @@
       "mode": "100644",
       "bytes": 4705,
       "method": "full-text",
-      "status": "unverified",
-      "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "status": "full-text-reviewed",
+      "reason": "Full first-party text read and baseline bytes confirmed; runtime/environment evidence is tracked separately.",
+      "read_ranges": [[1, 135]],
+      "evidence": [
+        "Full untruncated reading at e83a19598 in this continuation, baseline bytes match. Larger SQL/integration files read in bounded consecutive chunks; initial Supabase skill output was truncated and recovered as 1-170/171-340/341-520/521-550. Current command owner/CAS/source and revision/timezone page boundaries cross-checked; local-only integration fixtures not executed. F037 corrects only skill SQL example after reading."
+      ],
       "questions": []
     },
     {
@@ -16637,10 +16643,12 @@
       "mode": "100644",
       "bytes": 2794,
       "method": "full-text",
-      "status": "unverified",
-      "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "status": "full-text-reviewed",
+      "reason": "Full first-party text read and baseline bytes confirmed; runtime/environment evidence is tracked separately.",
+      "read_ranges": [[1, 83]],
+      "evidence": [
+        "Full untruncated reading at e83a19598 in this continuation, baseline bytes match. Larger SQL/integration files read in bounded consecutive chunks; initial Supabase skill output was truncated and recovered as 1-170/171-340/341-520/521-550. Current command owner/CAS/source and revision/timezone page boundaries cross-checked; local-only integration fixtures not executed. F037 corrects only skill SQL example after reading."
+      ],
       "questions": []
     },
     {
@@ -16888,10 +16896,12 @@
       "mode": "100644",
       "bytes": 8501,
       "method": "full-text",
-      "status": "unverified",
-      "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "status": "full-text-reviewed",
+      "reason": "Full first-party text read and baseline bytes confirmed; runtime/environment evidence is tracked separately.",
+      "read_ranges": [[1, 233]],
+      "evidence": [
+        "Full untruncated reading at e83a19598 in this continuation, baseline bytes match. Larger SQL/integration files read in bounded consecutive chunks; initial Supabase skill output was truncated and recovered as 1-170/171-340/341-520/521-550. Current command owner/CAS/source and revision/timezone page boundaries cross-checked; local-only integration fixtures not executed. F037 corrects only skill SQL example after reading."
+      ],
       "questions": []
     },
     {
@@ -16901,10 +16911,12 @@
       "mode": "100644",
       "bytes": 11289,
       "method": "full-text",
-      "status": "unverified",
-      "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "status": "full-text-reviewed",
+      "reason": "Full first-party text read and baseline bytes confirmed; runtime/environment evidence is tracked separately.",
+      "read_ranges": [[1, 365]],
+      "evidence": [
+        "Full untruncated reading at e83a19598 in this continuation, baseline bytes match. Larger SQL/integration files read in bounded consecutive chunks; initial Supabase skill output was truncated and recovered as 1-170/171-340/341-520/521-550. Current command owner/CAS/source and revision/timezone page boundaries cross-checked; local-only integration fixtures not executed. F037 corrects only skill SQL example after reading."
+      ],
       "questions": []
     },
     {
@@ -16914,10 +16926,12 @@
       "mode": "100644",
       "bytes": 5983,
       "method": "full-text",
-      "status": "unverified",
-      "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "status": "full-text-reviewed",
+      "reason": "Full first-party text read and baseline bytes confirmed; runtime/environment evidence is tracked separately.",
+      "read_ranges": [[1, 163]],
+      "evidence": [
+        "Full untruncated reading at e83a19598 in this continuation, baseline bytes match. Larger SQL/integration files read in bounded consecutive chunks; initial Supabase skill output was truncated and recovered as 1-170/171-340/341-520/521-550. Current command owner/CAS/source and revision/timezone page boundaries cross-checked; local-only integration fixtures not executed. F037 corrects only skill SQL example after reading."
+      ],
       "questions": []
     },
     {
@@ -16927,10 +16941,12 @@
       "mode": "100644",
       "bytes": 7909,
       "method": "full-text",
-      "status": "unverified",
-      "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "status": "full-text-reviewed",
+      "reason": "Full first-party text read and baseline bytes confirmed; runtime/environment evidence is tracked separately.",
+      "read_ranges": [[1, 242]],
+      "evidence": [
+        "Full untruncated reading at e83a19598 in this continuation, baseline bytes match. Larger SQL/integration files read in bounded consecutive chunks; initial Supabase skill output was truncated and recovered as 1-170/171-340/341-520/521-550. Current command owner/CAS/source and revision/timezone page boundaries cross-checked; local-only integration fixtures not executed. F037 corrects only skill SQL example after reading."
+      ],
       "questions": []
     },
     {
@@ -16940,10 +16956,12 @@
       "mode": "100644",
       "bytes": 8596,
       "method": "full-text",
-      "status": "unverified",
-      "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "status": "full-text-reviewed",
+      "reason": "Full first-party text read and baseline bytes confirmed; runtime/environment evidence is tracked separately.",
+      "read_ranges": [[1, 249]],
+      "evidence": [
+        "Full untruncated reading at e83a19598 in this continuation, baseline bytes match. Larger SQL/integration files read in bounded consecutive chunks; initial Supabase skill output was truncated and recovered as 1-170/171-340/341-520/521-550. Current command owner/CAS/source and revision/timezone page boundaries cross-checked; local-only integration fixtures not executed. F037 corrects only skill SQL example after reading."
+      ],
       "questions": []
     },
     {
@@ -16953,10 +16971,12 @@
       "mode": "100644",
       "bytes": 5555,
       "method": "full-text",
-      "status": "unverified",
-      "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "status": "full-text-reviewed",
+      "reason": "Full first-party text read and baseline bytes confirmed; runtime/environment evidence is tracked separately.",
+      "read_ranges": [[1, 174]],
+      "evidence": [
+        "Full untruncated reading at e83a19598 in this continuation, baseline bytes match. Larger SQL/integration files read in bounded consecutive chunks; initial Supabase skill output was truncated and recovered as 1-170/171-340/341-520/521-550. Current command owner/CAS/source and revision/timezone page boundaries cross-checked; local-only integration fixtures not executed. F037 corrects only skill SQL example after reading."
+      ],
       "questions": []
     },
     {
@@ -16966,10 +16986,12 @@
       "mode": "100644",
       "bytes": 4219,
       "method": "full-text",
-      "status": "unverified",
-      "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "status": "full-text-reviewed",
+      "reason": "Full first-party text read and baseline bytes confirmed; runtime/environment evidence is tracked separately.",
+      "read_ranges": [[1, 137]],
+      "evidence": [
+        "Full untruncated reading at e83a19598 in this continuation, baseline bytes match. Larger SQL/integration files read in bounded consecutive chunks; initial Supabase skill output was truncated and recovered as 1-170/171-340/341-520/521-550. Current command owner/CAS/source and revision/timezone page boundaries cross-checked; local-only integration fixtures not executed. F037 corrects only skill SQL example after reading."
+      ],
       "questions": []
     },
     {
@@ -16994,10 +17016,12 @@
       "mode": "100644",
       "bytes": 773,
       "method": "full-text",
-      "status": "unverified",
-      "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "status": "full-text-reviewed",
+      "reason": "Full first-party text read and baseline bytes confirmed; runtime/environment evidence is tracked separately.",
+      "read_ranges": [[1, 22]],
+      "evidence": [
+        "Full untruncated reading at e83a19598 in this continuation, baseline bytes match. Larger SQL/integration files read in bounded consecutive chunks; initial Supabase skill output was truncated and recovered as 1-170/171-340/341-520/521-550. Current command owner/CAS/source and revision/timezone page boundaries cross-checked; local-only integration fixtures not executed. F037 corrects only skill SQL example after reading."
+      ],
       "questions": []
     },
     {
@@ -17007,10 +17031,12 @@
       "mode": "100644",
       "bytes": 3126,
       "method": "full-text",
-      "status": "unverified",
-      "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "status": "full-text-reviewed",
+      "reason": "Full first-party text read and baseline bytes confirmed; runtime/environment evidence is tracked separately.",
+      "read_ranges": [[1, 111]],
+      "evidence": [
+        "Full untruncated reading at e83a19598 in this continuation, baseline bytes match. Larger SQL/integration files read in bounded consecutive chunks; initial Supabase skill output was truncated and recovered as 1-170/171-340/341-520/521-550. Current command owner/CAS/source and revision/timezone page boundaries cross-checked; local-only integration fixtures not executed. F037 corrects only skill SQL example after reading."
+      ],
       "questions": []
     },
     {
@@ -21114,10 +21140,12 @@
       "mode": "100644",
       "bytes": 187,
       "method": "full-text",
-      "status": "unverified",
-      "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "status": "full-text-reviewed",
+      "reason": "Full first-party text read and baseline bytes confirmed; runtime/environment evidence is tracked separately.",
+      "read_ranges": [[1, 5]],
+      "evidence": [
+        "Full untruncated reading at e83a19598 in this continuation, baseline bytes match. Larger SQL/integration files read in bounded consecutive chunks; initial Supabase skill output was truncated and recovered as 1-170/171-340/341-520/521-550. Current command owner/CAS/source and revision/timezone page boundaries cross-checked; local-only integration fixtures not executed. F037 corrects only skill SQL example after reading."
+      ],
       "questions": []
     },
     {
@@ -21127,10 +21155,12 @@
       "mode": "100644",
       "bytes": 18984,
       "method": "full-text",
-      "status": "unverified",
-      "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "status": "full-text-reviewed",
+      "reason": "Full first-party text read and baseline bytes confirmed; runtime/environment evidence is tracked separately.",
+      "read_ranges": [[1, 549]],
+      "evidence": [
+        "Full untruncated reading at e83a19598 in this continuation, baseline bytes match. Larger SQL/integration files read in bounded consecutive chunks; initial Supabase skill output was truncated and recovered as 1-170/171-340/341-520/521-550. Current command owner/CAS/source and revision/timezone page boundaries cross-checked; local-only integration fixtures not executed. F037 corrects only skill SQL example after reading."
+      ],
       "questions": []
     },
     {
@@ -21140,10 +21170,12 @@
       "mode": "100644",
       "bytes": 15722,
       "method": "full-text",
-      "status": "unverified",
-      "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "status": "full-text-reviewed",
+      "reason": "Full first-party text read and baseline bytes confirmed; runtime/environment evidence is tracked separately.",
+      "read_ranges": [[1, 552]],
+      "evidence": [
+        "Full untruncated reading at e83a19598 in this continuation, baseline bytes match. Larger SQL/integration files read in bounded consecutive chunks; initial Supabase skill output was truncated and recovered as 1-170/171-340/341-520/521-550. Current command owner/CAS/source and revision/timezone page boundaries cross-checked; local-only integration fixtures not executed. F037 corrects only skill SQL example after reading."
+      ],
       "questions": []
     },
     {
@@ -38141,10 +38173,12 @@
       "mode": "100644",
       "bytes": 6831,
       "method": "full-text",
-      "status": "unverified",
-      "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "status": "full-text-reviewed",
+      "reason": "Full first-party text read and baseline bytes confirmed; runtime/environment evidence is tracked separately.",
+      "read_ranges": [[1, 237]],
+      "evidence": [
+        "Full untruncated reading at e83a19598 in this continuation, baseline bytes match. Larger SQL/integration files read in bounded consecutive chunks; initial Supabase skill output was truncated and recovered as 1-170/171-340/341-520/521-550. Current command owner/CAS/source and revision/timezone page boundaries cross-checked; local-only integration fixtures not executed. F037 corrects only skill SQL example after reading."
+      ],
       "questions": []
     },
     {
@@ -39304,10 +39338,12 @@
       "mode": "100644",
       "bytes": 9773,
       "method": "full-text",
-      "status": "unverified",
-      "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "status": "full-text-reviewed",
+      "reason": "Full first-party text read and baseline bytes confirmed; runtime/environment evidence is tracked separately.",
+      "read_ranges": [[1, 193]],
+      "evidence": [
+        "Full untruncated reading at e83a19598 in this continuation, baseline bytes match. Larger SQL/integration files read in bounded consecutive chunks; initial Supabase skill output was truncated and recovered as 1-170/171-340/341-520/521-550. Current command owner/CAS/source and revision/timezone page boundaries cross-checked; local-only integration fixtures not executed. F037 corrects only skill SQL example after reading."
+      ],
       "questions": []
     },
     {
@@ -39635,10 +39671,12 @@
       "mode": "100644",
       "bytes": 35116,
       "method": "full-text",
-      "status": "unverified",
-      "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "status": "full-text-reviewed",
+      "reason": "Full first-party text read and baseline bytes confirmed; runtime/environment evidence is tracked separately.",
+      "read_ranges": [[1, 1067]],
+      "evidence": [
+        "Full untruncated reading at e83a19598 in this continuation, baseline bytes match. Larger SQL/integration files read in bounded consecutive chunks; initial Supabase skill output was truncated and recovered as 1-170/171-340/341-520/521-550. Current command owner/CAS/source and revision/timezone page boundaries cross-checked; local-only integration fixtures not executed. F037 corrects only skill SQL example after reading."
+      ],
       "questions": []
     },
     {
@@ -39648,10 +39686,12 @@
       "mode": "100644",
       "bytes": 10990,
       "method": "full-text",
-      "status": "unverified",
-      "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "status": "full-text-reviewed",
+      "reason": "Full first-party text read and baseline bytes confirmed; runtime/environment evidence is tracked separately.",
+      "read_ranges": [[1, 295]],
+      "evidence": [
+        "Full untruncated reading at e83a19598 in this continuation, baseline bytes match. Larger SQL/integration files read in bounded consecutive chunks; initial Supabase skill output was truncated and recovered as 1-170/171-340/341-520/521-550. Current command owner/CAS/source and revision/timezone page boundaries cross-checked; local-only integration fixtures not executed. F037 corrects only skill SQL example after reading."
+      ],
       "questions": []
     },
     {
