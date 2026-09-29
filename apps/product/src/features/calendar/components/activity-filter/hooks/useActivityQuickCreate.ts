@@ -38,20 +38,20 @@ import {
   useTimeblockWriteMutations,
 } from '@/features/timeblock';
 import { formatTimeString } from '@/lib/date';
-import { convertFromTimezone } from '@/lib/date/timezone';
+import { convertFromTimezone, convertToTimezone } from '@/lib/date/timezone';
 import { useUserPreferences } from '@/lib/hooks/useUserPreferences';
 import { toast } from '@/lib/toast';
 
 /** 開始時刻の既定: 対象日が今日なら現在時刻を次の 1 分境界へ ceil、それ以外は 09:00 */
-function defaultStartAt(forDate: Date): Date {
+function defaultStartAt(forDate: Date | undefined, timezone: string): Date {
   const now = new Date();
-  if (isSameDay(forDate, now)) {
+  if (!forDate || isSameDay(forDate, convertToTimezone(now, timezone))) {
     const ONE_MIN_MS = 60 * 1000;
     return new Date(Math.ceil(now.getTime() / ONE_MIN_MS) * ONE_MIN_MS);
   }
   const start = startOfDay(forDate);
   start.setHours(9, 0, 0, 0);
-  return start;
+  return convertFromTimezone(start, timezone);
 }
 
 interface QuickCreateArgs {
@@ -83,11 +83,10 @@ export function useActivityQuickCreate() {
         openSettings('billing');
         return;
       }
-      const localStart = defaultStartAt(date ?? new Date());
+      const defaultStart = defaultStartAt(date, timezone);
+      const localStart = convertToTimezone(defaultStart, timezone);
       const durationMinutes = getMedianMinutes(activityId) ?? defaultDuration;
-      const localEnd = new Date(localStart.getTime() + durationMinutes * 60 * 1000);
-      const defaultStart = convertFromTimezone(localStart, timezone);
-      const defaultEnd = convertFromTimezone(localEnd, timezone);
+      const defaultEnd = new Date(defaultStart.getTime() + durationMinutes * 60 * 1000);
       // 探す範囲はその日の終わりまで。翌日へ飛ばされる方が、作れないより驚く
       const searchLimit = convertFromTimezone(endOfDay(localStart), timezone);
 
@@ -105,9 +104,9 @@ export function useActivityQuickCreate() {
       const { startAt, endAt } = slot;
       const destination = resolveTimeblockDestination(endAt);
       // ずらしたなら、いつに作ったかを知らせる。押した時間と違う場所に現れる方が驚く。
-      // ずれ幅は UTC でも壁時計でも同じなので、既定の開始へ足して表示用の時刻にする
+      // DST切替を跨ぐ場合も、最終実時刻から設定timezoneの表示時刻を得る。
       const shiftedMs = startAt.getTime() - defaultStart.getTime();
-      const shiftedLocalStart = new Date(localStart.getTime() + shiftedMs);
+      const shiftedLocalStart = convertToTimezone(startAt, timezone);
 
       // ずらした結果 end_at が now を跨いでレーンが変わったら、移った先で見直す
       if (destination !== resolveTimeblockDestination(defaultEnd)) {

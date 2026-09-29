@@ -2129,7 +2129,7 @@ graph LR
 </details>
 
 <details>
-<summary>test の候補（97）</summary>
+<summary>test の候補（101）</summary>
 
 <!-- prettier-ignore -->
 | ファイル | 対応の根拠 |
@@ -2169,15 +2169,19 @@ graph LR
 | [apps/product/src/features/calendar/components/views/shared/hooks/useContainerHeight.test.ts](<../../../apps/product/src/features/calendar/components/views/shared/hooks/useContainerHeight.test.ts>) | feature: calendar |
 | [apps/product/src/features/calendar/components/views/shared/hooks/useCurrentTime.test.ts](<../../../apps/product/src/features/calendar/components/views/shared/hooks/useCurrentTime.test.ts>) | feature: calendar |
 | [apps/product/src/features/calendar/components/views/shared/hooks/useCurrentTimeLine.test.ts](<../../../apps/product/src/features/calendar/components/views/shared/hooks/useCurrentTimeLine.test.ts>) | feature: calendar |
+| [apps/product/src/features/calendar/components/views/shared/hooks/useMultiDayTimeblockPositions.test.ts](<../../../apps/product/src/features/calendar/components/views/shared/hooks/useMultiDayTimeblockPositions.test.ts>) | feature: calendar |
 | [apps/product/src/features/calendar/components/views/shared/hooks/useResponsiveHourHeight.test.ts](<../../../apps/product/src/features/calendar/components/views/shared/hooks/useResponsiveHourHeight.test.ts>) | feature: calendar |
 | [apps/product/src/features/calendar/components/views/shared/hooks/useScrollableCalendar.test.ts](<../../../apps/product/src/features/calendar/components/views/shared/hooks/useScrollableCalendar.test.ts>) | feature: calendar |
 | [apps/product/src/features/calendar/components/views/shared/hooks/useScrollTimeblockIntoView.test.tsx](<../../../apps/product/src/features/calendar/components/views/shared/hooks/useScrollTimeblockIntoView.test.tsx>) | feature: calendar |
+| [apps/product/src/features/calendar/components/views/shared/hooks/useTimeblocksByDate.test.ts](<../../../apps/product/src/features/calendar/components/views/shared/hooks/useTimeblocksByDate.test.ts>) | feature: calendar |
+| [apps/product/src/features/calendar/components/views/shared/hooks/useViewTimeblocks.test.ts](<../../../apps/product/src/features/calendar/components/views/shared/hooks/useViewTimeblocks.test.ts>) | feature: calendar |
 | [apps/product/src/features/calendar/components/views/shared/utils/dateHelpers.test.ts](<../../../apps/product/src/features/calendar/components/views/shared/utils/dateHelpers.test.ts>) | feature: calendar |
 | [apps/product/src/features/calendar/components/views/shared/utils/getTodayIndex.test.ts](<../../../apps/product/src/features/calendar/components/views/shared/utils/getTodayIndex.test.ts>) | feature: calendar |
 | [apps/product/src/features/calendar/components/views/shared/utils/interactionHelpers.test.ts](<../../../apps/product/src/features/calendar/components/views/shared/utils/interactionHelpers.test.ts>) | feature: calendar |
 | [apps/product/src/features/calendar/components/views/shared/utils/timeblockSorting.test.ts](<../../../apps/product/src/features/calendar/components/views/shared/utils/timeblockSorting.test.ts>) | feature: calendar |
 | [apps/product/src/features/calendar/components/views/WeekView/components/MobileWeekLaneSwitcher.test.tsx](<../../../apps/product/src/features/calendar/components/views/WeekView/components/MobileWeekLaneSwitcher.test.tsx>) | feature: calendar |
 | [apps/product/src/features/calendar/components/views/WeekView/components/WeekGrid.test.tsx](<../../../apps/product/src/features/calendar/components/views/WeekView/components/WeekGrid.test.tsx>) | feature: calendar |
+| [apps/product/src/features/calendar/components/views/WeekView/hooks/useWeekTimeblocks.test.ts](<../../../apps/product/src/features/calendar/components/views/WeekView/hooks/useWeekTimeblocks.test.ts>) | feature: calendar |
 | [apps/product/src/features/calendar/components/views/WeekView/useWeekTimeblocks.test.ts](<../../../apps/product/src/features/calendar/components/views/WeekView/useWeekTimeblocks.test.ts>) | feature: calendar |
 | [apps/product/src/features/calendar/components/views/WeekView/utils/weekTimeblockPosition.test.ts](<../../../apps/product/src/features/calendar/components/views/WeekView/utils/weekTimeblockPosition.test.ts>) | feature: calendar |
 | [apps/product/src/features/calendar/domain/activity-visibility.test.ts](<../../../apps/product/src/features/calendar/domain/activity-visibility.test.ts>) | feature: calendar |
@@ -2362,7 +2366,7 @@ graph LR
 </details>
 
 <details>
-<summary>test の候補（60）</summary>
+<summary>test の候補（61）</summary>
 
 <!-- prettier-ignore -->
 | ファイル | 対応の根拠 |
@@ -2386,6 +2390,7 @@ graph LR
 | [apps/product/src/features/settings/hooks/useDateFormat.test.ts](<../../../apps/product/src/features/settings/hooks/useDateFormat.test.ts>) | feature: settings |
 | [apps/product/src/features/settings/hooks/useMFA.test.ts](<../../../apps/product/src/features/settings/hooks/useMFA.test.ts>) | feature: settings |
 | [apps/product/src/features/settings/hooks/useStableBillingOperation.test.ts](<../../../apps/product/src/features/settings/hooks/useStableBillingOperation.test.ts>) | feature: settings |
+| [apps/product/src/features/settings/hooks/useTrialEndedDialog.test.ts](<../../../apps/product/src/features/settings/hooks/useTrialEndedDialog.test.ts>) | feature: settings |
 | [apps/product/src/features/settings/hooks/useUserSettings.test.ts](<../../../apps/product/src/features/settings/hooks/useUserSettings.test.ts>) | feature: settings |
 | [apps/product/src/features/settings/lib/billing-operation.test.ts](<../../../apps/product/src/features/settings/lib/billing-operation.test.ts>) | feature: settings |
 | [apps/product/src/features/settings/lib/billing-poll-observability.test.ts](<../../../apps/product/src/features/settings/lib/billing-poll-observability.test.ts>) | feature: settings |

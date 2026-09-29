@@ -1,7 +1,11 @@
 import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
 
-const FILES = new Set(['critical-path.spec.ts', 'mobile-critical-path.spec.ts']);
+const FILES = new Set([
+  'critical-path.spec.ts',
+  'mobile-critical-path.spec.ts',
+  'preview-authorization.spec.ts',
+]);
 const PROJECTS = new Set(['chromium', 'Mobile Chrome']);
 const CATEGORIES = new Set(['expect', 'pw:api', 'test.step', 'fixture', 'hook']);
 
