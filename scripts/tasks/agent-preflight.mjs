@@ -2,6 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { accessSync, constants, existsSync, readFileSync } from 'node:fs';
 import { delimiter, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { collectOnePasswordConfig } from './agent-service-account.mjs';
 
 // SessionStart の外側 timeout は 10 秒（.codex/hooks.json）。外部 command は
 // gh と pnpm を逐次確認するため、各々に同じ短い上限を持たせて合計を内側に収める。
@@ -168,6 +169,7 @@ export function collectPreflight(cwd = process.cwd()) {
     hooks,
     cli,
     ghIdentity,
+    onePassword: collectOnePasswordConfig(),
     skills,
     // Presence is not proof of runtime activation or trust.
     codexHooks: existsSync(join(root, '.codex/hooks.json'))
@@ -210,6 +212,7 @@ export function renderPreflight(state) {
     `**Codex hooks**: ${state.codexHooks}`,
     `**Read-only delegation**: wrapper:${state.readOnlyDelegation?.wrapper ? 'yes' : 'no'} codex:${state.readOnlyDelegation?.codex ? 'yes' : 'no'} claude:${state.readOnlyDelegation?.claude ? 'yes' : 'no'}; native: ${state.readOnlyDelegation?.native ?? 'unverified'}`,
     `**gh identity**: ${renderGhIdentity(state.ghIdentity)}`,
+    `**1Password**: ${state.onePassword?.tokenPresent ? 'Service Account 設定あり（認証・scope は未検証）' : 'Service Account 未設定'} | vault 権限:未検証 | 実行環境の分離:未検証`,
   ];
   if (state.ghIdentity?.broadScopes.length)
     lines.push(

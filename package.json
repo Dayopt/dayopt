@@ -110,7 +110,9 @@
     "build-storybook": "pnpm --filter @dayopt/storybook build",
     "build:web": "pnpm --filter @dayopt/web build",
     "test:web": "pnpm --filter @dayopt/web test",
-    "agent:preflight": "node scripts/tasks/agent-preflight.mjs"
+    "agent:preflight": "node scripts/tasks/agent-preflight.mjs",
+    "agent:secrets:check": "node scripts/tasks/agent-service-account.mjs check",
+    "agent:run": "node scripts/tasks/agent-service-account.mjs run"
   },
   "devDependencies": {
     "zod": "4.3.6",

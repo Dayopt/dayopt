@@ -392,21 +392,53 @@ AI_GATEWAY_API_KEY="op://agent/vercel-ai-gateway/credential" op run -- pnpm jev:
 
 **rotation**: §短命トークンのローテーション に従う。期限切れは `pnpm jev:*` の `auth_failed` で表面化する。運用手順と停止方法は [jev.md](./jev.md)。
 
-## Service Account（無人実行用、設計のみ・未導入）
+## Service Account
 
-策定日: 2026-08-17（[#2086](https://github.com/Dayopt/dayopt/issues/2086) 残 scope、User 裁可）。**本節は設計の記録であり、実装は未着手**。1Password 側の Service Account 作成・token 発行は 1Password への実操作を伴うため、このレーンの PR には含めない（merge 後に手作業レーンへ振る）。
+2026-09-30、User は Service Account 作成済みと報告し、ルールだけの vault 制限を権限と実行環境の分離へ移す方針を承認した。実行先は**専用クラウド環境**とする。2026-08-17 の「無人実行のみ・対話的 desktop 統合は変更しない」という適用範囲を更新し、対話・無人とも同じ境界に揃える。クラウドの provider / 接続先、作成済み SA の権限、token 注入は未確認であり、現行 Mac セッションの隔離完了を意味しない。
 
-**ただしこの「手作業レーンへ振る」は現時点でプラン制約により保留**（2026-08-17 実測確認）。1Password の Service Account は Business / Teams プラン限定で、現行の Family プランでは作成できない。再検討トリガーはプラン変更（Business/Teams への移行）。
+### 権限と実行環境
 
-**目的**: 夜間自律実行・cron のような無人実行が、人間の 1Password desktop 統合セッションの承認プロンプトを介さずに `op run` を通すための経路。対話的セッション（現行の desktop 統合）はこの節の対象外で、変更しない。
+- SA は `agent` vault の **`read_items` のみ**。`write_items` / `share_items` / vault 作成 / 1Password Environments へのアクセスは付けない。権限と vault の変更には SA の作り直しが必要（[公式仕様](https://www.1password.dev/service-accounts/get-started)）。vault の read-only は 1Password 内の権限であり、保存した API credential の外部サービス上の権限とは別。
+- agent は人間用 Mac から分離したクラウド環境で動かす。人間用の 1Password app / browser profile / CLI session / Keychain / home directory を配置・mount・同期しない。Mac のファイルやアプリを操作できる tool / MCP 接続も持ち込まない。
+- VM を採る場合は admin と実行 user を分け、agent に sudo、host socket、他環境の secret を読める cloud role を与えない。SSH agent forwarding は使わない。これらは provider 側の設定と live 証跡で確認する。repo の wrapper は OS や cloud role の権限境界ではない。
+- 人間用環境は `human` / `ci` の管理を持つ。切替のために、別作業中の Mac の認証設定・worktree を変更しない。旧セッションを停止し、必要な作業を専用環境へ移してから切替完了とする。
 
-**scope（決定）**: **`agent` vault の read-only のみ**。`human` / `ci` への到達権限は持たせない。これは pre-tool-guard-rules.mjs が消費側で強制している vault allowlist（`agent` のみ通す、上記「AI エージェントの env ファイル境界」節）と同じ境界を、1Password 側の権限設定でも二重に持つ形になる。
+### 起動契約
 
-**認証方式**: `OP_SERVICE_ACCOUNT_TOKEN` 環境変数を設定したプロセスでは `op` CLI が Service Account モードで動作し、desktop 統合を経由しない。SA token が `agent` vault read-only にしか scope されていなければ、そのプロセスから `human` / `ci` を参照する `op://` は 1Password サーバー側で拒否される（hook の正規表現マッチではなく、1Password 自体の権限モデルによる拒否）。
+実装は [`scripts/tasks/agent-service-account.mjs`](../../scripts/tasks/agent-service-account.mjs)。CLI が確認する metadata と platform 側で確認する隔離を区別する。
 
-**SA token 自体の保管（循環問題）**: SA token は「1Password を読むための鍵」なので、1Password 自身には保管できない。導入時点で **bootstrap 例外台帳の初件**になる（下記「Bootstrap 例外台帳」を参照）。保管場所（OS keychain、GitHub Secrets、その他）は導入時に手作業レーンが決定する。
+| 入力                              | 扱い                                                                                    |
+| --------------------------------- | --------------------------------------------------------------------------------------- |
+| `OP_SERVICE_ACCOUNT_TOKEN`        | クラウドの秘密ストアから実行 process へ注入。値を repo / shell 設定 / chat に保存しない |
+| `DAYOPT_AGENT_SERVICE_ACCOUNT_ID` | 管理画面で確認した SA の user ID。秘密ではない。起動する identity を pin する           |
+| `DAYOPT_AGENT_VAULT_ID`           | 管理画面で確認した `agent` vault の ID。秘密ではない。同名の別 vault を許可しない       |
 
-**inline `op://` 経路への効果（上記「AI エージェントの env ファイル境界」§閉じない境界 の再訪）**: 無人実行コンテキストに限り、SA が `human` / `ci` への読み取り権限を持たないため、env-file を経由しない `VAR="op://human/…" op run` のような inline 参照も構造的に失敗する。**対話的 desktop 統合セッションでは変更なし**（1Password 側の承認プロンプトが引き続き実効的な抑止点）。
+起動前に token と ID の存在を検査する。`OP_CONNECT_*`（SA より認証の優先順位が高い）、`OP_SESSION*`、`OP_ACCOUNT` を継承せず、private な一時 `OP_CONFIG_DIR`、`OP_BIOMETRIC_UNLOCK_ENABLED=false`、cache / debug 無効を設定する（[CLI 認証](https://www.1password.dev/service-accounts/use-with-1password-cli)、[環境変数](https://www.1password.dev/cli/environment-variables)）。
+
+`op user get --me` が確認済みの active SA と一致し、絞り込みなしの `op vault list` が確認済み ID・名前 `agent` の 1 件だけなら、渡された command を shell を介さず起動する。token 未設定・認証失敗・identity / vault 不一致では command を起動しない。検査の raw stdout / stderr は出さず、固定 error code だけを返す。一時 CLI 設定は終了時に削除する。
+
+```bash
+# 専用クラウド側で秘密ストアから token を注入した後に実行する
+pnpm agent:secrets:check --json
+pnpm agent:run -- codex
+pnpm agent:run -- claude
+```
+
+検査成功は **SA identity と読める vault の範囲**の証跡に限る。write / share / vault 作成 / Environments 権限は管理画面で別途確認する。`agent:preflight` は token / ID の設定有無だけを表示し、scope と実行環境の隔離を未検証と表示する。wrapper を通常の Mac で実行しても、人間用認証・UI への別経路を閉じたことにはならない。
+
+### Bootstrap と移行
+
+SA token の控えは **1Password の `human` に保管できる**（[公式の保管手順](https://www.1password.dev/service-accounts/get-started)）。旧記述の「1Password 自身には保管できない」は保存と起動時の取得を混同していたため訂正する。実行時には cloud secret store から注入し、agent が自分の token を 1Password から取得する循環を作らない。保管先と replica は実際に登録した時点で本ページの台帳に記録する。現在は登録先未決。
+
+1. provider と実行先を確定し、人間用の認証・ファイル・tool 接続を持たない環境を用意する。Node.js は `.nvmrc`、pnpm は `packageManager` に揃え、1Password CLI を公式配布から導入する。
+2. 管理画面で SA の read-only / 1 vault / Environments 無し / vault 作成不可を確認し、SA ID・vault ID を登録する。token は秘密ストアの UI 等から注入し、chat や引数へ貼らない。
+3. 専用環境で `agent:secrets:check` の metadata 結果を確認する。既知の非秘密 canary item を `agent` から取得でき、実在確認済みの `human` / `ci` の canary は権限拒否となることを process 内で確認し、値は表示しない。network error / item 不在を権限拒否の証明にしない。
+4. token 無し・無効で起動が失敗し、人間用認証の prompt / fallback が起きないことを確認する。Mac の home / 1Password / browser / 接続済み tool への到達経路が無いことも確認する。
+5. 1Password を使う対話・無人の agent 起動を `agent:run` に統一し、旧セッションを停止する。撤去対象の credential replica があれば記録してから処置する。障害時は専用環境を停止し、人間用の認証を agent に戻して復旧しない。
+
+Codex Cloud の Secret が setup phase のみに渡る既存構成では、agent phase の `op run` 用 token を得られない。setup から plaintext file / image / cache へ token を残す回避は採らない。作業中に SA が必要なら、runtime への秘密注入ができる専用実行先を使う。秘密を使わない通常の Codex Cloud worker は既存の setup を維持する（[tooling](./tooling.md#local--codex-cloud-の実行環境)）。
+
+移行完了には platform 設定、SA 権限確認、live の正負検証、旧起動経路の停止の証跡が必要。fixture test の成功だけで完了と扱わない。
 
 ---
 
@@ -515,7 +547,7 @@ master へ値を戻す時は GUI か対象を限定した `op item create` / `op
 
 **現在 0 件。** 調査の結果、既存の GitHub Secrets 6 件（`SUPABASE_AUTH_AUDIT_TOKEN` / `SUPABASE_STORAGE_RLS_AUDIT_TOKEN`（[#2345](https://github.com/Dayopt/dayopt/issues/2345) で発行・GitHub Secret 登録済み）/ `VERCEL_TOKEN` / `VERCEL_ORG_ID` / `VERCEL_AUTOMATION_BYPASS_PRODUCT` / `VERCEL_AUTOMATION_BYPASS_WEB`）はいずれも 1Password `ci` vault を master に持つ replica であり、真の bootstrap 例外には該当しない（[Environment Secrets](./security/environment-secrets.md) §GitHub の表と 1:1）。
 
-上記「Service Account（無人実行用、設計のみ・未導入）」の SA token が導入されれば、それが最初の例外になる（SA token は「1Password を読むための鍵」であるため、循環問題により 1Password 自身には保管できない）。保管場所は導入時に決定し、その時点でこの台帳に追記する。
+SA token は 1Password の `human` に控えを保存できるため、保存不能の例外には含めない。起動時の注入先は [Service Account](#service-account) の移行時に決め、実際に登録した cloud secret store を replica 台帳へ追記する。agent に人間用認証を渡して bootstrap する経路は作らない。
 
 ### Vercel Production の integration-managed 例外
 
