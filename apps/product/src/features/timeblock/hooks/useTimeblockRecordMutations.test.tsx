@@ -25,7 +25,8 @@ const mocks = vi.hoisted(() => ({
 
 const queryKey = [['records', 'list'], { input: {}, type: 'query' }];
 const query = { queryKey, queryHash: JSON.stringify(queryKey) };
-vi.mock('@tanstack/react-query', () => ({
+vi.mock('@tanstack/react-query', async () => ({
+  ...(await vi.importActual<typeof import('@tanstack/react-query')>('@tanstack/react-query')),
   useQueryClient: () => ({
     getQueryCache: () => ({ getAll: () => [query], find: () => query }),
     getMutationCache: () => ({ getAll: () => [] }),

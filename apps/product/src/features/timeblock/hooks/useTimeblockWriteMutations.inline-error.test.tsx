@@ -58,7 +58,8 @@ const mocks = vi.hoisted(() => ({
   toastError: vi.fn(),
 }));
 
-vi.mock('@tanstack/react-query', () => ({
+vi.mock('@tanstack/react-query', async () => ({
+  ...(await vi.importActual<typeof import('@tanstack/react-query')>('@tanstack/react-query')),
   useQueryClient: () => ({
     getMutationCache: () => ({ getAll: () => [] }),
     getQueryCache: () => {

@@ -11,7 +11,7 @@
  * 削除は不可逆なので楽観的更新の対象外（AGENTS.md）。確認ダイアログは `TemplateList` が持つ。
  */
 
-import { useQueryClient } from '@tanstack/react-query';
+import { isCancelledError, useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
 
 import { useUserPreferences } from '@/lib/hooks/useUserPreferences';
@@ -141,6 +141,7 @@ export function usePlanTemplateMutations() {
     },
     onError: (error, _input, context) => {
       restoreTimeblockLists(queryClient, context);
+      if (isCancelledError(error)) return;
       toast.error(
         isTimeblockOverlapError(error)
           ? t('calendar.templates.toast.applyOverlap')

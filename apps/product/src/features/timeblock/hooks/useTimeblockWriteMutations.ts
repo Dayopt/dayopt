@@ -1,6 +1,12 @@
 'use client';
 
-import { type QueryClient, type QueryKey, useQueryClient } from '@tanstack/react-query';
+import {
+  CancelledError,
+  isCancelledError,
+  type QueryClient,
+  type QueryKey,
+  useQueryClient,
+} from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
 
 import { toast } from '@/lib/toast';
@@ -168,6 +174,9 @@ export async function snapshotTimeblockLists(
     .getAll()
     .filter((mutation) => mutation.state.status === 'pending');
   await queryClient.cancelQueries({ predicate: isTimeblockListQuery });
+  if (!isTimeblockCacheCurrent(queryClient, { queries, mutations })) {
+    throw new CancelledError({ silent: true });
+  }
   let journal = cacheJournals.get(queryClient);
   if (
     journal &&
@@ -206,7 +215,7 @@ export async function snapshotTimeblockLists(
 /** A removed query/mutation belongs to a retired cache (for example after logout). */
 export function isTimeblockCacheCurrent(
   queryClient: QueryClient,
-  context: TimeblockListsSnapshot | undefined,
+  context: Pick<TimeblockListsSnapshot, 'queries' | 'mutations'> | undefined,
 ): boolean {
   if (!context) return false;
   // Pending mutations cannot be garbage-collected. Other completed mutations can,
@@ -574,6 +583,7 @@ export function useTimeblockWriteMutations(options: UseTimeblockWriteMutationsOp
   };
 
   const reportError = (error: { message: string }) => {
+    if (isCancelledError(error)) return;
     toast.error(
       temporalRuleMessage(error) ??
         (isTimeblockOverlapError(error)
@@ -846,6 +856,7 @@ export function useTimeblockWriteMutations(options: UseTimeblockWriteMutationsOp
     },
     onError: (_error, _input, context) => {
       restore(context);
+      if (isCancelledError(_error)) return;
       reportDeleteError();
     },
     onSettled: settleAndInvalidate,
@@ -863,6 +874,7 @@ export function useTimeblockWriteMutations(options: UseTimeblockWriteMutationsOp
     },
     onError: (_error, _input, context) => {
       restore(context);
+      if (isCancelledError(_error)) return;
       reportDeleteError();
     },
     onSettled: settleAndInvalidate,
@@ -880,6 +892,7 @@ export function useTimeblockWriteMutations(options: UseTimeblockWriteMutationsOp
     },
     onError: (_error, _input, context) => {
       restore(context);
+      if (isCancelledError(_error)) return;
       reportRestoreError();
     },
     onSettled: settleAndInvalidate,
@@ -897,6 +910,7 @@ export function useTimeblockWriteMutations(options: UseTimeblockWriteMutationsOp
     },
     onError: (_error, _input, context) => {
       restore(context);
+      if (isCancelledError(_error)) return;
       reportRestoreError();
     },
     onSettled: settleAndInvalidate,

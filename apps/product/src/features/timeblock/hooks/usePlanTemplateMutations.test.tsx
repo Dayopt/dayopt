@@ -60,7 +60,8 @@ vi.mock('./useTimeblockWriteMutations', async () => {
 
 const PLANS_QUERY = { queryKey: PLANS_LIST_KEY, queryHash: JSON.stringify(PLANS_LIST_KEY) };
 
-vi.mock('@tanstack/react-query', () => ({
+vi.mock('@tanstack/react-query', async () => ({
+  ...(await vi.importActual<typeof import('@tanstack/react-query')>('@tanstack/react-query')),
   useQueryClient: () => ({
     getMutationCache: () => ({ getAll: () => [] }),
     getQueryCache: () => ({

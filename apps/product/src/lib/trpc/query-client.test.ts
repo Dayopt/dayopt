@@ -1,5 +1,7 @@
+import { CancelledError } from '@tanstack/react-query';
 import { TRPCClientError } from '@trpc/client';
 import { describe, expect, it, vi } from 'vitest';
+import { captureUnexpectedTrpcClientFailure } from './client-errors';
 import { createAppQueryClient } from './query-client';
 
 function rateLimitedError(): TRPCClientError<never> {
@@ -47,6 +49,20 @@ describe('rate limit handling (#2669)', () => {
     const mutation = client.getMutationCache().build(client, { mutationFn });
     await expect(mutation.execute(undefined)).rejects.toBe(error);
     expect(mutationFn).toHaveBeenCalledTimes(1);
+    client.clear();
+  });
+});
+
+describe('local mutation cancellation', () => {
+  it('does not resend or report intentionally cancelled input', async () => {
+    vi.mocked(captureUnexpectedTrpcClientFailure).mockClear();
+    const client = createAppQueryClient();
+    const error = new CancelledError({ silent: true });
+    const mutationFn = vi.fn().mockRejectedValue(error);
+    const mutation = client.getMutationCache().build(client, { mutationFn });
+    await expect(mutation.execute(undefined)).rejects.toBe(error);
+    expect(mutationFn).toHaveBeenCalledTimes(1);
+    expect(captureUnexpectedTrpcClientFailure).not.toHaveBeenCalled();
     client.clear();
   });
 });

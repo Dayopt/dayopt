@@ -1,6 +1,6 @@
 'use client';
 
-import { useQueryClient } from '@tanstack/react-query';
+import { isCancelledError, useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
 
 import { toast } from '@/lib/toast';
@@ -43,6 +43,7 @@ export function useTimeblockRecordMutations() {
     },
     onError: (_error, _input, context) => {
       restoreTimeblockLists(queryClient, context);
+      if (isCancelledError(_error)) return;
       toast.error(t('toast.undoFailed'));
     },
     onSettled: (_data, _error, _input, context) => {
@@ -84,6 +85,7 @@ export function useTimeblockRecordMutations() {
     },
     onError: (error, _input, context) => {
       restoreTimeblockLists(queryClient, context);
+      if (isCancelledError(error)) return;
       toast.error(isTimeOverlapError(error) ? t('toast.overlap') : t('toast.recordFailed'));
     },
     onSettled: (_data, _error, _input, context) => {
@@ -116,6 +118,7 @@ export function useTimeblockRecordMutations() {
     },
     onError: (error, _input, context) => {
       restoreTimeblockLists(queryClient, context);
+      if (isCancelledError(error)) return;
       toast.error(isTimeOverlapError(error) ? t('toast.overlap') : t('toast.confirmFailed'));
     },
     onSettled: (_data, _error, _input, context) => {

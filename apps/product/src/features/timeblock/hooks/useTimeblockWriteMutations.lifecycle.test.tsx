@@ -253,13 +253,10 @@ describe('timeblock real mutation lifecycle', () => {
     queryClient.setQueryData(plansKey, []);
     await act(async () => {
       cancellation.resolve();
-    });
-    await waitFor(() => expect(command).toHaveBeenCalled());
-    expect(queryClient.getQueryData(plansKey)).toEqual([]);
-    await act(async () => {
       response.resolve(row('old-user'));
       await request;
     });
+    expect(command).not.toHaveBeenCalled();
     expect(queryClient.getQueryData(plansKey)).toEqual([]);
     expect(queryClient.getQueriesData({ queryKey: [['plans', 'getById']] })).toEqual([]);
   });
