@@ -467,9 +467,9 @@ token の控えの保管先は未確認。token 値や個人の ID 実値は本�
 3. SA の user ID が不明な場合は、token を注入済みの専用クラウドで `op user get --me` の `ID` を確認する。`Type: SERVICE_ACCOUNT` と `State: ACTIVE` を確認し、`op vault list --format=json` が `agent` 1 件だけであることとその `id` を管理画面の設定と照合して登録する。これらは metadata だけを取得する。item の値や token を表示するコマンドは使わない。
 4. 必要な 1Password 接続先を環境の network policy に許可し、Node.js / pnpm / 1Password CLI と検査 script を配置する。保存・Publish / Republish 後の新しい task で `pnpm agent:secrets:check --json` を実行する。既存 task は独自の状態を保持するため、環境更新だけで移行済みと扱わない。
 
-専用クラウドの CLI は `/workspace/.dayopt-1password/bin/op` に配置する。起動用スキルで SA 認証・vault 範囲と token なしの認証失敗を検証し、未注入なら停止する。標準 PATH のディレクトリは書き込み不可のため、各 shell でこのディレクトリを PATH の先頭に加えるか、launcher の絶対パスを使う。launcher は SA token 以外の `OP_*` を除去し、専用の CLI 設定を使う。秘密や人間用 account/session は image に保存しない。
+専用クラウドの CLI は `/workspace/.dayopt-1password/bin/op` に配置する。`/workspace/AGENTS.md` から `/workspace/.dayopt-1password/START.md` と `startup-check.py` を参照し、SA 認証・vault 範囲と token なしの認証失敗を検証する。未注入なら停止する。標準 PATH のディレクトリは書き込み不可のため、各 shell でこのディレクトリを PATH の先頭に加えるか、launcher の絶対パスを使う。launcher は SA token 以外の `OP_*` を除去し、専用の CLI 設定を使う。秘密や人間用 account/session は image に保存しない。
 
-status API の secret binding / readiness の表示だけでは token 注入の可否を判定しない。実行 process 内で存在を boolean として確認し、SA 認証と絞り込みなしの vault 一覧で検証する。編集環境の成功と、再公開後の新しい通常 task の成功は別に判定する。2026-10-01 に通常 task への CLI と token の継承も確認済み。保存した Start skill が通常 task から自動取得されることは未確認のため、CLI の場所と検証手順は task の依頼にも含める。
+status API の secret binding / readiness の表示だけでは token 注入の可否を判定しない。実行 process 内で存在を boolean として確認し、SA 認証と絞り込みなしの vault 一覧で検証する。編集環境の成功と、再公開後の新しい通常 task の成功は別に判定する。2026-10-01 に通常 task への CLI と token の継承も確認済み。保存した Start skill の本文・参照先は通常 task の取得経路では得られなかったため、手順を環境 image 内の上記ファイルにも保存した。root `AGENTS.md` が新しい task で自動読込されることは別途検証する。専用設定の `op-daemon.sock` は自身所有・0700 の Unix socket の場合だけ許容し、JSON 内の token・人間用 account/session がないことを検査する。
 
 **Network secret は使わない。** Network secret は proxy が置換する placeholder を process に渡す方式であり、1Password CLI が必要とする実 token を直接読めない。Personal vault の Environment variable は保存後の UI では値が隠れるが、実行する task は実値を読める。アクセス範囲は SA の権限と専用クラウドの分離で制限する。
 
