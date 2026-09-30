@@ -250,6 +250,9 @@ vi.mock('./TimeblockEditor', () => ({
       <button type="button" onClick={() => onNoteChange('最新メモ')}>
         edit-note
       </button>
+      <button type="button" onClick={() => onNoteChange('1行目\n2行目')}>
+        edit-multiline-note
+      </button>
       <button
         type="button"
         onClick={() =>
@@ -573,13 +576,13 @@ describe('TimeblockInspectorForm', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'edit-note' }));
+    fireEvent.click(screen.getByRole('button', { name: 'edit-multiline-note' }));
     expect(mocks.enqueueSave).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByRole('button', { name: 'prepare-record' }));
 
     expect(mocks.flushSave).toHaveBeenCalledWith({
-      note: '最新メモ',
+      note: '1行目\n2行目',
       activityId: null,
     });
 

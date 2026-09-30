@@ -37,8 +37,6 @@ import {
   useTimeblockWriteMutations,
   type TimeblockOverlapUpdateInput,
 } from '../../hooks/useTimeblockWriteMutations';
-import type { ClipboardTimeblock } from '../../lib/timeblock-clipboard';
-import { createClipboardTimeblock } from '../../lib/timeblock-clipboard';
 import {
   buildTimeblockDuplicateCreateInput,
   createTimeblockDuplicateDraft,
@@ -88,7 +86,6 @@ interface TimeModelInspectorFormProps {
   /** 関係行または記録直後の対象を同じ Inspector で開く。 */
   onOpenRelationship?: ((id: string, kind: TimeblockDestination) => void) | undefined;
   onViewStats?: ((tagId: string) => void) | undefined;
-  onCopy?: ((timeblock: ClipboardTimeblock) => void) | undefined;
   /** 現在の入力内容から独立複製の下書きを開く。 */
   onStartDuplicate?: ((draft: TimeblockDuplicateDraft) => void) | undefined;
   /** 複製用の未保存下書き。指定時は既存行を自動保存しない。 */
@@ -139,7 +136,6 @@ export function TimeblockInspectorForm({
   relationships,
   onOpenRelationship,
   onViewStats,
-  onCopy,
   onStartDuplicate,
   duplicateDraft,
   onCancelDuplicate,
@@ -477,20 +473,6 @@ export function TimeblockInspectorForm({
     return { expectedUpdatedAt: updatedAt, canUndo: false };
   }, [canUseProduct, cancelScheduledNoteSave, flushPendingEdits]);
 
-  const handleCopy = useCallback(() => {
-    if (!target || !onCopy) return;
-    onCopy(
-      createClipboardTimeblock({
-        kind,
-        title: target.title,
-        description: normalizeNote(value.note),
-        startAt: value.startAt,
-        endAt: value.endAt,
-        activityId: value.activityId,
-      }),
-    );
-  }, [kind, onCopy, target, value]);
-
   const handleStartDuplicate = useCallback(() => {
     if (!target || !onStartDuplicate) return;
     onStartDuplicate(
@@ -610,7 +592,6 @@ export function TimeblockInspectorForm({
         activityId: value.activityId,
         onViewStats:
           onViewStats && value.activityId ? () => onViewStats(value.activityId ?? '') : undefined,
-        onCopy: onCopy ? handleCopy : undefined,
         onDuplicate: canUseProduct && onStartDuplicate ? handleStartDuplicate : undefined,
         onDelete: isMigrated ? undefined : handleDelete,
       });

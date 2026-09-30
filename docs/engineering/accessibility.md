@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-08-17
+last_verified: 2026-09-28
 code: apps/product/src
 ---
 
@@ -223,8 +223,6 @@ if (isTyping) return; // 入力中は何もしない
 | `Escape`             | Inspectorを閉じる  |
 | `Delete / Backspace` | 選択中プランを削除 |
 | `C`                  | 新規プラン作成     |
-| `Cmd/Ctrl + C`       | コピー             |
-| `Cmd/Ctrl + V`       | ペースト           |
 
 ---
 

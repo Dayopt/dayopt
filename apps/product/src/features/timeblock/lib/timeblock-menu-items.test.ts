@@ -13,15 +13,14 @@ describe('getTimeblockMenuItems', () => {
       keys({
         activityId: 'activity-1',
         onViewStats: noop,
-        onCopy: noop,
         onDuplicate: noop,
         onDelete: noop,
       }),
-    ).toEqual(['viewStats', 'copy', 'duplicate', 'delete']);
+    ).toEqual(['viewStats', 'duplicate', 'delete']);
   });
 
-  it('アクティビティがなければ振り返りを表示しない', () => {
-    expect(keys({ onViewStats: noop, onCopy: noop })).toEqual(['copy']);
+  it('アクティビティがなければ振り返りを省き、複製を表示する', () => {
+    expect(keys({ onViewStats: noop, onDuplicate: noop })).toEqual(['duplicate']);
   });
 
   it('ハンドラがなければ項目を返さない', () => {

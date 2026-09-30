@@ -118,27 +118,15 @@ export const CALENDAR_SHORTCUT_CATALOG: ShortcutCatalog = {
     },
     {
       groupId: 'blocks',
-      labelKey: 'calendar.shortcuts.actions.copyBlock',
-      keys: ['Cmd+C'],
-      order: 220,
-    },
-    {
-      groupId: 'blocks',
-      labelKey: 'calendar.shortcuts.actions.pasteBlock',
-      keys: ['Cmd+V'],
-      order: 230,
-    },
-    {
-      groupId: 'blocks',
       labelKey: 'calendar.shortcuts.actions.deleteBlock',
       keys: ['Delete', 'Backspace'],
-      order: 240,
+      order: 220,
     },
     {
       groupId: 'blocks',
       labelKey: 'calendar.shortcuts.actions.closeInspector',
       keys: ['Escape'],
-      order: 250,
+      order: 230,
     },
   ],
 };

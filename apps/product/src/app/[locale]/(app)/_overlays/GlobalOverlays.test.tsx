@@ -37,7 +37,6 @@ vi.mock('@/features/calendar', () => ({
   useCalendarNavigation: () => ({ currentDate: navigation.date }),
   useShortcutRegistry: () => undefined,
   useTimeblockSearchShortcut: () => undefined,
-  useTimeblockClipboardStore: () => vi.fn(),
   InlineCreatePanel: () => null,
 }));
 vi.mock('@/components/ui/feedback/toast', () => ({ Toaster: () => null }));
