@@ -1974,7 +1974,7 @@ export type Database = {
         Returns: string;
       };
       ensure_mcp_integration_environment_identity_v1: {
-        Args: never;
+        Args: Record<PropertyKey, never>;
         Returns: {
           authorization_server_uri: string;
           environment: string;
