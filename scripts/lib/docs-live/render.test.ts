@@ -75,6 +75,21 @@ describe('閲覧時の生成', () => {
     expect(renderLiveDocument(root, 'README.md')).toBe(example);
   });
 
+  it.each([
+    ['blockquote', '> ' + block('commands').replaceAll('\n', '\n> ')],
+    ['list', '- ' + block('commands').replaceAll('\n', '\n  ')],
+    ['list の blockquote', '- > ' + block('commands').replaceAll('\n', '\n  > ')],
+  ])('%s 内の実 marker を古い本文のまま返さず拒否する', (_container, markdown) => {
+    writeFileSync(join(root, 'README.md'), markdown);
+    expect(() => renderLiveDocument(root, 'README.md')).toThrow('最上位');
+  });
+
+  it('blockquote 内でもコードフェンスの marker 例は変換しない', () => {
+    const example = '> ```md\n> ' + block('commands').replaceAll('\n', '\n> ') + '```\n';
+    writeFileSync(join(root, 'README.md'), example);
+    expect(renderLiveDocument(root, 'README.md')).toBe(example);
+  });
+
   it('異なる view の対応・入れ子を拒否する', () => {
     writeFileSync(
       join(root, 'README.md'),

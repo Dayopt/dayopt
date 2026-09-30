@@ -14,7 +14,14 @@
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
-      "outputs": [".next/**", "!.next/cache/**", "storybook-static/**", "dist/**"],
+      "outputs": [
+        ".next/**",
+        "!.next/cache/**",
+        "storybook-static/**",
+        "dist/**",
+        "public/brand/README.md",
+        "public/brand/dayopt-brand-F.zip"
+      ],
       "env": [
         "ANALYZE",
         "BILLING_ENFORCED",

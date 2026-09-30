@@ -106,7 +106,20 @@ export function renderLiveDocument(root: string, document: string): string {
 export function renderLiveMarkdown(root: string, document: string, markdown: string): string {
   const replacements: { start: number; end: number; view: View }[] = [];
   let open: { start: number; view: View } | undefined;
-  for (const node of fromMarkdown(markdown).children) {
+  const tree = fromMarkdown(markdown);
+  const rejectNestedMarkers = (nodes: typeof tree.children, depth: number): void => {
+    for (const node of nodes) {
+      if (depth > 0 && node.type === 'html' && node.value.includes('<!-- docs-live:')) {
+        throw new Error(`${document}: docs-live marker は最上位に置いてください`);
+      }
+      // コードフェンスは子ノードを持たないため、marker の例は検査対象にならない。
+      if ('children' in node) {
+        rejectNestedMarkers(node.children as typeof tree.children, depth + 1);
+      }
+    }
+  };
+  rejectNestedMarkers(tree.children, 0);
+  for (const node of tree.children) {
     if (node.type !== 'html' || !node.value.includes('<!-- docs-live:')) continue;
     const match = /^<!-- docs-live:(workspace|commands|files|facts):(start|end) -->$/.exec(
       node.value.trim(),

@@ -121,6 +121,11 @@ if [ "$HAS_BRANCH_UPDATE" = "1" ]; then
     echo "✗ docs:check が失敗しました。push を中断します。" >&2
     exit 1
   fi
+  # 修正済みのworking treeで、送信する未修正commitを隠せないよう各local_shaも検査する。
+  if ! node scripts/hooks/check-pushed-docs.mjs < "$PUSH_INPUT_FILE"; then
+    echo "✗ push対象commitの文書検査が失敗しました。pushを中断します。" >&2
+    exit 1
+  fi
   TURBO_TASKS="typecheck lint"
 
   # ローカルの origin/main が古いと affected 判定がずれうるが、over-scope

@@ -167,7 +167,7 @@ DB / 本番 / GitHub の実状態は、repo から稼働確認済みと推測し
 
 Node 24 と pnpm がある checkout では、ローカル・SSH 先・クラウド開発環境とも `pnpm install --frozen-lockfile` の後に同じ `pnpm check` を実行する。文書だけを確認する時は `pnpm docs:check`。`pnpm check` にも文書検査を含め、失敗すれば後続の検査へ進まない。
 
-通常の install の `prepare` が Husky を設定し、Git の branch push 前にも同じ `pnpm docs:check` を実行する。フックの設定状態は `git config --get core.hooksPath` で確認できる。install script を省略した環境やフックを無効にした環境、GitHub の Web 編集ではフックを前提にせず、実行環境で明示的に `pnpm check` を呼ぶ。
+通常の install の `prepare` が Husky を設定し、Git の branch push 前にも同じ `pnpm docs:check` を実行する。さらに送信する各 commit の tree を一時 worktree で検査するため、未コミットの修正や別 branch の checkout で違反を隠せない。一時 worktree は検査後に削除し、元の作業中の差分は変更しない。フックの設定状態は `git config --get core.hooksPath` で確認できる。install script を省略した環境やフックを無効にした環境、GitHub の Web 編集ではフックを前提にせず、実行環境で明示的に `pnpm check` を呼ぶ。
 
 今回の live 領域の手書き混入・marker・正本解決・配布生成物の Git 再登録の判定は push 前と明示的な pnpm 検査で行い、CI の gate にはしない。既存 CI は `pnpm docs:check --ci` を呼び、従来のリンク・metadata・命名・決定索引・glossary・構成図・教材の検査を維持する。`CI` 環境変数では切り替えないため、リモート環境の通常の `pnpm docs:check` と pre-push でも今回の判定は動く。フックを通らない変更経路では今回の判定が自動実行されないので、手元で同じコマンドを実行する。
 
