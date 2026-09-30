@@ -5,7 +5,7 @@ import Link from 'next/link';
 
 import { ErrorLayout } from './ErrorLayout';
 
-interface RootErrorStateProps {
+export interface RootErrorStateProps {
   error: Error & { digest?: string };
   onRetry: () => void;
   showDetails?: boolean;

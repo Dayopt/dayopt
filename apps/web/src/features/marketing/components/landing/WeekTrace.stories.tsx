@@ -44,10 +44,12 @@ export const English: Story = {
 export const Explore: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    const wednesday = canvas.getByRole('button', { name: /水:/ });
+    const wednesday = canvas.getByRole('radio', { name: /水:/ });
     await userEvent.click(wednesday);
-    await expect(wednesday).toHaveAttribute('aria-pressed', 'true');
-    await expect(canvasElement.querySelector('figcaption')).toHaveTextContent('150');
-    await expect(canvasElement.querySelector('figcaption')).toHaveTextContent('135');
+    await expect(wednesday).toBeChecked();
+    const detail = canvasElement.querySelector('figcaption [data-index="2"]');
+    await expect(detail).toBeVisible();
+    await expect(detail).toHaveTextContent('150');
+    await expect(detail).toHaveTextContent('135');
   },
 };

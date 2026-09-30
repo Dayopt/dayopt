@@ -1,14 +1,27 @@
 import { BROWSER_TELEMETRY_CONSENT_STORAGE_KEY } from '@dayopt/observability';
 import { expect, type Page, type Route, test } from '@playwright/test';
 
+import { appTrialDays } from '@dayopt/billing';
 import commonEn from '../../../messages/en/common.json' with { type: 'json' };
 import en from '../../../messages/en/marketing.json' with { type: 'json' };
 import commonJa from '../../../messages/ja/common.json' with { type: 'json' };
 import ja from '../../../messages/ja/marketing.json' with { type: 'json' };
 
 const locales = [
-  { locale: 'en', path: '/', copy: en.marketing.landing, common: commonEn.common },
-  { locale: 'ja', path: '/ja', copy: ja.marketing.landing, common: commonJa.common },
+  {
+    locale: 'en',
+    path: '/',
+    copy: en.marketing.landing,
+    pricingCopy: en.marketing.pricing.singlePlan,
+    common: commonEn.common,
+  },
+  {
+    locale: 'ja',
+    path: '/ja',
+    copy: ja.marketing.landing,
+    pricingCopy: ja.marketing.pricing.singlePlan,
+    common: commonJa.common,
+  },
 ] as const;
 const widths = [320, 390, 768, 1024, 1440, 1920] as const;
 
@@ -48,7 +61,7 @@ async function overflowingContent(page: Page) {
   });
 }
 
-for (const { locale, path, copy, common } of locales) {
+for (const { locale, path, copy, pricingCopy, common } of locales) {
   for (const colorScheme of ['light', 'dark'] as const) {
     for (const width of widths) {
       test(`${locale} ${colorScheme} ${width}px: 全セクションの構図と切れを確認`, async ({
@@ -95,7 +108,7 @@ for (const { locale, path, copy, common } of locales) {
         // 全ページ撮影ではブラウザーが画面外の描画を省くため、撮影中だけ全体を描画する。
         // 操作・構図・個別画像の検証は上の production CSS のまま行う。
         const captureStyle = await page.addStyleTag({
-          content: '[data-locale] > section { content-visibility: visible; }',
+          content: '[data-locale] > section { content-visibility: visible !important; }',
         });
         await page.screenshot({ path: screenshot, fullPage: true });
         await captureStyle.evaluate((element) => element.parentNode?.removeChild(element));
@@ -178,14 +191,17 @@ for (const { locale, path, copy, common } of locales) {
     await expect(slider).toHaveValue('30');
     await expect(demo.locator('output')).toHaveText(`09:30${copy.experience.probeRecord}`);
     const week = page.locator('#review');
-    const wednesday = week.getByRole('button', { name: new RegExp(`^${copy.review.days[2]}:`) });
+    const wednesday = week.getByRole('radio', { name: new RegExp(`^${copy.review.days[2]}:`) });
     await wednesday.click();
-    await expect(wednesday).toHaveAttribute('aria-pressed', 'true');
-    await expect(week.locator('figcaption')).toContainText('135');
-    const friday = week.getByRole('button', { name: new RegExp(`^${copy.review.days[4]}:`) });
+    await expect(wednesday).toBeChecked();
+    await expect(week.locator('figcaption [data-index="2"]')).toBeVisible();
+    await expect(week.locator('figcaption [data-index="2"]')).toContainText('135');
+    const friday = week.getByRole('radio', { name: new RegExp(`^${copy.review.days[4]}:`) });
     await friday.click();
-    await expect(wednesday).toHaveAttribute('aria-pressed', 'false');
-    await expect(week.locator('figcaption')).toContainText('180');
+    await expect(wednesday).not.toBeChecked();
+    await expect(week.locator('figcaption [data-index="2"]')).not.toBeVisible();
+    await expect(week.locator('figcaption [data-index="4"]')).toBeVisible();
+    await expect(week.locator('figcaption [data-index="4"]')).toContainText('180');
   });
 
   test(`${locale}: モバイルで説明を切り替えても操作ボタンの位置が動かない`, async ({ page }) => {
@@ -229,10 +245,37 @@ for (const { locale, path, copy, common } of locales) {
     const page = await context.newPage();
     await page.goto(new URL(path, testInfo.project.use.baseURL as string).href);
     await page.evaluate(() => document.fonts.ready);
+    await expect(page.locator('html')).toHaveAttribute('lang', locale);
     await expect(page.getByRole('heading', { level: 1 })).toContainText(copy.hero.title1);
     await expect(page.locator('#day-experience [data-plan-duration="30"]')).toBeVisible();
     await expect(page.locator('#day-experience [data-record-duration="45"]')).toBeVisible();
-    await expect(page.locator('#pricing')).toContainText('7');
+    const calendar = page.locator('#calendar-preview');
+    const tomorrow = calendar.getByRole('radio', { name: copy.calendar.stepNext, exact: true });
+    await tomorrow.check();
+    await expect(tomorrow).toBeChecked();
+    await expect(calendar.getByText(copy.calendar.dateNext, { exact: true })).toBeVisible();
+    const rhythm = page.locator('#learning');
+    await expect(rhythm.getByText(copy.templates.feedbackAfter, { exact: true })).not.toBeVisible();
+    await rhythm.locator('summary').filter({ hasText: copy.templates.apply }).click();
+    await expect(rhythm.getByText(copy.templates.feedbackAfter, { exact: true })).toBeVisible();
+    await rhythm.locator('summary').filter({ hasText: copy.templates.reset }).click();
+    await expect(rhythm.getByText(copy.templates.feedbackAfter, { exact: true })).not.toBeVisible();
+    const week = page.locator('#review');
+    const wednesday = week.getByRole('radio', { name: new RegExp(`^${copy.review.days[2]}:`) });
+    await expect(week.locator('figcaption [data-index="2"]')).not.toBeVisible();
+    await wednesday.check();
+    await expect(week.locator('figcaption [data-index="2"]')).toBeVisible();
+    await expect(week.locator('figcaption [data-index="2"]')).toContainText('135');
+    const pricing = page.locator('#pricing');
+    await expect(pricing.getByText('$0', { exact: true })).toHaveCount(0);
+    await expect(pricing.getByText(/^\$5\s*\//)).toBeVisible();
+    await expect(
+      pricing.getByText(pricingCopy.trial.replace('{days}', String(appTrialDays)), { exact: true }),
+    ).toBeVisible();
+    await expect(pricing.locator('a[href$="/auth/signup"]')).toHaveCount(1);
+    // Native details summaries are activated directly with JavaScript disabled.
+    await page.locator('#faq summary').filter({ hasText: copy.faq.q7 }).click();
+    await expect(page.getByText(copy.faq.a7, { exact: true })).toBeVisible();
     await page.locator('#faq summary').first().click();
     await expect(page.locator('#faq details').first()).toHaveAttribute('open', '');
     const signup = page.getByRole('link', { name: new RegExp(copy.hero.cta) }).first();
@@ -244,6 +287,35 @@ for (const { locale, path, copy, common } of locales) {
       contentType: 'image/png',
     });
     await context.close();
+  });
+
+  test(`${locale}: 単一プランの条件と体験終了後のFAQを確認できる`, async ({ page }) => {
+    await refuseAnalytics(page);
+    await page.goto(path);
+    const pricing = page.locator('#pricing');
+    await expect(pricing.getByText('$0', { exact: true })).toHaveCount(0);
+    await expect(pricing.getByText(/^\$5\s*\//)).toBeVisible();
+    await expect(
+      pricing.getByText(pricingCopy.trial.replace('{days}', String(appTrialDays)), { exact: true }),
+    ).toBeVisible();
+    await expect(pricing.getByText(pricingCopy.renewal, { exact: true })).toBeVisible();
+    await expect(pricing.locator('a[href$="/auth/signup"]')).toHaveCount(1);
+    await expect(pricing.locator('a[href$="/auth/signup"]')).toHaveAttribute(
+      'href',
+      /^https:\/\/[^/]+\/auth\/signup$/,
+    );
+    const answer = page.getByText(copy.faq.a8, { exact: true });
+    await expect(answer).not.toBeVisible();
+    await page.locator('#faq summary').filter({ hasText: copy.faq.q8 }).click();
+    await expect(answer).toBeVisible();
+    await page.locator('#faq summary').filter({ hasText: copy.faq.q8 }).click();
+    await expect(answer).not.toBeVisible();
+    for (const link of await page
+      .locator('header a')
+      .filter({ hasText: common.actions.login })
+      .all()) {
+      await expect(link).toHaveAttribute('href', /^https:\/\/[^/]+\/auth\/login$/);
+    }
   });
 
   test(`${locale}: 200%拡大相当の720px表示で1440px画面からリフローする`, async ({
@@ -337,7 +409,7 @@ for (const { locale, path, copy, common } of locales) {
     await expect(menu).toBeVisible();
     await expect(
       menu.getByRole('link', { name: common.actions.login, exact: true }),
-    ).toHaveAttribute('href', locale === 'ja' ? '/ja/login' : '/login');
+    ).toHaveAttribute('href', /^https:\/\/[^/]+\/auth\/login$/);
     await menu.getByRole('button', { name: common.aria.closeMenu }).tap();
     await expect(menu).toHaveCount(0);
     await context.close();

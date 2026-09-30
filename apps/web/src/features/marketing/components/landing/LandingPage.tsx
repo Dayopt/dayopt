@@ -1,12 +1,13 @@
-import { dayoptPlans, dayoptPricing } from '@dayopt/billing';
+import { appTrialDays, dayoptPricing } from '@dayopt/billing';
 import { Button } from '@dayopt/components';
-import { Link } from '@dayopt/i18n/navigation';
 import { SignupCtaLink } from '@web/shell/analytics/SignupCtaLink';
+import { SiteLink as Link } from '@web/shell/layout/SiteLink';
 import { getTranslations } from 'next-intl/server';
 
 import { DayCanvas, type DayCanvasCopy } from './DayCanvas';
 import { CalendarDemo, ClosingMark, TemplateDemo } from './LandingInteractions';
 import styles from './LandingPage.module.css';
+import { PricingOffer } from './PricingOffer';
 import { WeekTrace } from './WeekTrace';
 
 interface LandingPageProps {
@@ -43,8 +44,6 @@ function SectionTitle({
 
 export async function LandingPage({ locale }: LandingPageProps) {
   const t = await getTranslations({ locale, namespace: 'marketing' });
-  const freeFeatures = t.raw('pricing.plans.free.features') as string[];
-  const proHighlights = t.raw('pricing.plans.pro.highlights') as string[];
   const experienceCopy: DayCanvasCopy = {
     label: t('landing.experience.label'),
     sample: t('landing.experience.sample'),
@@ -105,6 +104,7 @@ export async function LandingPage({ locale }: LandingPageProps) {
                 {t('landing.hero.demo')} <span aria-hidden="true">↓</span>
               </a>
             </div>
+            <p className={styles.heroTrial}>{t('landing.hero.trialNote')}</p>
             <noscript>
               <p className={styles.noScript}>{t('landing.hero.noScript')}</p>
             </noscript>
@@ -507,49 +507,20 @@ export async function LandingPage({ locale }: LandingPageProps) {
             />
             <p>{t('landing.pricing.body')}</p>
           </div>
-          <div className={styles.pricingGrid}>
-            <div className={styles.priceCard}>
-              <div>
-                <p className={styles.priceName}>{t('pricing.plans.free.name')}</p>
-                <p className={styles.priceTagline}>{t('landing.pricing.freeLabel')}</p>
-              </div>
-              <p className={styles.priceAmount}>
-                {dayoptPricing[dayoptPlans.free.id].displayPrice}
-              </p>
-              <p>{t('pricing.plans.free.description')}</p>
-              <ul>
-                {freeFeatures.map((feature) => (
-                  <li key={feature}>{feature}</li>
-                ))}
-              </ul>
-              <Button variant="outline" size="lg" asChild>
-                <SignupCtaLink ctaId="pricing_free">
-                  {t('pricing.plans.free.cta')} <span aria-hidden="true">↗</span>
-                </SignupCtaLink>
-              </Button>
-            </div>
-            <div className={styles.priceCard}>
-              <div>
-                <p className={styles.priceName}>{t('pricing.plans.pro.name')}</p>
-                <p className={styles.priceTagline}>{t('landing.pricing.proLabel')}</p>
-              </div>
-              <p className={styles.priceAmount}>
-                {dayoptPricing[dayoptPlans.pro.id].displayPrice}{' '}
-                <span>{t('landing.pricing.period')}</span>
-              </p>
-              <p>{t('pricing.trialNote')}</p>
-              <ul>
-                {proHighlights.map((feature) => (
-                  <li key={feature}>{feature}</li>
-                ))}
-              </ul>
-              <Button variant="primary" size="lg" asChild>
-                <SignupCtaLink ctaId="pricing_pro">
-                  {t('pricing.plans.pro.cta')} <span aria-hidden="true">↗</span>
-                </SignupCtaLink>
-              </Button>
-            </div>
-          </div>
+          <PricingOffer
+            price={dayoptPricing.pro.displayPrice}
+            copy={{
+              title: t('pricing.singlePlan.title'),
+              description: t('pricing.singlePlan.description'),
+              perMonth: t('pricing.singlePlan.perMonth'),
+              trial: t('pricing.singlePlan.trial', { days: appTrialDays }),
+              features: t.raw('pricing.singlePlan.features') as string[],
+              afterTrial: t('pricing.singlePlan.afterTrial'),
+              renewal: t('pricing.singlePlan.renewal'),
+              details: t('pricing.singlePlan.details'),
+              cta: t('pricing.singlePlan.cta'),
+            }}
+          />
         </div>
       </section>
 
@@ -582,6 +553,8 @@ export async function LandingPage({ locale }: LandingPageProps) {
                 { question: t('landing.faq.q4'), answer: t('landing.faq.a4') },
                 { question: t('landing.faq.q5'), answer: t('landing.faq.a5') },
                 { question: t('landing.faq.q6'), answer: t('landing.faq.a6') },
+                { question: t('landing.faq.q7'), answer: t('landing.faq.a7') },
+                { question: t('landing.faq.q8'), answer: t('landing.faq.a8') },
               ].map((item) => (
                 <details key={item.question}>
                   <summary>{item.question}</summary>

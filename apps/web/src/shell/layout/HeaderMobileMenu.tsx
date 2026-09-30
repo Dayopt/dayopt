@@ -1,36 +1,45 @@
 'use client';
 
 import { Button, cn, Logo, Sheet, SheetContent } from '@dayopt/components';
-import { Link } from '@dayopt/i18n/navigation';
-import { useTranslations } from 'next-intl';
+import { productLoginUrl } from '@web/platform/config/product-signup-url';
+import Link from 'next/link';
+import type { HeaderLabels } from './HeaderClient';
 
 export function HeaderMobileMenu({
+  homeUrl,
   navigation,
+  labels,
   open,
   isActive,
   onOpenChange,
   onCloseAutoFocus,
 }: {
-  navigation: Array<{ name: string; href: string }>;
+  homeUrl: string;
+  navigation: Array<{ name: string; href: string; url: string }>;
+  labels: HeaderLabels;
   open: boolean;
   isActive: (href: string) => boolean;
   onOpenChange: (open: boolean) => void;
   onCloseAutoFocus: () => void;
 }) {
-  const t = useTranslations('common');
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side="right"
-        aria-label={t('aria.navigationMenu')}
-        closeButtonLabel={t('aria.closeMenu')}
+        aria-label={labels.navigationMenu}
+        closeButtonLabel={labels.closeMenu}
         onCloseAutoFocus={(event) => {
           event.preventDefault();
           onCloseAutoFocus();
         }}
         className="w-4/5 max-w-80 overflow-y-auto px-6 py-6 lg:hidden"
       >
-        <Link href="/" className="flex items-center gap-2" onClick={() => onOpenChange(false)}>
+        <Link
+          href={homeUrl}
+          prefetch={false}
+          className="flex items-center gap-2"
+          onClick={() => onOpenChange(false)}
+        >
           <Logo variant="lockup" size="md" />
         </Link>
 
@@ -40,7 +49,8 @@ export function HeaderMobileMenu({
               {navigation.map((item) => (
                 <Link
                   key={item.name}
-                  href={item.href}
+                  href={item.url}
+                  prefetch={false}
                   onClick={() => onOpenChange(false)}
                   aria-current={isActive(item.href) ? 'page' : undefined}
                   className={cn(
@@ -57,9 +67,9 @@ export function HeaderMobileMenu({
 
             <div className="py-6">
               <Button variant="outline" className="w-full" asChild>
-                <Link href="/login" onClick={() => onOpenChange(false)}>
-                  {t('actions.login')}
-                </Link>
+                <a href={productLoginUrl()} onClick={() => onOpenChange(false)}>
+                  {labels.login}
+                </a>
               </Button>
             </div>
           </div>

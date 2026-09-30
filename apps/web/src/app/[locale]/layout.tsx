@@ -1,8 +1,8 @@
 import { routing, type Locale } from '@dayopt/i18n/routing';
-import { NextIntlClientProvider } from 'next-intl';
 import { getMessages, setRequestLocale } from 'next-intl/server';
 import { notFound } from 'next/navigation';
 
+import { Document } from '@web/shell/layout/Document';
 import { BrowserTelemetry } from '@web/shell/privacy/BrowserTelemetry';
 import { CookieConsentBanner } from '@web/shell/privacy/CookieConsentBanner';
 import { japaneseBodyFonts } from '@web/styles/fonts/preloads';
@@ -27,20 +27,10 @@ export default async function LocaleLayout({
 
   // Enable static rendering
   setRequestLocale(locale);
-
-  const messages = await getMessages();
-
-  // LP の文言は Server Component で取得し、操作に必要な copy だけを渡す。
-  // client で翻訳する contact を残し、legal と LP 本文の二重配信を避ける。
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- rest destructuring で使わない namespace を除外する
-  const { legal, ossCredits, marketing, ...sharedMessages } = messages;
-  const clientMessages = {
-    ...sharedMessages,
-    marketing: { contact: marketing.contact },
-  };
+  await getMessages();
 
   return (
-    <NextIntlClientProvider messages={clientMessages}>
+    <Document locale={locale}>
       {locale === 'ja' &&
         japaneseBodyFonts.map((href) => (
           <link
@@ -55,6 +45,6 @@ export default async function LocaleLayout({
       {children}
       <BrowserTelemetry />
       <CookieConsentBanner />
-    </NextIntlClientProvider>
+    </Document>
   );
 }

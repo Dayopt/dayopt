@@ -23,7 +23,8 @@
         "replay": "Replay the motion",
         "eyebrow": "Make room for your time.",
         "scroll": "One day, a little clearer.",
-        "noScript": "Enable JavaScript to try the interactive examples. You can still read the page and sign up."
+        "noScript": "Enable JavaScript to try the interactive examples. You can still read the page and sign up.",
+        "trialNote": "45 days free. No card required. Starts when you first open the app."
       },
       "calendar": {
         "kicker": "A day in practice",
@@ -185,11 +186,9 @@
       },
       "pricing": {
         "kicker": "Pricing",
-        "title1": "A tool for every day,",
-        "title2": "on a plan that fits.",
+        "title1": "A tool for every day.",
+        "title2": "One plan for it all.",
         "body": "Plan your time. Record it. Reflect on it. Start with the part that helps you today.",
-        "freeLabel": "The essentials, always free.",
-        "proLabel": "Go wider and deeper.",
         "period": "/ month"
       },
       "faq": {
@@ -210,14 +209,18 @@
         "q5": "Do I have to connect an AI?",
         "a5": "No. Planning, recording, and reviewing work in Dayopt alone. Connect an MCP-compatible AI only if you want to.",
         "q6": "Can I take my data with me?",
-        "a6": "You can export your data as CSV or JSON from Settings."
+        "a6": "You can export your data as CSV or JSON from Settings.",
+        "q7": "When does the free trial start?",
+        "a7": "Your 45 days start when you first open the app, rather than when you sign up. Try every feature without adding a card.",
+        "q8": "What happens to my data after the trial?",
+        "a8": "There is no automatic charge when the trial ends. You can keep viewing your saved calendar and reports, exporting, and deleting. Subscribe for $5/month to continue creating, editing, and using integrations. Purchased subscriptions renew monthly until canceled."
       },
       "closing": {
         "replay": "Replay the Dayopt logo motion",
         "title1": "Your next day",
         "title2": "starts here.",
         "body": "A book you wanted to read. Something you wanted to make. Begin by giving one thing a little time.",
-        "note": "Your plans and records, together in one calendar."
+        "note": "45 days free. No card required. Starts when you first open the app."
       },
       "experience": {
         "label": "Interactive example comparing a 30-minute plan and a 45-minute record on the same timeline",
@@ -369,7 +372,24 @@
           ]
         }
       },
-      "trialNote": "7-day free trial · No credit card required"
+      "trialNote": "45 days free. No card required. Starts when you first open the app.",
+      "singlePlan": {
+        "title": "Dayopt",
+        "description": "Every feature. One plan.",
+        "perMonth": "/ month",
+        "trial": "Every feature, free for {days} days after you first open the app. No card required.",
+        "features": [
+          "One calendar for independent plans and records",
+          "Activities and templates",
+          "Weekly, monthly and yearly report views",
+          "Read-only connection from Google Calendar",
+          "MCP and API integrations"
+        ],
+        "afterTrial": "Keep viewing your saved calendar and reports, exporting, and deleting after the trial. Subscribe when you want to continue creating, editing, and using integrations.",
+        "renewal": "The trial ends without an automatic charge. A purchased subscription renews monthly until canceled.",
+        "details": "Read the full trial and pricing terms",
+        "cta": "Try Dayopt free"
+      }
     },
     "contact": {
       "title": "Get in Touch",

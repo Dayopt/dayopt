@@ -7,6 +7,11 @@
   background: var(--lp-paper);
   overflow: clip;
 }
+/* 画面外の高さを確定しながら移動する LP では、smooth な focus/anchor scroll が
+ * 再レイアウトと競合する。ホイール・タッチによるスクロールの動きはそのまま。 */
+:global(html):has(.landing) {
+  scroll-behavior: auto;
+}
 /* 長い LP の画面外をブラウザーが必要になるまで描画しない。
  * 内容は SSR に残り、スクロール・アンカー・検索・キーボードで通常どおり表示される。
  * auto は実際に描画した高さを再利用する。JS 無効時も CSS だけで成立する。 */
@@ -62,6 +67,12 @@
   color: var(--lp-muted);
   font-size: 15px;
   line-height: 1.9;
+}
+.heroAside > .heroTrial {
+  max-width: 380px;
+  margin-top: 18px;
+  font-size: 12px;
+  line-height: 1.8;
 }
 .noScript {
   margin-top: 20px;
@@ -182,7 +193,8 @@
   margin-bottom: 18px;
 }
 
-.experienceControls button {
+.experienceControls button,
+.experienceControls label {
   display: inline-flex;
   align-items: center;
   gap: 10px;
@@ -196,14 +208,64 @@
   cursor: pointer;
 }
 
-.experienceControls button[aria-pressed='true'] {
+.experienceControls button[aria-pressed='true'],
+.experienceControls label:has(input:checked) {
   border-color: var(--lp-ink);
   background: var(--lp-ink);
   color: var(--lp-paper);
 }
 
-.experienceControls button span {
+.experienceControls button span,
+.experienceControls label > span {
   font-size: 11px;
+}
+
+.nativeChoice {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+.experienceControls label {
+  position: relative;
+}
+.experienceControls input.nativeChoice {
+  z-index: 1;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  clip-path: none;
+  opacity: 0;
+  cursor: pointer;
+}
+.experienceControls label:has(input:focus-visible),
+.templateApply:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 3px;
+}
+/* Only state-specific text and record geometry change; the calendar DOM is shared. */
+.calendarDemo:not(:has(input[data-calendar-step='plan']:checked)) [data-calendar-content='plan'],
+.calendarDemo:not(:has(input[data-calendar-step='record']:checked))
+  [data-calendar-content='record'],
+.calendarDemo:not(:has(input[data-calendar-step='next']:checked)) [data-calendar-content='next'],
+.calendarDemo:has(input[data-calendar-step='next']:checked) [data-calendar-content='first'] {
+  display: none;
+}
+.templateSwitch > summary {
+  list-style: none;
+}
+.templateSwitch > summary::-webkit-details-marker {
+  display: none;
+}
+.templateDemo:not(:has(.templateSwitch[open])) [data-template-state='after'],
+.templateDemo:has(.templateSwitch[open]) [data-template-state='before'] {
+  display: none;
 }
 
 .productWindow {
@@ -408,15 +470,15 @@
   border-color: var(--category-amber);
 }
 
-.productWindow[data-step='plan'] .readingPlan,
-.productWindow[data-step='plan'] .developmentPlan,
-.productWindow[data-step='next'] .readingPlan,
-.productWindow[data-step='next'] .developmentPlan {
+.calendarDemo:has(input[data-calendar-step='plan']:checked) .productWindow .readingPlan,
+.calendarDemo:has(input[data-calendar-step='plan']:checked) .productWindow .developmentPlan,
+.calendarDemo:has(input[data-calendar-step='next']:checked) .productWindow .readingPlan,
+.calendarDemo:has(input[data-calendar-step='next']:checked) .productWindow .developmentPlan {
   width: auto;
   right: 8px;
 }
 
-.productWindow[data-step='next'] .readingPlan {
+.calendarDemo:has(input[data-calendar-step='next']:checked) .productWindow .readingPlan {
   height: 108px;
 }
 
@@ -1088,6 +1150,105 @@
   gap: 18px;
 }
 
+.pricingOffer {
+  --lp-ink: var(--foreground);
+  --lp-paper: var(--background);
+  --lp-muted: var(--muted-foreground);
+  --lp-line: var(--border);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: clamp(36px, 7vw, 108px);
+  padding-block: 44px;
+  border-block: 1px solid var(--lp-line);
+  color: var(--lp-ink);
+}
+
+.offerSummary h3 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 500;
+}
+
+.offerDescription {
+  margin: 10px 0 0;
+  color: var(--lp-muted);
+  font-size: 15px;
+}
+
+.offerAmount {
+  margin: 38px 0 26px;
+  font-size: clamp(72px, 8vw, 128px);
+  line-height: 1;
+  letter-spacing: -0.05em;
+}
+
+.offerAmount span {
+  margin-left: 10px;
+  color: var(--lp-muted);
+  font-size: 16px;
+  letter-spacing: 0;
+}
+
+.offerTrial {
+  max-width: 380px;
+  margin: 0 0 26px;
+  font-size: 16px;
+  line-height: 1.85;
+}
+
+.offerSummary > a {
+  display: inline-flex;
+  justify-content: space-between;
+  gap: 28px;
+  max-width: 100%;
+  min-height: 52px;
+  background: var(--lp-ink);
+  color: var(--lp-paper);
+  white-space: normal;
+}
+
+.offerSummary > a:hover {
+  background: color-mix(in oklch, var(--lp-ink) 88%, var(--lp-paper));
+}
+
+.offerDetails ul {
+  display: grid;
+  gap: 18px;
+  margin: 0 0 36px;
+  padding: 0;
+  list-style: none;
+}
+
+.offerDetails li {
+  display: flex;
+  gap: 16px;
+  font-size: 18px;
+  line-height: 1.7;
+}
+
+.offerDetails li::before {
+  content: '—';
+  color: var(--lp-muted);
+}
+
+.offerDetails > p {
+  margin: 0 0 16px;
+  color: var(--lp-muted);
+  font-size: 13px;
+  line-height: 1.9;
+}
+
+@media (max-width: 767px) {
+  .pricingOffer {
+    grid-template-columns: minmax(0, 1fr);
+    padding-block: 32px;
+  }
+  .offerDetails {
+    padding-top: 32px;
+    border-top: 1px solid var(--lp-line);
+  }
+}
+
 .priceCard {
   display: flex;
   flex-direction: column;
@@ -1358,7 +1519,7 @@
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
-  .experienceControls button {
+  .experienceControls :is(button, label) {
     flex-direction: column;
     align-items: start;
     gap: 2px;
@@ -1555,6 +1716,9 @@
   width: 72px;
   animation: markSettle 300ms var(--motion-ease-settle);
 }
+.closingMark:active > span {
+  animation: none;
+}
 .closingMark svg {
   width: 72px;
   height: 72px;
@@ -1665,4 +1829,10 @@
   .closingMark > span {
     animation: none;
   }
+}
+
+.templateApply > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
 }

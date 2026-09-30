@@ -17,6 +17,8 @@ import messages from '../../../messages/en/common.json';
 // ここで検証するのは同意値の読み書きと開閉なので、Link は素の anchor に差し替える。
 // locale prefix の付与そのものは banner の Story と E2E 側で見る。
 vi.mock('@dayopt/i18n/navigation', () => ({
+  getPathname: ({ locale, href }: { locale: string; href: string }) =>
+    locale === 'ja' ? `/ja${href}` : href,
   Link: ({ href, children, ...props }: { href: string; children: React.ReactNode }) => (
     <a href={href} {...props}>
       {children}

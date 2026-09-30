@@ -1,5 +1,6 @@
 import { ErrorLayout } from '@web/components/errors/ErrorLayout';
 import { generateSEOMetadata } from '@web/platform/seo/metadata';
+import { Document } from '@web/shell/layout/Document';
 
 export const metadata = generateSEOMetadata({
   title: 'Page Not Found - 404 Error',
@@ -11,10 +12,12 @@ export const metadata = generateSEOMetadata({
 
 export default function NotFound() {
   return (
-    <ErrorLayout
-      code="404"
-      title="Page not found"
-      description="Sorry, we couldn't find the page you're looking for."
-    />
+    <Document>
+      <ErrorLayout
+        code="404"
+        title="Page not found"
+        description="Sorry, we couldn't find the page you're looking for."
+      />
+    </Document>
   );
 }

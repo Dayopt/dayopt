@@ -1,7 +1,7 @@
 import { dayoptProductUrls } from '@dayopt/config';
 import { describe, expect, it } from 'vitest';
 
-import { productSignupUrl } from './product-signup-url';
+import { productLoginUrl, productSignupUrl } from './product-signup-url';
 
 describe('productSignupUrl', () => {
   it('uses the production Product URL when no override exists', () => {
@@ -11,6 +11,13 @@ describe('productSignupUrl', () => {
   it('keeps Preview registration on the matching Product deployment', () => {
     expect(productSignupUrl('https://product-preview.vercel.app')).toBe(
       'https://product-preview.vercel.app/auth/signup',
+    );
+  });
+
+  it('keeps login on the same production or Preview origin as registration', () => {
+    expect(productLoginUrl('')).toBe('https://app.dayopt.app/auth/login');
+    expect(productLoginUrl('https://product-preview.vercel.app')).toBe(
+      'https://product-preview.vercel.app/auth/login',
     );
   });
 

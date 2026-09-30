@@ -7,14 +7,22 @@ const trackSignupCta = vi.hoisted(() => vi.fn());
 vi.mock('@web/platform/analytics/signup-cta', () => ({ trackSignupCta }));
 vi.mock('@web/platform/config/product-signup-url', () => ({
   productSignupUrl: () => 'https://product-preview.example/auth/signup',
+  productLoginUrl: () => 'https://product-preview.example/auth/login',
 }));
 vi.mock('next-intl', () => ({
   useLocale: () => 'en',
   useTranslations: () => (key: string) => key,
 }));
 vi.mock('@dayopt/i18n/navigation', () => ({
+  getPathname: ({ href }: { href: string }) => href,
   usePathname: () => '/',
   Link: ({ href, children }: { href: string; children: React.ReactNode }) => (
+    <a href={href}>{children}</a>
+  ),
+}));
+vi.mock('next/navigation', () => ({ usePathname: () => '/' }));
+vi.mock('next/link', () => ({
+  default: ({ href, children }: { href: string; children: React.ReactNode }) => (
     <a href={href}>{children}</a>
   ),
 }));
@@ -38,4 +46,15 @@ it('keeps the desktop and mobile signup destinations and their tracking placemen
   expect(links).toHaveLength(2);
   for (const link of links) fireEvent.click(link);
   expect(trackSignupCta.mock.calls).toEqual([['header_desktop'], ['header_mobile']]);
+});
+
+it('sends both login links to the matching Product deployment', () => {
+  const { container } = render(<Header />);
+  const links = Array.from(container.querySelectorAll<HTMLAnchorElement>('a')).filter(
+    (link) => link.textContent === 'actions.login',
+  );
+  expect(links).toHaveLength(2);
+  for (const link of links) {
+    expect(link.href).toBe('https://product-preview.example/auth/login');
+  }
 });

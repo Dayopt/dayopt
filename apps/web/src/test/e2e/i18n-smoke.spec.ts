@@ -6,17 +6,33 @@ test('footer の言語切替で locale prefix と hero copy が切り替わる',
 
   const hero = page.getByRole('heading', { level: 1 });
   await expect(hero).toContainText('Give your day');
+  await expect(page.locator('html')).toHaveAttribute('lang', 'en');
 
   await page.getByRole('combobox', { name: 'Change language' }).selectOption('ja');
 
   await expect(page).toHaveURL(/\/ja\/?$/);
   await expect(hero).toContainText('一日が、');
+  await expect(page.locator('html')).toHaveAttribute('lang', 'ja');
 
   await page.getByRole('combobox', { name: '言語を変更' }).selectOption('en');
 
   await expect(page).toHaveURL(/\/$/);
   await expect(page).not.toHaveURL(/\/ja\/?$/);
   await expect(hero).toContainText('Give your day');
+  await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+});
+
+test('存在しないページでも有効な文書とホームへの導線を返す', async ({ page }) => {
+  for (const path of ['/lp-quality-missing-page', '/ja/lp-quality-missing-page']) {
+    const response = await page.goto(path);
+    expect(response?.status()).toBe(404);
+    const html = await response!.text();
+    expect(html.match(/<html(?:\s|>)/g)).toHaveLength(1);
+    expect(html.match(/<body(?:\s|>)/g)).toHaveLength(1);
+    await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+    await expect(page.getByRole('heading', { name: 'Page not found' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Back to home' })).toHaveAttribute('href', '/');
+  }
 });
 
 test('登録 CTA が product signup に統一されている', async ({ page }) => {
@@ -109,25 +125,28 @@ test('日々の使い方の表示例が操作に応じて変わる', async ({ pa
   await page.goto('/ja');
 
   const calendar = page.locator('#calendar-preview');
-  await calendar.getByRole('button', { name: /予定を立てる/ }).click();
+  await calendar.getByRole('radio', { name: /予定を立てる/ }).check();
   await expect(calendar.getByText('記録はこれから')).toBeVisible();
-  await calendar.getByRole('button', { name: /明日へつなぐ/ }).click();
+  await calendar.getByRole('radio', { name: /明日へつなぐ/ }).check();
   await expect(calendar.getByText('前日の記録 45分')).toBeVisible();
 
   const template = page.locator('#learning');
-  await template.getByRole('button', { name: /明日に並べてみる/ }).click();
-  await expect(template.getByText('3つの予定を追加')).toBeVisible();
-  await template.getByRole('button', { name: /操作例をリセット/ }).click();
+  const toggle = template.locator('summary').filter({ hasText: '明日に並べてみる' });
+  await toggle.click();
+  await expect(
+    template.locator('[data-template-state="after"]').filter({ hasText: '3つの予定を追加' }),
+  ).toBeVisible();
+  await toggle.click();
   await expect(template.getByText('予定を並べる前')).toBeVisible();
 });
 
 test('LPの案内は既存のBlog・Docs・登録先につながり、現行料金を示す', async ({ page }) => {
   await page.goto('/ja');
 
-  await expect(page.locator('#pricing')).toContainText('Free');
-  await expect(page.locator('#pricing')).toContainText('Pro');
-  await expect(page.locator('#pricing')).toContainText('7日間');
-  await expect(page.locator('#pricing')).not.toContainText('45日');
+  await expect(page.locator('#pricing')).toContainText('$5');
+  await expect(page.locator('#pricing')).toContainText('45日間');
+  await expect(page.locator('#pricing')).not.toContainText('7日間');
+  await expect(page.locator('#pricing')).not.toContainText('ずっと無料');
   await expect(page.getByRole('link', { name: 'はじめての使い方を読む' })).toHaveAttribute(
     'href',
     '/ja/docs/getting-started',

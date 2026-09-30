@@ -1,7 +1,7 @@
 /**
  * Header（サイト共通ヘッダー）の Storybook Story。
  *
- * Header は 'use client' + useTranslations('common') の client component。
+ * Header は server で文言と URL を確定し、HeaderClient が操作を持つ。
  * Storybook の共有 decorator は空メッセージのため、story 内で NextIntlClientProvider を
  * self-provide して web の common.json（common namespace）を渡す。locale 駆動なので ja / en。
  */

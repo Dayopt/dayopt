@@ -1,13 +1,11 @@
-'use client';
-
 import { LogoArtwork } from '@dayopt/assets/logo-artwork';
 import { Logo } from '@dayopt/components';
 import { dayoptBrand } from '@dayopt/config';
-import { Link } from '@dayopt/i18n/navigation';
 import { LanguageSwitcher } from '@web/components/ui/actions/language-switcher';
 import { ThemeToggle } from '@web/components/ui/actions/theme-toggle';
 import { CookieConsentSettings } from '@web/shell/privacy/CookieConsentSettings';
 import { useLocale, useTranslations } from 'next-intl';
+import { SiteLink as Link } from './SiteLink';
 
 import styles from './SiteChrome.module.css';
 
@@ -83,7 +81,7 @@ export function Footer() {
         <div className="xl:grid xl:grid-cols-3 xl:gap-8">
           {/* Logo */}
           <div>
-            <Link href="/" className={styles.logo}>
+            <Link href="/" prefetch={false} className={styles.logo}>
               <Logo variant="lockup" size="lg" />
             </Link>
           </div>
