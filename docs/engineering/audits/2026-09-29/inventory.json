@@ -2549,10 +2549,12 @@
       "mode": "100644",
       "bytes": 3630,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 53]],
+      "evidence": [
+        "Full 53-line baseline-equal current first-party source read at03888232d. Conformance319 split1-170/171-319 after initial truncated output was discarded; procedures207 split1-160/161-207. Other files whole. Auth/user scope, write fence, billing access, private error/logging and conformance child-env/dependency boundaries cross-checked. Synthetic/static test guarantees remain separate from live environment evidence."
+      ],
       "questions": []
     },
     {
@@ -2562,10 +2564,12 @@
       "mode": "100644",
       "bytes": 11001,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 319]],
+      "evidence": [
+        "Full 319-line baseline-equal current first-party source read at03888232d. Conformance319 split1-170/171-319 after initial truncated output was discarded; procedures207 split1-160/161-207. Other files whole. Auth/user scope, write fence, billing access, private error/logging and conformance child-env/dependency boundaries cross-checked. Synthetic/static test guarantees remain separate from live environment evidence."
+      ],
       "questions": []
     },
     {
@@ -3317,10 +3321,12 @@
       "mode": "100644",
       "bytes": 2591,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 66]],
+      "evidence": [
+        "Full untruncated read at03888232d, original bytes match baseline. Current45-day app access versus legacy7-day Stripe trial and modal/banner ownership cross-checked. Original hook/README reviewed before F046/F047 edits; no live billing evidence."
+      ],
       "questions": []
     },
     {
@@ -3395,10 +3401,12 @@
       "mode": "100644",
       "bytes": 6899,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 192]],
+      "evidence": [
+        "Full untruncated read at03888232d, original bytes match baseline. Current45-day app access versus legacy7-day Stripe trial and modal/banner ownership cross-checked. Original hook/README reviewed before F046/F047 edits; no live billing evidence."
+      ],
       "questions": []
     },
     {
@@ -3434,10 +3442,12 @@
       "mode": "100644",
       "bytes": 2796,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 84]],
+      "evidence": [
+        "Full untruncated read at03888232d, original bytes match baseline. Current45-day app access versus legacy7-day Stripe trial and modal/banner ownership cross-checked. Original hook/README reviewed before F046/F047 edits; no live billing evidence."
+      ],
       "questions": []
     },
     {
@@ -4856,10 +4866,12 @@
       "mode": "100644",
       "bytes": 2983,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 78]],
+      "evidence": [
+        "Full 78-line baseline-equal current first-party source read at03888232d. Conformance319 split1-170/171-319 after initial truncated output was discarded; procedures207 split1-160/161-207. Other files whole. Auth/user scope, write fence, billing access, private error/logging and conformance child-env/dependency boundaries cross-checked. Synthetic/static test guarantees remain separate from live environment evidence."
+      ],
       "questions": []
     },
     {
@@ -14251,10 +14263,12 @@
       "mode": "100644",
       "bytes": 1839,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 68]],
+      "evidence": [
+        "Full untruncated read at03888232d, original bytes match baseline. Current45-day app access versus legacy7-day Stripe trial and modal/banner ownership cross-checked. Original hook/README reviewed before F046/F047 edits; no live billing evidence."
+      ],
       "questions": []
     },
     {
@@ -14381,10 +14395,12 @@
       "mode": "100644",
       "bytes": 2340,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 71]],
+      "evidence": [
+        "Full untruncated read at03888232d, original bytes match baseline. Current45-day app access versus legacy7-day Stripe trial and modal/banner ownership cross-checked. Original hook/README reviewed before F046/F047 edits; no live billing evidence."
+      ],
       "questions": []
     },
     {
@@ -14420,10 +14436,12 @@
       "mode": "100644",
       "bytes": 1811,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 55]],
+      "evidence": [
+        "Full untruncated read at03888232d, original bytes match baseline. Current45-day app access versus legacy7-day Stripe trial and modal/banner ownership cross-checked. Original hook/README reviewed before F046/F047 edits; no live billing evidence."
+      ],
       "questions": []
     },
     {
@@ -17773,11 +17791,15 @@
       "mode": "100644",
       "bytes": 4533,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
-      "questions": []
+      "read_ranges": [[1, 146]],
+      "evidence": [
+        "Full 146-line baseline-equal current first-party source read at03888232d. Conformance319 split1-170/171-319 after initial truncated output was discarded; procedures207 split1-160/161-207. Other files whole. Auth/user scope, write fence, billing access, private error/logging and conformance child-env/dependency boundaries cross-checked. Synthetic/static test guarantees remain separate from live environment evidence."
+      ],
+      "questions": [
+        "Continue actual UI gate callsites, full billing package/source and clock/failure recovery. Existing mock/static tests are not live trial/CDN/RLS evidence."
+      ]
     },
     {
       "path": "apps/product/src/lib/billing/BillingAccessProvider.tsx",
@@ -17786,11 +17808,15 @@
       "mode": "100644",
       "bytes": 3822,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
-      "questions": []
+      "read_ranges": [[1, 110]],
+      "evidence": [
+        "Full 110-line baseline-equal current first-party source read at03888232d. Conformance319 split1-170/171-319 after initial truncated output was discarded; procedures207 split1-160/161-207. Other files whole. Auth/user scope, write fence, billing access, private error/logging and conformance child-env/dependency boundaries cross-checked. Synthetic/static test guarantees remain separate from live environment evidence."
+      ],
+      "questions": [
+        "Continue actual UI gate callsites, full billing package/source and clock/failure recovery. Existing mock/static tests are not live trial/CDN/RLS evidence."
+      ]
     },
     {
       "path": "apps/product/src/lib/billing/access-service.test.ts",
@@ -17799,11 +17825,15 @@
       "mode": "100644",
       "bytes": 2993,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
-      "questions": []
+      "read_ranges": [[1, 70]],
+      "evidence": [
+        "Full 70-line baseline-equal current first-party source read at03888232d. Conformance319 split1-170/171-319 after initial truncated output was discarded; procedures207 split1-160/161-207. Other files whole. Auth/user scope, write fence, billing access, private error/logging and conformance child-env/dependency boundaries cross-checked. Synthetic/static test guarantees remain separate from live environment evidence."
+      ],
+      "questions": [
+        "Continue actual UI gate callsites, full billing package/source and clock/failure recovery. Existing mock/static tests are not live trial/CDN/RLS evidence."
+      ]
     },
     {
       "path": "apps/product/src/lib/billing/access-service.ts",
@@ -17812,11 +17842,15 @@
       "mode": "100644",
       "bytes": 2730,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
-      "questions": []
+      "read_ranges": [[1, 80]],
+      "evidence": [
+        "Full 80-line baseline-equal current first-party source read at03888232d. Conformance319 split1-170/171-319 after initial truncated output was discarded; procedures207 split1-160/161-207. Other files whole. Auth/user scope, write fence, billing access, private error/logging and conformance child-env/dependency boundaries cross-checked. Synthetic/static test guarantees remain separate from live environment evidence."
+      ],
+      "questions": [
+        "Continue actual UI gate callsites, full billing package/source and clock/failure recovery. Existing mock/static tests are not live trial/CDN/RLS evidence."
+      ]
     },
     {
       "path": "apps/product/src/lib/billing/billing-access-context.ts",
@@ -17825,11 +17859,15 @@
       "mode": "100644",
       "bytes": 377,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
-      "questions": []
+      "read_ranges": [[1, 15]],
+      "evidence": [
+        "Full 15-line baseline-equal current first-party source read at03888232d. Conformance319 split1-170/171-319 after initial truncated output was discarded; procedures207 split1-160/161-207. Other files whole. Auth/user scope, write fence, billing access, private error/logging and conformance child-env/dependency boundaries cross-checked. Synthetic/static test guarantees remain separate from live environment evidence."
+      ],
+      "questions": [
+        "Continue actual UI gate callsites, full billing package/source and clock/failure recovery. Existing mock/static tests are not live trial/CDN/RLS evidence."
+      ]
     },
     {
       "path": "apps/product/src/lib/billing/client-access-error.ts",
@@ -17838,11 +17876,15 @@
       "mode": "100644",
       "bytes": 391,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
-      "questions": []
+      "read_ranges": [[1, 11]],
+      "evidence": [
+        "Full 11-line baseline-equal current first-party source read at03888232d. Conformance319 split1-170/171-319 after initial truncated output was discarded; procedures207 split1-160/161-207. Other files whole. Auth/user scope, write fence, billing access, private error/logging and conformance child-env/dependency boundaries cross-checked. Synthetic/static test guarantees remain separate from live environment evidence."
+      ],
+      "questions": [
+        "Continue actual UI gate callsites, full billing package/source and clock/failure recovery. Existing mock/static tests are not live trial/CDN/RLS evidence."
+      ]
     },
     {
       "path": "apps/product/src/lib/billing/enforcement-flag.ts",
@@ -17851,11 +17893,15 @@
       "mode": "100644",
       "bytes": 143,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
-      "questions": []
+      "read_ranges": [[1, 6]],
+      "evidence": [
+        "Full 6-line baseline-equal current first-party source read at03888232d. Conformance319 split1-170/171-319 after initial truncated output was discarded; procedures207 split1-160/161-207. Other files whole. Auth/user scope, write fence, billing access, private error/logging and conformance child-env/dependency boundaries cross-checked. Synthetic/static test guarantees remain separate from live environment evidence."
+      ],
+      "questions": [
+        "Continue actual UI gate callsites, full billing package/source and clock/failure recovery. Existing mock/static tests are not live trial/CDN/RLS evidence."
+      ]
     },
     {
       "path": "apps/product/src/lib/billing/enforcement.ts",
@@ -17864,11 +17910,15 @@
       "mode": "100644",
       "bytes": 794,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
-      "questions": []
+      "read_ranges": [[1, 21]],
+      "evidence": [
+        "Full 21-line baseline-equal current first-party source read at03888232d. Conformance319 split1-170/171-319 after initial truncated output was discarded; procedures207 split1-160/161-207. Other files whole. Auth/user scope, write fence, billing access, private error/logging and conformance child-env/dependency boundaries cross-checked. Synthetic/static test guarantees remain separate from live environment evidence."
+      ],
+      "questions": [
+        "Continue actual UI gate callsites, full billing package/source and clock/failure recovery. Existing mock/static tests are not live trial/CDN/RLS evidence."
+      ]
     },
     {
       "path": "apps/product/src/lib/billing/operation-access.test.ts",
@@ -17877,11 +17927,15 @@
       "mode": "100644",
       "bytes": 1688,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
-      "questions": []
+      "read_ranges": [[1, 45]],
+      "evidence": [
+        "Full 45-line baseline-equal current first-party source read at03888232d. Conformance319 split1-170/171-319 after initial truncated output was discarded; procedures207 split1-160/161-207. Other files whole. Auth/user scope, write fence, billing access, private error/logging and conformance child-env/dependency boundaries cross-checked. Synthetic/static test guarantees remain separate from live environment evidence."
+      ],
+      "questions": [
+        "Continue actual UI gate callsites, full billing package/source and clock/failure recovery. Existing mock/static tests are not live trial/CDN/RLS evidence."
+      ]
     },
     {
       "path": "apps/product/src/lib/billing/operation-access.ts",
@@ -17905,11 +17959,15 @@
       "mode": "100644",
       "bytes": 1398,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
-      "questions": []
+      "read_ranges": [[1, 47]],
+      "evidence": [
+        "Full 47-line baseline-equal current first-party source read at03888232d. Conformance319 split1-170/171-319 after initial truncated output was discarded; procedures207 split1-160/161-207. Other files whole. Auth/user scope, write fence, billing access, private error/logging and conformance child-env/dependency boundaries cross-checked. Synthetic/static test guarantees remain separate from live environment evidence."
+      ],
+      "questions": [
+        "Continue actual UI gate callsites, full billing package/source and clock/failure recovery. Existing mock/static tests are not live trial/CDN/RLS evidence."
+      ]
     },
     {
       "path": "apps/product/src/lib/billing/useProductAccessGate.ts",
@@ -17918,11 +17976,15 @@
       "mode": "100644",
       "bytes": 1273,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
-      "questions": []
+      "read_ranges": [[1, 32]],
+      "evidence": [
+        "Full 32-line baseline-equal current first-party source read at03888232d. Conformance319 split1-170/171-319 after initial truncated output was discarded; procedures207 split1-160/161-207. Other files whole. Auth/user scope, write fence, billing access, private error/logging and conformance child-env/dependency boundaries cross-checked. Synthetic/static test guarantees remain separate from live environment evidence."
+      ],
+      "questions": [
+        "Continue actual UI gate callsites, full billing package/source and clock/failure recovery. Existing mock/static tests are not live trial/CDN/RLS evidence."
+      ]
     },
     {
       "path": "apps/product/src/lib/breakpoints.test.ts",
@@ -21855,10 +21917,12 @@
       "mode": "100644",
       "bytes": 1690,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 40]],
+      "evidence": [
+        "Full 40-line baseline-equal current first-party source read at03888232d. Conformance319 split1-170/171-319 after initial truncated output was discarded; procedures207 split1-160/161-207. Other files whole. Auth/user scope, write fence, billing access, private error/logging and conformance child-env/dependency boundaries cross-checked. Synthetic/static test guarantees remain separate from live environment evidence."
+      ],
       "questions": []
     },
     {
@@ -21868,10 +21932,12 @@
       "mode": "100644",
       "bytes": 2520,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 46]],
+      "evidence": [
+        "Full 46-line baseline-equal current first-party source read at03888232d. Conformance319 split1-170/171-319 after initial truncated output was discarded; procedures207 split1-160/161-207. Other files whole. Auth/user scope, write fence, billing access, private error/logging and conformance child-env/dependency boundaries cross-checked. Synthetic/static test guarantees remain separate from live environment evidence."
+      ],
       "questions": []
     },
     {
@@ -21941,10 +22007,12 @@
       "mode": "100644",
       "bytes": 5636,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 133]],
+      "evidence": [
+        "Full 133-line baseline-equal current first-party source read at03888232d. Conformance319 split1-170/171-319 after initial truncated output was discarded; procedures207 split1-160/161-207. Other files whole. Auth/user scope, write fence, billing access, private error/logging and conformance child-env/dependency boundaries cross-checked. Synthetic/static test guarantees remain separate from live environment evidence."
+      ],
       "questions": []
     },
     {
@@ -21954,10 +22022,12 @@
       "mode": "100644",
       "bytes": 5747,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 166]],
+      "evidence": [
+        "Full 166-line baseline-equal current first-party source read at03888232d. Conformance319 split1-170/171-319 after initial truncated output was discarded; procedures207 split1-160/161-207. Other files whole. Auth/user scope, write fence, billing access, private error/logging and conformance child-env/dependency boundaries cross-checked. Synthetic/static test guarantees remain separate from live environment evidence."
+      ],
       "questions": []
     },
     {
@@ -21967,10 +22037,12 @@
       "mode": "100644",
       "bytes": 5866,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 190]],
+      "evidence": [
+        "Full 190-line baseline-equal current first-party source read at03888232d. Conformance319 split1-170/171-319 after initial truncated output was discarded; procedures207 split1-160/161-207. Other files whole. Auth/user scope, write fence, billing access, private error/logging and conformance child-env/dependency boundaries cross-checked. Synthetic/static test guarantees remain separate from live environment evidence."
+      ],
       "questions": []
     },
     {
@@ -21980,10 +22052,12 @@
       "mode": "100644",
       "bytes": 4861,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 131]],
+      "evidence": [
+        "Full 131-line baseline-equal current first-party source read at03888232d. Conformance319 split1-170/171-319 after initial truncated output was discarded; procedures207 split1-160/161-207. Other files whole. Auth/user scope, write fence, billing access, private error/logging and conformance child-env/dependency boundaries cross-checked. Synthetic/static test guarantees remain separate from live environment evidence."
+      ],
       "questions": []
     },
     {
@@ -21993,10 +22067,12 @@
       "mode": "100644",
       "bytes": 2058,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 56]],
+      "evidence": [
+        "Full 56-line baseline-equal current first-party source read at03888232d. Conformance319 split1-170/171-319 after initial truncated output was discarded; procedures207 split1-160/161-207. Other files whole. Auth/user scope, write fence, billing access, private error/logging and conformance child-env/dependency boundaries cross-checked. Synthetic/static test guarantees remain separate from live environment evidence."
+      ],
       "questions": []
     },
     {
@@ -22021,10 +22097,12 @@
       "mode": "100644",
       "bytes": 1380,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 35]],
+      "evidence": [
+        "Full 35-line baseline-equal current first-party source read at03888232d. Conformance319 split1-170/171-319 after initial truncated output was discarded; procedures207 split1-160/161-207. Other files whole. Auth/user scope, write fence, billing access, private error/logging and conformance child-env/dependency boundaries cross-checked. Synthetic/static test guarantees remain separate from live environment evidence."
+      ],
       "questions": []
     },
     {
@@ -22034,10 +22112,12 @@
       "mode": "100644",
       "bytes": 949,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 24]],
+      "evidence": [
+        "Full 24-line baseline-equal current first-party source read at03888232d. Conformance319 split1-170/171-319 after initial truncated output was discarded; procedures207 split1-160/161-207. Other files whole. Auth/user scope, write fence, billing access, private error/logging and conformance child-env/dependency boundaries cross-checked. Synthetic/static test guarantees remain separate from live environment evidence."
+      ],
       "questions": []
     },
     {
@@ -22047,10 +22127,12 @@
       "mode": "100644",
       "bytes": 4421,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 103]],
+      "evidence": [
+        "Full 103-line baseline-equal current first-party source read at03888232d. Conformance319 split1-170/171-319 after initial truncated output was discarded; procedures207 split1-160/161-207. Other files whole. Auth/user scope, write fence, billing access, private error/logging and conformance child-env/dependency boundaries cross-checked. Synthetic/static test guarantees remain separate from live environment evidence."
+      ],
       "questions": []
     },
     {
@@ -22060,10 +22142,12 @@
       "mode": "100644",
       "bytes": 7661,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 207]],
+      "evidence": [
+        "Full 207-line baseline-equal current first-party source read at03888232d. Conformance319 split1-170/171-319 after initial truncated output was discarded; procedures207 split1-160/161-207. Other files whole. Auth/user scope, write fence, billing access, private error/logging and conformance child-env/dependency boundaries cross-checked. Synthetic/static test guarantees remain separate from live environment evidence."
+      ],
       "questions": []
     },
     {
@@ -22103,10 +22187,12 @@
       "mode": "100644",
       "bytes": 79,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 1]],
+      "evidence": [
+        "Full 1-line baseline-equal current first-party source read at03888232d. Conformance319 split1-170/171-319 after initial truncated output was discarded; procedures207 split1-160/161-207. Other files whole. Auth/user scope, write fence, billing access, private error/logging and conformance child-env/dependency boundaries cross-checked. Synthetic/static test guarantees remain separate from live environment evidence."
+      ],
       "questions": []
     },
     {
@@ -22116,10 +22202,12 @@
       "mode": "100644",
       "bytes": 2235,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 79]],
+      "evidence": [
+        "Full 79-line baseline-equal current first-party source read at03888232d. Conformance319 split1-170/171-319 after initial truncated output was discarded; procedures207 split1-160/161-207. Other files whole. Auth/user scope, write fence, billing access, private error/logging and conformance child-env/dependency boundaries cross-checked. Synthetic/static test guarantees remain separate from live environment evidence."
+      ],
       "questions": []
     },
     {
@@ -22182,10 +22270,12 @@
       "mode": "100644",
       "bytes": 1702,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 54]],
+      "evidence": [
+        "Full 54-line baseline-equal current first-party source read at03888232d. Conformance319 split1-170/171-319 after initial truncated output was discarded; procedures207 split1-160/161-207. Other files whole. Auth/user scope, write fence, billing access, private error/logging and conformance child-env/dependency boundaries cross-checked. Synthetic/static test guarantees remain separate from live environment evidence."
+      ],
       "questions": []
     },
     {
@@ -30218,10 +30308,12 @@
       "mode": "100644",
       "bytes": 3759,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 62]],
+      "evidence": [
+        "Full untruncated read at03888232d, original bytes match baseline. Current45-day app access versus legacy7-day Stripe trial and modal/banner ownership cross-checked. Original hook/README reviewed before F046/F047 edits; no live billing evidence."
+      ],
       "questions": []
     },
     {
@@ -30231,10 +30323,12 @@
       "mode": "100644",
       "bytes": 173,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 4]],
+      "evidence": [
+        "Full untruncated read at03888232d, original bytes match baseline. Current45-day app access versus legacy7-day Stripe trial and modal/banner ownership cross-checked. Original hook/README reviewed before F046/F047 edits; no live billing evidence."
+      ],
       "questions": []
     },
     {
@@ -30244,10 +30338,12 @@
       "mode": "100644",
       "bytes": 419,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 20]],
+      "evidence": [
+        "Full untruncated read at03888232d, original bytes match baseline. Current45-day app access versus legacy7-day Stripe trial and modal/banner ownership cross-checked. Original hook/README reviewed before F046/F047 edits; no live billing evidence."
+      ],
       "questions": []
     },
     {
@@ -30257,10 +30353,12 @@
       "mode": "100644",
       "bytes": 2118,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 66]],
+      "evidence": [
+        "Full untruncated read at03888232d, original bytes match baseline. Current45-day app access versus legacy7-day Stripe trial and modal/banner ownership cross-checked. Original hook/README reviewed before F046/F047 edits; no live billing evidence."
+      ],
       "questions": []
     },
     {
@@ -30270,10 +30368,12 @@
       "mode": "100644",
       "bytes": 1599,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 50]],
+      "evidence": [
+        "Full untruncated read at03888232d, original bytes match baseline. Current45-day app access versus legacy7-day Stripe trial and modal/banner ownership cross-checked. Original hook/README reviewed before F046/F047 edits; no live billing evidence."
+      ],
       "questions": []
     },
     {
@@ -30283,10 +30383,12 @@
       "mode": "100644",
       "bytes": 446,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 15]],
+      "evidence": [
+        "Full untruncated read at03888232d, original bytes match baseline. Current45-day app access versus legacy7-day Stripe trial and modal/banner ownership cross-checked. Original hook/README reviewed before F046/F047 edits; no live billing evidence."
+      ],
       "questions": []
     },
     {
@@ -30296,10 +30398,12 @@
       "mode": "100644",
       "bytes": 793,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 20]],
+      "evidence": [
+        "Full untruncated read at03888232d, original bytes match baseline. Current45-day app access versus legacy7-day Stripe trial and modal/banner ownership cross-checked. Original hook/README reviewed before F046/F047 edits; no live billing evidence."
+      ],
       "questions": []
     },
     {
@@ -30309,10 +30413,12 @@
       "mode": "100644",
       "bytes": 141,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 5]],
+      "evidence": [
+        "Full untruncated read at03888232d, original bytes match baseline. Current45-day app access versus legacy7-day Stripe trial and modal/banner ownership cross-checked. Original hook/README reviewed before F046/F047 edits; no live billing evidence."
+      ],
       "questions": []
     },
     {
@@ -30322,10 +30428,12 @@
       "mode": "100644",
       "bytes": 536,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 26]],
+      "evidence": [
+        "Full untruncated read at03888232d, original bytes match baseline. Current45-day app access versus legacy7-day Stripe trial and modal/banner ownership cross-checked. Original hook/README reviewed before F046/F047 edits; no live billing evidence."
+      ],
       "questions": []
     },
     {
@@ -30335,10 +30443,12 @@
       "mode": "100644",
       "bytes": 850,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 33]],
+      "evidence": [
+        "Full untruncated read at03888232d, original bytes match baseline. Current45-day app access versus legacy7-day Stripe trial and modal/banner ownership cross-checked. Original hook/README reviewed before F046/F047 edits; no live billing evidence."
+      ],
       "questions": []
     },
     {
@@ -30348,10 +30458,12 @@
       "mode": "100644",
       "bytes": 1639,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 47]],
+      "evidence": [
+        "Full untruncated read at03888232d, original bytes match baseline. Current45-day app access versus legacy7-day Stripe trial and modal/banner ownership cross-checked. Original hook/README reviewed before F046/F047 edits; no live billing evidence."
+      ],
       "questions": []
     },
     {
@@ -30361,10 +30473,12 @@
       "mode": "100644",
       "bytes": 74,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 4]],
+      "evidence": [
+        "Full untruncated read at03888232d, original bytes match baseline. Current45-day app access versus legacy7-day Stripe trial and modal/banner ownership cross-checked. Original hook/README reviewed before F046/F047 edits; no live billing evidence."
+      ],
       "questions": []
     },
     {
@@ -32259,10 +32373,12 @@
       "mode": "100644",
       "bytes": 7649,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 174]],
+      "evidence": [
+        "Full 174-line baseline-equal current first-party source read at03888232d. Conformance319 split1-170/171-319 after initial truncated output was discarded; procedures207 split1-160/161-207. Other files whole. Auth/user scope, write fence, billing access, private error/logging and conformance child-env/dependency boundaries cross-checked. Synthetic/static test guarantees remain separate from live environment evidence."
+      ],
       "questions": []
     },
     {
@@ -42295,6 +42411,45 @@
       "read_ranges": [[1, 327]],
       "evidence": [
         "Baseline previously fully read; exact complete F044 diff read, final generated/written source reviewed. Source7-line guard preserves known auth failure across SDK removal; tests add four sequential mock cases and three real SDK/synthetic HTTP latency countercases. Red3/18 and green21, related145. Whole check running, no deployment proof."
+      ],
+      "questions": []
+    },
+    {
+      "path": "apps/product/src/lib/trpc/query-client.ts",
+      "sha": "03888232d88a1c89f6d5136bab8bb2de79c11969",
+      "change": "M",
+      "blob": "8d399a4f1dc7986be8441ec93a17c6ffad3aa3b0",
+      "method": "full-text",
+      "status": "full-text-reviewed",
+      "read_ranges": [[1, 134]],
+      "evidence": [
+        "Upstream#2971 delta completely read and merged in owned checkout. Conflict resolved by preserving original cancellation test block plus all four upstream billing cases and combining imports. Final factory whole read, exact test-block deltas reviewed. Related QueryClient8/sessionAuth21 pass (29); integrated check running at03888232d. Not new baseline reading or real billing proof."
+      ],
+      "questions": []
+    },
+    {
+      "path": "apps/product/src/lib/trpc/query-client.test.ts",
+      "sha": "03888232d88a1c89f6d5136bab8bb2de79c11969",
+      "change": "M",
+      "blob": "5c17fe7a270ed65201d63ffce7d4398d0ea9d1fd",
+      "method": "full-text",
+      "status": "full-text-reviewed",
+      "read_ranges": [[1, 155]],
+      "evidence": [
+        "Upstream#2971 delta completely read and merged in owned checkout. Conflict resolved by preserving original cancellation test block plus all four upstream billing cases and combining imports. Final factory whole read, exact test-block deltas reviewed. Related QueryClient8/sessionAuth21 pass (29); integrated check running at03888232d. Not new baseline reading or real billing proof."
+      ],
+      "questions": []
+    },
+    {
+      "path": "apps/product/src/features/settings/hooks/useTrialEndedDialog.test.tsx",
+      "sha": "51bc4196ca138e10043a0c15ea874ee929b996cf",
+      "change": "A",
+      "blob": "48c177806eefb7e673d9bb07cee2c7921d6989b6",
+      "method": "full-text",
+      "status": "full-text-reviewed",
+      "read_ranges": [[1, 86]],
+      "evidence": [
+        "All86 lines reviewed; production hook/real context10 cases, red4/6 before source edit, green10; related Provider4. Synthetic data only. New file separately tracked, not baseline count."
       ],
       "questions": []
     }

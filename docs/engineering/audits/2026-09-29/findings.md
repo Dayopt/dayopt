@@ -430,3 +430,27 @@ H041 integrated main verification: sourceb0deb289d830461ff92c63103d60e04f1925a95
 F044 whole verification: product8e172d847 full Node24 pnpm check exit0,7700 passed (product4586); docs:check exit0, source/test bytes unchanged after validation. Publication follows normalhooks; production/HTTP-runtime reachability remains unverified.
 
 F044 published e2fd91c62a5ae8a2a4306bb21329190f2c942a8d via normalhook; OPEN/Draft API verified. Issue record5902814607. Dependency warning candidate remains unadopted: installed undici7.29.0 dev graph, registry audit10 distinct advisories, metadata12 findings, snapshot SHA2562ee249599b2da63517d505d77593abd6b91bbdae66244329907afe9960ae928d; Dependabot details403. Read primary maintainer evidence and actual reachability before changing dependencies or claiming production exposure.
+
+## F045 — 現行lockfileのundici security advisory（既存PR追跡）
+
+- 根拠: Node24 pnpm audit snapshotはundici7.29.0の10 distinct advisory、metadata12 findingsを返す。Installed graphはAI/provider/gateway開発toolとMCP conformance開発tool。maintainer [7.29.1 security release](https://github.com/nodejs/undici/releases/tag/v7.29.1) と [7.30.0 release](https://github.com/nodejs/undici/releases/tag/v7.30.0) を照合。
+- 反証/限界: developer dependencyでも動的Agent/fetch経路は存在するが、全advisoryの脆弱経路を使うとの証明ではない。本番観測/実攻撃の再現なし。GitHub default-branch9件とregistry metadata12件は別snapshot。Dependabot詳細API403は一度確認、繰返しなし。
+- 方針/状態: 既存#2972がlockfile/integrity/snapshot/2edgesの7.30.0更新を準備済み。headfd689816aeea004970b1f05907dc708030342b1f exactdiff確認、通常CIの表示確認、監査結果を https://github.com/Dayopt/dayopt/pull/2972#issuecomment-5902880240 へ追記。重複PR/Issue作成・他branch変更なし。現在の監査checkoutの依存7.29.0は未解消、merge/配信待ちを修正完了とは数えない。追加の顧客判断はなく、通常レビュー/明示merge権限が再開条件。
+
+#2971 integration source03888232d merges upstream billing-overview freshness with H041 cancellation: real QueryClient observer/hydration8 plus sessionAuth21 passed; source unchanged after merge. Full integration check running; current7700 evidence does not yet cover main delta. Internal error allowlist, expected reporting, private search logs, MFA/session/service-role boundaries and server/client billing access full-read cross-check found no additional adopted defect in this reading group. Actual cloud/CDN/RLS/billing flows remain unverified.
+
+## F046 — 新方式の体験に旧Freeへの終了ダイアログが表示される
+
+- 契約: #2610と現行billing仕様はカード不要45日体験と単一有料プラン。購入中断・incompleteだけでは体験を消費しない。終了案内は実際の利用状態に基づく既存inline bannerが担当する。
+- 条件/原因: 認証済みshellに常設された旧hookがfree statusとStripe Customerの存在だけで旧「Freeで続ける」ダイアログを開く。Customerは中断・失敗したCheckoutでも存在し、体験終了の証明にならない。
+- 反証: enforcement offでは旧7日Stripe trialの互換経路が現存するため、旧hook/componentや保存済みdismissalを全面削除しない。新方式のexpiredも旧Freeへ誘導しない。実ブラウザ・Stripe・本番の観測とは区別する。
+- 再現/修正: production hookと実BillingAccessContextで新方式4状態がred4/既存6成功、`/tmp/dayopt-audit-trial-dialog-red.log`。enforced時だけ旧noticeを抑止。同じ10件green、Provider4と計14成功、`/tmp/dayopt-audit-trial-dialog-green-final.log`。旧方式の表示・実close後のlocal/persisted dismissalを検証した。
+- 状態: product `51bc4196ca138e10043a0c15ea874ee929b996cf`、全体check進行中。新たなmodalや操作は追加せず、既存の新方式案内経路を維持。Mission#2963で追跡。
+
+## F047 — billing packageの説明が旧機能別Free/Pro認可を正本としている
+
+- 根拠: package全ソースとREADME、現行service/procedure/providerを全文照合。access.tsの45日・1080時間モデルがREADMEの構造から抜け、旧entitlementと7日trialを現行共通ルールとして説明していた。
+- 修正: access.tsと現行認可経路を説明し、旧識別子・entitlement・Stripe trialを互換用途として明記。既存consumerのある定数は削除しない。価格・課金・実行環境設定は変更しない。
+- 状態: F046と同じproduct SHAに文書修正。architecture生成差分は新規test行・件数だけを機械照合。docs検証は別途記録する。
+
+F046/F047 final verification: product51bc4196ca138e10043a0c15ea874ee929b996cf whole Node24 check exit0,7714 passed (product4600), /tmp/dayopt-audit-check-trial-dialog.log; docs:check exit0 /tmp/dayopt-audit-trial-docs.log. Source/test bytes frozen; audit-only evidence commit and normal publication follow. The separate existing banner suite6 passes legacy Portal/polling only, not current expiry browser evidence.
