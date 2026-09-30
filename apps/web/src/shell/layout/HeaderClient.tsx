@@ -1,10 +1,10 @@
 'use client';
 
-import { Button, cn, Logo } from '@dayopt/components';
+import { Button, cn } from '@dayopt/components';
 import { Menu } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { lazy, Suspense, useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from 'react';
 
 import { trackSignupCta } from '@web/platform/analytics/signup-cta';
 import { productLoginUrl, productSignupUrl } from '@web/platform/config/product-signup-url';
@@ -27,11 +27,13 @@ export interface HeaderLabels {
 
 export function HeaderClient({
   locale,
+  logo,
   homeUrl,
   navigation,
   labels,
 }: {
   locale: string;
+  logo: ReactNode;
   homeUrl: string;
   navigation: Array<{ name: string; href: string; url: string }>;
   labels: HeaderLabels;
@@ -81,8 +83,7 @@ export function HeaderClient({
         {/* Logo */}
         <div className="flex lg:flex-1">
           <Link href={homeUrl} prefetch={false} className="flex items-center gap-2">
-            <Logo variant="lockup" size="sm" className="lg:hidden" />
-            <Logo variant="lockup" size="md" className="hidden lg:inline-flex" />
+            {logo}
           </Link>
         </div>
 

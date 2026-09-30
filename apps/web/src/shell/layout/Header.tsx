@@ -1,3 +1,4 @@
+import { Logo } from '@dayopt/components';
 import type { Locale } from '@dayopt/i18n/routing';
 import { sitePath } from '@web/platform/i18n/site-path';
 import { useLocale, useTranslations } from 'next-intl';
@@ -16,6 +17,12 @@ export function Header() {
   return (
     <HeaderClient
       locale={locale}
+      logo={
+        <>
+          <Logo variant="lockup" size="sm" className="lg:hidden" />
+          <Logo variant="lockup" size="md" className="hidden lg:inline-flex" />
+        </>
+      }
       homeUrl={sitePath('/', locale)}
       navigation={navigation}
       labels={{

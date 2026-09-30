@@ -1,6 +1,8 @@
 import { Noto_Sans_JP } from 'next/font/google';
 import type { ReactNode } from 'react';
 
+import './ContentTypography.css';
+
 // LP の共通文言は root の subset で網羅する。本文・検索結果・入力文字には
 // 既存の全文字フォントも必要なので、この定義を各 content route で読み込む。
 const fullJapanese = Noto_Sans_JP({

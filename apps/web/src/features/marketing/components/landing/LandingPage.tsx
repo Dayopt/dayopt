@@ -204,7 +204,11 @@ export async function LandingPage({ locale }: LandingPageProps) {
             />
             <p>{t('landing.activities.body')}</p>
           </div>
-          <div className={styles.activityLibrary} aria-label={t('landing.activities.exampleLabel')}>
+          <div
+            className={styles.activityLibrary}
+            role="group"
+            aria-label={t('landing.activities.exampleLabel')}
+          >
             {[
               {
                 name: t('landing.activities.learning'),

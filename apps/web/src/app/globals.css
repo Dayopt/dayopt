@@ -6,7 +6,6 @@
 @source not '../**/*.stories.tsx';
 @source not '../**/*.test.tsx';
 @source not '../test';
-@import 'highlight.js/styles/github.css';
 
 /* Design Tokens（@dayopt/foundations が単一ソース） */
 @import '@dayopt/foundations/tokens.css';
@@ -16,9 +15,6 @@
 
 /* Utilities（hero の静的装飾とローディング表示を含む） */
 @import '../styles/utilities.css';
-
-/* Tailwind Plugins */
-@plugin '@tailwindcss/typography';
 
 /* Tailwind v4 ダークモード設定（現行推奨形: @custom-variant） */
 @custom-variant dark (&:where(.dark, .dark *));
