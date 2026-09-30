@@ -42101,6 +42101,19 @@
         "PR #2968 non-JSON delta and new runner read fully without truncation. Artifact is generated experimental evidence: parsed completely; 13 unique results, 106 unique test identities, totals/failure membership/source and four file hashes match main. Reports 12 killed/1 survived. Saved messages omit full stacks/log bodies; metadata is not proof of current runtime or reproducible classification. Historical check/log checksum not used as current validation. Baseline denominator and unread statuses unchanged."
       ],
       "questions": []
+    },
+    {
+      "path": "apps/product/src/features/timeblock/server/statistics-fetchers.test.ts",
+      "sha": "083d08f1ad6dfa9f0ec735f06dd4f1a213091810",
+      "change": "A",
+      "blob": "992dcab5a2680caa63d9937788f91fb83280653a",
+      "method": "full-text",
+      "status": "full-text-reviewed",
+      "read_ranges": [[1, 52]],
+      "evidence": [
+        "New first-party52-line test fully read. Literal lower/upper clipping and full Record duration, owner/deletion/overlap predicates verified. Red1/1 then green2; not counted as baseline reading."
+      ],
+      "questions": []
     }
   ]
 }
