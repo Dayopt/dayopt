@@ -18,6 +18,7 @@ const CLIENT_SAFE_SERVICE_CODES = new Set([
   'STALE_VERSION',
   'TEMPORARY_FAILURE',
   'TIME_OVERLAP',
+  'EXTERNAL_CALENDAR_ALREADY_CONVERTED',
   // Timeblock: 時刻規則（DT003 / DT005）の拒否。UI 側の写しを外しても汎用の
   // saveFailed へ退化しないよう、規則ごとの文言へ写像できるようにする（#2628）。
   // 規則そのものは公開仕様（MCP `constraints.get` が同じものを返す）なので、

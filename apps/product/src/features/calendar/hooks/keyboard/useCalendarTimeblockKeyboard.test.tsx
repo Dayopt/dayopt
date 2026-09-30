@@ -66,6 +66,14 @@ describe('useCalendarEventKeyboard delete', () => {
     });
   });
 
+  it('Timeblockのコピーと貼り付けショートカットを登録しない', () => {
+    renderHook(() => useCalendarEventKeyboard({}));
+
+    const keys = mocks.shortcuts.map((shortcut) => shortcut.key);
+    expect(keys).not.toContain('Cmd+C');
+    expect(keys).not.toContain('Cmd+V');
+  });
+
   it('CAS conflictで削除されなかった時はInspectorを閉じない', async () => {
     const onDeleteTimeblock = vi.fn().mockResolvedValue(false);
     renderHook(() => useCalendarEventKeyboard({ onDeleteTimeblock }));

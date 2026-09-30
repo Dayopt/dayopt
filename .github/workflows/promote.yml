@@ -387,12 +387,14 @@ jobs:
             --jq '[.[] | select(.title | startswith(env.TITLE_PREFIX))][0].number // empty')
 
           if [ -n "$existing" ]; then
+            issue_number="$existing"
             gh issue comment "$existing" --repo "$GITHUB_REPOSITORY" --body "$body"
           else
-            gh issue create --repo "$GITHUB_REPOSITORY" \
+            issue_url=$(gh issue create --repo "$GITHUB_REPOSITORY" \
               --title "$title_prefix" \
-              --label "area:deployment,priority:p1" \
-              --body "$body"
+              --label "type:bug,area:deployment" \
+              --body "$body")
+            issue_number="${issue_url##*/}"
           fi
 
   # ─── promote 本体（層 4）────────────────────────────────────────────────

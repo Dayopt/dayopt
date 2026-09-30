@@ -1,12 +1,12 @@
 name: Docs
 description: ドキュメントの新規作成・更新・監査での発見事項
 title: 'docs: '
-labels: ['type:docs']
+labels: ['type:task']
 body:
   - type: markdown
     attributes:
       value: |
-        `priority:` / `area:` は [github-labels.md](https://github.com/Dayopt/dayopt/blob/main/docs/operations/github-labels.md) の一覧から選んで追加する。**milestone は付けない**（着手時に Main が付与する。`.agents/skills/dispatch/SKILL.md` 操作 A）。
+        `area:` は [github-labels.md](https://github.com/Dayopt/dayopt/blob/main/docs/operations/github-labels.md) の一覧から選ぶ。**milestone は付けない**（着手時に Main が付与する。`.agents/skills/dispatch/SKILL.md` 操作 A）。
   - type: textarea
     id: background
     attributes:

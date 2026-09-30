@@ -12,8 +12,10 @@ import {
 } from '@/features/external-calendar/server/connect-flow';
 import {
   CALENDAR_CONNECTION_DB_TIMEOUT_MS,
+  CalendarConnectionSaveError,
+  claimCalendarOAuthAttempt,
   getReconnectTarget,
-  reconnectExistingConnection,
+  reconnectConnection,
   revokeOrphanedGrant,
   saveConnection,
 } from '@/features/external-calendar/server/connection-service';
@@ -41,18 +43,14 @@ import { resolveMfaAssurance } from '@/lib/trpc/session-auth-context';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 /**
- * #1990 の予算検査により「code 消費後に kill される」経路は塞いだが、その予算検査
- * 自体の設計（`POST_EXCHANGE_BUDGET_MS = 45_000` 固定）と `maxDuration` の関係を
- * 指揮台が再検討した（PR #2075 クロスレビュー、risk/behavior 両者一致）。
+ * #1990 の予算検査により「code 消費後に kill される」経路は塞いだ。
+ * OAuth attempt claim を追加したため、code を消費する前に claim・token 交換・fenced save
+ * の timeout 合計（`PRE_CLAIM_BUDGET_MS = 45_000`）を確保する。
  *
- * maxDuration=60 のままだと `TIME_BUDGET_MS(50s) - POST_EXCHANGE_BUDGET_MS(45s) = 5s` が
- * code 消費前フェーズ（getUser / MFA / rate limit / write fence / Pro 判定の直列
- * 4〜5 ホップ）の全予算になる。個別 timeout に達しない軽度の遅延（Supabase 1 往復 2s 級）
- * だけで、従来成功していた接続が `budget_exhausted` になる可用性の崖ができる。
- *
- * **指揮台決定**: maxDuration を 90 へ引き上げる（`POST_EXCHANGE_BUDGET_MS` = 45s は
- * 不変）。消費前スラックが 35s に回復し、worst case 総計 80s ≤ 90 で hard kill margin
- * 10s を維持する。安全性（code 消費前後の境界の扱い）は変えず、可用性の崖だけを除去する。
+ * `TIME_BUDGET_MS(80s) - PRE_CLAIM_BUDGET_MS(45s) = 35s` が code 消費前フェーズ
+ * （getUser / MFA / rate limit / write fence / Pro 判定 / reconnect target の直列ホップ）
+ * の予算になる。遅延が大きい場合は、Google code を消費しないまま `budget_exhausted` を返す。
+ * maxDuration=90 により、消費前フェーズに 35s と hard kill margin 10s を残す。
  */
 export const maxDuration = 90;
 
@@ -68,18 +66,19 @@ const TIME_BUDGET_MS = 80_000;
  * （`TOKEN_REQUEST_TIMEOUT_MS`）も危険窓に含める（交換が成功で返ってきてから初めて
  * 危険が始まる、という早合点をしない）。
  *
- * 交換後の DB 書き込みは reconnect 経路（`getReconnectTarget` + `reconnectExistingConnection`
- * の 2 回の DB 往復が直列）を基準にする。新規接続経路（`saveConnection` 1 回）はこれより
- * 短く、常に安全側。`TOKEN_REQUEST_TIMEOUT_MS` / `CALENDAR_CONNECTION_DB_TIMEOUT_MS` から
- * 導出し、手書きの数値を二重管理しない。
+ * OAuth attempt claim を始めてから connection save までの worst case を基準にする。
+ * claim と save は各 1 回の DB 往復、code 交換は Google token endpoint 1 回。
+ * `TOKEN_REQUEST_TIMEOUT_MS` / `CALENDAR_CONNECTION_DB_TIMEOUT_MS` から導出し、数値を
+ * 二重管理しない。
  *
- * #2072 で追加した `revokeOrphanedGrant`（`scope_not_granted` / `account_mismatch` /
- * `reconnect_target_invalid` の失敗パスで best-effort に呼ぶ）はこの定数に**含めない**。
+ * #2072 で追加した `revokeOrphanedGrant`（`scope_not_granted` / `account_mismatch` の
+ * 失敗パスで best-effort に呼ぶ）はこの定数に**含めない**。
  * `revokeOrphanedGrant` は呼び出し時に渡す `deadlineAt`（= この route の `deadlineAt`）を
  * 自分で見て残予算不足なら revoke 自体を skip する自己完結の gate を持つため、
- * `POST_EXCHANGE_BUDGET_MS` を元に `maxDuration` を再導出する計算にこの分を足す必要は無い。
+ * `PRE_CLAIM_BUDGET_MS` の導出にこの分を足す必要は無い。
  */
-const POST_EXCHANGE_BUDGET_MS = TOKEN_REQUEST_TIMEOUT_MS + 2 * CALENDAR_CONNECTION_DB_TIMEOUT_MS;
+const POST_CLAIM_BUDGET_MS = TOKEN_REQUEST_TIMEOUT_MS + CALENDAR_CONNECTION_DB_TIMEOUT_MS;
+const PRE_CLAIM_BUDGET_MS = CALENDAR_CONNECTION_DB_TIMEOUT_MS + POST_CLAIM_BUDGET_MS;
 
 /**
  * Settings への戻り先。
@@ -246,18 +245,39 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     return fail('unsupported_environment');
   }
 
-  // #2156(a): saveConnection / reconnectExistingConnection の throw は下の outer catch
-  // でしか拾えない。token 交換済み・idToken parse 済みになった時点でこれを埋め、outer
+  // #2156(a): token 交換後の失敗は下の outer catch で拾う。idToken parse 済みになった時点で
+  // これを埋め、outer
   // catch は非 undefined なら best-effort で revoke する。try block 内の `const` は
   // catch から参照できないため、hoist して埋める（overview.md §5）。
   let orphanRevokeCandidate: { providerAccountId: string; refreshToken: string } | undefined;
 
   try {
-    // code を消費する（= token 交換を呼ぶ）前に、消費後の DB 書き込みを完走できる見込みが
-    // あるかを検査する（#1990）。ここで諦めれば code は未消費のまま残るので、ユーザーは
-    // Google の認可からやり直さずに再試行できる — 消費後に kill されるより安全側。
-    if (deadlineAt - Date.now() < POST_EXCHANGE_BUDGET_MS) {
+    // 再接続先を先に確かめる。Google code を消費してから対象なしと分かると、使い直せない
+    // code と孤立 grant が残るため、attempt claim / token 交換より前に読む。
+    const reconnectTarget = flowState.reconnectConnectionId
+      ? await getReconnectTarget(user.id, flowState.reconnectConnectionId)
+      : null;
+    if (flowState.reconnectConnectionId && !reconnectTarget) {
+      return fail('reconnect_target_invalid');
+    }
+
+    // code を消費する前に claim・交換・save の各 timeout を確保する（#1990）。ここで諦めれば
+    // code は未消費のまま残り、Google の認可からやり直さずに再試行できる。
+    if (deadlineAt - Date.now() < PRE_CLAIM_BUDGET_MS) {
       logger.warn('[calendar-callback] insufficient time budget remaining before code exchange');
+      return fail('budget_exhausted');
+    }
+
+    await claimCalendarOAuthAttempt({
+      attemptId: flowState.attemptId,
+      userId: user.id,
+      state: flowState.state,
+      verifier: flowState.verifier,
+    });
+
+    // claim RPC が上限まで使った場合は、code 交換を始めず安全に止める。
+    if (deadlineAt - Date.now() < POST_CLAIM_BUDGET_MS) {
+      logger.warn('[calendar-callback] insufficient time budget after OAuth attempt claim');
       return fail('budget_exhausted');
     }
 
@@ -304,6 +324,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     orphanRevokeCandidate = { providerAccountId: idToken.sub, refreshToken: tokens.refresh_token };
 
     const connectionInput = {
+      attemptId: flowState.attemptId,
       userId: user.id,
       providerAccountId: idToken.sub,
       providerAccountEmail: idToken.email ?? null,
@@ -312,46 +333,43 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       encryptionKey: env.CALENDAR_TOKEN_ENCRYPTION_KEY ?? '',
     };
 
-    if (flowState.reconnectConnectionId) {
-      const target = await getReconnectTarget(user.id, flowState.reconnectConnectionId);
-      if (!target) {
-        // #2072: この時点で token 交換済み・idToken parse 済みなので providerAccountId は
-        // 確定している。Dayopt 側に接続行が残らない孤立 grant を best-effort で revoke する。
-        await revokeOrphanedGrant({
-          providerAccountId: idToken.sub,
-          refreshToken: tokens.refresh_token,
-          deadlineAt,
-        });
-        return fail('reconnect_target_invalid');
-      }
-      if (target.providerAccountId !== idToken.sub) {
-        await revokeOrphanedGrant({
-          providerAccountId: idToken.sub,
-          refreshToken: tokens.refresh_token,
-          deadlineAt,
-        });
-        return fail('account_mismatch');
-      }
-
-      const outcome = await reconnectExistingConnection({
-        ...connectionInput,
-        connectionId: flowState.reconnectConnectionId,
+    if (reconnectTarget && reconnectTarget.providerAccountId !== idToken.sub) {
+      await revokeOrphanedGrant({
+        providerAccountId: idToken.sub,
+        refreshToken: tokens.refresh_token,
+        deadlineAt,
       });
-      if (outcome === 'missing') {
-        await revokeOrphanedGrant({
-          providerAccountId: idToken.sub,
-          refreshToken: tokens.refresh_token,
-          deadlineAt,
-        });
-        return fail('reconnect_target_invalid');
-      }
-    } else {
-      await saveConnection(connectionInput);
+      return fail('account_mismatch');
     }
+
+    const saveOutcome = reconnectTarget
+      ? await reconnectConnection({ ...connectionInput, connectionId: reconnectTarget.id })
+      : await saveConnection(connectionInput);
+    if (saveOutcome === 'missing') {
+      await revokeOrphanedGrant({
+        providerAccountId: idToken.sub,
+        refreshToken: tokens.refresh_token,
+        deadlineAt,
+      });
+      return fail('reconnect_target_invalid');
+    }
+    if (saveOutcome === 'enqueued') {
+      // fenced writer は接続を保存せず revoke outbox へ token を移した。二重 revoke はせず、
+      // ユーザーへ接続成功を返さない。
+      orphanRevokeCandidate = undefined;
+      logger.warn('[calendar-callback] calendar connection save was queued for revocation');
+      return fail('connection_failed');
+    }
+    orphanRevokeCandidate = undefined;
   } catch (error) {
-    // #2156(a): saveConnection / reconnectExistingConnection の throw（DB 障害等）は
-    // ここでしか拾えない。token 交換自体が失敗した早期エラー（GoogleOAuthError）では
-    // orphanRevokeCandidate は未設定のまま（idToken parse 前）なので自然に skip される。
+    // #2156(a): token 交換後の失敗はここでしか拾えない。token 交換自体が失敗した早期
+    // エラー（GoogleOAuthError）では orphanRevokeCandidate は未設定のままなので revoke を skip。
+    if (error instanceof CalendarConnectionSaveError && error.commitOutcome === 'unknown') {
+      // save RPC の応答が失われた場合、保存済みの credential を revoke する可能性がある。
+      // まずは接続状態を壊さないことを優先し、Sentry で調査できる状態に残す。
+      orphanRevokeCandidate = undefined;
+      logger.warn('[calendar-callback] connection save outcome is unknown; skipping token revoke');
+    }
     if (orphanRevokeCandidate) {
       await revokeOrphanedGrant({
         providerAccountId: orphanRevokeCandidate.providerAccountId,

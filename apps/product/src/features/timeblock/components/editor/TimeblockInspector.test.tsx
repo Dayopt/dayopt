@@ -1,3 +1,4 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -9,6 +10,7 @@ import { useTimeblockInspectorStore } from '../../stores/useTimeblockInspectorSt
 import { TimeblockInspector } from './TimeblockInspector';
 
 const mocks = vi.hoisted(() => ({
+  isMobile: false,
   planGetById: vi.fn(),
   recordGetById: vi.fn(),
   recordsList: vi.fn(),
@@ -19,7 +21,7 @@ vi.mock('next-intl', () => ({
 }));
 
 vi.mock('@/lib/hooks/useMediaQuery', () => ({
-  useMediaQuery: () => false,
+  useMediaQuery: () => mocks.isMobile,
 }));
 
 vi.mock('@/features/activities', () => ({
@@ -142,13 +144,24 @@ function success<T>(data: T) {
   };
 }
 
+function renderInspector(queryClient = new QueryClient()) {
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <TimeblockInspector />
+    </QueryClientProvider>,
+  );
+}
+
 describe('TimeblockInspector relationships', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.planGetById.mockImplementation((input: { id: string }, options: { enabled: boolean }) => {
-      if (!options.enabled) return success(undefined);
-      return success(input.id === plan.id ? plan : undefined);
-    });
+    mocks.isMobile = false;
+    mocks.planGetById.mockImplementation(
+      (input: { id: string }, options: { enabled: boolean; placeholderData?: PublicPlanRow }) => {
+        if (!options.enabled) return success(undefined);
+        return success(input.id === plan.id ? plan : undefined);
+      },
+    );
     mocks.recordGetById.mockImplementation((input: { id: string }) =>
       success(input.id === record.id ? record : undefined),
     );
@@ -162,7 +175,7 @@ describe('TimeblockInspector relationships', () => {
   it('Planの関連Recordを取得し、同じInspectorでRecordへ切り替えてfocusを戻す', async () => {
     const user = userEvent.setup();
     act(() => useTimeblockInspectorStore.getState().openInspector(plan.id, 'plan'));
-    render(<TimeblockInspector />);
+    renderInspector();
 
     expect(screen.getByRole('region', { name: 'Work' })).toBeInTheDocument();
     expect(screen.getByTestId('inspector-kind')).toHaveTextContent('plan');
@@ -185,7 +198,7 @@ describe('TimeblockInspector relationships', () => {
 
   it('記録詳細は元の予定を取得しない', () => {
     act(() => useTimeblockInspectorStore.getState().openInspector(record.id, 'record'));
-    render(<TimeblockInspector />);
+    renderInspector();
     expect(screen.getByTestId('relationship-status')).toHaveTextContent('none');
     expect(mocks.planGetById.mock.calls.some(([, options]) => options.enabled)).toBe(false);
   });
@@ -203,7 +216,7 @@ describe('TimeblockInspector relationships', () => {
         endAt: plan.end_at,
       }),
     );
-    render(<TimeblockInspector />);
+    renderInspector();
 
     expect(screen.getByRole('region', { name: 'Work' })).toBeInTheDocument();
     expect(screen.getByTestId('inspector-mode')).toHaveTextContent('duplicate');
@@ -216,5 +229,27 @@ describe('TimeblockInspector relationships', () => {
 
     expect(screen.getByTestId('inspector-mode')).toHaveTextContent('view');
     expect(useTimeblockInspectorStore.getState().duplicateDraft).toBeNull();
+  });
+
+  it('モバイルでは一覧キャッシュを使って予定詳細を先行表示する', () => {
+    mocks.isMobile = true;
+    const queryClient = new QueryClient();
+    queryClient.setQueryData([['plans', 'list'], { input: {}, type: 'query' }], [plan]);
+    mocks.planGetById.mockImplementation(
+      (_input: { id: string }, options: { enabled: boolean; placeholderData?: PublicPlanRow }) => ({
+        ...success(options.enabled ? options.placeholderData : undefined),
+        isPlaceholderData: options.enabled && options.placeholderData !== undefined,
+      }),
+    );
+    act(() => useTimeblockInspectorStore.getState().openInspector(plan.id, 'plan'));
+
+    renderInspector(queryClient);
+
+    expect(mocks.planGetById).toHaveBeenCalledWith(
+      { id: plan.id },
+      expect.objectContaining({ placeholderData: plan, enabled: true }),
+    );
+    expect(screen.getByTestId('inspector-kind')).toHaveTextContent('plan');
+    expect(screen.getByTestId('inspector-kind').closest('[inert]')).not.toBeNull();
   });
 });

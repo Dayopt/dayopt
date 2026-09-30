@@ -42,14 +42,15 @@ async function createPlan(input: {
   title: string;
   startAt: string;
   endAt: string;
-  source?: 'manual' | 'api';
+  source?: 'manual' | 'api' | 'external_calendar';
+  externalCalendarEventId?: string;
 }): Promise<PlanRow> {
   const { data, error } = await admin
     .rpc('create_plan_command_v1', {
       p_user_id: userId,
       p_title: input.title,
       p_note: dbNull,
-      p_external_calendar_event_id: dbNull,
+      p_external_calendar_event_id: input.externalCalendarEventId ?? dbNull,
       p_source: input.source ?? 'manual',
       p_start_at: input.startAt,
       p_end_at: input.endAt,
@@ -63,7 +64,8 @@ async function createRecord(input: {
   title: string;
   startAt: string;
   endAt: string;
-  source?: 'manual' | 'api';
+  source?: 'manual' | 'api' | 'external_calendar';
+  externalCalendarEventId?: string;
   planId?: string | null;
 }): Promise<RecordRow> {
   const { data, error } = await admin
@@ -72,7 +74,7 @@ async function createRecord(input: {
       p_title: input.title,
       p_note: dbNull,
       p_plan_id: (input.planId ?? null) as never,
-      p_external_calendar_event_id: dbNull,
+      p_external_calendar_event_id: input.externalCalendarEventId ?? dbNull,
       p_source: input.source ?? 'manual',
       p_start_at: input.startAt,
       p_end_at: input.endAt,
@@ -109,6 +111,26 @@ function recordUpdateArgs(record: RecordRow, title: string, expectedUpdatedAt = 
   };
 }
 
+async function createGhost(): Promise<string> {
+  const { data, error } = await admin
+    .from('external_calendar_events')
+    .insert({
+      user_id: userId,
+      provider: 'google',
+      provider_calendar_id: 'primary',
+      provider_event_id: `conversion-${crypto.randomUUID()}`,
+      title: 'Conversion fixture',
+      start_at: at(-12 * 60 * 60_000),
+      end_at: at(-11 * 60 * 60_000),
+      status: 'confirmed',
+      last_synced_at: new Date().toISOString(),
+    })
+    .select('id')
+    .single();
+  if (error) throw error;
+  return data.id;
+}
+
 describe.skipIf(!RUN_LOCAL)('atomic Plan and Record command boundary', () => {
   beforeAll(async () => {
     const { error } = await admin.auth.admin.createUser({
@@ -126,11 +148,201 @@ describe.skipIf(!RUN_LOCAL)('atomic Plan and Record command boundary', () => {
   afterEach(async () => {
     await admin.from('records').delete().eq('user_id', userId);
     await admin.from('plans').delete().eq('user_id', userId);
+    const { error } = await admin.from('external_calendar_events').delete().eq('user_id', userId);
+    if (error) throw error;
   });
 
   afterAll(async () => {
     await userClient.auth.signOut();
     await admin.auth.admin.deleteUser(userId);
+  });
+
+  it.each(['plan', 'record'] as const)(
+    'rejects stale %s conversion after the first row moves',
+    async (lane) => {
+      const eventId = await createGhost();
+      const input = {
+        title: 'First conversion',
+        startAt: at(-12 * 60 * 60_000),
+        endAt: at(-11 * 60 * 60_000),
+        source: 'external_calendar' as const,
+        externalCalendarEventId: eventId,
+      };
+      const first = lane === 'plan' ? await createPlan(input) : await createRecord(input);
+      const moved =
+        lane === 'plan'
+          ? await admin
+              .rpc('update_plan_command_v1', {
+                ...planUpdateArgs(first as PlanRow, 'Moved conversion'),
+                p_start_at: at(-8 * 60 * 60_000),
+                p_end_at: at(-7 * 60 * 60_000),
+              })
+              .single()
+          : await admin
+              .rpc('update_record_command_v1', {
+                ...recordUpdateArgs(first as RecordRow, 'Moved conversion'),
+                p_start_at: at(-8 * 60 * 60_000),
+                p_end_at: at(-7 * 60 * 60_000),
+              })
+              .single();
+      if (moved.error) throw moved.error;
+
+      const second = lane === 'plan' ? createPlan(input) : createRecord(input);
+      await expect(second).rejects.toMatchObject({
+        code: '23505',
+        message: expect.stringContaining(`"${lane}s_active_external_event_unique"`),
+      });
+      const { data, error } = await admin
+        .from(lane === 'plan' ? 'plans' : 'records')
+        .select('id,title,start_at,deleted_at')
+        .eq('user_id', userId)
+        .eq('external_calendar_event_id', eventId)
+        .is('deleted_at', null);
+      if (error) throw error;
+      expect(data).toEqual([
+        {
+          id: first.id,
+          title: 'Moved conversion',
+          start_at: moved.data.start_at,
+          deleted_at: null,
+        },
+      ]);
+    },
+  );
+
+  it.each(['plan', 'record'] as const)(
+    'persists only one %s reference even when concurrent times do not overlap',
+    async (lane) => {
+      const eventId = await createGhost();
+      const input = {
+        title: 'Concurrent conversion',
+        source: 'external_calendar' as const,
+        externalCalendarEventId: eventId,
+      };
+      const create = lane === 'plan' ? createPlan : createRecord;
+      const outcomes = await Promise.allSettled([
+        create({ ...input, startAt: at(-12 * 60 * 60_000), endAt: at(-11 * 60 * 60_000) }),
+        create({ ...input, startAt: at(-8 * 60 * 60_000), endAt: at(-7 * 60 * 60_000) }),
+      ]);
+      expect(outcomes.filter((outcome) => outcome.status === 'fulfilled')).toHaveLength(1);
+      const rejected = outcomes.find((outcome) => outcome.status === 'rejected');
+      expect(rejected).toMatchObject({ status: 'rejected', reason: { code: '23505' } });
+      const { data, error } = await admin
+        .from(lane === 'plan' ? 'plans' : 'records')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('external_calendar_event_id', eventId)
+        .is('deleted_at', null);
+      if (error) throw error;
+      expect(data).toHaveLength(1);
+    },
+  );
+
+  it.each(['plan', 'record'] as const)(
+    'allows %s reimport after deletion but preserves both rows when old restore conflicts',
+    async (lane) => {
+      const eventId = await createGhost();
+      const input = {
+        title: 'Old conversion',
+        startAt: at(-12 * 60 * 60_000),
+        endAt: at(-11 * 60 * 60_000),
+        source: 'external_calendar' as const,
+        externalCalendarEventId: eventId,
+      };
+      const create = lane === 'plan' ? createPlan : createRecord;
+      const first = await create(input);
+      const deleted =
+        lane === 'plan'
+          ? await admin
+              .rpc('delete_plan_command_v1', {
+                p_user_id: userId,
+                p_plan_id: first.id,
+                p_expected_updated_at: first.updated_at,
+              })
+              .single()
+          : await admin
+              .rpc('delete_record_command_v1', {
+                p_user_id: userId,
+                p_record_id: first.id,
+                p_expected_updated_at: first.updated_at,
+              })
+              .single();
+      if (deleted.error) throw deleted.error;
+      const replacement = await create({
+        ...input,
+        title: 'New conversion',
+        startAt: at(-8 * 60 * 60_000),
+        endAt: at(-7 * 60 * 60_000),
+      });
+      const restored =
+        lane === 'plan'
+          ? await admin
+              .rpc('restore_plan_command_v1', {
+                p_user_id: userId,
+                p_plan_id: first.id,
+                p_expected_updated_at: deleted.data.updated_at,
+              })
+              .single()
+          : await admin
+              .rpc('restore_record_command_v1', {
+                p_user_id: userId,
+                p_record_id: first.id,
+                p_expected_updated_at: deleted.data.updated_at,
+              })
+              .single();
+      expect(restored.error).toMatchObject({ code: '23505' });
+      const { data, error } = await admin
+        .from(lane === 'plan' ? 'plans' : 'records')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('external_calendar_event_id', eventId);
+      if (error) throw error;
+      expect(data).toHaveLength(2);
+      expect(data?.find((row) => row.id === first.id)).toEqual(deleted.data);
+      expect(data?.find((row) => row.id === replacement.id)).toEqual(replacement);
+    },
+  );
+
+  it('allows an external Plan and Record to coexist, other events and manual rows remain independent', async () => {
+    const eventId = await createGhost();
+    const input = {
+      title: 'External reference',
+      startAt: at(-12 * 60 * 60_000),
+      endAt: at(-11 * 60 * 60_000),
+      source: 'external_calendar' as const,
+      externalCalendarEventId: eventId,
+    };
+    const plan = await createPlan(input);
+    const copied = await admin
+      .rpc('record_plan_command_v1', {
+        p_user_id: userId,
+        p_plan_id: plan.id,
+        p_expected_updated_at: plan.updated_at,
+      })
+      .single();
+    if (copied.error) throw copied.error;
+    expect(copied.data.external_calendar_event_id).toBeNull();
+    const deletedCopy = await admin.rpc('delete_record_command_v1', {
+      p_user_id: userId,
+      p_record_id: copied.data.id,
+      p_expected_updated_at: copied.data.updated_at,
+    });
+    if (deletedCopy.error) throw deletedCopy.error;
+    const record = await createRecord(input);
+    expect(plan.external_calendar_event_id).toBe(eventId);
+    expect(record.external_calendar_event_id).toBe(eventId);
+    const otherEventId = await createGhost();
+    await expect(
+      createPlan({
+        ...input,
+        externalCalendarEventId: otherEventId,
+        startAt: at(-8 * 60 * 60_000),
+        endAt: at(-7 * 60 * 60_000),
+      }),
+    ).resolves.toMatchObject({ external_calendar_event_id: otherEventId });
+    await expect(
+      createPlan({ title: 'Manual', startAt: at(-6 * 60 * 60_000), endAt: at(-5 * 60 * 60_000) }),
+    ).resolves.toMatchObject({ external_calendar_event_id: null });
   });
 
   it('does not expose service-owned commands to authenticated clients', async () => {
@@ -316,10 +528,7 @@ describe.skipIf(!RUN_LOCAL)('atomic Plan and Record command boundary', () => {
     expect(new Date(adjacent.start_at).getTime()).toBe(new Date(endAt).getTime());
   });
 
-  // #1985: useConvertGhostEvent はタップのたびに ghost の同じ start_at/end_at を複製して
-  // create_plan_command_v1 / create_record_command_v1 を呼ぶ。external_calendar_event_id に
-  // 専用の unique 制約は無いため、二重変換の防止は plans_no_overlap（時間帯 EXCLUDE 制約）の
-  // 副作用に過ぎない（risk-reviewer 指摘）。この副作用が実際に効くことをここで固定する。
+  // 同時要求は一意制約・時間重複制約のどちらが先に評価されても1件だけ成功する。
   it('lets only one of two simultaneous conversions of the same ghost create a Plan', async () => {
     const startAt = at(8 * 60 * 60_000);
     const endAt = at(9 * 60 * 60_000);
@@ -369,7 +578,7 @@ describe.skipIf(!RUN_LOCAL)('atomic Plan and Record command boundary', () => {
 
       expect(attempts.filter(({ error }) => error === null)).toHaveLength(1);
       expect(
-        attempts.filter(({ error }) => ['23P01', '40P01'].includes(error?.code ?? '')),
+        attempts.filter(({ error }) => ['23505', '23P01', '40P01'].includes(error?.code ?? '')),
       ).toHaveLength(1);
     } finally {
       await admin.from('external_calendar_events').delete().eq('id', ghost.id);

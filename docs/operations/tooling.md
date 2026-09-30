@@ -487,11 +487,11 @@ BSD-2-Clause: 12 packages (1.3%)
 
 ## 2. Routing の基準
 
-通常開発は ChatGPT Chat + Codex。短い協働原則は `AGENTS.md`、モデル選択と委譲の詳細は `.agents/skills/routing/SKILL.md` を正本とする。同じ主担当が調査・判断・実装・検証・修正まで完了し、初期の委譲対象は実行時に read-only 境界を検証できる大量調査に限る。
+通常開発は ChatGPT Chat + Codex。共通指示は `AGENTS.md`、作業方針・Issue Brief・委譲の手順は `.agents/skills/routing/SKILL.md` を正本とする。同じ主担当が調査・判断・実装・検証・修正まで完了し、初期の委譲対象は実行時に read-only 境界を検証できる大量調査に限る。
 
 Chat は product / UX・research・仕様整理、Codex は repo に基づく判断と実装を担う。受け渡しが必要な時だけ [Chat 連携手順](./chat-handoff.md) を読む。承認済みの目的・仕様・リスク境界内の技術判断を毎回 Chat に戻さない。
 
-モデル名は難しさ・影響・検証可能性に応じた初期目安であり、実測なしに効率を主張しない。`pnpm ctx` の既存 L0〜L3 / preparation は助言として維持し、別 agent の起動指示にしない。
+モデルの固定割当や切替順序は設けない。実測なしに効率を主張しない。`pnpm ctx` の既存 L0〜L3 / preparation は助言として維持し、別 agent の起動指示にしない。
 
 ## 3. Hook の共有と保証境界
 
@@ -694,7 +694,7 @@ skill invocation は description を読んで判断される仕様上、**descri
 
 ## 4. 12 skill の類型マッピング
 
-各 skill の類型定義と書式詳細は [`skill-design` skill](../../.agents/skills/skill-design/SKILL.md) を参照。
+以下は移行当時の分類・書式の記録であり、現在の必須条件ではない。現在の設計方針は [`skill-design` skill](../../.agents/skills/skill-design/SKILL.md) を参照し、類型・字数・項目数の固定書式は要求しない。
 
 | #   | skill                  | 類型             |
 | --- | ---------------------- | ---------------- |
@@ -746,7 +746,7 @@ description に「DB 変更系 / Realtime 系 / Edge Functions 系 / 3 環境運
 - **境界設計原則**（skill 間 handoff、skill 層と rules 層の境界、自動生成 artifact の扱い、invocation トリガーと実行時ルールの分離、self-contained 原則）
 - **空白領域 flag**（URL state の将来 skill 化余地）
 
-本節は **1 回性のイベント記録**であり、skill 設計の source of truth は `skill-design` skill 側。将来 skill を追加・修正する際は `.agents/skills/skill-design/SKILL.md` を参照する。
+本節は **1 回性のイベント記録**であり、上の類型・字数・項目数の指定は撤去済み。現在の skill 設計の正本は `.agents/skills/skill-design/SKILL.md`。
 
 ## 7. スコープ境界（未着手タスク）
 

@@ -56,6 +56,7 @@
     "generate:og-fallback": "tsx scripts/generate-og-fallback.tsx"
   },
   "dependencies": {
+    "@dayopt/assets": "workspace:*",
     "@dayopt/billing": "workspace:*",
     "@dayopt/config": "workspace:*",
     "@dayopt/foundations": "workspace:*",

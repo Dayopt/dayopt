@@ -4,11 +4,10 @@
  * アクティビティ選択トリガー（Pure props）
  *
  * アイコン + アクティビティ名を表示し、クリックで ActivityQuickSelector を開く。
- * 2 つの呼び出し元で見た目の重さが異なるため `variant` で切り替える（#2298）:
- * - `heading`（既定）: 見出し相当の重さ。`ActivityTimeblockCreateForm`（activity-filter の
- *   ブロック作成 popover）はこのフォームの唯一の識別要素として使うため、この重さを保つ
- * - `compact`: Inspector パネルのヘッダー行に置く軽量なタップ要素。
- *   `TimeblockInspectorForm` から描画される（Plan/Record エディタ、#2430でヘッダー行へ移動）
+ * `variant` で表示密度を切り替える:
+ * - `heading`（既定）: 見出し相当の重さ。
+ * - `compact`: 軽量なタップ要素。
+ * - `card`: Inspector のカード全面を選択トリガーにし、カテゴリーも表示する。
  *
  * 「…」メニュー・閉じるボタンはこのコンポーネントの責務ではない。同じヘッダー行に並ぶ
  * InspectorHeaderActions が担う（アクティビティ表示を移動・縮小しても、それらの導線は動かない）。
@@ -25,15 +24,21 @@ import { useCallback, useRef, useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 
-import { ActivityIcon, ActivityQuickSelector } from '@/features/activities';
+import {
+  ActivityIcon,
+  ActivityQuickSelector,
+  getCategoryColorClasses,
+} from '@/features/activities';
 
-import { cn } from '@dayopt/components';
+import { Button, cn } from '@dayopt/components';
 import { useTimeblockInspectorStore } from '../../../stores/useTimeblockInspectorStore';
 
 interface ActivityFieldRowProps {
   activityId: string | null;
   /** 解決済みのアクティビティ名 */
   activityName: string;
+  /** 解決済みの所属カテゴリー名。card で補足表示する。 */
+  categoryName?: string | null | undefined;
   /** 解決済みの継承アイコン名（未分類・未設定なら null） */
   activityIcon?: string | null | undefined;
   /** 解決済みの継承色名（未分類・未設定なら null） */
@@ -55,7 +60,9 @@ interface ActivityFieldRowProps {
   ) => void;
   disabled?: boolean | undefined;
   /** 見た目の重さ。既定は `heading`（見出し相当）。 */
-  variant?: 'heading' | 'compact' | undefined;
+  variant?: 'heading' | 'compact' | 'card' | undefined;
+  /** card の表現。予定は枠線、記録は淡い塗りで表示する。 */
+  cardAppearance?: 'outline' | 'filled' | undefined;
   /**
    * activityId → 普段の長さ（分）。選択一覧の各行へ目安として添える。
    * 集計を引くのは呼び出し側（この component は pure props を保つ）。
@@ -67,6 +74,7 @@ interface ActivityFieldRowProps {
 export function ActivityFieldRow({
   activityId,
   activityName,
+  categoryName,
   activityIcon,
   activityColor,
   uncategorized = false,
@@ -74,6 +82,7 @@ export function ActivityFieldRow({
   onCreateAndSelect,
   disabled = false,
   variant = 'heading',
+  cardAppearance = 'outline',
   durationByActivityId,
 }: ActivityFieldRowProps) {
   const t = useTranslations();
@@ -82,6 +91,9 @@ export function ActivityFieldRow({
   // 開いているブロックのカードへ、選ぶ前の色・アイコン・名前を先出しする
   const setHoveredActivity = useTimeblockInspectorStore((state) => state.setHoveredActivity);
   const isCompact = variant === 'compact';
+  const isCard = variant === 'card';
+  const iconColorClasses =
+    activityId !== null && !uncategorized ? getCategoryColorClasses(activityColor) : null;
 
   const handleSelect = useCallback(
     (selectedActivityId: string) => {
@@ -105,7 +117,56 @@ export function ActivityFieldRow({
     [onCreateAndSelect],
   );
 
-  const trigger = (
+  const trigger = isCard ? (
+    <Button
+      ref={buttonRef}
+      type="button"
+      variant="outline"
+      onClick={() => setSelectorOpen(true)}
+      disabled={disabled}
+      className={cn(
+        'ease-standard relative isolate h-auto min-h-20 w-full cursor-pointer items-center justify-start overflow-hidden rounded-2xl px-4 py-3 text-left duration-150',
+        cardAppearance === 'outline'
+          ? cn('bg-transparent', iconColorClasses?.border ?? 'border-border')
+          : cn(
+              'border-transparent',
+              iconColorClasses
+                ? cn(iconColorClasses.tint, iconColorClasses.tintInteraction)
+                : 'bg-state-selected hover:bg-state-selected active:bg-state-selected',
+            ),
+        selectorOpen && 'ring-border ring-1',
+      )}
+      aria-label={`${t('calendar.filter.changeActivity')}: ${activityName}`}
+      aria-haspopup="dialog"
+      aria-expanded={selectorOpen}
+    >
+      {iconColorClasses && (
+        <span className="pointer-events-none absolute -right-2 -bottom-2 opacity-10" aria-hidden>
+          <ActivityIcon
+            icon={activityIcon ?? null}
+            color={activityColor ?? null}
+            className="size-20"
+          />
+        </span>
+      )}
+      <span className="relative flex min-w-0 flex-1 flex-col gap-1">
+        <span
+          className="text-muted-foreground truncate text-sm font-normal"
+          title={categoryName ?? undefined}
+        >
+          {categoryName ??
+            t(
+              activityId !== null && uncategorized
+                ? 'calendar.filter.uncategorized'
+                : 'calendar.filter.noCategory',
+            )}
+        </span>
+        <span className="text-foreground truncate text-lg font-medium" title={activityName}>
+          {activityName}
+        </span>
+      </span>
+    </Button>
+  ) : (
     <button
       ref={buttonRef}
       type="button"

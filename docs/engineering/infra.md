@@ -395,6 +395,8 @@ Code Qualityを採用しない判断と2026-07-21時点の外部設定証跡は�
 
 ### 共通検証計画の shadow（#2793 / #2794）
 
+2026-09-28 時点で GitHub Actions の `Validation shadow` と `Validation gate` は、消費削減のため repository Actions UI から手動停止している。workflow source と contract tests は残す。どちらも required check ではなく、現在の main ruleset に変更はない。#2811 の Validation gate 拡張・必須化は別件であり、今回の停止はその実施を意味しない。
+
 `validation-shadow.yml` は ready PR の base checkout にある `validation-plan-shadow.mjs` を実行する。
 PR 側は git diff のデータとして読み、依存 install やスクリプト実行には使わない。
 base の policy / workspace manifest、head、実際の merge revision、完全な patch hash を固定し、
@@ -1009,6 +1011,7 @@ Product / Webの`src/app/api/**`配下にある主要REST / Webhook endpoint総�
 | App     | Path                                         | Method               | 認証                               | Rate Limit                      | Runtime                  | 副作用 / 説明                                                                                                              |
 | ------- | -------------------------------------------- | -------------------- | ---------------------------------- | ------------------------------- | ------------------------ | -------------------------------------------------------------------------------------------------------------------------- |
 | Product | `/api/health`                                | GET                  | なし                               | なし                            | nodejs                   | DB / Upstash Redisの疎通をcheckし`healthy / degraded / unhealthy`を返す。Productionは`{ status }`だけを公開                |
+| Product | `/api/health/cron`                           | GET                  | なし（Productionのみ）             | 全体30/分                       | nodejs (maxDuration 20s) | production identity確認後に許可リスト内のcron heartbeatをread-only確認し、`{ status }`だけをno-storeで返す                 |
 | Product | `/api/health/version`                        | GET                  | なし                               | なし                            | nodejs                   | ビルドの`{ version, commitSha }`をno-storeで返す（外部I/Oなし）。開いたままのタブの新deploy検知に使う                      |
 | Product | `/api/csp-report`                            | POST                 | なし                               | IP 20/分 + 全体120/分           | nodejs                   | Product originの16 KiB以下のCSP reportだけを検証し、URL queryを除去してSentryへ送信                                        |
 | Product | `/api/trpc/[trpc]`                           | GET / POST           | procedure依存                      | procedure依存                   | nodejs                   | tRPC procedureのルーティング本体。Contactは認証済み`contact.submit`を使う                                                  |

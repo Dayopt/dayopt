@@ -139,7 +139,7 @@ export const AllColors: Story = {
       </h2>
 
       <ColorGroup title="Surface">
-        <ColorSwatch tailwindClass="bg-container" description="沈む: sidebar, footer" />
+        <ColorSwatch tailwindClass="bg-container" description="沈む: sidebar, side panel, footer" />
         <ColorSwatch tailwindClass="bg-background" description="基準: page" />
         <ColorSwatch tailwindClass="bg-card" description="浮く: card, dialog" />
         <ColorSwatch tailwindClass="bg-muted" description="窪み: input, well" />

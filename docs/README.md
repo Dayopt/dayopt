@@ -38,7 +38,7 @@
 
 ルート直下の `strategy.md` は stock として扱い、同じ frontmatter 契約（status / last_verified）に従う（docs-guard の `ROOT_STOCK_FILES`）。
 
-`strategy.md` と issue・PR は**変化速度で分かれる**。変わらない前提は `strategy.md`、現在地・賭け・当週キュー・進行中の作業は **issue と PR 自身**（`status:*` ラベルと各 issue のコメント列）。**現在地を docs へ転記しない** — 転記した瞬間に古くなる（2026-08-20 に廃止した STATE.md、2026-09-01 に廃止した日次盤面 issue、2026-09-02 に廃止した `state.md` と同じ失敗）。
+`strategy.md` と issue・PR は**変化速度で分かれる**。変わらない前提は `strategy.md`、現在地・賭け・当週キュー・進行中の作業は **issue と PR 自身**（open / closed state、Issue labels、コメント列）。**現在地を docs へ転記しない** — 転記した瞬間に古くなる（2026-08-20 に廃止した STATE.md、2026-09-01 に廃止した日次盤面 issue、2026-09-02 に廃止した `state.md` と同じ失敗）。
 
 ## 現在・履歴
 
@@ -61,9 +61,9 @@ code: apps/product/src/features/timeblock # 任意。repo 内の実在 path
 
 ### Decisions — 全決定の時系列索引
 
-各ドメイン直下の `log/YYYY-MM-DD-slug.md`（frozen frontmatter contract）は 2026-08-28（#2475）に全廃した。過去分は移設・蒸留せず、正本は Git 履歴と merged PR に任せる。
+各ドメイン直下の `log/YYYY-MM-DD-slug.md`（frozen frontmatter contract）は 2026-08-28（#2475）に全廃した。過去ログの一括移設は行わず、原典は Git 履歴と merged PR に残す。現在の判断に必要な理由・却下案が不足している時は、原典を確認して既存ストックへ蒸留する。手順は [意図の継承](operations/ai-development-loop.md#意図の継承)。
 
-意思決定は [`decisions.md`](./decisions.md) 1 ファイルへ集約する。append-only（`---` 区切りより下のエントリ領域は追記のみ、`pnpm docs:check` が機械的に強制）で、書式・タグ語彙は同ファイルのヘッダが正本（ここでは複製しない）。決定したら `decisions.md` へ 1 行追記し、該当ストック（`AGENTS.md` / 該当 docs）の編集を同じ変更に含める。
+意思決定の履歴は [`decisions.md`](./decisions.md) 1 ファイルへ集約する。初めて読む人・agent は [判断の入口](decisions.md#判断する前に読む)から現在の正本・理由・撤回と後継を辿る。append-only（`---` 区切りより下のエントリ領域は追記のみ、`pnpm docs:check` が機械的に強制）で、書式・タグ語彙は同ファイルのヘッダが正本（ここでは複製しない）。決定したら `decisions.md` へ 1 行追記し、該当ストック（`AGENTS.md` / 該当 docs）の編集を同じ変更に含める。
 
 調査・feedback・incidentなど 1 回きりの記録は GitHub issue として起票する（`dispatch` skill の既存ラベル体系に従う）。
 
@@ -81,6 +81,7 @@ code: apps/product/src/features/timeblock # 任意。repo 内の実在 path
 | プロダクト原則・不採用方針     | `product/principles.md`                                                              |
 | 現在の機能仕様                 | `product/specs/*.md`                                                                 |
 | UI / code用語                  | `product/glossary.md`                                                                |
+| ロゴ・ブランド素材             | `business/brand.md`                                                                  |
 | 訴求・コピー                   | `business/messaging.md`（UI 文言は `product/copywriting.md`）                        |
 | 全体 architecture / state flow | `engineering/architecture.md`                                                        |
 | 仕組みを追跡できるようになる   | `learn/README.md`（Dayopt Learning System。`pnpm learn` で対話画面）                 |

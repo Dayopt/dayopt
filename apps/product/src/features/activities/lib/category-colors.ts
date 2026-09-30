@@ -50,6 +50,8 @@ interface CategoryColorEntry {
   dot: string;
   /** card背景tint用 Tailwindクラス (e.g. 'bg-category-blue-tint') */
   tint: string;
+  /** tint をホバー・押下中も維持する Tailwindクラス */
+  tintInteraction: string;
   /** inline style用 CSS変数 (e.g. 'var(--category-blue)') */
   cssVar: string;
   /** inline style用 tint CSS変数 (e.g. 'var(--category-blue-tint)') */
@@ -71,12 +73,17 @@ interface CategoryColorEntry {
  * bg-category-blue-tint bg-category-indigo-tint bg-category-violet-tint bg-category-pink-tint bg-category-gray-tint
  * border-category-red border-category-orange border-category-amber border-category-green border-category-teal
  * border-category-blue border-category-indigo border-category-violet border-category-pink border-category-gray
+ * hover:bg-category-red-tint hover:bg-category-orange-tint hover:bg-category-amber-tint hover:bg-category-green-tint hover:bg-category-teal-tint
+ * hover:bg-category-blue-tint hover:bg-category-indigo-tint hover:bg-category-violet-tint hover:bg-category-pink-tint hover:bg-category-gray-tint
+ * active:bg-category-red-tint active:bg-category-orange-tint active:bg-category-amber-tint active:bg-category-green-tint active:bg-category-teal-tint
+ * active:bg-category-blue-tint active:bg-category-indigo-tint active:bg-category-violet-tint active:bg-category-pink-tint active:bg-category-gray-tint
  */
 function entry(name: CategoryColorName): CategoryColorEntry {
   return {
     border: `border-category-${name}`,
     dot: `bg-category-${name}`,
     tint: `bg-category-${name}-tint`,
+    tintInteraction: `hover:bg-category-${name}-tint active:bg-category-${name}-tint`,
     cssVar: `var(--category-${name})`,
     cssVarTint: `var(--category-${name}-tint)`,
   };

@@ -46,7 +46,7 @@ main の repository ruleset が required checks（Static / Unit / Integration / 
 
 - **ここを変えると**: required check に paths filter 付きの check を入れると、満たせない PR が merge できなくなる。
 - **コード**:
-  - [`AGENTS.md`](../../../AGENTS.md) で `merge の遮断は main の repository ruleset 1 本で行う` を探す
+  - [`AGENTS.md`](../../../AGENTS.md) で `main の ruleset` を探す
   - [`docs/engineering/infra.md`](../../engineering/infra.md) で `### merge gate の required checks` を探す
 
 ### 2. migration が本番 DB に入る（Supabase）
@@ -182,7 +182,7 @@ release job が migration の反映を確かめ（今は advisory で warning �
       "refs": [
         {
           "path": "AGENTS.md",
-          "find": "merge の遮断は main の repository ruleset 1 本で行う"
+          "find": "main の ruleset"
         },
         {
           "path": "docs/engineering/infra.md",

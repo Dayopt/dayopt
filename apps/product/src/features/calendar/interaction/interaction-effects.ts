@@ -6,10 +6,6 @@
  * 状態機械（machine.ts）が返した副作用リストを DOM / store / callback に反映する。
  */
 
-import { isPlanRecordDrop } from '@/features/timeblock';
-
-import { useCalendarDragStore } from '../stores/useCalendarDragStore';
-
 import type { InteractionAction, InteractionEffect } from '../domain/interaction/types';
 import type { InteractionRefs, InteractionRuntime } from './interaction-runtime';
 
@@ -29,14 +25,7 @@ export function processInteractionEffects(
   dispatchFn: (action: InteractionAction) => void,
   refs: InteractionRefs,
 ): void {
-  const {
-    stateRef,
-    timerRef,
-    dayColumnsRef,
-    pendingTargetLaneRef,
-    dragLaneRef,
-    interactionVersionRef,
-  } = refs;
+  const { stateRef, timerRef, dayColumnsRef, interactionVersionRef } = refs;
 
   for (const effect of effects) {
     switch (effect.type) {
@@ -65,8 +54,6 @@ export function processInteractionEffects(
         break;
 
       case 'EVENT_CLICK': {
-        pendingTargetLaneRef.current = null;
-        dragLaneRef.current = null;
         interactionVersionRef.current = null;
         const event = r.events.find((e) => e.id === effect.timeblockId);
         if (event) r.onEventClick?.(event);
@@ -74,22 +61,6 @@ export function processInteractionEffects(
       }
 
       case 'DROP': {
-        const event = r.events.find((candidate) => candidate.id === effect.timeblockId);
-        if (
-          event?.kind === 'plan' &&
-          dragLaneRef.current &&
-          isPlanRecordDrop(dragLaneRef.current.source, dragLaneRef.current.target)
-        ) {
-          // 制約は drop 先の時間帯だけ（DT005: Record は未来に終われない）。Plan が
-          // 未来に終わるかは見ない — 「未来 Plan」の特別扱いは #2598 で撤去済みで、
-          // DB も過去に終わる Record を未来 Plan へ紐付けられる（#2645）
-          const canCreateRecord = effect.time.end.getTime() <= Date.now();
-          if (canCreateRecord) {
-            r.onPlanRecord?.(effect.timeblockId, effect.time);
-          }
-          interactionVersionRef.current = null;
-          break;
-        }
         r.onEventUpdate?.(effect.timeblockId, {
           startTime: effect.time.start,
           endTime: effect.time.end,
@@ -144,13 +115,8 @@ export function processInteractionEffects(
       case 'DRAG_STORE_START': {
         const plan = r.events.find((e) => e.id === effect.timeblockId);
         if (plan) {
-          const lane = plan.kind ?? 'plan';
-          const targetLane = pendingTargetLaneRef.current ?? lane;
-          dragLaneRef.current = { source: lane, target: targetLane };
-          r.startDragStore(effect.timeblockId, plan, effect.dateIndex, lane);
-          if (targetLane !== lane) r.updateDragStore({ targetLane });
+          r.startDragStore(effect.timeblockId, plan, effect.dateIndex);
         }
-        pendingTargetLaneRef.current = null;
         // Cache day-column elements once at drag-start
         dayColumnsRef.current = document.querySelectorAll<HTMLElement>('[data-calendar-day-index]');
         break;
@@ -164,13 +130,6 @@ export function processInteractionEffects(
         break;
 
       case 'DRAG_STORE_END': {
-        const currentDrag = useCalendarDragStore.getState();
-        if (currentDrag.sourceLane && currentDrag.targetLane) {
-          dragLaneRef.current = {
-            source: currentDrag.sourceLane,
-            target: currentDrag.targetLane,
-          };
-        }
         r.endDragStore();
         // Clear cached day-column elements
         dayColumnsRef.current = null;
