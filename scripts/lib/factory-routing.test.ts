@@ -28,12 +28,23 @@ describe('factory routing', () => {
     { acceptance: false },
     { verification: false },
     { metadataAvailable: false },
+    { workflowStatus: 'Blocked', workflowStatusAvailable: true },
+    { workflowStatusAvailable: false },
     { state: 'CLOSED' },
     { labels: ['status:blocked'] },
   ])('情報不足・凍結を軽作業に格下げしない: %j', (change) => {
     expect(resolveFactoryRoute({ ...normal, ...change })).toMatchObject({
       level: 'unclassified',
       ready: false,
+    });
+  });
+
+  it('reports missing Issue Contract sections in its advisory checklist', () => {
+    expect(
+      resolveFactoryRoute({ ...normal, missingContractSections: ['背景', '注意'] }),
+    ).toMatchObject({
+      ready: false,
+      missing: ['背景（Issue Contract）', '注意（Issue Contract）'],
     });
   });
 

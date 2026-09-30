@@ -35,7 +35,7 @@ function isCodexBotLogin(login) {
  * Jev assistはdispatch時の `--post` か明示的な `--l1-shadow` previewでだけ実行する。
  * 出力は 150 行以内の markdown、判断そのものはしない（判断材料の収集で止める）。
  *
- * 呼び出し予算: issue は最大 6 回、PR は最大 9 回の gh 呼び出しに収める
+ * 呼び出し予算: issue は最大 7 回、PR は最大 9 回の gh 呼び出しに収める
  * （search prs / graphql の 1 回 + 関連先の pr view を必要な分だけ）。
  *
  * deferred（次回以降）: `--comments` の bot 判定を login 完全一致以外（app slug）
@@ -45,6 +45,7 @@ function isCodexBotLogin(login) {
  */
 
 const [REPO_OWNER, REPO_NAME] = REPO.split('/');
+const WORKFLOW_STATUS_FIELD_ID = 47507683;
 
 /** 配達コメントの先頭に置く隠しマーカー。このマーカーで始まるコメントが「ctx brief」。
  * selectComments / findMarkerComment / detectJudgmentRecords が共通で参照するため
@@ -741,45 +742,109 @@ export function detectJudgmentRecords(comments, body) {
   return { dod, breakdown, brief };
 }
 
-/** text 中の `## やること` セクションに、チェックリスト/箇条書き行が1つ以上あるか。 */
-function hasYaruKotoChecklist(text) {
-  if (!text) return false;
-  const lines = text.split('\n');
-  const startIdx = lines.findIndex((line) => /^#{1,6}\s*やること\s*$/.test(line.trim()));
-  if (startIdx === -1) return false;
+/** Parse a Markdown heading and normalize a short explanatory suffix. */
+function parseIssueHeading(line) {
+  const match = /^(#{1,6})\s+(.+?)\s*#*\s*$/.exec(String(line ?? '').trim());
+  if (!match) return null;
+  const rawTitle = match[2].replaceAll('`', '').replaceAll('**', '').trim();
+  const suffix = rawTitle.search(/\s+[—–-]\s*|[:：]|[（(]/u);
+  const title = (suffix === -1 ? rawTitle : rawTitle.slice(0, suffix)).trim().toLocaleLowerCase();
+  return { level: match[1].length, title };
+}
+
+function isIssueSectionHeading(line, name) {
+  return parseIssueHeading(line)?.title === name.toLocaleLowerCase();
+}
+
+/** A single `該当なし` is a placeholder; a short reason makes it an explicit answer. */
+function hasReasonedNotApplicable(text) {
+  return String(text ?? '')
+    .split('\n')
+    .some((line) => {
+      const match =
+        /^\s*(?:[-*+]\s*)?(?:\[[ xX]\]\s*)?該当なし\s*(?::|：|—|–|[-]|[（(])\s*(.+?)\s*[）)]?\s*$/.exec(
+          line,
+        );
+      const reason = match ? normalizeIssueContentLine(match[1]) : '';
+      return reason.length > 0 && !isIssuePlaceholder(reason);
+    });
+}
+
+function normalizeIssueContentLine(line) {
+  return String(line ?? '')
+    .trim()
+    .replace(/^[-*+]\s*(?:\[[ xX]\]\s*)?/, '')
+    .replace(/^>\s?/, '')
+    .replace(/[`*_~]/g, '')
+    .trim();
+}
+
+function isIssuePlaceholder(line) {
+  const normalized = normalizeIssueContentLine(line);
+  const barePlaceholder =
+    /^(?:tbd|todo|tbc|placeholder|n\/?a|na|none|なし|未記入|未入力|未確認|未定|記入待ち|入力待ち|該当なし|\.{3,}|…+|<[^>]+>)(?:\s*[:：-]\s*)?[.!。]*$/i;
+  if (barePlaceholder.test(normalized)) return true;
+  const notApplicableWithPlaceholder =
+    /^(?:該当なし|n\/?a|na|none|なし)\s*(?::|：|—|–|-|[（(])\s*(.+?)\s*[）)]?$/i.exec(normalized);
+  return (
+    notApplicableWithPlaceholder !== null && barePlaceholder.test(notApplicableWithPlaceholder[1])
+  );
+}
+
+/** Treat blank / placeholder-only content as missing; do not infer meaning from a label. */
+function hasMeaningfulIssueText(text) {
+  if (hasReasonedNotApplicable(text)) return true;
+  return String(text ?? '')
+    .split('\n')
+    .map(normalizeIssueContentLine)
+    .some((line) => line.length > 0 && !isIssuePlaceholder(line));
+}
+
+/** Extract one contract section, stopping at the next heading of equal or higher level. */
+function extractSectionText(text, headingName) {
+  const lines = String(text ?? '').split('\n');
+  const startIdx = lines.findIndex((line) => isIssueSectionHeading(line, headingName));
+  if (startIdx === -1) return null;
+  const startHeading = parseIssueHeading(lines[startIdx]);
+  if (!startHeading) return null;
+  const sectionLines = [];
   for (let i = startIdx + 1; i < lines.length; i += 1) {
-    const line = lines[i];
-    if (/^#{1,6}\s/.test(line)) break; // 次のセクションに入ったら終了
-    if (/^\s*[-*]\s*(\[[ xX]\])?\s*\S/.test(line)) return true;
+    const nextHeading = parseIssueHeading(lines[i]);
+    if (nextHeading && nextHeading.level <= startHeading.level) break;
+    sectionLines.push(lines[i]);
+  }
+  return sectionLines.join('\n').trim();
+}
+
+/** `やること` may contain nested headings, but only meaningful checklist items count. */
+function hasYaruKotoChecklist(text) {
+  const lines = String(text ?? '').split('\n');
+  const startIdx = lines.findIndex((line) => isIssueSectionHeading(line, 'やること'));
+  if (startIdx === -1) return false;
+  const startHeading = parseIssueHeading(lines[startIdx]);
+  if (!startHeading) return false;
+  for (let i = startIdx + 1; i < lines.length; i += 1) {
+    const heading = parseIssueHeading(lines[i]);
+    if (heading && heading.level <= startHeading.level) break;
+    if (!/^\s*[-*+]\s*(?:\[[ xX]\]\s*)?\S/.test(lines[i])) continue;
+    const item = normalizeIssueContentLine(lines[i]).replace(/^\[[ xX]\]\s*/, '');
+    const acceptanceValue = /^(?:受け入れ条件|完了条件)\s*[:：]\s*(.*)$/u.exec(item)?.[1];
+    if (hasMeaningfulIssueText(acceptanceValue ?? item)) return true;
   }
   return false;
 }
 
-/**
- * text 中の `## 検証` セクション本文だけを抜き出す（次の `## ` 見出しの直前まで、
- * `###` 以下のサブ見出しは区切りにしない）。見出しが無ければ空文字。
- */
+/** Extract a Markdown or GitHub Forms `検証` section. */
 function extractVerificationSection(text) {
-  return extractSectionText(text, /^##\s*検証\s*$/) ?? '';
+  return extractSectionText(text, '検証') ?? '';
 }
 
-/**
- * text 中の `headingRegex` に一致する見出し行の直後から、次の `##` 見出し
- * （`###` 以下のサブ見出しは区切りにしない）の直前までの本文を抜き出す。
- * 見出しが見つからなければ null。
- * @param {string} text
- * @param {RegExp} headingRegex 見出し行（trim 済み）に対する正規表現
- */
-function extractSectionText(text, headingRegex) {
-  const lines = String(text ?? '').split('\n');
-  const startIdx = lines.findIndex((line) => headingRegex.test(line.trim()));
-  if (startIdx === -1) return null;
-  const sectionLines = [];
-  for (let i = startIdx + 1; i < lines.length; i += 1) {
-    if (/^##(?!#)\s/.test(lines[i])) break; // 次の `##` 見出しに入ったら終了
-    sectionLines.push(lines[i]);
-  }
-  return sectionLines.join('\n').trim();
+function hasVerificationCommand(text) {
+  return (
+    /`(?:pnpm|gh|node|git|rg|npx)\s+[^`]+`/i.test(text) ||
+    /(?:^|\n)\s*(?:pnpm|gh|node|git|rg|npx)\s+\S+/im.test(text) ||
+    String(text ?? '').includes('expect(')
+  );
 }
 
 /**
@@ -791,11 +856,11 @@ function extractSectionText(text, headingRegex) {
  * @param {string | undefined | null} body
  */
 export function extractAcceptanceCriteriaText(body) {
-  const text = body ?? '';
+  const text = String(body ?? '');
   const parts = [];
-  const yaruKoto = extractSectionText(text, /^#{1,6}\s*やること\s*$/);
+  const yaruKoto = extractSectionText(text, 'やること');
   if (yaruKoto) parts.push(`## やること\n${yaruKoto}`);
-  const kensho = extractSectionText(text, /^##\s*検証\s*$/);
+  const kensho = extractSectionText(text, '検証');
   if (kensho) parts.push(`## 検証\n${kensho}`);
   if (parts.length > 0) return parts.join('\n\n').trim();
 
@@ -835,7 +900,7 @@ function extractBriefRequiredSections(body) {
 }
 
 /**
- * issue body の「受け入れ条件 / 検証コマンド」を判定する（routing skill / dispatch §status:ready）。
+ * issue body の「受け入れ条件 / 検証コマンド」を判定する（routing skill / dispatch §Workflow status=Ready）。
  *
  * - acceptance: body に `受け入れ条件` または `完了条件` の語がある、または
  *   `## やること` セクションにチェックリスト/箇条書き行が1つ以上ある
@@ -846,19 +911,34 @@ function extractBriefRequiredSections(body) {
  *   コマンドと誤認するのを防ぐ）
  */
 export function detectAcceptanceCriteria(body) {
-  const text = body ?? '';
-
+  const text = String(body ?? '');
+  const background = extractSectionText(text, '背景');
+  const scope = extractSectionText(text, 'やること');
+  const caution = extractSectionText(text, '注意');
+  const acceptanceSection =
+    extractSectionText(text, '受け入れ条件') ?? extractSectionText(text, '完了条件');
+  const acceptanceSectionContent = String(acceptanceSection ?? '')
+    .split('\n')
+    .map((line) => line.replace(/^\s*(?:受け入れ条件|完了条件)\s*[:：]\s*/u, ''))
+    .join('\n');
+  const hasAcceptanceLabel = text.split('\n').some((line) => {
+    const match = /(?:受け入れ条件|完了条件)\s*[:：]\s*(.*)$/u.exec(line);
+    return match !== null && hasMeaningfulIssueText(match[1]);
+  });
   const acceptance =
-    text.includes('受け入れ条件') || text.includes('完了条件') || hasYaruKotoChecklist(text);
-
+    hasMeaningfulIssueText(acceptanceSectionContent) ||
+    hasAcceptanceLabel ||
+    hasYaruKotoChecklist(text);
   const verificationSection = extractVerificationSection(text);
-  const hasFencedCodeBlock = /```/.test(verificationSection);
-  const hasVerificationCommand =
-    /`(pnpm|gh|node|git|rg|npx) [^`]*`/.test(verificationSection) ||
-    verificationSection.includes('expect(');
-  const verification = hasFencedCodeBlock || hasVerificationCommand;
+  const verification =
+    hasMeaningfulIssueText(verificationSection) && hasVerificationCommand(verificationSection);
+  const missingContractSections = [
+    !hasMeaningfulIssueText(background) ? '背景' : null,
+    !hasMeaningfulIssueText(scope) ? 'やること' : null,
+    !hasMeaningfulIssueText(caution) ? '注意' : null,
+  ].filter(Boolean);
 
-  return { acceptance, verification };
+  return { acceptance, verification, missingContractSections };
 }
 
 /**
@@ -874,7 +954,7 @@ export function buildJudgmentHint(records) {
   if (!records.brief) missing.push('brief');
   if ('acceptance' in records && !records.acceptance) missing.push('受け入れ条件');
   if ('verification' in records && !records.verification) {
-    missing.push('検証コマンド（dispatch §status:ready の機械判定）');
+    missing.push('検証コマンド（dispatch §Workflow status=Ready の機械判定）');
   }
   if (missing.length === 0) return null;
   return `判断の記録が欠けている: ${missing.join('・')}（routing skill 手順 1 / dispatch 手順 7）`;
@@ -1161,6 +1241,12 @@ function buildMarkdownLines(
     `assignee: ${pack.header.assignee ?? 'なし'}`,
     `url: ${pack.header.url ?? '未取得'}`,
   ];
+  if (pack.kind === 'issue') {
+    const workflowStatus = !pack.header.workflowStatusAvailable
+      ? '未取得'
+      : (pack.header.workflowStatus ?? '未設定');
+    headerParts.push(`Workflow status: ${workflowStatus}`);
+  }
   lines.push(headerParts.join(' | '));
   if (pack.snapshotId) {
     lines.push(`生成: ${pack.generatedAt ?? '未取得'} | snapshot: ${pack.snapshotId}`);
@@ -1650,10 +1736,20 @@ export function buildContextPack(options, deps = {}) {
     unresolvedThreads = threadNodes === null ? null : countUnresolvedThreads(threadNodes);
     header.unresolvedThreads = unresolvedThreads;
   } else {
+    const issueFieldValues = tryOr(
+      () =>
+        runGhJson(['api', `repos/${REPO}/issues/${number}/issue-field-values`], { execFileImpl }),
+      null,
+    );
+    const workflowStatusField = Array.isArray(issueFieldValues)
+      ? issueFieldValues.find((field) => field.issue_field_id === WORKFLOW_STATUS_FIELD_ID)
+      : null;
     header = {
       title: base?.title ?? null,
       state: base?.state ?? null,
       labels: (base?.labels ?? []).map((l) => l.name),
+      workflowStatus: workflowStatusField?.single_select_option?.name ?? null,
+      workflowStatusAvailable: Array.isArray(issueFieldValues),
       milestone: base?.milestone?.title ?? null,
       assignee: (base?.assignees ?? [])[0]?.login ?? null,
       url: base?.html_url ?? null,
@@ -1875,6 +1971,8 @@ export function buildContextPack(options, deps = {}) {
       title: header.title,
       state: header.state,
       labels: header.labels,
+      workflowStatus: header.workflowStatus ?? null,
+      workflowStatusAvailable: header.workflowStatusAvailable ?? null,
       milestone: header.milestone,
       assignee: header.assignee,
       url: header.url,
@@ -1943,6 +2041,12 @@ export function buildContextPack(options, deps = {}) {
   const routing = resolveFactoryRoute({
     files,
     labels: header.labels,
+    ...(kind === 'issue'
+      ? {
+          workflowStatus: header.workflowStatus,
+          workflowStatusAvailable: header.workflowStatusAvailable,
+        }
+      : {}),
     body: rawBody,
     ...criteria,
     metadataAvailable,

@@ -10,7 +10,6 @@
 // =============================================================================
 // Types
 // =============================================================================
-export type { ClipboardTimeblock } from './lib/timeblock-clipboard';
 export type { CalendarEvent } from './types/calendar-event';
 export type { PlanEvent, PlanEventStatus } from './types/plan-event';
 export type { RecordEvent } from './types/record-event';
@@ -41,7 +40,6 @@ export { TIMEBLOCK_PARAM, serializeTimeblockParam } from './lib/inspector-url';
 // Domain (時間モデル — 純粋関数、DB/tRPC/React 非依存)
 // =============================================================================
 export {
-  isPlanRecordDrop,
   resolveTimeblockDestination,
   resolveTimeblockKindChoice,
 } from './domain/timeblock-destination';
@@ -57,7 +55,6 @@ export { plansToICal } from './lib/plan-to-ical';
 // =============================================================================
 // Lib (timeblock menu items — 右クリック / Inspector メニュー共通の項目定義)
 // =============================================================================
-export { createClipboardTimeblock } from './lib/timeblock-clipboard';
 export { createTimeblockDuplicateDraft } from './lib/timeblock-duplicate';
 export {
   collectTimeblockLaneItems,

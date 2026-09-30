@@ -185,3 +185,8 @@ export const MFARecoveryCodes: Story = {
     />
   ),
 };
+
+/** アカウント設定をプロフィール・セキュリティ・セッションごとに表示。 */
+export const AllPatterns: Story = {
+  render: () => <AccountSettings _MFASectionProps={{ _useMFAHook: () => createMockMFA() }} />,
+};

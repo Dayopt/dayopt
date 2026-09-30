@@ -53,14 +53,15 @@ interface PlanLaneCardProps {
   onContextMenu?: ((event: PlanEvent, e: React.MouseEvent) => void) | undefined;
   onPointerDown?: ((event: PlanEvent, e: React.MouseEvent) => void) | undefined;
   onTouchStart?: ((event: PlanEvent, e: React.TouchEvent) => void) | undefined;
-  onResizeStart?: ((event: PlanEvent, e: React.MouseEvent | React.TouchEvent) => void) | undefined;
+  onResizeStart?:
+    ((event: PlanEvent, direction: 'top' | 'bottom', e: React.MouseEvent) => void) | undefined;
   /** ドラッグ中の opacity / リサイズ中の zIndex など、呼び出し側から上書きしたい style */
   styleOverride?: React.CSSProperties | undefined;
 }
 
-const MIN_HEIGHT = 20;
 const DETAIL_HEIGHT_THRESHOLD = 40;
-const RESIZE_HANDLE_HEIGHT = 20;
+const RESIZE_HANDLE_HEIGHT = 8;
+const MIN_RESIZE_HEIGHT = RESIZE_HANDLE_HEIGHT * 2 + 4;
 
 export function PlanLaneCard({
   event,
@@ -134,13 +135,14 @@ export function PlanLaneCard({
       data-plan-lane-card
       data-plan-status={event.status}
       data-timeblock-card={interactive ? 'true' : undefined}
+      data-timeblock-selected={interactive && isActive ? 'true' : undefined}
       data-timeblock-id={interactive ? event.id : undefined}
       tabIndex={interactive ? 0 : undefined}
       role={interactive ? 'button' : undefined}
       aria-label={interactive ? displayName : undefined}
       aria-hidden={interactive ? undefined : true}
       className={cn(
-        'absolute flex flex-col gap-1 overflow-hidden rounded-lg text-xs',
+        'group absolute flex flex-col gap-1 overflow-hidden rounded-lg text-xs',
         interactive ? 'pointer-events-auto' : 'pointer-events-none',
         compact ? 'border px-2' : 'border-2 px-3',
         // 高さが足りないカードだけ上下を詰める（詰めないと文字が切れる）
@@ -160,7 +162,7 @@ export function PlanLaneCard({
         top: `${position.top}px`,
         left: `${position.left}%`,
         width: `calc(${position.width}% - 4px)`,
-        height: `${Math.max(position.height, MIN_HEIGHT)}px`,
+        height: `${position.height}px`,
         ...styleOverride,
       }}
       onClick={interactive ? handleClick : undefined}
@@ -223,25 +225,31 @@ export function PlanLaneCard({
         </p>
       )}
       {showDayDiffMarker && <DayDiffMarker />}
-      {canDrag && !disableResize && onResizeStart && (
-        <div
-          // ポインター用のジェスチャー領域。キーボードではカードから Inspector の時刻入力を使う。
-          // ピクセル高を時刻の slider として公開しない。
-          role="presentation"
-          data-resize-handle
-          className="absolute right-0 bottom-0 left-0 cursor-ns-resize"
-          style={{ height: RESIZE_HANDLE_HEIGHT }}
-          onMouseDown={(e) => {
-            e.stopPropagation();
-            e.preventDefault();
-            onResizeStart(event, e);
-          }}
-          onTouchStart={(e) => {
-            e.stopPropagation();
-            onResizeStart(event, e);
-          }}
-        />
-      )}
+      {canDrag &&
+        !disableResize &&
+        onResizeStart &&
+        position.height >= MIN_RESIZE_HEIGHT &&
+        (['top', 'bottom'] as const).map((direction) => (
+          <div
+            // タッチ入力は親カードの長押し移動へ渡す。resize は hover 可能な Desktop pointer のみ。
+            role="presentation"
+            aria-hidden="true"
+            data-resize-handle={direction}
+            className={cn(
+              'calendar-resize-handle absolute right-0 left-0 z-10 cursor-ns-resize',
+              direction === 'top' ? 'top-0' : 'bottom-0',
+            )}
+            style={{ height: RESIZE_HANDLE_HEIGHT }}
+            key={direction}
+            onMouseDown={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+              onResizeStart(event, direction, e);
+            }}
+          >
+            <span className="calendar-resize-handle-indicator" />
+          </div>
+        ))}
     </div>
   );
 }

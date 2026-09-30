@@ -15,6 +15,9 @@
       "deleteFailed": "Failed to delete account",
       "profile": "Profile",
       "profileDesc": "Basic information and profile image settings",
+      "sections": {
+        "security": "Security"
+      },
       "displayName": "Display name",
       "displayNameDesc": "Name shown to other users",
       "displayNamePlaceholder": "Enter display name",
@@ -354,7 +357,7 @@
       },
       "mcp": {
         "title": "MCP / API",
-        "description": "Connect AI assistants like Claude, ChatGPT, or Cursor to your Dayopt data.",
+        "description": "Connect an AI assistant to your Dayopt data.",
         "serverUrl": "MCP server URL",
         "copied": "Copied to clipboard",
         "connectionGuide": "Add this URL as a custom connector or MCP server in your AI assistant's settings.",
@@ -590,6 +593,13 @@
       }
     },
     "accountPage": {
+      "sections": {
+        "settings": "Settings",
+        "data": "Data",
+        "plan": "Plan",
+        "support": "Support",
+        "other": "Other"
+      },
       "helpAndSupport": "Help & support",
       "releaseNotes": "Release notes",
       "documentation": "Documentation",

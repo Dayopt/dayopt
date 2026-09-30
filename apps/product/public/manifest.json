@@ -7,24 +7,13 @@
   "display": "standalone",
   "orientation": "portrait-primary",
   "background_color": "#f7f5f1",
-  "theme_color": "#23467f",
+  "theme_color": "#26251f",
   "lang": "ja",
   "categories": ["productivity", "utilities"],
   "icons": [
     {
-      "src": "/favicon.ico",
-      "sizes": "any",
-      "type": "image/x-icon"
-    },
-    {
       "src": "/icons/icon-192.png",
       "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "/icons/icon-512.png",
-      "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
     },
@@ -35,19 +24,16 @@
       "purpose": "maskable"
     },
     {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
       "src": "/icons/icon-512-maskable.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
-    }
-  ],
-  "screenshots": [
-    {
-      "src": "/og-image.png",
-      "sizes": "1200x630",
-      "type": "image/png",
-      "form_factor": "wide",
-      "label": "Dayopt Calendar View"
     }
   ]
 }

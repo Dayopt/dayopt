@@ -9,7 +9,7 @@
 
 ## 外部との接点
 
-### HTTP route（32）
+### HTTP route（33）
 
 tRPC の `/api/trpc` を含む、Next.js の route handler 全件。method は export から取る。
 
@@ -25,6 +25,7 @@ tRPC の `/api/trpc` を含む、Next.js の route handler 全件。method は e
 | product | `/api/cron/external-connection-maintenance`  | GET                | nodejs  | 60          | `apps/product/src/app/api/cron/external-connection-maintenance/route.ts`  |
 | product | `/api/csp-report`                            | POST, HEAD         | —       | 30          | `apps/product/src/app/api/csp-report/route.ts`                            |
 | product | `/api/health`                                | GET                | —       | 30          | `apps/product/src/app/api/health/route.ts`                                |
+| product | `/api/health/cron`                           | GET                | —       | 20          | `apps/product/src/app/api/health/cron/route.ts`                           |
 | product | `/api/health/version`                        | GET                | —       | 15          | `apps/product/src/app/api/health/version/route.ts`                        |
 | product | `/api/integrations/google-calendar/callback` | GET                | nodejs  | 90          | `apps/product/src/app/api/integrations/google-calendar/callback/route.ts` |
 | product | `/api/integrations/google-calendar/start`    | GET                | nodejs  | 90          | `apps/product/src/app/api/integrations/google-calendar/start/route.ts`    |
@@ -41,14 +42,14 @@ tRPC の `/api/trpc` を含む、Next.js の route handler 全件。method は e
 | web     | `/api/compass-docs`                          | GET                | —       | 30          | `apps/web/src/app/api/compass-docs/route.ts`                              |
 | web     | `/api/contact`                               | POST               | —       | 30          | `apps/web/src/app/api/contact/route.ts`                                   |
 | web     | `/api/csp-report`                            | POST, HEAD         | —       | 30          | `apps/web/src/app/api/csp-report/route.ts`                                |
-| web     | `/api/og`                                    | GET                | —       | 25          | `apps/web/src/app/api/og/route.tsx`                                       |
+| web     | `/api/og`                                    | GET                | nodejs  | 25          | `apps/web/src/app/api/og/route.tsx`                                       |
 | web     | `/api/search`                                | GET                | —       | 30          | `apps/web/src/app/api/search/route.ts`                                    |
 | web     | `/api/v1/system/[...retired]`                | GET, POST, OPTIONS | —       | 5           | `apps/web/src/app/api/v1/system/[...retired]/route.ts`                    |
 | web     | `/api/webhooks/resend`                       | POST               | nodejs  | 15          | `apps/web/src/app/api/webhooks/resend/route.ts`                           |
 | web     | `/blog/feed.xml`                             | GET                | —       | 30          | `apps/web/src/app/blog/feed.xml/route.ts`                                 |
 | web     | `/ja/blog/feed.xml`                          | GET                | —       | 30          | `apps/web/src/app/ja/blog/feed.xml/route.ts`                              |
 
-### 定期実行（16）
+### 定期実行（15）
 
 | source         | 対象                                         | schedule       | 発見元                                          |
 | -------------- | -------------------------------------------- | -------------- | ----------------------------------------------- |
@@ -60,7 +61,6 @@ tRPC の `/api/trpc` を含む、Next.js の route handler 全件。method は e
 | github-actions | `nightly.yml`                                | `30 21 * * *`  | `.github/workflows/nightly.yml`                 |
 | github-actions | `nightly.yml`                                | `0 22 * * *`   | `.github/workflows/nightly.yml`                 |
 | github-actions | `production-config-audit.yml`                | `0 21 * * *`   | `.github/workflows/production-config-audit.yml` |
-| github-actions | `production-config-audit.yml`                | `*/15 * * * *` | `.github/workflows/production-config-audit.yml` |
 
 **pg_cron（7）**: 下表は migration 上の定義を schedule / unschedule の順に畳んだもの。
 production の pg_cron は Supabase Dashboard 側が正本なので、ここは参考値として読む。
@@ -107,7 +107,7 @@ job 名を変数で渡す schedule と、jobid で消す unschedule は追えな
 | `protectedProcedure` | 67                      | `apps/product/src/lib/trpc/procedures.ts` |
 | `entitledProcedure`  | 4                       | `apps/product/src/lib/trpc/procedures.ts` |
 
-### rate limit（21）
+### rate limit（22）
 
 | limiter                        | 上限 | 窓     | 利用箇所                                                                                                                                          |
 | ------------------------------ | ---- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -121,12 +121,13 @@ job 名を変数で渡す schedule と、jobid で消す unschedule は追えな
 | `oauthTokenPreBodyIpRateLimit` | 600  | `1 m`  | `apps/product/src/lib/oauth-server/token-rate-limit.ts`                                                                                           |
 | `oauthTokenRefreshRateLimit`   | 30   | `1 m`  | `apps/product/src/lib/oauth-server/token-rate-limit.ts`                                                                                           |
 | `oauthTokenRefreshIpRateLimit` | 120  | `1 m`  | `apps/product/src/lib/oauth-server/token-rate-limit.ts`                                                                                           |
-| `oauthTokenGlobalRateLimit`    | 120  | `1 m`  | `apps/product/src/lib/oauth-server/token-rate-limit.ts`                                                                                           |
+| `oauthTokenClientRateLimit`    | 120  | `1 m`  | `apps/product/src/lib/oauth-server/token-rate-limit.ts`                                                                                           |
 | `timeblockCreateRateLimit`     | 500  | `24 h` | 利用箇所なし                                                                                                                                      |
 | `icalFeedRateLimit`            | 10   | `1 m`  | `apps/product/src/app/api/v1/calendar/[token]/route.ts`                                                                                           |
 | `icalFeedIpRateLimit`          | 60   | `1 m`  | `apps/product/src/app/api/v1/calendar/[token]/route.ts`                                                                                           |
 | `trpcPreAuthIpRateLimit`       | 600  | `1 m`  | `apps/product/src/lib/trpc/context.ts`                                                                                                            |
 | `healthCheckGlobalRateLimit`   | 120  | `1 m`  | `apps/product/src/app/api/health/route.ts`                                                                                                        |
+| `cronHeartbeatHealthRateLimit` | 30   | `1 m`  | `apps/product/src/app/api/health/cron/route.ts`                                                                                                   |
 | `icalFeedGlobalRateLimit`      | 600  | `1 m`  | `apps/product/src/app/api/v1/calendar/[token]/route.ts`                                                                                           |
 | `calendarConnectRateLimit`     | 10   | `1 h`  | `apps/product/src/app/api/integrations/google-calendar/callback/route.ts`, `apps/product/src/app/api/integrations/google-calendar/start/route.ts` |
 | `calendarSyncNowRateLimit`     | 6    | `1 h`  | `apps/product/src/features/external-calendar/server/router.ts`                                                                                    |
@@ -242,16 +243,17 @@ TS の `PRODUCT_EVENT_NAMES` と DB の CHECK 制約の両方で定義される�
 | `VERCEL_TEAM_ID`                         | yes  | public     | production          | vercel-production               | —                          |
 | `VERCEL_TOKEN`                           | yes  | secret     | production          | vercel-production               | —                          |
 
-### workspace package（6）
+### workspace package（7）
 
-| package                 | exports                                          | 依存している workspace                                |
-| ----------------------- | ------------------------------------------------ | ----------------------------------------------------- |
-| `@dayopt/billing`       | `.`                                              | `@dayopt/product`, `@dayopt/web`                      |
-| `@dayopt/components`    | `.`, `./testing/modal-menu`                      | `@dayopt/product`, `@dayopt/storybook`, `@dayopt/web` |
-| `@dayopt/config`        | `.`                                              | `@dayopt/i18n`, `@dayopt/product`, `@dayopt/web`      |
-| `@dayopt/foundations`   | `./og-colors`, `./scrollbar.css`, `./tokens.css` | `@dayopt/product`, `@dayopt/storybook`, `@dayopt/web` |
-| `@dayopt/i18n`          | `./navigation`, `./request`, `./routing`         | `@dayopt/product`, `@dayopt/web`                      |
-| `@dayopt/observability` | `.`, `./build-gate`                              | `@dayopt/product`, `@dayopt/web`                      |
+| package                 | exports                                                                                      | 依存している workspace                                 |
+| ----------------------- | -------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
+| `@dayopt/assets`        | `.`, `./brand`, `./logo-artwork`, `./og`, `./og-card-image`, `./og-fonts`, `./og-screenshot` | `@dayopt/components`, `@dayopt/product`, `@dayopt/web` |
+| `@dayopt/billing`       | `.`                                                                                          | `@dayopt/product`, `@dayopt/web`                       |
+| `@dayopt/components`    | `.`, `./brand`, `./testing/modal-menu`                                                       | `@dayopt/product`, `@dayopt/storybook`, `@dayopt/web`  |
+| `@dayopt/config`        | `.`                                                                                          | `@dayopt/i18n`, `@dayopt/product`, `@dayopt/web`       |
+| `@dayopt/foundations`   | `./og-colors`, `./scrollbar.css`, `./tokens.css`                                             | `@dayopt/product`, `@dayopt/storybook`, `@dayopt/web`  |
+| `@dayopt/i18n`          | `./navigation`, `./request`, `./routing`                                                     | `@dayopt/product`, `@dayopt/web`                       |
+| `@dayopt/observability` | `.`, `./build-gate`                                                                          | `@dayopt/product`, `@dayopt/web`                       |
 
 ## 関係
 
@@ -363,40 +365,40 @@ allowlist、MCP registry）に載っていないかを併せて確かめる。
 
 ### store の利用元
 
-| store                         | 利用 file 数 | 利用 file（先頭 3 件）                                                                                                                                                                                                                                                                 |
-| ----------------------------- | ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `useShellStore`               | 32           | `apps/product/src/app/[locale]/(app)/(workspace)/_composition/CalendarViewClient.tsx`, `apps/product/src/app/[locale]/(app)/(workspace)/_composition/ReportViewClient.tsx`, `apps/product/src/app/[locale]/(app)/_overlays/GlobalOverlays.tsx`                                         |
-| `useAuthStore`                | 22           | `apps/product/src/app/[locale]/(app)/_providers/_composition/QueryCacheAuthBoundary.tsx`, `apps/product/src/app/[locale]/(app)/_shell/MobileAccountButton.tsx`, `apps/product/src/app/[locale]/(app)/_shell/desktop-layout.tsx`                                                        |
-| `useTimeblockInspectorStore`  | 17           | `apps/product/src/app/[locale]/(app)/(workspace)/_composition/useCalendarComposition.ts`, `apps/product/src/app/[locale]/(app)/_overlays/GlobalOverlays.tsx`, `apps/product/src/app/[locale]/(app)/_providers/useApplyUpdateWhenSafe.ts`                                               |
-| `useReportDetailStore`        | 10           | `apps/product/src/app/[locale]/(app)/_shell/desktop-layout.tsx`, `apps/product/src/features/review/components/detail/ConnectedReportDetailPanel.tsx`, `apps/product/src/features/review/components/detail/ReportDetailResizeHandle.tsx`                                                |
-| `useInlineCreateStore`        | 7            | `apps/product/src/features/calendar/components/controller/hooks/useCalendarHandlers.ts`, `apps/product/src/features/calendar/components/create/InlineCreatePanel.tsx`, `apps/product/src/features/calendar/components/create/useInlineCreate.ts`                                       |
-| `useCalendarDragStore`        | 5            | `apps/product/src/features/calendar/components/activity-filter/ActivityDragContext.tsx`, `apps/product/src/features/calendar/components/views/shared/components/CalendarGridContent.tsx`, `apps/product/src/features/calendar/interaction/interaction-effects.ts`                      |
-| `useCalendarFilterStore`      | 5            | `apps/product/src/features/calendar/components/activity-filter/ActivityFilterList.tsx`, `apps/product/src/features/calendar/components/controller/hooks/useCalendarData.ts`, `apps/product/src/features/calendar/index.ts`                                                             |
-| `useTimeblockClipboardStore`  | 5            | `apps/product/src/app/[locale]/(app)/(workspace)/_composition/useCalendarCrudHandlers.ts`, `apps/product/src/app/[locale]/(app)/_overlays/GlobalOverlays.tsx`, `apps/product/src/features/calendar/components/views/shared/components/CalendarDragSelection/CalendarDragSelection.tsx` |
-| `useBillingPollStore`         | 4            | `apps/product/src/app/[locale]/(app)/_shell/useAppInlineBanner.ts`, `apps/product/src/app/[locale]/(app)/settings/[category]/page.tsx`, `apps/product/src/features/settings/components/BillingSettings.tsx`                                                                            |
-| `useCalendarNavigationStore`  | 4            | `apps/product/src/app/[locale]/(app)/(workspace)/_composition/useCalendarComposition.ts`, `apps/product/src/app/[locale]/(app)/_shell/CalendarSidebar.tsx`, `apps/product/src/features/calendar/hooks/navigation/CalendarNavigationContext.tsx`                                        |
-| `useReportViewStore`          | 4            | `apps/product/src/features/review/components/report/ReportBody.tsx`, `apps/product/src/features/review/components/sidebar/ReportFilterDrawer.tsx`, `apps/product/src/features/review/components/sidebar/ReportFilterList.tsx`                                                          |
-| `useTemplateSaveStore`        | 3            | `apps/product/src/app/[locale]/(app)/_shell/CalendarSidebar.tsx`, `apps/product/src/features/calendar/components/CalendarController.tsx`, `apps/product/src/features/calendar/index.ts`                                                                                                |
-| `useActivitySortStore`        | 2            | `apps/product/src/features/calendar/components/activity-filter/ActivityFilterList.tsx`, `apps/product/src/features/calendar/components/activity-filter/sort-activities.ts`                                                                                                             |
-| `useCalendarDisplayModeStore` | 2            | `apps/product/src/features/calendar/components/views/WeekView/components/MobileWeekLaneSwitcher.tsx`, `apps/product/src/features/calendar/components/views/WeekView/components/WeekGrid.tsx`                                                                                           |
+| store                         | 利用 file 数 | 利用 file（先頭 3 件）                                                                                                                                                                                                                           |
+| ----------------------------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `useShellStore`               | 32           | `apps/product/src/app/[locale]/(app)/(workspace)/_composition/CalendarViewClient.tsx`, `apps/product/src/app/[locale]/(app)/(workspace)/_composition/ReportViewClient.tsx`, `apps/product/src/app/[locale]/(app)/_overlays/GlobalOverlays.tsx`   |
+| `useAuthStore`                | 22           | `apps/product/src/app/[locale]/(app)/_providers/_composition/QueryCacheAuthBoundary.tsx`, `apps/product/src/app/[locale]/(app)/_shell/MobileAccountButton.tsx`, `apps/product/src/app/[locale]/(app)/_shell/desktop-layout.tsx`                  |
+| `useTimeblockInspectorStore`  | 17           | `apps/product/src/app/[locale]/(app)/(workspace)/_composition/useCalendarComposition.ts`, `apps/product/src/app/[locale]/(app)/_overlays/GlobalOverlays.tsx`, `apps/product/src/app/[locale]/(app)/_providers/useApplyUpdateWhenSafe.ts`         |
+| `useReportDetailStore`        | 10           | `apps/product/src/app/[locale]/(app)/_shell/desktop-layout.tsx`, `apps/product/src/features/review/components/detail/ConnectedReportDetailPanel.tsx`, `apps/product/src/features/review/components/detail/ReportDetailResizeHandle.tsx`          |
+| `useInlineCreateStore`        | 7            | `apps/product/src/features/calendar/components/controller/hooks/useCalendarHandlers.ts`, `apps/product/src/features/calendar/components/create/InlineCreatePanel.tsx`, `apps/product/src/features/calendar/components/create/useInlineCreate.ts` |
+| `useCalendarFilterStore`      | 5            | `apps/product/src/features/calendar/components/activity-filter/ActivityFilterList.tsx`, `apps/product/src/features/calendar/components/controller/hooks/useCalendarData.ts`, `apps/product/src/features/calendar/index.ts`                       |
+| `useBillingPollStore`         | 4            | `apps/product/src/app/[locale]/(app)/_shell/useAppInlineBanner.ts`, `apps/product/src/app/[locale]/(app)/settings/[category]/page.tsx`, `apps/product/src/features/settings/components/BillingSettings.tsx`                                      |
+| `useCalendarNavigationStore`  | 4            | `apps/product/src/app/[locale]/(app)/(workspace)/_composition/useCalendarComposition.ts`, `apps/product/src/app/[locale]/(app)/_shell/CalendarSidebar.tsx`, `apps/product/src/features/calendar/hooks/navigation/CalendarNavigationContext.tsx`  |
+| `useReportViewStore`          | 4            | `apps/product/src/features/review/components/report/ReportBody.tsx`, `apps/product/src/features/review/components/sidebar/ReportFilterDrawer.tsx`, `apps/product/src/features/review/components/sidebar/ReportFilterList.tsx`                    |
+| `useCalendarDragStore`        | 3            | `apps/product/src/features/calendar/components/activity-filter/ActivityDragContext.tsx`, `apps/product/src/features/calendar/interaction/interaction-runtime.ts`, `apps/product/src/features/calendar/interaction/useInteraction.ts`             |
+| `useTemplateSaveStore`        | 3            | `apps/product/src/app/[locale]/(app)/_shell/CalendarSidebar.tsx`, `apps/product/src/features/calendar/components/CalendarController.tsx`, `apps/product/src/features/calendar/index.ts`                                                          |
+| `useActivitySortStore`        | 2            | `apps/product/src/features/calendar/components/activity-filter/ActivityFilterList.tsx`, `apps/product/src/features/calendar/components/activity-filter/sort-activities.ts`                                                                       |
+| `useCalendarDisplayModeStore` | 2            | `apps/product/src/features/calendar/components/views/WeekView/components/MobileWeekLaneSwitcher.tsx`, `apps/product/src/features/calendar/components/views/WeekView/components/WeekGrid.tsx`                                                     |
 
 ### docs → feature
 
 docs の frontmatter `code:` が指す実装から引く。
 
-| doc                                            | feature                                 |
-| ---------------------------------------------- | --------------------------------------- |
-| `docs/operations/contact-email.md`             | `contact`                               |
-| `docs/operations/google-oauth-verification.md` | `external-calendar`                     |
-| `docs/operations/posthog-analytics.md`         | `settings`, `timeblock`                 |
-| `docs/product/specs/activities.md`             | `activities`                            |
-| `docs/product/specs/auth.md`                   | `auth`, `external-calendar`, `settings` |
-| `docs/product/specs/calendar.md`               | `calendar`                              |
-| `docs/product/specs/contact.md`                | `contact`                               |
-| `docs/product/specs/external-calendar.md`      | `external-calendar`                     |
-| `docs/product/specs/plan-record.md`            | `timeblock`                             |
-| `docs/product/specs/review.md`                 | `review`                                |
-| `docs/product/specs/settings.md`               | `settings`                              |
+| doc                                                 | feature                                 |
+| --------------------------------------------------- | --------------------------------------- |
+| `docs/operations/calendar-integration-rehearsal.md` | `external-calendar`                     |
+| `docs/operations/contact-email.md`                  | `contact`                               |
+| `docs/operations/google-oauth-verification.md`      | `external-calendar`                     |
+| `docs/operations/posthog-analytics.md`              | `settings`, `timeblock`                 |
+| `docs/product/specs/activities.md`                  | `activities`                            |
+| `docs/product/specs/auth.md`                        | `auth`, `external-calendar`, `settings` |
+| `docs/product/specs/calendar.md`                    | `calendar`                              |
+| `docs/product/specs/contact.md`                     | `contact`                               |
+| `docs/product/specs/external-calendar.md`           | `external-calendar`                     |
+| `docs/product/specs/plan-record.md`                 | `timeblock`                             |
+| `docs/product/specs/review.md`                      | `review`                                |
+| `docs/product/specs/settings.md`                    | `settings`                              |
 
 **doc から辿れない feature**: なし
 
@@ -548,11 +550,11 @@ page から import を宣言元まで解決して辿った結果（barrel の再
 
 | feature             | source | test file | component | Story のある component |
 | ------------------- | ------ | --------- | --------- | ---------------------- |
-| `activities`        | 30     | 3         | 11        | 3 / 11                 |
+| `activities`        | 30     | 4         | 11        | 3 / 11                 |
 | `auth`              | 22     | 15        | 8         | 7 / 8                  |
-| `calendar`          | 192    | 97        | 59        | 31 / 59                |
+| `calendar`          | 190    | 94        | 59        | 31 / 59                |
 | `contact`           | 8      | 6         | 2         | 1 / 2                  |
 | `external-calendar` | 26     | 19        | 2         | 1 / 2                  |
 | `review`            | 37     | 22        | 19        | 14 / 19                |
-| `settings`          | 49     | 39        | 22        | 17 / 22                |
-| `timeblock`         | 98     | 54        | 18        | 12 / 18                |
+| `settings`          | 49     | 39        | 22        | 18 / 22                |
+| `timeblock`         | 99     | 55        | 20        | 14 / 20                |

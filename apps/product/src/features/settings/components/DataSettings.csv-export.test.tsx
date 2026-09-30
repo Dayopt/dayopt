@@ -7,6 +7,7 @@ const createObjectURL = vi.hoisted(() => vi.fn());
 const revokeObjectURL = vi.hoisted(() => vi.fn());
 
 vi.mock('next-intl', () => ({
+  useLocale: () => 'en',
   useTranslations: () => (key: string) => key,
 }));
 

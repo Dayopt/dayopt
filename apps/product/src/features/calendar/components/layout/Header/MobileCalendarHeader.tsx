@@ -55,6 +55,7 @@ export const MobileCalendarHeader = memo<MobileCalendarHeaderProps>(
     // 外側タップで閉じる（#2297）。ヘッダー+パネル全体を containerRef で囲み、
     // isExpanded の間だけ document レベルの pointerdown を監視する
     const containerRef = useRef<HTMLDivElement>(null);
+    const flowSpacerRef = useRef<HTMLDivElement>(null);
 
     // viewMonth: グリッドスワイプで独立して変化する表示月
     const [viewMonth, setViewMonth] = useState(() => currentDate);
@@ -84,6 +85,24 @@ export const MobileCalendarHeader = memo<MobileCalendarHeaderProps>(
     const isPast = !today && isPastWallDateInTimezone(currentDate, timezone);
     const TodayIcon = isPast ? Redo2 : Undo2;
     const weekNumber = getWeek(currentDate, { weekStartsOn });
+
+    // ヘッダー本体は viewport に固定し、展開中の高さも後続コンテンツに確保する。
+    useEffect(() => {
+      const header = containerRef.current;
+      const spacer = flowSpacerRef.current;
+      if (!header || !spacer) return;
+
+      const syncSpacerHeight = () => {
+        spacer.style.height = `${header.getBoundingClientRect().height}px`;
+      };
+
+      syncSpacerHeight();
+      if (typeof ResizeObserver === 'undefined') return;
+
+      const observer = new ResizeObserver(syncSpacerHeight);
+      observer.observe(header);
+      return () => observer.disconnect();
+    }, []);
 
     const handleToggle = useCallback(() => {
       setIsExpanded((prev) => !prev);
@@ -131,133 +150,142 @@ export const MobileCalendarHeader = memo<MobileCalendarHeaderProps>(
     const ChevronIcon = isExpanded ? ChevronUp : ChevronDown;
 
     return (
-      <div
-        ref={containerRef}
-        className={cn('bg-background sticky top-0 z-20 md:hidden', className)}
-      >
-        <AppHeader
-          rightSlot={
-            <div className="flex h-8 items-center gap-1">
-              {/* 今日を見ている時はボタン自体を非表示にする（#2302）。過去日は
+      <>
+        <div
+          ref={containerRef}
+          className={cn('bg-background fixed inset-x-0 top-0 z-20 md:hidden', className)}
+        >
+          <AppHeader
+            contentClassName="mt-3 mb-0"
+            rightSlot={
+              <div className="flex h-8 items-center gap-1">
+                {/* 今日を見ている時はボタン自体を非表示にする（#2302）。過去日は
                   Redo（時間を進めて戻る）、未来日は Undo（時間を戻す）を出す */}
-              {!today && (
+                {!today && (
+                  <Button
+                    variant="ghost"
+                    icon
+                    size="sm"
+                    className="text-muted-foreground hover:text-foreground"
+                    onClick={handleTodayClick}
+                    onMouseEnter={() => onPrefetch?.('today')}
+                    onTouchStart={() => onPrefetch?.('today')}
+                    aria-label={t('actions.goToToday')}
+                  >
+                    <TodayIcon className="size-5" />
+                  </Button>
+                )}
+                {/* フッターの BottomTabBar 廃止に伴うトグル（#2300）。現在地ではなく
+                  遷移先（レポート）を示すアイコン。SidebarUtilities.tsx のテーマ
+                  切り替えパターンに倣う */}
                 <Button
                   variant="ghost"
                   icon
                   size="sm"
                   className="text-muted-foreground hover:text-foreground"
-                  onClick={handleTodayClick}
-                  onMouseEnter={() => onPrefetch?.('today')}
-                  onTouchStart={() => onPrefetch?.('today')}
-                  aria-label={t('actions.goToToday')}
+                  asChild
                 >
-                  <TodayIcon className="size-5" />
+                  <Link
+                    href={`/report?date=${formatCalendarDateParam(currentDate)}`}
+                    aria-label={t('actions.openReport')}
+                  >
+                    <BarChart3 className="size-5" />
+                  </Link>
                 </Button>
-              )}
-              {/* フッターの BottomTabBar 廃止に伴うトグル（#2300）。現在地ではなく
-                  遷移先（レポート）を示すアイコン。SidebarUtilities.tsx のテーマ
-                  切り替えパターンに倣う */}
-              <Button
-                variant="ghost"
-                icon
-                size="sm"
-                className="text-muted-foreground hover:text-foreground"
-                asChild
-              >
-                <Link
-                  href={`/report?date=${formatCalendarDateParam(currentDate)}`}
-                  aria-label={t('actions.openReport')}
-                >
-                  <BarChart3 className="size-5" />
-                </Link>
-              </Button>
-              {rightSlot}
-            </div>
-          }
-        >
-          <button
-            type="button"
-            onClick={handleToggle}
-            // 44px のタッチターゲット。AppHeader の行は 32px だが、はみ出す分は
-            // 透明なので見た目は動かず、当たり判定だけが広がる
-            className="flex min-h-11 items-center gap-1"
-            aria-expanded={isExpanded}
-            aria-label={isExpanded ? t('actions.closeMiniCalendar') : t('actions.openCalendar')}
-          >
-            <h2 className="flex items-center gap-2 text-xl">
-              <span className="flex items-center">
-                <span>{monthPart}</span>
-                <span
-                  className={cn(
-                    'flex items-center justify-center',
-                    today &&
-                      'bg-primary text-primary-foreground size-7 rounded-full text-base font-medium',
-                  )}
-                >
-                  {dayNumber}
-                </span>
-                {daySuffix ? <span>{daySuffix}</span> : null}
-              </span>
-              <span className="text-sm font-normal">{weekdayShort}</span>
-              {showWeekNumbers ? (
-                <span className="bg-muted text-muted-foreground flex size-6 items-center justify-center rounded-full text-xs font-normal">
-                  {weekNumber}
-                </span>
-              ) : null}
-            </h2>
-            <ChevronIcon className="text-muted-foreground size-5" />
-          </button>
-        </AppHeader>
-
-        {/* インライン展開パネル — grid-rows アニメーション */}
-        <div
-          inert={!isExpanded}
-          className={cn(
-            // eslint-disable-next-line tailwindcss/no-arbitrary-value -- grid-template-rows の transition はトークンで表現不可
-            'ease-standard grid transition-[grid-template-rows] duration-200',
-            isExpanded ? 'grid-rows-expanded' : 'grid-rows-collapsed',
-          )}
-        >
-          <div className="overflow-hidden">
-            <div>
-              <div className="px-3 pt-2">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="text-muted-foreground hover:text-foreground min-h-11 w-full justify-start gap-2"
-                  onClick={openTimeblockSearch}
-                  aria-label={t('search.open')}
-                >
-                  <Search className="size-4" />
-                  <span>{t('search.open')}</span>
-                </Button>
+                {rightSlot}
               </div>
+            }
+          >
+            <button
+              type="button"
+              onClick={handleToggle}
+              // 44px のタッチターゲット。AppHeader の行は 32px だが、はみ出す分は
+              // 透明なので見た目は動かず、当たり判定だけが広がる
+              className="flex min-h-11 items-center gap-1"
+              aria-expanded={isExpanded}
+              aria-label={isExpanded ? t('actions.closeMiniCalendar') : t('actions.openCalendar')}
+            >
+              <h2 className="flex items-center gap-2 text-xl">
+                <span className="flex items-center">
+                  <span>{monthPart}</span>
+                  <span
+                    className={cn(
+                      'flex items-center justify-center',
+                      today &&
+                        'bg-primary text-primary-foreground size-7 rounded-full text-base font-medium',
+                    )}
+                  >
+                    {dayNumber}
+                  </span>
+                  {daySuffix ? <span>{daySuffix}</span> : null}
+                </span>
+                <span className="text-sm font-normal">{weekdayShort}</span>
+                {showWeekNumbers ? (
+                  <span className="bg-muted text-muted-foreground flex size-6 items-center justify-center rounded-full text-xs font-normal">
+                    {weekNumber}
+                  </span>
+                ) : null}
+              </h2>
+              <ChevronIcon className="text-muted-foreground size-5" />
+            </button>
+          </AppHeader>
 
-              {/* 月グリッド。
+          {/* インライン展開パネル — grid-rows アニメーション */}
+          <div
+            inert={!isExpanded}
+            className={cn(
+              // eslint-disable-next-line tailwindcss/no-arbitrary-value -- grid-template-rows の transition はトークンで表現不可
+              'ease-standard grid transition-[grid-template-rows] duration-200',
+              isExpanded ? 'grid-rows-expanded' : 'grid-rows-collapsed',
+            )}
+          >
+            <div className="overflow-hidden">
+              <div>
+                <div className="px-3 pt-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-muted-foreground hover:text-foreground min-h-11 w-full justify-start gap-2"
+                    onClick={openTimeblockSearch}
+                    aria-label={t('search.open')}
+                  >
+                    <Search className="size-4" />
+                    <span>{t('search.open')}</span>
+                  </Button>
+                </div>
+
+                {/* 月グリッド。
                   **`displayRange` は渡さない。** カレンダーの表示日は連続とは限らず
                   （週末非表示の複数日ビューでは `generateMultiDayDates` が土日を飛ばす）、
                   端点だけを帯にすると描いていない土日まで「表示中」と塗ってしまう。
                   帯を出すなら `viewDateRange.days` そのものを渡す形へ直してから
                   （2026-09-07 の反証レビュー指摘）。レポートの期間は常に連続なので
                   あちらは `displayRange` を使う */}
-              <MobileMonthGrid
-                viewMonth={viewMonth}
-                selectedDate={currentDate}
-                onViewMonthChange={handleViewMonthChange}
-                onDateSelect={handleDateSelect}
-                className="w-full"
-              />
+                <MobileMonthGrid
+                  viewMonth={viewMonth}
+                  selectedDate={currentDate}
+                  onViewMonthChange={handleViewMonthChange}
+                  onDateSelect={handleDateSelect}
+                  className="w-full"
+                />
 
-              {/* 年セレクタ — 横スクロール */}
-              <MobileYearStrip
-                viewMonth={viewMonth}
-                onViewMonthChange={handleViewMonthChange}
-                className=""
-              />
+                {/* 年セレクタ — 横スクロール */}
+                <MobileYearStrip
+                  viewMonth={viewMonth}
+                  onViewMonthChange={handleViewMonthChange}
+                  className=""
+                />
+              </div>
             </div>
           </div>
         </div>
-      </div>
+        <div
+          ref={flowSpacerRef}
+          aria-hidden="true"
+          className="h-14 shrink-0 md:hidden"
+          style={{ height: 'calc(3.5rem + env(safe-area-inset-top, 0px))' }}
+        />
+      </>
     );
   },
 );

@@ -26,9 +26,9 @@ const CATALOG: ShortcutCatalog = {
   entries: [
     {
       groupId: 'blocks',
-      labelKey: 'calendar.shortcuts.actions.copyBlock',
+      labelKey: 'calendar.shortcuts.actions.openSearch',
       order: 10,
-      keys: ['Cmd+C'],
+      keys: ['Cmd+K'],
     },
     {
       groupId: 'blocks',
@@ -68,8 +68,8 @@ describe('ShortcutCheatSheetDialog', () => {
   it('登録済み操作をplatformに合うキー表記で表示する', () => {
     const onError = renderDialog();
 
-    expect(screen.getByText('Copy the selected timeblock')).toBeInTheDocument();
-    expect(screen.getByText('⌘C')).toBeInTheDocument();
+    expect(screen.getByText('Search timeblocks')).toBeInTheDocument();
+    expect(screen.getByText('⌘K')).toBeInTheDocument();
     expect(screen.getAllByText('⌫')).toHaveLength(1);
     expectNoMissingMessage(onError);
   });
@@ -98,9 +98,9 @@ describe('ShortcutCheatSheetDialog', () => {
         },
         {
           groupId: 'blocks',
-          labelKey: 'calendar.shortcuts.actions.copyBlock',
+          labelKey: 'calendar.shortcuts.actions.openSearch',
           order: 10,
-          keys: ['Cmd+C'],
+          keys: ['Cmd+K'],
         },
         {
           groupId: 'blocks',
@@ -114,17 +114,17 @@ describe('ShortcutCheatSheetDialog', () => {
     const onError = renderDialog({ catalog });
 
     fireEvent.change(screen.getByRole('searchbox', { name: 'Search shortcuts' }), {
-      target: { value: 'copy' },
+      target: { value: 'search' },
     });
 
-    expect(screen.getByText('Copy the selected timeblock')).toBeInTheDocument();
+    expect(screen.getByText('Search timeblocks')).toBeInTheDocument();
     expect(screen.queryByText('Delete the selected timeblock')).not.toBeInTheDocument();
     expect(screen.queryByText('Open keyboard shortcuts')).not.toBeInTheDocument();
     expectNoMissingMessage(onError);
   });
 
   it('検索語がキー表記にのみ一致する場合も絞り込む', () => {
-    // platform='other'ではCmd+Cが'Ctrl+C'に表記される。ラベル文には'ctrl'を
+    // platform='other'ではCmd+Kが'Ctrl+K'に表記される。ラベル文には'ctrl'を
     // 含む語が無いため、'ctrl'での一致はキー表記側のみで起きる。
     const onError = renderDialog({ platform: 'other' });
 
@@ -132,7 +132,7 @@ describe('ShortcutCheatSheetDialog', () => {
       target: { value: 'ctrl' },
     });
 
-    expect(screen.getByText('Copy the selected timeblock')).toBeInTheDocument();
+    expect(screen.getByText('Search timeblocks')).toBeInTheDocument();
     expect(screen.queryByText('Delete the selected timeblock')).not.toBeInTheDocument();
     expectNoMissingMessage(onError);
   });
@@ -145,7 +145,7 @@ describe('ShortcutCheatSheetDialog', () => {
     });
 
     expect(screen.getByText('No matching shortcuts')).toBeInTheDocument();
-    expect(screen.queryByText('Copy the selected timeblock')).not.toBeInTheDocument();
+    expect(screen.queryByText('Search timeblocks')).not.toBeInTheDocument();
     expectNoMissingMessage(onError);
   });
 
@@ -164,9 +164,9 @@ describe('ShortcutCheatSheetDialog', () => {
         },
         {
           groupId: 'blocks',
-          labelKey: 'calendar.shortcuts.actions.copyBlock',
+          labelKey: 'calendar.shortcuts.actions.openSearch',
           order: 10,
-          keys: ['Cmd+C'],
+          keys: ['Cmd+K'],
         },
       ],
     };
@@ -200,9 +200,9 @@ describe('ShortcutCheatSheetDialog', () => {
         },
         {
           groupId: 'blocks',
-          labelKey: 'calendar.shortcuts.actions.copyBlock',
+          labelKey: 'calendar.shortcuts.actions.openSearch',
           order: 10,
-          keys: ['Cmd+C'],
+          keys: ['Cmd+K'],
         },
       ],
     };

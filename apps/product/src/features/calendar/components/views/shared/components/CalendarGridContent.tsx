@@ -5,11 +5,7 @@ import React, { useCallback } from 'react';
 
 import { useActivitiesMap } from '@/features/activities';
 import type { ExternalCalendarEvent } from '@/features/external-calendar';
-import {
-  isPlanRecordDrop,
-  resolveTimeblockDestination,
-  useTimeblockWriteMutations,
-} from '@/features/timeblock';
+import { resolveTimeblockDestination } from '@/features/timeblock';
 import { MEDIA_QUERIES } from '@/lib/breakpoints';
 import { useMediaQuery } from '@/lib/hooks/useMediaQuery';
 import { useUserPreferences } from '@/lib/hooks/useUserPreferences';
@@ -27,13 +23,12 @@ import {
   calculateExternalEventLayout,
   toZonedExternalEvents,
 } from '../../../../lib/external-event-layout';
-import { buildPlanRecordDropInput } from '../../../../lib/plan-record-drop';
+import { buildDragPreviewTimeblock } from '../../../../lib/interaction-preview';
 import {
   calculateTwoLaneStylesForCalendarEvents,
   DEFAULT_PLAN_LANE_WIDTH_PERCENT,
   hasLaneCounterpart,
 } from '../../../../lib/two-lane-layout';
-import { useCalendarDragStore } from '../../../../stores/useCalendarDragStore';
 import type { CalendarDisplayEvent } from '../../../../types/calendar.types';
 import { HOURS_PER_DAY } from '../constants/grid.constants';
 import { useResponsiveHourHeight } from '../hooks/useResponsiveHourHeight';
@@ -45,28 +40,11 @@ import { PlanLaneCard } from './TwoLane/PlanLaneCard';
 import { RecordLaneCard } from './TwoLane/RecordLaneCard';
 import { TwoLaneTimeblockRenderer } from './TwoLaneTimeblockRenderer';
 
+export { buildDragPreviewTimeblock } from '../../../../lib/interaction-preview';
+
 // ========================================
 // Types
 // ========================================
-
-export function buildDragPreviewTimeblock(
-  timeblock: CalendarDisplayEvent,
-  previewTime: { start: Date; end: Date },
-): CalendarDisplayEvent {
-  const duration = Math.max(
-    1,
-    Math.round((previewTime.end.getTime() - previewTime.start.getTime()) / 60000),
-  );
-
-  return {
-    ...timeblock,
-    startDate: previewTime.start,
-    endDate: previewTime.end,
-    displayStartDate: previewTime.start,
-    displayEndDate: previewTime.end,
-    duration,
-  };
-}
 
 /** CalendarGridContent コンポーネントのプロパティ */
 interface CalendarGridContentProps {
@@ -165,7 +143,6 @@ export const CalendarGridContent = React.memo(function CalendarGridContent({
 
   const HOUR_HEIGHT = useResponsiveHourHeight();
   const gridHeight = HOURS_PER_DAY * HOUR_HEIGHT;
-  const { createRecord } = useTimeblockWriteMutations();
   const { convertGhost, dismissGhost } = useConvertGhostEvent();
 
   // 日付間ドラッグ（day以外のビューで使用）
@@ -223,17 +200,6 @@ export const CalendarGridContent = React.memo(function CalendarGridContent({
     [onEventUpdate],
   );
 
-  const handlePlanRecord = useCallback(
-    (planId: string, range: { start: Date; end: Date }) => {
-      const plan = timeblocks.find(
-        (timeblock) => timeblock.id === planId && timeblock.kind === 'plan',
-      );
-      if (!plan) return;
-      createRecord.mutate(buildPlanRecordDropInput(plan, range));
-    },
-    [createRecord, timeblocks],
-  );
-
   // 統合インタラクション（drag/resize/click）
   const { state, handlers } = useInteraction({
     date,
@@ -242,8 +208,6 @@ export const CalendarGridContent = React.memo(function CalendarGridContent({
     ...(displayDates ? { displayDates } : {}),
     viewMode,
     hourHeight: HOUR_HEIGHT,
-    planLaneWidthPercent,
-    onPlanRecord: handlePlanRecord,
     ...(onEventUpdate ? { onEventUpdate: wrappedOnEventUpdate } : {}),
     ...(onTimeblockClick ? { onEventClick: onTimeblockClick } : {}),
     ...(disabledTimeblockId != null
@@ -283,12 +247,10 @@ export const CalendarGridContent = React.memo(function CalendarGridContent({
       const sourceKind =
         timeblock.kind ??
         resolveTimeblockDestination(timeblock.endDate ?? timeblock.displayEndDate);
-      const targetLane = useCalendarDragStore.getState().targetLane ?? sourceKind;
-      const previewKind = isPlanRecordDrop(sourceKind, targetLane) ? 'record' : sourceKind;
       // #2250: ゴーストの幅も表示レイヤーと同じ動的判定に揃える。相手レーンに
       // previewTime と重なる timeblock が無ければフル幅（境界の無いカラムへ「掴んだ瞬間
       // 幅が縮む」ような不整合な見た目を出さない）。
-      const counterpartKind = previewKind === 'plan' ? 'record' : 'plan';
+      const counterpartKind = sourceKind === 'plan' ? 'record' : 'plan';
       const hasGhostCounterpart = hasLaneCounterpart(
         visibleTimeblocks.filter((candidate) => {
           if (candidate.id === timeblock.id) return false;
@@ -302,7 +264,7 @@ export const CalendarGridContent = React.memo(function CalendarGridContent({
       );
       const position = !hasGhostCounterpart
         ? { top: 0, left: 0, width: 100, height: ghostHeight }
-        : previewKind === 'plan'
+        : sourceKind === 'plan'
           ? { top: 0, left: 0, width: planLaneWidthPercent, height: ghostHeight }
           : {
               top: 0,
@@ -323,7 +285,7 @@ export const CalendarGridContent = React.memo(function CalendarGridContent({
         className: 'shadow-card',
       } as const;
 
-      if (previewKind === 'plan') {
+      if (sourceKind === 'plan') {
         return (
           <PlanLaneCard
             {...sharedProps}
@@ -335,15 +297,9 @@ export const CalendarGridContent = React.memo(function CalendarGridContent({
         );
       }
 
-      const recordPreview =
-        sourceKind === 'plan'
-          ? {
-              ...previewTimeblock,
-              kind: 'record' as const,
-            }
-          : previewTimeblock;
-
-      return <RecordLaneCard {...sharedProps} event={calendarEventToRecordEvent(recordPreview)} />;
+      return (
+        <RecordLaneCard {...sharedProps} event={calendarEventToRecordEvent(previewTimeblock)} />
+      );
     },
     [
       timeblocks,
@@ -444,9 +400,13 @@ export const CalendarGridContent = React.memo(function CalendarGridContent({
               onTouchStart={(...args) => {
                 if (canUseProduct) handlers.handleTouchStart(...args);
               }}
-              onResizeStart={(...args) => {
-                if (canUseProduct) handlers.handleResizeStart(...args);
-              }}
+              onResizeStart={
+                isMobile
+                  ? undefined
+                  : (...args) => {
+                      if (canUseProduct) handlers.handleResizeStart(...args);
+                    }
+              }
             />
           );
         })}

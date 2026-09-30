@@ -29,6 +29,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
         ? ['ブログ', '記事', 'SaaS', '開発', '技術', 'Next.js', 'TypeScript']
         : ['blog', 'articles', 'SaaS', 'development', 'technology', 'Next.js', 'TypeScript'],
     type: 'website',
+    category: 'journal',
   });
 }
 

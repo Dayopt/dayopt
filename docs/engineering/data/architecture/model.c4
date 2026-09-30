@@ -191,7 +191,7 @@ model {
     link ../../../../apps/product/src/lib/database/generated/database.types.ts
   }
   table t_cron_heartbeats 'cron_heartbeats' {
-    metadata { inventoryKind 'table' detail 'used by lib' }
+    metadata { inventoryKind 'table' detail 'used by app, lib' }
     link ../../../../apps/product/src/lib/database/generated/database.types.ts
   }
   table t_email_suppressions 'email_suppressions' {
@@ -1039,10 +1039,6 @@ model {
     metadata { inventoryKind 'store' feature 'calendar' }
     link ../../../../apps/product/src/features/calendar/stores/useTemplateSaveStore.ts
   }
-  store s_useTimeblockClipboardStore 'useTimeblockClipboardStore' {
-    metadata { inventoryKind 'store' feature 'calendar' }
-    link ../../../../apps/product/src/features/calendar/stores/useTimeblockClipboardStore.ts
-  }
   store s_useTimeblockInspectorStore 'useTimeblockInspectorStore' {
     metadata { inventoryKind 'store' feature 'timeblock' }
     link ../../../../apps/product/src/features/timeblock/stores/useTimeblockInspectorStore.ts
@@ -1086,6 +1082,10 @@ model {
   httproute h_product_api_health '/api/health' {
     metadata { app 'product' methods 'GET' }
     link ../../../../apps/product/src/app/api/health/route.ts
+  }
+  httproute h_product_api_health_cron '/api/health/cron' {
+    metadata { app 'product' methods 'GET' }
+    link ../../../../apps/product/src/app/api/health/cron/route.ts
   }
   httproute h_product_api_health_version '/api/health/version' {
     metadata { app 'product' methods 'GET' }
@@ -1205,10 +1205,6 @@ model {
   }
   schedule cron_github-actions_production-config-audit_yml__0_21_______ 'production-config-audit.yml (0 21 * * *)' {
     metadata { source 'github-actions' schedule '0 21 * * *' authoritative 'true' }
-    link ../../../../.github/workflows/production-config-audit.yml
-  }
-  schedule cron_github-actions_production-config-audit_yml____15_________ 'production-config-audit.yml (*/15 * * * *)' {
-    metadata { source 'github-actions' schedule '*/15 * * * *' authoritative 'true' }
     link ../../../../.github/workflows/production-config-audit.yml
   }
   schedule cron_pg_cron_cleanup-notifications 'cleanup-notifications' {
@@ -1398,7 +1394,6 @@ model {
   f_review -> s_useReportDetailStore 'owns'
   f_review -> s_useReportViewStore 'owns'
   f_calendar -> s_useTemplateSaveStore 'owns'
-  f_calendar -> s_useTimeblockClipboardStore 'owns'
   f_timeblock -> s_useTimeblockInspectorStore 'owns'
   f_activities -> t_activities 'reads'
   f_auth -> t_activities 'reads'

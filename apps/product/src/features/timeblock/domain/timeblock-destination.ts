@@ -8,14 +8,6 @@ export function resolveTimeblockDestination(
   return new Date(endAt).getTime() > now.getTime() ? 'plan' : 'record';
 }
 
-/** Plan を Record レーンへ落とす操作は記録化として扱う。 */
-export function isPlanRecordDrop(
-  sourceLane: TimeblockDestination,
-  targetLane: TimeblockDestination,
-): boolean {
-  return sourceLane === 'plan' && targetLane === 'record';
-}
-
 /**
  * 既定は {@link resolveTimeblockDestination} と同じ end_at 判定。
  * 過去スロット（end_at <= now）に限り、ユーザーが Plan / Record を選び直せる。

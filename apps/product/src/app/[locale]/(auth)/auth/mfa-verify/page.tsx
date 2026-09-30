@@ -1,5 +1,7 @@
 'use client';
 
+import { Logo } from '@dayopt/components';
+
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
@@ -216,6 +218,7 @@ export default function MFAVerifyPage() {
 
   return (
     <div className="bg-surface-container flex min-h-svh flex-col items-center justify-center p-4 md:p-8">
+      <Logo size="lg" className="mb-6" />
       <div className="w-full max-w-sm">
         <MFAVerifyForm
           mode={mode}

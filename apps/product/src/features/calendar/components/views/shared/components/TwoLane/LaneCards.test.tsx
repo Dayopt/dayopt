@@ -50,10 +50,109 @@ describe('TwoLane cards', () => {
       />,
     );
     expect(screen.queryByRole('slider')).not.toBeInTheDocument();
-    const handle = container.querySelector('[data-resize-handle]');
+    const handle = container.querySelector('[data-resize-handle="bottom"]');
     expect(handle).not.toBeNull();
     fireEvent.mouseDown(handle!);
-    expect(resize).toHaveBeenCalledOnce();
+    expect(resize).toHaveBeenCalledWith(plan, 'bottom', expect.anything());
+  });
+
+  it('Planカードの上下ハンドルはDesktopのリサイズ方向を渡す', () => {
+    const resize = vi.fn();
+    const { container } = render(
+      <PlanLaneCard
+        event={plan}
+        position={position}
+        activityName="確認"
+        onPointerDown={vi.fn()}
+        onResizeStart={resize}
+      />,
+    );
+
+    const topHandle = container.querySelector('[data-resize-handle="top"]');
+    expect(topHandle).not.toBeNull();
+    if (topHandle) fireEvent.mouseDown(topHandle);
+
+    expect(resize).toHaveBeenCalledWith(plan, 'top', expect.anything());
+  });
+
+  it('Recordカードの上下ハンドルもリサイズ方向を渡す', () => {
+    const resize = vi.fn();
+    const { container } = render(
+      <RecordLaneCard
+        event={record}
+        position={position}
+        activityName="確認"
+        onPointerDown={vi.fn()}
+        onResizeStart={resize}
+      />,
+    );
+
+    const bottomHandle = container.querySelector('[data-resize-handle="bottom"]');
+    expect(bottomHandle).not.toBeNull();
+    if (bottomHandle) fireEvent.mouseDown(bottomHandle);
+
+    expect(resize).toHaveBeenCalledWith(record, 'bottom', expect.anything());
+  });
+
+  it('Planカードのresize端をタッチすると長押し移動へ渡し、resizeしない', () => {
+    const resize = vi.fn();
+    const touchStart = vi.fn();
+    const { container } = render(
+      <PlanLaneCard
+        event={plan}
+        position={position}
+        activityName="確認"
+        onPointerDown={vi.fn()}
+        onTouchStart={touchStart}
+        onResizeStart={resize}
+      />,
+    );
+
+    const handle = container.querySelector('[data-resize-handle="bottom"]');
+    expect(handle).not.toBeNull();
+    if (handle) fireEvent.touchStart(handle);
+
+    expect(touchStart).toHaveBeenCalledOnce();
+    expect(resize).not.toHaveBeenCalled();
+  });
+
+  it('Recordカードのresize端をタッチすると長押し移動へ渡し、resizeしない', () => {
+    const resize = vi.fn();
+    const touchStart = vi.fn();
+    const { container } = render(
+      <RecordLaneCard
+        event={record}
+        position={position}
+        activityName="確認"
+        onPointerDown={vi.fn()}
+        onTouchStart={touchStart}
+        onResizeStart={resize}
+      />,
+    );
+
+    const handle = container.querySelector('[data-resize-handle="bottom"]');
+    expect(handle).not.toBeNull();
+    if (handle) fireEvent.touchStart(handle);
+
+    expect(touchStart).toHaveBeenCalledOnce();
+    expect(resize).not.toHaveBeenCalled();
+  });
+
+  it('短い Plan カードは実際の時間幅で表示し、resize handleを重ねない', () => {
+    const shortPosition = { ...position, height: 5 };
+    const { container } = render(
+      <PlanLaneCard
+        event={plan}
+        position={shortPosition}
+        activityName="確認"
+        onPointerDown={vi.fn()}
+        onResizeStart={vi.fn()}
+      />,
+    );
+
+    const card = container.querySelector('[data-plan-lane-card]');
+    expect(card).toHaveStyle({ height: '5px' });
+    expect(container.querySelectorAll('[data-resize-handle]')).toHaveLength(0);
   });
 
   it('Planカードはtitleではなくタグ名を表示する', () => {

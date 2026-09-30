@@ -4,15 +4,11 @@
  * useInteraction — グローバル DOM リスナーとカーソル管理
  *
  * インタラクション中のみ document へ move / up リスナーを張り、
- * multi-column の対象日付・2レーンの target lane を解決して dispatch する。
+ * multi-column の対象日付を解決し、ポインター操作を dispatch する。
  */
 
 import type React from 'react';
 import { useEffect } from 'react';
-
-import { resolveTimeblockDestination } from '@/features/timeblock';
-
-import { hasLaneCounterpart, resolveTwoLaneFromPointer } from '../lib/two-lane-layout';
 
 import {
   constrainToRect,
@@ -36,7 +32,7 @@ export function useInteractionListeners({
   latestRef,
   refs,
 }: UseInteractionListenersOptions): void {
-  const { stateRef, dayColumnsRef, pendingTargetLaneRef, dragLaneRef } = refs;
+  const { stateRef, dayColumnsRef } = refs;
 
   useEffect(() => {
     const needsListeners =
@@ -61,7 +57,6 @@ export function useInteractionListeners({
       // Calculate target date index for multi-column views
       let targetDateIndex: number | undefined;
       const r = latestRef.current;
-      let targetColumn: HTMLElement | undefined;
       const columns =
         dayColumnsRef.current ??
         document.querySelectorAll<HTMLElement>('[data-calendar-day-index]');
@@ -70,7 +65,6 @@ export function useInteractionListeners({
         for (const col of columns) {
           const rect = col.getBoundingClientRect();
           if (point.clientX >= rect.left && point.clientX < rect.right) {
-            targetColumn = col;
             targetDateIndex = parseInt(col.dataset.calendarDayIndex ?? '0', 10);
             break;
           }
@@ -80,76 +74,7 @@ export function useInteractionListeners({
           const first = columns[0]!;
           const last = columns[columns.length - 1]!;
           const edge = point.clientX < first.getBoundingClientRect().left ? first : last;
-          targetColumn = edge;
           targetDateIndex = parseInt(edge.dataset.calendarDayIndex ?? '0', 10);
-        }
-      }
-
-      if (!targetColumn) {
-        targetColumn = Array.from(columns).find((column) => {
-          const rect = column.getBoundingClientRect();
-          return point.clientX >= rect.left && point.clientX < rect.right;
-        });
-      }
-      const dragState = stateRef.current;
-      const interactionMode = dragState.mode;
-      if ((dragState.mode === 'pending' || dragState.mode === 'dragging') && targetColumn) {
-        const rect = targetColumn.getBoundingClientRect();
-
-        // #2250: 相手レーンに timeblock が無い時刻（= 画面上フル幅で境界が見えない）では、
-        // x 座標に関わらず sourceLane を維持する。表示だけフル幅にして pointer 判定を
-        // 旧固定境界のまま残すと、境界の見えないカラムで意図しない Plan→Record 変換が
-        // 発火する（plan-review で検出した P1 故障モード）。
-        const draggedTimeblock = r.events.find((event) => event.id === dragState.timeblockId);
-        const sourceLane: 'plan' | 'record' =
-          draggedTimeblock?.kind ??
-          (draggedTimeblock
-            ? resolveTimeblockDestination(
-                draggedTimeblock.endDate ?? draggedTimeblock.displayEndDate,
-              )
-            : 'plan');
-        // dragging は直近 tick の previewTime（1 frame 遅れ、体感上は無視できる）、
-        // pending はまだ previewTime が無いので timeblock 自身の現在時刻で近似する。
-        const timeblockStart =
-          draggedTimeblock?.displayStartDate ?? draggedTimeblock?.startDate ?? null;
-        const timeblockEnd = draggedTimeblock?.displayEndDate ?? draggedTimeblock?.endDate ?? null;
-        const targetTime =
-          dragState.mode === 'dragging'
-            ? dragState.previewTime
-            : timeblockStart && timeblockEnd
-              ? { start: timeblockStart, end: timeblockEnd }
-              : null;
-        const counterpartKind = sourceLane === 'plan' ? 'record' : 'plan';
-        const hasCounterpart = targetTime
-          ? hasLaneCounterpart(
-              r.allEvents.flatMap((event) => {
-                const kind =
-                  event.kind ?? resolveTimeblockDestination(event.endDate ?? event.displayEndDate);
-                if (kind !== counterpartKind) return [];
-                const start = event.displayStartDate ?? event.startDate;
-                const end = event.displayEndDate ?? event.endDate;
-                // display*/startDate/endDate が両方欠けた timeblock は判定できないため除外する
-                // （hasLaneCounterpart 自体は非 null Date を要求する契約を維持する）。
-                if (!start || !end) return [];
-                return [{ displayStartDate: start, displayEndDate: end }];
-              }),
-              targetTime.start,
-              targetTime.end,
-            )
-          : true; // timeblock 不明時は安全側（変換を許容する既存挙動）に倒す
-
-        const targetLane = resolveTwoLaneFromPointer(
-          point.clientX,
-          rect.left,
-          rect.width,
-          r.planLaneWidthPercent,
-          { sourceLane, hasCounterpart },
-        );
-        if (interactionMode === 'pending') {
-          pendingTargetLaneRef.current = targetLane;
-        } else {
-          if (dragLaneRef.current) dragLaneRef.current.target = targetLane;
-          r.updateDragStore({ targetLane });
         }
       }
 
@@ -172,20 +97,26 @@ export function useInteractionListeners({
       dispatch({ type: 'POINTER_UP' });
     }
 
+    function handleGlobalCancel() {
+      dispatch({ type: 'CANCEL' });
+    }
+
     document.addEventListener('mousemove', handleGlobalMove, { passive: false });
     document.addEventListener('mouseup', handleGlobalUp);
     document.addEventListener('touchmove', handleGlobalMove, { passive: false });
     document.addEventListener('touchend', handleGlobalUp);
-    document.addEventListener('touchcancel', handleGlobalUp);
+    document.addEventListener('touchcancel', handleGlobalCancel);
+    document.addEventListener('pointercancel', handleGlobalCancel);
 
     return () => {
       document.removeEventListener('mousemove', handleGlobalMove);
       document.removeEventListener('mouseup', handleGlobalUp);
       document.removeEventListener('touchmove', handleGlobalMove);
       document.removeEventListener('touchend', handleGlobalUp);
-      document.removeEventListener('touchcancel', handleGlobalUp);
+      document.removeEventListener('touchcancel', handleGlobalCancel);
+      document.removeEventListener('pointercancel', handleGlobalCancel);
     };
-  }, [mode, dispatch, latestRef, stateRef, dayColumnsRef, pendingTargetLaneRef, dragLaneRef]);
+  }, [mode, dispatch, latestRef, stateRef, dayColumnsRef]);
 }
 
 /** ドラッグ / リサイズ中のグローバルカーソル管理 */

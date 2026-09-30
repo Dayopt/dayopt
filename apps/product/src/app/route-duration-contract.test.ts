@@ -55,6 +55,7 @@ const ROUTE_DURATION_CONTRACT = {
 
   // 外部 I/O 1-2 本
   'src/app/api/csp-report/route.ts': 30,
+  'src/app/api/health/cron/route.ts': 20,
   'src/app/api/health/route.ts': 30,
 
   // 既存値（この PR 以前から production で稼働している値。導出段に当てはめ直していない）。

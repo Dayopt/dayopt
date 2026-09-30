@@ -60,6 +60,7 @@ let stubDir: string;
 let ghStubDir: string;
 let basePath: string;
 let bashPath: string;
+let realGitPath: string;
 
 beforeAll(() => {
   workDir = mkdtempSync(join(tmpdir(), 'session-start-'));
@@ -94,9 +95,14 @@ beforeAll(() => {
   // ディレクトリを作り、stub とそれ以外は一切見せない。
   const isolatedBin = join(workDir, 'bin');
   mkdirSync(isolatedBin);
-  for (const name of ['git', 'date', 'wc', 'tr', 'cat', 'dirname', 'which']) {
+  for (const name of ['bash', 'date', 'wc', 'tr', 'cat', 'dirname', 'which']) {
     symlinkSync(requireRealBinPath(name), join(isolatedBin, name));
   }
+  // PATH から取得した Git が相対 path の shim でも参照先を保てるよう、元の絶対 path へ転送する。
+  const gitStub = join(isolatedBin, 'git');
+  writeFileSync(gitStub, '#!/bin/bash\nexec "$GIT_TEST_REAL_BINARY" "$@"\n');
+  chmodSync(gitStub, 0o755);
+  realGitPath = requireRealBinPath('git');
   const timeoutPath = realBinPath('timeout');
   if (timeoutPath) symlinkSync(timeoutPath, join(isolatedBin, 'timeout'));
   symlinkSync(process.execPath, join(isolatedBin, 'node'));
@@ -124,6 +130,7 @@ function runHook(opts: { remote: boolean; stubExit?: number; withGh?: boolean })
     PATH: opts.withGh ? `${ghStubDir}:${basePath}` : basePath,
     TMPDIR: tmp,
     STUB_RECORD: record,
+    GIT_TEST_REAL_BINARY: realGitPath,
   };
   // この test 自体が cloud session で走ることがある（CLAUDE_CODE_REMOTE=true が
   // 継承される）。local の分岐を検証するには明示的に消す必要がある。

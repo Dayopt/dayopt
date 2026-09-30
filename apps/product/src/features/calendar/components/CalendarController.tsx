@@ -96,7 +96,6 @@ interface CalendarControllerProps {
   // --- Context menu actions ---
   onDeleteTimeblockConfirm: (timeblock: CalendarDisplayEvent) => void;
   onViewStats: (timeblock: CalendarDisplayEvent) => void;
-  onCopy: (timeblock: CalendarDisplayEvent) => void;
 
   // --- Navigation handlers ---
   onNavigate: (direction: 'prev' | 'next' | 'today') => void;
@@ -137,7 +136,6 @@ export function CalendarController({
   onDeleteTimeblock,
   onDeleteTimeblockConfirm,
   onViewStats,
-  onCopy,
   onNavigate,
   onViewChange,
   onNavigatePrev,
@@ -369,7 +367,6 @@ export function CalendarController({
           onClose={handleCloseContextMenu}
           onDelete={onDeleteTimeblockConfirm}
           onViewStats={onViewStats}
-          onCopy={onCopy}
           onDuplicate={handleDuplicate}
         />
       ) : null}

@@ -1,10 +1,10 @@
 ---
-title: 'Connect AI assistants with MCP'
-description: 'A guide to connecting Claude, ChatGPT, and Cursor to your Dayopt data with MCP.'
-tags: ['mcp', 'api', 'integration', 'pro']
+title: 'Connect Claude or ChatGPT to Dayopt with MCP'
+description: 'Connect a Dayopt account to Claude or ChatGPT through MCP.'
+tags: ['mcp', 'api', 'integration']
 author: 'Dayopt Team'
 publishedAt: '2026-07-24'
-updatedAt: '2026-08-03'
+updatedAt: '2026-09-25'
 order: 6
 category: 'data'
 slug: 'api-mcp'
@@ -14,90 +14,116 @@ ai:
   relatedQuestions:
     - 'How do I connect an AI assistant to Dayopt?'
     - 'Where do I find the MCP server URL?'
-    - 'Can AI assistants change my Dayopt data?'
-    - 'Is MCP access available on the free plan?'
+    - 'What can an AI assistant read from Dayopt?'
+    - 'Can ChatGPT Pro change my Dayopt data?'
+    - 'How do I revoke an MCP connection?'
   prerequisites:
     - 'You have a Dayopt account'
-    - 'You are on the Pro plan'
+    - 'You use Claude or ChatGPT on the web with custom MCP support enabled'
   relatedDocs:
-    - '/docs/plans'
     - '/docs/records'
+    - '/docs/calendar'
   chunkStrategy: 'h2'
   searchable: true
   difficulty: 'intermediate'
   contentType: 'guide'
 ---
 
-# Connect AI assistants with MCP
+# Connect Claude or ChatGPT to Dayopt with MCP
 
-You can let AI assistants like Claude and ChatGPT read your Dayopt data. Once connected, you can ask things like "Look at my records this week and suggest a plan for next week" — and the answer is based on how you actually spent your time. MCP access is a Pro plan feature.
+Connect an AI assistant to your Dayopt account through MCP (Model Context Protocol). Each client uses OAuth. Review the access shown on Dayopt's consent screen before you approve it.
 
-## What is MCP?
+MCP connections require a Dayopt account. The permissions available depend on the client and on whether that client and account have been enabled for Dayopt's write beta.
 
-MCP (Model Context Protocol) is a shared standard that connects AI assistants to outside apps. Dayopt runs an MCP server. Add one URL to your AI assistant, and it can securely access the data in your account.
+## What an assistant can read
 
-## What AI assistants can read
+An authorized client can read the Dayopt data included in its granted permissions.
 
-A connected AI assistant can read the following data.
+| Data        | What it includes                                      |
+| ----------- | ----------------------------------------------------- |
+| Plans       | Planned time, as a list or in detail                  |
+| Records     | Time you actually spent, as a list or in detail       |
+| Activities  | Activities and categories used to organize timeblocks |
+| Segments    | Saved queries for analyzing your time                 |
+| Review      | Statistics comparing plans and records                |
+| Constraints | Busy time and rules used when placing plans           |
 
-| Data        | What it includes                                          |
-| ----------- | --------------------------------------------------------- |
-| Plans       | Your upcoming time, as a list or in detail                |
-| Records     | Time you actually spent, as a list or in detail           |
-| Activities  | The activities and categories you use to group timeblocks |
-| Review      | Stats such as how plans compare to records                |
-| Constraints | Time slots already taken, and the rules for placing plans |
+## Read and write permissions
 
-**Connections are read-only for now.** AI assistants cannot create, change, or delete your plans and records. Write access is in a closed beta.
+ChatGPT Pro custom MCP apps can use read and fetch permissions in Developer Mode. They cannot use write actions through MCP. See [OpenAI's ChatGPT MCP guide](https://help.openai.com/en/articles/12584461-developer-mode-and-mcp-apps-in-chatgpt) for current availability and setup instructions.
 
-## How to connect
+Dayopt write access is a limited beta. It is available only when both the Dayopt account and the specific MCP client have been enabled, and the account meets Dayopt's current access requirements. A client that has not been enabled receives read-only access.
 
-The flow is the same for every client.
+The consent screen lists the permissions for your connection. `write:plans` lets the client create and update Plans. `write:records` lets it create and update Records. `delete:plans` and `delete:records` let it move the matching data to trash and restore it. Review each permission before you approve it.
 
-1. Open Dayopt Settings, go to "Data Controls", and copy the MCP Server URL in "MCP / API"
-2. Add the URL to your AI assistant's settings
-3. A Dayopt sign-in and consent screen opens. Check the details and approve
+Write permissions let the client change the selected data directly when it runs a write action. The consent screen does not confirm each change for you. Check whether your client lets you review each write action before it runs. Keep the connection read-only if you cannot review those actions.
 
-If you are not on the Pro plan, the "MCP / API" section shows an upgrade notice instead.
+## Find your MCP server URL
 
-### Claude
+1. Open Dayopt Settings and go to **Data Controls**.
+2. Copy the URL in **MCP / API**.
+3. Add that URL to your AI assistant and approve the requested access on Dayopt's consent screen.
 
-1. Open Settings in claude.ai or the Claude app
-2. Under Connectors, choose "Add custom connector"
-3. Enter a name (for example, Dayopt) and the copied URL, then add it
-4. Approve on the Dayopt consent screen that opens when you connect
+## Connect Claude
 
-### ChatGPT
+1. In Claude, open **Customize → Connectors**.
+2. Choose **+ → Add custom connector** and enter the name `Dayopt` and the URL copied from Dayopt.
+3. In **Advanced settings**, set the OAuth Client ID to `claude-ai`. Leave the OAuth Client Secret empty.
+4. Choose **Add**, connect to Dayopt, then review and approve the requested permissions.
+5. In a chat, choose **+ → Connectors** and enable Dayopt for the conversation.
 
-1. Open Connectors in ChatGPT Settings (some setups require turning on developer mode first)
-2. Add the copied URL as a new connector
-3. Approve on the Dayopt consent screen that opens when you connect
+Claude can receive write permissions only when that Claude client and your Dayopt account are enabled for the write beta. Otherwise, its connection is read-only. See [Anthropic's remote MCP connector guide](https://support.claude.com/en/articles/11175166-get-started-with-custom-connectors-using-remote-mcp) for current Claude instructions.
 
-### Cursor
+## Connect ChatGPT Pro
 
-1. Open the MCP settings in Cursor Settings
-2. Add the copied URL as a new MCP server. If you edit the config file, use this format
+Use ChatGPT on the web. ChatGPT Pro custom MCP apps currently support read and fetch permissions only.
 
-```json
-{
-  "mcpServers": {
-    "dayopt": {
-      "url": "https://mcp.dayopt.app"
-    }
-  }
-}
-```
+1. In ChatGPT on the web, enable **Developer Mode** in your settings. If you do not see this option, check OpenAI's current guide for your plan.
+2. Open **Settings → Apps → Create** and create a custom app for Dayopt.
+3. Enter the URL copied from Dayopt, scan the available tools, and complete the OAuth connection.
+4. Sign in to Dayopt and approve the read access shown on the consent screen.
+5. In a new chat, select the Dayopt app from the tools menu to use it.
 
-3. Follow the sign-in prompt in Cursor and approve on the Dayopt consent screen
+If tool calls fail after Dayopt's tool list changes, review the custom app settings and scan the tools again, or recreate the app if needed. Follow [OpenAI's current setup guide](https://help.openai.com/en/articles/12584461-developer-mode-and-mcp-apps-in-chatgpt).
 
-## If the connection fails
+## Try a read and write flow
 
-| Problem                                    | What to check                                                             |
-| ------------------------------------------ | ------------------------------------------------------------------------- |
-| No MCP Server URL appears in Settings      | Check that you are on the Pro plan. The free plan cannot connect          |
-| The client fails to connect                | Copy the URL from Settings again and check for extra characters around it |
-| The consent screen shows an error          | Sign in to Dayopt in the same browser, then try connecting again          |
-| Nothing works after approving              | Remove the connection on the client side and start over                   |
-| Activities or review data are not readable | If you connected before, reconnect to refresh what the assistant can read |
+Select Dayopt in a chat. Use separate read tools to review Plans and Records:
 
-If the problem continues, [contact us](/contact) and our support team will help.
+> List my Plans and Records separately for [date], from [start of date] to [start of next date] in [time zone]. Keep planned and completed time separate.
+
+If the consent screen grants `write:plans`, first ask for a draft without calling a Dayopt write tool:
+
+> Draft one future Plan called [title] for [activity] from [start time] to [end time]. Use full ISO 8601 date-times with the correct UTC offset. Do not call a Dayopt write tool yet. Show me the title, activity, start time, and end time so I can review them.
+
+After you review the draft, give a separate instruction to create it. The client applies the change when it calls `plans.create`. Check that the Plan appears in the Dayopt calendar.
+
+If the consent screen grants `write:records`, use the same two-step process after an activity has happened:
+
+> Draft one Record called [title] for [activity] from [past start time] to [past end time]. Use full ISO 8601 date-times with the correct UTC offset. Do not call a Dayopt write tool yet. Show me the title, activity, start time, and end time so I can review them.
+
+After you review the draft, give a separate instruction to create it. The client applies the change when it calls `records.create`. A Record must end at or before the current time. Dayopt rejects a Record that ends in the future. For a negative check, request a Record that ends in the future and confirm that Dayopt rejects it and no Record appears. Create a Plan for future time instead. For example, `2026-10-05T09:00:00+09:00` is an ISO 8601 date-time with a UTC offset.
+
+Use `plans.list` and `records.list` to read each type separately; both require `read:entries`. `activities.list` requires `read:activities` when you need to choose an activity. `review.get` compares Plans and Records for a date range of up to 31 days and requires `read:stats`. `entries.list` is also available when you want a combined list.
+
+ChatGPT Pro supports read and fetch only, so it cannot run the write steps above. If the client does not show write access, keep using read-only tools and check the permissions on the consent screen.
+
+## Revoke or reconnect
+
+To revoke Dayopt access, open **Settings → Integrations → MCP connections** in Dayopt and revoke access for that client. You can also remove the connector in the client. Removing it from the client does not replace revoking access in Dayopt.
+
+To reconnect, start the connection again from the client, sign in to Dayopt, and review the current permissions before you approve them.
+
+## Troubleshooting
+
+| Problem                                             | What to check                                                                                                          |
+| --------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| No MCP server URL appears in Dayopt Settings        | Sign in to the Dayopt product and open **Settings → Data Controls**. If it is still missing, contact support.          |
+| ChatGPT Pro cannot create or edit plans or records  | This is expected. ChatGPT Pro custom MCP apps currently have read and fetch permissions only.                          |
+| The client cannot connect                           | Copy the URL from Dayopt Settings again and check for extra characters.                                                |
+| The consent screen shows an error                   | Sign in to Dayopt in the same browser, then try again.                                                                 |
+| ChatGPT reports a redirect URI error                | Stop the setup and contact Dayopt support with the error text.                                                         |
+| Tools remain unavailable after a server change      | Reconnect and approve the current permissions. In ChatGPT, review the app settings and scan its tools again if needed. |
+| You revoked access and want to use the client again | Reconnect from the client and approve a new connection.                                                                |
+
+If the problem continues, [contact us](/contact).

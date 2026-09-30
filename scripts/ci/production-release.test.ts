@@ -158,6 +158,16 @@ function createReleaseWorld(
     productionSha?: string;
     smokeBody?: string;
     autoAssign?: boolean | null;
+    noGitCandidates?: boolean;
+    lateGitCandidates?: boolean;
+    changeAutoAssignDuringWait?: boolean;
+    projectGitLink?: {
+      type: string;
+      org: string;
+      repo: string;
+      productionBranch?: string;
+      repoId: number | string;
+    };
     webAlreadyAtTarget?: boolean;
     /** web の alias 読み取り n 回目に返す deployment id。末尾の値が以降も続く。 */
     webAliasSequence?: string[];
@@ -171,8 +181,8 @@ function createReleaseWorld(
   const store: Record<string, ReturnType<typeof deploymentRecord>> = {
     dpl_web_old: deploymentRecord('dpl_web_old', OLD_SHA, 1000),
     dpl_product_old: deploymentRecord('dpl_product_old', OLD_SHA, 1000),
-    dpl_web_new: deploymentRecord('dpl_web_new', SHA, 2000),
-    dpl_product_new: deploymentRecord('dpl_product_new', SHA, 2000),
+    dpl_web_new: deploymentRecord('dpl_web_new', SHA, 2000, { projectId: 'prj_web' }),
+    dpl_product_new: deploymentRecord('dpl_product_new', SHA, 2000, { projectId: 'prj_product' }),
     dpl_web_hotfix: deploymentRecord('dpl_web_hotfix', OLD_SHA, 1500),
     // 判定の基準 SHA でも target でもない第三の commit。
     dpl_web_other: deploymentRecord('dpl_web_other', OTHER_SHA, 1600),
@@ -187,7 +197,9 @@ function createReleaseWorld(
     web: deployment('dpl_web_new', SHA),
     product: deployment('dpl_product_new', SHA),
   };
+  const fallbackCreates: { project: 'web' | 'product'; body: Record<string, unknown> }[] = [];
   const pointCalls: { project: string; deploymentId: string }[] = [];
+  const candidateListReads: Record<string, number> = { web: 0, product: 0 };
   let webAliasReads = 0;
 
   const fetchImpl = vi.fn(async (input: URL | string, init?: RequestInit) => {
@@ -215,7 +227,34 @@ function createReleaseWorld(
       if (autoAssign[project] !== null) autoAssign[project] = true;
       return new Response(null, { status: 202 });
     }
+    if (method === 'POST' && url.includes('/v13/deployments?')) {
+      const body = JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>;
+      const projectName = String(body.name) as 'web' | 'product';
+      const id = `dpl_fallback_${projectName}`;
+      fallbackCreates.push({ project: projectName, body });
+      store[id] = deploymentRecord(id, SHA, 2000, { projectId: `prj_${projectName}` });
+      return Response.json({
+        uid: id,
+        url: `${id}.vercel.app`,
+        readyState: 'READY',
+        createdAt: 2000,
+        target: 'production',
+        alias: [],
+        aliasAssigned: false,
+        projectId: `prj_${projectName}`,
+        meta: { githubCommitSha: SHA },
+      });
+    }
     if (url.includes('/v7/deployments')) {
+      if (options.noGitCandidates) {
+        candidateListReads[project] = (candidateListReads[project] ?? 0) + 1;
+        if (options.changeAutoAssignDuringWait && candidateListReads[project] > 1) {
+          autoAssign[project] = true;
+        }
+        if (!options.lateGitCandidates || candidateListReads[project] === 1) {
+          return Response.json({ deployments: [] });
+        }
+      }
       return Response.json({ deployments: [candidates[project as 'web' | 'product']] });
     }
     if (url.includes('/env')) {
@@ -246,6 +285,13 @@ function createReleaseWorld(
       return Response.json({
         id: `prj_${project}`,
         autoAssignCustomDomains: autoAssign[project],
+        link: options.projectGitLink ?? {
+          type: 'github',
+          org: 'Dayopt',
+          repo: 'dayopt',
+          productionBranch: 'main',
+          repoId: 1006944000,
+        },
         rootDirectory: `apps/${project}`,
         commandForIgnoringBuildStep: null,
         enableAffectedProjectsDeployments: false,
@@ -259,7 +305,18 @@ function createReleaseWorld(
   const rolledBack = () =>
     pointCalls.filter((call) => call.deploymentId.endsWith('_old')).map((call) => call.project);
 
-  return { fetchImpl, pointCalls, promoted, rolledBack, patches, autoAssign, live, store, DOMAINS };
+  return {
+    fetchImpl,
+    pointCalls,
+    promoted,
+    rolledBack,
+    patches,
+    autoAssign,
+    live,
+    store,
+    fallbackCreates,
+    DOMAINS,
+  };
 }
 
 /** 両 app に影響する差分（root 設定）。project 別の影響は各 test で上書きする。 */
@@ -645,6 +702,98 @@ describe('runProductionRelease', () => {
     expect(result.status).toBe('promoted');
     expect(world.promoted()).toEqual(['web', 'product']);
     expect(world.rolledBack()).toEqual([]);
+  });
+
+  it('creates pinned, unaliased Production candidates for the exact linked Git SHA when none appear', async () => {
+    const world = createReleaseWorld({ noGitCandidates: true });
+    let clock = 0;
+
+    const result = await release({
+      fetchImpl: world.fetchImpl,
+      // Move beyond the short Git-candidate grace window in one poll.
+      nowImpl: () => (clock += 5 * 60 * 1000),
+    });
+
+    expect(result.status).toBe('promoted');
+    expect(world.fallbackCreates).toHaveLength(2);
+    for (const { project, body } of world.fallbackCreates) {
+      expect(body).toMatchObject({
+        name: project,
+        project: `prj_${project}`,
+        target: 'production',
+        gitSource: { type: 'vercel', repoId: '1006944000', sha: SHA },
+      });
+      expect(body).not.toHaveProperty('alias');
+    }
+    expect(world.pointCalls).toEqual([
+      { project: 'web', deploymentId: 'dpl_fallback_web' },
+      { project: 'product', deploymentId: 'dpl_fallback_product' },
+    ]);
+  });
+
+  it('pins a Git candidate that appears during the timeout recheck instead of creating a duplicate', async () => {
+    const world = createReleaseWorld({ noGitCandidates: true, lateGitCandidates: true });
+    let clock = 0;
+
+    const result = await release({
+      fetchImpl: world.fetchImpl,
+      nowImpl: () => (clock += 5 * 60 * 1000),
+    });
+
+    expect(result.status).toBe('promoted');
+    expect(world.fallbackCreates).toEqual([]);
+    expect(world.pointCalls).toEqual([
+      { project: 'web', deploymentId: 'dpl_web_new' },
+      { project: 'product', deploymentId: 'dpl_product_new' },
+    ]);
+  });
+
+  it('does not create a fallback deployment for an unrecognized Git repository link', async () => {
+    const world = createReleaseWorld({
+      noGitCandidates: true,
+      projectGitLink: { type: 'github', org: 'Other', repo: 'other', repoId: 123 },
+    });
+    let clock = 0;
+
+    await expect(
+      release({
+        fetchImpl: world.fetchImpl,
+        nowImpl: () => (clock += 5 * 60 * 1000),
+      }),
+    ).rejects.toThrow(/expected Dayopt\/dayopt GitHub repository/);
+    expect(world.fallbackCreates).toEqual([]);
+    expect(world.pointCalls).toEqual([]);
+  });
+
+  it('does not create a staged Production build when domain auto-assignment is not disabled', async () => {
+    const world = createReleaseWorld({ noGitCandidates: true, autoAssign: true });
+    let clock = 0;
+
+    await expect(
+      release({
+        fetchImpl: world.fetchImpl,
+        nowImpl: () => (clock += 5 * 60 * 1000),
+      }),
+    ).rejects.toThrow(/Auto-assign Custom Production Domains is not confirmed disabled/);
+    expect(world.fallbackCreates).toEqual([]);
+    expect(world.pointCalls).toEqual([]);
+  });
+
+  it('rechecks Auto-assign immediately before a staged build', async () => {
+    const world = createReleaseWorld({
+      noGitCandidates: true,
+      changeAutoAssignDuringWait: true,
+    });
+    let clock = 0;
+
+    await expect(
+      release({
+        fetchImpl: world.fetchImpl,
+        nowImpl: () => (clock += 5 * 60 * 1000),
+      }),
+    ).rejects.toThrow(/Auto-assign Custom Production Domains is not confirmed disabled/);
+    expect(world.fallbackCreates).toEqual([]);
+    expect(world.pointCalls).toEqual([]);
   });
 
   it('rolls web back to its previous deployment when product fails to promote', async () => {
@@ -2755,6 +2904,34 @@ describe('runProductionRelease（同一 commit の再配備）', () => {
       action: 'already-serving',
       deploymentId: 'dpl_web_new',
     });
+  });
+
+  it('keeps the full candidate wait window for a redeploy that is still building', async () => {
+    const world = createRedeployWorld(
+      deploymentRecord('dpl_product_redeploy', SHA, 3000, {
+        projectId: 'prj_product',
+        readyState: 'BUILDING',
+      }),
+    );
+    let clock = 0;
+
+    const result = await release({
+      fetchImpl: world.fetchImpl,
+      redeploy: REDEPLOY,
+      nowImpl: () => (clock += 6 * 60 * 1000),
+      sleepImpl: async () => {
+        world.store.dpl_product_redeploy = deploymentRecord('dpl_product_redeploy', SHA, 3000, {
+          projectId: 'prj_product',
+          readyState: 'READY',
+        });
+      },
+    });
+
+    expect(result.status).toBe('promoted');
+    expect(world.fallbackCreates).toEqual([]);
+    expect(world.pointCalls).toEqual([
+      { project: 'product', deploymentId: 'dpl_product_redeploy' },
+    ]);
   });
 
   it('promote 後の production smoke が落ちたら、元の deployment へ戻す', async () => {
