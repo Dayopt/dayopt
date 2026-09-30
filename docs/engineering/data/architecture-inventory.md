@@ -187,7 +187,7 @@ graph LR
 </details>
 
 <details>
-<summary>test の候補（79）</summary>
+<summary>test の候補（80）</summary>
 
 <!-- prettier-ignore -->
 | ファイル | 対応の根拠 |
@@ -220,6 +220,7 @@ graph LR
 | [apps/product/src/features/timeblock/hooks/useTimeblockDeleteUndo.test.ts](<../../../apps/product/src/features/timeblock/hooks/useTimeblockDeleteUndo.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/hooks/useTimeblockRecordMutations.test.tsx](<../../../apps/product/src/features/timeblock/hooks/useTimeblockRecordMutations.test.tsx>) | feature: timeblock |
 | [apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.inline-error.test.tsx](<../../../apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.inline-error.test.tsx>) | feature: timeblock |
+| [apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.rollback.test.ts](<../../../apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.rollback.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.test.ts](<../../../apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/lib/datetime.test.ts](<../../../apps/product/src/features/timeblock/lib/datetime.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/lib/inspector-url.test.ts](<../../../apps/product/src/features/timeblock/lib/inspector-url.test.ts>) | feature: timeblock |
@@ -431,7 +432,7 @@ graph LR
 </details>
 
 <details>
-<summary>test の候補（79）</summary>
+<summary>test の候補（80）</summary>
 
 <!-- prettier-ignore -->
 | ファイル | 対応の根拠 |
@@ -464,6 +465,7 @@ graph LR
 | [apps/product/src/features/timeblock/hooks/useTimeblockDeleteUndo.test.ts](<../../../apps/product/src/features/timeblock/hooks/useTimeblockDeleteUndo.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/hooks/useTimeblockRecordMutations.test.tsx](<../../../apps/product/src/features/timeblock/hooks/useTimeblockRecordMutations.test.tsx>) | feature: timeblock |
 | [apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.inline-error.test.tsx](<../../../apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.inline-error.test.tsx>) | feature: timeblock |
+| [apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.rollback.test.ts](<../../../apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.rollback.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.test.ts](<../../../apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/lib/datetime.test.ts](<../../../apps/product/src/features/timeblock/lib/datetime.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/lib/inspector-url.test.ts](<../../../apps/product/src/features/timeblock/lib/inspector-url.test.ts>) | feature: timeblock |
@@ -675,7 +677,7 @@ graph LR
 </details>
 
 <details>
-<summary>test の候補（79）</summary>
+<summary>test の候補（80）</summary>
 
 <!-- prettier-ignore -->
 | ファイル | 対応の根拠 |
@@ -708,6 +710,7 @@ graph LR
 | [apps/product/src/features/timeblock/hooks/useTimeblockDeleteUndo.test.ts](<../../../apps/product/src/features/timeblock/hooks/useTimeblockDeleteUndo.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/hooks/useTimeblockRecordMutations.test.tsx](<../../../apps/product/src/features/timeblock/hooks/useTimeblockRecordMutations.test.tsx>) | feature: timeblock |
 | [apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.inline-error.test.tsx](<../../../apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.inline-error.test.tsx>) | feature: timeblock |
+| [apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.rollback.test.ts](<../../../apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.rollback.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.test.ts](<../../../apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/lib/datetime.test.ts](<../../../apps/product/src/features/timeblock/lib/datetime.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/lib/inspector-url.test.ts](<../../../apps/product/src/features/timeblock/lib/inspector-url.test.ts>) | feature: timeblock |
@@ -1170,7 +1173,7 @@ graph LR
 </details>
 
 <details>
-<summary>test の候補（79）</summary>
+<summary>test の候補（80）</summary>
 
 <!-- prettier-ignore -->
 | ファイル | 対応の根拠 |
@@ -1203,6 +1206,7 @@ graph LR
 | [apps/product/src/features/timeblock/hooks/useTimeblockDeleteUndo.test.ts](<../../../apps/product/src/features/timeblock/hooks/useTimeblockDeleteUndo.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/hooks/useTimeblockRecordMutations.test.tsx](<../../../apps/product/src/features/timeblock/hooks/useTimeblockRecordMutations.test.tsx>) | feature: timeblock |
 | [apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.inline-error.test.tsx](<../../../apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.inline-error.test.tsx>) | feature: timeblock |
+| [apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.rollback.test.ts](<../../../apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.rollback.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.test.ts](<../../../apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/lib/datetime.test.ts](<../../../apps/product/src/features/timeblock/lib/datetime.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/lib/inspector-url.test.ts](<../../../apps/product/src/features/timeblock/lib/inspector-url.test.ts>) | feature: timeblock |
@@ -1514,7 +1518,7 @@ graph LR
 </details>
 
 <details>
-<summary>test の候補（79）</summary>
+<summary>test の候補（80）</summary>
 
 <!-- prettier-ignore -->
 | ファイル | 対応の根拠 |
@@ -1547,6 +1551,7 @@ graph LR
 | [apps/product/src/features/timeblock/hooks/useTimeblockDeleteUndo.test.ts](<../../../apps/product/src/features/timeblock/hooks/useTimeblockDeleteUndo.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/hooks/useTimeblockRecordMutations.test.tsx](<../../../apps/product/src/features/timeblock/hooks/useTimeblockRecordMutations.test.tsx>) | feature: timeblock |
 | [apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.inline-error.test.tsx](<../../../apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.inline-error.test.tsx>) | feature: timeblock |
+| [apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.rollback.test.ts](<../../../apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.rollback.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.test.ts](<../../../apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/lib/datetime.test.ts](<../../../apps/product/src/features/timeblock/lib/datetime.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/lib/inspector-url.test.ts](<../../../apps/product/src/features/timeblock/lib/inspector-url.test.ts>) | feature: timeblock |
