@@ -16569,12 +16569,13 @@
       "bytes": 14301,
       "method": "full-text",
       "status": "full-text-reviewed",
-      "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
+      "reason": "Current full test plus baseline delta including all removed lines fully read",
       "read_ranges": [[1, 391]],
       "evidence": [
         "All baseline text read in complete bounded ranges; template clock failure, report dataflow, DST distribution and guard boundaries cross-checked.",
         "Main advanced to 0bcdb864127feea425934baa179797bd53ecf375 (PR #2964). Full 17-file delta (1071 diff lines) read in bounded chunks after initial truncated attempt. Changes reconciled on audit branch; baseline read status unchanged, delta reading does not imply unread full file is reviewed. Five conflicts resolved to main: equivalent creation contract/test clock, current source references and retired glossary terms.",
-        "PR #2966 non-JSON diff 1088 lines read fully in bounded chunks. JSON contracts/validation also read fully. Delta is reviewed at 21770b13da1ff26c8982cdf041aa2a4d55025a3f. Existing full-file status unchanged."
+        "PR #2966 non-JSON diff 1088 lines read fully in bounded chunks. JSON contracts/validation also read fully. Delta is reviewed at 21770b13da1ff26c8982cdf041aa2a4d55025a3f. Existing full-file status unchanged.",
+        "Current full text at12644fc21. Router test matches baseline bytes; service test baseline delta read includes original static Record dates/import and added deterministic Date fixture. No invalid Gregorian/settings-error or missing-settings cases. H042 next red/green slice; historical main delta is not new runtime proof."
       ],
       "questions": []
     },
@@ -16601,10 +16602,12 @@
       "mode": "100644",
       "bytes": 4336,
       "method": "full-text",
-      "status": "unverified",
-      "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "status": "full-text-reviewed",
+      "reason": "Current full test plus baseline delta including all removed lines fully read",
+      "read_ranges": [[1, 123]],
+      "evidence": [
+        "Current full text at12644fc21. Router test matches baseline bytes; service test baseline delta read includes original static Record dates/import and added deterministic Date fixture. No invalid Gregorian/settings-error or missing-settings cases. H042 next red/green slice; historical main delta is not new runtime proof."
+      ],
       "questions": []
     },
     {
