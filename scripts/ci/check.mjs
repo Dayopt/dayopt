@@ -869,11 +869,11 @@ async function runIntegration() {
  * （fail open）設計を維持する。戻り値の `coupled`（既存オブジェクトの契約を縮める migration と
  * product runtime 変更が同一 PR、#2680）だけは呼び出し側（runUnit）が hard fail にする。
  *
- * **通知（ラベル付与・PR コメント）はここでは行わない**（2026-09-14、credential audit P2-6）。
+ * **通知（PR コメント）はここでは行わない**（2026-09-14、credential audit P2-6）。
  * この関数は PR head のコードと全依存を実行する unit job で走るため、write 権限の token を
  * 持たせない。`notify` と `summary` を返し、runUnit が formatMigrationSafetyOutput() で
  * job output へ出し、ci.yml の `migration-notice` job（checkout も依存 install もしない）が
- * コメント投稿 → ラベル付与を行う（順序と「付与済みなら再通知しない」規約はそちらが持つ）。
+ * bot の通知コメントを確認し、未通知の場合だけコメントを投稿する。
  *
  * 実行に使う関数はすべて注入可能にしてある（test では gh / fs へ実際に触れずに
  * 分岐を検証する）。
