@@ -3651,10 +3651,12 @@
       "mode": "100644",
       "bytes": 8055,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 171]],
+      "evidence": [
+        "Full untruncated read during auth/avatar cross-layer audit at 1b3bb360; exact baseline blob verified. Storage contract candidate refuted; dialog persistence failure reproduced separately in #2985. Integration fixtures not executed against a database."
+      ],
       "questions": []
     },
     {
@@ -3681,10 +3683,12 @@
       "mode": "100644",
       "bytes": 3374,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 82]],
+      "evidence": [
+        "Full untruncated read during auth/avatar cross-layer audit at 1b3bb360; exact baseline blob verified. Storage contract candidate refuted; dialog persistence failure reproduced separately in #2985. Integration fixtures not executed against a database."
+      ],
       "questions": []
     },
     {
@@ -3694,10 +3698,12 @@
       "mode": "100644",
       "bytes": 2929,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 68]],
+      "evidence": [
+        "Full untruncated read during auth/avatar cross-layer audit at 1b3bb360; exact baseline blob verified. Storage contract candidate refuted; dialog persistence failure reproduced separately in #2985. Integration fixtures not executed against a database."
+      ],
       "questions": []
     },
     {
@@ -5886,10 +5892,12 @@
       "mode": "100644",
       "bytes": 8195,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 265]],
+      "evidence": [
+        "Full untruncated read during auth/avatar cross-layer audit at 1b3bb360; exact baseline blob verified. Storage contract candidate refuted; dialog persistence failure reproduced separately in #2985. Integration fixtures not executed against a database."
+      ],
       "questions": []
     },
     {
@@ -7415,10 +7423,12 @@
       "mode": "100644",
       "bytes": 4749,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 128]],
+      "evidence": [
+        "Full untruncated read during auth/avatar cross-layer audit at 1b3bb360; exact baseline blob verified. Storage contract candidate refuted; dialog persistence failure reproduced separately in #2985. Integration fixtures not executed against a database."
+      ],
       "questions": []
     },
     {
@@ -13667,10 +13677,12 @@
       "mode": "100644",
       "bytes": 3927,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 114]],
+      "evidence": [
+        "Full untruncated read during auth/avatar cross-layer audit at 1b3bb360; exact baseline blob verified. Storage contract candidate refuted; dialog persistence failure reproduced separately in #2985. Integration fixtures not executed against a database."
+      ],
       "questions": []
     },
     {
@@ -13680,10 +13692,12 @@
       "mode": "100644",
       "bytes": 3296,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 117]],
+      "evidence": [
+        "Full untruncated read during auth/avatar cross-layer audit at 1b3bb360; exact baseline blob verified. Storage contract candidate refuted; dialog persistence failure reproduced separately in #2985. Integration fixtures not executed against a database."
+      ],
       "questions": []
     },
     {
@@ -13917,10 +13931,12 @@
       "mode": "100644",
       "bytes": 4492,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 136]],
+      "evidence": [
+        "Full untruncated read during auth/avatar cross-layer audit at 1b3bb360; exact baseline blob verified. Storage contract candidate refuted; dialog persistence failure reproduced separately in #2985. Integration fixtures not executed against a database."
+      ],
       "questions": []
     },
     {
@@ -15003,10 +15019,12 @@
       "mode": "100644",
       "bytes": 6936,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 224]],
+      "evidence": [
+        "Full untruncated auth/avatar follow-through read at fcc3d1ee; exact baseline blob verified. Supabase/provider failure semantics and profiles/Auth responsibility reviewed; no email sent or live DB operation."
+      ],
       "questions": []
     },
     {
@@ -15035,7 +15053,8 @@
       "reason": "Complete text read and baseline bytes match",
       "read_ranges": [[1, 249]],
       "evidence": [
-        "Full 249 lines read at407ce5bf2. SettingsService distinguishes missing row from fetch failure; template fallback currently differs. Partial update/upsert then personalization RPC and iCal token regeneration remain separate boundaries."
+        "Full 249 lines read at407ce5bf2. SettingsService distinguishes missing row from fetch failure; template fallback currently differs. Partial update/upsert then personalization RPC and iCal token regeneration remain separate boundaries.",
+        "Full untruncated auth/avatar follow-through read at fcc3d1ee; exact baseline blob verified. Supabase/provider failure semantics and profiles/Auth responsibility reviewed; no email sent or live DB operation."
       ],
       "questions": []
     },
@@ -18538,10 +18557,12 @@
       "mode": "100644",
       "bytes": 5920,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 198]],
+      "evidence": [
+        "Full untruncated read during auth/avatar cross-layer audit at 1b3bb360; exact baseline blob verified. Storage contract candidate refuted; dialog persistence failure reproduced separately in #2985. Integration fixtures not executed against a database."
+      ],
       "questions": []
     },
     {
@@ -18551,10 +18572,12 @@
       "mode": "100644",
       "bytes": 5467,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 156]],
+      "evidence": [
+        "Full untruncated read of suppression/provider failure synthetic tests at fcc3d1ee; no actual mail delivery. Baseline blob equality verified."
+      ],
       "questions": []
     },
     {
@@ -18564,10 +18587,12 @@
       "mode": "100644",
       "bytes": 4761,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 131]],
+      "evidence": [
+        "Full untruncated auth/avatar follow-through read at fcc3d1ee; exact baseline blob verified. Supabase/provider failure semantics and profiles/Auth responsibility reviewed; no email sent or live DB operation."
+      ],
       "questions": []
     },
     {
@@ -20391,10 +20416,12 @@
       "mode": "100644",
       "bytes": 4157,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 99]],
+      "evidence": [
+        "Full untruncated read during auth/avatar cross-layer audit at 1b3bb360; exact baseline blob verified. Storage contract candidate refuted; dialog persistence failure reproduced separately in #2985. Integration fixtures not executed against a database."
+      ],
       "questions": []
     },
     {
@@ -20404,10 +20431,12 @@
       "mode": "100644",
       "bytes": 7133,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 206]],
+      "evidence": [
+        "Full untruncated read during auth/avatar cross-layer audit at 1b3bb360; exact baseline blob verified. Storage contract candidate refuted; dialog persistence failure reproduced separately in #2985. Integration fixtures not executed against a database."
+      ],
       "questions": []
     },
     {
@@ -20417,10 +20446,12 @@
       "mode": "100644",
       "bytes": 7667,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 172]],
+      "evidence": [
+        "Full untruncated read during auth/avatar cross-layer audit at 1b3bb360; exact baseline blob verified. Storage contract candidate refuted; dialog persistence failure reproduced separately in #2985. Integration fixtures not executed against a database."
+      ],
       "questions": []
     },
     {
@@ -21055,10 +21086,12 @@
       "mode": "100644",
       "bytes": 5387,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 134]],
+      "evidence": [
+        "Full untruncated read during auth/avatar cross-layer audit at 1b3bb360; exact baseline blob verified. Storage contract candidate refuted; dialog persistence failure reproduced separately in #2985. Integration fixtures not executed against a database."
+      ],
       "questions": []
     },
     {
@@ -22454,10 +22487,12 @@
       "mode": "100644",
       "bytes": 1072,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 37]],
+      "evidence": [
+        "Full untruncated read during auth/avatar cross-layer audit at 1b3bb360; exact baseline blob verified. Storage contract candidate refuted; dialog persistence failure reproduced separately in #2985. Integration fixtures not executed against a database."
+      ],
       "questions": []
     },
     {
@@ -32855,10 +32890,12 @@
       "mode": "100644",
       "bytes": 8931,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 162]],
+      "evidence": [
+        "Full untruncated read during auth/avatar cross-layer audit at 1b3bb360; exact baseline blob verified. Storage contract candidate refuted; dialog persistence failure reproduced separately in #2985. Integration fixtures not executed against a database."
+      ],
       "questions": []
     },
     {
@@ -33465,10 +33502,12 @@
       "mode": "100644",
       "bytes": 14976,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 301]],
+      "evidence": [
+        "Full untruncated read during auth/avatar cross-layer audit at 1b3bb360; exact baseline blob verified. Storage contract candidate refuted; dialog persistence failure reproduced separately in #2985. Integration fixtures not executed against a database."
+      ],
       "questions": []
     },
     {
@@ -36166,10 +36205,12 @@
       "mode": "100644",
       "bytes": 16968,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 401]],
+      "evidence": [
+        "Full untruncated read during auth/avatar cross-layer audit at 1b3bb360; exact baseline blob verified. Storage contract candidate refuted; dialog persistence failure reproduced separately in #2985. Integration fixtures not executed against a database."
+      ],
       "questions": []
     },
     {
@@ -40187,10 +40228,12 @@
       "mode": "100644",
       "bytes": 3867,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 89]],
+      "evidence": [
+        "Full untruncated read during auth/avatar cross-layer audit at 1b3bb360; exact baseline blob verified. Storage contract candidate refuted; dialog persistence failure reproduced separately in #2985. Integration fixtures not executed against a database."
+      ],
       "questions": []
     },
     {
@@ -43810,6 +43853,32 @@
       "questions": [
         "Integrated check running; no own cloud/Google runtime or live database verification."
       ]
+    },
+    {
+      "path": "docs/operations/billing-integration-rehearsal.md",
+      "sha": "d81dae88241d7c1a623fde0276350dddf57c05f9",
+      "change": "A",
+      "blob": "f706e179718030a352cd7571e6c9c7547b7179be",
+      "method": "full-text",
+      "status": "delta-reviewed",
+      "read_ranges": [[1, 120]],
+      "evidence": [
+        "#2982 added rehearsal document fully read in bounded chunks; rollout complete two-line diff read. External runtime evidence distinguished from own observation; #2867/#2869 not complete. Integrated docs-only into audit checkout."
+      ],
+      "questions": ["No own cloud/test-clock/browser execution."]
+    },
+    {
+      "path": "docs/operations/billing-single-plan-rollout.md",
+      "sha": "d81dae88241d7c1a623fde0276350dddf57c05f9",
+      "change": "M",
+      "blob": "a7bfc6e355153b9e2befabb018118353398f4f10",
+      "method": "full-text-delta",
+      "status": "delta-reviewed",
+      "read_ranges": [],
+      "evidence": [
+        "#2982 added rehearsal document fully read in bounded chunks; rollout complete two-line diff read. External runtime evidence distinguished from own observation; #2867/#2869 not complete. Integrated docs-only into audit checkout."
+      ],
+      "questions": ["No own cloud/test-clock/browser execution."]
     }
   ]
 }
