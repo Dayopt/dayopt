@@ -43879,6 +43879,62 @@
         "#2982 added rehearsal document fully read in bounded chunks; rollout complete two-line diff read. External runtime evidence distinguished from own observation; #2867/#2869 not complete. Integrated docs-only into audit checkout."
       ],
       "questions": ["No own cloud/test-clock/browser execution."]
+    },
+    {
+      "path": "apps/product/src/features/settings/components/AvatarChangeDialog.test.tsx",
+      "sha": "c76658e58487a570a0776d8b6cc02e9b179774bc",
+      "change": "A",
+      "blob": "74a606cbdfbb52fbb9b78d014bc784a1e1a24531",
+      "method": "full-text",
+      "status": "delta-reviewed",
+      "read_ranges": [[1, 178]],
+      "evidence": [
+        "F050 #2985 own patch reviewed and validated in integrated7750-pass tree. Generated deltas contain the added test row/count and settings count only; no whole baseline/generated file reading claimed. Published Draft2965 head confirmed via GitHub API."
+      ],
+      "questions": [
+        "Live Storage/Auth/DB/browser and concurrent multi-tab avatar updates unverified."
+      ]
+    },
+    {
+      "path": "apps/product/src/features/settings/components/AvatarChangeDialog.tsx",
+      "sha": "c76658e58487a570a0776d8b6cc02e9b179774bc",
+      "change": "M",
+      "blob": "7b322c104168b5eec27f56bbf0bc5b9cf553da8f",
+      "method": "full-text-delta",
+      "status": "delta-reviewed",
+      "read_ranges": [],
+      "evidence": [
+        "F050 #2985 own patch reviewed and validated in integrated7750-pass tree. Generated deltas contain the added test row/count and settings count only; no whole baseline/generated file reading claimed. Published Draft2965 head confirmed via GitHub API."
+      ],
+      "questions": [
+        "Live Storage/Auth/DB/browser and concurrent multi-tab avatar updates unverified."
+      ]
+    },
+    {
+      "path": "docs/engineering/data/architecture-inventory.md",
+      "sha": "c76658e58487a570a0776d8b6cc02e9b179774bc",
+      "change": "M",
+      "blob": "525f9ec4e6c58556607eac89eae4e29a23b7646e",
+      "method": "mechanical-delta",
+      "status": "mechanically-checked",
+      "read_ranges": [],
+      "evidence": [
+        "F050 #2985 own patch reviewed and validated in integrated7750-pass tree. Generated deltas contain the added test row/count and settings count only; no whole baseline/generated file reading claimed. Published Draft2965 head confirmed via GitHub API."
+      ],
+      "questions": []
+    },
+    {
+      "path": "docs/engineering/data/system-surface.md",
+      "sha": "c76658e58487a570a0776d8b6cc02e9b179774bc",
+      "change": "M",
+      "blob": "2d2be0c46ca4c56c2a85816c2e1c0b5c72b23510",
+      "method": "mechanical-delta",
+      "status": "mechanically-checked",
+      "read_ranges": [],
+      "evidence": [
+        "F050 #2985 own patch reviewed and validated in integrated7750-pass tree. Generated deltas contain the added test row/count and settings count only; no whole baseline/generated file reading claimed. Published Draft2965 head confirmed via GitHub API."
+      ],
+      "questions": []
     }
   ]
 }
