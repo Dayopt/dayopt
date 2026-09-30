@@ -436,7 +436,18 @@ SA token の控えは **1Password の `human` に保管できる**（[公式の�
 4. token 無し・無効で起動が失敗し、人間用認証の prompt / fallback が起きないことを確認する。Mac の home / 1Password / browser / 接続済み tool への到達経路が無いことも確認する。
 5. 1Password を使う対話・無人の agent 起動を `agent:run` に統一し、旧セッションを停止する。撤去対象の credential replica があれば記録してから処置する。障害時は専用環境を停止し、人間用の認証を agent に戻して復旧しない。
 
-Codex Cloud の Secret が setup phase のみに渡る既存構成では、agent phase の `op run` 用 token を得られない。setup から plaintext file / image / cache へ token を残す回避は採らない。作業中に SA が必要なら、runtime への秘密注入ができる専用実行先を使う。秘密を使わない通常の Codex Cloud worker は既存の setup を維持する（[tooling](./tooling.md#local--codex-cloud-の実行環境)）。
+### Codex Cloud を使う場合の登録
+
+現行の [Codex Cloud 公式手順](https://learn.chatgpt.com/docs/environments/cloud-environments#supply-personal-values)では、**Personal vault の Environment variable** を task 内の process へ渡せる。アカウントの画面にこの項目があるか確認してから登録する。1Password の vault と Codex の Personal vault は別の保管先である。
+
+1. **Settings → Codex Cloud → Environments** で専用環境を作成・編集する。**Privacy → Who can use** は **Only me** とし、**Environment variables → Manage** で上記 3 key を要求するよう設定する。人間用の 1Password 認証や Mac の tool 接続は追加しない。
+2. **Settings → Codex Cloud → Personal vault → Add** を開く。**Type: Environment variable**、**Key: OP_SERVICE_ACCOUNT_TOKEN** とし、User が **Value** に SA token を直接入力する。**Applies to: Selected environments** で専用環境だけを選び、保存する。同様に 2 つの ID をそれぞれの key で登録する。**All environments** は選ばない。
+3. SA の user ID が不明な場合は、token を注入済みの専用クラウドで `op user get --me` の `ID` を確認する。`Type: SERVICE_ACCOUNT` と `State: ACTIVE` を確認し、`op vault list --format=json` が `agent` 1 件だけであることとその `id` を管理画面の設定と照合して登録する。これらは metadata だけを取得する。item の値や token を表示するコマンドは使わない。
+4. 必要な 1Password 接続先を環境の network policy に許可し、Node.js / pnpm / 1Password CLI と検査 script を配置する。保存・Publish / Republish 後の新しい task で `pnpm agent:secrets:check --json` を実行する。既存 task は独自の状態を保持するため、環境更新だけで移行済みと扱わない。
+
+**Network secret は使わない。** Network secret は proxy が置換する placeholder を process に渡す方式であり、1Password CLI が必要とする実 token を直接読めない。Personal vault の Environment variable は保存後の UI では値が隠れるが、実行する task は実値を読める。アクセス範囲は SA の権限と専用クラウドの分離で制限する。
+
+Personal vault が無く、Secret が setup phase のみに渡る旧構成では、agent phase の `op run` 用 token を得られない。setup から plaintext file / image / cache へ token を残す回避は採らず、runtime への秘密注入ができる専用実行先を使う。Jev など作業中に渡さない秘密は、既存の setup 限定の扱いを維持する（[tooling](./tooling.md#local--codex-cloud-の実行環境)）。
 
 移行完了には platform 設定、SA 権限確認、live の正負検証、旧起動経路の停止の証跡が必要。fixture test の成功だけで完了と扱わない。
 
