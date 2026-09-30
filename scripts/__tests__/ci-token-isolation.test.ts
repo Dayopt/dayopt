@@ -294,8 +294,8 @@ function runScriptOf(job: Job): string {
 const FAKE_GH = `#!/usr/bin/env bash
 printf '%s\\n' "$*" >> "$GH_LOG"
 if [ "$1" = api ] && [ "$2" != --method ]; then
-  [ "\${FAKE_LABELS_FAIL:-}" = 1 ] && exit 1
-  echo "\${FAKE_HAS_LABEL:-false}"
+  [ "\${FAKE_COMMENTS_FAIL:-}" = 1 ] && exit 1
+  [ "\${FAKE_HAS_COMMENT:-}" = true ] && echo 123
   exit 0
 fi
 if [ "$1" = pr ] && [ "$2" = comment ]; then
@@ -353,42 +353,40 @@ describe('migration-notice job の run script', () => {
     return { ...result, log, body, dir };
   }
 
-  it('未付与ならラベル作成 → コメント投稿 → ラベル付与の順で通知し、本文は decode した summary そのもの', () => {
+  it('未通知なら bot コメントを確認して投稿し、本文を shell に評価しない', () => {
     const result = runNotice({});
 
     expect(result.status).toBe(0);
     expect(result.log).toEqual([
-      'api repos/Dayopt/dayopt/issues/7/labels --jq [.[] | select(.name == "db:destructive-migration")] | length > 0',
-      'label create db:destructive-migration --repo Dayopt/dayopt --color B60205 --description 破壊的 migration を検知（EXPLICIT AUTHORITY 要確認）',
+      'api repos/Dayopt/dayopt/issues/7/comments --paginate --jq .[] | select(.user.login == "github-actions[bot]" and ((.body // "") | contains("<!-- dayopt:migration-safety-notice -->"))) | .id',
       `pr comment 7 --repo Dayopt/dayopt --body-file ${join(result.dir, 'migration-safety-comment.md')}`,
-      'api --method POST repos/Dayopt/dayopt/issues/7/labels -f labels[]=db:destructive-migration',
     ]);
-    expect(result.body).toBe(SUMMARY);
+    expect(result.body).toBe(`${SUMMARY}\n<!-- dayopt:migration-safety-notice -->\n`);
     // 本文はシェルに評価されない
     expect(existsSync(join(result.dir, 'pwned'))).toBe(false);
   });
 
-  it('付与済みなら再通知しない', () => {
-    const result = runNotice({ FAKE_HAS_LABEL: 'true' });
+  it('bot の通知コメントがあれば再通知しない', () => {
+    const result = runNotice({ FAKE_HAS_COMMENT: 'true' });
 
     expect(result.status).toBe(0);
     expect(result.log).toHaveLength(1);
     expect(result.body).toBeNull();
   });
 
-  it('ラベル確認の gh api が失敗しても fail open で通知する', () => {
-    const result = runNotice({ FAKE_LABELS_FAIL: '1' });
+  it('コメント確認の gh api が失敗しても fail open で通知する', () => {
+    const result = runNotice({ FAKE_COMMENTS_FAIL: '1' });
 
     expect(result.status).toBe(0);
+    expect(result.log.some((line) => line.includes('issues/7/comments'))).toBe(true);
     expect(result.log.some((line) => line.startsWith('pr comment 7'))).toBe(true);
-    expect(result.log.some((line) => line.startsWith('api --method POST'))).toBe(true);
   });
 
-  it('コメント投稿が失敗（fork PR の read-only token 等）したらラベルは付与せず、job も落とさない', () => {
+  it('コメント投稿が失敗（fork PR の read-only token 等）しても job を落とさない', () => {
     const result = runNotice({ FAKE_COMMENT_STATUS: '1' });
 
     expect(result.status).toBe(0);
-    expect(result.log.some((line) => line.startsWith('api --method POST'))).toBe(false);
+    expect(result.log.some((line) => line.startsWith('label create'))).toBe(false);
     expect(result.stdout).toContain('::warning::migration safety のコメント投稿に失敗しました');
   });
 

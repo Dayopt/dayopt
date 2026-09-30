@@ -833,29 +833,33 @@ async function runIntegration() {
     return;
   }
 
-  run(
-    'psql',
-    [
-      '-h',
-      '127.0.0.1',
-      '-p',
-      '54322',
-      '-U',
-      'postgres',
-      '-d',
-      'postgres',
-      '-v',
-      'ON_ERROR_STOP=1',
-      '-c',
-      'SET app.isolated_validation = on',
-      '-f',
-      'supabase/tests/cron-heartbeats.sql',
-      '-f',
-      'supabase/tests/integration-oauth-identity.sql',
-    ],
-    { env: { ...process.env, PGPASSWORD: 'postgres' } },
-  );
   run('pnpm', ['test:integration']);
+  for (const sqlFile of [
+    'supabase/tests/cron-heartbeats.sql',
+    'supabase/tests/fenced-calendar-reconnect.sql',
+    'supabase/tests/integration-oauth-identity.sql',
+  ]) {
+    run(
+      'psql',
+      [
+        '-h',
+        '127.0.0.1',
+        '-p',
+        '54322',
+        '-U',
+        'postgres',
+        '-d',
+        'postgres',
+        '-v',
+        'ON_ERROR_STOP=1',
+        '-c',
+        'SET app.isolated_validation = on',
+        '-f',
+        sqlFile,
+      ],
+      { env: { ...process.env, PGPASSWORD: 'postgres' } },
+    );
+  }
   run('pnpm', ['rls:snapshot:check']);
   run('pnpm', ['types:generate:local']);
   run('git', [
@@ -878,7 +882,7 @@ async function runIntegration() {
  * コメント投稿 → ラベル付与を行う（順序と「付与済みなら再通知しない」規約はそちらが持つ）。
  *
  * 実行に使う関数はすべて注入可能にしてある（test では gh / fs へ実際に触れずに
- * 分岐を検証する。clear-closed-workflow-status.mjs と同じ DI の型）。
+ * 分岐を検証する）。
  * @param {{
  *   repo?: string,
  *   prNumber?: string | number,

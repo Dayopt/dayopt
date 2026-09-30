@@ -24,9 +24,11 @@ import {
   clearCalendarSyncCursor,
   finishCalendarSyncRun,
   persistCalendarSyncResult,
+  repairCalendarConnectionAuthorityFence,
   resolveProjectKey,
   type CasContext,
 } from './fenced-sync-writer';
+import { TOKEN_REQUEST_TIMEOUT_MS } from './google-oauth';
 import { googleCalendarAdapter } from './providers/google';
 import {
   CalendarProviderError,
@@ -68,6 +70,9 @@ const TOMBSTONE_BATCH_SIZE = 150;
  * あって全依存同時ハング時の完走保証ではない）。
  */
 export const PERSIST_RESERVE_MS = 2 * DB_REQUEST_TIMEOUT_MS;
+
+/** Provider refresh と token rotation 保存（最大28秒）のために残す予算。 */
+const TOKEN_REFRESH_AND_PERSIST_RESERVE_MS = TOKEN_REQUEST_TIMEOUT_MS + PERSIST_RESERVE_MS;
 
 const PROVIDER = 'google';
 
@@ -557,7 +562,22 @@ async function syncConnectionFenced(args: {
     return { outcome: 'not_configured', calendarsSynced: 0, calendarsFailed: 0 };
   }
 
-  const begin = await beginCalendarSyncRun({ connectionId, userId, projectKey, deadlineAt });
+  let begin = await beginCalendarSyncRun({ connectionId, userId, projectKey, deadlineAt });
+  if (typeof begin !== 'string' && begin.result === 'missing') {
+    // Callback 由来の legacy connection は authority fence が NULL のまま残ることがある。
+    // begin の missing に限り DB の generation・authority 検証で修復し、同期開始を再試行する。
+    // 修復できない時は fail closed で provider へ進まない。
+    const repair = await repairCalendarConnectionAuthorityFence({
+      connectionId,
+      userId,
+      projectKey,
+      deadlineAt,
+    });
+    if (repair !== 'ready') {
+      return { outcome: 'not_configured', calendarsSynced: 0, calendarsFailed: 0 };
+    }
+    begin = await beginCalendarSyncRun({ connectionId, userId, projectKey, deadlineAt });
+  }
   if (typeof begin === 'string') {
     // callRpc 内で Sentry capture 済み（unresolved / rejected_input）か、想定内
     // （account_deleting / deadline_exceeded）。いずれも安全な no-op として畳む
@@ -592,6 +612,14 @@ async function syncConnectionFenced(args: {
     runStartedAtIso: begin.runStartedAt,
     refreshTokenEnc: begin.refreshTokenEnc,
   };
+
+  // Fence repair を含む DB 処理で残予算が減った場合、rotation されうる token を
+  // provider へ渡す前に次回同期へ延期する。provider refresh の上限に加えて、token
+  // rotation persistence / recovery を含む既存の DB 書き込み予算を確保する。
+  if (deadlineAt !== undefined && deadlineAt - Date.now() < TOKEN_REFRESH_AND_PERSIST_RESERVE_MS) {
+    await finishFencedSyncRunBestEffort(runState, 'partial_timeout', deadlineAt);
+    return { outcome: 'partial_timeout', calendarsSynced: 0, calendarsFailed: 0 };
+  }
 
   let refreshToken: string;
   try {
