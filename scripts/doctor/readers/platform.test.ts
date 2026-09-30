@@ -445,6 +445,20 @@ describe('platform readers (fixture request only)', () => {
     ).toEqual([MAIN, INTEGRATION]);
   });
 
+  it('attempts the pinned Integration project even when branch listing is forbidden', async () => {
+    const fixture = supabaseFixture();
+    fixture['supabase.branches'] = () => {
+      throw Object.assign(new Error('no body'), { code: 'FORBIDDEN', status: 403 });
+    };
+    const { ctx, request } = context(fixture);
+    const observed = await readPlatform('supabase', ctx);
+    expect(
+      request.mock.calls.some(
+        ([op, params]) => op === 'supabase.project' && params?.project_ref === INTEGRATION,
+      ),
+    ).toBe(true);
+    expect(value(observed, 'supabase.integration.project')).toMatchObject({ id: INTEGRATION });
+  });
   it('projects only safe Supabase Auth keys and safe audit summary, omitting hook/CAPTCHA/SMTP secrets', async () => {
     const observations = await readPlatform(
       'supabase',

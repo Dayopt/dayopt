@@ -79,7 +79,7 @@ async function observe(
       source: operation,
       status: 'blocked',
       reason:
-        status === 403
+        status === 403 || detail.code === 'FORBIDDEN'
           ? 'insufficient_access'
           : status === 401
             ? 'authentication_failed'

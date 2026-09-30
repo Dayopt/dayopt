@@ -420,7 +420,7 @@ async function vercel(ctx: ReaderContext): Promise<Observation[]> {
 
 async function supabase(ctx: ReaderContext): Promise<Observation[]> {
   const output: Observation[] = [];
-  const branches = await collect(
+  await collect(
     output,
     ctx,
     'supabase.branches',
@@ -442,16 +442,13 @@ async function supabase(ctx: ReaderContext): Promise<Observation[]> {
       ),
     { project_ref: PROJECT_REF },
   );
-  const projects = [{ ref: PROJECT_REF, environment: 'production' }];
-  if (branches !== undefined) {
-    for (const branch of rows(branches)) {
-      if (branch.name !== 'integration' || branch.parent_project_ref !== PROJECT_REF) continue;
-      if (typeof branch.project_ref !== 'string' || !/^[a-z]{20}$/.test(branch.project_ref))
-        continue;
-      projects.push({ ref: branch.project_ref, environment: 'integration' });
-    }
-  }
-  if (ctx.environment === 'preview') {
+  // Both refs are existing Dayopt resources in expected.yaml and the transport allowlist.
+  // Branch-list permissions do not imply project metadata permissions.
+  const projects = [
+    { ref: PROJECT_REF, environment: 'production' },
+    { ref: 'tilwaprottpyhlfoggbb', environment: 'integration' },
+  ];
+  if (['all', 'preview'].includes(ctx.environment)) {
     output.push({
       key: 'supabase.preview_project_selection',
       environment: 'preview',
@@ -462,7 +459,7 @@ async function supabase(ctx: ReaderContext): Promise<Observation[]> {
         '任意PR branchのDB参照は自動選択しません。対象branchとdeploymentの明示対応が必要です。',
       next_step: '確認対象PRのSupabase project refとVercel deploymentを明示してください。',
     });
-    return output;
+    if (ctx.environment === 'preview') return output;
   }
   for (const target of projects) {
     if (ctx.environment !== 'all' && ctx.environment !== target.environment) continue;
@@ -528,21 +525,33 @@ async function supabase(ctx: ReaderContext): Promise<Observation[]> {
         ),
       params,
     );
-    await collect(
-      output,
-      ctx,
-      'supabase.auth_audit',
-      `${prefix}.auth_audit`,
-      target.environment,
-      (value) => {
-        const row = record(value);
-        if (typeof row.passed !== 'boolean' || typeof row.error_count !== 'number') {
-          throw new Error('Unexpected Auth audit result');
-        }
-        return { passed: row.passed, error_count: row.error_count };
-      },
-      params,
-    );
+    if (target.environment === 'integration')
+      output.push({
+        key: `${prefix}.auth_audit`,
+        environment: 'integration',
+        source: 'production-auth-config-audit.mjs',
+        value: null,
+        status: 'manual',
+        reason:
+          'Production Auth baseline is not applied to Integration. Compare its separate callback and Auth contract.',
+      });
+    else {
+      await collect(
+        output,
+        ctx,
+        'supabase.auth_audit',
+        `${prefix}.auth_audit`,
+        target.environment,
+        (value) => {
+          const row = record(value);
+          if (typeof row.passed !== 'boolean' || typeof row.error_count !== 'number') {
+            throw new Error('Unexpected Auth audit result');
+          }
+          return { passed: row.passed, error_count: row.error_count };
+        },
+        params,
+      );
+    }
     await collect(
       output,
       ctx,

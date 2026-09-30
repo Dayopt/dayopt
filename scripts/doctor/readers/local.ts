@@ -193,7 +193,7 @@ async function health(ctx: ReaderContext): Promise<Observation[]> {
           'Provide an explicit existing PR deployment identity for a separate read-only check.',
       },
     ];
-  return Promise.all(
+  const observed: Observation[] = await Promise.all(
     targets.map(async (target) => {
       const key = `vercel.${target}.public_health`;
       try {
@@ -236,6 +236,17 @@ async function health(ctx: ReaderContext): Promise<Observation[]> {
       }
     }),
   );
+  if (ctx.environment === 'all')
+    observed.push({
+      key: 'vercel.preview.public_health',
+      environment: 'preview',
+      source: 'public.health',
+      value: null,
+      status: 'manual',
+      reason: 'Arbitrary Preview deployment URLs are not selected automatically.',
+      next_step: '対象PRの既存deployment URLを指定して読み取り確認してください。',
+    });
+  return observed;
 }
 
 async function oauthMetadata(ctx: ReaderContext): Promise<Observation[]> {

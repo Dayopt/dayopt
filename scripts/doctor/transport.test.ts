@@ -21,6 +21,17 @@ describe('doctor read transport', () => {
     await expect(createTransport(ENV, mock)('github.repository')).rejects.toMatchObject({ status });
     expect(mock).toHaveBeenCalledTimes(1);
   });
+  it('classifies a Resend sending-only key as scope-limited even when the provider uses 401', async () => {
+    const mock = vi
+      .fn()
+      .mockResolvedValue(
+        json({ name: 'restricted_api_key', message: 'FAKE_SECRET_DO_NOT_PRINT' }, 401),
+      );
+    await expect(
+      createTransport({ ...ENV, RESEND_API_KEY: 'fake-resend' }, mock)('resend.listDomains'),
+    ).rejects.toMatchObject({ code: 'FORBIDDEN', status: 401 });
+    expect(mock).toHaveBeenCalledTimes(1);
+  });
   it('rejects mutation and arbitrary endpoints without network calls', async () => {
     const mock = vi.fn();
     const request = createTransport(ENV, mock);
@@ -69,6 +80,17 @@ describe('doctor read transport', () => {
       status: 403,
     });
     expect(mock).toHaveBeenCalledTimes(2);
+  });
+  it('stops Sentry pagination when its next link says results=false', async () => {
+    const mock = vi.fn().mockResolvedValue(
+      json([{ slug: 'dayopt' }], 200, {
+        link: '<https://sentry.io/api/0/organizations/dayopt/projects/?cursor=end>; rel="next"; results="false"; cursor="end"',
+      }),
+    );
+    await expect(
+      createTransport({ ...ENV, SENTRY_AUTH_TOKEN: 'fake-sentry' }, mock)('sentry.listProjects'),
+    ).resolves.toEqual([{ slug: 'dayopt' }]);
+    expect(mock).toHaveBeenCalledTimes(1);
   });
   it('refuses pagination links that escape the scoped endpoint', async () => {
     const mock = vi

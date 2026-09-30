@@ -138,8 +138,13 @@ describe('local doctor reader', () => {
     const ctx = context();
     ctx.request = vi.fn().mockRejectedValue(new Error('https://private.test/?token=do-not-emit'));
     const result = await readLocal('vercel', ctx);
-    expect(result).toHaveLength(2);
-    expect(result.every((row) => row.status === 'blocked' && row.value === null)).toBe(true);
+    expect(result).toHaveLength(3);
+    expect(result.find((row) => row.environment === 'preview')?.status).toBe('manual');
+    expect(
+      result
+        .filter((row) => row.environment !== 'preview')
+        .every((row) => row.status === 'blocked' && row.value === null),
+    ).toBe(true);
     expect(JSON.stringify(result)).not.toContain('do-not-emit');
     ctx.request = vi.fn().mockResolvedValue({ version: 'secret-value', commitSha: 'bad' });
     expect((await readLocal('vercel', ctx))[0].status).toBe('blocked');

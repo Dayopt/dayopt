@@ -158,6 +158,15 @@ export function createTransport(env: NodeJS.ProcessEnv, fetchImpl: typeof fetch 
           await delay(250 * 2 ** retry);
           continue;
         }
+        if (url.origin === 'https://api.resend.com' && response.status === 401) {
+          // Resend uses 401 for sending-only keys too. Inspect only its fixed error name;
+          // never propagate the message or response body into observations.
+          const restricted = await response.json().then(
+            (body) => row(body).name === 'restricted_api_key',
+            () => false,
+          );
+          throw new ReadFailure(restricted ? 'FORBIDDEN' : 'AUTH_FAILED', 401);
+        }
         await response.body?.cancel();
         throw new ReadFailure(
           response.status === 403
@@ -193,7 +202,10 @@ export function createTransport(env: NodeJS.ProcessEnv, fetchImpl: typeof fetch 
       const batch = array(field ? row(response.data)[field] : response.data);
       output.push(...batch);
       const next = vercel ? row(row(response.data).pagination).next : null;
-      const linked = response.link?.match(/<([^>]+)>;\s*rel="next"/)?.[1];
+      const nextLink = [...(response.link ?? '').matchAll(/<([^>]+)>([^,]*)/g)].find((match) =>
+        /;\s*rel="next"/.test(match[2]),
+      );
+      const linked = nextLink && !/;\s*results="false"/.test(nextLink[2]) ? nextLink[1] : undefined;
       if (!linked && !next) return field ? { [field]: output } : output;
       if (linked) {
         const candidate = new URL(linked);

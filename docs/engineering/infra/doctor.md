@@ -70,3 +70,5 @@ Node 24で全16サービスを読み取り実行し、2026-09-30 12:37:14 JSTの
 差異は`vercel.product.public_bindings`の`posthog_enabled_without_deletion_key`。権限不足・認証失敗・metadata欠測・サービス間の証拠欠測を差異と分けて残した。未取得のsignature secret、API権限、配信契約の未確認を「全件正常」にしていない。サービスへの書き込みは行っていない。
 
 この記録は初版の限定的な読み取り証拠。現行状態は再実行で確認する。schema/cronの契約ファイル比較とURLの原表記保持は、この実行後にも回帰テストで確認した。
+
+初版後の差異・取得不能の切り分けとreader修正は[triage-2026-09-30.md](./triage-2026-09-30.md)に記録している。
