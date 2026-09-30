@@ -1,3 +1,4 @@
+import AxeBuilder from '@axe-core/playwright';
 import { BROWSER_TELEMETRY_CONSENT_STORAGE_KEY } from '@dayopt/observability';
 import { expect, type Page, type Route, test } from '@playwright/test';
 
@@ -357,6 +358,40 @@ for (const { locale, path, copy, pricingCopy, common } of locales) {
     await expect(demo.locator('svg')).toHaveCSS('stroke-dashoffset', '0px');
     await expect(demo.getByRole('heading')).toHaveText(copy.experience.nextTitle);
   });
+
+  for (const colorScheme of ['light', 'dark'] as const) {
+    test(`${locale} ${colorScheme}: 記録カードの登場途中でも文字のコントラストを保つ`, async ({
+      page,
+    }) => {
+      await refuseAnalytics(page);
+      await page.emulateMedia({ colorScheme, reducedMotion: 'no-preference' });
+      await page.setViewportSize({ width: 1440, height: 1000 });
+      await page.goto(path);
+      const demo = page.locator('#day-experience');
+      await demo.getByRole('button', { name: copy.experience.stepPlan, exact: true }).click();
+      await expect(demo.locator('[data-record-duration]')).toHaveCount(0);
+      await demo.getByRole('button', { name: copy.experience.stepRecord, exact: true }).click();
+      const heldTransitions = await demo.locator('[data-record-duration]').evaluate((card) => {
+        const transitions = card.getAnimations();
+        for (const animation of transitions) {
+          animation.pause();
+          animation.currentTime = Number(animation.effect?.getTiming().duration) / 10;
+        }
+        return transitions.length;
+      });
+      // Hold the real browser transition near its start, ensuring this check
+      // exercises the entrance instead of passing after the motion has ended.
+      expect(heldTransitions).toBeGreaterThan(0);
+      const audit = await new AxeBuilder({ page })
+        // The reported regression affects the small minute unit. The decorative
+        // SVG behind other labels requires a separate manual contrast review.
+        .include('#day-experience [data-record-duration] small')
+        .withRules(['color-contrast'])
+        .analyze();
+      expect(audit.violations).toEqual([]);
+      expect(audit.incomplete).toEqual([]);
+    });
+  }
 
   test(`${locale}: タッチでデモとモバイルメニューを操作できる`, async ({ browser }, testInfo) => {
     const context = await browser.newContext({

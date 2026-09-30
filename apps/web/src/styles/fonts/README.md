@@ -11,8 +11,9 @@ full Japanese font's large Unicode-range stylesheet.
 
 The Latin subset is preloaded. The 3.4KB Japanese H1 subset is embedded in the
 critical stylesheet, avoiding a separate request for the main heading.
-Japanese pages additionally preload the first-view characters for both body weights
-using content-hashed public URLs; English pages do not preload them. Other characters
+Japanese pages additionally preload the regular first-view characters using a
+content-hashed public URL; English pages do not preload them. The small medium face
+uses Next's CSS asset pipeline and loads with its first visible text. Other characters
 use disjoint Unicode ranges and load when their text is rendered. The long LP uses
 native `content-visibility: auto` for sections below the hero, retaining their
 complete server-rendered content and native anchor / search / focus behavior. The previous

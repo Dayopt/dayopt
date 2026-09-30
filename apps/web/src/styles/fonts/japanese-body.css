@@ -34,7 +34,7 @@
   font-style: normal;
   font-weight: 500;
   font-display: swap;
-  src: url('/fonts/NotoSansJP-critical500-62d7d8cb2170.woff2') format('woff2');
+  src: url('./NotoSansJP-critical500.woff2') format('woff2');
   unicode-range:
     U+3001, U+3002, U+3044, U+3046, U+304F, U+3050, U+3051, U+3057, U+3058, U+3059, U+305A, U+305F,
     U+3063, U+3064, U+3066, U+3068, U+306A, U+306B, U+306E, U+306F, U+3078, U+307E, U+307F, U+3081,

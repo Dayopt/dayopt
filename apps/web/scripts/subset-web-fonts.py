@@ -115,13 +115,19 @@ for source, name, codepoints, family, weight in (
                          actual["hmtx"].metrics[actual_name]), "Subset changed glyph shape or width"
     print(f"{name}: {len(wanted)} codepoints, {output.stat().st_size} bytes")
     if name.startswith(("NotoSansJP-critical", "NotoSansJP-body")):
-        # A hash in the public URL keeps immutable cache headers safe on updates.
-        digest = hashlib.sha256(output.read_bytes()).hexdigest()[:12]
-        target = PUBLIC / f"{Path(name).stem}-{digest}.woff2"
-        target.write_bytes(output.read_bytes())
-        output.unlink()
-        href = f"/fonts/{target.name}"
-        if name.startswith("NotoSansJP-critical"):
+        if name == "NotoSansJP-critical500.woff2":
+            # Let Next's CSS asset pipeline deliver the small medium face.
+            # It is discovered with its first visible text; the main heading
+            # already has its own embedded face and needs no medium preload.
+            href = f"./{name}"
+        else:
+            # A hash in the public URL keeps immutable cache headers safe on updates.
+            digest = hashlib.sha256(output.read_bytes()).hexdigest()[:12]
+            target = PUBLIC / f"{Path(name).stem}-{digest}.woff2"
+            target.write_bytes(output.read_bytes())
+            output.unlink()
+            href = f"/fonts/{target.name}"
+        if name == "NotoSansJP-critical400.woff2":
             body_fonts.append(href)
         unicode_range = ", ".join(f"U+{point:X}" for point in sorted(wanted))
         body_faces.append(f'''@font-face {{

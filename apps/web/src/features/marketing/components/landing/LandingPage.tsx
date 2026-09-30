@@ -78,6 +78,13 @@ export async function LandingPage({ locale }: LandingPageProps) {
 
   return (
     <div className={styles.landing} data-locale={locale} lang={locale}>
+      {/* Native controls remain reliable without script-driven viewport updates. */}
+      <noscript
+        dangerouslySetInnerHTML={{
+          __html:
+            '<style>[data-locale][lang] > section[id] { content-visibility: visible; contain-intrinsic-block-size: none; }</style>',
+        }}
+      />
       <section className={styles.hero} aria-labelledby="landing-title">
         <div className={styles.heroHead}>
           <div className={styles.heroIntro}>
