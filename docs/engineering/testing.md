@@ -43,9 +43,11 @@ nightly の full が落ちたら、落ちた test を直すのに加えて、PR 
 
 ## Storybook の実行契約
 
-`promote.yml` の専用 `storybook` job が、collect 検査と light / dark の render・play・a11y を実行する。両 app の配信中 SHA のうち、target の祖先と確認できる最も新しい SHA を共通基準に、product / web / 共有 UI / Storybook 設定と実行経路の変更を拾う。片方だけ昇格した後に古い app の SHA から同じ変更を繰り返し検査しない。配信 SHA の欠落・履歴の分岐・判定不能時は実行する。失敗・cancel・判定出力欠落は通常の promote を通さず、失敗通知は既存経路へ接続する。既存の force による緊急復旧は維持する。
+`promote.yml` の専用 `storybook` job が、collect 検査、同じ Story の静的 build、light / dark の render・play・a11y を実行する。両 app の配信中 SHA のうち、target の祖先と確認できる最も新しい SHA を共通基準に、product / web / 共有 UI / Storybook 設定と実行経路の変更を拾う。片方だけ昇格した後に古い app の SHA から同じ変更を繰り返し検査しない。配信 SHA の欠落・履歴の分岐・判定不能時は実行する。失敗・cancel・判定出力欠落は通常の promote を通さず、失敗通知は既存経路へ接続する。既存の force による緊急復旧は維持する。
 
-- collect: `pnpm exec tsx scripts/tasks/check-story-coverage.ts --collected`
+- per-PR / local static: `pnpm storybook:collect-files-check`（`check:static` に含む）。Vitest の `list --filesOnly` で両テーマの include 集合を全 Story ファイルと比較する。ブラウザ不要で root / glob の収集漏れを検知するが、runtime tag・play・a11y は検査しない。MDX は比較対象外、`docs-only` / `wip` の Story ファイルは両辺に含む。
+- browser collect: `pnpm exec tsx scripts/tasks/check-story-coverage.ts --collected`
+- static build: `pnpm build-storybook`。Local / CI で同じ `.stories.*` と mock を使い、アプリ資格情報は不要。既存の affected Storybook job で build 失敗も通常の promote を遮断する。静的 build の成功は Preview 配信・URL 発行・実ブラウザ描画の成功を意味しない。
 - 両テーマ: `pnpm --filter @dayopt/product exec vitest run --project storybook --project storybook-dark`
 - JSON 結果は `storybook-results-<attempt>` artifact に7日保持する。workflow 全体の成功だけでなく、当該 job の実行と失敗件数を確認する。
 - 全件を per-PR に追加しない。E2E と専用 job を並列実行して所要を分離する。cold cache と GitHub runner の実測は PR / Issue の証跡に残す。
