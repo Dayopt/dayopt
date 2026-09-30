@@ -1,3 +1,8 @@
+---
+status: current
+last_verified: 2026-10-01
+---
+
 # Infrastructure doctor
 
 期待値と実設定を、既存の1Password資格情報とAPI/CLIで読み取り専用に比較する。設定の変更、secret同期、メール送信、webhook発火、課金、cron実行、backup実行は行わない。

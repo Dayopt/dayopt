@@ -220,6 +220,7 @@ services:
       auth_callback: https://tilwaprottpyhlfoggbb.supabase.co/auth/v1/callback
       calendar_callback: https://product-git-integration-dayopt.vercel.app/api/integrations/google-calendar/callback
       calendar_authority_contract: calendar
+      environment_separation_contract: docs/operations/secrets.md#google-oauth-の本番非本番分離
     coverage:
       - registered_callbacks
       - consent_screen_and_test_users
@@ -363,6 +364,11 @@ advisories:
   - id: vercel.integration-topology
     desired: existing_product_project_preview_target_fixed_branch_origin
     source: https://github.com/Dayopt/dayopt/issues/2910
+    enforcement: advisory
+  - id: google.nonproduction-project-separation
+    desired: separate_cloud_project_with_distinct_auth_and_calendar_clients
+    source: docs/operations/secrets.md#google-oauth-の本番非本番分離
+    migration_status: pending
     enforcement: advisory
 resources:
   repository: Dayopt/dayopt

@@ -309,6 +309,16 @@ vault は 2026-08-14 の信頼境界軸再編（[#2086](https://github.com/Dayop
 - `STRIPE_ACCOUNT_ID` と `STRIPE_LIVEMODE` は、正しいStripe accountとmodeだけを変更するための固定identity。durable Billing / account deletionを有効にする前に、`STRIPE_SECRET_KEY` と3項目をまとめて設定する。test modeは `false`、live modeは `true`
 - Preview は登録しない。ephemeral hostname は Google 側に事前登録できず、`__Host-` cookie も host 固定のため、Preview では接続開始時に明示エラーを返す
 
+#### Google OAuth の本番・非本番分離
+
+2026-10-01、UserがGoogle Cloud project単位で本番と非本番を分離する方針を確定。非本番projectの中でもSupabase Auth用とCalendar用clientを分ける。本番`dayopt-503623`内の既存Calendar Integration clientをAuthと兼用する暫定案は採用しない。理由は、[Googleの環境分離方針](https://developers.google.com/identity/protocols/oauth2/policies)と、[同じproject内の全clientに及ぶ認可取消](https://developers.google.com/identity/protocols/oauth2/web-server#tokenrevoke)から、非本番の切断が同じGoogleユーザーの本番tokenへ波及する条件を除くため。用途別clientはcallback・secret配布先・rotationを分けるが、同一project内の認可取消まで用途別に隔離する保証ではない。
+
+移行先のproject / client / masterは実在を確認したものだけ台帳へ登録する。`human/google-auth-integration`は既存Calendar Integration clientのmasterであり、item名だけを根拠にAuth専用やproject分離済みとみなさない。既存tokenを新clientのcredentialと組み合わせず、非本番Calendarは新clientで再認可する。client移行と暗号鍵rotationは別工程とする。
+
+非本番Auth clientには非本番SupabaseのGoogle callbackを、非本番Calendar clientには固定Integration originのCalendar callbackを登録する。Auth credentialのreplicaは非本番Supabase provider、Calendar credentialのreplicaは対応する非本番Vercel target / branchに限定する。appの`/auth/callback`とSupabaseの`/auth/v1/callback`を取り違えない。移行中の本番project・client・grantは保持し、旧grantの取消・旧client削除は本番への波及を評価した別工程にする。
+
+External / TestingでCalendarのrefresh tokenは[7日で失効](https://developers.google.com/identity/protocols/oauth2#expiration)するため、検証手順に再認可を含める。実設定と未完了工程は[棚卸し記録](../engineering/infra/triage-2026-09-30.md)に置き、この方針の確定だけでログイン・同期・環境分離を検証済みとは扱わない。
+
 ### `ci`
 
 **CI が消費する値の master を置く。** GitHub Actions Secrets との対応は `scripts/tasks/env/schema.ts` の `ciSecretSchema` が正本で、workflow の `secrets.*` 参照と名前で双方向に一致することを `scripts/__tests__/ci-secret-ledger.test.ts` が検査する。 現在 CI は 1Password を直接読まず GitHub Secrets replica で動くため、この vault の読み手は同期作業の人間だけ。Service Account を導入する時は、この vault を SA の read scope にする（[#2086](https://github.com/Dayopt/dayopt/issues/2086)）。

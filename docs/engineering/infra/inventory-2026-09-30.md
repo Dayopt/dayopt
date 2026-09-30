@@ -1,3 +1,8 @@
+---
+status: current
+last_verified: 2026-09-30
+---
+
 # Dayopt サービス棚卸し — 2026-09-30
 
 読み取り専用のAPI/CLI、認証済みMCP、公開DNS、repo調査による観測記録。期待値は expected.yaml を参照。観測値から期待値を自動更新しない。秘密値・認証付きURLは記録しない。
