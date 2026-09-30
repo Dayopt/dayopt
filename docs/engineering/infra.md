@@ -1425,43 +1425,19 @@ browser を将来カバーするなら、Sentry browser 側の `tracePropagation
 
 ## 開発コマンド一覧
 
-Dayoptプロジェクトで使用可能な全npmコマンドのリファレンス。
+<!-- docs-live:commands:start -->
 
-### 基本開発コマンド（頻出）
+正本は [package.json](../../package.json)。現在の一覧は `pnpm docs:read docs/engineering/infra.md` で生成して読む。
 
-```bash
-pnpm dev                    # 1Password 経由で開発サーバー起動
-npm run typecheck           # 型チェック
-npm run lint                # コード品質チェック
-npm run lint:boundaries     # feature境界チェック
-npm run test:run            # ユニットテスト実行
-npm run check               # typecheck + lint + test:run（一括）
-```
+<!-- docs-live:commands:end -->
 
-> **Secrets**: 実値は `.env.local` に置かず、1Password master と `.op-env.agent` の `op://` 参照を `pnpm dev` で注入する。`pnpm dev` の Supabase 接続先は local 固定。素の起動が必要な一時作業だけ `pnpm dev:raw` を使う。詳細は `docs/operations/secrets.md`。
-> 開発サーバー（`pnpm dev`, `npm run storybook`）の起動・停止はユーザー責務。
-
-### 全コマンド一覧
-
-**一覧はここに置かない**。`package.json` の `scripts` が正本で、写すと必ず古くなる（2026-09-16 に、存在しない 12 script を並べた表を撤去した）。
-
-```bash
-# root の script 名を引く
-node -e "console.log(Object.keys(require('./package.json').scripts).join('\n'))"
-
-# workspace 個別（product / web / storybook / packages）
-pnpm --filter @dayopt/product run
-```
+Secrets の注入・開発サーバーの操作責務は [secrets.md](../operations/secrets.md) と [AGENTS.md](../../AGENTS.md) を参照する。
 
 script の追加・改名は permission allowlist と docs 参照の同時更新まで含めて 1 変更にする（AGENTS.md の Non-Negotiables）。どのコマンドをいつ使うかは、テストは [testing.md](./testing.md)、DB は [supabase skill](../../.agents/skills/supabase/SKILL.md)、release は [releasing skill](../../.agents/skills/releasing/SKILL.md) を見る。
 
-### pre-commit フック（自動実行）
+## pre-commit フック（自動実行）
 
-コミット時に以下が自動で実行される:
-
-1. **lint-staged**: ステージされた `.ts/.tsx/.js/.jsx/.mjs/.cjs` に prettier（app 配下なら eslint も）、`.json/.md/.yml/.yaml/.css/.mdx` に prettier
-2. **typecheck**: `.ts/.tsx` ファイルが含まれる場合のみ `tsc --noEmit`
-3. **license:check**: `package.json` 変更時のみライセンスチェック
+現在の処理は末尾で `.husky/pre-commit` と `lint-staged.config.mjs` の定義から生成して読む。何をいつ検証するかの正本は [testing.md](testing.md)。hook に書かれていない検査を実行済みと扱わない。
 
 ---
 
@@ -1669,7 +1645,7 @@ ORDER BY schemaname, tablename;
 | ------------------------------------------------- | -------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Storage オブジェクト**                          | どの DB backup にも含まれない（Supabase の仕様）               | 搬出/復元 script（`scripts/ci/storage-backup.sh` / `scripts/runbook/storage-restore.sh`、rclone ベース）は実装済み。**destination（Cloudflare R2）を確定し、初回搬出・実復元演習ともに完了**（2026-08-20、[#2026](https://github.com/Dayopt/dayopt/issues/2026)）。以後は日次 cron が差分同期する。詳細は [disaster-recovery-drill.md](../operations/disaster-recovery-drill.md) §Storage |
 | **Edge Functions とその secrets**                 | 復元対象外                                                     | `supabase functions deploy <slug> --use-api` で再デプロイ + **secrets を再投入**（`supabase secrets set`）。コードを戻しても secrets は戻らない                                                                                                                                                                                                                                           |
-| **Vault の secrets（別 project へ復元した場合）** | 暗号鍵は project 単位。別 project では復号できない可能性が高い | 1Password から再投入する（`vault.secrets` に 9 件。`stripe_secret_key` / `resend_api_key` / `service_role_key` / `recovery_code_pepper` 等）                                                                                                                                                                                                                                              |
+| **Vault の secrets（別 project へ復元した場合）** | 暗号鍵は project 単位。別 project では復号できない可能性が高い | 適用済み migration と最新の secret 名のメタデータを確認し、必要な値を 1Password から再投入する。件数は固定しない。`20260917050000_drop_vault_edge_invoke.sql` で撤去した secret は復活させない                                                                                                                                                                                            |
 | **Realtime publication**                          | 別 project へ復元した場合は再有効化が必要                      | 現状 publication は空なので影響なし                                                                                                                                                                                                                                                                                                                                                       |
 
 **production の pg_cron job は `supabase/migrations/` が正本ではない**（baseline に「本番は Dashboard で設定」とある）。復元の前後で `SELECT jobname, schedule, active FROM cron.job;` を控えて突き合わせる。
@@ -2217,3 +2193,11 @@ WHERE version = '20260319090000';  -- 該当バージョンに置き換え
 | **Have I Been Pwned** | signup / password 変更時の漏洩パスワード検査 | 停止時は fail-open（検査を通す）。代替 breach API / corpus へ |
 
 **Turnstile と Sentry はこの層に無い。** Turnstile は Cloudflare 行（中）に、Sentry は production build gate を握るため中層に含めた。
+
+## 機械取得する現状
+
+<!-- docs-live:facts:start -->
+
+抽出対象の登録は [scripts/lib/docs-live/facts.ts](../../scripts/lib/docs-live/facts.ts)。現在の一覧は `pnpm docs:read docs/engineering/infra.md` で生成して読む。
+
+<!-- docs-live:facts:end -->

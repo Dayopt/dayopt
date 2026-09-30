@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Eye, EyeOff } from 'lucide-react';
@@ -77,6 +77,7 @@ export function LoginForm({ className, ...props }: React.ComponentProps<'div'>) 
   // 直前に試したアドレス。確認メールの再送はこれを宛先にする
   const [attemptedEmail, setAttemptedEmail] = useState<string | null>(null);
   const [resendState, setResendState] = useState<'idle' | 'sending' | 'sent'>('idle');
+  const resendAttemptRef = useRef(0);
   const turnstile = useTurnstileGate();
   const turnstileLocale: 'ja' | 'en' | 'auto' =
     locale === 'ja' ? 'ja' : locale === 'en' ? 'en' : 'auto';
@@ -111,6 +112,7 @@ export function LoginForm({ className, ...props }: React.ComponentProps<'div'>) 
   });
 
   const clearResendTarget = () => {
+    resendAttemptRef.current += 1;
     setAttemptedEmail(null);
     setResendState('idle');
   };
@@ -129,10 +131,13 @@ export function LoginForm({ className, ...props }: React.ComponentProps<'div'>) 
   const handleResendConfirmation = async () => {
     if (!attemptedEmail) return;
 
+    const attempt = resendAttemptRef.current;
     setResendState('sending');
     const { error } = turnstile.token
       ? await resendConfirmation(attemptedEmail, { captchaToken: turnstile.token })
       : await resendConfirmation(attemptedEmail);
+    // 新しいログイン試行へ、古い再送の結果やcaptcha resetを持ち越さない。
+    if (attempt !== resendAttemptRef.current) return;
     turnstile.reset();
 
     if (error?.code === 'captcha_failed') {
@@ -217,7 +222,7 @@ export function LoginForm({ className, ...props }: React.ComponentProps<'div'>) 
     <div className={cn('flex flex-col gap-6', className)} {...props}>
       <Card className="overflow-hidden p-0">
         <CardContent className="p-0">
-          <form className="p-6 md:p-8" onSubmit={handleSubmit(onSubmit)}>
+          <form className="p-6 md:p-8" onSubmit={(event) => void handleSubmit(onSubmit)(event)}>
             <FieldGroup>
               <div className="flex flex-col items-center text-center">
                 <h1 className="text-2xl font-medium">{t('auth.loginForm.welcomeBack')}</h1>

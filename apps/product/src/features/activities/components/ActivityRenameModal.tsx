@@ -95,6 +95,8 @@ function ActivityRenameModalForm({ open, onClose, activity }: ActivityRenameModa
     try {
       await updateActivityMutation.mutateAsync({ id: activity.id, name: trimmedLive });
       onClose();
+    } catch {
+      // mutation hook が通知・rollback を担当する。入力を保って再試行できるよう閉じない。
     } finally {
       setSubmitting(false);
     }

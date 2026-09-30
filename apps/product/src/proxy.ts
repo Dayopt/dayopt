@@ -12,12 +12,11 @@ import {
   isPublicRewritePath,
 } from '@/lib/auth/domain';
 import { isValidCalendarViewToken } from '@/lib/calendar-view-tokens';
-import { resolveSupabaseProjectRef } from '@/lib/dayopt-environment';
 import { logger } from '@/lib/logger';
 import {
   isOAuthRequestHostAllowed,
   isOAuthSurfacePath,
-  resolveOAuthEnvironmentConfig,
+  resolveOAuthEnvironmentFromEnv,
 } from '@/lib/oauth-server/identity';
 import { captureUnexpectedError } from '@/lib/sentry';
 import { updateSession } from '@/lib/supabase/middleware';
@@ -533,20 +532,7 @@ export async function proxy(request: NextRequest) {
 function enforceOAuthHostBoundary(hostname: string, pathname: string): NextResponse | null {
   let identity;
   try {
-    identity = resolveOAuthEnvironmentConfig({
-      mcpOAuthEnvironment: process.env.MCP_OAUTH_ENVIRONMENT,
-      authorizationServerUri: process.env.OAUTH_AUTHORIZATION_SERVER_URI,
-      resourceUri: process.env.MCP_CANONICAL_RESOURCE_URI,
-      vercelEnvironment: process.env.VERCEL_ENV,
-      vercelTargetEnvironment: process.env.VERCEL_TARGET_ENV,
-      vercelBranchUrl: process.env.VERCEL_BRANCH_URL,
-      vercelGitCommitRef: process.env.VERCEL_GIT_COMMIT_REF,
-      mcpOAuthPreviewBranch: process.env.MCP_OAUTH_PREVIEW_BRANCH,
-      dayoptEnvironment: process.env.DAYOPT_ENVIRONMENT,
-      publicDayoptEnvironment: process.env.NEXT_PUBLIC_DAYOPT_ENVIRONMENT,
-      vercelProjectId: process.env.VERCEL_PROJECT_ID,
-      supabaseProjectRef: resolveSupabaseProjectRef(process.env.NEXT_PUBLIC_SUPABASE_URL),
-    });
+    identity = resolveOAuthEnvironmentFromEnv(process.env);
   } catch {
     if (!isOAuthSurfacePath(pathname) && !KNOWN_OAUTH_HOSTS.has(hostname)) return null;
     logger.error('OAuth deployment identity is invalid');

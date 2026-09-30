@@ -15,16 +15,7 @@ GitHub Actionsのセキュリティ設定、OWASP準拠のセキュリティ監�
 
 ## ワークフロー構成
 
-```
-.github/
-  dependabot.yml              # 依存関係自動更新
-  workflows/
-    ci.yml                    # impact（affected 判定）→ static（gitleaks + secrets:check + docs:check + lint/typecheck/knip）∥ unit（+ migration safety の検知）∥ integration（affected 時の RLS/integration）の並列 4 job + unit 後の migration-notice（検知時だけ PR コメント）
-    production-config-audit.yml  # Vercel environment metadata 監査
-    nightly.yml               # product-unit-full + replica-check + storage-backup-export + notify-failure（#2483 で旧ファイルから統合。night-watch は 2026-09-02、層 3 と integration は 2026-09-03、Workflow status cleanup は 2026-09-29 に撤去）
-    create-release.yml        # GitHub Release 作成
-    promote.yml               # main merge 連動の promote。impact → 層 3（E2E / Web Build & E2E）→ release の 3 job
-```
+現在のファイル一覧は末尾の生成領域で確認する。job と権限の定義はリンク先の workflow が正本。
 
 ## 権限設計
 
@@ -141,14 +132,7 @@ pin-github-action .github/workflows/*.yml
 
 ### 使用中の Secrets
 
-| Secret                                 | 用途              | ワークフロー                   |
-| -------------------------------------- | ----------------- | ------------------------------ |
-| `NEXT_PUBLIC_SUPABASE_URL`             | Supabase 接続     | ci, e2e                        |
-| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Supabase 匿名キー | ci, e2e                        |
-| `NEXT_PUBLIC_APP_URL`                  | アプリ URL        | ci, e2e                        |
-| `SUPABASE_ACCESS_TOKEN`                | Supabase CLI 認証 | emergency only / local scripts |
-| `VERCEL_TOKEN`                         | Vercel API 監査   | production-config-audit        |
-| `VERCEL_ORG_ID`                        | Vercel team 特定  | production-config-audit        |
+期待するキーと用途は [env schema](../../scripts/tasks/env/schema.ts)、参照する workflow は末尾の一覧から確認する。ここでは登録済み・実在する secret と断定しない。実値は取得・表示しない。
 
 `GEMINI_API_KEY` は外部モデル diff レビュー（ai-review）専用だったが、2026-08-03 の撤去に
 合わせて **key 自体を失効させた**。GitHub repo secret の削除に加え、Google AI Studio 側の
@@ -421,3 +405,11 @@ deleted rowはauthenticated clientへ露出しない。
 - `auto_migrated` Recordのdelete/restore拒否
 - 別ユーザーのカテゴリーを指すアクティビティのINSERT / UPDATE拒否（`activities_category_owner_fkey`）
 - [RLS snapshot](../engineering/data/db/rls-snapshot.md)のdrift check
+
+## 機械取得する現状
+
+<!-- docs-live:facts:start -->
+
+抽出対象の登録は [scripts/lib/docs-live/facts.ts](../../scripts/lib/docs-live/facts.ts)。現在の一覧は `pnpm docs:read docs/operations/security.md` で生成して読む。
+
+<!-- docs-live:facts:end -->

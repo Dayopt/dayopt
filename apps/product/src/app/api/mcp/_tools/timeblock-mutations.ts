@@ -141,7 +141,7 @@ export function registerPlansCreateTool(server: McpServer, ctx: McpRequestContex
     'plans.create',
     {
       title: 'Create a Dayopt plan',
-      description: 'Create one future Plan as canonical Dayopt data.',
+      description: 'Create one Plan in the past or future as canonical Dayopt data.',
       inputSchema: MCP_PLAN_CREATE_INPUT_SCHEMA,
       outputSchema: MCP_PLAN_ACTIVE_RECEIPT_SCHEMA,
       annotations: { destructiveHint: false, idempotentHint: true },

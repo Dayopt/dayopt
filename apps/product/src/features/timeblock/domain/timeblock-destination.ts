@@ -1,6 +1,6 @@
 export type TimeblockDestination = 'plan' | 'record';
 
-/** 保存先はユーザー選択ではなく終了時刻だけから決める。 */
+/** 新規作成の既定の保存先を終了時刻から決める。種別の選択可否は resolveTimeblockKindChoice が担う。 */
 export function resolveTimeblockDestination(
   endAt: Date | string,
   now: Date = new Date(),

@@ -11,7 +11,7 @@
  * 削除は不可逆なので楽観的更新の対象外（AGENTS.md）。確認ダイアログは `TemplateList` が持つ。
  */
 
-import { useQueryClient } from '@tanstack/react-query';
+import { isCancelledError, useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
 
 import { useUserPreferences } from '@/lib/hooks/useUserPreferences';
@@ -23,11 +23,14 @@ import { materializeTemplateDay } from '../domain/plan-template-materialize';
 import {
   getTimeblockServiceCode,
   insertTimeModelRowIntoMatchingLists,
+  isTimeblockCacheCurrent,
   isTimeblockOverlapError,
   removeTimeModelRowsFromMatchingLists,
   restoreTimeblockLists,
+  settleTimeblockCache,
   snapshotTimeblockLists,
   useTimeblockWriteMutations,
+  writeTimeblockCache,
   type TimeblockListsSnapshot,
 } from './useTimeblockWriteMutations';
 
@@ -75,7 +78,7 @@ export function usePlanTemplateMutations() {
         template.blocks.map((block) => [block.id, block.previewDurationMinutes]),
       ),
     }).map((plan) => ({
-      id: `temp-${template.id}-${plan.blockId}`,
+      id: `temp-${template.id}-${plan.blockId}-${crypto.randomUUID()}`,
       user_id: '',
       activity_id: plan.activityId,
       external_calendar_event_id: null,
@@ -108,16 +111,21 @@ export function usePlanTemplateMutations() {
         return { ...snapshot, tempIds: new Set() };
       }
 
-      for (const plan of optimisticPlans) {
-        insertTimeModelRowIntoMatchingLists(queryClient, 'plans', plan);
-      }
+      writeTimeblockCache(queryClient, snapshot, () => {
+        for (const plan of optimisticPlans) {
+          insertTimeModelRowIntoMatchingLists(queryClient, 'plans', plan);
+        }
+      });
       return { ...snapshot, tempIds: new Set(optimisticPlans.map((plan) => plan.id)) };
     },
     onSuccess: (rows, _input, context) => {
-      removeTimeModelRowsFromMatchingLists(queryClient, 'plans', context?.tempIds ?? new Set());
-      for (const row of rows) {
-        insertTimeModelRowIntoMatchingLists(queryClient, 'plans', row);
-      }
+      if (!context || !isTimeblockCacheCurrent(queryClient, context)) return;
+      writeTimeblockCache(queryClient, context, () => {
+        removeTimeModelRowsFromMatchingLists(queryClient, 'plans', context.tempIds);
+        for (const row of rows) {
+          insertTimeModelRowIntoMatchingLists(queryClient, 'plans', row);
+        }
+      });
       if (rows.length === 0) return;
       // 1 タップで複数件が増える操作なので、まとめて戻せる口をその場で渡す
       toast.success(t('calendar.templates.toast.applied', { count: rows.length }), {
@@ -133,6 +141,7 @@ export function usePlanTemplateMutations() {
     },
     onError: (error, _input, context) => {
       restoreTimeblockLists(queryClient, context);
+      if (isCancelledError(error)) return;
       toast.error(
         isTimeblockOverlapError(error)
           ? t('calendar.templates.toast.applyOverlap')
@@ -141,8 +150,10 @@ export function usePlanTemplateMutations() {
             : t('calendar.templates.toast.applyFailed'),
       );
     },
-    onSettled: () => {
-      void utils.plans.invalidate();
+    onSettled: (_data, _error, _input, context) => {
+      const current = isTimeblockCacheCurrent(queryClient, context);
+      settleTimeblockCache(queryClient, context);
+      if (current) void utils.plans.invalidate();
     },
   });
 

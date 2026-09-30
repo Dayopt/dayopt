@@ -2,6 +2,7 @@
 
 import { useCallback, useMemo, useState } from 'react';
 
+import { useBillingAccess } from '@/lib/billing/billing-access-context';
 import { useUpdateUserSettings } from '@/lib/hooks/useUpdateUserSettings';
 import { api } from '@/lib/trpc';
 
@@ -11,7 +12,9 @@ interface UseTrialEndedDialogResult {
 }
 
 /**
- * Trial終了ダイアログの表示判定 + フラグ管理
+ * 旧Free/Pro方式のTrial終了ダイアログの表示判定 + フラグ管理
+ * 単一有料プランでは利用状態に基づくinline bannerを使う。
+ * Stripe Customerの存在は45日体験の終了を意味しない。
  *
  * 表示条件（すべて満たす場合のみ）:
  * 1. subscriptionStatus === 'free'
@@ -23,6 +26,7 @@ interface UseTrialEndedDialogResult {
  * 失敗時も local dismiss は保持し、ユーザーがダイアログに閉じ込められないようにする。
  */
 export function useTrialEndedDialog(): UseTrialEndedDialogResult {
+  const { enforced } = useBillingAccess();
   const billingQuery = api.billing.getOverview.useQuery(undefined, {
     retry: false,
   });
@@ -37,7 +41,7 @@ export function useTrialEndedDialog(): UseTrialEndedDialogResult {
   }, [updateSettings]);
 
   const open = useMemo(() => {
-    if (locallyDismissed) return false;
+    if (enforced || locallyDismissed) return false;
 
     const billing = billingQuery.data?.billingInfo;
     const settings = settingsQuery.data;
@@ -49,7 +53,7 @@ export function useTrialEndedDialog(): UseTrialEndedDialogResult {
       billing.stripeCustomerId !== null &&
       !settings?.personalization.dismissedTrialEndedDialog
     );
-  }, [billingQuery.data, settingsQuery.data, locallyDismissed]);
+  }, [billingQuery.data, settingsQuery.data, locallyDismissed, enforced]);
 
   return { open, close };
 }

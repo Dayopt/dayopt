@@ -119,7 +119,7 @@ export async function fetchReportActivities(
   return data ?? [];
 }
 
-/** カテゴリー全件。色とアイコンは表示側が semantic token へ写す。 */
+/** 現役カテゴリー全件。アーカイブ済みへの所属はサイドバーと同じく未分類へ寄せる。 */
 export async function fetchReportCategories(
   supabase: ReportFetchClient,
   userId: string,
@@ -127,7 +127,8 @@ export async function fetchReportCategories(
   const { data, error } = await supabase
     .from(databaseTables.categories)
     .select('id, name, color, icon')
-    .eq('user_id', userId);
+    .eq('user_id', userId)
+    .is('archived_at', null);
 
   if (error) throwDatabaseError(error, 'fetch_report_categories');
   return data ?? [];

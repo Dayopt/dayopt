@@ -25,7 +25,7 @@ Google カレンダーの予定を読み取り専用でミラーし、Calendar �
 - 接続の再認証が必要な状態（`reauth_required`）になった接続は、同期を止め、ghost の表示対象からも除外する（stale なミラーを見せ続けない）
 - カレンダーの選択を解除すると、そのカレンダー由来で未変換の ghost は即時に取り込み対象から外れる。既に Plan / Record に変換済みの予定は影響を受けない
 - 接続を切断すると、未参照のミラー行を削除してから provider 側の許可を取り消し、最後に接続情報を削除する。解約済みユーザーでも接続状態の閲覧と切断は常に行える（読み取り 4 procedure と切断は `protectedProcedure`、ghost 表示・書き込み・オンデマンド操作は `entitledProcedure(entitlementKeys.externalCalendarSync)`）
-- アカウント削除が進行中の間は、Calendar 接続の削除・revoke を独立 cron（`/api/cron/calendar-account-deletion-settle`）が担う。アカウント削除全体のフローの一段として "pending" 状態から確定（settle）させ、通常の接続操作（sync / 切断）とは別経路で処理する
+- アカウント削除では、削除リクエスト内の専用経路が Calendar の接続・保持中トークンを処理し、Google への失効要求とその結果を記録する。独立 cron（`/api/cron/calendar-account-deletion-settle`）は、期限切れでも準備中のまま残った削除 intent を整理する。Google への失効要求を再送せず、送信開始済みで結果不明の処理を `unconfirmed` として確定する。通常の sync / 切断とは別経路で、cron の完了は Google 側での失効確認を意味しない（#2055）
 - OAuth start は state / PKCE verifier の SHA-256 digest だけを server-side attempt に保存する。callback は Google の一回限りの認可コードを交換する前に attempt を claim し、generation / authority fence に結び付けた RPC で接続を保存する
 - 再接続は start 時点で選んだ `reauth_required` 行、または authority fence が欠けた legacy `active` 行の ID・user・provider・Google `sub` を条件にした保存だけを許可する。OAuth 中にその行が切断・削除されていた場合、再作成せず `missing` を返す
 - fenced writer 導入前に作られた active 行で fence が NULL の場合、カレンダー一覧・選択更新の前に対象接続専用の service-role RPC が user data generation と project / quarantine / subject fence の ready 状態を確認し、1 行だけを原子的に fence へ結び付ける。CAS を迂回する未 fence 操作にはフォールバックしない。generation が古い接続や fence が処理中の接続は再認証へ誘導する

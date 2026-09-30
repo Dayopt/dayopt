@@ -30,7 +30,7 @@
 
 ## Rollback・外部状態
 
-<!-- rollback不能な変更、外部サービスやproduction state、段階展開の有無を書く。`scripts/ci/production-config-audit.mjs` / 各 `production-build-gate.mjs` / `production-config-audit.yml` に触れる場合は trusted dispatch が必要（`production-config-audit.yml` の self-change 検出を参照）。該当なしなら「なし」。 -->
+<!-- rollback不能な変更、外部サービスやproduction state、段階展開の有無を書く。audit contract を変更する場合の確認・レビューは `AGENTS.md` と `docs/decisions.md` の現行判断に従う（2026-09-18 に trusted dispatch 必須を撤回。User 指示で行う任意の確認として残す）。該当なしなら「なし」。 -->
 
 ## 例外・後続対応
 

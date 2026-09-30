@@ -7,14 +7,15 @@ Dayoptは、予定（Plan）と記録（Record）を同じCalendarで扱う個�
 
 ## Workspace
 
-| Path             | 責務                                     |
-| ---------------- | ---------------------------------------- |
-| `apps/product`   | 認証後のDayopt本体とAPI                  |
-| `apps/web`       | `dayopt.app` のmarketing・公開コンテンツ |
-| `apps/storybook` | product componentのStorybook host        |
-| `packages`       | app間で共有するdomain、UI、config等      |
-| `supabase`       | PostgreSQL schema、migration、local seed |
-| `docs`           | 内部仕様・設計・運用の正本               |
+<!-- docs-live:workspace:start -->
+
+正本は [pnpm-workspace.yaml](pnpm-workspace.yaml)。現在の一覧は `pnpm docs:read README.md` で生成して読む。
+
+<!-- docs-live:workspace:end -->
+
+各領域の責務は [アーキテクチャ](./docs/engineering/architecture.md)、Supabase 資産の運用は [インフラ](./docs/engineering/infra.md)、内部ドキュメントは [docs の地図](./docs/README.md) を参照する。
+
+人間向けの閲覧は `pnpm docs:serve`、仕組みを辿る対話画面は `pnpm learn`。どちらも読込のたびに正本から表示を作る。AI / CLI は `pnpm docs:read <path>` を使う。
 
 ## Quick Start
 
@@ -28,17 +29,13 @@ pnpm dev
 
 `.op-env.agent`には実値ではなく`op://`参照だけを書く。詳細は[Secrets Management](./docs/operations/secrets.md)を参照する。AIは`pnpm dev`を実行しない。
 
-## Main Commands
+## Commands
 
-```bash
-pnpm check              # typecheck / lint / static checks / unit tests
-pnpm docs:check         # internal docs contract
-pnpm build              # product build
-pnpm build:web          # marketing web build
-pnpm build-storybook    # Storybook build
-pnpm test:integration   # local Supabaseを使うintegration test
-pnpm test:e2e:smoke     # product + web smoke test
-```
+<!-- docs-live:commands:start -->
+
+正本は [package.json](package.json)。現在の一覧は `pnpm docs:read README.md` で生成して読む。
+
+<!-- docs-live:commands:end -->
 
 個別commandの正本はroot [`package.json`](./package.json)。exact framework / library versionも各`package.json`とlockfileを参照する。
 

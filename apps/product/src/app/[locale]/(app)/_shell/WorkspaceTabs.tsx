@@ -24,13 +24,14 @@ function useWorkspaceTabsState() {
   const currentTab = getWorkspaceTabFromPath(pathname);
   const date = navigation ? formatCalendarDateParam(navigation.currentDate) : undefined;
   const view = navigation?.viewType ?? 'week';
+  const isViewReady = navigation?.isViewReady !== false;
 
   const calendarHref = date ? `/calendar?view=${view}&date=${date}` : `/calendar?view=${view}`;
   const reportHref = date ? `/report?date=${date}` : '/report';
   const calendarLabel = t('sidebar.pageNav.calendar');
   const reportLabel = t('sidebar.pageNav.report');
 
-  return { currentTab, calendarHref, reportHref, calendarLabel, reportLabel };
+  return { currentTab, calendarHref, reportHref, calendarLabel, reportLabel, isViewReady };
 }
 
 /**
@@ -55,7 +56,7 @@ export function WorkspaceTitle() {
  */
 export function WorkspaceTabs() {
   const t = useTranslations();
-  const { currentTab, calendarHref, reportHref, calendarLabel, reportLabel } =
+  const { currentTab, calendarHref, reportHref, calendarLabel, reportLabel, isViewReady } =
     useWorkspaceTabsState();
 
   return (
@@ -68,7 +69,8 @@ export function WorkspaceTabs() {
         {
           value: 'calendar',
           label: calendarLabel,
-          href: calendarHref,
+          href: isViewReady ? calendarHref : undefined,
+          disabled: !isViewReady,
           icon: <CalendarDays className="size-4" />,
         },
         {

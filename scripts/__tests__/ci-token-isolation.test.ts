@@ -34,13 +34,17 @@ import { afterEach, describe, expect, it } from 'vitest';
  *
  * 保証しないこと:
  * - flow style（`{ contents: read }`）の permissions、anchor / alias、reusable workflow
- * - ci.yml 以外の workflow（promote.yml / nightly.yml は push / schedule で main の
+ * - ci.yml / calendar-navigation-e2e.yml 以外の workflow（promote.yml / nightly.yml は push / schedule で main の
  *   信頼済みコードを実行する前提。`pull_request` で PR コードを動かす workflow を足したら
  *   ここへ加えること）
  * - run script が curl 等で外部コードを取得して実行するケース
  */
 
 const CI_YML = readFileSync(join(process.cwd(), '.github/workflows/ci.yml'), 'utf8');
+const CALENDAR_E2E_YML = readFileSync(
+  join(process.cwd(), '.github/workflows/calendar-navigation-e2e.yml'),
+  'utf8',
+);
 const FINISH_BRANCH = readFileSync(join(process.cwd(), 'scripts/tasks/finish-branch.sh'), 'utf8');
 
 const withoutCommentLines = (text: string) =>
@@ -135,6 +139,17 @@ const jobById = (id: string) => {
   if (!job) throw new Error(`ci.yml に job ${id} が無い`);
   return job;
 };
+
+describe('calendar-navigation-e2e.yml の token 分離', () => {
+  it('PR コードは read-only token で実行し、外部秘密値を渡さない', () => {
+    expect(jobsOf(CALENDAR_E2E_YML)).toHaveLength(1);
+    expect(writeTokenOffenders(CALENDAR_E2E_YML)).toEqual([]);
+    expect(CALENDAR_E2E_YML).not.toMatch(/secrets\s*[.[]/);
+    expect(CALENDAR_E2E_YML).toContain('persist-credentials: false');
+    expect(CALENDAR_E2E_YML).toContain('ref: ${{ github.event.pull_request.head.sha }}');
+    expect(CALENDAR_E2E_YML).not.toContain('pull_request_target:');
+  });
+});
 
 describe('ci.yml の token 分離（credential audit P2-6）', () => {
   it('repo のコードや依存を実行する job は write 権限の token を持たない', () => {

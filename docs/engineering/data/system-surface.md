@@ -552,11 +552,11 @@ page から import を宣言元まで解決して辿った結果（barrel の再
 
 | feature             | source | test file | component | Story のある component |
 | ------------------- | ------ | --------- | --------- | ---------------------- |
-| `activities`        | 30     | 4         | 11        | 3 / 11                 |
+| `activities`        | 30     | 6         | 11        | 3 / 11                 |
 | `auth`              | 22     | 15        | 8         | 7 / 8                  |
-| `calendar`          | 190    | 94        | 59        | 31 / 59                |
+| `calendar`          | 190    | 95        | 59        | 31 / 59                |
 | `contact`           | 8      | 6         | 2         | 1 / 2                  |
 | `external-calendar` | 26     | 19        | 2         | 1 / 2                  |
 | `review`            | 37     | 22        | 19        | 14 / 19                |
-| `settings`          | 49     | 39        | 22        | 18 / 22                |
-| `timeblock`         | 99     | 55        | 20        | 14 / 20                |
+| `settings`          | 49     | 42        | 22        | 18 / 22                |
+| `timeblock`         | 99     | 58        | 20        | 14 / 20                |
