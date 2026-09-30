@@ -394,12 +394,13 @@ AI_GATEWAY_API_KEY="op://agent/vercel-ai-gateway/credential" op run -- pnpm jev:
 
 ## Service Account
 
-2026-09-30、User は Service Account 作成済みと報告し、ルールだけの vault 制限を権限と実行環境の分離へ移す方針を承認した。実行先は**専用クラウド環境**とする。2026-08-17 の「無人実行のみ・対話的 desktop 統合は変更しない」という適用範囲を更新し、対話・無人とも同じ境界に揃える。同日、User は Codex Cloud の `dayopt` 環境への token / ID 登録と公開を報告した。公開後の task での照合、SA の read-only 等の管理権限、旧 Mac 起動経路の停止は未確認であり、現行 Mac セッションの隔離完了を意味しない。
+2026-09-30、User は Service Account 作成済みと報告し、ルールだけの vault 制限を権限と実行環境の分離へ移す方針を承認した。実行先は**専用クラウド環境**を基本とする。同日の追加指示で、ローカルは**専用の標準 Mac ユーザー**を用意し、人間用ホームへのアクセスを閉じる分離を先に進める方針も承認した（[ローカル手順](./local-agent-isolation.md)）。2026-08-17 の「無人実行のみ・対話的 desktop 統合は変更しない」という適用範囲を更新し、対話・無人とも同じ境界に揃える。同日、User は Codex Cloud の `dayopt` 環境への token / ID 登録と公開を報告した。公開後の task での照合、SA の read-only 等の管理権限、専用 Mac ユーザーの作成と旧 Mac 起動経路の停止は未確認であり、現行 Mac セッションの隔離完了を意味しない。
 
 ### 権限と実行環境
 
 - SA は `agent` vault の **`read_items` のみ**。`write_items` / `share_items` / vault 作成 / 1Password Environments へのアクセスは付けない。権限と vault の変更には SA の作り直しが必要（[公式仕様](https://www.1password.dev/service-accounts/get-started)）。vault の read-only は 1Password 内の権限であり、保存した API credential の外部サービス上の権限とは別。
 - agent は人間用 Mac から分離したクラウド環境で動かす。人間用の 1Password app / browser profile / CLI session / Keychain / home directory を配置・mount・同期しない。Mac のファイルやアプリを操作できる tool / MCP 接続も持ち込まない。
+- ローカルでは専用の標準 Mac ユーザーで同じ境界を作る。人間用ホームへの到達を OS のアクセス権で閉じ、人間用認証や設定をコピーしない。専用ユーザーへ admin / sudo 権限を付けない。SA token の環境変数設定だけでは分離したことにならない。
 - VM を採る場合は admin と実行 user を分け、agent に sudo、host socket、他環境の secret を読める cloud role を与えない。SSH agent forwarding は使わない。これらは provider 側の設定と live 証跡で確認する。repo の wrapper は OS や cloud role の権限境界ではない。
 - 人間用環境は `human` / `ci` の管理を持つ。切替のために、別作業中の Mac の認証設定・worktree を変更しない。旧セッションを停止し、必要な作業を専用環境へ移してから切替完了とする。
 
@@ -407,11 +408,11 @@ AI_GATEWAY_API_KEY="op://agent/vercel-ai-gateway/credential" op run -- pnpm jev:
 
 実装は [`scripts/tasks/agent-service-account.mjs`](../../scripts/tasks/agent-service-account.mjs)。CLI が確認する metadata と platform 側で確認する隔離を区別する。
 
-| 入力                              | 扱い                                                                                    |
-| --------------------------------- | --------------------------------------------------------------------------------------- |
-| `OP_SERVICE_ACCOUNT_TOKEN`        | クラウドの秘密ストアから実行 process へ注入。値を repo / shell 設定 / chat に保存しない |
-| `DAYOPT_AGENT_SERVICE_ACCOUNT_ID` | 管理画面で確認した SA の user ID。秘密ではない。起動する identity を pin する           |
-| `DAYOPT_AGENT_VAULT_ID`           | 管理画面で確認した `agent` vault の ID。秘密ではない。同名の別 vault を許可しない       |
+| 入力                              | 扱い                                                                                                                                     |
+| --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `OP_SERVICE_ACCOUNT_TOKEN`        | クラウドの秘密ストア、または専用 Mac ユーザーの Terminal の非表示入力から実行 process へ注入。値を repo / shell 設定 / chat に保存しない |
+| `DAYOPT_AGENT_SERVICE_ACCOUNT_ID` | 管理画面で確認した SA の user ID。秘密ではない。起動する identity を pin する                                                            |
+| `DAYOPT_AGENT_VAULT_ID`           | 管理画面で確認した `agent` vault の ID。秘密ではない。同名の別 vault を許可しない                                                        |
 
 起動前に token と ID の存在を検査する。`OP_CONNECT_*`（SA より認証の優先順位が高い）、`OP_SESSION*`、`OP_ACCOUNT` を継承せず、private な一時 `OP_CONFIG_DIR`、`OP_BIOMETRIC_UNLOCK_ENABLED=false`、cache / debug 無効を設定する（[CLI 認証](https://www.1password.dev/service-accounts/use-with-1password-cli)、[環境変数](https://www.1password.dev/cli/environment-variables)）。
 
@@ -428,7 +429,7 @@ pnpm agent:run -- claude
 
 ### Bootstrap と移行
 
-SA token の控えは **1Password の `human` に保管できる**（[公式の保管手順](https://www.1password.dev/service-accounts/get-started)）。旧記述の「1Password 自身には保管できない」は保存と起動時の取得を混同していたため訂正する。実行時には cloud secret store から注入し、agent が自分の token を 1Password から取得する循環を作らない。
+SA token の控えは **1Password の `human` に保管できる**（[公式の保管手順](https://www.1password.dev/service-accounts/get-started)）。旧記述の「1Password 自身には保管できない」は保存と起動時の取得を混同していたため訂正する。クラウドでは cloud secret store から注入する。ローカルの初回起動では User が専用ユーザーの Terminal に非表示入力し、process 内だけで保持する。agent が自分の token を 1Password から取得する循環を作らない。
 
 | 登録先                        | 登録内容                                                                       | 確認状況                                                    |
 | ----------------------------- | ------------------------------------------------------------------------------ | ----------------------------------------------------------- |
