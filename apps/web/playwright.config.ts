@@ -21,6 +21,9 @@ export default defineConfig({
     : [['html']],
   use: {
     baseURL: externalBaseURL || 'http://localhost:3001',
+    // 保護された Preview では、一時アクセスの cookie を保存した state を任意指定する。
+    // 認証 state 自体は repository に保存しない。
+    storageState: process.env.WEB_E2E_STORAGE_STATE,
     actionTimeout: 10 * 1000,
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',

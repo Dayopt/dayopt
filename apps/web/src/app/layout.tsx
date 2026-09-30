@@ -4,6 +4,8 @@ import { generateEnhancedMetadata, StructuredData } from '@web/components/seo/En
 import { ThemeProvider } from '@web/shell/providers/theme-provider';
 import type { Metadata } from 'next';
 import { Noto_Sans_JP, Source_Sans_3 } from 'next/font/google';
+import localFont from 'next/font/local';
+import type { CSSProperties } from 'react';
 import './globals.css';
 
 // product（apps/product/src/app/layout.tsx）と同一のフォントスタック。
@@ -16,15 +18,45 @@ import './globals.css';
 const sourceSans = Source_Sans_3({
   subsets: ['latin'],
   display: 'swap',
-  variable: '--font-latin',
-  preload: true,
+  variable: '--font-latin-full',
+  preload: false,
 });
 
 const notoSansJP = Noto_Sans_JP({
   subsets: ['latin'],
-  weight: ['400', '500'],
+  weight: 'variable',
   display: 'swap',
-  variable: '--font-noto-jp',
+  variable: '--font-noto-jp-full',
+  preload: false,
+});
+
+// 同じ書体・字形のまま共通文言を1ファイルにまとめる。未収録の文字は full へ。
+// generic fallback は foundations の stack 末尾だけに置く。
+const webLatin = localFont({
+  src: '../styles/fonts/SourceSans3-web.woff2',
+  weight: '200 900',
+  display: 'swap',
+  variable: '--font-latin-subset',
+  adjustFontFallback: false,
+  preload: true,
+});
+const webJapanese = localFont({
+  src: [
+    { path: '../styles/fonts/NotoSansJP-web400.woff2', weight: '400' },
+    { path: '../styles/fonts/NotoSansJP-web500.woff2', weight: '500' },
+  ],
+  display: 'swap',
+  variable: '--font-noto-jp-subset',
+  adjustFontFallback: false,
+  preload: false,
+});
+// H1 の文字だけを先に配信し、大きい本文 subset の読み込みを待たせない。
+const heroJapanese = localFont({
+  src: '../styles/fonts/NotoSansJP-hero.woff2',
+  weight: '400',
+  display: 'swap',
+  variable: '--font-noto-jp-hero',
+  adjustFontFallback: false,
   preload: true,
 });
 
@@ -50,7 +82,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html
       lang="en"
       suppressHydrationWarning
-      className={`${sourceSans.variable} ${notoSansJP.variable}`}
+      className={`${sourceSans.variable} ${notoSansJP.variable} ${webLatin.variable} ${webJapanese.variable} ${heroJapanese.variable}`}
+      style={
+        {
+          '--font-latin': 'var(--font-latin-subset), var(--font-latin-full)',
+          '--font-noto-jp': 'var(--font-noto-jp-subset), var(--font-noto-jp-full)',
+        } as CSSProperties
+      }
     >
       <head>
         <link

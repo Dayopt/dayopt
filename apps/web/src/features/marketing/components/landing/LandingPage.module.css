@@ -30,6 +30,7 @@
 }
 .heroIntro h1 {
   margin: 0;
+  font-family: var(--font-noto-jp-hero, var(--font-latin)), var(--font-stack-sans);
   font-size: clamp(48px, 6.3vw, 112px);
   font-weight: 400;
   line-height: 1.22;
@@ -1208,14 +1209,6 @@
   cursor: pointer;
 }
 
-.closingMark .mark {
-  transform: scale(1.25);
-}
-
-.closingMark .markInkAnimated {
-  animation-delay: 0ms;
-}
-
 .closing p {
   max-width: 500px;
   margin: 0;
@@ -1229,33 +1222,9 @@
   font-size: 12px;
 }
 
-@keyframes drawPath {
-  to {
-    stroke-dashoffset: 0;
-  }
-}
-
 @keyframes arrive {
   to {
     opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes clickInk {
-  0%,
-  30% {
-    opacity: 0;
-    transform: translateY(-18px);
-  }
-  65% {
-    opacity: 1;
-    transform: translateY(3px);
-  }
-  82% {
-    transform: translateY(-2px);
-  }
-  100% {
     transform: translateY(0);
   }
 }
@@ -1265,11 +1234,6 @@
     grid-template-columns: 1fr;
     min-height: 0;
     gap: 30px;
-  }
-
-  .journey {
-    max-width: 720px;
-    width: 100%;
   }
 
   .experienceBody {
@@ -1382,52 +1346,6 @@
     display: none;
   }
 
-  .journeyMotion {
-    height: auto;
-    padding-block: 26px;
-  }
-
-  .journeyPath {
-    display: none;
-  }
-
-  .journeyMoments {
-    display: grid;
-    gap: 20px;
-  }
-
-  .moment,
-  .moment:nth-child(1),
-  .moment:nth-child(2),
-  .moment:nth-child(3) {
-    position: static;
-    width: 100%;
-    min-width: 0;
-  }
-
-  .moment + .moment {
-    padding-top: 20px;
-    border-top: 1px solid var(--lp-line);
-  }
-
-  .timePair {
-    max-width: 200px;
-  }
-
-  .timeOutline,
-  .timeInk {
-    height: 70px;
-  }
-
-  .journeyLegend {
-    flex-wrap: wrap;
-    gap: 6px 16px;
-  }
-
-  .replayButton {
-    display: none;
-  }
-
   .experienceControls {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1493,14 +1411,8 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .journeyPath,
-  .markInkAnimated,
   .rhythmPlan {
     animation: none;
-  }
-
-  .journeyPath {
-    stroke-dashoffset: 0;
   }
 }
 

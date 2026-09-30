@@ -1,0 +1,42 @@
+# Web font delivery
+
+These are glyph subsets of the existing Source Sans 3 and Noto Sans JP families,
+not a different typeface. They cover the current `common` and `marketing` messages
+in English and Japanese. Source Sans 3 retains its variable weight axis. Japanese
+uses the same 400 / 500 instances as before; their glyph outlines and advance
+widths are preserved. Other characters fall through to the existing full Google fonts.
+
+The Latin subset and the small Japanese H1 / navigation-symbol subset are preloaded. The
+Japanese body subset is requested when Japanese text is present. The previous
+full-font Latin preloads are disabled to avoid downloading the same characters
+twice. All subsets use `font-display: swap`. The full Japanese fallback uses its
+variable weight range instead of duplicated 400 / 500 declarations.
+
+Sources (Google Fonts upstream, downloaded 2026-09-30):
+
+- https://github.com/google/fonts/blob/main/ofl/sourcesans3/SourceSans3%5Bwght%5D.ttf
+- https://github.com/google/fonts/blob/main/ofl/notosansjp/NotoSansJP%5Bwght%5D.ttf
+
+Each is distributed under its accompanying SIL Open Font License. The derivative
+font names are `Dayopt Web Latin` and `Dayopt Web JP` to respect the reserved name
+in the license. The site continues to use Source Sans 3 / Noto Sans JP glyphs.
+
+Upstream SHA-256:
+
+```text
+Source Sans 3: 042fe2cc0b933e328410d7acbd0aa6a1873dca5aef81875f4bc214b08825c7b9
+Noto Sans JP: c2f3b4d463500a2ddcd3849cded1fceeb9fd6d1c32e6cbecd568453ba50fc68f
+```
+
+To regenerate after editing the messages:
+
+```sh
+python3 -m venv /tmp/dayopt-font-tools
+/tmp/dayopt-font-tools/bin/pip install 'fonttools[woff]==4.60.2'
+curl -fL 'https://raw.githubusercontent.com/google/fonts/main/ofl/sourcesans3/SourceSans3%5Bwght%5D.ttf' -o /tmp/SourceSans3-variable.ttf
+curl -fL 'https://raw.githubusercontent.com/google/fonts/main/ofl/notosansjp/NotoSansJP%5Bwght%5D.ttf' -o /tmp/NotoSansJP-variable.ttf
+/tmp/dayopt-font-tools/bin/python apps/web/scripts/subset-web-fonts.py /tmp/SourceSans3-variable.ttf /tmp/NotoSansJP-variable.ttf
+```
+
+The generator checks actual output `cmap` coverage and each font's expected weight
+representation. Refresh the upstream hashes and licenses when replacing the sources.

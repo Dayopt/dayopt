@@ -79,8 +79,10 @@ for (const { locale, path, copy, common } of locales) {
         expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(
           false,
         );
+        const screenshot = testInfo.outputPath(`lp-${locale}-${colorScheme}-${width}.png`);
+        await page.screenshot({ path: screenshot, fullPage: true });
         await testInfo.attach(`lp-${locale}-${colorScheme}-${width}`, {
-          body: await page.screenshot({ fullPage: true }),
+          path: screenshot,
           contentType: 'image/png',
         });
       });
@@ -200,11 +202,13 @@ for (const { locale, path, copy, common } of locales) {
     browser,
   }, testInfo) => {
     const context = await browser.newContext({
+      storageState: testInfo.project.use.storageState,
       javaScriptEnabled: false,
       viewport: { width: 390, height: 844 },
     });
     const page = await context.newPage();
     await page.goto(new URL(path, testInfo.project.use.baseURL as string).href);
+    await page.evaluate(() => document.fonts.ready);
     await expect(page.getByRole('heading', { level: 1 })).toContainText(copy.hero.title1);
     await expect(page.locator('#day-experience [data-plan-duration="30"]')).toBeVisible();
     await expect(page.locator('#day-experience [data-record-duration="45"]')).toBeVisible();
@@ -213,8 +217,10 @@ for (const { locale, path, copy, common } of locales) {
     await expect(page.locator('#faq details').first()).toHaveAttribute('open', '');
     const signup = page.getByRole('link', { name: new RegExp(copy.hero.cta) }).first();
     await expect(signup).toHaveAttribute('href', /^https:\/\/[^/]+\/auth\/signup$/);
+    const screenshot = testInfo.outputPath(`lp-${locale}-no-javascript.png`);
+    await page.screenshot({ path: screenshot, fullPage: true });
     await testInfo.attach(`lp-${locale}-no-javascript`, {
-      body: await page.screenshot({ fullPage: true }),
+      path: screenshot,
       contentType: 'image/png',
     });
     await context.close();
@@ -225,6 +231,7 @@ for (const { locale, path, copy, common } of locales) {
   }, testInfo) => {
     // 1440 physical pixels at 200% zoom: 720 CSS pixels rendered at scale 2.
     const context = await browser.newContext({
+      storageState: testInfo.project.use.storageState,
       viewport: { width: 720, height: 500 },
       deviceScaleFactor: 2,
     });
@@ -233,8 +240,10 @@ for (const { locale, path, copy, common } of locales) {
     await page.goto(new URL(path, testInfo.project.use.baseURL as string).href);
     expect(await overflowingContent(page)).toEqual([]);
     await expect(page.getByRole('link', { name: new RegExp(copy.hero.cta) }).first()).toBeVisible();
+    const screenshot = testInfo.outputPath(`lp-${locale}-zoom-200.png`);
+    await page.screenshot({ path: screenshot, fullPage: true });
     await testInfo.attach(`lp-${locale}-zoom-200`, {
-      body: await page.screenshot({ fullPage: true }),
+      path: screenshot,
       contentType: 'image/png',
     });
     await context.close();
@@ -259,6 +268,7 @@ for (const { locale, path, copy, common } of locales) {
 
   test(`${locale}: タッチでデモとモバイルメニューを操作できる`, async ({ browser }, testInfo) => {
     const context = await browser.newContext({
+      storageState: testInfo.project.use.storageState,
       viewport: { width: 390, height: 844 },
       hasTouch: true,
       isMobile: true,

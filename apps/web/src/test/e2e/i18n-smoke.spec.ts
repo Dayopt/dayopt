@@ -93,7 +93,7 @@ test('LP の en/ja × desktop/mobile を表示できる', async ({ page }, testI
   ] as const;
 
   for (const pattern of patterns) {
-    await page.context().clearCookies();
+    await page.context().clearCookies({ name: 'NEXT_LOCALE' });
     await page.setViewportSize({ width: pattern.width, height: pattern.height });
     await page.goto(pattern.path);
     await expect(page.getByRole('heading', { level: 1 })).toContainText(pattern.headline);
