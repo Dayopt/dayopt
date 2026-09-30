@@ -94,8 +94,9 @@ services:
         commandForIgnoringBuildStep: null
         affected_project_skip: disabled
         include_files_outside_root: true
-      integration_target: dedicated_vercel_project_production_target_fixed_origin
-      integration_migration_status: in_progress
+      integration_target: existing_product_project_preview_target_fixed_branch_origin
+      integration_contract_source: https://github.com/Dayopt/dayopt/issues/2910
+      integration_migration_status: runtime_verification_pending
       data: synthetic_no_production_clone
       deployment_identity: live_domain_alias_and_served_sha
       contracts:
@@ -350,7 +351,8 @@ advisories:
     desired: private_after_github_team
     enforcement: advisory
   - id: vercel.integration-topology
-    desired: dedicated_project_production_target_fixed_origin
+    desired: existing_product_project_preview_target_fixed_branch_origin
+    source: https://github.com/Dayopt/dayopt/issues/2910
     enforcement: advisory
 resources:
   repository: Dayopt/dayopt
