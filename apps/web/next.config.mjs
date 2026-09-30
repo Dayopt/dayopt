@@ -226,6 +226,8 @@ const nextConfig = {
   // @see https://nextjs.org/docs/app/api-reference/config/next-config-js/cacheComponents
 
   experimental: {
+    // 初回表示で stylesheet の追加往復を待たず、SSG HTML と一緒に描画する。
+    inlineCss: true,
     // 同じ root を使う本文 route の全文字フォント CSS を LP に混ぜない。
     // HTTP/2 の小さな追加リクエストより、不要な大きい stylesheet の配信を避ける。
     cssChunking: { type: 'graph', requestCost: 5000, weightDistribution: 0.5 },
