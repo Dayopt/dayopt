@@ -8,6 +8,7 @@
  *  - naming-check            : kebab-case 命名規約
  *  - decisions-append-only   : docs/decisions.md の append-only 契約
  *  - glossary-sync           : 用語集の生成ブロックが terms.ts と一致するか
+ *  - live-docs               : 閲覧時生成 marker と正本の解決
  *  - architecture-map        : Architecture Map の生成ブロック drift と参照切れ
  *  - learn-refs              : docs/learn の正本 schema・参照（path + find）の実在・生成ブロックの drift
  *  - likec4-validate         : LikeC4 model の構文（生成器か .c4 が変わった時だけ / advisory）
@@ -17,6 +18,7 @@
  *
  * Usage:
  *   tsx scripts/tasks/docs-guard/index.ts
+ *   tsx scripts/tasks/docs-guard/index.ts --ci（今回の live-docs 判定を省く）
  *
  * ローカルでは `pnpm docs:check` からも同じスクリプトが実行される。
  */
@@ -34,6 +36,7 @@ import { reportGlossarySyncCheck, runGlossarySyncCheck } from './checks/glossary
 import { reportLearnRefsCheck, runLearnRefsCheck } from './checks/learn-refs.ts';
 import { reportLikeC4ValidateCheck, runLikeC4ValidateCheck } from './checks/likec4-validate.ts';
 import { reportLinkCheck, runLinkCheck } from './checks/link-check.ts';
+import { runLiveDocsCheckForArgs } from './checks/live-docs.ts';
 import { reportNamingCheck, runNamingCheck } from './checks/naming-check.ts';
 import { colors } from './config.ts';
 
@@ -56,6 +59,10 @@ async function main(): Promise<void> {
   const glossarySyncViolations = await runGlossarySyncCheck();
   const glossarySyncOk = reportGlossarySyncCheck(glossarySyncViolations);
 
+  const liveDocsOk = runLiveDocsCheckForArgs(process.argv.slice(2));
+  if (process.argv.includes('--ci'))
+    console.log('live-docs: push 前の検査（CI preset では実行しない）');
+
   const architectureMapViolations = await runArchitectureMapCheck();
   const architectureMapOk = reportArchitectureMapCheck(architectureMapViolations);
 
@@ -72,6 +79,7 @@ async function main(): Promise<void> {
     namingOk &&
     decisionsAppendOnlyOk &&
     glossarySyncOk &&
+    liveDocsOk &&
     architectureMapOk &&
     learnRefsOk &&
     likec4Ok;

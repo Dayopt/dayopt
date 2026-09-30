@@ -180,6 +180,19 @@ const ROOT_BUILD_FILES = new Set([
 export const PRODUCT_BUILD_SCRIPTS = new Set([
   'scripts/tasks/check-client-bundle-secrets.mjs',
   'scripts/tasks/check-bundle-budget.ts',
+  'scripts/tasks/prepare-brand-docs.ts',
+]);
+
+// 文書だが app の配布物を作る正本。docs-only / scripts-neutral より先に判定する。
+export const PUBLIC_DOCUMENT_BUILD_INPUTS = new Set([
+  'docs/business/brand.md',
+  'scripts/tasks/prepare-brand-docs.ts',
+  'scripts/lib/docs-live/publish-brand.ts',
+  'scripts/lib/docs-live/brand-document.ts',
+  'scripts/lib/docs-live/render.ts',
+  'scripts/lib/docs-live/live-contract.ts',
+  'scripts/lib/docs-live/facts.ts',
+  'scripts/lib/create-deterministic-zip.ts',
 ]);
 
 // web の buildCommand（`pnpm generate:search-index && pnpm build`）が呼ぶのは
@@ -560,6 +573,14 @@ export function resolveImpact(changedFiles, options = {}) {
       mark('productUnit', file);
     }
 
+    if (PUBLIC_DOCUMENT_BUILD_INPUTS.has(file)) {
+      docsOnly = false;
+      product = true;
+      web = true;
+      mark('product', file);
+      mark('web', file);
+      continue;
+    }
     if (isDocsPath(file)) continue; // docsOnly を維持
 
     docsOnly = false;

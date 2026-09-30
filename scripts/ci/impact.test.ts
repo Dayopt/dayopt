@@ -16,6 +16,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import {
   PRODUCT_BUILD_SCRIPTS,
+  PUBLIC_DOCUMENT_BUILD_INPUTS,
   formatGithubOutput,
   formatSummary,
   readWorkspaceGraph,
@@ -402,6 +403,28 @@ describe('Vercel の build が実行する root script', () => {
 });
 
 describe('vercel.json ignoreCommand contract（Vercel Ignored Build Step）', () => {
+  it('ブランド説明の正本変更は docs-only で skip せず、両方の公開ビルドが必要になる', () => {
+    expectImpact(['docs/business/brand.md'], {
+      product: true,
+      web: true,
+      productJourney: true,
+      webPreviewSmoke: true,
+    });
+  });
+  it('配布文書の生成器・正本を変更すると両 app を rebuild し、Turbo cache も無効にする', () => {
+    const turbo = JSON.parse(readFileSync(join(rootDir, 'turbo.json'), 'utf8')) as {
+      globalDependencies: string[];
+    };
+    for (const path of PUBLIC_DOCUMENT_BUILD_INPUTS) {
+      expectImpact([path], {
+        product: true,
+        web: true,
+        productJourney: true,
+        webPreviewSmoke: true,
+      });
+      expect(turbo.globalDependencies).toContain(path);
+    }
+  });
   // apps/{product,web}/vercel.json の `ignoreCommand` が壊れると、Vercel の build container が
   // その project の全 deployment を無条件 build（コマンド解決失敗は exit != 0 = build 継続なので
   // 安全側だが Impact Resolver の判定が一切効かなくなる）に倒れる。path は Root Directory 基準の

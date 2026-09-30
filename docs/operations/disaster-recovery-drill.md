@@ -32,16 +32,16 @@ code:
 
 **この手順書は演習前に書かれている。以下は未確認のまま残っており、Step 0 で確定させる。** 確認するまで、後続 Step の所要時間・可否は見積りでしかない。
 
-| 未確認事項                                                       | なぜ未確認か                                                                                 | 確定させる場所    |
-| ---------------------------------------------------------------- | -------------------------------------------------------------------------------------------- | ----------------- |
-| 現行プランと backup 種別（daily / PITR）、保持期間、直近成功時刻 | Management API の project endpoint は backup 情報を返さない（2026-08-12 実測）               | Dashboard（User） |
-| daily backup が **logical / physical** のどちらか                | 方式によって復元経路が変わる。project 作成が 2025-12-23 と新しいため physical の可能性が高い | Dashboard（User） |
-| `supabase branches create --with-data` が実在するか              | CLI reference には記載があるが Branching guide は「data-less」と書いており、公式内で矛盾     | `--help` の実出力 |
-| pg_cron の `cron.job` が復元を跨いで残るか                       | 公式ドキュメントに記載が無い                                                                 | 演習中の実測      |
-| production の cron job の実数                                    | baseline に「本番は Dashboard で設定」とあり、repo が正本でない                              | Step 0 で控える   |
-| `auth` schema が復元対象に入るか（経路により異なる）             | 物理復元は cluster 単位なので入るはず。論理 dump は既定で除外                                | 演習中の実測      |
-| production DB の実サイズ                                         | RTO はサイズにほぼ比例する                                                                   | Step 0 で計測     |
-| **別 project へ復元した時に Vault の secrets が復号できるか**    | 暗号鍵は project 単位。復号できないと 9 件を手で再投入することになる                         | 演習中の実測      |
+| 未確認事項                                                       | なぜ未確認か                                                                                                | 確定させる場所    |
+| ---------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- | ----------------- |
+| 現行プランと backup 種別（daily / PITR）、保持期間、直近成功時刻 | Management API の project endpoint は backup 情報を返さない（2026-08-12 実測）                              | Dashboard（User） |
+| daily backup が **logical / physical** のどちらか                | 方式によって復元経路が変わる。project 作成が 2025-12-23 と新しいため physical の可能性が高い                | Dashboard（User） |
+| `supabase branches create --with-data` が実在するか              | CLI reference には記載があるが Branching guide は「data-less」と書いており、公式内で矛盾                    | `--help` の実出力 |
+| pg_cron の `cron.job` が復元を跨いで残るか                       | 公式ドキュメントに記載が無い                                                                                | 演習中の実測      |
+| production の cron job の実数                                    | baseline に「本番は Dashboard で設定」とあり、repo が正本でない                                             | Step 0 で控える   |
+| `auth` schema が復元対象に入るか（経路により異なる）             | 物理復元は cluster 単位なので入るはず。論理 dump は既定で除外                                               | 演習中の実測      |
+| production DB の実サイズ                                         | RTO はサイズにほぼ比例する                                                                                  | Step 0 で計測     |
+| **別 project へ復元した時に Vault の secrets が復号できるか**    | 暗号鍵は project 単位。復号できないと必要な secret を再投入することになる。対象は当日の metadata で確定する | 演習中の実測      |
 
 **空欄のまま infra.md へ数値を書かない。** 測っていない RTO / RPO を復旧手順書に書くのは、無いより危険（障害中にその数値を信じて判断される）。
 
@@ -226,7 +226,9 @@ DATABASE_URL="$DRILL_URL" pnpm rls:snapshot:check
 
 > **`pnpm rls:snapshot`（`--check` なし）を先に実行しない。** `scripts/tasks/generate-rls-snapshot.ts` は checked-in の `rls-snapshot.md` を**上書きする**ため、その直後の `:check` は自分が今書いた内容と比較して必ず一致する。backup から policy や GRANT が欠落していても合格になり、**演習の権限検証がまるごと無意味になる**。比較対象は常に main の golden snapshot に保つ。
 
-期待値は [rls-snapshot.md](../engineering/data/db/rls-snapshot.md) の現行値（policy 43 / RLS 有効テーブル 20 / GRANT 215 / storage policy 8 / Realtime publication 0）。**演習日に本番側の数値を取り直してから比較する**（この数値は 2026-08-12 時点）。
+比較の基準は [rls-snapshot.md](../engineering/data/db/rls-snapshot.md) の保存記録とする。**演習日に本番側の権限 metadata を取り直し、保存記録との差を確認してから復元先と比較する。** 保存記録の一致だけで本番の現状を確認済みとはしない。
+
+履歴: 2026-08-12 時点の記録は policy 43 / RLS 有効テーブル 20 / GRANT 215 / storage policy 8 / Realtime publication 0。これは現在の期待値ではない。
 
 - [ ] `authenticated` に余分な権限が復活していない
 
@@ -293,10 +295,11 @@ DB 内の hook function が戻っても、**GoTrue 側の hook 登録は引き�
 
 ### Vault / 秘密情報（**案β で最も壊れやすい箇所**）
 
-`vault.secrets` には production の要である 7 件が入っている（`stripe_secret_key` / `stripe_webhook_secret` / `resend_api_key` / `resend_webhook_secret` / `cron_secret` / `recovery_code_pepper` / `anthropic_api_key`）。**暗号鍵は project 単位で管理されるため、案β（別 project への復元）では復号できない可能性が高い。**
+Vault の復元対象は、復旧・演習当日に本番側で取得した secret 名・件数の metadata と [秘密情報の正本](./secrets.md)を照合して確定する。値は一覧・ログ・セッションへ出さない。固定件数を現在の状態として扱わない。**暗号鍵は project 単位で管理されるため、案β（別 project への復元）では復号できない可能性が高い。**
 
-`service_role_key` / `supabase_url` の 2 件は `20260917050000_drop_vault_edge_invoke.sql`（[#2733](https://github.com/Dayopt/dayopt/issues/2733)）で撤去した。読んでいたのが撤去済みの `invoke_edge_function` だけだったため、復元対象ではない。
+`service_role_key` / `supabase_url` の 2 件は `20260917050000_drop_vault_edge_invoke.sql`（[#2733](https://github.com/Dayopt/dayopt/issues/2733)）で撤去する migration として記録されている。読んでいたのが撤去済みの `invoke_edge_function` だけだったため、この旧用途のためには復元しない。実環境への適用と現在の用途は当日の metadata / migration 履歴で確認する。
 
+- [ ] 当日の本番側 metadata から対象名・件数を控え、復元先に必要な secret が揃っているか確認する（値は出力しない）
 - [ ] `vault.secrets` の**値が実際に復号できるか**確認する（行の存在確認だけでは不十分）
 - [ ] `PLACEHOLDER_REPLACE_ME` のままの行が無いか確認する（migration の seed 値）
 - [ ] **復号できなかった場合**: 1Password から再投入する。手順は `20260319000002_vault_seed_secrets.sql` の冒頭コメント（Dashboard の SQL Editor で `UPDATE vault.secrets SET secret = '<値>' WHERE name = '<名前>'`）。**値を標準出力・セッションへ表示しない**
