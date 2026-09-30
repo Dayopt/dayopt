@@ -1065,10 +1065,12 @@
       "mode": "100644",
       "bytes": 4636,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 128]],
+      "evidence": [
+        "Full untruncated read at 33e64a5d87d335f11c0d3f7f5c28c913b3352e33; baseline bytes equal. App trial -> payment-history preflight -> analytics stable IDs/retention -> browser consent -> build marker/DSN -> instrumentation reload -> component/E2E proof boundary cross-checked. No DB/SDK live sends/browser runtime tests executed. #2831 retains actual network proof; unmount alone does not prove SDK cleanup, Production reload is an independent countercheck."
+      ],
       "questions": []
     },
     {
@@ -1078,10 +1080,12 @@
       "mode": "100644",
       "bytes": 4712,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 142]],
+      "evidence": [
+        "Full untruncated read at 33e64a5d87d335f11c0d3f7f5c28c913b3352e33; baseline bytes equal. App trial -> payment-history preflight -> analytics stable IDs/retention -> browser consent -> build marker/DSN -> instrumentation reload -> component/E2E proof boundary cross-checked. No DB/SDK live sends/browser runtime tests executed. #2831 retains actual network proof; unmount alone does not prove SDK cleanup, Production reload is an independent countercheck."
+      ],
       "questions": []
     },
     {
@@ -1522,10 +1526,15 @@
       "mode": "100644",
       "bytes": 13425,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [
+        [1, 180],
+        [181, 331]
+      ],
+      "evidence": [
+        "Full untruncated read at 33e64a5d87d335f11c0d3f7f5c28c913b3352e33; baseline bytes equal. App trial -> payment-history preflight -> analytics stable IDs/retention -> browser consent -> build marker/DSN -> instrumentation reload -> component/E2E proof boundary cross-checked. No DB/SDK live sends/browser runtime tests executed. #2831 retains actual network proof; unmount alone does not prove SDK cleanup, Production reload is an independent countercheck."
+      ],
       "questions": []
     },
     {
@@ -17385,10 +17394,12 @@
       "mode": "100644",
       "bytes": 4278,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 133]],
+      "evidence": [
+        "Full untruncated read at 33e64a5d87d335f11c0d3f7f5c28c913b3352e33; baseline bytes equal. App trial -> payment-history preflight -> analytics stable IDs/retention -> browser consent -> build marker/DSN -> instrumentation reload -> component/E2E proof boundary cross-checked. No DB/SDK live sends/browser runtime tests executed. #2831 retains actual network proof; unmount alone does not prove SDK cleanup, Production reload is an independent countercheck."
+      ],
       "questions": []
     },
     {
@@ -17398,10 +17409,12 @@
       "mode": "100644",
       "bytes": 3290,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 113]],
+      "evidence": [
+        "Full untruncated read at 33e64a5d87d335f11c0d3f7f5c28c913b3352e33; baseline bytes equal. App trial -> payment-history preflight -> analytics stable IDs/retention -> browser consent -> build marker/DSN -> instrumentation reload -> component/E2E proof boundary cross-checked. No DB/SDK live sends/browser runtime tests executed. #2831 retains actual network proof; unmount alone does not prove SDK cleanup, Production reload is an independent countercheck."
+      ],
       "questions": []
     },
     {
@@ -17411,10 +17424,12 @@
       "mode": "100644",
       "bytes": 3089,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 83]],
+      "evidence": [
+        "Full untruncated read at 33e64a5d87d335f11c0d3f7f5c28c913b3352e33; baseline bytes equal. App trial -> payment-history preflight -> analytics stable IDs/retention -> browser consent -> build marker/DSN -> instrumentation reload -> component/E2E proof boundary cross-checked. No DB/SDK live sends/browser runtime tests executed. #2831 retains actual network proof; unmount alone does not prove SDK cleanup, Production reload is an independent countercheck."
+      ],
       "questions": []
     },
     {
@@ -17424,10 +17439,12 @@
       "mode": "100644",
       "bytes": 2349,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 71]],
+      "evidence": [
+        "Full untruncated read at 33e64a5d87d335f11c0d3f7f5c28c913b3352e33; baseline bytes equal. App trial -> payment-history preflight -> analytics stable IDs/retention -> browser consent -> build marker/DSN -> instrumentation reload -> component/E2E proof boundary cross-checked. No DB/SDK live sends/browser runtime tests executed. #2831 retains actual network proof; unmount alone does not prove SDK cleanup, Production reload is an independent countercheck."
+      ],
       "questions": []
     },
     {
@@ -17497,10 +17514,12 @@
       "mode": "100644",
       "bytes": 3616,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 100]],
+      "evidence": [
+        "Full untruncated read at 33e64a5d87d335f11c0d3f7f5c28c913b3352e33; baseline bytes equal. App trial -> payment-history preflight -> analytics stable IDs/retention -> browser consent -> build marker/DSN -> instrumentation reload -> component/E2E proof boundary cross-checked. No DB/SDK live sends/browser runtime tests executed. #2831 retains actual network proof; unmount alone does not prove SDK cleanup, Production reload is an independent countercheck."
+      ],
       "questions": []
     },
     {
@@ -17510,10 +17529,12 @@
       "mode": "100644",
       "bytes": 2245,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 74]],
+      "evidence": [
+        "Full untruncated read at 33e64a5d87d335f11c0d3f7f5c28c913b3352e33; baseline bytes equal. App trial -> payment-history preflight -> analytics stable IDs/retention -> browser consent -> build marker/DSN -> instrumentation reload -> component/E2E proof boundary cross-checked. No DB/SDK live sends/browser runtime tests executed. #2831 retains actual network proof; unmount alone does not prove SDK cleanup, Production reload is an independent countercheck."
+      ],
       "questions": []
     },
     {
@@ -17523,10 +17544,12 @@
       "mode": "100644",
       "bytes": 1116,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 29]],
+      "evidence": [
+        "Full untruncated read at 33e64a5d87d335f11c0d3f7f5c28c913b3352e33; baseline bytes equal. App trial -> payment-history preflight -> analytics stable IDs/retention -> browser consent -> build marker/DSN -> instrumentation reload -> component/E2E proof boundary cross-checked. No DB/SDK live sends/browser runtime tests executed. #2831 retains actual network proof; unmount alone does not prove SDK cleanup, Production reload is an independent countercheck."
+      ],
       "questions": []
     },
     {
@@ -17536,10 +17559,12 @@
       "mode": "100644",
       "bytes": 3522,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 106]],
+      "evidence": [
+        "Full untruncated read at 33e64a5d87d335f11c0d3f7f5c28c913b3352e33; baseline bytes equal. App trial -> payment-history preflight -> analytics stable IDs/retention -> browser consent -> build marker/DSN -> instrumentation reload -> component/E2E proof boundary cross-checked. No DB/SDK live sends/browser runtime tests executed. #2831 retains actual network proof; unmount alone does not prove SDK cleanup, Production reload is an independent countercheck."
+      ],
       "questions": []
     },
     {
@@ -18106,10 +18131,12 @@
       "mode": "100644",
       "bytes": 3460,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 130]],
+      "evidence": [
+        "Full untruncated read at 33e64a5d87d335f11c0d3f7f5c28c913b3352e33; baseline bytes equal. App trial -> payment-history preflight -> analytics stable IDs/retention -> browser consent -> build marker/DSN -> instrumentation reload -> component/E2E proof boundary cross-checked. No DB/SDK live sends/browser runtime tests executed. #2831 retains actual network proof; unmount alone does not prove SDK cleanup, Production reload is an independent countercheck."
+      ],
       "questions": []
     },
     {
@@ -24345,10 +24372,12 @@
       "mode": "100644",
       "bytes": 3359,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 116]],
+      "evidence": [
+        "Full untruncated read at 33e64a5d87d335f11c0d3f7f5c28c913b3352e33; baseline bytes equal. App trial -> payment-history preflight -> analytics stable IDs/retention -> browser consent -> build marker/DSN -> instrumentation reload -> component/E2E proof boundary cross-checked. No DB/SDK live sends/browser runtime tests executed. #2831 retains actual network proof; unmount alone does not prove SDK cleanup, Production reload is an independent countercheck."
+      ],
       "questions": []
     },
     {
@@ -24462,10 +24491,12 @@
       "mode": "100644",
       "bytes": 11080,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 288]],
+      "evidence": [
+        "Full untruncated read at 33e64a5d87d335f11c0d3f7f5c28c913b3352e33; baseline bytes equal. App trial -> payment-history preflight -> analytics stable IDs/retention -> browser consent -> build marker/DSN -> instrumentation reload -> component/E2E proof boundary cross-checked. No DB/SDK live sends/browser runtime tests executed. #2831 retains actual network proof; unmount alone does not prove SDK cleanup, Production reload is an independent countercheck."
+      ],
       "questions": []
     },
     {
@@ -27686,10 +27717,12 @@
       "mode": "100644",
       "bytes": 4865,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 135]],
+      "evidence": [
+        "Full untruncated read at 33e64a5d87d335f11c0d3f7f5c28c913b3352e33; baseline bytes equal. App trial -> payment-history preflight -> analytics stable IDs/retention -> browser consent -> build marker/DSN -> instrumentation reload -> component/E2E proof boundary cross-checked. No DB/SDK live sends/browser runtime tests executed. #2831 retains actual network proof; unmount alone does not prove SDK cleanup, Production reload is an independent countercheck."
+      ],
       "questions": []
     },
     {
@@ -27777,10 +27810,12 @@
       "mode": "100644",
       "bytes": 1675,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 61]],
+      "evidence": [
+        "Full untruncated read at 33e64a5d87d335f11c0d3f7f5c28c913b3352e33; baseline bytes equal. App trial -> payment-history preflight -> analytics stable IDs/retention -> browser consent -> build marker/DSN -> instrumentation reload -> component/E2E proof boundary cross-checked. No DB/SDK live sends/browser runtime tests executed. #2831 retains actual network proof; unmount alone does not prove SDK cleanup, Production reload is an independent countercheck."
+      ],
       "questions": []
     },
     {
@@ -28154,10 +28189,12 @@
       "mode": "100644",
       "bytes": 3093,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 92]],
+      "evidence": [
+        "Full untruncated read at 33e64a5d87d335f11c0d3f7f5c28c913b3352e33; baseline bytes equal. App trial -> payment-history preflight -> analytics stable IDs/retention -> browser consent -> build marker/DSN -> instrumentation reload -> component/E2E proof boundary cross-checked. No DB/SDK live sends/browser runtime tests executed. #2831 retains actual network proof; unmount alone does not prove SDK cleanup, Production reload is an independent countercheck."
+      ],
       "questions": []
     },
     {
@@ -28167,10 +28204,12 @@
       "mode": "100644",
       "bytes": 1973,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 63]],
+      "evidence": [
+        "Full untruncated read at 33e64a5d87d335f11c0d3f7f5c28c913b3352e33; baseline bytes equal. App trial -> payment-history preflight -> analytics stable IDs/retention -> browser consent -> build marker/DSN -> instrumentation reload -> component/E2E proof boundary cross-checked. No DB/SDK live sends/browser runtime tests executed. #2831 retains actual network proof; unmount alone does not prove SDK cleanup, Production reload is an independent countercheck."
+      ],
       "questions": []
     },
     {
@@ -28297,10 +28336,12 @@
       "mode": "100644",
       "bytes": 3531,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 68]],
+      "evidence": [
+        "Full untruncated read at 33e64a5d87d335f11c0d3f7f5c28c913b3352e33; baseline bytes equal. App trial -> payment-history preflight -> analytics stable IDs/retention -> browser consent -> build marker/DSN -> instrumentation reload -> component/E2E proof boundary cross-checked. No DB/SDK live sends/browser runtime tests executed. #2831 retains actual network proof; unmount alone does not prove SDK cleanup, Production reload is an independent countercheck."
+      ],
       "questions": []
     },
     {
@@ -32177,10 +32218,12 @@
       "mode": "100644",
       "bytes": 1257,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 41]],
+      "evidence": [
+        "Full untruncated read at 33e64a5d87d335f11c0d3f7f5c28c913b3352e33; baseline bytes equal. App trial -> payment-history preflight -> analytics stable IDs/retention -> browser consent -> build marker/DSN -> instrumentation reload -> component/E2E proof boundary cross-checked. No DB/SDK live sends/browser runtime tests executed. #2831 retains actual network proof; unmount alone does not prove SDK cleanup, Production reload is an independent countercheck."
+      ],
       "questions": []
     },
     {
@@ -32190,10 +32233,12 @@
       "mode": "100644",
       "bytes": 1902,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 46]],
+      "evidence": [
+        "Full untruncated read at 33e64a5d87d335f11c0d3f7f5c28c913b3352e33; baseline bytes equal. App trial -> payment-history preflight -> analytics stable IDs/retention -> browser consent -> build marker/DSN -> instrumentation reload -> component/E2E proof boundary cross-checked. No DB/SDK live sends/browser runtime tests executed. #2831 retains actual network proof; unmount alone does not prove SDK cleanup, Production reload is an independent countercheck."
+      ],
       "questions": []
     },
     {
@@ -32268,10 +32313,12 @@
       "mode": "100644",
       "bytes": 3246,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 95]],
+      "evidence": [
+        "Full untruncated read at 33e64a5d87d335f11c0d3f7f5c28c913b3352e33; baseline bytes equal. App trial -> payment-history preflight -> analytics stable IDs/retention -> browser consent -> build marker/DSN -> instrumentation reload -> component/E2E proof boundary cross-checked. No DB/SDK live sends/browser runtime tests executed. #2831 retains actual network proof; unmount alone does not prove SDK cleanup, Production reload is an independent countercheck."
+      ],
       "questions": []
     },
     {
@@ -40042,10 +40089,12 @@
       "mode": "100644",
       "bytes": 1810,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 44]],
+      "evidence": [
+        "Full untruncated read at 33e64a5d87d335f11c0d3f7f5c28c913b3352e33; baseline bytes equal. App trial -> payment-history preflight -> analytics stable IDs/retention -> browser consent -> build marker/DSN -> instrumentation reload -> component/E2E proof boundary cross-checked. No DB/SDK live sends/browser runtime tests executed. #2831 retains actual network proof; unmount alone does not prove SDK cleanup, Production reload is an independent countercheck."
+      ],
       "questions": []
     },
     {
@@ -41944,10 +41993,12 @@
       "mode": "100644",
       "bytes": 3750,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 69]],
+      "evidence": [
+        "Full untruncated read at 33e64a5d87d335f11c0d3f7f5c28c913b3352e33; baseline bytes equal. App trial -> payment-history preflight -> analytics stable IDs/retention -> browser consent -> build marker/DSN -> instrumentation reload -> component/E2E proof boundary cross-checked. No DB/SDK live sends/browser runtime tests executed. #2831 retains actual network proof; unmount alone does not prove SDK cleanup, Production reload is an independent countercheck."
+      ],
       "questions": []
     },
     {
@@ -42943,6 +42994,66 @@
         "F048 two comment lines synchronized with current CI bot-marker notification. Entire owned diff reviewed, commentless parsed JS byte-identical before/after, related94 passes. Whole7707 checked at83e429b41; no repeated whole run needed for documentation-only semantic-equivalent edit."
       ],
       "questions": []
+    },
+    {
+      "path": "apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.ts",
+      "sha": "b2cca8fa352c0bd2bbb66c1f50a6c68b71061334",
+      "change": "M",
+      "blob": "d5c37d24762a18469f270fcab3a882a6323a0290",
+      "method": "full-text",
+      "status": "delta-reviewed",
+      "read_ranges": [],
+      "evidence": [
+        "Entire untruncated unified diff 0762bffe671b50cbb2631a529e24e6ef6bd4e919 -> b2cca8fa352c0bd2bbb66c1f50a6c68b71061334 reviewed. This is four files of pending 50-file main delta, not a whole file baseline read or integrated verification. External-event duplicate error presentation/classification; merge into audit checkout not performed."
+      ],
+      "questions": [
+        "Reconcile upstream callback tests with actual operation contexts/H041 before integration; all remaining 46-file delta must be reviewed."
+      ]
+    },
+    {
+      "path": "apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.inline-error.test.tsx",
+      "sha": "b2cca8fa352c0bd2bbb66c1f50a6c68b71061334",
+      "change": "M",
+      "blob": "572eaab4fbaf04d7b26d977a3296b667c5f33e09",
+      "method": "full-text",
+      "status": "delta-reviewed",
+      "read_ranges": [],
+      "evidence": [
+        "Entire untruncated unified diff 0762bffe671b50cbb2631a529e24e6ef6bd4e919 -> b2cca8fa352c0bd2bbb66c1f50a6c68b71061334 reviewed. This is four files of pending 50-file main delta, not a whole file baseline read or integrated verification. External-event duplicate error presentation/classification; merge into audit checkout not performed."
+      ],
+      "questions": [
+        "Reconcile upstream callback tests with actual operation contexts/H041 before integration; all remaining 46-file delta must be reviewed."
+      ]
+    },
+    {
+      "path": "apps/product/src/features/timeblock/server/timeblock-command-client.ts",
+      "sha": "b2cca8fa352c0bd2bbb66c1f50a6c68b71061334",
+      "change": "M",
+      "blob": "614e61ae322be8ab81f9bd8d17cf67170c7ececf",
+      "method": "full-text",
+      "status": "delta-reviewed",
+      "read_ranges": [],
+      "evidence": [
+        "Entire untruncated unified diff 0762bffe671b50cbb2631a529e24e6ef6bd4e919 -> b2cca8fa352c0bd2bbb66c1f50a6c68b71061334 reviewed. This is four files of pending 50-file main delta, not a whole file baseline read or integrated verification. External-event duplicate error presentation/classification; merge into audit checkout not performed."
+      ],
+      "questions": [
+        "Reconcile upstream callback tests with actual operation contexts/H041 before integration; all remaining 46-file delta must be reviewed."
+      ]
+    },
+    {
+      "path": "apps/product/src/features/timeblock/server/mcp-mutation-client.ts",
+      "sha": "b2cca8fa352c0bd2bbb66c1f50a6c68b71061334",
+      "change": "M",
+      "blob": "83ba5fa2b2b0956e6c0924317f8809da6dfc59e6",
+      "method": "full-text",
+      "status": "delta-reviewed",
+      "read_ranges": [],
+      "evidence": [
+        "Entire untruncated unified diff 0762bffe671b50cbb2631a529e24e6ef6bd4e919 -> b2cca8fa352c0bd2bbb66c1f50a6c68b71061334 reviewed. This is four files of pending 50-file main delta, not a whole file baseline read or integrated verification. External-event duplicate error presentation/classification; merge into audit checkout not performed."
+      ],
+      "questions": [
+        "Reconcile upstream callback tests with actual operation contexts/H041 before integration; all remaining 46-file delta must be reviewed."
+      ]
     }
   ]
 }
