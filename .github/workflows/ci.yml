@@ -338,6 +338,11 @@ jobs:
           echo "service_role_key=$SERVICE_ROLE_KEY" >> $GITHUB_OUTPUT
           echo "db_url=$DB_URL" >> $GITHUB_OUTPUT
 
+      - name: Rehearse Production pgcrypto namespace without changing the shared database
+        env:
+          CI: true
+        run: node scripts/ci/integration-oauth-pgcrypto-check.mjs
+
       - name: Run integration/RLS tests
         env:
           INTEGRATION_AFFECTED: ${{ needs.impact.outputs.integration }}
@@ -349,11 +354,6 @@ jobs:
           NODE_ENV: test
           CI: true
         run: node scripts/ci/check.mjs integration
-
-      - name: Rehearse Production pgcrypto namespace without changing the shared database
-        env:
-          CI: true
-        run: node scripts/ci/integration-oauth-pgcrypto-check.mjs
 
       - name: Stop Supabase
         if: always()

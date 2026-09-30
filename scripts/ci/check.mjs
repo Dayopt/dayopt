@@ -833,12 +833,7 @@ async function runIntegration() {
     return;
   }
 
-  run('pnpm', ['test:integration']);
-  for (const sqlFile of [
-    'supabase/tests/cron-heartbeats.sql',
-    'supabase/tests/fenced-calendar-reconnect.sql',
-    'supabase/tests/integration-oauth-identity.sql',
-  ]) {
+  const runSql = (sqlFile) => {
     run(
       'psql',
       [
@@ -859,7 +854,15 @@ async function runIntegration() {
       ],
       { env: { ...process.env, PGPASSWORD: 'postgres' } },
     );
-  }
+  };
+  // Requires the fresh DB before Vitest provisions an immutable identity.
+  runSql('supabase/tests/integration-oauth-identity.sql');
+  run('pnpm', ['test:integration']);
+  for (const sqlFile of [
+    'supabase/tests/cron-heartbeats.sql',
+    'supabase/tests/fenced-calendar-reconnect.sql',
+  ])
+    runSql(sqlFile);
   run('pnpm', ['rls:snapshot:check']);
   run('pnpm', ['types:generate:local']);
   run('git', [
