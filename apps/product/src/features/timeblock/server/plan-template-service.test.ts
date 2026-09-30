@@ -123,6 +123,91 @@ describe('PlanTemplateService', () => {
     vi.useRealTimers();
   });
 
+  describe('duration context failures', () => {
+    it.each(['list', 'create', 'apply'] as const)(
+      'rejects %s when settings cannot be read instead of trusting UTC defaults',
+      async (operation) => {
+        const commands = createCommands();
+        commands.createPlansBulk.mockResolvedValue([]);
+        const { supabase, calls } = createSupabaseStub({
+          plan_templates: [{ data: operation === 'list' ? [template] : template, error: null }],
+          plan_template_blocks: [{ data: [blocks[2]], error: null }],
+          user_settings: [
+            { data: null, error: { code: 'PGRST000', message: 'Settings unavailable' } },
+          ],
+          records: [{ data: [], error: null }],
+        });
+        const service = new PlanTemplateService(supabase, commands, () => supabase);
+        const result =
+          operation === 'list'
+            ? service.list(USER_ID)
+            : operation === 'apply'
+              ? service.apply({
+                  userId: USER_ID,
+                  input: { templateId: TEMPLATE_ID, date: '2026-09-05' },
+                })
+              : service.create({
+                  userId: USER_ID,
+                  input: {
+                    name: 'Daily',
+                    blocks: [{ activityId: null, title: 'Focus', anchorMinute: 720 }],
+                  },
+                });
+        await expect(result).rejects.toMatchObject({ code: 'FETCH_FAILED' });
+        expect(commands.createPlansBulk).not.toHaveBeenCalled();
+        expect(calls.some((call) => call.method === 'insert')).toBe(false);
+        expect(trackProductEvents).not.toHaveBeenCalled();
+      },
+    );
+
+    it('does not persist a template when required duration records cannot be read', async () => {
+      const { supabase, calls } = createSupabaseStub({
+        plan_templates: [{ data: template, error: null }],
+        plan_template_blocks: [{ data: [blocks[2]], error: null }],
+        user_settings: [{ data: settings, error: null }],
+        records: [{ data: null, error: { code: 'PGRST000', message: 'Records unavailable' } }],
+      });
+      const service = new PlanTemplateService(supabase, createCommands(), () => supabase);
+      await expect(
+        service.create({
+          userId: USER_ID,
+          input: {
+            name: 'Daily',
+            blocks: [{ activityId: null, title: 'Focus', anchorMinute: 720 }],
+          },
+        }),
+      ).rejects.toMatchObject({ message: 'Records unavailable' });
+      expect(calls.some((call) => call.method === 'insert')).toBe(false);
+    });
+
+    it('retains the existing UTC and60-minute fallback for a missing settings row', async () => {
+      const commands = createCommands();
+      commands.createPlansBulk.mockResolvedValue([]);
+      const { supabase } = createSupabaseStub({
+        plan_templates: [{ data: template, error: null }],
+        plan_template_blocks: [{ data: [blocks[2]], error: null }],
+        user_settings: [{ data: null, error: null }],
+        records: [{ data: [], error: null }],
+      });
+      const service = new PlanTemplateService(supabase, commands, () => supabase);
+      await service.apply({
+        userId: USER_ID,
+        input: { templateId: TEMPLATE_ID, date: '2026-09-05' },
+      });
+      expect(commands.createPlansBulk).toHaveBeenCalledWith({
+        userId: USER_ID,
+        plans: [
+          {
+            title: blocks[2]!.title,
+            activityId: null,
+            startAt: '2026-09-05T12:00:00.000Z',
+            endAt: '2026-09-05T13:00:00.000Z',
+          },
+        ],
+      });
+    });
+  });
+
   describe('list', () => {
     it('中央値（n>=3）を着せ、無い activity と未分類は user_settings の既定長を着せる', async () => {
       // 守ること: 集計可能な実績は中央値を使い、実績がないブロックだけ既定長にする。

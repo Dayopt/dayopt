@@ -178,6 +178,8 @@ export class PlanTemplateService {
    */
   async create(options: UserOptions<CreatePlanTemplateInput>): Promise<PlanTemplateView> {
     const { userId, input } = options;
+    // Resolve the response prerequisites before persisting, so a read failure is safe to retry.
+    const context = await this.loadDurationContext(userId);
     const { data: template, error } = await this.writes()
       .from('plan_templates')
       .insert({ user_id: userId, name: input.name })
@@ -212,7 +214,6 @@ export class PlanTemplateService {
       toWriteError(blocksError, 'create_plan_template_blocks', 'CREATE_FAILED');
     }
 
-    const context = await this.loadDurationContext(userId);
     return toView(template, blocks ?? [], context);
   }
 
@@ -398,9 +399,11 @@ export class PlanTemplateService {
       .eq('user_id', userId)
       .maybeSingle();
     if (error) {
-      captureUnexpectedDatabaseError(error, {
-        feature: 'timeblock',
-        operation: 'fetch_plan_template_settings',
+      throw new TimeblockServiceError('FETCH_FAILED', 'Failed to fetch plan template settings', {
+        cause: captureUnexpectedDatabaseError(error, {
+          feature: 'timeblock',
+          operation: 'fetch_plan_template_settings',
+        }),
       });
     }
     const records = await fetchRecords(this.supabase, userId, {
