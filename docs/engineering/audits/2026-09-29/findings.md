@@ -428,3 +428,5 @@ H041 integrated main verification: sourceb0deb289d830461ff92c63103d60e04f1925a95
 - 状態: product8e172d8472163502b706bd8d2931cdd1da603adf、green21/関連145成功、docs:check成功。全体check進行中で未公開。旧H025仮説を丸ごと採用せずこの失敗消失だけを閉じる。Mission#2963、既存#2047は意図照合に使用し再開/重複起票なし。
 
 F044 whole verification: product8e172d847 full Node24 pnpm check exit0,7700 passed (product4586); docs:check exit0, source/test bytes unchanged after validation. Publication follows normalhooks; production/HTTP-runtime reachability remains unverified.
+
+F044 published e2fd91c62a5ae8a2a4306bb21329190f2c942a8d via normalhook; OPEN/Draft API verified. Issue record5902814607. Dependency warning candidate remains unadopted: installed undici7.29.0 dev graph, registry audit10 distinct advisories, metadata12 findings, snapshot SHA2562ee249599b2da63517d505d77593abd6b91bbdae66244329907afe9960ae928d; Dependabot details403. Read primary maintainer evidence and actual reachability before changing dependencies or claiming production exposure.
