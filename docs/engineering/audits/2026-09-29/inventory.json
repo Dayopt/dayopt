@@ -8597,10 +8597,12 @@
       "mode": "100644",
       "bytes": 2041,
       "method": "full-text",
-      "status": "unverified",
-      "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "status": "full-text-reviewed",
+      "reason": "Complete text read and baseline bytes match",
+      "read_ranges": [[1, 57]],
+      "evidence": [
+        "Full read at619a7a3044b69d5a79286106d734f1878a1a29ee. Template list query failure/retry is wired; displayed wall-clock day passed to apply. isPending blocks same-hook repeated UI apply, but independent normal mutations still share whole snapshots (H041)."
+      ],
       "questions": []
     },
     {
