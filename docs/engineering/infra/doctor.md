@@ -1,0 +1,72 @@
+# Infrastructure doctor
+
+期待値と実設定を、既存の1Password資格情報とAPI/CLIで読み取り専用に比較する。設定の変更、secret同期、メール送信、webhook発火、課金、cron実行、backup実行は行わない。
+
+## 実行
+
+Node 24とrepo指定のpnpmを使う。
+
+```bash
+pnpm run doctor --offline
+pnpm run doctor --list
+pnpm run doctor
+pnpm run doctor --service vercel
+pnpm run doctor --environment integration
+pnpm run doctor --format json
+```
+
+**`pnpm doctor`はpnpm自体の組み込みコマンド。Dayoptのdoctorには必ず`pnpm run doctor`を使う。** JSONの標準出力にpackage managerの進捗を混ぜたくない場合は`pnpm exec tsx scripts/doctor/cli.ts --format json`を使う。
+
+`--offline`はYAML、正本ファイル、検査定義を確認し、認証・通信をしない。通常実行は結果を標準出力へ出す。結果ファイルは自動作成しない。必要なら呼び出し元でリダイレクトする。
+
+## 対象と正本
+
+[expected.yaml](./expected.yaml)の`checks`が機械判定の一覧。`source_contracts`が既存監査・環境台帳の正本参照。今回の観測は[inventory-2026-09-30.md](./inventory-2026-09-30.md)に保存する。観測値で期待値を自動上書きしない。
+
+`--service`には`github`, `vercel`, `supabase`, `stripe`, `resend`, `cloudflare`, `sentry`, `posthog`, `upstash`, `uptimerobot`, `google`, `mcp_oauth`, `telemetry`, `pwned_passwords`, `support_smtp`, `optional`を指定できる。Cloudflareには公開DNS、Turnstile、R2を含む。`all`はCLI既定の環境選択。
+
+API/CLI readerはAPIが返すmetadataの安全な列だけを射影する。Googleの登録callback、Gmail SMTP、実際のsource map適用、secret replica値の一致など、現在のAPI資格情報で証明できない事項は`manual`または`blocked`。ソースファイルの存在、PING、domain verification、HTTP metadata取得だけで動作成功と扱わない。
+
+一般Preview、Integration、明示MCP OAuth Previewは別契約。ProductionのSupabase refをPreviewが使えば差異。IntegrationのStripe Test/Calendarは一律禁止しない。ProductのPostHog有効環境には削除credentialが必要だが、削除処理を持たないWebには同じキーを要求しない。
+
+公開domainのhealth/versionを配信中revisionの根拠にする。`targets.production`や最新deploymentを現在の配信と同一視しない。repo revisionが配信revisionより新しくても、その事実だけで失敗にしない。新しいrepo契約のlive適用は別確認。
+
+## 認証・読み取り境界
+
+各サービスの子プロセスを既存`op://`参照付きの`op run`で起動する。無関係な環境変数は渡さず、既存ログインや`.env`へfallbackしない。1Passwordの永続設定や権限は変更しない。ダイアログが出る場合は今回のみ許可する。
+
+通常API timeoutは10秒。認証と収集全体はサービスごと120秒。429と一時的5xxだけ最大2回再試行。一つの認証・API失敗が他サービスの結果を消さない。
+
+通信は固定のoperationとDayoptリソースに限定する。GETとmetadata用の固定read POSTのみ。Supabase SQLには`read_only:true`を付け、顧客行・Vault値・pg_cron commandを読まない。PostHogは直近7日のenvironment/count集計だけ。UptimeRobotは`getMonitors`だけ。RedisはPINGだけ。
+
+資格情報やAPI応答bodyをerror/logへ出さない。URLのquery/userinfoと未知のpathを削除する。公開client IDとproject/account IDは秘密値ではない。runtime secretは存在だけを扱い、復号・master照合ができない場合はunknownのまま残す。
+
+ページング途中の失敗を空一覧や不存在へ変換しない。GitHub backup履歴は直近10件のmain scheduled runという限定窓。workflow全体のconclusionからbackup jobの成功を推測しない。Storage/RLS既存監査の成功は全required policyの存在やrestore成功まで保証しない。
+
+## 判定と終了コード
+
+| 判定             | 意味                                                         |
+| ---------------- | ------------------------------------------------------------ |
+| `pass`           | 指定された比較条件と一致。metadata取得の検査なら取得成功だけ |
+| `drift`          | 取得できた実設定が期待値と異なる                             |
+| `blocked`        | 権限不足、認証timeout、接続失敗、必要なmetadataの欠測など    |
+| `manual`         | API metadataだけでは証明できず、人間による確認が必要         |
+| `not_applicable` | その環境で適用されない契約                                   |
+
+終了コードは`0`:必須検査一致、`1`:差異あり、`2`:差異未検出だが必須検査判定不能、`3`:引数・期待値・検査定義・内部処理の不備。差異と判定不能が混在すると`1`。任意検査のmanualは必須検査の成功判定には含めない。
+
+private化と専用Integration projectへの移行はadvisory。doctor結果をmerge/release gateに接続せず、定期CIや自動修復は別変更にする。
+
+## schema・cronの比較条件
+
+Productionの配信SHAにあるschema/cron契約ファイルがこのcheckoutと一致する場合のみ、既存migration比較関数、heartbeat判定、RLS snapshot生成器の`--check`を再利用する。snapshotはmanagement APIの読み取りだけを使い、標準出力・例外本文は取り込まない。契約ファイルが異なる、配信commitがローカルにない、またはSHAを取得できない場合は`manual`/`blocked`。cron scheduleは安全なmetadataを提示して配信revisionのmigrationとの手動照合に残す。
+
+UpstashのPINGは既存agent masterに限る。Preview/IntegrationのRedis接続先・分離をその結果から推測しない。
+
+## 初版の実行記録（2026-09-30）
+
+Node 24で全16サービスを読み取り実行し、2026-09-30 12:37:14 JSTのレポートは97結果（pass 50、drift 1、blocked 28、manual 17、not_applicable 1）、終了コード1だった。複数環境の検査は同じ定義から環境別結果を出すため、定義数とは異なる。
+
+差異は`vercel.product.public_bindings`の`posthog_enabled_without_deletion_key`。権限不足・認証失敗・metadata欠測・サービス間の証拠欠測を差異と分けて残した。未取得のsignature secret、API権限、配信契約の未確認を「全件正常」にしていない。サービスへの書き込みは行っていない。
+
+この記録は初版の限定的な読み取り証拠。現行状態は再実行で確認する。schema/cronの契約ファイル比較とURLの原表記保持は、この実行後にも回帰テストで確認した。

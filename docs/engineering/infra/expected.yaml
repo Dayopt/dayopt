@@ -361,3 +361,808 @@ resources:
     production: yvglwblxrnrenfifsnje
     integration: tilwaprottpyhlfoggbb
   posthog_project: 625917
+checks:
+  - id: github.repository
+    service: github
+    environments:
+      - shared
+    rule: subset
+    expected:
+      full_name: Dayopt/dayopt
+      default_branch: main
+      archived: false
+      allow_merge_commit: true
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: github.rulesets
+    service: github
+    environments:
+      - shared
+    rule: ruleset
+    expected:
+      required_checks:
+        - 🔍 Static Checks
+        - 📦 Unit Tests
+        - 🧪 Integration Tests
+        - Vercel – product
+        - Vercel – web
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: github.environments
+    service: github
+    environments:
+      - shared
+    rule: subset
+    expected:
+      - name: production-release
+        deployment_branch_policy:
+          custom_branch_policies: true
+      - name: production-ops
+        deployment_branch_policy:
+          custom_branch_policies: true
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: github.production-release.secret_names
+    service: github
+    environments:
+      - production
+    rule: ci_secrets
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: github.production-ops.secret_names
+    service: github
+    environments:
+      - production
+    rule: ci_secrets
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: github.workflows
+    service: github
+    environments:
+      - shared
+    rule: evidence
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: github.repository_hooks
+    service: github
+    environments:
+      - shared
+    rule: evidence
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: vercel.product.settings
+    service: vercel
+    environments:
+      - shared
+    rule: contract_errors
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: vercel.product.environment_metadata
+    service: vercel
+    environments:
+      - all
+    rule: contract_errors
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: vercel.product.public_bindings
+    service: vercel
+    environments:
+      - all
+    rule: bindings
+    expected:
+      production_ref: yvglwblxrnrenfifsnje
+      test_account: acct_1TBpLoRRjoh5xfrs
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: vercel.product.domains
+    service: vercel
+    environments:
+      - shared
+    rule: domains
+    expected:
+      names:
+        - app.dayopt.app
+        - mcp.dayopt.app
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: vercel.product.deployments
+    service: vercel
+    environments:
+      - all
+    rule: evidence
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: vercel.web.settings
+    service: vercel
+    environments:
+      - shared
+    rule: contract_errors
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: vercel.web.environment_metadata
+    service: vercel
+    environments:
+      - all
+    rule: contract_errors
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: vercel.web.public_bindings
+    service: vercel
+    environments:
+      - all
+    rule: bindings
+    expected:
+      production_ref: yvglwblxrnrenfifsnje
+      test_account: acct_1TBpLoRRjoh5xfrs
+      require_production_db: false
+      require_posthog_deletion: false
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: vercel.web.domains
+    service: vercel
+    environments:
+      - shared
+    rule: domains
+    expected:
+      names:
+        - dayopt.app
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: vercel.web.deployments
+    service: vercel
+    environments:
+      - all
+    rule: evidence
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: vercel.production.public_health
+    service: vercel
+    environments:
+      - production
+    rule: evidence
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: vercel.integration.public_health
+    service: vercel
+    environments:
+      - integration
+    rule: subset
+    expected:
+      supabase_project_ref: tilwaprottpyhlfoggbb
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: vercel.preview.public_health
+    service: vercel
+    environments:
+      - preview
+    rule: manual
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: supabase.branches
+    service: supabase
+    environments:
+      - shared
+    rule: evidence
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: supabase.production.project
+    service: supabase
+    environments:
+      - production
+    rule: subset
+    expected:
+      id: yvglwblxrnrenfifsnje
+      status: ACTIVE_HEALTHY
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: supabase.production.auth_config
+    service: supabase
+    environments:
+      - production
+    rule: evidence
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: supabase.production.auth_audit
+    service: supabase
+    environments:
+      - production
+    rule: passed
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: supabase.production.functions
+    service: supabase
+    environments:
+      - production
+    rule: subset
+    expected:
+      - slug: send-auth-email
+        verify_jwt: false
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: supabase.production.backup_metadata
+    service: supabase
+    environments:
+      - production
+    rule: evidence
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: supabase.production.database_metadata
+    service: supabase
+    environments:
+      - production
+    rule: database
+    expected:
+      mcp_control:
+        writes_enabled: false
+        enabled_client_ids: []
+        billing_enforced: false
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: supabase.integration.project
+    service: supabase
+    environments:
+      - integration
+    rule: subset
+    expected:
+      id: tilwaprottpyhlfoggbb
+      status: ACTIVE_HEALTHY
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: supabase.integration.auth_config
+    service: supabase
+    environments:
+      - integration
+    rule: subset
+    expected:
+      site_url: https://product-git-integration-dayopt.vercel.app
+      disable_signup: true
+      security_captcha_enabled: true
+      security_captcha_provider: turnstile
+      hook_send_email_enabled: false
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: supabase.integration.auth_audit
+    service: supabase
+    environments:
+      - integration
+    rule: manual
+    required: false
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: supabase.integration.functions
+    service: supabase
+    environments:
+      - integration
+    rule: evidence
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: supabase.integration.backup_metadata
+    service: supabase
+    environments:
+      - integration
+    rule: evidence
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: supabase.integration.database_metadata
+    service: supabase
+    environments:
+      - integration
+    rule: database
+    expected:
+      mcp_control:
+        writes_enabled: false
+        enabled_client_ids: []
+        billing_enforced: false
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: supabase.production.storage_audit
+    service: supabase
+    environments:
+      - production
+    rule: passed
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: supabase.preview_project_selection
+    service: supabase
+    environments:
+      - preview
+    rule: manual
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: stripe.account
+    service: stripe
+    environments:
+      - production
+      - integration
+    rule: stripe_account
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+    expected:
+      production: acct_1TBpLgIe9fUk4fJW
+      integration: acct_1TBpLoRRjoh5xfrs
+  - id: stripe.active_prices
+    service: stripe
+    environments:
+      - production
+      - integration
+    rule: stripe_prices
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+    expected:
+      id: price_1UDGzDRRjoh5xfrs4MMbK2rb
+      active: true
+      livemode: false
+      currency: usd
+      unit_amount: 500
+      interval: month
+  - id: stripe.webhooks
+    service: stripe
+    environments:
+      - production
+      - integration
+    rule: stripe_webhooks
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+    expected:
+      endpoint:
+        origin: https://product-git-integration-dayopt.vercel.app
+        path: /api/webhooks/stripe
+      status: enabled
+      livemode: false
+      api_version: 2026-02-25.clover
+      events:
+        - checkout.session.completed
+        - customer.subscription.updated
+        - customer.subscription.deleted
+        - invoice.paid
+        - invoice.payment_failed
+  - id: stripe.portal
+    service: stripe
+    environments:
+      - production
+      - integration
+    rule: evidence
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: stripe.deployed_identity_and_billing_gate
+    service: stripe
+    environments:
+      - production
+      - integration
+    rule: manual
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: resend.domains
+    service: resend
+    environments:
+      - production
+    rule: evidence
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: resend.domain_settings
+    service: resend
+    environments:
+      - production
+    rule: subset
+    expected:
+      name: dayopt.app
+      status: verified
+      open_tracking: false
+      click_tracking: false
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: resend.webhooks
+    service: resend
+    environments:
+      - production
+    rule: resend_webhooks
+    expected:
+      - endpoint:
+          origin: https://app.dayopt.app
+          path: /api/webhooks/resend
+        status: enabled
+        events:
+          - email.bounced
+          - email.complained
+          - email.delivered
+          - email.delivery_delayed
+          - email.failed
+          - email.suppressed
+      - endpoint:
+          origin: https://dayopt.app
+          path: /api/webhooks/resend
+        status: enabled
+        events:
+          - email.bounced
+          - email.complained
+          - email.failed
+          - email.suppressed
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: resend.sender_and_signature_replicas
+    service: resend
+    environments:
+      - production
+    rule: manual
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: cloudflare.zone
+    service: cloudflare
+    environments:
+      - all
+    rule: evidence
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: cloudflare.turnstile
+    service: cloudflare
+    environments:
+      - all
+    rule: evidence
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: cloudflare.r2_buckets
+    service: cloudflare
+    environments:
+      - production
+    rule: evidence
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: cloudflare.r2_locks.avatars
+    service: cloudflare
+    environments:
+      - production
+    rule: evidence
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: cloudflare.r2_locks.attachments
+    service: cloudflare
+    environments:
+      - production
+    rule: evidence
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: cloudflare.backup_credential_scope
+    service: cloudflare
+    environments:
+      - production
+    rule: manual
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: cloudflare.public_dns.ns
+    service: cloudflare
+    environments:
+      - shared
+    rule: subset
+    expected:
+      - keira.ns.cloudflare.com
+      - colin.ns.cloudflare.com
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: cloudflare.public_dns.app_cname
+    service: cloudflare
+    environments:
+      - shared
+    rule: subset
+    expected:
+      - cname.vercel-dns-017.com
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: cloudflare.public_dns.mcp_cname
+    service: cloudflare
+    environments:
+      - shared
+    rule: subset
+    expected:
+      - cname.vercel-dns-017.com
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: cloudflare.public_dns.apex_mx
+    service: cloudflare
+    environments:
+      - shared
+    rule: subset
+    expected:
+      - exchange: route1.mx.cloudflare.net
+      - exchange: route2.mx.cloudflare.net
+      - exchange: route3.mx.cloudflare.net
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: cloudflare.public_dns.send_mx
+    service: cloudflare
+    environments:
+      - shared
+    rule: subset
+    expected:
+      - exchange: feedback-smtp.ap-northeast-1.amazonses.com
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: cloudflare.public_dns.apex_spf
+    service: cloudflare
+    environments:
+      - shared
+    rule: subset
+    expected:
+      - v=spf1 include:_spf.mx.cloudflare.net ~all
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: cloudflare.public_dns.send_spf
+    service: cloudflare
+    environments:
+      - shared
+    rule: subset
+    expected:
+      - v=spf1 include:amazonses.com ~all
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: cloudflare.public_dns.dkim
+    service: cloudflare
+    environments:
+      - shared
+    rule: subset
+    expected:
+      - record_present: true
+        public_key_present: true
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: cloudflare.public_dns.dmarc
+    service: cloudflare
+    environments:
+      - shared
+    rule: subset
+    expected:
+      - policy: none
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: sentry.projects
+    service: sentry
+    environments:
+      - production
+    rule: subset
+    expected:
+      - id: '4509737836412928'
+        slug: dayopt
+      - id: '4511741979394048'
+        slug: dayopt-web
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: sentry.releases.dayopt
+    service: sentry
+    environments:
+      - production
+    rule: evidence
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: sentry.release_files.dayopt
+    service: sentry
+    environments:
+      - production
+    rule: evidence
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: sentry.releases.dayopt-web
+    service: sentry
+    environments:
+      - production
+    rule: evidence
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: sentry.release_files.dayopt-web
+    service: sentry
+    environments:
+      - production
+    rule: evidence
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: sentry.applied_source_maps
+    service: sentry
+    environments:
+      - production
+    rule: manual
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: posthog.settings
+    service: posthog
+    environments:
+      - all
+    rule: subset
+    expected:
+      id: 625917
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: posthog.ingestion_aggregate
+    service: posthog
+    environments:
+      - all
+    rule: evidence
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: posthog.deployed_privacy_and_deletion
+    service: posthog
+    environments:
+      - all
+    rule: manual
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: upstash.ping
+    service: upstash
+    environments:
+      - shared
+    rule: subset
+    expected:
+      reachable: true
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: uptimerobot.monitors
+    service: uptimerobot
+    environments:
+      - production
+    rule: subset
+    expected:
+      - endpoint:
+          origin: https://app.dayopt.app
+          path: /api/health
+        type: 1
+        interval_seconds: 300
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: google.source_contract
+    service: google
+    environments:
+      - shared
+    rule: evidence
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: google.registered_callbacks
+    service: google
+    environments:
+      - all
+    rule: manual
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: mcp_oauth.source_contract
+    service: mcp_oauth
+    environments:
+      - shared
+    rule: evidence
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: mcp_oauth.deployed_identity_and_client_callbacks
+    service: mcp_oauth
+    environments:
+      - all
+    rule: manual
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: telemetry.source_contract
+    service: telemetry
+    environments:
+      - shared
+    rule: evidence
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: telemetry.deployed_privacy_and_vercel_analytics
+    service: telemetry
+    environments:
+      - all
+    rule: manual
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: pwned_passwords.source_contract
+    service: pwned_passwords
+    environments:
+      - shared
+    rule: evidence
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: pwned_passwords.provider_and_deployed_behavior
+    service: pwned_passwords
+    environments:
+      - all
+    rule: manual
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: support_smtp.source_contract
+    service: support_smtp
+    environments:
+      - shared
+    rule: evidence
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: support_smtp.gmail_sender_and_smtp_replica
+    service: support_smtp
+    environments:
+      - all
+    rule: manual
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: optional.source_contract
+    service: optional
+    environments:
+      - shared
+    rule: evidence
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: optional.jev_gateway_budget_and_credentials
+    service: optional
+    environments:
+      - all
+    rule: manual
+    required: false
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: mcp_oauth.production.issuer
+    service: mcp_oauth
+    environments:
+      - production
+    rule: subset
+    expected:
+      issuer: https://app.dayopt.app
+      code_challenge_methods_supported:
+        - S256
+    required: true
+    next_step: 公開OAuth metadataと配信revisionを確認
+  - id: mcp_oauth.production.resource
+    service: mcp_oauth
+    environments:
+      - production
+    rule: subset
+    expected:
+      resource: https://mcp.dayopt.app
+      authorization_servers:
+        - https://app.dayopt.app
+    required: true
+    next_step: 公開MCP resource metadataと配信revisionを確認
+  - id: github.backup_runs
+    service: github
+    environments:
+      - production
+    rule: evidence
+    required: true
+    expected: latest_10_scheduled_main_runs_job_metadata
+    next_step: backup jobのconclusionと時刻を確認。workflow全体の失敗をbackup失敗と解釈せずrestoreを別確認。
+  - id: vercel.preview.database_references
+    service: vercel
+    environments:
+      - preview
+    rule: evidence
+    required: true
+    expected: each_preview_ref_in_accessible_dayopt_supabase_branches
+    next_step: 取得できるSupabase一覧とVercel branch参照を比較し、未掲載を削除済みと断定しない
+
+  - id: supabase.production.migrations
+    service: supabase
+    environments: [production]
+    rule: passed
+    required: true
+    next_step: 配信revisionの既存schema/cron契約と照合。API権限不足と未配信契約を区別してください。
+
+  - id: supabase.production.heartbeats
+    service: supabase
+    environments: [production]
+    rule: passed
+    required: true
+    next_step: 配信revisionの既存schema/cron契約と照合。API権限不足と未配信契約を区別してください。
+
+  - id: supabase.production.schema_snapshot
+    service: supabase
+    environments: [production]
+    rule: passed
+    required: true
+    next_step: 配信revisionの既存schema/cron契約と照合。API権限不足と未配信契約を区別してください。
+
+  - id: supabase.production.cron_schedule_review
+    service: supabase
+    environments: [production]
+    rule: manual
+    required: true
+    next_step: database_metadataのjobname/schedule/activeを配信revisionのmigrationと比較。cronを実行しないでください。
+  - id: upstash.environment_isolation
+    service: upstash
+    environments: [all]
+    rule: manual
+    required: true
+    next_step: Vercelの環境別Redis URLと既存Upstash metadataを比較。agent masterのPINGだけでPreview分離を証明しません。
+  - id: vercel.preview.mcp_build_policy
+    service: vercel
+    environments: [preview]
+    rule: passed
+    required: true
+    next_step: 明示MCP OAuth Previewの既存build gateと取得可能なbindingを比較。Integrationとは別の契約です。

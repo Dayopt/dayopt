@@ -110,10 +110,10 @@
     "build-storybook": "pnpm --filter @dayopt/storybook build",
     "build:web": "pnpm --filter @dayopt/web build",
     "test:web": "pnpm --filter @dayopt/web test",
-    "agent:preflight": "node scripts/tasks/agent-preflight.mjs"
+    "agent:preflight": "node scripts/tasks/agent-preflight.mjs",
+    "doctor": "tsx scripts/doctor/cli.ts"
   },
   "devDependencies": {
-    "zod": "4.3.6",
     "@ai-sdk/gateway": "4.0.85",
     "@axe-core/playwright": "catalog:tooling",
     "@axe-core/react": "catalog:tooling",
@@ -170,6 +170,8 @@
     "tw-animate-css": "catalog:tooling",
     "typescript": "catalog:tooling",
     "vitest": "catalog:tooling",
+    "yaml": "2.9.0",
+    "zod": "4.3.6",
     "zod-to-json-schema": "^3.25.2"
   }
 }
