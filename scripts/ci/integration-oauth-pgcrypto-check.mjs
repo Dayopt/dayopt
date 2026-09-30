@@ -71,7 +71,7 @@ BEGIN
     OR EXISTS ((SELECT * FROM authority_before EXCEPT SELECT * FROM public.mcp_environment_identity)
       UNION ALL (SELECT * FROM public.mcp_environment_identity EXCEPT SELECT * FROM authority_before))
     OR NOT EXISTS (SELECT 1 FROM pg_proc WHERE oid =
-      'public.provision_mcp_preview_environment_identity_v1(text,text,uuid)'::regprocedure
+      'public.provision_mcp_preview_environment_identity_v1(text,text,text)'::regprocedure
       AND strpos(prosrc, 'p_supabase_project_ref = ''tilwaprottpyhlfoggbb''') > 0)
   THEN RAISE EXCEPTION 'Production catalog hash rehearsal differs'; END IF;
 END
