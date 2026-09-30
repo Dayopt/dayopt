@@ -16109,10 +16109,12 @@
       "mode": "100644",
       "bytes": 4606,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 158]],
+      "evidence": [
+        "Full pre-edit158-line file read without truncation; baseline blob equals9311f3a33. Existing4 callback tests omitted onMutate/context lifecycle; updated to supply context. Real MutationCache integration covers recording/confirm-day overlap separately."
+      ],
       "questions": []
     },
     {
@@ -21782,10 +21784,12 @@
       "mode": "100644",
       "bytes": 955,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 34]],
+      "evidence": [
+        "Complete current file read without truncation, mechanically equal to baseline blob. Browser POST batching/legacy token headers, typed tRPC client export and shaped-server-vs-transport diagnostics cross-checked. Intentional cancellation is filtered at QueryClient callbacks; no generic client-error swallowing added. Header ownership and real account switching remain separate unverified boundaries."
+      ],
       "questions": []
     },
     {
@@ -21795,10 +21799,12 @@
       "mode": "100644",
       "bytes": 2382,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 75]],
+      "evidence": [
+        "Complete current file read without truncation, mechanically equal to baseline blob. Browser POST batching/legacy token headers, typed tRPC client export and shaped-server-vs-transport diagnostics cross-checked. Intentional cancellation is filtered at QueryClient callbacks; no generic client-error swallowing added. Header ownership and real account switching remain separate unverified boundaries."
+      ],
       "questions": []
     },
     {
@@ -21808,10 +21814,12 @@
       "mode": "100644",
       "bytes": 949,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 26]],
+      "evidence": [
+        "Complete current file read without truncation, mechanically equal to baseline blob. Browser POST batching/legacy token headers, typed tRPC client export and shaped-server-vs-transport diagnostics cross-checked. Intentional cancellation is filtered at QueryClient callbacks; no generic client-error swallowing added. Header ownership and real account switching remain separate unverified boundaries."
+      ],
       "questions": []
     },
     {
@@ -21966,10 +21974,12 @@
       "mode": "100644",
       "bytes": 744,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 25]],
+      "evidence": [
+        "Complete current file read without truncation, mechanically equal to baseline blob. Browser POST batching/legacy token headers, typed tRPC client export and shaped-server-vs-transport diagnostics cross-checked. Intentional cancellation is filtered at QueryClient callbacks; no generic client-error swallowing added. Header ownership and real account switching remain separate unverified boundaries."
+      ],
       "questions": []
     },
     {
@@ -22100,11 +22110,15 @@
       "mode": "100644",
       "bytes": 6721,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
-      "questions": []
+      "read_ranges": [[1, 186]],
+      "evidence": [
+        "Full current165-line source and186-line tests read without truncation; equal to baseline. Verified-user gate, independent session-ID/MFA lookups, null-session aal1 fallback and fail-closed repeated-error fixtures examined. HTTP/RSC selected setup lines checked, but their whole files remain unread."
+      ],
+      "questions": [
+        "H025: verify first getSession failure followed by second null/no-error after SDK storage invalidation. Current tests repeat the same error on both calls; compare #2047/current decision and installed SDK before adopting an MFA defect. No production observation."
+      ]
     },
     {
       "path": "apps/product/src/lib/trpc/session-auth-context.ts",
@@ -22113,11 +22127,15 @@
       "mode": "100644",
       "bytes": 6672,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
-      "questions": []
+      "read_ranges": [[1, 165]],
+      "evidence": [
+        "Full current165-line source and186-line tests read without truncation; equal to baseline. Verified-user gate, independent session-ID/MFA lookups, null-session aal1 fallback and fail-closed repeated-error fixtures examined. HTTP/RSC selected setup lines checked, but their whole files remain unread."
+      ],
+      "questions": [
+        "H025: verify first getSession failure followed by second null/no-error after SDK storage invalidation. Current tests repeat the same error on both calls; compare #2047/current decision and installed SDK before adopting an MFA defect. No production observation."
+      ]
     },
     {
       "path": "apps/product/src/lib/trpc/write-fence-procedure.test.ts",
@@ -28811,10 +28829,12 @@
       "mode": "100644",
       "bytes": 6161,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 111]],
+      "evidence": [
+        "Complete baseline git-show read without truncation. H041 operation-owned rollback explanation/reference updated. Historical2026-09-21 local observations remain dated; not treated as current production evidence."
+      ],
       "questions": []
     },
     {
@@ -29196,10 +29216,12 @@
       "mode": "100644",
       "bytes": 5428,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 118]],
+      "evidence": [
+        "Complete baseline git-show read without truncation. H041 operation-owned rollback explanation/reference updated. Historical2026-09-21 local observations remain dated; not treated as current production evidence."
+      ],
       "questions": []
     },
     {
@@ -42131,6 +42153,58 @@
       "questions": [
         "H041 fix pending across all callers; local checkpoint deliberately failing and not pushed."
       ]
+    },
+    {
+      "path": "apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.lifecycle.test.tsx",
+      "sha": "2987c53c2e6745ee8ffdd208347294d786d6ff5e",
+      "change": "A",
+      "blob": "9b1cb6bb80d1b2832436cb51e13ec35a565069f4",
+      "method": "full-text",
+      "status": "full-text-reviewed",
+      "read_ranges": [[1, 381]],
+      "evidence": [
+        "Complete source/diff review of new381-line file; separate from baseline counts. Actual QueryClient/MutationCache lifecycle12 tests passed; real-cache helper8 regressions included in final whole check. Old production red6/7 and original helper red7/0. No transport/DB/browser production verification."
+      ],
+      "questions": []
+    },
+    {
+      "path": "apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.rollback.test.ts",
+      "sha": "2987c53c2e6745ee8ffdd208347294d786d6ff5e",
+      "change": "M",
+      "blob": "8797e4e242c6c3d91ea927ee855359563357bef8",
+      "method": "full-text",
+      "status": "full-text-reviewed",
+      "read_ranges": [[1, 170]],
+      "evidence": [
+        "Complete source/diff review of new170-line file; separate from baseline counts. Actual QueryClient/MutationCache lifecycle12 tests passed; real-cache helper8 regressions included in final whole check. Old production red6/7 and original helper red7/0. No transport/DB/browser production verification."
+      ],
+      "questions": []
+    },
+    {
+      "path": "apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.lifecycle.test.tsx",
+      "sha": "15b09959df80bfcdea09ab54ce5df0e5955ec920",
+      "change": "M",
+      "blob": "f8ef5a7321891fa7266ef70268d4f6216a996927",
+      "method": "full-text",
+      "status": "full-text-reviewed",
+      "read_ranges": [[1, 410]],
+      "evidence": [
+        "Full previous source plus complete subsequent owned diff reviewed at final410-line blob. Real lifecycle13 cases pass; cancellation unit4 pass. Pre-dispatch genuine red1/12, limited replacement red1/13, cancellation retry red1/4 recorded. Final integrated check running."
+      ],
+      "questions": []
+    },
+    {
+      "path": "apps/product/src/lib/trpc/query-client.test.ts",
+      "sha": "15b09959df80bfcdea09ab54ce5df0e5955ec920",
+      "change": "M",
+      "blob": "22760032883b918371a1b740ad12e13bb8c0ca9f",
+      "method": "full-text",
+      "status": "full-text-reviewed",
+      "read_ranges": [[1, 68]],
+      "evidence": [
+        "Full previous source plus complete subsequent owned diff reviewed at final68-line blob. Real lifecycle13 cases pass; cancellation unit4 pass. Pre-dispatch genuine red1/12, limited replacement red1/13, cancellation retry red1/4 recorded. Final integrated check running."
+      ],
+      "questions": []
     }
   ]
 }
