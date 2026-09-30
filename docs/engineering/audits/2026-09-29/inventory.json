@@ -2536,10 +2536,12 @@
       "mode": "100644",
       "bytes": 3314,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 95]],
+      "evidence": [
+        "Full untruncated reading at 29687216fddb76733ac079bd03e61da7adcdae33; baseline bytes verified equal. Billing DB/service/current contract cross-checked. SQL/provider/cloud operations not executed. Historical definitions distinguished from later replacements; H034 lock-wait clock candidate remains unverified. Preflight historical classification requires #2614 decision countercheck."
+      ],
       "questions": []
     },
     {
@@ -29589,11 +29591,12 @@
       "mode": "100644",
       "bytes": 8462,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
+      "read_ranges": [[1, 62]],
       "evidence": [
-        "Main advanced to 0bcdb864127feea425934baa179797bd53ecf375 (PR #2964). Full 17-file delta (1071 diff lines) read in bounded chunks after initial truncated attempt. Changes reconciled on audit branch; baseline read status unchanged, delta reading does not imply unread full file is reviewed. Five conflicts resolved to main: equivalent creation contract/test clock, current source references and retired glossary terms."
+        "Main advanced to 0bcdb864127feea425934baa179797bd53ecf375 (PR #2964). Full 17-file delta (1071 diff lines) read in bounded chunks after initial truncated attempt. Changes reconciled on audit branch; baseline read status unchanged, delta reading does not imply unread full file is reviewed. Five conflicts resolved to main: equivalent creation contract/test clock, current source references and retired glossary terms.",
+        "Baseline full text read via git show after current-file equality check correctly rejected changed bytes. Current 70 lines fully reread at 29687216fddb76733ac079bd03e61da7adcdae33; Cloud-first/current #2867/#2869 authority delta distinguished from baseline. No rollout/preflight/provider operation executed."
       ],
       "questions": []
     },
@@ -29749,10 +29752,12 @@
       "mode": "100644",
       "bytes": 2039,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 32]],
+      "evidence": [
+        "Full untruncated reading at 29687216fddb76733ac079bd03e61da7adcdae33; baseline bytes verified equal. Billing DB/service/current contract cross-checked. SQL/provider/cloud operations not executed. Historical definitions distinguished from later replacements; H034 lock-wait clock candidate remains unverified. Preflight historical classification requires #2614 decision countercheck."
+      ],
       "questions": []
     },
     {
@@ -39127,10 +39132,17 @@
       "mode": "100644",
       "bytes": 23234,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [
+        [1, 195],
+        [196, 390],
+        [391, 590],
+        [591, 780]
+      ],
+      "evidence": [
+        "Full untruncated reading at 29687216fddb76733ac079bd03e61da7adcdae33; baseline bytes verified equal. Billing DB/service/current contract cross-checked. SQL/provider/cloud operations not executed. Historical definitions distinguished from later replacements; H034 lock-wait clock candidate remains unverified. Preflight historical classification requires #2614 decision countercheck."
+      ],
       "questions": []
     },
     {
@@ -39140,10 +39152,12 @@
       "mode": "100644",
       "bytes": 6155,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 200]],
+      "evidence": [
+        "Full untruncated reading at 29687216fddb76733ac079bd03e61da7adcdae33; baseline bytes verified equal. Billing DB/service/current contract cross-checked. SQL/provider/cloud operations not executed. Historical definitions distinguished from later replacements; H034 lock-wait clock candidate remains unverified. Preflight historical classification requires #2614 decision countercheck."
+      ],
       "questions": []
     },
     {
@@ -39153,10 +39167,16 @@
       "mode": "100644",
       "bytes": 18046,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [
+        [1, 205],
+        [206, 410],
+        [411, 612]
+      ],
+      "evidence": [
+        "Full untruncated reading at 29687216fddb76733ac079bd03e61da7adcdae33; baseline bytes verified equal. Billing DB/service/current contract cross-checked. SQL/provider/cloud operations not executed. Historical definitions distinguished from later replacements; H034 lock-wait clock candidate remains unverified. Preflight historical classification requires #2614 decision countercheck."
+      ],
       "questions": []
     },
     {
@@ -39192,10 +39212,16 @@
       "mode": "100644",
       "bytes": 16130,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [
+        [1, 180],
+        [181, 360],
+        [361, 536]
+      ],
+      "evidence": [
+        "Full untruncated reading at 29687216fddb76733ac079bd03e61da7adcdae33; baseline bytes verified equal. Billing DB/service/current contract cross-checked. SQL/provider/cloud operations not executed. Historical definitions distinguished from later replacements; H034 lock-wait clock candidate remains unverified. Preflight historical classification requires #2614 decision countercheck."
+      ],
       "questions": []
     },
     {
@@ -39205,10 +39231,12 @@
       "mode": "100644",
       "bytes": 2291,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 74]],
+      "evidence": [
+        "Full untruncated reading at 29687216fddb76733ac079bd03e61da7adcdae33; baseline bytes verified equal. Billing DB/service/current contract cross-checked. SQL/provider/cloud operations not executed. Historical definitions distinguished from later replacements; H034 lock-wait clock candidate remains unverified. Preflight historical classification requires #2614 decision countercheck."
+      ],
       "questions": []
     },
     {
@@ -39218,10 +39246,12 @@
       "mode": "100644",
       "bytes": 2709,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 82]],
+      "evidence": [
+        "Full untruncated reading at 29687216fddb76733ac079bd03e61da7adcdae33; baseline bytes verified equal. Billing DB/service/current contract cross-checked. SQL/provider/cloud operations not executed. Historical definitions distinguished from later replacements; H034 lock-wait clock candidate remains unverified. Preflight historical classification requires #2614 decision countercheck."
+      ],
       "questions": []
     },
     {
@@ -39332,10 +39362,12 @@
       "mode": "100644",
       "bytes": 2651,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 88]],
+      "evidence": [
+        "Full untruncated reading at 29687216fddb76733ac079bd03e61da7adcdae33; baseline bytes verified equal. Billing DB/service/current contract cross-checked. SQL/provider/cloud operations not executed. Historical definitions distinguished from later replacements; H034 lock-wait clock candidate remains unverified. Preflight historical classification requires #2614 decision countercheck."
+      ],
       "questions": []
     },
     {
@@ -39475,10 +39507,16 @@
       "mode": "100644",
       "bytes": 14343,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [
+        [1, 180],
+        [181, 360],
+        [361, 519]
+      ],
+      "evidence": [
+        "Full untruncated reading at 29687216fddb76733ac079bd03e61da7adcdae33; baseline bytes verified equal. Billing DB/service/current contract cross-checked. SQL/provider/cloud operations not executed. Historical definitions distinguished from later replacements; H034 lock-wait clock candidate remains unverified. Preflight historical classification requires #2614 decision countercheck."
+      ],
       "questions": []
     },
     {
