@@ -121,7 +121,9 @@ describe('agent service-account authentication', () => {
   it.each([
     [{ OP_SERVICE_ACCOUNT_TOKEN: 'personal-session' }, 'TOKEN_INVALID'],
     [{ DAYOPT_AGENT_SERVICE_ACCOUNT_ID: '' }, 'ACCOUNT_ID_REQUIRED'],
+    [{ DAYOPT_AGENT_SERVICE_ACCOUNT_ID: '0'.repeat(26) }, 'ACCOUNT_ID_REQUIRED'],
     [{ DAYOPT_AGENT_VAULT_ID: 'agent' }, 'VAULT_ID_REQUIRED'],
+    [{ DAYOPT_AGENT_VAULT_ID: '8'.repeat(26) }, 'VAULT_ID_REQUIRED'],
   ])('requires pinned IDs and a service-account token: %s', (env, code) => {
     const f = fixture(env);
     const result = f.run();
@@ -147,10 +149,27 @@ describe('agent service-account authentication', () => {
     expect(existsSync(f.calls()[0].config)).toBe(false);
   });
 
+  it('accepts uppercase service-account IDs returned by the CLI', () => {
+    const uppercaseAccountId = 'A'.repeat(26);
+    const f = fixture({
+      DAYOPT_AGENT_SERVICE_ACCOUNT_ID: uppercaseAccountId,
+      TEST_USER_ID: uppercaseAccountId,
+    });
+    const result = f.run();
+    expect(result.stderr).toBe('');
+    expect(result.status).toBe(0);
+    expect(JSON.parse(result.stdout)).toMatchObject({
+      identity: 'SERVICE_ACCOUNT',
+      vaultScope: 'agent-only',
+    });
+    expect(f.calls()).toHaveLength(2);
+  });
+
   it.each([
     { TEST_USER_TYPE: 'HUMAN' },
     { TEST_USER_STATE: 'SUSPENDED' },
     { TEST_USER_ID: 'b'.repeat(26) },
+    { DAYOPT_AGENT_SERVICE_ACCOUNT_ID: 'A'.repeat(26), TEST_USER_ID: 'B'.repeat(26) },
   ])('rejects a personal, inactive, or different identity before requesting vaults: %s', (env) => {
     const f = fixture(env);
     const result = f.run();

@@ -5,7 +5,7 @@ import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const OP_TIMEOUT_MS = 10_000;
-const OP_ID = /^[a-z2-7]{26}$/;
+const OP_ID = /^[a-z2-7]{26}$/i;
 
 class ServiceAccountError extends Error {
   constructor(code) {
