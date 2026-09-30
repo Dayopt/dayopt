@@ -3,7 +3,8 @@
 > 責務境界の全体像: [docs/engineering/architecture.md](../../docs/engineering/architecture.md)。課金フロー自体は [docs/product/specs/billing.md](../../docs/product/specs/billing.md)
 
 アプリ横断で使う **public-safe な billing model の source of truth**。
-Free / Pro の意味、subscription status、entitlement、価格表示用定数を一元化する。
+単一有料プランの利用状態・45日間のアプリ体験・subscription status・価格定数を一元化する。
+旧Free/Pro識別子と機能別entitlementは移行互換で残し、現行の認可には使わない。
 client import できる pure model だけを持ち、Stripe SDK / secret / runtime は **持たない**。
 
 consumer は `apps/product`（settings / access policy / webhook）と `apps/web`（LP pricing）の両方。
@@ -12,30 +13,31 @@ consumer は `apps/product`（settings / access policy / webhook）と `apps/web
 
 ```
 packages/billing/src/
-  plans.ts          Free/Pro plan id・name・plan metadata（dayoptPlanIds / dayoptPlans / isPaidPlan）
-  pricing.ts        価格表示用定数・trial 日数（dayoptPricing / dayoptProTrialDays / getMonthlyUsd*）
+  access.ts         アプリ体験45日・利用状態の正本（appTrialDays / appTrialDurationMs / resolveBillingAccess）
+  plans.ts          旧Free/Pro plan id・name・plan metadata（dayoptPlanIds / dayoptPlans / isPaidPlan）
+  pricing.ts        価格表示用定数・従来Stripe trial日数（dayoptPricing / dayoptProTrialDays / getMonthlyUsd*）
   subscription.ts   SubscriptionStatus・判定・Stripe→Dayopt 変換
                     （subscriptionStatuses / isProSubscriptionStatus /
                      getPlanIdForSubscriptionStatus / mapStripeSubscriptionStatus）
-  entitlement.ts    entitlement と access 判定（entitlementKeys / planEntitlements / canUseEntitlement）
+  entitlement.ts    旧機能別entitlementの互換モデル（entitlementKeys / planEntitlements / canUseEntitlement）
   index.ts          barrel
 ```
 
 ## 入れる / 入れない
 
 **入れる**: plan id / plan name / plan metadata、subscription status とその判定・Stripe からの変換、
-entitlement と access 判定、価格表示用定数（`$0` / `$5` / cents）、trial 日数、上記に閉じた pure helper。
+アプリ体験と利用状態の判定、旧entitlement互換定数、価格表示用定数（`$0` / `$5` / cents）、trial 日数、上記に閉じた pure helper。
 すべて**全環境で同一・公開して安全・副作用なし**。
 
 **入れない（置き場）**:
 
-| 入れないもの                                                | 正しい置き場                                                   |
-| ----------------------------------------------------------- | -------------------------------------------------------------- |
-| Stripe SDK client / secret / webhook handler                | `apps/product/src/lib/stripe` / `app/api/webhooks/stripe`      |
-| Checkout / Customer Portal / Invoice 等の Stripe API 操作   | `apps/product/src/features/settings/server/billing-service.ts` |
-| plan 説明文 / 機能リスト / email 本文（翻訳文言）           | `apps/*/messages`                                              |
-| `BILLING_ENFORCED` / Stripe price ID 等の env 依存値        | env（`apps/product/src/env.ts`）                               |
-| Pro gating の enforcement on/off / tRPC `entitledProcedure` | `apps/product/src/lib/billing` / `lib/trpc/procedures.ts`      |
+| 入れないもの                                                                      | 正しい置き場                                                   |
+| --------------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| Stripe SDK client / secret / webhook handler                                      | `apps/product/src/lib/stripe` / `app/api/webhooks/stripe`      |
+| Checkout / Customer Portal / Invoice 等の Stripe API 操作                         | `apps/product/src/features/settings/server/billing-service.ts` |
+| plan 説明文 / 機能リスト / email 本文（翻訳文言）                                 | `apps/*/messages`                                              |
+| `BILLING_ENFORCED` / Stripe price ID 等の env 依存値                              | env（`apps/product/src/env.ts`）                               |
+| 利用権の enforcement on/off / tRPC `protectedProcedure`・互換 `entitledProcedure` | `apps/product/src/lib/billing` / `lib/trpc/procedures.ts`      |
 
 ## 3 つの境界（billing model / Stripe runtime / i18n copy）
 
@@ -56,7 +58,9 @@ apps/web ─────┴──> @dayopt/billing
 
 NG: `@dayopt/billing` → `stripe` / `apps/*` / `next/*` / `react` / DB client
 
-## Future
+## 体験と認可の区別
 
-- email / settings の trial 日数表示（`"7-day"` / `"7日間"`）は現在 i18n copy にハードコード。
-  `dayoptProTrialDays` を ICU 補間で注入する統一は別タスク（trial 日数は稀にしか変わらないため後回し）。
+- `appTrialDays` / `appTrialDurationMs` は、初回アプリ表示から始まる45日・1080時間の体験。`resolveBillingAccess` が現在のprofileと時刻から利用状態を判定する。
+- `dayoptProTrialDays` は既存Stripe trialとの移行互換で7日。新方式のCheckoutにはStripe trialを付けない。
+- `canUseEntitlement` / `planEntitlements` は旧機能別モデルの互換用。現行のserver認可は `getBillingAccess` と `operation-access.ts` を使い、UIは `BillingAccessProvider` の結果を参照する。
+- `BILLING_ENFORCED` による新方式の有効化と本番公開は別判断。[公開手順](../../docs/operations/billing-single-plan-rollout.md)へ従う。
