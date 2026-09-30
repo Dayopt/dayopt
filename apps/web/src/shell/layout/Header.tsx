@@ -3,16 +3,19 @@
 import { Button, cn, Logo, Sheet, SheetContent } from '@dayopt/components';
 import { Link, usePathname } from '@dayopt/i18n/navigation';
 import { Menu } from 'lucide-react';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { useEffect, useState } from 'react';
 
 import { trackSignupCta } from '@web/platform/analytics/signup-cta';
 import { productSignupUrl } from '@web/platform/config/product-signup-url';
 
+import styles from './SiteChrome.module.css';
+
 export function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const t = useTranslations('common');
+  const locale = useLocale();
 
   const pathname = usePathname();
 
@@ -43,14 +46,9 @@ export function Header() {
   }, []);
 
   return (
-    <header
-      className={cn(
-        'bg-background/95 supports-[backdrop-filter]:bg-background/60 border-border z-dropdown sticky top-0 w-full border-b backdrop-blur transition-shadow',
-        isScrolled && 'shadow-sm',
-      )}
-    >
+    <header className={cn(styles.header, isScrolled && styles.scrolled)} lang={locale}>
       <nav
-        className="mx-auto flex h-14 max-w-7xl items-center justify-between px-6 lg:px-8"
+        className={cn(styles.nav, 'flex h-16 items-center justify-between lg:h-20')}
         aria-label={t('aria.mainNavigation')}
       >
         {/* Logo */}
@@ -87,7 +85,7 @@ export function Header() {
             <Button variant="ghost" size="default" asChild>
               <Link href="/login">{t('actions.login')}</Link>
             </Button>
-            <Button variant="primary" size="default" asChild>
+            <Button variant="primary" size="default" className={styles.signup} asChild>
               <a href={productSignupUrl()} onClick={() => trackSignupCta('header_desktop')}>
                 {t('actions.signup')}
               </a>
@@ -99,7 +97,7 @@ export function Header() {
             <Button variant="ghost" size="sm" asChild>
               <Link href="/login">{t('actions.login')}</Link>
             </Button>
-            <Button variant="primary" size="sm" asChild>
+            <Button variant="primary" size="sm" className={styles.signup} asChild>
               <a href={productSignupUrl()} onClick={() => trackSignupCta('header_mobile')}>
                 {t('actions.signup')}
               </a>

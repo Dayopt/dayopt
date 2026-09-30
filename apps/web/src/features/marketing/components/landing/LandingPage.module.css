@@ -7,66 +7,70 @@
   background: var(--lp-paper);
   overflow: clip;
 }
-
 .hero,
 .content {
-  width: min(100%, 1440px);
+  width: min(100%, 1600px);
   margin-inline: auto;
-  padding-inline: clamp(24px, 6vw, 96px);
+  padding-inline: clamp(20px, 5vw, 96px);
 }
-
 .hero {
-  display: grid;
-  grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr);
-  align-items: center;
-  gap: clamp(36px, 4vw, 72px);
-  min-height: 670px;
-  padding-block: 72px 78px;
+  display: block;
+  padding-block: clamp(48px, 6vw, 96px) 32px;
 }
-
+.heroHead {
+  display: grid;
+  grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr);
+  align-items: end;
+  gap: 64px;
+}
+.heroEyebrow {
+  margin: 0 0 28px;
+  color: var(--lp-muted);
+  font-size: 13px;
+}
 .heroIntro h1 {
   margin: 0;
-  font-size: clamp(38px, 4vw, 64px);
+  font-size: clamp(48px, 6.3vw, 112px);
   font-weight: 400;
-  line-height: 1.46;
-  letter-spacing: -0.055em;
+  line-height: 1.22;
+  letter-spacing: -0.065em;
 }
-
-.heroIntro h1 span,
-.closing h2 span {
+.heroIntro h1 span {
   white-space: nowrap;
 }
-
+.landing[data-locale='en'] .heroIntro h1 {
+  line-height: 1.04;
+  letter-spacing: -0.06em;
+}
 .landing[data-locale='en'] .heroIntro h1 span {
-  white-space: normal;
+  font-size: 1.5em;
+  letter-spacing: -0.07em;
 }
-
-@media (min-width: 761px) {
-  .landing[data-locale='en'] .heroIntro h1 {
-    font-size: clamp(36px, 3.25vw, 52px);
-  }
+.heroAside {
+  padding-bottom: 8px;
 }
-
-.heroIntro > p {
-  max-width: 460px;
-  margin: 30px 0 0;
+.heroAside > p {
+  margin: 0;
   color: var(--lp-muted);
   font-size: 15px;
-  line-height: 2.05;
+  line-height: 1.9;
 }
-
+.noScript {
+  margin-top: 20px;
+  color: var(--lp-muted);
+  font-size: 13px;
+  line-height: 1.8;
+}
 .heroActions {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 14px 24px;
-  margin-top: 32px;
+  gap: 16px 24px;
+  margin-top: 28px;
 }
-
 .heroActions a {
   min-height: 48px;
 }
-
 .heroActions a:first-child,
 .priceCard a,
 .closing a {
@@ -74,7 +78,28 @@
   justify-content: space-between;
   gap: 28px;
 }
-
+.heroActions a:first-child,
+.priceCard:last-child > a,
+.closing > a {
+  background: var(--lp-ink);
+  color: var(--lp-paper);
+}
+.heroActions a:first-child:hover,
+.priceCard:last-child > a:hover,
+.closing > a:hover {
+  background: color-mix(in oklch, var(--lp-ink) 88%, var(--lp-paper));
+}
+.heroExperience {
+  margin-top: 64px;
+  scroll-margin-top: 112px;
+}
+.heroFoot {
+  display: flex;
+  justify-content: space-between;
+  margin: 48px 0 0;
+  color: var(--lp-muted);
+  font-size: 12px;
+}
 .textLink,
 .sectionLinks a,
 .activityFoot a,
@@ -88,192 +113,12 @@
   font-size: 14px;
   text-decoration: none;
 }
-
 .textLink:hover,
 .sectionLinks a:hover,
 .activityFoot a:hover,
 .quietNote a:hover,
 .faqLinks a:hover {
   border-color: currentColor;
-}
-
-.journey {
-  min-width: 0;
-}
-
-.journeyMotion {
-  position: relative;
-  height: 400px;
-}
-
-.journeyPath {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  fill: none;
-  stroke: var(--lp-ink);
-  stroke-width: 1.1;
-  stroke-dasharray: 1;
-  stroke-dashoffset: 1;
-  opacity: 0.7;
-  animation: drawPath 2.8s ease-out forwards;
-}
-
-.journeyMoments {
-  position: relative;
-  height: 100%;
-}
-
-.moment {
-  position: absolute;
-  width: 31%;
-  min-width: 130px;
-}
-
-.moment:nth-child(1) {
-  left: 0;
-  top: 38px;
-}
-
-.moment:nth-child(2) {
-  left: 36%;
-  bottom: 141px;
-}
-
-.moment:nth-child(3) {
-  right: 0;
-  bottom: 27px;
-}
-
-.momentMeta,
-.moment > p {
-  font-size: 12px;
-}
-
-.momentMeta {
-  display: block;
-  margin-bottom: 12px;
-  color: var(--lp-muted);
-}
-
-.moment > p {
-  margin: 13px 0 0;
-  line-height: 1.6;
-}
-
-.timePair {
-  display: flex;
-  align-items: end;
-  gap: 7px;
-}
-
-.timeOutline,
-.timeInk {
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  flex: 1;
-  min-width: 0;
-  height: 94px;
-  padding: 10px;
-  border: 1px solid var(--lp-ink);
-  border-radius: 8px;
-  font-size: 12px;
-}
-
-.timeInk {
-  color: var(--lp-paper);
-  background: var(--lp-ink);
-}
-
-.timePair small {
-  font-size: 11px;
-}
-
-.completion {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  font-size: 14px;
-  line-height: 1.8;
-}
-
-.completion strong {
-  font-size: 18px;
-  font-weight: 500;
-}
-
-.mark {
-  display: inline-flex;
-  align-items: end;
-  gap: 4px;
-  width: 39px;
-  height: 39px;
-  flex: none;
-}
-
-.markOutline,
-.markInk,
-.markInkAnimated {
-  display: block;
-  width: 16px;
-  height: 34px;
-  border: 2px solid currentColor;
-  border-radius: 5px;
-}
-
-.markInk,
-.markInkAnimated {
-  background: currentColor;
-}
-
-.markInkAnimated {
-  animation: clickInk 750ms ease-out 2.3s both;
-}
-
-.journeyLegend {
-  display: flex;
-  align-items: center;
-  gap: 18px;
-  min-height: 52px;
-  color: var(--lp-muted);
-  font-size: 12px;
-}
-
-.journeyLegend > span,
-.calendarNote > span:first-child {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-}
-
-.legendOutline,
-.legendSolid {
-  display: inline-block;
-  width: 15px;
-  height: 13px;
-  flex: none;
-  border: 1px solid var(--lp-ink);
-  border-radius: 3px;
-}
-
-.legendSolid {
-  background: var(--lp-ink);
-}
-
-.replayButton {
-  min-height: 44px;
-  margin-left: auto;
-  border: 0;
-  background: none;
-  color: inherit;
-  font-size: 12px;
-  cursor: pointer;
-}
-
-.replayButton:hover {
-  color: var(--lp-ink);
 }
 
 .section .content,
@@ -1048,7 +893,7 @@
   grid-template-columns: 0.9fr 1.1fr;
   gap: 50px;
   padding-block: 40px;
-  scroll-margin-top: 72px;
+  scroll-margin-top: 112px;
 }
 
 .googleBridge h3,
@@ -1656,5 +1501,249 @@
 
   .journeyPath {
     stroke-dashoffset: 0;
+  }
+}
+
+/* The same time geometry carries the page from first interaction to the final mark. */
+.section .content,
+.integrations .content {
+  padding-block: clamp(72px, 8vw, 128px);
+}
+.sectionLead {
+  gap: 64px;
+  align-items: end;
+  margin-bottom: 56px;
+}
+.sectionTitle h2 {
+  font-size: clamp(32px, 3.8vw, 60px);
+  line-height: 1.35;
+  letter-spacing: -0.055em;
+  font-weight: 400;
+}
+.kicker {
+  font-size: 12px;
+  letter-spacing: 0.04em;
+}
+.kicker > span {
+  width: 28px;
+  display: inline-block;
+}
+.sectionLead > p {
+  max-width: 400px;
+  font-size: 15px;
+  line-height: 1.9;
+}
+.activityLibrary {
+  gap: 40px;
+}
+.activityGroup {
+  background: transparent;
+  padding-block: 32px;
+}
+.activityGroup > p {
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--lp-line);
+}
+.activityGroup li {
+  font-size: 24px;
+  padding-block: 16px;
+}
+.reviewPaper {
+  border-radius: 0;
+  background: var(--container);
+  padding: clamp(24px, 4vw, 64px);
+  box-shadow: none;
+}
+.reviewTop {
+  padding: 0 0 32px;
+}
+.reviewShape {
+  display: grid;
+  grid-template-columns: minmax(0, 0.7fr) minmax(0, 1.3fr);
+  align-items: end;
+  gap: 48px;
+  padding-block: 24px 48px;
+}
+.reviewShape .reviewTotal {
+  padding: 0;
+}
+.reviewShape .reviewTotal strong {
+  font-size: clamp(48px, 5vw, 80px);
+  letter-spacing: -0.055em;
+}
+.reviewColumns,
+.reviewBottom {
+  padding-inline: 0;
+}
+.reviewTotal strong {
+  font-weight: 400;
+}
+.quietNote {
+  padding-block: clamp(88px, 12vw, 180px);
+}
+.quietNote > p {
+  font-size: clamp(32px, 4.8vw, 72px);
+  letter-spacing: -0.055em;
+  line-height: 1.45;
+}
+.googleBridge,
+.mcpSection {
+  gap: clamp(40px, 6vw, 96px);
+}
+.priceCard {
+  border-radius: 0;
+  background: transparent;
+  padding: 40px 0;
+}
+.priceCard + .priceCard {
+  border-left: 1px solid var(--lp-line);
+  padding-left: 48px;
+}
+.priceAmount {
+  font-size: clamp(56px, 6vw, 88px);
+}
+.faqGrid {
+  gap: clamp(40px, 8vw, 128px);
+}
+.faqList summary {
+  padding-block: 24px;
+}
+.closing {
+  position: relative;
+  padding-block: 104px 120px;
+  background: var(--container);
+}
+.closing h2 {
+  font-size: clamp(44px, 5.5vw, 88px);
+  line-height: 1.28;
+  font-weight: 400;
+  letter-spacing: -0.055em;
+}
+.closingMark {
+  color: var(--brand-ink);
+  border: 0;
+  margin-bottom: 32px;
+  width: 80px;
+  height: 96px;
+  background: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.closingMark > span {
+  display: block;
+  width: 72px;
+  animation: markSettle 300ms var(--motion-ease-settle);
+}
+.closingMark svg {
+  width: 72px;
+  height: 72px;
+}
+@keyframes markSettle {
+  from {
+    transform: translateY(-12px);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+@media (max-width: 1023px) {
+  .heroHead {
+    gap: 32px;
+    grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+  }
+  .heroIntro h1 {
+    font-size: clamp(44px, 6.3vw, 80px);
+  }
+  .heroAside > p {
+    font-size: 13px;
+  }
+  .heroActions {
+    gap: 12px;
+  }
+  .heroExperience {
+    margin-top: 48px;
+  }
+}
+@media (max-width: 760px) {
+  .reviewShape {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 28px;
+    padding-block: 0 28px;
+  }
+  .reviewPaper {
+    padding: 24px;
+  }
+  .reviewTop,
+  .reviewColumns,
+  .reviewBottom {
+    padding-inline: 0;
+  }
+  .hero {
+    padding-block: 48px 32px;
+  }
+  .heroHead {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 28px;
+  }
+  .heroIntro h1 {
+    font-size: clamp(38px, 8.8vw, 64px);
+  }
+  .heroEyebrow {
+    margin-bottom: 24px;
+    font-size: 11px;
+  }
+  .heroAside > p {
+    font-size: 13px;
+    max-width: 440px;
+  }
+  .heroActions {
+    margin-top: 24px;
+    gap: 16px;
+  }
+  .heroExperience {
+    margin-top: 40px;
+  }
+  .heroFoot {
+    margin-top: 32px;
+  }
+  .sectionLead {
+    gap: 24px;
+    margin-bottom: 32px;
+  }
+  .sectionTitle h2 {
+    font-size: clamp(28px, 6.7vw, 44px);
+  }
+  .sectionLead > p {
+    font-size: 13px;
+  }
+  .activityLibrary {
+    gap: 24px;
+  }
+  .activityGroup li {
+    font-size: 20px;
+  }
+  .quietNote > p {
+    font-size: clamp(26px, 6.5vw, 44px);
+  }
+  .priceCard {
+    padding: 24px 0;
+  }
+  .priceCard + .priceCard {
+    padding-left: 0;
+    border-left: 0;
+    border-top: 1px solid var(--lp-line);
+  }
+  .closing {
+    padding-block: 72px;
+  }
+  .closing h2 {
+    font-size: clamp(32px, 8vw, 52px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .closingMark > span {
+    animation: none;
   }
 }

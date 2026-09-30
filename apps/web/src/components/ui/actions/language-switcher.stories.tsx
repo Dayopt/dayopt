@@ -5,6 +5,9 @@
  * 現在ロケールを取得するため、現在表示は JA / 日本語 になる。variant で短縮/フルを切替える。
  */
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { NextIntlClientProvider } from 'next-intl';
+
+import commonJa from '../../../../messages/ja/common.json';
 
 import { LanguageSwitcher } from './language-switcher';
 
@@ -13,6 +16,13 @@ const meta = {
   component: LanguageSwitcher,
   tags: ['autodocs'],
   parameters: { layout: 'centered' },
+  decorators: [
+    (Story) => (
+      <NextIntlClientProvider locale="ja" messages={commonJa}>
+        <Story />
+      </NextIntlClientProvider>
+    ),
+  ],
 } satisfies Meta<typeof LanguageSwitcher>;
 
 export default meta;

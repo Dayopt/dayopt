@@ -5,7 +5,9 @@
  * 無いため theme は未設定（System 表示）になる。ドロップダウンの開閉のみ確認する。
  */
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { NextIntlClientProvider } from 'next-intl';
 import { expect, userEvent, within } from 'storybook/test';
+import commonJa from '../../../../messages/ja/common.json';
 
 import { ThemeToggle } from './theme-toggle';
 
@@ -14,6 +16,13 @@ const meta = {
   component: ThemeToggle,
   tags: ['autodocs'],
   parameters: { layout: 'centered' },
+  decorators: [
+    (Story) => (
+      <NextIntlClientProvider locale="ja" messages={commonJa}>
+        <Story />
+      </NextIntlClientProvider>
+    ),
+  ],
 } satisfies Meta<typeof ThemeToggle>;
 
 export default meta;
@@ -26,7 +35,7 @@ export const Default: Story = {};
 export const Open: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await userEvent.click(canvas.getByRole('button', { name: 'Change theme' }));
+    await userEvent.click(canvas.getByRole('button', { name: /Change theme|テーマを変更/ }));
     // Radix の Portal + animation のため toBeVisible は不安定。存在確認で開いたことを担保する
     await expect(await within(document.body).findByRole('menu')).toBeInTheDocument();
   },

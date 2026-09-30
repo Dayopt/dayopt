@@ -1,113 +1,9 @@
 'use client';
 
+import { LogoArtwork } from '@dayopt/assets/logo-artwork';
 import { useState } from 'react';
 
 import styles from './LandingPage.module.css';
-
-interface JourneyCopy {
-  label: string;
-  first: string;
-  next: string;
-  later: string;
-  reading: string;
-  minuteUnit: string;
-  firstThought: string;
-  nextThought: string;
-  completion1: string;
-  completion2: string;
-  plan: string;
-  record: string;
-  replay: string;
-}
-
-function Mark({ animated = false }: { animated?: boolean }) {
-  return (
-    <span className={styles.mark} aria-hidden="true">
-      <span className={styles.markOutline} />
-      <span className={animated ? styles.markInkAnimated : styles.markInk} />
-    </span>
-  );
-}
-
-export function HeroJourney({ copy }: { copy: JourneyCopy }) {
-  const [run, setRun] = useState(0);
-
-  return (
-    <div className={styles.journey} role="group" aria-label={copy.label}>
-      <div key={run} className={styles.journeyMotion}>
-        <svg
-          className={styles.journeyPath}
-          viewBox="0 0 600 390"
-          preserveAspectRatio="none"
-          aria-hidden="true"
-        >
-          <path
-            pathLength="1"
-            d="M60 86 H172 Q195 86 195 109 V168 Q195 192 219 192 H340 Q364 192 364 215 V276 Q364 300 388 300 H535"
-          />
-        </svg>
-        <div className={styles.journeyMoments}>
-          <div className={styles.moment}>
-            <span className={styles.momentMeta}>{copy.first}</span>
-            <div className={styles.timePair}>
-              <div className={styles.timeOutline}>
-                <span>{copy.reading}</span>
-                <small>30{copy.minuteUnit}</small>
-              </div>
-              <div className={styles.timeInk}>
-                <span>{copy.reading}</span>
-                <small>45{copy.minuteUnit}</small>
-              </div>
-            </div>
-            <p>{copy.firstThought}</p>
-          </div>
-          <div className={styles.moment}>
-            <span className={styles.momentMeta}>{copy.next}</span>
-            <div className={styles.timePair}>
-              <div className={styles.timeOutline}>
-                <span>{copy.reading}</span>
-                <small>45{copy.minuteUnit}</small>
-              </div>
-              <div className={styles.timeInk}>
-                <span>{copy.reading}</span>
-                <small>45{copy.minuteUnit}</small>
-              </div>
-            </div>
-            <p>{copy.nextThought}</p>
-          </div>
-          <div className={styles.moment}>
-            <span className={styles.momentMeta}>{copy.later}</span>
-            <div className={styles.completion}>
-              <Mark animated />
-              <span>
-                {copy.completion1}
-                <br />
-                <strong>{copy.completion2}</strong>
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
-      <div className={styles.journeyLegend}>
-        <span>
-          <i className={styles.legendOutline} aria-hidden="true" />
-          {copy.plan}
-        </span>
-        <span>
-          <i className={styles.legendSolid} aria-hidden="true" />
-          {copy.record}
-        </span>
-        <button
-          type="button"
-          onClick={() => setRun((value) => value + 1)}
-          className={styles.replayButton}
-        >
-          <span aria-hidden="true">↻</span> {copy.replay}
-        </button>
-      </div>
-    </div>
-  );
-}
 
 type DayStep = 'plan' | 'record' | 'next';
 
@@ -403,7 +299,7 @@ export function ClosingMark({ label }: { label: string }) {
       onClick={() => setRun((value) => value + 1)}
     >
       <span key={run}>
-        <Mark animated />
+        <LogoArtwork variant="mark" width={100} height={100} />
       </span>
     </button>
   );

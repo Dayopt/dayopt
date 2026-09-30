@@ -10,7 +10,7 @@ import {
 import { usePathname, useRouter } from '@dayopt/i18n/navigation';
 import { routing, type Locale } from '@dayopt/i18n/routing';
 import { ChevronDown, Globe } from 'lucide-react';
-import { useLocale } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import * as React from 'react';
 
 const localeLabels: Record<Locale, string> = {
@@ -30,6 +30,7 @@ interface LanguageSwitcherProps {
 }
 
 export function LanguageSwitcher({ variant = 'short', className }: LanguageSwitcherProps) {
+  const t = useTranslations('common');
   const router = useRouter();
   const pathname = usePathname();
   const locale = useLocale() as Locale;
@@ -61,7 +62,7 @@ export function LanguageSwitcher({ variant = 'short', className }: LanguageSwitc
         <Button
           variant="ghost"
           size="default"
-          aria-label={`${currentLabel} - Change language`}
+          aria-label={`${currentLabel} - ${t('aria.changeLanguage')}`}
           className={className}
         >
           <Globe className="size-4" />

@@ -24,10 +24,10 @@ vi.mock('@web/platform/analytics/signup-cta', () => ({ trackSignupCta }));
 vi.mock('@web/platform/config/product-signup-url', () => ({
   productSignupUrl: () => 'https://product-preview.example/auth/signup',
 }));
+vi.mock('./DayCanvas', () => ({ DayCanvas: () => null }));
 vi.mock('./LandingInteractions', () => ({
   CalendarDemo: () => null,
   ClosingMark: () => null,
-  HeroJourney: () => null,
   TemplateDemo: () => null,
 }));
 

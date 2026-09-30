@@ -4,8 +4,10 @@ import { Link } from '@dayopt/i18n/navigation';
 import { SignupCtaLink } from '@web/shell/analytics/SignupCtaLink';
 import { getTranslations } from 'next-intl/server';
 
-import { CalendarDemo, ClosingMark, HeroJourney, TemplateDemo } from './LandingInteractions';
+import { DayCanvas, type DayCanvasCopy } from './DayCanvas';
+import { CalendarDemo, ClosingMark, TemplateDemo } from './LandingInteractions';
 import styles from './LandingPage.module.css';
+import { WeekTrace } from './WeekTrace';
 
 interface LandingPageProps {
   locale: string;
@@ -43,48 +45,78 @@ export async function LandingPage({ locale }: LandingPageProps) {
   const t = await getTranslations({ locale, namespace: 'marketing' });
   const freeFeatures = t.raw('pricing.plans.free.features') as string[];
   const proHighlights = t.raw('pricing.plans.pro.highlights') as string[];
+  const experienceCopy: DayCanvasCopy = {
+    label: t('landing.experience.label'),
+    sample: t('landing.experience.sample'),
+    dayFirst: t('landing.experience.dayFirst'),
+    dayNext: t('landing.experience.dayNext'),
+    plan: t('landing.experience.plan'),
+    record: t('landing.experience.record'),
+    reading: t('landing.experience.reading'),
+    minuteUnit: t('landing.experience.minuteUnit'),
+    previousRecord: t('landing.experience.previousRecord'),
+    pending: t('landing.experience.pending'),
+    controlsLabel: t('landing.experience.controlsLabel'),
+    stepPlan: t('landing.experience.stepPlan'),
+    stepRecord: t('landing.experience.stepRecord'),
+    stepNext: t('landing.experience.stepNext'),
+    reset: t('landing.experience.reset'),
+    planTitle: t('landing.experience.planTitle'),
+    planBody: t('landing.experience.planBody'),
+    recordTitle: t('landing.experience.recordTitle'),
+    recordBody: t('landing.experience.recordBody'),
+    nextTitle: t('landing.experience.nextTitle'),
+    nextBody: t('landing.experience.nextBody'),
+    room: t('landing.experience.room'),
+    help: t('landing.experience.help'),
+    probeLabel: t('landing.experience.probeLabel'),
+    probePlan: t('landing.experience.probePlan'),
+    probeBoth: t('landing.experience.probeBoth'),
+    probeRecord: t('landing.experience.probeRecord'),
+    probeNext: t('landing.experience.probeNext'),
+    probeRoom: t('landing.experience.probeRoom'),
+  };
 
   return (
-    <div className={styles.landing} data-locale={locale}>
+    <div className={styles.landing} data-locale={locale} lang={locale}>
       <section className={styles.hero} aria-labelledby="landing-title">
-        <div className={styles.heroIntro}>
-          <h1 id="landing-title">
-            {t('landing.hero.title1')}
-            <br />
-            <span>{t('landing.hero.title2')}</span>
-          </h1>
-          <p>
-            {t('landing.hero.body1')}
-            <br /> {t('landing.hero.body2')}
-          </p>
-          <div className={styles.heroActions}>
-            <Button variant="primary" size="lg" asChild>
-              <SignupCtaLink ctaId="hero">
-                {t('landing.hero.cta')} <span aria-hidden="true">↗</span>
-              </SignupCtaLink>
-            </Button>
-            <a className={styles.textLink} href="#calendar-preview">
-              {t('landing.hero.demo')} <span aria-hidden="true">↓</span>
-            </a>
+        <div className={styles.heroHead}>
+          <div className={styles.heroIntro}>
+            <p className={styles.heroEyebrow}>{t('landing.hero.eyebrow')}</p>
+            <h1 id="landing-title">
+              {t('landing.hero.title1')}
+              <br />
+              <span>{t('landing.hero.title2')}</span>
+            </h1>
+          </div>
+          <div className={styles.heroAside}>
+            <p>
+              {t('landing.hero.body1')}
+              <br />
+              {t('landing.hero.body2')}
+            </p>
+            <div className={styles.heroActions}>
+              <Button variant="primary" size="lg" asChild>
+                <SignupCtaLink ctaId="hero">
+                  {t('landing.hero.cta')} <span aria-hidden="true">↗</span>
+                </SignupCtaLink>
+              </Button>
+              <a className={styles.textLink} href="#day-experience">
+                {t('landing.hero.demo')} <span aria-hidden="true">↓</span>
+              </a>
+            </div>
+            <noscript>
+              <p className={styles.noScript}>{t('landing.hero.noScript')}</p>
+            </noscript>
           </div>
         </div>
-        <HeroJourney
-          copy={{
-            label: t('landing.hero.journeyLabel'),
-            first: t('landing.hero.first'),
-            next: t('landing.hero.next'),
-            later: t('landing.hero.later'),
-            reading: t('landing.hero.reading'),
-            minuteUnit: t('landing.hero.minuteUnit'),
-            firstThought: t('landing.hero.firstThought'),
-            nextThought: t('landing.hero.nextThought'),
-            completion1: t('landing.hero.completion1'),
-            completion2: t('landing.hero.completion2'),
-            plan: t('landing.hero.plan'),
-            record: t('landing.hero.record'),
-            replay: t('landing.hero.replay'),
-          }}
-        />
+        <div id="day-experience" className={styles.heroExperience}>
+          <DayCanvas copy={experienceCopy} />
+        </div>
+        <p className={styles.heroFoot}>
+          {t('landing.hero.scroll')}
+          <span aria-hidden="true">↓</span>
+        </p>
       </section>
 
       <section className={styles.section} id="calendar-preview" aria-labelledby="calendar-title">
@@ -269,13 +301,25 @@ export async function LandingPage({ locale }: LandingPageProps) {
               <strong>{t('landing.review.paperTitle')}</strong>
               <span>{t('landing.review.paperDate')}</span>
             </div>
-            <div className={styles.reviewTotal}>
-              <span>{t('landing.review.totalLabel')}</span>
-              <p>
-                <strong>16</strong> {t('landing.review.hour')} <strong>30</strong>{' '}
-                {t('landing.review.minute')}
-              </p>
-              <span>{t('landing.review.totalNote')}</span>
+            <div className={styles.reviewShape}>
+              <div className={styles.reviewTotal}>
+                <span>{t('landing.review.totalLabel')}</span>
+                <p>
+                  <strong>16</strong> {t('landing.review.hour')} <strong>30</strong>{' '}
+                  {t('landing.review.minute')}
+                </p>
+                <span>{t('landing.review.totalNote')}</span>
+              </div>
+              <WeekTrace
+                copy={{
+                  label: t('landing.review.traceLabel'),
+                  days: t.raw('landing.review.days') as string[],
+                  plan: t('landing.hero.plan'),
+                  record: t('landing.hero.record'),
+                  minuteUnit: t('landing.hero.minuteUnit'),
+                  scale: t('landing.review.traceScale'),
+                }}
+              />
             </div>
             <div className={styles.reviewColumns}>
               <div>

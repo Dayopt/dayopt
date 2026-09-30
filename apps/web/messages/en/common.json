@@ -94,7 +94,9 @@
       "goToNextPage": "Go to next page",
       "morePages": "More pages",
       "pagination": "pagination",
-      "more": "More"
+      "more": "More",
+      "changeTheme": "Change theme",
+      "changeLanguage": "Change language"
     },
     "cookies": {
       "banner": {
@@ -119,6 +121,11 @@
         "revokeCancelLabel": "Keep current choice",
         "saveFailed": "Could not save your choice. Browser storage rejected the write, so analytics was not changed."
       }
+    },
+    "theme": {
+      "light": "Light",
+      "dark": "Dark",
+      "system": "System"
     }
   },
   "errors": {

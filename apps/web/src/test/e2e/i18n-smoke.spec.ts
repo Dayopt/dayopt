@@ -5,20 +5,20 @@ test('footer の言語切替で locale prefix と hero copy が切り替わる',
   await page.goto('/');
 
   const hero = page.getByRole('heading', { level: 1 });
-  await expect(hero).toContainText('One day at a time,');
+  await expect(hero).toContainText('Give your day');
 
   await page.getByRole('button', { name: 'English - Change language' }).click();
   await page.getByRole('menuitemcheckbox', { name: '日本語' }).click();
 
   await expect(page).toHaveURL(/\/ja\/?$/);
-  await expect(hero).toContainText('一日を重ねて、');
+  await expect(hero).toContainText('一日が、');
 
-  await page.getByRole('button', { name: '日本語 - Change language' }).click();
+  await page.getByRole('button', { name: '日本語 - 言語を変更' }).click();
   await page.getByRole('menuitemcheckbox', { name: 'English' }).click();
 
   await expect(page).toHaveURL(/\/$/);
   await expect(page).not.toHaveURL(/\/ja\/?$/);
-  await expect(hero).toContainText('One day at a time,');
+  await expect(hero).toContainText('Give your day');
 });
 
 test('登録 CTA が product signup に統一されている', async ({ page }) => {
@@ -39,7 +39,7 @@ test('登録 CTA が product signup に統一されている', async ({ page }) 
 test('LP metadata と OG image が新コピーに整合する', async ({ page }) => {
   const ogTitle = 'Dayopt';
   const description =
-    "Your plans and records, together in one calendar. What you learn today makes tomorrow's plan a little better.";
+    'Your plans and records, together in one calendar. See how you spend your time. Find room for the next day.';
 
   await page.goto('/');
 
@@ -65,28 +65,28 @@ test('LP の en/ja × desktop/mobile を表示できる', async ({ page }, testI
     {
       name: 'en-desktop',
       path: '/',
-      headline: 'One day at a time,',
+      headline: 'Give your day',
       width: 1440,
       height: 1000,
     },
     {
       name: 'ja-desktop',
       path: '/ja',
-      headline: '一日を重ねて、',
+      headline: '一日が、',
       width: 1440,
       height: 1000,
     },
     {
       name: 'en-mobile',
       path: '/',
-      headline: 'One day at a time,',
+      headline: 'Give your day',
       width: 390,
       height: 844,
     },
     {
       name: 'ja-mobile',
       path: '/ja',
-      headline: '一日を重ねて、',
+      headline: '一日が、',
       width: 390,
       height: 844,
     },
@@ -107,7 +107,7 @@ test('LP の en/ja × desktop/mobile を表示できる', async ({ page }, testI
   }
 });
 
-test('C案の表示例が操作に応じて変わる', async ({ page }) => {
+test('日々の使い方の表示例が操作に応じて変わる', async ({ page }) => {
   await page.goto('/ja');
 
   const calendar = page.locator('#calendar-preview');
@@ -179,9 +179,9 @@ test('ダークモードと動きを減らす設定でもHeroの物語を読め�
   await page.emulateMedia({ colorScheme: 'dark', reducedMotion: 'reduce' });
   await page.goto('/ja');
 
-  await expect(page.getByRole('heading', { level: 1 })).toContainText('なりたい自分へ。');
-  await expect(page.getByText('思ったより、夢中に。')).toBeVisible();
-  await expect(page.getByText('読み終えた。')).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1 })).toContainText('かたちになる。');
+  await expect(page.locator('#day-experience [data-plan-duration="30"]')).toBeVisible();
+  await expect(page.locator('#day-experience [data-record-duration="45"]')).toBeVisible();
 
   await expect(page.locator('html')).toHaveClass(/dark/);
   const darkBackground = await page

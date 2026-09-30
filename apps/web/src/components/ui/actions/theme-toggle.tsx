@@ -8,16 +8,18 @@ import {
   DropdownMenuTrigger,
 } from '@dayopt/components';
 import { ChevronDown, Monitor, Moon, Sun } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import { useTheme } from 'next-themes';
 import * as React from 'react';
 
 const themeOptions = [
-  { value: 'light', label: 'Light', icon: Sun },
-  { value: 'dark', label: 'Dark', icon: Moon },
-  { value: 'system', label: 'System', icon: Monitor },
+  { value: 'light', icon: Sun },
+  { value: 'dark', icon: Moon },
+  { value: 'system', icon: Monitor },
 ] as const;
 
 export function ThemeToggle() {
+  const t = useTranslations('common');
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = React.useState(false);
 
@@ -30,7 +32,7 @@ export function ThemeToggle() {
 
   if (!mounted) {
     return (
-      <Button variant="ghost" size="default" disabled>
+      <Button variant="ghost" size="default" disabled aria-label={t('aria.changeTheme')}>
         <Sun className="size-4" />
         <ChevronDown className="size-3" />
       </Button>
@@ -40,7 +42,7 @@ export function ThemeToggle() {
   return (
     <DropdownMenu modal={false}>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="default" aria-label="Change theme">
+        <Button variant="ghost" size="default" aria-label={t('aria.changeTheme')}>
           <CurrentIcon className="size-4" />
           <ChevronDown className="size-3" />
         </Button>
@@ -54,7 +56,7 @@ export function ThemeToggle() {
           >
             <span className="flex items-center gap-2">
               <option.icon className="size-4" />
-              {option.label}
+              {t(`theme.${option.value}`)}
             </span>
           </DropdownMenuCheckboxItem>
         ))}

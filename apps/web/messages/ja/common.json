@@ -65,7 +65,9 @@
       "goToNextPage": "次のページへ",
       "morePages": "その他のページ",
       "pagination": "ページネーション",
-      "more": "その他"
+      "more": "その他",
+      "changeTheme": "テーマを変更",
+      "changeLanguage": "言語を変更"
     },
     "cookies": {
       "banner": {
@@ -90,6 +92,11 @@
         "revokeCancelLabel": "今の選択のままにする",
         "saveFailed": "選択を保存できませんでした。ブラウザの保存領域が書き込みを拒否したため、分析の設定は変わっていません。"
       }
+    },
+    "theme": {
+      "light": "ライト",
+      "dark": "ダーク",
+      "system": "システム"
     }
   },
   "footer": {

@@ -1,12 +1,15 @@
 'use client';
 
+import { LogoArtwork } from '@dayopt/assets/logo-artwork';
 import { Logo } from '@dayopt/components';
 import { dayoptBrand } from '@dayopt/config';
 import { Link } from '@dayopt/i18n/navigation';
 import { LanguageSwitcher } from '@web/components/ui/actions/language-switcher';
 import { ThemeToggle } from '@web/components/ui/actions/theme-toggle';
 import { CookieConsentSettings } from '@web/shell/privacy/CookieConsentSettings';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
+
+import styles from './SiteChrome.module.css';
 
 // SNS Icons
 const XIcon = (props: React.SVGProps<SVGSVGElement>) => (
@@ -36,6 +39,7 @@ const YouTubeIcon = (props: React.SVGProps<SVGSVGElement>) => (
 );
 
 export function Footer() {
+  const locale = useLocale();
   const t = useTranslations('common');
   const tFooter = useTranslations('footer');
 
@@ -73,13 +77,13 @@ export function Footer() {
   ];
 
   return (
-    <footer className="bg-background border-border border-t">
-      <div className="mx-auto max-w-7xl px-6 pt-12 pb-8 lg:px-8">
+    <footer className={styles.footer} lang={locale}>
+      <div className={styles.inner}>
         {/* Navigation Grid */}
         <div className="xl:grid xl:grid-cols-3 xl:gap-8">
           {/* Logo */}
           <div>
-            <Link href="/" className="inline-block">
+            <Link href="/" className={styles.logo}>
               <Logo variant="lockup" size="lg" />
             </Link>
           </div>
@@ -213,6 +217,9 @@ export function Footer() {
               </div>
             </div>
           </div>
+        </div>
+        <div className={styles.watermark} aria-hidden="true">
+          <LogoArtwork variant="wordmark" width={279.131} height={82} />
         </div>
       </div>
     </footer>

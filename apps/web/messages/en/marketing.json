@@ -2,12 +2,12 @@
   "marketing": {
     "landing": {
       "hero": {
-        "title1": "One day at a time,",
-        "title2": "closer to who you want to be.",
+        "title1": "Give your day",
+        "title2": "shape.",
         "body1": "Your plans and records, together in one calendar.",
-        "body2": "What you learn today makes tomorrow's plan a little better.",
+        "body2": "See how you spend your time. Find room for the next day.",
         "cta": "Get started with Dayopt",
-        "demo": "See a day in Dayopt",
+        "demo": "Explore a day",
         "journeyLabel": "An example of how one reading session can lead to progress the next day",
         "first": "One morning",
         "next": "The next day",
@@ -20,12 +20,15 @@
         "completion2": "the book I wanted to read.",
         "plan": "Plan",
         "record": "Record",
-        "replay": "Replay the motion"
+        "replay": "Replay the motion",
+        "eyebrow": "Make room for your time.",
+        "scroll": "One day, a little clearer.",
+        "noScript": "Enable JavaScript to try the interactive examples. You can still read the page and sign up."
       },
       "calendar": {
-        "kicker": "Calendar",
-        "title1": "What you planned.",
-        "title2": "What actually happened.",
+        "kicker": "A day in practice",
+        "title1": "Draw the outline.",
+        "title2": "Keep what happened.",
         "body1": "Choose when and how long to spend on what matters.",
         "body2": "See your plans beside your records and find your own pace.",
         "controlsLabel": "Switch between examples of planning and recording",
@@ -112,8 +115,8 @@
       },
       "review": {
         "kicker": "Review",
-        "title1": "Look back on a week.",
-        "title2": "See your next step.",
+        "title1": "A week becomes",
+        "title2": "a map of your time.",
         "body": "See where your time went and how it differed from the plan. Reflect on how that time felt, too. Follow your progress by week, month, and year.",
         "paperTitle": "This week's review",
         "paperDate": "September 7–13 · Illustration",
@@ -133,7 +136,10 @@
         "quality": "03 / Quality of time",
         "qualityNote": "Reflect on time that felt fulfilling or draining.",
         "next": "04 / Into the next period",
-        "nextNote": "Look at your records and outside commitments before planning the next week."
+        "nextNote": "Look at your records and outside commitments before planning the next week.",
+        "traceLabel": "A sample week. 15 hours 30 minutes planned, 16 hours 30 minutes recorded. Outlines are plans; filled shapes are records.",
+        "days": ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+        "traceScale": "3h"
       },
       "philosophy": {
         "title": "You don't have to fill every hour.",
@@ -207,11 +213,42 @@
         "a6": "You can export your data as CSV or JSON from Settings."
       },
       "closing": {
-        "replay": "Replay the logo's click-together motion",
-        "title1": "Keep adding days.",
-        "title2": "Move toward what matters.",
+        "replay": "Replay the Dayopt logo motion",
+        "title1": "Your next day",
+        "title2": "starts here.",
         "body": "A book you wanted to read. Something you wanted to make. Begin by giving one thing a little time.",
         "note": "Your plans and records, together in one calendar."
+      },
+      "experience": {
+        "label": "Interactive example comparing a 30-minute plan and a 45-minute record on the same timeline",
+        "sample": "An interactive example",
+        "dayFirst": "One day",
+        "dayNext": "The next day’s plan",
+        "plan": "Plan",
+        "record": "Record",
+        "reading": "Reading",
+        "minuteUnit": "min",
+        "previousRecord": "Previous day’s record",
+        "pending": "You choose what to record.",
+        "controlsLabel": "Explore the time in a day",
+        "stepPlan": "See a 30-minute plan",
+        "stepRecord": "Compare a 45-minute record",
+        "stepNext": "Plan 45 minutes tomorrow",
+        "reset": "Reset the example",
+        "planTitle": "A book. A little time. Thirty minutes.",
+        "planBody": "Make room for something you want to do. A plan gives your day an outline.",
+        "recordTitle": "Forty-five minutes, absorbed.",
+        "recordBody": "You planned 30 minutes. You spent 45. Side by side, your own pace comes into view.",
+        "nextTitle": "Next time, make it forty-five.",
+        "nextBody": "Use the previous day’s record to choose your next plan. The original plan and record each stay intact.",
+        "room": "Room to leave open.",
+        "help": "This example stays on this page. No plans or records are saved.",
+        "probeLabel": "Move through the time axis",
+        "probePlan": "Inside the outline: 30 minutes set aside for reading.",
+        "probeBoth": "At this moment, both a plan and a record exist.",
+        "probeRecord": "The 30-minute plan has ended. The record continues.",
+        "probeNext": "A 45-minute plan. Bring that shape into the next day.",
+        "probeRoom": "Unscheduled time is part of this day, too."
       }
     },
     "hero": {
