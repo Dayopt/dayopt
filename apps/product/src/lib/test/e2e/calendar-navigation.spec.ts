@@ -29,18 +29,23 @@ const TEST_PASSWORD = 'test-password-123';
 
 type SupabaseClient = ReturnType<typeof createClient<Database>>;
 
-async function expectCalendarUrl(page: Page, expected: { pathname: string; date: string }) {
+async function expectCalendarUrl(
+  page: Page,
+  expected: { pathname: string; date: string; view: string },
+) {
   await expect
     .poll(() => {
       const url = new URL(page.url());
       return {
         pathname: url.pathname,
         date: url.searchParams.get('date'),
+        view: url.searchParams.get('view'),
       };
     })
     .toEqual({
       pathname: expected.pathname,
       date: expected.date,
+      view: expected.view,
     });
 }
 
@@ -121,16 +126,16 @@ describeWithEnv('Calendar navigation', () => {
     await expect.poll(() => new URL(page.url()).pathname).toBe('/ja/report');
 
     await calendarTab.click();
-    await expectCalendarUrl(page, { pathname: '/ja/calendar', date: TEST_DATE });
+    await expectCalendarUrl(page, { pathname: '/ja/calendar', date: TEST_DATE, view: 'day' });
     await expect(page.locator('[data-calendar-grid]').first()).toBeVisible({ timeout: 10_000 });
 
     await page.getByRole('button', { name: '日', exact: true }).click();
     await page.getByRole('menuitem', { name: /^3日\s*3$/ }).click();
-    await expectCalendarUrl(page, { pathname: '/ja/calendar', date: TEST_DATE });
+    await expectCalendarUrl(page, { pathname: '/ja/calendar', date: TEST_DATE, view: '3day' });
     await expect(page.locator('[data-calendar-grid]')).toHaveCount(3);
 
     await page.goBack();
-    await expectCalendarUrl(page, { pathname: '/ja/calendar', date: TEST_DATE });
+    await expectCalendarUrl(page, { pathname: '/ja/calendar', date: TEST_DATE, view: 'day' });
     await expect(page.locator('[data-calendar-grid]')).toHaveCount(1);
     await expect(page.getByRole('button', { name: '日', exact: true })).toBeVisible();
   });
