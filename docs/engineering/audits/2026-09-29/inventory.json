@@ -16780,10 +16780,12 @@
       "mode": "100644",
       "bytes": 4050,
       "method": "full-text",
-      "status": "unverified",
-      "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "status": "full-text-reviewed",
+      "reason": "Complete text read; baseline bytes match",
+      "read_ranges": [[1, 108]],
+      "evidence": [
+        "Full read at9cce0ee2a. Feedforward requires clipped period overlap, distinct from full Record median; obsolete pairing/start-only test descriptions disagree with actual query assertions, pending call-site/contract reconciliation."
+      ],
       "questions": []
     },
     {
@@ -16793,10 +16795,12 @@
       "mode": "100644",
       "bytes": 2046,
       "method": "full-text",
-      "status": "unverified",
-      "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "status": "full-text-reviewed",
+      "reason": "Complete text read; baseline bytes match",
+      "read_ranges": [[1, 51]],
+      "evidence": [
+        "Full read at9cce0ee2a. Feedforward requires clipped period overlap, distinct from full Record median; obsolete pairing/start-only test descriptions disagree with actual query assertions, pending call-site/contract reconciliation."
+      ],
       "questions": []
     },
     {
@@ -16901,10 +16905,12 @@
       "mode": "100644",
       "bytes": 1787,
       "method": "full-text",
-      "status": "unverified",
-      "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "status": "full-text-reviewed",
+      "reason": "Complete current text read; baseline bytes verified equal",
+      "read_ranges": [[1, 55]],
+      "evidence": [
+        "Full text read at9cce0ee2a7d8193d6e2080e434ed71e153316d91. Range clipping defaults feed duration sums; median-window full-record contract examined. Conditional catch assert in statistics-shared test remains a candidate, not fixed."
+      ],
       "questions": []
     },
     {
