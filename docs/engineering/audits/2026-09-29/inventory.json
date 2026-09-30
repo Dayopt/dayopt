@@ -3721,10 +3721,12 @@
       "mode": "100644",
       "bytes": 621,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 22]],
+      "evidence": [
+        "Full untruncated read after F054; exact baseline bytes verified. Auth pages/server recovery-session precondition, error escape path and MFA challenge/localization/redirect tests traced. MFA test371 read1-145/146-290/291-371; other files complete. No new browser/cloud or auth transport claim."
+      ],
       "questions": []
     },
     {
@@ -3734,10 +3736,12 @@
       "mode": "100644",
       "bytes": 353,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 11]],
+      "evidence": [
+        "Full untruncated read after F054; exact baseline bytes verified. Auth pages/server recovery-session precondition, error escape path and MFA challenge/localization/redirect tests traced. MFA test371 read1-145/146-290/291-371; other files complete. No new browser/cloud or auth transport claim."
+      ],
       "questions": []
     },
     {
@@ -3747,10 +3751,12 @@
       "mode": "100644",
       "bytes": 12968,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 371]],
+      "evidence": [
+        "Full untruncated read after F054; exact baseline bytes verified. Auth pages/server recovery-session precondition, error escape path and MFA challenge/localization/redirect tests traced. MFA test371 read1-145/146-290/291-371; other files complete. No new browser/cloud or auth transport claim."
+      ],
       "questions": []
     },
     {
@@ -3775,10 +3781,12 @@
       "mode": "100644",
       "bytes": 308,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 12]],
+      "evidence": [
+        "Full untruncated read after F054; exact baseline bytes verified. Auth pages/server recovery-session precondition, error escape path and MFA challenge/localization/redirect tests traced. MFA test371 read1-145/146-290/291-371; other files complete. No new browser/cloud or auth transport claim."
+      ],
       "questions": []
     },
     {
@@ -3788,10 +3796,12 @@
       "mode": "100644",
       "bytes": 648,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 22]],
+      "evidence": [
+        "Full untruncated read after F054; exact baseline bytes verified. Auth pages/server recovery-session precondition, error escape path and MFA challenge/localization/redirect tests traced. MFA test371 read1-145/146-290/291-371; other files complete. No new browser/cloud or auth transport claim."
+      ],
       "questions": []
     },
     {
@@ -3801,10 +3811,12 @@
       "mode": "100644",
       "bytes": 1280,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 40]],
+      "evidence": [
+        "Full untruncated read after F054; exact baseline bytes verified. Auth pages/server recovery-session precondition, error escape path and MFA challenge/localization/redirect tests traced. MFA test371 read1-145/146-290/291-371; other files complete. No new browser/cloud or auth transport claim."
+      ],
       "questions": []
     },
     {
@@ -3814,10 +3826,12 @@
       "mode": "100644",
       "bytes": 3560,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 100]],
+      "evidence": [
+        "Full untruncated read after F054; exact baseline bytes verified. Auth pages/server recovery-session precondition, error escape path and MFA challenge/localization/redirect tests traced. MFA test371 read1-145/146-290/291-371; other files complete. No new browser/cloud or auth transport claim."
+      ],
       "questions": []
     },
     {
@@ -3827,10 +3841,12 @@
       "mode": "100644",
       "bytes": 949,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 27]],
+      "evidence": [
+        "Full untruncated read after F054; exact baseline bytes verified. Auth pages/server recovery-session precondition, error escape path and MFA challenge/localization/redirect tests traced. MFA test371 read1-145/146-290/291-371; other files complete. No new browser/cloud or auth transport claim."
+      ],
       "questions": []
     },
     {
@@ -3840,10 +3856,12 @@
       "mode": "100644",
       "bytes": 2346,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 56]],
+      "evidence": [
+        "Full untruncated read after F054; exact baseline bytes verified. Auth pages/server recovery-session precondition, error escape path and MFA challenge/localization/redirect tests traced. MFA test371 read1-145/146-290/291-371; other files complete. No new browser/cloud or auth transport claim."
+      ],
       "questions": []
     },
     {
@@ -3853,10 +3871,12 @@
       "mode": "100644",
       "bytes": 625,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 22]],
+      "evidence": [
+        "Full untruncated read after F054; exact baseline bytes verified. Auth pages/server recovery-session precondition, error escape path and MFA challenge/localization/redirect tests traced. MFA test371 read1-145/146-290/291-371; other files complete. No new browser/cloud or auth transport claim."
+      ],
       "questions": []
     },
     {
@@ -44121,6 +44141,383 @@
         "Full original Story and entire authored diff reviewed; F054 actual Chromium pending positive/negative controls and light/dark32 passed. Not product runtime/cloud proof."
       ],
       "questions": []
+    },
+    {
+      "path": ".github/workflows/ci.yml",
+      "sha": "ed354390172d947972967f9739fe4d9f84c16162",
+      "change": "M",
+      "blob": "ca600ac8bd8e64bbb842d22a5a4e74836b7ecb88",
+      "method": "full-text",
+      "status": "unverified",
+      "read_ranges": [],
+      "evidence": [
+        "Remote main drift from d81dae88 observed after F054 publication. Name/status and stat only; NOT full reading or integration. Review dependency, OAuth migrations/CI and affected contracts before own merge/revalidation."
+      ],
+      "questions": ["Pending upstream29-file delta review; baseline read status unchanged."]
+    },
+    {
+      "path": ".github/workflows/promote.yml",
+      "sha": "ed354390172d947972967f9739fe4d9f84c16162",
+      "change": "M",
+      "blob": "27817f1dc07db94f884126b5b3798f7e8d303247",
+      "method": "full-text",
+      "status": "unverified",
+      "read_ranges": [],
+      "evidence": [
+        "Remote main drift from d81dae88 observed after F054 publication. Name/status and stat only; NOT full reading or integration. Review dependency, OAuth migrations/CI and affected contracts before own merge/revalidation."
+      ],
+      "questions": ["Pending upstream29-file delta review; baseline read status unchanged."]
+    },
+    {
+      "path": "apps/product/package.json",
+      "sha": "ed354390172d947972967f9739fe4d9f84c16162",
+      "change": "M",
+      "blob": "f1197647c06f40d2fdc63f834dc3dce98c34ac41",
+      "method": "full-text",
+      "status": "unverified",
+      "read_ranges": [],
+      "evidence": [
+        "Remote main drift from d81dae88 observed after F054 publication. Name/status and stat only; NOT full reading or integration. Review dependency, OAuth migrations/CI and affected contracts before own merge/revalidation."
+      ],
+      "questions": ["Pending upstream29-file delta review; baseline read status unchanged."]
+    },
+    {
+      "path": "apps/product/public/legal/oss-credits.json",
+      "sha": "ed354390172d947972967f9739fe4d9f84c16162",
+      "change": "M",
+      "blob": "46014f7eab046125808e5cbdefa80091bebbf3b4",
+      "method": "mechanical",
+      "status": "unverified",
+      "read_ranges": [],
+      "evidence": [
+        "Remote main drift from d81dae88 observed after F054 publication. Name/status and stat only; NOT full reading or integration. Review dependency, OAuth migrations/CI and affected contracts before own merge/revalidation."
+      ],
+      "questions": ["Pending upstream29-file delta review; baseline read status unchanged."]
+    },
+    {
+      "path": "apps/product/src/lib/database/generated/database.types.ts",
+      "sha": "ed354390172d947972967f9739fe4d9f84c16162",
+      "change": "M",
+      "blob": "1e62b9ae20ee590b82a262fbea3edd5e845a67de",
+      "method": "mechanical",
+      "status": "unverified",
+      "read_ranges": [],
+      "evidence": [
+        "Remote main drift from d81dae88 observed after F054 publication. Name/status and stat only; NOT full reading or integration. Review dependency, OAuth migrations/CI and affected contracts before own merge/revalidation."
+      ],
+      "questions": ["Pending upstream29-file delta review; baseline read status unchanged."]
+    },
+    {
+      "path": "apps/product/src/lib/test/integration/account-deletion-gate-concurrency.integration.test.ts",
+      "sha": "ed354390172d947972967f9739fe4d9f84c16162",
+      "change": "M",
+      "blob": "1f4c3a027ad12420d7108f51787aa3e7c4baf519",
+      "method": "full-text",
+      "status": "unverified",
+      "read_ranges": [],
+      "evidence": [
+        "Remote main drift from d81dae88 observed after F054 publication. Name/status and stat only; NOT full reading or integration. Review dependency, OAuth migrations/CI and affected contracts before own merge/revalidation."
+      ],
+      "questions": ["Pending upstream29-file delta review; baseline read status unchanged."]
+    },
+    {
+      "path": "apps/product/src/lib/test/integration/account-deletion-gate.integration.test.ts",
+      "sha": "ed354390172d947972967f9739fe4d9f84c16162",
+      "change": "M",
+      "blob": "dfc35bbc30a33f77414c09cc6d99aeff26884c48",
+      "method": "full-text",
+      "status": "unverified",
+      "read_ranges": [],
+      "evidence": [
+        "Remote main drift from d81dae88 observed after F054 publication. Name/status and stat only; NOT full reading or integration. Review dependency, OAuth migrations/CI and affected contracts before own merge/revalidation."
+      ],
+      "questions": ["Pending upstream29-file delta review; baseline read status unchanged."]
+    },
+    {
+      "path": "apps/storybook/package.json",
+      "sha": "ed354390172d947972967f9739fe4d9f84c16162",
+      "change": "M",
+      "blob": "a66f71c247c27e3fc49aca0ce6460f68ed4d0c5a",
+      "method": "full-text",
+      "status": "unverified",
+      "read_ranges": [],
+      "evidence": [
+        "Remote main drift from d81dae88 observed after F054 publication. Name/status and stat only; NOT full reading or integration. Review dependency, OAuth migrations/CI and affected contracts before own merge/revalidation."
+      ],
+      "questions": ["Pending upstream29-file delta review; baseline read status unchanged."]
+    },
+    {
+      "path": "apps/web/package.json",
+      "sha": "ed354390172d947972967f9739fe4d9f84c16162",
+      "change": "M",
+      "blob": "fe54e2ac5826a6c6024133c7dc07969e117143c1",
+      "method": "full-text",
+      "status": "unverified",
+      "read_ranges": [],
+      "evidence": [
+        "Remote main drift from d81dae88 observed after F054 publication. Name/status and stat only; NOT full reading or integration. Review dependency, OAuth migrations/CI and affected contracts before own merge/revalidation."
+      ],
+      "questions": ["Pending upstream29-file delta review; baseline read status unchanged."]
+    },
+    {
+      "path": "apps/web/public/oss-credits.json",
+      "sha": "ed354390172d947972967f9739fe4d9f84c16162",
+      "change": "M",
+      "blob": "7d53c92b17118c4a64c1e06b71cec20703e18f13",
+      "method": "mechanical",
+      "status": "unverified",
+      "read_ranges": [],
+      "evidence": [
+        "Remote main drift from d81dae88 observed after F054 publication. Name/status and stat only; NOT full reading or integration. Review dependency, OAuth migrations/CI and affected contracts before own merge/revalidation."
+      ],
+      "questions": ["Pending upstream29-file delta review; baseline read status unchanged."]
+    },
+    {
+      "path": "docs/engineering/architecture.md",
+      "sha": "ed354390172d947972967f9739fe4d9f84c16162",
+      "change": "M",
+      "blob": "b8efd103d9a4f7da7b2548f60d88b157838135cf",
+      "method": "full-text",
+      "status": "unverified",
+      "read_ranges": [],
+      "evidence": [
+        "Remote main drift from d81dae88 observed after F054 publication. Name/status and stat only; NOT full reading or integration. Review dependency, OAuth migrations/CI and affected contracts before own merge/revalidation."
+      ],
+      "questions": ["Pending upstream29-file delta review; baseline read status unchanged."]
+    },
+    {
+      "path": "docs/engineering/data/architecture-inventory.md",
+      "sha": "ed354390172d947972967f9739fe4d9f84c16162",
+      "change": "M",
+      "blob": "f5e355745e59ff08f79ca9bc21d5e0a00d5ce466",
+      "method": "mechanical",
+      "status": "unverified",
+      "read_ranges": [],
+      "evidence": [
+        "Remote main drift from d81dae88 observed after F054 publication. Name/status and stat only; NOT full reading or integration. Review dependency, OAuth migrations/CI and affected contracts before own merge/revalidation."
+      ],
+      "questions": ["Pending upstream29-file delta review; baseline read status unchanged."]
+    },
+    {
+      "path": "docs/engineering/data/architecture/model.c4",
+      "sha": "ed354390172d947972967f9739fe4d9f84c16162",
+      "change": "M",
+      "blob": "83e468ec2debd1539d53f529223c29de17f86a4a",
+      "method": "mechanical",
+      "status": "unverified",
+      "read_ranges": [],
+      "evidence": [
+        "Remote main drift from d81dae88 observed after F054 publication. Name/status and stat only; NOT full reading or integration. Review dependency, OAuth migrations/CI and affected contracts before own merge/revalidation."
+      ],
+      "questions": ["Pending upstream29-file delta review; baseline read status unchanged."]
+    },
+    {
+      "path": "docs/engineering/data/db/rls-snapshot.md",
+      "sha": "ed354390172d947972967f9739fe4d9f84c16162",
+      "change": "M",
+      "blob": "52cb8b516c0d2d59fbfa557d0faa62e4387b1fb6",
+      "method": "mechanical",
+      "status": "unverified",
+      "read_ranges": [],
+      "evidence": [
+        "Remote main drift from d81dae88 observed after F054 publication. Name/status and stat only; NOT full reading or integration. Review dependency, OAuth migrations/CI and affected contracts before own merge/revalidation."
+      ],
+      "questions": ["Pending upstream29-file delta review; baseline read status unchanged."]
+    },
+    {
+      "path": "package.json",
+      "sha": "ed354390172d947972967f9739fe4d9f84c16162",
+      "change": "M",
+      "blob": "144eda1305d8b27460769740f0af106b6820c51f",
+      "method": "full-text",
+      "status": "unverified",
+      "read_ranges": [],
+      "evidence": [
+        "Remote main drift from d81dae88 observed after F054 publication. Name/status and stat only; NOT full reading or integration. Review dependency, OAuth migrations/CI and affected contracts before own merge/revalidation."
+      ],
+      "questions": ["Pending upstream29-file delta review; baseline read status unchanged."]
+    },
+    {
+      "path": "packages/observability/package.json",
+      "sha": "ed354390172d947972967f9739fe4d9f84c16162",
+      "change": "M",
+      "blob": "0c926467437926155c8472d07c600d7a3ccd7cc7",
+      "method": "full-text",
+      "status": "unverified",
+      "read_ranges": [],
+      "evidence": [
+        "Remote main drift from d81dae88 observed after F054 publication. Name/status and stat only; NOT full reading or integration. Review dependency, OAuth migrations/CI and affected contracts before own merge/revalidation."
+      ],
+      "questions": ["Pending upstream29-file delta review; baseline read status unchanged."]
+    },
+    {
+      "path": "pnpm-lock.yaml",
+      "sha": "ed354390172d947972967f9739fe4d9f84c16162",
+      "change": "M",
+      "blob": "85f41a96331e5194f42a8c88ac1d540625885a40",
+      "method": "mechanical",
+      "status": "unverified",
+      "read_ranges": [],
+      "evidence": [
+        "Remote main drift from d81dae88 observed after F054 publication. Name/status and stat only; NOT full reading or integration. Review dependency, OAuth migrations/CI and affected contracts before own merge/revalidation."
+      ],
+      "questions": ["Pending upstream29-file delta review; baseline read status unchanged."]
+    },
+    {
+      "path": "pnpm-workspace.yaml",
+      "sha": "ed354390172d947972967f9739fe4d9f84c16162",
+      "change": "M",
+      "blob": "b80a71186590ce4e22eacb8f545f50289c6b4f6f",
+      "method": "full-text",
+      "status": "unverified",
+      "read_ranges": [],
+      "evidence": [
+        "Remote main drift from d81dae88 observed after F054 publication. Name/status and stat only; NOT full reading or integration. Review dependency, OAuth migrations/CI and affected contracts before own merge/revalidation."
+      ],
+      "questions": ["Pending upstream29-file delta review; baseline read status unchanged."]
+    },
+    {
+      "path": "scripts/ci/check.mjs",
+      "sha": "ed354390172d947972967f9739fe4d9f84c16162",
+      "change": "M",
+      "blob": "5696106a23284bdf8efacf3db1bdf3ccc684a31a",
+      "method": "full-text",
+      "status": "unverified",
+      "read_ranges": [],
+      "evidence": [
+        "Remote main drift from d81dae88 observed after F054 publication. Name/status and stat only; NOT full reading or integration. Review dependency, OAuth migrations/CI and affected contracts before own merge/revalidation."
+      ],
+      "questions": ["Pending upstream29-file delta review; baseline read status unchanged."]
+    },
+    {
+      "path": "scripts/ci/impact.mjs",
+      "sha": "ed354390172d947972967f9739fe4d9f84c16162",
+      "change": "M",
+      "blob": "c5f3534add9d99b17980e8437256d47265633128",
+      "method": "full-text",
+      "status": "unverified",
+      "read_ranges": [],
+      "evidence": [
+        "Remote main drift from d81dae88 observed after F054 publication. Name/status and stat only; NOT full reading or integration. Review dependency, OAuth migrations/CI and affected contracts before own merge/revalidation."
+      ],
+      "questions": ["Pending upstream29-file delta review; baseline read status unchanged."]
+    },
+    {
+      "path": "scripts/ci/impact.test.ts",
+      "sha": "ed354390172d947972967f9739fe4d9f84c16162",
+      "change": "M",
+      "blob": "7972d447c5cd72484505f4de86f47f43a0e01628",
+      "method": "full-text",
+      "status": "unverified",
+      "read_ranges": [],
+      "evidence": [
+        "Remote main drift from d81dae88 observed after F054 publication. Name/status and stat only; NOT full reading or integration. Review dependency, OAuth migrations/CI and affected contracts before own merge/revalidation."
+      ],
+      "questions": ["Pending upstream29-file delta review; baseline read status unchanged."]
+    },
+    {
+      "path": "scripts/ci/integration-oauth-pgcrypto-check.mjs",
+      "sha": "ed354390172d947972967f9739fe4d9f84c16162",
+      "change": "A",
+      "blob": "cdf774d4190c8cb6992cff78e8353d75e8c713a4",
+      "method": "full-text",
+      "status": "unverified",
+      "read_ranges": [],
+      "evidence": [
+        "Remote main drift from d81dae88 observed after F054 publication. Name/status and stat only; NOT full reading or integration. Review dependency, OAuth migrations/CI and affected contracts before own merge/revalidation."
+      ],
+      "questions": ["Pending upstream29-file delta review; baseline read status unchanged."]
+    },
+    {
+      "path": "supabase/migrations/20260927034912_integration_oauth_environment_identity.sql",
+      "sha": "ed354390172d947972967f9739fe4d9f84c16162",
+      "change": "A",
+      "blob": "e2dbfd1ab7d26bf73f311142a5f67e81b128afaf",
+      "method": "full-text",
+      "status": "unverified",
+      "read_ranges": [],
+      "evidence": [
+        "Remote main drift from d81dae88 observed after F054 publication. Name/status and stat only; NOT full reading or integration. Review dependency, OAuth migrations/CI and affected contracts before own merge/revalidation."
+      ],
+      "questions": ["Pending upstream29-file delta review; baseline read status unchanged."]
+    },
+    {
+      "path": "supabase/migrations/20260927102812_fix_integration_oauth_origin.sql",
+      "sha": "ed354390172d947972967f9739fe4d9f84c16162",
+      "change": "A",
+      "blob": "5d3aee5acb167b0f16524d86418cc514bba6e072",
+      "method": "full-text",
+      "status": "unverified",
+      "read_ranges": [],
+      "evidence": [
+        "Remote main drift from d81dae88 observed after F054 publication. Name/status and stat only; NOT full reading or integration. Review dependency, OAuth migrations/CI and affected contracts before own merge/revalidation."
+      ],
+      "questions": ["Pending upstream29-file delta review; baseline read status unchanged."]
+    },
+    {
+      "path": "supabase/migrations/20260928043959_prepare_integration_catalog_hash.sql",
+      "sha": "ed354390172d947972967f9739fe4d9f84c16162",
+      "change": "A",
+      "blob": "315555f36ec186151e395834ebf79dbef79bce19",
+      "method": "full-text",
+      "status": "unverified",
+      "read_ranges": [],
+      "evidence": [
+        "Remote main drift from d81dae88 observed after F054 publication. Name/status and stat only; NOT full reading or integration. Review dependency, OAuth migrations/CI and affected contracts before own merge/revalidation."
+      ],
+      "questions": ["Pending upstream29-file delta review; baseline read status unchanged."]
+    },
+    {
+      "path": "supabase/migrations/20260928044000_align_integration_oauth_branch_origin.sql",
+      "sha": "ed354390172d947972967f9739fe4d9f84c16162",
+      "change": "A",
+      "blob": "ec043d34208a288fd833ad7e63a49f263fe0cead",
+      "method": "full-text",
+      "status": "unverified",
+      "read_ranges": [],
+      "evidence": [
+        "Remote main drift from d81dae88 observed after F054 publication. Name/status and stat only; NOT full reading or integration. Review dependency, OAuth migrations/CI and affected contracts before own merge/revalidation."
+      ],
+      "questions": ["Pending upstream29-file delta review; baseline read status unchanged."]
+    },
+    {
+      "path": "supabase/migrations/20260930020815_harden_integration_oauth_authority.sql",
+      "sha": "ed354390172d947972967f9739fe4d9f84c16162",
+      "change": "A",
+      "blob": "f1af6d8f842f8ec2d7f96d4813f81fa690ba2662",
+      "method": "full-text",
+      "status": "unverified",
+      "read_ranges": [],
+      "evidence": [
+        "Remote main drift from d81dae88 observed after F054 publication. Name/status and stat only; NOT full reading or integration. Review dependency, OAuth migrations/CI and affected contracts before own merge/revalidation."
+      ],
+      "questions": ["Pending upstream29-file delta review; baseline read status unchanged."]
+    },
+    {
+      "path": "supabase/migrations/20260930020816_remove_integration_catalog_hash_helper.sql",
+      "sha": "ed354390172d947972967f9739fe4d9f84c16162",
+      "change": "A",
+      "blob": "c9f03d9ae5ee2a9d3807f73068e991e81685e6dd",
+      "method": "full-text",
+      "status": "unverified",
+      "read_ranges": [],
+      "evidence": [
+        "Remote main drift from d81dae88 observed after F054 publication. Name/status and stat only; NOT full reading or integration. Review dependency, OAuth migrations/CI and affected contracts before own merge/revalidation."
+      ],
+      "questions": ["Pending upstream29-file delta review; baseline read status unchanged."]
+    },
+    {
+      "path": "supabase/tests/integration-oauth-identity.sql",
+      "sha": "ed354390172d947972967f9739fe4d9f84c16162",
+      "change": "A",
+      "blob": "6daa0ccf331f43450c2e368e663a0c979d0fbafb",
+      "method": "full-text",
+      "status": "unverified",
+      "read_ranges": [],
+      "evidence": [
+        "Remote main drift from d81dae88 observed after F054 publication. Name/status and stat only; NOT full reading or integration. Review dependency, OAuth migrations/CI and affected contracts before own merge/revalidation."
+      ],
+      "questions": ["Pending upstream29-file delta review; baseline read status unchanged."]
     }
   ]
 }
