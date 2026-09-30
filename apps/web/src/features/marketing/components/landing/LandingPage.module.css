@@ -91,20 +91,17 @@
   min-height: 48px;
 }
 .heroActions a:first-child,
-.priceCard a,
 .closing a {
   display: inline-flex;
   justify-content: space-between;
   gap: 28px;
 }
 .heroActions a:first-child,
-.priceCard:last-child > a,
 .closing > a {
   background: var(--lp-ink);
   color: var(--lp-paper);
 }
 .heroActions a:first-child:hover,
-.priceCard:last-child > a:hover,
 .closing > a:hover {
   background: color-mix(in oklch, var(--lp-ink) 88%, var(--lp-paper));
 }
@@ -1144,12 +1141,6 @@
   margin: 22px 0 0;
 }
 
-.pricingGrid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 18px;
-}
-
 .pricingOffer {
   --lp-ink: var(--foreground);
   --lp-paper: var(--background);
@@ -1247,67 +1238,6 @@
     padding-top: 32px;
     border-top: 1px solid var(--lp-line);
   }
-}
-
-.priceCard {
-  display: flex;
-  flex-direction: column;
-  min-height: 440px;
-  padding: 28px;
-  border-radius: 8px;
-  background: var(--card);
-  box-shadow: var(--shadow-sm);
-}
-
-.priceCard:nth-child(2) {
-  box-shadow: var(--shadow-md);
-}
-
-.priceName {
-  margin: 0;
-  font-size: 18px;
-  font-weight: 500;
-}
-
-.priceTagline,
-.priceCard > p:not(.priceAmount) {
-  color: var(--lp-muted);
-  font-size: 13px;
-}
-
-.priceCard .priceAmount {
-  margin: 32px 0 14px;
-  font-size: 46px;
-  line-height: 1;
-}
-
-.priceAmount span {
-  color: var(--lp-muted);
-  font-size: 15px;
-}
-
-.priceCard ul {
-  display: grid;
-  gap: 12px;
-  margin: 25px 0 30px;
-  padding: 0;
-  list-style: none;
-}
-
-.priceCard li {
-  display: flex;
-  gap: 11px;
-  font-size: 14px;
-}
-
-.priceCard li::before {
-  content: '—';
-  color: var(--lp-muted);
-}
-
-.priceCard a {
-  width: 100%;
-  margin-top: auto;
 }
 
 .faqGrid {
@@ -1429,8 +1359,7 @@
   .mcpSection,
   .templateDemo,
   .reviewColumns,
-  .reviewBottom,
-  .pricingGrid {
+  .reviewBottom {
     grid-template-columns: 1fr;
     gap: 25px;
   }
@@ -1572,10 +1501,6 @@
   .googleDiagram > div {
     padding: 10px;
   }
-
-  .priceCard {
-    min-height: 0;
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1669,18 +1594,6 @@
 .googleBridge,
 .mcpSection {
   gap: clamp(40px, 6vw, 96px);
-}
-.priceCard {
-  border-radius: 0;
-  background: transparent;
-  padding: 40px 0;
-}
-.priceCard + .priceCard {
-  border-left: 1px solid var(--lp-line);
-  padding-left: 48px;
-}
-.priceAmount {
-  font-size: clamp(56px, 6vw, 88px);
 }
 .faqGrid {
   gap: clamp(40px, 8vw, 128px);
@@ -1809,14 +1722,6 @@
   }
   .quietNote > p {
     font-size: clamp(26px, 6.5vw, 44px);
-  }
-  .priceCard {
-    padding: 24px 0;
-  }
-  .priceCard + .priceCard {
-    padding-left: 0;
-    border-left: 0;
-    border-top: 1px solid var(--lp-line);
   }
   .closing {
     padding-block: 72px;
