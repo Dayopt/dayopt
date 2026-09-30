@@ -42116,6 +42116,21 @@
         "New first-party52-line test fully read. Literal lower/upper clipping and full Record duration, owner/deletion/overlap predicates verified. Red1/1 then green2; not counted as baseline reading."
       ],
       "questions": []
+    },
+    {
+      "path": "apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.rollback.test.ts",
+      "sha": "9c6794b62346d205177be97d9e6980f8df39202a",
+      "change": "A",
+      "blob": "eba955a45727df286b4e4e8eb2765c78472d5f8a",
+      "method": "full-text",
+      "status": "full-text-reviewed",
+      "read_ranges": [[1, 141]],
+      "evidence": [
+        "New first-party141-line test fully read. Genuine real QueryClient red7/0; source review is not a passing verification. Unit-dom project required; ordinary unit collection was empty. Synthetic row/cache only, actual hook execution and browser auth switching not yet tested."
+      ],
+      "questions": [
+        "H041 fix pending across all callers; local checkpoint deliberately failing and not pushed."
+      ]
     }
   ]
 }
