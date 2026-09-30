@@ -15126,10 +15126,12 @@
       "mode": "100644",
       "bytes": 12028,
       "method": "full-text",
-      "status": "unverified",
-      "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "status": "full-text-reviewed",
+      "reason": "Current source/test fully read in untruncated bounded chunks before editing",
+      "read_ranges": [[1, 346]],
+      "evidence": [
+        "Full read at 4c2fbb0c8; baseline byte match. Inspector form keyed by kind/id/placeholder, refutes cross-target reuse of old save queue. Queue tests cover coalescing, discard, pause and flush. Template consumer shares whole cache snapshot. F040 temporary-ID collision reproduced and fixed in both normal create lanes and template apply; whole check pending."
+      ],
       "questions": []
     },
     {
@@ -15942,10 +15944,12 @@
       "mode": "100644",
       "bytes": 7528,
       "method": "full-text",
-      "status": "unverified",
-      "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "status": "full-text-reviewed",
+      "reason": "Current source/test fully read in untruncated bounded chunks before editing",
+      "read_ranges": [[1, 204]],
+      "evidence": [
+        "Full read at 4c2fbb0c8; baseline byte match. Inspector form keyed by kind/id/placeholder, refutes cross-target reuse of old save queue. Queue tests cover coalescing, discard, pause and flush. Template consumer shares whole cache snapshot. F040 temporary-ID collision reproduced and fixed in both normal create lanes and template apply; whole check pending."
+      ],
       "questions": []
     },
     {
@@ -16022,10 +16026,12 @@
       "mode": "100644",
       "bytes": 12335,
       "method": "full-text",
-      "status": "unverified",
-      "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "status": "full-text-reviewed",
+      "reason": "Current source/test fully read in untruncated bounded chunks before editing",
+      "read_ranges": [[1, 366]],
+      "evidence": [
+        "Full read at 4c2fbb0c8; baseline byte match. Inspector form keyed by kind/id/placeholder, refutes cross-target reuse of old save queue. Queue tests cover coalescing, discard, pause and flush. Template consumer shares whole cache snapshot. F040 temporary-ID collision reproduced and fixed in both normal create lanes and template apply; whole check pending."
+      ],
       "questions": []
     },
     {
@@ -16035,10 +16041,12 @@
       "mode": "100644",
       "bytes": 7184,
       "method": "full-text",
-      "status": "unverified",
-      "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "status": "full-text-reviewed",
+      "reason": "Current source/test fully read in untruncated bounded chunks before editing",
+      "read_ranges": [[1, 192]],
+      "evidence": [
+        "Full read at 4c2fbb0c8; baseline byte match. Inspector form keyed by kind/id/placeholder, refutes cross-target reuse of old save queue. Queue tests cover coalescing, discard, pause and flush. Template consumer shares whole cache snapshot. F040 temporary-ID collision reproduced and fixed in both normal create lanes and template apply; whole check pending."
+      ],
       "questions": []
     },
     {

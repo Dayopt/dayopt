@@ -361,3 +361,20 @@ H038追記: 初期RPC948行・後続guard27行・統合test931行を全文確認
 - Countercheck: Inspector local value does not update list caches. Copying the first cached row over all existing rows was rejected because it can regress newer note/version. Test preserves those fields. Server/DB contract, permissions and interaction count unchanged. Actual hook callbacks with synthetic cache/tRPC, not browser/DB observation. Whole-snapshot concurrent rollback and temporary-ID collisions remain separate candidates.
 
 F039 verification completed: whole pnpm check exit0 at product7b5508ff1, 7637 tests/types/lint/static/deadcode successful; docs:check exit0. Reproduction and synthetic-boundary limits above still apply.
+
+## F040 - Temporary IDs collide across independent create/apply operations
+
+- Status: reproduced and fixed; full check running. Mission #2963.
+- Contract: each optimistic resource has independent identity; completing one operation removes only its temporary rows. ID format is internal and retains temp- prefix.
+- Cause/conditions: normal Plan/Record create uses Date.now only; two operations in one millisecond share IDs. Template application uses template/block ID only, so applying the same template to two dates reuses IDs regardless of clock. Existing insertion helper removes same-ID rows, silently replacing another operation. Completion then removes another operation's pending row.
+- Reproduction: final red command (Node24 filtered vitest run, two existing files)3 failed/33 passed; normal lanes retained only Second instead of First+Second; template had2 temporary rows instead of4. Initial test was made independent of lane sort order before final red; no production code changed between red runs. Green same command36 passed. Logs /tmp/dayopt-audit-temp-id-{red-final,green}.log. Tests also complete first operation and assert second pending resources survive.
+- Fix: normal create uses temp-UUID; template IDs preserve template/block prefix and add UUID per materialized row. No shared abstraction, API/DB schema or persisted ID change. Prefix consumers found by repo search only require temp-. Old exact template-ID tests now check prefix; uniqueness is independently tested via resource cardinality, disjoint operation contexts and completion ownership.
+- Countercheck/limits: applying two days has no same-day overlap conflict, so server overlap rules do not avoid this condition. Production occurrence/browser observed behavior not claimed; actual hooks/helpers with synthetic cache/tRPC were executed. Whole-snapshot onError rollback is a distinct unresolved cause, not fixed by UUIDs.
+
+## H041 - Whole timeblock snapshots can rewind concurrent independent operations
+
+- Status: code-level candidate, execution reproduction pending.
+- Both normal mutations and template apply capture all plans/records queries; restoreTimeblockLists writes whole old query data. If B succeeds after A snapshots but before A fails, A restoration can erase B's committed cache row or revive B's deletion. Refetch is eventual repair, not isolation.
+- Must cover normal create/update/delete/restore, template bulk apply, limited/filter caches, same-resource later actions, auth/cache clear and details. Do not solve only one caller or replace all cached rows with an older canonical row. Next: independent QueryClient reproduction and minimal operation-owned inverse under existing mutation architecture.
+
+Rejected queue candidate: TimeblockInspector keys TimeblockInspectorForm by kind/id plus placeholder/loaded. Distinct targets remount queue, so new target does not reuse old pending queue. Continuing accepted old-target edits on unmount is not itself wrong-target persistence. No code change. Auth switching and response lifetimes still separate pending boundaries.

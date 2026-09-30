@@ -75,7 +75,7 @@ export function usePlanTemplateMutations() {
         template.blocks.map((block) => [block.id, block.previewDurationMinutes]),
       ),
     }).map((plan) => ({
-      id: `temp-${template.id}-${plan.blockId}`,
+      id: `temp-${template.id}-${plan.blockId}-${crypto.randomUUID()}`,
       user_id: '',
       activity_id: plan.activityId,
       external_calendar_event_id: null,

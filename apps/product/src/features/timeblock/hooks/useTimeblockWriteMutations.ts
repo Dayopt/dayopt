@@ -8,7 +8,7 @@ import { api } from '@/lib/trpc';
 
 /** 一時ID生成（楽観的作成用） */
 function createTempId(): string {
-  return `temp-${Date.now()}`;
+  return `temp-${crypto.randomUUID()}`;
 }
 
 function isLaneListQuery(lane: 'plans' | 'records') {

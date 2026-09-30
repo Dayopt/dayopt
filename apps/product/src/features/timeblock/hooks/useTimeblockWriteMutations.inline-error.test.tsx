@@ -14,7 +14,7 @@ type MutationInput = Record<string, unknown>;
 interface MutationCallbacks {
   retry?: boolean;
   onMutate?: (input: MutationInput) => Promise<unknown>;
-  onSuccess?: (data: TimeModelRow) => void;
+  onSuccess?: (data: TimeModelRow, input?: MutationInput, context?: unknown) => void;
   onError?: (
     error: { message: string; data?: { serviceCode?: string } },
     input: MutationInput | undefined,
@@ -466,6 +466,54 @@ describe('useTimeblockWriteMutations 楽観更新の巻き戻し', () => {
     mocks.otherMutationCallbacks = [];
     mocks.cacheEntries = [];
   });
+
+  it.each(['plans', 'records'] as const)(
+    '%s concurrent creates own distinct temporary rows',
+    async (lane) => {
+      const now = vi.spyOn(Date, 'now').mockReturnValue(1790640000000);
+      try {
+        mocks.cacheEntries = [[[[lane, 'list'], { input: {}, type: 'query' }], []]];
+        renderHook(() => useTimeblockWriteMutations());
+        const callbacks =
+          lane === 'plans' ? mocks.planCreateCallbacks : mocks.recordCreateCallbacks;
+        const firstInput = {
+          title: 'First',
+          start_at: '2026-07-17T09:00:00.000Z',
+          end_at: '2026-07-17T10:00:00.000Z',
+        };
+        const secondInput = {
+          title: 'Second',
+          start_at: '2026-07-17T11:00:00.000Z',
+          end_at: '2026-07-17T12:00:00.000Z',
+        };
+        let first: unknown;
+        await act(async () => {
+          first = await callbacks?.onMutate?.(firstInput);
+          await callbacks?.onMutate?.(secondInput);
+        });
+        expect(
+          rowsAt()
+            .map((row) => row.title)
+            .sort(),
+        ).toEqual(['First', 'Second']);
+        expect(new Set(rowsAt().map((row) => row.id)).size).toBe(2);
+        const created = listRow({ id: 'server-first', title: 'First' });
+        act(() => callbacks?.onSuccess?.(created, firstInput, first));
+        expect(
+          rowsAt()
+            .map((row) => row.title)
+            .sort(),
+        ).toEqual(['First', 'Second']);
+        expect(
+          rowsAt()
+            .filter((row) => row.id.startsWith('temp-'))
+            .map((row) => row.title),
+        ).toEqual(['Second']);
+      } finally {
+        now.mockRestore();
+      }
+    },
+  );
 
   it.each(['plans', 'records'] as const)(
     '%sのactivity変更を保存前に一覧・詳細と両フィルタへ反映する',

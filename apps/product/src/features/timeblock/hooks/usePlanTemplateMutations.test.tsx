@@ -176,6 +176,32 @@ describe('usePlanTemplateMutations', () => {
   });
 
   describe('applyToDay の楽観的更新', () => {
+    it('different-day applies keep distinct temporary rows and completion owns only its rows', async () => {
+      const first = await mocks.applyCallbacks?.onMutate?.({
+        templateId: TEMPLATE_ID,
+        date: '2026-09-05',
+      });
+      const second = await mocks.applyCallbacks?.onMutate?.({
+        templateId: TEMPLATE_ID,
+        date: '2026-09-06',
+      });
+      const firstIds = (first as { tempIds: Set<string> }).tempIds;
+      const secondIds = (second as { tempIds: Set<string> }).tempIds;
+      expect(
+        (mocks.planRows as PlanRow[]).filter((row) => row.id.startsWith('temp-')),
+      ).toHaveLength(4);
+      expect([...firstIds].some((id) => secondIds.has(id))).toBe(false);
+      const created = planRow({ id: 'first-day-server', start_at: '2026-09-05T00:00:00.000Z' });
+      mocks.applyCallbacks?.onSuccess?.([created], {}, first);
+      expect(
+        (mocks.planRows as PlanRow[])
+          .filter((row) => row.id.startsWith('temp-'))
+          .map((row) => row.id)
+          .sort(),
+      ).toEqual([...secondIds].sort());
+      expect((mocks.planRows as PlanRow[]).some((row) => row.id === created.id)).toBe(true);
+    });
+
     it('list のプレビュー長のまま temp 行を plans cache へ置く', async () => {
       const context = await mocks.applyCallbacks?.onMutate?.({
         templateId: TEMPLATE_ID,
@@ -185,14 +211,14 @@ describe('usePlanTemplateMutations', () => {
       const inserted = (mocks.planRows as PlanRow[]).filter((row) => row.id.startsWith('temp-'));
       expect(inserted).toEqual([
         expect.objectContaining({
-          id: `temp-${TEMPLATE_ID}-block-1`,
+          id: expect.stringMatching(/^temp-template-1-block-1-/),
           title: '集中',
           activity_id: ACTIVITY_ID,
           start_at: '2026-09-05T00:00:00.000Z', // 09:00 JST
           end_at: '2026-09-05T01:30:00.000Z', // プレビュー 90 分
         }),
         expect.objectContaining({
-          id: `temp-${TEMPLATE_ID}-block-2`,
+          id: expect.stringMatching(/^temp-template-1-block-2-/),
           title: '昼',
           activity_id: null,
           start_at: '2026-09-05T03:00:00.000Z',
