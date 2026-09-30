@@ -430,7 +430,7 @@ npx supabase functions deploy send-auth-email --use-api --project-ref=<PREVIEW_R
 npx supabase functions deploy send-auth-email --use-api --project-ref=<PROD_REF>
 ```
 
-通常は GitHub Actions が自動実行する。
+通常の経路は上の[デプロイ経路](#デプロイ経路)を参照する。実行済みかどうかは対象環境のデプロイ記録で確認する。
 
 ### Secrets 管理
 
