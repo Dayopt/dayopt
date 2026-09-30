@@ -406,10 +406,15 @@ export class PlanTemplateService {
         }),
       });
     }
-    const records = await fetchRecords(this.supabase, userId, {
-      startDate: new Date(now.getTime() - MEDIAN_DURATION_WINDOW_DAYS * MS_PER_DAY).toISOString(),
-      endDate: now.toISOString(),
-    });
+    const records = await fetchRecords(
+      this.supabase,
+      userId,
+      {
+        startDate: new Date(now.getTime() - MEDIAN_DURATION_WINDOW_DAYS * MS_PER_DAY).toISOString(),
+        endDate: now.toISOString(),
+      },
+      { clipToRange: false },
+    );
     return {
       timezone: settings?.timezone ?? 'UTC',
       defaultMinutes: settings?.default_duration ?? FALLBACK_DEFAULT_MINUTES,

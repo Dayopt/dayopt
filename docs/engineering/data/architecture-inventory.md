@@ -187,7 +187,7 @@ graph LR
 </details>
 
 <details>
-<summary>test の候補（78）</summary>
+<summary>test の候補（79）</summary>
 
 <!-- prettier-ignore -->
 | ファイル | 対応の根拠 |
@@ -238,6 +238,7 @@ graph LR
 | [apps/product/src/features/timeblock/server/private-timeblock-search-query.test.ts](<../../../apps/product/src/features/timeblock/server/private-timeblock-search-query.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/server/statistics-error-observability.test.ts](<../../../apps/product/src/features/timeblock/server/statistics-error-observability.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/server/statistics-feedforward-service.test.ts](<../../../apps/product/src/features/timeblock/server/statistics-feedforward-service.test.ts>) | feature: timeblock |
+| [apps/product/src/features/timeblock/server/statistics-fetchers.test.ts](<../../../apps/product/src/features/timeblock/server/statistics-fetchers.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/server/statistics-router.test.ts](<../../../apps/product/src/features/timeblock/server/statistics-router.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/server/statistics-service.test.ts](<../../../apps/product/src/features/timeblock/server/statistics-service.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/server/statistics-shared.test.ts](<../../../apps/product/src/features/timeblock/server/statistics-shared.test.ts>) | feature: timeblock |
@@ -430,7 +431,7 @@ graph LR
 </details>
 
 <details>
-<summary>test の候補（78）</summary>
+<summary>test の候補（79）</summary>
 
 <!-- prettier-ignore -->
 | ファイル | 対応の根拠 |
@@ -481,6 +482,7 @@ graph LR
 | [apps/product/src/features/timeblock/server/private-timeblock-search-query.test.ts](<../../../apps/product/src/features/timeblock/server/private-timeblock-search-query.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/server/statistics-error-observability.test.ts](<../../../apps/product/src/features/timeblock/server/statistics-error-observability.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/server/statistics-feedforward-service.test.ts](<../../../apps/product/src/features/timeblock/server/statistics-feedforward-service.test.ts>) | feature: timeblock |
+| [apps/product/src/features/timeblock/server/statistics-fetchers.test.ts](<../../../apps/product/src/features/timeblock/server/statistics-fetchers.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/server/statistics-router.test.ts](<../../../apps/product/src/features/timeblock/server/statistics-router.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/server/statistics-service.test.ts](<../../../apps/product/src/features/timeblock/server/statistics-service.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/server/statistics-shared.test.ts](<../../../apps/product/src/features/timeblock/server/statistics-shared.test.ts>) | feature: timeblock |
@@ -673,7 +675,7 @@ graph LR
 </details>
 
 <details>
-<summary>test の候補（78）</summary>
+<summary>test の候補（79）</summary>
 
 <!-- prettier-ignore -->
 | ファイル | 対応の根拠 |
@@ -724,6 +726,7 @@ graph LR
 | [apps/product/src/features/timeblock/server/private-timeblock-search-query.test.ts](<../../../apps/product/src/features/timeblock/server/private-timeblock-search-query.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/server/statistics-error-observability.test.ts](<../../../apps/product/src/features/timeblock/server/statistics-error-observability.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/server/statistics-feedforward-service.test.ts](<../../../apps/product/src/features/timeblock/server/statistics-feedforward-service.test.ts>) | feature: timeblock |
+| [apps/product/src/features/timeblock/server/statistics-fetchers.test.ts](<../../../apps/product/src/features/timeblock/server/statistics-fetchers.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/server/statistics-router.test.ts](<../../../apps/product/src/features/timeblock/server/statistics-router.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/server/statistics-service.test.ts](<../../../apps/product/src/features/timeblock/server/statistics-service.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/server/statistics-shared.test.ts](<../../../apps/product/src/features/timeblock/server/statistics-shared.test.ts>) | feature: timeblock |
@@ -1167,7 +1170,7 @@ graph LR
 </details>
 
 <details>
-<summary>test の候補（78）</summary>
+<summary>test の候補（79）</summary>
 
 <!-- prettier-ignore -->
 | ファイル | 対応の根拠 |
@@ -1218,6 +1221,7 @@ graph LR
 | [apps/product/src/features/timeblock/server/private-timeblock-search-query.test.ts](<../../../apps/product/src/features/timeblock/server/private-timeblock-search-query.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/server/statistics-error-observability.test.ts](<../../../apps/product/src/features/timeblock/server/statistics-error-observability.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/server/statistics-feedforward-service.test.ts](<../../../apps/product/src/features/timeblock/server/statistics-feedforward-service.test.ts>) | feature: timeblock |
+| [apps/product/src/features/timeblock/server/statistics-fetchers.test.ts](<../../../apps/product/src/features/timeblock/server/statistics-fetchers.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/server/statistics-router.test.ts](<../../../apps/product/src/features/timeblock/server/statistics-router.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/server/statistics-service.test.ts](<../../../apps/product/src/features/timeblock/server/statistics-service.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/server/statistics-shared.test.ts](<../../../apps/product/src/features/timeblock/server/statistics-shared.test.ts>) | feature: timeblock |
@@ -1510,7 +1514,7 @@ graph LR
 </details>
 
 <details>
-<summary>test の候補（78）</summary>
+<summary>test の候補（79）</summary>
 
 <!-- prettier-ignore -->
 | ファイル | 対応の根拠 |
@@ -1561,6 +1565,7 @@ graph LR
 | [apps/product/src/features/timeblock/server/private-timeblock-search-query.test.ts](<../../../apps/product/src/features/timeblock/server/private-timeblock-search-query.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/server/statistics-error-observability.test.ts](<../../../apps/product/src/features/timeblock/server/statistics-error-observability.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/server/statistics-feedforward-service.test.ts](<../../../apps/product/src/features/timeblock/server/statistics-feedforward-service.test.ts>) | feature: timeblock |
+| [apps/product/src/features/timeblock/server/statistics-fetchers.test.ts](<../../../apps/product/src/features/timeblock/server/statistics-fetchers.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/server/statistics-router.test.ts](<../../../apps/product/src/features/timeblock/server/statistics-router.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/server/statistics-service.test.ts](<../../../apps/product/src/features/timeblock/server/statistics-service.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/server/statistics-shared.test.ts](<../../../apps/product/src/features/timeblock/server/statistics-shared.test.ts>) | feature: timeblock |

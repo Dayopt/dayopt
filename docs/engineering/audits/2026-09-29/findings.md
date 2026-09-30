@@ -92,11 +92,12 @@ last_verified: 2026-09-29
 - 修正: testのDateだけを9月5日へ固定、afterEachで実時計へ復帰。test削除/skipなし。
 - 検証: 全体checkで2 failed / 4318 passed → 対象10 passed → 全体checkのproduct 434 files / 4320 passed。ログ `/tmp/dayopt-audit-check.log`、`/tmp/dayopt-audit-template-clock.log`、`/tmp/dayopt-audit-check-after-clock.log`。本番観測ではない。
 
-## H009 — テンプレート中央値と統計中央値の期間境界
+## F009 - Template and creation medians disagree at the window boundary
 
-- 状態: 未検証仮説、未修正。
-- 根拠: StatisticsGeneralServiceは期間に重なる実記録の全長、PlanTemplateServiceはfetchRecordsの期間clip後の長さを中央値に使う。前者には全長を使う意図のコメントがある。
-- 次の反証: 提案用と統計用で期間境界の意味を意図的に分けた契約か、仕様/決定/Issueから確認する。共通domain関数を使っているという理由だけで統合しない。
+- Adopted after source reconciliation: current plan-record.md42, commit33e8944689/PR#2710 and latest settled#2567 comment5550377188 require actual Record elapsed duration; old general-service clipping comment is inconsistent, not a product exception.
+- Synthetic crossing-window3x60-minute records: StatisticsGeneralService median60, template list/apply30. Red2/15 -> green17 with same command. Fetcher opt-out red1/1 -> green2; default lower/upper clipping and owner/deletion/overlap query predicates verified.
+- New private optional fetchRecords clipToRange:false only used by template; existing clipping callers unchanged. Stale general-service comment corrected. Related6files50 passed, /tmp/dayopt-audit-template-median-related.log.
+- Architecture generator run and exact5 test-list/count updates +1 surface count mechanically verified. Initial comparison script failed before writing evidence due incorrect summary whitespace; corrected exact-line comparison passed. No live DB/RLS/browser claim. Whole check running /tmp/dayopt-audit-check-template-median.log.
 
 ## F010 — 夏時間の時間帯集計が記録時間を失う/誤配置する
 
