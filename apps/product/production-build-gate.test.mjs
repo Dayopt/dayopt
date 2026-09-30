@@ -624,6 +624,7 @@ function completeSharedPreviewEnv() {
     NEXT_PUBLIC_SUPABASE_URL: `https://${PRODUCT_INTEGRATION_SUPABASE_REF}.supabase.co`,
     NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_safe-dummy-key',
     SUPABASE_SECRET_KEY: 'eyJ-safe-dummy-service-role-key',
+    RECOVERY_CODE_PEPPER: 'safe-dummy-recovery-pepper',
   };
 }
 
@@ -824,4 +825,108 @@ describe('Product deployment and Supabase binding', () => {
   it('does not require Vercel settings for local builds and CI', () => {
     expect(assertProductDeploymentEnvironmentBuildEnv({ CI: 'true' })).toBe(false);
   });
+});
+
+// Synthetic JWTs only: classify public key formats without authenticating to Supabase.
+function syntheticLegacyKey(payload, header = { alg: 'HS256', typ: 'JWT' }) {
+  return [header, payload]
+    .map((part) => Buffer.from(JSON.stringify(part)).toString('base64url'))
+    .concat(Buffer.alloc(32).toString('base64url'))
+    .join('.');
+}
+
+function runProductBuildGates(env) {
+  return [
+    assertProductDeploymentEnvironmentBuildEnv,
+    assertProductPreviewBuildEnv,
+    assertProductIntegrationBuildEnv,
+    assertProductOperationalProductionBuildEnv,
+  ].map((gate) => gate(env));
+}
+
+describe('Product deployment credential boundary', () => {
+  const anonKey = syntheticLegacyKey({ role: 'anon' });
+  const invalidPublicKeys = [
+    'sb_secret_do-not-leak',
+    syntheticLegacyKey({ role: 'service_role' }),
+    'not-a-key-do-not-leak',
+    'sb_publishable_',
+    'sb_publishable_invalid!characters',
+    `sb_publishable_safe-dummy-key\n`,
+    ` ${anonKey} `,
+    `sb_publishable_safe-dummy-key\\n`,
+    'eyJ-not-a-jwt',
+    syntheticLegacyKey({ role: 'authenticated' }),
+    syntheticLegacyKey({}),
+    syntheticLegacyKey(null),
+    syntheticLegacyKey({ role: 'anon' }, null),
+    syntheticLegacyKey({ role: ['anon'] }),
+    anonKey.replace(/[^.]+$/u, 'short'),
+    `${anonKey}=`,
+    syntheticLegacyKey({ role: 'anon' }, { alg: 'none', typ: 'JWT' }),
+    `${anonKey}.extra`,
+    anonKey.replace(/[^.]+$/u, ''),
+    anonKey.replace(/[^.]+$/u, 'invalid!signature'),
+    `${anonKey.split('.')[0]}.not-json.${anonKey.split('.')[2]}`,
+  ];
+
+  for (const [label, createEnv, expected] of [
+    ['Preview', completeSharedPreviewEnv, [true, false, false, false]],
+    ['Integration', completeIntegrationEnv, [true, false, true, false]],
+    [
+      'MCP Preview',
+      () => ({
+        ...completePreviewEnv(),
+        VERCEL_PROJECT_ID: PRODUCT_VERCEL_PROJECT_ID,
+        NEXT_PUBLIC_SUPABASE_URL: 'https://abcdefghijklmnopqrst.supabase.co',
+        SUPABASE_SECRET_KEY: 'sb_secret_safe-dummy-key',
+      }),
+      [true, true, false, false],
+    ],
+    [
+      'Production',
+      () => ({
+        ...completeProductionEnv(),
+        NEXT_PUBLIC_SUPABASE_URL: 'https://yvglwblxrnrenfifsnje.supabase.co',
+        VERCEL_GIT_COMMIT_REF: 'main',
+      }),
+      [true, false, false, true],
+    ],
+  ]) {
+    it.each(['sb_publishable_safe-dummy-key', anonKey])(
+      `accepts public key formats through the ${label} gate sequence: %s`,
+      (value) => {
+        expect(
+          runProductBuildGates({
+            ...createEnv(),
+            NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: value,
+          }),
+        ).toEqual(expected);
+      },
+    );
+
+    it.each(invalidPublicKeys)(
+      `rejects unsafe public keys without disclosing values in ${label}: %s`,
+      (value) => {
+        let message = '';
+        try {
+          runProductBuildGates({ ...createEnv(), NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: value });
+        } catch (error) {
+          message = error.message;
+        }
+        expect(message).toContain('NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY');
+        expect(message).not.toContain(value);
+        expect(message).not.toContain(value.trim());
+      },
+    );
+  }
+
+  it.each([undefined, '', '  ', '\n\t'])(
+    'rejects missing or blank recovery pepper on ordinary Preview: %s',
+    (value) => {
+      const env = { ...completeSharedPreviewEnv(), RECOVERY_CODE_PEPPER: value };
+      if (value === undefined) delete env.RECOVERY_CODE_PEPPER;
+      expect(() => runProductBuildGates(env)).toThrow('RECOVERY_CODE_PEPPER');
+    },
+  );
 });
