@@ -86,6 +86,23 @@ export function generatePreviewFixtureKeyPair() {
   }
 }
 
+function validatedRecipient(input, publicKey) {
+  return {
+    bound: authority(input),
+    recipient: rsa(createPublicKey(pem(publicKey, 'PUBLIC KEY', 2_048))),
+  };
+}
+
+/** Validate the public recipient before claiming or mutating a fixture. No secrets or I/O. */
+export function assertPreviewFixtureRecipient(options) {
+  try {
+    exact(options, ['input', 'publicKey']);
+    validatedRecipient(options.input, options.publicKey);
+  } catch {
+    throw new Error(ERROR);
+  }
+}
+
 /**
  * Confidentiality and binding only: anyone with the public key can encrypt.
  * A separate trusted artifact verifier MUST authenticate the sender and exact
@@ -98,8 +115,7 @@ export function encryptPreviewFixtureEnvelope(options) {
   try {
     exact(options, ['input', 'publicKey', 'payload']);
     const { input, publicKey, payload } = options;
-    const bound = authority(input);
-    const recipient = rsa(createPublicKey(pem(publicKey, 'PUBLIC KEY', 2_048)));
+    const { bound, recipient } = validatedRecipient(input, publicKey);
     const serialized = JSON.stringify(payload);
     if (typeof serialized !== 'string' || Buffer.byteLength(serialized) > MAX_PAYLOAD)
       throw new Error();

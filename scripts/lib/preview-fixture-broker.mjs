@@ -1,6 +1,10 @@
 import { createHash, createHmac } from 'node:crypto';
 
 import { assertFixtureBrokerTarget, verifyFixtureJobToken } from './preview-fixture-authority.mjs';
+import {
+  assertPreviewFixtureRecipient,
+  encryptPreviewFixtureEnvelope,
+} from './preview-fixture-envelope.mjs';
 import { assertCloudFixtureKey } from './preview-fixture-key.mjs';
 import { createSupabaseFixtureLifecycle } from './preview-fixture-lifecycle.mjs';
 
@@ -359,4 +363,32 @@ export async function executeDurableFixtureBroker({
       return createSupabaseFixtureLifecycle({ client })(binding, execute);
     },
   });
+}
+
+/**
+ * Provision-only trusted composition; not an HTTP route or artifact sender.
+ * Reject an unusable recipient before acquiring admin authority or creating users.
+ * The caller receives only encrypted credentials after durable provision succeeds.
+ */
+export async function executeEncryptedFixtureBroker({
+  publicKey,
+  input,
+  token,
+  createClient,
+  env = process.env,
+  fetchImpl = fetch,
+  now = () => Math.floor(Date.now() / 1000),
+  elapsed = () => performance.now(),
+}) {
+  assertPreviewFixtureRecipient({ input, publicKey });
+  const payload = await executeDurableFixtureBroker({
+    input,
+    token,
+    createClient,
+    env,
+    fetchImpl,
+    now,
+    elapsed,
+  });
+  return encryptPreviewFixtureEnvelope({ input, publicKey, payload });
 }

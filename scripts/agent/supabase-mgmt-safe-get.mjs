@@ -37,6 +37,85 @@ function usage() {
     'Usage: node scripts/agent/supabase-mgmt-safe-get.mjs auth-config <field1> [field2 ...]',
   );
   console.error(`許可されている field（${fields.length} 件）: ${fields.join(', ')}`);
+  console.error('Or: owned-branch-status <name> <branch UUID> <DB ref> <git branch> <PR number>');
+}
+
+/**
+ * Read-only metadata for an exactly bound, owned ephemeral branch. The parent is
+ * fixed. Never call the credential-bearing branch-config endpoint, return raw
+ * provider fields, or infer DB termination from HTTP errors/list absence.
+ * Uses the existing Preview readiness token; does not need keys or write scopes.
+ */
+export async function runOwnedBranchStatusSafeGet({
+  name,
+  branchId,
+  projectRef,
+  gitBranch,
+  prNumber,
+  token,
+  fetchImpl = fetch,
+}) {
+  let failedHttpStatus = null;
+  try {
+    if (
+      !token ||
+      typeof name !== 'string' ||
+      !/^[A-Za-z0-9][A-Za-z0-9_.\/-]{0,127}$/.test(name) ||
+      typeof branchId !== 'string' ||
+      !/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(branchId) ||
+      typeof projectRef !== 'string' ||
+      !/^[a-z]{20}$/.test(projectRef) ||
+      projectRef === SUPABASE_PRODUCTION_PROJECT_REF ||
+      projectRef === 'tilwaprottpyhlfoggbb' ||
+      typeof gitBranch !== 'string' ||
+      !/^codex\/[A-Za-z0-9][A-Za-z0-9_.\/-]{0,127}$/.test(gitBranch) ||
+      !Number.isSafeInteger(prNumber) ||
+      prNumber <= 0
+    )
+      throw new Error();
+    const response = await fetchImpl(
+      `https://api.supabase.com/v1/projects/${SUPABASE_PRODUCTION_PROJECT_REF}/branches/${encodeURIComponent(name)}`,
+      {
+        headers: { Authorization: `Bearer ${token}` },
+        redirect: 'error',
+        signal: AbortSignal.timeout(15_000),
+      },
+    );
+    if (!response.ok) {
+      if ([401, 403, 404, 409, 429, 500, 502, 503, 504].includes(response.status))
+        failedHttpStatus = response.status;
+      throw new Error();
+    }
+    const data = await response.json();
+    if (
+      !data ||
+      Array.isArray(data) ||
+      data.id !== branchId ||
+      data.name !== name ||
+      data.project_ref !== projectRef ||
+      data.parent_project_ref !== SUPABASE_PRODUCTION_PROJECT_REF ||
+      data.git_branch !== gitBranch ||
+      data.pr_number !== prNumber ||
+      data.persistent !== false ||
+      data.is_default !== false ||
+      data.with_data !== false
+    )
+      throw new Error();
+    // All returned identifiers are caller-supplied and matched. No arbitrary
+    // status string (which could contain secrets) is ever returned.
+    return {
+      name,
+      branchId,
+      projectRef,
+      gitBranch,
+      prNumber,
+      terminalVerified: data.preview_project_status === 'REMOVED',
+    };
+  } catch {
+    throw new Error(
+      `Owned Preview branch status is unconfirmed${failedHttpStatus === null ? '' : ` (HTTP ${failedHttpStatus})`}`,
+    );
+  }
 }
 
 async function fetchAuthConfig(projectRef, token, fetchImpl) {
@@ -104,7 +183,22 @@ function isDirectExecution() {
 if (isDirectExecution()) {
   const [subcommand, ...fields] = process.argv.slice(2);
 
-  if (subcommand !== 'auth-config' || fields.length === 0) {
+  if (subcommand === 'owned-branch-status' && fields.length === 5) {
+    const [name, branchId, projectRef, gitBranch, pr] = fields;
+    runOwnedBranchStatusSafeGet({
+      name,
+      branchId,
+      projectRef,
+      gitBranch,
+      prNumber: Number(pr),
+      token: process.env.SUPABASE_ACCESS_TOKEN,
+    })
+      .then((result) => console.log(JSON.stringify(result, null, 2)))
+      .catch((error) => {
+        console.error(error.message);
+        process.exitCode = 1;
+      });
+  } else if (subcommand !== 'auth-config' || fields.length === 0) {
     usage();
     process.exitCode = 1;
   } else {

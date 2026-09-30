@@ -3,7 +3,16 @@ import { createRequire } from 'node:module';
 import { describe, expect, it, vi } from 'vitest';
 
 import { prepareFixtureAuthority } from './preview-fixture-authority.mjs';
-import { executeDurableFixtureBroker, executeFixtureBroker } from './preview-fixture-broker.mjs';
+import {
+  executeDurableFixtureBroker,
+  executeEncryptedFixtureBroker,
+  executeFixtureBroker,
+} from './preview-fixture-broker.mjs';
+
+import {
+  decryptPreviewFixtureEnvelope,
+  generatePreviewFixtureKeyPair,
+} from './preview-fixture-envelope.mjs';
 
 // Exercise the installed SDK's real Auth and PostgREST request/response contract.
 const { createClient } = createRequire(new URL('../../apps/product/package.json', import.meta.url))(
@@ -262,8 +271,99 @@ function provider() {
       ...overrides,
     });
   }
-  return { users, tables, writes, failures, fetchImpl, run, runDurable };
+  async function runEncrypted(
+    publicKey: string,
+    selected = input,
+    overrides: Record<string, unknown> = {},
+  ) {
+    return executeEncryptedFixtureBroker({
+      input: selected,
+      token: token(selected),
+      env,
+      createClient,
+      fetchImpl,
+      now: () => now,
+      publicKey,
+      ...overrides,
+    });
+  }
+  return { users, tables, writes, failures, fetchImpl, run, runDurable, runEncrypted };
 }
+
+describe('encrypted provision composition before fixture changes', () => {
+  const recipient = generatePreviewFixtureKeyPair();
+  const weak = generateKeyPairSync('rsa', { modulusLength: 2048 })
+    .publicKey.export({ type: 'spki', format: 'pem' })
+    .toString();
+  const ec = generateKeyPairSync('ec', { namedCurve: 'prime256v1' })
+    .publicKey.export({ type: 'spki', format: 'pem' })
+    .toString();
+  it.each([
+    { name: 'empty', key: '' },
+    { name: 'malformed', key: 'PRIVATE malformed key' },
+    { name: 'weak RSA', key: weak },
+    { name: 'EC', key: ec },
+    { name: 'private PEM', key: recipient.privateKey },
+    { name: 'oversized', key: recipient.publicKey.repeat(4) },
+  ])('rejects $name without key access or provider requests', async ({ key }) => {
+    const p = provider();
+    const secret = vi.fn(() => env.SUPABASE_SECRET_KEY);
+    const selectedEnv = { ...env };
+    Object.defineProperty(selectedEnv, 'SUPABASE_SECRET_KEY', { get: secret });
+    await expect(p.runEncrypted(key, input, { env: selectedEnv })).rejects.toThrow(
+      /^Preview fixture envelope is invalid$/,
+    );
+    expect(secret).not.toHaveBeenCalled();
+    expect(p.fetchImpl).not.toHaveBeenCalled();
+    expect(p.writes).toEqual([]);
+    expect(p.users.size).toBe(1);
+  });
+  it('retains job authentication before reading the admin key or creating users', async () => {
+    const p = provider();
+    const secret = vi.fn(() => env.SUPABASE_SECRET_KEY);
+    const selectedEnv = { ...env };
+    Object.defineProperty(selectedEnv, 'SUPABASE_SECRET_KEY', { get: secret });
+    await expect(
+      p.runEncrypted(recipient.publicKey, input, { token: 'invalid', env: selectedEnv }),
+    ).rejects.toThrow(/^Preview fixture operation failed$/);
+    expect(secret).not.toHaveBeenCalled();
+    expect(p.writes).toEqual([]);
+    expect(p.users.size).toBe(1);
+  });
+  it('does not return an envelope when the durable claim is UNKNOWN', async () => {
+    const p = provider();
+    p.failures.lifecycleAction = 'claim';
+    await expect(p.runEncrypted(recipient.publicKey)).rejects.toThrow(
+      /^Preview fixture operation failed$/,
+    );
+    expect(p.users.size).toBe(1);
+    expect(p.writes.map((w) => w.path)).toEqual(['/rest/v1/rpc/preview_fixture_lifecycle_v1']);
+  });
+  it('returns only an envelope after the durable provision and preserves its login payload', async () => {
+    const p = provider();
+    const envelope = await p.runEncrypted(recipient.publicKey);
+    const payload = decryptPreviewFixtureEnvelope({
+      input,
+      privateKey: recipient.privateKey,
+      envelope,
+    });
+    expect(payload).toMatchObject({ operation: 'provision', runId: input.intent.runId });
+    expect(payload.users.desktop.password).toBeTruthy();
+    expect(payload.users.mobile.password).toBeTruthy();
+    expect(JSON.stringify(envelope)).not.toContain(payload.users.desktop.password);
+    expect(JSON.stringify(envelope)).not.toContain(payload.users.mobile.password);
+    expect(p.users.size).toBe(3);
+    expect(p.writes.at(-1)).toMatchObject({ body: { p_action: 'finish', p_success: true } });
+  });
+  it('rejects cleanup on this provision-only handoff before sending requests', async () => {
+    const p = provider();
+    await expect(
+      p.runEncrypted(recipient.publicKey, { ...input, operation: 'cleanup' }),
+    ).rejects.toThrow(/^Preview fixture envelope is invalid$/);
+    expect(p.fetchImpl).not.toHaveBeenCalled();
+    expect(p.writes).toEqual([]);
+  });
+});
 
 describe('trusted durable broker composition with installed SDK and mocked providers', () => {
   it('claims, guards every fixture write and finishes through the SDK RPC bridge', async () => {

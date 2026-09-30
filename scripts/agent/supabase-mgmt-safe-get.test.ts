@@ -1,6 +1,95 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { runAuthConfigSafeGet, SAFE_AUTH_CONFIG_FIELDS } from './supabase-mgmt-safe-get.mjs';
+import {
+  runAuthConfigSafeGet,
+  runOwnedBranchStatusSafeGet,
+  SAFE_AUTH_CONFIG_FIELDS,
+} from './supabase-mgmt-safe-get.mjs';
+
+const owned = {
+  name: 'pr-2954-owned-preview',
+  branchId: '0551a471-84f2-42d0-8f48-7808b7be09f5',
+  projectRef: 'tzxpmsytglfihbtcomuc',
+  gitBranch: 'codex/preview-credential-registration-2910',
+  prNumber: 2954,
+};
+const metadata = {
+  id: owned.branchId,
+  name: owned.name,
+  project_ref: owned.projectRef,
+  parent_project_ref: 'yvglwblxrnrenfifsnje',
+  git_branch: owned.gitBranch,
+  pr_number: owned.prNumber,
+  persistent: false,
+  is_default: false,
+  with_data: false,
+  preview_project_status: 'REMOVED',
+  SERVICE_ROLE_KEY: 'PRIVATE provider key',
+  db_pass: 'PRIVATE password',
+};
+
+describe('owned branch status safe projection', () => {
+  it('reports only the numeric 404 and never treats it as terminal proof', async () => {
+    const json = vi.fn();
+    const fetchImpl = vi.fn().mockResolvedValue({ ok: false, status: 404, json });
+    await expect(
+      runOwnedBranchStatusSafeGet({ ...owned, token: 'test-token', fetchImpl }),
+    ).rejects.toThrow('Owned Preview branch status is unconfirmed (HTTP 404)');
+    expect(json).not.toHaveBeenCalled();
+  });
+  it('returns only matching public ownership and the positive terminal observation', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(jsonResponse(metadata));
+    const result = await runOwnedBranchStatusSafeGet({ ...owned, token: 'test-token', fetchImpl });
+    expect(result).toEqual({ ...owned, terminalVerified: true });
+    expect(JSON.stringify(result)).not.toContain('PRIVATE');
+    expect(fetchImpl.mock.calls[0][1]).toMatchObject({ redirect: 'error' });
+  });
+  it.each(['ACTIVE_HEALTHY', 'GOING_DOWN', 'PRIVATE secret', undefined])(
+    'does not count %s as terminal',
+    async (status) => {
+      const fetchImpl = vi
+        .fn()
+        .mockResolvedValue(jsonResponse({ ...metadata, preview_project_status: status }));
+      expect(
+        await runOwnedBranchStatusSafeGet({ ...owned, token: 'test-token', fetchImpl }),
+      ).toEqual({ ...owned, terminalVerified: false });
+    },
+  );
+  it.each([
+    { id: 'foreign' },
+    { name: 'foreign' },
+    { project_ref: 'foreign' },
+    { parent_project_ref: 'foreign' },
+    { git_branch: 'foreign' },
+    { pr_number: 2957 },
+    { persistent: true },
+    { is_default: true },
+    { with_data: true },
+    { with_data: undefined },
+  ])('rejects ownership mismatch %#', async (drift) => {
+    const fetchImpl = vi.fn().mockResolvedValue(jsonResponse({ ...metadata, ...drift }));
+    await expect(
+      runOwnedBranchStatusSafeGet({ ...owned, token: 'test-token', fetchImpl }),
+    ).rejects.toThrow(/^Owned Preview branch status is unconfirmed$/);
+  });
+  it('rejects invalid public selectors before requesting anything', async () => {
+    const fetchImpl = vi.fn();
+    await expect(
+      runOwnedBranchStatusSafeGet({ ...owned, prNumber: 0, token: 'test-token', fetchImpl }),
+    ).rejects.toThrow(/^Owned Preview branch status is unconfirmed$/);
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+  it('does not expose HTTP or network failure bodies or classify them as terminal', async () => {
+    for (const fetchImpl of [
+      vi.fn().mockResolvedValue(jsonResponse({ secret: 'PRIVATE' }, false)),
+      vi.fn().mockRejectedValue(new Error('PRIVATE token/body')),
+    ]) {
+      await expect(
+        runOwnedBranchStatusSafeGet({ ...owned, token: 'test-token', fetchImpl }),
+      ).rejects.toThrow(/^Owned Preview branch status is unconfirmed$/);
+    }
+  });
+});
 
 function jsonResponse(body: unknown, ok = true) {
   return {
