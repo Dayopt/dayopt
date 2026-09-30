@@ -3388,10 +3388,12 @@
       "mode": "100644",
       "bytes": 5284,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 155]],
+      "evidence": [
+        "Full untruncated read atd8031edb1; baseline bytes equality verified. Retry IDs/error allowlist/return query/polling/access management cross-checked. Existing complete-suite tests passed at51bc4196c, no external provider/runtime proof. Older comments and same-ID settlement are candidates requiring caller/transport countercheck, not adopted defects."
+      ],
       "questions": []
     },
     {
@@ -3496,10 +3498,12 @@
       "mode": "100644",
       "bytes": 2261,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 62]],
+      "evidence": [
+        "Full untruncated read atd8031edb1; baseline bytes equality verified. Retry IDs/error allowlist/return query/polling/access management cross-checked. Existing complete-suite tests passed at51bc4196c, no external provider/runtime proof. Older comments and same-ID settlement are candidates requiring caller/transport countercheck, not adopted defects."
+      ],
       "questions": []
     },
     {
@@ -3509,10 +3513,12 @@
       "mode": "100644",
       "bytes": 1387,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 31]],
+      "evidence": [
+        "Full untruncated read atd8031edb1; baseline bytes equality verified. Retry IDs/error allowlist/return query/polling/access management cross-checked. Existing complete-suite tests passed at51bc4196c, no external provider/runtime proof. Older comments and same-ID settlement are candidates requiring caller/transport countercheck, not adopted defects."
+      ],
       "questions": []
     },
     {
@@ -14410,10 +14416,12 @@
       "mode": "100644",
       "bytes": 2484,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 76]],
+      "evidence": [
+        "Full untruncated read atd8031edb1; baseline bytes equality verified. Retry IDs/error allowlist/return query/polling/access management cross-checked. Existing complete-suite tests passed at51bc4196c, no external provider/runtime proof. Older comments and same-ID settlement are candidates requiring caller/transport countercheck, not adopted defects."
+      ],
       "questions": []
     },
     {
@@ -14423,10 +14431,12 @@
       "mode": "100644",
       "bytes": 1811,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 62]],
+      "evidence": [
+        "Full untruncated read atd8031edb1; baseline bytes equality verified. Retry IDs/error allowlist/return query/polling/access management cross-checked. Existing complete-suite tests passed at51bc4196c, no external provider/runtime proof. Older comments and same-ID settlement are candidates requiring caller/transport countercheck, not adopted defects."
+      ],
       "questions": []
     },
     {
@@ -14494,10 +14504,12 @@
       "mode": "100644",
       "bytes": 4287,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 119]],
+      "evidence": [
+        "Full untruncated read atd8031edb1; baseline bytes equality verified. Retry IDs/error allowlist/return query/polling/access management cross-checked. Existing complete-suite tests passed at51bc4196c, no external provider/runtime proof. Older comments and same-ID settlement are candidates requiring caller/transport countercheck, not adopted defects."
+      ],
       "questions": []
     },
     {
@@ -14507,10 +14519,12 @@
       "mode": "100644",
       "bytes": 4718,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 100]],
+      "evidence": [
+        "Full untruncated read atd8031edb1; baseline bytes equality verified. Retry IDs/error allowlist/return query/polling/access management cross-checked. Existing complete-suite tests passed at51bc4196c, no external provider/runtime proof. Older comments and same-ID settlement are candidates requiring caller/transport countercheck, not adopted defects."
+      ],
       "questions": []
     },
     {
@@ -14520,10 +14534,12 @@
       "mode": "100644",
       "bytes": 950,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 24]],
+      "evidence": [
+        "Full untruncated read atd8031edb1; baseline bytes equality verified. Retry IDs/error allowlist/return query/polling/access management cross-checked. Existing complete-suite tests passed at51bc4196c, no external provider/runtime proof. Older comments and same-ID settlement are candidates requiring caller/transport countercheck, not adopted defects."
+      ],
       "questions": []
     },
     {
@@ -14533,10 +14549,12 @@
       "mode": "100644",
       "bytes": 488,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 12]],
+      "evidence": [
+        "Full untruncated read atd8031edb1; baseline bytes equality verified. Retry IDs/error allowlist/return query/polling/access management cross-checked. Existing complete-suite tests passed at51bc4196c, no external provider/runtime proof. Older comments and same-ID settlement are candidates requiring caller/transport countercheck, not adopted defects."
+      ],
       "questions": []
     },
     {
@@ -14546,10 +14564,12 @@
       "mode": "100644",
       "bytes": 2675,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 90]],
+      "evidence": [
+        "Full untruncated read atd8031edb1; baseline bytes equality verified. Retry IDs/error allowlist/return query/polling/access management cross-checked. Existing complete-suite tests passed at51bc4196c, no external provider/runtime proof. Older comments and same-ID settlement are candidates requiring caller/transport countercheck, not adopted defects."
+      ],
       "questions": []
     },
     {
@@ -14559,10 +14579,12 @@
       "mode": "100644",
       "bytes": 2295,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 59]],
+      "evidence": [
+        "Full untruncated read atd8031edb1; baseline bytes equality verified. Retry IDs/error allowlist/return query/polling/access management cross-checked. Existing complete-suite tests passed at51bc4196c, no external provider/runtime proof. Older comments and same-ID settlement are candidates requiring caller/transport countercheck, not adopted defects."
+      ],
       "questions": []
     },
     {
@@ -14768,10 +14790,12 @@
       "mode": "100644",
       "bytes": 3884,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 124]],
+      "evidence": [
+        "Full untruncated read atd8031edb1; baseline bytes equality verified. Retry IDs/error allowlist/return query/polling/access management cross-checked. Existing complete-suite tests passed at51bc4196c, no external provider/runtime proof. Older comments and same-ID settlement are candidates requiring caller/transport countercheck, not adopted defects."
+      ],
       "questions": []
     },
     {
@@ -15001,10 +15025,12 @@
       "mode": "100644",
       "bytes": 1709,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 41]],
+      "evidence": [
+        "Full untruncated read atd8031edb1; baseline bytes equality verified. Retry IDs/error allowlist/return query/polling/access management cross-checked. Existing complete-suite tests passed at51bc4196c, no external provider/runtime proof. Older comments and same-ID settlement are candidates requiring caller/transport countercheck, not adopted defects."
+      ],
       "questions": []
     },
     {
