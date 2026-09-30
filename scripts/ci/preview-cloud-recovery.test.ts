@@ -11,6 +11,7 @@ import {
 import { recoverPreviewUsers } from '../runbook/preview-cleanup.mjs';
 import { createCloudIntent } from './preview-cloud-intent.mjs';
 import {
+  admitLegacyRecovery,
   decodePreviewIntentArtifactZip,
   executeCloudRecovery,
   prepareCloudRecovery,
@@ -362,5 +363,46 @@ describe('Cloud recovery after worker loss', () => {
     expect(result).toMatchObject({ status: 'failed', cleanupConfirmed: false, users: [] });
     expect(recover).not.toHaveBeenCalled();
     expect(readFileSync(join(directory, 'recovery.json'), 'utf8')).not.toContain('PRIVATE_');
+  });
+});
+
+it('keeps interrupted prepared fixtures UNKNOWN without reading an admin key or legacy deletion', async () => {
+  const directory = temp();
+  const prepared = { ...proof, recoveryMode: 'broker' };
+  writeFileSync(join(directory, 'verified.json'), JSON.stringify(prepared));
+  const recover = vi.fn();
+  const keyRead = vi.fn(() => {
+    throw new Error('SECRET_MUST_NOT_BE_READ');
+  });
+  const selectedEnv = { ...env };
+  Object.defineProperty(selectedEnv, 'SUPABASE_SECRET_KEY', { get: keyRead });
+  const result = await executeCloudRecovery({
+    directory,
+    env: selectedEnv,
+    verify: async () => prepared,
+    recover,
+  });
+  expect(result).toMatchObject({
+    status: 'unknown',
+    cleanupConfirmed: false,
+    failure: 'fixture-termination-unverified',
+    users: [],
+  });
+  expect(recover).not.toHaveBeenCalled();
+  expect(keyRead).not.toHaveBeenCalled();
+  expect(readFileSync(join(directory, 'recovery.json'), 'utf8')).not.toContain('SECRET');
+});
+
+it('writes UNKNOWN before the workflow can inject recovery credentials', () => {
+  const directory = temp();
+  writeFileSync(
+    join(directory, 'verified.json'),
+    JSON.stringify({ ...proof, recoveryMode: 'broker' }),
+  );
+  expect(() => admitLegacyRecovery(directory)).toThrow('Prepared fixture recovery remains UNKNOWN');
+  expect(JSON.parse(readFileSync(join(directory, 'recovery.json'), 'utf8'))).toMatchObject({
+    status: 'unknown',
+    cleanupConfirmed: false,
+    request: intent.request,
   });
 });

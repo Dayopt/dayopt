@@ -1,6 +1,10 @@
 import { createHash, createHmac } from 'node:crypto';
 
-import { assertFixtureBrokerTarget, verifyFixtureJobToken } from './preview-fixture-authority.mjs';
+import {
+  assertFixtureBrokerTarget,
+  verifyFixtureJobToken,
+  verifyPreviewAccessToken,
+} from './preview-fixture-authority.mjs';
 import {
   assertPreviewFixtureRecipient,
   encryptPreviewFixtureEnvelope,
@@ -372,6 +376,7 @@ export async function executeDurableFixtureBroker({
  */
 export async function executeEncryptedFixtureBroker({
   publicKey,
+  previewAccessToken = /** @type {string | undefined} */ (undefined),
   input,
   token,
   createClient,
@@ -381,6 +386,8 @@ export async function executeEncryptedFixtureBroker({
   elapsed = () => performance.now(),
 }) {
   assertPreviewFixtureRecipient({ input, publicKey });
+  if (previewAccessToken !== undefined)
+    await verifyPreviewAccessToken({ input, token: previewAccessToken, fetchImpl, now });
   const payload = await executeDurableFixtureBroker({
     input,
     token,
@@ -390,5 +397,9 @@ export async function executeEncryptedFixtureBroker({
     now,
     elapsed,
   });
-  return encryptPreviewFixtureEnvelope({ input, publicKey, payload });
+  return encryptPreviewFixtureEnvelope({
+    input,
+    publicKey,
+    payload: previewAccessToken !== undefined ? { fixture: payload, previewAccessToken } : payload,
+  });
 }

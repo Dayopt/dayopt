@@ -508,6 +508,8 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
           PREVIEW_REQUEST_JSON: ${{ toJSON(inputs) }}
         run: node scripts/ci/preview-cloud-trust.mjs "$RUNNER_TEMP/preview-request.json"
+      - name: Reject unverified prepared fixture execution before credentials
+        run: node scripts/ci/preview-prepared-admission.mjs "$RUNNER_TEMP/preview-request.json"
 
   preview-e2e:
     name: Remote Preview login and CRUD
@@ -601,6 +603,17 @@ jobs:
           PREVIEW_RECOVER_RUN: ${{ inputs.preview_recover_run }}
           PREVIEW_RECOVER_ATTEMPT: ${{ inputs.preview_recover_attempt }}
         run: node scripts/ci/preview-cloud-recovery.mjs prepare "$RUNNER_TEMP/preview-recovery"
+      - id: admit
+        name: Keep prepared recovery UNKNOWN before credential injection
+        run: node scripts/ci/preview-cloud-recovery.mjs admit-legacy "$RUNNER_TEMP/preview-recovery"
+      - name: Save public UNKNOWN quarantine evidence
+        if: always() && steps.admit.outcome == 'failure'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: preview-quarantine-${{ github.run_id }}-${{ github.run_attempt }}
+          if-no-files-found: ignore
+          path: ${{ runner.temp }}/preview-recovery/recovery.json
+          retention-days: 7
 
   preview-recovery:
     name: Recover interrupted Preview fixtures

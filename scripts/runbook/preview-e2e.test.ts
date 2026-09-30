@@ -278,6 +278,7 @@ fs.writeFileSync(path.join(process.env.E2E_PREVIEW_EVIDENCE_DIR, 'e2e.json'), JS
       '11111111-1111-4111-8111-111111111111',
       ids,
       '/credentials/login.json',
+      'synthetic.preview.access',
     );
     expect(worker).toMatchObject({
       E2E_PREVIEW_FIXTURE_REGISTRY: '/credentials/login.json',
@@ -285,7 +286,7 @@ fs.writeFileSync(path.join(process.env.E2E_PREVIEW_EVIDENCE_DIR, 'e2e.json'), JS
       E2E_PREVIEW_CLOUD_INTENT: '1',
       E2E_PREVIEW_DESKTOP_USER_ID: ids.desktop,
       E2E_PREVIEW_MOBILE_USER_ID: ids.mobile,
-      VERCEL_AUTOMATION_BYPASS_SECRET: env.VERCEL_AUTOMATION_BYPASS_SECRET,
+      E2E_PREVIEW_TRUSTED_OIDC_TOKEN: 'synthetic.preview.access',
     });
     for (const key of [
       'SUPABASE_SECRET_KEY',
@@ -472,4 +473,67 @@ describe('Preview reporter completeness', () => {
       expect(readFileSync(join(root, 'e2e.json'), 'utf8')).not.toContain('private-');
     },
   );
+});
+
+describe('prepared fixture consumer boundary', () => {
+  const users = {
+    desktop: '11111111-1111-4111-8111-111111111111',
+    mobile: '22222222-2222-4222-8222-222222222222',
+  };
+  it('passes the trusted registry without admin authority and defers cleanup to a separate job', async () => {
+    const s = scenario();
+    const result = await runPreviewE2E({
+      request: {},
+      env: {},
+      observe: s.observe,
+      execute: s.execute,
+      recover: s.recover,
+      tempRoot: s.root,
+      cloudUserIds: users,
+      registryPath: join(s.root, 'registry.json'),
+      trustedOidcToken: 'synthetic.preview.access',
+    });
+    expect(s.execute).toHaveBeenCalledOnce();
+    const worker = s.execute.mock.calls[0]![0];
+    expect(worker.E2E_PREVIEW_FIXTURE_REGISTRY).toBe(join(s.root, 'registry.json'));
+    expect(worker.E2E_PREVIEW_TRUSTED_OIDC_TOKEN).toBe('synthetic.preview.access');
+    expect(worker).not.toHaveProperty('SUPABASE_SECRET_KEY');
+    expect(worker).not.toHaveProperty('VERCEL_AUTOMATION_BYPASS_SECRET');
+    expect(s.recover).not.toHaveBeenCalled();
+    expect(result.status).toBe('failed');
+    expect(result.failure).toBe('cleanup-unconfirmed');
+    expect(result.cleanup.status).toBe('deferred');
+  });
+  it.each([
+    { SUPABASE_SECRET_KEY: 'do-not-disclose' },
+    { VERCEL_AUTOMATION_BYPASS_SECRET: 'do-not-disclose' },
+    { ACTIONS_ID_TOKEN_REQUEST_TOKEN: 'do-not-disclose' },
+  ])('rejects privileged prepared consumers before observation', async (unsafe) => {
+    const s = scenario();
+    await expect(
+      runPreviewE2E({
+        request: {},
+        env: unsafe,
+        observe: s.observe,
+        tempRoot: s.root,
+        registryPath: join(s.root, 'registry.json'),
+        trustedOidcToken: 'synthetic.preview.access',
+        cloudUserIds: users,
+      }),
+    ).rejects.toThrow('Prepared Preview consumer credentials are invalid');
+    expect(s.observe).not.toHaveBeenCalled();
+  });
+  it('does not fall back to project bypass when Trusted Sources access is missing', async () => {
+    const s = scenario();
+    await expect(
+      runPreviewE2E({
+        request: {},
+        env: {},
+        observe: s.observe,
+        registryPath: join(s.root, 'registry.json'),
+        cloudUserIds: users,
+      }),
+    ).rejects.toThrow('Prepared Preview consumer credentials are invalid');
+    expect(s.observe).not.toHaveBeenCalled();
+  });
 });

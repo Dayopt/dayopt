@@ -6,6 +6,7 @@ const ISSUER = 'https://token.actions.githubusercontent.com';
 const JWKS = `${ISSUER}/.well-known/jwks`;
 const ENVIRONMENT = 'Preview – product';
 const WORKFLOW = 'Dayopt/dayopt/.github/workflows/ci.yml@refs/heads/integration';
+export const PREVIEW_ACCESS_AUDIENCE = 'urn:dayopt:preview-access:v1';
 const SUBJECT = `repo:Dayopt/dayopt:environment:${ENVIRONMENT}`;
 const PROJECT = 'prj_hByu1DGZWiuLk0yfV4Gz1T4aIjpa';
 
@@ -167,14 +168,13 @@ async function readKeys(fetchImpl) {
  * jobs, or give those jobs id-token:write / the request bearer environment.
  * The caller keeps the result in memory; never log or upload it.
  */
-export async function requestFixtureJobToken({
-  input,
-  env = process.env,
-  fetchImpl = fetch,
-  now = () => Math.floor(Date.now() / 1000),
-}) {
+async function requestJobToken(
+  { input, env = process.env, fetchImpl = fetch, now = () => Math.floor(Date.now() / 1000) },
+  access = false,
+) {
   try {
     const authority = prepareFixtureAuthority(input);
+    if (access) authority.audience = PREVIEW_ACCESS_AUDIENCE;
     if (
       env.GITHUB_REPOSITORY !== 'Dayopt/dayopt' ||
       env.GITHUB_REF !== 'refs/heads/integration' ||
@@ -210,7 +210,7 @@ export async function requestFixtureJobToken({
     );
     // Check provider signature and the complete selected job/target binding
     // before handing the token to the broker transport.
-    await verifyFixtureJobToken({ input, token: body?.value, fetchImpl, now });
+    await verifyJobToken({ input, token: body?.value, fetchImpl, now }, access);
     return body.value;
   } catch {
     throw new Error('Preview fixture job token could not be requested');
@@ -223,14 +223,13 @@ export async function requestFixtureJobToken({
  * using preview-cloud-recovery-trust; this function is not artifact verification.
  * It never returns token claims, credentials, provider bodies, or raw errors.
  */
-export async function verifyFixtureJobToken({
-  input,
-  token,
-  fetchImpl = fetch,
-  now = () => Math.floor(Date.now() / 1000),
-}) {
+async function verifyJobToken(
+  { input, token, fetchImpl = fetch, now = () => Math.floor(Date.now() / 1000) },
+  access = false,
+) {
   try {
     const authority = prepareFixtureAuthority(input);
+    if (access) authority.audience = PREVIEW_ACCESS_AUDIENCE;
     if (typeof token !== 'string' || token.length > 16_384) throw new Error();
     const parts = token.split('.');
     if (parts.length !== 3 || !/^[A-Za-z0-9_-]+$/.test(parts[2])) throw new Error();
@@ -277,3 +276,10 @@ export async function verifyFixtureJobToken({
     throw new Error('Preview fixture job authentication failed');
   }
 }
+
+// The fixed access audience cannot authenticate a broker mutation. These wrappers
+// expose no caller-controlled audience/claim overrides.
+export const requestFixtureJobToken = (options) => requestJobToken(options);
+export const verifyFixtureJobToken = (options) => verifyJobToken(options);
+export const requestPreviewAccessToken = (options) => requestJobToken(options, true);
+export const verifyPreviewAccessToken = (options) => verifyJobToken(options, true);

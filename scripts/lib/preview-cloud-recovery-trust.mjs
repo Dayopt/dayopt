@@ -180,7 +180,17 @@ async function verifySourceAttemptJobs({ sourceRunId, sourceAttempt, token, fetc
     'source attempt jobs are incomplete',
   );
   const trustJobs = body.jobs.filter((job) => job?.name === JOB_TRUST);
-  const e2eJobs = body.jobs.filter((job) => job?.name === JOB_E2E);
+  const legacyJobs = body.jobs.filter(
+    (job) => job?.name === JOB_E2E && job.conclusion !== 'skipped',
+  );
+  const provisionJobs = body.jobs.filter((job) => job?.name === 'Provision Preview fixtures');
+  const prepared = provisionJobs.length > 0;
+  requireCondition(
+    !prepared || legacyJobs.length === 0,
+    'legacy and prepared jobs must be exclusive',
+  );
+  const e2eJobs = prepared ? provisionJobs : legacyJobs;
+  const executeStep = prepared ? 'Provision encrypted Preview fixtures' : STEP_E2E;
   requireCondition(
     trustJobs.length === 1 &&
       trustJobs[0].status === 'completed' &&
@@ -190,18 +200,20 @@ async function verifySourceAttemptJobs({ sourceRunId, sourceAttempt, token, fetc
   requireCondition(
     e2eJobs.length === 1 &&
       e2eJobs[0].status === 'completed' &&
-      FAILED_E2E_CONCLUSIONS.has(e2eJobs[0].conclusion) &&
+      (FAILED_E2E_CONCLUSIONS.has(e2eJobs[0].conclusion) ||
+        (prepared && e2eJobs[0].conclusion === 'success')) &&
       safeIsoDate(e2eJobs[0].started_at) !== null &&
       safeIsoDate(e2eJobs[0].completed_at) !== null,
     'source Preview E2E job was not a completed interrupted run',
   );
-  const executeSteps = e2eJobs[0].steps?.filter((step) => step?.name === STEP_E2E) ?? [];
+  const executeSteps = e2eJobs[0].steps?.filter((step) => step?.name === executeStep) ?? [];
   requireCondition(
     executeSteps.length === 1 &&
       executeSteps[0].status === 'completed' &&
       safeIsoDate(executeSteps[0].started_at) !== null &&
       safeIsoDate(executeSteps[0].completed_at) !== null &&
-      FAILED_E2E_CONCLUSIONS.has(executeSteps[0].conclusion),
+      (FAILED_E2E_CONCLUSIONS.has(executeSteps[0].conclusion) ||
+        (prepared && executeSteps[0].conclusion === 'success')),
     'source Preview E2E execute step did not fail after starting',
   );
   const jobStartedAt = safeIsoDate(e2eJobs[0].started_at);
@@ -218,7 +230,7 @@ async function verifySourceAttemptJobs({ sourceRunId, sourceAttempt, token, fetc
       stepCompletedAt <= jobCompletedAt,
     'source Preview E2E timestamps are inconsistent',
   );
-  return { jobStartedAt, jobCompletedAt, stepStartedAt, stepCompletedAt };
+  return { jobStartedAt, jobCompletedAt, stepStartedAt, stepCompletedAt, prepared };
 }
 
 async function findIntentArtifact({
@@ -375,5 +387,10 @@ export async function verifyPreviewRecoveryTrust({
       finalBinding.updatedAt === latestBinding.updatedAt,
     'source run changed during recovery verification',
   );
-  return { intent, artifactId: artifact.id, digest: artifact.digest };
+  return {
+    intent,
+    artifactId: artifact.id,
+    digest: artifact.digest,
+    ...(jobBinding.prepared ? { recoveryMode: 'broker' } : {}),
+  };
 }

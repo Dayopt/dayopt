@@ -140,13 +140,42 @@ export async function prepareCloudRecovery({
   });
   if (verified.artifactId !== artifacts[0].id || verified.digest !== artifacts[0].digest)
     throw new Error();
-  const result = { intent, artifactId: verified.artifactId, digest: verified.digest };
+  const result = {
+    intent,
+    artifactId: verified.artifactId,
+    digest: verified.digest,
+    ...(verified.recoveryMode === 'broker' ? { recoveryMode: 'broker' } : {}),
+  };
   mkdirSync(directory, { mode: 0o700, recursive: false });
   writeFileSync(join(directory, 'verified.json'), JSON.stringify(result), {
     mode: 0o600,
     flag: 'wx',
   });
   return result;
+}
+
+/** Stop before the credential-bearing recovery job. UNKNOWN evidence is safe to
+ * persist even when provider/Auth termination cannot be established. */
+export function admitLegacyRecovery(directory) {
+  const saved = readJson(join(directory, 'verified.json'));
+  if (saved.recoveryMode === undefined) return;
+  if (saved.recoveryMode !== 'broker') throw new Error();
+  const intent = validateCloudIntent(saved.intent);
+  writeFileSync(
+    join(directory, 'recovery.json'),
+    JSON.stringify({
+      sourceRunId: intent.sourceRunId,
+      sourceAttempt: intent.sourceAttempt,
+      runId: intent.runId,
+      request: intent.request,
+      status: 'unknown',
+      cleanupConfirmed: false,
+      failure: 'fixture-termination-unverified',
+      users: [],
+    }),
+    { mode: 0o600, flag: 'wx' },
+  );
+  throw new Error('Prepared fixture recovery remains UNKNOWN');
 }
 
 /** Reuse exact-ID recovery without enumerating or exposing other Auth users. */
@@ -237,6 +266,14 @@ export async function executeCloudRecovery({
     });
     if (current.artifactId !== saved.artifactId || current.digest !== saved.digest)
       throw new Error();
+    if (current.recoveryMode !== saved.recoveryMode) throw new Error();
+    if (current.recoveryMode === 'broker') {
+      // Never route a durable/UNKNOWN fixture into the legacy delete-and-count
+      // recovery. The provider terminal / in-flight Auth fence is not proven.
+      result.status = 'unknown';
+      result.failure = 'fixture-termination-unverified';
+      throw new Error();
+    }
     const cleanup = await recover({ intent, directory, serviceKey: env.SUPABASE_SECRET_KEY });
     result.status = cleanup.status;
     result.cleanupConfirmed = cleanup.status === 'clean';
@@ -256,12 +293,14 @@ if (isDirectExecution(import.meta.url)) {
     const [operation, directory, ...rest] = process.argv.slice(2);
     if (
       rest.length ||
-      !['prepare', 'execute'].includes(operation) ||
+      !['prepare', 'execute', 'admit-legacy'].includes(operation) ||
       !process.env.RUNNER_TEMP ||
       resolve(directory ?? '') !== join(resolve(process.env.RUNNER_TEMP), 'preview-recovery')
     )
       throw new Error();
-    if (operation === 'prepare') {
+    if (operation === 'admit-legacy') {
+      admitLegacyRecovery(directory);
+    } else if (operation === 'prepare') {
       await prepareCloudRecovery({
         directory,
         sourceRunId: process.env.PREVIEW_RECOVER_RUN,

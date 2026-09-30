@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { previewRequestTarget, validatePreviewOrigin } from './preview-access';
+import {
+  previewAccessHeaders,
+  previewRequestTarget,
+  validatePreviewOrigin,
+} from './preview-access';
 
 const origin = 'https://product-abc123-dayopt.vercel.app';
 const ref = 'abcdefghijklmnopqrst';
@@ -33,4 +37,23 @@ describe('Preview request routing', () => {
     expect(() => validatePreviewOrigin(url)).toThrow();
   });
   it('指定deployment URLを受理', () => expect(validatePreviewOrigin(origin)).toBe(origin));
+});
+
+it('adds Trusted Sources token only on the pinned Preview hop and strips inherited protection headers', () => {
+  const credential = { prepared: true, token: 'synthetic-access' };
+  const inherited = {
+    'X-Vercel-Protection-Bypass': 'must-not-leak',
+    'x-vercel-trusted-oidc-idp-token': 'must-not-leak',
+  };
+  expect(previewAccessHeaders(inherited, 'preview', credential)).toEqual({
+    'x-vercel-trusted-oidc-idp-token': 'synthetic-access',
+  });
+  for (const target of ['supabase', 'captcha', 'blocked'] as const)
+    expect(previewAccessHeaders(inherited, target, credential)).toEqual({});
+  expect(() =>
+    previewAccessHeaders({}, 'preview', { prepared: true, token: undefined, bypass: 'legacy' }),
+  ).toThrow();
+  expect(() =>
+    previewAccessHeaders({}, 'preview', { prepared: true, token: 'oidc', bypass: 'legacy' }),
+  ).toThrow();
 });

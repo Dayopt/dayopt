@@ -1,4 +1,4 @@
-import { createHash, generateKeyPairSync } from 'node:crypto';
+import { createHash, generateKeyPairSync, sign } from 'node:crypto';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -172,4 +172,99 @@ describe('trusted public key handoff with injected GitHub metadata and download'
       rmSync(runnerTemp, { recursive: true, force: true });
     }
   });
+});
+
+describe('encrypted Preview access handoff', () => {
+  it.each([true, false])(
+    'validates the separate signed access token before writing a registry (valid=%s)',
+    async (valid) => {
+      const signing = generateKeyPairSync('rsa', { modulusLength: 2048 });
+      const now = 1800000000;
+      const claims = {
+        iss: 'https://token.actions.githubusercontent.com',
+        aud: valid ? 'urn:dayopt:preview-access:v1' : 'wrong',
+        sub: 'repo:Dayopt/dayopt:environment:Preview – product',
+        repository: 'Dayopt/dayopt',
+        repository_id: '1006944000',
+        repository_owner: 'Dayopt',
+        repository_owner_id: '254866353',
+        environment: 'Preview – product',
+        ref: 'refs/heads/integration',
+        ref_type: 'branch',
+        workflow_ref: 'Dayopt/dayopt/.github/workflows/ci.yml@refs/heads/integration',
+        event_name: 'workflow_dispatch',
+        runner_environment: 'github-hosted',
+        sha: input.execution.workflowSha,
+        run_id: String(input.execution.runId),
+        run_attempt: String(input.execution.attempt),
+        iat: now,
+        nbf: now,
+        exp: now + 300,
+      };
+      const body = [{ alg: 'RS256', typ: 'JWT', kid: 'access-key' }, claims]
+        .map((x) => Buffer.from(JSON.stringify(x)).toString('base64url'))
+        .join('.');
+      const previewAccessToken =
+        body +
+        '.' +
+        sign('RSA-SHA256', Buffer.from(body), signing.privateKey).toString('base64url');
+      const users = Object.fromEntries(
+        Object.entries(input.intent.userIds).map(([slot, userId]) => [
+          slot,
+          {
+            userId,
+            email: `${slot === 'desktop' ? 'critical-path' : 'mobile-critical-path'}-${userId}@example.com`,
+            password: 'E2e!' + 'a'.repeat(43),
+            activityName: `Journey ${userId.slice(0, 8)}`,
+            categoryName: `Cat ${userId.slice(0, 8)}`,
+          },
+        ]),
+      );
+      const fixture = {
+        schemaVersion: 1,
+        operation: 'provision',
+        runId: input.intent.runId,
+        users,
+      };
+      const envelope = encryptPreviewFixtureEnvelope({
+        input,
+        publicKey: pair.publicKey,
+        payload: { fixture, previewAccessToken },
+      });
+      const runnerTemp = mkdtempSync(join(tmpdir(), 'prepared-access-'));
+      const privateOutput = join(runnerTemp, 'browser'),
+        evidenceDirectory = join(runnerTemp, 'evidence');
+      mkdirSync(privateOutput);
+      mkdirSync(evidenceDirectory);
+      try {
+        const receive = receivePreviewFixtureRegistry({
+          ...transfer(envelope, 'envelope'),
+          privateKey: pair.privateKey,
+          runnerTemp,
+          privateOutput,
+          evidenceDirectory,
+          preparedAccess: true,
+          now: () => now,
+          fetchImpl: async () =>
+            Response.json({
+              keys: [
+                {
+                  ...signing.publicKey.export({ format: 'jwk' }),
+                  alg: 'RS256',
+                  use: 'sig',
+                  kid: 'access-key',
+                },
+              ],
+            }),
+        });
+        if (valid) {
+          const result = await receive;
+          expect('trustedOidcToken' in result && result.trustedOidcToken).toBe(previewAccessToken);
+          expect(readFileSync(result.path, 'utf8')).not.toContain(previewAccessToken);
+        } else await expect(receive).rejects.toThrow(/^Preview fixture handoff failed$/);
+      } finally {
+        rmSync(runnerTemp, { recursive: true, force: true });
+      }
+    },
+  );
 });

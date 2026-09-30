@@ -32,6 +32,7 @@ export function previewWorkerEnvironment(
   runId,
   cloudUserIds = /** @type {{desktop: string, mobile: string} | undefined} */ (undefined),
   registryPath = /** @type {string | undefined} */ (undefined),
+  trustedOidcToken = /** @type {string | undefined} */ (undefined),
 ) {
   if (registryPath !== undefined) {
     try {
@@ -70,7 +71,9 @@ export function previewWorkerEnvironment(
     ...(registryPath !== undefined
       ? { E2E_PREVIEW_FIXTURE_REGISTRY: registryPath, E2E_PREVIEW_DB_MODE: 'ephemeral' }
       : { SUPABASE_SECRET_KEY: env.SUPABASE_SECRET_KEY }),
-    VERCEL_AUTOMATION_BYPASS_SECRET: env.VERCEL_AUTOMATION_BYPASS_SECRET,
+    ...(registryPath !== undefined
+      ? { E2E_PREVIEW_TRUSTED_OIDC_TOKEN: trustedOidcToken }
+      : { VERCEL_AUTOMATION_BYPASS_SECRET: env.VERCEL_AUTOMATION_BYPASS_SECRET }),
     E2E_ALLOW_NONLOCAL_SUPABASE: '1',
     E2E_REQUIRE_SERVICE_ROLE_SUITES: '1',
     E2E_SUPABASE_PROJECT_REF: ready.supabaseProjectRef,
@@ -178,6 +181,8 @@ function executePlaywright(env, candidateRoot = ROOT) {
  *   runDirectory?: string,
  *   runId?: string,
  *   cloudUserIds?: { desktop: string, mobile: string },
+ *   registryPath?: string,
+ *   trustedOidcToken?: string,
  * }} options
  */
 export async function runPreviewE2E({
@@ -192,13 +197,32 @@ export async function runPreviewE2E({
   runDirectory = undefined,
   runId = randomUUID(),
   cloudUserIds = /** @type {{desktop: string, mobile: string} | undefined} */ (undefined),
+  registryPath = /** @type {string | undefined} */ (undefined),
+  trustedOidcToken = /** @type {string | undefined} */ (undefined),
 }) {
-  if (!env.SUPABASE_SECRET_KEY?.trim())
+  if (registryPath !== undefined) {
+    if (
+      !trustedOidcToken?.trim() ||
+      trustedOidcToken.length > 16384 ||
+      [
+        'SUPABASE_SECRET_KEY',
+        'SUPABASE_SERVICE_ROLE_KEY',
+        'SUPABASE_ACCESS_TOKEN',
+        'VERCEL_TOKEN',
+        'VERCEL_AUTOMATION_BYPASS_SECRET',
+        'ACTIONS_ID_TOKEN_REQUEST_TOKEN',
+        'ACTIONS_ID_TOKEN_REQUEST_URL',
+      ].some((key) => env[key] !== undefined)
+    )
+      throw new Error('Prepared Preview consumer credentials are invalid');
+  } else if (!env.SUPABASE_SECRET_KEY?.trim())
     throw new Error('Nonproduction test credentials are required');
   const credentials = {
     githubToken: env.GITHUB_TOKEN,
     supabaseToken: env.SUPABASE_PREVIEW_READINESS_TOKEN,
-    bypassSecret: env.VERCEL_AUTOMATION_BYPASS_SECRET,
+    ...(registryPath !== undefined
+      ? { trustedOidcToken }
+      : { bypassSecret: env.VERCEL_AUTOMATION_BYPASS_SECRET }),
   };
   if (!/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(runId))
     throw new Error('Preview run identity is invalid');
@@ -233,7 +257,16 @@ export async function runPreviewE2E({
   let failure = 'execution-failed';
   try {
     exitCode = await execute(
-      previewWorkerEnvironment(env, before, privateDir, evidenceDir, runId, cloudUserIds),
+      previewWorkerEnvironment(
+        env,
+        before,
+        privateDir,
+        evidenceDir,
+        runId,
+        cloudUserIds,
+        registryPath,
+        trustedOidcToken,
+      ),
     );
   } catch {
     // A raw process error can contain env, command output, or request details.
@@ -243,12 +276,15 @@ export async function runPreviewE2E({
   }
   let cleanup = { status: 'failed', checked: 0, recovered: 0 };
   try {
-    cleanup = await recover({
-      evidenceDirectory: evidenceDir,
-      runId,
-      supabaseProjectRef: before.supabaseProjectRef,
-      serviceKey: env.SUPABASE_SECRET_KEY,
-    });
+    cleanup =
+      registryPath !== undefined
+        ? { status: 'deferred', checked: 0, recovered: 0 }
+        : await recover({
+            evidenceDirectory: evidenceDir,
+            runId,
+            supabaseProjectRef: before.supabaseProjectRef,
+            serviceKey: env.SUPABASE_SECRET_KEY,
+          });
   } catch {
     // Invalid journal or raw provider errors cannot be disclosed.
   }

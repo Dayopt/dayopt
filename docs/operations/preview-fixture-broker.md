@@ -61,13 +61,13 @@ executor は adapter の取得待ち後にも JWT の期限を再検証する。
 
 ## 準備済み login を使う candidate 側
 
-[registry reader](../../apps/product/src/lib/test/preview-fixture-registry.ts) と既存3specに、`E2E_PREVIEW_FIXTURE_REGISTRY` が指定された場合だけ有効な consumer 経路を用意した。現在の runner はこの変数を渡さないため、broker / workflow への接続は未完了のまま。
+[registry reader](../../apps/product/src/lib/test/preview-fixture-registry.ts) と既存3specに、`E2E_PREVIEW_FIXTURE_REGISTRY` が指定された場合だけ有効な consumer 経路を用意した。prepared consumer compositionはこの変数を渡す。既存CLI / workflowの実job間接続と公開brokerは未完了のまま。
 
 registry は provision 応答の `schemaVersion / operation / runId / users` に、信頼済み caller が `origin / supabaseProjectRef` を付けた JSON。予定2ユーザーの通常 login だけを含む。reader は immutable origin、ephemeral DB、run、予定UUID、メールとseed名を照合し、不正・不足・追加fieldは固定エラーで拒否する。admin key / provider PAT / OIDC発行変数を持つconsumerも拒否する。job全体のenv allowlistは引き続き必須で、このreaderを任意の環境変数の無害化器と扱わない。
 
 file は600、親directoryは700、16KiB以内とし、file symlinkを拒否する。公開evidenceだけでなくPlaywrightのoutputDirの外に保存する。Playwrightは起動時にoutputDirを消去するため、credentialsとbrowser出力を同じ場所へ置かない。生のlogin fileをartifactやログへ載せない。
 
-[private writer](../../scripts/lib/preview-fixture-registry.mjs) は認証済み応答の受信・復号後に使う保存処理。provisionの公開intentと応答のrun/予定2UUID/固定fieldを照合し、既存fileを上書きせず、新しい700directoryへ600fileを作る。browser outputと公開evidenceの配下は、symlinkの実体を含めて拒否する。実際のconsumer readerで読めることをローカルの実fileで検証している。この処理自体は応答の送信者認証やjob間転送を行わず、現在のrunnerにも未接続。保存先をartifactへ渡さず、worker終了時の削除をcallerが担当する。
+[private writer](../../scripts/lib/preview-fixture-registry.mjs) は認証済み応答の受信・復号後に使う保存処理。provisionの公開intentと応答のrun/予定2UUID/固定fieldを照合し、既存fileを上書きせず、新しい700directoryへ600fileを作る。browser outputと公開evidenceの配下は、symlinkの実体を含めて拒否する。実際のconsumer readerで読めることをローカルの実fileで検証している。この処理自体は応答の送信者認証やjob間転送を行わず、prepared consumer compositionから呼ばれるが、実workflowには未接続。保存先をartifactへ渡さず、worker終了時の削除をcallerが担当する。
 
 [暗号化コア](../../scripts/lib/preview-fixture-envelope.mjs) は一時RSA公開鍵でAES鍵を包み、login payloadをAES-GCMで暗号化する。公開intent・実行attempt・対象Preview/DB・受信者公開鍵へのbindingを検査する。暗号化は送信者認証ではないため、GitHub artifactの元run・trusted job・digestを確認する経路は別途必要。秘密鍵と復号済みloginはworker内だけに置き、artifactへ渡さない。provision用のtrusted compositionは公開鍵の形式・RSA強度・公開intentを管理キー取得とfixture変更の前に検証し、永続provisionの成功後に暗号化envelopeだけを返す。不正な鍵・job認証失敗・UNKNOWNのclaimではloginを返さない。installed SDKとmock providerによる検証であり、実PreviewやGitHub job間転送は未接続。
 
@@ -89,7 +89,7 @@ ZIPはdigest照合後に固定されたroot-levelの1fileだけをメモリ内�
 
 consumer時はspecごとのadmin生成・seed・削除を行わず、同じ2ユーザーを通常loginで使う。Preview configで **desktop6件 → mobile5件 → A/B認可1件** のproject依存を明示し、認可テストのRecordが先にReport集計へ混ざらないようにする。先行失敗時の後続skipは成功にしない。全project後の回収は別のtrusted jobが担当し、worker喪失時も予定intentから回収できる必要がある。legacyモードのspec別作成/削除は維持する。
 
-`previewWorkerEnvironment` は信頼済み caller が registry path を明示した場合だけ、検証済み readiness の ephemeral binding・immutable origin・run・予定2UUIDを確認し、管理キーを含まないenvを組み立てる。親envのregistry指定は無視する。GitHub token、provider PAT、OIDC発行変数、NODE_OPTIONSは引き継がず、Preview到達用bypassと通常loginのprivate file pathだけを既存allowlistへ加える。file内容の検証はconsumer readerが行う。現在のrunner呼び出しは追加引数を渡さず、従来動作を維持する。同一jobでenvを絞るだけでは、悪意あるcandidateから親プロセス・filesystemへのアクセスを隔離できないため、trusted/candidateのjob分離を省略してはならない。
+`previewWorkerEnvironment` は信頼済み caller が registry path を明示した場合だけ、検証済み readiness の ephemeral binding・immutable origin・run・予定2UUIDを確認し、管理キーを含まないenvを組み立てる。親envのregistry指定は無視する。GitHub token、provider PAT、OIDC発行変数、NODE_OPTIONSは引き継がず、Preview到達用bypassと通常loginのprivate file pathだけを既存allowlistへ加える。file内容の検証はconsumer readerが行う。prepared consumer compositionは追加引数を渡し、既存CLI呼び出しは従来動作を維持する。同一jobでenvを絞るだけでは、悪意あるcandidateから親プロセス・filesystemへのアクセスを隔離できないため、trusted/candidateのjob分離を省略してはならない。
 
 このreader・spec経路・`--list` の検証は、private fileの作成/安全な受け渡し・broker実行・通常login実走・最終回収を証明しない。それらはworkflow接続と実測の未完了条件として残る。
 
@@ -115,3 +115,13 @@ source と workflow は Git で復元できる。実証時の mutation は選択
 - 次の PR / branch 再作成でも手動の secret 保存が不要であること。
 
 根拠: [GitHub OIDC](https://docs.github.com/en/actions/reference/security/oidc)、[Supabase branching integrations](https://supabase.com/docs/guides/deployment/branching/integrations)、[Node 24 crypto](https://nodejs.org/docs/latest-v24.x/api/crypto.html)、既存の intent / trust / owned cleanup source。
+
+## Prepared consumer接続の現状
+
+`consumePreparedPreviewFixtures`（[source](../../scripts/runbook/preview-prepared-consumer.mjs)）は既存key custody・暗号化handoff・registry・runnerを順番に接続する。署名検証済みのPreview到達用tokenはloginと同じ暗号化envelopeで運び、private registryとは分離してメモリで渡す。秘密鍵の削除後にcandidate準備を開始し、終了時は自分のregistryと空directoryだけを削除する。candidateに管理key・OIDC発行能力・project全体bypassを渡さない。runnerはregistry引数を実際にconsumerへ渡し、この経路からlegacy Auth cleanupを呼ばない。別trusted jobの回収未確認は`cleanup-unconfirmed`であり、UI成功だけでは全体passにしない。
+
+Trusted Sources用audienceは`urn:dayopt:preview-access:v1`。fixture操作用audienceとは異なり、broker操作の署名検証では拒否する。発行者はGitHub Actions、repository/ownerの固定ID、`Dayopt/dayopt`、`refs/heads/integration`、`.github/workflows/ci.yml`、`Preview – product` environment、workflow SHA/run/attemptを照合する。Vercel側ではこのaudienceと同じrepository/workflow/environment identityを要求し、到達先environmentをPreviewだけに限定する設定が必要。設定保存・実OIDC疎通は未実施。Playwright/readinessはTrusted Sources headerを使用し、欠落時にproject bypassへfallbackしない。redirectと他originへcredentialを転送しない。
+
+現在は[workflow admission](../../scripts/ci/preview-prepared-admission.mjs)がephemeral実行をcredential注入前に停止する。環境変数・404・削除応答・経過時間では解除できない。公開broker route、trusted provision/consumerの実job間配線、送信済みAuth要求の終端保証が揃っていないためであり、DBを作成しても実受入は開始しない。このsource gateの撤去にはその実装と検証が必要。今回の接続はライブラリと故障テストの証拠であって、実Cloud job間転送の証拠ではない。
+
+回収trustはprovision開始後のfailure/cancelに加え、provision成功後に別jobが失敗したattemptも認証する。旧E2E経路と同じattemptで混在した場合は拒否。prepared由来の回収は旧delete-and-count処理へ流さず、read-only trust jobで公開`UNKNOWN` evidenceを保存してcredential-bearing jobを止める。別run再利用禁止とprovider終端確認は引き続き別条件であり、7日保持のartifactだけを永続的な外部隔離台帳と呼ばない。実workflowでのworker喪失、Auth遅延commit、回収後の非再作成は未達のまま。

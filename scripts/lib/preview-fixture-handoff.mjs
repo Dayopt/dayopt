@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { createHash, createPublicKey } from 'node:crypto';
 
 import { decodeVerifiedPreviewArtifactZip } from './preview-artifact-zip.mjs';
-import { prepareFixtureAuthority } from './preview-fixture-authority.mjs';
+import { prepareFixtureAuthority, verifyPreviewAccessToken } from './preview-fixture-authority.mjs';
 import { decryptPreviewFixtureEnvelope } from './preview-fixture-envelope.mjs';
 import {
   previewFixtureHandoffArtifactName,
@@ -69,6 +69,8 @@ export async function receivePreviewFixtureRegistry(options) {
       fetchImpl = fetch,
       verify = verifyPreviewFixtureHandoffTrust,
       download = downloadArtifact,
+      preparedAccess = false,
+      now = () => Math.floor(Date.now() / 1000),
     } = options;
     if (typeof token !== 'string' || !token.trim() || token.length > 16_384) throw new Error();
     const args = { input, role: 'envelope', token: token.trim(), fetchImpl };
@@ -93,6 +95,18 @@ export async function receivePreviewFixtureRegistry(options) {
       privateKey,
       envelope: JSON.parse(serialized),
     });
+    if (preparedAccess) {
+      exact(response, ['fixture', 'previewAccessToken']);
+      await verifyPreviewAccessToken({ input, token: response.previewAccessToken, fetchImpl, now });
+      const registry = writeFixtureRegistry({
+        input,
+        response: response.fixture,
+        runnerTemp,
+        privateOutput,
+        evidenceDirectory,
+      });
+      return { ...registry, trustedOidcToken: response.previewAccessToken };
+    }
     return writeFixtureRegistry({ input, response, runnerTemp, privateOutput, evidenceDirectory });
   } catch {
     throw new Error(ERROR);

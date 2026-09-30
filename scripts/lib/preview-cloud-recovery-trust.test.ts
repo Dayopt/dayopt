@@ -480,3 +480,28 @@ describe('Preview Cloud recovery trust gate', () => {
     ).rejects.toMatchObject({ message: 'Preview Cloud trust: GitHub read failed' });
   });
 });
+
+describe('prepared fixture interruption before E2E', () => {
+  it.each(['cancelled', 'success'])(
+    'authenticates started provision (%s) even when candidate execution never started',
+    async (conclusion) => {
+      const prepared = structuredClone(jobs);
+      prepared[1]!.name = 'Provision Preview fixtures';
+      prepared[1]!.conclusion = conclusion;
+      prepared[1]!.steps![0]!.conclusion = conclusion;
+      prepared[1]!.steps![0]!.name = 'Provision encrypted Preview fixtures';
+      const { fetchImpl } = githubWorld({ jobs: { total_count: prepared.length, jobs: prepared } });
+      const result = await verifyPreviewRecoveryTrust({ ...context, fetchImpl });
+      expect(result).toMatchObject({ intent, recoveryMode: 'broker' });
+    },
+  );
+  it('rejects mixed legacy and prepared execution in the same attempt', async () => {
+    const prepared = structuredClone(jobs[1]!);
+    prepared.name = 'Provision Preview fixtures';
+    prepared.steps![0]!.name = 'Provision encrypted Preview fixtures';
+    const { fetchImpl } = githubWorld({
+      jobs: { total_count: jobs.length + 1, jobs: [...jobs, prepared] },
+    });
+    await expect(verifyPreviewRecoveryTrust({ ...context, fetchImpl })).rejects.toThrow();
+  });
+});

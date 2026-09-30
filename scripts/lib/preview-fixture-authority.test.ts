@@ -4,8 +4,11 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   assertFixtureBrokerTarget,
   prepareFixtureAuthority,
+  PREVIEW_ACCESS_AUDIENCE,
   requestFixtureJobToken,
+  requestPreviewAccessToken,
   verifyFixtureJobToken,
+  verifyPreviewAccessToken,
 } from './preview-fixture-authority.mjs';
 
 const input = {
@@ -403,5 +406,33 @@ describe('GitHub fixture job authentication', () => {
         verifyFixtureJobToken({ input, token: token(), now: () => now, fetchImpl }),
       ).rejects.toThrow(/^Preview fixture job authentication failed$/);
     }
+  });
+});
+
+describe('Preview-only Trusted Sources token', () => {
+  it('uses a distinct audience which cannot authorize fixture mutation', async () => {
+    const access = token({ ...claims(), aud: PREVIEW_ACCESS_AUDIENCE });
+    await expect(
+      verifyPreviewAccessToken({ input, token: access, fetchImpl: keys(), now: () => now }),
+    ).resolves.toBeDefined();
+    await expect(
+      verifyFixtureJobToken({ input, token: access, fetchImpl: keys(), now: () => now }),
+    ).rejects.toThrow();
+    await expect(
+      verifyPreviewAccessToken({ input, token: token(), fetchImpl: keys(), now: () => now }),
+    ).rejects.toThrow();
+  });
+  it('requests only the fixed access audience and verifies provider signature', async () => {
+    const fetchImpl = vi.fn(async (url: string | URL | Request) =>
+      String(url).startsWith('https://token.actions.githubusercontent.com/')
+        ? Response.json({ keys: [jwk] })
+        : Response.json({ value: token({ ...claims(), aud: PREVIEW_ACCESS_AUDIENCE }) }),
+    );
+    await expect(
+      requestPreviewAccessToken({ input, env: jobEnv, fetchImpl, now: () => now }),
+    ).resolves.toBeDefined();
+    expect(new URL(String(fetchImpl.mock.calls[0]![0])).searchParams.get('audience')).toBe(
+      PREVIEW_ACCESS_AUDIENCE,
+    );
   });
 });
