@@ -27,6 +27,7 @@ import { env } from '@/env';
 import { resolveBillingLifecycleMode } from '@/features/settings/server/billing-lifecycle-mode';
 import {
   classifyBillingCustomerEvent,
+  getBillingSubscriptionSnapshot,
   syncDeletedSubscriptionStatus,
   syncSubscriptionStatus,
 } from '@/features/settings/server/billing-service';
@@ -201,6 +202,28 @@ async function sendTransactionalEmail(
   }
 }
 
+async function getCurrentSubscription(
+  stripe: Stripe,
+  subscriptionId: string,
+  customerId: string,
+  livemode: boolean,
+): Promise<Stripe.Subscription> {
+  const subscription = await stripe.subscriptions.retrieve(subscriptionId, {
+    maxNetworkRetries: 0,
+    timeout: 5_000,
+  });
+  const customer =
+    typeof subscription.customer === 'string' ? subscription.customer : subscription.customer.id;
+  if (
+    subscription.id !== subscriptionId ||
+    customer !== customerId ||
+    subscription.livemode !== livemode
+  ) {
+    throw new Error('Stripe subscription identity mismatch');
+  }
+  return subscription;
+}
+
 export async function POST(request: NextRequest) {
   const webhookSecret = env.STRIPE_WEBHOOK_SECRET;
 
@@ -346,11 +369,31 @@ export async function POST(request: NextRequest) {
               ? session.subscription
               : session.subscription.id;
 
+          if (
+            lifecycleMode === 'durable' &&
+            (await classifyBillingCustomerEvent(supabase, customerId)) === 'account_deleted'
+          )
+            break;
+
           // 実際の subscription ステータスを取得（trialing vs active）
-          const sub = await stripe.subscriptions.retrieve(subscriptionId);
+          const expected = await getBillingSubscriptionSnapshot(supabase, customerId);
+          const sub = await getCurrentSubscription(
+            stripe,
+            subscriptionId,
+            customerId,
+            event.livemode,
+          );
+          if (sub.status === 'canceled') {
+            if (lifecycleMode === 'durable') {
+              await syncDeletedSubscriptionStatus(supabase, customerId, subscriptionId);
+            } else if (expected.subscriptionId === subscriptionId) {
+              await syncSubscriptionStatus(supabase, customerId, null, 'canceled', expected);
+            }
+            break;
+          }
           const status = mapStripeSubscriptionStatus(sub.status);
 
-          await syncSubscriptionStatus(supabase, customerId, subscriptionId, status);
+          await syncSubscriptionStatus(supabase, customerId, subscriptionId, status, expected);
           logger.info('Checkout completed', { customerId, subscriptionId, status });
 
           const profile = await getBillingProfileByCustomerId(supabase, customerId);
@@ -392,11 +435,29 @@ export async function POST(request: NextRequest) {
       }
 
       case 'customer.subscription.updated': {
-        const subscription = event.data.object as Stripe.Subscription;
+        const snapshot = event.data.object as Stripe.Subscription;
         const customerId =
-          typeof subscription.customer === 'string'
-            ? subscription.customer
-            : subscription.customer.id;
+          typeof snapshot.customer === 'string' ? snapshot.customer : snapshot.customer.id;
+        if (
+          lifecycleMode === 'durable' &&
+          (await classifyBillingCustomerEvent(supabase, customerId)) === 'account_deleted'
+        )
+          break;
+        const expected = await getBillingSubscriptionSnapshot(supabase, customerId);
+        const subscription = await getCurrentSubscription(
+          stripe,
+          snapshot.id,
+          customerId,
+          event.livemode,
+        );
+        if (subscription.status === 'canceled') {
+          if (lifecycleMode === 'durable') {
+            await syncDeletedSubscriptionStatus(supabase, customerId, subscription.id);
+          } else if (expected.subscriptionId === subscription.id) {
+            await syncSubscriptionStatus(supabase, customerId, null, 'canceled', expected);
+          }
+          break;
+        }
 
         const status = mapStripeSubscriptionStatus(subscription.status);
         const previousStatus = event.data.previous_attributes
@@ -406,7 +467,7 @@ export async function POST(request: NextRequest) {
             )
           : null;
 
-        await syncSubscriptionStatus(supabase, customerId, subscription.id, status);
+        await syncSubscriptionStatus(supabase, customerId, subscription.id, status, expected);
         logger.info('Subscription updated', {
           customerId,
           subscriptionId: subscription.id,
@@ -463,8 +524,16 @@ export async function POST(request: NextRequest) {
         if (lifecycleMode === 'durable') {
           syncOutcome = await syncDeletedSubscriptionStatus(supabase, customerId, subscription.id);
         } else {
-          await syncSubscriptionStatus(supabase, customerId, null, 'canceled');
-          syncOutcome = 'updated';
+          const expected = await getBillingSubscriptionSnapshot(supabase, customerId);
+          if (expected.subscriptionId === subscription.id) {
+            await syncSubscriptionStatus(supabase, customerId, null, 'canceled', expected);
+            syncOutcome = 'updated';
+          } else {
+            syncOutcome =
+              expected.subscriptionId === null && expected.status === 'canceled'
+                ? 'already_terminal'
+                : 'stale_subscription';
+          }
         }
         logger.info('Subscription deleted', { outcome: syncOutcome });
 

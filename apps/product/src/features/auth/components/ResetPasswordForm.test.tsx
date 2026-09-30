@@ -444,5 +444,117 @@ describe('ResetPasswordForm', () => {
       // 枯渇時は password の再試行を行わない
       expect(mockUpdatePassword).toHaveBeenCalledTimes(1);
     });
+
+    it('renews an expired TOTP challenge and completes with the replacement', async () => {
+      mockInsufficientAal();
+      mockUpdatePassword.mockResolvedValueOnce({ data: { user: null }, error: null });
+      mockChallenge.mockResolvedValueOnce(challengeSuccess).mockResolvedValueOnce({
+        data: {
+          id: 'challenge-fresh',
+          type: 'totp',
+          expires_at: Math.floor(Date.now() / 1000) + 60,
+        },
+        error: null,
+      });
+      mockVerify
+        .mockResolvedValueOnce({
+          data: null,
+          error: Object.assign(new Error('Provider expiry text'), {
+            code: 'mfa_challenge_expired',
+          }),
+        })
+        .mockResolvedValueOnce({ data: {}, error: null });
+      const user = await submitValidPassword();
+      await user.type(await screen.findByLabelText('auth.mfaVerify.verificationCode'), '123456');
+      await waitFor(() =>
+        expect(mockVerify).toHaveBeenCalledWith({
+          factorId: 'factor-1',
+          challengeId: 'challenge-1',
+          code: '123456',
+        }),
+      );
+      await waitFor(() => expect(mockChallenge).toHaveBeenCalledTimes(2));
+      expect(screen.getByRole('alert')).toHaveTextContent('common.errors.mfa.challengeExpired');
+      await user.type(screen.getByLabelText('auth.mfaVerify.verificationCode'), '654321');
+      await waitFor(() =>
+        expect(mockVerify).toHaveBeenLastCalledWith({
+          factorId: 'factor-1',
+          challengeId: 'challenge-fresh',
+          code: '654321',
+        }),
+      );
+      expect(await screen.findByText('auth.resetPasswordForm.successTitle')).toBeInTheDocument();
+      expect(mockUpdatePassword).toHaveBeenCalledTimes(2);
+    });
+
+    it('does not renew a challenge for an incorrect TOTP code', async () => {
+      mockInsufficientAal();
+      mockVerify.mockResolvedValueOnce({
+        data: null,
+        error: Object.assign(new Error('Provider invalid text'), {
+          code: 'mfa_verification_failed',
+        }),
+      });
+      const user = await submitValidPassword();
+      await user.type(await screen.findByLabelText('auth.mfaVerify.verificationCode'), '123456');
+      await waitFor(() =>
+        expect(screen.getByRole('alert')).toHaveTextContent('common.errors.mfa.codeInvalid'),
+      );
+      expect(mockVerify).toHaveBeenCalledTimes(1);
+      expect(mockChallenge).toHaveBeenCalledTimes(1);
+      expect(mockUpdatePassword).toHaveBeenCalledTimes(1);
+    });
+
+    it.each(['returned error', 'throw'] as const)(
+      'recovers from challenge renewal %s without reusing the expired ID',
+      async (failureMode) => {
+        mockInsufficientAal();
+        mockInsufficientAal();
+        mockUpdatePassword.mockResolvedValueOnce({ data: { user: null }, error: null });
+        mockChallenge.mockResolvedValueOnce(challengeSuccess);
+        if (failureMode === 'throw')
+          mockChallenge.mockRejectedValueOnce(new Error('renewal unavailable'));
+        else
+          mockChallenge.mockResolvedValueOnce({
+            data: null,
+            error: new Error('renewal unavailable'),
+          });
+        mockChallenge.mockResolvedValueOnce({
+          data: {
+            id: 'challenge-retry',
+            type: 'totp',
+            expires_at: Math.floor(Date.now() / 1000) + 60,
+          },
+          error: null,
+        });
+        mockVerify
+          .mockResolvedValueOnce({
+            data: null,
+            error: Object.assign(new Error('Provider expiry text'), {
+              code: 'mfa_challenge_expired',
+            }),
+          })
+          .mockResolvedValueOnce({ data: {}, error: null });
+        const user = await submitValidPassword();
+        await user.type(await screen.findByLabelText('auth.mfaVerify.verificationCode'), '123456');
+        const retryButton = await screen.findByRole('button', {
+          name: 'auth.resetPasswordForm.updateButton',
+        });
+        expect(mockChallenge).toHaveBeenCalledTimes(2);
+        expect(mockVerify).toHaveBeenCalledTimes(1);
+        expect(screen.getByRole('alert')).toHaveTextContent('auth.errors.unexpectedError');
+        await user.click(retryButton);
+        await user.type(await screen.findByLabelText('auth.mfaVerify.verificationCode'), '654321');
+        await waitFor(() =>
+          expect(mockVerify).toHaveBeenLastCalledWith({
+            factorId: 'factor-1',
+            challengeId: 'challenge-retry',
+            code: '654321',
+          }),
+        );
+        expect(await screen.findByText('auth.resetPasswordForm.successTitle')).toBeInTheDocument();
+        expect(mockUpdatePassword).toHaveBeenCalledTimes(3);
+      },
+    );
   });
 });

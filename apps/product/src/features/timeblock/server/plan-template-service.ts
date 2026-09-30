@@ -178,6 +178,8 @@ export class PlanTemplateService {
    */
   async create(options: UserOptions<CreatePlanTemplateInput>): Promise<PlanTemplateView> {
     const { userId, input } = options;
+    // Resolve the response prerequisites before persisting, so a read failure is safe to retry.
+    const context = await this.loadDurationContext(userId);
     const { data: template, error } = await this.writes()
       .from('plan_templates')
       .insert({ user_id: userId, name: input.name })
@@ -212,7 +214,6 @@ export class PlanTemplateService {
       toWriteError(blocksError, 'create_plan_template_blocks', 'CREATE_FAILED');
     }
 
-    const context = await this.loadDurationContext(userId);
     return toView(template, blocks ?? [], context);
   }
 
@@ -398,15 +399,22 @@ export class PlanTemplateService {
       .eq('user_id', userId)
       .maybeSingle();
     if (error) {
-      captureUnexpectedDatabaseError(error, {
-        feature: 'timeblock',
-        operation: 'fetch_plan_template_settings',
+      throw new TimeblockServiceError('FETCH_FAILED', 'Failed to fetch plan template settings', {
+        cause: captureUnexpectedDatabaseError(error, {
+          feature: 'timeblock',
+          operation: 'fetch_plan_template_settings',
+        }),
       });
     }
-    const records = await fetchRecords(this.supabase, userId, {
-      startDate: new Date(now.getTime() - MEDIAN_DURATION_WINDOW_DAYS * MS_PER_DAY).toISOString(),
-      endDate: now.toISOString(),
-    });
+    const records = await fetchRecords(
+      this.supabase,
+      userId,
+      {
+        startDate: new Date(now.getTime() - MEDIAN_DURATION_WINDOW_DAYS * MS_PER_DAY).toISOString(),
+        endDate: now.toISOString(),
+      },
+      { clipToRange: false },
+    );
     return {
       timezone: settings?.timezone ?? 'UTC',
       defaultMinutes: settings?.default_duration ?? FALLBACK_DEFAULT_MINUTES,

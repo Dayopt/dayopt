@@ -30,6 +30,7 @@ import { getAuthErrorKey } from '../lib/sanitize-auth-error';
 export function PasswordResetForm({ className, ...props }: React.ComponentProps<'div'>) {
   const t = useTranslations();
   const [email, setEmail] = useState('');
+  const [submittedEmail, setSubmittedEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -61,6 +62,7 @@ export function PasswordResetForm({ className, ...props }: React.ComponentProps<
         // 新しい challenge token を取得させる
         turnstile.reset();
       } else {
+        setSubmittedEmail(email);
         setSuccess(true);
       }
     } catch {
@@ -82,7 +84,7 @@ export function PasswordResetForm({ className, ...props }: React.ComponentProps<
                   <h1 className="text-2xl font-medium">{t('auth.passwordResetForm.checkEmail')}</h1>
                   <p className="text-muted-foreground text-balance">
                     {t('auth.passwordResetForm.sentResetLink')}{' '}
-                    <span className="font-normal">{email}</span>
+                    <span className="font-normal">{submittedEmail}</span>
                   </p>
                 </div>
                 <Field>

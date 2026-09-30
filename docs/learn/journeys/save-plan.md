@@ -89,10 +89,10 @@ flowchart TD
 
 ### 3. 先に画面へ出す（楽観的更新）（ブラウザ）
 
-サーバーの返事を待たず、一時 ID（temp-…）の Plan を一覧のキャッシュへ差し込む。その直前に一覧の snapshot を取っておき、失敗したらそこへ戻す。
+サーバーの返事を待たず、一時 ID（temp-…）の Plan を一覧のキャッシュへ差し込む。操作ごとの書き込みを記録し、失敗したらその操作だけを取り消す。並行する別操作の確定結果と後続編集は残す。認証切り替えで消去したcacheには古いcallbackから書き込まない。
 
 - **なぜ必要か**: 通信を待つ間も画面を止めないため。失敗した時に元へ戻せるよう、差し込む前の状態を持っておく。
-- **入力 → 出力**: 作成の入力 → 一時 ID の行が入ったキャッシュと snapshot
+- **入力 → 出力**: 作成の入力 → 一時 ID の行が入ったキャッシュと操作ごとの変更記録
 - **ここを変えると**: キャッシュのキーや一覧の絞り込み条件を変えると、差し込み先と巻き戻し対象がずれる。書き込み mutation を足す時は optimistic-update skill の手順に従う。
 - **コード**:
   - [`apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.ts`](../../../apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.ts) で `const createPlan = api.planCommands.create.useMutation` を探す
@@ -130,14 +130,14 @@ flowchart TD
 <details>
 <summary>⚡ 通信が途中で切れる — 画面: エラー表示 / データ: どちらもありうる / 再試行: しない / 痕跡: Sentry</summary>
 
-- 画面: 一時 ID の Plan が消え（snapshot へ戻す）、「保存に失敗」のトーストが出る。
+- 画面: 失敗した操作の一時 ID の Plan が消え、並行する別操作の結果は残る。「保存に失敗」のトーストが出る。
 - データ: 2 通りある。届く前に切れたなら DB は変わらない。DB で確定した後に返事だけ失われたなら、DB には Plan がある。
 - 再試行: 自動では送り直さない（retry: false）。代わりに成功・失敗どちらでも一覧を取り直す（onSettled）。DB で確定していたなら取り直しで Plan が再び現れる。この時に利用者がもう一度作ると、同じ時間帯なら排他制約（23P01）で弾かれるが、サイドバーからの作成は次の空き時間に置くので、時間をずらした 2 つ目ができる。
 - 痕跡: サーバーの形をしていない通信エラーとして、ブラウザから Sentry へ送る（source: trpc_client_transport）。ブラウザの Sentry は本番（VERCEL_ENV=production）で、かつ分析の同意がある時だけ動くので、無いこともある。
 - **最初に見る場所**: Sentry で source:trpc_client_transport を探し、同じ時刻の Vercel の /api/trpc ログで、サーバーまで届いていたかを見る。
 - 根拠:
   - [`apps/product/src/lib/trpc/client-errors.ts`](../../../apps/product/src/lib/trpc/client-errors.ts) で `trpc_client_transport` を探す
-  - [`apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.ts`](../../../apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.ts) で `onSettled: invalidate` を探す
+  - [`apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.ts`](../../../apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.ts) で `onSettled: settleAndInvalidate` を探す
   - [`apps/product/instrumentation-client.ts`](../../../apps/product/instrumentation-client.ts) で `hasAnalyticsConsent` を探す
 
 </details>
@@ -350,7 +350,7 @@ service role の client で create_plan_command_v1 を呼び、user_id を引数
 - **入力 → 出力**: サーバーの行、またはエラー → 確定した一覧と、取り直した集計
 - **ここを変えると**: 新しい集計画面を足したら、ここの取り直し対象に入れないと保存後も古い数字が残る。
 - **コード**:
-  - [`apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.ts`](../../../apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.ts) で `insertIntoMatchingLists('plans', created, context?.tempId)` を探す
+  - [`apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.ts`](../../../apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.ts) で `insertIntoMatchingLists('plans', created, context.tempId)` を探す
   - [`apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.ts`](../../../apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.ts) で `void utils.plans.invalidate();` を探す
   - [`docs/engineering/infra.md`](../../engineering/infra.md) で `**Realtime は現状の浸透に含めない。**` を探す
 
@@ -497,11 +497,11 @@ service role の client で create_plan_command_v1 を呼び、user_id を引数
       "id": "optimistic",
       "svc": "browser",
       "title": "先に画面へ出す（楽観的更新）",
-      "what": "サーバーの返事を待たず、一時 ID（temp-…）の Plan を一覧のキャッシュへ差し込む。その直前に一覧の snapshot を取っておき、失敗したらそこへ戻す。",
+      "what": "サーバーの返事を待たず、一時 ID（temp-…）の Plan を一覧のキャッシュへ差し込む。操作ごとの書き込みを記録し、失敗したらその操作だけを取り消す。並行する別操作の確定結果と後続編集は残す。認証切り替えで消去したcacheには古いcallbackから書き込まない。",
       "why": "通信を待つ間も画面を止めないため。失敗した時に元へ戻せるよう、差し込む前の状態を持っておく。",
       "io": {
         "in": "作成の入力",
-        "out": "一時 ID の行が入ったキャッシュと snapshot"
+        "out": "一時 ID の行が入ったキャッシュと操作ごとの変更記録"
       },
       "change": "キャッシュのキーや一覧の絞り込み条件を変えると、差し込み先と巻き戻し対象がずれる。書き込み mutation を足す時は optimistic-update skill の手順に従う。",
       "refs": [
@@ -605,7 +605,7 @@ service role の client で create_plan_command_v1 を呼び、user_id を引数
         {
           "id": "network-lost",
           "label": "通信が途中で切れる",
-          "screen": "一時 ID の Plan が消え（snapshot へ戻す）、「保存に失敗」のトーストが出る。",
+          "screen": "失敗した操作の一時 ID の Plan が消え、並行する別操作の結果は残る。「保存に失敗」のトーストが出る。",
           "data": "2 通りある。届く前に切れたなら DB は変わらない。DB で確定した後に返事だけ失われたなら、DB には Plan がある。",
           "retry": "自動では送り直さない（retry: false）。代わりに成功・失敗どちらでも一覧を取り直す（onSettled）。DB で確定していたなら取り直しで Plan が再び現れる。この時に利用者がもう一度作ると、同じ時間帯なら排他制約（23P01）で弾かれるが、サイドバーからの作成は次の空き時間に置くので、時間をずらした 2 つ目ができる。",
           "trace": "サーバーの形をしていない通信エラーとして、ブラウザから Sentry へ送る（source: trpc_client_transport）。ブラウザの Sentry は本番（VERCEL_ENV=production）で、かつ分析の同意がある時だけ動くので、無いこともある。",
@@ -617,7 +617,7 @@ service role の client で create_plan_command_v1 を呼び、user_id を引数
             },
             {
               "path": "apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.ts",
-              "find": "onSettled: invalidate"
+              "find": "onSettled: settleAndInvalidate"
             },
             {
               "path": "apps/product/instrumentation-client.ts",
@@ -1193,7 +1193,7 @@ service role の client で create_plan_command_v1 を呼び、user_id を引数
       "refs": [
         {
           "path": "apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.ts",
-          "find": "insertIntoMatchingLists('plans', created, context?.tempId)"
+          "find": "insertIntoMatchingLists('plans', created, context.tempId)"
         },
         {
           "path": "apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.ts",

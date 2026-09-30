@@ -93,10 +93,19 @@ describe('生成物の契約', () => {
     expect(rendered).toContain('## 禁止表記一覧');
   });
 
-  it('すべての ui / design 概念が表に載る', () => {
+  it('ui / design の現行語だけが対応する用語表に載る', () => {
+    const tables = {
+      ui: rendered.split('### UI 用語\n')[1]?.split('\n### ')[0],
+      design: rendered.split('### 設計語（UI 文言には出さない）\n')[1]?.split('\n### ')[0],
+    };
     for (const entry of GLOSSARY) {
       if (entry.layer === 'code') continue;
-      expect(rendered, `${entry.id}`).toContain(entry.concept);
+      const rowStart = `\n| ${entry.concept} |`;
+      if (entry.status === 'current') {
+        expect(tables[entry.layer], `${entry.id}`).toContain(rowStart);
+      } else {
+        expect(tables[entry.layer], `${entry.id}`).not.toContain(rowStart);
+      }
     }
   });
 

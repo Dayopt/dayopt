@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -197,5 +197,41 @@ describe('PasswordResetForm', () => {
     await waitFor(() => {
       expect(mockResetPassword).toHaveBeenCalledWith('user@example.com');
     });
+  });
+
+  it.each([
+    ['success', null],
+    ['rate limited', { message: 'Please wait', code: 'over_email_send_rate_limit' }],
+  ])('shows the submitted recipient after an in-flight edit (%s)', async (_label, error) => {
+    let finish!: (value: { error: typeof error }) => void;
+    mockResetPassword.mockImplementationOnce(
+      () =>
+        new Promise<{ error: typeof error }>((resolve) => {
+          finish = resolve;
+        }),
+    );
+    mockTurnstileEnabled = false;
+    const user = userEvent.setup();
+    render(<PasswordResetForm />);
+    const input = screen.getByLabelText(/email/i);
+    await user.type(input, 'original@example.com');
+    await user.click(screen.getByRole('button', { name: /sendResetLink/i }));
+    await waitFor(() => expect(mockResetPassword).toHaveBeenCalledWith('original@example.com'));
+
+    // aria-disabled preserves keyboard focusability; edit without a pointer click.
+    // The loading submit button leaves focus; backwards traversal passes the login link.
+    await user.tab({ shift: true });
+    await user.tab({ shift: true });
+    expect(input).toHaveFocus();
+    await user.keyboard('{End}.edited');
+    expect(input).toHaveValue('original@example.com.edited');
+    await act(async () => finish({ error }));
+
+    expect(screen.getByText('auth.passwordResetForm.checkEmail')).toBeInTheDocument();
+    expect(screen.getByText('original@example.com', { exact: true })).toBeInTheDocument();
+    expect(
+      screen.queryByText('original@example.com.edited', { exact: true }),
+    ).not.toBeInTheDocument();
+    expect(mockResetPassword).toHaveBeenCalledTimes(1);
   });
 });

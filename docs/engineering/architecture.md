@@ -966,7 +966,7 @@ erDiagram
 単一 `entries` テーブル（ADR-011）に予定 range と実績 range を同居させ、実績を read 時に自動導出するモデルは、1予定に対する複数回の記録を表現できない・自動記録が見積もり精度などの KPI を歪める、という限界を抱えていた。ADR-025 でこれを Plan / Record の2独立エンティティへ分割し、記録を自動導出ではなく明示操作に反転した。物理テーブルと公開契約は `plans` / `records` に統一している。
 
 - 状態導出（`upcoming` / `active` / `past`）は Plan / Record それぞれの時間位置から行う
-- 保存先は選択 UI ではなく `end_at > now` か否かで一意に決まる（`end_at > now` → Plan、`end_at <= now` → Record）
+- 新規作成の既定は `end_at > now` → Plan、`end_at <= now` → Record（`resolveTimeblockDestination`）。作成 Inspector では終了が現在以前なら Plan / Record を選べる。未来は Plan のみ（`resolveTimeblockKindChoice`）
 - 詳細は ADR-025（削除済み、git 履歴参照） 参照
 
 #### カテゴリー / アクティビティの所有者整合

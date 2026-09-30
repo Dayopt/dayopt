@@ -167,11 +167,11 @@ last_verified: 2026-09-21
 #### `apps/product/src/app/api/mcp/_tools/registry.ts`
 
 - [削除と取り消し](journeys/delete-undo.md) の 6. 取り消しを出す — 取り消しの出し方はカレンダーと Inspector で 1 つにする意図（useTimeblockDeleteUndo）だが、Inspector は自前で同じトーストを組んでいる。変える時は両方を見る。「元に戻す」付きのトーストが出ている間、action の無い成功トーストは出さない（lib/toast）ので、「復元しました」が出ないこともある。
-- [AI クライアントから Plan を作る（MCP）](journeys/mcp.md) の 5. plans.create を呼ぶ — tool 名（plans.create）・入力 schema・必要 scope（write:plans）は外部契約。改名・削除・必須項目の追加は、既存クライアントと、それを前提に書かれた利用者の指示を壊す。tool の説明文は「Create one future Plan」のままで、過去にも Plan を置ける現行の規則と食い違っている。
+- [AI クライアントから Plan を作る（MCP）](journeys/mcp.md) の 5. plans.create を呼ぶ — tool 名（plans.create）・入力 schema・必要 scope（write:plans）は外部契約。改名・削除・必須項目の追加は、既存クライアントと、それを前提に書かれた利用者の指示を壊す。Plan は過去・未来とも作成できる。説明文も現行の時間規則と一致させる。
 
 #### `apps/product/src/app/api/mcp/_tools/timeblock-mutations.ts`
 
-- [AI クライアントから Plan を作る（MCP）](journeys/mcp.md) の 5. plans.create を呼ぶ — tool 名（plans.create）・入力 schema・必要 scope（write:plans）は外部契約。改名・削除・必須項目の追加は、既存クライアントと、それを前提に書かれた利用者の指示を壊す。tool の説明文は「Create one future Plan」のままで、過去にも Plan を置ける現行の規則と食い違っている。
+- [AI クライアントから Plan を作る（MCP）](journeys/mcp.md) の 5. plans.create を呼ぶ — tool 名（plans.create）・入力 schema・必要 scope（write:plans）は外部契約。改名・削除・必須項目の追加は、既存クライアントと、それを前提に書かれた利用者の指示を壊す。Plan は過去・未来とも作成できる。説明文も現行の時間規則と一致させる。
 - [AI クライアントから Plan を作る（MCP）](journeys/mcp.md) の 10. 受領証を受け取る — 受領証の field と schemaVersion は外部契約。変えると、保存済みの受領証を再送で返す時に outputSchema の検証が失敗し、全 mutation tool が壊れる（timeblock-mutations.ts のコメント）。
 
 #### `apps/product/src/app/api/mcp/_tools/tool-result.ts`
@@ -267,7 +267,7 @@ last_verified: 2026-09-21
 #### `apps/product/src/features/auth/server/router.ts`
 
 - [アカウントを削除する（不可逆）](journeys/account-deletion.md) の 2. 本人を確かめ直す — captcha を免除している経路なので、呼び出し元を増やす前に password-reauthentication.ts の契約と docs/product/specs/auth.md の保証境界を読む。検証用の session は scope: 'local' で消す（既定の global だと全端末がログアウトする）。
-- [データを書き出す](journeys/data-export.md) の 4. Service が 6 本読む — service role は RLS を越えるので、Plan / Record では .eq('user_id', userId) だけが他人のデータとの境界になる（REVIEW-1）。userId は必ず ctx から取り、入力で受けない。列は public-projections の select に限っているので、列を足す時はそこを変える。
+- [データを書き出す](journeys/data-export.md) の 4. Service が6種類を読む — service role は RLS を越えるので、Plan / Record では .eq('user_id', userId) だけが他人のデータとの境界になる（REVIEW-1）。userId は必ず ctx から取り、入力で受けない。列は public-projections の select に限っているので、列を足す時はそこを変える。
 
 #### `apps/product/src/features/auth/server/user-service.ts`
 
@@ -276,8 +276,8 @@ last_verified: 2026-09-21
 - [アカウントを削除する（不可逆）](journeys/account-deletion.md) の 4. 削除を開始（閉鎖へ） — DB の RPC は失敗 code が 40P01 / 55P03 / 57014（deadlock・lock 待ち・timeout）なら 3 回まで呼び直す。それでも取れなければ contention として利用者に押し直してもらう。
 - [アカウントを削除する（不可逆）](journeys/account-deletion.md) の 8. 封をして本体を消す — auth.users から ON DELETE CASCADE で届かないテーブルは、ここでは消えない。email_suppressions は削除後も残す扱いで未裁定（invariants.md）。この trigger は gate が有効な時だけ働く。
 - [アカウントを削除する（不可逆）](journeys/account-deletion.md) の 9. 削除完了メール — 削除のあとは user_settings も profiles も無い。メールに要る値はすべて削除の前に控えておく。
-- [データを書き出す](journeys/data-export.md) の 4. Service が 6 本読む — service role は RLS を越えるので、Plan / Record では .eq('user_id', userId) だけが他人のデータとの境界になる（REVIEW-1）。userId は必ず ctx から取り、入力で受けない。列は public-projections の select に限っているので、列を足す時はそこを変える。
-- [データを書き出す](journeys/data-export.md) の 5. 行を読む — PostgREST は 1 回の応答の行数に上限（max_rows）があり、超えた分は黙って切られる。local の設定は 1000。Plan / Record が多い利用者に効くので、直すなら collectQueryPages で読み切る。
+- [データを書き出す](journeys/data-export.md) の 4. Service が6種類を読む — service role は RLS を越えるので、Plan / Record では .eq('user_id', userId) だけが他人のデータとの境界になる（REVIEW-1）。userId は必ず ctx から取り、入力で受けない。列は public-projections の select に限っているので、列を足す時はそこを変える。
+- [データを書き出す](journeys/data-export.md) の 5. 行を読む — ページ途中の失敗は部分結果を返さずEXPORT_FAILEDにする。単一DB snapshotではないため取得中の同時編集に対する整合性保証は別。repoのmax_rowsは1000で、ページサイズ500以上の上限を前提とする。クラウドの現在値は未確認。
 
 #### `apps/product/src/features/auth/server/welcome-email.ts`
 
@@ -289,7 +289,7 @@ last_verified: 2026-09-21
 - [ログイン（MFA 含む）](journeys/login.md) の 2. パスワードを確かめる — 想定内の認証エラー（401 / 422 / 429 など）は Sentry に送らない。送る対象を変える時は isExpectedAuthError を見る。
 - [サインアップ → ウェルカムメール](journeys/signup.md) の 2. Auth に登録 — 認証は Supabase に最も深く依存している部分。乗り換えの重さは出口コスト台帳。
 - [パスワードを再設定する](journeys/password-reset.md) の 1. リセットを依頼 — 画面の出し分けを足すと列挙防止が崩れる。保証境界は docs/product/specs/auth.md のパスワードリセットの節。失敗の観測は画面ではなく store 側の Sentry が持つ。
-- [パスワードを再設定する](journeys/password-reset.md) の 3. リセットメール送信 — この Function は Vercel ではなく Supabase にデプロイする（supabase functions deploy --use-api）。アプリの deploy では変わらない。メール本文の「24 時間」とリンクの実際の有効時間はここでは揃えていない（下の注意を参照）。
+- [パスワードを再設定する](journeys/password-reset.md) の 3. リセットメール送信 — この Function は Vercel ではなく Supabase にデプロイする（supabase functions deploy --use-api）。アプリの deploy では変わらない。メールには期限切れ後の再リクエストを案内し、Hook payload に無い有効期限の数値は記載しない。期限設定そのものは Supabase Auth が持つ。
 - [パスワードを再設定する](journeys/password-reset.md) の 6. 新しいパスワードを送る — エラー code の読み分けは ResetPasswordForm の RECOVERY_UPDATE_BLOCKED_CODES と isMfaBlocked。message の文字列で判定しない方針。
 - [パスワードを再設定する](journeys/password-reset.md) の 8. 他の端末を切る — 今の端末の session は残る。そのため 3 秒後の /auth/login への移動は、proxy が「サインイン済みで auth 系 path へ来た」と見て /calendar へ送り直すはず（コードから読んだ挙動。ブラウザでは未確認）。文言は「まもなくサインインページに移動します」。
 
@@ -471,8 +471,8 @@ last_verified: 2026-09-21
 #### `apps/product/src/features/settings/components/DataSettings.tsx`
 
 - [データを書き出す](journeys/data-export.md) の 1. 形式と範囲を選ぶ — 同じ画面の下に、全件削除（deleteBlocks / deleteAllData）がある。こちらは不可逆なので、エクスポートとは別の経路として扱い、ここを変える時に巻き込まない。
-- [データを書き出す](journeys/data-export.md) の 2. 押した時に問い合わせる — refetch の結果は例外にならず、失敗しても前回成功した data を持ったまま返る。成否を data の有無だけで判定しているので、ここを触る時は result.isError も見る形にする。
-- [データを書き出す](journeys/data-export.md) の 7. 期間で絞る — 日付の境界をブラウザで組んでいて、利用者の timezone 設定を使っていない（timezone.md の禁止パターンに近い書き方）。開始日は UTC の 0 時として読まれ、終了日はブラウザの timezone で閉じるので、両端の扱いが揃っていない。直すなら toTZStartISO / toTZEndISO を利用者の timezone で使う。絞り込みは開始時刻だけで、期間を跨ぐ Plan / Record は開始側の期間にしか入らない。
+- [データを書き出す](journeys/data-export.md) の 2. 押した時に問い合わせる — refetchは失敗しても前回のdataを返すため、isErrorも確認して失敗時はファイルを作らない。dataの有無だけに戻すと古い結果を成功扱いする。
+- [データを書き出す](journeys/data-export.md) の 7. 期間で絞る — timezoneは既存のuseUserPreferencesから取得し、getDateKeyで各開始時刻の暦日を比較する。日を固定24時間として扱わないため、夏時間の23/25時間の日も同じ条件で選べる。期間を跨ぐ行は従来どおり開始側の期間に入る。
 - [データを書き出す](journeys/data-export.md) の 8. CSV か JSON にする — CSV の列を足すと、既存のスプレッドシートの取り込み手順が壊れうる（外部に渡る形式）。列は TIMEBLOCK_CSV_COLUMNS 1 か所で決まる。CSV にはカテゴリとアクティビティの名前が入らず、activity_id だけになる。
 - [データを書き出す](journeys/data-export.md) の 9. ファイルを保存する — 成功のトーストは click を呼んだ時点で出していて、ブラウザが実際に保存したかは確かめていない。
 
@@ -611,6 +611,10 @@ last_verified: 2026-09-21
 - [Record を作る・Plan を記録する](journeys/record-plan.md) の 4. Router → Service — 入力に項目を足す時も userId は ctx から渡す（REVIEW-1）。
 - [削除と取り消し](journeys/delete-undo.md) の 4. Router → Service — 入力に項目を足す時も userId は ctx から渡す（REVIEW-1）。
 
+#### `apps/product/src/lib/analytics/posthog-server.ts`
+
+- [AI クライアントから Plan を作る（MCP）](journeys/mcp.md) の 9. 画面と同じ関数で書く — create_plan_command_v1 の規則を変えると、画面と MCP の両方が同時に変わる。MCP のエラーコード対応表（EXPECTED_ERROR_CODES）は画面側の表とは別にあるので、新しい SQLSTATE を足したら両方に足さないと MCP だけ MUTATION_FAILED になる。
+
 #### `apps/product/src/lib/auth-error.ts`
 
 - [ログイン（MFA 含む）](journeys/login.md) の 2. パスワードを確かめる — 想定内の認証エラー（401 / 422 / 429 など）は Sentry に送らない。送る対象を変える時は isExpectedAuthError を見る。
@@ -651,11 +655,15 @@ last_verified: 2026-09-21
 
 - [レポートを開く（集計）](journeys/report.md) の 6. 行を取る — RLS（利用者の権限の client）に加えて user_id でも絞っている。PostgREST の 1 回あたりの行数上限に黙って切られないよう collectQueryPages で読み切るので、ここを単発の select に戻すと多い期間で数字が欠ける。
 - [レポートを開く（集計）](journeys/report.md) の 7. TS で集計 — 集計の数え方は lib/time の aggregate を詳細パネルと共有している。中央値の母集団（期間へ切り取った長さ、auto_migrated を除く）を片方だけ変えると、一覧と詳細パネルで同じアクティビティの中央値が食い違う。現在時刻（nowAt）はサーバーの値を返して、ブラウザの時計とのずれで数字が揺れないようにしている。
-- [データを書き出す](journeys/data-export.md) の 5. 行を読む — PostgREST は 1 回の応答の行数に上限（max_rows）があり、超えた分は黙って切られる。local の設定は 1000。Plan / Record が多い利用者に効くので、直すなら collectQueryPages で読み切る。
+- [データを書き出す](journeys/data-export.md) の 5. 行を読む — ページ途中の失敗は部分結果を返さずEXPORT_FAILEDにする。単一DB snapshotではないため取得中の同時編集に対する整合性保証は別。repoのmax_rowsは1000で、ページサイズ500以上の上限を前提とする。クラウドの現在値は未確認。
 
 #### `apps/product/src/lib/database/public-projections.ts`
 
-- [データを書き出す](journeys/data-export.md) の 4. Service が 6 本読む — service role は RLS を越えるので、Plan / Record では .eq('user_id', userId) だけが他人のデータとの境界になる（REVIEW-1）。userId は必ず ctx から取り、入力で受けない。列は public-projections の select に限っているので、列を足す時はそこを変える。
+- [データを書き出す](journeys/data-export.md) の 4. Service が6種類を読む — service role は RLS を越えるので、Plan / Record では .eq('user_id', userId) だけが他人のデータとの境界になる（REVIEW-1）。userId は必ず ctx から取り、入力で受けない。列は public-projections の select に限っているので、列を足す時はそこを変える。
+
+#### `apps/product/src/lib/date/core.ts`
+
+- [データを書き出す](journeys/data-export.md) の 7. 期間で絞る — timezoneは既存のuseUserPreferencesから取得し、getDateKeyで各開始時刻の暦日を比較する。日を固定24時間として扱わないため、夏時間の23/25時間の日も同じ条件で選べる。期間を跨ぐ行は従来どおり開始側の期間に入る。
 
 #### `apps/product/src/lib/email/notifications.ts`
 
@@ -685,7 +693,7 @@ last_verified: 2026-09-21
 
 #### `apps/product/src/lib/mcp/trpc-bridge.ts`
 
-- [AI クライアントから Plan を作る（MCP）](journeys/mcp.md) の 5. plans.create を呼ぶ — tool 名（plans.create）・入力 schema・必要 scope（write:plans）は外部契約。改名・削除・必須項目の追加は、既存クライアントと、それを前提に書かれた利用者の指示を壊す。tool の説明文は「Create one future Plan」のままで、過去にも Plan を置ける現行の規則と食い違っている。
+- [AI クライアントから Plan を作る（MCP）](journeys/mcp.md) の 5. plans.create を呼ぶ — tool 名（plans.create）・入力 schema・必要 scope（write:plans）は外部契約。改名・削除・必須項目の追加は、既存クライアントと、それを前提に書かれた利用者の指示を壊す。Plan は過去・未来とも作成できる。説明文も現行の時間規則と一致させる。
 
 #### `apps/product/src/lib/oauth-server/clients.ts`
 
@@ -738,7 +746,7 @@ last_verified: 2026-09-21
 
 #### `apps/product/src/lib/tanstack-query/should-persist-query.ts`
 
-- [データを書き出す](journeys/data-export.md) の 2. 押した時に問い合わせる — refetch の結果は例外にならず、失敗しても前回成功した data を持ったまま返る。成否を data の有無だけで判定しているので、ここを触る時は result.isError も見る形にする。
+- [データを書き出す](journeys/data-export.md) の 2. 押した時に問い合わせる — refetchは失敗しても前回のdataを返すため、isErrorも確認して失敗時はファイルを作らない。dataの有無だけに戻すと古い結果を成功扱いする。
 - [データを書き出す](journeys/data-export.md) の 6. 応答を受け取る — 全データを端末に残したくないなら、useQuery に meta: { persist: false } を付ける。応答の大きさは件数に比例する。Vercel の応答サイズの上限に当たるかは未確認。
 
 #### `apps/product/src/lib/time/derived-model.ts`
@@ -771,7 +779,7 @@ last_verified: 2026-09-21
 #### `apps/product/src/lib/trpc/error-code-map.ts`
 
 - [Plan / Record を動かす・直す](journeys/edit-timeblock.md) の 6. RPC で更新 — 訳したコードは client-safe-service-code.ts の許可一覧に載っているものだけがブラウザへ届く。載っていないコードは「結果不明」として扱われ、Inspector が止まる側に倒れる。
-- [データを書き出す](journeys/data-export.md) の 5. 行を読む — PostgREST は 1 回の応答の行数に上限（max_rows）があり、超えた分は黙って切られる。local の設定は 1000。Plan / Record が多い利用者に効くので、直すなら collectQueryPages で読み切る。
+- [データを書き出す](journeys/data-export.md) の 5. 行を読む — ページ途中の失敗は部分結果を返さずEXPORT_FAILEDにする。単一DB snapshotではないため取得中の同時編集に対する整合性保証は別。repoのmax_rowsは1000で、ページサイズ500以上の上限を前提とする。クラウドの現在値は未確認。
 
 #### `apps/product/src/lib/trpc/errors.ts`
 
@@ -794,7 +802,7 @@ last_verified: 2026-09-21
 - [Plan を保存](journeys/save-plan.md) の 6. 関門チェック — 順序に理由がある。write fence を rate limit より先に見るのは、止めている間の依頼で自分の枠を使い切り、復旧直後に締め出されるのを避けるため。
 - [レポートを開く（集計）](journeys/report.md) の 3. /api/trpc と関門 — requiresProductAccess を変えると、レポートを含む全 query の見え方が課金状態で変わる。ここは全 tRPC 共通なので、変更の影響は保存経路（Plan を保存）と同じ範囲に及ぶ。
 - [レポートを開く（集計）](journeys/report.md) の 6. 行を取る — RLS（利用者の権限の client）に加えて user_id でも絞っている。PostgREST の 1 回あたりの行数上限に黙って切られないよう collectQueryPages で読み切るので、ここを単発の select に戻すと多い期間で数字が欠ける。
-- [データを書き出す](journeys/data-export.md) の 2. 押した時に問い合わせる — refetch の結果は例外にならず、失敗しても前回成功した data を持ったまま返る。成否を data の有無だけで判定しているので、ここを触る時は result.isError も見る形にする。
+- [データを書き出す](journeys/data-export.md) の 2. 押した時に問い合わせる — refetchは失敗しても前回のdataを返すため、isErrorも確認して失敗時はファイルを作らない。dataの有無だけに戻すと古い結果を成功扱いする。
 - [データを書き出す](journeys/data-export.md) の 3. /api/trpc と関門 — requiresProductAccess を query にも掛けると、課金が切れた利用者がエクスポートできなくなる。operation-access.ts の一覧に user.exportData があるのは mutation 向けの例外表で、query のこの経路には効いていない。
 - [データを書き出す](journeys/data-export.md) の 6. 応答を受け取る — 全データを端末に残したくないなら、useQuery に meta: { persist: false } を付ける。応答の大きさは件数に比例する。Vercel の応答サイズの上限に当たるかは未確認。
 - [AI クライアントから Plan を作る（MCP）](journeys/mcp.md) の 11. Dayopt の画面に現れる — すぐ反映したくなったら Realtime を足す判断になるが、infra.md は Realtime を現状の構成に含めていない。staleTime を短くすると全 query の取得回数が増える。
@@ -860,20 +868,20 @@ last_verified: 2026-09-21
 
 - [パスワードを再設定する](journeys/password-reset.md) の 2. Auth が token を発行 — リンクの有効時間（mailer_otp_exp）や再送間隔は repo ではなく Supabase の Auth 設定が正本。production の値は Auth config audit が監視している（mailer_otp_exp は 3600 秒で固定）。
 - [パスワードを再設定する](journeys/password-reset.md) の 9. 変更通知メール — production で通知が有効かどうか（mailer_notifications_password_changed_enabled）は Auth config audit が監視する。リセットでも設定画面からの変更でも同じ通知が出る。
-- [データを書き出す](journeys/data-export.md) の 5. 行を読む — PostgREST は 1 回の応答の行数に上限（max_rows）があり、超えた分は黙って切られる。local の設定は 1000。Plan / Record が多い利用者に効くので、直すなら collectQueryPages で読み切る。
+- [データを書き出す](journeys/data-export.md) の 5. 行を読む — ページ途中の失敗は部分結果を返さずEXPORT_FAILEDにする。単一DB snapshotではないため取得中の同時編集に対する整合性保証は別。repoのmax_rowsは1000で、ページサイズ500以上の上限を前提とする。クラウドの現在値は未確認。
 
 #### `supabase/functions/send-auth-email/PasswordResetEmail.tsx`
 
-- [パスワードを再設定する](journeys/password-reset.md) の 3. リセットメール送信 — この Function は Vercel ではなく Supabase にデプロイする（supabase functions deploy --use-api）。アプリの deploy では変わらない。メール本文の「24 時間」とリンクの実際の有効時間はここでは揃えていない（下の注意を参照）。
+- [パスワードを再設定する](journeys/password-reset.md) の 3. リセットメール送信 — この Function は Vercel ではなく Supabase にデプロイする（supabase functions deploy --use-api）。アプリの deploy では変わらない。メールには期限切れ後の再リクエストを案内し、Hook payload に無い有効期限の数値は記載しない。期限設定そのものは Supabase Auth が持つ。
 
 #### `supabase/functions/send-auth-email/confirm-url.ts`
 
-- [パスワードを再設定する](journeys/password-reset.md) の 3. リセットメール送信 — この Function は Vercel ではなく Supabase にデプロイする（supabase functions deploy --use-api）。アプリの deploy では変わらない。メール本文の「24 時間」とリンクの実際の有効時間はここでは揃えていない（下の注意を参照）。
+- [パスワードを再設定する](journeys/password-reset.md) の 3. リセットメール送信 — この Function は Vercel ではなく Supabase にデプロイする（supabase functions deploy --use-api）。アプリの deploy では変わらない。メールには期限切れ後の再リクエストを案内し、Hook payload に無い有効期限の数値は記載しない。期限設定そのものは Supabase Auth が持つ。
 
 #### `supabase/functions/send-auth-email/index.ts`
 
 - [サインアップ → ウェルカムメール](journeys/signup.md) の 3. 確認メール送信 — この Function は Vercel ではなく Supabase にデプロイされる（supabase functions deploy --use-api）。アプリの deploy とは別に動く。
-- [パスワードを再設定する](journeys/password-reset.md) の 3. リセットメール送信 — この Function は Vercel ではなく Supabase にデプロイする（supabase functions deploy --use-api）。アプリの deploy では変わらない。メール本文の「24 時間」とリンクの実際の有効時間はここでは揃えていない（下の注意を参照）。
+- [パスワードを再設定する](journeys/password-reset.md) の 3. リセットメール送信 — この Function は Vercel ではなく Supabase にデプロイする（supabase functions deploy --use-api）。アプリの deploy では変わらない。メールには期限切れ後の再リクエストを案内し、Hook payload に無い有効期限の数値は記載しない。期限設定そのものは Supabase Auth が持つ。
 - [パスワードを再設定する](journeys/password-reset.md) の 9. 変更通知メール — production で通知が有効かどうか（mailer_notifications_password_changed_enabled）は Auth config audit が監視する。リセットでも設定画面からの変更でも同じ通知が出る。
 
 #### `supabase/functions/send-auth-email/password-changed-notification.ts`
@@ -882,7 +890,7 @@ last_verified: 2026-09-21
 
 #### `supabase/functions/send-auth-email/subjects.ts`
 
-- [パスワードを再設定する](journeys/password-reset.md) の 3. リセットメール送信 — この Function は Vercel ではなく Supabase にデプロイする（supabase functions deploy --use-api）。アプリの deploy では変わらない。メール本文の「24 時間」とリンクの実際の有効時間はここでは揃えていない（下の注意を参照）。
+- [パスワードを再設定する](journeys/password-reset.md) の 3. リセットメール送信 — この Function は Vercel ではなく Supabase にデプロイする（supabase functions deploy --use-api）。アプリの deploy では変わらない。メールには期限切れ後の再リクエストを案内し、Hook payload に無い有効期限の数値は記載しない。期限設定そのものは Supabase Auth が持つ。
 
 #### `supabase/migrations/20260708232500_add_time_model_tables.sql`
 
@@ -930,7 +938,7 @@ last_verified: 2026-09-21
 
 #### `supabase/migrations/20260809015344_optimize_soft_delete_rls_initplan.sql`
 
-- [データを書き出す](journeys/data-export.md) の 4. Service が 6 本読む — service role は RLS を越えるので、Plan / Record では .eq('user_id', userId) だけが他人のデータとの境界になる（REVIEW-1）。userId は必ず ctx から取り、入力で受けない。列は public-projections の select に限っているので、列を足す時はそこを変える。
+- [データを書き出す](journeys/data-export.md) の 4. Service が6種類を読む — service role は RLS を越えるので、Plan / Record では .eq('user_id', userId) だけが他人のデータとの境界になる（REVIEW-1）。userId は必ず ctx から取り、入力で受けない。列は public-projections の select に限っているので、列を足す時はそこを変える。
 
 #### `supabase/migrations/20260824090000_detach_tag_id_from_timeblock_write_path.sql`
 

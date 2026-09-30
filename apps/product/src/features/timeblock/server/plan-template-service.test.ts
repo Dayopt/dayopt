@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { PlanTemplateService } from './plan-template-service';
+import { StatisticsGeneralService } from './statistics-general-service';
 import type { TimeblockCommandClient } from './timeblock-command-client';
 import type { PlanRow } from './timeblock-types';
 import type { ServiceSupabaseClient } from './types';
@@ -121,6 +122,143 @@ describe('PlanTemplateService', () => {
 
   afterEach(() => {
     vi.useRealTimers();
+  });
+
+  it.each(['list', 'apply'] as const)(
+    'uses the same full Record median as activity creation for %s across the28-day boundary',
+    async (operation) => {
+      const crossingRecords = Array.from({ length: 3 }, (_, index) => ({
+        id: `crossing-${index}`,
+        activity_id: ACTIVITY_A,
+        source: 'manual',
+        start_at: '2026-08-07T23:30:00.000Z',
+        end_at: '2026-08-08T00:30:00.000Z',
+      }));
+      const commands = createCommands();
+      commands.createPlansBulk.mockResolvedValue([]);
+      const { supabase } = createSupabaseStub({
+        plans: [{ data: [], error: null }],
+        records: [
+          { data: crossingRecords, error: null },
+          { data: crossingRecords, error: null },
+        ],
+        plan_templates: [{ data: operation === 'list' ? [template] : template, error: null }],
+        plan_template_blocks: [{ data: [blocks[0]], error: null }],
+        user_settings: [{ data: settings, error: null }],
+        activities: [{ data: [{ id: ACTIVITY_A, archived_at: null }], error: null }],
+      });
+      const activityStats = await new StatisticsGeneralService(supabase).getActivityStats(
+        USER_ID,
+        new Date('2026-09-05T00:00:00.000Z'),
+      );
+      expect(activityStats.medianMinutes[ACTIVITY_A]).toBe(60);
+      const service = new PlanTemplateService(supabase, commands, () => supabase);
+      if (operation === 'list') {
+        const result = await service.list(USER_ID);
+        expect(result[0]?.blocks[0]?.previewDurationMinutes).toBe(60);
+      } else {
+        await service.apply({
+          userId: USER_ID,
+          input: { templateId: TEMPLATE_ID, date: '2026-09-05' },
+        });
+        expect(commands.createPlansBulk).toHaveBeenCalledWith({
+          userId: USER_ID,
+          plans: [
+            {
+              title: '集中',
+              activityId: ACTIVITY_A,
+              startAt: '2026-09-05T00:00:00.000Z',
+              endAt: '2026-09-05T01:00:00.000Z',
+            },
+          ],
+        });
+      }
+    },
+  );
+
+  describe('duration context failures', () => {
+    it.each(['list', 'create', 'apply'] as const)(
+      'rejects %s when settings cannot be read instead of trusting UTC defaults',
+      async (operation) => {
+        const commands = createCommands();
+        commands.createPlansBulk.mockResolvedValue([]);
+        const { supabase, calls } = createSupabaseStub({
+          plan_templates: [{ data: operation === 'list' ? [template] : template, error: null }],
+          plan_template_blocks: [{ data: [blocks[2]], error: null }],
+          user_settings: [
+            { data: null, error: { code: 'PGRST000', message: 'Settings unavailable' } },
+          ],
+          records: [{ data: [], error: null }],
+        });
+        const service = new PlanTemplateService(supabase, commands, () => supabase);
+        const result =
+          operation === 'list'
+            ? service.list(USER_ID)
+            : operation === 'apply'
+              ? service.apply({
+                  userId: USER_ID,
+                  input: { templateId: TEMPLATE_ID, date: '2026-09-05' },
+                })
+              : service.create({
+                  userId: USER_ID,
+                  input: {
+                    name: 'Daily',
+                    blocks: [{ activityId: null, title: 'Focus', anchorMinute: 720 }],
+                  },
+                });
+        await expect(result).rejects.toMatchObject({ code: 'FETCH_FAILED' });
+        expect(commands.createPlansBulk).not.toHaveBeenCalled();
+        expect(calls.some((call) => call.method === 'insert')).toBe(false);
+        expect(trackProductEvents).not.toHaveBeenCalled();
+      },
+    );
+
+    it('does not persist a template when required duration records cannot be read', async () => {
+      const { supabase, calls } = createSupabaseStub({
+        plan_templates: [{ data: template, error: null }],
+        plan_template_blocks: [{ data: [blocks[2]], error: null }],
+        user_settings: [{ data: settings, error: null }],
+        records: [{ data: null, error: { code: 'PGRST000', message: 'Records unavailable' } }],
+      });
+      const service = new PlanTemplateService(supabase, createCommands(), () => supabase);
+      await expect(
+        service.create({
+          userId: USER_ID,
+          input: {
+            name: 'Daily',
+            blocks: [{ activityId: null, title: 'Focus', anchorMinute: 720 }],
+          },
+        }),
+      ).rejects.toMatchObject({ message: 'Records unavailable' });
+      expect(calls.some((call) => call.method === 'insert')).toBe(false);
+    });
+
+    it('retains the existing UTC and60-minute fallback for a missing settings row', async () => {
+      const commands = createCommands();
+      commands.createPlansBulk.mockResolvedValue([]);
+      const { supabase } = createSupabaseStub({
+        plan_templates: [{ data: template, error: null }],
+        plan_template_blocks: [{ data: [blocks[2]], error: null }],
+        user_settings: [{ data: null, error: null }],
+        records: [{ data: [], error: null }],
+      });
+      const service = new PlanTemplateService(supabase, commands, () => supabase);
+      await service.apply({
+        userId: USER_ID,
+        input: { templateId: TEMPLATE_ID, date: '2026-09-05' },
+      });
+      expect(commands.createPlansBulk).toHaveBeenCalledWith({
+        userId: USER_ID,
+        plans: [
+          {
+            title: blocks[2]!.title,
+            activityId: null,
+            startAt: '2026-09-05T12:00:00.000Z',
+            endAt: '2026-09-05T13:00:00.000Z',
+          },
+        ],
+      });
+    });
   });
 
   describe('list', () => {

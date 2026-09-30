@@ -187,7 +187,7 @@ graph LR
 </details>
 
 <details>
-<summary>test の候補（78）</summary>
+<summary>test の候補（81）</summary>
 
 <!-- prettier-ignore -->
 | ファイル | 対応の根拠 |
@@ -220,6 +220,8 @@ graph LR
 | [apps/product/src/features/timeblock/hooks/useTimeblockDeleteUndo.test.ts](<../../../apps/product/src/features/timeblock/hooks/useTimeblockDeleteUndo.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/hooks/useTimeblockRecordMutations.test.tsx](<../../../apps/product/src/features/timeblock/hooks/useTimeblockRecordMutations.test.tsx>) | feature: timeblock |
 | [apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.inline-error.test.tsx](<../../../apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.inline-error.test.tsx>) | feature: timeblock |
+| [apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.lifecycle.test.tsx](<../../../apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.lifecycle.test.tsx>) | feature: timeblock |
+| [apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.rollback.test.ts](<../../../apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.rollback.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.test.ts](<../../../apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/lib/datetime.test.ts](<../../../apps/product/src/features/timeblock/lib/datetime.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/lib/inspector-url.test.ts](<../../../apps/product/src/features/timeblock/lib/inspector-url.test.ts>) | feature: timeblock |
@@ -238,6 +240,7 @@ graph LR
 | [apps/product/src/features/timeblock/server/private-timeblock-search-query.test.ts](<../../../apps/product/src/features/timeblock/server/private-timeblock-search-query.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/server/statistics-error-observability.test.ts](<../../../apps/product/src/features/timeblock/server/statistics-error-observability.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/server/statistics-feedforward-service.test.ts](<../../../apps/product/src/features/timeblock/server/statistics-feedforward-service.test.ts>) | feature: timeblock |
+| [apps/product/src/features/timeblock/server/statistics-fetchers.test.ts](<../../../apps/product/src/features/timeblock/server/statistics-fetchers.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/server/statistics-router.test.ts](<../../../apps/product/src/features/timeblock/server/statistics-router.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/server/statistics-service.test.ts](<../../../apps/product/src/features/timeblock/server/statistics-service.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/server/statistics-shared.test.ts](<../../../apps/product/src/features/timeblock/server/statistics-shared.test.ts>) | feature: timeblock |
@@ -430,7 +433,7 @@ graph LR
 </details>
 
 <details>
-<summary>test の候補（78）</summary>
+<summary>test の候補（81）</summary>
 
 <!-- prettier-ignore -->
 | ファイル | 対応の根拠 |
@@ -463,6 +466,8 @@ graph LR
 | [apps/product/src/features/timeblock/hooks/useTimeblockDeleteUndo.test.ts](<../../../apps/product/src/features/timeblock/hooks/useTimeblockDeleteUndo.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/hooks/useTimeblockRecordMutations.test.tsx](<../../../apps/product/src/features/timeblock/hooks/useTimeblockRecordMutations.test.tsx>) | feature: timeblock |
 | [apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.inline-error.test.tsx](<../../../apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.inline-error.test.tsx>) | feature: timeblock |
+| [apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.lifecycle.test.tsx](<../../../apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.lifecycle.test.tsx>) | feature: timeblock |
+| [apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.rollback.test.ts](<../../../apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.rollback.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.test.ts](<../../../apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/lib/datetime.test.ts](<../../../apps/product/src/features/timeblock/lib/datetime.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/lib/inspector-url.test.ts](<../../../apps/product/src/features/timeblock/lib/inspector-url.test.ts>) | feature: timeblock |
@@ -481,6 +486,7 @@ graph LR
 | [apps/product/src/features/timeblock/server/private-timeblock-search-query.test.ts](<../../../apps/product/src/features/timeblock/server/private-timeblock-search-query.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/server/statistics-error-observability.test.ts](<../../../apps/product/src/features/timeblock/server/statistics-error-observability.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/server/statistics-feedforward-service.test.ts](<../../../apps/product/src/features/timeblock/server/statistics-feedforward-service.test.ts>) | feature: timeblock |
+| [apps/product/src/features/timeblock/server/statistics-fetchers.test.ts](<../../../apps/product/src/features/timeblock/server/statistics-fetchers.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/server/statistics-router.test.ts](<../../../apps/product/src/features/timeblock/server/statistics-router.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/server/statistics-service.test.ts](<../../../apps/product/src/features/timeblock/server/statistics-service.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/server/statistics-shared.test.ts](<../../../apps/product/src/features/timeblock/server/statistics-shared.test.ts>) | feature: timeblock |
@@ -673,7 +679,7 @@ graph LR
 </details>
 
 <details>
-<summary>test の候補（78）</summary>
+<summary>test の候補（81）</summary>
 
 <!-- prettier-ignore -->
 | ファイル | 対応の根拠 |
@@ -706,6 +712,8 @@ graph LR
 | [apps/product/src/features/timeblock/hooks/useTimeblockDeleteUndo.test.ts](<../../../apps/product/src/features/timeblock/hooks/useTimeblockDeleteUndo.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/hooks/useTimeblockRecordMutations.test.tsx](<../../../apps/product/src/features/timeblock/hooks/useTimeblockRecordMutations.test.tsx>) | feature: timeblock |
 | [apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.inline-error.test.tsx](<../../../apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.inline-error.test.tsx>) | feature: timeblock |
+| [apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.lifecycle.test.tsx](<../../../apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.lifecycle.test.tsx>) | feature: timeblock |
+| [apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.rollback.test.ts](<../../../apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.rollback.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.test.ts](<../../../apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/lib/datetime.test.ts](<../../../apps/product/src/features/timeblock/lib/datetime.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/lib/inspector-url.test.ts](<../../../apps/product/src/features/timeblock/lib/inspector-url.test.ts>) | feature: timeblock |
@@ -724,6 +732,7 @@ graph LR
 | [apps/product/src/features/timeblock/server/private-timeblock-search-query.test.ts](<../../../apps/product/src/features/timeblock/server/private-timeblock-search-query.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/server/statistics-error-observability.test.ts](<../../../apps/product/src/features/timeblock/server/statistics-error-observability.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/server/statistics-feedforward-service.test.ts](<../../../apps/product/src/features/timeblock/server/statistics-feedforward-service.test.ts>) | feature: timeblock |
+| [apps/product/src/features/timeblock/server/statistics-fetchers.test.ts](<../../../apps/product/src/features/timeblock/server/statistics-fetchers.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/server/statistics-router.test.ts](<../../../apps/product/src/features/timeblock/server/statistics-router.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/server/statistics-service.test.ts](<../../../apps/product/src/features/timeblock/server/statistics-service.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/server/statistics-shared.test.ts](<../../../apps/product/src/features/timeblock/server/statistics-shared.test.ts>) | feature: timeblock |
@@ -838,13 +847,15 @@ graph LR
 </details>
 
 <details>
-<summary>test の候補（17）</summary>
+<summary>test の候補（19）</summary>
 
 <!-- prettier-ignore -->
 | ファイル | 対応の根拠 |
 | --- | --- |
 | [apps/product/src/features/activities/components/ActivityQuickSelector.test.tsx](<../../../apps/product/src/features/activities/components/ActivityQuickSelector.test.tsx>) | feature: activities |
+| [apps/product/src/features/activities/components/ActivityRenameModal.test.tsx](<../../../apps/product/src/features/activities/components/ActivityRenameModal.test.tsx>) | feature: activities |
 | [apps/product/src/features/activities/domain/activity-tree-cache.test.ts](<../../../apps/product/src/features/activities/domain/activity-tree-cache.test.ts>) | feature: activities |
+| [apps/product/src/features/activities/hooks/activities-cache.test.ts](<../../../apps/product/src/features/activities/hooks/activities-cache.test.ts>) | feature: activities |
 | [apps/product/src/features/activities/server/activities-query-service.test.ts](<../../../apps/product/src/features/activities/server/activities-query-service.test.ts>) | feature: activities |
 | [apps/product/src/features/activities/server/router.test.ts](<../../../apps/product/src/features/activities/server/router.test.ts>) | feature: activities |
 | [apps/product/src/lib/test/e2e/a11y.spec.ts](<../../../apps/product/src/lib/test/e2e/a11y.spec.ts>) | 画面: /[locale]/report |
@@ -1165,7 +1176,7 @@ graph LR
 </details>
 
 <details>
-<summary>test の候補（78）</summary>
+<summary>test の候補（81）</summary>
 
 <!-- prettier-ignore -->
 | ファイル | 対応の根拠 |
@@ -1198,6 +1209,8 @@ graph LR
 | [apps/product/src/features/timeblock/hooks/useTimeblockDeleteUndo.test.ts](<../../../apps/product/src/features/timeblock/hooks/useTimeblockDeleteUndo.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/hooks/useTimeblockRecordMutations.test.tsx](<../../../apps/product/src/features/timeblock/hooks/useTimeblockRecordMutations.test.tsx>) | feature: timeblock |
 | [apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.inline-error.test.tsx](<../../../apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.inline-error.test.tsx>) | feature: timeblock |
+| [apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.lifecycle.test.tsx](<../../../apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.lifecycle.test.tsx>) | feature: timeblock |
+| [apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.rollback.test.ts](<../../../apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.rollback.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.test.ts](<../../../apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/lib/datetime.test.ts](<../../../apps/product/src/features/timeblock/lib/datetime.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/lib/inspector-url.test.ts](<../../../apps/product/src/features/timeblock/lib/inspector-url.test.ts>) | feature: timeblock |
@@ -1216,6 +1229,7 @@ graph LR
 | [apps/product/src/features/timeblock/server/private-timeblock-search-query.test.ts](<../../../apps/product/src/features/timeblock/server/private-timeblock-search-query.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/server/statistics-error-observability.test.ts](<../../../apps/product/src/features/timeblock/server/statistics-error-observability.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/server/statistics-feedforward-service.test.ts](<../../../apps/product/src/features/timeblock/server/statistics-feedforward-service.test.ts>) | feature: timeblock |
+| [apps/product/src/features/timeblock/server/statistics-fetchers.test.ts](<../../../apps/product/src/features/timeblock/server/statistics-fetchers.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/server/statistics-router.test.ts](<../../../apps/product/src/features/timeblock/server/statistics-router.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/server/statistics-service.test.ts](<../../../apps/product/src/features/timeblock/server/statistics-service.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/server/statistics-shared.test.ts](<../../../apps/product/src/features/timeblock/server/statistics-shared.test.ts>) | feature: timeblock |
@@ -1508,7 +1522,7 @@ graph LR
 </details>
 
 <details>
-<summary>test の候補（78）</summary>
+<summary>test の候補（81）</summary>
 
 <!-- prettier-ignore -->
 | ファイル | 対応の根拠 |
@@ -1541,6 +1555,8 @@ graph LR
 | [apps/product/src/features/timeblock/hooks/useTimeblockDeleteUndo.test.ts](<../../../apps/product/src/features/timeblock/hooks/useTimeblockDeleteUndo.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/hooks/useTimeblockRecordMutations.test.tsx](<../../../apps/product/src/features/timeblock/hooks/useTimeblockRecordMutations.test.tsx>) | feature: timeblock |
 | [apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.inline-error.test.tsx](<../../../apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.inline-error.test.tsx>) | feature: timeblock |
+| [apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.lifecycle.test.tsx](<../../../apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.lifecycle.test.tsx>) | feature: timeblock |
+| [apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.rollback.test.ts](<../../../apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.rollback.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.test.ts](<../../../apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/lib/datetime.test.ts](<../../../apps/product/src/features/timeblock/lib/datetime.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/lib/inspector-url.test.ts](<../../../apps/product/src/features/timeblock/lib/inspector-url.test.ts>) | feature: timeblock |
@@ -1559,6 +1575,7 @@ graph LR
 | [apps/product/src/features/timeblock/server/private-timeblock-search-query.test.ts](<../../../apps/product/src/features/timeblock/server/private-timeblock-search-query.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/server/statistics-error-observability.test.ts](<../../../apps/product/src/features/timeblock/server/statistics-error-observability.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/server/statistics-feedforward-service.test.ts](<../../../apps/product/src/features/timeblock/server/statistics-feedforward-service.test.ts>) | feature: timeblock |
+| [apps/product/src/features/timeblock/server/statistics-fetchers.test.ts](<../../../apps/product/src/features/timeblock/server/statistics-fetchers.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/server/statistics-router.test.ts](<../../../apps/product/src/features/timeblock/server/statistics-router.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/server/statistics-service.test.ts](<../../../apps/product/src/features/timeblock/server/statistics-service.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/server/statistics-shared.test.ts](<../../../apps/product/src/features/timeblock/server/statistics-shared.test.ts>) | feature: timeblock |
@@ -2161,7 +2178,7 @@ graph LR
 </details>
 
 <details>
-<summary>test の候補（94）</summary>
+<summary>test の候補（95）</summary>
 
 <!-- prettier-ignore -->
 | ファイル | 対応の根拠 |
@@ -2169,6 +2186,7 @@ graph LR
 | [apps/product/src/features/calendar/components/activity-filter/activity-delete-counts.test.ts](<../../../apps/product/src/features/calendar/components/activity-filter/activity-delete-counts.test.ts>) | feature: calendar |
 | [apps/product/src/features/calendar/components/activity-filter/activity-drag.test.tsx](<../../../apps/product/src/features/calendar/components/activity-filter/activity-drag.test.tsx>) | feature: calendar |
 | [apps/product/src/features/calendar/components/activity-filter/activity-drop-target.test.ts](<../../../apps/product/src/features/calendar/components/activity-filter/activity-drop-target.test.ts>) | feature: calendar |
+| [apps/product/src/features/calendar/components/activity-filter/ActivityFilterList.deletion.test.tsx](<../../../apps/product/src/features/calendar/components/activity-filter/ActivityFilterList.deletion.test.tsx>) | feature: calendar |
 | [apps/product/src/features/calendar/components/activity-filter/components/CategoryCreateDialog.test.tsx](<../../../apps/product/src/features/calendar/components/activity-filter/components/CategoryCreateDialog.test.tsx>) | feature: calendar |
 | [apps/product/src/features/calendar/components/activity-filter/hooks/useActivityQuickCreate.test.ts](<../../../apps/product/src/features/calendar/components/activity-filter/hooks/useActivityQuickCreate.test.ts>) | feature: calendar |
 | [apps/product/src/features/calendar/components/activity-filter/sort-activities.test.ts](<../../../apps/product/src/features/calendar/components/activity-filter/sort-activities.test.ts>) | feature: calendar |
@@ -2392,15 +2410,17 @@ graph LR
 </details>
 
 <details>
-<summary>test の候補（60）</summary>
+<summary>test の候補（63）</summary>
 
 <!-- prettier-ignore -->
 | ファイル | 対応の根拠 |
 | --- | --- |
 | [apps/product/src/features/settings/components/AccountDeletionDialog.retry.test.tsx](<../../../apps/product/src/features/settings/components/AccountDeletionDialog.retry.test.tsx>) | feature: settings |
+| [apps/product/src/features/settings/components/AvatarChangeDialog.test.tsx](<../../../apps/product/src/features/settings/components/AvatarChangeDialog.test.tsx>) | feature: settings |
 | [apps/product/src/features/settings/components/BillingSettings.billing-operation.test.tsx](<../../../apps/product/src/features/settings/components/BillingSettings.billing-operation.test.tsx>) | feature: settings |
 | [apps/product/src/features/settings/components/DataSettings.analytics-consent.test.tsx](<../../../apps/product/src/features/settings/components/DataSettings.analytics-consent.test.tsx>) | feature: settings |
 | [apps/product/src/features/settings/components/DataSettings.csv-export.test.tsx](<../../../apps/product/src/features/settings/components/DataSettings.csv-export.test.tsx>) | feature: settings |
+| [apps/product/src/features/settings/components/DataSettings.deletion.test.tsx](<../../../apps/product/src/features/settings/components/DataSettings.deletion.test.tsx>) | feature: settings |
 | [apps/product/src/features/settings/components/DataSettings.mcp-url.test.tsx](<../../../apps/product/src/features/settings/components/DataSettings.mcp-url.test.tsx>) | feature: settings |
 | [apps/product/src/features/settings/components/DisplaySettings.test.tsx](<../../../apps/product/src/features/settings/components/DisplaySettings.test.tsx>) | feature: settings |
 | [apps/product/src/features/settings/components/EmailChangeDialog.retry.test.tsx](<../../../apps/product/src/features/settings/components/EmailChangeDialog.retry.test.tsx>) | feature: settings |
@@ -2416,6 +2436,7 @@ graph LR
 | [apps/product/src/features/settings/hooks/useDateFormat.test.ts](<../../../apps/product/src/features/settings/hooks/useDateFormat.test.ts>) | feature: settings |
 | [apps/product/src/features/settings/hooks/useMFA.test.ts](<../../../apps/product/src/features/settings/hooks/useMFA.test.ts>) | feature: settings |
 | [apps/product/src/features/settings/hooks/useStableBillingOperation.test.ts](<../../../apps/product/src/features/settings/hooks/useStableBillingOperation.test.ts>) | feature: settings |
+| [apps/product/src/features/settings/hooks/useTrialEndedDialog.test.tsx](<../../../apps/product/src/features/settings/hooks/useTrialEndedDialog.test.tsx>) | feature: settings |
 | [apps/product/src/features/settings/hooks/useUserSettings.test.ts](<../../../apps/product/src/features/settings/hooks/useUserSettings.test.ts>) | feature: settings |
 | [apps/product/src/features/settings/lib/billing-operation.test.ts](<../../../apps/product/src/features/settings/lib/billing-operation.test.ts>) | feature: settings |
 | [apps/product/src/features/settings/lib/billing-poll-observability.test.ts](<../../../apps/product/src/features/settings/lib/billing-poll-observability.test.ts>) | feature: settings |

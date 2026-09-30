@@ -7,6 +7,8 @@
  */
 
 import type { PersistedClient } from '@tanstack/query-persist-client-core';
+import { persistQueryClientRestore } from '@tanstack/query-persist-client-core';
+import { dehydrate, QueryClient } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -61,6 +63,69 @@ beforeEach(() => {
 });
 
 describe('createUserScopedQueryPersister', () => {
+  it.each(['auth-clear', 'persister-remove'] as const)(
+    '%s後に旧主体の遅い読み取りをhydrateしない',
+    async (removal) => {
+      // IndexedDB読み取り開始後に別タブのsign-inが入り、auth boundaryがclearする順序。
+      const storage = createMemoryStorage();
+      let owner = USER_A;
+      const persister = createUserScopedQueryPersister({
+        resolveUserId: async () => owner,
+        storage,
+      });
+      const source = new QueryClient();
+      source.setQueryData(['plans'], ['private-plan-a']);
+      await persister.persistClient({
+        timestamp: Date.now(),
+        buster: 'test',
+        clientState: dehydrate(source),
+      });
+
+      let finishRead!: () => void;
+      let signalRead!: () => void;
+      const readStarted = new Promise<void>((resolve) => {
+        signalRead = resolve;
+      });
+      const getItem = storage.getItem;
+      storage.getItem = async (key) => {
+        const snapshot = await getItem(key);
+        signalRead();
+        await new Promise<void>((resolve) => {
+          finishRead = resolve;
+        });
+        return snapshot;
+      };
+      const target = new QueryClient();
+      const restoring = persistQueryClientRestore({
+        queryClient: target,
+        persister,
+        buster: 'test',
+      });
+      await readStarted;
+
+      owner = USER_B;
+      target.clear();
+      if (removal === 'auth-clear') await clearPersistedQueryCache(storage);
+      else await persister.removeClient();
+      finishRead();
+      await restoring;
+
+      expect(target.getQueryData(['plans'])).toBeUndefined();
+      // 破棄後の新しい主体の保存・復元は引き続きできる。
+      storage.getItem = getItem;
+      source.setQueryData(['plans'], ['private-plan-b']);
+      await persister.persistClient({
+        timestamp: Date.now(),
+        buster: 'test',
+        clientState: dehydrate(source),
+      });
+      await persistQueryClientRestore({ queryClient: target, persister, buster: 'test' });
+      expect(target.getQueryData(['plans'])).toEqual(['private-plan-b']);
+      source.clear();
+      target.clear();
+    },
+  );
+
   it('user が未解決なら書き込まない（誰のものとも言えない blob を作らない）', async () => {
     const storage = createMemoryStorage();
     const persister = createUserScopedQueryPersister({
@@ -186,6 +251,66 @@ describe('createUserScopedQueryPersister', () => {
 });
 
 describe('clearPersistedQueryCache', () => {
+  it('保存失敗の後も破棄と次の保存が動く', async () => {
+    const storage = createMemoryStorage();
+    const persister = createUserScopedQueryPersister({
+      resolveUserId: async () => USER_A,
+      storage,
+    });
+    const setItem = storage.setItem;
+    storage.setItem = async () => {
+      throw new Error('storage unavailable');
+    };
+    await persister.persistClient(persistedClient('failed'));
+    await clearPersistedQueryCache(storage);
+    storage.setItem = setItem;
+    await persister.persistClient(persistedClient('retry'));
+    expect((await persister.restoreClient())?.clientState.queries[0]?.queryHash).toBe('retry');
+  });
+  it('破棄前に開始した遅い保存を待ってから消し、旧blobを復活させない', async () => {
+    const storage = createMemoryStorage();
+    let finishWrite!: () => void;
+    let signalWrite!: () => void;
+    const writing = new Promise<void>((resolve) => {
+      signalWrite = resolve;
+    });
+    const setItem = storage.setItem;
+    storage.setItem = async (key, value) => {
+      signalWrite();
+      await new Promise<void>((resolve) => {
+        finishWrite = resolve;
+      });
+      await setItem(key, value);
+    };
+    const persister = createUserScopedQueryPersister({
+      resolveUserId: async () => USER_A,
+      storage,
+    });
+    const saving = persister.persistClient(persistedClient('a'));
+    await writing;
+    const clearing = clearPersistedQueryCache(storage);
+    finishWrite();
+    await Promise.all([saving, clearing]);
+    expect(storage.entries.size).toBe(0);
+  });
+
+  it('所有者解決中に破棄された保存を、解決後に書き込まない', async () => {
+    const storage = createMemoryStorage();
+    let resolveOwner!: (owner: string) => void;
+    const persister = createUserScopedQueryPersister({
+      resolveUserId: () =>
+        new Promise<string>((resolve) => {
+          resolveOwner = resolve;
+        }),
+      storage,
+    });
+    const saving = persister.persistClient(persistedClient('a'));
+    await clearPersistedQueryCache(storage);
+    resolveOwner(USER_A);
+    await saving;
+    expect(storage.entries.size).toBe(0);
+  });
+
   it('保存済みの blob を全て破棄する', async () => {
     const storage = createMemoryStorage();
     storage.entries.set('DAYOPT_QUERY_CLIENT:user-a', 'x');
