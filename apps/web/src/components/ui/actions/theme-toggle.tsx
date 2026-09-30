@@ -1,16 +1,11 @@
 'use client';
 
-import {
-  Button,
-  DropdownMenu,
-  DropdownMenuCheckboxItem,
-  DropdownMenuContent,
-  DropdownMenuTrigger,
-} from '@dayopt/components';
-import { ChevronDown, Monitor, Moon, Sun } from 'lucide-react';
+import { Monitor, Moon, Sun } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useTheme } from 'next-themes';
-import * as React from 'react';
+import { useEffect, useState } from 'react';
+
+import styles from './PreferenceSelect.module.css';
 
 const themeOptions = [
   { value: 'light', icon: Sun },
@@ -21,46 +16,26 @@ const themeOptions = [
 export function ThemeToggle() {
   const t = useTranslations('common');
   const { theme, setTheme } = useTheme();
-  const [mounted, setMounted] = React.useState(false);
-
-  React.useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  const currentTheme = themeOptions.find((t) => t.value === theme) || themeOptions[2];
-  const CurrentIcon = currentTheme.icon;
-
-  if (!mounted) {
-    return (
-      <Button variant="ghost" size="default" disabled aria-label={t('aria.changeTheme')}>
-        <Sun className="size-4" />
-        <ChevronDown className="size-3" />
-      </Button>
-    );
-  }
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  const value = mounted ? theme || 'system' : 'system';
+  const Icon = themeOptions.find((option) => option.value === value)?.icon || Monitor;
 
   return (
-    <DropdownMenu modal={false}>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="default" aria-label={t('aria.changeTheme')}>
-          <CurrentIcon className="size-4" />
-          <ChevronDown className="size-3" />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
+    <div className={styles.control}>
+      <Icon aria-hidden="true" />
+      <select
+        aria-label={t('aria.changeTheme')}
+        value={value}
+        disabled={!mounted}
+        onChange={(event) => setTheme(event.target.value)}
+      >
         {themeOptions.map((option) => (
-          <DropdownMenuCheckboxItem
-            key={option.value}
-            checked={theme === option.value}
-            onCheckedChange={() => setTheme(option.value)}
-          >
-            <span className="flex items-center gap-2">
-              <option.icon className="size-4" />
-              {t(`theme.${option.value}`)}
-            </span>
-          </DropdownMenuCheckboxItem>
+          <option key={option.value} value={option.value}>
+            {t(`theme.${option.value}`)}
+          </option>
         ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
+      </select>
+    </div>
   );
 }

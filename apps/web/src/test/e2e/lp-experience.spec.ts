@@ -190,11 +190,13 @@ for (const { locale, path, copy, common } of locales) {
     await refuseAnalytics(page);
     await page.emulateMedia({ colorScheme: 'light' });
     await page.goto(path);
-    await page.getByRole('button', { name: common.aria.changeTheme }).click();
-    await page.getByRole('menuitemcheckbox', { name: common.theme.dark, exact: true }).click();
+    const select = page.getByRole('combobox', { name: common.aria.changeTheme });
+    await expect(select).toBeEnabled();
+    await select.selectOption('dark');
+    await expect(select).toHaveValue('dark');
     await expect(page.locator('html')).toHaveClass(/dark/);
-    await page.getByRole('button', { name: common.aria.changeTheme }).click();
-    await page.getByRole('menuitemcheckbox', { name: common.theme.light, exact: true }).click();
+    await select.selectOption('light');
+    await expect(select).toHaveValue('light');
     await expect(page.locator('html')).toHaveClass(/light/);
   });
 
@@ -288,5 +290,65 @@ for (const { locale, path, copy, common } of locales) {
     await page.getByRole('button', { name: common.aria.closeMenu }).tap();
     await expect(page.getByRole('dialog')).toHaveCount(0);
     await context.close();
+  });
+
+  test(`${locale}: 320px でロゴと登録が重ならずメニューからログインできる`, async ({
+    browser,
+  }, testInfo) => {
+    const context = await browser.newContext({
+      storageState: testInfo.project.use.storageState,
+      viewport: { width: 320, height: 844 },
+      hasTouch: true,
+      isMobile: true,
+    });
+    const page = await context.newPage();
+    await refuseAnalytics(page);
+    await page.goto(new URL(path, testInfo.project.use.baseURL as string).href);
+    await page.evaluate(() => document.fonts.ready);
+    const header = page.locator('header');
+    const logo = await header.getByRole('link', { name: 'Dayopt', exact: true }).boundingBox();
+    const signup = header.getByRole('link', { name: common.actions.signup, exact: true });
+    const signupBox = await signup.boundingBox();
+    expect(logo!.x + logo!.width).toBeLessThan(signupBox!.x);
+    await expect(signup).toHaveAttribute('href', /^https:\/\/[^/]+\/auth\/signup$/);
+    await expect(header.getByRole('link', { name: common.actions.login, exact: true })).toHaveCount(
+      0,
+    );
+    await header.getByRole('button', { name: common.aria.openMenu }).tap();
+    const menu = page.getByRole('dialog', { name: common.aria.navigationMenu });
+    await expect(menu).toBeVisible();
+    await expect(
+      menu.getByRole('link', { name: common.actions.login, exact: true }),
+    ).toHaveAttribute('href', locale === 'ja' ? '/ja/login' : '/login');
+    await menu.getByRole('button', { name: common.aria.closeMenu }).tap();
+    await expect(menu).toHaveCount(0);
+    await context.close();
+  });
+
+  test(`${locale}: ドキュメントへ移動して戻ってもテーマとLPの構図が保たれる`, async ({ page }) => {
+    await refuseAnalytics(page);
+    await page.emulateMedia({ colorScheme: 'dark' });
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await page.goto(path);
+    await page
+      .locator('header')
+      .getByRole('link', { name: common.navigation.docs, exact: true })
+      .click();
+    await expect(page).toHaveURL(new RegExp(`/${locale === 'ja' ? 'ja/' : ''}docs$`));
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+    await expect(page.locator('html')).toHaveClass(/dark/);
+    await page
+      .locator('header')
+      .getByRole('link', { name: common.navigation.home, exact: true })
+      .click();
+    await expect(page).toHaveURL(new URL(path, test.info().project.use.baseURL as string).href);
+    await expect(page.getByRole('heading', { level: 1 })).toContainText(copy.hero.title1);
+    expect(
+      await page
+        .getByRole('heading', { level: 1 })
+        .evaluate((el) => parseFloat(getComputedStyle(el).fontSize)),
+    ).toBeGreaterThan(70);
+    await expect(page.locator('html')).toHaveClass(/dark/);
+    expect(await overflowingContent(page)).toEqual([]);
   });
 }

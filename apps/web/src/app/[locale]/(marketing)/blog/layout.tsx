@@ -1,5 +1,8 @@
 import type { Metadata } from 'next';
 
+import { Toaster } from '@dayopt/components';
+import { ContentTypography } from '@web/shell/layout/ContentTypography';
+
 export const metadata: Metadata = {
   title: {
     template: '%s | Dayopt Blog',
@@ -25,5 +28,10 @@ export const metadata: Metadata = {
 };
 
 export default function BlogLayout({ children }: { children: React.ReactNode }) {
-  return <div className="bg-background min-h-screen">{children}</div>;
+  return (
+    <ContentTypography className="bg-background min-h-screen">
+      {children}
+      <Toaster />
+    </ContentTypography>
+  );
 }

@@ -94,7 +94,7 @@ export function Header() {
 
           {/* Mobile: Login + Signup + Menu */}
           <div className="flex items-center gap-x-2 lg:hidden">
-            <Button variant="ghost" size="sm" asChild>
+            <Button variant="ghost" size="sm" className={styles.mobileLogin} asChild>
               <Link href="/login">{t('actions.login')}</Link>
             </Button>
             <Button variant="primary" size="sm" className={styles.signup} asChild>

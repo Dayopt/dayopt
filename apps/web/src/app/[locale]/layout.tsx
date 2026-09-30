@@ -5,6 +5,7 @@ import { notFound } from 'next/navigation';
 
 import { BrowserTelemetry } from '@web/shell/privacy/BrowserTelemetry';
 import { CookieConsentBanner } from '@web/shell/privacy/CookieConsentBanner';
+import { japaneseBodyFonts } from '@web/styles/fonts/preloads';
 
 export function generateStaticParams() {
   return routing.locales.map((locale) => ({ locale }));
@@ -29,13 +30,28 @@ export default async function LocaleLayout({
 
   const messages = await getMessages();
 
-  // Client Component が使わない重いネームスペースを除外（legal: ~96KB）
-  // legal/ossCredits は Server Component で getTranslations() 経由で直接取得する
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- rest destructuring で除外する legal/ossCredits は意図的に未使用
-  const { legal, ossCredits, ...clientMessages } = messages as Record<string, unknown>;
+  // LP の文言は Server Component で取得し、操作に必要な copy だけを渡す。
+  // client で翻訳する contact を残し、legal と LP 本文の二重配信を避ける。
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- rest destructuring で使わない namespace を除外する
+  const { legal, ossCredits, marketing, ...sharedMessages } = messages;
+  const clientMessages = {
+    ...sharedMessages,
+    marketing: { contact: marketing.contact },
+  };
 
   return (
     <NextIntlClientProvider messages={clientMessages}>
+      {locale === 'ja' &&
+        japaneseBodyFonts.map((href) => (
+          <link
+            key={href}
+            rel="preload"
+            as="font"
+            type="font/woff2"
+            crossOrigin="anonymous"
+            href={href}
+          />
+        ))}
       {children}
       <BrowserTelemetry />
       <CookieConsentBanner />

@@ -7,14 +7,12 @@ test('footer の言語切替で locale prefix と hero copy が切り替わる',
   const hero = page.getByRole('heading', { level: 1 });
   await expect(hero).toContainText('Give your day');
 
-  await page.getByRole('button', { name: 'English - Change language' }).click();
-  await page.getByRole('menuitemcheckbox', { name: '日本語' }).click();
+  await page.getByRole('combobox', { name: 'Change language' }).selectOption('ja');
 
   await expect(page).toHaveURL(/\/ja\/?$/);
   await expect(hero).toContainText('一日が、');
 
-  await page.getByRole('button', { name: '日本語 - 言語を変更' }).click();
-  await page.getByRole('menuitemcheckbox', { name: 'English' }).click();
+  await page.getByRole('combobox', { name: '言語を変更' }).selectOption('en');
 
   await expect(page).toHaveURL(/\/$/);
   await expect(page).not.toHaveURL(/\/ja\/?$/);

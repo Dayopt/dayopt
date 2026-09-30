@@ -1,4 +1,5 @@
 import { ClientSidebar } from '@web/features/docs';
+import { ContentTypography } from '@web/shell/layout/ContentTypography';
 import { Footer } from '@web/shell/layout/Footer';
 import { Header } from '@web/shell/layout/Header';
 import { generateDocsNavigation } from '@web/shell/navigation';
@@ -17,7 +18,7 @@ export default async function DocsLayout({
   const navigation = await generateDocsNavigation(locale);
 
   return (
-    <div className="bg-background flex min-h-screen flex-col">
+    <ContentTypography className="bg-background flex min-h-screen flex-col">
       {/* 共通ヘッダー（marketing と統一、sticky） */}
       <Header />
 
@@ -38,6 +39,6 @@ export default async function DocsLayout({
 
       {/* Footer: Sidebar 部分も含めて画面全幅 */}
       <Footer />
-    </div>
+    </ContentTypography>
   );
 }

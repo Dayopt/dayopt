@@ -182,11 +182,11 @@ export function Footer() {
               ))}
             </div>
             {/* Copyright left, Settings right */}
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
               <p className="text-muted-foreground text-sm">
                 &copy; {new Date().getFullYear()} Dayopt, Inc.
               </p>
-              <div className="flex items-center gap-x-0">
+              <div className="flex items-center gap-x-2">
                 <ThemeToggle />
                 <LanguageSwitcher variant="full" />
               </div>
@@ -211,7 +211,7 @@ export function Footer() {
                   <item.icon aria-hidden="true" className="size-5" />
                 </a>
               ))}
-              <div className="ml-4 flex items-center gap-x-0">
+              <div className="ml-4 flex items-center gap-x-2">
                 <ThemeToggle />
                 <LanguageSwitcher variant="full" />
               </div>

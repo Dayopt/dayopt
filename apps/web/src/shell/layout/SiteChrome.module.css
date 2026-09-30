@@ -49,6 +49,12 @@
   height: auto;
   display: block;
 }
+@media (max-width: 359px) {
+  /* ログインは既存メニューにもある。320px ではロゴと登録を重ねない。 */
+  .mobileLogin {
+    display: none;
+  }
+}
 @media (max-width: 760px) {
   .nav {
     padding-inline: 16px;

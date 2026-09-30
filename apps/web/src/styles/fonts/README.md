@@ -4,10 +4,14 @@ These are glyph subsets of the existing Source Sans 3 and Noto Sans JP families,
 not a different typeface. They cover the current `common` and `marketing` messages
 in English and Japanese. Source Sans 3 retains its variable weight axis. Japanese
 uses the same 400 / 500 instances as before; their glyph outlines and advance
-widths are preserved. Other characters fall through to the existing full Google fonts.
+widths are preserved. Content routes (docs, blog, legal, contact, search) also load
+the existing full Japanese Google font as their fallback for other characters.
+The LP covers its current localized copy with the subsets and does not load the
+full Japanese font's large Unicode-range stylesheet.
 
-The Latin subset and the small Japanese H1 / navigation-symbol subset are preloaded. The
-Japanese body subset is requested when Japanese text is present. The previous
+The Latin subset and the small Japanese H1 / navigation-symbol subset are preloaded.
+Japanese pages additionally preload the two body weights using content-hashed
+public URLs; English pages do not preload them. The previous
 full-font Latin preloads are disabled to avoid downloading the same characters
 twice. All subsets use `font-display: swap`. The full Japanese fallback uses its
 variable weight range instead of duplicated 400 / 500 declarations.
@@ -38,5 +42,9 @@ curl -fL 'https://raw.githubusercontent.com/google/fonts/main/ofl/notosansjp/Not
 /tmp/dayopt-font-tools/bin/python apps/web/scripts/subset-web-fonts.py /tmp/SourceSans3-variable.ttf /tmp/NotoSansJP-variable.ttf
 ```
 
-The generator checks actual output `cmap` coverage and each font's expected weight
-representation. Refresh the upstream hashes and licenses when replacing the sources.
+The generator checks actual output `cmap` coverage, each font's expected weight
+representation, and every requested glyph's coordinates and horizontal metrics
+against its original instance. Vertical-only alternates and metrics are omitted
+because the site uses horizontal text. Refresh the upstream hashes and licenses
+when replacing the sources. Commit the generated body CSS / preload manifest
+alongside the fonts, removing superseded hashed body files.

@@ -62,6 +62,10 @@ export const MobileMenu: Story = {
     }
     const canvas = within(canvasElement);
     const openButton = await canvas.findByRole('button', { name: 'メニューを開く' });
+    const logo = canvas.getByRole('link', { name: 'Dayopt' }).getBoundingClientRect();
+    const signup = canvas.getByRole('link', { name: commonJa.common.actions.signup });
+    await expect(signup).toBeVisible();
+    await expect(logo.right).toBeLessThan(signup.getBoundingClientRect().left);
     await userEvent.click(openButton);
     // メニューは Radix Portal で document.body 直下に開く
     const dialog = await within(document.body).findByRole('dialog');
