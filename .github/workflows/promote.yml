@@ -244,6 +244,8 @@ jobs:
         run: pnpm --filter @dayopt/product exec playwright install --with-deps chromium
       - name: Check Storybook collection
         run: pnpm exec tsx scripts/tasks/check-story-coverage.ts --collected
+      - name: Build Storybook
+        run: pnpm build-storybook
       - name: Test Storybook light and dark
         run: pnpm --filter @dayopt/product exec vitest run --project storybook --project storybook-dark --reporter=default --reporter=json --outputFile=storybook-results.json
       - name: Upload Storybook results

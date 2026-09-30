@@ -1,4 +1,22 @@
+import path from 'node:path';
 import ts from 'typescript';
+
+/** Vitest 自身が解決した Story の一覧。MDX・ログ・別 project は比較対象外。 */
+export function parseCollectedStoryFiles(
+  output: string,
+  root: string,
+  project: 'storybook' | 'storybook-dark',
+): Set<string> {
+  const files = new Set<string>();
+  const pattern = new RegExp(
+    `^\\[${project} \\(chromium\\)\\] (.+?\\.stories\\.(?:ts|tsx|js|jsx|mjs))(?= >|$)`,
+  );
+  for (const line of output.split('\n')) {
+    const match = line.trimEnd().match(pattern);
+    if (match?.[1]) files.add(path.resolve(root, match[1]));
+  }
+  return files;
+}
 
 /** 個別 Story の展示タグを meta の除外と取り違えず、ファイル単位の期待集合を作る。 */
 export function hasExcludedMetaTag(content: string, excludedTags: readonly string[]): boolean {
