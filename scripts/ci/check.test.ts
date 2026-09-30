@@ -302,7 +302,7 @@ describe('runMigrationSafety', () => {
     expect(result.undeterminable).toBeUndefined();
   });
 
-  // 通知（ラベル + コメント）は ci.yml の migration-notice job が行う（credential audit P2-6）。
+  // 通知（PR コメント）は ci.yml の migration-notice job が行う（credential audit P2-6）。
   // この関数は通知が要るかと本文だけを返し、write 系の gh を呼ぶ注入点自体を持たない。
   // 通知の順序・再通知抑止・fork PR の fail open は scripts/__tests__/ci-token-isolation.test.ts
   // が migration-notice job の run script を偽 gh で実行して固定する。
