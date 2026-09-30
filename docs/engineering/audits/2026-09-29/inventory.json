@@ -391,10 +391,12 @@
       "mode": "100644",
       "bytes": 4614,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 102]],
+      "evidence": [
+        "Full untruncated read at 92b4c93be, exact baseline bytes verified. Storybook browser runner, synthetic env/provider/store overrides and no external HIBP mock wiring traced for F054; not deployed behavior."
+      ],
       "questions": []
     },
     {
@@ -417,10 +419,12 @@
       "mode": "100644",
       "bytes": 4243,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 107]],
+      "evidence": [
+        "Full untruncated read at 92b4c93be, exact baseline bytes verified. Storybook browser runner, synthetic env/provider/store overrides and no external HIBP mock wiring traced for F054; not deployed behavior."
+      ],
       "questions": []
     },
     {
@@ -1546,10 +1550,12 @@
       "mode": "100644",
       "bytes": 8175,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 166]],
+      "evidence": [
+        "Full untruncated read at 92b4c93be, exact baseline bytes verified. Storybook browser runner, synthetic env/provider/store overrides and no external HIBP mock wiring traced for F054; not deployed behavior."
+      ],
       "questions": []
     },
     {
@@ -21831,10 +21837,12 @@
       "mode": "100644",
       "bytes": 563,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 16]],
+      "evidence": [
+        "Full untruncated read at 92b4c93be, exact baseline bytes verified. Storybook browser runner, synthetic env/provider/store overrides and no external HIBP mock wiring traced for F054; not deployed behavior."
+      ],
       "questions": []
     },
     {
@@ -22713,10 +22721,12 @@
       "mode": "100644",
       "bytes": 7956,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 201]],
+      "evidence": [
+        "Full untruncated read at 92b4c93be, exact baseline bytes verified. Storybook browser runner, synthetic env/provider/store overrides and no external HIBP mock wiring traced for F054; not deployed behavior."
+      ],
       "questions": []
     },
     {
@@ -22739,10 +22749,12 @@
       "mode": "100644",
       "bytes": 3633,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 87]],
+      "evidence": [
+        "Full untruncated read at 92b4c93be, exact baseline bytes verified. Storybook browser runner, synthetic env/provider/store overrides and no external HIBP mock wiring traced for F054; not deployed behavior."
+      ],
       "questions": []
     },
     {
@@ -22752,10 +22764,12 @@
       "mode": "100644",
       "bytes": 6748,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 156]],
+      "evidence": [
+        "Full untruncated read at 92b4c93be, exact baseline bytes verified. Storybook browser runner, synthetic env/provider/store overrides and no external HIBP mock wiring traced for F054; not deployed behavior."
+      ],
       "questions": []
     },
     {
@@ -22843,10 +22857,12 @@
       "mode": "100644",
       "bytes": 4321,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 106]],
+      "evidence": [
+        "Full untruncated read at 92b4c93be, exact baseline bytes verified. Storybook browser runner, synthetic env/provider/store overrides and no external HIBP mock wiring traced for F054; not deployed behavior."
+      ],
       "questions": []
     },
     {
@@ -22895,10 +22911,12 @@
       "mode": "100644",
       "bytes": 4005,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 137]],
+      "evidence": [
+        "Full untruncated read at 92b4c93be, exact baseline bytes verified. Storybook browser runner, synthetic env/provider/store overrides and no external HIBP mock wiring traced for F054; not deployed behavior."
+      ],
       "questions": []
     },
     {
@@ -44075,6 +44093,32 @@
       "read_ranges": [[1, 560]],
       "evidence": [
         "Original full file and complete authored diff reviewed. Red/green and integrated7758 passed on identical source bytes; details F051/F052/F053. Not a baseline read or deployed claim."
+      ],
+      "questions": []
+    },
+    {
+      "path": "apps/product/src/features/auth/components/PasswordResetForm.stories.tsx",
+      "sha": "ed11781f92ef810e3b0d68c368e488097bcbcc84",
+      "change": "M",
+      "blob": "1c5c741976fe02b6c0fe401ee5f7f5babd9c2f19",
+      "method": "full-text",
+      "status": "delta-reviewed",
+      "read_ranges": [[1, 199]],
+      "evidence": [
+        "Full original Story and entire authored diff reviewed; F054 actual Chromium pending positive/negative controls and light/dark32 passed. Not product runtime/cloud proof."
+      ],
+      "questions": []
+    },
+    {
+      "path": "apps/product/src/features/auth/components/ResetPasswordForm.stories.tsx",
+      "sha": "ed11781f92ef810e3b0d68c368e488097bcbcc84",
+      "change": "M",
+      "blob": "155cbe4c677ffea042129ee51b22710593abb433",
+      "method": "full-text",
+      "status": "delta-reviewed",
+      "read_ranges": [[1, 214]],
+      "evidence": [
+        "Full original Story and entire authored diff reviewed; F054 actual Chromium pending positive/negative controls and light/dark32 passed. Not product runtime/cloud proof."
       ],
       "questions": []
     }
