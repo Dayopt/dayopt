@@ -1,6 +1,7 @@
 import { LogoArtwork } from '@dayopt/assets/logo-artwork';
 import { Fragment, useId, type ReactNode } from 'react';
 
+import { ClosingMarkReplay } from './ClosingMarkReplay';
 import styles from './LandingPage.module.css';
 
 interface CalendarCopy {
@@ -343,10 +344,8 @@ export function TemplateDemo({ copy }: { copy: TemplateCopy }) {
 
 export function ClosingMark({ label }: { label: string }) {
   return (
-    <button type="button" className={styles.closingMark} aria-label={label}>
-      <span>
-        <LogoArtwork variant="mark" width={100} height={100} />
-      </span>
-    </button>
+    <ClosingMarkReplay label={label} className={styles.closingMark}>
+      <LogoArtwork variant="mark" width={100} height={100} />
+    </ClosingMarkReplay>
   );
 }

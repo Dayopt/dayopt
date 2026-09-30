@@ -52,9 +52,14 @@ common = ja_common["common"]
 banner = common["cookies"]["banner"]
 header_text = "".join(common["navigation"][key] for key in ("home", "blog", "docs")) + common["actions"]["login"] + common["actions"]["signup"]
 footer_text = strings(ja_common["footer"]["sections"]) + strings(ja_common["footer"]["legal"]) + common["navigation"]["contact"] + common["cookies"]["settings"]["trigger"]
-critical_text = header_text + footer_text + strings(banner) + strings(common["theme"]) + "日本語" + strings(ja_landing["hero"]) + strings(ja_landing["experience"]) + strings(ja_landing["calendar"]) + strings(ja_landing["activities"]) + symbols
+# Chromium renders the immediately following calendar scene within its native
+# content-visibility look-ahead. Include that scene's default state, too, so it
+# cannot force the large deferred character sets into the first visit.
+calendar = ja_landing["calendar"]
+calendar_first = "".join(calendar[key] for key in ("kicker", "title1", "title2", "body1", "body2", "stepPlan", "stepRecord", "stepNext", "sample", "dateFirst", "weekdayFirst", "insightRecordCopy", "guide", "google"))
+critical_text = header_text + footer_text + strings(banner) + strings(common["theme"]) + "日本語" + strings(ja_landing["hero"]) + strings(ja_landing["experience"]) + calendar_first + symbols
 critical_400 = japanese & {ord(char) for char in critical_text}
-medium_text = header_text + strings(ja_common["footer"]["sections"]) + banner["title"] + banner["necessaryOnly"] + banner["allowAnalytics"] + ja_landing["hero"]["cta"] + "".join(ja_landing["experience"][key] for key in ("plan", "record", "reading", "minuteUnit")) + "".join(ja_landing["calendar"][key] for key in ("stepPlan", "stepRecord", "stepNext", "reading", "development", "walking", "insightPlan1", "insightPlan2", "insightRecord1", "insightRecord2", "insightNext1", "insightNext2"))
+medium_text = header_text + strings(ja_common["footer"]["sections"]) + banner["title"] + banner["necessaryOnly"] + banner["allowAnalytics"] + ja_landing["hero"]["cta"] + "".join(ja_landing["experience"][key] for key in ("plan", "record", "reading", "minuteUnit")) + "".join(calendar[key] for key in ("reading", "development", "walking", "insightRecord1", "insightRecord2"))
 critical_500 = japanese & {ord(char) for char in medium_text}
 
 for source, name, codepoints, family, weight in (
@@ -115,19 +120,13 @@ for source, name, codepoints, family, weight in (
                          actual["hmtx"].metrics[actual_name]), "Subset changed glyph shape or width"
     print(f"{name}: {len(wanted)} codepoints, {output.stat().st_size} bytes")
     if name.startswith(("NotoSansJP-critical", "NotoSansJP-body")):
-        if name == "NotoSansJP-critical500.woff2":
-            # Let Next's CSS asset pipeline deliver the small medium face.
-            # It is discovered with its first visible text; the main heading
-            # already has its own embedded face and needs no medium preload.
-            href = f"./{name}"
-        else:
-            # A hash in the public URL keeps immutable cache headers safe on updates.
-            digest = hashlib.sha256(output.read_bytes()).hexdigest()[:12]
-            target = PUBLIC / f"{Path(name).stem}-{digest}.woff2"
-            target.write_bytes(output.read_bytes())
-            output.unlink()
-            href = f"/fonts/{target.name}"
-        if name == "NotoSansJP-critical400.woff2":
+        # A hash in the public URL keeps immutable cache headers safe on updates.
+        digest = hashlib.sha256(output.read_bytes()).hexdigest()[:12]
+        target = PUBLIC / f"{Path(name).stem}-{digest}.woff2"
+        target.write_bytes(output.read_bytes())
+        output.unlink()
+        href = f"/fonts/{target.name}"
+        if name.startswith("NotoSansJP-critical"):
             body_fonts.append(href)
         unicode_range = ", ".join(f"U+{point:X}" for point in sorted(wanted))
         body_faces.append(f'''@font-face {{

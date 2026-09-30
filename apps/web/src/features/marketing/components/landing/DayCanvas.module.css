@@ -138,15 +138,6 @@
   height: 75%;
   color: var(--background);
   background: var(--foreground);
-  transform: translateX(0);
-  transition:
-    transform 300ms var(--motion-ease-settle),
-    height 300ms var(--motion-ease-settle);
-}
-@starting-style {
-  .record {
-    transform: translateX(12px);
-  }
 }
 .plan > span,
 .record > span {
@@ -190,6 +181,20 @@
   position: relative;
   z-index: 1;
 }
+.plan > span,
+.plan time,
+.record > span,
+.record time {
+  position: relative;
+  z-index: 2;
+  width: fit-content;
+  padding-right: 8px;
+  background: var(--background);
+}
+.record > span,
+.record time {
+  background: var(--foreground);
+}
 .inkLines {
   position: absolute;
   right: 0;
@@ -201,6 +206,13 @@
   stroke-width: 0.5;
   opacity: 0.2;
   pointer-events: none;
+  transform: translateX(0);
+  transition: transform 300ms var(--motion-ease-settle);
+}
+@starting-style {
+  .inkLines {
+    transform: translateX(12px);
+  }
 }
 .room {
   position: absolute;
@@ -520,6 +532,7 @@
   }
   .plan,
   .record,
+  .inkLines,
   .measure i {
     transition: none;
   }

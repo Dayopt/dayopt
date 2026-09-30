@@ -1716,8 +1716,8 @@
   width: 72px;
   animation: markSettle 300ms var(--motion-ease-settle);
 }
-.closingMark:active > span {
-  animation: none;
+.closingMark:disabled {
+  cursor: default;
 }
 .closingMark svg {
   width: 72px;

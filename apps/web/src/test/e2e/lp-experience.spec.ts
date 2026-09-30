@@ -176,6 +176,33 @@ for (const { locale, path, copy, pricingCopy, common } of locales) {
     await expect(item.locator('p')).not.toBeVisible();
   });
 
+  test(`${locale}: 最後のロゴを Enter と Space で再生できる`, async ({ page }) => {
+    await refuseAnalytics(page);
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
+    await page.goto(path);
+    const replay = page.getByRole('button', { name: copy.closing.replay });
+    await replay.scrollIntoViewIfNeeded();
+    await expect(replay).toBeEnabled();
+    // 初回表示のアニメーションを終えてから、キー操作で新しく起きた再生だけを数える。
+    await replay.evaluate(async (button) => {
+      await Promise.all(
+        button.getAnimations({ subtree: true }).map((animation) => animation.finished),
+      );
+      button.setAttribute('data-replays', '0');
+      button.addEventListener('animationstart', () => {
+        button.setAttribute(
+          'data-replays',
+          String(Number(button.getAttribute('data-replays')) + 1),
+        );
+      });
+    });
+    await replay.focus();
+    await page.keyboard.press('Enter');
+    await expect(replay).toHaveAttribute('data-replays', '1');
+    await page.keyboard.press('Space');
+    await expect(replay).toHaveAttribute('data-replays', '2');
+  });
+
   test(`${locale}: 時間軸の目盛りと週の図版を動かせる`, async ({ page }) => {
     await refuseAnalytics(page);
     await page.goto(path);
@@ -372,7 +399,7 @@ for (const { locale, path, copy, pricingCopy, common } of locales) {
       await expect(demo.locator('[data-record-duration]')).toHaveCount(0);
       await demo.getByRole('button', { name: copy.experience.stepRecord, exact: true }).click();
       const heldTransitions = await demo.locator('[data-record-duration]').evaluate((card) => {
-        const transitions = card.getAnimations();
+        const transitions = card.getAnimations({ subtree: true });
         for (const animation of transitions) {
           animation.pause();
           animation.currentTime = Number(animation.effect?.getTiming().duration) / 10;
