@@ -36,6 +36,7 @@ export async function fetchRecords(
   supabase: ServiceSupabaseClient,
   userId: string,
   range: DateRangeInput = {},
+  options: { clipToRange?: boolean | undefined } = {},
 ): Promise<StatRecordRow[]> {
   let query = supabase
     .from(databaseTables.records)
@@ -52,6 +53,8 @@ export async function fetchRecords(
       operation: 'fetch_records',
     });
   }
+  // Medians measure complete Record durations; period aggregates retain clipping by default.
+  if (options.clipToRange === false) return data ?? [];
   return (data ?? []).map((row) => ({
     ...row,
     start_at:

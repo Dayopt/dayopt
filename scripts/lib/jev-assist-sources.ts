@@ -1,10 +1,10 @@
 import { execFileSync } from 'node:child_process';
 import { z } from 'zod';
 
+import { buildContextInput } from './jev-assist-context.mjs';
 import {
   claimsInputSchema,
   type ClaimsInput,
-  type ContextCandidate,
   type ContextInput,
   type Evidence,
 } from './jev-assist-packs.ts';
@@ -46,52 +46,7 @@ const sourceSchema = z.object({
 
 export function contextFromSource(number: number, sha: string, raw: unknown): ContextInput {
   const source = sourceSchema.parse(raw);
-  const candidates: ContextCandidate[] = [];
-  candidates.push({
-    id: `issue-${number}`,
-    kind: 'issue',
-    text: `${source.title}\n${source.body}`,
-    url: source.url,
-    updatedAt: source.updatedAt ?? '',
-  });
-  for (const comment of source.comments ?? []) {
-    if (comment.id === undefined) continue;
-    candidates.push({
-      id: `comment-${comment.id}`,
-      kind: 'comment',
-      text: comment.body ?? '',
-      url: `${base}/issues/${number}#issuecomment-${comment.id}`,
-      updatedAt: comment.updated_at ?? comment.created_at ?? '',
-    });
-  }
-  for (const related of source.related) {
-    if (related.number === undefined) continue;
-    candidates.push({
-      id: `related-${related.number}`,
-      kind: 'related',
-      text: `${related.title ?? ''}\n${related.body ?? ''}`,
-      url: `${base}/issues/${related.number}`,
-      updatedAt: related.updated_at ?? related.updatedAt ?? related.created_at ?? '',
-    });
-  }
-  source.decisions.forEach((text, index) =>
-    candidates.push({
-      id: `decision-${index}`,
-      kind: 'decision',
-      text,
-      url: `${base}/blob/${sha}/docs/decisions.md`,
-      updatedAt: /\d{4}-\d{2}-\d{2}/.exec(text)?.[0] ?? '',
-    }),
-  );
-  return {
-    number,
-    sha,
-    title: source.title,
-    body: source.body,
-    url: source.url,
-    candidates,
-    missing: [...source.missing, ...(source.comments === null ? ['comments_unavailable'] : [])],
-  };
+  return buildContextInput(number, sha, source);
 }
 
 export async function collectAssistContext(

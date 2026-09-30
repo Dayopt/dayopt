@@ -11,16 +11,10 @@ const meta = {
   component: ResetPasswordForm,
   parameters: {
     layout: 'padded',
-    // access_token / refresh_token がないと useEffect でリダイレクトされるため
-    // ダミートークンをsearchParamsに設定する
     nextjs: {
       navigation: {
         pathname: '/ja/auth/reset-password',
         params: { locale: 'ja' },
-        searchParams: {
-          access_token: 'mock-access-token',
-          refresh_token: 'mock-refresh-token',
-        },
       },
     },
     // デフォルトのupdatePasswordはno-opに差し替える（Supabase接続不要）
@@ -148,7 +142,9 @@ export const Success: Story = {
     await userEvent.click(submitButton);
 
     // 実コンポーネントの成功画面が表示されることを確認
-    await expect(canvas.getByRole('heading', { level: 1 })).toBeInTheDocument();
+    await expect(
+      await canvas.findByRole('heading', { level: 1, name: 'パスワードを更新しました' }),
+    ).toBeInTheDocument();
   },
 };
 

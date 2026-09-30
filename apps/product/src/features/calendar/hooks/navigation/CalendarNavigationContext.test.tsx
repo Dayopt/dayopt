@@ -35,6 +35,7 @@ function TestConsumer() {
     <div>
       <span data-testid="date">{navigation.currentDate.toISOString().slice(0, 10)}</span>
       <span data-testid="view">{navigation.viewType}</span>
+      <span data-testid="view-ready">{String(navigation.isViewReady)}</span>
       <button
         type="button"
         onClick={() => navigation.navigateToDate(new Date('2026-03-29T12:00:00.000Z'))}
@@ -183,6 +184,24 @@ describe('CalendarNavigationProvider', () => {
 
     expect(screen.getByTestId('date')).toHaveTextContent('2026-04-01');
   });
+
+  it.each([null, 'invalid'])(
+    '/report の保存ビューが %s でも復元完了して week を使える',
+    (savedView) => {
+      window.localStorage.removeItem('dayopt:last-calendar-view');
+      if (savedView) window.localStorage.setItem('dayopt:last-calendar-view', savedView);
+      mockPathname = '/ja/report';
+      window.history.replaceState(null, '', '/ja/report?date=2026-03-25');
+      render(
+        <CalendarNavigationProvider>
+          <TestConsumer />
+        </CalendarNavigationProvider>,
+      );
+      expect(screen.getByTestId('view')).toHaveTextContent('week');
+      expect(screen.getByTestId('view-ready')).toHaveTextContent('true');
+      window.localStorage.removeItem('dayopt:last-calendar-view');
+    },
+  );
 
   // URL の書き手はタブ対応（overview.md §5-4-b）: /report 滞在中に日付を変えたら
   // /report の URL を書く。/calendar へタブが飛ばないことを固定する。
@@ -348,6 +367,8 @@ describe('CalendarNavigationProvider', () => {
       </CalendarNavigationProvider>,
     );
 
+    expect(screen.getByTestId('view-ready')).toHaveTextContent('true');
+
     // /report 自体は view を持たない概念だが、Provider 内部の viewType は
     // 「カレンダーへ戻る」リンクの組み立てに使われるため、reload 前の day を保持する
     expect(screen.getByTestId('view')).toHaveTextContent('day');
@@ -383,6 +404,7 @@ describe('CalendarNavigationProvider server initialization', () => {
     );
     expect(html).toContain('2026-01-01');
     expect(html).toContain('week');
+    expect(html).toContain('data-testid="view-ready">false');
     window.localStorage.removeItem('dayopt:last-calendar-view');
   });
 });

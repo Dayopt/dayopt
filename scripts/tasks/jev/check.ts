@@ -168,7 +168,7 @@ async function run(): Promise<number> {
   checks.push({
     name: 'assistは採用評価前のshadowで、権限・レビューを変更しない',
     ok: Object.values(ASSIST_PACKS).every((pack) => pack.mode === 'shadow'),
-    detail: 'ctx/routingへの自動接続は別PRのGo判定後',
+    detail: 'ctxはshadow候補をL2へ渡すが、Issue条件・権限・reviewの判定はコード側に残す',
   });
 
   // Phase 1 の質問セットも同じ静的検査に通す。質問文を足した時に上限や空欄で落ちるのを

@@ -41,6 +41,11 @@ export function handlePointerUp(
     }
 
     case 'resizing': {
+      const hasChanged =
+        Math.abs(state.snappedTop - state.originalPosition.top) > 0.01 ||
+        Math.abs(state.snappedHeight - state.originalPosition.height) > 0.01;
+      if (!hasChanged) return { state: IDLE, effects };
+
       if (state.isOverlapping) {
         effects.push({
           type: 'RESIZE_REJECTED',

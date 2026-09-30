@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-09-22
+last_verified: 2026-09-25
 ---
 
 # Dayopt 不変条件カタログ
@@ -46,8 +46,15 @@ docs へ残している。
 ## 公開 HTTP エンドポイント
 
 - 公開エンドポイント（OAuth callback / webhook / contact）は rate limit を持つ
+- `app/api/health/cron/route.ts` は UptimeRobot 用の無認証・production-only monitor。
+  service-role で読むのは `cron_heartbeats` の allowlist 8件の job 名と完了時刻だけで、
+  OAuth identity を照合してから評価する。全体 30回/分、DB query は5秒で打ち切り、
+  応答は `healthy` / `unhealthy` のみ・`no-store`・失敗時503。上限超過時は60秒以内の
+  成功/失敗結果だけ再生し、新しい結果が無ければ503を返す。
 - `withUpstashRateLimit` のIP rate limitはVercel由来の`X-Real-IP`だけを使い、`X-Forwarded-For`へfallbackしない。欠落・不正値は共有`ip:unknown`でfail closedにする
 - rate limitのRedis keyは`ip:` / `email:`のpurpose prefixを付けてHMAC化し、生のIP / emailを保存・記録しない。account bucketを併用する場合はIP-firstで短絡し、IP bucketが拒否したらaccount bucketを消費しない
+- OAuth token endpointはform bodyをstream中に実byte数で制限し、16 KiBを超えたら読込を止める。`Content-Length`だけを実測上限として扱わない
+- OAuth token endpointの最終rate-limit bucketは静的allowlistで解決したclientごとに分ける。clientごとの120件/分を守りつつ、一clientの無効grantで別clientの枠を消費させない。現行3 clientでは合計上限が360件/分になるため、allowlist拡張時はDB負荷上限を見直す
 - cron ルート（`app/api/cron/**`）は `CRON_SECRET` を検証する
 - **`writeCronHeartbeat` に渡せる job 名は `cron_heartbeats_job_name_check`（CHECK 制約）が
   決める。** 制約に無い名前で書くと毎回 CHECK violation になり、`writeCronHeartbeat` は例外を
@@ -92,6 +99,8 @@ docs へ残している。
 - **永続化するクライアント cache は認証主体に束縛する。** ブラウザに残す query cache は
   user id で名前空間を分け、別 principal の blob を復元せず、sign-out で破棄する。
   key に所有者が無いと、共有端末で前のユーザーのデータが次のユーザーへ復元される（#2619）
+  破棄時は進行中の保存・復元も無効化する。破棄前に始まった読み取り結果を後からhydrateせず、
+  開始済みの書き込みが完了してからstorageを消し、旧blobを復活させない（#2963）。
 - **所有者付きリソースを跨いで参照する行は、単一 ID ではなく `(id, user_id)` の複合 FK で
   束縛する。** トリガーではなく FK で守るので、他人の行を紐づけることが構造的に不可能になる。
   参照先には `UNIQUE (id, user_id)` の anchor が要る（`categories` / `activities` /
@@ -129,15 +138,18 @@ docs へ残している。
 - 外部 OAuth では `openid` scope を要求し、ユーザーの同定は id_token 側で行う
   （メールアドレスの一致で同定しない）
 - token 暗号化の鍵は起動時に長さを検証する（32 bytes 以上）
-- 外部カレンダーの再接続は、callback で検証した Google `sub` が保存済み
-  `provider_account_id` と一致する既存の `reauth_required` 行だけを条件付き更新する。
-  generic upsert で削除済み接続を復活させず、切断との競合では切断を勝たせる
+- 外部カレンダーの OAuth callback は、一回限りの code を交換する前に server-side attempt を claim する。
+  新規接続は ready な project / subject fence と開始時の user data generation を検証する DB command で保存し、
+  authority fence を伴わない接続は確定しない。再接続は callback で検証した Google `sub` が保存済み
+  `provider_account_id` と一致する同一 user / provider の `reauth_required` 行、または fence が欠けた legacy
+  `active` 行だけを条件付き更新する。generic upsert で再接続対象を復活させず、切断との競合では切断を勝たせる
 - iCal feed token は URL を知るだけで購読できる bearer-style credential として扱い、client query を
   永続 cache へ保存しない。Settings を開く時と focus 復帰時は再取得し、取得中の cached URL は操作させない
 - **ユーザーが明示した外部カレンダーの切断は、provider revoke の試行と行の削除の両方に必ず到達する。**
   authority fence（`authority_fence_id` / `authority_epoch`）の欠落を「切断済み」と解釈しない。
-  fence を書く接続作成経路が無い以上、fence を要求すると全ての新規接続で切断が空振りし、
-  UI が成功を表示したまま Google 側の grant が無期限に生き残る（#2620）
+  新規保存・再接続は DB command が ready な subject fence を付け、legacy の fence 欠落は user data generation と
+  project / quarantine / subject fence の ready 状態を確認する RPC で一覧・選択・同期の前に修復する。
+  切断は legacy の fence 欠落行でも revoke と削除を続ける（#2620、#2673）
 - **auth メールの token 配送先 origin は Edge Function 自身の allowlist で閉じる。** GoTrue の
   redirect allowlist（production は Dashboard が正本で repo から強制できず、CI 監査も fail-open）
   だけに依存しない。`redirect_to` の origin が allowlist 外なら `NEXT_PUBLIC_APP_URL` へ落とし、
@@ -323,7 +335,8 @@ docs へ残している。
     （REST + service role key）から送る（2026-09-21 実測、`supabase` skill §実測で分かった罠）
 - Plan は時間軸のどこにでも置ける。過去 Plan もドラッグ移動・リサイズ・時間編集ができ、
   編集しても Plan のままで Record にはならない。過去スロットへ新規に引いたブロックは
-  Record になる（宛先は `end_at` だけで決まる）
+  既定では Record になる。既定は `end_at` だけで決まり、終了が現在以前なら作成 Inspector で
+  Plan / Record を選べる（`resolveTimeblockKindChoice`）。未来は Plan のみ
 
 ### 規則の写しと、その分類
 
@@ -338,7 +351,7 @@ grep 対象にする。
 | (a) 契約変換  | `features/timeblock/server/mcp-mutation-client.ts` の `EXPECTED_ERROR_CODES`            | DT コード → `McpMutationErrorCode`                | 不可（MCP の公開契約）                        |
 | (a) 契約変換  | `features/timeblock/server/timeblock-context-contract.ts` の `TIMEBLOCK_CONTEXT_RULES`  | MCP `constraints.get` が返す規則の宣言            | 不可（公開契約）                              |
 | (b) UX 先回り | `features/timeblock/schemas/timeblock.ts` の `timeRangeRefine`                          | 往復前に `end > start` を弾く                     | 可（server が同じ規則で拒否する）             |
-| (b) UX 先回り | `features/timeblock/domain/timeblock-destination.ts`                                    | `end_at` から Plan / Record の宛先を決める        | 不可（規則の写しではなく宛先の決定そのもの）  |
+| (b) UX 先回り | `features/timeblock/domain/timeblock-destination.ts`                                    | `end_at` から既定の宛先と種別の選択可否を決める   | 不可（規則の写しではなく宛先の決定そのもの）  |
 | (b) UX 先回り | `features/calendar/lib/overlap.ts` + `lib/time/time-conflict.ts`                        | 重なりの事前表示                                  | 可（overlap は DB 側 `TIME_OVERLAP` が正）    |
 | (b) UX 先回り | `features/calendar/hooks/operations/useTimeblockOperations.ts` の record 未来移動ガード | ドラッグ中に `timeLocked` を出す                  | 可（server 拒否でも同じ toast が出る。#2628） |
 | (b) UX 先回り | `features/calendar/interaction/interaction-effects.ts` の `case 'DROP'` の記録化経路    | Record レーンへの drop 先が未来なら記録を作らない | 可（server が `DT005` で拒否する。#2645）     |

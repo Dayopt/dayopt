@@ -23,7 +23,34 @@ Dayopt の標準ルートは `local → PR Preview → production`。Vercel Prev
 
 web（`dayopt.app`）と product（`app.dayopt.app`）は別ドメインで配信する。web から product へは絶対 URL でリンクし、path ベースの Multi-Zones（web の rewrites で `/settings` や `/app-static` を product へ proxy する構成）は使わない。production で既に 404 になっていたため 2026-09-14 に設定を撤去した（#2747）。security headers の正本は各 app の `next.config.mjs` の `headers()` で、`vercel.json` には置かない。
 
-persistent staging は常設しない。固定 URL が必要な Stripe / OAuth callback / closed beta 検証が出た時だけ、Vercel staging と Supabase persistent branch を追加する。
+上表は稼働中の構成。Cloud-firstへの移行仕様は次節。常設環境の構築と通し検証が終わるまで、稼働済みの構成とは区別する。
+
+### Cloud-firstへの移行契約（#2910、構築中）
+
+通常の実装はCodex Cloud、手元のUI確認は任意のStorybookを入口とする。CI内のDocker・隔離DB・RLS・migration検証は維持する。個人の1Password unlockやMacのDBを通常workerの前提にしない。
+
+| 用途                               | アプリ                                         | DB                                  |
+| ---------------------------------- | ---------------------------------------------- | ----------------------------------- |
+| 通常PR                             | PRごとのVercel Preview                         | 常設の非本番Supabaseを共有          |
+| DB・共通認証設定の変更、破壊的検証 | PRごとのVercel Preview                         | そのPR専用の使い捨てSupabase branch |
+| 統合確認                           | 専用Vercel projectのProduction target、固定URL | 同じ常設Supabase 1環境              |
+| 任意の手元UI確認                   | Storybook / mock                               | 不要                                |
+
+常設には合成データとテスト専用アカウントを維持する。人間の確認用とAI・E2E用のユーザーを分離し、並列runは自分が作ったデータだけ掃除する。DB/RLS/migration以外でも、全ユーザー対象のjob、Auth、Storage、共通設定に影響する実験は共有DBで行わない。本番データを複製しない。
+
+同じDBへ接続するとアカウントを使い回せるが、異なるPreview domain間のログインsession共有は保証されない。アプリ認証とVercel Deployment Protectionは別々に確認する。共有DBに接続したPRを固定MCP OAuth issuerとして扱わない。
+
+本番と揃えるのはcode、migration、RLS、認証・利用権・Webhook・Cronの処理。変えてよいものは接続先、資格情報、データ、URL、外部サービスのテストaccount/mode、メール送信先、ログ環境、容量。`VERCEL_ENV=production`だけで本番と判定せず、専用project/ref/domainと外部accountを照合する。認証や課金判定を無効化して同等とみなさない。
+
+待機時の常設は実際に公開済みの本番revisionに対応させる。統合確認時だけ候補を固定し、別候補で上書きしない。必要な確認はmain merge前に行う（既存Supabase Git integrationはmerge時に本番migrationを適用するため）。本番へ渡すのは検証したcode/migrationであり、非本番Secret入りのbuildではない。
+
+証拠はIssue/PR、既存ctx/trace/Validation、各サービスへの参照を使う。head/base SHA、deployment、DB ref、migration集合、run/attempt、観測時刻を対応付け、古い成功・欠測・接続拒否を現在の成功にしない。専用dashboardや管理DBは作らない。
+
+**使い捨てbranchの費用と終了**: 作成前にPR・git branch・Supabase branch ID/ref・所有者を記録する。作成したら検証とマージまで進める。マージできなければ、そのPR専用で非default・非persistentと確認できたbranchだけを削除し、APIで消滅を確認する。単なる古いbranch名やPR checkの成功から削除対象を推測しない。理由、保持した証拠、再開時のGit integrationによる再作成・migration/seed・環境変数再同期・新deploymentの照合手順をPRへ残す。再開時には古いDBの成功を再利用しない。Vercel deploymentとCI artifactの保持はDB削除と別に扱う。
+
+**構築前の確認対象**: 常設Micro相当1本、専用Vercel project、固定URL、Stripe Sandbox、Resendの許可送信先、Google Calendarテストaccount、Sentry環境、MCP OAuth identity、Cron。新規有料プランは前提にしない。Microのcomputeは概ね月$10だがusageは別であり上限保証ではない。resource一覧・接続先・費用・復旧方法をまとめて確認してから作る。データの復旧はアプリrollbackと分け、DBだけresetしてStripe等を孤児化させない。
+
+2026-09-26の確認ではSupabaseはmainのみで、常設と上記接続は未構築。未接続のAC、統合gateの実強制、Preview E2Eの通し検証は#2910に残す。通し検証前に旧経路や手元の実物を削除しない。
 
 ### テスト自動化の現在地
 
@@ -163,6 +190,15 @@ workflow は次を満たした時だけ promote する。
   Protection Bypass for Automation の secret が必須）
 - live な Vercel metadata に対する Production Config Audit が成功
 - promote 後、`dayopt.app` と `app.dayopt.app` の両方への smoke が成功
+
+候補待ちはまず 5 分。時間内に全 project が READY にならない時は対象 SHA を再検索し、既存 candidate
+（QUEUED / BUILDING を含む）があれば deployment ID を固定して最大 25 分待つ。candidate が無い project
+だけ、Vercel project が `Dayopt/dayopt` に link 済みで Auto-assign が `false` と読めた場合に限り、Vercel
+Git source から exact SHA の staged Production build を作る。作成直前の project 設定が Auto-assign
+無効であることと、response の `aliasAssigned=false` / alias 空を確認し、project ID・target・GitHub source
+SHA・deployment ID を再読込して既存の smoke / audit / promote
+gate に通す。link / Auto-assign / API response を確認できない時は fail closed で promote しない。
+候補待ちの最悪時間はこの 5 分 + 25 分で、workflow timeout の算定にも含める。
 
 **どの project を進めるかは project ごとに判定する。** 基準は「その project が今配信している
 deployment の source SHA」で、そこから対象 SHA までの `git diff` を Impact Resolver
@@ -358,6 +394,8 @@ Code Qualityを採用しない判断と2026-07-21時点の外部設定証跡は�
     env監査（key/target/type）はrelease gateでも従来どおり実行する
 
 ### 共通検証計画の shadow（#2793 / #2794）
+
+2026-09-28 時点で GitHub Actions の `Validation shadow` と `Validation gate` は、消費削減のため repository Actions UI から手動停止している。workflow source と contract tests は残す。どちらも required check ではなく、現在の main ruleset に変更はない。#2811 の Validation gate 拡張・必須化は別件であり、今回の停止はその実施を意味しない。
 
 `validation-shadow.yml` は ready PR の base checkout にある `validation-plan-shadow.mjs` を実行する。
 PR 側は git diff のデータとして読み、依存 install やスクリプト実行には使わない。
@@ -973,6 +1011,7 @@ Product / Webの`src/app/api/**`配下にある主要REST / Webhook endpoint総�
 | App     | Path                                         | Method               | 認証                               | Rate Limit                      | Runtime                  | 副作用 / 説明                                                                                                              |
 | ------- | -------------------------------------------- | -------------------- | ---------------------------------- | ------------------------------- | ------------------------ | -------------------------------------------------------------------------------------------------------------------------- |
 | Product | `/api/health`                                | GET                  | なし                               | なし                            | nodejs                   | DB / Upstash Redisの疎通をcheckし`healthy / degraded / unhealthy`を返す。Productionは`{ status }`だけを公開                |
+| Product | `/api/health/cron`                           | GET                  | なし（Productionのみ）             | 全体30/分                       | nodejs (maxDuration 20s) | production identity確認後に許可リスト内のcron heartbeatをread-only確認し、`{ status }`だけをno-storeで返す                 |
 | Product | `/api/health/version`                        | GET                  | なし                               | なし                            | nodejs                   | ビルドの`{ version, commitSha }`をno-storeで返す（外部I/Oなし）。開いたままのタブの新deploy検知に使う                      |
 | Product | `/api/csp-report`                            | POST                 | なし                               | IP 20/分 + 全体120/分           | nodejs                   | Product originの16 KiB以下のCSP reportだけを検証し、URL queryを除去してSentryへ送信                                        |
 | Product | `/api/trpc/[trpc]`                           | GET / POST           | procedure依存                      | procedure依存                   | nodejs                   | tRPC procedureのルーティング本体。Contactは認証済み`contact.submit`を使う                                                  |
@@ -1121,15 +1160,16 @@ Supabase CLIを使用して、データベーススキーマからTypeScript型�
 
 ### コマンド
 
-| コマンド                            | ソース          | 用途                                      |
-| ----------------------------------- | --------------- | ----------------------------------------- |
-| `npm run types:generate`            | production main | `types:generate:production` の互換 alias  |
-| `npm run types:generate:production` | production main | production main から生成                  |
-| `npm run types:generate:local`      | Local DB        | ローカルから生成（`supabase start` 必要） |
+| コマンド                                                       | ソース          | 用途                                      |
+| -------------------------------------------------------------- | --------------- | ----------------------------------------- |
+| `pnpm types:generate --target preview --project-ref <ref>`     | PR専用DB        | 対象refを明示して生成                     |
+| `pnpm types:generate --target integration --project-ref <ref>` | 常設非本番DB    | 対象refを明示して生成                     |
+| `npm run types:generate:production`                            | production main | production main から生成                  |
+| `npm run types:generate:local`                                 | Local DB        | ローカルから生成（`supabase start` 必要） |
 
-PR Preview Branch の schema は Supabase integration check で検証する。型生成は production main か local のどちらかを明示して行う。
+引数なしの `pnpm types:generate` は失敗する。本番取得は明示した `types:generate:production` のみ。preview/integrationに本番refは指定できない。環境名は利用者の指定であり、そのrefの所有者やmigration適用済みを証明するものではない。PRのbranch/ref・適用migrationと照合してから実行し、CIの `types:generate:local` による再構築比較も維持する。
 
-全コマンドとも `apps/product/src/lib/database/generated/database.types.ts` に出力。
+全コマンドとも `apps/product/src/lib/database/generated/database.types.ts` に出力。CLI成功・Database型取得・整形成功後だけ置き換える。認証や生成に失敗しても既存ファイルは保持し、CLIの生のエラー出力は秘密情報を含み得るため表示しない。
 
 ### 使用タイミング
 
@@ -1373,43 +1413,19 @@ browser を将来カバーするなら、Sentry browser 側の `tracePropagation
 
 ## 開発コマンド一覧
 
-Dayoptプロジェクトで使用可能な全npmコマンドのリファレンス。
+<!-- docs-live:commands:start -->
 
-### 基本開発コマンド（頻出）
+正本は [package.json](../../package.json)。現在の一覧は `pnpm docs:read docs/engineering/infra.md` で生成して読む。
 
-```bash
-pnpm dev                    # 1Password 経由で開発サーバー起動
-npm run typecheck           # 型チェック
-npm run lint                # コード品質チェック
-npm run lint:boundaries     # feature境界チェック
-npm run test:run            # ユニットテスト実行
-npm run check               # typecheck + lint + test:run（一括）
-```
+<!-- docs-live:commands:end -->
 
-> **Secrets**: 実値は `.env.local` に置かず、1Password master と `.op-env.agent` の `op://` 参照を `pnpm dev` で注入する。`pnpm dev` の Supabase 接続先は local 固定。素の起動が必要な一時作業だけ `pnpm dev:raw` を使う。詳細は `docs/operations/secrets.md`。
-> 開発サーバー（`pnpm dev`, `npm run storybook`）の起動・停止はユーザー責務。
-
-### 全コマンド一覧
-
-**一覧はここに置かない**。`package.json` の `scripts` が正本で、写すと必ず古くなる（2026-09-16 に、存在しない 12 script を並べた表を撤去した）。
-
-```bash
-# root の script 名を引く
-node -e "console.log(Object.keys(require('./package.json').scripts).join('\n'))"
-
-# workspace 個別（product / web / storybook / packages）
-pnpm --filter @dayopt/product run
-```
+Secrets の注入・開発サーバーの操作責務は [secrets.md](../operations/secrets.md) と [AGENTS.md](../../AGENTS.md) を参照する。
 
 script の追加・改名は permission allowlist と docs 参照の同時更新まで含めて 1 変更にする（AGENTS.md の Non-Negotiables）。どのコマンドをいつ使うかは、テストは [testing.md](./testing.md)、DB は [supabase skill](../../.agents/skills/supabase/SKILL.md)、release は [releasing skill](../../.agents/skills/releasing/SKILL.md) を見る。
 
-### pre-commit フック（自動実行）
+## pre-commit フック（自動実行）
 
-コミット時に以下が自動で実行される:
-
-1. **lint-staged**: ステージされた `.ts/.tsx/.js/.jsx/.mjs/.cjs` に prettier（app 配下なら eslint も）、`.json/.md/.yml/.yaml/.css/.mdx` に prettier
-2. **typecheck**: `.ts/.tsx` ファイルが含まれる場合のみ `tsc --noEmit`
-3. **license:check**: `package.json` 変更時のみライセンスチェック
+現在の処理は末尾で `.husky/pre-commit` と `lint-staged.config.mjs` の定義から生成して読む。何をいつ検証するかの正本は [testing.md](testing.md)。hook に書かれていない検査を実行済みと扱わない。
 
 ---
 
@@ -1617,7 +1633,7 @@ ORDER BY schemaname, tablename;
 | ------------------------------------------------- | -------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Storage オブジェクト**                          | どの DB backup にも含まれない（Supabase の仕様）               | 搬出/復元 script（`scripts/ci/storage-backup.sh` / `scripts/runbook/storage-restore.sh`、rclone ベース）は実装済み。**destination（Cloudflare R2）を確定し、初回搬出・実復元演習ともに完了**（2026-08-20、[#2026](https://github.com/Dayopt/dayopt/issues/2026)）。以後は日次 cron が差分同期する。詳細は [disaster-recovery-drill.md](../operations/disaster-recovery-drill.md) §Storage |
 | **Edge Functions とその secrets**                 | 復元対象外                                                     | `supabase functions deploy <slug> --use-api` で再デプロイ + **secrets を再投入**（`supabase secrets set`）。コードを戻しても secrets は戻らない                                                                                                                                                                                                                                           |
-| **Vault の secrets（別 project へ復元した場合）** | 暗号鍵は project 単位。別 project では復号できない可能性が高い | 1Password から再投入する（`vault.secrets` に 9 件。`stripe_secret_key` / `resend_api_key` / `service_role_key` / `recovery_code_pepper` 等）                                                                                                                                                                                                                                              |
+| **Vault の secrets（別 project へ復元した場合）** | 暗号鍵は project 単位。別 project では復号できない可能性が高い | 適用済み migration と最新の secret 名のメタデータを確認し、必要な値を 1Password から再投入する。件数は固定しない。`20260917050000_drop_vault_edge_invoke.sql` で撤去した secret は復活させない                                                                                                                                                                                            |
 | **Realtime publication**                          | 別 project へ復元した場合は再有効化が必要                      | 現状 publication は空なので影響なし                                                                                                                                                                                                                                                                                                                                                       |
 
 **production の pg_cron job は `supabase/migrations/` が正本ではない**（baseline に「本番は Dashboard で設定」とある）。復元の前後で `SELECT jobname, schedule, active FROM cron.job;` を控えて突き合わせる。
@@ -2165,3 +2181,11 @@ WHERE version = '20260319090000';  -- 該当バージョンに置き換え
 | **Have I Been Pwned** | signup / password 変更時の漏洩パスワード検査 | 停止時は fail-open（検査を通す）。代替 breach API / corpus へ |
 
 **Turnstile と Sentry はこの層に無い。** Turnstile は Cloudflare 行（中）に、Sentry は production build gate を握るため中層に含めた。
+
+## 機械取得する現状
+
+<!-- docs-live:facts:start -->
+
+抽出対象の登録は [scripts/lib/docs-live/facts.ts](../../scripts/lib/docs-live/facts.ts)。現在の一覧は `pnpm docs:read docs/engineering/infra.md` で生成して読む。
+
+<!-- docs-live:facts:end -->

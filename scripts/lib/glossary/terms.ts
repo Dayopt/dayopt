@@ -506,36 +506,6 @@ export const GLOSSARY: readonly GlossaryEntry[] = [
     usage: 'タブ。それが良い使い方だったかを見る面。中身は質の面。ja はページ名（Review）と同じ語',
     code: { identifiers: ['ReportTabs'] },
   },
-  {
-    id: 'report-chapter-allocation',
-    layer: 'ui',
-    status: 'current',
-    concept: 'Allocation (chapter 1)',
-    ja: '配分',
-    en: 'Allocation',
-    usage: '1 章。時間そのものを分母（週 = 168h）に置いて、どこへ流れたかを見る',
-    code: { identifiers: ['AllocationChapter'] },
-  },
-  {
-    id: 'report-chapter-execution',
-    layer: 'ui',
-    status: 'current',
-    concept: 'Execution (chapter 2)',
-    ja: '執行',
-    en: 'Execution',
-    usage: '2 章。予定に対して記録がどう動いたか。全体遵守率のような合成値は作らない',
-    code: { identifiers: ['ExecutionChapter'] },
-  },
-  {
-    id: 'report-chapter-quality',
-    layer: 'ui',
-    status: 'current',
-    concept: 'Quality (chapter 3)',
-    ja: '質',
-    en: 'Quality',
-    usage: '3 章。投下時間と充実 / 消耗の関係を見る。中の散布図が「羅針盤」',
-    code: { identifiers: ['QualityChapter'] },
-  },
 
   // ─── 設計語（UI 文言には出さない） ───
   {
@@ -545,7 +515,7 @@ export const GLOSSARY: readonly GlossaryEntry[] = [
     concept: 'Ink',
     ja: 'インク',
     en: 'Ink',
-    usage: '記録として書かれた時間。決算バーの塗り',
+    usage: '記録として書かれた時間。レポートの現行表示は docs/product/specs/review.md を参照',
     code: { identifiers: ['buildInkColumns'] },
   },
   {
@@ -576,22 +546,13 @@ export const GLOSSARY: readonly GlossaryEntry[] = [
     ],
   },
   {
-    id: 'ledger-bar',
-    layer: 'design',
-    status: 'current',
-    concept: 'Ledger bar',
-    ja: '決算バー',
-    en: 'Ledger bar',
-    usage: '1 章の横 1 本のバー。塗りがインク、塗り残しが余白。UI にラベルとしては出さない',
-  },
-  {
     id: 'mirror',
     layer: 'design',
     status: 'current',
     concept: 'Mirror',
     ja: '見積もりの鏡',
     en: 'Mirror',
-    usage: '2 章の節。記録 / 過去予定の係数を癖の強い順に最大 3 件出す',
+    usage: '「差分」タブの節。記録 / 過去予定の係数を癖の強い順に最大 3 件出す',
     code: { identifiers: ['buildMirrorRows'] },
   },
   {
@@ -601,7 +562,7 @@ export const GLOSSARY: readonly GlossaryEntry[] = [
     concept: 'Compass',
     ja: '羅針盤',
     en: 'Compass',
-    usage: '3 章の散布図。横軸が投下時間、縦軸が充実と消耗の差。平均・回帰線・象限は作らない',
+    usage: '「振り返り」タブの散布図。軸と集計の正本は docs/product/specs/review.md を参照',
     code: { identifiers: ['CompassScatter', 'buildCompassPoints'] },
   },
   {
@@ -622,8 +583,8 @@ export const GLOSSARY: readonly GlossaryEntry[] = [
     ja: '保存先ルール',
     en: 'Destination rule',
     usage:
-      '新規作成は end_at だけで宛先が決まる（未来なら予定、過去なら記録）。種別選択の UI は置かない',
-    code: { identifiers: ['resolveTimeblockDestination'] },
+      '新規作成の既定は end_at で決まる。過去枠は予定 / 記録を選べる。正本: docs/product/specs/plan-record.md',
+    code: { identifiers: ['resolveTimeblockDestination', 'resolveTimeblockKindChoice'] },
   },
 
   // ─── コード内部語 ───

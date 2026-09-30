@@ -162,7 +162,7 @@ jobs:
           fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
 
-      - uses: supabase/setup-cli@46f7f98c7f948ad727d22c1e67fab04c223a0520 # v3.0.0
+      - uses: supabase/setup-cli@45a513f8c64c0bc8e0e3dfe572b5c95be85f6359 # v3.0.1
         with:
           version: ${{ steps.supabase-version.outputs.version }}
 
@@ -387,12 +387,14 @@ jobs:
             --jq '[.[] | select(.title | startswith(env.TITLE_PREFIX))][0].number // empty')
 
           if [ -n "$existing" ]; then
+            issue_number="$existing"
             gh issue comment "$existing" --repo "$GITHUB_REPOSITORY" --body "$body"
           else
-            gh issue create --repo "$GITHUB_REPOSITORY" \
+            issue_url=$(gh issue create --repo "$GITHUB_REPOSITORY" \
               --title "$title_prefix" \
-              --label "area:deployment,priority:p1" \
-              --body "$body"
+              --label "type:bug,area:deployment" \
+              --body "$body")
+            issue_number="${issue_url##*/}"
           fi
 
   # ─── promote 本体（層 4）────────────────────────────────────────────────

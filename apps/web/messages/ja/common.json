@@ -44,7 +44,13 @@
     },
     "metadata": {
       "siteName": "Dayopt",
-      "siteDescription": "Next.jsとTailwind CSSで構築されたモダンなSaaSプラットフォーム"
+      "siteDescription": "Next.jsとTailwind CSSで構築されたモダンなSaaSプラットフォーム",
+      "ogCategories": {
+        "product": "プロダクト",
+        "docs": "ドキュメント",
+        "journal": "ブログ",
+        "release": "リリース"
+      }
     },
     "aria": {
       "openMenu": "メニューを開く",

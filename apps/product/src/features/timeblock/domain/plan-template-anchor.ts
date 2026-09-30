@@ -26,20 +26,16 @@ export const MINUTES_PER_DAY = 1440;
 
 const DATE_KEY_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/;
 
-interface DateKeyParts {
-  year: number;
-  month: number;
-  day: number;
+/** Validate the Gregorian day without allowing Date's overflow normalization. */
+export function isValidTemplateDateKey(dateKey: string): boolean {
+  if (!DATE_KEY_PATTERN.test(dateKey)) return false;
+  const date = new Date(`${dateKey}T00:00:00.000Z`);
+  return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === dateKey;
 }
 
-function parseDateKey(dateKey: string): DateKeyParts {
-  const match = DATE_KEY_PATTERN.exec(dateKey);
-  if (!match) throw new RangeError(`Invalid date key: ${dateKey}`);
-  return {
-    year: Number(match[1]),
-    month: Number(match[2]),
-    day: Number(match[3]),
-  };
+function parseDateKey(dateKey: string): Date {
+  if (!isValidTemplateDateKey(dateKey)) throw new RangeError(`Invalid date key: ${dateKey}`);
+  return new Date(`${dateKey}T00:00:00.000Z`);
 }
 
 function pad2(value: number): string {
@@ -48,9 +44,10 @@ function pad2(value: number): string {
 
 /** `dateKey` の翌日（暦日演算は UTC で行う。壁時計フィールドしか触らないので TZ 非依存）。 */
 export function nextDateKey(dateKey: string): string {
-  const { year, month, day } = parseDateKey(dateKey);
-  const next = new Date(Date.UTC(year, month - 1, day + 1));
-  return `${next.getUTCFullYear()}-${pad2(next.getUTCMonth() + 1)}-${pad2(next.getUTCDate())}`;
+  const next = parseDateKey(dateKey);
+  next.setUTCDate(next.getUTCDate() + 1);
+  const iso = next.toISOString();
+  return iso.slice(0, iso.indexOf('T'));
 }
 
 /**
@@ -68,10 +65,11 @@ export function anchorMinuteToInstant(
   if (!Number.isInteger(anchorMinute) || anchorMinute < 0 || anchorMinute >= MINUTES_PER_DAY) {
     throw new RangeError(`Invalid anchor minute: ${anchorMinute}`);
   }
-  const { year, month, day } = parseDateKey(dateKey);
+  const wallAsUtc = parseDateKey(dateKey);
   const hours = Math.floor(anchorMinute / 60);
   const minutes = anchorMinute % 60;
-  const wallAsUtcMs = Date.UTC(year, month - 1, day, hours, minutes);
+  wallAsUtc.setUTCHours(hours, minutes);
+  const wallAsUtcMs = wallAsUtc.getTime();
   const expectedWall = `${dateKey} ${pad2(hours)}:${pad2(minutes)}`;
 
   const offsets = new Set<number>();
@@ -85,7 +83,7 @@ export function anchorMinuteToInstant(
 
   const candidates = [...offsets]
     .map((offset) => wallAsUtcMs - offset)
-    .filter((instant) => formatInTimeZone(instant, timezone, 'yyyy-MM-dd HH:mm') === expectedWall)
+    .filter((instant) => formatInTimeZone(instant, timezone, 'uuuu-MM-dd HH:mm') === expectedWall)
     .sort((a, b) => a - b);
 
   const earliest = candidates[0];
@@ -103,7 +101,7 @@ export function dayEndInstant(dateKey: string, timezone: string): Date {
 
 /** instant を timezone の暦日キー（yyyy-MM-dd）へ。 */
 export function instantToDateKey(instant: Date, timezone: string): string {
-  return formatInTimeZone(instant, timezone, 'yyyy-MM-dd');
+  return formatInTimeZone(instant, timezone, 'uuuu-MM-dd');
 }
 
 /** instant を timezone の壁時計で見た「local midnight からの分」へ。 */

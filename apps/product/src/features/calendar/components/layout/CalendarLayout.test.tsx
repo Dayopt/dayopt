@@ -260,6 +260,48 @@ describe('resolveSideRailMaxWidth', () => {
 });
 
 describe('CalendarLayout side rail space recovery', () => {
+  it.each(['pointerup', 'pointercancel', 'unmount', 'close'] as const)(
+    'releases resizing and body styles after %s',
+    (interruption) => {
+      measuredLayoutWidth = 1400;
+      const onRecoveryChange = vi.fn();
+      const { unmount, rerender } = render(
+        renderCalendarLayout({ onSideRailSpaceRecoveryChange: onRecoveryChange }),
+      );
+      document.body.style.cursor = 'crosshair';
+      document.body.style.userSelect = 'text';
+      try {
+        fireEvent.pointerDown(screen.getByRole('separator'), { button: 0, clientX: 500 });
+        fireEvent.pointerMove(window, { clientX: 440 });
+        expect(screen.getByRole('separator')).toHaveAttribute('aria-valuenow', '316');
+        expect(document.body.style.userSelect).toBe('none');
+
+        if (interruption === 'unmount') unmount();
+        else if (interruption === 'close') {
+          rerender(
+            renderCalendarLayout({
+              sideRailOpen: false,
+              onSideRailSpaceRecoveryChange: onRecoveryChange,
+            }),
+          );
+        } else if (interruption === 'pointerup') fireEvent.pointerUp(window);
+        else fireEvent.pointerCancel(window);
+
+        expect(document.body.style.cursor).toBe('crosshair');
+        expect(document.body.style.userSelect).toBe('text');
+        fireEvent.pointerMove(window, { clientX: 400 });
+        if (interruption !== 'unmount') {
+          rerender(renderCalendarLayout({ onSideRailSpaceRecoveryChange: onRecoveryChange }));
+          expect(screen.getByRole('separator')).toHaveAttribute('aria-valuenow', '316');
+        }
+      } finally {
+        fireEvent.pointerUp(window);
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+      }
+    },
+  );
+
   it('requests suppression once, settles, and restores when the rail closes', () => {
     const onRecoveryChange = vi.fn();
     const { rerender } = render(

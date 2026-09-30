@@ -1,0 +1,16 @@
+/* Match the fonts embedded in the generated PNG; independent of OS font fallback. */
+@font-face {
+  font-family: 'Dayopt OG Latin';
+  src: url('/og-fonts/SourceSans3-Semibold.ttf') format('truetype');
+  font-style: normal;
+  font-weight: 600;
+  font-display: block;
+}
+
+@font-face {
+  font-family: 'Dayopt OG Japanese';
+  src: url('/og-fonts/NotoSansJP-Medium.ttf') format('truetype');
+  font-style: normal;
+  font-weight: 600;
+  font-display: block;
+}

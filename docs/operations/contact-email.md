@@ -126,7 +126,7 @@ _dmarc.dayopt.app TXT "v=DMARC1; p=none; rua=mailto:dmarc@dayopt.app"
 
 ## 3. Merge前のProduction preflight
 
-3点のユーザーcheckpoint後にIssue #1646の`status:blocked`を解除し、次を値を表示せず確認する。
+3点のユーザーcheckpoint後にIssue #1646 の `status:blocked` を外し、次を値を表示せず確認する。
 
 既存1Password環境では`setup-1password.sh`を実行しない。このscriptは空のvault向け初回bootstrap専用なので、masterを次の順で手動更新する。
 

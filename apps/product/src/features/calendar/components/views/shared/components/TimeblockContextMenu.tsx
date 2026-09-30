@@ -14,7 +14,6 @@ interface TimeblockContextMenuProps {
   onClose: () => void;
   onDelete?: ((timeblock: CalendarDisplayEvent) => void) | undefined;
   onViewStats?: ((timeblock: CalendarDisplayEvent) => void) | undefined;
-  onCopy?: ((timeblock: CalendarDisplayEvent) => void) | undefined;
   onDuplicate?: ((timeblock: CalendarDisplayEvent) => void) | undefined;
 }
 
@@ -25,7 +24,6 @@ export const EventContextMenu = ({
   onClose,
   onDelete,
   onViewStats,
-  onCopy,
   onDuplicate,
 }: TimeblockContextMenuProps) => {
   const t = useTranslations();
@@ -110,7 +108,6 @@ export const EventContextMenu = ({
   // 共通の menu items 定義から取得（Inspector の TagRow と同じ source）
   const menuItems = getTimeblockMenuItems({
     onViewStats: onViewStats ? () => onViewStats(timeblock) : undefined,
-    onCopy: onCopy ? () => onCopy(timeblock) : undefined,
     onDuplicate: onDuplicate ? () => onDuplicate(timeblock) : undefined,
     onDelete:
       onDelete && timeblock.recordSource !== 'auto_migrated'

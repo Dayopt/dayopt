@@ -35,14 +35,14 @@ provider plan、sampling rate、SDK versionなどの値は変わるため、pack
 
 | 対象                                                                                                      | 監査頻度                   | 異常条件                                               |
 | --------------------------------------------------------------------------------------------------------- | -------------------------- | ------------------------------------------------------ |
-| calendar-sync / external-connection-maintenance                                                           | 15分                       | 最終完了から45分超                                     |
-| calendar-account-deletion-settle                                                                          | 15分                       | 最終完了から180分超                                    |
-| expire-calendar-revoke-outbox                                                                             | 15分                       | 最終完了から3分超                                      |
-| cleanup-product-events                                                                                    | 15分                       | 最終完了から4320分超                                   |
-| cleanup-calendar-authority-retention / expire-calendar-revoke-authority / finalize-calendar-revoke-guards | 15分                       | 最終完了から180分超                                    |
+| calendar-sync / external-connection-maintenance                                                           | 日次・main push時          | 最終完了から45分超                                     |
+| calendar-account-deletion-settle                                                                          | 日次・main push時          | 最終完了から180分超                                    |
+| expire-calendar-revoke-outbox                                                                             | 日次・main push時          | 最終完了から3分超                                      |
+| cleanup-product-events                                                                                    | 日次・main push時          | 最終完了から4320分超                                   |
+| cleanup-calendar-authority-retention / expire-calendar-revoke-authority / finalize-calendar-revoke-guards | 日次・main push時          | 最終完了から180分超                                    |
 | migration / schema / RLS / ACL / default privileges                                                       | 毎日06:00 JST、main push時 | 未適用migration、repository snapshotとの差分、読取失敗 |
 
-GitHub の schedule は実行時刻を保証しない。15分は起動予定の頻度であり、検知・通知の最大遅延の保証ではない。記録欠落、無効時刻、資格情報不足、API失敗も監査失敗とする。本番だけにある migration version は履歴差として表示し、schema / ACL の比較は省略しない。baseline は migration から生成し、本番から上書きしない。CI は隔離DBから型を再生成して committed types と比較する。default privileges の方針変更は #1715 で判断する。この監査はmigration履歴・RLS・ACLの比較で、列型・constraint・trigger/function本文すべての同一性を保証するものではない。
+GitHub の日次 schedule は実行時刻を保証しないため、heartbeat異常は次の main push または日次監査で検出する（遅延は日次実行より長くなりうる）。`/api/health/cron` は外形監視用に実装済みだが、UptimeRobot 側の設定状況は未確認。記録欠落、無効時刻、資格情報不足、API失敗も監査失敗とする。本番だけにある migration version は履歴差として表示し、schema / ACL の比較は省略しない。baseline は migration から生成し、本番から上書きしない。CI は隔離DBから型を再生成して committed types と比較する。default privileges の方針変更は #1715 で判断する。この監査はmigration履歴・RLS・ACLの比較で、列型・constraint・trigger/function本文すべての同一性を保証するものではない。
 
 完了記録は `public.cron_heartbeats`。利用者ID・入力・資格情報を含めず、job名、開始・完了時刻、成功と所要時間だけを保存する。Vercel側の記録失敗は Sentry に送るが保守処理を止めない（各書込1.5秒、開始・終了合計3秒）。pg_cron は元の schedule / owner / command を保持して同じトランザクションで記録する。処理が失敗すれば開始記録も rollback され、最後の成功が古くなることで検出する。authority identity不足で処理をskipした実行は完了を記録しない。heartbeat は正常終了の証拠であり、処理対象がゼロになった証拠ではない。
 

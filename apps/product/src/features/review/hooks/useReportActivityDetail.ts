@@ -8,7 +8,7 @@ import type { ReportGranularity } from '../lib/report-period';
 /**
  * 詳細パネルの明細を取る。
  *
- * **パネルが閉じている間は取りに行かない**（`enabled`）。1〜4 章は `getReportPeriod` の
+ * **パネルが閉じている間は取りに行かない**（`enabled`）。3タブは `getReportPeriod` の
  * 1 本だけで描けるので、開くまで箱の明細を運ばない（#2576 の設計）。
  *
  * `activityId` が `null` は「アクティビティ未設定の記録」で、開いていない状態とは区別する

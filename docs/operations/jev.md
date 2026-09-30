@@ -43,9 +43,15 @@ pnpm jev:check         # ネットワーク不要の静的検査。ここが落�
 
 ## コマンド
 
-### 判断材料を用意する assist（採用評価前）
+### 日常作業で使う L1 context-relevance
 
-`context-relevance` と `claim-support` は独立した shadow 用途。`pnpm ctx <N>` はL0だけを収集し、Jevを呼ばない。`pnpm ctx <N> --post` も評価を起動せず、既にある入力の再評価もしない。Issue briefのL1表示は、人がGoを確認してコード側で採用したpackの完全評価、十分な確信度、L0に存在する出典参照が揃った時だけ許可する。自由文、URL、SHA、検査結果をJevの出力から作らない。部分評価・停止・低確信度は未評価として扱う。現在はGoを記録したpackが無いため、L1は未接続である。`PACK_STATUS.active` や `GO_CANDIDATE` は採用記録ではない。
+`context-relevance` はIssue本文・コメント・関連資料の読む順を助けるshadow助言として、通常のIssue作業で使う。品質評価や人手評価を利用開始の条件にしない。運用で見つかった誤分類・見落とし・不要候補を、通常の修正や指摘と同じ流れで中長期的に改善する。これは性能が検証済みという意味ではなく、候補は毎回一次資料と照合する。
+
+dispatch担当は `pnpm ctx <N> --post` でL0とJev L1候補を含むBriefをIssueへ作成・更新する。workerの `pnpm ctx <N>` / `pnpm ctx <N> --reuse-brief-l1` はJev APIを呼ばず、Issue本文などのL0を再収集し、入力snapshotとHEADが一致する信頼済みBriefのL1だけを再利用する。`--l1-shadow` は明示的なローカルpreview用。通常の `ctx` 経路での未キャッシュ生成はdispatchまたはこの明示previewに限定し、下記の `jev:assist` は必要があって明示実行する時だけ使う。
+
+L1はIssue本文・必須条件・信頼できる出典を置き換えない。自由文、URL、SHA、検査結果をJev出力から作らない。候補が欠けても無関係の証明にせず、部分評価・停止・低確信度・入力不一致は候補順位を出さず未取得理由を示す。候補は必須条件・policy・権限・検証条件・最終判断を変更しない。
+
+Briefは、同一の公開Issue・コメント・関連資料・決定記録から作った入力snapshotとL0が一致した時だけL1候補を表示する。対象HEADは公開済みcommitを要求する。入力不一致やL1障害時は候補を使わず、L0の収集結果で続行する。`--post` はGitHubコメントを作成・更新するため、通常のdispatch手順として実行する。
 
 Issue本文は要求・制約の正本で、briefは原文の該当節、出典、snapshot、個別PRのSHA/CI、未確認事項を短く配る補助資料。必須条件と失敗・欠測はL1の順位付けで削らない。Codex sessionはIssue本文と信頼できる最新 `ctx-brief` コメントを明示取得し、Issue番号とsnapshotを確認する。コメントが存在するだけでは取得済みとみなさない。
 
@@ -104,12 +110,25 @@ pnpm jev:assist-eval report --input /absolute/path/evaluation.json
 
 ひな型は未確認の空欄で、正解ではない。原資料、対象ID、baselineの規則と結果、質問version、split、採用基準を送信前に人が確認し、共有保存先に凍結して残す。`reviewedBy`・`rationale`・`sourceRefs` を埋める。`frozenAt` は固定記録の時刻。CLIは申告された記録を集計するだけで、人手確認の実施や後からの改変を保証しない。元の凍結資料との照合はレビューで行う。
 
-- contextは30 Issue（tune10 / holdout20）。`candidateIds` 全体に対する人手の `usefulIds` と `requiredIds`、Jev・最新順・既存キーワード規則の各上位5件を記録する。Recall@5が強いbaselineを平均0.10以上上回り、baselineが拾った必須制約を新たに落とさないこと。
-- claimsは60組、4分類各15組（各分類tune5 / holdout10）。単純baselineは常に判断不能。holdoutのmacro-F1が0.75以上かつbaseline +0.10以上で、反証・判断不能を支持と誤分類しないこと。
-- holdoutは一度だけ。見た後に閾値を調整しない。欠測・未確認・入力不足はGoにしない。集計の `GO_CANDIDATE` は運用接続の許可ではなく、原資料を人が照合するための候補結果。
-- `skill-suggestion` の採用評価は #2852 の条件で別途完了させる。他packの合格で代替しない。
-- 合格したpackだけ、次のPRでctxへの保存済み注釈表示・`ctx --post`の評価・routingでの明示claims呼び出しを接続する。接続後20件で入力準備・待ち時間を含む時間、有用/不要候補、見逃しをbaselineと比較し、品質・時間で届かないpackを明示呼び出しに戻す。
-- 継続判断日は **2026-10-19**。baselineを上回って実際に使われるpackがあるかを確認し、継続・停止を記録する。
+### L1の改善
+
+`context-relevance` に30件の人手評価、holdout、baseline比較、合格閾値、定期Go/No-Goは設けない。各Issueの通常作業で具体的な誤りや不足が見つかった時に、一次資料と照合して必要な範囲を直す。shadow助言を使うためにpack評価記録を作ったり、利用件数を満たしたりする必要はない。`pnpm jev:check` は配線・schema等の静的検査で、Jevの性能や候補の正しさを証明しない。
+
+### Codex Cloud での Jev 結果の受け渡し
+
+Codex Cloud の Secret はsetup scriptにだけ提供され、agent phaseの開始前に取り除かれる。Gateway keyを通常のEnvironment Variableとして登録するとagentから読めるため登録しない（[Cloud environment documentation](https://learn.chatgpt.com/docs/environments/cloud-environment)）。Cloud task内でJevを新規実行するのでなく、dispatch担当が日常利用するL1候補をIssue Briefへ保存し、CloudのL2担当が同じ結果を読み取る。
+
+```bash
+# ローカルの認証済み担当。GitHubコメントを作成・更新する。
+pnpm ctx 2853 --post
+
+# Cloud の L2 担当。Jev API は呼ばず、現在のL0と一致した保存済みL1だけを読む。
+pnpm ctx 2853 --reuse-brief-l1
+```
+
+BriefにはL1候補の再利用用メタデータが含まれる。Cloud側は信頼済み `ctx-brief` コメントから読んだpayloadのIssue番号・URL・snapshot・HEAD SHAを照合し、投稿者が現在の `gh` 認証ユーザーと一致するBriefだけを使う。条件がひとつでも違えば候補を使わずL0のみを返す。旧形式や古いBriefを使う場合は、ローカル側で明示的に再生成する。Cloudでこのコマンドを使うには repository access と `gh` の GitHub API 読み取りが必要。認証または通信が使えない環境ではL1未取得と報告し、候補が届いたと扱わない。
+
+context-relevance は通常のIssue対応で利用する助言層で、正式な品質評価結果・候補順位の正しさ・性能改善を保証しない。`claim-support` や他packの新規採用評価は今回のL1運用の前提ではなく、明示的な別目的が生じた場合に限り扱う。
 
 ### 既存batch入口
 

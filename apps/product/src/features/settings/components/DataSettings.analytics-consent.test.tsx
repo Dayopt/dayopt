@@ -10,6 +10,7 @@ import {
 const accountConsent = vi.hoisted(() => ({ mutateAsync: vi.fn(), setData: vi.fn() }));
 
 vi.mock('next-intl', () => ({
+  useLocale: () => 'en',
   useTranslations: (namespace: string) => (key: string) => `${namespace}.${key}`,
 }));
 
@@ -23,6 +24,7 @@ vi.mock('@/lib/trpc', () => ({
       userSettings: { getAnalyticsConsent: { setData: accountConsent.setData } },
     }),
     userSettings: {
+      get: { useQuery: () => ({ data: undefined }) },
       getAnalyticsConsent: {
         useQuery: () => ({ data: { allowed: false }, isLoading: false, isError: false }),
       },

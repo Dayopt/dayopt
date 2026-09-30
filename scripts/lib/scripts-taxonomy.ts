@@ -269,7 +269,8 @@ export function buildScanContext(repoRoot: string, scriptsDir = 'scripts'): Scan
       repoRoot,
       fs.existsSync(path.join(repoRoot, '.agents/skills')) ? '.agents/skills' : '.claude/skills',
     ),
-    docsFiles: walkFiles(repoRoot, 'docs'),
+    // JSON 等の棚卸し・検証データに含まれる path は実行手順ではない。
+    docsFiles: walkFiles(repoRoot, 'docs', ['.md', '.mdx']),
   };
 }
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { MutationCache, QueryCache, QueryClient } from '@tanstack/react-query';
+import { isCancelledError, MutationCache, QueryCache, QueryClient } from '@tanstack/react-query';
 import { TRPCClientError } from '@trpc/client';
 
 import { isBillingAccessEndedError } from '@/lib/billing/client-access-error';
@@ -61,6 +61,7 @@ export function createAppQueryClient(): QueryClient {
   const queryClient: QueryClient = new QueryClient({
     queryCache: new QueryCache({
       onError: (error) => {
+        if (isCancelledError(error)) return;
         handleAuthError(error);
         if (isBillingAccessEndedError(error))
           void queryClient.invalidateQueries({ queryKey: [['billing', 'getAccess']] });
@@ -72,6 +73,7 @@ export function createAppQueryClient(): QueryClient {
     }),
     mutationCache: new MutationCache({
       onError: (error) => {
+        if (isCancelledError(error)) return;
         handleAuthError(error);
         if (isBillingAccessEndedError(error))
           void queryClient.invalidateQueries({ queryKey: [['billing', 'getAccess']] });
@@ -93,7 +95,12 @@ export function createAppQueryClient(): QueryClient {
         retry: (failureCount, error) => {
           // 認証エラーはリトライしない(すぐにリダイレクト)。rate limit 超過も
           // リトライすると budget を食い潰すだけなので諦める
-          if (isAuthError(error) || isBillingAccessEndedError(error) || isRateLimitedError(error))
+          if (
+            isCancelledError(error) ||
+            isAuthError(error) ||
+            isBillingAccessEndedError(error) ||
+            isRateLimitedError(error)
+          )
             return false;
           // 404もリトライしない
           if (error && 'status' in error && error.status === 404) return false;
@@ -104,12 +111,24 @@ export function createAppQueryClient(): QueryClient {
       mutations: {
         retry: (failureCount, error) => {
           // 認証エラーはリトライしない
-          if (isAuthError(error) || isBillingAccessEndedError(error) || isRateLimitedError(error))
+          if (
+            isCancelledError(error) ||
+            isAuthError(error) ||
+            isBillingAccessEndedError(error) ||
+            isRateLimitedError(error)
+          )
             return false;
           return failureCount < 1;
         },
       },
     },
+  });
+  // 課金状態は外部の解約・支払いで変わるため、一般データの鮮度を継承しない。
+  queryClient.setQueryDefaults([['billing', 'getOverview']], {
+    staleTime: 0,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: 'always',
+    meta: { persist: false },
   });
   return queryClient;
 }
