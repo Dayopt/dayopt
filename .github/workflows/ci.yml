@@ -433,8 +433,9 @@ jobs:
   # validation-evidence の PRODUCERS と ci-job-name-contract.test.ts も直す。
   #
   # migration を追加していない PR では impact の `migrations_added` が空で skip される
-  # （plan 側も not-applicable）。PR では merge commit の第 1 親、手動実行では
-  # origin/main を比較元に使う。両方の ref と履歴を取得する。接続先は CI の Docker だけ。
+  # （plan 側も not-applicable）。GitHub の PR merge ref だけ第 1 親を使い、
+  # 手動 dispatch の通常 branch（main-sync merge commit を含む）では origin/main を
+  # 比較元にする。両方の ref と履歴を取得する。接続先は隔離 CI runner の Docker だけ。
   db-upgrade:
     name: "\U0001F9F1 DB Upgrade (shadow)"
     needs: impact
