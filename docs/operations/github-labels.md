@@ -54,7 +54,7 @@ code: .github/dependabot.yml
 
 旧候補が食い違った 26 件は User が振り分けを承認し、Mission 21 件、Task 3 件（#1524 / #2292 / #72）、Question 2 件（#591 / #590）へ統合した。旧 `type:*` ラベル 8 種類は削除し、`type:board` だけを持っていた 9 件は Type 未設定とした。現行 Type は上記 4 種類のラベルだけを使う。
 
-Priority の値は一度優先度ラベルへ移して照合後、Organization の Priority field と Issue Type 定義 4 種類を削除した。その後、優先度は作業順の判定に使わないと決め、新規付与を停止した。既存値は過去の記録として残し、コードの参照を除いてからラベルをアーカイブする。Workflow status field と Project #3 は最終確認時点で存在しなかった。
+Priority の値は一度優先度ラベルへ移して照合後、Organization の Priority field と Issue Type 定義 4 種類を削除した。その後、優先度は作業順の判定に使わないと決め、ラベルもアーカイブした。既存値は過去の記録として残す。Workflow status field と Project #3 は最終確認時点で存在しなかった。
 
 ## 正規ラベル一覧
 
@@ -90,7 +90,7 @@ Priority の値は一度優先度ラベルへ移して照合後、Organization �
 
 ## アーカイブ済みラベル
 
-`size:*`、`scope:epic`、`risk:authority`、`review:full`、`db:destructive-migration`、`status:ready` はアーカイブ済み。`priority:p0`〜`priority:p3` は新規付与を止め、main の参照を除去した後にアーカイブする。過去の Issue / PR の読み取りにのみ使う。不可逆操作の権限は `AGENTS.md`、重点レビューは実際の変更内容で判断する。
+`priority:p0`〜`priority:p3`、`size:*`、`scope:epic`、`risk:authority`、`review:full`、`db:destructive-migration`、`status:ready` はアーカイブ済み。新規付与せず、過去の Issue / PR の読み取りにのみ使う。不可逆操作の権限は `AGENTS.md`、重点レビューは実際の変更内容で判断する。
 
 ## Dependabot ラベル
 
