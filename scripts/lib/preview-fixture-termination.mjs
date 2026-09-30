@@ -10,7 +10,7 @@ const ERROR = 'Preview fixture database termination is unconfirmed';
  * Trusted recovery caller only, after authenticating the source run/intent.
  * No CLI/HTTP entrypoint; the provider token never reaches candidate code.
  * DELETE acceptance or a missing branch is not a terminal database proof.
- * A positive provider REMOVED observation for the exact project is required.
+ * A positive branch preview_project_status=REMOVED for the exact DB is required.
  * @param {{intent: unknown, token: string, fetchImpl?: typeof fetch,
  * wait?: (duration: number) => Promise<unknown>, elapsed?: () => number}} options
  */
@@ -62,28 +62,36 @@ export async function terminatePreviewFixtureBranch({
         branch.id === bound.supabaseBranchId || branch.project_ref === bound.supabaseProjectRef,
     );
     const branch = matches[0];
+    const owned = (selected) =>
+      selected?.id === bound.supabaseBranchId &&
+      selected.project_ref === bound.supabaseProjectRef &&
+      selected.parent_project_ref === SUPABASE_PRODUCTION_PROJECT_REF &&
+      selected.persistent === false &&
+      selected.is_default === false &&
+      selected.with_data === false &&
+      selected.git_branch === bound.branchName &&
+      selected.pr_number === bound.prNumber;
     if (
       matches.length !== 1 ||
-      branch.id !== bound.supabaseBranchId ||
-      branch.project_ref !== bound.supabaseProjectRef ||
-      branch.parent_project_ref !== SUPABASE_PRODUCTION_PROJECT_REF ||
-      branch.persistent !== false ||
-      branch.is_default !== false ||
-      branch.with_data !== false ||
-      branch.git_branch !== bound.branchName ||
-      branch.pr_number !== bound.prNumber
+      !owned(branch) ||
+      typeof branch.name !== 'string' ||
+      !/^[A-Za-z0-9][A-Za-z0-9_./-]{0,127}$/.test(branch.name)
     )
       throw new Error();
     const observe = async () => {
-      const project = await request(`projects/${bound.supabaseProjectRef}`);
+      // Preview projects are not necessarily visible through /projects/{ref}.
+      // Use the documented parent-project branch API and recheck full ownership
+      // on every observation, including the positive terminal response.
+      const selected = await request(
+        `projects/${SUPABASE_PRODUCTION_PROJECT_REF}/branches/${encodeURIComponent(branch.name)}`,
+      );
       if (
-        !project ||
-        project.ref !== bound.supabaseProjectRef ||
-        project.id !== bound.supabaseProjectRef ||
-        typeof project.status !== 'string'
+        !owned(selected) ||
+        selected.name !== branch.name ||
+        typeof selected.preview_project_status !== 'string'
       )
         throw new Error();
-      return project.status;
+      return selected.preview_project_status;
     };
     // Verify that the token can positively observe the same DB before deletion.
     const before = await observe();

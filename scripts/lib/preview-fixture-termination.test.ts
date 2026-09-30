@@ -27,6 +27,7 @@ const intent = {
   },
 };
 const branch = {
+  name: 'pr-2954-preview',
   id: intent.request.supabaseBranchId,
   project_ref: intent.request.supabaseProjectRef,
   parent_project_ref: 'yvglwblxrnrenfifsnje',
@@ -40,9 +41,9 @@ function world() {
   let ticks = 0;
   const queue = [
     Response.json([branch]),
-    Response.json({ id: 'abcdefghijklmnopqrst', ref: 'abcdefghijklmnopqrst', status: 'UNKNOWN' }),
+    Response.json({ ...branch, preview_project_status: 'UNKNOWN' }),
     Response.json({ message: 'ok' }),
-    Response.json({ id: 'abcdefghijklmnopqrst', ref: 'abcdefghijklmnopqrst', status: 'REMOVED' }),
+    Response.json({ ...branch, preview_project_status: 'REMOVED' }),
   ];
   const fetchImpl = vi.fn<typeof fetch>(async (_url, _init) => {
     const result = queue.shift();
@@ -78,12 +79,12 @@ describe('owned Preview database termination', () => {
     });
     expect(w.fetchImpl.mock.calls.map(([url, init]) => [url, init?.method])).toEqual([
       ['https://api.supabase.com/v1/projects/yvglwblxrnrenfifsnje/branches', 'GET'],
-      ['https://api.supabase.com/v1/projects/abcdefghijklmnopqrst', 'GET'],
+      ['https://api.supabase.com/v1/projects/yvglwblxrnrenfifsnje/branches/pr-2954-preview', 'GET'],
       [
         'https://api.supabase.com/v1/branches/33333333-3333-4333-8333-333333333333?force=true',
         'DELETE',
       ],
-      ['https://api.supabase.com/v1/projects/abcdefghijklmnopqrst', 'GET'],
+      ['https://api.supabase.com/v1/projects/yvglwblxrnrenfifsnje/branches/pr-2954-preview', 'GET'],
     ]);
     for (const [, init] of w.fetchImpl.mock.calls) {
       expect(init?.redirect).toBe('error');
@@ -161,9 +162,8 @@ describe('owned Preview database termination', () => {
       1,
       ...Array.from({ length: 30 }, () =>
         Response.json({
-          id: 'abcdefghijklmnopqrst',
-          ref: 'abcdefghijklmnopqrst',
-          status: 'GOING_DOWN',
+          ...branch,
+          preview_project_status: 'GOING_DOWN',
         }),
       ),
     );
@@ -177,7 +177,25 @@ describe('owned Preview database termination', () => {
   // Protects against the provider returning a different project after DELETE.
   it('rejects mismatched terminal project identity', async () => {
     const w = world();
-    w.queue[3] = Response.json({ id: 'foreign', ref: 'foreign', status: 'REMOVED' });
+    w.queue[3] = Response.json({
+      ...branch,
+      project_ref: 'foreign',
+      preview_project_status: 'REMOVED',
+    });
+    await expect(terminatePreviewFixtureBranch(w.options)).rejects.toThrow(
+      'termination is unconfirmed',
+    );
+  });
+
+  it.each([
+    { name: 'foreign' },
+    { persistent: true },
+    { git_branch: 'codex/foreign' },
+    { pr_number: 999 },
+    { parent_project_ref: 'bbbbbbbbbbbbbbbbbbbb' },
+  ])('rejects terminal branch ownership drift: %j', async (change) => {
+    const w = world();
+    w.queue[3] = Response.json({ ...branch, ...change, preview_project_status: 'REMOVED' });
     await expect(terminatePreviewFixtureBranch(w.options)).rejects.toThrow(
       'termination is unconfirmed',
     );
