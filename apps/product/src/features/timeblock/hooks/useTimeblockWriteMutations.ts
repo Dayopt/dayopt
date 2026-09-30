@@ -291,7 +291,10 @@ export function useTimeblockWriteMutations(options: UseTimeblockWriteMutationsOp
 
   const reportError = (error: { message: string }) => {
     toast.error(
-      temporalRuleMessage(error) ??
+      (getTimeblockServiceCode(error) === 'EXTERNAL_CALENDAR_ALREADY_CONVERTED'
+        ? t('toast.externalCalendarAlreadyConverted')
+        : undefined) ??
+        temporalRuleMessage(error) ??
         (isTimeblockOverlapError(error)
           ? t('toast.overlap')
           : isTimeblockStaleError(error)
@@ -482,7 +485,14 @@ export function useTimeblockWriteMutations(options: UseTimeblockWriteMutationsOp
   });
 
   const reportDeleteError = () => toast.error(t('toast.deleteFailed'));
-  const reportRestoreError = () => toast.error(t('toast.restoreFailed'));
+  const reportRestoreError = (error: unknown) =>
+    toast.error(
+      getTimeblockServiceCode(error) === 'EXTERNAL_CALENDAR_ALREADY_CONVERTED'
+        ? t('toast.externalCalendarRestoreConflict')
+        : getTimeblockServiceCode(error) === 'TIME_OVERLAP'
+          ? t('toast.overlap')
+          : t('toast.restoreFailed'),
+    );
 
   const deletePlan = api.planCommands.delete.useMutation({
     retry: false,
@@ -525,9 +535,9 @@ export function useTimeblockWriteMutations(options: UseTimeblockWriteMutationsOp
       insertIntoMatchingLists('plans', restored);
       utils.plans.getById.setData({ id: restored.id }, restored);
     },
-    onError: (_error, _input, context) => {
+    onError: (error, _input, context) => {
       restore(context);
-      reportRestoreError();
+      reportRestoreError(error);
     },
     onSettled: invalidate,
   });
@@ -539,9 +549,9 @@ export function useTimeblockWriteMutations(options: UseTimeblockWriteMutationsOp
       insertIntoMatchingLists('records', restored);
       utils.records.getById.setData({ id: restored.id }, restored);
     },
-    onError: (_error, _input, context) => {
+    onError: (error, _input, context) => {
       restore(context);
-      reportRestoreError();
+      reportRestoreError(error);
     },
     onSettled: invalidate,
   });

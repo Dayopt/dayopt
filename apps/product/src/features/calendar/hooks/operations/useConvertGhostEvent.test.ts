@@ -165,16 +165,20 @@ describe('useConvertGhostEvent — convertGhost', () => {
     });
   });
 
-  it('失敗時、ghost 一覧を invalidate してエラー toast を出す', () => {
-    const { result } = renderHook(() => useConvertGhostEvent());
-    result.current.convertGhost(FUTURE_EVENT);
+  it.each([FUTURE_EVENT, PAST_EVENT])(
+    '変換失敗時はghostを再取得し、共有mutationの通知を重ねない（$id）',
+    (event) => {
+      const { result } = renderHook(() => useConvertGhostEvent());
+      result.current.convertGhost(event);
 
-    const [, options] = lastCallArgs(createPlanMutate) as [unknown, { onError: () => void }];
-    options.onError();
+      const mutation = event === FUTURE_EVENT ? createPlanMutate : createRecordMutate;
+      const [, options] = lastCallArgs(mutation) as [unknown, { onError: () => void }];
+      options.onError();
 
-    expect(listEventsInvalidate).toHaveBeenCalled();
-    expect(toastError).toHaveBeenCalledWith('calendar.external.toast.convertFailed');
-  });
+      expect(listEventsInvalidate).toHaveBeenCalledTimes(1);
+      expect(toastError).not.toHaveBeenCalled();
+    },
+  );
 });
 
 describe('useConvertGhostEvent — dismissGhost', () => {
