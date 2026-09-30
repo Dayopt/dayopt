@@ -36,7 +36,7 @@ repo調査、対象内の可逆修正、テスト、commit、必要なpush/Draft
 
 ## 現在確認した境界
 
-- `routing` はread-only + repository scopeをruntimeで強制できないdelegateを禁止。利用可能なnative collaborationは同じ全権限環境を共有するため使用していない。Luna利用自体はユーザー許可済みだが、runtime境界を満たす経路は未確認。規則は変更していない。
+- `routing` はread-only + repository scopeをruntimeで強制できないdelegateを禁止。開始時は委譲せず、2026-09-30の実測後にユーザーがこの監査限定のCLI read-only/repository読み取りscope例外を明示承認した。書き込み拒否を実測した通常read-only経路のみ使う。repo外read拒否は保証できず、固定SHAの限定ソースsnapshot・外部/秘密アクセス禁止の指示は防止策であってruntime保証ではない。native全権限共有は引き続き使わない。共通routing規則自体は変更していない。
 - Node実測: 既定v26.5.0、`.nvmrc`は24、`/opt/homebrew/opt/node@24/bin/node`あり。検証ではNode24を使う。
 - 開始時open PR: #2957 / #2956 / #2954 / #2937 / #2926 / #2903 / #2833 / #2670。Cloud Preview、GitHubラベル、schema/OAuth、外部calendar、法務、billing公開表示の変更と衝突させない。API取得時点のsnapshotであり完了証拠ではない。
 - #2958 はStorybook開発基盤の別Mission。#2910はCloud Preview環境。関連作業は本文・ctxから再確認してから扱う。
@@ -505,3 +505,35 @@ F056は同イベントでも再送時DB言語取得失敗でja→enになり、�
 次はメール運用のDMARC現在説明、READMEの生成数/共有依存の旧説明、TrialStartのlegacy到達性を現行通知service→mailer→翻訳/HTML→provider/claim/抑止まで照合する。未採用候補に削除/顧客変更を混ぜていない。クラウド境界/その他2471未確認も継続対象。自分の修正SHA/読解SHA/公開headを区別し、別worktree/Productionを変更していない。
 
 文書検査は最初にpassword-reset journeyの旧24h locatorを検出してexit1。正本のembeddedJSON3項目だけを更新しlearn:generateでjourney/逆引き資料を生成、docs:check最終exit0（/tmp/dayopt-audit-email-docs-final.log）。journey1322行は部分読解で基準未確認のまま。Auth auditorのmailer_otp_exp expected3600/fail-openはsource locatorとして確認、Production現在値を取得した証拠ではない。次の全文読解はこのjourneyと659行のAuth auditorを優先する。
+
+## 実行方法の再編 — 2026-09-30
+
+ユーザーの追加指示により、監査目的・完了条件・基準3141path・全文対象を維持し、逐次候補対応からまとまった読解と照合へ変更。再開SHA966dc3759fc4b8041be4b969c292ad9fef206ef2は既にpush済み、Draft2965の公開headもAPI照合済み。F055のproduct検証SHAf18c17b2d/7763成功、記録・docs補正/正常pre-pushの公開SHA966dcを区別し、同じ差分の成功済み検査は再実行していない。未公開差分は今回の監査記録のみ。F056/2992の判断待ちは独立作業を止めない。
+
+### バッチと主担当の統合責任
+
+未確認pathは既存inventoryのmethodと生成元・責務・利用先から束ねる。主な照合束は(1)時間/外部calendar/状態更新/DB/MCP、(2)identity/session/権限/billing/所有権、(3)問い合わせ/Auth/メール配送/locale/再送/署名/抑止、(4)公開Web/docs/翻訳/公開契約、(5)UI基盤/状態/store/shared package、(6)CI/検査script/agent規則/deployment/移行。束の外にある第一者ソースも残したまま後続へ割り当てる。辞書・Story・テスト・設定をコードと同じ束に含め、責務の違いを削除理由にしない。
+
+- 読解担当には固定SHA、明示path manifest、問い、読解のみの権限、全行範囲/欠落/候補/反証/不足する他層を渡す。生成物は生成元の全文読解と既存generator/構造/依存/差分検査で閉じる。未読を生成物/除外へ付け替えない。
+- 主担当は担当の原文取得ログとblobを検査し、重大候補は関連原文に戻って裁定する。候補ごとに即修正へ切り替えず、同原因を蓄積し、契約を閉じてから最小修正と対象red/greenをまとめる。編集者は主担当のみ。
+- 全体pnpm checkは挙動修正を統合した節目、必要な新upstream差分、必須ready/pre-push経路で行う。読解や候補の追加だけでは繰り返さない。Issue化は修正完了に数えない。
+
+### 委譲の実測と承認境界
+
+通常codex sandbox read-onlyで合成tempへのwriteを拒否した。custom filesystem profileはrepo外canary read/symlink escape/temp writeを許し、通常read-onlyと組み合わせてもtemp writeを許したため使用しない。repo実pathの拒否一例や接続先のないcurl失敗をscope/network保証と解釈しない。ユーザーは「限定例外を承認（推奨）」と明示回答した。通常CLI read-onlyだけを使い、repo外readは技術的に禁止できない危険を残す。全権限nativeは例外の対象ではない。
+
+CLI login statusはChatGPT利用経路と確認。--ignore-user-config/--ephemeral/--sandbox read-only、web_search disabled、shell env inherit none。既存Codex利用枠のLuna、固定966dcの秘密を含まない明示pathだけをsnapshotへ渡し、credentials/env/private filesを渡さない。workerには外部read/network/apps/編集/test/git/再委譲を禁止するが、これはruntime保証と別物。CLI認証は既存CODEX_HOMEを使うため個人file/credentialへの指示違反read危険は残る。プラットフォーム既定skill説明がworkerへ提示されることもあり、ユーザーconfig無視を「全外部toolが技術的に無効」とは報告しない。
+
+workerはCLIの継続exec sessionで実行。最初の短命Python親からのPopenはsession終了後に消え、読解0として通常sessionで起動し直した。失敗起動を読了に数えていない。実行ログと結果はlocal /private/tmp/dayopt-audit-reading-o_htqv3s、主担当照合script /tmp/dayopt-audit-validate-worker-reads.py。共有repo/DB/worktreeへのworker編集なし。
+
+### 最初の実測と残工数の扱い
+
+親のContact16 files/62437bytesは06:17:15–06:18:01 UTC、全文提示+初期追跡46秒。Luna2担当はsnapshot準備06:24:28から最終出力06:26:37まで約129秒（失敗起動と再起動の費用も含む）：Web contact9 files/52465bytes、Resend境界8 files/47998bytes、合計17 files/100463bytes。主担当は全原文行が正常command出力へ含まれることを機械照合し、17件欠落なし/基準blob一致、実際の完了turnを確認。取得速度だけで理解・安全・完了時刻を算出しない。独立したSQL/Redis責務の次バッチ7 files/47969bytesを追加して難度差を測っている。
+
+再編時の未確認全文は16715918bytes、機械候補は9075690bytes。これは残工数の割合ではない。暫定の残工数は**主担当の稼働15–30時間＋外部判断/隔離環境の待ち時間**を幅のある作業予算とする（低確度、完了予定ではない）。単純なUI/配送束の速度は良いが、支配的な難所はSQL移行の最終有効状態、時間/DST/競合、権限/billing/MCP公開契約、検査の誤検知/未検出、既存所見の隔離実行。残る複雑な束の実測で再見積もりする。ファイル件数の線形外挿ではなく、並列読解の実測と主担当に残る照合・修正・統合の依存から判断する。アクセス/人間待ちが未解決なら全体完了とはしない。
+
+親20＋delegate17の37 baseline全文を追加し、699 full/8 mechanical/2434 unverified。全3141pathを保全、status降格/対象除外なし。新しい読解だけで挙動変更や実環境検証は主張しない。次はRedis/DB束の原文coverage確認とContact仕様の他層照合、同原因候補の蓄積、残る時間/権限/公開Web/CI束へ継続する。
+
+保存層バッチの追記: Luna7件/47969bytesも完了し、全原文chunk/行の取得ログ、baseline/current blob、読解SHA966dcを主担当照合。SQLはcreation→June falseRLS→July grants復元→August browser grants撤回の順を確認し、service role DML維持/column権限検査を読んだ。現在配信DBの値は別で未観測。Product/Web maxDuration30/15秒はいずれもlease300秒より短く、通常経路で5分超lease takeoverを起こす新bugは未採用。親20+delegate24=44件の新baseline全文、706 full/8 mechanical/2427 unverified。全3141path/方法を保全。既存Auth auditorはinventory上すでにfullだったため今回の追加件数へ含めない。継続summaryの「未昇格」と実台帳の食い違いは実台帳を確認して訂正した。
+
+実測の難度補足: 保存層7件/47969bytesは06:28:45の起動から06:30:40の完了まで約115秒（local filesystem時刻）。原文全行とSQL順序が読めても、実DB権限・Redis Lua競合・外部保持期間の観測までは証明しない。上記15–30時間は低確度の稼働予算であり、外部環境待ちを含むカレンダー上の締切ではない。

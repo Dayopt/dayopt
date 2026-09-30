@@ -1194,10 +1194,12 @@
       "mode": "100644",
       "bytes": 751,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 22]],
+      "evidence": [
+        "Parent full untruncated bounded read at 966dc3759fc4b8041be4b969c292ad9fef206ef2; exact baseline/current blob and byte equality checked. Contact feature sixteen files, dictionaries/spec/journey Contact journey1-160/161-320/321-480/481-640/641-779 includes canonical JSON, not just generated prose. No test rerun or runtime/cloud claim."
+      ],
       "questions": []
     },
     {
@@ -1389,10 +1391,12 @@
       "mode": "100644",
       "bytes": 890,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 22]],
+      "evidence": [
+        "Parent full untruncated bounded read at 966dc3759fc4b8041be4b969c292ad9fef206ef2; exact baseline/current blob and byte equality checked. Contact feature sixteen files, dictionaries/spec/journey Contact journey1-160/161-320/321-480/481-640/641-779 includes canonical JSON, not just generated prose. No test rerun or runtime/cloud claim."
+      ],
       "questions": []
     },
     {
@@ -5123,10 +5127,12 @@
       "mode": "100644",
       "bytes": 14363,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 371]],
+      "evidence": [
+        "Fixed read SHA 966dc3759fc4b8041be4b969c292ad9fef206ef2; approved CLI read-only Luna lane resend-receipts. Parent verified every original numbered line in successful command output, no missing/truncated ranges, manifest/blob/byte equality and actual completed turn. Local transcript /private/tmp/dayopt-audit-reading-o_htqv3s/resend-receipts.events.jsonl; report and line receipts beside it. Parent owns cross-layer adjudication; no tests/cloud operation by worker."
+      ],
       "questions": []
     },
     {
@@ -5136,10 +5142,12 @@
       "mode": "100644",
       "bytes": 12096,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 343]],
+      "evidence": [
+        "Fixed read SHA 966dc3759fc4b8041be4b969c292ad9fef206ef2; approved CLI read-only Luna lane resend-receipts. Parent verified every original numbered line in successful command output, no missing/truncated ranges, manifest/blob/byte equality and actual completed turn. Local transcript /private/tmp/dayopt-audit-reading-o_htqv3s/resend-receipts.events.jsonl; report and line receipts beside it. Parent owns cross-layer adjudication; no tests/cloud operation by worker."
+      ],
       "questions": []
     },
     {
@@ -11820,10 +11828,12 @@
       "mode": "100644",
       "bytes": 3056,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 68]],
+      "evidence": [
+        "Parent full untruncated bounded read at 966dc3759fc4b8041be4b969c292ad9fef206ef2; exact baseline/current blob and byte equality checked. Contact feature sixteen files, dictionaries/spec/journey Contact journey1-160/161-320/321-480/481-640/641-779 includes canonical JSON, not just generated prose. No test rerun or runtime/cloud claim."
+      ],
       "questions": []
     },
     {
@@ -11833,10 +11843,12 @@
       "mode": "100644",
       "bytes": 2566,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 70]],
+      "evidence": [
+        "Parent full untruncated bounded read at 966dc3759fc4b8041be4b969c292ad9fef206ef2; exact baseline/current blob and byte equality checked. Contact feature sixteen files, dictionaries/spec/journey Contact journey1-160/161-320/321-480/481-640/641-779 includes canonical JSON, not just generated prose. No test rerun or runtime/cloud claim."
+      ],
       "questions": []
     },
     {
@@ -11846,10 +11858,12 @@
       "mode": "100644",
       "bytes": 3322,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 108]],
+      "evidence": [
+        "Parent full untruncated bounded read at 966dc3759fc4b8041be4b969c292ad9fef206ef2; exact baseline/current blob and byte equality checked. Contact feature sixteen files, dictionaries/spec/journey Contact journey1-160/161-320/321-480/481-640/641-779 includes canonical JSON, not just generated prose. No test rerun or runtime/cloud claim."
+      ],
       "questions": []
     },
     {
@@ -11859,10 +11873,12 @@
       "mode": "100644",
       "bytes": 5515,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 158]],
+      "evidence": [
+        "Parent full untruncated bounded read at 966dc3759fc4b8041be4b969c292ad9fef206ef2; exact baseline/current blob and byte equality checked. Contact feature sixteen files, dictionaries/spec/journey Contact journey1-160/161-320/321-480/481-640/641-779 includes canonical JSON, not just generated prose. No test rerun or runtime/cloud claim."
+      ],
       "questions": []
     },
     {
@@ -11872,10 +11888,12 @@
       "mode": "100644",
       "bytes": 5158,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 150]],
+      "evidence": [
+        "Parent full untruncated bounded read at 966dc3759fc4b8041be4b969c292ad9fef206ef2; exact baseline/current blob and byte equality checked. Contact feature sixteen files, dictionaries/spec/journey Contact journey1-160/161-320/321-480/481-640/641-779 includes canonical JSON, not just generated prose. No test rerun or runtime/cloud claim."
+      ],
       "questions": []
     },
     {
@@ -11885,10 +11903,12 @@
       "mode": "100644",
       "bytes": 6993,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 251]],
+      "evidence": [
+        "Parent full untruncated bounded read at 966dc3759fc4b8041be4b969c292ad9fef206ef2; exact baseline/current blob and byte equality checked. Contact feature sixteen files, dictionaries/spec/journey Contact journey1-160/161-320/321-480/481-640/641-779 includes canonical JSON, not just generated prose. No test rerun or runtime/cloud claim."
+      ],
       "questions": []
     },
     {
@@ -11898,10 +11918,12 @@
       "mode": "100644",
       "bytes": 1048,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 19]],
+      "evidence": [
+        "Parent full untruncated bounded read at 966dc3759fc4b8041be4b969c292ad9fef206ef2; exact baseline/current blob and byte equality checked. Contact feature sixteen files, dictionaries/spec/journey Contact journey1-160/161-320/321-480/481-640/641-779 includes canonical JSON, not just generated prose. No test rerun or runtime/cloud claim."
+      ],
       "questions": []
     },
     {
@@ -11911,10 +11933,12 @@
       "mode": "100644",
       "bytes": 4296,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 138]],
+      "evidence": [
+        "Parent full untruncated bounded read at 966dc3759fc4b8041be4b969c292ad9fef206ef2; exact baseline/current blob and byte equality checked. Contact feature sixteen files, dictionaries/spec/journey Contact journey1-160/161-320/321-480/481-640/641-779 includes canonical JSON, not just generated prose. No test rerun or runtime/cloud claim."
+      ],
       "questions": []
     },
     {
@@ -11924,10 +11948,12 @@
       "mode": "100644",
       "bytes": 2137,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 70]],
+      "evidence": [
+        "Parent full untruncated bounded read at 966dc3759fc4b8041be4b969c292ad9fef206ef2; exact baseline/current blob and byte equality checked. Contact feature sixteen files, dictionaries/spec/journey Contact journey1-160/161-320/321-480/481-640/641-779 includes canonical JSON, not just generated prose. No test rerun or runtime/cloud claim."
+      ],
       "questions": []
     },
     {
@@ -11937,10 +11963,12 @@
       "mode": "100644",
       "bytes": 3320,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 99]],
+      "evidence": [
+        "Parent full untruncated bounded read at 966dc3759fc4b8041be4b969c292ad9fef206ef2; exact baseline/current blob and byte equality checked. Contact feature sixteen files, dictionaries/spec/journey Contact journey1-160/161-320/321-480/481-640/641-779 includes canonical JSON, not just generated prose. No test rerun or runtime/cloud claim."
+      ],
       "questions": []
     },
     {
@@ -11950,10 +11978,12 @@
       "mode": "100644",
       "bytes": 857,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 29]],
+      "evidence": [
+        "Parent full untruncated bounded read at 966dc3759fc4b8041be4b969c292ad9fef206ef2; exact baseline/current blob and byte equality checked. Contact feature sixteen files, dictionaries/spec/journey Contact journey1-160/161-320/321-480/481-640/641-779 includes canonical JSON, not just generated prose. No test rerun or runtime/cloud claim."
+      ],
       "questions": []
     },
     {
@@ -11963,10 +11993,12 @@
       "mode": "100644",
       "bytes": 12741,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 347]],
+      "evidence": [
+        "Parent full untruncated bounded read at 966dc3759fc4b8041be4b969c292ad9fef206ef2; exact baseline/current blob and byte equality checked. Contact feature sixteen files, dictionaries/spec/journey Contact journey1-160/161-320/321-480/481-640/641-779 includes canonical JSON, not just generated prose. No test rerun or runtime/cloud claim."
+      ],
       "questions": []
     },
     {
@@ -11976,10 +12008,12 @@
       "mode": "100644",
       "bytes": 5756,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 189]],
+      "evidence": [
+        "Parent full untruncated bounded read at 966dc3759fc4b8041be4b969c292ad9fef206ef2; exact baseline/current blob and byte equality checked. Contact feature sixteen files, dictionaries/spec/journey Contact journey1-160/161-320/321-480/481-640/641-779 includes canonical JSON, not just generated prose. No test rerun or runtime/cloud claim."
+      ],
       "questions": []
     },
     {
@@ -11989,10 +12023,12 @@
       "mode": "100644",
       "bytes": 2501,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 80]],
+      "evidence": [
+        "Parent full untruncated bounded read at 966dc3759fc4b8041be4b969c292ad9fef206ef2; exact baseline/current blob and byte equality checked. Contact feature sixteen files, dictionaries/spec/journey Contact journey1-160/161-320/321-480/481-640/641-779 includes canonical JSON, not just generated prose. No test rerun or runtime/cloud claim."
+      ],
       "questions": []
     },
     {
@@ -12002,10 +12038,12 @@
       "mode": "100644",
       "bytes": 2661,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 92]],
+      "evidence": [
+        "Parent full untruncated bounded read at 966dc3759fc4b8041be4b969c292ad9fef206ef2; exact baseline/current blob and byte equality checked. Contact feature sixteen files, dictionaries/spec/journey Contact journey1-160/161-320/321-480/481-640/641-779 includes canonical JSON, not just generated prose. No test rerun or runtime/cloud claim."
+      ],
       "questions": []
     },
     {
@@ -12015,10 +12053,12 @@
       "mode": "100644",
       "bytes": 510,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 14]],
+      "evidence": [
+        "Parent full untruncated bounded read at 966dc3759fc4b8041be4b969c292ad9fef206ef2; exact baseline/current blob and byte equality checked. Contact feature sixteen files, dictionaries/spec/journey Contact journey1-160/161-320/321-480/481-640/641-779 includes canonical JSON, not just generated prose. No test rerun or runtime/cloud claim."
+      ],
       "questions": []
     },
     {
@@ -20001,10 +20041,12 @@
       "mode": "100644",
       "bytes": 10320,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 270]],
+      "evidence": [
+        "Approved CLI read-only Luna mail-storage-policy lane at fixed966dc3759fc4b8041be4b969c292ad9fef206ef2. Parent verifies complete original chunks or numbered lines in successful logged output, manifest and baseline/current blob equality, no gaps/truncation. Local transcript/report/coverage checks /private/tmp/dayopt-audit-reading-o_htqv3s/mail-storage-policy.*. Parent cross-checks route maxDuration30/15s vs300s lease, lowercase normalization and ordered grants; no live Redis/DB proof."
+      ],
       "questions": []
     },
     {
@@ -20014,10 +20056,12 @@
       "mode": "100644",
       "bytes": 20285,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 547]],
+      "evidence": [
+        "Approved CLI read-only Luna mail-storage-policy lane at fixed966dc3759fc4b8041be4b969c292ad9fef206ef2. Parent verifies complete original chunks or numbered lines in successful logged output, manifest and baseline/current blob equality, no gaps/truncation. Local transcript/report/coverage checks /private/tmp/dayopt-audit-reading-o_htqv3s/mail-storage-policy.*. Parent cross-checks route maxDuration30/15s vs300s lease, lowercase normalization and ordered grants; no live Redis/DB proof."
+      ],
       "questions": []
     },
     {
@@ -22609,10 +22653,12 @@
       "mode": "100644",
       "bytes": 1786,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 60]],
+      "evidence": [
+        "Fixed read SHA 966dc3759fc4b8041be4b969c292ad9fef206ef2; approved CLI read-only Luna lane resend-receipts. Parent verified every original numbered line in successful command output, no missing/truncated ranges, manifest/blob/byte equality and actual completed turn. Local transcript /private/tmp/dayopt-audit-reading-o_htqv3s/resend-receipts.events.jsonl; report and line receipts beside it. Parent owns cross-layer adjudication; no tests/cloud operation by worker."
+      ],
       "questions": []
     },
     {
@@ -22622,10 +22668,12 @@
       "mode": "100644",
       "bytes": 1255,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 42]],
+      "evidence": [
+        "Fixed read SHA 966dc3759fc4b8041be4b969c292ad9fef206ef2; approved CLI read-only Luna lane resend-receipts. Parent verified every original numbered line in successful command output, no missing/truncated ranges, manifest/blob/byte equality and actual completed turn. Local transcript /private/tmp/dayopt-audit-reading-o_htqv3s/resend-receipts.events.jsonl; report and line receipts beside it. Parent owns cross-layer adjudication; no tests/cloud operation by worker."
+      ],
       "questions": []
     },
     {
@@ -25688,10 +25736,12 @@
       "mode": "100644",
       "bytes": 3067,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 87]],
+      "evidence": [
+        "Fixed read SHA 966dc3759fc4b8041be4b969c292ad9fef206ef2; approved CLI read-only Luna lane web-contact. Parent verified every original numbered line in successful command output, no missing/truncated ranges, manifest/blob/byte equality and actual completed turn. Local transcript /private/tmp/dayopt-audit-reading-o_htqv3s/web-contact.events.jsonl; report and line receipts beside it. Parent owns cross-layer adjudication; no tests/cloud operation by worker."
+      ],
       "questions": []
     },
     {
@@ -25701,10 +25751,12 @@
       "mode": "100644",
       "bytes": 1327,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 43]],
+      "evidence": [
+        "Fixed read SHA 966dc3759fc4b8041be4b969c292ad9fef206ef2; approved CLI read-only Luna lane web-contact. Parent verified every original numbered line in successful command output, no missing/truncated ranges, manifest/blob/byte equality and actual completed turn. Local transcript /private/tmp/dayopt-audit-reading-o_htqv3s/web-contact.events.jsonl; report and line receipts beside it. Parent owns cross-layer adjudication; no tests/cloud operation by worker."
+      ],
       "questions": []
     },
     {
@@ -25714,10 +25766,12 @@
       "mode": "100644",
       "bytes": 6199,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 165]],
+      "evidence": [
+        "Fixed read SHA 966dc3759fc4b8041be4b969c292ad9fef206ef2; approved CLI read-only Luna lane web-contact. Parent verified every original numbered line in successful command output, no missing/truncated ranges, manifest/blob/byte equality and actual completed turn. Local transcript /private/tmp/dayopt-audit-reading-o_htqv3s/web-contact.events.jsonl; report and line receipts beside it. Parent owns cross-layer adjudication; no tests/cloud operation by worker."
+      ],
       "questions": []
     },
     {
@@ -25727,10 +25781,12 @@
       "mode": "100644",
       "bytes": 10468,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 293]],
+      "evidence": [
+        "Fixed read SHA 966dc3759fc4b8041be4b969c292ad9fef206ef2; approved CLI read-only Luna lane web-contact. Parent verified every original numbered line in successful command output, no missing/truncated ranges, manifest/blob/byte equality and actual completed turn. Local transcript /private/tmp/dayopt-audit-reading-o_htqv3s/web-contact.events.jsonl; report and line receipts beside it. Parent owns cross-layer adjudication; no tests/cloud operation by worker."
+      ],
       "questions": []
     },
     {
@@ -25740,10 +25796,12 @@
       "mode": "100644",
       "bytes": 2545,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 75]],
+      "evidence": [
+        "Fixed read SHA 966dc3759fc4b8041be4b969c292ad9fef206ef2; approved CLI read-only Luna lane web-contact. Parent verified every original numbered line in successful command output, no missing/truncated ranges, manifest/blob/byte equality and actual completed turn. Local transcript /private/tmp/dayopt-audit-reading-o_htqv3s/web-contact.events.jsonl; report and line receipts beside it. Parent owns cross-layer adjudication; no tests/cloud operation by worker."
+      ],
       "questions": []
     },
     {
@@ -26117,10 +26175,12 @@
       "mode": "100644",
       "bytes": 6170,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 174]],
+      "evidence": [
+        "Fixed read SHA 966dc3759fc4b8041be4b969c292ad9fef206ef2; approved CLI read-only Luna lane web-contact. Parent verified every original numbered line in successful command output, no missing/truncated ranges, manifest/blob/byte equality and actual completed turn. Local transcript /private/tmp/dayopt-audit-reading-o_htqv3s/web-contact.events.jsonl; report and line receipts beside it. Parent owns cross-layer adjudication; no tests/cloud operation by worker."
+      ],
       "questions": []
     },
     {
@@ -26130,10 +26190,12 @@
       "mode": "100644",
       "bytes": 3818,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 117]],
+      "evidence": [
+        "Fixed read SHA 966dc3759fc4b8041be4b969c292ad9fef206ef2; approved CLI read-only Luna lane web-contact. Parent verified every original numbered line in successful command output, no missing/truncated ranges, manifest/blob/byte equality and actual completed turn. Local transcript /private/tmp/dayopt-audit-reading-o_htqv3s/web-contact.events.jsonl; report and line receipts beside it. Parent owns cross-layer adjudication; no tests/cloud operation by worker."
+      ],
       "questions": []
     },
     {
@@ -26143,10 +26205,12 @@
       "mode": "100644",
       "bytes": 10630,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 274]],
+      "evidence": [
+        "Fixed read SHA 966dc3759fc4b8041be4b969c292ad9fef206ef2; approved CLI read-only Luna lane web-contact. Parent verified every original numbered line in successful command output, no missing/truncated ranges, manifest/blob/byte equality and actual completed turn. Local transcript /private/tmp/dayopt-audit-reading-o_htqv3s/web-contact.events.jsonl; report and line receipts beside it. Parent owns cross-layer adjudication; no tests/cloud operation by worker."
+      ],
       "questions": []
     },
     {
@@ -26156,10 +26220,12 @@
       "mode": "100644",
       "bytes": 8241,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 227]],
+      "evidence": [
+        "Fixed read SHA 966dc3759fc4b8041be4b969c292ad9fef206ef2; approved CLI read-only Luna lane web-contact. Parent verified every original numbered line in successful command output, no missing/truncated ranges, manifest/blob/byte equality and actual completed turn. Local transcript /private/tmp/dayopt-audit-reading-o_htqv3s/web-contact.events.jsonl; report and line receipts beside it. Parent owns cross-layer adjudication; no tests/cloud operation by worker."
+      ],
       "questions": []
     },
     {
@@ -26299,10 +26365,12 @@
       "mode": "100644",
       "bytes": 7382,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 196]],
+      "evidence": [
+        "Fixed read SHA 966dc3759fc4b8041be4b969c292ad9fef206ef2; approved CLI read-only Luna lane resend-receipts. Parent verified every original numbered line in successful command output, no missing/truncated ranges, manifest/blob/byte equality and actual completed turn. Local transcript /private/tmp/dayopt-audit-reading-o_htqv3s/resend-receipts.events.jsonl; report and line receipts beside it. Parent owns cross-layer adjudication; no tests/cloud operation by worker."
+      ],
       "questions": []
     },
     {
@@ -26312,10 +26380,12 @@
       "mode": "100644",
       "bytes": 6265,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 187]],
+      "evidence": [
+        "Fixed read SHA 966dc3759fc4b8041be4b969c292ad9fef206ef2; approved CLI read-only Luna lane resend-receipts. Parent verified every original numbered line in successful command output, no missing/truncated ranges, manifest/blob/byte equality and actual completed turn. Local transcript /private/tmp/dayopt-audit-reading-o_htqv3s/resend-receipts.events.jsonl; report and line receipts beside it. Parent owns cross-layer adjudication; no tests/cloud operation by worker."
+      ],
       "questions": []
     },
     {
@@ -28058,10 +28128,12 @@
       "mode": "100644",
       "bytes": 1859,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 48]],
+      "evidence": [
+        "Fixed read SHA 966dc3759fc4b8041be4b969c292ad9fef206ef2; approved CLI read-only Luna lane resend-receipts. Parent verified every original numbered line in successful command output, no missing/truncated ranges, manifest/blob/byte equality and actual completed turn. Local transcript /private/tmp/dayopt-audit-reading-o_htqv3s/resend-receipts.events.jsonl; report and line receipts beside it. Parent owns cross-layer adjudication; no tests/cloud operation by worker."
+      ],
       "questions": []
     },
     {
@@ -28071,10 +28143,12 @@
       "mode": "100644",
       "bytes": 2992,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 86]],
+      "evidence": [
+        "Fixed read SHA 966dc3759fc4b8041be4b969c292ad9fef206ef2; approved CLI read-only Luna lane resend-receipts. Parent verified every original numbered line in successful command output, no missing/truncated ranges, manifest/blob/byte equality and actual completed turn. Local transcript /private/tmp/dayopt-audit-reading-o_htqv3s/resend-receipts.events.jsonl; report and line receipts beside it. Parent owns cross-layer adjudication; no tests/cloud operation by worker."
+      ],
       "questions": []
     },
     {
@@ -29414,10 +29488,12 @@
       "mode": "100644",
       "bytes": 45260,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 779]],
+      "evidence": [
+        "Parent full untruncated bounded read at 966dc3759fc4b8041be4b969c292ad9fef206ef2; exact baseline/current blob and byte equality checked. Contact feature sixteen files, dictionaries/spec/journey Contact journey1-160/161-320/321-480/481-640/641-779 includes canonical JSON, not just generated prose. No test rerun or runtime/cloud claim."
+      ],
       "questions": []
     },
     {
@@ -30180,10 +30256,12 @@
       "mode": "100644",
       "bytes": 3956,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 51]],
+      "evidence": [
+        "Parent full untruncated bounded read at 966dc3759fc4b8041be4b969c292ad9fef206ef2; exact baseline/current blob and byte equality checked. Contact feature sixteen files, dictionaries/spec/journey Contact journey1-160/161-320/321-480/481-640/641-779 includes canonical JSON, not just generated prose. No test rerun or runtime/cloud claim."
+      ],
       "questions": []
     },
     {
@@ -31783,10 +31861,12 @@
       "mode": "100644",
       "bytes": 1424,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 49]],
+      "evidence": [
+        "Approved CLI read-only Luna mail-storage-policy lane at fixed966dc3759fc4b8041be4b969c292ad9fef206ef2. Parent verifies complete original chunks or numbered lines in successful logged output, manifest and baseline/current blob equality, no gaps/truncation. Local transcript/report/coverage checks /private/tmp/dayopt-audit-reading-o_htqv3s/mail-storage-policy.*. Parent cross-checks route maxDuration30/15s vs300s lease, lowercase normalization and ordered grants; no live Redis/DB proof."
+      ],
       "questions": []
     },
     {
@@ -36747,10 +36827,12 @@
       "mode": "100644",
       "bytes": 1268,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 29]],
+      "evidence": [
+        "Approved CLI read-only Luna mail-storage-policy lane at fixed966dc3759fc4b8041be4b969c292ad9fef206ef2. Parent verifies complete original chunks or numbered lines in successful logged output, manifest and baseline/current blob equality, no gaps/truncation. Local transcript/report/coverage checks /private/tmp/dayopt-audit-reading-o_htqv3s/mail-storage-policy.*. Parent cross-checks route maxDuration30/15s vs300s lease, lowercase normalization and ordered grants; no live Redis/DB proof."
+      ],
       "questions": []
     },
     {
@@ -38075,10 +38157,12 @@
       "mode": "100644",
       "bytes": 5633,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 118]],
+      "evidence": [
+        "Approved CLI read-only Luna mail-storage-policy lane at fixed966dc3759fc4b8041be4b969c292ad9fef206ef2. Parent verifies complete original chunks or numbered lines in successful logged output, manifest and baseline/current blob equality, no gaps/truncation. Local transcript/report/coverage checks /private/tmp/dayopt-audit-reading-o_htqv3s/mail-storage-policy.*. Parent cross-checks route maxDuration30/15s vs300s lease, lowercase normalization and ordered grants; no live Redis/DB proof."
+      ],
       "questions": []
     },
     {
@@ -38387,10 +38471,12 @@
       "mode": "100644",
       "bytes": 950,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 27]],
+      "evidence": [
+        "Approved CLI read-only Luna mail-storage-policy lane at fixed966dc3759fc4b8041be4b969c292ad9fef206ef2. Parent verifies complete original chunks or numbered lines in successful logged output, manifest and baseline/current blob equality, no gaps/truncation. Local transcript/report/coverage checks /private/tmp/dayopt-audit-reading-o_htqv3s/mail-storage-policy.*. Parent cross-checks route maxDuration30/15s vs300s lease, lowercase normalization and ordered grants; no live Redis/DB proof."
+      ],
       "questions": []
     },
     {
@@ -39829,10 +39915,12 @@
       "mode": "100644",
       "bytes": 8089,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 142]],
+      "evidence": [
+        "Approved CLI read-only Luna mail-storage-policy lane at fixed966dc3759fc4b8041be4b969c292ad9fef206ef2. Parent verifies complete original chunks or numbered lines in successful logged output, manifest and baseline/current blob equality, no gaps/truncation. Local transcript/report/coverage checks /private/tmp/dayopt-audit-reading-o_htqv3s/mail-storage-policy.*. Parent cross-checks route maxDuration30/15s vs300s lease, lowercase normalization and ordered grants; no live Redis/DB proof."
+      ],
       "questions": []
     },
     {
