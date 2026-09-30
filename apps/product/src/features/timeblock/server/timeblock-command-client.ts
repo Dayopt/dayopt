@@ -123,6 +123,7 @@ const EXPECTED_COMMAND_ERRORS: Readonly<Record<string, string>> = {
 
 const EXPECTED_COMMAND_MESSAGES: Readonly<Record<string, string>> = {
   CONFLICT: 'This command conflicts with another change.',
+  EXTERNAL_CALENDAR_ALREADY_CONVERTED: 'This external calendar event has already been converted.',
   FORBIDDEN: 'This item cannot be changed.',
   INVALID_INPUT: 'The timeblock input is invalid.',
   INVALID_TIME_RANGE: 'Time range end must be after start.',
@@ -154,6 +155,14 @@ function throwCommandError(error: CommandError, operation: CommandOperation): ne
   if (mappedCode) throwExpectedCommandError(mappedCode);
 
   if (error.code === '23505') {
+    // PostgREST exposes the constraint name in PostgreSQL's message, not as a
+    // separate field. Match only our exact quoted names; never forward DB details.
+    if (
+      error.message.includes('"plans_active_external_event_unique"') ||
+      error.message.includes('"records_active_external_event_unique"')
+    ) {
+      throwExpectedCommandError('EXTERNAL_CALENDAR_ALREADY_CONVERTED');
+    }
     throwExpectedCommandError('CONFLICT');
   }
 

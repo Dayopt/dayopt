@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 
-import { X } from 'lucide-react';
+import { CalendarDays, CalendarPlus, X } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 
 import { ConfirmDialog } from '@/components/ui/overlays/confirm-dialog';
@@ -34,9 +34,9 @@ import {
  *   ConfirmDialog を挟む（design-system.md の確認フロー表で「アーカイブ」に該当するため、
  *   toast undo ではなく確認ダイアログを使う判断は #1985 plan review 参照）
  *
- * 視覚区別に塗りを使わないのは、`PlanLaneCard` が `bg-transparent` だから。ghost に背景色を敷くと
- * 上に重なる plan カードの中身の背景として透け、plan が ghost に飲まれて見える。破線も未記録 plan の
- * シグナルとして使用済みなので、左のインジケータ線と減光で区別する。
+ * Plan は実線のアウトライン、Record は塗りカードなので、ghost は破線のアウトラインと
+ * 減光で区別する。背景を塗ると上に重なる Plan の中へ透け、外部予定が Dayopt 所有に見えるため
+ * transparent のままにする。
  */
 
 const DETAIL_HEIGHT_THRESHOLD = 40;
@@ -81,7 +81,7 @@ export function ExternalEventCard({
     <div
       data-external-event-card
       className={cn(
-        'border-border-subtle absolute flex flex-col gap-1 overflow-hidden rounded-lg border text-xs',
+        'border-border-subtle absolute flex flex-col gap-1 overflow-hidden rounded-lg border border-dashed text-xs',
         'border-l-indicator border-l-border',
         interactive ? 'pointer-events-auto cursor-pointer' : 'pointer-events-none',
         interactive &&
@@ -114,9 +114,14 @@ export function ExternalEventCard({
           onClick={onConvert}
         />
       )}
-      <p className="truncate font-medium">
+      <p className="flex min-h-0 items-center gap-1 truncate font-medium">
+        {interactive ? (
+          <CalendarPlus aria-hidden="true" className="size-3.5 shrink-0" />
+        ) : (
+          <CalendarDays aria-hidden="true" className="size-3.5 shrink-0" />
+        )}
         <span className="sr-only">{t('screenReaderPrefix')}</span>
-        {displayTitle}
+        <span className="truncate">{displayTitle}</span>
         {interactive && <span className="sr-only">, {t('convert.hint')}</span>}
       </p>
       {showDetails && <p className="truncate">{eventDetails}</p>}

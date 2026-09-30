@@ -24,6 +24,7 @@ import {
   beginCalendarSyncRun,
   clearCalendarSyncCursor,
   finishCalendarSyncRun,
+  repairCalendarConnectionAuthorityFence,
   resolveProjectKey,
 } from './fenced-sync-writer';
 
@@ -309,6 +310,25 @@ describe('beginCalendarSyncRun（RETURNS TABLE の shape 変換）', () => {
     });
 
     expect(result).toBe('unresolved');
+  });
+});
+
+describe('repairCalendarConnectionAuthorityFence', () => {
+  it('typed RPC に project・user・connection を渡し、ready を返す', async () => {
+    const rpc = mockRpc(() => ({ data: 'ready', error: null }));
+
+    const result = await repairCalendarConnectionAuthorityFence({
+      connectionId: CAS.connectionId,
+      userId: CAS.userId,
+      projectKey: CAS.projectKey,
+    });
+
+    expect(result).toBe('ready');
+    expect(rpc).toHaveBeenCalledWith('repair_calendar_connection_authority_fence_v1', {
+      p_project_key: CAS.projectKey,
+      p_user_id: CAS.userId,
+      p_connection_id: CAS.connectionId,
+    });
   });
 });
 

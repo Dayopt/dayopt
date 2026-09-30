@@ -20,6 +20,12 @@ Dayopt の共通指示。Project 設定を正本とし、個人設定・ホー�
 - **CHECKPOINT**: 顧客挙動・公開契約・権限/プライバシーの未決判断は、選択肢・推奨・最悪ケースをまとめて確認する。
 - **EXPLICIT AUTHORITY**: production mutation・release・データ削除・不可逆 migration・実課金は、明示指示 + 独立レビュー + dry-run/backup が揃うまで実行しない。
 
+## Issue の進め方
+
+- 作業対象の Issue には `type:mission` / `type:task` / `type:bug` / `type:question` を 1 つ付ける。Mission は子 Issue へ分解し、Mission 自体では実装しない。Task は合意済みの範囲を実装・検証する。Bug は再現して回帰を防ぐ検証を加え、修正する。Question は証拠を Issue コメントに残して人の判断を待ち、実装 PR を作らない。
+- 着手・続行を妨げる前提がある open Issue だけに `status:blocked` を付け、解除条件を本文へ書く。解除条件を確認してから外す。進行は Issue の open / closed、リンク済み PR、コメントと worktree で確認する。PR に分類ラベルを複製しない。
+- 作業順はユーザーの指定、進行中の作業、依存関係、期限や障害の実態から決める。ラベルの優先度からエージェントが自動決定しない。不可逆操作の許可とレビュー要否は上記の権限境界と変更内容から判断する。
+
 ## Dayopt のコア不変条件
 
 ### 時間（Plan / Record 分離モデル）
@@ -61,7 +67,7 @@ Dayopt の共通指示。Project 設定を正本とし、個人設定・ホー�
 - 全 PR をリスクに比例してセルフレビューする。main の ruleset（required checks、最新 main への追従、review thread 解決）を満たし、bypass しない。
 - `scripts/ci/protected-path-gate.mjs` が外部契約・不可逆・ガードレール変更と判定した PR だけ、CI 成功・head 安定後に `pr-cross-review` で独立レビューを依頼する。追加 reviewer は明示指示なしに起動しない。
 - 指摘は修正・根拠付き反論・Issue 化で解決する。根拠のある不具合は直し、保証境界の外への点追加を繰り返さない。merge の基準は main より安全か。
-- timeblock / lib/time 配下の test を削除・skip する PR は `review:full` を付け User の確認を受ける。この label は reviewer の自動起動条件にしない。
+- timeblock / lib/time 配下の test を削除・skip する PR は変更理由と代替検証を PR に明記し、User の確認を受ける。
 
 ### レーン運用
 
@@ -82,7 +88,7 @@ Dayopt の共通指示。Project 設定を正本とし、個人設定・ホー�
 | skill                  | 使う場面                       |
 | ---------------------- | ------------------------------ |
 | `routing`              | 作業方針・委譲の判断           |
-| `dispatch`             | Issue 起票・割り当て           |
+| `dispatch`             | Issue 起票・担当への引き渡し   |
 | `mcp-usage`            | 外部ツールの利用               |
 | `skill-design`         | skill の作成・整理             |
 | `supabase`             | migration・RLS・DB             |

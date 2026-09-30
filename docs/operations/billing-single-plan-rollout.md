@@ -12,6 +12,8 @@ code: apps/product/src/lib/billing/access-service.ts
 
 Stripe test mode の実走と証拠は [#2867](https://github.com/Dayopt/dayopt/issues/2867)、その完了を受けた本番有効化は [#2869](https://github.com/Dayopt/dayopt/issues/2869) が要求の正本。テスト完了を本番有効化・実課金の許可に読み替えない。
 
+2026-09-30までの検証範囲・SHAごとの証跡・残件Issue・再開条件は [Stripe Integration 検証の結果と引き継ぎ](./billing-integration-rehearsal.md) を参照する。#2867全体は未完了で、環境全体の停止・復帰も後続作業として残っている。
+
 環境は [Cloud-first 方針](../engineering/infra.md#環境構成)と [#2910](https://github.com/Dayopt/dayopt/issues/2910) を参照し、#2867 の本文・後続の合意から今回使う project / DB branch / SHA を特定する。古い local Supabase 前提や次の localhost 例だけで環境を選ばない。必要環境が未準備なら依存する実走を保留し、別環境の mock / SQL / 過去の Stripe object を今回の Checkout / Webhook の証拠として代用しない。環境の準備状況と停止・再開判断は各 Issue に置く。
 
 ## 事前検証

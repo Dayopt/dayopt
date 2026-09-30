@@ -45,7 +45,6 @@ function isCodexBotLogin(login) {
  */
 
 const [REPO_OWNER, REPO_NAME] = REPO.split('/');
-const WORKFLOW_STATUS_FIELD_ID = 47507683;
 
 /** 配達コメントの先頭に置く隠しマーカー。このマーカーで始まるコメントが「ctx brief」。
  * selectComments / findMarkerComment / detectJudgmentRecords が共通で参照するため
@@ -900,7 +899,7 @@ function extractBriefRequiredSections(body) {
 }
 
 /**
- * issue body の「受け入れ条件 / 検証コマンド」を判定する（routing skill / dispatch §Workflow status=Ready）。
+ * issue body の「受け入れ条件 / 検証コマンド」を判定する（routing skill / dispatch issue contract）。
  *
  * - acceptance: body に `受け入れ条件` または `完了条件` の語がある、または
  *   `## やること` セクションにチェックリスト/箇条書き行が1つ以上ある
@@ -954,7 +953,7 @@ export function buildJudgmentHint(records) {
   if (!records.brief) missing.push('brief');
   if ('acceptance' in records && !records.acceptance) missing.push('受け入れ条件');
   if ('verification' in records && !records.verification) {
-    missing.push('検証コマンド（dispatch §Workflow status=Ready の機械判定）');
+    missing.push('検証コマンド（dispatch issue contract の機械判定）');
   }
   if (missing.length === 0) return null;
   return `判断の記録が欠けている: ${missing.join('・')}（routing skill 手順 1 / dispatch 手順 7）`;
@@ -1241,12 +1240,6 @@ function buildMarkdownLines(
     `assignee: ${pack.header.assignee ?? 'なし'}`,
     `url: ${pack.header.url ?? '未取得'}`,
   ];
-  if (pack.kind === 'issue') {
-    const workflowStatus = !pack.header.workflowStatusAvailable
-      ? '未取得'
-      : (pack.header.workflowStatus ?? '未設定');
-    headerParts.push(`Workflow status: ${workflowStatus}`);
-  }
   lines.push(headerParts.join(' | '));
   if (pack.snapshotId) {
     lines.push(`生成: ${pack.generatedAt ?? '未取得'} | snapshot: ${pack.snapshotId}`);
@@ -1468,6 +1461,7 @@ function buildMarkdownLines(
     lines.push(
       `実装・判断: ${pack.routing.level} | 入力充足: ${pack.routing.ready ? 'あり' : '不足'} | 事前整理: ${pack.routing.preparation}`,
     );
+    if (pack.routing.workGuidance) lines.push(`type の進め方: ${pack.routing.workGuidance}`);
     lines.push(`理由: ${pack.routing.reasons.join(' / ')}`);
     lines.push(`不足: ${pack.routing.missing.join(' / ') || 'なし（内容の正しさは担当が確認）'}`);
     lines.push(`事前整理の成果: ${pack.routing.preparationGoal}`, '');
@@ -1736,20 +1730,10 @@ export function buildContextPack(options, deps = {}) {
     unresolvedThreads = threadNodes === null ? null : countUnresolvedThreads(threadNodes);
     header.unresolvedThreads = unresolvedThreads;
   } else {
-    const issueFieldValues = tryOr(
-      () =>
-        runGhJson(['api', `repos/${REPO}/issues/${number}/issue-field-values`], { execFileImpl }),
-      null,
-    );
-    const workflowStatusField = Array.isArray(issueFieldValues)
-      ? issueFieldValues.find((field) => field.issue_field_id === WORKFLOW_STATUS_FIELD_ID)
-      : null;
     header = {
       title: base?.title ?? null,
       state: base?.state ?? null,
       labels: (base?.labels ?? []).map((l) => l.name),
-      workflowStatus: workflowStatusField?.single_select_option?.name ?? null,
-      workflowStatusAvailable: Array.isArray(issueFieldValues),
       milestone: base?.milestone?.title ?? null,
       assignee: (base?.assignees ?? [])[0]?.login ?? null,
       url: base?.html_url ?? null,
@@ -1971,8 +1955,6 @@ export function buildContextPack(options, deps = {}) {
       title: header.title,
       state: header.state,
       labels: header.labels,
-      workflowStatus: header.workflowStatus ?? null,
-      workflowStatusAvailable: header.workflowStatusAvailable ?? null,
       milestone: header.milestone,
       assignee: header.assignee,
       url: header.url,
@@ -2041,12 +2023,6 @@ export function buildContextPack(options, deps = {}) {
   const routing = resolveFactoryRoute({
     files,
     labels: header.labels,
-    ...(kind === 'issue'
-      ? {
-          workflowStatus: header.workflowStatus,
-          workflowStatusAvailable: header.workflowStatusAvailable,
-        }
-      : {}),
     body: rawBody,
     ...criteria,
     metadataAvailable,

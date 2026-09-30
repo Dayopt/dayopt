@@ -1,11 +1,14 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { expect, fn, userEvent, within } from 'storybook/test';
 
+import type { RecordEvent } from '@/features/timeblock';
+
 import { calculateExternalEventLayout } from '../../../../../lib/external-event-layout';
 import { DEFAULT_PLAN_LANE_WIDTH_PERCENT } from '../../../../../lib/two-lane-layout';
 
 import { ExternalEventCard } from './ExternalEventCard';
 import { PlanLaneCard } from './PlanLaneCard';
+import { RecordLaneCard } from './RecordLaneCard';
 
 const HOUR_HEIGHT = 60;
 const DAY_START = new Date(2026, 6, 15, 0, 0);
@@ -335,6 +338,68 @@ export const Convertible: Story = {
     await userEvent.keyboard('{Enter}');
     await expect(args.onConvert).toHaveBeenCalledTimes(2);
     await expect(args.onDismiss).not.toHaveBeenCalled();
+  },
+};
+
+/** 予定・記録・外部カレンダーの予定を同じ時間軸で比べる。 */
+export const ThreeSources: Story = {
+  render: () => {
+    const planStart = at(9);
+    const recordStart = at(10);
+    const externalStart = at(11);
+    const record: RecordEvent = {
+      id: 'record-source',
+      title: 'Deep Work',
+      note: null,
+      activityId: null,
+      startDate: recordStart,
+      endDate: at(11),
+      displayStartDate: recordStart,
+      displayEndDate: at(11),
+      duration: 60,
+    };
+
+    return (
+      <DayColumn>
+        <PlanLaneCard
+          event={{
+            id: 'plan-source',
+            title: 'Deep Work',
+            note: null,
+            activityId: null,
+            startDate: planStart,
+            endDate: recordStart,
+            displayStartDate: planStart,
+            displayEndDate: recordStart,
+            duration: 60,
+            status: 'upcoming',
+          }}
+          position={{ top: 9 * HOUR_HEIGHT, height: 60, left: 0, width: 38 }}
+          activityName="Deep Work"
+          activityColor="blue"
+          interactive={false}
+        />
+        <RecordLaneCard
+          event={record}
+          position={{ top: 10 * HOUR_HEIGHT, height: 60, left: 0, width: 38 }}
+          activityName="Deep Work"
+          activityColor="blue"
+          interactive={false}
+        />
+        <ExternalEventCard
+          event={ghost({ id: 'external-source', startDate: externalStart, endDate: at(12) })}
+          position={{
+            top: 11 * HOUR_HEIGHT,
+            height: 60,
+            left: 0,
+            width: 38,
+            displayStartDate: externalStart,
+            displayEndDate: at(12),
+          }}
+          onConvert={fn()}
+        />
+      </DayColumn>
+    );
   },
 };
 

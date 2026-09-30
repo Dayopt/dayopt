@@ -88,6 +88,7 @@ export type GoogleIdTokenPayload = z.infer<typeof googleIdTokenPayloadSchema>;
 export const connectFlowStateSchema = z.object({
   state: z.string().min(1).max(255),
   verifier: z.string().min(1).max(255),
+  attemptId: z.string().uuid(),
   locale: z.string().min(1).max(16),
   userId: z.string().uuid(),
   reconnectConnectionId: z.string().uuid().optional(),
