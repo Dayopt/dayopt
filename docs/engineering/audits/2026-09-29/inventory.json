@@ -15741,11 +15741,12 @@
       "mode": "100644",
       "bytes": 6177,
       "method": "full-text",
-      "status": "unverified",
-      "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
+      "status": "full-text-reviewed",
+      "reason": "Fully read current domain/input/router/service/test; baseline byte or additive-only mapping verified",
+      "read_ranges": [[1, 143]],
       "evidence": [
-        "PR #2966 non-JSON diff 1088 lines read fully in bounded chunks. JSON contracts/validation also read fully. Delta is reviewed at 21770b13da1ff26c8982cdf041aa2a4d55025a3f. Existing full-file status unchanged."
+        "PR #2966 non-JSON diff 1088 lines read fully in bounded chunks. JSON contracts/validation also read fully. Delta is reviewed at 21770b13da1ff26c8982cdf041aa2a4d55025a3f. Existing full-file status unchanged.",
+        "Full current read at b1a0a6259. Baseline143 lines all preserved in fully-read current164 lines; exact 21-line additive delta independently read with git diff. DST policy and bulk apply boundary traced. H042 invalid calendar input reproduced without DB write; settings error fallback remains candidate."
       ],
       "questions": []
     },
@@ -15756,10 +15757,12 @@
       "mode": "100644",
       "bytes": 5347,
       "method": "full-text",
-      "status": "unverified",
-      "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "status": "full-text-reviewed",
+      "reason": "Fully read current domain/input/router/service/test; baseline byte or additive-only mapping verified",
+      "read_ranges": [[1, 118]],
+      "evidence": [
+        "Full current read at b1a0a6259. Baseline bytes match. DST policy and bulk apply boundary traced. H042 invalid calendar input reproduced without DB write; settings error fallback remains candidate."
+      ],
       "questions": []
     },
     {
@@ -15823,10 +15826,12 @@
       "mode": "100644",
       "bytes": 8361,
       "method": "full-text",
-      "status": "unverified",
-      "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "status": "full-text-reviewed",
+      "reason": "Fully read current domain/input/router/service/test; baseline byte or additive-only mapping verified",
+      "read_ranges": [[1, 238]],
+      "evidence": [
+        "Full current read at b1a0a6259. Baseline bytes match. DST policy and bulk apply boundary traced. H042 invalid calendar input reproduced without DB write; settings error fallback remains candidate."
+      ],
       "questions": []
     },
     {
@@ -15836,10 +15841,12 @@
       "mode": "100644",
       "bytes": 6756,
       "method": "full-text",
-      "status": "unverified",
-      "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "status": "full-text-reviewed",
+      "reason": "Fully read current domain/input/router/service/test; baseline byte or additive-only mapping verified",
+      "read_ranges": [[1, 169]],
+      "evidence": [
+        "Full current read at b1a0a6259. Baseline bytes match. DST policy and bulk apply boundary traced. H042 invalid calendar input reproduced without DB write; settings error fallback remains candidate."
+      ],
       "questions": []
     },
     {
@@ -16393,10 +16400,12 @@
       "mode": "100644",
       "bytes": 1812,
       "method": "full-text",
-      "status": "unverified",
-      "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "status": "full-text-reviewed",
+      "reason": "Fully read current domain/input/router/service/test; baseline byte or additive-only mapping verified",
+      "read_ranges": [[1, 50]],
+      "evidence": [
+        "Full current read at b1a0a6259. Baseline bytes match. DST policy and bulk apply boundary traced. H042 invalid calendar input reproduced without DB write; settings error fallback remains candidate."
+      ],
       "questions": []
     },
     {
@@ -16577,10 +16586,11 @@
       "bytes": 14481,
       "method": "full-text",
       "status": "full-text-reviewed",
-      "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
+      "reason": "Fully read current domain/input/router/service/test; baseline byte or additive-only mapping verified",
       "read_ranges": [[1, 420]],
       "evidence": [
-        "All baseline text read in complete bounded ranges; template clock failure, report dataflow, DST distribution and guard boundaries cross-checked."
+        "All baseline text read in complete bounded ranges; template clock failure, report dataflow, DST distribution and guard boundaries cross-checked.",
+        "Full current read at b1a0a6259. Baseline bytes match. DST policy and bulk apply boundary traced. H042 invalid calendar input reproduced without DB write; settings error fallback remains candidate."
       ],
       "questions": []
     },
@@ -16604,10 +16614,12 @@
       "mode": "100644",
       "bytes": 2664,
       "method": "full-text",
-      "status": "unverified",
-      "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "status": "full-text-reviewed",
+      "reason": "Fully read current domain/input/router/service/test; baseline byte or additive-only mapping verified",
+      "read_ranges": [[1, 79]],
+      "evidence": [
+        "Full current read at b1a0a6259. Baseline bytes match. DST policy and bulk apply boundary traced. H042 invalid calendar input reproduced without DB write; settings error fallback remains candidate."
+      ],
       "questions": []
     },
     {

@@ -378,3 +378,10 @@ F039 verification completed: whole pnpm check exit0 at product7b5508ff1, 7637 te
 - Must cover normal create/update/delete/restore, template bulk apply, limited/filter caches, same-resource later actions, auth/cache clear and details. Do not solve only one caller or replace all cached rows with an older canonical row. Next: independent QueryClient reproduction and minimal operation-owned inverse under existing mutation architecture.
 
 Rejected queue candidate: TimeblockInspector keys TimeblockInspectorForm by kind/id plus placeholder/loaded. Distinct targets remount queue, so new target does not reuse old pending queue. Continuing accepted old-target edits on unmount is not itself wrong-target persistence. No code change. Auth switching and response lifetimes still separate pending boundaries.
+
+## H042 - Invalid calendar input silently becomes another template application day
+
+- Real schema/pure-function reproduction, no DB write: date2026-02-30 accepted by applyPlanTemplateSchema; materializeTemplateDay returns synthetic block at2026-03-02T09:00Z/end10:00Z. Log /tmp/dayopt-audit-template-invalid-date-repro.log. Service forwards these instants to createPlansBulk without further date validation.
+- Contract: apply date is a user's timezone calendar day, not an overflow-normalized arbitrary date. Schema regex and parseDateKey extract syntax/numbers only; Date.UTC normalizes impossible Gregorian components. Existing anchor negative test rejects separators/anchor range only.
+- Next: inspect router/service tests and existing calendar validators, then red/green Gregorian validation at input/domain boundaries while preserving valid leap dates, DST gap/fold and past Plan contract.
+- Separate settings candidate: loadDurationContext captures settings query error but proceeds with UTC/default60. Failed read differs from absent row and can alter persisted instants; not execution-reproduced. Confirm failure/missing-row contract and tests before changing.
