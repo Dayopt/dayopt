@@ -58,11 +58,18 @@ vi.mock('./useTimeblockWriteMutations', async () => {
   };
 });
 
+const PLANS_QUERY = { queryKey: PLANS_LIST_KEY, queryHash: JSON.stringify(PLANS_LIST_KEY) };
+
 vi.mock('@tanstack/react-query', () => ({
   useQueryClient: () => ({
+    getMutationCache: () => ({ getAll: () => [] }),
+    getQueryCache: () => ({
+      getAll: () => [PLANS_QUERY],
+      find: () => PLANS_QUERY,
+    }),
     cancelQueries: mocks.cancelQueries.mockResolvedValue(undefined),
     getQueriesData: vi.fn(({ predicate }: { predicate: (q: { queryKey: unknown }) => boolean }) =>
-      predicate({ queryKey: PLANS_LIST_KEY }) ? [[PLANS_LIST_KEY, [...mocks.planRows]]] : [],
+      predicate({ queryKey: PLANS_LIST_KEY }) ? [[PLANS_LIST_KEY, mocks.planRows]] : [],
     ),
     setQueryData: vi.fn((_key: unknown, value: unknown) => {
       mocks.planRows =

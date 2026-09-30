@@ -36,31 +36,288 @@ function isTimeblockListQuery(query: { queryKey: unknown }): boolean {
   return isPlansListQuery(query) || isRecordsListQuery(query);
 }
 
-/**
- * plans / records の全 cache を退避する（テンプレート適用など、この hook の外の
- * mutation も同じ rollback 単位を使うため module 関数として公開する）。
- * cancel は list query だけに掛ける — in-flight の refetch が楽観行を上書きする窓を
- * 閉じるのが目的で、getById の再取得まで止める必要は無い。
- */
+/** Pending operations share a base, but each owns only its cache writes. */
+interface CacheChange {
+  queryKey: QueryKey;
+  apply: (data: unknown, lookup: (id: string) => TimeModelListRow | undefined) => unknown;
+  owner?: TimeblockListsSnapshot;
+}
+interface CacheJournal {
+  base: ReadonlyArray<readonly [QueryKey, unknown]>;
+  observed: ReadonlyArray<readonly [QueryKey, unknown]>;
+  changes: CacheChange[];
+  pending: Set<TimeblockListsSnapshot>;
+  queries: Map<string, ReturnType<ReturnType<QueryClient['getQueryCache']>['getAll']>[number]>;
+}
+const cacheJournals = new WeakMap<QueryClient, CacheJournal>();
+
+function cacheRows(data: unknown): data is TimeModelListRow[] {
+  return Array.isArray(data) && data.every((row) => row && typeof row.id === 'string');
+}
+
+function readTimeblockCache(queryClient: QueryClient) {
+  return queryClient.getQueriesData({ predicate: isTimeblockQuery });
+}
+
+function captureCacheChanges(
+  queryClient: QueryClient,
+  journal: CacheJournal,
+  owner?: TimeblockListsSnapshot,
+): void {
+  const current = readTimeblockCache(queryClient);
+  for (const [queryKey, after] of current) {
+    const query = queryClient.getQueryCache().find({ queryKey, exact: true });
+    const hash = query?.queryHash;
+    if (query && !journal.queries.has(query.queryHash)) journal.queries.set(query.queryHash, query);
+    const before = journal.observed.find(
+      ([key]) =>
+        queryClient.getQueryCache().find({ queryKey: key, exact: true })?.queryHash === hash,
+    )?.[1];
+    if (before === after) continue;
+    if (
+      !journal.base.some(
+        ([key]) =>
+          queryClient.getQueryCache().find({ queryKey: key, exact: true })?.queryHash === hash,
+      )
+    )
+      journal.base = [...journal.base, [queryKey, before]];
+    if (!owner) {
+      // A refetch is authoritative, including rows absent from its response.
+      journal.changes.push({ queryKey, apply: () => after });
+    } else if (cacheRows(before) && cacheRows(after)) {
+      const lane = isPlansListQuery({ queryKey }) ? 'plans' : 'records';
+      const added = after.filter((row) => !before.some((old) => old.id === row.id));
+      const moving = added.map((row) => {
+        const source = journal.observed
+          .flatMap(([key, data]) =>
+            isLaneListQuery(lane)({ queryKey: key }) && cacheRows(data) ? data : [],
+          )
+          .find((old) => old.id === row.id);
+        const fields = source
+          ? Object.fromEntries(
+              Object.entries(row).filter(
+                ([key, value]) =>
+                  !Object.is(value, (source as unknown as Record<string, unknown>)[key]),
+              ),
+            )
+          : undefined;
+        return { row, fields };
+      });
+      const removed = before.filter((row) => !after.some((next) => next.id === row.id));
+      const patches = after.flatMap((row) => {
+        const old = before.find((candidate) => candidate.id === row.id);
+        if (!old) return [];
+        const fields = Object.fromEntries(
+          Object.entries(row).filter(
+            ([key, value]) => !Object.is(value, (old as unknown as Record<string, unknown>)[key]),
+          ),
+        );
+        return Object.keys(fields).length ? [{ id: row.id, fields }] : [];
+      });
+      // Insertion into a limited list displaces rows; it does not delete them.
+      const displaced = added.length > 0 && getListFilter(queryKey).limit !== undefined;
+      journal.changes.push({
+        queryKey,
+        owner,
+        apply: (data, lookup) => {
+          const rows = cacheRows(data) ? data : [];
+          const kept = rows.filter((row) => displaced || !removed.some((old) => old.id === row.id));
+          const patched = kept.map((row) => ({
+            ...row,
+            ...patches.find((patch) => patch.id === row.id)?.fields,
+          }));
+          return sortAndLimitRows(
+            [
+              ...patched.filter((row) => !added.some((next) => next.id === row.id)),
+              ...moving.map(({ row, fields }) =>
+                fields ? { ...(lookup(row.id) ?? row), ...fields } : row,
+              ),
+            ],
+            queryKey,
+            lane,
+          );
+        },
+      });
+    } else if (before && after && typeof before === 'object' && typeof after === 'object') {
+      const fields = Object.fromEntries(
+        Object.entries(after).filter(
+          ([key, value]) => !Object.is(value, (before as Record<string, unknown>)[key]),
+        ),
+      );
+      journal.changes.push({
+        queryKey,
+        owner,
+        apply: (data) => ({
+          ...(data && typeof data === 'object' ? data : before),
+          ...fields,
+        }),
+      });
+    } else {
+      journal.changes.push({ queryKey, owner, apply: () => after });
+    }
+  }
+  journal.observed = current;
+}
+
 export async function snapshotTimeblockLists(
   queryClient: QueryClient,
 ): Promise<TimeblockListsSnapshot> {
+  const queries = queryClient.getQueryCache().getAll().filter(isTimeblockQuery);
+  const mutations = queryClient
+    .getMutationCache()
+    .getAll()
+    .filter((mutation) => mutation.state.status === 'pending');
   await queryClient.cancelQueries({ predicate: isTimeblockListQuery });
-  return {
-    snapshots: queryClient.getQueriesData({ predicate: isTimeblockQuery }) as Array<
-      [QueryKey, unknown]
-    >,
+  let journal = cacheJournals.get(queryClient);
+  if (
+    journal &&
+    [...journal.pending].every((context) => !isTimeblockCacheCurrent(queryClient, context))
+  ) {
+    cacheJournals.delete(queryClient);
+    journal = undefined;
+  }
+  if (!journal) {
+    const base = readTimeblockCache(queryClient);
+    journal = {
+      base,
+      observed: base,
+      changes: [],
+      pending: new Set(),
+      queries: new Map(
+        queryClient
+          .getQueryCache()
+          .getAll()
+          .filter(isTimeblockQuery)
+          .map((query) => [query.queryHash, query]),
+      ),
+    };
+    cacheJournals.set(queryClient, journal);
+  } else captureCacheChanges(queryClient, journal);
+  const context: TimeblockListsSnapshot = {
+    journal,
+    operation: { failed: false },
+    queries,
+    mutations,
   };
+  journal.pending.add(context);
+  return context;
 }
 
-/** `snapshotTimeblockLists` で取った cache を書き戻す。 */
+/** A removed query/mutation belongs to a retired cache (for example after logout). */
+export function isTimeblockCacheCurrent(
+  queryClient: QueryClient,
+  context: TimeblockListsSnapshot | undefined,
+): boolean {
+  if (!context) return false;
+  // Pending mutations cannot be garbage-collected. Other completed mutations can,
+  // so requiring every captured mutation to remain would discard valid long requests.
+  if (context.mutations.length > 0) {
+    const mutations = queryClient.getMutationCache().getAll();
+    return context.mutations.some((mutation) => mutations.includes(mutation));
+  }
+  return context.queries.every((query) => queryClient.getQueryCache().getAll().includes(query));
+}
+
+export function writeTimeblockCache(
+  queryClient: QueryClient,
+  context: TimeblockListsSnapshot,
+  write: () => void,
+  replay?: (queryKey: QueryKey, data: unknown) => unknown,
+): void {
+  if (!isTimeblockCacheCurrent(queryClient, context)) return;
+  captureCacheChanges(queryClient, context.journal);
+  write();
+  if (replay) {
+    const current = readTimeblockCache(queryClient);
+    for (const [queryKey] of current) {
+      context.journal.changes.push({
+        queryKey,
+        owner: context,
+        apply: (data) => replay(queryKey, data),
+      });
+    }
+    context.journal.observed = current;
+  } else captureCacheChanges(queryClient, context.journal, context);
+}
+
+/** Record deletion intent even when a limited list has displaced the row. */
+export function deleteTimeblockCacheRows(
+  queryClient: QueryClient,
+  context: TimeblockListsSnapshot,
+  lane: 'plans' | 'records',
+  ids: ReadonlySet<string>,
+): void {
+  writeTimeblockCache(queryClient, context, () =>
+    removeTimeModelRowsFromMatchingLists(queryClient, lane, ids),
+  );
+  for (const [queryKey] of context.journal.base) {
+    if (!isLaneListQuery(lane)({ queryKey })) continue;
+    context.journal.changes.push({
+      queryKey,
+      owner: context,
+      apply: (data) => (cacheRows(data) ? data.filter((row) => !ids.has(row.id)) : data),
+    });
+  }
+}
+
+export function settleTimeblockCache(
+  queryClient: QueryClient,
+  context: TimeblockListsSnapshot | undefined,
+): void {
+  if (!context) return;
+  for (const pending of context.journal.pending) {
+    if (pending.operation === context.operation) context.journal.pending.delete(pending);
+  }
+  if (context.journal.pending.size === 0 && cacheJournals.get(queryClient) === context.journal) {
+    cacheJournals.delete(queryClient);
+  }
+}
+
+/** Replay surviving writes; a later optimistic patch never restores a failed predecessor. */
 export function restoreTimeblockLists(
   queryClient: QueryClient,
   context: TimeblockListsSnapshot | undefined,
 ): void {
-  for (const [queryKey, data] of context?.snapshots ?? []) {
-    queryClient.setQueryData(queryKey, data);
+  if (!context) return;
+  if (isTimeblockCacheCurrent(queryClient, context)) {
+    const journal = context.journal;
+    captureCacheChanges(queryClient, journal);
+    context.operation.failed = true;
+    const states = new Map<string, { key: QueryKey; data: unknown }>(
+      journal.base.flatMap(([key, data]) => {
+        const query = queryClient.getQueryCache().find({ queryKey: key, exact: true });
+        return query && journal.queries.get(query.queryHash) === query
+          ? [[query.queryHash, { key, data }] as const]
+          : [];
+      }),
+    );
+    const rows = new Map<string, TimeModelListRow>();
+    const rememberRows = (queryKey: QueryKey, data: unknown) => {
+      if (cacheRows(data)) {
+        const lane = isPlansListQuery({ queryKey }) ? 'plans' : 'records';
+        for (const row of data) rows.set(`${lane}:${row.id}`, row);
+      }
+    };
+    for (const [key, data] of journal.base) rememberRows(key, data);
+    for (const change of journal.changes) {
+      if (change.owner?.operation.failed) continue;
+      const hash = queryClient
+        .getQueryCache()
+        .find({ queryKey: change.queryKey, exact: true })?.queryHash;
+      if (!hash) continue;
+      const state = states.get(hash);
+      if (!state) continue;
+      const lane = isPlansListQuery({ queryKey: change.queryKey }) ? 'plans' : 'records';
+      state.data = change.apply(state.data, (id) => rows.get(`${lane}:${id}`));
+      rememberRows(state.key, state.data);
+    }
+    for (const { key, data } of states.values()) {
+      if (data === undefined) queryClient.removeQueries({ queryKey: key, exact: true });
+      else queryClient.setQueryData(key, data);
+    }
+    journal.observed = readTimeblockCache(queryClient);
   }
+  settleTimeblockCache(queryClient, context);
 }
 
 interface TimeModelListFilter {
@@ -169,6 +426,27 @@ export function removeTimeModelRowsFromMatchingLists(
   );
 }
 
+function replayServerTimeModelRow(
+  queryKey: QueryKey,
+  data: unknown,
+  lane: 'plans' | 'records',
+  row: TimeModelListRow,
+): unknown {
+  const path = queryKey[0];
+  if (!Array.isArray(path) || path[0] !== lane) return data;
+  if (isLaneListQuery(lane)({ queryKey })) {
+    const rows = cacheRows(data) ? data : [];
+    const filter = getListFilter(queryKey);
+    if (filter.search || ((filter.offset ?? 0) > 0 && !rows.some((value) => value.id === row.id)))
+      return data;
+    const without = rows.filter((value) => value.id !== row.id);
+    return doesTimeModelListQueryIncludeRow(queryKey, row, lane, 'update')
+      ? sortAndLimitRows([...without, row], queryKey, lane)
+      : without;
+  }
+  return data && typeof data === 'object' && 'id' in data && data.id === row.id ? row : data;
+}
+
 /** DBが返した確定行を、現在保持している全list cacheへ反映する。 */
 function replaceTimeModelRowInMatchingLists<T extends TimeModelListRow>(
   queryClient: QueryClient,
@@ -229,7 +507,10 @@ export function isTimeblockUncertainError(error: unknown): boolean {
 }
 
 export interface TimeblockListsSnapshot {
-  snapshots: ReadonlyArray<readonly [QueryKey, unknown]>;
+  journal: CacheJournal;
+  operation: { failed: boolean };
+  queries: ReturnType<ReturnType<QueryClient['getQueryCache']>['getAll']>;
+  mutations: ReturnType<ReturnType<QueryClient['getMutationCache']>['getAll']>;
 }
 
 interface MutationContext extends TimeblockListsSnapshot {
@@ -348,6 +629,29 @@ export function useTimeblockWriteMutations(options: UseTimeblockWriteMutationsOp
     }
   };
 
+  const recordPatchIntent = <T extends TimeModelListRow>(
+    context: MutationContext,
+    lane: 'plans' | 'records',
+    id: string,
+    patch: (row: T) => T,
+  ) => {
+    for (const [queryKey] of readTimeblockCache(queryClient)) {
+      const path = queryKey[0];
+      if (!Array.isArray(path) || path[0] !== lane) continue;
+      if (isLaneListQuery(lane)({ queryKey }) && getListFilter(queryKey).search) continue;
+      context.journal.changes.push({
+        queryKey,
+        owner: context,
+        apply: (data) => {
+          if (cacheRows(data)) return data.map((row) => (row.id === id ? patch(row as T) : row));
+          if (data && typeof data === 'object' && 'id' in data && data.id === id)
+            return patch(data as T);
+          return data;
+        },
+      });
+    }
+  };
+
   // getById も対象に含めて router 全体を再検証する（Inspector の updated_at 鮮度を保つ）
   const invalidate = () => {
     void queryClient.invalidateQueries({
@@ -358,6 +662,17 @@ export function useTimeblockWriteMutations(options: UseTimeblockWriteMutationsOp
     });
     void utils.plans.invalidate();
     void utils.records.invalidate();
+  };
+
+  const settleAndInvalidate = (
+    _data: unknown,
+    _error: unknown,
+    _input: unknown,
+    context: MutationContext | undefined,
+  ) => {
+    const current = isTimeblockCacheCurrent(queryClient, context);
+    settleTimeblockCache(queryClient, context);
+    if (current) invalidate();
   };
 
   const createPlan = api.planCommands.create.useMutation({
@@ -380,19 +695,22 @@ export function useTimeblockWriteMutations(options: UseTimeblockWriteMutationsOp
         created_at: nowIso,
         updated_at: nowIso,
       };
-      insertIntoMatchingLists('plans', tempPlan);
+      writeTimeblockCache(queryClient, context, () => insertIntoMatchingLists('plans', tempPlan));
       return { ...context, tempId };
     },
     onSuccess: (created, _input, context) => {
       if (!created) return;
-      insertIntoMatchingLists('plans', created, context?.tempId);
-      utils.plans.getById.setData({ id: created.id }, created);
+      if (!context) return;
+      writeTimeblockCache(queryClient, context, () => {
+        insertIntoMatchingLists('plans', created, context.tempId);
+        utils.plans.getById.setData({ id: created.id }, created);
+      });
     },
     onError: (error, _input, context) => {
       restore(context);
       reportCreateError(error);
     },
-    onSettled: invalidate,
+    onSettled: settleAndInvalidate,
   });
 
   const createRecord = api.recordCommands.create.useMutation({
@@ -416,19 +734,24 @@ export function useTimeblockWriteMutations(options: UseTimeblockWriteMutationsOp
         created_at: nowIso,
         updated_at: nowIso,
       };
-      insertIntoMatchingLists('records', tempRecord);
+      writeTimeblockCache(queryClient, context, () =>
+        insertIntoMatchingLists('records', tempRecord),
+      );
       return { ...context, tempId };
     },
     onSuccess: (created, _input, context) => {
       if (!created) return;
-      insertIntoMatchingLists('records', created, context?.tempId);
-      utils.records.getById.setData({ id: created.id }, created);
+      if (!context) return;
+      writeTimeblockCache(queryClient, context, () => {
+        insertIntoMatchingLists('records', created, context.tempId);
+        utils.records.getById.setData({ id: created.id }, created);
+      });
     },
     onError: (error, _input, context) => {
       restore(context);
       reportCreateError(error);
     },
-    onSettled: invalidate,
+    onSettled: settleAndInvalidate,
   });
 
   const updatePlan = api.planCommands.update.useMutation({
@@ -443,19 +766,30 @@ export function useTimeblockWriteMutations(options: UseTimeblockWriteMutationsOp
         ...(input.data.start_at !== undefined ? { start_at: input.data.start_at } : {}),
         ...(input.data.end_at !== undefined ? { end_at: input.data.end_at } : {}),
       });
-      patchMatchingLists('plans', input.id, patch);
-      utils.plans.getById.setData({ id: input.id }, (old) => (old ? patch(old) : old));
+      writeTimeblockCache(queryClient, context, () => {
+        recordPatchIntent(context, 'plans', input.id, patch);
+        patchMatchingLists('plans', input.id, patch);
+        utils.plans.getById.setData({ id: input.id }, (old) => (old ? patch(old) : old));
+      });
       return context;
     },
-    onSuccess: (updated) => {
-      replaceServerRow('plans', updated);
-      utils.plans.getById.setData({ id: updated.id }, updated);
+    onSuccess: (updated, _input, context) => {
+      if (!context) return;
+      writeTimeblockCache(
+        queryClient,
+        context,
+        () => {
+          replaceServerRow('plans', updated);
+          utils.plans.getById.setData({ id: updated.id }, updated);
+        },
+        (key, data) => replayServerTimeModelRow(key, data, 'plans', updated),
+      );
     },
     onError: (error, input, context) => {
       restore(context);
       reportUpdateError(error, input);
     },
-    onSettled: invalidate,
+    onSettled: settleAndInvalidate,
   });
 
   const updateRecord = api.recordCommands.update.useMutation({
@@ -471,19 +805,30 @@ export function useTimeblockWriteMutations(options: UseTimeblockWriteMutationsOp
         ...(input.data.end_at !== undefined ? { end_at: input.data.end_at } : {}),
         ...(input.data.fulfillment !== undefined ? { fulfillment: input.data.fulfillment } : {}),
       });
-      patchMatchingLists('records', input.id, patch);
-      utils.records.getById.setData({ id: input.id }, (old) => (old ? patch(old) : old));
+      writeTimeblockCache(queryClient, context, () => {
+        recordPatchIntent(context, 'records', input.id, patch);
+        patchMatchingLists('records', input.id, patch);
+        utils.records.getById.setData({ id: input.id }, (old) => (old ? patch(old) : old));
+      });
       return context;
     },
-    onSuccess: (updated) => {
-      replaceServerRow('records', updated);
-      utils.records.getById.setData({ id: updated.id }, updated);
+    onSuccess: (updated, _input, context) => {
+      if (!context) return;
+      writeTimeblockCache(
+        queryClient,
+        context,
+        () => {
+          replaceServerRow('records', updated);
+          utils.records.getById.setData({ id: updated.id }, updated);
+        },
+        (key, data) => replayServerTimeModelRow(key, data, 'records', updated),
+      );
     },
     onError: (error, input, context) => {
       restore(context);
       reportUpdateError(error, input);
     },
-    onSettled: invalidate,
+    onSettled: settleAndInvalidate,
   });
 
   const reportDeleteError = () => toast.error(t('toast.deleteFailed'));
@@ -493,62 +838,68 @@ export function useTimeblockWriteMutations(options: UseTimeblockWriteMutationsOp
     retry: false,
     onMutate: async (input): Promise<MutationContext> => {
       const context = await snapshot();
-      queryClient.setQueriesData<PlanListItem[]>({ predicate: isPlansListQuery }, (old) =>
-        old?.filter((row) => row.id !== input.id),
+      deleteTimeblockCacheRows(queryClient, context, 'plans', new Set([input.id]));
+      writeTimeblockCache(queryClient, context, () =>
+        utils.plans.getById.setData({ id: input.id }, undefined),
       );
-      utils.plans.getById.setData({ id: input.id }, undefined);
       return context;
     },
     onError: (_error, _input, context) => {
       restore(context);
       reportDeleteError();
     },
-    onSettled: invalidate,
+    onSettled: settleAndInvalidate,
   });
 
   const deleteRecord = api.recordCommands.delete.useMutation({
     retry: false,
     onMutate: async (input): Promise<MutationContext> => {
       const context = await snapshot();
-      queryClient.setQueriesData<RecordListItem[]>({ predicate: isRecordsListQuery }, (old) =>
-        old?.filter((row) => row.id !== input.id),
+      deleteTimeblockCacheRows(queryClient, context, 'records', new Set([input.id]));
+      writeTimeblockCache(queryClient, context, () =>
+        utils.records.getById.setData({ id: input.id }, undefined),
       );
-      utils.records.getById.setData({ id: input.id }, undefined);
       return context;
     },
     onError: (_error, _input, context) => {
       restore(context);
       reportDeleteError();
     },
-    onSettled: invalidate,
+    onSettled: settleAndInvalidate,
   });
 
   const restorePlan = api.planCommands.restore.useMutation({
     retry: false,
     onMutate: snapshot,
-    onSuccess: (restored) => {
-      insertIntoMatchingLists('plans', restored);
-      utils.plans.getById.setData({ id: restored.id }, restored);
+    onSuccess: (restored, _input, context) => {
+      if (!context) return;
+      writeTimeblockCache(queryClient, context, () => {
+        insertIntoMatchingLists('plans', restored);
+        utils.plans.getById.setData({ id: restored.id }, restored);
+      });
     },
     onError: (_error, _input, context) => {
       restore(context);
       reportRestoreError();
     },
-    onSettled: invalidate,
+    onSettled: settleAndInvalidate,
   });
 
   const restoreRecord = api.recordCommands.restore.useMutation({
     retry: false,
     onMutate: snapshot,
-    onSuccess: (restored) => {
-      insertIntoMatchingLists('records', restored);
-      utils.records.getById.setData({ id: restored.id }, restored);
+    onSuccess: (restored, _input, context) => {
+      if (!context) return;
+      writeTimeblockCache(queryClient, context, () => {
+        insertIntoMatchingLists('records', restored);
+        utils.records.getById.setData({ id: restored.id }, restored);
+      });
     },
     onError: (_error, _input, context) => {
       restore(context);
       reportRestoreError();
     },
-    onSettled: invalidate,
+    onSettled: settleAndInvalidate,
   });
 
   const fetchPlanById = async (id: string) => {

@@ -4,10 +4,12 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 vi.mock('@/lib/trpc', () => ({ api: {} }));
 
 import {
+  deleteTimeblockCacheRows,
   insertTimeModelRowIntoMatchingLists,
-  removeTimeModelRowsFromMatchingLists,
   restoreTimeblockLists,
+  settleTimeblockCache,
   snapshotTimeblockLists,
+  writeTimeblockCache,
 } from './useTimeblockWriteMutations';
 
 const plansKey = [['plans', 'list'], { type: 'query' }] as const;
@@ -52,8 +54,14 @@ describe('timeblock rollback isolation', () => {
       queryClient.setQueryData(plansKey, []);
       queryClient.setQueryData(recordsKey, []);
       const context = await snapshotTimeblockLists(queryClient);
-      insertTimeModelRowIntoMatchingLists(queryClient, 'plans', row('temp-a'));
-      insertTimeModelRowIntoMatchingLists(queryClient, lane, row('committed-b'));
+      writeTimeblockCache(queryClient, context, () =>
+        insertTimeModelRowIntoMatchingLists(queryClient, 'plans', row('temp-a')),
+      );
+      const committed = await snapshotTimeblockLists(queryClient);
+      writeTimeblockCache(queryClient, committed, () =>
+        insertTimeModelRowIntoMatchingLists(queryClient, lane, row('committed-b')),
+      );
+      settleTimeblockCache(queryClient, committed);
       restoreTimeblockLists(queryClient, context);
       const key = lane === 'plans' ? plansKey : recordsKey;
       expect(queryClient.getQueryData(key)).toEqual([row('committed-b')]);
@@ -70,8 +78,10 @@ describe('timeblock rollback isolation', () => {
     const queryClient = client();
     queryClient.setQueryData(plansKey, [row('a'), row('b')]);
     const context = await snapshotTimeblockLists(queryClient);
-    removeTimeModelRowsFromMatchingLists(queryClient, 'plans', new Set(['a']));
-    removeTimeModelRowsFromMatchingLists(queryClient, 'plans', new Set(['b']));
+    deleteTimeblockCacheRows(queryClient, context, 'plans', new Set(['a']));
+    const deletion = await snapshotTimeblockLists(queryClient);
+    deleteTimeblockCacheRows(queryClient, deletion, 'plans', new Set(['b']));
+    settleTimeblockCache(queryClient, deletion);
     restoreTimeblockLists(queryClient, context);
     expect(queryClient.getQueryData(plansKey)).toEqual([row('a')]);
     queryClient.clear();
@@ -82,7 +92,7 @@ describe('timeblock rollback isolation', () => {
     queryClient.setQueryData(plansKey, [row('a')]);
     queryClient.setQueryData(detailKey, row('b'));
     const context = await snapshotTimeblockLists(queryClient);
-    removeTimeModelRowsFromMatchingLists(queryClient, 'plans', new Set(['a']));
+    deleteTimeblockCacheRows(queryClient, context, 'plans', new Set(['a']));
     const refreshed = {
       ...row('b'),
       note: 'committed edit',
@@ -99,15 +109,19 @@ describe('timeblock rollback isolation', () => {
     const limitedKey = [['plans', 'list'], { type: 'query', input: { limit: 1 } }] as const;
     queryClient.setQueryData(limitedKey, [row('b')]);
     const context = await snapshotTimeblockLists(queryClient);
-    insertTimeModelRowIntoMatchingLists(queryClient, 'plans', {
-      ...row('temp-a'),
-      start_at: '2026-09-01T08:00:00.000Z',
-    });
+    writeTimeblockCache(queryClient, context, () =>
+      insertTimeModelRowIntoMatchingLists(queryClient, 'plans', {
+        ...row('temp-a'),
+        start_at: '2026-09-01T08:00:00.000Z',
+      }),
+    );
     expect(queryClient.getQueryData(limitedKey)).toEqual([
       { ...row('temp-a'), start_at: '2026-09-01T08:00:00.000Z' },
     ]);
     // B can be deleted through a loaded Inspector even when displaced from this list.
-    removeTimeModelRowsFromMatchingLists(queryClient, 'plans', new Set(['b']));
+    const deletion = await snapshotTimeblockLists(queryClient);
+    deleteTimeblockCacheRows(queryClient, deletion, 'plans', new Set(['b']));
+    settleTimeblockCache(queryClient, deletion);
     restoreTimeblockLists(queryClient, context);
     expect(queryClient.getQueryData(limitedKey)).toEqual([]);
     queryClient.clear();
@@ -119,9 +133,13 @@ describe('timeblock rollback isolation', () => {
     queryClient.setQueryData(plansKey, [original]);
     const first = await snapshotTimeblockLists(queryClient);
     const firstOptimistic = { ...original, title: 'failed title' };
-    queryClient.setQueryData(plansKey, [firstOptimistic]);
+    writeTimeblockCache(queryClient, first, () =>
+      queryClient.setQueryData(plansKey, [firstOptimistic]),
+    );
     const second = await snapshotTimeblockLists(queryClient);
-    queryClient.setQueryData(plansKey, [{ ...firstOptimistic, note: 'failed note' }]);
+    writeTimeblockCache(queryClient, second, () =>
+      queryClient.setQueryData(plansKey, [{ ...firstOptimistic, note: 'failed note' }]),
+    );
     restoreTimeblockLists(queryClient, first);
     restoreTimeblockLists(queryClient, second);
     expect(queryClient.getQueryData(plansKey)).toEqual([original]);
@@ -137,5 +155,16 @@ describe('timeblock rollback isolation', () => {
     restoreTimeblockLists(queryClient, context);
     expect(queryClient.getQueryData(plansKey)).toEqual([]);
     queryClient.clear();
+  });
+  it('removes a failed optimistic row from a query that had no data yet', async () => {
+    const queryClient = client();
+    queryClient.getQueryCache().build(queryClient, { queryKey: plansKey });
+    const context = await snapshotTimeblockLists(queryClient);
+    writeTimeblockCache(queryClient, context, () =>
+      insertTimeModelRowIntoMatchingLists(queryClient, 'plans', row('temp-a')),
+    );
+    expect(queryClient.getQueryData(plansKey)).toEqual([row('temp-a')]);
+    restoreTimeblockLists(queryClient, context);
+    expect(queryClient.getQueryData(plansKey)).toBeUndefined();
   });
 });
