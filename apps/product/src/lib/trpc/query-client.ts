@@ -123,5 +123,12 @@ export function createAppQueryClient(): QueryClient {
       },
     },
   });
+  // 課金状態は外部の解約・支払いで変わるため、一般データの鮮度を継承しない。
+  queryClient.setQueryDefaults([['billing', 'getOverview']], {
+    staleTime: 0,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: 'always',
+    meta: { persist: false },
+  });
   return queryClient;
 }
