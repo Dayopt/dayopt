@@ -138,7 +138,7 @@ spec-first の draft / 凍結は agent 単独の承認ではない。顧客挙�
 
 ## 外部知見・レビュー所見の抽出
 
-外部研究・事例や再利用できそうなレビュー所見から変更候補を考える時だけ、次の短いカードを使う。通常の製品 Issue に全項目を求めず、論文ごとの Issue や別の知見管理基盤を作らない。Issue Contract の入力仕様は [`dispatch` の handoff-quality テンプレート](../../.agents/skills/dispatch/SKILL.md)が正本。
+外部研究・事例や再利用できそうなレビュー所見から変更候補を考える時だけ、次の短いカードを使う。通常の製品 Issue に全項目を求めず、論文ごとの Issue や別の知見管理基盤を作らない。Issue Contract の 4 節は [`dispatch` の起票手順](../../.agents/skills/dispatch/SKILL.md)が正本。
 
 ```markdown
 ### <知見を一文で>
