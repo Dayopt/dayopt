@@ -30,7 +30,17 @@ if (a[0] === 'item' && a[1] === 'get') {
 `,
   );
   chmodSync(binary, 0o755);
+  const keychainBinary = join(root, 'security');
+  writeFileSync(
+    keychainBinary,
+    `#!${process.execPath}
+if(process.env.TEST_BOOTSTRAP_FAIL) { console.error('ops_test_private'); process.exit(1); }
+console.log(process.env.TEST_BAD_TOKEN ? 'invalid' : 'ops_test_private');
+`,
+  );
+  chmodSync(keychainBinary, 0o755);
   const config = {
+    keychainBinary,
     binary,
     account: 'a'.repeat(26),
     vault: 'b'.repeat(26),
@@ -53,6 +63,7 @@ catch (e) { console.error(e.message); process.exitCode = 1; }
         env: {
           ...process.env,
           TEST_LOG: log,
+          OP_SERVICE_ACCOUNT_TOKEN: '',
           OP_CONNECT_TOKEN: 'unwanted-connect',
           OP_SESSION: 'unwanted-session',
           ...extraEnv,
@@ -70,52 +81,48 @@ catch (e) { console.error(e.message); process.exitCode = 1; }
 }
 
 describe('agent op entry point', () => {
-  it('resolves only the configured item, verifies the SA, then runs an unfiltered vault list', () => {
+  it('uses the SA from Keychain without accessing human 1Password authentication', () => {
     const f = fixture();
     const result = f.run();
     expect(result.status).toBe(0);
     expect(JSON.parse(result.stdout)).toEqual([{ id: 'e'.repeat(26), name: 'agent' }]);
     const calls = f.calls();
-    expect(calls).toHaveLength(4);
-    expect(calls[0].args).toEqual([
-      'item',
-      'get',
-      'c'.repeat(26),
-      '--vault',
-      'b'.repeat(26),
-      '--account',
-      'a'.repeat(26),
-      '--format=json',
-    ]);
-    expect(calls[0].sa).toBe(false);
+    expect(calls).toHaveLength(3);
     expect(
-      calls
-        .slice(1)
-        .every((call) => call.sa && !call.connect && !call.session && call.biometric === 'false'),
+      calls.every(
+        (call) => call.sa && !call.connect && !call.session && call.biometric === 'false',
+      ),
     ).toBe(true);
-    expect(calls[3].args).toEqual(['vault', 'list']);
+    expect(calls[2].args).toEqual(['vault', 'list']);
+    expect(calls.some((call) => call.args[0] === 'item')).toBe(false);
     expect(result.stdout + result.stderr).not.toContain('ops_test_private');
   });
 
-  it('stops on bootstrap failure without exposing stderr or using human auth for the requested command', () => {
+  it('uses an injected token without requiring access to Keychain', () => {
+    const f = fixture({ OP_SERVICE_ACCOUNT_TOKEN: 'ops_test_private', TEST_BOOTSTRAP_FAIL: '1' });
+    expect(f.run().status).toBe(0);
+    expect(f.calls()).toHaveLength(3);
+  });
+
+  it('stops on Keychain failure without exposing stderr or falling back to human authentication', () => {
     const f = fixture({ TEST_BOOTSTRAP_FAIL: '1' });
     const result = f.run();
     expect(result.status).toBe(1);
-    expect(result.stderr).toContain('BOOTSTRAP_FAILED');
+    expect(result.stderr).toContain('TOKEN_UNAVAILABLE');
     expect(result.stdout + result.stderr).not.toContain('ops_test_private');
-    expect(f.calls()).toHaveLength(1);
+    expect(f.calls()).toHaveLength(0);
   });
 
-  it('stops when the stored item has no SA token', () => {
+  it('stops when Keychain returns an invalid token', () => {
     const f = fixture({ TEST_BAD_TOKEN: '1' });
-    expect(f.run().stderr).toContain('TOKEN_FIELD_NOT_UNIQUE');
-    expect(f.calls()).toHaveLength(1);
+    expect(f.run().stderr).toContain('TOKEN_INVALID');
+    expect(f.calls()).toHaveLength(0);
   });
 
   it('does not execute the requested command after a vault mismatch', () => {
     const f = fixture({ TEST_BAD_SCOPE: '1' });
     expect(f.run().stderr).toContain('VAULT_SCOPE_MISMATCH');
-    expect(f.calls()).toHaveLength(3);
+    expect(f.calls()).toHaveLength(2);
   });
 
   it.each([
