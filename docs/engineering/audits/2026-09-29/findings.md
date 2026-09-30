@@ -454,3 +454,16 @@ F044 published e2fd91c62a5ae8a2a4306bb21329190f2c942a8d via normalhook; OPEN/Dra
 - 状態: F046と同じproduct SHAに文書修正。architecture生成差分は新規test行・件数だけを機械照合。docs検証は別途記録する。
 
 F046/F047 final verification: product51bc4196ca138e10043a0c15ea874ee929b996cf whole Node24 check exit0,7714 passed (product4600), /tmp/dayopt-audit-check-trial-dialog.log; docs:check exit0 /tmp/dayopt-audit-trial-docs.log. Source/test bytes frozen; audit-only evidence commit and normal publication follow. The separate existing banner suite6 passes legacy Portal/polling only, not current expiry browser evidence.
+
+## F048 — migration通知の説明が廃止したラベル付与を示す
+
+- 根拠: upstream#2956はCI通知をbotコメントのmarker確認へ移行し、ラベル作成/付与を廃止した。check.mjsのrunMigrationSafety説明だけが「コメント→ラベル付与」「付与済み」を残していた。
+- 修正: 現行migration-noticeの責務に説明を同期。権限やruntimeには手を加えない。TypeScript parserでcommentsを除いたJS出力のbyte一致を確認。raw scannerはtemplate/regexの文脈を処理せず誤って差分を示したため採用しない。
+- 検証: upstream統合83e429b41のNode24全体check7707成功。コメント修正後は関連94件成功、`/tmp/dayopt-audit-migration-notice-comment-test.log`。文書訂正なので修正前失敗testは作らない。実GitHub通知や本番migrationは実行しない。
+
+課金経路の追加照合（未採用候補/反証）:
+
+- 同じoperationIdの再試行後に旧callbackが再度unlockする候補: installed TanStack query-core5.102.8 mutation.ts160-340を機械照合。retryer完了後だけsuccess/error callbackが走り、失敗通知後に同じmutationが再度success通知する経路はこのexecuteにない。既存の手動callbackテストだけから実際の二重通知を推定しない。success callback自身のthrow→onErrorはterminal IDを既に破棄するため旧IDとして拒否される。現callerに新たなattempt世代を追加しない。実ブラウザ/transport全体の証明ではない。
+- provider再送の環境前提: digestはemail/price/appUrlまたはcustomer/appUrlを持ち、enforcement/account/modeは含まない。既存open Checkoutの回復は当初trial条件を維持しうる。flag・provider変更時の未完了operationの扱いはrollout/activation/DB契約へ戻って確認する。configuration切替の実走なし、現時点で公開契約の変更を採用しない。
+- Invoice通貨: UIはamount/100、StoryのJPYも同じscale。現行の提供はUSD $5であり、Storyだけで本番JPY請求の到達を証明できない。currency/amountのprovider契約と過去請求の対応を確認してから採否を決める。今回表示単位は変えない。
+- OverviewはbillingInfoとaccessでprofilesを別々に取得する。UIとProviderも独立queryのため、同一snapshotを必須とする範囲・現在のrace影響を再現する必要がある。単に2回SELECTだから安全性欠陥とはしない。

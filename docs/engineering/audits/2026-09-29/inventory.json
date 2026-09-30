@@ -13666,10 +13666,12 @@
       "mode": "100644",
       "bytes": 8667,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 268]],
+      "evidence": [
+        "Full bounded untruncated read at933ec1cb2, baseline byte equality verified. Durable claim/start/reconcile/error classification, frontend retry/canonical IDs and old schema/activation compatibility examined. Mock callback tests do not prove transport lifetime or DB/Stripe atomicity. Provider replay/rollout/currency candidates require countercheck."
+      ],
       "questions": []
     },
     {
@@ -13679,10 +13681,12 @@
       "mode": "100644",
       "bytes": 7790,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 256]],
+      "evidence": [
+        "Full bounded untruncated read at933ec1cb2, baseline byte equality verified. Durable claim/start/reconcile/error classification, frontend retry/canonical IDs and old schema/activation compatibility examined. Mock callback tests do not prove transport lifetime or DB/Stripe atomicity. Provider replay/rollout/currency candidates require countercheck."
+      ],
       "questions": []
     },
     {
@@ -13692,10 +13696,12 @@
       "mode": "100644",
       "bytes": 18964,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 479]],
+      "evidence": [
+        "Full bounded untruncated read at933ec1cb2, baseline byte equality verified. Durable claim/start/reconcile/error classification, frontend retry/canonical IDs and old schema/activation compatibility examined. Mock callback tests do not prove transport lifetime or DB/Stripe atomicity. Provider replay/rollout/currency candidates require countercheck."
+      ],
       "questions": []
     },
     {
@@ -14139,10 +14145,12 @@
       "mode": "100644",
       "bytes": 5966,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 191]],
+      "evidence": [
+        "Full bounded untruncated read at933ec1cb2, baseline byte equality verified. Durable claim/start/reconcile/error classification, frontend retry/canonical IDs and old schema/activation compatibility examined. Mock callback tests do not prove transport lifetime or DB/Stripe atomicity. Provider replay/rollout/currency candidates require countercheck."
+      ],
       "questions": []
     },
     {
@@ -14165,10 +14173,12 @@
       "mode": "100644",
       "bytes": 3718,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 127]],
+      "evidence": [
+        "Full bounded untruncated read at933ec1cb2, baseline byte equality verified. Durable claim/start/reconcile/error classification, frontend retry/canonical IDs and old schema/activation compatibility examined. Mock callback tests do not prove transport lifetime or DB/Stripe atomicity. Provider replay/rollout/currency candidates require countercheck."
+      ],
       "questions": []
     },
     {
@@ -14738,10 +14748,12 @@
       "mode": "100644",
       "bytes": 1229,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 39]],
+      "evidence": [
+        "Full bounded untruncated read at933ec1cb2, baseline byte equality verified. Durable claim/start/reconcile/error classification, frontend retry/canonical IDs and old schema/activation compatibility examined. Mock callback tests do not prove transport lifetime or DB/Stripe atomicity. Provider replay/rollout/currency candidates require countercheck."
+      ],
       "questions": []
     },
     {
@@ -14751,10 +14763,12 @@
       "mode": "100644",
       "bytes": 24440,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 705]],
+      "evidence": [
+        "Full bounded untruncated read at933ec1cb2, baseline byte equality verified. Durable claim/start/reconcile/error classification, frontend retry/canonical IDs and old schema/activation compatibility examined. Mock callback tests do not prove transport lifetime or DB/Stripe atomicity. Provider replay/rollout/currency candidates require countercheck."
+      ],
       "questions": []
     },
     {
@@ -14764,10 +14778,12 @@
       "mode": "100644",
       "bytes": 38113,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 1255]],
+      "evidence": [
+        "Full bounded untruncated read at933ec1cb2, baseline byte equality verified. Durable claim/start/reconcile/error classification, frontend retry/canonical IDs and old schema/activation compatibility examined. Mock callback tests do not prove transport lifetime or DB/Stripe atomicity. Provider replay/rollout/currency candidates require countercheck."
+      ],
       "questions": []
     },
     {
@@ -14777,10 +14793,12 @@
       "mode": "100644",
       "bytes": 10744,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 304]],
+      "evidence": [
+        "Full bounded untruncated read at933ec1cb2, baseline byte equality verified. Durable claim/start/reconcile/error classification, frontend retry/canonical IDs and old schema/activation compatibility examined. Mock callback tests do not prove transport lifetime or DB/Stripe atomicity. Provider replay/rollout/currency candidates require countercheck."
+      ],
       "questions": []
     },
     {
@@ -14805,10 +14823,12 @@
       "mode": "100644",
       "bytes": 4936,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 142]],
+      "evidence": [
+        "Full bounded untruncated read at933ec1cb2, baseline byte equality verified. Durable claim/start/reconcile/error classification, frontend retry/canonical IDs and old schema/activation compatibility examined. Mock callback tests do not prove transport lifetime or DB/Stripe atomicity. Provider replay/rollout/currency candidates require countercheck."
+      ],
       "questions": []
     },
     {
@@ -33083,10 +33103,12 @@
       "mode": "100644",
       "bytes": 10273,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 254]],
+      "evidence": [
+        "All original text read: removed files via complete254/181-line deletion diff, old dispatch whole129-line replacement hunk, current billing spec whole. Baseline bytes match933ec1cb2. Removal tracked separately; no unread-to-exclusion conversion."
+      ],
       "questions": []
     },
     {
@@ -33096,10 +33118,12 @@
       "mode": "100644",
       "bytes": 6579,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 181]],
+      "evidence": [
+        "All original text read: removed files via complete254/181-line deletion diff, old dispatch whole129-line replacement hunk, current billing spec whole. Baseline bytes match933ec1cb2. Removal tracked separately; no unread-to-exclusion conversion."
+      ],
       "questions": []
     },
     {
@@ -42476,6 +42500,409 @@
       "read_ranges": [[1, 86]],
       "evidence": [
         "All86 lines reviewed; production hook/real context10 cases, red4/6 before source edit, green10; related Provider4. Synthetic data only. New file separately tracked, not baseline count."
+      ],
+      "questions": []
+    },
+    {
+      "path": ".agents/skills/dispatch/SKILL.md",
+      "sha": "83e429b4145aa24b53ac3081152aef972032d389",
+      "change": "M",
+      "blob": "53716c23c952cf211e6879e84e7e4a2a5a8b3a46",
+      "method": "full-text",
+      "status": "delta-reviewed",
+      "read_ranges": [],
+      "evidence": [
+        "Upstream#2956 entire30-file delta read, failed/truncated batch discarded; dispatch157 diff lines reread1-70/71-157, deletion447 diff lines1-180/181-340/341-447. Remaining grouped diffs untruncated. Integrated main0762bffe6 into owned checkout83e429b41, no conflicts/other checkout edits. Full Node24 check exit0,7707 tests including scripts2638; source product unchanged from51bc4196c. Changes retire fields/labels and cleanup, preserve auth/notification token isolation. Delta-only reading does not promote full baseline files. User explicit mission implementation/publication scope remains authority for existing combined audit Draft."
+      ],
+      "questions": []
+    },
+    {
+      "path": ".agents/skills/routing/references/handoff.md",
+      "sha": "83e429b4145aa24b53ac3081152aef972032d389",
+      "change": "M",
+      "blob": "3d3a87378498b3a298086db2c93f2055f25cb19b",
+      "method": "full-text",
+      "status": "delta-reviewed",
+      "read_ranges": [],
+      "evidence": [
+        "Upstream#2956 entire30-file delta read, failed/truncated batch discarded; dispatch157 diff lines reread1-70/71-157, deletion447 diff lines1-180/181-340/341-447. Remaining grouped diffs untruncated. Integrated main0762bffe6 into owned checkout83e429b41, no conflicts/other checkout edits. Full Node24 check exit0,7707 tests including scripts2638; source product unchanged from51bc4196c. Changes retire fields/labels and cleanup, preserve auth/notification token isolation. Delta-only reading does not promote full baseline files. User explicit mission implementation/publication scope remains authority for existing combined audit Draft."
+      ],
+      "questions": []
+    },
+    {
+      "path": ".github/ISSUE_TEMPLATE/bug.yml",
+      "sha": "83e429b4145aa24b53ac3081152aef972032d389",
+      "change": "M",
+      "blob": "bcb36055b319bf7747b597241c6f17ddd84e30f4",
+      "method": "full-text",
+      "status": "delta-reviewed",
+      "read_ranges": [],
+      "evidence": [
+        "Upstream#2956 entire30-file delta read, failed/truncated batch discarded; dispatch157 diff lines reread1-70/71-157, deletion447 diff lines1-180/181-340/341-447. Remaining grouped diffs untruncated. Integrated main0762bffe6 into owned checkout83e429b41, no conflicts/other checkout edits. Full Node24 check exit0,7707 tests including scripts2638; source product unchanged from51bc4196c. Changes retire fields/labels and cleanup, preserve auth/notification token isolation. Delta-only reading does not promote full baseline files. User explicit mission implementation/publication scope remains authority for existing combined audit Draft."
+      ],
+      "questions": []
+    },
+    {
+      "path": ".github/ISSUE_TEMPLATE/chore.yml",
+      "sha": "83e429b4145aa24b53ac3081152aef972032d389",
+      "change": "M",
+      "blob": "126576c5c91900e7aaf375d0bfed0b350e47fced",
+      "method": "full-text",
+      "status": "delta-reviewed",
+      "read_ranges": [],
+      "evidence": [
+        "Upstream#2956 entire30-file delta read, failed/truncated batch discarded; dispatch157 diff lines reread1-70/71-157, deletion447 diff lines1-180/181-340/341-447. Remaining grouped diffs untruncated. Integrated main0762bffe6 into owned checkout83e429b41, no conflicts/other checkout edits. Full Node24 check exit0,7707 tests including scripts2638; source product unchanged from51bc4196c. Changes retire fields/labels and cleanup, preserve auth/notification token isolation. Delta-only reading does not promote full baseline files. User explicit mission implementation/publication scope remains authority for existing combined audit Draft."
+      ],
+      "questions": []
+    },
+    {
+      "path": ".github/ISSUE_TEMPLATE/docs.yml",
+      "sha": "83e429b4145aa24b53ac3081152aef972032d389",
+      "change": "M",
+      "blob": "438f6cd077ab6f0bde1dcb57ca9d720b8db73efe",
+      "method": "full-text",
+      "status": "delta-reviewed",
+      "read_ranges": [],
+      "evidence": [
+        "Upstream#2956 entire30-file delta read, failed/truncated batch discarded; dispatch157 diff lines reread1-70/71-157, deletion447 diff lines1-180/181-340/341-447. Remaining grouped diffs untruncated. Integrated main0762bffe6 into owned checkout83e429b41, no conflicts/other checkout edits. Full Node24 check exit0,7707 tests including scripts2638; source product unchanged from51bc4196c. Changes retire fields/labels and cleanup, preserve auth/notification token isolation. Delta-only reading does not promote full baseline files. User explicit mission implementation/publication scope remains authority for existing combined audit Draft."
+      ],
+      "questions": []
+    },
+    {
+      "path": ".github/dependabot.yml",
+      "sha": "83e429b4145aa24b53ac3081152aef972032d389",
+      "change": "M",
+      "blob": "fbf3f77c3c348d0f93dcd72e0c3ac1b6756b86dc",
+      "method": "full-text",
+      "status": "delta-reviewed",
+      "read_ranges": [],
+      "evidence": [
+        "Upstream#2956 entire30-file delta read, failed/truncated batch discarded; dispatch157 diff lines reread1-70/71-157, deletion447 diff lines1-180/181-340/341-447. Remaining grouped diffs untruncated. Integrated main0762bffe6 into owned checkout83e429b41, no conflicts/other checkout edits. Full Node24 check exit0,7707 tests including scripts2638; source product unchanged from51bc4196c. Changes retire fields/labels and cleanup, preserve auth/notification token isolation. Delta-only reading does not promote full baseline files. User explicit mission implementation/publication scope remains authority for existing combined audit Draft."
+      ],
+      "questions": []
+    },
+    {
+      "path": ".github/workflows/ci.yml",
+      "sha": "83e429b4145aa24b53ac3081152aef972032d389",
+      "change": "M",
+      "blob": "fec82a448111d365f2cc3c40d6c322015bdcd299",
+      "method": "full-text",
+      "status": "delta-reviewed",
+      "read_ranges": [],
+      "evidence": [
+        "Upstream#2956 entire30-file delta read, failed/truncated batch discarded; dispatch157 diff lines reread1-70/71-157, deletion447 diff lines1-180/181-340/341-447. Remaining grouped diffs untruncated. Integrated main0762bffe6 into owned checkout83e429b41, no conflicts/other checkout edits. Full Node24 check exit0,7707 tests including scripts2638; source product unchanged from51bc4196c. Changes retire fields/labels and cleanup, preserve auth/notification token isolation. Delta-only reading does not promote full baseline files. User explicit mission implementation/publication scope remains authority for existing combined audit Draft."
+      ],
+      "questions": []
+    },
+    {
+      "path": ".github/workflows/nightly.yml",
+      "sha": "83e429b4145aa24b53ac3081152aef972032d389",
+      "change": "M",
+      "blob": "de59b992987f8c3d038ec2fadf35183874da5e28",
+      "method": "full-text",
+      "status": "delta-reviewed",
+      "read_ranges": [],
+      "evidence": [
+        "Upstream#2956 entire30-file delta read, failed/truncated batch discarded; dispatch157 diff lines reread1-70/71-157, deletion447 diff lines1-180/181-340/341-447. Remaining grouped diffs untruncated. Integrated main0762bffe6 into owned checkout83e429b41, no conflicts/other checkout edits. Full Node24 check exit0,7707 tests including scripts2638; source product unchanged from51bc4196c. Changes retire fields/labels and cleanup, preserve auth/notification token isolation. Delta-only reading does not promote full baseline files. User explicit mission implementation/publication scope remains authority for existing combined audit Draft."
+      ],
+      "questions": []
+    },
+    {
+      "path": ".github/workflows/production-config-audit.yml",
+      "sha": "83e429b4145aa24b53ac3081152aef972032d389",
+      "change": "M",
+      "blob": "7062993c2be79e7f193e08c7a38589520ffda380",
+      "method": "full-text",
+      "status": "delta-reviewed",
+      "read_ranges": [],
+      "evidence": [
+        "Upstream#2956 entire30-file delta read, failed/truncated batch discarded; dispatch157 diff lines reread1-70/71-157, deletion447 diff lines1-180/181-340/341-447. Remaining grouped diffs untruncated. Integrated main0762bffe6 into owned checkout83e429b41, no conflicts/other checkout edits. Full Node24 check exit0,7707 tests including scripts2638; source product unchanged from51bc4196c. Changes retire fields/labels and cleanup, preserve auth/notification token isolation. Delta-only reading does not promote full baseline files. User explicit mission implementation/publication scope remains authority for existing combined audit Draft."
+      ],
+      "questions": []
+    },
+    {
+      "path": ".github/workflows/promote.yml",
+      "sha": "83e429b4145aa24b53ac3081152aef972032d389",
+      "change": "M",
+      "blob": "7bafa38296809833166d00cf7f3b9b73b8f41573",
+      "method": "full-text",
+      "status": "delta-reviewed",
+      "read_ranges": [],
+      "evidence": [
+        "Upstream#2956 entire30-file delta read, failed/truncated batch discarded; dispatch157 diff lines reread1-70/71-157, deletion447 diff lines1-180/181-340/341-447. Remaining grouped diffs untruncated. Integrated main0762bffe6 into owned checkout83e429b41, no conflicts/other checkout edits. Full Node24 check exit0,7707 tests including scripts2638; source product unchanged from51bc4196c. Changes retire fields/labels and cleanup, preserve auth/notification token isolation. Delta-only reading does not promote full baseline files. User explicit mission implementation/publication scope remains authority for existing combined audit Draft."
+      ],
+      "questions": []
+    },
+    {
+      "path": "AGENTS.md",
+      "sha": "83e429b4145aa24b53ac3081152aef972032d389",
+      "change": "M",
+      "blob": "7e4db15c1ad71c195b87b440e45b5df999e93741",
+      "method": "full-text",
+      "status": "delta-reviewed",
+      "read_ranges": [],
+      "evidence": [
+        "Upstream#2956 entire30-file delta read, failed/truncated batch discarded; dispatch157 diff lines reread1-70/71-157, deletion447 diff lines1-180/181-340/341-447. Remaining grouped diffs untruncated. Integrated main0762bffe6 into owned checkout83e429b41, no conflicts/other checkout edits. Full Node24 check exit0,7707 tests including scripts2638; source product unchanged from51bc4196c. Changes retire fields/labels and cleanup, preserve auth/notification token isolation. Delta-only reading does not promote full baseline files. User explicit mission implementation/publication scope remains authority for existing combined audit Draft."
+      ],
+      "questions": []
+    },
+    {
+      "path": "docs/README.md",
+      "sha": "83e429b4145aa24b53ac3081152aef972032d389",
+      "change": "M",
+      "blob": "89bbd2cbe55e2f4f056ad8662af32252128af8a2",
+      "method": "full-text",
+      "status": "delta-reviewed",
+      "read_ranges": [],
+      "evidence": [
+        "Upstream#2956 entire30-file delta read, failed/truncated batch discarded; dispatch157 diff lines reread1-70/71-157, deletion447 diff lines1-180/181-340/341-447. Remaining grouped diffs untruncated. Integrated main0762bffe6 into owned checkout83e429b41, no conflicts/other checkout edits. Full Node24 check exit0,7707 tests including scripts2638; source product unchanged from51bc4196c. Changes retire fields/labels and cleanup, preserve auth/notification token isolation. Delta-only reading does not promote full baseline files. User explicit mission implementation/publication scope remains authority for existing combined audit Draft."
+      ],
+      "questions": []
+    },
+    {
+      "path": "docs/operations/ai-development-loop.md",
+      "sha": "83e429b4145aa24b53ac3081152aef972032d389",
+      "change": "M",
+      "blob": "3959c25755c1059a34a6f28cd16acf9578a72bbb",
+      "method": "full-text",
+      "status": "delta-reviewed",
+      "read_ranges": [],
+      "evidence": [
+        "Upstream#2956 entire30-file delta read, failed/truncated batch discarded; dispatch157 diff lines reread1-70/71-157, deletion447 diff lines1-180/181-340/341-447. Remaining grouped diffs untruncated. Integrated main0762bffe6 into owned checkout83e429b41, no conflicts/other checkout edits. Full Node24 check exit0,7707 tests including scripts2638; source product unchanged from51bc4196c. Changes retire fields/labels and cleanup, preserve auth/notification token isolation. Delta-only reading does not promote full baseline files. User explicit mission implementation/publication scope remains authority for existing combined audit Draft."
+      ],
+      "questions": []
+    },
+    {
+      "path": "docs/operations/contact-email.md",
+      "sha": "83e429b4145aa24b53ac3081152aef972032d389",
+      "change": "M",
+      "blob": "5564c9af31a0d2b87ede370805409ddb787c8444",
+      "method": "full-text",
+      "status": "delta-reviewed",
+      "read_ranges": [],
+      "evidence": [
+        "Upstream#2956 entire30-file delta read, failed/truncated batch discarded; dispatch157 diff lines reread1-70/71-157, deletion447 diff lines1-180/181-340/341-447. Remaining grouped diffs untruncated. Integrated main0762bffe6 into owned checkout83e429b41, no conflicts/other checkout edits. Full Node24 check exit0,7707 tests including scripts2638; source product unchanged from51bc4196c. Changes retire fields/labels and cleanup, preserve auth/notification token isolation. Delta-only reading does not promote full baseline files. User explicit mission implementation/publication scope remains authority for existing combined audit Draft."
+      ],
+      "questions": []
+    },
+    {
+      "path": "docs/operations/github-labels.md",
+      "sha": "83e429b4145aa24b53ac3081152aef972032d389",
+      "change": "M",
+      "blob": "97f4612a9e0b1216ae90822537cf24fd72c899e5",
+      "method": "full-text",
+      "status": "delta-reviewed",
+      "read_ranges": [],
+      "evidence": [
+        "Upstream#2956 entire30-file delta read, failed/truncated batch discarded; dispatch157 diff lines reread1-70/71-157, deletion447 diff lines1-180/181-340/341-447. Remaining grouped diffs untruncated. Integrated main0762bffe6 into owned checkout83e429b41, no conflicts/other checkout edits. Full Node24 check exit0,7707 tests including scripts2638; source product unchanged from51bc4196c. Changes retire fields/labels and cleanup, preserve auth/notification token isolation. Delta-only reading does not promote full baseline files. User explicit mission implementation/publication scope remains authority for existing combined audit Draft."
+      ],
+      "questions": []
+    },
+    {
+      "path": "docs/operations/runbook.md",
+      "sha": "83e429b4145aa24b53ac3081152aef972032d389",
+      "change": "M",
+      "blob": "938aa1a8ec31fbba2ee05878ae5f27b9c6e0b23d",
+      "method": "full-text",
+      "status": "delta-reviewed",
+      "read_ranges": [],
+      "evidence": [
+        "Upstream#2956 entire30-file delta read, failed/truncated batch discarded; dispatch157 diff lines reread1-70/71-157, deletion447 diff lines1-180/181-340/341-447. Remaining grouped diffs untruncated. Integrated main0762bffe6 into owned checkout83e429b41, no conflicts/other checkout edits. Full Node24 check exit0,7707 tests including scripts2638; source product unchanged from51bc4196c. Changes retire fields/labels and cleanup, preserve auth/notification token isolation. Delta-only reading does not promote full baseline files. User explicit mission implementation/publication scope remains authority for existing combined audit Draft."
+      ],
+      "questions": []
+    },
+    {
+      "path": "docs/operations/security.md",
+      "sha": "83e429b4145aa24b53ac3081152aef972032d389",
+      "change": "M",
+      "blob": "5586f9dd33880aa4461b3c843201b12a32a906c1",
+      "method": "full-text",
+      "status": "delta-reviewed",
+      "read_ranges": [],
+      "evidence": [
+        "Upstream#2956 entire30-file delta read, failed/truncated batch discarded; dispatch157 diff lines reread1-70/71-157, deletion447 diff lines1-180/181-340/341-447. Remaining grouped diffs untruncated. Integrated main0762bffe6 into owned checkout83e429b41, no conflicts/other checkout edits. Full Node24 check exit0,7707 tests including scripts2638; source product unchanged from51bc4196c. Changes retire fields/labels and cleanup, preserve auth/notification token isolation. Delta-only reading does not promote full baseline files. User explicit mission implementation/publication scope remains authority for existing combined audit Draft."
+      ],
+      "questions": []
+    },
+    {
+      "path": "scripts/__tests__/ci-token-isolation.test.ts",
+      "sha": "83e429b4145aa24b53ac3081152aef972032d389",
+      "change": "M",
+      "blob": "52a10e6e0464498cfeae5218d90c14cae6fbea0b",
+      "method": "full-text",
+      "status": "delta-reviewed",
+      "read_ranges": [],
+      "evidence": [
+        "Upstream#2956 entire30-file delta read, failed/truncated batch discarded; dispatch157 diff lines reread1-70/71-157, deletion447 diff lines1-180/181-340/341-447. Remaining grouped diffs untruncated. Integrated main0762bffe6 into owned checkout83e429b41, no conflicts/other checkout edits. Full Node24 check exit0,7707 tests including scripts2638; source product unchanged from51bc4196c. Changes retire fields/labels and cleanup, preserve auth/notification token isolation. Delta-only reading does not promote full baseline files. User explicit mission implementation/publication scope remains authority for existing combined audit Draft."
+      ],
+      "questions": []
+    },
+    {
+      "path": "scripts/__tests__/pre-tool-guard.test.ts",
+      "sha": "83e429b4145aa24b53ac3081152aef972032d389",
+      "change": "M",
+      "blob": "11a641201e3864dc6ed4e1eed2be8a7e57e25aa8",
+      "method": "full-text",
+      "status": "delta-reviewed",
+      "read_ranges": [],
+      "evidence": [
+        "Upstream#2956 entire30-file delta read, failed/truncated batch discarded; dispatch157 diff lines reread1-70/71-157, deletion447 diff lines1-180/181-340/341-447. Remaining grouped diffs untruncated. Integrated main0762bffe6 into owned checkout83e429b41, no conflicts/other checkout edits. Full Node24 check exit0,7707 tests including scripts2638; source product unchanged from51bc4196c. Changes retire fields/labels and cleanup, preserve auth/notification token isolation. Delta-only reading does not promote full baseline files. User explicit mission implementation/publication scope remains authority for existing combined audit Draft."
+      ],
+      "questions": []
+    },
+    {
+      "path": "scripts/ci/check.mjs",
+      "sha": "83e429b4145aa24b53ac3081152aef972032d389",
+      "change": "M",
+      "blob": "2342a0f56e210cb4c13d2572fdbe19fdd85f0ed5",
+      "method": "full-text",
+      "status": "delta-reviewed",
+      "read_ranges": [],
+      "evidence": [
+        "Upstream#2956 entire30-file delta read, failed/truncated batch discarded; dispatch157 diff lines reread1-70/71-157, deletion447 diff lines1-180/181-340/341-447. Remaining grouped diffs untruncated. Integrated main0762bffe6 into owned checkout83e429b41, no conflicts/other checkout edits. Full Node24 check exit0,7707 tests including scripts2638; source product unchanged from51bc4196c. Changes retire fields/labels and cleanup, preserve auth/notification token isolation. Delta-only reading does not promote full baseline files. User explicit mission implementation/publication scope remains authority for existing combined audit Draft."
+      ],
+      "questions": []
+    },
+    {
+      "path": "scripts/ci/check.test.ts",
+      "sha": "83e429b4145aa24b53ac3081152aef972032d389",
+      "change": "M",
+      "blob": "2894628070518382b0305a14aed349d37ec38362",
+      "method": "full-text",
+      "status": "delta-reviewed",
+      "read_ranges": [],
+      "evidence": [
+        "Upstream#2956 entire30-file delta read, failed/truncated batch discarded; dispatch157 diff lines reread1-70/71-157, deletion447 diff lines1-180/181-340/341-447. Remaining grouped diffs untruncated. Integrated main0762bffe6 into owned checkout83e429b41, no conflicts/other checkout edits. Full Node24 check exit0,7707 tests including scripts2638; source product unchanged from51bc4196c. Changes retire fields/labels and cleanup, preserve auth/notification token isolation. Delta-only reading does not promote full baseline files. User explicit mission implementation/publication scope remains authority for existing combined audit Draft."
+      ],
+      "questions": []
+    },
+    {
+      "path": "scripts/ci/clear-closed-workflow-status.mjs",
+      "sha": "83e429b4145aa24b53ac3081152aef972032d389",
+      "change": "D",
+      "blob": null,
+      "method": "full-text",
+      "status": "delta-reviewed",
+      "read_ranges": [],
+      "evidence": [
+        "Upstream#2956 entire30-file delta read, failed/truncated batch discarded; dispatch157 diff lines reread1-70/71-157, deletion447 diff lines1-180/181-340/341-447. Remaining grouped diffs untruncated. Integrated main0762bffe6 into owned checkout83e429b41, no conflicts/other checkout edits. Full Node24 check exit0,7707 tests including scripts2638; source product unchanged from51bc4196c. Changes retire fields/labels and cleanup, preserve auth/notification token isolation. Delta-only reading does not promote full baseline files. User explicit mission implementation/publication scope remains authority for existing combined audit Draft."
+      ],
+      "questions": []
+    },
+    {
+      "path": "scripts/ci/clear-closed-workflow-status.test.ts",
+      "sha": "83e429b4145aa24b53ac3081152aef972032d389",
+      "change": "D",
+      "blob": null,
+      "method": "full-text",
+      "status": "delta-reviewed",
+      "read_ranges": [],
+      "evidence": [
+        "Upstream#2956 entire30-file delta read, failed/truncated batch discarded; dispatch157 diff lines reread1-70/71-157, deletion447 diff lines1-180/181-340/341-447. Remaining grouped diffs untruncated. Integrated main0762bffe6 into owned checkout83e429b41, no conflicts/other checkout edits. Full Node24 check exit0,7707 tests including scripts2638; source product unchanged from51bc4196c. Changes retire fields/labels and cleanup, preserve auth/notification token isolation. Delta-only reading does not promote full baseline files. User explicit mission implementation/publication scope remains authority for existing combined audit Draft."
+      ],
+      "questions": []
+    },
+    {
+      "path": "scripts/ci/production-operations-audit.test.ts",
+      "sha": "83e429b4145aa24b53ac3081152aef972032d389",
+      "change": "M",
+      "blob": "c5605202db77acb917ed45615476e62939a8c08d",
+      "method": "full-text",
+      "status": "delta-reviewed",
+      "read_ranges": [],
+      "evidence": [
+        "Upstream#2956 entire30-file delta read, failed/truncated batch discarded; dispatch157 diff lines reread1-70/71-157, deletion447 diff lines1-180/181-340/341-447. Remaining grouped diffs untruncated. Integrated main0762bffe6 into owned checkout83e429b41, no conflicts/other checkout edits. Full Node24 check exit0,7707 tests including scripts2638; source product unchanged from51bc4196c. Changes retire fields/labels and cleanup, preserve auth/notification token isolation. Delta-only reading does not promote full baseline files. User explicit mission implementation/publication scope remains authority for existing combined audit Draft."
+      ],
+      "questions": []
+    },
+    {
+      "path": "scripts/ci/protected-path-gate.mjs",
+      "sha": "83e429b4145aa24b53ac3081152aef972032d389",
+      "change": "M",
+      "blob": "f8839cd425b97d0c5dea54ffff5457a6e08ac8d2",
+      "method": "full-text",
+      "status": "delta-reviewed",
+      "read_ranges": [],
+      "evidence": [
+        "Upstream#2956 entire30-file delta read, failed/truncated batch discarded; dispatch157 diff lines reread1-70/71-157, deletion447 diff lines1-180/181-340/341-447. Remaining grouped diffs untruncated. Integrated main0762bffe6 into owned checkout83e429b41, no conflicts/other checkout edits. Full Node24 check exit0,7707 tests including scripts2638; source product unchanged from51bc4196c. Changes retire fields/labels and cleanup, preserve auth/notification token isolation. Delta-only reading does not promote full baseline files. User explicit mission implementation/publication scope remains authority for existing combined audit Draft."
+      ],
+      "questions": []
+    },
+    {
+      "path": "scripts/hooks/pre-tool-guard-rules.mjs",
+      "sha": "83e429b4145aa24b53ac3081152aef972032d389",
+      "change": "M",
+      "blob": "78e4448140d0e0bab3a8774ec03936328d534336",
+      "method": "full-text",
+      "status": "delta-reviewed",
+      "read_ranges": [],
+      "evidence": [
+        "Upstream#2956 entire30-file delta read, failed/truncated batch discarded; dispatch157 diff lines reread1-70/71-157, deletion447 diff lines1-180/181-340/341-447. Remaining grouped diffs untruncated. Integrated main0762bffe6 into owned checkout83e429b41, no conflicts/other checkout edits. Full Node24 check exit0,7707 tests including scripts2638; source product unchanged from51bc4196c. Changes retire fields/labels and cleanup, preserve auth/notification token isolation. Delta-only reading does not promote full baseline files. User explicit mission implementation/publication scope remains authority for existing combined audit Draft."
+      ],
+      "questions": []
+    },
+    {
+      "path": "scripts/lib/factory-routing.mjs",
+      "sha": "83e429b4145aa24b53ac3081152aef972032d389",
+      "change": "M",
+      "blob": "61b960a1543ced19812c4b997666ef892936e74e",
+      "method": "full-text",
+      "status": "delta-reviewed",
+      "read_ranges": [],
+      "evidence": [
+        "Upstream#2956 entire30-file delta read, failed/truncated batch discarded; dispatch157 diff lines reread1-70/71-157, deletion447 diff lines1-180/181-340/341-447. Remaining grouped diffs untruncated. Integrated main0762bffe6 into owned checkout83e429b41, no conflicts/other checkout edits. Full Node24 check exit0,7707 tests including scripts2638; source product unchanged from51bc4196c. Changes retire fields/labels and cleanup, preserve auth/notification token isolation. Delta-only reading does not promote full baseline files. User explicit mission implementation/publication scope remains authority for existing combined audit Draft."
+      ],
+      "questions": []
+    },
+    {
+      "path": "scripts/lib/factory-routing.test.ts",
+      "sha": "83e429b4145aa24b53ac3081152aef972032d389",
+      "change": "M",
+      "blob": "a680fcb617bda1f2f14f0a343c98154ff8a8efa9",
+      "method": "full-text",
+      "status": "delta-reviewed",
+      "read_ranges": [],
+      "evidence": [
+        "Upstream#2956 entire30-file delta read, failed/truncated batch discarded; dispatch157 diff lines reread1-70/71-157, deletion447 diff lines1-180/181-340/341-447. Remaining grouped diffs untruncated. Integrated main0762bffe6 into owned checkout83e429b41, no conflicts/other checkout edits. Full Node24 check exit0,7707 tests including scripts2638; source product unchanged from51bc4196c. Changes retire fields/labels and cleanup, preserve auth/notification token isolation. Delta-only reading does not promote full baseline files. User explicit mission implementation/publication scope remains authority for existing combined audit Draft."
+      ],
+      "questions": []
+    },
+    {
+      "path": "scripts/tasks/ctx.mjs",
+      "sha": "83e429b4145aa24b53ac3081152aef972032d389",
+      "change": "M",
+      "blob": "6a4c728bcb3f6768b57feaccd56b0ffd77694d27",
+      "method": "full-text",
+      "status": "delta-reviewed",
+      "read_ranges": [],
+      "evidence": [
+        "Upstream#2956 entire30-file delta read, failed/truncated batch discarded; dispatch157 diff lines reread1-70/71-157, deletion447 diff lines1-180/181-340/341-447. Remaining grouped diffs untruncated. Integrated main0762bffe6 into owned checkout83e429b41, no conflicts/other checkout edits. Full Node24 check exit0,7707 tests including scripts2638; source product unchanged from51bc4196c. Changes retire fields/labels and cleanup, preserve auth/notification token isolation. Delta-only reading does not promote full baseline files. User explicit mission implementation/publication scope remains authority for existing combined audit Draft."
+      ],
+      "questions": []
+    },
+    {
+      "path": "scripts/tasks/ctx.test.ts",
+      "sha": "83e429b4145aa24b53ac3081152aef972032d389",
+      "change": "M",
+      "blob": "ffc8746fca93fb6d1e7a87dd983dda0c65871f50",
+      "method": "full-text",
+      "status": "delta-reviewed",
+      "read_ranges": [],
+      "evidence": [
+        "Upstream#2956 entire30-file delta read, failed/truncated batch discarded; dispatch157 diff lines reread1-70/71-157, deletion447 diff lines1-180/181-340/341-447. Remaining grouped diffs untruncated. Integrated main0762bffe6 into owned checkout83e429b41, no conflicts/other checkout edits. Full Node24 check exit0,7707 tests including scripts2638; source product unchanged from51bc4196c. Changes retire fields/labels and cleanup, preserve auth/notification token isolation. Delta-only reading does not promote full baseline files. User explicit mission implementation/publication scope remains authority for existing combined audit Draft."
+      ],
+      "questions": []
+    },
+    {
+      "path": "scripts/ci/check.mjs",
+      "sha": "fc9c892863d201a77e6fe8aaebb338caeae70ef3",
+      "change": "M",
+      "blob": "3514a5c634d791b69aff58d5489825a8adc6e731",
+      "method": "full-text",
+      "status": "delta-reviewed",
+      "read_ranges": [[868, 878]],
+      "evidence": [
+        "F048 two comment lines synchronized with current CI bot-marker notification. Entire owned diff reviewed, commentless parsed JS byte-identical before/after, related94 passes. Whole7707 checked at83e429b41; no repeated whole run needed for documentation-only semantic-equivalent edit."
       ],
       "questions": []
     }
