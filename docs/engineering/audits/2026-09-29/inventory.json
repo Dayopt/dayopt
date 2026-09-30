@@ -14925,10 +14925,12 @@
       "mode": "100644",
       "bytes": 8764,
       "method": "full-text",
-      "status": "unverified",
-      "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "status": "full-text-reviewed",
+      "reason": "Complete text read and baseline bytes verified equal",
+      "read_ranges": [[1, 255]],
+      "evidence": [
+        "Full 255 lines read at407ce5bf2 in1-150 and151-255. Existing settings tests explicitly separate missing row/null from FETCH_FAILED; no new template settings-failure regression yet. iCal test mocks UUID but returns a different stored token; not used as proof of generated token round-trip."
+      ],
       "questions": []
     },
     {
@@ -14938,10 +14940,12 @@
       "mode": "100644",
       "bytes": 9022,
       "method": "full-text",
-      "status": "unverified",
-      "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "status": "full-text-reviewed",
+      "reason": "Complete text read and baseline bytes match",
+      "read_ranges": [[1, 249]],
+      "evidence": [
+        "Full 249 lines read at407ce5bf2. SettingsService distinguishes missing row from fetch failure; template fallback currently differs. Partial update/upsert then personalization RPC and iCal token regeneration remain separate boundaries."
+      ],
       "questions": []
     },
     {
