@@ -22031,10 +22031,12 @@
       "mode": "100644",
       "bytes": 2141,
       "method": "full-text",
-      "status": "unverified",
-      "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "status": "full-text-reviewed",
+      "reason": "Full text read; baseline bytes verified equal",
+      "read_ranges": [[1, 52]],
+      "evidence": [
+        "Full52 lines read at667122c8d. Real QueryClient tests prove rate-limited query/mutation and access-ended mutation each execute once; no coverage of cache clear followed by late mutation rollback. Query-client115 source re-read but previously counted."
+      ],
       "questions": []
     },
     {
