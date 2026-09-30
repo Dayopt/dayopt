@@ -394,7 +394,7 @@ AI_GATEWAY_API_KEY="op://agent/vercel-ai-gateway/credential" op run -- pnpm jev:
 
 ## Service Account
 
-2026-09-30、User は Service Account 作成済みと報告し、ルールだけの vault 制限を権限と実行環境の分離へ移す方針を承認した。実行先は**専用クラウド環境**とする。2026-08-17 の「無人実行のみ・対話的 desktop 統合は変更しない」という適用範囲を更新し、対話・無人とも同じ境界に揃える。クラウドの provider / 接続先、作成済み SA の権限、token 注入は未確認であり、現行 Mac セッションの隔離完了を意味しない。
+2026-09-30、User は Service Account 作成済みと報告し、ルールだけの vault 制限を権限と実行環境の分離へ移す方針を承認した。実行先は**専用クラウド環境**とする。2026-08-17 の「無人実行のみ・対話的 desktop 統合は変更しない」という適用範囲を更新し、対話・無人とも同じ境界に揃える。同日、User は Codex Cloud の `dayopt` 環境への token / ID 登録と公開を報告した。公開後の task での照合、SA の read-only 等の管理権限、旧 Mac 起動経路の停止は未確認であり、現行 Mac セッションの隔離完了を意味しない。
 
 ### 権限と実行環境
 
@@ -428,7 +428,14 @@ pnpm agent:run -- claude
 
 ### Bootstrap と移行
 
-SA token の控えは **1Password の `human` に保管できる**（[公式の保管手順](https://www.1password.dev/service-accounts/get-started)）。旧記述の「1Password 自身には保管できない」は保存と起動時の取得を混同していたため訂正する。実行時には cloud secret store から注入し、agent が自分の token を 1Password から取得する循環を作らない。保管先と replica は実際に登録した時点で本ページの台帳に記録する。現在は登録先未決。
+SA token の控えは **1Password の `human` に保管できる**（[公式の保管手順](https://www.1password.dev/service-accounts/get-started)）。旧記述の「1Password 自身には保管できない」は保存と起動時の取得を混同していたため訂正する。実行時には cloud secret store から注入し、agent が自分の token を 1Password から取得する循環を作らない。
+
+| 登録先                        | 登録内容                                                                       | 確認状況                                                    |
+| ----------------------------- | ------------------------------------------------------------------------------ | ----------------------------------------------------------- |
+| Codex Cloud の Personal vault | `OP_SERVICE_ACCOUNT_TOKEN`。専用の `dayopt` 環境が個人の値を要求する           | 2026-09-30 に User が登録・公開を報告。公開後の注入は未検証 |
+| Codex Cloud の `dayopt` 環境  | `DAYOPT_AGENT_SERVICE_ACCOUNT_ID` / `DAYOPT_AGENT_VAULT_ID`。ID は秘密ではない | 同日、User が取得結果を共有し、環境へ登録・公開を報告       |
+
+token の控えの保管先は未確認。token 値や個人の ID 実値は本ページに保存しない。
 
 1. provider と実行先を確定し、人間用の認証・ファイル・tool 接続を持たない環境を用意する。Node.js は `.nvmrc`、pnpm は `packageManager` に揃え、1Password CLI を公式配布から導入する。
 2. 管理画面で SA の read-only / 1 vault / Environments 無し / vault 作成不可を確認し、SA ID・vault ID を登録する。token は秘密ストアの UI 等から注入し、chat や引数へ貼らない。
