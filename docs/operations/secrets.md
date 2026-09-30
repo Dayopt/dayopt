@@ -445,10 +445,10 @@ pnpm agent:run -- claude
 
 SA token の控えは **1Password の `human` に保管できる**（[公式の保管手順](https://www.1password.dev/service-accounts/get-started)）。旧記述の「1Password 自身には保管できない」は保存と起動時の取得を混同していたため訂正する。クラウドでは cloud secret store から注入する。ローカルの初回起動では User が専用ユーザーの Terminal に非表示入力し、process 内だけで保持する。agent が自分の token を 1Password から取得する循環を作らない。
 
-| 登録先                        | 登録内容                                                                       | 確認状況                                                                                                                                                                   |
-| ----------------------------- | ------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Codex Cloud の Personal vault | `OP_SERVICE_ACCOUNT_TOKEN`。専用の `dayopt` 環境が個人の値を要求する           | 2026-10-01 に適用先を dayopt のみに限定して保存。編集環境では画面から開始した turn の注入・SA認証・agent 1件を実測。CLI と起動手順を再公開済み。公開後の通常 task は未検証 |
-| Codex Cloud の `dayopt` 環境  | `DAYOPT_AGENT_SERVICE_ACCOUNT_ID` / `DAYOPT_AGENT_VAULT_ID`。ID は秘密ではない | 2026-09-30 に User が登録・公開を報告。2026-10-01 に指定値一致を実測                                                                                                       |
+| 登録先                        | 登録内容                                                                       | 確認状況                                                                                                                                                                                                               |
+| ----------------------------- | ------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Codex Cloud の Personal vault | `OP_SERVICE_ACCOUNT_TOKEN`。専用の `dayopt` 環境が個人の値を要求する           | 2026-10-01 に適用先を dayopt のみに限定して保存。編集環境では画面から開始した turn の注入・SA認証・agent 1件を実測。CLI と起動手順を再公開済み。新しい通常 task でも token 注入・agent 1件・token なしの認証失敗を実測 |
+| Codex Cloud の `dayopt` 環境  | `DAYOPT_AGENT_SERVICE_ACCOUNT_ID` / `DAYOPT_AGENT_VAULT_ID`。ID は秘密ではない | 2026-09-30 に User が登録・公開を報告。2026-10-01 に指定値一致を実測                                                                                                                                                   |
 
 token の控えの保管先は未確認。token 値や個人の ID 実値は本ページに保存しない。
 
@@ -469,7 +469,7 @@ token の控えの保管先は未確認。token 値や個人の ID 実値は本�
 
 専用クラウドの CLI は `/workspace/.dayopt-1password/bin/op` に配置する。起動用スキルで SA 認証・vault 範囲と token なしの認証失敗を検証し、未注入なら停止する。標準 PATH のディレクトリは書き込み不可のため、各 shell でこのディレクトリを PATH の先頭に加えるか、launcher の絶対パスを使う。launcher は SA token 以外の `OP_*` を除去し、専用の CLI 設定を使う。秘密や人間用 account/session は image に保存しない。
 
-status API の secret binding / readiness の表示だけでは token 注入の可否を判定しない。実行 process 内で存在を boolean として確認し、SA 認証と絞り込みなしの vault 一覧で検証する。編集環境の成功と、再公開後の新しい通常 task の成功は別に判定する。
+status API の secret binding / readiness の表示だけでは token 注入の可否を判定しない。実行 process 内で存在を boolean として確認し、SA 認証と絞り込みなしの vault 一覧で検証する。編集環境の成功と、再公開後の新しい通常 task の成功は別に判定する。2026-10-01 に通常 task への CLI と token の継承も確認済み。保存した Start skill が通常 task から自動取得されることは未確認のため、CLI の場所と検証手順は task の依頼にも含める。
 
 **Network secret は使わない。** Network secret は proxy が置換する placeholder を process に渡す方式であり、1Password CLI が必要とする実 token を直接読めない。Personal vault の Environment variable は保存後の UI では値が隠れるが、実行する task は実値を読める。アクセス範囲は SA の権限と専用クラウドの分離で制限する。
 
