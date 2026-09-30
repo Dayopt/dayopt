@@ -13,6 +13,27 @@ import {
  * gap は前方へ送る、fold は早い方、を実 instant で固定する。
  */
 describe('anchorMinuteToInstant', () => {
+  it.each([
+    ['Africa/Casablanca', '2025-02-23', 150, '2025-02-23T01:30:00.000Z'],
+    ['America/Anchorage', '2025-11-02', 90, '2025-11-02T09:30:00.000Z'],
+  ])(
+    '前日の offset が必要な %s の fold でも早い instant を選ぶ',
+    (timezone, dateKey, minute, expected) => {
+      // 守ること: 時計が戻る日の二重の壁時計時刻では、常に早い instant を選ぶ。
+      const formatter = new Intl.DateTimeFormat('en-GB', {
+        timeZone: timezone,
+        hour: '2-digit',
+        minute: '2-digit',
+        hourCycle: 'h23',
+      });
+      const early = new Date(expected);
+      const late = new Date(early.getTime() + 3_600_000);
+      // 独立した Intl で両 instant が同じ壁時計時刻を指すことも確認する。
+      expect(formatter.format(early)).toBe(formatter.format(late));
+      expect(anchorMinuteToInstant(dateKey, minute, timezone).toISOString()).toBe(expected);
+    },
+  );
+
   it('UTC では壁時計がそのまま instant になる', () => {
     expect(anchorMinuteToInstant('2026-09-05', 9 * 60 + 30, 'UTC').toISOString()).toBe(
       '2026-09-05T09:30:00.000Z',
