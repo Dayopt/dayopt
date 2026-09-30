@@ -7,7 +7,7 @@ import { WeekTrace } from './WeekTrace';
 afterEach(cleanup);
 
 it('lets a reader select a day while keeping the plan and record durations independent', () => {
-  const { container } = render(
+  render(
     <WeekTrace
       copy={{
         label: '一週間の表示例',
@@ -19,14 +19,16 @@ it('lets a reader select a day while keeping the plan and record durations indep
       }}
     />,
   );
-  const wednesday = screen.getByRole('button', { name: /水:/ });
+  const monday = screen.getByRole('radio', { name: /月:/ });
+  const wednesday = screen.getByRole('radio', { name: /水: 予定 150 分, 記録 135 分/ });
+  expect(monday).toHaveProperty('checked', true);
+  expect(wednesday).toHaveProperty('checked', false);
   fireEvent.click(wednesday);
-  expect(wednesday.getAttribute('aria-pressed')).toBe('true');
-  expect(container.querySelector('figcaption')?.textContent).toContain('150');
-  expect(container.querySelector('figcaption')?.textContent).toContain('135');
-  const friday = screen.getByRole('button', { name: /金:/ });
+  expect(wednesday).toHaveProperty('checked', true);
+  expect(monday).toHaveProperty('checked', false);
+  const friday = screen.getByRole('radio', { name: /金:/ });
+  expect(friday).toHaveProperty('checked', false);
   fireEvent.click(friday);
-  expect(wednesday.getAttribute('aria-pressed')).toBe('false');
-  expect(friday.getAttribute('aria-pressed')).toBe('true');
-  expect(container.querySelector('figcaption')?.textContent).toContain('180');
+  expect(wednesday).toHaveProperty('checked', false);
+  expect(friday).toHaveProperty('checked', true);
 });

@@ -26,7 +26,10 @@ it('keeps retry and home available when the detailed error view cannot load', as
   await waitFor(() => expect(capture).toHaveBeenCalledWith(error, 'root_error'));
   await waitFor(() =>
     expect(capture).toHaveBeenCalledWith(
-      expect.objectContaining({ message: 'error view chunk failed' }),
+      // Vitest wraps a failed module factory; the rejected import retains the original cause.
+      expect.objectContaining({
+        cause: expect.objectContaining({ message: 'error view chunk failed' }),
+      }),
       'root_error',
     ),
   );
