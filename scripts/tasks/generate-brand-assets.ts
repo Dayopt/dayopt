@@ -4,6 +4,7 @@ import path from 'node:path';
 import sharp from 'sharp';
 import { DAYOPT_BRAND as brand } from '../../packages/assets/src/brand';
 import { createDeterministicZip } from '../lib/create-deterministic-zip';
+import { BRAND_DOCUMENT_SOURCE, BRAND_DOCUMENT_TARGETS } from '../lib/docs-live/brand-document';
 
 async function main() {
   const root = process.cwd();
@@ -193,11 +194,12 @@ async function main() {
     );
   }
   // zip is available on macOS/Linux; no extra JavaScript dependency required.
-  for (const app of ['product', 'web']) {
-    const dest = path.join(root, `apps/${app}/public/brand`);
-    await copyFile(path.join(root, 'docs/business/brand.md'), path.join(dest, 'README.md'));
+  for (const document of BRAND_DOCUMENT_TARGETS) {
+    const dest = path.dirname(path.join(root, document));
+    const pub = path.dirname(dest);
+    await copyFile(path.join(root, BRAND_DOCUMENT_SOURCE), path.join(root, document));
     for (const name of ['og-image.png', 'og-image-light.png', 'og-image-dark.png']) {
-      await copyFile(path.join(root, `apps/${app}/public`, name), path.join(dest, name));
+      await copyFile(path.join(pub, name), path.join(dest, name));
     }
     const files = (await readdir(dest)).filter((name) => !name.endsWith('.zip')).sort();
     await createDeterministicZip(dest, 'dayopt-brand-F.zip', files);

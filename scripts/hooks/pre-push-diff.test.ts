@@ -1,3 +1,7 @@
+import { spawnSync } from 'node:child_process';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 
 import {
@@ -8,6 +12,70 @@ import {
 } from './pre-push-diff.mjs';
 
 const ZERO = '0000000000000000000000000000000000000000';
+
+describe('ローカル / リモート共通の文書検査', () => {
+  it.each(['manual', 'push'] as const)(
+    '%s 経路で文書違反があれば後続の検査へ進まず失敗する',
+    (entry) => {
+      const result = runDocumentationPreflight(entry, true);
+      expect(result.status).not.toBe(0);
+      expect(result.trace).toContain('pnpm docs:check');
+      expect(result.trace).not.toContain('pnpm typecheck');
+      expect(result.trace).not.toContain('npx turbo');
+    },
+  );
+  it.each(['manual', 'push'] as const)('%s 経路で文書検査成功後に従来の検査を続ける', (entry) => {
+    const result = runDocumentationPreflight(entry, false);
+    expect(result.status).toBe(0);
+    expect(result.trace).toContain('pnpm docs:check');
+    expect(result.trace).toContain(
+      entry === 'manual' ? 'pnpm typecheck' : 'pnpm typecheck:scripts',
+    );
+  });
+});
+
+function runDocumentationPreflight(entry: 'manual' | 'push', fail: boolean) {
+  const repo = resolve(import.meta.dirname, '../..');
+  const root = mkdtempSync(join(tmpdir(), 'dayopt-doc-preflight-'));
+  try {
+    const bin = join(root, 'bin');
+    mkdirSync(bin);
+    mkdirSync(join(root, '.git/dayopt-push-confirm'), { recursive: true });
+    writeFileSync(join(root, '.git/dayopt-push-confirm/confirmed'), '');
+    const scripts: Record<string, string> = {
+      pnpm: 'printf "pnpm %s\\n" "$*" >> "$DOC_PREFLIGHT_TRACE"\nif [ "$1" = "docs:check" ] && [ "$DOC_PREFLIGHT_FAIL" = "1" ]; then exit 19; fi\nexit 0',
+      git: 'case "$1" in rev-parse) echo .git ;; hash-object) cat >/dev/null; echo confirmed ;; *) exit 1 ;; esac',
+      node: 'echo no-skip',
+      npx: 'printf "npx %s\\n" "$*" >> "$DOC_PREFLIGHT_TRACE"\necho "{}"',
+      jq: 'cat >/dev/null; echo 0',
+    };
+    for (const [name, body] of Object.entries(scripts))
+      writeFileSync(join(bin, name), '#!/bin/sh\n' + body + '\n', { mode: 0o755 });
+    const command =
+      entry === 'manual'
+        ? ['-c', JSON.parse(readFileSync(join(repo, 'package.json'), 'utf8')).scripts.check]
+        : [join(repo, '.husky/pre-push')];
+    const trace = join(root, 'trace');
+    writeFileSync(trace, '');
+    const result = spawnSync('sh', command, {
+      cwd: root,
+      env: {
+        ...process.env,
+        PATH: `${bin}:${process.env.PATH}`,
+        CI: '1',
+        DOC_PREFLIGHT_TRACE: trace,
+        DOC_PREFLIGHT_FAIL: fail ? '1' : '0',
+      },
+      input:
+        'refs/heads/test 1111111111111111111111111111111111111111 refs/heads/test 0000000000000000000000000000000000000000\n',
+      encoding: 'utf8',
+      timeout: 10000,
+    });
+    return { status: result.status, trace: readFileSync(trace, 'utf8') };
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
 
 describe('parseRefUpdates', () => {
   it('git pre-push hook の stdin 形式を1行ずつパースする', () => {

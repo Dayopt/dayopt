@@ -23,14 +23,7 @@ ProductのProduction build gateは、どちらかの値がない場合、URLがH
 
 ## 現行quota
 
-| 境界                 | quota          |
-| -------------------- | -------------- |
-| contact              | 5回 / 1時間    |
-| protected tRPC       | 100回 / 1分    |
-| timeblock作成        | 500回 / 24時間 |
-| iCal feed            | 10回 / 1分     |
-| CSP report（IP単位） | 20回 / 1分     |
-| CSP report（全体）   | 120回 / 1分    |
+末尾の生成領域で境界別の設定定義を読む。これはrepoの期待値であり、Upstashの稼働状態や適用済み設定を証明しない。
 
 ## 確認
 
@@ -48,3 +41,11 @@ Upstash dashboardではrequest volume、latency、errorを確認する。keyを�
 - 429急増: 攻撃・誤loop・quota不足を切り分け、Sentryのaccepted / discarded eventと合わせて確認する
 
 関連: [Monitoring](../../../../../../docs/operations/monitoring.md)、[Runbook](../../../../../../docs/operations/runbook.md)
+
+## 機械取得する現状
+
+<!-- docs-live:facts:start -->
+
+抽出対象の登録は [scripts/lib/docs-live/facts.ts](../../../../../../scripts/lib/docs-live/facts.ts)。現在の一覧は `pnpm docs:read apps/product/src/lib/rate-limit/docs/upstash-setup.md` で生成して読む。
+
+<!-- docs-live:facts:end -->
