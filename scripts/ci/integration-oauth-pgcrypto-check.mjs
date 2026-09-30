@@ -17,12 +17,16 @@ const align = readMigration('20260928044000_align_integration_oauth_branch_origi
 const prepare = readMigration('20260928043959_prepare_integration_catalog_hash');
 const harden = readMigration('20260930020815_harden_integration_oauth_authority');
 const remove = readMigration('20260930020816_remove_integration_catalog_hash_helper');
+const previewPredecessor = readMigration('20260729114832_harden_mcp_preview_seed_fixture');
 const setup = `BEGIN;
 SET LOCAL app.isolated_validation = on;
 INSERT INTO public.mcp_environment_identity (
   singleton_key, environment, authorization_server_uri, resource_uri, supabase_project_ref
 ) VALUES (true, 'production', 'https://app.dayopt.app', 'https://mcp.dayopt.app', NULL);
 CREATE TEMP TABLE authority_before AS SELECT * FROM public.mcp_environment_identity;
+ALTER TABLE public.mcp_environment_identity
+  DROP CONSTRAINT mcp_environment_identity_preview_integration_fence_check;
+${previewPredecessor}
 ALTER EXTENSION pgcrypto SET SCHEMA auth;
 DROP FUNCTION public.ensure_mcp_integration_environment_identity_v1();
 ${initial}
