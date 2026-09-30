@@ -350,3 +350,14 @@ H024の反証追記: installed `@supabase/auth-js@2.116.0` のGoTrueClient.ts 40
 - 次: substrate/record RPCと統合testの残り全文を読み、insert receipt後のactivity/fulfillment更新を隔離DBで再現する。既存receiptの短期TTL/保持/互換条件とconsumer計画を照合し、新しい列をblindに必須化しない。実DB対象の確認が必要であり、共有activationや本番へ検査を向けない。
 
 H038追記: 初期RPC948行・後続guard27行・統合test931行を全文確認。#2394の移設Step3原文§4はinsert作成時全フィールドを要求する。現行testは5列だけをfull maskとして複製し、activity/fulfillment事後変更の負例は無い。現在検索したapps/packages/scriptsにはgenerated types・testを除くRPC callsiteは無い。#2435のclosed/activation OFF計画を実装・配信証拠にはしない。ローカルDB専用test未実行。更新Undoのmask外変更を許す契約を行全体CASへ変更する提案は却下し、insert側だけの保護と旧receipt互換を次に調べる。
+
+## F039 - Activity/time updates do not optimistically enter destination list caches
+
+- Status: reproduced and fixed in 7b5508ff1; whole check running. Mission #2963. Distinct from H038 DB receipts.
+- Contract: Inspector activity selection saves immediately; user mutations update detail/list/filter caches while awaiting persistence. Omission preserves activity, explicit null clears it. Keep raw microsecond updated_at.
+- Cause: handleActivityChange -> enqueueSave -> updatePlan/updateRecord. Both patches lacked activityId; patchMatchingLists only visited caches already containing the row, so destination activity/time lists stayed empty.
+- Reproduction: Node24 pnpm test -- src/features/timeblock/hooks/useTimeblockWriteMutations.inline-error.test.tsx actually ran all product unit tests: 2 failed/4517 passed, both expected activity-after but got activity-before. Same command after fix: 4519 passed. Additional targeted boundaries: 2 files/26 passed, final target 23 passed. Logs /tmp/dayopt-audit-activity-optimistic-{red,green,boundaries,final-target}.log.
+- Fix: both patches map explicit activityId to activity_id. Reuse server-row list membership handling for destination caches, but patch each existing cache row independently so newer untouched fields are preserved. Search remains server-revalidated; unknown offset page insertion is avoided. Existing snapshot rollback remains.
+- Countercheck: Inspector local value does not update list caches. Copying the first cached row over all existing rows was rejected because it can regress newer note/version. Test preserves those fields. Server/DB contract, permissions and interaction count unchanged. Actual hook callbacks with synthetic cache/tRPC, not browser/DB observation. Whole-snapshot concurrent rollback and temporary-ID collisions remain separate candidates.
+
+F039 verification completed: whole pnpm check exit0 at product7b5508ff1, 7637 tests/types/lint/static/deadcode successful; docs:check exit0. Reproduction and synthetic-boundary limits above still apply.

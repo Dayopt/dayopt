@@ -10681,10 +10681,12 @@
       "mode": "100644",
       "bytes": 1923,
       "method": "full-text",
-      "status": "unverified",
-      "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "status": "full-text-reviewed",
+      "reason": "Current first-party hook fully read without truncation",
+      "read_ranges": [[1, 51]],
+      "evidence": [
+        "Full read at 7b5508ff1; baseline byte match. Context/keyboard delete and DnD use mutation-returned version for Undo; migrated records rejected. Coalesced queue serializes pending patches, discards stale/billing failures and pauses uncertain writes. Cross-target queue lifetime still pending tests/parent-key review."
+      ],
       "questions": []
     },
     {
@@ -10707,10 +10709,12 @@
       "mode": "100644",
       "bytes": 7881,
       "method": "full-text",
-      "status": "unverified",
-      "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "status": "full-text-reviewed",
+      "reason": "Current first-party hook fully read without truncation",
+      "read_ranges": [[1, 221]],
+      "evidence": [
+        "Full read at 7b5508ff1; baseline byte match. Context/keyboard delete and DnD use mutation-returned version for Undo; migrated records rejected. Coalesced queue serializes pending patches, discards stale/billing failures and pauses uncertain writes. Cross-target queue lifetime still pending tests/parent-key review."
+      ],
       "questions": []
     },
     {
@@ -15161,10 +15165,12 @@
       "mode": "100644",
       "bytes": 27991,
       "method": "full-text",
-      "status": "unverified",
-      "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "status": "full-text-reviewed",
+      "reason": "Current hook/component/test fully read in untruncated chunks before modification",
+      "read_ranges": [[1, 757]],
+      "evidence": [
+        "Full pre-edit text at fce767dec; baseline bytes match. Inspector activity save -> optimistic cache -> server row and deletion response version -> restore traced. F039 red2/green. Whole check running. Receipt substrate differs from current soft-delete/restore UI."
+      ],
       "questions": []
     },
     {
@@ -15949,10 +15955,12 @@
       "mode": "100644",
       "bytes": 4569,
       "method": "full-text",
-      "status": "unverified",
-      "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "status": "full-text-reviewed",
+      "reason": "Current first-party hook fully read without truncation",
+      "read_ranges": [[1, 144]],
+      "evidence": [
+        "Full read at 7b5508ff1; baseline byte match. Context/keyboard delete and DnD use mutation-returned version for Undo; migrated records rejected. Coalesced queue serializes pending patches, discards stale/billing failures and pauses uncertain writes. Cross-target queue lifetime still pending tests/parent-key review."
+      ],
       "questions": []
     },
     {
@@ -16040,10 +16048,12 @@
       "mode": "100644",
       "bytes": 2881,
       "method": "full-text",
-      "status": "unverified",
-      "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "status": "full-text-reviewed",
+      "reason": "Current hook/component/test fully read in untruncated chunks before modification",
+      "read_ranges": [[1, 82]],
+      "evidence": [
+        "Full pre-edit text at fce767dec; baseline bytes match. Inspector activity save -> optimistic cache -> server row and deletion response version -> restore traced. F039 red2/green. Whole check running. Receipt substrate differs from current soft-delete/restore UI."
+      ],
       "questions": []
     },
     {
@@ -16053,10 +16063,12 @@
       "mode": "100644",
       "bytes": 1724,
       "method": "full-text",
-      "status": "unverified",
-      "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "status": "full-text-reviewed",
+      "reason": "Current hook/component/test fully read in untruncated chunks before modification",
+      "read_ranges": [[1, 50]],
+      "evidence": [
+        "Full pre-edit text at fce767dec; baseline bytes match. Inspector activity save -> optimistic cache -> server row and deletion response version -> restore traced. F039 red2/green. Whole check running. Receipt substrate differs from current soft-delete/restore UI."
+      ],
       "questions": []
     },
     {
@@ -16094,10 +16106,12 @@
       "mode": "100644",
       "bytes": 20388,
       "method": "full-text",
-      "status": "unverified",
-      "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "status": "full-text-reviewed",
+      "reason": "Current hook/component/test fully read in untruncated chunks before modification",
+      "read_ranges": [[1, 567]],
+      "evidence": [
+        "Full pre-edit text at fce767dec; baseline bytes match. Inspector activity save -> optimistic cache -> server row and deletion response version -> restore traced. F039 red2/green. Whole check running. Receipt substrate differs from current soft-delete/restore UI."
+      ],
       "questions": []
     },
     {
@@ -16107,10 +16121,12 @@
       "mode": "100644",
       "bytes": 2438,
       "method": "full-text",
-      "status": "unverified",
-      "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "status": "full-text-reviewed",
+      "reason": "Current hook/component/test fully read in untruncated chunks before modification",
+      "read_ranges": [[1, 76]],
+      "evidence": [
+        "Full pre-edit text at fce767dec; baseline bytes match. Inspector activity save -> optimistic cache -> server row and deletion response version -> restore traced. F039 red2/green. Whole check running. Receipt substrate differs from current soft-delete/restore UI."
+      ],
       "questions": []
     },
     {
@@ -16120,10 +16136,12 @@
       "mode": "100644",
       "bytes": 20278,
       "method": "full-text",
-      "status": "unverified",
-      "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "status": "full-text-reviewed",
+      "reason": "Current hook/component/test fully read in untruncated chunks before modification",
+      "read_ranges": [[1, 570]],
+      "evidence": [
+        "Full pre-edit text at fce767dec; baseline bytes match. Inspector activity save -> optimistic cache -> server row and deletion response version -> restore traced. F039 red2/green. Whole check running. Receipt substrate differs from current soft-delete/restore UI."
+      ],
       "questions": []
     },
     {
