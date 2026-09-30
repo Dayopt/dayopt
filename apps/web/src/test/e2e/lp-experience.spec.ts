@@ -1,5 +1,5 @@
 import { BROWSER_TELEMETRY_CONSENT_STORAGE_KEY } from '@dayopt/observability';
-import { expect, type Page, test } from '@playwright/test';
+import { expect, type Page, type Route, test } from '@playwright/test';
 
 import commonEn from '../../../messages/en/common.json' with { type: 'json' };
 import en from '../../../messages/en/marketing.json' with { type: 'json' };
@@ -73,14 +73,32 @@ for (const { locale, path, copy, common } of locales) {
           'faq',
           'next-day',
         ]) {
-          await expect(page.locator(`#${id}`)).toBeVisible();
+          const section = page.locator(`#${id}`);
+          await section.scrollIntoViewIfNeeded();
+          await page.evaluate(() => document.fonts.ready);
+          await expect(section).toBeVisible();
+          // 画面外の content-visibility を変更せず、表示した実セクションを記録する。
+          const sectionImage = await section.screenshot();
+          await testInfo.attach(`lp-${locale}-${colorScheme}-${width}-${id}`, {
+            body: sectionImage,
+            contentType: 'image/png',
+          });
         }
+        await page.locator('footer').scrollIntoViewIfNeeded();
+        await page.evaluate(() => document.fonts.ready);
         expect(await overflowingContent(page)).toEqual([]);
         expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(
           false,
         );
         const screenshot = testInfo.outputPath(`lp-${locale}-${colorScheme}-${width}.png`);
+        await page.evaluate(() => window.scrollTo(0, 0));
+        // 全ページ撮影ではブラウザーが画面外の描画を省くため、撮影中だけ全体を描画する。
+        // 操作・構図・個別画像の検証は上の production CSS のまま行う。
+        const captureStyle = await page.addStyleTag({
+          content: '[data-locale] > section { content-visibility: visible; }',
+        });
         await page.screenshot({ path: screenshot, fullPage: true });
+        await captureStyle.evaluate((element) => element.parentNode?.removeChild(element));
         await testInfo.attach(`lp-${locale}-${colorScheme}-${width}`, {
           path: screenshot,
           contentType: 'image/png',
@@ -323,6 +341,44 @@ for (const { locale, path, copy, common } of locales) {
     await menu.getByRole('button', { name: common.aria.closeMenu }).tap();
     await expect(menu).toHaveCount(0);
     await context.close();
+  });
+
+  test(`${locale}: メニューの読み込み中も Escape で開く操作を取り消せる`, async ({ page }) => {
+    await refuseAnalytics(page);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(path);
+    // 初期の React コードが動いたことを、操作による表示変化で確認してから遅延する。
+    const plan = page
+      .locator('#day-experience')
+      .getByRole('button', { name: copy.experience.stepPlan });
+    await plan.click();
+    await expect(plan).toHaveAttribute('aria-pressed', 'true');
+    let resumeRequests: () => void = () => {};
+    const pauseRequests = new Promise<void>((resolve) => {
+      resumeRequests = resolve;
+    });
+    const pending: Promise<void>[] = [];
+    await page.route('**/*.js', (route: Route) => {
+      const request = pauseRequests.then(() => route.continue());
+      pending.push(request);
+      return request;
+    });
+    const open = page.getByRole('button', { name: common.aria.openMenu });
+    await open.click();
+    await expect(open).toHaveAttribute('aria-expanded', 'true');
+    await expect.poll(() => pending.length).toBeGreaterThan(0);
+    await page.keyboard.press('Escape');
+    await expect(open).toHaveAttribute('aria-expanded', 'false');
+    resumeRequests();
+    await Promise.all(pending);
+    await page.unroute('**/*.js');
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+    // 取り消し後にも、実際に開いて閉じられる。
+    await open.click();
+    await expect(page.getByRole('dialog')).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+    await expect(open).toBeFocused();
   });
 
   test(`${locale}: ドキュメントへ移動して戻ってもテーマとLPの構図が保たれる`, async ({ page }) => {

@@ -7,7 +7,7 @@
  */
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { NextIntlClientProvider } from 'next-intl';
-import { expect, userEvent, within } from 'storybook/test';
+import { expect, userEvent, waitFor, within } from 'storybook/test';
 
 import commonEn from '../../../messages/en/common.json';
 import commonJa from '../../../messages/ja/common.json';
@@ -68,8 +68,12 @@ export const MobileMenu: Story = {
     await expect(logo.right).toBeLessThan(signup.getBoundingClientRect().left);
     await userEvent.click(openButton);
     // メニューは Radix Portal で document.body 直下に開く
-    const dialog = await within(document.body).findByRole('dialog');
+    const dialog = await within(document.body).findByRole('dialog', {}, { timeout: 5000 });
     await expect(dialog).toBeVisible();
+    const close = within(dialog).getByRole('button', { name: commonJa.common.aria.closeMenu });
+    await userEvent.click(close);
+    await waitFor(() => expect(dialog).not.toBeInTheDocument());
+    await waitFor(() => expect(openButton).toHaveFocus());
   },
 };
 

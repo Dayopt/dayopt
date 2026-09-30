@@ -7,6 +7,13 @@
   background: var(--lp-paper);
   overflow: clip;
 }
+/* 長い LP の画面外をブラウザーが必要になるまで描画しない。
+ * 内容は SSR に残り、スクロール・アンカー・検索・キーボードで通常どおり表示される。
+ * auto は実際に描画した高さを再利用する。JS 無効時も CSS だけで成立する。 */
+.landing > section:not(.hero) {
+  content-visibility: auto;
+  contain-intrinsic-block-size: auto 1000px;
+}
 .hero,
 .content {
   width: min(100%, 1600px);

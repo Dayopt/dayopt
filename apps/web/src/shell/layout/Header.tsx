@@ -1,18 +1,24 @@
 'use client';
 
-import { Button, cn, Logo, Sheet, SheetContent } from '@dayopt/components';
+import { Button, cn, Logo } from '@dayopt/components';
 import { Link, usePathname } from '@dayopt/i18n/navigation';
 import { Menu } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 
 import { trackSignupCta } from '@web/platform/analytics/signup-cta';
 import { productSignupUrl } from '@web/platform/config/product-signup-url';
 
 import styles from './SiteChrome.module.css';
 
+const HeaderMobileMenu = lazy(() =>
+  import('./HeaderMobileMenu').then((module) => ({ default: module.HeaderMobileMenu })),
+);
+
 export function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [mobileMenuRequested, setMobileMenuRequested] = useState(false);
+  const mobileMenuButton = useRef<HTMLButtonElement>(null);
   const [isScrolled, setIsScrolled] = useState(false);
   const t = useTranslations('common');
   const locale = useLocale();
@@ -28,6 +34,16 @@ export function Header() {
   // ハッシュリンク（/#features 等）は対象外。/blog・/docs などの実ページのみハイライト
   const isActive = (href: string) =>
     !href.includes('#') && (pathname === href || pathname.startsWith(`${href}/`));
+
+  useEffect(() => {
+    if (!mobileMenuOpen) return;
+    // 読み込み待ちの間も開く操作を取り消せる。
+    const cancelMenu = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setMobileMenuOpen(false);
+    };
+    window.addEventListener('keydown', cancelMenu);
+    return () => window.removeEventListener('keydown', cancelMenu);
+  }, [mobileMenuOpen]);
 
   useEffect(() => {
     let ticking = false;
@@ -103,10 +119,16 @@ export function Header() {
               </a>
             </Button>
             <Button
+              ref={mobileMenuButton}
               variant="ghost"
               icon
               size="sm"
-              onClick={() => setMobileMenuOpen(true)}
+              onClick={() => {
+                setMobileMenuRequested(true);
+                setMobileMenuOpen(true);
+              }}
+              aria-haspopup="dialog"
+              aria-expanded={mobileMenuOpen}
               aria-label={t('aria.openMenu')}
             >
               <Menu className="size-5" aria-hidden="true" />
@@ -115,54 +137,25 @@ export function Header() {
         </div>
       </nav>
 
-      {/* Mobile menu */}
-      <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
-        <SheetContent
-          side="right"
-          aria-label={t('aria.navigationMenu')}
-          closeButtonLabel={t('aria.closeMenu')}
-          className="w-4/5 max-w-80 overflow-y-auto px-6 py-6 lg:hidden"
+      {mobileMenuRequested && (
+        <Suspense
+          fallback={
+            mobileMenuOpen ? (
+              <span className="sr-only" role="status">
+                {t('states.loading')}
+              </span>
+            ) : null
+          }
         >
-          <Link
-            href="/"
-            className="flex items-center gap-2"
-            onClick={() => setMobileMenuOpen(false)}
-          >
-            <Logo variant="lockup" size="md" />
-          </Link>
-
-          <div className="mt-6 flow-root">
-            <div className="divide-border -my-6 divide-y">
-              <div className="space-y-1 py-6">
-                {navigation.map((item) => (
-                  <Link
-                    key={item.name}
-                    href={item.href}
-                    onClick={() => setMobileMenuOpen(false)}
-                    aria-current={isActive(item.href) ? 'page' : undefined}
-                    className={cn(
-                      'block rounded-lg px-4 py-2 text-sm font-medium transition-colors',
-                      isActive(item.href)
-                        ? 'bg-state-selected text-foreground'
-                        : 'text-foreground hover:bg-state-hover',
-                    )}
-                  >
-                    {item.name}
-                  </Link>
-                ))}
-              </div>
-
-              <div className="py-6">
-                <Button variant="outline" className="w-full" asChild>
-                  <Link href="/login" onClick={() => setMobileMenuOpen(false)}>
-                    {t('actions.login')}
-                  </Link>
-                </Button>
-              </div>
-            </div>
-          </div>
-        </SheetContent>
-      </Sheet>
+          <HeaderMobileMenu
+            navigation={navigation}
+            open={mobileMenuOpen}
+            isActive={isActive}
+            onOpenChange={setMobileMenuOpen}
+            onCloseAutoFocus={() => mobileMenuButton.current?.focus()}
+          />
+        </Suspense>
+      )}
     </header>
   );
 }

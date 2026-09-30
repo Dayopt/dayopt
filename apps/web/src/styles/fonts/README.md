@@ -10,8 +10,11 @@ The LP covers its current localized copy with the subsets and does not load the
 full Japanese font's large Unicode-range stylesheet.
 
 The Latin subset and the small Japanese H1 / navigation-symbol subset are preloaded.
-Japanese pages additionally preload the two body weights using content-hashed
-public URLs; English pages do not preload them. The previous
+Japanese pages additionally preload the first-view characters for both body weights
+using content-hashed public URLs; English pages do not preload them. Other characters
+use disjoint Unicode ranges and load when their text is rendered. The long LP uses
+native `content-visibility: auto` for sections below the hero, retaining their
+complete server-rendered content and native anchor / search / focus behavior. The previous
 full-font Latin preloads are disabled to avoid downloading the same characters
 twice. All subsets use `font-display: swap`. The full Japanese fallback uses its
 variable weight range instead of duplicated 400 / 500 declarations.
@@ -40,6 +43,7 @@ python3 -m venv /tmp/dayopt-font-tools
 curl -fL 'https://raw.githubusercontent.com/google/fonts/main/ofl/sourcesans3/SourceSans3%5Bwght%5D.ttf' -o /tmp/SourceSans3-variable.ttf
 curl -fL 'https://raw.githubusercontent.com/google/fonts/main/ofl/notosansjp/NotoSansJP%5Bwght%5D.ttf' -o /tmp/NotoSansJP-variable.ttf
 /tmp/dayopt-font-tools/bin/python apps/web/scripts/subset-web-fonts.py /tmp/SourceSans3-variable.ttf /tmp/NotoSansJP-variable.ttf
+pnpm exec prettier --write apps/web/src/styles/fonts/japanese-body.css apps/web/src/styles/fonts/preloads.ts
 ```
 
 The generator checks actual output `cmap` coverage, each font's expected weight

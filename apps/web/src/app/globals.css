@@ -1,5 +1,11 @@
 @import 'tailwindcss';
 @source '../../../../packages/components/src';
+/* 展示・検証専用の class は公開ページに配信しない。実装と MDX は引き続き走査する。 */
+@source not '../../../../packages/components/src/**/*.stories.tsx';
+@source not '../../../../packages/components/src/**/*.test.tsx';
+@source not '../**/*.stories.tsx';
+@source not '../**/*.test.tsx';
+@source not '../test';
 @import 'highlight.js/styles/github.css';
 
 /* Design Tokens（@dayopt/foundations が単一ソース） */
