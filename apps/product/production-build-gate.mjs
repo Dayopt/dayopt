@@ -107,6 +107,45 @@ function assertServerSupabaseKey(env) {
   }
 }
 
+/** Classify the exact value bundled by Next.js; never normalize a public credential. */
+function assertPublicSupabaseKey(env) {
+  const value = env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+  if (typeof value === 'string') {
+    if (/^sb_publishable_[A-Za-z0-9_-]+$/u.test(value) && value === value.trim()) return;
+
+    // Legacy anon keys are HS256 JWTs. This checks format and role, not signature
+    // authenticity or project binding, which remain the Supabase gateway's job.
+    const parts = value.split('.');
+    if (
+      parts.length === 3 &&
+      parts.every(
+        (part) =>
+          /^[A-Za-z0-9_-]+$/u.test(part) &&
+          Buffer.from(part, 'base64url').toString('base64url') === part,
+      )
+    ) {
+      try {
+        const header = JSON.parse(Buffer.from(parts[0], 'base64url').toString('utf8'));
+        const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8'));
+        if (
+          header?.alg === 'HS256' &&
+          header?.typ === 'JWT' &&
+          payload?.role === 'anon' &&
+          Buffer.from(parts[2], 'base64url').length === 32
+        ) {
+          return;
+        }
+      } catch {
+        // Malformed JWTs fail with the same value-free error as privileged keys.
+      }
+    }
+  }
+  throw new Error(
+    'Product deployment requires a public NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ' +
+      '(publishable key or legacy anon JWT)',
+  );
+}
+
 export const PRODUCT_PRODUCTION_ORIGIN = 'https://app.dayopt.app';
 export const MCP_PRODUCTION_ORIGIN = 'https://mcp.dayopt.app';
 export const PRODUCT_INTEGRATION_ORIGIN = 'https://product-git-integration-dayopt.vercel.app';
@@ -354,6 +393,7 @@ export function assertProductDeploymentEnvironmentBuildEnv(env) {
     'NEXT_PUBLIC_SUPABASE_URL',
     'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY',
     'SUPABASE_SECRET_KEY',
+    'RECOVERY_CODE_PEPPER',
   ].filter((name) => !hasNonEmptyValue(env, name));
   if (missingNames.length > 0) {
     throw new Error(`Product ${vercelEnvironment} build requires: ${missingNames.join(', ')}`);
@@ -363,6 +403,7 @@ export function assertProductDeploymentEnvironmentBuildEnv(env) {
   if (!projectRef) {
     throw new Error('Product deployment requires a canonical HTTPS Supabase project URL');
   }
+  assertPublicSupabaseKey(env);
   assertServerSupabaseKey(env, vercelEnvironment);
 
   const appMarker = env.DAYOPT_ENVIRONMENT || env.NEXT_PUBLIC_DAYOPT_ENVIRONMENT;
