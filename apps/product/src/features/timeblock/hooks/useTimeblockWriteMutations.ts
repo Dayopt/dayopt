@@ -174,6 +174,7 @@ function replaceTimeModelRowInMatchingLists<T extends TimeModelListRow>(
   queryClient: QueryClient,
   lane: 'plans' | 'records',
   row: T,
+  patchExisting?: (current: T) => T,
 ): void {
   const predicate = lane === 'plans' ? isPlansListQuery : isRecordsListQuery;
   for (const [queryKey, data] of queryClient.getQueriesData<T[]>({ predicate })) {
@@ -181,8 +182,10 @@ function replaceTimeModelRowInMatchingLists<T extends TimeModelListRow>(
     if (filter.search) continue;
 
     const old = data ?? [];
-    const containsRow = old.some((candidate) => candidate.id === row.id);
-    const shouldInclude = doesTimeModelListQueryIncludeRow(queryKey, row, lane, 'update');
+    const current = old.find((candidate) => candidate.id === row.id);
+    const containsRow = current !== undefined;
+    const nextRow = current && patchExisting ? patchExisting(current) : row;
+    const shouldInclude = doesTimeModelListQueryIncludeRow(queryKey, nextRow, lane, 'update');
 
     if (!shouldInclude) {
       if (containsRow) {
@@ -196,7 +199,7 @@ function replaceTimeModelRowInMatchingLists<T extends TimeModelListRow>(
 
     if (!containsRow && (filter.offset ?? 0) > 0) continue;
     const withoutRow = old.filter((candidate) => candidate.id !== row.id);
-    queryClient.setQueryData(queryKey, sortAndLimitRows([...withoutRow, row], queryKey, lane));
+    queryClient.setQueryData(queryKey, sortAndLimitRows([...withoutRow, nextRow], queryKey, lane));
   }
 }
 
@@ -334,14 +337,14 @@ export function useTimeblockWriteMutations(options: UseTimeblockWriteMutationsOp
     patch: (row: T) => T,
   ) => {
     const predicate = lane === 'plans' ? isPlansListQuery : isRecordsListQuery;
+    // 現在の行を一度patchし、変更後に一致する一覧へ移す。
+    // 既存の一覧だけをmapすると、activity/期間を変更した先のcacheに入らない。
     for (const [queryKey, data] of queryClient.getQueriesData<T[]>({ predicate })) {
       if (getListFilter(queryKey).search) continue;
-      if (!data?.some((row) => row.id === id)) continue;
-      const patched = data.map((row) => (row.id === id ? patch(row) : row));
-      const filtered = patched.filter(
-        (row) => row.id !== id || doesTimeModelListQueryIncludeRow(queryKey, row, lane, 'update'),
-      );
-      queryClient.setQueryData(queryKey, sortAndLimitRows(filtered, queryKey, lane));
+      const current = data?.find((row) => row.id === id);
+      if (!current) continue;
+      replaceTimeModelRowInMatchingLists(queryClient, lane, patch(current), patch);
+      return;
     }
   };
 
@@ -436,6 +439,7 @@ export function useTimeblockWriteMutations(options: UseTimeblockWriteMutationsOp
         ...row,
         ...(input.data.title !== undefined ? { title: input.data.title } : {}),
         ...(input.data.note !== undefined ? { note: input.data.note ?? null } : {}),
+        ...(input.data.activityId !== undefined ? { activity_id: input.data.activityId } : {}),
         ...(input.data.start_at !== undefined ? { start_at: input.data.start_at } : {}),
         ...(input.data.end_at !== undefined ? { end_at: input.data.end_at } : {}),
       });
@@ -462,6 +466,7 @@ export function useTimeblockWriteMutations(options: UseTimeblockWriteMutationsOp
         ...row,
         ...(input.data.title !== undefined ? { title: input.data.title } : {}),
         ...(input.data.note !== undefined ? { note: input.data.note ?? null } : {}),
+        ...(input.data.activityId !== undefined ? { activity_id: input.data.activityId } : {}),
         ...(input.data.start_at !== undefined ? { start_at: input.data.start_at } : {}),
         ...(input.data.end_at !== undefined ? { end_at: input.data.end_at } : {}),
         ...(input.data.fulfillment !== undefined ? { fulfillment: input.data.fulfillment } : {}),

@@ -467,6 +467,112 @@ describe('useTimeblockWriteMutations 楽観更新の巻き戻し', () => {
     mocks.cacheEntries = [];
   });
 
+  it.each(['plans', 'records'] as const)(
+    '%sのactivity変更を保存前に一覧・詳細と両フィルタへ反映する',
+    async (lane) => {
+      const existing = listRow({ activity_id: 'activity-before' });
+      const allKey = [[lane, 'list'], { input: {}, type: 'query' }];
+      const beforeKey = [
+        [lane, 'list'],
+        { input: { activityId: 'activity-before' }, type: 'query' },
+      ];
+      const afterKey = [[lane, 'list'], { input: { activityId: 'activity-after' }, type: 'query' }];
+      mocks.cacheEntries = [
+        [allKey, [existing]],
+        [beforeKey, [existing]],
+        [afterKey, []],
+      ];
+      renderHook(() => useTimeblockWriteMutations());
+      const callbacks = lane === 'plans' ? mocks.planUpdateCallbacks : mocks.recordUpdateCallbacks;
+      const input = { id: existing.id, data: { activityId: 'activity-after' } };
+      let context: unknown;
+      await act(async () => {
+        context = await callbacks?.onMutate?.(input);
+      });
+
+      expect(rowsAt(0)[0]?.activity_id).toBe('activity-after');
+      expect(rowsAt(1)).toEqual([]);
+      expect(rowsAt(2)).toEqual([{ ...existing, activity_id: 'activity-after' }]);
+      const detail = lane === 'plans' ? mocks.planDetailSetData : mocks.recordDetailSetData;
+      const updater = detail.mock.calls.at(-1)?.[1] as (row: TimeModelRow) => TimeModelRow;
+      expect(updater(existing).activity_id).toBe('activity-after');
+
+      act(() => callbacks?.onError?.({ message: 'UNKNOWN' }, input, context));
+      expect(rowsAt(0)).toEqual([existing]);
+      expect(rowsAt(1)).toEqual([existing]);
+      expect(rowsAt(2)).toEqual([]);
+    },
+  );
+
+  it.each(['plans', 'records'] as const)(
+    '%sのactivity解除と省略を区別しraw versionを維持する',
+    async (lane) => {
+      const existing = listRow({
+        activity_id: 'activity-before',
+        updated_at: '2026-07-17T08:00:00.000001+00:00',
+      });
+      mocks.cacheEntries = [[[[lane, 'list'], { input: {}, type: 'query' }], [existing]]];
+      renderHook(() => useTimeblockWriteMutations());
+      const callbacks = lane === 'plans' ? mocks.planUpdateCallbacks : mocks.recordUpdateCallbacks;
+      await act(async () => {
+        await callbacks?.onMutate?.({ id: existing.id, data: { note: 'Only note' } });
+      });
+      expect(rowsAt(0)[0]?.activity_id).toBe('activity-before');
+      await act(async () => {
+        await callbacks?.onMutate?.({ id: existing.id, data: { activityId: null } });
+      });
+      expect(rowsAt(0)[0]?.activity_id).toBeNull();
+      expect(rowsAt(0)[0]?.updated_at).toBe('2026-07-17T08:00:00.000001+00:00');
+      const detail = lane === 'plans' ? mocks.planDetailSetData : mocks.recordDetailSetData;
+      const updater = detail.mock.calls.at(-1)?.[1] as (row: TimeModelRow) => TimeModelRow;
+      expect(updater(existing).activity_id).toBeNull();
+    },
+  );
+
+  it('移動先の期間cacheへ挿入し、検索・未保持の後続ページは推測しない', async () => {
+    const existing = listRow();
+    const filter = { startDate: '2026-07-17T11:00:00.000Z', endDate: '2026-07-17T12:00:00.000Z' };
+    mocks.cacheEntries = [
+      [PLANS_LIST_KEY, [existing]],
+      [[['plans', 'list'], { input: filter, type: 'query' }], []],
+      [[['plans', 'list'], { input: { ...filter, offset: 10 }, type: 'query' }], []],
+      [[['plans', 'list'], { input: { search: 'Existing' }, type: 'query' }], [existing]],
+    ];
+    renderHook(() => useTimeblockWriteMutations());
+    await act(async () => {
+      await mocks.planUpdateCallbacks?.onMutate?.({
+        id: existing.id,
+        data: { start_at: '2026-07-17T11:00:00.000Z', end_at: '2026-07-17T12:00:00.000Z' },
+      });
+    });
+    expect(rowsAt(1)).toEqual([
+      { ...existing, start_at: '2026-07-17T11:00:00.000Z', end_at: '2026-07-17T12:00:00.000Z' },
+    ]);
+    expect(rowsAt(2)).toEqual([]);
+    expect(rowsAt(3)).toEqual([existing]);
+  });
+
+  it('別の一覧で保持した未変更フィールドを楽観patchで上書きしない', async () => {
+    const existing = listRow({ activity_id: 'activity-before', note: 'Older note' });
+    const fresher = {
+      ...existing,
+      note: 'Newer note',
+      updated_at: '2026-07-17T08:00:00.000002+00:00',
+    };
+    mocks.cacheEntries = [
+      [PLANS_LIST_KEY, [existing]],
+      [[['plans', 'list'], { input: { activityId: 'activity-after' }, type: 'query' }], [fresher]],
+    ];
+    renderHook(() => useTimeblockWriteMutations());
+    await act(async () => {
+      await mocks.planUpdateCallbacks?.onMutate?.({
+        id: existing.id,
+        data: { activityId: 'activity-after' },
+      });
+    });
+    expect(rowsAt(1)).toEqual([{ ...fresher, activity_id: 'activity-after' }]);
+  });
+
   it('Plan createの失敗で楽観挿入したtemp行を操作前へ戻す', async () => {
     const existing = listRow();
     mocks.cacheEntries = [[PLANS_LIST_KEY, [existing]]];
