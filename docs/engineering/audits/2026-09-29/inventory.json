@@ -42205,6 +42205,32 @@
         "Full previous source plus complete subsequent owned diff reviewed at final68-line blob. Real lifecycle13 cases pass; cancellation unit4 pass. Pre-dispatch genuine red1/12, limited replacement red1/13, cancellation retry red1/4 recorded. Final integrated check running."
       ],
       "questions": []
+    },
+    {
+      "path": "apps/product/public/legal/oss-credits.json",
+      "sha": "0aa61be10f90f503dbb7f23090f68a907ae64989",
+      "change": "M",
+      "blob": "f35accc5a3fa614f8b095ec09b6041b1cc6f4365",
+      "method": "mechanical",
+      "status": "mechanically-checked",
+      "read_ranges": [],
+      "evidence": [
+        "Upstream #2967 two-file delta from650f62dc7 read exactly: ip-address10.4.0 to10.7.2, package integrity/snapshot/express-rate-limit/socks edges and OSS credit version only. Integratedb0deb289d; frozen-lock install exit0 (reused3/downloaded0), pnpm why confirms one10.7.2 through MCP SDK/rate limiter and development proxy tools. Not full baseline lockfile/credits validation. Integrated whole check running."
+      ],
+      "questions": []
+    },
+    {
+      "path": "pnpm-lock.yaml",
+      "sha": "0aa61be10f90f503dbb7f23090f68a907ae64989",
+      "change": "M",
+      "blob": "7e67c0b60b982a98894f44774fa26f08db94e332",
+      "method": "mechanical",
+      "status": "mechanically-checked",
+      "read_ranges": [],
+      "evidence": [
+        "Upstream #2967 two-file delta from650f62dc7 read exactly: ip-address10.4.0 to10.7.2, package integrity/snapshot/express-rate-limit/socks edges and OSS credit version only. Integratedb0deb289d; frozen-lock install exit0 (reused3/downloaded0), pnpm why confirms one10.7.2 through MCP SDK/rate limiter and development proxy tools. Not full baseline lockfile/credits validation. Integrated whole check running."
+      ],
+      "questions": []
     }
   ]
 }
