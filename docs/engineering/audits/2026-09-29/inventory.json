@@ -187,7 +187,8 @@
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
       "read_ranges": [[1, 285]],
       "evidence": [
-        "Full text read at ef0f9e572; baseline bytes unchanged. Account deletion uses mutate/retry:false; provider durable and legacy paths require continued DB/callsite reconciliation. i18n confirms reuse of existing common.toast.copyFailed."
+        "Full text read at ef0f9e572; baseline bytes unchanged. Account deletion uses mutate/retry:false; provider durable and legacy paths require continued DB/callsite reconciliation. i18n confirms reuse of existing common.toast.copyFailed.",
+        "Full untruncated read at 47014031, exact baseline blob verified. Auth UI input/attempt/challenge lifecycle and synthetic test seams cross-checked; F051/#2988, F052/#2989 and F053/#2838 reproduced independently. Story reads are not rendered runtime proof. Truncated attempts reacquired in bounded chunks."
       ],
       "questions": []
     },
@@ -352,7 +353,8 @@
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
       "read_ranges": [[1, 193]],
       "evidence": [
-        "Full read and applied implementation guide for OAuth configuration boundary fix. No new general security sweep or cloud advisor claim."
+        "Full read and applied implementation guide for OAuth configuration boundary fix. No new general security sweep or cloud advisor claim.",
+        "Full untruncated read at 47014031, exact baseline blob verified. Auth UI input/attempt/challenge lifecycle and synthetic test seams cross-checked; F051/#2988, F052/#2989 and F053/#2838 reproduced independently. Story reads are not rendered runtime proof. Truncated attempts reacquired in bounded chunks."
       ],
       "questions": []
     },
@@ -3752,10 +3754,12 @@
       "mode": "100644",
       "bytes": 8921,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 255]],
+      "evidence": [
+        "Full untruncated read at 47014031, exact baseline blob verified. Auth UI input/attempt/challenge lifecycle and synthetic test seams cross-checked; F051/#2988, F052/#2989 and F053/#2838 reproduced independently. Story reads are not rendered runtime proof. Truncated attempts reacquired in bounded chunks."
+      ],
       "questions": []
     },
     {
@@ -6908,10 +6912,12 @@
       "mode": "100644",
       "bytes": 4714,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 116]],
+      "evidence": [
+        "Full untruncated read at 47014031, exact baseline blob verified. Auth UI input/attempt/challenge lifecycle and synthetic test seams cross-checked; F051/#2988, F052/#2989 and F053/#2838 reproduced independently. Story reads are not rendered runtime proof. Truncated attempts reacquired in bounded chunks."
+      ],
       "questions": []
     },
     {
@@ -6921,10 +6927,12 @@
       "mode": "100644",
       "bytes": 5364,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 154]],
+      "evidence": [
+        "Full untruncated read at 47014031, exact baseline blob verified. Auth UI input/attempt/challenge lifecycle and synthetic test seams cross-checked; F051/#2988, F052/#2989 and F053/#2838 reproduced independently. Story reads are not rendered runtime proof. Truncated attempts reacquired in bounded chunks."
+      ],
       "questions": []
     },
     {
@@ -6934,10 +6942,12 @@
       "mode": "100644",
       "bytes": 1116,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 32]],
+      "evidence": [
+        "Full untruncated read at 47014031, exact baseline blob verified. Auth UI input/attempt/challenge lifecycle and synthetic test seams cross-checked; F051/#2988, F052/#2989 and F053/#2838 reproduced independently. Story reads are not rendered runtime proof. Truncated attempts reacquired in bounded chunks."
+      ],
       "questions": []
     },
     {
@@ -6947,10 +6957,12 @@
       "mode": "100644",
       "bytes": 6380,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 168]],
+      "evidence": [
+        "Full untruncated Story source read at 47014031. Initial generic heading assertions and obsolete URL-token fixture are pending verifier candidates, not executed browser evidence. Baseline equality verified."
+      ],
       "questions": []
     },
     {
@@ -6960,10 +6972,12 @@
       "mode": "100644",
       "bytes": 20714,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 555]],
+      "evidence": [
+        "Full untruncated read at 47014031, exact baseline blob verified. Auth UI input/attempt/challenge lifecycle and synthetic test seams cross-checked; F051/#2988, F052/#2989 and F053/#2838 reproduced independently. Story reads are not rendered runtime proof. Truncated attempts reacquired in bounded chunks."
+      ],
       "questions": []
     },
     {
@@ -6973,10 +6987,12 @@
       "mode": "100644",
       "bytes": 17798,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 424]],
+      "evidence": [
+        "Full untruncated read at 47014031, exact baseline blob verified. Auth UI input/attempt/challenge lifecycle and synthetic test seams cross-checked; F051/#2988, F052/#2989 and F053/#2838 reproduced independently. Story reads are not rendered runtime proof. Truncated attempts reacquired in bounded chunks."
+      ],
       "questions": []
     },
     {
@@ -6986,10 +7002,12 @@
       "mode": "100644",
       "bytes": 5962,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 182]],
+      "evidence": [
+        "Full untruncated Story source read at 47014031. Initial generic heading assertions and obsolete URL-token fixture are pending verifier candidates, not executed browser evidence. Baseline equality verified."
+      ],
       "questions": []
     },
     {
@@ -6999,10 +7017,12 @@
       "mode": "100644",
       "bytes": 8609,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 230]],
+      "evidence": [
+        "Full untruncated read at 47014031, exact baseline blob verified. Auth UI input/attempt/challenge lifecycle and synthetic test seams cross-checked; F051/#2988, F052/#2989 and F053/#2838 reproduced independently. Story reads are not rendered runtime proof. Truncated attempts reacquired in bounded chunks."
+      ],
       "questions": []
     },
     {
@@ -7012,10 +7032,12 @@
       "mode": "100644",
       "bytes": 7646,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 207]],
+      "evidence": [
+        "Full untruncated read at 47014031, exact baseline blob verified. Auth UI input/attempt/challenge lifecycle and synthetic test seams cross-checked; F051/#2988, F052/#2989 and F053/#2838 reproduced independently. Story reads are not rendered runtime proof. Truncated attempts reacquired in bounded chunks."
+      ],
       "questions": []
     },
     {
@@ -7025,10 +7047,12 @@
       "mode": "100644",
       "bytes": 6600,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 193]],
+      "evidence": [
+        "Full untruncated Story source read at 47014031. Initial generic heading assertions and obsolete URL-token fixture are pending verifier candidates, not executed browser evidence. Baseline equality verified."
+      ],
       "questions": []
     },
     {
@@ -7038,10 +7062,12 @@
       "mode": "100644",
       "bytes": 7815,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 201]],
+      "evidence": [
+        "Full untruncated read at 47014031, exact baseline blob verified. Auth UI input/attempt/challenge lifecycle and synthetic test seams cross-checked; F051/#2988, F052/#2989 and F053/#2838 reproduced independently. Story reads are not rendered runtime proof. Truncated attempts reacquired in bounded chunks."
+      ],
       "questions": []
     },
     {
@@ -7051,10 +7077,12 @@
       "mode": "100644",
       "bytes": 7762,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 197]],
+      "evidence": [
+        "Full untruncated read at 47014031, exact baseline blob verified. Auth UI input/attempt/challenge lifecycle and synthetic test seams cross-checked; F051/#2988, F052/#2989 and F053/#2838 reproduced independently. Story reads are not rendered runtime proof. Truncated attempts reacquired in bounded chunks."
+      ],
       "questions": []
     },
     {
@@ -7064,10 +7092,12 @@
       "mode": "100644",
       "bytes": 7617,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 218]],
+      "evidence": [
+        "Full untruncated Story source read at 47014031. Initial generic heading assertions and obsolete URL-token fixture are pending verifier candidates, not executed browser evidence. Baseline equality verified."
+      ],
       "questions": []
     },
     {
@@ -7077,10 +7107,12 @@
       "mode": "100644",
       "bytes": 17382,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 448]],
+      "evidence": [
+        "Full untruncated read at 47014031, exact baseline blob verified. Auth UI input/attempt/challenge lifecycle and synthetic test seams cross-checked; F051/#2988, F052/#2989 and F053/#2838 reproduced independently. Story reads are not rendered runtime proof. Truncated attempts reacquired in bounded chunks."
+      ],
       "questions": []
     },
     {
@@ -7090,10 +7122,12 @@
       "mode": "100644",
       "bytes": 20493,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 514]],
+      "evidence": [
+        "Full untruncated read at 47014031, exact baseline blob verified. Auth UI input/attempt/challenge lifecycle and synthetic test seams cross-checked; F051/#2988, F052/#2989 and F053/#2838 reproduced independently. Story reads are not rendered runtime proof. Truncated attempts reacquired in bounded chunks."
+      ],
       "questions": []
     },
     {
@@ -7118,10 +7152,12 @@
       "mode": "100644",
       "bytes": 3981,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 133]],
+      "evidence": [
+        "Full untruncated read at 47014031, exact baseline blob verified. Auth UI input/attempt/challenge lifecycle and synthetic test seams cross-checked; F051/#2988, F052/#2989 and F053/#2838 reproduced independently. Story reads are not rendered runtime proof. Truncated attempts reacquired in bounded chunks."
+      ],
       "questions": []
     },
     {
@@ -7146,10 +7182,12 @@
       "mode": "100644",
       "bytes": 6978,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 182]],
+      "evidence": [
+        "Full untruncated Story source read at 47014031. Initial generic heading assertions and obsolete URL-token fixture are pending verifier candidates, not executed browser evidence. Baseline equality verified."
+      ],
       "questions": []
     },
     {
@@ -7159,10 +7197,12 @@
       "mode": "100644",
       "bytes": 9159,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 241]],
+      "evidence": [
+        "Full untruncated read at 47014031, exact baseline blob verified. Auth UI input/attempt/challenge lifecycle and synthetic test seams cross-checked; F051/#2988, F052/#2989 and F053/#2838 reproduced independently. Story reads are not rendered runtime proof. Truncated attempts reacquired in bounded chunks."
+      ],
       "questions": []
     },
     {
@@ -7172,10 +7212,12 @@
       "mode": "100644",
       "bytes": 14590,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 359]],
+      "evidence": [
+        "Full untruncated read at 47014031, exact baseline blob verified. Auth UI input/attempt/challenge lifecycle and synthetic test seams cross-checked; F051/#2988, F052/#2989 and F053/#2838 reproduced independently. Story reads are not rendered runtime proof. Truncated attempts reacquired in bounded chunks."
+      ],
       "questions": []
     },
     {
@@ -7260,10 +7302,12 @@
       "mode": "100644",
       "bytes": 5754,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 136]],
+      "evidence": [
+        "Full untruncated read at 47014031; exact baseline blob verified. Session expiry, password-update partial failure and context-specific auth sanitization tests reviewed; mocked transport only."
+      ],
       "questions": []
     },
     {
@@ -7500,10 +7544,12 @@
       "mode": "100644",
       "bytes": 7070,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 203]],
+      "evidence": [
+        "Full untruncated read at 47014031; exact baseline blob verified. Session expiry, password-update partial failure and context-specific auth sanitization tests reviewed; mocked transport only."
+      ],
       "questions": []
     },
     {
@@ -7528,10 +7574,12 @@
       "mode": "100644",
       "bytes": 4134,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 99]],
+      "evidence": [
+        "Full untruncated read at 47014031; exact baseline blob verified. Session expiry, password-update partial failure and context-specific auth sanitization tests reviewed; mocked transport only."
+      ],
       "questions": []
     },
     {
@@ -17783,7 +17831,8 @@
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
       "read_ranges": [[1, 35]],
       "evidence": [
-        "Full text read at fd815fa1d1a0baca98673267c163eebf428915aa; unchanged from baseline. Auth spec initial truncated 1-145 recovered as 1-75 and 76-145; rest 146-215 and 216-279. Session config/store/hook/UI/test and auth spec cross-checked. Wrong store mock path is a reproduction candidate; pure validateSession millisecond/second mismatch has only test callers and is not treated as live session enforcement."
+        "Full text read at fd815fa1d1a0baca98673267c163eebf428915aa; unchanged from baseline. Auth spec initial truncated 1-145 recovered as 1-75 and 76-145; rest 146-215 and 216-279. Session config/store/hook/UI/test and auth spec cross-checked. Wrong store mock path is a reproduction candidate; pure validateSession millisecond/second mismatch has only test callers and is not treated as live session enforcement.",
+        "Full untruncated read at 47014031, exact baseline blob verified. Auth UI input/attempt/challenge lifecycle and synthetic test seams cross-checked; F051/#2988, F052/#2989 and F053/#2838 reproduced independently. Story reads are not rendered runtime proof. Truncated attempts reacquired in bounded chunks."
       ],
       "questions": []
     },
@@ -18544,10 +18593,12 @@
       "mode": "100644",
       "bytes": 4288,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 121]],
+      "evidence": [
+        "Full untruncated read at 47014031, exact baseline blob verified. Auth UI input/attempt/challenge lifecycle and synthetic test seams cross-checked; F051/#2988, F052/#2989 and F053/#2838 reproduced independently. Story reads are not rendered runtime proof. Truncated attempts reacquired in bounded chunks."
+      ],
       "questions": []
     },
     {
@@ -31138,10 +31189,12 @@
       "mode": "100644",
       "bytes": 2869,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 74]],
+      "evidence": [
+        "Full untruncated read at 47014031, exact baseline blob verified. Auth UI input/attempt/challenge lifecycle and synthetic test seams cross-checked; F051/#2988, F052/#2989 and F053/#2838 reproduced independently. Story reads are not rendered runtime proof. Truncated attempts reacquired in bounded chunks."
+      ],
       "questions": []
     },
     {
@@ -43933,6 +43986,95 @@
       "read_ranges": [],
       "evidence": [
         "F050 #2985 own patch reviewed and validated in integrated7750-pass tree. Generated deltas contain the added test row/count and settings count only; no whole baseline/generated file reading claimed. Published Draft2965 head confirmed via GitHub API."
+      ],
+      "questions": []
+    },
+    {
+      "path": "docs/engineering/threat-model.md",
+      "sha": "47014031cac0a60b65ff6b801f6da0e86dac480d",
+      "change": "M",
+      "blob": "7a5f3552b975293e29611fc47f7491be7ad17fc0",
+      "method": "full-text",
+      "status": "delta-reviewed",
+      "read_ranges": [[1, 216]],
+      "evidence": ["Full current file read; baseline differs and is not promoted."],
+      "questions": []
+    },
+    {
+      "path": "apps/product/src/features/auth/components/PasswordResetForm.tsx",
+      "sha": "9eee0a61929b0f5323d586362ebcd52b2222941a",
+      "change": "M",
+      "blob": "44d1d349c3fba7144decde850bada5a42074830d",
+      "method": "full-text",
+      "status": "delta-reviewed",
+      "read_ranges": [[1, 199]],
+      "evidence": [
+        "Original full file and complete authored diff reviewed. Red/green and integrated7758 passed on identical source bytes; details F051/F052/F053. Not a baseline read or deployed claim."
+      ],
+      "questions": []
+    },
+    {
+      "path": "apps/product/src/features/auth/components/PasswordResetForm.test.tsx",
+      "sha": "9eee0a61929b0f5323d586362ebcd52b2222941a",
+      "change": "M",
+      "blob": "a55fe88b56efdd42b34ab38ce36f4273fe7c2888",
+      "method": "full-text",
+      "status": "delta-reviewed",
+      "read_ranges": [[1, 237]],
+      "evidence": [
+        "Original full file and complete authored diff reviewed. Red/green and integrated7758 passed on identical source bytes; details F051/F052/F053. Not a baseline read or deployed claim."
+      ],
+      "questions": []
+    },
+    {
+      "path": "apps/product/src/features/auth/components/LoginForm.tsx",
+      "sha": "0446feb3a16f8cc8b6a59d29e1bec325b2b3fcbb",
+      "change": "M",
+      "blob": "8ddca4137a3156ffd135609c72acd032e2439500",
+      "method": "full-text",
+      "status": "delta-reviewed",
+      "read_ranges": [[1, 429]],
+      "evidence": [
+        "Original full file and complete authored diff reviewed. Red/green and integrated7758 passed on identical source bytes; details F051/F052/F053. Not a baseline read or deployed claim."
+      ],
+      "questions": []
+    },
+    {
+      "path": "apps/product/src/features/auth/components/LoginForm.test.tsx",
+      "sha": "0446feb3a16f8cc8b6a59d29e1bec325b2b3fcbb",
+      "change": "M",
+      "blob": "6c64740e4add0c4781959d7eae253777afb887c7",
+      "method": "full-text",
+      "status": "delta-reviewed",
+      "read_ranges": [[1, 588]],
+      "evidence": [
+        "Original full file and complete authored diff reviewed. Red/green and integrated7758 passed on identical source bytes; details F051/F052/F053. Not a baseline read or deployed claim."
+      ],
+      "questions": []
+    },
+    {
+      "path": "apps/product/src/features/auth/components/ResetPasswordForm.tsx",
+      "sha": "9fa8686db5aa25c23c731512b36e3b8af3874d0b",
+      "change": "M",
+      "blob": "f96a5dfb2e34c90679131c58071603b15e937ec4",
+      "method": "full-text",
+      "status": "delta-reviewed",
+      "read_ranges": [[1, 530]],
+      "evidence": [
+        "Original full file and complete authored diff reviewed. Red/green and integrated7758 passed on identical source bytes; details F051/F052/F053. Not a baseline read or deployed claim."
+      ],
+      "questions": []
+    },
+    {
+      "path": "apps/product/src/features/auth/components/ResetPasswordForm.test.tsx",
+      "sha": "9fa8686db5aa25c23c731512b36e3b8af3874d0b",
+      "change": "M",
+      "blob": "1108b404e8d2576df05adc2842a60c0b8c28c848",
+      "method": "full-text",
+      "status": "delta-reviewed",
+      "read_ranges": [[1, 560]],
+      "evidence": [
+        "Original full file and complete authored diff reviewed. Red/green and integrated7758 passed on identical source bytes; details F051/F052/F053. Not a baseline read or deployed claim."
       ],
       "questions": []
     }
