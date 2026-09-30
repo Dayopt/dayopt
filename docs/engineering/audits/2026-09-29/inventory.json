@@ -2848,10 +2848,12 @@
       "mode": "100644",
       "bytes": 2887,
       "method": "full-text",
-      "status": "unverified",
-      "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "status": "full-text-reviewed",
+      "reason": "Complete current text read; baseline bytes verified equal",
+      "read_ranges": [[1, 62]],
+      "evidence": [
+        "Full text read at daf3995e88133b121ee31c020792a2a3833278c0; Gregorian URL rejection and shared calendar prefetch input examined."
+      ],
       "questions": []
     },
     {
@@ -10105,10 +10107,12 @@
       "mode": "100644",
       "bytes": 5038,
       "method": "full-text",
-      "status": "unverified",
-      "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "status": "full-text-reviewed",
+      "reason": "Complete current text read; baseline bytes verified equal",
+      "read_ranges": [[1, 152]],
+      "evidence": [
+        "Full text read at daf3995e88133b121ee31c020792a2a3833278c0; Gregorian URL rejection and shared calendar prefetch input examined."
+      ],
       "questions": []
     },
     {
@@ -10118,10 +10122,12 @@
       "mode": "100644",
       "bytes": 3689,
       "method": "full-text",
-      "status": "unverified",
-      "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "status": "full-text-reviewed",
+      "reason": "Complete current text read; baseline bytes verified equal",
+      "read_ranges": [[1, 93]],
+      "evidence": [
+        "Full text read at daf3995e88133b121ee31c020792a2a3833278c0; Gregorian URL rejection and shared calendar prefetch input examined."
+      ],
       "questions": []
     },
     {
@@ -10934,10 +10940,12 @@
       "mode": "100644",
       "bytes": 1135,
       "method": "full-text",
-      "status": "unverified",
-      "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "status": "full-text-reviewed",
+      "reason": "Complete current text read; baseline bytes verified equal",
+      "read_ranges": [[1, 32]],
+      "evidence": [
+        "Full text read at daf3995e88133b121ee31c020792a2a3833278c0; Gregorian URL rejection and shared calendar prefetch input examined."
+      ],
       "questions": []
     },
     {
@@ -10947,10 +10955,12 @@
       "mode": "100644",
       "bytes": 1113,
       "method": "full-text",
-      "status": "unverified",
-      "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "status": "full-text-reviewed",
+      "reason": "Complete current text read; baseline bytes verified equal",
+      "read_ranges": [[1, 38]],
+      "evidence": [
+        "Full text read at daf3995e88133b121ee31c020792a2a3833278c0; Gregorian URL rejection and shared calendar prefetch input examined."
+      ],
       "questions": []
     },
     {
