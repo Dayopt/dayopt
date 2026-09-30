@@ -36283,10 +36283,12 @@
       "mode": "100644",
       "bytes": 2563,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 24]],
+      "evidence": [
+        "Standalone full untruncated read at upstream integration checkpoint; exact baseline bytes verified. DB ownership/ACL/destructive-migration review rules applied to2937 delta. Initial combined plugin output truncated and not used as full proof."
+      ],
       "questions": []
     },
     {
@@ -36324,10 +36326,12 @@
       "mode": "100644",
       "bytes": 702,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 29]],
+      "evidence": [
+        "Full untruncated read during updated-main integration; index390 bounded1-145/146-290/291-390, other sources complete. Exact baseline bytes verified. Signed-hook dispatch, locale lookup, per-recipient idempotency, partial send/retry/error redaction traced. Dynamic locale during retry remains unadopted candidate; no actual hook/send execution."
+      ],
       "questions": []
     },
     {
@@ -36415,10 +36419,12 @@
       "mode": "100644",
       "bytes": 5576,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 119]],
+      "evidence": [
+        "Full untruncated read during updated-main integrated check; exact baseline bytes verified. Auth mail subjects/source generation, credential selector without actual values, password-notification suppression and confirmation origin/token/next delegation traced. No mail or DB execution; consumer/index/tests still pending."
+      ],
       "questions": []
     },
     {
@@ -36428,10 +36434,12 @@
       "mode": "100644",
       "bytes": 6844,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 165]],
+      "evidence": [
+        "Full untruncated read during updated-main integration; index390 bounded1-145/146-290/291-390, other sources complete. Exact baseline bytes verified. Signed-hook dispatch, locale lookup, per-recipient idempotency, partial send/retry/error redaction traced. Dynamic locale during retry remains unadopted candidate; no actual hook/send execution."
+      ],
       "questions": []
     },
     {
@@ -36441,10 +36449,12 @@
       "mode": "100644",
       "bytes": 3782,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 72]],
+      "evidence": [
+        "Full untruncated read during updated-main integration; index390 bounded1-145/146-290/291-390, other sources complete. Exact baseline bytes verified. Signed-hook dispatch, locale lookup, per-recipient idempotency, partial send/retry/error redaction traced. Dynamic locale during retry remains unadopted candidate; no actual hook/send execution."
+      ],
       "questions": []
     },
     {
@@ -36454,10 +36464,12 @@
       "mode": "100644",
       "bytes": 13985,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 390]],
+      "evidence": [
+        "Full untruncated read during updated-main integration; index390 bounded1-145/146-290/291-390, other sources complete. Exact baseline bytes verified. Signed-hook dispatch, locale lookup, per-recipient idempotency, partial send/retry/error redaction traced. Dynamic locale during retry remains unadopted candidate; no actual hook/send execution."
+      ],
       "questions": []
     },
     {
@@ -36467,10 +36479,12 @@
       "mode": "100644",
       "bytes": 1824,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 57]],
+      "evidence": [
+        "Full untruncated read during updated-main integrated check; exact baseline bytes verified. Auth mail subjects/source generation, credential selector without actual values, password-notification suppression and confirmation origin/token/next delegation traced. No mail or DB execution; consumer/index/tests still pending."
+      ],
       "questions": []
     },
     {
@@ -36493,10 +36507,12 @@
       "mode": "100644",
       "bytes": 1318,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 36]],
+      "evidence": [
+        "Full untruncated read during updated-main integrated check; exact baseline bytes verified. Auth mail subjects/source generation, credential selector without actual values, password-notification suppression and confirmation origin/token/next delegation traced. No mail or DB execution; consumer/index/tests still pending."
+      ],
       "questions": []
     },
     {
@@ -36506,10 +36522,12 @@
       "mode": "100644",
       "bytes": 1918,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 51]],
+      "evidence": [
+        "Full untruncated read during updated-main integrated check; exact baseline bytes verified. Auth mail subjects/source generation, credential selector without actual values, password-notification suppression and confirmation origin/token/next delegation traced. No mail or DB execution; consumer/index/tests still pending."
+      ],
       "questions": []
     },
     {
@@ -44155,7 +44173,7 @@
         "Upstream full migration/test/rehearsal texts read untruncated; other first-party whole diffs reviewed independently after oversized generated output was rejected. Generated TS AST canonicalization isolates semantic type changes; license JSON parsed (same package names/licenses, version/repository changes); YAML lock parsed11 importers, undici7.30.0; inventory normalized cells add exactly Integration RPC; model and ACL delta match service_role grant. Own integration/frozen install/tests still pending; NOT deployed evidence."
       ],
       "questions": [
-        "Own merge/frozen install/generated consistency/full validation pending; isolated DB chain not executed by this lane."
+        "Own resolved integration/frozen install/full check7759 and light/dark32 passed; isolated SQL/catalog/deployed state remain unverified."
       ]
     },
     {
@@ -44171,7 +44189,7 @@
         "Upstream full migration/test/rehearsal texts read untruncated; other first-party whole diffs reviewed independently after oversized generated output was rejected. Generated TS AST canonicalization isolates semantic type changes; license JSON parsed (same package names/licenses, version/repository changes); YAML lock parsed11 importers, undici7.30.0; inventory normalized cells add exactly Integration RPC; model and ACL delta match service_role grant. Own integration/frozen install/tests still pending; NOT deployed evidence."
       ],
       "questions": [
-        "Own merge/frozen install/generated consistency/full validation pending; isolated DB chain not executed by this lane."
+        "Own resolved integration/frozen install/full check7759 and light/dark32 passed; isolated SQL/catalog/deployed state remain unverified."
       ]
     },
     {
@@ -44187,7 +44205,7 @@
         "Upstream full migration/test/rehearsal texts read untruncated; other first-party whole diffs reviewed independently after oversized generated output was rejected. Generated TS AST canonicalization isolates semantic type changes; license JSON parsed (same package names/licenses, version/repository changes); YAML lock parsed11 importers, undici7.30.0; inventory normalized cells add exactly Integration RPC; model and ACL delta match service_role grant. Own integration/frozen install/tests still pending; NOT deployed evidence."
       ],
       "questions": [
-        "Own merge/frozen install/generated consistency/full validation pending; isolated DB chain not executed by this lane."
+        "Own resolved integration/frozen install/full check7759 and light/dark32 passed; isolated SQL/catalog/deployed state remain unverified."
       ]
     },
     {
@@ -44203,7 +44221,7 @@
         "Upstream full migration/test/rehearsal texts read untruncated; other first-party whole diffs reviewed independently after oversized generated output was rejected. Generated TS AST canonicalization isolates semantic type changes; license JSON parsed (same package names/licenses, version/repository changes); YAML lock parsed11 importers, undici7.30.0; inventory normalized cells add exactly Integration RPC; model and ACL delta match service_role grant. Own integration/frozen install/tests still pending; NOT deployed evidence."
       ],
       "questions": [
-        "Own merge/frozen install/generated consistency/full validation pending; isolated DB chain not executed by this lane."
+        "Own resolved integration/frozen install/full check7759 and light/dark32 passed; isolated SQL/catalog/deployed state remain unverified."
       ]
     },
     {
@@ -44219,7 +44237,7 @@
         "Upstream full migration/test/rehearsal texts read untruncated; other first-party whole diffs reviewed independently after oversized generated output was rejected. Generated TS AST canonicalization isolates semantic type changes; license JSON parsed (same package names/licenses, version/repository changes); YAML lock parsed11 importers, undici7.30.0; inventory normalized cells add exactly Integration RPC; model and ACL delta match service_role grant. Own integration/frozen install/tests still pending; NOT deployed evidence."
       ],
       "questions": [
-        "Own merge/frozen install/generated consistency/full validation pending; isolated DB chain not executed by this lane."
+        "Own resolved integration/frozen install/full check7759 and light/dark32 passed; isolated SQL/catalog/deployed state remain unverified."
       ]
     },
     {
@@ -44235,7 +44253,7 @@
         "Upstream full migration/test/rehearsal texts read untruncated; other first-party whole diffs reviewed independently after oversized generated output was rejected. Generated TS AST canonicalization isolates semantic type changes; license JSON parsed (same package names/licenses, version/repository changes); YAML lock parsed11 importers, undici7.30.0; inventory normalized cells add exactly Integration RPC; model and ACL delta match service_role grant. Own integration/frozen install/tests still pending; NOT deployed evidence."
       ],
       "questions": [
-        "Own merge/frozen install/generated consistency/full validation pending; isolated DB chain not executed by this lane."
+        "Own resolved integration/frozen install/full check7759 and light/dark32 passed; isolated SQL/catalog/deployed state remain unverified."
       ]
     },
     {
@@ -44251,7 +44269,7 @@
         "Upstream full migration/test/rehearsal texts read untruncated; other first-party whole diffs reviewed independently after oversized generated output was rejected. Generated TS AST canonicalization isolates semantic type changes; license JSON parsed (same package names/licenses, version/repository changes); YAML lock parsed11 importers, undici7.30.0; inventory normalized cells add exactly Integration RPC; model and ACL delta match service_role grant. Own integration/frozen install/tests still pending; NOT deployed evidence."
       ],
       "questions": [
-        "Own merge/frozen install/generated consistency/full validation pending; isolated DB chain not executed by this lane."
+        "Own resolved integration/frozen install/full check7759 and light/dark32 passed; isolated SQL/catalog/deployed state remain unverified."
       ]
     },
     {
@@ -44267,7 +44285,7 @@
         "Upstream full migration/test/rehearsal texts read untruncated; other first-party whole diffs reviewed independently after oversized generated output was rejected. Generated TS AST canonicalization isolates semantic type changes; license JSON parsed (same package names/licenses, version/repository changes); YAML lock parsed11 importers, undici7.30.0; inventory normalized cells add exactly Integration RPC; model and ACL delta match service_role grant. Own integration/frozen install/tests still pending; NOT deployed evidence."
       ],
       "questions": [
-        "Own merge/frozen install/generated consistency/full validation pending; isolated DB chain not executed by this lane."
+        "Own resolved integration/frozen install/full check7759 and light/dark32 passed; isolated SQL/catalog/deployed state remain unverified."
       ]
     },
     {
@@ -44283,7 +44301,7 @@
         "Upstream full migration/test/rehearsal texts read untruncated; other first-party whole diffs reviewed independently after oversized generated output was rejected. Generated TS AST canonicalization isolates semantic type changes; license JSON parsed (same package names/licenses, version/repository changes); YAML lock parsed11 importers, undici7.30.0; inventory normalized cells add exactly Integration RPC; model and ACL delta match service_role grant. Own integration/frozen install/tests still pending; NOT deployed evidence."
       ],
       "questions": [
-        "Own merge/frozen install/generated consistency/full validation pending; isolated DB chain not executed by this lane."
+        "Own resolved integration/frozen install/full check7759 and light/dark32 passed; isolated SQL/catalog/deployed state remain unverified."
       ]
     },
     {
@@ -44299,7 +44317,7 @@
         "Upstream full migration/test/rehearsal texts read untruncated; other first-party whole diffs reviewed independently after oversized generated output was rejected. Generated TS AST canonicalization isolates semantic type changes; license JSON parsed (same package names/licenses, version/repository changes); YAML lock parsed11 importers, undici7.30.0; inventory normalized cells add exactly Integration RPC; model and ACL delta match service_role grant. Own integration/frozen install/tests still pending; NOT deployed evidence."
       ],
       "questions": [
-        "Own merge/frozen install/generated consistency/full validation pending; isolated DB chain not executed by this lane."
+        "Own resolved integration/frozen install/full check7759 and light/dark32 passed; isolated SQL/catalog/deployed state remain unverified."
       ]
     },
     {
@@ -44315,7 +44333,7 @@
         "Upstream full migration/test/rehearsal texts read untruncated; other first-party whole diffs reviewed independently after oversized generated output was rejected. Generated TS AST canonicalization isolates semantic type changes; license JSON parsed (same package names/licenses, version/repository changes); YAML lock parsed11 importers, undici7.30.0; inventory normalized cells add exactly Integration RPC; model and ACL delta match service_role grant. Own integration/frozen install/tests still pending; NOT deployed evidence."
       ],
       "questions": [
-        "Own merge/frozen install/generated consistency/full validation pending; isolated DB chain not executed by this lane."
+        "Own resolved integration/frozen install/full check7759 and light/dark32 passed; isolated SQL/catalog/deployed state remain unverified."
       ]
     },
     {
@@ -44331,7 +44349,7 @@
         "Upstream full migration/test/rehearsal texts read untruncated; other first-party whole diffs reviewed independently after oversized generated output was rejected. Generated TS AST canonicalization isolates semantic type changes; license JSON parsed (same package names/licenses, version/repository changes); YAML lock parsed11 importers, undici7.30.0; inventory normalized cells add exactly Integration RPC; model and ACL delta match service_role grant. Own integration/frozen install/tests still pending; NOT deployed evidence."
       ],
       "questions": [
-        "Own merge/frozen install/generated consistency/full validation pending; isolated DB chain not executed by this lane."
+        "Own resolved integration/frozen install/full check7759 and light/dark32 passed; isolated SQL/catalog/deployed state remain unverified."
       ]
     },
     {
@@ -44347,7 +44365,7 @@
         "Upstream full migration/test/rehearsal texts read untruncated; other first-party whole diffs reviewed independently after oversized generated output was rejected. Generated TS AST canonicalization isolates semantic type changes; license JSON parsed (same package names/licenses, version/repository changes); YAML lock parsed11 importers, undici7.30.0; inventory normalized cells add exactly Integration RPC; model and ACL delta match service_role grant. Own integration/frozen install/tests still pending; NOT deployed evidence."
       ],
       "questions": [
-        "Own merge/frozen install/generated consistency/full validation pending; isolated DB chain not executed by this lane."
+        "Own resolved integration/frozen install/full check7759 and light/dark32 passed; isolated SQL/catalog/deployed state remain unverified."
       ]
     },
     {
@@ -44363,7 +44381,7 @@
         "Upstream full migration/test/rehearsal texts read untruncated; other first-party whole diffs reviewed independently after oversized generated output was rejected. Generated TS AST canonicalization isolates semantic type changes; license JSON parsed (same package names/licenses, version/repository changes); YAML lock parsed11 importers, undici7.30.0; inventory normalized cells add exactly Integration RPC; model and ACL delta match service_role grant. Own integration/frozen install/tests still pending; NOT deployed evidence."
       ],
       "questions": [
-        "Own merge/frozen install/generated consistency/full validation pending; isolated DB chain not executed by this lane."
+        "Own resolved integration/frozen install/full check7759 and light/dark32 passed; isolated SQL/catalog/deployed state remain unverified."
       ]
     },
     {
@@ -44379,7 +44397,7 @@
         "Upstream full migration/test/rehearsal texts read untruncated; other first-party whole diffs reviewed independently after oversized generated output was rejected. Generated TS AST canonicalization isolates semantic type changes; license JSON parsed (same package names/licenses, version/repository changes); YAML lock parsed11 importers, undici7.30.0; inventory normalized cells add exactly Integration RPC; model and ACL delta match service_role grant. Own integration/frozen install/tests still pending; NOT deployed evidence."
       ],
       "questions": [
-        "Own merge/frozen install/generated consistency/full validation pending; isolated DB chain not executed by this lane."
+        "Own resolved integration/frozen install/full check7759 and light/dark32 passed; isolated SQL/catalog/deployed state remain unverified."
       ]
     },
     {
@@ -44395,7 +44413,7 @@
         "Upstream full migration/test/rehearsal texts read untruncated; other first-party whole diffs reviewed independently after oversized generated output was rejected. Generated TS AST canonicalization isolates semantic type changes; license JSON parsed (same package names/licenses, version/repository changes); YAML lock parsed11 importers, undici7.30.0; inventory normalized cells add exactly Integration RPC; model and ACL delta match service_role grant. Own integration/frozen install/tests still pending; NOT deployed evidence."
       ],
       "questions": [
-        "Own merge/frozen install/generated consistency/full validation pending; isolated DB chain not executed by this lane."
+        "Own resolved integration/frozen install/full check7759 and light/dark32 passed; isolated SQL/catalog/deployed state remain unverified."
       ]
     },
     {
@@ -44411,7 +44429,7 @@
         "Upstream full migration/test/rehearsal texts read untruncated; other first-party whole diffs reviewed independently after oversized generated output was rejected. Generated TS AST canonicalization isolates semantic type changes; license JSON parsed (same package names/licenses, version/repository changes); YAML lock parsed11 importers, undici7.30.0; inventory normalized cells add exactly Integration RPC; model and ACL delta match service_role grant. Own integration/frozen install/tests still pending; NOT deployed evidence."
       ],
       "questions": [
-        "Own merge/frozen install/generated consistency/full validation pending; isolated DB chain not executed by this lane."
+        "Own resolved integration/frozen install/full check7759 and light/dark32 passed; isolated SQL/catalog/deployed state remain unverified."
       ]
     },
     {
@@ -44427,7 +44445,7 @@
         "Upstream full migration/test/rehearsal texts read untruncated; other first-party whole diffs reviewed independently after oversized generated output was rejected. Generated TS AST canonicalization isolates semantic type changes; license JSON parsed (same package names/licenses, version/repository changes); YAML lock parsed11 importers, undici7.30.0; inventory normalized cells add exactly Integration RPC; model and ACL delta match service_role grant. Own integration/frozen install/tests still pending; NOT deployed evidence."
       ],
       "questions": [
-        "Own merge/frozen install/generated consistency/full validation pending; isolated DB chain not executed by this lane."
+        "Own resolved integration/frozen install/full check7759 and light/dark32 passed; isolated SQL/catalog/deployed state remain unverified."
       ]
     },
     {
@@ -44443,7 +44461,7 @@
         "Upstream full migration/test/rehearsal texts read untruncated; other first-party whole diffs reviewed independently after oversized generated output was rejected. Generated TS AST canonicalization isolates semantic type changes; license JSON parsed (same package names/licenses, version/repository changes); YAML lock parsed11 importers, undici7.30.0; inventory normalized cells add exactly Integration RPC; model and ACL delta match service_role grant. Own integration/frozen install/tests still pending; NOT deployed evidence."
       ],
       "questions": [
-        "Own merge/frozen install/generated consistency/full validation pending; isolated DB chain not executed by this lane."
+        "Own resolved integration/frozen install/full check7759 and light/dark32 passed; isolated SQL/catalog/deployed state remain unverified."
       ]
     },
     {
@@ -44459,7 +44477,7 @@
         "Upstream full migration/test/rehearsal texts read untruncated; other first-party whole diffs reviewed independently after oversized generated output was rejected. Generated TS AST canonicalization isolates semantic type changes; license JSON parsed (same package names/licenses, version/repository changes); YAML lock parsed11 importers, undici7.30.0; inventory normalized cells add exactly Integration RPC; model and ACL delta match service_role grant. Own integration/frozen install/tests still pending; NOT deployed evidence."
       ],
       "questions": [
-        "Own merge/frozen install/generated consistency/full validation pending; isolated DB chain not executed by this lane."
+        "Own resolved integration/frozen install/full check7759 and light/dark32 passed; isolated SQL/catalog/deployed state remain unverified."
       ]
     },
     {
@@ -44475,7 +44493,7 @@
         "Upstream full migration/test/rehearsal texts read untruncated; other first-party whole diffs reviewed independently after oversized generated output was rejected. Generated TS AST canonicalization isolates semantic type changes; license JSON parsed (same package names/licenses, version/repository changes); YAML lock parsed11 importers, undici7.30.0; inventory normalized cells add exactly Integration RPC; model and ACL delta match service_role grant. Own integration/frozen install/tests still pending; NOT deployed evidence."
       ],
       "questions": [
-        "Own merge/frozen install/generated consistency/full validation pending; isolated DB chain not executed by this lane."
+        "Own resolved integration/frozen install/full check7759 and light/dark32 passed; isolated SQL/catalog/deployed state remain unverified."
       ]
     },
     {
@@ -44491,7 +44509,7 @@
         "Upstream full migration/test/rehearsal texts read untruncated; other first-party whole diffs reviewed independently after oversized generated output was rejected. Generated TS AST canonicalization isolates semantic type changes; license JSON parsed (same package names/licenses, version/repository changes); YAML lock parsed11 importers, undici7.30.0; inventory normalized cells add exactly Integration RPC; model and ACL delta match service_role grant. Own integration/frozen install/tests still pending; NOT deployed evidence."
       ],
       "questions": [
-        "Own merge/frozen install/generated consistency/full validation pending; isolated DB chain not executed by this lane."
+        "Own resolved integration/frozen install/full check7759 and light/dark32 passed; isolated SQL/catalog/deployed state remain unverified."
       ]
     },
     {
@@ -44507,7 +44525,7 @@
         "Upstream full migration/test/rehearsal texts read untruncated; other first-party whole diffs reviewed independently after oversized generated output was rejected. Generated TS AST canonicalization isolates semantic type changes; license JSON parsed (same package names/licenses, version/repository changes); YAML lock parsed11 importers, undici7.30.0; inventory normalized cells add exactly Integration RPC; model and ACL delta match service_role grant. Own integration/frozen install/tests still pending; NOT deployed evidence."
       ],
       "questions": [
-        "Own merge/frozen install/generated consistency/full validation pending; isolated DB chain not executed by this lane."
+        "Own resolved integration/frozen install/full check7759 and light/dark32 passed; isolated SQL/catalog/deployed state remain unverified."
       ]
     },
     {
@@ -44523,7 +44541,7 @@
         "Upstream full migration/test/rehearsal texts read untruncated; other first-party whole diffs reviewed independently after oversized generated output was rejected. Generated TS AST canonicalization isolates semantic type changes; license JSON parsed (same package names/licenses, version/repository changes); YAML lock parsed11 importers, undici7.30.0; inventory normalized cells add exactly Integration RPC; model and ACL delta match service_role grant. Own integration/frozen install/tests still pending; NOT deployed evidence."
       ],
       "questions": [
-        "Own merge/frozen install/generated consistency/full validation pending; isolated DB chain not executed by this lane."
+        "Own resolved integration/frozen install/full check7759 and light/dark32 passed; isolated SQL/catalog/deployed state remain unverified."
       ]
     },
     {
@@ -44539,7 +44557,7 @@
         "Upstream full migration/test/rehearsal texts read untruncated; other first-party whole diffs reviewed independently after oversized generated output was rejected. Generated TS AST canonicalization isolates semantic type changes; license JSON parsed (same package names/licenses, version/repository changes); YAML lock parsed11 importers, undici7.30.0; inventory normalized cells add exactly Integration RPC; model and ACL delta match service_role grant. Own integration/frozen install/tests still pending; NOT deployed evidence."
       ],
       "questions": [
-        "Own merge/frozen install/generated consistency/full validation pending; isolated DB chain not executed by this lane."
+        "Own resolved integration/frozen install/full check7759 and light/dark32 passed; isolated SQL/catalog/deployed state remain unverified."
       ]
     },
     {
@@ -44555,7 +44573,7 @@
         "Upstream full migration/test/rehearsal texts read untruncated; other first-party whole diffs reviewed independently after oversized generated output was rejected. Generated TS AST canonicalization isolates semantic type changes; license JSON parsed (same package names/licenses, version/repository changes); YAML lock parsed11 importers, undici7.30.0; inventory normalized cells add exactly Integration RPC; model and ACL delta match service_role grant. Own integration/frozen install/tests still pending; NOT deployed evidence."
       ],
       "questions": [
-        "Own merge/frozen install/generated consistency/full validation pending; isolated DB chain not executed by this lane."
+        "Own resolved integration/frozen install/full check7759 and light/dark32 passed; isolated SQL/catalog/deployed state remain unverified."
       ]
     },
     {
@@ -44571,7 +44589,7 @@
         "Upstream full migration/test/rehearsal texts read untruncated; other first-party whole diffs reviewed independently after oversized generated output was rejected. Generated TS AST canonicalization isolates semantic type changes; license JSON parsed (same package names/licenses, version/repository changes); YAML lock parsed11 importers, undici7.30.0; inventory normalized cells add exactly Integration RPC; model and ACL delta match service_role grant. Own integration/frozen install/tests still pending; NOT deployed evidence."
       ],
       "questions": [
-        "Own merge/frozen install/generated consistency/full validation pending; isolated DB chain not executed by this lane."
+        "Own resolved integration/frozen install/full check7759 and light/dark32 passed; isolated SQL/catalog/deployed state remain unverified."
       ]
     },
     {
@@ -44587,7 +44605,7 @@
         "Upstream full migration/test/rehearsal texts read untruncated; other first-party whole diffs reviewed independently after oversized generated output was rejected. Generated TS AST canonicalization isolates semantic type changes; license JSON parsed (same package names/licenses, version/repository changes); YAML lock parsed11 importers, undici7.30.0; inventory normalized cells add exactly Integration RPC; model and ACL delta match service_role grant. Own integration/frozen install/tests still pending; NOT deployed evidence."
       ],
       "questions": [
-        "Own merge/frozen install/generated consistency/full validation pending; isolated DB chain not executed by this lane."
+        "Own resolved integration/frozen install/full check7759 and light/dark32 passed; isolated SQL/catalog/deployed state remain unverified."
       ]
     },
     {
@@ -44603,7 +44621,7 @@
         "Upstream full migration/test/rehearsal texts read untruncated; other first-party whole diffs reviewed independently after oversized generated output was rejected. Generated TS AST canonicalization isolates semantic type changes; license JSON parsed (same package names/licenses, version/repository changes); YAML lock parsed11 importers, undici7.30.0; inventory normalized cells add exactly Integration RPC; model and ACL delta match service_role grant. Own integration/frozen install/tests still pending; NOT deployed evidence."
       ],
       "questions": [
-        "Own merge/frozen install/generated consistency/full validation pending; isolated DB chain not executed by this lane."
+        "Own resolved integration/frozen install/full check7759 and light/dark32 passed; isolated SQL/catalog/deployed state remain unverified."
       ]
     }
   ]
