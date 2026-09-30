@@ -266,20 +266,12 @@ const serverSchema = z
 
       const sender = data.RESEND_FROM_EMAIL?.trim().toLowerCase();
       if (data.DAYOPT_ENVIRONMENT === 'integration') {
-        const mailValues = [
+        return ![
           data.RESEND_API_KEY,
           data.RESEND_FROM_EMAIL,
           data.RESEND_WEBHOOK_SECRET,
           data.CONTACT_INTEGRATION_RECIPIENT,
-        ].map((value) => Boolean(value?.trim()));
-        if (!mailValues.every(Boolean) && mailValues.some(Boolean)) return false;
-        if (!mailValues.some(Boolean)) return true;
-        return Boolean(
-          sender &&
-          sender !== 'onboarding@resend.dev' &&
-          isDayoptEmailAddress(sender) &&
-          data.CONTACT_INTEGRATION_RECIPIENT?.trim().toLowerCase() !== 'support@dayopt.app',
-        );
+        ].some((value) => Boolean(value?.trim()));
       }
 
       return Boolean(
@@ -292,7 +284,7 @@ const serverSchema = z
     },
     {
       message:
-        'RESEND_API_KEY / apex dayopt.app RESEND_FROM_EMAIL / RESEND_WEBHOOK_SECRET はVercel Productionで必須です',
+        'RESEND_API_KEY / apex dayopt.app RESEND_FROM_EMAIL / RESEND_WEBHOOK_SECRET はVercel Productionで必須です。Integration Resend deliveryは未対応のため設定しないでください',
       path: ['RESEND_API_KEY'],
     },
   )

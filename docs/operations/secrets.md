@@ -270,7 +270,7 @@ Integration は既存 `product` Vercel projectの `integration` branchと、非�
 
 固定originは `https://product-git-integration-dayopt.vercel.app`、Supabase refは `tilwaprottpyhlfoggbb`。Vercel project ID、Git branch、Preview target、branch alias、app URL、Supabase ref、OAuth issuer/resourceの一致をbuildとruntimeで検査する。Vercel system variablesは手入力せず、実secretやdeployment-specific URLをrepo・Issue・会話へ記録しない。
 
-IntegrationのOAuth identity確認はread-only RPCだけを使い、healthやOAuth requestから自動provisionしない。不足・不一致はfail closedにする。MCP write allowlist、billing、PostHog送信は閉じたままにし、Integration専用Upstash key namespaceとrate-limit credentialsをProductionから分離する。Stripe・Resend・Google Calendarは使う時だけtest用の一式を設定し、送信先やOAuth accountも専用のテスト資源に限る。
+IntegrationのOAuth identity確認はread-only RPCだけを使い、healthやOAuth requestから自動provisionしない。不足・不一致はfail closedにする。MCP write allowlist、billing、PostHog送信は閉じたままにし、Integration専用Upstash key namespaceとrate-limit credentialsをProductionから分離する。Stripe・Google Calendarは使う時だけtest用の一式を設定し、Stripe account IDとOAuth accountも専用のテスト資源に限る。IntegrationのResend送信は未対応のため、API key・sender・webhook secret・CONTACT_INTEGRATION_RECIPIENTは設定しない。専用recipientを送信処理へ接続するまでは、完全な一式でもbuild/runtimeで拒否する。
 
 2026-09-28の非本番確認では固定Integration deploymentのhealth（DB/Redis）、OAuth metadataとDB identityの一致、MCP write gates closedを確認した。fresh Auth login、redirect/callbackを含むログイン、アプリCRUD、full Cloud replayは別のE2E証拠として扱う。deployment healthだけでこれらの動作を完了としない。
 

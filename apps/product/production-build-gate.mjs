@@ -257,26 +257,25 @@ export function assertProductIntegrationBuildEnv(env) {
   assertOptionalEnvironmentGroup(env, 'Product Integration Stripe configuration', [
     'STRIPE_SECRET_KEY',
     'STRIPE_WEBHOOK_SECRET',
+    'STRIPE_ACCOUNT_ID',
   ]);
-
-  const contactRecipient =
-    typeof env.CONTACT_INTEGRATION_RECIPIENT === 'string'
-      ? env.CONTACT_INTEGRATION_RECIPIENT.trim().toLowerCase()
-      : '';
-  if (
-    hasNonEmptyValue(env, 'RESEND_API_KEY') &&
-    (!isValidEmailAddress(contactRecipient) || contactRecipient === 'support@dayopt.app')
-  ) {
-    throw new Error(
-      'Product Integration with Resend requires a dedicated CONTACT_INTEGRATION_RECIPIENT',
-    );
+  if (stripeKey && !/^acct_[A-Za-z0-9_]+$/.test(env.STRIPE_ACCOUNT_ID)) {
+    throw new Error('Product Integration requires a valid STRIPE_ACCOUNT_ID');
   }
-  assertOptionalEnvironmentGroup(env, 'Product Integration Resend configuration', [
+
+  // The contact runtime is Production-only. Do not claim a configured sink is
+  // usable until an independently reviewed Integration delivery path exists.
+  const mailNames = [
     'RESEND_API_KEY',
     'RESEND_FROM_EMAIL',
     'RESEND_WEBHOOK_SECRET',
     'CONTACT_INTEGRATION_RECIPIENT',
-  ]);
+  ];
+  if (mailNames.some((name) => hasNonEmptyValue(env, name))) {
+    throw new Error(
+      'Product Integration Resend delivery is not supported; leave mail settings unset',
+    );
+  }
   assertOptionalEnvironmentGroup(env, 'Product Integration Calendar configuration', [
     'GOOGLE_CALENDAR_CLIENT_ID',
     'GOOGLE_CALENDAR_PROJECT_NUMBER',
@@ -284,6 +283,15 @@ export function assertProductIntegrationBuildEnv(env) {
     'CALENDAR_TOKEN_ENCRYPTION_KEY',
     'GOOGLE_CALENDAR_REDIRECT_URIS',
   ]);
+
+  if (hasNonEmptyValue(env, 'GOOGLE_CALENDAR_CLIENT_ID')) {
+    if (!/^[1-9][0-9]{5,29}$/.test(env.GOOGLE_CALENDAR_PROJECT_NUMBER)) {
+      throw new Error('Product Integration requires a valid GOOGLE_CALENDAR_PROJECT_NUMBER');
+    }
+    if (Buffer.from(env.CALENDAR_TOKEN_ENCRYPTION_KEY.trim(), 'base64').length !== 32) {
+      throw new Error('Product Integration requires a 32-byte CALENDAR_TOKEN_ENCRYPTION_KEY');
+    }
+  }
 
   if (
     hasNonEmptyValue(env, 'GOOGLE_CALENDAR_CLIENT_ID') &&
@@ -301,12 +309,6 @@ function assertOptionalEnvironmentGroup(env, label, names) {
   if (configured > 0 && configured !== names.length) {
     throw new Error(`${label} requires all or none of: ${names.join(', ')}`);
   }
-}
-
-function isValidEmailAddress(value) {
-  return (
-    value.length <= 254 && !/[\r\n,]/u.test(value) && /^[^\s@]+@[^\s@]+\.[^\s@]+$/u.test(value)
-  );
 }
 
 function hasNonEmptyValue(env, name) {

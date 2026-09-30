@@ -439,34 +439,80 @@ describe('Product Integration build gate', () => {
         ...completeIntegrationEnv(),
         STRIPE_SECRET_KEY: 'sk_' + 'test_safe-test-key',
         STRIPE_WEBHOOK_SECRET: 'safe-dummy-webhook-secret',
+        STRIPE_ACCOUNT_ID: 'acct_synthetic',
         STRIPE_LIVEMODE: 'false',
       }),
     ).toBe(true);
   });
 
-  it('requires a dedicated non-support recipient before enabling Resend', () => {
+  it.each(['noreply@dayopt.app', 'onboarding@resend.dev', 'sender@example.com'])(
+    'rejects Integration Resend with complete configuration (%s)',
+    (sender) => {
+      expect(() =>
+        assertProductIntegrationBuildEnv({
+          ...completeIntegrationEnv(),
+          RESEND_API_KEY: 'synthetic-mail-key',
+          RESEND_FROM_EMAIL: sender,
+          RESEND_WEBHOOK_SECRET: 'synthetic-webhook-key',
+          CONTACT_INTEGRATION_RECIPIENT: 'qa@example.com',
+        }),
+      ).toThrow('Integration Resend delivery is not supported');
+    },
+  );
+  it.each([
+    'RESEND_API_KEY',
+    'RESEND_FROM_EMAIL',
+    'RESEND_WEBHOOK_SECRET',
+    'CONTACT_INTEGRATION_RECIPIENT',
+  ])('rejects partial Integration mail settings: %s', (name) => {
     expect(() =>
       assertProductIntegrationBuildEnv({
         ...completeIntegrationEnv(),
-        RESEND_API_KEY: 'test-key',
+        [name]: 'synthetic-private-value',
       }),
-    ).toThrow('dedicated CONTACT_INTEGRATION_RECIPIENT');
-    expect(() =>
-      assertProductIntegrationBuildEnv({
-        ...completeIntegrationEnv(),
-        RESEND_API_KEY: 'test-key',
-        CONTACT_INTEGRATION_RECIPIENT: 'support@dayopt.app',
-      }),
-    ).toThrow('dedicated CONTACT_INTEGRATION_RECIPIENT');
-    expect(
-      assertProductIntegrationBuildEnv({
-        ...completeIntegrationEnv(),
-        RESEND_API_KEY: 'test-key',
-        RESEND_FROM_EMAIL: 'noreply@dayopt.app',
-        RESEND_WEBHOOK_SECRET: 'test-webhook-secret',
-        CONTACT_INTEGRATION_RECIPIENT: 'qa+integration@example.com',
-      }),
-    ).toBe(true);
+    ).toThrow('Integration Resend delivery is not supported');
+  });
+  it.each([undefined, '', ' ', 'account_invalid', 'acct_'])(
+    'rejects missing or malformed Stripe account identity: %s',
+    (account) => {
+      expect(() =>
+        assertProductIntegrationBuildEnv({
+          ...completeIntegrationEnv(),
+          STRIPE_SECRET_KEY: 'sk_' + 'test_synthetic',
+          STRIPE_WEBHOOK_SECRET: 'synthetic-webhook',
+          STRIPE_LIVEMODE: 'false',
+          STRIPE_ACCOUNT_ID: account,
+        }),
+      ).toThrow(/STRIPE_ACCOUNT_ID/);
+    },
+  );
+  const calendarEnv = () => ({
+    ...completeIntegrationEnv(),
+    GOOGLE_CALENDAR_CLIENT_ID: 'synthetic-client',
+    GOOGLE_CALENDAR_CLIENT_SECRET: 'synthetic-secret',
+    GOOGLE_CALENDAR_PROJECT_NUMBER: '123456',
+    CALENDAR_TOKEN_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString('base64'),
+    GOOGLE_CALENDAR_REDIRECT_URIS: `${PRODUCT_INTEGRATION_ORIGIN}/api/integrations/google-calendar/callback`,
+  });
+  it('accepts a complete well-formed Calendar configuration', () => {
+    expect(assertProductIntegrationBuildEnv(calendarEnv())).toBe(true);
+  });
+  it.each([
+    ['GOOGLE_CALENDAR_PROJECT_NUMBER', '12345'],
+    ['GOOGLE_CALENDAR_PROJECT_NUMBER', '012345'],
+    ['GOOGLE_CALENDAR_PROJECT_NUMBER', 'x'.repeat(6)],
+    ['GOOGLE_CALENDAR_PROJECT_NUMBER', '1'.repeat(31)],
+    ['CALENDAR_TOKEN_ENCRYPTION_KEY', Buffer.alloc(31).toString('base64')],
+    ['CALENDAR_TOKEN_ENCRYPTION_KEY', Buffer.alloc(33).toString('base64')],
+    ['CALENDAR_TOKEN_ENCRYPTION_KEY', 'synthetic-private-invalid'],
+  ])('rejects malformed Calendar %s without disclosing values', (name, value) => {
+    try {
+      assertProductIntegrationBuildEnv({ ...calendarEnv(), [name]: value });
+      expect.fail('invalid Calendar configuration was accepted');
+    } catch (error) {
+      expect(error.message).toContain(name);
+      expect(error.message).not.toContain(value);
+    }
   });
 });
 

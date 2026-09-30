@@ -86,21 +86,17 @@ describe('Integration server environment', () => {
     expect(JSON.stringify(errorLog.mock.calls)).not.toContain('sensitive-invalid-url');
   });
 
-  it('accepts a complete Integration-only Resend sink and rejects partial configuration', async () => {
+  it('rejects complete and partial Integration Resend settings until delivery is supported', async () => {
     const complete = await loadIntegrationEnv({
       RESEND_API_KEY: 'safe-dummy-test-key',
       RESEND_FROM_EMAIL: 'noreply@dayopt.app',
       RESEND_WEBHOOK_SECRET: 'safe-dummy-webhook-secret',
       CONTACT_INTEGRATION_RECIPIENT: 'qa+integration@example.com',
     });
-    expect(complete.env.NEXT_PUBLIC_SUPABASE_URL).toBe(
-      `https://${PRODUCT_INTEGRATION_SUPABASE_REF}.supabase.co`,
-    );
+    expect(() => complete.env.NEXT_PUBLIC_SUPABASE_URL).toThrow('Integration Resend');
 
     const partial = await loadIntegrationEnv({ RESEND_API_KEY: 'safe-dummy-test-key' });
-    expect(() => partial.env.NEXT_PUBLIC_SUPABASE_URL).toThrow(
-      'RESEND_API_KEY / apex dayopt.app RESEND_FROM_EMAIL / RESEND_WEBHOOK_SECRET',
-    );
+    expect(() => partial.env.NEXT_PUBLIC_SUPABASE_URL).toThrow('Integration Resend');
   });
 
   it('rejects Stripe live-mode credentials', async () => {
