@@ -429,6 +429,18 @@ pnpm agent:run -- claude
 
 ### Bootstrap と移行
 
+#### ローカル Codex の通常の `op` 呼び出し
+
+2026-09-30、User が指定した 1Password 項目から SA token を process 内だけに読み込み、active な指定 SA と、絞り込みなしの vault 一覧が `agent` 1 件であることを実測した。続けて [`scripts/tasks/agent-op.mjs`](../../scripts/tasks/agent-op.mjs) を使うローカル entry point を導入し、Codex の通常の `op vault list` でも同じ結果を確認した。
+
+- `~/.local/bin/op` は `CODEX_THREAD_ID` / `CODEX_SESSION_ID` がある process に SA 用 entry point を適用する。それ以外は元の CLI を呼ぶ。
+- `~/.config/dayopt-agent-op/config.json` には元の CLI の絶対 path、bootstrap 項目の account / vault / item ID、検証対象の SA / vault ID だけを保存する。token 自体は保存しない。
+- 各呼び出しで、User が指定した bootstrap 項目だけを人間用認証で読み出す。1Password の承認が必要になる場合がある。その後、継承した `OP_*` を除去し、一時設定・生体認証無効の SA 環境で identity と vault を照合してから、要求された command を実行する。
+- bootstrap / SA 検証に失敗した場合は停止する。要求された command を人間用認証へ fallback させない。`--account` / `--session` / `--config` / `--debug` と `signin` / `signout` は入口で拒否する。
+- **これは通常の CLI 認証の切替であり、OS の隔離ではない。** marker の解除、元の CLI の絶対 path、別の MCP / UI 経路などを禁止する境界ではない。Codex 全体の認証が強制的に SA へ固定されたとは扱わない。
+- 反映確認は Codex の実際の shell で `command -v op` と、絞り込みなしの `op vault list` を実行する。別の実行環境・PATH・MCP にも適用されるとは推測しない。
+- 解除は今回作成した `~/.local/bin/op` を削除する。`~/.config/dayopt-agent-op/` は entry point の source と非秘密の参照情報だけを持つ。
+
 SA token の控えは **1Password の `human` に保管できる**（[公式の保管手順](https://www.1password.dev/service-accounts/get-started)）。旧記述の「1Password 自身には保管できない」は保存と起動時の取得を混同していたため訂正する。クラウドでは cloud secret store から注入する。ローカルの初回起動では User が専用ユーザーの Terminal に非表示入力し、process 内だけで保持する。agent が自分の token を 1Password から取得する循環を作らない。
 
 | 登録先                        | 登録内容                                                                       | 確認状況                                                    |

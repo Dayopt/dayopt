@@ -8,7 +8,9 @@ code: scripts/tasks/agent-service-account.mjs
 
 2026-09-30、User はローカルの分離を先に進め、専用の標準 Mac ユーザーに切り替えて Codex を使う方針を承認した。本ページはその準備手順。ユーザー作成・ACL の適用・移行完了は未確認。SA の権限・起動検証とクラウド側の方針は [Secrets](./secrets.md#service-account) を正本とする。
 
-同じ OS ユーザーで `OP_SERVICE_ACCOUNT_TOKEN` や `OP_CONFIG_DIR` だけを切り替えても、人間の CLI 設定・Keychain・ブラウザー・1Password アプリへ戻る経路は閉じない。ローカルの分離には OS ユーザーとファイルアクセス権の境界が必要。
+同じ OS ユーザーで `OP_SERVICE_ACCOUNT_TOKEN` や `OP_CONFIG_DIR` だけを切り替えても、人間の CLI 設定・Keychain・ブラウザー・1Password アプリへ戻る経路は閉じない。本ページは OS ユーザーとファイルアクセス権で分離する一つの方法を示す。同一ユーザーで OS sandbox を使う方法もあるため、専用ユーザーが唯一の方法ではない。sandbox を採る場合は command に加えて MCP / browser / Computer Use の経路も制限・検証する必要がある（[Codex の適用範囲](https://learn.chatgpt.com/docs/permissions#scope-and-enforcement)）。
+
+通常の `op` 呼び出しを SA に切り替える entry point の導入状況は [Secrets](./secrets.md#ローカル-codex-の通常の-op-呼び出し)を参照する。この認証切替と、本ページの OS 分離完了は別に判定する。
 
 ## 1. 専用ユーザーを作る
 
