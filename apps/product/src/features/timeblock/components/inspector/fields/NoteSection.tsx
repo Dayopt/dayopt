@@ -3,7 +3,7 @@
 import type { LucideIcon } from 'lucide-react';
 import { useId, useMemo, useState } from 'react';
 
-import { Input } from '@dayopt/components';
+import { Textarea } from '@dayopt/components';
 
 import { convertNoteHtmlToText } from './note-html-to-text';
 
@@ -12,27 +12,21 @@ interface NoteSectionProps {
   icon?: LucideIcon | undefined;
   note: string;
   onNoteChange: (text: string) => void;
-  placeholder?: string | undefined;
   disabled?: boolean | undefined;
   maxLength?: number | undefined;
 }
 
-function toSingleLineNote(note: string): string {
-  return convertNoteHtmlToText(note).replace(/\r?\n/g, ' ');
-}
-
-/** Inspector専用の、1行 input で編集するコンパクトなメモ欄。 */
+/** Inspector専用の、入力内容に合わせて高さが広がるメモ欄。 */
 export function NoteSection({
   label,
   icon: Icon,
   note,
   onNoteChange,
-  placeholder,
   disabled = false,
   maxLength = 1000,
 }: NoteSectionProps) {
   const inputId = useId();
-  const displayNote = useMemo(() => toSingleLineNote(note), [note]);
+  const displayNote = useMemo(() => convertNoteHtmlToText(note), [note]);
   const [localNote, setLocalNote] = useState(displayNote);
   const [isFocused, setIsFocused] = useState(false);
   const [previousDisplayNote, setPreviousDisplayNote] = useState(displayNote);
@@ -56,9 +50,8 @@ export function NoteSection({
           {localNote.length}/{maxLength}
         </span>
       </div>
-      <Input
+      <Textarea
         id={inputId}
-        type="text"
         value={localNote}
         onChange={(event) => {
           setLocalNote(event.target.value);
@@ -69,11 +62,10 @@ export function NoteSection({
           setIsFocused(false);
           setLocalNote(displayNote);
         }}
-        placeholder={placeholder}
         disabled={disabled}
         maxLength={maxLength}
         aria-describedby={`${inputId}-counter`}
-        className="bg-muted h-11 border-0 px-3 text-sm shadow-none"
+        className="resize-none text-sm"
       />
     </div>
   );

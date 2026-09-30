@@ -40,14 +40,9 @@
         "toggleWeekends": "Show or hide weekends",
         "createBlock": "Create a timeblock",
         "createBlockNow": "Create a timeblock at the current time",
-        "copyBlock": "Copy the selected timeblock",
-        "pasteBlock": "Paste the copied timeblock",
         "deleteBlock": "Delete the selected timeblock",
         "closeInspector": "Close timeblock details"
       }
-    },
-    "clipboard": {
-      "recordRequiresPast": "Records can only be pasted into past time"
     },
     "panel": {
       "resizeLabel": "Resize right panel"

@@ -29,7 +29,6 @@ import { Drawer, DrawerContent, DrawerTitle, Spinner } from '@dayopt/components'
 import type { TimeblockDestination } from '../../domain/timeblock-destination';
 import { useInspectorURLSync } from '../../hooks/useInspectorURLSync';
 import { TIMEBLOCK_INSPECTOR_SLOT_KEY } from '../../lib/inspector-slot';
-import type { ClipboardTimeblock } from '../../lib/timeblock-clipboard';
 import { useTimeblockInspectorStore } from '../../stores/useTimeblockInspectorStore';
 import { DockedInspectorPanel } from '../inspector/DockedInspectorPanel';
 import { useInspectorKeyboard } from '../inspector/hooks';
@@ -42,10 +41,10 @@ function InspectorURLSyncHandler() {
 }
 
 interface TimeModelInspectorProps {
+  /** 予定 / 記録の内容末尾に表示する操作。PC / モバイルで共通。 */
+  actionsSlot?: React.ReactNode;
   /** 振り返り panel を開くコールバック（Composition Layer から注入） */
   onViewStats?: ((tagId: string) => void) | undefined;
-  /** Timeblockを独立複製用のクリップボードへ保存する。 */
-  onCopy?: ((timeblock: ClipboardTimeblock) => void) | undefined;
   /**
    * ドラッグ作成モード（store.createMode）で描く内容。calendar 側が組み立てて
    * Composition Layer から注入する（timeblock は calendar を import できないため）。
@@ -110,8 +109,8 @@ function toInspectorDerivedBlock(
 
 /** plans / records 対応 Inspector のトップレベル（モバイル=Drawer / PC=DockedInspectorPanel） */
 export function TimeblockInspector({
+  actionsSlot,
   onViewStats,
-  onCopy,
   createContent,
 }: TimeModelInspectorProps) {
   const t = useTranslations();
@@ -282,12 +281,12 @@ export function TimeblockInspector({
       <TimeblockInspectorForm
         key={`${timeblockKind}:${target.id}:${activeQuery.isPlaceholderData ? 'placeholder' : 'loaded'}`}
         kind={timeblockKind}
+        actionsSlot={actionsSlot}
         plan={plan}
         record={record}
         relationships={relationships}
         onOpenRelationship={handleOpenRelationship}
         onViewStats={onViewStats}
-        onCopy={onCopy}
         onStartDuplicate={openDuplicate}
         onCloseInspector={handleClose}
         onDeleted={handleClose}

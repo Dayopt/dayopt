@@ -179,7 +179,16 @@ describe('OG image route', () => {
   });
 
   it.each([
-    ['category=docs', { category: 'docs', layout: 'center' }],
+    ['category=docs', { category: 'docs', layout: 'center', categoryLabel: 'Docs' }],
+    [
+      'category=docs&locale=ja',
+      { category: 'docs', layout: 'center', categoryLabel: 'ドキュメント' },
+    ],
+    ['category=docs&locale=en', { category: 'docs', layout: 'center', categoryLabel: 'Docs' }],
+    [
+      'category=docs&locale=unsupported',
+      { category: 'docs', layout: 'center', categoryLabel: 'Docs' },
+    ],
     ['type=blog', { category: 'journal', layout: 'left' }],
     ['type=release', { category: 'release', layout: 'left' }],
     ['category=docs&layout=left', { category: 'docs', layout: 'left' }],

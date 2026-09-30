@@ -9,7 +9,6 @@
  */
 
 import { cn } from '@dayopt/components';
-import { useTimeblockClipboardStore } from '../../../../../stores/useTimeblockClipboardStore';
 
 import { useResponsiveHourHeight } from '../../hooks/useResponsiveHourHeight';
 import { CalendarDropZone } from '../CalendarDropZone';
@@ -65,8 +64,6 @@ export const CalendarDragSelection = ({
       <div
         className="absolute inset-0"
         onMouseDown={(e) => {
-          // Googleカレンダー互換: クリックした日付を記憶（Cmd+Vでペーストする日付として使用）
-          useTimeblockClipboardStore.getState().setLastClickedPosition({ date });
           handleMouseDown(e);
         }}
         onDoubleClick={handleDoubleClick}

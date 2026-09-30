@@ -9,11 +9,11 @@
  */
 
 import type { LucideIcon } from 'lucide-react';
-import { BarChart3, Copy, CopyPlus, Trash2 } from 'lucide-react';
+import { BarChart3, CopyPlus, Trash2 } from 'lucide-react';
 
 import type { MessageKey } from '@/lib/i18n';
 
-export type TimeblockMenuItemKey = 'viewStats' | 'copy' | 'duplicate' | 'delete';
+export type TimeblockMenuItemKey = 'viewStats' | 'duplicate' | 'delete';
 
 export interface TimeblockMenuItem {
   key: TimeblockMenuItemKey;
@@ -27,7 +27,6 @@ export interface TimeblockMenuItem {
 interface TimeblockMenuItemsArgs {
   activityId?: string | null | undefined;
   onViewStats?: (() => void) | undefined;
-  onCopy?: (() => void) | undefined;
   onDuplicate?: (() => void) | undefined;
   onDelete?: (() => void) | undefined;
 }
@@ -35,7 +34,6 @@ interface TimeblockMenuItemsArgs {
 export function getTimeblockMenuItems({
   activityId,
   onViewStats,
-  onCopy,
   onDuplicate,
   onDelete,
 }: TimeblockMenuItemsArgs): TimeblockMenuItem[] {
@@ -47,15 +45,6 @@ export function getTimeblockMenuItems({
           icon: BarChart3,
           dangerous: false,
           onSelect: onViewStats,
-        }
-      : null,
-    onCopy
-      ? {
-          key: 'copy',
-          labelKey: 'common.actions.copy',
-          icon: Copy,
-          dangerous: false,
-          onSelect: onCopy,
         }
       : null,
     onDuplicate

@@ -120,7 +120,7 @@ export function DockedInspectorPanel({
       role="region"
       aria-label={title}
       tabIndex={-1}
-      className="flex h-full min-h-0 flex-col gap-0 overflow-hidden focus:outline-none"
+      className="bg-surface-container flex h-full min-h-0 flex-col gap-0 overflow-hidden focus:outline-none"
     >
       {/*
         overflow-x-hidden: 行の 44px タップ領域は擬似要素で外へ広げているため数 px はみ出す。

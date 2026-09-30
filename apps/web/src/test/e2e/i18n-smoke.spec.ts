@@ -54,6 +54,7 @@ test('LP metadata と OG image が新コピーに整合する', async ({ page })
   expect(ogUrl.pathname).toBe('/api/og');
   expect(ogUrl.searchParams.get('title')).toBe(ogTitle);
   expect(ogUrl.searchParams.get('description')).toBe(description);
+  expect(ogUrl.searchParams.get('locale')).toBe('en');
 
   const response = await page.request.get(`/api/og?${ogUrl.searchParams.toString()}`);
   expect(response.ok()).toBe(true);

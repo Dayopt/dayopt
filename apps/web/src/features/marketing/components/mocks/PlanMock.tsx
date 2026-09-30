@@ -58,7 +58,7 @@ export function PlanMock() {
         <div className="bg-container border-border hidden w-44 shrink-0 flex-col border-r p-3 lg:flex">
           {/* Logo */}
           <div className="mb-4 flex items-center px-1">
-            <Logo variant="wordmark" size="sm" />
+            <Logo variant="lockup" size="sm" />
           </div>
 
           {/* Nav */}

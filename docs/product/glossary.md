@@ -70,21 +70,17 @@ pnpm copy:check:strict
 | Time spent (report tab)      | 時間の使い方         | Time spent      | `ReportTabs`                                                                         | —                                 | —                                  | タブ。事実だけで何にいくら使ったかを見る面。中身は配分の面                            |
 | Plan vs. record (report tab) | 差分                 | Plan vs. record | `ReportTabs`                                                                         | —                                 | —                                  | タブ。予定と記録の違いを見る面。中身は執行の面。「レビュー」は禁止語なので付けない    |
 | Reflection (report tab)      | 振り返り             | Reflection      | `ReportTabs`                                                                         | —                                 | —                                  | タブ。それが良い使い方だったかを見る面。中身は質の面。ja はページ名（Review）と同じ語 |
-| Allocation (chapter 1)       | 配分                 | Allocation      | `AllocationChapter`                                                                  | —                                 | —                                  | 1 章。時間そのものを分母（週 = 168h）に置いて、どこへ流れたかを見る                   |
-| Execution (chapter 2)        | 執行                 | Execution       | `ExecutionChapter`                                                                   | —                                 | —                                  | 2 章。予定に対して記録がどう動いたか。全体遵守率のような合成値は作らない              |
-| Quality (chapter 3)          | 質                   | Quality         | `QualityChapter`                                                                     | —                                 | —                                  | 3 章。投下時間と充実 / 消耗の関係を見る。中の散布図が「羅針盤」                       |
 
 ### 設計語（UI 文言には出さない）
 
-| Concept          | ja           | en               | 禁止表記 (ja) | 使い方                                                                                         |
-| ---------------- | ------------ | ---------------- | ------------- | ---------------------------------------------------------------------------------------------- |
-| Ink              | インク       | Ink              | —             | 記録として書かれた時間。決算バーの塗り                                                         |
-| Margin           | 余白         | Margin           | 空白 / 無駄   | 記録が書かれていない時間。見出しに数字で出すだけで、配分には混ぜず塗らない。フィルタで動かない |
-| Ledger bar       | 決算バー     | Ledger bar       | —             | 1 章の横 1 本のバー。塗りがインク、塗り残しが余白。UI にラベルとしては出さない                 |
-| Mirror           | 見積もりの鏡 | Mirror           | —             | 2 章の節。記録 / 過去予定の係数を癖の強い順に最大 3 件出す                                     |
-| Compass          | 羅針盤       | Compass          | —             | 3 章の散布図。横軸が投下時間、縦軸が充実と消耗の差。平均・回帰線・象限は作らない               |
-| Two-lane view    | 2 レーン表示 | Two-lane view    | —             | 予定レーン（アウトライン・淡色）と記録レーン（塗り・主役）を横並びに出す                       |
-| Destination rule | 保存先ルール | Destination rule | —             | 新規作成は end_at だけで宛先が決まる（未来なら予定、過去なら記録）。種別選択の UI は置かない   |
+| Concept          | ja           | en               | 禁止表記 (ja) | 使い方                                                                                                 |
+| ---------------- | ------------ | ---------------- | ------------- | ------------------------------------------------------------------------------------------------------ |
+| Ink              | インク       | Ink              | —             | 記録として書かれた時間。レポートの現行表示は docs/product/specs/review.md を参照                       |
+| Margin           | 余白         | Margin           | 空白 / 無駄   | 記録が書かれていない時間。見出しに数字で出すだけで、配分には混ぜず塗らない。フィルタで動かない         |
+| Mirror           | 見積もりの鏡 | Mirror           | —             | 「差分」タブの節。記録 / 過去予定の係数を癖の強い順に最大 3 件出す                                     |
+| Compass          | 羅針盤       | Compass          | —             | 「振り返り」タブの散布図。軸と集計の正本は docs/product/specs/review.md を参照                         |
+| Two-lane view    | 2 レーン表示 | Two-lane view    | —             | 予定レーン（アウトライン・淡色）と記録レーン（塗り・主役）を横並びに出す                               |
+| Destination rule | 保存先ルール | Destination rule | —             | 新規作成の既定は end_at で決まる。過去枠は予定 / 記録を選べる。正本: docs/product/specs/plan-record.md |
 
 ### コード内部語
 

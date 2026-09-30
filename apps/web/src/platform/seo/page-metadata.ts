@@ -2,6 +2,7 @@ import type { OgCategory, OgLayout } from '@dayopt/assets/og';
 import { env } from '@web/platform/config/env';
 import type { Metadata } from 'next';
 
+import { normalizeOgLocale } from './og-category-label';
 import { siteConfig } from './site-config';
 
 export interface SEOData {
@@ -83,6 +84,7 @@ export function generateSEOMetadata(data: SEOData = {}): Metadata {
     title: ogTitle || title || siteConfig.title,
     description,
     category,
+    locale: normalizeOgLocale(locale),
   });
   if (layout) ogSearchParams.set('layout', layout);
   if (screenshot) ogSearchParams.set('screenshot', screenshot);

@@ -9,6 +9,7 @@
     "./logo-artwork": "./src/logo-artwork.tsx",
     "./og": "./src/og.ts",
     "./og-card-image": "./src/og-card-image.tsx",
+    "./og-fonts": "./src/og-fonts.ts",
     "./og-screenshot": "./src/og-screenshot.ts"
   },
   "types": "./src/index.ts",
