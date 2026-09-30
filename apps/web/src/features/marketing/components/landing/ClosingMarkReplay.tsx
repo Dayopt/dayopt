@@ -8,7 +8,7 @@ export function ClosingMarkReplay({
   children,
 }: {
   label: string;
-  className: string;
+  className?: string;
   children: ReactNode;
 }) {
   const [ready, setReady] = useState(false);
