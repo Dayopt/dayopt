@@ -1,0 +1,363 @@
+version: 1
+scope:
+  project: Dayopt
+  repository_baseline: 650f62dc733831765aa8c110e29533b532e023f2
+  mode: read_only
+  environments:
+    - production
+    - preview
+    - integration
+source_contracts:
+  infrastructure:
+    - docs/engineering/infra.md
+    - docs/decisions.md
+  secrets:
+    - docs/operations/secrets.md
+    - scripts/tasks/env/schema.ts
+  vercel:
+    - scripts/ci/production-config-audit.mjs
+    - apps/product/vercel.json
+    - apps/web/vercel.json
+  release:
+    - .github/workflows/promote.yml
+    - scripts/ci/production-release.mjs
+  operations:
+    - .github/workflows/production-config-audit.yml
+    - .github/workflows/nightly.yml
+  auth:
+    - scripts/ci/production-auth-config-audit.mjs
+    - supabase/config.toml
+  storage_rls:
+    - scripts/ci/production-storage-rls-audit.mjs
+  schema:
+    - scripts/ci/production-schema-drift-audit.mjs
+    - supabase/migrations
+  cron:
+    - apps/product/src/lib/ops/cron-heartbeat-policy.mjs
+    - supabase/migrations
+  mcp:
+    - apps/product/src/lib/oauth-server
+    - apps/product/production-build-gate.mjs
+    - scripts/tasks/mcp-gate.ts
+  calendar:
+    - apps/product/src/features/external-calendar/server/authority-config.ts
+  backup:
+    - scripts/ci/storage-backup.sh
+  privacy:
+    - packages/observability/src/posthog-browser.ts
+    - apps/product/sentry.server.config.ts
+  password_check:
+    - apps/product/src/lib/auth/pwned-password.ts
+  billing:
+    - apps/product/src/features/settings/server/billing-mutation-service.ts
+  telemetry:
+    - apps/product/src/lib/analytics/DeferredAnalytics.tsx
+    - apps/web/src/shell/privacy/BrowserTelemetry.tsx
+  development_ai:
+    - scripts/tasks/env/schema.ts
+    - scripts/lib/jev-adapter.ts
+services:
+  github:
+    expected:
+      visibility_direction: private
+      visibility_precondition: github_team
+      visibility_transition: unknown
+      environments:
+        - production-release
+        - production-ops
+      release_allowed_branch: main
+      release_required_reviewers: none
+      ruleset:
+        strict_up_to_date: true
+        resolve_threads: true
+        bypass_actors: 0
+      required_check_contract:
+        - Static_Checks
+        - Unit_Tests
+        - Integration_Tests
+        - Vercel_product
+        - Vercel_web
+      contracts:
+        - release
+        - operations
+        - infrastructure
+        - secrets
+    coverage:
+      - hooks
+      - secrets_api
+      - ruleset_details
+  vercel:
+    expected:
+      product_and_web:
+        autoAssignCustomDomains: false
+        functionDefaultTimeout: 60
+        commandForIgnoringBuildStep: null
+        affected_project_skip: disabled
+        include_files_outside_root: true
+      integration_target: dedicated_vercel_project_production_target_fixed_origin
+      integration_migration_status: in_progress
+      data: synthetic_no_production_clone
+      deployment_identity: live_domain_alias_and_served_sha
+      contracts:
+        - vercel
+        - release
+        - infrastructure
+    coverage:
+      - sensitive_env_values
+      - project_settings
+      - deployed_cron_heartbeat
+  supabase:
+    expected:
+      contracts:
+        - auth
+        - storage_rls
+        - schema
+        - cron
+        - infrastructure
+      auth_contract: AUTH_CONFIG_CONTRACT_safe_fields_plus_hook_endpoint
+      auth_hook_endpoint: https://yvglwblxrnrenfifsnje.supabase.co/functions/v1/send-auth-email
+      edge_function:
+        name: send-auth-email
+        verify_jwt: false
+        authentication: hook_signature
+      avatars:
+        public: true
+        max_bytes: 5242880
+        mime:
+          - image/jpeg
+          - image/png
+          - image/gif
+          - image/webp
+      rls: owner_isolation_and_required_policies
+      schema: deployed_revision_migration_set
+    coverage:
+      - backups_api
+      - google_selected_client
+      - captcha_secret_match
+      - storage_rls_and_schema_live
+      - pg_cron_success
+  mcp_oauth:
+    expected:
+      production:
+        issuer: https://app.dayopt.app
+        resource: https://mcp.dayopt.app
+      clients:
+        claude_ai: https://claude.ai/api/mcp/auth_callback
+        chatgpt: https://chatgpt.com/connector_platform_oauth_redirect
+        cursor: cursor://anysphere.cursor-mcp/oauth/callback
+      preview: exact_branch_origin_database_and_upstash_binding
+      gates:
+        - runtime_client_allowlist
+        - database_mutation_control
+        - billing_gate
+        - maintenance_write_fence
+      contracts:
+        - mcp
+    coverage:
+      - client_registration
+      - sensitive_upstash_binding
+      - maintenance_write_fence
+  stripe:
+    expected:
+      production_activation: pending
+      integration: test_only
+      portal_and_trial: source_contract_before_activation
+      contract_ref: billing
+    coverage:
+      - portal_settings
+      - webhook_secret_replica
+      - billing_flow
+  resend:
+    expected:
+      separate_webhook_signatures: true
+      auth_hook_and_contact_sender: explicit_verified_sender
+      support_replies: dedicated_smtp_key
+    coverage:
+      - sender_replicas
+      - edge_secret_replicas
+      - support_smtp
+  cloudflare:
+    expected:
+      authoritative_zone: dayopt.app
+      backup_buckets:
+        - avatars
+        - attachments
+      backup_retention_days: 35
+      rclone_sync_default_max_delete: 1000
+    coverage:
+      - zone_admin_settings
+      - turnstile_domains
+      - r2_locks
+      - r2_permissions_and_retention
+      - backup_restore_evidence
+  posthog:
+    expected:
+      production_activation: legal_approval_pending
+      consent: required
+      autocapture: false
+      session_replay: false
+      person_profiles: identified_only
+      event_property_filter: required
+      deletion_credential_before_enable: true
+    coverage:
+      - project_settings
+      - public_key_project_match
+      - deletion_master_exists
+      - deletion_flow
+  sentry:
+    expected:
+      send_default_pii: false
+      pii_scrubbing: required
+      root_trace_sample_rate: 0.1
+      source_maps_match_served_release: true
+      auth_edge_reporting: optional
+    coverage:
+      - source_map_application
+      - privacy_dashboard_settings
+  google:
+    expected:
+      auth_callback: https://tilwaprottpyhlfoggbb.supabase.co/auth/v1/callback
+      calendar_callback: https://product-git-integration-dayopt.vercel.app/api/integrations/google-calendar/callback
+      calendar_authority_contract: calendar
+    coverage:
+      - registered_callbacks
+      - consent_screen_and_test_users
+      - project_number_and_refresh_token_key_replicas
+  turnstile:
+    expected:
+      production_domains:
+        - app.dayopt.app
+        - dayopt.app
+      server_secret_matches_site_key: true
+    coverage:
+      - allowed_domains
+      - sensitive_product_secret_pair
+  upstash:
+    expected:
+      preview_binding: isolated_nonproduction
+    coverage:
+      - product_sensitive_url
+      - token_permissions
+  uptime_robot:
+    expected: {}
+    coverage:
+      - notification_routes
+  vercel_browser_telemetry:
+    expected:
+      products:
+        - product
+        - web
+      providers:
+        - analytics
+        - speed_insights
+      production_only: true
+      consent: required
+      contract_ref: telemetry
+    coverage:
+      - dashboard_enablement_and_ingestion
+  pwned_passwords:
+    expected:
+      origin: https://api.pwnedpasswords.com
+      authentication: none
+      payload: sha1_prefix_5_characters
+      timeout_ms: 3000
+      failure: continue_without_check
+    coverage:
+      - live_availability
+  optional:
+    expected: {}
+    coverage: []
+secret_refs:
+  ledger:
+    contract_ref: secrets
+    coverage: runtime_operational_backup_and_replica_fields
+    verification: field_existence_and_replica_match_not_implied
+  integration_managed_supabase:
+    owner: vercel_supabase_integration
+    op_ref: null
+    verification: integration_owned_no_invented_master
+  product_bypass:
+    op_ref: op://ci/vercel-production/VERCEL_AUTOMATION_BYPASS_PRODUCT
+    master_match: verified
+    github_replica_value: not_retrievable
+  web_bypass:
+    op_ref: op://ci/vercel-production/VERCEL_AUTOMATION_BYPASS_WEB
+    verification: unknown
+  supabase_secret:
+    op_ref: op://human/supabase/SUPABASE_SECRET_KEY
+    verification: unknown
+  auth_hook:
+    op_ref: op://human/supabase/SEND_EMAIL_HOOK_SECRET
+    verification: unknown
+  cron_secret:
+    op_ref: op://human/supabase/CRON_SECRET
+    verification: unknown
+  resend_send:
+    op_ref: op://human/resend-send/RESEND_API_KEY
+    verification: unknown
+  resend_product_hook:
+    op_ref: op://human/resend/RESEND_WEBHOOK_SECRET
+    verification: unknown
+  resend_web_hook:
+    op_ref: op://human/resend-web/RESEND_WEBHOOK_SECRET
+    verification: unknown
+  support_smtp:
+    op_ref: op://human/resend-support-replies/RESEND_SMTP_API_KEY
+    verification: unknown
+  google_auth_secret:
+    op_ref: op://human/google-auth/SUPABASE_AUTH_GOOGLE_SECRET
+    verification: unknown
+  calendar_secret:
+    op_ref: op://human/google-calendar/GOOGLE_CALENDAR_CLIENT_SECRET
+    verification: unknown
+  calendar_encryption:
+    op_ref: op://human/google-calendar/CALENDAR_TOKEN_ENCRYPTION_KEY
+    consumers:
+      - product_prod
+    integration_master: unknown
+    verification: per_environment_master_and_replica_unknown
+  recovery_pepper:
+    op_ref: op://human/app/RECOVERY_CODE_PEPPER
+    verification: unknown
+  stripe_live:
+    op_ref: op://human/stripe-live/STRIPE_SECRET_KEY
+    usage: pending_production_activation
+  stripe_test:
+    op_ref: op://agent/stripe-test/STRIPE_SECRET_KEY
+    verification: api_account_verified
+  stripe_test_hook:
+    op_ref: op://agent/stripe-integration-webhook-2867/password
+    verification: replica_match_unknown
+  posthog_delete:
+    op_ref: op://human/posthog-delete/credential
+    verification: documented_ref_existence_unknown
+  sentry_release:
+    op_ref: op://ci/sentry-release-token/SENTRY_AUTH_TOKEN
+    verification: upload_vs_runtime_release_unknown
+  backup_source:
+    op_ref: op://ci/Supabase-StorageS3-backupsource/RCLONE_CONFIG_SOURCE_SECRET_ACCESS_KEY
+    consumer_operation: read
+    credential_capability: write_delete_and_rls_bypass_documented
+  backup_destination:
+    op_ref: op://ci/Cloudflare-R2-storagebackup/RCLONE_CONFIG_DEST_SECRET_ACCESS_KEY
+    expected_capability: object_read_write_bucket_scoped
+    verification: permission_scope_unknown
+  ai_gateway:
+    op_ref: op://agent/vercel-ai-gateway/credential
+    verification: optional_unknown
+advisories:
+  - id: github.private-transition
+    desired: private_after_github_team
+    enforcement: advisory
+  - id: vercel.integration-topology
+    desired: dedicated_project_production_target_fixed_origin
+    enforcement: advisory
+resources:
+  repository: Dayopt/dayopt
+  vercel:
+    product: prj_hByu1DGZWiuLk0yfV4Gz1T4aIjpa
+    web: prj_saTfo2jhvayTDb3YoMSKmla6QryZ
+  supabase:
+    production: yvglwblxrnrenfifsnje
+    integration: tilwaprottpyhlfoggbb
+  posthog_project: 625917
