@@ -293,7 +293,7 @@ vault は 2026-08-14 の信頼境界軸再編（[#2086](https://github.com/Dayop
 | `domain`                 | registrar login, TOTP, recovery codes（旧 Shared）                                                                                                                                                                                                                                     |
 | `resend-support-replies` | `RESEND_SMTP_API_KEY`。Gmail Send mail as 専用（旧 Shared）                                                                                                                                                                                                                            |
 
-`google-auth` は Supabase Auth の Google provider（ソーシャルログイン）用。**アプリの env には入らず、Supabase Dashboard だけが replica** になる（Dashboard Secrets 節を参照）。GCP project は `dayopt`（`dayopt-503623`）、client 名は `Dayopt Auth (Supabase)`、redirect URI は `https://yvglwblxrnrenfifsnje.supabase.co/auth/v1/callback` の 1 本だけ。
+`google-auth` は Supabase Auth の Google provider（ソーシャルログイン）用。**アプリの env には入らず、Supabase Dashboard だけが replica** になる（Dashboard Secrets 節を参照）。GCP project は `Dayopt Production`（`dayopt-503623`、旧表示名`dayopt`）、client 名は `Dayopt Auth (Supabase)`、redirect URI は `https://yvglwblxrnrenfifsnje.supabase.co/auth/v1/callback` の 1 本だけ。
 
 `google-calendar` は外部カレンダー取り込み（[#1702](https://github.com/Dayopt/dayopt/issues/1702)）専用の OAuth client で、Supabase Auth の Google provider とは別 client として作る。Supabase 側の client secret を流用しない。`GOOGLE_CALENDAR_PROJECT_NUMBER` は client ID の先頭にある project number と一致させる。
 
@@ -314,6 +314,8 @@ vault は 2026-08-14 の信頼境界軸再編（[#2086](https://github.com/Dayop
 2026-10-01、UserがGoogle Cloud project単位で本番と非本番を分離する方針を確定。非本番projectの中でもSupabase Auth用とCalendar用clientを分ける。本番`dayopt-503623`内の既存Calendar Integration clientをAuthと兼用する暫定案は採用しない。理由は、[Googleの環境分離方針](https://developers.google.com/identity/protocols/oauth2/policies)と、[同じproject内の全clientに及ぶ認可取消](https://developers.google.com/identity/protocols/oauth2/web-server#tokenrevoke)から、非本番の切断が同じGoogleユーザーの本番tokenへ波及する条件を除くため。用途別clientはcallback・secret配布先・rotationを分けるが、同一project内の認可取消まで用途別に隔離する保証ではない。
 
 移行先のproject / client / masterは実在を確認したものだけ台帳へ登録する。`human/google-auth-integration`は既存Calendar Integration clientのmasterであり、item名だけを根拠にAuth専用やproject分離済みとみなさない。既存tokenを新clientのcredentialと組み合わせず、非本番Calendarは新clientで再認可する。client移行と暗号鍵rotationは別工程とする。
+
+2026-10-01、Cloud projectの表示名を本番`Dayopt Production`（ID `dayopt-503623`）、非本番`Dayopt Nonproduction`（ID `dayopt-nonproduction`）へ統一した。非本番projectは作成済みだがOAuth設定は未構成。project作成・名前の統一だけでclient / replicaの移行完了とは扱わない。
 
 非本番Auth clientには非本番SupabaseのGoogle callbackを、非本番Calendar clientには固定Integration originのCalendar callbackを登録する。Auth credentialのreplicaは非本番Supabase provider、Calendar credentialのreplicaは対応する非本番Vercel target / branchに限定する。appの`/auth/callback`とSupabaseの`/auth/v1/callback`を取り違えない。移行中の本番project・client・grantは保持し、旧grantの取消・旧client削除は本番への波及を評価した別工程にする。
 
