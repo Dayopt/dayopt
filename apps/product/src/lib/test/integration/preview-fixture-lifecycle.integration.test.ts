@@ -112,6 +112,41 @@ describe.skipIf(!RUN_LOCAL)('durable Preview fixture lifecycle in isolated CI Po
       ),
     ).toBe('0');
   });
+  it('quarantines the DB across run IDs after an uncertain operation', () => {
+    const failedRun = runId();
+    const activeRun = runId();
+    const newRun = runId();
+    expect(status(failedRun, 'claim')).toBe('acquired');
+    expect(status(activeRun, 'claim')).toBe('acquired');
+    expect(status(failedRun, 'finish', 'provision', owner, false)).toBe('unknown');
+    expect(status(newRun, 'claim')).toBe('unknown');
+    expect(status(activeRun, 'guard')).toBe('unknown');
+    expect(status(activeRun, 'finish', 'provision', owner, true)).toBe('unknown');
+    expect(status(newRun, 'claim', 'cleanup')).toBe('unknown');
+    expect(status(newRun, 'claim', 'recover')).toBe('unknown');
+    expect(
+      sql(`SELECT count(*) FROM private.preview_fixture_lifecycle
+      WHERE database_ref = '${ref}' AND run_id = '${newRun}';`),
+    ).toBe('0');
+  });
+  it('discovers another run expired before granting a new run ownership', () => {
+    const expiredRun = runId();
+    expect(status(expiredRun, 'claim')).toBe('acquired');
+    sql(`UPDATE private.preview_fixture_lifecycle
+      SET deadline = pg_catalog.clock_timestamp() - INTERVAL '1 second'
+      WHERE database_ref = '${ref}' AND run_id = '${expiredRun}';`);
+    expect(status(runId(), 'claim')).toBe('unknown');
+    expect(
+      sql(`SELECT state || ':' || closed::text FROM private.preview_fixture_lifecycle
+      WHERE database_ref = '${ref}' AND run_id = '${expiredRun}';`),
+    ).toBe('UNKNOWN:true');
+  });
+  it('keeps healthy runs reusable after another run is cleanly recovered', () => {
+    const cleanedRun = runId();
+    expect(status(cleanedRun, 'claim', 'cleanup')).toBe('acquired');
+    expect(status(cleanedRun, 'finish', 'cleanup', owner, true)).toBe('finished');
+    expect(status(runId(), 'claim')).toBe('acquired');
+  });
   it('allows exactly one simultaneous claim across independent SQL connections', async () => {
     const id = runId();
     localOnly();
