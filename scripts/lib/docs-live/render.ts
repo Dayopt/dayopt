@@ -4,6 +4,7 @@ import { spawnSync } from 'node:child_process';
 import { readFileSync, realpathSync } from 'node:fs';
 import { dirname, relative, resolve } from 'node:path';
 import { renderFacts } from './facts.ts';
+import { LIVE_DOCUMENT_VIEWS } from './live-contract.ts';
 
 type View = 'workspace' | 'commands' | 'files' | 'facts';
 interface Manifest {
@@ -143,6 +144,11 @@ export function renderLiveMarkdown(root: string, document: string, markdown: str
     }
   }
   if (open) throw new Error(`${document}: docs-live end marker がありません`);
+  for (const view of LIVE_DOCUMENT_VIEWS[document] ?? []) {
+    if (!replacements.some((block) => block.view === view)) {
+      throw new Error(`${document}: ${view}: 登録済み生成領域の marker がありません`);
+    }
+  }
   // 全入力の解決に成功するまで呼び出し側へ本文を渡さない。古い本文への fallback はしない。
   let output = markdown;
   for (const block of replacements.reverse()) {

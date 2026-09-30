@@ -32,47 +32,64 @@ describe('閲覧時の生成', () => {
 
   it('Markdown 名の symlink から秘密ファイルへ読取を迂回させない', () => {
     writeFileSync(join(root, 'secret.txt'), 'secret');
-    symlinkSync(join(root, 'secret.txt'), join(root, 'README.md'));
-    expect(() => renderLiveDocument(root, 'README.md')).toThrow('symlink');
+    symlinkSync(join(root, 'secret.txt'), join(root, 'notes.md'));
+    expect(() => renderLiveDocument(root, 'notes.md')).toThrow('symlink');
   });
   it('同じ process で正本を変更すると次の読取に反映し、生成本文を保存しない', () => {
-    writeFileSync(join(root, 'README.md'), block('commands'));
-    expect(renderLiveDocument(root, 'README.md')).toContain('old-command');
+    writeFileSync(join(root, 'notes.md'), block('commands'));
+    expect(renderLiveDocument(root, 'notes.md')).toContain('old-command');
     writeFileSync(
       join(root, 'package.json'),
       JSON.stringify({ name: 'fixture', scripts: { build: 'new-command' } }),
     );
-    const next = renderLiveDocument(root, 'README.md');
+    const next = renderLiveDocument(root, 'notes.md');
     expect(next).toContain('| pnpm build | new-command |');
     expect(next).not.toContain('old-command');
     expect(next).not.toContain('pnpm check');
-    expect(readFileSync(join(root, 'README.md'), 'utf8')).toBe(block('commands'));
+    expect(readFileSync(join(root, 'notes.md'), 'utf8')).toBe(block('commands'));
   });
 
   it('workspace の追加・除外を pnpm の selector から再発見する', () => {
-    writeFileSync(join(root, 'README.md'), block('workspace'));
+    writeFileSync(join(root, 'notes.md'), block('workspace'));
     mkdirSync(join(root, 'packages/new'), { recursive: true });
     writeFileSync(join(root, 'packages/new/package.json'), '{"name":"@fixture/new"}');
-    expect(renderLiveDocument(root, 'README.md')).toContain('@fixture/new');
+    expect(renderLiveDocument(root, 'notes.md')).toContain('@fixture/new');
     writeFileSync(join(root, 'pnpm-workspace.yaml'), "packages:\n  - 'apps/*'\n");
-    expect(renderLiveDocument(root, 'README.md')).not.toContain('@fixture/new');
+    expect(renderLiveDocument(root, 'notes.md')).not.toContain('@fixture/new');
+  });
+
+  it.each([
+    ['全 marker 削除', '# 古い保存本文\n\nold-command'],
+    ['workspace marker 削除', block('commands')],
+    ['コード例だけ残す', '```md\n' + block('workspace') + block('commands') + '```\n'],
+  ])('登録済み文書の %s を読取時に拒否する', (_change, markdown) => {
+    writeFileSync(join(root, 'README.md'), markdown);
+    expect(() => renderLiveDocument(root, 'README.md')).toThrow('登録済み生成領域');
+  });
+
+  it('登録済み文書の全領域を正本から解決する', () => {
+    writeFileSync(join(root, 'README.md'), block('workspace') + '\n' + block('commands'));
+    const next = renderLiveDocument(root, 'README.md');
+    expect(next).toContain('| Path / manifest | Package |');
+    expect(next).toContain('| pnpm check | old-command |');
+    expect(next).not.toContain('docs-live:');
   });
 
   it('入力が壊れた時に以前の結果や fallback 本文を返さない', () => {
-    writeFileSync(join(root, 'README.md'), block('commands'));
-    renderLiveDocument(root, 'README.md');
+    writeFileSync(join(root, 'notes.md'), block('commands'));
+    renderLiveDocument(root, 'notes.md');
     writeFileSync(join(root, 'package.json'), '{');
-    expect(() => renderLiveDocument(root, 'README.md')).toThrow();
+    expect(() => renderLiveDocument(root, 'notes.md')).toThrow();
   });
 
   it('不明な view・閉じ忘れは拒否し、コード例は変換しない', () => {
-    writeFileSync(join(root, 'README.md'), block('unknown'));
-    expect(() => renderLiveDocument(root, 'README.md')).toThrow('不正な');
-    writeFileSync(join(root, 'README.md'), '<!-- docs-live:commands:start -->');
-    expect(() => renderLiveDocument(root, 'README.md')).toThrow('end marker');
+    writeFileSync(join(root, 'notes.md'), block('unknown'));
+    expect(() => renderLiveDocument(root, 'notes.md')).toThrow('不正な');
+    writeFileSync(join(root, 'notes.md'), '<!-- docs-live:commands:start -->');
+    expect(() => renderLiveDocument(root, 'notes.md')).toThrow('end marker');
     const example = '```md\n' + block('commands') + '```\n';
-    writeFileSync(join(root, 'README.md'), example);
-    expect(renderLiveDocument(root, 'README.md')).toBe(example);
+    writeFileSync(join(root, 'notes.md'), example);
+    expect(renderLiveDocument(root, 'notes.md')).toBe(example);
   });
 
   it.each([
@@ -80,27 +97,27 @@ describe('閲覧時の生成', () => {
     ['list', '- ' + block('commands').replaceAll('\n', '\n  ')],
     ['list の blockquote', '- > ' + block('commands').replaceAll('\n', '\n  > ')],
   ])('%s 内の実 marker を古い本文のまま返さず拒否する', (_container, markdown) => {
-    writeFileSync(join(root, 'README.md'), markdown);
-    expect(() => renderLiveDocument(root, 'README.md')).toThrow('最上位');
+    writeFileSync(join(root, 'notes.md'), markdown);
+    expect(() => renderLiveDocument(root, 'notes.md')).toThrow('最上位');
   });
 
   it('blockquote 内でもコードフェンスの marker 例は変換しない', () => {
     const example = '> ```md\n> ' + block('commands').replaceAll('\n', '\n> ') + '```\n';
-    writeFileSync(join(root, 'README.md'), example);
-    expect(renderLiveDocument(root, 'README.md')).toBe(example);
+    writeFileSync(join(root, 'notes.md'), example);
+    expect(renderLiveDocument(root, 'notes.md')).toBe(example);
   });
 
   it('異なる view の対応・入れ子を拒否する', () => {
     writeFileSync(
-      join(root, 'README.md'),
+      join(root, 'notes.md'),
       '<!-- docs-live:commands:start -->\n\n<!-- docs-live:workspace:end -->',
     );
-    expect(() => renderLiveDocument(root, 'README.md')).toThrow('対応');
+    expect(() => renderLiveDocument(root, 'notes.md')).toThrow('対応');
     writeFileSync(
-      join(root, 'README.md'),
+      join(root, 'notes.md'),
       '<!-- docs-live:commands:start -->\n\n' + block('workspace'),
     );
-    expect(() => renderLiveDocument(root, 'README.md')).toThrow('入れ子');
+    expect(() => renderLiveDocument(root, 'notes.md')).toThrow('入れ子');
   });
 });
 

@@ -10,7 +10,7 @@
   ],
   "scripts": {
     "dev": "bash ../../scripts/tasks/dev-with-op.sh",
-    "dev:raw": "NODE_OPTIONS='--max-old-space-size=12288' next dev",
+    "dev:raw": "pnpm prepare:brand-docs && NODE_OPTIONS='--max-old-space-size=12288' next dev",
     "dev:op": "pnpm dev",
     "typecheck:op": "op run --env-file=../../.op-env.agent -- pnpm typecheck",
     "env:check": "op run --env-file=../../.op-env.agent -- pnpm exec tsx ../../scripts/tasks/env/check-env.ts",

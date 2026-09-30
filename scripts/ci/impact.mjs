@@ -190,6 +190,7 @@ export const PUBLIC_DOCUMENT_BUILD_INPUTS = new Set([
   'scripts/lib/docs-live/publish-brand.ts',
   'scripts/lib/docs-live/brand-document.ts',
   'scripts/lib/docs-live/render.ts',
+  'scripts/lib/docs-live/live-contract.ts',
   'scripts/lib/docs-live/facts.ts',
   'scripts/lib/create-deterministic-zip.ts',
 ]);

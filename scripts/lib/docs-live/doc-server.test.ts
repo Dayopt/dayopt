@@ -28,7 +28,7 @@ beforeEach(async () => {
   writeFileSync(join(root, '.gitignore'), 'node_modules/\n');
   writeFileSync(join(root, 'package.json'), '{"scripts":{"check":"old-command"}}');
   writeFileSync(
-    join(root, 'README.md'),
+    join(root, 'notes.md'),
     '<!-- docs-live:commands:start -->\n\n古い本文\n\n<!-- docs-live:commands:end -->\n',
   );
   server = createDocumentationServer(root);
@@ -78,9 +78,9 @@ afterEach(async () => {
 });
 
 it('同じ閲覧サーバーへの次の HTTP request で正本の変更を反映し、破損時に古い本文を返さない', async () => {
-  expect(await (await fetch(url + '/doc?path=README.md')).text()).toContain('old-command');
+  expect(await (await fetch(url + '/doc?path=notes.md')).text()).toContain('old-command');
   writeFileSync(join(root, 'package.json'), '{"scripts":{"build":"new-command"}}');
-  const response = await fetch(url + '/doc?path=README.md');
+  const response = await fetch(url + '/doc?path=notes.md');
   const html = await response.text();
   expect(response.headers.get('cache-control')).toBe('no-store');
   expect(html).toContain('<table>');
@@ -88,7 +88,7 @@ it('同じ閲覧サーバーへの次の HTTP request で正本の変更を反�
   expect(html).not.toContain('old-command');
   expect(html).not.toContain('古い本文');
   writeFileSync(join(root, 'package.json'), '{');
-  const broken = await fetch(url + '/doc?path=README.md');
+  const broken = await fetch(url + '/doc?path=notes.md');
   expect(broken.status).toBe(500);
   expect(await broken.text()).not.toContain('new-command');
 });
