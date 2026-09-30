@@ -1,7 +1,7 @@
 ---
 title: 'Cookie Policy'
 description: 'How Dayopt uses cookies and similar technologies'
-lastUpdated: 'Review draft: 2026-09-25'
+lastUpdated: 'Review draft: 2026-10-01'
 ---
 
 <CookieDocument
@@ -28,7 +28,7 @@ lastUpdated: 'Review draft: 2026-09-25'
         analytics: {
           name: 'Analytics Cookies',
           description:
-            'These optional cookies and similar browser technologies help us diagnose browser errors and understand performance and usage. Browser Sentry, PostHog, Vercel Analytics, and Speed Insights start only after analytics consent on that site. Product server-side analytics uses a separate account-level choice. Session Replay is disabled.',
+            'These optional cookies and similar browser technologies help us diagnose browser errors and understand performance and usage. Browser Sentry, PostHog, Vercel Analytics, and Speed Insights start only after analytics consent on that site. Product server-side PostHog analytics uses a separate account-level choice. Internal Supabase service usage records continue independently of these choices. Session Replay is disabled.',
           examples: 'Browser errors, page views, signup interactions, and performance metrics',
         },
         preference: {
@@ -92,7 +92,8 @@ lastUpdated: 'Review draft: 2026-09-25'
         posthog: {
           name: 'PostHog browser analytics storage',
           provider: 'PostHog',
-          purpose: 'Keeps a pseudonymous browser identifier for consented browser analytics',
+          purpose:
+            'Keeps a browser identifier shared across Dayopt subdomains for consented analytics; signing in with Product browser analytics enabled links it to your account UUID',
           category: 'Analytics',
           duration:
             'SDK-controlled browser persistence. Verify the actual storage keys, duration, and removal after withdrawal before publication (HUMAN-09).',
@@ -115,7 +116,7 @@ lastUpdated: 'Review draft: 2026-09-25'
         sentry:
           'Sentry — server and edge diagnostics continue independently of browser consent. Browser initialization and event sending require analytics consent; SDK code may be included before consent. We filter request bodies, email addresses, query strings, cookies and authorization credentials. Session Replay is disabled.',
         posthog:
-          'PostHog — consented website and Product browser events use a pseudonymous browser identifier. Product server-side account events use the separate account analytics setting described in the Privacy Policy.',
+          'PostHog — consented website and Product browser events use a browser identifier shared across Dayopt subdomains. Signing in with Product browser analytics enabled links it to your account UUID, so consented website visits and Product activity can be associated. Product server-side PostHog events use the separate account analytics setting described in the Privacy Policy.',
         turnstile:
           "Cloudflare Turnstile — Essential bot protection on forms. A verification token and the requester's IP address are sent to Cloudflare. Cloudflare may use necessary browser storage and device signals under its Privacy Policy.",
         note: "Please refer to each provider's privacy policy for more information about its processing and use of browser technologies.",
@@ -123,7 +124,7 @@ lastUpdated: 'Review draft: 2026-09-25'
       manageCookies: {
         title: 'How to Manage Cookies',
         intro:
-          'The consent banner offers acceptance or refusal of analytics. To change a saved choice today, clear this site’s local storage and reload, then choose again; this may reset other preferences. Website and application choices are stored separately. [HUMAN-09: a persistent in-service withdrawal control and live network verification are required before publication.]',
+          'The consent banner offers acceptance or refusal of analytics. Change a saved website choice through Cookie settings in the footer. Change Product browser analytics in Settings > Data controls > Cookie settings. Website and application browser choices are stored separately for each origin. Withdrawing browser consent may reload the page, so save any unfinished input first. Withdrawal stops future consented processing; it does not itself delete previously collected events. [HUMAN-09: verify browser traffic and cross-tab withdrawal before publication.]',
         chrome: 'Google Chrome: Settings > Privacy and Security > Cookies and other site data',
         firefox: 'Mozilla Firefox: Settings > Privacy & Security > Cookies and Site Data',
         safari: 'Safari: Preferences > Privacy > Manage Website Data',
@@ -132,7 +133,7 @@ lastUpdated: 'Review draft: 2026-09-25'
       impact: {
         title: 'Impact of Disabling Cookies',
         content:
-          'If you disable essential cookies, you will not be able to log in or use core features of the Service. Disabling preference cookies means your settings (such as language and theme) will not be remembered between sessions. Declining analytics does not affect core features; browser Sentry, PostHog, Vercel Analytics, and Speed Insights do not start on that site. Product’s separate account analytics setting controls Product server-side account events. Session Replay is disabled. Sanitized Production server and edge error monitoring remains active to diagnose service failures.',
+          'If you disable essential cookies, you will not be able to sign in or use core features of the Service. Disabling preference cookies means your settings (such as language and theme) will not be remembered between sessions. Declining analytics does not affect core features; browser Sentry, PostHog, Vercel Analytics, and Speed Insights do not start on that site. Product’s separate account analytics setting controls Product server-side PostHog events. Internal Supabase service usage records continue independently of these choices. Session Replay is disabled. Sanitized Production server and edge error monitoring remains active to diagnose service failures.',
       },
       doNotTrack: {
         title: 'Do Not Track Signals',

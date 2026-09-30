@@ -130,8 +130,8 @@ const LEGAL_CONTRACT_CASES: readonly LegalContractCase[] = [
     slug: 'privacy',
     metadataTitle: 'Privacy Policy - Dayopt',
     metadataDescription: 'How Dayopt handles your personal information',
-    lastUpdated: 'Review draft: 2026-09-25',
-    bodyHash: '669c587b6aa8979b4f9b5295feb8275ebab65724d78f8902d9c25abb3083b2c5',
+    lastUpdated: 'Review draft: 2026-10-01',
+    bodyHash: 'db7ef1e221ff8ac2f4b9e5e774515a28af993160dc81deef5b4884afb4dc2f37',
     hrefs: [
       'https://developers.google.com/terms/api-services-user-data-policy',
       '/legal/cookies',
@@ -164,8 +164,8 @@ const LEGAL_CONTRACT_CASES: readonly LegalContractCase[] = [
     slug: 'cookies',
     metadataTitle: 'Cookie Policy - Dayopt',
     metadataDescription: 'How Dayopt uses cookies and similar technologies',
-    lastUpdated: 'Review draft: 2026-09-25',
-    bodyHash: '20e009b46e4a23b48a1dcb3df8614921673da3f4c2cef206aff072a81b322b37',
+    lastUpdated: 'Review draft: 2026-10-01',
+    bodyHash: '65e77b51ba885e8a0f7b7a4beed727c1a53aaacb516b5efe419a1c37891dffb4',
     hrefs: ['/legal/privacy'],
     counts: {
       h2: 10,
@@ -215,8 +215,8 @@ const LEGAL_CONTRACT_CASES: readonly LegalContractCase[] = [
     slug: 'privacy',
     metadataTitle: 'プライバシーポリシー - Dayopt',
     metadataDescription: 'Dayoptにおける個人情報の取り扱いについて',
-    lastUpdated: 'レビュー原稿: 2026-09-25',
-    bodyHash: 'b4cc3018705fb30991a6def1bae6b5d7155624b9fbd30421283846046f164b39',
+    lastUpdated: 'レビュー原稿: 2026-10-01',
+    bodyHash: '0b8f413fb860771bce1fcc625aaed9a16d8ca57829ad7aaa531bf84023313467',
     hrefs: [
       'https://developers.google.com/terms/api-services-user-data-policy',
       '/ja/legal/cookies',
@@ -249,8 +249,8 @@ const LEGAL_CONTRACT_CASES: readonly LegalContractCase[] = [
     slug: 'cookies',
     metadataTitle: 'Cookieポリシー - Dayopt',
     metadataDescription: 'Dayoptにおけるクッキーおよび類似技術の使用について',
-    lastUpdated: 'レビュー原稿: 2026-09-25',
-    bodyHash: '000b4f314d0609306a072711000766a796204def62043d2c6335070075fb5964',
+    lastUpdated: 'レビュー原稿: 2026-10-01',
+    bodyHash: 'd31eeb9e2bf12118c779add6f9236bf2d5700315095672568b27597c175a7528',
     hrefs: ['/ja/legal/privacy'],
     counts: {
       h2: 10,
@@ -396,6 +396,14 @@ describe('legal review factual boundaries', () => {
         expect(container.textContent).toMatch(/support@dayopt.app/);
         expect(container.textContent).not.toMatch(
           /at least 30 days to export|削除後30日間.*エクスポート/,
+        );
+        expect(container.textContent).toMatch(/Supabase.*consent choices|Supabase.*同意設定/);
+        expect(container.textContent).toMatch(/linked.*account UUID|アカウントUUID.*関連付/);
+      }
+      if (testCase.slug === 'privacy' || testCase.slug === 'cookies') {
+        expect(container.textContent).toMatch(/footer.*Cookie settings|フッター.*Cookie設定/);
+        expect(container.textContent).not.toMatch(
+          /clear this site’s local storage|ローカルストレージを消去して/,
         );
       }
       if (testCase.slug === 'terms') {

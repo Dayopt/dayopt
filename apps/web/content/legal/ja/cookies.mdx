@@ -1,7 +1,7 @@
 ---
 title: 'Cookieポリシー'
 description: 'Dayoptにおけるクッキーおよび類似技術の使用について'
-lastUpdated: 'レビュー原稿: 2026-09-25'
+lastUpdated: 'レビュー原稿: 2026-10-01'
 ---
 
 <CookieDocument
@@ -28,7 +28,7 @@ lastUpdated: 'レビュー原稿: 2026-09-25'
         analytics: {
           name: '分析Cookie',
           description:
-            'ブラウザエラーの診断とパフォーマンス・利用状況の把握に使う、任意のCookieおよび類似のブラウザ技術です。ブラウザ版Sentry、PostHog、Vercel Analytics、Speed Insightsは各サイトで分析に同意した後のみ起動します。Productのサーバー側分析は別のアカウント設定で制御します。Session Replayは無効にしています。',
+            'ブラウザエラーの診断とパフォーマンス・利用状況の把握に使う、任意のCookieおよび類似のブラウザ技術です。ブラウザ版Sentry、PostHog、Vercel Analytics、Speed Insightsは各サイトで分析に同意した後のみ起動します。Productのサーバー側PostHog分析は別のアカウント設定で制御します。Supabase内の利用状況記録は、これらの選択とは独立して継続します。Session Replayは無効にしています。',
           examples: 'ブラウザエラー、ページ閲覧、登録導線、パフォーマンス指標',
         },
         preference: {
@@ -92,7 +92,8 @@ lastUpdated: 'レビュー原稿: 2026-09-25'
         posthog: {
           name: 'PostHogのブラウザ分析保存領域',
           provider: 'PostHog',
-          purpose: '同意済みブラウザ分析に使う仮名化ブラウザ識別子を保持',
+          purpose:
+            '同意済み分析のためDayoptのサブドメイン間で共有するブラウザ識別子を保持。Productのブラウザ分析を許可してサインインするとアカウントUUIDに関連付け',
           category: '分析',
           duration:
             'SDKが保存方法を管理します。公開前に実際の保存キー・期間・撤回後の削除を確認してください（HUMAN-09）。',
@@ -114,7 +115,7 @@ lastUpdated: 'レビュー原稿: 2026-09-25'
         sentry:
           'Sentry — サーバー・エッジの診断はブラウザの同意とは独立して継続します。ブラウザでの初期化と情報送信には分析への同意が必要ですが、SDKのコード自体は同意前にも含まれる場合があります。リクエスト本文、メールアドレス、クエリ文字列、Cookie、認証情報を除去する処理を行います。Session Replayは無効です。',
         posthog:
-          'PostHog — 同意後のウェブサイト・Productのブラウザイベントに仮名化ブラウザ識別子を使います。Productのサーバー側アカウントイベントは、プライバシーポリシーに記載する別のアカウント分析設定で制御します。',
+          'PostHog — 同意後のウェブサイト・Productのブラウザイベントに、Dayoptのサブドメイン間で共有するブラウザ識別子を使います。Productのブラウザ分析を許可してサインインするとアカウントUUIDに関連付けられ、同意済みのウェブサイト閲覧とProductの利用を関連付けて分析できます。Productのサーバー側PostHogイベントは、プライバシーポリシーに記載する別のアカウント分析設定で制御します。',
         turnstile:
           'Cloudflare Turnstile — フォームに必要なbot対策です。検証tokenと送信元IPアドレスをCloudflareへ送ります。Cloudflareは同社のプライバシーポリシーに基づき、必要なブラウザ保存領域とdevice signalを使用する場合があります。',
         note: '各プロバイダーによるデータ処理とブラウザ技術の使用については、各社のプライバシーポリシーをご参照ください。',
@@ -122,7 +123,7 @@ lastUpdated: 'レビュー原稿: 2026-09-25'
       manageCookies: {
         title: 'Cookieの管理方法',
         intro:
-          '同意バナーでは分析の許可・拒否を選べます。現時点で保存済みの選択を変えるには、このサイトのローカルストレージを消去して再読み込みし、再度選択してください。他の設定も初期化される場合があります。ウェブサイトとアプリの選択はそれぞれに保存されます。［HUMAN-09：公開前に常設の同意撤回の操作を整備し、実際の通信を検証］',
+          '同意バナーでは分析の許可・拒否を選べます。保存済みのウェブサイトの選択は、フッターの「Cookie設定」から変更できます。Productのブラウザ分析は「設定 > データ管理 > Cookie設定」で変更できます。ブラウザの選択はウェブサイトとアプリの各サイトに別々に保存します。同意の撤回時はページが再読み込みされる場合があるため、編集中の内容を先に保存してください。撤回は以後の同意に基づく処理を止める操作であり、収集済みイベントの削除とは別です。［HUMAN-09：公開前にブラウザ通信と別タブでの撤回を実測］',
         chrome: 'Google Chrome: 設定 > プライバシーとセキュリティ > Cookieとサイトデータ',
         firefox: 'Mozilla Firefox: 設定 > プライバシーとセキュリティ > Cookieとサイトデータ',
         safari: 'Safari: 環境設定 > プライバシー > Webサイトデータを管理',
@@ -131,7 +132,7 @@ lastUpdated: 'レビュー原稿: 2026-09-25'
       impact: {
         title: 'Cookie無効化の影響',
         content:
-          '必須Cookieを無効にすると、サインインや主要機能の使用ができなくなります。設定Cookieを無効にすると、言語やテーマなどの設定がセッション間で記憶されなくなります。分析を拒否しても主要機能には影響せず、そのサイトではブラウザ版Sentry、PostHog、Vercel Analytics、Speed Insightsは起動しません。Productのサーバー側アカウントイベントは、別のアカウント分析設定で制御します。Session Replayは無効にしています。サービス障害を診断するため、サニタイズ済みのProductionサーバー・Edgeエラー監視は継続します。',
+          '必須Cookieを無効にすると、サインインや主要機能の使用ができなくなります。設定Cookieを無効にすると、言語やテーマなどの設定がセッション間で記憶されなくなります。分析を拒否しても主要機能には影響せず、そのサイトではブラウザ版Sentry、PostHog、Vercel Analytics、Speed Insightsは起動しません。Productのサーバー側PostHogイベントは、別のアカウント分析設定で制御します。Supabase内の利用状況記録は、これらの選択とは独立して継続します。Session Replayは無効にしています。サービス障害を診断するため、サニタイズ済みのProductionサーバー・Edgeエラー監視は継続します。',
       },
       doNotTrack: {
         title: 'Do Not Trackシグナル',

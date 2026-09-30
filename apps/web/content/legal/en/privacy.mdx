@@ -1,7 +1,7 @@
 ---
 title: 'Privacy Policy'
 description: 'How Dayopt handles your personal information'
-lastUpdated: 'Review draft: 2026-09-25'
+lastUpdated: 'Review draft: 2026-10-01'
 ---
 
 <PrivacyDocument
@@ -36,7 +36,7 @@ lastUpdated: 'Review draft: 2026-09-25'
         security:
           'Server and edge error monitoring, security and abuse prevention: legitimate interests in operating a reliable and secure service, subject to applicable law and your rights.',
         analytics:
-          'Optional browser error, performance, and usage analytics require consent on each site. Separately, Product server-side usage events are sent to PostHog only when account analytics consent is enabled. PostHog receives a pseudonymous browser identifier for consented browser events and the Supabase account UUID for consented Product events; it does not receive email, name, Plan or Record content, or payment IDs. [HUMAN-02: confirm the legal basis and objection process for this analysis before publication.]',
+          'Optional browser error, performance, and usage analytics require consent on each site. PostHog browser identifiers are shared across Dayopt subdomains; when you sign in with Product browser analytics enabled, the browser identifier is linked to your Supabase account UUID, so consented website visits and Product activity can be associated. Product server-side events are sent to PostHog only when account analytics consent is enabled. We do not send email, name, Plan or Record content, or payment IDs to PostHog. Separately, Supabase stores account UUID, event type and time for internal service usage and billing analysis regardless of these consent choices; it does not store Plan or Record content in these events. [HUMAN-02: confirm the legal basis and objection process for the internal analysis before publication.]',
         legal:
           'Meeting applicable accounting, legal and regulatory requirements: legal obligation where applicable. We do not use automated decisions that produce legal or similarly significant effects on you.',
       },
@@ -129,7 +129,7 @@ lastUpdated: 'Review draft: 2026-09-25'
           posthog: {
             category: 'PostHog analytics events',
             period:
-              'The current Free plan retention rule is one year for events. Account deletion submits an asynchronous request to delete events associated with the Product account UUID; completion is controlled by PostHog. Unlinked anonymous browser events may remain under the provider retention rule. [HUMAN-05: confirm the project-specific retention setting and verify account-linked and anonymous-event deletion handling before publication.]',
+              'PostHog’s general Free plan rule provides a one-year event query window; this is not a guaranteed deletion deadline. Account deletion submits an asynchronous request to delete events associated with the Product account UUID; completion is controlled by PostHog. Unlinked anonymous browser events are not covered by the account deletion request. [HUMAN-05: verify the current plan, query window, actual deletion periods, and account-linked and anonymous-event deletion handling before publication.]',
           },
           backup: {
             category: 'Database and file backups',
@@ -156,7 +156,7 @@ lastUpdated: 'Review draft: 2026-09-25'
         export:
           'Settings provides JSON export of your profile, plans, records, categories, activities and settings. CSV contains plan and record rows. This self-service export is not a complete copy of provider logs, correspondence or billing records; request other personal information through support.',
         consent:
-          'The website browser choice controls website browser analytics. Product has a separate account analytics setting that controls server-side account events and can be changed in Product Settings from any device. To change a saved website choice today, clear this site’s local storage in your browser and reload, then choose again; this may reset other preferences. [HUMAN-09: provide a persistent website withdrawal control and verify that browser events stop after withdrawal before publication.]',
+          'Change website browser analytics through Cookie settings in the footer. Change Product browser analytics in Settings > Data controls > Cookie settings; these browser choices are stored separately for each origin. Product Settings also has a separate account analytics setting for PostHog server events that you can change from any device. Internal Supabase service usage records and necessary server diagnostics continue independently of these switches. Browser withdrawal may reload the page, so save any unfinished input first. Withdrawal stops future consented processing; it does not itself delete events already collected. [HUMAN-09: verify browser traffic and cross-tab withdrawal before publication.]',
         california:
           'We do not sell personal information or share it for cross-context behavioral advertising. California statutory rights apply where the relevant law covers the service. [HUMAN-02: confirm applicability and request-handling obligations.]',
         children:
