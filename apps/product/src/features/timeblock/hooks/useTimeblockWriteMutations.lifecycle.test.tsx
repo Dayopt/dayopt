@@ -375,4 +375,36 @@ describe('timeblock real mutation lifecycle', () => {
     });
     expect(queryClient.getQueryData(plansKey)).toEqual([committed]);
   });
+  it('keeps the server row instead of its temporary predecessor when replaying a limited list', async () => {
+    const first = deferred<ReturnType<typeof row>>();
+    const second = deferred<ReturnType<typeof row>>();
+    mocks.commands['records.create'] = () => first.promise;
+    mocks.commands['plans.create'] = () => second.promise;
+    const { queryClient, result } = setup();
+    const limitedKey = [['plans', 'list'], { type: 'query', input: { limit: 1 } }] as const;
+    queryClient.setQueryData(limitedKey, [row('old')]);
+    queryClient.setQueryData(recordsKey, []);
+    const a = result.current.createRecord.mutateAsync(creation).catch((error: unknown) => error);
+    await waitFor(() => expect(queryClient.getQueryData<unknown[]>(recordsKey)).toHaveLength(1));
+    const b = result.current.createPlan.mutateAsync({
+      ...creation,
+      start_at: '2026-09-01T08:00:00.000Z',
+    });
+    await waitFor(() =>
+      expect(
+        queryClient.getQueryData<ReturnType<typeof row>[]>(limitedKey)?.[0]?.id.startsWith('temp-'),
+      ).toBe(true),
+    );
+    const committed = { ...row('b'), start_at: '2026-09-01T08:00:00.000Z' };
+    await act(async () => {
+      second.resolve(committed);
+      await b;
+    });
+    expect(queryClient.getQueryData(limitedKey)).toEqual([committed]);
+    await act(async () => {
+      first.reject(new Error('failed'));
+      await a;
+    });
+    expect(queryClient.getQueryData(limitedKey)).toEqual([committed]);
+  });
 });

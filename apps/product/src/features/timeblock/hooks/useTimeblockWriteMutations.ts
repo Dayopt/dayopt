@@ -120,14 +120,18 @@ function captureCacheChanges(
         );
         return Object.keys(fields).length ? [{ id: row.id, fields }] : [];
       });
-      // Insertion into a limited list displaces rows; it does not delete them.
+      // Limited-list insertion displaces persisted rows; replaced temporary rows must still be removed.
       const displaced = added.length > 0 && getListFilter(queryKey).limit !== undefined;
       journal.changes.push({
         queryKey,
         owner,
         apply: (data, lookup) => {
           const rows = cacheRows(data) ? data : [];
-          const kept = rows.filter((row) => displaced || !removed.some((old) => old.id === row.id));
+          const kept = rows.filter(
+            (row) =>
+              (displaced && !row.id.startsWith('temp-')) ||
+              !removed.some((old) => old.id === row.id),
+          );
           const patched = kept.map((row) => ({
             ...row,
             ...patches.find((patch) => patch.id === row.id)?.fields,
