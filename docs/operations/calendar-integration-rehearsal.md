@@ -1,5 +1,5 @@
 ---
-status: draft
+status: current
 last_verified: 2026-09-30
 code: apps/product/src/features/external-calendar
 ---
