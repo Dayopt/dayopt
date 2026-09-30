@@ -40,7 +40,7 @@ export function resolveFactoryRoute({
   ) {
     reasons.push('時間・操作の不変条件に関係する可能性');
   }
-  if (labels.includes('risk:authority') || labels.includes('type:question')) {
+  if (labels.includes('type:question')) {
     reasons.push('設計・権限・詳細レビューの明示指定');
   }
   const workType = labels.find((label) => /^type:(mission|task|bug|question)$/.test(label)) ?? null;

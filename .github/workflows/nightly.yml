@@ -280,13 +280,7 @@ jobs:
           else
             issue_url=$(gh issue create --repo "$GITHUB_REPOSITORY" \
               --title "$title_prefix" \
-              --label "type:bug,area:operations,priority:p2" \
+              --label "type:bug,area:operations" \
               --body "$body")
             issue_number="${issue_url##*/}"
-          fi
-
-          current_priority=$(gh issue view "$issue_number" --repo "$GITHUB_REPOSITORY" \
-            --json labels --jq '[.labels[].name | select(test("^priority:p[0-3]$"))][0] // empty')
-          if [ -z "$current_priority" ]; then
-            gh issue edit "$issue_number" --repo "$GITHUB_REPOSITORY" --add-label priority:p2
           fi

@@ -19,7 +19,7 @@ GitHub Actionsのセキュリティ設定、OWASP準拠のセキュリティ監�
 .github/
   dependabot.yml              # 依存関係自動更新
   workflows/
-    ci.yml                    # impact（affected 判定）→ static（gitleaks + secrets:check + docs:check + lint/typecheck/knip）∥ unit（+ migration safety の検知）∥ integration（affected 時の RLS/integration）の並列 4 job + unit 後の migration-notice（検知時だけラベル + コメント）
+    ci.yml                    # impact（affected 判定）→ static（gitleaks + secrets:check + docs:check + lint/typecheck/knip）∥ unit（+ migration safety の検知）∥ integration（affected 時の RLS/integration）の並列 4 job + unit 後の migration-notice（検知時だけ PR コメント）
     production-config-audit.yml  # Vercel environment metadata 監査
     nightly.yml               # product-unit-full + replica-check + storage-backup-export + notify-failure（#2483 で旧ファイルから統合。night-watch は 2026-09-02、層 3 と integration は 2026-09-03、Workflow status cleanup は 2026-09-29 に撤去）
     create-release.yml        # GitHub Release 作成

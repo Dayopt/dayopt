@@ -487,7 +487,7 @@ function checkSpawnTaskMainOnly(cwd, execFileImpl) {
   const isMainCheckout = roots ? roots.isMainCheckout : false;
   if (!isMainCheckout) {
     block(
-      'BLOCKED: チップ起票（spawn_task）は Main（main checkout の session）の専権です。レーンで別件を見つけたら、(1) dispatch skill の規約に沿って issue を起票し、(2) Main へ send_message で連絡してください。User へ直接チップを出すと triage の判断が User に飛びます（dispatch skill（旧 orchestration.md、#2479 で再編） §レーンの連絡規律）',
+      'BLOCKED: チップ起票（spawn_task）は Main（main checkout の session）の専権です。レーンで別件を見つけたら、(1) dispatch skill に従って Issue を起票し、(2) Main へ send_message で連絡してください。User へ直接チップを出すと triage の判断が User に飛びます。',
     );
   }
 }

@@ -74,8 +74,9 @@ describe('factory routing', () => {
     });
   });
 
-  it('review:full は人間向けの印で機械判定に使わない', () => {
+  it('アーカイブ済みの安全ラベルは機械判定に使わない', () => {
     expect(resolveFactoryRoute({ ...normal, labels: ['review:full'] }).level).toBe('L2');
+    expect(resolveFactoryRoute({ ...normal, labels: ['risk:authority'] }).level).toBe('L2');
     expect(resolveFactoryRoute({ ...normal, labels: ['type:question'] }).level).toBe('L3');
   });
 
