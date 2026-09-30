@@ -16,7 +16,7 @@ updates:
 
     # ラベル設定（securityは自動付与に任せる）
     labels:
-      - 'type:chore'
+      - 'type:task'
 
     # レビュアー設定
     reviewers:
@@ -134,7 +134,7 @@ updates:
       timezone: 'Asia/Tokyo'
 
     labels:
-      - 'type:chore'
+      - 'type:task'
       - 'area:infrastructure'
 
     reviewers:

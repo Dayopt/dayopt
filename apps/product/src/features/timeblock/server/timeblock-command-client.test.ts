@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { PublicPlanRow } from '@/lib/database';
+import { getClientSafeServiceCode } from '@/lib/trpc/client-safe-service-code';
+import { handleServiceError } from '@/lib/trpc/errors';
 
 import { TimeblockCommandClient } from './timeblock-command-client';
 
@@ -47,6 +49,41 @@ function createPlanInput() {
 describe('TimeblockCommandClient', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  it.each(['plans_active_external_event_unique', 'records_active_external_event_unique'])(
+    '%s の拒否だけを外部予定の確定済みとして公開する',
+    async (constraint) => {
+      rpc.mockResolvedValue({
+        data: null,
+        error: {
+          code: '23505',
+          message: `duplicate key value violates unique constraint "${constraint}"`,
+          details: 'private user and external event IDs',
+        },
+      });
+      const error = await new TimeblockCommandClient()
+        .createPlan(createPlanInput())
+        .catch((caught: unknown) => caught);
+
+      expect(error).toMatchObject({ code: 'EXTERNAL_CALENDAR_ALREADY_CONVERTED' });
+      expect(getClientSafeServiceCode(error)).toBe('EXTERNAL_CALENDAR_ALREADY_CONVERTED');
+      expect(() => handleServiceError(error)).toThrow(
+        expect.objectContaining({ code: 'CONFLICT' }),
+      );
+      expect(error).not.toHaveProperty('details');
+    },
+  );
+
+  it.each([
+    ['23505', 'duplicate key value violates unique constraint "plans_pkey"'],
+    ['23505', 'plans_active_external_event_unique_similar'],
+    ['23505', 'duplicate key without a constraint name'],
+  ])('無関係な一意競合は既存の汎用CONFLICTを保つ（%s / %s）', async (code, message) => {
+    rpc.mockResolvedValue({ data: null, error: { code, message } });
+    await expect(new TimeblockCommandClient().createPlan(createPlanInput())).rejects.toMatchObject({
+      code: 'CONFLICT',
+    });
   });
 
   it('tenantとnullable fieldを原子的create commandへ閉じ込める', async () => {

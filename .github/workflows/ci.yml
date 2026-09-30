@@ -241,7 +241,7 @@ jobs:
           CI: true
         run: node scripts/ci/check.mjs unit
 
-  # ── migration safety の通知（ラベル + PR コメント）───────────────────
+  # ── migration safety の通知（PR コメント）─────────────────────────
   #
   # **write 権限を持つ唯一の job。checkout も依存 install もせず、repo のコードを
   # 1 行も実行しない**（2026-09-14、credential audit P2-6）。runner 同梱の gh / base64 だけで
@@ -250,9 +250,7 @@ jobs:
   # シェルへは env 経由でだけ渡す（`${{ }}` を run に展開しない）。PR 番号と repo は
   # event context から取る。
   #
-  # 挙動は unit job に同居していた頃（check.mjs の runMigrationSafety）と同じ:
-  # 付与済みなら再通知しない → ラベル作成（既存なら無視）→ コメント投稿 → 成功時だけ
-  # ラベル付与（crash-safety: 通知前に打ち切られてラベルだけ残る状態を避ける）。
+  # 同じ PR への追い push では bot の通知コメントを探して重複投稿しない。
   # 失敗はすべて fail open（warning のみで exit 0）。finish-branch.sh は rollup の
   # failure を merge 阻止に使うため、通知の失敗で merge を止めない。
   #
@@ -270,7 +268,7 @@ jobs:
       pull-requests: write
       issues: write
     steps:
-      - name: Label and comment destructive migration
+      - name: Comment on destructive migration
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
@@ -278,7 +276,7 @@ jobs:
           MIGRATION_DESTRUCTIVE: ${{ needs.unit.outputs.migration_destructive }}
           MIGRATION_COMMENT_B64: ${{ needs.unit.outputs.migration_comment_b64 }}
         run: |
-          label='db:destructive-migration'
+          marker='<!-- dayopt:migration-safety-notice -->'
           if [ "${MIGRATION_DESTRUCTIVE:-}" != 'true' ]; then
             echo "migration_destructive が true ではないため通知しません。"
             exit 0
@@ -297,21 +295,16 @@ jobs:
             exit 0
           fi
 
-          # round ごとの追い push で毎回コメントしない。取得失敗は未付与扱い（fail open）。
-          has_label=$(gh api "repos/$GH_REPO/issues/$PR_NUMBER/labels" \
-            --jq "[.[] | select(.name == \"$label\")] | length > 0" 2>/dev/null) || has_label=false
-          if [ "$has_label" = 'true' ]; then
-            echo "$label は付与済みのため再通知しません。"
+          # bot が投稿した印だけを使い、PR 投稿者の偽コメントでは通知を抑止しない。
+          existing=$(gh api "repos/$GH_REPO/issues/$PR_NUMBER/comments" --paginate \
+            --jq '.[] | select(.user.login == "github-actions[bot]" and ((.body // "") | contains("<!-- dayopt:migration-safety-notice -->"))) | .id' 2>/dev/null) || existing=''
+          if [ -n "$existing" ]; then
+            echo 'migration safety は通知済みです。'
             exit 0
           fi
 
-          gh label create "$label" --repo "$GH_REPO" --color B60205 \
-            --description '破壊的 migration を検知（EXPLICIT AUTHORITY 要確認）' > /dev/null 2>&1 || true
-
-          if gh pr comment "$PR_NUMBER" --repo "$GH_REPO" --body-file "$body_file"; then
-            gh api --method POST "repos/$GH_REPO/issues/$PR_NUMBER/labels" \
-              -f "labels[]=$label" > /dev/null || true
-          else
+          printf '\n%s\n' "$marker" >> "$body_file"
+          if ! gh pr comment "$PR_NUMBER" --repo "$GH_REPO" --body-file "$body_file"; then
             # fork PR では pull_request イベントの GITHUB_TOKEN が構造的に read-only になる
             echo "::warning::migration safety のコメント投稿に失敗しました（fork PR 等で write 権限が無い可能性）。Unit Tests の Step Summary の検知結果を確認してください。"
           fi
@@ -363,7 +356,7 @@ jobs:
           fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
 
-      - uses: supabase/setup-cli@46f7f98c7f948ad727d22c1e67fab04c223a0520 # v3.0.0
+      - uses: supabase/setup-cli@45a513f8c64c0bc8e0e3dfe572b5c95be85f6359 # v3.0.1
         with:
           version: ${{ steps.supabase-version.outputs.version }}
 
@@ -381,6 +374,11 @@ jobs:
           echo "anon_key=$ANON_KEY" >> $GITHUB_OUTPUT
           echo "service_role_key=$SERVICE_ROLE_KEY" >> $GITHUB_OUTPUT
           echo "db_url=$DB_URL" >> $GITHUB_OUTPUT
+
+      - name: Rehearse Production pgcrypto namespace without changing the shared database
+        env:
+          CI: true
+        run: node scripts/ci/integration-oauth-pgcrypto-check.mjs
 
       - name: Run integration/RLS tests
         env:
@@ -438,7 +436,7 @@ jobs:
           fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
 
-      - uses: supabase/setup-cli@46f7f98c7f948ad727d22c1e67fab04c223a0520 # v3.0.0
+      - uses: supabase/setup-cli@45a513f8c64c0bc8e0e3dfe572b5c95be85f6359 # v3.0.1
         with:
           version: ${{ steps.supabase-version.outputs.version }}
 

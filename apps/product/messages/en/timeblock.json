@@ -135,6 +135,8 @@
         "deleteFailed": "Could not delete. Please try again",
         "restored": "Restored",
         "restoreFailed": "Could not restore. Please try again",
+        "externalCalendarAlreadyConverted": "This external calendar appointment has already been added",
+        "externalCalendarRestoreConflict": "Cannot restore because this external calendar appointment has already been added again",
         "planCreated": "Plan added ✓",
         "planCreatedShifted": "Plan added at {time}",
         "recordedShifted": "Recorded at {time}"

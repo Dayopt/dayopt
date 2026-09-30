@@ -794,7 +794,7 @@ describe('pre-tool-guard.mjs: 引用済み引数内の区切り記号（#1987、
 
 // #1959: チップ起票（spawn_task）は Main（main checkout の session）の専権。レーンが直接 User へ
 // チップを出すと triage の判断が User に飛ぶ。レーンは issue 化 + Main へ
-// send_message に一本化する（dispatch skill（旧 orchestration.md、#2479 で再編） §レーンの連絡規律）。
+// send_message に一本化する。Issue の起票には dispatch skill を使う。
 describe('pre-tool-guard.mjs: レーンからのチップ起票', () => {
   const SPAWN = 'mcp__ccd_session__spawn_task';
   let fixtureRoot: string;
