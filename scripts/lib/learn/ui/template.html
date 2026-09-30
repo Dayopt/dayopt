@@ -6,9 +6,9 @@
     <title>Dayopt Learning System</title>
     <!--
       Dayopt Learning System の対話画面テンプレート。`pnpm learn` が __LEARN_DATA__ を
-      docs/learn/**/*.md の learn:* block から集めた data で置き換え、.learn/index.html を作る。
+      docs/learn/**/*.md の learn:* block から集めた data で、閲覧するたびに置き換える。
       正本は docs/learn の Markdown。このテンプレートは表示装置で、内容を持たない。
-      外部 script / CSS / font は使わない（file:// で開ける状態を保つ）。
+      外部 script / CSS / font は使わない。保存記録は --snapshot を明示した時だけ出す。
     -->
     <style>
       /* 学習画面はダーク表示だけにする */
@@ -1604,10 +1604,11 @@
           <div id="view"></div>
           <footer>
             この画面は <code>docs/learn</code> の Markdown（各ファイルの JSON block）から
-            <code>pnpm learn</code> が作った表示。記述がコードとずれていたら、その .md の JSON
-            を直して <code>pnpm learn:generate</code> を実行する。コードへのリンクは GitHub の
-            <code>main</code> を指す。参照先の実在は <code>pnpm docs:check</code> が検査する。 段は
-            ← → キーでも送れる。
+            <code>pnpm learn</code> が読込時に作る表示。記述がコードとずれていたら、その .md の JSON
+            を直す。保存済み Markdown の図と説明は
+            <code>pnpm learn:generate</code> で更新する。コードへのリンクは GitHub の
+            <code>main</code> を指す。参照先の実在は画面の読込時にも検査する。 段は ← →
+            キーでも送れる。
           </footer>
         </div>
       </main>
@@ -1705,6 +1706,8 @@
             { class: 'refs' },
             refs.map(function (r) {
               var href = data.repo + r.path.split('/').map(encodeURIComponent).join('/');
+              if (data.documentBase && /\.mdx?$/.test(r.path))
+                href = data.documentBase + encodeURIComponent(r.path);
               return el('li', {}, [
                 el('a', { href: href, target: '_blank', rel: 'noopener' }, [
                   el('code', { text: r.path }),
@@ -1838,7 +1841,9 @@
             btns.appendChild(
               el('a', {
                 class: 'ghost',
-                href: '../docs/learn/labs/' + sc.lab + '.md',
+                href: data.documentBase
+                  ? data.documentBase + encodeURIComponent('docs/learn/labs/' + sc.lab + '.md')
+                  : '../docs/learn/labs/' + sc.lab + '.md',
                 target: '_blank',
                 rel: 'noopener',
                 text: '🧪 壊して確かめる（lab）',

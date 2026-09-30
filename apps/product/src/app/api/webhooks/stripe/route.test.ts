@@ -35,6 +35,7 @@ const retrieveEvent = vi.hoisted(() => vi.fn());
 const retrieveSubscription = vi.hoisted(() => vi.fn());
 const syncDeletedSubscriptionStatus = vi.hoisted(() => vi.fn());
 const syncSubscriptionStatus = vi.hoisted(() => vi.fn());
+const getBillingSubscriptionSnapshot = vi.hoisted(() => vi.fn());
 const classifyBillingCustomerEvent = vi.hoisted(() => vi.fn());
 const resolveBillingLifecycleMode = vi.hoisted(() => vi.fn());
 const claimStripeWebhookEvent = vi.hoisted(() => vi.fn());
@@ -91,6 +92,7 @@ vi.mock('@/lib/analytics/product-events', () => ({ trackProductEvent }));
 vi.mock('@/lib/email/send', () => ({ sendTransactionalEmail: deliverTransactionalEmail }));
 vi.mock('@/features/settings/server/billing-service', () => ({
   classifyBillingCustomerEvent,
+  getBillingSubscriptionSnapshot,
   syncDeletedSubscriptionStatus,
   syncSubscriptionStatus,
 }));
@@ -147,7 +149,18 @@ beforeEach(() => {
   };
   retrieveAccount.mockResolvedValue({ id: 'acct_dayopt' });
   retrieveEvent.mockImplementation(async () => ({ ...eventMock }));
-  retrieveSubscription.mockResolvedValue({ status: 'trialing', trial_end: null });
+  retrieveSubscription.mockImplementation(async (id: string) => ({
+    id,
+    customer: 'cus_test123',
+    livemode: false,
+    status: eventMock.type === 'customer.subscription.updated' ? 'active' : 'trialing',
+    trial_end: null,
+  }));
+  getBillingSubscriptionSnapshot.mockResolvedValue({
+    subscriptionId: 'sub_test456',
+    status: 'active',
+    updatedAt: '2026-09-30T00:00:00Z',
+  });
   claimStripeWebhookEvent.mockResolvedValue('claimed');
   markStripeWebhookEventProcessed.mockResolvedValue(undefined);
   releaseStripeWebhookEvent.mockResolvedValue(undefined);
@@ -206,6 +219,7 @@ describe('Stripe webhook route', () => {
       'cus_test123',
       'sub_test456',
       'trialing',
+      { subscriptionId: 'sub_test456', status: 'active', updatedAt: '2026-09-30T00:00:00Z' },
     );
     expect(markStripeWebhookEventProcessed).toHaveBeenCalledWith(expect.anything(), 'evt_test123');
     expect(trackProductEvent).toHaveBeenCalledWith({
@@ -508,11 +522,12 @@ describe('Stripe webhook route', () => {
       'cus_test123',
       'sub_test456',
       'active',
+      { subscriptionId: 'sub_test456', status: 'active', updatedAt: '2026-09-30T00:00:00Z' },
     );
     expect(syncDeletedSubscriptionStatus).not.toHaveBeenCalled();
   });
 
-  it('activation前は現行のsubscription削除経路を維持する', async () => {
+  it('activation前はRPCを使わず現在のsubscriptionだけを削除する', async () => {
     resolveBillingLifecycleMode.mockResolvedValue('legacy');
 
     const response = await POST(request());
@@ -523,6 +538,7 @@ describe('Stripe webhook route', () => {
       'cus_test123',
       null,
       'canceled',
+      { subscriptionId: 'sub_test456', status: 'active', updatedAt: '2026-09-30T00:00:00Z' },
     );
     expect(syncDeletedSubscriptionStatus).not.toHaveBeenCalled();
     expect(retrieveEvent).not.toHaveBeenCalled();

@@ -17,7 +17,7 @@
     "build": "pnpm --filter @dayopt/product build",
     "build:packages": "turbo run build --filter='./packages/*'",
     "start": "pnpm --filter @dayopt/product start",
-    "check": "pnpm secrets:check && pnpm typecheck && pnpm lint && pnpm check:static && pnpm quality:deadcode:ci && pnpm test:run",
+    "check": "pnpm secrets:check && pnpm docs:check && pnpm typecheck && pnpm lint && pnpm check:static && pnpm quality:deadcode:ci && pnpm test:run",
     "check:static": "pnpm auth-email:check && pnpm lint:boundaries && pnpm lint:tokens && pnpm format:check && pnpm license:check && pnpm license:credits:check && pnpm lint:i18n && pnpm copy:check:strict && pnpm storybook:taxonomy",
     "check:workspace": "pnpm typecheck && pnpm lint && pnpm build:packages && pnpm build-storybook",
     "lint": "turbo run lint",
@@ -56,6 +56,9 @@
     "functions:check": "deno check --no-lock --config supabase/functions/deno.json supabase/functions",
     "lint:i18n": "pnpm --filter @dayopt/product lint:i18n",
     "docs:check": "tsx scripts/tasks/docs-guard/index.ts",
+    "docs:read": "tsx scripts/tasks/read-docs.ts",
+    "docs:audit": "tsx scripts/tasks/read-docs.ts --audit",
+    "docs:serve": "tsx scripts/tasks/serve-docs.ts",
     "learn": "tsx scripts/tasks/learn.ts",
     "learn:generate": "tsx scripts/tasks/learn.ts --generate",
     "docs:coverage": "tsx scripts/tasks/docs-coverage/index.ts",
@@ -113,7 +116,6 @@
     "agent:preflight": "node scripts/tasks/agent-preflight.mjs"
   },
   "devDependencies": {
-    "zod": "4.3.6",
     "@ai-sdk/gateway": "4.0.94",
     "@axe-core/playwright": "catalog:tooling",
     "@axe-core/react": "catalog:tooling",
@@ -154,6 +156,7 @@
     "knip": "catalog:tooling",
     "license-checker": "catalog:tooling",
     "lint-staged": "^16.4.0",
+    "marked": "16.4.2",
     "mdast-util-from-markdown": "^2.0.3",
     "next": "catalog:",
     "playwright": "catalog:tooling",
@@ -170,6 +173,7 @@
     "tw-animate-css": "catalog:tooling",
     "typescript": "catalog:tooling",
     "vitest": "catalog:tooling",
+    "zod": "4.3.6",
     "zod-to-json-schema": "^3.25.2"
   }
 }

@@ -44,6 +44,21 @@ const STORE_NAME = 'cache';
 const CACHE_KEY_PREFIX = 'DAYOPT_QUERY_CLIENT';
 const DB_VERSION = 1;
 
+// clearより前に開始したowner解決・読み取りを、後から復元/保存させない。
+// persisterの再生成を跨ぐためmodule単位で持つ（同じブラウザのDBを共有する）。
+let cacheGeneration = 0;
+let storageMutationQueue: Promise<void> = Promise.resolve();
+
+/** 先に始まった保存がclearの後に完了してblobを復活させないよう、書き込みを直列化する。 */
+function mutateStorage(generation: number, mutation: () => Promise<void>): Promise<void> {
+  const pending = storageMutationQueue.then(async () => {
+    if (generation === cacheGeneration) await mutation();
+  });
+  // 失敗は呼び出し元で記録する。次のclear/保存は前の失敗で止めない。
+  storageMutationQueue = pending.catch(() => {});
+  return pending;
+}
+
 function cacheKeyFor(userId: string): string {
   return `${CACHE_KEY_PREFIX}:${userId}`;
 }
@@ -188,22 +203,27 @@ export function createUserScopedQueryPersister({
   storage = indexedDbQueryCacheStorage,
 }: CreatePersisterOptions): Persister {
   /** 現在の user のもの以外を全部消す。ログアウトを経ずに残った他人の blob を回収する。 */
-  async function evictForeignBlobs(currentKey: string): Promise<void> {
+  async function evictForeignBlobs(currentKey: string, generation: number): Promise<void> {
     const keys = await storage.keys();
-    await Promise.all(
-      keys.filter((key) => key !== currentKey).map((key) => storage.removeItem(key)),
-    );
+    await mutateStorage(generation, async () => {
+      await Promise.all(
+        keys.filter((key) => key !== currentKey).map((key) => storage.removeItem(key)),
+      );
+    });
   }
 
   return {
     persistClient: async (client: PersistedClient): Promise<void> => {
       if (!isStorageAvailable()) return;
+      const generation = cacheGeneration;
       try {
         const userId = await resolveUserId();
         // 所有者が確定しない状態では書かない（誰のものとも言えない blob を作らない）。
         if (!userId) return;
         const envelope: PersistedClientEnvelope = { userId, client };
-        await storage.setItem(cacheKeyFor(userId), superjson.stringify(envelope));
+        await mutateStorage(generation, () =>
+          storage.setItem(cacheKeyFor(userId), superjson.stringify(envelope)),
+        );
       } catch (error) {
         logger.warn('[QueryPersist] persistClient failed:', error);
       }
@@ -211,6 +231,7 @@ export function createUserScopedQueryPersister({
 
     restoreClient: async (): Promise<PersistedClient | undefined> => {
       if (!isStorageAvailable()) return undefined;
+      const generation = cacheGeneration;
       try {
         const userId = await resolveUserId();
         if (!userId) {
@@ -225,15 +246,16 @@ export function createUserScopedQueryPersister({
         }
 
         const key = cacheKeyFor(userId);
-        await evictForeignBlobs(key);
+        await evictForeignBlobs(key, generation);
+        if (generation !== cacheGeneration) return undefined;
 
         const serialized = await storage.getItem(key);
-        if (!serialized) return undefined;
+        if (!serialized || generation !== cacheGeneration) return undefined;
 
         const envelope = superjson.parse<unknown>(serialized);
         if (!isEnvelope(envelope) || envelope.userId !== userId) {
           // key と中身が食い違う blob は信用しない（壊れているか、別人のもの）。
-          await storage.removeItem(key);
+          await mutateStorage(generation, () => storage.removeItem(key));
           return undefined;
         }
         return envelope.client;
@@ -245,9 +267,10 @@ export function createUserScopedQueryPersister({
 
     removeClient: async (): Promise<void> => {
       if (!isStorageAvailable()) return;
+      const generation = ++cacheGeneration;
       try {
         // 現在の user の分だけでなく全件消す。sign-out 後に誰の残骸も残さない。
-        await storage.clear();
+        await mutateStorage(generation, () => storage.clear());
       } catch (error) {
         logger.warn('[QueryPersist] removeClient failed:', error);
       }
@@ -265,12 +288,13 @@ export async function clearPersistedQueryCache(
   storage: QueryCacheStorage = indexedDbQueryCacheStorage,
 ): Promise<void> {
   if (!isStorageAvailable()) return;
+  const generation = ++cacheGeneration;
   // 覚えている所有者も必ず対で忘れる。ここに同居させておけば、sign-out 経路が増えても
   // 「cache は消したが所有者は覚えたまま」（＝オフライン fallback が前ユーザーを指し続ける）
   // という取りこぼしが構造的に起きない。
   forgetLastKnownUserId();
   try {
-    await storage.clear();
+    await mutateStorage(generation, () => storage.clear());
   } catch (error) {
     logger.warn('[QueryPersist] clearPersistedQueryCache failed:', error);
   }

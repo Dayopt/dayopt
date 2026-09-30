@@ -71,6 +71,7 @@ export async function resolveSessionAuthContext(
   }
 
   let sessionId: string | undefined;
+  let sessionLookupFailed = false;
   try {
     const {
       data: { session },
@@ -79,16 +80,18 @@ export async function resolveSessionAuthContext(
       supabase.auth.getSession(),
     );
     if (sessionError) {
+      sessionLookupFailed = true;
       logger.warn('Session token lookup failed');
     } else {
       sessionId = session?.access_token;
     }
   } catch {
-    // session tokenはログ用であり、失敗しても独立したMFA lookupを継続する。
+    // tokenが独立したMFA lookupで回復すれば継続できる。
+    sessionLookupFailed = true;
     logger.warn('Session token lookup threw');
   }
 
-  const mfaAssurance = await resolveMfaAssurance(supabase, operationPrefix);
+  const mfaAssurance = await resolveMfaAssurance(supabase, operationPrefix, sessionLookupFailed);
 
   return { userId, sessionId, mfaAssurance };
 }
@@ -118,6 +121,7 @@ export async function resolveSessionAuthContext(
 export async function resolveMfaAssurance(
   supabase: SupabaseClient<Database>,
   operationPrefix: SessionAuthOperationPrefix,
+  sessionLookupFailed = false,
 ): Promise<MfaAssurance> {
   try {
     const { data: sessionData, error: sessionError } = await observeAuthOperation(
@@ -137,6 +141,9 @@ export async function resolveMfaAssurance(
     // 事前にgetUser()でuserを検証済みという前提のもとでのみfail-openとして安全
     // （関数doc参照）。
     if (!accessToken) {
+      // SDKがrefresh失敗でsessionを破棄すると、次のlookupはnull/no-errorになる。
+      // 先行する失敗を正常なlegacy sessionと誤認せず、tokenの回復だけを許可する。
+      if (sessionLookupFailed) return createFailedMfaAssurance();
       return { currentLevel: 'aal1', nextLevel: 'aal1' };
     }
 
