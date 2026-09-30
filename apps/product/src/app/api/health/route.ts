@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
 
-import { resolveDayoptEnvironment } from '@/lib/dayopt-environment';
+import { isOrdinaryProductPreview, resolveDayoptEnvironment } from '@/lib/dayopt-environment';
 import { logger } from '@/lib/logger';
 import {
   assertDatabaseOAuthIdentity,
@@ -115,6 +115,7 @@ async function checkDatabase(): Promise<'ok' | 'error' | 'warning'> {
  * Redis（Upstash）接続チェック
  */
 async function checkRedis(): Promise<'ok' | 'error' | 'warning' | 'skipped'> {
+  if (isOrdinaryProductPreview(process.env)) return 'skipped';
   const redisUrl = process.env.UPSTASH_REDIS_REST_URL;
   const redisToken = process.env.UPSTASH_REDIS_REST_TOKEN;
   const isUpstashEnabled = Boolean(redisUrl && redisToken);

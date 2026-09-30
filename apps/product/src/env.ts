@@ -9,7 +9,7 @@ import 'server-only';
 
 import { z } from 'zod';
 
-import { resolveDayoptEnvironment } from '@/lib/dayopt-environment';
+import { isOrdinaryProductPreview, resolveDayoptEnvironment } from '@/lib/dayopt-environment';
 import { logger } from '@/lib/logger';
 
 import { isValidOAuthRedirectUriList } from '@/lib/oauth-server/redirect-uris';
@@ -353,6 +353,11 @@ export const env = new Proxy({} as ServerEnv, {
       for (const [key, value] of Object.entries(process.env)) {
         const trimmed = value?.replace(/\\n/g, '').trim();
         cleaned[key] = trimmed === '' ? undefined : trimmed;
+      }
+      // Unused inherited Redis configuration must not break verified ordinary Preview.
+      if (isOrdinaryProductPreview(process.env)) {
+        delete cleaned.UPSTASH_REDIS_REST_URL;
+        delete cleaned.UPSTASH_REDIS_REST_TOKEN;
       }
       const result = serverSchema.safeParse(cleaned);
       if (!result.success) {
