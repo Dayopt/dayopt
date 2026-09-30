@@ -16,6 +16,24 @@ const ENV = {
   UPTIME_KEY: 'fake-uptime',
 };
 describe('doctor read transport', () => {
+  it('reads R2 bucket locks from the singular lock endpoint in the verified account', async () => {
+    const mock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        json({
+          success: true,
+          result: [{ name: 'dayopt.app', account: { id: 'account_dayopt' } }],
+        }),
+      )
+      .mockResolvedValueOnce(json({ success: true, result: { rules: [] } }));
+    const request = createTransport({ ...ENV, CF_TOKEN: 'fake-cloudflare' }, mock);
+    await request('cloudflare.listZones');
+    await request('cloudflare.getR2Locks', { account_id: 'account_dayopt', bucket: 'avatars' });
+    expect(new URL(mock.mock.calls[1][0]).pathname).toBe(
+      '/client/v4/accounts/account_dayopt/r2/buckets/avatars/lock',
+    );
+    expect(mock.mock.calls[1][1].method).toBe('GET');
+  });
   it.each([401, 403, 404])('classifies HTTP %s without exposing response body', async (status) => {
     const mock = vi.fn().mockResolvedValue(json({ secret: 'FAKE_RESPONSE_SECRET' }, status));
     await expect(createTransport(ENV, mock)('github.repository')).rejects.toMatchObject({ status });

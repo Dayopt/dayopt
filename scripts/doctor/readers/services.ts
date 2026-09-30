@@ -1,3 +1,4 @@
+import { ReadFailure } from '../safety.ts';
 import type { Observation, ReaderContext } from '../types.ts';
 
 type Row = Record<string, unknown>;
@@ -79,13 +80,15 @@ async function observe(
       source: operation,
       status: 'blocked',
       reason:
-        status === 403 || detail.code === 'FORBIDDEN'
-          ? 'insufficient_access'
-          : status === 401
-            ? 'authentication_failed'
-            : status === 404
-              ? 'resource_not_accessible'
-              : 'read_failed',
+        detail.code === 'dayopt_zone_not_visible'
+          ? 'dayopt_zone_not_visible'
+          : status === 403 || detail.code === 'FORBIDDEN'
+            ? 'insufficient_access'
+            : status === 401
+              ? 'authentication_failed'
+              : status === 404
+                ? 'resource_not_accessible'
+                : 'read_failed',
       next_step:
         'Confirm the existing credential scope and resource in the provider UI; do not issue new credentials.',
     });
@@ -335,16 +338,19 @@ async function cloudflare(ctx: ReaderContext, output: Observation[]): Promise<vo
     'all',
     'cloudflare.listZones',
     { name: 'dayopt.app', page: 1, per_page: 50 },
-    (value) =>
-      rows(value)
-        .filter((row) => row.name === 'dayopt.app')
-        .map((row) => ({
-          id: scalar(row.id),
-          name: scalar(row.name),
-          status: scalar(row.status),
-          name_servers: strings(row.name_servers),
-          account_id: scalar(record(row.account).id),
-        })),
+    (value) => {
+      const matching = rows(value).filter((row) => row.name === 'dayopt.app');
+      // Scoped credentials may return an empty list for an existing zone.
+      // Missing visibility proves neither resource absence nor a matching configuration.
+      if (!matching.length) throw new ReadFailure('dayopt_zone_not_visible');
+      return matching.map((row) => ({
+        id: scalar(row.id),
+        name: scalar(row.name),
+        status: scalar(row.status),
+        name_servers: strings(row.name_servers),
+        account_id: scalar(record(row.account).id),
+      }));
+    },
   );
   const accounts = new Set(
     rows(zones)

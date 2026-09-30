@@ -212,6 +212,23 @@ test('Cloudflare derives account ID only from the Dayopt zone', async () => {
   assert.ok(accountCalls.every((call) => call.params.account_id === 'account_dayopt'));
 });
 
+for (const result of [
+  [],
+  [{ id: 'unrelated_zone', name: 'unrelated.example', account: { id: 'other_account' } }],
+]) {
+  test(`Cloudflare blocks invisible Dayopt zone instead of accepting empty evidence (${result.length} visible zones)`, async () => {
+    const { ctx, calls } = context({
+      'cloudflare.listZones': { success: true, result, result_info: { page: 1, total_pages: 1 } },
+    });
+    const output = await readService('cloudflare', ctx);
+    const zone = output.find((row) => row.key === 'cloudflare.zone');
+    assert.equal(zone?.status, 'blocked');
+    assert.equal(zone?.reason, 'dayopt_zone_not_visible');
+    assert.equal(zone?.value, null);
+    assert.ok(calls.every((call) => call.operation === 'cloudflare.listZones'));
+  });
+}
+
 for (const status of [403, 404]) {
   test(`HTTP ${status} blocks one operation and continues independent operations`, async () => {
     const error = Object.assign(new Error(`https://secret.example/${fixtureSecret}`), { status });

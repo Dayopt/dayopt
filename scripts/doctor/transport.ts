@@ -552,7 +552,7 @@ export function createTransport(env: NodeJS.ProcessEnv, fetchImpl: typeof fetch 
         case 'cloudflare.getR2Locks':
           if (!['avatars', 'attachments'].includes(String(params.bucket)))
             throw new ReadFailure('POLICY_BLOCKED');
-          path = `/client/v4/accounts/${account}/r2/buckets/${params.bucket}/locks`;
+          path = `/client/v4/accounts/${account}/r2/buckets/${params.bucket}/lock`;
           break;
         default:
           throw new ReadFailure('UNSUPPORTED_OPERATION');
