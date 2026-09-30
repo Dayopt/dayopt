@@ -1973,6 +1973,16 @@ export type Database = {
         };
         Returns: string;
       };
+      ensure_mcp_integration_environment_identity_v1: {
+        Args: never;
+        Returns: {
+          authorization_server_uri: string;
+          environment: string;
+          provisioned_at: string;
+          resource_uri: string;
+          supabase_project_ref: string;
+        }[];
+      };
       exchange_oauth_authorization_code_v2: {
         Args: {
           p_access_hash: string;
