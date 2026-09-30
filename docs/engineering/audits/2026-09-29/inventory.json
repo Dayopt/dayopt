@@ -6146,11 +6146,13 @@
       "blob": "d32ee45648b53e0b965ace3c2bd9e845582d492b",
       "mode": "100644",
       "bytes": 3049,
-      "method": "full-text",
-      "status": "unverified",
-      "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
+      "method": "generated-source-equivalence",
+      "status": "mechanically-checked",
+      "reason": "Explicit @generated Product preview, canonical Edge source and generator fully read; mechanical byte equivalence appropriate instead of duplicate full reading.",
       "read_ranges": [],
-      "evidence": [],
+      "evidence": [
+        "Immutable baseline generator bytes match current generator; actual generateProductAuthEmailTemplate applied to all7 original baseline source blobs, each generated result byte-equals corresponding original baseline destination. /tmp/dayopt-audit-auth-email-baseline-generated.mts and .log exit0. Current source separately auth-email:check/fullcheck success. Different Node/Deno renderer versions acknowledged; source equivalence is not deployed HTML proof."
+      ],
       "questions": []
     },
     {
@@ -6159,11 +6161,13 @@
       "blob": "fee4281a05f74bde4cd5144c9c4083602f173687",
       "mode": "100644",
       "bytes": 4540,
-      "method": "full-text",
-      "status": "unverified",
-      "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
+      "method": "generated-source-equivalence",
+      "status": "mechanically-checked",
+      "reason": "Explicit @generated Product preview, canonical Edge source and generator fully read; mechanical byte equivalence appropriate instead of duplicate full reading.",
       "read_ranges": [],
-      "evidence": [],
+      "evidence": [
+        "Immutable baseline generator bytes match current generator; actual generateProductAuthEmailTemplate applied to all7 original baseline source blobs, each generated result byte-equals corresponding original baseline destination. /tmp/dayopt-audit-auth-email-baseline-generated.mts and .log exit0. Current source separately auth-email:check/fullcheck success. Different Node/Deno renderer versions acknowledged; source equivalence is not deployed HTML proof."
+      ],
       "questions": []
     },
     {
@@ -6173,10 +6177,12 @@
       "mode": "100644",
       "bytes": 19168,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 530]],
+      "evidence": [
+        "Whole source read untruncated during mail definition -> locale dictionaries -> render -> Story preview trace, baseline bytes equal6685a356. Email-specific translator is intentional Node runtime boundary, not next-intl UI. Story previews presentational; not successful-send evidence. TrialStart retains historical7-day/Stripe-trigger comments, current notification callsite eligibility not fully confirmed."
+      ],
       "questions": []
     },
     {
@@ -6185,11 +6191,13 @@
       "blob": "5bbe4ea68d001ddf546280ec82e4bd3c0ef6d212",
       "mode": "100644",
       "bytes": 3137,
-      "method": "full-text",
-      "status": "unverified",
-      "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
+      "method": "generated-source-equivalence",
+      "status": "mechanically-checked",
+      "reason": "Explicit @generated Product preview, canonical Edge source and generator fully read; mechanical byte equivalence appropriate instead of duplicate full reading.",
       "read_ranges": [],
-      "evidence": [],
+      "evidence": [
+        "Immutable baseline generator bytes match current generator; actual generateProductAuthEmailTemplate applied to all7 original baseline source blobs, each generated result byte-equals corresponding original baseline destination. /tmp/dayopt-audit-auth-email-baseline-generated.mts and .log exit0. Current source separately auth-email:check/fullcheck success. Different Node/Deno renderer versions acknowledged; source equivalence is not deployed HTML proof."
+      ],
       "questions": []
     },
     {
@@ -6211,11 +6219,13 @@
       "blob": "90a769d782f5849f959dad8c2997418bf58868ed",
       "mode": "100644",
       "bytes": 2979,
-      "method": "full-text",
-      "status": "unverified",
-      "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
+      "method": "generated-source-equivalence",
+      "status": "mechanically-checked",
+      "reason": "Explicit @generated Product preview, canonical Edge source and generator fully read; mechanical byte equivalence appropriate instead of duplicate full reading.",
       "read_ranges": [],
-      "evidence": [],
+      "evidence": [
+        "Immutable baseline generator bytes match current generator; actual generateProductAuthEmailTemplate applied to all7 original baseline source blobs, each generated result byte-equals corresponding original baseline destination. /tmp/dayopt-audit-auth-email-baseline-generated.mts and .log exit0. Current source separately auth-email:check/fullcheck success. Different Node/Deno renderer versions acknowledged; source equivalence is not deployed HTML proof."
+      ],
       "questions": []
     },
     {
@@ -6224,11 +6234,13 @@
       "blob": "ea2558d92fb3672f6b48041b4f239742189f52d5",
       "mode": "100644",
       "bytes": 3929,
-      "method": "full-text",
-      "status": "unverified",
-      "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
+      "method": "generated-source-equivalence",
+      "status": "mechanically-checked",
+      "reason": "Explicit @generated Product preview, canonical Edge source and generator fully read; mechanical byte equivalence appropriate instead of duplicate full reading.",
       "read_ranges": [],
-      "evidence": [],
+      "evidence": [
+        "Immutable baseline generator bytes match current generator; actual generateProductAuthEmailTemplate applied to all7 original baseline source blobs, each generated result byte-equals corresponding original baseline destination. /tmp/dayopt-audit-auth-email-baseline-generated.mts and .log exit0. Current source separately auth-email:check/fullcheck success. Different Node/Deno renderer versions acknowledged; source equivalence is not deployed HTML proof."
+      ],
       "questions": []
     },
     {
@@ -6277,10 +6289,12 @@
       "mode": "100644",
       "bytes": 1461,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 32]],
+      "evidence": [
+        "Full source/test/template/generator text read in bounded untruncated ranges during auth-mail contract audit; baseline bytes equal immutable readSHA6685a356. Dynamic DB locale versus signed-event retry reproduced with actual handler/canonical JSX and synthetic boundary adapters; expiry display traced to absent payload duration/common otp_expiry; #2991/#2992. Node rendering is not deployed Deno or actual provider evidence."
+      ],
       "questions": []
     },
     {
@@ -6290,10 +6304,12 @@
       "mode": "100644",
       "bytes": 2420,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 70]],
+      "evidence": [
+        "Whole source read untruncated during mail definition -> locale dictionaries -> render -> Story preview trace, baseline bytes equal6685a356. Email-specific translator is intentional Node runtime boundary, not next-intl UI. Story previews presentational; not successful-send evidence. TrialStart retains historical7-day/Stripe-trigger comments, current notification callsite eligibility not fully confirmed."
+      ],
       "questions": []
     },
     {
@@ -6303,10 +6319,12 @@
       "mode": "100644",
       "bytes": 1927,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 61]],
+      "evidence": [
+        "Whole source read untruncated during mail definition -> locale dictionaries -> render -> Story preview trace, baseline bytes equal6685a356. Email-specific translator is intentional Node runtime boundary, not next-intl UI. Story previews presentational; not successful-send evidence. TrialStart retains historical7-day/Stripe-trigger comments, current notification callsite eligibility not fully confirmed."
+      ],
       "questions": []
     },
     {
@@ -6315,11 +6333,13 @@
       "blob": "8c42131b4b8a128490d06f32f8b9b32a78d4dd05",
       "mode": "100644",
       "bytes": 4406,
-      "method": "full-text",
-      "status": "unverified",
-      "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
+      "method": "generated-source-equivalence",
+      "status": "mechanically-checked",
+      "reason": "Explicit @generated Product preview, canonical Edge source and generator fully read; mechanical byte equivalence appropriate instead of duplicate full reading.",
       "read_ranges": [],
-      "evidence": [],
+      "evidence": [
+        "Immutable baseline generator bytes match current generator; actual generateProductAuthEmailTemplate applied to all7 original baseline source blobs, each generated result byte-equals corresponding original baseline destination. /tmp/dayopt-audit-auth-email-baseline-generated.mts and .log exit0. Current source separately auth-email:check/fullcheck success. Different Node/Deno renderer versions acknowledged; source equivalence is not deployed HTML proof."
+      ],
       "questions": []
     },
     {
@@ -6328,11 +6348,13 @@
       "blob": "87de2d4f60504a802f709d50ab2a1e714292d0d1",
       "mode": "100644",
       "bytes": 1468,
-      "method": "full-text",
-      "status": "unverified",
-      "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
+      "method": "generated-source-equivalence",
+      "status": "mechanically-checked",
+      "reason": "Explicit @generated Product preview, canonical Edge source and generator fully read; mechanical byte equivalence appropriate instead of duplicate full reading.",
       "read_ranges": [],
-      "evidence": [],
+      "evidence": [
+        "Immutable baseline generator bytes match current generator; actual generateProductAuthEmailTemplate applied to all7 original baseline source blobs, each generated result byte-equals corresponding original baseline destination. /tmp/dayopt-audit-auth-email-baseline-generated.mts and .log exit0. Current source separately auth-email:check/fullcheck success. Different Node/Deno renderer versions acknowledged; source equivalence is not deployed HTML proof."
+      ],
       "questions": []
     },
     {
@@ -6342,10 +6364,12 @@
       "mode": "100644",
       "bytes": 7608,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 218]],
+      "evidence": [
+        "Full source/test/template/generator text read in bounded untruncated ranges during auth-mail contract audit; baseline bytes equal immutable readSHA6685a356. Dynamic DB locale versus signed-event retry reproduced with actual handler/canonical JSX and synthetic boundary adapters; expiry display traced to absent payload duration/common otp_expiry; #2991/#2992. Node rendering is not deployed Deno or actual provider evidence."
+      ],
       "questions": []
     },
     {
@@ -6355,10 +6379,12 @@
       "mode": "100644",
       "bytes": 1408,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 43]],
+      "evidence": [
+        "Whole source read untruncated during mail definition -> locale dictionaries -> render -> Story preview trace, baseline bytes equal6685a356. Email-specific translator is intentional Node runtime boundary, not next-intl UI. Story previews presentational; not successful-send evidence. TrialStart retains historical7-day/Stripe-trigger comments, current notification callsite eligibility not fully confirmed."
+      ],
       "questions": []
     },
     {
@@ -6368,10 +6394,12 @@
       "mode": "100644",
       "bytes": 4988,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 164]],
+      "evidence": [
+        "Whole source read untruncated during mail definition -> locale dictionaries -> render -> Story preview trace, baseline bytes equal6685a356. Email-specific translator is intentional Node runtime boundary, not next-intl UI. Story previews presentational; not successful-send evidence. TrialStart retains historical7-day/Stripe-trigger comments, current notification callsite eligibility not fully confirmed."
+      ],
       "questions": []
     },
     {
@@ -29498,7 +29526,9 @@
       "status": "unverified",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
       "read_ranges": [],
-      "evidence": [],
+      "evidence": [
+        "F055 partial current read1-140/550-600 and whole narrow3-field JSON/prose diff; NOT full1322-line original review. Baseline retainedunverified; see delta. Continuing full read next."
+      ],
       "questions": []
     },
     {
@@ -29801,11 +29831,15 @@
       "mode": "100644",
       "bytes": 17018,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
-      "questions": []
+      "read_ranges": [[1, 205]],
+      "evidence": [
+        "All current lines read in bounded ranges1-105/106-140/141-205; exact baseline comparison differs only one workflow-label line, original line read in full diff. Retry contract and secret/PII boundaries reconciled with #2803 historical comments. DMARC missing-policy paragraph conflicts with subsequent #2803 completed DNS evidence; current DNS not observed, follow-up candidate retained."
+      ],
+      "questions": [
+        "Current DMARC paragraph is historical without subsequent resolution; reconcile #2803 recorded completion and fresh public DNS before updating current-state guidance. No DNS writes."
+      ]
     },
     {
       "path": "docs/operations/disaster-recovery-drill.md",
@@ -33024,10 +33058,12 @@
       "mode": "100644",
       "bytes": 6798,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 166]],
+      "evidence": [
+        "Full source/test/template/generator text read in bounded untruncated ranges during auth-mail contract audit; baseline bytes equal immutable readSHA6685a356. Dynamic DB locale versus signed-event retry reproduced with actual handler/canonical JSX and synthetic boundary adapters; expiry display traced to absent payload duration/common otp_expiry; #2991/#2992. Node rendering is not deployed Deno or actual provider evidence."
+      ],
       "questions": []
     },
     {
@@ -33037,10 +33073,12 @@
       "mode": "100644",
       "bytes": 12156,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 330]],
+      "evidence": [
+        "Full source/test/template/generator text read in bounded untruncated ranges during auth-mail contract audit; baseline bytes equal immutable readSHA6685a356. Dynamic DB locale versus signed-event retry reproduced with actual handler/canonical JSX and synthetic boundary adapters; expiry display traced to absent payload duration/common otp_expiry; #2991/#2992. Node rendering is not deployed Deno or actual provider evidence."
+      ],
       "questions": []
     },
     {
@@ -33050,10 +33088,12 @@
       "mode": "100644",
       "bytes": 5908,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 161]],
+      "evidence": [
+        "Full source/test/template/generator text read in bounded untruncated ranges during auth-mail contract audit; baseline bytes equal immutable readSHA6685a356. Dynamic DB locale versus signed-event retry reproduced with actual handler/canonical JSX and synthetic boundary adapters; expiry display traced to absent payload duration/common otp_expiry; #2991/#2992. Node rendering is not deployed Deno or actual provider evidence."
+      ],
       "questions": []
     },
     {
@@ -33063,10 +33103,12 @@
       "mode": "100644",
       "bytes": 3791,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 105]],
+      "evidence": [
+        "Full source/test/template/generator text read in bounded untruncated ranges during auth-mail contract audit; baseline bytes equal immutable readSHA6685a356. Dynamic DB locale versus signed-event retry reproduced with actual handler/canonical JSX and synthetic boundary adapters; expiry display traced to absent payload duration/common otp_expiry; #2991/#2992. Node rendering is not deployed Deno or actual provider evidence."
+      ],
       "questions": []
     },
     {
@@ -33076,10 +33118,12 @@
       "mode": "100644",
       "bytes": 3448,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 113]],
+      "evidence": [
+        "Full source/test/template/generator text read in bounded untruncated ranges during auth-mail contract audit; baseline bytes equal immutable readSHA6685a356. Dynamic DB locale versus signed-event retry reproduced with actual handler/canonical JSX and synthetic boundary adapters; expiry display traced to absent payload duration/common otp_expiry; #2991/#2992. Node rendering is not deployed Deno or actual provider evidence."
+      ],
       "questions": []
     },
     {
@@ -33154,10 +33198,12 @@
       "mode": "100644",
       "bytes": 5056,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 137]],
+      "evidence": [
+        "Full source/test/template/generator text read in bounded untruncated ranges during auth-mail contract audit; baseline bytes equal immutable readSHA6685a356. Dynamic DB locale versus signed-event retry reproduced with actual handler/canonical JSX and synthetic boundary adapters; expiry display traced to absent payload duration/common otp_expiry; #2991/#2992. Node rendering is not deployed Deno or actual provider evidence."
+      ],
       "questions": []
     },
     {
@@ -36192,10 +36238,12 @@
       "mode": "100644",
       "bytes": 5891,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 191]],
+      "evidence": [
+        "Full source/test/template/generator text read in bounded untruncated ranges during auth-mail contract audit; baseline bytes equal immutable readSHA6685a356. Dynamic DB locale versus signed-event retry reproduced with actual handler/canonical JSX and synthetic boundary adapters; expiry display traced to absent payload duration/common otp_expiry; #2991/#2992. Node rendering is not deployed Deno or actual provider evidence."
+      ],
       "questions": []
     },
     {
@@ -36313,10 +36361,12 @@
       "mode": "100644",
       "bytes": 4544,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 125]],
+      "evidence": [
+        "Full source/test/template/generator text read in bounded untruncated ranges during auth-mail contract audit; baseline bytes equal immutable readSHA6685a356. Dynamic DB locale versus signed-event retry reproduced with actual handler/canonical JSX and synthetic boundary adapters; expiry display traced to absent payload duration/common otp_expiry; #2991/#2992. Node rendering is not deployed Deno or actual provider evidence."
+      ],
       "questions": []
     },
     {
@@ -36341,10 +36391,12 @@
       "mode": "100644",
       "bytes": 484,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 16]],
+      "evidence": [
+        "Full source/test/template/generator text read in bounded untruncated ranges during auth-mail contract audit; baseline bytes equal immutable readSHA6685a356. Dynamic DB locale versus signed-event retry reproduced with actual handler/canonical JSX and synthetic boundary adapters; expiry display traced to absent payload duration/common otp_expiry; #2991/#2992. Node rendering is not deployed Deno or actual provider evidence."
+      ],
       "questions": []
     },
     {
@@ -36354,10 +36406,12 @@
       "mode": "100644",
       "bytes": 2862,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 81]],
+      "evidence": [
+        "Full source/test/template/generator text read in bounded untruncated ranges during auth-mail contract audit; baseline bytes equal immutable readSHA6685a356. Dynamic DB locale versus signed-event retry reproduced with actual handler/canonical JSX and synthetic boundary adapters; expiry display traced to absent payload duration/common otp_expiry; #2991/#2992. Node rendering is not deployed Deno or actual provider evidence."
+      ],
       "questions": []
     },
     {
@@ -36367,10 +36421,12 @@
       "mode": "100644",
       "bytes": 4351,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 108]],
+      "evidence": [
+        "Full source/test/template/generator text read in bounded untruncated ranges during auth-mail contract audit; baseline bytes equal immutable readSHA6685a356. Dynamic DB locale versus signed-event retry reproduced with actual handler/canonical JSX and synthetic boundary adapters; expiry display traced to absent payload duration/common otp_expiry; #2991/#2992. Node rendering is not deployed Deno or actual provider evidence."
+      ],
       "questions": []
     },
     {
@@ -36380,10 +36436,12 @@
       "mode": "100644",
       "bytes": 2950,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 84]],
+      "evidence": [
+        "Full source/test/template/generator text read in bounded untruncated ranges during auth-mail contract audit; baseline bytes equal immutable readSHA6685a356. Dynamic DB locale versus signed-event retry reproduced with actual handler/canonical JSX and synthetic boundary adapters; expiry display traced to absent payload duration/common otp_expiry; #2991/#2992. Node rendering is not deployed Deno or actual provider evidence."
+      ],
       "questions": []
     },
     {
@@ -36393,10 +36451,12 @@
       "mode": "100644",
       "bytes": 2786,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 82]],
+      "evidence": [
+        "Full source/test/template/generator text read in bounded untruncated ranges during auth-mail contract audit; baseline bytes equal immutable readSHA6685a356. Dynamic DB locale versus signed-event retry reproduced with actual handler/canonical JSX and synthetic boundary adapters; expiry display traced to absent payload duration/common otp_expiry; #2991/#2992. Node rendering is not deployed Deno or actual provider evidence."
+      ],
       "questions": []
     },
     {
@@ -36406,10 +36466,12 @@
       "mode": "100644",
       "bytes": 3736,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 96]],
+      "evidence": [
+        "Full source/test/template/generator text read in bounded untruncated ranges during auth-mail contract audit; baseline bytes equal immutable readSHA6685a356. Dynamic DB locale versus signed-event retry reproduced with actual handler/canonical JSX and synthetic boundary adapters; expiry display traced to absent payload duration/common otp_expiry; #2991/#2992. Node rendering is not deployed Deno or actual provider evidence."
+      ],
       "questions": []
     },
     {
@@ -36494,10 +36556,12 @@
       "mode": "100644",
       "bytes": 4256,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 136]],
+      "evidence": [
+        "Full source/test/template/generator text read in bounded untruncated ranges during auth-mail contract audit; baseline bytes equal immutable readSHA6685a356. Dynamic DB locale versus signed-event retry reproduced with actual handler/canonical JSX and synthetic boundary adapters; expiry display traced to absent payload duration/common otp_expiry; #2991/#2992. Node rendering is not deployed Deno or actual provider evidence."
+      ],
       "questions": []
     },
     {
@@ -44622,6 +44686,104 @@
       ],
       "questions": [
         "Own resolved integration/frozen install/full check7759 and light/dark32 passed; isolated SQL/catalog/deployed state remain unverified."
+      ]
+    },
+    {
+      "path": "supabase/functions/send-auth-email/MagicLinkEmail.tsx",
+      "sha": "f18c17b2d01b63ad9a7dbb780f95a7db86d1ab83",
+      "change": "M",
+      "blob": "a921ef191e3eff01c5261bb9159c1e9fb03a240c",
+      "method": "full-text",
+      "status": "delta-reviewed",
+      "read_ranges": [[1, 85]],
+      "evidence": [
+        "F055/#2991 final whole diff reviewed. Two canonical copy updates only; regression uses actual rendered output in both locales and both link types. red4/pass33 -> green37; unchanged URLs maintained. Full integrated validation running at fixed productSHA; no deployment."
+      ],
+      "questions": []
+    },
+    {
+      "path": "supabase/functions/send-auth-email/PasswordResetEmail.tsx",
+      "sha": "f18c17b2d01b63ad9a7dbb780f95a7db86d1ab83",
+      "change": "M",
+      "blob": "0182cff2df38da4f016be93a7ab515d3b153d2df",
+      "method": "full-text",
+      "status": "delta-reviewed",
+      "read_ranges": [[1, 97]],
+      "evidence": [
+        "F055/#2991 final whole diff reviewed. Two canonical copy updates only; regression uses actual rendered output in both locales and both link types. red4/pass33 -> green37; unchanged URLs maintained. Full integrated validation running at fixed productSHA; no deployment."
+      ],
+      "questions": []
+    },
+    {
+      "path": "apps/product/src/emails/email-templates.test.tsx",
+      "sha": "f18c17b2d01b63ad9a7dbb780f95a7db86d1ab83",
+      "change": "M",
+      "blob": "60c7322dd6ad150ac7710f33cc39ac9c652a151f",
+      "method": "full-text",
+      "status": "delta-reviewed",
+      "read_ranges": [[1, 250]],
+      "evidence": [
+        "F055/#2991 final whole diff reviewed. Two canonical copy updates only; regression uses actual rendered output in both locales and both link types. red4/pass33 -> green37; unchanged URLs maintained. Full integrated validation running at fixed productSHA; no deployment."
+      ],
+      "questions": []
+    },
+    {
+      "path": "apps/product/src/emails/MagicLinkEmail.tsx",
+      "sha": "f18c17b2d01b63ad9a7dbb780f95a7db86d1ab83",
+      "change": "M",
+      "blob": "a9be3f525b9b13673290bf474c4f10ee0f24f09c",
+      "method": "generated-source-diff",
+      "status": "delta-reviewed",
+      "read_ranges": [],
+      "evidence": [
+        "F055 existing auth-email:sync generated preview from canonical template; complete narrow generated diff inspected; auth-email:check exit0 before normal commit, exact committed generator consistency also checked by integratedcheck. Not deployed mail runtime."
+      ],
+      "questions": []
+    },
+    {
+      "path": "apps/product/src/emails/PasswordResetEmail.tsx",
+      "sha": "f18c17b2d01b63ad9a7dbb780f95a7db86d1ab83",
+      "change": "M",
+      "blob": "0de13ec49403b2cbac58dbdeaea258328db59e7d",
+      "method": "generated-source-diff",
+      "status": "delta-reviewed",
+      "read_ranges": [],
+      "evidence": [
+        "F055 existing auth-email:sync generated preview from canonical template; complete narrow generated diff inspected; auth-email:check exit0 before normal commit, exact committed generator consistency also checked by integratedcheck. Not deployed mail runtime."
+      ],
+      "questions": []
+    },
+    {
+      "path": "docs/learn/journeys/password-reset.md",
+      "sha": "f18c17b2d01b63ad9a7dbb780f95a7db86d1ab83",
+      "change": "M",
+      "blob": "643a27e264f0bbbf822f4bb29668dc3014918dd9",
+      "method": "canonical-reference-diff-and-generation",
+      "status": "delta-reviewed",
+      "read_ranges": [
+        [1, 140],
+        [550, 600]
+      ],
+      "evidence": [
+        "F055 follow-up: docs:check initially detects stale fixed24h locator. Only3 embedded journey JSON fields updated, whole resulting diff read; existing learn:generate updates prose/reciprocal lookup. docs:check final exit0. Entire1322-line journey NOT fully read, baseline status remainsunverified; original gen region and edited JSON region bounded reading only. Expected Production audit mailer_otp_exp3600/fail-open locator found in source, no live config observation."
+      ],
+      "questions": [
+        "Full original journey and Production Auth audit659line reading still required; no baseline full-review promotion."
+      ]
+    },
+    {
+      "path": "docs/learn/12-change.md",
+      "sha": "f18c17b2d01b63ad9a7dbb780f95a7db86d1ab83",
+      "change": "M",
+      "blob": "9c0a4e4a7f2fde42ac96180c529b8a3ade98da26",
+      "method": "canonical-reference-diff-and-generation",
+      "status": "delta-reviewed",
+      "read_ranges": [],
+      "evidence": [
+        "F055 follow-up: docs:check initially detects stale fixed24h locator. Only3 embedded journey JSON fields updated, whole resulting diff read; existing learn:generate updates prose/reciprocal lookup. docs:check final exit0. Entire1322-line journey NOT fully read, baseline status remainsunverified; original gen region and edited JSON region bounded reading only. Expected Production audit mailer_otp_exp3600/fail-open locator found in source, no live config observation."
+      ],
+      "questions": [
+        "Full original journey and Production Auth audit659line reading still required; no baseline full-review promotion."
       ]
     }
   ]

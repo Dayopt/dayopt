@@ -289,7 +289,7 @@ last_verified: 2026-09-21
 - [ログイン（MFA 含む）](journeys/login.md) の 2. パスワードを確かめる — 想定内の認証エラー（401 / 422 / 429 など）は Sentry に送らない。送る対象を変える時は isExpectedAuthError を見る。
 - [サインアップ → ウェルカムメール](journeys/signup.md) の 2. Auth に登録 — 認証は Supabase に最も深く依存している部分。乗り換えの重さは出口コスト台帳。
 - [パスワードを再設定する](journeys/password-reset.md) の 1. リセットを依頼 — 画面の出し分けを足すと列挙防止が崩れる。保証境界は docs/product/specs/auth.md のパスワードリセットの節。失敗の観測は画面ではなく store 側の Sentry が持つ。
-- [パスワードを再設定する](journeys/password-reset.md) の 3. リセットメール送信 — この Function は Vercel ではなく Supabase にデプロイする（supabase functions deploy --use-api）。アプリの deploy では変わらない。メール本文の「24 時間」とリンクの実際の有効時間はここでは揃えていない（下の注意を参照）。
+- [パスワードを再設定する](journeys/password-reset.md) の 3. リセットメール送信 — この Function は Vercel ではなく Supabase にデプロイする（supabase functions deploy --use-api）。アプリの deploy では変わらない。メールには期限切れ後の再リクエストを案内し、Hook payload に無い有効期限の数値は記載しない。期限設定そのものは Supabase Auth が持つ。
 - [パスワードを再設定する](journeys/password-reset.md) の 6. 新しいパスワードを送る — エラー code の読み分けは ResetPasswordForm の RECOVERY_UPDATE_BLOCKED_CODES と isMfaBlocked。message の文字列で判定しない方針。
 - [パスワードを再設定する](journeys/password-reset.md) の 8. 他の端末を切る — 今の端末の session は残る。そのため 3 秒後の /auth/login への移動は、proxy が「サインイン済みで auth 系 path へ来た」と見て /calendar へ送り直すはず（コードから読んだ挙動。ブラウザでは未確認）。文言は「まもなくサインインページに移動します」。
 
@@ -872,16 +872,16 @@ last_verified: 2026-09-21
 
 #### `supabase/functions/send-auth-email/PasswordResetEmail.tsx`
 
-- [パスワードを再設定する](journeys/password-reset.md) の 3. リセットメール送信 — この Function は Vercel ではなく Supabase にデプロイする（supabase functions deploy --use-api）。アプリの deploy では変わらない。メール本文の「24 時間」とリンクの実際の有効時間はここでは揃えていない（下の注意を参照）。
+- [パスワードを再設定する](journeys/password-reset.md) の 3. リセットメール送信 — この Function は Vercel ではなく Supabase にデプロイする（supabase functions deploy --use-api）。アプリの deploy では変わらない。メールには期限切れ後の再リクエストを案内し、Hook payload に無い有効期限の数値は記載しない。期限設定そのものは Supabase Auth が持つ。
 
 #### `supabase/functions/send-auth-email/confirm-url.ts`
 
-- [パスワードを再設定する](journeys/password-reset.md) の 3. リセットメール送信 — この Function は Vercel ではなく Supabase にデプロイする（supabase functions deploy --use-api）。アプリの deploy では変わらない。メール本文の「24 時間」とリンクの実際の有効時間はここでは揃えていない（下の注意を参照）。
+- [パスワードを再設定する](journeys/password-reset.md) の 3. リセットメール送信 — この Function は Vercel ではなく Supabase にデプロイする（supabase functions deploy --use-api）。アプリの deploy では変わらない。メールには期限切れ後の再リクエストを案内し、Hook payload に無い有効期限の数値は記載しない。期限設定そのものは Supabase Auth が持つ。
 
 #### `supabase/functions/send-auth-email/index.ts`
 
 - [サインアップ → ウェルカムメール](journeys/signup.md) の 3. 確認メール送信 — この Function は Vercel ではなく Supabase にデプロイされる（supabase functions deploy --use-api）。アプリの deploy とは別に動く。
-- [パスワードを再設定する](journeys/password-reset.md) の 3. リセットメール送信 — この Function は Vercel ではなく Supabase にデプロイする（supabase functions deploy --use-api）。アプリの deploy では変わらない。メール本文の「24 時間」とリンクの実際の有効時間はここでは揃えていない（下の注意を参照）。
+- [パスワードを再設定する](journeys/password-reset.md) の 3. リセットメール送信 — この Function は Vercel ではなく Supabase にデプロイする（supabase functions deploy --use-api）。アプリの deploy では変わらない。メールには期限切れ後の再リクエストを案内し、Hook payload に無い有効期限の数値は記載しない。期限設定そのものは Supabase Auth が持つ。
 - [パスワードを再設定する](journeys/password-reset.md) の 9. 変更通知メール — production で通知が有効かどうか（mailer_notifications_password_changed_enabled）は Auth config audit が監視する。リセットでも設定画面からの変更でも同じ通知が出る。
 
 #### `supabase/functions/send-auth-email/password-changed-notification.ts`
@@ -890,7 +890,7 @@ last_verified: 2026-09-21
 
 #### `supabase/functions/send-auth-email/subjects.ts`
 
-- [パスワードを再設定する](journeys/password-reset.md) の 3. リセットメール送信 — この Function は Vercel ではなく Supabase にデプロイする（supabase functions deploy --use-api）。アプリの deploy では変わらない。メール本文の「24 時間」とリンクの実際の有効時間はここでは揃えていない（下の注意を参照）。
+- [パスワードを再設定する](journeys/password-reset.md) の 3. リセットメール送信 — この Function は Vercel ではなく Supabase にデプロイする（supabase functions deploy --use-api）。アプリの deploy では変わらない。メールには期限切れ後の再リクエストを案内し、Hook payload に無い有効期限の数値は記載しない。期限設定そのものは Supabase Auth が持つ。
 
 #### `supabase/migrations/20260708232500_add_time_model_tables.sql`
 

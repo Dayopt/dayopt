@@ -107,12 +107,12 @@ Edge Function send-auth-email が hook の署名を検証し、PasswordResetEmai
 
 - **なぜ必要か**: token_hash を検証できるのは app の /auth/confirm だけなので、リンクは必ずそこを通す。origin を二重に確かめるのは、Supabase 側の Redirect URLs 設定がずれただけで token が第三者の origin へ載るのを防ぐため。
 - **入力 → 出力**: hook payload（user、email_data） → 件名「Dayopt パスワードのリセット」のメール
-- **ここを変えると**: この Function は Vercel ではなく Supabase にデプロイする（supabase functions deploy --use-api）。アプリの deploy では変わらない。メール本文の「24 時間」とリンクの実際の有効時間はここでは揃えていない（下の注意を参照）。
+- **ここを変えると**: この Function は Vercel ではなく Supabase にデプロイする（supabase functions deploy --use-api）。アプリの deploy では変わらない。メールには期限切れ後の再リクエストを案内し、Hook payload に無い有効期限の数値は記載しない。期限設定そのものは Supabase Auth が持つ。
 - **コード**:
   - [`supabase/functions/send-auth-email/index.ts`](../../../supabase/functions/send-auth-email/index.ts) で `element: React.createElement(PasswordResetEmail, {` を探す
   - [`supabase/functions/send-auth-email/confirm-url.ts`](../../../supabase/functions/send-auth-email/confirm-url.ts) で `export function resolveConfirmOrigin` を探す
   - [`supabase/functions/send-auth-email/subjects.ts`](../../../supabase/functions/send-auth-email/subjects.ts) で `recovery: 'Dayopt パスワードのリセット',` を探す
-  - [`supabase/functions/send-auth-email/PasswordResetEmail.tsx`](../../../supabase/functions/send-auth-email/PasswordResetEmail.tsx) で `expiryNote: 'このリンクは24時間で有効期限が切れます。',` を探す（production のリンクは mailer_otp_exp = 3600 秒。文面と食い違う）
+  - [`supabase/functions/send-auth-email/PasswordResetEmail.tsx`](../../../supabase/functions/send-auth-email/PasswordResetEmail.tsx) で `<Text style={styles.smallText}>{t.expiryNote}</Text>` を探す（有効期限と、期限切れの場合に再リクエストする案内。期限の数値は環境の Auth 設定に従う）
 - **この段を守るテスト**:
   - [`scripts/__tests__/send-auth-email-confirm-url.test.ts`](../../../scripts/__tests__/send-auth-email-confirm-url.test.ts) で `攻撃者 origin の redirect_to でも token_hash は app origin にしか載らない` を探す
   - [`scripts/__tests__/send-auth-email-idempotency.test.ts`](../../../scripts/__tests__/send-auth-email-idempotency.test.ts) で `同じ webhook-id の再試行では同じ key になる（重複配送しない）` を探す
@@ -557,7 +557,7 @@ updateUser が成功したら signOut({ scope: 'others' }) で、この端末以
         "in": "hook payload（user、email_data）",
         "out": "件名「Dayopt パスワードのリセット」のメール"
       },
-      "change": "この Function は Vercel ではなく Supabase にデプロイする（supabase functions deploy --use-api）。アプリの deploy では変わらない。メール本文の「24 時間」とリンクの実際の有効時間はここでは揃えていない（下の注意を参照）。",
+      "change": "この Function は Vercel ではなく Supabase にデプロイする（supabase functions deploy --use-api）。アプリの deploy では変わらない。メールには期限切れ後の再リクエストを案内し、Hook payload に無い有効期限の数値は記載しない。期限設定そのものは Supabase Auth が持つ。",
       "refs": [
         {
           "path": "supabase/functions/send-auth-email/index.ts",
@@ -573,8 +573,8 @@ updateUser が成功したら signOut({ scope: 'others' }) で、この端末以
         },
         {
           "path": "supabase/functions/send-auth-email/PasswordResetEmail.tsx",
-          "find": "expiryNote: 'このリンクは24時間で有効期限が切れます。',",
-          "why": "production のリンクは mailer_otp_exp = 3600 秒。文面と食い違う"
+          "find": "<Text style={styles.smallText}>{t.expiryNote}</Text>",
+          "why": "有効期限と、期限切れの場合に再リクエストする案内。期限の数値は環境の Auth 設定に従う"
         }
       ],
       "tests": [
