@@ -417,3 +417,14 @@ H025 next auth hypothesis (unadopted): resolveSessionAuthContext verifies getUse
 H041 final verification: product15b09959df80bfcdea09ab54ce5df0e5955ec920, full Node24 pnpm check exit0 (/tmp/dayopt-audit-check-rollback-published.log): types10/lint9/static/deadcode; billing37/i18n2/observability64/product4579/web366/scripts2645 =7693 passed. Actual lifecycle13 plus helper8 and cancellation unit4 are included, not extra summed onto total. Final docs:check exit0 (/tmp/dayopt-audit-rollback-docs-final.log). No product source changes after verification SHA; audit-only evidence commit follows. No cloud/browser/DB/deployment proof; mission whole reading remains unfinished.
 
 H041 integrated main verification: sourceb0deb289d830461ff92c63103d60e04f1925a958 includes main0aa61be10 #2967 dependency/OSS-credit delta. Frozen-lock install passed and ip-address10.7.2 graph verified. Integrated full Node24 pnpm check exit0, total7693 (product4579), /tmp/dayopt-audit-check-rollback-main.log. Main delta did not change first-party business code. This verification supersedes pre-update15b09959d for publication. Auth-js2.116.0 selected vendor source supports storage invalidation but also preserves proactive valid sessions/cached failure cooldown; H025 mixed-result hypothesis remains unadopted until actual SDK synthetic reproduction and#2047 contract review.
+
+## F044 — セッション取得失敗後のMFA判定が失敗を失う
+
+- 契約: #2047のserver検証済みMFA判定とfail-closed。ログ用session取得が失敗しても独立したMFA token取得が回復すれば継続する。失敗後のtokenなしは正常なlegacy sessionとは区別する。
+- 根拠: resolveSessionAuthContextの二回のgetSessionで最初のerror/throwをログだけに捨て、SDKがstorageを消した後のnull/no-errorをaal1/aal1へ正規化していた。auth-js2.116.0/SSRの合成HTTPによる実SDK＋実production helperでこの結果を確認。MFA登録済みserver userとstorage情報を区別した。
+- 反証/限界:0sでは有効session保持、31sではcached errorを繰返して既にfail-closed。61s synthetic caseはHTTP route60sを越えるため、本番HTTP bypassの観測・到達証明とはしない。RSC/他callerのruntime制約は未確認。従来tokenなしの一般policyやaal2->aal1降格の変更は採らない。
+- 再現: sequential error/throw2件＋realSSR61s1件がred3 failed/18 passed、/tmp/dayopt-audit-auth-sdk-red.log。SDK本体のgetSession/MFA/user判定はmockせず、clockとHTTP応答のみ合成。
+- 修正: sessionLookupFailedをMFA解決へ渡し、token未回復時だけlookupFailedを保持。独立token回復、従来の取得失敗なしnull session、null-AALとMFA無効化後降格は維持。
+- 状態: product8e172d8472163502b706bd8d2931cdd1da603adf、green21/関連145成功、docs:check成功。全体check進行中で未公開。旧H025仮説を丸ごと採用せずこの失敗消失だけを閉じる。Mission#2963、既存#2047は意図照合に使用し再開/重複起票なし。
+
+F044 whole verification: product8e172d847 full Node24 pnpm check exit0,7700 passed (product4586); docs:check exit0, source/test bytes unchanged after validation. Publication follows normalhooks; production/HTTP-runtime reachability remains unverified.

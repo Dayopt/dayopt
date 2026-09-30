@@ -20099,10 +20099,12 @@
       "mode": "100644",
       "bytes": 2835,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 83]],
+      "evidence": [
+        "Full 83-line first-party file read without truncation at8e172d847, baseline byte equality verified. HTTP context split1-210/211-321; other files read whole. Session cookie continuity, auth mode, failure classification, timeout factories and trace boundaries cross-checked. No runtime/cloud proof inferred from mock/static tests."
+      ],
       "questions": []
     },
     {
@@ -20112,10 +20114,12 @@
       "mode": "100644",
       "bytes": 5877,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 153]],
+      "evidence": [
+        "Full 153-line first-party file read without truncation at8e172d847, baseline byte equality verified. HTTP context split1-210/211-321; other files read whole. Session cookie continuity, auth mode, failure classification, timeout factories and trace boundaries cross-checked. No runtime/cloud proof inferred from mock/static tests."
+      ],
       "questions": []
     },
     {
@@ -20125,11 +20129,15 @@
       "mode": "100644",
       "bytes": 6066,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
-      "questions": []
+      "read_ranges": [[1, 144]],
+      "evidence": [
+        "Full 144-line first-party file read without truncation at8e172d847, baseline byte equality verified. HTTP context split1-210/211-321; other files read whole. Session cookie continuity, auth mode, failure classification, timeout factories and trace boundaries cross-checked. No runtime/cloud proof inferred from mock/static tests."
+      ],
+      "questions": [
+        "Continue actual auth event/cache lifecycle and missing-session transition across callers. Server helper has15s fetch floor; HTTP/RSC context factories lack the same floor. No production observation; do not generalize61s synthetic SDK result to60s HTTP route."
+      ]
     },
     {
       "path": "apps/product/src/lib/supabase/oauth.test.ts",
@@ -20138,10 +20146,12 @@
       "mode": "100644",
       "bytes": 3202,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 103]],
+      "evidence": [
+        "Full 103-line first-party file read without truncation at8e172d847, baseline byte equality verified. HTTP context split1-210/211-321; other files read whole. Session cookie continuity, auth mode, failure classification, timeout factories and trace boundaries cross-checked. No runtime/cloud proof inferred from mock/static tests."
+      ],
       "questions": []
     },
     {
@@ -20151,10 +20161,12 @@
       "mode": "100644",
       "bytes": 4716,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 168]],
+      "evidence": [
+        "Full 168-line first-party file read without truncation at8e172d847, baseline byte equality verified. HTTP context split1-210/211-321; other files read whole. Session cookie continuity, auth mode, failure classification, timeout factories and trace boundaries cross-checked. No runtime/cloud proof inferred from mock/static tests."
+      ],
       "questions": []
     },
     {
@@ -20164,11 +20176,15 @@
       "mode": "100644",
       "bytes": 2924,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
-      "questions": []
+      "read_ranges": [[1, 105]],
+      "evidence": [
+        "Full 105-line first-party file read without truncation at8e172d847, baseline byte equality verified. HTTP context split1-210/211-321; other files read whole. Session cookie continuity, auth mode, failure classification, timeout factories and trace boundaries cross-checked. No runtime/cloud proof inferred from mock/static tests."
+      ],
+      "questions": [
+        "Continue actual auth event/cache lifecycle and missing-session transition across callers. Server helper has15s fetch floor; HTTP/RSC context factories lack the same floor. No production observation; do not generalize61s synthetic SDK result to60s HTTP route."
+      ]
     },
     {
       "path": "apps/product/src/lib/supabase/service-role-timeout-contract.test.ts",
@@ -20177,10 +20193,12 @@
       "mode": "100644",
       "bytes": 4180,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 79]],
+      "evidence": [
+        "Full 79-line first-party file read without truncation at8e172d847, baseline byte equality verified. HTTP context split1-210/211-321; other files read whole. Session cookie continuity, auth mode, failure classification, timeout factories and trace boundaries cross-checked. No runtime/cloud proof inferred from mock/static tests."
+      ],
       "questions": []
     },
     {
@@ -20190,10 +20208,12 @@
       "mode": "100644",
       "bytes": 2198,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 61]],
+      "evidence": [
+        "Full 61-line first-party file read without truncation at8e172d847, baseline byte equality verified. HTTP context split1-210/211-321; other files read whole. Session cookie continuity, auth mode, failure classification, timeout factories and trace boundaries cross-checked. No runtime/cloud proof inferred from mock/static tests."
+      ],
       "questions": []
     },
     {
@@ -20203,10 +20223,12 @@
       "mode": "100644",
       "bytes": 2627,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 60]],
+      "evidence": [
+        "Full 60-line first-party file read without truncation at8e172d847, baseline byte equality verified. HTTP context split1-210/211-321; other files read whole. Session cookie continuity, auth mode, failure classification, timeout factories and trace boundaries cross-checked. No runtime/cloud proof inferred from mock/static tests."
+      ],
       "questions": []
     },
     {
@@ -20255,10 +20277,12 @@
       "mode": "100644",
       "bytes": 3549,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 90]],
+      "evidence": [
+        "Full 90-line first-party file read without truncation at8e172d847, baseline byte equality verified. HTTP context split1-210/211-321; other files read whole. Session cookie continuity, auth mode, failure classification, timeout factories and trace boundaries cross-checked. No runtime/cloud proof inferred from mock/static tests."
+      ],
       "questions": []
     },
     {
@@ -20268,10 +20292,12 @@
       "mode": "100644",
       "bytes": 1509,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 23]],
+      "evidence": [
+        "Full 23-line first-party file read without truncation at8e172d847, baseline byte equality verified. HTTP context split1-210/211-321; other files read whole. Session cookie continuity, auth mode, failure classification, timeout factories and trace boundaries cross-checked. No runtime/cloud proof inferred from mock/static tests."
+      ],
       "questions": []
     },
     {
@@ -21870,10 +21896,12 @@
       "mode": "100644",
       "bytes": 4591,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
+      "read_ranges": [[1, 145]],
+      "evidence": [
+        "Full 145-line first-party file read without truncation at8e172d847, baseline byte equality verified. HTTP context split1-210/211-321; other files read whole. Session cookie continuity, auth mode, failure classification, timeout factories and trace boundaries cross-checked. No runtime/cloud proof inferred from mock/static tests."
+      ],
       "questions": []
     },
     {
@@ -21883,11 +21911,15 @@
       "mode": "100644",
       "bytes": 11609,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
-      "questions": []
+      "read_ranges": [[1, 321]],
+      "evidence": [
+        "Full 321-line first-party file read without truncation at8e172d847, baseline byte equality verified. HTTP context split1-210/211-321; other files read whole. Session cookie continuity, auth mode, failure classification, timeout factories and trace boundaries cross-checked. No runtime/cloud proof inferred from mock/static tests."
+      ],
+      "questions": [
+        "Continue actual auth event/cache lifecycle and missing-session transition across callers. Server helper has15s fetch floor; HTTP/RSC context factories lack the same floor. No production observation; do not generalize61s synthetic SDK result to60s HTTP route."
+      ]
     },
     {
       "path": "apps/product/src/lib/trpc/entitled-procedure.test.ts",
@@ -22097,11 +22129,15 @@
       "mode": "100644",
       "bytes": 3633,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
-      "questions": []
+      "read_ranges": [[1, 127]],
+      "evidence": [
+        "Full 127-line first-party file read without truncation at8e172d847, baseline byte equality verified. HTTP context split1-210/211-321; other files read whole. Session cookie continuity, auth mode, failure classification, timeout factories and trace boundaries cross-checked. No runtime/cloud proof inferred from mock/static tests."
+      ],
+      "questions": [
+        "Continue actual auth event/cache lifecycle and missing-session transition across callers. Server helper has15s fetch floor; HTTP/RSC context factories lack the same floor. No production observation; do not generalize61s synthetic SDK result to60s HTTP route."
+      ]
     },
     {
       "path": "apps/product/src/lib/trpc/session-auth-context.test.ts",
@@ -22114,10 +22150,11 @@
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
       "read_ranges": [[1, 186]],
       "evidence": [
-        "Full current165-line source and186-line tests read without truncation; equal to baseline. Verified-user gate, independent session-ID/MFA lookups, null-session aal1 fallback and fail-closed repeated-error fixtures examined. HTTP/RSC selected setup lines checked, but their whole files remain unread."
+        "Full current165-line source and186-line tests read without truncation; equal to baseline. Verified-user gate, independent session-ID/MFA lookups, null-session aal1 fallback and fail-closed repeated-error fixtures examined. HTTP/RSC selected setup lines checked, but their whole files remain unread.",
+        "F044: #2047 body25/comment24 lines fully read; ctx L1 unavailable/stale, primary sources used. Real SSR/auth-js2.116.0 synthetic HTTP confirms proactive preservation at0s, repeated failure at31s, failure then missing/no-error at61s. Product helper red3/18->green21 (related145), known prior lookup failure retained only if independent MFA cannot recover a token. Legacy no-failure missing session and aal2->aal1 preserved. No live Auth/DB/HTTP timeout bypass proof."
       ],
       "questions": [
-        "H025: verify first getSession failure followed by second null/no-error after SDK storage invalidation. Current tests repeat the same error on both calls; compare #2047/current decision and installed SDK before adopting an MFA defect. No production observation."
+        "H025 remaining: auth event-to-effect cache clear, other document/provider lifetime, single-lookup callers and actual deployment timeout boundaries remain unverified. F044 closes only prior session failure -> missing-session MFA normalization."
       ]
     },
     {
@@ -22131,10 +22168,11 @@
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
       "read_ranges": [[1, 165]],
       "evidence": [
-        "Full current165-line source and186-line tests read without truncation; equal to baseline. Verified-user gate, independent session-ID/MFA lookups, null-session aal1 fallback and fail-closed repeated-error fixtures examined. HTTP/RSC selected setup lines checked, but their whole files remain unread."
+        "Full current165-line source and186-line tests read without truncation; equal to baseline. Verified-user gate, independent session-ID/MFA lookups, null-session aal1 fallback and fail-closed repeated-error fixtures examined. HTTP/RSC selected setup lines checked, but their whole files remain unread.",
+        "F044: #2047 body25/comment24 lines fully read; ctx L1 unavailable/stale, primary sources used. Real SSR/auth-js2.116.0 synthetic HTTP confirms proactive preservation at0s, repeated failure at31s, failure then missing/no-error at61s. Product helper red3/18->green21 (related145), known prior lookup failure retained only if independent MFA cannot recover a token. Legacy no-failure missing session and aal2->aal1 preserved. No live Auth/DB/HTTP timeout bypass proof."
       ],
       "questions": [
-        "H025: verify first getSession failure followed by second null/no-error after SDK storage invalidation. Current tests repeat the same error on both calls; compare #2047/current decision and installed SDK before adopting an MFA defect. No production observation."
+        "H025 remaining: auth event-to-effect cache clear, other document/provider lifetime, single-lookup callers and actual deployment timeout boundaries remain unverified. F044 closes only prior session failure -> missing-session MFA normalization."
       ]
     },
     {
@@ -42215,7 +42253,8 @@
       "status": "mechanically-checked",
       "read_ranges": [],
       "evidence": [
-        "Upstream #2967 two-file delta from650f62dc7 read exactly: ip-address10.4.0 to10.7.2, package integrity/snapshot/express-rate-limit/socks edges and OSS credit version only. Integratedb0deb289d; frozen-lock install exit0 (reused3/downloaded0), pnpm why confirms one10.7.2 through MCP SDK/rate limiter and development proxy tools. Not full baseline lockfile/credits validation. Integrated whole check running."
+        "Upstream #2967 two-file delta from650f62dc7 read exactly: ip-address10.4.0 to10.7.2, package integrity/snapshot/express-rate-limit/socks edges and OSS credit version only. Integratedb0deb289d; frozen-lock install exit0 (reused3/downloaded0), pnpm why confirms one10.7.2 through MCP SDK/rate limiter and development proxy tools. Not full baseline lockfile/credits validation. Integrated whole check running.",
+        "Integrated full Node24 pnpm check atb0deb289d exit0,7693; normal hook publication head7e8f9fea3 verified OPEN/Draft. H041 Issue record5902656962."
       ],
       "questions": []
     },
@@ -42228,7 +42267,34 @@
       "status": "mechanically-checked",
       "read_ranges": [],
       "evidence": [
-        "Upstream #2967 two-file delta from650f62dc7 read exactly: ip-address10.4.0 to10.7.2, package integrity/snapshot/express-rate-limit/socks edges and OSS credit version only. Integratedb0deb289d; frozen-lock install exit0 (reused3/downloaded0), pnpm why confirms one10.7.2 through MCP SDK/rate limiter and development proxy tools. Not full baseline lockfile/credits validation. Integrated whole check running."
+        "Upstream #2967 two-file delta from650f62dc7 read exactly: ip-address10.4.0 to10.7.2, package integrity/snapshot/express-rate-limit/socks edges and OSS credit version only. Integratedb0deb289d; frozen-lock install exit0 (reused3/downloaded0), pnpm why confirms one10.7.2 through MCP SDK/rate limiter and development proxy tools. Not full baseline lockfile/credits validation. Integrated whole check running.",
+        "Integrated full Node24 pnpm check atb0deb289d exit0,7693; normal hook publication head7e8f9fea3 verified OPEN/Draft. H041 Issue record5902656962."
+      ],
+      "questions": []
+    },
+    {
+      "path": "apps/product/src/lib/trpc/session-auth-context.ts",
+      "sha": "8e172d8472163502b706bd8d2931cdd1da603adf",
+      "change": "M",
+      "blob": "fa23e17432930bd3f12d013ad9090830b5d49127",
+      "method": "full-text",
+      "status": "full-text-reviewed",
+      "read_ranges": [[1, 172]],
+      "evidence": [
+        "Baseline previously fully read; exact complete F044 diff read, final generated/written source reviewed. Source7-line guard preserves known auth failure across SDK removal; tests add four sequential mock cases and three real SDK/synthetic HTTP latency countercases. Red3/18 and green21, related145. Whole check running, no deployment proof."
+      ],
+      "questions": []
+    },
+    {
+      "path": "apps/product/src/lib/trpc/session-auth-context.test.ts",
+      "sha": "8e172d8472163502b706bd8d2931cdd1da603adf",
+      "change": "M",
+      "blob": "1317fd147d5e8a0361a20571e154aa58ae5cdafb",
+      "method": "full-text",
+      "status": "full-text-reviewed",
+      "read_ranges": [[1, 327]],
+      "evidence": [
+        "Baseline previously fully read; exact complete F044 diff read, final generated/written source reviewed. Source7-line guard preserves known auth failure across SDK removal; tests add four sequential mock cases and three real SDK/synthetic HTTP latency countercases. Red3/18 and green21, related145. Whole check running, no deployment proof."
       ],
       "questions": []
     }
