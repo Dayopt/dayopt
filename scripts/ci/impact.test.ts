@@ -89,6 +89,13 @@ describe('workspace 依存グラフ', () => {
   });
 });
 
+describe('SQL検証のCI配線', () => {
+  it('SQLテスト単独の変更でも隔離DBのintegration検証を要求する', () => {
+    const impact = resolveImpact(['supabase/tests/integration-oauth-identity.sql']);
+    expect(impact.integration).toBe(true);
+  });
+});
+
 describe('workspace test scope', () => {
   it('Product の変更は Product 側の related 判定へ任せる', () => {
     expect(
