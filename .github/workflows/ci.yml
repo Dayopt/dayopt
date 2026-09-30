@@ -498,7 +498,9 @@ jobs:
       deployments: read
       statuses: read
     steps:
-      # Execute the supervisor from the dispatched trusted Integration revision.
+      # Execute the entire harness and its dependencies from trusted Integration.
+      # Candidate files are read only as provenance/migration data; never execute
+      # candidate install scripts, config, specs, or transitive imports here.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.sha }}
@@ -524,10 +526,9 @@ jobs:
           path: candidate
           persist-credentials: false
       - uses: ./.github/actions/setup
-      - name: Install candidate and Chromium before injecting platform credentials
+      - name: Install trusted Chromium before injecting platform credentials
         run: |
-          pnpm --dir candidate install --frozen-lockfile
-          pnpm --dir candidate/apps/product exec playwright install --with-deps chromium
+          pnpm --dir apps/product exec playwright install --with-deps chromium
       - name: Revalidate immediately before the credential step
         env:
           GITHUB_TOKEN: ${{ github.token }}

@@ -302,7 +302,6 @@ if (isDirectExecution(import.meta.url)) {
       verifyCloudFixtureContract(candidateRoot);
       await assertCloudFixtureKey({ request, serviceKey: process.env.SUPABASE_SECRET_KEY });
       const result = await runPreviewE2E({
-        candidateRoot,
         runDirectory: directory,
         request: { ...request, expectedMigrations: expectedMigrationVersions(candidateRoot) },
         runId: intent.runId,

@@ -1,6 +1,32 @@
 -- Run after the normal local Supabase start has applied seed.sql once.
 -- Re-applying a branch seed must keep the fixture stable and preserve edits.
 BEGIN;
+SET LOCAL TIME ZONE 'UTC';
+
+-- Simulate a persistent branch seeded long before today's re-application.
+-- This transaction is local CI-only and rolls back all fixture changes.
+DELETE FROM public.plans WHERE user_id = '00000000-0000-0000-0000-000000000001';
+DELETE FROM public.records WHERE user_id = '00000000-0000-0000-0000-000000000001';
+UPDATE auth.users SET created_at = '2026-01-14 00:00:00+00'
+WHERE id = '00000000-0000-0000-0000-000000000001';
+\ir ../seed.sql
+
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM public.plans WHERE user_id = '00000000-0000-0000-0000-000000000001')
+     OR NOT EXISTS (SELECT 1 FROM public.records WHERE user_id = '00000000-0000-0000-0000-000000000001') THEN
+    RAISE EXCEPTION 'seed fixture timeblocks are missing';
+  END IF;
+  IF EXISTS (
+    SELECT start_at FROM public.plans WHERE user_id = '00000000-0000-0000-0000-000000000001'
+      AND (start_at < '2026-01-01 00:00:00+00' OR start_at >= '2026-01-15 00:00:00+00')
+    UNION ALL
+    SELECT start_at FROM public.records WHERE user_id = '00000000-0000-0000-0000-000000000001'
+      AND (start_at < '2026-01-01 00:00:00+00' OR start_at >= '2026-01-15 00:00:00+00')
+  ) THEN
+    RAISE EXCEPTION 'seed re-run moved the initial fixture window with the wall clock';
+  END IF;
+END $$;
 
 CREATE TEMP TABLE seed_fixture_before ON COMMIT DROP AS
 SELECT
