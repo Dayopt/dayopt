@@ -612,7 +612,7 @@ async function runStatic() {
   }
 
   run('pnpm', ['secrets:check']);
-  run('pnpm', ['docs:check'], {
+  run('pnpm', ['docs:check', '--ci'], {
     env: {
       ...process.env,
       DOCS_GUARD_BASE_REF: `origin/${process.env.GITHUB_BASE_REF || 'main'}`,

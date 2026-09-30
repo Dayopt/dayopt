@@ -85,14 +85,9 @@ lp:
 
 数えるに足りない回数で比率を作らない。定数は `domain/report/report-view-model.ts` にある。
 
-| 定数                         | 値    | 効き方                                                                       |
-| ---------------------------- | ----- | ---------------------------------------------------------------------------- |
-| `EXECUTION_MIN_PLAN_MINUTES` | 15 分 | 2 章の予定比。過去予定がこれ未満なら `null`（0% でも空文字でもなくダッシュ） |
-| `MIRROR_MIN_PLAN_MINUTES`    | 30 分 | 見積もりの鏡の候補条件                                                       |
-| `MIRROR_MIN_PLAN_BOXES`      | 3 件  | 同上                                                                         |
-| `COMPASS_MIN_FULFILLMENT`    | 5 件  | 羅針盤の点。充実の回答がこれ未満なら点にせず待機リストへ                     |
+数値の定義は末尾の生成領域で確認する。`EXECUTION_MIN_PLAN_MINUTES` は予定比の沈黙、`MIRROR_MIN_PLAN_MINUTES` / `MIRROR_MIN_PLAN_BOXES` は鏡の候補条件、`COMPASS_MIN_FULFILLMENT` は点と待機リストの境界。
 
-- **見積もりの鏡**: 「過去予定 >= 30 分」∧「記録がある」∧「過去予定の件数 >= 3」を**すべて**満たす行だけが候補。`|coef − 1|` の降順（癖の強い順）で最大 3 件。`coef = rec / planPast`。全体遵守率のような合成値は作らない
+- **見積もりの鏡**: 「過去予定 >= `MIRROR_MIN_PLAN_MINUTES`」∧「記録がある」∧「過去予定の件数 >= `MIRROR_MIN_PLAN_BOXES`」を**すべて**満たす行だけが候補。`|coef − 1|` の降順（癖の強い順）で最大 `MIRROR_MAX_ROWS` 件。`coef = rec / planPast`。全体遵守率のような合成値は作らない
 - **`planPast`** は開始が `nowAt` 以下の予定だけを数える。未来の予定で係数を汚さない
 - **2 章の行は足切りしない**。記録か予定のどちらかがある行はすべて出す（決算の完全性）
 
@@ -189,3 +184,11 @@ lp:
 - 2026-09-04 [product]: Plan / Record の時刻ルールを 2 本へ（[#2598](https://github.com/Dayopt/dayopt/pull/2598)）
 - ADR-025: Plan / Record モデル（削除済み、git 履歴参照）
 - 2026-09-15 [product]: 4 章 1 スクロールを 3 タブへ再編し、セグメントと「整える」を撤去。サイドバーはカテゴリー / アクティビティのチェックリストだけにした
+
+## 機械取得する現状
+
+<!-- docs-live:facts:start -->
+
+抽出対象の登録は [scripts/lib/docs-live/facts.ts](../../../scripts/lib/docs-live/facts.ts)。現在の一覧は `pnpm docs:read docs/product/specs/review.md` で生成して読む。
+
+<!-- docs-live:facts:end -->

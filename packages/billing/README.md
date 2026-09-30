@@ -9,19 +9,13 @@ client import できる pure model だけを持ち、Stripe SDK / secret / runti
 
 consumer は `apps/product`（settings / access policy / webhook）と `apps/web`（LP pricing）の両方。
 
-## 構造（カテゴリ → file）
+## 構造
 
-```
-packages/billing/src/
-  access.ts         アプリ体験45日・利用状態の正本（appTrialDays / appTrialDurationMs / resolveBillingAccess）
-  plans.ts          旧Free/Pro plan id・name・plan metadata（dayoptPlanIds / dayoptPlans / isPaidPlan）
-  pricing.ts        価格表示用定数・従来Stripe trial日数（dayoptPricing / dayoptProTrialDays / getMonthlyUsd*）
-  subscription.ts   SubscriptionStatus・判定・Stripe→Dayopt 変換
-                    （subscriptionStatuses / isProSubscriptionStatus /
-                     getPlanIdForSubscriptionStatus / mapStripeSubscriptionStatus）
-  entitlement.ts    旧機能別entitlementの互換モデル（entitlementKeys / planEntitlements / canUseEntitlement）
-  index.ts          barrel
-```
+<!-- docs-live:files:start -->
+
+正本は [packages/billing/src/](src)。現在の一覧は `pnpm docs:read packages/billing/README.md` で生成して読む。
+
+<!-- docs-live:files:end -->
 
 ## 入れる / 入れない
 

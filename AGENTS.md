@@ -7,6 +7,7 @@ Dayopt の共通指示。Project 設定を正本とし、個人設定・ホー�
 - **Cloud-first、Local-optional**。開発・画面確認はクラウドを基本とし、必要ならローカルも使う。作業中の別 worktree・branch・未コミット差分を勝手に変更しない。
 - 提案・変更前に既存実装と関連判断を調べる。Issue の有無を問わず [判断の入口](docs/decisions.md#判断する前に読む)から現行の正本・理由・却下案を確認し、履歴の撤回済み判断を復活させない。検索は `rg` を優先し、repo 全体は `rg --hidden --glob '!.git/**'`。構造は [architecture.md](docs/engineering/architecture.md)、技術規約は [conventions.md](docs/engineering/conventions.md)、用語は [glossary.md](docs/product/glossary.md) を参照する。
 - Issue / PR がある非自明な作業は `pnpm ctx <N> --reuse-brief-l1` から始める。Issue 本文が要求の正本。Brief は助言であり、古い・取得できない場合は報告して一次資料で進める。詳細は `routing`。
+- 文書の現状説明を根拠にする時は `pnpm --silent docs:read <repo-relative-path>` で正本から読む。生成本文は手編集せず正本を更新する。読取失敗を保存済み本文で補わない。読取・更新・検証の手順は [docs 運用規約](docs/README.md#ai-の標準手順)に従う。
 - 秘密情報は [secrets.md](docs/operations/secrets.md) の境界に従う。`.env` / `.env.local` は読み書きしない。`.op-env.agent` / `.op-env.human` を使う。
 - 変更した挙動を対象 test / E2E / Storybook 等で確かめる。同じ差分・環境の成功済み検査を根拠なく繰り返さない。ready 化前の `pnpm check` と pre-push は必須。詳細は [testing.md](docs/engineering/testing.md)。
 - commit は対象 path だけ stage して差分を確認する。日本語 Conventional Commits を使い、hook を迂回しない。

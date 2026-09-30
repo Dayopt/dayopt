@@ -27,7 +27,7 @@ flowchart LR
     C2["commit-msg<br/>commitlint"]
   end
   subgraph S4["push"]
-    D1["pre-push<br/>main 直 push 禁止・DO-CONFIRM・typecheck と lint"]
+    D1["pre-push<br/>main 直 push 禁止・DO-CONFIRM・docs:check・typecheck と lint"]
   end
   subgraph S5["PR"]
     E1["CI の required checks"]
@@ -46,65 +46,38 @@ flowchart LR
 
 ## 指示書
 
-| ファイル                                                                    | 誰が読むか                    | いつ読まれるか                         | 何を決めているか                                                                                                                                           |
-| --------------------------------------------------------------------------- | ----------------------------- | -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [AGENTS.md](../../../AGENTS.md)                                             | Claude Code・Codex            | 毎セッションの最初                     | 正本。レビュー規則、シンプルルール 5 箇条と 3 段階のテンポ、時間の不変条件、アーキテクチャ、Non-Negotiables、PR / git 運用、委任・報告の作法、skill の索引 |
-| [CLAUDE.md](../../../CLAUDE.md)                                             | Claude Code                   | 毎セッションの最初                     | `@AGENTS.md` を読み込むだけの adapter。中身は書かない                                                                                                      |
-| [apps/product/src/AGENTS.md](../../../apps/product/src/AGENTS.md)           | Codex（主に `@codex review`） | `apps/product/src/` 配下の変更を見る時 | レビューで追加確認する 3 規則: 認証・所有権・secret の境界（AUTH-1）、外部状態・webhook・課金（EXT-1）、時刻・日付境界（TIME-1）                           |
-| [supabase/AGENTS.md](../../../supabase/AGENTS.md)                           | Codex（主に `@codex review`） | `supabase/` 配下の変更を見る時         | 同じく 3 規則: RLS・policy・GRANT（DB-1）、SECURITY DEFINER（DB-2）、破壊的 migration（DB-3）                                                              |
-| [apps/product/messages/CLAUDE.md](../../../apps/product/messages/CLAUDE.md) | Claude Code                   | 翻訳ファイルを触る時                   | 先に `i18n` skill を読む。キー名にも旧語彙を使わない                                                                                                       |
-| [supabase/migrations/CLAUDE.md](../../../supabase/migrations/CLAUDE.md)     | Claude Code                   | migration を触る時                     | 先に `supabase` skill を読む                                                                                                                               |
+| ファイル                                                                    | 誰が読むか                    | いつ読まれるか                         | 何を決めているか                                                                                                                                                          |
+| --------------------------------------------------------------------------- | ----------------------------- | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [AGENTS.md](../../../AGENTS.md)                                             | Claude Code・Codex            | 毎セッションの最初                     | 正本。レビュー規則、AUTONOMOUS / CHECKPOINT / EXPLICIT AUTHORITY の判断層、時間の不変条件、アーキテクチャ、Non-Negotiables、PR / git 運用、委任・報告の作法、skill の索引 |
+| [CLAUDE.md](../../../CLAUDE.md)                                             | Claude Code                   | 毎セッションの最初                     | `@AGENTS.md` を読み込むだけの adapter。中身は書かない                                                                                                                     |
+| [apps/product/src/AGENTS.md](../../../apps/product/src/AGENTS.md)           | Codex（主に `@codex review`） | `apps/product/src/` 配下の変更を見る時 | レビューで追加確認する 3 規則: 認証・所有権・secret の境界（AUTH-1）、外部状態・webhook・課金（EXT-1）、時刻・日付境界（TIME-1）                                          |
+| [supabase/AGENTS.md](../../../supabase/AGENTS.md)                           | Codex（主に `@codex review`） | `supabase/` 配下の変更を見る時         | 同じく 3 規則: RLS・policy・GRANT（DB-1）、SECURITY DEFINER（DB-2）、破壊的 migration（DB-3）                                                                             |
+| [apps/product/messages/CLAUDE.md](../../../apps/product/messages/CLAUDE.md) | Claude Code                   | 翻訳ファイルを触る時                   | 先に `i18n` skill を読む。キー名にも旧語彙を使わない                                                                                                                      |
+| [supabase/migrations/CLAUDE.md](../../../supabase/migrations/CLAUDE.md)     | Claude Code                   | migration を触る時                     | 先に `supabase` skill を読む                                                                                                                                              |
 
 「誰が読むか」は各 AI の仕様による（Claude Code は `CLAUDE.md` を、Codex は `AGENTS.md` を、作業するディレクトリの階層に沿って読む）。repo の中にこの読み込み規則を書いた正本は無い。帰結として、**Claude Code には入れ子の `AGENTS.md` の規則（AUTH-1・DB-1 など）が自動では届かず、Codex には入れ子の `CLAUDE.md` の skill への誘導が届かない**。どちらにも効かせたい規則は root の `AGENTS.md` か skill に置く。
 
 `.claude/skills` は `.agents/skills` への symlink で、skill の正本は `.agents/skills/` の 1 か所だけ。Next.js の `next dev` が app 直下に書き出す `AGENTS.md` / `CLAUDE.md` は指示の正本ではない（生成は止めてある。[infra.md](../../engineering/infra.md)）。
 
-## skill（24 個）
+## skill
 
-各 `.agents/skills/<名前>/SKILL.md`。先頭の `description` が「いつ読むか」の条件で、AI はそれを見て、該当する作業の時にだけ本文を読む。★ は User が明示的に頼んだ時だけ使うもの（`docs-audit` は月次の `gardening` の中からも呼ばれる）。
-
-| 群             | skill                  | 何を決めているか                                              |
-| -------------- | ---------------------- | ------------------------------------------------------------- |
-| 進め方         | `routing`              | 成功条件・実行方法・委譲するかの判断。単独完遂が既定          |
-|                | `dispatch`             | issue の起票、worker へ渡す準備、状態ラベル                   |
-|                | `decision` ★           | `docs/decisions.md` への意思決定の 1 行追記                   |
-|                | `gardening` ★          | 月次の改善ループ（実測 → 月に 1 つだけ変える → 結果を回収）   |
-| 実装の型       | `supabase`             | migration・RLS・Storage・Realtime の書き方と必須チェック      |
-|                | `trpc-router-creating` | router → service → Supabase の 3 層                           |
-|                | `store-creating`       | Zustand store の新設                                          |
-|                | `optimistic-update`    | mutation の楽観的更新（`onMutate` / `onError` / `onSettled`） |
-|                | `error-handling`       | try/catch・`onError`・ErrorBoundary・Sentry                   |
-|                | `i18n`                 | UI 文言と翻訳ファイル、用語集                                 |
-|                | `storybook`            | Story の追加と design token の選び方                          |
-|                | `react-performance`    | 取得の waterfall・bundle・RSC 境界                            |
-| 品質           | `test`                 | バグ修正前の失敗テスト、新機能後のテスト                      |
-|                | `diagnosing-bugs`      | 原因不明・複数層に跨る不具合の再現と切り分け                  |
-|                | `security`             | 認証・認可・RLS・外部入力                                     |
-|                | `ui-audit` ★           | 指定した UI の操作性とアクセシビリティのコード監査            |
-|                | `pr-cross-review`      | 独立レビューは `@codex review`。追加の reviewer は停止中      |
-| 文書           | `docs-writing`         | 利用者向け docs とリリースノート                              |
-|                | `docs-audit` ★         | 公開 docs と実機能の突き合わせ                                |
-|                | `blog-ideas` ★         | ブログのネタ出しと起票                                        |
-| 運用と AI 設定 | `releasing` ★          | リリース作業の end-to-end                                     |
-|                | `mcp-usage`            | Sentry / Supabase などの MCP と CLI をいつ使うか              |
-|                | `skill-design`         | skill の新設と description の書き方                           |
-|                | `audit-ai-config` ★    | AI 設定（指示書・skill・hook・MCP）の棚卸し                   |
+各 skill の description が「いつ読むか」の正本。現在の一覧と発動条件は末尾の生成領域で取得する。個別の規範・理由は各 SKILL.md を読む。`.claude/skills` は同じ正本への互換入口。
 
 ## guard / hook
 
-| 名前                                | 発火するタイミング                                                           | 何をするか                                                                                                                                                                                      | 止めるか                 | 設定の場所                                                                        |
-| ----------------------------------- | ---------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------ | --------------------------------------------------------------------------------- |
-| `pre-tool-guard`                    | Claude Code がツールを使う前（Write / Edit / Bash / Read / Agent など 8 種） | 危険な操作を止める（下の一覧）                                                                                                                                                                  | 止める                   | `.claude/settings.json` の `hooks.PreToolUse` → `scripts/hooks/pre-tool-guard.sh` |
-| `codex-pre-tool-guard`              | Codex がツールを使う前（全ツール）                                           | 同じ判定。**規則の本体 `pre-tool-guard-rules.mjs` を Claude 側と共有**し、Codex の入出力形式へ写すだけ                                                                                          | 止める                   | `.codex/hooks.json`（`.codex/config.toml` で hooks を有効化）                     |
-| permissions                         | Claude Code がツールを使う前                                                 | allow 121 件は確認なしで通す。ask 4 件（`git pull` / `git reset` / `curl` / `wget`）は確認を求める。deny 16 件（`.env` 系・`~/.ssh` などの読み取り）は拒否                                      | 止める                   | `.claude/settings.json` の `permissions`                                          |
-| `session-start` / `agent-preflight` | セッション開始時                                                             | branch・変更・環境・gh の権限などを最初に見せる。Claude では token の消費量の集計（`session-token-usage.py`）も出す                                                                             | 止めない                 | Claude は `session-start.sh` 経由、Codex は `agent-preflight.mjs` を直接          |
-| `post-tool-format`                  | Claude Code が Write / Edit した後                                           | prettier で整形する                                                                                                                                                                             | 止めない                 | `.claude/settings.json` の `hooks.PostToolUse`                                    |
-| `notification` / `stop-failure`     | 許可待ち・作業完了の時                                                       | macOS の通知を出す。エラーを記録する                                                                                                                                                            | 止めない                 | `.claude/settings.json`                                                           |
-| `.husky/pre-commit`                 | `git commit`（人・AI とも）                                                  | staged 差分の secret を gitleaks で探し、lint-staged で整形する                                                                                                                                 | 止める                   | `.husky/pre-commit`                                                               |
-| `.husky/commit-msg`                 | `git commit`                                                                 | 日本語の Conventional Commits かを commitlint で確かめる                                                                                                                                        | 止める                   | `.husky/commit-msg`                                                               |
-| `.husky/pre-push`                   | `git push`                                                                   | main への直接 push を止める。commit のまとまりごとに、最初の 1 回は DO-CONFIRM の 4 点に答えるまで止める（差分の無い push では飛ばす）。その後、変更の影響範囲だけ typecheck と lint を走らせる | 止める                   | `.husky/pre-push`                                                                 |
-| `protected-path-gate`               | `pnpm branch:finish`（merge の直前）                                         | 外部契約・不可逆の path に触ったかを示し、レビューで重点的に読む範囲の目安にする。CI では shadow 検査（Validation (shadow)）の計画の入力にも使われる                                            | **止めない**（示すだけ） | `scripts/ci/protected-path-gate.mjs`                                              |
-| main の ruleset                     | merge                                                                        | required checks の成功と review thread の全解決を求める。bypass できる人はいない                                                                                                                | 止める                   | GitHub の repository ruleset（[infra.md](../../engineering/infra.md)）            |
+| 名前                                | 発火するタイミング                                                           | 何をするか                                                                                                                                                                                                            | 止めるか                 | 設定の場所                                                                        |
+| ----------------------------------- | ---------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------ | --------------------------------------------------------------------------------- |
+| `pre-tool-guard`                    | Claude Code がツールを使う前（Write / Edit / Bash / Read / Agent など 8 種） | 危険な操作を止める（下の一覧）                                                                                                                                                                                        | 止める                   | `.claude/settings.json` の `hooks.PreToolUse` → `scripts/hooks/pre-tool-guard.sh` |
+| `codex-pre-tool-guard`              | Codex がツールを使う前（全ツール）                                           | 同じ判定。**規則の本体 `pre-tool-guard-rules.mjs` を Claude 側と共有**し、Codex の入出力形式へ写すだけ                                                                                                                | 止める                   | `.codex/hooks.json`（`.codex/config.toml` で hooks を有効化）                     |
+| permissions                         | Claude Code がツールを使う前                                                 | allow / ask / deny の設定が操作を分類する。現在の登録件数は末尾で生成し、作用は設定と各 runtime の契約を確認する                                                                                                      | 止める                   | `.claude/settings.json` の `permissions`                                          |
+| `session-start` / `agent-preflight` | セッション開始時                                                             | branch・変更・環境・gh の権限などを最初に見せる。Claude では token の消費量の集計（`session-token-usage.py`）も出す                                                                                                   | 止めない                 | Claude は `session-start.sh` 経由、Codex は `agent-preflight.mjs` を直接          |
+| `post-tool-format`                  | Claude Code が Write / Edit した後                                           | prettier で整形する                                                                                                                                                                                                   | 止めない                 | `.claude/settings.json` の `hooks.PostToolUse`                                    |
+| `notification` / `stop-failure`     | 許可待ち・作業完了の時                                                       | macOS の通知を出す。エラーを記録する                                                                                                                                                                                  | 止めない                 | `.claude/settings.json`                                                           |
+| `.husky/pre-commit`                 | `git commit`（人・AI とも）                                                  | staged 差分の secret を gitleaks で探し、lint-staged で整形する                                                                                                                                                       | 止める                   | `.husky/pre-commit`                                                               |
+| `.husky/commit-msg`                 | `git commit`                                                                 | 日本語の Conventional Commits かを commitlint で確かめる                                                                                                                                                              | 止める                   | `.husky/commit-msg`                                                               |
+| `.husky/pre-push`                   | `git push`                                                                   | main への直接 push を止める。commit のまとまりごとに、最初の 1 回は DO-CONFIRM の 4 点に答えるまで止める（差分の無い push では飛ばす）。その後 `docs:check` を実行し、変更の影響範囲だけ typecheck と lint を走らせる | 止める                   | `.husky/pre-push`                                                                 |
+| `protected-path-gate`               | `pnpm branch:finish`（merge の直前）                                         | 外部契約・不可逆の path に触ったかを示し、レビューで重点的に読む範囲の目安にする。CI では shadow 検査（Validation (shadow)）の計画の入力にも使われる                                                                  | **止めない**（示すだけ） | `scripts/ci/protected-path-gate.mjs`                                              |
+| main の ruleset                     | merge                                                                        | required checks の成功と review thread の全解決を求める。bypass できる人はいない                                                                                                                                      | 止める                   | GitHub の repository ruleset（[infra.md](../../engineering/infra.md)）            |
 
 `pre-tool-guard` が止めるもの（`scripts/hooks/pre-tool-guard-rules.mjs` の `BLOCKED:` の要約）:
 
@@ -335,3 +308,11 @@ flowchart LR
   }
 ]
 ```
+
+## 機械取得する現状
+
+<!-- docs-live:facts:start -->
+
+抽出対象の登録は [scripts/lib/docs-live/facts.ts](../../../scripts/lib/docs-live/facts.ts)。現在の一覧は `pnpm docs:read docs/learn/system/agents.md` で生成して読む。
+
+<!-- docs-live:facts:end -->

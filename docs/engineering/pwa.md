@@ -140,27 +140,14 @@ Until those conditions are met, failed or unavailable mutations follow the norma
 
 ## Files
 
-```text
-src/lib/pwa/
-├── auto-reload-blockers.ts
-├── build-staleness.ts
-├── chunk-load-recovery.ts
-├── install-prompt.ts
-└── ios-workarounds.ts
+Implementation entry points:
 
-src/lib/hooks/
-├── useInstallPrompt.ts
-├── usePWA.ts
-└── useServiceWorker.ts
+- [PWA helpers](../../apps/product/src/lib/pwa/)
+- [PWA hooks](../../apps/product/src/lib/hooks/)
+- [InstallBanner](../../apps/product/src/components/shell/InstallBanner.tsx) and [IOSInstallGuide](../../apps/product/src/components/shell/IOSInstallGuide.tsx)
+- [Manifest](../../apps/product/public/manifest.json) and [service worker](../../apps/product/public/sw.js)
 
-src/lib/components/shell/
-├── InstallBanner.tsx
-└── IOSInstallGuide.tsx
-
-public/
-├── manifest.json
-└── sw.js
-```
+Read the implementation directories for the current file inventory.
 
 ## Verification
 

@@ -967,7 +967,7 @@ last_verified: 2026-09-21
 
 ## 正本
 
-- [AGENTS.md](../../AGENTS.md) — 実装 plan の必須セクション（Reversibility Table ほか）、レビュー規則
+- [AGENTS.md](../../AGENTS.md) — 実装 Plan に示す目的・方針・検証方法と、レビュー規則。固定の書式は要求しない
 - [docs/engineering/invariants.md](../engineering/invariants.md)
 - [docs/engineering/architecture.md](../engineering/architecture.md) の Feature 間の依存
 

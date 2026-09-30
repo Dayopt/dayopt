@@ -5,7 +5,7 @@ last_verified: 2026-09-30
 
 # Dayopt 全体横断監査 — 継続記録
 
-状態: **進行中・全体監査未完了**。主担当: Codex。この記録は監査の証拠であり、読了数は理解・安全性の証明ではない。
+状態: **ユーザー指示により中止・全体監査未完了**。主担当: Codex。この記録は監査の証拠であり、読了数は理解・安全性の証明ではない。
 
 ## 依頼と権限
 
@@ -537,3 +537,11 @@ workerはCLIの継続exec sessionで実行。最初の短命Python親からのPo
 保存層バッチの追記: Luna7件/47969bytesも完了し、全原文chunk/行の取得ログ、baseline/current blob、読解SHA966dcを主担当照合。SQLはcreation→June falseRLS→July grants復元→August browser grants撤回の順を確認し、service role DML維持/column権限検査を読んだ。現在配信DBの値は別で未観測。Product/Web maxDuration30/15秒はいずれもlease300秒より短く、通常経路で5分超lease takeoverを起こす新bugは未採用。親20+delegate24=44件の新baseline全文、706 full/8 mechanical/2427 unverified。全3141path/方法を保全。既存Auth auditorはinventory上すでにfullだったため今回の追加件数へ含めない。継続summaryの「未昇格」と実台帳の食い違いは実台帳を確認して訂正した。
 
 実測の難度補足: 保存層7件/47969bytesは06:28:45の起動から06:30:40の完了まで約115秒（local filesystem時刻）。原文全行とSQL順序が読めても、実DB権限・Redis Lua競合・外部保持期間の観測までは証明しない。上記15–30時間は低確度の稼働予算であり、外部環境待ちを含むカレンダー上の締切ではない。
+
+## 中止と修正成果の取り込み — 2026-09-30
+
+ユーザーは全体監査を中止し、その後「ここまでの修正を既存PRで仕上げ、修正済みの子Issueをclose、Missionを中止としてclose、未修正Questionは残し、取り込み後にbranch/worktreeを整理する」流れを承認し、PR mergeまで明示指示した。残る全文読解を再開しない。未確認2427pathを読了/対象外へ変更せず、706 full/8 mechanicalの証拠と未採用候補/反証を保全する。監査中止を全体監査完了とは扱わない。
+
+アーカイブsnapshot f15545c1d55c5094e79a5849c9210197f508a78f の監査記録をrestoreし、own branchへfast-forward。公開PR2965の前head966dcとは区別する。main c019da6ba7d03dd6bb04010babf01ceac1a56c0f（docs閲覧時生成2983、calendar navigation2993）を取り込み、billing READMEのみの競合で上流のdocs-live構造を採用し、45日体験/旧7日Stripe互換の修正意図を維持した。これは通常のPR仕上げで、追加の全体監査やクラウド操作ではない。
+
+修正済み2985/2988/2989/2838/2990/2991は受け入れ条件と実diff・検証を照合して本PRへclose linkを付ける。2992は未実装のQuestion、2831のネットワーク観測等も未完了のまま保持する。Mission2963は修正取り込み後に「not planned / ユーザー中止」の理由でcloseする。未確認環境や未採用候補を解消済みとはしない。merge前の新統合tree検証、現head CI、protected-pathの独立review、裁定、branch:finishのdry-run/実行結果をPRに残す。通常のmain pipelineと手動release/本番操作は区別し、gate/bypass/forceを使わない。

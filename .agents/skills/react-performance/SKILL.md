@@ -40,10 +40,10 @@ maxTurns: 15
 ## Dayopt の適用除外（上流をそのまま適用しない点）
 
 - **feature 間の barrel を壊さない**。上流の `bundle-barrel-imports` は第三者 package の規則として読む。`features/*/index.ts` 経由の import は Dayopt の依存規則であり、性能を理由に deep import を解禁しない。`pnpm lint:boundaries` を緩める提案をしない
-- **第三者 package は `optimizePackageImports`**（`apps/product/next.config.ts`）で扱う。未登録の重い package があればそこへ足す
+- **第三者 package は `optimizePackageImports`**（`apps/product/next.config.mjs`）で扱う。未登録の重い package があればそこへ足す
 - **SWR を足さない**。上流は `client-swr-dedup` で SWR を例示するが、Dayopt は tRPC + TanStack Query が正本。重複取得は既存の query key / `React.cache()` で解く
 - **cache はユーザー・認可・リクエスト境界を確認する**。module スコープの LRU / Map cache は、キーにユーザーを含めない限りユーザー間でデータが混ざる（REVIEW-1）。性能を理由にユーザー分離を弱めない
-- **memo は計測付きでのみ**。React Compiler は現在無効（`apps/product/next.config.ts` の `reactCompiler` はコメントアウト）。無条件の `memo` / `useMemo` 追加は提案しない
+- **memo は計測付きでのみ**。React Compiler は現在無効（`apps/product/next.config.mjs` の `reactCompiler` はコメントアウト）。無条件の `memo` / `useMemo` 追加は提案しない
 - **データ取得方式・RSC 化の一括置換はしない**。既存の tRPC / Zustand / `useCalendarData` の構造を保ったまま、局所の直列・重複を直す
 - **上流の HIGH / CRITICAL を P1 / P2 に変換しない**。Dayopt の優先度は AGENTS.md §レビュー規則の failure scenario で決める
 
