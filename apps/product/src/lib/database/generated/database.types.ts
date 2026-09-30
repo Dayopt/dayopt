@@ -2424,6 +2424,20 @@ export type Database = {
         };
         Returns: string;
       };
+      reconnect_calendar_connection_command_v1: {
+        Args: {
+          p_attempt_id: string;
+          p_expected_connection_id: string;
+          p_granted_scopes: string[];
+          p_project_key: string;
+          p_provider: string;
+          p_provider_account_email: string;
+          p_provider_account_id: string;
+          p_refresh_token_enc: string;
+          p_user_id: string;
+        };
+        Returns: string;
+      };
       record_plan_command_v1: {
         Args: {
           p_expected_updated_at: string;
@@ -2460,6 +2474,14 @@ export type Database = {
           p_operation_id: string;
           p_origin_connection_id: string;
           p_undo_ttl_seconds: number;
+          p_user_id: string;
+        };
+        Returns: string;
+      };
+      repair_calendar_connection_authority_fence_v1: {
+        Args: {
+          p_connection_id: string;
+          p_project_key: string;
           p_user_id: string;
         };
         Returns: string;

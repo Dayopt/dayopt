@@ -201,7 +201,7 @@ restore_plan_command_v1 / restore_record_command_v1 を呼ぶ。削除済みの�
 - 痕跡: 想定内（TIME_OVERLAP）なので Sentry には出ない。
 - **最初に見る場所**: 同じ時間帯の行。MCP の trash から探して、時間帯を空けてから戻す。
 - 根拠:
-  - [`apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.ts`](../../../apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.ts) で `const reportRestoreError = () => toast.error(t('toast.restoreFailed'));` を探す
+  - [`apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.ts`](../../../apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.ts) で `const reportRestoreError = (error: unknown) =>` を探す
 
 </details>
 
@@ -683,7 +683,7 @@ restore は先に描かない。返ってきた行を、条件の合う一覧と
           "refs": [
             {
               "path": "apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.ts",
-              "find": "const reportRestoreError = () => toast.error(t('toast.restoreFailed'));"
+              "find": "const reportRestoreError = (error: unknown) =>"
             }
           ],
           "tags": {

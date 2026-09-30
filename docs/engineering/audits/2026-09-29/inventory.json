@@ -3617,11 +3617,15 @@
       "mode": "100644",
       "bytes": 2380,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
-      "questions": []
+      "read_ranges": [[1, 58]],
+      "evidence": [
+        "Entire source/test read untruncated; baseline bytes verified equal. Auth code/OTP, safe redirect, access-token/session distinction, once-only welcome claim and signed signup analytics claim traced. No actual provider/mail/DB request."
+      ],
+      "questions": [
+        "Complete OTP tests, confirmation UI, transport budgets and current provider contracts before broader auth conclusion."
+      ]
     },
     {
       "path": "apps/product/src/app/[locale]/(auth)/auth/callback/route.ts",
@@ -3630,11 +3634,15 @@
       "mode": "100644",
       "bytes": 3201,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
-      "questions": []
+      "read_ranges": [[1, 78]],
+      "evidence": [
+        "Entire source/test read untruncated; baseline bytes verified equal. Auth code/OTP, safe redirect, access-token/session distinction, once-only welcome claim and signed signup analytics claim traced. No actual provider/mail/DB request."
+      ],
+      "questions": [
+        "Complete OTP tests, confirmation UI, transport budgets and current provider contracts before broader auth conclusion."
+      ]
     },
     {
       "path": "apps/product/src/app/[locale]/(auth)/auth/confirm/route.test.ts",
@@ -3656,11 +3664,15 @@
       "mode": "100644",
       "bytes": 6448,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
-      "questions": []
+      "read_ranges": [[1, 122]],
+      "evidence": [
+        "Entire source/test read untruncated; baseline bytes verified equal. Auth code/OTP, safe redirect, access-token/session distinction, once-only welcome claim and signed signup analytics claim traced. No actual provider/mail/DB request."
+      ],
+      "questions": [
+        "Complete OTP tests, confirmation UI, transport budgets and current provider contracts before broader auth conclusion."
+      ]
     },
     {
       "path": "apps/product/src/app/[locale]/(auth)/auth/confirmed/page.test.tsx",
@@ -7416,11 +7428,15 @@
       "mode": "100644",
       "bytes": 2761,
       "method": "full-text",
-      "status": "unverified",
+      "status": "full-text-reviewed",
       "reason": "Current first-party source, tests, configuration or documentation; full reading pending",
-      "read_ranges": [],
-      "evidence": [],
-      "questions": []
+      "read_ranges": [[1, 72]],
+      "evidence": [
+        "Entire source/test read untruncated; baseline bytes verified equal. Auth code/OTP, safe redirect, access-token/session distinction, once-only welcome claim and signed signup analytics claim traced. No actual provider/mail/DB request."
+      ],
+      "questions": [
+        "Complete OTP tests, confirmation UI, transport budgets and current provider contracts before broader auth conclusion."
+      ]
     },
     {
       "path": "apps/product/src/features/auth/stores/AuthStoreInitializer.tsx",
@@ -43004,10 +43020,11 @@
       "status": "delta-reviewed",
       "read_ranges": [],
       "evidence": [
-        "Entire untruncated unified diff 0762bffe671b50cbb2631a529e24e6ef6bd4e919 -> b2cca8fa352c0bd2bbb66c1f50a6c68b71061334 reviewed. This is four files of pending 50-file main delta, not a whole file baseline read or integrated verification. External-event duplicate error presentation/classification; merge into audit checkout not performed."
+        "Entire upstream unified diff reviewed; this is delta coverage, not baseline full-file reading.",
+        "Reviewed before integration of main #2903. Existing baseline status remains unchanged."
       ],
       "questions": [
-        "Reconcile upstream callback tests with actual operation contexts/H041 before integration; all remaining 46-file delta must be reviewed."
+        "Integrated check running; no own cloud/Google runtime or live database verification."
       ]
     },
     {
@@ -43019,10 +43036,11 @@
       "status": "delta-reviewed",
       "read_ranges": [],
       "evidence": [
-        "Entire untruncated unified diff 0762bffe671b50cbb2631a529e24e6ef6bd4e919 -> b2cca8fa352c0bd2bbb66c1f50a6c68b71061334 reviewed. This is four files of pending 50-file main delta, not a whole file baseline read or integrated verification. External-event duplicate error presentation/classification; merge into audit checkout not performed."
+        "Entire upstream unified diff reviewed; this is delta coverage, not baseline full-file reading.",
+        "Reviewed before integration of main #2903. Existing baseline status remains unchanged."
       ],
       "questions": [
-        "Reconcile upstream callback tests with actual operation contexts/H041 before integration; all remaining 46-file delta must be reviewed."
+        "Integrated check running; no own cloud/Google runtime or live database verification."
       ]
     },
     {
@@ -43034,10 +43052,11 @@
       "status": "delta-reviewed",
       "read_ranges": [],
       "evidence": [
-        "Entire untruncated unified diff 0762bffe671b50cbb2631a529e24e6ef6bd4e919 -> b2cca8fa352c0bd2bbb66c1f50a6c68b71061334 reviewed. This is four files of pending 50-file main delta, not a whole file baseline read or integrated verification. External-event duplicate error presentation/classification; merge into audit checkout not performed."
+        "Entire upstream unified diff reviewed; this is delta coverage, not baseline full-file reading.",
+        "Reviewed before integration of main #2903. Existing baseline status remains unchanged."
       ],
       "questions": [
-        "Reconcile upstream callback tests with actual operation contexts/H041 before integration; all remaining 46-file delta must be reviewed."
+        "Integrated check running; no own cloud/Google runtime or live database verification."
       ]
     },
     {
@@ -43049,10 +43068,747 @@
       "status": "delta-reviewed",
       "read_ranges": [],
       "evidence": [
-        "Entire untruncated unified diff 0762bffe671b50cbb2631a529e24e6ef6bd4e919 -> b2cca8fa352c0bd2bbb66c1f50a6c68b71061334 reviewed. This is four files of pending 50-file main delta, not a whole file baseline read or integrated verification. External-event duplicate error presentation/classification; merge into audit checkout not performed."
+        "Entire upstream unified diff reviewed; this is delta coverage, not baseline full-file reading.",
+        "Reviewed before integration of main #2903. Existing baseline status remains unchanged."
       ],
       "questions": [
-        "Reconcile upstream callback tests with actual operation contexts/H041 before integration; all remaining 46-file delta must be reviewed."
+        "Integrated check running; no own cloud/Google runtime or live database verification."
+      ]
+    },
+    {
+      "path": "apps/product/messages/en/calendar.json",
+      "sha": "b2cca8fa352c0bd2bbb66c1f50a6c68b71061334",
+      "change": "M",
+      "blob": "a2f644226557106d9bbbd8be8534cd9fff7b44b5",
+      "method": "full-text",
+      "status": "delta-reviewed",
+      "read_ranges": [],
+      "evidence": [
+        "Entire upstream unified diff reviewed; this is delta coverage, not baseline full-file reading.",
+        "Reviewed before integration of main #2903. Existing baseline status remains unchanged."
+      ],
+      "questions": [
+        "Integrated check running; no own cloud/Google runtime or live database verification."
+      ]
+    },
+    {
+      "path": "apps/product/messages/en/timeblock.json",
+      "sha": "b2cca8fa352c0bd2bbb66c1f50a6c68b71061334",
+      "change": "M",
+      "blob": "1d605386d4d6793ecddee645d483c89297c0c235",
+      "method": "full-text",
+      "status": "delta-reviewed",
+      "read_ranges": [],
+      "evidence": [
+        "Entire upstream unified diff reviewed; this is delta coverage, not baseline full-file reading.",
+        "Reviewed before integration of main #2903. Existing baseline status remains unchanged."
+      ],
+      "questions": [
+        "Integrated check running; no own cloud/Google runtime or live database verification."
+      ]
+    },
+    {
+      "path": "apps/product/messages/ja/calendar.json",
+      "sha": "b2cca8fa352c0bd2bbb66c1f50a6c68b71061334",
+      "change": "M",
+      "blob": "7f2d6a09ebaa916805438934732fff3f588e001e",
+      "method": "full-text",
+      "status": "delta-reviewed",
+      "read_ranges": [],
+      "evidence": [
+        "Entire upstream unified diff reviewed; this is delta coverage, not baseline full-file reading.",
+        "Reviewed before integration of main #2903. Existing baseline status remains unchanged."
+      ],
+      "questions": [
+        "Integrated check running; no own cloud/Google runtime or live database verification."
+      ]
+    },
+    {
+      "path": "apps/product/messages/ja/timeblock.json",
+      "sha": "b2cca8fa352c0bd2bbb66c1f50a6c68b71061334",
+      "change": "M",
+      "blob": "f287d4613c187c64cc8640cbe3adceec33edf584",
+      "method": "full-text",
+      "status": "delta-reviewed",
+      "read_ranges": [],
+      "evidence": [
+        "Entire upstream unified diff reviewed; this is delta coverage, not baseline full-file reading.",
+        "Reviewed before integration of main #2903. Existing baseline status remains unchanged."
+      ],
+      "questions": [
+        "Integrated check running; no own cloud/Google runtime or live database verification."
+      ]
+    },
+    {
+      "path": "apps/product/src/app/api/integrations/google-calendar/callback-route.test.ts",
+      "sha": "b2cca8fa352c0bd2bbb66c1f50a6c68b71061334",
+      "change": "M",
+      "blob": "ec4cf011d3c93299f2dce5a1036fcd11d4895098",
+      "method": "full-text",
+      "status": "delta-reviewed",
+      "read_ranges": [],
+      "evidence": [
+        "Entire upstream unified diff reviewed; this is delta coverage, not baseline full-file reading.",
+        "Reviewed before integration of main #2903. Existing baseline status remains unchanged."
+      ],
+      "questions": [
+        "Integrated check running; no own cloud/Google runtime or live database verification."
+      ]
+    },
+    {
+      "path": "apps/product/src/app/api/integrations/google-calendar/callback/route.ts",
+      "sha": "b2cca8fa352c0bd2bbb66c1f50a6c68b71061334",
+      "change": "M",
+      "blob": "6eb7824f7cba73ee28cddf72086f5540cf270772",
+      "method": "full-text",
+      "status": "delta-reviewed",
+      "read_ranges": [],
+      "evidence": [
+        "Entire upstream unified diff reviewed; this is delta coverage, not baseline full-file reading.",
+        "Reviewed before integration of main #2903. Existing baseline status remains unchanged."
+      ],
+      "questions": [
+        "Integrated check running; no own cloud/Google runtime or live database verification."
+      ]
+    },
+    {
+      "path": "apps/product/src/app/api/integrations/google-calendar/start-route.test.ts",
+      "sha": "b2cca8fa352c0bd2bbb66c1f50a6c68b71061334",
+      "change": "M",
+      "blob": "b406596412a5d203f48b086b0a080ee06dc58da3",
+      "method": "full-text",
+      "status": "delta-reviewed",
+      "read_ranges": [],
+      "evidence": [
+        "Entire upstream unified diff reviewed; this is delta coverage, not baseline full-file reading.",
+        "Reviewed before integration of main #2903. Existing baseline status remains unchanged."
+      ],
+      "questions": [
+        "Integrated check running; no own cloud/Google runtime or live database verification."
+      ]
+    },
+    {
+      "path": "apps/product/src/app/api/integrations/google-calendar/start/route.ts",
+      "sha": "b2cca8fa352c0bd2bbb66c1f50a6c68b71061334",
+      "change": "M",
+      "blob": "723241d94a945de32341db207032b0a51d8ff9bc",
+      "method": "full-text",
+      "status": "delta-reviewed",
+      "read_ranges": [],
+      "evidence": [
+        "Entire upstream unified diff reviewed; this is delta coverage, not baseline full-file reading.",
+        "Reviewed before integration of main #2903. Existing baseline status remains unchanged."
+      ],
+      "questions": [
+        "Integrated check running; no own cloud/Google runtime or live database verification."
+      ]
+    },
+    {
+      "path": "apps/product/src/app/route-duration-contract.test.ts",
+      "sha": "b2cca8fa352c0bd2bbb66c1f50a6c68b71061334",
+      "change": "M",
+      "blob": "31a5a5001177262e8151d61bbba3a137fa1f3882",
+      "method": "full-text",
+      "status": "delta-reviewed",
+      "read_ranges": [],
+      "evidence": [
+        "Entire upstream unified diff reviewed; this is delta coverage, not baseline full-file reading.",
+        "Reviewed before integration of main #2903. Existing baseline status remains unchanged."
+      ],
+      "questions": [
+        "Integrated check running; no own cloud/Google runtime or live database verification."
+      ]
+    },
+    {
+      "path": "apps/product/src/features/calendar/components/views/shared/components/TwoLane/ExternalEventCard.stories.tsx",
+      "sha": "b2cca8fa352c0bd2bbb66c1f50a6c68b71061334",
+      "change": "M",
+      "blob": "0dd2e64855c7dce05b22d0d7ec212007a7dc2936",
+      "method": "full-text",
+      "status": "delta-reviewed",
+      "read_ranges": [],
+      "evidence": [
+        "Entire upstream unified diff reviewed; this is delta coverage, not baseline full-file reading.",
+        "Reviewed before integration of main #2903. Existing baseline status remains unchanged."
+      ],
+      "questions": [
+        "Integrated check running; no own cloud/Google runtime or live database verification."
+      ]
+    },
+    {
+      "path": "apps/product/src/features/calendar/components/views/shared/components/TwoLane/ExternalEventCard.tsx",
+      "sha": "b2cca8fa352c0bd2bbb66c1f50a6c68b71061334",
+      "change": "M",
+      "blob": "66632a19a46d12e93203a53af915ad1e16024744",
+      "method": "full-text",
+      "status": "delta-reviewed",
+      "read_ranges": [],
+      "evidence": [
+        "Entire upstream unified diff reviewed; this is delta coverage, not baseline full-file reading.",
+        "Reviewed before integration of main #2903. Existing baseline status remains unchanged."
+      ],
+      "questions": [
+        "Integrated check running; no own cloud/Google runtime or live database verification."
+      ]
+    },
+    {
+      "path": "apps/product/src/features/calendar/hooks/operations/useConvertGhostEvent.test.ts",
+      "sha": "b2cca8fa352c0bd2bbb66c1f50a6c68b71061334",
+      "change": "M",
+      "blob": "72064db1190bc8f4cd4ac883bad827fa6031855f",
+      "method": "full-text",
+      "status": "delta-reviewed",
+      "read_ranges": [],
+      "evidence": [
+        "Entire upstream unified diff reviewed; this is delta coverage, not baseline full-file reading.",
+        "Reviewed before integration of main #2903. Existing baseline status remains unchanged."
+      ],
+      "questions": [
+        "Integrated check running; no own cloud/Google runtime or live database verification."
+      ]
+    },
+    {
+      "path": "apps/product/src/features/calendar/hooks/operations/useConvertGhostEvent.ts",
+      "sha": "b2cca8fa352c0bd2bbb66c1f50a6c68b71061334",
+      "change": "M",
+      "blob": "ef1cb77c7f57035233fb4f378e1d04dcd98695c9",
+      "method": "full-text",
+      "status": "delta-reviewed",
+      "read_ranges": [],
+      "evidence": [
+        "Entire upstream unified diff reviewed; this is delta coverage, not baseline full-file reading.",
+        "Reviewed before integration of main #2903. Existing baseline status remains unchanged."
+      ],
+      "questions": [
+        "Integrated check running; no own cloud/Google runtime or live database verification."
+      ]
+    },
+    {
+      "path": "apps/product/src/features/external-calendar/schemas/google.test.ts",
+      "sha": "b2cca8fa352c0bd2bbb66c1f50a6c68b71061334",
+      "change": "M",
+      "blob": "cea293bb0d06f9906486abfba6803f4b7cf5f0b3",
+      "method": "full-text",
+      "status": "delta-reviewed",
+      "read_ranges": [],
+      "evidence": [
+        "Entire upstream unified diff reviewed; this is delta coverage, not baseline full-file reading.",
+        "Reviewed before integration of main #2903. Existing baseline status remains unchanged."
+      ],
+      "questions": [
+        "Integrated check running; no own cloud/Google runtime or live database verification."
+      ]
+    },
+    {
+      "path": "apps/product/src/features/external-calendar/schemas/google.ts",
+      "sha": "b2cca8fa352c0bd2bbb66c1f50a6c68b71061334",
+      "change": "M",
+      "blob": "f279894d9328b32ec3567c419dbb6443986c34e7",
+      "method": "full-text",
+      "status": "delta-reviewed",
+      "read_ranges": [],
+      "evidence": [
+        "Entire upstream unified diff reviewed; this is delta coverage, not baseline full-file reading.",
+        "Reviewed before integration of main #2903. Existing baseline status remains unchanged."
+      ],
+      "questions": [
+        "Integrated check running; no own cloud/Google runtime or live database verification."
+      ]
+    },
+    {
+      "path": "apps/product/src/features/external-calendar/server/connection-service.test.ts",
+      "sha": "b2cca8fa352c0bd2bbb66c1f50a6c68b71061334",
+      "change": "M",
+      "blob": "ad031a3f89322e09ad0671ec82c8628a50d69887",
+      "method": "full-text",
+      "status": "delta-reviewed",
+      "read_ranges": [],
+      "evidence": [
+        "Entire upstream unified diff reviewed; this is delta coverage, not baseline full-file reading.",
+        "Reviewed before integration of main #2903. Existing baseline status remains unchanged."
+      ],
+      "questions": [
+        "Integrated check running; no own cloud/Google runtime or live database verification."
+      ]
+    },
+    {
+      "path": "apps/product/src/features/external-calendar/server/connection-service.ts",
+      "sha": "b2cca8fa352c0bd2bbb66c1f50a6c68b71061334",
+      "change": "M",
+      "blob": "5b9a1294cc4593f6ddcb9deeb77c3c94d57f24e0",
+      "method": "full-text",
+      "status": "delta-reviewed",
+      "read_ranges": [],
+      "evidence": [
+        "Entire upstream unified diff reviewed; this is delta coverage, not baseline full-file reading.",
+        "Reviewed before integration of main #2903. Existing baseline status remains unchanged."
+      ],
+      "questions": [
+        "Integrated check running; no own cloud/Google runtime or live database verification."
+      ]
+    },
+    {
+      "path": "apps/product/src/features/external-calendar/server/fenced-sync-writer.test.ts",
+      "sha": "b2cca8fa352c0bd2bbb66c1f50a6c68b71061334",
+      "change": "M",
+      "blob": "7c92662e0291f9a647cf3b32b835e5a857819f0d",
+      "method": "full-text",
+      "status": "delta-reviewed",
+      "read_ranges": [],
+      "evidence": [
+        "Entire upstream unified diff reviewed; this is delta coverage, not baseline full-file reading.",
+        "Reviewed before integration of main #2903. Existing baseline status remains unchanged."
+      ],
+      "questions": [
+        "Integrated check running; no own cloud/Google runtime or live database verification."
+      ]
+    },
+    {
+      "path": "apps/product/src/features/external-calendar/server/fenced-sync-writer.ts",
+      "sha": "b2cca8fa352c0bd2bbb66c1f50a6c68b71061334",
+      "change": "M",
+      "blob": "aeb578a7aa9f72fd27a633efdb1abe22057af09e",
+      "method": "full-text",
+      "status": "delta-reviewed",
+      "read_ranges": [],
+      "evidence": [
+        "Entire upstream unified diff reviewed; this is delta coverage, not baseline full-file reading.",
+        "Reviewed before integration of main #2903. Existing baseline status remains unchanged."
+      ],
+      "questions": [
+        "Integrated check running; no own cloud/Google runtime or live database verification."
+      ]
+    },
+    {
+      "path": "apps/product/src/features/external-calendar/server/sync-service.test.ts",
+      "sha": "b2cca8fa352c0bd2bbb66c1f50a6c68b71061334",
+      "change": "M",
+      "blob": "280f84587c8f6f38f57ac85947edd0501cd6da85",
+      "method": "full-text",
+      "status": "delta-reviewed",
+      "read_ranges": [],
+      "evidence": [
+        "Entire upstream unified diff reviewed; this is delta coverage, not baseline full-file reading.",
+        "Reviewed before integration of main #2903. Existing baseline status remains unchanged."
+      ],
+      "questions": [
+        "Integrated check running; no own cloud/Google runtime or live database verification."
+      ]
+    },
+    {
+      "path": "apps/product/src/features/external-calendar/server/sync-service.ts",
+      "sha": "b2cca8fa352c0bd2bbb66c1f50a6c68b71061334",
+      "change": "M",
+      "blob": "52bea1fa63011fbbccb2137dcfd088e42156757c",
+      "method": "full-text",
+      "status": "delta-reviewed",
+      "read_ranges": [],
+      "evidence": [
+        "Entire upstream unified diff reviewed; this is delta coverage, not baseline full-file reading.",
+        "Reviewed before integration of main #2903. Existing baseline status remains unchanged."
+      ],
+      "questions": [
+        "Integrated check running; no own cloud/Google runtime or live database verification."
+      ]
+    },
+    {
+      "path": "apps/product/src/features/timeblock/server/mcp-mutation-client.test.ts",
+      "sha": "b2cca8fa352c0bd2bbb66c1f50a6c68b71061334",
+      "change": "M",
+      "blob": "717003f1be0f33601c68be8f0ce7724e28f53deb",
+      "method": "full-text",
+      "status": "delta-reviewed",
+      "read_ranges": [],
+      "evidence": [
+        "Entire upstream unified diff reviewed; this is delta coverage, not baseline full-file reading.",
+        "Reviewed before integration of main #2903. Existing baseline status remains unchanged."
+      ],
+      "questions": [
+        "Integrated check running; no own cloud/Google runtime or live database verification."
+      ]
+    },
+    {
+      "path": "apps/product/src/features/timeblock/server/timeblock-command-client.test.ts",
+      "sha": "b2cca8fa352c0bd2bbb66c1f50a6c68b71061334",
+      "change": "M",
+      "blob": "2f078e917e39517c3ca6117c2f50b10748f58cc2",
+      "method": "full-text",
+      "status": "delta-reviewed",
+      "read_ranges": [],
+      "evidence": [
+        "Entire upstream unified diff reviewed; this is delta coverage, not baseline full-file reading.",
+        "Reviewed before integration of main #2903. Existing baseline status remains unchanged."
+      ],
+      "questions": [
+        "Integrated check running; no own cloud/Google runtime or live database verification."
+      ]
+    },
+    {
+      "path": "apps/product/src/lib/database/generated/database.types.ts",
+      "sha": "b2cca8fa352c0bd2bbb66c1f50a6c68b71061334",
+      "change": "M",
+      "blob": "6038d9fd5812db21bcad276499d134fb0688f22b",
+      "method": "mechanical",
+      "status": "mechanically-checked",
+      "read_ranges": [],
+      "evidence": [
+        "Entire upstream unified diff reviewed; this is delta coverage, not baseline full-file reading.",
+        "Generated files: changed RPC signatures/grants and normalized generated relationships inspected; architecture:check passes in integrated working tree. RLS/type live regeneration not performed."
+      ],
+      "questions": [
+        "Integrated check running; no own cloud/Google runtime or live database verification."
+      ]
+    },
+    {
+      "path": "apps/product/src/lib/test/integration/calendar-revoke-authority.integration.test.ts",
+      "sha": "b2cca8fa352c0bd2bbb66c1f50a6c68b71061334",
+      "change": "M",
+      "blob": "a99f0e354767d0f8daca359d93eda8307585f4b3",
+      "method": "full-text",
+      "status": "delta-reviewed",
+      "read_ranges": [],
+      "evidence": [
+        "Entire upstream unified diff reviewed; this is delta coverage, not baseline full-file reading.",
+        "Reviewed before integration of main #2903. Existing baseline status remains unchanged."
+      ],
+      "questions": [
+        "Integrated check running; no own cloud/Google runtime or live database verification."
+      ]
+    },
+    {
+      "path": "apps/product/src/lib/test/integration/timeblock-atomic-commands.integration.test.ts",
+      "sha": "b2cca8fa352c0bd2bbb66c1f50a6c68b71061334",
+      "change": "M",
+      "blob": "145b7b166ef97775168405936708eb0062965c02",
+      "method": "full-text",
+      "status": "delta-reviewed",
+      "read_ranges": [],
+      "evidence": [
+        "Entire upstream unified diff reviewed; this is delta coverage, not baseline full-file reading.",
+        "Reviewed before integration of main #2903. Existing baseline status remains unchanged."
+      ],
+      "questions": [
+        "Integrated check running; no own cloud/Google runtime or live database verification."
+      ]
+    },
+    {
+      "path": "apps/product/src/lib/trpc/client-safe-service-code.ts",
+      "sha": "b2cca8fa352c0bd2bbb66c1f50a6c68b71061334",
+      "change": "M",
+      "blob": "35a183ef35e32249751a9668ce943208412d1e44",
+      "method": "full-text",
+      "status": "delta-reviewed",
+      "read_ranges": [],
+      "evidence": [
+        "Entire upstream unified diff reviewed; this is delta coverage, not baseline full-file reading.",
+        "Reviewed before integration of main #2903. Existing baseline status remains unchanged."
+      ],
+      "questions": [
+        "Integrated check running; no own cloud/Google runtime or live database verification."
+      ]
+    },
+    {
+      "path": "apps/product/src/lib/trpc/error-code-map.ts",
+      "sha": "b2cca8fa352c0bd2bbb66c1f50a6c68b71061334",
+      "change": "M",
+      "blob": "1dfe1a6ea250cb11679b42583c617aefabc2569a",
+      "method": "full-text",
+      "status": "delta-reviewed",
+      "read_ranges": [],
+      "evidence": [
+        "Entire upstream unified diff reviewed; this is delta coverage, not baseline full-file reading.",
+        "Reviewed before integration of main #2903. Existing baseline status remains unchanged."
+      ],
+      "questions": [
+        "Integrated check running; no own cloud/Google runtime or live database verification."
+      ]
+    },
+    {
+      "path": "docs/engineering/data/architecture-inventory.md",
+      "sha": "b2cca8fa352c0bd2bbb66c1f50a6c68b71061334",
+      "change": "M",
+      "blob": "a71fa572cebc6561dc56552b83d9c28e1eb70251",
+      "method": "mechanical",
+      "status": "mechanically-checked",
+      "read_ranges": [],
+      "evidence": [
+        "Entire upstream unified diff reviewed; this is delta coverage, not baseline full-file reading.",
+        "Generated files: changed RPC signatures/grants and normalized generated relationships inspected; architecture:check passes in integrated working tree. RLS/type live regeneration not performed."
+      ],
+      "questions": [
+        "Integrated check running; no own cloud/Google runtime or live database verification."
+      ]
+    },
+    {
+      "path": "docs/engineering/data/architecture/model.c4",
+      "sha": "b2cca8fa352c0bd2bbb66c1f50a6c68b71061334",
+      "change": "M",
+      "blob": "78d143591259250c3b26826f4e1c40c88d18fbf1",
+      "method": "mechanical",
+      "status": "mechanically-checked",
+      "read_ranges": [],
+      "evidence": [
+        "Entire upstream unified diff reviewed; this is delta coverage, not baseline full-file reading.",
+        "Generated files: changed RPC signatures/grants and normalized generated relationships inspected; architecture:check passes in integrated working tree. RLS/type live regeneration not performed."
+      ],
+      "questions": [
+        "Integrated check running; no own cloud/Google runtime or live database verification."
+      ]
+    },
+    {
+      "path": "docs/engineering/data/db/rls-snapshot.md",
+      "sha": "b2cca8fa352c0bd2bbb66c1f50a6c68b71061334",
+      "change": "M",
+      "blob": "2aa13abf89e0fcc1abb085612f066a597e7e9eb7",
+      "method": "mechanical",
+      "status": "mechanically-checked",
+      "read_ranges": [],
+      "evidence": [
+        "Entire upstream unified diff reviewed; this is delta coverage, not baseline full-file reading.",
+        "Generated files: changed RPC signatures/grants and normalized generated relationships inspected; architecture:check passes in integrated working tree. RLS/type live regeneration not performed."
+      ],
+      "questions": [
+        "Integrated check running; no own cloud/Google runtime or live database verification."
+      ]
+    },
+    {
+      "path": "docs/engineering/data/system-surface.md",
+      "sha": "b2cca8fa352c0bd2bbb66c1f50a6c68b71061334",
+      "change": "M",
+      "blob": "79a6b58bc9353de46083295d6985aad4af9bcf03",
+      "method": "mechanical",
+      "status": "mechanically-checked",
+      "read_ranges": [],
+      "evidence": [
+        "Entire upstream unified diff reviewed; this is delta coverage, not baseline full-file reading.",
+        "Generated files: changed RPC signatures/grants and normalized generated relationships inspected; architecture:check passes in integrated working tree. RLS/type live regeneration not performed."
+      ],
+      "questions": [
+        "Integrated check running; no own cloud/Google runtime or live database verification."
+      ]
+    },
+    {
+      "path": "docs/engineering/invariants.md",
+      "sha": "b2cca8fa352c0bd2bbb66c1f50a6c68b71061334",
+      "change": "M",
+      "blob": "86532de7e7936ccecf99d5c6be9bb3da3f992f45",
+      "method": "full-text",
+      "status": "delta-reviewed",
+      "read_ranges": [],
+      "evidence": [
+        "Entire upstream unified diff reviewed; this is delta coverage, not baseline full-file reading.",
+        "Reviewed before integration of main #2903. Existing baseline status remains unchanged."
+      ],
+      "questions": [
+        "Integrated check running; no own cloud/Google runtime or live database verification."
+      ]
+    },
+    {
+      "path": "docs/engineering/threat-model.md",
+      "sha": "b2cca8fa352c0bd2bbb66c1f50a6c68b71061334",
+      "change": "M",
+      "blob": "7a5f3552b975293e29611fc47f7491be7ad17fc0",
+      "method": "full-text",
+      "status": "delta-reviewed",
+      "read_ranges": [],
+      "evidence": [
+        "Entire upstream unified diff reviewed; this is delta coverage, not baseline full-file reading.",
+        "Reviewed before integration of main #2903. Existing baseline status remains unchanged."
+      ],
+      "questions": [
+        "Integrated check running; no own cloud/Google runtime or live database verification."
+      ]
+    },
+    {
+      "path": "docs/learn/journeys/delete-undo.md",
+      "sha": "b2cca8fa352c0bd2bbb66c1f50a6c68b71061334",
+      "change": "M",
+      "blob": "5c665cbb5543cae4ed3838e892d6ba7dc3379d13",
+      "method": "full-text",
+      "status": "delta-reviewed",
+      "read_ranges": [],
+      "evidence": [
+        "Entire upstream unified diff reviewed; this is delta coverage, not baseline full-file reading.",
+        "Reviewed before integration of main #2903. Existing baseline status remains unchanged."
+      ],
+      "questions": [
+        "Integrated check running; no own cloud/Google runtime or live database verification."
+      ]
+    },
+    {
+      "path": "docs/learn/journeys/google-calendar.md",
+      "sha": "b2cca8fa352c0bd2bbb66c1f50a6c68b71061334",
+      "change": "M",
+      "blob": "b1ec4bba1fd1f1d3717b47c6ef2fbddf3f6d2ae2",
+      "method": "full-text",
+      "status": "delta-reviewed",
+      "read_ranges": [],
+      "evidence": [
+        "Entire upstream unified diff reviewed; this is delta coverage, not baseline full-file reading.",
+        "Reviewed before integration of main #2903. Existing baseline status remains unchanged."
+      ],
+      "questions": [
+        "Integrated check running; no own cloud/Google runtime or live database verification."
+      ]
+    },
+    {
+      "path": "docs/operations/calendar-authority-cutover.md",
+      "sha": "b2cca8fa352c0bd2bbb66c1f50a6c68b71061334",
+      "change": "A",
+      "blob": "0e3e304f260fc072ee095269d4af48a602311625",
+      "method": "full-text",
+      "status": "delta-reviewed",
+      "read_ranges": [[1, 72]],
+      "evidence": [
+        "Full added file read in bounded untruncated chunks.",
+        "Reviewed before integration of main #2903. Existing baseline status remains unchanged."
+      ],
+      "questions": [
+        "Integrated check running; no own cloud/Google runtime or live database verification."
+      ]
+    },
+    {
+      "path": "docs/operations/calendar-integration-rehearsal.md",
+      "sha": "b2cca8fa352c0bd2bbb66c1f50a6c68b71061334",
+      "change": "A",
+      "blob": "d2324ef5963aac29917b6714f008b6aab897d6c0",
+      "method": "full-text",
+      "status": "delta-reviewed",
+      "read_ranges": [[1, 204]],
+      "evidence": [
+        "Full added file read in bounded untruncated chunks.",
+        "Reviewed before integration of main #2903. Existing baseline status remains unchanged."
+      ],
+      "questions": [
+        "Integrated check running; no own cloud/Google runtime or live database verification."
+      ]
+    },
+    {
+      "path": "docs/product/specs/external-calendar.md",
+      "sha": "b2cca8fa352c0bd2bbb66c1f50a6c68b71061334",
+      "change": "M",
+      "blob": "ecceaa5d186828c94a966c27a633369b7dfdd2b2",
+      "method": "full-text",
+      "status": "delta-reviewed",
+      "read_ranges": [],
+      "evidence": [
+        "Entire upstream unified diff reviewed; this is delta coverage, not baseline full-file reading.",
+        "Reviewed before integration of main #2903. Existing baseline status remains unchanged."
+      ],
+      "questions": [
+        "Integrated check running; no own cloud/Google runtime or live database verification."
+      ]
+    },
+    {
+      "path": "scripts/ci/check.mjs",
+      "sha": "b2cca8fa352c0bd2bbb66c1f50a6c68b71061334",
+      "change": "M",
+      "blob": "43b3fef8d4c2daf1069486c7d51e4c3dac468292",
+      "method": "full-text",
+      "status": "delta-reviewed",
+      "read_ranges": [],
+      "evidence": [
+        "Entire upstream unified diff reviewed; this is delta coverage, not baseline full-file reading.",
+        "Reviewed before integration of main #2903. Existing baseline status remains unchanged."
+      ],
+      "questions": [
+        "Integrated check running; no own cloud/Google runtime or live database verification."
+      ]
+    },
+    {
+      "path": "scripts/runbook/calendar-authority-cutover.sql",
+      "sha": "b2cca8fa352c0bd2bbb66c1f50a6c68b71061334",
+      "change": "A",
+      "blob": "353a8086869d26594a65adb097b5df29f3568478",
+      "method": "full-text",
+      "status": "delta-reviewed",
+      "read_ranges": [[1, 92]],
+      "evidence": [
+        "Full added file read in bounded untruncated chunks.",
+        "Reviewed before integration of main #2903. Existing baseline status remains unchanged."
+      ],
+      "questions": [
+        "Integrated check running; no own cloud/Google runtime or live database verification."
+      ]
+    },
+    {
+      "path": "supabase/migrations/20260925000000_fenced_calendar_reconnect_command.sql",
+      "sha": "b2cca8fa352c0bd2bbb66c1f50a6c68b71061334",
+      "change": "A",
+      "blob": "684db539d7380e25b2e8499486bdeeab06ea2561",
+      "method": "full-text",
+      "status": "delta-reviewed",
+      "read_ranges": [[1, 324]],
+      "evidence": [
+        "Full added file read in bounded untruncated chunks.",
+        "Reviewed before integration of main #2903. Existing baseline status remains unchanged."
+      ],
+      "questions": [
+        "Integrated check running; no own cloud/Google runtime or live database verification."
+      ]
+    },
+    {
+      "path": "supabase/migrations/20260925100000_repair_legacy_calendar_connection_fence.sql",
+      "sha": "b2cca8fa352c0bd2bbb66c1f50a6c68b71061334",
+      "change": "A",
+      "blob": "8dc162b7b069f6eeaea11d619534806e9f5872c9",
+      "method": "full-text",
+      "status": "delta-reviewed",
+      "read_ranges": [[1, 177]],
+      "evidence": [
+        "Full added file read in bounded untruncated chunks.",
+        "Reviewed before integration of main #2903. Existing baseline status remains unchanged."
+      ],
+      "questions": [
+        "Integrated check running; no own cloud/Google runtime or live database verification."
+      ]
+    },
+    {
+      "path": "supabase/migrations/20260925120000_calendar_oauth_reconnect_hardening.sql",
+      "sha": "b2cca8fa352c0bd2bbb66c1f50a6c68b71061334",
+      "change": "A",
+      "blob": "94ddbb46e3341898a4085d023352cc80777b6640",
+      "method": "full-text",
+      "status": "delta-reviewed",
+      "read_ranges": [[1, 430]],
+      "evidence": [
+        "Full added file read in bounded untruncated chunks.",
+        "Reviewed before integration of main #2903. Existing baseline status remains unchanged."
+      ],
+      "questions": [
+        "Integrated check running; no own cloud/Google runtime or live database verification."
+      ]
+    },
+    {
+      "path": "supabase/migrations/20260930014002_prevent_duplicate_external_calendar_conversion.sql",
+      "sha": "b2cca8fa352c0bd2bbb66c1f50a6c68b71061334",
+      "change": "A",
+      "blob": "38cf11ad38d873b05d7dcab27f0978cf6fb1e49c",
+      "method": "full-text",
+      "status": "delta-reviewed",
+      "read_ranges": [[1, 43]],
+      "evidence": [
+        "Full added file read in bounded untruncated chunks.",
+        "Reviewed before integration of main #2903. Existing baseline status remains unchanged."
+      ],
+      "questions": [
+        "Integrated check running; no own cloud/Google runtime or live database verification."
+      ]
+    },
+    {
+      "path": "supabase/tests/fenced-calendar-reconnect.sql",
+      "sha": "b2cca8fa352c0bd2bbb66c1f50a6c68b71061334",
+      "change": "A",
+      "blob": "4c0b4df368cb2cd11f20a1a713b2fefb115cba96",
+      "method": "full-text",
+      "status": "delta-reviewed",
+      "read_ranges": [[1, 282]],
+      "evidence": [
+        "Full added file read in bounded untruncated chunks.",
+        "Reviewed before integration of main #2903. Existing baseline status remains unchanged."
+      ],
+      "questions": [
+        "Integrated check running; no own cloud/Google runtime or live database verification."
       ]
     }
   ]

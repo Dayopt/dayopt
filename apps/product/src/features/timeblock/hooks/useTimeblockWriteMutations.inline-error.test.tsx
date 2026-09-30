@@ -44,6 +44,7 @@ const mocks = vi.hoisted(() => ({
   recordUpdateCallbacks: undefined as MutationCallbacks | undefined,
   planDeleteCallbacks: undefined as MutationCallbacks | undefined,
   planRestoreCallbacks: undefined as MutationCallbacks | undefined,
+  recordRestoreCallbacks: undefined as MutationCallbacks | undefined,
   otherMutationCallbacks: [] as MutationCallbacks[],
   cacheEntries: [] as CacheEntry[],
   queryObjects: new Map<unknown, { queryKey: unknown; queryHash: string }>(),
@@ -183,7 +184,12 @@ vi.mock('@/lib/trpc', () => {
           },
         },
         delete: { useMutation },
-        restore: { useMutation },
+        restore: {
+          useMutation: (callbacks: MutationCallbacks) => {
+            mocks.recordRestoreCallbacks = callbacks;
+            return useMutation(callbacks);
+          },
+        },
       },
     },
   };
@@ -198,6 +204,7 @@ describe('useTimeblockWriteMutations create overlap presentation', () => {
     mocks.recordUpdateCallbacks = undefined;
     mocks.planDeleteCallbacks = undefined;
     mocks.planRestoreCallbacks = undefined;
+    mocks.recordRestoreCallbacks = undefined;
     mocks.otherMutationCallbacks = [];
     mocks.cacheEntries = [];
     mocks.recordDetailSetData.mockClear();
@@ -215,6 +222,81 @@ describe('useTimeblockWriteMutations create overlap presentation', () => {
     ];
     expect(callbacks).toHaveLength(8);
     expect(callbacks.every((options) => options?.retry === false)).toBe(true);
+  });
+
+  it('外部予定の二重確定はPlanとRecordで再試行を促さず理由を知らせる', async () => {
+    renderHook(() => useTimeblockWriteMutations());
+    const error = {
+      message: 'already converted',
+      data: { serviceCode: 'EXTERNAL_CALENDAR_ALREADY_CONVERTED' },
+    };
+    const input = {
+      title: 'External appointment',
+      start_at: '2026-07-01T09:00:00.000Z',
+      end_at: '2026-07-01T10:00:00.000Z',
+      externalCalendarEventId: 'external-event-1',
+    };
+    for (const callbacks of [mocks.planCreateCallbacks, mocks.recordCreateCallbacks]) {
+      if (!callbacks?.onMutate) throw new Error('Create callbacks missing');
+      let context: unknown;
+      await act(async () => {
+        context = await callbacks.onMutate?.(input);
+      });
+      act(() => callbacks.onError?.(error, input, context));
+      expect(mocks.toastError).toHaveBeenLastCalledWith('toast.externalCalendarAlreadyConverted');
+      act(() => callbacks.onSettled?.(undefined, error, input, context));
+    }
+    expect(mocks.toastError).toHaveBeenCalledTimes(2);
+    expect(mocks.plansInvalidate).toHaveBeenCalledTimes(2);
+    expect(mocks.recordsInvalidate).toHaveBeenCalledTimes(2);
+  });
+
+  it('再取り込み後の旧行復元は復元不可の理由を知らせて一覧を再取得する', async () => {
+    renderHook(() => useTimeblockWriteMutations());
+    const input = { id: 'old-external-row', expectedUpdatedAt: '2026-07-01T10:00:00.000Z' };
+    const error = {
+      message: 'already converted',
+      data: { serviceCode: 'EXTERNAL_CALENDAR_ALREADY_CONVERTED' },
+    };
+    for (const callbacks of [mocks.planRestoreCallbacks, mocks.recordRestoreCallbacks]) {
+      if (!callbacks?.onMutate) throw new Error('Restore callbacks missing');
+      let context: unknown;
+      await act(async () => {
+        context = await callbacks.onMutate?.(input);
+      });
+      act(() => callbacks.onError?.(error, input, context));
+      expect(mocks.toastError).toHaveBeenLastCalledWith('toast.externalCalendarRestoreConflict');
+      act(() => callbacks.onSettled?.(undefined, error, input, context));
+    }
+    expect(mocks.toastError).toHaveBeenCalledTimes(2);
+    expect(mocks.plansInvalidate).toHaveBeenCalledTimes(2);
+    expect(mocks.recordsInvalidate).toHaveBeenCalledTimes(2);
+    expect(mocks.planDetailSetData).not.toHaveBeenCalled();
+    expect(mocks.recordDetailSetData).not.toHaveBeenCalled();
+  });
+
+  it('無関係な復元失敗を外部予定の競合と誤表示しない', () => {
+    renderHook(() => useTimeblockWriteMutations());
+    act(() =>
+      mocks.planRestoreCallbacks?.onError?.(
+        { message: 'other conflict', data: { serviceCode: 'STALE_VERSION' } },
+        undefined,
+        undefined,
+      ),
+    );
+    expect(mocks.toastError).toHaveBeenCalledExactlyOnceWith('toast.restoreFailed');
+  });
+
+  it('復元で時間重複制約が先に拒否しても再試行を促さず重複理由を知らせる', () => {
+    renderHook(() => useTimeblockWriteMutations());
+    act(() =>
+      mocks.planRestoreCallbacks?.onError?.(
+        { message: 'time overlap', data: { serviceCode: 'TIME_OVERLAP' } },
+        undefined,
+        undefined,
+      ),
+    );
+    expect(mocks.toastError).toHaveBeenCalledExactlyOnceWith('toast.overlap');
   });
 
   it('Recordのfulfillment省略更新は楽観patchで既存値を保持する', async () => {
