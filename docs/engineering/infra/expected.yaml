@@ -277,6 +277,16 @@ secret_refs:
     owner: vercel_supabase_integration
     op_ref: null
     verification: integration_owned_no_invented_master
+  nonproduction_test_username:
+    op_ref: op://dlmo7yfs5buvd3j3sbikjjqypa/s3tems3afbzvvguakggydcgxni/username
+    usage: existing_seed_user_login_verification
+    environments: [preview, integration]
+    db_ref: tilwaprottpyhlfoggbb
+  nonproduction_test_password:
+    op_ref: op://dlmo7yfs5buvd3j3sbikjjqypa/s3tems3afbzvvguakggydcgxni/password
+    usage: existing_seed_user_login_verification
+    environments: [preview, integration]
+    db_ref: tilwaprottpyhlfoggbb
   product_bypass:
     op_ref: op://ci/vercel-production/VERCEL_AUTOMATION_BYPASS_PRODUCT
     master_match: verified
