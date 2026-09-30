@@ -114,7 +114,7 @@ describe('operational failure delivery', () => {
   it.each(['', '9999'])(
     'executes the real notification shell with existing issue %s',
     (existing) => {
-      // 守ること: 監査失敗を正しいIssueへ届け、標準入力の優先度JSONも最後まで送る。
+      // 守ること: 監査失敗を正しい Issue へ届け、廃止した Priority field に書かない。
       const workflow = readFileSync('.github/workflows/production-config-audit.yml', 'utf8');
       const notification = workflow.split('  notify-supabase-audit-failure:')[1]!;
       const script = notification
@@ -124,14 +124,10 @@ describe('operational failure delivery', () => {
         .join('\n');
       const temp = mkdtempSync(join(tmpdir(), 'dayopt-notification-'));
       const calls = join(temp, 'calls');
-      const inputBody = join(temp, 'input-body');
       try {
         // Shadow gh inside the same shell: no network or real GitHub mutation is possible.
         const fakeGh = `gh() {
           printf "%s\\0" "$@" >> "$FIXTURE_CALLS"
-          case " $* " in
-            *" --input - "*) cat >> "$FIXTURE_INPUT_BODY" ;;
-          esac
           case "$1 $2" in
             "issue list") printf "%s" "$FIXTURE_EXISTING" ;;
             "issue create") printf "%s" "https://github.com/fixture/repo/issues/4242" ;;
@@ -150,7 +146,6 @@ describe('operational failure delivery', () => {
             HEARTBEAT_RESULT: 'failure',
             SCHEMA_RESULT: 'failure',
             FIXTURE_CALLS: calls,
-            FIXTURE_INPUT_BODY: inputBody,
             FIXTURE_EXISTING: existing,
           },
         });
@@ -158,12 +153,8 @@ describe('operational failure delivery', () => {
         const args = readFileSync(calls, 'utf8').split('\0');
         expect(args).toContain(existing ? 'comment' : 'create');
         if (existing) expect(args).toContain(existing);
-        expect(args).toContain(
-          `repos/fixture/repo/issues/${existing || '4242'}/issue-field-values`,
-        );
-        expect(JSON.parse(readFileSync(inputBody, 'utf8'))).toEqual({
-          issue_field_values: [{ field_id: 38713666, value: 'High' }],
-        });
+        expect(args.some((arg) => arg.includes('/issue-field-values'))).toBe(false);
+        expect(args).not.toContain('priority:p1');
         const body = args[args.indexOf('--body') + 1]!;
         expect(body).toContain('| Audit production cron heartbeats | `failure` |');
         expect(body).toContain('| Audit production schema and ACL | `failure` |');
