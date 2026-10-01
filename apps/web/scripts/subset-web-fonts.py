@@ -35,7 +35,8 @@ def strings(value):
     return ""
 
 
-text = "".join(
+docs_introduction = (WEB / "content/docs/ja/getting-started/index.mdx").read_text().split("---", 2)[2].split("\n## ", 1)[0]
+text = docs_introduction + "".join(
     strings(json.loads((WEB / f"messages/{locale}/{namespace}.json").read_text()))
     for locale in ("en", "ja")
     for namespace in ("common", "marketing")
@@ -59,6 +60,10 @@ footer_text = strings(ja_common["footer"]["sections"]) + strings(ja_common["foot
 calendar = ja_landing["calendar"]
 calendar_first = "".join(calendar[key] for key in ("kicker", "title1", "title2", "body1", "body2", "stepPlan", "stepRecord", "stepNext", "sample", "dateFirst", "weekdayFirst", "insightRecordCopy", "guide", "google"))
 critical_text = header_text + footer_text + strings(banner) + strings(common["theme"]) + "日本語" + strings(ja_landing["hero"]) + strings(ja_landing["experience"]) + calendar_first + symbols
+critical_text += strings(ja_common["blog"]["header"])
+critical_text += docs_introduction
+contact = json.loads((WEB / "messages/ja/marketing.json").read_text())["marketing"]["contact"]
+critical_text += contact["title"] + contact["subtitle"]
 critical_400 = japanese & {ord(char) for char in critical_text}
 medium_text = header_text + strings(ja_common["footer"]["sections"]) + banner["title"] + banner["necessaryOnly"] + banner["allowAnalytics"] + ja_landing["hero"]["cta"] + "".join(ja_landing["experience"][key] for key in ("plan", "record", "reading", "minuteUnit")) + "".join(calendar[key] for key in ("reading", "development", "walking", "insightRecord1", "insightRecord2"))
 critical_500 = japanese & {ord(char) for char in medium_text}

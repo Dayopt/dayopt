@@ -90,9 +90,9 @@ export function Footer() {
           <div className="mt-16 grid grid-cols-2 gap-8 md:grid-cols-3 xl:col-span-2 xl:mt-0">
             {/* Resources */}
             <div>
-              <h3 className="text-foreground text-base font-medium">
+              <h2 className="text-foreground text-base font-medium">
                 {tFooter('sections.resources')}
-              </h3>
+              </h2>
               <ul role="list" className="mt-6 space-y-4">
                 {navigation.resources.map((item) => (
                   <li key={item.name}>
@@ -108,9 +108,9 @@ export function Footer() {
             </div>
             {/* Support */}
             <div>
-              <h3 className="text-foreground text-base font-medium">
+              <h2 className="text-foreground text-base font-medium">
                 {tFooter('sections.support')}
-              </h3>
+              </h2>
               <ul role="list" className="mt-6 space-y-4">
                 {navigation.support.map((item) =>
                   'external' in item && item.external ? (
@@ -139,7 +139,7 @@ export function Footer() {
             </div>
             {/* Legal */}
             <div className="col-span-2 md:col-span-1">
-              <h3 className="text-foreground text-base font-medium">{tFooter('sections.legal')}</h3>
+              <h2 className="text-foreground text-base font-medium">{tFooter('sections.legal')}</h2>
               <ul role="list" className="mt-6 space-y-4">
                 {navigation.legal.map((item) => (
                   <li key={item.name}>
