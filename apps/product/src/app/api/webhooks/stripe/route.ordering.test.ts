@@ -201,10 +201,11 @@ beforeEach(() => {
 
 describe('Stripe webhook delivery order', () => {
   it.each(['durable', 'legacy'] as const)(
-    '%s: retry after receipt failure preserves a valid trial conversion notification',
+    '%s: retry after receipt failure does not duplicate a delivered trial conversion notification',
     async (mode) => {
       fixture.mode = mode;
       fixture.emailEnabled = true;
+      fixture.profile.subscription_status = 'trialing';
       fixture.event.type = 'customer.subscription.updated';
       fixture.event.data.object.status = 'active';
       fixture.event.data.previous_attributes = { status: 'trialing' };
@@ -219,7 +220,7 @@ describe('Stripe webhook delivery order', () => {
       expect(released).toHaveBeenCalledTimes(1);
       expect(fixture.profile.subscription_status).toBe('active');
       expect((await deliver()).status).toBe(200);
-      expect(deliveredEmail).toHaveBeenCalledTimes(2);
+      expect(deliveredEmail).toHaveBeenCalledTimes(1);
       for (const [delivery] of deliveredEmail.mock.calls) {
         expect(delivery).toMatchObject({
           to: 'fixture@example.test',
@@ -231,7 +232,7 @@ describe('Stripe webhook delivery order', () => {
   );
 
   it.each(['durable', 'legacy'] as const)(
-    '%s: recovery followed by an older past_due snapshot sends no trial conversion',
+    '%s: recovery followed by an older active trial snapshot sends no trial conversion',
     async (mode) => {
       fixture.mode = mode;
       fixture.emailEnabled = true;
@@ -256,7 +257,7 @@ describe('Stripe webhook delivery order', () => {
       );
       fixture.event.id = 'evt_older_trial_end';
       fixture.event.created -= 1;
-      fixture.event.data.object.status = 'past_due';
+      fixture.event.data.object.status = 'active';
       fixture.event.data.previous_attributes = { status: 'trialing' };
       expect((await deliver()).status).toBe(200);
       expect(fixture.profile.subscription_status).toBe('active');

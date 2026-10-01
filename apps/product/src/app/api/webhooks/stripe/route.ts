@@ -472,6 +472,7 @@ export async function POST(request: NextRequest) {
                   .status ?? subscription.status,
               )
             : null;
+        const persistedTransition = expected.status === previousStatus;
 
         await syncSubscriptionStatus(supabase, customerId, subscription.id, status, expected);
         logger.info('Subscription updated', {
@@ -482,7 +483,7 @@ export async function POST(request: NextRequest) {
         });
 
         // trialing → active: Pro開始メール
-        if (previousStatus === 'trialing' && status === 'active') {
+        if (persistedTransition && previousStatus === 'trialing' && status === 'active') {
           const updatedUser = await getUserByCustomerId(supabase, customerId);
           if (updatedUser) {
             const t = createEmailTranslator(updatedUser.locale);
@@ -500,7 +501,7 @@ export async function POST(request: NextRequest) {
         }
 
         // past_due → active: 支払い復旧メール
-        if (previousStatus === 'past_due' && status === 'active') {
+        if (persistedTransition && previousStatus === 'past_due' && status === 'active') {
           const recoveredUser = await getUserByCustomerId(supabase, customerId);
           if (recoveredUser) {
             const t = createEmailTranslator(recoveredUser.locale);
