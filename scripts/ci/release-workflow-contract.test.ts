@@ -471,6 +471,19 @@ describe('release workflow contract', () => {
 describe('Storybook promote contract', () => {
   const source = workflow('promote.yml');
   const job = source.slice(source.indexOf('\n  storybook:'), source.indexOf('\n  web:'));
+  it('同じ affected / force gate 内で静的ビルドをブラウザテスト前に検証する', () => {
+    expect(job).toMatch(/^    needs: impact$/m);
+    expect(job).toMatch(
+      /^    if: \$\{\{ needs\.impact\.outputs\.storybook_affected == 'true' && github\.event\.inputs\.force != 'true' \}\}$/m,
+    );
+    const buildStep = job.match(
+      /^      - name: Build Storybook\n        run: pnpm build-storybook$/m,
+    );
+    expect(buildStep).not.toBeNull();
+    expect(buildStep!.index).toBeLessThan(job.indexOf('- name: Test Storybook light and dark'));
+    // build は検証 job 内の通常 step。独立した deploy や追加の免除条件にしない。
+    expect(job).not.toMatch(/vercel|deploy|secrets\./i);
+  });
   it('collect と両テーマを実行し、失敗を握り潰さない', () => {
     expect(job).toContain("needs.impact.outputs.storybook_affected == 'true'");
     expect(job).toContain('check-story-coverage.ts --collected');

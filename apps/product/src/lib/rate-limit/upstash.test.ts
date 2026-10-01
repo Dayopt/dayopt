@@ -295,7 +295,15 @@ describe('Upstash Rate Limit', () => {
     vi.stubEnv('UPSTASH_REDIS_REST_TOKEN', 'configured');
     for (const [name, value] of Object.entries(environment)) vi.stubEnv(name, value);
 
-    await import('./upstash');
+    const rateLimits = await import('./upstash');
+    if (environment.DAYOPT_ENVIRONMENT === 'preview') {
+      expect(constructorOptions).toEqual([]);
+      expect(await rateLimits.contactRateLimit!.limit('preview-user')).toMatchObject({
+        success: true,
+        limit: 5,
+      });
+      return;
+    }
 
     const prefixes = constructorOptions.map((options) => options.prefix);
     expect(prefixes).toContain(expectedPrefix);

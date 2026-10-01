@@ -1,8 +1,43 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, symlinkSync } from 'node:fs';
+import {
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readlinkSync,
+  rmSync,
+  symlinkSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { isAbsolute, join, relative, resolve } from 'node:path';
 import { isDirectExecution } from '../lib/is-direct-execution.mjs';
+
+/**
+ * installed layout を snapshot 内に複製し、workspace code へのリンクも snapshot へ向ける。
+ * @param {string} source
+ * @param {string} target
+ * @param {string} root
+ * @param {string} snapshot
+ */
+function copyWorkspaceDependencies(source, target, root, snapshot) {
+  mkdirSync(target, { recursive: true });
+  for (const entry of readdirSync(source, { withFileTypes: true })) {
+    const from = join(source, entry.name);
+    const to = join(target, entry.name);
+    if (entry.isSymbolicLink()) {
+      const destination = resolve(source, readlinkSync(from));
+      const repoRelative = relative(root, destination);
+      const withinRepo =
+        !isAbsolute(repoRelative) && repoRelative !== '..' && !repoRelative.startsWith('../');
+      symlinkSync(withinRepo ? relative(target, join(snapshot, repoRelative)) : destination, to);
+    } else if (entry.isDirectory()) {
+      copyWorkspaceDependencies(from, to, root, snapshot);
+    } else {
+      copyFileSync(from, to);
+    }
+  }
+}
 
 /** Git hookの環境を子worktreeへ持ち込まず、送信するcommit treeごとに通常docs:checkを実行する。 */
 export function checkPushedDocuments(input, root = process.cwd()) {
@@ -45,6 +80,25 @@ export function checkPushedDocuments(input, root = process.cwd()) {
         for (const entry of readdirSync(dependencies)) {
           if (entry.startsWith('.pnpm-') && entry.includes('state')) continue;
           symlinkSync(join(dependencies, entry), join(target, entry));
+        }
+      }
+      // TypeScript の生成図は app 固有の依存型も辿る。root だけでは Supabase 等の
+      // 型が解決できず、同じ commit の MCP → DB 接点が欠落して drift と誤判定する。
+      for (const group of ['apps', 'packages']) {
+        const groupPath = join(snapshot, group);
+        if (!existsSync(groupPath)) continue;
+        for (const entry of readdirSync(groupPath, { withFileTypes: true })) {
+          if (!entry.isDirectory() || !existsSync(join(groupPath, entry.name, 'package.json')))
+            continue;
+          const installed = join(root, group, entry.name, 'node_modules');
+          if (existsSync(installed)) {
+            copyWorkspaceDependencies(
+              installed,
+              join(groupPath, entry.name, 'node_modules'),
+              root,
+              snapshot,
+            );
+          }
         }
       }
       console.log(`→ push文書検査: ${sha}`);

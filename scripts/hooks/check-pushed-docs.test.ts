@@ -1,5 +1,13 @@
 import { execFileSync, spawnSync } from 'node:child_process';
-import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  copyFileSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { afterEach, beforeEach, expect, it } from 'vitest';
@@ -53,6 +61,53 @@ it('正しいcommitを通し、不明なSHAや不正入力は失敗させる', (
   expect(() => checkPushedDocuments(input(good), root)).not.toThrow();
   expect(() => checkPushedDocuments(input('f'.repeat(40)), root)).toThrow();
   expect(() => checkPushedDocuments('malformed', root)).toThrow();
+});
+
+it('snapshotのworkspace依存型を解決し、workspaceリンクが作業中のコードを参照しない', () => {
+  writeFileSync(join(root, '.gitignore'), 'node_modules/\n');
+  mkdirSync(join(root, 'apps/product'), { recursive: true });
+  mkdirSync(join(root, 'packages/shared'), { recursive: true });
+  writeFileSync(
+    join(root, 'apps/product/package.json'),
+    JSON.stringify({ name: '@dayopt/product' }),
+  );
+  writeFileSync(
+    join(root, 'packages/shared/package.json'),
+    JSON.stringify({ name: '@dayopt/shared' }),
+  );
+  writeFileSync(join(root, 'packages/shared/value.txt'), 'committed');
+  writeFileSync(
+    join(root, 'inspect.mjs'),
+    `
+    import { readFileSync, realpathSync, lstatSync } from 'node:fs';
+    import { join } from 'node:path';
+    const modules = join(process.cwd(), 'apps/product/node_modules');
+    if (lstatSync(modules).isSymbolicLink()) throw new Error('shared mutable modules directory');
+    if (readFileSync(join(modules, 'dependency/value.txt'), 'utf8') !== 'installed') throw new Error('missing dependency');
+    if (realpathSync(join(modules, '@dayopt/shared')) !== realpathSync('packages/shared')) throw new Error('wrong workspace');
+    if (readFileSync(join(modules, '@dayopt/shared/value.txt'), 'utf8') !== 'committed') throw new Error('uncommitted code');
+  `,
+  );
+  const good = commit('valid');
+  mkdirSync(join(root, 'node_modules/dependency'), { recursive: true });
+  writeFileSync(join(root, 'node_modules/dependency/value.txt'), 'installed');
+  mkdirSync(join(root, 'apps/product/node_modules/@dayopt'), { recursive: true });
+  symlinkSync(
+    '../../../node_modules/dependency',
+    join(root, 'apps/product/node_modules/dependency'),
+  );
+  // 絶対リンクでも snapshot の同じ workspace へ置き換える。
+  symlinkSync(
+    join(root, 'packages/shared'),
+    join(root, 'apps/product/node_modules/@dayopt/shared'),
+  );
+  writeFileSync(join(root, 'packages/shared/value.txt'), 'uncommitted');
+  const before = git('status', '--porcelain');
+  expect(() => checkPushedDocuments(input(good), root)).not.toThrow();
+  expect(readFileSync(join(root, 'packages/shared/value.txt'), 'utf8')).toBe('uncommitted');
+  expect(readFileSync(join(root, 'node_modules/dependency/value.txt'), 'utf8')).toBe('installed');
+  expect(git('status', '--porcelain')).toBe(before);
+  expect(git('worktree', 'list', '--porcelain').match(/^worktree /gm)).toHaveLength(1);
 });
 
 it('実pre-pushも作業中の修正で送信commitの違反を隠せない（hook環境はsnapshotへ継承しない）', () => {

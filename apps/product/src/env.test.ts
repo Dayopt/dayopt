@@ -119,3 +119,23 @@ describe('Integration server environment', () => {
     );
   });
 });
+
+describe('ordinary Preview Redis independence', () => {
+  it.each(['tilwaprottpyhlfoggbb', 'abcdefghijklmnopqrst'])(
+    'ignores unused malformed inherited Redis for %s at runtime',
+    async (ref) => {
+      const { env } = await loadIntegrationEnv({
+        DAYOPT_ENVIRONMENT: 'preview',
+        NEXT_PUBLIC_DAYOPT_ENVIRONMENT: 'preview',
+        VERCEL_GIT_COMMIT_REF: 'codex/example',
+        VERCEL_URL: 'product-example-dayopt.vercel.app',
+        VERCEL_BRANCH_URL: 'product-example-dayopt.vercel.app',
+        NEXT_PUBLIC_APP_URL: 'https://product-example-dayopt.vercel.app',
+        NEXT_PUBLIC_SUPABASE_URL: `https://${ref}.supabase.co`,
+        UPSTASH_REDIS_REST_URL: 'malformed',
+        UPSTASH_REDIS_REST_TOKEN: '',
+      });
+      expect(env.NEXT_PUBLIC_SUPABASE_URL).toBe(`https://${ref}.supabase.co`);
+    },
+  );
+});

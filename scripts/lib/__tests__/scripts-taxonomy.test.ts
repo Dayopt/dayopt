@@ -32,6 +32,31 @@ function makeFixtureRepo(files: Record<string, string>): string {
   return root;
 }
 
+describe('Vercel の CI command 参照', () => {
+  it.each(['buildCommand', 'installCommand', 'ignoreCommand'])(
+    '%s の実行scriptはCI、その他JSONの一覧は参照に数えない',
+    (field) => {
+      const root = makeFixtureRepo({
+        'scripts/ci/deployment.mjs': 'export const check = 1;',
+        'scripts/ci/inventory-only.mjs': 'export const inventory = 1;',
+        'apps/storybook/vercel.json': JSON.stringify({
+          [field]: 'node ../../scripts/ci/deployment.mjs',
+          notes: ['scripts/ci/inventory-only.mjs'],
+        }),
+        'docs/runbook.md': 'Run `node scripts/ci/deployment.mjs`.',
+      });
+      const entries = classifyAllScripts(root);
+      expect(entries.find((entry) => entry.path === 'scripts/ci/deployment.mjs')).toMatchObject({
+        category: 'ci',
+        hits: { workflow: [`apps/storybook/vercel.json#${field}`] },
+      });
+      expect(
+        entries.find((entry) => entry.path === 'scripts/ci/inventory-only.mjs')?.category,
+      ).toBe('unreferenced');
+    },
+  );
+});
+
 describe('classifyHits', () => {
   it('優先順位どおり最初に該当したカテゴリを返す(pkg > workflow > hooks > agent > runbook > lib)', () => {
     expect(

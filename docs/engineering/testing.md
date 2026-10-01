@@ -43,9 +43,13 @@ nightly の full が落ちたら、落ちた test を直すのに加えて、PR 
 
 ## Storybook の実行契約
 
-`promote.yml` の専用 `storybook` job が、collect 検査と light / dark の render・play・a11y を実行する。両 app の配信中 SHA のうち、target の祖先と確認できる最も新しい SHA を共通基準に、product / web / 共有 UI / Storybook 設定と実行経路の変更を拾う。片方だけ昇格した後に古い app の SHA から同じ変更を繰り返し検査しない。配信 SHA の欠落・履歴の分岐・判定不能時は実行する。失敗・cancel・判定出力欠落は通常の promote を通さず、失敗通知は既存経路へ接続する。既存の force による緊急復旧は維持する。
+`promote.yml` の専用 `storybook` job が、collect 検査、同じ Story の静的 build、light / dark の render・play・a11y を実行する。両 app の配信中 SHA のうち、target の祖先と確認できる最も新しい SHA を共通基準に、product / web / 共有 UI / Storybook 設定と実行経路の変更を拾う。片方だけ昇格した後に古い app の SHA から同じ変更を繰り返し検査しない。配信 SHA の欠落・履歴の分岐・判定不能時は実行する。失敗・cancel・判定出力欠落は通常の promote を通さず、失敗通知は既存経路へ接続する。既存の force による緊急復旧は維持する。
 
-- collect: `pnpm exec tsx scripts/tasks/check-story-coverage.ts --collected`
+- per-PR / local static: `pnpm storybook:collect-files-check`（`check:static` に含む）。Vitest の `list --filesOnly` で両テーマの include 集合を全 Story ファイルと比較する。ブラウザ不要で root / glob の収集漏れを検知するが、runtime tag・play・a11y は検査しない。MDX は比較対象外、`docs-only` / `wip` の Story ファイルは両辺に含む。
+- browser collect: `pnpm exec tsx scripts/tasks/check-story-coverage.ts --collected`
+- static build: `pnpm build-storybook`。Local / CI で同じ `.stories.*` と mock を使い、アプリ資格情報は不要。既存の affected Storybook job で build 失敗も通常の promote を遮断する。静的 build の成功は Preview 配信・URL 発行・実ブラウザ描画の成功を意味しない。
+- Vercel 配信: Dayopt の専用 `storybook` Project は同じ GitHub monorepo の `apps/storybook` を Root Directory とし、Node 24、root 外の workspace source 参照、`pnpm install --frozen-lockfile`、`pnpm build-storybook`、`storybook-static` を設定する。設定の正本は `apps/storybook/vercel.json`。資格情報・DB・custom domain は使わず、全 URL を Vercel Authentication で保護する。PR branch の generated Preview URL と main の固定 URL `https://storybook-sigma-gold.vercel.app` を使用する。固定 URL の初回配信はこの設定を main に merge した後であり、Preview の成功を main 配信済みとは扱わない。
+- 配信対象の判定: `scripts/ci/storybook-impact.mjs` を dependency install 前の Ignored Build Step で実行する。直前の成功 deployment SHA と今回 SHA の両方から workspace manifest・frontend source・静的 asset・参照先を調べるため、Story 自身の変更がなくても UI・CSS・theme・依存設定の変更を拾う。関係しない backend / docs は skip し、初回・履歴不足・入力判定失敗は build する。main にも同じ判定を適用し、product / web の release candidate 判定は変更しない。導入前の branch に判定 script が存在しない場合だけ Project 設定の bootstrap guard で skip し、既存 PR や未導入 main の配信を開始しない。
 - 両テーマ: `pnpm --filter @dayopt/product exec vitest run --project storybook --project storybook-dark`
 - JSON 結果は `storybook-results-<attempt>` artifact に7日保持する。workflow 全体の成功だけでなく、当該 job の実行と失敗件数を確認する。
 - 全件を per-PR に追加しない。E2E と専用 job を並列実行して所要を分離する。cold cache と GitHub runner の実測は PR / Issue の証跡に残す。

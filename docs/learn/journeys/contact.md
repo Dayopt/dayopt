@@ -101,7 +101,7 @@ protectedProcedure でログインを確かめる。contact.submit は利用権�
 - **コード**:
   - [`apps/product/src/lib/billing/operation-access.ts`](../../../apps/product/src/lib/billing/operation-access.ts) で `'contact.submit',` を探す
   - [`apps/product/src/features/contact/server/router.ts`](../../../apps/product/src/features/contact/server/router.ts) で `await enforceContactRateLimit(contactGlobalRateLimit, 'global');` を探す
-  - [`apps/product/src/lib/rate-limit/upstash.ts`](../../../apps/product/src/lib/rate-limit/upstash.ts) で `Ratelimit.slidingWindow(5, '1 h'),` を探す
+  - [`apps/product/src/lib/rate-limit/upstash.ts`](../../../apps/product/src/lib/rate-limit/upstash.ts) で `export const contactRateLimit = createRateLimiter(5, '1 h',` を探す
 - **この段を守るテスト**:
   - [`apps/product/src/features/contact/server/router.test.ts`](../../../apps/product/src/features/contact/server/router.test.ts) で `describe('contact router rate-limit availability'` を探す
 
@@ -425,7 +425,7 @@ Resend は配送の結果を webhook で送ってくる。宛先が support@dayo
         },
         {
           "path": "apps/product/src/lib/rate-limit/upstash.ts",
-          "find": "Ratelimit.slidingWindow(5, '1 h'),"
+          "find": "export const contactRateLimit = createRateLimiter(5, '1 h',"
         }
       ],
       "tests": [
