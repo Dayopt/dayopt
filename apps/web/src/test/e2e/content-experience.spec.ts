@@ -40,9 +40,26 @@ test('Blog検索は結果を絞り込み、クリア後に記事を戻す', asyn
   await expect(page.getByText('記事が見つかりませんでした')).toBeVisible();
   await search.fill('');
   await expect(articles).not.toHaveCount(0);
+  const firstTitle = await articles.first().locator('h2').textContent();
+  await page.getByRole('link', { name: '次のページへ', exact: true }).click();
+  await expect(page).toHaveURL(/\/ja\/blog\?page=2$/);
+  await expect(articles.first().locator('h2')).not.toHaveText(firstTitle!);
+  await page.getByRole('link', { name: '前のページへ', exact: true }).click();
+  await expect(articles.first().locator('h2')).toHaveText(firstTitle!);
   await page.getByRole('link', { name: '設計思想', exact: true }).click();
   await expect(page).toHaveURL(/\/ja\/blog\/philosophy$/);
   await expect(page.locator('main nav a[aria-current="page"]')).toHaveText('設計思想');
+});
+
+test('実際の横断検索APIから予定ガイドを開ける', async ({ page }) => {
+  await page.goto('/search');
+  await page.getByLabel('Keywords', { exact: true }).fill('plans');
+  await page.getByRole('button', { name: 'Search', exact: true }).click();
+  const guide = page.locator('main').getByRole('link', { name: 'Create Plans', exact: true });
+  await expect(guide).toBeVisible();
+  await guide.click();
+  await expect(page).toHaveURL(/\/docs\/plans$/);
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Create Plans');
 });
 
 test('日本語の横断検索と対象切替は操作後の結果を表示する', async ({ page }) => {
