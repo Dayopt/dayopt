@@ -130,7 +130,7 @@
     "repository": "https://cli.eloqnt.dev/docs/formats/po"
   },
   {
-    "name": "@esbuild/darwin-arm64",
+    "name": "@esbuild/linux-x64",
     "version": "0.28.1",
     "license": "MIT",
     "repository": "https://github.com/evanw/esbuild.git"
@@ -203,17 +203,17 @@
     "repository": "https://github.com/lovell/colour.git"
   },
   {
-    "name": "@img/sharp-darwin-arm64",
-    "version": "0.35.4",
-    "license": "Apache-2.0",
-    "repository": "https://github.com/lovell/sharp.git",
+    "name": "@img/sharp-libvips-linux-x64",
+    "version": "1.3.4",
+    "license": "LGPL-3.0-or-later",
+    "repository": "https://github.com/lovell/sharp-libvips.git",
     "publisher": "Lovell Fuller <npm@lovell.info>"
   },
   {
-    "name": "@img/sharp-libvips-darwin-arm64",
-    "version": "1.3.3",
-    "license": "LGPL-3.0-or-later",
-    "repository": "https://github.com/lovell/sharp-libvips.git",
+    "name": "@img/sharp-linux-x64",
+    "version": "0.35.5",
+    "license": "Apache-2.0",
+    "repository": "https://github.com/lovell/sharp.git",
     "publisher": "Lovell Fuller <npm@lovell.info>"
   },
   {
@@ -287,7 +287,7 @@
     "publisher": "Next.js Team <support@vercel.com>"
   },
   {
-    "name": "@next/swc-darwin-arm64",
+    "name": "@next/swc-linux-x64-gnu",
     "version": "16.3.6",
     "license": "MIT",
     "repository": "https://github.com/vercel/next.js"
@@ -355,7 +355,7 @@
     "repository": "https://github.com/parcel-bundler/watcher.git"
   },
   {
-    "name": "@parcel/watcher-darwin-arm64",
+    "name": "@parcel/watcher-linux-x64-glibc",
     "version": "2.5.6",
     "license": "MIT",
     "repository": "https://github.com/parcel-bundler/watcher.git"
@@ -676,7 +676,7 @@
     "publisher": "Rich Harris <richard.a.harris@gmail.com>"
   },
   {
-    "name": "@rollup/rollup-darwin-arm64",
+    "name": "@rollup/rollup-linux-x64-gnu",
     "version": "4.62.2",
     "license": "MIT",
     "repository": "https://github.com/rollup/rollup.git",
@@ -732,7 +732,7 @@
     "publisher": "Sentry"
   },
   {
-    "name": "@sentry/cli-darwin",
+    "name": "@sentry/cli-linux-x64",
     "version": "2.58.6",
     "license": "FSL-1.1-MIT",
     "repository": "https://github.com/getsentry/sentry-cli"
@@ -849,7 +849,7 @@
     "publisher": "강동윤 <kdy1997.dev@gmail.com>"
   },
   {
-    "name": "@swc/core-darwin-arm64",
+    "name": "@swc/core-linux-x64-gnu",
     "version": "1.16.2",
     "license": "Apache-2.0 AND MIT",
     "repository": "https://github.com/swc-project/swc.git",
@@ -877,7 +877,7 @@
     "publisher": "강동윤 <kdy1997.dev@gmail.com>"
   },
   {
-    "name": "@tailwindcss/oxide-darwin-arm64",
+    "name": "@tailwindcss/oxide-linux-x64-gnu",
     "version": "4.3.3",
     "license": "MIT",
     "repository": "https://github.com/tailwindlabs/tailwindcss.git"
@@ -939,12 +939,6 @@
   {
     "name": "@types/ms",
     "version": "2.1.0",
-    "license": "MIT",
-    "repository": "https://github.com/DefinitelyTyped/DefinitelyTyped.git"
-  },
-  {
-    "name": "@types/node",
-    "version": "24.13.4",
     "license": "MIT",
     "repository": "https://github.com/DefinitelyTyped/DefinitelyTyped.git"
   },
@@ -1473,7 +1467,7 @@
   },
   {
     "name": "dompurify",
-    "version": "3.4.13",
+    "version": "3.4.16",
     "license": "(MPL-2.0 OR Apache-2.0)",
     "repository": "git://github.com/cure53/DOMPurify.git",
     "publisher": "Dr.-Ing. Mario Heiderich, Cure53 <mario@cure53.de> (https://cure53.de/)"
@@ -1702,12 +1696,6 @@
     "license": "MIT",
     "repository": "sindresorhus/find-up",
     "publisher": "Sindre Sorhus"
-  },
-  {
-    "name": "fsevents",
-    "version": "2.3.3",
-    "license": "MIT",
-    "repository": "https://github.com/fsevents/fsevents.git"
   },
   {
     "name": "gensync",
@@ -2014,7 +2002,7 @@
     "repository": "https://github.com/parcel-bundler/lightningcss.git"
   },
   {
-    "name": "lightningcss-darwin-arm64",
+    "name": "lightningcss-linux-x64-gnu",
     "version": "1.33.0",
     "license": "MPL-2.0",
     "repository": "https://github.com/parcel-bundler/lightningcss.git"
@@ -2918,7 +2906,7 @@
   },
   {
     "name": "sharp",
-    "version": "0.35.4",
+    "version": "0.35.5",
     "license": "Apache-2.0",
     "repository": "https://github.com/lovell/sharp.git",
     "publisher": "Lovell Fuller <npm@lovell.info>"
@@ -3094,12 +3082,6 @@
     "version": "0.1.3",
     "license": "MIT",
     "repository": "unjs/uncrypto"
-  },
-  {
-    "name": "undici-types",
-    "version": "7.18.2",
-    "license": "MIT",
-    "repository": "https://github.com/nodejs/undici.git"
   },
   {
     "name": "undici-types",
