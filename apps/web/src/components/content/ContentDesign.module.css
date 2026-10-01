@@ -120,7 +120,12 @@
   font-style: normal;
 }
 .articleBody a {
+  color: var(--foreground);
+  text-decoration: underline;
   text-underline-offset: 4px;
+}
+.articleBody :global(.text-primary) {
+  color: var(--foreground);
 }
 .articleBody table {
   width: 100%;

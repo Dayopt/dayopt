@@ -128,7 +128,7 @@ export default async function OSSCreditsPage({ params }: PageProps) {
                       v{credit.version}
                     </span>
                   </h3>
-                  <span className="bg-muted text-primary w-fit rounded-lg px-4 py-1 text-sm font-medium">
+                  <span className="bg-muted text-foreground w-fit rounded-lg px-4 py-1 text-sm font-medium">
                     {credit.license}
                   </span>
                 </div>
@@ -147,7 +147,7 @@ export default async function OSSCreditsPage({ params }: PageProps) {
                         href={credit.repository}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-primary break-all hover:underline"
+                        className="text-foreground break-all underline underline-offset-4"
                       >
                         {credit.repository}
                       </Link>
@@ -167,7 +167,7 @@ export default async function OSSCreditsPage({ params }: PageProps) {
           <Link
             href="/THIRD_PARTY_NOTICES.txt"
             target="_blank"
-            className="text-primary break-all hover:underline"
+            className="text-foreground break-all underline underline-offset-4"
           >
             {t('ossCredits.footer.thirdPartyNotices')}
           </Link>

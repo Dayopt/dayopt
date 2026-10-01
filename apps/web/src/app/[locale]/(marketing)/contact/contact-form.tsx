@@ -284,7 +284,7 @@ export function ContactForm() {
 
         <p className="text-muted-foreground text-center text-xs">
           {t('form.privacyNotice')}{' '}
-          <Link href="/legal/privacy" className="text-primary hover:underline">
+          <Link href="/legal/privacy" className="text-foreground underline underline-offset-4">
             {t('form.privacyLink')}
           </Link>
         </p>

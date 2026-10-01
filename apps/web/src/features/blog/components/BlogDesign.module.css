@@ -32,6 +32,10 @@
   border-bottom: 1px solid var(--border);
   padding-bottom: 24px;
 }
+.post:not([data-layout='featured']) {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 560px;
+}
 .post[data-layout='featured'] {
   grid-column: 1 / -1;
   padding-bottom: 40px;

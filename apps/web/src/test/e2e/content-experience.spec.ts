@@ -9,6 +9,10 @@ test('スマホのDocs目次から日本語の予定ガイドへ移動できる'
   await expect(page).toHaveURL(/\/ja\/docs\/plans$/);
   await expect(page.locator('html')).toHaveAttribute('lang', 'ja');
   await expect(page.getByRole('heading', { level: 1 })).toContainText('予定');
+  const nextPage = page.locator('main').getByRole('link', { name: /次.*カレンダー/ });
+  await expect(nextPage).toHaveAttribute('href', '/ja/docs/calendar');
+  await nextPage.click();
+  await expect(page).toHaveURL(/\/ja\/docs\/calendar$/);
 });
 
 test('日本語Docsのサイドバーは言語を保ったまま移動する', async ({ page }) => {
@@ -92,6 +96,23 @@ test('検索エラーは結果ゼロと区別して案内する', async ({ page 
   await expect(
     page.locator('main').getByRole('link', { name: 'ドキュメント', exact: true }),
   ).toHaveAttribute('href', '/ja/docs');
+});
+
+test('記事の横長テーブルはキーボードで横へ読める', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 844 });
+  await page.goto('/blog/timeboxing-guide');
+  const table = page.locator('main div[tabindex="0"]').filter({ has: page.locator('table') });
+  const overflowingTable = table.filter({
+    has: page.getByRole('cell', { name: 'Morning planning', exact: true }),
+  });
+  await overflowingTable.scrollIntoViewIfNeeded();
+  await overflowingTable.focus();
+  await expect(overflowingTable).toBeFocused();
+  const before = await overflowingTable.evaluate((element) => element.scrollLeft);
+  await page.keyboard.press('ArrowRight');
+  await expect
+    .poll(() => overflowingTable.evaluate((element) => element.scrollLeft))
+    .toBeGreaterThan(before);
 });
 
 test('JavaScript無効でもモバイルのガイドとBlogの登録導線が成立する', async ({

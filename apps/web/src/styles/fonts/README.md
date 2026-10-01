@@ -4,8 +4,13 @@ These are glyph subsets of the existing Source Sans 3 and Noto Sans JP families,
 not a different typeface. They cover the current `common` and `marketing` messages
 in English and Japanese. Source Sans 3 retains its variable weight axis. Japanese
 uses the same 400 / 500 instances as before; their glyph outlines and advance
-widths are preserved. Content routes (docs, blog, legal, contact, search) also load
-the existing full Japanese Google font as their fallback for other characters.
+widths are preserved. Content routes (docs, blog, legal, contact, search) additionally
+load a variable subset containing the characters in current MDX and messages.
+This avoids dozens of separate Unicode-range font requests for a reading page.
+The existing full Japanese Google font remains the fallback for other characters,
+including arbitrary search queries and form input. The content subset is generated
+alongside the other subsets, with the same glyph and metrics checks, and loaded
+only by ContentTypography. It is not preloaded on the LP.
 The LP covers its current localized copy with the subsets and does not load the
 full Japanese font's large Unicode-range stylesheet.
 
@@ -51,7 +56,8 @@ curl -fL 'https://raw.githubusercontent.com/google/fonts/main/ofl/notosansjp/Not
 pnpm exec prettier --write apps/web/src/styles/fonts/japanese-body.css apps/web/src/styles/fonts/japanese-hero.css apps/web/src/styles/fonts/preloads.ts
 ```
 
-The generator checks actual output `cmap` coverage, each font's expected weight
+The generator reads all current MDX and message files. Regenerate after editing
+public content as well as messages. The generator checks actual output `cmap` coverage, each font's expected weight
 representation, and every requested glyph's coordinates and horizontal metrics
 against its original instance. Vertical-only alternates and metrics are omitted
 because the site uses horizontal text. Refresh the upstream hashes and licenses
