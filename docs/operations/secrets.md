@@ -418,6 +418,8 @@ AI_GATEWAY_API_KEY="op://agent/vercel-ai-gateway/credential" op run -- pnpm jev:
 
 `op user get --me` が確認済みの active SA と一致し、絞り込みなしの `op vault list` が確認済み ID・名前 `agent` の 1 件だけなら、渡された command を shell を介さず起動する。token 未設定・認証失敗・identity / vault 不一致では command を起動しない。検査の raw stdout / stderr は出さず、固定 error code だけを返す。一時 CLI 設定は終了時に削除する。
 
+`agent:run` は **SA を利用する、信頼済み agent の起動入口**であり、未信頼コードの sandbox ではない。起動した process とその子 process は SA token を読める。第三者 PR の test / build、依存の install script 等を未信頼コードとして実行する場合は、token・Keychain・親 process の認証情報・host socket に到達できない別 worker で実行する。同じ OS user の子 process から環境変数を外すだけでは親 process 等への到達を閉じた証明にならない。SA の vault 制限は token の持ち出しや、vault 内の API credential の外部権限を制限しない。今回のクラウド検証は未信頼コード worker の隔離を含まない。
+
 ```bash
 # 専用クラウド側で秘密ストアから token を注入した後に実行する
 pnpm agent:secrets:check --json
