@@ -855,6 +855,7 @@ async function runIntegration() {
       { env: { ...process.env, PGPASSWORD: 'postgres' } },
     );
   };
+  runSql('supabase/tests/seed-idempotency.sql');
   // Requires the fresh DB before Vitest provisions an immutable identity.
   runSql('supabase/tests/integration-oauth-identity.sql');
   run('pnpm', ['test:integration']);

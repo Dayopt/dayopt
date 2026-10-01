@@ -6,6 +6,7 @@
  * @see https://docs.sentry.io/platforms/javascript/guides/nextjs/manual-setup/
  */
 
+import { resolveDayoptEnvironment } from '@/lib/dayopt-environment';
 import { sanitizeTechnicalContext, type TechnicalErrorContext } from '@dayopt/observability';
 
 function createTechnicalErrorTags(context: TechnicalErrorContext): Record<string, string> {
@@ -70,9 +71,22 @@ export const onRequestError = async (
       | undefined;
   },
 ) => {
-  const isSentryProduction = process.env.VERCEL_ENV === 'production';
+  const dayoptEnvironment = resolveDayoptEnvironment({
+    dayoptEnvironment: process.env.DAYOPT_ENVIRONMENT,
+    publicDayoptEnvironment: process.env.NEXT_PUBLIC_DAYOPT_ENVIRONMENT,
+    vercelEnvironment: process.env.VERCEL_ENV,
+    vercelTargetEnvironment: process.env.VERCEL_TARGET_ENV,
+    vercelGitCommitRef: process.env.VERCEL_GIT_COMMIT_REF,
+    vercelProjectId: process.env.VERCEL_PROJECT_ID,
+    vercelBranchUrl: process.env.VERCEL_BRANCH_URL,
+    vercelUrl: process.env.VERCEL_URL,
+    appUrl: process.env.NEXT_PUBLIC_APP_URL,
+    supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL,
+  });
+  const isSentryEnvironment =
+    dayoptEnvironment === 'production' || dayoptEnvironment === 'integration';
   const hasSentryDsn = Boolean(process.env.SENTRY_DSN);
-  if (!isSentryProduction || !hasSentryDsn) return;
+  if (!isSentryEnvironment || !hasSentryDsn) return;
 
   const Sentry = await import('@sentry/nextjs');
   const requestId = resolveTechnicalRequestId(request.headers);

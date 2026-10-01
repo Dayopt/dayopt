@@ -17,6 +17,8 @@ describe('Product server/edge Sentry runtime configuration', () => {
   beforeEach(() => {
     vi.resetModules();
     vi.clearAllMocks();
+    vi.stubEnv('VERCEL_GIT_COMMIT_REF', 'main');
+    vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://yvglwblxrnrenfifsnje.supabase.co');
     vi.stubEnv('SENTRY_DSN', 'https://public@example.ingest.sentry.io/1');
   });
 

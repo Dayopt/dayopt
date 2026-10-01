@@ -384,7 +384,7 @@ export const operationalItems: OperationalItem[] = [
 // GitHub Actions Secrets（repo 単位）。envName は workflow の step env 名で、Secret 名が違う時だけ
 // githubSecret を持つ。workflow の secrets.* 参照とこの表の対応は
 // scripts/__tests__/ci-secret-ledger.test.ts が名前で双方向に検査する（2026-09-14 監査）。
-// どれが欠けても本番 promote・監査・backup のいずれかが止まるため、すべて required。
+// どれが欠けても本番 promote・監査・backup のいずれかが止まるため、Production entry は required。Cloud Preview は未初期化を明示する pending entry。
 // 本番 release（promote.yml）と、監査・backup・replica check（production-config-audit.yml /
 // nightly.yml）で environment を分ける。どちらも deployment branch policy は main だけ。
 const RELEASE_AND_OPS = ['production-release', 'production-ops'];
@@ -427,7 +427,7 @@ function rcloneEntries(side: 'SOURCE' | 'DEST', item: string): EnvSchemaEntry[] 
 export const ciSecretSchema: EnvSchemaEntry[] = [
   // item 名は 2026-09-14 に vercel から vercel-production へ変更（用途を名前で分かるように）。
   // token は team 全権で、promote / rollback（promote.yml）と読み取り監査で共用する。
-  // Vercel の token は scope を絞れないため、分けても被害範囲は変わらない。
+  // Production master は既存team token。project tokenも同じProduct内のProduction/Previewを分離しない。
   ciEntry('VERCEL_TOKEN', 'secret', 'vercel-production', RELEASE_AND_OPS),
   ciEntry('VERCEL_TEAM_ID', 'public', 'vercel-production', RELEASE_AND_OPS, {
     githubSecret: 'VERCEL_ORG_ID',
@@ -447,6 +447,25 @@ export const ciSecretSchema: EnvSchemaEntry[] = [
   ciEntry('SUPABASE_STORAGE_RLS_AUDIT_TOKEN', 'secret', 'supabase-storage-rls-audit', OPS, {
     field: 'credential',
   }),
+  // Planned masters remain pending independently of replicas saved directly in the Environment.
+  // GitHub's short-lived read token observes Vercel; never add a Production-capable Vercel PAT here.
+  ...[
+    ['SUPABASE_PREVIEW_READINESS_TOKEN', 'PREVIEW_E2E_SUPABASE_READINESS_TOKEN'],
+    ['VERCEL_AUTOMATION_BYPASS_SECRET', 'PREVIEW_E2E_BYPASS_SECRET'],
+    ['SUPABASE_SECRET_KEY', 'PREVIEW_E2E_SUPABASE_KEY'],
+  ].map(([envName, githubSecret]) => ({
+    ...pendingEnvEntry(
+      envName,
+      'secret',
+      'staging',
+      ci,
+      'preview-e2e',
+      'Cloud Preview master is not initialized; direct Environment replicas do not prove a master exists or resolve the remaining bypass boundary',
+      githubSecret,
+    ),
+    githubSecret,
+    githubEnvironments: ['Preview – product'],
+  })),
   // nightly の Storage backup（rclone）。SOURCE は Supabase Storage の S3 接続、DEST は Cloudflare R2。
   ...rcloneEntries('SOURCE', 'Supabase-StorageS3-backupsource'),
   ...rcloneEntries('DEST', 'Cloudflare-R2-storagebackup'),

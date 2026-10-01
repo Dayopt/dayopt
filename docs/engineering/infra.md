@@ -1,46 +1,47 @@
 ---
 status: current
-last_verified: 2026-09-22
+last_verified: 2026-09-28
 ---
 
 # インフラ・環境・API/Routing 総覧
 
-環境構成（Local / PR Preview / Production）、CI品質ゲートのロードマップ、DNS 管理（Cloudflare）、Bot 対策（Turnstile）、API endpoints 総覧、Supabase 型自動生成、App Router routing 総覧、パフォーマンス監視の原則、開発コマンド一覧、マイグレーション/リリースチェックリスト、災害復旧手順、DB Migration Rollback 手順書、出口コスト台帳。「環境・デプロイ・シークレットは?」の正。
+環境構成（Local / PR Preview / Integration / Production）、CI品質ゲートのロードマップ、DNS 管理（Cloudflare）、Bot 対策（Turnstile）、API endpoints 総覧、Supabase 型自動生成、App Router routing 総覧、パフォーマンス監視の原則、開発コマンド一覧、マイグレーション/リリースチェックリスト、災害復旧手順、DB Migration Rollback 手順書、出口コスト台帳。「環境・デプロイ・シークレットは?」の正。
 
 ---
 
 ## 環境構成
 
-Dayopt の標準ルートは `local → PR Preview → production`。Vercel Preview が production Supabase DB を触らないことを最優先にする。
+Dayopt のリリース経路は `local → PR Preview → production`。固定Integrationは別の非本番確認先で、Production Supabase DBを使わない。
 
 ### 環境一覧
 
-| 環境           | Supabase                          | Vercel                                     | URL              |
-| -------------- | --------------------------------- | ------------------------------------------ | ---------------- |
-| **Local**      | `supabase start`                  | `pnpm dev`                                 | localhost:3000   |
-| **PR Preview** | PR ごとの Supabase Preview Branch | Vercel Preview (`product`)                 | `*.vercel.app`   |
-| **Production** | `dayopt` main                     | main merge で自動 promote（`promote.yml`） | `app.dayopt.app` |
+| 環境            | Supabase                   | Vercel                                     | URL                                         |
+| --------------- | -------------------------- | ------------------------------------------ | ------------------------------------------- |
+| **Local**       | `supabase start`           | `pnpm dev`                                 | localhost:3000                              |
+| **PR Preview**  | 常設の非本番Supabaseを共有 | Vercel Preview (`product`)                 | `*.vercel.app`                              |
+| **Integration** | 常設の非本番Supabase       | `product` の `integration` branch Preview  | `product-git-integration-dayopt.vercel.app` |
+| **Production**  | `dayopt` main              | main merge で自動 promote（`promote.yml`） | `app.dayopt.app`                            |
 
 web（`dayopt.app`）と product（`app.dayopt.app`）は別ドメインで配信する。web から product へは絶対 URL でリンクし、path ベースの Multi-Zones（web の rewrites で `/settings` や `/app-static` を product へ proxy する構成）は使わない。production で既に 404 になっていたため 2026-09-14 に設定を撤去した（#2747）。security headers の正本は各 app の `next.config.mjs` の `headers()` で、`vercel.json` には置かない。
 
-上表は稼働中の構成。Cloud-firstへの移行仕様は次節。常設環境の構築と通し検証が終わるまで、稼働済みの構成とは区別する。
+Integration は非本番の固定確認先で、通常PR Previewと同じ Product project / 非本番Supabaseを使うが、OAuth identity とrate-limit namespaceは別に固定する。通常PR Previewは独立したPreview identityのまま扱う。
 
 ### Cloud-firstへの移行契約（#2910、構築中）
 
 通常の実装はCodex Cloud、手元のUI確認は任意のStorybookを入口とする。CI内のDocker・隔離DB・RLS・migration検証は維持する。個人の1Password unlockやMacのDBを通常workerの前提にしない。
 
-| 用途                               | アプリ                                         | DB                                  |
-| ---------------------------------- | ---------------------------------------------- | ----------------------------------- |
-| 通常PR                             | PRごとのVercel Preview                         | 常設の非本番Supabaseを共有          |
-| DB・共通認証設定の変更、破壊的検証 | PRごとのVercel Preview                         | そのPR専用の使い捨てSupabase branch |
-| 統合確認                           | 専用Vercel projectのProduction target、固定URL | 同じ常設Supabase 1環境              |
-| 任意の手元UI確認                   | Storybook / mock                               | 不要                                |
+| 用途                               | アプリ                                    | DB                                  |
+| ---------------------------------- | ----------------------------------------- | ----------------------------------- |
+| 通常PR                             | `product` のPR Preview                    | 常設の非本番Supabaseを共有          |
+| DB・共通認証設定の変更、破壊的検証 | `product` のPR Preview                    | そのPR専用の使い捨てSupabase branch |
+| 固定Integration確認                | `product` の `integration` branch Preview | 同じ常設Supabase 1環境              |
+| 任意の手元UI確認                   | Storybook / mock                          | 不要                                |
 
 常設には合成データとテスト専用アカウントを維持する。人間の確認用とAI・E2E用のユーザーを分離し、並列runは自分が作ったデータだけ掃除する。DB/RLS/migration以外でも、全ユーザー対象のjob、Auth、Storage、共通設定に影響する実験は共有DBで行わない。本番データを複製しない。
 
 同じDBへ接続するとアカウントを使い回せるが、異なるPreview domain間のログインsession共有は保証されない。アプリ認証とVercel Deployment Protectionは別々に確認する。共有DBに接続したPRを固定MCP OAuth issuerとして扱わない。
 
-本番と揃えるのはcode、migration、RLS、認証・利用権・Webhook・Cronの処理。変えてよいものは接続先、資格情報、データ、URL、外部サービスのテストaccount/mode、メール送信先、ログ環境、容量。`VERCEL_ENV=production`だけで本番と判定せず、専用project/ref/domainと外部accountを照合する。認証や課金判定を無効化して同等とみなさない。
+本番と揃えるのはcode、migration、RLS、認証・利用権・Webhook・Cronの処理。変えてよいものは接続先、資格情報、データ、URL、外部サービスのテストaccount/mode、メール送信先、ログ環境、容量。`VERCEL_ENV=production`だけで本番と判定せず、Vercel Project・Git branch・DB ref・生成URLと外部accountを照合する。認証や課金判定を無効化して同等とみなさない。
 
 待機時の常設は実際に公開済みの本番revisionに対応させる。統合確認時だけ候補を固定し、別候補で上書きしない。必要な確認はmain merge前に行う（既存Supabase Git integrationはmerge時に本番migrationを適用するため）。本番へ渡すのは検証したcode/migrationであり、非本番Secret入りのbuildではない。
 
@@ -48,9 +49,19 @@ web（`dayopt.app`）と product（`app.dayopt.app`）は別ドメインで配�
 
 **使い捨てbranchの費用と終了**: 作成前にPR・git branch・Supabase branch ID/ref・所有者を記録する。作成したら検証とマージまで進める。マージできなければ、そのPR専用で非default・非persistentと確認できたbranchだけを削除し、APIで消滅を確認する。単なる古いbranch名やPR checkの成功から削除対象を推測しない。理由、保持した証拠、再開時のGit integrationによる再作成・migration/seed・環境変数再同期・新deploymentの照合手順をPRへ残す。再開時には古いDBの成功を再利用しない。Vercel deploymentとCI artifactの保持はDB削除と別に扱う。
 
-**構築前の確認対象**: 常設Micro相当1本、専用Vercel project、固定URL、Stripe Sandbox、Resendの許可送信先、Google Calendarテストaccount、Sentry環境、MCP OAuth identity、Cron。新規有料プランは前提にしない。Microのcomputeは概ね月$10だがusageは別であり上限保証ではない。resource一覧・接続先・費用・復旧方法をまとめて確認してから作る。データの復旧はアプリrollbackと分け、DBだけresetしてStripe等を孤児化させない。
+### #2910 通常Previewと固定Integrationの接続契約（2026-09-28時点）
 
-2026-09-26の確認ではSupabaseはmainのみで、常設と上記接続は未構築。未接続のAC、統合gateの実強制、Preview E2Eの通し検証は#2910に残す。通し検証前に旧経路や手元の実物を削除しない。
+`apps/product/production-build-gate.mjs` と runtime resolver は通常PR Previewを `preview` identityとして扱う。共有の非本番Supabaseを使っても、PR Previewが固定OAuth issuerやIntegration扱いになることはない。固定Integrationは既存 `product` projectの `integration` branchに限定し、server/public marker、Preview target、Git branch、Project ID、固定branch URL、app URL、Supabase ref、OAuth issuer/resourceの全てが一致した場合だけ許可する。IntegrationもVercel上はPreview targetであり、Production扱いにはしない。buildとruntimeのどちらかでbindingが崩れたら停止する。
+
+Product Previewは非本番の常設Supabase接続を共有する。`SUPABASE_SECRET_KEY` はserver-onlyで、`next.config.mjs` がbrowserへ露出するのは非秘密のidentity metadataだけ。固定Integrationの `DAYOPT_ENVIRONMENT` / `NEXT_PUBLIC_DAYOPT_ENVIRONMENT` / `NEXT_PUBLIC_APP_URL` / OAuth origin設定は `integration` branchにだけ適用し、共通Preview scopeへ設定しない。`VERCEL_PROJECT_ID` と `VERCEL_BRANCH_URL` 等のsystem valuesはVercelが供給する。Turborepoのstrict env contractでは `NEXT_PUBLIC_*` はNext.jsのframework inferenceに任せ、その他のbuild-gate入力は `turbo.json` のallowlistで渡す。実値をrepo・Issue・会話へ記録しない。
+
+Vercel Projectは `product` と `web` の2つに集約し、別の `product-integration` projectや独自domainを作らない。固定Integration URL `https://product-git-integration-dayopt.vercel.app` は既存Product projectの `integration` branch deploymentに付くVercel alias。ProductのGit Fork ProtectionとDeployment Protectionは維持し、未信頼forkへ共有Preview secretを渡さない。`vercel.json` がIgnored Build Stepの正で、Dashboard overrideは設定しない。
+
+Supabase readiness runnerは `shared` / `ephemeral` を明示してpersistent branch ID、project ref、migration集合、対象deployment/healthを照合する。branch別overrideが残っていても、要求されたDB mode/refと一致しなければE2Eを開始しない。通常Previewは固定originを持たず、Vercel deployment URLへ戻る。異なるPreview URL間でAuth sessionが共有されるとは仮定しない。
+
+OAuth identityのruntime検証は `get_mcp_environment_identity_v1` のread-only照会に限る。health・MCP access・token issuanceからidentityをprovisionしない。不足または不一致なら利用を停止し、明示的な環境準備で整える。IntegrationのRedis keyは `ratelimit:product:integration` namespaceへ分離し、固定IntegrationのRedis設定欠落・不一致はfail closedにする。MCP write allowlist・billing・PostHog event送信はIntegrationで閉じる。SentryはProductionまたは完全にboundされたIntegrationのみ初期化し、browserでは既存consentも要求する。
+
+2026-09-28の非本番確認では、固定Integrationのdeployment healthはDB/Redis healthy、OAuth metadataは固定originと一致し、DB OAuth identityはprovision済みでMCP write gatesはclosed。これはdeployment/runtime readinessの証拠で、fresh password login、Auth redirect/callback、アプリCRUD、full Cloud replayの成功を意味しない。これらのE2EとSupabase Auth redirect allowlistの同期確認を#2910の残作業として扱う。Production DB・Production設定へこの確認を広げない。
 
 ### テスト自動化の現在地
 
@@ -67,9 +78,10 @@ e2e job は `supabase/setup-cli` + `supabase start` でlocal Supabase stackを�
 
 ### Supabase Project
 
-| Project | Reference ID           | Region | 用途                          |
-| ------- | ---------------------- | ------ | ----------------------------- |
-| dayopt  | `yvglwblxrnrenfifsnje` | Tokyo  | production main + PR branches |
+| Project | Reference ID           | Region | 用途                                                                 |
+| ------- | ---------------------- | ------ | -------------------------------------------------------------------- |
+| dayopt  | `yvglwblxrnrenfifsnje` | Tokyo  | production main + PR branches                                        |
+| dayopt  | `tilwaprottpyhlfoggbb` | Tokyo  | persistent nonproduction `integration` branch; trusted Preview共有用 |
 
 Supabase GitHub integration が migrations / Edge Functions / Storage buckets の deployment owner。GitHub Actions から `supabase db push` は通常実行しない。
 
@@ -83,11 +95,11 @@ Secrets の正本は `docs/operations/secrets.md`。1Password は production / s
 
 ```txt
 Production → human の Supabase credentials
-Preview    → Supabase Vercel integration が PR Branch credentials を注入
-Development/local → .op-env.agent + op run
+Preview    → trusted 通常PRは非本番Persistent credentials、隔離が必要なPRだけbranch-specific credentials
+Development/local → Supabase localを既定にする。shared Persistentを使う場合は明示的なdevelopment identity
 ```
 
-Preview environment に production Supabase credentials を手動設定しない。残っている場合は削除または Preview scope から外す。
+Preview environment に production Supabase credentials を手動設定しない。Vercel Previewの共通 `SUPABASE_SECRET_KEY` はPreview deploymentのserver build/runtimeから読み得るため、外部forkのdeploy承認だけで同一repoの任意PRを信頼済みにはならない。2026-09-28の読み取りではProduct Preview scopeに共通Supabase URL / publishable key / server keyがまだ無く、過去PR向けbranch-specific valuesのみがある。共通値を保存するまでは通常Preview接続は有効化されていない。secret値をpreview build logやbrowserへ出さず、非本番Persistent projectに限って使う。
 
 #### `.op-env.agent`
 

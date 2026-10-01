@@ -226,7 +226,12 @@ async function checkAggregateRateLimit(
   operation: string,
 ): Promise<AggregateRateLimitState> {
   if (!limiter) {
-    return process.env.VERCEL_ENV === 'production' ? 'unavailable' : 'allowed';
+    const requiresDistributedLimiter =
+      process.env.VERCEL_ENV === 'production' ||
+      process.env.DAYOPT_ENVIRONMENT === 'integration' ||
+      process.env.NEXT_PUBLIC_DAYOPT_ENVIRONMENT === 'integration' ||
+      process.env.MCP_OAUTH_ENVIRONMENT === 'integration';
+    return requiresDistributedLimiter ? 'unavailable' : 'allowed';
   }
 
   try {

@@ -4,13 +4,13 @@
 # 各設定値には「なぜそうしたか」を記載。
 # 公式リファレンス: https://supabase.com/docs/guides/local-development/cli/config
 #
-# 運用モデル: local → PR Preview → production
-#   - Local:      supabase start（この config.toml を使用）
-#   - PR Preview: Supabase GitHub integration が PR ごとに Preview Branch を作成
-#   - Production: dayopt main (ref: yvglwblxrnrenfifsnje)
-#
-# persistent staging は常設しない。固定URLが必要な検証時だけ追加する。
-# 詳細: apps/storybook/docs/dev/guides/MigrationChecklist.mdx / .claude/skills/supabase/SKILL.md
+# 運用モデル: optional local / persistent nonproduction / isolated PR Preview / production
+#   - Local:          supabase start（この config.toml を使用。完全なアプリ開発が必要な時だけ）
+#   - Persistent:     通常のProduct Preview・固定Integration・必要時のlocal appが共有する非本番branch
+#   - PR Preview:     migrationなど共有backendの隔離が必要な変更だけに作成
+#   - Production:     dayopt main (ref: yvglwblxrnrenfifsnje)
+# Supabase Preview branchを全PRの必須経路にはせず、既存のpersistent nonproduction branchを再利用する。
+# 詳細: .agents/skills/supabase/SKILL.md
 # ============================================================
 
 project_id = "dayopt"

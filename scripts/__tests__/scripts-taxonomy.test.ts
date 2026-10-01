@@ -161,6 +161,9 @@ const KNOWN_PLACEMENT_EXCEPTIONS = new Set<string>([
   // family と同型のペア構成（内部結合の強い unit）。loader は settings.json から
   // 参照されるため hooks 判定になり、rules だけがこの例外で hooks/ に揃える。
   'scripts/hooks/pre-tool-guard-rules.mjs',
+  // preview-e2e-recovery.mjs: Preview runbook CLI と unit tests の両方から使う内部 helper。
+  // importedBy 判定は lib に分類するが、運用コマンドと密結合しているため CLI の隣に置く。
+  'scripts/runbook/preview-e2e-recovery.mjs',
 ]);
 
 describe('scripts/ 呼ばれ方別 taxonomy', () => {

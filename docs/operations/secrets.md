@@ -235,13 +235,13 @@ vault は 2026-08-14 の信頼境界軸再編（[#2086](https://github.com/Dayop
 
 **AI が `op run` で解決してよい credentials を全部ここに置く**（「入れた瞬間 AI に漏れたとみなしても困らないもの」だけを入れる）。pre-tool-guard の vault allowlist はこの 1 vault のみを通す。
 
-**test mode credential と、local dev が使う app 設定が主な中身。** 通常の PR Preview では使わず、persistent staging を追加した時、または local dev 用の長寿命参照が必要な時だけ使う。
+**test mode credential と、local dev が使う app 設定が主な中身。** 通常の PR Preview と固定 Integration の接続情報はここへ置かず、それぞれの非本番 Vercel / Supabase 設定で管理する。
 
-**常設 staging 環境は存在しない**（Supabase の branch は `main` のみ）。そのため Supabase の接続情報（`NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` / `SUPABASE_SERVICE_ROLE_KEY` / `SUPABASE_DB_PASSWORD`）はこの vault に置かない。置けば production の複製にしかならず、実際 2026-08-11 まで 4 field とも `human/supabase` と同一値だった（[#1929](https://github.com/Dayopt/dayopt/issues/1929)）。local dev の Supabase 接続は `scripts/tasks/dev-with-op.sh` が `supabase status -o env` から注入し、1Password を経由しない。この境界は `scripts/__tests__/staging-supabase-boundary.test.ts` が固定する。
+固定 Integration は Production branch の複製ではなく、Supabase の非本番 `integration` branch と既存 Product Vercel projectのbranch-scoped Preview設定を使う。IntegrationのSupabase接続値や専用外部service credentialsを1Password `agent` vaultへ複製しない。Productionの鍵をPreviewへ流用しない。local dev のSupabase接続は `scripts/tasks/dev-with-op.sh` が `supabase status -o env` から注入し、1Passwordを経由しない。この境界は `scripts/__tests__/staging-supabase-boundary.test.ts` が固定する。
 
 | Item                  | Fields                                                                                                                                                                                                                                                                                                                                               | 用途                                                                                                                                                                                                            |
 | --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `supabase`            | `CRON_SECRET`, `SEND_EMAIL_HOOK_SECRET`, `SENTRY_DSN`（Edge Function send-auth-email 用、任意）                                                                                                                                                                                                                                                      | staging 用 optional secret（cron / send-email hook の local dev 検証）                                                                                                                                          |
+| `supabase`            | `CRON_SECRET`, `SEND_EMAIL_HOOK_SECRET`, `SENTRY_DSN`（Edge Function send-auth-email 用、任意）                                                                                                                                                                                                                                                      | local dev 用 optional secret（cron / send-email hook の検証）                                                                                                                                                   |
 | `upstash`             | `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`                                                                                                                                                                                                                                                                                                 | Redis rate limit / cache                                                                                                                                                                                        |
 | `stripe-test`         | `STRIPE_SECRET_KEY`, `STRIPE_ACCOUNT_ID`, `STRIPE_LIVEMODE`, `STRIPE_WEBHOOK_SECRET`, `NEXT_PUBLIC_STRIPE_PRO_PRICE_ID`                                                                                                                                                                                                                              | Stripe test mode                                                                                                                                                                                                |
 | `app`                 | `NEXT_PUBLIC_APP_URL`, `NEXT_PUBLIC_SITE_URL`, `RECOVERY_CODE_PEPPER`, `OAUTH_CLAUDE_REDIRECT_URIS`, `OAUTH_CHATGPT_REDIRECT_URIS`, `OAUTH_CURSOR_REDIRECT_URIS`, `MCP_OAUTH_ENVIRONMENT`, `OAUTH_AUTHORIZATION_SERVER_URI`, `MCP_CANONICAL_RESOURCE_URI`, `MCP_OAUTH_PREVIEW_BRANCH`, `MCP_OAUTH_PREVIEW_UPSTASH_HOST`, `MCP_WRITE_ENABLED_CLIENTS` | App URL / recovery code HMAC pepper / MCP OAuth beta                                                                                                                                                            |
@@ -263,6 +263,16 @@ vault は 2026-08-14 の信頼境界軸再編（[#2086](https://github.com/Dayop
 同じ整理で `human/upstash-legacy`（schema 未参照、値未登録の残骸）・`human/resend-old-staging`（`resend` / `resend-web` と同一 field 構成の古い複製）の 2 件を archive した（1Password 側は削除ではなく Archive、復元可能）。`human/supabase-legacy` は #2127 着手前に User が削除済みだったことを実測で確認した。`human/upstash-login` は `human/supabase-login` と同型の Upstash Console GUI ログインと判定し、残置のうえ台帳化した。実施記録は [#2127 コメント](https://github.com/Dayopt/dayopt/issues/2127#issuecomment-5312176560)を参照。
 
 `google-calendar` item は 2026-08-14 実測時点で **1Password に存在しない**（#2063）。`.op-env.agent.example` の該当行はコメントアウト済みで、`pnpm dev` の正規ルートはブロックされない。外部カレンダー連携を local dev で検証するには、test mode の Google OAuth client を作成した上で item を作る必要がある（User 手作業）。
+
+### Persistent Product Integration（#2910）
+
+Integration は既存 `product` Vercel projectの `integration` branchと、非本番Supabase projectの `integration` branchを使う。新しいVercel projectや独自domainは作らない。共通Product Previewでは非本番persistent Supabaseを共有し、branch-scoped environment marker / OAuth originは固定Integration branchにだけ設定する。Supabase secret keyはserver-onlyで、Production credentialsをコピーしない。
+
+固定originは `https://product-git-integration-dayopt.vercel.app`、Supabase refは `tilwaprottpyhlfoggbb`。Vercel project ID、Git branch、Preview target、branch alias、app URL、Supabase ref、OAuth issuer/resourceの一致をbuildとruntimeで検査する。Vercel system variablesは手入力せず、実secretやdeployment-specific URLをrepo・Issue・会話へ記録しない。
+
+IntegrationのOAuth identity確認はread-only RPCだけを使い、healthやOAuth requestから自動provisionしない。不足・不一致はfail closedにする。MCP write allowlist、billing、PostHog送信は閉じたままにし、Integration専用Upstash key namespaceとrate-limit credentialsをProductionから分離する。Stripe・Google Calendarは使う時だけtest用の一式を設定し、Stripe account IDとOAuth accountも専用のテスト資源に限る。IntegrationのResend送信は未対応のため、API key・sender・webhook secret・CONTACT_INTEGRATION_RECIPIENTは設定しない。専用recipientを送信処理へ接続するまでは、完全な一式でもbuild/runtimeで拒否する。
+
+2026-09-28の非本番確認では固定Integration deploymentのhealth（DB/Redis）、OAuth metadataとDB identityの一致、MCP write gates closedを確認した。fresh Auth login、redirect/callbackを含むログイン、アプリCRUD、full Cloud replayは別のE2E証拠として扱う。deployment healthだけでこれらの動作を完了としない。
 
 ### `human`
 
@@ -352,7 +362,7 @@ vault は 2026-08-14 の信頼境界軸再編（[#2086](https://github.com/Dayop
 
 ## Agent の vercel CLI（読み取り系だけ）
 
-策定日: 2026-09-14（Secret / Credential 監査 P1-2、User 裁可）。agent の `vercel` CLI は User 本人の対話 login で動き、team `Dayopt` の全権を持つ。Vercel の token は scope を絞れないため、GitHub のような identity 分離はできない。そこで **agent から実行してよい vercel サブコマンドを読み取り系に固定する**。
+策定日: 2026-09-14（Secret / Credential 監査 P1-2、User 裁可）。agent の `vercel` CLI は User 本人の対話 login で動き、team `Dayopt` の全権を持つ。現在はproject-scoped tokenも発行できるが、同じProduct project内のProduction/Previewを分離できずread/write権限を持つ。このため **agent から実行してよい vercel サブコマンドを読み取り系に固定する**。
 
 **agent 用 Vercel token は置かない。** 以前は `agent/vercel` を「agent 用の別発行 token（発行待ち）」として schema に持っていたが、実際には未使用の team 全権 token が入っていた。agent vault の定義（漏れても 1 日で戻せるもの）に合わないため、2026-09-14 に Vercel 側で revoke し、1Password の item を archive した。
 
@@ -584,7 +594,7 @@ master へ値を戻す時は GUI か対象を限定した `op item create` / `op
 
 策定日: 2026-08-17（[#2086](https://github.com/Dayopt/dayopt/issues/2086) 残 scope）。上記の Replica 台帳が「master は 1Password、replica は外部」の対応を列挙するのに対し、こちらは **1Password の外に構造的に実値が存在する場所**（1Password へ登録すること自体ができない値）を列挙する。基本方針 7「値がどこに存在していようと、必ず 1Password にもある」の唯一の意図的な例外群。
 
-**現在 0 件。** 調査の結果、既存の GitHub Secrets 6 件（`SUPABASE_AUTH_AUDIT_TOKEN` / `SUPABASE_STORAGE_RLS_AUDIT_TOKEN`（[#2345](https://github.com/Dayopt/dayopt/issues/2345) で発行・GitHub Secret 登録済み）/ `VERCEL_TOKEN` / `VERCEL_ORG_ID` / `VERCEL_AUTOMATION_BYPASS_PRODUCT` / `VERCEL_AUTOMATION_BYPASS_WEB`）はいずれも 1Password `ci` vault を master に持つ replica であり、真の bootstrap 例外には該当しない（[Environment Secrets](./security/environment-secrets.md) §GitHub の表と 1:1）。
+**Production経路は0件。** Cloud Previewはユーザー指示で2件をEnvironmentへ直接保存した例外があり、master未初期化の扱いは下記「Cloud Preview の未初期化台帳」を参照する。調査の結果、既存の GitHub Secrets 6 件（`SUPABASE_AUTH_AUDIT_TOKEN` / `SUPABASE_STORAGE_RLS_AUDIT_TOKEN`（[#2345](https://github.com/Dayopt/dayopt/issues/2345) で発行・GitHub Secret 登録済み）/ `VERCEL_TOKEN` / `VERCEL_ORG_ID` / `VERCEL_AUTOMATION_BYPASS_PRODUCT` / `VERCEL_AUTOMATION_BYPASS_WEB`）はいずれも 1Password `ci` vault を master に持つ replica であり、真の bootstrap 例外には該当しない（[Environment Secrets](./security/environment-secrets.md) §GitHub の表と 1:1）。
 
 SA token は 1Password の `human` に控えを保存できるため、保存不能の例外には含めない。起動時の注入先は [Service Account](#service-account) の移行時に決め、実際に登録した cloud secret store を replica 台帳へ追記する。agent に人間用認証を渡して bootstrap する経路は作らない。
 
@@ -742,3 +752,13 @@ reCAPTCHA 関連 env は旧方式。新規設定・docs・example には追加�
 - `docs/engineering/infra.md` — Supabase / deployment 環境構成
 - `docs/operations/security/environment-secrets.md` — GitHub / Vercel / Supabase replica
 - `docs/operations/contact-email.md` — 問い合わせのDNS / mailbox / release運用
+
+### Cloud Preview の未初期化台帳（#2910）
+
+`ci/preview-e2e` の3参照（`PREVIEW_E2E_SUPABASE_READINESS_TOKEN`、`PREVIEW_E2E_BYPASS_SECRET`、`PREVIEW_E2E_SUPABASE_KEY`）は **planned master** としてoptional/pendingを維持する。1Password item・master値の実在や同期を確認した証拠ではない。2026-09-29の作業で、ユーザーの明示指示により個人Vault・1Passwordを開かず、readiness tokenと選択したIntegration DB keyを `Preview – product` Environmentへ直接保存し、登録名をUIで確認した。Environmentのbranch policyは `integration` だけに保存・確認済み。値は会話へ出さない。
+
+`PREVIEW_E2E_VERCEL_TOKEN` のplanned参照は廃止する。短寿命 `GITHUB_TOKEN` のdeployments/statuses read権限で、GitHubが認証したVercel botのProduct Preview記録を確認する。Production用 `VERCEL_TOKEN` のmaster・replica・release経路は変更しない。project-scoped Vercel tokenもProductのProductionを含むread/write権限を持つため、Preview用tokenとして新規発行しない。
+
+Protection bypassは未保存・権限境界の判断待ち。project単位keyはProduct projectのProductionにも到達し得るため、非本番だけの資格情報とは呼ばない。専用project keyと対象Previewだけのshare方式のどちらを採用するか、所有者の判断後に対応する。既存Production bypassを複製しない。既存 `sync-ci-environment-secrets.sh` のProduction同期は実行しない。残る3参照は同scriptでplanned masterとの対応をpendingコメントに残し、実行対象に加えていない。masterを初期化済みにする判断は別途行う。
+
+`PREVIEW_E2E_SUPABASE_READINESS_TOKEN` は **Development Branches Read**（`branching_development_read`）と **Migrations Read**（`database_migrations_read`）だけを持つfine-grained tokenとする。branch一覧と `GET /v1/projects/{ref}/database/migrations` のversion metadataを確認し、Database Data Read・SQL実行・write権限を与えない。project選択が親projectしか提供しない場合は親を選ぶため、親のbranch/migration metadataも読める境界になる。Productionのユーザーデータを読めるtokenではなく、非本番projectだけに限定したtokenとも呼ばない。親projectで選んだtokenが対象子projectのmigration一覧を読めることは別途実測し、401/403ではProduction credentialやSQLへのfallbackをせず停止する。[migration一覧の公式契約](https://supabase.com/docs/reference/api/v1-list-migration-history)に従い、versionの欠落・追加・重複・不正応答はreadiness失敗とする。
