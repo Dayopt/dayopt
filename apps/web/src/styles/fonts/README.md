@@ -9,8 +9,8 @@ the existing full Japanese Google font as their fallback for other characters.
 The LP covers its current localized copy with the subsets and does not load the
 full Japanese font's large Unicode-range stylesheet.
 
-The Latin subset is preloaded. The 3.4KB Japanese H1 subset is embedded in the
-critical stylesheet, avoiding a separate request for the main heading.
+The Latin subset is preloaded. The Japanese H1 face shares the preloaded regular subset with the body;
+its face declaration preserves the original heading baseline without a duplicate font.
 Japanese pages additionally preload the first-view characters for both body weights
 using content-hashed public URLs; English pages do not preload them. Other characters
 use disjoint Unicode ranges and load when their text is rendered. The first-view
