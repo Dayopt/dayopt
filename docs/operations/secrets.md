@@ -469,7 +469,7 @@ token の控えの保管先は未確認。token 値や個人の ID 実値は本�
 
 専用クラウドの CLI は `/workspace/.dayopt-1password/bin/op` に配置する。`/workspace/AGENTS.md` から `/workspace/.dayopt-1password/START.md` と `startup-check.py` を参照し、SA 認証・vault 範囲と token なしの認証失敗を検証する。未注入なら停止する。標準 PATH のディレクトリは書き込み不可のため、各 shell でこのディレクトリを PATH の先頭に加えるか、launcher の絶対パスを使う。launcher は SA token 以外の `OP_*` を除去し、専用の CLI 設定を使う。秘密や人間用 account/session は image に保存しない。
 
-status API の secret binding / readiness の表示だけでは token 注入の可否を判定しない。実行 process 内で存在を boolean として確認し、SA 認証と絞り込みなしの vault 一覧で検証する。編集環境の成功と、再公開後の新しい通常 task の成功は別に判定する。2026-10-01 に通常 task への CLI と token の継承も確認済み。保存した Start skill の本文・参照先は通常 task の取得経路では得られなかったため、手順を環境 image 内の上記ファイルにも保存した。root `AGENTS.md` が新しい task で自動読込されることは別途検証する。専用設定の `op-daemon.sock` は自身所有・0700 の Unix socket の場合だけ許容し、JSON 内の token・人間用 account/session がないことを検査する。
+status API の secret binding / readiness の表示だけでは token 注入の可否を判定しない。実行 process 内で存在を boolean として確認し、SA 認証と絞り込みなしの vault 一覧で検証する。編集環境の成功と、再公開後の新しい通常 task の成功は別に判定する。2026-10-01 に通常 task への CLI と token の継承も確認済み。保存した Start skill の本文・参照先は通常 task の取得経路では得られなかったため、手順を環境 image 内の上記ファイルにも保存した。同日に再公開後の新しい通常 task「1Password利用前の確認」で、場所・コマンドを含めない依頼から `START.md` の読み取り、shell の PATH 設定、`startup-check.py` の実行まで自律的に進み、終了コード 0 を実測した。これは案内の読み取りと使用前確認の成功であり、task 起動時に script が無条件で実行される保証ではない。検査には SA 認証・agent 1件・token なしの認証失敗が含まれるため、status API が `unknown` でも実アクセスの検査成功を未確認へ戻さない。専用設定の `op-daemon.sock` は自身所有・0700 の Unix socket の場合だけ許容し、JSON 内の token・人間用 account/session がないことを検査する。
 
 **Network secret は使わない。** Network secret は proxy が置換する placeholder を process に渡す方式であり、1Password CLI が必要とする実 token を直接読めない。Personal vault の Environment variable は保存後の UI では値が隠れるが、実行する task は実値を読める。アクセス範囲は SA の権限と専用クラウドの分離で制限する。
 
