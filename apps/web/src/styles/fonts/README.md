@@ -14,12 +14,9 @@ critical stylesheet, avoiding a separate request for the main heading.
 Japanese pages additionally preload the first-view characters for both body weights
 using content-hashed public URLs; English pages do not preload them. Other characters
 use disjoint Unicode ranges and load when their text is rendered. The first-view
-sets cover the hero, its time demo, navigation, and consent controls; the
+sets cover the hero, its time demo, navigation, footer, and consent controls; the
 default calendar scene also belongs to Chromium's offscreen rendering look-ahead.
 Other daily-use states load their remaining characters when they are displayed.
-The distant footer also uses native offscreen deferral, so its text and selectors
-load their remaining glyphs as the footer approaches the viewport. Its HTML and
-keyboard / search / no-JavaScript navigation remain available.
 The long LP uses
 native `content-visibility: auto` for sections below the hero, retaining their
 complete server-rendered content and native anchor / search / focus behavior. The previous

@@ -231,9 +231,9 @@ const nextConfig = {
       priorityRoutes: [/^\/(?:\[locale\]\/\(landing\)\/page|ja|en)?$/],
       priorityBoost: 2,
       requestCost: 2000000,
-      minChunkSize: 200000,
-      maxMergeChunkSize: 1000000,
-      maxChunkCountPerGroup: 2,
+      minChunkSize: 2000000,
+      maxMergeChunkSize: 4000000,
+      maxChunkCountPerGroup: 1,
     },
     // 同じ root を使う本文 route の全文字フォント CSS を LP に混ぜない。
     // HTTP/2 の小さな追加リクエストより、不要な大きい stylesheet の配信を避ける。
