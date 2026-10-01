@@ -10,16 +10,16 @@ import * as AlertDialogStories from './alert-dialog.stories';
 
 重要なアクションの確認ダイアログ。削除、ログアウト、不可逆操作で使用。
 
-Dialogと異なり **ESCで閉じない・オーバーレイクリックで閉じない**。
-ユーザーは必ずCancel / Actionのどちらかを選択する必要がある。
+**オーバーレイクリックでは閉じない**。インストール済み Radix の既定では Escape は dismiss を要求するが、呼出側が `onEscapeKeyDown` で `preventDefault()` した場合や、controlled `open` を更新しない場合は閉じない。
+この [wrapper](alert-dialog.tsx) は Escape を一律に禁止せず、Content の props を Radix へ渡す。Cancel / Action の明示的な選択を用意し、閉じ方は呼出側の `open` / `onOpenChange` と合わせて確認する。
 
 ## Dialog vs AlertDialog
 
-|                      | Dialog           | AlertDialog |
-| -------------------- | ---------------- | ----------- |
-| ESCで閉じる          | ○                | ✕           |
-| オーバーレイクリック | ○                | ✕           |
-| 用途                 | 一般的なモーダル | 重要な確認  |
+|                      | Dialog                             | AlertDialog                        |
+| -------------------- | ---------------------------------- | ---------------------------------- |
+| ESCで閉じる          | 既定は ○（props / state で制御可） | 既定は ○（props / state で制御可） |
+| オーバーレイクリック | ○                                  | ✕                                  |
+| 用途                 | 一般的なモーダル                   | 重要な確認                         |
 
 ## コンポーネント構成
 
@@ -35,14 +35,9 @@ Dialogと異なり **ESCで閉じない・オーバーレイクリックで閉�
 | `AlertDialogCancel`      | キャンセルボタン（variant: outline）  |
 | `AlertDialogAction`      | 実行ボタン（variant: default）        |
 
-## 使用箇所
+## 使用箇所を確認する
 
-| 実装                  | 用途                       |
-| --------------------- | -------------------------- |
-| AccountDeletionDialog | アカウント削除（GDPR対応） |
-| SessionTimeoutDialog  | セッションタイムアウト警告 |
-| TagMerge確認          | タグマージの確認           |
-| BulkDelete確認        | 一括削除の確認             |
+利用例は [AccountDeletionDialog](../../../../apps/product/src/features/settings/components/AccountDeletionDialog.tsx) と [SessionTimeoutDialog](../../../../apps/product/src/features/auth/components/SessionTimeoutDialog.tsx) の source を読む。各呼出側の controlled `open`、`onOpenChange`、Content のイベント props を確認する。実在する利用箇所の全一覧は `AlertDialog` / `AlertDialogContent` の import 検索から取得し、ここには旧機能名を含む inventory を複製しない。
 
 ## Default
 

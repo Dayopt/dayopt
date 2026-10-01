@@ -255,13 +255,13 @@ Stripe がホストする Checkout ページ。カード情報は Dayopt を通�
 
 ### 7. event ごとに profiles の契約状態を書く（Supabase）
 
-checkout.session.completed なら Stripe から subscription を取り直し、その status を Dayopt の状態へ写して、stripe_customer_id が一致する profiles の subscription_status / subscription_id を更新する。subscription.updated / deleted、invoice.paid（体験の消費日時）、invoice.payment_failed（メール）も同じ入口で扱う。最後に予約を processed にして 200 を返す。途中で失敗したら予約を failed に戻して 500 を返し、Stripe の再送に任せる。
+checkout.session.completed / subscription.updated では現在の Subscription を Stripe から取り直し、ID・Customer・mode を照合する。現在 canceled なら同じ契約だけを終了し、それ以外は取得前の profiles の契約ID・状態・updated_at が一致する場合だけ subscription_status / subscription_id を更新する。並行更新で条件が変わった時は保存せず再送へ戻す。subscription.updated / deleted、invoice.paid（体験の消費日時）、invoice.payment_failed（メール）も同じ入口で扱う。最後に予約を processed にして 200 を返す。途中で失敗したら予約を failed に戻して 500 を返し、Stripe の再送に任せる。
 
 - **なぜ必要か**: 契約状態の正本は Stripe で、DB はその写し。写しを書く経路を webhook に一本化しているので、戻りの URL や画面の操作では契約状態が変わらない。
 - **入力 → 出力**: 予約済みの event → profiles.subscription_status、予約の processed、200
 - **ここを変えると**: 外部契約。Stripe の status の写し（mapStripeSubscriptionStatus）を変えると、active / trialing / past_due を「契約中」とみなす判定（isProSubscriptionStatus）と噛み合わなくなる。メール送信は失敗しても 200 を返す（throw すると Stripe が再送し、状態同期が揺れる）。durable 経路では未対応の event 種別を 500 にするので、Stripe Dashboard で購読 event を足すとそれが再送され続ける。
 - **コード**:
-  - [`apps/product/src/app/api/webhooks/stripe/route.ts`](../../../apps/product/src/app/api/webhooks/stripe/route.ts) で `await syncSubscriptionStatus(supabase, customerId, subscriptionId, status);` を探す
+  - [`apps/product/src/app/api/webhooks/stripe/route.ts`](../../../apps/product/src/app/api/webhooks/stripe/route.ts) で `await syncSubscriptionStatus(supabase, customerId, subscriptionId, status, expected);` を探す
   - [`apps/product/src/features/settings/server/billing-service.ts`](../../../apps/product/src/features/settings/server/billing-service.ts) で `'No billing profile was updated for the Stripe customer',` を探す
   - [`packages/billing/src/subscription.ts`](../../../packages/billing/src/subscription.ts) で `export function mapStripeSubscriptionStatus(stripeStatus: string): SubscriptionStatus {` を探す
   - [`apps/product/src/app/api/webhooks/stripe/route.ts`](../../../apps/product/src/app/api/webhooks/stripe/route.ts) で `await releaseStripeWebhookEvent(supabase, event.id);` を探す
@@ -933,7 +933,7 @@ Vercel cron が毎日 /api/cron/billing-reconciliation を叩く。Stripe の直
       "svc": "supabase",
       "short": "契約状態を書く",
       "title": "event ごとに profiles の契約状態を書く",
-      "what": "checkout.session.completed なら Stripe から subscription を取り直し、その status を Dayopt の状態へ写して、stripe_customer_id が一致する profiles の subscription_status / subscription_id を更新する。subscription.updated / deleted、invoice.paid（体験の消費日時）、invoice.payment_failed（メール）も同じ入口で扱う。最後に予約を processed にして 200 を返す。途中で失敗したら予約を failed に戻して 500 を返し、Stripe の再送に任せる。",
+      "what": "checkout.session.completed / subscription.updated では現在の Subscription を Stripe から取り直し、ID・Customer・mode を照合する。現在 canceled なら同じ契約だけを終了し、それ以外は取得前の profiles の契約ID・状態・updated_at が一致する場合だけ subscription_status / subscription_id を更新する。並行更新で条件が変わった時は保存せず再送へ戻す。subscription.updated / deleted、invoice.paid（体験の消費日時）、invoice.payment_failed（メール）も同じ入口で扱う。最後に予約を processed にして 200 を返す。途中で失敗したら予約を failed に戻して 500 を返し、Stripe の再送に任せる。",
       "why": "契約状態の正本は Stripe で、DB はその写し。写しを書く経路を webhook に一本化しているので、戻りの URL や画面の操作では契約状態が変わらない。",
       "io": {
         "in": "予約済みの event",
@@ -943,7 +943,7 @@ Vercel cron が毎日 /api/cron/billing-reconciliation を叩く。Stripe の直
       "refs": [
         {
           "path": "apps/product/src/app/api/webhooks/stripe/route.ts",
-          "find": "await syncSubscriptionStatus(supabase, customerId, subscriptionId, status);"
+          "find": "await syncSubscriptionStatus(supabase, customerId, subscriptionId, status, expected);"
         },
         {
           "path": "apps/product/src/features/settings/server/billing-service.ts",

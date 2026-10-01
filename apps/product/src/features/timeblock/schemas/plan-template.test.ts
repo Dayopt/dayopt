@@ -92,6 +92,20 @@ describe('plan template input contracts', () => {
       date: '2026-09-29',
     });
   });
+  it.each([
+    '2026-02-30',
+    '2025-02-29',
+    '1900-02-29',
+    '2026-04-31',
+    '2026-00-01',
+    '2026-13-01',
+    '2026-01-00',
+  ])('rejects nonexistent Gregorian date %s', (date) => {
+    expect(applyPlanTemplateSchema.safeParse({ templateId: ID, date }).success).toBe(false);
+  });
+  it.each(['2000-02-29', '2024-02-29', '0099-01-01'])('accepts valid Gregorian date %s', (date) => {
+    expect(applyPlanTemplateSchema.safeParse({ templateId: ID, date }).success).toBe(true);
+  });
   it.each(['2026-9-29', '2026-09-29T00:00:00Z', '', '2026/09/29'])(
     'rejects a non-date-key apply input %j',
     (date) => {

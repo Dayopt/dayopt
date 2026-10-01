@@ -8,19 +8,19 @@ type MutationInput = Record<string, unknown>;
 /**
  * **`onError` の第 3 引数を `undefined` 固定にしない。** react-query は `onMutate` の
  * 返り値を context としてここへ渡す契約で、実装の rollback（`restoreTimeblockLists`）は
- * `context.snapshots` を回す。型を `undefined` に狭めると test から rollback 経路を
+ * 操作に所有された変更を取り消す。型を `undefined` に狭めると test から rollback 経路を
  * 踏めず、`restore` を no-op にしても緑のままになる（#2644 で故障注入により実証）。
  */
 interface MutationCallbacks {
   retry?: boolean;
   onMutate?: (input: MutationInput) => Promise<unknown>;
-  onSuccess?: (data: TimeModelRow) => void;
+  onSuccess?: (data: TimeModelRow, input?: MutationInput, context?: unknown) => void;
   onError?: (
     error: { message: string; data?: { serviceCode?: string } },
     input: MutationInput | undefined,
     context: unknown,
   ) => void;
-  onSettled?: () => void;
+  onSettled?: (data: unknown, error: unknown, input: unknown, context: unknown) => void;
 }
 
 interface TimeModelRow {
@@ -47,6 +47,7 @@ const mocks = vi.hoisted(() => ({
   recordRestoreCallbacks: undefined as MutationCallbacks | undefined,
   otherMutationCallbacks: [] as MutationCallbacks[],
   cacheEntries: [] as CacheEntry[],
+  queryObjects: new Map<unknown, { queryKey: unknown; queryHash: string }>(),
   querySetData: vi.fn(),
   queryInvalidate: vi.fn(),
   plansInvalidate: vi.fn(),
@@ -58,19 +59,37 @@ const mocks = vi.hoisted(() => ({
   toastError: vi.fn(),
 }));
 
-vi.mock('@tanstack/react-query', () => ({
+vi.mock('@tanstack/react-query', async () => ({
+  ...(await vi.importActual<typeof import('@tanstack/react-query')>('@tanstack/react-query')),
   useQueryClient: () => ({
+    getMutationCache: () => ({ getAll: () => [] }),
+    getQueryCache: () => {
+      const getAll = () =>
+        mocks.cacheEntries.map(([queryKey]) => {
+          let query = mocks.queryObjects.get(queryKey);
+          if (!query) {
+            query = { queryKey, queryHash: JSON.stringify(queryKey) };
+            mocks.queryObjects.set(queryKey, query);
+          }
+          return query;
+        });
+      return {
+        getAll,
+        find: ({ queryKey }: { queryKey: unknown }) =>
+          getAll().find((query) => query.queryHash === JSON.stringify(queryKey)),
+      };
+    },
     // snapshot 前の in-flight refetch を止める（#2567 で utils.*.cancel から
     // queryClient.cancelQueries へ移した。挙動は同じく list query だけを止める）
     cancelQueries: vi.fn().mockResolvedValue(undefined),
     // **tuple ごと複製して返す。** `mocks.cacheEntries` の要素をそのまま渡すと
-    // snapshot が保持する tuple と cache の tuple が同一オブジェクトになり、後続の
-    // `setQueryData`（`entry[1]` への代入）が snapshot 側まで書き換える。その状態では
+    // journal が保持する tuple と cache の tuple が同一オブジェクトになり、後続の
+    // `setQueryData`（`entry[1]` への代入）が 退避側まで書き換える。その状態では
     // rollback が「現在値の書き戻し」に退化し、`restore` を no-op にしても緑になる（#2644）。
     getQueriesData: vi.fn(({ predicate }) =>
       mocks.cacheEntries
         .filter(([queryKey]) => predicate({ queryKey }))
-        .map(([queryKey, rows]): CacheEntry => [queryKey, [...rows]]),
+        .map(([queryKey, rows]): CacheEntry => [queryKey, rows]),
     ),
     invalidateQueries: mocks.queryInvalidate,
     // delete の楽観除去はこちらを通る。no-op stub のままだと「行が消えたこと」自体が
@@ -205,37 +224,49 @@ describe('useTimeblockWriteMutations create overlap presentation', () => {
     expect(callbacks.every((options) => options?.retry === false)).toBe(true);
   });
 
-  it('外部予定の二重確定はPlanとRecordで再試行を促さず理由を知らせる', () => {
+  it('外部予定の二重確定はPlanとRecordで再試行を促さず理由を知らせる', async () => {
     renderHook(() => useTimeblockWriteMutations());
     const error = {
       message: 'already converted',
       data: { serviceCode: 'EXTERNAL_CALENDAR_ALREADY_CONVERTED' },
     };
+    const input = {
+      title: 'External appointment',
+      start_at: '2026-07-01T09:00:00.000Z',
+      end_at: '2026-07-01T10:00:00.000Z',
+      externalCalendarEventId: 'external-event-1',
+    };
     for (const callbacks of [mocks.planCreateCallbacks, mocks.recordCreateCallbacks]) {
-      act(() => callbacks?.onError?.(error, undefined, undefined));
+      if (!callbacks?.onMutate) throw new Error('Create callbacks missing');
+      let context: unknown;
+      await act(async () => {
+        context = await callbacks.onMutate?.(input);
+      });
+      act(() => callbacks.onError?.(error, input, context));
       expect(mocks.toastError).toHaveBeenLastCalledWith('toast.externalCalendarAlreadyConverted');
-      act(() => callbacks?.onSettled?.());
+      act(() => callbacks.onSettled?.(undefined, error, input, context));
     }
     expect(mocks.toastError).toHaveBeenCalledTimes(2);
     expect(mocks.plansInvalidate).toHaveBeenCalledTimes(2);
     expect(mocks.recordsInvalidate).toHaveBeenCalledTimes(2);
   });
 
-  it('再取り込み後の旧行復元は復元不可の理由を知らせて一覧を再取得する', () => {
+  it('再取り込み後の旧行復元は復元不可の理由を知らせて一覧を再取得する', async () => {
     renderHook(() => useTimeblockWriteMutations());
+    const input = { id: 'old-external-row', expectedUpdatedAt: '2026-07-01T10:00:00.000Z' };
+    const error = {
+      message: 'already converted',
+      data: { serviceCode: 'EXTERNAL_CALENDAR_ALREADY_CONVERTED' },
+    };
     for (const callbacks of [mocks.planRestoreCallbacks, mocks.recordRestoreCallbacks]) {
-      act(() =>
-        callbacks?.onError?.(
-          {
-            message: 'already converted',
-            data: { serviceCode: 'EXTERNAL_CALENDAR_ALREADY_CONVERTED' },
-          },
-          undefined,
-          undefined,
-        ),
-      );
+      if (!callbacks?.onMutate) throw new Error('Restore callbacks missing');
+      let context: unknown;
+      await act(async () => {
+        context = await callbacks.onMutate?.(input);
+      });
+      act(() => callbacks.onError?.(error, input, context));
       expect(mocks.toastError).toHaveBeenLastCalledWith('toast.externalCalendarRestoreConflict');
-      act(() => callbacks?.onSettled?.());
+      act(() => callbacks.onSettled?.(undefined, error, input, context));
     }
     expect(mocks.toastError).toHaveBeenCalledTimes(2);
     expect(mocks.plansInvalidate).toHaveBeenCalledTimes(2);
@@ -439,7 +470,7 @@ describe('useTimeblockWriteMutations create overlap presentation', () => {
     expect(mocks.toastError).toHaveBeenLastCalledWith('toast.saveFailed');
   });
 
-  it('update commandの返却行とraw versionを一覧・詳細cacheの正本にする', () => {
+  it('update commandの返却行とraw versionを一覧・詳細cacheの正本にする', async () => {
     const queryKey = [['plans', 'list'], { input: {}, type: 'query' }];
     const current: TimeModelRow = {
       id: 'plan-1',
@@ -461,13 +492,17 @@ describe('useTimeblockWriteMutations create overlap presentation', () => {
     mocks.cacheEntries = [[queryKey, [current]]];
     renderHook(() => useTimeblockWriteMutations());
 
-    act(() => mocks.planUpdateCallbacks?.onSuccess?.(updated));
+    const context = await mocks.planUpdateCallbacks?.onMutate?.({
+      id: current.id,
+      data: { title: 'After' },
+    });
+    act(() => mocks.planUpdateCallbacks?.onSuccess?.(updated, {}, context));
 
     expect(mocks.cacheEntries[0]?.[1]).toEqual([updated]);
     expect(mocks.planDetailSetData).toHaveBeenCalledWith({ id: updated.id }, updated);
   });
 
-  it('restore commandの返却行を一致する一覧へ再挿入する', () => {
+  it('restore commandの返却行を一致する一覧へ再挿入する', async () => {
     const queryKey = [['plans', 'list'], { input: {}, type: 'query' }];
     const restored: TimeModelRow = {
       id: 'plan-1',
@@ -484,7 +519,8 @@ describe('useTimeblockWriteMutations create overlap presentation', () => {
     mocks.cacheEntries = [[queryKey, []]];
     renderHook(() => useTimeblockWriteMutations());
 
-    act(() => mocks.planRestoreCallbacks?.onSuccess?.(restored));
+    const context = await mocks.planRestoreCallbacks?.onMutate?.({ id: restored.id });
+    act(() => mocks.planRestoreCallbacks?.onSuccess?.(restored, {}, context));
 
     expect(mocks.cacheEntries[0]?.[1]).toEqual([restored]);
     expect(mocks.planDetailSetData).toHaveBeenCalledWith({ id: restored.id }, restored);
@@ -535,6 +571,160 @@ describe('useTimeblockWriteMutations 楽観更新の巻き戻し', () => {
     mocks.planRestoreCallbacks = undefined;
     mocks.otherMutationCallbacks = [];
     mocks.cacheEntries = [];
+  });
+
+  it.each(['plans', 'records'] as const)(
+    '%s concurrent creates own distinct temporary rows',
+    async (lane) => {
+      const now = vi.spyOn(Date, 'now').mockReturnValue(1790640000000);
+      try {
+        mocks.cacheEntries = [[[[lane, 'list'], { input: {}, type: 'query' }], []]];
+        renderHook(() => useTimeblockWriteMutations());
+        const callbacks =
+          lane === 'plans' ? mocks.planCreateCallbacks : mocks.recordCreateCallbacks;
+        const firstInput = {
+          title: 'First',
+          start_at: '2026-07-17T09:00:00.000Z',
+          end_at: '2026-07-17T10:00:00.000Z',
+        };
+        const secondInput = {
+          title: 'Second',
+          start_at: '2026-07-17T11:00:00.000Z',
+          end_at: '2026-07-17T12:00:00.000Z',
+        };
+        let first: unknown;
+        await act(async () => {
+          first = await callbacks?.onMutate?.(firstInput);
+          await callbacks?.onMutate?.(secondInput);
+        });
+        expect(
+          rowsAt()
+            .map((row) => row.title)
+            .sort(),
+        ).toEqual(['First', 'Second']);
+        expect(new Set(rowsAt().map((row) => row.id)).size).toBe(2);
+        const created = listRow({ id: 'server-first', title: 'First' });
+        act(() => callbacks?.onSuccess?.(created, firstInput, first));
+        expect(
+          rowsAt()
+            .map((row) => row.title)
+            .sort(),
+        ).toEqual(['First', 'Second']);
+        expect(
+          rowsAt()
+            .filter((row) => row.id.startsWith('temp-'))
+            .map((row) => row.title),
+        ).toEqual(['Second']);
+      } finally {
+        now.mockRestore();
+      }
+    },
+  );
+
+  it.each(['plans', 'records'] as const)(
+    '%sのactivity変更を保存前に一覧・詳細と両フィルタへ反映する',
+    async (lane) => {
+      const existing = listRow({ activity_id: 'activity-before' });
+      const allKey = [[lane, 'list'], { input: {}, type: 'query' }];
+      const beforeKey = [
+        [lane, 'list'],
+        { input: { activityId: 'activity-before' }, type: 'query' },
+      ];
+      const afterKey = [[lane, 'list'], { input: { activityId: 'activity-after' }, type: 'query' }];
+      mocks.cacheEntries = [
+        [allKey, [existing]],
+        [beforeKey, [existing]],
+        [afterKey, []],
+      ];
+      renderHook(() => useTimeblockWriteMutations());
+      const callbacks = lane === 'plans' ? mocks.planUpdateCallbacks : mocks.recordUpdateCallbacks;
+      const input = { id: existing.id, data: { activityId: 'activity-after' } };
+      let context: unknown;
+      await act(async () => {
+        context = await callbacks?.onMutate?.(input);
+      });
+
+      expect(rowsAt(0)[0]?.activity_id).toBe('activity-after');
+      expect(rowsAt(1)).toEqual([]);
+      expect(rowsAt(2)).toEqual([{ ...existing, activity_id: 'activity-after' }]);
+      const detail = lane === 'plans' ? mocks.planDetailSetData : mocks.recordDetailSetData;
+      const updater = detail.mock.calls.at(-1)?.[1] as (row: TimeModelRow) => TimeModelRow;
+      expect(updater(existing).activity_id).toBe('activity-after');
+
+      act(() => callbacks?.onError?.({ message: 'UNKNOWN' }, input, context));
+      expect(rowsAt(0)).toEqual([existing]);
+      expect(rowsAt(1)).toEqual([existing]);
+      expect(rowsAt(2)).toEqual([]);
+    },
+  );
+
+  it.each(['plans', 'records'] as const)(
+    '%sのactivity解除と省略を区別しraw versionを維持する',
+    async (lane) => {
+      const existing = listRow({
+        activity_id: 'activity-before',
+        updated_at: '2026-07-17T08:00:00.000001+00:00',
+      });
+      mocks.cacheEntries = [[[[lane, 'list'], { input: {}, type: 'query' }], [existing]]];
+      renderHook(() => useTimeblockWriteMutations());
+      const callbacks = lane === 'plans' ? mocks.planUpdateCallbacks : mocks.recordUpdateCallbacks;
+      await act(async () => {
+        await callbacks?.onMutate?.({ id: existing.id, data: { note: 'Only note' } });
+      });
+      expect(rowsAt(0)[0]?.activity_id).toBe('activity-before');
+      await act(async () => {
+        await callbacks?.onMutate?.({ id: existing.id, data: { activityId: null } });
+      });
+      expect(rowsAt(0)[0]?.activity_id).toBeNull();
+      expect(rowsAt(0)[0]?.updated_at).toBe('2026-07-17T08:00:00.000001+00:00');
+      const detail = lane === 'plans' ? mocks.planDetailSetData : mocks.recordDetailSetData;
+      const updater = detail.mock.calls.at(-1)?.[1] as (row: TimeModelRow) => TimeModelRow;
+      expect(updater(existing).activity_id).toBeNull();
+    },
+  );
+
+  it('移動先の期間cacheへ挿入し、検索・未保持の後続ページは推測しない', async () => {
+    const existing = listRow();
+    const filter = { startDate: '2026-07-17T11:00:00.000Z', endDate: '2026-07-17T12:00:00.000Z' };
+    mocks.cacheEntries = [
+      [PLANS_LIST_KEY, [existing]],
+      [[['plans', 'list'], { input: filter, type: 'query' }], []],
+      [[['plans', 'list'], { input: { ...filter, offset: 10 }, type: 'query' }], []],
+      [[['plans', 'list'], { input: { search: 'Existing' }, type: 'query' }], [existing]],
+    ];
+    renderHook(() => useTimeblockWriteMutations());
+    await act(async () => {
+      await mocks.planUpdateCallbacks?.onMutate?.({
+        id: existing.id,
+        data: { start_at: '2026-07-17T11:00:00.000Z', end_at: '2026-07-17T12:00:00.000Z' },
+      });
+    });
+    expect(rowsAt(1)).toEqual([
+      { ...existing, start_at: '2026-07-17T11:00:00.000Z', end_at: '2026-07-17T12:00:00.000Z' },
+    ]);
+    expect(rowsAt(2)).toEqual([]);
+    expect(rowsAt(3)).toEqual([existing]);
+  });
+
+  it('別の一覧で保持した未変更フィールドを楽観patchで上書きしない', async () => {
+    const existing = listRow({ activity_id: 'activity-before', note: 'Older note' });
+    const fresher = {
+      ...existing,
+      note: 'Newer note',
+      updated_at: '2026-07-17T08:00:00.000002+00:00',
+    };
+    mocks.cacheEntries = [
+      [PLANS_LIST_KEY, [existing]],
+      [[['plans', 'list'], { input: { activityId: 'activity-after' }, type: 'query' }], [fresher]],
+    ];
+    renderHook(() => useTimeblockWriteMutations());
+    await act(async () => {
+      await mocks.planUpdateCallbacks?.onMutate?.({
+        id: existing.id,
+        data: { activityId: 'activity-after' },
+      });
+    });
+    expect(rowsAt(1)).toEqual([{ ...fresher, activity_id: 'activity-after' }]);
   });
 
   it('Plan createの失敗で楽観挿入したtemp行を操作前へ戻す', async () => {
@@ -619,10 +809,11 @@ describe('useTimeblockWriteMutations 楽観更新の巻き戻し', () => {
 
   // onSettled は成否によらず走る再取得。ここが消えると、巻き戻した cache が
   // server の真値へ追いつかないまま残る。
-  it('onSettledでplans / recordsと集計系queryを再検証する', () => {
+  it('onSettledでplans / recordsと集計系queryを再検証する', async () => {
     renderHook(() => useTimeblockWriteMutations());
 
-    act(() => mocks.planUpdateCallbacks?.onSettled?.());
+    const context = await mocks.planUpdateCallbacks?.onMutate?.({ id: 'absent', data: {} });
+    act(() => mocks.planUpdateCallbacks?.onSettled?.(undefined, undefined, {}, context));
 
     expect(mocks.plansInvalidate).toHaveBeenCalledOnce();
     expect(mocks.recordsInvalidate).toHaveBeenCalledOnce();

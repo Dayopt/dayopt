@@ -41,6 +41,8 @@ const EXPECTED_ERROR_CODES: Readonly<Record<string, McpMutationErrorCode>> = {
   DM004: 'AUTHORIZATION_LOST',
   DM005: 'PRO_REQUIRED',
   DM006: 'IDEMPOTENCY_KEY_REUSED',
+  // A purge invalidates the saved result permanently; replay cannot recover it.
+  DM008: 'NOT_FOUND',
   DT001: 'NOT_FOUND',
   DT002: 'CONFLICT',
   DT003: 'INVALID_TIME_RANGE',

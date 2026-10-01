@@ -34,6 +34,33 @@ describe('anchorMinuteToInstant', () => {
     },
   );
 
+  it.each([
+    '2026-02-30',
+    '2025-02-29',
+    '1900-02-29',
+    '2026-04-31',
+    '2026-00-01',
+    '2026-13-01',
+    '2026-01-00',
+  ])('rejects nonexistent Gregorian date %s before normalization', (date) => {
+    expect(() => anchorMinuteToInstant(date, 540, 'UTC')).toThrow(RangeError);
+    expect(() => nextDateKey(date)).toThrow(RangeError);
+  });
+
+  it('preserves a four-digit year below 100 rather than adding 1900', () => {
+    expect(anchorMinuteToInstant('0099-01-01', 540, 'UTC').toISOString()).toBe(
+      '0099-01-01T09:00:00.000Z',
+    );
+    expect(nextDateKey('0099-12-31')).toBe('0100-01-01');
+  });
+
+  it('accepts the Gregorian century leap day', () => {
+    expect(anchorMinuteToInstant('2000-02-29', 540, 'UTC').toISOString()).toBe(
+      '2000-02-29T09:00:00.000Z',
+    );
+    expect(nextDateKey('2000-02-29')).toBe('2000-03-01');
+  });
+
   it('UTC では壁時計がそのまま instant になる', () => {
     expect(anchorMinuteToInstant('2026-09-05', 9 * 60 + 30, 'UTC').toISOString()).toBe(
       '2026-09-05T09:30:00.000Z',

@@ -106,6 +106,8 @@ docs へ残している。
 - **永続化するクライアント cache は認証主体に束縛する。** ブラウザに残す query cache は
   user id で名前空間を分け、別 principal の blob を復元せず、sign-out で破棄する。
   key に所有者が無いと、共有端末で前のユーザーのデータが次のユーザーへ復元される（#2619）
+  破棄時は進行中の保存・復元も無効化する。破棄前に始まった読み取り結果を後からhydrateせず、
+  開始済みの書き込みが完了してからstorageを消し、旧blobを復活させない（#2963）。
 - **所有者付きリソースを跨いで参照する行は、単一 ID ではなく `(id, user_id)` の複合 FK で
   束縛する。** トリガーではなく FK で守るので、他人の行を紐づけることが構造的に不可能になる。
   参照先には `UNIQUE (id, user_id)` の anchor が要る（`categories` / `activities` /
@@ -340,7 +342,8 @@ docs へ残している。
     （REST + service role key）から送る（2026-09-21 実測、`supabase` skill §実測で分かった罠）
 - Plan は時間軸のどこにでも置ける。過去 Plan もドラッグ移動・リサイズ・時間編集ができ、
   編集しても Plan のままで Record にはならない。過去スロットへ新規に引いたブロックは
-  Record になる（宛先は `end_at` だけで決まる）
+  既定では Record になる。既定は `end_at` だけで決まり、終了が現在以前なら作成 Inspector で
+  Plan / Record を選べる（`resolveTimeblockKindChoice`）。未来は Plan のみ
 
 ### 規則の写しと、その分類
 
@@ -355,7 +358,7 @@ grep 対象にする。
 | (a) 契約変換  | `features/timeblock/server/mcp-mutation-client.ts` の `EXPECTED_ERROR_CODES`            | DT コード → `McpMutationErrorCode`                | 不可（MCP の公開契約）                        |
 | (a) 契約変換  | `features/timeblock/server/timeblock-context-contract.ts` の `TIMEBLOCK_CONTEXT_RULES`  | MCP `constraints.get` が返す規則の宣言            | 不可（公開契約）                              |
 | (b) UX 先回り | `features/timeblock/schemas/timeblock.ts` の `timeRangeRefine`                          | 往復前に `end > start` を弾く                     | 可（server が同じ規則で拒否する）             |
-| (b) UX 先回り | `features/timeblock/domain/timeblock-destination.ts`                                    | `end_at` から Plan / Record の宛先を決める        | 不可（規則の写しではなく宛先の決定そのもの）  |
+| (b) UX 先回り | `features/timeblock/domain/timeblock-destination.ts`                                    | `end_at` から既定の宛先と種別の選択可否を決める   | 不可（規則の写しではなく宛先の決定そのもの）  |
 | (b) UX 先回り | `features/calendar/lib/overlap.ts` + `lib/time/time-conflict.ts`                        | 重なりの事前表示                                  | 可（overlap は DB 側 `TIME_OVERLAP` が正）    |
 | (b) UX 先回り | `features/calendar/hooks/operations/useTimeblockOperations.ts` の record 未来移動ガード | ドラッグ中に `timeLocked` を出す                  | 可（server 拒否でも同じ toast が出る。#2628） |
 | (b) UX 先回り | `features/calendar/interaction/interaction-effects.ts` の `case 'DROP'` の記録化経路    | Record レーンへの drop 先が未来なら記録を作らない | 可（server が `DT005` で拒否する。#2645）     |

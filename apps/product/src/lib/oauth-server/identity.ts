@@ -36,6 +36,23 @@ interface OAuthEnvironmentInput {
   mcpOAuthPreviewBranch?: string | undefined;
 }
 
+/** Normalize deployment env at both proxy and handler boundaries before applying identity policy. */
+export function resolveOAuthEnvironmentFromEnv(
+  environment: Readonly<Record<string, string | undefined>>,
+): OAuthEnvironmentConfig {
+  const read = (key: string): string | undefined => environment[key]?.trim() || undefined;
+  return resolveOAuthEnvironmentConfig({
+    mcpOAuthEnvironment: read('MCP_OAUTH_ENVIRONMENT'),
+    authorizationServerUri: read('OAUTH_AUTHORIZATION_SERVER_URI'),
+    resourceUri: read('MCP_CANONICAL_RESOURCE_URI'),
+    vercelEnvironment: read('VERCEL_ENV'),
+    vercelTargetEnvironment: read('VERCEL_TARGET_ENV'),
+    vercelBranchUrl: read('VERCEL_BRANCH_URL'),
+    vercelGitCommitRef: read('VERCEL_GIT_COMMIT_REF'),
+    mcpOAuthPreviewBranch: read('MCP_OAUTH_PREVIEW_BRANCH'),
+  });
+}
+
 const AUTHORIZATION_SERVER_PATHS = new Set([
   '/oauth/authorize',
   '/oauth/consent',

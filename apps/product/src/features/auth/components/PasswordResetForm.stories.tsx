@@ -88,7 +88,10 @@ export const Success: Story = {
     await userEvent.click(submitButton);
 
     // 実コンポーネントの成功画面が表示されることを確認
-    await expect(canvas.getByRole('heading', { level: 1 })).toBeInTheDocument();
+    await expect(
+      await canvas.findByRole('heading', { level: 1, name: 'メールを確認してください' }),
+    ).toBeInTheDocument();
+    await expect(canvas.getByText('user@example.com', { exact: true })).toBeInTheDocument();
   },
 };
 
@@ -159,7 +162,10 @@ export const RateLimitedShowsSuccess: Story = {
     await userEvent.click(submitButton);
 
     // 成功と同じ画面になる（エラー表示は出ない）
-    await expect(canvas.getByRole('heading', { level: 1 })).toBeInTheDocument();
+    await expect(
+      await canvas.findByRole('heading', { level: 1, name: 'メールを確認してください' }),
+    ).toBeInTheDocument();
+    await expect(canvas.getByText('forgot@example.com', { exact: true })).toBeInTheDocument();
     await expect(canvas.queryByRole('alert')).not.toBeInTheDocument();
   },
 };

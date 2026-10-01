@@ -36,12 +36,7 @@ repo rootの`.op-env.agent`に`op://`参照だけを置き、通常はroot comma
 
 ## Content
 
-| Path               | 内容                 |
-| ------------------ | -------------------- |
-| `content/blog`     | blog記事             |
-| `content/docs`     | 外部ユーザー向けdocs |
-| `content/releases` | 公開release notes    |
-| `messages/{en,ja}` | web用copy            |
+コンテンツの配置は [content/](./content/)、翻訳コピーは [messages/](./messages/) の実ファイルを参照する。リリースノートは blog の `release` カテゴリ記事として扱う。
 
 公開コンテンツの執筆規約は`.agents/skills/docs-writing/SKILL.md`を使う（`.claude/skills` は互換 symlink で正本ではない）。内部設計・開発規約はroot [`docs/README.md`](../../docs/README.md)へ置き、このapp配下に二重管理しない。
 

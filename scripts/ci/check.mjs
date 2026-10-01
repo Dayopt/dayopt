@@ -612,7 +612,7 @@ async function runStatic() {
   }
 
   run('pnpm', ['secrets:check']);
-  run('pnpm', ['docs:check'], {
+  run('pnpm', ['docs:check', '--ci'], {
     env: {
       ...process.env,
       DOCS_GUARD_BASE_REF: `origin/${process.env.GITHUB_BASE_REF || 'main'}`,
@@ -833,11 +833,7 @@ async function runIntegration() {
     return;
   }
 
-  run('pnpm', ['test:integration']);
-  for (const sqlFile of [
-    'supabase/tests/cron-heartbeats.sql',
-    'supabase/tests/fenced-calendar-reconnect.sql',
-  ]) {
+  const runSql = (sqlFile) => {
     run(
       'psql',
       [
@@ -858,7 +854,15 @@ async function runIntegration() {
       ],
       { env: { ...process.env, PGPASSWORD: 'postgres' } },
     );
-  }
+  };
+  // Requires the fresh DB before Vitest provisions an immutable identity.
+  runSql('supabase/tests/integration-oauth-identity.sql');
+  run('pnpm', ['test:integration']);
+  for (const sqlFile of [
+    'supabase/tests/cron-heartbeats.sql',
+    'supabase/tests/fenced-calendar-reconnect.sql',
+  ])
+    runSql(sqlFile);
   run('pnpm', ['rls:snapshot:check']);
   run('pnpm', ['types:generate:local']);
   run('git', [
@@ -874,11 +878,11 @@ async function runIntegration() {
  * （fail open）設計を維持する。戻り値の `coupled`（既存オブジェクトの契約を縮める migration と
  * product runtime 変更が同一 PR、#2680）だけは呼び出し側（runUnit）が hard fail にする。
  *
- * **通知（ラベル付与・PR コメント）はここでは行わない**（2026-09-14、credential audit P2-6）。
+ * **通知（PR コメント）はここでは行わない**（2026-09-14、credential audit P2-6）。
  * この関数は PR head のコードと全依存を実行する unit job で走るため、write 権限の token を
  * 持たせない。`notify` と `summary` を返し、runUnit が formatMigrationSafetyOutput() で
  * job output へ出し、ci.yml の `migration-notice` job（checkout も依存 install もしない）が
- * コメント投稿 → ラベル付与を行う（順序と「付与済みなら再通知しない」規約はそちらが持つ）。
+ * bot の通知コメントを確認し、未通知の場合だけコメントを投稿する。
  *
  * 実行に使う関数はすべて注入可能にしてある（test では gh / fs へ実際に触れずに
  * 分岐を検証する）。

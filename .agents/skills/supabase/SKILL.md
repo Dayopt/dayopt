@@ -209,53 +209,15 @@ supabase/migrations/YYYYMMDDHHMMSS_description.sql
 
 例: `20260420000000_add_streak_column.sql`
 
-### マイグレーションテンプレート
+### マイグレーションの実装例
 
-```sql
--- テーブル作成
-CREATE TABLE IF NOT EXISTS public.new_table (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  name TEXT NOT NULL,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
-);
+新しいユーザーデータtableは、現行の
+[`20260818130000_create_segments.sql`](../../../supabase/migrations/20260818130000_create_segments.sql)
+を例にする。RLS・必要なpolicy・REVOKE先行のGRANT・権限不変条件・updated_atを
+同一transactionで定義している。参照先のpolicyやgrantをそのまま複製せず、対象の操作境界に合わせる。
 
--- RLSを有効化
-ALTER TABLE public.new_table ENABLE ROW LEVEL SECURITY;
-
--- Data API への明示 GRANT（RLS とセットで必須）
--- Supabase は新規 public テーブルを Data API に自動公開しなくなる方向のため、
--- authenticated role での PostgREST アクセス権を明示的に付与する。
--- anon は原則付与しない（公開読み取りが必要なテーブルのみ SELECT を個別付与）。
-GRANT SELECT, INSERT, UPDATE, DELETE ON public.new_table TO authenticated;
-
--- RLSポリシー
-CREATE POLICY "Users can view own data"
-  ON public.new_table FOR SELECT
-  USING (auth.uid() = user_id);
-
-CREATE POLICY "Users can insert own data"
-  ON public.new_table FOR INSERT
-  WITH CHECK (auth.uid() = user_id);
-
-CREATE POLICY "Users can update own data"
-  ON public.new_table FOR UPDATE
-  USING (auth.uid() = user_id);
-
-CREATE POLICY "Users can delete own data"
-  ON public.new_table FOR DELETE
-  USING (auth.uid() = user_id);
-
--- updated_atトリガー
-CREATE TRIGGER set_updated_at
-  BEFORE UPDATE ON public.new_table
-  FOR EACH ROW
-  EXECUTE FUNCTION public.handle_updated_at();
-
--- インデックス
-CREATE INDEX idx_new_table_user_id ON public.new_table(user_id);
-```
+必要な条件は下のチェックリストと[データ分離の正本](../../../docs/engineering/invariants.md#データ分離rls)
+で確認する。別の短縮SQL雛形は置かず、権限検査や現行helperの欠落を防ぐ。
 
 ### マイグレーション作成時チェックリスト
 
@@ -427,7 +389,7 @@ npx supabase functions deploy send-auth-email --use-api --project-ref=<PREVIEW_R
 npx supabase functions deploy send-auth-email --use-api --project-ref=<PROD_REF>
 ```
 
-通常は GitHub Actions が自動実行する。
+通常の経路は上の[デプロイ経路](#デプロイ経路)を参照する。実行済みかどうかは対象環境のデプロイ記録で確認する。
 
 ### Secrets 管理
 
