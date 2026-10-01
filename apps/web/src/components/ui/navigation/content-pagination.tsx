@@ -72,12 +72,12 @@ export function ContentPagination({
             <PaginationPrevious
               href={generatePageUrl(currentPage - 1)}
               label={t('previous')}
-              ariaLabel={t('goToPreviousPage')}
+              ariaLabel={t('previous')}
             />
           ) : (
             <PaginationPrevious
               label={t('previous')}
-              ariaLabel={t('goToPreviousPage')}
+              ariaLabel={t('previous')}
               href="#"
               className="pointer-events-none opacity-50"
               aria-disabled="true"
@@ -115,12 +115,12 @@ export function ContentPagination({
             <PaginationNext
               href={generatePageUrl(currentPage + 1)}
               label={t('next')}
-              ariaLabel={t('goToNextPage')}
+              ariaLabel={t('next')}
             />
           ) : (
             <PaginationNext
               label={t('next')}
-              ariaLabel={t('goToNextPage')}
+              ariaLabel={t('next')}
               href="#"
               className="pointer-events-none opacity-50"
               aria-disabled="true"

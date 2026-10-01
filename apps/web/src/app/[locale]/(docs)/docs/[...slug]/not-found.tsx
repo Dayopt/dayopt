@@ -1,7 +1,9 @@
 'use client';
 
-import { Button, Heading, Text } from '@dayopt/components';
+import { Button } from '@dayopt/components';
 import { Link } from '@dayopt/i18n/navigation';
+import design from '@web/components/content/ContentDesign.module.css';
+import { EditorialHeader } from '@web/components/content/EditorialHeader';
 import { useTranslations } from 'next-intl';
 
 // Client Component にしている理由:
@@ -13,22 +15,17 @@ export default function NotFound() {
   const t = useTranslations('errors');
 
   return (
-    <div className="bg-background flex min-h-[60vh] items-center justify-center">
-      <div className="mx-auto max-w-md text-center">
-        <div className="text-muted-foreground mb-4 text-sm tabular-nums">404</div>
-
-        <Heading as="h2" size="xl" className="mb-4">
-          {t('notFound.title')}
-        </Heading>
-
-        <Text variant="muted" className="mb-8">
-          {t('notFound.description')}
-        </Text>
-
-        <Button asChild className="w-full">
+    <div className={design.page}>
+      <EditorialHeader
+        eyebrow="404"
+        title={t('notFound.title')}
+        description={t('notFound.description')}
+        artwork
+      >
+        <Button asChild className="mt-8">
           <Link href="/">{t('notFound.goHome')}</Link>
         </Button>
-      </div>
+      </EditorialHeader>
     </div>
   );
 }

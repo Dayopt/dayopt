@@ -4,6 +4,22 @@
   padding: clamp(40px, 6vw, 96px) clamp(20px, 5vw, 96px) clamp(64px, 8vw, 128px);
   color: var(--foreground);
 }
+.errorHeader,
+.errorNavigation {
+  width: min(100%, 1600px);
+  margin-inline: auto;
+  padding: 32px clamp(20px, 5vw, 96px);
+}
+.errorHeader {
+  padding-bottom: 0;
+}
+.errorNavigation {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+  font-size: 14px;
+  color: var(--muted-foreground);
+}
 .pageHeader {
   position: relative;
   display: grid;
@@ -18,6 +34,9 @@
 }
 .headerCopy {
   min-width: 0;
+  font-family:
+    var(--font-latin-subset), var(--font-noto-jp-hero), var(--font-noto-jp-subset),
+    'Dayopt Content JP', var(--font-stack-sans);
 }
 .eyebrow {
   margin: 0 0 24px;

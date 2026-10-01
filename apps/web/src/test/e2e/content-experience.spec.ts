@@ -41,10 +41,10 @@ test('Blog検索は結果を絞り込み、クリア後に記事を戻す', asyn
   await search.fill('');
   await expect(articles).not.toHaveCount(0);
   const firstTitle = await articles.first().locator('h2').textContent();
-  await page.getByRole('link', { name: '次のページへ', exact: true }).click();
+  await page.getByRole('link', { name: '次へ', exact: true }).click();
   await expect(page).toHaveURL(/\/ja\/blog\?page=2$/);
   await expect(articles.first().locator('h2')).not.toHaveText(firstTitle!);
-  await page.getByRole('link', { name: '前のページへ', exact: true }).click();
+  await page.getByRole('link', { name: '前へ', exact: true }).click();
   await expect(articles.first().locator('h2')).toHaveText(firstTitle!);
   await page.getByRole('link', { name: '設計思想', exact: true }).click();
   await expect(page).toHaveURL(/\/ja\/blog\/philosophy$/);
@@ -130,6 +130,17 @@ test('記事の横長テーブルはキーボードで横へ読める', async ({
   await expect
     .poll(() => overflowingTable.evaluate((element) => element.scrollLeft))
     .toBeGreaterThan(before);
+});
+
+test('未知のガイドは404を返し、ホームへ戻れる', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const response = await page.goto('/ja/docs/missing-dayopt-guide');
+  expect(response?.status()).toBe(404);
+  // dynamicParams=false の未知 slug は locale boundary より前に global 404 へ送られる。
+  await expect(page.getByRole('heading', { level: 1, name: 'Page not found' })).toBeVisible();
+  await page.getByRole('link', { name: 'Back to home', exact: true }).click();
+  await expect(page).toHaveURL(/\/ja$/);
+  await expect(page.locator('html')).toHaveAttribute('lang', 'ja');
 });
 
 test('JavaScript無効でもモバイルのガイドとBlogの登録導線が成立する', async ({
