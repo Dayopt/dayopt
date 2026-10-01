@@ -52,6 +52,7 @@
   white-space: nowrap;
 }
 .landing[data-locale='en'] .heroIntro h1 {
+  font-family: var(--font-latin), var(--font-stack-sans);
   line-height: 1.04;
   letter-spacing: -0.06em;
 }
