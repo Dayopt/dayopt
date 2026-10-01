@@ -126,6 +126,13 @@
       "light": "Light",
       "dark": "Dark",
       "system": "System"
+    },
+    "contentDesign": {
+      "legal": "Policies & transparency",
+      "support": "Dayopt Support",
+      "contactHelp": "Find a guide or an answer to a common question.",
+      "contactNote": "Send a question or share your thoughts about Dayopt.",
+      "faq": "Frequently asked questions"
     }
   },
   "errors": {
@@ -183,7 +190,11 @@
   },
   "blog": {
     "header": {
-      "title": "Blog"
+      "title": "Thoughts on time.\nRoom for a better day.",
+      "eyebrow": "Dayopt Journal",
+      "description": "Ideas for spending time, the thinking behind Dayopt, and notes from building it.",
+      "latest": "Latest story",
+      "rss": "RSS feed"
     },
     "tabs": {
       "all": "All",
@@ -228,7 +239,9 @@
       "clearAllFilters": "Clear All Filters"
     },
     "post": {
-      "tagsUsed": "Tags"
+      "tagsUsed": "Tags",
+      "read": "Read story",
+      "readingTime": "{minutes} min read"
     },
     "share": {
       "title": "Share this article"
@@ -273,6 +286,8 @@
     },
     "sidebar": {
       "searchPlaceholder": "Search docs..."
-    }
+    },
+    "browse": "Explore the guides",
+    "guide": "The Dayopt guide"
   }
 }

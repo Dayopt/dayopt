@@ -1,5 +1,7 @@
+import design from '@web/components/content/ContentDesign.module.css';
 import { FAQStructuredData } from '@web/components/seo/EnhancedSEO';
 import { ContentData } from '@web/types/content';
+import { getTranslations } from 'next-intl/server';
 import { MDXRemote } from 'next-mdx-remote/rsc';
 import rehypeHighlight from 'rehype-highlight';
 import remarkGfm from 'remark-gfm';
@@ -51,12 +53,17 @@ export async function DocArticle({
   nextPage,
 }: DocArticleProps) {
   const isFAQ = category === 'faq';
+  const t = await getTranslations('docs');
 
   return (
-    <div className="flex">
+    <div className={`${design.docsArticle} ${design.articleLayout}`}>
       {/* Main Content */}
-      <div className="min-w-0 flex-1 px-6 py-8 lg:px-8">
-        <div className="mx-auto max-w-3xl">
+      <div className={design.articleBody}>
+        <div>
+          <div className={design.docKicker}>
+            <span aria-hidden="true">D /</span>
+            <span>{t('guide')}</span>
+          </div>
           {/* FAQ構造化データ */}
           {isFAQ &&
             (() => {
@@ -84,8 +91,8 @@ export async function DocArticle({
       </div>
 
       {/* Right Sidebar - Table of Contents（xl以上で表示。blog と共通の2card レイアウト） */}
-      <aside className="hidden w-72 flex-shrink-0 xl:block">
-        <div className="sticky top-14 py-8 pr-6 lg:pr-8">
+      <aside className={design.articleAside}>
+        <div>
           <TableOfContentsCards content={mdxContent} />
         </div>
       </aside>

@@ -13,3 +13,5 @@ export {
   generateTableOfContents,
 } from './lib/toc';
 export type { TocItem } from './lib/toc';
+
+export { DocsMobileNavigation } from './components/DocsMobileNavigation';

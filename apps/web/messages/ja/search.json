@@ -16,6 +16,29 @@
     "toSelect": "選択",
     "toClose": "閉じる",
     "close": "検索を閉じる",
-    "poweredBy": "Dayopt Search による検索"
+    "poweredBy": "Dayopt Search による検索",
+    "page": {
+      "eyebrow": "Dayopt Library",
+      "title": "探していた、答えへ。",
+      "description": "使い方のガイドと、時間を考える記事を横断して検索できます。",
+      "input": "キーワード",
+      "placeholder": "予定、記録、時間の使い方…",
+      "submit": "検索",
+      "all": "すべて",
+      "docs": "ドキュメント",
+      "blog": "ブログ",
+      "filters": "検索対象",
+      "count": "「{query}」の検索結果 {count}件",
+      "loading": "検索中…",
+      "emptyTitle": "一致する結果がありません",
+      "emptyDescription": "別のキーワードで検索してみてください。",
+      "startTitle": "知りたいことを、ひとつ。",
+      "startDescription": "キーワードを入力するか、ガイドやブログから探してみてください。",
+      "clear": "検索をクリア",
+      "read": "詳しく読む",
+      "updated": "更新: {date}",
+      "errorTitle": "検索できませんでした",
+      "errorDescription": "しばらくしてからもう一度検索してください。ガイドやブログからも探せます。"
+    }
   }
 }

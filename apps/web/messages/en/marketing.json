@@ -435,7 +435,8 @@
           "newMessage": "Send New Message"
         },
         "privacyNotice": "By submitting this form, you agree to our",
-        "privacyLink": "Privacy Policy"
+        "privacyLink": "Privacy Policy",
+        "requiredBadge": "Required"
       }
     }
   }

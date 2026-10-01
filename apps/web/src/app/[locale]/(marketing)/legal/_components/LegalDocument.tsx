@@ -1,5 +1,7 @@
+import { Link } from '@dayopt/i18n/navigation';
 import type { Locale } from '@dayopt/i18n/routing';
-import { Shield } from 'lucide-react';
+import design from '@web/components/content/ContentDesign.module.css';
+import { EditorialHeader } from '@web/components/content/EditorialHeader';
 import { getTranslations } from 'next-intl/server';
 import { MDXRemote } from 'next-mdx-remote/rsc';
 
@@ -71,36 +73,44 @@ export async function LegalDocument({ locale, slug }: LegalDocumentProps) {
   const { frontMatter, content } = getLegalDocument(locale, slug);
   const reviewWarning = await getReviewWarning(locale, slug);
   const isSecurity = slug === 'security';
+  const t = await getTranslations({ locale });
+  const navigation = ['terms', 'privacy', 'cookies', 'tokushoho', 'security'] as const;
 
   return (
-    <div className="bg-background container mx-auto min-h-screen max-w-4xl px-4 py-12 md:px-8 md:py-16">
-      {isSecurity ? (
-        <div className="mb-8">
-          <div className="mb-4 flex items-center gap-4">
-            <Shield className="text-primary size-10" />
-            <h1 className="text-3xl font-medium">{frontMatter.title}</h1>
-          </div>
-          <p className="text-muted-foreground">{frontMatter.description}</p>
-        </div>
-      ) : (
-        <div className="mb-8">
-          <h1 className="mb-2 text-3xl font-medium">{frontMatter.title}</h1>
-          <p className="text-muted-foreground">{frontMatter.description}</p>
-          <p className="text-muted-foreground mt-2 text-sm">{frontMatter.lastUpdated}</p>
-        </div>
-      )}
+    <section className={design.page}>
+      <EditorialHeader
+        eyebrow={t('common.contentDesign.legal')}
+        title={frontMatter.title}
+        description={frontMatter.description}
+      >
+        <p className={design.articleMeta}>{frontMatter.lastUpdated}</p>
+      </EditorialHeader>
+      <div className={design.legalGrid}>
+        <nav className={design.legalNav} aria-label={t('footer.sections.legal')}>
+          {navigation.map((destination) => (
+            <Link
+              key={destination}
+              href={`/legal/${destination}`}
+              aria-current={destination === slug ? 'page' : undefined}
+            >
+              {getLegalDocument(locale, destination).frontMatter.title}
+            </Link>
+          ))}
+        </nav>
+        <div className={design.articleBody}>
+          <MDXRemote source={content} components={legalMdxComponents} options={LEGAL_MDX_OPTIONS} />
 
-      <MDXRemote source={content} components={legalMdxComponents} options={LEGAL_MDX_OPTIONS} />
+          {reviewWarning ? (
+            <LegalReviewWarning content={reviewWarning} compact={slug === 'tokushoho'} />
+          ) : null}
 
-      {reviewWarning ? (
-        <LegalReviewWarning content={reviewWarning} compact={slug === 'tokushoho'} />
-      ) : null}
-
-      {isSecurity ? (
-        <div className="text-muted-foreground mt-8 text-center text-sm">
-          <p>{frontMatter.lastUpdated}</p>
+          {isSecurity ? (
+            <div className="text-muted-foreground mt-8 text-center text-sm">
+              <p>{frontMatter.lastUpdated}</p>
+            </div>
+          ) : null}
         </div>
-      ) : null}
-    </div>
+      </div>
+    </section>
   );
 }

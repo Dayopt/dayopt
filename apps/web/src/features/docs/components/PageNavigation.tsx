@@ -19,7 +19,7 @@ export async function PageNavigation({ previousPage, nextPage }: PageNavigationP
 
   return (
     <div className="border-border mt-12 border-t pt-8">
-      <div className="flex justify-between gap-4">
+      <div className="flex flex-col justify-between gap-4 sm:flex-row">
         {/* Previous Page */}
         <div className="flex-1">
           {previousPage && (
@@ -33,7 +33,7 @@ export async function PageNavigation({ previousPage, nextPage }: PageNavigationP
                 <ChevronLeft className="mr-2 size-4 shrink-0" />
                 <div className="text-left">
                   <div className="text-muted-foreground text-xs">{t('previous')}</div>
-                  <div className="text-foreground text-sm font-medium">
+                  <div className="text-foreground text-sm font-medium whitespace-normal">
                     {previousPage.frontMatter.title}
                   </div>
                 </div>
@@ -54,7 +54,7 @@ export async function PageNavigation({ previousPage, nextPage }: PageNavigationP
               <Link href={getDocHref(nextPage)}>
                 <div className="text-right">
                   <div className="text-muted-foreground text-xs">{t('next')}</div>
-                  <div className="text-foreground text-sm font-medium">
+                  <div className="text-foreground text-sm font-medium whitespace-normal">
                     {nextPage.frontMatter.title}
                   </div>
                 </div>

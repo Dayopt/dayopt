@@ -1,4 +1,6 @@
 import type { Locale } from '@dayopt/i18n/routing';
+import design from '@web/components/content/ContentDesign.module.css';
+import { EditorialHeader } from '@web/components/content/EditorialHeader';
 import type { Metadata } from 'next';
 import { getTranslations } from 'next-intl/server';
 import Link from 'next/link';
@@ -65,12 +67,13 @@ export default async function OSSCreditsPage({ params }: PageProps) {
   });
 
   return (
-    <div className="bg-background container mx-auto min-h-screen max-w-6xl px-4 py-12 md:px-8 md:py-16">
+    <div className={design.page}>
       {/* ヘッダー */}
-      <div className="mb-8">
-        <h1 className="mb-2 text-3xl font-medium">{t('ossCredits.title')}</h1>
-        <p className="text-muted-foreground">{t('ossCredits.description')}</p>
-      </div>
+      <EditorialHeader
+        eyebrow={t('common.contentDesign.legal')}
+        title={t('ossCredits.title')}
+        description={t('ossCredits.description')}
+      />
 
       {/* イントロダクション */}
       <div className="bg-container mb-8 rounded-2xl p-6">
@@ -119,7 +122,7 @@ export default async function OSSCreditsPage({ params }: PageProps) {
                 className="bg-card border-border-subtle hover:border-primary rounded-2xl border p-6 shadow-sm transition-colors"
               >
                 <div className="mb-2 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-                  <h3 className="text-foreground text-lg font-medium">
+                  <h3 className="text-foreground text-lg font-medium break-all">
                     {credit.name}
                     <span className="text-muted-foreground ml-2 text-sm font-normal">
                       v{credit.version}
@@ -144,7 +147,7 @@ export default async function OSSCreditsPage({ params }: PageProps) {
                         href={credit.repository}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-primary hover:underline"
+                        className="text-primary break-all hover:underline"
                       >
                         {credit.repository}
                       </Link>
@@ -164,7 +167,7 @@ export default async function OSSCreditsPage({ params }: PageProps) {
           <Link
             href="/THIRD_PARTY_NOTICES.txt"
             target="_blank"
-            className="text-primary hover:underline"
+            className="text-primary break-all hover:underline"
           >
             {t('ossCredits.footer.thirdPartyNotices')}
           </Link>
