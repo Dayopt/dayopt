@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process';
 import { resolve } from 'node:path';
-import { ReadFailure } from './safety.ts';
+import { loadConfig } from './config.ts';
+import { failureCode, ReadFailure } from './safety.ts';
 import type { Environment, Observation } from './types.ts';
 
 export const CREDENTIALS: Record<string, Record<string, string>> = {
@@ -27,6 +28,7 @@ export const CREDENTIALS: Record<string, Record<string, string>> = {
 export function collectorEnvironment(
   service: string,
   inherited: NodeJS.ProcessEnv,
+  environment: Environment = 'all',
 ): NodeJS.ProcessEnv {
   // Do not let op resolve unrelated op:// variables from the caller's environment.
   const safe = Object.fromEntries(
@@ -38,14 +40,55 @@ export function collectorEnvironment(
       'LC_ALL',
       'SSH_AUTH_SOCK',
       'OP_BIOMETRIC_UNLOCK_ENABLED',
+      // The existing op wrapper uses these identifiers to select agent-only auth.
+      'CODEX_THREAD_ID',
+      'CODEX_SESSION_ID',
     ].flatMap((name) => (inherited[name] ? [[name, inherited[name]]] : [])),
   );
-  return { ...safe, ...CREDENTIALS[service], DOCTOR_INTERNAL: '1' };
+  const credentials = { ...CREDENTIALS[service] };
+  if (service === 'stripe' && environment !== 'all') {
+    delete credentials[
+      environment === 'production' ? 'STRIPE_TEST_SECRET_KEY' : 'STRIPE_LIVE_SECRET_KEY'
+    ];
+  }
+  return { ...safe, ...credentials, DOCTOR_INTERNAL: '1' };
 }
 export async function collectAuthenticated(
   service: string,
   environment: Environment,
   root: string,
+): Promise<Observation[]> {
+  if (service !== 'stripe' || environment !== 'all')
+    return collectOne(service, environment, root, 120_000);
+  const deadline = Date.now() + 120_000;
+  const output: Observation[] = [];
+  const definitions = loadConfig(root).checks.filter((check) => check.service === service);
+  for (const scope of ['production', 'integration'] as const) {
+    try {
+      const remaining = deadline - Date.now();
+      if (remaining <= 0) throw new ReadFailure('authorization_or_service_timeout');
+      output.push(...(await collectOne(service, scope, root, remaining)));
+    } catch (error) {
+      output.push(
+        ...definitions.map((check) => ({
+          key: check.id,
+          environment: scope,
+          source: 'op run',
+          value: null,
+          status: 'blocked' as const,
+          reason: failureCode(error),
+          next_step: check.next_step,
+        })),
+      );
+    }
+  }
+  return output;
+}
+async function collectOne(
+  service: string,
+  environment: Environment,
+  root: string,
+  timeoutMs: number,
 ): Promise<Observation[]> {
   return new Promise((resolvePromise, reject) => {
     const child = spawn(
@@ -63,7 +106,7 @@ export async function collectAuthenticated(
       ],
       {
         cwd: root,
-        env: collectorEnvironment(service, process.env),
+        env: collectorEnvironment(service, process.env, environment),
         stdio: ['ignore', 'pipe', 'pipe'],
         detached: true,
       },
@@ -96,7 +139,7 @@ export async function collectAuthenticated(
         finished = true;
         reject(new ReadFailure('authorization_or_service_timeout'));
       }
-    }, 120_000);
+    }, timeoutMs);
     child.stdout.on('data', (chunk: Buffer) => {
       output += chunk.toString();
       if (output.length > 4_000_000) {

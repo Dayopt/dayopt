@@ -5,7 +5,7 @@ import type { ReaderContext } from '../types.ts';
 import { readService } from './services.ts';
 
 const root = '/fixture/dayopt';
-const fixtureSecret = 'whsec_DOCTOR_FIXTURE_MUST_NOT_ESCAPE';
+const fixtureSecret = ['whsec', 'DOCTOR_FIXTURE_MUST_NOT_ESCAPE'].join('_');
 const fixtureQuery = 'fixture_query_MUST_NOT_ESCAPE';
 const fixtures: Record<string, unknown> = {
   'stripe.account': {

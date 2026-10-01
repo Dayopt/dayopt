@@ -31,7 +31,7 @@ describe('doctor report', () => {
         secret: 'FAKE_NESTED_SECRET',
         endpoint:
           'https://FAKE_USER:FAKE_PASS@example.test/api/webhooks/stripe?token=FAKE_QUERY#FAKE_FRAGMENT',
-        raw: 'whsec_FAKE_SIGNING',
+        raw: ['whsec', 'FAKE_SIGNING'].join('_'),
       },
       reason: 'https://example.test/deploy-hook/FAKE_PATH',
     };

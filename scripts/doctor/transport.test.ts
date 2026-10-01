@@ -16,6 +16,22 @@ const ENV = {
   UPTIME_KEY: 'fake-uptime',
 };
 describe('doctor read transport', () => {
+  it('reads only the fixed public registration endpoint without credentials or other domains', async () => {
+    const mock = vi.fn().mockResolvedValue(json({ ldhName: 'dayopt.app' }));
+    const request = createTransport(ENV, mock);
+    await expect(request('public.domain_registration')).resolves.toMatchObject({
+      ldhName: 'dayopt.app',
+    });
+    expect(String(mock.mock.calls[0][0])).toBe(
+      'https://pubapi.registry.google/rdap/domain/dayopt.app',
+    );
+    expect(mock.mock.calls[0][1].method).toBe('GET');
+    expect(mock.mock.calls[0][1].headers).not.toHaveProperty('Authorization');
+    await expect(
+      request('public.domain_registration', { domain: 'other.app' }),
+    ).rejects.toMatchObject({ code: 'POLICY_BLOCKED' });
+    expect(mock).toHaveBeenCalledTimes(1);
+  });
   it('reads R2 bucket locks from the singular lock endpoint in the verified account', async () => {
     const mock = vi
       .fn()

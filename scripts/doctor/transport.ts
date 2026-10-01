@@ -22,6 +22,7 @@ const SUPABASE_REFS = new Set(['yvglwblxrnrenfifsnje', 'tilwaprottpyhlfoggbb']);
 export const OPERATIONS = new Set([
   'public.health',
   'public.oauth_metadata',
+  'public.domain_registration',
   'github.repository',
   'github.rulesets',
   'github.environments',
@@ -221,6 +222,10 @@ export function createTransport(env: NodeJS.ProcessEnv, fetchImpl: typeof fetch 
   }
   async function request(operation: string, params: Row = {}): Promise<unknown> {
     if (!OPERATIONS.has(operation)) throw new ReadFailure('UNSUPPORTED_OPERATION');
+    if (operation === 'public.domain_registration') {
+      if (Object.keys(params).length) throw new ReadFailure('POLICY_BLOCKED');
+      return (await http(new URL('https://pubapi.registry.google/rdap/domain/dayopt.app'))).data;
+    }
     if (operation === 'public.health') {
       const origins: Record<string, string> = {
         production: 'https://app.dayopt.app',

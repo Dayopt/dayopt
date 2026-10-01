@@ -306,6 +306,79 @@ async function oauthMetadata(ctx: ReaderContext): Promise<Observation[]> {
   );
 }
 
+async function registration(ctx: ReaderContext): Promise<Observation[]> {
+  const key = 'cloudflare.registrar_metadata';
+  const source = 'public.domain_registration';
+  let metadata: Observation;
+  try {
+    const raw = await ctx.request(source);
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error('metadata_missing');
+    const data = raw as Record<string, unknown>;
+    if (data.ldhName !== 'dayopt.app') throw new Error('domain_identity_mismatch');
+    const rows = (value: unknown): Record<string, unknown>[] =>
+      Array.isArray(value)
+        ? value.filter((entry) => entry && typeof entry === 'object' && !Array.isArray(entry))
+        : [];
+    const text = (value: unknown) => (typeof value === 'string' ? value : null);
+    metadata = {
+      key,
+      source,
+      environment: 'shared',
+      value: {
+        domain: 'dayopt.app',
+        registrar: rows(data.entities)
+          .filter((entry) => Array.isArray(entry.roles) && entry.roles.includes('registrar'))
+          .map((entry) => {
+            const vcard =
+              Array.isArray(entry.vcardArray) && Array.isArray(entry.vcardArray[1])
+                ? entry.vcardArray[1]
+                : [];
+            return {
+              id: text(entry.handle),
+              name: text(
+                vcard.find((field: unknown) => Array.isArray(field) && field[0] === 'fn')?.[3],
+              ),
+            };
+          }),
+        events: rows(data.events)
+          .filter((entry) =>
+            ['registration', 'expiration', 'last changed'].includes(String(entry.eventAction)),
+          )
+          .map((entry) => ({ action: text(entry.eventAction), date: text(entry.eventDate) })),
+        nameservers: rows(data.nameservers).map((entry) => text(entry.ldhName)),
+        delegation_signed:
+          typeof rows([data.secureDNS])[0]?.delegationSigned === 'boolean'
+            ? rows([data.secureDNS])[0].delegationSigned
+            : null,
+      },
+    };
+  } catch (error) {
+    metadata = {
+      key,
+      source,
+      environment: 'shared',
+      value: null,
+      status: 'blocked',
+      reason: failureCode(error),
+      next_step: '公開登録情報の接続・domain identityを確認。未取得を未登録と解釈しない。',
+    };
+  }
+  return [
+    metadata,
+    {
+      key: 'cloudflare.registrar_operations',
+      source: 'registrar_dashboard',
+      environment: 'shared',
+      value: null,
+      status: 'manual',
+      reason:
+        'Public registration metadata does not establish auto-renewal, payment or account recovery settings.',
+      next_step:
+        '既存の登録事業者Dashboardで自動更新・更新担当・回復方法を確認。支払情報や個人連絡先は出力しない。',
+    },
+  ];
+}
+
 /** Static contract presence and public metadata are separate from unverified live settings. */
 export async function readLocal(service: string, ctx: ReaderContext): Promise<Observation[]> {
   const name = service.toLowerCase();
@@ -314,7 +387,20 @@ export async function readLocal(service: string, ctx: ReaderContext): Promise<Ob
       ...(await contract(name, ctx)),
       ...(name === 'mcp_oauth' ? await oauthMetadata(ctx) : []),
     ];
-  if (name === 'cloudflare') return dns();
+  if (name === 'cloudflare') return [...(await dns()), ...(await registration(ctx))];
   if (name === 'vercel') return health(ctx);
+  if (name === 'github')
+    return [
+      {
+        key: 'github.installed_apps',
+        source: 'GitHub installed Apps / repository settings',
+        environment: 'shared',
+        value: null,
+        status: 'manual',
+        reason: 'Repository hooks do not establish installed GitHub Apps or their permissions.',
+        next_step:
+          '認証済みrepo SettingsでApp名・権限・対象repoを確認。未取得を未接続と解釈しない。',
+      },
+    ];
   return [];
 }

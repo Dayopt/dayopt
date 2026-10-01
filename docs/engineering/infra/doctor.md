@@ -26,9 +26,9 @@ pnpm run doctor --format json
 
 ## 対象と正本
 
-[expected.yaml](./expected.yaml)の`checks`が機械判定の一覧。`source_contracts`が既存監査・環境台帳の正本参照。今回の観測は[inventory-2026-09-30.md](./inventory-2026-09-30.md)に保存する。観測値で期待値を自動上書きしない。
+[expected.yaml](./expected.yaml)の`checks`が機械判定の一覧。`source_contracts`が既存監査・環境台帳の正本参照。現行の統合棚卸しは[inventory-2026-10-01.md](./inventory-2026-10-01.md)、初回の履歴は[inventory-2026-09-30.md](./inventory-2026-09-30.md)。観測値で期待値を自動上書きしない。
 
-`--service`には`github`, `vercel`, `supabase`, `stripe`, `resend`, `cloudflare`, `sentry`, `posthog`, `upstash`, `uptimerobot`, `google`, `mcp_oauth`, `telemetry`, `pwned_passwords`, `support_smtp`, `optional`を指定できる。Cloudflareには公開DNS、Turnstile、R2を含む。`all`はCLI既定の環境選択。
+`--service`には`github`, `vercel`, `supabase`, `stripe`, `resend`, `cloudflare`, `sentry`, `posthog`, `upstash`, `uptimerobot`, `google`, `mcp_oauth`, `telemetry`, `pwned_passwords`, `support_smtp`, `optional`を指定できる。Cloudflareには公開DNS、Turnstile、R2とdomain registration metadataを含む。GitHub Appsはrepository hooksとは別のmanual検査。`all`はCLI既定の環境選択。
 
 API/CLI readerはAPIが返すmetadataの安全な列だけを射影する。Googleの登録callback、Gmail SMTP、実際のsource map適用、secret replica値の一致など、現在のAPI資格情報で証明できない事項は`manual`または`blocked`。ソースファイルの存在、PING、domain verification、HTTP metadata取得だけで動作成功と扱わない。
 
@@ -38,11 +38,11 @@ API/CLI readerはAPIが返すmetadataの安全な列だけを射影する。Goog
 
 ## 認証・読み取り境界
 
-各サービスの子プロセスを既存`op://`参照付きの`op run`で起動する。無関係な環境変数は渡さず、既存ログインや`.env`へfallbackしない。1Passwordの永続設定や権限は変更しない。ダイアログが出る場合は今回のみ許可する。
+各サービスの子プロセスを既存`op://`参照付きの`op run`で起動する。無関係な環境変数は渡さず、既存ログインや`.env`へfallbackしない。既存agent専用op wrapperが必要とする非秘密のCODEX_THREAD_ID / CODEX_SESSION_IDだけは維持する。OP_SERVICE_ACCOUNT_TOKEN / OP_CONFIG_DIRなどの認証overrideを親から継承しない。1Passwordの永続設定や権限は変更しない。ダイアログが出る場合は今回のみ許可する。
 
-通常API timeoutは10秒。認証と収集全体はサービスごと120秒。429と一時的5xxだけ最大2回再試行。一つの認証・API失敗が他サービスの結果を消さない。
+通常API timeoutは10秒。認証と収集全体はサービスごと120秒。429と一時的5xxだけ最大2回再試行。一つの認証・API失敗が他サービスの結果を消さない。StripeのallはLive/Testを別々の子プロセスで取得し、Live失敗でもTest結果を残す。サービス全体の120秒上限は共通。
 
-通信は固定のoperationとDayoptリソースに限定する。GETとmetadata用の固定read POSTのみ。Supabase SQLには`read_only:true`を付け、顧客行・Vault値・pg_cron commandを読まない。PostHogは直近7日のenvironment/count集計だけ。UptimeRobotは`getMonitors`だけ。RedisはPINGだけ。
+通信は固定のoperationとDayoptリソースに限定する。GETとmetadata用の固定read POSTのみ。Supabase SQLには`read_only:true`を付け、顧客行・Vault値・pg_cron commandを読まない。PostHogは直近7日のenvironment/count集計だけ。UptimeRobotは`getMonitors`だけ。RedisはPINGだけ。domain registrationはdayopt.app固定の公開registry RDAP GETだけで、registrant連絡先を出力しない。
 
 資格情報やAPI応答bodyをerror/logへ出さない。URLのquery/userinfoと未知のpathを削除する。公開client IDとproject/account IDは秘密値ではない。runtime secretは存在だけを扱い、復号・master照合ができない場合はunknownのまま残す。
 
@@ -77,3 +77,9 @@ Node 24で全16サービスを読み取り実行し、2026-09-30 12:37:14 JSTの
 この記録は初版の限定的な読み取り証拠。現行状態は再実行で確認する。schema/cronの契約ファイル比較とURLの原表記保持は、この実行後にも回帰テストで確認した。
 
 初版後の差異・取得不能の切り分けとreader修正は[triage-2026-09-30.md](./triage-2026-09-30.md)に記録している。
+
+## 接続・取得制約の台帳
+
+expected.yamlの`connections`は安定ID、対象環境、from/to、check ID、既存正本、既存secret参照を持つ。`ui_only`は互換上の名称であり、API未提供を確定した項目と、現在の権限不足、reader不足、secret再表示不可、実動作検証を分ける。すべてをUI限定と扱わない。offlineでID重複と参照切れを検査する。
+
+10/1時点は95定義・60接続・23取得制約。全実環境runは100結果（pass 45 / drift 0 / blocked 36 / manual 19）、終了コード2。MCP/UIによる補足と過去証拠は統合棚卸しに記録し、自動取得結果と混ぜて全件正常にしない。Googleの切り替え作業は別セッションで進行している。

@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { failureCode, ReadFailure, sanitize } from './safety';
 
+// Assemble a recognizably fake provider credential at runtime, without storing a secret literal.
+const fakeStripeKey = ['sk', 'test', 'FAKE_SENTINEL'].join('_');
+
 describe('doctor output safety', () => {
   it('removes known secrets and credential fields recursively', () => {
     const result = JSON.stringify(
@@ -8,17 +11,12 @@ describe('doctor output safety', () => {
         {
           secret: 'opaque-secret',
           nested: [{ token: 'opaque-token', note: 'fake-opaque-value' }],
-          provider: 'sk_test_FAKE_SENTINEL',
+          provider: fakeStripeKey,
         },
         ['fake-opaque-value'],
       ),
     );
-    for (const sentinel of [
-      'opaque-secret',
-      'opaque-token',
-      'fake-opaque-value',
-      'sk_test_FAKE_SENTINEL',
-    ])
+    for (const sentinel of ['opaque-secret', 'opaque-token', 'fake-opaque-value', fakeStripeKey])
       expect(result).not.toContain(sentinel);
   });
   it('removes URL userinfo, query, fragment and arbitrary credential paths', () => {

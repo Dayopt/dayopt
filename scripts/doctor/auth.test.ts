@@ -1,4 +1,5 @@
 import { EventEmitter } from 'node:events';
+import { resolve } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { collectAuthenticated, collectorEnvironment } from './auth';
 import { ReadFailure } from './safety';
@@ -27,6 +28,74 @@ afterEach(() => {
 });
 
 describe('authenticated collector timeout', () => {
+  it('resolves only the selected Stripe mode credentials', () => {
+    expect(collectorEnvironment('stripe', {}, 'integration')).toMatchObject({
+      STRIPE_TEST_SECRET_KEY: 'op://agent/stripe-test/STRIPE_SECRET_KEY',
+    });
+    expect(collectorEnvironment('stripe', {}, 'integration')).not.toHaveProperty(
+      'STRIPE_LIVE_SECRET_KEY',
+    );
+    expect(collectorEnvironment('stripe', {}, 'production')).not.toHaveProperty(
+      'STRIPE_TEST_SECRET_KEY',
+    );
+  });
+
+  it('keeps Stripe Test observations when Live authentication fails without switching authentication paths', async () => {
+    const live = collectorChild();
+    const test = collectorChild();
+    mocks.spawn.mockReturnValueOnce(live).mockReturnValueOnce(test);
+    const pending = collectAuthenticated('stripe', 'all', resolve(import.meta.dirname, '../..'));
+    live.stderr.emit('data', Buffer.from('FAKE_AUTH_DIAGNOSTIC'));
+    live.exitCode = 1;
+    live.emit('close', 1);
+    await vi.advanceTimersByTimeAsync(0);
+    test.stdout.emit(
+      'data',
+      Buffer.from(
+        JSON.stringify([
+          {
+            key: 'stripe.account',
+            environment: 'integration',
+            source: 'stripe.account',
+            value: { id: 'test-account' },
+          },
+        ]),
+      ),
+    );
+    test.exitCode = 0;
+    test.emit('close', 0);
+    const result = await pending;
+    expect(result.filter((row) => row.environment === 'production')).toHaveLength(5);
+    expect(result.find((row) => row.environment === 'production')).toMatchObject({
+      status: 'blocked',
+      reason: 'credential_or_collector_failed',
+    });
+    expect(result.find((row) => row.environment === 'integration')?.value).toEqual({
+      id: 'test-account',
+    });
+    expect(mocks.spawn.mock.calls.map((call) => call[0])).toEqual(['op', 'op']);
+    expect(mocks.spawn.mock.calls[0][2].env).not.toHaveProperty('STRIPE_TEST_SECRET_KEY');
+    expect(mocks.spawn.mock.calls[1][2].env).not.toHaveProperty('STRIPE_LIVE_SECRET_KEY');
+    expect(JSON.stringify(result)).not.toContain('FAKE_AUTH_DIAGNOSTIC');
+  });
+  it('preserves the Codex identity required by the agent-only op wrapper without inheriting auth overrides', () => {
+    const environment = collectorEnvironment('github', {
+      PATH: '/bin',
+      CODEX_THREAD_ID: 'audit-thread',
+      CODEX_SESSION_ID: 'audit-session',
+      OP_SERVICE_ACCOUNT_TOKEN: 'FAKE_UNRELATED_TOKEN',
+      OP_CONFIG_DIR: '/alternate-auth',
+      UNRELATED: 'op://human/unrelated/password',
+    });
+    expect(environment).toEqual({
+      PATH: '/bin',
+      CODEX_THREAD_ID: 'audit-thread',
+      CODEX_SESSION_ID: 'audit-session',
+      GH_TOKEN: 'op://agent/github-agent/credential',
+      DOCTOR_INTERNAL: '1',
+    });
+  });
+
   it('waits at most 120 seconds and stops the process group, then hard-stops an unresponsive child', async () => {
     const child = collectorChild();
     mocks.spawn.mockReturnValue(child);

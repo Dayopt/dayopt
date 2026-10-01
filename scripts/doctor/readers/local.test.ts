@@ -45,6 +45,13 @@ beforeEach(() => {
 });
 
 describe('local doctor reader', () => {
+  it('retains installed GitHub Apps as a manual inventory check without treating hooks as Apps', async () => {
+    const ctx = context();
+    expect(await readLocal('github', ctx)).toMatchObject([
+      { key: 'github.installed_apps', status: 'manual', value: null },
+    ]);
+    expect(ctx.request).not.toHaveBeenCalled();
+  });
   it.each(['google', 'mcp_oauth', 'telemetry', 'pwned_passwords', 'support_smtp', 'optional'])(
     'keeps %s source presence separate from unverified live settings',
     async (service) => {
@@ -77,14 +84,58 @@ describe('local doctor reader', () => {
     expect(mocks.constructor).toHaveBeenCalledWith({ timeout: 10_000, tries: 1 });
     expect(mocks.ns).toHaveBeenCalledWith('dayopt.app');
     expect(mocks.cname.mock.calls).toEqual([['app.dayopt.app'], ['mcp.dayopt.app']]);
-    expect(result).toHaveLength(9);
+    expect(result).toHaveLength(11);
     expect(result.find((row) => row.key.endsWith('.dkim'))?.value).toEqual([
       { record_present: true, public_key_present: true, key_type: 'rsa' },
     ]);
     expect(result.find((row) => row.key.endsWith('.dmarc'))?.value).toEqual([{ policy: 'none' }]);
     expect(JSON.stringify(result)).not.toContain('PUBLICKEY');
     expect(JSON.stringify(result)).not.toContain('google-site-verification');
-    expect(ctx.request).not.toHaveBeenCalled();
+    expect(ctx.request).toHaveBeenCalledExactlyOnceWith('public.domain_registration');
+  });
+
+  it('projects registrar and expiry metadata without registrant contacts or raw RDAP entities', async () => {
+    const ctx = context();
+    ctx.request = vi.fn().mockResolvedValue({
+      ldhName: 'dayopt.app',
+      status: ['client transfer prohibited'],
+      secureDNS: { delegationSigned: false },
+      nameservers: [{ ldhName: 'colin.ns.cloudflare.com' }],
+      events: [{ eventAction: 'expiration', eventDate: '2027-01-05T01:10:42Z' }],
+      entities: [
+        {
+          roles: ['registrar'],
+          handle: '625',
+          vcardArray: [
+            'vcard',
+            [
+              ['fn', {}, 'text', 'Name.com, Inc.'],
+              ['email', {}, 'text', 'FAKE_CONTACT'],
+            ],
+          ],
+        },
+        { roles: ['registrant'], vcardArray: ['vcard', [['fn', {}, 'text', 'FAKE_OWNER']]] },
+      ],
+    });
+    const result = await readLocal('cloudflare', ctx);
+    expect(result.find((row) => row.key === 'cloudflare.registrar_metadata')).toMatchObject({
+      value: {
+        domain: 'dayopt.app',
+        registrar: [{ id: '625', name: 'Name.com, Inc.' }],
+        delegation_signed: false,
+      },
+    });
+    expect(result.find((row) => row.key === 'cloudflare.registrar_operations')).toMatchObject({
+      status: 'manual',
+      value: null,
+    });
+    expect(JSON.stringify(result)).not.toMatch(/FAKE_CONTACT|FAKE_OWNER/);
+    ctx.request = vi.fn().mockResolvedValue({ ldhName: 'other.app' });
+    expect(
+      (await readLocal('cloudflare', ctx)).find(
+        (row) => row.key === 'cloudflare.registrar_metadata',
+      ),
+    ).toMatchObject({ status: 'blocked', value: null });
   });
 
   it('isolates individual DNS errors and never treats a lookup failure as an empty record', async () => {
