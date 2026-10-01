@@ -54,6 +54,11 @@ vi.mock('@/env', () => ({
   ),
 }));
 
+import {
+  PRODUCT_INTEGRATION_APP_ORIGIN,
+  PRODUCT_INTEGRATION_SUPABASE_REF,
+  PRODUCT_VERCEL_PROJECT_ID,
+} from '@/lib/dayopt-environment';
 import { GET } from './route';
 
 describe('GET /api/health', () => {
@@ -106,6 +111,79 @@ describe('GET /api/health', () => {
     vi.clearAllMocks();
     vi.restoreAllMocks();
     vi.unstubAllEnvs();
+  });
+
+  it('unprovisioned Integration health stays read-only across repeated checks', async () => {
+    vi.stubEnv('VERCEL_ENV', 'preview');
+    vi.stubEnv('VERCEL_TARGET_ENV', 'preview');
+    vi.stubEnv('VERCEL_GIT_COMMIT_REF', 'integration');
+    vi.stubEnv('VERCEL_PROJECT_ID', PRODUCT_VERCEL_PROJECT_ID);
+    vi.stubEnv('VERCEL_BRANCH_URL', PRODUCT_INTEGRATION_APP_ORIGIN.slice('https://'.length));
+    vi.stubEnv('NEXT_PUBLIC_APP_URL', PRODUCT_INTEGRATION_APP_ORIGIN);
+    vi.stubEnv('DAYOPT_ENVIRONMENT', 'integration');
+    vi.stubEnv('NEXT_PUBLIC_DAYOPT_ENVIRONMENT', 'integration');
+    vi.stubEnv('MCP_OAUTH_ENVIRONMENT', 'integration');
+    vi.stubEnv(
+      'NEXT_PUBLIC_SUPABASE_URL',
+      `https://${PRODUCT_INTEGRATION_SUPABASE_REF}.supabase.co`,
+    );
+    vi.stubEnv('OAUTH_AUTHORIZATION_SERVER_URI', PRODUCT_INTEGRATION_APP_ORIGIN);
+    vi.stubEnv('MCP_CANONICAL_RESOURCE_URI', PRODUCT_INTEGRATION_APP_ORIGIN);
+    mocks.rpc.mockResolvedValue({ data: [], error: null });
+
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const response = await GET();
+      expect(response.status).toBe(503);
+    }
+    expect(mocks.rpc.mock.calls.map(([name]) => name)).toEqual([
+      'get_mcp_environment_identity_v1',
+      'get_mcp_environment_identity_v1',
+    ]);
+    expect(mocks.from).not.toHaveBeenCalled();
+  });
+
+  it('checks a provisioned fixed Integration identity and rejects later database drift', async () => {
+    vi.stubEnv('VERCEL_ENV', 'preview');
+    vi.stubEnv('VERCEL_TARGET_ENV', 'preview');
+    vi.stubEnv('VERCEL_GIT_COMMIT_REF', 'integration');
+    vi.stubEnv('VERCEL_PROJECT_ID', PRODUCT_VERCEL_PROJECT_ID);
+    vi.stubEnv('VERCEL_BRANCH_URL', PRODUCT_INTEGRATION_APP_ORIGIN.slice('https://'.length));
+    vi.stubEnv('NEXT_PUBLIC_APP_URL', PRODUCT_INTEGRATION_APP_ORIGIN);
+    vi.stubEnv('DAYOPT_ENVIRONMENT', 'integration');
+    vi.stubEnv('NEXT_PUBLIC_DAYOPT_ENVIRONMENT', 'integration');
+    vi.stubEnv('MCP_OAUTH_ENVIRONMENT', 'integration');
+    vi.stubEnv(
+      'NEXT_PUBLIC_SUPABASE_URL',
+      `https://${PRODUCT_INTEGRATION_SUPABASE_REF}.supabase.co`,
+    );
+    vi.stubEnv('OAUTH_AUTHORIZATION_SERVER_URI', PRODUCT_INTEGRATION_APP_ORIGIN);
+    vi.stubEnv('MCP_CANONICAL_RESOURCE_URI', PRODUCT_INTEGRATION_APP_ORIGIN);
+    vi.stubEnv('UPSTASH_REDIS_REST_URL', 'https://example.upstash.io');
+    vi.stubEnv('UPSTASH_REDIS_REST_TOKEN', 'test-redis-token');
+    const identity = {
+      environment: 'integration',
+      authorization_server_uri: PRODUCT_INTEGRATION_APP_ORIGIN,
+      resource_uri: PRODUCT_INTEGRATION_APP_ORIGIN,
+      supabase_project_ref: PRODUCT_INTEGRATION_SUPABASE_REF,
+      provisioned_at: '2026-09-28T00:00:00.000Z',
+    };
+    mocks.rpc.mockResolvedValue({ data: [identity], error: null });
+
+    const response = await GET();
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ status: 'healthy' });
+    expect(mocks.from).toHaveBeenCalledWith('profiles');
+    expect(mocks.redisPing).toHaveBeenCalledOnce();
+
+    mocks.rpc.mockResolvedValue({
+      data: [{ ...identity, resource_uri: 'https://app.dayopt.app' }],
+      error: null,
+    });
+    expect((await GET()).status).toBe(503);
+    expect(mocks.rpc.mock.calls.map(([name]) => name)).toEqual([
+      'get_mcp_environment_identity_v1',
+      'get_mcp_environment_identity_v1',
+    ]);
   });
 
   it('profilesへの空結果SELECT成功をhealthyとして扱う', async () => {

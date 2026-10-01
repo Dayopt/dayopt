@@ -67,6 +67,10 @@ const CATEGORY_DIR: Record<string, string> = {
  * #2476 Phase B/C の issue コメントで都度説明済み（各行にコメントを付す）。
  */
 const KNOWN_PLACEMENT_EXCEPTIONS = new Set<string>([
+  // agent-op.mjs: インストール済みのローカル op launcher から import する
+  // agent-service-account.mjs の adapter。repo 内の importer がなく docs 参照で
+  // runbook 判定になるが、起動 task と同じ unit・既存 launcher の参照先を保つ。
+  'scripts/tasks/agent-op.mjs',
   // boundaries/: check.ts が root package.json "lint:boundaries" を持つ tasks unit。
   // budget.ts / checks/*.ts / config.ts は内部 lib・runbook 判定だが分割しない。
   'scripts/tasks/boundaries/budget.ts',
@@ -157,6 +161,9 @@ const KNOWN_PLACEMENT_EXCEPTIONS = new Set<string>([
   // family と同型のペア構成（内部結合の強い unit）。loader は settings.json から
   // 参照されるため hooks 判定になり、rules だけがこの例外で hooks/ に揃える。
   'scripts/hooks/pre-tool-guard-rules.mjs',
+  // preview-e2e-recovery.mjs: Preview runbook CLI と unit tests の両方から使う内部 helper。
+  // importedBy 判定は lib に分類するが、運用コマンドと密結合しているため CLI の隣に置く。
+  'scripts/runbook/preview-e2e-recovery.mjs',
 ]);
 
 describe('scripts/ 呼ばれ方別 taxonomy', () => {

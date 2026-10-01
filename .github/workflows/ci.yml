@@ -23,7 +23,9 @@ name: CI
 
 on:
   pull_request:
-    branches: [main]
+    # Integration の候補も merge 前に同じ品質検査を通す。通常PRを
+    # Integration 経由にする規則ではなく、既存の非本番変更経路の検査。
+    branches: [main, integration]
     # **`ready_for_review` を明示的に含める。** 既定の types は
     # `opened / synchronize / reopened` だけで ready_for_review を含まないため、
     # これが無いと draft → ready の変換で CI が再発火しない
@@ -34,10 +36,45 @@ on:
   # マージ後の main は常に PR で検証済みの tree と一致する。
   # 手動で main を検証したい時は workflow_dispatch を使う。
   workflow_dispatch:
+    inputs:
+      preview_e2e:
+        description: Run Preview E2E or recover a completed Preview run
+        type: boolean
+        default: false
+      preview_pr:
+        description: Open internal PR number
+        type: string
+      preview_sha:
+        description: Reviewed 40-character candidate SHA
+        type: string
+      preview_deployment:
+        description: READY Product deployment ID
+        type: string
+      preview_db_mode:
+        description: Explicit nonproduction database mode
+        type: choice
+        options: [shared, ephemeral]
+        default: shared
+      preview_db_ref:
+        description: Selected nonproduction Supabase project ref
+        type: string
+      preview_db_branch:
+        description: Selected nonproduction Supabase branch UUID
+        type: string
+
+      preview_recover_run:
+        description: Recovery only - original completed Cloud workflow run ID
+        type: string
+        default: ""
+      preview_recover_attempt:
+        description: Recovery only - original workflow run attempt
+        type: string
+        default: ""
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # Independent synthetic runs must finish their own cleanup instead of cancelling one another.
+  group: ${{ github.workflow }}-${{ inputs.preview_e2e && github.run_id || github.ref }}
+  cancel-in-progress: ${{ !inputs.preview_e2e }}
 
 # pull-requests: read は impact job の判定と unit job の migration safety（PR の変更
 # ファイル一覧取得）に要る。書き込み権限（pull-requests: write / issues: write）は
@@ -86,7 +123,7 @@ jobs:
   # 名前で要求する）。**緩むのは課金だけで gate は緩まない。**
   impact:
     name: "\U0001F9ED Impact"
-    if: github.event.pull_request.draft != true
+    if: github.event.pull_request.draft != true && !inputs.preview_e2e
     runs-on: ubuntu-latest
     timeout-minutes: 10
     outputs:
@@ -114,7 +151,7 @@ jobs:
   static:
     name: "\U0001F50D Static Checks"
     needs: impact
-    if: ${{ !cancelled() && github.event.pull_request.draft != true }}
+    if: ${{ !cancelled() && github.event.pull_request.draft != true && !inputs.preview_e2e }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -161,7 +198,7 @@ jobs:
     # `always()` を付けるのは、上流 job 自体が落ちた時に下流が skip されると
     # 「検証なしで required check が success」になる（fail open）ため。always()
     # なら impact 失敗時も評価され、空の output は `!= 'true'` で実行側に倒れる。
-    if: ${{ !cancelled() && github.event.pull_request.draft != true && needs.impact.outputs.docs_only != 'true' }}
+    if: ${{ !cancelled() && github.event.pull_request.draft != true && !inputs.preview_e2e && needs.impact.outputs.docs_only != 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 35
     # **write 権限を持たない**（2026-09-14、credential audit P2-6）。この job は PR head の
@@ -295,7 +332,7 @@ jobs:
   integration:
     name: "\U0001F9EA Integration Tests"
     needs: impact
-    if: ${{ !cancelled() && github.event.pull_request.draft != true && needs.impact.outputs.integration != 'false' }}
+    if: ${{ !cancelled() && github.event.pull_request.draft != true && !inputs.preview_e2e && needs.impact.outputs.integration != 'false' }}
     runs-on: ubuntu-latest
     timeout-minutes: 35
     # gh を呼ばないため write 権限も GH_TOKEN も渡さない（migration safety は
@@ -372,12 +409,12 @@ jobs:
   # validation-evidence の PRODUCERS と ci-job-name-contract.test.ts も直す。
   #
   # migration を追加していない PR では impact の `migrations_added` が空で skip される
-  # （plan 側も not-applicable）。`fetch-depth: 2` は merge commit の第 1 親（base）を
-  # `git ls-tree` / `git show` で読むため。接続先はローカル Docker だけ。
+  # （plan 側も not-applicable）。手動 dispatch の通常 branch（main-sync merge commit を含む）では origin/main を
+  # 比較元にできるよう full history を取得する。接続先は隔離 CI runner の Docker だけ。
   db-upgrade:
     name: "\U0001F9F1 DB Upgrade (shadow)"
     needs: impact
-    if: ${{ !cancelled() && github.event.pull_request.draft != true && needs.impact.outputs.migrations_added == 'true' }}
+    if: ${{ !cancelled() && github.event.pull_request.draft != true && !inputs.preview_e2e && needs.impact.outputs.migrations_added == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -385,7 +422,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          fetch-depth: 2
+          fetch-depth: 0
           persist-credentials: false
 
       - uses: ./.github/actions/setup
@@ -424,3 +461,159 @@ jobs:
       - name: Stop Supabase
         if: always()
         run: supabase stop
+
+  preview-trust:
+    name: Preview candidate trust
+    if: github.event_name == 'workflow_dispatch' && inputs.preview_e2e && inputs.preview_recover_run == '' && github.ref == 'refs/heads/integration'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+      actions: read
+    outputs:
+      sha: ${{ steps.trust.outputs.sha }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - id: trust
+        name: Validate internal PR and database mode before environment access
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          PREVIEW_REQUEST_JSON: ${{ toJSON(inputs) }}
+        run: node scripts/ci/preview-cloud-trust.mjs "$RUNNER_TEMP/preview-request.json"
+
+  preview-e2e:
+    name: Remote Preview login and CRUD
+    needs: preview-trust
+    if: ${{ always() && needs.preview-trust.result == 'success' && github.event_name == 'workflow_dispatch' && inputs.preview_e2e && inputs.preview_recover_run == '' && github.ref == 'refs/heads/integration' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: Preview – product
+    permissions:
+      contents: read
+      pull-requests: read
+      actions: read
+      deployments: read
+      statuses: read
+    steps:
+      # Execute the entire harness and its dependencies from trusted Integration.
+      # Candidate files are read only as provenance/migration data; never execute
+      # candidate install scripts, config, specs, or transitive imports here.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Revalidate the live PR on this worker
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          PREVIEW_REQUEST_JSON: ${{ toJSON(inputs) }}
+        run: node scripts/ci/preview-cloud-trust.mjs "$RUNNER_TEMP/preview-initial-request.json"
+      - name: Allocate the public run and planned user identities before candidate code
+        run: node scripts/ci/preview-cloud-intent.mjs "$RUNNER_TEMP/preview-initial-request.json" "$RUNNER_TEMP/preview-intent"
+      - name: Persist the public recovery intent before candidate code or credentials
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: preview-intent-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/preview-intent/intent.json
+          if-no-files-found: error
+          retention-days: 7
+      - name: Checkout the exact reviewed candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.preview-trust.outputs.sha }}
+          path: candidate
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+      - name: Install trusted Chromium before injecting platform credentials
+        run: |
+          pnpm --dir apps/product exec playwright install --with-deps chromium
+      - name: Revalidate immediately before the credential step
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          PREVIEW_REQUEST_JSON: ${{ toJSON(inputs) }}
+        run: node scripts/ci/preview-cloud-trust.mjs "$RUNNER_TEMP/preview-request.json"
+      - id: execute
+        name: Pinned remote login, desktop and mobile CRUD, and cleanup
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          SUPABASE_PREVIEW_READINESS_TOKEN: ${{ secrets.PREVIEW_E2E_SUPABASE_READINESS_TOKEN }}
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.PREVIEW_E2E_BYPASS_SECRET }}
+          SUPABASE_SECRET_KEY: ${{ secrets.PREVIEW_E2E_SUPABASE_KEY }}
+        run: node scripts/ci/preview-cloud-run.mjs execute "$RUNNER_TEMP/preview-request.json" "$GITHUB_WORKSPACE/candidate" "$RUNNER_TEMP/preview-run" "$RUNNER_TEMP/preview-public" "$RUNNER_TEMP/preview-intent/intent.json"
+      - name: Recover owned users on a surviving worker after failure or cancellation
+        if: always() && steps.execute.outcome != 'skipped'
+        env:
+          SUPABASE_SECRET_KEY: ${{ secrets.PREVIEW_E2E_SUPABASE_KEY }}
+        run: node scripts/ci/preview-cloud-run.mjs cleanup "$RUNNER_TEMP/preview-request.json" "$GITHUB_WORKSPACE/candidate" "$RUNNER_TEMP/preview-run" "$RUNNER_TEMP/preview-public" "$RUNNER_TEMP/preview-intent/intent.json"
+      - name: Reconstruct JSON-only public evidence
+        if: always() && steps.execute.outcome != 'skipped'
+        run: node scripts/ci/preview-cloud-run.mjs publish "$RUNNER_TEMP/preview-request.json" "$GITHUB_WORKSPACE/candidate" "$RUNNER_TEMP/preview-run" "$RUNNER_TEMP/preview-public" "$RUNNER_TEMP/preview-intent/intent.json"
+      - name: Upload reconstructed evidence only
+        if: always() && steps.execute.outcome != 'skipped'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: preview-e2e-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/preview-public/preview.json
+          if-no-files-found: error
+          retention-days: 7
+
+
+  preview-recovery-trust:
+    name: Preview recovery trust
+    if: github.event_name == 'workflow_dispatch' && inputs.preview_e2e && inputs.preview_recover_run != '' && github.ref == 'refs/heads/integration'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Verify the completed original attempt and public intent before environment access
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          PREVIEW_RECOVER_RUN: ${{ inputs.preview_recover_run }}
+          PREVIEW_RECOVER_ATTEMPT: ${{ inputs.preview_recover_attempt }}
+        run: node scripts/ci/preview-cloud-recovery.mjs prepare "$RUNNER_TEMP/preview-recovery"
+
+  preview-recovery:
+    name: Recover interrupted Preview fixtures
+    needs: preview-recovery-trust
+    if: ${{ always() && needs.preview-recovery-trust.result == 'success' && github.event_name == 'workflow_dispatch' && inputs.preview_e2e && inputs.preview_recover_run != '' && github.ref == 'refs/heads/integration' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: Preview – product
+    concurrency:
+      group: preview-recovery-${{ inputs.preview_recover_run }}-${{ inputs.preview_recover_attempt }}
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Revalidate and retrieve the same public intent on the recovery worker
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          PREVIEW_RECOVER_RUN: ${{ inputs.preview_recover_run }}
+          PREVIEW_RECOVER_ATTEMPT: ${{ inputs.preview_recover_attempt }}
+        run: node scripts/ci/preview-cloud-recovery.mjs prepare "$RUNNER_TEMP/preview-recovery"
+      - id: recover
+        name: Revalidate the completed source and recover only its planned synthetic users
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          SUPABASE_SECRET_KEY: ${{ secrets.PREVIEW_E2E_SUPABASE_KEY }}
+        run: node scripts/ci/preview-cloud-recovery.mjs execute "$RUNNER_TEMP/preview-recovery"
+      - name: Save public recovery confirmation
+        if: always() && steps.recover.outcome != 'skipped'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: preview-recovery-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/preview-recovery/recovery.json
+          if-no-files-found: error
+          retention-days: 7

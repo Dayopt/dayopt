@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import {
+  PRODUCT_INTEGRATION_APP_ORIGIN,
+  PRODUCT_INTEGRATION_SUPABASE_REF,
+  PRODUCT_VERCEL_PROJECT_ID,
+} from '@/lib/dayopt-environment';
+
 const mocks = vi.hoisted(() => ({
   updateSession: vi.fn(),
   captureUnexpectedError: vi.fn(),
@@ -54,6 +60,69 @@ function mockUnauthenticatedSession() {
     supabase: { auth: {} },
   });
 }
+
+function stubIntegrationOAuthEnvironment() {
+  const integrationEnvironment = {
+    DAYOPT_ENVIRONMENT: 'integration',
+    NEXT_PUBLIC_DAYOPT_ENVIRONMENT: 'integration',
+    MCP_OAUTH_ENVIRONMENT: 'integration',
+    MCP_OAUTH_PREVIEW_BRANCH: '',
+    OAUTH_AUTHORIZATION_SERVER_URI: PRODUCT_INTEGRATION_APP_ORIGIN,
+    MCP_CANONICAL_RESOURCE_URI: PRODUCT_INTEGRATION_APP_ORIGIN,
+    VERCEL_ENV: 'preview',
+    VERCEL_TARGET_ENV: 'preview',
+    VERCEL_PROJECT_ID: PRODUCT_VERCEL_PROJECT_ID,
+    VERCEL_BRANCH_URL: PRODUCT_INTEGRATION_APP_ORIGIN.slice('https://'.length),
+    VERCEL_GIT_COMMIT_REF: 'integration',
+    NEXT_PUBLIC_SUPABASE_URL: `https://${PRODUCT_INTEGRATION_SUPABASE_REF}.supabase.co`,
+  };
+
+  for (const [name, value] of Object.entries(integrationEnvironment)) {
+    vi.stubEnv(name, value);
+  }
+}
+
+describe('proxy OAuth host boundary for fixed Integration', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    stubIntegrationOAuthEnvironment();
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('allows OAuth surfaces on the exact Integration deployment binding', async () => {
+    const response = await proxy(
+      new NextRequest(`${PRODUCT_INTEGRATION_APP_ORIGIN}/.well-known/oauth-authorization-server`),
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('location')).toBeNull();
+    expect(mocks.updateSession).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['private Dayopt marker', 'DAYOPT_ENVIRONMENT', 'preview'],
+    ['public Dayopt marker', 'NEXT_PUBLIC_DAYOPT_ENVIRONMENT', 'preview'],
+    ['Vercel project', 'VERCEL_PROJECT_ID', 'prj_untrusted'],
+    [
+      'Supabase project ref',
+      'NEXT_PUBLIC_SUPABASE_URL',
+      'https://yvglwblxrnrenfifsnje.supabase.co',
+    ],
+  ])('rejects the Integration OAuth surface when the %s binding drifts', async (_, name, value) => {
+    vi.stubEnv(name, value);
+
+    const response = await proxy(
+      new NextRequest(`${PRODUCT_INTEGRATION_APP_ORIGIN}/.well-known/oauth-authorization-server`),
+    );
+
+    expect(response.status).toBe(503);
+    expect(response.headers.get('cache-control')).toBe('no-store');
+    expect(mocks.updateSession).not.toHaveBeenCalled();
+  });
+});
 
 describe('proxy MFA gate', () => {
   beforeEach(() => {

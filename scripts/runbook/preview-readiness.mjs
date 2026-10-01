@@ -5,26 +5,25 @@ import { fileURLToPath } from 'node:url';
 import { SUPABASE_PRODUCTION_PROJECT_REF } from '../ci/production-auth-config-audit.mjs';
 import { expectedMigrationVersions } from '../ci/production-migration-readiness.mjs';
 import { isDirectExecution } from '../lib/is-direct-execution.mjs';
+import { observeProductPreviewDeployment } from '../lib/preview-deployment-provenance.mjs';
 
 class PreviewReadinessError extends Error {}
 
-const PRODUCT_PROJECT_ID = 'prj_hByu1DGZWiuLk0yfV4Gz1T4aIjpa';
 const REF = /^[a-z]{20}$/;
 const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
 const MIGRATION = /^\d{14}$/;
+const MAX_OBSERVATION_MS = 60_000;
 
 /** No mutation, redirects, API bodies, or credentials in diagnostics/evidence. */
-async function readJson(url, token, fetchImpl, body) {
+async function readJson(url, token, fetchImpl) {
   try {
     const response = await fetchImpl(url, {
-      method: body ? 'POST' : 'GET',
+      method: 'GET',
       redirect: 'error',
       signal: AbortSignal.timeout(15_000),
       headers: {
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        ...(body ? { 'Content-Type': 'application/json' } : {}),
       },
-      ...(body ? { body: JSON.stringify(body) } : {}),
     });
     if (!response.ok) throw new Error();
     return await response.json();
@@ -35,6 +34,16 @@ async function readJson(url, token, fetchImpl, body) {
 
 function requireCondition(condition, message) {
   if (!condition) throw new PreviewReadinessError(`Preview readiness: ${message}`);
+}
+
+function observationTime(now) {
+  requireCondition(typeof now === 'function', 'observation clock is invalid');
+  const value = now();
+  requireCondition(
+    value instanceof Date && Number.isFinite(value.getTime()),
+    'observation clock is invalid',
+  );
+  return value;
 }
 
 /**
@@ -52,9 +61,10 @@ export async function observePreviewReadiness({
   supabaseBranchId,
   databaseMode,
   expectedMigrations,
-  vercelToken,
+  githubToken,
   supabaseToken,
   bypassSecret,
+  requireRunnablePullRequest = true,
   fetchImpl = fetch,
   now = () => new Date(),
 }) {
@@ -85,31 +95,25 @@ export async function observePreviewReadiness({
     'invalid expected migration set',
   );
   requireCondition(
-    [vercelToken, supabaseToken, bypassSecret].every(
+    [githubToken, supabaseToken, bypassSecret].every(
       (value) => typeof value === 'string' && value.trim(),
     ),
     'platform read credentials and automation bypass are required',
   );
 
-  const startedAt = now().toISOString();
-  const deployment = await readJson(
-    `https://api.vercel.com/v13/deployments/${deploymentId}`,
-    vercelToken,
+  const startedMs = observationTime(now).getTime();
+  const startedAt = new Date(startedMs).toISOString();
+  // GitHub-authenticated Vercel bot records bind Product Preview; no Production-capable PAT.
+  const { origin, providerEvidence } = await observeProductPreviewDeployment({
+    sha,
+    deploymentId,
+    branchName,
+    prNumber,
+    githubToken,
     fetchImpl,
-  );
-  requireCondition(
-    deployment?.id === deploymentId &&
-      deployment.projectId === PRODUCT_PROJECT_ID &&
-      (deployment.target === null || deployment.target === 'preview') &&
-      deployment.readyState === 'READY' &&
-      deployment.meta?.githubCommitSha === sha &&
-      deployment.meta?.githubCommitOrg === 'Dayopt' &&
-      deployment.meta?.githubCommitRepo === 'dayopt' &&
-      deployment.meta?.githubCommitRef === branchName &&
-      /^product-[a-z0-9]+-dayopt\.vercel\.app$/.test(deployment.url ?? ''),
-    'deployment does not match the ready Product Preview candidate',
-  );
-  const origin = `https://${deployment.url}`;
+    now,
+    requireRunnablePullRequest,
+  });
   const branches = await readJson(
     `https://api.supabase.com/v1/projects/${SUPABASE_PRODUCTION_PROJECT_REF}/branches`,
     supabaseToken,
@@ -133,13 +137,10 @@ export async function observePreviewReadiness({
     'database branch is not the requested ready nonproduction environment',
   );
   const migrations = await readJson(
-    `https://api.supabase.com/v1/projects/${supabaseProjectRef}/database/query`,
+    // Migration metadata needs database_migrations_read, not arbitrary SQL/data access.
+    `https://api.supabase.com/v1/projects/${supabaseProjectRef}/database/migrations`,
     supabaseToken,
     fetchImpl,
-    {
-      query: 'SELECT version FROM supabase_migrations.schema_migrations ORDER BY version',
-      read_only: true,
-    },
   );
   requireCondition(
     Array.isArray(migrations) &&
@@ -173,6 +174,12 @@ export async function observePreviewReadiness({
       health.checks?.database === 'ok',
     'application health is not ready',
   );
+  const observedMs = observationTime(now).getTime();
+  const elapsed = observedMs - startedMs;
+  requireCondition(
+    elapsed >= 0 && elapsed <= MAX_OBSERVATION_MS,
+    'observation window is stale or clock moved backwards',
+  );
   return {
     status: 'ready',
     sha,
@@ -184,8 +191,9 @@ export async function observePreviewReadiness({
     supabaseProjectRef,
     supabaseBranchId,
     migrationVersions: expected,
+    providerEvidence,
     startedAt,
-    observedAt: now().toISOString(),
+    observedAt: new Date(observedMs).toISOString(),
   };
 }
 
@@ -238,7 +246,7 @@ if (isDirectExecution(import.meta.url)) {
     const result = await observePreviewReadiness({
       ...input,
       expectedMigrations: expectedMigrationVersions(root),
-      vercelToken: process.env.VERCEL_TOKEN,
+      githubToken: process.env.GITHUB_TOKEN,
       supabaseToken: process.env.SUPABASE_PREVIEW_READINESS_TOKEN,
       bypassSecret: process.env.VERCEL_AUTOMATION_BYPASS_SECRET,
     });

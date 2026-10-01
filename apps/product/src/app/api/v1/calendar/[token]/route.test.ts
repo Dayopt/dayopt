@@ -325,22 +325,32 @@ describe('iCal feed route (aggregate limiter未設定)', () => {
   });
 
   it.each([
-    ['production', 503],
-    ['preview', 200],
-  ])('VERCEL_ENV=%s の時、limiter未設定はstatus %iになる', async (vercelEnv, expectedStatus) => {
-    vi.stubEnv('VERCEL_ENV', vercelEnv);
-    vi.doMock('@/lib/rate-limit/upstash', () => ({
-      icalFeedRateLimit: { limit: rateLimit },
-      icalFeedIpRateLimit: null,
-      icalFeedGlobalRateLimit: null,
-    }));
-    vi.resetModules();
-    const { GET: freshGet } = await import('./route');
-    mockTokenLookup();
-    rateLimit.mockResolvedValue({ success: true, limit: 10, remaining: 9, reset: Date.now() });
+    ['production', undefined, undefined, 503],
+    ['preview', undefined, undefined, 200],
+    ['preview', 'integration', undefined, 503],
+    ['preview', undefined, 'integration', 503],
+  ])(
+    'VERCEL_ENV=%s / DAYOPT_ENVIRONMENT=%s / MCP_OAUTH_ENVIRONMENT=%s の時、limiter未設定はstatus %iになる',
+    async (vercelEnv, dayoptEnvironment, mcpOAuthEnvironment, expectedStatus) => {
+      vi.stubEnv('VERCEL_ENV', vercelEnv);
+      if (dayoptEnvironment) {
+        vi.stubEnv('DAYOPT_ENVIRONMENT', dayoptEnvironment);
+        vi.stubEnv('NEXT_PUBLIC_DAYOPT_ENVIRONMENT', dayoptEnvironment);
+      }
+      if (mcpOAuthEnvironment) vi.stubEnv('MCP_OAUTH_ENVIRONMENT', mcpOAuthEnvironment);
+      vi.doMock('@/lib/rate-limit/upstash', () => ({
+        icalFeedRateLimit: { limit: rateLimit },
+        icalFeedIpRateLimit: null,
+        icalFeedGlobalRateLimit: null,
+      }));
+      vi.resetModules();
+      const { GET: freshGet } = await import('./route');
+      mockTokenLookup();
+      rateLimit.mockResolvedValue({ success: true, limit: 10, remaining: 9, reset: Date.now() });
 
-    const response = await freshGet(request(), context());
+      const response = await freshGet(request(), context());
 
-    expect(response.status).toBe(expectedStatus);
-  });
+      expect(response.status).toBe(expectedStatus);
+    },
+  );
 });
