@@ -322,6 +322,22 @@ secret_refs:
   calendar_secret:
     op_ref: op://human/google-calendar/GOOGLE_CALENDAR_CLIENT_SECRET
     verification: unknown
+  google_auth_nonproduction_client:
+    op_ref: op://agent/google-auth-nonproduction/username
+    intended_consumer: nonproduction_supabase_google_provider
+    verification: console_client_identity_match
+  google_auth_nonproduction_secret:
+    op_ref: op://agent/google-auth-nonproduction/credential
+    intended_consumer: nonproduction_supabase_google_provider
+    verification: field_present_replica_and_oauth_exchange_unverified
+  calendar_nonproduction_client:
+    op_ref: op://agent/google-calendar-nonproduction/username
+    intended_consumer: product_integration_calendar
+    verification: console_client_identity_match
+  calendar_nonproduction_secret:
+    op_ref: op://agent/google-calendar-nonproduction/credential
+    intended_consumer: product_integration_calendar
+    verification: field_present_replica_and_oauth_exchange_unverified
   calendar_encryption:
     op_ref: op://human/google-calendar/CALENDAR_TOKEN_ENCRYPTION_KEY
     consumers:
