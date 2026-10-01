@@ -6,12 +6,14 @@
  * また「アクティビティを選んだ瞬間に保存」「閉じたら保存しない」も併せて見る。
  */
 
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useInlineCreateStore } from '../../stores/useInlineCreateStore';
 
 import { InlineCreatePanel } from './InlineCreatePanel';
+
+const medians = vi.hoisted(() => new Map<string, number>([['activity-1', 45]]));
 
 const createPlanMutate = vi.hoisted(() => vi.fn());
 const createRecordMutate = vi.hoisted(() => vi.fn());
@@ -64,8 +66,9 @@ vi.mock('@/features/timeblock', async () => {
       </button>
     ),
     useActivityMedianDurations: () => ({
-      medianByActivityId: new Map([['activity-1', 45]]),
-      getMedianMinutes: (activityId: string | null) => (activityId === 'activity-1' ? 45 : null),
+      medianByActivityId: medians,
+      getMedianMinutes: (activityId: string | null) =>
+        activityId === null ? null : (medians.get(activityId) ?? null),
     }),
     InspectorHeaderActions: ({ onCloseInspector }: { onCloseInspector?: () => void }) => (
       <button type="button" onClick={onCloseInspector}>
@@ -154,6 +157,38 @@ describe('InlineCreatePanel', () => {
     closeInspector.mockClear();
     useInlineCreateStore.getState().clearPendingSelection();
     laneItems.length = 0;
+  });
+
+  it('late stats keep edited selection and save fields, and do not create again', () => {
+    medians.clear();
+    setSelection(pastDay());
+    const view = render(<InlineCreatePanel onClose={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'note' }));
+    fireEvent.click(screen.getByRole('button', { name: 'fulfillment' }));
+    act(() => useInlineCreateStore.getState().updateSelectionTimes({ endHour: 11, endMinute: 15 }));
+    const selection = useInlineCreateStore.getState().pendingSelection;
+    expect(screen.getByTestId('median')).toHaveTextContent('none');
+    medians.set('activity-1', 45);
+    view.rerender(<InlineCreatePanel onClose={vi.fn()} />);
+    expect(screen.getByTestId('median')).toHaveTextContent('45');
+    expect(useInlineCreateStore.getState().pendingSelection).toEqual(selection);
+    expect(createRecordMutate).not.toHaveBeenCalled();
+    fireEvent.mouseEnter(screen.getByRole('button', { name: '開発' }));
+    expect(useInlineCreateStore.getState().pendingSelection).toEqual(selection);
+    fireEvent.click(screen.getByRole('button', { name: '開発' }));
+    expect(createRecordMutate).toHaveBeenCalledTimes(1);
+    expect(createRecordMutate.mock.calls[0]?.[0]).toMatchObject({
+      note: '集中できた',
+      fulfillment: 'high',
+      activityId: 'activity-1',
+      end_at: expect.stringContaining('T11:15:00'),
+    });
+    medians.set('activity-1', 90);
+    view.rerender(<InlineCreatePanel onClose={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: '開発' }));
+    expect(createRecordMutate).toHaveBeenCalledTimes(1);
+    expect(createPlanMutate).not.toHaveBeenCalled();
+    medians.set('activity-1', 45);
   });
 
   it('過去スロットの既定は記録で、アクティビティを押した時点で Record を作る', () => {

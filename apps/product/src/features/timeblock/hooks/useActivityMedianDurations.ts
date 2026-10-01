@@ -7,7 +7,7 @@
  * 集計の定義は `domain/plan-template-duration.ts` が正本（直近 4 週・`n >= 3`・
  * 5 分丸め・`auto_migrated` 除外）で、テンプレート適用が着せる長さと同じ値。
  *
- * query はサイドバー（`ActivityFilterList`）が既に引いていて SSR prefetch もされている
+ * query はサイドバー（`ActivityFilterList`）が非同期で引いている
  * `statistics.getActivityStats` をそのまま共有する。この機能のための追加クエリは無い。
  */
 
