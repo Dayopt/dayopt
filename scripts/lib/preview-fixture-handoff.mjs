@@ -9,6 +9,10 @@ import {
   verifyPreviewFixtureHandoffTrust,
 } from './preview-fixture-handoff-trust.mjs';
 import { writeFixtureRegistry } from './preview-fixture-registry.mjs';
+import {
+  preparedAccessDeadline,
+  preparedReadinessSnapshot,
+} from './preview-prepared-readiness.mjs';
 
 const ERROR = 'Preview fixture handoff failed';
 
@@ -70,6 +74,7 @@ export async function receivePreviewFixtureRegistry(options) {
       verify = verifyPreviewFixtureHandoffTrust,
       download = downloadArtifact,
       preparedAccess = false,
+      preparedReadiness = false,
       now = () => Math.floor(Date.now() / 1000),
     } = options;
     if (typeof token !== 'string' || !token.trim() || token.length > 16_384) throw new Error();
@@ -96,8 +101,23 @@ export async function receivePreviewFixtureRegistry(options) {
       envelope: JSON.parse(serialized),
     });
     if (preparedAccess) {
-      exact(response, ['fixture', 'previewAccessToken']);
+      exact(response, [
+        'fixture',
+        'previewAccessToken',
+        ...(preparedReadiness ? ['readiness'] : []),
+      ]);
       await verifyPreviewAccessToken({ input, token: response.previewAccessToken, fetchImpl, now });
+      const readiness = preparedReadiness
+        ? preparedReadinessSnapshot(input, response.readiness, now() * 1000)
+        : undefined;
+      const accessDeadline = preparedReadiness
+        ? await preparedAccessDeadline({
+            input,
+            token: response.previewAccessToken,
+            fetchImpl,
+            now,
+          })
+        : undefined;
       const registry = writeFixtureRegistry({
         input,
         response: response.fixture,
@@ -105,7 +125,11 @@ export async function receivePreviewFixtureRegistry(options) {
         privateOutput,
         evidenceDirectory,
       });
-      return { ...registry, trustedOidcToken: response.previewAccessToken };
+      return {
+        ...registry,
+        trustedOidcToken: response.previewAccessToken,
+        ...(preparedReadiness ? { readiness, accessDeadline } : {}),
+      };
     }
     return writeFixtureRegistry({ input, response, runnerTemp, privateOutput, evidenceDirectory });
   } catch {

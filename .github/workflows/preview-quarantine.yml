@@ -1,0 +1,40 @@
+name: Observe interrupted prepared Preview
+
+# Independent read-only observer survives loss/cancellation of the original VM.
+# workflow_run only activates after this definition exists on the default branch.
+on:
+  workflow_run:
+    workflows: [CI]
+    branches: [integration]
+    types: [completed]
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: preview-quarantine-${{ github.event.workflow_run.id }}-${{ github.event.workflow_run.run_attempt }}
+  cancel-in-progress: false
+
+jobs:
+  observe:
+    if: ${{ github.event.workflow_run.event == 'workflow_dispatch' && github.event.workflow_run.head_repository.full_name == github.repository && github.event.workflow_run.conclusion != 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Verify original attempt and record UNKNOWN without mutation authority
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/ci/preview-cloud-recovery.mjs observe-completed "$RUNNER_TEMP/preview-recovery"
+      - name: Publish bounded observation only
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: preview-quarantine-${{ github.event.workflow_run.id }}-${{ github.event.workflow_run.run_attempt }}
+          path: ${{ runner.temp }}/preview-recovery/recovery.json
+          if-no-files-found: ignore
+          retention-days: 7

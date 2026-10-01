@@ -495,8 +495,13 @@ jobs:
       contents: read
       pull-requests: read
       actions: read
+      deployments: read
+      statuses: read
     outputs:
       sha: ${{ steps.trust.outputs.sha }}
+      prepared_context: ${{ steps.prepared.outputs.context }}
+      public_key_name: ${{ steps.prepared.outputs.public_key_name }}
+      envelope_name: ${{ steps.prepared.outputs.envelope_name }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -510,11 +515,25 @@ jobs:
         run: node scripts/ci/preview-cloud-trust.mjs "$RUNNER_TEMP/preview-request.json"
       - name: Reject unverified prepared fixture execution before credentials
         run: node scripts/ci/preview-prepared-admission.mjs "$RUNNER_TEMP/preview-request.json"
+      - id: prepared
+        name: Bind prepared jobs and allocate public recovery intent
+        if: inputs.preview_db_mode == 'ephemeral'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/ci/preview-prepared-jobs.mjs plan
+      - name: Persist prepared recovery intent before any credential worker
+        if: inputs.preview_db_mode == 'ephemeral'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: preview-intent-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/preview-intent/intent.json
+          if-no-files-found: error
+          retention-days: 7
 
   preview-e2e:
     name: Remote Preview login and CRUD
     needs: preview-trust
-    if: ${{ always() && needs.preview-trust.result == 'success' && github.event_name == 'workflow_dispatch' && inputs.preview_e2e && inputs.preview_recover_run == '' && github.ref == 'refs/heads/integration' }}
+    if: ${{ always() && needs.preview-trust.result == 'success' && github.event_name == 'workflow_dispatch' && inputs.preview_e2e && inputs.preview_recover_run == '' && github.ref == 'refs/heads/integration' && inputs.preview_db_mode == 'shared' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     environment: Preview – product
@@ -582,6 +601,132 @@ jobs:
         with:
           name: preview-e2e-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/preview-public/preview.json
+          if-no-files-found: error
+          retention-days: 7
+
+  preview-prepared-consumer:
+    name: Consume prepared Preview fixtures
+    needs: preview-trust
+    if: ${{ needs.preview-trust.result == 'success' && needs.preview-trust.outputs.prepared_context != '' && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/integration' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      actions: read
+    env:
+      PREVIEW_PREPARED_CONTEXT: ${{ needs.preview-trust.outputs.prepared_context }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      # No shared cache may be saved after candidate execution.
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version-file: .nvmrc
+      - name: Prepare trusted tooling before key generation
+        run: |
+          corepack enable
+          pnpm install --frozen-lockfile
+          pnpm --dir apps/product exec playwright install --with-deps chromium
+      - id: key
+        name: Prepare one-time private key outside public artifacts
+        run: node scripts/ci/preview-prepared-jobs.mjs key
+      - name: Publish Preview fixture public key
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ${{ needs.preview-trust.outputs.public_key_name }}
+          path: ${{ steps.key.outputs.public_path }}
+          if-no-files-found: error
+          retention-days: 1
+      - name: Authenticate handoff and destroy one-time private key
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/ci/preview-prepared-jobs.mjs receive
+      - name: Checkout reviewed Preview candidate
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/ci/preview-prepared-jobs.mjs checkout
+      - name: Execute prepared Preview tests
+        run: node scripts/ci/preview-prepared-jobs.mjs execute
+      - name: Remove owned private files after transfer or consumer interruption
+        if: always() && steps.key.outcome != 'skipped'
+        run: node scripts/ci/preview-prepared-jobs.mjs clean
+      - name: Publish bounded consumer diagnostics only
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: preview-e2e-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/prepared-public/preview.json
+          if-no-files-found: ignore
+          retention-days: 7
+
+  preview-prepared-provision:
+    name: Provision Preview fixtures
+    needs: preview-trust
+    if: ${{ needs.preview-trust.result == 'success' && needs.preview-trust.outputs.prepared_context != '' && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/integration' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: Preview – product
+    # OIDC issuance is deliberately NOT granted by this patch. Source admission
+    # and the missing durable quarantine adapter also reject execution.
+    permissions:
+      contents: read
+      pull-requests: read
+      actions: read
+      deployments: read
+      statuses: read
+    env:
+      PREVIEW_PREPARED_CONTEXT: ${{ needs.preview-trust.outputs.prepared_context }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Provision encrypted Preview fixtures
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          SUPABASE_PREVIEW_READINESS_TOKEN: ${{ secrets.PREVIEW_E2E_SUPABASE_READINESS_TOKEN }}
+        run: node scripts/ci/preview-prepared-jobs.mjs provision
+      - name: Publish encrypted Preview fixtures
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ${{ needs.preview-trust.outputs.envelope_name }}
+          path: ${{ runner.temp }}/prepared-envelope/envelope.json
+          if-no-files-found: error
+          retention-days: 1
+
+  preview-prepared-post:
+    name: Observe prepared Preview outcome and quarantine
+    needs: [preview-trust, preview-prepared-provision, preview-prepared-consumer]
+    if: ${{ always() && needs.preview-trust.result == 'success' && needs.preview-trust.outputs.prepared_context != '' && needs.preview-prepared-provision.result != 'skipped' && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/integration' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: Preview – product
+    permissions:
+      contents: read
+      pull-requests: read
+      actions: read
+      deployments: read
+      statuses: read
+    env:
+      PREVIEW_PREPARED_CONTEXT: ${{ needs.preview-trust.outputs.prepared_context }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Independently observe provider readiness and keep cleanup UNKNOWN
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          SUPABASE_PREVIEW_READINESS_TOKEN: ${{ secrets.PREVIEW_E2E_SUPABASE_READINESS_TOKEN }}
+        run: node scripts/ci/preview-prepared-jobs.mjs post
+      - name: Publish UNKNOWN evidence without claiming persistent quarantine
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: preview-quarantine-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/prepared-quarantine/recovery.json
           if-no-files-found: error
           retention-days: 7
 

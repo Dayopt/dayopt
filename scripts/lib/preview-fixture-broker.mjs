@@ -11,6 +11,7 @@ import {
 } from './preview-fixture-envelope.mjs';
 import { assertCloudFixtureKey } from './preview-fixture-key.mjs';
 import { createSupabaseFixtureLifecycle } from './preview-fixture-lifecycle.mjs';
+import { preparedReadinessSnapshot } from './preview-prepared-readiness.mjs';
 
 const TABLES = ['records', 'plans', 'activities', 'categories', 'user_settings', 'profiles'];
 const SLOT_PREFIX = { desktop: 'critical-path', mobile: 'mobile-critical-path' };
@@ -377,6 +378,7 @@ export async function executeDurableFixtureBroker({
 export async function executeEncryptedFixtureBroker({
   publicKey,
   previewAccessToken = /** @type {string | undefined} */ (undefined),
+  previewReadiness = undefined,
   input,
   token,
   createClient,
@@ -388,6 +390,11 @@ export async function executeEncryptedFixtureBroker({
   assertPreviewFixtureRecipient({ input, publicKey });
   if (previewAccessToken !== undefined)
     await verifyPreviewAccessToken({ input, token: previewAccessToken, fetchImpl, now });
+  const readiness =
+    previewReadiness === undefined
+      ? undefined
+      : preparedReadinessSnapshot(input, previewReadiness, now() * 1000);
+  if (readiness && previewAccessToken === undefined) throw new Error('Preview access is required');
   const payload = await executeDurableFixtureBroker({
     input,
     token,
@@ -400,6 +407,9 @@ export async function executeEncryptedFixtureBroker({
   return encryptPreviewFixtureEnvelope({
     input,
     publicKey,
-    payload: previewAccessToken !== undefined ? { fixture: payload, previewAccessToken } : payload,
+    payload:
+      previewAccessToken !== undefined
+        ? { fixture: payload, previewAccessToken, ...(readiness ? { readiness } : {}) }
+        : payload,
   });
 }

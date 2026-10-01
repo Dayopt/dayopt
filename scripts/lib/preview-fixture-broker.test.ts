@@ -69,10 +69,10 @@ const jwk = {
   use: 'sig',
   kid: 'broker-test',
 };
-function token(selected = input) {
+function token(selected = input, audience = prepareFixtureAuthority(selected).audience) {
   const claims = {
     iss: 'https://token.actions.githubusercontent.com',
-    aud: prepareFixtureAuthority(selected).audience,
+    aud: audience,
     sub: 'repo:Dayopt/dayopt:environment:Preview – product',
     repository: 'Dayopt/dayopt',
     repository_id: '1006944000',
@@ -293,6 +293,27 @@ function provider() {
 
 describe('encrypted provision composition before fixture changes', () => {
   const recipient = generatePreviewFixtureKeyPair();
+  it('encrypts the separately verified Preview access token with the fixture for the consumer', async () => {
+    const p = provider();
+    const previewAccessToken = token(input, 'urn:dayopt:preview-access:v1');
+    const envelope = await p.runEncrypted(recipient.publicKey, input, { previewAccessToken });
+    expect(JSON.stringify(envelope)).not.toContain(previewAccessToken);
+    const payload = decryptPreviewFixtureEnvelope({
+      input,
+      privateKey: recipient.privateKey,
+      envelope,
+    });
+    expect(payload.previewAccessToken).toBe(previewAccessToken);
+    expect(payload.fixture.runId).toBe(input.intent.runId);
+    expect(Object.keys(payload).sort()).toEqual(['fixture', 'previewAccessToken']);
+  });
+  it('rejects a broker-audience token in the access slot before any durable mutation', async () => {
+    const p = provider();
+    await expect(
+      p.runEncrypted(recipient.publicKey, input, { previewAccessToken: token() }),
+    ).rejects.toThrow();
+    expect(p.writes).toEqual([]);
+  });
   const weak = generateKeyPairSync('rsa', { modulusLength: 2048 })
     .publicKey.export({ type: 'spki', format: 'pem' })
     .toString();
@@ -732,7 +753,19 @@ describe('authenticated Preview fixture executor with installed Supabase SDK', (
 });
 
 describe('Preview broker HTTP admission', () => {
-  const request = (body: unknown = { input, publicKey: 'synthetic' }, bearer = token()) =>
+  const accessToken = () => token(input, 'urn:dayopt:preview-access:v1');
+  const readiness = {
+    status: 'ready',
+    ...input.intent.request,
+    origin: input.origin,
+    migrationVersions: ['20260930020816'],
+    startedAt: new Date(now * 1000).toISOString(),
+    observedAt: new Date(now * 1000).toISOString(),
+  };
+  const request = (
+    body: unknown = { input, publicKey: 'synthetic', previewAccessToken: accessToken(), readiness },
+    bearer = token(),
+  ) =>
     new Request(`${input.origin}/api/preview-fixtures`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', authorization: `Bearer ${bearer}` },
@@ -752,9 +785,36 @@ describe('Preview broker HTTP admission', () => {
       now: () => now,
     });
     expect(response.status).toBe(503);
-    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
     expect(response.headers.get('cache-control')).toBe('no-store');
     expect(await response.text()).not.toContain(token());
+  });
+  it.each([undefined, token(), 'synthetic.invalid.token'])(
+    'rejects missing or wrong access authority',
+    async (previewAccessToken) => {
+      const readKey = vi.fn(() => env.SUPABASE_SECRET_KEY);
+      const guarded = { ...env };
+      Object.defineProperty(guarded, 'SUPABASE_SECRET_KEY', { get: readKey });
+      const response = await handlePreviewFixtureRequest(
+        request({ input, publicKey: 'synthetic', previewAccessToken, readiness }),
+        {
+          env: guarded,
+          now: () => now,
+          fetchImpl: async () => Response.json({ keys: [jwk] }),
+        },
+      );
+      expect([400, 403]).toContain(response.status);
+      expect(readKey).not.toHaveBeenCalled();
+      expect(await response.text()).toBe('{"error":"Preview fixture request rejected"}');
+    },
+  );
+  it('does not accept the access audience as broker authority', async () => {
+    const response = await handlePreviewFixtureRequest(request(undefined, accessToken()), {
+      env,
+      now: () => now,
+      fetchImpl: async () => Response.json({ keys: [jwk] }),
+    });
+    expect(response.status).toBe(403);
   });
   it.each(['production', 'development', undefined])(
     'rejects %s before network or credentials',

@@ -183,7 +183,9 @@ async function verifySourceAttemptJobs({ sourceRunId, sourceAttempt, token, fetc
   const legacyJobs = body.jobs.filter(
     (job) => job?.name === JOB_E2E && job.conclusion !== 'skipped',
   );
-  const provisionJobs = body.jobs.filter((job) => job?.name === 'Provision Preview fixtures');
+  const provisionJobs = body.jobs.filter(
+    (job) => job?.name === 'Provision Preview fixtures' && job.conclusion !== 'skipped',
+  );
   const prepared = provisionJobs.length > 0;
   requireCondition(
     !prepared || legacyJobs.length === 0,
@@ -290,7 +292,7 @@ async function findIntentArtifact({
 /**
  * Verify a failed Integration run and its public intent through read-only GitHub APIs.
  * Artifact bytes must be downloaded and checked by the caller before recovery.
- * @param {{ repository: string, eventName: string, ref: string, token: string, sourceRunId: string | number, sourceAttempt: string | number, intent: object, fetchImpl?: typeof fetch }} options
+ * @param {{ repository: string, eventName: string, ref: string, token: string, sourceRunId: string | number, sourceAttempt: string | number, intent: object, fetchImpl?: typeof fetch, readOnlyObserver?: boolean }} options
  * @returns {Promise<{ intent: object, artifactId: number, digest: string }>}
  */
 export async function verifyPreviewRecoveryTrust({
@@ -302,10 +304,17 @@ export async function verifyPreviewRecoveryTrust({
   sourceAttempt: sourceAttemptInput,
   intent: untrustedIntent,
   fetchImpl = fetch,
+  readOnlyObserver = false,
 }) {
-  requireCondition(eventName === 'workflow_dispatch', 'only workflow_dispatch is allowed');
+  requireCondition(
+    eventName === (readOnlyObserver ? 'workflow_run' : 'workflow_dispatch'),
+    'recovery event is invalid',
+  );
   requireCondition(repository === GITHUB_REPOSITORY, 'repository is not allowed');
-  requireCondition(ref === 'refs/heads/integration', 'recovery must run from Integration');
+  requireCondition(
+    ref === (readOnlyObserver ? 'refs/heads/main' : 'refs/heads/integration'),
+    'recovery source ref is invalid',
+  );
   requireCondition(
     typeof token === 'string' && token.trim().length > 0,
     'read-only GitHub token is required',
@@ -326,7 +335,7 @@ export async function verifyPreviewRecoveryTrust({
       intent.sourceAttempt === sourceAttempt &&
       intent.repository === GITHUB_REPOSITORY &&
       intent.workflow === PREVIEW_INTENT_WORKFLOW &&
-      intent.workflowRef === ref,
+      intent.workflowRef === 'refs/heads/integration',
     'source intent binding differs',
   );
 

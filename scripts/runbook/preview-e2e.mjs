@@ -10,6 +10,7 @@ import { expectedMigrationVersions } from '../ci/production-migration-readiness.
 import { isDirectExecution } from '../lib/is-direct-execution.mjs';
 import { validateCloudRequest } from '../lib/preview-cloud-binding.mjs';
 import { isPassingPreviewReport } from '../lib/preview-e2e-reporter.mjs';
+import { remainingPreparedBudget } from '../lib/preview-prepared-readiness.mjs';
 import { recoverPreviewUsers } from './preview-cleanup.mjs';
 import {
   createPreviewRunManifest,
@@ -92,7 +93,7 @@ export function previewWorkerEnvironment(
 }
 
 /** @returns {Promise<number>} */
-function executePlaywright(env, candidateRoot = ROOT) {
+function executePlaywright(env, candidateRoot = ROOT, timeoutMs = 7 * 60 * 1000) {
   // Cloud runners and the optional Mac path are POSIX. Own the process group so
   // a deadline cannot leave browsers running after private output is removed.
   return new Promise((resolveExit) => {
@@ -120,6 +121,7 @@ function executePlaywright(env, candidateRoot = ROOT) {
     const finish = (code) => {
       if (settled) return;
       settled = true;
+      killGroup('SIGKILL');
       clearTimeout(deadline);
       process.removeListener('SIGINT', onInterrupt);
       process.removeListener('SIGTERM', onTerminate);
@@ -145,17 +147,14 @@ function executePlaywright(env, candidateRoot = ROOT) {
     const onTerminate = () => interrupt('SIGTERM');
     process.once('SIGINT', onInterrupt);
     process.once('SIGTERM', onTerminate);
-    deadline = setTimeout(
-      () => {
-        timedOut = true;
-        killGroup('SIGTERM');
-        setTimeout(() => {
-          killGroup('SIGKILL');
-          finish(1);
-        }, 3000);
-      },
-      7 * 60 * 1000,
-    );
+    deadline = setTimeout(() => {
+      timedOut = true;
+      killGroup('SIGTERM');
+      setTimeout(() => {
+        killGroup('SIGKILL');
+        finish(1);
+      }, 3000);
+    }, timeoutMs);
     child.on('error', () => {
       finish(1);
     });
@@ -183,6 +182,7 @@ function executePlaywright(env, candidateRoot = ROOT) {
  *   cloudUserIds?: { desktop: string, mobile: string },
  *   registryPath?: string,
  *   trustedOidcToken?: string,
+ *   accessDeadline?: number,
  * }} options
  */
 export async function runPreviewE2E({
@@ -190,7 +190,12 @@ export async function runPreviewE2E({
   env = process.env,
   observe = observePreviewReadiness,
   candidateRoot = ROOT,
-  execute = (workerEnv) => executePlaywright(workerEnv, candidateRoot),
+  execute = (workerEnv) =>
+    executePlaywright(
+      workerEnv,
+      candidateRoot,
+      accessDeadline === undefined ? 7 * 60 * 1000 : remainingPreparedBudget(accessDeadline),
+    ),
   recover = recoverPreviewUsers,
   tempRoot = previewE2EStateRoot(env),
   onStarted = () => {},
@@ -199,8 +204,10 @@ export async function runPreviewE2E({
   cloudUserIds = /** @type {{desktop: string, mobile: string} | undefined} */ (undefined),
   registryPath = /** @type {string | undefined} */ (undefined),
   trustedOidcToken = /** @type {string | undefined} */ (undefined),
+  accessDeadline = /** @type {number | undefined} */ (undefined),
 }) {
   if (registryPath !== undefined) {
+    if (accessDeadline !== undefined) remainingPreparedBudget(accessDeadline);
     if (
       !trustedOidcToken?.trim() ||
       trustedOidcToken.length > 16384 ||

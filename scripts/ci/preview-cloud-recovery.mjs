@@ -18,9 +18,9 @@ function number(value) {
   if (!Number.isSafeInteger(result)) throw new Error();
   return result;
 }
-function readJson(path) {
+function readJson(path, maxBytes = 16_384) {
   const stat = lstatSync(path);
-  if (!stat.isFile() || stat.isSymbolicLink() || stat.size > 16_384) throw new Error();
+  if (!stat.isFile() || stat.isSymbolicLink() || stat.size > maxBytes) throw new Error();
   return JSON.parse(readFileSync(path, 'utf8'));
 }
 function safeGhEnv(token, env = process.env) {
@@ -62,6 +62,50 @@ export function decodePreviewIntentArtifactZip(archive) {
   return decodePreviewArtifactZip(archive, 'intent');
 }
 
+/** Only select applicability here. Full source/intent authentication still runs
+ * before writing UNKNOWN; an ordinary failed CI run has no prepared fixtures. */
+export async function hasPreparedAttempt({ sourceRunId, sourceAttempt, token, fetchImpl = fetch }) {
+  const runId = number(sourceRunId),
+    attempt = number(sourceAttempt);
+  if (typeof token !== 'string' || !token.trim()) throw new Error();
+  const response = await fetchImpl(
+    `https://api.github.com/repos/${REPO}/actions/runs/${runId}/attempts/${attempt}/jobs?per_page=100`,
+    {
+      redirect: 'error',
+      signal: AbortSignal.timeout(15_000),
+      headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json' },
+    },
+  );
+  if (
+    response.status !== 200 ||
+    response.redirected ||
+    !response.body ||
+    response.headers.get('link')?.includes('rel="next"')
+  )
+    throw new Error();
+  const reader = response.body.getReader();
+  const chunks = [];
+  let size = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      size += value.byteLength;
+      if (size > 1_048_576) throw new Error();
+      chunks.push(value);
+    }
+  } finally {
+    await reader.cancel().catch(() => undefined);
+    reader.releaseLock();
+  }
+  const body = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+  if (!Array.isArray(body.jobs) || body.total_count !== body.jobs.length || body.jobs.length > 100)
+    throw new Error();
+  return body.jobs.some(
+    (job) => job?.name === 'Provision Preview fixtures' && job.conclusion !== 'skipped',
+  );
+}
+
 /** Download only the small, uniquely named public plan; no platform key is needed. */
 export async function prepareCloudRecovery({
   directory,
@@ -72,14 +116,18 @@ export async function prepareCloudRecovery({
   download = downloadIntent,
   decode = decodePreviewIntentArtifactZip,
   verify = verifyPreviewRecoveryTrust,
+  readOnlyObserver = false,
 }) {
   const runId = number(sourceRunId);
   const attempt = number(sourceAttempt);
   if (
     env.GITHUB_REPOSITORY !== REPO ||
-    env.GITHUB_EVENT_NAME !== 'workflow_dispatch' ||
-    env.GITHUB_REF !== 'refs/heads/integration' ||
-    env.GITHUB_WORKFLOW_REF !== `${REPO}/.github/workflows/ci.yml@refs/heads/integration` ||
+    env.GITHUB_EVENT_NAME !== (readOnlyObserver ? 'workflow_run' : 'workflow_dispatch') ||
+    env.GITHUB_REF !== (readOnlyObserver ? 'refs/heads/main' : 'refs/heads/integration') ||
+    env.GITHUB_WORKFLOW_REF !==
+      (readOnlyObserver
+        ? `${REPO}/.github/workflows/preview-quarantine.yml@refs/heads/main`
+        : `${REPO}/.github/workflows/ci.yml@refs/heads/integration`) ||
     !env.GITHUB_TOKEN?.trim()
   )
     throw new Error();
@@ -137,6 +185,7 @@ export async function prepareCloudRecovery({
     sourceAttempt: String(attempt),
     intent,
     fetchImpl,
+    readOnlyObserver,
   });
   if (verified.artifactId !== artifacts[0].id || verified.digest !== artifacts[0].digest)
     throw new Error();
@@ -170,6 +219,8 @@ export function admitLegacyRecovery(directory) {
       request: intent.request,
       status: 'unknown',
       cleanupConfirmed: false,
+      quarantinePersisted: false,
+      reusable: false,
       failure: 'fixture-termination-unverified',
       users: [],
     }),
@@ -293,12 +344,41 @@ if (isDirectExecution(import.meta.url)) {
     const [operation, directory, ...rest] = process.argv.slice(2);
     if (
       rest.length ||
-      !['prepare', 'execute', 'admit-legacy'].includes(operation) ||
+      !['prepare', 'execute', 'admit-legacy', 'observe-completed'].includes(operation) ||
       !process.env.RUNNER_TEMP ||
       resolve(directory ?? '') !== join(resolve(process.env.RUNNER_TEMP), 'preview-recovery')
     )
       throw new Error();
-    if (operation === 'admit-legacy') {
+    if (operation === 'observe-completed') {
+      const event = readJson(process.env.GITHUB_EVENT_PATH, 1_048_576);
+      const source = event.workflow_run;
+      if (
+        event.action !== 'completed' ||
+        source?.status !== 'completed' ||
+        source.event !== 'workflow_dispatch' ||
+        source.head_branch !== 'integration' ||
+        event.repository?.full_name !== REPO ||
+        source.head_repository?.full_name !== REPO
+      )
+        throw new Error();
+      if (
+        await hasPreparedAttempt({
+          sourceRunId: source.id,
+          sourceAttempt: source.run_attempt,
+          token: process.env.GITHUB_TOKEN,
+        })
+      ) {
+        const saved = await prepareCloudRecovery({
+          directory,
+          sourceRunId: source.id,
+          sourceAttempt: source.run_attempt,
+          readOnlyObserver: true,
+        });
+        // An observer has no mutation command or provider credential path.
+        if (saved.recoveryMode === 'broker') admitLegacyRecovery(directory);
+        else throw new Error();
+      }
+    } else if (operation === 'admit-legacy') {
       admitLegacyRecovery(directory);
     } else if (operation === 'prepare') {
       await prepareCloudRecovery({

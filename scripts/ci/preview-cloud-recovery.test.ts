@@ -14,6 +14,7 @@ import {
   admitLegacyRecovery,
   decodePreviewIntentArtifactZip,
   executeCloudRecovery,
+  hasPreparedAttempt,
   prepareCloudRecovery,
   recoverCloudIntent,
 } from './preview-cloud-recovery.mjs';
@@ -405,4 +406,31 @@ it('writes UNKNOWN before the workflow can inject recovery credentials', () => {
     cleanupConfirmed: false,
     request: intent.request,
   });
+});
+
+it.each(['absent', 'skipped', 'cancelled'])(
+  'independent observer only selects a prepared source (%s)',
+  async (mode) => {
+    const jobs =
+      mode === 'absent' ? [] : [{ name: 'Provision Preview fixtures', conclusion: mode }];
+    const fetchImpl = vi.fn(async () => Response.json({ total_count: jobs.length, jobs }));
+    expect(
+      await hasPreparedAttempt({
+        sourceRunId: '123',
+        sourceAttempt: '1',
+        token: 'synthetic',
+        fetchImpl,
+      }),
+    ).toBe(mode === 'cancelled');
+  },
+);
+it('observer applicability rejects incomplete API listings instead of claiming no fixtures', async () => {
+  await expect(
+    hasPreparedAttempt({
+      sourceRunId: '123',
+      sourceAttempt: '1',
+      token: 'synthetic',
+      fetchImpl: async () => Response.json({ total_count: 2, jobs: [] }),
+    }),
+  ).rejects.toThrow();
 });

@@ -162,6 +162,11 @@ function job(job, bound, attempt) {
 
 function assertJobs(body, bound, attempt, role) {
   const jobs = list(body, 'jobs');
+  requireCondition(
+    !jobs.some(
+      (job) => job.name === 'Remote Preview login and CRUD' && job.conclusion !== 'skipped',
+    ),
+  );
   const trust = one(jobs, PREVIEW_FIXTURE_HANDOFF_CONTRACT.trustJob);
   const consumer = one(jobs, PREVIEW_FIXTURE_HANDOFF_CONTRACT.consumerJob);
   const provision = one(jobs, PREVIEW_FIXTURE_HANDOFF_CONTRACT.provisionJob);

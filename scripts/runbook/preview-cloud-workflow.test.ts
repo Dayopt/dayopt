@@ -74,3 +74,68 @@ describe('Cloud Preview credential wiring', () => {
     expect(recovery).toContain('path: ${{ runner.temp }}/preview-recovery/recovery.json');
   });
 });
+
+describe('prepared workflow separates provider authority from candidate execution', () => {
+  const consumer = cloud.slice(
+    cloud.indexOf('\n  preview-prepared-consumer:'),
+    cloud.indexOf('\n  preview-prepared-provision:'),
+  );
+  const provision = cloud.slice(
+    cloud.indexOf('\n  preview-prepared-provision:'),
+    cloud.indexOf('\n  preview-prepared-post:'),
+  );
+  const post = cloud.slice(
+    cloud.indexOf('\n  preview-prepared-post:'),
+    cloud.indexOf('\n  preview-recovery-trust:'),
+  );
+  it('runs consumer and provision in parallel only after the closed trust gate; legacy execution is shared-only', () => {
+    for (const job of [consumer, provision]) {
+      expect(job).toContain('needs: preview-trust');
+      expect(job).toContain("needs.preview-trust.result == 'success'");
+      expect(job).toContain("needs.preview-trust.outputs.prepared_context != ''");
+      expect(job).toContain("github.ref == 'refs/heads/integration'");
+    }
+    expect(
+      cloud.slice(
+        cloud.indexOf('\n  preview-e2e:'),
+        cloud.indexOf('\n  preview-prepared-consumer:'),
+      ),
+    ).toContain("inputs.preview_db_mode == 'shared'");
+  });
+  it('finishes authenticated transfer and private-key destruction before any candidate checkout/install', () => {
+    const receive = consumer.indexOf('preview-prepared-jobs.mjs receive');
+    const checkout = consumer.indexOf('name: Checkout reviewed Preview candidate');
+    const execute = consumer.indexOf('name: Execute prepared Preview tests');
+    expect(receive).toBeGreaterThan(0);
+    expect(receive).toBeLessThan(checkout);
+    expect(checkout).toBeLessThan(execute);
+    expect(consumer).not.toMatch(/secrets\.|id-token:|SUPABASE_|VERCEL_|environment:|cache:/);
+    expect(consumer).toContain('preview-prepared-jobs.mjs clean');
+    expect(consumer).not.toContain('path: candidate');
+    expect(consumer).toContain('path: ${{ steps.key.outputs.public_path }}');
+    expect(consumer).toContain('path: ${{ runner.temp }}/prepared-public/preview.json');
+    expect(consumer).not.toMatch(/path:.*(?:session|registry|private\.pem)/);
+  });
+  it('keeps management reads in trusted provision/post jobs with no candidate code or admin credentials', () => {
+    for (const job of [provision, post]) {
+      expect(job).toContain('secrets.PREVIEW_E2E_SUPABASE_READINESS_TOKEN');
+      expect(job).not.toMatch(
+        /PREVIEW_E2E_SUPABASE_KEY|BYPASS|path: candidate|pnpm|id-token: write/,
+      );
+      expect(job).toContain('ref: ${{ github.sha }}');
+    }
+    expect(post).toContain(
+      'needs: [preview-trust, preview-prepared-provision, preview-prepared-consumer]',
+    );
+    expect(post).toContain('always()');
+    expect(post).toContain('prepared-quarantine/recovery.json');
+  });
+  it('observes original-worker loss from default-branch trusted code without mutation permission', () => {
+    const observer = readFileSync('.github/workflows/preview-quarantine.yml', 'utf8');
+    expect(observer).toContain('workflow_run:');
+    expect(observer).toContain('types: [completed]');
+    expect(observer).toContain('ref: ${{ github.sha }}');
+    expect(observer).toContain('preview-cloud-recovery.mjs observe-completed');
+    expect(observer).not.toMatch(/secrets\.|: write|environment:|head_sha|pnpm|path: candidate/);
+  });
+});

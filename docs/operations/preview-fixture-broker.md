@@ -10,7 +10,7 @@ DB 変更 PR の Supabase branch でも、毎 PR の secret 保存や手動 sign
 
 ## 現在の状態
 
-実装済みなのは [短命認証コア](../../scripts/lib/preview-fixture-authority.mjs) と [予定ユーザーの実行処理](../../scripts/lib/preview-fixture-broker.mjs)。実行処理は、永続的に操作順と終了状態を管理する adapter が渡されなければ、管理キーを読む前に拒否する。`executeDurableFixtureBroker`でtarget/OIDC確認後に永続adapterとSDK bridgeを構成するサーバー内接続処理を用意した。lifecycle RPCは固定URLのPOSTだけに制限し、送信前にtarget/OIDCとabortを再確認する。Preview限定のPOST `/api/preview-fixtures`を追加したが、認証後のsource admissionで503を返し、fixture作成は開放していない。fixture の寿命とworkflow の job 分離にはまだ接続していない。既存の共有 Preview runner の認証や権限は変更していない。
+実装済みなのは [短命認証コア](../../scripts/lib/preview-fixture-authority.mjs) と [予定ユーザーの実行処理](../../scripts/lib/preview-fixture-broker.mjs)。実行処理は、永続的に操作順と終了状態を管理する adapter が渡されなければ、管理キーを読む前に拒否する。`executeDurableFixtureBroker`でtarget/OIDC確認後に永続adapterとSDK bridgeを構成するサーバー内接続処理を用意した。lifecycle RPCは固定URLのPOSTだけに制限し、送信前にtarget/OIDCとabortを再確認する。Preview限定のPOST `/api/preview-fixtures`を追加したが、認証後のsource admissionで503を返し、fixture作成は開放していない。workflowのconsumer/provision/post分離とtoken寿命による実行上限を接続したが、source admissionと未設定の永続隔離adapterが実行を拒否する。既存の共有 Preview runner の認証や権限は変更していない。
 
 ローカルの署名・拒否テストが成功しても、GitHub の実 OIDC 発行、Preview サーバーの system env、実際のログインや回収が動いた証拠にはならない。共有 Integration が別の検証で凍結中なら、source 作業だけを進める。
 
@@ -18,7 +18,7 @@ DB 変更 PR の Supabase branch でも、毎 PR の secret 保存や手動 sign
 
 信頼済み workflow job が、事前保存した公開 intent の予定 2 UUID を対象に作成・回収する。管理キーは対象の immutable Product Preview サーバー内に残し、candidate の install / Playwright job には合成ログイン情報だけを渡す。任意 SQL、任意 table / user、管理キー取得 API は作らない。
 
-OIDC の `id-token: write` は信頼済み job だけに付ける。candidate job にこの権限や `ACTIONS_ID_TOKEN_REQUEST_*` を渡してはならない。これは candidate server source の sandbox ではないため、既存のレビュー済み SHA と trusted source 一致の契約も維持する。
+OIDC の `id-token: write` を付けられるのは信頼済み job だけ。今回のpatchでは新しい発行権限を付けず、実運用前の明示承認条件として残す。candidate job にこの権限や `ACTIONS_ID_TOKEN_REQUEST_*` を渡してはならない。これは candidate server source の sandbox ではないため、既存のレビュー済み SHA と trusted source 一致の契約も維持する。
 
 利用者の操作数は現在の workflow dispatch から増やさない。新しい dashboard、Vercel project、独自 domain、長期 secret 保管先は不要。
 
@@ -61,7 +61,7 @@ executor は adapter の取得待ち後にも JWT の期限を再検証する。
 
 ## 準備済み login を使う candidate 側
 
-[registry reader](../../apps/product/src/lib/test/preview-fixture-registry.ts) と既存3specに、`E2E_PREVIEW_FIXTURE_REGISTRY` が指定された場合だけ有効な consumer 経路を用意した。prepared consumer compositionはこの変数を渡す。既存CLI / workflowの実job間接続と公開brokerは未完了のまま。
+[registry reader](../../apps/product/src/lib/test/preview-fixture-registry.ts) と既存3specに、`E2E_PREVIEW_FIXTURE_REGISTRY` が指定された場合だけ有効な consumer 経路を用意した。prepared consumer compositionはこの変数を渡す。CLI / workflowの配線は追加したが、公開brokerのadmissionは閉じたままで実job間通信は未実測。
 
 registry は provision 応答の `schemaVersion / operation / runId / users` に、信頼済み caller が `origin / supabaseProjectRef` を付けた JSON。予定2ユーザーの通常 login だけを含む。reader は immutable origin、ephemeral DB、run、予定UUID、メールとseed名を照合し、不正・不足・追加fieldは固定エラーで拒否する。admin key / provider PAT / OIDC発行変数を持つconsumerも拒否する。job全体のenv allowlistは引き続き必須で、このreaderを任意の環境変数の無害化器と扱わない。
 
@@ -85,7 +85,7 @@ ZIPはdigest照合後に固定されたroot-levelの1fileだけをメモリ内�
 
 [一時鍵の保管処理](../../scripts/lib/preview-fixture-key-custody.mjs) は、RUNNER_TEMP内の別々の新規directoryにprivate.pemとpublic-key.jsonを作る。公開uploadはpublic-key.jsonだけに限定し、秘密鍵のdirectoryを含めない。秘密鍵は700directory / 600fileとし、読取時にrun binding・path・owner・mode・inode・hardlinkを検査する。trusted callerの受信処理を待ち、成功・失敗のどちらでも所有秘密鍵と空directoryを削除する。削除に失敗した場合も処理全体を失敗にする。未知fileの再帰削除や、同じOS userの任意コードに対する隔離保証は行わない。
 
-この保管処理はworkflowに未接続である。公開鍵upload前など、秘密鍵を消費するstepへ到達しない失敗の後始末と、worker喪失時のrunner破棄は別途必要。callback終了後の削除だけを、全中断経路の鍵削除やDB fixture回収の証拠にしてはならない。公開directoryの削除もcallerが担当する。
+この保管処理はconsumerのkey/receive/clean stepに接続した。公開鍵upload前など、秘密鍵を消費するstepへ到達しない失敗の後始末と、worker喪失時のrunner破棄は別途必要。callback終了後の削除だけを、全中断経路の鍵削除やDB fixture回収の証拠にしてはならない。公開directoryの削除もcallerが担当する。
 
 consumer時はspecごとのadmin生成・seed・削除を行わず、同じ2ユーザーを通常loginで使う。Preview configで **desktop6件 → mobile5件 → A/B認可1件** のproject依存を明示し、認可テストのRecordが先にReport集計へ混ざらないようにする。先行失敗時の後続skipは成功にしない。全project後の回収は別のtrusted jobが担当し、worker喪失時も予定intentから回収できる必要がある。legacyモードのspec別作成/削除は維持する。
 
@@ -122,7 +122,7 @@ source と workflow は Git で復元できる。実証時の mutation は選択
 
 Trusted Sources用audienceは`urn:dayopt:preview-access:v1`。fixture操作用audienceとは異なり、broker操作の署名検証では拒否する。発行者はGitHub Actions、repository/ownerの固定ID、`Dayopt/dayopt`、`refs/heads/integration`、`.github/workflows/ci.yml`、`Preview – product` environment、workflow SHA/run/attemptを照合する。Vercel側ではこのaudienceと同じrepository/workflow/environment identityを要求し、到達先environmentをPreviewだけに限定する設定が必要。設定保存・実OIDC疎通は未実施。Playwright/readinessはTrusted Sources headerを使用し、欠落時にproject bypassへfallbackしない。redirectと他originへcredentialを転送しない。
 
-現在は[workflow admission](../../scripts/ci/preview-prepared-admission.mjs)がephemeral実行をcredential注入前に停止する。環境変数・404・削除応答・経過時間では解除できない。公開broker routeは追加したが、trusted provision/consumerの実job間配線と送信済みAuth要求の終端保証が揃っていないためであり、DBを作成しても実受入は開始しない。このsource gateの撤去にはその実装と検証が必要。今回の接続はライブラリと故障テストの証拠であって、実Cloud job間転送の証拠ではない。
+現在は[workflow admission](../../scripts/ci/preview-prepared-admission.mjs)がephemeral実行をcredential注入前に停止する。環境変数・404・削除応答・経過時間では解除できない。公開broker routeは追加したが、実OIDC/handoffの検証と送信済みAuth要求の終端保証が揃っていないためであり、DBを作成しても実受入は開始しない。このsource gateの撤去にはその実装と検証が必要。今回の接続はライブラリと故障テストの証拠であって、実Cloud job間転送の証拠ではない。
 
 回収trustはprovision開始後のfailure/cancelに加え、provision成功後に別jobが失敗したattemptも認証する。旧E2E経路と同じattemptで混在した場合は拒否。prepared由来の回収は旧delete-and-count処理へ流さず、read-only trust jobで公開`UNKNOWN` evidenceを保存してcredential-bearing jobを止める。別run再利用禁止とprovider終端確認は引き続き別条件であり、7日保持のartifactだけを永続的な外部隔離台帳と呼ばない。実workflowでのworker喪失、Auth遅延commit、回収後の非再作成は未達のまま。
 
@@ -131,3 +131,19 @@ Trusted Sources用audienceは`urn:dayopt:preview-access:v1`。fixture操作用au
 `route.preview.js`はVercel Preview buildだけが選ぶ拡張子を使い、Productionではroute manifestから除外する。実Next buildを使った回帰は同じroute sourceでPreviewの存在とProductionの不在を確認する。これは本体全体のProduction配備実測とは区別する。
 
 POSTはBearer JWTとapplication/jsonの固定入力だけを受け、Origin付きbrowser要求、圧縮body、48KiB超のstream、不正target/署名を拒否する。認証済みでもprepared admissionが503で止め、admin key/SDK mutationへ到達しない。source gate解除後のprovisionは既存の永続brokerと暗号化envelopeへ接続するが、解除は本変更の範囲外。cleanup/recover operationはこの入口では受け付けず、未実装のtrusted回収を成功扱いしない。固定エラーとno-storeだけを返し、body・JWT・provider errorをログへ出さない。
+
+HTTP bodyの固定fieldは`input`・`publicKey`・`previewAccessToken`・`readiness`。操作用Bearerと別にaccess tokenの署名・audience・run/attemptを検査し、欠落や操作用tokenの流用は拒否する。access tokenは既存brokerの暗号化payloadに含め、consumerが期待する`fixture`・`previewAccessToken`・検証済み`readiness`の組で運ぶ。平文の公開artifactやlogには出さない。trusted provision側は到達用headerにも同じaccess tokenを指定する。実Vercel設定・疎通は未検証で、設定不足時にproject-wide bypassへfallbackしない。
+
+実job接続前にはtoken寿命とcandidate準備時間の整合も必要。現署名検証は`exp - iat <= 600`かつ未失効を要求し、consumerは同じtokenを使う。CLIはcandidate installとbrowser process groupを残存時間内に制限し、終了処理の猶予を残す。期限不足やtimeoutは失敗であり、全testが時間内に完了する実測やtoken更新経路はまだない。寿命の検査を緩めたりproject-wide bypassへfallbackして解決しない。
+
+## trusted readinessとjob配線（2026-10-01）
+
+[CLI](../../scripts/ci/preview-prepared-jobs.mjs)は既存の鍵保管・artifact検証・registry・runnerを接続する。`preview-trust`は公開intentとexact candidateのmigrationファイル名だけを読み、candidateをcheckout/実行しない。source admissionとDB外の永続隔離adapterの存在確認を通らなければ後続jobを開始しない。現在adapterは未設定で全拒否する実装であり、環境変数や「UNKNOWNが見つからない」という観測で許可に変えない。
+
+consumerとprovisionはtrust後に並列起動する。consumerはtrusted tooling準備→公開鍵upload→認証済み暗号化handoff→秘密鍵削除の順を完了してから、exact candidateをcheckoutする。候補のinstallとbrowser出力は公開logへ流さず、公開artifactは既存sanitizerの診断JSONだけ。consumerに管理API用token・admin key・OIDC発行権限・project-wide bypassは渡さず、candidate実行後に共有cacheを保存しない。
+
+provisionだけが既存のreadiness用管理API tokenでbranch所有・migration set・実Previewを事前確認する。公開fieldへ再構成した結果をlogin/access tokenと一緒に暗号化して渡す。consumerはこの結果を新しい管理API観測と偽らず、管理資格情報なしでimmutable Previewのidentity/healthを確認する。別post jobが管理APIを再観測するまでproviderの事後確認は未確認。正常UI終了でも回収未確認のため全体passにしない。
+
+`preview-prepared-post`はprovision/consumer終了後に実行し、公開`UNKNOWN` evidenceを保存する。`quarantinePersisted:false`・`reusable:false`・`cleanupConfirmed:false`を明示し、provider readinessが成功しても回収成功にはしない。元workflow全体のcancel/VM喪失に備える[独立observer](../../.github/workflows/preview-quarantine.yml)は元run/attempt/intent/digestを読取専用で再検証する。default branchからのみ動くため、2954のIntegration側変更だけでは有効にならない。元sourceのcheckout、依存install、provider credential、データ削除は行わない。7日artifactは期限付きの診断証拠であり、DB削除後も残る永続的な隔離台帳の代替ではない。
+
+実行を開く前に必要なのは、(1) DB外で所有DB/branch/runのUNKNOWNを保持し新規利用も拒否する実adapter、(2) provider/Authの終端契約と実測、(3) trusted provision/postだけのOIDC発行権限の承認、(4) Preview限定Trusted Sources設定、(5) trusted workflowとdefault-branch observerの正規配備、(6) exact headの実handoff・通常login・CRUD/認可・中断回収の検証である。これらの権限・設定・resource変更は本patchで実行していない。404やREMOVEDだけでは(2)を満たさない。

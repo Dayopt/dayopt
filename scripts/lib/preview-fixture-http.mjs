@@ -1,6 +1,11 @@
 import { assertPreparedPreviewAdmission } from '../ci/preview-prepared-admission.mjs';
-import { assertFixtureBrokerTarget, verifyFixtureJobToken } from './preview-fixture-authority.mjs';
+import {
+  assertFixtureBrokerTarget,
+  verifyFixtureJobToken,
+  verifyPreviewAccessToken,
+} from './preview-fixture-authority.mjs';
 import { executeEncryptedFixtureBroker } from './preview-fixture-broker.mjs';
+import { preparedReadinessSnapshot } from './preview-prepared-readiness.mjs';
 
 const LIMIT = 48 * 1024;
 const headers = { 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' };
@@ -52,13 +57,22 @@ export async function handlePreviewFixtureRequest(
       !body ||
       typeof body !== 'object' ||
       Array.isArray(body) ||
-      Object.keys(body).sort().join(',') !== 'input,publicKey'
+      Object.keys(body).sort().join(',') !== 'input,previewAccessToken,publicKey,readiness'
     )
       return reject(400);
     const target = assertFixtureBrokerTarget(body.input, env);
     if (new URL(request.url).origin !== target.origin) return reject(403);
     if (target.operation !== 'provision') return reject(400);
     await verifyFixtureJobToken({ input: body.input, token, fetchImpl, now });
+    // The Preview access audience is separate from broker mutation authority.
+    // Carry it inside the encrypted response; never return it as a public field.
+    await verifyPreviewAccessToken({
+      input: body.input,
+      token: body.previewAccessToken,
+      fetchImpl,
+      now,
+    });
+    const previewReadiness = preparedReadinessSnapshot(body.input, body.readiness, now() * 1000);
     // Do not expose executeDurableFixtureBroker while Auth quiescence and trusted
     // recovery remain unverified. No admin key is read on this HTTP surface.
     try {
@@ -70,6 +84,8 @@ export async function handlePreviewFixtureRequest(
     const encrypted = await executeEncryptedFixtureBroker({
       input: body.input,
       publicKey: body.publicKey,
+      previewAccessToken: body.previewAccessToken,
+      previewReadiness,
       token,
       createClient,
       env,

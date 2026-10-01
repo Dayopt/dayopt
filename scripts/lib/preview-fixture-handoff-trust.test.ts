@@ -499,3 +499,23 @@ describe('read-only same-attempt fixture artifact trust before any candidate cod
     ).rejects.toThrow(invalid);
   });
 });
+
+it.each(['success', 'skipped'])(
+  'rejects legacy execution on metadata recheck but permits skipped jobs (%s)',
+  async (conclusion) => {
+    const world = fixture();
+    const finalJobs = {
+      total_count: world.jobs.total_count + 1,
+      jobs: [
+        ...world.jobs.jobs,
+        { ...world.jobs.jobs[1], name: 'Remote Preview login and CRUD', conclusion },
+      ],
+    };
+    if (conclusion === 'skipped')
+      await expect(verify(world, 'public-key', { finalJobs })).resolves.toHaveProperty(
+        'artifactId',
+        991,
+      );
+    else await expect(verify(world, 'public-key', { finalJobs })).rejects.toThrow(invalid);
+  },
+);

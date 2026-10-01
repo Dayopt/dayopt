@@ -175,9 +175,13 @@ describe('trusted public key handoff with injected GitHub metadata and download'
 });
 
 describe('encrypted Preview access handoff', () => {
-  it.each([true, false])(
-    'validates the separate signed access token before writing a registry (valid=%s)',
-    async (valid) => {
+  it.each([
+    { valid: true, prepared: false },
+    { valid: true, prepared: true },
+    { valid: false, prepared: true },
+  ])(
+    'validates the separate signed access token before writing a registry (valid=$valid prepared=$prepared)',
+    async ({ valid, prepared }) => {
       const signing = generateKeyPairSync('rsa', { modulusLength: 2048 });
       const now = 1800000000;
       const claims = {
@@ -229,7 +233,22 @@ describe('encrypted Preview access handoff', () => {
       const envelope = encryptPreviewFixtureEnvelope({
         input,
         publicKey: pair.publicKey,
-        payload: { fixture, previewAccessToken },
+        payload: {
+          fixture,
+          previewAccessToken,
+          ...(prepared
+            ? {
+                readiness: {
+                  status: 'ready',
+                  ...input.intent.request,
+                  origin: input.origin,
+                  migrationVersions: ['20260930020816'],
+                  startedAt: new Date(now * 1000).toISOString(),
+                  observedAt: new Date(now * 1000).toISOString(),
+                },
+              }
+            : {}),
+        },
       });
       const runnerTemp = mkdtempSync(join(tmpdir(), 'prepared-access-'));
       const privateOutput = join(runnerTemp, 'browser'),
@@ -244,6 +263,7 @@ describe('encrypted Preview access handoff', () => {
           privateOutput,
           evidenceDirectory,
           preparedAccess: true,
+          preparedReadiness: prepared,
           now: () => now,
           fetchImpl: async () =>
             Response.json({
@@ -261,6 +281,13 @@ describe('encrypted Preview access handoff', () => {
           const result = await receive;
           expect('trustedOidcToken' in result && result.trustedOidcToken).toBe(previewAccessToken);
           expect(readFileSync(result.path, 'utf8')).not.toContain(previewAccessToken);
+          if (prepared) {
+            expect('accessDeadline' in result && result.accessDeadline).toBe((now + 300) * 1000);
+            expect('readiness' in result && result.readiness).toMatchObject({
+              status: 'ready',
+              migrationVersions: ['20260930020816'],
+            });
+          }
         } else await expect(receive).rejects.toThrow(/^Preview fixture handoff failed$/);
       } finally {
         rmSync(runnerTemp, { recursive: true, force: true });

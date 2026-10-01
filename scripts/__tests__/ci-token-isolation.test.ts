@@ -152,6 +152,9 @@ describe('ci.yml の token 分離（credential audit P2-6）', () => {
       'migration-notice',
       'preview-trust',
       'preview-e2e',
+      'preview-prepared-consumer',
+      'preview-prepared-provision',
+      'preview-prepared-post',
       'preview-recovery-trust',
       'preview-recovery',
     ]);
@@ -267,7 +270,7 @@ describe('ci.yml の token 分離（credential audit P2-6）', () => {
       expect(writeTokenOffenders(fine)).toEqual([]);
     });
 
-    it('実ファイルから 10 job を読めている（切り出しの空振りで全 assert が素通りしない）', () => {
+    it('実ファイルから 13 job を読めている（切り出しの空振りで全 assert が素通りしない）', () => {
       expect(ciJobs.map((job) => job.id)).toEqual([
         'impact',
         'static',
@@ -277,6 +280,9 @@ describe('ci.yml の token 分離（credential audit P2-6）', () => {
         'db-upgrade',
         'preview-trust',
         'preview-e2e',
+        'preview-prepared-consumer',
+        'preview-prepared-provision',
+        'preview-prepared-post',
         'preview-recovery-trust',
         'preview-recovery',
       ]);
