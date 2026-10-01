@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { Database } from '@/lib/database';
@@ -56,12 +58,15 @@ vi.mock('@/lib/sentry', () => ({
 }));
 
 import {
+  CalendarConnectionSaveError,
+  beginCalendarOAuthAttempt,
+  claimCalendarOAuthAttempt,
   disconnect,
   getReconnectTarget,
   getSyncStatus,
   listConnections,
   listProviderCalendars,
-  reconnectExistingConnection,
+  reconnectConnection,
   revokeOrphanedGrant,
   saveConnection,
   updateSelectedCalendars,
@@ -69,10 +74,16 @@ import {
 
 const USER_ID = '00000000-0000-4000-8000-0000000000a1';
 const CONNECTION_ID = '00000000-0000-4000-8000-0000000000c1';
+const OAUTH_ATTEMPT_ID = '00000000-0000-4000-8000-0000000000a2';
 
 type Recorder = { table: string; chain: Array<{ method: string; args: unknown[] }> };
 
 type Config = {
+  saveResult?: string;
+  saveTransportFailure?: boolean;
+  saveDatabaseFailure?: boolean;
+  saveGatewayFailure?: boolean;
+  repairResult?: string;
   connection?: {
     data_generation?: number;
     status: string;
@@ -84,6 +95,9 @@ type Config = {
     id: string;
     provider_account_id: string;
     provider_account_email: string | null;
+    status: 'active' | 'reauth_required';
+    authority_fence_id: string | null;
+    authority_epoch: number | null;
   } | null;
   reconnectUpdate?: { id: string } | null;
   childRows?: Array<{ provider_calendar_id: string }>;
@@ -91,6 +105,7 @@ type Config = {
 
 function setupServiceRoleDb(config: Config) {
   const calls: Recorder[] = [];
+  const rpcCalls: Array<{ functionName: string; args: Record<string, unknown> }> = [];
 
   function resolve(recorder: Recorder): { data: unknown; error: unknown } {
     const methods = recorder.chain.map((entry) => entry.method);
@@ -99,7 +114,10 @@ function setupServiceRoleDb(config: Config) {
         if (methods.includes('update'))
           return { data: config.reconnectUpdate ?? null, error: null };
         const select = recorder.chain.find((entry) => entry.method === 'select')?.args[0];
-        if (select === 'id, provider_account_id, provider_account_email') {
+        if (
+          select ===
+          'id, provider_account_id, provider_account_email, status, authority_fence_id, authority_epoch'
+        ) {
           return { data: config.reconnectTarget ?? null, error: null };
         }
         return { data: config.connection ?? null, error: null };
@@ -138,8 +156,58 @@ function setupServiceRoleDb(config: Config) {
     return proxy;
   });
 
-  createClient.mockReturnValue({ from });
-  return { calls };
+  const rpc = vi.fn((functionName: string, args: Record<string, unknown>) => {
+    rpcCalls.push({ functionName, args });
+    if (functionName === 'repair_calendar_connection_authority_fence_v1') {
+      const result = config.repairResult ?? 'ready';
+      if (result === 'ready' && config.connection) {
+        config.connection.authority_fence_id = 'repaired-fence-id';
+        config.connection.authority_epoch = 9;
+      }
+      return Promise.resolve({ data: result, error: null });
+    }
+    if (functionName === 'begin_calendar_oauth_attempt_v1') {
+      return Promise.resolve({
+        data: [
+          {
+            attempt_id: OAUTH_ATTEMPT_ID,
+            operation_id: '00000000-0000-4000-8000-0000000000a3',
+            connection_id: '00000000-0000-4000-8000-0000000000a4',
+            expires_at: '2026-09-25T00:10:00.000Z',
+          },
+        ],
+        error: null,
+      });
+    }
+    if (functionName === 'claim_calendar_oauth_attempt_v1') {
+      return Promise.resolve({ data: [{ attempt_id: OAUTH_ATTEMPT_ID }], error: null });
+    }
+    if (
+      (functionName === 'save_calendar_connection_command_v2' ||
+        functionName === 'reconnect_calendar_connection_command_v1') &&
+      config.saveTransportFailure
+    ) {
+      return Promise.reject(new Error('database transport timed out'));
+    }
+    if (
+      (functionName === 'save_calendar_connection_command_v2' ||
+        functionName === 'reconnect_calendar_connection_command_v1') &&
+      config.saveDatabaseFailure
+    ) {
+      return Promise.resolve({ data: null, error: { code: 'CA016' } });
+    }
+    if (
+      (functionName === 'save_calendar_connection_command_v2' ||
+        functionName === 'reconnect_calendar_connection_command_v1') &&
+      config.saveGatewayFailure
+    ) {
+      return Promise.resolve({ data: null, error: { code: 'PGRST000' } });
+    }
+    return Promise.resolve({ data: config.saveResult ?? 'saved', error: null });
+  });
+
+  createClient.mockReturnValue({ from, rpc });
+  return { calls, rpcCalls };
 }
 
 function recordersFor(calls: Recorder[], table: string): Recorder[] {
@@ -211,12 +279,15 @@ describe('getSyncStatus', () => {
 });
 
 describe('reconnect contract', () => {
-  it('対象読取を id / user / provider / reauth_required で限定する', async () => {
+  it('対象読取を id / user / provider で限定し、reauth_required を許可する', async () => {
     const { calls } = setupServiceRoleDb({
       reconnectTarget: {
         id: CONNECTION_ID,
         provider_account_id: 'google-sub-123',
         provider_account_email: 'owner@example.com',
+        status: 'reauth_required',
+        authority_fence_id: 'fence-id',
+        authority_epoch: 1,
       },
     });
 
@@ -234,15 +305,48 @@ describe('reconnect contract', () => {
         ['id', CONNECTION_ID],
         ['user_id', USER_ID],
         ['provider', 'google'],
-        ['status', 'reauth_required'],
       ],
     );
   });
 
-  it('接続の保存は連続失敗数を 0 に戻す（#2687）', async () => {
-    const { calls } = setupServiceRoleDb({});
+  it('authority fence の欠けた legacy active row は OAuth 回復用の対象にする', async () => {
+    setupServiceRoleDb({
+      reconnectTarget: {
+        id: CONNECTION_ID,
+        provider_account_id: 'google-sub-123',
+        provider_account_email: 'owner@example.com',
+        status: 'active',
+        authority_fence_id: null,
+        authority_epoch: null,
+      },
+    });
+
+    await expect(getReconnectTarget(USER_ID, CONNECTION_ID)).resolves.toMatchObject({
+      id: CONNECTION_ID,
+      providerAccountId: 'google-sub-123',
+    });
+  });
+
+  it('authority fence のある active row は再接続対象にしない', async () => {
+    setupServiceRoleDb({
+      reconnectTarget: {
+        id: CONNECTION_ID,
+        provider_account_id: 'google-sub-123',
+        provider_account_email: 'owner@example.com',
+        status: 'active',
+        authority_fence_id: 'fence-id',
+        authority_epoch: 1,
+      },
+    });
+
+    await expect(getReconnectTarget(USER_ID, CONNECTION_ID)).resolves.toBeNull();
+  });
+
+  it('接続の保存は既存アカウントを fenced RPC 経由で更新する', async () => {
+    const { calls, rpcCalls } = setupServiceRoleDb({});
 
     await saveConnection({
+      attemptId: OAUTH_ATTEMPT_ID,
       userId: USER_ID,
       providerAccountId: 'google-sub-123',
       providerAccountEmail: 'user@example.com',
@@ -251,68 +355,182 @@ describe('reconnect contract', () => {
       encryptionKey: 'encryption-key',
     });
 
-    const upsert = findWith(calls, 'calendar_connections', 'upsert');
-    if (!upsert) throw new Error('connection upsert not found');
-    expect(argsOf(upsert, 'upsert')[0]).toMatchObject({
-      status: 'active',
-      last_sync_error: null,
-      consecutive_failures: 0,
+    expect(rpcCalls).toContainEqual({
+      functionName: 'save_calendar_connection_command_v2',
+      args: {
+        p_attempt_id: OAUTH_ATTEMPT_ID,
+        p_project_key: 'project-key',
+        p_user_id: USER_ID,
+        p_provider: 'google',
+        p_provider_account_id: 'google-sub-123',
+        p_provider_account_email: 'user@example.com',
+        p_granted_scopes: ['calendar.readonly'],
+        p_refresh_token_enc: 'enc',
+      },
     });
-  });
-
-  it('再接続は安定 sub を含む条件付き UPDATE だけを実行する', async () => {
-    const { calls } = setupServiceRoleDb({ reconnectUpdate: { id: CONNECTION_ID } });
-
-    await expect(
-      reconnectExistingConnection({
-        connectionId: CONNECTION_ID,
-        userId: USER_ID,
-        providerAccountId: 'google-sub-123',
-        providerAccountEmail: 'user@example.com',
-        grantedScopes: ['calendar.readonly'],
-        refreshToken: 'new-refresh-token',
-        encryptionKey: 'encryption-key',
-      }),
-    ).resolves.toBe('updated');
-
-    const update = findWith(calls, 'calendar_connections', 'update');
-    if (!update) throw new Error('reconnect update not found');
-    expect(argsOf(update, 'update')[0]).toEqual({
-      provider_account_email: 'user@example.com',
-      granted_scopes: ['calendar.readonly'],
-      refresh_token_enc: 'enc',
-      status: 'active',
-      last_sync_error: null,
-      consecutive_failures: 0,
-    });
-    expect(
-      update.chain.filter((entry) => entry.method === 'eq').map((entry) => entry.args),
-    ).toEqual([
-      ['id', CONNECTION_ID],
-      ['user_id', USER_ID],
-      ['provider', 'google'],
-      ['provider_account_id', 'google-sub-123'],
-      ['status', 'reauth_required'],
-    ]);
     expect(findWith(calls, 'calendar_connections', 'upsert')).toBeUndefined();
   });
+});
 
-  it('切断との競合で更新行が無ければ missing とし、新規行を作らない', async () => {
-    const { calls } = setupServiceRoleDb({ reconnectUpdate: null });
+describe('fenced OAuth connection save', () => {
+  it('state と PKCE verifier の SHA-256 digest で server-side attempt を作る', async () => {
+    const { rpcCalls } = setupServiceRoleDb({});
+    const state = 'opaque-state';
+    const verifier = 'pkce-verifier';
+
+    await expect(beginCalendarOAuthAttempt({ userId: USER_ID, state, verifier })).resolves.toBe(
+      OAUTH_ATTEMPT_ID,
+    );
+
+    const rpc = rpcCalls.find((call) => call.functionName === 'begin_calendar_oauth_attempt_v1');
+    expect(rpc?.args).toEqual({
+      p_project_key: 'project-key',
+      p_user_id: USER_ID,
+      p_state_digest: `\\x${createHash('sha256').update(state).digest('hex')}`,
+      p_verifier_digest: `\\x${createHash('sha256').update(verifier).digest('hex')}`,
+    });
+    expect(JSON.stringify(rpc?.args)).not.toContain(state);
+    expect(JSON.stringify(rpc?.args)).not.toContain(verifier);
+  });
+
+  it('Google code 交換前の claim が同じ state / verifier attempt を検証する', async () => {
+    const { rpcCalls } = setupServiceRoleDb({});
+    const state = 'opaque-state';
+    const verifier = 'pkce-verifier';
 
     await expect(
-      reconnectExistingConnection({
+      claimCalendarOAuthAttempt({
+        attemptId: OAUTH_ATTEMPT_ID,
+        userId: USER_ID,
+        state,
+        verifier,
+      }),
+    ).resolves.toBeUndefined();
+
+    expect(rpcCalls).toContainEqual({
+      functionName: 'claim_calendar_oauth_attempt_v1',
+      args: {
+        p_project_key: 'project-key',
+        p_user_id: USER_ID,
+        p_state_digest: `\\x${createHash('sha256').update(state).digest('hex')}`,
+        p_verifier_digest: `\\x${createHash('sha256').update(verifier).digest('hex')}`,
+      },
+    });
+  });
+
+  it('再接続は期待した connection id のみ条件付きで更新する RPC を使う', async () => {
+    const { calls, rpcCalls } = setupServiceRoleDb({});
+
+    await expect(
+      reconnectConnection({
+        attemptId: OAUTH_ATTEMPT_ID,
         connectionId: CONNECTION_ID,
         userId: USER_ID,
         providerAccountId: 'google-sub-123',
         providerAccountEmail: null,
         grantedScopes: ['calendar.readonly'],
-        refreshToken: 'new-refresh-token',
+        refreshToken: 'refresh-token',
+        encryptionKey: 'encryption-key',
+      }),
+    ).resolves.toBe('saved');
+
+    expect(rpcCalls).toContainEqual({
+      functionName: 'reconnect_calendar_connection_command_v1',
+      args: {
+        p_attempt_id: OAUTH_ATTEMPT_ID,
+        p_project_key: 'project-key',
+        p_user_id: USER_ID,
+        p_provider: 'google',
+        p_provider_account_id: 'google-sub-123',
+        p_provider_account_email: null,
+        p_granted_scopes: ['calendar.readonly'],
+        p_refresh_token_enc: 'enc',
+        p_expected_connection_id: CONNECTION_ID,
+      },
+    });
+    expect(findWith(calls, 'calendar_connections', 'upsert')).toBeUndefined();
+  });
+
+  it('再接続対象が消えていれば missing を返し、upsert しない', async () => {
+    setupServiceRoleDb({ saveResult: 'missing' });
+
+    await expect(
+      reconnectConnection({
+        attemptId: OAUTH_ATTEMPT_ID,
+        connectionId: CONNECTION_ID,
+        userId: USER_ID,
+        providerAccountId: 'google-sub-123',
+        providerAccountEmail: null,
+        grantedScopes: ['calendar.readonly'],
+        refreshToken: 'refresh-token',
         encryptionKey: 'encryption-key',
       }),
     ).resolves.toBe('missing');
+  });
 
-    expect(findWith(calls, 'calendar_connections', 'upsert')).toBeUndefined();
+  it('fenced save が revoke outbox へ移した token を saved と扱わない', async () => {
+    setupServiceRoleDb({ saveResult: 'enqueued' });
+
+    await expect(
+      saveConnection({
+        attemptId: OAUTH_ATTEMPT_ID,
+        userId: USER_ID,
+        providerAccountId: 'google-sub-123',
+        providerAccountEmail: null,
+        grantedScopes: ['calendar.readonly'],
+        refreshToken: 'refresh-token',
+        encryptionKey: 'encryption-key',
+      }),
+    ).resolves.toBe('enqueued');
+  });
+
+  it('RPC transport failure は commit outcome unknown として分類する', async () => {
+    setupServiceRoleDb({ saveTransportFailure: true });
+
+    const save = saveConnection({
+      attemptId: OAUTH_ATTEMPT_ID,
+      userId: USER_ID,
+      providerAccountId: 'google-sub-123',
+      providerAccountEmail: null,
+      grantedScopes: ['calendar.readonly'],
+      refreshToken: 'refresh-token',
+      encryptionKey: 'encryption-key',
+    });
+
+    await expect(save).rejects.toBeInstanceOf(CalendarConnectionSaveError);
+    await expect(save).rejects.toMatchObject({ commitOutcome: 'unknown' });
+  });
+
+  it('RPC が返した PostgreSQL SQLSTATE は transaction rollback 済みとして分類する', async () => {
+    setupServiceRoleDb({ saveDatabaseFailure: true });
+
+    await expect(
+      saveConnection({
+        attemptId: OAUTH_ATTEMPT_ID,
+        userId: USER_ID,
+        providerAccountId: 'google-sub-123',
+        providerAccountEmail: null,
+        grantedScopes: ['calendar.readonly'],
+        refreshToken: 'refresh-token',
+        encryptionKey: 'encryption-key',
+      }),
+    ).rejects.toMatchObject({ commitOutcome: 'not_committed' });
+  });
+
+  it('RPC gateway error は commit outcome unknown として token revoke を避ける', async () => {
+    setupServiceRoleDb({ saveGatewayFailure: true });
+
+    await expect(
+      saveConnection({
+        attemptId: OAUTH_ATTEMPT_ID,
+        userId: USER_ID,
+        providerAccountId: 'google-sub-123',
+        providerAccountEmail: null,
+        grantedScopes: ['calendar.readonly'],
+        refreshToken: 'refresh-token',
+        encryptionKey: 'encryption-key',
+      }),
+    ).rejects.toMatchObject({ commitOutcome: 'unknown' });
   });
 });
 
@@ -358,6 +576,76 @@ describe('listProviderCalendars', () => {
     await expect(listProviderCalendars(USER_ID, CONNECTION_ID)).rejects.toMatchObject({
       code: 'REAUTH_REQUIRED',
     });
+    expect(startSession).not.toHaveBeenCalled();
+  });
+
+  it('fenced writer ready 後の legacy NULL fence は修復 RPC の後で calendarList を取得する', async () => {
+    isConfiguredFencedCalendarSyncWriterReady.mockResolvedValue(true);
+    const { rpcCalls } = setupServiceRoleDb({
+      connection: {
+        data_generation: 3,
+        status: 'active',
+        refresh_token_enc: 'enc',
+        authority_fence_id: null,
+        authority_epoch: null,
+      },
+    });
+    listCalendars.mockResolvedValue([{ id: 'cal-a', name: 'A', primary: true }]);
+
+    await expect(listProviderCalendars(USER_ID, CONNECTION_ID)).resolves.toEqual([
+      { id: 'cal-a', name: 'A', primary: true, selected: false },
+    ]);
+    expect(rpcCalls).toContainEqual({
+      functionName: 'repair_calendar_connection_authority_fence_v1',
+      args: {
+        p_project_key: 'project-key',
+        p_user_id: USER_ID,
+        p_connection_id: CONNECTION_ID,
+      },
+    });
+    expect(listCalendars).toHaveBeenCalledTimes(1);
+  });
+
+  it('legacy fence repair 後に refresh と保存の予算が足りなければ Google session を開始しない', async () => {
+    isConfiguredFencedCalendarSyncWriterReady.mockResolvedValue(true);
+    const { rpcCalls } = setupServiceRoleDb({
+      connection: {
+        data_generation: 3,
+        status: 'active',
+        refresh_token_enc: 'enc',
+        authority_fence_id: null,
+        authority_epoch: null,
+      },
+    });
+    const deadlineAt = Date.now() + 20_000;
+
+    await expect(listProviderCalendars(USER_ID, CONNECTION_ID, deadlineAt)).rejects.toMatchObject({
+      code: 'DEADLINE_EXCEEDED',
+    });
+
+    expect(rpcCalls).toContainEqual(
+      expect.objectContaining({ functionName: 'repair_calendar_connection_authority_fence_v1' }),
+    );
+    expect(startSession).not.toHaveBeenCalled();
+  });
+
+  it('DB timeout より短い残り予算では fence repair を始めない', async () => {
+    isConfiguredFencedCalendarSyncWriterReady.mockResolvedValue(true);
+    const { rpcCalls } = setupServiceRoleDb({
+      connection: {
+        data_generation: 3,
+        status: 'active',
+        refresh_token_enc: 'enc',
+        authority_fence_id: null,
+        authority_epoch: null,
+      },
+    });
+
+    await expect(
+      listProviderCalendars(USER_ID, CONNECTION_ID, Date.now() + 1_000),
+    ).rejects.toMatchObject({ code: 'DEADLINE_EXCEEDED' });
+
+    expect(rpcCalls).toHaveLength(0);
     expect(startSession).not.toHaveBeenCalled();
   });
 
@@ -465,10 +753,11 @@ describe('listProviderCalendars', () => {
   // deadlineAt をそのまま adapter へ通す。
   it('deadlineAt を listCalendars へそのまま渡す', async () => {
     setupServiceRoleDb({ connection: { status: 'active', refresh_token_enc: 'enc' } });
+    const deadlineAt = Date.now() + 60_000;
 
-    await listProviderCalendars(USER_ID, CONNECTION_ID, 12_345);
+    await listProviderCalendars(USER_ID, CONNECTION_ID, deadlineAt);
 
-    expect(listCalendars).toHaveBeenCalledWith(expect.anything(), 12_345);
+    expect(listCalendars).toHaveBeenCalledWith(expect.anything(), deadlineAt);
   });
 
   // 一覧取得の予算超過は syncCalendar の「部分結果を安全に返す」とは扱いを変え、明示的な
@@ -639,9 +928,11 @@ describe('updateSelectedCalendars（fenced writer ready）', () => {
     ).rejects.toMatchObject({ code: 'UPDATE_FAILED' });
   });
 
-  it('authority fence が未確立の接続は missing 相当として CONNECTION_NOT_FOUND を throw する', async () => {
-    setupServiceRoleDb({
+  it('authority fence が未確立でも修復して fenced CAS で選択を更新する', async () => {
+    isConfiguredFencedCalendarSyncWriterReady.mockResolvedValue(true);
+    const { rpcCalls } = setupServiceRoleDb({
       connection: {
+        data_generation: 3,
         status: 'active',
         refresh_token_enc: 'enc',
         authority_fence_id: null,
@@ -653,7 +944,40 @@ describe('updateSelectedCalendars（fenced writer ready）', () => {
       updateSelectedCalendars(USER_ID, CONNECTION_ID, [
         { providerCalendarId: 'cal-a', calendarName: 'A' },
       ]),
-    ).rejects.toMatchObject({ code: 'CONNECTION_NOT_FOUND' });
+    ).resolves.toBeUndefined();
+    expect(rpcCalls).toContainEqual(
+      expect.objectContaining({
+        functionName: 'repair_calendar_connection_authority_fence_v1',
+      }),
+    );
+    expect(replaceSelectedCalendars).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: USER_ID,
+        connectionId: CONNECTION_ID,
+        expectedGeneration: 3,
+        expectedAuthorityFenceId: 'repaired-fence-id',
+        expectedAuthorityEpoch: 9,
+      }),
+    );
+  });
+
+  it('repair RPC が stale generation を返したら CAS を呼ばず再認証を要求する', async () => {
+    setupServiceRoleDb({
+      repairResult: 'stale',
+      connection: {
+        data_generation: 3,
+        status: 'active',
+        refresh_token_enc: 'enc',
+        authority_fence_id: null,
+        authority_epoch: null,
+      },
+    });
+
+    await expect(
+      updateSelectedCalendars(USER_ID, CONNECTION_ID, [
+        { providerCalendarId: 'cal-a', calendarName: 'A' },
+      ]),
+    ).rejects.toMatchObject({ code: 'REAUTH_REQUIRED' });
     expect(replaceSelectedCalendars).not.toHaveBeenCalled();
   });
 
@@ -889,11 +1213,7 @@ describe('disconnect', () => {
   });
 });
 
-// #2620: production では fenced writer が ready で、かつ接続作成経路（saveConnection /
-// reconnectExistingConnection）が authority fence 列を書かないため、OAuth callback が作った
-// 接続は必ず fence NULL で始まる。この組み合わせを固定するテストが 1 件も無かったため
-// （既存の disconnect テストは beforeEach の既定 false で非 fenced 経路だけを通る）、
-// 「切断しましたと言うのに revoke も削除もしない」不具合が緑のまま隠れていた。
+// #2620: fenced save 導入前に作られた fence 欠落行を disconnect する経路を確認する。
 describe('disconnect（fenced writer ready）', () => {
   beforeEach(() => {
     isConfiguredFencedCalendarSyncWriterReady.mockResolvedValue(true);

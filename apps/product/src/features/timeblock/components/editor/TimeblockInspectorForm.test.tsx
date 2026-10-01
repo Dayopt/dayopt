@@ -1,3 +1,5 @@
+import type { ReactNode } from 'react';
+
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -163,6 +165,7 @@ vi.mock('../inspector/fields', () => ({
 }));
 
 vi.mock('./TimeblockRecordActions', () => ({
+  TimeblockRecordActions: ({ children }: { children: ReactNode }) => <>{children}</>,
   RecordPlanButton: ({
     beforeRecord,
     onRecorded,
@@ -246,6 +249,9 @@ vi.mock('./TimeblockEditor', () => ({
       </button>
       <button type="button" onClick={() => onNoteChange('最新メモ')}>
         edit-note
+      </button>
+      <button type="button" onClick={() => onNoteChange('1行目\n2行目')}>
+        edit-multiline-note
       </button>
       <button
         type="button"
@@ -570,13 +576,13 @@ describe('TimeblockInspectorForm', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'edit-note' }));
+    fireEvent.click(screen.getByRole('button', { name: 'edit-multiline-note' }));
     expect(mocks.enqueueSave).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByRole('button', { name: 'prepare-record' }));
 
     expect(mocks.flushSave).toHaveBeenCalledWith({
-      note: '最新メモ',
+      note: '1行目\n2行目',
       activityId: null,
     });
 

@@ -7,11 +7,13 @@ import { expectedMigrationVersions } from '../ci/production-migration-readiness.
 import { isDirectExecution } from '../lib/is-direct-execution.mjs';
 import { validateCloudRequest } from '../lib/preview-cloud-binding.mjs';
 import { isPassingPreviewReport } from '../lib/preview-e2e-reporter.mjs';
+import { assertCloudFixtureKey } from '../lib/preview-fixture-key.mjs';
 import { recoverPreviewUsers } from '../runbook/preview-cleanup.mjs';
 import { runPreviewE2E } from '../runbook/preview-e2e.mjs';
 import { validateCloudIntent } from './preview-cloud-intent.mjs';
 
 export { validateCloudRequest } from '../lib/preview-cloud-binding.mjs';
+export { assertCloudFixtureKey } from '../lib/preview-fixture-key.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 export function verifyCloudFixtureContract(candidateRoot, trustedRoot = ROOT) {
@@ -19,6 +21,7 @@ export function verifyCloudFixtureContract(candidateRoot, trustedRoot = ROOT) {
   // intent. Require the trusted allocation contract before any fixture mutation.
   for (const path of [
     'apps/product/src/lib/test/preview-cloud-identity.ts',
+    'apps/product/src/lib/test/preview-fixture-registry.ts',
     'apps/product/src/lib/test/e2e/critical-path-fixture.ts',
   ]) {
     const source = readFileSync(join(trustedRoot, path));
@@ -42,8 +45,12 @@ const STATES = new Set([
   'cleanup-failed',
   'deleted',
 ]);
-const FILES = new Set(['critical-path.spec.ts', 'mobile-critical-path.spec.ts']);
-const PROJECTS = new Set(['chromium', 'Mobile Chrome']);
+const FILES = new Set([
+  'critical-path.spec.ts',
+  'mobile-critical-path.spec.ts',
+  'preview-authorization.spec.ts',
+]);
+const PROJECTS = new Set(['chromium', 'Mobile Chrome', 'preview-authorization']);
 const TEST_STATES = new Set(['passed', 'failed', 'timedOut', 'skipped', 'interrupted', 'unknown']);
 const safeGitEnv = () =>
   Object.fromEntries(
@@ -54,38 +61,6 @@ function readJson(path) {
   const stat = lstatSync(path);
   if (!stat.isFile() || stat.isSymbolicLink() || stat.size > 2 * 1024 * 1024) throw new Error();
   return JSON.parse(readFileSync(path, 'utf8'));
-}
-
-/** Authenticate the selected key against the selected nonproduction Auth API before creating fixtures. */
-export async function assertCloudFixtureKey({ request, serviceKey, fetchImpl = fetch }) {
-  const bound = validateCloudRequest(request);
-  if (!serviceKey?.trim()) throw new Error('Cloud Preview fixture key is missing');
-  if (!serviceKey.startsWith('sb_secret_')) {
-    try {
-      const parts = serviceKey.split('.');
-      if (parts.length !== 3) throw new Error();
-      const claims = JSON.parse(Buffer.from(parts[1], 'base64url').toString());
-      if (claims.role !== 'service_role' || claims.ref !== bound.supabaseProjectRef)
-        throw new Error();
-    } catch {
-      throw new Error('Cloud Preview fixture key binding differs');
-    }
-  }
-  try {
-    const response = await fetchImpl(
-      `https://${bound.supabaseProjectRef}.supabase.co/auth/v1/admin/users/00000000-0000-0000-0000-000000000001`,
-      {
-        method: 'GET',
-        redirect: 'error',
-        signal: AbortSignal.timeout(15000),
-        headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` },
-      },
-    );
-    if (!response.ok || (await response.json())?.id !== '00000000-0000-0000-0000-000000000001')
-      throw new Error();
-  } catch {
-    throw new Error('Cloud Preview fixture key or baseline is not ready');
-  }
 }
 
 function readRun(directory, request) {
@@ -141,6 +116,26 @@ export async function cleanupCloudRun({
     { mode: 0o600 },
   );
   return cleanup;
+}
+
+const STEP_CATEGORIES = new Set(['expect', 'pw:api', 'test.step', 'fixture', 'hook', 'other']);
+
+/** Candidate reporter metadata is untrusted: rebuild only bounded diagnostic coordinates. */
+function publicSteps(steps) {
+  if (!Array.isArray(steps)) return [];
+  return steps.slice(0, 2000).map((step) => ({
+    category: STEP_CATEGORIES.has(step?.category) ? step.category : 'other',
+    file: FILES.has(step?.file) ? step.file : null,
+    line:
+      Number.isSafeInteger(step?.line) && step.line > 0 && step.line <= 1_000_000
+        ? step.line
+        : null,
+    duration:
+      Number.isFinite(step?.duration) && step.duration >= 0 && step.duration <= 20 * 60 * 1000
+        ? step.duration
+        : 0,
+    failed: step?.failed === true,
+  }));
 }
 
 /** Reconstruct a JSON-only public artifact. Never copy browser output, screenshots, or raw JSON. */
@@ -209,6 +204,7 @@ export function publishCloudEvidence({ directory, destination, request, intent =
         status: test.status,
         retry: test.retry,
         expectedPassed: test.expectedPassed === true,
+        steps: publicSteps(test.steps),
       };
     });
   } catch {

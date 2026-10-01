@@ -17,3 +17,28 @@ export function validatePreviewOrigin(origin: string | undefined): string {
   }
   return origin;
 }
+
+/** Strip both protection credentials on every hop; never forward to Supabase,
+ * captcha, redirects, or a foreign deployment. Prepared access has no fallback. */
+export function previewAccessHeaders(
+  headers: Record<string, string>,
+  target: ReturnType<typeof previewRequestTarget>,
+  credential: { prepared: boolean; token: string | undefined; bypass?: string | undefined },
+): Record<string, string> {
+  if (!credential.token?.trim() || (credential.prepared && credential.bypass !== undefined))
+    throw new Error('Preview access credential is invalid');
+  const result = Object.fromEntries(
+    Object.entries(headers).filter(
+      ([name]) =>
+        ![
+          'x-vercel-protection-bypass',
+          'x-vercel-set-bypass-cookie',
+          'x-vercel-trusted-oidc-idp-token',
+        ].includes(name.toLowerCase()),
+    ),
+  );
+  if (target === 'preview')
+    result[credential.prepared ? 'x-vercel-trusted-oidc-idp-token' : 'x-vercel-protection-bypass'] =
+      credential.token;
+  return result;
+}

@@ -2,9 +2,9 @@ import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { lstatSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { inflateRawSync } from 'node:zlib';
 
 import { isDirectExecution } from '../lib/is-direct-execution.mjs';
+import { decodePreviewArtifactZip } from '../lib/preview-artifact-zip.mjs';
 import { verifyPreviewRecoveryTrust } from '../lib/preview-cloud-recovery-trust.mjs';
 import { recoverPreviewUsers } from '../runbook/preview-cleanup.mjs';
 import { validateCloudIntent } from './preview-cloud-intent.mjs';
@@ -12,16 +12,15 @@ import { assertCloudFixtureKey } from './preview-cloud-run.mjs';
 
 const REPO = 'Dayopt/dayopt';
 const MAX_ARCHIVE_BYTES = 128 * 1024;
-const MAX_INTENT_BYTES = 16 * 1024;
 function number(value) {
   if (!/^[1-9]\d*$/.test(String(value))) throw new Error();
   const result = Number(value);
   if (!Number.isSafeInteger(result)) throw new Error();
   return result;
 }
-function readJson(path) {
+function readJson(path, maxBytes = 16_384) {
   const stat = lstatSync(path);
-  if (!stat.isFile() || stat.isSymbolicLink() || stat.size > 16_384) throw new Error();
+  if (!stat.isFile() || stat.isSymbolicLink() || stat.size > maxBytes) throw new Error();
   return JSON.parse(readFileSync(path, 'utf8'));
 }
 function safeGhEnv(token, env = process.env) {
@@ -58,194 +57,53 @@ async function downloadIntent({ artifactId, token }) {
   }
 }
 
-function crc32(data) {
-  let crc = 0xffffffff;
-  for (const byte of data) {
-    crc ^= byte;
-    for (let bit = 0; bit < 8; bit++) crc = (crc >>> 1) ^ (crc & 1 ? 0xedb88320 : 0);
-  }
-  return (crc ^ 0xffffffff) >>> 0;
-}
-
-function assertRange(buffer, offset, length, boundary = buffer.length) {
-  if (
-    !Number.isSafeInteger(offset) ||
-    !Number.isSafeInteger(length) ||
-    offset < 0 ||
-    length < 0 ||
-    offset + length > boundary ||
-    boundary > buffer.length
-  )
-    throw new Error('Invalid Preview recovery ZIP');
-}
-
-function assertExtraFields(buffer, offset, length) {
-  const end = offset + length;
-  assertRange(buffer, offset, length);
-  while (offset < end) {
-    assertRange(buffer, offset, 4, end);
-    const id = buffer.readUInt16LE(offset);
-    const fieldLength = buffer.readUInt16LE(offset + 2);
-    if (id === 0x0001 || id === 0x7075 || id === 0x6375)
-      throw new Error('Unsupported Preview recovery ZIP extra field');
-    offset += 4;
-    assertRange(buffer, offset, fieldLength, end);
-    offset += fieldLength;
-  }
-}
-
-function findEndOfCentralDirectory(buffer) {
-  const minOffset = Math.max(0, buffer.length - 22 - 0xffff);
-  for (let offset = buffer.length - 22; offset >= minOffset; offset--) {
-    if (buffer.readUInt32LE(offset) !== 0x06054b50) continue;
-    if (offset + 22 > buffer.length) break;
-    const commentLength = buffer.readUInt16LE(offset + 20);
-    if (commentLength !== 0 || offset + 22 !== buffer.length) continue;
-    return offset;
-  }
-  throw new Error('Invalid Preview recovery ZIP');
-}
-
-/** Parse one small root-level intent.json from an already digest-verified ZIP. */
+/** Preserve the recovery-only intent contract; larger handoff envelopes are never accepted here. */
 export function decodePreviewIntentArtifactZip(archive) {
-  if (!Buffer.isBuffer(archive) || archive.length < 22 || archive.length > MAX_ARCHIVE_BYTES)
-    throw new Error('Invalid Preview recovery ZIP');
-  const eocdOffset = findEndOfCentralDirectory(archive);
-  const diskNumber = archive.readUInt16LE(eocdOffset + 4);
-  const centralDiskNumber = archive.readUInt16LE(eocdOffset + 6);
-  const diskEntries = archive.readUInt16LE(eocdOffset + 8);
-  const totalEntries = archive.readUInt16LE(eocdOffset + 10);
-  const centralSize = archive.readUInt32LE(eocdOffset + 12);
-  const centralOffset = archive.readUInt32LE(eocdOffset + 16);
+  return decodePreviewArtifactZip(archive, 'intent');
+}
+
+/** Only select applicability here. Full source/intent authentication still runs
+ * before writing UNKNOWN; an ordinary failed CI run has no prepared fixtures. */
+export async function hasPreparedAttempt({ sourceRunId, sourceAttempt, token, fetchImpl = fetch }) {
+  const runId = number(sourceRunId),
+    attempt = number(sourceAttempt);
+  if (typeof token !== 'string' || !token.trim()) throw new Error();
+  const response = await fetchImpl(
+    `https://api.github.com/repos/${REPO}/actions/runs/${runId}/attempts/${attempt}/jobs?per_page=100`,
+    {
+      redirect: 'error',
+      signal: AbortSignal.timeout(15_000),
+      headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json' },
+    },
+  );
   if (
-    diskNumber !== 0 ||
-    centralDiskNumber !== 0 ||
-    diskEntries !== 1 ||
-    totalEntries !== 1 ||
-    centralOffset + centralSize !== eocdOffset
+    response.status !== 200 ||
+    response.redirected ||
+    !response.body ||
+    response.headers.get('link')?.includes('rel="next"')
   )
-    throw new Error('Invalid Preview recovery ZIP');
-
-  assertRange(archive, centralOffset, 46, eocdOffset);
-  if (archive.readUInt32LE(centralOffset) !== 0x02014b50)
-    throw new Error('Invalid Preview recovery ZIP');
-  const madeBy = archive.readUInt16LE(centralOffset + 4);
-  const neededVersion = archive.readUInt16LE(centralOffset + 6);
-  const flags = archive.readUInt16LE(centralOffset + 8);
-  const method = archive.readUInt16LE(centralOffset + 10);
-  const expectedCrc = archive.readUInt32LE(centralOffset + 16);
-  const compressedSize = archive.readUInt32LE(centralOffset + 20);
-  const uncompressedSize = archive.readUInt32LE(centralOffset + 24);
-  const nameLength = archive.readUInt16LE(centralOffset + 28);
-  const extraLength = archive.readUInt16LE(centralOffset + 30);
-  const commentLength = archive.readUInt16LE(centralOffset + 32);
-  const diskStart = archive.readUInt16LE(centralOffset + 34);
-  const externalAttributes = archive.readUInt32LE(centralOffset + 38);
-  const localOffset = archive.readUInt32LE(centralOffset + 42);
-  const centralHeaderLength = 46 + nameLength + extraLength + commentLength;
-  assertRange(archive, centralOffset, centralHeaderLength, eocdOffset);
-  const nameOffset = centralOffset + 46;
-  const centralName = archive.subarray(nameOffset, nameOffset + nameLength);
-  const allowedFlags = 0x080e;
-  const creatorHost = madeBy >>> 8;
-  const unixMode = externalAttributes >>> 16;
-  const fileType = unixMode & 0o170000;
-  if (
-    centralHeaderLength !== centralSize ||
-    commentLength !== 0 ||
-    diskStart !== 0 ||
-    localOffset !== 0 ||
-    neededVersion >= 45 ||
-    (flags & ~allowedFlags) !== 0 ||
-    ![0, 8].includes(method) ||
-    (method === 0 && (flags & 0x0006) !== 0) ||
-    !centralName.equals(Buffer.from('intent.json')) ||
-    (creatorHost === 0 && (externalAttributes & 0x10) !== 0) ||
-    (fileType !== 0 && fileType !== 0o100000) ||
-    uncompressedSize < 1 ||
-    uncompressedSize > MAX_INTENT_BYTES ||
-    compressedSize < 1 ||
-    compressedSize > MAX_ARCHIVE_BYTES
-  )
-    throw new Error('Unsupported Preview recovery ZIP entry');
-  assertExtraFields(archive, nameOffset + nameLength, extraLength);
-
-  assertRange(archive, localOffset, 30, centralOffset);
-  if (archive.readUInt32LE(localOffset) !== 0x04034b50)
-    throw new Error('Invalid Preview recovery ZIP');
-  const localFlags = archive.readUInt16LE(localOffset + 6);
-  const localMethod = archive.readUInt16LE(localOffset + 8);
-  const localCrc = archive.readUInt32LE(localOffset + 14);
-  const localCompressedSize = archive.readUInt32LE(localOffset + 18);
-  const localUncompressedSize = archive.readUInt32LE(localOffset + 22);
-  const localNameLength = archive.readUInt16LE(localOffset + 26);
-  const localExtraLength = archive.readUInt16LE(localOffset + 28);
-  const localNameOffset = localOffset + 30;
-  assertRange(archive, localNameOffset, localNameLength + localExtraLength, centralOffset);
-  const localName = archive.subarray(localNameOffset, localNameOffset + localNameLength);
-  if (localFlags !== flags || localMethod !== method || !localName.equals(centralName))
-    throw new Error('Preview recovery ZIP headers differ');
-  assertExtraFields(archive, localNameOffset + localNameLength, localExtraLength);
-  const dataOffset = localNameOffset + localNameLength + localExtraLength;
-  const dataEnd = dataOffset + compressedSize;
-  assertRange(archive, dataOffset, compressedSize, centralOffset);
-  const hasDataDescriptor = (flags & 0x0008) !== 0;
-  if (!hasDataDescriptor) {
-    if (
-      localCrc !== expectedCrc ||
-      localCompressedSize !== compressedSize ||
-      localUncompressedSize !== uncompressedSize ||
-      dataEnd !== centralOffset
-    )
-      throw new Error('Preview recovery ZIP headers differ');
-  } else {
-    if (
-      ![0, expectedCrc].includes(localCrc) ||
-      ![0, compressedSize].includes(localCompressedSize) ||
-      ![0, uncompressedSize].includes(localUncompressedSize)
-    )
-      throw new Error('Preview recovery ZIP headers differ');
-    const descriptorOffset = dataEnd;
-    assertRange(archive, descriptorOffset, 12, centralOffset);
-    const descriptorLength = centralOffset - descriptorOffset;
-    const descriptorHasSignature =
-      descriptorLength === 16 && archive.readUInt32LE(descriptorOffset) === 0x08074b50;
-    if (descriptorLength !== (descriptorHasSignature ? 16 : 12))
-      throw new Error('Invalid Preview recovery ZIP descriptor');
-    const descriptorStart = descriptorOffset + (descriptorHasSignature ? 4 : 0);
-    assertRange(archive, descriptorStart, 12, centralOffset);
-    if (
-      archive.readUInt32LE(descriptorStart) !== expectedCrc ||
-      archive.readUInt32LE(descriptorStart + 4) !== compressedSize ||
-      archive.readUInt32LE(descriptorStart + 8) !== uncompressedSize ||
-      descriptorStart + 12 !== centralOffset
-    )
-      throw new Error('Invalid Preview recovery ZIP descriptor');
-  }
-
-  const compressed = archive.subarray(dataOffset, dataEnd);
-  let content;
+    throw new Error();
+  const reader = response.body.getReader();
+  const chunks = [];
+  let size = 0;
   try {
-    content =
-      method === 0
-        ? Buffer.from(compressed)
-        : inflateRawSync(compressed, {
-            maxOutputLength: MAX_INTENT_BYTES,
-          });
-  } catch {
-    throw new Error('Invalid Preview recovery ZIP data');
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      size += value.byteLength;
+      if (size > 1_048_576) throw new Error();
+      chunks.push(value);
+    }
+  } finally {
+    await reader.cancel().catch(() => undefined);
+    reader.releaseLock();
   }
-  if (
-    content.length !== uncompressedSize ||
-    content.length > MAX_INTENT_BYTES ||
-    crc32(content) !== expectedCrc
-  )
-    throw new Error('Invalid Preview recovery ZIP checksum');
-  try {
-    return new TextDecoder('utf-8', { fatal: true }).decode(content);
-  } catch {
-    throw new Error('Invalid Preview recovery intent encoding');
-  }
+  const body = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+  if (!Array.isArray(body.jobs) || body.total_count !== body.jobs.length || body.jobs.length > 100)
+    throw new Error();
+  return body.jobs.some(
+    (job) => job?.name === 'Provision Preview fixtures' && job.conclusion !== 'skipped',
+  );
 }
 
 /** Download only the small, uniquely named public plan; no platform key is needed. */
@@ -258,14 +116,18 @@ export async function prepareCloudRecovery({
   download = downloadIntent,
   decode = decodePreviewIntentArtifactZip,
   verify = verifyPreviewRecoveryTrust,
+  readOnlyObserver = false,
 }) {
   const runId = number(sourceRunId);
   const attempt = number(sourceAttempt);
   if (
     env.GITHUB_REPOSITORY !== REPO ||
-    env.GITHUB_EVENT_NAME !== 'workflow_dispatch' ||
-    env.GITHUB_REF !== 'refs/heads/integration' ||
-    env.GITHUB_WORKFLOW_REF !== `${REPO}/.github/workflows/ci.yml@refs/heads/integration` ||
+    env.GITHUB_EVENT_NAME !== (readOnlyObserver ? 'workflow_run' : 'workflow_dispatch') ||
+    env.GITHUB_REF !== (readOnlyObserver ? 'refs/heads/main' : 'refs/heads/integration') ||
+    env.GITHUB_WORKFLOW_REF !==
+      (readOnlyObserver
+        ? `${REPO}/.github/workflows/preview-quarantine.yml@refs/heads/main`
+        : `${REPO}/.github/workflows/ci.yml@refs/heads/integration`) ||
     !env.GITHUB_TOKEN?.trim()
   )
     throw new Error();
@@ -323,16 +185,48 @@ export async function prepareCloudRecovery({
     sourceAttempt: String(attempt),
     intent,
     fetchImpl,
+    readOnlyObserver,
   });
   if (verified.artifactId !== artifacts[0].id || verified.digest !== artifacts[0].digest)
     throw new Error();
-  const result = { intent, artifactId: verified.artifactId, digest: verified.digest };
+  const result = {
+    intent,
+    artifactId: verified.artifactId,
+    digest: verified.digest,
+    ...(verified.recoveryMode === 'broker' ? { recoveryMode: 'broker' } : {}),
+  };
   mkdirSync(directory, { mode: 0o700, recursive: false });
   writeFileSync(join(directory, 'verified.json'), JSON.stringify(result), {
     mode: 0o600,
     flag: 'wx',
   });
   return result;
+}
+
+/** Stop before the credential-bearing recovery job. UNKNOWN evidence is safe to
+ * persist even when provider/Auth termination cannot be established. */
+export function admitLegacyRecovery(directory) {
+  const saved = readJson(join(directory, 'verified.json'));
+  if (saved.recoveryMode === undefined) return;
+  if (saved.recoveryMode !== 'broker') throw new Error();
+  const intent = validateCloudIntent(saved.intent);
+  writeFileSync(
+    join(directory, 'recovery.json'),
+    JSON.stringify({
+      sourceRunId: intent.sourceRunId,
+      sourceAttempt: intent.sourceAttempt,
+      runId: intent.runId,
+      request: intent.request,
+      status: 'unknown',
+      cleanupConfirmed: false,
+      quarantinePersisted: false,
+      reusable: false,
+      failure: 'fixture-termination-unverified',
+      users: [],
+    }),
+    { mode: 0o600, flag: 'wx' },
+  );
+  throw new Error('Prepared fixture recovery remains UNKNOWN');
 }
 
 /** Reuse exact-ID recovery without enumerating or exposing other Auth users. */
@@ -423,6 +317,14 @@ export async function executeCloudRecovery({
     });
     if (current.artifactId !== saved.artifactId || current.digest !== saved.digest)
       throw new Error();
+    if (current.recoveryMode !== saved.recoveryMode) throw new Error();
+    if (current.recoveryMode === 'broker') {
+      // Never route a durable/UNKNOWN fixture into the legacy delete-and-count
+      // recovery. The provider terminal / in-flight Auth fence is not proven.
+      result.status = 'unknown';
+      result.failure = 'fixture-termination-unverified';
+      throw new Error();
+    }
     const cleanup = await recover({ intent, directory, serviceKey: env.SUPABASE_SECRET_KEY });
     result.status = cleanup.status;
     result.cleanupConfirmed = cleanup.status === 'clean';
@@ -442,12 +344,43 @@ if (isDirectExecution(import.meta.url)) {
     const [operation, directory, ...rest] = process.argv.slice(2);
     if (
       rest.length ||
-      !['prepare', 'execute'].includes(operation) ||
+      !['prepare', 'execute', 'admit-legacy', 'observe-completed'].includes(operation) ||
       !process.env.RUNNER_TEMP ||
       resolve(directory ?? '') !== join(resolve(process.env.RUNNER_TEMP), 'preview-recovery')
     )
       throw new Error();
-    if (operation === 'prepare') {
+    if (operation === 'observe-completed') {
+      const event = readJson(process.env.GITHUB_EVENT_PATH, 1_048_576);
+      const source = event.workflow_run;
+      if (
+        event.action !== 'completed' ||
+        source?.status !== 'completed' ||
+        source.event !== 'workflow_dispatch' ||
+        source.head_branch !== 'integration' ||
+        event.repository?.full_name !== REPO ||
+        source.head_repository?.full_name !== REPO
+      )
+        throw new Error();
+      if (
+        await hasPreparedAttempt({
+          sourceRunId: source.id,
+          sourceAttempt: source.run_attempt,
+          token: process.env.GITHUB_TOKEN,
+        })
+      ) {
+        const saved = await prepareCloudRecovery({
+          directory,
+          sourceRunId: source.id,
+          sourceAttempt: source.run_attempt,
+          readOnlyObserver: true,
+        });
+        // An observer has no mutation command or provider credential path.
+        if (saved.recoveryMode === 'broker') admitLegacyRecovery(directory);
+        else throw new Error();
+      }
+    } else if (operation === 'admit-legacy') {
+      admitLegacyRecovery(directory);
+    } else if (operation === 'prepare') {
       await prepareCloudRecovery({
         directory,
         sourceRunId: process.env.PREVIEW_RECOVER_RUN,

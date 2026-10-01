@@ -288,7 +288,7 @@
   },
   {
     "name": "@modelcontextprotocol/sdk",
-    "version": "1.30.0",
+    "version": "1.30.1",
     "license": "MIT",
     "repository": "https://github.com/modelcontextprotocol/typescript-sdk.git",
     "publisher": "Anthropic, PBC (https://anthropic.com)"
@@ -383,13 +383,13 @@
   },
   {
     "name": "@posthog/browser-common",
-    "version": "0.8.3",
+    "version": "0.9.0",
     "license": "MIT",
     "repository": "https://github.com/PostHog/posthog-js.git"
   },
   {
     "name": "@posthog/core",
-    "version": "1.55.1",
+    "version": "1.55.2",
     "license": "MIT",
     "repository": "https://github.com/PostHog/posthog-js.git"
   },
@@ -719,14 +719,14 @@
   },
   {
     "name": "@sentry/browser",
-    "version": "10.74.0",
+    "version": "10.75.3",
     "license": "MIT",
     "repository": "git://github.com/getsentry/sentry-javascript.git",
     "publisher": "Sentry"
   },
   {
     "name": "@sentry/browser-utils",
-    "version": "10.74.0",
+    "version": "10.75.3",
     "license": "MIT",
     "repository": "git://github.com/getsentry/sentry-javascript.git",
     "publisher": "Sentry"
@@ -759,77 +759,77 @@
   },
   {
     "name": "@sentry/core",
-    "version": "10.74.0",
+    "version": "10.75.3",
     "license": "MIT",
     "repository": "git://github.com/getsentry/sentry-javascript.git",
     "publisher": "Sentry"
   },
   {
     "name": "@sentry/feedback",
-    "version": "10.74.0",
+    "version": "10.75.3",
     "license": "MIT",
     "repository": "git://github.com/getsentry/sentry-javascript.git",
     "publisher": "Sentry"
   },
   {
     "name": "@sentry/nextjs",
-    "version": "10.74.0",
+    "version": "10.75.3",
     "license": "MIT",
     "repository": "git://github.com/getsentry/sentry-javascript.git",
     "publisher": "Sentry"
   },
   {
     "name": "@sentry/node",
-    "version": "10.74.0",
+    "version": "10.75.3",
     "license": "MIT",
     "repository": "git://github.com/getsentry/sentry-javascript.git",
     "publisher": "Sentry"
   },
   {
     "name": "@sentry/node-core",
-    "version": "10.74.0",
+    "version": "10.75.3",
     "license": "MIT",
     "repository": "git://github.com/getsentry/sentry-javascript.git",
     "publisher": "Sentry"
   },
   {
     "name": "@sentry/opentelemetry",
-    "version": "10.74.0",
+    "version": "10.75.3",
     "license": "MIT",
     "repository": "git://github.com/getsentry/sentry-javascript.git",
     "publisher": "Sentry"
   },
   {
     "name": "@sentry/react",
-    "version": "10.74.0",
+    "version": "10.75.3",
     "license": "MIT",
     "repository": "git://github.com/getsentry/sentry-javascript.git",
     "publisher": "Sentry"
   },
   {
     "name": "@sentry/replay",
-    "version": "10.74.0",
+    "version": "10.75.3",
     "license": "MIT",
     "repository": "https://github.com/getsentry/sentry-javascript.git",
     "publisher": "Sentry"
   },
   {
     "name": "@sentry/replay-canvas",
-    "version": "10.74.0",
+    "version": "10.75.3",
     "license": "MIT",
     "repository": "https://github.com/getsentry/sentry-javascript.git",
     "publisher": "Sentry"
   },
   {
     "name": "@sentry/server-utils",
-    "version": "10.74.0",
+    "version": "10.75.3",
     "license": "MIT",
     "repository": "git://github.com/getsentry/sentry-javascript.git",
     "publisher": "Sentry"
   },
   {
     "name": "@sentry/vercel-edge",
-    "version": "10.74.0",
+    "version": "10.75.3",
     "license": "MIT",
     "repository": "git://github.com/getsentry/sentry-javascript.git",
     "publisher": "Sentry"
@@ -856,14 +856,14 @@
   },
   {
     "name": "@supabase/auth-js",
-    "version": "2.116.0",
+    "version": "2.117.2",
     "license": "MIT",
     "repository": "https://github.com/supabase/supabase-js.git",
     "publisher": "Supabase"
   },
   {
     "name": "@supabase/functions-js",
-    "version": "2.116.0",
+    "version": "2.117.2",
     "license": "MIT",
     "repository": "https://github.com/supabase/supabase-js.git",
     "publisher": "Supabase"
@@ -877,14 +877,14 @@
   },
   {
     "name": "@supabase/postgrest-js",
-    "version": "2.116.0",
+    "version": "2.117.2",
     "license": "MIT",
     "repository": "https://github.com/supabase/supabase-js.git",
     "publisher": "Supabase"
   },
   {
     "name": "@supabase/realtime-js",
-    "version": "2.116.0",
+    "version": "2.117.2",
     "license": "MIT",
     "repository": "https://github.com/supabase/supabase-js.git",
     "publisher": "Supabase"
@@ -898,14 +898,14 @@
   },
   {
     "name": "@supabase/storage-js",
-    "version": "2.116.0",
+    "version": "2.117.2",
     "license": "MIT",
     "repository": "https://github.com/supabase/supabase-js.git",
     "publisher": "Supabase"
   },
   {
     "name": "@supabase/supabase-js",
-    "version": "2.116.0",
+    "version": "2.117.2",
     "license": "MIT",
     "repository": "https://github.com/supabase/supabase-js.git",
     "publisher": "Supabase"
@@ -953,49 +953,49 @@
   },
   {
     "name": "@tanstack/query-core",
-    "version": "5.102.8",
+    "version": "5.104.0",
     "license": "MIT",
     "repository": "https://github.com/TanStack/query.git",
     "publisher": "tannerlinsley"
   },
   {
     "name": "@tanstack/query-persist-client-core",
-    "version": "5.102.8",
+    "version": "5.104.0",
     "license": "MIT",
     "repository": "https://github.com/TanStack/query.git",
     "publisher": "tannerlinsley"
   },
   {
     "name": "@tanstack/react-query",
-    "version": "5.102.8",
+    "version": "5.104.0",
     "license": "MIT",
     "repository": "https://github.com/TanStack/query.git",
     "publisher": "tannerlinsley"
   },
   {
     "name": "@tanstack/react-query-persist-client",
-    "version": "5.102.8",
+    "version": "5.104.0",
     "license": "MIT",
     "repository": "https://github.com/TanStack/query.git",
     "publisher": "tannerlinsley"
   },
   {
     "name": "@trpc/client",
-    "version": "11.18.0",
+    "version": "11.19.0",
     "license": "MIT",
     "repository": "https://github.com/trpc/trpc.git",
     "publisher": "KATT"
   },
   {
     "name": "@trpc/react-query",
-    "version": "11.18.0",
+    "version": "11.19.0",
     "license": "MIT",
     "repository": "https://github.com/trpc/trpc.git",
     "publisher": "KATT"
   },
   {
     "name": "@trpc/server",
-    "version": "11.18.0",
+    "version": "11.19.0",
     "license": "MIT",
     "repository": "https://github.com/trpc/trpc.git",
     "publisher": "KATT"
@@ -1032,13 +1032,13 @@
   },
   {
     "name": "@types/node",
-    "version": "24.13.3",
+    "version": "24.13.4",
     "license": "MIT",
     "repository": "https://github.com/DefinitelyTyped/DefinitelyTyped.git"
   },
   {
     "name": "@types/node",
-    "version": "24.13.4",
+    "version": "24.19.0",
     "license": "MIT",
     "repository": "https://github.com/DefinitelyTyped/DefinitelyTyped.git"
   },
@@ -1075,12 +1075,13 @@
   },
   {
     "name": "@upstash/ratelimit",
-    "version": "2.0.8",
-    "license": "MIT"
+    "version": "2.2.0",
+    "license": "MIT",
+    "repository": "https://github.com/upstash/ratelimit-js.git"
   },
   {
     "name": "@upstash/redis",
-    "version": "1.38.4",
+    "version": "1.39.0",
     "license": "MIT",
     "repository": "git@github.com:upstash/redis-js.git",
     "publisher": "Andreas Thomas <dev@chronark.com>"
@@ -1408,7 +1409,7 @@
   },
   {
     "name": "chokidar",
-    "version": "4.0.3",
+    "version": "5.0.0",
     "license": "MIT",
     "repository": "https://github.com/paulmillr/chokidar.git",
     "publisher": "Paul Miller (https://paulmillr.com)"
@@ -1764,7 +1765,7 @@
   },
   {
     "name": "engine.io",
-    "version": "6.6.9",
+    "version": "6.6.11",
     "license": "MIT",
     "repository": "https://github.com/socketio/socket.io.git",
     "publisher": "Guillermo Rauch <guillermo@learnboost.com>"
@@ -2145,7 +2146,7 @@
   },
   {
     "name": "icu-minify",
-    "version": "4.14.4",
+    "version": "4.14.7",
     "license": "MIT",
     "repository": "https://github.com/amannn/next-intl.git",
     "publisher": "Jan Amann <jan@amann.work>"
@@ -2179,7 +2180,7 @@
   },
   {
     "name": "ip-address",
-    "version": "10.4.0",
+    "version": "10.7.2",
     "license": "MIT",
     "repository": "https://github.com/beaugunderson/ip-address.git",
     "publisher": "Beau Gunderson <beau@beaugunderson.com> (https://beaugunderson.com/)"
@@ -2261,7 +2262,7 @@
   },
   {
     "name": "jose",
-    "version": "6.2.3",
+    "version": "6.2.12",
     "license": "MIT",
     "repository": "panva/jose",
     "publisher": "Filip Skokan <panva.ip@gmail.com>"
@@ -2529,14 +2530,14 @@
   },
   {
     "name": "next-intl",
-    "version": "4.14.4",
+    "version": "4.14.7",
     "license": "MIT",
     "repository": "https://github.com/amannn/next-intl.git",
     "publisher": "Jan Amann <jan@amann.work>"
   },
   {
     "name": "next-intl-swc-plugin-extractor",
-    "version": "4.14.4",
+    "version": "4.14.7",
     "license": "MIT",
     "repository": "https://github.com/amannn/next-intl.git",
     "publisher": "Jan Amann <jan@amann.work>"
@@ -2704,7 +2705,7 @@
   },
   {
     "name": "picomatch",
-    "version": "4.0.5",
+    "version": "4.0.7",
     "license": "MIT",
     "repository": "micromatch/picomatch",
     "publisher": "Jon Schlinkert (https://github.com/jonschlinkert)"
@@ -2752,7 +2753,7 @@
   },
   {
     "name": "postal-mime",
-    "version": "2.7.5",
+    "version": "2.7.6",
     "license": "MIT-0",
     "repository": "https://github.com/postalsys/postal-mime.git",
     "publisher": "Andris Reinman"
@@ -2779,14 +2780,14 @@
   },
   {
     "name": "posthog-js",
-    "version": "1.433.5",
+    "version": "1.434.15",
     "license": "(Apache-2.0 AND MIT)",
     "repository": "https://github.com/PostHog/posthog-js",
     "publisher": "engineering@posthog.com"
   },
   {
     "name": "posthog-node",
-    "version": "5.52.4",
+    "version": "5.54.1",
     "license": "MIT",
     "repository": "https://github.com/PostHog/posthog-js.git",
     "publisher": "PostHog"
@@ -2799,7 +2800,7 @@
   },
   {
     "name": "prettier",
-    "version": "3.9.6",
+    "version": "3.9.9",
     "license": "MIT",
     "repository": "prettier/prettier",
     "publisher": "James Long"
@@ -2900,13 +2901,13 @@
   },
   {
     "name": "react-email",
-    "version": "6.9.5",
+    "version": "6.11.0",
     "license": "MIT",
     "repository": "https://github.com/resend/react-email.git"
   },
   {
     "name": "react-hook-form",
-    "version": "7.88.0",
+    "version": "7.89.0",
     "license": "MIT",
     "repository": "https://github.com/react-hook-form/react-hook-form",
     "publisher": "Beier(Bill) Luo <bluebill1049@hotmail.com>"
@@ -2940,9 +2941,9 @@
   },
   {
     "name": "readdirp",
-    "version": "4.1.2",
+    "version": "5.1.1",
     "license": "MIT",
-    "repository": "git://github.com/paulmillr/readdirp.git",
+    "repository": "https://github.com/paulmillr/readdirp.git",
     "publisher": "Thorsten Lorenz <thlorenz@gmx.de> (thlorenz.com)"
   },
   {
@@ -2975,7 +2976,7 @@
   },
   {
     "name": "resend",
-    "version": "6.28.0",
+    "version": "6.30.0",
     "license": "MIT",
     "repository": "https://github.com/resend/resend-node.git"
   },
@@ -3178,7 +3179,7 @@
   },
   {
     "name": "standardwebhooks",
-    "version": "1.0.0",
+    "version": "1.1.1",
     "license": "MIT",
     "repository": "https://github.com/standard-webhooks/standard-webhooks",
     "publisher": "Standard Webhooks"
@@ -3258,7 +3259,7 @@
   },
   {
     "name": "tailwind-merge",
-    "version": "3.6.0",
+    "version": "3.7.0",
     "license": "MIT",
     "repository": "https://github.com/dcastil/tailwind-merge.git",
     "publisher": "Dany Castillo"
@@ -3372,6 +3373,12 @@
     "repository": "https://github.com/nodejs/undici.git"
   },
   {
+    "name": "undici-types",
+    "version": "7.24.6",
+    "license": "MIT",
+    "repository": "https://github.com/nodejs/undici.git"
+  },
+  {
     "name": "unpipe",
     "version": "1.0.0",
     "license": "MIT",
@@ -3394,7 +3401,7 @@
   },
   {
     "name": "use-intl",
-    "version": "4.14.4",
+    "version": "4.14.7",
     "license": "MIT",
     "repository": "https://github.com/amannn/next-intl.git",
     "publisher": "Jan Amann <jan@amann.work>"

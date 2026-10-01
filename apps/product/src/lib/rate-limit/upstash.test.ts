@@ -220,7 +220,8 @@ describe('Upstash Rate Limit', () => {
     const enabledModule = await import('./upstash');
     // #2024 で reauthRateLimit を追加（15 → 16）
     // #2721 で oauth-token の pre-body / refresh、tRPC の pre-auth 2 本、health を追加（16 → 21）
-    expect(constructorOptions).toHaveLength(21);
+    // cron heartbeat health route に global limiter を追加（21 → 22）
+    expect(constructorOptions).toHaveLength(22);
     for (const options of constructorOptions) {
       expect(options.analytics).toBe(false);
       expect(options.timeout).toBe(RATE_LIMIT_TIMEOUT_MS);

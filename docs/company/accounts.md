@@ -28,7 +28,7 @@ Dayopt が運用時に依存する外部サービスの索引。ここでは用�
 ## 更新ルール
 
 - 新しい runtime SaaS を導入したら、実装と同じ変更でこの表と関連する operations docs を更新する。
-- 解約や移行は行を黙って消さず、該当ドメインの `log/` に判断を残してから現行表を更新する。
+- 解約や移行は行を黙って消さず、[decision の手順](../../.agents/skills/decision/SKILL.md)に従い、[決定索引](../decisions.md)と該当する正本へ判断を残し、現行表を更新する。
 - 金額、workflow 数、プラン上限など変動する値をこのファイルへ複製しない。
 - 開発時だけ使う Context7、Storybook MCP などは runtime 契約に含めない。
 - Anthropic / OpenAI は product runtime 依存ではない（製品コードが API key を消費せず、AI 連携はユーザーが選ぶ MCP / API client 側で行う）。ただし開発・運用の契約としては本表に載せる。

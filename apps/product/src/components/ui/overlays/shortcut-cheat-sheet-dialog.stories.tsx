@@ -43,12 +43,6 @@ const CATALOG: ShortcutCatalog = {
     },
     {
       groupId: 'blocks',
-      labelKey: 'calendar.shortcuts.actions.copyBlock',
-      order: 220,
-      keys: ['Cmd+C'],
-    },
-    {
-      groupId: 'blocks',
       labelKey: 'calendar.shortcuts.actions.deleteBlock',
       order: 240,
       keys: ['Delete', 'Backspace'],
@@ -91,10 +85,10 @@ export const Search: Story = {
   play: async () => {
     const body = within(document.body);
     const input = await body.findByRole('searchbox', { name: 'ショートカットを検索' });
-    await userEvent.type(input, 'コピー');
+    await userEvent.type(input, '削除');
 
-    await expect(body.getByText('選択中のタイムブロックをコピー')).toBeInTheDocument();
-    await expect(body.queryByText('選択中のタイムブロックを削除')).not.toBeInTheDocument();
+    await expect(body.getByText('選択中のタイムブロックを削除')).toBeInTheDocument();
+    await expect(body.queryByText('タイムブロックを検索')).not.toBeInTheDocument();
   },
 };
 

@@ -26,13 +26,8 @@
  * behavior covered by unit tests and CI, and keeping them here put nearly every
  * product PR on the required side - which, combined with cloud sessions where
  * `Workflow` / `Agent` are disabled by default (#2472), stalled merges instead
- * of adding review. `review:full` remains a human-only attention label and
- * does not expand this machine-selected scope.
- *
- * Retreat condition for that call: see AGENTS.md §レビュー (the sentence
- * referencing #2489 / #2503) for when a PR must carry `review:full` by hand
- * even though nothing here re-checks it. Described once there, not
- * duplicated here, to avoid two sources of truth drifting apart.
+ * of adding review. User confirmation for deleting or skipping time-related
+ * tests is recorded on the PR under AGENTS.md §レビュー.
  *
  * Usage:
  *   printf '%s\n' file1 file2 | node scripts/ci/protected-path-gate.mjs --stdin

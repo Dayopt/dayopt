@@ -480,3 +480,91 @@ describe('Preview Cloud recovery trust gate', () => {
     ).rejects.toMatchObject({ message: 'Preview Cloud trust: GitHub read failed' });
   });
 });
+
+describe('prepared fixture interruption before E2E', () => {
+  it.each(['cancelled', 'success'])(
+    'authenticates started provision (%s) even when candidate execution never started',
+    async (conclusion) => {
+      const prepared = structuredClone(jobs);
+      prepared[1]!.name = 'Provision Preview fixtures';
+      prepared[1]!.conclusion = conclusion;
+      prepared[1]!.steps![0]!.conclusion = conclusion;
+      prepared[1]!.steps![0]!.name = 'Provision encrypted Preview fixtures';
+      const { fetchImpl } = githubWorld({ jobs: { total_count: prepared.length, jobs: prepared } });
+      const result = await verifyPreviewRecoveryTrust({ ...context, fetchImpl });
+      expect(result).toMatchObject({ intent, recoveryMode: 'broker' });
+    },
+  );
+  it('rejects mixed legacy and prepared execution in the same attempt', async () => {
+    const prepared = structuredClone(jobs[1]!);
+    prepared.name = 'Provision Preview fixtures';
+    prepared.steps![0]!.name = 'Provision encrypted Preview fixtures';
+    const { fetchImpl } = githubWorld({
+      jobs: { total_count: jobs.length + 1, jobs: [...jobs, prepared] },
+    });
+    await expect(verifyPreviewRecoveryTrust({ ...context, fetchImpl })).rejects.toThrow();
+  });
+});
+
+describe('read-only default-branch interruption observer', () => {
+  it('authenticates the original completed attempt without changing its Integration authority', async () => {
+    const prepared = structuredClone(jobs);
+    prepared[1]!.name = 'Provision Preview fixtures';
+    prepared[1]!.steps![0]!.name = 'Provision encrypted Preview fixtures';
+    const { fetchImpl } = githubWorld({ jobs: { total_count: prepared.length, jobs: prepared } });
+    expect(
+      await verifyPreviewRecoveryTrust({
+        ...context,
+        eventName: 'workflow_run',
+        ref: 'refs/heads/main',
+        readOnlyObserver: true,
+        fetchImpl,
+      }),
+    ).toMatchObject({ intent, recoveryMode: 'broker' });
+  });
+  it('does not let observer context authorize the existing mutation recovery mode', async () => {
+    const { fetchImpl } = githubWorld();
+    await expect(
+      verifyPreviewRecoveryTrust({
+        ...context,
+        eventName: 'workflow_run',
+        ref: 'refs/heads/main',
+        fetchImpl,
+      }),
+    ).rejects.toThrow();
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+  it.each(['pull_request', 'workflow_dispatch'])(
+    'rejects %s on the observer-only path',
+    async (eventName) => {
+      const { fetchImpl } = githubWorld();
+      await expect(
+        verifyPreviewRecoveryTrust({
+          ...context,
+          eventName,
+          ref: 'refs/heads/main',
+          readOnlyObserver: true,
+          fetchImpl,
+        }),
+      ).rejects.toThrow();
+      expect(fetchImpl).not.toHaveBeenCalled();
+    },
+  );
+});
+
+it('ignores an unstarted skipped prepared job when recovering a legacy shared attempt', async () => {
+  const skipped = {
+    name: 'Provision Preview fixtures',
+    status: 'completed',
+    conclusion: 'skipped',
+    steps: [],
+  };
+  const { fetchImpl } = githubWorld({
+    jobs: { total_count: jobs.length + 1, jobs: [...jobs, skipped] },
+  });
+  expect(await verifyPreviewRecoveryTrust({ ...context, fetchImpl })).toEqual({
+    intent,
+    artifactId,
+    digest,
+  });
+});

@@ -2,13 +2,19 @@ import { createHash } from 'node:crypto';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { deflateRawSync } from 'node:zlib';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { createPreviewArtifactZip as createZip } from '../__tests__/helpers/preview-artifact-zip';
+import {
+  decodePreviewArtifactZip,
+  decodeVerifiedPreviewArtifactZip,
+} from '../lib/preview-artifact-zip.mjs';
 import { recoverPreviewUsers } from '../runbook/preview-cleanup.mjs';
 import { createCloudIntent } from './preview-cloud-intent.mjs';
 import {
+  admitLegacyRecovery,
   decodePreviewIntentArtifactZip,
   executeCloudRecovery,
+  hasPreparedAttempt,
   prepareCloudRecovery,
   recoverCloudIntent,
 } from './preview-cloud-recovery.mjs';
@@ -35,71 +41,6 @@ const request = {
   supabaseBranchId: '4c2ed092-cba3-4f37-98e1-78f61cdf52ed',
 };
 const intent = createCloudIntent({ request, env });
-function crc32(data: Buffer) {
-  let crc = 0xffffffff;
-  for (const byte of data) {
-    crc ^= byte;
-    for (let bit = 0; bit < 8; bit++) crc = (crc >>> 1) ^ (crc & 1 ? 0xedb88320 : 0);
-  }
-  return (crc ^ 0xffffffff) >>> 0;
-}
-function createZip(
-  entries: Array<{ name: string; data: Buffer | string; flags?: number; mode?: number }>,
-) {
-  const locals: Buffer[] = [];
-  const centrals: Buffer[] = [];
-  let offset = 0;
-  for (const entry of entries) {
-    const data = Buffer.isBuffer(entry.data) ? entry.data : Buffer.from(entry.data);
-    const name = Buffer.from(entry.name);
-    const method = 8;
-    const flags = entry.flags ?? 0x0008;
-    const compressed = deflateRawSync(data);
-    const checksum = crc32(data);
-    const local = Buffer.alloc(30);
-    local.writeUInt32LE(0x04034b50, 0);
-    local.writeUInt16LE(20, 4);
-    local.writeUInt16LE(flags, 6);
-    local.writeUInt16LE(method, 8);
-    if ((flags & 0x0008) === 0) {
-      local.writeUInt32LE(checksum, 14);
-      local.writeUInt32LE(compressed.length, 18);
-      local.writeUInt32LE(data.length, 22);
-    }
-    local.writeUInt16LE(name.length, 26);
-    const descriptor = Buffer.alloc((flags & 0x0008) === 0 ? 0 : 16);
-    if (descriptor.length) {
-      descriptor.writeUInt32LE(0x08074b50, 0);
-      descriptor.writeUInt32LE(checksum, 4);
-      descriptor.writeUInt32LE(compressed.length, 8);
-      descriptor.writeUInt32LE(data.length, 12);
-    }
-    locals.push(local, name, compressed, descriptor);
-
-    const central = Buffer.alloc(46);
-    central.writeUInt32LE(0x02014b50, 0);
-    central.writeUInt16LE(0x0314, 4);
-    central.writeUInt16LE(20, 6);
-    central.writeUInt16LE(flags, 8);
-    central.writeUInt16LE(method, 10);
-    central.writeUInt32LE(checksum, 16);
-    central.writeUInt32LE(compressed.length, 20);
-    central.writeUInt32LE(data.length, 24);
-    central.writeUInt16LE(name.length, 28);
-    central.writeUInt32LE(((entry.mode ?? 0o100644) << 16) >>> 0, 38);
-    central.writeUInt32LE(offset, 42);
-    centrals.push(central, name);
-    offset += local.length + name.length + compressed.length + descriptor.length;
-  }
-  const centralDirectory = Buffer.concat(centrals);
-  const end = Buffer.alloc(22);
-  end.writeUInt32LE(0x06054b50, 0);
-  end.writeUInt16LE(entries.length, 8);
-  end.writeUInt16LE(entries.length, 10);
-  end.writeUInt32LE(centralDirectory.length, 12);
-  end.writeUInt32LE(offset, 16);
-  return Buffer.concat([...locals, centralDirectory, end]);
-}
 const intentJson = Buffer.from(JSON.stringify(intent));
 const intentArchive = createZip([{ name: 'intent.json', data: intentJson }]);
 const artifactDigest = `sha256:${createHash('sha256').update(intentArchive).digest('hex')}`;
@@ -140,6 +81,60 @@ function prepare() {
   };
 }
 describe('Cloud recovery plan intake', () => {
+  it('checks the raw archive digest before interpreting handoff ZIP bytes', () => {
+    const archive = createZip([{ name: 'envelope.json', data: '{"encrypted":true}' }]);
+    const digest = `sha256:${createHash('sha256').update(archive).digest('hex')}`;
+    expect(decodeVerifiedPreviewArtifactZip({ archive, digest, kind: 'envelope' })).toBe(
+      '{"encrypted":true}',
+    );
+    const corrupt = Buffer.from(archive);
+    corrupt[0] ^= 0xff;
+    expect(() =>
+      decodeVerifiedPreviewArtifactZip({ archive: corrupt, digest, kind: 'envelope' }),
+    ).toThrow('Preview artifact archive digest differs');
+    expect(() =>
+      decodeVerifiedPreviewArtifactZip({ archive, digest: 'SECRET', kind: 'envelope' }),
+    ).toThrow('Preview artifact archive digest differs');
+  });
+  it.each([
+    ['public-key', 'public-key.json', 32_768],
+    ['envelope', 'envelope.json', 49_152],
+  ] as const)(
+    'decodes bounded %s handoff JSON without widening the intent decoder',
+    (kind, name, limit) => {
+      const data = JSON.stringify('a'.repeat(limit - 2));
+      const archive = createZip([{ name, data }]);
+      expect(decodePreviewArtifactZip(archive, kind)).toBe(data);
+      expect(() => decodePreviewIntentArtifactZip(archive)).toThrow();
+      expect(() =>
+        decodePreviewArtifactZip(createZip([{ name, data: data + ' ' }]), kind),
+      ).toThrow();
+      expect(() =>
+        decodePreviewArtifactZip(createZip([{ name: `../${name}`, data }]), kind),
+      ).toThrow();
+      expect(() =>
+        decodePreviewArtifactZip(createZip([{ name, data, mode: 0o120777 }]), kind),
+      ).toThrow();
+      expect(() =>
+        decodePreviewArtifactZip(
+          createZip([
+            { name, data },
+            { name: 'extra.json', data: '{}' },
+          ]),
+          kind,
+        ),
+      ).toThrow();
+    },
+  );
+  it('does not accept arbitrary archive kinds or larger recovery intents', () => {
+    expect(() => decodePreviewArtifactZip(intentArchive, 'constructor')).toThrow();
+    expect(() => decodePreviewArtifactZip(intentArchive, '../intent')).toThrow();
+    expect(() =>
+      decodePreviewIntentArtifactZip(
+        createZip([{ name: 'intent.json', data: 'a'.repeat(16_385) }]),
+      ),
+    ).toThrow();
+  });
   it('retrieves only the uniquely named public intent and rechecks its immutable metadata', async () => {
     const s = prepare();
     expect(await prepareCloudRecovery(s)).toEqual(proof);
@@ -238,6 +233,71 @@ describe('Cloud recovery plan intake', () => {
   });
 });
 describe('Cloud recovery after worker loss', () => {
+  it('repeats recovery from the durable intent without touching another run', async () => {
+    const foreignId = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+    const foreignUser = {
+      id: foreignId,
+      email: `critical-path-${foreignId}@example.com`,
+      app_metadata: { e2e_run_id: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd' },
+    };
+    const users = new Map([
+      [
+        intent.userIds.desktop,
+        {
+          id: intent.userIds.desktop,
+          email: `critical-path-${intent.userIds.desktop}@example.com`,
+          app_metadata: { e2e_run_id: intent.runId },
+        },
+      ],
+      [foreignId, foreignUser],
+    ]);
+    const fetchImpl = vi.fn<typeof fetch>(async (input, options) => {
+      const url = new URL(
+        typeof input === 'string' ? input : input instanceof URL ? input : input.url,
+      );
+      const userId = url.pathname.split('/').at(-1)!;
+      if (!Object.values(intent.userIds).includes(userId)) throw new Error('unexpected user');
+      if (options?.method === 'DELETE') {
+        users.delete(userId);
+        return new Response('{}', { status: 200 });
+      }
+      const user = users.get(userId);
+      return new Response(JSON.stringify(user ?? {}), { status: user ? 200 : 404 });
+    });
+    const authenticate = vi.fn(async () => undefined);
+    const recover = (options: {
+      evidenceDirectory: string;
+      runId: string;
+      supabaseProjectRef: string;
+      serviceKey: string;
+    }) => recoverPreviewUsers({ ...options, fetchImpl });
+    const first = await recoverCloudIntent({
+      intent,
+      directory: temp(),
+      serviceKey: 'sb_secret_dummy',
+      authenticate,
+      recover,
+    });
+    expect(first).toMatchObject({ status: 'clean', checked: 2, recovered: 1 });
+    expect(first.users.every((user) => user.status === 'deleted')).toBe(true);
+    expect(fetchImpl.mock.calls.filter((call) => call[1]?.method === 'DELETE')).toHaveLength(1);
+    expect(users.get(foreignId)).toEqual(foreignUser);
+
+    fetchImpl.mockClear();
+    const second = await recoverCloudIntent({
+      intent,
+      directory: temp(),
+      serviceKey: 'sb_secret_dummy',
+      authenticate,
+      recover,
+    });
+    expect(second).toMatchObject({ status: 'clean', checked: 2, recovered: 0 });
+    expect(second.users.every((user) => user.status === 'deleted')).toBe(true);
+    expect(fetchImpl.mock.calls).toHaveLength(2);
+    expect(fetchImpl.mock.calls.every((call) => call[1]?.method === 'GET')).toBe(true);
+    expect(authenticate).toHaveBeenCalledTimes(2);
+    expect([...users.entries()]).toEqual([[foreignId, foreignUser]]);
+  });
   it('recovers partial creation without the lost journal, using only two precommitted IDs', async () => {
     const directory = temp();
     const authenticate = vi.fn(async () => undefined);
@@ -305,4 +365,72 @@ describe('Cloud recovery after worker loss', () => {
     expect(recover).not.toHaveBeenCalled();
     expect(readFileSync(join(directory, 'recovery.json'), 'utf8')).not.toContain('PRIVATE_');
   });
+});
+
+it('keeps interrupted prepared fixtures UNKNOWN without reading an admin key or legacy deletion', async () => {
+  const directory = temp();
+  const prepared = { ...proof, recoveryMode: 'broker' };
+  writeFileSync(join(directory, 'verified.json'), JSON.stringify(prepared));
+  const recover = vi.fn();
+  const keyRead = vi.fn(() => {
+    throw new Error('SECRET_MUST_NOT_BE_READ');
+  });
+  const selectedEnv = { ...env };
+  Object.defineProperty(selectedEnv, 'SUPABASE_SECRET_KEY', { get: keyRead });
+  const result = await executeCloudRecovery({
+    directory,
+    env: selectedEnv,
+    verify: async () => prepared,
+    recover,
+  });
+  expect(result).toMatchObject({
+    status: 'unknown',
+    cleanupConfirmed: false,
+    failure: 'fixture-termination-unverified',
+    users: [],
+  });
+  expect(recover).not.toHaveBeenCalled();
+  expect(keyRead).not.toHaveBeenCalled();
+  expect(readFileSync(join(directory, 'recovery.json'), 'utf8')).not.toContain('SECRET');
+});
+
+it('writes UNKNOWN before the workflow can inject recovery credentials', () => {
+  const directory = temp();
+  writeFileSync(
+    join(directory, 'verified.json'),
+    JSON.stringify({ ...proof, recoveryMode: 'broker' }),
+  );
+  expect(() => admitLegacyRecovery(directory)).toThrow('Prepared fixture recovery remains UNKNOWN');
+  expect(JSON.parse(readFileSync(join(directory, 'recovery.json'), 'utf8'))).toMatchObject({
+    status: 'unknown',
+    cleanupConfirmed: false,
+    request: intent.request,
+  });
+});
+
+it.each(['absent', 'skipped', 'cancelled'])(
+  'independent observer only selects a prepared source (%s)',
+  async (mode) => {
+    const jobs =
+      mode === 'absent' ? [] : [{ name: 'Provision Preview fixtures', conclusion: mode }];
+    const fetchImpl = vi.fn(async () => Response.json({ total_count: jobs.length, jobs }));
+    expect(
+      await hasPreparedAttempt({
+        sourceRunId: '123',
+        sourceAttempt: '1',
+        token: 'synthetic',
+        fetchImpl,
+      }),
+    ).toBe(mode === 'cancelled');
+  },
+);
+it('observer applicability rejects incomplete API listings instead of claiming no fixtures', async () => {
+  await expect(
+    hasPreparedAttempt({
+      sourceRunId: '123',
+      sourceAttempt: '1',
+      token: 'synthetic',
+      fetchImpl: async () => Response.json({ total_count: 2, jobs: [] }),
+    }),
+  ).rejects.toThrow();
 });

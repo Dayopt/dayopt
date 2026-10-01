@@ -24,13 +24,9 @@ import { api } from '@/lib/trpc';
  * （`resolveTimeblockDestination` と同じ規則。Plan は時間軸のどこにでも置けるが、
  * 終了済みの ghost を Plan にしても意味がないため Record へ寄せる）。メニュー UI は不要。
  *
- * **二重変換防止は `external_calendar_event_id` 専用の unique 制約ではなく、
- * `plans_no_overlap` / `records_no_overlap` EXCLUDE 制約（`user_id` + 時間帯の重複防止）の
- * 副作用として成立している**（risk-reviewer 指摘、PR review）。同じ ghost を変換すると常に
- * 同じ `start_at`/`end_at` を複製するため、同時に複数リクエストが飛んでも後発は必ず時間帯が
- * 重複し `TIME_OVERLAP` で弾かれる。ただし overlap 制約の意味論が将来変わると、この副作用も
- * 静かに失われる。恒久的な保証にする場合は `external_calendar_event_id` への
- * partial unique index（`deleted_at IS NULL`）を別途検討する。
+ * 二重変換は各 table の有効な外部予定参照の unique index で防ぐ。時間を移動した後も
+ * 同じ外部予定への2件目の参照は拒否される。競合理由の通知と Dayopt 側の rollback /
+ * 再取得は共有 mutation に任せ、この hook は ghost 側を再取得する。
  */
 function isPastGhost(event: ExternalCalendarEvent): boolean {
   return event.endDate.getTime() <= Date.now();
@@ -120,7 +116,7 @@ export function useConvertGhostEvent() {
           // 二重変換 race（TIME_OVERLAP 等）を含め、失敗時は ghost 一覧を再取得して
           // 実際の DB 状態に合わせる（optimistic 除去のロールバックはこの invalidate が兼ねる）。
           invalidateGhosts();
-          toast.error(t('calendar.external.toast.convertFailed'));
+          // create mutation が理由に応じた通知を出す。ここで汎用トーストを重ねない。
         },
       });
     },

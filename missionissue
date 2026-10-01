@@ -1,0 +1,174 @@
+# テスト耐性ミッション
+
+記録者: Codex / 2026-09-29
+対象: `5b93a735d5f97d1ec090b29907d5572b1156bcf6` + 本ブランチのテスト・検査 script。
+ブランチ: `codex/test-mutation-evidence`
+
+## 判定
+
+**一部達成。リポジトリ全体を「どこを壊しても必ず落ちる」とは保証しない。**
+有限の20試行は、選んだ20変更の検出証拠であり、全変更・全APIの保証ではない。
+
+| 達成条件 | 判定 | 証拠・最も近づいた状態 |
+| --- | --- | --- |
+| issues/ の conflict 各件に修正前 red / 修正後 green | 未達・入力欠落 | checkout に `issues/` がない。`git ls-files` と filesystem の両方を調査し、対応する conflict 本文・修正前版を特定できなかった。空集合として達成扱いにせず、GitHub Issue やコード中の conflict を勝手に代用しなかった。 |
+| 全公開関数・全 endpoint に正常系 / 異常系各1本 | 未達 | 構文上の公開関数候補 2,015、endpoint候補 101 を列挙。関数単位の正常・異常 assertion の完全な対応表は未作成。隣接 test のない候補は 912 → 900（別ファイル・integration での網羅を否定する値ではない）。新たに時刻範囲・重複入力・billing の status / price / plan にテストを追加。 |
+| 主要モジュール20箇所を無作為に壊し20回落ちる | 達成（指定した母集団） | **20/20検出**、baseline / 復元後328ケース成功・skip 0。seed `20260929`、事前列挙した演算子323箇所から重複なしで20箇所。最初の選択を変えず不足テストを追加。 |
+| 各 test の冒頭に守る対象を1行記載 | 新規分のみ達成、全件は未達 | 追加27宣言・展開後53ケースには `// 守ること:` を配置。既存を含む6,437宣言候補のうち5,934は callback 冒頭のコメント未検出。外側コメントや test 名だけを達成とは数えていない。 |
+
+未達理由: conflict の要求・修正前資料が欠落している。API 全件の正常系/異常系を意味に沿って対応付ける作業、既存内部 mock の境界への置換、既存 test の目的確認は完了していない。単純な隣接ファイル検査やコメント自動挿入を代用せず、未確認のまま残す。全件の達成を宣言できないため、ユーザー指定の未達終了形式で証拠と残件を残す。
+
+## 壊してもテストが落ちなかった箇所
+
+最初の試行は **18/20 検出**（baseline / 復元後とも292ケース成功、skip 0）。次の2箇所が生存した。
+
+1. `apps/product/src/features/timeblock/domain/plan-template-anchor.ts:78`
+   - `wallAsUtcMs - MS_PER_DAY` → `wallAsUtcMs + MS_PER_DAY`。
+   - 前日 offset の候補が消え、Casablanca 2025-02-23 02:30 の早い instant `01:30Z` が `02:30Z` になる。探索時には Anchorage の fold にも差が出た（探索は実機TZ、最終試行はTZ=UTC）。最終試行のredはCasablancaの1ケース。
+   - 追加: `plan-template-anchor.test.ts` の Casablanca / Anchorage 各1ケース。Intl でも早い/遅い2 instant が同じ壁時計を表すことを確認し、早い方の ISO 値を assertion。
+   - 調査では2025年の260 timezone遷移周辺・74,880入力を比較して差分276件を発見。この比較は候補発見用であり、元実装の出力を正解とする test は追加していない。
+2. `apps/product/src/lib/time/time-conflict.ts:38`
+   - `firstStartMs == null || firstEndMs == null` の `||` → `&&`。
+   - 開始だけ欠損すると null が数値比較で epoch 0 のように評価され、重複と誤判定する。
+   - 追加: `time-conflict.test.ts`。null / undefined / 不正文字列 / Invalid Date を各端点へ独立に与え、false を確認。
+
+上記はいずれも**既存の正常実装に対するテスト不足**。本番コードの不具合修正と偽らず、隔離コピーへ不具合を注入し、追加testがred、元へ復元してgreenを確認した。
+
+## 実験方法と制約
+
+- 対象母集団: `lib/time`、`features/timeblock/domain`、`features/calendar/domain`、`packages/billing/src`。認証・全 endpoint・DB・web UI を含む全 repo からの一様抽出ではない。
+- TypeScript AST の比較・論理・算術二項演算子を置換。Fisher–Yates + 固定 seed。候補数、選択、行番号、式、元ファイル SHA-256 を記録。
+- 作業中 checkout は壊さず、OS の一時ディレクトリへコピー。1変更ずつ試し、finally で復元。最後に無変更 suite を再実行。一時コピーは終了時削除。
+- 専用 Vitest 設定は setupFiles が空。選択対象 domain の既存・追加 test は内部mockなし。フレームワーク hook を同時 import する `calendar-query-input.test.ts` はこの純粋関数 suite の対象外と明記して除外。
+- assertion failure を確認したものだけ killed。import/収集エラー・timeout を成功に数えない。最終 runner は baseline と同数のケースが実行され、skip/runtime error がないことも必要とする。
+- 追加E2E **0本**。追加mock **0箇所**。既存の全 suite には内部mockが残存するため、repo全体でこの制約へ移行済みとは主張しない。
+- DB・外部API・production・課金の変更なし。既存の integration 環境へは接続していない。
+- `issues/` / 既存 `missionissue` / Issue番号の指定がないため、`pnpm ctx <N>` の N は推測せず、本ファイルを要求と証拠の保存先にした。
+
+## 再現コマンド
+
+Node 24 を使用する。
+
+```sh
+export PATH=/opt/homebrew/opt/node@24/bin:$PATH
+node scripts/runbook/mission-inventory.mjs
+node scripts/runbook/mission-mutations.mjs artifacts/test-mission/replay 20260929
+pnpm check
+```
+
+Mutation script は baseline不成立・survivor・inconclusive があれば非ゼロ終了。生成先には `selection.json`、各試行の Vitest JSON / log、`report.json` を残す。削除されるのは一時コピーだけ。
+
+- [棚卸しスナップショット](mission-evidence/inventory.json): 構文上の候補。re-export / wrapper / class・object method / 動的endpoint / Deno.serve は完全解決しておらず、網羅性の証明に使わない。
+- 生ログ: `artifacts/test-mission/`（gitignored）。コミット対象の要約証拠は `mission-evidence/` に保持する。
+
+## 検証結果（初回終了時点）
+
+- `node scripts/runbook/mission-mutations.mjs artifacts/test-mission/final`: **exit 0、20/20 killed**。無変更baseline328 passed、復元後328 passed、skip 0。元ソースSHA-256は全選択箇所で一致。
+- [全20件の修正前・中間・最終の証拠](mission-evidence/mutations.json): mutation、場所、元SHA、成功/失敗件数、失敗test名とassertion抜粋を保存。18/20 → 19/20 → 20/20。
+- 実行環境: Node v24.19.0、ICU78.3、tzdata2026a。専用 suite は TZ=UTC。
+- `pnpm check` 初回: static/typecheck/lintは通過。Productで1 file / 2 tests failed、435 files / 4,329 tests passed。後続web/scriptsは連鎖停止。
+- 既存 `plan-template-service.test.ts` の `recordRows` が2026-09-01固定で、実時計の直近28日から外れていた。対象testと実装は着手HEADから無変更だったことをdiffで確認し、単独実行でも **2 failed / 8 passed** を再現。
+- fixtureを実行日の7日前に変更（Date/内部ロジックのmock追加なし）。**同じ単独コマンドで10 passed** に回復。期待値は緩和していない。既存の内部mockが残るこのsuiteの結果を、mock制約を満たすAPI全件証拠には数えない。
+
+```sh
+pnpm --filter @dayopt/product exec vitest run --project unit src/features/timeblock/server/plan-template-service.test.ts --maxWorkers=1
+```
+
+再実行2回目は Product 436 files / 4,331 tests、Web 50 files / 366 tests が成功したが、scriptsが8件失敗した。
+
+- 新規scriptの未参照・非標準配置: `scripts/runbook/` と手順書へ移して修正。
+- 棚卸しJSONをdocs配下に置くと、列挙したscript名を「手順書から参照されている」と分類して既存libの分類を変えるため、証拠を root `mission-evidence/` へ移動。分類規則や既存期待値は緩和していない。
+- `resolveWorkspaceTestScope` の6件は廃止済み `packages/domain` に `.turbo` のログ2ファイルだけが残り、manifest欠落としてfail closedになったため。作業前から存在したキャッシュを `artifacts/test-mission/obsolete-domain-cache` へ可逆に退避。コード・package manifest・既存の認可境界は変更していない。
+
+最終20試行は移動前の `scripts/quality/mission-mutations.mjs` で実行した。現在の再現コマンドは同一内容を移動した `scripts/runbook/mission-mutations.mjs`。ソースコードの変更を再試行なしに成功扱いしたものではない。
+
+初回終了時点の `pnpm check`: **exit 0**。secrets / typecheck / lint / static / deadcode / test を完走。
+
+| suite | files passed | tests passed |
+| --- | ---: | ---: |
+| billing | 5 | 37 |
+| i18n | 1 | 2 |
+| observability | 7 | 64 |
+| Product | 436 | 4,331 |
+| Web | 50 | 366 |
+| scripts | 110 | 2,624 |
+| 合計 | 609 | 7,424 |
+
+`git diff --check` 成功。CI・実DB integration・E2E・pre-push は未実行。push / PR / ready化は行っていない。
+全公開APIの意味的網羅はこの全体成功から推定せず、判定表の未達を維持する。
+
+
+## PR・マージに向けた追加検証（2026-09-29）
+
+ユーザーから継続作業とPR・マージの許可を受領。main `0bcdb8641` を取り込んだ。
+先の終了時点の結果は履歴として保持し、今回の差分・実測と区別する。
+
+- 破壊試行の判定関数にも17ケースを追加。候補不足、seed不正、同一位置の重複、収集エラー、skip、中断、起動失敗、終了コードだけの偽成功、baseline不成立、test名の入れ替わり、ソースSHA/位置のずれ、無変更mutationを拒否する。
+- 件数だけでなくsuite名とtest名を照合。復元後にも同一の全testが成功したことを要求する。
+- 強化後のrunnerでも同じ20箇所で20/20検出、baseline/復元後とも328成功・skipなし。
+- [17公開関数の正常系・異常系対応表](mission-evidence/contracts.json)を追加。全公開APIや全endpointの網羅へ一般化しない。
+- 全体の意味的なAPI網羅と既存test全件の目的追記は引き続き未完了。`issues/` の欠落は最新mainでも確認した。他担当のMission #2963をこの依頼のconflict一覧へ読み替えず、変更・closeもしない。
+- 適用範囲のprotected-path判定は `required:false` / `auditContract:false`。追加reviewerは起動せず、self reviewとmain rulesetを満たして進める。
+
+
+追加の全体検証では、既存の `production-operations-audit.test.ts` のGitHub CLI代役が
+`--input -` の標準入力を消費せず、パイプ側がSIGPIPE（exit 141）になる非決定的失敗を検出した。
+境界の代役が入力を読み切るように修正し、作成時のIssue URLも返し、対象Issue番号と優先度JSONをassertした。
+本番workflowの変更・外部API呼び出しはない。対象3 files / 37 tests（通知18、判定器17、配置規則2）が成功。
+
+
+### PR #2966 の検証
+
+- Draft PR: https://github.com/Dayopt/dayopt/pull/2966
+- 検証対象コード: `4be4e4b2487aac12a1cf55908aaa94355bcf41ec`。Node24の `pnpm check` が exit 0、610 files / **7,441 tests passed**（Product4,331 / Web366 / scripts2,641 / billing37 / i18n2 / observability64）。skipなし。
+- pre-pushも成功し、対象ブランチをpush済み。gitleaks、整形、対象ESLintを含むcommit hookも通過。
+- 強化後runner: **20/20検出**。baseline/復元後328ケース、全test identity一致。証拠は `mission-evidence/mutations.json` の `verifiedRunner`。
+- この追記は検証済みコードに対する証拠更新。GitHub必須チェック・mergeの最終状態はPR側の当該headのcheckとmerge commitを正本とする。未達条件を達成へ変更しない。
+
+## Issueを前提にしない継続作業（2026-09-29）
+
+ユーザーの「Issueになくてもいい。ベストを尽くして」を受領。
+以降は `issues/` の欠落を作業停止理由にせず、実装の契約と実測から補強する。
+存在しないconflictの一覧を捏造せず、新たに発見した問題のred/greenを記録する。
+
+### 追加した保護
+
+- `activities` の全13 procedureについて、正常系・未認証・MFA未完了・公開OAuth拒否を網羅。書込10件にはwrite fence、更新/削除8件には他ユーザーID、作成/編集8件には利用権切れを追加。入力型、UUID、名前、enum、アーカイブ先への割当、DB一意制約のエラー変換も検査。**106ケース**。
+- 実Router・middleware・Service・Supabase clientを通し、DBのHTTP通信だけを代替する。アプリの所有者filterが抜けたときにfixture側のRLSが隠さない設計。これは実DBのRLS/FKやcookie/token検証の証明ではない。
+- テンプレートの4公開schemaに**25ケース**。0/1439分、端数/非有限値、名前100文字・タイトル200文字、1〜50ブロック、UUID、日付形式を検査。
+- 追加testのcallback先頭にはすべて「守ること」を明記。新規E2E **0件**、内部業務ロジックのmock **0件**。共通setupの既存server-only marker等は既存設定のまま。
+
+### 新たに発見・修正した検証ツールの問題
+
+`classifyMutationRun` が、Vitestの `.rejects` / `.resolves` による
+「Promiseが期待と逆に成功/失敗した」assertionを `inconclusive` にしていた。
+拒否の必要な認可を壊した場合、test自体は落ちるのに判定器が検出と分類できなかった。
+
+- 対象: `scripts/lib/mutation-evidence.test.ts`、正常/否定を3ケース追加。
+- 修正前: resolvedパターン **1 failed / 19 passed**。続いてrejectedパターンも **1 failed / 19 passed** を確認。
+- 修正後: 同じ `pnpm exec vitest run --config vitest.scripts.config.ts scripts/lib/mutation-evidence.test.ts` で **20 passed**。
+- メッセージだけで認定せず、Vitestの `_Assertion.__VITEST_REJECTS__` / `__VITEST_RESOLVES__` markerも要求。収集失敗・中断・skip・test identity不一致の拒否は保持。
+- DB重複名の期待値は既存 `error-code-map.ts` の契約を確認して `BAD_REQUEST / DUPLICATE_NAME` とした。初回のCONFLICTという期待値誤りを本番不具合やred/green証拠へ数えていない。
+
+### API破壊試行の結果
+
+[証拠](mission-evidence/api-boundaries.json)。無作為20件とは別の、事前定義した13種類の契約破壊。
+**12/13検出、1件生存**。baseline/復元後とも106成功・skipなし。検出ごとの失敗test名を保存。
+認証・MFA・OAuth・billing・write fence・所有者filter・アーカイブ・入力上限の異常を検出した。
+
+壊しても落ちなかったのは `router.ts` の名前上限を50→500へ緩める変更。
+実Serviceの上限50が残るので、不正入力は引き続き拒否され、APIの成功/失敗は変わらない。
+50→49へ狭める別試行は、最大長50文字を正常入力とする追加testが検出する。
+意味の変わらないmutationを検出するためだけに内部実装の文字列をassertせず、生存をそのまま記録する。
+runnerは生存があるため **exit 1** を返し、成功へ偽装しない。
+
+全公開関数/endpointと既存test全件の目的コメントは引き続き未完了。
+今回のAPI一覧はrouterの登録一覧とも照合し、この13件内にendpointを足してtest一覧を更新しなければ落ちる。
+全repoの候補数に対する単純な割合を意味的カバレッジとして報告しない。
+
+### 継続作業の全体検証
+
+- Node24で `pnpm check`: **exit 0、612 files / 7,575 tests passed**。Product4,462 / Web366 / scripts2,644 / billing37 / i18n2 / observability64。skipなし。
+- 初回は追加testを列挙するArchitecture Mapが未更新でscriptsの1件が失敗。`pnpm architecture:generate` で生成一覧2ファイルを更新し、同じ `pnpm check` を完走した。
+- protected-path判定: `required:false / auditContract:false`。製品の認証・権限・課金契約への変更はなく、追加reviewerを起動せずセルフレビューと必須CIで検証する。
+- ローカルログ: `/tmp/dayopt-api-check-final.log`。CI・mergeの最終状態はこの変更のPR側のhead/check/merge commitを正本とする。

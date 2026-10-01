@@ -10,7 +10,7 @@ const meta = {
   argTypes: {
     label: {
       control: 'text',
-      description: 'ロゴに付与するアクセシブル名と wordmark の表示文言',
+      description: 'ロゴのアクセシブル名（文字形状は確定済みのDayopt）',
     },
     size: {
       control: 'select',
@@ -55,6 +55,9 @@ export const AllPatterns: Story = {
         <Logo variant="wordmark" size="sm" />
         <Logo variant="wordmark" size="md" />
         <Logo variant="wordmark" size="lg" />
+      </div>
+      <div className="dark bg-background rounded-lg p-6">
+        <Logo size="lg" />
       </div>
     </div>
   ),

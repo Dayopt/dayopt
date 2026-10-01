@@ -300,14 +300,11 @@ last_verified: 2026-09-21
 #### `apps/product/src/features/calendar/components/create/InlineCreatePanel.tsx`
 
 - [Plan を保存](journeys/save-plan.md) の 2. 作成を依頼 — 作成の入口はここと、サイドバーのアクティビティタップの 2 つ。手数を変える時は両方を見る。
+- [Record を作る・Plan を記録する](journeys/record-plan.md) の 1. 入口を選ぶ — Record の未来終了制約は Inspector の記録操作と作成 UI の選択可否に反映する。Plan のドラッグ移動では Record を作らず、種別を保ったまま時刻を更新する。ConfirmDayButton は画面に置いている箇所を確認できていない。
 
 #### `apps/product/src/features/calendar/components/create/useInlineCreate.ts`
 
 - [Plan を保存](journeys/save-plan.md) の 2. 作成を依頼 — 作成の入口はここと、サイドバーのアクティビティタップの 2 つ。手数を変える時は両方を見る。
-
-#### `apps/product/src/features/calendar/components/views/shared/components/CalendarGridContent.tsx`
-
-- [Record を作る・Plan を記録する](journeys/record-plan.md) の 2. 列へ落とす — 「そのまま記録」と違い、成功時に取り消しトーストが出ない。揃える時は useTimeblockRecordMutations の取り消しを流用する。
 
 #### `apps/product/src/features/calendar/hooks/keyboard/useCalendarTimeblockKeyboard.ts`
 
@@ -329,21 +326,15 @@ last_verified: 2026-09-21
 
 #### `apps/product/src/features/calendar/interaction/GhostRenderer.tsx`
 
-- [Plan / Record を動かす・直す](journeys/edit-timeblock.md) の 1. ドラッグを離す — Plan を Record の列へ落とした時だけは更新ではなく記録になる（「Record を作る・Plan を記録する」）。重なりの判定を変える時は、DB の排他制約（Plan 同士・Record 同士、半開区間 [start, end)）と揃っているかを見る。
+- [Plan / Record を動かす・直す](journeys/edit-timeblock.md) の 1. ドラッグを離す — Plan のドラッグはレーンにかかわらずPlanの時刻更新になる。Plan同士・Record同士の重複は拒否し、PlanとRecordの重複は許可する。重なりの判定を変える時は、DB の排他制約（同種同士、半開区間 [start, end)）と揃っているかを見る。
 
 #### `apps/product/src/features/calendar/interaction/interaction-effects.ts`
 
-- [Plan / Record を動かす・直す](journeys/edit-timeblock.md) の 1. ドラッグを離す — Plan を Record の列へ落とした時だけは更新ではなく記録になる（「Record を作る・Plan を記録する」）。重なりの判定を変える時は、DB の排他制約（Plan 同士・Record 同士、半開区間 [start, end)）と揃っているかを見る。
-- [Record を作る・Plan を記録する](journeys/record-plan.md) の 1. 入口を選ぶ — 出す条件は DB 規則の写し。規則を変える時は invariants.md §時刻 の写し表に沿って 3 つとも見る。日の単位でまとめて記録する ConfirmDayButton も部品としてはあるが、画面に置いている箇所は見つからなかった（未確認）。
+- [Plan / Record を動かす・直す](journeys/edit-timeblock.md) の 1. ドラッグを離す — Plan のドラッグはレーンにかかわらずPlanの時刻更新になる。Plan同士・Record同士の重複は拒否し、PlanとRecordの重複は許可する。重なりの判定を変える時は、DB の排他制約（同種同士、半開区間 [start, end)）と揃っているかを見る。
 
 #### `apps/product/src/features/calendar/interaction/useInteraction.ts`
 
-- [Plan / Record を動かす・直す](journeys/edit-timeblock.md) の 1. ドラッグを離す — Plan を Record の列へ落とした時だけは更新ではなく記録になる（「Record を作る・Plan を記録する」）。重なりの判定を変える時は、DB の排他制約（Plan 同士・Record 同士、半開区間 [start, end)）と揃っているかを見る。
-- [Record を作る・Plan を記録する](journeys/record-plan.md) の 2. 列へ落とす — 「そのまま記録」と違い、成功時に取り消しトーストが出ない。揃える時は useTimeblockRecordMutations の取り消しを流用する。
-
-#### `apps/product/src/features/calendar/lib/plan-record-drop.ts`
-
-- [Record を作る・Plan を記録する](journeys/record-plan.md) の 2. 列へ落とす — 「そのまま記録」と違い、成功時に取り消しトーストが出ない。揃える時は useTimeblockRecordMutations の取り消しを流用する。
+- [Plan / Record を動かす・直す](journeys/edit-timeblock.md) の 1. ドラッグを離す — Plan のドラッグはレーンにかかわらずPlanの時刻更新になる。Plan同士・Record同士の重複は拒否し、PlanとRecordの重複は許可する。重なりの判定を変える時は、DB の排他制約（同種同士、半開区間 [start, end)）と揃っているかを見る。
 
 #### `apps/product/src/features/contact/components/ContactDialog.tsx`
 
@@ -539,21 +530,21 @@ last_verified: 2026-09-21
 - [Plan / Record を動かす・直す](journeys/edit-timeblock.md) の 3. Inspector で直す — まとめ方を変えると、競合時にどの変更を捨てるか（古い版の待ち行列は捨てる）と、結果が分からない時に止めるか（止めて自動再送しない）の 2 つが崩れる。Inspector は自前の取り消しトーストを出さない。
 - [Plan / Record を動かす・直す](journeys/edit-timeblock.md) の 4. 先に書き換える — 書き換える項目はタイトル・メモ・開始・終了（Record は充実度も）だけ。アクティビティの変更はここでは一覧へ反映せず、返事で差し替わる。書き換える項目を足す時はここと onSuccess の差し替えを揃える。
 - [Plan / Record を動かす・直す](journeys/edit-timeblock.md) の 7. 版と規則を確かめる — 版の比較を緩めると、別の場所の変更を古い入力が潰す。規則を変える時は DB → service → UI の写しを 1 変更で全部変える。
-- [Record を作る・Plan を記録する](journeys/record-plan.md) の 1. 入口を選ぶ — 出す条件は DB 規則の写し。規則を変える時は invariants.md §時刻 の写し表に沿って 3 つとも見る。日の単位でまとめて記録する ConfirmDayButton も部品としてはあるが、画面に置いている箇所は見つからなかった（未確認）。
-- [Record を作る・Plan を記録する](journeys/record-plan.md) の 3. 編集を保存しきる — 記録を Plan の最新内容と揃える要。ここを飛ばすと版が古くなり、記録は DT002 で弾かれる。
+- [Record を作る・Plan を記録する](journeys/record-plan.md) の 1. 入口を選ぶ — Record の未来終了制約は Inspector の記録操作と作成 UI の選択可否に反映する。Plan のドラッグ移動では Record を作らず、種別を保ったまま時刻を更新する。ConfirmDayButton は画面に置いている箇所を確認できていない。
+- [Record を作る・Plan を記録する](journeys/record-plan.md) の 2. 編集を保存しきる — 記録を Plan の最新内容と揃える要。ここを飛ばすと版が古くなり、記録は DT002 で弾かれる。
 - [削除と取り消し](journeys/delete-undo.md) の 1. 入口を選ぶ — 入口を足したら、useTimeblockDeleteUndo を通して同じ取り消しを出す。messages には「完全に削除されます。取り消せません」という確認文言が残っているが、Plan / Record の削除からは使われていない（未使用の文言）。
 - [削除と取り消し](journeys/delete-undo.md) の 2. 編集を保存しきる — カレンダー側の入口はこの準備をしない（キャッシュの版を使う）。Inspector を開いたままのキーボード削除は、保存が走っている最中だと版が古くなりうる（未確認・推測）。
 - [削除と取り消し](journeys/delete-undo.md) の 6. 取り消しを出す — 取り消しの出し方はカレンダーと Inspector で 1 つにする意図（useTimeblockDeleteUndo）だが、Inspector は自前で同じトーストを組んでいる。変える時は両方を見る。「元に戻す」付きのトーストが出ている間、action の無い成功トーストは出さない（lib/toast）ので、「復元しました」が出ないこともある。
 
 #### `apps/product/src/features/timeblock/components/editor/TimeblockRecordActions.tsx`
 
-- [Record を作る・Plan を記録する](journeys/record-plan.md) の 3. 編集を保存しきる — 記録を Plan の最新内容と揃える要。ここを飛ばすと版が古くなり、記録は DT002 で弾かれる。
-- [Record を作る・Plan を記録する](journeys/record-plan.md) の 4. 記録を依頼 — 楽観的に描く形へ変えるなら、DB の写し方（タイトル・メモ・アクティビティ・時刻）と一致させる必要がある。
+- [Record を作る・Plan を記録する](journeys/record-plan.md) の 2. 編集を保存しきる — 記録を Plan の最新内容と揃える要。ここを飛ばすと版が古くなり、記録は DT002 で弾かれる。
+- [Record を作る・Plan を記録する](journeys/record-plan.md) の 3. 記録を依頼 — 楽観的に描く形へ変えるなら、DB の写し方（タイトル・メモ・アクティビティ・時刻）と一致させる必要がある。
 
 #### `apps/product/src/features/timeblock/domain/timeblock-destination.ts`
 
 - [Plan を保存](journeys/save-plan.md) の 1. Plan か Record か決める — 時刻の規則を強制しているのは DB trigger で、ここはその写し。ここだけ変えても保存できるかどうかは変わらない。規則を撤去・変更する時は invariants.md §時刻 の写し表を全部たどる。
-- [Record を作る・Plan を記録する](journeys/record-plan.md) の 1. 入口を選ぶ — 出す条件は DB 規則の写し。規則を変える時は invariants.md §時刻 の写し表に沿って 3 つとも見る。日の単位でまとめて記録する ConfirmDayButton も部品としてはあるが、画面に置いている箇所は見つからなかった（未確認）。
+- [Record を作る・Plan を記録する](journeys/record-plan.md) の 1. 入口を選ぶ — Record の未来終了制約は Inspector の記録操作と作成 UI の選択可否に反映する。Plan のドラッグ移動では Record を作らず、種別を保ったまま時刻を更新する。ConfirmDayButton は画面に置いている箇所を確認できていない。
 
 #### `apps/product/src/features/timeblock/hooks/useCoalescedTimeblockSave.ts`
 
@@ -565,9 +556,9 @@ last_verified: 2026-09-21
 
 #### `apps/product/src/features/timeblock/hooks/useTimeblockRecordMutations.ts`
 
-- [Record を作る・Plan を記録する](journeys/record-plan.md) の 4. 記録を依頼 — 楽観的に描く形へ変えるなら、DB の写し方（タイトル・メモ・アクティビティ・時刻）と一致させる必要がある。
-- [Record を作る・Plan を記録する](journeys/record-plan.md) の 7. Plan を写して作る — Plan と Record を独立させた後（2026-09-07）の形。紐付けを戻す・写す項目を変える時は、MCP の records.create と日次確定（confirm_day）も同じ規則か確かめる。
-- [Record を作る・Plan を記録する](journeys/record-plan.md) の 8. 出して取り消しを出す — 取り消しは recordCommands.delete（ソフト削除）を通るので、「削除と取り消し」の規則がそのまま効く。
+- [Record を作る・Plan を記録する](journeys/record-plan.md) の 3. 記録を依頼 — 楽観的に描く形へ変えるなら、DB の写し方（タイトル・メモ・アクティビティ・時刻）と一致させる必要がある。
+- [Record を作る・Plan を記録する](journeys/record-plan.md) の 6. Plan を写して作る — Plan と Record を独立させた後（2026-09-07）の形。紐付けを戻す・写す項目を変える時は、MCP の records.create と日次確定（confirm_day）も同じ規則か確かめる。
+- [Record を作る・Plan を記録する](journeys/record-plan.md) の 7. 出して取り消しを出す — 取り消しは recordCommands.delete（ソフト削除）を通るので、「削除と取り消し」の規則がそのまま効く。
 
 #### `apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.ts`
 
@@ -595,7 +586,7 @@ last_verified: 2026-09-21
 
 - [Plan を保存](journeys/save-plan.md) の 7. Router → Service — 業務ロジックは Service に置き、Router に書かない（trpc-router-creating skill）。利用記録は best-effort で、失敗しても保存は取り消さない。
 - [Plan / Record を動かす・直す](journeys/edit-timeblock.md) の 5. Router → Service — schema に項目を足す時は、Service で埋める処理と command の引数を揃える。userId を input から受け取る形にしない（REVIEW-1）。
-- [Record を作る・Plan を記録する](journeys/record-plan.md) の 5. Router → Service — 入力に項目を足す時も userId は ctx から渡す（REVIEW-1）。
+- [Record を作る・Plan を記録する](journeys/record-plan.md) の 4. Router → Service — 入力に項目を足す時も userId は ctx から渡す（REVIEW-1）。
 - [削除と取り消し](journeys/delete-undo.md) の 4. Router → Service — 入力に項目を足す時も userId は ctx から渡す（REVIEW-1）。
 
 #### `apps/product/src/features/timeblock/server/record-commands-router.ts`
@@ -608,8 +599,8 @@ last_verified: 2026-09-21
 - [Plan を保存](journeys/save-plan.md) の 9. 時刻の規則で検査 — 規則の正本はここ。変える時は DB → service → UI の写しを 1 変更で全部変える。DB だけ緩めて UI の写しが残ると「操作はできるのに保存されない」になる。
 - [Plan / Record を動かす・直す](journeys/edit-timeblock.md) の 6. RPC で更新 — 訳したコードは client-safe-service-code.ts の許可一覧に載っているものだけがブラウザへ届く。載っていないコードは「結果不明」として扱われ、Inspector が止まる側に倒れる。
 - [Plan / Record を動かす・直す](journeys/edit-timeblock.md) の 7. 版と規則を確かめる — 版の比較を緩めると、別の場所の変更を古い入力が潰す。規則を変える時は DB → service → UI の写しを 1 変更で全部変える。
-- [Record を作る・Plan を記録する](journeys/record-plan.md) の 6. RPC で記録 — 版付きの操作を足したら VERSIONED_TARGET_OPERATIONS に入れる。
-- [Record を作る・Plan を記録する](journeys/record-plan.md) の 7. Plan を写して作る — Plan と Record を独立させた後（2026-09-07）の形。紐付けを戻す・写す項目を変える時は、MCP の records.create と日次確定（confirm_day）も同じ規則か確かめる。
+- [Record を作る・Plan を記録する](journeys/record-plan.md) の 5. RPC で記録 — 版付きの操作を足したら VERSIONED_TARGET_OPERATIONS に入れる。
+- [Record を作る・Plan を記録する](journeys/record-plan.md) の 6. Plan を写して作る — Plan と Record を独立させた後（2026-09-07）の形。紐付けを戻す・写す項目を変える時は、MCP の records.create と日次確定（confirm_day）も同じ規則か確かめる。
 - [削除と取り消し](journeys/delete-undo.md) の 5. deleted_at を付ける — deleted_at の付いた行は一覧・重なりの判定（排他制約は deleted_at IS NULL だけが対象）から外れる。削除済みの行を自動で物理削除する仕組みは見つからなかった（未確認）。
 - [削除と取り消し](journeys/delete-undo.md) の 7. deleted_at を外す — Record の復元は DT005（未来に終われない）の対象外（時刻を変えないため trigger が見ない）。
 
@@ -617,7 +608,7 @@ last_verified: 2026-09-21
 
 - [Plan を保存](journeys/save-plan.md) の 7. Router → Service — 業務ロジックは Service に置き、Router に書かない（trpc-router-creating skill）。利用記録は best-effort で、失敗しても保存は取り消さない。
 - [Plan / Record を動かす・直す](journeys/edit-timeblock.md) の 5. Router → Service — schema に項目を足す時は、Service で埋める処理と command の引数を揃える。userId を input から受け取る形にしない（REVIEW-1）。
-- [Record を作る・Plan を記録する](journeys/record-plan.md) の 5. Router → Service — 入力に項目を足す時も userId は ctx から渡す（REVIEW-1）。
+- [Record を作る・Plan を記録する](journeys/record-plan.md) の 4. Router → Service — 入力に項目を足す時も userId は ctx から渡す（REVIEW-1）。
 - [削除と取り消し](journeys/delete-undo.md) の 4. Router → Service — 入力に項目を足す時も userId は ctx から渡す（REVIEW-1）。
 
 #### `apps/product/src/lib/auth-error.ts`
@@ -900,7 +891,7 @@ last_verified: 2026-09-21
 #### `supabase/migrations/20260729062435_timeblock_atomic_commands.sql`
 
 - [Plan / Record を動かす・直す](journeys/edit-timeblock.md) の 7. 版と規則を確かめる — 版の比較を緩めると、別の場所の変更を古い入力が潰す。規則を変える時は DB → service → UI の写しを 1 変更で全部変える。
-- [Record を作る・Plan を記録する](journeys/record-plan.md) の 7. Plan を写して作る — Plan と Record を独立させた後（2026-09-07）の形。紐付けを戻す・写す項目を変える時は、MCP の records.create と日次確定（confirm_day）も同じ規則か確かめる。
+- [Record を作る・Plan を記録する](journeys/record-plan.md) の 6. Plan を写して作る — Plan と Record を独立させた後（2026-09-07）の形。紐付けを戻す・写す項目を変える時は、MCP の records.create と日次確定（confirm_day）も同じ規則か確かめる。
 - [削除と取り消し](journeys/delete-undo.md) の 5. deleted_at を付ける — deleted_at の付いた行は一覧・重なりの判定（排他制約は deleted_at IS NULL だけが対象）から外れる。削除済みの行を自動で物理削除する仕組みは見つからなかった（未確認）。
 - [削除と取り消し](journeys/delete-undo.md) の 7. deleted_at を外す — Record の復元は DT005（未来に終われない）の対象外（時刻を変えないため trigger が見ない）。
 
@@ -952,7 +943,7 @@ last_verified: 2026-09-21
 
 #### `supabase/migrations/20260907081237_independent_plan_record_commands.sql`
 
-- [Record を作る・Plan を記録する](journeys/record-plan.md) の 7. Plan を写して作る — Plan と Record を独立させた後（2026-09-07）の形。紐付けを戻す・写す項目を変える時は、MCP の records.create と日次確定（confirm_day）も同じ規則か確かめる。
+- [Record を作る・Plan を記録する](journeys/record-plan.md) の 6. Plan を写して作る — Plan と Record を独立させた後（2026-09-07）の形。紐付けを戻す・写す項目を変える時は、MCP の records.create と日次確定（confirm_day）も同じ規則か確かめる。
 - [削除と取り消し](journeys/delete-undo.md) の 7. deleted_at を外す — Record の復元は DT005（未来に終われない）の対象外（時刻を変えないため trigger が見ない）。
 
 #### `supabase/migrations/20260908022927_add_mcp_billing_access_switch.sql`
@@ -968,7 +959,7 @@ last_verified: 2026-09-21
 
 ## 正本
 
-- [AGENTS.md](../../AGENTS.md) — 実装 plan の必須セクション（Reversibility Table ほか）、レビュー規則
+- [AGENTS.md](../../AGENTS.md) — 実装 Plan に示す目的・方針・検証方法と、レビュー規則。固定の書式は要求しない
 - [docs/engineering/invariants.md](../engineering/invariants.md)
 - [docs/engineering/architecture.md](../engineering/architecture.md) の Feature 間の依存
 

@@ -441,3 +441,29 @@ describe('Preview readiness CLI input', () => {
     },
   );
 });
+
+it.each([200, 401, 403])(
+  'uses only Trusted Sources access and fails closed on missing access (%s)',
+  async (status) => {
+    const w = world();
+    const original = w.fetchImpl.getMockImplementation()!;
+    w.fetchImpl.mockImplementation(async (input, init) => {
+      const url = String(input);
+      const headers = new Headers(init?.headers);
+      if (url.startsWith('https://product-')) {
+        expect(headers.get('x-vercel-trusted-oidc-idp-token')).toBe('private-preview-oidc');
+        expect(headers.has('x-vercel-protection-bypass')).toBe(false);
+        if (status !== 200) return new Response('PRIVATE_PROVIDER_BODY', { status });
+      } else expect(headers.has('x-vercel-trusted-oidc-idp-token')).toBe(false);
+      return original(input, init);
+    });
+    const pending = observePreviewReadiness({
+      ...options,
+      bypassSecret: undefined,
+      trustedOidcToken: 'private-preview-oidc',
+      fetchImpl: w.fetchImpl,
+    });
+    if (status === 200) expect(JSON.stringify(await pending)).not.toContain('private-preview-oidc');
+    else await expect(pending).rejects.toThrow();
+  },
+);

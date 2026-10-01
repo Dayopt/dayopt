@@ -43,13 +43,12 @@ There are four ways to create a Plan.
 | **`C`**                   | Create a timeblock                                        |
 | **`Shift+C`**             | Create a 15-minute timeblock starting at the current time |
 
-The Inspector opens when the Plan is created. Type a title and it saves as you go.
+Selecting a time range opens the Inspector. Choose an activity to save the timeblock. Closing it before choosing an activity leaves nothing saved.
 
 ## Editing a Plan
 
 Click a Plan on the calendar to open the **Inspector**. You can edit these fields:
 
-- **Title** — saves automatically as you type
 - **Date** — move the Plan to a different date
 - **Time** — adjust the start and end (duration is shown automatically)
 - **Activity** — one activity per timeblock
@@ -61,10 +60,10 @@ Inside the Inspector, use `↑` / `k` and `↓` / `j` to move between timeblocks
 
 Pick an activity and a line appears directly above the date and time fields — "Recent actuals for this activity are around 45m". It lets you see how long this thing usually takes before you commit to a time.
 
-The figure is your recorded time over the last four weeks divided by your ended planned time over the same period, applied to the length you are currently drafting, and rounded to 5 minutes.
+The figure is your recorded time over the last four weeks divided by your elapsed planned time over the same period, applied to the length you are currently drafting, and rounded to 5 minutes.
 
-- It only appears while the end time is in the future. Move the end into the past and the Plan becomes a Record, so the line disappears
-- If the activity has fewer than three ended Plans in the last four weeks, nothing is shown
+- It only appears while the end time is in the future. Moving an existing Plan's end into the past hides the hint, but the Plan stays a Plan
+- If the activity has fewer than three started Plans in the last four weeks, nothing is shown
 
 ## Drag and Drop
 
@@ -87,7 +86,7 @@ The Plan Inspector lists **"Records during this time"** for the same activity wi
 
 ## Duplicating a Plan
 
-Open the Inspector menu and select **"Duplicate"** to create another Plan with the same details. You can also copy the Plan and paste it at another time.
+Open the Inspector menu and select **"Duplicate"** to create another Plan with the same activity, note, and duration.
 
 ## Using the sidebar
 
@@ -95,15 +94,14 @@ The sidebar is where you switch views (day, several days, week), filter which ca
 
 ## Keyboard Shortcuts
 
-| Shortcut          | Action                                 |
-| ----------------- | -------------------------------------- |
-| `C`               | Create a timeblock                     |
-| `Shift+C`         | Create a timeblock at the current time |
-| `Escape`          | Close the Inspector / cancel a drag    |
-| `↑` or `k`        | Previous timeblock                     |
-| `↓` or `j`        | Next timeblock                         |
-| `Cmd+C` / `Cmd+V` | Copy / paste                           |
-| `Delete`          | Delete the selected timeblock          |
+| Shortcut   | Action                                 |
+| ---------- | -------------------------------------- |
+| `C`        | Create a timeblock                     |
+| `Shift+C`  | Create a timeblock at the current time |
+| `Escape`   | Close the Inspector / cancel a drag    |
+| `↑` or `k` | Previous timeblock                     |
+| `↓` or `j` | Next timeblock                         |
+| `Delete`   | Delete the selected timeblock          |
 
 On Windows and Linux, use `Ctrl` instead of `Cmd`. Press `Shift+?` to see the full list.
 

@@ -13,7 +13,14 @@ describe('Supabase API key migration contract', () => {
     })
       .trim()
       .split('\n')
-      .filter((file) => /\.[cm]?[jt]sx?$/.test(file) && existsSync(resolve(root, file)));
+      // Node-only test helpers explicitly reject legacy key names in credential
+      // input. They are not application env readers; retain the guard on app code.
+      .filter(
+        (file) =>
+          /\.[cm]?[jt]sx?$/.test(file) &&
+          !file.startsWith('apps/product/src/lib/test/') &&
+          existsSync(resolve(root, file)),
+      );
     expect(files.length).toBeGreaterThan(100);
     const violations = files.filter((file) =>
       /(?:NEXT_PUBLIC_SUPABASE_ANON_KEY|SUPABASE_SERVICE_ROLE_KEY)/.test(

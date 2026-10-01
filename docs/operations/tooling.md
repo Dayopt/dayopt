@@ -332,40 +332,7 @@ GitHub Actionsが自動実行:
 
 ## ライセンスポリシー
 
-### 許可ライセンス（全16種類）
-
-| ライセンス   | 商用利用 | 注意点                         |
-| ------------ | -------- | ------------------------------ |
-| MIT          | ✅       | 著作権表示必須                 |
-| Apache-2.0   | ✅       | NOTICE表示必須（自動対応済み） |
-| ISC          | ✅       | 著作権表示必須                 |
-| BSD-2-Clause | ✅       | 著作権表示必須                 |
-| BSD-3-Clause | ✅       | 著作権表示 + 推薦禁止条項      |
-| MPL-2.0      | ✅       | ファイル単位のコピーレフト     |
-| CC0-1.0      | ✅       | パブリックドメイン             |
-| 0BSD         | ✅       | 著作権表示不要                 |
-| Unlicense    | ✅       | パブリックドメイン             |
-
-### 制限ライセンス（全10種類）
-
-| ライセンス     | 理由                                         | 代替案                               |
-| -------------- | -------------------------------------------- | ------------------------------------ |
-| GPL-2.0/3.0    | コピーレフト                                 | MITライセンスのパッケージを探す      |
-| AGPL-3.0       | 強力なコピーレフト（ネットワーク経由も適用） | Apache-2.0のパッケージを探す         |
-| LGPL-2.1/3.0   | 動的リンクのみ許可                           | 代替パッケージを探す                 |
-| SSPL           | サーバーサイド利用でソース公開義務           | 代替パッケージを探す                 |
-| Commons Clause | 商用利用禁止                                 | 商用利用可能なパッケージを探す       |
-| BUSL-1.1       | ビジネス利用に時間制限                       | 代替パッケージを探す                 |
-| UNLICENSED     | ライセンス不明                               | 公式ライセンスがあるパッケージを探す |
-| UNKNOWN        | ライセンス情報なし                           | 公式パッケージを探す                 |
-
-### 警告ライセンス（3種類）
-
-| ライセンス   | 注意点                                       | 対応         |
-| ------------ | -------------------------------------------- | ------------ |
-| CC-BY-SA-4.0 | ShareAlike条項（派生物に同一ライセンス適用） | 使用前に確認 |
-| EPL-2.0      | 弱いコピーレフト（ファイル単位）             | 使用前に確認 |
-| CDDL-1.0     | 弱いコピーレフト（ファイル単位）             | 使用前に確認 |
+機械が消費する式・識別子は末尾の生成領域で読む。許可式、禁止識別子、警告設定を別々に表示し、矛盾もそのまま残す。許可と禁止の双方に現れる設定の解消は法務判断が必要で、生成器は採否を決めない。[risk checker](../../scripts/tasks/check-license-risks.ts) の判定も併せて確認する。
 
 ## トラブルシューティング（ライセンス）
 
@@ -487,11 +454,11 @@ BSD-2-Clause: 12 packages (1.3%)
 
 ## 2. Routing の基準
 
-通常開発は ChatGPT Chat + Codex。短い協働原則は `AGENTS.md`、モデル選択と委譲の詳細は `.agents/skills/routing/SKILL.md` を正本とする。同じ主担当が調査・判断・実装・検証・修正まで完了し、初期の委譲対象は実行時に read-only 境界を検証できる大量調査に限る。
+通常開発は ChatGPT Chat + Codex。共通指示は `AGENTS.md`、作業方針・Issue Brief・委譲の手順は `.agents/skills/routing/SKILL.md` を正本とする。同じ主担当が調査・判断・実装・検証・修正まで完了し、初期の委譲対象は実行時に read-only 境界を検証できる大量調査に限る。
 
 Chat は product / UX・research・仕様整理、Codex は repo に基づく判断と実装を担う。受け渡しが必要な時だけ [Chat 連携手順](./chat-handoff.md) を読む。承認済みの目的・仕様・リスク境界内の技術判断を毎回 Chat に戻さない。
 
-モデル名は難しさ・影響・検証可能性に応じた初期目安であり、実測なしに効率を主張しない。`pnpm ctx` の既存 L0〜L3 / preparation は助言として維持し、別 agent の起動指示にしない。
+モデルの固定割当や切替順序は設けない。実測なしに効率を主張しない。`pnpm ctx` の既存 L0〜L3 / preparation は助言として維持し、別 agent の起動指示にしない。
 
 ## 3. Hook の共有と保証境界
 
@@ -694,7 +661,7 @@ skill invocation は description を読んで判断される仕様上、**descri
 
 ## 4. 12 skill の類型マッピング
 
-各 skill の類型定義と書式詳細は [`skill-design` skill](../../.agents/skills/skill-design/SKILL.md) を参照。
+以下は移行当時の分類・書式の記録であり、現在の必須条件ではない。現在の設計方針は [`skill-design` skill](../../.agents/skills/skill-design/SKILL.md) を参照し、類型・字数・項目数の固定書式は要求しない。
 
 | #   | skill                  | 類型             |
 | --- | ---------------------- | ---------------- |
@@ -746,7 +713,7 @@ description に「DB 変更系 / Realtime 系 / Edge Functions 系 / 3 環境運
 - **境界設計原則**（skill 間 handoff、skill 層と rules 層の境界、自動生成 artifact の扱い、invocation トリガーと実行時ルールの分離、self-contained 原則）
 - **空白領域 flag**（URL state の将来 skill 化余地）
 
-本節は **1 回性のイベント記録**であり、skill 設計の source of truth は `skill-design` skill 側。将来 skill を追加・修正する際は `.agents/skills/skill-design/SKILL.md` を参照する。
+本節は **1 回性のイベント記録**であり、上の類型・字数・項目数の指定は撤去済み。現在の skill 設計の正本は `.agents/skills/skill-design/SKILL.md`。
 
 ## 7. スコープ境界（未着手タスク）
 
@@ -804,3 +771,11 @@ op run --env-file=.op-env.human -- \
 | `verify-login.sh`     | email + password の組合せで直接 `/auth/v1/token` を叩き、login 可否を確認する（read-only）                                                                                                                                                                                                                                                                                     | `USER_EMAIL`, `PASSWORD_ITEM_ID`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` |
 
 `verify-login.sh` が成功すれば password 自体は正しい（UI / CSP / form 側の問題）。失敗すれば `admin-set-user-password.sh` で password を再設定する。
+
+## 機械取得する現状
+
+<!-- docs-live:facts:start -->
+
+抽出対象の登録は [scripts/lib/docs-live/facts.ts](../../scripts/lib/docs-live/facts.ts)。現在の一覧は `pnpm docs:read docs/operations/tooling.md` で生成して読む。
+
+<!-- docs-live:facts:end -->

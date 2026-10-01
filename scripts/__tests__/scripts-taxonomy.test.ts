@@ -42,6 +42,7 @@ const KNOWN_PLACEMENT_EXCEPTIONS = new Set<string>([
   'scripts/tasks/docs-guard/checks/learn-refs.ts',
   'scripts/tasks/docs-guard/checks/likec4-validate.ts',
   'scripts/tasks/docs-guard/checks/link-check.ts',
+  'scripts/tasks/docs-guard/checks/live-docs.ts',
   'scripts/tasks/docs-guard/checks/naming-check.ts',
   'scripts/tasks/docs-guard/config.ts',
   'scripts/tasks/docs-guard/git-changes.ts',
@@ -78,11 +79,34 @@ const KNOWN_PLACEMENT_EXCEPTIONS = new Set<string>([
   // 案内であって実行手順ではない（storage-objects-app-policy-names.mjs と同型）。
   'scripts/lib/glossary/core.ts',
   'scripts/lib/glossary/terms.ts',
+  // docs-live/render.ts: CLI と docs-guard が import する lib。
+  // docs/README の実装リンクは runbook の実行手順ではなく、glossary/ と同じ案内。
+  'scripts/lib/docs-live/render.ts',
+  // live-contract.ts: docs が保存形式の正本へ案内するが、実行するのは docs-guard の import。
+  'scripts/lib/docs-live/live-contract.ts',
+  // facts.ts: 保存stubが所在を示すだけで、readerからimportされる抽出ライブラリ。
+  'scripts/lib/docs-live/facts.ts',
   // vocabulary-scope.ts: concept-map.ts / likec4-model.ts から import される lib だが、
   // architecture.md と生成物が「判定規則はここが持つ」と名指しするため docs 参照が
   // 先に当たって runbook 判定になる。terms.ts と同型（読者への案内であって手順ではない）。
   'scripts/lib/architecture-map/vocabulary-scope.ts',
   'scripts/lib/scripts-taxonomy.ts',
+  // Preview fixture libraries: operational docからのsource参照は実行手順ではなく、
+  // CLI entryも持たない（glossary/coreと同型）。brokerは永続adapter未実装のため
+  // API未接続。doc参照がimportより優先される分類器の既知の例外。
+  'scripts/lib/preview-fixture-authority.mjs',
+  'scripts/lib/preview-fixture-broker.mjs',
+  'scripts/lib/preview-fixture-registry.mjs',
+  'scripts/lib/preview-fixture-envelope.mjs',
+  'scripts/lib/preview-fixture-handoff-trust.mjs',
+  'scripts/lib/preview-fixture-handoff.mjs',
+  'scripts/lib/preview-fixture-key-custody.mjs',
+  'scripts/lib/preview-fixture-lifecycle.mjs',
+  'scripts/lib/preview-fixture-termination.mjs',
+  // HTTP adapter is imported by apps/product's Preview-only route, outside this
+  // classifier's scripts-only importer scan. The real Next build regression
+  // verifies that route import and Production exclusion without adding a CLI.
+  'scripts/lib/preview-fixture-http.mjs',
   // protected-path-gate.mjs: impact.mjs（scripts/ci/、同じ --stdin 呼び出し規約）と
   // 同型で、finish-branch.sh から node 経由で呼ばれる ci unit。skill docs（audit-ai-
   // config / pr-cross-review）からの言及は利用者向けの説明文であり、実行呼び出しでは

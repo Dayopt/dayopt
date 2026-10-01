@@ -44,6 +44,10 @@
         "saveFailed": "保存できませんでした。入力内容は保持されています。もう一度お試しください"
       },
       "noTitle": "（タイトルなし）",
+      "kind": {
+        "plan": "予定",
+        "record": "記録"
+      },
       "notFound": "タイムブロックが見つかりません",
       "noData": "データが見つかりません",
       "menu": {
@@ -106,7 +110,6 @@
       "date": "日付",
       "time": "時間",
       "note": "メモ",
-      "notePlaceholder": "例: 集中できた",
       "timeLocked": "記録は未来へ移動できません",
       "duplicate": {
         "create": "複製を作成",
@@ -132,6 +135,8 @@
         "deleteFailed": "削除できませんでした。もう一度お試しください",
         "restored": "復元しました",
         "restoreFailed": "復元できませんでした。もう一度お試しください",
+        "externalCalendarAlreadyConverted": "この外部予定は取り込み済みです",
+        "externalCalendarRestoreConflict": "同じ外部予定を取り込み済みのため、復元できません",
         "planCreated": "予定を追加しました ✓",
         "planCreatedShifted": "{time} に予定を追加しました",
         "recordedShifted": "{time} に記録しました"

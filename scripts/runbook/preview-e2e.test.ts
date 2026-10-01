@@ -257,6 +257,101 @@ fs.writeFileSync(path.join(process.env.E2E_PREVIEW_EVIDENCE_DIR, 'e2e.json'), JS
       }),
     );
   });
+  it('preprovisioned worker gets only scoped logins and no admin or OIDC authority', () => {
+    const ids = {
+      desktop: '22222222-2222-4222-8222-222222222222',
+      mobile: '33333333-3333-4333-8333-333333333333',
+    };
+    const parent = {
+      ...env,
+      GH_TOKEN: 'must-not-leak',
+      ACTIONS_ID_TOKEN_REQUEST_URL: 'must-not-leak',
+      ACTIONS_ID_TOKEN_REQUEST_TOKEN: 'must-not-leak',
+      NODE_OPTIONS: 'must-not-leak',
+      E2E_PREVIEW_FIXTURE_REGISTRY: 'untrusted-parent-path',
+    };
+    const worker = previewWorkerEnvironment(
+      parent,
+      ready,
+      '/private',
+      '/evidence',
+      '11111111-1111-4111-8111-111111111111',
+      ids,
+      '/credentials/login.json',
+      'synthetic.preview.access',
+    );
+    expect(worker).toMatchObject({
+      E2E_PREVIEW_FIXTURE_REGISTRY: '/credentials/login.json',
+      E2E_PREVIEW_DB_MODE: 'ephemeral',
+      E2E_PREVIEW_CLOUD_INTENT: '1',
+      E2E_PREVIEW_DESKTOP_USER_ID: ids.desktop,
+      E2E_PREVIEW_MOBILE_USER_ID: ids.mobile,
+      E2E_PREVIEW_TRUSTED_OIDC_TOKEN: 'synthetic.preview.access',
+    });
+    for (const key of [
+      'SUPABASE_SECRET_KEY',
+      'GH_TOKEN',
+      'GITHUB_TOKEN',
+      'VERCEL_TOKEN',
+      'SUPABASE_PREVIEW_READINESS_TOKEN',
+      'STRIPE_SECRET_KEY',
+      'ACTIONS_ID_TOKEN_REQUEST_URL',
+      'ACTIONS_ID_TOKEN_REQUEST_TOKEN',
+      'NODE_OPTIONS',
+    ])
+      expect(worker).not.toHaveProperty(key);
+    expect(JSON.stringify(worker)).not.toContain('must-not-leak');
+    expect(parent.SUPABASE_SECRET_KEY).toBe(env.SUPABASE_SECRET_KEY);
+    // Inherited mode hints cannot silently switch legacy execution to the new mode.
+    const legacy = previewWorkerEnvironment(
+      parent,
+      ready,
+      '/private',
+      '/evidence',
+      '11111111-1111-4111-8111-111111111111',
+      ids,
+    );
+    expect(legacy).not.toHaveProperty('E2E_PREVIEW_FIXTURE_REGISTRY');
+    expect(legacy).toHaveProperty('SUPABASE_SECRET_KEY', env.SUPABASE_SECRET_KEY);
+  });
+  it.each([
+    'shared',
+    'production',
+    'not-ready',
+    'missing-users',
+    'same-users',
+    'baseline-user',
+    'relative-path',
+    'empty-path',
+    'bad-run',
+    'bad-origin',
+  ])('preprovisioned environment fails closed for %s', (scenario) => {
+    const binding = { ...ready };
+    let ids: { desktop: string; mobile: string } | undefined = {
+      desktop: '22222222-2222-4222-8222-222222222222',
+      mobile: '33333333-3333-4333-8333-333333333333',
+    };
+    let path = '/credentials/login.json';
+    let runId = '11111111-1111-4111-8111-111111111111';
+    if (scenario === 'shared')
+      Object.assign(binding, {
+        databaseMode: 'shared',
+        supabaseProjectRef: 'tilwaprottpyhlfoggbb',
+        supabaseBranchId: '4c2ed092-cba3-4f37-98e1-78f61cdf52ed',
+      });
+    if (scenario === 'production') binding.supabaseProjectRef = 'yvglwblxrnrenfifsnje';
+    if (scenario === 'not-ready') binding.status = 'failed';
+    if (scenario === 'missing-users') ids = undefined;
+    if (scenario === 'same-users') ids!.mobile = ids!.desktop;
+    if (scenario === 'baseline-user') ids!.desktop = '00000000-0000-0000-0000-000000000001';
+    if (scenario === 'relative-path') path = 'login.json';
+    if (scenario === 'empty-path') path = '';
+    if (scenario === 'bad-run') runId = 'must-not-leak';
+    if (scenario === 'bad-origin') binding.origin = 'https://example.com';
+    expect(() =>
+      previewWorkerEnvironment(env, binding, '/private', '/evidence', runId, ids, path),
+    ).toThrow(/^Preview fixture worker binding is invalid$/);
+  });
   it('子プロセスには管理tokenと本番secretを渡さない', () => {
     const worker = previewWorkerEnvironment(
       env,
@@ -274,6 +369,23 @@ fs.writeFileSync(path.join(process.env.E2E_PREVIEW_EVIDENCE_DIR, 'e2e.json'), JS
 });
 
 describe('Safe failure evidence', () => {
+  it('authorization失敗も入力や応答を含めず位置だけ残す', () => {
+    expect(
+      safePreviewStep({
+        category: 'test.step',
+        duration: 5,
+        location: { file: '/repo/preview-authorization.spec.ts', line: 80 },
+        title: 'PRIVATE_USER',
+        error: { message: 'PRIVATE_RESPONSE' },
+      }),
+    ).toEqual({
+      category: 'test.step',
+      file: 'preview-authorization.spec.ts',
+      line: 80,
+      duration: 5,
+      failed: true,
+    });
+  });
   it('stepのtitle/引数/error本文を捨てて位置と結果だけ残す', () => {
     const result = safePreviewStep({
       category: 'pw:api',
@@ -318,8 +430,12 @@ describe('Preview reporter completeness', () => {
       const root = mkdtempSync(join(tmpdir(), 'preview-reporter-'));
       roots.push(root);
       const reporter = new PreviewE2EReporter({ directory: root });
-      reporter.onBegin({}, { allTests: () => [1, 2] });
-      for (const [index, project] of ['chromium', 'Mobile Chrome'].entries()) {
+      reporter.onBegin({}, { allTests: () => [1, 2, 3] });
+      for (const [index, project] of [
+        'chromium',
+        'Mobile Chrome',
+        'preview-authorization',
+      ].entries()) {
         const test = {
           id: String(index),
           expectedStatus: 'passed',
@@ -357,4 +473,67 @@ describe('Preview reporter completeness', () => {
       expect(readFileSync(join(root, 'e2e.json'), 'utf8')).not.toContain('private-');
     },
   );
+});
+
+describe('prepared fixture consumer boundary', () => {
+  const users = {
+    desktop: '11111111-1111-4111-8111-111111111111',
+    mobile: '22222222-2222-4222-8222-222222222222',
+  };
+  it('passes the trusted registry without admin authority and defers cleanup to a separate job', async () => {
+    const s = scenario();
+    const result = await runPreviewE2E({
+      request: {},
+      env: {},
+      observe: s.observe,
+      execute: s.execute,
+      recover: s.recover,
+      tempRoot: s.root,
+      cloudUserIds: users,
+      registryPath: join(s.root, 'registry.json'),
+      trustedOidcToken: 'synthetic.preview.access',
+    });
+    expect(s.execute).toHaveBeenCalledOnce();
+    const worker = s.execute.mock.calls[0]![0];
+    expect(worker.E2E_PREVIEW_FIXTURE_REGISTRY).toBe(join(s.root, 'registry.json'));
+    expect(worker.E2E_PREVIEW_TRUSTED_OIDC_TOKEN).toBe('synthetic.preview.access');
+    expect(worker).not.toHaveProperty('SUPABASE_SECRET_KEY');
+    expect(worker).not.toHaveProperty('VERCEL_AUTOMATION_BYPASS_SECRET');
+    expect(s.recover).not.toHaveBeenCalled();
+    expect(result.status).toBe('failed');
+    expect(result.failure).toBe('cleanup-unconfirmed');
+    expect(result.cleanup.status).toBe('deferred');
+  });
+  it.each([
+    { SUPABASE_SECRET_KEY: 'do-not-disclose' },
+    { VERCEL_AUTOMATION_BYPASS_SECRET: 'do-not-disclose' },
+    { ACTIONS_ID_TOKEN_REQUEST_TOKEN: 'do-not-disclose' },
+  ])('rejects privileged prepared consumers before observation', async (unsafe) => {
+    const s = scenario();
+    await expect(
+      runPreviewE2E({
+        request: {},
+        env: unsafe,
+        observe: s.observe,
+        tempRoot: s.root,
+        registryPath: join(s.root, 'registry.json'),
+        trustedOidcToken: 'synthetic.preview.access',
+        cloudUserIds: users,
+      }),
+    ).rejects.toThrow('Prepared Preview consumer credentials are invalid');
+    expect(s.observe).not.toHaveBeenCalled();
+  });
+  it('does not fall back to project bypass when Trusted Sources access is missing', async () => {
+    const s = scenario();
+    await expect(
+      runPreviewE2E({
+        request: {},
+        env: {},
+        observe: s.observe,
+        registryPath: join(s.root, 'registry.json'),
+        cloudUserIds: users,
+      }),
+    ).rejects.toThrow('Prepared Preview consumer credentials are invalid');
+    expect(s.observe).not.toHaveBeenCalled();
+  });
 });

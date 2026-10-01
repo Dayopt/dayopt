@@ -78,6 +78,27 @@ function recordReceiptRow(overrides: Record<string, unknown> = {}) {
 }
 
 describe('McpMutationClient archived activity boundary', () => {
+  it.each(['plan', 'record'] as const)(
+    '再取り込み済み%sの復元拒否は既存CONFLICT契約を保つ',
+    async (lane) => {
+      const db = createFakeDb();
+      const rpc = lane === 'plan' ? db.applyPlanRestore : db.applyRecordRestore;
+      rpc.mockResolvedValue({ data: null, error: { code: '23505' } });
+      const client = buildClient(db);
+      const input = {
+        operationId: 'restore-conflict',
+        expectedUpdatedAt: '2026-08-01T00:00:00.000000Z',
+        connectionId: CONNECTION_ID,
+        accessTokenId: ACCESS_TOKEN_ID,
+      };
+      const result =
+        lane === 'plan'
+          ? client.restorePlan({ ...input, planId: 'plan-1' })
+          : client.restoreRecord({ ...input, recordId: 'record-1' });
+      await expect(result).rejects.toMatchObject({ code: 'CONFLICT' });
+      expect(rpc).toHaveBeenCalledOnce();
+    },
+  );
   it('tracks a successful MCP plan creation for the authenticated account', async () => {
     const db = createFakeDb();
     db.applyPlanCreate.mockResolvedValue({

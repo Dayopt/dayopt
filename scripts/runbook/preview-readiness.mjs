@@ -64,6 +64,7 @@ export async function observePreviewReadiness({
   githubToken,
   supabaseToken,
   bypassSecret,
+  trustedOidcToken = /** @type {string | undefined} */ (undefined),
   requireRunnablePullRequest = true,
   fetchImpl = fetch,
   now = () => new Date(),
@@ -95,7 +96,7 @@ export async function observePreviewReadiness({
     'invalid expected migration set',
   );
   requireCondition(
-    [githubToken, supabaseToken, bypassSecret].every(
+    [githubToken, supabaseToken, trustedOidcToken ?? bypassSecret].every(
       (value) => typeof value === 'string' && value.trim(),
     ),
     'platform read credentials and automation bypass are required',
@@ -158,7 +159,10 @@ export async function observePreviewReadiness({
   const appFetch = (url, options) =>
     fetchImpl(url, {
       ...options,
-      headers: { 'x-vercel-protection-bypass': bypassSecret },
+      headers:
+        trustedOidcToken !== undefined
+          ? { 'x-vercel-trusted-oidc-idp-token': trustedOidcToken }
+          : { 'x-vercel-protection-bypass': bypassSecret },
     });
   const version = await readJson(`${origin}/api/health/version`, null, appFetch);
   requireCondition(

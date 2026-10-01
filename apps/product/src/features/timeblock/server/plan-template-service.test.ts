@@ -93,13 +93,15 @@ const blocks = [
 const settings = { timezone: 'Asia/Tokyo', default_duration: 45 };
 
 function recordRows(activityId: string, minutes: number, count: number) {
+  // 直近4週の集計を守る fixture。固定日が実時計の窓から外れて中央値が消えるのを防ぐ。
+  const start = Date.now() - 7 * 24 * 60 * 60 * 1_000;
   return Array.from({ length: count }, (_, index) => ({
     id: `rec-${index}`,
     activity_id: activityId,
 
     source: 'manual',
-    start_at: '2026-09-01T00:00:00.000Z',
-    end_at: new Date(Date.parse('2026-09-01T00:00:00.000Z') + minutes * 60_000).toISOString(),
+    start_at: new Date(start).toISOString(),
+    end_at: new Date(start + minutes * 60_000).toISOString(),
   }));
 }
 
@@ -123,6 +125,7 @@ describe('PlanTemplateService', () => {
 
   describe('list', () => {
     it('中央値（n>=3）を着せ、無い activity と未分類は user_settings の既定長を着せる', async () => {
+      // 守ること: 集計可能な実績は中央値を使い、実績がないブロックだけ既定長にする。
       const { supabase } = createSupabaseStub({
         plan_templates: [{ data: [template], error: null }],
         plan_template_blocks: [{ data: blocks, error: null }],
@@ -139,6 +142,41 @@ describe('PlanTemplateService', () => {
         45, // n < 3 → 既定長 45
         45, // 未分類 → 既定長 45
       ]);
+    });
+
+    it('28日前の境界をまたぐ記録は集計窓内の時間だけを中央値に使う', async () => {
+      vi.setSystemTime(new Date('2026-09-29T00:45:00.000Z'));
+      const { supabase, calls } = createSupabaseStub({
+        plan_templates: [{ data: [template], error: null }],
+        plan_template_blocks: [{ data: [blocks[0]], error: null }],
+        user_settings: [{ data: settings, error: null }],
+        records: [
+          {
+            data: recordRows(ACTIVITY_A, 90, 3).map((record) => ({
+              ...record,
+              start_at: '2026-09-01T00:00:00.000Z',
+              end_at: '2026-09-01T01:30:00.000Z',
+            })),
+            error: null,
+          },
+        ],
+      });
+      const service = new PlanTemplateService(supabase, createCommands(), () => supabase);
+
+      const result = await service.list(USER_ID);
+
+      // 9月1日00:00〜01:30のうち、00:45以降の45分だけが28日の窓に残る。
+      expect(result[0]?.blocks[0]?.previewDurationMinutes).toBe(45);
+      expect(calls).toContainEqual({
+        table: 'records',
+        method: 'gt',
+        args: ['end_at', '2026-09-01T00:45:00.000Z'],
+      });
+      expect(calls).toContainEqual({
+        table: 'records',
+        method: 'lt',
+        args: ['start_at', '2026-09-29T00:45:00.000Z'],
+      });
     });
 
     it('template が無ければ blocks も records も読まない', async () => {
@@ -272,6 +310,7 @@ describe('PlanTemplateService', () => {
 
   describe('apply', () => {
     it('中央値 / 既定長 / archived を反映した行を 1 回の bulk command へ渡し、Plan 行を返す', async () => {
+      // 守ること: 実績の中央値とアーカイブ状態を反映した予定を一括作成へ渡す。
       const created = [{ id: 'plan-1' }, { id: 'plan-2' }, { id: 'plan-3' }] as PlanRow[];
       const commands = createCommands();
       commands.createPlansBulk.mockResolvedValue(created);
