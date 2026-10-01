@@ -8,6 +8,7 @@ import {
   executeEncryptedFixtureBroker,
   executeFixtureBroker,
 } from './preview-fixture-broker.mjs';
+import { handlePreviewFixtureRequest } from './preview-fixture-http.mjs';
 
 import {
   decryptPreviewFixtureEnvelope,
@@ -727,5 +728,102 @@ describe('authenticated Preview fixture executor with installed Supabase SDK', (
     p.failures.table = '';
     await expect(p.run()).rejects.toThrow(/^Preview fixture operation failed$/);
     expect([...p.tables.get('categories')!.values()]).toEqual([before]);
+  });
+});
+
+describe('Preview broker HTTP admission', () => {
+  const request = (body: unknown = { input, publicKey: 'synthetic' }, bearer = token()) =>
+    new Request(`${input.origin}/api/preview-fixtures`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${bearer}` },
+      body: JSON.stringify(body),
+    });
+  it('authenticates a real signed token but keeps provision closed before key access', async () => {
+    const fetchImpl = vi.fn(async () => Response.json({ keys: [jwk] }));
+    const guarded = { ...env };
+    Object.defineProperty(guarded, 'SUPABASE_SECRET_KEY', {
+      get() {
+        throw new Error('key accessed');
+      },
+    });
+    const response = await handlePreviewFixtureRequest(request(), {
+      env: guarded,
+      fetchImpl,
+      now: () => now,
+    });
+    expect(response.status).toBe(503);
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(response.headers.get('cache-control')).toBe('no-store');
+    expect(await response.text()).not.toContain(token());
+  });
+  it.each(['production', 'development', undefined])(
+    'rejects %s before network or credentials',
+    async (mode) => {
+      const fetchImpl = vi.fn();
+      const response = await handlePreviewFixtureRequest(request(), {
+        env: { ...env, VERCEL_ENV: mode },
+        fetchImpl,
+      });
+      expect(response.status).toBe(404);
+      expect(fetchImpl).not.toHaveBeenCalled();
+    },
+  );
+  it('rejects invalid signature without reflecting request data', async () => {
+    const bad = token().slice(0, -12) + 'AAAAAAAAAAAA';
+    const response = await handlePreviewFixtureRequest(request(undefined, bad), {
+      env,
+      now: () => now,
+      fetchImpl: async () => Response.json({ keys: [jwk] }),
+    });
+    expect(response.status).toBe(403);
+    expect(await response.text()).toBe('{"error":"Preview fixture request rejected"}');
+  });
+  it.each([
+    { input, publicKey: 'x', env },
+    { input: { ...input, origin: 'https://attacker.invalid' }, publicKey: 'x' },
+  ])('rejects extra authority or wrong origin', async (body) => {
+    const fetchImpl = vi.fn();
+    const response = await handlePreviewFixtureRequest(request(body), { env, fetchImpl });
+    expect([400, 403]).toContain(response.status);
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+  it('bounds streamed bytes independently of content-length', async () => {
+    const response = await handlePreviewFixtureRequest(request('x'.repeat(49 * 1024)), { env });
+    expect(response.status).toBe(413);
+  });
+  it('rejects missing bearer', async () => {
+    const response = await handlePreviewFixtureRequest(request(undefined, ''), { env });
+    expect(response.status).toBe(401);
+  });
+  it('rejects an alias even when the body names the immutable deployment', async () => {
+    const original = request();
+    const aliased = new Request(
+      'https://product-git-codex-example-dayopt.vercel.app/api/preview-fixtures',
+      original,
+    );
+    const fetchImpl = vi.fn();
+    expect((await handlePreviewFixtureRequest(aliased, { env, fetchImpl })).status).toBe(403);
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+  it.each([
+    ['origin', 'https://untrusted.invalid'],
+    ['content-encoding', 'gzip'],
+    ['content-type', 'text/plain'],
+  ])('rejects unsupported %s before OIDC lookup', async (name, value) => {
+    const selected = request();
+    selected.headers.set(name, value);
+    const fetchImpl = vi.fn();
+    expect((await handlePreviewFixtureRequest(selected, { env, fetchImpl })).status).toBe(400);
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+  it('rejects cleanup on the provision-only HTTP surface', async () => {
+    const fetchImpl = vi.fn();
+    const selected = { ...input, operation: 'cleanup' };
+    const response = await handlePreviewFixtureRequest(
+      request({ input: selected, publicKey: null }, token(selected)),
+      { env, fetchImpl },
+    );
+    expect(response.status).toBe(400);
+    expect(fetchImpl).not.toHaveBeenCalled();
   });
 });

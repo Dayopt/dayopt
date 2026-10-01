@@ -5,6 +5,7 @@ import { withSentryConfig } from '@sentry/nextjs';
 import createNextIntlPlugin from 'next-intl/plugin';
 import { fileURLToPath } from 'url';
 
+import { productPageExtensions } from './preview-route-extensions.mjs';
 import {
   assertProductDeploymentEnvironmentBuildEnv,
   assertProductIntegrationBuildEnv,
@@ -32,6 +33,7 @@ assertProductOperationalProductionBuildEnv(process.env);
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  pageExtensions: productPageExtensions(),
   outputFileTracingIncludes: {
     '/opengraph-image': ['../../packages/assets/fonts/*.ttf'],
   },

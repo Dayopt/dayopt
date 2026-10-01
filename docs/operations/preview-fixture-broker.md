@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-09-30
+last_verified: 2026-10-01
 code: scripts/lib/preview-fixture-broker.mjs
 ---
 
@@ -10,7 +10,7 @@ DB 変更 PR の Supabase branch でも、毎 PR の secret 保存や手動 sign
 
 ## 現在の状態
 
-実装済みなのは [短命認証コア](../../scripts/lib/preview-fixture-authority.mjs) と [予定ユーザーの実行処理](../../scripts/lib/preview-fixture-broker.mjs)。実行処理は、永続的に操作順と終了状態を管理する adapter が渡されなければ、管理キーを読む前に拒否する。`executeDurableFixtureBroker`でtarget/OIDC確認後に永続adapterとSDK bridgeを構成するサーバー内接続処理を用意した。lifecycle RPCは固定URLのPOSTだけに制限し、送信前にtarget/OIDCとabortを再確認する。broker API、fixture の寿命、workflow の job 分離にはまだ接続していない。既存の共有 Preview runner の認証や権限は変更していない。
+実装済みなのは [短命認証コア](../../scripts/lib/preview-fixture-authority.mjs) と [予定ユーザーの実行処理](../../scripts/lib/preview-fixture-broker.mjs)。実行処理は、永続的に操作順と終了状態を管理する adapter が渡されなければ、管理キーを読む前に拒否する。`executeDurableFixtureBroker`でtarget/OIDC確認後に永続adapterとSDK bridgeを構成するサーバー内接続処理を用意した。lifecycle RPCは固定URLのPOSTだけに制限し、送信前にtarget/OIDCとabortを再確認する。Preview限定のPOST `/api/preview-fixtures`を追加したが、認証後のsource admissionで503を返し、fixture作成は開放していない。fixture の寿命とworkflow の job 分離にはまだ接続していない。既存の共有 Preview runner の認証や権限は変更していない。
 
 ローカルの署名・拒否テストが成功しても、GitHub の実 OIDC 発行、Preview サーバーの system env、実際のログインや回収が動いた証拠にはならない。共有 Integration が別の検証で凍結中なら、source 作業だけを進める。
 
@@ -122,6 +122,12 @@ source と workflow は Git で復元できる。実証時の mutation は選択
 
 Trusted Sources用audienceは`urn:dayopt:preview-access:v1`。fixture操作用audienceとは異なり、broker操作の署名検証では拒否する。発行者はGitHub Actions、repository/ownerの固定ID、`Dayopt/dayopt`、`refs/heads/integration`、`.github/workflows/ci.yml`、`Preview – product` environment、workflow SHA/run/attemptを照合する。Vercel側ではこのaudienceと同じrepository/workflow/environment identityを要求し、到達先environmentをPreviewだけに限定する設定が必要。設定保存・実OIDC疎通は未実施。Playwright/readinessはTrusted Sources headerを使用し、欠落時にproject bypassへfallbackしない。redirectと他originへcredentialを転送しない。
 
-現在は[workflow admission](../../scripts/ci/preview-prepared-admission.mjs)がephemeral実行をcredential注入前に停止する。環境変数・404・削除応答・経過時間では解除できない。公開broker route、trusted provision/consumerの実job間配線、送信済みAuth要求の終端保証が揃っていないためであり、DBを作成しても実受入は開始しない。このsource gateの撤去にはその実装と検証が必要。今回の接続はライブラリと故障テストの証拠であって、実Cloud job間転送の証拠ではない。
+現在は[workflow admission](../../scripts/ci/preview-prepared-admission.mjs)がephemeral実行をcredential注入前に停止する。環境変数・404・削除応答・経過時間では解除できない。公開broker routeは追加したが、trusted provision/consumerの実job間配線と送信済みAuth要求の終端保証が揃っていないためであり、DBを作成しても実受入は開始しない。このsource gateの撤去にはその実装と検証が必要。今回の接続はライブラリと故障テストの証拠であって、実Cloud job間転送の証拠ではない。
 
 回収trustはprovision開始後のfailure/cancelに加え、provision成功後に別jobが失敗したattemptも認証する。旧E2E経路と同じattemptで混在した場合は拒否。prepared由来の回収は旧delete-and-count処理へ流さず、read-only trust jobで公開`UNKNOWN` evidenceを保存してcredential-bearing jobを止める。別run再利用禁止とprovider終端確認は引き続き別条件であり、7日保持のartifactだけを永続的な外部隔離台帳と呼ばない。実workflowでのworker喪失、Auth遅延commit、回収後の非再作成は未達のまま。
+
+## HTTP入口の限定接続（2026-10-01）
+
+`route.preview.js`はVercel Preview buildだけが選ぶ拡張子を使い、Productionではroute manifestから除外する。実Next buildを使った回帰は同じroute sourceでPreviewの存在とProductionの不在を確認する。これは本体全体のProduction配備実測とは区別する。
+
+POSTはBearer JWTとapplication/jsonの固定入力だけを受け、Origin付きbrowser要求、圧縮body、48KiB超のstream、不正target/署名を拒否する。認証済みでもprepared admissionが503で止め、admin key/SDK mutationへ到達しない。source gate解除後のprovisionは既存の永続brokerと暗号化envelopeへ接続するが、解除は本変更の範囲外。cleanup/recover operationはこの入口では受け付けず、未実装のtrusted回収を成功扱いしない。固定エラーとno-storeだけを返し、body・JWT・provider errorをログへ出さない。
