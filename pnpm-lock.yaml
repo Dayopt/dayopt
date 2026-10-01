@@ -252,8 +252,8 @@ importers:
   .:
     devDependencies:
       '@ai-sdk/gateway':
-        specifier: 4.0.94
-        version: 4.0.94(zod@4.3.6)
+        specifier: 4.0.96
+        version: 4.0.96(zod@4.3.6)
       '@axe-core/playwright':
         specifier: catalog:tooling
         version: 4.13.0(playwright-core@1.63.0)
@@ -333,8 +333,8 @@ importers:
         specifier: catalog:tooling
         version: 10.0.8(storybook@10.6.0(@types/react@19.2.17)(prettier@3.9.9)(react@19.3.0))
       ai:
-        specifier: 7.0.116
-        version: 7.0.116(zod@4.3.6)
+        specifier: 7.0.118
+        version: 7.0.118(zod@4.3.6)
       babel-plugin-react-compiler:
         specifier: catalog:tooling
         version: 1.0.0
@@ -1200,8 +1200,8 @@ packages:
   '@adobe/css-tools@4.4.4':
     resolution: {integrity: sha512-Elp+iwUx5rN5+Y8xLt5/GRoG20WGoDCQ/1Fb+1LiGtvwbDavuSk0jhD/eZdckHAuzcDzccnkv+rEjyWfRx18gg==}
 
-  '@ai-sdk/gateway@4.0.94':
-    resolution: {integrity: sha512-hcp7GLnMynH6NfMnemgvW9acn7j3WsUe/dHFzX3/fhPit08xhm1aYmDGHMiIT6YwsXVBxkit9TriKb2SGAOg+Q==}
+  '@ai-sdk/gateway@4.0.96':
+    resolution: {integrity: sha512-1aniRTzEf9T7uRHdKnBQ36WgEVQswK6wDgkPVsNMl+sPy7otcmrBa2HEurdFBS51s1q3/UXlh8nNcguwU79Hkg==}
     engines: {node: '>=22'}
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
@@ -4909,8 +4909,8 @@ packages:
     resolution: {integrity: sha512-MnA+YT8fwfJPgBx3m60MNqakm30XOkyIoH1y6huTQvC0PwZG7ki8NacLBcrPbNoo8vEZy7Jpuk7+jMO+CUovTQ==}
     engines: {node: '>= 14'}
 
-  ai@7.0.116:
-    resolution: {integrity: sha512-gmkVGPzTNPcJixBiG9zUvP3gmvwko85dHiKrxFKK0zcVJIIu1FP6YDo3jna+ZrC2twMAsUPLr5htCwZjCINH3Q==}
+  ai@7.0.118:
+    resolution: {integrity: sha512-ZjkbbOffH09yQAjeZ5yGXd8ePTQlFIyKH5aW0s0LOMmvaR1TSoeg5wVURwLvFry/IzzaLndmw9glTKwWRoog3Q==}
     engines: {node: '>=22'}
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
@@ -9912,7 +9912,7 @@ snapshots:
 
   '@adobe/css-tools@4.4.4': {}
 
-  '@ai-sdk/gateway@4.0.94(zod@4.3.6)':
+  '@ai-sdk/gateway@4.0.96(zod@4.3.6)':
     dependencies:
       '@ai-sdk/provider': 4.0.18
       '@ai-sdk/provider-utils': 5.0.49(zod@4.3.6)
@@ -13585,9 +13585,9 @@ snapshots:
 
   agent-base@7.1.4: {}
 
-  ai@7.0.116(zod@4.3.6):
+  ai@7.0.118(zod@4.3.6):
     dependencies:
-      '@ai-sdk/gateway': 4.0.94(zod@4.3.6)
+      '@ai-sdk/gateway': 4.0.96(zod@4.3.6)
       '@ai-sdk/provider': 4.0.18
       '@ai-sdk/provider-utils': 5.0.49(zod@4.3.6)
       zod: 4.3.6
@@ -16118,7 +16118,7 @@ snapshots:
 
   jest-worker@27.5.1:
     dependencies:
-      '@types/node': 24.13.4
+      '@types/node': 24.19.0
       merge-stream: 2.0.0
       supports-color: 8.1.1
 
