@@ -116,7 +116,7 @@
     "agent:preflight": "node scripts/tasks/agent-preflight.mjs"
   },
   "devDependencies": {
-    "@ai-sdk/gateway": "4.0.94",
+    "@ai-sdk/gateway": "4.0.96",
     "@axe-core/playwright": "catalog:tooling",
     "@axe-core/react": "catalog:tooling",
     "@commitlint/cli": "^20.5.3",
@@ -143,7 +143,7 @@
     "@vitest/coverage-istanbul": "catalog:tooling",
     "@vitest/ui": "catalog:tooling",
     "@vueless/storybook-dark-mode": "catalog:tooling",
-    "ai": "7.0.116",
+    "ai": "7.0.118",
     "babel-plugin-react-compiler": "catalog:tooling",
     "eslint": "catalog:tooling",
     "eslint-config-next": "catalog:tooling",
