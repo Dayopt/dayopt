@@ -48,7 +48,7 @@ chmod -a 'user:dayopt-agent deny list,search' /Users/tanakatomoya
 
 専用ユーザーへログインし、そのホームに新しい作業コピーを作る。人間の checkout や認証ディレクトリへの symlink / shared mount は使わない。既存の Homebrew の Node / op / codex を利用する場合は、専用ユーザーから executable とその配置先を変更できないことを確認する。
 
-この branch の `scripts/tasks/agent-service-account.mjs` は Node の組み込みモジュールだけを使うため、リポジトリ全体や認証ファイルを移さずに bootstrap できる。まだ push されていないので、通常の clone に含まれるとは扱わない。人間がこのファイルだけを読取専用の受け渡し先へ置き、専用ユーザー側へコピーする。
+`scripts/tasks/agent-service-account.mjs` は Node の組み込みモジュールだけを使うため、リポジトリ全体や認証ファイルを移さずに bootstrap できる。この変更を含む revision を取得する。共有パスから bootstrap する場合は、人間がこのファイルだけを読取専用の受け渡し先へ置き、専用ユーザー側へコピーする。
 
 SA token の手入力は専用ユーザーの Terminal で行う。次は Bash 用で、値は入力中に表示せず、shell 設定やファイルへ保存しない。トークンを chat に送らない。
 
