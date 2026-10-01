@@ -2,6 +2,7 @@ import { expect, type Locator, type Page } from '@playwright/test';
 import { createClient } from '@supabase/supabase-js';
 
 import type { Database } from '@/lib/database';
+import { resolvePreviewCloudUserId } from '../preview-cloud-identity';
 import { recordPreviewUser } from '../preview-user-lifecycle';
 import { REPORT_ALLOCATION } from './report-selectors';
 import { suppressConsentBanner } from './suppress-consent-banner';
@@ -22,6 +23,7 @@ const ONE_HOUR_SPAN = '1時間';
 export type AdminSupabase = ReturnType<typeof createClient<Database>>;
 
 interface CriticalPathIdentity {
+  prefix?: string;
   userId: string;
   email: string;
   password: string;
@@ -31,8 +33,10 @@ interface CriticalPathIdentity {
 
 export function createCriticalPathIdentity(prefix: string): CriticalPathIdentity {
   const runId = crypto.randomUUID();
+  const userId = resolvePreviewCloudUserId(prefix) ?? crypto.randomUUID();
   return {
-    userId: crypto.randomUUID(),
+    prefix,
+    userId,
     email: `${prefix}-${runId}@example.com`,
     password: crypto.randomUUID(),
     activityName: `Journey ${runId.slice(0, 8)}`,
@@ -75,6 +79,10 @@ export async function seedCriticalPathUser(
   identity: CriticalPathIdentity,
   fullName: string,
 ) {
+  const expectedCloudUserId = resolvePreviewCloudUserId(identity.prefix ?? '');
+  if (expectedCloudUserId && expectedCloudUserId !== identity.userId.toLowerCase()) {
+    throw new Error('Preview Cloud identity configuration is invalid');
+  }
   recordPreviewUser(identity.userId, 'creating');
   const { data: authData, error: authError } = await admin.auth.admin.createUser({
     id: identity.userId,

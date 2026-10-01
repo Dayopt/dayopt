@@ -176,7 +176,7 @@ TS の `PRODUCT_EVENT_NAMES` と DB の CHECK 制約の両方で定義される�
 
 ## 設定
 
-### env 変数（60）
+### env 変数（62）
 
 名前と所在だけを載せる（値は 1Password にあり、この生成物は触らない）。
 
@@ -233,11 +233,13 @@ TS の `PRODUCT_EVENT_NAMES` と DB の CHECK 制約の両方で定義される�
 | `SUPABASE_ACCESS_TOKEN`                  | no   | secret     | production          | supabase-cli                    | —                          |
 | `SUPABASE_AUTH_AUDIT_TOKEN`              | yes  | secret     | production          | supabase-auth-audit             | —                          |
 | `SUPABASE_DB_PASSWORD`                   | yes  | secret     | production          | supabase                        | —                          |
-| `SUPABASE_SECRET_KEY`                    | yes  | secret     | production          | supabase                        | —                          |
+| `SUPABASE_PREVIEW_READINESS_TOKEN`       | no   | secret     | staging             | preview-e2e                     | —                          |
+| `SUPABASE_SECRET_KEY`                    | yes  | secret     | production, staging | supabase, preview-e2e           | —                          |
 | `SUPABASE_STORAGE_RLS_AUDIT_TOKEN`       | yes  | secret     | production          | supabase-storage-rls-audit      | —                          |
 | `TURNSTILE_SECRET_KEY`                   | no   | secret     | shared              | turnstile                       | —                          |
 | `UPSTASH_REDIS_REST_TOKEN`               | no   | secret     | staging, production | upstash                         | —                          |
 | `UPSTASH_REDIS_REST_URL`                 | no   | secret     | staging, production | upstash                         | —                          |
+| `VERCEL_AUTOMATION_BYPASS_SECRET`        | no   | secret     | staging             | preview-e2e                     | —                          |
 | `VERCEL_BYPASS_PRODUCT`                  | yes  | secret     | production          | vercel-production               | —                          |
 | `VERCEL_BYPASS_WEB`                      | yes  | secret     | production          | vercel-production               | —                          |
 | `VERCEL_TEAM_ID`                         | yes  | public     | production          | vercel-production               | —                          |

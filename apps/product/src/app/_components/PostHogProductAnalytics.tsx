@@ -16,6 +16,7 @@ import { usePathname } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 
 import { useAuthStore } from '@/features/auth';
+import { resolveDayoptEnvironment } from '@/lib/dayopt-environment';
 import { captureUnexpectedError } from '@/lib/sentry';
 import { vanillaTrpc } from '@/lib/trpc/client';
 
@@ -72,7 +73,23 @@ export function PostHogProductAnalytics() {
 
   useEffect(() => {
     const projectKey = process.env.NEXT_PUBLIC_POSTHOG_PROJECT_KEY;
+    const environment = resolveDayoptEnvironment({
+      dayoptEnvironment: process.env.NEXT_PUBLIC_DAYOPT_ENVIRONMENT,
+      publicDayoptEnvironment: process.env.NEXT_PUBLIC_DAYOPT_ENVIRONMENT,
+      vercelEnvironment: process.env.NEXT_PUBLIC_VERCEL_ENV,
+      vercelTargetEnvironment: process.env.NEXT_PUBLIC_VERCEL_TARGET_ENV,
+      vercelGitCommitRef: process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_REF,
+      vercelProjectId: process.env.NEXT_PUBLIC_VERCEL_PROJECT_ID,
+      vercelBranchUrl: process.env.NEXT_PUBLIC_VERCEL_BRANCH_URL,
+      vercelUrl: process.env.NEXT_PUBLIC_VERCEL_URL,
+      appUrl: process.env.NEXT_PUBLIC_APP_URL,
+      supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL,
+    });
     if (!hasConsent()) {
+      stopPostHogBrowser(projectKey);
+      return;
+    }
+    if (environment === 'integration' || environment === 'unknown') {
       stopPostHogBrowser(projectKey);
       return;
     }
@@ -82,12 +99,7 @@ export function PostHogProductAnalytics() {
     let active = true;
     void startPostHogBrowser({
       projectKey,
-      environment:
-        process.env.NEXT_PUBLIC_VERCEL_ENV === 'production'
-          ? 'production'
-          : process.env.NEXT_PUBLIC_VERCEL_ENV === 'preview'
-            ? 'preview'
-            : 'development',
+      environment,
       surface: 'product',
       hasConsent,
     }).then(() => {
