@@ -151,7 +151,7 @@ catalogs:
     prettier: '^3.9.9'
     prettier-plugin-organize-imports: '^4.3.0'
     prettier-plugin-tailwindcss: '^0.8.1'
-    sharp: '^0.35.4'
+    sharp: '^0.35.5'
     storybook: '^10.6.0'
     tailwindcss: '^4.3.3'
     tsx: '^4.23.15'
