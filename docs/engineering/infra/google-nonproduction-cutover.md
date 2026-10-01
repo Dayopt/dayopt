@@ -26,6 +26,8 @@ Calendar client IDと`GOOGLE_CALENDAR_PROJECT_NUMBER`はDBのcanonical identity�
 
 2026-10-01、Userが作成・指定した専用Googleアカウントを非本番OAuthのテストユーザーへ保存し、対象画面の1件の登録行とテストユーザー数1人を確認した。メールアドレス・アカウントのログイン情報は本書へ保存しない。scope一覧は全区分で未登録だった。ログイン用の`openid` / `userinfo.email` / `userinfo.profile`とCalendarのnarrow pairを選択したが、ページ全体のSaveは未実行。保存直前の確認を待つ未保存案であり、Google認可・データ取得は行っていない。
 
+続くUserの承認後、同じ非本番projectのSaveを実行し、「データアクセスの変更を保存しました」、5件の一覧、Save / 変更を破棄のdisabledを確認した。これにより前段の未保存状態を更新する。Calendarは`calendar.calendarlist.readonly` / `calendar.events.readonly`だけで、書き込みscopeと制限付きscopeは登録していない。OAuthの実認可・token交換・Calendar同期は未実行。
+
 1. テストに使うGoogleアカウントをUserが指定し、非本番OAuthのテストユーザーへ登録する。サポートメールの選択をtest user追加の許可とみなさない。Calendar用データは専用テストカレンダーに用意する。
 2. Calendar APIの有効状態と、同意画面のscopeを確認する。Authの基本scopeと、Calendarコードの`openid` / `email` / `calendar.calendarlist.readonly` / `calendar.events.readonly`を照合する。未保存のscopeや未実施の認可を成功と扱わない。
 3. 固定Integration aliasが指すdeploymentの完全SHA、Preview target、git branch、Supabase refを取得し、その配信revisionのauthority契約を照合する。現在のcheckoutのコードだけでは判定しない。
@@ -53,6 +55,20 @@ Calendar client IDと`GOOGLE_CALENDAR_PROJECT_NUMBER`はDBのcanonical identity�
 
 基線の変化、対象ref不一致、RPCの相違、既存Google接続や取消処理の出現、readinessの権限拒否、配信revision不明は停止条件。DBのGoogle接続が空でも、他のDayoptデータが空とはみなさない。reset / purgeや旧grant取消を復旧手段にしない。
 
+### 非本番dry-run案の確認点
+
+scope保存後に同じ非本番refへ固定metadata queryを読み取りtransactionで再実行し、Google接続・authority project / fence・revoke operation / outboxが引き続き0件、2 RPCのfingerprintが上表と一致することを確認した。`app.settings.api_external_url`は存在しないため、SQL内のその設定値で接続先を証明する案は使えない。MCPの指定refを確認した今回の読み取り結果を、別の管理接続の接続先保証へ流用しない。
+
+Chromeで同refのSQL Editorを開き、URLとproject / branchのパンくずが`dayopt` / `integration Persistent`を示すことを確認した。初回の読み込み途中表示ではRole postgresを確認したが、管理権限での実行成功は未検証。queryは入力・保存・実行していない。SQL Editorは人間の管理操作の候補であり、agentの読み取りMCPを昇格する経路ではない。管理接続の確認と独立レビューを済ませるまで、実行可能なcutoverやCOMMIT手順として扱わない。
+
+既存の本番runbookとの差分案は次のとおり。実行用SQL・独立レビュー・backup・dry-runの成功はまだ用意できていない。
+
+- Google project / clientを上表の非本番identityへ固定する。
+- 本番runbookの「Google接続1件」の条件を「0件」へ変更し、既存Google接続のsnapshot / backfillが必要な場合は停止して再設計する。
+- 正当な管理実行経路で接続先refを独立に確認する。現在の読み取りMCPにrole / claimを追加して拒否を回避しない。
+- RPCのfingerprint・空の基線をtransaction内のlock後に再確認し、provision → 未activationのreadiness → activation → readinessの順序を保つ。
+- postconditionで非本番identity、project fence / quarantine fence各1件、Google接続0件、revoke operation / outbox0件、ready / activatedの条件を確認し、`ROLLBACK`する。rollback後に読み取り経路で空の基線へ戻ったことを確認する。
+
 ## 完了判定
 
-API有効化とclient / master作成、専用アカウントのテストユーザー登録は確認済み。scopeの保存、配信revisionのruntime接続照合、DB登録、replica切替、新clientでの実動作は未完了。切替前ならreplicaは旧状態を保持する。DBのidentity登録後は通常の設定巻き戻しだけでは復旧できないため、失敗時は再認可を止め、登録済みidentityを変更・削除せず原因を調べる。
+API有効化とclient / master作成、専用アカウントのテストユーザー登録、scope5件の保存は確認済み。配信revisionのruntime接続照合、DB登録、replica切替、新clientでの実動作は未完了。切替前ならreplicaは旧状態を保持する。DBのidentity登録後は通常の設定巻き戻しだけでは復旧できないため、失敗時は再認可を止め、登録済みidentityを変更・削除せず原因を調べる。
