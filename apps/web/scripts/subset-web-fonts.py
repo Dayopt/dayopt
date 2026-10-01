@@ -51,15 +51,16 @@ ja_landing = json.loads((WEB / "messages/ja/marketing.json").read_text())["marke
 common = ja_common["common"]
 banner = common["cookies"]["banner"]
 header_text = "".join(common["navigation"][key] for key in ("home", "blog", "docs")) + common["actions"]["login"] + common["actions"]["signup"]
-footer_text = strings(ja_common["footer"]["sections"]) + strings(ja_common["footer"]["legal"]) + common["navigation"]["contact"] + common["cookies"]["settings"]["trigger"]
 # Chromium renders the immediately following calendar scene within its native
 # content-visibility look-ahead. Include that scene's default state, too, so it
 # cannot force the large deferred character sets into the first visit.
 calendar = ja_landing["calendar"]
 calendar_first = "".join(calendar[key] for key in ("kicker", "title1", "title2", "body1", "body2", "stepPlan", "stepRecord", "stepNext", "sample", "dateFirst", "weekdayFirst", "insightRecordCopy", "guide", "google"))
-critical_text = header_text + footer_text + strings(banner) + strings(common["theme"]) + "日本語" + strings(ja_landing["hero"]) + strings(ja_landing["experience"]) + calendar_first + symbols
+# The distant footer uses content-visibility and requests its glyphs on approach.
+# Do not let its controls enlarge fonts needed by the first visible scene.
+critical_text = header_text + strings(banner) + strings(ja_landing["hero"]) + strings(ja_landing["experience"]) + calendar_first + symbols
 critical_400 = japanese & {ord(char) for char in critical_text}
-medium_text = header_text + strings(ja_common["footer"]["sections"]) + banner["title"] + banner["necessaryOnly"] + banner["allowAnalytics"] + ja_landing["hero"]["cta"] + "".join(ja_landing["experience"][key] for key in ("plan", "record", "reading", "minuteUnit")) + "".join(calendar[key] for key in ("reading", "development", "walking", "insightRecord1", "insightRecord2"))
+medium_text = header_text + banner["title"] + banner["necessaryOnly"] + banner["allowAnalytics"] + ja_landing["hero"]["cta"] + "".join(ja_landing["experience"][key] for key in ("plan", "record", "reading", "minuteUnit")) + "".join(calendar[key] for key in ("reading", "development", "walking", "insightRecord1", "insightRecord2"))
 critical_500 = japanese & {ord(char) for char in medium_text}
 
 for source, name, codepoints, family, weight in (
