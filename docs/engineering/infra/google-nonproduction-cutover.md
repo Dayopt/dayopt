@@ -24,6 +24,8 @@ Calendar client IDと`GOOGLE_CALENDAR_PROJECT_NUMBER`はDBのcanonical identity�
 
 ## 実行順序
 
+2026-10-01、Userが作成・指定した専用Googleアカウントを非本番OAuthのテストユーザーへ保存し、対象画面の1件の登録行とテストユーザー数1人を確認した。メールアドレス・アカウントのログイン情報は本書へ保存しない。scope一覧は全区分で未登録だった。ログイン用の`openid` / `userinfo.email` / `userinfo.profile`とCalendarのnarrow pairを選択したが、ページ全体のSaveは未実行。保存直前の確認を待つ未保存案であり、Google認可・データ取得は行っていない。
+
 1. テストに使うGoogleアカウントをUserが指定し、非本番OAuthのテストユーザーへ登録する。サポートメールの選択をtest user追加の許可とみなさない。Calendar用データは専用テストカレンダーに用意する。
 2. Calendar APIの有効状態と、同意画面のscopeを確認する。Authの基本scopeと、Calendarコードの`openid` / `email` / `calendar.calendarlist.readonly` / `calendar.events.readonly`を照合する。未保存のscopeや未実施の認可を成功と扱わない。
 3. 固定Integration aliasが指すdeploymentの完全SHA、Preview target、git branch、Supabase refを取得し、その配信revisionのauthority契約を照合する。現在のcheckoutのコードだけでは判定しない。
@@ -53,4 +55,4 @@ Calendar client IDと`GOOGLE_CALENDAR_PROJECT_NUMBER`はDBのcanonical identity�
 
 ## 完了判定
 
-API有効化とclient / master作成は確認済み。テストユーザー、scope、配信revisionのruntime接続照合、DB登録、replica切替、新clientでの実動作は未完了。切替前ならreplicaは旧状態を保持する。DBのidentity登録後は通常の設定巻き戻しだけでは復旧できないため、失敗時は再認可を止め、登録済みidentityを変更・削除せず原因を調べる。
+API有効化とclient / master作成、専用アカウントのテストユーザー登録は確認済み。scopeの保存、配信revisionのruntime接続照合、DB登録、replica切替、新clientでの実動作は未完了。切替前ならreplicaは旧状態を保持する。DBのidentity登録後は通常の設定巻き戻しだけでは復旧できないため、失敗時は再認可を止め、登録済みidentityを変更・削除せず原因を調べる。
