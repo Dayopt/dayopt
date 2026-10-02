@@ -20,6 +20,8 @@ const createPlanMutate = vi.hoisted(() => vi.fn());
 const createRecordMutate = vi.hoisted(() => vi.fn());
 const openInspector = vi.hoisted(() => vi.fn());
 /** activityId → 記録の中央値（分）。空なら設定の既定の長さへフォールバックする */
+const statsPending = vi.hoisted(() => ({ value: false }));
+const resolveMedianMinutes = vi.hoisted(() => vi.fn());
 const medianMinutes = vi.hoisted(() => ({ value: new Map<string, number>() }));
 
 vi.mock('@/features/timeblock', async () => {
@@ -44,6 +46,8 @@ vi.mock('@/features/timeblock', async () => {
     }),
     useActivityMedianDurations: () => ({
       medianByActivityId: medianMinutes.value,
+      isPending: statsPending.value,
+      resolveMedianMinutes,
       getMedianMinutes: (activityId: string | null) =>
         activityId == null ? null : (medianMinutes.value.get(activityId) ?? null),
     }),
@@ -95,6 +99,8 @@ describe('useActivityQuickCreate', () => {
     hasConflict.value = false;
     laneItems.value = [];
     medianMinutes.value = new Map();
+    statsPending.value = false;
+    resolveMedianMinutes.mockReset();
     toastSuccess.mockClear();
     createPlanMutate.mockClear();
     createRecordMutate.mockClear();
@@ -103,6 +109,36 @@ describe('useActivityQuickCreate', () => {
 
   afterEach(() => {
     vi.useRealTimers();
+  });
+
+  it('統計待ちのタップは中央値で1回だけ保存し、連打で重複作成しない', async () => {
+    statsPending.value = true;
+    let release!: (value: number | null) => void;
+    resolveMedianMinutes.mockReturnValue(
+      new Promise<number | null>((resolve) => {
+        release = resolve;
+      }),
+    );
+    const { result } = renderHook(() => useActivityQuickCreate());
+    result.current({ activityId: 'activity-1', activityName: '開発' });
+    result.current({ activityId: 'activity-1', activityName: '開発' });
+    expect(createPlanMutate).not.toHaveBeenCalled();
+    expect(resolveMedianMinutes).toHaveBeenCalledTimes(1);
+    release(45);
+    await Promise.resolve();
+    expect(createPlanMutate).toHaveBeenCalledTimes(1);
+    const [input] = createPlanMutate.mock.calls[0] as [{ start_at: string; end_at: string }];
+    expect((Date.parse(input.end_at) - Date.parse(input.start_at)) / 60000).toBe(45);
+  });
+
+  it('取得後も中央値が無ければ設定値へフォールバックする', async () => {
+    statsPending.value = true;
+    resolveMedianMinutes.mockResolvedValue(null);
+    const { result } = renderHook(() => useActivityQuickCreate());
+    result.current({ activityId: 'activity-1', activityName: '開発' });
+    await Promise.resolve();
+    const [input] = createPlanMutate.mock.calls[0] as [{ start_at: string; end_at: string }];
+    expect((Date.parse(input.end_at) - Date.parse(input.start_at)) / 60000).toBe(60);
   });
 
   it('中央値の無いアクティビティは設定の既定の長さで保存する', () => {

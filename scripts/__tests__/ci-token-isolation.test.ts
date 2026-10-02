@@ -146,12 +146,18 @@ describe('calendar-navigation-e2e.yml の token 分離', () => {
       /- name: Run E2E tests[\s\S]*?run: ([\s\S]*?)\n        env:/,
     )?.[1];
     expect(command).toBeDefined();
-    expect(command?.match(/[\w-]+\.spec\.ts/g)).toEqual([
+    const filters = [...(command?.matchAll(/'([^']+)'/g) ?? [])].map((match) => match[1]!);
+    const files = [
       'calendar-initial-load.spec.ts',
       'critical-path.spec.ts',
       'calendar-navigation.spec.ts',
       'block-search.spec.ts',
-    ]);
+    ];
+    expect(filters).toHaveLength(files.length);
+    for (const file of [...files, 'mobile-critical-path.spec.ts']) {
+      const selected = filters.some((filter) => new RegExp(filter).test(`/repo/e2e/${file}`));
+      expect(selected, file).toBe(files.includes(file));
+    }
     expect(command?.match(/--project="[^"]+"/g)).toEqual([
       '--project="chromium"',
       '--project="Mobile Chrome"',
