@@ -7,6 +7,7 @@ export const JOB_MAX_AGE_MINUTES: Readonly<{
   'cleanup-calendar-authority-retention': 180;
   'expire-calendar-revoke-authority': 180;
   'finalize-calendar-revoke-guards': 180;
+  'billing-reconciliation': 1560;
 }>;
 
 export type CronHeartbeatJobName = keyof typeof JOB_MAX_AGE_MINUTES;
