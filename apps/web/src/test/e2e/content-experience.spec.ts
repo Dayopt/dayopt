@@ -143,6 +143,24 @@ test('未知のガイドは404を返し、ホームへ戻れる', async ({ page 
   await expect(page.locator('html')).toHaveAttribute('lang', 'ja');
 });
 
+test('Blog一覧は本文フォントを取得せず、記事を開くと本文の字形を取得する', async ({ page }) => {
+  const fonts: string[] = [];
+  page.on('request', (request) => {
+    if (/\/fonts\/NotoSansJP-/.test(request.url())) fonts.push(request.url());
+  });
+  await page.goto('/ja/blog');
+  await page.evaluate(() => document.fonts.ready);
+  expect(fonts.some((url) => url.includes('NotoSansJP-blog-meta-'))).toBe(true);
+  expect(fonts.some((url) => /NotoSansJP-(blog-body|content|full)-/.test(url))).toBe(false);
+  const bodyFont = page.waitForResponse((response) =>
+    /NotoSansJP-blog-body-.*\.woff2/.test(response.url()),
+  );
+  await page.locator('main article').first().getByRole('link').click();
+  expect((await bodyFont).status()).toBe(200);
+  await page.evaluate(() => document.fonts.ready);
+  await expect(page.locator('main article').first()).toBeVisible();
+});
+
 test('現在の文面では全文字フォントを読み込まず、任意入力の字形は補える', async ({ page }) => {
   const fullFontRequests: string[] = [];
   page.on('request', (request) => {

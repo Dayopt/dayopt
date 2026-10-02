@@ -36,7 +36,7 @@
   min-width: 0;
   font-family:
     var(--font-latin-subset), var(--font-noto-jp-hero), var(--font-noto-jp-subset),
-    'Dayopt Content JP', var(--font-stack-sans);
+    var(--font-reading-jp, 'Dayopt Content JP'), 'Dayopt Content JP', var(--font-stack-sans);
 }
 .eyebrow {
   margin: 0 0 24px;

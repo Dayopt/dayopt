@@ -19,7 +19,7 @@ export default async function DocsLayout({
   const navigation = await generateDocsNavigation(locale);
 
   return (
-    <ContentTypography className="bg-background flex min-h-screen flex-col">
+    <ContentTypography collection="docs" className="bg-background flex min-h-screen flex-col">
       {/* 共通ヘッダー（marketing と統一、sticky） */}
       <Header />
 

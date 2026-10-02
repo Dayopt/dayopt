@@ -14,5 +14,9 @@ interface LegalLayoutProps {
 }
 
 export default function LegalLayout({ children }: LegalLayoutProps) {
-  return <ContentTypography className="bg-background">{children}</ContentTypography>;
+  return (
+    <ContentTypography collection="legal" className="bg-background">
+      {children}
+    </ContentTypography>
+  );
 }

@@ -29,7 +29,7 @@ export const metadata: Metadata = {
 
 export default function BlogLayout({ children }: { children: React.ReactNode }) {
   return (
-    <ContentTypography className="bg-background min-h-screen">
+    <ContentTypography collection="blog" className="bg-background min-h-screen">
       {children}
       <Toaster />
     </ContentTypography>

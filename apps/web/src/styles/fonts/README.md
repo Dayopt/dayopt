@@ -6,7 +6,12 @@ in English and Japanese. Source Sans 3 retains its variable weight axis. Japanes
 uses the same 400 / 500 instances as before; their glyph outlines and advance
 widths are preserved. Content routes (docs, blog, legal, contact, search) additionally
 load a variable subset containing the characters in current MDX and messages.
-This avoids dozens of separate Unicode-range font requests for a reading page.
+Blog metadata, Blog body, Docs, and legal copy additionally have collection
+faces before that general fallback. The Blog metadata/body faces have disjoint
+character ranges: listings fetch only metadata glyphs, while articles can fetch
+the rest. All collections retain the source variable weight axis and pass the
+same outline/advance checks. This avoids loading an unrelated collection of
+characters for a reading page, and dozens of Unicode-range font requests.
 The remaining glyphs of that same Japanese font are one deferred local fallback,
 including arbitrary search queries and form input. It follows the current-copy
 faces in the font stack, so those faces satisfy known characters first. Its face
