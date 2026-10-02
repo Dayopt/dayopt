@@ -189,11 +189,16 @@ for (const { timezone, offset } of CASES) {
       }
       // 実 UI から隠す。mounted store と食い違う storage の直接書換えは、
       // sync effect に上書きされ得るため保存済み設定の fixture にならない。
+      // preferred_locale は ja。上の /en navigation の redirect に依存せず
+      // 操作する route とアクセシブル名を明示する。
+      await page.goto(`/ja/calendar?view=week&date=${TARGET_DATE}`);
+      await expect(seededCard).toBeVisible();
+      await page.waitForLoadState('networkidle');
       const activityRow = page.getByRole('listitem').filter({
         has: page.getByRole('button', { name: activityName, exact: true }),
       });
       await activityRow.hover();
-      await activityRow.getByRole('button', { name: 'Hide from calendar', exact: true }).click();
+      await activityRow.getByRole('button', { name: 'カレンダーから非表示', exact: true }).click();
       await expect(seededCard).toHaveCount(0);
       const persistedVisibility = () =>
         page.evaluate((id) => {
