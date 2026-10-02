@@ -1,4 +1,3 @@
-import { japaneseReadingFonts } from '@web/styles/fonts/preloads';
 import type { CSSProperties, ReactNode } from 'react';
 
 import '../../styles/fonts/japanese-collections.css';
@@ -11,20 +10,14 @@ export function ContentTypography({
   children,
   className,
   collection,
-  locale,
 }: {
   children: ReactNode;
   className?: string;
   collection?: 'blog' | 'docs' | 'legal';
-  locale?: string;
 }) {
   const family = collection
     ? `Dayopt ${collection.charAt(0).toUpperCase()}${collection.slice(1)} JP`
     : 'Dayopt Content JP';
-  const preloads = [
-    japaneseReadingFonts.regular,
-    ...(collection ? [japaneseReadingFonts.medium, japaneseReadingFonts[collection]] : []),
-  ];
   return (
     <div
       className={className}
@@ -35,17 +28,6 @@ export function ContentTypography({
         } as CSSProperties
       }
     >
-      {locale === 'ja' &&
-        preloads.map((href) => (
-          <link
-            key={href}
-            rel="preload"
-            as="font"
-            type="font/woff2"
-            crossOrigin="anonymous"
-            href={href}
-          />
-        ))}
       {children}
     </div>
   );

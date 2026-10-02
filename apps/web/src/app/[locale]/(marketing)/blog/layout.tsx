@@ -27,16 +27,9 @@ export const metadata: Metadata = {
   },
 };
 
-export default async function BlogLayout({
-  children,
-  params,
-}: {
-  children: React.ReactNode;
-  params: Promise<{ locale: string }>;
-}) {
-  const { locale } = await params;
+export default function BlogLayout({ children }: { children: React.ReactNode }) {
   return (
-    <ContentTypography locale={locale} collection="blog" className="bg-background min-h-screen">
+    <ContentTypography collection="blog" className="bg-background min-h-screen">
       {children}
       <Toaster />
     </ContentTypography>
