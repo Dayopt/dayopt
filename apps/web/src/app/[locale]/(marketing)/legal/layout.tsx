@@ -11,11 +11,13 @@ import { ContentTypography } from '@web/shell/layout/ContentTypography';
 
 interface LegalLayoutProps {
   children: ReactNode;
+  params: Promise<{ locale: string }>;
 }
 
-export default function LegalLayout({ children }: LegalLayoutProps) {
+export default async function LegalLayout({ children, params }: LegalLayoutProps) {
+  const { locale } = await params;
   return (
-    <ContentTypography collection="legal" className="bg-background">
+    <ContentTypography locale={locale} collection="legal" className="bg-background">
       {children}
     </ContentTypography>
   );

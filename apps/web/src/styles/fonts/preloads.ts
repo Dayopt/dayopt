@@ -3,3 +3,11 @@ export const japaneseBodyFonts = [
   '/fonts/NotoSansJP-critical400-d23924dddaaf.woff2',
   '/fonts/NotoSansJP-critical500-a8a9650bca36.woff2',
 ] as const;
+
+export const japaneseReadingFonts = {
+  regular: '/fonts/NotoSansJP-body400-6f2c99ac77e9.woff2',
+  medium: '/fonts/NotoSansJP-body500-fe4f2b7ec708.woff2',
+  blog: '/fonts/NotoSansJP-blog-meta-f72e28ca2f0e.woff2',
+  docs: '/fonts/NotoSansJP-docs-c38689a65db1.woff2',
+  legal: '/fonts/NotoSansJP-legal-744f97b6e48d.woff2',
+} as const;

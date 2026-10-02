@@ -143,6 +143,17 @@ test('未知のガイドは404を返し、ホームへ戻れる', async ({ page 
   await expect(page.locator('html')).toHaveAttribute('lang', 'ja');
 });
 
+test('日本語の読み物だけが必要な日本語フォントを先読みする', async ({ page }) => {
+  await page.goto('/contact');
+  await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+  await expect(page.locator('link[rel="preload"][as="font"][href*="NotoSansJP"]')).toHaveCount(0);
+  await page.goto('/ja/docs');
+  await expect(
+    page.locator('link[rel="preload"][as="font"][href*="NotoSansJP-docs-"]'),
+  ).toHaveCount(1);
+  await expect(page.locator('main h1')).toBeVisible();
+});
+
 test('Blog一覧は本文フォントを取得せず、記事を開くと本文の字形を取得する', async ({ page }) => {
   const fonts: string[] = [];
   page.on('request', (request) => {

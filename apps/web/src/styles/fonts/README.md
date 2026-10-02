@@ -18,7 +18,9 @@ faces in the font stack, so those faces satisfy known characters first. Its face
 declaration does not repeat thousands of Unicode ranges on every content page.
 The content subset is generated
 alongside the other subsets, with the same glyph and metrics checks, and loaded
-only by ContentTypography. It is not preloaded on the LP.
+only by ContentTypography. Japanese reading routes preload the body weights
+and the collection they use. English routes and the LP do not preload these
+reading fonts.
 The LP covers its current localized copy with the subsets and does not load the
 full Japanese font's large Unicode-range stylesheet.
 
