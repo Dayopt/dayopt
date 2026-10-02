@@ -1,13 +1,13 @@
 /**
  * Header（サイト共通ヘッダー）の Storybook Story。
  *
- * Header は 'use client' + useTranslations('common') の client component。
+ * Header は server で文言と URL を確定し、HeaderClient が操作を持つ。
  * Storybook の共有 decorator は空メッセージのため、story 内で NextIntlClientProvider を
  * self-provide して web の common.json（common namespace）を渡す。locale 駆動なので ja / en。
  */
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { NextIntlClientProvider } from 'next-intl';
-import { expect, userEvent, within } from 'storybook/test';
+import { expect, userEvent, waitFor, within } from 'storybook/test';
 
 import commonEn from '../../../messages/en/common.json';
 import commonJa from '../../../messages/ja/common.json';
@@ -62,10 +62,18 @@ export const MobileMenu: Story = {
     }
     const canvas = within(canvasElement);
     const openButton = await canvas.findByRole('button', { name: 'メニューを開く' });
+    const logo = canvas.getByRole('link', { name: 'Dayopt' }).getBoundingClientRect();
+    const signup = canvas.getByRole('link', { name: commonJa.common.actions.signup });
+    await expect(signup).toBeVisible();
+    await expect(logo.right).toBeLessThan(signup.getBoundingClientRect().left);
     await userEvent.click(openButton);
     // メニューは Radix Portal で document.body 直下に開く
-    const dialog = await within(document.body).findByRole('dialog');
+    const dialog = await within(document.body).findByRole('dialog', {}, { timeout: 5000 });
     await expect(dialog).toBeVisible();
+    const close = within(dialog).getByRole('button', { name: commonJa.common.aria.closeMenu });
+    await userEvent.click(close);
+    await waitFor(() => expect(dialog).not.toBeInTheDocument());
+    await waitFor(() => expect(openButton).toHaveFocus());
   },
 };
 

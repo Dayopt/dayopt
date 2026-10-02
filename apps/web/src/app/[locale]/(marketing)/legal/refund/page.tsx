@@ -1,5 +1,7 @@
 import { Link } from '@dayopt/i18n/navigation';
 import type { Locale } from '@dayopt/i18n/routing';
+import design from '@web/components/content/ContentDesign.module.css';
+import { EditorialHeader } from '@web/components/content/EditorialHeader';
 import type { Metadata } from 'next';
 import { getTranslations } from 'next-intl/server';
 
@@ -37,18 +39,20 @@ export default async function RefundPolicyPage({ params }: PageProps) {
   const lastUpdated = '2026-03-17';
 
   return (
-    <div className="bg-background container mx-auto min-h-screen max-w-4xl px-4 py-12 md:px-8 md:py-16">
+    <div className={design.page}>
       {/* ヘッダー */}
-      <div className="mb-8">
-        <h1 className="mb-2 text-3xl font-medium">{t('legal.refund.title')}</h1>
-        <p className="text-muted-foreground">{t('legal.refund.description')}</p>
-        <p className="text-muted-foreground mt-2 text-sm">
+      <EditorialHeader
+        eyebrow={t('common.contentDesign.legal')}
+        title={t('legal.refund.title')}
+        description={t('legal.refund.description')}
+      >
+        <p className={design.articleMeta}>
           {t('legal.lastUpdated')}: {lastUpdated}
         </p>
-      </div>
+      </EditorialHeader>
 
       {/* コンテンツ */}
-      <div className="space-y-8">
+      <div className={`${design.articleBody} space-y-8`}>
         {/* 1. 解約ポリシー */}
         <section>
           <h2 className="mb-4 text-2xl font-medium">

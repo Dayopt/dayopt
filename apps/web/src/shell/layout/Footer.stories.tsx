@@ -1,8 +1,8 @@
 /**
  * Footer（サイト共通フッター）の Storybook Story。
  *
- * Footer は 'use client' + useTranslations('common' / 'footer') の client component。
- * ThemeToggle / LanguageSwitcher を内包する。story 内で NextIntlClientProvider を
+ * Footer の静的な部分は server、ThemeToggle / LanguageSwitcher は client。
+ * story では同じ表示を NextIntlClientProvider で
  * self-provide し、common namespace と footer namespace を含む common.json を渡す。
  * locale 駆動なので ja / en。
  */

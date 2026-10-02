@@ -1,5 +1,8 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { expect, fn, userEvent, within } from 'storybook/test';
 
+import { BoundaryRecovery } from './BoundaryRecovery';
+import { GlobalErrorPresentation } from './GlobalErrorPresentation';
 import { RootErrorState } from './RootErrorState';
 
 const exampleError = new Error('Example render failure');
@@ -26,6 +29,28 @@ export const Development: Story = {
   args: { showDetails: true },
 };
 
+/** Recovery controls while the detailed view is loading or unavailable. */
+export const LoadingRecovery: Story = {
+  args: { onRetry: fn() },
+  render: (args) => <BoundaryRecovery {...args} />,
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(canvas.getByRole('button', { name: 'Try again' }));
+    await expect(args.onRetry).toHaveBeenCalledTimes(1);
+    await expect(canvas.getByRole('link', { name: 'Go home' })).toHaveAttribute('href', '/');
+  },
+};
+
+/** Global presentation keeps the current error boundary's retry callback. */
+export const Global: Story = {
+  args: { onRetry: fn() },
+  render: (args) => <GlobalErrorPresentation {...args} />,
+  play: async ({ canvasElement, args }) => {
+    await userEvent.click(within(canvasElement).getByRole('button', { name: 'Try again' }));
+    await expect(args.onRetry).toHaveBeenCalledTimes(1);
+  },
+};
+
 /** All supported error presentation states. */
 export const AllPatterns: Story = {
   parameters: {
@@ -47,6 +72,8 @@ export const AllPatterns: Story = {
     <div className="flex flex-col">
       <RootErrorState {...args} showDetails={false} />
       <RootErrorState {...args} showDetails />
+      <BoundaryRecovery {...args} />
+      <GlobalErrorPresentation {...args} />
     </div>
   ),
 };

@@ -1,6 +1,6 @@
 'use client';
 
-import * as Sentry from '@sentry/nextjs';
+import { getReadyBrowserSentryRuntime } from './browser-sentry-runtime';
 
 type ErrorBoundaryName = 'root_error' | 'global_error';
 
@@ -16,13 +16,10 @@ export function captureBoundaryError(
   if (capturedBoundaryErrors.has(error)) return;
   capturedBoundaryErrors.add(error);
 
-  Sentry.withScope((scope) => {
-    scope.setTags({
-      feature: 'web',
-      operation: 'react_render',
-      route: window.location.pathname,
-      source: boundary,
-    });
-    Sentry.captureException(error);
+  getReadyBrowserSentryRuntime()?.captureBoundaryError(error, {
+    feature: 'web',
+    operation: 'react_render',
+    route: window.location.pathname,
+    source: boundary,
   });
 }

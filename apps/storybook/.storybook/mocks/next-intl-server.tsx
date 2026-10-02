@@ -62,9 +62,13 @@ function createTranslator(locale: string, namespace?: string): Translator {
   const localeMessages = messagesByLocale[locale] ?? messagesByLocale[DEFAULT_LOCALE] ?? {};
   const scope = namespace ? resolvePath(localeMessages, namespace) : localeMessages;
 
-  const t = ((key: string) => {
+  const t = ((key: string, values?: Record<string, unknown>) => {
     const value = resolvePath(scope, key);
-    return typeof value === 'string' ? value : key;
+    return typeof value === 'string'
+      ? value.replace(/\{(\w+)\}/g, (placeholder, name: string) =>
+          values && name in values ? String(values[name]) : placeholder,
+        )
+      : key;
   }) as Translator;
 
   t.raw = (key: string) => resolvePath(scope, key);

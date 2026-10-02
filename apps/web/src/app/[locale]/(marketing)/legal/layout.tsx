@@ -7,10 +7,16 @@
  */
 import type { ReactNode } from 'react';
 
+import { ContentTypography } from '@web/shell/layout/ContentTypography';
+
 interface LegalLayoutProps {
   children: ReactNode;
 }
 
 export default function LegalLayout({ children }: LegalLayoutProps) {
-  return <div className="bg-background">{children}</div>;
+  return (
+    <ContentTypography collection="legal" className="bg-background">
+      {children}
+    </ContentTypography>
+  );
 }

@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 
-import { act, cleanup, render, screen } from '@testing-library/react';
+import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -8,17 +8,12 @@ import {
   BROWSER_TELEMETRY_CONSENT_STORAGE_KEY,
 } from '@dayopt/observability';
 
-const dynamicState = vi.hoisted(() => ({ callCount: 0 }));
-
 vi.mock('./PostHogWebAnalytics', () => ({ PostHogWebAnalytics: () => null }));
-
-vi.mock('next/dynamic', () => ({
-  default: () => {
-    const testId = dynamicState.callCount++ === 0 ? 'analytics' : 'speed-insights';
-    return function MockTelemetryComponent() {
-      return <div data-testid={testId} />;
-    };
-  },
+vi.mock('@vercel/analytics/react', () => ({
+  Analytics: () => <div data-testid="analytics" />,
+}));
+vi.mock('@vercel/speed-insights/next', () => ({
+  SpeedInsights: () => <div data-testid="speed-insights" />,
 }));
 
 import { persistBrowserTelemetryConsent } from '@web/platform/privacy/browser-telemetry-consent';
@@ -36,18 +31,18 @@ describe('Web analytics consent gate', () => {
     vi.unstubAllEnvs();
   });
 
-  it('mounts analytics once only after consent and removes it after revocation', () => {
+  it('mounts analytics once only after consent and removes it after revocation', async () => {
     render(<BrowserTelemetry />);
 
     expect(screen.queryByTestId('analytics')).toBeNull();
     expect(screen.queryByTestId('speed-insights')).toBeNull();
 
     act(() => persistBrowserTelemetryConsent(true));
-    expect(screen.getAllByTestId('analytics')).toHaveLength(1);
+    await waitFor(() => expect(screen.getAllByTestId('analytics')).toHaveLength(1));
     expect(screen.getAllByTestId('speed-insights')).toHaveLength(1);
 
     act(() => persistBrowserTelemetryConsent(true));
-    expect(screen.getAllByTestId('analytics')).toHaveLength(1);
+    await waitFor(() => expect(screen.getAllByTestId('analytics')).toHaveLength(1));
     expect(screen.getAllByTestId('speed-insights')).toHaveLength(1);
 
     act(() => persistBrowserTelemetryConsent(false));
@@ -62,10 +57,10 @@ describe('Web analytics consent gate', () => {
     expect(screen.queryByTestId('analytics')).toBeNull();
   });
 
-  it('unmounts analytics after another tab refuses consent', () => {
+  it('unmounts analytics after another tab refuses consent', async () => {
     persistBrowserTelemetryConsent(true);
     render(<BrowserTelemetry />);
-    expect(screen.getByTestId('analytics')).not.toBeNull();
+    await waitFor(() => expect(screen.getByTestId('analytics')).not.toBeNull());
 
     act(() => {
       localStorage.setItem(

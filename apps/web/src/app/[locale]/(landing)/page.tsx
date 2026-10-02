@@ -1,6 +1,6 @@
 import { dayoptBrand } from '@dayopt/config';
 import { routing } from '@dayopt/i18n/routing';
-import { LandingPage } from '@web/features/marketing';
+import { LandingPage } from '@web/features/marketing/landing';
 import { generateSEOMetadata } from '@web/platform/seo/metadata';
 import type { Metadata } from 'next';
 import { getTranslations, setRequestLocale } from 'next-intl/server';

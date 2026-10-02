@@ -9,6 +9,7 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from '@dayopt/components';
+import { useTranslations } from 'next-intl';
 
 interface ContentPaginationProps {
   currentPage: number;
@@ -23,6 +24,7 @@ export function ContentPagination({
   basePath,
   className,
 }: ContentPaginationProps) {
+  const t = useTranslations('common.aria');
   if (totalPages <= 1) return null;
 
   const generatePageUrl = (page: number) => {
@@ -63,13 +65,19 @@ export function ContentPagination({
   const visiblePages = getVisiblePages();
 
   return (
-    <Pagination className={className}>
+    <Pagination className={className} ariaLabel={t('pagination')}>
       <PaginationContent>
         <PaginationItem>
           {currentPage > 1 ? (
-            <PaginationPrevious href={generatePageUrl(currentPage - 1)} />
+            <PaginationPrevious
+              href={generatePageUrl(currentPage - 1)}
+              label={t('previous')}
+              ariaLabel={t('previous')}
+            />
           ) : (
             <PaginationPrevious
+              label={t('previous')}
+              ariaLabel={t('previous')}
               href="#"
               className="pointer-events-none opacity-50"
               aria-disabled="true"
@@ -81,7 +89,7 @@ export function ContentPagination({
           if (page === '...') {
             return (
               <PaginationItem key={`dots-${index}`}>
-                <PaginationEllipsis />
+                <PaginationEllipsis srLabel={t('morePages')} />
               </PaginationItem>
             );
           }
@@ -104,9 +112,15 @@ export function ContentPagination({
 
         <PaginationItem>
           {currentPage < totalPages ? (
-            <PaginationNext href={generatePageUrl(currentPage + 1)} />
+            <PaginationNext
+              href={generatePageUrl(currentPage + 1)}
+              label={t('next')}
+              ariaLabel={t('next')}
+            />
           ) : (
             <PaginationNext
+              label={t('next')}
+              ariaLabel={t('next')}
               href="#"
               className="pointer-events-none opacity-50"
               aria-disabled="true"

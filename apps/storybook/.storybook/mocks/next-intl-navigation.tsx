@@ -24,6 +24,7 @@ interface LinkProps extends Omit<AnchorHTMLAttributes<HTMLAnchorElement>, 'href'
   href: NavigationHref;
   children: ReactNode;
   locale?: string;
+  prefetch?: boolean | null | 'auto';
 }
 
 interface GetPathnameArgs {
@@ -124,7 +125,8 @@ function localizeHref(
 export function createNavigation(routing: RoutingConfig = {}) {
   const locales = routing.locales ?? ['en', 'ja'];
 
-  function MockLink({ href, children, locale, ...props }: LinkProps) {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- Next Link の制御 prop を DOM に渡さない
+  function MockLink({ href, children, locale, prefetch, ...props }: LinkProps) {
     const currentLocale = useLocale();
     const localizedHref = localizeHref(
       href,

@@ -1,0 +1,252 @@
+import AxeBuilder from '@axe-core/playwright';
+import { expect, test } from '@playwright/test';
+
+test('スマホのDocs目次から日本語の予定ガイドへ移動できる', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/ja/docs');
+  const contents = page.locator('[data-docs-mobile-navigation]');
+  await contents.locator('summary').click();
+  await contents.getByRole('link', { name: '予定を立てる', exact: true }).click();
+  await expect(page).toHaveURL(/\/ja\/docs\/plans$/);
+  await expect(page.locator('html')).toHaveAttribute('lang', 'ja');
+  await expect(page.getByRole('heading', { level: 1 })).toContainText('予定');
+  const nextPage = page.locator('main').getByRole('link', { name: /次.*カレンダー/ });
+  await expect(nextPage).toHaveAttribute('href', '/ja/docs/calendar');
+  await nextPage.click();
+  await expect(page).toHaveURL(/\/ja\/docs\/calendar$/);
+});
+
+test('日本語Docsのサイドバーは言語を保ったまま移動する', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.goto('/ja/docs');
+  await expect(
+    page.locator('aside').getByRole('link', { name: '予定を立てる', exact: true }),
+  ).toHaveAttribute('href', '/ja/docs/plans');
+  await page
+    .locator('aside')
+    .filter({ has: page.getByRole('link', { name: '予定を立てる', exact: true }) })
+    .getByRole('link', { name: '予定を立てる', exact: true })
+    .click();
+  await expect(page).toHaveURL(/\/ja\/docs\/plans$/);
+  await expect(page.locator('html')).toHaveAttribute('lang', 'ja');
+});
+
+test('Blog検索は結果を絞り込み、クリア後に記事を戻す', async ({ page }) => {
+  await page.goto('/ja/blog');
+  const articles = page.locator('main article');
+  await expect(articles).not.toHaveCount(0);
+  const search = page.getByPlaceholder('タイトル、内容、タグで検索...');
+  await search.fill('zz-no-dayopt-result');
+  await expect(articles).toHaveCount(0);
+  await expect(page.getByText('記事が見つかりませんでした')).toBeVisible();
+  await search.fill('');
+  await expect(articles).not.toHaveCount(0);
+  const firstTitle = await articles.first().locator('h2').textContent();
+  await page.getByRole('link', { name: '次へ', exact: true }).click();
+  await expect(page).toHaveURL(/\/ja\/blog\?page=2$/);
+  await expect(articles.first().locator('h2')).not.toHaveText(firstTitle!);
+  await page.getByRole('link', { name: '前へ', exact: true }).click();
+  await expect(articles.first().locator('h2')).toHaveText(firstTitle!);
+  await page.getByRole('link', { name: '設計思想', exact: true }).click();
+  await expect(page).toHaveURL(/\/ja\/blog\/philosophy$/);
+  await expect(page.locator('main nav a[aria-current="page"]')).toHaveText('設計思想');
+});
+
+test('実際の横断検索APIから予定ガイドを開ける', async ({ page }) => {
+  await page.goto('/search');
+  await page.getByLabel('Keywords', { exact: true }).fill('plans');
+  await page.getByRole('button', { name: 'Search', exact: true }).click();
+  const guide = page.locator('main').getByRole('link', { name: 'Create Plans', exact: true });
+  await expect(guide).toBeVisible();
+  await guide.click();
+  await expect(page).toHaveURL(/\/docs\/plans$/);
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Create Plans');
+});
+
+test('日本語の横断検索と対象切替は操作後の結果を表示する', async ({ page }) => {
+  await page.route('**/api/search?**', async (route) => {
+    const url = new URL(route.request().url());
+    expect(url.searchParams.get('locale')).toBe('ja');
+    await route.fulfill({
+      json: {
+        results: [
+          {
+            id: 'plan-guide',
+            title: '予定のガイド',
+            description: '予定を立てる方法',
+            url: '/ja/docs/plans',
+            type: 'docs',
+            breadcrumbs: [],
+            lastModified: '2026-10-02',
+          },
+          {
+            id: 'time-story',
+            title: '予定を考える記事',
+            description: '予定と時間の話',
+            url: '/ja/blog/timeboxing-guide',
+            type: 'blog',
+            breadcrumbs: [],
+            lastModified: '2026-10-02',
+          },
+        ],
+      },
+    });
+  });
+  await page.goto('/ja/search');
+  await expect(page.getByRole('link', { name: '予定のガイド' })).toHaveCount(0);
+  await page.getByLabel('キーワード', { exact: true }).fill('予定');
+  await page.getByRole('button', { name: '検索', exact: true }).click();
+  await expect(page).toHaveURL(/\/ja\/search\?q=/);
+  await expect(page.getByRole('link', { name: '予定のガイド' })).toBeVisible();
+  await expect(page.getByRole('link', { name: '予定を考える記事' })).toBeVisible();
+  await page.getByRole('button', { name: /ドキュメント 1/ }).click();
+  await expect(page.getByRole('link', { name: '予定を考える記事' })).toHaveCount(0);
+  await expect(page.getByRole('link', { name: '予定のガイド' })).toBeVisible();
+});
+
+test('検索エラーは結果ゼロと区別して案内する', async ({ page }) => {
+  await page.route('**/api/search?**', (route) =>
+    route.fulfill({ status: 503, json: { error: 'unavailable' } }),
+  );
+  await page.goto('/ja/search?q=plans');
+  await expect(page.getByRole('heading', { name: '検索できませんでした' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '一致する結果がありません' })).toHaveCount(0);
+  await expect(
+    page.locator('main').getByRole('link', { name: 'ドキュメント', exact: true }),
+  ).toHaveAttribute('href', '/ja/docs');
+});
+
+test('記事の横長テーブルはキーボードで横へ読める', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 844 });
+  await page.goto('/blog/timeboxing-guide');
+  const table = page.locator('main div[tabindex="0"]').filter({ has: page.locator('table') });
+  const overflowingTable = table.filter({
+    has: page.getByRole('cell', { name: 'Morning planning', exact: true }),
+  });
+  await overflowingTable.scrollIntoViewIfNeeded();
+  await overflowingTable.focus();
+  await expect(overflowingTable).toBeFocused();
+  const before = await overflowingTable.evaluate((element) => element.scrollLeft);
+  await page.keyboard.press('ArrowRight');
+  await expect
+    .poll(() => overflowingTable.evaluate((element) => element.scrollLeft))
+    .toBeGreaterThan(before);
+});
+
+test('未知のガイドは404を返し、ホームへ戻れる', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const response = await page.goto('/ja/docs/missing-dayopt-guide');
+  expect(response?.status()).toBe(404);
+  // dynamicParams=false の未知 slug は locale boundary より前に global 404 へ送られる。
+  await expect(page.getByRole('heading', { level: 1, name: 'Page not found' })).toBeVisible();
+  await page.getByRole('link', { name: 'Back to home', exact: true }).click();
+  await expect(page).toHaveURL(/\/ja$/);
+  await expect(page.locator('html')).toHaveAttribute('lang', 'ja');
+});
+
+test('Blog一覧は本文フォントを取得せず、記事を開くと本文の字形を取得する', async ({ page }) => {
+  const fonts: string[] = [];
+  page.on('request', (request) => {
+    if (/\/fonts\/NotoSansJP-/.test(request.url())) fonts.push(request.url());
+  });
+  await page.goto('/ja/blog');
+  await page.evaluate(() => document.fonts.ready);
+  expect(fonts.some((url) => url.includes('NotoSansJP-blog-meta-'))).toBe(true);
+  expect(fonts.some((url) => /NotoSansJP-(blog-body|content|full)-/.test(url))).toBe(false);
+  const bodyFont = page.waitForResponse((response) =>
+    /NotoSansJP-blog-body-.*\.woff2/.test(response.url()),
+  );
+  await page.locator('main article').first().getByRole('link').click();
+  expect((await bodyFont).status()).toBe(200);
+  await page.evaluate(() => document.fonts.ready);
+  await expect(page.locator('main article').first()).toBeVisible();
+});
+
+test('現在の文面では全文字フォントを読み込まず、任意入力の字形は補える', async ({ page }) => {
+  const fullFontRequests: string[] = [];
+  page.on('request', (request) => {
+    if (/\/fonts\/NotoSansJP-full-.*\.woff2/.test(request.url()))
+      fullFontRequests.push(request.url());
+  });
+  await page.goto('/ja/contact');
+  await page.evaluate(() => document.fonts.ready);
+  expect(fullFontRequests).toHaveLength(0);
+  const fontResponse = page.waitForResponse((response) =>
+    /\/fonts\/NotoSansJP-full-.*\.woff2/.test(response.url()),
+  );
+  const name = page.locator('input[name="name"]');
+  await name.fill('龍');
+  expect((await fontResponse).status()).toBe(200);
+  await page.evaluate(() => document.fonts.ready);
+  await expect(name).toHaveValue('龍');
+});
+
+test('JavaScript無効でもモバイルのガイドとBlogの登録導線が成立する', async ({
+  browser,
+}, testInfo) => {
+  const context = await browser.newContext({
+    javaScriptEnabled: false,
+    viewport: { width: 390, height: 844 },
+    storageState: process.env.WEB_E2E_STORAGE_STATE,
+  });
+  const page = await context.newPage();
+  const base = testInfo.project.use.baseURL;
+  await page.goto(`${base}/ja/docs`);
+  await page.locator('[data-docs-mobile-navigation] summary').click();
+  await expect(
+    page
+      .locator('[data-docs-mobile-navigation]')
+      .getByRole('link', { name: '予定を立てる', exact: true }),
+  ).toBeVisible();
+  await page.goto(`${base}/ja/blog`);
+  await expect(page.locator('main article')).not.toHaveCount(0);
+  await expect(page.getByRole('link', { name: '新規登録', exact: true })).toHaveAttribute(
+    'href',
+    'https://app.dayopt.app/auth/signup',
+  );
+  await context.close();
+});
+
+test('Blogのカテゴリは日本語フォント読み込みで記事を移動させない', async ({ page }) => {
+  await page.setViewportSize({ width: 412, height: 823 });
+  let releaseFont!: () => void;
+  const fontGate = new Promise<void>((resolve) => {
+    releaseFont = resolve;
+  });
+  await page.route('**/fonts/NotoSansJP-critical400-*.woff2', async (route) => {
+    await fontGate;
+    await route.continue();
+  });
+  await page.goto('/ja/blog', { waitUntil: 'domcontentloaded' });
+  const article = page.locator('main article').first();
+  await expect(article).toBeAttached();
+  // 他のフォントを先に読み込ませ、critical400 の切り替わりだけを測る。
+  await page.evaluate(async () => {
+    await Promise.all(
+      [...document.fonts]
+        .filter(
+          (font) =>
+            !['Dayopt Web JP', 'Dayopt Web JP Hero'].includes(font.family.replaceAll('"', '')),
+        )
+        .filter((font) => font.status === 'loading')
+        .map((font) => font.loaded),
+    );
+  });
+  const before = await article.boundingBox();
+  releaseFont();
+  await page.evaluate(() => document.fonts.ready);
+  const after = await article.boundingBox();
+  expect(Math.abs(after!.y - before!.y)).toBeLessThan(1);
+});
+
+for (const locale of ['en', 'ja']) {
+  for (const colorScheme of ['light', 'dark'] as const) {
+    test(`Docs ${locale} ${colorScheme}: 補助領域を読み上げで区別できる`, async ({ page }) => {
+      await page.setViewportSize({ width: 1440, height: 1000 });
+      await page.emulateMedia({ colorScheme });
+      await page.goto(locale === 'ja' ? '/ja/docs' : '/docs');
+      const result = await new AxeBuilder({ page }).withRules(['landmark-unique']).analyze();
+      expect(result.violations).toEqual([]);
+    });
+  }
+}

@@ -1,12 +1,13 @@
-'use client';
-
+import { LogoArtwork } from '@dayopt/assets/logo-artwork';
 import { Logo } from '@dayopt/components';
 import { dayoptBrand } from '@dayopt/config';
-import { Link } from '@dayopt/i18n/navigation';
 import { LanguageSwitcher } from '@web/components/ui/actions/language-switcher';
 import { ThemeToggle } from '@web/components/ui/actions/theme-toggle';
 import { CookieConsentSettings } from '@web/shell/privacy/CookieConsentSettings';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
+import { SiteLink as Link } from './SiteLink';
+
+import styles from './SiteChrome.module.css';
 
 // SNS Icons
 const XIcon = (props: React.SVGProps<SVGSVGElement>) => (
@@ -36,6 +37,7 @@ const YouTubeIcon = (props: React.SVGProps<SVGSVGElement>) => (
 );
 
 export function Footer() {
+  const locale = useLocale();
   const t = useTranslations('common');
   const tFooter = useTranslations('footer');
 
@@ -73,13 +75,13 @@ export function Footer() {
   ];
 
   return (
-    <footer className="bg-background border-border border-t">
-      <div className="mx-auto max-w-7xl px-6 pt-12 pb-8 lg:px-8">
+    <footer className={styles.footer} lang={locale}>
+      <div className={styles.inner}>
         {/* Navigation Grid */}
         <div className="xl:grid xl:grid-cols-3 xl:gap-8">
           {/* Logo */}
           <div>
-            <Link href="/" className="inline-block">
+            <Link href="/" prefetch={false} className={styles.logo}>
               <Logo variant="lockup" size="lg" />
             </Link>
           </div>
@@ -88,9 +90,9 @@ export function Footer() {
           <div className="mt-16 grid grid-cols-2 gap-8 md:grid-cols-3 xl:col-span-2 xl:mt-0">
             {/* Resources */}
             <div>
-              <h3 className="text-foreground text-base font-medium">
+              <h2 className="text-foreground text-base font-medium">
                 {tFooter('sections.resources')}
-              </h3>
+              </h2>
               <ul role="list" className="mt-6 space-y-4">
                 {navigation.resources.map((item) => (
                   <li key={item.name}>
@@ -106,9 +108,9 @@ export function Footer() {
             </div>
             {/* Support */}
             <div>
-              <h3 className="text-foreground text-base font-medium">
+              <h2 className="text-foreground text-base font-medium">
                 {tFooter('sections.support')}
-              </h3>
+              </h2>
               <ul role="list" className="mt-6 space-y-4">
                 {navigation.support.map((item) =>
                   'external' in item && item.external ? (
@@ -137,7 +139,7 @@ export function Footer() {
             </div>
             {/* Legal */}
             <div className="col-span-2 md:col-span-1">
-              <h3 className="text-foreground text-base font-medium">{tFooter('sections.legal')}</h3>
+              <h2 className="text-foreground text-base font-medium">{tFooter('sections.legal')}</h2>
               <ul role="list" className="mt-6 space-y-4">
                 {navigation.legal.map((item) => (
                   <li key={item.name}>
@@ -178,11 +180,11 @@ export function Footer() {
               ))}
             </div>
             {/* Copyright left, Settings right */}
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
               <p className="text-muted-foreground text-sm">
                 &copy; {new Date().getFullYear()} Dayopt, Inc.
               </p>
-              <div className="flex items-center gap-x-0">
+              <div className="flex items-center gap-x-2">
                 <ThemeToggle />
                 <LanguageSwitcher variant="full" />
               </div>
@@ -207,12 +209,15 @@ export function Footer() {
                   <item.icon aria-hidden="true" className="size-5" />
                 </a>
               ))}
-              <div className="ml-4 flex items-center gap-x-0">
+              <div className="ml-4 flex items-center gap-x-2">
                 <ThemeToggle />
                 <LanguageSwitcher variant="full" />
               </div>
             </div>
           </div>
+        </div>
+        <div className={styles.watermark} aria-hidden="true">
+          <LogoArtwork variant="wordmark" width={279.131} height={82} />
         </div>
       </div>
     </footer>

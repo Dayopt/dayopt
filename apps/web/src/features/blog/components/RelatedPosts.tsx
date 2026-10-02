@@ -1,7 +1,8 @@
 'use client';
 
-import { Container, Heading, Text } from '@dayopt/components';
+import { Heading, Text } from '@dayopt/components';
 import { Link } from '@dayopt/i18n/navigation';
+import design from '@web/components/content/ContentDesign.module.css';
 import { ArrowRight } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { BlogPostMeta } from '../lib/blog';
@@ -25,10 +26,10 @@ export function RelatedPosts({
   }
 
   return (
-    <section className="bg-container py-16">
-      <Container>
+    <section className="bg-muted border-border border-t">
+      <div className={design.page}>
         <div className="mx-auto max-w-6xl">
-          <div className="mb-12 text-center">
+          <div className="mb-12">
             <Heading as="h2" size="2xl" className="mb-4">
               {t('title')}
             </Heading>
@@ -38,11 +39,11 @@ export function RelatedPosts({
           </div>
 
           <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-3">
-            {posts.slice(0, 3).map((post, index) => (
+            {posts.slice(0, 3).map((post) => (
               <PostCard
                 key={post.slug}
                 post={post}
-                priority={index === 0}
+                priority={false}
                 layout="vertical"
                 locale={locale}
               />
@@ -62,7 +63,7 @@ export function RelatedPosts({
             </Link>
           </div>
         </div>
-      </Container>
+      </div>
     </section>
   );
 }

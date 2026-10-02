@@ -1,7 +1,7 @@
+import { Link } from '@dayopt/i18n/navigation';
 import { createMDXComponents } from '@web/components/content/ContentMDXComponents';
 import { generateAnchorId } from '@web/features/docs/lib/toc';
 import type { MDXComponents } from 'mdx/types';
-import Link from 'next/link';
 import type { ComponentPropsWithoutRef, ReactElement, ReactNode } from 'react';
 import { CopyCodeButton } from './CopyCodeButton';
 
@@ -50,6 +50,7 @@ function CodeBlock({ children, className }: CodeBlockProps) {
         <CopyCodeButton code={codeString} />
       </div>
       <pre
+        tabIndex={0}
         className={`hljs ${languageClass} bg-muted text-foreground overflow-x-auto rounded-lg p-4`}
       >
         <code className={languageClass}>{codeString}</code>
@@ -130,7 +131,9 @@ export const faqMdxComponents: MDXComponents = createMDXComponents({
         id={id}
         className="border-border bg-container mt-10 flex items-baseline gap-3 rounded-lg border px-4 py-4 text-xl font-medium first:mt-0"
       >
-        <span className="text-primary flex-shrink-0 text-base font-medium tracking-wide">Q.</span>
+        <span className="text-foreground flex-shrink-0 text-base font-medium tracking-wide">
+          Q.
+        </span>
         <span className="text-foreground">{props.children}</span>
       </h2>
     );

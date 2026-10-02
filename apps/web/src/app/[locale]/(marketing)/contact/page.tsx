@@ -1,6 +1,9 @@
-import { Container } from '@dayopt/components';
+import { Link } from '@dayopt/i18n/navigation';
 import { routing } from '@dayopt/i18n/routing';
+import design from '@web/components/content/ContentDesign.module.css';
+import { EditorialHeader } from '@web/components/content/EditorialHeader';
 import { generateSEOMetadata } from '@web/platform/seo/metadata';
+import { ArrowUpRight } from 'lucide-react';
 import type { Metadata } from 'next';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import dynamic from 'next/dynamic';
@@ -52,24 +55,33 @@ export default async function ContactPage({ params }: PageProps) {
   setRequestLocale(locale);
 
   const t = await getTranslations({ locale, namespace: 'marketing' });
+  const tc = await getTranslations({ locale, namespace: 'common' });
 
   return (
-    <div className="bg-background">
-      <section className="py-24 sm:py-32">
-        <Container>
-          <div className="mx-auto max-w-4xl text-center">
-            <h1 className="text-foreground mb-6 text-4xl font-medium tracking-tight sm:text-5xl">
-              {t('contact.title')}
-            </h1>
-            <p className="text-muted-foreground mb-12 text-lg sm:text-xl">
-              {t('contact.subtitle')}
-            </p>
-            <div className="bg-card border-border-subtle w-full rounded-2xl border p-6 text-left shadow-sm md:p-8">
-              <ContactForm />
-            </div>
-          </div>
-        </Container>
-      </section>
-    </div>
+    <section className={design.page}>
+      <EditorialHeader
+        eyebrow={tc('contentDesign.support')}
+        title={t('contact.title')}
+        description={t('contact.subtitle')}
+        artwork
+      />
+      <div className={design.contactGrid}>
+        <aside className={design.contactAside}>
+          <p>{tc('contentDesign.contactNote')}</p>
+          <p className="mt-8">{tc('contentDesign.contactHelp')}</p>
+          <Link href="/docs">
+            {tc('navigation.docs')}
+            <ArrowUpRight size={16} aria-hidden="true" />
+          </Link>
+          <Link href="/docs/faq">
+            {tc('contentDesign.faq')}
+            <ArrowUpRight size={16} aria-hidden="true" />
+          </Link>
+        </aside>
+        <div className={design.contactForm}>
+          <ContactForm />
+        </div>
+      </div>
+    </section>
   );
 }

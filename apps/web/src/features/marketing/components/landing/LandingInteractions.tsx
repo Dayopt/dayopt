@@ -1,115 +1,8 @@
-'use client';
+import { LogoArtwork } from '@dayopt/assets/logo-artwork';
+import { Fragment, useId, type ReactNode } from 'react';
 
-import { useState } from 'react';
-
+import { ClosingMarkReplay } from './ClosingMarkReplay';
 import styles from './LandingPage.module.css';
-
-interface JourneyCopy {
-  label: string;
-  first: string;
-  next: string;
-  later: string;
-  reading: string;
-  minuteUnit: string;
-  firstThought: string;
-  nextThought: string;
-  completion1: string;
-  completion2: string;
-  plan: string;
-  record: string;
-  replay: string;
-}
-
-function Mark({ animated = false }: { animated?: boolean }) {
-  return (
-    <span className={styles.mark} aria-hidden="true">
-      <span className={styles.markOutline} />
-      <span className={animated ? styles.markInkAnimated : styles.markInk} />
-    </span>
-  );
-}
-
-export function HeroJourney({ copy }: { copy: JourneyCopy }) {
-  const [run, setRun] = useState(0);
-
-  return (
-    <div className={styles.journey} role="group" aria-label={copy.label}>
-      <div key={run} className={styles.journeyMotion}>
-        <svg
-          className={styles.journeyPath}
-          viewBox="0 0 600 390"
-          preserveAspectRatio="none"
-          aria-hidden="true"
-        >
-          <path
-            pathLength="1"
-            d="M60 86 H172 Q195 86 195 109 V168 Q195 192 219 192 H340 Q364 192 364 215 V276 Q364 300 388 300 H535"
-          />
-        </svg>
-        <div className={styles.journeyMoments}>
-          <div className={styles.moment}>
-            <span className={styles.momentMeta}>{copy.first}</span>
-            <div className={styles.timePair}>
-              <div className={styles.timeOutline}>
-                <span>{copy.reading}</span>
-                <small>30{copy.minuteUnit}</small>
-              </div>
-              <div className={styles.timeInk}>
-                <span>{copy.reading}</span>
-                <small>45{copy.minuteUnit}</small>
-              </div>
-            </div>
-            <p>{copy.firstThought}</p>
-          </div>
-          <div className={styles.moment}>
-            <span className={styles.momentMeta}>{copy.next}</span>
-            <div className={styles.timePair}>
-              <div className={styles.timeOutline}>
-                <span>{copy.reading}</span>
-                <small>45{copy.minuteUnit}</small>
-              </div>
-              <div className={styles.timeInk}>
-                <span>{copy.reading}</span>
-                <small>45{copy.minuteUnit}</small>
-              </div>
-            </div>
-            <p>{copy.nextThought}</p>
-          </div>
-          <div className={styles.moment}>
-            <span className={styles.momentMeta}>{copy.later}</span>
-            <div className={styles.completion}>
-              <Mark animated />
-              <span>
-                {copy.completion1}
-                <br />
-                <strong>{copy.completion2}</strong>
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
-      <div className={styles.journeyLegend}>
-        <span>
-          <i className={styles.legendOutline} aria-hidden="true" />
-          {copy.plan}
-        </span>
-        <span>
-          <i className={styles.legendSolid} aria-hidden="true" />
-          {copy.record}
-        </span>
-        <button
-          type="button"
-          onClick={() => setRun((value) => value + 1)}
-          className={styles.replayButton}
-        >
-          <span aria-hidden="true">↻</span> {copy.replay}
-        </button>
-      </div>
-    </div>
-  );
-}
-
-type DayStep = 'plan' | 'record' | 'next';
 
 interface CalendarCopy {
   controlsLabel: string;
@@ -149,145 +42,188 @@ interface CalendarCopy {
   sameTimeline: string;
 }
 
+/** Browser-native choices keep this sample usable before hydration and without JS. */
 export function CalendarDemo({ copy }: { copy: CalendarCopy }) {
-  const [step, setStep] = useState<DayStep>('record');
-  const steps: Array<{ id: DayStep; label: string }> = [
+  const name = useId();
+  const steps = [
     { id: 'plan', label: copy.stepPlan },
     { id: 'record', label: copy.stepRecord },
     { id: 'next', label: copy.stepNext },
-  ];
-  const insight = {
-    plan: [copy.insightPlan1, copy.insightPlan2, copy.insightPlanCopy],
-    record: [copy.insightRecord1, copy.insightRecord2, copy.insightRecordCopy],
-    next: [copy.insightNext1, copy.insightNext2, copy.insightNextCopy],
-  }[step];
-
+  ] as const;
   return (
-    <>
-      <div className={styles.experienceControls} role="group" aria-label={copy.controlsLabel}>
+    <div className={styles.calendarDemo}>
+      <div className={styles.experienceControls} role="radiogroup" aria-label={copy.controlsLabel}>
         {steps.map((item, index) => (
-          <button
-            key={item.id}
-            type="button"
-            aria-pressed={step === item.id}
-            onClick={() => setStep(item.id)}
-          >
-            <span>0{index + 1}</span>
+          <label key={item.id}>
+            <input
+              className={styles.nativeChoice}
+              type="radio"
+              name={name}
+              value={item.id}
+              data-calendar-step={item.id}
+              aria-label={item.label}
+              defaultChecked={item.id === 'record'}
+            />
+            <span aria-hidden="true">0{index + 1}</span>
             {item.label}
-          </button>
+          </label>
         ))}
       </div>
-      <figure className={styles.productWindow} data-step={step} aria-label={copy.figureLabel}>
-        <div className={styles.productToolbar}>
-          <strong>dayopt</strong>
-          <span>{step === 'next' ? copy.dateNext : copy.dateFirst}</span>
-          <small>{copy.sample}</small>
-        </div>
-        <div className={styles.experienceBody}>
-          <aside className={styles.experienceSidebar} aria-hidden="true">
-            <div>
-              <p>
-                <i className={styles.blueDot} />
-                {copy.learning}
-              </p>
-              <span>{copy.reading}</span>
-              <span>{copy.language}</span>
+      <CalendarScene copy={copy} />
+    </div>
+  );
+}
+
+function CalendarAlternatives({ first, next }: { first: ReactNode; next: ReactNode }) {
+  return (
+    <>
+      <span data-calendar-content="first">{first}</span>
+      <span data-calendar-content="next">{next}</span>
+    </>
+  );
+}
+
+function CalendarScene({ copy }: { copy: CalendarCopy }) {
+  const descriptions = [
+    {
+      value: 'plan',
+      count: '01',
+      content: [copy.insightPlan1, copy.insightPlan2, copy.insightPlanCopy],
+    },
+    {
+      value: 'record',
+      count: '02',
+      content: [copy.insightRecord1, copy.insightRecord2, copy.insightRecordCopy],
+    },
+    {
+      value: 'next',
+      count: '03',
+      content: [copy.insightNext1, copy.insightNext2, copy.insightNextCopy],
+    },
+  ];
+  return (
+    <figure className={styles.productWindow} aria-label={copy.figureLabel}>
+      <div className={styles.productToolbar}>
+        <strong>dayopt</strong>
+        <span>
+          <CalendarAlternatives first={copy.dateFirst} next={copy.dateNext} />
+        </span>
+        <small>{copy.sample}</small>
+      </div>
+      <div className={styles.experienceBody}>
+        <aside className={styles.experienceSidebar} aria-hidden="true">
+          <div>
+            <p>
+              <i className={styles.blueDot} />
+              {copy.learning}
+            </p>
+            <span>{copy.reading}</span>
+            <span>{copy.language}</span>
+          </div>
+          <div>
+            <p>
+              <i className={styles.indigoDot} />
+              {copy.work}
+            </p>
+            <span>{copy.development}</span>
+            <span>{copy.meeting}</span>
+          </div>
+          <div>
+            <p>
+              <i className={styles.amberDot} />
+              {copy.life}
+            </p>
+            <span>{copy.walking}</span>
+          </div>
+          <p>{copy.template}</p>
+          <span>{copy.templateName}</span>
+        </aside>
+        <div className={styles.experienceCalendar}>
+          <div className={styles.experienceDay}>
+            <span>
+              <CalendarAlternatives first={copy.weekdayFirst} next={copy.weekdayNext} />
+            </span>
+            <b>
+              <CalendarAlternatives first={'10'} next={'11'} />
+            </b>
+          </div>
+          <div className={styles.timeGrid}>
+            <div className={styles.hours} aria-hidden="true">
+              <span>09:00</span>
+              <span>10:00</span>
+              <span>11:00</span>
+              <span>12:00</span>
             </div>
-            <div>
-              <p>
-                <i className={styles.indigoDot} />
-                {copy.work}
-              </p>
-              <span>{copy.development}</span>
-              <span>{copy.meeting}</span>
-            </div>
-            <div>
-              <p>
-                <i className={styles.amberDot} />
-                {copy.life}
-              </p>
-              <span>{copy.walking}</span>
-            </div>
-            <p>{copy.template}</p>
-            <span>{copy.templateName}</span>
-          </aside>
-          <div className={styles.experienceCalendar}>
-            <div className={styles.experienceDay}>
-              <span>{step === 'next' ? copy.weekdayNext : copy.weekdayFirst}</span>
-              <b>{step === 'next' ? '11' : '10'}</b>
-            </div>
-            <div className={styles.timeGrid}>
-              <div className={styles.hours} aria-hidden="true">
-                <span>09:00</span>
-                <span>10:00</span>
-                <span>11:00</span>
-                <span>12:00</span>
+            <div className={styles.events}>
+              <div className={styles.readingPlan}>
+                <strong>{copy.reading}</strong>
+                <small>
+                  <CalendarAlternatives
+                    first={'30' + copy.minuteUnit}
+                    next={'45' + copy.minuteUnit}
+                  />
+                </small>
               </div>
-              <div className={styles.events}>
-                <div className={styles.readingPlan}>
-                  <strong>{copy.reading}</strong>
-                  <small>{step === 'next' ? '45' + copy.minuteUnit : '30' + copy.minuteUnit}</small>
-                </div>
-                {step === 'record' && (
-                  <div className={styles.readingRecord}>
-                    <strong>{copy.reading}</strong>
-                    <small>45{copy.minuteUnit}</small>
-                  </div>
-                )}
-                <div className={styles.developmentPlan}>
-                  <strong>{copy.development}</strong>
-                  <small>60{copy.minuteUnit}</small>
-                </div>
-                {step === 'record' && (
-                  <div className={styles.developmentRecord}>
-                    <strong>{copy.development}</strong>
-                    <small>60{copy.minuteUnit}</small>
-                  </div>
-                )}
-                <div className={styles.walkPlan}>
-                  <strong>{copy.walking}</strong>
-                  <small>30{copy.minuteUnit}</small>
-                </div>
+              <div className={styles.readingRecord} data-calendar-content="record">
+                <strong>{copy.reading}</strong>
+                <small>45{copy.minuteUnit}</small>
+              </div>
+              <div className={styles.developmentPlan}>
+                <strong>{copy.development}</strong>
+                <small>60{copy.minuteUnit}</small>
+              </div>
+              <div className={styles.developmentRecord} data-calendar-content="record">
+                <strong>{copy.development}</strong>
+                <small>60{copy.minuteUnit}</small>
+              </div>
+              <div className={styles.walkPlan}>
+                <strong>{copy.walking}</strong>
+                <small>30{copy.minuteUnit}</small>
               </div>
             </div>
           </div>
-          <aside className={styles.experienceInsight} aria-live="polite" aria-atomic="true">
-            <span className={styles.stepCount}>
-              0{steps.findIndex((item) => item.id === step) + 1}
-            </span>
-            <p>
-              {insight[0]}
-              <br />
-              {insight[1]}
-            </p>
-            <span>{insight[2]}</span>
-            <div className={styles.experienceMeasure}>
-              <div>
-                <i className={styles.legendOutline} aria-hidden="true" />
-                {copy.plan} {step === 'next' ? '45' + copy.minuteUnit : '30' + copy.minuteUnit}
-              </div>
-              <div>
-                <i className={styles.legendSolid} aria-hidden="true" />
-                {step === 'plan'
-                  ? copy.recordPending
-                  : step === 'next'
-                    ? copy.recordPrevious
-                    : copy.record + ' 45' + copy.minuteUnit}
-              </div>
-            </div>
-          </aside>
         </div>
-        <figcaption className={styles.calendarNote}>
-          <span>
-            <i className={styles.legendOutline} aria-hidden="true" />
-            {copy.plan}
-            <i className={styles.legendSolid} aria-hidden="true" />
-            {copy.record}
-          </span>
-          <span>{copy.sameTimeline}</span>
-        </figcaption>
-      </figure>
-    </>
+        <aside className={styles.experienceInsight} aria-live="polite" aria-atomic="true">
+          {descriptions.map(({ value, count, content }) => (
+            <Fragment key={value}>
+              <span className={styles.stepCount} data-calendar-content={value}>
+                {count}
+              </span>
+              <p data-calendar-content={value}>
+                {content[0]}
+                <br />
+                {content[1]}
+              </p>
+              <span data-calendar-content={value}>{content[2]}</span>
+            </Fragment>
+          ))}
+          <div className={styles.experienceMeasure}>
+            <div>
+              <i className={styles.legendOutline} aria-hidden="true" />
+              {copy.plan}{' '}
+              <CalendarAlternatives first={'30' + copy.minuteUnit} next={'45' + copy.minuteUnit} />
+            </div>
+            <div>
+              <i className={styles.legendSolid} aria-hidden="true" />
+              <span data-calendar-content="plan">{copy.recordPending}</span>
+              <span data-calendar-content="record">
+                {copy.record} 45{copy.minuteUnit}
+              </span>
+              <span data-calendar-content="next">{copy.recordPrevious}</span>
+            </div>
+          </div>
+        </aside>
+      </div>
+      <figcaption className={styles.calendarNote}>
+        <span>
+          <i className={styles.legendOutline} aria-hidden="true" />
+          {copy.plan}
+          <i className={styles.legendSolid} aria-hidden="true" />
+          {copy.record}
+        </span>
+        <span>{copy.sameTimeline}</span>
+      </figcaption>
+    </figure>
   );
 }
 
@@ -315,7 +251,6 @@ interface TemplateCopy {
 }
 
 export function TemplateDemo({ copy }: { copy: TemplateCopy }) {
-  const [applied, setApplied] = useState(false);
   const rows = [
     {
       time: '09:00',
@@ -341,7 +276,7 @@ export function TemplateDemo({ copy }: { copy: TemplateCopy }) {
   ];
 
   return (
-    <div className={styles.templateDemo} data-applied={applied}>
+    <div className={styles.templateDemo}>
       <div className={styles.templateSource}>
         <p className={styles.demoOverline}>
           {copy.saved} <span>{copy.sample}</span>
@@ -356,36 +291,50 @@ export function TemplateDemo({ copy }: { copy: TemplateCopy }) {
           ))}
         </ol>
         <p className={styles.rhythmNote}>{copy.sourceNote}</p>
-        <button type="button" className={styles.templateApply} onClick={() => setApplied(!applied)}>
-          {applied ? copy.reset : copy.apply}
-          <span aria-hidden="true">{applied ? '↻' : '→'}</span>
-        </button>
+        <details className={styles.templateSwitch}>
+          <summary className={styles.templateApply}>
+            <span data-template-state="before">
+              {copy.apply} <span aria-hidden="true">→</span>
+            </span>
+            <span data-template-state="after">
+              {copy.reset} <span aria-hidden="true">↻</span>
+            </span>
+          </summary>
+          <span className={styles.nativeChoice}>{copy.after}</span>
+        </details>
         <p className={styles.templateHelp}>{copy.help}</p>
       </div>
       <div className={styles.templateTarget}>
         <div className={styles.templateTargetHead}>
           <strong>{copy.target}</strong>
-          <span>{applied ? copy.after : copy.before}</span>
+          <span>
+            <span data-template-state="before">{copy.before}</span>
+            <span data-template-state="after">{copy.after}</span>
+          </span>
         </div>
         <div className={styles.templateTimeline}>
           {rows.map((row) => (
             <div className={styles.rhythmRow} key={row.time}>
               <time>{row.time}</time>
               <div>
-                {applied ? (
-                  <span className={styles.rhythmPlan} data-kind={row.kind}>
-                    <b>{row.name}</b>
-                    <span>{row.duration}</span>
-                  </span>
-                ) : (
-                  <span className={styles.rhythmPlaceholder}>{row.placeholder}</span>
-                )}
+                <span
+                  className={styles.rhythmPlan}
+                  data-kind={row.kind}
+                  data-template-state="after"
+                >
+                  <b>{row.name}</b>
+                  <span>{row.duration}</span>
+                </span>
+                <span className={styles.rhythmPlaceholder} data-template-state="before">
+                  {row.placeholder}
+                </span>
               </div>
             </div>
           ))}
         </div>
         <p className={styles.templateResult} aria-live="polite">
-          {applied ? copy.feedbackAfter : copy.feedbackBefore}
+          <span data-template-state="before">{copy.feedbackBefore}</span>
+          <span data-template-state="after">{copy.feedbackAfter}</span>
         </p>
         <p className={styles.templateEvidence}>{copy.evidence}</p>
       </div>
@@ -394,17 +343,9 @@ export function TemplateDemo({ copy }: { copy: TemplateCopy }) {
 }
 
 export function ClosingMark({ label }: { label: string }) {
-  const [run, setRun] = useState(0);
   return (
-    <button
-      type="button"
-      className={styles.closingMark}
-      aria-label={label}
-      onClick={() => setRun((value) => value + 1)}
-    >
-      <span key={run}>
-        <Mark animated />
-      </span>
-    </button>
+    <ClosingMarkReplay label={label} className={styles.closingMark}>
+      <LogoArtwork variant="mark" width={100} height={100} />
+    </ClosingMarkReplay>
   );
 }

@@ -65,7 +65,9 @@
       "goToNextPage": "次のページへ",
       "morePages": "その他のページ",
       "pagination": "ページネーション",
-      "more": "その他"
+      "more": "その他",
+      "changeTheme": "テーマを変更",
+      "changeLanguage": "言語を変更"
     },
     "cookies": {
       "banner": {
@@ -90,6 +92,18 @@
         "revokeCancelLabel": "今の選択のままにする",
         "saveFailed": "選択を保存できませんでした。ブラウザの保存領域が書き込みを拒否したため、分析の設定は変わっていません。"
       }
+    },
+    "theme": {
+      "light": "ライト",
+      "dark": "ダーク",
+      "system": "システム"
+    },
+    "contentDesign": {
+      "legal": "ポリシーと透明性",
+      "support": "Dayopt Support",
+      "contactHelp": "使い方や、よくある質問はこちらから。",
+      "contactNote": "Dayopt に関する質問やご意見をお寄せください。",
+      "faq": "よくある質問"
     }
   },
   "footer": {
@@ -146,7 +160,11 @@
   },
   "blog": {
     "header": {
-      "title": "ブログ"
+      "title": "時間を考える。\n日々をつくる。",
+      "eyebrow": "Dayopt Journal",
+      "description": "時間の使い方、Dayopt の考え方、つくる過程。日々を見つめ直すための記事を集めました。",
+      "latest": "最新の記事",
+      "rss": "RSS フィード"
     },
     "tabs": {
       "all": "すべて",
@@ -191,7 +209,9 @@
       "clearAllFilters": "すべてのフィルターをクリア"
     },
     "post": {
-      "tagsUsed": "タグ"
+      "tagsUsed": "タグ",
+      "read": "記事を読む",
+      "readingTime": "{minutes}分で読めます"
     },
     "share": {
       "title": "この記事をシェア"
@@ -236,6 +256,8 @@
     },
     "sidebar": {
       "searchPlaceholder": "ドキュメントを検索..."
-    }
+    },
+    "browse": "ガイドを選ぶ",
+    "guide": "Dayopt の使い方"
   }
 }

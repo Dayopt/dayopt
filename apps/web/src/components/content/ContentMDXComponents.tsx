@@ -151,6 +151,7 @@ export const contentMDXComponents: MDXComponents = {
   ),
   pre: (props: PreProps) => (
     <pre
+      tabIndex={0}
       className="bg-muted text-foreground my-6 overflow-x-auto rounded-lg p-4 text-base"
       {...props}
     />
@@ -193,7 +194,7 @@ export const contentMDXComponents: MDXComponents = {
 
   // Tables
   table: (props: TableProps) => (
-    <div className="my-6 overflow-x-auto">
+    <div className="my-6 overflow-x-auto" tabIndex={0}>
       <table
         className="divide-border border-border min-w-full divide-y rounded-lg border"
         {...props}

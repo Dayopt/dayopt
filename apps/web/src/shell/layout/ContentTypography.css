@@ -1,0 +1,9 @@
+/* 本文だけが使うコード装飾と prose を、LP の初期 stylesheet に含めない。 */
+@import '../../styles/fonts/japanese-content.css';
+@import '../../styles/fonts/japanese-full.css';
+@import 'highlight.js/styles/github.css';
+@import 'tailwindcss/utilities' layer(utilities) source(none);
+@reference 'tailwindcss';
+@custom-variant dark (&:where(.dark, .dark *));
+@plugin '@tailwindcss/typography';
+@source inline('prose dark:prose-invert text-lg leading-7');
