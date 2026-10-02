@@ -50,15 +50,6 @@ content_text = "".join(file.read_text() for file in (WEB / "content").rglob("*.m
 content_japanese = {ord(char) for char in content_text if ord(char) > 127} - japanese
 full_japanese = set(TTFont(sys.argv[2]).getBestCmap()) - japanese - content_japanese - latin
 
-
-def unicode_ranges(points):
-    ranges = []
-    for point in sorted(points):
-        if ranges and point == ranges[-1][1] + 1:
-            ranges[-1][1] = point
-        else:
-            ranges.append([point, point])
-    return ", ".join(f"U+{start:X}" if start == end else f"U+{start:X}-{end:X}" for start, end in ranges)
 ja_common = json.loads((WEB / "messages/ja/common.json").read_text())
 ja_landing = json.loads((WEB / "messages/ja/marketing.json").read_text())["marketing"]["landing"]
 common = ja_common["common"]
@@ -164,7 +155,6 @@ for source, name, codepoints, family, weight in (
   font-weight: 100 900;
   font-display: swap;
   src: url('{href}') format('woff2');
-  unicode-range: {unicode_ranges(wanted)};
 }}
 ''')
             continue
