@@ -54,7 +54,7 @@ docs へ残している。
 
 - 公開エンドポイント（OAuth callback / webhook / contact）は rate limit を持つ
 - `app/api/health/cron/route.ts` は UptimeRobot 用の無認証・production-only monitor。
-  service-role で読むのは `cron_heartbeats` の allowlist 8件の job 名と完了時刻だけで、
+  service-role で読むのは `cron_heartbeats` の allowlist 9件の job 名と完了時刻だけで、
   OAuth identity を照合してから評価する。全体 30回/分、DB query は5秒で打ち切り、
   応答は `healthy` / `unhealthy` のみ・`no-store`・失敗時503。上限超過時は60秒以内の
   成功/失敗結果だけ再生し、新しい結果が無ければ503を返す。
@@ -68,8 +68,8 @@ docs へ残している。
   握って Sentry へ送るだけなので **行は永遠に作られない**。監査
   （`production-cron-heartbeat-audit.mjs` の `JOB_MAX_AGE_MINUTES`）へ job を足すのは、
   制約を広げる migration と**同じ変更**で行う（片方だけ足すと監査が恒久 missing になる）。
-  現状 **Vercel cron 4 本のうち `billing-reconciliation` だけ heartbeat を持たない**ため、
-  止まっても検知されない（2026-09-20 に PR #2863 の `@codex review` で判明、#2864 で塞ぐ）
+  監査対象の全job名を実DBのCHECK制約と照合するintegration testで追加漏れを検出する
+  （#2864）。`billing-reconciliation` は差分検出の503とは独立に、照合完了を記録する。
 - redirect 先はユーザー入力をそのまま使わず、`lib/safe-redirect.ts` の検証を通す
 
 ## メール通知

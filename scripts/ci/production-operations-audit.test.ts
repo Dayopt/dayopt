@@ -21,6 +21,14 @@ const fresh = () =>
   }));
 
 describe('production cron heartbeat evidence', () => {
+  it('audits daily billing reconciliation with a 1560 minute completion budget', async () => {
+    expect(JOB_MAX_AGE_MINUTES['billing-reconciliation']).toBe(1560);
+    await expect(auditHeartbeats(async () => fresh(), now)).resolves.toBe(9);
+    const rows = fresh().filter((row) => row.job_name !== 'billing-reconciliation');
+    expect(evaluateHeartbeats(rows, now)).toEqual([
+      'billing-reconciliation: missing or duplicate heartbeat',
+    ]);
+  });
   it('requires every expected job and rejects missing completion', async () => {
     expect(evaluateHeartbeats(fresh(), now)).toEqual([]);
     await expect(auditHeartbeats(async () => fresh().slice(1), now)).rejects.toThrow('missing');
