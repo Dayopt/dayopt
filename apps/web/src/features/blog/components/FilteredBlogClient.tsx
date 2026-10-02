@@ -83,7 +83,7 @@ export function FilteredBlogClient({
 
       {/* タブ（カテゴリ＝URL）+ RSS + 検索 */}
       <div className={styles.toolbar}>
-        <nav className="flex flex-wrap items-center gap-0" aria-label={t('filters.title')}>
+        <nav className={styles.categories} aria-label={t('filters.title')}>
           {BLOG_CATEGORIES.map((category) => {
             const isActive = category === activeCategory;
             return (

@@ -237,7 +237,7 @@ const nextConfig = {
     },
     // 本文の全文字フォント CSS は小さなローカル face へ置き換え済み。
     // 小さい stylesheet をまとめ、初期描画前のリクエストを減らす。
-    cssChunking: { type: 'graph', requestCost: 50000, weightDistribution: 0.5 },
+    cssChunking: { type: 'graph', requestCost: 5000, weightDistribution: 0.5 },
     // staleTimes は指定しない（Next.js の既定 dynamic: 0 / static: 300 を使う）。2026-09-14 実測（#2747）。
     // web のページは全て静的（SSG）で dynamic の対象が無く、以前の static: 180 は既定の 5 分より短く
     // 訪問済みページの再取得を早めるだけだった（Link で戻る遷移が 200 秒後に 1 回再取得される）。

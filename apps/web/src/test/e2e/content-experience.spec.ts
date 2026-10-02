@@ -205,3 +205,35 @@ test('JavaScript無効でもモバイルのガイドとBlogの登録導線が成
   );
   await context.close();
 });
+
+test('Blogのカテゴリは日本語フォント読み込みで記事を移動させない', async ({ page }) => {
+  await page.setViewportSize({ width: 412, height: 823 });
+  let releaseFont!: () => void;
+  const fontGate = new Promise<void>((resolve) => {
+    releaseFont = resolve;
+  });
+  await page.route('**/fonts/NotoSansJP-critical400-*.woff2', async (route) => {
+    await fontGate;
+    await route.continue();
+  });
+  await page.goto('/ja/blog', { waitUntil: 'domcontentloaded' });
+  const article = page.locator('main article').first();
+  await expect(article).toBeAttached();
+  // 他のフォントを先に読み込ませ、critical400 の切り替わりだけを測る。
+  await page.evaluate(async () => {
+    await Promise.all(
+      [...document.fonts]
+        .filter(
+          (font) =>
+            !['Dayopt Web JP', 'Dayopt Web JP Hero'].includes(font.family.replaceAll('"', '')),
+        )
+        .filter((font) => font.status === 'loading')
+        .map((font) => font.loaded),
+    );
+  });
+  const before = await article.boundingBox();
+  releaseFont();
+  await page.evaluate(() => document.fonts.ready);
+  const after = await article.boundingBox();
+  expect(Math.abs(after!.y - before!.y)).toBeLessThan(1);
+});

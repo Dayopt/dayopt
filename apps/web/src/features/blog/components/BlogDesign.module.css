@@ -6,6 +6,11 @@
   padding-bottom: 24px;
   border-bottom: 1px solid var(--border);
 }
+.categories {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+}
 .category {
   display: inline-flex;
   align-items: center;
@@ -153,8 +158,13 @@
     grid-template-columns: minmax(0, 1fr);
     gap: 24px;
   }
+  .categories {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
   .category {
     padding-inline: 10px;
+    white-space: nowrap;
   }
   .post h2 {
     font-size: 24px;
