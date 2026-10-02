@@ -1,21 +1,21 @@
 ---
 title: 'Specified Commercial Transactions Act'
 description: 'Information required under the Act on Specified Commercial Transactions (Japan)'
-lastUpdated: 'Last Updated: 2025-12-07'
+lastUpdated: 'Review draft: 2026-09-17'
 ---
 
 <TokushohoDocument
   data={{
     setupNotice: {
-      title: 'Input Required Before Offering Paid Plans',
+      title: 'Review draft — operator and payment details require approval',
       description:
-        "Items highlighted in yellow marked 'Required' must be replaced with actual information before starting paid services.",
+        'HUMAN-01 and HUMAN-07 must be resolved before this page is published or used for paid sales. An omission on request is not approved by this draft.',
     },
-    placeholder: 'Required',
+    placeholder: '[HUMAN-01: operator input required]',
     items: {
       seller: {
         label: 'Seller',
-        hint: 'Individual name or trade name',
+        hint: 'Legal name of the seller; confirm any permitted omission separately',
       },
       representative: {
         label: 'Representative',
@@ -23,32 +23,38 @@ lastUpdated: 'Last Updated: 2025-12-07'
       },
       address: {
         label: 'Address',
-        hint: 'Address (disclosed without delay upon request)',
+        hint: 'Verified business address; review any omission and disclosure process',
       },
       contact: {
         label: 'Contact',
         phoneLabel: 'Phone',
+        emailLabel: 'Email',
       },
       price: {
         label: 'Price',
-        content: 'Displayed on pricing page (tax included)',
+        content:
+          '$5 per month. [HUMAN-07: confirm currency, tax-inclusive total and any additional charges against checkout.]',
       },
       payment: {
         label: 'Payment Methods',
-        creditCard: 'Credit Card (Visa, Mastercard, American Express, JCB)',
+        creditCard:
+          'Credit card via Stripe. [HUMAN-07: confirm enabled payment methods and accepted card brands.]',
       },
       paymentTiming: {
         label: 'Payment Timing',
-        content: 'Initial payment at subscription signup, then automatic billing on renewal date',
+        content:
+          'No charge during the card-free 45-day trial. Payment begins only when you purchase; a purchased subscription renews monthly until cancelled.',
       },
       delivery: {
         label: 'Service Delivery',
-        content: 'Service is available immediately after payment completion',
+        content:
+          'The trial starts on first application access after authentication. Paid access is enabled after payment is confirmed.',
       },
       cancellation: {
         label: 'Cancellation & Refund',
-        anytime: 'You can cancel your subscription at any time',
-        noRefund: 'No prorated refund for the paid period',
+        anytime: 'Cancel renewal from Settings > Billing and billing management.',
+        noRefund:
+          'No prorated refunds as a general rule, without limiting mandatory legal rights. Billing errors and exceptional outages are reviewed individually.',
         access: 'Service remains available until the end of the paid period after cancellation',
       },
       environment: {
@@ -59,8 +65,9 @@ lastUpdated: 'Last Updated: 2025-12-07'
       notes: {
         label: 'Notes',
         autoRenewal:
-          'Subscriptions are automatically renewed. You will be notified by email before renewal',
-        priceChange: 'Price changes will be notified at least 30 days in advance',
+          'Trial expiry does not trigger automatic payment. Purchased subscriptions renew monthly; check the next billing date in billing management.',
+        priceChange:
+          'Price changes are disclosed before they take effect, with notices or agreement as required by law.',
       },
     },
   }}

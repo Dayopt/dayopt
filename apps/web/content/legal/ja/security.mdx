@@ -1,7 +1,7 @@
 ---
 title: 'セキュリティ'
-description: 'Dayoptは、ユーザーの皆様の情報を保護するために、最高水準のセキュリティ対策を実施しています。'
-lastUpdated: '最終更新日: 2026-09-14'
+description: 'Dayoptの安全管理と脆弱性の報告窓口'
+lastUpdated: 'レビュー原稿: 2026-09-17'
 ---
 
 <SecurityDocument
@@ -12,21 +12,25 @@ lastUpdated: '最終更新日: 2026-09-14'
         title: 'サポート対象バージョン',
         version: 'バージョン',
         status: 'サポート状況',
-        v1: '1.x.x',
-        v1Status: '✅ セキュリティアップデート提供中',
-        v0: '< 1.0',
-        v0Status: '❌ サポート終了',
+        v1: '現在提供中のDayopt',
+        v1Status: '保守・更新の対象',
+        v0: '過去のリリース・独自運用のコピー',
+        v0Status: '個別の保守を保証しません',
       },
       measures: {
         title: '実装しているセキュリティ対策',
-        transportEncryption: 'HTTPS強制: すべての通信をTLS 1.3で暗号化',
+        transportEncryption:
+          'HTTPS/TLSで通信を保護します。対応するプロトコルのバージョンは接続先により異なります。',
         mfa: '多要素認証 (MFA): TOTP（Time-based One-Time Password）対応',
         rateLimit: 'レート制限: ブルートフォース攻撃防止',
-        sqlInjection: 'SQL インジェクション対策: Prisma ORM + パラメータ化クエリ',
+        sqlInjection:
+          'Supabase/Postgresを通じたデータアクセス、パラメータ化した操作、行単位のアクセスポリシー。',
         xss: 'XSS対策: React自動エスケープ + Content Security Policy',
-        csrf: 'CSRF対策: SameSite Cookie + トークン検証',
-        dependencies: '依存関係管理: Dependabot による週次チェック',
-        monitoring: 'エラー監視: Sentry によるリアルタイム監視',
+        csrf: 'リクエスト元の検証、セッションCookieの制御、保護対象の操作に対する認可確認。',
+        dependencies:
+          '依存関係の自動検査とコードレビュー。第三者によるセキュリティ認証を示すものではありません。',
+        monitoring:
+          '本番のサーバー・エッジで除去処理済みのエラーを監視します。ブラウザ計測は分析への同意後に行い、Session Replayは無効です。',
       },
     },
     vulnerability: {
@@ -51,35 +55,22 @@ lastUpdated: '最終更新日: 2026-09-14'
         fix: '推奨される修正方法（任意）',
       },
       timeline: {
-        title: '対応タイムライン',
-        severity: '深刻度',
-        initialResponse: '初動確認',
-        fixRelease: '修正リリース',
-        critical: 'Critical',
-        criticalResponse: '24時間以内',
-        criticalFix: '48時間以内',
-        high: 'High',
-        highResponse: '48時間以内',
-        highFix: '1週間以内',
-        medium: 'Medium',
-        mediumResponse: '1週間以内',
-        mediumFix: '2週間以内',
-        low: 'Low',
-        lowResponse: '2週間以内',
-        lowFix: '次回リリース',
+        title: '報告への対応',
+        content:
+          '影響に応じて報告を確認し、確認できた問題の抑制と修正を進めます。対応・修正の時期は深刻度と得られる情報により異なり、固定の期限は保証しません。［HUMAN-06：公開前に security@dayopt.app の受信確認と事故対応責任者を確認］',
       },
     },
     disclosure: {
       title: '責任ある開示（Responsible Disclosure）',
       safeHarbor: {
-        title: 'セーフハーバー（Safe Harbor）',
+        title: '事前に調整したセキュリティ検証',
         description:
-          'ガイドラインに従って行われたセキュリティ研究活動に対して、法的措置を取ることはありません。',
+          '検証前に security@dayopt.app へ連絡し、範囲を合意してください。管理下のアカウントとデータだけを使い、他人の情報に触れた場合は停止して報告してください。このページは無制限な検証を許可したり、適用法上の免責を約束したりするものではありません。',
         allowed: {
-          title: '✅ 許可される行為',
-          ownAccount: '• 自身のアカウントでのテスト',
-          research: '• 脆弱性の調査と報告',
-          poc: '• 概念実証コードの作成',
+          title: '合意した範囲で行うこと',
+          ownAccount: '自身のアカウントとデータを使った検証',
+          research: '再現可能な問題の非公開での報告',
+          poc: 'サービスを妨害しない最小限の再現例',
         },
         prohibited: {
           title: '❌ 禁止される行為',

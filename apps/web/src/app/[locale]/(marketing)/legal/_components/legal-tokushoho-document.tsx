@@ -84,7 +84,9 @@ export function TokushohoDocument({ data }: { data: LegalContentTree }) {
               <td className="text-foreground px-6 py-4 text-sm">
                 <div className="space-y-1">
                   <p>
-                    <span className="text-muted-foreground">Email:</span>{' '}
+                    <span className="text-muted-foreground">
+                      {readLegalText(items, 'contact', 'emailLabel')}:
+                    </span>{' '}
                     {dayoptContact.supportEmail}
                   </p>
                   <p>
