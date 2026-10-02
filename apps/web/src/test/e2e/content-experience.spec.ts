@@ -1,3 +1,4 @@
+import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
 
 test('スマホのDocs目次から日本語の予定ガイドへ移動できる', async ({ page }) => {
@@ -237,3 +238,15 @@ test('Blogのカテゴリは日本語フォント読み込みで記事を移動�
   const after = await article.boundingBox();
   expect(Math.abs(after!.y - before!.y)).toBeLessThan(1);
 });
+
+for (const locale of ['en', 'ja']) {
+  for (const colorScheme of ['light', 'dark'] as const) {
+    test(`Docs ${locale} ${colorScheme}: 補助領域を読み上げで区別できる`, async ({ page }) => {
+      await page.setViewportSize({ width: 1440, height: 1000 });
+      await page.emulateMedia({ colorScheme });
+      await page.goto(locale === 'ja' ? '/ja/docs' : '/docs');
+      const result = await new AxeBuilder({ page }).withRules(['landmark-unique']).analyze();
+      expect(result.violations).toEqual([]);
+    });
+  }
+}

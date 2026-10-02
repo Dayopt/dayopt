@@ -91,7 +91,7 @@ export async function DocArticle({
       </div>
 
       {/* Right Sidebar - Table of Contents（xl以上で表示。blog と共通の2card レイアウト） */}
-      <aside className={design.articleAside}>
+      <aside className={design.articleAside} aria-label={t('toc.onThisPage')}>
         <div>
           <TableOfContentsCards content={mdxContent} />
         </div>

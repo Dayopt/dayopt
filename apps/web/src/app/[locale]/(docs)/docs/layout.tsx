@@ -4,7 +4,7 @@ import { ContentTypography } from '@web/shell/layout/ContentTypography';
 import { Footer } from '@web/shell/layout/Footer';
 import { Header } from '@web/shell/layout/Header';
 import { generateDocsNavigation } from '@web/shell/navigation';
-import { setRequestLocale } from 'next-intl/server';
+import { getTranslations, setRequestLocale } from 'next-intl/server';
 
 export default async function DocsLayout({
   children,
@@ -16,7 +16,10 @@ export default async function DocsLayout({
   const { locale } = await params;
   // 静的レンダリングを有効にする（これがないと配下が動的レンダリングになる）
   setRequestLocale(locale);
-  const navigation = await generateDocsNavigation(locale);
+  const [navigation, t] = await Promise.all([
+    generateDocsNavigation(locale),
+    getTranslations('docs'),
+  ]);
 
   return (
     <ContentTypography collection="docs" className="bg-background flex min-h-screen flex-col">
@@ -26,7 +29,7 @@ export default async function DocsLayout({
       {/* 3カラムレイアウト: Sidebar(240px) | Main(flex-1)。Footer はこの外側で画面全幅にする */}
       <div className={design.docsShell}>
         {/* Left Sidebar - Navigation (lg以上で表示、sticky で独立スクロール) */}
-        <aside className={design.docsSidebar} data-docs-desktop-navigation>
+        <aside className={design.docsSidebar} aria-label={t('browse')} data-docs-desktop-navigation>
           <div>
             <ClientSidebar navigation={navigation} />
           </div>
