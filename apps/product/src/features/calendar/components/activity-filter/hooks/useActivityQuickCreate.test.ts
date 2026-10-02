@@ -6,7 +6,7 @@
  * 既定の長さ）になることを確認する。
  */
 
-import { renderHook } from '@testing-library/react';
+import { renderHook, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useActivityQuickCreate } from './useActivityQuickCreate';
@@ -39,8 +39,8 @@ vi.mock('@/features/timeblock', async () => {
     hasTimeblockLaneConflict: () => hasConflict.value,
     findFreeTimeblockLaneSlot: lane.findFreeTimeblockLaneSlot,
     useTimeblockWriteMutations: () => ({
-      createPlan: { mutate: createPlanMutate },
-      createRecord: { mutate: createRecordMutate },
+      createPlan: { mutate: createPlanMutate, mutateAsync: createPlanMutate },
+      createRecord: { mutate: createRecordMutate, mutateAsync: createRecordMutate },
       deletePlan: { mutate: vi.fn() },
       deleteRecord: { mutate: vi.fn() },
     }),
@@ -125,8 +125,7 @@ describe('useActivityQuickCreate', () => {
     expect(createPlanMutate).not.toHaveBeenCalled();
     expect(resolveMedianMinutes).toHaveBeenCalledTimes(1);
     release(45);
-    await Promise.resolve();
-    expect(createPlanMutate).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(createPlanMutate).toHaveBeenCalledTimes(1));
     const [input] = createPlanMutate.mock.calls[0] as [{ start_at: string; end_at: string }];
     expect((Date.parse(input.end_at) - Date.parse(input.start_at)) / 60000).toBe(45);
   });
@@ -144,12 +143,32 @@ describe('useActivityQuickCreate', () => {
     result.current({ activityId: 'activity-2', activityName: '読書' });
     expect(createPlanMutate).not.toHaveBeenCalled();
     release(45);
-    await Promise.resolve();
-    expect(createPlanMutate).toHaveBeenCalledTimes(2);
+    await waitFor(() => expect(createPlanMutate).toHaveBeenCalledTimes(2));
     expect(createPlanMutate.mock.calls.map(([input]) => input.activityId)).toEqual([
       'activity-1',
       'activity-2',
     ]);
+  });
+
+  it('統計で同時に解放された別活動はasync mutation完了後に空きを探す', async () => {
+    statsPending.value = true;
+    resolveMedianMinutes.mockResolvedValue(45);
+    let saveFirst!: () => void;
+    createPlanMutate.mockImplementationOnce(async (input) => {
+      await new Promise<void>((resolve) => {
+        saveFirst = resolve;
+      });
+      laneItems.value.push({ id: 'first', start_at: input.start_at, end_at: input.end_at });
+    });
+    const { result } = renderHook(() => useActivityQuickCreate());
+    result.current({ activityId: 'activity-1', activityName: '開発' });
+    result.current({ activityId: 'activity-2', activityName: '読書' });
+    await waitFor(() => expect(createPlanMutate).toHaveBeenCalledTimes(1));
+    saveFirst();
+    await waitFor(() => expect(createPlanMutate).toHaveBeenCalledTimes(2));
+    expect(createPlanMutate.mock.calls[1]?.[0].start_at).toBe(
+      createPlanMutate.mock.calls[0]?.[0].end_at,
+    );
   });
 
   it('取得後も中央値が無ければ設定値へフォールバックする', async () => {
@@ -157,7 +176,7 @@ describe('useActivityQuickCreate', () => {
     resolveMedianMinutes.mockResolvedValue(null);
     const { result } = renderHook(() => useActivityQuickCreate());
     result.current({ activityId: 'activity-1', activityName: '開発' });
-    await Promise.resolve();
+    await waitFor(() => expect(createPlanMutate).toHaveBeenCalledTimes(1));
     const [input] = createPlanMutate.mock.calls[0] as [{ start_at: string; end_at: string }];
     expect((Date.parse(input.end_at) - Date.parse(input.start_at)) / 60000).toBe(60);
   });

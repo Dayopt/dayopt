@@ -59,6 +59,8 @@ export interface PendingSelection {
 
 interface InlineCreateState {
   pendingSelection: PendingSelection | null;
+  /** 新しい選択・clear の世代。時間/種別/日付の編集では変えない */
+  selectionRevision: number;
   /**
    * 作成パネルでホバー中のアクティビティ。グリッドのハイライトが色と名前を先出しする。
    * パネルとハイライトは別コンポーネントなので、hook の local state では伝わらない。
@@ -96,6 +98,7 @@ const useInlineCreateStoreBase = create<InlineCreateState>()(
   devtools(
     (set) => ({
       pendingSelection: null,
+      selectionRevision: 0,
       hoveredActivity: null,
       baseDurationMinutes: null,
       hasUserSetDuration: false,
@@ -115,19 +118,21 @@ const useInlineCreateStoreBase = create<InlineCreateState>()(
           return { pendingSelection: { ...selection, endHour, endMinute } };
         }),
       setPendingSelection: (selection) =>
-        set({
+        set((state) => ({
+          selectionRevision: state.selectionRevision + 1,
           pendingSelection: selection,
           baseDurationMinutes: durationMinutesOf(selection),
           // 範囲を引いた選択は最初から「ユーザーが長さを決めた」扱い
           hasUserSetDuration: selection.durationSource === 'dragged',
-        }),
+        })),
       clearPendingSelection: () =>
-        set({
+        set((state) => ({
+          selectionRevision: state.selectionRevision + 1,
           pendingSelection: null,
           hoveredActivity: null,
           baseDurationMinutes: null,
           hasUserSetDuration: false,
-        }),
+        })),
       setSelectionKind: (kind) =>
         set((state) =>
           state.pendingSelection

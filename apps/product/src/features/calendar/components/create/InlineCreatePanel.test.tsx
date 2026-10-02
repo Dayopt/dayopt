@@ -109,6 +109,9 @@ vi.mock('@/features/activities', () => ({
       >
         開発
       </button>
+      <button type="button" onClick={() => onSelect('activity-2', '読書')}>
+        読書
+      </button>
       <span data-testid="median">{durationByActivityId?.get('activity-1') ?? 'none'}</span>
     </div>
   ),
@@ -279,6 +282,47 @@ describe('InlineCreatePanel', () => {
     expect(resolveMedianMinutes).not.toHaveBeenCalled();
     const input = createRecordMutate.mock.calls[0]?.[0];
     expect((Date.parse(input.end_at) - Date.parse(input.start_at)) / 60000).toBe(60);
+  });
+
+  it('統計待ちに選び直した活動だけを保存する', async () => {
+    statsPending.value = true;
+    let release!: (value: number | null) => void;
+    resolveMedianMinutes.mockReturnValue(
+      new Promise<number | null>((resolve) => {
+        release = resolve;
+      }),
+    );
+    setSelection(pastDay());
+    render(<InlineCreatePanel onClose={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: '開発' }));
+    fireEvent.click(screen.getByRole('button', { name: '読書' }));
+    await act(async () => {
+      release(30);
+    });
+    expect(createRecordMutate).toHaveBeenCalledTimes(1);
+    expect(createRecordMutate.mock.calls[0]?.[0]).toMatchObject({
+      activityId: 'activity-2',
+      title: '読書',
+    });
+  });
+
+  it('clearを挟まず置換した選択へ古い作成要求を保存しない', async () => {
+    statsPending.value = true;
+    let release!: (value: number | null) => void;
+    resolveMedianMinutes.mockReturnValue(
+      new Promise<number | null>((resolve) => {
+        release = resolve;
+      }),
+    );
+    setSelection(pastDay());
+    render(<InlineCreatePanel onClose={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: '開発' }));
+    act(() => setSelection(futureDay()));
+    await act(async () => {
+      release(45);
+    });
+    expect(createRecordMutate).not.toHaveBeenCalled();
+    expect(createPlanMutate).not.toHaveBeenCalled();
   });
 
   it('late stats keep edited selection and save fields, and do not create again', () => {

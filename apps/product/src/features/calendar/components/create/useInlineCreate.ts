@@ -47,7 +47,7 @@ export function useInlineCreate(extras: InlineCreateExtras = {}) {
   const setHoveredActivity = useInlineCreateStore.use.setHoveredActivity();
   const previewActivityDuration = useInlineCreateStore.use.previewActivityDuration();
   const { getMedianMinutes, isPending, resolveMedianMinutes } = useActivityMedianDurations();
-  const waitingRef = useRef<object | null>(null);
+  const waitingRef = useRef<{ activityId: string; selectionRevision: number } | null>(null);
   const extrasRef = useRef(extras);
   useLayoutEffect(() => {
     extrasRef.current = extras;
@@ -80,7 +80,15 @@ export function useInlineCreate(extras: InlineCreateExtras = {}) {
   // plan / record 作成ハンドラー（アクティビティ必須、その名前をタイトルに設定）
   const handleCreate = useCallback(
     (activityId: string, activityName: string) => {
-      if (isCreating || waitingRef.current) return;
+      if (isCreating) return;
+      const selectionRevision = useInlineCreateStore.getState().selectionRevision;
+      if (
+        waitingRef.current?.activityId === activityId &&
+        waitingRef.current.selectionRevision === selectionRevision
+      )
+        return;
+      // 選び直した活動だけを確定対象にする。古い completion は identity で無効になる。
+      waitingRef.current = null;
       const create = (medianMinutes: number | null) => {
         // ホバーの無い環境（タップ）でも同じ長さで作る。ホバー済みなら同じ値なので
         // 何も動かない。長さを直した後は store 側で no-op になる
@@ -203,18 +211,18 @@ export function useInlineCreate(extras: InlineCreateExtras = {}) {
       };
       if (isPending && !useInlineCreateStore.getState().hasUserSetDuration) {
         // 未編集のクリック選択だけ中央値を待つ。drag/edit の長さは即保存する。
-        const request = {};
+        const request = { activityId, selectionRevision };
         waitingRef.current = request;
         let cancelled = false;
         const unsubscribe = useInlineCreateStore.subscribe((state) => {
-          if (!state.pendingSelection) {
+          if (!state.pendingSelection || state.selectionRevision !== selectionRevision) {
             cancelled = true;
             if (waitingRef.current === request) waitingRef.current = null;
           }
         });
         void resolveMedianMinutes(activityId)
           .then((medianMinutes) => {
-            if (!cancelled) create(medianMinutes);
+            if (!cancelled && waitingRef.current === request) create(medianMinutes);
           })
           .finally(() => {
             unsubscribe();

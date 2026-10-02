@@ -71,6 +71,7 @@ export function useActivityQuickCreate() {
   const defaultDuration = useUserPreferences((s) => s.defaultDuration);
   const { getMedianMinutes, isPending, resolveMedianMinutes } = useActivityMedianDurations();
   const waitingForStats = useRef(new Set<string>());
+  const creationQueue = useRef(Promise.resolve());
   const queryClient = useQueryClient();
   const { createPlan, createRecord, deletePlan, deleteRecord } = useTimeblockWriteMutations();
   const openInspector = useTimeblockInspectorStore((state) => state.openInspector);
@@ -86,7 +87,7 @@ export function useActivityQuickCreate() {
         openSettings('billing');
         return;
       }
-      const create = (medianMinutes: number | null) => {
+      const create = async (medianMinutes: number | null) => {
         const localStart = defaultStartAt(date ?? new Date());
         const durationMinutes = medianMinutes ?? defaultDuration;
         const localEnd = new Date(localStart.getTime() + durationMinutes * 60 * 1000);
@@ -131,7 +132,7 @@ export function useActivityQuickCreate() {
         }
 
         const mutation = destination === 'plan' ? createPlan : createRecord;
-        mutation.mutate(
+        await mutation.mutateAsync(
           {
             title: activityName,
             activityId,
@@ -187,17 +188,26 @@ export function useActivityQuickCreate() {
           },
         );
       };
-      if (isPending) {
+      if (isPending || waitingForStats.current.size > 0) {
         // 取得待ちの連打で同じ操作を重複作成しない。表示範囲は待たせない。
         waitingForStats.current.add(requestKey);
         void resolveMedianMinutes(activityId)
-          .then(create)
+          .then((medianMinutes) => {
+            // 前の mutation の async onMutate / 保存が完了した cache で次の空きを探す。
+            const queued = creationQueue.current.then(() => create(medianMinutes));
+            creationQueue.current = queued.then(
+              () => undefined,
+              () => undefined,
+            );
+            return queued;
+          })
+          .catch(() => undefined)
           .finally(() => {
             waitingForStats.current.delete(requestKey);
           });
         return;
       }
-      create(getMedianMinutes(activityId));
+      void create(getMedianMinutes(activityId)).catch(() => undefined);
     },
     [
       canUseProduct,
