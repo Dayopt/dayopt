@@ -70,7 +70,7 @@ export function useActivityQuickCreate() {
   const timeFormat = useUserPreferences((s) => s.timeFormat);
   const defaultDuration = useUserPreferences((s) => s.defaultDuration);
   const { getMedianMinutes, isPending, resolveMedianMinutes } = useActivityMedianDurations();
-  const waitingForStats = useRef(false);
+  const waitingForStats = useRef(new Set<string>());
   const queryClient = useQueryClient();
   const { createPlan, createRecord, deletePlan, deleteRecord } = useTimeblockWriteMutations();
   const openInspector = useTimeblockInspectorStore((state) => state.openInspector);
@@ -78,7 +78,8 @@ export function useActivityQuickCreate() {
 
   return useCallback(
     ({ activityId, activityName, date }: QuickCreateArgs) => {
-      if (waitingForStats.current) return;
+      const requestKey = `${activityId}:${date?.getTime() ?? 'today'}`;
+      if (waitingForStats.current.has(requestKey)) return;
       if (!canUseProduct) {
         // 課金の状態は開いた設定画面そのものが説明する。閲覧のみである旨の
         // 説明文をトーストへ流用しても「なぜ作れないか」は伝わらない
@@ -188,11 +189,11 @@ export function useActivityQuickCreate() {
       };
       if (isPending) {
         // 取得待ちの連打で同じ操作を重複作成しない。表示範囲は待たせない。
-        waitingForStats.current = true;
+        waitingForStats.current.add(requestKey);
         void resolveMedianMinutes(activityId)
           .then(create)
           .finally(() => {
-            waitingForStats.current = false;
+            waitingForStats.current.delete(requestKey);
           });
         return;
       }

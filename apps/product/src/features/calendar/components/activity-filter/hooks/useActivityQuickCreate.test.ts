@@ -131,6 +131,27 @@ describe('useActivityQuickCreate', () => {
     expect((Date.parse(input.end_at) - Date.parse(input.start_at)) / 60000).toBe(45);
   });
 
+  it('統計待ちでも別アクティビティの明示的な作成は保持する', async () => {
+    statsPending.value = true;
+    let release!: (value: number) => void;
+    resolveMedianMinutes.mockReturnValue(
+      new Promise<number>((resolve) => {
+        release = resolve;
+      }),
+    );
+    const { result } = renderHook(() => useActivityQuickCreate());
+    result.current({ activityId: 'activity-1', activityName: '開発' });
+    result.current({ activityId: 'activity-2', activityName: '読書' });
+    expect(createPlanMutate).not.toHaveBeenCalled();
+    release(45);
+    await Promise.resolve();
+    expect(createPlanMutate).toHaveBeenCalledTimes(2);
+    expect(createPlanMutate.mock.calls.map(([input]) => input.activityId)).toEqual([
+      'activity-1',
+      'activity-2',
+    ]);
+  });
+
   it('取得後も中央値が無ければ設定値へフォールバックする', async () => {
     statsPending.value = true;
     resolveMedianMinutes.mockResolvedValue(null);
