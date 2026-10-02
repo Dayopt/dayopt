@@ -1,7 +1,5 @@
 import type { ReactNode } from 'react';
 
-import '../../styles/fonts/japanese-content.css';
-import '../../styles/fonts/japanese-full.css';
 import './ContentTypography.css';
 
 // 現在の本文は subset、その他の文字は同じ書体の full face で補う。
